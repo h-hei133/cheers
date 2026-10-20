@@ -7,6 +7,11 @@ import { CATALOG_LIMITS, type SessionCatalogSnapshot, type SessionReferenceQuery
 import { decodeSessionSummary } from './projection.js';
 import { resolveCatalogReference } from './reference.js';
 
+export interface SessionCatalogDiagnostic {
+  readonly unreadableSessionIds: readonly string[];
+  readonly unreadableDirectories: readonly string[];
+}
+
 /** Bounded, process-local listing index; every use checks the actual core-file version. */
 export class SessionCatalog {
   private readonly cache = new Map<string, SessionSummary>();
@@ -18,13 +23,31 @@ export class SessionCatalog {
   }
 
   async *list(context: SessionSelectionContext, signal?: AbortSignal, limit = 40,
-    onSource?: (target: string) => void): AsyncGenerator<SessionCatalogSnapshot> {
+    onSource?: (target: string) => void,
+    onUnreadable?: (diagnostic: SessionCatalogDiagnostic) => void): AsyncGenerator<SessionCatalogSnapshot> {
     signal?.throwIfAborted();
     if (!Number.isInteger(limit) || limit < 1 || limit > 10_000) throw new RangeError('Invalid session listing limit.');
     let scanned = 0;
     let unreadable = 0;
     let limited = 0;
     let recent: readonly SessionSummary[] = [];
+    const unreadableSessionIds = new Set<string>();
+    const unreadableDirectories = new Set<string>();
+    let diagnosed = false;
+    const diagnose = (): void => {
+      if (diagnosed) return;
+      diagnosed = true;
+      if (signal?.aborted) return;
+      if (unreadableSessionIds.size === 0 && unreadableDirectories.size === 0) return;
+      try {
+        onUnreadable?.({
+          unreadableSessionIds: [...unreadableSessionIds],
+          unreadableDirectories: [...unreadableDirectories],
+        });
+      } catch {
+        // Diagnostics are observational; they must not change catalog results.
+      }
+    };
     const read = async (id: string, directory?: string): Promise<SessionSummary | undefined> => {
       try {
         const summary = await this.read(id, signal, directory, onSource);
@@ -33,41 +56,51 @@ export class SessionCatalog {
       } catch {
         signal?.throwIfAborted();
         unreadable++;
+        // The active session can still be completing its first write when the
+        // post-frame hint scan starts. Its failure is not a historical entry
+        // the user needs to repair, and the current projection already reports
+        // it separately.
+        if (id !== context.sessionId) unreadableSessionIds.add(id);
         return undefined;
       }
     };
-    const current = await read(context.sessionId);
-    if (current) { recent = [current]; this.remember([current]); }
-    const snapshot = (status: SessionCatalogSnapshot['status']): SessionCatalogSnapshot => ({
-      ...sessionChoices(recent, context, limit), scanned, unreadable, limited, status,
-    });
-    // The runtime identity is available before historical discovery starts.
-    yield snapshot('scanning');
-    for await (const page of discoverSessions(this.layout, signal, onSource)) {
-      unreadable += page.unreadable;
-      const ids = page.ids.filter(id => id !== context.sessionId);
-      const loaded: SessionSummary[] = [];
-      let next = 0;
-      const worker = async (): Promise<void> => {
-        while (next < ids.length) {
-          signal?.throwIfAborted();
-          const summary = await read(ids[next++]!, page.directory);
-          if (summary) loaded.push(summary);
-        }
-      };
-      const settled = await Promise.allSettled(Array.from({ length: Math.min(CATALOG_LIMITS.concurrency, ids.length) }, worker));
-      signal?.throwIfAborted();
-      const failure = settled.find(result => result.status === 'rejected');
-      if (failure?.status === 'rejected') throw failure.reason;
-      const choices = sessionChoices([...recent, ...loaded], context, limit);
-      recent = choices.sessions;
-      // Retain even an out-of-scope/empty current record solely for its explanation.
-      if (current && !recent.some(item => item.id === current.id)) recent = [...recent, current];
+    try {
+      const current = context.sessionId ? await read(context.sessionId) : undefined;
+      if (current) { recent = [current]; this.remember([current]); }
+      const snapshot = (status: SessionCatalogSnapshot['status']): SessionCatalogSnapshot => ({
+        ...sessionChoices(recent, context, limit), scanned, unreadable, limited, status,
+      });
+      // The runtime identity is available before historical discovery starts.
       yield snapshot('scanning');
+      for await (const page of discoverSessions(this.layout, signal, onSource)) {
+        if (page.unreadable > 0) unreadableDirectories.add(page.directory);
+        unreadable += page.unreadable;
+        const ids = page.ids.filter(id => id !== context.sessionId);
+        const loaded: SessionSummary[] = [];
+        let next = 0;
+        const worker = async (): Promise<void> => {
+          while (next < ids.length) {
+            signal?.throwIfAborted();
+            const summary = await read(ids[next++]!, page.directory);
+            if (summary) loaded.push(summary);
+          }
+        };
+        const settled = await Promise.allSettled(Array.from({ length: Math.min(CATALOG_LIMITS.concurrency, ids.length) }, worker));
+        signal?.throwIfAborted();
+        const failure = settled.find(result => result.status === 'rejected');
+        if (failure?.status === 'rejected') throw failure.reason;
+        const choices = sessionChoices([...recent, ...loaded], context, limit);
+        recent = choices.sessions;
+        // Retain even an out-of-scope/empty current record solely for its explanation.
+        if (current && !recent.some(item => item.id === current.id)) recent = [...recent, current];
+        yield snapshot('scanning');
+      }
+      signal?.throwIfAborted();
+      this.remember(sessionChoices(recent, context, limit).sessions);
+      yield snapshot(unreadable || limited ? 'partial' : 'complete');
+    } finally {
+      diagnose();
     }
-    signal?.throwIfAborted();
-    this.remember(sessionChoices(recent, context, limit).sessions);
-    yield snapshot(unreadable || limited ? 'partial' : 'complete');
   }
 
   private remember(sessions: readonly SessionSummary[]): void {

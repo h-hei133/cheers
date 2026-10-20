@@ -62,6 +62,7 @@ export function commitOperation(prepared: PreparedOperation, options: { readonly
       const now = new Date().toISOString();
       receipt = allocateOperation({ ...prepared.scope, schemaVersion: 1, operationId: prepared.operationId,
         callId: prepared.identity.callId, correlationId: prepared.identity.correlationId,
+        ...(prepared.identity.selection ? { selection: prepared.identity.selection } : {}),
         revision: 1, status: 'intent', undo: 'none', files: prepared.files.map(file => file.receipt), createdAt: now, updatedAt: now });
       const files = [...receipt.files];
       const written = new Map<number, FileState>();

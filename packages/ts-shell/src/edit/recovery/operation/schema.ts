@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { normalizeWorkspaceRelativePath } from '../recoveryAuthorityStore.js';
 import { contentHashPattern, safeRecoveryId } from '../record.js';
-import type { ContentVersion, OperationFile, OperationReceipt, OperationScope, WorkspaceIdentity } from './model.js';
+import type { ContentVersion, OperationFile, OperationReceipt, OperationScope, OperationSelection, WorkspaceIdentity } from './model.js';
 
 function object(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -16,6 +16,19 @@ function identity(value: unknown): value is WorkspaceIdentity {
 function version(value: unknown): value is ContentVersion {
   return object(value) && (value.state === 'absent' || (value.state === 'exists' && typeof value.hash === 'string' && contentHashPattern.test(value.hash)
     && (value.mode === undefined || (Number.isInteger(value.mode) && (value.mode as number) >= 0 && (value.mode as number) <= 0o777))));
+}
+
+function selection(value: unknown): value is OperationSelection {
+  if (!object(value) || typeof value.fullRevision !== 'string' || !contentHashPattern.test(value.fullRevision)
+    || typeof value.selectedRevision !== 'string' || !contentHashPattern.test(value.selectedRevision)
+    || !Array.isArray(value.selectedGroupIds) || !Array.isArray(value.skippedGroupIds)
+    || value.selectedGroupIds.length > 256 || value.skippedGroupIds.length > 256
+    || value.selectedGroupIds.some(id => typeof id !== 'string' || !safeRecoveryId(id))
+    || value.skippedGroupIds.some(id => typeof id !== 'string' || !safeRecoveryId(id))) return false;
+  const selected = new Set(value.selectedGroupIds);
+  return selected.size === value.selectedGroupIds.length
+    && new Set(value.skippedGroupIds).size === value.skippedGroupIds.length
+    && value.skippedGroupIds.every(id => !selected.has(id));
 }
 
 function file(value: unknown): value is OperationFile {
@@ -39,6 +52,7 @@ export function decodeOperation(value: unknown, scope: OperationScope): Operatio
     || JSON.stringify(value.profile) !== JSON.stringify(scope.profile)
     || typeof value.callId !== 'string' || !value.callId || value.callId.length > 512
     || (value.correlationId !== undefined && typeof value.correlationId !== 'string')
+    || (value.selection !== undefined && !selection(value.selection))
     || !Number.isSafeInteger(value.sequence) || (value.sequence as number) < 1
     || !Number.isSafeInteger(value.revision) || (value.revision as number) < 1
     || !['intent', 'committed', 'compensating', 'restored', 'failed', 'partial', 'unknown'].includes(value.status as string)

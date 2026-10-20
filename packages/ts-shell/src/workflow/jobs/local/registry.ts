@@ -8,8 +8,11 @@ import type { BackgroundInput, BackgroundRunner, BackgroundTask, LocalJournalPor
 import { taskSnapshot } from './snapshot.js';
 import { closeOutput } from './settlement.js';
 
+const PENDING_OUTPUT_LIMIT = 65536;
+
 interface Operation { readonly controller: AbortController; readonly sink: OutputSink; readonly stdout: StringDecoder;
-  readonly stderr: StringDecoder; settlement: Promise<void>; readonly handle?: LocalExecutionHandle; readonly input?: BackgroundInput; readonly adopted?: boolean; watch?: ReturnType<typeof setInterval>; }
+  readonly stderr: StringDecoder; readonly pendingOutput: Buffer[]; pendingBytes: number; pendingTruncated: boolean;
+  settlement: Promise<void>; readonly handle?: LocalExecutionHandle; readonly input?: BackgroundInput; readonly adopted?: boolean; watch?: ReturnType<typeof setInterval>; }
 
 /** Live handles belong to this owner; restart never signals a numeric PID from a journal. */
 export class TaskRegistry implements BackgroundRunner {
@@ -47,9 +50,15 @@ export class TaskRegistry implements BackgroundRunner {
     const id = randomUUID();
     const task: BackgroundTask = { id, command: input.command, cwd: input.cwd, pid: handle.pid, startedAt: Date.now(), state: 'running', output: '' };
     this.tasks.set(id, task);
+    let resolveSettlement!: () => void;
+    let rejectSettlement!: (reason?: unknown) => void;
+    const settlement = new Promise<void>((resolve, reject) => {
+      resolveSettlement = resolve;
+      rejectSettlement = reject;
+    });
     const operation: Operation = { controller: new AbortController(), sink: createOutputSink({ limitBytes: 65536, label: id,
       ...(!this.journal && this.spillDirectory ? { spillDirectory: this.spillDirectory } : {}) }), stdout: new StringDecoder('utf8'), stderr: new StringDecoder('utf8'),
-      settlement: Promise.resolve(), handle, input, adopted: true };
+      pendingOutput: [], pendingBytes: 0, pendingTruncated: false, settlement, handle, input, adopted: true };
     this.operations.set(id, operation);
     let resolvePromotion!: (outcome: 'promoted' | 'settled' | 'refused') => void;
     const promotion = new Promise<'promoted' | 'settled' | 'refused'>(resolve => { resolvePromotion = resolve; });
@@ -60,11 +69,23 @@ export class TaskRegistry implements BackgroundRunner {
       if (operation.watch) { clearInterval(operation.watch); operation.watch = undefined; }
       // Publication must finish while the promotion marker is still set; the
       // cleanup below is what makes the task invisible to `hasLive`.
-      await this.finish(id, result);
+      let failure: unknown;
+      try {
+        await this.finish(id, result);
+      } catch (error) {
+        failure = error;
+        this.tasks.set(id, {
+          ...this.tasks.get(id)!,
+          state: 'unknown',
+          failure: 'Native cleanup or durable publication remains unverified.',
+        });
+      }
       this.settlePromotion(id, 'settled');
       this.operations.delete(id);
       if (!this.promoted.has(id)) this.tasks.delete(id);
       this.promoted.delete(id);
+      if (failure) rejectSettlement(failure);
+      else resolveSettlement();
     };
     handle.result.then(() => void settle({ status: 'completed', exitCode: 0 })).catch((error: unknown) => {
       const failure = error as { cancelled?: boolean; timedOut?: boolean; code?: number | string | null; terminationFailed?: boolean; outputFailed?: boolean };
@@ -84,6 +105,14 @@ export class TaskRegistry implements BackgroundRunner {
       if (!this.journal) return 'refused';
       try {
         this.journal.promote(id, operation.input, task.pid);
+        // Output may arrive while the child is still a foreground wait. Publish
+        // that prefix before marking the task promoted so restart and notices
+        // see the same stream the live sink already showed.
+        for (const chunk of operation.pendingOutput) this.journal.output(id, 'stdout', chunk);
+        if (operation.pendingTruncated) this.journal.truncate(id, 'stdout');
+        operation.pendingOutput.length = 0;
+        operation.pendingBytes = 0;
+        operation.pendingTruncated = false;
         this.promoted.add(id);
         // A promoted foreground child is admitted exactly like a launched job:
         // revoking the grant kills the same PID, not a copy of it.
@@ -93,6 +122,7 @@ export class TaskRegistry implements BackgroundRunner {
       } catch {
         // Capacity or journal refusal: the provisional task must not keep a live
         // child that nothing can address, so it is killed here.
+        try { this.journal?.unverified(id); } catch { /* The original fence remains authoritative. */ }
         void operation.handle.kill();
         return 'refused';
       }
@@ -130,7 +160,7 @@ export class TaskRegistry implements BackgroundRunner {
     this.tasks.set(id, task);
     const operation: Operation = { controller: new AbortController(), sink: createOutputSink({ limitBytes: 65536, label: id,
       ...(!this.journal && this.spillDirectory ? { spillDirectory: this.spillDirectory } : {}) }), stdout: new StringDecoder('utf8'), stderr: new StringDecoder('utf8'),
-      settlement: Promise.resolve() };
+      pendingOutput: [], pendingBytes: 0, pendingTruncated: false, settlement: Promise.resolve() };
     this.operations.set(id, operation);
     // The durable replay fence is established before calling the native execution owner.
     try { this.journal?.arm(id); }
@@ -170,11 +200,26 @@ export class TaskRegistry implements BackgroundRunner {
   }
   private appendAdopted(id: string, text: string): void {
     const operation = this.operations.get(id); if (!operation) return;
-    if (this.promoted.has(id)) this.journal?.output(id, 'stdout', Buffer.from(text));
+    const bytes = Buffer.from(text);
+    if (this.promoted.has(id)) this.journal?.output(id, 'stdout', bytes);
+    else {
+      const remaining = PENDING_OUTPUT_LIMIT - operation.pendingBytes;
+      if (remaining > 0) {
+        const prefix = utf8Prefix(bytes, remaining);
+        if (prefix.length > 0) {
+          operation.pendingOutput.push(prefix);
+          operation.pendingBytes += prefix.length;
+        }
+        if (prefix.length < bytes.length) operation.pendingTruncated = true;
+      } else {
+        operation.pendingTruncated = true;
+      }
+    }
     void operation.sink.append(text);
     this.tasks.set(id, { ...this.tasks.get(id)!, output: operation.sink.tail, outputTruncated: operation.sink.truncated,
       get outputPath() { return operation.sink.spillPath; } });
   }
+
   private append(id: string, stream: 'stdout' | 'stderr', bytes: Buffer): void | Promise<void> {
     const operation = this.operations.get(id)!;
     this.journal?.output(id, stream, bytes);
@@ -195,7 +240,12 @@ export class TaskRegistry implements BackgroundRunner {
     // A foreground-adopted task is journaled only after promotion; an ordinary
     // launched task is journaled from the start.
     if (!operation.adopted || this.promoted.has(id)) {
-      try { this.journal?.finish(id, result); } catch { publicationFailed = true; }
+      try { this.journal?.finish(id, result); } catch {
+        publicationFailed = true;
+        // A live task cannot be the only record of a settled child. Keep the
+        // durable row unknown rather than leaving it looking runnable forever.
+        try { this.journal?.unverified(id); } catch { /* The original tombstone remains. */ }
+      }
     }
     const task: BackgroundTask = { ...this.tasks.get(id)!, state: publicationFailed || result.terminationFailed ? 'unknown'
       : result.status === 'cancelled' ? 'killed' : 'exited', exitCode: result.exitCode ?? undefined,
@@ -204,7 +254,9 @@ export class TaskRegistry implements BackgroundRunner {
       ...(result.spawnErrorCode ? { failure: `${result.spawnErrorCode}: Local command could not start.` } : {}),
       ...(publicationFailed || result.terminationFailed ? { failure: 'Native cleanup or durable publication remains unverified.' } : {}) };
     this.retain(task);
-    for (const listener of this.listeners) { try { listener(this.get(id) ?? task); } catch { /* Observer failure cannot alter native evidence. */ } }
+    if (!operation.adopted || this.promoted.has(id)) {
+      for (const listener of this.listeners) { try { listener(this.get(id) ?? task); } catch { /* Observer failure cannot alter native evidence. */ } }
+    }
   }
   private retain(task: BackgroundTask): void {
     this.tasks.delete(task.id); this.tasks.set(task.id, task);
@@ -212,4 +264,12 @@ export class TaskRegistry implements BackgroundRunner {
     let excess = [...this.tasks.values()].filter(value => !this.operations.has(value.id) || value.id === task.id).length - 100;
     for (const [id] of this.tasks) { if (excess <= 0) break; if (!this.operations.has(id) || id === task.id) { this.tasks.delete(id); excess--; } }
   }
+}
+
+/** Keep a prefix that ends on a complete UTF-8 code point. */
+function utf8Prefix(bytes: Buffer, maxBytes: number): Buffer {
+  if (bytes.length <= maxBytes) return bytes;
+  let end = Math.max(0, maxBytes);
+  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end--;
+  return bytes.subarray(0, end);
 }

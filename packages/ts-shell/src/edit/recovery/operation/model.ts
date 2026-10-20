@@ -16,6 +16,13 @@ export type ContentVersion = { readonly state: 'absent' } | { readonly state: 'e
 export type OperationStatus = 'intent' | 'committed' | 'compensating' | 'restored' | 'failed' | 'partial' | 'unknown';
 export type UndoStatus = 'none' | 'intent' | 'restored-verified' | 'partial' | 'unknown';
 
+export interface OperationSelection {
+  readonly fullRevision: string;
+  readonly selectedRevision: string;
+  readonly selectedGroupIds: readonly string[];
+  readonly skippedGroupIds: readonly string[];
+}
+
 export interface OperationFile {
   readonly id: string;
   readonly workspace: WorkspaceIdentity;
@@ -40,6 +47,7 @@ export interface OperationReceipt extends OperationScope {
   readonly revision: number;
   readonly status: OperationStatus;
   readonly undo: UndoStatus;
+  readonly selection?: OperationSelection;
   readonly files: readonly OperationFile[];
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -50,6 +58,7 @@ export interface EditOperationIdentity {
   readonly workspaceRoot: string;
   readonly callId: string;
   readonly correlationId?: string;
+  readonly selection?: OperationSelection;
 }
 
 export interface PreparedFile {

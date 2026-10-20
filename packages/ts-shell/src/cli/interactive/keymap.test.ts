@@ -4,12 +4,15 @@ import { describe, expect, it, vi } from "vitest";
 import { routeKey, type KeymapActions } from "./keymap.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { parseKeyEvent } from "../../presentation/tui/input/keys.js";
+import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
 import { KEY_BINDINGS } from "../../presentation/tui/chrome/keys.js";
 import { dispatchedKeyIds } from "./keymap.js";
 import { Keybindings } from "./keybindings.js";
 
 function build(busy = false, interruptible = false, vimMode = false): {
   press: (data: string) => void;
+  feed: (data: string) => void;
+  flushInput: () => void;
   surface: InteractiveSurface;
   actions: { [K in keyof KeymapActions]: ReturnType<typeof vi.fn> };
   clock: { now: number };
@@ -46,21 +49,25 @@ function build(busy = false, interruptible = false, vimMode = false): {
   };
   const clock = { now: 0 };
   const gesture: { lastCancelAt?: number } = {};
+  const context = {
+    view: surface,
+    actions: actions as unknown as KeymapActions,
+    busy,
+    interruptible,
+    now: () => clock.now,
+    gesture,
+    keybindings: new Keybindings(),
+    vimMode,
+  };
+  const input = new StdinBuffer({ setTimer: () => undefined, clearTimer: () => undefined });
+  input.onKey((event) => routeKey(event, context));
   return {
     surface,
     actions,
     clock,
-    press: (data: string) =>
-      routeKey(parseKeyEvent(data), {
-        view: surface,
-        actions: actions as unknown as KeymapActions,
-        busy,
-        interruptible,
-        now: () => clock.now,
-        gesture,
-        keybindings: new Keybindings(),
-        vimMode,
-      }),
+    press: (data: string) => routeKey(parseKeyEvent(data), context),
+    feed: (data: string) => input.feed(data),
+    flushInput: () => input.flush(),
   };
 }
 describe("scrolling", () => {
@@ -323,6 +330,54 @@ describe("vim mode", () => {
     press("i");
     press("a");
     expect(surface.editor.getText()).toBe("abc");
+  });
+
+  it("matches a multi-codepoint grapheme after f through the real input buffer", () => {
+    const { press, feed, flushInput, surface } = build(false, false, true);
+    const family = "👨‍👩‍👧‍👦";
+    surface.editor.setText(`a${family}b`);
+    surface.editor.move("doc-start");
+    press("\x1b");
+    feed(`f${family}`);
+    flushInput();
+    expect(surface.editor.snapshot().cursor).toBe(1);
+  });
+
+  it("matches a multi-codepoint grapheme when input chunks split it", () => {
+    const { press, feed, flushInput, surface } = build(false, false, true);
+    const family = "👨‍👩‍👧‍👦";
+    surface.editor.setText(`a${family}b`);
+    surface.editor.move("doc-start");
+    press("\x1b");
+    feed("f");
+    feed("👨");
+    feed("\u200d");
+    feed("👩‍👧‍👦");
+    flushInput();
+    expect(surface.editor.snapshot().cursor).toBe(1);
+  });
+
+  it("matches a punctuation-led keycap grapheme after f through the real input buffer", () => {
+    const { press, feed, flushInput, surface } = build(false, false, true);
+    const keycap = "*️⃣";
+    surface.editor.setText(`a${keycap}b`);
+    surface.editor.move("doc-start");
+    press("\x1b");
+    feed(`f${keycap}`);
+    flushInput();
+    expect(surface.editor.snapshot().cursor).toBe(1);
+  });
+
+  it("keeps vertical movement on a grapheme boundary through the editor", () => {
+    const { press, surface } = build(false, false, true);
+    surface.editor.setText("xxx\na🙂");
+    surface.editor.move("doc-start");
+    surface.editor.move("right");
+    surface.editor.move("right");
+    press("\x1b");
+    press("l");
+    press("j");
+    expect(surface.editor.snapshot().cursor).toBe(5);
   });
 });
 

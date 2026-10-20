@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { StringDecoder } from 'node:string_decoder'
 import { killProcessTree, trackChildPid, untrackChildPid } from '../../core/shell/platform/processTree.js'
 import type { ExecutionInput, LocalExecutionHandle, NormalizedExecutionResult } from './types.js'
 import { OutputConsumer } from './stream.js'
@@ -75,15 +76,34 @@ export function startStreamed(options: StreamOptions): { handle: LocalExecutionH
     let nativeClosed = false
     let termination: Promise<void> | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
+    const stdoutDecoder = new StringDecoder('utf8')
+    const stderrDecoder = new StringDecoder('utf8')
+    let decodersFlushed = false
     const consumers = new OutputConsumer()
     // A detached terminal child keeps tree cleanup but is outside the terminal's
     // foreground group. Forward resize while this owner still holds that child.
     const resize = (): void => { if (!nativeClosed && !settled) child.kill('SIGWINCH') }
     if (options.inheritTerminal && process.platform !== 'win32') process.on('SIGWINCH', resize)
+    const flushDecoded = (): void => {
+      if (decodersFlushed) return
+      decodersFlushed = true
+      const stdoutTail = stdoutDecoder.end()
+      const stderrTail = stderrDecoder.end()
+      if (stdoutTail) {
+        if (options.captureOutput !== false) stdout += stdoutTail
+        options.onOutput(stdoutTail)
+        for (const listener of listeners) listener(stdoutTail)
+      }
+      if (stderrTail) {
+        if (options.captureOutput !== false) stderr += stderrTail
+        options.onOutput(stderrTail)
+      }
+    }
     const finish = (): void => {
       clearTimeout(timer)
       options.abortSignal?.removeEventListener('abort', onAbort)
       process.off('SIGWINCH', resize)
+      flushDecoded()
     }
     const fail = (message: string, details: Record<string, unknown> = {}): void => {
       if (settled) return
@@ -131,13 +151,13 @@ export function startStreamed(options: StreamOptions): { handle: LocalExecutionH
       else options.abortSignal.addEventListener('abort', onAbort, { once: true })
     }
     child.stdout?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString()
+      const text = stdoutDecoder.write(chunk)
       if (options.captureOutput !== false) stdout += text
       consumers.consume([child.stdout, child.stderr], () => { options.onOutput(text); for (const listener of listeners) listener(text); return options.onStdout?.(chunk); },
         () => { streamFailed = true; stop(true) })
     })
     child.stderr?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString()
+      const text = stderrDecoder.write(chunk)
       if (options.captureOutput !== false) stderr += text
       consumers.consume([child.stdout, child.stderr], () => { options.onOutput(text); return options.onStderr?.(chunk); },
         () => { streamFailed = true; stop(true) })

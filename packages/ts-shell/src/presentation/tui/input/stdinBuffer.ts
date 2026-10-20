@@ -1,7 +1,8 @@
-import { ESC, ESCAPE_INCOMPLETE, ESCAPE_OVERLONG, resolveEscapeEnd, scalarLength } from "./escape.js";
+import { ESC, ESCAPE_INCOMPLETE, ESCAPE_OVERLONG, resolveEscapeEnd } from "./escape.js";
 import { parseKeyEvent, type ParsedKeyEvent } from "./keys.js";
 import { isMouseSequence, parseMouseReport, type MouseReport } from "./mouse.js";
 import { AppearanceReports } from "./appearance.js";
+import { firstClusterLength } from "../text/measure.js";
 
 /**
  * Raw stdin reassembler.
@@ -19,6 +20,8 @@ const BRACKETED_PASTE_END = "\x1b[201~";
 
 /** How long a dangling partial sequence is held before it is treated as typed. */
 const PARTIAL_HOLD_MS = 40;
+/** How long a possibly extendable text cluster waits for its continuation. */
+const CLUSTER_HOLD_MS = 8;
 /** How long an unterminated paste block is held before it is released as text. */
 const PASTE_HOLD_MS = 1000;
 
@@ -29,6 +32,7 @@ export type MouseListener = (report: MouseReport) => void;
 export interface StdinBufferOptions {
   readonly onAppearance?: (appearance: "dark" | "light") => void;
   readonly partialHoldMs?: number;
+  readonly clusterHoldMs?: number;
   readonly pasteHoldMs?: number;
   readonly setTimer?: (callback: () => void, delayMs: number) => unknown;
   readonly clearTimer?: (handle: unknown) => void;
@@ -42,11 +46,13 @@ export class StdinBuffer {
   private pasteBuffer = "";
   private partialTimer: unknown;
   private pasteTimer: unknown;
+  private holdingCluster = false;
 
   private readonly keyListeners = new Set<KeyListener>();
   private readonly pasteListeners = new Set<PasteListener>();
   private readonly mouseListeners = new Set<MouseListener>();
   private readonly partialHoldMs: number;
+  private readonly clusterHoldMs: number;
   private readonly pasteHoldMs: number;
   private readonly setTimer: (callback: () => void, delayMs: number) => unknown;
   private readonly clearTimer: (handle: unknown) => void;
@@ -54,6 +60,7 @@ export class StdinBuffer {
   constructor(options: StdinBufferOptions = {}) {
     this.appearance = new AppearanceReports(options.onAppearance);
     this.partialHoldMs = options.partialHoldMs ?? PARTIAL_HOLD_MS;
+    this.clusterHoldMs = options.clusterHoldMs ?? CLUSTER_HOLD_MS;
     this.pasteHoldMs = options.pasteHoldMs ?? PASTE_HOLD_MS;
     this.setTimer = options.setTimer ?? ((callback, delayMs) => setTimeout(callback, delayMs));
     this.clearTimer = options.clearTimer ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
@@ -81,7 +88,10 @@ export class StdinBuffer {
     this.buffer += chunk;
     this.drain();
     if (this.buffer.length > 0 && !this.pasting) {
-      this.partialTimer = this.setTimer(() => this.releasePartial(), this.partialHoldMs);
+      this.partialTimer = this.setTimer(
+        () => this.releasePartial(),
+        this.holdingCluster ? this.clusterHoldMs : this.partialHoldMs,
+      );
     }
   }
 
@@ -108,6 +118,7 @@ export class StdinBuffer {
 
   /** Consume every sequence the buffer can complete, leaving any partial behind. */
   private drain(): void {
+    this.holdingCluster = false;
     while (!this.disposed && this.buffer.length > 0) {
       if (this.pasting) {
         if (!this.consumePaste()) return;
@@ -128,7 +139,12 @@ export class StdinBuffer {
         if (this.buffer.startsWith("\r\n")) {
           this.buffer = `\r${this.buffer.slice(2)}`;
         }
-        this.take(scalarLength(this.buffer, 0));
+        const length = firstClusterLength(this.buffer);
+        if (length === this.buffer.length && canExtendCluster(this.buffer)) {
+          this.holdingCluster = true;
+          return;
+        }
+        this.take(length);
         continue;
       }
       // `ESC ESC` is a meta-Escape chord; take the first ESC alone so the
@@ -196,6 +212,7 @@ export class StdinBuffer {
    */
   private releasePartial(): void {
     this.partialTimer = undefined;
+    this.holdingCluster = false;
     // No timer or unbounded payload remains, and late fragments still belong
     // to this report. In particular, OSC's terminating BEL is never ctrl+g.
     if (this.appearance.holds(this.buffer)) return;
@@ -205,7 +222,7 @@ export class StdinBuffer {
         const end = resolveEscapeEnd(this.buffer, 0);
         this.take(end > 0 ? end : this.buffer.length);
       } else {
-        this.take(scalarLength(this.buffer, 0));
+        this.take(firstClusterLength(this.buffer));
       }
       if (this.buffer.length === before) return;
     }
@@ -226,4 +243,10 @@ export class StdinBuffer {
     if (!event.keyId) return;
     for (const listener of this.keyListeners) listener(event);
   }
+}
+
+function canExtendCluster(cluster: string): boolean {
+  const first = cluster.codePointAt(0) ?? 0;
+  if (first < 0x20 || first === 0x7f) return false;
+  return first !== 0x85 && first !== 0x2028 && first !== 0x2029;
 }

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { StringDecoder } from "node:string_decoder";
 import { drainInput } from "./input/drain.js";
 import { QUERY_APPEARANCE, STOP_APPEARANCE } from "./input/appearance.js";
 import { KeyboardNegotiation, type KeyboardProtocol } from "./input/keyboardProtocol.js";
@@ -88,6 +89,7 @@ export class Terminal implements TerminalDevice {
   private keyboardTimer: NodeJS.Timeout | undefined;
   private deferredInput: string[] = [];
   private inputReady?: () => void;
+  private decoder = new StringDecoder("utf8");
 
   private onInput: InputHandler = () => {};
   private onResize: ResizeHandler = () => {};
@@ -95,7 +97,15 @@ export class Terminal implements TerminalDevice {
 
   private readonly handleData = (chunk: Buffer | string): void => {
     if (this.draining) return;
-    let text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    let text: string;
+    if (typeof chunk === "string") {
+      const tail = this.decoder.end();
+      this.decoder = new StringDecoder("utf8");
+      text = tail + chunk;
+    } else {
+      text = this.decoder.write(chunk);
+    }
+    if (text.length === 0) return;
     if (this.keyboard.pending) {
       const step = this.keyboard.consume(text);
       if (step.write) this.write(step.write);
@@ -156,6 +166,7 @@ export class Terminal implements TerminalDevice {
     this.started = true;
     this.draining = false;
     this.keyboard = new KeyboardNegotiation();
+    this.decoder = new StringDecoder("utf8");
     // However the process leaves — clean exit, crash, or a signal — the terminal
     // must not be left in raw mode with the cursor hidden and autowrap off.
     process.once("exit", this.handleExit);

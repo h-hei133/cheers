@@ -14,7 +14,16 @@ import { redactExportText } from "../core/security/redaction.js";
 import { validateToolArguments } from "../core/tools/arguments.js";
 import { workspaceToolBinding } from '../core/workspace/tools.js';
 import type { WorkspaceRoot } from '../core/workspace/model.js';
-import { authorizeToolCall, consumeToolCall, discardToolCall, preparedSelection, preparedToolCall, prepareToolCall, setPreparedSelection } from '../tools/preparation.js';
+import {
+  authorizeToolCall,
+  consumeToolCall,
+  discardToolCall,
+  preparedSelection,
+  preparedSelectionRevision,
+  preparedToolCall,
+  prepareToolCall,
+  setPreparedSelection,
+} from '../tools/preparation.js';
 import { preparationContext, preparationPermission } from './preparation.js';
 import { bindExecutionTarget, executionApprovalPreview } from '../runtime/execution/binding.js';
 import { assertSourceAccess } from '../core/query/sourcePolicy.js';
@@ -172,8 +181,10 @@ async function executeTool(
     toolScopePolicy(tool.name, args, options, preparedToolCall(args, options));
     const binding = workspaceToolBinding(tool.name, args, options.workspaceRoot, options.workspaceRoots);
     const selection = preparedSelection(args);
+    const selectionRevision = preparedSelectionRevision(args);
     const preparation = consumeToolCall(args, options, tool, toolCallId);
-    const execute = preparation ? (_args: Record<string, unknown>, context: import('../tools/types.js').ToolExecutionContext) => preparation.execute(context, selection)
+    const execute = preparation ? (_args: Record<string, unknown>, context: import('../tools/types.js').ToolExecutionContext) =>
+      preparation.execute(context, selection, selectionRevision ? { revision: selectionRevision } : undefined)
       : tool.execute.bind(tool);
     const result = await execute(binding.args, {
       workspaceRoot: binding.root,
@@ -430,6 +441,8 @@ async function askPermission(
   if (preparation) {
     prompt.context.preview = preparation.preview; prompt.context.previewKind = preparation.previewKind;
     if (preparation.selections) prompt.context.selections = preparation.selections;
+    if (preparation.selectionRevision) prompt.context.selectionRevision = preparation.selectionRevision;
+    if (preparation.selectionPreview) prompt.context.selectionPreview = preparation.selectionPreview;
   }
   else if (toolName === 'lsp' && args.backend !== 'scanner') {
     prompt.context.preview = executionApprovalPreview(args, args.server, options.workspaceRoot);
@@ -437,6 +450,12 @@ async function askPermission(
   }
   const response = await options.escalationPromptHandler(prompt);
   if (signal?.aborted) return { blocked: "Operation aborted" };
+  if (toolName === 'apply_patch' && response.decision === 'allow-always') {
+    options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "denied" });
+    return {
+      blocked: "Blocked: apply_patch requires an exact one-time selection; allow-always is not available for this tool.",
+    };
+  }
   if (response.decision === "deny") {
     options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "denied" });
     const feedback =
@@ -459,7 +478,21 @@ async function askPermission(
         : `Blocked: User denied permission for tool '${toolName}' (${evaluation.operation}) on '${evaluation.target}'.`,
     };
   }
-  if (response.selected) setPreparedSelection(args, response.selected);
+  if (response.selected) {
+    setPreparedSelection(args, response.selected, response.selectionRevision);
+  } else if (
+    preparation?.selections?.length === 1 &&
+    preparation.selectionRevision
+  ) {
+    // A one-group plan has no ambiguous subset to collect. Bind the exact
+    // preview revision anyway, so a non-interactive or scripted approval
+    // cannot execute without the same stale-read fence as a subset.
+    setPreparedSelection(
+      args,
+      [preparation.selections[0]!.id],
+      preparation.selectionRevision,
+    );
+  }
   options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "approved" });
   return { approved: { operation: evaluation.operation, decision: response.decision } };
 }

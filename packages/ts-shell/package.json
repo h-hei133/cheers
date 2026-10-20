@@ -9,7 +9,7 @@
     "src"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node ../../scripts/build-cli.mjs",
     "dev": "tsx watch src/entrypoints/cli.tsx",
     "start": "tsx src/entrypoints/cli.tsx",
     "test": "vitest run",

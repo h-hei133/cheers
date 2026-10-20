@@ -102,23 +102,11 @@ export function createCliBootstrapRuntimeContext(
       chunk: (text) => writeJsonEvent({ type: "cli.output", text }),
     });
   }
-  // What a bare `/resume` or `/continue` falls back to. Recovery eligibility is too
-  // narrow for that: a session that finished cleanly is exactly what someone means
-  // by "the one I was in".
-  const recoveryCandidate = !input.options.sessionId
-    ? sessionManager.getReentryCandidate({
-        preferredProjectRoot: input.rootContext.workspaceRoot,
-      })
-    : null;
-  const recoveryCandidateSummary = recoveryCandidate
-    ? sessionManager.describeSessionReentry(recoveryCandidate.id)
-    : null;
-  const recoveryBlockedNotice =
-    !input.options.sessionId && !recoveryCandidate
-      ? sessionManager.getRecoveryTrustBoundaryBlock({
-          preferredProjectRoot: input.rootContext.workspaceRoot,
-        })
-      : null;
+  // Recovery suggestions are discovered after the first frame. The interactive
+  // and print paths retain their explicit on-demand resolution semantics.
+  const recoveryCandidate = null;
+  const recoveryCandidateSummary = null;
+  const recoveryBlockedNotice = null;
   const bootstrap = (() => {
     try {
       return bootstrapShellRuntime({

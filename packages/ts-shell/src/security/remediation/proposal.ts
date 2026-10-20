@@ -25,8 +25,8 @@ export function remediationTool(proposal: Remediation, publish: (proposal: Remed
       if (args.input !== proposal.input || digest(proposal.input) !== proposal.digest || JSON.stringify(args.expectedHashes) !== JSON.stringify(proposal.expectedHashes)) throw new Error('Security patch proposal changed.');
       const prepared = patch.prepare!.call(patch, args, context);
       if (prepared.targets.length !== Object.keys(proposal.expectedHashes).length || prepared.targets.some(target => target.operation !== 'write' || !Object.hasOwn(proposal.expectedHashes, target.path))) throw new Error('Security patch targets exceed finding authorization.');
-      return { ...prepared, execute: async actual => {
-        const result = await prepared.execute(actual); const receipt = result.metadata;
+      return { ...prepared, execute: async (actual, selection, approval) => {
+        const result = await prepared.execute(actual, selection, approval); const receipt = result.metadata;
         const status = receipt?.status === 'committed' && typeof receipt.operationId === 'string' ? 'applied'
           : receipt?.status === 'partial' ? 'partial' : receipt?.status === 'unknown' ? 'unknown' : 'blocked';
         const next = { ...proposal, status: status as Remediation['status'], ...(typeof receipt?.operationId === 'string' ? { operationId: receipt.operationId } : {}) };

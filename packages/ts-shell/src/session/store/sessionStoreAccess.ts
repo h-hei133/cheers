@@ -24,7 +24,10 @@ import {
 } from "./sessionFileLayout.js";
 import { writeJsonFileAtomic } from "./sessionFileStore.js";
 import { SessionFiles } from './files.js';
-import { SessionCatalog } from './catalog/index.js';
+import {
+  SessionCatalog,
+  type SessionCatalogDiagnostic,
+} from './catalog/index.js';
 import {
   deleteSessionRecord,
   loadSessionRecord,
@@ -42,6 +45,10 @@ import {
   withSessionStateLock,
   writeSessionState,
 } from "./sessionStateStore.js";
+import {
+  formatListSessionsFailureWarning,
+  formatUnreadableSessionDirectoryWarning,
+} from "../presentation/sessionWarningSurface.js";
 
 export class SessionStoreAccess {
   readonly files: SessionFiles;
@@ -173,6 +180,35 @@ export class SessionStoreAccess {
     return sessions.sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
+  }
+
+  /** Report catalog failures through the same de-duplicated warning owner as listSessions. */
+  reportCatalogUnreadable(input: SessionCatalogDiagnostic): void {
+    const newlyUnreadable = input.unreadableSessionIds.filter(
+      (sessionId) => !this.listWarningState.warnedUnreadableSessionDirs.has(sessionId),
+    );
+    if (newlyUnreadable.length > 0) {
+      for (const sessionId of newlyUnreadable) {
+        this.listWarningState.warnedUnreadableSessionDirs.add(sessionId);
+      }
+      const warning = formatUnreadableSessionDirectoryWarning({
+        sessionDirs: newlyUnreadable,
+      });
+      if (warning) console.warn(warning);
+    }
+
+    if (
+      input.unreadableDirectories.length > 0 &&
+      !this.listWarningState.didWarnListSessionsFailure
+    ) {
+      this.listWarningState.didWarnListSessionsFailure = true;
+      console.warn(
+        formatListSessionsFailureWarning({
+          sessionsDir: input.unreadableDirectories[0]!,
+          error: new Error("session directory could not be opened"),
+        }),
+      );
+    }
   }
 
   getCurrentSessionForProject(projectRoot: string): Session | null {

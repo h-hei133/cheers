@@ -45,6 +45,7 @@ import {
 import {
   projectAndRenderCliStartupSurface,
 } from "./cliStartupSurface.js";
+import { loadRecoveryHint } from "./recoveryHint.js";
 import {
   runInteractiveLoop,
 } from "../interactive/interactiveLoop.js";
@@ -176,9 +177,11 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
   let isBusy: (() => boolean) | undefined;
   let requested: RestartRequest | SwitchTicket | undefined;
   const stopSurface = new AbortController();
+  const recoveryHintController = new AbortController();
   const shutdown = createCliShutdown({
     close: async () => {
       const results = await Promise.allSettled([
+        Promise.resolve().then(() => recoveryHintController.abort()),
         Promise.resolve().then(() => cancelRun?.()),
         closeMediaFor(runtimeContext), closeDirectorFor(runtimeContext), closeJobsFor(runtimeContext, Boolean(requested && 'kind' in requested)), closeSshFor(runtimeContext),
         closeCollaborationFor(runtimeContext), closeExtensionsFor(runtimeContext), closeTraceDashboard(), mcpGateway.close(),
@@ -245,6 +248,39 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       providerModeEnv: providerRuntimeBridge.providerModeEnv(),
     });
     time("startup surface prepared");
+    if (!options.sessionId && !options.printMode && !options.replayFile
+      && stdinPromptCapture.nonInteractivePrompts.length === 0) {
+      setImmediate(() => {
+        void loadRecoveryHint({
+          sessionManager,
+          preferredProjectRoot: runtimeContext.projectRoot,
+          currentSessionId: runtimeContext.session.id,
+          signal: recoveryHintController.signal,
+          generation: () => JSON.stringify({
+            sessionId: runtimeContext.session.id,
+            sessionCreatedAt: runtimeContext.session.createdAt,
+            projectRoot: runtimeContext.projectRoot,
+            configRevision: runtimeContext.configuration.current.revision,
+          }),
+        }).then((hint) => {
+          if (!hint || recoveryHintController.signal.aborted) return;
+          if (hint.candidate && hint.summary) {
+            renderer.renderLine(
+              `- Recovery hint: /resume or --session-id ${hint.candidate.id} (${hint.summary.resumeDisposition})`,
+            );
+          } else if (hint.blocked) {
+            renderer.renderLine(
+              `- Recovery boundary: ${hint.blocked.detail.slice(0, 180)}${hint.blocked.detail.length > 180 ? "..." : ""}`,
+            );
+          }
+        }).catch((error) => {
+          if (recoveryHintController.signal.aborted) return;
+          logger.warn("Recovery hint scan failed", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      });
+    }
     logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
     // Started and not waited on, so the first frame is never behind a network
     // call. Only for an interactive session: a scripted run has nobody to read a

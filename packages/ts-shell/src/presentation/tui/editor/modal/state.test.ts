@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { feedVim, initialVimState, type VimKey, type VimState } from "./state.js";
+import { feedVim, initialVimState, validCursor, type VimKey, type VimState } from "./state.js";
 
 const key = (value: string, text = value): VimKey => ({ key: value, text });
 
@@ -56,8 +56,35 @@ it("enters Insert at the four positions and opens lines", () => {
 });
 
 it("replaces characters in Replace mode and changes a whole line with S", () => {
-  expect(run("abc", 1, [key("R"), key("X")])).toMatchObject({ text: "aXc", state: { mode: "insert" } });
+  expect(run("abc", 1, [key("R"), key("X"), key("Y")])).toMatchObject({ text: "aXY", cursor: 3, state: { mode: "replace" } });
+  expect(run("abc", 1, [key("R"), key("X"), key("escape")])).toMatchObject({ text: "aXc", state: { mode: "normal" } });
   expect(run("one\ntwo", 0, [key("S")])).toMatchObject({ text: "\ntwo", state: { mode: "insert" } });
+});
+
+it("keeps counts across operators and text objects", () => {
+  expect(run("one\ntwo\nthree\nfour", 0, [key("3"), key("d"), key("d")]).text).toBe("four");
+  expect(run("one two three", 0, [key("d"), key("2"), key("i"), key("w")]).text).toBe(" three");
+  expect(run("abcdef", 0, [key("3"), key("r"), key("X")])).toMatchObject({ text: "XXXdef", cursor: 2 });
+});
+
+it("uses counts for find, line jumps and line yank", () => {
+  expect(run("a.b.c.d", 0, [key("2"), key("f"), key(".")])).toMatchObject({ cursor: 3 });
+  expect(run("a.b.c.d", 0, [key("2"), key("t"), key(".")])).toMatchObject({ cursor: 2 });
+  expect(run("🙂🙂x", 0, [key("t"), key("🙂")])).toMatchObject({ cursor: 0 });
+  expect(run("🙂🙂x", 0, [key("f"), key("🙂")])).toMatchObject({ cursor: 2 });
+  expect(run("a\nb\nc\nd", 0, [key("3"), key("G")])).toMatchObject({ cursor: 4 });
+  expect(run("a\nb\nc", 2, [key("1"), key("G")])).toMatchObject({ cursor: 0 });
+  expect(run("a\nb\nc", 0, [key("2"), key("Y"), key("p")]).text).toBe("a\na\nb\nb\nc");
+});
+
+it("does not replace a newline in Replace mode or miscount D/C", () => {
+  expect(run("ab\ncd", 1, [key("R"), key("X"), key("Y")])).toMatchObject({ text: "aXY\ncd", cursor: 3 });
+  expect(run("a\nb\nc\nd", 0, [key("2"), key("D")]).text).toBe("\nc\nd");
+  expect(run("a\nb\nc", 0, [key("2"), key("C")])).toMatchObject({ text: "\nc", state: { mode: "insert" } });
+});
+
+it("passes the count through operator G", () => {
+  expect(run("a\nb\nc\nd", 0, [key("d"), key("2"), key("G")]).text).toBe("c\nd");
 });
 
 it("moves by words and lines without crossing the buffer edges", () => {
@@ -67,4 +94,11 @@ it("moves by words and lines without crossing the buffer edges", () => {
   expect(run("a\nb", 0, [key("j")]).cursor).toBe(2);
   expect(run("a\nb", 2, [key("k")]).cursor).toBe(0);
   expect(run("abc", 0, [key("h")]).cursor).toBe(0);
+});
+
+it("keeps vertical motion on a grapheme boundary", () => {
+  const text = "xxx\na🙂";
+  const result = run(text, 2, [key("j")]);
+  expect(result.cursor).toBe(5);
+  expect(validCursor(text, result.cursor)).toBe(true);
 });

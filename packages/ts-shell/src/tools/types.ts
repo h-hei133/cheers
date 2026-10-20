@@ -88,5 +88,16 @@ export interface ToolPreparation {
    * selection; a host that cannot must not assume the whole plan was chosen.
    */
   readonly selections?: readonly { readonly id: string; readonly label: string; readonly files?: readonly string[] }[]
-  readonly execute: (context: ToolExecutionContext, selection?: readonly string[]) => Promise<ToolExecutionResult>
+  /** Exact full-plan revision shown before a host collects a subset. */
+  readonly selectionRevision?: string
+  /** Build the exact preview and revision for a host-collected group selection. */
+  readonly selectionPreview?: (selection: readonly string[]) => {
+    readonly preview: string;
+    readonly revision: string;
+  }
+  readonly execute: (
+    context: ToolExecutionContext,
+    selection?: readonly string[],
+    approval?: { readonly revision?: string },
+  ) => Promise<ToolExecutionResult>
 }

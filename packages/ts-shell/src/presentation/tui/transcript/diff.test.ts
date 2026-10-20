@@ -23,6 +23,13 @@ describe("unified diff", () => {
     expect(rows[1]).toContain("\x1b[7m2\x1b[27m");
   });
 
+  it("keeps emoji graphemes intact when adding emphasis", () => {
+    const rows = renderDiff("-a🙂x\n+a🙃x", WIDTH).map(stripAnsi);
+    expect(rows[0]).toContain("a🙂x");
+    expect(rows[1]).toContain("a🙃x");
+    for (const row of rows) expect(Buffer.from(row, "utf8").toString("utf8")).not.toContain("�");
+  });
+
   it("gives added and removed lines different colours", () => {
     const rows = renderDiff("-gone\n+kept", WIDTH);
     expect(rows[0]).not.toBe(rows[1]);
@@ -38,6 +45,14 @@ describe("unified diff", () => {
     for (const row of renderDiff("+" + "z".repeat(200), WIDTH)) {
       expect(visibleWidth(row)).toBeLessThanOrEqual(WIDTH);
     }
+  });
+
+  it("bounds unified rows and bytes independently", () => {
+    const long = "+x\n".repeat(1000);
+    expect(renderDiff(long, WIDTH, { maxRows: 21 })).toHaveLength(22);
+    expect(stripAnsi(renderDiff(long, WIDTH, { maxRows: 21 }).at(-1)!)).toContain("truncated");
+    const zeroWidth = "+" + "\u200b".repeat(70000);
+    expect(stripAnsi(renderDiff(zeroWidth, WIDTH, { maxBytes: 1024 }).at(-1)!)).toContain("truncated");
   });
 });
 

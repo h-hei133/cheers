@@ -32,7 +32,10 @@ const two = () => patch(update('a.txt', 'before-a', 'after-a'), update('b.txt', 
 
 const approveAll = async (prompt: Parameters<NonNullable<ToolGateOptions['escalationPromptHandler']>>[0]) =>
   ({ promptId: prompt.id, decision: 'allow-once' as const, respondedAt: Date.now(),
-    ...(prompt.context.selections?.length ? { selected: prompt.context.selections.map(selection => selection.id) } : {}) });
+    ...(prompt.context.selections?.length ? {
+      selected: prompt.context.selections.map(selection => selection.id),
+      ...(prompt.context.selectionRevision ? { selectionRevision: prompt.context.selectionRevision } : {}),
+    } : {}) });
 
 function setup(overrides: Partial<ToolGateOptions> = {}) {
   const options: ToolGateOptions = { workspaceRoot: workspace, sessionId: 'patch-session', permissionScope: 'ask', emit: () => undefined,
@@ -75,13 +78,160 @@ describe('recorded patch batches', () => {
     const prepared = tool.prepare!({ input: two() }, context) as import('../../tools/types.js').ToolPreparation;
     expect(prepared.selections).toHaveLength(2);
     const onlyA = prepared.selections!.find(selection => selection.label === 'Update a.txt (1 hunk)')!;
-    const result = await prepared.execute(context, [onlyA.id]);
+    const preview = prepared.selectionPreview!([onlyA.id]);
+    const result = await prepared.execute(context, [onlyA.id], { revision: preview.revision });
     expect(result.success).toBe(true);
     expect(fs.readFileSync(a, 'utf8')).toBe('after-a\n');
     expect(fs.readFileSync(b, 'utf8')).toBe('before-b\n');
     const receipts = readOperations(scope());
     expect(receipts).toHaveLength(1);
     expect(receipts[0]!.files).toHaveLength(1);
+    expect(receipts[0]!.selection).toMatchObject({
+      selectedGroupIds: [onlyA.id],
+      skippedGroupIds: [prepared.selections![1]!.id],
+    });
+  });
+
+  it('offers and applies one hunk from a same-file update', async () => {
+    fs.writeFileSync(a, 'before-a\nmiddle\nbefore-b\n');
+    const input = patch(
+      '*** Update File: a.txt',
+      '@@',
+      '-before-a',
+      '+after-a',
+      '@@',
+      '-before-b',
+      '+after-b',
+    );
+    const tool = createPatchToolDefinition();
+    const context = { workspaceRoot: workspace, sessionId: 'patch-session', taskId: 'hunk-selection-call' } as never;
+    const prepared = tool.prepare!({ input }, context) as import('../../tools/types.js').ToolPreparation;
+    expect(prepared.selections).toHaveLength(2);
+    expect(prepared.selections!.map(selection => selection.label)).toEqual([
+      'Update a.txt (hunk 1/2)',
+      'Update a.txt (hunk 2/2)',
+    ]);
+
+    const second = prepared.selections![1]!;
+    const preview = prepared.selectionPreview!([second.id]);
+    const result = await prepared.execute(context, [second.id], { revision: preview.revision });
+
+    expect(result.success).toBe(true);
+    expect(fs.readFileSync(a, 'utf8')).toBe('before-a\nmiddle\nafter-b\n');
+    const receipts = readOperations(scope());
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0]!.files).toHaveLength(1);
+    expect(receipts[0]!.selection?.selectedGroupIds).toEqual([second.id]);
+  });
+
+  it('merges a cursor-dependent hunk into one atomic group', async () => {
+    fs.writeFileSync(a, 'anchor\nsame\nsame\n');
+    const input = patch(
+      '*** Update File: a.txt',
+      '@@',
+      '-anchor',
+      '-same',
+      '+anchor',
+      '+first',
+      '@@',
+      '-same',
+      '+second',
+    );
+    const tool = createPatchToolDefinition();
+    const context = { workspaceRoot: workspace, sessionId: 'patch-session', taskId: 'dependency-call' } as never;
+    const prepared = tool.prepare!({ input }, context) as import('../../tools/types.js').ToolPreparation;
+
+    expect(prepared.selections).toHaveLength(1);
+    expect(prepared.selections![0]!.label).toContain('hunks 1,2/2');
+    const only = prepared.selections![0]!;
+    const preview = prepared.selectionPreview!([only.id]);
+    const result = await prepared.execute(context, [only.id], { revision: preview.revision });
+
+    expect(result.success).toBe(true);
+    expect(fs.readFileSync(a, 'utf8')).toBe('anchor\nfirst\nsecond\n');
+    expect(readOperations(scope())[0]!.selection?.selectedGroupIds).toEqual([only.id]);
+  });
+
+  it('does not let an unselected file invalidate an exact selected subset', async () => {
+    const tool = createPatchToolDefinition();
+    const context = { workspaceRoot: workspace, sessionId: 'patch-session', taskId: 'subset-independent-call' } as never;
+    const prepared = tool.prepare!({ input: two() }, context) as import('../../tools/types.js').ToolPreparation;
+    const onlyA = prepared.selections!.find(selection => selection.label === 'Update a.txt (1 hunk)')!;
+    const preview = prepared.selectionPreview!([onlyA.id]);
+
+    fs.writeFileSync(b, 'external\n');
+    const result = await prepared.execute(context, [onlyA.id], { revision: preview.revision });
+
+    expect(result.success).toBe(true);
+    expect(fs.readFileSync(a, 'utf8')).toBe('after-a\n');
+    expect(fs.readFileSync(b, 'utf8')).toBe('external\n');
+    expect(readOperations(scope())[0]!.selection).toMatchObject({
+      selectedGroupIds: [onlyA.id],
+      skippedGroupIds: [prepared.selections![1]!.id],
+    });
+  });
+
+  it('rejects a selected subset whose source changed after its preview', async () => {
+    const tool = createPatchToolDefinition();
+    const context = { workspaceRoot: workspace, sessionId: 'patch-session', taskId: 'subset-stale-call' } as never;
+    const prepared = tool.prepare!({ input: two() }, context) as import('../../tools/types.js').ToolPreparation;
+    const onlyA = prepared.selections!.find(selection => selection.label === 'Update a.txt (1 hunk)')!;
+    const preview = prepared.selectionPreview!([onlyA.id]);
+
+    fs.writeFileSync(a, 'external\n');
+    await expect(prepared.execute(context, [onlyA.id], { revision: preview.revision }))
+      .rejects.toThrow(/stale|changed|does not match/i);
+    expect(fs.readFileSync(a, 'utf8')).toBe('external\n');
+    expect(readOperations(scope())).toEqual([]);
+  });
+
+  it('rejects a whole-plan approval when content outside the hunk changed', async () => {
+    fs.writeFileSync(a, 'before-a\ncontext\n');
+    const tool = createPatchToolDefinition();
+    const context = { workspaceRoot: workspace, sessionId: 'patch-session', taskId: 'whole-plan-stale-call' } as never;
+    const prepared = tool.prepare!({
+      input: patch(update('a.txt', 'before-a', 'after-a')),
+    }, context) as import('../../tools/types.js').ToolPreparation;
+
+    fs.writeFileSync(a, 'before-a\nexternal\n');
+    await expect(prepared.execute(context, prepared.selections!.map(selection => selection.id), {
+      revision: prepared.selectionRevision,
+    })).rejects.toThrow(/stale|changed|does not match/i);
+    expect(fs.readFileSync(a, 'utf8')).toBe('before-a\nexternal\n');
+    expect(readOperations(scope())).toEqual([]);
+  });
+
+  it('carries the selected-subset revision through the real tool approval gate', async () => {
+    fs.writeFileSync(a, 'before-a\nmiddle\nbefore-b\n');
+    const input = patch(
+      '*** Update File: a.txt',
+      '@@',
+      '-before-a',
+      '+after-a',
+      '@@',
+      '-before-b',
+      '+after-b',
+    );
+    const handler = vi.fn(async prompt => {
+      const second = prompt.context.selections![1]!;
+      const selected = prompt.context.selectionPreview!([second.id]);
+      return {
+        promptId: prompt.id,
+        decision: 'allow-once' as const,
+        respondedAt: 1,
+        selected: [second.id],
+        selectionRevision: selected.revision,
+      };
+    });
+
+    const result = await run(input, { escalationPromptHandler: handler });
+
+    expect(result.messages[0]?.content).toContain(': committed.');
+    expect(fs.readFileSync(a, 'utf8')).toBe('before-a\nmiddle\nafter-b\n');
+    expect(readOperations(scope())[0]!.selection).toMatchObject({
+      selectedGroupIds: [expect.any(String)],
+      skippedGroupIds: [expect.any(String)],
+    });
   });
 
   it('refuses a multi-group patch when the host collected no selection', async () => {
@@ -89,6 +239,20 @@ describe('recorded patch batches', () => {
     expect(result.messages[0]?.content).not.toContain(': committed.');
     expect(fs.readFileSync(a, 'utf8')).toBe('before-a\n');
     expect(fs.readFileSync(b, 'utf8')).toBe('before-b\n');
+  });
+
+  it('refuses allow-always for apply_patch', async () => {
+    const result = await run(patch(update('a.txt', 'before-a', 'after-a')), {
+      escalationPromptHandler: async prompt => ({
+        promptId: prompt.id,
+        decision: 'allow-always',
+        respondedAt: 1,
+      }),
+    });
+
+    expect(result.messages[0]?.content).toContain('allow-always is not available');
+    expect(fs.readFileSync(a, 'utf8')).toBe('before-a\n');
+    expect(readOperations(scope())).toEqual([]);
   });
 
   it.each(['missing-source', 'duplicate-path', 'case-alias', 'parent-alias', 'hardlink-alias', 'ambiguous-context', 'invalid-protocol'])('fails full preflight with zero target writes for %s', async kind => {

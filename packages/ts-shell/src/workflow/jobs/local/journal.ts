@@ -60,6 +60,10 @@ export class LocalJournal implements LocalJournalPort {
     const bytes = Buffer.concat([old, chunk.subarray(0, Math.max(0, 65536 - old.length))]);
     this.change(job, { [stream]: bytes.toString('base64'), truncated: job.truncated || chunk.length > 65536 - old.length });
   }
+  truncate(id: string, stream: 'stdout' | 'stderr'): void {
+    const job = this.get(id);
+    if (!job.truncated) this.change(job, { truncated: true, note: `${stream} output exceeded its retained byte budget.` });
+  }
   finish(id: string, result: Pick<CommandExecutionResult, 'status' | 'exitCode' | 'terminationFailed' | 'outputFailed' | 'spawnErrorCode'>): void {
     const job = this.get(id);
     const unknown = result.terminationFailed === true;

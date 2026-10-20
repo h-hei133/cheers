@@ -231,6 +231,7 @@ describe("CLI streaming baseline (T3)", () => {
       JSON.stringify(
         {
           id: sessionId,
+          projectRoot: repoRoot,
           createdAt: now,
           updatedAt: now,
         },
@@ -244,6 +245,7 @@ describe("CLI streaming baseline (T3)", () => {
       JSON.stringify(
         {
           status: "interrupted",
+          projectRoot: repoRoot,
           pendingPrompt: "recover me",
           runPhase: "prompt-persisted",
           interruptedKind: "prompt",
@@ -2222,13 +2224,19 @@ describe("CLI streaming baseline (T3)", () => {
       const timeout = setTimeout(() => {
         cli.kill();
         reject(
-          new Error("Timed out waiting for CLI startup health-check output"),
+          new Error(
+            `Timed out waiting for CLI startup health-check output. Output:\n${output}`,
+          ),
         );
       }, 20000);
 
       const onData = (chunk: Buffer) => {
         output += chunk.toString();
-        if (output.includes("Ctrl+C cancels the current run. Ctrl+D exits.")) {
+        if (
+          output.includes("Ctrl+C cancels the current run. Ctrl+D exits.") &&
+          output.includes("- Recovery hint:") &&
+          /Skipped\s+3\s+unreadable session directories/.test(output)
+        ) {
           clearTimeout(timeout);
           cli.kill();
           try {
@@ -2238,6 +2246,7 @@ describe("CLI streaming baseline (T3)", () => {
             expect(output).toContain(
               "- /resume             inspect sessions or continue work.",
             );
+            expect(output).toContain("- Recovery hint:");
 
             const noisyWarnings =
               output.match(/Skipping unreadable session directory/g)?.length ??
@@ -2248,6 +2257,9 @@ describe("CLI streaming baseline (T3)", () => {
 
             expect(noisyWarnings).toBe(0);
             expect(aggregatedWarnings).toBe(1);
+            expect(output).toContain(
+              "Skipped 3 unreadable session directories",
+            );
             resolve();
           } catch (error) {
             reject(error);
@@ -3478,7 +3490,9 @@ describe("CLI streaming baseline (T3)", () => {
 
       const timeout = setTimeout(() => {
         fail(
-          new Error("Timed out waiting for unified golden smoke completion"),
+          new Error(
+            `Timed out waiting for unified golden smoke completion. Output:\n${output}`,
+          ),
         );
       }, 45000);
 
@@ -3528,7 +3542,11 @@ describe("CLI streaming baseline (T3)", () => {
           );
         }
 
-        if (sessionId && persistedCompletionCount >= 2) {
+        if (
+          sessionId &&
+          persistedCompletionCount >= 2 &&
+          /Skipped\s+2\s+unreadable session directories/.test(output)
+        ) {
           clearTimeout(timeout);
           finish(() => {
             expect(output).toContain("Cheers Shell");

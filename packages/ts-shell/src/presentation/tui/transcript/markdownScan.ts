@@ -42,6 +42,13 @@ export interface TableBlock {
   readonly rows: readonly string[];
 }
 
+export interface MathBlock {
+  readonly kind: "math";
+  readonly body: string;
+  /** Complete source including delimiters, used when projection is unavailable. */
+  readonly raw: string;
+}
+
 /** A list item, with the marker kept because its shape is what a reader sees. */
 export interface ListBlock {
   readonly kind: "list";
@@ -61,6 +68,7 @@ export type MarkdownBlock =
   | RuleBlock
   | FenceBlock
   | TableBlock
+  | MathBlock
   | ListBlock
   | QuoteBlock;
 
@@ -88,6 +96,30 @@ export function scanBlocks(text: string): readonly MarkdownBlock[] {
   let index = 0;
   while (index < lines.length) {
     const line = lines[index]!;
+
+    const displayMath = /^\s*(\$\$|\\\[)\s*$/.exec(line);
+    if (displayMath) {
+      const closing = displayMath[1] === "$$" ? /^\s*\$\$\s*$/ : /^\s*\\\]\s*$/;
+      let closingIndex = index + 1;
+      while (closingIndex < lines.length && !closing.test(lines[closingIndex]!)) closingIndex += 1;
+      if (closingIndex < lines.length) {
+        blocks.push({
+          kind: "math",
+          body: lines.slice(index + 1, closingIndex).join("\n"),
+          raw: lines.slice(index, closingIndex + 1).join("\n"),
+        });
+        index = closingIndex + 1;
+        continue;
+      }
+      // An opening delimiter without its pair is ordinary source text. Treating
+      // it as math would consume the rest of the answer and drop the delimiter
+      // the reader needs to copy.
+      while (index < lines.length) {
+        blocks.push({ kind: "text", line: lines[index]! });
+        index += 1;
+      }
+      break;
+    }
 
     if (TABLE_ROW.test(line) && TABLE_RULE.test(lines[index + 1] ?? "")) {
       const rows: string[] = [];

@@ -53,7 +53,7 @@ export function feedVim(state: VimState, key: VimKey, text: string, cursor: numb
     if (key.key === "escape") return { state: { ...state, mode: "normal" }, effect: { kind: "mode", mode: "normal" } };
     const character = key.text;
     if (!character || key.ctrl || key.alt || key.meta) return { state, effect: { kind: "none" } };
-    return { state: { ...state, mode: "insert" }, effect: replaceCharacter(text, bounded, character) };
+    return { state, effect: replaceCharacter(text, bounded, character, true) };
   }
   return normalKey(state, key, text, bounded);
 }
@@ -84,21 +84,24 @@ function normalKey(state: VimState, key: VimKey, text: string, cursor: number): 
   const count = state.count || 1;
 
   if (state.pending === "g") {
-    if (character === "g") return { state: clear(), effect: { kind: "cursor", offset: applyMotion(text, cursor, "doc-start", count) } };
+    if (character === "g") {
+      const offset = count > 1 ? lineOffset(text, count - 1) : 0;
+      return { state: clear(), effect: { kind: "cursor", offset } };
+    }
     return { state: clear(), effect: { kind: "none" } };
   }
   if (state.pending === "r") {
     if (character.length === 0) return { state: clear(), effect: { kind: "none" } };
-    const effect = replaceCharacter(text, cursor, character);
+    const effect = replaceCharacters(text, cursor, count, character);
     return { state: clear(), effect };
   }
   if (state.pending === "i" || state.pending === "a") {
-    const range = textObject(text, cursor, character, state.pending === "a");
+    const range = textObject(text, cursor, character, state.pending === "a", count);
     if (!range) return { state: clear(), effect: { kind: "none" } };
     return applyOperator(state, text, range, true);
   }
   if (state.pending === "f" || state.pending === "F" || state.pending === "t" || state.pending === "T") {
-    const target = findCharacter(text, cursor, character, state.pending);
+    const target = findCharacter(text, cursor, character, state.pending, count);
     return { state: clear(), effect: target === undefined ? { kind: "none" } : { kind: "cursor", offset: target } };
   }
 
@@ -115,10 +118,20 @@ function normalKey(state: VimState, key: VimKey, text: string, cursor: number): 
   }
   if (state.operator) {
     if (character === state.operator) {
-      const range = lineRange(text, cursor);
+      const range = lineRange(text, cursor, count);
       return applyOperator(state, text, range, false);
     }
-    if (character === "i" || character === "a") return { state: { ...state, pending: character, count: 0 }, effect: { kind: "none" } };
+    if (character === "G") {
+      const lines = text.split("\n");
+      const currentLine = lineAt(text, cursor).index;
+      const targetLine = state.count > 0 ? Math.min(lines.length - 1, state.count - 1) : lines.length - 1;
+      const first = Math.min(currentLine, targetLine);
+      const last = Math.max(currentLine, targetLine);
+      const from = lineOffset(text, first);
+      const end = lineEndOffset(text, lineOffset(text, last));
+      return applyOperator(state, text, { from, to: end < text.length ? end + 1 : end, linewise: true }, false);
+    }
+    if (character === "i" || character === "a") return { state: { ...state, pending: character }, effect: { kind: "none" } };
     const target = motionTarget(text, cursor, character, count);
     if (target === undefined) return { state: clear(), effect: { kind: "none" } };
     return applyOperator(state, text, { from: Math.min(cursor, target), to: Math.max(cursor, target), linewise: false }, false);
@@ -134,26 +147,28 @@ function normalKey(state: VimState, key: VimKey, text: string, cursor: number): 
     case "w": return { state: clear(), effect: { kind: "cursor", offset: applyMotion(text, cursor, "word-forward", count) } };
     case "b": return { state: clear(), effect: { kind: "cursor", offset: applyMotion(text, cursor, "word-back", count) } };
     case "e": return { state: clear(), effect: { kind: "cursor", offset: applyMotion(text, cursor, "word-end", count) } };
+    case "f": case "F": case "t": case "T": return { state: { ...state, pending: character }, effect: { kind: "none" } };
     case "g": return { state: { ...state, pending: "g" }, effect: { kind: "none" } };
-    case "G": return { state: clear(), effect: { kind: "cursor", offset: applyMotion(text, cursor, "doc-end", 1) } };
+    case "G": return { state: clear(), effect: { kind: "cursor", offset: state.count > 0 ? lineOffset(text, state.count - 1) : applyMotion(text, cursor, "doc-end", 1) } };
     case "i": return { state: { ...clear(), mode: "insert" }, effect: { kind: "mode", mode: "insert" } };
     case "a": return { state: { ...clear(), mode: "insert" }, effect: { kind: "mode", mode: "insert", offset: nextOffset(text, cursor) } };
     case "I": return { state: { ...clear(), mode: "insert" }, effect: { kind: "mode", mode: "insert", offset: applyMotion(text, cursor, "line-start", 1) } };
     case "A": return { state: { ...clear(), mode: "insert" }, effect: { kind: "mode", mode: "insert", offset: lineEndOffset(text, cursor) } };
     case "o": return { state: { ...clear(), mode: "insert" }, effect: { kind: "edit", from: lineEndOffset(text, cursor), to: lineEndOffset(text, cursor), text: "\n", cursorOffset: 1 } };
     case "O": return { state: { ...clear(), mode: "insert" }, effect: { kind: "edit", from: lineStart(text, cursor), to: lineStart(text, cursor), text: "\n", cursorOffset: 0 } };
-    case "x": return { state: clear(), effect: deleteRange(text, cursor, nextOffset(text, cursor)) };
-    case "X": return { state: clear(), effect: deleteRange(text, cursor, previousOffset(text, cursor)) };
-    case "D": return { state: clear(), effect: deleteRange(text, cursor, lineEndOffset(text, cursor)) };
+    case "x": return { state: clear(), effect: deleteRange(text, cursor, repeatOffset(text, cursor, count, false)) };
+    case "X": return { state: clear(), effect: deleteRange(text, cursor, repeatOffset(text, cursor, count, true)) };
+    case "D": return { state: clear(), effect: deleteRange(text, cursor, lineEndForCount(text, cursor, count)) };
+    case "Y": return applyOperator({ ...state, operator: "y" }, text, lineRange(text, cursor, count), false);
     case "C": {
-      const end = lineEndOffset(text, cursor);
+      const end = lineEndForCount(text, cursor, count);
       return { state: { ...clear(), mode: "insert" },
         effect: end > cursor ? { kind: "edit", from: cursor, to: end, text: "", cursorOffset: 0 } : { kind: "mode", mode: "insert" } };
     }
-    case "d": case "y": case "c": return { state: { ...state, operator: character, count: 0 }, effect: { kind: "none" } };
+    case "d": case "y": case "c": return { state: { ...state, operator: character }, effect: { kind: "none" } };
     case "R": return { state: { ...clear(), mode: "replace" }, effect: { kind: "mode", mode: "replace" } };
     case "S": {
-      const range = lineRange(text, cursor);
+      const range = lineRange(text, cursor, count);
       return applyOperator({ ...state, operator: "c" }, text, range, false);
     }
     case "v": return { state: { ...clear(), mode: "visual", anchor: cursor }, effect: { kind: "mode", mode: "visual" } };
@@ -202,35 +217,93 @@ function deleteRange(text: string, from: number, to: number): VimEffect {
   return { kind: "edit", from: start, to: end, text: "", cursorOffset: 0 };
 }
 
-function replaceCharacter(text: string, cursor: number, character: string): VimEffect {
-  const end = nextOffset(text, cursor);
-  if (end === cursor) return { kind: "none" };
-  return { kind: "edit", from: cursor, to: end, text: character, cursorOffset: Math.max(0, character.length - 1) };
+function replaceCharacter(text: string, cursor: number, character: string, append = false): VimEffect {
+  const line = lineAt(text, cursor);
+  const start = lineStart(text, cursor);
+  const end = lineEndOffset(text, cursor);
+  if (end === cursor) {
+    return append
+      ? { kind: "edit", from: cursor, to: cursor, text: character, cursorOffset: character.length }
+      : { kind: "none" };
+  }
+  const to = start + nextCluster(line.text, cursor - start);
+  return { kind: "edit", from: cursor, to, text: character, cursorOffset: character.length };
 }
 
-function textObject(text: string, cursor: number, object: string, around: boolean): { from: number; to: number; linewise: boolean } | undefined {
+function replaceCharacters(text: string, cursor: number, count: number, character: string): VimEffect {
+  let to = cursor;
+  let replaced = 0;
+  for (let index = 0; index < count; index++) {
+    const line = lineAt(text, to);
+    if (to >= lineEndOffset(text, to)) break;
+    to = lineStart(text, to) + nextCluster(line.text, to - lineStart(text, to));
+    replaced += 1;
+  }
+  if (to === cursor) return { kind: "none" };
+  const boundaries = graphemeBoundaries(character);
+  const lastCluster = boundaries.length > 1 ? boundaries[boundaries.length - 2]! : 0;
+  return { kind: "edit", from: cursor, to, text: character.repeat(replaced),
+    cursorOffset: character.length * (replaced - 1) + lastCluster };
+}
+
+function textObject(text: string, cursor: number, object: string, around: boolean, count = 1): { from: number; to: number; linewise: boolean } | undefined {
   if (object !== "w" && object !== "W") return undefined;
   const line = lineAt(text, cursor);
   const start = lineStart(text, cursor);
   const column = cursor - start;
   let from = wordStart(line.text, column);
   let to = wordEnd(line.text, column);
+  for (let index = 1; index < count; index++) {
+    let next = to;
+    while (next < line.text.length && /\s/.test(line.text[next]!)) next += 1;
+    if (next >= line.text.length) break;
+    to = wordEnd(line.text, next);
+  }
   if (around) {
     while (to < line.text.length && /\s/.test(line.text[to]!)) to += 1;
+  } else {
+    while (to > from && /\s/.test(line.text[to - 1]!)) to -= 1;
   }
   return { from: start + from, to: start + to, linewise: false };
 }
 
-function findCharacter(text: string, cursor: number, character: string, kind: "f" | "F" | "t" | "T"): number | undefined {
-  const line = lineAt(text, cursor);
-  const start = lineStart(text, cursor);
-  const column = cursor - start;
-  const index = kind === "f" || kind === "t"
-    ? line.text.indexOf(character, column + 1)
-    : line.text.lastIndexOf(character, Math.max(0, column - 1));
-  if (index < 0) return undefined;
-  const target = kind === "t" ? index - 1 : kind === "T" ? index + 1 : index;
-  return start + Math.max(0, Math.min(line.text.length, target));
+function findCharacter(text: string, cursor: number, character: string, kind: "f" | "F" | "t" | "T", count = 1): number | undefined {
+  let current = cursor;
+  let searchFrom = cursor;
+  for (let occurrence = 0; occurrence < count; occurrence++) {
+    const line = lineAt(text, searchFrom);
+    const start = lineStart(text, searchFrom);
+    const localFrom = Math.max(0, Math.min(line.text.length, searchFrom - start));
+    const boundaries = graphemeBoundaries(line.text);
+    let found = -1;
+    if (kind === "f" || kind === "t") {
+      for (let index = 1; index < boundaries.length; index++) {
+        const clusterStart = boundaries[index - 1]!;
+        if (clusterStart <= localFrom) continue;
+        if (line.text.slice(clusterStart, boundaries[index]!) === character) {
+          found = index - 1;
+          break;
+        }
+      }
+    } else {
+      for (let index = boundaries.length - 1; index > 0; index--) {
+        const clusterStart = boundaries[index - 1]!;
+        if (clusterStart >= localFrom) continue;
+        if (line.text.slice(clusterStart, boundaries[index]!) === character) {
+          found = index - 1;
+          break;
+        }
+      }
+    }
+    if (found < 0) return undefined;
+    const clusterStart = boundaries[found]!;
+    const clusterEnd = boundaries[found + 1]!;
+    const target = kind === "t" ? (found > 0 ? boundaries[found - 1]! : 0)
+      : kind === "T" ? clusterEnd : clusterStart;
+    current = start + target;
+    searchFrom = start + clusterStart;
+  }
+  return current;
 }
 
 function motionTarget(text: string, cursor: number, character: string, count: number): number | undefined {
@@ -285,7 +358,14 @@ function vertical(text: string, offset: number, direction: -1 | 1): number {
   const lines = text.split("\n");
   if (target < 0 || target >= lines.length) return offset;
   const targetStart = lines.slice(0, target).reduce((sum, value) => sum + value.length + 1, 0);
-  return targetStart + Math.min(column, lines[target]!.length);
+  const targetLine = lines[target]!;
+  const targetColumn = Math.min(column, targetLine.length);
+  let boundary = 0;
+  for (const candidate of graphemeBoundaries(targetLine)) {
+    if (candidate > targetColumn) break;
+    boundary = candidate;
+  }
+  return targetStart + boundary;
 }
 
 function wordForward(text: string, offset: number): number {
@@ -353,10 +433,33 @@ function lineEndOffset(text: string, offset: number): number {
   return next < 0 ? text.length : next;
 }
 
-function lineRange(text: string, cursor: number): { from: number; to: number; linewise: boolean } {
+function lineEndForCount(text: string, offset: number, count: number): number {
+  let end = lineEndOffset(text, offset);
+  for (let index = 1; index < count && end < text.length; index++) end = lineEndOffset(text, end + 1);
+  return end;
+}
+
+function lineOffset(text: string, lineIndex: number): number {
+  const lines = text.split("\n");
+  const index = Math.max(0, Math.min(lines.length - 1, lineIndex));
+  return lines.slice(0, index).reduce((sum, value) => sum + value.length + 1, 0);
+}
+
+function lineRange(text: string, cursor: number, count = 1): { from: number; to: number; linewise: boolean } {
   const from = lineStart(text, cursor);
-  const end = lineEndOffset(text, cursor);
+  let end = lineEndOffset(text, cursor);
+  for (let index = 1; index < count && end < text.length; index++) end = lineEndOffset(text, end + 1);
   return { from, to: end < text.length ? end + 1 : end, linewise: true };
+}
+
+function repeatOffset(text: string, cursor: number, count: number, backward: boolean): number {
+  let offset = cursor;
+  for (let index = 0; index < count; index++) {
+    const next = backward ? previousOffset(text, offset) : nextOffset(text, offset);
+    if (next === offset) break;
+    offset = next;
+  }
+  return offset;
 }
 
 /** Whether `offset` is a grapheme boundary, so the editor can apply a cursor intent. */

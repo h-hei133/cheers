@@ -34,6 +34,61 @@ it('marks successful stream completion only when its callback succeeds', () => {
   expect(terminal.getPendingOutputBytes()).toBe(0);
 });
 
+it("reassembles a UTF-8 code point split across stdin chunks", () => {
+  const input = Object.assign(new PassThrough(), { isTTY: true, isRaw: false, setRawMode: vi.fn() });
+  vi.spyOn(process, "stdin", "get").mockReturnValue(input as unknown as NodeJS.ReadStream);
+  const terminal = new Terminal({
+    hasTrueColor: false,
+    has256Color: false,
+    supportsDec2026Sync: false,
+    supportsKittyKeyboard: false,
+    supportsBracketedPaste: false,
+    insideMultiplexer: false,
+  });
+  const forwarded = vi.fn();
+  vi.spyOn(terminal, "write").mockImplementation(() => {});
+  vi.spyOn(terminal, "writeSync").mockImplementation(() => {});
+  terminal.start(forwarded, () => {}, () => {});
+  try {
+    const bytes = Buffer.from("🙂", "utf8");
+    input.emit("data", bytes.subarray(0, 2));
+    expect(forwarded).not.toHaveBeenCalled();
+    input.emit("data", bytes.subarray(2));
+    expect(forwarded).toHaveBeenCalledWith("🙂");
+  } finally {
+    terminal.stop();
+    input.destroy();
+  }
+});
+
+it("flushes pending bytes before a string chunk and starts a fresh decoder", () => {
+  const input = Object.assign(new PassThrough(), { isTTY: true, isRaw: false, setRawMode: vi.fn() });
+  vi.spyOn(process, "stdin", "get").mockReturnValue(input as unknown as NodeJS.ReadStream);
+  const terminal = new Terminal({
+    hasTrueColor: false,
+    has256Color: false,
+    supportsDec2026Sync: false,
+    supportsKittyKeyboard: false,
+    supportsBracketedPaste: false,
+    insideMultiplexer: false,
+  });
+  const forwarded = vi.fn();
+  vi.spyOn(terminal, "write").mockImplementation(() => {});
+  vi.spyOn(terminal, "writeSync").mockImplementation(() => {});
+  terminal.start(forwarded, () => {}, () => {});
+  try {
+    const bytes = Buffer.from("🙂", "utf8");
+    input.emit("data", bytes.subarray(0, 2));
+    input.emit("data", "x");
+    input.emit("data", bytes);
+    expect(forwarded).toHaveBeenNthCalledWith(1, "�x");
+    expect(forwarded).toHaveBeenNthCalledWith(2, "🙂");
+  } finally {
+    terminal.stop();
+    input.destroy();
+  }
+});
+
 it("disables keyboard reports before draining and restores raw mode only afterward", async () => {
   vi.useFakeTimers();
   const input = Object.assign(new PassThrough(), { isTTY: true, isRaw: false, setRawMode: vi.fn() });

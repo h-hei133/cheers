@@ -17,7 +17,40 @@ export function promptApproval(prompt: EscalationPrompt, host: { readonly pager:
     };
     const chooseGroups = () => {
       host.overlay.close();
-      host.overlay.open(hunkPicker(prompt, settle));
+      host.pager.close();
+      host.overlay.open(hunkPicker(prompt, selected => {
+        const ids = selected.selected ?? [];
+        if (!prompt.context.selectionPreview || ids.length === 0) {
+          settle(selected);
+          return;
+        }
+        let refined: { readonly preview: string; readonly revision: string };
+        try {
+          refined = prompt.context.selectionPreview(ids);
+        } catch (error) {
+          settle({ decision: 'deny', reason: error instanceof Error ? error.message : 'The selected patch subset could not be prepared.' });
+          return;
+        }
+        const selectedIds = new Set(ids);
+        const refinedPrompt: EscalationPrompt = {
+          ...prompt,
+          context: {
+            ...prompt.context,
+            preview: refined.preview,
+            previewKind: 'file-plan',
+            selections: prompt.context.selections?.filter(selection => selectedIds.has(selection.id)),
+            selectionRevision: refined.revision,
+          },
+        };
+        host.overlay.close();
+        host.overlay.open(approvalPicker(refinedPrompt, decision => settle({
+          ...decision,
+          ...(decision.decision === 'deny' ? {} : { selected: ids, selectionRevision: refined.revision }),
+        })));
+        const preview = approvalPreview(refinedPrompt);
+        if (preview) host.pager.open(preview.title, reportText(preview), preview);
+        host.render();
+      }, settle));
       host.render();
     };
     host.overlay.open(approvalPicker(prompt, settle, chooseGroups));
@@ -46,6 +79,8 @@ export interface ApprovalSettleResult {
   readonly reason?: string;
   /** Group ids the user approved; a whole-plan approval selects every group. */
   readonly selected?: readonly string[];
+  /** Exact selected-subset revision shown in the final approval preview. */
+  readonly selectionRevision?: string;
 }
 
 export type InteractiveApprovalResult = ApprovalDecision | ApprovalSettleResult;
@@ -56,6 +91,7 @@ export function approvalPicker(
   onChooseGroups?: () => void,
 ): Picker {
   const toolName = prompt.context?.toolName || "tool";
+  const persistentAllowed = toolName !== 'apply_patch';
   const operation = prompt.context?.operation ? ` (${prompt.context.operation})` : "";
   const target = prompt.context?.target ? ` on '${prompt.context.target}'` : "";
   const permitted = (choice: ApprovalDecision) => !prompt.options.length || prompt.options.some(option => option.value === choice);
@@ -88,14 +124,20 @@ export function approvalPicker(
         detail: "Block this action and return failure to model",
         note: "3 / n / d / esc",
       },
-    ].filter(option => permitted(option.id as ApprovalDecision)),
+    ].filter(option => permitted(option.id as ApprovalDecision)
+      && (persistentAllowed || option.id !== 'allow-always')),
     apply: async (ids): Promise<undefined> => {
       if (ids[0] === 'choose-groups' && onChooseGroups) { onChooseGroups(); return undefined; }
       const choice = ids[0] as ApprovalDecision | undefined;
       const decision = choice && permitted(choice) ? choice : "deny";
       const selected = decision !== "deny" && prompt.context?.selections?.length
         ? prompt.context.selections.map(selection => selection.id) : undefined;
-      onSettle({ decision, ...(selected ? { selected } : {}) });
+      onSettle({
+        decision,
+        ...(selected ? { selected } : {}),
+        ...(decision !== 'deny' && prompt.context?.selectionRevision
+          ? { selectionRevision: prompt.context.selectionRevision } : {}),
+      });
       return undefined;
     },
     onDeny: (reason?: string) => {
@@ -108,7 +150,11 @@ export function approvalPicker(
 }
 
 /** Group selection for a multi-group plan; every group starts selected. */
-function hunkPicker(prompt: EscalationPrompt, onSettle: (result: ApprovalSettleResult) => void): Picker {
+function hunkPicker(
+  prompt: EscalationPrompt,
+  onSelect: (result: ApprovalSettleResult) => void,
+  onDeny: (result: ApprovalSettleResult) => void,
+): Picker {
   return {
     title: 'Apply which groups?',
     form: 'panel',
@@ -119,11 +165,11 @@ function hunkPicker(prompt: EscalationPrompt, onSettle: (result: ApprovalSettleR
     load: async (): Promise<readonly Option[]> => (prompt.context?.selections ?? []).map(selection => ({
       id: selection.id, label: selection.label, detail: selection.files?.join(', '), selected: true })),
     apply: async (ids): Promise<undefined> => {
-      if (ids.length === 0) { onSettle({ decision: 'deny' }); return undefined; }
-      onSettle({ decision: 'allow-once', selected: [...ids] });
+      if (ids.length === 0) { onDeny({ decision: 'deny' }); return undefined; }
+      onSelect({ decision: 'allow-once', selected: [...ids] });
       return undefined;
     },
-    onDeny: (reason?: string) => { onSettle({ decision: 'deny', ...(reason ? { reason } : {}) }); },
-    previewEnd: () => { onSettle({ decision: 'deny' }); },
+    onDeny: (reason?: string) => { onDeny({ decision: 'deny', ...(reason ? { reason } : {}) }); },
+    previewEnd: () => { onDeny({ decision: 'deny' }); },
   };
 }

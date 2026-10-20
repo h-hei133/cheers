@@ -1,4 +1,6 @@
 import { scanBlocks, type MarkdownBlock } from "../../presentation/tui/transcript/markdownScan.js";
+import { latexToText } from "../../presentation/tui/transcript/math.js";
+import { splitTableRow } from "../../presentation/tui/transcript/table.js";
 
 /**
  * Markdown as HTML, for the exported page.
@@ -172,6 +174,8 @@ function renderBlockHtml(block: Grouped): string {
       return renderFenceHtml(block.lines, block.language);
     case "table":
       return renderTableHtml(block.header, block.rows);
+    case "math":
+      return `<div class="math">${escapeHtml(latexToText(block.body) === undefined ? block.raw : block.body)}</div>`;
     case "list": {
       // The marker decided the list kind when the items were grouped; a terminal
       // prints the marker and a browser does not, so this is where they part.
@@ -201,18 +205,13 @@ function renderFenceHtml(lines: readonly string[], language: string): string {
 }
 
 function renderTableHtml(header: string, rows: readonly string[]): string {
-  const head = splitRow(header).map((cell) => `<th>${renderInlineHtml(cell)}</th>`).join("");
+  const head = splitTableRow(header).map((cell) => `<th>${renderTableCellHtml(cell)}</th>`).join("");
   const body = rows
-    .map((row) => `<tr>${splitRow(row).map((cell) => `<td>${renderInlineHtml(cell)}</td>`).join("")}</tr>`)
+    .map((row) => `<tr>${splitTableRow(row).map((cell) => `<td>${renderTableCellHtml(cell)}</td>`).join("")}</tr>`)
     .join("");
   return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
-/** The cells of one table row, with the pipes that delimit them removed. */
-function splitRow(line: string): readonly string[] {
-  return line
-    .replace(/^\s*\|/, "")
-    .replace(/\|\s*$/, "")
-    .split("|")
-    .map((cell) => cell.trim());
+function renderTableCellHtml(cell: string): string {
+  return cell.split(/<br\s*\/?>/i).map(renderInlineHtml).join("<br>");
 }

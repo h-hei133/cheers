@@ -5,6 +5,7 @@ interface Harness {
   readonly buffer: StdinBuffer;
   readonly keys: string[];
   readonly pastes: string[];
+  readonly delays: number[];
   fire(): void;
 }
 
@@ -13,9 +14,11 @@ function harness(): Harness {
   let nextId = 1;
   const keys: string[] = [];
   const pastes: string[] = [];
+  const delays: number[] = [];
   const buffer = new StdinBuffer({
-    setTimer: (run) => {
+    setTimer: (run, delayMs) => {
       const id = nextId++;
+      delays.push(delayMs);
       timers.push({ id, run });
       return id;
     },
@@ -29,6 +32,7 @@ function harness(): Harness {
     buffer,
     keys,
     pastes,
+    delays,
     fire: () => {
       const due = timers;
       timers = [];
@@ -39,15 +43,105 @@ function harness(): Harness {
 
 describe("keystroke assembly", () => {
   it("splits a fused chunk into one event per character", () => {
-    const { buffer, keys } = harness();
+    const { buffer, keys, fire } = harness();
     buffer.feed("abc");
+    fire();
     expect(keys).toEqual(["a", "b", "c"]);
   });
 
   it("delivers a scalar above the BMP as one event", () => {
-    const { buffer, keys } = harness();
+    const { buffer, keys, fire } = harness();
     buffer.feed("\u{1f680}");
+    fire();
     expect(keys).toEqual(["\u{1f680}"]);
+  });
+
+  it("delivers a multi-codepoint grapheme as one event", () => {
+    const { buffer, keys, fire } = harness();
+    buffer.feed("👨‍👩‍👧‍👦");
+    fire();
+    expect(keys).toEqual(["👨‍👩‍👧‍👦"]);
+  });
+
+  it("reassembles a multi-codepoint grapheme split across chunks", () => {
+    const { buffer, keys, fire } = harness();
+    buffer.feed("👨");
+    buffer.feed("\u200d");
+    buffer.feed("👩‍👧‍👦");
+    expect(keys).toEqual([]);
+    fire();
+    expect(keys).toEqual(["👨‍👩‍👧‍👦"]);
+  });
+
+  it("reassembles a combining mark split from its base", () => {
+    const { buffer, keys, fire } = harness();
+    buffer.feed("e");
+    buffer.feed("\u0301");
+    expect(keys).toEqual([]);
+    fire();
+    expect(keys).toEqual(["é"]);
+  });
+
+  it("reassembles a combining mark split from ASCII punctuation", () => {
+    const { buffer, keys, fire } = harness();
+    buffer.feed("!");
+    buffer.feed("\u0301");
+    expect(keys).toEqual([]);
+    fire();
+    expect(keys).toEqual(["!́"]);
+  });
+
+  it("reassembles a keycap split from its punctuation base", () => {
+    const { buffer, keys, fire } = harness();
+    buffer.feed("*");
+    buffer.feed("\ufe0f");
+    buffer.feed("\u20e3");
+    expect(keys).toEqual([]);
+    fire();
+    expect(keys).toEqual(["*️⃣"]);
+  });
+
+  it("holds the trailing cluster of a fused text chunk", () => {
+    const { buffer, keys, fire } = harness();
+    buffer.feed("x👨");
+    buffer.feed("\u200d");
+    buffer.feed("👩‍👧‍👦");
+    expect(keys).toEqual(["x"]);
+    fire();
+    expect(keys).toEqual(["x", "👨‍👩‍👧‍👦"]);
+  });
+
+  it("holds text after an escape sequence until its combining mark arrives", () => {
+    const { buffer, keys, fire } = harness();
+    buffer.feed("\x1b[Ae");
+    buffer.feed("\u0301");
+    expect(keys).toEqual(["up"]);
+    fire();
+    expect(keys).toEqual(["up", "é"]);
+  });
+
+  it("holds text after a paste until its combining mark arrives", () => {
+    const { buffer, keys, pastes, fire } = harness();
+    buffer.feed("\x1b[200~p\x1b[201~e");
+    buffer.feed("\u0301");
+    expect(pastes).toEqual(["p"]);
+    expect(keys).toEqual([]);
+    fire();
+    expect(keys).toEqual(["é"]);
+  });
+
+  it("does not defer controls", () => {
+    const { buffer, keys } = harness();
+    buffer.feed("\x7f");
+    expect(keys).toEqual(["backspace"]);
+  });
+
+  it("uses the short cluster hold and the longer partial-escape hold", () => {
+    const { buffer, delays } = harness();
+    buffer.feed("a");
+    expect(delays.at(-1)).toBe(8);
+    buffer.feed("\x1b");
+    expect(delays.at(-1)).toBe(40);
   });
 
   it("reassembles a sequence split across chunks", () => {
@@ -105,11 +199,12 @@ describe("the lone escape ambiguity", () => {
   it("discards an incomplete sequence on flush rather than leaking its bytes", () => {
     // No terminal sends a truncated CSI, so releasing "[" as typed text would
     // only ever corrupt the draft.
-    const { buffer, keys } = harness();
+    const { buffer, keys, fire } = harness();
     buffer.feed("\x1b[");
     buffer.flush();
     expect(keys).toEqual([]);
     buffer.feed("x");
+    fire();
     expect(keys).toEqual(["x"]);
   });
 
@@ -123,9 +218,10 @@ describe("the lone escape ambiguity", () => {
 
 describe("bracketed paste", () => {
   it("emits the block as one paste and resumes keys after it", () => {
-    const { buffer, keys, pastes } = harness();
+    const { buffer, keys, pastes, fire } = harness();
     buffer.feed("\x1b[200~hello\nworld\x1b[201~x");
     expect(pastes).toEqual(["hello\nworld"]);
+    fire();
     expect(keys).toEqual(["x"]);
   });
 

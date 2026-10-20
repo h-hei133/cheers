@@ -13,12 +13,15 @@ it('saves only through the prepared approved Add File receipt and refuses existi
   const tool = researchSaveTool(setup.runtime, setup.created.id); const args = { runId: setup.created.id, path: 'report.md' };
   const context = { taskId: 'save', sessionId: setup.session.id, workspaceRoot: setup.root };
   const prepared = tool.prepare!(args, context); expect(prepared.preview).toContain('Add:'); expect(fs.existsSync(target)).toBe(false);
-  const result = await prepared.execute(context); expect(result).toMatchObject({ success: true, metadata: { status: 'committed', researchSave: 'committed' } });
+  const selection = prepared.selections!.map(item => item.id);
+  const result = await prepared.execute(context, selection, { revision: prepared.selectionRevision });
+  expect(result).toMatchObject({ success: true, metadata: { status: 'committed', researchSave: 'committed' } });
   expect(setup.current().save).toMatchObject({ status: 'committed', path: target, operationId: result.metadata!.operationId });
   expect(fs.readFileSync(target, 'utf8')).toContain('[source:s-fixture#l1]');
   expect(() => tool.prepare!(args, context)).toThrow(/exists|overwrite/i);
   const second = tool.prepare!({ ...args, path: 'stale.md' }, context); setup.runtime.pause();
-  await expect(second.execute(context)).rejects.toThrow(/changed/); expect(fs.existsSync(path.join(setup.root, 'stale.md'))).toBe(false);
+  await expect(second.execute(context, selection, { revision: second.selectionRevision })).rejects.toThrow(/changed/);
+  expect(fs.existsSync(path.join(setup.root, 'stale.md'))).toBe(false);
 });
 it('ordinary plan/read-only/deny hooks prevent saving and never claim committed success', async () => {
   for (const mode of ['plan', 'read-only', 'deny', 'user-deny'] as const) {

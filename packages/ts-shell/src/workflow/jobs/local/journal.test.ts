@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../../session/SessionManager.js';
 import type { Session } from '../../../session/schema/sessionRecord.js';
 import { createDefaultExecutionService } from '../../../runtime/execution/service.js';
-import type { CommandExecutionResult } from '../../../runtime/execution/types.js';
+import type { CommandExecutionResult, LocalExecutionHandle } from '../../../runtime/execution/types.js';
 import { JobStore } from '../store.js';
 import { LocalJournal } from './journal.js';
 import { TaskRegistry } from './registry.js';
@@ -50,17 +50,64 @@ it('persists the fence before a real child starts and never replays that ID afte
 it('adopts a foreground child and promotes it without a second spawn', async () => {
   const local = journal();
   const owner = new TaskRegistry({ runCommand: vi.fn() }, local); owners.push(owner);
+  const ended: string[] = [];
+  owner.onEnded(task => ended.push(task.id));
   const { startStreamed } = await import('../../../runtime/execution/local.js');
   const { handle } = startStreamed({ command: process.execPath,
-    args: ['-e', 'setTimeout(() => { console.log("adopted"); process.exit(0) }, 250)'], cwd: root, onOutput: () => {} });
+    args: ['-e', 'process.stdout.write("early\\n"); setTimeout(() => { console.log("adopted"); process.exit(0) }, 250)'], cwd: root, onOutput: () => {} });
   const task = owner.adopt(handle, { command: 'adopted-command', cwd: root });
   expect(task.pid).toBe(handle.pid);
   expect(local.list()).toEqual([]);
+  // The adopted task is intentionally not visible through the durable journal
+  // until promotion; wait for the live child to emit before promoting it.
+  await new Promise(resolve => setTimeout(resolve, 100));
   expect(owner.promote(task.id)).toBe('promoted');
   expect(local.get(task.id)).toMatchObject({ status: 'running' });
   await until(() => !owner.hasLive(task.id));
   expect(local.get(task.id)).toMatchObject({ status: 'completed', output: 'complete' });
+  expect(Buffer.from(local.get(task.id).stdout, 'base64').toString('utf8')).toContain('early');
+  expect(Buffer.from(local.get(task.id).stdout, 'base64').toString('utf8')).toContain('adopted');
   expect(handle.pid).toBe(task.pid);
+  expect(ended).toEqual([task.id]);
+});
+
+it('preserves a UTF-8 code point split across adopted output chunks', async () => {
+  const local = journal();
+  const owner = new TaskRegistry({ runCommand: vi.fn() }, local); owners.push(owner);
+  const { handle } = await import('../../../runtime/execution/local.js').then(({ startStreamed }) => startStreamed({
+    command: process.execPath,
+    args: ['-e', "const b=Buffer.from('🙂'); process.stdout.write(b.subarray(0,2)); setTimeout(() => { process.stdout.write(b.subarray(2)); process.exit(0) }, 150)"],
+    cwd: root,
+    onOutput: () => {},
+  }));
+  const task = owner.adopt(handle, { command: 'split-utf8', cwd: root });
+  await new Promise(resolve => setTimeout(resolve, 75));
+  expect(owner.promote(task.id)).toBe('promoted');
+  await until(() => !owner.hasLive(task.id));
+  expect(Buffer.from(local.get(task.id).stdout, 'base64').toString('utf8')).toBe('🙂');
+});
+
+it('bounds output retained before an adopted task is promoted', async () => {
+  const local = journal();
+  const owner = new TaskRegistry({ runCommand: vi.fn() }, local); owners.push(owner);
+  let emit!: (text: string) => void;
+  let finish!: () => void;
+  const result = new Promise<{ stdout: string; stderr: string }>(resolve => { finish = () => resolve({ stdout: '', stderr: '' }); });
+  const handle: LocalExecutionHandle = {
+    pid: 43211,
+    onOutput(listener) { emit = listener; return () => {}; },
+    detach() {},
+    kill: async () => {},
+    result,
+  };
+  const task = owner.adopt(handle, { command: 'large-prefix', cwd: root });
+  for (let index = 0; index < 250; index++) emit('x'.repeat(50_000));
+  expect(owner.promote(task.id)).toBe('promoted');
+  finish();
+  await until(() => !owner.hasLive(task.id));
+  const row = local.get(task.id);
+  expect(Buffer.from(row.stdout, 'base64')).toHaveLength(65_536);
+  expect(row.truncated).toBe(true);
 });
 
 it('promotes every provisional foreground task when a new message arrives', async () => {
@@ -103,11 +150,35 @@ it('kills a promoted foreground child when its grant is revoked', async () => {
 
 it('reports settled for a provisional task that finishes before promotion', async () => {
   const owner = new TaskRegistry({ runCommand: vi.fn() }); owners.push(owner);
+  const ended: string[] = [];
+  owner.onEnded(task => ended.push(task.id));
   const { startStreamed } = await import('../../../runtime/execution/local.js');
   const handle = startStreamed({ command: process.execPath, args: ['-e', 'process.exit(0)'], cwd: root, onOutput: () => {} }).handle;
   const task = owner.adopt(handle, { command: 'quick', cwd: root });
   expect(await owner.whenPromoted(task.id)).toBe('settled');
   expect(owner.get(task.id)).toBeUndefined();
+  expect(ended).toEqual([]);
+});
+
+it('waits for an adopted task settlement before reporting stop', async () => {
+  const owner = new TaskRegistry({ runCommand: vi.fn() }); owners.push(owner);
+  let resolveResult!: () => void;
+  const result = new Promise<void>(resolve => { resolveResult = resolve; });
+  const handle = {
+    pid: 43210,
+    onOutput: () => () => {},
+    detach: () => {},
+    kill: async () => {},
+    result,
+  };
+  const task = owner.adopt(handle, { command: 'held foreground', cwd: root });
+  let stopped = false;
+  const pending = owner.stop(task.id).then(value => { stopped = true; return value; });
+  await Promise.resolve();
+  expect(stopped).toBe(false);
+  resolveResult();
+  await pending;
+  expect(stopped).toBe(true);
 });
 
 it('refuses promotion when the journal is at capacity and kills the provisional child', async () => {
@@ -186,6 +257,22 @@ it('does not claim cancellation until the native owner settles and preserves fai
   settle(result('failed', null, true)); expect(await pending).toBe(false);
   expect(local.get(task.id)).toMatchObject({ status: 'unknown', dispatchPossible: true, output: 'unknown' });
   expect(() => journal().adopt(task.id)).toThrow(/conflict/);
+});
+
+it('keeps a durable task unknown when settlement publication fails', async () => {
+  const local = journal();
+  vi.spyOn(local, 'finish').mockImplementationOnce(() => { throw new Error('synthetic publication failure'); });
+  const owner = new TaskRegistry({ runCommand: vi.fn(async request => {
+    request.onStarted?.(12345);
+    return result('completed', 0);
+  }) }, local); owners.push(owner);
+  const task = owner.start({ command: 'synthetic publication', cwd: root });
+  await until(() => !owner.hasLive(task.id));
+  expect(local.get(task.id)).toMatchObject({
+    status: 'unknown',
+    dispatchPossible: true,
+    output: 'unknown',
+  });
 });
 
 it('reports successful native cancellation after releasing the live handle and retains its durable result', async () => {

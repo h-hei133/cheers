@@ -1,10 +1,11 @@
 import { defaultTheme } from "../../theme/theme.js";
 import { highlightCode } from "../../theme/syntax.js";
 import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
-import { visibleWidth } from "../text/measure.js";
+import { graphemeBoundaries, visibleWidth } from "../text/measure.js";
 import { DIAGRAM_LANGUAGE, renderDiagram } from "./mermaid.js";
 import { scanBlocks } from "./markdownScan.js";
-import { projectMath } from "./math.js";
+import { latexToText, projectMath } from "./math.js";
+import { splitTableRow } from "./table.js";
 /**
  * Markdown rendering for assistant prose.
  *
@@ -19,14 +20,13 @@ import { projectMath } from "./math.js";
  * sequences, so a styled span wraps on its visible cells rather than its markup.
  */
 
-const TABLE_ROW = /^\s*\|(.+)\|\s*$/;
-const TABLE_RULE = /^\s*\|[\s:|-]+\|\s*$/;
-
 /** Bounds that keep one table from becoming the whole frame. */
 const MAX_TABLE_COLUMNS = 16;
 const MAX_TABLE_ROWS = 200;
 const MAX_CELL_BYTES = 4096;
 const MAX_CELL_LINES = 8;
+const MAX_RAW_TABLE_ROWS = 400;
+const MAX_RAW_TABLE_BYTES = 64 * 1024;
 
 /** Drop a trailing partial code fence so a streaming block does not flicker. */
 export function trimPartialFence(text: string): string {
@@ -70,6 +70,11 @@ export function renderMarkdown(text: string, width: number): string[] {
       case "table":
         rows.push(...renderTable(block.header, block.rows, cells));
         break;
+      case "math": {
+        const projected = latexToText(block.body) ?? block.raw;
+        rows.push(...wrapWithIndent(defaultTheme.fg("mdHeading", projected), "", cells));
+        break;
+      }
       case "fence":
         rows.push(...renderFence(block.lines, block.language, cells));
         break;
@@ -112,8 +117,8 @@ export function renderMarkdown(text: string, width: number): string[] {
  * table that overflows is worse than one with a truncated cell.
  */
 function renderTable(header: string, body: readonly string[], cells: number): string[] {
-  const head = splitRow(header);
-  const rowsOfCells = body.map(splitRow);
+  const head = splitTableRow(header);
+  const rowsOfCells = body.map(splitTableRow);
   const columns = Math.max(head.length, ...rowsOfCells.map(row => row.length));
   const bytes = [header, ...body].reduce((sum, line) => sum + Buffer.byteLength(line, "utf8"), 0);
   const separators = (columns - 1) * 3;
@@ -122,38 +127,81 @@ function renderTable(header: string, body: readonly string[], cells: number): st
   // the tail of every cell.
   if (columns > MAX_TABLE_COLUMNS || rowsOfCells.length > MAX_TABLE_ROWS || bytes > MAX_CELL_BYTES * 4
     || columns * 5 + separators > cells) return rawTable(header, body, cells);
-  const widths = columnWidths([head, ...rowsOfCells], cells);
+  const rows = [head, ...rowsOfCells];
+  if (rows.some(row => row.some(cell => Buffer.byteLength(cell, "utf8") > MAX_CELL_BYTES))) {
+    return rawTable(header, body, cells);
+  }
+  const widths = columnWidths(rows, cells);
+  if (!tableCellsFit(rows, widths)) return rawTable(header, body, cells);
   const line = defaultTheme.fg("border", widths.map((width) => "─".repeat(width)).join("─┼─"));
-  const rows = [...formatRow(head, widths, true), line];
-  for (const row of rowsOfCells) rows.push(...formatRow(row, widths, false));
-  return rows;
+  const rendered = [...formatRow(head, widths, true), line];
+  for (const row of rowsOfCells) rendered.push(...formatRow(row, widths, false));
+  return rendered;
+}
+
+function tableCellsFit(rows: readonly string[][], widths: readonly number[]): boolean {
+  for (const row of rows) {
+    for (let column = 0; column < widths.length; column++) {
+      let lines = 0;
+      for (const segment of (row[column] ?? "").split(/<br\s*\/?>/i)) {
+        lines += wrapToWidth(segment, widths[column]!).length;
+      }
+      if (lines > MAX_CELL_LINES) return false;
+    }
+  }
+  return true;
 }
 
 /** The original table, wrapped rather than truncated, when layout cannot help. */
 function rawTable(header: string, body: readonly string[], cells: number): string[] {
-  return [header, ...body].flatMap(line => wrapToWidth(defaultTheme.dim(line), cells));
+  const rows: string[] = [];
+  const marker = defaultTheme.dim("… table truncated by the view budget");
+  const markerBytes = Buffer.byteLength(marker, "utf8");
+  let bytes = 0;
+  let truncated = false;
+  for (const line of [header, ...body]) {
+    const lineBytes = Buffer.byteLength(line, "utf8");
+    const bounded = truncateUtf8(line, MAX_RAW_TABLE_BYTES);
+    if (lineBytes > MAX_RAW_TABLE_BYTES) truncated = true;
+    for (const row of wrapToWidth(defaultTheme.dim(bounded), cells)) {
+      const rowBytes = Buffer.byteLength(row, "utf8");
+      const nextBytes = bytes + rowBytes + (rows.length > 0 ? 1 : 0);
+      if (rows.length >= MAX_RAW_TABLE_ROWS || nextBytes > MAX_RAW_TABLE_BYTES) {
+        truncated = true;
+        break;
+      }
+      rows.push(row);
+      bytes = nextBytes;
+    }
+    if (truncated) break;
+  }
+  if (truncated) {
+    while (rows.length >= MAX_RAW_TABLE_ROWS
+      || (rows.length > 0 && bytes + 1 + markerBytes > MAX_RAW_TABLE_BYTES)) {
+      const removed = rows.pop();
+      if (removed === undefined) break;
+      bytes -= Buffer.byteLength(removed, "utf8") + (rows.length > 0 ? 1 : 0);
+    }
+    if (bytes + markerBytes + (rows.length > 0 ? 1 : 0) <= MAX_RAW_TABLE_BYTES) rows.push(marker);
+  }
+  return rows;
 }
 
-/**
- * Split a table row into cells.
- *
- * A pipe inside a backtick span or written as `\|` is content, not a separator;
- * splitting on the raw character loses code and escaped text.
- */
-function splitRow(line: string): string[] {
-  const inner = TABLE_ROW.exec(line)?.[1] ?? "";
-  const cells: string[] = [];
-  let current = "";
-  let backticks = 0;
-  for (let index = 0; index < inner.length; index++) {
-    const character = inner[index]!;
-    if (character === "\\" && inner[index + 1] === "|") { current += "|"; index += 1; continue; }
-    if (character === "`") backticks = backticks === 0 ? 1 : 0;
-    if (character === "|" && backticks === 0) { cells.push(current.trim()); current = ""; continue; }
-    current += character;
+/** Cut at a grapheme boundary without exceeding a UTF-8 byte budget. */
+function truncateUtf8(text: string, maxBytes: number): string {
+  if (maxBytes <= 0) return "";
+  if (Buffer.byteLength(text, "utf8") <= maxBytes) return text;
+  const boundaries = graphemeBoundaries(text);
+  let bytes = 0;
+  let end = 0;
+  for (let index = 1; index < boundaries.length; index++) {
+    const boundary = boundaries[index]!;
+    const size = Buffer.byteLength(text.slice(boundaries[index - 1]!, boundary), "utf8");
+    if (bytes + size > maxBytes) break;
+    bytes += size;
+    end = boundary;
   }
-  cells.push(current.trim());
-  return cells;
+  return text.slice(0, end);
 }
 
 /** Column widths sized to content, then scaled down to fit the frame. */
@@ -190,9 +238,7 @@ function formatRow(row: readonly string[], widths: readonly number[], header: bo
     for (const segment of segments) {
       for (const line of wrapToWidth(segment, width)) {
         lines.push(header ? defaultTheme.bold(line) : renderInline(line));
-        if (lines.length >= MAX_CELL_LINES) break;
       }
-      if (lines.length >= MAX_CELL_LINES) break;
     }
     return lines.length ? lines : [""];
   });

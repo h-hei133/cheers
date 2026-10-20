@@ -63,6 +63,102 @@ describe("SessionManager", () => {
     }
   });
 
+  it("discovers a reentry candidate through the cancellable catalog scan", async () => {
+    const manager = new SessionManager();
+    const projectRoot = path.join(fakeHome, "reentry-project");
+    const session = manager.createNew(projectRoot);
+    manager.addTurn(session.id, { role: "user", content: "resume this work" });
+    manager.saveInterrupted(session.id);
+
+    const candidate = await manager.getReentryCandidateAsync({
+      preferredProjectRoot: projectRoot,
+      currentSessionId: "sess_current",
+    });
+
+    expect(candidate?.id).toBe(session.id);
+  });
+
+  it("reports unreadable catalog entries after the asynchronous scan without duplicates", async () => {
+    const manager = new SessionManager();
+    const projectRoot = path.join(fakeHome, "reentry-project");
+    const session = manager.createNew(projectRoot);
+    manager.addTurn(session.id, { role: "user", content: "resume this work" });
+    manager.saveInterrupted(session.id);
+
+    const sessionsRoot = path.join(fakeHome, ".cheers", "sessions");
+    for (const sessionId of ["sess_broken_a", "sess_broken_b"]) {
+      const sessionDir = path.join(sessionsRoot, sessionId);
+      fs.mkdirSync(sessionDir, { recursive: true });
+      fs.writeFileSync(path.join(sessionDir, "metadata.json"), "{broken", "utf8");
+      fs.writeFileSync(path.join(sessionDir, "state.json"), "{}", "utf8");
+      fs.writeFileSync(path.join(sessionDir, "transcript.jsonl"), "", "utf8");
+    }
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const first = await manager.getRecoveryHintAsync({
+        preferredProjectRoot: projectRoot,
+      });
+      const second = await manager.getRecoveryHintAsync({
+        preferredProjectRoot: projectRoot,
+      });
+
+      expect(first?.candidate?.id).toBe(session.id);
+      expect(second?.candidate?.id).toBe(session.id);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toContain(
+        "Skipped 2 unreadable session directories",
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("selects the preferred project before a newer candidate in another project", async () => {
+    const manager = new SessionManager();
+    const preferredRoot = path.join(fakeHome, "preferred-project");
+    const otherRoot = path.join(fakeHome, "other-project");
+    const preferred = manager.createNew(preferredRoot);
+    manager.addTurn(preferred.id, { role: "user", content: "preferred work" });
+    manager.saveInterrupted(preferred.id);
+    const other = manager.createNew(otherRoot);
+    manager.addTurn(other.id, { role: "user", content: "other work" });
+    manager.saveInterrupted(other.id);
+
+    const hint = await manager.getRecoveryHintAsync({
+      preferredProjectRoot: preferredRoot,
+    });
+
+    expect(hint?.candidate?.id).toBe(preferred.id);
+  });
+
+  it("returns an asynchronous blocked boundary when no safe candidate exists", async () => {
+    const manager = new SessionManager();
+    const projectRoot = path.join(fakeHome, "blocked-project");
+    const session = manager.createNew(projectRoot);
+    manager.addTurn(session.id, { role: "user", content: "blocked work" });
+    const metadataPath = manager.getSessionFilePath(session.id);
+    const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8")) as Record<string, unknown>;
+    metadata.status = "error";
+    delete metadata.pendingPrompt;
+    fs.writeFileSync(metadataPath, JSON.stringify(metadata), "utf8");
+    fs.writeFileSync(
+      path.join(manager.getSessionDirPath(session.id), "state.json"),
+      JSON.stringify({ status: "error", runPhase: "idle" }),
+      "utf8",
+    );
+
+    const hint = await manager.getRecoveryHintAsync({
+      preferredProjectRoot: projectRoot,
+    });
+
+    expect(hint?.candidate).toBeUndefined();
+    expect(hint?.blocked).toMatchObject({
+      sessionId: session.id,
+      reason: "terminal-evidence-indeterminate",
+    });
+  });
+
   it.each(["deleteSession", "discardIfEmpty"] as const)("releases todos through %s", (operation) => {
     const manager = new SessionManager();
     const session = manager.createNew();

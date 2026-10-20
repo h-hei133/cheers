@@ -32,7 +32,11 @@ export function researchSaveTool(runtime: ResearchRuntime, runId: string): ToolD
       const content = report.text;
       const patch = `*** Begin Patch\n*** Add File: ${relative}\n${content.split('\n').map(line => `+${line}`).join('\n')}\n*** End Patch`;
       const prepared = createPatchToolDefinition().prepare!({ input: patch }, context);
-      return Object.freeze({ ...prepared, execute: async (actual: ToolExecutionContext): Promise<ToolExecutionResult> => {
+      return Object.freeze({ ...prepared, execute: async (
+        actual: ToolExecutionContext,
+        selection?: readonly string[],
+        approval?: { readonly revision?: string },
+      ): Promise<ToolExecutionResult> => {
         const current = boundRun(captured.binding);
         if (current.revision !== captured.run.revision || current.epoch !== captured.run.epoch
           || researchReportDigest(current) !== captured.digest || runtime.selected(runId)?.epoch !== current.epoch) throw new Error('Research report changed after save preparation.');
@@ -51,7 +55,7 @@ export function researchSaveTool(runtime: ResearchRuntime, runId: string): ToolD
             pending = updateRun(captured.binding, run => ({ ...run, save: { ...run.save, operationId } }));
             actual.onEditOperationPrepared?.(operationId);
           },
-          assertFileAccess: absolute => { assert(); actual.assertFileAccess?.(absolute); } }); }
+          assertFileAccess: absolute => { assert(); actual.assertFileAccess?.(absolute); } }, selection, approval); }
         catch { result = { success: false, error: 'Research save failed before a verified committed receipt. Inspect the edit operation before retrying.', metadata: { status: 'unknown' } }; }
         const receiptOutcome = savedOperationOutcome(pending);
         const committed = result.success && result.metadata?.status === 'committed'

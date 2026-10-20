@@ -182,3 +182,15 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - Linux PTY smoke 四格通过：Node/exe × regular/fullscreen 均完成 `/tools`、`/sessions current`、`/exit` 并退出 0。
 - 全量 `test:ts` 运行 9,120 通过、1 跳过、5 失败；五个失败均为 browser scenario 负载下失败，逐一隔离复跑全部通过，因此本轮不能记作全量绿。相关测试文件为 receipt、cache、skills、healing 和 external handoff。
 - 当前批次尚未提交/推送，不能把本地证据当作新 SHA CI；`ec658966` 的 CI `39289335200` 与 Watch `39289335408` 已读回 success。
+
+### 2026-10-20 W7/W8/W9 与 TUI 输入/渲染返工
+
+- 当前基线为 `10f4b579`。本批修复 build manifest 输入/emit/资产绑定、不可变构建、原子 pointer、lock-owner 事务恢复、CLI 硬门禁、同文件多 hunk 选集、后台任务结算/脱敏/reload、首帧 session catalog 扫描，以及 TUI 多反引号表格、raw fallback 字节预算、UTF-8 chunk、字素保持和 Vim 纵向边界。
+- build lock 现在由恢复与发布共用：恢复先原子取得锁；active、stale、malformed lock 均 fail-closed；发布必须提供自己的 owner，编译期间 lock 被替换时拒绝发布且不删除替代 lock。stale lock 需人工确认后清理。
+- `StdinBuffer` 对跨 chunk 的完整字素使用 8 ms hold，覆盖 ASCII 标点、combining mark、keycap、ZWJ、escape/paste 后文本；控制键不延迟。`InteractiveMode` 复用注入 scheduler，避免测试与生产出现两套时间源。
+- JSON CLI 硬门禁验证真实 read 输出、stdin 加 prompt、单 hunk `apply_patch`、default-deny、失败后续、session migration 和 packaged entry；负例覆盖 `success:false`、approval/result 乱序及顶层 `toolCallId` 错配。
+- 聚焦 TUI/input/editor/render/HTML/InteractiveMode 套件 11 文件/266 项通过；`scripts/start.test.mjs` 30 项、`scripts/verify-cli-entry.test.mjs` 4 项及其余脚本合计 91 项通过。
+- browser/CLI 场景串行 34 文件/214 项通过、1 跳过。非 browser/CLI 完整车道 860 文件/8,983 项通过、1 项失败；唯一失败为既有 `grepPaths` 夹具 `spawn ETXTBSY`，该文件单独复跑 12/12 通过，不能记作该车道全绿。
+- 当前源码双构建通过：TS manifest `0ca9903c8a39c2771befc377c316d1f93a1e41eed51e7883b2ca954b62b50094`，1754 个 emit 文件；exe 102,574,208 bytes、SHA-256 `c516f9f1c6c61e036a4ab41b02de2353ac092ef79dda885a28624fe72d253fd6`。Node CLI、exe、`start` 均输出 `0.1.0`。
+- `verify:cli-entry` 全项通过；Linux Node/exe × regular/fullscreen PTY 四格通过。严格 docs drift 通过并保留 118 条既有 advisory；NormProof blocking unresolved-specifier 义务 satisfied，仍为 8 项既有函数上限 advisory。
+- 本条写入时尚未提交、推送，也没有新 SHA CI；全部 47 项 Phase 20 范围继续 active。

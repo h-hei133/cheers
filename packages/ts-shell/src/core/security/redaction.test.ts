@@ -27,4 +27,16 @@ describe("credential assignments", () => {
   it.each([24681357, false, null])("scrubs a JSON scalar credential: %s", password => {
     expect(JSON.parse(redactExportText(JSON.stringify({ password, keep: "visible" })))).toEqual({ password: "[redacted]", keep: "visible" });
   });
+
+  it.each([
+    "Authorization: Basic dXNlcjpwYXNz",
+    "curl --api-key FAKE_API_KEY --password FAKE_PASSWORD -u user:FAKE_PASSWORD",
+    "client-secret=FAKE_CLIENT_SECRET",
+    "curl -uuser:FAKE_PASSWORD https://user:FAKE_PASSWORD@example.test",
+    "DB_PASSWORD=FAKE_DB_PASSWORD OPENAI_API_KEY=FAKE_API_KEY",
+  ])("scrubs common CLI and Basic-auth credential spellings: %s", input => {
+    const output = redactReportText(input, 1000);
+    expect(output).not.toContain("FAKE_");
+    expect(output).not.toContain("dXNlcjpwYXNz");
+  });
 });

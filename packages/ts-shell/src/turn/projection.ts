@@ -173,6 +173,26 @@ export function concludeRun(messages: readonly AgentMessage[], prompt: string, s
       },
     };
   }
+  const failed = failedToolCall(messages);
+  if (failed) {
+    return {
+      kind: "completed",
+      finalOutput,
+      explained,
+      completed: {
+        type: "query.completed",
+        result: {
+          status: "stopped_error",
+          terminalClassification: "stopped",
+          terminalReason: "stopped_error",
+          stopReason: failed,
+          transcript: [],
+          sharedContext: { sessionId, initialPrompt: prompt, notes: [`steps: ${steps}`], handoffs: [] },
+          finalOutput,
+        },
+      },
+    };
+  }
   return {
     kind: "completed",
     finalOutput,
@@ -207,6 +227,17 @@ function refusedToolCall(messages: readonly AgentMessage[]): string | undefined 
     // The newest tool result is not a refusal, so whatever happened earlier was
     // recovered from; the run is not stopped by it.
     return undefined;
+  }
+  return undefined;
+}
+
+/** A tool failure remains a stopped outcome until a newer tool succeeds. */
+function failedToolCall(messages: readonly AgentMessage[]): string | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== "tool") continue;
+    const status = message.metadata?.status;
+    return status === "failed" || status === "unknown" ? messageToText(message.content) : undefined;
   }
   return undefined;
 }

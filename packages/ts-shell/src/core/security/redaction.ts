@@ -105,6 +105,15 @@ export function redactReportText(
 function applySecretRules(value: string): string {
   return value
     .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
+    .replace(/\b([A-Z][A-Z0-9_]*(?:API[_-]?KEY|CLIENT[_-]?SECRET|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|AUTH[_-]?TOKEN|PASSWORD|PASSWD|SECRET|TOKEN))\s*[:=]\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s"'`]+)/gi,
+      "$1=[redacted]")
+    .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, "$1[redacted]@")
+    .replace(/(^|[\s"'`])(-u|--user)(?:\s+|=)?(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s"'`]+)/gi,
+      "$1$2=[redacted]")
+    .replace(/\b(?:proxy-)?authorization\s*[:=]\s*(?:basic|bearer)\s+[A-Za-z0-9._~+/=-]+/gi,
+      "Authorization=[redacted]")
+    .replace(/(^|[\s"'`])(--?(?:api[-_]?key|client[-_]?secret|access[-_]?token|refresh[-_]?token|auth[-_]?token|authorization|token|secret|password|passwd|user(?:name)?|u))(?:\s+|=)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s"'`]+)/gi,
+      "$1$2=[redacted]")
     .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [redacted]")
     .replace(/(["'](?:api[_-]?key|token|secret|cookie|authorization|password)["']\s*:\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:-?\d+(?:\.\d+)?(?:e[+-]?\d+)?|true|false|null)(?=\s*[,}\]]))/gi, '$1"[redacted]"')
     .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*(?:(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s"']+)+|\S+)/gi, "$1=[redacted]")

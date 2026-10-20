@@ -11,7 +11,7 @@ import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
-import { RecordingTerminal } from "../../test-utils/terminalDouble.js";
+import { ManualScheduler, RecordingTerminal } from "../../test-utils/terminalDouble.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import type { OverlayHost, Picker } from "./overlay.js";
 import type { PickerHost } from "./picker/registry.js";
@@ -32,7 +32,11 @@ import * as goalScheduling from '../runtime/goalScheduling.js';
 import type { SubmissionQueue } from './inputQueue.js';
 import type { InteractiveApprovalResult } from './picker/approval.js';
 
-function build(overrides: { observeEvents?: () => () => void; exit?: (code?: number) => void } = {}): {
+function build(overrides: {
+  observeEvents?: () => () => void;
+  exit?: (code?: number) => void;
+  scheduler?: ManualScheduler;
+} = {}): {
   mode: InteractiveMode;
   renderer: StreamingRenderer;
   readline: { current: unknown };
@@ -66,6 +70,7 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
     initialMcpGateway: {} as unknown as CliMcpGateway,
     terminal,
     exit: overrides.exit,
+    scheduler: overrides.scheduler,
     setInteractiveApprovalPrompt: handler => { approval.current = handler; },
     setReadline: (value) => {
       readline.current = value;
@@ -342,12 +347,14 @@ describe("session wiring", () => {
   });
 
   it.each([["cp", "[text]"], ["recall", "<query>"], ["retain", "<statement>"]])("keeps /%s usage informational and submits the literal body once", (name, hint) => {
-    const { mode, terminal } = build();
+    const scheduler = new ManualScheduler();
+    const { mode, terminal } = build({ scheduler });
     const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void };
     const submit = vi.spyOn(host, "onSubmit").mockImplementation(() => {});
     mode.start();
     try {
       terminal.input(`/${name} `);
+      scheduler.flush();
       expect(host.view.suggestionsOpen).toBe(false);
       expect(stripAnsi(host.view.renderFrame({ columns: 100, rows: 24 }).rows.join("\n"))).toContain(`Usage: /${name} ${hint}`);
       terminal.input("\t");
@@ -359,6 +366,7 @@ describe("session wiring", () => {
       expect(submit).toHaveBeenCalledOnce();
       expect(submit.mock.calls[0]?.[0]).toBe(`/${name} ` + body);
       terminal.input("/btw ");
+      scheduler.flush();
       const next = stripAnsi(host.view.renderFrame({ columns: 100, rows: 24 }).rows.join("\n"));
       expect(next).toContain("Usage: /btw <question>");
       expect(next).not.toContain(`Usage: /${name}`);
@@ -577,7 +585,8 @@ describe("attention on idle", () => {
 
 
 it('keeps real wheel and bracketed paste input in the reader and restores the untouched draft', async () => {
-  const { mode, terminal } = build();
+  const scheduler = new ManualScheduler();
+  const { mode, terminal } = build({ scheduler });
   const host = mode as unknown as { pager: Pager; view: InteractiveView; onSubmit(text: string): void };
   const submit = vi.spyOn(host, 'onSubmit').mockImplementation(() => {});
   mode.start();
@@ -591,8 +600,12 @@ it('keeps real wheel and bracketed paste input in the reader and restores the un
     const filtered = stripAnsi(host.view.renderFrame({ columns: 80, rows: 24 }).rows.join('\n'));
     expect(filtered).toContain('record-42'); expect(filtered).not.toContain('record-3');
     expect(host.view.editor.getText()).toBe('untouched draft'); expect(submit).not.toHaveBeenCalled();
-    terminal.input('\x1b'); await vi.waitFor(() => expect(host.pager.active).toBe(false));
-    terminal.input('!'); expect(host.view.editor.getText()).toBe('untouched draft!');
+    terminal.input('\x1b');
+    scheduler.flush();
+    expect(host.pager.active).toBe(false);
+    terminal.input('!');
+    scheduler.flush();
+    expect(host.view.editor.getText()).toBe('untouched draft!');
     expect(submit).not.toHaveBeenCalled();
   } finally { mode.stop(); }
 });

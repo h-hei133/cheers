@@ -70,9 +70,9 @@
 | 任务 | 所有者 | 证据 | 反转 |
 |---|---|---|---|
 | RENDER-01（部分） | `transcript/math.ts` | math（4） | 金额被当公式或未知命令丢失参数时失败 |
-| RENDER-02（部分） | `transcript/markdown.ts` | markdown（32） | code pipe 被拆 cell 或窄屏截断长尾时失败 |
-| RENDER-03（部分） | `transcript/diff.ts` | diff（10） | 零宽内容绕过字节预算时失败 |
-| INPUT-01 | `editor/modal/state.ts`、`cli/interactive/keymap.ts` | 已有实现，计数/operator/文本对象、IME/粘贴及完整五模式合同待本次复核 | 不再以“未开始”描述已有代码，也不把少量模式测试当完整交付 |
+| RENDER-02（部分） | `transcript/{markdown,table}.ts` | markdown（41）、table（2）、html（31）；raw fallback 以最终 `rows.join("\n")` 的 UTF-8 字节计预算 | 多反引号 code span pipe 被拆 cell、ANSI/行分隔符绕过 64 KiB 预算或窄屏截断长尾时失败 |
+| RENDER-03（部分） | `transcript/diff.ts` | diff（12） | 零宽内容绕过字节预算时失败 |
+| INPUT-01（部分） | `editor/modal/state.ts`、`input/{terminal,stdinBuffer}.ts`、`cli/interactive/keymap.ts` | state（12）、keymap（63）、stdinBuffer（25）、terminal（7）；跨 UTF-8 chunk、fused/cross-chunk 字素、combining mark、keycap、paste/escape 后文本与纵向边界 | UTF-8 半码点产生替换字符、`f/F/t/T` 只收到首个 scalar、纵向移动落到 surrogate 中间或字素跨 chunk 被拆时失败；完整 IME/五模式合同仍待复核 |
 
 ## W8/W9
 
@@ -83,7 +83,7 @@
 | JOB-01（部分） | `LocalExecutionHandle`、一次 spawn 的 `adopt/promote`、原 PID 晋升、容量拒绝与重启 unknown 路径已有实现；`src/core/tools/shell/promotion.test.ts` 覆盖了基本晋升。 | adopted task 的 settlement 初值是已解决 Promise，`stop` 在子进程真正退出前即可返回；拒绝路径还会立即宣称没有运行中的进程。需要以真实子进程断言“停止派发”与“结算”分离。 |
 | JOB-02（部分） | 本地 notice、opt-in follow-up、去重/预算/截断和重启不重播已有实现与单测。 | follow-up 直接使用 `task.output`，未经过 UI notice 相同的脱敏；策略在构造时捕获 `backgroundFollowUp`，配置 reload 后不会重新读取。需要 secret 反例和 reload 反例。 |
 | EDIT-01（部分） | 稳定 group id、依赖组、选集绑定、重规划 revision 检查和无选集拒绝已有实现。 | 当前 approval group 按文件操作划分，同一文件多个 hunk 仍是一个可批准组；尚未满足 hunk 级选集与依赖契约。需要同文件双 hunk 反例。 |
-| START-01（未闭合） | build manifest、start/start:dev 和缺文件/过期源码的基本拒绝已有测试。 | manifest 未绑定 lockfile、构建配置、emit 字节和运行资产；`entry` 也未限制在 dist 内。需要 lockfile、dist 字节和越界 entry 的反例。 |
+| START-01（部分，本轮补强） | build manifest 已绑定 lockfile、构建配置、编译器/标准库、全部 emit 字节、五个运行资产和受控 entry；`start.test` 覆盖 journal 恢复、活动/stale build lock fail-closed、恢复期间竞争者拒绝、越界/未登记入口、篡改产物与 launcher/package-main 回滚。 | 仍按完整 START-01 裁决复核 version/help 懒加载、坏配置准入和同一 buildID 的发布时序；stale lock 需人工确认后清理，本轮本地通过不等于任务或 CI 完成。 |
 | START-02（部分） | 10k catalog 首屏测试和持久 reentry 摘要索引存在。 | 默认 bootstrap 仍可能在首帧前调用 `listSessions` 全量扫描；现有测试没有穿过真实 bootstrap 路径。需要 0/100/1k/10k 会话的首帧反转探针。 |
 | START-03（部分） | 历史 `bench:start`、`bench:interactive` 已记录 Node/exe 版本启动及 regular/fullscreen/pipe 首帧/退出数据。 | benchmark 未消费 ready/layout/write 观察点，未同步实际 prompt，交互矩阵仍为 Node-only，且缺少 raw sample、构建摘要和受控冷缓存；受控冷缓存及真实 ready 测量仍未闭合。 |
 

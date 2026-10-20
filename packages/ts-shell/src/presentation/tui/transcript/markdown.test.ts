@@ -89,6 +89,29 @@ describe("block structure", () => {
       expect(visibleWidth(row)).toBeLessThanOrEqual(24);
     }
   });
+
+  it.each([
+    "$$\nx^2 + y_1\n$$",
+    "\\[\nx^2 + y_1\n\\]",
+  ])("projects multiline display math", source => {
+    expect(plain(renderMarkdown(source, WIDTH))).toContain("x² + y₁");
+  });
+
+  it.each([
+    "$$\nx^2 + y_1",
+    "\\[\nx^2 + y_1",
+  ])("preserves an unterminated display-math delimiter", source => {
+    const rendered = plain(renderMarkdown(source, WIDTH));
+    expect(rendered).toContain(source.split("\n")[0]!);
+    expect(rendered).toContain("x^2 + y_1");
+  });
+
+  it("keeps the complete source when display math exceeds its projection budget", () => {
+    const source = `$$\n${"x".repeat(5000)}\n$$`;
+    const rendered = plain(renderMarkdown(source, WIDTH));
+    expect(rendered).toContain("$$");
+    expect(rendered).toContain("x".repeat(40));
+  });
 });
 
 describe("tables", () => {
@@ -204,6 +227,13 @@ describe("table cell semantics", () => {
     expect(rows.join("\n")).toContain("p | q");
   });
 
+  it("keeps a multi-backtick code-span pipe in one cell", () => {
+    const rows = renderMarkdown("| left | right |\n|---|---|\n| alpha | ``x | y`` |", 80).map(stripAnsi);
+    const body = rows.find((row) => row.includes("alpha"))!;
+    expect(body).toContain("x | y");
+    expect(body.match(/ │ /g)).toHaveLength(1);
+  });
+
   it("renders an explicit <br> as a second line and pads the shorter cell", () => {
     const rows = renderMarkdown("| a | b |\n|---|---|\n| one | first<br>second |", 80).map(stripAnsi);
     expect(rows.some(row => row.includes("first"))).toBe(true);
@@ -222,6 +252,7 @@ describe("table cell semantics", () => {
   it("stays inside the width for wide glyphs and long cells", () => {
     const table = "| 名称 | 说明 |\n|---|---|\n| 中文 | " + "长".repeat(200) + " |";
     for (const row of renderMarkdown(table, 40)) expect(visibleWidth(row)).toBeLessThanOrEqual(40);
+    expect(plain(renderMarkdown(table, 40)).replace(/\s/g, "")).toContain("长".repeat(200));
   });
 
   it("refuses more columns than the budget and shows the source", () => {
@@ -229,5 +260,39 @@ describe("table cell semantics", () => {
     const rule = "|" + Array.from({ length: 20 }, () => "---").join("|") + "|";
     const rows = renderMarkdown(`${header}\n${rule}\n|${Array.from({ length: 20 }, () => "x").join("|")}|`, 200).map(stripAnsi);
     expect(rows.join("\n")).toContain("c0");
+  });
+
+  it("bounds the raw fallback when a table exceeds the structured budget", () => {
+    const columns = 20;
+    const header = "|" + Array.from({ length: columns }, (_, index) => `c${index}`).join("|") + "|";
+    const rule = "|" + Array.from({ length: columns }, () => "---").join("|") + "|";
+    const body = Array.from({ length: 500 }, (_, row) => "|" + Array.from({ length: columns }, (_, column) => `${row}-${column}`).join("|") + "|");
+    const rows = renderMarkdown([header, rule, ...body].join("\n"), 80);
+    expect(rows.length).toBeLessThanOrEqual(401);
+    expect(plain(rows)).toContain("table truncated");
+  });
+
+  it("uses UTF-8 bytes rather than code units when bounding a raw table", () => {
+    const columns = 20;
+    const header = "|" + Array.from({ length: columns }, (_, index) => `c${index}`).join("|") + "|";
+    const rule = "|" + Array.from({ length: columns }, () => "---").join("|") + "|";
+    const rows = renderMarkdown(`${header}\n${rule}\n|${"🙂".repeat(20000)}|`, 80);
+    const text = plain(rows);
+    expect(text).not.toContain("\ufffd");
+    expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(64 * 1024);
+  });
+
+  it("counts ANSI bytes and row separators in the raw-table budget", () => {
+    const base = getDefaultTheme();
+    defaultTheme.apply(base, "truecolor");
+    try {
+      const columns = 20;
+      const header = "|" + Array.from({ length: columns }, (_, index) => `c${index}`).join("|") + "|";
+      const rule = "|" + Array.from({ length: columns }, () => "---").join("|") + "|";
+      const rows = renderMarkdown(`${header}\n${rule}\n|${"🙂".repeat(20000)}|`, 80);
+      expect(Buffer.byteLength(rows.join("\n"), "utf8")).toBeLessThanOrEqual(64 * 1024);
+    } finally {
+      defaultTheme.apply(base, "none");
+    }
   });
 });

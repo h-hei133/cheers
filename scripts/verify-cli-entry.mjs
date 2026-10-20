@@ -11,13 +11,13 @@ import {
   getSyntheticHome,
   getTestRoot,
 } from './support/testPaths.mjs'
+import { checkBuild } from './start-lib.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
 const packagedCliEntryPath = path.join(repoRoot, 'dist', 'cli.js')
-const builtTsShellCliPath = path.join(tsShellRoot, 'dist', 'packages', 'ts-shell', 'src', 'entrypoints', 'cli.js')
 const buildCliBinScriptPath = path.join(repoRoot, 'scripts', 'build-cli-bin.mjs')
 const syntheticHome = getSyntheticHome()
 const realProviderHome = getRealProviderHome({ allowDefault: true })
@@ -28,19 +28,15 @@ const migratedProjectRoot = path.join(testRoot, 'cli-entry-gate-rebased')
 const oldProjectRoot = path.join(testRoot, 'cli-entry-gate-old-root')
 const fixturePath = `${projectRoot}/fixture.txt`
 const stdinFixturePath = `${projectRoot}/stdin-fixture.txt`
+const patchFixturePath = `${projectRoot}/patch-fixture.txt`
 const replayPath = `${projectRoot}/replay.txt`
 const migratedFixturePath = `${migratedProjectRoot}/rebased-fixture.txt`
 const seededSessionId = 'cli_entry_gate_seeded_session'
-const fixtureReadMarker = `Read result for ${fixturePath}:`
-const stdinFixtureReadMarker = `Read result for ${stdinFixturePath}:`
-const migratedFixtureReadMarker = `Read result for ${migratedFixturePath}:`
 
 const commonResultMarkers = [
   'Result',
   'Outcome: success',
-  'Action result',
-  'Task: read-file',
-  'Verification: not-requested',
+  'Execution summary',
 ]
 
 function run(command, args, options = {}) {
@@ -124,6 +120,7 @@ function ensureFixtureData() {
     ['cli entry stdin fixture line 1', 'cli entry stdin fixture line 2'].join('\n'),
     'utf8',
   )
+  fs.writeFileSync(patchFixturePath, 'before\n', 'utf8')
   fs.writeFileSync(
     migratedFixturePath,
     ['cli entry migrated fixture line 1', 'cli entry migrated fixture line 2'].join('\n'),
@@ -199,6 +196,7 @@ async function runCli(args, options = {}) {
     HOME: syntheticHome,
     USERPROFILE: syntheticHome,
     CHEERS_PROVIDER_MODE: 'synthetic',
+    CHEERS_SYNTHETIC_TOOLS: '1',
     ...(options.env ?? {}),
   }
   return run(process.execPath, [tsxCliPath, cliEntryPath, ...args], {
@@ -210,11 +208,17 @@ async function runCli(args, options = {}) {
 }
 
 async function ensurePackagedCliEntry() {
-  if (!fs.existsSync(builtTsShellCliPath)) {
+  const tsShellPackage = readJson(path.join(tsShellRoot, 'package.json'))
+  const build = checkBuild({
+    root: repoRoot,
+    dist: path.join(tsShellRoot, 'dist'),
+    version: tsShellPackage.version,
+  })
+  if (!build.ok) {
     printStep(
       'cli-entry-packaged-build-artifact',
       'product-regression',
-      `missing built ts-shell CLI: ${builtTsShellCliPath}`,
+      `${build.state}: ${build.reason}`,
     )
     return false
   }
@@ -249,6 +253,7 @@ async function runPackagedCli(args, options = {}) {
     HOME: syntheticHome,
     USERPROFILE: syntheticHome,
     CHEERS_PROVIDER_MODE: 'synthetic',
+    CHEERS_SYNTHETIC_TOOLS: '1',
     ...(options.env ?? {}),
   }
   return run(process.execPath, [packagedCliEntryPath, ...args], {
@@ -279,30 +284,161 @@ async function assertSuccessfulPackagedCliRun(name, args, markers, options = {})
   return assertMarkers(result.output, markers, name)
 }
 
+function parseJsonStream(output, label) {
+  const events = []
+  const lines = output.split(/\r?\n/).filter(Boolean)
+  for (let index = 0; index < lines.length; index += 1) {
+    try {
+      const value = JSON.parse(lines[index])
+      if (value?.schemaVersion !== 'run-event-stream.v1'
+        || typeof value.eventType !== 'string'
+        || !value.facts
+        || value.truthfulness?.observationOnly !== true
+        || value.truthfulness?.terminalSuccessClaim !== false) {
+        throw new Error('invalid event shape')
+      }
+      events.push(value)
+    } catch (error) {
+      printStep(label, 'product-regression', `invalid JSON line ${index + 1}: ${error instanceof Error ? error.message : String(error)}`)
+      console.log(summarizeOutput(output))
+      return undefined
+    }
+  }
+  if (events.length === 0) {
+    printStep(label, 'product-regression', 'empty JSON event stream')
+    console.log(summarizeOutput(output))
+    return undefined
+  }
+  return events
+}
+
+export function assertJsonToolResult(
+  name,
+  result,
+  markers,
+  toolName,
+  expectedOutputs,
+  expectedCompletions = 1,
+  expectedApproval = false,
+) {
+  if (result.code !== 0 || result.timedOut) {
+    printStep(name, 'product-regression', result.timedOut ? 'timed out' : `exit=${result.code}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  const missing = markers.filter((marker) => !result.output.includes(marker))
+  if (missing.length > 0) {
+    printStep(name, 'product-regression', `missing=${missing.join(' | ')}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  const events = parseJsonStream(result.stdout, name)
+  if (!events) return false
+  const completions = events.filter((event) => event.eventType === 'query.completed'
+    && event.facts?.result?.status === 'completed')
+  if (completions.length !== expectedCompletions) {
+    printStep(name, 'product-regression', `completed=${completions.length} expected=${expectedCompletions}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  if (expectedApproval && !events.some((event) => event.eventType === 'approval.resolved'
+    && event.facts?.toolName === toolName && event.facts?.outcome === 'approved')) {
+    printStep(name, 'product-regression', `missing approved ${toolName} approval event`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  const toolResults = events.filter((event) => event.eventType === 'tool.result'
+    && event.facts?.toolName === toolName)
+  if (toolResults.some((event) => event.facts?.success !== true
+    || event.facts?.failureReason !== undefined
+    || event.facts?.metadata?.files?.some((file) => file.compensation && file.compensation !== 'none'))) {
+    printStep(name, 'product-regression', `${toolName} reported a failed or compensated result`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  if (expectedApproval) {
+    const approval = events.find((event) => event.eventType === 'approval.resolved'
+      && event.facts?.toolName === toolName && event.facts?.outcome === 'approved')
+    const resultEvent = toolResults[0]
+    if (!approval || !resultEvent || approval.order >= resultEvent.order
+      || typeof approval.toolCallId !== 'string'
+      || typeof resultEvent.toolCallId !== 'string'
+      || approval.toolCallId !== resultEvent.toolCallId) {
+      printStep(name, 'product-regression', `${toolName} approval/result ordering or correlation is invalid`)
+      console.log(summarizeOutput(result.output))
+      return false
+    }
+  }
+  const outputs = toolResults
+    .map((event) => event.facts?.output)
+    .filter((output) => typeof output === 'string')
+  const missingOutputs = expectedOutputs.filter((expected) => !outputs.some((output) => output.includes(expected)))
+  if (outputs.length !== expectedOutputs.length || missingOutputs.length > 0) {
+    printStep(
+      name,
+      'product-regression',
+      `${toolName}-results=${outputs.length} expected=${expectedOutputs.length} missing=${missingOutputs.join(' | ') || 'none'}`,
+    )
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  printStep(name, 'pass')
+  return true
+}
+
+function assertJsonReadResult(name, result, markers, expectedOutputs, expectedCompletions = 1) {
+  return assertJsonToolResult(name, result, markers, 'read', expectedOutputs, expectedCompletions)
+}
+
+async function assertSuccessfulJsonReads(name, args, markers, expectedOutputs, expectedCompletions = 1, options = {}) {
+  return assertJsonReadResult(name, await runCli(args, options), markers, expectedOutputs, expectedCompletions)
+}
+
+async function assertSuccessfulPackagedJsonReads(name, args, markers, expectedOutputs, expectedCompletions = 1, options = {}) {
+  return assertJsonReadResult(name, await runPackagedCli(args, options), markers, expectedOutputs, expectedCompletions)
+}
+
 async function runPrintReplayBoundary() {
-  const printOk = await assertSuccessfulCliRun(
+  const printOk = await assertSuccessfulJsonReads(
     'cli-entry-print-mode',
-    ['--project', projectRoot, '--print', `read the first line from ${fixturePath}`],
-    [fixtureReadMarker, 'cli entry fixture line 1'],
+    [
+      '--project',
+      projectRoot,
+      '--json',
+      '--print',
+      `read the first line from ${fixturePath}`,
+    ],
+    [],
+    ['cli entry fixture line 1'],
   )
-  const replayOk = await assertSuccessfulCliRun(
+  const replayOk = await assertSuccessfulJsonReads(
     'cli-entry-replay-file-mode',
-    ['--project', projectRoot, '--replay-file', replayPath],
-    ['Replay mode: running 1 prompt(s)', fixtureReadMarker, 'cli entry fixture line 1'],
+    [
+      '--project',
+      projectRoot,
+      '--json',
+      '--replay-file',
+      replayPath,
+    ],
+    [],
+    ['cli entry fixture line 1'],
   )
   return printOk && replayOk
 }
 
 async function runStdinPromptBoundary() {
-  return assertSuccessfulCliRun(
+  return assertSuccessfulJsonReads(
     'cli-entry-print-stdin-plus-prompt-boundary',
-    ['--project', projectRoot, '--print', `read the first line from ${fixturePath}`],
     [
-      fixtureReadMarker,
-      'cli entry fixture line 1',
-      stdinFixtureReadMarker,
-      'cli entry stdin fixture line 1',
+      '--project',
+      projectRoot,
+      '--json',
+      '--print',
+      `read the first line from ${fixturePath}`,
     ],
+    [],
+    ['cli entry fixture line 1', 'cli entry stdin fixture line 1'],
+    2,
     { stdin: `read the first line from ${stdinFixturePath}\n` },
   )
 }
@@ -315,6 +451,8 @@ async function runPrintToolExecutionSurface() {
   const result = await runCli([
     '--project',
     projectRoot,
+    '--non-interactive-approval',
+    'allow-once',
     '--print',
     `Create file ${targetFile} with content: cli entry tool execution surface.`,
   ])
@@ -330,13 +468,11 @@ async function runPrintToolExecutionSurface() {
 
   const requiredMarkers = [
     'Result',
-    'Action result',
-    'Task: write-file',
-    'Changed files: cli-entry-tool-execution.txt',
-    'Verification: status=skipped',
-    'Verdict: Partial',
-    '[not_proven] relevant verification did not pass',
-    '[action] Next:',
+    'Approval decision: allow-once',
+    'Outcome: success',
+    'Execution summary',
+    'Actions: write (1 run)',
+    'Approvals: 1/1 approved',
   ]
   const missing = requiredMarkers.filter((marker) => !result.output.includes(marker))
   if (missing.length > 0) {
@@ -358,6 +494,37 @@ async function runPrintToolExecutionSurface() {
   }
 
   printStep('cli-entry-print-tool-execution-surface', 'pass')
+  return true
+}
+
+async function runNonInteractiveSingleHunkPatch() {
+  const name = 'cli-entry-non-interactive-single-hunk-patch'
+  fs.writeFileSync(patchFixturePath, 'before\n', 'utf8')
+  const result = await runCli([
+    '--project',
+    projectRoot,
+    '--json',
+    '--non-interactive-approval',
+    'allow-once',
+    '--print',
+    'Apply patch to patch-fixture.txt replacing before with after',
+  ])
+  const toolOk = assertJsonToolResult(
+    name,
+    result,
+    [],
+    'apply_patch',
+    ['committed'],
+    1,
+    true,
+  )
+  if (!toolOk) return false
+  const content = fs.readFileSync(patchFixturePath, 'utf8')
+  if (content !== 'after\n') {
+    printStep(`${name}-content`, 'product-regression', `content=${JSON.stringify(content)}`)
+    return false
+  }
+  printStep(`${name}-content`, 'pass')
   return true
 }
 
@@ -388,8 +555,7 @@ async function runNonInteractiveApprovalBoundary() {
     'Result',
     'Outcome: stopped',
     'BlockerKind: approval-denied',
-    'Action result',
-    'Task: run-command',
+    'Actions: bash (1 run, 1 failed)',
     'Approvals: 0/1 approved',
   ]
   const missing = requiredMarkers.filter((marker) => !result.output.includes(marker))
@@ -436,17 +602,8 @@ async function runFailedToolFollowupSurface() {
     'Approval decision: allow-once',
     'Result',
     'Outcome: stopped',
-    'BlockerKind: verification-failed',
-    'Action result',
-    'Task: run-command',
-    'Changed: none',
-    'Failed files: (command)',
-    'Failure reason: (command):',
-    'Verification: failed',
-    'Verification detail:',
-    'Next action:',
     'Next steps',
-    'Tool execution failed after approval; inspect the command output/error.',
+    'Actions: bash (1 run, 1 failed)',
     'Approvals: 1/1 approved',
   ]
   const missing = requiredMarkers.filter((marker) => !result.output.includes(marker))
@@ -471,10 +628,22 @@ async function runFailedToolFollowupSurface() {
 }
 
 function extractResultReason(output) {
-  const reasonMatch = output.match(/^- Reason:\s*(.+)$/m)
-  if (reasonMatch?.[1]?.trim()) return reasonMatch[1].trim()
-  const failureReasonMatch = output.match(/^- Failure reason:\s*(.+)$/m)
-  if (failureReasonMatch?.[1]?.trim()) return failureReasonMatch[1].trim()
+  const lines = output.split(/\r?\n/)
+  for (const label of ['Reason', 'Failure reason', 'Detail']) {
+    const prefix = `- ${label}:`
+    const index = lines.findIndex((line) => line.startsWith(prefix))
+    if (index < 0) continue
+    const parts = [lines[index].slice(prefix.length).trim()]
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const line = lines[next]
+      if (/^- [A-Za-z][A-Za-z ]*:/.test(line)
+        || /^(Next steps|Execution summary|Result|Continuation)$/.test(line)) break
+      parts.push(line)
+    }
+    while (parts.length > 1 && !parts.at(-1).trim()) parts.pop()
+    const reason = parts.join('\n').trimEnd()
+    if (reason) return reason
+  }
   return undefined
 }
 
@@ -501,12 +670,9 @@ async function runStoppedFailureFollowupRealPath() {
     'Approval decision: allow-once',
     'Result',
     'Outcome: stopped',
-    'BlockerKind: verification-failed',
-    'Action result',
-    'Task: run-command',
-    'Verification: failed',
-    'Next action:',
     'Next steps',
+    'Actions: bash (1 run, 1 failed)',
+    'Approvals: 1/1 approved',
   ]
   const missingFailureMarkers = failureMarkers.filter((marker) => !failed.output.includes(marker))
   if (missingFailureMarkers.length > 0) {
@@ -598,18 +764,20 @@ async function runStoppedFailureFollowupRealPath() {
 
 async function runSessionMigrationBoundary() {
   seedSessionForMigration()
-  const ok = await assertSuccessfulCliRun(
+  const ok = await assertSuccessfulJsonReads(
     'cli-entry-session-id-migration-boundary',
     [
       '--project',
       migratedProjectRoot,
+      '--json',
       '--session-id',
       seededSessionId,
       '--migrate-session-root',
       '--print',
       `read the first line from ${migratedFixturePath}`,
     ],
-    [migratedFixtureReadMarker, 'cli entry migrated fixture line 1'],
+    [],
+    ['cli entry migrated fixture line 1'],
   )
   if (!ok) return false
 
@@ -673,14 +841,17 @@ async function runPackagedEntryBoundary() {
     ['--project', projectRoot, '--print', '/sessions current'],
     ['Current session', '- ID:'],
   )
-  const printOk = await assertSuccessfulPackagedCliRun(
+  const printOk = await assertSuccessfulPackagedJsonReads(
     'cli-entry-packaged-print-mode',
-    ['--project', projectRoot, '--print', `read the first line from ${fixturePath}`],
     [
-      ...commonResultMarkers,
-      fixtureReadMarker,
-      'cli entry fixture line 1',
+      '--project',
+      projectRoot,
+      '--json',
+      '--print',
+      `read the first line from ${fixturePath}`,
     ],
+    [],
+    ['cli entry fixture line 1'],
   )
   return slashOk && printOk
 }
@@ -706,6 +877,7 @@ async function main() {
   checks.push(await runPrintReplayBoundary())
   checks.push(await runStdinPromptBoundary())
   checks.push(await runPrintToolExecutionSurface())
+  checks.push(await runNonInteractiveSingleHunkPatch())
   checks.push(await runNonInteractiveApprovalBoundary())
   checks.push(await runFailedToolFollowupSurface())
   checks.push(await runStoppedFailureFollowupRealPath())
@@ -718,7 +890,9 @@ async function main() {
   process.exit(ok ? 0 : 1)
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exit(1)
-})
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
+}

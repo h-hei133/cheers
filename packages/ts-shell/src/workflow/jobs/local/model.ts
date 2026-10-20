@@ -59,6 +59,7 @@ export interface LocalJournalPort {
   arm(id: string): void;
   started(id: string): void;
   output(id: string, stream: 'stdout' | 'stderr', chunk: Buffer): void;
+  truncate(id: string, stream: 'stdout' | 'stderr'): void;
   finish(id: string, result: Pick<CommandExecutionResult, 'status' | 'exitCode' | 'terminationFailed' | 'outputFailed' | 'spawnErrorCode'>): void;
   unverified(id: string): void;
   admission(id: string): string | undefined;

@@ -36,6 +36,7 @@ import {
   projectSessionReentrySummary,
   type SessionReentrySummary,
 } from "./presentation/sessionReentrySurface.js";
+import type { SessionSummary } from "./store/catalog/model.js";
 import type { RecoveryTrustBoundaryBlock } from "./recovery/recoveryTrustBoundary.js";
 import type { SessionResumeEligibility } from "./recovery/sessionResumeEligibility.js";
 import type {
@@ -51,6 +52,10 @@ import {
   evaluateRecoveryTrustBoundaryForSession,
   projectRecoveryTrustBoundaryBlockForSession,
 } from "./recovery/sessionRecoveryRuntime.js";
+import {
+  selectAsyncReentryHint,
+  type AsyncReentryHint,
+} from "./recovery/asyncReentryHint.js";
 import type { RecoverySnapshot } from "./recovery/sessionRecoverySnapshot.js";
 import {
   resumeSession,
@@ -322,6 +327,66 @@ export class SessionManager extends SessionReadSurface {
     });
     const withContent = summaries.find((summary) => summary.hasConversation === true || summary.hasReportHistory === true);
     return withContent ? this.host.store.load(withContent.id) : null;
+  }
+
+  /**
+   * Bounded, cancellable re-entry discovery for startup hints.
+   *
+   * The catalog yields its current identity before directory discovery and
+   * then publishes pages. This method never treats an incomplete scan as an
+   * authoritative absence; callers use the result only as a suggestion.
+   */
+  async getReentryCandidateAsync(input: {
+    readonly preferredProjectRoot: string;
+    readonly currentSessionId?: string;
+    readonly signal?: AbortSignal;
+  }): Promise<Session | null> {
+    return (await this.getRecoveryHintAsync(input))?.candidate ?? null;
+  }
+
+  /**
+   * Discover the post-first-frame recovery suggestion and its blocked result.
+   *
+   * The catalog owns directory traversal and diagnostics. Selection is a
+   * separate projection so a blocked session can never be mistaken for a
+   * usable candidate merely because it appeared first in a page.
+   */
+  async getRecoveryHintAsync(input: {
+    readonly preferredProjectRoot: string;
+    readonly currentSessionId?: string;
+    readonly signal?: AbortSignal;
+  }): Promise<AsyncReentryHint | null> {
+    const signal = input.signal;
+    signal?.throwIfAborted();
+    const context = {
+      sessionId: input.currentSessionId ?? "",
+      projectRoot: input.preferredProjectRoot,
+      busy: false,
+      allProjects: true,
+    };
+    const summaries = new Map<string, SessionSummary>();
+    for await (const page of this.catalog.list(
+      context,
+      signal,
+      10_000,
+      undefined,
+      (diagnostic) => this.host.store.reportCatalogUnreadable(diagnostic),
+    )) {
+      signal?.throwIfAborted();
+      for (const summary of page.sessions) {
+        if (summary.id === input.currentSessionId) continue;
+        summaries.set(summary.id, summary);
+      }
+    }
+    signal?.throwIfAborted();
+    return selectAsyncReentryHint({
+      summaries: [...summaries.values()],
+      preferredProjectRoot: input.preferredProjectRoot,
+      signal,
+      loadSession: (sessionId) => this.getSession(sessionId),
+      describe: (sessionId) => this.describeSessionReentry(sessionId),
+      evaluate: (session) => this.evaluateRecoveryTrustBoundary(session),
+    });
   }
 
   getSuggestedRecoverySession(input?: {

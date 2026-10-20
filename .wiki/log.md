@@ -8045,3 +8045,19 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 全量 `npm run test:ts` 实际结果：9,120 通过、1 跳过、5 失败。失败集中在 `test-utils/browser/{receipt,cache,skills,healing,network/external}` 的 CLI 子进程场景；五个文件分别隔离复跑全部通过，归类为并发负载下的场景夹具失败，保留失败日志，不记作全量绿或产品通过。
 - 独立 review 另确认了 W7/W8/W9 的既有问题：同文件多 hunk 仍按文件组审批、adopted task 在子进程结算前可报告 stopped、background follow-up 未脱敏且 reload 不重读策略、默认 bootstrap 仍有首帧前全量 session scan、START-01 manifest 未绑定 lockfile/emit/runtime assets 且 entry 未限制在 dist。相应旧“完成”标签已从 contract/status 撤回，后续按审计顺序返工。
 - 当前批次尚未提交/推送；`ec658966` 的 CI `39289335200`/job `118185566198` 与 Architecture Watch `39289335408` 已实际读回 success。不能把当前工作区证据当作该 SHA 的 CI 证据。
+
+### 2026-10-20 W7/W8/W9、START-01 与 TUI 输入/渲染返工
+
+- 基线 `10f4b579`。本批按原 owner 修复 START-01 manifest schema v2：输入摘要覆盖源文件、lockfile、构建配置、编译器/标准库与构建/启动脚本；发布记录全部 emit 字节、五个运行资产、launcher/package-main，并把入口限制在不可变 build 内。发布改为 staging 快照、不可变 build、原子 pointer 与 journal/backup 回滚。
+- build lock 与事务恢复统一：`start` 在读取 journal 前原子取得同一把锁；active、stale、malformed lock 均 fail-closed，不修改 pointer/journal/backup。`buildCli` 持有锁并显式传递 owner；`publishBuild` 不再以“存在 active lock”泛化放行，恢复期间竞争者和编译期间 lock 替换均被拒绝。
+- CLI launcher 不再继承重复 inspector，但保留 `--require`/`--loader` 等执行选项。`verify:cli-entry` 改为解析真实 JSONL `tool.result`，验证 read 内容、stdin+prompt、单 hunk patch、default-deny、失败后续、migration 与 packaged entry；新增纯断言负例，修复原先把顶层 `toolCallId` 错读为 `facts.toolCallId` 后“双方 undefined 仍相等”的假通过。
+- TUI 渲染修复多反引号 code span 的 pipe 拆 cell；raw table fallback 以最终 `rows.join("\n")` 的 UTF-8 字节计 64 KiB 预算；终端 HTML/表格回归同步。`Terminal` 使用持久 `StringDecoder`，string/Buffer 交错不会把半码点变成替换字符。
+- `StdinBuffer` 以 `Intl.Segmenter` 完整字素为输入单位，跨 chunk hold 8 ms；覆盖 ASCII 标点、combining mark、keycap、ZWJ、fused tail、escape/paste 后文本，控制键不延迟。`InteractiveMode` 复用注入 scheduler；Vim 纵向移动落在字素边界，真实 `StdinBuffer -> keymap -> editor` 覆盖 `f/F/t/T` 字素匹配。
+- W7/W8/W9 同时修复同文件多 hunk 选集/依赖组、adopted task 的停止与结算分离、后台 follow-up 脱敏和 reload 重读、bootstrap 首帧前 session catalog 扫描，以及 session/recovery/turn/research 等相关回归；contract/status 保持 INPUT-01、RENDER-01…03、EDIT-01、JOB-01/02、START-01/02 为 partial，不把本批当阶段完成。
+- 独立 reviewer 对当前工作树给出 `REQUEST: APPROVE`；前两轮指出的 lock TOCTOU、标点起始 cluster、真实事件层级和 scheduler 同步问题均已修复并复测。最终文档与 stale-lock fail-closed 行为一致。
+- 聚焦 TUI/input/editor/render/HTML/InteractiveMode 11 文件/266 项通过；`start.test` 30 项、CLI gate 负例 4 项及其余脚本共 91 项通过。browser/CLI 场景串行 34 文件/214 项通过、1 跳过。
+- 非 browser/CLI 完整车道 860 文件/8,983 项通过、1 项失败：`core/tools/grepPaths.test.ts` 在并发车道命中既有 `spawn ETXTBSY`；该文件单独复跑 12/12 通过。该失败保留，不把车道记作全绿。默认并发全量运行还出现 browser/CLI 子进程负载失败；串行两车道是本次可复现的分类证据。
+- `tsc -p packages/ts-shell/tsconfig.build.json --noEmit`、import cycles、config consumers、declarations、Node floor、strict docs drift 与 `git diff --check` 通过；strict docs drift 保留 118 条既有 advisory。仓库 tgz 的 NormProof 退出 0、verdict partial：blocking unresolved-specifier 与无环义务 satisfied，仍为 8 项既有函数上限 advisory。
+- 当前源码双构建通过：TS manifest `0ca9903c8a39c2771befc377c316d1f93a1e41eed51e7883b2ca954b62b50094`，inputsDigest `eed34dd1a4be064f217c0621acd2c919d846d479c0d8e1b5a3b5bcd558545ec9`，artifactDigest `c98694a6932023aed031f46807c6db4157b78356c8dc98dec3ee8fd5dcf2d658`，1754 个 emit 文件。exe 102,574,208 bytes、SHA-256 `c516f9f1c6c61e036a4ab41b02de2353ac092ef79dda885a28624fe72d253fd6`。
+- `verify:cli-entry` 全项通过；Linux Node/exe × regular/fullscreen PTY 四格通过；`node dist/cli.js --version`、`dist/bin/cheers --version`、`node scripts/start.mjs --version` 均为 `0.1.0`。未使用真实 provider 配置或凭据。
+- 本条写入时尚未提交/推送，没有新 SHA CI；全部 47 项 Phase 20 范围继续 active。

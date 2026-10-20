@@ -44,6 +44,13 @@ export function graphemeBoundaries(text: string): number[] {
   return boundaries;
 }
 
+/** Length of the first grapheme cluster, or zero for an empty string. */
+export function firstClusterLength(text: string): number {
+  if (!text) return 0;
+  for (const { segment } of segmenter.segment(text)) return segment.length;
+  return 0;
+}
+
 /** Ordered visible cells of a rendered line, each carrying its escape prefix. */
 export function* lineCells(line: string): Generator<LineCell> {
   let index = 0;

@@ -17,6 +17,7 @@ describe("appearance reports through stdin", () => {
       try {
         input.feed("x" + report.slice(0, split));
         input.feed(report.slice(split) + "y");
+        input.flush();
         expect(onAppearance.mock.calls).toEqual([[expected]]);
         expect(key.mock.calls.map(([event]) => event.text).join("")).toBe("xy");
       } finally { input.dispose(); }
@@ -74,6 +75,7 @@ it.each([
     vi.advanceTimersByTime(5000);
     expect(vi.getTimerCount()).toBe(0);
     input.feed(tail + "x");
+    input.flush();
     expect(onAppearance.mock.calls).toEqual([["light"]]);
     expect(key.mock.calls.map(([event]) => event.keyId)).toEqual(["x"]);
   } finally { input.dispose(); vi.useRealTimers(); }
@@ -94,6 +96,7 @@ it("discards oversized report payloads through their terminator and resumes typi
     input.feed("\x1b[?997;1A\x1b[?997A");
     input.feed("\x1b[?997;" + "1;".repeat(400) + "A");
     expect(onAppearance).not.toHaveBeenCalled();
+    input.flush();
     expect(key.mock.calls.map(([event]) => event.keyId)).toEqual(["x", "y"]);
     input.feed("\x1b]11;unfinished\x1b[A");
     expect(key.mock.lastCall?.[0].keyId).toBe("up");

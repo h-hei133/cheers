@@ -165,17 +165,60 @@ const defaultDependencies: CliRuntimeInvocationDependencies = {
  * answering in prose.
  */
 const SYNTHETIC_TOOL_INTENTS = [
-  { phrase: "node version", tool: "bash", command: "node --version" },
-  { phrase: "node --version", tool: "bash", command: "node --version" },
+  {
+    phrase: "node version",
+    name: "bash",
+    args: () => ({ command: "node --version" }),
+  },
+  {
+    phrase: "node --version",
+    name: "bash",
+    args: () => ({ command: "node --version" }),
+  },
+  {
+    phrase: "read the first line from ",
+    name: "read",
+    args: (prompt: string) => ({
+      path: prompt.slice(prompt.toLowerCase().indexOf("read the first line from ") + "read the first line from ".length).trim(),
+      limit: 1,
+    }),
+  },
+  {
+    phrase: "create file ",
+    name: "write",
+    args: (prompt: string) => {
+      const match = /^create file (.+?) with content:\s*([\s\S]+)$/i.exec(prompt.trim());
+      return match ? { path: match[1]!.trim(), content: match[2]!.trim() } : {};
+    },
+  },
+  {
+    phrase: "apply patch to ",
+    name: "apply_patch",
+    args: (prompt: string) => {
+      const match = /^apply patch to (.+?) replacing ([\s\S]+?) with ([\s\S]+)$/i.exec(prompt.trim());
+      if (!match) return {};
+      return {
+        input: [
+          "*** Begin Patch",
+          `*** Update File: ${match[1]!.trim()}`,
+          "@@",
+          `-${match[2]!.trim()}`,
+          `+${match[3]!.trim()}`,
+          "*** End Patch",
+        ].join("\n"),
+      };
+    },
+  },
+  {
+    phrase: "run ",
+    name: "bash",
+    args: (prompt: string) => ({ command: prompt.replace(/^run\s+/i, "").trim() }),
+  },
 ] as const;
 
 function syntheticToolIntent() {
   if (process.env.CHEERS_SYNTHETIC_TOOLS !== "1") return undefined;
-  return SYNTHETIC_TOOL_INTENTS.map((intent) => ({
-    phrase: intent.phrase,
-    name: intent.tool,
-    args: () => ({ command: intent.command }),
-  }));
+  return SYNTHETIC_TOOL_INTENTS.map(({ phrase, name, args }) => ({ phrase, name, args }));
 }
 
 export function buildCliRuntimeInvocation(input: CliRuntimeInvocationInput): CliRuntimeInvocationRequest {

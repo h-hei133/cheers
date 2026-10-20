@@ -47,7 +47,14 @@ export function createSyntheticStep(options?: {
 
 /** Whether any tool has already produced a result in this conversation. */
 function alreadyCalled(messages: readonly AgentMessage[]): boolean {
-  return messages.some((message) => message.role === "tool");
+  let lastUser = -1;
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index]!.role === "user") {
+      lastUser = index;
+      break;
+    }
+  }
+  return messages.slice(lastUser + 1).some((message) => message.role === "tool");
 }
 }
 
@@ -83,9 +90,25 @@ function lastUserText(messages: readonly AgentMessage[]): string {
     const message = messages[index];
     if (message.role !== "user") continue;
     // The opening message carries an environment line ahead of the prompt.
-    const content = messageToText(message.content);
-    const lines = content.split("\n");
-    return (lines[0]?.startsWith("[Environment Context:") ? lines.slice(1).join("\n") : content).trim();
+    return stripPromptContext(messageToText(message.content));
   }
   return "";
+}
+
+/** Remove the runtime-owned opening sections without treating them as user intent. */
+function stripPromptContext(content: string): string {
+  let text = content.trim();
+  if (text.startsWith("[Environment Context:")) {
+    const separator = text.indexOf("\n\n");
+    if (separator >= 0) text = text.slice(separator + 2);
+  }
+  if (text.startsWith("Recorded session facts (historical context, not current authorization):")) {
+    const instruction = "- instruction: use this continuity context to continue the same task; do not restart from scratch.";
+    const instructionIndex = text.indexOf(instruction);
+    if (instructionIndex >= 0) {
+      const separator = text.indexOf("\n\n", instructionIndex + instruction.length);
+      if (separator >= 0) text = text.slice(separator + 2);
+    }
+  }
+  return text.trim();
 }

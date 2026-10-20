@@ -1,6 +1,6 @@
 import { defaultTheme } from "../../theme/theme.js";
 import { truncateToWidth } from "../text/layout.js";
-import { visibleWidth } from "../text/measure.js";
+import { graphemeBoundaries, visibleWidth } from "../text/measure.js";
 
 /**
  * Unified diff rendering with intra-line emphasis.
@@ -34,48 +34,73 @@ const DEFAULT_MAX_BYTES = 64 * 1024;
 export function renderDiff(diff: string, width: number, options: DiffRenderOptions = {}): string[] {
   if (!diff) return [];
   if (options.sideBySide && width >= SIDE_BY_SIDE_MIN_WIDTH) return renderSideBySide(diff, width, options);
+  const maxRows = Math.max(1, options.maxRows ?? DEFAULT_MAX_ROWS);
+  const maxBytes = Math.max(1, options.maxBytes ?? DEFAULT_MAX_BYTES);
   const lines = diff.split("\n");
   const rows: string[] = [];
+  let consumed = 0;
+  let truncated = false;
+  const push = (row: string): boolean => {
+    if (rows.length >= maxRows) { truncated = true; return false; }
+    rows.push(row);
+    return true;
+  };
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]!;
+    consumed += Buffer.byteLength(line, "utf8") + 1;
+    if (consumed > maxBytes) { truncated = true; break; }
     if (HUNK_PREFIXES.some((prefix) => line.startsWith(prefix))) {
-      rows.push(defaultTheme.fg("muted", truncateToWidth(line, width)));
+      if (!push(defaultTheme.fg("muted", truncateToWidth(line, width)))) break;
       continue;
     }
     const next = lines[index + 1];
     if (line.startsWith("-") && next?.startsWith("+")) {
+      consumed += Buffer.byteLength(next, "utf8") + 1;
+      if (consumed > maxBytes) { truncated = true; break; }
       const split = splitEmphasis(line.slice(1), next.slice(1));
-      rows.push(emphasised("-", split.removed, "diffRemoved", width));
-      rows.push(emphasised("+", split.added, "diffAdded", width));
+      if (!push(emphasised("-", split.removed, "diffRemoved", width))
+        || !push(emphasised("+", split.added, "diffAdded", width))) break;
       index += 1;
       continue;
     }
-    if (line.startsWith("+")) rows.push(plain("+", line.slice(1), "diffAdded", width));
-    else if (line.startsWith("-")) rows.push(plain("-", line.slice(1), "diffRemoved", width));
-    else rows.push(plain(" ", line.replace(/^ /, ""), "diffContext", width));
+    if (line.startsWith("+")) {
+      if (!push(plain("+", line.slice(1), "diffAdded", width))) break;
+    } else if (line.startsWith("-")) {
+      if (!push(plain("-", line.slice(1), "diffRemoved", width))) break;
+    } else if (!push(plain(" ", line.replace(/^ /, ""), "diffContext", width))) break;
   }
+  if (truncated) rows.push(defaultTheme.dim("… diff truncated by the view budget"));
   return rows;
 }
 
 /** Shared prefix and suffix of a removed/added pair, with the differing middles. */
 function splitEmphasis(removed: string, added: string): { removed: Emphasis; added: Emphasis } {
+  const removedClusters = splitClusters(removed);
+  const addedClusters = splitClusters(added);
   let head = 0;
-  const limit = Math.min(removed.length, added.length);
-  while (head < limit && removed[head] === added[head]) head += 1;
+  const limit = Math.min(removedClusters.length, addedClusters.length);
+  while (head < limit && removedClusters[head] === addedClusters[head]) head += 1;
   let tail = 0;
-  while (tail < limit - head && removed[removed.length - 1 - tail] === added[added.length - 1 - tail]) tail += 1;
+  while (tail < limit - head
+    && removedClusters[removedClusters.length - 1 - tail] === addedClusters[addedClusters.length - 1 - tail]) tail += 1;
   return {
     removed: {
-      head: removed.slice(0, head),
-      body: removed.slice(head, removed.length - tail),
-      tail: removed.slice(removed.length - tail),
+      head: removedClusters.slice(0, head).join(""),
+      body: removedClusters.slice(head, removedClusters.length - tail).join(""),
+      tail: removedClusters.slice(removedClusters.length - tail).join(""),
     },
     added: {
-      head: added.slice(0, head),
-      body: added.slice(head, added.length - tail),
-      tail: added.slice(added.length - tail),
+      head: addedClusters.slice(0, head).join(""),
+      body: addedClusters.slice(head, addedClusters.length - tail).join(""),
+      tail: addedClusters.slice(addedClusters.length - tail).join(""),
     },
   };
+}
+
+function splitClusters(text: string): string[] {
+  const boundaries = graphemeBoundaries(text);
+  return Array.from({ length: Math.max(0, boundaries.length - 1) }, (_, index) =>
+    text.slice(boundaries[index]!, boundaries[index + 1]!));
 }
 
 function emphasised(

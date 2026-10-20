@@ -142,13 +142,7 @@ export class InteractiveMode {
   private readonly view: InteractiveSurface;
   /** The transcript, draft, pastes, and completions the surface projects. */
   private readonly state: ViewState;
-  private readonly stdin = new StdinBuffer({
-    onAppearance: (appearance) => {
-      if (!updateAppearance(appearance)) return;
-      this.theme.refresh();
-      this.tui.requestRender({ force: true });
-    },
-  });
+  private readonly stdin: StdinBuffer;
   private readonly sink: TurnSink;
   private readonly questions: QuestionBridge;
   private readonly readline: ReadlineInterface;
@@ -262,6 +256,17 @@ export class InteractiveMode {
       // does not.
       onReload: () => this.tui.requestRender({ force: true }),
     });
+    this.stdin = new StdinBuffer({
+      onAppearance: (appearance) => {
+        if (!updateAppearance(appearance)) return;
+        this.theme.refresh();
+        this.tui.requestRender({ force: true });
+      },
+      ...(options.scheduler ? {
+        setTimer: (callback: () => void, delayMs: number) => options.scheduler?.setTimeout(callback, delayMs),
+        clearTimer: (handle: unknown) => options.scheduler?.clearTimeout(handle),
+      } : {}),
+    });
     this.tui.setDisconnectHandler(() => { void this.shutdown(); });
     // Build the transcript before subscribing to the live job owner. A native
     // runner may settle during construction; completion notices must have a
@@ -270,7 +275,9 @@ export class InteractiveMode {
     excludeRecordingInput(options.runtimeContext, () => this.stopped || Boolean(this.state.editor.getText() || this.questions.question() || this.overlay.active || this.pager.active || this.search.active));
     // Completion is a scoped local notice. Output does not become new user intent
     // or silently dispatch a model request; taskOutput exposes the retained facts.
-    const backgroundFollowUp = createBackgroundFollowUp({ enabled: options.runtimeContext.runtimeConfig.backgroundFollowUp === true });
+    const backgroundFollowUp = createBackgroundFollowUp({
+      enabled: () => options.runtimeContext.runtimeConfig.backgroundFollowUp === true,
+    });
     this.stopWatchingBackground = watchJobsFor(options.runtimeContext, (task) => {
       this.state.transcript.append(textBlock('notice', renderTaskNotice(task)));
       this.tui.requestRender();

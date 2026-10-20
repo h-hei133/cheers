@@ -107,6 +107,35 @@ describe("blocks", () => {
     expect(html).toContain("<td>2</td>");
   });
 
+  it("uses the same escaped-pipe, code-span, and explicit-break cell semantics as the terminal", () => {
+    const html = renderMarkdownHtml("| a | b |\n|---|---|\n| x \\| y | `p | q`<br>next |");
+    expect(html).toContain("<td>x | y</td>");
+    expect(html).toContain("<td><code>p | q</code><br>next</td>");
+  });
+
+  it("keeps a multi-backtick code-span pipe in one table cell", () => {
+    const html = renderMarkdownHtml("| a | b |\n|---|---|\n| left | ``x | y`` |");
+    expect(html.match(/<td>/g)).toHaveLength(2);
+    expect(html).toContain("x | y");
+  });
+
+  it("keeps multiline display math as a bounded source block", () => {
+    const html = renderMarkdownHtml("$$\nx^2 + y_1\n$$");
+    expect(html).toBe('<div class="math">x^2 + y_1</div>');
+  });
+
+  it("keeps an unterminated display-math delimiter in the exported source", () => {
+    const html = renderMarkdownHtml("$$\nx^2 + y_1");
+    expect(html).toContain("$$");
+    expect(html).toContain("x^2 + y_1");
+  });
+
+  it("keeps complete display-math delimiters when projection is over budget", () => {
+    const html = renderMarkdownHtml(`$$\n${"x".repeat(5000)}\n$$`);
+    expect(html).toContain("$$");
+    expect(html).toContain("x".repeat(40));
+  });
+
   it("renders a fenced block as code, not as markup", () => {
     const html = renderMarkdownHtml("```ts\nconst x = 1;\n```");
     expect(html).toContain("<code>const x = 1;</code>");

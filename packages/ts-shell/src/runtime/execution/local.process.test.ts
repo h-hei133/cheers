@@ -16,6 +16,23 @@ it('handles a child that exits before consuming its stdin without an unhandled p
   expect(result).toMatchObject({ status: 'failed', exitCode: 1 });
 });
 
+it('decodes a UTF-8 code point split across stdout chunks once', async () => {
+  let live = '';
+  const result = await executeLocally({
+    command: process.execPath,
+    args: ['-e', [
+      "const bytes = Buffer.from('🙂')",
+      "process.stdout.write(bytes.subarray(0, 2))",
+      "setTimeout(() => process.stdout.write(bytes.subarray(2)), 10)",
+    ].join(';')],
+    cwd: process.cwd(),
+    onOutput: chunk => { live += chunk },
+    timeoutMs: 1000,
+  });
+  expect(result).toMatchObject({ status: 'completed', stdout: '🙂' });
+  expect(live).toBe('🙂');
+});
+
 it.skipIf(process.platform === "win32").each([false, true])(
   "allows graceful TERM exit and escalates an ignoring child (ignores: %s)", async ignores => {
     const controller = new AbortController();

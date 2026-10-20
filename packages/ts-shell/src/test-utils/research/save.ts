@@ -30,5 +30,8 @@ const context = { workspaceRoot: workspace, sessionId, taskId: `save-${phase}`,
     fs.renameSync = (...args) => { rename(...args); published(args[1]); };
   } };
 const prepared = await researchSaveTool(runtime, run.id).prepare!({ runId: run.id, path: 'report.md' }, context);
-await prepared.execute(context);
+const selection = prepared.selections?.length === 1
+  ? [prepared.selections[0]!.id]
+  : undefined;
+await prepared.execute(context, selection, { revision: prepared.selectionRevision });
 throw new Error('The save crash fixture did not reach its selected interruption.');
