@@ -58,7 +58,7 @@ export function renderPanel(
   const chips = contentCapacity >= 2 ? chrome.chips : undefined;
   const chipRows = chips ? 1 : 0;
   const listBudget = Math.max(0, contentCapacity - 1 - chipRows);
-  const overflow = listBudget > 0 && model.total > listBudget;
+  const overflow = listBudget > 1 && model.total > listBudget;
   const listRows = Math.max(0, listBudget - (overflow ? 1 : 0));
   if (chips) {
     rows.push(chips.text);
@@ -160,6 +160,9 @@ function rowMarker(option: Option, active: boolean, model: OptionModel, chrome: 
 
 function renderFooterRows(chrome: PanelChrome, width: number, maxRows: number): string[] {
   if (chrome.footer) {
+    if (width < 20 && chrome.footer.includes('Esc to close')) {
+      return [defaultTheme.dim(truncateToWidth('  Esc to close', width))];
+    }
     const rows = chrome.groupHint
       ? [defaultTheme.dim(truncateToWidth(`  ${chrome.groupHint}`, width))]
       : [];
