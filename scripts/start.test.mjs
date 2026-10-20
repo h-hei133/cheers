@@ -149,7 +149,7 @@ test("binds enumerated compiler inputs outside known type roots", () => {
     path.join(value.root, "node_modules/typescript/bin/tsc"),
     `process.stdout.write(${JSON.stringify(compilerInput)} + "\\n");\n`,
   );
-  write(path.join(value.root, "node_modules/typescript/package.json"), '{"type":"module"}\n');
+  write(path.join(value.root, "node_modules/typescript/package.json"), '{"type":"commonjs"}\n');
   assert.deepEqual(listCompilerFiles(value.root), ["node_modules/custom-types/index.d.ts"]);
   const before = buildInputDigest(value.root, ["node_modules/custom-types/index.d.ts"]).digest;
   write(compilerInput, "export type Value = 'after';\n");

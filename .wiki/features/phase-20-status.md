@@ -193,4 +193,5 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - browser/CLI 场景串行 34 文件/214 项通过、1 跳过。非 browser/CLI 完整车道 860 文件/8,983 项通过、1 项失败；唯一失败为既有 `grepPaths` 夹具 `spawn ETXTBSY`，该文件单独复跑 12/12 通过，不能记作该车道全绿。
 - 当前源码双构建通过：TS manifest `0ca9903c8a39c2771befc377c316d1f93a1e41eed51e7883b2ca954b62b50094`，1754 个 emit 文件；exe 102,574,208 bytes、SHA-256 `c516f9f1c6c61e036a4ab41b02de2353ac092ef79dda885a28624fe72d253fd6`。Node CLI、exe、`start` 均输出 `0.1.0`。
 - `verify:cli-entry` 全项通过；Linux Node/exe × regular/fullscreen PTY 四格通过。严格 docs drift 通过并保留 118 条既有 advisory；NormProof blocking unresolved-specifier 义务 satisfied，仍为 8 项既有函数上限 advisory。
-- 本条写入时尚未提交、推送，也没有新 SHA CI；全部 47 项 Phase 20 范围继续 active。
+- 首推 `96fae26d877a6d162c0f9909d3726969ca6c635d` 的 Architecture Watch `39397906660` success；CI `39397906657`/job `118545101287` 在 `test:scripts` 唯一失败：Node 20.3 下假 `tsc` fixture 被 `type:module` 当作 extensionless ESM，退出 1。已改为显式 CommonJS 并本地 91/91 通过，后续 SHA 的 CI 尚待读回。
+- 全部 47 项 Phase 20 范围继续 active。
