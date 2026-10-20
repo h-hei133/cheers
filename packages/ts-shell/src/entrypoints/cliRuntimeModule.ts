@@ -88,9 +88,13 @@ export async function runNonTtyPromptStream(options: {
   nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
   ruleControlsCommand?: import("../core/commands/types.js").CommandContext['ruleControlsCommand'];
   forceTool?: import("../core/commands/types.js").CommandContext['forceTool'];
+  onFirstFrame?: () => void;
+  onUserIntent?: () => void;
 }): Promise<void> {
   await runPromptInputStream({ runtimeContext: options.runtimeContext, sessionRuntime: options.sessionRuntime,
     renderer: options.renderer, logger: options.logger,
+    onFirstFrame: options.onFirstFrame,
+    onUserIntent: options.onUserIntent,
     runPrompt: prompt => runNonInteractivePrompt({ ...options, prompt, printMode: false, awaitGoalScheduling: false }),
   });
 }

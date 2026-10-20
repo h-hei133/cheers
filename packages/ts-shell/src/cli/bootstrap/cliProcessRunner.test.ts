@@ -78,6 +78,7 @@ import { createCliShutdown } from "../runtime/shutdown.js";
 import { createCliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBridge.js";
 import { createCliSessionRuntime } from "../runtime/cliSessionRuntimeFactory.js";
 import { captureCliStdinPrompts } from "../print/stdinPromptCapture.js";
+import { runCliPrintModeRouter } from "../print/printModeRouter.js";
 import { runCliProcess } from "./cliProcessRunner.js";
 
 const projectRoot = "/tmp/cli-process-runner-project";
@@ -284,7 +285,9 @@ it("waits for the line-loop first-frame callback before starting the recovery hi
     waitForIdle: vi.fn(async () => undefined),
   } as never);
   vi.mocked(createCliShutdown).mockReturnValue(shutdown as never);
+  let interactiveInput: Parameters<typeof runInteractiveLoop>[0] | undefined;
   vi.mocked(runInteractiveLoop).mockImplementation(async (input) => {
+    interactiveInput = input;
     expect(getRecoveryHintAsync).not.toHaveBeenCalled();
     await new Promise<void>(resolve => setImmediate(resolve));
     expect(getRecoveryHintAsync).not.toHaveBeenCalled();
@@ -329,5 +332,8 @@ it("waits for the line-loop first-frame callback before starting the recovery hi
 
   expect(getRecoveryHintAsync).toHaveBeenCalledOnce();
   expect(stdoutWrite.mock.calls.some(([chunk]) => String(chunk).includes("Recovery hint"))).toBe(false);
+  const routed = vi.mocked(runCliPrintModeRouter).mock.calls[0]?.[0];
+  expect(routed?.onFirstFrame).toBe(interactiveInput?.onFirstFrame);
+  expect(routed?.onUserIntent).toBe(interactiveInput?.onUserIntent);
   expect(shutdown.close).toHaveBeenCalledOnce();
 });

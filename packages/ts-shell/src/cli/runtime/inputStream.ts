@@ -32,6 +32,8 @@ export async function runPromptInputStream(options: {
   readonly renderer: StreamingRenderer;
   readonly logger: StructuredLogger;
   readonly runPrompt: (prompt: string) => Promise<'exit' | void>;
+  readonly onFirstFrame?: () => void;
+  readonly onUserIntent?: () => void;
 }): Promise<void> {
   const contextTag = (): string =>
     formatCliContextTag({
@@ -44,6 +46,7 @@ export async function runPromptInputStream(options: {
   options.renderer.renderLine(
     "Send one prompt per line, or paste fenced/multiline content. Close stdin to finish.\n",
   );
+  options.onFirstFrame?.();
   options.logger.info("CLI non-TTY stdin stream mode started", {
     sessionId: options.runtimeContext.session.id,
   });
@@ -167,6 +170,7 @@ export async function runPromptInputStream(options: {
   };
 
   stdinReader.on("line", (line) => {
+    options.onUserIntent?.();
     if (exitRequested) return;
     const normalizedLine = line.replace(/^\uFEFF/, "");
     if (pendingPrompt) {

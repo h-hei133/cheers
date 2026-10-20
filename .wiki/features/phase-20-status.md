@@ -93,7 +93,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | CMD-01/02 | `0345b44f`、`a4deb45e` | 前缀排序、完整命令提交；102 入口审计沿用既有契约 |
 | SET-01/02 | `734f51a4`、`9ce49b16` | 34 项编辑器、7 组 tab、changed 标记 |
 | SET-03（预览） | `6736f402` | status/theme 预览撤销；Apply 前不写、CAS 保持 |
-| PAN-02（部分） | `6736f402`、本次 | 时间分组、`Ctrl+P` pin、tree 连接线、resume 分页到 10000 |
+| PAN-02（部分） | `6736f402`、本次 | 时间分组、`Ctrl+P` pin、tree 连接线与 current focus、全屏事实/对话预览、窄屏 stacked preview、完整授权目录搜索、10k 分页批处理、pin 持久化 |
 | PAN-03（部分） | 本次 | `/hub` 只读主从面板、1s journal 轮询、详情列 |
 | PAN-05（部分） | 本次 | `/advisor` 只读 checkpoint/note 主从面板；`/plan-review` 增加结构化 `CommandReport`（版本/阶段/验收项/绑定状态），`/btw` 增加问题/是否送达/答案报告；两者仍只读或独立授权 |
 | INPUT-01（部分） | 本次 | 五模式状态机、vimMode、Normal/Visual Enter 不提交、粘贴优先 |
@@ -118,7 +118,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | 任务 | 已做 | 缺 |
 |---|---|---|
 | PAN-01 | model 两栏与详情、同名 relay 区分、预设行 | 连接/role 的绑定 revision 搜索验收 |
-| PAN-02 | 分组、pin、树形、分页、跨项目搜索 | 预览/置顶持久验收 |
+| PAN-02 | 时间分组、pin、树形、跨项目完整授权目录搜索、10k 分页批处理、全屏事实/对话预览、窄屏 stacked preview、current tree focus、pin 持久化 | fork/restore/delete 组合 PTY 验收 |
 | PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
 | PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝 | history 完整树、copy 到头/失败/取消边界、back/undo/restore 审计 |
 | PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引） | agents 专用操作仍归 `/jobs`；未知状态验收未单列 |
@@ -140,6 +140,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 - 更早的失败提交均已被后续修复覆盖：handoff 的 `todo` pin、director feature tools、settings 标签、firstFrame padding、MCP 启动超时、copy 的环境依赖。
 - `57e1ffb3`、`7da6e6d4`、`f0f2f2d2` 的 CI 均因同一对取消测试超时失败（`director/runtime.test.ts`、`jobs/agent/command.test.ts`）：bash 工具改走 `startCommand` 后，测试仍 mock `executeLocally`。`0b8dcdb4` 改为 mock `startStreamed` 并让 `startCommand` 同样报告 settlement；本地全量 8473 通过，CI success（run 39061415399）。`c5da8107`（启动基准脚本与 `bench:start`）CI success（run 39062680340）。`070f1405` CI success（run 39066438514）；`93302750`、`a6ba2665`、`4631ea3a`、`8802e496` CI success。`2bdebf5a` 仅 `browser.test.ts` 的 “blocked without a manifest” 失败（本地 5/5 通过，且其后含同改动的 `4631ea3a` CI success），归为 CI 浏览器环境抖动。`ea0078ab`（索引清理）、`cd881d25`（双构建 PTY）、`df23d812`（并排源复制）、`0ea1c2fa`（预派发取消）、`a8b07008`（浏览器场景超时）、`e3217a14`（CLI 场景超时）CI success；`768903b0`（external 场景超时）CI success（run 39076664306）。`bde00a5e` 再次命中同一 baseline 管道抖动；已改为等待 `- ID:` 行，本地 40/40，后续 SHA 验证。
 - `8c7f949f`、`3de906fe`、`2a4bafe5`、`b913c50e` CI success；`dd43bcce` 的 CI 仅 `cli-baseline.test.ts` 的 pipe-spawn smoke 失败（期望 `- ID:`），本地单跑 40/40 通过，且其后的 SHA 同代码 CI success，归为负载下的 spawn 抖动。
+- `8ee42201` 的 CI `39460132672`/job `118757136751` completed/failure：9306 项通过、2 失败、3 跳过；两项都在 `cli-baseline.test.ts` 的 non-TTY health/golden 路径，实际原因是 `runPromptInputStream` 绕过 `runLineLoop` 后未接 first-frame/user-intent，导致 recovery hint 与聚合诊断不发布，不是单纯超时。当前工作树已接同一 lifecycle，并将 golden fixture 改为先等待 health 结果再发首个 prompt；本批新 SHA CI 待提交后实际读回。
 
 ## 启动基准（2026-10-18，WSL2，Node 20）
 
@@ -232,3 +233,12 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 全量 `npm run test:ts` 本轮实际出现 20 项失败，全部集中在 browser CLI 子进程场景的 exit-code/输出缺失；将同一组 11 个失败文件以 `--single-thread` 串行复跑得到 85 项通过、1 项跳过，说明并发负载下的场景夹具失败仍需在 CI/串行车道单独观察，不能记为全量绿。
 - fresh TS build `c80b84f0d7af`，inputs digest `9c5cafc1dd17`，artifact digest `4bb084c80969`；exe 102,668,416 bytes、SHA-256 `9420876813f3`。`verify:cli-entry`、`start --version`、import cycles、config consumers、declarations、Node floor、strict docs drift、`git diff --check` 均通过；docs drift 保留 118 条既有 advisory，module facade 保持 8 项既有 advisory（本批触及的 lineLoop 未新增越界）。仓库 tgz 的 NormProof 实际退出 0、verdict partial，blocking unresolved-specifier 义务 satisfied，仍为 8 项既有函数上限 advisory。
 - 本批尚未提交/推送；新 SHA CI、最终独立复核和远端结果仍待实际读回，不把工作树结果写成交付完成。
+
+### 2026-10-21 PAN-02 搜索/预览与 non-TTY recovery 修复
+
+- `/resume` 现在使用 full-screen panel；`Picker.fullScreen` 允许 panel 保留两栏并占满帧。session picker 从 catalog summary 渲染当前/选中会话的项目、状态、时间、文件大小、pin、首问和末答摘录，摘录各限制 1200 个 code point；窄于 60 列时使用 stacked preview，footer 先折行而不是丢弃状态。
+- 本地过滤不再只搜索已加载的 40 项：picker 的 debounce search port 由 `OverlayHost` 统一持有 generation/AbortController/timer，旧 query 或 scope 的 late result 不能回填；session listing 扫描完整授权目录后分页匹配结果，文件大小按 41 项 batch 采样，显式区分 searching/partial/complete/no-match/failure。search 结果保留首屏外 identity，`more` 可继续搜索分页并携带 query。
+- tree picker 以当前健康 entry 为 initial focus，unavailable entry 仍 disabled；pin/unpin 经既有 metadata owner 原子写入、读回确认，并验证 transcript/state 字节不变。
+- non-TTY live stdin 不再绕过 recovery lifecycle：`runPromptInputStream` 在启动输出后报告 first frame，在首行输入时推进 user intent；`printModeRouter`/`cliRuntimeModule`/`cliProcessRunner` 传递同一 hooks。取消 recovery hint 不再吞掉已发现的 unreadable-directory 诊断；golden fixture 在首个 prompt 前等待 health 结果，避免把 fence 误当成产品成功。
+- 聚焦 12 文件/170 项、完整 `cli-baseline.test.ts` 41/41、`test:scripts` 92 项通过；import cycles、config consumers、declarations、Node floor、strict docs drift、`git diff --check` 通过，docs drift 保留 118 条既有 advisory，module facade 保持 8 项既有 advisory。fresh TS manifest `fd2581a4f34d`，exe SHA-256 `8330eeaf524c20bae03108a8c34c039e81d59a663664bdc1fbfb59ffdd354e28`；Node/exe × regular/fullscreen PTY 四格、`verify:cli-entry` 19/19 通过。仓库 tgz NormProof 退出 0/partial，open obligations 为 0，保留 8 项 proof gap/既有 ceiling advisory。
+- 仍未闭合：fork/restore/delete 的组合 PTY 验收；START-03 的真实 ready/key/event-loop/raw sample/受控冷缓存仍缺，QA-02 的 line/pipe 五条业务链和跨平台/IME 仍缺，QA-03/TOOL-02 真实质量与 tokenizer 仍未验。本批尚未提交/推送；新 SHA CI 与 Watch 待实际读回。

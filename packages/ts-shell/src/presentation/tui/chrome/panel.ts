@@ -1,5 +1,5 @@
 import { defaultTheme } from "../../theme/theme.js";
-import { padToWidth, truncateToWidth } from "../text/layout.js";
+import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import type { Option, OptionModel } from "./options.js";
 import type { ChipStrip } from "./chips.js";
@@ -50,32 +50,45 @@ export function renderPanel(
 ): string[] {
   capacity = Math.max(0, Math.floor(capacity));
   if (capacity === 0 || width <= 0) return [];
-  if (capacity === 1) return [renderFooter(chrome, width)];
+  const footer = renderFooterRows(chrome, width, capacity >= 6 ? 3 : capacity >= 4 ? 2 : 1);
+  if (capacity === 1) return footer.slice(0, 1);
+  const contentCapacity = Math.max(1, capacity - footer.length);
   const rows: string[] = [renderHeader(model, chrome, width)];
-  // Header and footer always cost a row each; an overflow notice costs a third,
-  // and forgetting to reserve it is how a bounded panel overruns its budget.
-  const chips = capacity >= 3 ? chrome.chips : undefined;
+  // Header and footer cost fixed rows; an overflow notice costs one more.
+  const chips = contentCapacity >= 2 ? chrome.chips : undefined;
   const chipRows = chips ? 1 : 0;
-  const overflow = capacity >= 4 + chipRows && model.total > capacity - 2 - chipRows;
-  const listRows = Math.max(0, capacity - (overflow ? 3 : 2) - chipRows);
+  const listBudget = Math.max(0, contentCapacity - 1 - chipRows);
+  const overflow = listBudget > 0 && model.total > listBudget;
+  const listRows = Math.max(0, listBudget - (overflow ? 1 : 0));
   if (chips) {
     rows.push(chips.text);
     for (const span of chips.spans) chrome.onChipRow?.(rows.length - 1, span.id, span.from, span.to);
   }
-  if (listRows === 0) return [...rows, renderFooter(chrome, width)];
+  if (listRows === 0) return [...rows, ...footer];
   if (model.total === 0) {
     const message = chrome.state === "error" ? defaultTheme.fg("error", chrome.empty) : defaultTheme.dim(chrome.empty);
     rows.push(truncateToWidth(`  ${message}`, width));
-    rows.push(renderFooter(chrome, width));
+    rows.push(...footer);
     return rows;
   }
-  const window = model.window(listRows);
   const twoColumn = chrome.detail !== undefined && width >= TWO_COLUMN_MIN_WIDTH;
   const listWidth = twoColumn ? Math.max(20, Math.floor(width * 0.45)) : width;
   const detailWidth = twoColumn ? Math.max(0, width - listWidth - 1) : 0;
-  const detailLines = twoColumn ? chrome.detail!(model.current()?.id) : [];
+  const detailLines = chrome.detail?.(model.current()?.id) ?? [];
+  const previewRows = !twoColumn && listRows >= 4
+    ? Math.min(12, listRows - 3, detailLines.length)
+    : 0;
+  let optionRows = Math.max(1, listRows - previewRows - (previewRows > 0 ? 1 : 0));
+  let overflowNotice = overflow;
+  if (previewRows > 0 && model.total > optionRows && !overflowNotice) {
+    overflowNotice = true;
+    optionRows = Math.max(1, optionRows - 1);
+  }
+  const window = model.window(twoColumn ? listRows : optionRows);
   const labelWidth = measureLabelWidth(model.visible, listWidth);
-  const bodyRows = Math.min(listRows, Math.max(window.count, detailLines.length));
+  const bodyRows = twoColumn
+    ? Math.min(listRows, Math.max(window.count, detailLines.length))
+    : Math.min(optionRows, window.count);
   for (let rowIndex = 0; rowIndex < bodyRows; rowIndex++) {
     const index = window.offset + rowIndex;
     const option = model.visible[index];
@@ -86,8 +99,14 @@ export function renderPanel(
         + padToWidth(truncateToWidth(detailLines[rowIndex] ?? "", detailWidth), detailWidth)
       : row);
   }
-  if (overflow) rows.push(truncateToWidth(`  ${defaultTheme.dim(`↑ ${window.above} · ↓ ${window.below} more`)}`, width));
-  rows.push(renderFooter(chrome, width));
+  if (previewRows > 0) {
+    rows.push(truncateToWidth(`  ${defaultTheme.dim("Preview")}`, width));
+    for (const line of detailLines.slice(0, previewRows)) {
+      rows.push(truncateToWidth(`  ${defaultTheme.dim(line)}`, width));
+    }
+  }
+  if (overflowNotice) rows.push(truncateToWidth(`  ${defaultTheme.dim(`↑ ${window.above} · ↓ ${window.below} more`)}`, width));
+  rows.push(...footer);
   return rows;
 }
 
@@ -139,16 +158,21 @@ function rowMarker(option: Option, active: boolean, model: OptionModel, chrome: 
   return `  ${box} `;
 }
 
-function renderFooter(chrome: PanelChrome, width: number): string {
+function renderFooterRows(chrome: PanelChrome, width: number, maxRows: number): string[] {
   if (chrome.footer) {
-    const footer = [chrome.groupHint, chrome.footer].filter(Boolean).join(' · ');
-    return defaultTheme.dim(truncateToWidth(visibleWidth(`  ${footer}`) <= width ? `  ${footer}` : "Esc to close", width));
+    const rows = chrome.groupHint
+      ? [defaultTheme.dim(truncateToWidth(`  ${chrome.groupHint}`, width))]
+      : [];
+    const footerRows = Math.max(1, maxRows - rows.length);
+    rows.push(...wrapToWidth(chrome.footer, Math.max(1, width - 4)).slice(0, footerRows)
+      .map(line => defaultTheme.dim(truncateToWidth(`  ${line}`, width))));
+    return rows.slice(0, maxRows);
   }
   const keys = chrome.multiple
     ? ["↑↓ move", "space toggle", "↵ apply", "esc cancel"]
     : ["↑↓ move", "↵ choose", "esc cancel"];
   if (chrome.groupHint) keys.unshift(chrome.groupHint);
-  return defaultTheme.dim(truncateToWidth(`  ${chrome.filterable === false ? '' : 'type to filter  ·  '}${keys.join("  ·  ")}`, width));
+  return [defaultTheme.dim(truncateToWidth(`  ${chrome.filterable === false ? '' : 'type to filter  ·  '}${keys.join("  ·  ")}`, width))];
 }
 
 /** Column the detail text starts at, bounded so a long label cannot eat the row. */

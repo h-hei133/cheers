@@ -6,6 +6,27 @@ import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { queueCommandFor } from './inputQueue.js';
 import { runPromptInputStream } from './inputStream.js';
 
+it('reports the first frame before input and fences the first user intent', async () => {
+  const stdin = new PassThrough();
+  const events: string[] = [];
+  const context = { session: { id: 'pipe', projectRoot: '/workspace' }, projectRoot: '/workspace' } as ShellRuntimeContext;
+  const run = runPromptInputStream({
+    stdin,
+    runtimeContext: context,
+    sessionRuntime: { waitForIdle: async () => {} } as ShellSessionRuntime,
+    renderer: { renderLine: () => {} } as never,
+    logger: { info: () => {} } as never,
+    onFirstFrame: () => events.push('frame'),
+    onUserIntent: () => events.push('intent'),
+    runPrompt: async () => {},
+  });
+
+  expect(events).toEqual(['frame']);
+  stdin.end('one prompt\n');
+  await run;
+  expect(events).toEqual(['frame', 'intent']);
+});
+
 it('edits, moves and cancels the real pipe consumer queue while an ordinary prompt is held', async () => {
   const stdin = new PassThrough(); const seen: string[] = []; const lines: string[] = [];
   let release!: () => void; let started!: () => void; let submitted!: () => void;

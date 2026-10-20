@@ -72,6 +72,41 @@ it('renders a chip strip inside the capacity and reports its spans', () => {
   expect(hits[1]![3]).toBeGreaterThan(hits[1]![2]);
 });
 
+it('wraps a long status footer before dropping it', () => {
+  const rows = renderPanel(model(), {
+    title: 'Pick',
+    empty: 'none',
+    multiple: false,
+    footer: 'Session files: logical size; excludes attachments.',
+  }, 40, 8);
+  const output = stripAnsi(rows.join('\n'));
+  expect(output).toContain('Session files: logical size;');
+  expect(output).toContain('excludes attachments.');
+  expect(rows.length).toBeLessThanOrEqual(8);
+});
+
+it('stacks a bounded selected-item preview below the two-column width', () => {
+  const rows = renderPanel(model(), {
+    title: 'Sessions',
+    empty: 'none',
+    multiple: false,
+    detail: () => [
+      'Current session',
+      'Project: /workspace',
+      'Prompt:',
+      'saved question',
+      'Latest answer:',
+      'saved answer',
+    ],
+  }, 40, 12);
+  const output = stripAnsi(rows.join('\n'));
+  expect(output).toContain('Preview');
+  expect(output).toContain('Current session');
+  expect(output).toContain('saved question');
+  expect(output).not.toContain('│');
+  expect(rows.length).toBeLessThanOrEqual(12);
+});
+
 it('degrades to nothing or a footer at zero and one row', () => {
   expect(renderPanel(model(), { title: 'Pick', empty: 'none', multiple: false }, 40, 0)).toEqual([]);
   const one = renderPanel(model(), { title: 'Pick', empty: 'none', multiple: false }, 40, 1);

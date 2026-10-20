@@ -3524,6 +3524,20 @@ describe("CLI streaming baseline (T3)", () => {
         );
       }, 45000);
 
+      const sendFirstPromptWhenHealthy = (): void => {
+        if (
+          promptSent ||
+          !output.includes("Ctrl+C cancels the current run. Ctrl+D exits.") ||
+          !/Skipped\s+2\s+unreadable session directories/.test(output)
+        ) {
+          return;
+        }
+        promptSent = true;
+        cli.stdin?.write(
+          "Golden smoke: check node version for this workspace\n",
+        );
+      };
+
       cli.stdout?.on("data", (data) => {
         output += data.toString();
 
@@ -3534,15 +3548,7 @@ describe("CLI streaming baseline (T3)", () => {
           }
         }
 
-        if (
-          !promptSent &&
-          output.includes("Ctrl+C cancels the current run. Ctrl+D exits.")
-        ) {
-          promptSent = true;
-          cli.stdin?.write(
-            "Golden smoke: check node version for this workspace\n",
-          );
-        }
+        sendFirstPromptWhenHealthy();
 
         const sessionDir = sessionId ? path.join(sessionsDir, sessionId) : "";
         const transcriptPath = sessionDir
@@ -3652,6 +3658,7 @@ describe("CLI streaming baseline (T3)", () => {
 
       cli.stderr?.on("data", (data) => {
         output += data.toString();
+        sendFirstPromptWhenHealthy();
       });
 
       cli.on("error", (error) => {

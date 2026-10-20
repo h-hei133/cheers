@@ -13,6 +13,7 @@ import type { SessionSummary } from './model.js';
 export function summarizeSession(session: Session, version: string, limited = false): SessionSummary {
   const first = session.turns.find(turn => (turn.role === 'user' || turn.role === 'assistant') && messageToText(turn.content).trim());
   const preview = messageToText(first?.content) || session.pendingPrompt;
+  const conversation = sessionPreview(session);
   return {
     id: session.id, projectRoot: session.projectRoot,
     ...(session.pinned === true ? { pinned: true } : {}),
@@ -21,7 +22,7 @@ export function summarizeSession(session: Session, version: string, limited = fa
     titleComplete: Boolean(session.title?.trim()) || !limited,
     createdAt: session.createdAt, updatedAt: session.updatedAt, status: session.status,
     reentry: sessionHasReentrySurface(session) ? 'available' : limited ? 'unknown' : 'empty',
-    quality: limited ? 'limited' : 'complete', version,
+    quality: limited ? 'limited' : 'complete', ...(conversation ? { preview: conversation } : {}), version,
   };
 }
 
@@ -51,4 +52,25 @@ export function decodeSessionSummary(id: string, metadataText: string, stateText
   const latest = reports.at(-1)?.timestamp;
   if (latest && Date.parse(latest) > Date.parse(session.updatedAt)) session.updatedAt = latest;
   return summarizeSession(session, version, transcript === undefined || transcript.warnings.length > 0);
+}
+
+function sessionPreview(session: Session): SessionSummary['preview'] | undefined {
+  const prompt = session.turns.find(turn => turn.role === 'user' && messageToText(turn.content).trim());
+  let answer: (typeof session.turns)[number] | undefined;
+  for (let index = session.turns.length - 1; index >= 0; index--) {
+    const turn = session.turns[index]!;
+    if (turn.role === 'assistant' && messageToText(turn.content).trim()) { answer = turn; break; }
+  }
+  const promptText = boundedText(messageToText(prompt?.content) || session.pendingPrompt || '');
+  const answerText = boundedText(messageToText(answer?.content), true);
+  return promptText || answerText
+    ? { ...(promptText ? { prompt: promptText } : {}), ...(answerText ? { answer: answerText } : {}) }
+    : undefined;
+}
+
+function boundedText(value: string, tail = false): string {
+  const compact = value.replace(/\s+/g, ' ').trim();
+  const points = Array.from(compact);
+  if (points.length <= 1200) return compact;
+  return tail ? `…${points.slice(-1200).join('')}` : points.slice(0, 1200).join('');
 }

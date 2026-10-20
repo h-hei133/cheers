@@ -35,6 +35,22 @@ it('renames one session through the shared owner without changing the active ide
   expect(fs.readFileSync(path.join(h.manager.getSessionDirPath(h.target.id), 'transcript.jsonl'))).toEqual(before);
 });
 
+it('persists pin and unpin through metadata without changing conversation bytes', async () => {
+  const h = fixture();
+  const transcript = fs.readFileSync(path.join(h.manager.getSessionDirPath(h.target.id), 'transcript.jsonl'));
+  const state = fs.readFileSync(path.join(h.manager.getSessionDirPath(h.target.id), 'state.json'));
+
+  const pin = await prepareSessionManagement(h.manager, h.host.sessionContext, 'pin', h.target.id);
+  expect(applySessionManagement(h.manager, h.host.sessionContext, pin.preview!)).toMatchObject({ status: 'changed' });
+  expect(new SessionManager().getSession(h.target.id)?.pinned).toBe(true);
+  expect(fs.readFileSync(path.join(h.manager.getSessionDirPath(h.target.id), 'transcript.jsonl'))).toEqual(transcript);
+  expect(fs.readFileSync(path.join(h.manager.getSessionDirPath(h.target.id), 'state.json'))).toEqual(state);
+
+  const unpin = await prepareSessionManagement(new SessionManager(), h.host.sessionContext, 'pin', h.target.id);
+  expect(applySessionManagement(new SessionManager(), h.host.sessionContext, unpin.preview!)).toMatchObject({ status: 'changed' });
+  expect(new SessionManager().getSession(h.target.id)?.pinned).not.toBe(true);
+});
+
 it.each(['current', 'busy', 'running', 'foreign'] as const)('blocks %s deletion before any writer', async kind => {
   const h = fixture(); const remove = vi.spyOn(h.manager, 'deleteSession'); let id = h.target.id;
   if (kind === 'current') id = h.current.id;

@@ -9,7 +9,7 @@ export interface SessionFileSize {
   readonly sampledAt: string;
 }
 
-const MAX_SIZE_SESSIONS = 41;
+export const SESSION_SIZE_BATCH = 41;
 const SIZE_CONCURRENCY = 4;
 
 /** Read-only sampling of the store's metadata, complete transcript and state files. */
@@ -19,7 +19,7 @@ export class SessionFiles {
   async sizes(sessionIds: readonly string[], signal?: AbortSignal): Promise<ReadonlyMap<string, SessionFileSize>> {
     assertSessionStoreProfile(this.layout);
     signal?.throwIfAborted();
-    if (sessionIds.length > MAX_SIZE_SESSIONS) throw new RangeError('Too many sessions in one file-size sample.');
+    if (sessionIds.length > SESSION_SIZE_BATCH) throw new RangeError('Too many sessions in one file-size sample.');
     const ids = [...new Set(sessionIds)];
     for (const id of ids) {
       if (validateSessionId(id) !== id || id === '.' || id === '..') throw new Error('Invalid session identity.');

@@ -57,7 +57,7 @@ describe("pointer focus", () => {
     expect(apply).toHaveBeenCalledWith(expect.anything(), ["b"]);
   });
 
-  it("ignores headers, disabled rows, and stale rows after filtering", async () => {
+  it("ignores headers and disabled rows", async () => {
     const { overlay } = host();
     const apply = vi.fn();
     overlay.open(picker({ load: async () => [...options, { id: "blocked", label: "disabled", disabled: true }] }));
@@ -65,11 +65,33 @@ describe("pointer focus", () => {
     overlay.render(60, 20);
     overlay.handlePointer(parseMouseReport("\x1b[<0;5;4M")!, 0);
     overlay.handlePointer(parseMouseReport("\x1b[<0;5;1M")!, 0);
-    press(overlay, "b");
-    // Filtering invalidates the previous row map until the new frame is rendered.
-    overlay.handlePointer(parseMouseReport("\x1b[<0;5;2M")!, 0);
     press(overlay, "\r", apply);
-    expect(apply).toHaveBeenCalledWith(expect.anything(), ["b"]);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["a"]);
+  });
+
+  it("invalidates pointer rows until the filtered frame is rendered", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(picker({
+      initialSelection: "alpha",
+      load: async () => [
+        { id: "alpha", label: "alpha" },
+        { id: "bee", label: "bee" },
+        { id: "charm", label: "charm" },
+        { id: "delta", label: "delta" },
+      ],
+    }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const initial = overlay.render(60, 20);
+    const oldCharmRow = initial.findIndex(row => row.includes("charm"));
+    expect(oldCharmRow).toBeGreaterThan(0);
+
+    overlay.handlePaste("a");
+    // The old charm row now occupies the row painted for delta. A stale map
+    // would focus charm; an invalidated map leaves the current alpha selected.
+    overlay.handlePointer(parseMouseReport(`\x1b[<0;5;${oldCharmRow + 1}M`)!, 0);
+    press(overlay, "\r", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["alpha"]);
   });
 
   it("maps a scrolled panel row to the option actually painted", async () => {
@@ -347,6 +369,23 @@ describe("lifecycle", () => {
     expect(overlay.fullScreen).toBe(false);
     overlay.open(picker({ form: "modal" }));
     expect(overlay.fullScreen).toBe(true);
+    overlay.open(picker({ fullScreen: true }));
+    expect(overlay.fullScreen).toBe(true);
+    overlay.open(picker({ form: "modal", fullScreen: false }));
+    expect(overlay.fullScreen).toBe(true);
+  });
+
+  it("lets a full-screen panel consume the frame without dropping its detail column", async () => {
+    const { overlay } = host();
+    overlay.open(picker({
+      fullScreen: true,
+      load: async () => Array.from({ length: 30 }, (_, index) => ({ id: `${index}`, label: `choice-${index}` })),
+      detail: id => [`preview for ${id ?? "none"}`],
+    }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const rows = overlay.render(80, 20, 6);
+    expect(rows).toHaveLength(20);
+    expect(rows.some(row => stripAnsi(row).includes("│"))).toBe(true);
   });
 
   it("shows a loading state until the options arrive", async () => {
@@ -411,6 +450,145 @@ describe("key routing", () => {
     const rows = overlay.render(60, 20).join("\n");
     expect(rows).toContain("beta");
     expect(rows).not.toContain("alpha");
+  });
+});
+
+describe("catalogue search", () => {
+  it("debounces a full search and restores the loaded page when the query clears", async () => {
+    vi.useFakeTimers();
+    try {
+      const { overlay } = host();
+      const search = vi.fn(async (query: string) => [{ id: "remote", label: `remote ${query}` }]);
+      overlay.open(picker({
+        load: async () => [{ id: "local", label: "local" }],
+        search,
+        searchDebounceMs: 10,
+      }));
+      await Promise.resolve(); await Promise.resolve();
+
+      press(overlay, "r");
+      expect(search).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(search).toHaveBeenCalledWith("r", expect.any(AbortSignal));
+      expect(stripAnsi(overlay.render(60, 20).join("\n"))).toContain("remote r");
+
+      press(overlay, "\x7f");
+      await vi.advanceTimersByTimeAsync(10);
+      const restored = stripAnsi(overlay.render(60, 20).join("\n"));
+      expect(restored).toContain("local");
+      expect(restored).not.toContain("remote r");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("aborts an old search so its late result cannot replace the current query", async () => {
+    vi.useFakeTimers();
+    try {
+      const { overlay } = host();
+      const pending = new Map<string, { signal?: AbortSignal; resolve: (options: readonly Option[]) => void }>();
+      const search = vi.fn((query: string, signal?: AbortSignal) => new Promise<readonly Option[]>(resolve => {
+        pending.set(query, { signal, resolve });
+      }));
+      overlay.open(picker({
+        load: async () => [{ id: "base", label: "base" }],
+        search,
+        searchDebounceMs: 5,
+      }));
+      await Promise.resolve(); await Promise.resolve();
+
+      press(overlay, "o");
+      await vi.advanceTimersByTimeAsync(5);
+      press(overlay, "x");
+      await vi.advanceTimersByTimeAsync(5);
+      expect(pending.get("o")?.signal?.aborted).toBe(true);
+
+      pending.get("o")!.resolve([{ id: "old", label: "old result o" }]);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(stripAnsi(overlay.render(60, 20).join("\n"))).not.toContain("old result o");
+      pending.get("ox")!.resolve([{ id: "new", label: "new result ox" }]);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(stripAnsi(overlay.render(60, 20).join("\n"))).toContain("new result ox");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows a safe search failure without replacing local results", async () => {
+    vi.useFakeTimers();
+    try {
+      const { overlay } = host();
+      overlay.open(picker({
+        load: async () => [{ id: "local", label: "local result" }],
+        search: async () => { throw new Error("PRIVATE_SEARCH_PATH"); },
+        searchDebounceMs: 5,
+        searchError: "Search unavailable.",
+      }));
+      await Promise.resolve(); await Promise.resolve();
+      press(overlay, "l");
+      await vi.advanceTimersByTimeAsync(5);
+      const output = stripAnsi(overlay.render(60, 20).join("\n"));
+      expect(output).toContain("local result");
+      expect(output).toContain("Search unavailable.");
+      expect(output).not.toContain("PRIVATE_SEARCH_PATH");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not restart an active search for a base-list publication", async () => {
+    vi.useFakeTimers();
+    try {
+      const { overlay } = host();
+      let publish!: (options: readonly Option[]) => void;
+      let signal: AbortSignal | undefined;
+      let resolve!: (options: readonly Option[]) => void;
+      const search = vi.fn((_query: string, next?: AbortSignal) => {
+        signal = next;
+        return new Promise<readonly Option[]>(done => { resolve = done; });
+      });
+      overlay.open(picker({
+        load: async () => [{ id: "base", label: "base" }],
+        subscribe: callback => { publish = callback; return () => {}; },
+        search,
+        searchDebounceMs: 5,
+      }));
+      await Promise.resolve(); await Promise.resolve();
+      press(overlay, "b");
+      await vi.advanceTimersByTimeAsync(5);
+      expect(search).toHaveBeenCalledOnce();
+
+      publish([{ id: "base", label: "updated base" }]);
+      expect(search).toHaveBeenCalledOnce();
+      expect(signal?.aborted).toBe(false);
+
+      resolve([{ id: "remote", label: "remote b" }]);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(stripAnsi(overlay.render(60, 20).join("\n"))).toContain("remote b");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps transient search state visible ahead of long picker status", async () => {
+    vi.useFakeTimers();
+    try {
+      const { overlay } = host();
+      overlay.open(picker({
+        fullScreen: true,
+        load: async () => [{ id: "local", label: "local result" }],
+        search: () => new Promise(() => {}),
+        searchDebounceMs: 5,
+        status: () => "Current session is hidden by the filter and the saved listing is still incomplete.",
+      }));
+      await Promise.resolve(); await Promise.resolve();
+      press(overlay, "l");
+      await vi.advanceTimersByTimeAsync(5);
+      const output = stripAnsi(overlay.render(40, 8).join("\n"));
+      expect(output).toContain("Searching…");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

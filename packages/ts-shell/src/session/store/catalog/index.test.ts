@@ -111,6 +111,27 @@ it('bounds directory discovery and summary dispatch per update and closes an aba
   await query.return(undefined); expect(closed).toBe(1);
 });
 
+it('reports unreadable diagnostics discovered before a cancelled scan', async () => {
+  const { layout, context, catalog } = fixture();
+  seed(layout, 'current');
+  const broken = projectSessionFileLayout({ sessionsDir: layout.sessionsDir, sessionId: 'broken' });
+  fs.mkdirSync(broken.sessionDir, { recursive: true });
+  fs.writeFileSync(broken.metadataPath, '{broken', 'utf8');
+  const onUnreadable = vi.fn();
+  const controller = new AbortController();
+  const query = catalog.list(context, controller.signal, 40, undefined, onUnreadable);
+  await query.next();
+  let page = await query.next();
+  while (!page.done && page.value.unreadable === 0) page = await query.next();
+  expect(page.done).toBe(false);
+  expect(page.value.unreadable).toBeGreaterThan(0);
+
+  controller.abort();
+  await query.return(undefined);
+  expect(onUnreadable).toHaveBeenCalledOnce();
+  expect(onUnreadable.mock.calls[0]?.[0].unreadableSessionIds).toContain('broken');
+});
+
 it('keeps the recent forty plus current, reuses unchanged summaries, and invalidates on replacement or append', async () => {
   const { layout, context, catalog } = fixture(); seed(layout, 'current', { updatedAt: '2025-01-01T00:00:00.000Z' });
   for (let index = 0; index < 55; index++) seed(layout, `recent-${index.toString().padStart(2, '0')}`);

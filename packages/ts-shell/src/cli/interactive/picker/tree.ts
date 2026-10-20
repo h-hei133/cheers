@@ -48,6 +48,9 @@ export function treePicker(context: CommandContext, rewind: RewindPickerInput["r
     form: "modal",
     exclusive: true,
     empty: "No session entries are available.",
+    get initialSelection() {
+      return points.find(point => point.current && point.unavailable === undefined)?.entryId;
+    },
     async load() {
       points = context.sessionId ? readSessionNavigation(context.sessionId, context.cwd).points.filter(point => !userOnly || point.prompt !== undefined) : [];
       return points.map((point, index) => ({

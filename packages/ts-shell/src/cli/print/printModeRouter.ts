@@ -31,6 +31,8 @@ export interface RunCliPrintModeRouterInput {
   /** Passed through so a scripted `/permissions` writes the same trust store. */
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly stopRequested?: () => boolean;
+  readonly onFirstFrame?: () => void;
+  readonly onUserIntent?: () => void;
 }
 
 export async function runCliPrintModeRouter(
@@ -74,6 +76,8 @@ export async function runCliPrintModeRouter(
       runStream: () =>
         runNonTtyPromptStream({
           ...runtimeInput,
+          onFirstFrame: input.onFirstFrame,
+          onUserIntent: input.onUserIntent,
         }),
     });
     return true;

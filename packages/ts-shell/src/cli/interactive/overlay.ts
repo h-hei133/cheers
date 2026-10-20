@@ -44,6 +44,8 @@ export interface Picker {
   readonly input?: PickerInput<PickerOutcome | undefined>;
   readonly title: string;
   readonly form: PickerForm;
+  /** Let a panel consume the whole frame while retaining its two-column layout. */
+  readonly fullScreen?: boolean;
   /** Queue new submissions until a conversation-changing selection has settled. */
   readonly exclusive?: boolean;
   readonly initialSelection?: string;
@@ -54,7 +56,7 @@ export interface Picker {
   readonly loadError?: string;
   readonly footer?: string;
   /** Context that depends on which identities remain visible after filtering. */
-  status?(visible: readonly Option[]): string | undefined;
+  status?(visible: readonly Option[], query?: string): string | undefined;
   /** True when the picker collects several answers before applying. */
   readonly multiple?: boolean;
   /**
@@ -66,6 +68,16 @@ export interface Picker {
   readonly filterable?: boolean;
   /** Search/group projection over the full loaded catalogue; performs no I/O. */
   readonly filterOptions?: OptionFilter;
+  /** Search the complete authorized catalogue after a short debounce. */
+  readonly search?: (query: string, signal?: AbortSignal) => Promise<readonly Option[]>;
+  /** Invalidate any completed search projection as soon as the query changes. */
+  readonly onSearchChange?: (query: string) => void;
+  /** Delay before `search` starts, so held keys do not dispatch every prefix. */
+  readonly searchDebounceMs?: number;
+  /** Safe failure text when a catalogue search cannot complete. */
+  readonly searchError?: string;
+  /** Restore any query-dependent picker state when the user clears the filter. */
+  readonly onSearchClear?: () => readonly Option[] | undefined;
   /** Rows each option occupies beyond its first, in the full-screen form. */
   readonly detailRows?: number;
   /** A second column in the inline panel when the surface is wide enough. */
@@ -116,6 +128,12 @@ export class OverlayHost {
   private actionPending = false;
   private actionNotice: string | undefined;
   private unsubscribe: (() => void) | undefined;
+  private baseOptions: readonly Option[] = [];
+  private searchController: AbortController | undefined;
+  private searchTimer: ReturnType<typeof setTimeout> | undefined;
+  private searchGeneration = 0;
+  private searching = false;
+  private searchFailed = false;
   private readonly optionRows = new Map<number, { readonly id: string; readonly from: number; readonly to: number }>();
   private readonly chipRows = new Map<number, Array<{ readonly id: string; readonly from: number; readonly to: number }>>();
   private renderedWidth = 0;
@@ -135,7 +153,7 @@ export class OverlayHost {
 
   /** Whether the open picker wants the whole screen. */
   get fullScreen(): boolean {
-    return this.picker?.form === "modal";
+    return this.picker?.fullScreen === true || this.picker?.form === "modal";
   }
 
   /** Open `picker`, loading its options in the background. */
@@ -147,6 +165,8 @@ export class OverlayHost {
     this.actionPending = false;
     this.actionNotice = undefined;
     this.input = picker.input ? new InputForm(picker.input) : undefined;
+    this.baseOptions = [];
+    this.cancelSearch();
     this.optionRows.clear();
     this.chipRows.clear();
     this.picker?.previewEnd?.();
@@ -166,6 +186,7 @@ export class OverlayHost {
   close(): void {
     this.loadController?.abort();
     this.loadController = undefined;
+    this.cancelSearch();
     this.actionPending = false;
     this.actionNotice = undefined;
     this.denyDraft = "";
@@ -203,14 +224,19 @@ export class OverlayHost {
     if (this.subMode === "deny-reason") {
       return this.renderDenyReason(width, height);
     }
-    const empty = this.loading ? "loading…" : this.loadFailed ? picker.loadError ?? "Options could not be loaded." : picker.empty;
-    const state = this.loading ? "loading" : this.loadFailed ? "error" : undefined;
+    const empty = this.loading ? "loading…" : this.loadFailed ? picker.loadError ?? "Options could not be loaded."
+      : this.searchFailed ? picker.searchError ?? "Search could not be completed."
+      : this.searching && this.model.total === 0 ? "Searching…" : picker.empty;
+    const state = this.loading || (this.searching && this.model.total === 0) ? "loading"
+      : this.loadFailed || this.searchFailed ? "error" : undefined;
     const actionHints = (
       picker.onDelete || picker.onRename || picker.onPin
         ? `${picker.onDelete ? "^D delete" : ""}  ${picker.onRename ? "^R rename" : ""}  ${picker.onPin ? "^P pin" : ""}`.trim()
         : undefined);
+    const pickerStatus = !this.loading && !this.loadFailed ? picker.status?.(this.model.visible, this.model.filter) : undefined;
+    const searchStatus = this.searching ? 'Searching…' : this.searchFailed ? picker.searchError ?? 'Search could not be completed.' : undefined;
     const status = this.actionPending ? 'Updating…' : this.actionNotice ??
-      (!this.loading && !this.loadFailed ? picker.status?.(this.model.visible) : undefined);
+      ([searchStatus, pickerStatus].filter(Boolean).join(' ') || undefined);
     const groupKeys = picker.chips ? ['tui.overlay.previousGroup', 'tui.overlay.nextGroup'].flatMap(id =>
       this.bindings.keysFor(id).filter(key => this.bindings.actionFor(key, 'overlay') === id)) : [];
     const chipChrome = {
@@ -259,7 +285,7 @@ export class OverlayHost {
         onOptionRow: (row, id, from, to) => this.optionRows.set(row, { id, from: from ?? 0, to: to ?? width }),
       },
       width,
-      Math.max(0, Math.min(height, availableRows)),
+      this.fullScreen ? height : Math.max(0, Math.min(height, availableRows)),
     );
   }
 
@@ -293,8 +319,9 @@ export class OverlayHost {
     if (this.actionPending) return true;
     if (this.input) this.input.paste(text);
     else if (this.subMode === 'none' && this.picker.filterable !== false) {
-      this.optionRows.clear();
-      this.model.appendFilter(stripAnsi(text).replace(/[\r\n\t]+/g, ' ').replace(/[\x00-\x1f\x7f-\x9f]/g, ''));
+      this.changeFilter(() => this.model.appendFilter(
+        stripAnsi(text).replace(/[\r\n\t]+/g, ' ').replace(/[\x00-\x1f\x7f-\x9f]/g, ''),
+      ));
       if (!this.picker.multiple) this.picker.previewChange?.(idsOf(this.model.current()));
     }
     this.onChange();
@@ -593,14 +620,12 @@ export class OverlayHost {
           this.model.toggle();
           picker.previewChange?.(this.model.chosenIds());
         } else if (!isApprovalPicker && picker.filterable !== false) {
-          this.optionRows.clear();
-          this.model.appendFilter(" ");
+          this.changeFilter(() => this.model.appendFilter(" "));
         }
         break;
       case "backspace":
         if (!isApprovalPicker && picker.filterable !== false) {
-          this.optionRows.clear();
-          this.model.backspaceFilter();
+          this.changeFilter(() => this.model.backspaceFilter());
         }
         break;
       case "enter":
@@ -619,8 +644,7 @@ export class OverlayHost {
         }
         if (event.text && !event.ctrl && !event.alt) {
           if (!isApprovalPicker && picker.filterable !== false) {
-            this.optionRows.clear();
-            this.model.appendFilter(event.text);
+            this.changeFilter(() => this.model.appendFilter(event.text));
           }
         } else {
           return true;
@@ -635,6 +659,7 @@ export class OverlayHost {
     const picker = this.picker;
     if (!picker) return;
     this.loadController?.abort();
+    this.cancelSearch();
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     const controller = new AbortController();
@@ -649,6 +674,7 @@ export class OverlayHost {
     void pending.then(options => {
       if (this.picker !== picker || this.generation !== generation || this.loadController !== controller) return;
       this.loading = false;
+      this.baseOptions = options;
       this.model.setOptions(options);
       if (initial && picker.initialSelection) this.model.focus(picker.initialSelection);
       if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
@@ -656,17 +682,20 @@ export class OverlayHost {
       const unsubscribe = picker.subscribe?.(options => {
         if (this.picker !== picker || this.generation !== generation || this.loadController !== controller) return;
         this.optionRows.clear();
-        this.model.setOptions(options);
+        this.baseOptions = options;
+        if (!this.model.filter.trim() || !picker.search) this.model.setOptions(options);
         if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
         this.onChange();
       });
       if (this.picker === picker && this.generation === generation && this.loadController === controller) this.unsubscribe = unsubscribe;
       else unsubscribe?.();
+      if (this.model.filter.trim() && picker.search) this.scheduleSearch();
       this.onChange();
     }).catch(() => {
       if (this.picker !== picker || this.generation !== generation || this.loadController !== controller) return;
       this.loading = false;
       this.loadFailed = true;
+      this.cancelSearch();
       this.optionRows.clear();
       this.model.setOptions([]);
       picker.previewEnd?.();
@@ -702,6 +731,7 @@ export class OverlayHost {
     const ids = picker.multiple ? this.model.chosenIds() : idsOf(this.model.current());
     this.loadController?.abort();
     this.loadController = undefined;
+    this.cancelSearch();
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.picker = undefined;
@@ -718,6 +748,7 @@ export class OverlayHost {
     if (ids.some(id => !this.model.visible.some(option => option.id === id && !option.disabled))) return;
     this.loadController?.abort();
     this.loadController = undefined;
+    this.cancelSearch();
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.picker = undefined;
@@ -725,6 +756,75 @@ export class OverlayHost {
     this.loading = false;
     this.onChange();
     apply(picker, ids);
+  }
+
+  private changeFilter(change: () => void): void {
+    this.optionRows.clear();
+    this.model.setOptions(this.baseOptions);
+    change();
+    this.scheduleSearch();
+  }
+
+  private scheduleSearch(): void {
+    const picker = this.picker;
+    if (!picker?.search) return;
+    const query = this.model.filter.trim();
+    const generation = ++this.searchGeneration;
+    this.searchController?.abort();
+    this.searchController = undefined;
+    if (this.searchTimer !== undefined) clearTimeout(this.searchTimer);
+    this.searchTimer = undefined;
+    this.searchFailed = false;
+    if (!query) {
+      this.searching = false;
+      const restored = picker.onSearchClear?.();
+      if (restored !== undefined) this.baseOptions = restored;
+      this.model.setOptions(restored ?? this.baseOptions);
+      return;
+    }
+    picker.onSearchChange?.(query);
+    this.searching = true;
+    this.searchTimer = setTimeout(() => {
+      this.searchTimer = undefined;
+      const controller = new AbortController();
+      this.searchController = controller;
+      let pending: Promise<readonly Option[]>;
+      try {
+        pending = picker.search!(query, controller.signal);
+      } catch (error) {
+        pending = Promise.reject(error);
+      }
+      void pending.then(options => {
+        if (this.picker !== picker || this.searchGeneration !== generation
+          || this.model.filter.trim() !== query || this.searchController !== controller
+          || controller.signal.aborted) return;
+        this.searching = false;
+        this.searchController = undefined;
+        this.optionRows.clear();
+        this.model.setOptions(options);
+        if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
+        this.onChange();
+      }).catch(() => {
+        if (this.picker !== picker || this.searchGeneration !== generation
+          || this.model.filter.trim() !== query || this.searchController !== controller
+          || controller.signal.aborted) return;
+        this.searching = false;
+        this.searchFailed = true;
+        this.searchController = undefined;
+        this.optionRows.clear();
+        this.onChange();
+      });
+    }, Math.max(0, picker.searchDebounceMs ?? 100));
+  }
+
+  private cancelSearch(): void {
+    ++this.searchGeneration;
+    this.searchController?.abort();
+    this.searchController = undefined;
+    if (this.searchTimer !== undefined) clearTimeout(this.searchTimer);
+    this.searchTimer = undefined;
+    this.searching = false;
+    this.searchFailed = false;
   }
 }
 

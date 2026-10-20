@@ -37,7 +37,6 @@ export class SessionCatalog {
     const diagnose = (): void => {
       if (diagnosed) return;
       diagnosed = true;
-      if (signal?.aborted) return;
       if (unreadableSessionIds.size === 0 && unreadableDirectories.size === 0) return;
       try {
         onUnreadable?.({

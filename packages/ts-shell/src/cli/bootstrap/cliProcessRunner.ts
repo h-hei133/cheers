@@ -353,6 +353,8 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       },
       approvalTrustPolicy,
       stopRequested: () => requested !== undefined,
+      onFirstFrame,
+      onUserIntent,
     });
     if (handledPrintMode) {
       return requested;

@@ -13,6 +13,11 @@ export interface SessionSummary {
   readonly status?: Session['status'];
   readonly reentry: 'available' | 'empty' | 'unknown';
   readonly quality: 'complete' | 'limited';
+  /** Bounded conversation excerpts already read for the catalog projection. */
+  readonly preview?: {
+    readonly prompt?: string;
+    readonly answer?: string;
+  };
   /** Opaque version of the directory and all three core files. */
   readonly version: string;
 }
