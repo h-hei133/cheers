@@ -7,6 +7,7 @@
  * original. Code spans, escaped dollars and currency are protected before math
  * recognition, because `$5 and $10` is money, not a formula.
  */
+import { findCodeSpan } from "../text/codeSpan.js";
 
 const MAX_FORMULA_BYTES = 4096;
 const MAX_TOKENS = 512;
@@ -130,23 +131,45 @@ function subscript(text: string): string {
 export function projectMath(text: string): string {
   let output = "";
   let index = 0;
+  let nextParenClose = text.indexOf("\\)");
+  let nextBracketClose = text.indexOf("\\]");
   while (index < text.length) {
     const character = text[index]!;
     if (character === "`") {
-      const end = text.indexOf("`", index + 1);
-      const stop = end < 0 ? text.length : end + 1;
-      output += text.slice(index, stop);
-      index = stop;
+      const span = findCodeSpan(text, index);
+      if (!span) {
+        const run = backtickRun(text, index);
+        output += text.slice(index, index + run);
+        index += run;
+        continue;
+      }
+      output += text.slice(index, span.end);
+      index = span.end;
       continue;
     }
     if (character === "\\" && text[index + 1] === "$") { output += "\\$"; index += 2; continue; }
     if (character === "\\" && (text[index + 1] === "(" || text[index + 1] === "[")) {
-      const closeMarker = text[index + 1] === "(" ? "\\)" : "\\]";
-      const close = text.indexOf(closeMarker, index + 2);
-      if (close >= 0) {
-        const converted = latexToText(text.slice(index + 2, close));
-        if (converted !== undefined) { output += converted; index = close + 2; continue; }
+      const parenthesized = text[index + 1] === "(";
+      const closeMarker = parenthesized ? "\\)" : "\\]";
+      const searchFrom = index + 2;
+      let close = parenthesized ? nextParenClose : nextBracketClose;
+      while (close >= 0 && close < searchFrom) {
+        close = text.indexOf(closeMarker, close + 2);
+        if (parenthesized) nextParenClose = close;
+        else nextBracketClose = close;
       }
+      if (close >= 0 && close - searchFrom <= MAX_FORMULA_BYTES) {
+        const converted = latexToText(text.slice(index + 2, close));
+        output += converted ?? text.slice(index, close + 2);
+        index = close + 2;
+        const next = text.indexOf(closeMarker, index);
+        if (parenthesized) nextParenClose = next;
+        else nextBracketClose = next;
+        continue;
+      }
+      output += text.slice(index, index + 2);
+      index += 2;
+      continue;
     }
     if (character !== "$") { output += character; index += 1; continue; }
     const display = text[index + 1] === "$";
@@ -172,8 +195,19 @@ function findClose(text: string, from: number, display: boolean): number {
   const marker = display ? "$$" : "$";
   for (let index = from; index < text.length; index++) {
     if (text[index] === "\\") { index += 1; continue; }
-    if (text[index] === "`") { const end = text.indexOf("`", index + 1); if (end < 0) return -1; index = end; continue; }
+    if (text[index] === "`") {
+      const span = findCodeSpan(text, index);
+      if (span) index = span.end - 1;
+      else index += backtickRun(text, index) - 1;
+      continue;
+    }
     if (text.startsWith(marker, index)) return index;
   }
   return -1;
+}
+
+function backtickRun(text: string, start: number): number {
+  let run = 1;
+  while (text[start + run] === "`") run++;
+  return run;
 }

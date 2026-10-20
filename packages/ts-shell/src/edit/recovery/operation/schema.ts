@@ -22,13 +22,20 @@ function selection(value: unknown): value is OperationSelection {
   if (!object(value) || typeof value.fullRevision !== 'string' || !contentHashPattern.test(value.fullRevision)
     || typeof value.selectedRevision !== 'string' || !contentHashPattern.test(value.selectedRevision)
     || !Array.isArray(value.selectedGroupIds) || !Array.isArray(value.skippedGroupIds)
+    || (value.requestedGroupIds !== undefined && !Array.isArray(value.requestedGroupIds))
     || value.selectedGroupIds.length > 256 || value.skippedGroupIds.length > 256
+    || (Array.isArray(value.requestedGroupIds) && value.requestedGroupIds.length > 256)
     || value.selectedGroupIds.some(id => typeof id !== 'string' || !safeRecoveryId(id))
-    || value.skippedGroupIds.some(id => typeof id !== 'string' || !safeRecoveryId(id))) return false;
+    || value.skippedGroupIds.some(id => typeof id !== 'string' || !safeRecoveryId(id))
+    || (Array.isArray(value.requestedGroupIds)
+      && value.requestedGroupIds.some(id => typeof id !== 'string' || !safeRecoveryId(id)))) return false;
   const selected = new Set(value.selectedGroupIds);
+  const requested = new Set(value.requestedGroupIds ?? value.selectedGroupIds);
   return selected.size === value.selectedGroupIds.length
     && new Set(value.skippedGroupIds).size === value.skippedGroupIds.length
-    && value.skippedGroupIds.every(id => !selected.has(id));
+    && requested.size === (value.requestedGroupIds ?? value.selectedGroupIds).length
+    && value.skippedGroupIds.every(id => !selected.has(id))
+    && value.selectedGroupIds.every(id => requested.has(id));
 }
 
 function file(value: unknown): value is OperationFile {

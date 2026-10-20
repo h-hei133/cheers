@@ -61,6 +61,7 @@ import type { RestartOutcome, RestartPort, RestartRequest } from '../../core/com
 import type { CliProcessRunnerInput } from './contract.js';
 import { createProfileContext, currentProfile, withProfile } from '../../core/paths/profile/context.js';
 import { configurationAdmission } from '../../core/shell/configuration.js';
+import { cliHelpText, isHelpRequested } from '../options/early.js';
 import { profileSwitchPort } from './profile/port.js';
 import { freshExecutable } from './profile/invocation.js';
 import { claimSwitchChild, admitSwitchChild } from './profile/admission.js';
@@ -74,6 +75,10 @@ export type { CliProcessRunnerInput } from './contract.js';
 export async function runCliProcess(
   input: CliProcessRunnerInput,
 ): Promise<void> {
+  if (isHelpRequested(input.args)) {
+    input.writeOutput(cliHelpText());
+    return;
+  }
   // Explicit service mode has its own authenticated state owner and protocol.
   if (input.args[0] === 'serve') { await runCliCycle(input); return; }
   const parsed = parseCliArgs(input.args, { cwd: input.launchCwd });

@@ -14,7 +14,7 @@
 | W3 | CTX-03 有界分段/合并、永久重播证据、原生 source CAS 与精确发布证明已有本地及独立验收；自动/overflow 未验证发布停止 turn | 两项架构 WATCH 为容量拒绝和锁内同步 I/O，已记录取舍；本批提交/远端按日志；CTX-01/02/04、TOOL-01 继续复核 |
 | W5 | SET-02 已修复选中分组后无法搜索其他组的问题；复用文字匹配排序，跨组按最佳得分和固定组序展示；清空搜索回原组，从详情 Back 回字段所属组并聚焦 | CMD-01/02、SET-01/03 全部验收；SET-02 其余来源/状态细节继续按合同核查 |
 | W6 | modal 的项目范围切组现已可达；不能由此证明完整目录分页/搜索 | PAN-01…08 各动作、只读边界、分页和 revision |
-| W7/W8/W9 | 2026-10-20 复核发现 EDIT/JOB/START 的旧“完成”标签不成立：hunk 级选集、后台输出脱敏与结算、首帧扫描及 build 产物绑定仍有缺口 | INPUT-01、RENDER-01…03、EDIT-01、JOB-01/02、START-01/02 的完整裁决 |
+| W7/W8/W9 | 2026-10-20 返工已补上同文件 hunk 的 baseline/content identity、detach 后保留晋升总期限、adopted settlement、follow-up 脱敏/reload、轻量 `--help`/`--version`、首帧 bootstrap 扫描探针，以及最终 Markdown/HTML code-span、diff rows/bytes/rename 与 copy 反例 | START-02 的完整 CLI 首帧证据、START-01 的 fresh packaged gate 与 CI，以及其余 INPUT/RENDER consumer 仍按合同复核 |
 | W10 | 本批 135 文件/1813 测试通过；修改前实现使 20 项回归失败；两路独立复核通过；Node/exe × regular/fullscreen 的 settings/resume 切组、关闭与退出 PTY 通过 | QA-01/02/04 随后续返工累积；本批不等于全阶段交付 |
 
 本批静态检查、构建、提交和 CI 的精确状态见开发日志。本轮 PTY 鼠标只验证 fullscreen；regular 仍由终端负责鼠标滚动与选择。
@@ -97,17 +97,17 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | PAN-03（部分） | 本次 | `/hub` 只读主从面板、1s journal 轮询、详情列 |
 | PAN-05（部分） | 本次 | `/advisor` 只读 checkpoint/note 主从面板；`/plan-review` 增加结构化 `CommandReport`（版本/阶段/验收项/绑定状态），`/btw` 增加问题/是否送达/答案报告；两者仍只读或独立授权 |
 | INPUT-01（部分） | 本次 | 五模式状态机、vimMode、Normal/Visual Enter 不提交、粘贴优先 |
-| RENDER-03 | 本次 | 并排 diff（tool 卡片在 inner≥100 时也并排）、配对行号、双预算、窄屏 unified 回退、resize 锚点、左右源复制（command/error 与 framed tool 卡片） |
-| RENDER-02（部分） | 本次 | 多行 cell、escaped/code pipe、`<br>`、窄屏源码回退与预算 |
-| RENDER-01（部分） | 本次 | 内联数学投影、金额/代码保护、未知命令与超预算保原文 |
+| RENDER-03（补强） | 本次 | 并排 diff、配对行号、严格 rows/bytes 双预算、精确 UTF-8 边界、窄屏 unified 回退、resize 锚点、左右源复制、纯 rename 与 rename/BOM/EOL/EOF facts |
+| RENDER-02（部分） | 本次 | 多行 cell、escaped/code pipe、`<br>`、最终 Markdown/HTML code-span 一致性、窄屏源码回退与预算 |
+| RENDER-01（部分） | 本次 | 内联数学投影、金额/代码保护、escaped/multi-run/unmatched backtick、未知命令与超预算保原文 |
 | PAN-04（部分） | `6736f402`、本次 | `/usage account` quota 进度投影、`/thinking` effort 选择器 |
 | PAN-06（部分） | `6736f402` | copy 移除 recent-30 窗口 |
 | PAN-07（部分） | 本次 | `/extensions` 为 `/plugin` 别名 |
-| START-01 | `0afab79a` | build manifest、五种拒绝状态、`start`/`start:dev` |
-| JOB-01 | `dd43bcce` | 单次 spawn、detach/kill、adopt/promote、60s/新消息晋升、撤权 kill、重启 unknown 不重播 |
-| JOB-02 | `7da6e6d4`、`8c7f949f` | 本地 notice、opt-in follow-up（去重/预算/截断）、取消不转后台 |
-| EDIT-01 | `57e1ffb3`、`8c7f949f` | 稳定 group id、依赖分组、选集绑定、无选集拒绝、重规划基线校验、CLI 多选 |
-| START-02 | `3de906fe` | 10k 首帧不扫描；持久摘要索引（mtime/size、损坏即 miss） |
+| START-01（补强） | `0afab79a`、本次 | build manifest、五种拒绝状态、`start`/`start:dev`；轻量 `--version`/`--help`、组合参数和坏配置准入 |
+| JOB-01（补强） | `dd43bcce`、本次 | 单次 spawn、detach/kill、adopt/promote、60s/新消息晋升、撤权 kill、重启 unknown 不重播；detach 后保留 settlement 与 300s 总期限 |
+| JOB-02（补强） | `7da6e6d4`、`8c7f949f`、本次 | 本地 notice、opt-in follow-up（去重/预算/截断）、脱敏/reload、取消不转后台 |
+| EDIT-01（补强） | `57e1ffb3`、`8c7f949f`、本次 | 稳定且绑定 baseline/hunk content/add content 的 group id、依赖分组、同文件 hunk 选集、无选集拒绝、重规划 revision、requested/selected/skipped receipt |
+| START-02（部分） | `3de906fe`、本次 | 10k 首帧不扫描；持久摘要索引；0/100/1k/10k bootstrap 不枚举探针；完整 CLI 首帧仍待验收 |
 | PAN-05 | `2a4bafe5`、本次 | advisor 只读面板 + enable/review/apply 分别授权；plan-review 结构化报告与版本化 approve/reject/execute；btw 结构化报告、带外；面板查看不启模型，模型工作只走显式命令/普通 turn |
 | PAN-03（部分） | `070f1405` | hub 本地作业输出页（脱敏/截断）、后续页指引 |
 | PAN-08（部分） | `93302750` | MCP 逐项向导；临时定义 0600 且必删 |
@@ -120,7 +120,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | PAN-01 | model 两栏与详情、同名 relay 区分、预设行 | 连接/role 的绑定 revision 搜索验收 |
 | PAN-02 | 分组、pin、树形、分页、跨项目搜索 | 预览/置顶持久验收 |
 | PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
-| PAN-06 | copy 全量、pin | history 完整树、copy 分页/源 revision 到头、back/undo/restore 审计 |
+| PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝 | history 完整树、copy 到头/失败/取消边界、back/undo/restore 审计 |
 | PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引） | agents 专用操作仍归 `/jobs`；未知状态验收未单列 |
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
@@ -196,3 +196,15 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 首推 `96fae26d877a6d162c0f9909d3726969ca6c635d` 的 Architecture Watch `39397906660` success；CI `39397906657`/job `118545101287` 在 `test:scripts` 唯一失败：Node 20.3 下假 `tsc` fixture 被 `type:module` 当作 extensionless ESM，退出 1。夹具改为显式 CommonJS 后提交 `116639111a491b063904eb502c55f2b749f7df32`，远端 main 已读回。
 - 修复 SHA 的 CI `39398373664`/job `118546643247` completed/success，耗时 16m49s，893 个测试文件通过、1 跳过；Architecture Watch `39398373370`/job `118546640910` success。旧 SHA 失败保留，不改写为通过。
 - 全部 47 项 Phase 20 范围继续 active。
+
+### 2026-10-20 二次返工：启动、任务、编辑、渲染与 copy
+
+- 独立只读审计确认旧“只剩 4 项”仍不成立，并给出可复现反例。本批没有把实现存在当成验收通过；下列结果均为当前工作树实际运行。
+- START-01 入口已拆分：`--version`/`--help` 在加载 `cliProcessRunner` 与 runtime 图前返回；`--profile default --help`、`--help --print` 也按 help 处理，`--` 后的同名文本仍按普通输入。`startup.test` 新增 0/100/1k/10k bootstrap 不调用 `listSessions`，并覆盖缺失显式配置仍在 bootstrap 前拒绝。
+- JOB-01 现在把晋升后的总期限传到 `startCommand`/`startStreamed`，`detach()` 只释放前台 abort 绑定而保留 deadline，`stop` 等待 adopted settlement；JOB-02 每次 completion 重新读取 enable 策略，命令与输出均先脱敏。JOB 聚焦测试为 `local.handle` 4 项、`journal` 19 项、`backgroundNotice` 6 项，另 `service` 8 项与 `promotion` 4 项通过。
+- EDIT-01 现在把源基线、hunk indexes/content 与 add content 纳入 group identity，选集重建时校验基线，并在 receipt 中同时记录 requested/selected/skipped IDs；同文件双 hunk、依赖组、源变化、同基线内容变化和 stale revision 均由 `batch` 38 项覆盖。
+- RENDER 侧修复：diff rows/bytes 均严格受限，ASCII/UTF-8/CRLF/尾换行精确边界不误截断，文件头与 removed/added 分离，side-by-side sources 与 rows 对齐，纯 rename 和 rename/BOM/EOL/EOF facts 可见；数学、表格、Markdown 与 HTML 共用有界 inline token 解析，区分 escaped/multi-run/unmatched，link label 内 code 可达，强调可跨 token 闭合，64 KiB 边界内 64k backtick/escaped-math run 线性处理，超 1 byte 原样保留，80k bracket/60k private-use run 受预算保护，label 内不生成嵌套链接，code 内不解析公式、链接或强调。math/table/diff/markdown/html 合计 122 项通过。
+- PAN-06 copy 首屏改为 100 项有界页，提供明确 continuation、source revision 和 stale selection 拒绝；1001-block、下一页与 revision 变化均有回归，`copy` 3 项通过。
+- 多轮定向反转分别产生 10、4、3、2 个实际失败：撤销 `stop` settlement、timeout 传播或 detach deadline 后 JOB 用例失败；把函数型 follow-up policy 退化为布尔值后 reload 用例失败；合并同文件 hunk、移除 hunk/add content identity 后 identity 用例失败；恢复 escaped/multi-run 误解析、link label 不递归、固定多计换行字节、纯 rename 早退或把 `---`/`+++` header 当改动后，最终 renderer 与 diff 边界用例失败；强制 bootstrap 调用 `listSessions` 后 0 会话探针失败。反转源码已恢复，`git diff --check` 通过。
+- 最终受影响 14 文件/303 项通过；fresh TS 构建 `fae6df0de84b`、exe 102,615,168 bytes/SHA-256 `a2ad338ad80429db850e5c98e930d19d8b63d9167ed87aaae0dcd3400a7de70d`，`verify:cli-entry` 全项与 Linux Node/exe × regular/fullscreen 四格 PTY 通过。`test:scripts` 91 项、TypeScript、import cycles、config consumers、declarations、Node floor、strict docs drift 与 `git diff --check` 通过；docs drift 保留 118 条既有 advisory。
+- 仍未闭合：START-02 需要真实 CLI 首帧渲染和用户选择后的 late-result fencing；START-01 需要 fresh build 后的 packaged gate、提交/推送/精确 SHA CI；RENDER/PAN 其余消费者仍按原合同复核。START-03、QA-02/03、TOOL-02 的用户已允许环境/真实模型项继续延期，不把本轮合成测试替代它们。

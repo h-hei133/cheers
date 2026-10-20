@@ -310,3 +310,29 @@ describe('pre-dispatch cancellation', () => {
     expect(result.status).toBe('cancelled')
   })
 })
+
+describe('started command deadlines', () => {
+  it('honors the request timeout after detaching from foreground waiting', async () => {
+    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cheers-started-timeout-'))
+    const service = createDefaultExecutionService()
+    const started = service.startCommand!({
+      operationKind: 'command.run',
+      command: process.execPath,
+      args: ['-e', 'setTimeout(() => {}, 200)'],
+      cwd: workspaceRoot,
+      workspaceRoot,
+      authority: COMMAND_AUTHORITY,
+      caller: 'started-timeout-test',
+      reason: 'verify a started command retains its deadline',
+      reportSafeCommand: 'node -e "setTimeout(() => {}, 200)"',
+      timeoutMs: 30,
+    })
+
+    started.handle.detach()
+    await expect(started.result).resolves.toMatchObject({
+      status: 'timeout',
+      errorClass: 'timeout',
+      receipt: { timedOut: true },
+    })
+  })
+})

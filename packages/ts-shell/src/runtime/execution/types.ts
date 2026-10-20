@@ -175,7 +175,7 @@ export interface LocalExecutionHandle {
   readonly pid: number | undefined;
   /** Combined stdout/stderr chunks from now on. */
   onOutput(listener: (chunk: string) => void): () => void;
-  /** Stop waiting without killing the child; its result settles on exit. */
+  /** Release the foreground abort binding without removing the command deadline. */
   detach(): void;
   /** Kill the exact process tree; resolves once the kill was dispatched. */
   kill(): Promise<void>;

@@ -208,4 +208,57 @@ describe("inline spans", () => {
       "<strong>b</strong> and <code>c</code> and <em>i</em>",
     );
   });
+
+  it("distinguishes escaped, multi-run, and unmatched backticks", () => {
+    expect(renderInlineHtml("\\`text $x^2$\\`")).toBe("\\`text $x^2$\\`");
+    expect(renderInlineHtml("``code $x^2$``")).toBe("<code>code $x^2$</code>");
+    expect(renderInlineHtml("`unmatched")).toBe("`unmatched");
+    expect(renderInlineHtml("``unmatched")).toBe("``unmatched");
+    expect(renderInlineHtml("``unmatched`")).toBe("``unmatched`");
+  });
+
+  it("escapes code content and suppresses inline markup inside it", () => {
+    expect(renderInlineHtml("`</code> **literal** [x](https://example.com)`")).toBe(
+      "<code>&lt;/code&gt; **literal** [x](https://example.com)</code>",
+    );
+  });
+
+  it("allows a code span inside a link label", () => {
+    expect(renderInlineHtml("[`x`](https://example.com)")).toBe(
+      '<a href="https://example.com" rel="noreferrer noopener"><code>x</code></a>',
+    );
+    expect(renderInlineHtml("[`a ] b`](https://example.com)")).toBe(
+      '<a href="https://example.com" rel="noreferrer noopener"><code>a ] b</code></a>',
+    );
+  });
+
+  it("allows emphasis to wrap code and link tokens", () => {
+    expect(renderInlineHtml("**`x`**")).toBe("<strong><code>x</code></strong>");
+    expect(renderInlineHtml("**[x](https://example.com)**")).toBe(
+      '<strong><a href="https://example.com" rel="noreferrer noopener">x</a></strong>',
+    );
+  });
+
+  it("bounds large unmatched brackets and refuses nested anchors", () => {
+    const input = "[".repeat(80_000);
+    expect(renderInlineHtml(input)).toBe(input);
+
+    const nested = "[[inner](https://inner.test)](https://outer.test)";
+    const rendered = renderInlineHtml(nested);
+    expect(rendered.match(/<a /g)).toHaveLength(1);
+    expect(rendered).toContain('href="https://outer.test"');
+    expect(rendered).toContain("[inner](https://inner.test)");
+  });
+
+  it("keeps the exact 64 KiB budget and escapes raw source one byte over", () => {
+    const prefix = "`**literal**` [x](https://e.test) <b>";
+    const exact = prefix + "a".repeat(64 * 1024 - Buffer.byteLength(prefix, "utf8"));
+    const over = `${exact}a`;
+    const projected = renderInlineHtml(exact);
+    expect(projected).toContain("<code>**literal**</code>");
+    expect(projected).toContain('<a href="https://e.test"');
+    expect(projected).toContain("&lt;b&gt;");
+    expect(renderInlineHtml(over)).toBe(escapeHtml(over));
+    expect(renderInlineHtml(over)).not.toContain("<code>");
+  });
 });

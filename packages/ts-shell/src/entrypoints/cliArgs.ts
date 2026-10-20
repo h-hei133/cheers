@@ -2,6 +2,7 @@ import path from "node:path";
 import { profileName } from '../core/paths/profile/name.js';
 import { RUNTIME_PROVIDERS, isRuntimeProvider } from "../config/runtimeConfig.js";
 import { listSlashInvocations, subscribeSlashCommands } from "./slashCommandRegistry.js";
+import { isVersionRequested } from "../cli/options/early.js";
 import type {
   CliArgParseError,
   CliArgParseResult,
@@ -19,6 +20,7 @@ export type {
   NonInteractiveApprovalMode,
   ParseCliArgsOptions,
 } from "../cli/options/cliOptions.js";
+export { isHelpRequested, isVersionRequested } from "../cli/options/early.js";
 
 const VALUE_FLAGS = new Set([
   "--profile",
@@ -320,16 +322,6 @@ export function parseCliArgs(
     },
   };
 }
-
-
-
-export function isVersionRequested(args: readonly string[]): boolean {
-  return (
-    args.length === 1 &&
-    (args[0] === "--version" || args[0] === "-v" || args[0] === "-V")
-  );
-}
-
 export function isPrintModeRequested(args: CliArgs): boolean {
   return args.options.printMode === true;
 }

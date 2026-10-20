@@ -19,8 +19,68 @@ describe("inline styling", () => {
     expect(stripAnsi(renderInline("call `run()` now"))).toBe("call run() now");
   });
 
+  it("distinguishes escaped, multi-run, and unmatched backticks", () => {
+    expect(stripAnsi(renderInline("\\`text $x^2$\\`"))).toBe("\\`text x²\\`");
+    expect(stripAnsi(renderInline("``code $x^2$``"))).toBe("code $x^2$");
+    expect(stripAnsi(renderInline("`unmatched $x^2$"))).toBe("`unmatched x²");
+    expect(stripAnsi(renderInline("``unmatched"))).toBe("``unmatched");
+    expect(stripAnsi(renderInline("``unmatched`"))).toBe("``unmatched`");
+  });
+
+  it("does not apply emphasis inside a code span", () => {
+    expect(stripAnsi(renderInline("`**literal**` and **bold**"))).toBe("**literal** and bold");
+  });
+
+  it("allows emphasis to wrap code and link tokens", () => {
+    expect(stripAnsi(renderInline("**`x`**"))).toBe("x");
+    expect(stripAnsi(renderInline("**[x](https://e.test)**"))).toBe("x (https://e.test)");
+  });
+
   it("shows a link label with its target", () => {
     expect(stripAnsi(renderInline("[docs](https://x/y)"))).toBe("docs (https://x/y)");
+  });
+
+  it("renders code spans inside link labels", () => {
+    expect(stripAnsi(renderInline("[`x`](https://e.test)"))).toBe("x (https://e.test)");
+    expect(stripAnsi(renderInline("[``x``](https://e.test)"))).toBe("x (https://e.test)");
+    expect(stripAnsi(renderInline("[`a ] b`](https://e.test)"))).toBe("a ] b (https://e.test)");
+    expect(stripAnsi(renderInline("[`a [ b`](https://e.test)"))).toBe("a [ b (https://e.test)");
+  });
+
+  it("bounds large unmatched bracket input", () => {
+    const input = "[".repeat(80_000);
+    expect(stripAnsi(renderInline(input))).toBe(input);
+  });
+
+  it("chooses an inline marker without rescanning a large private-use run", () => {
+    const input = "\uE000".repeat(60_000);
+    expect(stripAnsi(renderInline(input))).toBe(input);
+  });
+
+  it("keeps the exact 64 KiB budget and preserves raw source one byte over", () => {
+    const prefix = "`**literal**` $x^2$ [x](https://e.test)";
+    const exact = prefix + "a".repeat(64 * 1024 - Buffer.byteLength(prefix, "utf8"));
+    const over = `${exact}a`;
+    const projected = stripAnsi(renderInline(exact));
+    expect(projected).toContain("**literal**");
+    expect(projected).toContain("x²");
+    expect(projected).toContain("x (https://e.test)");
+    expect(stripAnsi(renderInline(over))).toBe(over);
+  });
+
+  it("does not rescan an unmatched 64 KiB backtick run", () => {
+    const input = "`".repeat(64 * 1024);
+    expect(stripAnsi(renderInline(input))).toBe(input);
+  });
+
+  it("does not rescan unmatched 64 KiB escaped math openers", () => {
+    const input = "\\[".repeat(32 * 1024);
+    expect(stripAnsi(renderInline(input))).toBe(input);
+  });
+
+  it("does not recurse into a link nested inside a label", () => {
+    const source = "[[inner](https://inner.test)](https://outer.test)";
+    expect(stripAnsi(renderInline(source))).toContain("[inner](https://inner.test) (https://outer.test)");
   });
 
   it("leaves plain prose untouched", () => {

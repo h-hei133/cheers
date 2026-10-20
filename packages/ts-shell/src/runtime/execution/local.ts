@@ -213,7 +213,13 @@ export function startStreamed(options: StreamOptions): { handle: LocalExecutionH
   const handle: LocalExecutionHandle = {
     get pid() { return child.pid },
     onOutput(listener) { listeners.add(listener); return () => { listeners.delete(listener) } },
-    detach() { if (detached) return; detached = true; clearTimeout(timer); options.abortSignal?.removeEventListener('abort', onAbort) },
+    detach() {
+      if (detached) return
+      detached = true
+      // Detaching releases the foreground turn's abort listener, but the
+      // command's own lifecycle deadline must survive the handoff.
+      options.abortSignal?.removeEventListener('abort', onAbort)
+    },
     kill() { cancelled = true; stop(); return termination ?? Promise.resolve() },
     result,
   }

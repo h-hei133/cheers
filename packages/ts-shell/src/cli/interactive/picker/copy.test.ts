@@ -23,3 +23,35 @@ it('lists every block, newest first, and copies the chosen source', async () => 
     setClipboardSink(undefined);
   }
 });
+
+it('loads a bounded first page and follows the explicit continuation', async () => {
+  const transcript = new Transcript();
+  for (let index = 0; index < 1001; index++) transcript.append(textBlock('assistant', `answer ${index}`));
+  const first = copyPicker(transcript, { cwd: '/workspace' } as CommandContext);
+  const firstOptions = await first.load();
+  expect(firstOptions).toHaveLength(101);
+  expect(firstOptions.at(-1)?.id).toBe('__more__');
+  expect(firstOptions[0]?.detail).toBe('answer 1000');
+
+  const next = await first.apply(['__more__']);
+  expect(next?.next).toBeDefined();
+  const secondOptions = await next!.next!.load();
+  expect(secondOptions[0]?.detail).toBe('answer 900');
+});
+
+it('rejects a copy selection after the transcript revision changes', async () => {
+  const captured: string[] = [];
+  setClipboardSink(sequence => captured.push(sequence));
+  const transcript = new Transcript();
+  const block = transcript.append(textBlock('assistant', 'before'));
+  const picker = copyPicker(transcript, { cwd: '/workspace' } as CommandContext);
+  const options = await picker.load();
+  transcript.setText(block, 'after');
+  try {
+    const result = await picker.apply([options[0]!.id]);
+    expect(result?.note).toContain('Transcript changed');
+    expect(captured).toHaveLength(0);
+  } finally {
+    setClipboardSink(undefined);
+  }
+});

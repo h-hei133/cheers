@@ -74,6 +74,7 @@ export function createDefaultExecutionService(onCommandSettled?: (result: Pick<C
         command: request.command,
         args: [...request.args],
         cwd: request.cwd,
+        ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
         ...(request.abortSignal ? { abortSignal: request.abortSignal } : {}),
         ...(request.env ? { env: request.env } : {}),
         onOutput: request.onOutput ?? (() => {}),

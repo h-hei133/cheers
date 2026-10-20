@@ -8063,3 +8063,16 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 首推 `96fae26d877a6d162c0f9909d3726969ca6c635d`，远端 main 已读回；Architecture Watch `39397906660` success。CI `39397906657`/job `118545101287` completed/failure：`test:scripts` 91 项中唯一失败为 `binds enumerated compiler inputs outside known type roots`。Node 20.3 将 fixture 的 extensionless fake `tsc` 按 `type:module` 加载并退出 1；产品编译未执行。夹具改为显式 `type:commonjs` 后本地脚本 91/91 通过。
 - 修复提交 `116639111a491b063904eb502c55f2b749f7df32` 已推送、远端 main 完整 SHA 读回。CI `39398373664`/job `118546643247` 于 `2026-10-20T09:24:18Z` completed/success，16m49s；893 个测试文件通过、1 跳过，全部前置门禁、构建、测试与 NormProof 步骤 success。Architecture Watch `39398373370`/job `118546640910` completed/success。旧 `96fae26d` 失败记录保留。
 - 全部 47 项 Phase 20 范围继续 active。
+
+### 2026-10-20 启动早路、后台期限、编辑身份与渲染/copy 二次返工
+
+- 独立只读审计在 HEAD `980f7916` 的未提交工作树上复现了五项缺口：晋升后的前台命令丢失总期限；组合参数中的 `--help` 被忽略；并排 diff 在行预算耗尽时无显式截断且缺 rename/BOM/EOL/EOF facts；多反引号 code span 仍泄漏给数学/表格解析；copy 无分页和 source revision。旧“只剩四项环境阻塞”结论继续无效。
+- START-01 入口现在只静态加载早路模块；`--version`、`--help`、`--profile default --help`、`--help --print` 在 `cliProcessRunner`/runtime 图前返回，`--` 后同名文本不触发。正常启动仍动态加载完整 runtime。`startup.test` 新增 0/100/1k/10k bootstrap 不调用 `listSessions`，并证明缺失 `--config` 仍在 bootstrap 前拒绝；packaged help/version/组合 help 已加入 `verify:cli-entry`。
+- JOB-01 把默认晋升路径的 300 秒总期限放进原生 `startCommand` 请求并传到 `startStreamed`，`detach()` 只释放前台 abort 绑定而保留生命周期 deadline，`stop` 继续等待 adopted settlement；JOB-02 的 enabled 回调、脱敏、reload 行为由既有回归固定。JOB 相关 `local.handle` 4、`journal` 19、`backgroundNotice` 6、`service` 8、`promotion` 4 项通过。adopted stop 测试增加受控 kill gate；反转去掉 settlement 等待、timeout 传播或 detach 后 deadline 时均实际失败。
+- EDIT-01 的 group id 现在绑定源基线、hunk indexes/content 与 add content，选集重建检查基线；receipt 同时记录 requested/selected/skipped。`batch` 38 项通过；反转合并同文件 hunk、改变基线、同基线 hunk 内容或 add 内容时，对应用例实际失败或拒绝。
+- RENDER 侧加入有界共享 inline token 扫描；Markdown 与 HTML 都区分 escaped/multi-run/unmatched backtick，link label 内 code 可达，强调可跨 token 闭合，64 KiB 边界内 64k backtick/escaped-math run 线性处理，超 1 byte 原样保留，80k bracket/60k private-use run 受预算保护，label 内不生成嵌套链接，code 内不解析公式、链接或强调。diff rows/bytes 均严格受限，ASCII/UTF-8/CRLF/尾换行精确边界不误截断，文件头与 removed/added 分离，side-by-side sources/rows 对齐，纯 rename 与 rename/BOM/EOL/EOF facts 可见。math/table/diff/markdown/html 122 项通过。
+- PAN-06 copy 首屏改为 100 项有界页，`More blocks` continuation、source revision、stale selection 拒绝和 1001-block 下一页均有回归，`copy` 3 项通过。
+- 多轮独立只读复核先后复现并推动修复：JOB detach 清 timer、diff 行/字节预算与文件头、escaped/multi-run/unmatched inline、EDIT hunk/add identity、纯 rename、link label code、超长 bracket/private-use run、嵌套 anchor、超预算原文保真与 projectMath 平方扫描。最终受影响 14 文件/303 项通过。
+- fresh TS 构建 manifest `fae6df0de84b`；exe 102,615,168 bytes、SHA-256 `a2ad338ad80429db850e5c98e930d19d8b63d9167ed87aaae0dcd3400a7de70d`；Node 与 exe `--version` 均为 `0.1.0`。`verify:cli-entry` 全项通过，Linux Node/exe × regular/fullscreen 四格 PTY 通过。
+- 当前本地已通过 `test:scripts` 91 项、TypeScript、import cycles、config consumers、declarations、Node floor、strict docs drift 与 `git diff --check`；docs drift 保留 118 条既有 advisory。`normproof` 命令在当前环境不可用，不能记为通过；提交、推送和精确 SHA CI 仍需实际执行并读回。
+- START-02 仍缺完整 CLI 首帧渲染与用户选择后的 late-result fencing；START-01 仍缺 fresh packaged gate 与远端结果；START-03、QA-02/03、TOOL-02 的用户已允许环境/真实模型项继续延期。全部 47 项 Phase 20 范围保持 active。

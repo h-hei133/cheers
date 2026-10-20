@@ -12,6 +12,9 @@ it("converts common inline formulas to readable text", () => {
 it("leaves currency, code spans and escaped dollars alone", () => {
   expect(projectMath("$5 and $10")).toBe("$5 and $10");
   expect(projectMath("`$x^2$`")).toBe("`$x^2$`");
+  expect(projectMath("``code $x^2$``")).toBe("``code $x^2$``");
+  expect(projectMath("\\`text $x^2$\\`")).toBe("\\`text x²\\`");
+  expect(projectMath("`unmatched $x^2$")).toBe("`unmatched x²");
   expect(projectMath("\\$x\\$")).toBe("\\$x\\$");
 });
 

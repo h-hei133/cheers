@@ -19,6 +19,8 @@ export type UndoStatus = 'none' | 'intent' | 'restored-verified' | 'partial' | '
 export interface OperationSelection {
   readonly fullRevision: string;
   readonly selectedRevision: string;
+  /** IDs requested by the approval, including groups later found to be no-ops. */
+  readonly requestedGroupIds?: readonly string[];
   readonly selectedGroupIds: readonly string[];
   readonly skippedGroupIds: readonly string[];
 }

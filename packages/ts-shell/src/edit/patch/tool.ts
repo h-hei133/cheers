@@ -34,7 +34,7 @@ export function createPatchToolDefinition(): ToolDefinition<ToolPreparation> {
       const selections = Object.freeze(plan.groups.map(group => Object.freeze({ id: group.id, label: group.label, files: group.files })));
       const renderPreview = (value: PatchPlan): string => ['Patch plan', `Revision: ${value.revision}`, ...value.files.map(file => {
         const before = file.before.state === 'exists' ? file.before.content : '';
-        return `${file.content === undefined ? 'Delete' : file.rename ? 'Rename endpoint' : file.before.state === 'absent' ? 'Add' : 'Update'}: ${JSON.stringify(path.join(file.workspaceRoot, file.relativePath))}\n${editDiff(file.relativePath, before, file.content ?? '')}`;
+        return `${file.content === undefined ? 'Delete' : file.rename ? 'Rename endpoint' : file.before.state === 'absent' ? 'Add' : 'Update'}: ${JSON.stringify(path.join(file.workspaceRoot, file.relativePath))}\n${editDiff(file.relativePath, before, file.content ?? '', file.rename ? { oldPath: file.rename.source, newPath: file.rename.target } : undefined)}`;
       }), 'Files commit separately. A later failure may require guarded compensation.'].join('\n\n');
       const preview = renderPreview(plan);
       if (Buffer.byteLength(preview) > patchLimits.previewBytes) throw new Error('Patch preview is too large; split the operation before requesting approval.');
@@ -63,6 +63,7 @@ export function createPatchToolDefinition(): ToolDefinition<ToolPreparation> {
             selection: {
               fullRevision: plan.fullRevision,
               selectedRevision: selectedPlan.revision,
+              requestedGroupIds: chosen,
               selectedGroupIds: selectedPlan.selected,
               skippedGroupIds: plan.groups.filter(group => !selectedPlan.selected.includes(group.id)).map(group => group.id),
             } }, actual);

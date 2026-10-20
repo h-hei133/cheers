@@ -6,9 +6,11 @@ import {
   getApprovalMode,
   getWorkspaceSelection,
   isContinueRequested,
+  isHelpRequested,
   isPrintModeRequested,
   isProviderReadinessRequested,
   isStdinModeRequested,
+  isVersionRequested,
   parseCliArgs,
 } from "./cliArgs.js";
 
@@ -33,12 +35,26 @@ function expectParseError(args: readonly string[]) {
 }
 
 describe("cli args parser", () => {
-  it("preserves version-only detection without parsing later modes", () => {
+  it("preserves version early detection without parsing later modes", () => {
     const parsed = expectParsed(["--version"]);
 
     expect(parsed.versionRequested).toBe(true);
     expect(parsed.doctorRequested).toBe(false);
     expect(parsed.options).toEqual({});
+  });
+
+  it("recognizes version before the prompt terminator", () => {
+    expect(isVersionRequested(["--profile", "default", "--version"])).toBe(true);
+    expect(isVersionRequested(["--", "--version"])).toBe(false);
+  });
+
+  it("recognizes help before the prompt terminator", () => {
+    expect(isHelpRequested(["--help"])).toBe(true);
+    expect(isHelpRequested(["-h"])).toBe(true);
+    expect(isHelpRequested(["--profile", "default", "--help"])).toBe(true);
+    expect(isHelpRequested(["--help", "--print"])).toBe(true);
+    expect(isHelpRequested(["--", "--help"])).toBe(false);
+    expect(isHelpRequested([])).toBe(false);
   });
 
   it("preserves workspace selection aliases and removes project path from prompt", () => {

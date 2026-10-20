@@ -163,18 +163,21 @@ it('reports settled for a provisional task that finishes before promotion', asyn
 it('waits for an adopted task settlement before reporting stop', async () => {
   const owner = new TaskRegistry({ runCommand: vi.fn() }); owners.push(owner);
   let resolveResult!: () => void;
+  let resolveKill!: () => void;
+  const killGate = new Promise<void>(resolve => { resolveKill = resolve; });
   const result = new Promise<void>(resolve => { resolveResult = resolve; });
   const handle = {
     pid: 43210,
     onOutput: () => () => {},
     detach: () => {},
-    kill: async () => {},
+    kill: async () => { await killGate; },
     result,
   };
   const task = owner.adopt(handle, { command: 'held foreground', cwd: root });
   let stopped = false;
   const pending = owner.stop(task.id).then(value => { stopped = true; return value; });
-  await Promise.resolve();
+  resolveKill();
+  await new Promise<void>(resolve => setImmediate(resolve));
   expect(stopped).toBe(false);
   resolveResult();
   await pending;

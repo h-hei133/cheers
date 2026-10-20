@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { renderDiff, renderSideBySide } from "./diff.js";
+import { createUnifiedDiff, renderDiff, renderSideBySide } from "./diff.js";
 import { stripAnsi } from "../text/ansi.js";
 import { visibleWidth } from "../text/measure.js";
+import { defaultTheme } from "../../theme/theme.js";
+import { getDefaultTheme } from "../../themes/index.js";
 
 const WIDTH = 40;
 
@@ -49,10 +51,43 @@ describe("unified diff", () => {
 
   it("bounds unified rows and bytes independently", () => {
     const long = "+x\n".repeat(1000);
-    expect(renderDiff(long, WIDTH, { maxRows: 21 })).toHaveLength(22);
-    expect(stripAnsi(renderDiff(long, WIDTH, { maxRows: 21 }).at(-1)!)).toContain("truncated");
+    const rows = renderDiff(long, WIDTH, { maxRows: 21 });
+    expect(rows).toHaveLength(21);
+    expect(stripAnsi(rows.at(-1)!)).toContain("truncated");
     const zeroWidth = "+" + "\u200b".repeat(70000);
     expect(stripAnsi(renderDiff(zeroWidth, WIDTH, { maxBytes: 1024 }).at(-1)!)).toContain("truncated");
+  });
+
+  it("keeps an exactly filled row budget without a false truncation marker", () => {
+    const rows = renderDiff("-old\n+new", WIDTH, { maxRows: 2 }).map(stripAnsi);
+    expect(rows).toEqual(["-old", "+new"]);
+  });
+
+  it("treats maxBytes as the exact UTF-8 input boundary", () => {
+    expect(renderDiff("-a\n+b", WIDTH, { maxBytes: 5 }).map(stripAnsi)).toEqual(["-a", "+b"]);
+    expect(stripAnsi(renderDiff("-a\n+b", WIDTH, { maxBytes: 4 }).at(-1)!)).toContain("truncated");
+  });
+
+  it.each([
+    ["UTF-8 emoji", "-🙂\n+🙃"],
+    ["CRLF", "-old\r\n+new\r\n"],
+    ["trailing newline", "-a\n+b\n"],
+  ])("keeps the exact %s boundary without truncation", (_name, input) => {
+    const exact = Buffer.byteLength(input, "utf8");
+    expect(stripAnsi(renderDiff(input, WIDTH, { maxBytes: exact }).at(-1)!)).not.toContain("truncated");
+    expect(stripAnsi(renderDiff(input, WIDTH, { maxBytes: exact - 1 }).at(-1)!)).toContain("truncated");
+  });
+
+  it("keeps file headers out of removed/added emphasis", () => {
+    defaultTheme.apply(getDefaultTheme(), "truecolor");
+    try {
+      const rows = renderDiff("--- a/file.txt\n+++ b/file.txt", WIDTH);
+      expect(rows[0]).toContain(defaultTheme.fg("muted", "--- a/file.txt"));
+      expect(rows[1]).toContain(defaultTheme.fg("muted", "+++ b/file.txt"));
+      expect(rows.join("")).not.toContain("\x1b[7m");
+    } finally {
+      defaultTheme.apply(getDefaultTheme(), "none");
+    }
   });
 });
 
@@ -74,14 +109,68 @@ describe("side-by-side diff", () => {
 
   it("bounds rows and bytes, including zero-width input", () => {
     const long = "@@ -1 +1 @@\n" + "+x\n".repeat(1000);
-    expect(renderSideBySide(long, 120, { maxRows: 20 }).length).toBeLessThanOrEqual(21);
+    expect(renderSideBySide(long, 120, { maxRows: 20 }).length).toBeLessThanOrEqual(20);
     const zeroWidth = "@@ -1 +1 @@\n+" + "\u200b".repeat(70000);
     const rows = renderSideBySide(zeroWidth, 120, { maxBytes: 1024 }).map(stripAnsi);
     expect(rows.at(-1)).toContain("truncated");
   });
 
+  it("marks the row budget even when the next row would exceed it", () => {
+    const rows = renderSideBySide("@@ -1,2 +1,2 @@\n-a\n-b\n+x\n+y", 120, { maxRows: 2 }).map(stripAnsi);
+    expect(rows).toHaveLength(2);
+    expect(rows.at(-1)).toContain("truncated");
+  });
+
+  it("treats maxBytes as the exact UTF-8 input boundary", () => {
+    const exact = renderSideBySide("-a\n+b", 120, { maxBytes: 5 }).map(stripAnsi);
+    expect(exact).toHaveLength(1);
+    expect(exact[0]).not.toContain("truncated");
+    expect(renderSideBySide("-a\n+b", 120, { maxBytes: 4 }).map(stripAnsi).at(-1)).toContain("truncated");
+  });
+
+  it.each([
+    ["UTF-8 emoji", "-🙂\n+🙃"],
+    ["CRLF", "-old\r\n+new\r\n"],
+    ["trailing newline", "-a\n+b\n"],
+  ])("keeps the exact %s boundary without truncation", (_name, input) => {
+    const exact = Buffer.byteLength(input, "utf8");
+    expect(renderSideBySide(input, 120, { maxBytes: exact }).map(stripAnsi).at(-1)).not.toContain("truncated");
+    expect(renderSideBySide(input, 120, { maxBytes: exact - 1 }).map(stripAnsi).at(-1)).toContain("truncated");
+  });
+
+  it("stops a removed run before the next file header", () => {
+    const rows = renderSideBySide("-old\n--- a/next.txt\n+++ b/next.txt", 120).map(stripAnsi);
+    expect(rows).toHaveLength(3);
+    expect(rows[1]).toBe("--- a/next.txt");
+    expect(rows[2]).toBe("+++ b/next.txt");
+  });
+
   it("keeps every row inside the width, including wide glyphs", () => {
     const rows = renderSideBySide("@@ -1 +1 @@\n-中文内容\n+中文更新", 120);
     for (const row of rows) expect(visibleWidth(row)).toBeLessThanOrEqual(120);
+  });
+});
+
+describe("diff facts", () => {
+  it("records a pure rename even when the content is unchanged", () => {
+    const diff = createUnifiedDiff("new.txt", "same", "same", {
+      oldPath: "old.txt",
+      newPath: "new.txt",
+    });
+    expect(diff).toContain("rename from old.txt");
+    expect(diff).toContain("rename to new.txt");
+    expect(renderDiff(diff, WIDTH).map(stripAnsi)).toEqual(["rename from old.txt", "rename to new.txt"]);
+  });
+
+  it("records rename, BOM, line-ending, and EOF facts", () => {
+    const diff = createUnifiedDiff("new.txt", "\uFEFFold\r\n", "new", {
+      oldPath: "old.txt",
+      newPath: "new.txt",
+    });
+    expect(diff).toContain("rename from old.txt");
+    expect(diff).toContain("rename to new.txt");
+    expect(diff).toContain("BOM: old=present, new=absent");
+    expect(diff).toContain("EOL: old=CRLF, new=none");
+    expect(diff).toContain("No newline at end of file");
   });
 });

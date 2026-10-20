@@ -51,12 +51,19 @@ export interface RenderedTranscript {
 
 export class Transcript {
   private blocks: Block[] = [];
+  private revisionValue = 0;
   private readonly cache = new WeakMap<Block, CacheEntry[]>();
 
   /** Add a block to the end of the transcript. */
   append(block: Block): Block {
     this.blocks.push(block);
+    this.revisionValue++;
     return block;
+  }
+
+  /** Source revision for consumers that must not apply a stale selection. */
+  get revision(): number {
+    return this.revisionValue;
   }
 
   /**
@@ -110,18 +117,21 @@ export class Transcript {
    */
   setText(block: Block, text: string): void {
     block.text = text;
+    this.revisionValue++;
     this.cache.delete(block);
   }
 
   /** Attach a diff below the body, forgetting the cached rows it changes. */
   setDiff(block: Block, diff: string): void {
     block.diff = diff;
+    this.revisionValue++;
     this.cache.delete(block);
   }
 
   /** Drop the diff, forgetting the cached rows it was part of. */
   clearDiff(block: Block): void {
     block.diff = undefined;
+    this.revisionValue++;
     this.cache.delete(block);
   }
 
@@ -133,6 +143,7 @@ export class Transcript {
   /** Forget everything. */
   clear(): void {
     this.blocks = [];
+    this.revisionValue++;
   }
 
   /** Rows the whole transcript occupies at `width`. */

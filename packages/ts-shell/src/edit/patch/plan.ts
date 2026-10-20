@@ -18,6 +18,8 @@ export interface PatchGroup {
   readonly operationIndex: number;
   /** Present when this group is one independently selectable update hunk. */
   readonly hunkIndexes?: readonly number[];
+  /** Source identity captured when the group was planned. */
+  readonly baseline: string;
 }
 
 export interface PatchPlan {
@@ -118,14 +120,21 @@ export function planPatch(input: string, context: {
   const entries: Entry[] = [];
   for (const [operationIndex, operation] of parsePatch(input).entries()) {
     const source = target(operation.path);
+    const baseline = source.before.state === 'exists' ? hashContent(source.before.content) : 'absent';
     if (operation.kind === 'add') {
       if (source.before.state !== 'absent') throw new Error('Add File target already exists.');
       const prepared = { ...source, content: operation.content };
       const group = Object.freeze({
-        id: hashContent(JSON.stringify({ kind: operation.kind, path: operation.path })).slice(0, 12),
+        id: hashContent(JSON.stringify({
+          kind: operation.kind,
+          path: operation.path,
+          content: operation.content,
+          baseline,
+        })).slice(0, 12),
         label: `Add ${operation.path}`,
         files: Object.freeze([path.join(source.workspaceRoot, source.relativePath)]),
         operationIndex,
+        baseline,
       });
       entries.push({ operation, groups: [group], files: [prepared] });
     } else {
@@ -133,10 +142,11 @@ export function planPatch(input: string, context: {
       if (operation.kind === 'delete') {
         const prepared = { ...source, content: undefined };
         const group = Object.freeze({
-          id: hashContent(JSON.stringify({ kind: operation.kind, path: operation.path })).slice(0, 12),
+          id: hashContent(JSON.stringify({ kind: operation.kind, path: operation.path, baseline })).slice(0, 12),
           label: `Delete ${operation.path}`,
           files: Object.freeze([path.join(source.workspaceRoot, source.relativePath)]),
           operationIndex,
+          baseline,
         });
         entries.push({ operation, groups: [group], files: [prepared] });
       }
@@ -148,10 +158,11 @@ export function planPatch(input: string, context: {
           const rename = Object.freeze({ source: source.relativePath, target: destination.relativePath });
           const prepared = [{ ...destination, content, mode: source.before.mode & 0o777, rename }, { ...source, content: undefined, rename }];
           const group = Object.freeze({
-            id: hashContent(JSON.stringify({ kind: operation.kind, path: operation.path, moveTo: operation.moveTo, hunks: operation.hunks })).slice(0, 12),
+            id: hashContent(JSON.stringify({ kind: operation.kind, path: operation.path, moveTo: operation.moveTo, hunks: operation.hunks, baseline })).slice(0, 12),
             label: `Move ${operation.path} to ${operation.moveTo}`,
             files: Object.freeze(prepared.map(file => path.join(file.workspaceRoot, file.relativePath))),
             operationIndex,
+            baseline,
           });
           entries.push({ operation, groups: [group], files: prepared, source });
         } else {
@@ -164,11 +175,18 @@ export function planPatch(input: string, context: {
                 : `Update ${operation.path} (hunk ${first}/${operation.hunks.length})`
               : `Update ${operation.path} (hunks ${hunkIndexes.map(index => index + 1).join(",")}/${operation.hunks.length})`;
             return Object.freeze({
-              id: hashContent(JSON.stringify({ kind: operation.kind, path: operation.path, hunkIndexes })).slice(0, 12),
+              id: hashContent(JSON.stringify({
+                kind: operation.kind,
+                path: operation.path,
+                hunkIndexes,
+                hunks: hunkIndexes.map(index => operation.hunks[index]),
+                baseline,
+              })).slice(0, 12),
               label,
               files: Object.freeze([path.join(source.workspaceRoot, source.relativePath)]),
               operationIndex,
               hunkIndexes,
+              baseline,
             });
           });
           entries.push({ operation, groups, files: prepared, source });
@@ -276,6 +294,7 @@ export function planPatchSelection(input: string, context: {
     if (operation.kind === 'update') {
       const source = target(operation.path);
       if (source.before.state !== 'exists') throw new Error('Patch source file is missing.');
+      assertGroupBaseline(selectedGroups, source.before.content);
       const hunkIndexes = selectedGroups.flatMap(group => group.hunkIndexes ?? []).sort((left, right) => left - right);
       const content = applyHunks(source.before.content, hunkIndexes.map(index => operation.hunks[index]!));
       if (content !== source.before.content) files.push({ ...source, content });
@@ -283,6 +302,7 @@ export function planPatchSelection(input: string, context: {
     }
 
     const source = target(operation.path);
+    assertGroupBaseline(selectedGroups, source.before.state === 'exists' ? source.before.content : undefined);
     if (operation.kind === 'add' && source.before.state !== 'absent') throw new Error('Add File target already exists.');
     if (operation.kind === 'delete' && source.before.state !== 'exists') throw new Error('Patch source file is missing.');
     if (operation.kind === 'move') {
@@ -311,4 +331,11 @@ export function planPatchSelection(input: string, context: {
   const revision = hashContent(JSON.stringify({ scope: base.scope, files: planned }));
   return Object.freeze({ scope: base.scope, revision, fullRevision: base.fullRevision,
     files: Object.freeze(planned), groups: base.groups, selected });
+}
+
+function assertGroupBaseline(groups: readonly PatchGroup[], content: string | undefined): void {
+  const baseline = content === undefined ? 'absent' : hashContent(content);
+  if (groups.some(group => group.baseline !== baseline)) {
+    throw new Error('Patch group baseline changed after approval; re-plan before applying.');
+  }
 }

@@ -10,4 +10,12 @@ describe("table row cells", () => {
   it("still treats an escaped pipe outside a code span as cell content", () => {
     expect(splitTableRow("| left | x \\| y |")).toEqual(["left", "x | y"]);
   });
+
+  it("does not let an escaped backtick hide later pipes", () => {
+    expect(splitTableRow("| a | \\`x | y\\` |")).toEqual(["a", "\\`x", "y\\`"]);
+  });
+
+  it("treats an unmatched code run literally and keeps later pipes as cells", () => {
+    expect(splitTableRow("| a | `oops | b |")).toEqual(["a", "`oops", "b"]);
+  });
 });

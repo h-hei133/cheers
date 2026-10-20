@@ -1064,6 +1064,34 @@ describe("CLI streaming baseline (T3)", () => {
     });
   }, 10000);
 
+  it("supports --help without bootstrapping a session", async () => {
+    await new Promise<void>((resolve, reject) => {
+      const cli = spawnCli(fakeHomeDir, ["--help"]);
+      let output = "";
+
+      const onData = (data: Buffer) => {
+        output += data.toString();
+      };
+
+      cli.stdout?.on("data", onData);
+      cli.stderr?.on("data", onData);
+
+      cli.on("close", (code) => {
+        try {
+          expect(code).toBe(0);
+          expect(output).toContain("Usage:");
+          expect(output).toContain("cheers --help");
+          expect(output).not.toContain("Session:");
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      cli.on("error", reject);
+    });
+  }, 10000);
+
   it("shows why a cross-root current session pointer was ignored", async () => {
     const projectRoot = path.join(fakeHomeDir, "current-project");
     const otherRoot = path.join(fakeHomeDir, "other-project");

@@ -10,7 +10,7 @@ import { graphemeBoundaries, visibleWidth } from "../text/measure.js";
  * lets a reader see *what* changed instead of re-reading two similar lines.
  */
 
-const HUNK_PREFIXES = ["+++", "---", "@@", "diff ", "index "];
+const HUNK_PREFIXES = ["+++", "---", "@@", "diff ", "index ", "rename ", "\\ "];
 
 interface Emphasis {
   readonly head: string;
@@ -24,6 +24,13 @@ export interface DiffRenderOptions {
   /** Rows and input bytes are bounded independently; zero-width bytes still count. */
   readonly maxRows?: number;
   readonly maxBytes?: number;
+}
+
+export interface DiffFacts {
+  /** Original path when the operation is a rename. */
+  readonly oldPath?: string;
+  /** Destination path when the operation is a rename. */
+  readonly newPath?: string;
 }
 
 const SIDE_BY_SIDE_MIN_WIDTH = 100;
@@ -47,20 +54,21 @@ export function renderDiff(diff: string, width: number, options: DiffRenderOptio
   };
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]!;
-    consumed += Buffer.byteLength(line, "utf8") + 1;
-    if (consumed > maxBytes) { truncated = true; break; }
-    if (HUNK_PREFIXES.some((prefix) => line.startsWith(prefix))) {
-      if (!push(defaultTheme.fg("muted", truncateToWidth(line, width)))) break;
-      continue;
-    }
     const next = lines[index + 1];
-    if (line.startsWith("-") && next?.startsWith("+")) {
-      consumed += Buffer.byteLength(next, "utf8") + 1;
+    const hunk = HUNK_PREFIXES.some((prefix) => line.startsWith(prefix));
+    if (!hunk && line.startsWith("-") && next?.startsWith("+")) {
+      consumed += lineByteLength(lines, index) + lineByteLength(lines, index + 1);
       if (consumed > maxBytes) { truncated = true; break; }
       const split = splitEmphasis(line.slice(1), next.slice(1));
       if (!push(emphasised("-", split.removed, "diffRemoved", width))
         || !push(emphasised("+", split.added, "diffAdded", width))) break;
       index += 1;
+      continue;
+    }
+    consumed += lineByteLength(lines, index);
+    if (consumed > maxBytes) { truncated = true; break; }
+    if (hunk) {
+      if (!push(defaultTheme.fg("muted", truncateToWidth(line, width)))) break;
       continue;
     }
     if (line.startsWith("+")) {
@@ -69,7 +77,11 @@ export function renderDiff(diff: string, width: number, options: DiffRenderOptio
       if (!push(plain("-", line.slice(1), "diffRemoved", width))) break;
     } else if (!push(plain(" ", line.replace(/^ /, ""), "diffContext", width))) break;
   }
-  if (truncated) rows.push(defaultTheme.dim("… diff truncated by the view budget"));
+  if (truncated) {
+    const marker = defaultTheme.dim("… diff truncated by the view budget");
+    if (rows.length >= maxRows) rows[maxRows - 1] = marker;
+    else rows.push(marker);
+  }
   return rows;
 }
 
@@ -132,8 +144,20 @@ function plain(
  * Identifies common prefix and suffix lines, frames the differing middle with
  * up to two lines of context, and produces standard unified diff format.
  */
-export function createUnifiedDiff(filePath: string, oldText: string, newText: string): string {
-  if (oldText === newText) return "";
+export function createUnifiedDiff(
+  filePath: string,
+  oldText: string,
+  newText: string,
+  facts: DiffFacts = {},
+): string {
+  const oldPath = (facts.oldPath ?? filePath).replace(/\\/g, "/");
+  const newPath = (facts.newPath ?? filePath).replace(/\\/g, "/");
+  const metadata: string[] = [];
+  if (oldPath !== newPath) {
+    metadata.push(`rename from ${oldPath}`, `rename to ${newPath}`);
+  }
+  if (oldText === newText) return metadata.join("\n");
+
   const oldLines = oldText.split("\n");
   const newLines = newText.split("\n");
 
@@ -160,10 +184,19 @@ export function createUnifiedDiff(filePath: string, oldText: string, newText: st
   const oldSlice = oldLines.slice(startOld, oldLines.length - suffix + contextAfter);
   const newSlice = newLines.slice(startNew, newLines.length - suffix + contextAfter);
 
-  const relPath = filePath.replace(/\\/g, "/");
+  const oldBom = oldText.startsWith("\uFEFF");
+  const newBom = newText.startsWith("\uFEFF");
+  if (oldBom !== newBom) metadata.push(`\\ BOM: old=${oldBom ? "present" : "absent"}, new=${newBom ? "present" : "absent"}`);
+  const oldEol = lineEndingKind(oldText);
+  const newEol = lineEndingKind(newText);
+  if (oldEol !== newEol) metadata.push(`\\ EOL: old=${oldEol}, new=${newEol}`);
+  if (endsWithLineBreak(oldText) !== endsWithLineBreak(newText)) {
+    metadata.push(`\\ No newline at end of file: old=${endsWithLineBreak(oldText) ? "no" : "yes"}, new=${endsWithLineBreak(newText) ? "no" : "yes"}`);
+  }
   const header = [
-    `--- a/${relPath}`,
-    `+++ b/${relPath}`,
+    ...metadata,
+    `--- a/${oldPath}`,
+    `+++ b/${newPath}`,
     `@@ -${startOld + 1},${oldSlice.length} +${startNew + 1},${newSlice.length} @@`,
   ];
 
@@ -182,6 +215,33 @@ export function createUnifiedDiff(filePath: string, oldText: string, newText: st
   }
 
   return [...header, ...body].join("\n");
+}
+
+function lineEndingKind(text: string): "LF" | "CRLF" | "CR" | "mixed" | "none" {
+  let lf = 0;
+  let crlf = 0;
+  let cr = 0;
+  for (let index = 0; index < text.length; index++) {
+    if (text[index] === "\r") {
+      if (text[index + 1] === "\n") {
+        crlf++;
+        index++;
+      } else {
+        cr++;
+      }
+    } else if (text[index] === "\n") {
+      lf++;
+    }
+  }
+  const kinds = [lf, crlf, cr].filter(count => count > 0).length;
+  if (kinds > 1) return "mixed";
+  if (crlf > 0) return "CRLF";
+  if (cr > 0) return "CR";
+  return lf > 0 ? "LF" : "none";
+}
+
+function endsWithLineBreak(text: string): boolean {
+  return /(?:\r\n|\r|\n)$/.test(text);
 }
 
 
@@ -216,8 +276,18 @@ export function layoutSideBySide(diff: string, width: number, options: DiffRende
   const lines = diff.split('\n');
   const rows: string[] = [];
   const sources: (DiffRowSource | undefined)[] = [];
+  let truncatedShown = false;
   const truncated = (): void => {
-    if (rows.length < maxRows) rows.push(defaultTheme.dim('… diff truncated by the view budget'));
+    if (truncatedShown) return;
+    truncatedShown = true;
+    const marker = defaultTheme.dim('… diff truncated by the view budget');
+    if (rows.length >= maxRows) {
+      rows[maxRows - 1] = marker;
+      sources[maxRows - 1] = undefined;
+    } else {
+      rows.push(marker);
+      sources.push(undefined);
+    }
   };
   const numberWidth = 5;
   const cell = Math.max(8, Math.floor((width - numberWidth * 2 - 5) / 2));
@@ -236,31 +306,17 @@ export function layoutSideBySide(diff: string, width: number, options: DiffRende
   const split = numberWidth * 2 + 2;
   while (index < lines.length) {
     const line = lines[index]!;
-    consumed += Buffer.byteLength(line, 'utf8') + 1;
-    if (consumed > maxBytes) { truncated(); break; }
-    if (HUNK_PREFIXES.some(prefix => line.startsWith(prefix))) {
-      if (line.startsWith('@@')) {
-        const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
-        if (match) { oldLine = Number(match[1]); newLine = Number(match[2]); }
-      }
-      if (!push(defaultTheme.fg('muted', truncateToWidth(line, width)))) { truncated(); break; }
-      index += 1;
-      continue;
-    }
-    if (line.startsWith(' ')) {
-      const text = line.slice(1);
-      if (!push(gutter(String(oldLine), String(newLine)) + defaultTheme.fg('diffContext', truncateToWidth(text, cell))
-        + ' │ ' + defaultTheme.fg('diffContext', truncateToWidth(text, cell)), { left: text, right: text, split })) { truncated(); break; }
-      oldLine += 1; newLine += 1; index += 1; continue;
-    }
-    if (line.startsWith('-') || line.startsWith('+')) {
+    const hunk = HUNK_PREFIXES.some(prefix => line.startsWith(prefix));
+    if (!hunk && (line.startsWith('-') || line.startsWith('+'))) {
       const removed: string[] = [];
       const added: string[] = [];
-      while (index < lines.length && lines[index]!.startsWith('-')) {
-        consumed += Buffer.byteLength(lines[index]!, 'utf8') + 1; removed.push(lines[index]!.slice(1)); index += 1;
+      while (index < lines.length && lines[index]!.startsWith('-')
+        && !HUNK_PREFIXES.some(prefix => lines[index]!.startsWith(prefix))) {
+        consumed += lineByteLength(lines, index); removed.push(lines[index]!.slice(1)); index += 1;
       }
-      while (index < lines.length && lines[index]!.startsWith('+')) {
-        consumed += Buffer.byteLength(lines[index]!, 'utf8') + 1; added.push(lines[index]!.slice(1)); index += 1;
+      while (index < lines.length && lines[index]!.startsWith('+')
+        && !HUNK_PREFIXES.some(prefix => lines[index]!.startsWith(prefix))) {
+        consumed += lineByteLength(lines, index); added.push(lines[index]!.slice(1)); index += 1;
       }
       if (consumed > maxBytes) { truncated(); return { rows, sources }; }
       const count = Math.max(removed.length, added.length);
@@ -276,14 +332,35 @@ export function layoutSideBySide(diff: string, width: number, options: DiffRende
       }
       continue;
     }
+    consumed += lineByteLength(lines, index);
+    if (consumed > maxBytes) { truncated(); break; }
+    if (hunk) {
+      if (line.startsWith('@@')) {
+        const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+        if (match) { oldLine = Number(match[1]); newLine = Number(match[2]); }
+      }
+      if (!push(defaultTheme.fg('muted', truncateToWidth(line, width)))) { truncated(); break; }
+      index += 1;
+      continue;
+    }
+    if (line.startsWith(' ')) {
+      const text = line.slice(1);
+      if (!push(gutter(String(oldLine), String(newLine)) + defaultTheme.fg('diffContext', truncateToWidth(text, cell))
+        + ' │ ' + defaultTheme.fg('diffContext', truncateToWidth(text, cell)), { left: text, right: text, split })) { truncated(); break; }
+      oldLine += 1; newLine += 1; index += 1; continue;
+    }
     if (!push(defaultTheme.dim(truncateToWidth(line, width)))) { truncated(); break; }
     index += 1;
   }
-  if (bytes > maxBytes && rows.length < maxRows) truncated();
+  if (bytes > maxBytes) truncated();
   return { rows, sources };
 }
 
 /** Pad to the cell width without counting escape sequences as cells. */
 function pad(text: string, width: number): string {
   return text + ' '.repeat(Math.max(0, width - visibleWidth(text)));
+}
+
+function lineByteLength(lines: readonly string[], index: number): number {
+  return Buffer.byteLength(lines[index]!, "utf8") + (index + 1 < lines.length ? 1 : 0);
 }

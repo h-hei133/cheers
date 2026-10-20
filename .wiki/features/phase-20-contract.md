@@ -62,16 +62,16 @@
 | PAN-02 | `picker/session.ts`、`tree.ts` | session（20）、tree（2） | 分组行可选中、连接线缺失或跨项目动作被放行时失败 |
 | PAN-03 | `picker/hub.ts` | pickers（39） | `/hub` 在无 composition 时仍打开或 apply 取消任务时失败 |
 | PAN-04 | `cli/usage/service.ts` | usage（31） | 无限分母输出百分比时失败 |
-| PAN-06 | `picker/copy.ts` | copy（1） | 第 40 个 block 不可复制时失败 |
+| PAN-06（部分） | `picker/copy.ts`、`transcript/container.ts` | copy（3）；100 项分页、continuation、source revision 和 stale selection | 第 40 个 block 不可复制、revision 变化后仍复制或下一页丢失时失败 |
 | PAN-07 | `registry.ts` | slashCommandRegistry（11） | `/extensions` 不解析到 plugin 时失败 |
 
 ## W7 输入与渲染
 
 | 任务 | 所有者 | 证据 | 反转 |
 |---|---|---|---|
-| RENDER-01（部分） | `transcript/math.ts` | math（4） | 金额被当公式或未知命令丢失参数时失败 |
-| RENDER-02（部分） | `transcript/{markdown,table}.ts` | markdown（41）、table（2）、html（31）；raw fallback 以最终 `rows.join("\n")` 的 UTF-8 字节计预算 | 多反引号 code span pipe 被拆 cell、ANSI/行分隔符绕过 64 KiB 预算或窄屏截断长尾时失败 |
-| RENDER-03（部分） | `transcript/diff.ts` | diff（12） | 零宽内容绕过字节预算时失败 |
+| RENDER-01（部分） | `transcript/math.ts`、`text/{codeSpan,inline}.ts` | math（4）、markdown（51）、html（37）；最终 inline renderer 区分 escaped/multi-run/unmatched backtick，link label 内 code 可达，强调可跨 token 闭合，64 KiB 边界内 64k backtick/escaped-math run 线性处理，超 1 byte 原样保留，80k bracket/60k private-use run 受预算保护，label 内不生成嵌套链接，code span 内不投影公式、链接或强调 | 转义反引号被当成 code span、多 run 被拆坏、未闭合 run 吞掉后续文本、link label 丢 code、强调无法跨 token、超长输入平方扫描、超预算改写原文或嵌套 anchor 时失败 |
+| RENDER-02（部分） | `transcript/{markdown,table}.ts`、`session/export/htmlRender.ts`、`text/{codeSpan,inline}.ts` | markdown（51）、table（4）、html（37）；raw fallback 以最终 `rows.join("\n")` 的 UTF-8 字节计预算 | 多反引号 code span pipe 被拆 cell、未闭合 run 吞掉后续 pipe、ANSI/行分隔符绕过预算或窄屏截断长尾时失败 |
+| RENDER-03（部分） | `transcript/diff.ts` | diff（26）；rows/bytes 均严格不超预算，ASCII/UTF-8/CRLF/尾换行精确边界不误截断，`---`/`+++` header 与 removed/added 分离，side-by-side sources 对齐，纯 rename 与 rename/BOM/EOL/EOF facts 可见 | 零宽内容绕过字节预算、截断标记突破 rows、边界输入误截断、header 被当改动或 facts 被吞掉时失败 |
 | INPUT-01（部分） | `editor/modal/state.ts`、`input/{terminal,stdinBuffer}.ts`、`cli/interactive/keymap.ts` | state（12）、keymap（63）、stdinBuffer（25）、terminal（7）；跨 UTF-8 chunk、fused/cross-chunk 字素、combining mark、keycap、paste/escape 后文本与纵向边界 | UTF-8 半码点产生替换字符、`f/F/t/T` 只收到首个 scalar、纵向移动落到 surrogate 中间或字素跨 chunk 被拆时失败；完整 IME/五模式合同仍待复核 |
 
 ## W8/W9
@@ -80,11 +80,11 @@
 
 | 任务 | 证据 | 反转/未闭合 |
 |---|---|---|
-| JOB-01（部分） | `LocalExecutionHandle`、一次 spawn 的 `adopt/promote`、原 PID 晋升、容量拒绝与重启 unknown 路径已有实现；`src/core/tools/shell/promotion.test.ts` 覆盖了基本晋升。 | adopted task 的 settlement 初值是已解决 Promise，`stop` 在子进程真正退出前即可返回；拒绝路径还会立即宣称没有运行中的进程。需要以真实子进程断言“停止派发”与“结算”分离。 |
-| JOB-02（部分） | 本地 notice、opt-in follow-up、去重/预算/截断和重启不重播已有实现与单测。 | follow-up 直接使用 `task.output`，未经过 UI notice 相同的脱敏；策略在构造时捕获 `backgroundFollowUp`，配置 reload 后不会重新读取。需要 secret 反例和 reload 反例。 |
-| EDIT-01（部分） | 稳定 group id、依赖组、选集绑定、重规划 revision 检查和无选集拒绝已有实现。 | 当前 approval group 按文件操作划分，同一文件多个 hunk 仍是一个可批准组；尚未满足 hunk 级选集与依赖契约。需要同文件双 hunk 反例。 |
-| START-01（部分，本轮补强） | build manifest 已绑定 lockfile、构建配置、编译器/标准库、全部 emit 字节、五个运行资产和受控 entry；`start.test` 覆盖 journal 恢复、活动/stale build lock fail-closed、恢复期间竞争者拒绝、越界/未登记入口、篡改产物与 launcher/package-main 回滚。 | 仍按完整 START-01 裁决复核 version/help 懒加载、坏配置准入和同一 buildID 的发布时序；stale lock 需人工确认后清理，本轮本地通过不等于任务或 CI 完成。 |
-| START-02（部分） | 10k catalog 首屏测试和持久 reentry 摘要索引存在。 | 默认 bootstrap 仍可能在首帧前调用 `listSessions` 全量扫描；现有测试没有穿过真实 bootstrap 路径。需要 0/100/1k/10k 会话的首帧反转探针。 |
+| JOB-01 | `LocalExecutionHandle`、一次 spawn 的 `adopt/promote`、原 PID 晋升、容量拒绝与重启 unknown 路径；`local.handle`（4）、`journal`（19）、`service`（8）、`promotion`（4）覆盖 detach 后保留生命周期 deadline、adopted settlement、kill gate、撤权、容量拒绝和重启不重播。 | 撤销 `stop` 的 settlement 等待、timeout 传播或在 `detach()` 清除 timer 时，对应真实子进程/服务用例失败。 |
+| JOB-02 | 本地 notice、opt-in follow-up、去重/预算/截断、配置 reload 重新读取 enable 策略，以及命令/输出两侧脱敏；`backgroundNotice.test.ts` 6 项通过。 | 将函数型 enable 策略退化为构造时布尔值后，reload 用例实际失败。 |
+| EDIT-01 | 稳定 group id、源基线、hunk indexes/content 与 add content 身份绑定、依赖组、同文件双 hunk 选集、重规划 revision 检查、无选集拒绝，以及 requested/selected/skipped receipt；`batch.test.ts` 38 项通过。 | 将同文件 hunk 合并成单组、改变源基线、改变同基线 hunk 内容或 add 内容后，对应选集/identity 用例实际失败或拒绝。 |
+| START-01（部分） | build manifest 已绑定 lockfile、构建配置、编译器/标准库、全部 emit 字节、五个运行资产和受控 entry；`start.test` 覆盖 journal 恢复、活动/stale build lock fail-closed、恢复期间竞争者拒绝、越界/未登记入口、篡改产物与 launcher/package-main 回滚。`--version`/`--help` 现在由轻量入口在加载 runtime 图前处理；组合参数 `--profile default --help`、`--help --print` 和坏配置正常准入均有覆盖。 | 仍需最终 fresh build 的 packaged gate、CI 与精确 SHA；stale lock 需人工确认后清理，本轮本地通过不等于任务或 CI 完成。 |
+| START-02（部分） | 10k catalog 首屏测试、持久 reentry 摘要索引，以及真实 `createCliBootstrapRuntimeContext` 在 0/100/1k/10k 目录下不调用 `listSessions` 的探针已加入；startup surface 后才 `setImmediate` 加载 recovery hint。 | 仍需通过完整 CLI 首帧渲染路径记录实际帧和用户选择后的 late-result fencing；当前单元探针不能替代端到端启动证据。 |
 | START-03（部分） | 历史 `bench:start`、`bench:interactive` 已记录 Node/exe 版本启动及 regular/fullscreen/pipe 首帧/退出数据。 | benchmark 未消费 ready/layout/write 观察点，未同步实际 prompt，交互矩阵仍为 Node-only，且缺少 raw sample、构建摘要和受控冷缓存；受控冷缓存及真实 ready 测量仍未闭合。 |
 
 ## W10

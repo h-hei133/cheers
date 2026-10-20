@@ -836,6 +836,45 @@ async function runPackagedEntryBoundary() {
   }
   printStep('cli-entry-packaged-version', 'pass')
 
+  const helpResult = await runPackagedCli(['--help'])
+  if (helpResult.code !== 0 || helpResult.timedOut) {
+    printStep(
+      'cli-entry-packaged-help',
+      'product-regression',
+      helpResult.timedOut ? 'timed out' : `exit=${helpResult.code}`,
+    )
+    console.log(summarizeOutput(helpResult.output))
+    return false
+  }
+  if (!helpResult.output.includes('Usage:') || !helpResult.output.includes('cheers --help')) {
+    printStep('cli-entry-packaged-help', 'product-regression', 'missing help markers')
+    console.log(summarizeOutput(helpResult.output))
+    return false
+  }
+  if (helpResult.output.includes('Session:')) {
+    printStep('cli-entry-packaged-help', 'product-regression', 'help bootstrapped a session')
+    console.log(summarizeOutput(helpResult.output))
+    return false
+  }
+  printStep('cli-entry-packaged-help', 'pass')
+
+  const combinedHelp = await runPackagedCli(['--profile', 'default', '--help'])
+  if (combinedHelp.code !== 0 || combinedHelp.timedOut) {
+    printStep(
+      'cli-entry-packaged-combined-help',
+      'product-regression',
+      combinedHelp.timedOut ? 'timed out' : `exit=${combinedHelp.code}`,
+    )
+    console.log(summarizeOutput(combinedHelp.output))
+    return false
+  }
+  if (!combinedHelp.output.includes('Usage:') || combinedHelp.output.includes('Session:')) {
+    printStep('cli-entry-packaged-combined-help', 'product-regression', 'combined help did not stay lightweight')
+    console.log(summarizeOutput(combinedHelp.output))
+    return false
+  }
+  printStep('cli-entry-packaged-combined-help', 'pass')
+
   const slashOk = await assertSuccessfulPackagedCliRun(
     'cli-entry-packaged-slash-current-session',
     ['--project', projectRoot, '--print', '/sessions current'],

@@ -110,6 +110,11 @@ async function runCommandTool(
   }
   const proof = startCommandProof(command, context)
   context.commandProof?.started(proof, context.assertSourceAccess)
+  // A default-timeout foreground command is spawned once and adopted by the
+  // job owner. Keep the bounded background deadline on the native handle too;
+  // the foreground race only releases the turn and must not remove the limit.
+  const promotable = requestedTimeoutSeconds === undefined && context.background?.adopt && context.background.promote
+    && context.onOutput && executionService.startCommand
   const request = {
     operationKind: 'command.run' as const,
     command: sandbox.command ?? shellBin,
@@ -123,12 +128,11 @@ async function runCommandTool(
     abortSignal: context.abortSignal,
     ...(context.commandEnv ? { env: context.commandEnv } : {}),
     ...(context.onOutput ? { onOutput: context.onOutput } : {}),
+    ...(promotable ? { timeoutMs: 300_000 } : {}),
   }
   // An interactive default-timeout command is spawned once and adopted by the
   // job owner. If it outlives the foreground window it is promoted in place,
   // keeping the same PID; an explicit timeout keeps the ordinary path.
-  const promotable = requestedTimeoutSeconds === undefined && context.background?.adopt && context.background.promote
-    && context.onOutput && executionService.startCommand
   let result: Awaited<ReturnType<ExecutionService['runCommand']>>
   if (promotable) {
     const started = executionService.startCommand!(request)

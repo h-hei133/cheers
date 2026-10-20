@@ -6,6 +6,7 @@ import { DIAGRAM_LANGUAGE, renderDiagram } from "./mermaid.js";
 import { scanBlocks } from "./markdownScan.js";
 import { latexToText, projectMath } from "./math.js";
 import { splitTableRow } from "./table.js";
+import { inlineWithinBudget, transformInline, type InlineContext } from "../text/inline.js";
 /**
  * Markdown rendering for assistant prose.
  *
@@ -41,18 +42,28 @@ export function trimPartialFence(text: string): string {
 
 /** Inline emphasis, code spans, and link labels for one line. */
 export function renderInline(text: string): string {
-  return projectMath(text)
-    .replace(/`([^`]+)`/g, (_match, code: string) => {
+  return renderInlineAt(text);
+}
+
+function renderInlineAt(text: string, context?: InlineContext): string {
+  if (!inlineWithinBudget(text, context)) return text;
+  return transformInline(projectMath(text), {
+    renderCode: (code) => {
       if (code.includes("/") || code.includes("\\") || /\.[a-zA-Z0-9_-]+$/.test(code)) {
         return defaultTheme.fg("filename", code);
       }
       return defaultTheme.fg("mdCode", code);
-    })
+    },
+    renderText: renderPlainInline,
+    renderLink: (label, href, next) =>
+      `${defaultTheme.fg("mdLink", renderInlineAt(label, next))}${defaultTheme.fg("mdLinkUrl", ` (${href})`)}`,
+  }, context);
+}
+
+function renderPlainInline(text: string): string {
+  return text
     .replace(/\*\*([^*]+)\*\*/g, (_match, body: string) => defaultTheme.bold(body))
-    .replace(/(^|[^*])\*([^*\n]+)\*/g, (_match, lead: string, body: string) => `${lead}\x1b[3m${body}\x1b[23m`)
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, href: string) =>
-      `${defaultTheme.fg("mdLink", label)}${defaultTheme.fg("mdLinkUrl", ` (${href})`)}`,
-    );
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, (_match, lead: string, body: string) => `${lead}\x1b[3m${body}\x1b[23m`);
 }
 
 /**

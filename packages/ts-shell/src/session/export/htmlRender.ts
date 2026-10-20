@@ -1,6 +1,7 @@
 import { scanBlocks, type MarkdownBlock } from "../../presentation/tui/transcript/markdownScan.js";
 import { latexToText } from "../../presentation/tui/transcript/math.js";
 import { splitTableRow } from "../../presentation/tui/transcript/table.js";
+import { inlineWithinBudget, transformInline, type InlineContext } from "../../presentation/tui/text/inline.js";
 
 /**
  * Markdown as HTML, for the exported page.
@@ -57,31 +58,29 @@ export function safeUrl(value: string): string | undefined {
  * twice, turning a working query string into a literal `&amp;`.
  */
 export function renderInlineHtml(text: string): string {
-  const parts: string[] = [];
-  const LINK = /\[([^\]]*)\]\(([^()\s]*(?:\([^()\s]*\)[^()\s]*)*)\)/g;
-  let cursor = 0;
-  let match = LINK.exec(text);
-  while (match !== null) {
-    parts.push(renderSpans(match.index > cursor ? text.slice(cursor, match.index) : ""));
-    const url = safeUrl(match[2]!);
-    parts.push(
-      url === undefined
-        // A refused scheme loses the link, not the words: the label is still
-        // what the author wrote.
-        ? renderSpans(match[1]!)
-        : `<a href="${escapeHtml(url)}" rel="noreferrer noopener">${renderSpans(match[1]!)}</a>`,
-    );
-    cursor = match.index + match[0].length;
-    match = LINK.exec(text);
-  }
-  if (cursor < text.length) parts.push(renderSpans(text.slice(cursor)));
-  return parts.join("");
+  return renderInlineHtmlAt(text);
+}
+
+function renderInlineHtmlAt(text: string, context?: InlineContext): string {
+  if (!inlineWithinBudget(text, context)) return escapeHtml(text);
+  return transformInline(text, {
+    renderCode: (code) => `<code>${escapeHtml(code)}</code>`,
+    renderText: (plain) => renderEmphasisHtml(escapeHtml(plain)),
+    renderLink: (label, href, next) => {
+      const url = safeUrl(href);
+      const renderedLabel = renderInlineHtmlAt(label, next);
+      // A refused scheme loses the link, not the words: the label is still what
+      // the author wrote.
+      return url === undefined
+        ? renderedLabel
+        : `<a href="${escapeHtml(url)}" rel="noreferrer noopener">${renderedLabel}</a>`;
+    },
+  }, context);
 }
 
 /** Code and emphasis, on text that has already had its links taken out. */
-function renderSpans(text: string): string {
-  return escapeHtml(text)
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
+function renderEmphasisHtml(text: string): string {
+  return text
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
 }

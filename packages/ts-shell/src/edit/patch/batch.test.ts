@@ -87,6 +87,7 @@ describe('recorded patch batches', () => {
     expect(receipts).toHaveLength(1);
     expect(receipts[0]!.files).toHaveLength(1);
     expect(receipts[0]!.selection).toMatchObject({
+      requestedGroupIds: [onlyA.id],
       selectedGroupIds: [onlyA.id],
       skippedGroupIds: [prepared.selections![1]!.id],
     });
@@ -122,6 +123,7 @@ describe('recorded patch batches', () => {
     expect(receipts).toHaveLength(1);
     expect(receipts[0]!.files).toHaveLength(1);
     expect(receipts[0]!.selection?.selectedGroupIds).toEqual([second.id]);
+    expect(receipts[0]!.selection?.requestedGroupIds).toEqual([second.id]);
   });
 
   it('merges a cursor-dependent hunk into one atomic group', async () => {
@@ -150,6 +152,7 @@ describe('recorded patch batches', () => {
     expect(result.success).toBe(true);
     expect(fs.readFileSync(a, 'utf8')).toBe('anchor\nfirst\nsecond\n');
     expect(readOperations(scope())[0]!.selection?.selectedGroupIds).toEqual([only.id]);
+    expect(readOperations(scope())[0]!.selection?.requestedGroupIds).toEqual([only.id]);
   });
 
   it('does not let an unselected file invalidate an exact selected subset', async () => {
@@ -183,6 +186,35 @@ describe('recorded patch batches', () => {
       .rejects.toThrow(/stale|changed|does not match/i);
     expect(fs.readFileSync(a, 'utf8')).toBe('external\n');
     expect(readOperations(scope())).toEqual([]);
+  });
+
+  it('changes group identity when the source baseline changes', async () => {
+    const tool = createPatchToolDefinition();
+    const context = { workspaceRoot: workspace, sessionId: 'patch-session', taskId: 'baseline-group-call' } as never;
+    const first = tool.prepare!({ input: patch(update('a.txt', 'before-a', 'after-a')) }, context) as import('../../tools/types.js').ToolPreparation;
+    fs.writeFileSync(a, 'before-a\nexternal\n');
+    const second = tool.prepare!({ input: patch(update('a.txt', 'before-a', 'after-a')) }, context) as import('../../tools/types.js').ToolPreparation;
+
+    expect(second.selections![0]!.id).not.toBe(first.selections![0]!.id);
+    expect(() => first.selectionPreview!([first.selections![0]!.id])).toThrow(/baseline|stale|changed/i);
+  });
+
+  it('changes group identity when hunk content changes against the same baseline', async () => {
+    const tool = createPatchToolDefinition();
+    const context = { workspaceRoot: workspace, sessionId: 'patch-session', taskId: 'hunk-content-group-call' } as never;
+    const first = tool.prepare!({ input: patch(update('a.txt', 'before-a', 'after-a')) }, context) as import('../../tools/types.js').ToolPreparation;
+    const second = tool.prepare!({ input: patch(update('a.txt', 'before-a', 'different-a')) }, context) as import('../../tools/types.js').ToolPreparation;
+
+    expect(second.selections![0]!.id).not.toBe(first.selections![0]!.id);
+  });
+
+  it('changes add group identity when added content changes', async () => {
+    const tool = createPatchToolDefinition();
+    const context = { workspaceRoot: workspace, sessionId: 'patch-session', taskId: 'add-content-group-call' } as never;
+    const first = tool.prepare!({ input: patch('*** Add File: created.txt\n+first') }, context) as import('../../tools/types.js').ToolPreparation;
+    const second = tool.prepare!({ input: patch('*** Add File: created.txt\n+second') }, context) as import('../../tools/types.js').ToolPreparation;
+
+    expect(second.selections![0]!.id).not.toBe(first.selections![0]!.id);
   });
 
   it('rejects a whole-plan approval when content outside the hunk changed', async () => {
