@@ -35,6 +35,8 @@ export interface GoogleAccountAuthConfig {
  */
 export interface SubscriptionAccountAuthConfig {
   readonly type: "subscription";
+  /** Omitted only in legacy storage; an unbound credential cannot authorize requests. */
+  readonly provider?: 'github-copilot' | 'anthropic';
   readonly accessToken: string;
   readonly refreshToken: string;
   readonly expiresAt: number;
@@ -152,6 +154,7 @@ export function normalizeProviderAccountAuth(
     if (!accessToken || !refreshToken || !Number.isFinite(expiresAt) || expiresAt <= 0) return undefined;
     const baseUrl = normalizeBaseUrl(subscription.baseUrl);
     return { subscription: { type: "subscription", accessToken, refreshToken, expiresAt,
+      ...(subscription.provider ? { provider: subscription.provider } : {}),
       ...(baseUrl ? { baseUrl } : {}) } };
   }
 

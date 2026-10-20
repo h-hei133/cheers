@@ -1,256 +1,92 @@
-import { describe, expect, it } from "vitest";
-import {
-  ANTHROPIC_SUBSCRIPTION,
-  completeGitHubDeviceFlow,
-  copilotBaseUrl,
-  exchangeAnthropicCode,
-  gitHubEndpoints,
-  parseAuthorizationInput,
-  refreshAnthropicToken,
-  startGitHubDeviceFlow,
-  SubscriptionError,
-} from "./subscription.js";
-import type { DeviceCodeGrant } from "./deviceCode.js";
+import { describe, expect, it } from 'vitest';
+import { completeGitHubDeviceFlow, nativeCopilotLogin, refreshCopilotToken, startGitHubDeviceFlow } from './copilot/flow.js';
+import { copilotBaseUrl } from './copilot/policy.js';
+import type { DeviceCodeGrant } from './deviceCode.js';
 
-/**
- * Signing in with a subscription.
- *
- * Both providers are checked at the wire: what is asked for, and what is read
- * back. The token exchange is where these differ from an API key — one returns a
- * credential directly, the other needs a second request — and both are the part a
- * mistake would make look like a wrong password.
- */
-
-/** A fetch that answers each call in turn and records the requests. */
-function scripted(...responses: Array<{ body?: unknown; status?: number; text?: string }>) {
-  const calls: Array<{ url: string; method: string; body: string; headers: Record<string, string> }> = [];
-  let index = 0;
-  const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
-    calls.push({
-      url: String(url),
-      method: init?.method ?? "GET",
-      body: String(init?.body ?? ""),
-      headers: (init?.headers as Record<string, string>) ?? {},
-    });
-    const response = responses[Math.min(index++, responses.length - 1)]!;
-    return new Response(response.text ?? JSON.stringify(response.body ?? {}), { status: response.status ?? 200 });
-  }) as unknown as typeof fetch;
-  return { fetchImpl, calls };
-}
-
-describe("where a GitHub sign-in runs", () => {
-  it("puts every endpoint under the account's domain", () => {
-    // Taking the domain rather than the URLs means a caller cannot supply one
-    // that disagrees with another.
-    const endpoints = gitHubEndpoints("github.example");
-
-    expect(endpoints.deviceCode).toBe("https://github.example/login/device/code");
-    expect(endpoints.accessToken).toBe("https://github.example/login/oauth/access_token");
-    expect(endpoints.apiBase).toBe("https://api.github.example");
-  });
-});
-
-describe("starting a GitHub sign-in", () => {
-  it("asks for a code and returns what to show", async () => {
-    const { fetchImpl, calls } = scripted({
-      body: {
-        device_code: "DEVICE",
-        user_code: "ABCD-1234",
-        verification_uri: "https://github.com/login/device",
-        interval: 5,
-        expires_in: 900,
-      },
-    });
-
-    const grant = await startGitHubDeviceFlow({ fetchImpl });
-
-    expect(grant.userCode).toBe("ABCD-1234");
-    expect(grant.verificationUri).toBe("https://github.com/login/device");
-    expect(grant.intervalSeconds).toBe(5);
-    expect(calls[0]!.body).toContain("client_id=");
-  });
-
-  it("refuses an answer with nothing to show", async () => {
-    const { fetchImpl } = scripted({ body: { device_code: "D" } });
-
-    await expect(startGitHubDeviceFlow({ fetchImpl })).rejects.toThrow(/no code to show/);
-  });
-
-  it("reports a refusal rather than a missing code", async () => {
-    const { fetchImpl } = scripted({ status: 403, text: "forbidden" });
-
-    await expect(startGitHubDeviceFlow({ fetchImpl })).rejects.toThrow(SubscriptionError);
-  });
-});
-
-describe("finishing a GitHub sign-in", () => {
-  const grant: DeviceCodeGrant = {
-    deviceCode: "DEVICE",
-    userCode: "ABCD",
-    verificationUri: "https://github.com/login/device",
-    intervalSeconds: 1,
-    expiresInSeconds: 60,
+const grant: DeviceCodeGrant = { deviceCode: 'device', userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device', intervalSeconds: 1, expiresInSeconds: 60 };
+function scripted(...answers: { body?: unknown; status?: number; text?: string }[]) {
+  const calls: { url: string; init: RequestInit }[] = [];
+  let cursor = 0;
+  const fetchImpl: typeof fetch = async (url, init) => {
+    calls.push({ url: String(url), init: init ?? {} });
+    const answer = answers[cursor++] ?? answers.at(-1)!;
+    return new Response(answer.text ?? JSON.stringify(answer.body ?? {}), { status: answer.status ?? 200 });
   };
+  return { calls, fetchImpl };
+}
+const token = (accessToken = 'tid=session;proxy-ep=proxy.individual.githubcopilot.com') => ({ token: accessToken, expires_at: Math.floor(Date.now() / 1000) + 3600 });
 
-  it("keeps polling until the code has been entered and exchanges the token for a Copilot credential", async () => {
-    const { fetchImpl, calls } = scripted(
-      { body: { error: "authorization_pending" } },
-      { body: { access_token: "GHO_TOKEN" } },
-      { body: { token: "tid=session;proxy-ep=proxy.individual.githubcopilot.com", expires_at: 1_800_000_000 } },
-    );
-
-    const credential = await completeGitHubDeviceFlow({ grant, fetchImpl });
-
-    expect(credential.accessToken).toBe("tid=session;proxy-ep=proxy.individual.githubcopilot.com");
-    expect(credential.refreshToken).toBe("GHO_TOKEN");
-    expect(calls).toHaveLength(3);
-    expect(calls[1]!.body).toContain("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code");
-    expect(calls[2]!.url).toBe("https://api.github.com/copilot_internal/v2/token");
-    expect(calls[2]!.headers.authorization).toBe("Bearer GHO_TOKEN");
+describe('native Copilot device and session exchange', () => {
+  it('validates and exposes a native device code', async () => {
+    const fixture = scripted({ body: { device_code: 'device', user_code: 'ABCD-1234', verification_uri: 'https://github.com/login/device', interval: 5, expires_in: 900 } });
+    expect(await startGitHubDeviceFlow(fixture)).toMatchObject({ ...grant, intervalSeconds: 5, expiresInSeconds: 900 });
+    expect(fixture.calls[0]!.url).toBe('https://github.com/login/device/code');
+    expect(fixture.calls[0]!.init.redirect).toBe('error');
   });
-
-  it("stores the reported expiry with the skew convention applied", async () => {
-    const { fetchImpl } = scripted(
-      { body: { access_token: "GHO_TOKEN" } },
-      { body: { token: "COPILOT_SESSION_TOKEN", expires_at: 1_800_000_000 } },
-    );
-
-    const credential = await completeGitHubDeviceFlow({ grant, fetchImpl });
-
-    expect(credential.refreshToken).toBe("GHO_TOKEN");
-    // 60-second refresh skew matches the existing convention in this directory
-    expect(credential.expiresAt).toBe((1_800_000_000 - 60) * 1_000);
+  it('polls OAuth then exchanges only the GitHub token for a bounded native session', async () => {
+    const response = token();
+    const fixture = scripted({ body: { error: 'authorization_pending' } }, { body: { access_token: 'synthetic-github' } }, { body: response });
+    const credential = await completeGitHubDeviceFlow({ grant, fetchImpl: fixture.fetchImpl });
+    expect(credential).toMatchObject({ provider: 'github-copilot', refreshToken: 'synthetic-github', accessToken: response.token,
+      expiresAt: response.expires_at * 1000, baseUrl: 'https://api.individual.githubcopilot.com' });
+    expect(fixture.calls).toHaveLength(3);
+    expect(fixture.calls[2]!.url).toBe('https://api.github.com/copilot_internal/v2/token');
+    expect(new Headers(fixture.calls[2]!.init.headers).get('authorization')).toBe('Bearer synthetic-github');
+    expect(fixture.calls.every(call => call.init.redirect === 'error')).toBe(true);
+    expect(nativeCopilotLogin(credential)).toBe(true);
+    for (const change of [{ provider: 'anthropic' }, { accessToken: 'foreign' }, { refreshToken: 'foreign' }, { expiresAt: credential.expiresAt + 1 },
+      { baseUrl: 'https://api.business.githubcopilot.com' }, { production: {} }]) expect(nativeCopilotLogin({ ...credential, ...change })).toBe(false);
   });
-
-  it("sets the baseUrl using the endpoint hint in the Copilot token", async () => {
-    const { fetchImpl } = scripted(
-      { body: { access_token: "GHO_TOKEN" } },
-      { body: { token: "tid=x;proxy-ep=proxy.individual.githubcopilot.com", expires_at: 1_800_000_000 } },
-    );
-
-    const credential = await completeGitHubDeviceFlow({ grant, fetchImpl });
-
-    expect(credential.baseUrl).toBe("https://api.individual.githubcopilot.com");
+  it('retains the long-lived GitHub token on renewal with exact issued expiry', async () => {
+    const response = token('synthetic-session');
+    const fixture = scripted({ body: response });
+    const fresh = await refreshCopilotToken({ refreshToken: 'synthetic-github', fetchImpl: fixture.fetchImpl });
+    expect(fresh.refreshToken).toBe('synthetic-github');
+    expect(fresh.expiresAt).toBe(response.expires_at * 1000);
+    expect(fresh.baseUrl).toBe('https://api.individual.githubcopilot.com');
+    expect(nativeCopilotLogin(fresh)).toBe(false);
   });
-
-  it("falls back to the apiBase when the token does not contain an endpoint hint", async () => {
-    const { fetchImpl } = scripted(
-      { body: { access_token: "GHO_TOKEN" } },
-      { body: { token: "plain_token_without_hint", expires_at: 1_800_000_000 } },
-    );
-
-    const credential = await completeGitHubDeviceFlow({ grant, fetchImpl });
-
-    expect(credential.baseUrl).toBe("https://api.github.com");
+  it.each([null, [], {}, { token: '' }, { token: '   ', expires_at: 1800000000 }, { token: 't', expires_at: -1 },
+    { token: 't', expires_at: 0 }, { token: 't', expires_at: '1800000000' }, { token: 't', expires_at: 1.1 },
+    { token: 't', expires_at: null }, { token: 't', expires_at: 9e15 }, { ...token(), error: 'synthetic-body-secret' }])('refuses invalid session response %j', async body => {
+    const fixture = scripted({ body });
+    await expect(refreshCopilotToken({ refreshToken: 'synthetic-github', fetchImpl: fixture.fetchImpl })).rejects.toThrow(/response|metadata/);
   });
-
-  it("reports a failed token exchange with the endpoint's response text", async () => {
-    const { fetchImpl } = scripted(
-      { body: { access_token: "GHO_TOKEN" } },
-      { text: "Copilot subscription not found for user", status: 403 },
-    );
-
-    await expect(completeGitHubDeviceFlow({ grant, fetchImpl })).rejects.toThrow(
-      "GitHub refused the Copilot token exchange: Copilot subscription not found for user",
-    );
+  it.each([400, 401, 403, 500])('does not read or report a refused HTTP %i body', async status => {
+    const fixture = scripted({ status, text: 'synthetic-body-secret' });
+    await expect(refreshCopilotToken({ refreshToken: 'synthetic-github', fetchImpl: fixture.fetchImpl })).rejects.toThrow(`HTTP ${status}`);
+    try { await refreshCopilotToken({ refreshToken: 'synthetic-github', fetchImpl: fixture.fetchImpl }); } catch (error) { expect(String(error)).not.toContain('synthetic-body-secret'); }
   });
-
-  it("stops when the person refuses", async () => {
-    const { fetchImpl } = scripted({ body: { error: "access_denied" } });
-
-    await expect(completeGitHubDeviceFlow({ grant, fetchImpl })).rejects.toThrow(/refused/);
+  it('does not accept an access_token field in a refused polling response', async () => {
+    const fixture = scripted({ status: 400, body: { access_token: 'synthetic-wrong' } });
+    await expect(completeGitHubDeviceFlow({ grant, fetchImpl: fixture.fetchImpl })).rejects.toThrow('HTTP 400');
+    expect(fixture.calls).toHaveLength(1);
+  });
+  it('redacts transport and device refusal details', async () => {
+    await expect(refreshCopilotToken({ refreshToken: 'synthetic-github', fetchImpl: async () => { throw new Error('synthetic-transport-secret'); } })).rejects.toThrow('GitHub account transport or response failed');
+    const fixture = scripted({ body: { error: 'denied', error_description: 'synthetic-body-secret' } });
+    await expect(completeGitHubDeviceFlow({ grant, fetchImpl: fixture.fetchImpl })).rejects.toThrow('GitHub sign-in was refused');
+  });
+  it.each(['file:///bin/sh', 'javascript:alert(1)', 'https://foreign.invalid/login/device', 'https://github.com@foreign.invalid/login/device'])('refuses an untrusted verification URL %s', async verification_uri => {
+    const fixture = scripted({ body: { device_code: 'device', user_code: 'ABCD-1234', verification_uri, expires_in: 900 } });
+    await expect(startGitHubDeviceFlow(fixture)).rejects.toThrow(/untrusted|invalid/);
+  });
+  it('cancels before HTTP', async () => {
+    const fixture = scripted({ body: token() });
+    const signal = AbortSignal.abort();
+    await expect(refreshCopilotToken({ refreshToken: 'synthetic-github', fetchImpl: fixture.fetchImpl, signal })).rejects.toThrow();
+    expect(fixture.calls).toHaveLength(0);
   });
 });
 
-describe("where a Copilot credential is used", () => {
-  it("takes the host out of the token when it names one", () => {
-    // The token says which endpoint the subscription may reach, and an account
-    // routed elsewhere would otherwise be sent somewhere it is not allowed.
-    expect(copilotBaseUrl("tid=x;exp=1;proxy-ep=proxy.individual.githubcopilot.com;x=y", "https://fallback")).toBe(
-      "https://api.individual.githubcopilot.com",
-    );
+describe('issuer-owned Copilot routing', () => {
+  it.each(['individual', 'business', 'enterprise'])('accepts only the native %s gateway', tier => {
+    expect(copilotBaseUrl(`tid=x;proxy-ep=proxy.${tier}.githubcopilot.com`)).toBe(`https://api.${tier}.githubcopilot.com`);
   });
-
-  it("keeps the fallback when the token says nothing", () => {
-    expect(copilotBaseUrl("tid=x;exp=1", "https://fallback")).toBe("https://fallback");
+  it('uses the native individual API without a proxy hint', () => expect(copilotBaseUrl('tid=x')).toBe('https://api.individual.githubcopilot.com'));
+  it.each(['foreign.invalid', 'proxy.individual.githubcopilot.com.evil.invalid', 'proxy.individual.githubcopilot.com/x',
+    'proxy.individual.githubcopilot.com:443', 'user@proxy.individual.githubcopilot.com', ''])('refuses a hostile hint %s', hint => {
+    expect(() => copilotBaseUrl(`tid=x;proxy-ep=${hint}`)).toThrow(/unverified/);
   });
-});
-
-describe("the Anthropic subscription", () => {
-  it("asks for the code with the fixed address the consent screen is registered to", () => {
-    // A different port is a redirect the server refuses, so this is not a
-    // preference.
-    expect(ANTHROPIC_SUBSCRIPTION.callbackPort).toBe(53692);
-    expect(ANTHROPIC_SUBSCRIPTION.tokenUrl).toBe("https://platform.claude.com/v1/oauth/token");
-  });
-
-  it("exchanges a code with a JSON body, which is what this endpoint takes", async () => {
-    const { fetchImpl, calls } = scripted({ body: { access_token: "AT", refresh_token: "RT", expires_in: 3600 } });
-
-    const credential = await exchangeAnthropicCode({
-      code: "CODE",
-      verifier: "VERIFIER",
-      redirectUri: "http://localhost:53692/callback",
-      fetchImpl,
-    });
-
-    expect(credential.accessToken).toBe("AT");
-    expect(credential.refreshToken).toBe("RT");
-    expect(calls[0]!.headers["content-type"]).toBe("application/json");
-    expect(JSON.parse(calls[0]!.body)).toMatchObject({
-      grant_type: "authorization_code",
-      code: "CODE",
-      code_verifier: "VERIFIER",
-    });
-  });
-
-  it("renews a minute before the token lapses", async () => {
-    // So a request does not go out with a token that expires in flight, which
-    // would read as a wrong credential.
-    const before = Date.now();
-    const { fetchImpl } = scripted({ body: { access_token: "AT", expires_in: 3600 } });
-
-    const credential = await refreshAnthropicToken({ refreshToken: "RT", fetchImpl });
-
-    // An hour, less the minute held back. The window allows for the time the
-    // call itself takes: the assertion is about which skew was applied, not
-    // about how fast the machine is.
-    const lifetime = credential.expiresAt - before;
-    expect(lifetime).toBeGreaterThanOrEqual(3_539_000);
-    expect(lifetime).toBeLessThan(3_545_000);
-  });
-
-  it("carries what the endpoint said when it refuses", async () => {
-    const { fetchImpl } = scripted({ status: 400, text: "invalid_grant" });
-
-    await expect(refreshAnthropicToken({ refreshToken: "bad", fetchImpl })).rejects.toThrow(/invalid_grant/);
-  });
-});
-
-describe("what a person pasted", () => {
-  it("takes a bare code", () => {
-    expect(parseAuthorizationInput("abc123")).toEqual({ code: "abc123" });
-  });
-
-  it("takes a whole redirect address", () => {
-    // The consent screen sends the browser somewhere that may not be reachable,
-    // so the value in the address bar is accepted as it is.
-    expect(parseAuthorizationInput("http://localhost:53692/callback?code=abc&state=s1")).toEqual({
-      code: "abc",
-      state: "s1",
-    });
-  });
-
-  it("takes a query string on its own", () => {
-    expect(parseAuthorizationInput("code=abc")).toEqual({ code: "abc" });
-  });
-
-  it("ignores a fragment after the query", () => {
-    expect(parseAuthorizationInput("http://x.test/cb?code=abc#frag")).toEqual({ code: "abc" });
-  });
-
-  it("answers nothing for input with no code in it", () => {
-    expect(parseAuthorizationInput("")).toBeUndefined();
-    expect(parseAuthorizationInput("http://x.test/cb?error=denied")).toBeUndefined();
-  });
+  it('refuses duplicate hints', () => expect(() => copilotBaseUrl('proxy-ep=proxy.individual.githubcopilot.com;proxy-ep=proxy.business.githubcopilot.com')).toThrow('ambiguous'));
 });

@@ -15,6 +15,7 @@ import "./anthropicMessages.js";
 import "./bedrockConverse.js";
 import "./googleGenAI.js";
 import "./googleAccount.js";
+import "./copilot.js";
 import "./googleVertex.js";
 import "./responses/index.js";
 import "./responses/account.js";

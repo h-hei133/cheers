@@ -1,87 +1,97 @@
-import { describe, expect, it } from "vitest";
-import { resolveProviderAuthContract } from "../auth/providerAuthRuntime.js";
-import { providerFacts } from "../providers/facts.js";
-import { isRuntimeProvider } from "../../config/runtimeConfig.js";
-import { toSubscriptionAccountAuthConfig } from "../auth/providerAuthContract.js";
-import { accountAuthFor } from "../../provider/request/authorization.js";
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { resolveProviderAuthContract, runProviderAccountAuthLogin } from '../auth/providerAuthRuntime.js';
+import { toSubscriptionAccountAuthConfig } from '../auth/providerAuthContract.js';
+import { accountAuthFor } from '../../provider/request/authorization.js';
+import { loginGitHubCopilotViaDeviceFlow } from './subscriptionAccountAuth.js';
+import { resolveProviderCredential } from '../shell/providerCredentials.js';
+import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { renewStoredAccount } from '../auth/account/renewal.js';
 
-/**
- * A subscription sign-in is reachable from the command that starts one.
- *
- * The flows were written, unit-tested, and reachable from nothing: a credential
- * this build can issue but cannot be asked to issue is a credential a user never
- * gets. What makes one reachable is a contract registered under the provider the
- * command names, so that is what is asserted — through the same lookup the
- * command uses, not through the export.
- */
-describe("a subscription sign-in", () => {
-  for (const provider of ["github-copilot", "anthropic"] as const) {
-    it(`can be started for ${provider}`, () => {
-      expect(isRuntimeProvider(provider)).toBe(true);
-      expect(resolveProviderAuthContract(provider)).toBeDefined();
+const homes: string[] = [];
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  for (const home of homes.splice(0)) fs.rmSync(home, { recursive: true, force: true });
+});
+
+describe('supported native subscription entrypoint', () => {
+  it('offers only the Copilot device flow', () => {
+    expect(resolveProviderAuthContract('github-copilot')?.methods).toEqual([{ kind: 'device-code', label: expect.any(String) }]);
+    expect(resolveProviderAuthContract('anthropic')).toBeUndefined();
+  });
+  it('refuses Anthropic account login without setup or network', async () => {
+    const onPersisted = vi.fn();
+    expect(await runProviderAccountAuthLogin({ provider: 'anthropic', providerLabel: 'Anthropic', onPersisted })).toContain('API key');
+    expect(onPersisted).not.toHaveBeenCalled();
+  });
+  it('binds newly produced credentials to exactly one provider', () => {
+    const stored = toSubscriptionAccountAuthConfig({ provider: 'github-copilot', accessToken: 'synthetic-session', refreshToken: 'synthetic-github',
+      expiresAt: Date.now() + 600000, baseUrl: 'https://api.individual.githubcopilot.com' });
+    expect(accountAuthFor('github-copilot', { accountAuth: stored })).toEqual(stored);
+    for (const provider of ['anthropic', 'openai', 'google'] as const) expect(accountAuthFor(provider, { accountAuth: stored })).toBeUndefined();
+    expect(accountAuthFor('github-copilot', { accountAuth: { ...stored, provider: undefined } })).toBeUndefined();
+  });
+
+  it('runs a device login without a progress callback', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/login/device/code')) return Response.json({ device_code: 'device', user_code: 'ABCD-1234',
+        verification_uri: 'https://github.com/login/device', interval: 0.01, expires_in: 1 });
+      if (url.endsWith('/login/oauth/access_token')) return Response.json({ access_token: 'synthetic-github' });
+      if (url.includes('/copilot_internal/v2/token')) return Response.json({ token: 'tid=x;proxy-ep=proxy.individual.githubcopilot.com',
+        expires_at: Math.floor(Date.now() / 1000) + 60 });
+      throw new Error(`unexpected URL: ${url}`);
+    }) as typeof fetch);
+    await expect(loginGitHubCopilotViaDeviceFlow()).resolves.toMatchObject({
+      provider: 'github-copilot',
+      refreshToken: 'synthetic-github',
+      baseUrl: 'https://api.individual.githubcopilot.com',
     });
-
-    it(`offers a method a surface can state for ${provider}`, () => {
-      const contract = resolveProviderAuthContract(provider)!;
-      expect(contract.methods.length).toBeGreaterThan(0);
-      for (const method of contract.methods) {
-        expect(method.label.trim().length, JSON.stringify(method)).toBeGreaterThan(0);
-      }
-    });
-
-    it(`files its credential under the slot its declaration names for ${provider}`, () => {
-      const facts = providerFacts(provider);
-      expect(facts.accountAuthKey).toBe("subscription");
-      expect(facts.accountAuthType).toBe(toSubscriptionAccountAuthConfig({
-        accessToken: "t",
-        refreshToken: "r",
-        expiresAt: 0,
-      }).type);
-    });
-  }
-
-  /**
-   * The code sign-in is offered as its own method.
-   *
-   * It exists for a machine that cannot open a browser, which is a different
-   * situation from one that can — so a surface that only offered "sign in" would
-   * send someone without a browser down a path that cannot finish.
-   */
-  it("is offered as a code method where the provider has one", () => {
-    const methods = resolveProviderAuthContract("github-copilot")!.methods;
-
-    expect(methods.some((method) => method.kind === "device-code")).toBe(true);
   });
 });
 
-describe("the credential a subscription sign-in produced", () => {
-  /**
-   * It is readable by the request path, not merely storable.
-   *
-   * Persisting a credential the request layer then refuses is the same as not
-   * having signed in, and it fails later — at the first request — with a message
-   * about authentication rather than about the sign-in.
-   */
-  it("is accepted for the provider it belongs to", () => {
-    const stored = toSubscriptionAccountAuthConfig({
-      accessToken: "session-token",
-      refreshToken: "renew-token",
-      expiresAt: Date.now() + 600_000,
-    });
-
-    expect(accountAuthFor("github-copilot", { accountAuth: stored })?.accessToken).toBe("session-token");
-    expect(accountAuthFor("anthropic", { accountAuth: stored })?.accessToken).toBe("session-token");
-  });
-
-  it("is refused for a provider it does not belong to", () => {
-    const stored = toSubscriptionAccountAuthConfig({
-      accessToken: "session-token",
-      refreshToken: "renew-token",
-      expiresAt: Date.now() + 600_000,
-    });
-
-    // Otherwise one service's token would be sent to another.
-    expect(accountAuthFor("openai", { accountAuth: stored })).toBeUndefined();
-    expect(accountAuthFor("google", { accountAuth: stored })).toBeUndefined();
+describe('Copilot login persistence and renewal', () => {
+  it('stores the native grant and renews it without replacing the long-lived GitHub token', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-login-'));
+    homes.push(home);
+    vi.stubEnv('HOME', home);
+    vi.stubEnv('USERPROFILE', home);
+    const workspace = path.join(home, 'workspace');
+    fs.mkdirSync(path.join(workspace, '.agents'), { recursive: true });
+    const expiresAt = Math.floor(Date.now() / 1000) + 30;
+    let calls = 0;
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      calls++;
+      const url = String(input);
+      if (url.endsWith('/login/device/code')) return Response.json({ device_code: 'device', user_code: 'ABCD-1234',
+        verification_uri: 'https://github.com/login/device', interval: 0.01, expires_in: 1 });
+      if (url.endsWith('/login/oauth/access_token')) return Response.json({ access_token: 'synthetic-github' });
+      if (url.includes('/copilot_internal/v2/token')) return Response.json({
+        token: calls === 3 ? 'tid=old;proxy-ep=proxy.individual.githubcopilot.com' : 'tid=new;proxy-ep=proxy.individual.githubcopilot.com',
+        expires_at: calls === 3 ? expiresAt : Math.floor(Date.now() / 1000) + 3_600,
+      });
+      throw new Error(`unexpected URL: ${url}`);
+    }) as typeof fetch;
+    vi.stubGlobal('fetch', fetchImpl);
+    const progress = vi.fn();
+    const result = await runProviderAccountAuthLogin({ provider: 'github-copilot', providerLabel: 'GitHub Copilot',
+      workspaceRoot: workspace, onProgress: progress });
+    expect(result).toContain('connected via device code');
+    expect(progress).toHaveBeenCalledWith(expect.objectContaining({ userCode: 'ABCD-1234' }));
+    const config = JSON.parse(fs.readFileSync(path.join(home, '.cheers', 'config.json'), 'utf8'));
+    expect(config.providerConnections[0]).toMatchObject({ provider: 'github-copilot', status: 'connected',
+      accountAuth: { subscription: { type: 'subscription', provider: 'github-copilot',
+        refreshToken: 'synthetic-github', baseUrl: 'https://api.individual.githubcopilot.com' } } });
+    const resolution = resolveProviderCredential({ runtimeConfig: getRuntimeConfig(workspace), env: {} });
+    const renewed = await renewStoredAccount({ workspaceRoot: workspace, resolution, fetchImpl });
+    expect(renewed).toMatchObject({ stored: true, writeState: 'persisted' });
+    expect(renewed.accountAuth).toMatchObject({ type: 'subscription', provider: 'github-copilot',
+      refreshToken: 'synthetic-github', accessToken: 'tid=new;proxy-ep=proxy.individual.githubcopilot.com',
+      baseUrl: 'https://api.individual.githubcopilot.com' });
+    expect(calls).toBe(4);
   });
 });

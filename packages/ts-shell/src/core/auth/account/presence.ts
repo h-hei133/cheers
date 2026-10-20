@@ -1,5 +1,6 @@
 import type { AccountAuthConfig, ProviderConnectionConfig, ProviderCredentialConfig, RuntimeProvider } from '../../../config/runtimeConfig.js';
 import { providerFacts } from '../../providers/facts.js';
+import { assertCopilotAccount } from '../oauth/copilot/policy.js';
 
 /** The subset of availability a single connection can establish locally. */
 export type ConnectionCredentialState = 'ready' | 'credential-missing' | 'pending' | 'error';
@@ -15,6 +16,12 @@ export function ownedConnectionCredential(connection: ProviderConnectionConfig):
 } {
   const facts = providerFacts(connection.provider);
   const stored = facts.accountAuthKey ? connection.accountAuth?.[facts.accountAuthKey] : undefined;
+  if (stored?.type === 'subscription') {
+    try {
+      if (connection.provider !== 'github-copilot') throw new Error('unsupported');
+      assertCopilotAccount(stored);
+    } catch { return { connectionId: connection.id }; }
+  }
   const accountAuth = stored && stored.type === facts.accountAuthType
     && typeof stored.accessToken === 'string' && stored.accessToken.trim() ? stored : undefined;
   // An unavailable preferred account does not authorize a different authentication mode.
@@ -42,6 +49,7 @@ export function connectionCredentialState(config: CredentialPresenceConfig, conn
     return { state: 'ready', reason: 'Account credential is stored on this connection.' };
   }
   if (owned.apiKey) return { state: 'ready', reason: 'API key is stored on this connection.' };
+  if (connection.authType === 'account-auth') return { state: 'credential-missing', reason: 'The selected account credential is unavailable. Reconnect before requests.' };
   const legacy = credentialSources(config, connection.provider, env);
   if (legacy.env) return { state: 'ready', reason: `Credential comes from ${providerFacts(connection.provider).apiKeyEnvVar}.` };
   if (legacy.configApiKey || legacy.configAccount) return { state: 'ready', reason: 'Credential comes from the provider profile, not this connection.' };

@@ -3,6 +3,12 @@ import type { StreamingRenderer } from '../../presentation/terminal/streaming.js
 import type { SessionMessage } from '../../session/schema/sessionMessage.js';
 import type { ReportWriter } from '../../session/reports/model.js';
 import { reportSaveNotice } from './reports.js';
+import type { SignInProgress } from '../../core/auth/providerAuthContract.js';
+
+/** Native flow validates these transient instructions before requesting a display. */
+export function renderSignInProgress(renderer: Pick<StreamingRenderer, 'renderLine'>, progress: SignInProgress): void {
+  renderer.renderLine(`Sign in at ${progress.authorizeUrl}${progress.userCode ? `\nEnter code: ${progress.userCode}` : ''}`);
+}
 
 /** Keep an independently durable business result visible when context publication fails. */
 export function renderLocalCommand(input: {

@@ -34,6 +34,8 @@ import type { SidebarLiveEventStore } from '../../presentation/sidebar/sidebarLi
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
 export interface CommandContext {
+  /** Transient native sign-in instructions; displayed without adding model context. */
+  readonly signInProgress?: (progress: import('../auth/providerAuthContract.js').SignInProgress) => void;
   /** The host registers local work until its result and cleanup have settled. */
   readonly runCancellable?: <T>(operation: (signal: AbortSignal) => Promise<T>) => Promise<T>;
   /** Parent cancellation for callers without a session host. */

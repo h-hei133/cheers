@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { AccountAuthConfig, RuntimeProvider } from '../../../config/runtimeConfig.js';
 import { googleOAuthConfig, openAIOAuthConfig, resolveGoogleClientId } from '../oauth/providers.js';
+import { COPILOT_OAUTH } from '../oauth/copilot/policy.js';
 
 export interface RefreshIdentity {
   readonly provider: RuntimeProvider;
@@ -15,6 +16,8 @@ export function credentialDigest(value: unknown): string {
 
 /** The trusted issuer, client and token identify consumption independently of its slot. */
 export function refreshLineage(input: RefreshIdentity & { readonly credentialId?: string }): string {
+  if (input.provider === 'github-copilot') return credentialDigest([input.provider, COPILOT_OAUTH.issuer,
+    COPILOT_OAUTH.clientId, credentialDigest(input.refreshToken.trim())]);
   const config = input.provider === 'openai' ? openAIOAuthConfig()
     : input.provider === 'google' ? googleOAuthConfig(resolveGoogleClientId(input.clientId)) : undefined;
   if (!config) throw new Error('This account has no refresh protocol.');

@@ -53,7 +53,10 @@ export async function renewStoredAccount(input: {
   readonly admission?: Admission;
 }): Promise<StoredAccountRenewal> {
   const original = accountAuthFor(input.resolution.provider, input.resolution.credential ?? {});
-  if (!original || !original.refreshToken?.trim() || !['openai', 'google'].includes(input.resolution.provider)) {
+  if (!original && input.resolution.credential?.accountAuth?.type === 'subscription') {
+    return { stored: false, writeState: 'unchanged', failure: 'Subscription provider is unsupported or unverified. Reconnect before requests.' };
+  }
+  if (!original || !original.refreshToken?.trim() || !['openai', 'google', 'github-copilot'].includes(input.resolution.provider)) {
     return { accountAuth: original, stored: false, writeState: 'unchanged' };
   }
   const expiring = isExpiring(original.expiresAt);

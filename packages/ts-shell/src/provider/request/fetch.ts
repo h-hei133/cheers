@@ -274,7 +274,8 @@ export function providerFetchForEndpoint(
   const base = admittedFetch((input, init) => {
     init?.signal?.throwIfAborted();
     beforeDispatch?.(init);
-    return configured(input, (endpoint === 'openai-account-responses' || endpoint === 'google-account-generative-ai') ? { ...init, redirect: 'error' } : init);
+    return configured(input, (endpoint === 'openai-account-responses' || endpoint === 'google-account-generative-ai'
+      || endpoint === 'copilot-chat-completions' || endpoint === 'copilot-messages') ? { ...init, redirect: 'error' } : init);
   }, admission);
   if (!signer) return base;
 

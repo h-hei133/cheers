@@ -12,6 +12,7 @@ import { ownedConnectionCredential } from '../auth/account/presence.js';
 import { BUILTIN_PROVIDERS } from '../models/catalog.js';
 import type { ProviderCredentialResolution } from '../auth/credential.js';
 import { accountProtocol, assertAccountAddress } from '../auth/account/policy.js';
+import { assertCopilotAccount } from '../auth/oauth/copilot/policy.js';
 export type {
   ProviderCredentialSource, ProviderCredentialAuthMode,
   ResolvedProviderCredential, ProviderCredentialResolution,
@@ -34,6 +35,11 @@ export function resolveProviderCredential(
   const resolution = resolveCredential(input);
   const credential = resolution.credential;
   if (!credential?.accountAuth) return resolution;
+  if (credential.accountAuth.type === 'subscription' && (resolution.provider !== 'github-copilot'
+    || credential.accountAuth.provider !== resolution.provider)) {
+    return { selection: resolution.selection, provider: resolution.provider, expectedEnvVarName: resolution.expectedEnvVarName,
+      model: resolution.model, blocked: 'connection-unavailable' };
+  }
   const connection = credential.connectionId
     ? input.runtimeConfig.providerConnections.find(item => item.id === credential.connectionId && item.provider === resolution.provider)
     : undefined;
@@ -211,6 +217,14 @@ function resolveCredential(
   }
 
   const envApiKey = env[expectedEnvVarName]?.trim();
+  const preferredSubscription = connectionAccountAuth?.type === 'subscription' ? connectionAccountAuth
+    : !activeConnectionProfile?.apiKey?.trim() && configAccountAuth?.type === 'subscription' ? configAccountAuth : undefined;
+  if (preferredSubscription) {
+    try {
+      if (provider !== 'github-copilot') throw new Error('unsupported');
+      assertCopilotAccount(preferredSubscription);
+    } catch { return { ...preference, provider, expectedEnvVarName, model, blocked: 'connection-unavailable' }; }
+  }
   if (envApiKey) {
     return {
       ...preference,

@@ -76,19 +76,21 @@
 
 ## W8/W9
 
-| 任务 | 证据 | 反转 |
+2026-10-20 复核撤回了本表此前的“完成”标签：实现存在不等于合同闭合，以下行均保留开放状态。
+
+| 任务 | 证据 | 反转/未闭合 |
 |---|---|---|
-| JOB-01 | 完成 | `LocalExecutionHandle`（`runtime/execution/types.ts`）提供 `pid/onOutput/detach/kill/result`；`startStreamed` 一次 spawn，`collectStreamed` 仅为兼容包装。`ExecutionService.startCommand` 返回 handle 与投影结果。`BackgroundRunner.adopt/promote` 与 `LocalJournal.promote(id,input,pid)` 把前台子进程原地晋升为持久 job，不二次 spawn；晋升前任务对 `list()` 不可见；`promote` 返回 `promoted|settled|refused`，结算先于晋升时调用方仍取得真实结果，容量拒绝时 kill 该子进程。bash 工具在默认超时（60s）且交互上下文下走 adopt，超时 `detach` 后晋升；显式 `timeout` 保持原路径。新消息到达时交互层调用 `promoteForeground()` 立即晋升所有临时前台任务，工具通过 `whenPromoted` 立刻返回后台 id；晋升后的任务继续轮询 `admission`，撤权即 kill 同一 PID；重启后 journal 中残留的 running 记录经 `taskSnapshot` 投影为 unknown，不重播、不可 resume。 |
-| JOB-02 | 完成 | 完成通知是本地 notice，不写新 prompt、不发模型请求。`backgroundFollowUp`（默认 false，Session 组）opt-in 后，完成且已退出的任务以 `background:<id>` 去重、每会话 20 条预算、4000 字符截断作为原 session 的 follow-up 注入；未 opt-in 时零模型请求。重启不重播：journal 的 running/unknown 记录不会自动 dispatch。取消（abort）杀进程且不晋升。follow-up 策略抽为 `backgroundNotice.ts`，去重/预算/截断有单元测试。 |
-| EDIT-01 | 完成 | `planPatch` 为每个文件操作生成内容派生的稳定 group id、label 与文件集；同一 group 内的 rename 源/目标与 hunks 不可拆分。`ToolPreparation.selections` 与 `execute(context, selection)` 承载选集；审批响应 `selected` 经 `setPreparedSelection` 绑定到已 prepare 的调用。多 group 且宿主未选集时拒绝执行且零写入；执行前重规划并比较 `fullRevision`，基线或内容改变即拒绝。CLI 审批在多 group 时提供 “Choose groups…” 多选（默认全选，Space 切换），选出的 id 随 allow-once 返回；单 group 仍三选一。desktop 宿主可直接返回 `selected` 子集。 |
-| START-01 | `scripts/start.test.mjs`（2） | stale 源码仍启动时失败 |
-| START-02 | 完成 | 首帧前不扫描历史（10k 会话测试）；`listReentrySummaries` 使用 `.reentry-index.json` 持久摘要索引，键为 metadata/state/transcript 的 size+mtime，缺失/损坏/过期只导致重算；显式 resume/fallback 路径不变。 |
-| START-03 | 部分 | 历史 `bench:start`、`bench:interactive` 已记录 Node/exe 版本启动及 regular/fullscreen/pipe 首帧/退出数据；受控冷缓存、真实逐键响应和 ready 边界仍未闭合，不能用退出延迟代替。 |
+| JOB-01（部分） | `LocalExecutionHandle`、一次 spawn 的 `adopt/promote`、原 PID 晋升、容量拒绝与重启 unknown 路径已有实现；`src/core/tools/shell/promotion.test.ts` 覆盖了基本晋升。 | adopted task 的 settlement 初值是已解决 Promise，`stop` 在子进程真正退出前即可返回；拒绝路径还会立即宣称没有运行中的进程。需要以真实子进程断言“停止派发”与“结算”分离。 |
+| JOB-02（部分） | 本地 notice、opt-in follow-up、去重/预算/截断和重启不重播已有实现与单测。 | follow-up 直接使用 `task.output`，未经过 UI notice 相同的脱敏；策略在构造时捕获 `backgroundFollowUp`，配置 reload 后不会重新读取。需要 secret 反例和 reload 反例。 |
+| EDIT-01（部分） | 稳定 group id、依赖组、选集绑定、重规划 revision 检查和无选集拒绝已有实现。 | 当前 approval group 按文件操作划分，同一文件多个 hunk 仍是一个可批准组；尚未满足 hunk 级选集与依赖契约。需要同文件双 hunk 反例。 |
+| START-01（未闭合） | build manifest、start/start:dev 和缺文件/过期源码的基本拒绝已有测试。 | manifest 未绑定 lockfile、构建配置、emit 字节和运行资产；`entry` 也未限制在 dist 内。需要 lockfile、dist 字节和越界 entry 的反例。 |
+| START-02（部分） | 10k catalog 首屏测试和持久 reentry 摘要索引存在。 | 默认 bootstrap 仍可能在首帧前调用 `listSessions` 全量扫描；现有测试没有穿过真实 bootstrap 路径。需要 0/100/1k/10k 会话的首帧反转探针。 |
+| START-03（部分） | 历史 `bench:start`、`bench:interactive` 已记录 Node/exe 版本启动及 regular/fullscreen/pipe 首帧/退出数据。 | benchmark 未消费 ready/layout/write 观察点，未同步实际 prompt，交互矩阵仍为 Node-only，且缺少 raw sample、构建摘要和受控冷缓存；受控冷缓存及真实 ready 测量仍未闭合。 |
 
 ## W10
 
 | 任务 | 证据 |
 |---|---|
-| QA-01 | 本矩阵 + 各反转测试 |
-| QA-02/03 | 已有 Linux 合成 PTY；本次增加 Node/exe × regular/fullscreen 的 settings/resume 切组和关闭；完整本地工作流、跨平台及真实质量仍未闭合 |
+| QA-01 | 本矩阵 + 各反转测试；2026-10-20 复核确认矩阵仍缺 `TOOL-02`、`PAN-05`、`PAN-08` 的独立行，`CTX-02`/`QA-03` 仍为合并行，不能作为 47 项全覆盖证明。 |
+| QA-02/03 | 已有 Linux 合成 PTY；本次增加 Node/exe × regular/fullscreen 的 settings/resume 切组和关闭；line/pipe、profile/task/discovery/approval/save 合成链路、跨平台及真实质量仍未闭合。 |
 | QA-04 | 本地门禁与精确提交；CI 以 run 结果为准 |

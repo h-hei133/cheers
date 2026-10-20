@@ -10,6 +10,8 @@ import { accountBinding, captureAccountEdit } from './account/state.js';
 import { grantRefreshLogin, reserveRefreshLogin, refreshLeasesPath, captureLeaseStore, type RefreshStore } from './account/lease.js';
 import { accountGeneration, credentialDigest } from './account/lineage.js';
 import { nativeOAuthLogin, OAuthExchangeError } from './oauth/flow.js';
+import { nativeCopilotLogin } from './oauth/copilot/flow.js';
+import { assertCopilotAccount } from './oauth/copilot/policy.js';
 import { oauthConfigFor } from './oauth/providers.js';
 import { accountProtocol } from './account/policy.js';
 import { AccountAuthConfig, type GoogleAccountAuthConfig, type OpenAIAccountAuthConfig, type ProviderConnectionConfig, readRuntimeConfigEditAt, getUserRuntimeConfigPath, type RuntimeConfigFile, type RuntimeProvider, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
@@ -25,7 +27,6 @@ import {
   type ProviderAuthContract,
 } from "./providerAuthContract.js";
 import {
-  anthropicSubscriptionProviderAuthContract,
   gitHubCopilotProviderAuthContract,
 } from "../commands/subscriptionAccountAuth.js";
 
@@ -36,7 +37,6 @@ const CONTRACTS: readonly ProviderAuthContract[] = [
   // one: the credential is issued to the account by a sign-in, so without a
   // contract here the flow exists and nothing can start it.
   gitHubCopilotProviderAuthContract,
-  anthropicSubscriptionProviderAuthContract,
 ];
 let testOpenAILoginOverride:
   | ((...args: Parameters<ProviderAuthContract["loginAccountAuth"]>) => ReturnType<ProviderAuthContract["loginAccountAuth"]>)
@@ -73,9 +73,12 @@ export async function runProviderAccountAuthLogin(input: {
   readonly labelOverride?: string;
   readonly onPersisted?: () => void;
   readonly workspaceRoot?: string;
+  readonly signal?: AbortSignal;
+  readonly onProgress?: (progress: import('./providerAuthContract.js').SignInProgress) => void;
 }): Promise<string> {
   const contract = resolveProviderAuthContract(input.provider);
   if (!contract) {
+    if (input.provider === 'anthropic') return 'Anthropic subscription login is unsupported. Configure an API key with /connect login anthropic --api-key <key>.';
     return [
       "Account-auth is currently unavailable for this provider in this build.",
       `Use --api-key or --browser for ${input.provider}.`,
@@ -106,14 +109,15 @@ export async function runProviderAccountAuthLogin(input: {
   input.onPersisted?.();
 
   try {
-    const authResult = await contract.loginAccountAuth();
+    const authResult = await contract.loginAccountAuth({ signal: input.signal, onProgress: input.onProgress });
+    input.signal?.throwIfAborted();
     const accountAuth = resolveAccountAuthConfig(input.provider, authResult);
     if (!accountAuth) {
       throw new Error(
         `Provider ${input.provider} returned unsupported account-auth payload.`,
       );
     }
-    if ((input.provider === 'openai' || input.provider === 'google') && accountAuth.expiresAt <= Date.now()) {
+    if (accountAuth.expiresAt <= Date.now()) {
       throw new OAuthExchangeError('expiry', input.providerLabel, 'token exchange');
     }
     const summary = persistConnectedAccountAuth({
@@ -128,7 +132,7 @@ export async function runProviderAccountAuthLogin(input: {
     input.onPersisted?.();
 
     return [
-      `${input.providerLabel} account-auth connected via browser login.`,
+      `${input.providerLabel} account-auth connected via ${input.provider === 'github-copilot' ? 'device code' : 'browser'} login.`,
       `Connection ID: ${summary.connectionId}`,
       "State transition: pending -> connected",
       "Connection type: account-auth",
@@ -150,8 +154,7 @@ export async function runProviderAccountAuthLogin(input: {
       `${input.providerLabel} account-auth login failed.`,
       `Connection ID: ${connectionId}`,
       "State transition: pending -> error",
-      `Reason: ${error instanceof OAuthExchangeError ? error.message : input.provider === 'openai' || input.provider === 'google'
-        ? 'The authorization flow did not complete. Retry the login.' : error instanceof Error ? error.message : String(error)}`,
+      `Reason: ${error instanceof OAuthExchangeError ? error.message : 'The authorization flow did not complete. Retry the login.'}`,
       `Stored at: ${configPath}`,
       `Retry with: /connect login ${input.provider} --account`,
     ].join("\n");
@@ -241,13 +244,15 @@ function persistConnectedAccountAuth(input: {
   const oauth = input.provider === 'openai' || input.provider === 'google'
     ? oauthConfigFor(input.provider, 'clientId' in input.accountAuth ? input.accountAuth.clientId : undefined,
       'clientSecret' in input.accountAuth ? input.accountAuth.clientSecret : undefined, 'quotaProject' in input.accountAuth ? input.accountAuth.quotaProject : undefined) : undefined;
+  const native = input.provider === 'github-copilot' ? nativeCopilotLogin({ ...input.nativeResult, baseUrl: input.nativeResult.baseUrl ?? '' })
+    : !!oauth && nativeOAuthLogin(input.nativeResult, oauth);
   let enrollment: ReturnType<typeof reserveRefreshLogin>;
   try {
-    if (oauth) enrollment = reserveRefreshLogin({ provider: input.provider, refreshToken: input.accountAuth.refreshToken,
+    enrollment = reserveRefreshLogin({ provider: input.provider, refreshToken: input.accountAuth.refreshToken,
       ...('clientId' in input.accountAuth ? { clientId: input.accountAuth.clientId } : {}), store: input.pending.leaseStore,
       owner: credentialDigest([input.pending.source, input.pending.target, input.provider, input.connectionId,
         input.pending.connection, input.pending.mirror?.[input.provider]]), generation: accountGeneration(input.accountAuth),
-      native: nativeOAuthLogin(input.nativeResult, oauth) });
+      native });
   } catch {
     // Without durable enrollment, a later compatibility baseline could grant these unverified credentials.
     throw new ConfigWriteError('write-failed', 'unchanged');
@@ -262,9 +267,9 @@ function persistConnectedAccountAuth(input: {
     throw new ConfigWriteError('verification-failed', 'persisted');
   }
   let refreshWarning: string | undefined;
-  if (input.provider === 'openai' || input.provider === 'google') {
+  if (input.provider === 'openai' || input.provider === 'google' || input.provider === 'github-copilot') {
     try {
-      if (!enrollment || !oauth || !nativeOAuthLogin(input.nativeResult, oauth)) throw new Error('native login unavailable');
+      if (!enrollment || !native) throw new Error('native login unavailable');
       const runtime = getRuntimeConfig(input.pending.workspaceRoot);
       const resolution = resolveProviderCredential({ runtimeConfig: { ...runtime, provider: input.provider,
         activeProviderConnectionId: input.connectionId, sessionConnection: { id: input.connectionId, provider: input.provider } }, env: {} });
@@ -408,13 +413,17 @@ function resolveAccountAuthConfig(
   // A subscription sign-in issues the same three fields through a different
   // route, and the stored shape records that it did — the two have to agree at
   // read time, which is what the stored `type` is for.
-  if (provider === "github-copilot" || provider === "anthropic") {
-    return toSubscriptionAccountAuthConfig({
+  if (provider === 'github-copilot') {
+    if (result.provider !== provider) throw new Error('Subscription provider mismatch.');
+    const account = toSubscriptionAccountAuthConfig({
+      provider,
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
       expiresAt: result.expiresAt,
-      ...(result.callbackUrl ? { baseUrl: result.callbackUrl } : {}),
+      ...(result.baseUrl ? { baseUrl: result.baseUrl } : {}),
     });
+    assertCopilotAccount(account);
+    return account;
   }
   return undefined;
 }

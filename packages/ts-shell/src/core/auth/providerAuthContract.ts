@@ -22,6 +22,8 @@ export interface ProviderAuthMethod {
 }
 
 export interface ProviderAccountAuthResult {
+  readonly provider?: RuntimeProvider;
+  readonly baseUrl?: string;
   readonly accessToken: string;
   readonly refreshToken: string;
   readonly expiresAt: number;
@@ -40,15 +42,16 @@ export interface ProviderAuthContract {
   readonly provider: RuntimeProvider;
   readonly methods: readonly ProviderAuthMethod[];
   loginAccountAuth(options?: {
+    readonly signal?: AbortSignal;
     readonly timeoutMs?: number;
     /**
      * Told what to show the person while the sign-in is in progress.
      *
      * A device-code flow has nothing to open: the code and the address it is
      * entered at are the whole instruction, and a surface that can only learn
-     * them after the flow returns can never show them in time. Absent means the
-     * surface has no way to display one, which is not an error — the flow still
-     * runs and the credential still arrives.
+     * them after the flow returns can never show them in time. A device-code
+     * implementation may require this callback before it starts a flow; callers
+     * that omit it are responsible for providing an equivalent out-of-band display.
      */
     readonly onProgress?: (progress: SignInProgress) => void;
   }): Promise<ProviderAccountAuthResult>;
@@ -111,6 +114,7 @@ export function toGoogleAccountAuthConfig(
  * the issuer handed back rather than a second sign-in.
  */
 export function toSubscriptionAccountAuthConfig(input: {
+  readonly provider: 'github-copilot';
   readonly accessToken: string;
   readonly refreshToken: string;
   readonly expiresAt: number;
@@ -118,6 +122,7 @@ export function toSubscriptionAccountAuthConfig(input: {
 }): SubscriptionAccountAuthConfig {
   return {
     type: "subscription",
+    provider: input.provider,
     accessToken: input.accessToken,
     refreshToken: input.refreshToken,
     expiresAt: input.expiresAt,

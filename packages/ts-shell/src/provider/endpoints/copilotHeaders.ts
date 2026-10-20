@@ -25,14 +25,23 @@ function hasImages(messages: readonly ChatMessage[]): boolean {
   );
 }
 
-/** The headers a Copilot gateway requires, or nothing for anyone else. */
-export function copilotRequestHeaders(input: TurnRequest): Record<string, string> {
-  if (input.provider !== "github-copilot") return {};
+/** Identity headers that every Copilot gateway resource requires. */
+export function copilotGatewayHeaders(provider: string | undefined): Record<string, string> {
+  if (provider !== "github-copilot") return {};
   return {
     "Editor-Version": "vscode/1.107.0",
     "Editor-Plugin-Version": "copilot-chat/0.35.0",
     "Copilot-Integration-Id": "vscode-chat",
     "User-Agent": "GitHubCopilotChat/0.35.0",
+  };
+}
+
+/** The headers a Copilot gateway requires, or nothing for anyone else. */
+export function copilotRequestHeaders(input: Pick<TurnRequest, 'provider' | 'messages'>): Record<string, string> {
+  const headers = copilotGatewayHeaders(input.provider);
+  if (Object.keys(headers).length === 0) return headers;
+  return {
+    ...headers,
     "X-Initiator": initiatorFor(input.messages),
     "Openai-Intent": "conversation-edits",
     ...(hasImages(input.messages) ? { "Copilot-Vision-Request": "true" } : {}),

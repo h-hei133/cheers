@@ -8,6 +8,7 @@ import type { ResolvedRequestShape } from '../../core/models/requestShape.js';
 import type { ProviderUsage } from '../../turn/completion.js';
 import { requestReplayBinding } from './replay.js';
 import { readCompletion } from '../response/read.js';
+import { copilotRequestHeaders } from '../endpoints/copilotHeaders.js';
 
 /**
  * One out-of-band model call.
@@ -93,6 +94,9 @@ export async function requestSimpleCompletion(
     .join("\n\n");
   const messages = request.messages.filter((message) => message.role !== "system");
   const headers = new Headers(request.provider.headers);
+  if (kind === 'copilot-chat-completions' || kind === 'copilot-messages') {
+    for (const [name, value] of Object.entries(copilotRequestHeaders({ provider: request.provider.providerId, messages }))) headers.set(name, value);
+  }
   headers.set("accept", endpointShape(kind).simpleResponse === 'stream' ? 'text/event-stream' : 'application/json');
   const serialized = JSON.stringify(
     endpointBody(kind, {

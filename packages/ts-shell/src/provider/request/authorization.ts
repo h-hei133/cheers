@@ -1,9 +1,11 @@
 import { assertGoogleAccount, assertGoogleScopes } from '../../core/auth/account/google.js';
 import type { AccountAuthConfig, RuntimeProvider } from "../../config/runtimeConfig.js";
-import { isExpiring, refreshOAuthTokens, type OAuthProviderConfig } from "../../core/auth/oauth/flow.js";
+import { isExpiring, refreshOAuthTokens, type OAuthProviderConfig, type OAuthTokens } from "../../core/auth/oauth/flow.js";
 import { googleOAuthConfig, openAIOAuthConfig, resolveGoogleClientId } from "../../core/auth/oauth/providers.js";
 import { DEFAULT_ENDPOINT_KIND, endpointShape, type EndpointKind } from "../endpoints/index.js";
 import { accountGeneration, credentialDigest, refreshLineage } from '../../core/auth/account/lineage.js';
+import { assertCopilotAccount, copilotEndpoint } from '../../core/auth/oauth/copilot/policy.js';
+import { refreshCopilotToken } from '../../core/auth/oauth/copilot/flow.js';
 
 /**
  * How one provider request authenticates.
@@ -36,6 +38,21 @@ const BASE_HEADERS: Readonly<Record<string, string>> = {
   "Content-Type": "application/json",
 };
 
+function mergeHeaders(...sources: readonly Readonly<Record<string, string>>[]): Record<string, string> {
+  const merged: Record<string, string> = {};
+  const names = new Map<string, string>();
+  for (const source of sources) {
+    for (const [name, value] of Object.entries(source)) {
+      const normalized = name.toLowerCase();
+      const previous = names.get(normalized);
+      if (previous !== undefined) delete merged[previous];
+      names.set(normalized, name);
+      merged[name] = value;
+    }
+  }
+  return merged;
+}
+
 /** The account credential a provider uses, if it has one. */
 export function accountAuthFor(
   provider: RuntimeProvider,
@@ -53,7 +70,7 @@ export function accountAuthFor(
   // two subscription providers are told apart by the token rather than by a
   // client id. Accepting it for any other provider would send one service's
   // token to another.
-  if (account.type === "subscription" && (provider === "github-copilot" || provider === "anthropic")) {
+  if (account.type === "subscription" && provider === 'github-copilot' && account.provider === provider) {
     return account;
   }
   return undefined;
@@ -83,6 +100,13 @@ export function providerAuthorization(input: {
    */
   readonly endpoint?: EndpointKind;
 }): ProviderAuthorization {
+  if (input.accountAuth?.type === 'subscription') {
+    assertCopilotAccount(input.accountAuth);
+    if (input.endpoint !== undefined && input.endpoint !== 'openai-compatible'
+      && input.endpoint !== 'anthropic-messages' && input.endpoint !== copilotEndpoint(input.endpoint)) {
+      throw new Error('Copilot account requires its native protocol declaration.');
+    }
+  }
   if (input.accountAuth?.type === 'google-gemini-account') {
     assertGoogleAccount(input.accountAuth);
     if (input.endpoint !== 'google-account-generative-ai') throw new Error('Google account protocol conflicts with the native API login.');
@@ -112,11 +136,9 @@ export function providerAuthorization(input: {
 
   const account = input.accountAuth;
   if (account) {
-    const headers: Record<string, string> = {
-      ...BASE_HEADERS,
-      ...(input.endpoint ? endpointShape(input.endpoint).headers() : {}),
-      Authorization: `Bearer ${account.accessToken}`,
-    };
+    const headers = mergeHeaders(BASE_HEADERS,
+      input.endpoint ? endpointShape(input.endpoint).headers() : {},
+      { Authorization: `Bearer ${account.accessToken}` });
     if (account.type === 'google-gemini-account') headers['x-goog-user-project'] = account.quotaProject!;
     // The account-scoped endpoint rejects a token whose account is not named.
     if (account.type === "openai-chatgpt-account" && account.accountId) {
@@ -214,7 +236,14 @@ export async function renewAccountAuthIfExpiring(input: {
   readonly renewalLease?: RenewalLeaseHooks;
 }): Promise<AccountAuthRenewal> {
   const account = accountAuthFor(input.provider, input.credential);
+  if (!account && input.credential.accountAuth?.type === 'subscription') {
+    return { renewed: false, failure: 'Subscription provider is unsupported or unverified. Configure an API key or reconnect.' };
+  }
   if (!account) return { renewed: false };
+  if (account.type === 'subscription') {
+    try { assertCopilotAccount(account); }
+    catch { return { renewed: false, failure: 'Subscription issuer or service address is unverified. Reconnect before renewal.' }; }
+  }
   if (account.type === 'google-gemini-account') {
     try { assertGoogleAccount(account); }
     catch { return { renewed: false, failure: 'Google account scope or billing project is unverified. Reconnect before renewal.' }; }
@@ -223,7 +252,7 @@ export async function renewAccountAuthIfExpiring(input: {
 
   const config = oauthConfigFor(input.provider, account);
   const refreshToken = account.refreshToken?.trim();
-  if (!config || !refreshToken) {
+  if ((!config && account.type !== 'subscription') || !refreshToken) {
     return {
       accountAuth: account,
       renewed: false,
@@ -289,13 +318,13 @@ export function nativeAccountProduction(result: AccountAuthRenewal, scope: strin
 
 /** The label a user knows a provider by, for a message they have to act on. */
 function providerLabel(provider: RuntimeProvider): string {
-  return provider === "openai" ? "OpenAI account" : "Google account";
+  return provider === 'openai' ? 'OpenAI account' : provider === 'github-copilot' ? 'GitHub Copilot account' : 'Google account';
 }
 
 async function exchangeAccountAuth(input: {
   readonly provider: RuntimeProvider;
   readonly account: AccountAuthConfig;
-  readonly config: OAuthProviderConfig;
+  readonly config?: OAuthProviderConfig;
   readonly refreshToken: string;
   readonly fetchImpl: typeof fetch;
   readonly signal?: AbortSignal;
@@ -304,10 +333,16 @@ async function exchangeAccountAuth(input: {
   readonly scope: string;
 }): Promise<AccountAuthRenewal> {
   try {
-    const tokens = await refreshOAuthTokens(input.config, input.refreshToken, (url, init) => {
+    const fetchImpl: typeof fetch = (url, init) => {
       input.onDispatch?.();
       return input.fetchImpl(url, init);
-    });
+    };
+    const tokens: OAuthTokens & { readonly baseUrl?: string } = input.account.type === 'subscription'
+      ? await refreshCopilotToken({ refreshToken: input.refreshToken, fetchImpl, ...(input.signal ? { signal: input.signal } : {}) })
+      : await refreshOAuthTokens(input.config!, input.refreshToken, fetchImpl);
+    if (input.account.type === 'subscription' && (!('baseUrl' in tokens) || tokens.baseUrl !== input.account.baseUrl)) {
+      throw new Error('Renewal changed the captured Copilot service address.');
+    }
     if (input.account.type === 'google-gemini-account') {
       assertGoogleScopes(tokens.scopes);
       if (JSON.stringify([...new Set(tokens.scopes ?? [])].sort()) !== JSON.stringify([...new Set(input.account.scopes ?? [])].sort())) {
@@ -325,14 +360,14 @@ async function exchangeAccountAuth(input: {
       };
     const production = Object.freeze({});
     productions.set(production, { scope: input.scope, generation: accountGeneration(accountAuth),
-      lineage: refreshLineage({ provider: input.provider, refreshToken: accountAuth.refreshToken, clientId: input.config.clientId }) });
+      lineage: refreshLineage({ provider: input.provider, refreshToken: accountAuth.refreshToken, clientId: input.config?.clientId }) });
     return { accountAuth, renewed: true, production };
   } catch (error) {
     return {
       accountAuth: input.account,
       renewed: false,
       failure: `The ${providerLabel(input.provider)} login could not be renewed: ${
-        error instanceof Error ? error.message : String(error)
+        'The native account exchange did not complete'
       }. Re-run /connect login ${input.provider} --account, then retry.`,
     };
   }

@@ -1,8 +1,13 @@
 import { assertGoogleAccount } from './google.js';
 import type { AccountAuthConfig } from '../../../config/account.js';
+import { assertCopilotAccount, assertCopilotOrigin } from '../oauth/copilot/policy.js';
 
 /** A login's issuer owns its generation route, independently of model metadata. */
-export function accountProtocol(account: AccountAuthConfig | undefined): { readonly baseUrl: string; readonly endpoint: string } | undefined {
+export function accountProtocol(account: AccountAuthConfig | undefined): { readonly baseUrl: string; readonly endpoint?: string } | undefined {
+  if (account?.type === 'subscription') {
+    assertCopilotAccount(account);
+    return { baseUrl: assertCopilotOrigin(account.baseUrl) };
+  }
   if (account?.type === 'google-gemini-account') {
     assertGoogleAccount(account);
     return { baseUrl: 'https://generativelanguage.googleapis.com', endpoint: 'google-account-generative-ai' };

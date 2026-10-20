@@ -11,6 +11,8 @@ import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
 import { getProviderApiKeyEnvVarName } from "./providerCredentials.js";
 import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
 import { accountProtocol, assertAccountAddress } from '../auth/account/policy.js';
+import { copilotEndpoint } from '../auth/oauth/copilot/policy.js';
+import { copilotGatewayHeaders } from '../../provider/endpoints/copilotHeaders.js';
 
 const DEFAULT_PROVIDER_NETWORK_RECONNECT_ATTEMPTS = 5;
 
@@ -97,11 +99,14 @@ export async function checkRealProviderReadiness(
   let endpoint = options.endpoint ?? providerEndpoint(BUILTIN_PROVIDERS, provider);
   let nativeBaseUrl: string | undefined;
   try {
+    if (options.accountAuth?.type === 'subscription' && (provider !== 'github-copilot' || options.accountAuth.provider !== provider)) {
+      throw new Error('Subscription provider mismatch.');
+    }
     assertAccountAddress(options.accountAuth, options.baseUrl);
     const native = accountProtocol(options.accountAuth);
     if (native) {
-      if (options.endpoint && options.endpoint !== native.endpoint) throw new Error('Account protocol mismatch.');
-      endpoint = native.endpoint;
+      if (native.endpoint && options.endpoint && options.endpoint !== native.endpoint) throw new Error('Account protocol mismatch.');
+      endpoint = options.accountAuth?.type === 'subscription' ? copilotEndpoint(endpoint) : native.endpoint;
       nativeBaseUrl = native.baseUrl;
     }
   } catch { return { ok: false, failure: { kind: 'missing-config', stopReason: 'Provider readiness failed: the account issuer endpoint or protocol conflicts with the selected request.' } }; }
@@ -179,7 +184,11 @@ export async function checkRealProviderReadiness(
   // A signer is resolved on the actual request, not by sending its credentials
   // to an invented resource. This is admission, not proof of authentication.
   if (!shape.modelsPath) return { ok: true };
-  const headers = providerAuthorization({ apiKey, accountAuth: options.accountAuth, endpoint }).headers;
+  const headers = {
+    ...providerAuthorization({ apiKey, accountAuth: options.accountAuth, endpoint }).headers,
+    ...copilotGatewayHeaders(provider),
+    ...(provider === 'github-copilot' ? { Accept: 'application/json' } : {}),
+  };
 
   const reconnectAttempts: string[] = [];
   for (
@@ -206,11 +215,14 @@ export async function checkRealProviderReadiness(
       options.signal?.throwIfAborted();
 
       if (response.status === 401 || response.status === 403) {
+        const copilotPolicyDenial = provider === 'github-copilot' && response.status === 403;
         return {
           ok: false,
           failure: {
             kind: "auth",
-            stopReason: `Provider readiness failed (provider-readiness:auth): ${getProviderLabel(provider)} authentication was rejected (401/403). Verify ${provider === "openai" ? "account-auth session or OPENAI_API_KEY" : envVarName} validity and access scope, then retry.`,
+            stopReason: copilotPolicyDenial
+              ? 'Provider readiness failed (provider-readiness:auth): GitHub Copilot denied access to this account or model. The stored login was not changed; check the account plan, organization policy, and selected model, then retry.'
+              : `Provider readiness failed (provider-readiness:auth): ${getProviderLabel(provider)} authentication was rejected (401/403). Verify ${provider === "openai" ? "account-auth session or OPENAI_API_KEY" : envVarName} validity and access scope, then retry.`,
           },
         };
       }

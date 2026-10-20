@@ -14,7 +14,7 @@
 | W3 | CTX-03 有界分段/合并、永久重播证据、原生 source CAS 与精确发布证明已有本地及独立验收；自动/overflow 未验证发布停止 turn | 两项架构 WATCH 为容量拒绝和锁内同步 I/O，已记录取舍；本批提交/远端按日志；CTX-01/02/04、TOOL-01 继续复核 |
 | W5 | SET-02 已修复选中分组后无法搜索其他组的问题；复用文字匹配排序，跨组按最佳得分和固定组序展示；清空搜索回原组，从详情 Back 回字段所属组并聚焦 | CMD-01/02、SET-01/03 全部验收；SET-02 其余来源/状态细节继续按合同核查 |
 | W6 | modal 的项目范围切组现已可达；不能由此证明完整目录分页/搜索 | PAN-01…08 各动作、只读边界、分页和 revision |
-| W7/W8/W9 | 尚未完成本次逐条复核 | INPUT-01、RENDER-01…03、EDIT-01、JOB-01/02、START-01/02 的完整裁决 |
+| W7/W8/W9 | 2026-10-20 复核发现 EDIT/JOB/START 的旧“完成”标签不成立：hunk 级选集、后台输出脱敏与结算、首帧扫描及 build 产物绑定仍有缺口 | INPUT-01、RENDER-01…03、EDIT-01、JOB-01/02、START-01/02 的完整裁决 |
 | W10 | 本批 135 文件/1813 测试通过；修改前实现使 20 项回归失败；两路独立复核通过；Node/exe × regular/fullscreen 的 settings/resume 切组、关闭与退出 PTY 通过 | QA-01/02/04 随后续返工累积；本批不等于全阶段交付 |
 
 本批静态检查、构建、提交和 CI 的精确状态见开发日志。本轮 PTY 鼠标只验证 fullscreen；regular 仍由终端负责鼠标滚动与选择。
@@ -131,6 +131,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 
 - QA-02/03：Linux PTY 矩阵已通过 Node/exe × regular/fullscreen（`npm run qa:pty`：`/tools` 后 Esc 关闭 reader、`/sessions current`、`/exit`）；Windows/macOS/IME/系统复制与真实质量仍缺环境/模型。
 - TOOL-02：静态描述/schema 字节成本已进 `/tools` 报告（`size.unit=utf8-bytes`，`tokens=not-measured`）；同模型质量/缓存对比与 tokenizer 校准仍需真实模型。
+- QA-02 本地前置仍缺 line/pipe、profile 切换、任务/discovery/approval/settings save 的合成端到端链路；QA-01 当前矩阵也不是 47 项全覆盖。
 
 ## CI
 
@@ -172,3 +173,12 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 `verify:import-cycles`、`check:declarations`、`check:config-consumers`、`check:node-floor` 通过；`verify:docs-drift:strict` 只有既有 advisory。全量 `test:ts` 结果以运行日志为准。
 
 Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；Watch `39284913470` success。CI `39284913496`/job `118168018187` completed/failure：9107通过、2失败、3跳过，失败仅Google畸形JSON SSE旧stop期待。新合同拒绝工具/签名权威，测试/文档单独校正；新SHA结果以日志实际证据为准。Copilot身份/续期与全部47项继续，Anthropic订阅方向按官方第三方应用限制和项目身份边界修正为API-key路径，尚未交付。
+
+### 2026-10-20 返工审计与 Copilot 修复
+
+- Copilot 未提交批次发现并修复：Messages 路由应为 `/v1/messages`；account-auth 头必须按大小写不敏感合并，避免重复 `Content-Type`；Copilot readiness 必须携带 gateway identity 头；省略 endpoint 时允许 native default；设备码流缺 progress 回调不再抛错；Copilot 403 不再被误报为 API-key 失效。
+- Copilot 原生登录到持久化 grant、再到 `renewStoredAccount` 的合成链路已加入回归；wire 解析、redirect、proof、base URL 与 issuer 校验仍保持拒绝路径。
+- 本地 Copilot 聚焦集 8 文件/113 项通过；renewal/connect/provider 相关集 7 文件/185 项通过；Node/exe 双构建、脚本 59 项、四项静态门禁和 strict docs drift 通过（118 条既有 advisory）。
+- Linux PTY smoke 四格通过：Node/exe × regular/fullscreen 均完成 `/tools`、`/sessions current`、`/exit` 并退出 0。
+- 全量 `test:ts` 运行 9,120 通过、1 跳过、5 失败；五个失败均为 browser scenario 负载下失败，逐一隔离复跑全部通过，因此本轮不能记作全量绿。相关测试文件为 receipt、cache、skills、healing 和 external handoff。
+- 当前批次尚未提交/推送，不能把本地证据当作新 SHA CI；`ec658966` 的 CI `39289335200` 与 Watch `39289335408` 已读回 success。

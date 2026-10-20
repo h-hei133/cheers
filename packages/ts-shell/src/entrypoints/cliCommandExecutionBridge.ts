@@ -28,7 +28,7 @@ import type { CompactLiveCheckpointStore } from "../context/compact/checkpoint/c
 import type { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import type { ReportWriter } from '../session/reports/model.js';
-import { renderLocalCommand } from '../cli/output/command.js';
+import { renderLocalCommand, renderSignInProgress } from '../cli/output/command.js';
 
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
 
@@ -171,6 +171,7 @@ export async function buildCliCommandExecution(
       ref: { mode: "explicit-local", root: projectMemoryRootFor(projectRoot) },
     });
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
+    signInProgress: progress => renderSignInProgress(input.renderer, progress),
     runCancellable: input.runCancellable,
     freshState: input.freshState,
     restart: input.restart,

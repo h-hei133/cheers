@@ -8033,3 +8033,15 @@ Google原生OAuth/有序签名批已推送为 `311573ca63f7cbd6e8e4b8d8f417ebc34
 当前仅校正 `provider/endpoints/sse.test.ts` 的Google畸形JSON终态，保留合法多行/多字节与其他协议既有断言；工具及reasoningSignature均不应有权威。独立评审指出原opaqueReplay断言读错codec层，已改为该层实际reasoningSignature字段。订阅批独立返工继续，未并入本次测试/文档交付；精确验证/评审及新SHA CI后续记录。整个Phase20保持active。
 
 SSE校正精确1文件/19项通过，独立code另跑19项并APPROVE、architecture另跑19项并CLEAR，计数重叠不累加。最终测试SHA256 `488cc438b3d46752f14e3e0b6cb0f252f21913fa82e2d580473c4f22fb5a21cd`；code报告 `319b26586f03843d4b5f63786d814007b16faef9df3d03cb67d8bce20ccfc41d`，architecture报告 `5963f7465c8f6c76b04093f8923cd35046297150635865fe274ebcb5734d827d`。综合APPROVE仅测试修正；该无签名fixture只证畸形JSON拒绝终态/无虚构文本，签名能力反例仍由已交付replay套件承担。新SHA提交/推送/CI后续实际查询，订阅产品修改保持未提交。
+
+SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读回一致；后续实际读回 Watch `39289335408` success，CI `39289335200`/job `118185566198` completed/success。Copilot批未提交。
+
+### 2026-10-20 Copilot 原生登录返工与全量失败分类
+
+- 当前未提交 Copilot 批次在原实现基础上修复了五项合同缺陷：Copilot Messages 端点必须走 `/v1/messages`；account-auth 头按大小写不敏感合并，避免 `application/json, application/json`；readiness 的 `/models` 请求补齐 gateway identity 头；省略 endpoint 时允许 native default；设备码流缺少 progress 回调时按共享合同继续，不再在请求前失败。Copilot `403` 改为账户/模型策略拒绝说明，不再建议替换为 API key。
+- 新增 `provider/endpoints/copilot.test.ts`、readiness/header/authorization 回归和真实合成链路：设备码登录、provider/baseUrl 持久化、native grant、`renewStoredAccount` 续期，续期保持长寿命 GitHub token，短寿命 Copilot access token 被替换。
+- 本地证据：Copilot 聚焦集 8 文件/113 项通过；随后 renewal/connect/provider 相关集 7 文件/185 项通过；`npm run build:ts` 通过（manifest `7429a6e7bf7d`），`npm run build:exe` 通过；`test:scripts` 59 项、import cycles、config consumers、declarations、node floor、strict docs drift 均通过；strict docs drift 保留 118 条既有 advisory。
+- 最终本地 Linux PTY smoke `npm run qa:pty` 四格通过：Node/exe × regular/fullscreen 均实际发送 `/tools`、`/sessions current`、`/exit` 并退出 0。
+- 全量 `npm run test:ts` 实际结果：9,120 通过、1 跳过、5 失败。失败集中在 `test-utils/browser/{receipt,cache,skills,healing,network/external}` 的 CLI 子进程场景；五个文件分别隔离复跑全部通过，归类为并发负载下的场景夹具失败，保留失败日志，不记作全量绿或产品通过。
+- 独立 review 另确认了 W7/W8/W9 的既有问题：同文件多 hunk 仍按文件组审批、adopted task 在子进程结算前可报告 stopped、background follow-up 未脱敏且 reload 不重读策略、默认 bootstrap 仍有首帧前全量 session scan、START-01 manifest 未绑定 lockfile/emit/runtime assets 且 entry 未限制在 dist。相应旧“完成”标签已从 contract/status 撤回，后续按审计顺序返工。
+- 当前批次尚未提交/推送；`ec658966` 的 CI `39289335200`/job `118185566198` 与 Architecture Watch `39289335408` 已实际读回 success。不能把当前工作区证据当作该 SHA 的 CI 证据。

@@ -7,6 +7,40 @@ import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
 import { DEFAULT_ENDPOINT_KIND } from "../../provider/endpoints/index.js";
 
 describe("provider readiness boundary", () => {
+  it("sends Copilot gateway identity on the models probe", async () => {
+    const result = await checkRealProviderReadiness({
+      provider: "github-copilot",
+      accountAuth: { type: "subscription", provider: "github-copilot", baseUrl: "https://api.individual.githubcopilot.com",
+        accessToken: "synthetic-access", refreshToken: "synthetic-refresh", expiresAt: Date.now() + 3_600_000 },
+      fetchImpl: async (input, init) => {
+        expect(String(input)).toBe("https://api.individual.githubcopilot.com/models");
+        const headers = new Headers(init?.headers);
+        expect(headers.get("authorization")).toBe("Bearer synthetic-access");
+        expect(headers.get("accept")).toBe("application/json");
+        expect(headers.get("editor-version")).toBe("vscode/1.107.0");
+        expect(headers.get("editor-plugin-version")).toBe("copilot-chat/0.35.0");
+        expect(headers.get("copilot-integration-id")).toBe("vscode-chat");
+        expect(headers.get("user-agent")).toBe("GitHubCopilotChat/0.35.0");
+        return new Response("{}");
+      },
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("does not tell a Copilot policy denial to replace a valid login with an API key", async () => {
+    const result = await checkRealProviderReadiness({
+      provider: "github-copilot",
+      accountAuth: { type: "subscription", provider: "github-copilot", baseUrl: "https://api.individual.githubcopilot.com",
+        accessToken: "synthetic-access", refreshToken: "synthetic-refresh", expiresAt: Date.now() + 3_600_000 },
+      fetchImpl: async () => new Response("forbidden", { status: 403 }),
+    });
+    expect(result).toMatchObject({ ok: false, failure: { kind: "auth" } });
+    if ("failure" in result) {
+      expect(result.failure.stopReason).toContain("plan");
+      expect(result.failure.stopReason).not.toContain("GITHUB_COPILOT_API_KEY");
+    }
+  });
+
   it.each([{ scopes: undefined }, { quotaProject: undefined }])('reports unverified Google metadata %j before any HTTP', async patch => {
     const fetchImpl = vi.fn();
     const result = await checkRealProviderReadiness({ provider: 'google', model: 'gemini-fixture',

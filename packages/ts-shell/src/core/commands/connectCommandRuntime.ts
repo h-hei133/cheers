@@ -94,7 +94,10 @@ export async function runConnectCommand(
   let persisted = false;
   const onPersisted = () => { persisted = true; };
   let output: string;
-  if (action === "login") output = await addConnection(rest, onPersisted, context.cwd);
+  if (action === 'login') {
+    const login = (signal?: AbortSignal) => addConnection(rest, onPersisted, context.cwd, { signal, onProgress: context.signInProgress });
+    output = context.runCancellable ? await context.runCancellable(login) : await login(context.signal);
+  }
   else if (action === "set") output = await addConnectionFromLegacyAuthSet(rest, onPersisted);
   else if (action === "use" || action === "activate") output = activateConnection(rest, onPersisted);
   else if (action === "logout" || action === "remove" || action === "rm") output = removeConnection(rest, onPersisted);
@@ -104,7 +107,8 @@ export async function runConnectCommand(
 
 }
 
-export async function addConnection(args: string[], onPersisted?: () => void, workspaceRoot?: string): Promise<string> {
+export async function addConnection(args: string[], onPersisted?: () => void, workspaceRoot?: string,
+  options?: { readonly signal?: AbortSignal; readonly onProgress?: CommandContext['signInProgress'] }): Promise<string> {
   const syntax = parseConnectArgs(["login", ...args]);
   if (!syntax.ok) return `Invalid /connect arguments: ${syntax.reason}\n${syntaxHelp(connectSyntax)}`;
   const parsed = { positionals: syntax.args, flags: Object.fromEntries(syntax.flags) };
@@ -119,7 +123,7 @@ export async function addConnection(args: string[], onPersisted?: () => void, wo
   }
 
   if (parsed.flags.account === true) {
-    return await runAccountAuthConnection(target, parsed.flags.label, onPersisted, workspaceRoot);
+    return await runAccountAuthConnection(target, parsed.flags.label, onPersisted, workspaceRoot, options);
   }
 
   if (parsed.flags.browser === true) {
@@ -455,6 +459,7 @@ export async function runAccountAuthConnection(
   labelFlag?: string | boolean,
   onPersisted?: () => void,
   workspaceRoot?: string,
+  options?: { readonly signal?: AbortSignal; readonly onProgress?: CommandContext['signInProgress'] },
 ): Promise<string> {
   return runProviderAccountAuthLogin({
     provider: target.provider,
@@ -463,5 +468,6 @@ export async function runAccountAuthConnection(
     labelOverride: parseFlagValue(labelFlag),
     onPersisted,
     workspaceRoot,
+    ...options,
   });
 }
