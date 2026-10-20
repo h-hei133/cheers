@@ -8074,5 +8074,6 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - PAN-06 copy 首屏改为 100 项有界页，`More blocks` continuation、source revision、stale selection 拒绝和 1001-block 下一页均有回归，`copy` 3 项通过。
 - 多轮独立只读复核先后复现并推动修复：JOB detach 清 timer、diff 行/字节预算与文件头、escaped/multi-run/unmatched inline、EDIT hunk/add identity、纯 rename、link label code、超长 bracket/private-use run、嵌套 anchor、超预算原文保真与 projectMath 平方扫描。最终受影响 14 文件/303 项通过。
 - fresh TS 构建 manifest `fae6df0de84b`；exe 102,615,168 bytes、SHA-256 `a2ad338ad80429db850e5c98e930d19d8b63d9167ed87aaae0dcd3400a7de70d`；Node 与 exe `--version` 均为 `0.1.0`。`verify:cli-entry` 全项通过，Linux Node/exe × regular/fullscreen 四格 PTY 通过。
-- 当前本地已通过 `test:scripts` 91 项、TypeScript、import cycles、config consumers、declarations、Node floor、strict docs drift 与 `git diff --check`；docs drift 保留 118 条既有 advisory。`normproof` 命令在当前环境不可用，不能记为通过；提交、推送和精确 SHA CI 仍需实际执行并读回。
+- 当前本地已通过 `test:scripts` 91 项、TypeScript、import cycles、config consumers、declarations、Node floor、strict docs drift 与 `git diff --check`；docs drift 保留 118 条既有 advisory。`normproof` 命令在当前环境不可用，不能记为通过。
+- 本批提交 `a425420aafdc46140075e4b4560c53727f929212` 已推送，远端 main 完整 SHA 读回。CI `39413554234`/job `118596969632` 于 `2026-10-20T11:30:52Z` completed/success，16m12s；Architecture Watch `39413554208`/job `118596969793` 于 `2026-10-20T11:15:01Z` completed/success。
 - START-02 仍缺完整 CLI 首帧渲染与用户选择后的 late-result fencing；START-01 仍缺 fresh packaged gate 与远端结果；START-03、QA-02/03、TOOL-02 的用户已允许环境/真实模型项继续延期。全部 47 项 Phase 20 范围保持 active。
