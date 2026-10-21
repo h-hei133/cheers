@@ -1,199 +1,528 @@
 #!/usr/bin/env node
 /**
- * Linux PTY smoke for the interactive command path, across both shipped launch
- * forms and both screen modes.
+ * Linux end-to-end CLI smoke for both shipped launch forms and every local
+ * input surface: regular, fullscreen, line-stream, and print-batch.
  *
- * This is not a platform matrix: Windows/macOS, IME and system copy remain
- * unverified unless run there. It proves the PTY host starts, accepts local
- * commands, and exits cleanly in each mode.
+ * The harness is synthetic and isolated. It proves local CLI/PTY wiring and
+ * business chains; it is not a Windows/macOS, IME, system-copy, or real-model
+ * quality matrix.
  */
-import { spawn } from 'node:child_process';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createQaPtyEnvironment } from './qa-pty-env.mjs';
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createQaPtyEnvironment } from "./qa-pty-env.mjs";
+import { seedRecoverySession, seedSavedSession, extractSessionId, currentSessionFromStore, assertTranscript } from "./qa/session.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const qaOutputDir = process.env.QA_PTY_OUTPUT_DIR?.trim();
 const targetCandidates = [
-  { name: 'node', command: process.execPath, args: [path.join(root, 'dist/cli.js')] },
-  { name: 'exe', command: path.join(root, 'dist/bin/cheers'), args: [] },
+  { name: "node", command: process.execPath, args: [path.join(root, "dist/cli.js")] },
+  { name: "exe", command: path.join(root, "dist/bin/cheers"), args: [] },
 ];
-const missing = targetCandidates.filter(target => !fs.existsSync(target.name === 'node' ? target.args[0] : target.command));
+const missing = targetCandidates.filter(target => !fs.existsSync(target.name === "node" ? target.args[0] : target.command));
 if (missing.length > 0) {
-  console.error(`Build first: missing ${missing.map(target => target.name).join(', ')} target`);
+  console.error(`Build first: missing ${missing.map(target => target.name).join(", ")} target`);
   process.exit(2);
 }
+
 const targets = targetCandidates.filter(target => !process.env.QA_PTY_TARGET || target.name === process.env.QA_PTY_TARGET);
-const modes = process.env.QA_PTY_MODE ? [process.env.QA_PTY_MODE] : ['regular', 'fullscreen'];
+const modes = process.env.QA_PTY_MODE ? [process.env.QA_PTY_MODE] : ["regular", "fullscreen", "line", "pipe"];
+const terminalModes = new Set(["regular", "fullscreen"]);
+const allModes = new Set([...terminalModes, "line", "pipe"]);
 if (targets.length === 0) {
   console.error(`Unknown QA_PTY_TARGET: ${process.env.QA_PTY_TARGET}`);
   process.exit(2);
 }
-if (modes.some(mode => mode !== 'regular' && mode !== 'fullscreen')) {
+if (modes.some(mode => !allModes.has(mode))) {
   console.error(`Unknown QA_PTY_MODE: ${process.env.QA_PTY_MODE}`);
   process.exit(2);
 }
 
-const plain = value => value.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
+const plain = value => value.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
 const normalized = value => plain(value)
-  .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, '')
-  .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
+  .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
+  .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "");
 
-function waitForOutput(read, predicate, label, timeoutMs = 15_000, diagnostic) {
+function waitForOutput(read, predicate, label, timeoutMs = 20_000, diagnostic) {
   return new Promise((resolve, reject) => {
     const started = Date.now();
     const tick = () => {
-      if (predicate(read())) {
-        resolve();
-        return;
-      }
-      if (Date.now() - started >= timeoutMs) {
-        const detail = diagnostic?.();
-        reject(new Error(`timed out waiting for ${label}${detail ? ` (${detail})` : ''}`));
-        return;
-      }
-      setTimeout(tick, 50);
+      try {
+        if (predicate(read())) {
+          resolve();
+          return;
+        }
+        if (Date.now() - started >= timeoutMs) {
+          const detail = diagnostic?.();
+          reject(new Error(`timed out waiting for ${label}${detail ? ` (${detail})` : ""}`));
+          return;
+        }
+        setTimeout(tick, 50);
+      } catch (error) { reject(error); }
     };
     tick();
   });
 }
 
-function waitForExit(child, timeoutMs = 10_000) {
+function waitForExit(child, timeoutMs = 15_000) {
+  if (child.probeError) return Promise.reject(child.probeError);
   if (child.exitCode !== null) return Promise.resolve(child.exitCode);
   return new Promise((resolve, reject) => {
+    const onError = error => { clearTimeout(timer); child.off("exit", onExit); reject(error); };
     const timer = setTimeout(() => {
-      child.off('exit', onExit);
-      reject(new Error('timed out waiting for process exit'));
+      child.off("exit", onExit);
+      child.off("error", onError);
+      reject(new Error("timed out waiting for process exit"));
     }, timeoutMs);
     const onExit = code => {
       clearTimeout(timer);
+      child.off("error", onError);
       resolve(code);
     };
-    child.once('exit', onExit);
+    child.once("exit", onExit);
+    child.once("error", onError);
   });
 }
 
-function seedRecoverySession(home, project) {
-  const sessionId = `sess_recovery_probe_${Date.now()}`;
-  const sessionDir = path.join(home, '.cheers', 'sessions', sessionId);
-  const timestamp = new Date().toISOString();
-  fs.mkdirSync(sessionDir, { recursive: true });
-  fs.writeFileSync(path.join(sessionDir, 'metadata.json'), JSON.stringify({
-    id: sessionId,
-    projectRoot: project,
-    title: 'Recovery probe',
-    createdAt: timestamp,
-    updatedAt: timestamp,
+function createFixture(mode) {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "qa-cli-home-"));
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), "qa-cli-project-"));
+  fs.mkdirSync(path.join(project, ".git"));
+  fs.mkdirSync(path.join(project, ".agents", "skills", "qa-discovery"), { recursive: true });
+  fs.writeFileSync(
+    path.join(project, ".agents", "skills", "qa-discovery", "SKILL.md"),
+    "---\nname: qa-discovery\ndescription: Local discovery fixture\n---\n\nqa-skill-body\n",
+  );
+  fs.mkdirSync(path.join(home, ".cheers"), { recursive: true });
+  fs.writeFileSync(path.join(home, ".cheers", "config.json"), JSON.stringify({
+    tuiMode: mode === "fullscreen" ? "fullscreen" : "regular",
   }));
-  fs.writeFileSync(path.join(sessionDir, 'state.json'), JSON.stringify({
-    status: 'interrupted',
-    projectRoot: project,
-    pendingPrompt: 'Recover the interrupted probe',
-    runPhase: 'idle',
-    interruptedKind: 'prompt',
-    pendingLifecycle: { pendingApprovals: {}, pendingTools: {}, taskStates: {} },
-    thread: {
-      schemaVersion: 1,
-      entries: [
-        { id: `${sessionId}:root`, kind: 'session-root', order: 0, timestamp },
-        { id: 'turn_recovery_probe', parentId: `${sessionId}:root`, kind: 'turn-message', role: 'user', order: 1, timestamp },
-      ],
-      activeLeafId: 'turn_recovery_probe',
-      branches: [],
-      compactions: [],
-    },
-  }));
-  fs.writeFileSync(path.join(sessionDir, 'transcript.jsonl'), [
-    JSON.stringify({ type: 'session', version: 1, id: sessionId, timestamp, cwd: project }),
-    JSON.stringify({ type: 'message', id: 'turn_recovery_probe', role: 'user', content: 'Recover the interrupted probe', timestamp }),
-    JSON.stringify({ type: 'lifecycle', id: 'evt_recovery_probe', event: 'run-interrupted', timestamp, detail: 'Recover the interrupted probe' }),
-  ].join('\n') + '\n');
-  return sessionId;
+  return { home, project };
 }
 
-async function smoke(target, mode) {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'qa-pty-home-'));
-  const project = fs.mkdtempSync(path.join(os.tmpdir(), 'qa-pty-project-'));
-  fs.mkdirSync(path.join(project, '.git'));
-  fs.mkdirSync(path.join(home, '.cheers'), { recursive: true });
-  fs.writeFileSync(path.join(home, '.cheers', 'config.json'), JSON.stringify({ tuiMode: mode }));
-  const sessionId = seedRecoverySession(home, project);
-  const command = `stty rows 60 cols 120; ${[target.command, ...target.args].map(part => JSON.stringify(part)).join(' ')}`;
-  const child = spawn('script', ['-qec', command, '/dev/null'],
-    { cwd: project, env: createQaPtyEnvironment(home, project) });
-  let output = '';
-  child.stdout.on('data', chunk => { output += chunk.toString('utf8'); });
-  child.stderr.on('data', chunk => { output += chunk.toString('utf8'); });
-  const read = () => plain(output);
-  const send = text => child.stdin.write(text);
-  const hardTimeout = setTimeout(() => child.kill('SIGKILL'), 30_000);
-  try {
-    await waitForOutput(read, value => value.includes('Cheers') && value.includes(sessionId) && value.includes('Recovery hint'),
-      'first frame and recovery hint', 15_000);
-    const initial = read();
-    const firstFrame = initial.indexOf('Cheers');
-    const recoveryHint = initial.indexOf('Recovery hint');
-    const hintLine = initial.split('\n').find(line => line.includes('Recovery hint'));
-    if (!hintLine?.includes(sessionId) || recoveryHint <= firstFrame) {
-      throw new Error('recovery hint did not follow the first frame with the seeded session');
+function removeFixture(home, project) {
+  for (const target of [home, project]) {
+    try {
+      fs.rmSync(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+    } catch {
+      // A killed script wrapper can outlive one cleanup attempt; the next run
+      // uses a fresh temporary root, so cleanup failure must not mask the result.
     }
-    const startupIds = [...initial.matchAll(/sess_[A-Za-z0-9_]+/g)]
-      .map(match => match[0]);
-    const currentSessionId = startupIds.find(id => id !== sessionId);
-    if (!currentSessionId) {
-      throw new Error(`startup output did not expose the current session id (${startupIds.join(', ')})`);
-    }
-
-    send('/sessions current\r');
-    await waitForOutput(() => normalized(output), value =>
-      /Session\s+command\s+map/.test(value), 'current session command map', 15_000, () => {
-      const value = normalized(output);
-      return JSON.stringify({
-        map: value.indexOf('Session command map'),
-        ids: [...value.matchAll(/sess_[A-Za-z0-9_]+/g)].map(match => match[0]).slice(-8),
-        tail: value.slice(-800),
-      });
-    });
-    const sessions = normalized(output);
-    const commandSessionId = /(?:• ID:|- ID:)\s*(sess_[A-Za-z0-9_]+)/.exec(sessions)?.[1];
-    if (commandSessionId !== currentSessionId) {
-      throw new Error(`current session output id ${commandSessionId ?? 'missing'} did not match startup id ${currentSessionId}`);
-    }
-    send('/tools\r');
-    await waitForOutput(() => normalized(output), value => value.includes('Tools')
-      && value.includes('bash')
-      && /Esc\s+to\s+close/i.test(value), 'tools report reader');
-    const tools = normalized(output);
-
-    // Let the picker process Escape as its own key event, then send the next
-    // command. A failed close leaves `/exit` with the picker and the final exit
-    // wait fails, so exit 0 also proves the close transition completed.
-    const closeStart = output.length;
-    send('\x1b');
-    await waitForOutput(() => String(output.length), value =>
-      Number(value) > closeStart, 'tools report close');
-    send('/exit\r');
-    const code = await waitForExit(child, 10_000);
-    const clean = read();
-    const ok = code === 0
-      && currentSessionId !== sessionId
-      && initial.includes(currentSessionId)
-      && tools.includes('Tools')
-      && clean.includes('Session command map');
-    process.stdout.write(`${ok ? 'PASS' : 'FAIL'} ${target.name}/${mode} pty commands (exit ${code}, ${output.length} bytes)\n`);
-    if (!ok) { process.stdout.write(clean.slice(-2000)); process.exitCode = 1; }
-  } catch (error) {
-    const clean = read();
-    process.stdout.write(`FAIL ${target.name}/${mode} pty commands (${error instanceof Error ? error.message : String(error)})\n`);
-    process.stdout.write(clean.slice(-2000));
-    process.exitCode = 1;
-    child.kill('SIGKILL');
-    await waitForExit(child, 2_000).catch(() => undefined);
-  } finally {
-    clearTimeout(hardTimeout);
-    fs.rmSync(home, { recursive: true, force: true }); fs.rmSync(project, { recursive: true, force: true });
   }
 }
 
-for (const target of targets) for (const mode of modes) await smoke(target, mode);
+function recordResult(target, mode, state, status, exitCode, detail) {
+  if (!qaOutputDir) return;
+  fs.mkdirSync(qaOutputDir, { recursive: true });
+  const stem = `${target.name}-${mode}`;
+  fs.writeFileSync(path.join(qaOutputDir, `${stem}.txt`), state.output, "utf8");
+  fs.writeFileSync(path.join(qaOutputDir, `${stem}.json`), `${JSON.stringify({
+    target: target.name,
+    mode,
+    status,
+    exitCode,
+    bytes: Buffer.byteLength(state.output, "utf8"),
+    ...(detail ? { detail } : {}),
+  }, null, 2)}\n`, "utf8");
+}
+
+function qaEnvironment(home, project) {
+  return {
+    ...createQaPtyEnvironment(home, project),
+    CHEERS_SYNTHETIC_TOOLS: "1",
+  };
+}
+
+
+async function runInteractivePrompt(state, child, prompt, expected, timeoutMs = 30_000) {
+  const start = state.output.length;
+  child.stdin.write(`${prompt}\r`);
+  const started = Date.now();
+  let previewClosed = false;
+  let lastApproved = "";
+  while (Date.now() - started < timeoutMs) {
+    const tail = normalized(state.output.slice(start));
+    if (expected.every(item => tail.includes(item))) return;
+    if (!previewClosed && tail.includes("close to choose approval")) {
+      previewClosed = true;
+      child.stdin.write("\x1b");
+    }
+    const approvals = [...tail.matchAll(/Permission:\s+([^\s(]+)/g)];
+    const currentTool = approvals.at(-1)?.[1] ?? "";
+    if (currentTool && currentTool !== lastApproved) {
+      lastApproved = currentTool;
+      child.stdin.write("y");
+    }
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  throw new Error(`timed out waiting for prompt completion: ${prompt}`);
+}
+
+async function saveMaxTurns(state, child, home) {
+  let start = state.output.length;
+  child.stdin.write("/settings\r");
+  await waitForOutput(
+    () => normalized(state.output.slice(start)),
+    value => value.includes("Settings") && value.includes("user configuration"),
+    "settings panel",
+  );
+  start = state.output.length;
+  child.stdin.write("maxTurns");
+  await waitForOutput(
+    () => normalized(state.output.slice(start)),
+    value => value.includes("Maximum turns"),
+    "settings search",
+  );
+  start = state.output.length;
+  child.stdin.write("\r");
+  await waitForOutput(
+    () => normalized(state.output.slice(start)),
+    value => value.includes("Maximum turns") && value.includes("save to user"),
+    "settings detail",
+  );
+  start = state.output.length;
+  child.stdin.write("\r");
+  await waitForOutput(
+    () => normalized(state.output.slice(start)),
+    value => value.includes("Edit Maximum turns"),
+    "settings editor",
+  );
+  start = state.output.length;
+  child.stdin.write("\x157\r");
+  await waitForOutput(
+    () => normalized(state.output.slice(start)),
+    value => value.includes("Pending: 7"),
+    "settings staged value",
+  );
+  start = state.output.length;
+  child.stdin.write("\r");
+  await waitForOutput(
+    () => normalized(state.output.slice(start)),
+    value => value.includes("Saved to your user configuration"),
+    "settings save",
+  );
+  const config = JSON.parse(fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8"));
+  if (config.maxTurns !== 7) throw new Error(`settings save persisted maxTurns=${String(config.maxTurns)}`);
+}
+
+async function runTerminalSmoke(target, mode) {
+  const { home, project } = createFixture(mode);
+  const recoverySession = seedRecoverySession(home, project);
+  const savedSession = seedSavedSession(home, project);
+  const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
+  const command = `stty rows 60 cols 120; exec ${[target.command, ...target.args].map(quote).join(" ")}`;
+  const child = spawn("script", ["-qec", command, "/dev/null"], {
+    cwd: project,
+    env: qaEnvironment(home, project),
+  });
+  child.on("error", error => { child.probeError = error; });
+  const state = { output: "" };
+  child.stdout.on("data", chunk => { state.output += chunk.toString("utf8"); });
+  child.stderr.on("data", chunk => { state.output += chunk.toString("utf8"); });
+  const read = () => {
+    if (child.probeError) throw child.probeError;
+    return plain(state.output);
+  };
+  const hardTimeout = setTimeout(() => child.kill("SIGKILL"), 90_000);
+  try {
+    await waitForOutput(read, value => value.includes("Cheers") && value.includes(recoverySession) && value.includes("Recovery hint"),
+      "first frame and recovery hint", 20_000);
+    const sessionId = extractSessionId(state.output, recoverySession);
+    if (!sessionId) throw new Error("startup output did not expose the current session id");
+
+    let start = state.output.length;
+    child.stdin.write(`/resume fork ${recoverySession}\r`);
+    await waitForOutput(() => currentSessionFromStore(home, project),
+      value => Boolean(value) && value !== sessionId,
+      "fork current session");
+    const activeSessionId = currentSessionFromStore(home, project);
+    if (!activeSessionId) throw new Error("fork output did not expose the new session id");
+
+    start = state.output.length;
+    child.stdin.write(`/resume ${savedSession}\r`);
+    await waitForOutput(() => currentSessionFromStore(home, project),
+      value => value === savedSession,
+      "resume saved session");
+    await waitForOutput(() => normalized(state.output.slice(start)),
+      value => value.includes("Ask anything, or / for commands"),
+      "saved session prompt");
+    start = state.output.length;
+    child.stdin.write(`/resume ${activeSessionId}\r`);
+    await waitForOutput(() => currentSessionFromStore(home, project),
+      value => value === activeSessionId,
+      "resume forked session");
+    await waitForOutput(() => normalized(state.output.slice(start)),
+      value => value.includes("Ask anything, or / for commands"),
+      "forked session prompt");
+
+    start = state.output.length;
+    child.stdin.write(`/resume delete ${recoverySession}\r`);
+    await waitForOutput(() => normalized(state.output.slice(start)),
+      value => value.includes("Permanently delete this session"),
+      "delete session confirmation");
+    child.stdin.write("\x1b[B");
+    await new Promise(resolve => setTimeout(resolve, 100));
+    child.stdin.write("\r");
+    await waitForOutput(() => normalized(state.output.slice(start)),
+      value => value.includes(`Deleted session ${recoverySession}`),
+      "delete session result");
+    if (fs.existsSync(path.join(home, ".cheers", "sessions", recoverySession))) {
+      throw new Error("deleted session directory still exists");
+    }
+
+    start = state.output.length;
+    child.stdin.write("/resume panel\r");
+    await waitForOutput(() => normalized(state.output.slice(start)),
+      value => value.includes("esc close") && value.includes("type to filter"),
+      "resume panel");
+    const resumeCloseStart = state.output.length;
+    child.stdin.write("\x1b");
+    await new Promise(resolve => setTimeout(resolve, 250));
+    child.stdin.write("/sessions current\r");
+    await waitForOutput(() => normalized(state.output.slice(resumeCloseStart)), value => value.includes("show full command guide"),
+      "resume panel close");
+    if (extractSessionId(state.output.slice(resumeCloseStart), recoverySession) !== activeSessionId) {
+      throw new Error("resume panel close returned to a different current session");
+    }
+    child.stdin.write("\x1b");
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    start = state.output.length;
+    child.stdin.write("/tools\r");
+    await waitForOutput(() => normalized(state.output.slice(start)),
+      value => value.includes("Tools") && value.includes("bash") && /Esc\s+to\s+close/i.test(value),
+      "tools report reader", 25_000);
+    const closeStart = state.output.length;
+    child.stdin.write("\x1b");
+    await new Promise(resolve => setTimeout(resolve, 250));
+    child.stdin.write("/sessions current\r");
+    await waitForOutput(() => normalized(state.output.slice(closeStart)),
+      value => value.includes("show full command guide"),
+      "tools report close");
+    child.stdin.write("\x1b");
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    await runInteractivePrompt(
+      state,
+      child,
+      "run printf qa-approval-ok",
+      ["qa-approval-ok", "Synthetic reply: run printf qa-approval-ok"],
+    );
+    await runInteractivePrompt(
+      state,
+      child,
+      "delegate task inspect qa fixture",
+      ["Synthetic reply: delegate task inspect qa fixture"],
+    );
+
+    await runInteractivePrompt(
+      state,
+      child,
+      "discover and load skill qa-discovery",
+      ["Synthetic reply: discover and load skill qa-discovery"],
+    );
+
+    await saveMaxTurns(state, child, home);
+
+    start = state.output.length;
+    child.stdin.write("/profile create work\r");
+    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes("Profile work: created"), "profile create");
+    start = state.output.length;
+    child.stdin.write("/profile switch work\r");
+    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes("Confirm digest:"), "profile switch preview");
+    const digest = /Confirm digest:\s*([a-f0-9]{64})/.exec(normalized(state.output.slice(start)))?.[1];
+    if (!digest) throw new Error("profile switch preview did not expose a full digest");
+
+    start = state.output.length;
+    child.stdin.write(`/profile switch work --confirm ${digest}\r`);
+    await waitForOutput(() => normalized(state.output.slice(start)),
+      value => fs.existsSync(path.join(home, ".cheers", "profiles", "work", "current-session.json"))
+        && value.includes("Ask anything"),
+      "profile switch target startup", 30_000);
+    start = state.output.length;
+    child.stdin.write("/profile status\r");
+    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes("Active profile: work"),
+      "switched profile status");
+    start = state.output.length;
+    child.stdin.write("/sessions current\r");
+    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes("Current session"),
+      "switched profile current session");
+    const switchedSession = extractSessionId(state.output.slice(start), sessionId);
+    if (!switchedSession) throw new Error("profile switch target did not expose a fresh session id");
+
+    child.stdin.write("/exit\r");
+    const code = await waitForExit(child, 20_000);
+    if (code !== 0) throw new Error(`process exited ${code}`);
+    const clean = normalized(state.output);
+    if (!clean.includes("Profile target startup was read back in fresh session")) {
+      throw new Error("profile switch did not report verified target startup");
+    }
+    if (!fs.existsSync(path.join(home, ".cheers", "profiles", "work", "sessions", switchedSession))) {
+      throw new Error(`switched profile session was not stored under the named profile: ${switchedSession}`);
+    }
+    assertTranscript(home, activeSessionId, [
+      "\"name\":\"bash\"",
+      "\"name\":\"task\"",
+      "\"name\":\"tool_search\"",
+      "\"name\":\"tool_load\"",
+      "\"name\":\"skill\"",
+      "\"type\":\"approval.resolved\"",
+      "qa-approval-ok",
+      "qa-skill-body",
+    ], qaOutputDir);
+    recordResult(target, mode, state, "pass", code);
+    process.stdout.write(`PASS ${target.name}/${mode} settings profile task discovery approval (exit ${code}, ${state.output.length} bytes)\n`);
+  } catch (error) {
+    const clean = normalized(state.output);
+    recordResult(target, mode, state, "fail", child.exitCode, error instanceof Error ? error.message : String(error));
+    process.stdout.write(`FAIL ${target.name}/${mode} business chains (${error instanceof Error ? error.message : String(error)})\n`);
+    process.stdout.write(clean.slice(-4000));
+    process.exitCode = 1;
+    child.kill("SIGKILL");
+    await waitForExit(child, 2_000).catch(() => undefined);
+  } finally {
+    clearTimeout(hardTimeout);
+    removeFixture(home, project);
+  }
+}
+
+async function runLineSmoke(target) {
+  const { home, project } = createFixture("regular");
+  const configBefore = fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8");
+  const child = spawn(target.command, [...target.args, "--non-interactive-approval", "allow-once"], {
+    cwd: project,
+    env: qaEnvironment(home, project),
+  });
+  child.on("error", error => { child.probeError = error; });
+  const state = { output: "" };
+  child.stdout.on("data", chunk => { state.output += chunk.toString("utf8"); });
+  child.stderr.on("data", chunk => { state.output += chunk.toString("utf8"); });
+  const hardTimeout = setTimeout(() => child.kill("SIGKILL"), 90_000);
+  try {
+    await waitForOutput(() => {
+      if (child.probeError) throw child.probeError;
+      return normalized(state.output);
+    }, value => value.includes("Cheers") && value.includes("Session: sess_"),
+      "line startup", 20_000);
+    const sessionId = extractSessionId(state.output);
+    if (!sessionId) throw new Error("line startup did not expose the current session id");
+
+    for (const step of [
+      { command: "/sessions current", expected: "Current session" },
+      { command: "/tools", expected: "Tools" },
+      { command: "run printf qa-approval-ok", expected: "qa-approval-ok" },
+      { command: "delegate task inspect qa fixture", expected: "Synthetic reply: delegate task inspect qa fixture" },
+      { command: "discover and load skill qa-discovery", expected: "Synthetic reply: discover and load skill qa-discovery" },
+      { command: "/settings", expected: "does not write configuration" },
+    ]) {
+      const start = state.output.length;
+      child.stdin.write(`${step.command}\n`);
+      await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes(step.expected),
+        `line ${step.command}`, 25_000);
+    }
+    child.stdin.write("/exit\n");
+    const code = await waitForExit(child, 20_000);
+    if (code !== 0) throw new Error(`process exited ${code}`);
+    if (fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8") !== configBefore) {
+      throw new Error("line read-only settings changed the configuration");
+    }
+    assertTranscript(home, sessionId, [
+      "\"name\":\"bash\"",
+      "\"name\":\"task\"",
+      "\"name\":\"tool_search\"",
+      "\"name\":\"tool_load\"",
+      "\"name\":\"skill\"",
+      "\"type\":\"approval.resolved\"",
+      "qa-approval-ok",
+      "qa-skill-body",
+    ], qaOutputDir);
+    recordResult(target, "line", state, "pass", code);
+    process.stdout.write(`PASS ${target.name}/line task discovery approval settings boundary (exit ${code}, ${state.output.length} bytes)\n`);
+  } catch (error) {
+    recordResult(target, "line", state, "fail", child.exitCode, error instanceof Error ? error.message : String(error));
+    process.stdout.write(`FAIL ${target.name}/line business chains (${error instanceof Error ? error.message : String(error)})\n`);
+    process.stdout.write(normalized(state.output).slice(-4000));
+    process.exitCode = 1;
+    child.kill("SIGKILL");
+    await waitForExit(child, 2_000).catch(() => undefined);
+  } finally {
+    clearTimeout(hardTimeout);
+    removeFixture(home, project);
+  }
+}
+
+async function runPipeSmoke(target) {
+  const { home, project } = createFixture("regular");
+  const configBefore = fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8");
+  const input = [
+    "/sessions current",
+    "/tools",
+    "run printf qa-approval-ok",
+    "delegate task inspect qa fixture",
+    "discover and load skill qa-discovery",
+    "/settings",
+    "/exit",
+  ].join("\n") + "\n";
+  const child = spawn(target.command, [...target.args, "--print", "--non-interactive-approval", "allow-once"], {
+    cwd: project,
+    env: qaEnvironment(home, project),
+  });
+  child.on("error", error => { child.probeError = error; });
+  const state = { output: "" };
+  child.stdout.on("data", chunk => { state.output += chunk.toString("utf8"); });
+  child.stderr.on("data", chunk => { state.output += chunk.toString("utf8"); });
+  child.stdin.end(input);
+  const hardTimeout = setTimeout(() => child.kill("SIGKILL"), 90_000);
+  try {
+    const code = await waitForExit(child, 60_000);
+    if (code !== 0) throw new Error(`process exited ${code}`);
+    if (fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8") !== configBefore) {
+      throw new Error("pipe read-only settings changed the configuration");
+    }
+    const output = normalized(state.output);
+    for (const expected of [
+      "Current session",
+      "Tools",
+      "qa-approval-ok",
+      "Synthetic reply: delegate task inspect qa fixture",
+      "Synthetic reply: discover and load skill qa-discovery",
+      "does not write configuration",
+    ]) {
+      if (!output.includes(expected)) throw new Error(`pipe output missing ${expected}`);
+    }
+    const sessionId = extractSessionId(state.output);
+    if (!sessionId) throw new Error("pipe output did not expose the current session id");
+    assertTranscript(home, sessionId, [
+      "\"name\":\"bash\"",
+      "\"name\":\"task\"",
+      "\"name\":\"tool_search\"",
+      "\"name\":\"tool_load\"",
+      "\"name\":\"skill\"",
+      "\"type\":\"approval.resolved\"",
+      "qa-approval-ok",
+      "qa-skill-body",
+    ], qaOutputDir);
+    recordResult(target, "pipe", state, "pass", code);
+    process.stdout.write(`PASS ${target.name}/pipe task discovery approval settings boundary (exit ${code}, ${state.output.length} bytes)\n`);
+  } catch (error) {
+    recordResult(target, "pipe", state, "fail", child.exitCode, error instanceof Error ? error.message : String(error));
+    process.stdout.write(`FAIL ${target.name}/pipe business chains (${error instanceof Error ? error.message : String(error)})\n`);
+    process.stdout.write(normalized(state.output).slice(-4000));
+    process.exitCode = 1;
+    child.kill("SIGKILL");
+    await waitForExit(child, 2_000).catch(() => undefined);
+  } finally {
+    clearTimeout(hardTimeout);
+    removeFixture(home, project);
+  }
+}
+
+for (const target of targets) {
+  for (const mode of modes) {
+    if (terminalModes.has(mode)) await runTerminalSmoke(target, mode);
+    else if (mode === "line") await runLineSmoke(target);
+    else await runPipeSmoke(target);
+  }
+}

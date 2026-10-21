@@ -1,13 +1,31 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 const clock = vi.hoisted(() => ({ now: vi.fn(() => 0) }));
-vi.mock('node:perf_hooks', () => ({ performance: clock }));
+const loop = vi.hoisted(() => ({
+  enable: vi.fn(),
+  count: 2,
+  min: 1_000_000,
+  mean: 3_000_000,
+  max: 9_000_000,
+  percentile: vi.fn((value: number) => value === 50 ? 2_000_000 : value === 95 ? 7_000_000 : 8_000_000),
+}));
+vi.mock('node:perf_hooks', () => ({
+  performance: clock,
+  monitorEventLoopDelay: vi.fn(() => loop),
+}));
 
 async function loadWith(env: string | undefined) {
   vi.resetModules();
   vi.stubEnv('CHEERS_TIMING', env);
   return import("./startupTiming.js");
 }
-afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); vi.useRealTimers(); clock.now.mockReset(); });
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.resetModules();
+  vi.useRealTimers();
+  clock.now.mockReset();
+  loop.enable.mockClear();
+  loop.percentile.mockClear();
+});
 
 describe('startup timing', () => {
   it.each([undefined, 'true'])('records nothing and installs no observers with gate %s', async env => {
@@ -15,6 +33,7 @@ describe('startup timing', () => {
     timing.time('first');
     expect(timing.startupObservers()).toEqual({});
     expect(clock.now).not.toHaveBeenCalled();
+    expect(loop.enable).not.toHaveBeenCalled();
     expect(timing.formatTimingReport()).toContain('No timing recorded');
   });
 
@@ -31,6 +50,7 @@ describe('startup timing', () => {
     expect(report).toContain('total: 200.0ms');
     expect(report).toContain('Excludes parent launcher time');
     expect(report).toContain('not visible terminal pixels');
+    expect(timing.timingSnapshot().eventLoop).toMatchObject({ count: 2, p95Ms: 7 });
   });
 
   it('records actual observer events and keeps namespaces apart', async () => {

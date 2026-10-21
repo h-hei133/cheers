@@ -2,6 +2,7 @@ import { messageToText } from "../model-adapters/multimodal.js";
 import type { AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import type { StepFunction } from "./step.js";
+import { randomUUID } from "node:crypto";
 
 /**
  * A model that answers without a provider.
@@ -26,15 +27,13 @@ export function createSyntheticStep(options?: {
   readonly toolIntent?: readonly SyntheticToolIntent[];
 }): StepFunction {
   const toolIntent = options?.toolIntent ?? [];
+  const identity = randomUUID();
   return async (messages, signal, listener) => {
     if (signal?.aborted) {
       return { text: "", toolCalls: [], stopReason: "aborted", errorMessage: "Operation aborted" };
     }
     const prompt = lastUserText(messages);
-    // Ask once. A second pass means the call already ran, so the run finishes
-    // with prose instead of asking again — otherwise the tool gate would see an
-    // identical repeated call and stop it as a loop.
-    const call = alreadyCalled(messages) ? undefined : matchToolIntent(prompt, toolIntent);
+    const call = nextToolCall(messages, prompt, toolIntent, identity);
     if (call) {
       const text = `Synthetic tool call: ${call.name}`;
       for (const piece of text.match(/\S+\s*/g) ?? [text]) listener.onText?.(piece);
@@ -43,10 +42,43 @@ export function createSyntheticStep(options?: {
     const text = `Synthetic reply: ${prompt}`;
     for (const piece of text.match(/\S+\s*/g) ?? [text]) listener.onText?.(piece);
     return { text, toolCalls: [], stopReason: "stop" };
+  };
 }
 
-/** Whether any tool has already produced a result in this conversation. */
-function alreadyCalled(messages: readonly AgentMessage[]): boolean {
+/**
+ * The next planned call after the tool results already returned for this user
+ * turn. A new user message starts a new plan; an outstanding call must receive
+ * its result before another step can be emitted.
+ */
+function nextToolCall(
+  messages: readonly AgentMessage[],
+  prompt: string,
+  intents: readonly SyntheticToolIntent[],
+  identity: string,
+): AgentToolCall | undefined {
+  const intent = matchToolIntent(prompt, intents);
+  if (!intent) return undefined;
+  const steps = intent.sequence?.(prompt) ?? [{ name: intent.name, args: intent.args(prompt) }];
+  const current = currentTurnMessages(messages);
+  const calls = current.flatMap(message => message.role === "assistant" ? message.tool_calls ?? [] : []);
+  const results = new Set(current.flatMap(message => message.role === "tool" && message.tool_call_id ? [message.tool_call_id] : []));
+  if (calls.some(call => !results.has(call.id))) return undefined;
+  let completed = 0;
+  for (const call of calls) {
+    if (call.function.name === steps[completed]?.name) completed++;
+  }
+  const step = steps[completed];
+  if (!step) return undefined;
+  const id = `synthetic-${identity}-${messages.length - current.length}-${step.name}-${completed + 1}`;
+  return {
+    id,
+    name: step.name,
+    args: step.args,
+  };
+}
+
+/** Messages returned since the latest user message. */
+function currentTurnMessages(messages: readonly AgentMessage[]): readonly AgentMessage[] {
   let lastUser = -1;
   for (let index = messages.length - 1; index >= 0; index--) {
     if (messages[index]!.role === "user") {
@@ -54,8 +86,7 @@ function alreadyCalled(messages: readonly AgentMessage[]): boolean {
       break;
     }
   }
-  return messages.slice(lastUser + 1).some((message) => message.role === "tool");
-}
+  return messages.slice(lastUser + 1);
 }
 
 /** One opt-in mapping from a prompt phrase to the tool call it should produce. */
@@ -66,21 +97,27 @@ export interface SyntheticToolIntent {
   readonly name: string;
   /** Argument resolver, given the matched prompt. */
   readonly args: (prompt: string) => unknown;
+  /**
+   * Optional bounded plan. When omitted, the single name/args pair is the plan.
+   * Each tool result advances exactly one step.
+   */
+  readonly sequence?: (prompt: string) => readonly SyntheticToolStep[];
 }
 
-/** The first intent whose phrase appears in the prompt, as a call. */
+/** One call in a synthetic multi-step plan. */
+export interface SyntheticToolStep {
+  readonly name: string;
+  readonly args: unknown;
+}
+
+/** The first intent whose phrase appears in the prompt. */
 function matchToolIntent(
   prompt: string,
   intents: readonly SyntheticToolIntent[],
-): AgentToolCall | undefined {
+): SyntheticToolIntent | undefined {
   const haystack = prompt.toLowerCase();
   for (const intent of intents) {
-    if (!haystack.includes(intent.phrase)) continue;
-    return {
-      id: `synthetic-${intent.name}`,
-      name: intent.name,
-      args: intent.args(prompt),
-    };
+    if (haystack.includes(intent.phrase)) return intent;
   }
   return undefined;
 }

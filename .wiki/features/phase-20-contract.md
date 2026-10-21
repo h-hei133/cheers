@@ -88,14 +88,14 @@
 | EDIT-01 | 稳定 group id、源基线、hunk indexes/content 与 add content 身份绑定、依赖组、同文件双 hunk 选集、重规划 revision 检查、无选集拒绝，以及 requested/selected/skipped receipt；`batch.test.ts` 38 项通过。 | 将同文件 hunk 合并成单组、改变源基线、改变同基线 hunk 内容或 add 内容后，对应选集/identity 用例实际失败或拒绝。 |
 | START-01（本地证据闭合） | build manifest 已绑定 lockfile、构建配置、编译器/标准库、全部 emit 字节、五个运行资产和受控 entry；`start.test` 覆盖 journal 恢复、活动/stale build lock fail-closed、恢复期间竞争者拒绝、越界/未登记入口、篡改产物与 launcher/package-main 回滚。`--version`/`--help` 现在由轻量入口在加载 runtime 图前处理；组合参数、坏配置准入与 fresh packaged gate 均已通过。 | stale lock 仍需人工确认后清理；本地 packaged gate 不等于新提交的 CI，精确 SHA CI 另行取证。 |
 | START-02（本地证据闭合） | 10k catalog 首屏、持久 reentry 索引、0/100/1k/10k 不枚举探针；recovery hint 由实际 TUI `onFirstWrite`、line prompt write callback 或 non-TTY live first frame 启动；routing sink 与 transcript ownership 分离，line mode 保留 turn boundary 且 `/sessions` 仍走非交互 overview；用户键盘、鼠标、粘贴、picker 与 line 输入只推进一次 fence；teardown 在 sink 恢复前完成，失败路径不调用 `exit(0)`，cleanup 自身抛错或 logger 抛错也保证 sink 恢复；line prompt callback 与 stdout `error` 的异步失败均进入同一 rejection，不再静默挂起；真实 `GoalScheduler` drain 超时结算 captured host，line sink 在 goal dispatch 真正完成前保持 discard fence；MCP snapshot/refresh 在队列等待阶段即可取消，collaboration ticket/poll/propose 继承关闭 signal；`runCliProcess` 集成测试证明 fullscreen hint 经 transcript 且不直写 stdout；non-TTY live stream 现在把 first-frame/user-intent 接到同一 recovery lifecycle，取消 hint 时仍发布已发现的可读性诊断；Node/exe × regular/fullscreen seeded PTY 连续通过并匹配精确 current session。 | 真实跨平台/IME 仍归 QA-02；本行不把 Linux PTY 外推为平台矩阵完成。 |
-| START-03（部分） | 历史 `bench:start`、`bench:interactive` 已记录 Node/exe 版本启动及 regular/fullscreen/pipe 首帧/退出数据。 | benchmark 未消费 ready/layout/write 观察点，未同步实际 prompt，交互矩阵仍为 Node-only，且缺少 raw sample、构建摘要和受控冷缓存；受控冷缓存及真实 ready 测量仍未闭合。 |
+| START-03（部分） | `bench:interactive` 现在分别记录 Node/exe × regular/fullscreen/line/pipe 的首字节、首帧/输入提示、TUI listener/layout/write 进程观察点、渲染字符键响应、批处理首答和命令退出；保存每次原始样本、样本数、p50/p95、机器与构建摘要。键测量关闭 PTY echo，等待 UTF-8 字符进入实际输出；缺必需观察点拒绝。 | runtime-ready、受控冷缓存、1000项列表键响应、复杂stream单次阻塞和分位数不确定性仍未闭合。line/pipe没有TUI listener标记，null不兑换ready；进程采样delay不证明最初同步加载或单操作阻塞上界。 |
 
 ## W10
 
 | 任务 | 证据 |
 |---|---|
 | QA-01 | 本矩阵 + 各反转测试；`CTX-02`、`TOOL-02`、`PAN-05`、`PAN-08`、`QA-03` 已拆成独立行；但行存在不等于任务完成，仍按各行状态累积。 |
-| QA-02 | 已有 Linux 合成 PTY；本次增加 Node/exe × regular/fullscreen 的 settings/resume 切组、关闭、首帧后 recovery hint 和命令退出；line/pipe、profile/task/discovery/approval/save 合成链路及跨平台仍未闭合。 |
+| QA-02 | Linux Node/exe × regular/fullscreen/line/pipe 八格合成CLI已通过；TUI覆盖会话fork/切换/确认删除、panel关闭、任务、发现/search/load/skill、审批、settings保存和profile受控重启；line/pipe覆盖任务/发现/显式allow-once以及settings只读字节对照。逐调用关联持久tool.result与成功输出，不以模型重复prompt替代结果。line/pipe完整profile切换/保存、restore preview、跨平台/IME/系统复制仍未闭合；settings面板不由非TTY伪造。 |
 | QA-03 | START-03 启动数据、RENDER/INPUT 回归与合成 PTY 可作质量前置；§6 预注册指标、真实模型任务集和安全回归的真实质量证据仍缺，mock 不替代。 |
 | TOOL-02（部分） | `/tools` 报告 description/schema 的 UTF-8 字节数、逐工具成本列与文本摘要，明确 `tokens=not-measured`；同模型/任务/权限的总请求、发现额外成本、关键参数质量与 tokenizer/多语言误差仍待真实模型。 |
 | QA-04 | 本地门禁与精确提交；CI 以 run 结果为准 |

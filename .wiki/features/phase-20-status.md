@@ -118,20 +118,20 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | 任务 | 已做 | 缺 |
 |---|---|---|
 | PAN-01 | model 两栏与详情、同名 relay 区分、预设行 | 连接/role 的绑定 revision 搜索验收 |
-| PAN-02 | 时间分组、pin、树形、跨项目完整授权目录搜索、10k 分页批处理、全屏事实/对话预览、窄屏 stacked preview、current tree focus、pin 持久化 | fork/restore/delete 组合 PTY 验收 |
+| PAN-02 | 时间分组、pin、树形、跨项目完整授权目录搜索、10k 分页批处理、全屏事实/对话预览、窄屏 stacked preview、current tree focus、pin 持久化；Linux TUI fork/切换/确认删除组合通过 | restore preview 与其余动作边界验收 |
 | PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
 | PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝 | history 完整树、copy 到头/失败/取消边界、back/undo/restore 审计 |
-| PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引） | agents 专用操作仍归 `/jobs`；未知状态验收未单列 |
+| PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引）、watcher 注销与 unknown status 回归 | agents 专用操作仍归 `/jobs`；其余 journal/revision 边界继续复核 |
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
 
 ## 未闭合
 
-- START-03：受控冷缓存（需清页缓存权限）；逐键延迟目前以 `/exit` 命令处理为代理。
+- START-03：已保存八组各30次原始样本，渲染键响应关闭 PTY echo 并等待完整 UTF-8 字符；runtime-ready、受控冷缓存、1000项列表键响应、复杂 stream 单次阻塞与分位数不确定性仍未验。
 
-- QA-02/03：Linux PTY 矩阵已连续两次通过 Node/exe × regular/fullscreen（`npm run qa:pty`：等待首帧与 seeded recovery hint，`/sessions current` 精确匹配 startup/current id，`/tools` picker 后 Esc 关闭，再 `/exit`）；Windows/macOS/IME/系统复制与真实质量仍缺环境/模型。
+- QA-02/03：Linux Node/exe × regular/fullscreen/line/pipe 八格合成 CLI 通过；TUI 覆盖会话/任务/发现/审批/settings 保存/profile 重启，line/pipe 覆盖任务/发现/显式审批和 settings 只读；Windows/macOS/IME/系统复制与真实质量仍缺环境/模型。
 - TOOL-02：静态描述/schema 字节成本已进 `/tools` 报告（`size.unit=utf8-bytes`，`tokens=not-measured`）；同模型质量/缓存对比与 tokenizer 校准仍需真实模型。
-- QA-02 本地前置仍缺 line/pipe、profile 切换、任务/discovery/approval/settings save 的合成端到端链路；QA-01 矩阵已补齐独立任务行，但仍不能作为 47 项全闭合证明。
+- QA-02 本地前置仍缺 restore preview 与 line/pipe 完整 profile/save；QA-01 矩阵已补齐独立任务行，但仍不能作为 47 项全闭合证明。
 
 ## CI
 
@@ -244,3 +244,12 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - non-TTY live stdin 不再绕过 recovery lifecycle：`runPromptInputStream` 在启动输出后报告 first frame，在首行输入时推进 user intent；`printModeRouter`/`cliRuntimeModule`/`cliProcessRunner` 传递同一 hooks。取消 recovery hint 不再吞掉已发现的 unreadable-directory 诊断；golden fixture 在首个 prompt 前等待 health 结果，避免把 fence 误当成产品成功。
 - 聚焦 13 文件/186 项、完整 `cli-baseline.test.ts` 41/41、`test:scripts` 92 项通过；import cycles、config consumers、declarations、Node floor、strict docs drift、`git diff --check` 通过，docs drift 保留 118 条既有 advisory，module facade 保持 8 项既有 advisory。fresh TS manifest `6c1e9a7232ce`，exe SHA-256 `687d4c069b0e0c1496fdccd883a166d29f6a9733cc2d1c067e09818c22c7aaa8`；Node/exe × regular/fullscreen PTY 四格、`verify:cli-entry` 19/19 通过。仓库 tgz NormProof 退出 0/partial，open obligations 为 0，保留 8 项 proof gap/既有 ceiling advisory。
 - 仍未闭合：fork/restore/delete 的组合 PTY 验收；START-03 的真实 ready/key/event-loop/raw sample/受控冷缓存仍缺，QA-02 的 line/pipe 五条业务链和跨平台/IME 仍缺，QA-03/TOOL-02 真实质量与 tokenizer 仍未验。本批 `20e6ee61` 已提交/推送，CI 与 Watch 已按精确 SHA 读回 success。
+
+
+### 2026-10-21 QA-02 业务链与 START-03 测量返工
+
+- `qa:pty` 已扩至 Linux Node/exe × regular/fullscreen/line/pipe。TUI 合成链覆盖 seed recovery、fork、新旧会话切换、显式确认删除、resume/tools 关闭、bash、task、tool_search/tool_load/skill、逐次审批、settings 写后读回和 profile 重启后命名目录 session 读回；line/pipe 覆盖任务/发现/显式 allow-once 与 settings 文件字节不变。最终八格 exit 0，持久 transcript 按工具名、call ID、success 和实际 payload 关联。
+- 修复合成驱动跨轮次复用 call ID，以及旧 outstanding call 在新实例中被重新派发、无关 tool result 推进计划的问题。意图解析归 `turn/intents.ts`，入口只组装；持久 tool call 使用既有 function 形状，不新增执行路径。
+- 新 benchmark 区分首帧/输入提示/TUI listener/write/批处理首答/命令退出，键响应关闭 PTY echo 并等待完整 UTF-8 字符。原来首 chunk 命中、字段误读和旧构建拒绝的失败记录保留。最终基准保存8组各30次共240个原始样本与机器/构建摘要；runtime-ready、冷缓存、1000项列表和复杂stream阻塞、分位数不确定性仍未验。
+- 聚焦 7 文件/86 项通过；脚本 96 项通过，两种构建通过；静态 cycles/config/declarations/Node floor 通过。独立 code APPROVE、architecture WATCH，WATCH 为仍缺的验收指标、采样 histogram 与构建前后摘要的证据边界。本批提交/推送/CI 状态以日志中精确 SHA 读回为准；全部47项仍保持原范围复核。
+- 全量 TypeScript 实际为 9348 passed / 1 failed / 10 skipped（412.74s、exit 1）；唯一失败是 MCP 畸形配置四次 CLI 启动在并发下超过25秒。相同用例隔离 `--single-thread` 复跑 1 passed（16.63s），原失败日志保留，暂归并发负载夹具超时，不记为全量绿。

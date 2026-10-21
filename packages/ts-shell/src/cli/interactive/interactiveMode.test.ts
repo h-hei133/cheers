@@ -635,6 +635,28 @@ it('shows the complete file plan and keeps approval pending when its reader clos
   } finally { mode.stop(); }
 });
 
+it('keeps pasted Vim commands literal and approval shortcuts outside Vim handling', async () => {
+  const scheduler = new ManualScheduler();
+  const { mode, terminal, approval } = build({ scheduler });
+  const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView;
+    options: { runtimeContext: ShellRuntimeContext } };
+  host.options.runtimeContext.runtimeConfig.vimMode = true;
+  mode.start();
+  try {
+    terminal.input("\x1b[200~dd\x1b[201~");
+    expect(host.view.editor.getText()).toBe("dd");
+    terminal.input("\x1b");
+    scheduler.flush();
+    const decision = approval.current!({ id: "vim-approval", title: "Write", message: "Confirm action",
+      context: { toolName: "edit", operation: "write", target: "file.ts" }, options: [], defaultOption: "deny",
+      recommendedAction: "deny", severity: "medium" });
+    await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('Permission: edit'));
+    terminal.input("y");
+    scheduler.flush();
+    await expect(decision).resolves.toEqual({ decision: "allow-once" });
+  } finally { mode.stop(); }
+});
+
 it('yields a reader to runtime questions, permission prompts and queued pickers', async () => {
   const { mode, terminal, approval } = build();
   const host = mode as unknown as { pager: Pager; view: InteractiveView; onQuestion(text: string): void;
