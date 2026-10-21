@@ -53,6 +53,8 @@ checkpoint 批已推送为 `c0f065385597e6cb3a5138b22a5fb7ba65360ad6`，Architec
 
 该 SHA 的 CI `39534315600` 已完成但因 `catalog.test.ts` 在 Node 20.3 关闭目录句柄后同步抛错、测试直接把调用结果交给 `.rejects` 而失败；905 文件/9378 项通过，失败仅此测试。将断言包在 microtask 中同时覆盖同步 throw 与 rejected promise，保留 `ERR_DIR_CLOSED` 精确检查；catalog 4/4、上述 PAN-02 组合 133/133 及生产类型检查通过，代码 APPROVE、架构 CLEAR。修复另行提交，旧 CI 失败保留，不记作新 SHA 证据。
 
+修复提交 `ec09693ee50ca1f05d0c5c656ec6d05ee5f0c9a0` 已推送，远端 main 精确读回；Architecture Watch `39536881716` success，CI `39536881715` 于 `2026-10-21T03:27:30Z` completed/success。CI 9382 项测试（9378 passed、3 skipped、1 skipped file）及 NormProof 均通过；该证据只绑定此测试兼容修复，Phase 20 继续 active。
+
 PRV-04 谱系批本地验收通过：38 文件/682 项、14 项有效反转、两构建、跨进程复制槽位/五组恢复/三组 V1 迁移/default 与 named profile 替换拒绝、Linux Node/exe × regular/fullscreen 四格 PTY。最终独立复核 APPROVED、5 文件/178 项及原生探针通过，计数与本地集重叠不相加。完整 TypeScript 诊断相对 `e4ae423d` 为 149/149、无新增，不能记为全项目 tsc 通过。该批提交/推送/新 SHA CI 按日志及实际查询记录；PRV-03/05 已复现的池外授权与乱序退避、CTX-03 和其余全部 47 项继续原范围。
 
 谱系批已推送为 `87a55c5f0b4fcbdab5a063e0b74a6d399c0f0692`；Architecture Watch `39140810147` success，CI `39140810129` failure，7 项入口续期测试失败、8808 项通过。失败来自旧夹具伪造续期 payload，未提供新的原生响应凭证；当前夹具改走实际原生解码、验证 HTTP 前 dispatched，并补伪造结果拒绝，8 项通过。此失败记录保留，不当作旧 SHA CI 通过。
