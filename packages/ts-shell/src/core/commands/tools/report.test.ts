@@ -6,6 +6,15 @@ import type { ToolDefinition } from '../../../tools/types.js';
 const tool = (name: string, description: string, argsSchema: Record<string, unknown>): ToolDefinition =>
   ({ name, description, argsSchema, execute: async () => ({ success: true, output: '' }) });
 
+it.each(['file', 'fi\x1b[31mle'])('scrubs decoded file URL controls before redaction: %s', protocol => {
+  const raw = `${protocol}:///fixture/sk-%C2%9B31msynthetic-sensitive`;
+  const item = tool(raw, raw, { type: 'object' });
+  for (const report of [toolReport(item, '/fixture'), toolsReport(new Map([[raw, item]]), '/fixture')]) {
+    expect(JSON.stringify(report)).not.toContain('synthetic-sensitive');
+    expect(reportText(report)).not.toContain('synthetic-sensitive');
+  }
+});
+
 it('reports static description and schema bytes without claiming a token count', () => {
   const report = toolsReport(new Map([
     ['a', tool('a', 'first', { type: 'object' })],

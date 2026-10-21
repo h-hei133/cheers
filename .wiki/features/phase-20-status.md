@@ -351,3 +351,10 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 补充回归复现ANSI先脱敏后移除会重新拼接密钥；修复规范化顺序后，独立架构又找到CRLF显示字面回车的兼容回归，现于本域规范CRLF，保留两行及原byte成本。generic report codec的facts LF转义合同不改；测试误期待literal LF的中间失败单独保留并纠正。最终主集5文件133项、直接consumer5文件13项、strict TS、双构建、10项有效反转通过。
 - Node/exe × regular/fullscreen四格专用PTY验证本地MCP不可信metadata在列表/详情/直接命令及持久报告均安全；取消零写，显式查看仅新增2条command-output，无新model消息，state/metadata/config/工作区原字节不变，原catalog discovery仍发生但tools/call为0。八格通用smoke及19入口通过。独立代码APPROVE/架构WATCH，五文件hash绑定；全目录获取/排序/完整schema序列化无总资源/延迟界，不能称检查不启动进程或网络，也不闭合PAN-08及47项。
 - 前批MCP添加已commit/push `d69fea2fba8733430624a8c202230b33fca7e567`，远端main同SHA，CI `39599867617`于12:44:21Z completed/success、Watch `39599867653` success。本批新SHA交付分别取证；其他help/skills/context/cost消费者继续复核。
+
+## 2026-10-21 技能只读列表与精确选择（PAN-08 部分）
+
+- 原列表直接展示敏感metadata、重新解析可把移除的大小写技能替换为另一个，特殊名称草稿无法由原parser读回；旧admission/失败与重复选择也未拒绝。现原skill command共用原catalog读取，列表为body-free CommandReport，单offered/一次消费/精确选择，metadata安全投影与原始正文明确分开；可原样安全展示的名称才插入精确quoted草稿。原loader保持不规范名称的诊断及保留语义、trust/noSkills/显式路径与contribution仍生效。
+- 两条独立复核补出真实缺口：overlay的load取消未透传；file URL路径解码在plain之后引入C1，后续renderer移除时重组未脱敏密钥。现load合并原signal/overlay signal，accepted apply不复用已释放的load signal；共享report metadata原语在一次path投影两侧plain，最后原scrub/cap，tools同类路径一起修复。正文仍为原loader解析后的指令，只本地显示，不冒充安全报告。
+- 本地10文件276项、strict生产TS、双构建、14项有效反转通过；四格Node/exe专用PTY验证安全列表/header/facts、特殊名称草稿、明确读取原正文，取消与选择不增持久消息，原参数列表仅新增1条body-free command-output，无model调用，state/metadata/config/workspace原字节不变。八格smoke与97脚本通过；19入口与严格docs门最终结果见log。
+- 独立代码APPROVE/架构WATCH，两报告七文件hash已逐项绑定最终产物；accepted apply尚无独立取消owner、holdInput等待不可强制中断任意贡献Promise，合作式发现预算不证明总延迟/资源界。不闭合PAN-08或47项。前批tools精确SHA `f46e6c97c92497c35b6e4496f930a1124ae42f73` CI `39602459208` / job `119230129576`于13:01:35Z completed/success，Watch `39602459194` success。本批提交/推送/新SHA CI另取证。

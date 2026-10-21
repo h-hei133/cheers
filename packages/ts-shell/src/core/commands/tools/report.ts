@@ -1,14 +1,14 @@
 import type { ToolDefinition } from '../../../tools/types.js';
 import { toolPlanMode } from '../../query/toolPolicy.js';
 import type { CommandReport, ReportLine } from '../report/contract.js';
-import { createReport, plainReportText, span } from '../report/projection.js';
-import { redactReportText } from '../../security/redaction.js';
+import { createReport, span } from '../report/projection.js';
+import { reportMetadata } from '../report/metadata.js';
 
 const PERMISSIONS = "Eligible tools still require the session's permissions and approval.";
 
 /** Display canonicalization precedes scrubbing so removed ANSI cannot join secret fragments. */
 function metadataText(value: string, projectRoot: string, maxLength = 4096, preserveLines = false): string {
-  return redactReportText(plainReportText(value.replace(/\r\n/g, '\n')), maxLength, { projectRoot, preserveLines });
+  return reportMetadata(value, projectRoot, maxLength, preserveLines);
 }
 
 export function toolLabel(name: string, projectRoot = process.cwd()): string {

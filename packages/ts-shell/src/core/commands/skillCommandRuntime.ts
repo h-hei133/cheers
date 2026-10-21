@@ -4,6 +4,9 @@ import { syntaxHelp } from "./syntax/projection.js";
 import { type Skill } from "../skills/skillLoader.js";
 import { resolveSkillCatalog } from "../skills/skillCatalog.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
+import { assertAdmission } from '../network/admission.js';
+import { reportText } from './report/projection.js';
+import { skillInstructions, skillLabel, skillsReport } from './skill/report.js';
 
 export const skillSyntax = entitySyntax("skill");
 
@@ -23,55 +26,36 @@ export async function runSkillCommand(
   // The same catalog the prompt path and `/skill:` resolve through, so the list
   // read here is the list the model was given — a skill named with `--skill`
   // appears, and an untrusted project's skills do not.
-  const skills = (await resolveSkillCatalog({
-    workspaceRoot: context.cwd,
-    sessionId: context.sessionId,
-    ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
-    ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
-  })).skills;
+  const skills = await readSkillCatalog(context);
   const wanted = parsed.args[0];
-  if (!wanted) return { kind: "local", output: listSkills([...skills.values()]) };
+  if (!wanted) {
+    const report = skillsReport([...skills.values()], context.cwd);
+    return { kind: 'local', output: reportText(report), report };
+  }
 
   const skill = skills.get(wanted) ?? findLoosely(skills, wanted);
   if (!skill) {
     return {
       kind: "local",
-      output: `No skill named \`${wanted}\`. Run \`/skill\` to see what is available.`,
+      output: `No skill named \`${skillLabel(wanted, context.cwd)}\`. Run \`/skill\` to see what is available.`,
     };
   }
-  return { kind: "local", output: describeSkill(skill) };
+  return { kind: "local", output: skillInstructions(skill, context.cwd) };
 }
 
-/** Every skill as a table, or an explanation of where to put one. */
-function listSkills(skills: readonly Skill[]): string {
-  if (skills.length === 0) {
-    return [
-      "### Skills",
-      "",
-      "None found.",
-      "",
-      "A skill is a folder with a `SKILL.md` in it — frontmatter naming and describing it, then the instructions:",
-      "",
-      "- `~/.cheers/skills/<name>/SKILL.md` — yours, everywhere",
-      "- `.agents/skills/<name>/SKILL.md` — this project's, and it wins",
-    ].join("\n");
-  }
-  return [
-    "### Skills",
-    "",
-    "| Skill | From | What it is for |",
-    "| :--- | :--- | :--- |",
-    ...skills.map((skill) => `| ${skill.name} | ${skill.source} | ${skill.description || "—"} |`),
-    "",
-    "`/skill <name>` reads one out.",
-  ].join("\n");
-}
-
-function describeSkill(skill: Skill): string {
-  const lines = [`### ${skill.name}`, ""];
-  if (skill.description) lines.push(skill.description, "");
-  lines.push(skill.body);
-  return lines.join("\n");
+/** Reuse original discovery, project trust, flags and contribution freshness. */
+export async function readSkillCatalog(context: CommandContext, loadSignal?: AbortSignal) {
+  const signal = context.signal && loadSignal ? AbortSignal.any([context.signal, loadSignal]) : context.signal ?? loadSignal;
+  signal?.throwIfAborted();
+  assertAdmission(context.admission);
+  const { skills } = await resolveSkillCatalog({ workspaceRoot: context.cwd, sessionId: context.sessionId,
+    ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
+    ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
+    ...(signal ? { abortSignal: signal } : {}),
+  });
+  signal?.throwIfAborted();
+  assertAdmission(context.admission);
+  return skills;
 }
 
 /** Case-insensitive match, so a name read off a table can be typed as read. */
