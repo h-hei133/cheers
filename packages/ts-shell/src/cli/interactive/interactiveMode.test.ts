@@ -35,6 +35,7 @@ import { parseKeyEvent } from '../../presentation/tui/input/keys.js';
 import type { SubmissionQueue } from './inputQueue.js';
 import type { InteractiveApprovalResult } from './picker/approval.js';
 import * as extensionRuntime from '../runtime/extensions.js';
+import * as mcpRuntime from '../runtime/mcp.js';
 import { pluginPicker } from './picker/plugins.js';
 import type { ExtensionManager } from '../../extensions/view/model.js';
 
@@ -86,6 +87,19 @@ function build(overrides: {
 }
 
 describe("session wiring", () => {
+  it('binds typed MCP definitions to the original runtime owner without a file staging adapter', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { pickerHost(): PickerHost; options: { runtimeContext: ShellRuntimeContext } };
+    const add = vi.fn(async () => 'ordinary writer result');
+    const port = vi.spyOn(mcpRuntime, 'mcpDefinitionFor').mockReturnValue(add);
+    try {
+      const pickerHost = host.pickerHost();
+      expect(port).toHaveBeenCalledWith(host.options.runtimeContext);
+      expect(pickerHost.addMcpServer).toBe(add);
+      expect(await pickerHost.addMcpServer!('project', 'local', { command: 'server', args: ['two words'] })).toBe('ordinary writer result');
+      expect(add).toHaveBeenCalledWith('project', 'local', { command: 'server', args: ['two words'] });
+    } finally { port.mockRestore(); }
+  });
   it('binds the extension management port to both real picker aliases and retains the settled ordinary approval result', async () => {
     const { mode } = build();
     const host = mode as unknown as { pickerHost(): PickerHost; overlay: OverlayHost; view: InteractiveView; applyPicker(picker: Picker, ids: readonly string[]): void };

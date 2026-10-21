@@ -116,7 +116,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | START-02（本地证据闭合） | `3de906fe`、本次 | 10k 首帧不扫描；持久摘要索引；0/100/1k/10k bootstrap 不枚举探针；TUI/line 首帧 write completion 后 recovery hint；routing sink 与 transcript ownership 分离；键盘/鼠标/粘贴/picker/line 用户意图 fence；line close/stop 主动取消 MCP/SSH/collaboration/current run 并释放 goal scheduler；真实 scheduler drain 超时结算 captured host，sink 对迟到 goal dispatch 保持 discard fence；teardown sink 顺序、`runCliProcess` fullscreen 集成与 Node/exe × regular/fullscreen 两次 seeded PTY |
 | PAN-05 | `2a4bafe5`、本次 | advisor 只读面板 + enable/review/apply 分别授权；plan-review 结构化报告与版本化 approve/reject/execute；btw 结构化报告、带外；面板查看不启模型，模型工作只走显式命令/普通 turn |
 | PAN-03（部分） | `070f1405` | hub 本地作业输出页（脱敏/截断）、后续页指引 |
-| PAN-08（部分） | `93302750` | MCP 逐项向导；临时定义 0600 且必删 |
+| PAN-08（历史部分实现） | `93302750` | 旧MCP逐项向导及临时定义机制；2026-10-21返工发现临时文件不在source授权范围，现已由typed原owner替代，当前证据见下文 |
 | START-03（部分） | `a6ba2665` | Node/exe 与 regular/fullscreen/pipe 各 30 次首帧、命令→退出基准 |
 
 ## 部分完成（有实现，验收未闭合）
@@ -337,3 +337,10 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 独立架构复核实际复现共享reader在检查后把被替换父目录canonicalize为新根；现从原绝对路径的filesystem root检查，保持原词法路径直到描述符比对。同inode父目录链接替换仍拒绝；普通文件在首次权威观察前被替换不属于普遍竞态拒绝保证。初始BLOCK和修复后报告保留，未用旧四文件批准替代最终六文件复核。
 - 受影响集合去重19文件222项通过（主集合108、直接consumer84、补充30；共享16项只计一次），strict production TS、双构建、10项有效反转、四格专用PTY、八格通用smoke及19入口通过。四格证实超大来源unknown/超大state unavailable/恢复、取消无写及原普通审批；精确构建、hash与命令证据见log。
 - 独立代码APPROVE/架构WATCH，综合COMMENT；两份报告的六文件hash均读回匹配。每秒全量解码/hash/projection与累计成本、unknown仅实例内存仍WATCH，未据此关闭PAN-07或47项。原生认证已提交推送`4a7b656267b631c43a703c55d6046a93f3d5cbe8`，Watch success；11:59Z前最近读回的精确SHA CI仍in_progress，本批交付及新SHA另取证。
+
+## 2026-10-21 MCP 添加向导原审批链（PAN-08 部分）
+
+- 复核发现旧向导把整行命令放进executable、默认确认添加，且host在系统临时目录生成定义文件，随后被原source授权拒绝。现单独采集executable与有界JSON字符串argv，typed definition进入原MCP配置owner；普通文件命令保留source授权/身份与文本重查，scope/trust/普通审批/精确字节发布及unknown语义仍由原路径承担。
+- 每步要求offered、有效单项及一次消费；review默认取消，提交前消耗，原session/root/substrate admission贯穿等待审批及writer，取消仍走原pending owner，迟到note不发布。review省略argv值和URL query，明确Connection: not tested；保存仅失效原连接，不自动执行或发现。独立架构实际render发现输入footer不可见，现将真实阶段放入输入标题并复验，不伪造认证/连接进度。
+- 最终6文件178项、strict production TS、双构建、11项有效反转全部通过。Node/exe × regular/fullscreen四格专用PTY验证完整分步输入、默认取消原字节不变、原文件计划/普通审批、精确命令和argv、无临时定义/连接/模型消息；仅目标配置新增，metadata/全局config/工作区不变。Linux八格通用smoke与19项入口通过；失败测试及探针分类、构建hash见开发日志。
+- 两路独立代码APPROVE/架构CLEAR，九文件hash与最终构建读回绑定。仅证明本机合成定义保存；真实MCP连接/认证、env/headers交互编辑、其他report消费者及全部47项继续复核，不恢复“只剩四项”。此前原生认证精确SHA的CI `39594034576` 已completed/success（12:01:51Z）；扩展读取已commit/push `d4b5c89343a984540136b001aecb5c681a1c48c3`，CI `39596352846`（12:13:18Z）和Watch `39596352847`均success。本批commit/push/新SHA CI分别取证。

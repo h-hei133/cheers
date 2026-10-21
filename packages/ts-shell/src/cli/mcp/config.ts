@@ -47,7 +47,16 @@ function display(config: ScopedMcpServerConfig): string {
 export async function runMcpConfigCommand(args: readonly string[], host: McpConfigHost): Promise<LocalCommandResult> {
   const parsed = parseSyntax(mcpSyntax, args);
   if (!parsed.ok) return report(`Invalid /mcp arguments: ${parsed.reason}`, 'unchanged');
-  const action = parsed.action.name; const values = parsed.args; const options = host.gate();
+  return runConfigOperation(parsed.action.name, parsed.args, host);
+}
+
+/** Typed interactive input shares the original validation, approval and publication owner. */
+export function addMcpDefinition(scope: McpConfigScope, name: string, definition: unknown, host: McpConfigHost): Promise<LocalCommandResult> {
+  return runConfigOperation('add', [scope, name], host, definition);
+}
+
+async function runConfigOperation(action: string, values: readonly string[], host: McpConfigHost, definitionInput?: unknown): Promise<LocalCommandResult> {
+  const options = host.gate();
   try {
     const refused = options.admission?.(); if (refused) throw new Error(refused);
     if (action === 'list' || action === 'show') {
@@ -74,9 +83,13 @@ export async function runMcpConfigCommand(args: readonly string[], host: McpConf
     let source: { path: string; text: string; identity: string } | undefined;
     if (action === 'add' || action === 'edit') {
       if (action === 'add' ? exists : !exists) throw new Error(action === 'add' ? 'An MCP definition already exists in this scope; use edit.' : 'No MCP definition exists in this scope.');
-      const input = path.resolve(host.root, values[2]!); host.sourceAccess(input);
-      const text = readTextFile(input, 32 * 1024); if (text === undefined) throw new Error('MCP definition input file was not found.');
-      source = { path: input, text, identity: pathIdentity(input) };
+      let text: string;
+      if (definitionInput !== undefined) text = JSON.stringify(definitionInput);
+      else {
+        const input = path.resolve(host.root, values[2]!); host.sourceAccess(input);
+        const content = readTextFile(input, 32 * 1024); if (content === undefined) throw new Error('MCP definition input file was not found.');
+        text = content; source = { path: input, text, identity: pathIdentity(input) };
+      }
       servers[name] = parseMcpDefinition(text);
     } else if (action === 'remove') {
       if (!exists) throw new Error('No MCP definition exists in this scope.');
