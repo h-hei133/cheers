@@ -76,6 +76,7 @@ export async function runProviderAccountAuthLogin(input: {
   readonly signal?: AbortSignal;
   readonly onProgress?: (progress: import('./providerAuthContract.js').SignInProgress) => void;
 }): Promise<string> {
+  input.signal?.throwIfAborted();
   const contract = resolveProviderAuthContract(input.provider);
   if (!contract) {
     if (input.provider === 'anthropic') return 'Anthropic subscription login is unsupported. Configure an API key with /connect login anthropic --api-key <key>.';
@@ -187,7 +188,7 @@ export function resolveProviderAuthContract(
 
 export function __setOpenAIProviderAuthLoginForTest(
   override?: (
-    options?: { readonly timeoutMs?: number },
+    options?: Parameters<ProviderAuthContract['loginAccountAuth']>[0],
   ) => ReturnType<ProviderAuthContract["loginAccountAuth"]>,
 ): void {
   testOpenAILoginOverride = override;

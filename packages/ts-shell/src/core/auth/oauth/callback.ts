@@ -39,6 +39,7 @@ export interface CallbackOptions {
   readonly requireState?: boolean;
   /** Name used in messages, so a failure says which login it belonged to. */
   readonly label: string;
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -49,16 +50,19 @@ export interface CallbackOptions {
  * because a listener left bound is a port the next attempt cannot have.
  */
 export async function startCallbackServer(options: CallbackOptions): Promise<CallbackServer> {
-  const { port, server } = await bind(options.port, options.label);
+  if (options.signal?.aborted) throw new DOMException('Sign-in cancelled.', 'AbortError');
+  const { port, server } = await bind(options.port, options.label, options.signal);
   const redirectUri = `http://localhost:${port}${options.path}`;
   let settled = false;
   let timer: NodeJS.Timeout | undefined;
+  let stop: () => void = () => undefined;
 
   const received = new Promise<CallbackRequest>((resolve, reject) => {
     const finish = (action: () => void): void => {
       if (settled) return;
       settled = true;
       if (timer) clearTimeout(timer);
+      options.signal?.removeEventListener('abort', stop);
       // The browser holds the connection open for reuse, and `close` waits for
       // every open socket. Waiting for a keep-alive idle timeout would add seconds
       // to a login that has already finished, so the sockets are dropped: the
@@ -66,6 +70,8 @@ export async function startCallbackServer(options: CallbackOptions): Promise<Cal
       server.closeAllConnections();
       server.close(() => action());
     };
+    stop = () => finish(() => reject(new DOMException('Sign-in cancelled.', 'AbortError')));
+    options.signal?.addEventListener('abort', stop, { once: true });
 
     timer = setTimeout(() => {
       finish(() =>
@@ -92,31 +98,29 @@ export async function startCallbackServer(options: CallbackOptions): Promise<Cal
         return;
       }
       response.writeHead(200, { "content-type": "text/html; charset=utf-8", connection: "close" });
-      response.end(page("Signed in", "You can close this tab and go back to the terminal."));
+      response.end(page("Authorization received", "Return to the terminal to check whether sign-in completed."));
       finish(() => resolve(outcome.request));
     });
   });
+  // Closing or cancellation can happen before the caller starts awaiting the redirect.
+  void received.catch(() => undefined);
+  if (options.signal?.aborted) stop();
 
   return {
     redirectUri,
     received,
-    close() {
-      if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
-      server.closeAllConnections();
-      server.close();
-    },
+    close: () => stop(),
   };
 }
 
 /** Bind the preferred port, falling back so an occupied port is not a dead end. */
-async function bind(preferred: number, label: string): Promise<{ port: number; server: Server }> {
+async function bind(preferred: number, label: string, signal?: AbortSignal): Promise<{ port: number; server: Server }> {
   let lastError: unknown;
   for (const candidate of [preferred, ...FALLBACK_PORTS]) {
     try {
-      return await listen(candidate);
+      return await listen(candidate, signal);
     } catch (error) {
+      if (signal?.aborted) throw new DOMException('Sign-in cancelled.', 'AbortError');
       lastError = error;
     }
   }
@@ -125,16 +129,24 @@ async function bind(preferred: number, label: string): Promise<{ port: number; s
 }
 
 /** One bind attempt, resolved with the port the OS actually gave. */
-async function listen(port: number): Promise<{ port: number; server: Server }> {
+async function listen(port: number, signal?: AbortSignal): Promise<{ port: number; server: Server }> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new DOMException('Sign-in cancelled.', 'AbortError')); return; }
     const server = createServer();
+    const onAbort = (): void => {
+      server.close();
+      reject(new DOMException('Sign-in cancelled.', 'AbortError'));
+    };
     const onError = (error: unknown): void => {
+      signal?.removeEventListener('abort', onAbort);
       server.removeListener("listening", onListening);
       server.close();
       reject(error);
     };
     const onListening = (): void => {
+      signal?.removeEventListener('abort', onAbort);
       server.removeListener("error", onError);
+      if (signal?.aborted) { server.close(); reject(new DOMException('Sign-in cancelled.', 'AbortError')); return; }
       const address = server.address();
       if (address === null || typeof address === "string") {
         server.close();
@@ -145,7 +157,8 @@ async function listen(port: number): Promise<{ port: number; server: Server }> {
     };
     server.once("error", onError);
     server.once("listening", onListening);
-    server.listen(port, "localhost");
+    signal?.addEventListener('abort', onAbort, { once: true });
+    server.listen({ port, host: 'localhost', ...(signal ? { signal } : {}) });
   });
 }
 

@@ -2,6 +2,8 @@ import { spawn } from "node:child_process";
 import { createHash } from 'node:crypto';
 import { createPkcePair, createState } from "./pkce.js";
 import { startCallbackServer } from "./callback.js";
+import { loginLifetime, waitForLogin } from './lifetime.js';
+import type { SignInProgress } from '../providerAuthContract.js';
 
 /**
  * One authorization-code-with-PKCE flow, for every provider that uses it.
@@ -58,9 +60,9 @@ export interface OAuthTokens {
 const loginProductions = new WeakMap<object, { readonly issuer: string; readonly client: string; readonly provider: string; readonly digest: string; readonly binding: string }>();
 
 export class OAuthExchangeError extends Error {
-  constructor(readonly code: 'http' | 'transport' | 'cancelled' | 'decode' | 'response' | 'access' | 'metadata' | 'expiry',
+  constructor(readonly code: 'http' | 'transport' | 'cancelled' | 'timeout' | 'decode' | 'response' | 'access' | 'metadata' | 'expiry',
     provider: string, step: string, readonly status?: number) {
-    const detail = { http: `failed with HTTP ${status}`, transport: 'transport failed', cancelled: 'cancelled',
+    const detail = { http: `failed with HTTP ${status}`, transport: 'transport failed', cancelled: 'cancelled', timeout: 'timed out',
       decode: 'response could not be decoded', response: 'returned an invalid token response',
       access: 'returned no access token', metadata: 'returned invalid token metadata', expiry: 'returned an expired access token' }[code];
     super(`${provider}: ${step} ${detail}.`);
@@ -91,6 +93,8 @@ export interface OAuthLoginResult extends OAuthTokens {
 
 export interface OAuthLoginOptions {
   readonly timeoutMs?: number;
+  readonly signal?: AbortSignal;
+  readonly onProgress?: (progress: SignInProgress) => void;
   /** Override how the browser is opened; tests pass a recorder. */
   readonly openBrowser?: (url: string) => Promise<void> | void;
   /** Called with the authorize URL, so a surface can show it for manual opening. */
@@ -117,42 +121,54 @@ export async function runOAuthLogin(
   config: OAuthProviderConfig,
   options: OAuthLoginOptions = {},
 ): Promise<OAuthLoginResult> {
+  if (options.timeoutMs !== undefined && (!Number.isFinite(options.timeoutMs) || options.timeoutMs <= 0 || options.timeoutMs > 2_147_483_647)) {
+    throw new Error('Sign-in timeout must be a positive finite duration within the timer limit.');
+  }
   const timeoutMs = Math.max(MIN_TIMEOUT_MS, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  const state = createState();
-  const pkce = createPkcePair();
-  const server = await startCallbackServer({
-    path: config.callbackPath,
-    port: config.callbackPort,
-    expectedState: state,
-    timeoutMs,
-    ...(config.requireState === false ? { requireState: false } : {}),
-    label: config.label,
-  });
-
+  const lifetime = loginLifetime(timeoutMs, options.signal);
+  let server: Awaited<ReturnType<typeof startCallbackServer>> | undefined;
   try {
+    lifetime.signal.throwIfAborted();
+    const state = createState();
+    const pkce = createPkcePair();
+    server = await startCallbackServer({
+      path: config.callbackPath, port: config.callbackPort, expectedState: state, timeoutMs,
+      ...(config.requireState === false ? { requireState: false } : {}),
+      label: config.label, signal: lifetime.signal,
+    });
+    lifetime.signal.throwIfAborted();
     const authorizeUrl = buildAuthorizeUrl(config, {
       redirectUri: server.redirectUri,
       state,
       challenge: pkce.challenge,
     });
     options.onAuthorizeUrl?.(authorizeUrl);
-    await (options.openBrowser ?? openInBrowser)(authorizeUrl);
+    lifetime.signal.throwIfAborted();
+    options.onProgress?.({ authorizeUrl });
+    lifetime.signal.throwIfAborted();
+    await waitForLogin((options.openBrowser ?? openInBrowser)(authorizeUrl), lifetime.signal);
 
-    const callback = await server.received;
+    const callback = await waitForLogin(server.received, lifetime.signal);
     const tokens = await exchangeCode(config, {
       code: callback.code,
       verifier: pkce.verifier,
       redirectUri: server.redirectUri,
       fetchImpl: options.fetchImpl ?? fetch,
+      signal: lifetime.signal,
     });
+    lifetime.signal.throwIfAborted();
     return {
       ...tokens,
       authorizeUrl,
       callbackUrl: server.redirectUri,
       clientId: config.clientId,
     };
+  } catch (error) {
+    if (lifetime.signal.aborted) throw new OAuthExchangeError(lifetime.signal.reason?.name === 'TimeoutError' ? 'timeout' : 'cancelled', config.label, 'sign-in');
+    throw error;
   } finally {
-    server.close();
+    server?.close();
+    lifetime.close();
   }
 }
 
@@ -209,7 +225,12 @@ function buildAuthorizeUrl(
     state: input.state,
     ...(config.authorizeParams ?? {}),
   });
-  return `${config.authorizeUrl}?${params.toString()}`;
+  const url = new URL(config.authorizeUrl);
+  if (url.protocol !== 'https:' || url.username || url.password || url.hash || /[\x00-\x20\x7f-\x9f]/.test(config.authorizeUrl)) {
+    throw new Error('Sign-in requires a safe HTTPS authorization URL.');
+  }
+  for (const [key, value] of params) url.searchParams.set(key, value);
+  return url.toString();
 }
 
 /** Redeem the authorization code. */
@@ -220,6 +241,7 @@ async function exchangeCode(
     readonly verifier: string;
     readonly redirectUri: string;
     readonly fetchImpl: typeof fetch;
+    readonly signal?: AbortSignal;
   },
 ): Promise<OAuthTokens> {
   const body = new URLSearchParams({
@@ -230,7 +252,7 @@ async function exchangeCode(
     code_verifier: input.verifier,
     ...(config.clientSecret ? { client_secret: config.clientSecret } : {}),
   });
-  const payload = await post(config, body, input.fetchImpl, "token exchange");
+  const payload = await post(config, body, input.fetchImpl, "token exchange", input.signal);
   const tokens: OAuthTokens = {
     accessToken: payload.access_token,
     refreshToken: payload.refresh_token ?? "",
@@ -256,12 +278,17 @@ async function post(
   body: URLSearchParams,
   fetchImpl: typeof fetch,
   step: string,
+  signal?: AbortSignal,
 ): Promise<TokenPayload> {
   let response: Response;
   try {
-    response = await fetchImpl(config.tokenUrl, {
+    signal?.throwIfAborted();
+    const pending = fetchImpl(config.tokenUrl, {
       method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: body.toString(), redirect: 'error',
+      ...(signal ? { signal } : {}),
     });
+    if (signal) void pending.then(late => { if (signal.aborted) void late.body?.cancel().catch(() => undefined); }, () => undefined);
+    response = await waitForLogin(pending, signal);
   } catch (error) {
     const kind = error instanceof Error && error.name === 'AbortError' ? 'cancelled' : 'transport';
     throw new OAuthExchangeError(kind, config.label, step);
@@ -271,7 +298,7 @@ async function post(
     throw new OAuthExchangeError('http', config.label, step, response.status);
   }
   let decoded: unknown;
-  try { decoded = await response.json(); }
+  try { decoded = await waitForLogin(response.json(), signal); }
   catch { throw new OAuthExchangeError('decode', config.label, step); }
   if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) throw new OAuthExchangeError('response', config.label, step);
   const payload = decoded as Partial<TokenPayload>;
@@ -334,7 +361,9 @@ async function openInBrowser(url: string): Promise<void> {
   try {
     // Detached and with its own streams: the launcher must not hold the terminal
     // or write into a frame the interface is painting.
-    spawn(command, args, { detached: true, stdio: "ignore" }).unref();
+    const child = spawn(command, args, { detached: true, stdio: "ignore" });
+    child.once('error', () => undefined);
+    child.unref();
   } catch {
     // A machine with no browser launcher is not a failed login — the authorize URL
     // was already reported, and it can be opened by hand.

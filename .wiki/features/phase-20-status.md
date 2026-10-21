@@ -323,3 +323,10 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - package/source/activation/grant/durability分别投影，source unavailable不抹掉package，state unreadable不冒充空集。原service保留实际卸载cleanup unknown，同store实例重开仍可见并拒绝fresh mutation；不声称跨restart/rebind持久化。修复多行预览neutralise丢布局；安全投影不改精确执行身份。
 - 最终受影响6文件208项、strict production TS、TS/exe双构建、12项实际断言反转、四格专用PTY与八格通用smoke、19入口、97脚本及静态门通过。专用PTY取消无写，真实enable审批只新增4条原权限/工具事件，无model消息且grants仍空；不以审批后状态逐字节不变为合同。原错误探针与测试失败独立保留在log。
 - 独立代码APPROVE/架构WATCH，14文件hash与构建实际绑定。全量同步获取/解码/hash/projection在dedup前、post-read大小检查无总资源/延迟上界；未知receipt仅原store实例内存。完整面板生命周期、真实registry/平台与全部47项仍须继续复验；前批debug精确SHA CI/Watch成功，本批交付另取新SHA证据。
+
+## 2026-10-21 原生浏览器登录取消与进度（PAN-07 部分）
+
+- 复核真实命令→provider contract→共享OAuth flow，发现OpenAI/Google wrapper虽透传options，但原flow既不消费signal也不调用onProgress。现由原OAuth owner统一控制整次期限与取消，覆盖localhost bind、浏览器等待、回调及token headers/body，迟到结果不能成为已连接凭据；pre-abort在pending配置写入前拒绝。原条件写、native proof、refresh enrollment与保存unknown不换owner。
+- 授权URL先校验安全HTTPS/无userinfo、fragment或原始控制符再展示，launcher缺失不产生未处理错误；手动URL仍可用。回调页仅报告收到授权，后续token交换及保存由终端结算。独立复核发现并修复DNS bind阶段的取消延迟，实际延迟lookup探针证实取消立即结算、无fallback/迟到监听。
+- 最终175项受影响测试、strict production TS、TS/exe构建、九项有效反转通过；四格专用PTY覆盖面板和参数原生取消，取消缺省确认零写，已启动取消pending→error、不保存凭据、回调端口释放、peer连接及session原字节不变。正常exit按原owner终止state并只追加run-terminated；八格通用smoke及19入口通过。探针与负例失败分类及构建/源码绑定见log。
+- 独立代码APPROVE、架构CLEAR，六文件hash均读回一致。这里只证明合成本机认证生命周期；真实授权、系统浏览器关闭、已派发服务端token撤销及完整PAN-07/其余47项仍未闭合。前批插件精确SHA已commit/push且CI/Watch成功，本批新SHA另取证。

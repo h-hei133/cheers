@@ -12,6 +12,7 @@ import * as store from '../../session/store/sessionFileStore.js';
 import { refreshLeasesPath } from '../auth/account/lease.js';
 import { renewStoredAccount } from '../auth/account/renewal.js';
 import { ConfigWriteError } from '../../config/outcome.js';
+import { __setOpenAIProviderAuthLoginForTest } from '../auth/providerAuthRuntime.js';
 import {
   getUserRuntimeConfigPath,
   writeUserRuntimeConfigFile,
@@ -64,6 +65,30 @@ describe("connect command runtime", () => {
     __setOpenAIAccountAuthRunnerForTest(undefined);
     fs.rmSync(fakeHome, { recursive: true, force: true });
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('does not insert a pending connection when cancellation preceded native login admission', async () => {
+    const controller = new AbortController(); controller.abort();
+    writeUserRuntimeConfigFile({ model: 'retained' }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    const before = fs.readFileSync(getUserRuntimeConfigPath(), 'utf8');
+    await expect(runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot, signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8')).toBe(before);
+  });
+
+  it('cancels the real browser callback through the command host without storing late credentials', async () => {
+    const controller = new AbortController(), progress: string[] = [];
+    __setOpenAIProviderAuthLoginForTest(options => loginOpenAIAccountViaAuthorizationCodeFlow({ ...options,
+      openBrowser: () => { controller.abort('private cancellation reason'); }, fetchImpl: vi.fn() as unknown as typeof fetch }));
+    const result = await runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot,
+      runCancellable: operation => operation(controller.signal), signInProgress: value => progress.push(value.authorizeUrl) });
+    expect(progress).toHaveLength(1); expect(progress[0]).toMatch(/^https:\/\/auth\.openai\.com\//);
+    expect(result.output).toContain('pending -> error'); expect(result.output).toContain('sign-in cancelled');
+    expect(result.output).not.toMatch(/pending -> connected|private cancellation reason/);
+    const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    expect(stored.providerConnections?.[0]?.status).toBe('error');
+    expect(stored.providerConnections?.[0]?.accountAuth).toBeUndefined(); expect(stored.providerCredentials?.openai).toBeUndefined();
+    const callback = new URL(progress[0]!).searchParams.get('redirect_uri')!;
+    await expect(fetch(callback)).rejects.toThrow();
   });
 
   it("creates a siliconflow connection and sets it as active runtime provider", async () => {
