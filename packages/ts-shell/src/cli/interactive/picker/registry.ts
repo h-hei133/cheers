@@ -85,7 +85,8 @@ export interface PickerHost extends SettingsHost {
 type PickerFactory = (host: PickerHost, argument?: string) => Picker | undefined;
 
 const PICKERS: Record<string, PickerFactory> = {
-  help: host => helpPicker(host.commandContext ? { root: host.commandContext.cwd, sessionId: host.commandContext.sessionId } : undefined),
+  help: host => helpPicker(host.commandContext ? { root: host.commandContext.cwd, sessionId: host.commandContext.sessionId } : undefined,
+    host.commandContext?.admission),
   tools: (host) => toolsPicker(host.commandContext),
   model: (host) => modelPicker(host.commandContext),
   copy: (host) => copyPicker(host.transcript, host.commandContext),

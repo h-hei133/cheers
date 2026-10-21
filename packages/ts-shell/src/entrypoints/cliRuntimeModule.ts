@@ -239,7 +239,7 @@ export async function runNonInteractivePrompt(options: {
     }
 
     if (resolved.slashResult.action === "show-help") {
-      renderUserHelp(options.renderer);
+      renderUserHelp(options.renderer, { root: options.runtimeContext.cwd, sessionId: options.runtimeContext.session.id });
       return;
     }
 

@@ -4,6 +4,8 @@ import { commandInvocations, resolveCommandInvocation, type CommandInvocation } 
 import { listVisibleCommands } from "../core/commands/registry.js";
 import type { CommandDefinition } from "../core/commands/types.js";
 import { catalogContributions, observeCatalogContributions } from '../core/catalog/contributions.js';
+import { helpReport } from '../core/commands/help/report.js';
+import { reportText } from '../core/commands/report/projection.js';
 
 export interface SlashCommandCompletion {
   readonly value: string;
@@ -58,8 +60,8 @@ function project(command: CommandDefinition): SlashCommandSpec {
   };
 }
 
-function builtinCommands(): readonly SlashCommandSpec[] {
-  return listVisibleCommands().map(project);
+function builtinCommands(root?: string): readonly SlashCommandSpec[] {
+  return listVisibleCommands(root).map(project);
 }
 
 /**
@@ -85,11 +87,11 @@ const PICKER_ONLY: readonly SlashCommandSpec[] = [
 
 const extensions: SlashCommandSpec[] = [...PICKER_ONLY];
 export interface SlashCatalogScope { readonly root: string; readonly sessionId?: string }
-const listeners = new Set<(commands: readonly SlashCommandSpec[]) => void>();
-observeCatalogContributions(undefined, () => { for (const listener of listeners) listener(allCommands()); });
+const listeners = new Set<() => void>();
+observeCatalogContributions(undefined, () => { for (const listener of listeners) listener(); });
 
 function allCommands(scope?: SlashCatalogScope): readonly SlashCommandSpec[] {
-  const builtins = [...builtinCommands(), ...catalogContributions(scope?.root, scope?.sessionId).flatMap(entry => entry.commands).map(project)];
+  const builtins = [...builtinCommands(scope?.root), ...catalogContributions(scope?.root, scope?.sessionId).flatMap(entry => entry.commands).map(project)];
   return extensions.length === 0 ? builtins : [...builtins, ...extensions];
 }
 
@@ -109,17 +111,18 @@ export function registerSlashCommand(command: SlashCommandSpec): () => void {
     if (getSlashInvocation(invocation.name)) throw new Error(`Slash command already registered: ${invocation.name}`);
   }
   extensions.push(registered);
-  for (const listener of listeners) listener(allCommands());
+  for (const listener of listeners) listener();
   return () => {
     const index = extensions.indexOf(registered);
     if (index < 0) return;
     extensions.splice(index, 1);
-    for (const listener of listeners) listener(allCommands());
+    for (const listener of listeners) listener();
   };
 }
 
-export function subscribeSlashCommands(listener: (commands: readonly SlashCommandSpec[]) => void, scope?: SlashCatalogScope): () => void {
-  const changed = () => listener(allCommands(scope)); listeners.add(changed);
+export function subscribeSlashCommands(listener: (commands: readonly SlashCommandSpec[]) => void, scope?: SlashCatalogScope,
+  isCurrent: () => boolean = () => true): () => void {
+  const changed = () => { if (isCurrent()) listener(allCommands(scope)); }; listeners.add(changed);
   changed();
   return () => listeners.delete(changed);
 }
@@ -159,14 +162,6 @@ export function renderSessionCommandMap(
   }
 }
 
-const GROUP_TITLES: Record<SlashCommandSpec["group"], string> = {
-  session: "Session",
-  context: "Context",
-  workspace: "Workspace",
-  workflow: "Workflow",
-  diagnostics: "Diagnostics",
-};
-
 /**
  * The command guide, generated from the registry.
  *
@@ -176,30 +171,5 @@ const GROUP_TITLES: Record<SlashCommandSpec["group"], string> = {
  * one that does.
  */
 export function renderUserHelp(renderer: SlashCommandLineRenderer, scope?: SlashCatalogScope): void {
-  const commands = listSlashInvocations(scope).filter(invocation => invocation.kind !== "alias");
-  const width = longestName(commands);
-  renderer.renderLine("\nSlash commands");
-  for (const group of Object.keys(GROUP_TITLES) as SlashCommandSpec["group"][]) {
-    const inGroup = commands.filter((command) => command.group === group);
-    if (inGroup.length === 0) continue;
-    renderer.renderLine(`\n${GROUP_TITLES[group]}`);
-    for (const command of inGroup) {
-      renderer.renderLine(`  /${command.name.padEnd(width)}  ${command.summary}`);
-    }
-  }
-  // The keys live in one table that the keymap dispatches on; naming a few of
-  // them again here is how a guide ends up advertising a key nothing binds.
-  renderer.renderLine("\nKeys");
-  renderer.renderLine("  shift+tab   switch between planning and building");
-  renderer.renderLine("  alt+p       cycle how much a turn may do without asking");
-  renderer.renderLine("  ctrl+j      insert a newline without sending");
-  renderer.renderLine("  /hotkey     every key, and which ones this terminal delivers");
-  renderer.renderLine("");
-}
-
-/** Longest command name, so summaries line up in one column. */
-function longestName(commands: readonly { readonly name: string }[]): number {
-  let longest = 0;
-  for (const command of commands) longest = Math.max(longest, command.name.length);
-  return longest;
+  renderer.renderLine(reportText(helpReport(listSlashCommands(scope), scope?.root ?? process.cwd())));
 }

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { listSlashInvocations, registerSlashCommand } from "../../../entrypoints/slashCommandRegistry.js";
+import { listSlashInvocations, registerSlashCommand, renderUserHelp, getSlashInvocation } from "../../../entrypoints/slashCommandRegistry.js";
+import * as registry from "../../../entrypoints/slashCommandRegistry.js";
+import { registerCatalogContribution } from '../../../core/catalog/contributions.js';
 import * as configuration from "../../../config/runtimeConfig.js";
 import { OptionModel } from "../../../presentation/tui/chrome/options.js";
 import { parseKeyEvent } from "../../../presentation/tui/input/keys.js";
@@ -47,4 +49,83 @@ describe("command guide", () => {
       expect(await picker.apply(["/guide-fixture"])).toBeUndefined();
     } finally { remove(); overlay.close(); }
   });
+});
+
+
+it('scrubs current guide metadata for picker and direct help without altering raw registry entries', async () => {
+  const root = '/guide-workspace';
+  const summary = `Guide sk-\x1b[31msynthetic-sensitive-description file://${root}/sk-%C2%9B31msynthetic-sensitive-path`;
+  const remove = registerSlashCommand({ name: 'guide-safe', aliases: ['guide-safe-alias'], group: 'workflow', summary,
+    argumentHint: 'password=synthetic-sensitive-hint', invocations: [{ name: 'guide-named', summary, argumentHint: 'Bearer synthetic-sensitive-token' }] });
+  try {
+    const picker = helpPicker({ root });
+    const options = (await picker.load()).filter(row => row.id.startsWith('/guide-'));
+    expect(options.map(({ label, detail, note, searchText }) => ({ label, detail, note, searchText }))).toHaveLength(2);
+    expect(JSON.stringify(options)).not.toContain('synthetic-sensitive');
+    expect(options.find(row => row.id === '/guide-safe')?.searchText).toBe('/guide-safe-alias');
+    const lines: string[] = []; renderUserHelp({ renderLine: line => lines.push(line) }, { root });
+    expect(lines.join('\n')).not.toContain('synthetic-sensitive');
+    expect(lines.join('\n')).toContain('/guide-named');
+    expect(getSlashInvocation('guide-safe')?.summary).toBe(summary);
+    expect(await picker.apply(['/guide-safe'])).toEqual({ draft: '/guide-safe ' });
+    expect(await picker.apply(['/guide-named'])).toEqual({ draft: '/guide-named ' });
+  } finally { remove(); }
+});
+
+it('keeps projected command names visible without inserting raw names into the draft', async () => {
+  const name = 'sk-synthetic-sensitive-command';
+  const remove = registerSlashCommand({ name, aliases: ['sk-synthetic-sensitive-alias'], group: 'workflow', summary: 'A named command' });
+  try {
+    const picker = helpPicker(), row = (await picker.load()).find(option => option.id === `/${name}`)!;
+    expect(row.label).not.toContain('synthetic-sensitive'); expect(row.disabled).toBe(true);
+    expect(row.searchText).not.toContain('synthetic-sensitive');
+    expect(await picker.apply([`/${name}`])).toBeUndefined();
+    const lines: string[] = []; renderUserHelp({ renderLine: line => lines.push(line) });
+    expect(lines.join('\n')).not.toContain(name);
+  } finally { remove(); }
+});
+
+it('does not project an expired session catalog when the shared contribution observer notifies', async () => {
+  let stale = false;
+  const picker = pickerFor('/help', { commandContext: { cwd: '/guide-workspace', sessionId: 'guide-session',
+    admission: () => stale ? 'original binding changed' : undefined } } as PickerHost)!;
+  await picker.load(); const publish = vi.fn(), unsubscribe = picker.subscribe?.(publish);
+  stale = true; publish.mockClear();
+  const read = vi.spyOn(configuration, 'getRuntimeConfig');
+  const remove = registerCatalogContribution({ root: '/guide-workspace', sessionId: 'guide-session', commands: [], tools: [], skills: () => [] });
+  try { await Promise.resolve(); expect(read).not.toHaveBeenCalled(); expect(publish).not.toHaveBeenCalled(); }
+  finally { unsubscribe?.(); read.mockRestore(); remove(); }
+});
+
+it('uses the explicit workspace for builtin help visibility as well as contributed commands', async () => {
+  const root = '/guide-workspace', config = configuration.getRuntimeConfig();
+  const read = vi.spyOn(configuration, 'getRuntimeConfig').mockImplementation(cwd => ({ ...config, enableMcpTools: cwd !== root }));
+  try {
+    expect((await helpPicker({ root }).load()).some(row => row.id === '/mcp')).toBe(false);
+    const lines: string[] = []; renderUserHelp({ renderLine: line => lines.push(line) }, { root });
+    expect(lines.join('\n')).not.toContain('/mcp'); expect(read).toHaveBeenCalledWith(root);
+  } finally { read.mockRestore(); }
+});
+
+it.each(['before', 'after'] as const)('retains original help admission %s loading and subscription changes', async phase => {
+  let stale = phase === 'before';
+  const read = vi.spyOn(registry, 'listSlashCommands');
+  const picker = pickerFor('/help', { commandContext: { cwd: '/guide-workspace', sessionId: 'guide-session', admission: () => stale ? 'original binding changed' : undefined } } as PickerHost)!;
+  const publish = vi.fn(); let unsubscribe: (() => void) | undefined;
+  try {
+    if (phase === 'before') { expect(await picker.load()).toEqual([]); expect(read).not.toHaveBeenCalled(); }
+    else { await picker.load(); unsubscribe = picker.subscribe?.(publish); read.mockClear(); publish.mockClear(); stale = true; }
+    const remove = registerSlashCommand({ name: 'guide-change', group: 'workflow', summary: 'A change' });
+    try {
+      expect(picker.isCurrent?.()).toBe(false);
+      expect(await picker.apply(['/model'])).toBeUndefined();
+      expect(read).not.toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
+    } finally { remove(); }
+  } finally { unsubscribe?.(); read.mockRestore(); }
+});
+
+it('requires a single current guide selection while retaining draft-only apply without a prior load', async () => {
+  expect(await helpPicker().apply(['/model', '/exit'])).toBeUndefined();
+  expect(await helpPicker().apply(['/model'])).toEqual({ draft: '/model ' });
 });

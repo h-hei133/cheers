@@ -30,6 +30,18 @@ describe("command completions", () => {
     expect(slashSuggestions("how do I build this")).toBeNull();
   });
 
+  it("projects informational usage with its workspace without changing registry hints", () => {
+    const root = "/guide-usage", argumentHint = `password=synthetic-sensitive-hint file://${root}/meter`;
+    const remove = registerSlashCommand({ name: "guide-usage", group: "workflow", summary: "Guide", argumentHint });
+    try {
+      const text = "/guide-usage ";
+      expect(slashArgumentHint({ text, cursor: text.length, revision: 1 }, { root })).toBe(
+        "Usage: /guide-usage password=[redacted] [project]/meter",
+      );
+      expect(getSlashCommand("guide-usage")?.argumentHint).toBe(argumentHint);
+    } finally { remove(); }
+  });
+
   it("offers each distinct invocation without synonymous aliases for a bare slash", () => {
     const names = new Set(listSlashInvocations().filter(invocation => invocation.kind !== "alias").map(invocation => invocation.name));
     expect(slashSuggestions("/")).toHaveLength(names.size);

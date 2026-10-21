@@ -367,3 +367,6 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - WATCH：脱敏key不是全局唯一账本身份，脱敏attribution不能回灌原ledger validator；原array保留组数/精确数值。全量catalog/bucket处理及MCP发现无总资源或延迟界，不闭合PAN-08/47项。前批技能`77700f4f`精确CI`39606383097`于13:28:27Z success、Watch`39606383042`success；本批独立最终绑定/交付及新SHA CI以日志实际读回为准。
 
 - 最终独立代码APPROVE/架构WATCH，综合COMMENT；两报告八文件SHA与双构建已逐项读回绑定。组合标题为各组件分别受限，无单一4096合成界；旧报告绑定拒绝与新字节复验均保留。strict docs/diff通过，本批commit/push/精确CI尚须分别读回。
+
+
+2026-10-21 help返工本地验收：安全共享CommandReport/rows、精确root/session、原admission与真正通知前检查、原draft-only/alias/named语义、选中后usage提示均已修复；最终12文件189项、13项有效反转、strict生产TS/双构建、四格合成扩展PTY与八格smoke、19入口/97脚本及静态门通过。代码APPROVE/架构WATCH，最终十一文件/两报告/双构建hash已读回绑定；直接help仍原shell-action/pager，不新增报告持久化。完整registry成本及原配置live读无总资源/accepted-publication保证，global completion metadata不据此闭合。accounting提交`972a9ff5`已推送、Watch success，精确CI`39609907792`本次仍in_progress；本批提交/新SHA CI另记。其余picker与全部47项继续原范围，原用户环境/真实模型推迟项不扩大。

@@ -14,12 +14,13 @@ import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import { ManualScheduler, RecordingTerminal } from "../../test-utils/terminalDouble.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import type { OverlayHost, Picker } from "./overlay.js";
-import type { PickerHost } from "./picker/registry.js";
+import { pickerFor, type PickerHost } from "./picker/registry.js";
 import type { InteractiveView } from "../../presentation/tui/surface/contract.js";
 import * as fileWalk from "../../runtime/execution/fileWalk.js";
 import { currentTheme } from '../../presentation/theme/theme.js';
 import { isThemePreviewActive, selectTheme } from '../../presentation/theme/selection.js';
 import { helpPicker } from './picker/help.js';
+import { registerSlashCommand } from '../../entrypoints/slashCommandRegistry.js';
 import { toolsPicker } from './picker/tools.js';
 import { restorePicker } from './picker/restore.js';
 import * as toolCatalog from '../../core/tools/catalog.js';
@@ -87,6 +88,23 @@ function build(overrides: {
 }
 
 describe("session wiring", () => {
+  it('suppresses an accepted help draft when the original binding expires before host publication', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { pickerHost(): PickerHost; overlay: OverlayHost; view: InteractiveView;
+      applyPicker(picker: Picker, ids: readonly string[]): void; pickerInputPending: Map<number, number>; sink: { begin(): void } };
+    const begin = vi.spyOn(host.sink, 'begin'); let current = true;
+    const original = host.pickerHost();
+    const picker = pickerFor('/help', { ...original, commandContext: { ...original.commandContext,
+      admission: () => current ? undefined : 'original binding changed' } })!;
+    const guarded = { ...picker, apply: async (ids: readonly string[]) => {
+      const outcome = await picker.apply(ids); current = false; return outcome;
+    } };
+    host.overlay.open(guarded); const before = [...host.view.transcript.all()];
+    host.applyPicker(guarded, ['/model']);
+    await vi.waitFor(() => expect(host.pickerInputPending.size).toBe(0));
+    expect(host.view.editor.getText()).toBe(''); expect(host.view.transcript.all()).toEqual(before);
+    expect(begin).not.toHaveBeenCalled(); host.overlay.close();
+  });
   it('binds typed MCP definitions to the original runtime owner without a file staging adapter', async () => {
     const { mode } = build();
     const host = mode as unknown as { pickerHost(): PickerHost; options: { runtimeContext: ShellRuntimeContext } };
@@ -521,6 +539,25 @@ describe("session wiring", () => {
         terminal.input('\r'); expect(submit).toHaveBeenCalledOnce(); expect(submit).toHaveBeenCalledWith(submitted, undefined, undefined);
       } finally { mode.stop(); }
     });
+
+  it('keeps selected help usage safe in the actual host without executing the draft', async () => {
+    const argumentHint = 'password=synthetic-sensitive-hint file:///workspace/meter';
+    const remove = registerSlashCommand({ name: 'guide-usage', group: 'workflow', summary: 'Guide', argumentHint });
+    const { mode, terminal } = build();
+    const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView; onSubmit(text: string): void };
+    const submit = vi.spyOn(host, 'onSubmit').mockImplementation(() => {});
+    mode.start();
+    try {
+      host.overlay.open(helpPicker({ root: '/workspace', sessionId: 'sess_1' }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+      terminal.input('/guide-usage'); terminal.input('\r');
+      await vi.waitFor(() => expect(host.view.editor.getText()).toBe('/guide-usage '));
+      const frame = stripAnsi(host.view.renderFrame({ columns: 140, rows: 24 }).rows.join('\n'));
+      expect(frame).toContain('Usage: /guide-usage password=[redacted] [project]/meter');
+      expect(frame).not.toContain('synthetic-sensitive'); expect(frame).not.toContain('file:///workspace');
+      expect(host.overlay.active).toBe(false); expect(submit).not.toHaveBeenCalled();
+    } finally { mode.stop(); remove(); }
+  });
 
   it('gives help the remaining rows after a multiline composer and preserves the draft on escape', async () => {
     const { mode, terminal } = build();

@@ -2,6 +2,7 @@ import { completionToken, completionEdit, quoteCompletion } from "./completion.j
 import type { DraftSnapshot } from "../../presentation/tui/editor/replacement.js";
 import type { Suggestion } from "../../presentation/tui/chrome/suggestions.js";
 import { matchSuggestions } from "../../presentation/tui/chrome/suggestions.js";
+import { reportMetadata } from "../../core/commands/report/metadata.js";
 import {
   listSlashInvocations,
   getSlashInvocation,
@@ -58,7 +59,9 @@ export function slashArgumentHint(snapshot: DraftSnapshot, scope?: SlashCatalogS
   const command = completionToken(snapshot.text, snapshot.cursor).before[0];
   if (!command || !COMMAND_DRAFT.test(snapshot.text.slice(command.from, command.to))) return undefined;
   const invocation = getSlashInvocation(command.value, scope);
-  return invocation?.argumentHint ? `Usage: ${invocation.invocation} ${invocation.argumentHint}` : undefined;
+  if (!invocation?.argumentHint) return undefined;
+  const root = scope?.root ?? process.cwd();
+  return `Usage: /${reportMetadata(invocation.name, root)} ${reportMetadata(invocation.argumentHint, root)}`;
 }
 /**
  * A draft that is a command name being typed and nothing else.

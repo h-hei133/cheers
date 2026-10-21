@@ -109,3 +109,5 @@
 | QA-03 | START-03 启动数据、RENDER/INPUT 回归与合成 PTY 可作质量前置；§6 预注册指标、真实模型任务集和安全回归的真实质量证据仍缺，mock 不替代。 |
 | TOOL-02（部分） | `/tools` 报告 description/schema 的 UTF-8 字节数、逐工具成本列与文本摘要，明确 `tokens=not-measured`；同模型/任务/权限的总请求、发现额外成本、关键参数质量与 tokenizer/多语言误差仍待真实模型。 |
 | QA-04 | 本地门禁与精确提交；CI 以 run 结果为准 |
+
+| PAN-08 help（部分） | `core/commands/help/report.ts`、`picker/help.ts`、原slash registry/print owner、`slashSuggestions.ts` | immutable安全report与共享rows；raw ID本地保留、安全name才能插draft；alias搜索/named独立、单current selection；原admission读前/通知前/apply/真实host发布检查；精确cwd/session及builtin root；选中后usage安全；12文件189项、strict TS/双构建、四格合成扩展PTY/八格smoke | metadata/name/alias/single/before/apply/current/subscription/notification/root/print/removed/hint共13项有效反转；取消/查看/草稿不改session/源文件，不执行script或模型、不新增command-output。原完整registry/配置读取无总资源界，live config不等于accepted snapshot；独立codeAPPROVE/architectureWATCH，原hint泄露已实际复现修复；其余picker/PAN-08/47项继续 |
