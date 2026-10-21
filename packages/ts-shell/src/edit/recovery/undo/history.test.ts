@@ -1,0 +1,143 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import type { CommandContext } from '../../../core/commands/types.js';
+import { undoPicker } from '../../../cli/interactive/picker/undo.js';
+import { OverlayHost } from '../../../cli/interactive/overlay.js';
+import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
+import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
+import { allocateOperation, captureOperationScope, persistOperation, readOperations, withOperationStore } from '../operation/store.js';
+import { hashContent } from '../../authority/content.js';
+import { runUndoCommand } from './command.js';
+import { readUndoHistoryPage } from './service.js';
+
+let directory: string;
+let context: CommandContext;
+beforeEach(() => {
+  directory = fs.mkdtempSync(path.join(os.tmpdir(), 'undo-history-'));
+  fs.writeFileSync(path.join(directory, 'note.txt'), 'workspace stays unchanged\n');
+  context = { cwd: directory, sessionId: 'history-session' };
+});
+afterEach(() => fs.rmSync(directory, { recursive: true, force: true }));
+
+function seed(count: number, sessionId = context.sessionId!) {
+  const scope = captureOperationScope({ sessionId, workspaceRoot: directory });
+  withOperationStore(scope, () => {
+    for (let index = 0; index < count; index++) {
+      const operationId = `operation-${index}`;
+      allocateOperation({ ...scope, schemaVersion: 1, operationId, callId: 'history-fixture', revision: 1,
+        status: index === count - 1 ? 'unknown' : 'committed', undo: 'none',
+        createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
+        files: [{ id: 'file', workspace: scope.workspace, path: 'note.txt', kind: 'update',
+          before: { state: 'exists', hash: hashContent('before') }, after: { state: 'exists', hash: hashContent('after') },
+          snapshot: { authorityId: operationId, recordId: 'file' }, status: 'committed', undo: 'none' }] });
+    }
+  });
+}
+
+function bytes(root = directory): Record<string, string> {
+  return Object.fromEntries(fs.readdirSync(root, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name)).flatMap(entry => {
+    const target = path.join(root, entry.name);
+    return entry.isDirectory() ? Object.entries(bytes(target)) : [[target, fs.readFileSync(target).toString('hex')]];
+  }));
+}
+
+async function picker() {
+  const root = undoPicker({ context: () => context });
+  await root.load();
+  return (await root.apply(['history']))!.next!;
+}
+
+it('makes all saved receipts reachable through three bounded read-only command and picker pages', async () => {
+  seed(85);
+  seed(2, 'foreign-session');
+  const before = bytes();
+  const expected = Array.from({ length: 85 }, (_, index) => `operation-${84 - index}`);
+  const commandIds: string[] = [];
+  let args = ['status'];
+  for (let index = 0; index < 3; index++) {
+    const result = await runUndoCommand(args, context);
+    const facts = result.report!.facts;
+    expect(facts.total).toBe(85);
+    expect(facts.count).toBe(index === 2 ? 5 : 40);
+    commandIds.push(...(facts.operations as { operationId: string }[]).map(receipt => receipt.operationId));
+    if (index < 2) {
+      expect(result.output).toContain(`/undo status --cursor=${facts.nextCursor}`);
+      args = ['status', `--cursor=${facts.nextCursor}`];
+    } else {
+      expect(facts.nextCursor).toBeNull();
+      expect(result.output).toContain('End of saved operation results.');
+    }
+  }
+  expect(commandIds).toEqual(expected);
+  const pickerIds: string[] = [];
+  let page = await picker();
+  for (let index = 0; index < 3; index++) {
+    const options = await page.load();
+    expect(options).toHaveLength(index === 2 ? 5 : 41);
+    pickerIds.push(...options.filter(option => option.id !== 'more:results').map(option => option.id));
+    expect(await page.apply(['not-offered'])).toBeUndefined();
+    expect(await page.apply(['operation-0', 'operation-1'])).toBeUndefined();
+    if (index < 2) page = (await page.apply(['more:results']))!.next!;
+    else {
+      expect(await page.apply(['more:results'])).toBeUndefined();
+      expect((await page.apply(['operation-0']))!.report!.facts.count).toBe(1);
+    }
+  }
+  expect(pickerIds).toEqual(expected);
+  expect(bytes()).toEqual(before);
+});
+
+it('rejects changed receipts and foreign scopes without moving the saved-results cursor', async () => {
+  seed(41);
+  const first = readUndoHistoryPage(context)!;
+  const page = await picker();
+  await page.load();
+  const next = (await page.apply(['more:results']))!.next!;
+  const scope = captureOperationScope({ sessionId: context.sessionId!, workspaceRoot: directory });
+  const newest = readOperations(scope)[0]!;
+  withOperationStore(scope, () => persistOperation({ ...newest, revision: newest.revision + 1, undo: 'unknown' }));
+  const before = bytes();
+  expect(readUndoHistoryPage(context, first.nextCursor)).toBeUndefined();
+  expect((await runUndoCommand(['status', `--cursor=${first.nextCursor}`], context)).report!.facts.status).toBe('stale');
+  expect((await page.apply(['operation-40']))!.report!.facts.status).toBe('stale');
+  await expect(next.load()).rejects.toThrow('changed');
+  context = { ...context, sessionId: 'another-session' };
+  expect((await page.apply(['more:results']))!.report!.facts.status).toBe('stale');
+  expect((await runUndoCommand(['status', `--cursor=${first.nextCursor}`], context)).report!.facts.status).toBe('stale');
+  expect(bytes()).toEqual(before);
+});
+
+it('keeps exact-ID lookup beyond the first page and reports missing identities as empty', async () => {
+  seed(41);
+  const before = bytes();
+  const selected = await runUndoCommand(['status', 'operation-0'], context);
+  expect(selected.report!.facts.operations).toEqual([{ operationId: 'operation-0', status: 'committed', undo: 'none' }]);
+  expect((await runUndoCommand(['status', 'missing'], context)).report!.facts.status).toBe('empty');
+  expect(bytes()).toEqual(before);
+});
+
+it('rejects invalid or conflicting cursors before accessing the current context', async () => {
+  const guarded = new Proxy({} as CommandContext, { get() { throw new Error('Context must not be read'); } });
+  const valid = `${'a'.repeat(64)}:operation-0`;
+  for (const args of [['status', '--cursor=invalid'], ['status', `--cursor=${'a'.repeat(64)}:../escape`],
+    ['status', 'operation-0', `--cursor=${valid}`], ['preview', `--cursor=${valid}`],
+    ['status', `--cursor=${valid}`, `--cursor=${valid}`]]) {
+    expect((await runUndoCommand(args, guarded)).output).toContain('Invalid /undo arguments:');
+  }
+});
+
+it('closes the real history overlay on cancellation and preserves workspace and receipt bytes', async () => {
+  seed(41);
+  const before = bytes();
+  const page = await picker();
+  const overlay = new OverlayHost(() => {});
+  overlay.open(page);
+  await vi.waitFor(() => expect(stripAnsi(overlay.render(100, 28).join('\n'))).toContain('Operations 1-40 of 41'));
+  const selected = vi.fn();
+  overlay.handleKey(parseKeyEvent('\x1b'), selected);
+  expect(overlay.active).toBe(false);
+  expect(selected).not.toHaveBeenCalled();
+  expect(bytes()).toEqual(before);
+});

@@ -6,6 +6,7 @@ import { latestOperation, previewOperation, type UndoPreview } from '../operatio
 import { restoreOperation, type UndoResult } from '../operation/restore.js';
 import type { OperationAccess } from '../operation/access.js';
 import type { OperationScope, OperationReceipt } from '../operation/model.js';
+import { pageUndoHistory } from './history.js';
 
 export interface UndoHost {
   context(): CommandContext;
@@ -43,6 +44,11 @@ export async function prepareUndo(context: CommandContext, signal?: AbortSignal)
 }
 
 export function undoHistory(context: CommandContext) { return readOperations(undoScope(context)); }
+
+export function readUndoHistoryPage(context: CommandContext, cursor?: string) {
+  const scope = undoScope(context);
+  return pageUndoHistory(scope, readOperations(scope), cursor);
+}
 
 export async function executeUndo(host: UndoHost, preview: UndoPreview, confirmed: boolean): Promise<{ readonly result: UndoResult; readonly warning?: string }> {
   const original = preview.receipt;

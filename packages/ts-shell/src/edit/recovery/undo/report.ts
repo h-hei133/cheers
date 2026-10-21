@@ -5,6 +5,7 @@ import { editDiff } from '../../result/diff.js';
 import type { ContentVersion, OperationReceipt } from '../operation/model.js';
 import type { UndoPreview } from '../operation/preview.js';
 import type { UndoResult } from '../operation/restore.js';
+import type { UndoHistoryPage } from './history.js';
 
 const DIFF_BYTES = 64 * 1024;
 const text = (value: string): ReportLine => ({ kind: 'text', spans: [span(value)] });
@@ -48,12 +49,16 @@ export function undoResultReport(result: UndoResult, receipt: OperationReceipt, 
     facts: { operationId: result.operationId, status: result.status, files: result.files.map(file => ({ ...file })), rollbackAtomicityClaim: false } });
 }
 
-export function undoStatusReport(receipts: readonly OperationReceipt[]) {
+export function undoStatusReport(receipts: readonly OperationReceipt[], page?: UndoHistoryPage) {
   return createReport({ title: 'Saved file operations', lines: receipts.flatMap(receipt => [
     { kind: 'heading' as const, spans: [span(`${receipt.sequence}: ${receipt.operationId} · ${receipt.createdAt}`)] },
     text(`Write: ${receipt.status} · undo: ${receipt.undo}`),
     ...receipt.files.map(file => text(`${JSON.stringify(path.join(file.workspace.path, file.path))}: write ${file.status}, undo ${file.undo}, compensation ${file.compensation ?? 'none'}`)),
-  ]), facts: { status: 'observation', count: receipts.length, operations: receipts.map(receipt => ({ operationId: receipt.operationId, status: receipt.status, undo: receipt.undo })) } });
+  ]).concat(page ? [text(`Operations ${page.offset + 1}-${page.offset + receipts.length} of ${page.total}.`),
+    text(page.nextCursor ? `Next results: /undo status --cursor=${page.nextCursor}` : 'End of saved operation results.')] : []),
+  facts: { status: 'observation', count: receipts.length,
+    ...(page ? { total: page.total, offset: page.offset, nextCursor: page.nextCursor ?? null } : {}),
+    operations: receipts.map(receipt => ({ operationId: receipt.operationId, status: receipt.status, undo: receipt.undo })) } });
 }
 
 function version(state: ContentVersion): string { return state.state === 'absent' ? 'absent' : `sha256 ${state.hash}${state.mode === undefined ? '' : ` · mode ${state.mode.toString(8)}`}`; }

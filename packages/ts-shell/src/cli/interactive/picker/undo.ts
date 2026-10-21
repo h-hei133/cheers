@@ -1,6 +1,7 @@
 import type { Picker, PickerOutcome } from '../overlay.js';
 import type { UndoPreview } from '../../../edit/recovery/operation/preview.js';
-import { executeUndo, prepareUndo, undoHistory, type UndoHost } from '../../../edit/recovery/undo/service.js';
+import { executeUndo, prepareUndo, readUndoHistoryPage, type UndoHost } from '../../../edit/recovery/undo/service.js';
+import type { UndoHistoryPage } from '../../../edit/recovery/undo/history.js';
 import { undoNotice, undoPreviewReport, undoResultReport, undoStatusReport } from '../../../edit/recovery/undo/report.js';
 
 export function undoPicker(host: UndoHost): Picker {
@@ -40,19 +41,29 @@ function confirmationPicker(host: UndoHost, preview: UndoPreview): Picker {
   };
 }
 
-function historyPicker(host: UndoHost): Picker {
-  let receipts: ReturnType<typeof undoHistory> = [];
+function historyPicker(host: UndoHost, cursor?: string): Picker {
+  let page: UndoHistoryPage | undefined;
+  // The receipt identity grammar excludes colons.
+  const moreId = 'more:results';
   return { title: 'Saved file operation results', form: 'modal', exclusive: true, holdInput: true,
-    empty: 'No recorded operations belong to this session and workspace.', loadError: 'Saved operation results could not be verified.',
+    filterable: false,
+    empty: 'No recorded operations belong to this session and workspace.', loadError: 'Saved operation results could not be verified. Reopen /undo.',
+    status: () => !page ? 'Loading saved operation results.' : `Operations ${page.total === 0 ? '0' : `${page.offset + 1}-${page.offset + page.receipts.length}`} of ${page.total}${page.nextCursor ? '; more available' : '; end of saved results'}`,
     async load(signal) {
-      signal?.throwIfAborted(); receipts = undoHistory(host.context()).slice(0, 40); signal?.throwIfAborted();
-      return receipts.map(receipt => ({ id: receipt.operationId, label: receipt.operationId,
-        detail: `${receipt.files.length} files · write ${receipt.status} · undo ${receipt.undo}` }));
+      signal?.throwIfAborted(); page = readUndoHistoryPage(host.context(), cursor); signal?.throwIfAborted();
+      if (!page) throw new Error('Saved operation results changed.');
+      return [...page.receipts.map(receipt => ({ id: receipt.operationId, label: receipt.operationId,
+        detail: `${receipt.files.length} files · write ${receipt.status} · undo ${receipt.undo}` })),
+      ...(page.nextCursor ? [{ id: moreId, label: 'More saved results', detail: 'Continue to older operations' }] : [])];
     },
     async apply(ids) {
+      if (ids.length !== 1 || !page) return undefined;
       try {
-        const selected = undoHistory(host.context()).filter(receipt => receipts.some(offered => offered.operationId === receipt.operationId) && ids.includes(receipt.operationId));
-        return { report: selected.length ? undoStatusReport(selected) : undoNotice('The selected operation is unavailable in this session and workspace.') };
+        const current = readUndoHistoryPage(host.context(), cursor);
+        if (!current || current.revision !== page.revision) return { report: undoNotice('Saved operation results changed. Reopen /undo.', 'stale') };
+        if (ids[0] === moreId) return page.nextCursor ? { next: historyPicker(host, page.nextCursor) } : undefined;
+        const selected = page.receipts.filter(receipt => receipt.operationId === ids[0]);
+        return selected.length ? { report: undoStatusReport(selected) } : undefined;
       } catch { return { report: undoNotice('Saved operation results could not be verified.') }; }
     },
   };

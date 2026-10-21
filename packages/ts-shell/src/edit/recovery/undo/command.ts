@@ -5,7 +5,8 @@ import { undoSyntax } from '../../../core/commands/undo/syntax.js';
 import { reportText } from '../../../core/commands/report/projection.js';
 import type { CommandReport } from '../../../core/commands/report/contract.js';
 import { contentHashPattern, safeRecoveryId } from '../record.js';
-import { executeUndo, prepareUndo, undoHistory } from './service.js';
+import { executeUndo, prepareUndo, readUndoHistoryPage, undoHistory } from './service.js';
+import { validUndoHistoryCursor } from './history.js';
 import { undoNotice, undoPreviewReport, undoResultReport, undoStatusReport } from './report.js';
 
 export async function runUndoCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
@@ -13,16 +14,22 @@ export async function runUndoCommand(args: string[], context: CommandContext): P
     '`--hard` is gone. It discarded the whole working tree, including files this session never touched. Use /undo to review a recorded file operation.' };
   const parsed = parseSyntax(undoSyntax, args);
   const invalid = !parsed.ok ? parsed.reason : parsed.args[0] && !safeRecoveryId(parsed.args[0]) ? 'Invalid operation identity.'
-    : parsed.action.name === 'execute' && !contentHashPattern.test(parsed.args[1]!) ? 'Invalid preview revision.' : undefined;
+    : parsed.action.name === 'execute' && !contentHashPattern.test(parsed.args[1]!) ? 'Invalid preview revision.'
+    : parsed.flags.has('cursor') && !validUndoHistoryCursor(parsed.flags.get('cursor')) ? 'Invalid saved-results cursor.' : undefined;
   if (invalid || !parsed.ok) return { kind: 'local', output: `Invalid /undo arguments: ${invalid}\n${syntaxHelp(undoSyntax)}` };
   if (parsed.action.name === 'help') return { kind: 'local', output: syntaxHelp(undoSyntax) };
   if (parsed.action.name === 'execute' && !parsed.flags.has('execute')) return local(undoNotice('Explicit --execute confirmation is required. Nothing was written.', 'permission-pending'));
   let executionStarted = false;
   try {
     if (parsed.action.name === 'status') {
-      const receipts = undoHistory(context);
-      const selected = parsed.args[0] ? receipts.filter(receipt => receipt.operationId === parsed.args[0]) : receipts.slice(0, 40);
-      return local(selected.length ? undoStatusReport(selected) : undoNotice('No recorded operation was found in this session and workspace.', 'empty'));
+      if (parsed.args[0]) {
+        const selected = undoHistory(context).filter(receipt => receipt.operationId === parsed.args[0]);
+        return local(selected.length ? undoStatusReport(selected) : undoNotice('No recorded operation was found in this session and workspace.', 'empty'));
+      }
+      const page = readUndoHistoryPage(context, parsed.flags.get('cursor') as string | undefined);
+      if (!page) return local(undoNotice('Saved operation results changed. Start again with /undo status.', 'stale'));
+      return local(page.receipts.length ? undoStatusReport(page.receipts, page)
+        : undoNotice('No recorded operation was found in this session and workspace.', 'empty'));
     }
     const selection = await prepareUndo(context);
     if (!selection.preview) return local(undoNotice(selection.note, 'empty'));
