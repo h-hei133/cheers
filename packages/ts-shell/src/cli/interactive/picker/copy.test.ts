@@ -5,7 +5,7 @@ import { textBlock } from '../../../presentation/tui/transcript/blocks.js';
 import { copyPicker } from './copy.js';
 import { setClipboardSink } from '../../../core/commands/copyCommandRuntime.js';
 import type { CommandContext } from '../../../core/commands/types.js';
-import { OverlayHost } from '../overlay.js';
+import { OverlayHost, type Picker } from '../overlay.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 
@@ -119,6 +119,41 @@ it('filters complete source text before paging and retains the query across cont
   expect(await next.apply(['0'])).toBeUndefined();
   overlay.close();
   expect(exec).not.toHaveBeenCalled();
+});
+
+it('hands captured sources to the next page after the host releases its closed model', async () => {
+  const transcript = new Transcript();
+  for (let index = 0; index < 3; index++) transcript.append(textBlock('assistant', `answer ${index}\narchived`));
+  const overlay = new OverlayHost(() => {});
+  overlay.open(copyPicker(transcript, { cwd: '/workspace' }, { pageSize: 1 }));
+  await vi.waitFor(() => expect(stripAnsi(overlay.render(100, 30).join('\n'))).toContain('answer 2'));
+  overlay.handlePaste('archived');
+  const oldModel = Reflect.get(overlay, 'model');
+  const revision = overlay.revision;
+  const captured: string[] = [];
+  setClipboardSink(sequence => captured.push(sequence));
+  const results: Promise<unknown>[] = [];
+  const notes: string[] = [];
+  const apply = vi.fn((picker: Picker, ids: readonly string[]) => {
+    expect(overlay.active).toBe(false);
+    expect(Reflect.get(overlay, 'model')).not.toBe(oldModel);
+    results.push(picker.apply(ids).then(outcome => {
+      if (outcome?.next) overlay.open(outcome.next);
+      if (outcome?.note) notes.push(outcome.note);
+    }));
+  });
+  overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+  overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(overlay.revision).toBe(revision);
+  await Promise.all(results);
+  await vi.waitFor(() => expect(stripAnsi(overlay.render(100, 30).join('\n'))).toContain('answer 1'));
+  expect(Reflect.get(overlay, 'model').filter).toBe('archived');
+  expect(captured).toHaveLength(0);
+  overlay.handleKey(parseKeyEvent('\r'), apply);
+  await Promise.all(results);
+  expect(Buffer.from(/;c;([^\x07]+)\x07/.exec(captured[0]!)![1]!, 'base64').toString()).toBe('answer 1\narchived');
+  expect(notes[0]).toContain('Sent');
+  expect(overlay.active).toBe(false);
 });
 
 it('rejects a continuation after source replacement and copies only the selected raw text', async () => {

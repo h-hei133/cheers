@@ -8199,3 +8199,16 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 最终cycles为0/0；config/declarations/Node-floor与97项脚本此前通过，新增history/container无配置/API变化；最终NormProof/入口/八格smoke及五文件独立审查后续收齐。完整earlier源常驻、同步全文搜索/摘要和OverlayHost关闭后filter callback持有源的成本均无整体上界证据，不以100项页宣称bounded-memory/latency，也不关闭PAN-06或全部47项。
 - 最终五文件独立代码APPROVE、架构WATCH，综合COMMENT；hash与报告一致（copy `ae1433ec…a0b42`、copy.test `37c2605c…69ca2`、history `bfd18695…e425`、history.test `884645ab…cbfd`、container `3c29cfc6…95d8b`）。报告`phase20-copy-code-review.md`的final段和`phase20-copy-final-architecture.md`取代旧两文件scope结论，历史报告保留。WATCH保留全源常驻/同步查找与关闭overlay后callback持有旧源；container职责计数19，未突破20。
 - 最终19项CLI入口与八格smoke全PASS/exit0，严格docs drift及diffcheck通过（118条既有advisory）；tgz NormProof exit0/partial，blocking specifier/cycles satisfied，8项既有ceiling advisory保留。双构建最终manifest完整ID `841ce7a2b1254daf887db107b1d4b143a45238c1bf9f368886d552764706237f`已从构建记录读回；当前仅提交前证据，精确新SHA CI另取。
+
+
+### 2026-10-21 PAN-06 浮层关闭后的快照释放
+
+- `/undo`精确提交`9dfdaf2513d9e11f0983a20372174402025818c6`的CI`39543768435` / job`119037205415`于`2026-10-21T04:36:47Z` completed/success，907文件通过/1跳过、9392项通过/3跳过；静态门、构建、Chromium、测试和NormProof步骤均success。完整日志`phase20-undo-history-ci-final.log`。copy批已提交推送`588efa2bfa06a27030494b55cb70e488fd23f15c`并读回远端main；Watch`39544701897` success，CI`39544701974`仍在运行。
+- 修复前条独立架构WATCH中的具体生命周期缺陷：OverlayHost关闭或确认后仍保留OptionModel/filter闭包、baseOptions与输入表单，旧会话源可被host持有至下次open。新增本域共同release；普通与直接接受合并并先捕获offered-ID/空多选语义，再释放host资源。取消仍推进generation并previewEnd，接受保留revision且不撤销已确认预览；不改变持久化、复制/写权限owner。
+- 定向只读对照：选择器dispose交给builder，builder的reset明确清理缓存map/array与container；采用关闭即释放owner快照的决策。确认回调仍须保留选中源/下一步，不能把host清理误作业务源销毁。没有移植对方整套渲染架构。
+- 最终受影响分两命令合计9文件241项：overlay72、copy9、input3、settings15、interactiveMode46、rewind21、restore15、pickers41、options19。命令最初额外传了并不存在的undo.test.ts，Vitest实际报告7文件181项；随后使用真实pickers/options路径补60项，不伪记不存在的文件。四项加载时反转均exit1/真实断言失败：model9、baseOptions7、input1、empty-accept3，源hash未变。材料`phase20-overlay-release-reversal.config.mjs` / `phase20-overlay-release-reverse-*.log`。
+- 生产strict TS及fresh TS/exe通过；manifest`891652207368bb0aae1e2e25c2254e832d5ef16f2ea0bf5587e3df689e177df3`。compiled模块隔离WeakRef+GC四路径24对象均不可达，材料`phase20-overlay-release-gc.mjs` / log；不以此声称总内存上界。专用四格Node/exe × regular/fullscreen打包PTY全过：205源完整查询/三页、取消零OSC52、最旧原文只报offered，文件/分支/持久消息不变，隔离失败native stub不写系统clipboard；材料`phase20-overlay-release-pty.mjs` / log及目录。
+- cycles0/0、config/declarations/Node-floor通过；tgz NormProof exit0/partial，blocking specifier/cycles satisfied，保留既有advisory。完整源常驻/同步搜索仍是单独未闭合资源合同；此处只关闭host生命周期缺口，不闭合PAN-06或47项。最终入口/八格smoke/独立复核与新SHA交付后续取证。
+
+- 最终独立code APPROVE、architecture CLEAR，综合APPROVE；三源hash与报告读回匹配（overlay `f20f5a63…186b9`、overlay.test `fc4c6b4b…d1c40`、copy.test `aef7e810…2df54`），材料`phase20-overlay-release-code-review.md` / `phase20-overlay-release-architecture.md`。报告独立集合重叠不累加。release替代acceptDirect未增加函数名；含accessor不含constructor为20，含constructor前后均21，计数歧义保留且不再增长host职责。
+- 最终19项CLI入口与八格smoke全PASS/exit0，strict docs drift通过（118条既有advisory），diffcheck通过。exe SHA256`cd76fddb23990efbcd0afcc8bd2f9cb1a7948f2e92006ba2f2ba2206044972cd`；本地最终源码与build绑定未变。提交/推送与该新SHA CI后续实际记录。

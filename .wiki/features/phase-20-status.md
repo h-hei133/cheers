@@ -278,3 +278,11 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 打包205条恢复会话探针先复现真实缺陷：history owner仅保留最后60个重建block，copy分页无法到达早期源。现由相同history投影保留earlier blocks交给Transcript，copy显式读取完整重建源，显示窗口仍60；clear释放两部分并推进revision。未新增磁盘reader。历史源是现有重建Block.text，不能冒充SessionMessage字节级原文或独立diff字段导出。
 - 最终受影响8文件197项、生产TypeScript、fresh TS/exe、六项有效反转通过；四格专用PTY现均可搜索205条、跨三页到头、取消零OSC52，确认最旧源仅offered，文件/分支/205条持久消息不变。完整源保留、同步搜索和关闭后overlay callback持有源的成本仍未给上界；独立复核/交付按日志最终证据记录，PAN-06与47项仍active。
 - 最终五文件独立代码APPROVE、架构WATCH，综合COMMENT；hash匹配。八格smoke及NormProof blocking gates通过（整体partial/8旧advisory），最终新SHA交付另记；页面行数不代表资源保证。
+
+## 2026-10-21 浮层关闭后释放源快照
+
+- OverlayHost取消与普通/快捷键/表单确认共用本域释放：丢弃OptionModel及筛选闭包、baseOptions、输入表单与行映射，abort加载/搜索并注销订阅。接受前捕获已验证ID和空多选语义；保留accept revision以交接下一页，取消仍推进revision并撤销预览。
+- 本地9文件241项、四项有效反转、strict TS/exe双构建、静态门、NormProof blocking门通过。隔离compiled模块4路径/24对象WeakRef+GC核对不再由host持有；这不等于进程总内存/搜索延迟上界。四格205源专用PTY通过，完整源与query继续可达，取消零clipboard、原文件/分支/消息不变。最终smoke/入口/独立复核和交付按日志实际更新。
+- `/undo`提交`9dfdaf2513d9e11f0983a20372174402025818c6`的CI`39543768435` / job`119037205415`于`2026-10-21T04:36:47Z` completed/success，Watch`39543768378` success。`/copy`已推送`588efa2bfa06a27030494b55cb70e488fd23f15c`并读回remote main，Watch`39544701897` success；CI`39544701974`仍运行，不借用其他SHA结果。PAN-06和47项继续active。
+
+- 浮层批最终独立代码APPROVE、架构CLEAR，综合APPROVE；三源hash一致。最终19项入口和八格smoke全PASS，strict docs drift及diffcheck通过；完整源常驻/同步搜索成本仍WATCH，未据此闭合PAN-06。

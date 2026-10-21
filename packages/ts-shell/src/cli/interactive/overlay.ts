@@ -184,6 +184,15 @@ export class OverlayHost {
   }
 
   close(): void {
+    const picker = this.picker;
+    this.generation++;
+    this.release();
+    picker?.previewEnd?.();
+    this.onChange();
+  }
+
+  /** Drop host-owned sources before notifying or handing the selection to its owner. */
+  private release(): void {
     this.loadController?.abort();
     this.loadController = undefined;
     this.cancelSearch();
@@ -192,18 +201,19 @@ export class OverlayHost {
     this.denyDraft = "";
     this.unsubscribe?.();
     this.unsubscribe = undefined;
-    this.generation++;
     this.input = undefined;
+    this.model = new OptionModel();
+    this.baseOptions = [];
     this.optionRows.clear();
     this.chipRows.clear();
-    this.picker?.previewEnd?.();
+    this.renderedWidth = 0;
     this.picker = undefined;
     this.subMode = "none";
     this.subTargetId = undefined;
     this.subTargetLabel = undefined;
     this.renameDraft = "";
     this.loading = false;
-    this.onChange();
+    this.loadFailed = false;
   }
 
   /** Rows for the open picker at the given geometry, or none when closed. */
@@ -417,7 +427,7 @@ export class OverlayHost {
       if (event.keyId === 'escape' || event.keyId === 'ctrl+c') this.close();
       else if (event.keyId === 'enter') {
         const value = this.input.value();
-        if (value !== undefined) this.acceptDirect({ ...picker, apply: () => picker.input!.apply(value) }, apply, []);
+        if (value !== undefined) this.accept({ ...picker, apply: () => picker.input!.apply(value) }, apply, []);
       } else this.input.key(event);
       this.onChange();
       return true;
@@ -523,11 +533,11 @@ export class OverlayHost {
       const key = event.keyId.toLowerCase();
       const text = (event.text ?? "").toLowerCase();
       if (key === "y" || key === "1" || text === "1" || text === "y") {
-        this.acceptDirect(picker, apply, ["allow-once"]);
+        this.accept(picker, apply, ["allow-once"]);
         return true;
       }
       if (key === "a" || key === "2" || text === "2" || text === "a") {
-        this.acceptDirect(picker, apply, ["allow-always"]);
+        this.accept(picker, apply, ["allow-always"]);
         return true;
       }
       if (key === "n" || key === "d" || key === "3" || text === "3" || text === "n" || text === "d") {
@@ -537,7 +547,7 @@ export class OverlayHost {
           this.onChange();
           return true;
         }
-        this.acceptDirect(picker, apply, ["deny"]);
+        this.accept(picker, apply, ["deny"]);
         return true;
       }
       if (key === "j") {
@@ -727,37 +737,19 @@ export class OverlayHost {
     });
   }
 
-  private accept(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void): void {
-    const ids = picker.multiple ? this.model.chosenIds() : idsOf(this.model.current());
-    this.loadController?.abort();
-    this.loadController = undefined;
-    this.cancelSearch();
-    this.unsubscribe?.();
-    this.unsubscribe = undefined;
-    this.picker = undefined;
-    this.subMode = "none";
-    this.loading = false;
+  private accept(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void, directIds?: readonly string[]): void {
+    if (directIds?.some(id => !this.model.visible.some(option => option.id === id && !option.disabled))) return;
+    const ids = directIds ?? (picker.multiple ? this.model.chosenIds() : idsOf(this.model.current()));
+    const accepted = directIds !== undefined || ids.length > 0 ||
+      (picker.multiple && this.model.visible.some(option => !option.disabled));
+    this.release();
     this.onChange();
-    if (ids.length > 0 || (picker.multiple && this.model.visible.some(option => !option.disabled))) {
+    if (accepted) {
       apply(picker, ids);
     } else {
       picker.previewEnd?.();
     }
   }
-  private acceptDirect(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void, ids: readonly string[]): void {
-    if (ids.some(id => !this.model.visible.some(option => option.id === id && !option.disabled))) return;
-    this.loadController?.abort();
-    this.loadController = undefined;
-    this.cancelSearch();
-    this.unsubscribe?.();
-    this.unsubscribe = undefined;
-    this.picker = undefined;
-    this.subMode = "none";
-    this.loading = false;
-    this.onChange();
-    apply(picker, ids);
-  }
-
   private changeFilter(change: () => void): void {
     this.optionRows.clear();
     this.model.setOptions(this.baseOptions);

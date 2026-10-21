@@ -280,6 +280,77 @@ describe("pointer focus", () => {
 
 
 describe("lifecycle", () => {
+  it.each(['close', 'escape', 'accept', 'shortcut', 'input', 'empty', 'multiple'] as const)(
+    'releases host-owned options, filter closures and input on %s', async action => {
+      const { overlay } = host();
+      const previewEnd = vi.fn();
+      const unsubscribe = vi.fn();
+      const loaded = action === 'empty' ? [] : action === 'shortcut'
+        ? [{ id: 'allow-once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }] : options;
+      let signal!: AbortSignal;
+      const menu = picker({
+        load: async value => { signal = value!; return loaded; },
+        filterOptions: (_query, rows) => rows,
+        subscribe: () => unsubscribe,
+        previewEnd,
+        multiple: action === 'multiple',
+        input: action === 'input' ? {
+          initial: 'retained draft', label: 'Value', validate: () => undefined,
+          apply: async () => undefined,
+        } : undefined,
+      });
+      overlay.open(menu);
+      await Promise.resolve(); await Promise.resolve();
+      const model = Reflect.get(overlay, 'model');
+      const revision = overlay.revision;
+      expect(Reflect.get(overlay, 'baseOptions')).toBe(loaded);
+      const released = () => {
+        expect(overlay.active).toBe(false);
+        expect(Reflect.get(overlay, 'baseOptions')).toEqual([]);
+        expect(Reflect.get(overlay, 'model')).not.toBe(model);
+        expect(Reflect.get(overlay, 'model').total).toBe(0);
+        expect(Reflect.get(overlay, 'input')).toBeUndefined();
+        expect(signal.aborted).toBe(true);
+        expect(unsubscribe).toHaveBeenCalledOnce();
+      };
+      const apply = vi.fn(released);
+      if (action === 'close') overlay.close();
+      else press(overlay, action === 'escape' ? '\x1b' : action === 'shortcut' ? 'y' : '\r', apply);
+      released();
+      const canceled = action === 'close' || action === 'escape' || action === 'empty';
+      expect(apply).toHaveBeenCalledTimes(canceled ? 0 : 1);
+      expect(previewEnd).toHaveBeenCalledTimes(canceled ? 1 : 0);
+      expect(overlay.revision).toBe(revision + (action === 'close' || action === 'escape' ? 1 : 0));
+      if (action === 'multiple') expect(apply).toHaveBeenCalledWith(menu, ['b']);
+      if (action === 'input') expect(apply).toHaveBeenCalledWith(expect.anything(), []);
+    },
+  );
+
+  it('does not restore closed source references from a late search or live publication', async () => {
+    const { overlay } = host();
+    let resolveSearch!: (rows: readonly Option[]) => void;
+    let publish!: (rows: readonly Option[]) => void;
+    let signal!: AbortSignal;
+    overlay.open(picker({
+      searchDebounceMs: 0,
+      search: (_query, value) => { signal = value!; return new Promise(resolve => { resolveSearch = resolve; }); },
+      subscribe: callback => { publish = callback; return () => {}; },
+    }));
+    await Promise.resolve(); await Promise.resolve();
+    overlay.handlePaste('a');
+    await vi.waitFor(() => expect(resolveSearch).toBeDefined());
+    overlay.close();
+    expect(signal.aborted).toBe(true);
+    const model = Reflect.get(overlay, 'model');
+    publish(options);
+    resolveSearch(options);
+    await Promise.resolve(); await Promise.resolve();
+    expect(Reflect.get(overlay, 'baseOptions')).toEqual([]);
+    expect(Reflect.get(overlay, 'model')).toBe(model);
+    expect(model.total).toBe(0);
+    expect(overlay.render(80, 24)).toEqual([]);
+  });
+
   it('keeps previews aligned with the selected identity after filtering and live replacement', async () => {
     const { overlay } = host(); const previewChange = vi.fn();
     let publish!: (items: readonly Option[]) => void;
