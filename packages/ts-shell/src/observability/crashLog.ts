@@ -64,13 +64,57 @@ export function crashLogPath(): string {
  * is already failing, so it must not be the thing that fails.
  */
 export function readCrashLog(filePath: string = crashLogPath(), profile: ProfileContext | undefined = currentProfile()): CrashRecord[] {
+  return inspectCrashLog(filePath, profile, Infinity).records;
+}
+
+export interface CrashRead {
+  readonly records: CrashRecord[];
+  readonly status: 'reported' | 'partial' | 'unavailable';
+  readonly reason?: 'missing' | 'unreadable' | 'invalid' | 'over-limit';
+  readonly invalidRecords: number;
+}
+
+/** Diagnostic reads preserve failure status and cap bytes before parsing. */
+export function inspectCrashLog(
+  filePath: string = crashLogPath(),
+  profile: ProfileContext | undefined = currentProfile(),
+  maxBytes = 1024 * 1024,
+): CrashRead {
+  let handle: number | undefined;
   try {
     assertProfileStorage(filePath, profile);
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isCrashRecord);
-  } catch {
-    return [];
+    handle = fs.openSync(filePath, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
+    const stat = fs.fstatSync(handle);
+    if (!stat.isFile()) return { records: [], status: 'unavailable', reason: 'unreadable', invalidRecords: 0 };
+    const size = stat.size;
+    if (size > maxBytes) return { records: [], status: 'unavailable', reason: 'over-limit', invalidRecords: 0 };
+    let text: string;
+    if (maxBytes === Infinity) text = fs.readFileSync(handle, 'utf8');
+    else {
+      const buffer = Buffer.alloc(Math.min(size + 1, maxBytes + 1));
+      let count = 0;
+      while (count < buffer.length) {
+        const read = fs.readSync(handle, buffer, count, buffer.length - count, null);
+        if (!read) break;
+        count += read;
+      }
+      if (count > maxBytes) return { records: [], status: 'unavailable', reason: 'over-limit', invalidRecords: 0 };
+      text = buffer.toString('utf8', 0, count);
+    }
+    let parsed: unknown;
+    try { parsed = JSON.parse(text); }
+    catch { return { records: [], status: 'unavailable', reason: 'invalid', invalidRecords: 0 }; }
+    if (!Array.isArray(parsed)) return { records: [], status: 'unavailable', reason: 'invalid', invalidRecords: 0 };
+    const records = parsed.filter(isCrashRecord);
+    const invalidRecords = parsed.length - records.length;
+    return { records, status: invalidRecords ? 'partial' : 'reported', invalidRecords };
+  } catch (error) {
+    return { records: [], status: (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'reported' : 'unavailable',
+      reason: (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'unreadable', invalidRecords: 0 };
+  } finally {
+    if (handle !== undefined) {
+      try { fs.closeSync(handle); } catch { /* Crash inspection must not throw during failure handling. */ }
+    }
   }
 }
 

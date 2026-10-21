@@ -39,6 +39,8 @@ export interface PickerOutcome {
 }
 
 export interface Picker {
+  /** Suppress stale UI results; this check never grants write or execution authority. */
+  readonly isCurrent?: () => boolean;
   /** Keep typed/pasted input within a staged interaction while its step applies. */
   readonly holdInput?: boolean;
   readonly input?: PickerInput<PickerOutcome | undefined>;

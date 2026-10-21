@@ -91,26 +91,26 @@ describe("session wiring", () => {
     expect(run).toHaveBeenCalledWith('/connect "login" "openai" "--account"');
     run.mockRestore();
   });
-  it('opens bare cleanse while work runs, keeps argument commands queued, and preserves pending overlays', () => {
+  it.each(['cleanse', 'debug'])('opens bare %s while work runs, keeps argument commands queued, and preserves pending overlays', command => {
     const { mode } = build();
     const host = mode as unknown as { busy: boolean; pickerPending: boolean; queue: SubmissionQueue; overlay: OverlayHost; onSubmit(text: string): void; openPicker(command: string): void };
     host.busy = true;
     const open = vi.spyOn(host, 'openPicker').mockImplementation(() => undefined);
-    host.onSubmit('/cleanse');
+    host.onSubmit(`/${command}`);
     expect(open).toHaveBeenCalledOnce();
     expect(host.queue.shift()).toBeUndefined();
-    host.onSubmit('/cleanse verify scan-1');
+    host.onSubmit(`/${command} verify scan-1`);
     expect(open).toHaveBeenCalledOnce();
-    expect(host.queue.shift()).toBe('/cleanse verify scan-1');
+    expect(host.queue.shift()).toBe(`/${command} verify scan-1`);
     host.pickerPending = true;
-    host.onSubmit('/cleanse');
+    host.onSubmit(`/${command}`);
     expect(open).toHaveBeenCalledOnce();
-    expect(host.queue.shift()).toBe('/cleanse');
+    expect(host.queue.shift()).toBe(`/${command}`);
     host.pickerPending = false;
     host.overlay.open({ title: 'Pending permission', form: 'panel', empty: 'pending', load: async () => [], apply: async () => undefined });
-    host.onSubmit('/cleanse');
+    host.onSubmit(`/${command}`);
     expect(open).toHaveBeenCalledOnce();
-    expect(host.queue.shift()).toBe('/cleanse');
+    expect(host.queue.shift()).toBe(`/${command}`);
     host.overlay.close();
   });
 
@@ -126,6 +126,86 @@ describe("session wiring", () => {
     await vi.waitFor(() => expect(stripAnsi(host.overlay.render(120, 30).join('\n'))).toContain('No retained security scans'));
     expect(begin).not.toHaveBeenCalled();
     host.overlay.close();
+  });
+
+  it('opens queued debug through the real picker without starting a turn or reading diagnostic storage', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { overlay: OverlayHost; run(text: string): Promise<void>; pickerHost(): PickerHost; sink: { begin(): void } };
+    const begin = vi.spyOn(host.sink, 'begin');
+    const original = host.pickerHost();
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, commandContext: { cwd: '/workspace', admission: () => undefined } });
+    await host.run('/debug');
+    await vi.waitFor(() => expect(stripAnsi(host.overlay.render(120, 30).join('\n'))).toContain('inspect recent structured log records'));
+    expect(begin).not.toHaveBeenCalled();
+    host.overlay.close();
+  });
+
+  it.each(['success', 'failure'])('suppresses a guarded picker %s when its binding expires before host publication', async settlement => {
+    const { mode } = build();
+    const host = mode as unknown as { overlay: OverlayHost; applyPicker(picker: Picker, ids: readonly string[]): void;
+      view: InteractiveView; pager: Pager; pickerInputPending: Map<number, number>; options: { sessionManager: SessionManager } };
+    const save = vi.fn(() => 'saved' as const);
+    host.options.sessionManager.captureReportWriter = () => save;
+    let current = true;
+    const report = createReport({ title: 'Old diagnostics', lines: [], facts: {} });
+    const picker: Picker = { title: 'Debug probe', form: 'panel', empty: '', holdInput: true, isCurrent: () => current,
+      load: async () => [], apply: () => {
+        queueMicrotask(() => { current = false; });
+        return settlement === 'success' ? Promise.resolve({ note: 'old owner note', report, draft: 'old draft' }) : Promise.reject(new Error('old source failure'));
+      } };
+    host.overlay.open(picker);
+    const before = [...host.view.transcript.all()];
+    host.applyPicker(picker, ['summary']);
+    await vi.waitFor(() => expect(host.pickerInputPending.size).toBe(0));
+    expect(host.view.transcript.all()).toEqual(before);
+    expect(host.view.editor.getText()).toBe('');
+    expect(host.pager.active).toBe(false);
+    expect(save).not.toHaveBeenCalled();
+    host.overlay.close();
+  });
+
+  it.each(['overlay', 'stopped', 'throw'])('suppresses obsolete guarded picker failure after %s without stranding input', async change => {
+    const { mode } = build();
+    const host = mode as unknown as { stopped: boolean; overlay: OverlayHost; applyPicker(picker: Picker, ids: readonly string[]): void;
+      view: InteractiveView; pickerInputPending: Map<number, number> };
+    let fail!: () => void;
+    let throws = false;
+    const picker: Picker = { title: 'Debug probe', form: 'panel', empty: '', holdInput: true,
+      isCurrent: () => { if (throws) throw new Error('private admission error'); return true; }, load: async () => [],
+      apply: () => new Promise((_, reject) => { fail = () => reject(new Error('old private source')); }) };
+    host.overlay.open(picker);
+    const before = [...host.view.transcript.all()];
+    host.applyPicker(picker, ['summary']);
+    if (change === 'overlay') host.overlay.open({ ...picker, title: 'New overlay' });
+    else if (change === 'stopped') host.stopped = true;
+    else throws = true;
+    fail();
+    await vi.waitFor(() => expect(host.pickerInputPending.size).toBe(0));
+    expect(host.view.transcript.all()).toEqual(before);
+    host.overlay.close();
+  });
+
+  it('keeps active-run cancellation available while the debug tool catalog is pending', async () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { busy: boolean; overlay: OverlayHost; openPicker(command: string): void; pickerHost(): PickerHost;
+      options: { sessionRuntime: ShellSessionRuntime } };
+    let finish!: () => void;
+    const pool = new Promise<ReadonlyMap<string, never>>(resolve => { finish = () => resolve(new Map()); });
+    const original = host.pickerHost();
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, commandContext: { cwd: '/workspace', getToolPool: () => pool } });
+    const cancel = vi.fn(async () => undefined);
+    host.options.sessionRuntime.cancelAndWait = cancel;
+    mode.start();
+    try {
+      host.busy = true;
+      host.openPicker('/debug');
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(120, 30).join('\n'))).toContain('inspect the current tool catalog'));
+      terminal.input('tools'); terminal.input('\r');
+      await vi.waitFor(() => expect(host.overlay.active).toBe(false));
+      terminal.input('\x03');
+      await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+      finish();
+    } finally { finish(); mode.stop(); }
   });
 
   it('interrupts goal scheduling between rounds without discarding the human draft', async () => {

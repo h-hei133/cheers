@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runDebugCommand } from "./debugCommandRuntime.js";
 import type { CommandContext } from "./types.js";
+import { inspectCrashLog } from '../../observability/crashLog.js';
+import { readStructuredLogs } from '../../observability/diagnostics.js';
+import { readMetrics } from '../../observability/metrics/reader.js';
 
 const state = vi.hoisted(() => ({
   logs: {
@@ -10,7 +13,8 @@ const state = vi.hoisted(() => ({
     unreadableFiles: 1,
   },
   metrics: {
-    samples: [{ value: 1 }],
+    samples: [{ name: 'requests', unit: 'count', total: 1, count: 1, max: 1, tags: {} }],
+    limit: 2000,
     status: "partial" as const,
     filesInspected: 1,
     unreadableFiles: 2,
@@ -24,14 +28,16 @@ vi.mock("../../observability/rotatingFileSink.js", () => ({
     getCurrentFilePath: () => "/logs/current.jsonl",
   }),
 }));
-vi.mock("../../observability/diagnostics.js", () => ({
-  readStructuredLogs: () => state.logs,
+vi.mock("../../observability/diagnostics.js", async importOriginal => ({
+  ...await importOriginal<typeof import('../../observability/diagnostics.js')>(),
+  readStructuredLogs: vi.fn(() => state.logs),
 }));
 vi.mock("../../observability/crashLog.js", () => ({
-  readCrashLog: () => state.crashes,
+  MAX_CRASH_RECORDS: 5,
+  inspectCrashLog: vi.fn(() => ({ records: state.crashes, status: 'reported', invalidRecords: 0 })),
 }));
 vi.mock("../../observability/metrics/reader.js", () => ({
-  readMetrics: () => state.metrics,
+  readMetrics: vi.fn(() => state.metrics),
 }));
 vi.mock("../../observability/startupTiming.js", () => ({
   formatTimingReport: () => "Startup phases: ready\nEvent loop delay: p95=7.0ms max=9.0ms",
@@ -39,6 +45,9 @@ vi.mock("../../observability/startupTiming.js", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(inspectCrashLog).mockReturnValue({ records: state.crashes as never, status: 'reported', invalidRecords: 0 });
+  vi.mocked(readStructuredLogs).mockReturnValue(state.logs as never);
+  vi.mocked(readMetrics).mockReturnValue(state.metrics as never);
 });
 
 function context(getToolPool: CommandContext["getToolPool"]): CommandContext {
@@ -71,7 +80,7 @@ describe("/debug", () => {
 
     expect(result.report?.facts).toMatchObject({
       status: "partial",
-      tools: { count: 0, names: [] },
+      tools: { status: 'unavailable', count: null, names: [] },
     });
     expect(result.output).toContain("unavailable");
   });
@@ -81,5 +90,66 @@ describe("/debug", () => {
 
     expect(result.output).toContain("Invalid /debug arguments");
     expect(result.report).toBeUndefined();
+  });
+
+  it('does not claim an absent tool-pool capability reports zero tools', async () => {
+    const result = await runDebugCommand([], context(undefined));
+    expect(result.report?.facts.tools).toEqual({ status: 'unavailable', count: null, names: [] });
+    expect(result.output).toContain('| Available tools | unknown | unavailable |');
+    const detail = await runDebugCommand(['tools'], context(undefined));
+    expect(detail.report?.facts).toEqual({ status: 'unavailable', count: null });
+  });
+
+  it('preserves an unavailable crash count in the summary and detail', async () => {
+    vi.mocked(inspectCrashLog).mockReturnValue({ records: [], status: 'unavailable', reason: 'invalid', invalidRecords: 0 });
+    const result = await runDebugCommand([], context(async () => new Map()));
+    expect(result.report?.facts).toMatchObject({ status: 'partial', crashes: null, crashSource: { status: 'unavailable', reason: 'invalid' } });
+    expect(result.output).toContain('| Crash records | unknown | unavailable |');
+    const detail = await runDebugCommand(['crashes'], context(undefined));
+    expect(detail.report?.facts.observedRecords).toBeNull();
+    expect(detail.output).toContain('the count is unknown');
+    expect(detail.output).not.toContain('Showing 0 of 0');
+  });
+
+  it('uses the existing metric and timing owners without reading other sources', async () => {
+    const pool = vi.fn();
+    const metrics = await runDebugCommand(['metrics'], context(pool));
+    expect(metrics.report?.facts).toMatchObject({ source: 'structured-log-tails', status: 'partial', samplesRead: 1 });
+    const timing = await runDebugCommand(['timings'], context(pool));
+    expect(timing.output).toContain('Event loop delay');
+    expect(inspectCrashLog).not.toHaveBeenCalled();
+    expect(pool).not.toHaveBeenCalled();
+  });
+
+  it('keeps unreadable sources distinct from empty sources in structured facts', async () => {
+    vi.mocked(readStructuredLogs).mockReturnValue({ entries: [], status: 'unavailable', filesInspected: 0, unreadableFiles: 0 });
+    vi.mocked(readMetrics).mockReturnValue({ samples: [], status: 'unavailable', filesInspected: 0, unreadableFiles: 0, limit: 2000 });
+    const result = await runDebugCommand([], context(async () => new Map()));
+    expect(result.report?.facts).toMatchObject({ status: 'partial',
+      logs: { status: 'unavailable', entries: null }, metrics: { status: 'unavailable', samples: null } });
+  });
+
+  it('redacts metric details through the original report owner', async () => {
+    vi.mocked(readMetrics).mockReturnValue({ samples: [{ name: 'api_key=synthetic-sensitive-name', unit: 'count',
+      total: 1, count: 1, max: 1, tags: { reason: 'Authorization: Bearer synthetic-sensitive-tag' } }],
+      status: 'reported', filesInspected: 1, unreadableFiles: 0, limit: 2000 });
+    const result = await runDebugCommand(['metrics'], context(undefined));
+    expect(result.report?.facts.samplesRead).toBe(1);
+    expect(JSON.stringify(result)).not.toContain('synthetic-sensitive');
+  });
+
+  it('redacts tool catalog and summary names while keeping original byte costs and never executing a tool', async () => {
+    const execute = vi.fn();
+    const name = 'api_key=synthetic-sensitive-name';
+    const description = `${'x'.repeat(100)} sk-synthetic-sensitive-description`;
+    const contextWithTools = context(async () => new Map([[name, { name, description, argsSchema: { type: 'object' }, execute } as never]]));
+    const detail = await runDebugCommand(['tools'], contextWithTools);
+    expect(detail.report?.facts).toMatchObject({ count: 1, size: { descriptionBytes: Buffer.byteLength(description) } });
+    expect(JSON.stringify(detail)).not.toContain('synthetic-sensitive');
+    expect(JSON.stringify(detail)).not.toContain('sk-synth');
+    const summary = await runDebugCommand([], contextWithTools);
+    expect(summary.report?.facts.tools).toMatchObject({ count: 1, status: 'reported' });
+    expect(JSON.stringify(summary)).not.toContain('synthetic-sensitive');
+    expect(execute).not.toHaveBeenCalled();
   });
 });

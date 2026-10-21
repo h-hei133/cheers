@@ -18,7 +18,9 @@ export function readStructuredLogs(directory: string, currentPath: string, limit
   }).reverse();
   if (directoryUnavailable) return { entries: [], status: 'unavailable', filesInspected: 0, unreadableFiles: 0 };
   const entries: StructuredLogEntry[] = [];
+  let filesInspected = unreadableFiles;
   for (const file of files) {
+    filesInspected += 1;
     let lines: string[];
     try { lines = tailLines(file, LOG_TAIL_BYTES, { strict: true }); }
     catch { unreadableFiles += 1; continue; }
@@ -28,8 +30,8 @@ export function readStructuredLogs(directory: string, currentPath: string, limit
     }
     if (entries.length >= limit) break;
   }
-  const status = unreadableFiles === 0 ? 'reported' : unreadableFiles === files.length ? 'unavailable' : 'partial';
-  return { entries: entries.reverse(), status, filesInspected: files.length, unreadableFiles };
+  const status = unreadableFiles === 0 ? 'reported' : unreadableFiles === filesInspected ? 'unavailable' : 'partial';
+  return { entries: entries.reverse(), status, filesInspected, unreadableFiles };
 }
 
 function parseEntry(line: string): StructuredLogEntry | undefined {
@@ -42,8 +44,8 @@ function parseEntry(line: string): StructuredLogEntry | undefined {
   } catch { return undefined; }
 }
 
-export function traceRows(logs: readonly StructuredLogEntry[]): readonly TraceRow[] {
-  const text = (value: string): string => redactReportText(value, 240, { projectRoot: process.cwd() });
+export function traceRows(logs: readonly StructuredLogEntry[], projectRoot = process.cwd()): readonly TraceRow[] {
+  const text = (value: string): string => redactReportText(value, 240, { projectRoot });
   return logs.map(entry => {
     const fields = entry.fields;
     const requestId = stringField(fields, 'requestId') ?? stringField(fields, 'request_id');

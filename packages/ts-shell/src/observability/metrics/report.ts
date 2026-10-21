@@ -3,9 +3,13 @@ import type { CommandReport, ReportLine } from '../../core/commands/report/contr
 import { LOG_TAIL_BYTES } from '../logs/files.js';
 import { aggregateMetrics, METRIC_TAGS } from './model.js';
 import type { MetricRead } from './reader.js';
+import { redactReportText } from '../../core/security/redaction.js';
 
-export function metricsReport(read: MetricRead): CommandReport {
+export function metricsReport(read: MetricRead, projectRoot = process.cwd()): CommandReport {
+  const safe = (value: string): string => redactReportText(value, 240, { projectRoot });
+  // Aggregate by original identity before projecting labels; redaction must not merge groups.
   const groups = aggregateMetrics(read.samples).map(entry => ({ ...entry,
+    name: safe(entry.name), tags: Object.fromEntries(Object.entries(entry.tags).map(([key, value]) => [key, safe(value)])),
     count: finite(entry.count), total: finite(entry.total), max: finite(entry.max),
     average: entry.unit === 'ms' && entry.count > 0 ? finite(entry.total / entry.count) : null,
   }));

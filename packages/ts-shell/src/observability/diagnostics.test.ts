@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readStructuredLogs, traceRows } from './diagnostics.js';
 import { RotatingFileSink } from './rotatingFileSink.js';
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('diagnostic trace projection', () => {
   it('preserves recorded request and tool IDs and labels missing IDs', () => {
@@ -19,5 +21,25 @@ describe('diagnostic trace projection', () => {
     expect(rows[0]?.toolId).toBeUndefined();
     sink.flushAndClose();
     fs.rmSync(directory, { recursive: true, force: true });
+  });
+
+  it('reports files actually inspected when the recent-record limit stops scanning early', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-diag-'));
+    try {
+      const record = { timestamp: 't', level: 'info', traceId: 'trace', spanId: 'span', component: 'tool', message: 'm', fields: {} };
+      for (let i = 0; i < 3; i++) fs.writeFileSync(path.join(directory, `${i}.log`), `${JSON.stringify(record)}\n`);
+      const read = readStructuredLogs(directory, path.join(directory, '2.log'), 1);
+      expect(read).toMatchObject({ status: 'reported', filesInspected: 1, unreadableFiles: 0 });
+      expect(read.entries).toHaveLength(1);
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it('reports unavailable when enumeration finds only unreadable files', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-diag-'));
+    try {
+      const file = path.join(directory, 'x.log');
+      fs.symlinkSync(path.join(directory, 'missing'), file);
+      expect(readStructuredLogs(directory, file)).toMatchObject({ status: 'unavailable', filesInspected: 1, unreadableFiles: 1 });
+    } finally { vi.restoreAllMocks(); fs.rmSync(directory, { recursive: true, force: true }); }
   });
 });

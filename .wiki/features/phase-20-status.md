@@ -308,3 +308,10 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 裸login经provider/实际支持的account method及cancel缺省确认复用原可取消命令host；API key只产原命令草稿。logout逐条列primary saved connections，完整身份不按label/provider推导；安全投影不含凭据，精确确认带原ConfigEdit进既有writer。打开/取消不写，配置/publication/owner变化拒绝，原writer保留并发冲突与unknown语义。参数与非交互路径继续原路由。
 - 独立复核发现的compatible relay重复行与flag-shaped saved ID拒绝均已修复。最终6文件253项、strict TS、fresh双构建、七项有效反转、四格专用PTY通过；真实删除只影响选定连接，state/transcript/metadata/工作区原字节保持。原生账户取消合成测试为pending→error，不声称真实登录已验收。证据与精确交付见日志。
 - 代码APPROVE/架构WATCH，综合COMMENT：全配置同步读取/哈希/availability投影尚无资源上界；没有据此关闭PAN-07、其他面板或全部47项。debug/plugin与完整认证生命周期仍按原裁决复核。上批cleanse的精确SHA CI/Watch均success，本批提交/推送/新SHA结果分别取证。
+
+## 2026-10-21 `/debug` 只读诊断入口（PAN-07 部分）
+
+- 裸入口从唯一CommandSyntax生成summary/logs/crashes/metrics/timings/tools静态菜单；打开/取消不读取诊断源、不写入。显式选择复用原观测及报告owner，参数与非交互形式保留。崩溃诊断在解析前限制1MiB，区分missing/invalid/over-limit/unreadable与混合无效记录；原崩溃兼容读取仍保留全部记录。缺工具池、不可读日志/指标/崩溃在UI及facts保持unknown/null及来源status，计数不冒充历史总量。
+- 独立评审查实并修正原始指标/工具元数据泄露和先截短后脱敏的key前缀泄露；分组、策略和字节成本仍由原始身份计算，再生成安全报告。原admission在选择前/读取后重验，host按原绑定、overlay revision及stopped状态拒绝迟到发布；读取目录时不持有输入锁，Ctrl+C仍可取消正在进行的任务。
+- 最终269项受影响测试、9项报告持久化/codec回归、14项有效反转及生产strict TS通过。四格Node/exe专用PTY覆盖菜单/no-match/取消、六视图及直接不可读来源；显式查看只增安全command-output，无模型消息，配置/工作区/state/metadata原字节保持；Linux八格通用smoke和19项CLI入口通过。中间stale build及探针选择/分页断言问题保留失败证据，最终结果见日志。
+- 代码APPROVE、架构WATCH，综合COMMENT；两报告21文件hash与最终双构建已读回绑定。全目录同步枚举/逐文件tail和完整catalog仍无全局资源或延迟界，不据此关闭PAN-07。前批认证SHA的CI已success；本批commit/push/新SHA CI各自取证。plugin/extensions及其余47项继续原范围复核。

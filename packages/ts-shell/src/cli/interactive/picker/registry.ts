@@ -36,6 +36,7 @@ import { gitPicker } from './git.js';
 import type { SecurityInspector } from '../../../security/view/inspection.js';
 import { cleansePicker } from './cleanse.js';
 import { authPicker, type SignInCommand } from './auth.js';
+import { debugPicker } from './debug.js';
 
 /**
  * Which commands open a chooser.
@@ -93,6 +94,7 @@ const PICKERS: Record<string, PickerFactory> = {
   connect: (host) => connectionPicker(host.commandContext),
   login: host => authPicker(host.commandContext, 'login', host.signIn),
   logout: host => authPicker(host.commandContext, 'logout'),
+  debug: host => debugPicker(host.commandContext),
   permissions: (host) =>
     permissionPicker({
       policy: host.approvalTrustPolicy,

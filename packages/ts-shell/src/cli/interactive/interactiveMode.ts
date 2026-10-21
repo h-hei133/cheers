@@ -78,6 +78,7 @@ import { Pager, pageLongOutput } from "../../presentation/tui/chrome/pager.js";
 import { TranscriptSearch } from "../../presentation/tui/transcript/searchState.js";
 import { routeSearchKey, styleSearchRow } from "../../presentation/tui/transcript/searchHost.js";
 import { OverlayHost, type Picker } from "./overlay.js";
+import { pickerIsCurrent } from './picker/current.js';
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
 import { ComposerPreference, readStatusItems, writeStatusItems } from "./tuiSettings.js";
 import type { ImageContent } from "../../model-adapters/multimodal.js";
@@ -842,7 +843,7 @@ export class InteractiveMode {
       this.tui.requestRender();
       return;
     }
-    if (this.busy && !this.pickerPending && !this.questions.question() && !this.overlay.active && /^\/cleanse$/i.test(text.trim())) {
+    if (this.busy && !this.pickerPending && !this.questions.question() && !this.overlay.active && /^\/(?:cleanse|debug)$/i.test(text.trim())) {
       this.openPicker(text);
       return;
     }
@@ -1032,6 +1033,7 @@ export class InteractiveMode {
     void picker
       .apply(ids)
       .then((outcome) => {
+        if (picker.isCurrent && (this.stopped || this.overlay.revision !== revision || !pickerIsCurrent(picker))) return;
         if (outcome?.note) {
           this.state.transcript.append(textBlock("command", outcome.note, picker.title));
         }
@@ -1052,6 +1054,7 @@ export class InteractiveMode {
         if (outcome?.next && !this.stopped && this.overlay.revision === revision) this.overlay.open(outcome.next);
       })
       .catch((error: unknown) => {
+        if (picker.isCurrent && (this.stopped || this.overlay.revision !== revision || !pickerIsCurrent(picker))) return;
         this.state.transcript.append(
           textBlock("error", error instanceof Error ? error.message : String(error), picker.title),
         );

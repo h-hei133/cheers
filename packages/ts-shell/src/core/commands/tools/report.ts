@@ -2,10 +2,12 @@ import type { ToolDefinition } from '../../../tools/types.js';
 import { toolPlanMode } from '../../query/toolPolicy.js';
 import type { CommandReport, ReportLine } from '../report/contract.js';
 import { createReport, span } from '../report/projection.js';
+import { redactReportText } from '../../security/redaction.js';
 
 const PERMISSIONS = "Eligible tools still require the session's permissions and approval.";
 
-export function toolsReport(pool: ReadonlyMap<string, ToolDefinition>): CommandReport {
+export function toolsReport(pool: ReadonlyMap<string, ToolDefinition>, projectRoot = process.cwd()): CommandReport {
+  const safe = (value: string, maxLength = 4096): string => redactReportText(value, maxLength, { projectRoot });
   const tools = [...pool.values()].sort((a, b) => a.name.localeCompare(b.name));
   const measured = tools.map(tool => ({ name: tool.name, descriptionBytes: Buffer.byteLength(tool.description, 'utf8'),
     schemaBytes: Buffer.byteLength(JSON.stringify(tool.argsSchema), 'utf8') }));
@@ -16,10 +18,10 @@ export function toolsReport(pool: ReadonlyMap<string, ToolDefinition>): CommandR
       { label: 'What it does', minWidth: 24 }],
     lines: [
       ...tools.map((tool): ReportLine => ({ kind: 'columns', cells: [
-        [span(tool.name, 'code')], [span(toolPlanMode(tool.name, tool))],
+        [span(safe(tool.name, 240), 'code')], [span(toolPlanMode(tool.name, tool))],
         [span(measurements.get(tool.name)!.descriptionBytes, 'number')],
         [span(measurements.get(tool.name)!.schemaBytes, 'number')],
-        [span(toolSummary(tool.description))],
+        [span(toolSummary(safe(tool.description)))],
       ] })),
       { kind: 'space' },
       { kind: 'text', spans: [span(`Static wire cost: ${measured.reduce((sum, tool) => sum + tool.descriptionBytes, 0)} description bytes + ${measured.reduce((sum, tool) => sum + tool.schemaBytes, 0)} schema bytes. `),
@@ -28,12 +30,12 @@ export function toolsReport(pool: ReadonlyMap<string, ToolDefinition>): CommandR
       { kind: 'text', spans: [span('Plan mode permits only read-only bash commands and browser actions.')] },
       { kind: 'text', spans: [span(PERMISSIONS, 'warning')] },
     ],
-    facts: { count: tools.length, tools: tools.map(tool => ({ name: tool.name,
-      description: tool.description, planMode: toolPlanMode(tool.name, tool) })), permission: 'not-evaluated',
+    facts: { count: tools.length, tools: tools.map(tool => ({ name: safe(tool.name, 240),
+      description: safe(tool.description), planMode: toolPlanMode(tool.name, tool) })), permission: 'not-evaluated',
       // Static wire cost only; a token count requires the model's tokenizer.
       size: { unit: 'utf8-bytes', tokens: 'not-measured',
         descriptionBytes: measured.reduce((sum, tool) => sum + tool.descriptionBytes, 0),
-        schemaBytes: measured.reduce((sum, tool) => sum + tool.schemaBytes, 0), perTool: measured } },
+        schemaBytes: measured.reduce((sum, tool) => sum + tool.schemaBytes, 0), perTool: measured.map(tool => ({ ...tool, name: safe(tool.name, 240) })) } },
   });
 }
 

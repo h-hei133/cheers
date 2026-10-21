@@ -6,5 +6,10 @@ export const debugSyntax: CommandSyntax = {
   flags: [],
   actions: [
     { name: 'summary', summary: 'aggregate logs, crashes, timings, metrics and tools' },
+    { name: 'logs', summary: 'inspect recent structured log records' },
+    { name: 'crashes', summary: 'inspect retained crash records' },
+    { name: 'metrics', summary: 'inspect recorded counters and durations' },
+    { name: 'timings', summary: 'inspect startup measurements' },
+    { name: 'tools', summary: 'inspect the current tool catalog' },
   ],
 };

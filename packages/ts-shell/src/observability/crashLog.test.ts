@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { afterEach, describe, expect, it } from "vitest";
-import { MAX_CRASH_AGE_MS, MAX_CRASH_RECORDS, crashLogPath, installCrashRecorder, readCrashLog, readRecentCrashes, recordCrash } from "./crashLog.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { MAX_CRASH_AGE_MS, MAX_CRASH_RECORDS, crashLogPath, inspectCrashLog, installCrashRecorder, readCrashLog, readRecentCrashes, recordCrash } from "./crashLog.js";
 
 /**
  * A crash tears the terminal down as it goes, so the message scrolls away with
@@ -20,7 +20,65 @@ function tempFile(): string {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+describe('diagnostic crash inspection', () => {
+  it('distinguishes missing, invalid and mixed-validity sources without rewriting them', () => {
+    const file = tempFile();
+    expect(inspectCrashLog(file)).toMatchObject({ records: [], status: 'reported', reason: 'missing' });
+    for (const raw of ['{ not json', '{}']) {
+      fs.writeFileSync(file, raw);
+      expect(inspectCrashLog(file)).toMatchObject({ records: [], status: 'unavailable', reason: 'invalid' });
+      expect(fs.readFileSync(file, 'utf8')).toBe(raw);
+    }
+    const raw = JSON.stringify([{ nope: true }, { timestamp: 't', message: 'm', cwd: '/w', kind: 'uncaught-exception' }]);
+    fs.writeFileSync(file, raw);
+    expect(inspectCrashLog(file)).toMatchObject({ status: 'partial', invalidRecords: 1, records: [{ message: 'm' }] });
+    expect(fs.readFileSync(file, 'utf8')).toBe(raw);
+  });
+
+  it('refuses an oversized diagnostic source before reading, preserving the compatibility reader', () => {
+    const file = tempFile();
+    const raw = JSON.stringify([{ timestamp: 't', message: 'm'.repeat(1024), cwd: '/w', kind: 'uncaught-exception' }]);
+    fs.writeFileSync(file, raw);
+    const read = vi.spyOn(fs, 'readSync');
+    expect(inspectCrashLog(file, undefined, 100)).toMatchObject({ status: 'unavailable', reason: 'over-limit', records: [] });
+    expect(read).not.toHaveBeenCalled();
+    expect(readCrashLog(file)).toHaveLength(1);
+    expect(fs.readFileSync(file, 'utf8')).toBe(raw);
+  });
+
+  it('handles short reads and releases its descriptor on both valid and invalid JSON', () => {
+    const file = tempFile();
+    const raw = JSON.stringify([{ timestamp: 't', message: 'm', cwd: '/w', kind: 'uncaught-exception' }]);
+    fs.writeFileSync(file, raw);
+    const original = fs.readSync;
+    const close = vi.spyOn(fs, 'closeSync');
+    vi.spyOn(fs, 'readSync').mockImplementation(((fd: number, buffer: Buffer, offset: number, length: number, position: number | null) =>
+      original(fd, buffer, offset, Math.min(length, 3), position)) as typeof fs.readSync);
+    expect(inspectCrashLog(file)).toMatchObject({ status: 'reported', records: [{ message: 'm' }] });
+    expect(close).toHaveBeenCalledTimes(1);
+    fs.writeFileSync(file, '{bad');
+    close.mockClear();
+    expect(inspectCrashLog(file).status).toBe('unavailable');
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves unreadable status and keeps raw storage errors out of diagnostics', () => {
+    const file = tempFile();
+    vi.spyOn(fs, 'openSync').mockImplementation(() => { throw Object.assign(new Error('raw private details'), { code: 'EACCES' }); });
+    expect(inspectCrashLog(file)).toEqual({ records: [], status: 'unavailable', reason: 'unreadable', invalidRecords: 0 });
+  });
+
+  it('rejects non-file crash storage before reading from it', () => {
+    const file = tempFile();
+    fs.mkdirSync(file);
+    const read = vi.spyOn(fs, 'readSync');
+    expect(inspectCrashLog(file)).toMatchObject({ status: 'unavailable', reason: 'unreadable' });
+    expect(read).not.toHaveBeenCalled();
+  });
 });
 
 describe("recordCrash", () => {

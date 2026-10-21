@@ -41,7 +41,7 @@ export async function runToolsCommand(
     return { kind: "local", output: reportText(report), report };
   }
 
-  const report = toolsReport(registry);
+  const report = toolsReport(registry, context.cwd);
   return { kind: "local", output: reportText(report), report };
 }
 
