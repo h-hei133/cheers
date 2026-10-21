@@ -1,5 +1,6 @@
 import { configurationApplicationNotice } from "./configuration.js";
 import { ConfigWriteError } from '../../config/outcome.js';
+import type { ConfigEdit } from '../../config/persistence.js';
 import { connectSyntax, parseConnectArgs } from "./connect/syntax.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import {
@@ -74,6 +75,7 @@ export function __setOpenAIAccountAuthRunnerForTest(
 export async function runConnectCommand(
   args: string[],
   context: CommandContext,
+  baseline?: ConfigEdit<RuntimeConfigFile>,
 ): Promise<LocalCommandResult> {
   const parsed = parseConnectArgs(args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /connect arguments: ${parsed.reason}\n${syntaxHelp(connectSyntax)}` };
@@ -100,7 +102,7 @@ export async function runConnectCommand(
   }
   else if (action === "set") output = await addConnectionFromLegacyAuthSet(rest, onPersisted);
   else if (action === "use" || action === "activate") output = activateConnection(rest, onPersisted);
-  else if (action === "logout" || action === "remove" || action === "rm") output = removeConnection(rest, onPersisted);
+  else if (action === "logout" || action === "remove" || action === "rm") output = removeConnection(rest, onPersisted, baseline);
   else return { kind: "local", output: `Unknown /connect action: ${action}\n\n${getConnectHelpText()}` };
   return { kind: "local", output: [output, persisted ? configurationApplicationNotice(context,
     ['provider', 'activeProviderConnectionId', 'providerConnections', 'providerCredentials']) : undefined].filter(Boolean).join('\n') };
@@ -280,7 +282,7 @@ export function activateConnection(args: string[], onPersisted?: () => void): st
   ].join("\n");
 }
 
-export function removeConnection(args: string[], onPersisted?: () => void): string {
+export function removeConnection(args: string[], onPersisted?: () => void, baseline?: ConfigEdit<RuntimeConfigFile>): string {
   const syntax = parseConnectArgs(["logout", ...args]);
   if (!syntax.ok) return `Invalid /connect arguments: ${syntax.reason}\n${syntaxHelp(connectSyntax)}`;
   args = [...syntax.args];
@@ -289,12 +291,12 @@ export function removeConnection(args: string[], onPersisted?: () => void): stri
     return "Usage: /connect logout <connection-id|provider>";
   }
 
-  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const edit = baseline ?? readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   const userConfig = edit.values;
   const connections = normalizeConnections(userConfig);
   const existing =
     connections.find((connection) => connection.id === target) ??
-    connections.find((connection) => connection.provider === target);
+    (!baseline ? connections.find((connection) => connection.provider === target) : undefined);
   if (!existing) {
     return `Connection not found: ${target}`;
   }

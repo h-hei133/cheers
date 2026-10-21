@@ -35,6 +35,7 @@ import type { GitWorkbench } from '../../../workflow/git/service.js';
 import { gitPicker } from './git.js';
 import type { SecurityInspector } from '../../../security/view/inspection.js';
 import { cleansePicker } from './cleanse.js';
+import { authPicker, type SignInCommand } from './auth.js';
 
 /**
  * Which commands open a chooser.
@@ -56,6 +57,7 @@ export interface PickerHost extends SettingsHost {
   readonly undo: UndoHost;
   readonly gitWorkbench?: GitWorkbench;
   readonly security?: SecurityInspector;
+  readonly signIn?: SignInCommand;
   readonly jobs?: import('../../jobs/model.js').JobsComposition;
   readonly advisorState?: () => import('../../../advisor/model.js').AdvisorState | undefined;
   sessionContext(): SessionSelectionContext;
@@ -89,6 +91,8 @@ const PICKERS: Record<string, PickerFactory> = {
   mcp: (host) => serverPicker({ gateway: host.mcpGateway, refresh: host.refreshServer,
     ...(host.addMcpServer ? { add: () => mcpAddWizard(host.addMcpServer!) } : {}) }),
   connect: (host) => connectionPicker(host.commandContext),
+  login: host => authPicker(host.commandContext, 'login', host.signIn),
+  logout: host => authPicker(host.commandContext, 'logout'),
   permissions: (host) =>
     permissionPicker({
       policy: host.approvalTrustPolicy,

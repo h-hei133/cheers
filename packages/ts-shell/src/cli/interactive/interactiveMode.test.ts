@@ -83,6 +83,14 @@ function build(overrides: {
 }
 
 describe("session wiring", () => {
+  it('routes confirmed account sign-in through the normal command host with exact argument quoting', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { pickerHost(): PickerHost; run(line: string): Promise<void> };
+    const run = vi.spyOn(host, 'run').mockResolvedValue();
+    await host.pickerHost().signIn!(['login', 'openai', '--account']);
+    expect(run).toHaveBeenCalledWith('/connect "login" "openai" "--account"');
+    run.mockRestore();
+  });
   it('opens bare cleanse while work runs, keeps argument commands queued, and preserves pending overlays', () => {
     const { mode } = build();
     const host = mode as unknown as { busy: boolean; pickerPending: boolean; queue: SubmissionQueue; overlay: OverlayHost; onSubmit(text: string): void; openPicker(command: string): void };

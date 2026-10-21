@@ -1,4 +1,5 @@
 import { sessionPickerHost } from './picker/session/host.js';
+import { quoteCompletion } from './completion.js';
 import { sessionManagementPicker } from './picker/session/management.js';
 import type { ShellActionResult } from '../../core/commands/types.js';
 import { CatalogController } from "./completion/controller.js";
@@ -1110,6 +1111,7 @@ export class InteractiveMode {
         resume: sessionId => this.runCommandLine(`/resume ${sessionId}`),
       }),
       refreshServer: (serverName) => this.runCommandLine(`/mcp refresh ${serverName}`),
+      signIn: args => this.runCommandLine(`/connect ${args.map(arg => quoteCompletion(arg, '"')).join(' ')}`),
       addMcpServer: async (scope, name, definition) => {
         // The definition file is the existing publication input; it is private,
         // short-lived, and deleted whether the command succeeds or refuses.

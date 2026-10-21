@@ -301,3 +301,10 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 身份与内容hash在选择前复核；live、无owner的pending→unknown、durability unknown分别保留；外部更新/存储不可用/恢复由视图订阅观察，关闭释放计时器和原owner监听。普通同绑定session对象刷新保留process-only未知receipt；同ID换根使旧视图stale，重开绑定新owner。
 - 独立复核发现并修复任意保留remediation status的控制符/凭据泄露、草稿target的C1/凭据绕过，以及缓存换根恢复和同绑定未知证据丢失。最终8文件203项、13项有效反转、生产strict TS、双构建通过；四格Node/exe × regular/fullscreen验证96条记录、全文细节搜索、确认仅草稿、取消零写、实时故障恢复和外部更新。完整日志、独立复核和最终交付按开发日志实际结果记录。
 - 资源合同仍WATCH：每秒同步读取完整session、解码/hash再去重；4MiB/32/64是持久owner限制，保留durability unknown影子证据可超过它们。没有进程总内存、累计I/O或响应上界证据，不据此关闭PAN-06或收窄全部47项范围。
+
+
+## 2026-10-21 `/login` 与 `/logout` 面板入口（PAN-07 部分）
+
+- 裸login经provider/实际支持的account method及cancel缺省确认复用原可取消命令host；API key只产原命令草稿。logout逐条列primary saved connections，完整身份不按label/provider推导；安全投影不含凭据，精确确认带原ConfigEdit进既有writer。打开/取消不写，配置/publication/owner变化拒绝，原writer保留并发冲突与unknown语义。参数与非交互路径继续原路由。
+- 独立复核发现的compatible relay重复行与flag-shaped saved ID拒绝均已修复。最终6文件253项、strict TS、fresh双构建、七项有效反转、四格专用PTY通过；真实删除只影响选定连接，state/transcript/metadata/工作区原字节保持。原生账户取消合成测试为pending→error，不声称真实登录已验收。证据与精确交付见日志。
+- 代码APPROVE/架构WATCH，综合COMMENT：全配置同步读取/哈希/availability投影尚无资源上界；没有据此关闭PAN-07、其他面板或全部47项。debug/plugin与完整认证生命周期仍按原裁决复核。上批cleanse的精确SHA CI/Watch均success，本批提交/推送/新SHA结果分别取证。
