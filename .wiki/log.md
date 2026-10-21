@@ -8144,3 +8144,9 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 最终19文件/266项聚焦、独立4文件/65项（重叠不相加）、脚本97项通过；生产 `tsc -p packages/ts-shell/tsconfig.build.json --noEmit` 实际exit0/零诊断。双构建通过，fresh TS manifest `0f0b2a43806e3243da632107d11b9c18a74afdaa80614a8e3f6c2794429421f0`，inputs `668e5425049487984425764e74b8048332e0dd49d7340b1cca97f8b0a08ca934`，artifact `4a31b32bbad1f3ee98f75c79def5096693fd59c36bd72daffe9af4fb14bafb93`；exe 102680704 bytes、SHA256 `702c09bc9c57c530a3ca10250febba421553ae50d615987eb899dc685891a92b`。
 - 最终构建Linux八格 `phase20-restore-pages-pty.log` 全PASS/exit0；文件/record/blob原字节保持，任务/审批/配置/profile等既有合成链不变。`verify:cli-entry` 19项通过；四项隔离加载反转分别放宽page size、移除cursor revision、取消完整query过滤、移除search generation，全为真实断言失败exit1，源码未改。材料 `phase20-restore-pages-reverse-*-final.log`。
 - cycles/config/declarations/Node floor与strict docs drift通过，118条既有docs advisory；仓库tgz NormProof exit0/partial，blocking unresolved及混合cycles satisfied，仍8项既有ceiling advisory；新catalog/picker分别5/12个function-like names。PAN-06的history/back/undo与copy剩余合同、line/pipe完整profile/save、其余47项继续；本批尚未提交推送，远端结果待精确SHA查询，不把本地通过当作CI完成。
+### 2026-10-21 PAN-02 排队 tree 的延迟焦点
+
+- 基线 `829a8694`。真实排队入口 `InteractiveMode.run('/tree')` 在 load 前展开 picker，提前求值 `initialSelection`，加载后 Enter 实际选择较旧节点。改为复制属性描述符并保留 prototype，仅覆盖 exclusive，动态 getter 继续由 OverlayHost 在加载后读取。
+- 定向参考的树选择器先读取实际 current leaf 并以其聚焦；本实现保留相同语义，继续使用现有 Picker/OverlayHost，不增加导航或写入路径。真实排队用例在修复前断言失败；加载时反转回对象展开又实际得到 `older` 而非 `current`，退出 1。
+- 受影响 4 文件/129 项通过；生产 strict TypeScript、TS/exe 两构建、import cycles、config consumers、declarations、Node floor、strict docs drift 通过；docs 保留 118 条既有 advisory。Linux Node/exe × regular/fullscreen/line/pipe 八格合成 QA 退出 0。独立代码 APPROVE、架构 CLEAR，精确两文件 hash 匹配。
+- 打包入口 gate 全项通过。当前为本地证据；提交、推送和新 SHA CI 后续实际读回。全部 47 项继续按原范围 active。

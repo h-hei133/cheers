@@ -60,7 +60,7 @@
 | 任务 | 所有者 | 证据 | 反转 |
 |---|---|---|---|
 | PAN-01 连接/具名角色选择 | `picker/model.ts` | picker/model、pickers；两栏内保留 target 对象和 admission | 同名 model 不区分 connection、失效项可执行或只应用默认角色时失败 |
-| PAN-02 | `picker/session.ts`、`picker/session/preview.ts`、`picker/session/listing.ts`、`tree.ts` | session（33）、session/listing（5）、tree（4）、overlay（64）、panel（11）、management（20）、catalog projection（1） | 分组行可选中、完整目录搜索只扫描首屏、旧 query/scope 回填、10k 页在 41 项批处理边界失败、窄屏 footer 丢状态、连接线/current focus 缺失或跨项目动作被放行时失败 |
+| PAN-02 | `picker/session.ts`、`picker/session/preview.ts`、`picker/session/listing.ts`、`tree.ts` | session（33）、session/listing（5）、tree（4）、overlay（64）、panel（11）、management（20）、catalog projection（1）；真实排队 `/tree` 在 load 后读取 current focus，exclusive 包装保留 getter | 分组行可选中、完整目录搜索只扫描首屏、旧 query/scope 回填、10k 页在 41 项批处理边界失败、窄屏 footer 丢状态、连接线/current focus 缺失或跨项目动作被放行时失败；反转对象展开会实际选中旧节点 |
 | PAN-03 | `picker/hub.ts` | pickers（39） | `/hub` 在无 composition 时仍打开或 apply 取消任务时失败 |
 | PAN-04 | `cli/usage/service.ts` | usage（31） | 无限分母输出百分比时失败 |
 | PAN-05（部分） | `picker/advisor.ts`、`core/commands/report/projection.ts`、`btwCommandRuntime` | advisor 只读 checkpoint/note 面板；plan-review 与 btw 结构化报告；打开面板不发模型请求，模型工作走显式命令 | 面板打开触发模型、旧流串入新面板或 plan/btw 越权写入主会话时失败 |

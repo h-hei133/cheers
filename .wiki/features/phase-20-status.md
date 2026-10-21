@@ -49,6 +49,8 @@ checkpoint 批已推送为 `c0f065385597e6cb3a5138b22a5fb7ba65360ad6`，Architec
 
 用户已允许后续验证的环境/真实模型项：START-03 受控冷缓存及剩余响应测量、QA-02 跨平台/IME/系统复制、QA-03 真实质量、TOOL-02 成本与 tokenizer 校准。**这项保留不覆盖可在本地完成的缺失实现和合成端到端验收。**
 
+2026-10-21 PAN-02 再次复现真实排队 `/tree` 的焦点错误：exclusive 包装的对象展开在 load 前读掉 `initialSelection` getter，Enter 因而选中旧节点。现在保留属性描述符及 prototype；真实 `InteractiveMode.run('/tree')` 回归先失败后通过，对象展开反转再次失败。受影响 4 文件/129 项、生产类型检查、双构建、打包入口 gate、静态门和 Linux 八格隔离 QA 通过；独立 code APPROVE、architecture CLEAR。该批提交与精确 SHA CI 仍按日志实际结果记录，不据此闭合全阶段。
+
 PRV-04 谱系批本地验收通过：38 文件/682 项、14 项有效反转、两构建、跨进程复制槽位/五组恢复/三组 V1 迁移/default 与 named profile 替换拒绝、Linux Node/exe × regular/fullscreen 四格 PTY。最终独立复核 APPROVED、5 文件/178 项及原生探针通过，计数与本地集重叠不相加。完整 TypeScript 诊断相对 `e4ae423d` 为 149/149、无新增，不能记为全项目 tsc 通过。该批提交/推送/新 SHA CI 按日志及实际查询记录；PRV-03/05 已复现的池外授权与乱序退避、CTX-03 和其余全部 47 项继续原范围。
 
 谱系批已推送为 `87a55c5f0b4fcbdab5a063e0b74a6d399c0f0692`；Architecture Watch `39140810147` success，CI `39140810129` failure，7 项入口续期测试失败、8808 项通过。失败来自旧夹具伪造续期 payload，未提供新的原生响应凭证；当前夹具改走实际原生解码、验证 HTTP 前 dispatched，并补伪造结果拒绝，8 项通过。此失败记录保留，不当作旧 SHA CI 通过。

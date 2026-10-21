@@ -1007,7 +1007,11 @@ export class InteractiveMode {
   private openPicker(command: string, waitForApply = false): void {
     const picker = pickerFor(command, this.pickerHost());
     if (!picker) return;
-    this.overlay.open(waitForApply ? { ...picker, exclusive: true } : picker);
+    // Picker getters may depend on load/search completing; keep them lazy.
+    this.overlay.open(waitForApply ? Object.create(Object.getPrototypeOf(picker), {
+      ...Object.getOwnPropertyDescriptors(picker),
+      exclusive: { value: true, enumerable: true },
+    }) as Picker : picker);
   }
 
   /** Hand the choice to the picker that produced it and surface what it reports. */

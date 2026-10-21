@@ -30,6 +30,8 @@ import * as management from '../../session/lifecycle/management.js';
 import * as undoService from '../../edit/recovery/undo/service.js';
 import type { UndoPreview } from '../../edit/recovery/operation/preview.js';
 import * as goalScheduling from '../runtime/goalScheduling.js';
+import * as sessionNavigation from '../../session/query/navigation.js';
+import { parseKeyEvent } from '../../presentation/tui/input/keys.js';
 import type { SubmissionQueue } from './inputQueue.js';
 import type { InteractiveApprovalResult } from './picker/approval.js';
 
@@ -209,6 +211,25 @@ describe("session wiring", () => {
       expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).not.toContain('PRIVATE_RESPONSE_BODY');
       expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).not.toContain('No matching tools');
     } finally { mode.stop(); }
+  });
+
+  it('reads the current tree focus after loading through the queued command path', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void> };
+    const navigation = vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({
+      points: [
+        { entryId: 'older', label: 'Older question', depth: 0, current: false, prompt: 'older' },
+        { entryId: 'current', label: 'Current question', depth: 1, current: true, prompt: 'current' },
+      ],
+    } as ReturnType<typeof sessionNavigation.readSessionNavigation>);
+    mode.start();
+    try {
+      await host.run('/tree');
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).toContain('Current question'));
+      const selected = vi.fn();
+      host.overlay.handleKey(parseKeyEvent('\r'), selected);
+      expect(selected).toHaveBeenCalledWith(expect.objectContaining({ exclusive: true }), ['current']);
+    } finally { mode.stop(); navigation.mockRestore(); }
   });
 
   it('inspects the host tool pool through the real picker and retains a copyable report without taking the turn sink', async () => {
