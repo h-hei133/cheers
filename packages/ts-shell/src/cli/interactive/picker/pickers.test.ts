@@ -18,12 +18,23 @@ import { textBlock } from "../../../presentation/tui/transcript/blocks.js";
 const CONTEXT = { cwd: "/workspace", sessionId: "sess_test" };
 
 describe("which commands open a chooser", () => {
-  it.each(["/resume", "/pin", "/history", "/mcp", "/connect", "/restore", "/marketplace", "/plugin", "/copy"])(
+  it.each(["/resume", "/pin", "/history", "/mcp", "/connect", "/restore", "/marketplace", "/plugin", "/copy", "/cleanse"])(
     "opens one for a bare %s",
     (command) => {
       expect(opensPicker(command)).toBe(true);
     },
   );
+
+  it('opens cleanse as a read-only retained-evidence inspector', async () => {
+    const host = {
+      commandContext: CONTEXT,
+      security: { read: () => ({ state: 'ready', snapshot: { identity: { sessionId: 's', workspaceRoot: '/workspace' }, version: '1', items: [] } }), subscribe: () => () => undefined },
+    } as unknown as PickerHost;
+    const picker = pickerFor('/cleanse', host)!;
+    expect(picker.title).toContain('retained diagnostics');
+    expect(await picker.load()).toEqual([]);
+    expect(opensPicker('/cleanse diagnose scan-1')).toBe(false);
+  });
 
   it("disables effort levels the selected model cannot honour", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "thinking-picker-"));

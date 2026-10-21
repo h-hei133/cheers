@@ -33,6 +33,8 @@ import { undoPicker } from './undo.js';
 import type { UndoHost } from '../../../edit/recovery/undo/service.js';
 import type { GitWorkbench } from '../../../workflow/git/service.js';
 import { gitPicker } from './git.js';
+import type { SecurityInspector } from '../../../security/view/inspection.js';
+import { cleansePicker } from './cleanse.js';
 
 /**
  * Which commands open a chooser.
@@ -53,6 +55,7 @@ export interface PickerHost extends SettingsHost {
   readonly statusItems: readonly StatusItemId[];
   readonly undo: UndoHost;
   readonly gitWorkbench?: GitWorkbench;
+  readonly security?: SecurityInspector;
   readonly jobs?: import('../../jobs/model.js').JobsComposition;
   readonly advisorState?: () => import('../../../advisor/model.js').AdvisorState | undefined;
   sessionContext(): SessionSelectionContext;
@@ -114,6 +117,7 @@ const PICKERS: Record<string, PickerFactory> = {
   hub: host => host.jobs ? hubPicker(host.jobs) : undefined,
   advisor: host => { const state = host.advisorState?.(); return state ? advisorPicker(state) : undefined; },
   git: host => gitPicker(host.gitWorkbench),
+  cleanse: host => cleansePicker(host.security),
 };
 
 function savedSessionPicker(host: PickerHost, action: 'resume' | 'pin'): Picker {

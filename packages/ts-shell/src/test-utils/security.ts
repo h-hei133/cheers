@@ -41,7 +41,7 @@ export function createSecurityHarness(native = false) {
     if (request.args.includes('--sarif')) return analyzerResult(request, JSON.stringify(sarifFixture(file, found)));
     return analyzerResult(request, JSON.stringify({ version: '1.30.2', paths: { scanned: files }, errors: [], results: found ? [{ check_id: 'unsafe-dynamic-code', path: file, start: { line: 1 } }] : [] }));
   });
-  const host = { store: { read: () => store.read(), write: (update: Parameters<SecurityStore['write']>[0]) => store.write(update) }, root: () => root,
+  const host = { sessionId: session.id, store: { read: () => store.read(), write: (update: Parameters<SecurityStore['write']>[0]) => store.write(update) }, root: () => root,
     homeParent: () => manager.getSessionDirPath(session.id), busy: () => busy, sourceAccess: (_absolute: string) => undefined,
     execution: { ...execution, runCommand: run }, gate: () => ({ sessionId: session.id, workspaceRoot: root, permissionScope: 'ask' as const,
       hooks: new HookDispatcher(), emit: () => undefined, escalationPromptHandler: async (prompt: EscalationPrompt) => { approvals.push(prompt); return approval(prompt); } }) };

@@ -18,21 +18,31 @@ import { verifiesRemediation } from './remediation/verification.js';
 import { securityReport, scanReport, sortedFindings } from './view/report.js';
 import { exportReport, exportTool } from './view/export.js';
 import { SecurityPublication } from './findings/publication.js';
+import { inspectionState, securityInspection, type SecurityInspectionSnapshot } from './view/inspection.js';
 import type { ExecutionService } from '../runtime/execution/types.js';
 import { readOperation, captureOperationScope } from '../edit/recovery/operation/store.js';
 
 export interface SecurityHost {
+  readonly sessionId: string;
   readonly store: SecurityStore; readonly root: () => string; readonly homeParent: () => string;
   readonly gate: (tool?: 'bash' | 'apply_patch' | 'security_propose') => ToolGateOptions; readonly busy: () => boolean; readonly sourceAccess: (absolute: string) => void;
   readonly execution?: ExecutionService;
 }
 export class SecurityService {
   private active?: { readonly id: string; readonly controller: AbortController };
+  private applying?: string;
   readonly publication: SecurityPublication;
   constructor(readonly host: SecurityHost) { this.publication = new SecurityPublication(host.store); }
   state(): SecurityState { const state = this.host.store.read(); return { ...state,
     scans: state.scans.map(item => this.publication.scans.get(item.id) ?? item),
     remediations: state.remediations.map(item => this.publication.remediations.get(item.id) ?? item) }; }
+  inspection(): SecurityInspectionSnapshot {
+    const state = inspectionState(this.host.store.read(), this.publication.scans.values(), this.publication.remediations.values());
+    return securityInspection(state, { sessionId: this.host.sessionId, workspaceRoot: this.host.root(), liveScanId: this.active?.id, liveRemediationId: this.applying });
+  }
+  subscribeInspection(listener: () => void): () => void {
+    return this.publication.subscribe(listener);
+  }
   plan(executable: string, version: string, rules: string, files: readonly string[]): LocalCommandResult {
     this.assertIdle(); const plan = prepareScan({ root: this.host.root(), executable, version, rules, files,
       home: path.join(this.host.homeParent(), `security-${randomUUID()}`), sourceAccess: this.host.sourceAccess });
@@ -56,7 +66,7 @@ export class SecurityService {
         this.publication.scan({ ...observed, status: 'unknown', note: 'Analyzer result publication was not confirmed; inspect retained execution receipts before retrying.' });
       }
       return scanReport(this.publication.scans.get(id) ?? this.scanRecord(id));
-    } finally { this.active = undefined; }
+    } finally { this.active = undefined; this.publication.notify(); }
   }
   status(id?: string): LocalCommandResult {
     const scan = this.publication.scans.get(id ?? '') ?? this.scanRecord(id); return scanReport(scan, ['running', 'permission-pending'].includes(scan.status) && this.active?.id !== scan.id);
@@ -108,6 +118,7 @@ export class SecurityService {
     if (!['open', 'false-positive', 'accepted-risk'].includes(decision) || !scan.findings.some(item => item.fingerprint === fingerprint) || !reason.trim() || reason.length > 2000) throw new Error('A real finding and explicit bounded disposition reason are required.');
     const safe = redactReportText(reason, 2000); if (!safe) throw new Error('Disposition reason is empty after redaction.');
     this.host.store.write(state => ({ ...state, dispositions: [...state.dispositions, { scanId: id, fingerprint, state: decision, reason: safe, at: new Date().toISOString() }] }));
+    this.publication.notify();
     return this.show(id, fingerprint);
   }
   propose(id: string, fingerprint: string, input: string, currentModelCall = false): LocalCommandResult {
@@ -126,12 +137,15 @@ export class SecurityService {
     const original = this.scanRecord(id); const finding = original.findings.find(item => item.fingerprint === fingerprint);
     if (original.origin !== 'local' || !finding || Object.keys(proposal.expectedHashes).length !== 1 || Object.keys(proposal.afterHashes).length !== 1
       || proposal.expectedHashes[finding.path] !== finding.sourceDigest || !proposal.afterHashes[finding.path]) throw new Error('Security patch authorization no longer matches its native finding.');
-    const pending = { ...proposal, status: 'permission-pending' as const }; this.publication.remediation(pending);
-    const result = await runSecurityTool(remediationTool(proposal, next => this.publication.remediation(next)),
-      { input: proposal.input, expectedHashes: proposal.expectedHashes }, this.host.gate('apply_patch'), undefined, proposal.id);
-    const observed = this.state().remediations.find(item => item.id === proposalId)!;
-    if (observed.status === 'permission-pending') this.publication.remediation({ ...observed, status: 'unknown' });
-    return securityReport('Security patch', [result.output, 'Applied and native verified are separate states.'], { proposalId, status: this.state().remediations.find(item => item.id === proposalId)!.status });
+    this.applying = proposal.id;
+    try {
+      const pending = { ...proposal, status: 'permission-pending' as const }; this.publication.remediation(pending);
+      const result = await runSecurityTool(remediationTool(proposal, next => this.publication.remediation(next)),
+        { input: proposal.input, expectedHashes: proposal.expectedHashes }, this.host.gate('apply_patch'), undefined, proposal.id);
+      const observed = this.state().remediations.find(item => item.id === proposalId)!;
+      if (observed.status === 'permission-pending') this.publication.remediation({ ...observed, status: 'unknown' });
+      return securityReport('Security patch', [result.output, 'Applied and native verified are separate states.'], { proposalId, status: this.state().remediations.find(item => item.id === proposalId)!.status });
+    } finally { this.applying = undefined; this.publication.notify(); }
   }
   async validate(id: string, fingerprint?: string): Promise<LocalCommandResult> {
     this.assertIdle(); const original = this.scanRecord(id);

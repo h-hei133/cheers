@@ -48,7 +48,7 @@ import { handoffControl, handoffCommandFor } from '../runtime/handoff.js';
 import { directorControl, directorCommandFor, directorInterruptible } from '../runtime/director.js';
 import { evaluationCommandFor, evaluationInterruptible, cancelEvaluationFor, evaluationControl } from '../runtime/evaluation.js';
 import { mediaCommandFor, mediaControl, cancelMediaCommand, mediaInterruptible, excludeRecordingInput, recordingFrameProvider } from '../runtime/media.js';
-import { isSecurityControl, securityCommandFor } from '../runtime/security.js';
+import { isSecurityControl, securityCommandFor, securityInspectorFor } from '../runtime/security.js';
 import { isAgentsControl, agentsCommandFor } from '../runtime/agents.js';
 import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
 import { sshControl, runSshControl } from '../ssh/control.js';
@@ -841,6 +841,10 @@ export class InteractiveMode {
       this.tui.requestRender();
       return;
     }
+    if (this.busy && !this.pickerPending && !this.questions.question() && !this.overlay.active && /^\/cleanse$/i.test(text.trim())) {
+      this.openPicker(text);
+      return;
+    }
     if (!this.busy && opensPicker(text)) {
       this.openPicker(text);
       return;
@@ -1098,6 +1102,7 @@ export class InteractiveMode {
       undo: undoPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null }),
       gitWorkbench: gitWorkbenchFor(this.options.runtimeContext),
+      security: securityInspectorFor(this.options.runtimeContext),
       jobs: jobsFor(this.options.runtimeContext),
       advisorState: () => decodeAdvisor(readBoundSessionState(this.options.sessionManager, this.options.runtimeContext.session).state.advisor),
       ...sessionPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,

@@ -294,3 +294,10 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 本地最终6文件251项及生产strict TS/静态门通过，真实元数据集成验证pin/unpin、外部更新拒绝、活动身份与state/transcript不变。初次夹具误把目录首个增量当最终结果，后一次误断言unpinned序列化为false；现分别按真实订阅与省略false的既有codec精确验证。双构建/打包/独立复核/交付依最终日志，不借用旧证据。history和cleanse仍缺独立面板入口，PAN-06不闭合。
 
 - pin最终四项有效反转、fresh TS/exe、四格专用PTY、八格smoke和19项入口全通过；独立代码APPROVE、架构CLEAR，综合APPROVE，五文件hash绑定。四格验证真实pin/unpin、取消不写、stale拒绝、直接参数，以及活动会话/state/transcript/工作区不变。copy提交`588efa2b`的CI`39544701974`于`2026-10-21T04:46:39Z` completed/success，9398项通过/3跳过；其Watch亦success。pin新SHA交付继续按实际更新。
+
+## 2026-10-21 `/cleanse` 保留诊断面板
+
+- 裸命令现沿原security owner的结构化快照和发布事件，浏览保留扫描/修复证据；诊断参数形式仍走原命令，选择只生成带引号的精确诊断草稿。打开/搜索/关闭不启动分析或修复、不取消执行、不写会话或文件；运行中无待处理overlay时可打开只读面板，审批/排队控制继续保留。
+- 身份与内容hash在选择前复核；live、无owner的pending→unknown、durability unknown分别保留；外部更新/存储不可用/恢复由视图订阅观察，关闭释放计时器和原owner监听。普通同绑定session对象刷新保留process-only未知receipt；同ID换根使旧视图stale，重开绑定新owner。
+- 独立复核发现并修复任意保留remediation status的控制符/凭据泄露、草稿target的C1/凭据绕过，以及缓存换根恢复和同绑定未知证据丢失。最终8文件203项、13项有效反转、生产strict TS、双构建通过；四格Node/exe × regular/fullscreen验证96条记录、全文细节搜索、确认仅草稿、取消零写、实时故障恢复和外部更新。完整日志、独立复核和最终交付按开发日志实际结果记录。
+- 资源合同仍WATCH：每秒同步读取完整session、解码/hash再去重；4MiB/32/64是持久owner限制，保留durability unknown影子证据可超过它们。没有进程总内存、累计I/O或响应上界证据，不据此关闭PAN-06或收窄全部47项范围。

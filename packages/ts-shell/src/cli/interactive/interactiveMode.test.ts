@@ -83,6 +83,43 @@ function build(overrides: {
 }
 
 describe("session wiring", () => {
+  it('opens bare cleanse while work runs, keeps argument commands queued, and preserves pending overlays', () => {
+    const { mode } = build();
+    const host = mode as unknown as { busy: boolean; pickerPending: boolean; queue: SubmissionQueue; overlay: OverlayHost; onSubmit(text: string): void; openPicker(command: string): void };
+    host.busy = true;
+    const open = vi.spyOn(host, 'openPicker').mockImplementation(() => undefined);
+    host.onSubmit('/cleanse');
+    expect(open).toHaveBeenCalledOnce();
+    expect(host.queue.shift()).toBeUndefined();
+    host.onSubmit('/cleanse verify scan-1');
+    expect(open).toHaveBeenCalledOnce();
+    expect(host.queue.shift()).toBe('/cleanse verify scan-1');
+    host.pickerPending = true;
+    host.onSubmit('/cleanse');
+    expect(open).toHaveBeenCalledOnce();
+    expect(host.queue.shift()).toBe('/cleanse');
+    host.pickerPending = false;
+    host.overlay.open({ title: 'Pending permission', form: 'panel', empty: 'pending', load: async () => [], apply: async () => undefined });
+    host.onSubmit('/cleanse');
+    expect(open).toHaveBeenCalledOnce();
+    expect(host.queue.shift()).toBe('/cleanse');
+    host.overlay.close();
+  });
+
+  it('opens queued cleanse through the real picker without starting a turn', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { overlay: OverlayHost; run(text: string): Promise<void>; pickerHost(): PickerHost; sink: { begin(): void } };
+    const original = host.pickerHost(); const begin = vi.spyOn(host.sink, 'begin');
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, security: {
+      read: () => ({ state: 'ready', snapshot: { identity: { sessionId: 'sess_1', workspaceRoot: '/workspace' }, version: 'v1', items: [] } }),
+      subscribe: () => () => undefined,
+    } });
+    await host.run('/cleanse');
+    await vi.waitFor(() => expect(stripAnsi(host.overlay.render(120, 30).join('\n'))).toContain('No retained security scans'));
+    expect(begin).not.toHaveBeenCalled();
+    host.overlay.close();
+  });
+
   it('interrupts goal scheduling between rounds without discarding the human draft', async () => {
     const { mode, terminal } = build();
     const host = mode as unknown as { options: { sessionRuntime: ShellSessionRuntime }; view: InteractiveView };
