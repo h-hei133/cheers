@@ -5,6 +5,7 @@ import { createReport, span } from '../report/projection.js';
 import type { RequestContext, TextSize } from '../../../context/request/model.js';
 import { CHARS_PER_TOKEN } from '../../../session/context.js';
 import { requestDetails } from './request.js';
+import { reportMetadata } from '../report/metadata.js';
 
 export function contextReport(input: {
   readonly resolution: ResolvedContextWindow;
@@ -18,16 +19,17 @@ export function contextReport(input: {
   readonly toolCount: number;
   readonly totalTokens: number;
   readonly turns: number;
-}) {
+}, projectRoot = process.cwd()) {
   const { resolution, used, reserve, schemaTokens, toolCount } = input;
   const measurement = input.measurement ?? (used === undefined ? 'unknown' : 'measured');
   const window = resolution.window;
   const free = used === undefined ? undefined : Math.max(0, window - used - reserve);
   const compactAt = Math.max(0, window - reserve);
+  const warning = resolution.warning === undefined ? undefined : reportMetadata(resolution.warning, projectRoot);
   const lines: ReportLine[] = [
     { kind: 'text', bullet: true, spans: [span('Window: '), span(window.toLocaleString(), 'number'),
       span(` tokens (${resolution.source === 'default' ? 'assumed default' : resolution.source})`)] },
-    ...(resolution.warning ? [{ kind: 'text' as const, bullet: true, spans: [span(`Warning: ${resolution.warning}`, 'warning')] }] : []),
+    ...(warning ? [{ kind: 'text' as const, bullet: true, spans: [span(`Warning: ${warning}`, 'warning')] }] : []),
   ];
   if (used === undefined) {
     lines.push({ kind: 'text', bullet: true, spans: [span('Current tool schema estimate: '),
@@ -57,11 +59,11 @@ export function contextReport(input: {
   if (input.schemaSize) lines.push({ kind: 'space' }, { kind: 'text', spans: [span(
     `Current tool definitions: ${input.schemaSize.bytes.toLocaleString()} UTF-8 bytes, ${input.schemaSize.codeUnits.toLocaleString()} UTF-16 code units of JSON; estimate divides code units by ${CHARS_PER_TOKEN}.`,
   )] });
-  const request = requestDetails(input.request);
+  const request = requestDetails(input.request, projectRoot);
   lines.push(...request.lines);
   return createReport({ title: 'Context window',
     columns: [{ label: 'What', minWidth: 20 }, { label: 'Value', align: 'right', minWidth: 8 }, { label: 'How it is known', minWidth: 24 }],
-    lines, facts: { window: { tokens: window, source: resolution.source, warning: resolution.warning ?? null },
+    lines, facts: { window: { tokens: window, source: resolution.source, warning: warning ?? null },
       prompt: used === undefined ? { status: measurement === 'stale' ? 'stale' : 'unknown',
         estimate: { status: 'estimated', tokens: schemaTokens, basis: 'current-tool-schemas' } }
         : { status: 'measured', tokens: used },

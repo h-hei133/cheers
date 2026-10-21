@@ -11,6 +11,10 @@ import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { reportText } from "./report/projection.js";
 import { renderReport } from "../../presentation/tui/report/renderer.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
+import { getSessionUsage } from '../../observability/usageTelemetry.js';
+import { costModel } from './cost/model.js';
+import { costReport } from './cost/report.js';
+import { captureUsageAttribution } from '../../observability/usage/identity.js';
 
 /**
  * `/cost` renders one table per model.
@@ -45,6 +49,47 @@ afterEach(() => {
 });
 
 describe("runCostCommand", () => {
+  it('scrubs legacy and captured metadata only after exact grouping and price lookup', async () => {
+    const session = 'cost-safe-metadata'; resetSessionUsage(session);
+    const names = ['sk-\x1b[31msynthetic-sensitive-one', 'sk-\x1b[32msynthetic-sensitive-two', '@usage:sk-\x1b[31msynthetic-sensitive-legacy'];
+    const prices = names.map((id, index) => ({ id, cost: { promptPerMTok: index + 1, completionPerMTok: 0 } }));
+    vi.spyOn(catalogStore, 'loadCatalog').mockReturnValue([{ id: 'fixture', models: prices }]);
+    for (const model of names) recordSessionUsage(session, { model, provider: '', promptTokens: 1_000_000 });
+    const attribution = captureUsageAttribution({ provider: 'password=synthetic-sensitive-provider', model: 'sk-\x1b[31msynthetic-sensitive-captured',
+      baseUrl: 'https://fixture.invalid/v1?api_key=synthetic-never-copied', rates: { promptPerMTok: 4, completionPerMTok: 0 } });
+    recordSessionUsage(session, { provider: attribution.provider, model: attribution.model, attribution, promptTokens: 1_000_000 });
+    const telemetry = getSessionUsage(session), before = JSON.stringify(telemetry);
+    const model = costModel(telemetry, [{ id: 'fixture', models: prices }]);
+    const report = costReport(model), result = await runCostCommand([], { cwd: workspace(), sessionId: session });
+    for (const output of [JSON.stringify(report), reportText(report), JSON.stringify(result)]) expect(output).not.toContain('synthetic-sensitive');
+    expect(report.facts).toMatchObject({ recordedTokens: 4_000_000, recordedTurns: 4, estimate: { usd: 10 } });
+    expect((report.facts.models as Array<{ estimate: { usd: number } }>).map(bucket => bucket.estimate.usd).sort()).toEqual([1, 2, 3, 4]);
+    expect(model.buckets).toHaveLength(4); expect(model.modelCount).toBe(4);
+    const projected = report.facts.models as Array<{ key: string; label: string }>;
+    expect(new Set(projected.map(bucket => bucket.key)).size).toBe(4);
+    expect(projected.every(bucket => /^redacted:[a-f0-9]{64}$/.test(bucket.key))).toBe(true);
+    expect(costReport(model).facts.models).toEqual(report.facts.models);
+    expect(model.buckets.some(bucket => bucket.model === names[0])).toBe(true);
+    expect(JSON.stringify(telemetry)).toBe(before);
+  });
+
+  it('rejects an obsolete original admission before reading accounting configuration', async () => {
+    const read = vi.fn(() => ({ config: getRuntimeConfig(), catalog: [] }));
+    const result = await runCostCommand([], { cwd: workspace(), admission: () => 'original binding changed', readConfiguration: read });
+    expect(result.output).toBe('original binding changed'); expect(result.report).toBeUndefined(); expect(read).not.toHaveBeenCalled();
+  });
+
+  it('uses the original command workspace for safe paths without changing ledger names', async () => {
+    const cwd = workspace(), session = 'cost-report-path', name = `file://${cwd}/meter`;
+    const attribution = captureUsageAttribution({ provider: 'fixture', model: name, baseUrl: 'https://fixture.invalid',
+      rates: { promptPerMTok: 1, completionPerMTok: 0 } });
+    resetSessionUsage(session); recordSessionUsage(session, { provider: attribution.provider, model: name, attribution, promptTokens: 1 });
+    vi.spyOn(catalogStore, 'loadCatalog').mockReturnValue([]);
+    const result = await runCostCommand([], { cwd, sessionId: session });
+    expect(result.report?.facts.models).toMatchObject([{ model: '[project]/meter', attribution: { model: '[project]/meter' } }]);
+    expect((result.report?.facts.models as Array<{ label: string }>)[0]?.label).toBe('fixture/[project]/meter · https://fixture.invalid · destination 1');
+    expect(Object.values(getSessionUsage(session).byModel)[0]?.attribution?.model).toBe(name);
+  });
   it('keeps a positive cache estimate visible below four decimal places', async () => {
     const session = 'tiny-cache'; resetSessionUsage(session);
     for (let index = 0; index < 2; index++) recordSessionUsage(session, { provider: 'priced', model: 'meter', promptTokens: 1025 });

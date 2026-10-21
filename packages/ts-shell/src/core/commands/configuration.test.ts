@@ -8,7 +8,8 @@ import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../shell/r
 import { configurationAdmission } from '../shell/configuration.js';
 import { resolveCliCredential } from '../../cli/provider/cliProviderRuntimeBridge.js';
 import { SessionManager } from '../../session/SessionManager.js';
-import { recordSessionUsage } from '../../observability/usageTelemetry.js';
+import { recordRequestContext, recordSessionUsage } from '../../observability/usageTelemetry.js';
+import { requestContext } from '../../context/request/projection.js';
 import * as transport from '../../provider/request/fetch.js';
 import * as refresh from '../models/catalogRefresh.js';
 import { runBtwCommand } from './btwCommandRuntime.js';
@@ -59,6 +60,29 @@ function fixture() {
     refreshRuntimeConfig: () => refreshShellRuntimeConfig(shell), getToolPool: async () => new Map() };
   return { shell, context };
 }
+
+it.each(['before', 'after'] as const)('rejects obsolete context report admission %s catalog loading', async phase => {
+  const { context } = fixture(); let stale = phase === 'before', release!: () => void;
+  const read = vi.fn(context.readConfiguration!);
+  const getToolPool = vi.fn(async () => { if (phase === 'after') await new Promise<void>(resolve => { release = resolve; }); return new Map(); });
+  const pending = runContextCommand([], { ...context, readConfiguration: read, getToolPool,
+    admission: () => stale ? 'original binding changed' : undefined });
+  if (phase === 'after') { await vi.waitFor(() => expect(release).toBeTypeOf('function')); stale = true; release(); }
+  else release?.();
+  const result = await pending;
+  expect(result.output).toBe('original binding changed'); expect(result.report).toBeUndefined();
+  if (phase === 'before') { expect(read).not.toHaveBeenCalled(); expect(getToolPool).not.toHaveBeenCalled(); }
+});
+
+it('uses the original workspace to project accepted request identity without changing raw measurements', async () => {
+  const { context } = fixture();
+  const captured = requestContext({ body: '{"messages":[],"unicode":"😀"}', provider: 'google', model: 'chosen', endpoint: `file://${root}/protocol` });
+  recordRequestContext(context.sessionId!, captured);
+  const result = await runContextCommand([], context);
+  expect(result.report?.facts.request).toMatchObject({ provider: 'google', model: 'chosen', endpoint: '[project]/protocol', body: captured.body,
+    usage: { status: 'unknown' } });
+  expect(captured.endpoint).toBe(`file://${root}/protocol`);
+});
 
 it('keeps menus, completion, and context on the accepted catalogue until successful reload', async () => {
   const { shell, context } = fixture();

@@ -3,17 +3,20 @@ import { createReport, span } from '../report/projection.js';
 import { cacheLines } from './cache.js';
 import { money } from './format.js';
 import type { CostModel } from './model.js';
+import { createHash } from 'node:crypto';
+import { reportMetadata } from '../report/metadata.js';
 
-export function costReport(model: CostModel) {
+export function costReport(model: CostModel, projectRoot = process.cwd()) {
+  const buckets = model.buckets.map(bucket => projectBucket(bucket, projectRoot));
   const lines: ReportLine[] = [];
   if (model.recordedTurns === 0 && model.buckets.length === 0) {
     lines.push({ kind: 'text', spans: [span('No usage has been recorded in this session yet, so there is nothing to count.')] });
   } else {
     lines.push({ kind: 'text', bullet: true, spans: model.buckets.length === 1
-      ? [span('Model '), span(model.buckets[0]!.label, 'code'), span(` · ${model.recordedTurns} recorded request${model.recordedTurns === 1 ? '' : 's'}`)]
+      ? [span('Model '), span(buckets[0]!.label, 'code'), span(` · ${model.recordedTurns} recorded request${model.recordedTurns === 1 ? '' : 's'}`)]
       : [span(model.modelCount, 'number'), span(` model${model.modelCount === 1 ? '' : 's'}${model.buckets.length !== model.modelCount ? ` · ${model.buckets.length} usage groups` : ''} · ${model.recordedTurns} recorded request${model.recordedTurns === 1 ? '' : 's'}`)] },
     { kind: 'text', bullet: true, spans: [span(model.recordedTokens.toLocaleString(), 'number'), span(' tokens reported by the provider')] });
-    for (const bucket of model.buckets) lines.push(...bucketLines(bucket, model.buckets.length > 1));
+    for (const bucket of buckets) lines.push(...bucketLines(bucket, model.buckets.length > 1));
     if (model.buckets.length > 1) lines.push({ kind: 'text', spans: [span('Session total estimate: '),
       span(money(model.estimate.usd), model.estimate.usd === null ? 'warning' : 'number')] });
     lines.push({ kind: 'space' }, { kind: 'text', spans: [span('Costs are estimates for recorded usage, not a provider bill.')] });
@@ -28,12 +31,31 @@ export function costReport(model: CostModel) {
   return createReport({ title: 'Usage', columns: [{ label: 'Category', minWidth: 12 }, { label: 'Tokens', minWidth: 8, align: 'right' },
     { label: 'Rate / million', minWidth: 14, align: 'right' }, { label: 'Estimated USD', minWidth: 14, align: 'right' }], lines,
     facts: { recordedTurns: model.recordedTurns, recordedTokens: model.recordedTokens, estimate: model.estimate,
-      models: model.buckets.map(bucket => ({ ...bucket, attribution: bucket.attribution ? {
+      models: buckets.map(bucket => ({ ...bucket, attribution: bucket.attribution ? {
         ...bucket.attribution, rates: bucket.attribution.rates ? { ...bucket.attribution.rates } : null,
       } : null })),
       cache: { ...model.cache, usage: { ...model.cache.usage, hitRate: model.cache.usage.hitRate ?? null },
         waste: { totals: { ...model.cache.waste.totals }, misses: model.cache.waste.misses.map(miss => ({ ...miss })) } } },
   });
+}
+
+/** Group and price by raw identity first; safe report keys are never ledger keys. */
+function projectBucket(bucket: CostModel['buckets'][number], projectRoot: string): CostModel['buckets'][number] {
+  const safe = (value: string) => reportMetadata(value, projectRoot);
+  const provider = safe(bucket.provider), model = safe(bucket.model);
+  const rawName = bucket.provider ? `${bucket.provider}/${bucket.model}` : bucket.model;
+  const name = provider ? `${provider}/${model}` : model;
+  const suffix = safe(bucket.label.slice(rawName.length));
+  // Legacy escaped keys contain JSON-encoded model text. Once either identity
+  // changes for display, use an opaque stable key rather than copying that text.
+  const key = provider === bucket.provider && model === bucket.model ? safe(bucket.key)
+    : `redacted:${createHash('sha256').update(bucket.key).digest('hex')}`;
+  return { ...bucket, key, provider, model, label: suffix ? `${name} ${suffix}` : name,
+    ...(bucket.attribution ? { attribution: { ...bucket.attribution,
+      provider: safe(bucket.attribution.provider), model: safe(bucket.attribution.model),
+      ...(bucket.attribution.origin ? { origin: safe(bucket.attribution.origin) } : {}),
+    } } : {}),
+  };
 }
 
 function bucketLines(bucket: CostModel['buckets'][number], heading: boolean): ReportLine[] {

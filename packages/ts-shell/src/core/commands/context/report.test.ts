@@ -6,6 +6,20 @@ import { requestContext } from '../../../context/request/projection.js';
 const input = { resolution: { window: 200000, source: 'catalog' as const }, reserve: 17000,
   schemaTokens: 8000, toolCount: 22, totalTokens: 72000, turns: 2 };
 
+it('projects safe request metadata and warnings while retaining raw observation dimensions', () => {
+  const raw = 'sk-\x1b[31msynthetic-sensitive-model';
+  const request = requestContext({ body: '{"messages":[],"unicode":"😀"}', provider: 'password=synthetic-sensitive-provider',
+    model: raw, endpoint: 'file:///fixture/sk-%C2%9B31msynthetic-sensitive-endpoint' });
+  const report = contextReport({ ...input, used: undefined, request,
+    resolution: { window: 64000, source: 'default', warning: `No context window is known for ${raw}` } });
+  expect(JSON.stringify(report)).not.toContain('synthetic-sensitive');
+  expect(reportText(report)).not.toContain('synthetic-sensitive');
+  expect(report.facts.request).toMatchObject({ body: request.body, provider: 'password=[redacted]', model: '[secret-redacted]',
+    endpoint: '[external]/[secret-redacted]' });
+  expect(request.model).toBe(raw); expect(request.body.bytes).toBe(Buffer.byteLength('{"messages":[],"unicode":"😀"}'));
+  expect(report.facts.prompt).toMatchObject({ status: 'unknown' });
+});
+
 it('keeps exact wire dimensions, raw estimates, tokenizer absence and provider usage distinct', () => {
   const request = requestContext({ body: JSON.stringify({ messages: [{ role: 'system', content: 'PRIVATE_INSTRUCTIONS🔒' }], secret: 'FIXTURE_SECRET' }),
     provider: 'fixture', model: 'm', endpoint: 'openai-compatible', fields: { conversation: 'messages', firstMessageIsSystem: true },

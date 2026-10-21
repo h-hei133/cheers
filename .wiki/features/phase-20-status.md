@@ -358,3 +358,12 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 两条独立复核补出真实缺口：overlay的load取消未透传；file URL路径解码在plain之后引入C1，后续renderer移除时重组未脱敏密钥。现load合并原signal/overlay signal，accepted apply不复用已释放的load signal；共享report metadata原语在一次path投影两侧plain，最后原scrub/cap，tools同类路径一起修复。正文仍为原loader解析后的指令，只本地显示，不冒充安全报告。
 - 本地10文件276项、strict生产TS、双构建、14项有效反转通过；四格Node/exe专用PTY验证安全列表/header/facts、特殊名称草稿、明确读取原正文，取消与选择不增持久消息，原参数列表仅新增1条body-free command-output，无model调用，state/metadata/config/workspace原字节不变。八格smoke与97脚本通过；19入口与严格docs门最终结果见log。
 - 独立代码APPROVE/架构WATCH，两报告七文件hash已逐项绑定最终产物；accepted apply尚无独立取消owner、holdInput等待不可强制中断任意贡献Promise，合作式发现预算不证明总延迟/资源界。不闭合PAN-08或47项。前批tools精确SHA `f46e6c97c92497c35b6e4496f930a1124ae42f73` CI `39602459208` / job `119230129576`于13:01:35Z completed/success，Watch `39602459194` success。本批提交/推送/新SHA CI另取证。
+
+
+## 2026-10-21 context/cost 安全只读报告（PAN-08 部分）
+
+- context请求身份/警告、cost字段与facts仅在报告投影脱敏；原capture/ledger身份、分组、captured/current价格、body/parts/source维度和unknown合同保留。两命令读前原admission，context保留await后检查，均用真实cwd；cost组合标题用分别安全的身份和suffix构造，修复PTY发现的带provider前缀绝对路径漏投影。
+- Parent最终10文件97项、strict生产TS/双构建、11项有效反转、四格专用PTY、八格smoke、19入口和97脚本通过。PTY保留三原captured组USD1/2/3及总USD6，只有两安全command-output，无模型消息或原state/config/metadata/workspace变更；累计用量不冒充当前prompt/foreground capture。中途legacy夹具错误、组合标题产品失败、trim分隔符失败与无效反转按日志分类保留。
+- WATCH：脱敏key不是全局唯一账本身份，脱敏attribution不能回灌原ledger validator；原array保留组数/精确数值。全量catalog/bucket处理及MCP发现无总资源或延迟界，不闭合PAN-08/47项。前批技能`77700f4f`精确CI`39606383097`于13:28:27Z success、Watch`39606383042`success；本批独立最终绑定/交付及新SHA CI以日志实际读回为准。
+
+- 最终独立代码APPROVE/架构WATCH，综合COMMENT；两报告八文件SHA与双构建已逐项读回绑定。组合标题为各组件分别受限，无单一4096合成界；旧报告绑定拒绝与新字节复验均保留。strict docs/diff通过，本批commit/push/精确CI尚须分别读回。

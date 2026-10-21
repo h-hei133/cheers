@@ -39,6 +39,8 @@ export async function runContextCommand(
     return context.ruleControlsCommand ? context.ruleControlsCommand('context', args, context) as Promise<LocalCommandResult>
       : { kind: 'local', output: 'Extra context requires a bound source-read permission owner.' };
   }
+  const refused = context.admission?.();
+  if (refused) return { kind: 'local', output: refused };
   const sessionId = context.sessionId ?? "";
   const telemetry = sessionId ? getSessionUsage(sessionId) : undefined;
   // The window and reserve the compaction engine actually works to. Read from
@@ -72,6 +74,6 @@ export async function runContextCommand(
     : telemetry?.lastPromptTokens !== undefined ? 'stale' as const : 'unknown' as const;
   const report = contextReport({ resolution, used: measured?.tokens, measurement, reserve,
     schemaTokens, schemaSize, request: telemetry?.requestContext, toolCount: registry.size, totalTokens: telemetry ? totalTokens(telemetry) : 0,
-    turns: telemetry?.turnsCount ?? 0 });
+    turns: telemetry?.turnsCount ?? 0 }, context.cwd);
   return { kind: "local", output: reportText(report), report };
 }

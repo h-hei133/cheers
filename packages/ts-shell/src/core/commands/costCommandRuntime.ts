@@ -10,7 +10,9 @@ import { reportText } from "./report/projection.js";
 export async function runCostCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
   const invalid = rejectArguments("cost", args);
   if (invalid) return invalid;
+  const refused = context.admission?.();
+  if (refused) return { kind: 'local', output: refused };
   const catalog = context.readConfiguration?.().catalog ?? loadCatalog();
-  const report = costReport(costModel(getSessionUsage(context.sessionId ?? ""), catalog));
+  const report = costReport(costModel(getSessionUsage(context.sessionId ?? ""), catalog), context.cwd);
   return { kind: "local", output: reportText(report), report };
 }
