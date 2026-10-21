@@ -11,7 +11,8 @@ permissions:
 jobs:
   build-and-test:
     name: Build & Test
-    runs-on: ubuntu-latest
+    # Playwright 1.60 supports Ubuntu 24.04; ubuntu-latest can advance beyond it.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 

@@ -8161,3 +8161,8 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - numeric selector（例如 `26`）与 stable entry ID 会直接定位到包含它们的页；提示文本也会定位匹配问题，未命中时保留原有 filter 行为。续页、页内选择、空会话和旧问题定位由新增回归覆盖，聚焦 interactive/history/picker 集合为 5 个文件、83 项通过。
 - 定向反转将 `hasMore` 固定为 `false`，续页测试实际从 26 行降为 25 行并退出 1；源码恢复后 `/back` picker 15/15 通过。TypeScript、TS/exe 双构建、cycles/config/declarations/Node-floor、strict docs drift、`test:scripts` 97 项、`verify:cli-entry` 19 项和 Linux Node/exe × regular/fullscreen/line/pipe 八格 smoke 均通过；strict docs drift 保留 118 条既有 advisory。
 - 本条是未提交的本地证据；尚无新 commit、push、CI 或独立复核结果。PAN-06 的 history 完整树、undo 精确 receipt 补偿以及 copy 到头/失败/取消边界继续开放。
+
+### 2026-10-21 CI runner 与浏览器依赖兼容
+
+- 上述 `/back` 批已推送为 `163b1607346102d5dbabe813550e0181dd624f08`，远端 main 精确读回；Architecture Watch `39542097301` success。CI `39542097297` / job `119031924600` 于 `2026-10-21T04:06:18Z` completed/failure：静态门、脚本与 TS build 均通过，但 `ubuntu-latest` 分配 Ubuntu 26.04，Playwright 1.60.0 明确拒绝 Chromium 安装，TS tests 与 NormProof 未运行。该失败归 CI 依赖环境兼容，不能写作测试通过。
+- 核对上游该版本 `registry/nativeDeps.ts` 的 Ubuntu 24.04 x64/arm64 支持清单后，将唯一 build-and-test job 固定到 `ubuntu-24.04`，保留 Node 20.3 与全部安装、测试和架构门。对照参考的浏览器 CI 同样实际安装 Chromium 后才跑测试，未采用跳过浏览器测试的处理方式。本改动尚无新 SHA CI 证据；后续按实际结果记录。
