@@ -120,16 +120,23 @@ export class ExtensionService implements LifecycleHost {
       try { current(); } catch { return { ...result, success: false, output: `${result.output}\nExtension authority changed after execution; actual receipt remains visible.` }; } return result;
     }, context.abortSignal);
   }
-  async approve(operation: Operation, selected: 'extension_manage' | 'extension_grant' = 'extension_manage'): Promise<string> {
+  async approve(operation: Operation, selected: 'extension_manage' | 'extension_grant' = 'extension_manage', signal?: AbortSignal): Promise<string> {
     this.check(); return this.calls.run(async signal => {
     const gate = this.options.gate(selected); const admission = () => { if (signal.aborted) return 'Extension operation cancelled.'; try { this.check(); return gate.admission?.(); } catch { return 'Extension lifecycle authority changed.'; } };
     const tool: ToolDefinition = { name: selected, description: 'Apply the exact reviewed extension lifecycle operation.', argsSchema: { type: 'object' },
       resultAdmission: admission,
       prepare: () => ({ targets: [], permissionArgs: { operation: selected }, previewKind: 'execution', preview: operation.preview,
-        execute: async context => { this.check(); const effect: EffectOutcome = await operation.apply(context); return { success: effect.durability === 'confirmed', output: `${effect.detail}\nEffect: ${effect.effect}; durability: ${effect.durability}.`, metadata: { effect } }; } }),
+        execute: async context => {
+          this.check(); const effect: EffectOutcome = await operation.apply(context);
+          // Cleanup can become uncertain after a confirmed registry publication.
+          // Retain that actual result alongside uncertain saves, so reopening a
+          // view or command cannot offer a fresh mutation in the same runtime.
+          if (effect.durability === 'unknown' && !this.store.outcomes.some(entry => canonical(entry) === canonical(effect))) this.store.outcomes.push(effect);
+          return { success: effect.durability === 'confirmed', output: `${effect.detail}\nEffect: ${effect.effect}; durability: ${effect.durability}.`, metadata: { effect } };
+        } }),
       execute: async () => { throw new Error('Extension lifecycle requires its original prepared and approved call.'); } };
     return (await runPreparedTool(tool, {}, { ...gate, admission, permissionScope: 'ask' }, signal, undefined, 'Extension operation')).output;
-    });
+    }, signal);
   }
   async run(packageName: string, script: string, args: string[]): Promise<string> {
     const record = this.store.read().packages.find(entry => entry.name === packageName); if (!record) throw new Error('Extension is not installed.');

@@ -29,6 +29,10 @@ import type { DenyRule } from '../core/shell/approval/deny.js';
 import { assertSourceAccess } from '../core/query/sourcePolicy.js';
 import { slashSuggestions } from '../cli/interactive/slashSuggestions.js';
 import { createDefaultExecutionService, type ExecutionService } from '../runtime/execution/service.js';
+import { extensionManager } from './view/manager.js';
+import type { ExtensionManager, ExtensionSnapshot } from './view/model.js';
+import { ShellCommandRuntime } from '../core/shell/command.js';
+
 
 let root: string; let workspace: string; let server: Server; let base: string; let service: ExtensionService;
 let allow: boolean; let requests: string[]; let approvals: string[]; let denyRules: DenyRule[]; let releases: Release[];
@@ -320,5 +324,191 @@ describe('actual capability grants, precedence and bounded unload', () => {
     await ready(); const data = path.join(root, 'owned/data/sample'); fs.mkdirSync(data, { recursive: true }); fs.writeFileSync(path.join(data, 'keep'), 'user data');
     expect(await service.approve(removeOperation(service, 'sample'))).toContain('uninstalled'); expect(service.store.read().packages).toEqual([]); expect(fs.readFileSync(path.join(data, 'keep'), 'utf8')).toBe('user data');
     expect(listSlashCommands().some(entry => entry.name === 'sample-echo')).toBe(false);
+  });
+});
+
+
+describe('bound extension management views', () => {
+  function manager(admission = () => undefined as string | undefined, commands = new ShellCommandRuntime()): ExtensionManager {
+    return extensionManager(service, admission, operation => commands.run(operation));
+  }
+  function snapshot(view: ExtensionManager): ExtensionSnapshot {
+    const inspection = view.read(); expect(inspection.state).toBe('ready');
+    if (inspection.state !== 'ready') throw new Error('Fixture inspection unavailable');
+    return inspection.snapshot;
+  }
+  async function prepare(view: ExtensionManager, action: string, input?: string) {
+    const current = snapshot(view); const item = current.items[0]!;
+    const selected = item.actions.find(entry => entry.label.startsWith(action))!;
+    expect(selected).toBeDefined();
+    return view.prepare(current.version, { item: item.id, action: selected.id, ...(input ? { input } : {}) });
+  }
+
+  it('reads original packages, provenance, scoped grants and safe details without approvals or requests', async () => {
+    await ready(); approvals.length = 0; requests.length = 0;
+    const before = fs.readFileSync(service.store.file);
+    const current = snapshot(manager());
+    expect(current.items[0]!.detail.join(' ')).toContain('trust current');
+    expect(current.items[0]!.status).toContain('enabled');
+    expect(current.items[0]!.detail.join(' ')).toContain('script:echo');
+    expect(current.items[0]!.actions.some(entry => entry.label === 'revoke sample prompt')).toBe(true);
+    expect(current.items[0]!.actions.some(entry => entry.label === 'uninstall sample')).toBe(true);
+    expect(Object.isFrozen(current.items[0])).toBe(true);
+    expect(fs.readFileSync(service.store.file)).toEqual(before);
+    expect(approvals).toEqual([]); expect(requests).toEqual([]);
+    const state = service.store.read();
+    fs.writeFileSync(service.store.file, JSON.stringify({ ...state, packages: state.packages.map(entry => ({ ...entry,
+      active: { ...entry.active, manifest: { ...entry.active.manifest, description: 'token=synthetic-secret \u009b31m' } } })) }));
+    const safe = JSON.stringify(snapshot(manager()));
+    expect(safe).not.toContain('synthetic-secret'); expect(safe).not.toContain('\u009b');
+  });
+
+  it('prepares one exact change without writes, uses ordinary approval and consumes once', async () => {
+    await ready(); const view = manager(); const before = fs.readFileSync(service.store.file); approvals.length = 0;
+    const prepared = await prepare(view, 'disable');
+    expect(prepared.preview.join(' ')).toContain(releases[0]!.digest);
+    expect(prepared.preview.some(line => line.startsWith('Source fixture; version 1.0.0; SHA256 '))).toBe(true);
+    expect(prepared.preview.some(line => line.startsWith('Workspace '))).toBe(true);
+    expect(fs.readFileSync(service.store.file)).toEqual(before); expect(approvals).toEqual([]);
+    expect(await prepared.apply()).toContain('durability: confirmed');
+    expect(service.store.read().packages[0]!.activation[workspace]!.enabled).toBe(false);
+    expect(approvals).toEqual(['extension_grant']);
+    expect(await prepared.apply()).toContain('consumed'); expect(approvals).toHaveLength(1);
+  });
+
+  it('preserves ordinary denial and refuses unknown publication without replay', async () => {
+    await install(); const view = manager(); const before = fs.readFileSync(service.store.file);
+    const denied = await prepare(view, 'enable'); allow = false;
+    expect(await denied.apply()).toBe('Extension operation refused by its ordinary permission or hook gate.'); expect(fs.readFileSync(service.store.file)).toEqual(before);
+    allow = true;
+    const pending = await prepare(view, 'enable');
+    service.store.outcomes.push({ effect: 'saved', durability: 'unknown', detail: 'Synthetic uncertain publication' });
+    expect(snapshot(view).mutationBlocked).toBe(true);
+    await expect(pending.apply()).rejects.toThrow('changed');
+    expect(await pending.apply()).toContain('consumed'); expect(fs.readFileSync(service.store.file)).toEqual(before);
+  });
+
+  it('retains actual uninstall cleanup uncertainty on reopen and blocks a fresh mutation', async () => {
+    await install(); const view = manager(); const record = service.store.read().packages[0]!;
+    const owned = versionPath(record.active, service.store.file); const remove = fs.rmSync;
+    const failed = vi.spyOn(fs, 'rmSync').mockImplementation((selected, options) => {
+      if (selected === owned) throw new Error('Synthetic removal failure');
+      return remove(selected, options);
+    });
+    try {
+      const plan = await prepare(view, 'uninstall');
+      expect(await plan.apply()).toContain('durability: unknown');
+      expect(service.store.read().packages).toEqual([]); expect(fs.existsSync(owned)).toBe(true);
+      expect(service.store.outcomes.some(entry => entry.durability === 'unknown' && entry.effect === 'removed')).toBe(true);
+      const reopened = snapshot(manager());
+      expect(reopened.mutationBlocked).toBe(true); expect(reopened.notices.join(' ')).toContain('cleanup of remaining versions is unknown');
+      expect((await pluginCommand(['list'], service)).output).toContain('durability unknown');
+      await expect(view.prepare(reopened.version, { action: reopened.install.id, input: 'fixture:sample@1.0.0' })).rejects.toThrow('changed');
+    } finally { failed.mockRestore(); }
+  });
+
+  it('rechecks the offered state and trust before preparation, confirmation and the approved writer', async () => {
+    await ready(); const view = manager(); const before = fs.readFileSync(service.store.file);
+    const old = snapshot(view); const item = old.items[0]!; const action = item.actions.find(entry => entry.label.startsWith('disable'))!;
+    const first = await prepare(view, 'disable');
+    changeSources(sources => sources.map(source => ({ ...source, description: 'Changed source identity' })));
+    await expect(first.apply()).rejects.toThrow('changed');
+    await expect(view.prepare(old.version, { item: item.id, action: action.id })).rejects.toThrow('changed');
+    expect(fs.readFileSync(service.store.file)).toEqual(before);
+    const latest = await prepare(view, 'disable');
+    let release!: () => void; let entered!: () => void;
+    approvalWait = new Promise<void>(resolve => { release = resolve; });
+    const requested = new Promise<void>(resolve => { entered = resolve; });
+    hooks.registerInProcessHook({ name: 'observe-approval', event: 'PermissionRequest', handler: () => { entered(); return { decision: 'allow' }; } });
+    const applying = latest.apply(); await requested;
+    changeSources(sources => sources.map(source => ({ ...source, description: 'Source changed during ordinary approval' })));
+    release();
+    expect(await applying).toContain('changed');
+    expect(service.store.read().packages[0]!.activation[workspace]!.enabled).toBe(true);
+    expect(fs.readFileSync(service.store.file)).toEqual(before);
+  });
+
+  it('rejects fabricated identities and update package substitution before network access', async () => {
+    await install(); const view = manager(); const current = snapshot(view); requests.length = 0;
+    await expect(view.prepare(current.version, { item: 'not-offered', action: current.install.id, input: 'fixture:sample@1.0.0' })).rejects.toThrow('offered');
+    await expect(prepare(view, 'update', 'fixture:other@2.0.0')).rejects.toThrow('selected package');
+    expect(requests).toEqual([]);
+  });
+
+  it('observes external changes and unavailable storage while subscribed and releases idempotently', async () => {
+    await install(); const view = manager(); const listener = vi.fn();
+    vi.useFakeTimers();
+    const release = view.subscribe(listener);
+    try {
+      const before = fs.readFileSync(service.store.file); const current = service.store.read();
+      fs.writeFileSync(service.store.file, JSON.stringify({ ...current, revision: current.revision + 1 }));
+      vi.advanceTimersByTime(1000);
+      expect(listener.mock.lastCall![0].snapshot.version).not.toBe(listener.mock.calls[0]![0].snapshot.version);
+      fs.writeFileSync(service.store.file, '{'); vi.advanceTimersByTime(1000);
+      expect(listener.mock.lastCall![0]).toEqual({ state: 'unavailable' });
+      fs.writeFileSync(service.store.file, before); vi.advanceTimersByTime(1000);
+      expect(listener.mock.lastCall![0].state).toBe('ready');
+      release(); release(); expect(vi.getTimerCount()).toBe(0); const count = listener.mock.calls.length;
+      vi.advanceTimersByTime(2000); expect(listener).toHaveBeenCalledTimes(count);
+    } finally { release(); vi.useRealTimers(); }
+  });
+
+  it('retains package facts when sources are unreadable and labels stale workspace activation', async () => {
+    await ready(); const sourceFile = path.join(root, 'sources.json'); const original = fs.readFileSync(sourceFile);
+    fs.writeFileSync(sourceFile, '{');
+    const unavailable = snapshot(manager());
+    expect(unavailable.items).toHaveLength(1); expect(unavailable.notices.join(' ')).toContain('trust is unknown');
+    expect(unavailable.items[0]!.detail.join(' ')).toContain('trust unknown');
+    fs.writeFileSync(sourceFile, original);
+    await service.close(); fs.renameSync(workspace, workspace + '-old'); fs.mkdirSync(workspace); service = newService();
+    expect(snapshot(manager()).items[0]!.status).toContain('stale workspace');
+    expect(snapshot(manager()).items[0]!.detail.join(' ')).toContain('none current');
+  });
+
+  it('binds the original admission and never refreshes it for a saved confirmation', async () => {
+    await install(); let blocked = false; const view = manager(() => blocked ? 'changed binding' : undefined);
+    const before = fs.readFileSync(service.store.file); const prepared = await prepare(view, 'enable'); blocked = true;
+    expect(view.read()).toEqual({ state: 'stale' });
+    await expect(prepared.apply()).rejects.toThrow('changed');
+    expect(fs.readFileSync(service.store.file)).toEqual(before);
+  });
+
+  it('installs, updates, rolls back and uninstalls through original signed lifecycle owners', async () => {
+    const view = manager(); let current = snapshot(view);
+    const installPlan = await view.prepare(current.version, { action: current.install.id, input: 'fixture:sample@1.0.0' });
+    expect(service.store.read().packages).toEqual([]);
+    expect(await installPlan.apply()).toContain('published');
+    await archive('2.0.0');
+    expect(await (await prepare(view, 'update', 'fixture:sample@2.0.0')).apply()).toContain('published');
+    expect(service.store.read().packages[0]!.active.manifest.version).toBe('2.0.0');
+    expect(await (await prepare(view, 'rollback')).apply()).toContain('rolled back');
+    expect(service.store.read().packages[0]!.active.manifest.version).toBe('1.0.0');
+    expect(await (await prepare(view, 'grant sample prompt')).apply()).toContain('saved');
+    expect(await (await prepare(view, 'revoke sample prompt')).apply()).toContain('saved');
+    expect(await (await prepare(view, 'uninstall')).apply()).toContain('uninstalled');
+    expect(snapshot(view).items).toEqual([]);
+  });
+
+  it('cancels preparation in the original command boundary without a writer or fake success', async () => {
+    const commands = new ShellCommandRuntime(); const view = manager(() => undefined, commands); const current = snapshot(view);
+    const held = holdResponse('/registry/v1/packages/sample');
+    const pending = view.prepare(current.version, { action: current.install.id, input: 'fixture:sample@1.0.0' });
+    await held; commands.current!.controller.abort();
+    await expect(pending).rejects.toThrow();
+    resumeResponses(); expect(service.store.read().packages).toEqual([]); expect(approvals).toEqual([]);
+  });
+
+  it('cancels an ordinary approval through the original command signal without applying', async () => {
+    await install(); const commands = new ShellCommandRuntime(); const view = manager(() => undefined, commands);
+    const plan = await prepare(view, 'enable'); const before = fs.readFileSync(service.store.file);
+    let release!: () => void, entered!: () => void;
+    approvalWait = new Promise<void>(resolve => { release = resolve; });
+    const requested = new Promise<void>(resolve => { entered = resolve; });
+    hooks.registerInProcessHook({ name: 'observe-cancel', event: 'PermissionRequest', handler: () => { entered(); return { decision: 'allow' }; } });
+    const applying = plan.apply(); await requested;
+    commands.current!.controller.abort(); release();
+    expect(await applying).toContain('refused');
+    expect(fs.readFileSync(service.store.file)).toEqual(before);
+    expect(await plan.apply()).toContain('consumed');
   });
 });

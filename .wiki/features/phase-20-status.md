@@ -315,3 +315,11 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 独立评审查实并修正原始指标/工具元数据泄露和先截短后脱敏的key前缀泄露；分组、策略和字节成本仍由原始身份计算，再生成安全报告。原admission在选择前/读取后重验，host按原绑定、overlay revision及stopped状态拒绝迟到发布；读取目录时不持有输入锁，Ctrl+C仍可取消正在进行的任务。
 - 最终269项受影响测试、9项报告持久化/codec回归、14项有效反转及生产strict TS通过。四格Node/exe专用PTY覆盖菜单/no-match/取消、六视图及直接不可读来源；显式查看只增安全command-output，无模型消息，配置/工作区/state/metadata原字节保持；Linux八格通用smoke和19项CLI入口通过。中间stale build及探针选择/分页断言问题保留失败证据，最终结果见日志。
 - 代码APPROVE、架构WATCH，综合COMMENT；两报告21文件hash与最终双构建已读回绑定。全目录同步枚举/逐文件tail和完整catalog仍无全局资源或延迟界，不据此关闭PAN-07。前批认证SHA的CI已success；本批commit/push/新SHA CI各自取证。plugin/extensions及其余47项继续原范围复核。
+
+
+## 2026-10-21 `/plugin` 与 `/extensions` 原运行时管理（PAN-07 部分）
+
+- 修复真实pickerHost漏接运行时而走legacy的问题；结构化view只读原ExtensionService/store/source，两个alias同状态。单package inspect、精确release安装/更新、retained rollback、workspace启停、独立grant/revoke、uninstall逐条cancel缺省确认，继续使用原签名/lifecycle/普通审批与command cancellation；提交及审批后的writer前复核原snapshot/source/config/session/workspace，不改非交互与参数路由。
+- package/source/activation/grant/durability分别投影，source unavailable不抹掉package，state unreadable不冒充空集。原service保留实际卸载cleanup unknown，同store实例重开仍可见并拒绝fresh mutation；不声称跨restart/rebind持久化。修复多行预览neutralise丢布局；安全投影不改精确执行身份。
+- 最终受影响6文件208项、strict production TS、TS/exe双构建、12项实际断言反转、四格专用PTY与八格通用smoke、19入口、97脚本及静态门通过。专用PTY取消无写，真实enable审批只新增4条原权限/工具事件，无model消息且grants仍空；不以审批后状态逐字节不变为合同。原错误探针与测试失败独立保留在log。
+- 独立代码APPROVE/架构WATCH，14文件hash与构建实际绑定。全量同步获取/解码/hash/projection在dedup前、post-read大小检查无总资源/延迟上界；未知receipt仅原store实例内存。完整面板生命周期、真实registry/平台与全部47项仍须继续复验；前批debug精确SHA CI/Watch成功，本批交付另取新SHA证据。

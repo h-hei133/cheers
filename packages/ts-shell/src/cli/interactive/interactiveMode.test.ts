@@ -34,6 +34,9 @@ import * as sessionNavigation from '../../session/query/navigation.js';
 import { parseKeyEvent } from '../../presentation/tui/input/keys.js';
 import type { SubmissionQueue } from './inputQueue.js';
 import type { InteractiveApprovalResult } from './picker/approval.js';
+import * as extensionRuntime from '../runtime/extensions.js';
+import { pluginPicker } from './picker/plugins.js';
+import type { ExtensionManager } from '../../extensions/view/model.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
@@ -83,6 +86,31 @@ function build(overrides: {
 }
 
 describe("session wiring", () => {
+  it('binds the extension management port to both real picker aliases and retains the settled ordinary approval result', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { pickerHost(): PickerHost; overlay: OverlayHost; view: InteractiveView; applyPicker(picker: Picker, ids: readonly string[]): void };
+    const apply = vi.fn(async () => {
+      host.overlay.open({ title: 'Ordinary approval', form: 'panel', empty: '', load: async () => [], apply: async () => undefined });
+      host.overlay.close();
+      return 'Effect: saved; durability: confirmed.';
+    });
+    const manager: ExtensionManager = { read: () => ({ state: 'ready', snapshot: {
+      version: 'v1', mutationBlocked: false, notices: [], install: { id: 'install', label: 'install', detail: '' },
+      items: [{ id: 'one', label: 'installed', description: 'real service port', status: 'enabled', detail: [],
+        actions: [{ id: 'disable', label: 'disable installed', detail: '' }] }],
+    } }), subscribe: () => () => {}, prepare: async () => ({ title: 'disable installed', preview: [], apply }) };
+    const port = vi.spyOn(extensionRuntime, 'extensionManagerFor').mockReturnValue(manager);
+    try {
+      expect(host.pickerHost().extensions).toBe(manager);
+      const picker = pluginPicker(host.pickerHost().extensions); await picker.load();
+      const actions = (await picker.apply(['one']))!.next!; await actions.load();
+      const confirm = (await actions.apply(['disable']))!.next!; await confirm.load();
+      host.applyPicker(confirm, ['continue']);
+      await vi.waitFor(() => expect(host.view.transcript.all().some(block => block.kind === 'command' && block.title === 'Confirm disable installed'
+        && block.text === 'Effect: saved; durability: confirmed.')).toBe(true));
+      expect(apply).toHaveBeenCalledTimes(1);
+    } finally { port.mockRestore(); host.overlay.close(); }
+  });
   it('routes confirmed account sign-in through the normal command host with exact argument quoting', async () => {
     const { mode } = build();
     const host = mode as unknown as { pickerHost(): PickerHost; run(line: string): Promise<void> };

@@ -53,7 +53,7 @@ import { isSecurityControl, securityCommandFor, securityInspectorFor } from '../
 import { isAgentsControl, agentsCommandFor } from '../runtime/agents.js';
 import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
 import { sshControl, runSshControl } from '../ssh/control.js';
-import { isExtensionControl, extensionCommandFor } from '../runtime/extensions.js';
+import { isExtensionControl, extensionCommandFor, extensionManagerFor } from '../runtime/extensions.js';
 import { isMcpRequest, isMcpConfiguration, mcpControl } from '../mcp/content.js';
 import { runMcpConfigurationControl } from '../mcp/control.js';
 import { cancelMcpFor, mcpCommandFor } from '../runtime/mcp.js';
@@ -1107,6 +1107,7 @@ export class InteractiveMode {
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null }),
       gitWorkbench: gitWorkbenchFor(this.options.runtimeContext),
       security: securityInspectorFor(this.options.runtimeContext),
+      extensions: extensionManagerFor(this.options.runtimeContext),
       jobs: jobsFor(this.options.runtimeContext),
       advisorState: () => decodeAdvisor(readBoundSessionState(this.options.sessionManager, this.options.runtimeContext.session).state.advisor),
       ...sessionPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,

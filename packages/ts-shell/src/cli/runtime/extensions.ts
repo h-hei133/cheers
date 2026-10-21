@@ -8,14 +8,16 @@ import { selectWorkspaceRoot } from '../../core/workspace/roots.js';
 import { ExtensionService } from '../../extensions/service.js';
 import { marketplaceCommand } from '../../extensions/command/marketplace.js';
 import { pluginCommand } from '../../extensions/command/plugin.js';
+import { extensionManager, type ExtensionRun } from '../../extensions/view/manager.js';
+import type { ExtensionManager } from '../../extensions/view/model.js';
 
-interface ExtensionRuntime { readonly service: () => ExtensionService; readonly close: () => Promise<void>; readonly cancel: () => Promise<void> }
+interface ExtensionRuntime { readonly service: () => ExtensionService; readonly close: () => Promise<void>; readonly cancel: () => Promise<void>; readonly run: ExtensionRun }
 const runtimes = new WeakMap<ShellRuntimeContext, ExtensionRuntime>();
 export function installExtensionRuntime(context: ShellRuntimeContext, runtime: ShellSessionRuntime, gate: (tool?: string) => ToolGateOptions): void {
   let service: ExtensionService | undefined; let identity: string | undefined;
   let closed = false; let retiredUnknown = false;
   const retiring = new Set<Promise<void>>();
-  runtimes.set(context, { cancel: async () => { await service?.cancel(); }, close: async () => {
+  runtimes.set(context, { run: operation => runtime.commands.run(operation), cancel: async () => { await service?.cancel(); }, close: async () => {
     closed = true;
     const results = await Promise.allSettled([...retiring, ...(service ? [service.close()] : [])]);
     if (retiredUnknown || results.some(result => result.status === 'rejected')) throw new Error('Extension cleanup remains unknown; runtime reentry is blocked.');
@@ -48,4 +50,16 @@ export function extensionCommandFor(context: ShellRuntimeContext): NonNullable<C
 export function cancelExtensionsFor(context: ShellRuntimeContext): void { void runtimes.get(context)?.cancel(); }
 export async function closeExtensionsFor(context: ShellRuntimeContext): Promise<void> { await runtimes.get(context)?.close(); }
 export function refreshExtensionsFor(context: ShellRuntimeContext): void { runtimes.get(context)?.service(); }
-export function isExtensionControl(text: string): boolean { return /^\/(?:plugin|plugins)(?:\s+(?:cancel|list|details|disable|revoke|reload)(?:\s|$)|\s*$)|^\/reload-plugins(?:\s|$)/i.test(text.trim()); }
+export function extensionManagerFor(context: ShellRuntimeContext): ExtensionManager | undefined {
+  const runtime = runtimes.get(context);
+  if (!runtime) return undefined;
+  try {
+    const service = runtime.service();
+    const binding = JSON.stringify([context.session.id, context.session.createdAt, context.session.projectRoot, context.cwd]);
+    const admitted = configurationAdmission(context);
+    const admission = () => binding !== JSON.stringify([context.session.id, context.session.createdAt, context.session.projectRoot, context.cwd])
+      ? 'Extension binding changed.' : admitted();
+    return extensionManager(service, admission, runtime.run);
+  } catch { return undefined; }
+}
+export function isExtensionControl(text: string): boolean { return /^\/(?:plugin|plugins|extensions)(?:\s+(?:cancel|list|details|disable|revoke|reload)(?:\s|$)|\s*$)|^\/reload-plugins(?:\s|$)/i.test(text.trim()); }

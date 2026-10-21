@@ -37,6 +37,7 @@ import type { SecurityInspector } from '../../../security/view/inspection.js';
 import { cleansePicker } from './cleanse.js';
 import { authPicker, type SignInCommand } from './auth.js';
 import { debugPicker } from './debug.js';
+import type { ExtensionManager } from '../../../extensions/view/model.js';
 
 /**
  * Which commands open a chooser.
@@ -58,6 +59,7 @@ export interface PickerHost extends SettingsHost {
   readonly undo: UndoHost;
   readonly gitWorkbench?: GitWorkbench;
   readonly security?: SecurityInspector;
+  readonly extensions?: ExtensionManager;
   readonly signIn?: SignInCommand;
   readonly jobs?: import('../../jobs/model.js').JobsComposition;
   readonly advisorState?: () => import('../../../advisor/model.js').AdvisorState | undefined;
@@ -101,7 +103,7 @@ const PICKERS: Record<string, PickerFactory> = {
       projectRoot: host.projectRoot,
       revoke: host.revokeGrant,
     }),
-  plugin: (host) => pluginPicker(host.commandContext),
+  plugin: host => pluginPicker(host.extensions),
   marketplace: (host) => sourcePicker(host.commandContext),
   restore: (host) => restorePicker(host.projectRoot),
   undo: (host) => undoPicker(host.undo),
