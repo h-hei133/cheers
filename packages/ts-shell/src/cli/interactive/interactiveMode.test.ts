@@ -213,7 +213,7 @@ describe("session wiring", () => {
     } finally { mode.stop(); }
   });
 
-  it('reads the current tree focus after loading through the queued command path', async () => {
+  it.each(['/tree', '/history'])('reads the current tree focus after loading %s through the queued command path', async command => {
     const { mode } = build();
     const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void> };
     const navigation = vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({
@@ -224,12 +224,46 @@ describe("session wiring", () => {
     } as ReturnType<typeof sessionNavigation.readSessionNavigation>);
     mode.start();
     try {
-      await host.run('/tree');
+      await host.run(command);
       await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).toContain('Current question'));
       const selected = vi.fn();
       host.overlay.handleKey(parseKeyEvent('\r'), selected);
       expect(selected).toHaveBeenCalledWith(expect.objectContaining({ exclusive: true }), ['current']);
     } finally { mode.stop(); navigation.mockRestore(); }
+  });
+
+  it('reports queued history read failures without exposing storage errors or claiming empty history', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void> };
+    vi.spyOn(sessionNavigation, 'readSessionNavigation').mockImplementation(() => { throw new Error('PRIVATE_STORAGE_BODY'); });
+    mode.start();
+    try {
+      await host.run('/history');
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).toContain('Session history unavailable. Reopen /history to retry.'));
+      const frame = stripAnsi(host.overlay.render(100, 24).join('\n'));
+      expect(frame).not.toContain('PRIVATE_STORAGE_BODY');
+      expect(frame).not.toContain('No saved session history');
+    } finally { mode.stop(); }
+  });
+
+  it.each([true, false])('distinguishes queued history no-match from an empty tree (saved=%s)', async saved => {
+    const { mode } = build();
+    const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void> };
+    vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({ points: saved
+      ? [{ entryId: 'saved', depth: 0, label: 'Saved question', current: true }]
+      : [] } as ReturnType<typeof sessionNavigation.readSessionNavigation>);
+    mode.start();
+    try {
+      await host.run('/history');
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n')))
+        .toContain(saved ? 'Saved question' : 'No saved session history is available.'));
+      if (saved) {
+        host.overlay.handlePaste('no-match-query');
+        const frame = stripAnsi(host.overlay.render(100, 24).join('\n'));
+        expect(frame).toContain('No session history entries match this search.');
+        expect(frame).not.toContain('No saved session history is available.');
+      }
+    } finally { mode.stop(); }
   });
 
   it('inspects the host tool pool through the real picker and retains a copyable report without taking the turn sink', async () => {

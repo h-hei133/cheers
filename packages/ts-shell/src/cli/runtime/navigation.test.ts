@@ -96,6 +96,29 @@ describe("session tree navigation", () => {
     expect(readSessionNavigation(session.id, root).thread.activeLeafId).toBe(turns[2]!.id);
   });
 
+  it('browses persisted abandoned branches through history without changing the branch or files', async () => {
+    const { input, session, turns, summarize, layout } = harness();
+    await navigateSession(input, turns[0]!.id!);
+    input.sessionManager.addTurn(session.id, { role: 'user', content: 'Alternative branch' });
+    const workspaceFile = path.join(root, 'untouched.txt');
+    fs.writeFileSync(workspaceFile, 'unchanged\r\n😀\n');
+    const before = [layout.statePath, layout.transcriptPath, layout.metadataPath, workspaceFile].map(file => fs.readFileSync(file));
+    const navigation = readSessionNavigation(session.id, root);
+    const rewind = vi.fn();
+    summarize.mockClear();
+    const picker = treePicker({ sessionId: session.id, cwd: root }, rewind, 'history');
+    const options = await picker.load();
+    expect(options.map(option => option.id)).toEqual(navigation.points.map(point => point.entryId));
+    expect(options.some(option => option.label.includes('Alternative branch'))).toBe(true);
+    expect(options.some(option => option.id === turns[3]!.id)).toBe(true);
+    expect(input.sessionManager.getSession(session.id)!.turns.some(turn => turn.id === turns[3]!.id)).toBe(false);
+    expect(picker.initialSelection).toBe(navigation.thread.activeLeafId);
+    expect(await picker.apply([turns[3]!.id!])).toEqual({ draft: `/tree -- ${turns[3]!.id}` });
+    expect(rewind).not.toHaveBeenCalled();
+    expect(summarize).not.toHaveBeenCalled();
+    expect([layout.statePath, layout.transcriptPath, layout.metadataPath, workspaceFile].map(file => fs.readFileSync(file))).toEqual(before);
+  });
+
   it("makes listing, /entries tree, and selecting the current leaf read-only", async () => {
     const { input, session, turns, summarize, layout } = harness();
     const state = fs.readFileSync(layout.statePath);

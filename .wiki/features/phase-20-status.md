@@ -127,6 +127,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | PAN-02 | 时间分组、pin、树形、跨项目完整授权目录搜索、10k 分页批处理、全屏事实/对话预览、窄屏 stacked preview、current tree focus、pin 持久化；Linux TUI fork/切换/确认删除组合通过 | 其余动作身份/revision 边界继续复核；restore preview 另归 PAN-06 |
 | PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
 | PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝；restore 100项分页/续页、全目录搜索、有界目录缓冲与记录保留、复合身份消歧、元数据digest重验、特殊路径参数及preview-only业务链；back 保留完整候选、25项展示续页、numeric/exact-ID定位、完整prompt搜索和共享捕获快照，沿既有草稿/分支回退；四格打包PTY核对60题全可达与文件不变 | history完整持久树沿既有query owner；undo saved-results已补40条续页/明确到头、scope和完整receipt revision重验，精确补偿沿原owner；copy已补完整block搜索/续页/到头/失败/取消及恢复会话早期源；其余identity/revision及资源边界继续复核；back完整候选保留/同步搜索随源大小增长，restore每页/搜索仍线性扫描目录，不宣称搜索延迟上界或原子目录快照 |
+| PAN-06 history | 裸 `/history` 复用完整持久树及废弃分支，选择只生成精确 `/tree -- <entry-id>` 草稿；空历史/无匹配/读取失败分开；真实排队焦点、禁用身份与取消无写回归；底栏任务存储读取失败显示 unavailable，恢复后重新读取 | 完整树/全文搜索仍同步且未设总字节/工作量界，10k模拟节点不证明真实大历史响应界；cleanse 面板、其余 identity/revision 及资源合同继续开放；本批293项、专用故障PTY与交付证据见开发日志 |
 | PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引）、watcher 注销与 unknown status 回归 | agents 专用操作仍归 `/jobs`；其余 journal/revision 边界继续复核 |
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |

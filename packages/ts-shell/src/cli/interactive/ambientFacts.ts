@@ -18,8 +18,18 @@ export function readAmbientFacts(sessionId: string, background?: BackgroundRunne
   return {
     openTodos: getSessionTodos(sessionId).filter((todo) => todo.status !== "done" && todo.status !== "dropped").length,
     peerSessions: countPeerSessions(sessionId),
-    runningCommands: background?.list().filter((task) => task.state === "running" || task.state === 'starting').length ?? 0,
+    runningCommands: runningCommandCount(background),
   };
+}
+
+function runningCommandCount(background?: BackgroundRunner): AmbientContext['runningCommands'] {
+  try {
+    return background?.list().filter(task => task.state === 'running' || task.state === 'starting').length ?? 0;
+  } catch {
+    // A failed display read conveys no knowledge of the task count. The store
+    // still owns rejection of unavailable publication and execution requests.
+    return 'unavailable';
+  }
 }
 
 /** Other live sessions reachable for cross-session messaging. */

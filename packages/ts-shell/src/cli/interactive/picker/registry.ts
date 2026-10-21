@@ -101,7 +101,8 @@ const PICKERS: Record<string, PickerFactory> = {
   // gesture is fast once known; the command is how it becomes known.
   back: (host, selector) => rewindPicker({ turns: host.sessionTurns(), rewind: host.rewind, selector }),
   tree: (host) => treePicker(host.commandContext, host.rewind),
-  fork: host => treePicker(host.commandContext, point => host.fork?.(point.entryId) ?? Promise.resolve(undefined), true),
+  history: (host) => treePicker(host.commandContext, host.rewind, "history"),
+  fork: host => treePicker(host.commandContext, point => host.fork?.(point.entryId) ?? Promise.resolve(undefined), "fork"),
   statusline: (host) =>
     statusItemPicker({
       current: host.statusItems,

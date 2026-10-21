@@ -18,7 +18,7 @@ import { textBlock } from "../../../presentation/tui/transcript/blocks.js";
 const CONTEXT = { cwd: "/workspace", sessionId: "sess_test" };
 
 describe("which commands open a chooser", () => {
-  it.each(["/resume", "/pin", "/mcp", "/connect", "/restore", "/marketplace", "/plugin", "/copy"])(
+  it.each(["/resume", "/pin", "/history", "/mcp", "/connect", "/restore", "/marketplace", "/plugin", "/copy"])(
     "opens one for a bare %s",
     (command) => {
       expect(opensPicker(command)).toBe(true);
@@ -99,6 +99,14 @@ describe("which commands open a chooser", () => {
     expect(pin.onDelete).toBeUndefined();
     expect(pin.onRename).toBeUndefined();
     expect(pin.chips?.select('all')?.title).toBe('Pin saved session');
+  });
+
+  it('opens history as a read-only tree chooser and keeps direct forms routed', () => {
+    const picker = pickerFor('/history', { commandContext: CONTEXT, rewind: vi.fn(async () => undefined) } as unknown as PickerHost)!;
+    expect(picker.title).toBe('Session history');
+    expect(opensPicker('/history list')).toBe(false);
+    expect(opensPicker('/history export "archive.json"')).toBe(false);
+    expect(opensPicker('/history --help')).toBe(false);
   });
 
   it("claims nothing that is not a command", () => {
