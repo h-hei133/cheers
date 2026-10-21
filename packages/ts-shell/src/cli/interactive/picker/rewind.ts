@@ -20,8 +20,13 @@ import type { Picker, PickerOutcome } from "../overlay.js";
  * decisions, and `/undo` is the other one.
  */
 
-const MAX_POINTS = 25;
+const PAGE_SIZE = 25;
+const MORE_ID = "__more__";
 const SUMMARY_LENGTH = 72;
+
+interface RewindPage {
+  readonly offset?: number;
+}
 
 export interface RewindPoint {
   /** The entry to make active, so the choice survives the turns moving. */
@@ -39,29 +44,51 @@ export interface RewindPickerInput {
   rewind(point: RewindPoint): Promise<PickerOutcome | undefined>;
 }
 
-export function rewindPicker(input: RewindPickerInput): Picker {
+export function rewindPicker(input: RewindPickerInput, page: RewindPage = {}): Picker {
   const points = rewindPoints(input.turns);
   const selector = input.selector?.trim();
-  const selected = selector && /^[1-9]\d*$/.test(selector)
-    ? points[Number(selector) - 1]
-    : points.find((point) => point.entryId === selector);
+  const selectedIndex = selector && /^[1-9]\d*$/.test(selector)
+    ? Number(selector) - 1
+    : selector ? points.findIndex((point) => point.entryId === selector
+      || point.prompt.toLocaleLowerCase().includes(selector.toLocaleLowerCase())) : -1;
+  const selected = selectedIndex >= 0 ? points[selectedIndex] : undefined;
+  const offset = Math.min(
+    Math.max(0, page.offset ?? (selected ? Math.floor(selectedIndex / PAGE_SIZE) * PAGE_SIZE : 0)),
+    Math.max(0, points.length - 1),
+  );
+  const visible = points.slice(offset, offset + PAGE_SIZE);
+  const hasMore = offset + PAGE_SIZE < points.length;
   return {
     title: "Ask again from",
     form: "panel",
     exclusive: true,
-    ...(selected ? { initialSelection: selected.entryId } : {}),
+    ...(selected && visible.includes(selected) ? { initialSelection: selected.entryId } : {}),
     ...(selector && !selected ? { initialFilter: selector } : {}),
+    footer: points.length === 0
+      ? "Questions 0 of 0"
+      : `Questions ${offset + 1}-${Math.min(offset + PAGE_SIZE, points.length)} of ${points.length}${hasMore ? "; more available" : ""}`,
     empty: "Nothing to go back to yet — no questions have been asked in this session.",
     async load(): Promise<readonly Option[]> {
-      return points.map<Option>((point) => ({
+      const options = visible.map<Option>((point) => ({
         id: point.entryId,
         label: summarise(point.prompt),
         detail: describeCost(point.dropped),
         note: "keeps files",
       }));
+      if (hasMore) options.push({
+        id: MORE_ID,
+        label: "More questions",
+        detail: "Continue to older questions",
+        note: `${points.length - offset - PAGE_SIZE} remaining`,
+      });
+      return options;
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
-      const point = points.find((candidate) => candidate.entryId === ids[0]);
+      if (ids[0] === MORE_ID) {
+        if (ids.length !== 1 || !hasMore) return undefined;
+        return { next: rewindPicker(input, { offset: offset + PAGE_SIZE }) };
+      }
+      const point = visible.find((candidate) => candidate.entryId === ids[0]);
       if (!point) return undefined;
       return input.rewind(point);
     },
@@ -88,7 +115,7 @@ export function rewindPoints(turns: readonly SessionMessage[]): RewindPoint[] {
       dropped: messages.length - index - 1,
     });
   }
-  return points.reverse().slice(0, MAX_POINTS);
+  return points.reverse();
 }
 
 /**

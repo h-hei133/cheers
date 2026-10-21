@@ -40,4 +40,45 @@ describe("back selectors", () => {
     });
     expect(await picker.apply(['question'])).toEqual({ note: 'Navigation outcome is unknown.' });
   });
+
+  it('pages older questions while keeping the newest-first order', async () => {
+    const turns = Array.from({ length: 60 }, (_, index) => ({
+      id: `question-${index}`,
+      role: 'user' as const,
+      content: `question ${index}`,
+    }));
+    const rewind = vi.fn(async () => ({ note: 'restored' }));
+    const first = rewindPicker({ turns, rewind });
+    const firstOptions = await first.load();
+
+    expect(firstOptions).toHaveLength(26);
+    expect(firstOptions[0]?.label).toBe('question 59');
+    expect(firstOptions.at(-1)?.id).toBe('__more__');
+
+    const second = await first.apply(['__more__']);
+    expect(second?.next).toBeDefined();
+    const secondOptions = await second!.next!.load();
+    expect(secondOptions[0]?.label).toBe('question 34');
+    expect(secondOptions.at(-1)?.id).toBe('__more__');
+
+    await second!.next!.apply(['question-10']);
+    expect(rewind).toHaveBeenCalledWith(expect.objectContaining({ entryId: 'question-10' }));
+  });
+
+  it('positions numeric and stable-id selectors on the page that contains them', async () => {
+    const turns = Array.from({ length: 60 }, (_, index) => ({
+      id: `question-${index}`,
+      role: 'user' as const,
+      content: `question ${index}`,
+    }));
+    const rewind = vi.fn(async () => ({ note: 'restored' }));
+
+    const numeric = rewindPicker({ turns, selector: '26', rewind });
+    expect(numeric.initialSelection).toBe('question-34');
+    expect((await numeric.load())[0]?.id).toBe('question-34');
+
+    const stable = rewindPicker({ turns, selector: 'question-0', rewind });
+    expect(stable.initialSelection).toBe('question-0');
+    expect((await stable.load()).at(-1)?.id).toBe('question-0');
+  });
 });

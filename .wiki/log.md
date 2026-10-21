@@ -8154,3 +8154,10 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - `7f9a27f4` 的 CI `39534315600` 于 `2026-10-21T02:58:54Z` completed/failure：905 个测试文件、9378 项通过，唯一失败是 `edit/recovery/catalog.test.ts` 的取消句柄断言。CI Node 20.3 在目录已关闭时同步抛出 `ERR_DIR_CLOSED`，而本地较新 Node 返回 rejected promise；产品关闭行为未失败。测试断言现用 microtask 统一两种 Node 行为，并仍精确断言关闭错误码。
 - 修复本地 catalog 4/4、PAN-02 相关 5 文件/133 项、生产 strict TypeScript、`git diff --check` 通过；独立代码 APPROVE、架构 CLEAR，测试文件 hash `6a4af2339e6f4324f6c837de8b0d43d81de448e5e1cf3f03fe142b7b2c397819`。该修复尚未提交/推送，新的 CI 结果待精确 SHA 读回。
 - 修复提交 `ec09693ee50ca1f05d0c5c656ec6d05ee5f0c9a0` 已推送，远端 main 精确读回；Architecture Watch `39536881716` success；CI `39536881715`/job `119015459598` 于 `2026-10-21T03:27:30Z` completed/success。前置门禁、构建、9382 项测试（9378 passed、3 skipped、1 skipped file）和 NormProof 均 success。失败 SHA `7f9a27f4` 保留并分类为 Node 20.3 测试断言兼容问题。
+
+### 2026-10-21 PAN-06 `/back` 有界续页与旧问题可达性
+
+- `/back` 先前在 `rewindPoints` 末尾静默保留最近 25 个问题，导致更早的分支和稳定 entry ID 永远不可达。现在保留完整的分支候选，在 picker owner 内按 25 项输出 newest-first 页面，并提供明确的 `More questions` continuation；分页只读取当前页用于展示和 apply，继续复用现有 rewind 回调，因此仍只移动对话分支并恢复草稿，不触碰文件。
+- numeric selector（例如 `26`）与 stable entry ID 会直接定位到包含它们的页；提示文本也会定位匹配问题，未命中时保留原有 filter 行为。续页、页内选择、空会话和旧问题定位由新增回归覆盖，聚焦 interactive/history/picker 集合为 5 个文件、83 项通过。
+- 定向反转将 `hasMore` 固定为 `false`，续页测试实际从 26 行降为 25 行并退出 1；源码恢复后 `/back` picker 15/15 通过。TypeScript、TS/exe 双构建、cycles/config/declarations/Node-floor、strict docs drift、`test:scripts` 97 项、`verify:cli-entry` 19 项和 Linux Node/exe × regular/fullscreen/line/pipe 八格 smoke 均通过；strict docs drift 保留 118 条既有 advisory。
+- 本条是未提交的本地证据；尚无新 commit、push、CI 或独立复核结果。PAN-06 的 history 完整树、undo 精确 receipt 补偿以及 copy 到头/失败/取消边界继续开放。
