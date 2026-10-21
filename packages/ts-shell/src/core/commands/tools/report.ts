@@ -1,13 +1,22 @@
 import type { ToolDefinition } from '../../../tools/types.js';
 import { toolPlanMode } from '../../query/toolPolicy.js';
 import type { CommandReport, ReportLine } from '../report/contract.js';
-import { createReport, span } from '../report/projection.js';
+import { createReport, plainReportText, span } from '../report/projection.js';
 import { redactReportText } from '../../security/redaction.js';
 
 const PERMISSIONS = "Eligible tools still require the session's permissions and approval.";
 
+/** Display canonicalization precedes scrubbing so removed ANSI cannot join secret fragments. */
+function metadataText(value: string, projectRoot: string, maxLength = 4096, preserveLines = false): string {
+  return redactReportText(plainReportText(value.replace(/\r\n/g, '\n')), maxLength, { projectRoot, preserveLines });
+}
+
+export function toolLabel(name: string, projectRoot = process.cwd()): string {
+  return metadataText(name, projectRoot, 240);
+}
+
 export function toolsReport(pool: ReadonlyMap<string, ToolDefinition>, projectRoot = process.cwd()): CommandReport {
-  const safe = (value: string, maxLength = 4096): string => redactReportText(value, maxLength, { projectRoot });
+  const safe = (value: string, maxLength = 4096): string => metadataText(value, projectRoot, maxLength);
   const tools = [...pool.values()].sort((a, b) => a.name.localeCompare(b.name));
   const measured = tools.map(tool => ({ name: tool.name, descriptionBytes: Buffer.byteLength(tool.description, 'utf8'),
     schemaBytes: Buffer.byteLength(JSON.stringify(tool.argsSchema), 'utf8') }));
@@ -21,7 +30,7 @@ export function toolsReport(pool: ReadonlyMap<string, ToolDefinition>, projectRo
         [span(safe(tool.name, 240), 'code')], [span(toolPlanMode(tool.name, tool))],
         [span(measurements.get(tool.name)!.descriptionBytes, 'number')],
         [span(measurements.get(tool.name)!.schemaBytes, 'number')],
-        [span(toolSummary(safe(tool.description)))],
+        [span(toolSummary(tool.description, projectRoot))],
       ] })),
       { kind: 'space' },
       { kind: 'text', spans: [span(`Static wire cost: ${measured.reduce((sum, tool) => sum + tool.descriptionBytes, 0)} description bytes + ${measured.reduce((sum, tool) => sum + tool.schemaBytes, 0)} schema bytes. `),
@@ -40,23 +49,26 @@ export function toolsReport(pool: ReadonlyMap<string, ToolDefinition>, projectRo
 }
 
 /** Snapshot only documentation fields, never executable callbacks or defaults. */
-export function toolReport(tool: ToolDefinition): CommandReport {
+export function toolReport(tool: ToolDefinition, projectRoot = process.cwd()): CommandReport {
+  const safe = (value: string, maxLength = 4096): string => metadataText(value, projectRoot, maxLength);
+  const description = metadataText(tool.description, projectRoot, 48_000, true);
   const properties = tool.argsSchema.properties;
   const required = new Set(Array.isArray(tool.argsSchema.required) ? tool.argsSchema.required : []);
   const args = properties && typeof properties === 'object' && !Array.isArray(properties)
     ? Object.entries(properties).map(([name, value]) => {
       const shape = value && typeof value === 'object' ? value as { type?: unknown; description?: unknown } : {};
-      return { name, type: typeof shape.type === 'string' ? shape.type : 'any', required: required.has(name),
-        description: typeof shape.description === 'string' ? shape.description : '' };
+      return { name: safe(name, 240), type: typeof shape.type === 'string' ? safe(shape.type, 80) : 'any', required: required.has(name),
+        description: typeof shape.description === 'string' ? safe(shape.description) : '' };
     }) : [];
   const planMode = toolPlanMode(tool.name, tool);
   const descriptionBytes = Buffer.byteLength(tool.description, 'utf8');
   const schemaBytes = Buffer.byteLength(JSON.stringify(tool.argsSchema), 'utf8');
-  return createReport({ title: tool.name,
+  const name = toolLabel(tool.name, projectRoot);
+  return createReport({ title: name,
     columns: [{ label: 'Argument', minWidth: 14 }, { label: 'Type', minWidth: 8 },
       { label: 'Required', minWidth: 8 }, { label: 'Description', minWidth: 24 }],
     lines: [
-      ...tool.description.trim().split(/\r?\n/).map((text): ReportLine => ({ kind: 'text', spans: [span(text)] })),
+      ...description.split(/\r?\n/).map((text): ReportLine => ({ kind: 'text', spans: [span(text)] })),
       { kind: 'space' },
       { kind: 'text', spans: [span(`Static wire cost: ${descriptionBytes} description bytes + ${schemaBytes} schema bytes. Token count: not measured.`)] },
       { kind: 'text', spans: [span('Plan mode: '), span(planMode, planMode === 'blocked' ? 'warning' : 'text')] },
@@ -66,14 +78,14 @@ export function toolReport(tool: ToolDefinition): CommandReport {
         [span(arg.name, 'argument')], [span(arg.type, 'code')], [span(arg.required ? 'yes' : 'no')], [span(arg.description)],
       ] })) : [{ kind: 'text' as const, spans: [span('No top-level arguments are declared.')] }]),
     ],
-    facts: { name: tool.name, description: tool.description, planMode, arguments: args, permission: 'not-evaluated',
+    facts: { name, description, planMode, arguments: args, permission: 'not-evaluated',
       size: { unit: 'utf8-bytes', tokens: 'not-measured', descriptionBytes, schemaBytes } },
   });
 }
 
 /** Abbreviations do not end the first sentence of a tool's list description. */
-export function toolSummary(description: string): string {
-  const flat = description.replace(/\s+/g, ' ').trim();
+export function toolSummary(description: string, projectRoot = process.cwd()): string {
+  const flat = metadataText(description, projectRoot);
   let from = 0;
   for (;;) {
     const stop = flat.indexOf('. ', from);

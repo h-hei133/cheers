@@ -5,6 +5,7 @@ import type { CommandContext, LocalCommandResult } from "./types.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
 import { toolReport, toolsReport } from "./tools/report.js";
 import { reportText } from "./report/projection.js";
+import { assertAdmission } from '../network/admission.js';
 
 export const toolsSyntax = entitySyntax("tools");
 
@@ -37,7 +38,7 @@ export async function runToolsCommand(
         output: `No tool named \`${wanted}\`. \`/tools\` lists the ${registry.size} there are.`,
       };
     }
-    const report = toolReport(tool);
+    const report = toolReport(tool, context.cwd);
     return { kind: "local", output: reportText(report), report };
   }
 
@@ -47,5 +48,8 @@ export async function runToolsCommand(
 
 /** Commands and choosers inspect the same current pool; neither executes it. */
 export async function readToolPool(context: CommandContext) {
-  return context.getToolPool ? context.getToolPool() : createCoreToolRegistry();
+  assertAdmission(context.admission);
+  const pool = await (context.getToolPool ? context.getToolPool() : createCoreToolRegistry());
+  assertAdmission(context.admission);
+  return pool;
 }

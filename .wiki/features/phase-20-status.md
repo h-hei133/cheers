@@ -344,3 +344,10 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 每步要求offered、有效单项及一次消费；review默认取消，提交前消耗，原session/root/substrate admission贯穿等待审批及writer，取消仍走原pending owner，迟到note不发布。review省略argv值和URL query，明确Connection: not tested；保存仅失效原连接，不自动执行或发现。独立架构实际render发现输入footer不可见，现将真实阶段放入输入标题并复验，不伪造认证/连接进度。
 - 最终6文件178项、strict production TS、双构建、11项有效反转全部通过。Node/exe × regular/fullscreen四格专用PTY验证完整分步输入、默认取消原字节不变、原文件计划/普通审批、精确命令和argv、无临时定义/连接/模型消息；仅目标配置新增，metadata/全局config/工作区不变。Linux八格通用smoke与19项入口通过；失败测试及探针分类、构建hash见开发日志。
 - 两路独立代码APPROVE/架构CLEAR，九文件hash与最终构建读回绑定。仅证明本机合成定义保存；真实MCP连接/认证、env/headers交互编辑、其他report消费者及全部47项继续复核，不恢复“只剩四项”。此前原生认证精确SHA的CI `39594034576` 已completed/success（12:01:51Z）；扩展读取已commit/push `d4b5c89343a984540136b001aecb5c681a1c48c3`，CI `39596352846`（12:13:18Z）和Watch `39596352847`均success。本批commit/push/新SHA CI分别取证。
+
+## 2026-10-21 `/tools` 报告投影与原读取准入（PAN-08 部分）
+
+- 新增回归先复现原详情title/description/schema文档及facts含敏感元数据、列表截短留下密钥前缀、异步目录后旧绑定仍返回report/note。现由原工具报告owner先规范terminal文本、再复用既有redactor、最后截短；原始工具ID、required判定、plan policy和完整description/schema字节计量保留，safe facts不作执行schema或权限证明。两种命令入口共用原context admission的读前/读后重验，picker和真实host拒绝旧结果。
+- 补充回归复现ANSI先脱敏后移除会重新拼接密钥；修复规范化顺序后，独立架构又找到CRLF显示字面回车的兼容回归，现于本域规范CRLF，保留两行及原byte成本。generic report codec的facts LF转义合同不改；测试误期待literal LF的中间失败单独保留并纠正。最终主集5文件133项、直接consumer5文件13项、strict TS、双构建、10项有效反转通过。
+- Node/exe × regular/fullscreen四格专用PTY验证本地MCP不可信metadata在列表/详情/直接命令及持久报告均安全；取消零写，显式查看仅新增2条command-output，无新model消息，state/metadata/config/工作区原字节不变，原catalog discovery仍发生但tools/call为0。八格通用smoke及19入口通过。独立代码APPROVE/架构WATCH，五文件hash绑定；全目录获取/排序/完整schema序列化无总资源/延迟界，不能称检查不启动进程或网络，也不闭合PAN-08及47项。
+- 前批MCP添加已commit/push `d69fea2fba8733430624a8c202230b33fca7e567`，远端main同SHA，CI `39599867617`于12:44:21Z completed/success、Watch `39599867653` success。本批新SHA交付分别取证；其他help/skills/context/cost消费者继续复核。

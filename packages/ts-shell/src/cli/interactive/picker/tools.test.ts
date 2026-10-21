@@ -65,4 +65,43 @@ describe('tool inspection', () => {
     expect(toolSummary('Match a pattern (e.g. *.ts). More details.')).toBe('Match a pattern (e.g. *.ts).');
     expect(toolSummary('a'.repeat(200))).toHaveLength(110);
   });
+
+  it('keeps exact tool identity while redacting list and detail projections before truncation', async () => {
+    const item = { ...fixture(), name: 'api_key=synthetic-\x1b[31msensitive-name', description: `${'x'.repeat(100)} sk-\x1b[31msynthetic-sensitive-description` };
+    const picker = toolsPicker({ cwd: '/fixture', getToolPool: async () => new Map([[item.name, item]]) });
+    const [option] = await picker.load();
+    expect(option!.id).toBe(item.name);
+    expect(JSON.stringify({ label: option!.label, detail: option!.detail })).not.toContain('synthetic-sensitive');
+    expect(option!.detail).not.toContain('sk-synt');
+    const result = await picker.apply([item.name]);
+    expect(JSON.stringify(result)).not.toContain('synthetic-sensitive'); expect(item.execute).not.toHaveBeenCalled();
+  });
+
+  it.each(['load', 'apply', 'failure'] as const)('rejects stale owner metadata during %s without exposing a late note or report', async phase => {
+    let stale = false, release!: () => void;
+    const item = fixture(), pool = new Map([[item.name, item]]);
+    const getToolPool = vi.fn(async () => pool);
+    const context = { cwd: '/fixture', admission: () => stale ? 'original binding changed' : undefined, getToolPool };
+    const picker = toolsPicker(context);
+    await picker.load();
+    getToolPool.mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => { release = resolve; });
+      if (phase === 'failure') throw new Error('PRIVATE_RESPONSE_BODY');
+      return pool;
+    });
+    if (phase === 'load') {
+      const loading = picker.load(); await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+      stale = true; release(); await expect(loading).rejects.toThrow('original binding changed');
+    } else {
+      const result = picker.apply([item.name]); await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+      stale = true; release(); expect(await result).toBeUndefined();
+    }
+    expect(picker.isCurrent?.()).toBe(false);
+    expect(picker.status?.()).toContain('changed');
+    const reads = getToolPool.mock.calls.length;
+    await expect(picker.load()).rejects.toThrow('original binding changed');
+    await expect(runToolsCommand([], context)).rejects.toThrow('original binding changed');
+    expect(getToolPool).toHaveBeenCalledTimes(reads);
+    expect(item.execute).not.toHaveBeenCalled();
+  });
 });
