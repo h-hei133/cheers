@@ -120,7 +120,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | PAN-01 | model 两栏与详情、同名 relay 区分、预设行 | 连接/role 的绑定 revision 搜索验收 |
 | PAN-02 | 时间分组、pin、树形、跨项目完整授权目录搜索、10k 分页批处理、全屏事实/对话预览、窄屏 stacked preview、current tree focus、pin 持久化；Linux TUI fork/切换/确认删除组合通过 | 其余动作身份/revision 边界继续复核；restore preview 另归 PAN-06 |
 | PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
-| PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝；restore 不再截断到40项，复合身份消歧、元数据 digest 重验、特殊路径参数及 preview-only 业务链通过 | history 完整树、copy 到头/失败/取消边界、back/undo 审计；restore 大型目录仍全量读取/排序/保留，缺分页和明确资源上界 |
+| PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝；restore 100项分页/续页、全目录搜索、有界目录缓冲与记录保留、复合身份消歧、元数据digest重验、特殊路径参数及preview-only业务链 | history 完整树、copy 到头/失败/取消边界、back/undo 审计；restore 每页/搜索仍线性扫描目录，不宣称扫描延迟上界或原子目录快照 |
 | PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引）、watcher 注销与 unknown status 回归 | agents 专用操作仍归 `/jobs`；其余 journal/revision 边界继续复核 |
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |

@@ -64,7 +64,7 @@
 | PAN-03 | `picker/hub.ts` | pickers（39） | `/hub` 在无 composition 时仍打开或 apply 取消任务时失败 |
 | PAN-04 | `cli/usage/service.ts` | usage（31） | 无限分母输出百分比时失败 |
 | PAN-05（部分） | `picker/advisor.ts`、`core/commands/report/projection.ts`、`btwCommandRuntime` | advisor 只读 checkpoint/note 面板；plan-review 与 btw 结构化报告；打开面板不发模型请求，模型工作走显式命令 | 面板打开触发模型、旧流串入新面板或 plan/btw 越权写入主会话时失败 |
-| PAN-06（部分） | `picker/copy.ts`、`picker/restore.ts`、`edit/recovery/recoveryAuthorityIndex.ts`、`transcript/container.ts` | copy（3）；100 项分页、continuation、source revision 和 stale selection；restore（10）及 recovery index（5），选择仅生成可解析 preview draft，复合身份消歧、完整元数据 digest 重验，特殊路径/缺内容/缺失与坏目录/取消均有回归；Linux 八格预览验证文件、记录、blob 字节不变 | 第 40 个 block 不可复制、revision 变化后仍复制或下一页丢失时失败；恢复空格分隔的ID参数后遇dash-leading值被解析器拒绝，单 record ID、40项截断或移除 digest 后各有实际断言失败。restore 大型目录仍缺分页/资源上界，history/back/undo/copy 剩余边界不据此闭合 |
+| PAN-06（部分） | `picker/copy.ts`、`picker/restore.ts`、`edit/recovery/{catalog,recoveryAuthorityIndex}.ts`、`transcript/container.ts` | copy（3）；100 项分页、continuation、source revision 和 stale selection；restore（15）、catalog（4）及 recovery index（5），选择仅生成可解析preview draft，复合身份/digest重验；目录buffer32、最多101条排序记录/每页100条，205条跨三页无遗漏/重复、完整搜索、变化拒绝和取消关闭句柄；加载中输入及普通/排队no-match渲染均有回归；Linux八格预览核对文件/记录/blob字节 | dash-leading参数、单record identity、40项截断或移除digest有实际失败；放宽100项页、移除cursor revision、关闭完整搜索或移除search generation亦有反转失败。每页/搜索仍线性I/O，不承诺扫描延迟上界/原子目录快照；history/back/undo/copy剩余边界不据此闭合 |
 | PAN-07 | `registry.ts` | slashCommandRegistry（11） | `/extensions` 不解析到 plugin 时失败 |
 | PAN-08（部分） | `picker/mcpAdd.ts`、`picker/{help,tools,skills}.ts`、`core/commands/tools/report.ts` | mcpAdd（2）、help/tools；逐步 scope/name/transport/confirm，临时定义 0600 且无论成功拒绝都删除；report 只读 | 未确认即发布、临时定义残留或打开 report 触发执行时失败 |
 

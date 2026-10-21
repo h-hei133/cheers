@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { captureRecoveryAuthorityRecord } from '../../../edit/recovery/recoveryAuthorityStore.js';
 import { snapshotRoot } from '../../../edit/recovery/root.js';
 import { tokenizeCommandArgs } from '../../../core/commands/arguments.js';
@@ -106,6 +106,77 @@ describe('restore selection contract', () => {
     const rows = await picker.load();
     expect(rows[0]?.disabled).toBe(false);
     expect((await picker.apply([rows[0]!.id]))?.draft).toContain('/restore preview');
+  });
+
+  it('pages beyond one hundred snapshots and searches records outside the current page', async () => {
+    const root = workspace();
+    for (let index = 0; index < 105; index++) await capture(root, 'edit-a', `record-${String(index).padStart(3, '0')}`);
+    const picker = restorePicker(root);
+    const first = await picker.load();
+    expect(first).toHaveLength(101);
+    expect(picker.status?.(first)).toContain('105');
+    const more = first.find(row => row.note !== 'restorable' && row.label === 'More snapshots')!;
+    expect((await picker.apply([first[0]!.id, more.id]))?.draft).toBeUndefined();
+    const next = (await picker.apply([more.id]))!.next!;
+    expect(await next.load()).toHaveLength(5);
+    const matches = await picker.search!('record-104');
+    expect(matches.map(row => row.id)).toEqual(['edit-a:record-104']);
+    expect((await picker.apply([matches[0]!.id]))?.draft).toContain('--record=record-104');
+    expect(picker.onSearchClear!()).toHaveLength(101);
+
+    const allMatches = await picker.search!('record-');
+    const searchedNext = (await picker.apply([allMatches.at(-1)!.id]))!.next!;
+    expect(searchedNext.initialFilter).toBe('record-');
+    await searchedNext.load();
+    expect(await searchedNext.search!('record-')).toHaveLength(5);
+    expect(searchedNext.onSearchClear!()).toHaveLength(101);
+
+    await capture(root, 'edit-a', 'another-record');
+    await expect(next.load()).rejects.toThrow('changed');
+  });
+
+  it('does not publish a delayed search after the query was cleared', async () => {
+    const root = workspace();
+    await capture(root, 'edit-a', 'record-a');
+    const picker = restorePicker(root);
+    const rows = await picker.load();
+    picker.onSearchChange!('no-match');
+    expect((await picker.apply([rows[0]!.id]))?.draft).toBeUndefined();
+    const delayed = picker.search!('no-match');
+    expect(picker.onSearchClear!()).toHaveLength(1);
+    await expect(delayed).rejects.toThrow('changed');
+    expect((await picker.apply([rows[0]!.id]))?.draft).toContain('--record=record-a');
+  });
+
+  it('keeps initial loading successful when a query is typed during the scan', async () => {
+    const root = workspace();
+    await capture(root, 'edit-a', 'record-a');
+    const picker = restorePicker(root);
+    const loading = picker.load();
+    picker.onSearchChange!('record-a');
+    const rows = await loading;
+    expect(rows).toHaveLength(1);
+    expect((await picker.apply([rows[0]!.id]))?.draft).toBeUndefined();
+    expect(await picker.search!('record-a')).toHaveLength(1);
+    expect((await picker.apply([rows[0]!.id]))?.draft).toContain('--record=record-a');
+  });
+
+  it.each([false, true])('renders no matches separately from an empty ledger with queued wrapper=%s', async queued => {
+    const root = workspace();
+    await capture(root, 'edit-a', 'record-a');
+    const picker = restorePicker(root);
+    const host = new OverlayHost(() => {});
+    host.open(queued ? { ...picker, exclusive: true } : picker);
+    try {
+      await vi.waitFor(() => expect(host.render(120, 40).join('\n')).toContain('record-a.txt'));
+      host.handlePaste('no-matching-snapshot');
+      await vi.waitFor(() => expect(picker.status?.([])).toContain('of 0 snapshots'));
+      const rendered = host.render(120, 40).join('\n');
+      expect(rendered).toContain('No edit snapshots match this search.');
+      expect(rendered).not.toContain('No edit snapshots recorded for this project yet.');
+      picker.onSearchClear!();
+      expect(picker.empty).toBe('No edit snapshots to show.');
+    } finally { host.close(); }
   });
 
   it('rejects a selection whose record changed or disappeared while the chooser was open', async () => {

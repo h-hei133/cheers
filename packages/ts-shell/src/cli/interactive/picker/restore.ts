@@ -1,8 +1,8 @@
 import {
-  listRecoveryAuthorityNamespaces,
   listRecoveryAuthorityRecords,
   type RecoveryAuthorityRecordIndexEntry,
 } from "../../../edit/recovery/recoveryAuthorityIndex.js";
+import { readRecoveryCatalogPage, type RecoveryCatalogPage, type RecoveryCatalogCursor } from '../../../edit/recovery/catalog.js';
 import { snapshotRoot } from "../../../edit/recovery/root.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
@@ -23,33 +23,65 @@ interface LedgerRecord extends RecoveryAuthorityRecordIndexEntry {
   readonly ledgerRoot: string;
 }
 
-export function restorePicker(workspaceRoot: string): Picker {
+const MORE_ID = ':more';
+
+export function restorePicker(workspaceRoot: string, continuation?: { after: RecoveryCatalogCursor; query?: string }): Picker {
   let offered: LedgerRecord[] = [];
-  let unavailable = 0;
+  let page: RecoveryCatalogPage | undefined;
+  let base: RecoveryCatalogPage | undefined;
+  let query: string | undefined;
+  let generation = 0;
+  let pending = false;
+  let searchQuery = '';
+  const ledgerRoot = snapshotRoot(workspaceRoot);
+  const accept = (value: RecoveryCatalogPage, filter?: string): readonly Option[] => {
+    page = value;
+    query = filter;
+    offered = value.records.map(record => ({ ...record, ledgerRoot }));
+    return catalogueRows(value, filter);
+  };
   return {
     title: "Restore a snapshot",
     holdInput: true,
     form: "panel",
-    empty: "No edit snapshots recorded for this project yet.",
-    loadError: 'Edit snapshots could not be read. Check the project ledger before retrying.',
+    empty: 'No edit snapshots to show.',
+    initialFilter: continuation?.query,
+    loadError: 'Edit snapshots could not be read or changed between pages. Reopen /restore before retrying.',
+    searchError: 'Snapshot search could not be completed. Reopen /restore before retrying.',
     status(visible) {
-      return `${visible.length} of ${offered.length} snapshots${unavailable ? `; ${unavailable} unavailable records or edits` : ''}. Selection creates a preview draft.`;
+      const empty = page?.matches === 0 && !pending
+        ? searchQuery ? 'No edit snapshots match this search. ' : 'No edit snapshots recorded for this project yet. '
+        : '';
+      return `${visible.filter(row => row.id !== MORE_ID).length} shown of ${page?.matches ?? 0} snapshots${page?.next ? '; more pages available' : ''}${page?.unavailable ? `; ${page.unavailable} unavailable records or edits` : ''}. ${empty}Selection creates a preview draft.`;
     },
     multiple: true,
     async load(signal): Promise<readonly Option[]> {
-      const listing = await readLedger(workspaceRoot, signal);
-      offered = listing.records;
-      unavailable = listing.unavailable;
-      return offered.map<Option>((record) => ({
-        id: identity(record),
-        label: record.workspaceRelativePath,
-        detail: `${record.operationKind} · was ${record.beforeState} · ${age(record.createdAt)}`,
-        searchText: `${record.authorityId} ${record.recordId}`,
-        note: canPreview(record) ? "restorable" : "no content",
-        disabled: !canPreview(record),
-      }));
+      const listing = await readRecoveryCatalogPage({ ledgerRoot, signal, after: continuation?.query ? undefined : continuation?.after });
+      signal?.throwIfAborted();
+      base = listing;
+      return pending || query ? catalogueRows(listing) : accept(listing);
+    },
+    onSearchChange(filter) { generation++; pending = true; searchQuery = filter; },
+    onSearchClear() {
+      generation++; pending = false; searchQuery = '';
+      return base ? accept(base) : undefined;
+    },
+    async search(filter, signal) {
+      const token = ++generation;
+      pending = true; searchQuery = filter;
+      const listing = await readRecoveryCatalogPage({ ledgerRoot, query: filter, signal,
+        after: continuation?.query === filter ? continuation.after : undefined });
+      signal?.throwIfAborted();
+      if (token !== generation) throw new Error('Snapshot search changed.');
+      pending = false;
+      return accept(listing, filter);
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
+      if (pending) return { note: 'Snapshot search is incomplete; wait or reopen /restore before choosing a record.' };
+      if (ids.includes(MORE_ID)) {
+        if (ids.length !== 1) return { note: 'Choose snapshots or another page separately; nothing was restored.' };
+        return page?.next ? { next: restorePicker(workspaceRoot, { after: page.next, query }) } : undefined;
+      }
       const selected = new Set(ids);
       const chosen = offered.filter((record) => selected.has(identity(record)));
       if (chosen.length === 0) return { note: "Nothing selected, so nothing will be restored." };
@@ -82,28 +114,15 @@ export function restorePicker(workspaceRoot: string): Picker {
   };
 }
 
-/** Every record in the project's ledger, newest first. */
-async function readLedger(workspaceRoot: string, signal?: AbortSignal): Promise<{ records: LedgerRecord[]; unavailable: number }> {
-  signal?.throwIfAborted();
-  const ledgerRoot = snapshotRoot(workspaceRoot);
-  const namespaces = await listRecoveryAuthorityNamespaces({ ledgerRoot });
-  signal?.throwIfAborted();
-  if (namespaces.status !== "listed") {
-    if (namespaces.blockedReason === 'namespace-not-found') return { records: [], unavailable: 0 };
-    throw new Error('Edit snapshots could not be read.');
-  }
-  const records: LedgerRecord[] = [];
-  let unavailable = 0;
-  for (const authorityId of namespaces.authorityIds) {
-    const listed = await listRecoveryAuthorityRecords({ ledgerRoot, authorityId, signal });
-    if (listed.status !== "listed") { unavailable++; continue; }
-    unavailable += listed.missingRecords.length;
-    for (const record of listed.records) records.push({ ...record, ledgerRoot });
-  }
-  signal?.throwIfAborted();
-  if (!records.length && unavailable) throw new Error('No snapshot records could be read.');
-  records.sort((left, right) => right.createdAt.localeCompare(left.createdAt) || identity(left).localeCompare(identity(right)));
-  return { records, unavailable };
+function catalogueRows(page: RecoveryCatalogPage, filter?: string): readonly Option[] {
+  const rows = page.records.map<Option>((record) => ({
+    id: identity(record), label: record.workspaceRelativePath,
+    detail: `${record.operationKind} · was ${record.beforeState} · ${age(record.createdAt)}`,
+    searchText: `${record.authorityId} ${record.recordId}`,
+    note: canPreview(record) ? 'restorable' : 'no content', disabled: !canPreview(record),
+  }));
+  if (page.next) rows.push({ id: MORE_ID, label: 'More snapshots', detail: 'Continue to the next page', searchText: filter });
+  return rows;
 }
 
 function identity(record: RecoveryAuthorityRecordIndexEntry): string {

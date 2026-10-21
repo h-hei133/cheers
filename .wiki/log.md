@@ -8133,3 +8133,14 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 四项加载时反转仅改隔离模块：空格分隔ID值被解析器拒绝，单record identity、40项截断和无效digest分别产生明确断言失败，均exit1。首轮误用仓库根Vitest二进制导致加载失败，不算反转证据；改用workspace正式入口后才取得上述结果，产品源hash未变。最终材料 `phase20-restore-reverse-*-final.log`。
 - `verify:cli-entry` 19项、cycles/config consumers/declarations/Node floor、strict docs drift及diff whitespace通过；docs保留118条既有advisory。仓库tgz NormProof实际exit0/partial，blocking unresolved specifiers及混合图cycles satisfied，8项既有ceiling advisory。触及两个产品owner函数计数8/7。未新增一轮全量TS声明；上批精确SHA远端成功与本批聚焦证据分开。
 - 两个原生审查预设模型不可用，失败不能记为批准；随后用继承当前模型的两个独立干净上下文完成相同lane。代码APPROVE、架构WATCH，报告精确绑定9个文件hash；综合COMMENT。WATCH是大型恢复目录仍全量读取/排序/保留、缺分页/资源上界，PAN-06保持部分。报告 `phase20-restore-code-review.md` / `phase20-restore-architecture.md`。本批尚未提交推送，精确新SHA CI/Watch仍待读回；全部47项范围和原环境/真实质量延期边界不变。
+
+### 2026-10-21 PAN-06 恢复目录有界分页与搜索
+
+- 上批已提交推送为 `135fce318a6994a1803987f57875842153039dd5`，远端main读回相同；Watch `39532339281` completed/success，CI `39532339286` 本条写入前查询仍in_progress，正在运行测试，未记为通过。
+- 继续处理架构WATCH：在现有 `edit/recovery/` 域内新增 `catalog.ts` 目录投影，不建持久索引或第二套记录读取/恢复实现。`opendir` buffer32逐项遍历，调用原index读取有界元数据，只保留排序前101条，输出每页100条和continuation。现有picker的next/search生命周期提供完整目录搜索与分页；每页版本含所有扫描到的record identity/digest/blob可见性及数量，变化即拒绝旧cursor，选择仍原位重验。
+- 只读参考的目录列举采用取消、并发解析和批次发布，保留其取消/旧结果不回填取舍；本仓快照记录不复用会话目录的全量结果数组，改用有界保留。为保留全局newest-first，当前每页/搜索仍线性I/O；不增加另一持久catalog系统，不宣称扫描延迟上界、跨目录原子快照或对持续并发变更的完整证明。多页反复扫描的总工作量明确保留。
+- 实测205条记录跨三页100/100/5、无重复/遗漏，首屏外query可达；测试禁止readdir，取消后两个目录句柄均已关闭，隐藏metadata变化拒绝续页，坏record/目录、真正empty与完整no-match分别处理。picker覆盖105条续页、query保留/清空、旧search拒绝、混合选集与more零dispatch。初始加载中键入query不再被generation误判为load失败。
+- 独立code发现无匹配时错误声称空ledger；首修使用getter，但排队入口复制picker会提前取值。最终采用中性的empty和动态status方法，真实OverlayHost普通/queued两条路径均有精确渲染断言。两个独立lane最终code APPROVE、architecture CLEAR，4文件hash实际读回匹配，原有有界保留WATCH已解决；线性I/O与非原子扫描边界仍记录。报告 `phase20-restore-pages-code-review.md` / `phase20-restore-pages-architecture.md`。
+- 最终19文件/266项聚焦、独立4文件/65项（重叠不相加）、脚本97项通过；生产 `tsc -p packages/ts-shell/tsconfig.build.json --noEmit` 实际exit0/零诊断。双构建通过，fresh TS manifest `0f0b2a43806e3243da632107d11b9c18a74afdaa80614a8e3f6c2794429421f0`，inputs `668e5425049487984425764e74b8048332e0dd49d7340b1cca97f8b0a08ca934`，artifact `4a31b32bbad1f3ee98f75c79def5096693fd59c36bd72daffe9af4fb14bafb93`；exe 102680704 bytes、SHA256 `702c09bc9c57c530a3ca10250febba421553ae50d615987eb899dc685891a92b`。
+- 最终构建Linux八格 `phase20-restore-pages-pty.log` 全PASS/exit0；文件/record/blob原字节保持，任务/审批/配置/profile等既有合成链不变。`verify:cli-entry` 19项通过；四项隔离加载反转分别放宽page size、移除cursor revision、取消完整query过滤、移除search generation，全为真实断言失败exit1，源码未改。材料 `phase20-restore-pages-reverse-*-final.log`。
+- cycles/config/declarations/Node floor与strict docs drift通过，118条既有docs advisory；仓库tgz NormProof exit0/partial，blocking unresolved及混合cycles satisfied，仍8项既有ceiling advisory；新catalog/picker分别5/12个function-like names。PAN-06的history/back/undo与copy剩余合同、line/pipe完整profile/save、其余47项继续；本批尚未提交推送，远端结果待精确SHA查询，不把本地通过当作CI完成。
