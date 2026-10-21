@@ -91,6 +91,10 @@ describe('recovery catalogue pages', () => {
     });
     await expect(readRecoveryCatalogPage({ ledgerRoot, signal: controller.signal })).rejects.toThrow('cancelled snapshot scan');
     expect(opened).toHaveLength(2);
-    for (const directory of opened) await expect(directory.read()).rejects.toMatchObject({ code: 'ERR_DIR_CLOSED' });
+    // Node 20.3 may throw synchronously here while newer Node versions return a
+    // rejected promise; normalize both forms without weakening the close check.
+    for (const directory of opened) {
+      await expect(Promise.resolve().then(() => directory.read())).rejects.toMatchObject({ code: 'ERR_DIR_CLOSED' });
+    }
   });
 });

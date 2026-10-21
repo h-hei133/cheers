@@ -8150,3 +8150,6 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 定向参考的树选择器先读取实际 current leaf 并以其聚焦；本实现保留相同语义，继续使用现有 Picker/OverlayHost，不增加导航或写入路径。真实排队用例在修复前断言失败；加载时反转回对象展开又实际得到 `older` 而非 `current`，退出 1。
 - 受影响 4 文件/129 项通过；生产 strict TypeScript、TS/exe 两构建、import cycles、config consumers、declarations、Node floor、strict docs drift 通过；docs 保留 118 条既有 advisory。Linux Node/exe × regular/fullscreen/line/pipe 八格合成 QA 退出 0。独立代码 APPROVE、架构 CLEAR，精确两文件 hash 匹配。
 - 打包入口 gate 全项通过。当前为本地证据；提交、推送和新 SHA CI 后续实际读回。全部 47 项继续按原范围 active。
+
+- `7f9a27f4` 的 CI `39534315600` 于 `2026-10-21T02:58:54Z` completed/failure：905 个测试文件、9378 项通过，唯一失败是 `edit/recovery/catalog.test.ts` 的取消句柄断言。CI Node 20.3 在目录已关闭时同步抛出 `ERR_DIR_CLOSED`，而本地较新 Node 返回 rejected promise；产品关闭行为未失败。测试断言现用 microtask 统一两种 Node 行为，并仍精确断言关闭错误码。
+- 修复本地 catalog 4/4、PAN-02 相关 5 文件/133 项、生产 strict TypeScript、`git diff --check` 通过；独立代码 APPROVE、架构 CLEAR，测试文件 hash `6a4af2339e6f4324f6c837de8b0d43d81de448e5e1cf3f03fe142b7b2c397819`。该修复尚未提交/推送，新的 CI 结果待精确 SHA 读回。
