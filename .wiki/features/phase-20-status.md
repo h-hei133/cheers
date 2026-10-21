@@ -126,7 +126,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | PAN-01 | model 两栏与详情、同名 relay 区分、预设行 | 连接/role 的绑定 revision 搜索验收 |
 | PAN-02 | 时间分组、pin、树形、跨项目完整授权目录搜索、10k 分页批处理、全屏事实/对话预览、窄屏 stacked preview、current tree focus、pin 持久化；Linux TUI fork/切换/确认删除组合通过 | 其余动作身份/revision 边界继续复核；restore preview 另归 PAN-06 |
 | PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
-| PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝；restore 100项分页/续页、全目录搜索、有界目录缓冲与记录保留、复合身份消歧、元数据digest重验、特殊路径参数及preview-only业务链；back 保留完整候选、25项展示续页、numeric/exact-ID定位、完整prompt搜索和共享捕获快照，沿既有草稿/分支回退；四格打包PTY核对60题全可达与文件不变 | history完整持久树沿既有query owner；undo saved-results已补40条续页/明确到头、scope和完整receipt revision重验，精确补偿沿原owner；copy到头/失败/取消与其余边界继续复核；back完整候选保留/同步搜索随源大小增长，restore每页/搜索仍线性扫描目录，不宣称搜索延迟上界或原子目录快照 |
+| PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝；restore 100项分页/续页、全目录搜索、有界目录缓冲与记录保留、复合身份消歧、元数据digest重验、特殊路径参数及preview-only业务链；back 保留完整候选、25项展示续页、numeric/exact-ID定位、完整prompt搜索和共享捕获快照，沿既有草稿/分支回退；四格打包PTY核对60题全可达与文件不变 | history完整持久树沿既有query owner；undo saved-results已补40条续页/明确到头、scope和完整receipt revision重验，精确补偿沿原owner；copy已补完整block搜索/续页/到头/失败/取消及恢复会话早期源；其余identity/revision及资源边界继续复核；back完整候选保留/同步搜索随源大小增长，restore每页/搜索仍线性扫描目录，不宣称搜索延迟上界或原子目录快照 |
 | PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引）、watcher 注销与 unknown status 回归 | agents 专用操作仍归 `/jobs`；其余 journal/revision 边界继续复核 |
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
@@ -264,10 +264,17 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 
 - 修正已推送初版的 selector/filter 缺口：exact stable ID 优先于 prompt 子串；数字按全局 newest-first 位置定位；文本查询扫描完整 prompt/ID 后再分页，改变查询回首页，续页保留查询。所有页共享捕获候选，continuation 避让真实 ID，apply 仅接收当前提供的单项。
 - 最终受影响6文件/153项、生产TypeScript、TS/exe双构建、四项有效反转、四格专用打包PTY、八格smoke、97项脚本和19项入口检查通过；独立代码APPROVE、架构CLEAR，三文件hash绑定一致。PTY验证取消保持原分支、确认持久化目标leaf/草稿、60条原消息保留及工作区文件字节不变。
-- 初版 `163b1607` 的 Watch `39542097301` success；CI `39542097297` 在Ubuntu 26.04安装Chromium失败，TS测试与NormProof未运行。独立提交 `5b885bce` 固定Ubuntu 24.04并保留Node 20.3及全部步骤；`/back`最终修正已推送为 `16b030ec727a47f92f595d5ff1ce2b7b59ec51d8`，Watch `39543032753` success；CI `39543032739`已通过Chromium安装并在跑TS测试，尚无最终结论。PAN-06及全部47项范围继续active。
+- 初版 `163b1607` 的 Watch `39542097301` success；CI `39542097297` 在Ubuntu 26.04安装Chromium失败，TS测试与NormProof未运行。独立提交 `5b885bce` 固定Ubuntu 24.04并保留Node 20.3及全部步骤；`/back`最终修正已推送为 `16b030ec727a47f92f595d5ff1ce2b7b59ec51d8`，Watch `39543032753` success；CI `39543032739`于`2026-10-21T04:27:15Z` completed/success，9387项通过、3跳过、1文件跳过，NormProof步骤通过。PAN-06及全部47项范围继续active。
 
 ## 2026-10-21 `/undo` saved-results 完整可达
 
 - 面板与直接命令共用recovery undo域的40条分页；`/undo status --cursor=…`和More saved results可到旧记录，末页明确结束。游标绑定profile/session/workspace及完整receipt值；翻页/选择前复核，变化明确stale，不回填旧会话。按operation ID直接查询继续覆盖完整账本。浏览/取消不调用restore；精确预览、显式确认与逐文件partial/unknown结果沿现有owner。
 - 本地10文件/271项（分三条受影响命令）、四项有效反转、生产TypeScript和TS/exe构建通过；四格Node/exe TUI及直接print命令均验证85条/三页完整有序可达、最旧单项可读、取消及工作区/receipt字节不变。新SHA交付按日志实际更新。40条仅约束展示页，账本仍全量同步读/hash；不承诺总I/O或延迟上界，PAN-06继续部分。
 - 最终19项入口与八格smoke通过；独立代码APPROVE、架构WATCH，综合COMMENT，七文件hash绑定一致。WATCH保留全账本同步读/hash及receipt内文件数成本；没有总资源/延迟承诺。
+
+## 2026-10-21 `/copy` 完整恢复源与边界
+
+- 完整block文本先搜索再分页，每页最多100个block；查询变化回首页、续页保留查询，所有页共享捕获源及revision。单选只接受当前提供的精确ID，末页拒绝继续；复制清除旧raw argv并沿既有native/OSC52 owner报告实际结果。取消无复制，native失败且仅发出OSC52仍只报告offered。
+- 打包205条恢复会话探针先复现真实缺陷：history owner仅保留最后60个重建block，copy分页无法到达早期源。现由相同history投影保留earlier blocks交给Transcript，copy显式读取完整重建源，显示窗口仍60；clear释放两部分并推进revision。未新增磁盘reader。历史源是现有重建Block.text，不能冒充SessionMessage字节级原文或独立diff字段导出。
+- 最终受影响8文件197项、生产TypeScript、fresh TS/exe、六项有效反转通过；四格专用PTY现均可搜索205条、跨三页到头、取消零OSC52，确认最旧源仅offered，文件/分支/205条持久消息不变。完整源保留、同步搜索和关闭后overlay callback持有源的成本仍未给上界；独立复核/交付按日志最终证据记录，PAN-06与47项仍active。
+- 最终五文件独立代码APPROVE、架构WATCH，综合COMMENT；hash匹配。八格smoke及NormProof blocking gates通过（整体partial/8旧advisory），最终新SHA交付另记；页面行数不代表资源保证。

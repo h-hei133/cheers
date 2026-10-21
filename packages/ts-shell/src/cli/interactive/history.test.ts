@@ -3,7 +3,8 @@ import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import { createShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import { forgetSessionTodos, getSessionTodos, setSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 import { Transcript } from "../../presentation/tui/transcript/container.js";
-import { restoreConversation, showConversation, startFreshSession } from "./history.js";
+import { appendConversation, restoreConversation, showConversation, startFreshSession } from "./history.js";
+import { copyPicker } from './picker/copy.js';
 import { rewindPoints, rewindPicker } from "./picker/rewind.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 
@@ -60,7 +61,25 @@ describe("restoring a conversation", () => {
 
     expect(restored.blocks).toHaveLength(60);
     expect(restored.omitted).toBe(140);
+    expect(restored.earlier).toHaveLength(140);
+    expect(restored.earlier[0]!.text).toBe('q0');
     expect(restored.blocks.at(-1)?.text).toBe("q199");
+  });
+
+  it('keeps earlier restored sources reachable by copy while displaying the recent window', async () => {
+    const transcript = new Transcript();
+    const turns = Array.from({ length: 205 }, (_, index) => turn('user', `archived question ${index}`));
+    appendConversation({ transcript }, { id: 'copy-history', turns } as never);
+    expect(transcript.all()).toHaveLength(61);
+    const picker = copyPicker(transcript, { cwd: '/workspace' });
+    const filtered = picker.filterOptions!('archived question 0', []);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]!.detail).toBe('archived question 0');
+    const changed = transcript.revision;
+    transcript.clear();
+    expect(transcript.copyable()).toEqual([]);
+    expect(transcript.revision).toBeGreaterThan(changed);
+    expect((await picker.apply([filtered[0]!.id]))?.note).toContain('Transcript changed');
   });
 
   it("marks restored blocks as finished, so they can retire", () => {

@@ -26,7 +26,9 @@ const MAX_RESTORED = 60;
 
 export interface RestoredHistory {
   readonly blocks: readonly Block[];
-  /** Turns left out because the history was longer than the bound. */
+  /** Source blocks retained for explicit copy access, outside the initial display. */
+  readonly earlier: readonly Block[];
+  /** Blocks left out of the initial display because history was longer than the bound. */
   readonly omitted: number;
 }
 
@@ -103,7 +105,7 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
   }
 
   const kept = blocks.slice(Math.max(0, blocks.length - MAX_RESTORED));
-  return { blocks: kept, omitted: blocks.length - kept.length };
+  return { blocks: kept, earlier: blocks.slice(0, blocks.length - kept.length), omitted: blocks.length - kept.length };
 }
 export interface HistoryTarget {
   readonly transcript: Transcript;
@@ -149,6 +151,7 @@ export function appendConversation(target: Pick<HistoryTarget, 'transcript' | 'e
   // that is being shown is a session whose checklist has just been restored.
   replayTodosFromMessages(session.id, session.turns);
   const restored = restoreConversation(session.turns, session.reports);
+  target.transcript.retainEarlier(restored.earlier);
   if (restored.omitted > 0) {
     target.transcript.append(
       textBlock("notice", `${restored.omitted} earlier messages are not shown.`),

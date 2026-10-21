@@ -51,6 +51,7 @@ export interface RenderedTranscript {
 
 export class Transcript {
   private blocks: Block[] = [];
+  private earlier: readonly Block[] = [];
   private revisionValue = 0;
   private readonly cache = new WeakMap<Block, CacheEntry[]>();
 
@@ -75,6 +76,16 @@ export class Transcript {
    */
   all(): readonly Block[] {
     return this.blocks;
+  }
+
+  /** Restored source blocks outside the initial display window remain copyable. */
+  retainEarlier(blocks: readonly Block[]): void {
+    this.earlier = [...blocks];
+    this.revisionValue++;
+  }
+
+  copyable(): readonly Block[] {
+    return [...this.earlier, ...this.blocks];
   }
 
   /** The most recently appended block, for streaming updates. */
@@ -143,6 +154,7 @@ export class Transcript {
   /** Forget everything. */
   clear(): void {
     this.blocks = [];
+    this.earlier = [];
     this.revisionValue++;
   }
 
