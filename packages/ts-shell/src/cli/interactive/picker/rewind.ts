@@ -26,6 +26,8 @@ const SUMMARY_LENGTH = 72;
 
 interface RewindPage {
   readonly offset?: number;
+  readonly query?: string;
+  readonly selectedId?: string;
 }
 
 export interface RewindPoint {
@@ -44,53 +46,66 @@ export interface RewindPickerInput {
   rewind(point: RewindPoint): Promise<PickerOutcome | undefined>;
 }
 
-export function rewindPicker(input: RewindPickerInput, page: RewindPage = {}): Picker {
+export function rewindPicker(input: RewindPickerInput): Picker {
   const points = rewindPoints(input.turns);
   const selector = input.selector?.trim();
   const selectedIndex = selector && /^[1-9]\d*$/.test(selector)
     ? Number(selector) - 1
-    : selector ? points.findIndex((point) => point.entryId === selector
-      || point.prompt.toLocaleLowerCase().includes(selector.toLocaleLowerCase())) : -1;
-  const selected = selectedIndex >= 0 ? points[selectedIndex] : undefined;
-  const offset = Math.min(
-    Math.max(0, page.offset ?? (selected ? Math.floor(selectedIndex / PAGE_SIZE) * PAGE_SIZE : 0)),
-    Math.max(0, points.length - 1),
-  );
-  const visible = points.slice(offset, offset + PAGE_SIZE);
-  const hasMore = offset + PAGE_SIZE < points.length;
+    : points.findIndex(point => point.entryId === selector);
+  const selected = points[selectedIndex];
+  return questionPage(points, input.rewind, selected
+    ? { offset: Math.floor(selectedIndex / PAGE_SIZE) * PAGE_SIZE, selectedId: selected.entryId }
+    : { query: selector });
+}
+
+/** Pages share the captured points; a moving turns array cannot shift a continuation. */
+function questionPage(points: readonly RewindPoint[], rewind: RewindPickerInput['rewind'], page: RewindPage): Picker {
+  let query = page.query?.trim().toLowerCase() ?? '';
+  let offset = page.offset ?? 0;
+  let offered: readonly RewindPoint[] = [];
+  let total = 0;
+  let moreId = MORE_ID;
+  while (points.some(point => point.entryId === moreId)) moreId += '_';
+  const project = (filter: string): readonly Option[] => {
+    const needle = filter.trim().toLowerCase();
+    if (needle !== query) offset = 0;
+    query = needle;
+    const matches = query ? points.filter(point => `${point.entryId} ${point.prompt}`.toLowerCase().includes(query)) : points;
+    total = matches.length;
+    offered = matches.slice(offset, offset + PAGE_SIZE);
+    const rows = offered.map<Option>(point => ({
+      id: point.entryId, label: summarise(point.prompt), detail: describeCost(point.dropped), note: 'keeps files',
+    }));
+    if (offset + PAGE_SIZE < total) rows.push({ id: moreId, label: 'More questions',
+      detail: 'Continue to older questions', note: `${total - offset - PAGE_SIZE} remaining` });
+    return rows;
+  };
+  project(query);
   return {
     title: "Ask again from",
     form: "panel",
     exclusive: true,
-    ...(selected && visible.includes(selected) ? { initialSelection: selected.entryId } : {}),
-    ...(selector && !selected ? { initialFilter: selector } : {}),
-    footer: points.length === 0
-      ? "Questions 0 of 0"
-      : `Questions ${offset + 1}-${Math.min(offset + PAGE_SIZE, points.length)} of ${points.length}${hasMore ? "; more available" : ""}`,
-    empty: "Nothing to go back to yet — no questions have been asked in this session.",
-    async load(): Promise<readonly Option[]> {
-      const options = visible.map<Option>((point) => ({
-        id: point.entryId,
-        label: summarise(point.prompt),
-        detail: describeCost(point.dropped),
-        note: "keeps files",
-      }));
-      if (hasMore) options.push({
-        id: MORE_ID,
-        label: "More questions",
-        detail: "Continue to older questions",
-        note: `${points.length - offset - PAGE_SIZE} remaining`,
-      });
-      return options;
+    initialSelection: page.selectedId,
+    initialFilter: page.query,
+    empty: 'No questions to show.',
+    status() {
+      if (total === 0) return query ? 'No questions match this search.'
+        : 'Nothing to go back to yet — no questions have been asked in this session.';
+      return `Questions ${offset + 1}-${offset + offered.length} of ${total}${offset + PAGE_SIZE < total ? '; more available' : '; end of questions'}`;
+    },
+    filterOptions: project,
+    async load(signal): Promise<readonly Option[]> {
+      signal?.throwIfAborted();
+      return project(query);
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
-      if (ids[0] === MORE_ID) {
-        if (ids.length !== 1 || !hasMore) return undefined;
-        return { next: rewindPicker(input, { offset: offset + PAGE_SIZE }) };
+      if (ids.length !== 1) return undefined;
+      if (ids[0] === moreId) {
+        return offset + PAGE_SIZE < total ? { next: questionPage(points, rewind, { offset: offset + PAGE_SIZE, query }) } : undefined;
       }
-      const point = visible.find((candidate) => candidate.entryId === ids[0]);
+      const point = offered.find(candidate => candidate.entryId === ids[0]);
       if (!point) return undefined;
-      return input.rewind(point);
+      return rewind(point);
     },
   };
 }

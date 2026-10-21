@@ -8166,3 +8166,12 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 
 - 上述 `/back` 批已推送为 `163b1607346102d5dbabe813550e0181dd624f08`，远端 main 精确读回；Architecture Watch `39542097301` success。CI `39542097297` / job `119031924600` 于 `2026-10-21T04:06:18Z` completed/failure：静态门、脚本与 TS build 均通过，但 `ubuntu-latest` 分配 Ubuntu 26.04，Playwright 1.60.0 明确拒绝 Chromium 安装，TS tests 与 NormProof 未运行。该失败归 CI 依赖环境兼容，不能写作测试通过。
 - 核对上游该版本 `registry/nativeDeps.ts` 的 Ubuntu 24.04 x64/arm64 支持清单后，将唯一 build-and-test job 固定到 `ubuntu-24.04`，保留 Node 20.3 与全部安装、测试和架构门。对照参考的浏览器 CI 同样实际安装 Chromium 后才跑测试，未采用跳过浏览器测试的处理方式。本改动尚无新 SHA CI 证据；后续按实际结果记录。
+
+### 2026-10-21 PAN-06 `/back` selector、完整搜索与分页快照修正
+
+- 继续纠正初版 `163b1607`：exact stable ID 独立解析并优先于提示子串；数字定位全局newest-first位置；文本selector为真实filter，使用已有同步 `Picker.filterOptions` 搜索完整prompt/ID后再分页。查询变化回首页，续页保留查询，continuation ID避让真实entry。各页共享捕获候选，不因源turns追加漂移；apply只接收当前提供的单项，继续由既有navigation owner验证并持久化分支、返回实际草稿，不写工作区文件。
+- 只读定向对照用户消息选择器的完整保留、exact-ID焦点、限制展示和确认/取消分离，保留本产品newest-first及既有navigation合同。25项限制的是展示Option行，完整候选保留和同步全文搜索仍随源大小增长，没有内存或输入延迟上界证据。
+- 最终受影响history/historyStore/rewind/tree/interactiveMode/overlay共6文件153项通过；生产TypeScript、TS/exe fresh构建通过。TS manifest `a71330ce031bcb94359c8d1417ea6be4bf541b0e005490cbf201f0e5d211316a`；exe SHA256 `c3dab2b66dc361cce00bc973799d6815483f6ff70c575a26494974607e23945a`。根Vitest曾扫描临时副本OOM，该错误调用不是有效测试证据；最终使用workspace受影响集合。
+- 四项加载时隔离反转均exit1：continuation 2、完整保留7、exact identity 2、完整query 2项断言失败，产品文件hash未改。材料 `phase20-rewind-reversal.config.mjs` 与 `phase20-rewind-reverse-{continuation,full,exact,query}.log`。
+- 专用Node/exe × regular/fullscreen打包PTY四格全过：60题跨三页完整可达、取消保持原leaf、数字/ID焦点正确、确认持久化 `turn_34` 并恢复草稿、60条原消息保留、工作区文件字节不变。材料 `phase20-rewind-pty.mjs`、同名log及目录。最终Linux八格合成smoke全PASS/exit0，材料 `phase20-rewind-smoke/`；97项脚本、19项CLI入口、cycles/config/declarations/Node-floor通过。仓库tgz NormProof exit0/partial，blocking unresolved-specifier与cycles satisfied，既有ceiling/proof-gap advisory保留；未据此声称全部合同闭合。
+- 独立代码APPROVE、架构CLEAR，报告 `phase20-rewind-code-review.md` / `phase20-rewind-architecture.md`；独立测试与parent集合重叠，不累加。报告精确绑定rewind源 `88957dc0…71f73`、测试 `f1159de6…3f1a5`、CI workflow `cecd53a2…888dd`，最终读回一致。初版远端CI失败与runner修正保留前条归因，本批提交/推送/精确SHA CI后续实际记录；PAN-06剩余history/undo/copy边界及全部47项继续active。

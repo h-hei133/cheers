@@ -126,7 +126,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | PAN-01 | model 两栏与详情、同名 relay 区分、预设行 | 连接/role 的绑定 revision 搜索验收 |
 | PAN-02 | 时间分组、pin、树形、跨项目完整授权目录搜索、10k 分页批处理、全屏事实/对话预览、窄屏 stacked preview、current tree focus、pin 持久化；Linux TUI fork/切换/确认删除组合通过 | 其余动作身份/revision 边界继续复核；restore preview 另归 PAN-06 |
 | PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
-| PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝；restore 100项分页/续页、全目录搜索、有界目录缓冲与记录保留、复合身份消歧、元数据digest重验、特殊路径参数及preview-only业务链；back 25 项有界续页、numeric/stable-id 定位与草稿/分支语义 | history 完整树、copy 到头/失败/取消边界、back/undo 其余审计；restore 每页/搜索仍线性扫描目录，不宣称扫描延迟上界或原子目录快照 |
+| PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝；restore 100项分页/续页、全目录搜索、有界目录缓冲与记录保留、复合身份消歧、元数据digest重验、特殊路径参数及preview-only业务链；back 保留完整候选、25项展示续页、numeric/exact-ID定位、完整prompt搜索和共享捕获快照，沿既有草稿/分支回退；四格打包PTY核对60题全可达与文件不变 | history 完整树、undo 精确receipt及copy到头/失败/取消边界继续复核；back完整候选保留/同步搜索随源大小增长，restore每页/搜索仍线性扫描目录，不宣称搜索延迟上界或原子目录快照 |
 | PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引）、watcher 注销与 unknown status 回归 | agents 专用操作仍归 `/jobs`；其余 journal/revision 边界继续复核 |
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
@@ -259,3 +259,9 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 新 benchmark 区分首帧/输入提示/TUI listener/write/批处理首答/命令退出，键响应关闭 PTY echo 并等待完整 UTF-8 字符。原来首 chunk 命中、字段误读和旧构建拒绝的失败记录保留。最终基准保存8组各30次共240个原始样本与机器/构建摘要；runtime-ready、冷缓存、1000项列表和复杂stream阻塞、分位数不确定性仍未验。
 - 聚焦 7 文件/86 项通过；脚本 96 项通过，两种构建通过；静态 cycles/config/declarations/Node floor 通过。独立 code APPROVE、architecture WATCH，WATCH 为仍缺的验收指标、采样 histogram 与构建前后摘要的证据边界。本批提交/推送/CI 状态以日志中精确 SHA 读回为准；全部47项仍保持原范围复核。
 - 全量 TypeScript 实际为 9348 passed / 1 failed / 10 skipped（412.74s、exit 1）；唯一失败是 MCP 畸形配置四次 CLI 启动在并发下超过25秒。相同用例隔离 `--single-thread` 复跑 1 passed（16.63s），原失败日志保留，暂归并发负载夹具超时，不记为全量绿。
+
+## 2026-10-21 `/back` 最终修正与交付边界
+
+- 修正已推送初版的 selector/filter 缺口：exact stable ID 优先于 prompt 子串；数字按全局 newest-first 位置定位；文本查询扫描完整 prompt/ID 后再分页，改变查询回首页，续页保留查询。所有页共享捕获候选，continuation 避让真实 ID，apply 仅接收当前提供的单项。
+- 最终受影响6文件/153项、生产TypeScript、TS/exe双构建、四项有效反转、四格专用打包PTY、八格smoke、97项脚本和19项入口检查通过；独立代码APPROVE、架构CLEAR，三文件hash绑定一致。PTY验证取消保持原分支、确认持久化目标leaf/草稿、60条原消息保留及工作区文件字节不变。
+- 初版 `163b1607` 的 Watch `39542097301` success；CI `39542097297` 在Ubuntu 26.04安装Chromium失败，TS测试与NormProof未运行。独立提交 `5b885bce` 固定Ubuntu 24.04并保留Node 20.3及全部步骤；当前修正尚待提交推送与精确SHA CI，不能用本地通过替代。PAN-06及全部47项范围继续active。
