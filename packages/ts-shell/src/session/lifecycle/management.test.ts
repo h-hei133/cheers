@@ -6,6 +6,7 @@ import { SessionManager } from '../SessionManager.js';
 import { prepareSessionManagement, applySessionManagement, invalidSessionTitle } from './management.js';
 import { sessionManagementPicker } from '../../cli/interactive/picker/session/management.js';
 import { sessionPickerHost } from '../../cli/interactive/picker/session/host.js';
+import { pickerFor, type PickerHost } from '../../cli/interactive/picker/registry.js';
 import { runSessionManagement } from '../../cli/runtime/management.js';
 import { OverlayHost } from '../../cli/interactive/overlay.js';
 import { parseKeyEvent } from '../../presentation/tui/input/keys.js';
@@ -49,6 +50,42 @@ it('persists pin and unpin through metadata without changing conversation bytes'
   const unpin = await prepareSessionManagement(new SessionManager(), h.host.sessionContext, 'pin', h.target.id);
   expect(applySessionManagement(new SessionManager(), h.host.sessionContext, unpin.preview!)).toMatchObject({ status: 'changed' });
   expect(new SessionManager().getSession(h.target.id)?.pinned).not.toBe(true);
+});
+
+it('routes bare pin through the real saved metadata owner and rejects an offered version that changed', async () => {
+  const h = fixture();
+  const directory = h.manager.getSessionDirPath(h.target.id);
+  const transcriptPath = path.join(directory, 'transcript.jsonl');
+  fs.appendFileSync(transcriptPath, JSON.stringify({ type: 'message', id: 'pin-question', role: 'user',
+    content: 'Saved pin target', timestamp: h.target.createdAt }) + '\n');
+  const transcript = fs.readFileSync(transcriptPath);
+  const state = fs.readFileSync(path.join(directory, 'state.json'));
+  const resume = vi.fn(async () => undefined);
+  const actions = sessionPickerHost({ runtimeContext: h.runtimeContext, sessionManager: h.manager,
+    busy: () => h.context.busy, resume });
+  const host = { ...actions, sessionManager: h.manager, commandContext: { cwd: h.root } } as unknown as PickerHost;
+  const picker = pickerFor('/pin', host)!;
+  const overlay = new OverlayHost(() => {});
+  overlay.open(picker);
+  await vi.waitFor(() => expect(overlay.render(100, 30).join('\n')).toContain('Saved work'));
+  const pinned = (await picker.apply([h.target.id]))!.next!;
+  expect(new SessionManager().getSession(h.target.id)?.pinned).toBe(true);
+  overlay.open(pinned);
+  await vi.waitFor(() => expect(overlay.render(100, 30).join('\n')).toContain('pinned'));
+  const unpinned = (await pinned.apply([h.target.id]))!.next!;
+  expect(new SessionManager().getSession(h.target.id)?.pinned).toBeUndefined();
+  overlay.open(unpinned);
+  await vi.waitFor(() => expect(overlay.render(100, 30).join('\n')).toContain('Saved work'));
+  h.manager.renameSession(h.target.id, 'External update');
+  const refused = await unpinned.apply([h.target.id]);
+  expect(refused?.note).toContain('changed after the preview');
+  expect(refused?.next).toBeUndefined();
+  expect(new SessionManager().getSession(h.target.id)?.pinned).toBeUndefined();
+  expect(fs.readFileSync(transcriptPath)).toEqual(transcript);
+  expect(fs.readFileSync(path.join(directory, 'state.json'))).toEqual(state);
+  expect(h.runtimeContext.session.id).toBe(h.current.id);
+  expect(resume).not.toHaveBeenCalled();
+  overlay.close();
 });
 
 it.each(['current', 'busy', 'running', 'foreign'] as const)('blocks %s deletion before any writer', async kind => {

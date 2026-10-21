@@ -8212,3 +8212,17 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 
 - 最终独立code APPROVE、architecture CLEAR，综合APPROVE；三源hash与报告读回匹配（overlay `f20f5a63…186b9`、overlay.test `fc4c6b4b…d1c40`、copy.test `aef7e810…2df54`），材料`phase20-overlay-release-code-review.md` / `phase20-overlay-release-architecture.md`。报告独立集合重叠不累加。release替代acceptDirect未增加函数名；含accessor不含constructor为20，含constructor前后均21，计数歧义保留且不再增长host职责。
 - 最终19项CLI入口与八格smoke全PASS/exit0，strict docs drift通过（118条既有advisory），diffcheck通过。exe SHA256`cd76fddb23990efbcd0afcc8bd2f9cb1a7948f2e92006ba2f2ba2206044972cd`；本地最终源码与build绑定未变。提交/推送与该新SHA CI后续实际记录。
+
+
+### 2026-10-21 PAN-06 `/pin` 薄入口与真实元数据
+
+- 浮层释放批已提交推送`362aee854c4d19a0c4599668dd02dba50c1cfdf7`并读回remote main；Watch`39545248717` success，CI`39545248629`仍运行。copy批CI`39544701974`也仍运行，不以其他SHA成功替代。
+- 继续核对剩余PAN-06发现真实未接线：registry没有history/pin/cleanse，旧“pin已做”只证明resume的Ctrl+P。当前新增`/pin`裸入口共享sessionPicker，既有目录/搜索/preview/范围/分页同owner；Enter只调用原pinSession并带offered版本，owner确认changed才返回下一页重新读回/query保留，unknown/unchanged仍显示原note且不生成成功continuation。参数形式仍走直接命令。pin入口不提供rename/delete动作，也不切换会话。
+- 定向参考实际同名pin绑定provider OAuth账户，语义与本产品会话置顶不同；只采用显式选择/取消分离与提交时重查identity的决策，不移植账户绑定或增加存储。session的pin仍沿原prepare/apply元数据CAS和locked reread，浏览不写。
+- 最终6文件251项通过：session42、pickers43、management21、overlay72、interactiveMode46、navigation syntax27。新增真实存储测试通过实际OverlayHost订阅到达目标、pin/unpin并读回新manager、外部rename后原offered version拒绝，state/transcript原始字节及活动identity不变。初轮真实夹具误等同首个增量与最终目录；下一轮误用false断言而既有metadata codec只序列化true。两者归为新夹具/期望错误，改为真实订阅及精确undefined，不修改产品行为。部分初始命令含不存在的测试路径，文件数均取Vitest实际结果。
+- 最终四项加载时隔离反转已运行，材料`phase20-pin-reversal.config.mjs` / `phase20-pin-reverse-*-final.log`；最终实际失败统计后续补入。最终strict TS构建曾在最后management测试修订前生成，Node freshness gate正确拒绝旧摘要；PTY首帧超时/smoke首格拒绝不能归作产品成功。旧probe还先有移除copy stub后遗留bin变量的harness错误，均保留日志；现刷新最终双构建/探针。未据此关闭PAN-06和47项。
+
+- copy精确SHA`588efa2bfa06a27030494b55cb70e488fd23f15c`的CI`39544701974` / job`119040116401`于`2026-10-21T04:46:39Z` completed/success：907文件通过/1跳过，9398项通过/3跳过；前置门、构建、Chromium与NormProof均success。完整日志`phase20-copy-ci-final.log`，Watch`39544701897`亦success。
+- pin最终四项反转均exit1，version2、action3、scope15、refusal2项真实断言失败，final日志以最终dd6ec767测试hash为准；首轮非最终夹具日志不代替。生产源hash与独立报告一致；code APPROVE、architecture CLEAR，综合APPROVE。报告`phase20-pin-code-review.md` / `phase20-pin-architecture.md`，独立重叠106项不加总。
+- 最终fresh TS manifest`cf472a51aa41ad408c08b00ae2f2457822da5366b3e48ea496419e0a66eceb32`，exe SHA256`f6e42fab77c9b0a34082ba2d733a03fba5d81711eb0690245a1017a5941131e0`。四格Node/exe × regular/fullscreen专用PTY全PASS：浏览/取消metadata原字节不变，pin/unpin真实落盘，外部改标题后的原版本拒绝，参数on/off仍执行，活动会话、目标state/transcript和工作区文件不变。材料`phase20-pin-pty.mjs`、`phase20-pin-pty-verified.log`及同名目录。最初fixture空.git未构成独立Git根，导致scope落父仓；改为fixture内真实git init。另一次差分重绘没有重发不变Prompt字段，探针改为no-match→目标的真实搜索切换；两者仅harness修正，原失败log保留。
+- 最终八格smoke、19项CLI入口全PASS/exit0；材料`phase20-pin-smoke-final.log` / 目录与`phase20-pin-cli-entry-final.log`。cycles/config/declarations/Node-floor通过，tgz NormProof exit0/partial及既有8项ceiling advisory保留，strict docs drift/diffcheck依最终提交前结果。未新增reader/writer；目录10k/cumulative页及完整源搜索资源边界仍开放，不以本入口关闭PAN-06。新SHA提交/推送/CI另取。

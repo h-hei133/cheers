@@ -17,6 +17,7 @@ function fixture(
   pin = vi.fn(async () => undefined),
   overrides: {
     readonly allProjects?: boolean;
+    readonly action?: 'resume' | 'pin';
     readonly initialLimit?: number;
     readonly listingStatus?: 'scanning' | 'complete' | 'partial';
   } = {},
@@ -44,6 +45,52 @@ it('focuses the current identity beyond the recent forty without importing anoth
   const overlay = new OverlayHost(() => {}); overlay.open(picker); await new Promise(resolve => setTimeout(resolve, 0));
   const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
   expect(apply).toHaveBeenCalledWith(picker, ['current']);
+});
+
+it('pins through the offered version, preserves the query and refreshes the same action without resuming', async () => {
+  const pin = vi.fn(async () => undefined);
+  const setup = fixture(undefined, pin, { action: 'pin' });
+  await setup.picker.load();
+  setup.picker.onSearchChange?.('other');
+  await setup.picker.search!('other');
+  const result = await setup.picker.apply(['other']);
+  expect(pin).toHaveBeenCalledOnce();
+  expect(pin).toHaveBeenCalledWith('other', 'version');
+  expect(setup.resume).not.toHaveBeenCalled();
+  expect(result?.next?.title).toBe('Pin saved session');
+  expect(result?.next?.initialFilter).toBe('other');
+  expect(result?.note).toBeUndefined();
+  expect((await result!.next!.load()).some(row => row.id === 'other')).toBe(true);
+});
+
+it.each(['busy', 'session', 'project', 'missing', 'foreign', 'unoffered', 'multiple'] as const)(
+  'refuses a pin selection after %s changes', async change => {
+    const setup = fixture(undefined, undefined, { action: 'pin' });
+    await setup.picker.load();
+    if (change === 'busy') setup.context.busy = true;
+    if (change === 'session') setup.context.sessionId = 'elsewhere';
+    if (change === 'project') setup.context.projectRoot = '/elsewhere';
+    if (change === 'missing') setup.records.delete('other');
+    if (change === 'foreign') setup.records.get('other')!.projectRoot = '/elsewhere';
+    await setup.picker.apply(change === 'multiple' ? ['other', 'current'] : [change === 'unoffered' ? 'injected' : 'other']);
+    expect(setup.pin).not.toHaveBeenCalled();
+    expect(setup.resume).not.toHaveBeenCalled();
+  },
+);
+
+it('cancels pin selection without changing metadata and reports a refused owner result without a success continuation', async () => {
+  const pin = vi.fn(async () => 'The saved session changed after the preview.');
+  const setup = fixture(undefined, pin, { action: 'pin' });
+  const overlay = new OverlayHost(() => {});
+  overlay.open(setup.picker);
+  await vi.waitFor(() => expect(overlay.render(100, 24).join('\n')).toContain('Pin saved session'));
+  overlay.handleKey(parseKeyEvent('\x1b'), () => { throw new Error('Canceled selection applied'); });
+  expect(pin).not.toHaveBeenCalled();
+  await setup.picker.load();
+  const result = await setup.picker.apply(['other']);
+  expect(result?.note).toContain('changed after the preview');
+  expect(result?.next).toBeUndefined();
+  expect(setup.resume).not.toHaveBeenCalled();
 });
 
 it('shows a filtered-current notice and restores current focus when the same picker reopens', async () => {

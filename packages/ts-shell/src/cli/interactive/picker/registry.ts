@@ -81,15 +81,8 @@ const PICKERS: Record<string, PickerFactory> = {
   tools: (host) => toolsPicker(host.commandContext),
   model: (host) => modelPicker(host.commandContext),
   copy: (host) => copyPicker(host.transcript, host.commandContext),
-  resume: (host) =>
-    sessionPicker({
-      sessionManager: host.sessionManager,
-      context: host.sessionContext,
-      resume: host.resumeSession,
-      delete: host.deleteSession,
-      rename: host.renameSession,
-      pin: host.pinSession,
-    }),
+  resume: host => savedSessionPicker(host, 'resume'),
+  pin: host => savedSessionPicker(host, 'pin'),
   mcp: (host) => serverPicker({ gateway: host.mcpGateway, refresh: host.refreshServer,
     ...(host.addMcpServer ? { add: () => mcpAddWizard(host.addMcpServer!) } : {}) }),
   connect: (host) => connectionPicker(host.commandContext),
@@ -121,6 +114,17 @@ const PICKERS: Record<string, PickerFactory> = {
   advisor: host => { const state = host.advisorState?.(); return state ? advisorPicker(state) : undefined; },
   git: host => gitPicker(host.gitWorkbench),
 };
+
+function savedSessionPicker(host: PickerHost, action: 'resume' | 'pin'): Picker {
+  return sessionPicker({
+    sessionManager: host.sessionManager,
+    context: host.sessionContext,
+    resume: host.resumeSession,
+    pin: host.pinSession,
+    action,
+    ...(action === 'resume' ? { delete: host.deleteSession, rename: host.renameSession } : {}),
+  });
+}
 
 /** Arguments belong to the picker when that command explicitly accepts them. */
 export function pickerFor(command: string, host: PickerHost): Picker | undefined {

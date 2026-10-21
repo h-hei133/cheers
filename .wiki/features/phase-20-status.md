@@ -286,3 +286,10 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - `/undo`提交`9dfdaf2513d9e11f0983a20372174402025818c6`的CI`39543768435` / job`119037205415`于`2026-10-21T04:36:47Z` completed/success，Watch`39543768378` success。`/copy`已推送`588efa2bfa06a27030494b55cb70e488fd23f15c`并读回remote main，Watch`39544701897` success；CI`39544701974`仍运行，不借用其他SHA结果。PAN-06和47项继续active。
 
 - 浮层批最终独立代码APPROVE、架构CLEAR，综合APPROVE；三源hash一致。最终19项入口和八格smoke全PASS，strict docs drift及diffcheck通过；完整源常驻/同步搜索成本仍WATCH，未据此闭合PAN-06。
+
+## 2026-10-21 `/pin` 独立入口返工
+
+- 源码复核发现旧状态中的“pin已做”只覆盖resume里的Ctrl+P，`/pin`没有picker映射；新增裸命令薄入口，复用sessionPicker目录/预览/完整授权搜索与现有元数据CAS。Enter只调用pinSession并携带offered version，确认改变后重新读回同一面板/query；失败保留owner原note，取消零写，参数形式保留原直接命令。
+- 本地最终6文件251项及生产strict TS/静态门通过，真实元数据集成验证pin/unpin、外部更新拒绝、活动身份与state/transcript不变。初次夹具误把目录首个增量当最终结果，后一次误断言unpinned序列化为false；现分别按真实订阅与省略false的既有codec精确验证。双构建/打包/独立复核/交付依最终日志，不借用旧证据。history和cleanse仍缺独立面板入口，PAN-06不闭合。
+
+- pin最终四项有效反转、fresh TS/exe、四格专用PTY、八格smoke和19项入口全通过；独立代码APPROVE、架构CLEAR，综合APPROVE，五文件hash绑定。四格验证真实pin/unpin、取消不写、stale拒绝、直接参数，以及活动会话/state/transcript/工作区不变。copy提交`588efa2b`的CI`39544701974`于`2026-10-21T04:46:39Z` completed/success，9398项通过/3跳过；其Watch亦success。pin新SHA交付继续按实际更新。

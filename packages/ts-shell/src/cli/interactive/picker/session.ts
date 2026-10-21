@@ -16,6 +16,8 @@ import { displayText, sessionPreview } from './session/preview.js';
  */
 
 export interface SessionPickerOptions {
+  /** Enter resumes a session or toggles its existing pinned metadata. */
+  readonly action?: 'resume' | 'pin';
   readonly sessionManager: SessionManager;
   readonly context: () => SessionSelectionContext;
   /** Resume the chosen session; the host owns how that is executed. */
@@ -95,7 +97,7 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
   };
   const allProjects = options.allProjects === true;
   return {
-    title: "Resume session",
+    title: options.action === 'pin' ? 'Pin saved session' : 'Resume session',
     form: "panel",
     fullScreen: true,
     chips: {
@@ -113,7 +115,8 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     },
     loadError: 'Saved sessions could not be loaded.',
     searchError: 'Session search could not be completed. The loaded results are incomplete.',
-    footer: 'Session files: logical size; excludes attachments.',
+    footer: [options.action === 'pin' ? 'Enter: toggle pin.' : undefined,
+      'Session files: logical size; excludes attachments.'].filter(Boolean).join(' '),
     get initialSelection() { return expected.sessionId; },
     get initialFilter() { return options.initialQuery?.trim() || undefined; },
     onSearchChange(query) {
@@ -176,6 +179,7 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
       if (!lastQuery) publish(rows);
     }),
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
+      if (ids.length !== 1) return undefined;
       const sessionId = ids[0];
       if (!sessionId) return undefined;
       if (sessionId === 'more') return {
@@ -185,8 +189,14 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
           ...(lastQuery ? { initialQuery: lastQuery } : {}),
         }),
       };
-      const block = blocked(sessionId, 'resume');
+      const action = options.action ?? 'resume';
+      const block = blocked(sessionId, action);
       if (block) return { note: block };
+      if (action === 'pin') {
+        if (!options.pin) return { note: 'Session pinning is unavailable.' };
+        const note = await options.pin(sessionId, activeProjection()?.versions.get(sessionId));
+        return note ? { note } : { next: sessionPicker({ ...options, initialQuery: lastQuery }) };
+      }
       const note = await options.resume(sessionId);
       return note ? { note } : undefined;
     },

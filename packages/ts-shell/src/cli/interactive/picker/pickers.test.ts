@@ -18,7 +18,7 @@ import { textBlock } from "../../../presentation/tui/transcript/blocks.js";
 const CONTEXT = { cwd: "/workspace", sessionId: "sess_test" };
 
 describe("which commands open a chooser", () => {
-  it.each(["/resume", "/mcp", "/connect", "/restore", "/marketplace", "/plugin", "/copy"])(
+  it.each(["/resume", "/pin", "/mcp", "/connect", "/restore", "/marketplace", "/plugin", "/copy"])(
     "opens one for a bare %s",
     (command) => {
       expect(opensPicker(command)).toBe(true);
@@ -89,6 +89,16 @@ describe("which commands open a chooser", () => {
   it("leaves a command with arguments to run as typed", () => {
     expect(opensPicker("/restore execute --all")).toBe(false);
     expect(opensPicker("/resume sess_abc")).toBe(false);
+    expect(opensPicker('/pin here on')).toBe(false);
+  });
+
+  it('reuses the saved-session chooser for pin without offering resume, rename or delete actions', () => {
+    const host = { commandContext: CONTEXT, sessionContext: () => ({ sessionId: 's', projectRoot: '/workspace', busy: false }) } as unknown as PickerHost;
+    const pin = pickerFor('/pin', host)!;
+    expect(pin.title).toBe('Pin saved session');
+    expect(pin.onDelete).toBeUndefined();
+    expect(pin.onRename).toBeUndefined();
+    expect(pin.chips?.select('all')?.title).toBe('Pin saved session');
   });
 
   it("claims nothing that is not a command", () => {
