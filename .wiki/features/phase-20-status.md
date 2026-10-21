@@ -330,3 +330,10 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 授权URL先校验安全HTTPS/无userinfo、fragment或原始控制符再展示，launcher缺失不产生未处理错误；手动URL仍可用。回调页仅报告收到授权，后续token交换及保存由终端结算。独立复核发现并修复DNS bind阶段的取消延迟，实际延迟lookup探针证实取消立即结算、无fallback/迟到监听。
 - 最终175项受影响测试、strict production TS、TS/exe构建、九项有效反转通过；四格专用PTY覆盖面板和参数原生取消，取消缺省确认零写，已启动取消pending→error、不保存凭据、回调端口释放、peer连接及session原字节不变。正常exit按原owner终止state并只追加run-terminated；八格通用smoke及19入口通过。探针与负例失败分类及构建/源码绑定见log。
 - 独立代码APPROVE、架构CLEAR，六文件hash均读回一致。这里只证明合成本机认证生命周期；真实授权、系统浏览器关闭、已派发服务端token撤销及完整PAN-07/其余47项仍未闭合。前批插件精确SHA已commit/push且CI/Watch成功，本批新SHA另取证。
+
+## 2026-10-21 扩展注册有界获取与父路径竞态（PAN-07 部分）
+
+- 状态/来源从整文件读取后检查字符数，改为复用原 `core/workspace/files.ts` 有界描述符读取；获取前分别限制8MiB/1MiB，解码后仍检查原2Mi/256Ki UTF-16限额，合法Unicode范围保留。来源明确拒绝叶/祖先链接、非普通文件和非法UTF-8；原state早已拒绝链接。缺失仍无写空集，不可读state为unavailable，来源不可读保留包并显示trust unknown，恢复重新读取。
+- 独立架构复核实际复现共享reader在检查后把被替换父目录canonicalize为新根；现从原绝对路径的filesystem root检查，保持原词法路径直到描述符比对。同inode父目录链接替换仍拒绝；普通文件在首次权威观察前被替换不属于普遍竞态拒绝保证。初始BLOCK和修复后报告保留，未用旧四文件批准替代最终六文件复核。
+- 受影响集合去重19文件222项通过（主集合108、直接consumer84、补充30；共享16项只计一次），strict production TS、双构建、10项有效反转、四格专用PTY、八格通用smoke及19入口通过。四格证实超大来源unknown/超大state unavailable/恢复、取消无写及原普通审批；精确构建、hash与命令证据见log。
+- 独立代码APPROVE/架构WATCH，综合COMMENT；两份报告的六文件hash均读回匹配。每秒全量解码/hash/projection与累计成本、unknown仅实例内存仍WATCH，未据此关闭PAN-07或47项。原生认证已提交推送`4a7b656267b631c43a703c55d6046a93f3d5cbe8`，Watch success；11:59Z前最近读回的精确SHA CI仍in_progress，本批交付及新SHA另取证。

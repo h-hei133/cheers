@@ -1,11 +1,13 @@
-import fs from 'node:fs';
 import { createPublicKey } from 'node:crypto';
 import { resolveUserDataFile } from '../../core/paths/userHome.js';
 import { profilePathOverride } from '../../core/paths/profile/context.js';
 import { withFileLock, writeJsonFileAtomic } from '../../session/store/sessionFileStore.js';
 import { isRecord } from '../../core/values/record.js';
+import { readTextFile } from '../../core/workspace/files.js';
 import { canonical, digest, name, text } from './validation.js';
 import type { ExtensionSource, TrustAnchor } from '../model.js';
+
+const SOURCE_CHARACTERS = 256 * 1024;
 
 export function sourceFile(): string { return profilePathOverride('CHEERS_MARKETPLACES_FILE') || resolveUserDataFile('marketplaces.json'); }
 export function sourceUrl(value: string): URL {
@@ -22,8 +24,13 @@ export function trustAnchor(keyId: string, publicKey: string, provenance: string
 }
 export function readSources(): ExtensionSource[] {
   let value: unknown;
-  try { const raw = fs.readFileSync(sourceFile(), 'utf8'); if (raw.length > 256 * 1024) throw new Error(); value = JSON.parse(raw); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw new Error('Marketplace source registry could not be read.'); }
+  try {
+    // Trust registrations must be ordinary UTF-8 files with bounded acquisition.
+    const raw = readTextFile(sourceFile(), SOURCE_CHARACTERS * 4);
+    if (raw === undefined) return [];
+    if (raw.length > SOURCE_CHARACTERS) throw new Error();
+    value = JSON.parse(raw);
+  } catch { throw new Error('Marketplace source registry could not be read.'); }
   if (!Array.isArray(value) || value.length > 64) throw new Error('Marketplace source registry must be a bounded list.');
   const sources = value.map(entry => {
     if (!isRecord(entry)) throw new Error('Invalid source registration.');

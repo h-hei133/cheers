@@ -1,13 +1,15 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { resolveUserDataFile } from '../../core/paths/userHome.js';
 import { assertProfileStorage, currentProfile, profilePathOverride } from '../../core/paths/profile/context.js';
 import { withFileLock, writeJsonFileAtomic } from '../../session/store/sessionFileStore.js';
 import { isRecord } from '../../core/values/record.js';
+import { readTextFile } from '../../core/workspace/files.js';
 import { canonical, digest, manifest, name, relativePath, release } from '../registry/validation.js';
 import type { ExtensionState, PackageRecord, VersionRecord, EffectOutcome } from '../model.js';
 import { assertStoragePath } from './paths.js';
 export { assertStoragePath, storageIdentity, assertStorageIdentity } from './paths.js';
+
+const STATE_CHARACTERS = 2 * 1024 * 1024;
 
 export function extensionFile(): string { return profilePathOverride('CHEERS_EXTENSIONS_FILE') || resolveUserDataFile('extensions/registry.json'); }
 export function packageRoot(file = extensionFile()): string { return path.join(path.dirname(file), 'packages'); }
@@ -23,8 +25,13 @@ function validVersion(value: unknown): VersionRecord {
 export function readState(file = extensionFile()): ExtensionState {
   assertStoragePath(file);
   let value: unknown;
-  try { const raw = fs.readFileSync(file, 'utf8'); if (raw.length > 2 * 1024 * 1024) throw new Error(); value = JSON.parse(raw); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { schema: 1, revision: 0, packages: [], imports: [] }; throw new Error('Extension state is unreadable; capabilities are withheld.'); }
+  try {
+    // Bound acquisition before decoding; keep the existing UTF-16 character limit.
+    const raw = readTextFile(file, STATE_CHARACTERS * 4);
+    if (raw === undefined) return { schema: 1, revision: 0, packages: [], imports: [] };
+    if (raw.length > STATE_CHARACTERS) throw new Error();
+    value = JSON.parse(raw);
+  } catch { throw new Error('Extension state is unreadable; capabilities are withheld.'); }
   if (!isRecord(value) || value.schema !== 1 || !Number.isSafeInteger(value.revision) || (value.revision as number) < 0 || !Array.isArray(value.packages) || value.packages.length > 64 || !Array.isArray(value.imports) || value.imports.length > 64) throw new Error('Invalid extension state.');
   const packages: PackageRecord[] = value.packages.map(entry => {
     if (!isRecord(entry) || !Array.isArray(entry.history) || entry.history.length > 3 || !isRecord(entry.activation) || Object.keys(entry.activation).length > 64) throw new Error('Invalid extension record.');

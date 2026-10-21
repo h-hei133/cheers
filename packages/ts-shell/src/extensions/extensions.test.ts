@@ -435,7 +435,7 @@ describe('bound extension management views', () => {
     expect(requests).toEqual([]);
   });
 
-  it('observes external changes and unavailable storage while subscribed and releases idempotently', async () => {
+  it.each(['malformed', 'oversized'])('observes external changes and %s unavailable storage while subscribed and releases idempotently', async kind => {
     await install(); const view = manager(); const listener = vi.fn();
     vi.useFakeTimers();
     const release = view.subscribe(listener);
@@ -444,7 +444,9 @@ describe('bound extension management views', () => {
       fs.writeFileSync(service.store.file, JSON.stringify({ ...current, revision: current.revision + 1 }));
       vi.advanceTimersByTime(1000);
       expect(listener.mock.lastCall![0].snapshot.version).not.toBe(listener.mock.calls[0]![0].snapshot.version);
-      fs.writeFileSync(service.store.file, '{'); vi.advanceTimersByTime(1000);
+      if (kind === 'malformed') fs.writeFileSync(service.store.file, '{');
+      else fs.truncateSync(service.store.file, 8 * 1024 * 1024 + 1);
+      vi.advanceTimersByTime(1000);
       expect(listener.mock.lastCall![0]).toEqual({ state: 'unavailable' });
       fs.writeFileSync(service.store.file, before); vi.advanceTimersByTime(1000);
       expect(listener.mock.lastCall![0].state).toBe('ready');
@@ -453,9 +455,10 @@ describe('bound extension management views', () => {
     } finally { release(); vi.useRealTimers(); }
   });
 
-  it('retains package facts when sources are unreadable and labels stale workspace activation', async () => {
+  it.each(['malformed', 'oversized'])('retains package facts when sources are %s and labels stale workspace activation', async kind => {
     await ready(); const sourceFile = path.join(root, 'sources.json'); const original = fs.readFileSync(sourceFile);
-    fs.writeFileSync(sourceFile, '{');
+    if (kind === 'malformed') fs.writeFileSync(sourceFile, '{');
+    else fs.truncateSync(sourceFile, 1024 * 1024 + 1);
     const unavailable = snapshot(manager());
     expect(unavailable.items).toHaveLength(1); expect(unavailable.notices.join(' ')).toContain('trust is unknown');
     expect(unavailable.items[0]!.detail.join(' ')).toContain('trust unknown');

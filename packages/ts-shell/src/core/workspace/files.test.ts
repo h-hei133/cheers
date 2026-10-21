@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { inspectWorkspaceFile, workspaceFilePath } from './files.js';
+import { inspectWorkspaceFile, readTextFile, workspaceFilePath } from './files.js';
 import { createWorkspaceWriteAuthority } from '../../edit/authority/workspace.js';
 
 let fixture: string;
@@ -126,4 +126,31 @@ it('refuses an unselected root link whose canonical target is the authorized roo
   const authority = createWorkspaceWriteAuthority(workspace);
   expect(authority.readFile(path.join(sibling, 'inside.txt'))).toBeUndefined();
   expect(authority.directoryExists(sibling)).toBe(false);
+});
+
+it.each(['after ancestry inspection', 'during descriptor acquisition'])('refuses parent-link replacement %s when reading text', stage => {
+  const target = path.join(workspace, 'inside.txt'); let replaced = false;
+  const replace = () => {
+    if (replaced) return;
+    replaced = true; fs.renameSync(workspace, `${workspace}-retained`);
+    // At open time preserve the file inode: its descriptor path must still reject the link.
+    fs.symlinkSync(stage === 'during descriptor acquisition' ? `${workspace}-retained` : sibling, workspace, 'dir');
+  };
+  if (stage === 'after ancestry inspection') {
+    const lstat = fs.lstatSync;
+    vi.spyOn(fs, 'lstatSync').mockImplementation(file => {
+      const stat = lstat(file);
+      if (String(file) === path.parse(target).root) replace();
+      return stat;
+    });
+  } else {
+    const open = fs.openSync;
+    vi.spyOn(fs, 'openSync').mockImplementation((file, flags, mode) => {
+      if (String(file) === target) replace();
+      return open(file, flags, mode);
+    });
+  }
+  expect(() => readTextFile(target, 1024)).toThrow();
+  expect(replaced).toBe(true);
+  expect(fs.readFileSync(path.join(sibling, 'inside.txt'), 'utf8')).toBe('outside same name');
 });

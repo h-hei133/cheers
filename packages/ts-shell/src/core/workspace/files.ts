@@ -119,9 +119,12 @@ export function pathIdentity(target: string): string {
   return parts.join('|');
 }
 export function readTextFile(target: string, maxBytes: number): string | undefined {
-  pathIdentity(target);
-  let root = path.dirname(path.resolve(target)); while (!fs.existsSync(root)) root = path.dirname(root);
-  const state = inspectWorkspaceFile(root, path.relative(root, target), undefined, maxBytes);
+  const absolute = path.resolve(target);
+  pathIdentity(absolute);
+  // Keep the original pathname when a checked parent is replaced by a link.
+  // Canonicalizing that parent as a new root would authorize its replacement.
+  const root = path.parse(absolute).root;
+  const state = inspectWorkspaceFile(root, path.relative(root, absolute), undefined, maxBytes);
   return state.state === 'exists' ? state.content : undefined;
 }
 

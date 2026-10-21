@@ -2,7 +2,7 @@
 title: "扩展源协议与独立授权"
 category: specification
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-21
 tags: [extensions, registry, permissions]
 summary: "版本化签名源、固定归档和安装/启用/能力/执行的独立决定；验收状态以 Phase 19 为准。"
 ---
@@ -23,6 +23,8 @@ summary: "版本化签名源、固定归档和安装/启用/能力/执行的独�
 `manifest` 的完整形状见下一节。JSON 响应的 envelope 为 `{"payload":<object>,"keyId":"publisher-key","signature":"<base64>"}`。签名输入是 payload 的紧凑 UTF-8 JSON：对象键按递归字典序排列，数组顺序保留，字符串与原始值按 JSON 编码；Ed25519 签名后用 base64 编码。源协议响应限制 512 KiB、每页 20 包、每包 32 个固定版本、请求 15 秒；游标不透明且有界，重复游标拒绝。
 
 信任锚由用户单独取得并明确选择 PEM SPKI Ed25519 公钥。客户端显示 SHA256 DER SPKI 指纹与来源，包自带公钥不能授予信任。签名确认所选发布者，压缩包 SHA256 只确认字节完整性；两者均不代表代码已经审查或获准执行。
+
+本地来源注册与安装状态须为普通 UTF-8 文件，路径及祖先不能是符号链接；来源文件过去可跟随链接，当前明确拒绝该布局，显式路径覆盖亦遵守此限制。读取前按描述符大小拒绝来源超过 1 MiB、状态超过 8 MiB 的文件，再以有界读取检测增长；解码后继续保留原有 256 Ki / 2 Mi UTF-16 code unit 限额，兼容合法非 ASCII 文档。缺失文件只表示无注册，不创建存储；非法 UTF-8、非普通文件和检测到的读取变化为不可读。面板在来源不可读时保留安装事实并显示 trust unknown，状态不可读时显示 unavailable，文件恢复后重新观察。每次读取的字节界不代表累计 I/O、解析/投影内存或取消延迟上界；未知持久化 receipt 仍仅由原 store 实例保留。本轮证据见 [Phase 20 状态](phase-20-status.md)。
 
 ## 包清单
 
