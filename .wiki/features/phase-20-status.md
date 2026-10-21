@@ -101,7 +101,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | RENDER-02（部分） | 本次 | 多行 cell、escaped/code pipe、`<br>`、最终 Markdown/HTML code-span 一致性、窄屏源码回退与预算 |
 | RENDER-01（部分） | 本次 | 内联数学投影、金额/代码保护、escaped/multi-run/unmatched backtick、未知命令与超预算保原文 |
 | PAN-04（部分） | `6736f402`、本次 | `/usage account` quota 进度投影、`/thinking` effort 选择器 |
-| PAN-06（部分） | `6736f402` | copy 移除 recent-30 窗口 |
+| PAN-06（部分） | `6736f402`、本次 | copy 移除 recent-30 窗口；restore 生成可解析的 preview draft，绑定项目及复合快照身份，提交前重读元数据，明确失败/部分目录与取消 |
 | PAN-07（部分） | 本次 | `/extensions` 为 `/plugin` 别名 |
 | START-01（补强） | `0afab79a`、本次 | build manifest、五种拒绝状态、`start`/`start:dev`；轻量 `--version`/`--help`、组合参数和坏配置准入；fresh packaged gate 通过 |
 | JOB-01（补强） | `dd43bcce`、本次 | 单次 spawn、detach/kill、adopt/promote、60s/新消息晋升、撤权 kill、重启 unknown 不重播；detach 后保留 settlement 与 300s 总期限 |
@@ -118,9 +118,9 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | 任务 | 已做 | 缺 |
 |---|---|---|
 | PAN-01 | model 两栏与详情、同名 relay 区分、预设行 | 连接/role 的绑定 revision 搜索验收 |
-| PAN-02 | 时间分组、pin、树形、跨项目完整授权目录搜索、10k 分页批处理、全屏事实/对话预览、窄屏 stacked preview、current tree focus、pin 持久化；Linux TUI fork/切换/确认删除组合通过 | restore preview 与其余动作边界验收 |
+| PAN-02 | 时间分组、pin、树形、跨项目完整授权目录搜索、10k 分页批处理、全屏事实/对话预览、窄屏 stacked preview、current tree focus、pin 持久化；Linux TUI fork/切换/确认删除组合通过 | 其余动作身份/revision 边界继续复核；restore preview 另归 PAN-06 |
 | PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
-| PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝 | history 完整树、copy 到头/失败/取消边界、back/undo/restore 审计 |
+| PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝；restore 不再截断到40项，复合身份消歧、元数据 digest 重验、特殊路径参数及 preview-only 业务链通过 | history 完整树、copy 到头/失败/取消边界、back/undo 审计；restore 大型目录仍全量读取/排序/保留，缺分页和明确资源上界 |
 | PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引）、watcher 注销与 unknown status 回归 | agents 专用操作仍归 `/jobs`；其余 journal/revision 边界继续复核 |
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
@@ -131,7 +131,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 
 - QA-02/03：Linux Node/exe × regular/fullscreen/line/pipe 八格合成 CLI 通过；TUI 覆盖会话/任务/发现/审批/settings 保存/profile 重启，line/pipe 覆盖任务/发现/显式审批和 settings 只读；Windows/macOS/IME/系统复制与真实质量仍缺环境/模型。
 - TOOL-02：静态描述/schema 字节成本已进 `/tools` 报告（`size.unit=utf8-bytes`，`tokens=not-measured`）；同模型质量/缓存对比与 tokenizer 校准仍需真实模型。
-- QA-02 本地前置仍缺 restore preview 与 line/pipe 完整 profile/save；QA-01 矩阵已补齐独立任务行，但仍不能作为 47 项全闭合证明。
+- QA-02 的 restore preview 已在 Linux 八格通过，并验证文件/记录/blob 字节不变；line/pipe 完整 profile/save 仍缺。QA-01 矩阵已补齐独立任务行，但仍不能作为 47 项全闭合证明。
 
 ## CI
 

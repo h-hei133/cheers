@@ -221,7 +221,7 @@ describe("restore chooser", () => {
     const options = await restorePicker(workspace).load();
 
     expect(options).toHaveLength(1);
-    expect(options[0]).toMatchObject({ id: "record-a", label: "src/a.ts", note: "restorable" });
+    expect(options[0]).toMatchObject({ id: "edit-one:record-a", label: "src/a.ts", note: "restorable" });
   });
 
   it("shows the newest snapshot first", async () => {
@@ -240,7 +240,7 @@ describe("restore chooser", () => {
 
     const options = await restorePicker(workspace).load();
 
-    expect(options.map((option) => option.id)).toEqual(["newer", "older"]);
+    expect(options.map((option) => option.id)).toEqual(["edit-two:newer", "edit-one:older"]);
   });
 
   it("never restores: it hands back the preview command with the choice in it", async () => {
@@ -253,11 +253,11 @@ describe("restore chooser", () => {
     const picker = restorePicker(workspace);
     await picker.load();
 
-    const outcome = await picker.apply(["record-a"]);
+    const outcome = await picker.apply(["edit-one:record-a"]);
 
     expect(outcome?.draft).toContain("/restore preview");
-    expect(outcome?.draft).toContain("--authority edit-one");
-    expect(outcome?.draft).toContain("--records record-a");
+    expect(outcome?.draft).toContain("--authority-id=edit-one");
+    expect(outcome?.draft).toContain("--record=record-a");
     expect(outcome?.note).toBeUndefined();
   });
 
@@ -277,7 +277,7 @@ describe("restore chooser", () => {
     const picker = restorePicker(workspace);
     await picker.load();
 
-    const outcome = await picker.apply(["record-a", "record-b"]);
+    const outcome = await picker.apply(["edit-one:record-a", "edit-two:record-b"]);
 
     expect(outcome?.note).toContain("different edits");
     expect(outcome?.draft).toBeUndefined();

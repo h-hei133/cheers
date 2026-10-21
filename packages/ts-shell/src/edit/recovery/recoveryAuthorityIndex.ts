@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   normalizeWorkspaceRelativePath,
+  hashContent,
   readRecoveryAuthorityRecord,
   type RecoveryAuthorityStoredRecord,
 } from "./recoveryAuthorityStore.js";
@@ -15,6 +16,8 @@ export type RecoveryAuthorityIndexBlockedReason =
   | "file-system-error";
 
 export interface RecoveryAuthorityRecordIndexEntry {
+  /** Identity of every stored metadata field; original file content stays private. */
+  readonly recordDigest: string;
   readonly recordId: string;
   readonly authorityId: string;
   readonly workspaceRelativePath: string;
@@ -84,8 +87,8 @@ export async function listRecoveryAuthorityNamespaces(input: {
         "recovery-authority-index:no-raw-content",
       ],
     };
-  } catch {
-    return blockedNamespaces("namespace-not-found");
+  } catch (error) {
+    return blockedNamespaces(indexReadFailure(error));
   }
 }
 
@@ -93,7 +96,9 @@ export async function listRecoveryAuthorityRecords(input: {
   readonly ledgerRoot?: string;
   readonly authorityId?: string;
   readonly recordIds?: readonly string[];
+  readonly signal?: AbortSignal;
 }): Promise<RecoveryAuthorityRecordIndexResult> {
+  input.signal?.throwIfAborted();
   const config = validateConfig(input);
   if (config.ok === false) {
     return blockedRecords(config.blockedReason, input.authorityId, []);
@@ -112,8 +117,8 @@ export async function listRecoveryAuthorityRecords(input: {
         .map((entry) => entry.name.slice(0, -".json".length))
         .sort();
     }
-  } catch {
-    return blockedRecords("namespace-not-found", config.authorityId, []);
+  } catch (error) {
+    return blockedRecords(indexReadFailure(error), config.authorityId, []);
   }
 
   if (recordIds.some((recordId) => !idPattern.test(recordId))) {
@@ -123,6 +128,7 @@ export async function listRecoveryAuthorityRecords(input: {
   const records: RecoveryAuthorityRecordIndexEntry[] = [];
   const missingRecords: string[] = [];
   for (const recordId of recordIds) {
+    input.signal?.throwIfAborted();
     const record = await readRecoveryAuthorityRecord({
       ledgerRoot: config.ledgerRoot,
       authorityId: config.authorityId,
@@ -140,6 +146,7 @@ export async function listRecoveryAuthorityRecords(input: {
       continue;
     }
     records.push({
+      recordDigest: hashContent(JSON.stringify(record)),
       recordId: record.recordId,
       authorityId: record.authorityId,
       workspaceRelativePath: normalized,
@@ -158,6 +165,8 @@ export async function listRecoveryAuthorityRecords(input: {
     });
   }
 
+  input.signal?.throwIfAborted();
+
   return {
     status: "listed",
     authorityId: config.authorityId,
@@ -171,6 +180,11 @@ export async function listRecoveryAuthorityRecords(input: {
       "recovery-authority-index:no-raw-content",
     ],
   };
+}
+
+function indexReadFailure(error: unknown): RecoveryAuthorityIndexBlockedReason {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT'
+    ? 'namespace-not-found' : 'file-system-error';
 }
 
 function validateConfig(input: {

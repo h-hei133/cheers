@@ -14,6 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createQaPtyEnvironment } from "./qa-pty-env.mjs";
 import { seedRecoverySession, seedSavedSession, extractSessionId, currentSessionFromStore, assertTranscript } from "./qa/session.mjs";
+import { seedRestoreSnapshot, assertRestoreUnchanged, runRestorePreview } from './qa/restore.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const qaOutputDir = process.env.QA_PTY_OUTPUT_DIR?.trim();
@@ -88,7 +89,7 @@ function waitForExit(child, timeoutMs = 15_000) {
 
 function createFixture(mode) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "qa-cli-home-"));
-  const project = fs.mkdtempSync(path.join(os.tmpdir(), "qa-cli-project-"));
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), "qa-cli project '$`-"));
   fs.mkdirSync(path.join(project, ".git"));
   fs.mkdirSync(path.join(project, ".agents", "skills", "qa-discovery"), { recursive: true });
   fs.writeFileSync(
@@ -99,7 +100,8 @@ function createFixture(mode) {
   fs.writeFileSync(path.join(home, ".cheers", "config.json"), JSON.stringify({
     tuiMode: mode === "fullscreen" ? "fullscreen" : "regular",
   }));
-  return { home, project };
+  const restore = seedRestoreSnapshot(project);
+  return { home, project, restore };
 }
 
 function removeFixture(home, project) {
@@ -208,7 +210,7 @@ async function saveMaxTurns(state, child, home) {
 }
 
 async function runTerminalSmoke(target, mode) {
-  const { home, project } = createFixture(mode);
+  const { home, project, restore } = createFixture(mode);
   const recoverySession = seedRecoverySession(home, project);
   const savedSession = seedSavedSession(home, project);
   const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
@@ -304,6 +306,8 @@ async function runTerminalSmoke(target, mode) {
     child.stdin.write("\x1b");
     await new Promise(resolve => setTimeout(resolve, 250));
 
+    await runRestorePreview(state, child, restore, normalized, waitForOutput);
+
     await runInteractivePrompt(
       state,
       child,
@@ -389,7 +393,7 @@ async function runTerminalSmoke(target, mode) {
 }
 
 async function runLineSmoke(target) {
-  const { home, project } = createFixture("regular");
+  const { home, project, restore } = createFixture("regular");
   const configBefore = fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8");
   const child = spawn(target.command, [...target.args, "--non-interactive-approval", "allow-once"], {
     cwd: project,
@@ -416,10 +420,12 @@ async function runLineSmoke(target) {
       { command: "delegate task inspect qa fixture", expected: "Synthetic reply: delegate task inspect qa fixture" },
       { command: "discover and load skill qa-discovery", expected: "Synthetic reply: discover and load skill qa-discovery" },
       { command: "/settings", expected: "does not write configuration" },
+      { command: '/restore preview --authority-id qa-restore --record qa-record', expected: ['Would restore', 'qa-restore.txt', 'Nothing was written.'] },
     ]) {
       const start = state.output.length;
       child.stdin.write(`${step.command}\n`);
-      await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes(step.expected),
+      await waitForOutput(() => normalized(state.output.slice(start)), value =>
+        (Array.isArray(step.expected) ? step.expected : [step.expected]).every(expected => value.includes(expected)),
         `line ${step.command}`, 25_000);
     }
     child.stdin.write("/exit\n");
@@ -428,6 +434,7 @@ async function runLineSmoke(target) {
     if (fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8") !== configBefore) {
       throw new Error("line read-only settings changed the configuration");
     }
+    assertRestoreUnchanged(restore);
     assertTranscript(home, sessionId, [
       "\"name\":\"bash\"",
       "\"name\":\"task\"",
@@ -454,7 +461,7 @@ async function runLineSmoke(target) {
 }
 
 async function runPipeSmoke(target) {
-  const { home, project } = createFixture("regular");
+  const { home, project, restore } = createFixture("regular");
   const configBefore = fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8");
   const input = [
     "/sessions current",
@@ -463,6 +470,7 @@ async function runPipeSmoke(target) {
     "delegate task inspect qa fixture",
     "discover and load skill qa-discovery",
     "/settings",
+    '/restore preview --authority-id qa-restore --record qa-record',
     "/exit",
   ].join("\n") + "\n";
   const child = spawn(target.command, [...target.args, "--print", "--non-interactive-approval", "allow-once"], {
@@ -489,9 +497,13 @@ async function runPipeSmoke(target) {
       "Synthetic reply: delegate task inspect qa fixture",
       "Synthetic reply: discover and load skill qa-discovery",
       "does not write configuration",
+      'Would restore',
+      'qa-restore.txt',
+      'Nothing was written.',
     ]) {
       if (!output.includes(expected)) throw new Error(`pipe output missing ${expected}`);
     }
+    assertRestoreUnchanged(restore);
     const sessionId = extractSessionId(state.output);
     if (!sessionId) throw new Error("pipe output did not expose the current session id");
     assertTranscript(home, sessionId, [

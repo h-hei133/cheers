@@ -104,6 +104,29 @@ describe("recovery authority index", () => {
     expect(invalidRecord.status).toBe("blocked");
     expect(invalidRecord.blockedReason).toBe("invalid-id");
   });
+
+  it('distinguishes filesystem failures from missing ledger and namespace directories', async () => {
+    const root = tempRoot('recovery-index-failure-');
+    const ledgerRoot = path.join(root, 'ledger');
+    fs.writeFileSync(ledgerRoot, 'ordinary file');
+    expect(await listRecoveryAuthorityNamespaces({ ledgerRoot })).toMatchObject({
+      status: 'blocked', blockedReason: 'file-system-error',
+    });
+    fs.rmSync(ledgerRoot);
+    fs.mkdirSync(path.join(ledgerRoot, 'edit-a'), { recursive: true });
+    fs.writeFileSync(path.join(ledgerRoot, 'edit-a', 'records'), 'ordinary file');
+    expect(await listRecoveryAuthorityRecords({ ledgerRoot, authorityId: 'edit-a' })).toMatchObject({
+      status: 'blocked', blockedReason: 'file-system-error',
+    });
+  });
+
+  it('stops an aborted catalogue read before inspecting records', async () => {
+    const controller = new AbortController();
+    controller.abort(new Error('listing cancelled'));
+    await expect(listRecoveryAuthorityRecords({
+      ledgerRoot: tempRoot('recovery-index-cancel-'), authorityId: 'edit-a', signal: controller.signal,
+    })).rejects.toThrow('listing cancelled');
+  });
 });
 
 async function captureRecord(input: {

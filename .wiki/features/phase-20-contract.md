@@ -64,7 +64,7 @@
 | PAN-03 | `picker/hub.ts` | pickers（39） | `/hub` 在无 composition 时仍打开或 apply 取消任务时失败 |
 | PAN-04 | `cli/usage/service.ts` | usage（31） | 无限分母输出百分比时失败 |
 | PAN-05（部分） | `picker/advisor.ts`、`core/commands/report/projection.ts`、`btwCommandRuntime` | advisor 只读 checkpoint/note 面板；plan-review 与 btw 结构化报告；打开面板不发模型请求，模型工作走显式命令 | 面板打开触发模型、旧流串入新面板或 plan/btw 越权写入主会话时失败 |
-| PAN-06（部分） | `picker/copy.ts`、`transcript/container.ts` | copy（3）；100 项分页、continuation、source revision 和 stale selection | 第 40 个 block 不可复制、revision 变化后仍复制或下一页丢失时失败 |
+| PAN-06（部分） | `picker/copy.ts`、`picker/restore.ts`、`edit/recovery/recoveryAuthorityIndex.ts`、`transcript/container.ts` | copy（3）；100 项分页、continuation、source revision 和 stale selection；restore（10）及 recovery index（5），选择仅生成可解析 preview draft，复合身份消歧、完整元数据 digest 重验，特殊路径/缺内容/缺失与坏目录/取消均有回归；Linux 八格预览验证文件、记录、blob 字节不变 | 第 40 个 block 不可复制、revision 变化后仍复制或下一页丢失时失败；恢复空格分隔的ID参数后遇dash-leading值被解析器拒绝，单 record ID、40项截断或移除 digest 后各有实际断言失败。restore 大型目录仍缺分页/资源上界，history/back/undo/copy 剩余边界不据此闭合 |
 | PAN-07 | `registry.ts` | slashCommandRegistry（11） | `/extensions` 不解析到 plugin 时失败 |
 | PAN-08（部分） | `picker/mcpAdd.ts`、`picker/{help,tools,skills}.ts`、`core/commands/tools/report.ts` | mcpAdd（2）、help/tools；逐步 scope/name/transport/confirm，临时定义 0600 且无论成功拒绝都删除；report 只读 | 未确认即发布、临时定义残留或打开 report 触发执行时失败 |
 
@@ -95,7 +95,7 @@
 | 任务 | 证据 |
 |---|---|
 | QA-01 | 本矩阵 + 各反转测试；`CTX-02`、`TOOL-02`、`PAN-05`、`PAN-08`、`QA-03` 已拆成独立行；但行存在不等于任务完成，仍按各行状态累积。 |
-| QA-02 | Linux Node/exe × regular/fullscreen/line/pipe 八格合成CLI已通过；TUI覆盖会话fork/切换/确认删除、panel关闭、任务、发现/search/load/skill、审批、settings保存和profile受控重启；line/pipe覆盖任务/发现/显式allow-once以及settings只读字节对照。逐调用关联持久tool.result与成功输出，不以模型重复prompt替代结果。line/pipe完整profile切换/保存、restore preview、跨平台/IME/系统复制仍未闭合；settings面板不由非TTY伪造。 |
+| QA-02 | Linux Node/exe × regular/fullscreen/line/pipe 八格合成CLI已通过；TUI覆盖会话fork/切换/确认删除、panel关闭、任务、发现/search/load/skill、审批、settings保存和profile受控重启；line/pipe覆盖任务/发现/显式allow-once以及settings只读字节对照。八格新增restore preview和文件/记录/blob精确字节对照；TUI另覆盖选择器取消、重新打开及显式提交draft。逐调用关联持久tool.result与成功输出，不以模型重复prompt替代结果。line/pipe完整profile切换/保存、跨平台/IME/系统复制仍未闭合；settings面板不由非TTY伪造。 |
 | QA-03 | START-03 启动数据、RENDER/INPUT 回归与合成 PTY 可作质量前置；§6 预注册指标、真实模型任务集和安全回归的真实质量证据仍缺，mock 不替代。 |
 | TOOL-02（部分） | `/tools` 报告 description/schema 的 UTF-8 字节数、逐工具成本列与文本摘要，明确 `tokens=not-measured`；同模型/任务/权限的总请求、发现额外成本、关键参数质量与 tokenizer/多语言误差仍待真实模型。 |
 | QA-04 | 本地门禁与精确提交；CI 以 run 结果为准 |

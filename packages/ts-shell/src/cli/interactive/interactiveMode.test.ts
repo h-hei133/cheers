@@ -21,6 +21,7 @@ import { currentTheme } from '../../presentation/theme/theme.js';
 import { isThemePreviewActive, selectTheme } from '../../presentation/theme/selection.js';
 import { helpPicker } from './picker/help.js';
 import { toolsPicker } from './picker/tools.js';
+import { restorePicker } from './picker/restore.js';
 import * as toolCatalog from '../../core/tools/catalog.js';
 import { createReport, span } from '../../core/commands/report/projection.js';
 import type { PickerOutcome } from './overlay.js';
@@ -257,6 +258,25 @@ describe("session wiring", () => {
       resolve({ report }); await new Promise(done => setTimeout(done, 0));
       expect(host.pager.active).toBe(false);
       expect(host.view.transcript.all().some(block => block.report === report)).toBe(false);
+    } finally { mode.stop(); }
+  });
+
+  it('holds composer typing and paste until a delayed restore preview draft settles', async () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { view: InteractiveView; applyPicker(picker: Picker, ids: readonly string[]): void };
+    let resolve!: (value: PickerOutcome) => void;
+    const pending = new Promise<PickerOutcome>(done => { resolve = done; });
+    mode.start();
+    try {
+      host.view.editor.setText('original draft');
+      host.applyPicker({ ...restorePicker('/workspace'), apply: () => pending }, ['edit-a:record-a']);
+      terminal.input('typed\x1b[200~ pasted\x1b[201~');
+      expect(host.view.editor.getText()).toBe('original draft');
+      resolve({ draft: '/restore preview --authority-id=edit-a --record=record-a' });
+      await new Promise(done => setTimeout(done, 0));
+      expect(host.view.editor.getText()).toContain('/restore preview');
+      terminal.input('!');
+      await vi.waitFor(() => expect(host.view.editor.getText()).toContain('--record=record-a!'));
     } finally { mode.stop(); }
   });
 
