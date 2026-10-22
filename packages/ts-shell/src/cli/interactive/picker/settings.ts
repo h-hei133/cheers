@@ -127,7 +127,10 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
       }
       preview?.end();
       if (ids.length !== 1) return undefined;
-      if (index >= 0 && previewError) return { note: 'Display preview is unavailable because the accepted setting changed. Review the current value before applying.', next: settingDetail(host, draft, setting, pending, failure) };
+      if (index >= 0 && previewError) return {
+        note: `${setting.key === 'theme' ? 'Theme' : 'Display'} preview is unavailable because the accepted setting changed. Review the current value before applying.`,
+        next: settingDetail(host, draft, setting, pending, failure),
+      };
       const id = ids[0];
       if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending) };
       if (id === 'unset') return { next: settingDetail(host, draft, setting, { value: undefined }, failure) };

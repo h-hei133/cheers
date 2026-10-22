@@ -158,7 +158,7 @@ describe('advanced settings picker', () => {
     field.previewChange!([light]);
     expect(shown).toBe('external');
     const result = await field.apply([light]);
-    expect(result?.note).toContain('Display preview is unavailable');
+    expect(result?.note).toContain('Theme preview is unavailable');
     expect(h.save).not.toHaveBeenCalled();
   });
   it.each([80, 120])('shows effective/source/stored/target and pending state at %i columns', async width => {
