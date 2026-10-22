@@ -123,12 +123,16 @@ export function createApprovalResponse(input: {
   readonly decision: ApprovalDecision;
   readonly userComment: string;
   readonly respondedAt?: number;
+  readonly selected?: readonly string[];
+  readonly selectionRevision?: string;
 }): EscalationResponse {
   return {
     promptId: input.promptId,
     decision: input.decision,
     respondedAt: input.respondedAt ?? Date.now(),
     userComment: input.userComment,
+    ...(input.selected ? { selected: input.selected } : {}),
+    ...(input.selectionRevision ? { selectionRevision: input.selectionRevision } : {}),
   };
 }
 

@@ -26,8 +26,8 @@ const SCOPE_LABELS: Record<PermissionScope, string> = {
 
 const SCOPE_MEANING: Record<PermissionScope, string> = {
   ask: "every escalation is put to you",
-  "accept-edits": "edits inside the project go through; commands and network still ask",
-  "allow-all": "nothing is put to you for the rest of the session",
+  "accept-edits": "project edits are pre-approved; commands, network and exact patch group selection still ask",
+  "allow-all": "ordinary approvals are pre-approved; exact patch group selection still asks",
 };
 
 /** Operations that are an edit to the project rather than an act on the system. */

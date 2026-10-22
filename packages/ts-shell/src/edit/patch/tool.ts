@@ -44,8 +44,13 @@ export function createPatchToolDefinition(): ToolDefinition<ToolPreparation> {
         if (Buffer.byteLength(selectedPreview) > patchLimits.previewBytes) throw new Error('Selected patch preview is too large; split the operation before requesting approval.');
         return { preview: selectedPreview, revision: selectedPlan.revision };
       }, execute: async (actual: ToolExecutionContext, selection?: readonly string[], approval?: { readonly revision?: string }) => {
-        const chosen = selection ?? (plan.groups.length === 1 ? [plan.groups[0]!.id] : undefined);
-        if (!chosen) throw new Error(`This patch changes ${plan.groups.length} groups; the approval must select which groups to apply. Nothing was written.`);
+        const chosen = selection;
+        if (!Array.isArray(chosen) || chosen.length === 0) {
+          throw new Error('The approval must explicitly select at least one patch group. Nothing was written.');
+        }
+        if (new Set(chosen).size !== chosen.length || chosen.some(id => typeof id !== 'string' || !id.trim())) {
+          throw new Error('The approved patch selection contains duplicate or invalid group IDs. Nothing was written.');
+        }
         let selectedPlan: ReturnType<typeof planPatch>;
         try { selectedPlan = planPatchSelection(args.input as string, { ...context, sessionId: context.sessionId!, workspaceRoot: root }, chosen, plan); }
         catch (error) {

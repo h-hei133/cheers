@@ -11,6 +11,10 @@ import { restoreOperation } from '../recovery/operation/restore.js';
 import { createPatchToolDefinition } from './tool.js';
 import { applyPatchPlan } from './batch.js';
 import { planPatch } from './plan.js';
+import type { ToolPreparation } from '../../tools/types.js';
+import { ApprovalTrustPolicy } from '../../core/shell/approvalTrustPolicy.js';
+import { createCliEscalationPromptHandler } from '../../entrypoints/cliApprovalModule.js';
+import { StreamingRenderer } from '../../presentation/terminal/streaming.js';
 
 let root: string;
 let workspace: string;
@@ -266,6 +270,104 @@ describe('recorded patch batches', () => {
     });
   });
 
+  it('refuses a one-group patch when the approval omits the explicit selection', async () => {
+    const emitted: unknown[] = [];
+    const result = await run(patch(update('a.txt', 'before-a', 'after-a')), {
+      escalationPromptHandler: async prompt => ({
+        promptId: prompt.id,
+        decision: 'allow-once',
+        respondedAt: 1,
+      }),
+      emit: event => emitted.push(event),
+    });
+    expect(result.messages[0]?.content).toContain('explicit group selection');
+    expect(fs.readFileSync(a, 'utf8')).toBe('before-a\n');
+    expect(readOperations(scope())).toEqual([]);
+    expect(emitted).toContainEqual({
+      type: 'approval.resolved',
+      toolName: 'apply_patch',
+      taskId: 'actual-patch-call',
+      outcome: 'denied',
+    });
+  });
+
+  it.each(['accept-edits', 'allow-all'] as const)(
+    'collects an exact subset through the CLI host when %s already permits the workspace write',
+    async permissionScope => {
+      const interactive = vi.fn(async prompt => {
+        const second = prompt.context.selections![1]!;
+        const selected = prompt.context.selectionPreview!([second.id]);
+        return {
+          promptId: prompt.id,
+          decision: 'allow-once' as const,
+          respondedAt: 1,
+          selected: [second.id],
+          selectionRevision: selected.revision,
+        };
+      });
+      const renderer = new StreamingRenderer();
+      renderer.setSink({ line: () => undefined, chunk: () => undefined });
+      const handler = createCliEscalationPromptHandler(
+        renderer,
+        null,
+        () => 'compact',
+        new ApprovalTrustPolicy(),
+        () => workspace,
+        undefined,
+        undefined,
+        undefined,
+        () => permissionScope,
+        interactive,
+      );
+      const result = await run(two(), { permissionScope, escalationPromptHandler: handler });
+      expect(interactive).toHaveBeenCalledOnce();
+      expect(result.messages[0]?.content).toContain(': committed.');
+      expect(fs.readFileSync(a, 'utf8')).toBe('before-a\n');
+      expect(fs.readFileSync(b, 'utf8')).toBe('after-b\n');
+    },
+  );
+
+  it('refuses direct one-group execution without an explicit selection', async () => {
+    const tool = createPatchToolDefinition();
+    const context = { workspaceRoot: workspace, sessionId: 'patch-session', taskId: 'direct-one-group' } as never;
+    const prepared = tool.prepare!({ input: patch(update('a.txt', 'before-a', 'after-a')) }, context) as ToolPreparation;
+    await expect(prepared.execute(context, undefined, { revision: prepared.selectionRevision }))
+      .rejects.toThrow(/explicitly select at least one patch group/);
+    expect(fs.readFileSync(a, 'utf8')).toBe('before-a\n');
+    expect(readOperations(scope())).toEqual([]);
+  });
+
+  it('refuses direct prepared execution with duplicate or invalid group ids', async () => {
+    const tool = createPatchToolDefinition();
+    const context = { workspaceRoot: workspace, sessionId: 'patch-session', taskId: 'direct-invalid-selection' } as never;
+    const prepared = tool.prepare!({ input: patch(update('a.txt', 'before-a', 'after-a')) }, context) as ToolPreparation;
+    const id = prepared.selections![0]!.id;
+    for (const selection of [[id, id], [id, ''], [id, 42 as unknown as string]]) {
+      await expect(prepared.execute(context, selection, { revision: prepared.selectionRevision }))
+        .rejects.toThrow(/duplicate or invalid group IDs/);
+    }
+    expect(fs.readFileSync(a, 'utf8')).toBe('before-a\n');
+    expect(readOperations(scope())).toEqual([]);
+  });
+
+  it.each(['unknown', 'duplicate'])('refuses %s selected groups before execution', async kind => {
+    const result = await run(patch(update('a.txt', 'before-a', 'after-a')), {
+      escalationPromptHandler: async prompt => {
+        const id = prompt.context.selections![0]!.id;
+        return {
+          promptId: prompt.id,
+          decision: 'allow-once',
+          respondedAt: 1,
+          selected: kind === 'unknown' ? ['missing-group'] : [id, id],
+          selectionRevision: prompt.context.selectionRevision,
+        };
+      },
+    });
+    expect(result.messages[0]?.content).toContain('unknown or duplicate groups');
+    expect(fs.readFileSync(a, 'utf8')).toBe('before-a\n');
+    expect(readOperations(scope())).toEqual([]);
+  });
+
   it('refuses a multi-group patch when the host collected no selection', async () => {
     const result = await run(two(), { permissionScope: 'allow-all', escalationPromptHandler: undefined });
     expect(result.messages[0]?.content).not.toContain(': committed.');
@@ -319,7 +421,8 @@ describe('recorded patch batches', () => {
       expect(prompt.message).toContain('-"before-a"'); expect(prompt.message).toContain('+"after-b"');
       fs.writeFileSync(b, 'external\n');
       return { promptId: prompt.id, decision: 'allow-once' as const, respondedAt: 1,
-        selected: prompt.context.selections!.map(selection => selection.id) };
+        selected: prompt.context.selections!.map(selection => selection.id),
+        selectionRevision: prompt.context.selectionRevision };
     });
     const result = await run(two(), { permissionScope: 'ask', escalationPromptHandler: handler });
     expect(handler).toHaveBeenCalledOnce(); expect(result.messages[0]?.content).toContain('changed after approval');

@@ -183,19 +183,20 @@ export function createCliEscalationPromptHandler(
     const projectRoot = getProjectRoot();
     const evaluation = trustPolicy.evaluate(prompt, projectRoot);
     const isNonInteractive = rl === null && !promptInteractiveApproval;
-    const cliNonInteractiveDecision = isNonInteractive
+    const requiresSelection = Boolean(prompt.context.selections?.length);
+    const cliNonInteractiveDecision = isNonInteractive && !requiresSelection
       ? getNonInteractiveDecision?.()
       : undefined;
-    const approvalModeObject = getApprovalModeObject?.();
-    const hasAllowOnceCache = trustPolicy.hasAllowOnce(evaluation.cacheKey);
-    const hasAllowAlwaysGrant = Boolean(evaluation.matchedGrant);
+    const approvalModeObject = requiresSelection ? undefined : getApprovalModeObject?.();
+    const hasAllowOnceCache = !requiresSelection && trustPolicy.hasAllowOnce(evaluation.cacheKey);
+    const hasAllowAlwaysGrant = !requiresSelection && Boolean(evaluation.matchedGrant);
     const hasCachedGrant = hasAllowOnceCache || hasAllowAlwaysGrant;
     // A session scope answers before anything is put to the user, and only in the
     // interactive channel: the non-interactive path has its own explicit policy,
     // and letting a display-level setting speak for it would hide which authority
     // actually decided.
-    const scope = getPermissionScope?.() ?? "ask";
-    const scopeDecision = isNonInteractive ? undefined : scopeAnswer(scope, prompt);
+    const scope = requiresSelection ? "ask" : getPermissionScope?.() ?? "ask";
+    const scopeDecision = isNonInteractive || requiresSelection ? undefined : scopeAnswer(scope, prompt);
     if (scopeDecision) {
       renderApprovalRequiredSurface(renderer, {
         prompt,
@@ -222,7 +223,32 @@ export function createCliEscalationPromptHandler(
       });
     }
 
-    if (isNonInteractive) {
+    if (requiresSelection && !promptInteractiveApproval) {
+      renderApprovalRequiredSurface(renderer, {
+        prompt,
+        includeRisk: true,
+        decisionSource: "selection-host-unavailable",
+        lines: ["- Exact patch group selection requires an interactive group picker."],
+      });
+      emitApprovalAudit({
+        channel: isNonInteractive ? "non-interactive" : "interactive",
+        decision: "deny",
+        decisionSource: "selection-host-unavailable",
+        persistent: false,
+        cacheEffect: "none",
+        projectRoot,
+        cacheKey: evaluation.cacheKey,
+        scopeLabel: evaluation.scopeLabel,
+      });
+      renderer.renderLine("");
+      return createApprovalResponse({
+        promptId: prompt.id,
+        decision: "deny",
+        userComment: "CLI exact selection blocked: no interactive group-selection host is available.",
+      });
+    }
+
+    if (!requiresSelection && isNonInteractive) {
       const nonInteractiveDecisionPlan = resolveNonInteractiveApprovalDecision({
         cliDecision: cliNonInteractiveDecision,
         approvalModeObject,
@@ -333,7 +359,7 @@ export function createCliEscalationPromptHandler(
       });
     }
 
-    if (approvalModeObject) {
+    if (!requiresSelection && approvalModeObject) {
       const interactiveDecisionPlan = resolveNonInteractiveApprovalDecision({
         approvalModeObject,
         hasAllowOnceCache,
@@ -420,7 +446,7 @@ export function createCliEscalationPromptHandler(
       }
     }
 
-    if (hasAllowOnceCache) {
+    if (!requiresSelection && hasAllowOnceCache) {
       trustPolicy.consumeAllowOnce(evaluation.cacheKey);
       trustPolicy.recordLastHit({
         source: "allow-once-cache",
@@ -449,7 +475,7 @@ export function createCliEscalationPromptHandler(
         userComment: "CLI auto-approval from allow-once cache",
       });
     }
-    if (evaluation.matchedGrant) {
+    if (!requiresSelection && evaluation.matchedGrant) {
       trustPolicy.recordLastHit({
         source: "allow-always-policy",
         projectRoot,
@@ -506,6 +532,8 @@ export function createCliEscalationPromptHandler(
     let decision: "deny" | "allow-once" | "allow-always";
     let decisionInputKey: "y" | "a" | "n" | "other" | undefined;
     let denialReason: string | undefined;
+    let selected: readonly string[] | undefined;
+    let selectionRevision: string | undefined;
     if (isNonInteractive) {
       decision = "deny";
       decisionInputKey = "n";
@@ -521,6 +549,10 @@ export function createCliEscalationPromptHandler(
         if (typeof res === "object" && res !== null) {
           decision = res.decision;
           denialReason = res.reason;
+          if (decision !== "deny") {
+            selected = res.selected;
+            selectionRevision = res.selectionRevision;
+          }
         } else if (typeof res === "string") {
           decision = res;
         } else {
@@ -552,6 +584,12 @@ export function createCliEscalationPromptHandler(
           : normalized === "a"
             ? "allow-always"
             : "deny";
+    }
+
+    if (prompt.context.toolName === "apply_patch" && decision === "allow-always") {
+      decision = "deny";
+      decisionInputKey = "n";
+      denialReason = "apply_patch requires an exact one-time group selection; allow-always is not available.";
     }
 
     if (!promptInteractiveApproval && decision === "allow-once") {
@@ -609,8 +647,10 @@ export function createCliEscalationPromptHandler(
         ? `User denied with reason: ${denialReason}`
         : formatExplicitApprovalComment({
             decision,
-            hasApprovalModeObject: Boolean(getApprovalModeObject?.()),
+            hasApprovalModeObject: Boolean(approvalModeObject),
           }),
+      ...(selected ? { selected } : {}),
+      ...(selectionRevision ? { selectionRevision } : {}),
     });
   };
 }

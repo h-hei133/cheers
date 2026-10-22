@@ -204,12 +204,16 @@ describe("approval prompt bridge", () => {
         decision: "allow-once",
         respondedAt: 123,
         userComment: "CLI explicit approval: allow-once",
+        selected: ["group-a"],
+        selectionRevision: "subset-revision",
       }),
     ).toEqual({
       promptId: "approval_prompt_1",
       decision: "allow-once",
       respondedAt: 123,
       userComment: "CLI explicit approval: allow-once",
+      selected: ["group-a"],
+      selectionRevision: "subset-revision",
     });
   });
 
@@ -327,6 +331,134 @@ describe("createCliEscalationPromptHandler with promptInteractiveApproval", () =
     expect(interactiveApproval).toHaveBeenCalledOnce();
     expect(result.decision).toBe("allow-once");
     expect(renderer.lines).toEqual([]);
+  });
+
+  it("preserves the exact group selection and revision returned by the interactive host", async () => {
+    const renderer = createRenderer();
+    const trustPolicy = new ApprovalTrustPolicy();
+    const interactiveApproval = vi.fn().mockResolvedValue({
+      decision: "allow-once",
+      selected: ["group-a"],
+      selectionRevision: "subset-revision",
+    });
+    const approvalModeObject = vi.fn(() => ({
+      mode: "allow-once" as const,
+      persistent: false,
+      verifyLineage: "selection-test",
+    }));
+    const handler = createCliEscalationPromptHandler(
+      renderer,
+      null,
+      () => "compact",
+      trustPolicy,
+      () => "/project",
+      undefined,
+      approvalModeObject,
+      undefined,
+      () => "ask",
+      interactiveApproval,
+    );
+    const prompt: EscalationPrompt = {
+      ...uniquePrompt("selected"),
+      context: {
+        toolName: "apply_patch",
+        operation: "write",
+        target: "a.txt",
+        selections: [{ id: "group-a", label: "Update a.txt (1 hunk)" }],
+        selectionRevision: "full-revision",
+      },
+    };
+    const result = await handler(prompt);
+    expect(result).toMatchObject({
+      decision: "allow-once",
+      selected: ["group-a"],
+      selectionRevision: "subset-revision",
+    });
+    expect(result.userComment).not.toContain("approval-mode-object");
+    expect(approvalModeObject).not.toHaveBeenCalled();
+  });
+
+  it("refuses to persist allow-always for an exact patch selection", async () => {
+    const renderer = createRenderer();
+    const trustPolicy = new ApprovalTrustPolicy();
+    const rememberAllowAlways = vi.spyOn(trustPolicy, "rememberAllowAlways");
+    const interactiveApproval = vi.fn().mockResolvedValue({
+      decision: "allow-always",
+      selected: ["group-a"],
+      selectionRevision: "subset-revision",
+    });
+    const handler = createCliEscalationPromptHandler(
+      renderer,
+      null,
+      () => "compact",
+      trustPolicy,
+      () => "/project",
+      undefined,
+      undefined,
+      undefined,
+      () => "ask",
+      interactiveApproval,
+    );
+    const prompt: EscalationPrompt = {
+      ...uniquePrompt("patch_always"),
+      context: {
+        toolName: "apply_patch",
+        operation: "write",
+        target: "a.txt",
+        selections: [{ id: "group-a", label: "Update a.txt (1 hunk)" }],
+        selectionRevision: "full-revision",
+      },
+    };
+    const result = await handler(prompt);
+    expect(result).toMatchObject({
+      decision: "deny",
+      userComment: expect.stringContaining("allow-always is not available"),
+    });
+    expect(rememberAllowAlways).not.toHaveBeenCalled();
+  });
+
+  it("refuses a selection prompt without a picker before scopes, policy or cached approval can answer", async () => {
+    const renderer = createRenderer();
+    const trustPolicy = new ApprovalTrustPolicy();
+    const audited: ApprovalAuditRecord[] = [];
+    const nonInteractiveDecision = vi.fn(() => "allow-once" as const);
+    const approvalModeObject = vi.fn(() => ({ mode: "allow-once" as const, persistent: false, verifyLineage: "selection-test" }));
+    const permissionScope = vi.fn(() => "allow-all" as const);
+    const prompt: EscalationPrompt = {
+      ...uniquePrompt("selection_without_host"),
+      context: {
+        toolName: "apply_patch",
+        operation: "write",
+        target: "a.txt",
+        selections: [{ id: "group-a", label: "Update a.txt (1 hunk)" }],
+        selectionRevision: "full-revision",
+      },
+    };
+    const cacheKey = trustPolicy.evaluate(prompt, "/project").cacheKey;
+    trustPolicy.rememberAllowOnce(cacheKey);
+    const handler = createCliEscalationPromptHandler(
+      renderer,
+      null,
+      () => "compact",
+      trustPolicy,
+      () => "/project",
+      nonInteractiveDecision,
+      approvalModeObject,
+      record => audited.push(record),
+      permissionScope,
+    );
+    await expect(handler(prompt)).resolves.toMatchObject({
+      decision: "deny",
+      userComment: expect.stringContaining("no interactive group-selection host"),
+    });
+    expect(audited.at(-1)).toMatchObject({
+      decision: "deny",
+      decisionSource: "selection-host-unavailable",
+    });
+    expect(nonInteractiveDecision).not.toHaveBeenCalled();
+    expect(approvalModeObject).not.toHaveBeenCalled();
+    expect(permissionScope).not.toHaveBeenCalled();
+    expect(trustPolicy.hasAllowOnce(cacheKey)).toBe(true);
   });
 
   it("uses promptInteractiveApproval to resolve allow-always and records policy grant", async () => {

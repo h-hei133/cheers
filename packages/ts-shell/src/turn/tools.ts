@@ -7,7 +7,7 @@ import type { DenyRule } from "../core/shell/approval/deny.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { InteractiveAsk } from "../core/tools/ask/contract.js";
 import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
-import type { ToolDefinition, ToolExecutionContext } from "../tools/types.js";
+import type { ToolDefinition, ToolExecutionContext, ToolPreparation } from "../tools/types.js";
 import type { SubagentRunner } from "../core/subagents/runner.js";
 import { neutraliseForDisplay } from "../core/text/safety.js";
 import { redactExportText } from "../core/security/redaction.js";
@@ -399,9 +399,10 @@ async function askPermission(
   tool?: ToolDefinition,
 ): Promise<{ readonly blocked?: string; readonly approved?: { operation: string; decision: string } }> {
   let evaluation: ReturnType<typeof evaluateToolPermissionScope>;
+  let preparation: ToolPreparation | undefined;
   try {
     if (toolName === 'lsp' && args.backend !== 'scanner') bindExecutionTarget(args, args.server, options.workspaceRoot);
-    const preparation = preparedToolCall(args, options);
+    preparation = preparedToolCall(args, options);
     evaluation = preparation ? preparationPermission(toolName, preparation, options, args) : evaluateWorkspacePermission(toolName, args, options, tool);
   }
   catch (error) { return { blocked: error instanceof Error ? error.message : 'Workspace access could not be checked.' }; }
@@ -422,22 +423,31 @@ async function askPermission(
     });
     return { blocked: `Blocked: ${evaluation.reason}` };
   }
-  if (!evaluation.requiresEscalation) return {};
+  const requiresSelection = Boolean(preparation?.selections?.length);
+  if (!evaluation.requiresEscalation && !requiresSelection) return {};
   if (!options.escalationPromptHandler) {
-    return { blocked: `Blocked: Tool '${toolName}' requires permission (${evaluation.reason}), but no interactive handler is available.` };
+    return {
+      blocked: requiresSelection
+        ? `Blocked: Tool '${toolName}' requires an explicit group selection, but no interactive handler is available.`
+        : `Blocked: Tool '${toolName}' requires permission (${evaluation.reason}), but no interactive handler is available.`,
+    };
   }
   options.emit({ type: "approval.requested", toolName, taskId: toolCallId });
-  await options.hooks.dispatch({
-    eventName: "PermissionRequest",
-    sessionId: options.sessionId,
-    workspaceRoot: options.workspaceRoot,
-    timestamp: new Date().toISOString(),
-    toolName,
-    toolCallId,
-    args,
-  });
-  const prompt = buildToolEscalationPrompt(toolName, evaluation.operation, evaluation.target, evaluation.reason);
-  const preparation = preparedToolCall(args, options);
+  if (evaluation.requiresEscalation) {
+    await options.hooks.dispatch({
+      eventName: "PermissionRequest",
+      sessionId: options.sessionId,
+      workspaceRoot: options.workspaceRoot,
+      timestamp: new Date().toISOString(),
+      toolName,
+      toolCallId,
+      args,
+    });
+  }
+  const promptReason = evaluation.requiresEscalation
+    ? evaluation.reason
+    : "The permission scope allows this operation, but the exact patch groups still require explicit selection.";
+  const prompt = buildToolEscalationPrompt(toolName, evaluation.operation, evaluation.target, promptReason);
   if (preparation) {
     prompt.context.preview = preparation.preview; prompt.context.previewKind = preparation.previewKind;
     if (preparation.selections) prompt.context.selections = preparation.selections;
@@ -462,36 +472,44 @@ async function askPermission(
       response.userComment && !response.userComment.startsWith("CLI explicit approval")
         ? response.userComment.replace(/^User denied with reason:\s*/i, "").trim()
         : "";
-    await options.hooks.dispatch({
-      eventName: "PermissionDenied",
-      sessionId: options.sessionId,
-      workspaceRoot: options.workspaceRoot,
-      timestamp: new Date().toISOString(),
-      toolName,
-      toolCallId,
-      args,
-      reason: feedback || evaluation.reason,
-    });
+    if (evaluation.requiresEscalation) {
+      await options.hooks.dispatch({
+        eventName: "PermissionDenied",
+        sessionId: options.sessionId,
+        workspaceRoot: options.workspaceRoot,
+        timestamp: new Date().toISOString(),
+        toolName,
+        toolCallId,
+        args,
+        reason: feedback || evaluation.reason,
+      });
+    }
     return {
       blocked: feedback
         ? `[User Denied Permission]: The user explicitly rejected this tool call.\nUser feedback / instructions: "${feedback}"\nYou MUST follow the user's instructions above instead of repeating the rejected action.`
-        : `Blocked: User denied permission for tool '${toolName}' (${evaluation.operation}) on '${evaluation.target}'.`,
+        : !evaluation.requiresEscalation && requiresSelection
+          ? `Blocked: User declined the exact group selection for '${toolName}' on '${evaluation.target}'.`
+          : `Blocked: User denied permission for tool '${toolName}' (${evaluation.operation}) on '${evaluation.target}'.`,
     };
   }
-  if (response.selected) {
-    setPreparedSelection(args, response.selected, response.selectionRevision);
-  } else if (
-    preparation?.selections?.length === 1 &&
-    preparation.selectionRevision
-  ) {
-    // A one-group plan has no ambiguous subset to collect. Bind the exact
-    // preview revision anyway, so a non-interactive or scripted approval
-    // cannot execute without the same stale-read fence as a subset.
-    setPreparedSelection(
-      args,
-      [preparation.selections[0]!.id],
-      preparation.selectionRevision,
-    );
+  if (preparation?.selections?.length) {
+    const selected = response.selected;
+    const offered = new Set(preparation.selections.map(selection => selection.id));
+    const unique = Array.isArray(selected) ? new Set(selected) : undefined;
+    if (!Array.isArray(selected) || selected.length === 0
+      || typeof response.selectionRevision !== "string" || !response.selectionRevision.trim()) {
+      options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "denied" });
+      return {
+        blocked: "Blocked: this tool requires an explicit group selection and exact selection revision. Nothing was executed.",
+      };
+    }
+    if (unique?.size !== selected.length || selected.some(id => typeof id !== "string" || !offered.has(id))) {
+      options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "denied" });
+      return {
+        blocked: "Blocked: the approval selected unknown or duplicate groups. Nothing was executed.",
+      };
+    }
+    setPreparedSelection(args, selected, response.selectionRevision);
   }
   options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "approved" });
   return { approved: { operation: evaluation.operation, decision: response.decision } };
