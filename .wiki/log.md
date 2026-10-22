@@ -8484,3 +8484,4 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - TypeScript build ID `7deb2f1e19bbb943a4be88ed67100a4a5989a5eb5a5cb146d00a332d2f97dcb3`，inputs digest `57d8a7007d314082fa7273ee14872560561fda8f6a10eed7b4fd399b3dc56616`；executable SHA-256 `bb2bdc3a82706a044c1ea735a510daaac4ea6b0f5bbf1a84661efb435d3654c1`。
 - 指定 `cn:deepseek-v4.1-flash` 的独立 reviewer 返回 `503 Service Unavailable`，未取得独立批准；本轮结论来自本地自审、聚焦测试和实际反转，不把不可用 reviewer 写成 APPROVE。
 - `request-attribution.md` 已明确 title 的本地派生边界和未来模型标题必须复用同一 policy/credential identity。PRV-05 仍保持 `partial`，因为本轮没有可信远端结算/账单证据；本地 ledger、quota 与合成 HTTP 不能替代 provider 侧计费。
+- 代码批 `9a7e386982577d64c84e970ad3e661d9f329c5bc` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39862167681`/job `120115317655` completed/success，耗时 22m19s；完整测试 927 文件通过/1 跳过、9863 项通过/3 项跳过、673.80s，静态门、脚本门、构建、Chromium 安装与 NormProof 步骤均 success。Architecture Watch `39862167651`/job `120115317662` completed/success；两项只绑定该代码 SHA。

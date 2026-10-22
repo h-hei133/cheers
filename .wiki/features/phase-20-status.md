@@ -13,7 +13,7 @@
 - TypeScript build ID `a58dfcd24f10f6ce1bcaf439429c6a74a56f751dd0ed22338b81cefd85057344`, inputs digest `78897a48c56602798fedf02697fed1a08ee384eb3713f0eba5cf641d1687c397`; executable SHA-256 `c60eee11c3750a1adde1a5dd2b03a963674962025b7aa92436764927cb2aa003`.
 - 代码批 `0e21c3f2c6d470dc05ab4ce19e3bdd3cbd25c4fa` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39858979177`/job `120104440105` 为 completed/success，耗时 23m25s；完整测试 927 文件通过/1 跳过、9861 项通过/3 跳过，测试耗时 692.18s，静态门、脚本门、构建与 NormProof 均 success。Architecture Watch `39858979216`/job `120104440365` 为 completed/success。PRV-03 remains `partial` because no real account lifecycle evidence was obtained.
 
-## 2026-10-23 PRV-05 auxiliary request attribution（本地验证；remote billing 仍 partial）
+## 2026-10-23 PRV-05 auxiliary request attribution（代码批 `9a7e3869` 已推送；CI/Watch success）
 
 - Existing request-ledger and backoff coverage already proves per-credential generation waits, late 429 isolation, pre-reserve and pre-handoff checks, unknown retention, cap enforcement, and no replay of partial/unknown streams.
 - `cli/provider/identity.test.ts` now exercises main, delegated, side-question, compaction-summary, and cache-refresh sends against real local HTTP. Each reservation retains its non-secret `credentialId`, rotation-sensitive generation, and purpose; summary/cache tests also verify the committed ledger totals and empty pending set.
@@ -21,6 +21,7 @@
 - The auxiliary matrix passed 10 files/208 tests. A loading-time reversal that removed the cache-refresh policy from `sendSentRequest` made the new identity assertion fail with zero reservations; restoring the policy passed 5/5 identity tests.
 - TypeScript build ID `7deb2f1e19bbb943a4be88ed67100a4a5989a5eb5a5cb146d00a332d2f97dcb3`, inputs digest `57d8a7007d314082fa7273ee14872560561fda8f6a10eed7b4fd399b3dc56616`; executable SHA-256 `bb2bdc3a82706a044c1ea735a510daaac4ea6b0f5bbf1a84661efb435d3654c1`.
 - The required independent reviewer using `cn:deepseek-v4.1-flash` returned `503 Service Unavailable`; no independent approval was obtained.
+- 代码批 `9a7e386982577d64c84e970ad3e661d9f329c5bc` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39862167681`/job `120115317655` 为 completed/success，耗时 22m19s；完整测试 927 文件通过/1 跳过、9863 项通过/3 项跳过，测试耗时 673.80s，静态门、脚本门、构建、Chromium 安装与 NormProof 步骤均 success。Architecture Watch `39862167651`/job `120115317662` 为 completed/success。两项只绑定该代码 SHA。
 - PRV-05 remains `partial`: no trusted remote settlement or billing evidence was obtained. The local ledger and quota projection are not a substitute for provider-side accounting.
 
 ## 2026-10-23 全 47 项复核与 QA-03/TOOL-02 harness 返工（代码批 `6ed28019` 已推送；CI/Watch success；真实模型项仍 partial）
