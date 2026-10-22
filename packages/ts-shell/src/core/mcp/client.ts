@@ -103,6 +103,8 @@ export class CoreMcpClient {
     this.contentChannel = new McpContentChannel(client, () => !this.closed && this.client === client && this.connected, this.changed);
     try {
       await this.withCancellation(signal => client.connect(transport, { timeout: this.timeoutMs, signal }), signal);
+      assertAdmission(admission);
+      signal?.throwIfAborted();
       if (this.closed) throw new Error("MCP client closed during connection");
       this.connected = true;
       return { type: "connected", name: this.name, config: this.config };
@@ -122,6 +124,8 @@ export class CoreMcpClient {
     this.listedTools = undefined;
     this.changed?.();
     const client = await this.requireClient(admission, signal);
+    assertAdmission(admission);
+    signal?.throwIfAborted();
     const revision = ++this.catalogRevision;
     if (!client.getServerCapabilities()?.tools) {
       this.catalog = new McpToolCatalog([]);
@@ -140,6 +144,8 @@ export class CoreMcpClient {
         const result = await this.withCancellation(signal => client.request(
           { method: "tools/list", params: cursor ? { cursor } : {} },
           ListToolsResultSchema, { timeout: this.timeoutMs, signal }), signal);
+        assertAdmission(admission);
+        signal?.throwIfAborted();
         if (this.closed || !this.connected || revision !== this.catalogRevision) throw new Error("MCP tool catalog changed during listing");
         metadata.push(...result.tools);
         for (const tool of result.tools) tools.push({

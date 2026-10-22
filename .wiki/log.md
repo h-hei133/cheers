@@ -8390,3 +8390,15 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - WATCH：load/apply/通知仍同步遍历原完整registry及配置，metadata cap在扫描后，不证明总I/O/内存/延迟界；准入不主动清掉已显示的安全文档快照；原raw ID保留于本地，不是可安全导出的report字段。仅既有脱敏规则，不保证任意编码；本批hint投影不等于全completion候选metadata审计。展示与选择不产生新执行授权，真正提交仍由原runtime重验。其余既有picker、完整PAN-08及全部47项继续原范围复核。
 
 - 最终strict docs/diff均exit0，原118项docs advisory保留；交付前再次核对两报告十一文件SHA及build/exe一致。提交推送与精确新SHA CI继续分别取证。
+
+## [2026-10-22] fix | Phase 20 MCP 精确刷新、取消与报告投影（PAN-08 部分）
+
+- 续接前批未提交改动，先核对 AGENTS、重构现状、Phase 20 裁决/status、真实工作树与最终绑定。原 help 提交 `eeeb9268c5f879c457a43c3cdee96f43d2965173` 的 CI `39614206610` 于 `2026-10-21T14:27:00Z` completed/success，Watch `39614206887` success；旧 SHA 结果不兑换本批 CI。
+- 原服务器 picker 不再重组命令字符串，完整原名称与定义进入原 gateway；`all` 与包含空格的名称保留精确目标。选择一次消费，load/prepare/refresh/client handshake/catalog/publication 与每个 renderer handoff 重核原准入和 signal；拒绝/取消后关闭本次 transport。host 原 exclusive interaction 让 Ctrl+C 到达 ShellCommandRuntime owner，line/print 传入实际 cwd 和配置 admission。
+- 本域 `core/commands/mcp/report.ts` 只生成不可变、安全 metadata 报告，pending 等状态工具数保留 null；原 config/args/env/headers 不持久化为报告。直接 status/tools/doctor/refresh、blocked guidance 与 taxonomy 复用共同投影。guidance 保留固定 slash 语法，whole-string secret prepass→仅中间 path projection→whole-string postpass→cap，修复 quoted secret 被拆分及 file URL 解码引入引号后的上下文丢失。原始 identity/config 不改，report 不生成 tools/call 或模型消息。
+- 先核对 target，再定点只读对照连接 owner 的 session signal、attempt identity 和 onTools/onChange 发布前检查，采纳发布本身必须受准入保护的决策；保留原串行 gateway，不引入第二份连接系统。真实 stale catalog/empty capability/client handoff 回归在修前失败、修后通过。参考 provenance 在既有独立审查保存，本次重新读回相关源码，不往产品新增外部项目标签。
+- 原最终受影响 18 文件/247 项及补充 4 文件/24 项 exit 0，18 项 isolated loading 反转 exit 1 且实际 AssertionError，日志在 `.omx/artifacts/mcp-picker/`。最终生产 TS 与 TS/exe 构建 exit 0，build ID `b4d6c65ea410a78309251871eb7c465a3a72636a00bf7a01545e1ecc72f0803c`，exe SHA256 `e5b237e4f26394761898eb9f4a8a2d7c8c96b1e8431ee35ebfe01c711a12f1dc`。本次实际运行 bind.mjs，21 个源/测试文件与两份审查 hash 全部相等；以上旧测试/构建证据仅因相同字节绑定可用，不声称本次重跑。
+- 同产物四格专用 PTY exit 0，验证 exact all/空格名称、安全 picker/direct/persisted report、Ctrl+C、最终 cleanup/reopen、零 tools/call/模型消息；Linux 八格通用 smoke 与19项入口检查 exit 0。既有 scripts 97项、result-contract 6套154项通过。两个 MCP routing/local-execution gate 因引用已删除测试返回 exit1，原日志保留并归 script drift，计划单独修复；不是产品已通过的证据。
+- 本次四项 cycles/config-consumers/declarations/Node-floor 实际重跑 exit0，保留 `*-current.log`。既有 NormProof exit0/partial，blocking imports/cycles satisfied、8项 ceiling advisory。独立 code APPROVE、architecture WATCH、综合 COMMENT，两报告 SHA已本次重核。源值 ABA、实际清理时限、任意编码、总资源界及继承函数上限债务仍保留；完整 PAN-08、其他 picker 与47项继续原范围。严格 docs/diff、commit/push/新SHA CI另取证。
+
+- 交付前实际 strict docs/diff exit0（保留原118项docs advisory），再次运行bind逐项相符。门禁脚本漂移独立处理，不改变本批产品源码和审查绑定。

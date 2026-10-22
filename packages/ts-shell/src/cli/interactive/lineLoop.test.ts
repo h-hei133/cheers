@@ -11,6 +11,7 @@ import { createStartupRecoveryHint } from '../bootstrap/recoveryHint.js';
 import { attachGoalSubmission } from '../runtime/goalScheduling.js';
 import { runCliMcpCommand } from '../../entrypoints/cliMcpModule.js';
 import { runSshControl } from '../ssh/control.js';
+import * as configuration from '../../core/shell/configuration.js';
 
 vi.mock('./interactiveCommandRouter.js', () => ({ routeInteractiveCommand: vi.fn() }));
 vi.mock('../runtime/goalScheduling.js', () => ({
@@ -568,24 +569,30 @@ it('keeps delayed asynchronous control output on the line sink until close clean
 
 it('cancels pending MCP control when the stop signal aborts', async () => {
   let signal: AbortSignal | undefined;
+  const admission = () => undefined;
+  const capture = vi.spyOn(configuration, 'configurationAdmission').mockReturnValue(admission);
   vi.mocked(runCliMcpCommand).mockImplementationOnce(input => new Promise((_, reject) => {
     signal = input.signal;
     input.signal?.addEventListener('abort', () => reject(new Error('MCP control cancelled')), { once: true });
   }));
   const stop = new AbortController();
   const renderer = new StreamingRenderer();
-  const loop = setup({ renderer, stopSignal: stop.signal });
+  const loop = setup({ renderer, stopSignal: stop.signal,
+    runtimeContext: { cwd: '/workspace', projectRoot: '/workspace', session: { id: 'sess_line' } } as never });
 
-  loop.stdin.write('/mcp cancel\n');
-  await vi.waitFor(() => expect(runCliMcpCommand).toHaveBeenCalledOnce());
-  stop.abort();
-  await Promise.race([
-    loop.running,
-    new Promise((_, reject) => setTimeout(() => reject(new Error('line loop did not settle')), 1_000)),
-  ]);
+  try {
+    loop.stdin.write('/mcp cancel\n');
+    await vi.waitFor(() => expect(runCliMcpCommand).toHaveBeenCalledOnce());
+    expect(vi.mocked(runCliMcpCommand).mock.calls[0]?.[0]).toMatchObject({ admission, projectRoot: '/workspace' });
+    stop.abort();
+    await Promise.race([
+      loop.running,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('line loop did not settle')), 1_000)),
+    ]);
 
-  expect(signal?.aborted).toBe(true);
-  expect(renderer.captured).toBe(false);
+    expect(signal?.aborted).toBe(true);
+    expect(renderer.captured).toBe(false);
+  } finally { capture.mockRestore(); }
 });
 
 it('cancels a pending goal round when the stop signal aborts', async () => {

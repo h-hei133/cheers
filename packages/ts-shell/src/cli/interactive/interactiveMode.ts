@@ -771,6 +771,8 @@ export class InteractiveMode {
     if (mcp && (mcp.action === 'cancel' || this.busy || this.questions.question())) {
       if (mcp.action === 'cancel') { this.queue.cancelWhere(isMcpRequest); cancelMcpFor(this.options.runtimeContext); }
       void runCliMcpCommand({ gateway: this.options.initialMcpGateway,
+        projectRoot: this.options.runtimeContext.cwd,
+        admission: configurationAdmission(this.options.runtimeContext),
         renderer: transcriptLineRenderer(this.state.transcript, this.tui, '/mcp'),
         mcpAction: mcp.action, mcpTarget: mcp.target,
       });
@@ -1112,7 +1114,8 @@ export class InteractiveMode {
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null,
         resume: sessionId => this.runCommandLine(`/resume ${sessionId}`),
       }),
-      refreshServer: (serverName) => this.runCommandLine(`/mcp refresh ${serverName}`),
+      refreshServer: (serverName, expected, admission) => this.options.sessionRuntime.commands.run(signal => this.options.initialMcpGateway.refresh(serverName,
+        { exactTarget: true, expectedConfig: expected, signal, ...(admission ? { admission } : {}) })),
       signIn: args => this.runCommandLine(`/connect ${args.map(arg => quoteCompletion(arg, '"')).join(' ')}`),
       addMcpServer: mcpDefinitionFor(this.options.runtimeContext),
       revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),

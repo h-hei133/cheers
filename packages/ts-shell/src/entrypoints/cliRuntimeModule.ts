@@ -291,6 +291,8 @@ export async function runNonInteractivePrompt(options: {
       try {
         await runCliMcpCommand({
           renderer: options.renderer,
+          projectRoot: options.runtimeContext.cwd,
+          admission: configurationAdmission(options.runtimeContext),
           gateway,
           mcpAction: resolved.slashResult.mcpAction,
           mcpTarget: resolved.slashResult.mcpTarget,

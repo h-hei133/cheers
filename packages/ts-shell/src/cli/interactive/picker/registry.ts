@@ -38,6 +38,7 @@ import { cleansePicker } from './cleanse.js';
 import { authPicker, type SignInCommand } from './auth.js';
 import { debugPicker } from './debug.js';
 import type { ExtensionManager } from '../../../extensions/view/model.js';
+import type { McpClientSnapshot, ScopedMcpServerConfig } from '../../../core/mcp/types.js';
 
 /**
  * Which commands open a chooser.
@@ -68,7 +69,7 @@ export interface PickerHost extends SettingsHost {
   deleteSession(sessionId: string, version?: string): Promise<string | undefined>;
   renameSession(sessionId: string, title: string, version?: string): Promise<string | undefined>;
   pinSession?(sessionId: string, version?: string): Promise<string | undefined>;
-  refreshServer(serverName: string): Promise<string | undefined>;
+  refreshServer(serverName: string, expected: ScopedMcpServerConfig, admission?: () => string | undefined): Promise<McpClientSnapshot>;
   addMcpServer?(scope: 'user' | 'project', name: string,
     definition: { readonly command: string; readonly args: readonly string[] } | { readonly url: string }): Promise<string | undefined>;
   revokeGrant(key: string): Promise<string | undefined>;
@@ -92,7 +93,8 @@ const PICKERS: Record<string, PickerFactory> = {
   copy: (host) => copyPicker(host.transcript, host.commandContext),
   resume: host => savedSessionPicker(host, 'resume'),
   pin: host => savedSessionPicker(host, 'pin'),
-  mcp: (host) => serverPicker({ gateway: host.mcpGateway, refresh: host.refreshServer,
+  mcp: (host) => serverPicker({ gateway: host.mcpGateway, root: host.commandContext.cwd,
+    admission: host.commandContext.admission, refresh: host.refreshServer,
     ...(host.addMcpServer ? { add: () => mcpAddWizard(host.addMcpServer!, host.commandContext.admission) } : {}) }),
   connect: (host) => connectionPicker(host.commandContext),
   login: host => authPicker(host.commandContext, 'login', host.signIn),

@@ -39,6 +39,7 @@ import * as extensionRuntime from '../runtime/extensions.js';
 import * as mcpRuntime from '../runtime/mcp.js';
 import { pluginPicker } from './picker/plugins.js';
 import type { ExtensionManager } from '../../extensions/view/model.js';
+import { ShellCommandRuntime } from '../../core/shell/command.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
@@ -88,6 +89,41 @@ function build(overrides: {
 }
 
 describe("session wiring", () => {
+  it('cancels an accepted exact MCP refresh through the actual terminal command lifecycle', async () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { pickerHost(): PickerHost; overlay: OverlayHost; busy: boolean;
+      options: { sessionRuntime: ShellSessionRuntime; initialMcpGateway: CliMcpGateway } };
+    const commands = new ShellCommandRuntime();
+    Object.assign(host.options.sessionRuntime, { commands, cancelAndWait: async () => {
+      const active = commands.current; active?.controller.abort(new Error('MCP refresh cancelled'));
+      await active?.settled.catch(() => {});
+    } });
+    const config = { scope: 'user' as const, transport: 'stdio' as const, command: 'fixture' };
+    const snapshot = { clients: [{ name: 'all', config, type: 'connected' as const }], tools: [] };
+    let signal: AbortSignal | undefined;
+    const refresh = vi.fn(async (_name, options) => {
+      signal = options.signal;
+      await new Promise((_resolve, reject) => signal!.addEventListener('abort', () => reject(signal!.reason), { once: true }));
+      return snapshot;
+    });
+    Object.assign(host.options.initialMcpGateway, { snapshot: async () => snapshot, refresh });
+    mode.start();
+    try {
+      const port = host.pickerHost();
+      const picker = pickerFor('/mcp', { ...port, commandContext: { ...port.commandContext, admission: () => undefined } })!;
+      host.overlay.open(picker);
+      await vi.waitFor(() => expect(host.overlay.render(100, 20).join('\n')).toContain('all'));
+      terminal.input('\r');
+      await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+      expect(host.busy).toBe(true);
+      expect(refresh).toHaveBeenCalledWith('all', expect.objectContaining({ exactTarget: true, expectedConfig: config,
+        signal: expect.any(AbortSignal), admission: expect.any(Function) }));
+      terminal.input('\x03');
+      await vi.waitFor(() => expect(signal?.aborted).toBe(true));
+      await vi.waitFor(() => expect(commands.current).toBeUndefined());
+      await vi.waitFor(() => expect(host.busy).toBe(false));
+    } finally { commands.current?.controller.abort(); mode.stop(); }
+  });
   it('suppresses an accepted help draft when the original binding expires before host publication', async () => {
     const { mode } = build();
     const host = mode as unknown as { pickerHost(): PickerHost; overlay: OverlayHost; view: InteractiveView;

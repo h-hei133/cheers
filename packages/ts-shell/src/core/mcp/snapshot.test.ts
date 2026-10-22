@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CoreMcpGateway } from "./gateway.js";
 import { projectTrust } from "../security/projectTrust.js";
+import { CoreMcpClient } from "./client.js";
 let root: string;
 let log: string;
 let owner: CoreMcpGateway;
@@ -90,4 +91,77 @@ it("rejects a listing invalidated before its response instead of publishing stal
   const snapshot = await owner.snapshot();
   expect(snapshot.clients[0]?.type).toBe("failed"); expect(snapshot.tools).toEqual([]);
   expect(owner.peekSnapshot()).toBeUndefined();
+});
+
+it("refreshes only the originally selected definition and rejects a replacement before reconnecting", async () => {
+  configure();
+  const before = await owner.snapshot();
+  const selected = before.clients[0]!.config;
+  const protocol = fs.readFileSync(log);
+  configure({ enabled: false });
+  await expect(owner.refresh('fixture', { exactTarget: true, expectedConfig: selected })).rejects.toThrow(/definition changed/);
+  expect(owner.peekSnapshot()).toBeUndefined();
+  expect(fs.readFileSync(log)).toEqual(protocol);
+});
+
+it('rejects a changed definition after connecting before listing and closes the rejected connection', async () => {
+  configure();
+  const selected = (await owner.snapshot()).clients[0]!.config;
+  const protocol = fs.readFileSync(log, 'utf8');
+  const close = vi.spyOn(CoreMcpClient.prototype, 'close');
+  const connect = CoreMcpClient.prototype.connect;
+  vi.spyOn(CoreMcpClient.prototype, 'connect').mockImplementationOnce(async function (admission, signal) {
+    const state = await connect.call(this, admission, signal);
+    configure({ enabled: false });
+    return state;
+  });
+  await expect(owner.refresh('fixture', { exactTarget: true, expectedConfig: selected })).rejects.toThrow(/definition changed/);
+  expect(fs.readFileSync(log, 'utf8').slice(protocol.length)).not.toContain('tools/list');
+  expect(close).toHaveBeenCalledTimes(2);
+  expect(owner.peekSnapshot()).toBeUndefined();
+});
+
+it('rechecks the original admission after prepare before closing the selected live connection', async () => {
+  configure();
+  const selected = (await owner.snapshot()).clients[0]!.config;
+  const protocol = fs.readFileSync(log);
+  let current = true;
+  // prepare awaits reconciliation even when no definitions changed.
+  const load = owner.loadConfigs.bind(owner);
+  vi.spyOn(owner, 'loadConfigs').mockImplementationOnce(load).mockImplementationOnce(() => {
+    current = false;
+    return load();
+  });
+  const close = vi.spyOn(CoreMcpClient.prototype, 'close');
+  await expect(owner.refresh('fixture', { exactTarget: true, expectedConfig: selected,
+    admission: () => current ? undefined : 'original binding changed' })).rejects.toThrow(/original binding changed/);
+  expect(close).not.toHaveBeenCalled();
+  expect(fs.readFileSync(log)).toEqual(protocol);
+});
+
+it('refreshes a selected literal all server without touching an unrelated live connection', async () => {
+  configure();
+  const file = path.join(root, '.cheers.mcp.json');
+  const config = JSON.parse(fs.readFileSync(file, 'utf8')).mcpServers.fixture;
+  fs.writeFileSync(file, JSON.stringify({ mcpServers: { all: config, unrelated: config } }));
+  const selected = (await owner.snapshot()).clients.find(client => client.name === 'all')!.config;
+  const close = vi.spyOn(CoreMcpClient.prototype, 'close');
+  const result = await owner.refresh('all', { exactTarget: true, expectedConfig: selected });
+  expect(result.clients.map(client => client.name)).toEqual(['all']);
+  expect(close).toHaveBeenCalledOnce();
+  expect(owner.peekSnapshot()?.clients.map(client => client.name)).toEqual(['all', 'unrelated']);
+  expect(fs.readFileSync(log, 'utf8')).not.toContain('tools/call');
+});
+
+it('does not read definitions after admission expires during workspace preparation', async () => {
+  configure({ enabled: false });
+  const selected = (await owner.snapshot()).clients[0]!.config;
+  const load = owner.loadConfigs.bind(owner);
+  let current = true; let staleReads = 0;
+  vi.spyOn(owner, 'loadConfigs').mockImplementation(() => { if (!current) staleReads++; return load(); });
+  const pending = owner.refresh('fixture', { exactTarget: true, expectedConfig: selected,
+    admission: () => current ? undefined : 'original binding changed' });
+  queueMicrotask(() => { current = false; });
+  await expect(pending).rejects.toThrow('original binding changed');
+  expect(staleReads).toBe(0); expect(fs.existsSync(log)).toBe(false);
 });

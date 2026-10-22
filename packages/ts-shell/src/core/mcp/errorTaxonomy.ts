@@ -100,7 +100,8 @@ function failurePlaneForClass(failureClass: McpFailureClass): McpFailurePlane {
 }
 
 function sanitizeMcpDiagnostic(value: string): string {
-  return neutraliseForDisplay(redactReportText(value, 240));
+  return neutraliseForDisplay(redactReportText(stripVTControlCharacters(value), 240));
 }
+import { stripVTControlCharacters } from 'node:util';
 import { redactReportText } from "../security/redaction.js";
 import { neutraliseForDisplay } from "../text/safety.js";

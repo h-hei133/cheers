@@ -7,6 +7,7 @@ import { projectTrust } from "../security/projectTrust.js";
 import { assertAdmission, type Admission } from '../network/admission.js';
 import type { McpContentRequest, McpContentResponse, McpNotificationSnapshot } from "./content/types.js";
 import { McpContentLifetime } from "./content/lifetime.js";
+import { mcpSelectionAdmission } from './config/selection.js';
 import type { McpHttpAuthorization } from './http/fetch.js';
 import type {
   McpClientSnapshot,
@@ -48,7 +49,7 @@ export class CoreMcpGateway {
     return this.run(async () => {
       signal?.throwIfAborted();
       assertAdmission(admission);
-      const configs = await this.prepare();
+      const configs = await this.prepare(admission);
       signal?.throwIfAborted();
       return this.readSnapshot(configs, admission, signal);
     }, signal);
@@ -61,21 +62,28 @@ export class CoreMcpGateway {
     return this.connectionManager.peekSnapshot(this.loadConfigs());
   }
 
-  refresh(target: string = "all", options?: { exactTarget: boolean; signal?: AbortSignal }): Promise<McpClientSnapshot> {
-    const admission = this.admissionForOperation?.();
+  refresh(target: string = "all", options?: { exactTarget: boolean; signal?: AbortSignal;
+    expectedConfig?: ScopedMcpServerConfig; admission?: () => string | undefined }): Promise<McpClientSnapshot> {
+    const name = target.trim();
+    const all = !options?.exactTarget && !options?.expectedConfig && (!name || name.toLowerCase() === 'all');
+    const admission = mcpSelectionAdmission(this.loadConfigs.bind(this), name, options?.expectedConfig,
+      options?.admission ?? this.admissionForOperation?.(), options?.signal);
     return this.run(async () => {
-      options?.signal?.throwIfAborted();
       assertAdmission(admission);
-      const configs = await this.prepare();
-      options?.signal?.throwIfAborted();
-      const name = target.trim();
-      const all = !options?.exactTarget && (!name || name.toLowerCase() === "all");
+      const configs = await this.prepare(admission);
+      assertAdmission(admission);
       if (!all && !Object.hasOwn(configs, name)) {
         throw unknownServer(name);
       }
-      await this.connectionManager.close(all ? undefined : name);
-      options?.signal?.throwIfAborted();
-      return this.readSnapshot(all ? configs : { [name]: configs[name]! }, admission, options?.signal);
+      try {
+        await this.connectionManager.close(all ? undefined : name);
+        assertAdmission(admission);
+        return await this.readSnapshot(all ? configs : { [name]: configs[name]! }, admission, options?.signal);
+      } catch (error) {
+        // A rejected or cancelled refresh must not retain its newly opened transport.
+        await this.connectionManager.close(all ? undefined : name);
+        throw error;
+      }
     }, options?.signal);
   }
 
@@ -206,8 +214,9 @@ export class CoreMcpGateway {
     this.workspaceRoot = next;
   }
 
-  private async prepare(): Promise<Record<string, ScopedMcpServerConfig>> {
+  private async prepare(admission?: Admission): Promise<Record<string, ScopedMcpServerConfig>> {
     await this.synchronizeWorkspace();
+    assertAdmission(admission);
     let configs: Record<string, ScopedMcpServerConfig>;
     try {
       configs = this.loadConfigs();
@@ -220,6 +229,7 @@ export class CoreMcpGateway {
         doNext: error.doNext,
       });
     }
+    assertAdmission(admission);
     await this.connectionManager.reconcile(configs);
     return configs;
   }

@@ -34,6 +34,7 @@ import { runCliMcpCommand } from '../../entrypoints/cliMcpModule.js';
 import { isAdvisorControl } from '../runtime/advisor.js';
 import { isResearchControl } from '../runtime/research.js';
 import { bindOutputFailure } from './outputFailure.js';
+import { configurationAdmission } from '../../core/shell/configuration.js';
 
 /**
  * Line-oriented interactive loop for a session without a real terminal.
@@ -374,6 +375,8 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
         if (mcp && (mcp.action === 'cancel' || busy || questions.question())) {
           if (mcp.action === 'cancel') { queue.cancelWhere(isMcpRequest); cancelMcpFor(options.runtimeContext); }
           trackControl(runCliMcpCommand({ gateway: mcpGateway, renderer: options.renderer,
+            projectRoot: options.runtimeContext.cwd,
+            admission: configurationAdmission(options.runtimeContext),
             mcpAction: mcp.action, mcpTarget: mcp.target, signal: controlAbort.signal })
             .then(() => { if (!closed) input.prompt(); })
           );

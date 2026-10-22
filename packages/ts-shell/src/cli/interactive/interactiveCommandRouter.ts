@@ -355,6 +355,8 @@ export async function routeInteractiveCommand(
   if (isShellAction(slashResult, "show-mcp")) {
     await runCliMcpCommand({
       renderer: input.renderer,
+      projectRoot: input.runtimeContext.cwd,
+      admission: configurationAdmission(input.runtimeContext),
       gateway: input.mcpGateway,
       mcpAction: slashResult.mcpAction,
       mcpTarget: slashResult.mcpTarget,

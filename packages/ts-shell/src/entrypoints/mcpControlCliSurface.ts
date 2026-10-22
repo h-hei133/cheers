@@ -2,8 +2,10 @@ import {
   describeMcpConnectionState,
 } from "../core/mcp/gateway.js";
 import type { McpClientSnapshot } from "../core/mcp/types.js";
-import { redactReportText } from "../core/security/redaction.js";
-import { neutraliseForDisplay } from "../core/text/safety.js";
+import { reportMetadata } from '../core/commands/report/metadata.js';
+import { plainReportText } from '../core/commands/report/projection.js';
+import { redactReportText } from '../core/security/redaction.js';
+import { redactReportPaths } from '../core/security/paths.js';
 
 export interface McpCliLineRenderer {
   renderLine(line: string): void;
@@ -21,19 +23,21 @@ export function renderMcpBlockedContract(
     reason: string;
     doNext: string;
   },
+  projectRoot = process.cwd(),
 ): void {
   renderer.renderLine("");
   renderer.renderLine("Result");
   renderer.renderLine("- Outcome: blocked");
   renderer.renderLine(`- BlockerKind: ${input.blockerKind}`);
-  renderer.renderLine(`- Reason: ${neutraliseForDisplay(redactReportText(input.reason, 2000))}`);
-  renderer.renderLine(`- DoNext: ${neutraliseForDisplay(redactReportText(input.doNext, 2000))}`);
+  renderer.renderLine(`- Reason: ${reportMetadata(input.reason, projectRoot, 2000)}`);
+  renderer.renderLine(`- DoNext: ${guidance(input.doNext, projectRoot)}`);
   renderer.renderLine("");
 }
 
 export function renderMcpStatusControlPlane(
   renderer: McpCliLineRenderer,
   snapshot: McpClientSnapshot,
+  projectRoot = process.cwd(),
 ): void {
   const connected = snapshot.clients.filter(
     (client) => client.type === "connected",
@@ -72,15 +76,15 @@ export function renderMcpStatusControlPlane(
     const stateDescription = describeMcpConnectionState(client);
     const executable = stateDescription.executable && toolCount > 0;
     renderer.renderLine(
-      `- ${client.name}: ${client.type} (scope=${scope}, transport=${transport}, tools=${toolCount}, executable=${executable ? "yes" : "no"})`,
+      `- ${reportMetadata(client.name, projectRoot)}: ${client.type} (scope=${scope}, transport=${transport}, tools=${toolCount}, executable=${executable ? "yes" : "no"})`,
     );
     if (stateDescription.reason) {
-      renderer.renderLine(`  reason: ${truncate(stateDescription.reason, 140)}`);
+      renderer.renderLine(`  reason: ${truncate(reportMetadata(stateDescription.reason, projectRoot), 140)}`);
     }
     if (client.type === "connected" && toolCount === 0) {
       renderer.renderLine("  reason: MCP server is connected but exposes no tools.");
     }
-    renderer.renderLine(`  do-next: ${stateDescription.doNext}`);
+    renderer.renderLine(`  do-next: ${guidance(stateDescription.doNext, projectRoot)}`);
   }
 
   renderer.renderLine("Next actions:");
@@ -96,6 +100,7 @@ export function renderMcpRefreshControlPlane(
   renderer: McpCliLineRenderer,
   snapshot: McpClientSnapshot,
   refreshTarget: string,
+  projectRoot = process.cwd(),
 ): void {
   if (refreshTarget !== "all") {
     const refreshedClient = snapshot.clients.find(
@@ -109,28 +114,29 @@ export function renderMcpRefreshControlPlane(
           stateDescription.reason ??
           `MCP server ${refreshedClient.name} is not executable after refresh.`,
         doNext: stateDescription.doNext,
-      });
+      }, projectRoot);
       return;
     }
   }
 
   renderer.renderLine(
-    `\nMCP refresh complete (${refreshTarget === "all" ? "all servers" : refreshTarget}).`,
+    `\nMCP refresh complete (${refreshTarget === "all" ? "all servers" : reportMetadata(refreshTarget, projectRoot)}).`,
   );
-  renderMcpStatusControlPlane(renderer, snapshot);
+  renderMcpStatusControlPlane(renderer, snapshot, projectRoot);
 }
 
 export function renderMcpToolsControlPlane(
   renderer: McpCliLineRenderer,
   snapshot: McpClientSnapshot,
   targetServer?: string,
+  projectRoot = process.cwd(),
 ): void {
   const normalizedTarget = targetServer?.trim();
   const targetClients = normalizedTarget
     ? snapshot.clients.filter((client) => client.name === normalizedTarget)
     : snapshot.clients;
   if (normalizedTarget && targetClients.length === 0) {
-    renderer.renderLine(`\nUnknown MCP server: ${normalizedTarget}`);
+    renderer.renderLine(`\nUnknown MCP server: ${reportMetadata(normalizedTarget, projectRoot)}`);
     renderer.renderLine(
       "Run /mcp status to inspect configured server names.\n",
     );
@@ -142,7 +148,7 @@ export function renderMcpToolsControlPlane(
     : snapshot.tools;
 
   renderer.renderLine(
-    `\nMCP tools${normalizedTarget ? ` @ ${normalizedTarget}` : ""}`,
+    `\nMCP tools${normalizedTarget ? ` @ ${reportMetadata(normalizedTarget, projectRoot)}` : ""}`,
   );
   if (tools.length === 0) {
     renderer.renderLine("- No tools currently exposed.");
@@ -154,12 +160,12 @@ export function renderMcpToolsControlPlane(
       for (const client of unresolved) {
         const stateDescription = describeMcpConnectionState(client);
         renderer.renderLine(
-          `  ${client.name}: ${client.type} (executable=no)`,
+          `  ${reportMetadata(client.name, projectRoot)}: ${client.type} (executable=no)`,
         );
         if (stateDescription.reason) {
-          renderer.renderLine(`    reason: ${truncate(stateDescription.reason, 140)}`);
+          renderer.renderLine(`    reason: ${truncate(reportMetadata(stateDescription.reason, projectRoot), 140)}`);
         }
-        renderer.renderLine(`    do-next: ${stateDescription.doNext}`);
+        renderer.renderLine(`    do-next: ${guidance(stateDescription.doNext, projectRoot)}`);
       }
     }
     renderer.renderLine("");
@@ -167,9 +173,9 @@ export function renderMcpToolsControlPlane(
   }
 
   for (const tool of tools) {
-    renderer.renderLine(`- ${tool.qualifiedName}`);
+    renderer.renderLine(`- ${reportMetadata(tool.qualifiedName, projectRoot)}`);
     if (tool.description?.trim()) {
-      renderer.renderLine(`  ${truncate(tool.description.trim(), 140)}`);
+      renderer.renderLine(`  ${truncate(reportMetadata(tool.description.trim(), projectRoot), 140)}`);
     }
   }
   renderer.renderLine("");
@@ -179,6 +185,7 @@ export function renderMcpDoctorControlPlane(
   renderer: McpCliLineRenderer,
   snapshot: McpClientSnapshot,
   targetServer?: string,
+  projectRoot = process.cwd(),
 ): void {
   const normalizedTarget = targetServer?.trim();
   const targetClients = normalizedTarget
@@ -186,11 +193,11 @@ export function renderMcpDoctorControlPlane(
     : snapshot.clients;
 
   renderer.renderLine(
-    `\nMCP doctor${normalizedTarget ? ` @ ${normalizedTarget}` : ""}`,
+    `\nMCP doctor${normalizedTarget ? ` @ ${reportMetadata(normalizedTarget, projectRoot)}` : ""}`,
   );
   if (normalizedTarget && targetClients.length === 0) {
     renderer.renderLine("- Unknown server:");
-    renderer.renderLine(`  reason: Unknown MCP server: ${normalizedTarget}`);
+    renderer.renderLine(`  reason: Unknown MCP server: ${reportMetadata(normalizedTarget, projectRoot)}`);
     renderer.renderLine(
       "  do-next: Run /mcp status to list configured servers, then retry with a valid server name.",
     );
@@ -235,13 +242,13 @@ export function renderMcpDoctorControlPlane(
     renderer.renderLine(label);
     for (const client of clients) {
       const stateDescription = describeMcpConnectionState(client);
-      renderer.renderLine(`  ${client.name}: ${client.type} (executable=no)`);
+      renderer.renderLine(`  ${reportMetadata(client.name, projectRoot)}: ${client.type} (executable=no)`);
       if (stateDescription.reason) {
         renderer.renderLine(
-          `    reason: ${truncate(stateDescription.reason, 140)}`,
+          `    reason: ${truncate(reportMetadata(stateDescription.reason, projectRoot), 140)}`,
         );
       }
-      renderer.renderLine(`    do-next: ${stateDescription.doNext}`);
+      renderer.renderLine(`    do-next: ${guidance(stateDescription.doNext, projectRoot)}`);
     }
   };
 
@@ -272,4 +279,13 @@ function truncate(value: string, max: number): string {
     return value;
   }
   return `${value.slice(0, max)}...`;
+}
+
+/** Public slash command tokens are syntax; their surrounding metadata still needs projection. */
+function guidance(value: string, projectRoot: string): string {
+  const canonical = redactReportText(plainReportText(value), Infinity);
+  const projected = canonical.split(/((?:^|\s)\/(?:mcp|connect)(?=\s|$))/g)
+    .map((part, index) => index % 2 ? part.trim() : redactReportPaths(part, projectRoot))
+    .filter(Boolean).join(' ');
+  return redactReportText(plainReportText(projected), 2000);
 }

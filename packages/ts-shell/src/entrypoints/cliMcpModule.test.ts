@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { McpGatewayBlockedError } from "../core/mcp/gateway.js";
 import type { McpClientSnapshot } from "../core/mcp/types.js";
 import { runCliMcpCommand, type CliMcpGateway } from "./cliMcpModule.js";
@@ -41,6 +41,38 @@ function captureRenderer(): {
 }
 
 describe("runCliMcpCommand", () => {
+  it.each(['status', 'refresh'] as const)('keeps the original %s admission before reads and at late publication', async action => {
+    let current = false;
+    const admission = () => current ? undefined : 'original binding changed';
+    const read = vi.fn(async () => { current = false; return snapshot(); });
+    const gateway: CliMcpGateway = { snapshot: read, refresh: read };
+    const captured = captureRenderer();
+    await runCliMcpCommand({ gateway, renderer: captured.renderer, admission, mcpAction: action });
+    expect(read).not.toHaveBeenCalled(); expect(captured.lines).toEqual([]);
+    current = true;
+    await runCliMcpCommand({ gateway, renderer: captured.renderer, admission, mcpAction: action });
+    expect(read).toHaveBeenCalledOnce(); expect(captured.lines).toEqual([]);
+    if (action === 'status') expect(read).toHaveBeenCalledWith(admission, undefined);
+    else expect(read).toHaveBeenCalledWith('all', { exactTarget: false, admission });
+  });
+
+  it('rechecks the original admission at every renderer handoff', async () => {
+    let current = true; const lines: string[] = [];
+    await runCliMcpCommand({ gateway: { snapshot: async () => snapshot(), refresh: async () => snapshot() },
+      admission: () => current ? undefined : 'original binding changed', renderer: { renderLine(line) { lines.push(line); current = false; } } });
+    expect(lines).toEqual(['\nMCP control plane']);
+  });
+
+  it('uses the supplied project scope for safe direct diagnostics', async () => {
+    const captured = captureRenderer();
+    const value: McpClientSnapshot = { clients: [{ type: 'failed', name: 'password=synthetic-sensitive-name',
+      config: { scope: 'project', transport: 'stdio' }, error: 'file:///command-project/private password=synthetic-sensitive-error' }], tools: [] };
+    await runCliMcpCommand({ gateway: { snapshot: async () => value, refresh: async () => value },
+      renderer: captured.renderer, projectRoot: '/command-project' });
+    expect(captured.lines.join('\n')).toContain('[project]/private');
+    expect(captured.lines.join('\n')).not.toMatch(/synthetic-sensitive|file:\/\/\/command-project/);
+  });
+
   it("renders status through the supplied gateway", async () => {
     const captured = captureRenderer();
     const gateway: CliMcpGateway = {
