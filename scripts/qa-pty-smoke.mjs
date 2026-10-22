@@ -179,6 +179,8 @@ async function assertFixtureSkillDiscovery(project) {
   let directoryError;
   let manifestBytes;
   let manifestError;
+  let containment;
+  let realpaths;
   try {
     const { readDirectory } = await import(pathToFileURL(path.join(buildRoot, "runtime", "execution", "directory.js")).href);
     directoryEntries = (await readDirectory(workspaceRoot, skillDirectory)).map(entry => entry.name);
@@ -191,6 +193,18 @@ async function assertFixtureSkillDiscovery(project) {
   } catch (error) {
     manifestError = describeError(error);
   }
+  try {
+    const { verifyPathContainment } = await import(pathToFileURL(path.join(buildRoot, "core", "security", "pathJail.js")).href);
+    containment = verifyPathContainment(manifest, workspaceRoot);
+    realpaths = {
+      workspace: fs.realpathSync(workspaceRoot),
+      workspaceNative: fs.realpathSync.native(workspaceRoot),
+      manifest: fs.realpathSync(manifest),
+      manifestNative: fs.realpathSync.native(manifest),
+    };
+  } catch (error) {
+    containment = { error: describeError(error) };
+  }
   throw new Error(`fixture skill discovery failed (${JSON.stringify({
     project,
     workspaceRoot,
@@ -200,6 +214,8 @@ async function assertFixtureSkillDiscovery(project) {
     directoryError,
     manifestBytes,
     manifestError,
+    containment,
+    realpaths,
     sources,
     diagnostics: loaded.diagnostics,
     failures: loaded.failures,
