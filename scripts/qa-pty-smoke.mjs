@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createQaPtyEnvironment } from "./qa-pty-env.mjs";
 import { seedRecoverySession, seedSavedSession, extractSessionId, currentSessionFromStore, assertTranscript } from "./qa/session.mjs";
 import { seedRestoreSnapshot, assertRestoreUnchanged, runRestorePreview } from './qa/restore.mjs';
@@ -165,6 +165,24 @@ function qaEnvironment(home, project) {
   };
 }
 
+async function assertFixtureSkillDiscovery(project) {
+  const modulePath = path.join(root, "packages", "ts-shell", "dist", "builds", verified.manifest.buildId,
+    "core", "skills", "skillLoader.js");
+  const { SkillLoader } = await import(pathToFileURL(modulePath).href);
+  const sources = [];
+  const loaded = await new SkillLoader(project, { onSource: target => sources.push(target) }).loadDetailed();
+  if (loaded.skills.has("qa-discovery")) return;
+  const manifest = path.join(project, ".agents", "skills", "qa-discovery", "SKILL.md");
+  throw new Error(`fixture skill discovery failed (${JSON.stringify({
+    project,
+    manifest,
+    manifestExists: fs.existsSync(manifest),
+    sources,
+    diagnostics: loaded.diagnostics,
+    failures: loaded.failures,
+  })})`);
+}
+
 
 async function runInteractivePrompt(state, child, prompt, expected, timeoutMs = 30_000) {
   const start = state.output.length;
@@ -256,6 +274,7 @@ async function runTerminalSmoke(target, mode) {
   };
   const hardTimeout = setTimeout(() => child.kill("SIGKILL"), 90_000);
   try {
+    await assertFixtureSkillDiscovery(project);
     await waitForOutput(read, value => value.includes("Cheers") && value.includes(recoverySession) && value.includes("Recovery hint"),
       "first frame and recovery hint", 20_000);
     const sessionId = extractSessionId(state.output, recoverySession);
@@ -432,6 +451,7 @@ async function runLineSmoke(target) {
   child.stderr.on("data", chunk => { state.output += chunk.toString("utf8"); });
   const hardTimeout = setTimeout(() => child.kill("SIGKILL"), 90_000);
   try {
+    await assertFixtureSkillDiscovery(project);
     await waitForOutput(() => {
       if (child.probeError) throw child.probeError;
       return normalized(state.output);
@@ -519,6 +539,7 @@ async function runPipeSmoke(target) {
   child.stdin.end(input);
   const hardTimeout = setTimeout(() => child.kill("SIGKILL"), 90_000);
   try {
+    await assertFixtureSkillDiscovery(project);
     const code = await waitForExit(child, 60_000);
     if (code !== 0) throw new Error(`process exited ${code}`);
     const config = JSON.parse(fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8"));
