@@ -2,7 +2,7 @@
 
 本文只记录有本地证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
-## 2026-10-23 Phase 20 本地返工与全量复核（本地证据；提交/推送/CI 待补记）
+## 2026-10-23 Phase 20 本地返工与全量复核（代码批已推送；CI/Watch success；延期项保留）
 
 - 续接上一轮未提交工作树，完成 `/review` 空 focus、output-aware `/context` 与 runtime protocol facts、动态发现 generation/subscription、transcript pointer source revision、Vim operator motion、Markdown source/diff/math/table、bounded usage attribution、provider fallback/profile scope 和 executable manifest 绑定返工。自审又修复了 pointer 自动滚动被自身 revision 误失效、同一毫秒相同 usage 请求可能丢失、非法右花括号数学被静默截断，以及 host-verified executable 版本可与 build 不同的四个真实缺陷；均有修前回归或等价断言。
 - QA harness 现在要求 qualifying corpus 至少 20 项、确定性任务至少一个可观察检查、文件字节与 mode policy 证据、事件流 observation-only、每臂一致的 provider/model/endpoint、完整 protocol 探针、双独立盲评与明确裁决；`complete` 还要求 100 个正式 pair、唯一 ID、无执行失败、零 policy violation 和无限制项。starter corpus 保持 `qualifying:false` 的 6 项，dry-run 固定 `inconclusive`。
@@ -11,6 +11,7 @@
 - 同 build 的 Linux Node/exe × regular/fullscreen/line/pipe 八格 PTY 全部 pass/exit 0，覆盖 settings 保存、命名 profile 创建与重启读回、任务、发现、逐次审批、会话和 restore 字节对照；所有 JSON 均绑定上述 build/artifact/exe。QA quality dry-run 为 `inconclusive`/exit 2，明确表示没有真实模型质量结果。
 - 同 build 的 START-03 补充证据：`bench:start` 各 30 次，Node p50/p95 `405.6/415.8ms`、exe `214.5/231.9ms`；`bench:interactive` 保存 Node/exe × 四模式共 240 个样本，regular/fullscreen 均取得 runtime-ready、首帧和完整 UTF-8 键响应；`bench:responsiveness` 30 次通过 1000 项列表 p95 `<50ms` 与 math/table/diff 单次阻塞 `<100ms` 阈值。全部为 warm/uncontrolled 缓存，不能替代受控冷缓存。
 - NormProof 实际 exit 0/partial：blocking unresolved-specifier 与 cycle obligations satisfied，0 blocking；11 项 function-ceiling advisory 保留。委派 reviewer 使用指定模型多次遇到 429/503，不可用不等于批准；本轮结论来自本地自审和实际门禁，不声称独立 review approval。
+- 代码批 `0d42697d3aa6130412d57afdf76cf2ae15d0a539` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39810323144`/job `119934502881` 为 completed/success，耗时 17m35s；静态门、脚本门、构建、Chromium 安装、完整测试与 NormProof 均 success，CI 测试实际为 927 文件通过、1 文件跳过，9852 项通过、3 项跳过，967.66s。Architecture Watch `39810323104`/job `119934501742` 为 completed/success。两项只绑定上述代码 SHA；本段后续文档证据补记另提交，不扩大产品范围。
 - 仍未闭合：START-03 受控冷缓存；QA-02 Windows/macOS、IME、系统复制及非 Linux 平台矩阵；QA-03 正式 20 项 corpus、真实模型执行和双盲评分；TOOL-02 同模型总成本/cache/参数质量/多语言 tokenizer 校准。Phase 20 不因本批本地返工而宣称全部 47 项完成。
 
 ## 2026-10-22 面板、源投影与 W2/W3 本地返工（代码批 `152d9ecc` 已推送；CI/Watch success）
