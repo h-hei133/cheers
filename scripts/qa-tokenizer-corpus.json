@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "phase20-tokenizer-corpus.v1",
+  "version": "phase20-tokenizer-v1",
+  "samples": [
+    {
+      "id": "english-prose",
+      "language": "en",
+      "text": "The quick brown fox crosses the quiet terminal while the cache warms and the fallback path remains available."
+    },
+    {
+      "id": "chinese-prose",
+      "language": "zh",
+      "text": "缓存预热期间，回退路径必须保持可用，并且任何真实请求都不能被当作成功证据。"
+    },
+    {
+      "id": "typescript-code",
+      "language": "code",
+      "text": "const snapshot = await loadSnapshot({ sessionId, revision, signal });\nif (!snapshot.current) throw new Error(\"STALE_SNAPSHOT\");\n"
+    },
+    {
+      "id": "mixed-cjk-emoji",
+      "language": "mixed-cjk-emoji",
+      "text": "状态：缓存🔥已就绪，但 provider 的 token 计数仍需实测；unknown ≠ zero。"
+    }
+  ]
+}

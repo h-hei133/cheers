@@ -8452,3 +8452,14 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - Linux/macOS 共享 build ID `58cca24b15858754afd2b576b5d7ac28c058b8aff40a476db756672308f14d24`、inputs `b0d80fb795665149129c17af6410f2faa46b8cbc0adfe4b220fcac60c532c660`、artifact `a16dab3c00554ed3712e8b6f1fc400530446a92125b938be9e565bc283a7e320`；Windows build ID `da633dea4e9f70a9fd3d0596a753f5094811f60e59aa5429e57b850e8eea5c56`、inputs `1b84c7c343c2dce36b537a1e05abc93c1b259de137367247b551d6821ef42ecb`、artifact `ce7667041ce10b94984261048a404062ce812c7b3e85a9deecbfb12ab81be4fc`。证据目录 `.omx/artifacts/platform-39834842595/`。
 - 本地最终源码上 `test:scripts` 141/141、path/read/skill 聚焦 93/93、完整 `test:ts` 927 文件通过/1 跳过、9849 项通过/10 跳过；TypeScript 与 exe 构建通过，Node/exe line smoke 均 pass/exit 0。cycles/config-consumers/declarations/Node-floor、strict docs/rules 与 `git diff --check` 通过。QA-02 的支持矩阵现已闭合；Windows 交互 PTY、真实 IME、系统复制，以及 QA-03/TOOL-02 的真实模型与 tokenizer 范围仍开放，不宣称 Phase 20 完成。
 - 代码批 `fa493e2e8c6608e768ccb312204553c722467522` 已提交/推送，远端 `main` 精确读回同 SHA。CI `39834842366`/job `120020311437` completed/success，耗时 16m41s；完整测试为 927 文件通过/1 跳过、9857 项通过/3 跳过、918.53s，静态门、脚本门、构建、Chromium 与 NormProof 均 success。Architecture Watch `39834842316`/job `120020311060` completed/success；两项只绑定该代码 SHA，后续证据文档提交不扩大产品范围。
+
+## [2026-10-23] fix | Phase 20 QA-03/TOOL-02 harness 完整性与 47 项复核
+
+- 在既有未提交 Phase 20 工作树上补齐机器可检查矩阵 `scripts/phase20-requirements.json`：47 个决策 ID 当前为 27 `complete`、20 `partial`、0 `open`，整体仍为 `partial`。矩阵测试强制 ID 与决策表完全相等，complete 行不得保留 missing evidence，partial 行不得隐藏缺口。
+- 默认质量 corpus 改为 20 项 qualifying 任务，覆盖 12 项发现/执行、4 项摘要和 4 项渲染；新增隔离 MCP、Linux extension、denied-write 与跨进程 session follow-up。`--validate-fixtures` 在最终构建上 20/20 通过，MCP 与 extension 完整池各 18 项，其余各 17 项。
+- `full`/`dynamic` 两臂统一固定 `temperature=0`、`topP=1`、`maxOutputTokens=4096`。runtime identity 缺少数值时不能判为 complete；tokenizer 仍以同模型/协议/endpoint 的 paired first-request prompt-token delta 计算四语言误差。
+- 新增 revisioned `run-manifest.json`，绑定 `run-meta.json`、`tokenizer.json`、全部 pair/raw arm、脱敏 candidate、review map 与评分文件。resume 在任何重投影前验证精确 artifact 集合和 SHA-256；评分文件先解析和双评分校验，再以 revision+1 写入 manifest。
+- 最终脚本测试 157/157 通过；`qa-quality.test` 22 项、manifest 3 项、requirements 4 项通过。JOB 聚焦 47 项、EDIT-01 聚焦 67 项、START 聚焦 9 项通过。dry-run 实际为 `inconclusive`/exit 2，不冒充质量结果。
+- 最终 TypeScript build `4ae21f27315a` 与单文件 exe 构建通过；exe SHA-256 为 `4fdfcb0836c7339e86ab0e3edab1699a9b1600eeb9f12df2466417542f3ba342`。用该构建重放 100 个合成 pair，manifest 从 revision 1 扩到 revision 2、绑定 344 个 artifact，resume 为 `complete`；这只证明 harness 合同，不是模型质量。
+- 静态门、Node floor、strict rules/docs drift 与 `git diff --check` 通过；docs-source 保留既有 118 项 advisory。仓库 tgz NormProof exit 0/partial，blocking unresolved-specifier/cycle 满足，保留既有 11 项 function-ceiling advisory。
+- 指定 `cn:deepseek-v4.1-flash` 独立 reviewer 再次返回 `503 Service Unavailable`，不可用 reviewer 不是批准。真实 provider、双人盲评、100 个真实 pair、真实成本/cache 与四语言 tokenizer 数值仍未执行，QA-03/TOOL-02 与 Phase 20 整体继续为 partial。

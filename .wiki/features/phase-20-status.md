@@ -2,6 +2,17 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
+## 2026-10-23 全 47 项复核与 QA-03/TOOL-02 harness 返工（本地通过；尚未提交）
+
+- `scripts/phase20-requirements.json` 现在逐项记录决策表全部 47 个唯一 ID：27 项 `complete`、20 项 `partial`、0 项 `open`，整体仍为 `partial`。`scripts/phase20-requirements.mjs` 与 4 项回归强制矩阵 ID 和决策表完全相等，complete 行不得保留缺失证据，partial 行不得隐藏缺口。该矩阵明确保留 PRV-03/05、SET-03、PAN-01…08、INPUT-01、RENDER-01…03、TOOL-02、QA-01…04 的开放验收，不再把“未闭合”简化为 QA-03/TOOL-02 两项。
+- 默认 `npm run qa:quality` 改用 `scripts/qa-quality-formal.json` 的 20 项 qualifying corpus：12 项发现/执行、4 项摘要、4 项渲染；decoder 强制分类下限，starter corpus 只留作回归。`--validate-fixtures` 在不发 provider 请求的情况下准备 20 个隔离 home/project 并调用本地 `/tools`，实际 20/20 通过；固定 allowlist 下 MCP fixture 完整池 18 项、extension fixture 完整池 18 项，其余 18 个任务各 17 项。
+- harness 现在逐 arm 记录 turns、tool calls、argument errors、missed discovery、批准结果、成功工具、cache read/write、实际 usage 与捕获价格成本 coverage；任务支持批准拒绝、文件必须不存在、任一编辑工具成功、隔离 MCP、受原 state/inventory 校验的 Linux extension，以及同一 session 的跨进程 follow-up。缺失 session、换 session、无 measured request、未知 tokenizer 或未定价 cache token 均 fail closed。blind-human 输出写入独立 mode `0600` candidate，arm 映射单独保存；`--resume --ratings` 可在不重复 provider 请求的情况下重投影报告。两臂统一使用 `temperature=0`、`topP=1`、`maxOutputTokens=4096`，报告缺少数值时不能判为 complete。
+- 每个真实 run 在 `run-meta.json` 与 `tokenizer.json` 之后生成 revisioned `run-manifest.json`，绑定 run metadata、tokenizer evidence、全部 pair/raw arm、脱敏 candidate、review map 与评分文件。resume 先验证精确文件集合和每个 SHA-256；已有 artifact 变更、未登记 artifact、重复/缺失 pair 或非法评分都会在重投影前失败。评分文件只在解析与双评分校验通过后复制到 private 目录，再以 revision+1 追加到 manifest。
+- `scripts/qa-tokenizer-corpus.json` 固定英文、中文、代码、混合 CJK/emoji 四层。真实运行对每层发送同 project、同完整工具池的两组首次请求，以 provider prompt-token 差值计算实测值；样本文本不写入报告，只保存 SHA-256 与字符数。dry-run 仍为 `inconclusive`/exit 2，明确没有真实质量结果。
+- 用当前构建生成 100 个合成 pair 后，`--resume --ratings` 在不调用 provider 的情况下重投影为 `complete`，manifest 从 revision 1 扩展到 revision 2、绑定 344 个 artifact，并把评分文件复制到 run private 目录。证据目录为 `.omx/artifacts/quality-runs/synthetic-manifest-validation/`，扩展后 manifest SHA-256 为 `9cffc2606b06331e2945a85e794df9f39a0ea3bdfb81ede525191ce10e252cc8`，绑定 exe SHA-256 `4fdfcb0836c7339e86ab0e3edab1699a9b1600eeb9f12df2466417542f3ba342`。该运行只证明 resume/评分/报告合同，不是模型质量证据。
+- `npm run test:scripts` 实际 157 项通过；`node --test scripts/qa-quality.test.mjs` 22 项、`node --test scripts/qa-quality-manifest.test.mjs` 3 项、`node --test scripts/phase20-requirements.test.mjs` 4 项、`node scripts/phase20-requirements.mjs` 均通过。dry-run 实际输出 `inconclusive`/exit 2，fixture validation 为 20/20。尚未执行真实 provider、双人盲评、100 个真实 pair、真实成本或四语言 tokenizer 数值，因此 QA-03/TOOL-02 仍为 partial。
+- 本轮重新核对 `complete` 行时，对最容易受历史状态漂移影响的任务补跑当前源码聚焦集：JOB 相关 47 项、EDIT-01 相关 67 项、START 相关 9 项均通过；其余 complete 行仍以其绑定测试、构建或精确 SHA CI 证据为准。指定 `cn:deepseek-v4.1-flash` 的独立 reviewer 再次返回 `503 Service Unavailable`，因此没有独立批准，不能把本矩阵当作 QA-04 或 Phase 20 完成。
+
 ## 2026-10-23 QA-02 跨平台 CLI 矩阵（代码批 `fa493e2e` 已推送；Platform QA/CI/Watch success）
 
 - `.github/workflows/platform.yml` 在 GitHub `ubuntu-24.04` x64、`macos-14` arm64 与 `windows-2022` x64 上使用 Node `20.3.0`、Bun `1.3.14`，覆盖 Linux/macOS Node/exe × regular/fullscreen/line/pipe 各八格，以及 Windows Node/exe × line/pipe 四格；Windows regular/fullscreen 明确标记为不支持的交互 PTY 路径，不伪装成跳过后的通过。
@@ -203,8 +214,8 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 START-03 已由 2026-10-23 的受控冷/热基准闭合；以下只列仍开放项。
 
 - QA-02：Linux/macOS 各 Node/exe × regular/fullscreen/line/pipe 八格与 Windows Node/exe × line/pipe 四格在 `Platform QA` `39834842595` 全部 pass/exit 0；20 个 JSON/transcript 已完成平台、架构、target/mode、构建摘要、工具 result 与 skill payload 审计。Windows 交互 PTY、真实 IME 和系统复制仍缺环境，不把 line/pipe 结果外推为完整 Windows TUI。
-- QA-03：`npm run qa:quality` 已提供 fail-closed harness、build-bound JSON、确定性/双盲评分和 10,000 次 paired bootstrap；当前 starter corpus 只有 6 项，正式 12 项发现任务加摘要/渲染/启动质量任务与真实模型执行仍缺。
-- TOOL-02：`/tools` 已按当前 endpoint 序列化协议声明，报告 description/schema payload、UTF-8 bytes 与 code-unit token estimate；有界 `recentRequests` 持久化 discovery purpose/input/output attribution。同模型质量/cache 对比、多语言 tokenizer 校准与真实总成本仍需真实模型。
+- QA-03：`npm run qa:quality` 已提供 fail-closed harness、正式 20 项 corpus、隔离 MCP/extension、跨进程续接、build-bound JSON、确定性/双盲评分和 10,000 次 paired bootstrap；真实 100 pair、双盲评分和启动/性能聚合仍缺。
+- TOOL-02：`/tools` 已按当前 endpoint 序列化协议声明，报告 description/schema payload、UTF-8 bytes 与 code-unit token estimate；有界 `recentRequests` 持久化 discovery purpose/input/output attribution。正式 harness 已能测同模型 turns/tool calls/argument errors/missed discovery/cache/cost coverage 与四语言 tokenizer 误差，但真实数值尚未运行。
 - QA-02 的 restore preview 已在 Linux/macOS 全部 16 格及 Windows line/pipe 4 格通过，并验证文件/记录/blob 字节不变；line/pipe 已覆盖 settings 保存、命名 profile 创建和重启读回，但非交互 profile switch/approval 与 Windows TUI 的完整生命周期仍需按平台实际验证。QA-01 矩阵已补齐独立任务行，但仍不能作为 47 项全闭合证明。
 
 ## CI

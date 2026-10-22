@@ -2,7 +2,7 @@
 title: "动态工具发现"
 category: article
 created: 2026-10-17
-updated: 2026-10-17
+updated: 2026-10-23
 tags: [tools, context, phase-20]
 summary: "默认只声明常驻工具并提供 search/load 入口；加载只改变下一次请求的 schema，不授予执行权限；full 模式保留诊断与对照。"
 ---
@@ -53,4 +53,13 @@ step 在每次调用时读取当前快照，所以加载后的 schema 立即计�
 - `quality.schemaPreserved` 检查加载返回的定义与目录中的 `argsSchema`/description 完全一致；加载不会改写或截断关键参数。
 - `tokenEstimateError` 对成对的估算/实测给出比例范围；没有样本时明确 `unknown`，不生成校准因子。
 
-真实任务成功率、漏发现、参数错误与 cache 复用属于 QA-03 的成对任务集；本模块不替代该证据，也不在没有证据时自动精简描述或删除参数说明。
+2026-10-23 起，`npm run qa:quality` 的正式 harness 把 TOOL-02 证据并入同一构建绑定报告：
+
+- 同模型、同协议、同权限、同初始状态且固定 `temperature=0`、`topP=1`、`maxOutputTokens=4096` 的 `full`/`dynamic` pair 记录总输入/输出、cache read/write、turns、tool calls、发现调用及其 input/output。
+- 每个确定性任务把所需工具缺失计为 `missedDiscovery`，把 schema/参数失败计为 `argumentErrors`；这些值按任务与工具族保留，不只报告总成功率。
+- 成本只用请求时捕获的公开价格；任何缺价 token 都使 coverage 为 `partial`，总成本保持 `null`，不能写成零。
+- 四语言 tokenizer corpus 用两组首次请求的 provider prompt-token 差值校准；未知模型、缺失 usage、不同 endpoint 或非正差值均保持未测。
+- run 级 revisioned manifest 绑定 pair、raw arm、tokenizer、盲评 candidate、review map 与评分文件；resume 遇到 artifact 增删改、固定采样缺失或 manifest 不一致时 fail closed。
+- `/tools` 仍只报告静态声明字节和 `characters-per-token` 估算，因为命令本身没有目标模型 tokenizer；真实 tokenizer 误差由上述隔离 harness 报告，不把估算写回产品界面冒充实测。
+
+真实任务成功率、漏发现、参数错误、cache 复用与成本仍未执行；fixture validation、单元测试和离线比较不替代真实模型证据，也不在没有证据时自动精简描述或删除参数说明。

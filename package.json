@@ -122,6 +122,7 @@
     "bench:start": "node scripts/bench-start.mjs",
     "bench:interactive": "node scripts/bench-interactive.mjs",
     "bench:responsiveness": "node scripts/bench-responsiveness.mjs",
+    "verify:phase20-requirements": "node scripts/phase20-requirements.mjs",
     "qa:quality": "node scripts/qa-quality.mjs",
     "qa:pty": "node scripts/qa-pty-smoke.mjs"
   },

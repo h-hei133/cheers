@@ -1,0 +1,289 @@
+{
+  "schemaVersion": "phase20-requirements.v1",
+  "source": ".wiki/features/phase-20-decisions.md",
+  "updated": "2026-10-23",
+  "tasks": [
+    {
+      "id": "CFG-01",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W1; config/runtimeConfig and profile/path tests",
+      "missing": ""
+    },
+    {
+      "id": "CFG-02",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W1; profile import/scope tests",
+      "missing": ""
+    },
+    {
+      "id": "CFG-03",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W1; config/layers tests",
+      "missing": ""
+    },
+    {
+      "id": "CFG-04",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W1; config/scope tests",
+      "missing": ""
+    },
+    {
+      "id": "CFG-05",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W1; config/fields and environment tests",
+      "missing": ""
+    },
+    {
+      "id": "PRV-01",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W2; model selection and provider credential tests",
+      "missing": ""
+    },
+    {
+      "id": "PRV-02",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W2; model preset and picker tests",
+      "missing": ""
+    },
+    {
+      "id": "PRV-03",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W2; account pool/presence and endpoint/audience tests",
+      "missing": "Opaque subscription-token issuer/audience proof and real account lifecycle evidence remain."
+    },
+    {
+      "id": "PRV-04",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W2; refresh lease and renewal tests",
+      "missing": ""
+    },
+    {
+      "id": "PRV-05",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W2; request ledger, backoff, attribution and cache tests",
+      "missing": "Full auxiliary consumer coverage and trusted remote settlement/billing evidence remain."
+    },
+    {
+      "id": "CTX-01",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W3; request budget and telemetry tests",
+      "missing": ""
+    },
+    {
+      "id": "CTX-02",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W3; request budget and compaction wiring tests",
+      "missing": ""
+    },
+    {
+      "id": "CTX-03",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W3; compaction operation/step tests",
+      "missing": ""
+    },
+    {
+      "id": "CTX-04",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W3; context report and session facts tests",
+      "missing": ""
+    },
+    {
+      "id": "TOOL-01",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W3; discovery state/tools/catalog tests",
+      "missing": ""
+    },
+    {
+      "id": "TOOL-02",
+      "status": "partial",
+      "evidence": "scripts/qa-quality.mjs formal paired harness, scripts/qa-quality-formal.json, scripts/qa-tokenizer-corpus.json and scripts/qa-quality-manifest.mjs; 157 script tests and 20/20 fixture validation pass",
+      "missing": "Real same-model full/dynamic execution, cache and total-cost comparison, parameter-quality evidence and four-language tokenizer calibration remain unrun."
+    },
+    {
+      "id": "UI-01",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W4; composer geometry tests",
+      "missing": ""
+    },
+    {
+      "id": "UI-02",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W4; panel/modal/surface/hit tests",
+      "missing": ""
+    },
+    {
+      "id": "UI-03",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W4; progress/chips/overlay/keybinding tests",
+      "missing": ""
+    },
+    {
+      "id": "UI-04",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W4; transcript source mapping tests",
+      "missing": ""
+    },
+    {
+      "id": "CMD-01",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W5; suggestions/keymap tests",
+      "missing": ""
+    },
+    {
+      "id": "CMD-02",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W5; syntax and command registry tests",
+      "missing": ""
+    },
+    {
+      "id": "SET-01",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W5; settings editor tests",
+      "missing": ""
+    },
+    {
+      "id": "SET-02",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W5; settings tabs/search and PTY evidence",
+      "missing": ""
+    },
+    {
+      "id": "SET-03",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W5; preview lease, save and apply tests",
+      "missing": "External-update invalidation still needs end-to-end acceptance."
+    },
+    {
+      "id": "PAN-01",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W6; model two-column and relay identity tests",
+      "missing": "Connection/role binding-revision search acceptance remains."
+    },
+    {
+      "id": "PAN-02",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W6; resume grouping/search/paging/tree tests and PTY evidence",
+      "missing": "Remaining action identity/revision boundaries and total resource bounds remain; restore is tracked under PAN-06."
+    },
+    {
+      "id": "PAN-03",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W6; jobs/hub/agents projection and liveness tests",
+      "missing": "Remaining journal/revision boundaries need acceptance."
+    },
+    {
+      "id": "PAN-04",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W6; usage/quota and thinking tests",
+      "missing": "Effort/model joint constraints and additional unknown-nonzero model acceptance remain."
+    },
+    {
+      "id": "PAN-05",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W6; advisor/plan-review/btw reports and authority tests",
+      "missing": "Current revision/stream isolation and packaged PTY acceptance remain."
+    },
+    {
+      "id": "PAN-06",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W6; copy/history/back/undo/restore/cleanse tests and PTY evidence",
+      "missing": "Cleanse and history total resource/latency bounds, synchronous I/O and remaining identity/revision edges remain."
+    },
+    {
+      "id": "PAN-07",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W6; auth/plugin/extensions/debug tests and PTY evidence",
+      "missing": "Login/logout device-code end-to-end acceptance, complete authentication lifecycle and total extension resource bounds remain."
+    },
+    {
+      "id": "PAN-08",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W6; MCP/tools/skill/context/cost/help report tests",
+      "missing": "Real MCP connection/auth, remaining report consumers and total catalog/projection resource bounds remain."
+    },
+    {
+      "id": "INPUT-01",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W7; Vim state, keymap, stdin and terminal tests",
+      "missing": "Complete IME/five-mode contract and actual platform IME evidence remain."
+    },
+    {
+      "id": "RENDER-01",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W7; math/code-span/markdown/HTML tests",
+      "missing": "Full nested/display limits, streaming and packaged visual/export acceptance remain."
+    },
+    {
+      "id": "RENDER-02",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W7; markdown/table/HTML/code-span tests",
+      "missing": "Complete ANSI/OSC8/style-boundary and packaged visual/source-copy acceptance remain."
+    },
+    {
+      "id": "RENDER-03",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-contract.md W7; diff rows/bytes/side-by-side tests",
+      "missing": "Packaged PTY visual/source-copy acceptance and remaining full-view resource edges remain."
+    },
+    {
+      "id": "EDIT-01",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W7; patch batch 45, approval selection 4 and approval bridge 18 focused tests passed on 2026-10-23",
+      "missing": ""
+    },
+    {
+      "id": "JOB-01",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W8; local handle 4, journal 19, service 9 and promotion 4 focused tests passed on 2026-10-23",
+      "missing": ""
+    },
+    {
+      "id": "JOB-02",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W8; background notice 6 and runtime jobs 5 focused tests passed on 2026-10-23, with session-owned follow-up delivery in interactiveMode",
+      "missing": ""
+    },
+    {
+      "id": "START-01",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W8/W9; start/build manifest, packaged and exact-SHA CI evidence",
+      "missing": ""
+    },
+    {
+      "id": "START-02",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W8/W9; 10k reentry, 9 focused startup tests and PTY/platform evidence",
+      "missing": ""
+    },
+    {
+      "id": "START-03",
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-status.md START-03; Performance run 39817293051 with 30 warm/cold samples per target/mode",
+      "missing": ""
+    },
+    {
+      "id": "QA-01",
+      "status": "partial",
+      "evidence": "scripts/phase20-requirements.json plus .wiki/features/phase-20-contract.md; task-specific reversal evidence",
+      "missing": "The matrix is now explicit, but all 47 task-specific reversal and cross-task integration rows are not yet closed."
+    },
+    {
+      "id": "QA-02",
+      "status": "partial",
+      "evidence": ".wiki/features/phase-20-status.md QA-02; Platform QA 39834842595 with 20 supported CLI cells",
+      "missing": "Windows interactive PTY, real IME behavior, system copy and non-interactive profile-switch/approval lifecycle remain unverified."
+    },
+    {
+      "id": "QA-03",
+      "status": "partial",
+      "evidence": "scripts/qa-quality-formal.json, scripts/qa-quality.mjs, scripts/qa-quality-manifest.mjs and phase-20-quality-evaluation.md; dry-run remains inconclusive by design and synthetic 100-pair resume only proves the harness contract",
+      "missing": "Real provider execution, blind ratings, formal pair completion and startup/performance aggregation remain."
+    },
+    {
+      "id": "QA-04",
+      "status": "partial",
+      "evidence": "current static gates, CI/Watch and exact-SHA evidence in phase-20-status.md",
+      "missing": "Final all-task structural gate, independent review, completion docs and release/delivery evidence remain."
+    }
+  ]
+}

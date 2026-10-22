@@ -2,6 +2,8 @@
 
 每一行把任务绑定到所有者、当前测试与一个反转条件。测试通过只证明该行；没有真实 provider、PTY、跨平台或发布证据的行仍保持开放。
 
+2026-10-23 的机器可检查复核矩阵为 [scripts/phase20-requirements.json](../../scripts/phase20-requirements.json)，由 `npm run verify:phase20-requirements` 对照本规划逐 ID 校验：47 项中 27 项 `complete`、20 项 `partial`、0 项 `open`，整体仍为 `partial`。`complete` 只表示该行已取得当前约定的本地/构建/CI 证据，不替代 QA-02 的真实平台格、QA-03 的真实质量或 Phase 20 总完成。
+
 2026-10-18 返工复核发现旧表有状态漂移：实现存在或测试数量不能替代完整裁决。当前复核范围及未闭合项见 [交付状态](phase-20-status.md#返工复核2026-10-18)；以下未重新验收的行均是历史证据索引。
 
 ## W1 配置
@@ -34,7 +36,7 @@
 | CTX-03 | `session/compactionOperation.ts` | 操作测试（7） | unknown 步骤被重播时失败 |
 | CTX-04 | `context/report` | report（6）、sessionFacts（9） | stale 被当作当前值报告时失败 |
 | TOOL-01 | `core/tools/discovery/*`、`core/tools/catalog.ts` | discovery（10）、handoff/director | `todo` 或 run feature tool 不在首请求时失败 |
-| TOOL-02（部分） | `core/tools/discovery/evaluation.ts`、`provider/endpoints/toolSurface.ts`、`observability/usage/*`、`turn/{session,step}.ts` | endpoint-specific declaration bytes、code-unit estimate、quality status `not-measured/preserved/changed`、bounded request purpose/history；`evaluation.test`、`toolSurface.test`、`usage`/`turn` suites | 去掉真实 load 后 quality 不得为 `preserved`；把 UTF-8 bytes 当 code units、忽略 endpoint 协议或丢失 discovery purpose 时失败；真实模型成本/参数质量仍开放 |
+| TOOL-02（部分） | `core/tools/discovery/evaluation.ts`、`provider/endpoints/toolSurface.ts`、`observability/usage/*`、`turn/{session,step}.ts`、`scripts/qa-quality*` | endpoint-specific declaration bytes、code-unit estimate、quality status、bounded request purpose/history；正式 20 项 paired harness 已测固定 `temperature=0`/`maxOutputTokens=4096` 下的 turns/tool calls/argument errors/missed discovery/cache/cost coverage，并用四语言 paired first-request delta 校准 tokenizer；157 项脚本测试及 20/20 fixture validation 通过 | 去掉真实 load 后 quality 不得为 `preserved`；把 UTF-8 bytes 当 code units、忽略 endpoint 协议、丢失 discovery purpose 或删除固定采样值/manifest 校验时失败；真实模型总请求/成本、参数质量与 tokenizer 数值仍待真实 opt-in 运行 |
 
 ## W4 布局
 
@@ -90,7 +92,7 @@
 
 ## W8/W9
 
-2026-10-20 复核撤回了本表此前的“完成”标签：实现存在不等于合同闭合，以下行均保留开放状态。
+2026-10-20 复核撤回了本表此前的“完成”标签；后续聚焦反转、跨平台 CI 与受控性能证据分别闭合了 `JOB-01/02`、`EDIT-01`、`START-01/02` 和 `START-03`。以下各行保留当前实际证据，不能用本表存在替代 Phase 20 整体完成。
 
 | 任务 | 证据 | 反转/未闭合 |
 |---|---|---|
@@ -99,15 +101,15 @@
 | EDIT-01 | 稳定 group id、源基线、hunk indexes/content 与 add content 身份绑定、依赖组、同文件双 hunk 选集、重规划 revision 检查、显式 `selected`/`selectionRevision` 跨 CLI bridge、scope/policy/cache 绕过、无 picker 拒绝，以及 requested/selected/skipped receipt；`batch.test.ts` 45 项、CLI/approval 聚焦集 133 项通过。 | 移除 bridge 字段、恢复 turn/tool 单组 fallback、恢复 scope 自动回答或删除直接执行的重复/非法 ID 校验后，对应聚焦用例实际失败或拒绝。 |
 | START-01（本地证据闭合） | build manifest 已绑定 lockfile、构建配置、编译器/标准库、全部 emit 字节、五个运行资产和受控 entry；`start.test` 覆盖 journal 恢复、活动/stale build lock fail-closed、恢复期间竞争者拒绝、越界/未登记入口、篡改产物与 launcher/package-main 回滚。`--version`/`--help` 现在由轻量入口在加载 runtime 图前处理；组合参数、坏配置准入与 fresh packaged gate 均已通过。 | stale lock 仍需人工确认后清理；本地 packaged gate 不等于新提交的 CI，精确 SHA CI 另行取证。 |
 | START-02（本地证据闭合） | 10k catalog 首屏、持久 reentry 索引、0/100/1k/10k 不枚举探针；recovery hint 由实际 TUI `onFirstWrite`、line prompt write callback 或 non-TTY live first frame 启动；routing sink 与 transcript ownership 分离，line mode 保留 turn boundary 且 `/sessions` 仍走非交互 overview；用户键盘、鼠标、粘贴、picker 与 line 输入只推进一次 fence；teardown 在 sink 恢复前完成，失败路径不调用 `exit(0)`，cleanup 自身抛错或 logger 抛错也保证 sink 恢复；line prompt callback 与 stdout `error` 的异步失败均进入同一 rejection，不再静默挂起；真实 `GoalScheduler` drain 超时结算 captured host，line sink 在 goal dispatch 真正完成前保持 discard fence；MCP snapshot/refresh 在队列等待阶段即可取消，collaboration ticket/poll/propose 继承关闭 signal；`runCliProcess` 集成测试证明 fullscreen hint 经 transcript 且不直写 stdout；non-TTY live stream 现在把 first-frame/user-intent 接到同一 recovery lifecycle，取消 hint 时仍发布已发现的可读性诊断；Node/exe × regular/fullscreen seeded PTY 连续通过并匹配精确 current session。 | Linux/macOS TUI 与 Windows line/pipe 的平台矩阵已由 QA-02 `Platform QA` `39834842595` 覆盖；Windows 交互 PTY、真实 IME 与系统复制仍归 QA-02。 |
-| START-03（部分） | `bench:interactive` 分别记录 Node/exe × regular/fullscreen/line/pipe 的首字节、首帧/输入提示、TUI listener/layout/write 进程观察点、渲染字符键响应、批处理首答和命令退出；`bench:responsiveness` 记录 1000 项列表同步键路径及 math/table/diff 单次阻塞。两者保存样本、p50/p95、机器与构建摘要。键测量关闭 PTY echo 并等待完整 UTF-8 字符。 | 受控冷缓存仍缺；responsiveness 是 Node 宿主同步模块探针，不覆盖完整键盘/输入路径或 exe-specific 行为；line/pipe 无 TUI listener 标记，null 不兑换 ready，进程采样 delay 不证明最初同步加载或单操作阻塞上界。 |
+| START-03（性能证据闭合） | `bench:interactive` 分别记录 Node/exe × regular/fullscreen/line/pipe 的首字节、首帧/输入提示、TUI listener/layout/write 进程观察点、渲染字符键响应、批处理首答和命令退出；`bench:responsiveness` 记录 1000 项列表同步键路径及 math/table/diff 单次阻塞。`Performance` run `39817293051` 在同一 runner/fixture 上完成 warm/cold 各 30 样本，process 60/60 与 interactive 240/240 次 cache drop，保存 p50/p95、机器与构建摘要。 | responsiveness 仍是 Node 宿主同步模块探针，不覆盖完整键盘/输入路径或 exe-specific 行为；line/pipe 无 TUI listener 标记，null 不兑换 ready，进程采样 delay 不证明最初同步加载或单操作阻塞上界。 |
 
 ## W10
 
 | 任务 | 证据 |
 |---|---|
-| QA-01 | 本矩阵 + 各反转测试；`CTX-02`、`TOOL-02`、`PAN-05`、`PAN-08`、`QA-03` 已拆成独立行；但行存在不等于任务完成，仍按各行状态累积。 |
+| QA-01 | 本矩阵 + `scripts/phase20-requirements.json` + 各反转测试；47 个规划 ID 与决策表逐项相等，complete 行必须无缺失证据、partial 行必须写明缺口；但行存在不等于任务完成，仍按各行状态累积。 |
 | QA-02 | Linux/macOS 各 Node/exe × regular/fullscreen/line/pipe 八格与 Windows Node/exe × line/pipe 四格均通过 `Platform QA` `39834842595`（completed/success）；20 个 JSON 已审计 pass/exit 0、平台/架构/target/mode 与完整 build identity，20 个 transcript 均有成功 bash/task/tool_search/tool_load/skill result、审批 resolution 和 `qa-skill-body`。TUI覆盖会话fork/切换/确认删除、panel关闭、任务、发现/search/load/skill、审批、settings保存和profile创建/切换/受控重启；line/pipe覆盖任务、发现、显式allow-once、settings保存、命名profile创建及重启读回；restore preview 全部支持格验证文件/记录/blob字节不变。 | Windows 交互 PTY、真实 IME、系统复制仍未闭合；settings面板不由非TTY伪造。 |
-| QA-03 | `scripts/qa-quality.mjs` + `qa-quality-lib`/starter corpus 覆盖 pair 顺序、JSONL 边界、确定性/双盲分支、build identity、policy zero-tolerance 与 10,000 次 bootstrap；dry-run 固定 `inconclusive`。正式 12 项发现任务、摘要/渲染/启动质量任务、真实模型执行与双盲评分仍未完成，mock 不替代。 |
+| QA-03 | `scripts/qa-quality.mjs` + `qa-quality-lib` + `qa-quality-manifest` + 正式 20 项 corpus 覆盖 pair 顺序、隔离 MCP/extension、跨进程续接、JSONL 边界、确定性/双盲分支、脱敏 candidate/private mapping、固定采样、revisioned artifact manifest、无 provider 的 resume 评分、build identity、policy zero-tolerance、四语言 tokenizer 与 10,000 次 bootstrap；dry-run 固定 `inconclusive`，fixture validation 20/20，100 个合成 pair 的 manifest revision 1→2 与 resume 只证明 harness 合同。真实模型执行、100 个真实 pair 与双盲评分仍未完成，mock 不替代。 |
 | QA-04 | 本地门禁与精确提交；CI 以 run 结果为准 |
 
 | PAN-08 help（部分） | `core/commands/help/report.ts`、`picker/help.ts`、原slash registry/print owner、`slashSuggestions.ts` | immutable安全report与共享rows；raw ID本地保留、安全name才能插draft；alias搜索/named独立、单current selection；原admission读前/通知前/apply/真实host发布检查；精确cwd/session及builtin root；选中后usage安全；12文件189项、strict TS/双构建、四格合成扩展PTY/八格smoke | metadata/name/alias/single/before/apply/current/subscription/notification/root/print/removed/hint共13项有效反转；取消/查看/草稿不改session/源文件，不执行script或模型、不新增command-output。原完整registry/配置读取无总资源界，live config不等于accepted snapshot；独立codeAPPROVE/architectureWATCH，原hint泄露已实际复现修复；其余picker/PAN-08/47项继续 |

@@ -1,0 +1,357 @@
+{
+  "schemaVersion": "phase20-quality-corpus.v1",
+  "version": "phase20-qa03-formal-v1",
+  "qualifying": true,
+  "minimumPairs": 5,
+  "tasks": [
+    {
+      "id": "read-symbol",
+      "category": "discovery",
+      "stratum": "local-read",
+      "prompt": "Read src/symbol.ts and return only JSON with keys path, symbol, and value. The target symbol is target and its value is alpha.",
+      "fixture": [
+        {
+          "path": "src/symbol.ts",
+          "content": "export const target = \"alpha\";\n"
+        }
+      ],
+      "scorer": {
+        "kind": "deterministic",
+        "textIncludes": ["src/symbol.ts", "target", "alpha"],
+        "jsonFields": ["path", "symbol", "value"],
+        "requiredTools": ["read"],
+        "successfulTools": ["read"]
+      }
+    },
+    {
+      "id": "edit-single-file",
+      "category": "discovery",
+      "stratum": "local-edit",
+      "prompt": "Change notes.txt so its complete content is status=ready followed by one newline. Do not modify any other file.",
+      "fixture": [
+        {
+          "path": "notes.txt",
+          "content": "status=old\n"
+        }
+      ],
+      "scorer": {
+        "kind": "deterministic",
+        "files": [
+          {
+            "path": "notes.txt",
+            "content": "status=ready\n"
+          }
+        ],
+        "toolsAnyOf": [["edit", "write", "apply_patch"]]
+      }
+    },
+    {
+      "id": "edit-two-files",
+      "category": "discovery",
+      "stratum": "multi-file-edit",
+      "prompt": "Set alpha.txt to alpha and beta.txt to beta. Keep exactly one newline at the end of each file.",
+      "fixture": [
+        {
+          "path": "alpha.txt",
+          "content": "old-alpha\n"
+        },
+        {
+          "path": "beta.txt",
+          "content": "old-beta\n"
+        }
+      ],
+      "scorer": {
+        "kind": "deterministic",
+        "files": [
+          {
+            "path": "alpha.txt",
+            "content": "alpha\n"
+          },
+          {
+            "path": "beta.txt",
+            "content": "beta\n"
+          }
+        ],
+        "toolsAnyOf": [["edit", "write", "apply_patch"]]
+      }
+    },
+    {
+      "id": "delegate-inspect",
+      "category": "discovery",
+      "stratum": "multi-step-delegation",
+      "prompt": "Use the task tool to delegate inspection of delegate.txt. The delegated result must be DELEGATE-OK. Return only that marker.",
+      "fixture": [
+        {
+          "path": "delegate.txt",
+          "content": "DELEGATE-OK\n"
+        }
+      ],
+      "scorer": {
+        "kind": "deterministic",
+        "textIncludes": ["DELEGATE-OK"],
+        "requiredTools": ["task"],
+        "successfulTools": ["task"]
+      }
+    },
+    {
+      "id": "browse-docs",
+      "category": "discovery",
+      "stratum": "browse-search",
+      "prompt": "Use web_fetch on https://example.com/ and return the page title exactly as the site reports it. Do not infer it from memory.",
+      "fixture": [],
+      "scorer": {
+        "kind": "deterministic",
+        "textIncludes": ["Example Domain"],
+        "requiredTools": ["web_fetch"],
+        "successfulTools": ["web_fetch"]
+      }
+    },
+    {
+      "id": "search-large-tree",
+      "category": "discovery",
+      "stratum": "repository-search",
+      "prompt": "Find the unique marker NEEDLE-7 in the workspace. Return a JSON object with path and marker keys.",
+      "fixture": [
+        { "path": "data/00.txt", "content": "noise\n" },
+        { "path": "data/01.txt", "content": "noise\n" },
+        { "path": "data/02.txt", "content": "noise\n" },
+        { "path": "data/03.txt", "content": "noise\n" },
+        { "path": "data/04.txt", "content": "noise\n" },
+        { "path": "data/05.txt", "content": "noise\n" },
+        { "path": "data/06.txt", "content": "noise\n" },
+        { "path": "data/07.txt", "content": "noise\n" },
+        { "path": "data/08.txt", "content": "noise\n" },
+        { "path": "data/09.txt", "content": "noise\n" },
+        { "path": "data/10.txt", "content": "NEEDLE-7\n" },
+        { "path": "data/11.txt", "content": "noise\n" }
+      ],
+      "scorer": {
+        "kind": "deterministic",
+        "textIncludes": ["NEEDLE-7", "data/10.txt"],
+        "jsonFields": ["path", "marker"],
+        "requiredTools": ["grep"],
+        "successfulTools": ["grep"]
+      }
+    },
+    {
+      "id": "lsp-symbol",
+      "category": "discovery",
+      "stratum": "language-service",
+      "prompt": "Use lsp with backend scanner and workspaceSymbol to locate uniqueSymbol. Return JSON with path and symbol keys.",
+      "fixture": [
+        {
+          "path": "src/symbols.ts",
+          "content": "export function uniqueSymbol() { return \"LSP-OK\"; }\n"
+        }
+      ],
+      "scorer": {
+        "kind": "deterministic",
+        "textIncludes": ["src/symbols.ts", "uniqueSymbol"],
+        "jsonFields": ["path", "symbol"],
+        "requiredTools": ["lsp"],
+        "successfulTools": ["lsp"]
+      }
+    },
+    {
+      "id": "mcp-read-tool",
+      "category": "discovery",
+      "stratum": "mcp",
+      "prompt": "Use the MCP echo_message tool to echo MCP-OK. Return only the echoed marker.",
+      "fixture": [
+        {
+          "path": "mcp-server.mjs",
+          "content": "import readline from \"node:readline\";\nlet initialized = false;\nconst send = value => process.stdout.write(`${JSON.stringify(value)}\\n`);\nreadline.createInterface({ input: process.stdin }).on(\"line\", line => {\n  const request = JSON.parse(line);\n  if (request.method === \"initialize\") return send({ jsonrpc: \"2.0\", id: request.id, result: { protocolVersion: request.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: \"quality\", version: \"1.0.0\" } } });\n  if (request.method === \"notifications/initialized\") { initialized = true; return; }\n  if (request.id === undefined) return;\n  if (!initialized) return send({ jsonrpc: \"2.0\", id: request.id, error: { code: -32603, message: \"not initialized\" } });\n  if (request.method === \"tools/list\") return send({ jsonrpc: \"2.0\", id: request.id, result: { tools: [{ name: \"echo_message\", description: \"Echo one message\", inputSchema: { type: \"object\", properties: { message: { type: \"string\" } }, required: [\"message\"] }, annotations: { readOnlyHint: true } }] } });\n  if (request.method === \"tools/call\") return send({ jsonrpc: \"2.0\", id: request.id, result: { content: [{ type: \"text\", text: request.params.arguments.message }] } });\n  send({ jsonrpc: \"2.0\", id: request.id, error: { code: -32601, message: \"unsupported\" } });\n});\n"
+        }
+      ],
+      "homeFiles": [
+        {
+          "path": ".cheers/mcp.json",
+          "content": "{\n  \"mcpServers\": {\n    \"quality\": {\n      \"transport\": \"stdio\",\n      \"command\": \"{{node}}\",\n      \"args\": [\"{{projectRoot}}/mcp-server.mjs\"]\n    }\n  }\n}\n"
+        }
+      ],
+      "scorer": {
+        "kind": "deterministic",
+        "textIncludes": ["MCP-OK"],
+        "requiredTools": ["mcp__quality__echo_message"],
+        "successfulTools": ["mcp__quality__echo_message"]
+      }
+    },
+    {
+      "id": "extension-tool",
+      "category": "discovery",
+      "stratum": "extension",
+      "prompt": "Use the installed extension tool ext_quality_extension_echo with an empty args array. Return only its EXTENSION-OK marker.",
+      "fixture": [],
+      "extension": {
+        "name": "quality-extension",
+        "version": "1.0.0",
+        "description": "Echo a fixed extension marker",
+        "script": "printf 'EXTENSION-OK\\n'\n"
+      },
+      "scorer": {
+        "kind": "deterministic",
+        "textIncludes": ["EXTENSION-OK"],
+        "requiredTools": ["ext_quality_extension_echo"],
+        "successfulTools": ["ext_quality_extension_echo"]
+      }
+    },
+    {
+      "id": "denied-write",
+      "category": "discovery",
+      "stratum": "permission-denied",
+      "prompt": "Call the write tool to create forbidden.txt with content forbidden. Do not use bash as a substitute. Report whether the write was denied.",
+      "fixture": [],
+      "approval": "deny",
+      "scorer": {
+        "kind": "deterministic",
+        "textIncludes": ["denied"],
+        "requiredTools": ["write"],
+        "approvalOutcomes": ["denied"],
+        "absentFiles": ["forbidden.txt"]
+      }
+    },
+    {
+      "id": "resume-after-stop",
+      "category": "discovery",
+      "stratum": "recovery",
+      "prompt": "Read resume.txt and retain its token for the next turn. Reply only with the single word READY.",
+      "followUps": [
+        "Without reading the file again, return only JSON with keys token and source. Use the token from this session and set source to remembered."
+      ],
+      "fixture": [
+        {
+          "path": "resume.txt",
+          "content": "RESUME-OK\n"
+        }
+      ],
+      "scorer": {
+        "kind": "deterministic",
+        "textIncludes": ["RESUME-OK", "remembered"],
+        "jsonFields": ["token", "source"],
+        "requiredTools": ["read"],
+        "successfulTools": ["read"]
+      }
+    },
+    {
+      "id": "load-on-demand",
+      "category": "discovery",
+      "stratum": "unknown-tool-need",
+      "prompt": "Use the todo tool to add a task named QA-LOAD, then list tasks. Return only QA-LOAD.",
+      "fixture": [],
+      "scorer": {
+        "kind": "deterministic",
+        "textIncludes": ["QA-LOAD"],
+        "requiredTools": ["todo"],
+        "successfulTools": ["todo"]
+      }
+    },
+    {
+      "id": "summary-facts",
+      "category": "summary",
+      "stratum": "summary-fact-retention",
+      "prompt": "Read context.md and return a concise summary with exactly two labeled lines: RISK: followed by the stated risk, and DECISION: followed by the stated decision. Do not add other claims.",
+      "fixture": [
+        {
+          "path": "context.md",
+          "content": "Risk: the cache may be cold on the first request.\nDecision: keep the fallback path enabled.\n"
+        }
+      ],
+      "scorer": {
+        "kind": "blind-human",
+        "rubric": "The summary names the cold-cache risk, preserves the fallback decision, adds no unsupported claims, and uses exactly the requested labels."
+      }
+    },
+    {
+      "id": "summary-decisions",
+      "category": "summary",
+      "stratum": "summary-decision-retention",
+      "prompt": "Read decision.md and return a decision-only summary in at most three sentences. Preserve the chosen action, the rejected alternative, and the stated reason.",
+      "fixture": [
+        {
+          "path": "decision.md",
+          "content": "Chosen action: run the isolated harness.\nRejected alternative: reuse the developer home.\nReason: profile state and credentials must not leak between runs.\n"
+        }
+      ],
+      "scorer": {
+        "kind": "blind-human",
+        "rubric": "The summary retains all three facts, distinguishes the chosen action from the rejected alternative, and adds no new recommendation."
+      }
+    },
+    {
+      "id": "summary-no-new-facts",
+      "category": "summary",
+      "stratum": "summary-no-added-claims",
+      "prompt": "Read incident.md and summarize only what it states. Use at most two sentences and do not speculate about cause or remediation.",
+      "fixture": [
+        {
+          "path": "incident.md",
+          "content": "At 10:15 the cache returned stale metadata for four minutes. The fallback remained available and no writes occurred.\n"
+        }
+      ],
+      "scorer": {
+        "kind": "blind-human",
+        "rubric": "The summary preserves the timing, stale metadata, fallback availability, and zero writes, without inventing a cause, impact, or fix."
+      }
+    },
+    {
+      "id": "summary-labels",
+      "category": "summary",
+      "stratum": "summary-requested-labels",
+      "prompt": "Read report.md and return exactly three lines labeled EVIDENCE:, LIMIT:, and NEXT:. Preserve the stated facts and add no extra line.",
+      "fixture": [
+        {
+          "path": "report.md",
+          "content": "Evidence: one local run passed.\nLimit: no remote platform was tested.\nNext: run the platform matrix.\n"
+        }
+      ],
+      "scorer": {
+        "kind": "blind-human",
+        "rubric": "The answer has exactly the three requested labels in order and preserves the local-only evidence, remote-platform limit, and next action."
+      }
+    },
+    {
+      "id": "render-table",
+      "category": "render",
+      "stratum": "render-multiline-table",
+      "prompt": "Return one Markdown table with columns Name, State, and Note. Include two rows; one Note cell must contain an explicit line break. Do not add prose outside the table.",
+      "fixture": [],
+      "scorer": {
+        "kind": "blind-human",
+        "rubric": "The output is one valid table with the requested columns and two rows, preserves an explicit line break in one cell, and has no surrounding prose."
+      }
+    },
+    {
+      "id": "render-math",
+      "category": "render",
+      "stratum": "render-math",
+      "prompt": "Return a short Markdown example with one inline expression for x squared and one display matrix containing 1, 2, 3, and 4. Do not execute or evaluate anything.",
+      "fixture": [],
+      "scorer": {
+        "kind": "blind-human",
+        "rubric": "The example uses valid inline and display math syntax, preserves the four matrix values, and contains no evaluation, command, or unsupported claim."
+      }
+    },
+    {
+      "id": "render-code",
+      "category": "render",
+      "stratum": "render-fenced-code",
+      "prompt": "Return one fenced TypeScript code block that logs a value named ready and one short sentence after the fence. Do not run the code.",
+      "fixture": [],
+      "scorer": {
+        "kind": "blind-human",
+        "rubric": "The output has one valid fenced TypeScript block containing a ready log, preserves the code exactly, and follows it with one short non-execution sentence."
+      }
+    },
+    {
+      "id": "render-diff-overflow",
+      "category": "render",
+      "stratum": "render-diff-fallback",
+      "prompt": "Return a unified diff example for one changed line in notes.txt. Keep the diff under twelve lines and state in one sentence that the source remains available when the view is narrow.",
+      "fixture": [],
+      "scorer": {
+        "kind": "blind-human",
+        "rubric": "The diff is valid, under twelve lines, identifies notes.txt and one old/new line pair, and the fallback sentence does not claim that display authorizes applying the diff."
+      }
+    }
+  ]
+}
