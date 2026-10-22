@@ -166,21 +166,53 @@ function qaEnvironment(home, project) {
 }
 
 async function assertFixtureSkillDiscovery(project) {
-  const modulePath = path.join(root, "packages", "ts-shell", "dist", "builds", verified.manifest.buildId,
-    "core", "skills", "skillLoader.js");
+  const buildRoot = path.join(root, "packages", "ts-shell", "dist", "builds", verified.manifest.buildId);
+  const modulePath = path.join(buildRoot, "core", "skills", "skillLoader.js");
   const { SkillLoader } = await import(pathToFileURL(modulePath).href);
   const sources = [];
   const loaded = await new SkillLoader(project, { onSource: target => sources.push(target) }).loadDetailed();
   if (loaded.skills.has("qa-discovery")) return;
+  const skillDirectory = path.join(project, ".agents", "skills", "qa-discovery");
   const manifest = path.join(project, ".agents", "skills", "qa-discovery", "SKILL.md");
+  const workspaceRoot = fs.realpathSync(project);
+  let directoryEntries;
+  let directoryError;
+  let manifestBytes;
+  let manifestError;
+  try {
+    const { readDirectory } = await import(pathToFileURL(path.join(buildRoot, "runtime", "execution", "directory.js")).href);
+    directoryEntries = (await readDirectory(workspaceRoot, skillDirectory)).map(entry => entry.name);
+  } catch (error) {
+    directoryError = describeError(error);
+  }
+  try {
+    const { readBinarySnapshot } = await import(pathToFileURL(path.join(buildRoot, "runtime", "execution", "snapshot.js")).href);
+    manifestBytes = (await readBinarySnapshot({ absolutePath: manifest, workspaceRoot }, 512 * 1024)).length;
+  } catch (error) {
+    manifestError = describeError(error);
+  }
   throw new Error(`fixture skill discovery failed (${JSON.stringify({
     project,
+    workspaceRoot,
     manifest,
     manifestExists: fs.existsSync(manifest),
+    directoryEntries,
+    directoryError,
+    manifestBytes,
+    manifestError,
     sources,
     diagnostics: loaded.diagnostics,
     failures: loaded.failures,
   })})`);
+}
+
+function describeError(error) {
+  if (!(error instanceof Error)) return { message: String(error) };
+  return {
+    name: error.name,
+    message: error.message,
+    ...("code" in error && typeof error.code === "string" ? { code: error.code } : {}),
+  };
 }
 
 
