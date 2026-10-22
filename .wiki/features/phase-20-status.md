@@ -2,7 +2,7 @@
 
 本文只记录有本地证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
-## 2026-10-22 面板、源投影与 W2/W3 本地返工（未提交）
+## 2026-10-22 面板、源投影与 W2/W3 本地返工（代码批 `152d9ecc` 已推送；CI/Watch success）
 
 - 补齐 `/jobs`、`/agents`、`/usage`、`/plan-review`、`/btw` 的既有 picker consumer。`/agents` 通过 jobs owner 的 `agentProjection` 投影 live owner、detached、stored/running→unknown 与保留运行，通过 `agentPage` 提供脱敏、截断的文本页；同时展示 `SubagentLoader` 的有效定义和经安全投影的 discovery diagnostics，不借用 jobs 的本地任务身份；`/usage` 打开时只读本地账本，账户读取必须显式选行并在配置 revision 变化后丢弃迟到结果；`/plan-review` 绑定已加载版本，`/btw` 只读 transcript 中的保留报告。
 - `/settings set <key> <value> [--project]` 已沿交互、line、pipe/print 与 command bridge 接入同一 CAS writer；用户范围、显式项目范围、非法值、未知键和 session 变更拒绝均有回归。Linux Node/exe × regular/fullscreen/line/pipe 八格隔离 smoke 通过，line/pipe 覆盖 profile 创建、切换的显式非交互拒绝和 `maxTurns=7` 文件读回。
@@ -12,7 +12,7 @@
 - 最终聚焦 23 文件/430 项通过。最终字节的完整 `test:ts` 使用仓库外临时配置以 2 worker、1 次 retry 运行，实际 926 文件通过、1 文件跳过，9781 项通过、10 项跳过，804.69s，无失败或 retry 标记；这不等同于默认 8-worker 结果。此前默认并行下的 browser/CLI 负载型失败保留原分类，未用低并发结果冒充默认并行通过。旧提交 `5576b1d3` 的 CI `39717903140` 仍只证明旧 SHA。
 - `test:scripts` 106 项、`verify:result-contract` 6 套/154 项、golden main path、`verify:cli-entry` 19 项、cycles/config-consumers/declarations/Node-floor、strict docs/rules 与 `git diff --check` 通过；module facade 仍为既有 8 项 advisory，docs-source 仍为 118 项 advisory。NormProof 实际 exit 0/partial，blocking import/cycle 义务 satisfied、0 blocking，既有 8 项 function-ceiling advisory 保留。
 - 最终 TS build ID `faeb78a44674365c5490409b013b6eb7dfe9c7f71b9fbb23ab4dcadf3fc65e5e`，inputs digest `70aedc13fda716d9778be5460ef2e985ffb1a44aa4a1714e8f9e8199cef1a513`，artifact digest `813a2891a181c948e6e6b57a727c784008e59020406db2491d40f2b4c94d8c96`；exe 102,742,144 bytes、mode 755、SHA-256 `355d84e9e1d9c5f731fd82a76243670f629a52114d0d19cf333d8fca1eb6274f`。该产物 Node/exe × regular/fullscreen/line/pipe 八格隔离 PTY 全部 exit 0；最终 exe 上的 19 项 CLI hard gate 也全部通过。
-- CLI hard gate 的单 hunk 检查现在证明非交互无 group-selection host 时拒绝且零写入；正向单 hunk 应用仍由 patch/turn 聚焦回归覆盖，未把无选择宿主伪装成成功路径。已执行并恢复的最终反转包括 wrapped-node 逻辑换行、JSON list 设置、no-tools wire schema、compaction 身份与 opt-out、compaction 回退 overhead live getter、output-aware retained tail、context/status 身份、retained identity fallback、部分身份严格拒绝、interactive usage binding、live discovery compaction identity、fence blank-line source、agents live binding 与 owner projection、agents continuation syntax、UTF-8 分页、panel 控制字节、jobs workspace identity 和 `/btw` retained report。所有反转均取得真实失败，恢复后源码 SHA256 与反转前一致。当前批次 commit、push 与新 SHA CI 尚未执行；START-03、QA-02/03、TOOL-02 仍按用户允许的延期范围保留。
+- CLI hard gate 的单 hunk 检查现在证明非交互无 group-selection host 时拒绝且零写入；正向单 hunk 应用仍由 patch/turn 聚焦回归覆盖，未把无选择宿主伪装成成功路径。已执行并恢复的最终反转包括 wrapped-node 逻辑换行、JSON list 设置、no-tools wire schema、compaction 身份与 opt-out、compaction 回退 overhead live getter、output-aware retained tail、context/status 身份、retained identity fallback、部分身份严格拒绝、interactive usage binding、live discovery compaction identity、fence blank-line source、agents live binding 与 owner projection、agents continuation syntax、UTF-8 分页、panel 控制字节、jobs workspace identity 和 `/btw` retained report。所有反转均取得真实失败，恢复后源码 SHA256 与反转前一致。代码批 `152d9ecc7d55ff8ced88a338ff1db7eb153aa4f7` 已提交并推送；CI `39753892764`/job `119740926577` 与 Architecture Watch `39753892815`/job `119740927033` 均 completed/success，只绑定该代码 SHA。START-03、QA-02/03、TOOL-02 仍按用户允许的延期范围保留。
 
 ## 2026-10-22 MCP 服务器刷新与安全报告返工（PAN-08 部分）
 
