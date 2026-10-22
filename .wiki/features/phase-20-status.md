@@ -35,9 +35,16 @@
 - 代码批 `286c961c3fcf319d95054c12cac69ae2cb281706` 已推送；CI `39867401287`/job `120132949473` 为 completed/failure，测试 9868 项通过、1 项失败、3 项跳过，耗时 766.52s；Architecture Watch `39867401240`/job `120132949040` 为 success。失败项是 theme stale-preview 文案被泛化，未把该 run 记成成功。
 - 修复批 `cbde43e0a7f9e1a34ade16b2487363351ad0d5e1` 已推送，远端 `main` 精确读回同 SHA。CI `39869615352`/job `120140442661` 为 completed/success，耗时 25m23s；完整测试 927 文件通过/1 跳过、9869 项通过/3 项跳过，测试耗时 819.25s，静态门、脚本门、构建、Chromium 安装与 NormProof 步骤均 success。Architecture Watch `39869615369`/job `120140443173` 为 completed/success。两项只绑定该修复 SHA。
 
+## 2026-10-23 PAN-01 revision-bound model search（本地验证；代码批待提交）
+
+- `picker/model.test.ts` now drives the real `OverlayHost`: pasting `relay b` leaves only the relay-B model row, and pasting `review` leaves the named profile-role row. The displayed row is accepted through the ordinary Enter path rather than a synthetic direct apply.
+- After relay search, the test advances the accepted publication revision before Enter and requires `Model selection expired`; session model bytes remain unchanged. After role search, it replaces the same profile role with a different model, then requires `Model preset changed` instead of silently applying the new target; session model bytes remain unchanged.
+- Focused picker/model host set: 3 files/74 tests passed. Two isolated reversals failed as expected: removing connection ID/label from the row made relay search fail, and removing the preset-owner comparison made the changed role apply instead of being rejected. Both source reversals were restored.
+- No product source changed in this batch; it closes the previously missing PAN-01 search/revision acceptance. The matrix moves to 29 `complete`/18 `partial`/0 `open`; Phase 20 remains `partial` because the other rows retain their stated gaps.
+
 ## 2026-10-23 全 47 项复核与 QA-03/TOOL-02 harness 返工（代码批 `6ed28019` 已推送；CI/Watch success；真实模型项仍 partial）
 
-- `scripts/phase20-requirements.json` 现在逐项记录决策表全部 47 个唯一 ID：28 项 `complete`、19 项 `partial`、0 项 `open`，整体仍为 `partial`。`scripts/phase20-requirements.mjs` 与 4 项回归强制矩阵 ID 和决策表完全相等，complete 行不得保留缺失证据，partial 行不得隐藏缺口。该矩阵明确保留 PRV-03/05、PAN-01…08、INPUT-01、RENDER-01…03、TOOL-02、QA-01…04 的开放验收，不再把“未闭合”简化为 QA-03/TOOL-02 两项。
+- `scripts/phase20-requirements.json` 现在逐项记录决策表全部 47 个唯一 ID：29 项 `complete`、18 项 `partial`、0 项 `open`，整体仍为 `partial`。`scripts/phase20-requirements.mjs` 与 4 项回归强制矩阵 ID 和决策表完全相等，complete 行不得保留缺失证据，partial 行不得隐藏缺口。该矩阵明确保留 PRV-03/05、PAN-02…08、INPUT-01、RENDER-01…03、TOOL-02、QA-01…04 的开放验收，不再把“未闭合”简化为 QA-03/TOOL-02 两项。
 - 默认 `npm run qa:quality` 改用 `scripts/qa-quality-formal.json` 的 20 项 qualifying corpus：12 项发现/执行、4 项摘要、4 项渲染；decoder 强制分类下限，starter corpus 只留作回归。`--validate-fixtures` 在不发 provider 请求的情况下准备 20 个隔离 home/project 并调用本地 `/tools`，实际 20/20 通过；固定 allowlist 下 MCP fixture 完整池 18 项、extension fixture 完整池 18 项，其余 18 个任务各 17 项。
 - harness 现在逐 arm 记录 turns、tool calls、argument errors、missed discovery、批准结果、成功工具、cache read/write、实际 usage 与捕获价格成本 coverage；任务支持批准拒绝、文件必须不存在、任一编辑工具成功、隔离 MCP、受原 state/inventory 校验的 Linux extension，以及同一 session 的跨进程 follow-up。缺失 session、换 session、无 measured request、未知 tokenizer 或未定价 cache token 均 fail closed。blind-human 输出写入独立 mode `0600` candidate，arm 映射单独保存；`--resume --ratings` 可在不重复 provider 请求的情况下重投影报告。两臂统一使用 `temperature=0`、`topP=1`、`maxOutputTokens=4096`，报告缺少数值时不能判为 complete。
 - 每个真实 run 在 `run-meta.json` 与 `tokenizer.json` 之后生成 revisioned `run-manifest.json`，绑定 run metadata、tokenizer evidence、全部 pair/raw arm、脱敏 candidate、review map 与评分文件。resume 先验证精确文件集合和每个 SHA-256；已有 artifact 变更、未登记 artifact、重复/缺失 pair 或非法评分都会在重投影前失败。评分文件只在解析与双评分校验通过后复制到 private 目录，再以 revision+1 追加到 manifest。
@@ -124,7 +131,7 @@
 | W2 | 连接/角色/目录、委派续期、主/cache/辅助费用及池限制/退避已有逐批证据；只读可用性现共用完整池拓扑、自身凭据与当前代次等待，active 不可用和无目录成员保真 | 本批提交/远端按日志记录；完整 consumer/publication 与 provider/endpoint/受众复核仍开放 |
 | W3 | CTX-03 有界分段/合并、永久重播证据、原生 source CAS 与精确发布证明已有本地及独立验收；自动/overflow 未验证发布停止 turn | 两项架构 WATCH 为容量拒绝和锁内同步 I/O，已记录取舍；本批提交/远端按日志；CTX-01/02/04、TOOL-01 继续复核 |
 | W5 | SET-02 已修复选中分组后无法搜索其他组的问题；复用文字匹配排序，跨组按最佳得分和固定组序展示；清空搜索回原组，从详情 Back 回字段所属组并聚焦 | CMD-01/02、SET-01/03 全部验收；SET-02 其余来源/状态细节继续按合同核查 |
-| W6 | modal 的项目范围切组现已可达；不能由此证明完整目录分页/搜索 | PAN-01…08 各动作、只读边界、分页和 revision |
+| W6 | modal 的项目范围切组现已可达；不能由此证明完整目录分页/搜索 | PAN-02…08 各动作、只读边界、分页和 revision；PAN-01 已由后续搜索/revision 验收闭合 |
 | W7/W8/W9 | 2026-10-20 返工已补上同文件 hunk 的 baseline/content identity、detach 后保留晋升总期限、adopted settlement、follow-up 脱敏/reload、轻量 `--help`/`--version`、首帧 bootstrap 扫描探针，以及最终 Markdown/HTML code-span、diff rows/bytes/rename 与 copy 反例；START-02 现有 packaged 首帧恢复提示与用户意图 fence，START-01 fresh packaged gate 已在本工作树通过 | 其余 INPUT/RENDER consumer 仍按合同复核；START-01/02 的新提交 CI 与跨平台验收另行取证 |
 | W10 | 本批 135 文件/1813 测试通过；修改前实现使 20 项回归失败；两路独立复核通过；Node/exe × regular/fullscreen 的 settings/resume 切组、关闭与退出 PTY 通过 | QA-01/02/04 随后续返工累积；本批不等于全阶段交付 |
 
@@ -234,7 +241,6 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 
 | 任务 | 已做 | 缺 |
 |---|---|---|
-| PAN-01 | model 两栏与详情、同名 relay 区分、预设行 | 连接/role 的绑定 revision 搜索验收 |
 | PAN-02 | 时间分组、pin、树形、跨项目完整授权目录搜索、10k 分页批处理、全屏事实/对话预览、窄屏 stacked preview、current tree focus、pin 持久化；Linux TUI fork/切换/确认删除组合通过 | 其余动作身份/revision 边界继续复核；restore preview 另归 PAN-06 |
 | PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
 | PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝；restore 100项分页/续页、全目录搜索、有界目录缓冲与记录保留、复合身份消歧、元数据digest重验、特殊路径参数及preview-only业务链；back 保留完整候选、25项展示续页、numeric/exact-ID定位、完整prompt搜索和共享捕获快照，沿既有草稿/分支回退；四格打包PTY核对60题全可达与文件不变 | history完整持久树沿既有query owner；undo saved-results已补40条续页/明确到头、scope和完整receipt revision重验，精确补偿沿原owner；copy已补完整block搜索/续页/到头/失败/取消及恢复会话早期源；其余identity/revision及资源边界继续复核；back完整候选保留/同步搜索随源大小增长，restore每页/搜索仍线性扫描目录，不宣称搜索延迟上界或原子目录快照 |

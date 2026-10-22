@@ -2,7 +2,7 @@
 
 每一行把任务绑定到所有者、当前测试与一个反转条件。测试通过只证明该行；没有真实 provider、PTY、跨平台或发布证据的行仍保持开放。
 
-2026-10-23 的机器可检查复核矩阵为 [scripts/phase20-requirements.json](../../scripts/phase20-requirements.json)，由 `npm run verify:phase20-requirements` 对照本规划逐 ID 校验：47 项中 28 项 `complete`、19 项 `partial`、0 项 `open`，整体仍为 `partial`。`complete` 只表示该行已取得当前约定的本地/构建/CI 证据，不替代 QA-02 的真实平台格、QA-03 的真实质量或 Phase 20 总完成。
+2026-10-23 的机器可检查复核矩阵为 [scripts/phase20-requirements.json](../../scripts/phase20-requirements.json)，由 `npm run verify:phase20-requirements` 对照本规划逐 ID 校验：47 项中 29 项 `complete`、18 项 `partial`、0 项 `open`，整体仍为 `partial`。`complete` 只表示该行已取得当前约定的本地/构建/CI 证据，不替代 QA-02 的真实平台格、QA-03 的真实质量或 Phase 20 总完成。
 
 2026-10-18 返工复核发现旧表有状态漂移：实现存在或测试数量不能替代完整裁决。当前复核范围及未闭合项见 [交付状态](phase-20-status.md#返工复核2026-10-18)；以下未重新验收的行均是历史证据索引。
 
@@ -62,7 +62,7 @@
 
 | 任务 | 所有者 | 证据 | 反转 |
 |---|---|---|---|
-| PAN-01 连接/具名角色选择 | `picker/model.ts` | picker/model、pickers；两栏内保留 target 对象和 admission | 同名 model 不区分 connection、失效项可执行或只应用默认角色时失败 |
+| PAN-01 连接/具名角色选择 | `picker/model.ts` | picker/model（26）、model host（1）、pickers（47）；真实 overlay 按 relay 与 role 搜索，选择后分别改变 publication revision 和 preset owner，旧行均被拒绝且会话字节不变 | 移除 relay 身份后搜索失败；移除 preset owner 比较后改名的 role 会替换原显示目标并失败 |
 | PAN-02 | `picker/session.ts`、`picker/session/preview.ts`、`picker/session/listing.ts`、`tree.ts` | session（33）、session/listing（5）、tree（4）、overlay（64）、panel（11）、management（20）、catalog projection（1）；真实排队 `/tree` 在 load 后读取 current focus，exclusive 包装保留 getter | 分组行可选中、完整目录搜索只扫描首屏、旧 query/scope 回填、10k 页在 41 项批处理边界失败、窄屏 footer 丢状态、连接线/current focus 缺失或跨项目动作被放行时失败；反转对象展开会实际选中旧节点 |
 | PAN-03 | `picker/hub.ts`、`picker/agents.ts`、`jobs/agent/projection.ts` | pickers（39）；`/agents` stale/detached、liveness、session rebind 与 `agentPage` 脱敏分页 | `/hub` 在无 composition 时仍打开或 apply 取消任务时失败；绕过 `agentProjection` 时 stored running 仍显示 running |
 | PAN-04 | `cli/usage/service.ts` | usage（31） | 无限分母输出百分比时失败 |

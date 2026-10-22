@@ -15,6 +15,9 @@ import { createCliProviderRuntimeBridge } from '../../provider/cliProviderRuntim
 import { saveProfileModelPreset } from '../../../core/commands/model/preset.js';
 import { runModelCommand } from '../../../core/commands/modelCommandRuntime.js';
 import { connectionPicker } from './connections.js';
+import { OverlayHost } from '../overlay.js';
+import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
+import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 
 let home: string;
 let manager: SessionManager;
@@ -239,5 +242,47 @@ it('applies a named profile role in an empty session and rejects later preset re
   expect(saveProfileModelPreset('work', { default: roles.default }, context())).toContain('replaced');
   const before = readSessionModelEdit(sessionId);
   expect((await picker.apply(['preset:work:review']))?.note).toContain('preset changed');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+});
+
+it('searches a relay and rejects its row after the publication revision changes', async () => {
+  let revision = 1;
+  const config = getRuntimeConfig(home); const catalog = loadCatalog();
+  const picker = modelPicker({ ...context(), readConfiguration: () => ({ config, catalog, revision }) });
+  const overlay = new OverlayHost(() => {});
+  overlay.open(picker);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  overlay.handlePaste('relay b');
+  const rendered = stripAnsi(overlay.render(120, 30).join('\n'));
+  expect(rendered).toContain('Relay b');
+  expect(rendered).not.toContain('Relay a');
+
+  revision++;
+  const before = readSessionModelEdit(sessionId);
+  let result: ReturnType<typeof picker.apply> | undefined;
+  overlay.handleKey(parseKeyEvent('\r'), (selected, ids) => { result = selected.apply(ids); });
+  expect((await result!)?.note).toContain('expired');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+});
+
+it('searches a named role and rejects it after the preset owner changes', async () => {
+  const roles = { default: { connectionId: 'a', provider: 'openai', model: 'shared' },
+    review: { connectionId: 'b', provider: 'openai', model: 'other', thinkingEffort: 'high' as const } };
+  expect(saveProfileModelPreset('work', roles, context())).toContain('saved');
+  const picker = modelPicker(context());
+  const overlay = new OverlayHost(() => {});
+  overlay.open(picker);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  overlay.handlePaste('review');
+  expect(stripAnsi(overlay.render(120, 30).join('\n'))).toContain('Preset: work / review');
+
+  expect(saveProfileModelPreset('work', {
+    default: roles.default,
+    review: { ...roles.review, model: 'shared' },
+  }, context())).toContain('replaced');
+  const before = readSessionModelEdit(sessionId);
+  let result: ReturnType<typeof picker.apply> | undefined;
+  overlay.handleKey(parseKeyEvent('\r'), (selected, ids) => { result = selected.apply(ids); });
+  expect((await result!)?.note).toContain('preset changed');
   expect(readSessionModelEdit(sessionId)).toEqual(before);
 });

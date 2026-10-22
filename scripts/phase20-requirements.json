@@ -155,9 +155,9 @@
     },
     {
       "id": "PAN-01",
-      "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; model two-column and relay identity tests",
-      "missing": "Connection/role binding-revision search acceptance remains."
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W6; model overlay relay/role search plus publication and preset-owner revision rejection tests",
+      "missing": ""
     },
     {
       "id": "PAN-02",

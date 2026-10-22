@@ -8496,3 +8496,11 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 最终 TypeScript build ID `124883cf2cf00ed6efa79089ec83cf929c662b3846b6f45862cb3c3ff2dcd301`，inputs digest `5ace5cd64a6026d6df7028b3713917ba7383c72c047b66118a06098982a04695`，artifact digest `a69a74836ff5f57bbf3044ceb9f51d801bdb70c6db1f3317c646b77ec8459b82`；executable SHA-256 `19e1c4965ac7dc697228bab42dd34332a4a92ed0e282db433160d9fe7717cbe8`。双构建、`test:scripts` 157 项、19 项 CLI entry、四项静态门、Node/exe × regular/fullscreen/line/pipe 合成 PTY 八格与仓库 NormProof exit 0/partial（11 项既有 function-ceiling advisory）均通过。
 - 代码批 `286c961c3fcf319d95054c12cac69ae2cb281706` 已推送；CI `39867401287`/job `120132949473` completed/failure，9868 项通过、1 项失败、3 项跳过、766.52s；Architecture Watch `39867401240`/job `120132949040` success。失败保留为真实中间结果。
 - 修复批 `cbde43e0a7f9e1a34ade16b2487363351ad0d5e1` 已推送，远端 `main` 精确读回同 SHA。CI `39869615352`/job `120140442661` completed/success，耗时 25m23s；927 文件通过/1 跳过、9869 项通过/3 项跳过、819.25s；Architecture Watch `39869615369`/job `120140443173` completed/success。矩阵仍为 28 `complete`/19 `partial`/0 `open`；Phase 20 整体为 `partial`，不把 SET-03 证据扩大为其余任务闭合。
+
+## [2026-10-23] test | Phase 20 PAN-01 revision-bound model search
+
+- 续接 PAN-01 唯一剩余验收：model 两栏、同名 relay、预设行与精确 target 已存在，但缺少真实搜索后仍受 publication/preset revision 约束的端到端证据。
+- `picker/model.test.ts` 现在通过真实 `OverlayHost` 粘贴 `relay b`，只保留 relay-B 行；随后推进 accepted configuration publication revision 并按 Enter，要求 `Model selection expired`，session model 字节不变。
+- 第二个用例粘贴 `review`，定位 profile role 行；随后把同名 role 改成另一模型，再按 Enter。preset-owner 比较必须返回 `Model preset changed`，不能把旧行重新解释为新 target，session model 字节不变。
+- 聚焦 picker/model host 3 文件/74 项通过。两项隔离反转实际失败：删除 model row 的 connection ID/label 后 relay 搜索失败；删除 preset-owner 比较后改名的 role 被直接应用。反转均已恢复，`model.ts` 最终 diff 为空。
+- 本批只新增验收测试，不改产品源码；`scripts/phase20-requirements.json` 将 PAN-01 更新为 `complete`，矩阵为 29 `complete`/18 `partial`/0 `open`。Phase 20 整体仍为 `partial`；提交、推送、精确 SHA CI/Watch 待后续实际读回。
