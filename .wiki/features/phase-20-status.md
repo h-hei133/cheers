@@ -24,9 +24,17 @@
 - 代码批 `9a7e386982577d64c84e970ad3e661d9f329c5bc` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39862167681`/job `120115317655` 为 completed/success，耗时 22m19s；完整测试 927 文件通过/1 跳过、9863 项通过/3 项跳过，测试耗时 673.80s，静态门、脚本门、构建、Chromium 安装与 NormProof 步骤均 success。Architecture Watch `39862167651`/job `120115317662` 为 completed/success。两项只绑定该代码 SHA。
 - PRV-05 remains `partial`: no trusted remote settlement or billing evidence was obtained. The local ledger and quota projection are not a substitute for provider-side accounting.
 
+## 2026-10-23 SET-03 settings preview external invalidation（本地验证；代码批待提交）
+
+- `picker/preview.ts` now captures the active configuration publication revision for composer and status previews; a later publication invalidates the preview before it can be shown again. Theme preview keeps its existing generation-bound lease and refuses a superseded selection.
+- `ComposerPreference.read()` drops a staged composer preview when the configuration revision changes, and `InteractiveMode` drops status preview state when a publication advances. Both paths therefore return the newly accepted value rather than the old display proposal.
+- The settings picker tests cover composer and status previews, the real `refreshShellRuntimeConfig` publication path, and theme revision protection. The affected set is 9 files/313 tests; the initial pre-fix run failed the composer and status revision assertions, and three isolated reversals failed the preview guard, composer invalidation, and status publication checks respectively.
+- The final TypeScript build is `6919128a4d4960fd51e6c33414f622ca4419d3e9fecd5f25064d353283656832`, inputs digest `f3b6f475af77dba3d6a7009404f7072c38148ca895817192848a69c965f185b9`, artifact digest `147da6bbcd80e8a5861ef4e5818963dfe7d8c599cfdef51ac81510c6a9ba10d9`; executable SHA-256 `2bca92f979ba97a64725a9c9e176bfbcb70caa98b0147697dc40d13f2e37d8da`.
+- `verify:import-cycles` (2,764 files, 0 runtime/type cycles), `check:config-consumers` (53/53), `check:declarations` (18/18 hooks, 11/11 factories), `check:node-floor`, `test:scripts` (157), `verify:cli-entry` (19), TypeScript build, executable build, `git diff --check`, and Node/exe × regular/fullscreen synthetic PTY smoke (4/4) passed. SET-03 is now `complete`; Phase 20 remains `partial` because the other matrix rows retain their stated gaps.
+
 ## 2026-10-23 全 47 项复核与 QA-03/TOOL-02 harness 返工（代码批 `6ed28019` 已推送；CI/Watch success；真实模型项仍 partial）
 
-- `scripts/phase20-requirements.json` 现在逐项记录决策表全部 47 个唯一 ID：27 项 `complete`、20 项 `partial`、0 项 `open`，整体仍为 `partial`。`scripts/phase20-requirements.mjs` 与 4 项回归强制矩阵 ID 和决策表完全相等，complete 行不得保留缺失证据，partial 行不得隐藏缺口。该矩阵明确保留 PRV-03/05、SET-03、PAN-01…08、INPUT-01、RENDER-01…03、TOOL-02、QA-01…04 的开放验收，不再把“未闭合”简化为 QA-03/TOOL-02 两项。
+- `scripts/phase20-requirements.json` 现在逐项记录决策表全部 47 个唯一 ID：28 项 `complete`、19 项 `partial`、0 项 `open`，整体仍为 `partial`。`scripts/phase20-requirements.mjs` 与 4 项回归强制矩阵 ID 和决策表完全相等，complete 行不得保留缺失证据，partial 行不得隐藏缺口。该矩阵明确保留 PRV-03/05、PAN-01…08、INPUT-01、RENDER-01…03、TOOL-02、QA-01…04 的开放验收，不再把“未闭合”简化为 QA-03/TOOL-02 两项。
 - 默认 `npm run qa:quality` 改用 `scripts/qa-quality-formal.json` 的 20 项 qualifying corpus：12 项发现/执行、4 项摘要、4 项渲染；decoder 强制分类下限，starter corpus 只留作回归。`--validate-fixtures` 在不发 provider 请求的情况下准备 20 个隔离 home/project 并调用本地 `/tools`，实际 20/20 通过；固定 allowlist 下 MCP fixture 完整池 18 项、extension fixture 完整池 18 项，其余 18 个任务各 17 项。
 - harness 现在逐 arm 记录 turns、tool calls、argument errors、missed discovery、批准结果、成功工具、cache read/write、实际 usage 与捕获价格成本 coverage；任务支持批准拒绝、文件必须不存在、任一编辑工具成功、隔离 MCP、受原 state/inventory 校验的 Linux extension，以及同一 session 的跨进程 follow-up。缺失 session、换 session、无 measured request、未知 tokenizer 或未定价 cache token 均 fail closed。blind-human 输出写入独立 mode `0600` candidate，arm 映射单独保存；`--resume --ratings` 可在不重复 provider 请求的情况下重投影报告。两臂统一使用 `temperature=0`、`topP=1`、`maxOutputTokens=4096`，报告缺少数值时不能判为 complete。
 - 每个真实 run 在 `run-meta.json` 与 `tokenizer.json` 之后生成 revisioned `run-manifest.json`，绑定 run metadata、tokenizer evidence、全部 pair/raw arm、脱敏 candidate、review map 与评分文件。resume 先验证精确文件集合和每个 SHA-256；已有 artifact 变更、未登记 artifact、重复/缺失 pair 或非法评分都会在重投影前失败。评分文件只在解析与双评分校验通过后复制到 private 目录，再以 revision+1 追加到 manifest。
@@ -230,8 +238,6 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | PAN-06 history | 裸 `/history` 复用完整持久树及废弃分支，选择只生成精确 `/tree -- <entry-id>` 草稿；空历史/无匹配/读取失败分开；真实排队焦点、禁用身份与取消无写回归；底栏任务存储读取失败显示 unavailable，恢复后重新读取 | 完整树/全文搜索仍同步且未设总字节/工作量界，10k模拟节点不证明真实大历史响应界；cleanse 面板、其余 identity/revision 及资源合同继续开放；本批293项、专用故障PTY与交付证据见开发日志 |
 | PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引）、watcher 注销与 unknown status 回归；`/agents` 复用 jobs owner 的 `agentProjection`/`agentPage`，覆盖 stale/detached 与脱敏输出页 | agents 控制操作仍归 `/jobs`；其余 journal/revision 边界继续复核 |
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
-| SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
-
 ## 未闭合
 
 START-03 已由 2026-10-23 的受控冷/热基准闭合；以下只列仍开放项。

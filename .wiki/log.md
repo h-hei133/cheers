@@ -8485,3 +8485,11 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 指定 `cn:deepseek-v4.1-flash` 的独立 reviewer 返回 `503 Service Unavailable`，未取得独立批准；本轮结论来自本地自审、聚焦测试和实际反转，不把不可用 reviewer 写成 APPROVE。
 - `request-attribution.md` 已明确 title 的本地派生边界和未来模型标题必须复用同一 policy/credential identity。PRV-05 仍保持 `partial`，因为本轮没有可信远端结算/账单证据；本地 ledger、quota 与合成 HTTP 不能替代 provider 侧计费。
 - 代码批 `9a7e386982577d64c84e970ad3e661d9f329c5bc` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39862167681`/job `120115317655` completed/success，耗时 22m19s；完整测试 927 文件通过/1 跳过、9863 项通过/3 项跳过、673.80s，静态门、脚本门、构建、Chromium 安装与 NormProof 步骤均 success。Architecture Watch `39862167651`/job `120115317662` completed/success；两项只绑定该代码 SHA。
+
+## [2026-10-23] fix | Phase 20 SET-03 preview external invalidation
+
+- 续接 SET-03 的外部更新撤销验收，先确认原 theme lease 已绑定 generation，而 composer/status 仅清空 preview、没有配置 publication revision guard。先在 settings picker 增加 composer/status 外部 revision 用例，预实现运行实际 2 项断言失败并保留为有效反例。
+- `settingPreview` 现在按配置 publication revision 拒绝过期的 composer/status 预览；`ComposerPreference.read()` 在 revision 变化后丢弃 composer 提案，`InteractiveMode` 的 status thunk 在 publication 前进后清除 preview 并读取当前 accepted 配置。theme 继续使用原 `beginThemePreview` generation lease，外部选择不会被旧 `end` 覆盖。
+- 最终受影响 9 文件/313 项通过：theme selection/preview、settings picker、真实 settings runtime、overlay、pickers、firstFrame、selection 与 interactiveMode。三组实际反转均取得断言失败：删除 preview revision guard 时 composer/status 2 项失败；删除 composer lazy invalidation 时真实外部 publication 1 项失败；删除 status publication check 时 status preview 1 项失败。
+- 最终 TypeScript build ID `6919128a4d4960fd51e6c33414f622ca4419d3e9fecd5f25064d353283656832`，inputs digest `f3b6f475af77dba3d6a7009404f7072c38148ca895817192848a69c965f185b9`，artifact digest `147da6bbcd80e8a5861ef4e5818963dfe7d8c599cfdef51ac81510c6a9ba10d9`；executable SHA-256 `2bca92f979ba97a64725a9c9e176bfbcb70caa98b0147697dc40d13f2e37d8da`。双构建、`test:scripts` 157 项、19 项 CLI entry、四项静态门、Node/exe × regular/fullscreen 合成 PTY 四格均通过。
+- 矩阵已把 SET-03 从 `partial` 更新为 `complete`，计数变为 28 `complete`/19 `partial`/0 `open`；Phase 20 整体仍为 `partial`，不把本批证据扩大为其余任务闭合。代码批、远端 SHA 与 CI/Watch 证据将在提交推送后按实际结果补记。

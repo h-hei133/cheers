@@ -46,9 +46,11 @@ function valueEditor(host: SettingsHost, draft: SettingsDraft, setting: SettingD
   const current = draft.values[setting.key];
   const value = pending ? pending.value : current.stored === undefined ? current.requested : current.stored;
   if (setting.key === 'tui.statusItems') {
+    const preview = settingPreview(host, setting.key);
     const picker = statusItemPicker({ current: normalizeStatusItems(value as readonly string[] | undefined), save: async () => undefined,
-      preview: host.previewStatusItems ?? (() => {}) });
+      preview: items => { preview?.show(items); } });
     return { ...picker, title: 'Stage status items — Enter reviews; empty uses defaults', exclusive: true, holdInput: true,
+      previewEnd: preview?.end,
       apply: async ids => validateSetting(setting, ids) ? undefined : ({ next: settingDetail(host, draft, setting, { value: normalizeStatusItems(ids) }) }) };
   }
   return {
@@ -125,7 +127,7 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
       }
       preview?.end();
       if (ids.length !== 1) return undefined;
-      if (index >= 0 && previewError) return { note: 'Theme preview is unavailable. Check the theme and reopen Settings.', next: settingDetail(host, draft, setting, pending, failure) };
+      if (index >= 0 && previewError) return { note: 'Display preview is unavailable because the accepted setting changed. Review the current value before applying.', next: settingDetail(host, draft, setting, pending, failure) };
       const id = ids[0];
       if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending) };
       if (id === 'unset') return { next: settingDetail(host, draft, setting, { value: undefined }, failure) };

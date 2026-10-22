@@ -258,6 +258,49 @@ it('previews actual shapes without writing, restores on cancel, and publishes on
   expect(preference.read()).toBe('band');
 });
 
+it('revokes a composer preview after a real external configuration publication', async () => {
+  const context = runtime(); const changed = vi.fn();
+  const preference = new ComposerPreference(() => context.runtimeConfig, changed,
+    () => context.configuration.current.revision);
+  const host = {
+    openSettings: () => openSettings(context, changed),
+    previewComposerShape: preference.propose,
+    configurationRevision: () => context.configuration.current.revision,
+  };
+  const rootPicker = settingsPicker(host); await rootPicker.load();
+  const detail = (await rootPicker.apply(['tui.composerShape']))!.next!;
+  detail.previewChange!(['choice:7']);
+  expect(preference.read()).toBe('box');
+  fs.writeFileSync(file, '{"tui":{"composerShape":"rail"}}');
+  expect(refreshShellRuntimeConfig(context).status).toBe('applied');
+  expect(preference.read()).toBe('rail');
+  detail.previewChange!(['choice:0']);
+  expect(preference.read()).toBe('rail');
+  const result = await detail.apply(['choice:0']);
+  expect(result?.note).toContain('Display preview is unavailable');
+  expect(preference.read()).toBe('rail');
+  expect(JSON.parse(fs.readFileSync(file, 'utf8')).tui.composerShape).toBe('rail');
+});
+
+it('revokes a status preview after a real external configuration publication', async () => {
+  const context = runtime();
+  let previewed: readonly string[] | undefined;
+  const host = {
+    openSettings: () => openSettings(context, vi.fn()),
+    previewStatusItems: (items: readonly string[] | undefined) => { previewed = items; },
+    configurationRevision: () => context.configuration.current.revision,
+  };
+  const rootPicker = settingsPicker(host); await rootPicker.load();
+  const detail = (await rootPicker.apply(['tui.statusItems']))!.next!;
+  const editor = (await detail.apply(['edit']))!.next!;
+  editor.previewChange!(['cost']);
+  expect(previewed).toEqual(['cost']);
+  fs.writeFileSync(file, '{"tui":{"statusItems":["model"]}}');
+  expect(refreshShellRuntimeConfig(context).status).toBe('applied');
+  editor.previewChange!(['cost']);
+  expect(previewed).toBeUndefined();
+});
+
 it('keeps project shape precedence and exposes the user shape when the project choice is removed', async () => {
   projectTrust.setProjectTrust(root, 'session-only');
   fs.writeFileSync(file, '{"tui":{"composerShape":"band"}}');

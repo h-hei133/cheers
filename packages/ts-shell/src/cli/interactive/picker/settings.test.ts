@@ -98,6 +98,69 @@ describe('advanced settings picker', () => {
     expect(h.save).toHaveBeenCalledOnce(); expect(h.save).toHaveBeenCalledWith('attentionOnIdle', true);
     expect(result?.note).toBe('Attention on idle: Saved. Configuration was not applied (rejected).');
   });
+  it('revokes a composer preview after an external configuration publication', async () => {
+    let revision = 0;
+    const preview = vi.fn();
+    const h = { ...host(), configurationRevision: () => revision, previewComposerShape: preview };
+    const field = await detail(h, 'tui.composerShape');
+    const choices = CONFIG_SETTINGS.find(item => item.key === 'tui.composerShape')!.choices!;
+    const box = `choice:${choices.indexOf('box')}`;
+    const fallback = `choice:${choices.indexOf('default')}`;
+    field.previewChange!([box]);
+    expect(preview).toHaveBeenLastCalledWith('box');
+    revision++;
+    field.previewChange!([fallback]);
+    expect(preview).toHaveBeenLastCalledWith(undefined);
+    const result = await field.apply([fallback]);
+    expect(result?.note).toContain('Display preview is unavailable');
+    expect(h.save).not.toHaveBeenCalled();
+  });
+  it('revokes a status preview after an external configuration publication', async () => {
+    let revision = 0;
+    const preview = vi.fn();
+    const h = { ...host(), configurationRevision: () => revision, previewStatusItems: preview };
+    const field = await detail(h, 'tui.statusItems');
+    const editor = (await field.apply(['edit']))!.next!;
+    editor.previewChange!(['cost']);
+    expect(preview).toHaveBeenLastCalledWith(['cost']);
+    revision++;
+    editor.previewChange!(['model']);
+    expect(preview).toHaveBeenLastCalledWith(undefined);
+  });
+  it('does not let a theme preview overwrite an externally accepted theme', async () => {
+    let revision = 0;
+    let shown = 'dark';
+    const themes = {
+      names: () => ['dark', 'light', 'external'],
+      selected: () => shown,
+      revision: () => revision,
+      begin: vi.fn(() => {
+        const accepted = revision;
+        return {
+          show(name: string) {
+            if (accepted !== revision) return false;
+            shown = name;
+            return true;
+          },
+          end() {
+            if (accepted === revision) shown = 'dark';
+          },
+        };
+      }),
+    };
+    const h = { ...host(), themes };
+    const field = await detail(h, 'theme');
+    const light = `choice:${themes.names().indexOf('light')}`;
+    field.previewChange!([light]);
+    expect(shown).toBe('light');
+    revision++;
+    shown = 'external';
+    field.previewChange!([light]);
+    expect(shown).toBe('external');
+    const result = await field.apply([light]);
+    expect(result?.note).toContain('Display preview is unavailable');
+    expect(h.save).not.toHaveBeenCalled();
+  });
   it.each([80, 120])('shows effective/source/stored/target and pending state at %i columns', async width => {
     const h = host(); const field = await detail(h);
     const overlay = new OverlayHost(() => {}); overlay.open(field); await Promise.resolve(); await Promise.resolve();

@@ -200,6 +200,7 @@ export class InteractiveMode {
    * — Escape leaves the saved band exactly as it was.
    */
   private previewItems: readonly StatusItemId[] | undefined;
+  private previewItemsRevision: number | undefined;
   private stopped = false;
   private closing = false;
   private readonly alternateScreen: boolean;
@@ -243,10 +244,14 @@ export class InteractiveMode {
   constructor(private readonly options: InteractiveModeOptions) {
     this.alternateScreen = options.runtimeContext.runtimeConfig.tuiMode !== "regular";
     this.terminal = options.terminal ?? processTerminal;
-    this.composerPreference = new ComposerPreference(() => this.options.runtimeContext.runtimeConfig, () => {
-      this.view.invalidateLayout();
-      this.tui.requestRender();
-    });
+    this.composerPreference = new ComposerPreference(
+      () => this.options.runtimeContext.runtimeConfig,
+      () => {
+        this.view.invalidateLayout();
+        this.tui.requestRender();
+      },
+      () => this.options.runtimeContext.configuration.current.revision,
+    );
     this.statusItems = readStatusItems(options.runtimeContext.projectRoot, options.runtimeContext.runtimeConfig);
     this.clipboard = new Clipboard({
       cwd: options.runtimeContext.cwd,
@@ -305,7 +310,14 @@ export class InteractiveMode {
             queued: this.queue.length + (this.options.sessionRuntime.input?.()?.pending().followUps.length ?? 0),
             peers: readAmbientFacts(this.options.runtimeContext.session.id).peerSessions,
           }),
-        statusItems: () => this.previewItems ?? this.statusItems,
+        statusItems: () => {
+          const revision = this.options.runtimeContext.configuration.current.revision;
+          if (this.previewItemsRevision !== undefined && this.previewItemsRevision !== revision) {
+            this.previewItems = undefined;
+            this.previewItemsRevision = undefined;
+          }
+          return this.previewItems ?? readStatusItems(this.options.runtimeContext.projectRoot, this.options.runtimeContext.runtimeConfig);
+        },
         composerShape: this.composerPreference.read,
         activity: () => this.sink.activity(),
         busy: () => this.busy,
@@ -917,6 +929,7 @@ export class InteractiveMode {
     const previousTurnFailed = this.sink.lastTurnFailed;
     if (!automatic && !text.startsWith("/")) this.lastPrompt = text;
     const command = text.startsWith("/") ? text.split(/\s+/)[0]! : "turn";
+    const configurationRevision = this.options.runtimeContext.configuration.current.revision;
     this.sink.begin(text.startsWith("/") ? "command" : "turn", command);
     this.options.renderer.setSink(this.sink);
     try {
@@ -941,6 +954,7 @@ export class InteractiveMode {
       });
       this.catalogs.invalidate();
       this.turnNumber = result.turnNumber;
+      if (configurationRevision !== this.options.runtimeContext.configuration.current.revision) this.view.invalidateLayout();
       if (result.refreshMcpGateway) await this.options.initialMcpGateway.syncWorkspace?.();
       // `/theme` and `/reload` both change which file is worth following, and the
       // watcher would otherwise keep repainting for the theme that was replaced.
@@ -1120,7 +1134,7 @@ export class InteractiveMode {
       mcpGateway: this.options.initialMcpGateway,
       approvalTrustPolicy: this.options.approvalTrustPolicy,
       projectRoot: this.options.runtimeContext.projectRoot,
-      statusItems: this.statusItems,
+      statusItems: readStatusItems(this.options.runtimeContext.projectRoot, this.options.runtimeContext.runtimeConfig),
       undo: undoPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null }),
       gitWorkbench: gitWorkbenchFor(this.options.runtimeContext),
@@ -1152,6 +1166,7 @@ export class InteractiveMode {
       fork: entryId => this.runCommandLine(`/fork here --from ${entryId}`),
       previewStatusItems: (items) => {
         this.previewItems = items;
+        this.previewItemsRevision = items === undefined ? undefined : this.options.runtimeContext.configuration.current.revision;
         this.tui.requestRender();
       },
       previewComposerShape: this.composerPreference.propose,
@@ -1161,6 +1176,7 @@ export class InteractiveMode {
         follower: this.theme,
         redraw: () => this.tui.requestRender({ force: true }),
       }),
+      configurationRevision: () => this.options.runtimeContext.configuration.current.revision,
       saveStatusItems: async (items) => {
         const written = writeStatusItems(this.options.runtimeContext.projectRoot, items);
         this.statusItems = items;

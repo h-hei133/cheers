@@ -149,9 +149,9 @@
     },
     {
       "id": "SET-03",
-      "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W5; preview lease, save and apply tests",
-      "missing": "External-update invalidation still needs end-to-end acceptance."
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W5; preview revision leases, real external publication tests, CAS/apply/restart tests",
+      "missing": ""
     },
     {
       "id": "PAN-01",

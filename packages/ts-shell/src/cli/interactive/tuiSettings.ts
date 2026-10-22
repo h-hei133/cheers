@@ -83,11 +83,15 @@ export function readComposerShape(config: RuntimeConfig): ComposerShapeId {
 
 /** A picker proposes a shape without changing the accepted configuration. */
 export class ComposerPreference {
-  private preview: ComposerShapeId | undefined;
-  constructor(private readonly config: () => RuntimeConfig, private readonly changed: () => void) {}
-  readonly read = (): ComposerShapeId => this.preview ?? readComposerShape(this.config());
+  private preview: { readonly shape: ComposerShapeId; readonly revision: number } | undefined;
+  constructor(private readonly config: () => RuntimeConfig, private readonly changed: () => void,
+    private readonly revision: () => number = () => 0) {}
+  readonly read = (): ComposerShapeId => {
+    if (this.preview && this.preview.revision !== this.revision()) this.preview = undefined;
+    return this.preview?.shape ?? readComposerShape(this.config());
+  };
   readonly propose = (shape: ComposerShapeId | undefined): void => {
-    this.preview = shape;
+    this.preview = shape === undefined ? undefined : { shape, revision: this.revision() };
     this.changed();
   };
 }

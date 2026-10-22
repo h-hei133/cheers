@@ -93,6 +93,23 @@ function build(overrides: {
 }
 
 describe("session wiring", () => {
+  it("drops a status preview when an external configuration publication advances", () => {
+    const { mode } = build();
+    const host = mode as unknown as {
+      pickerHost(): PickerHost;
+      options: { runtimeContext: ShellRuntimeContext };
+      view: { context: { statusItems(): readonly string[] } };
+    };
+    Object.defineProperty(host.options.runtimeContext, 'runtimeConfig', {
+      configurable: true,
+      get: () => host.options.runtimeContext.configuration.current.config,
+    });
+    host.pickerHost().previewStatusItems(["cost"]);
+    expect(host.view.context.statusItems()).toEqual(["cost"]);
+    host.options.runtimeContext.configuration.recordDisplay({ tui: { statusItems: ["model"] } });
+    expect(host.view.context.statusItems()).toEqual(["model"]);
+    expect(host.pickerHost().statusItems).toEqual(["model"]);
+  });
   it('binds the usage picker to an interactive command context for local reset inspection', async () => {
     const { mode } = build();
     const host = mode as unknown as { pickerHost(): PickerHost; options: { runtimeContext: ShellRuntimeContext } };
