@@ -126,10 +126,13 @@ describe("choosing which credential to authorize with", () => {
   it("keeps native version headers with a subscription bearer token", () => {
     const result = providerAuthorization({
       endpoint: "copilot-messages",
-      accountAuth: { type: "subscription", provider: "github-copilot", baseUrl: "https://api.individual.githubcopilot.com", accessToken: "subscription-token", refreshToken: "refresh", expiresAt: Date.now() + 60_000 },
+      accountAuth: { type: "subscription", provider: "github-copilot",
+        baseUrl: "https://api.individual.githubcopilot.com",
+        accessToken: "tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com",
+        refreshToken: "refresh", expiresAt: Date.now() + 60_000 },
     });
     const headers = new Headers(result.headers);
-    expect(headers.get("authorization")).toBe("Bearer subscription-token");
+    expect(headers.get("authorization")).toBe("Bearer tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com");
     expect(headers.get("anthropic-version")).toBe("2023-06-01");
     expect(headers.get("content-type")).toBe("application/json");
     expect(headers.has("x-api-key")).toBe(false);
@@ -138,9 +141,11 @@ describe("choosing which credential to authorize with", () => {
   it("uses the native Copilot default when the endpoint is omitted", () => {
     const result = providerAuthorization({
       accountAuth: { type: "subscription", provider: "github-copilot", baseUrl: "https://api.individual.githubcopilot.com",
-        accessToken: "subscription-token", refreshToken: "refresh", expiresAt: Date.now() + 60_000 },
+        accessToken: "tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com",
+        refreshToken: "refresh", expiresAt: Date.now() + 60_000 },
     });
-    expect(new Headers(result.headers).get("authorization")).toBe("Bearer subscription-token");
+    expect(new Headers(result.headers).get("authorization"))
+      .toBe("Bearer tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com");
   });
 
   it("refuses a credential the provider did not issue", () => {

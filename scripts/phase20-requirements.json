@@ -48,8 +48,8 @@
     {
       "id": "PRV-03",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W2; account pool/presence and endpoint/audience tests",
-      "missing": "Opaque subscription-token issuer/audience proof and real account lifecycle evidence remain."
+      "evidence": ".wiki/features/phase-20-contract.md W2; account pool/presence, opaque token identity and endpoint/audience tests",
+      "missing": "Real account lifecycle evidence remains; token metadata and cross-origin isolation are covered synthetically."
     },
     {
       "id": "PRV-04",

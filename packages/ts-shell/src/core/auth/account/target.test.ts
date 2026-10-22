@@ -34,7 +34,8 @@ describe('captured account endpoint', () => {
   it('uses the subscription-issued endpoint and refuses a conflicting selected target', () => {
     const credential = account().credential!;
     const resolution: ProviderCredentialResolution = { ...account(), provider: 'github-copilot', credential: { ...credential,
-      provider: 'github-copilot', accountAuth: { type: 'subscription', provider: 'github-copilot', accessToken: 'synthetic', refreshToken: 'synthetic',
+      provider: 'github-copilot', accountAuth: { type: 'subscription', provider: 'github-copilot',
+        accessToken: 'tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com', refreshToken: 'synthetic',
         expiresAt: 1, baseUrl: 'https://api.individual.githubcopilot.com' } } };
     expect(providerCredentialBaseUrl(foreign, resolution)).toBe('https://api.individual.githubcopilot.com');
     expect(() => providerCredentialBaseUrl(foreign, { ...resolution, baseUrl: 'https://foreign.invalid/v1' })).toThrow('account issuer');

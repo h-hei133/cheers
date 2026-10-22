@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { completeGitHubDeviceFlow, nativeCopilotLogin, refreshCopilotToken, startGitHubDeviceFlow } from './copilot/flow.js';
-import { copilotBaseUrl } from './copilot/policy.js';
+import { assertCopilotAccount, copilotBaseUrl, copilotTokenIdentity } from './copilot/policy.js';
 import type { DeviceCodeGrant } from './deviceCode.js';
 
 const grant: DeviceCodeGrant = { deviceCode: 'device', userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device', intervalSeconds: 1, expiresInSeconds: 60 };
@@ -38,13 +38,19 @@ describe('native Copilot device and session exchange', () => {
       { baseUrl: 'https://api.business.githubcopilot.com' }, { production: {} }]) expect(nativeCopilotLogin({ ...credential, ...change })).toBe(false);
   });
   it('retains the long-lived GitHub token on renewal with exact issued expiry', async () => {
-    const response = token('synthetic-session');
+    const response = token();
     const fixture = scripted({ body: response });
     const fresh = await refreshCopilotToken({ refreshToken: 'synthetic-github', fetchImpl: fixture.fetchImpl });
     expect(fresh.refreshToken).toBe('synthetic-github');
     expect(fresh.expiresAt).toBe(response.expires_at * 1000);
     expect(fresh.baseUrl).toBe('https://api.individual.githubcopilot.com');
     expect(nativeCopilotLogin(fresh)).toBe(false);
+  });
+  it('accepts the individual default when renewal omits the audience hint', async () => {
+    const response = token('tid=session');
+    const fixture = scripted({ body: response });
+    const fresh = await refreshCopilotToken({ refreshToken: 'synthetic-github', fetchImpl: fixture.fetchImpl });
+    expect(fresh.baseUrl).toBe('https://api.individual.githubcopilot.com');
   });
   it.each([null, [], {}, { token: '' }, { token: '   ', expires_at: 1800000000 }, { token: 't', expires_at: -1 },
     { token: 't', expires_at: 0 }, { token: 't', expires_at: '1800000000' }, { token: 't', expires_at: 1.1 },
@@ -83,10 +89,36 @@ describe('issuer-owned Copilot routing', () => {
   it.each(['individual', 'business', 'enterprise'])('accepts only the native %s gateway', tier => {
     expect(copilotBaseUrl(`tid=x;proxy-ep=proxy.${tier}.githubcopilot.com`)).toBe(`https://api.${tier}.githubcopilot.com`);
   });
-  it('uses the native individual API without a proxy hint', () => expect(copilotBaseUrl('tid=x')).toBe('https://api.individual.githubcopilot.com'));
+  it('requires a tenant and permits only the individual default without an audience hint', () => {
+    expect(copilotTokenIdentity('tid=tenant;proxy-ep=proxy.individual.githubcopilot.com')).toEqual({
+      tenantId: 'tenant', baseUrl: 'https://api.individual.githubcopilot.com',
+    });
+    expect(copilotBaseUrl('tid=tenant')).toBe('https://api.individual.githubcopilot.com');
+    expect(copilotBaseUrl('tid=tenant', 'https://api.business.githubcopilot.com')).toBe('https://api.business.githubcopilot.com');
+    expect(() => copilotBaseUrl('proxy-ep=proxy.individual.githubcopilot.com')).toThrow(/no tenant identity/);
+  });
+  it('binds the stored account audience to the opaque token', () => {
+    const account = {
+      type: 'subscription' as const,
+      provider: 'github-copilot' as const,
+      accessToken: 'tid=tenant;proxy-ep=proxy.individual.githubcopilot.com',
+      refreshToken: 'synthetic-github',
+      expiresAt: Date.now() + 60_000,
+      baseUrl: 'https://api.individual.githubcopilot.com',
+    };
+    expect(() => assertCopilotAccount(account)).not.toThrow();
+    expect(() => assertCopilotAccount({ ...account, baseUrl: 'https://api.business.githubcopilot.com' }))
+      .toThrow(/audience conflicts/);
+    expect(() => assertCopilotAccount({ ...account, accessToken: 'tid=tenant' })).not.toThrow();
+    expect(() => assertCopilotAccount({ ...account, accessToken: 'tid=tenant', baseUrl: 'https://api.business.githubcopilot.com' }))
+      .toThrow(/no service audience/);
+  });
   it.each(['foreign.invalid', 'proxy.individual.githubcopilot.com.evil.invalid', 'proxy.individual.githubcopilot.com/x',
     'proxy.individual.githubcopilot.com:443', 'user@proxy.individual.githubcopilot.com', ''])('refuses a hostile hint %s', hint => {
-    expect(() => copilotBaseUrl(`tid=x;proxy-ep=${hint}`)).toThrow(/unverified/);
+    expect(() => copilotBaseUrl(`tid=x;proxy-ep=${hint}`)).toThrow(/unverified|no service audience/);
   });
-  it('refuses duplicate hints', () => expect(() => copilotBaseUrl('proxy-ep=proxy.individual.githubcopilot.com;proxy-ep=proxy.business.githubcopilot.com')).toThrow('ambiguous'));
+  it.each([
+    'tid=a;tid=b;proxy-ep=proxy.individual.githubcopilot.com',
+    'tid=a;proxy-ep=proxy.individual.githubcopilot.com;proxy-ep=proxy.business.githubcopilot.com',
+  ])('refuses duplicate token metadata %s', value => expect(() => copilotBaseUrl(value)).toThrow('ambiguous'));
 });

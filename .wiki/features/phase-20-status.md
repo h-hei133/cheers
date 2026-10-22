@@ -2,6 +2,17 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
+## 2026-10-23 PRV-03 Copilot opaque token audience binding（本地验证完成；待提交/推送）
+
+- `core/auth/oauth/copilot/policy.ts` now parses the opaque session token's `tid` and `proxy-ep` metadata. Missing `tid`, duplicate fields, malformed fields, hostile hosts, and explicit empty audiences are refused; a token without `proxy-ep` may use only the native individual default, while business and enterprise accounts require an explicit audience.
+- `assertCopilotAccount` binds the parsed audience to the stored connection address before a request can use the credential. The pool's owned-credential path therefore marks a mismatched Copilot member unavailable instead of falling back to a sibling, environment key, or profile key.
+- The subscription flow now rejects invalid or untrusted token metadata before persisting a credential, and all Copilot request/readiness fixtures use the native opaque-token shape.
+- Added a pool-level reversal test with individual and business origins: swapping either token to the other connection yields `pool-unavailable` with no credential. Disabling the audience guard makes that test fail; restoring it passes.
+- Focused PRV-03 set: 8 files/165 tests passed. Broader auth/config/provider/shell set: 72 files/1,054 tests passed on the final rerun; an earlier unrelated `fetch.test.ts` deadline assertion failed under parallel load and passed 29/29 in isolation.
+- `verify:import-cycles` (2,764 files, 0 runtime/type cycles), `check:config-consumers` (53/53), `check:declarations` (18/18 hooks, 11/11 factories), `check:node-floor`, `test:scripts` (157), `verify:docs-drift:strict` (118 existing source advisories), `git diff --check`, TypeScript build, executable build, and NormProof exit 0/partial with the existing 11 function-ceiling advisories passed.
+- TypeScript build ID `a58dfcd24f10f6ce1bcaf439429c6a74a56f751dd0ed22338b81cefd85057344`, inputs digest `78897a48c56602798fedf02697fed1a08ee384eb3713f0eba5cf641d1687c397`; executable SHA-256 `c60eee11c3750a1adde1a5dd2b03a963674962025b7aa92436764927cb2aa003`.
+- PRV-03 remains `partial`: no real account lifecycle evidence was obtained, and this batch has not yet been committed, pushed, or assigned a new-SHA CI/Watch result.
+
 ## 2026-10-23 全 47 项复核与 QA-03/TOOL-02 harness 返工（代码批 `6ed28019` 已推送；CI/Watch success；真实模型项仍 partial）
 
 - `scripts/phase20-requirements.json` 现在逐项记录决策表全部 47 个唯一 ID：27 项 `complete`、20 项 `partial`、0 项 `open`，整体仍为 `partial`。`scripts/phase20-requirements.mjs` 与 4 项回归强制矩阵 ID 和决策表完全相等，complete 行不得保留缺失证据，partial 行不得隐藏缺口。该矩阵明确保留 PRV-03/05、SET-03、PAN-01…08、INPUT-01、RENDER-01…03、TOOL-02、QA-01…04 的开放验收，不再把“未闭合”简化为 QA-03/TOOL-02 两项。

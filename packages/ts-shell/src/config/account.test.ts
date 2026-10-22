@@ -35,7 +35,8 @@ describe('persisted subscription credentials', () => {
       it(`keeps ${provider} ${source} material through configuration and authorization`, () => {
         const baseUrl = provider === 'github-copilot' ? 'https://api.individual.githubcopilot.com' : 'https://api.anthropic.com/v1';
         const expiresAt = Date.now() + 3_600_000;
-        const stored = { type: 'subscription', provider: 'github-copilot', accessToken: ' synthetic-access ', refreshToken: ' synthetic-refresh ',
+        const stored = { type: 'subscription', provider: 'github-copilot',
+          accessToken: ' tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com ', refreshToken: ' synthetic-refresh ',
           expiresAt, baseUrl: ` ${baseUrl}/ ` };
         const values = source === 'connection'
           ? { activeProviderConnectionId: 'owner', providerConnections: [{ id: 'owner', provider, authType: 'account-auth',
@@ -45,12 +46,14 @@ describe('persisted subscription credentials', () => {
         fs.writeFileSync(getUserRuntimeConfigPath(), raw);
         const config = getRuntimeConfig(workspace);
         expect(config.configValidation.valid).toBe(true);
-        const expected = { ...stored, accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', baseUrl };
+        const expected = { ...stored, accessToken: 'tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com',
+          refreshToken: 'synthetic-refresh', baseUrl };
         expect(source === 'connection' ? config.providerConnections[0]?.accountAuth?.subscription
           : config.providerCredentials[provider]?.accountAuth?.subscription).toEqual(expected);
         const resolution = resolveProviderCredential({ runtimeConfig: config, env: {} });
         expect(resolution.credential).toMatchObject({ source, authMode: 'account-auth', accountAuth: expected });
-        expect(providerAuthorization({ accountAuth: resolution.credential?.accountAuth, endpoint: 'copilot-chat-completions' }).headers.Authorization).toBe('Bearer synthetic-access');
+        expect(providerAuthorization({ accountAuth: resolution.credential?.accountAuth, endpoint: 'copilot-chat-completions' }).headers.Authorization)
+          .toBe('Bearer tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com');
         expect(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8')).toBe(raw);
       });
     }
@@ -101,7 +104,8 @@ describe('persisted subscription credentials', () => {
   }
 
   it('preserves a subscription on the exact bound pool member', () => {
-    const subscription = { type: 'subscription', provider: 'github-copilot', accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh',
+    const subscription = { type: 'subscription', provider: 'github-copilot',
+      accessToken: 'tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com', refreshToken: 'synthetic-refresh',
       expiresAt: Date.now() + 3_600_000, baseUrl: 'https://api.individual.githubcopilot.com' };
     fs.writeFileSync(getUserRuntimeConfigPath(), JSON.stringify({ provider: 'github-copilot',
       accountPool: { 'github-copilot': { connections: ['owner'] } }, activeProviderConnectionId: 'owner',
@@ -126,7 +130,8 @@ describe('persisted subscription credentials', () => {
   for (const provider of ['github-copilot'] as const) {
     it(`binds ${provider} to the subscription address before CLI overrides`, () => {
       const baseUrl = provider === 'github-copilot' ? 'https://api.individual.githubcopilot.com' : 'https://api.anthropic.com/v1';
-      const subscription = { type: 'subscription', provider: 'github-copilot', accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh',
+      const subscription = { type: 'subscription', provider: 'github-copilot',
+        accessToken: 'tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com', refreshToken: 'synthetic-refresh',
         expiresAt: Date.now() + 3_600_000, baseUrl };
       fs.writeFileSync(getUserRuntimeConfigPath(), JSON.stringify({ provider, activeProviderConnectionId: 'owner',
         providerConnections: [{ id: 'owner', provider, authType: 'account-auth', model: 'model',

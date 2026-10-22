@@ -11,11 +11,12 @@ describe("provider readiness boundary", () => {
     const result = await checkRealProviderReadiness({
       provider: "github-copilot",
       accountAuth: { type: "subscription", provider: "github-copilot", baseUrl: "https://api.individual.githubcopilot.com",
-        accessToken: "synthetic-access", refreshToken: "synthetic-refresh", expiresAt: Date.now() + 3_600_000 },
+        accessToken: "tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com",
+        refreshToken: "synthetic-refresh", expiresAt: Date.now() + 3_600_000 },
       fetchImpl: async (input, init) => {
         expect(String(input)).toBe("https://api.individual.githubcopilot.com/models");
         const headers = new Headers(init?.headers);
-        expect(headers.get("authorization")).toBe("Bearer synthetic-access");
+        expect(headers.get("authorization")).toBe("Bearer tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com");
         expect(headers.get("accept")).toBe("application/json");
         expect(headers.get("editor-version")).toBe("vscode/1.107.0");
         expect(headers.get("editor-plugin-version")).toBe("copilot-chat/0.35.0");
@@ -31,7 +32,8 @@ describe("provider readiness boundary", () => {
     const result = await checkRealProviderReadiness({
       provider: "github-copilot",
       accountAuth: { type: "subscription", provider: "github-copilot", baseUrl: "https://api.individual.githubcopilot.com",
-        accessToken: "synthetic-access", refreshToken: "synthetic-refresh", expiresAt: Date.now() + 3_600_000 },
+        accessToken: "tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com",
+        refreshToken: "synthetic-refresh", expiresAt: Date.now() + 3_600_000 },
       fetchImpl: async () => new Response("forbidden", { status: 403 }),
     });
     expect(result).toMatchObject({ ok: false, failure: { kind: "auth" } });

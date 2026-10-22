@@ -230,3 +230,29 @@ it('an affinity record cannot preserve a deleted or relogged credential generati
   expect(selectPooledConnection({ config: { ...captured, providerConnections: [] }, provider: 'openai', sessionId: 'generation-affinity' }))
     .toEqual({ blocked: 'pool-unavailable' });
 });
+
+it('never moves a Copilot token to a sibling account with another service origin', () => {
+  const copilot = (id: string, tier: 'individual' | 'business', tokenTier = tier) => ({
+    id, provider: 'github-copilot' as const, authType: 'account-auth' as const, model: 'model',
+    createdAt: '2026-01-01', updatedAt: '2026-01-01', status: 'connected' as const,
+    accountAuth: { subscription: { type: 'subscription' as const, provider: 'github-copilot' as const,
+      accessToken: `tid=${id};proxy-ep=proxy.${tokenTier}.githubcopilot.com`, refreshToken: 'refresh',
+      expiresAt: Date.now() + 60_000, baseUrl: `https://api.${tier}.githubcopilot.com` } },
+  });
+  const members = [copilot('individual', 'individual'), copilot('business', 'business')];
+  const captured = { ...config(), provider: 'github-copilot' as const, providerConnections: members,
+    accountPool: { 'github-copilot': { connections: ['individual', 'business'] } } } as RuntimeConfig;
+  for (const connectionId of ['individual', 'business'] as const) {
+    expect(resolveProviderCredential({ runtimeConfig: { ...captured, activeProviderConnectionId: connectionId }, env: {} }).credential)
+      .toMatchObject({ connectionId, accountAuth: { baseUrl: `https://api.${connectionId}.githubcopilot.com` } });
+  }
+  const mixed = { ...captured, providerConnections: [
+    copilot('individual', 'individual', 'business'),
+    copilot('business', 'business', 'individual'),
+  ] };
+  for (const connectionId of ['individual', 'business'] as const) {
+    const resolution = resolveProviderCredential({ runtimeConfig: { ...mixed, activeProviderConnectionId: connectionId }, env: {} });
+    expect(resolution.blocked).toBe('pool-unavailable');
+    expect(resolution.credential).toBeUndefined();
+  }
+});

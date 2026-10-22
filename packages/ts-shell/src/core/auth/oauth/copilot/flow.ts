@@ -76,7 +76,9 @@ export async function refreshCopilotToken(input: { readonly refreshToken: string
     throw new SubscriptionError('GitHub returned invalid or expired Copilot session metadata.');
   }
   let baseUrl: string;
-  try { baseUrl = copilotBaseUrl(body.token); } catch { throw new SubscriptionError('GitHub returned an untrusted Copilot service address.'); }
+  try { baseUrl = copilotBaseUrl(body.token); } catch {
+    throw new SubscriptionError('GitHub returned invalid or untrusted Copilot session metadata.');
+  }
   return { provider: 'github-copilot', accessToken: body.token, refreshToken: input.refreshToken,
     expiresAt: body.expires_at * 1000, baseUrl };
 }

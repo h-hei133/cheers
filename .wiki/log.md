@@ -8464,3 +8464,14 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 静态门、Node floor、strict rules/docs drift 与 `git diff --check` 通过；docs-source 保留既有 118 项 advisory。仓库 tgz NormProof exit 0/partial，blocking unresolved-specifier/cycle 满足，保留既有 11 项 function-ceiling advisory。
 - 指定 `cn:deepseek-v4.1-flash` 独立 reviewer 再次返回 `503 Service Unavailable`，不可用 reviewer 不是批准。真实 provider、双人盲评、100 个真实 pair、真实成本/cache 与四语言 tokenizer 数值仍未执行，QA-03/TOOL-02 与 Phase 20 整体继续为 partial。
 - 代码批 `6ed28019162c87260a32df251f1c2456bc595583` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39850665748`/job `120075621131` completed/success，耗时 16m45s；完整测试 927 文件通过/1 跳过、9857 项通过/3 跳过、921.47s，静态门、脚本门、构建、Chromium 与 NormProof 均 success。Architecture Watch `39850665653`/job `120075621701` completed/success；两项只绑定该代码 SHA，后续证据文档提交不扩大产品范围。
+
+## [2026-10-23] fix | Phase 20 PRV-03 Copilot token audience binding
+
+- 续接 PRV-03 未提交工作树，先核对 `AGENTS.md`、Phase 20 契约/status、账号池/凭据 presence、Copilot OAuth policy/flow 与现有回归。现有池封闭性、不可用成员、亲和、generation、profile 隔离和 endpoint 检查保持不变；本轮只补 opaque session token 的 tenant/audience 绑定。
+- 只读比较 Pi 与 oh-my-pi 的 Copilot token 处理：两者都从 `proxy-ep` 推导 API origin，缺少 hint 时回退 individual 默认地址。采纳该兼容边界，但仅允许默认 individual；business/enterprise 缺 audience 仍拒绝，避免把旧兼容 fallback 扩大为跨套餐授权。
+- `copilotTokenIdentity()` 现在解析 `tid`/`proxy-ep`，拒绝缺失 tenant、重复/畸形字段、空值、非原生 origin 和重复 audience；`assertCopilotAccount()` 将 token audience 与连接存储地址逐项绑定。`refreshCopilotToken()` 在持久化前使用同一校验，错误文本不包含响应体或凭据。
+- 账号池新增双向反转回归：同一 `github-copilot` provider 的 individual/business 连接交换 token 后，显式选择任一成员都必须 `pool-unavailable`，不能借用 sibling、env 或 profile 凭据。实际加载时临时禁用 audience guard，测试退出 1；恢复后 35 项池测试通过。
+- 最终 PRV-03 聚焦集 8 文件/165 项通过；auth/config/provider/shell 扩展集 72 文件/1,054 项通过。首次扩展运行出现无关的 `provider/request/fetch.test.ts` 并行负载计时失败（负 elapsed），单独复跑 29/29 通过，未改该路径。
+- `verify:import-cycles`（2,764 文件、0 runtime/type cycles）、`check:config-consumers`（53/53）、`check:declarations`（18/18 hooks、11/11 factories）、`check:node-floor`、`test:scripts` 157 项、`verify:docs-drift:strict`（118 项既有 docs-source advisory）与 `git diff --check` 通过。NormProof 仓库 tgz 实际 exit 0/partial，blocking unresolved-specifier/cycle satisfied，保留既有 11 项 function-ceiling advisory。
+- TypeScript build exit 0，build ID `a58dfcd24f10f6ce1bcaf439429c6a74a56f751dd0ed22338b81cefd85057344`，inputs digest `78897a48c56602798fedf02697fed1a08ee384eb3713f0eba5cf641d1687c397`；executable build exit 0，immutable exe SHA-256 `c60eee11c3750a1adde1a5dd2b03a963674962025b7aa92436764927cb2aa003`。
+- 本条只证明合成 token metadata、池隔离、测试和本地构建；没有真实 Copilot 登录、续期、账号删除/重登或跨进程生命周期证据，因此 PRV-03 保持 `partial`，Phase 20 仍未完成。提交、推送和新 SHA CI/Watch 待后续实际结果补记。
