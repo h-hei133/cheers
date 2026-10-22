@@ -2,7 +2,7 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
-## 2026-10-23 PRV-03 Copilot opaque token audience binding（本地验证完成；待提交/推送）
+## 2026-10-23 PRV-03 Copilot opaque token audience binding（代码批 `0e21c3f2` 已推送；CI/Watch success）
 
 - `core/auth/oauth/copilot/policy.ts` now parses the opaque session token's `tid` and `proxy-ep` metadata. Missing `tid`, duplicate fields, malformed fields, hostile hosts, and explicit empty audiences are refused; a token without `proxy-ep` may use only the native individual default, while business and enterprise accounts require an explicit audience.
 - `assertCopilotAccount` binds the parsed audience to the stored connection address before a request can use the credential. The pool's owned-credential path therefore marks a mismatched Copilot member unavailable instead of falling back to a sibling, environment key, or profile key.
@@ -11,7 +11,17 @@
 - Focused PRV-03 set: 8 files/165 tests passed. Broader auth/config/provider/shell set: 72 files/1,054 tests passed on the final rerun; an earlier unrelated `fetch.test.ts` deadline assertion failed under parallel load and passed 29/29 in isolation.
 - `verify:import-cycles` (2,764 files, 0 runtime/type cycles), `check:config-consumers` (53/53), `check:declarations` (18/18 hooks, 11/11 factories), `check:node-floor`, `test:scripts` (157), `verify:docs-drift:strict` (118 existing source advisories), `git diff --check`, TypeScript build, executable build, and NormProof exit 0/partial with the existing 11 function-ceiling advisories passed.
 - TypeScript build ID `a58dfcd24f10f6ce1bcaf439429c6a74a56f751dd0ed22338b81cefd85057344`, inputs digest `78897a48c56602798fedf02697fed1a08ee384eb3713f0eba5cf641d1687c397`; executable SHA-256 `c60eee11c3750a1adde1a5dd2b03a963674962025b7aa92436764927cb2aa003`.
-- PRV-03 remains `partial`: no real account lifecycle evidence was obtained, and this batch has not yet been committed, pushed, or assigned a new-SHA CI/Watch result.
+- 代码批 `0e21c3f2c6d470dc05ab4ce19e3bdd3cbd25c4fa` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39858979177`/job `120104440105` 为 completed/success，耗时 23m25s；完整测试 927 文件通过/1 跳过、9861 项通过/3 跳过，测试耗时 692.18s，静态门、脚本门、构建与 NormProof 均 success。Architecture Watch `39858979216`/job `120104440365` 为 completed/success。PRV-03 remains `partial` because no real account lifecycle evidence was obtained.
+
+## 2026-10-23 PRV-05 auxiliary request attribution（本地验证；remote billing 仍 partial）
+
+- Existing request-ledger and backoff coverage already proves per-credential generation waits, late 429 isolation, pre-reserve and pre-handoff checks, unknown retention, cap enforcement, and no replay of partial/unknown streams.
+- `cli/provider/identity.test.ts` now exercises main, delegated, side-question, compaction-summary, and cache-refresh sends against real local HTTP. Each reservation retains its non-secret `credentialId`, rotation-sensitive generation, and purpose; summary/cache tests also verify the committed ledger totals and empty pending set.
+- Advisor uses the subagent request path and jobs use the shared parent policy; their existing native HTTP and budget tests remain part of this matrix. Session titles are derived locally from the first prompt and do not create a provider request.
+- The auxiliary matrix passed 10 files/208 tests. A loading-time reversal that removed the cache-refresh policy from `sendSentRequest` made the new identity assertion fail with zero reservations; restoring the policy passed 5/5 identity tests.
+- TypeScript build ID `7deb2f1e19bbb943a4be88ed67100a4a5989a5eb5a5cb146d00a332d2f97dcb3`, inputs digest `57d8a7007d314082fa7273ee14872560561fda8f6a10eed7b4fd399b3dc56616`; executable SHA-256 `bb2bdc3a82706a044c1ea735a510daaac4ea6b0f5bbf1a84661efb435d3654c1`.
+- The required independent reviewer using `cn:deepseek-v4.1-flash` returned `503 Service Unavailable`; no independent approval was obtained.
+- PRV-05 remains `partial`: no trusted remote settlement or billing evidence was obtained. The local ledger and quota projection are not a substitute for provider-side accounting.
 
 ## 2026-10-23 全 47 项复核与 QA-03/TOOL-02 harness 返工（代码批 `6ed28019` 已推送；CI/Watch success；真实模型项仍 partial）
 

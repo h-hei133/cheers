@@ -24,7 +24,7 @@
 | PRV-02 具名角色应用 | `core/commands/model/preset*` | presetCommand、presetStore、picker/model；空 session 应用 profile 角色、明确 connection 解析、旧 provider 身份不能消歧 | 跨连接改回拒绝、同名跨层合并或任一无效角色仍写入时失败；自动角色 consumer 另行复核 |
 | PRV-03 | `core/auth/account/{pool,presence}.ts`、`core/auth/oauth/copilot/policy.ts` | `account-pool`、subscription、account/readiness/authorization 测试；opaque token tenant/audience 绑定 | 池外发送回退到 env/profile 时失败；同一 provider 的两个 Copilot origin 交换 token 时失败 |
 | PRV-04 | `core/auth/account/lease.ts` | `lease.test.ts`（7）、renewal（38） | dispatched/unknown 被提前清理时失败 |
-| PRV-05 | `provider/request/backoff.ts` | backoff（5）、ledger | A 的 429 阻塞 B 时失败 |
+| PRV-05 | `provider/request/backoff.ts`、`core/agent/request/` | backoff（5）、ledger、main/delegated/side/summary/cache identity；advisor/jobs 共享预算 | A 的 429 阻塞 B 时失败；移除 auxiliary policy/credential attribution 时失败 |
 | PRV-05 历史费用 | `observability/usage/`、`turn/step.ts`、`cli/runtime/cache.ts`、`core/commands/cost/` | attribution、turn/usage、store/usage、cache、sessionFacts；本机 HTTP 晚到响应及多进程真实落盘 | 移除发送前捕获、按当前目录重算、取消旧键转义、缓存类型命名空间或 partial 状态标记时失败；完整 PRV-05 仍开放 |
 
 ## W3 上下文与工具

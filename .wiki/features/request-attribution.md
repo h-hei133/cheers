@@ -2,7 +2,7 @@
 title: "请求归属与凭据退避"
 category: article
 created: 2026-10-17
-updated: 2026-10-19
+updated: 2026-10-23
 summary: "每次真实发送记录非秘密 credential 身份；429 按凭据代际退避，另一账号不受影响，轮换不重置会话预算。"
 ---
 
@@ -15,9 +15,9 @@ summary: "每次真实发送记录非秘密 credential 身份；429 按凭据代
 - `credentialId = <provider>:<connectionId | config>`；
 - `credentialGeneration` 是凭据材料的 SHA-256 前缀，轮换后变化，不含 key/token 原文。
 
-覆盖的发送路径：主 turn、子代理、compaction/摘要、btw 侧问、jobs 代理、cache refresh。调用方在构造 provider 目标时携带同一身份，`prepareRequestAttempt` 把它写入 ledger 的 pending attempt。恢复后 `decodeRequestLedger` 保留这两个字段，并拒绝非 16 位十六进制的 generation。
+覆盖的发送路径：主 turn、子代理、advisor（复用子代理发送路径）、compaction/摘要、btw 侧问、jobs 代理、cache refresh。调用方在构造 provider 目标时携带同一身份，`prepareRequestAttempt` 把它写入 ledger 的 pending attempt。恢复后 `decodeRequestLedger` 保留这两个字段，并拒绝非 16 位十六进制的 generation。会话标题由首条 prompt 在本地派生，不发起模型请求；未来若增加模型标题，必须复用同一 `RequestPolicy` 和凭据身份。
 
-返工修复了生产者直接展开 `{credentialId, generation}`、消费者却读取 `credentialGeneration` 的不匹配。主请求/普通委派和 btw 现在显式映射；摘要生产者已在上一批修复。真实本机 HTTP 回归覆盖各路径的 A 迟到 429、B 不受影响、A 新代次继续请求，核对实际发送次数与原账本的未决 A 身份、累计 12 input/3 output。
+返工修复了生产者直接展开 `{credentialId, generation}`、消费者却读取 `credentialGeneration` 的不匹配。主请求/普通委派、btw、摘要和 cache refresh 现在显式映射；`identity.test.ts` 在真实本机 HTTP 上核对 purpose、credentialId/generation、累计 ledger，以及 A 迟到 429、B 不受影响、A 新代次继续请求。
 
 ## 2. 退避
 

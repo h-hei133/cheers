@@ -8474,4 +8474,13 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 最终 PRV-03 聚焦集 8 文件/165 项通过；auth/config/provider/shell 扩展集 72 文件/1,054 项通过。首次扩展运行出现无关的 `provider/request/fetch.test.ts` 并行负载计时失败（负 elapsed），单独复跑 29/29 通过，未改该路径。
 - `verify:import-cycles`（2,764 文件、0 runtime/type cycles）、`check:config-consumers`（53/53）、`check:declarations`（18/18 hooks、11/11 factories）、`check:node-floor`、`test:scripts` 157 项、`verify:docs-drift:strict`（118 项既有 docs-source advisory）与 `git diff --check` 通过。NormProof 仓库 tgz 实际 exit 0/partial，blocking unresolved-specifier/cycle satisfied，保留既有 11 项 function-ceiling advisory。
 - TypeScript build exit 0，build ID `a58dfcd24f10f6ce1bcaf439429c6a74a56f751dd0ed22338b81cefd85057344`，inputs digest `78897a48c56602798fedf02697fed1a08ee384eb3713f0eba5cf641d1687c397`；executable build exit 0，immutable exe SHA-256 `c60eee11c3750a1adde1a5dd2b03a963674962025b7aa92436764927cb2aa003`。
-- 本条只证明合成 token metadata、池隔离、测试和本地构建；没有真实 Copilot 登录、续期、账号删除/重登或跨进程生命周期证据，因此 PRV-03 保持 `partial`，Phase 20 仍未完成。提交、推送和新 SHA CI/Watch 待后续实际结果补记。
+- 本条只证明合成 token metadata、池隔离、测试和本地构建；没有真实 Copilot 登录、续期、账号删除/重登或跨进程生命周期证据，因此 PRV-03 保持 `partial`，Phase 20 仍未完成。代码批 `0e21c3f2c6d470dc05ab4ce19e3bdd3cbd25c4fa` 已提交并推送，远端 `main` 精确读回同 SHA；CI `39858979177`/job `120104440105` completed/success，耗时 23m25s，927 文件通过/1 跳过、9861 项通过/3 跳过、692.18s；Architecture Watch `39858979216`/job `120104440365` success。两项只绑定该代码 SHA。
+
+## [2026-10-23] test | Phase 20 PRV-05 auxiliary request attribution
+
+- 复核 PRV-05 现有 ledger/backoff、账号代际、迟到 429、unknown/partial、共享 cap 与辅助用途路径。主 turn、子代理、advisor、摘要、侧问、jobs 和 cache refresh 都复用同一 `prepareRequestAttempt`/`RequestPolicy`；会话标题由首条 prompt 本地派生，没有模型请求。
+- `cli/provider/identity.test.ts` 从 main/delegated/side 扩展到 summary/cache：真实本机 HTTP 上分别断言 `purpose`、非秘密 `credentialId`、轮换敏感 generation，以及 ledger 已结算且无 pending。既有 advisor/jobs 原生 HTTP、共享预算与 usage 回归继续覆盖其各自的 request owner。
+- 聚焦相关 10 文件/208 项通过：identity、summary、cache、compaction、sentRequest、completion、turn step、jobs command、advisor 与 goal budget。实际加载时移除 cache refresh 的 policy 后，新 identity 用例以零 reservation 失败；恢复后 5/5 通过，产品源码未回退。
+- TypeScript build ID `7deb2f1e19bbb943a4be88ed67100a4a5989a5eb5a5cb146d00a332d2f97dcb3`，inputs digest `57d8a7007d314082fa7273ee14872560561fda8f6a10eed7b4fd399b3dc56616`；executable SHA-256 `bb2bdc3a82706a044c1ea735a510daaac4ea6b0f5bbf1a84661efb435d3654c1`。
+- 指定 `cn:deepseek-v4.1-flash` 的独立 reviewer 返回 `503 Service Unavailable`，未取得独立批准；本轮结论来自本地自审、聚焦测试和实际反转，不把不可用 reviewer 写成 APPROVE。
+- `request-attribution.md` 已明确 title 的本地派生边界和未来模型标题必须复用同一 policy/credential identity。PRV-05 仍保持 `partial`，因为本轮没有可信远端结算/账单证据；本地 ledger、quota 与合成 HTTP 不能替代 provider 侧计费。

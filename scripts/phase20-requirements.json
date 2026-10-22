@@ -60,8 +60,8 @@
     {
       "id": "PRV-05",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W2; request ledger, backoff, attribution and cache tests",
-      "missing": "Full auxiliary consumer coverage and trusted remote settlement/billing evidence remain."
+      "evidence": ".wiki/features/phase-20-contract.md W2; request ledger/backoff and main/delegated/side/summary/cache identity tests",
+      "missing": "Trusted remote settlement/billing evidence remains; title is local-derived, not a provider request."
     },
     {
       "id": "CTX-01",
