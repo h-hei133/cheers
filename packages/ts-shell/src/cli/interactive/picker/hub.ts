@@ -4,6 +4,7 @@ import { createReport, span } from '../../../core/commands/report/projection.js'
 import type { JobsComposition } from '../../jobs/model.js';
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import type { Picker } from '../overlay.js';
+import { captureWorkspaceRoot } from '../../../core/workspace/roots.js';
 
 /** One job as the chooser shows it, independent of the backend's extra fields. */
 interface JobRow {
@@ -25,10 +26,19 @@ interface JobRow {
 export function hubPicker(jobs: JobsComposition): Picker {
   const rows: JobRow[] = [];
   const details = new Map<string, readonly string[]>();
+  let offered = new Set<string>();
+  const initialSession = jobs.session;
+  let initialWorkspace: ReturnType<typeof captureWorkspaceRoot> | undefined;
+  try {
+    if (initialSession?.projectRoot) initialWorkspace = captureWorkspaceRoot(initialSession.projectRoot, initialSession.projectRoot, 'read');
+  } catch {
+    initialWorkspace = undefined;
+  }
   const refresh = (): readonly Option[] => {
     const hub = hubProjection(jobs);
     rows.length = 0;
     details.clear();
+    offered = new Set<string>();
     for (const job of hub.jobs as readonly Record<string, unknown>[]) {
       const id = typeof job.id === 'string' ? job.id : '';
       if (!id) continue;
@@ -49,6 +59,7 @@ export function hubPicker(jobs: JobsComposition): Picker {
       ];
       rows.push({ id, kind, status, summary, detail });
       details.set(id, detail);
+      offered.add(id);
     }
     return rows.map(row => ({ id: row.id, label: `${row.kind} ${row.id.slice(0, 8)}`, detail: row.summary, note: row.status }));
   };
@@ -65,7 +76,9 @@ export function hubPicker(jobs: JobsComposition): Picker {
     detail: id => (id ? details.get(id) ?? [] : []),
     async apply(ids) {
       const id = ids[0];
-      const job = id ? jobs.local.get(id) : undefined;
+      if (!id || ids.length !== 1 || !offered.has(id)) return undefined;
+      let job;
+      try { job = jobs.local.get(id); } catch { job = undefined; }
       if (job) {
         // The pager scrolls this page; later offsets stay with `/jobs show`, which
         // applies the same redaction and truncation rules.
@@ -75,6 +88,18 @@ export function hubPicker(jobs: JobsComposition): Picker {
             { kind: 'text' as const, spans: [span('Later pages: /jobs show <id> stdout <offset>.', 'muted')] }] }) };
       }
       return { note: 'Read-only view. Use /jobs show <id> for output, or /jobs cancel <id> for a separately approved action.' };
+    },
+    isCurrent: () => {
+      try {
+        const current = jobs.context.session;
+        if (current !== initialSession || current.id !== initialSession?.id
+          || current.createdAt !== initialSession?.createdAt || current.projectRoot !== initialSession?.projectRoot
+          || !initialWorkspace) return false;
+        const workspace = captureWorkspaceRoot(current.projectRoot, current.projectRoot, 'read');
+        return workspace.path === initialWorkspace.path && workspace.identity === initialWorkspace.identity;
+      } catch {
+        return false;
+      }
     },
   };
 }

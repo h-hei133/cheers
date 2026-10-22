@@ -96,9 +96,25 @@ describe("bucketing", () => {
     expect(measuredPromptContext(SESSION, { ...identity, endpoint: 'anthropic' })).toBeUndefined();
     expect(measuredPromptContext(SESSION, { ...identity, schemaDigest: 'c'.repeat(64) })).toBeUndefined();
     expect(measuredPromptContext(SESSION, { ...identity, systemDigest: 'd'.repeat(64) })).toBeUndefined();
+    expect(measuredPromptContext(SESSION, { provider: 'openai', model: 'm', endpoint: 'openai-compatible',
+      schemaDigest: identity.schemaDigest }, { requireExpectedIdentity: true })).toBeUndefined();
     invalidatePromptMeasurement(SESSION);
     expect(measuredPromptContext(SESSION, identity)).toBeUndefined();
     expect(getSessionUsage(SESSION).lastPromptMessageCount).toBe(0);
+  });
+
+  it("rejects incomplete recorded identities when the caller requires all fields", () => {
+    const identity = { provider: 'openai', model: 'm', endpoint: 'openai-compatible', schemaDigest: 'a'.repeat(64), systemDigest: 'b'.repeat(64) };
+    recordSessionUsage(SESSION, { promptTokens: 500, promptMessageCount: 3, model: 'm', provider: 'openai',
+      promptIdentity: { provider: 'openai', model: 'm', endpoint: 'openai-compatible', schemaDigest: identity.schemaDigest } });
+    expect(measuredPromptContext(SESSION, identity, { requireExpectedIdentity: true })).toBeUndefined();
+    resetSessionUsage(SESSION);
+    const partial = { provider: 'openai', model: 'm', endpoint: 'openai-compatible', schemaDigest: identity.schemaDigest };
+    recordSessionUsage(SESSION, { promptTokens: 500, promptMessageCount: 3, model: 'm', provider: 'openai', promptIdentity: partial });
+    expect(measuredPromptContext(SESSION, partial, { requireExpectedIdentity: true })).toBeUndefined();
+    resetSessionUsage(SESSION);
+    recordSessionUsage(SESSION, { promptTokens: 500, promptMessageCount: 3, model: 'm', provider: 'openai' });
+    expect(measuredPromptContext(SESSION, identity, { requireExpectedIdentity: true })).toBeUndefined();
   });
 
   it("keeps a legacy measurement usable until a model change clears it", () => {

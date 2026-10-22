@@ -43,12 +43,14 @@ import { attachGoalSubmission, schedulerForRuntime } from '../runtime/goalSchedu
 import { attachSubmissionQueue, isQueueControl, queueCommandFor } from '../runtime/inputQueue.js';
 import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
+import { usageCommandFor } from '../runtime/usage.js';
+import { settingsCommandFor } from '../runtime/settings.js';
 import { handoffControl, handoffCommandFor } from '../runtime/handoff.js';
 import { directorControl, directorCommandFor, directorInterruptible } from '../runtime/director.js';
 import { evaluationCommandFor, evaluationInterruptible, cancelEvaluationFor, evaluationControl } from '../runtime/evaluation.js';
 import { mediaCommandFor, mediaControl, cancelMediaCommand, mediaInterruptible, excludeRecordingInput, recordingFrameProvider } from '../runtime/media.js';
 import { isSecurityControl, securityCommandFor, securityInspectorFor } from '../runtime/security.js';
-import { isAgentsControl, agentsCommandFor } from '../runtime/agents.js';
+import { isAgentsControl, agentsCommandFor, agentDefinitionsFor, agentDiscoveryFor } from '../runtime/agents.js';
 import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
 import { sshControl, runSshControl } from '../ssh/control.js';
 import { isExtensionControl, extensionCommandFor, extensionManagerFor } from '../runtime/extensions.js';
@@ -1038,6 +1040,11 @@ export class InteractiveMode {
           this.state.transcript.append(textBlock("command", outcome.note, picker.title));
         }
         if (outcome?.report && !this.stopped && this.overlay.revision === revision) {
+          if (outcome.reportRetained) {
+            pageLongOutput(this.pager, outcome.report.title,
+              { text: reportText(outcome.report), report: outcome.report }, this.state.transcript);
+            return;
+          }
           const block = { ...textBlock('command', reportText(outcome.report), picker.title), report: outcome.report };
           this.state.transcript.append(block);
           pageLongOutput(this.pager, outcome.report.title, block, this.state.transcript);
@@ -1089,7 +1096,13 @@ export class InteractiveMode {
         refreshRuntimeConfig: () => refreshShellRuntimeConfig(this.options.runtimeContext),
         cwd: this.options.runtimeContext.cwd,
         sessionId: this.options.runtimeContext.session.id,
+        interactive: true,
         workspaceRoots: this.options.runtimeContext.session.workspaceRoots,
+        agentsCommand: agentsCommandFor(this.options.runtimeContext),
+        usageCommand: usageCommandFor(this.options.runtimeContext),
+        settingsCommand: settingsCommandFor(this.options.runtimeContext),
+        planningCommand: planningCommandFor(this.options.runtimeContext, this.options.sessionManager,
+          this.options.sessionRuntime, this.readline),
         ...(this.options.runtimeContext.skillOptions
           ? { skillOptions: this.options.runtimeContext.skillOptions }
           : {}),
@@ -1109,6 +1122,8 @@ export class InteractiveMode {
       security: securityInspectorFor(this.options.runtimeContext),
       extensions: extensionManagerFor(this.options.runtimeContext),
       jobs: jobsFor(this.options.runtimeContext),
+      agentDefinitions: () => agentDefinitionsFor(this.options.runtimeContext),
+      agentDiscovery: () => agentDiscoveryFor(this.options.runtimeContext),
       advisorState: () => decodeAdvisor(readBoundSessionState(this.options.sessionManager, this.options.runtimeContext.session).state.advisor),
       ...sessionPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null,

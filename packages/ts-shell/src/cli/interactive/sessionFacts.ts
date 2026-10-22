@@ -1,5 +1,7 @@
 import { resolveContextWindow, resolveModelCost } from "../../core/models/window.js";
 import { resolveProviderCredential } from "../../core/shell/providerCredentials.js";
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from "../../core/auth/account/target.js";
+import { DEFAULT_ENDPOINT_KIND } from "../../provider/endpoints/index.js";
 import path from "node:path";
 import os from "node:os";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
@@ -52,8 +54,17 @@ export function readStatusFacts(
 ): StatusFacts {
   const { config, catalog } = context.configuration.current;
   const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+  let activeBaseUrl = active.baseUrl;
+  let activeEndpoint: string | undefined;
+  try {
+    activeBaseUrl = providerCredentialBaseUrl(catalog, active);
+    activeEndpoint = providerCredentialEndpoint(catalog, active, activeBaseUrl) ?? DEFAULT_ENDPOINT_KIND;
+  } catch {
+    activeEndpoint = undefined;
+  }
   const usage = getSessionUsage(context.session.id);
-  const measured = active.model ? measuredPromptContext(context.session.id, { provider: active.provider, model: active.model }) : undefined;
+  const measured = active.model && activeEndpoint ? measuredPromptContext(context.session.id, { provider: active.provider, model: active.model,
+    endpoint: activeEndpoint }) : undefined;
   // Summed across the models that answered, each at the rate published for the
   // provider that served it. A session that switched models — or providers — spent
   // tokens at more than one price, and the status band must not show the newest
@@ -62,7 +73,7 @@ export function readStatusFacts(
   const { cost, usesAssumedRates, partial, zeroCostSupported } = estimateSessionCost(usage, (provider, model) =>
     resolveModelCost(catalog, provider, model),
   );
-  const window = resolveContextWindow({ catalog, provider: active.provider, model: active.model, baseUrl: active.baseUrl, configured: config.contextWindow });
+  const window = resolveContextWindow({ catalog, provider: active.provider, model: active.model, baseUrl: activeBaseUrl, configured: config.contextWindow });
   return {
     model: active.model ?? active.provider,
     provider: active.provider,

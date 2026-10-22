@@ -11,6 +11,7 @@ import { contextAttachments } from './attachments.js';
 import { contextEntryStillAuthorized } from '../../context/attachment/entry.js';
 import type { ToolGateOptions } from '../../turn/tools.js';
 import { routeSlashCommand } from '../../core/commands/slashRouter.js';
+import { approveAllGroups } from '../../test-utils/approval.js';
 
 let root: string;
 beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-rule-native-')); vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); });
@@ -22,7 +23,7 @@ function runtime(overrides: Partial<ToolGateOptions> = {}) {
   let denies: ToolGateOptions['denyRules'] = [];
   installCommandGate(context, () => ({ sessionId: context.session.id, workspaceRoot: root, permissionScope: 'ask', agentMode: 'build', emit: () => {}, denyRules: denies,
     hooks: { dispatch: async () => ({ decision: 'allow' }) } as never,
-    escalationPromptHandler: async prompt => ({ promptId: prompt.id, decision: 'allow-once', respondedAt: 1 }), ...overrides }));
+    escalationPromptHandler: async prompt => approveAllGroups(prompt), ...overrides }));
   const rules = ruleCommandsFor(context, () => false);
   return { context, manager, rules, deny: () => { denies = [{ tool: 'read', pattern: 'notes.md' }]; } };
 }

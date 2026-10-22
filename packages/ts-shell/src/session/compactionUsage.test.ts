@@ -52,6 +52,48 @@ describe("the provider's measurement drives the threshold", () => {
     expect(messages[plan!.cut]!.role).not.toBe("tool");
   });
 
+  it("uses the request budget's soft band when output headroom is known", () => {
+    const messages = longConversation(8);
+    const base = {
+      contextWindow: 64_000,
+      reserveTokens: 8_000,
+      keepRecentTokens: 600,
+      measureContextTokens: () => 48_000,
+    };
+
+    // The old reserve-only threshold was 56,000. With an 8,000-token output
+    // ceiling the shared budget's soft band is 48,000, so equality must fire.
+    expect(planCompaction(messages, base)).toBeUndefined();
+    expect(planCompaction(messages, { ...base, outputTokens: 8_000 })).not.toBeUndefined();
+    expect(planCompaction(messages, { ...base, outputTokens: 8_000, measureContextTokens: () => 47_999 })).toBeUndefined();
+  });
+
+  it("keeps an explicit disabled policy from triggering through the output-aware band", () => {
+    const messages = longConversation(8);
+    expect(planCompaction(messages, {
+      contextWindow: 64_000,
+      reserveTokens: 8_000,
+      outputTokens: 8_000,
+      keepRecentTokens: 600,
+      enabled: false,
+      measureContextTokens: () => 60_000,
+    })).toBeUndefined();
+  });
+
+  it("passes the effective request identity to the measurement callback", () => {
+    const messages = longConversation(8);
+    const identity = { schemaDigest: "schema", systemDigest: "system" };
+    const measured = vi.fn(() => 60_000);
+    planCompaction(messages, {
+      contextWindow: 64_000,
+      reserveTokens: 8_000,
+      keepRecentTokens: 600,
+      promptIdentity: identity,
+      measureContextTokens: measured,
+    });
+    expect(measured).toHaveBeenCalledWith(messages, identity);
+  });
+
   it("declines when the request is large only because of overhead, not the conversation", () => {
     // Eight short exchanges: the whole conversation is smaller than the budget
     // the window reserves for recent history, so there is nothing to replace.
@@ -151,6 +193,24 @@ describe("a budget larger than the window", () => {
     // Without the clamp the budget would exceed anything the window could hold,
     // so no cut would ever be found and compaction could never run.
     expect(planCompactionCut(messages, policy)).not.toBeUndefined();
+  });
+
+  it("leaves room for the output ceiling when clamping the retained tail", () => {
+    const messages = longConversation(8);
+    const withoutOutput = planCompactionCut(messages, {
+      contextWindow: 1_000,
+      reserveTokens: 100,
+      keepRecentTokens: 10_000,
+    });
+    const withOutput = planCompactionCut(messages, {
+      contextWindow: 1_000,
+      reserveTokens: 100,
+      outputTokens: 800,
+      keepRecentTokens: 10_000,
+    });
+    expect(withoutOutput).not.toBeUndefined();
+    expect(withOutput).not.toBeUndefined();
+    expect(withOutput!.keptMessages).toBeLessThan(withoutOutput!.keptMessages);
   });
 });
 

@@ -7,6 +7,7 @@ import { SecurityService } from './service.js';
 import { securityProposalTool } from './remediation/tool.js';
 import { readOperation, captureOperationScope } from '../edit/recovery/operation/store.js';
 import { readBoundSessionState } from '../session/store/bound.js';
+import { approveAllGroups } from '../test-utils/approval.js';
 
 afterEach(cleanupSecurityHarnesses);
 const patch = '*** Begin Patch\n*** Update File: dynamic.ts\n@@\n-export const decode = (input: string): unknown => eval(input);\n+export const decode = (input: string): unknown => JSON.parse(input);\n*** End Patch';
@@ -15,7 +16,7 @@ it('plan is zero execution; denied scan launches nothing; approved native observ
   expect(h.service.scanRecord(id).plan.argv).toHaveLength(3);
   h.setApproval(async () => ({ decision: 'deny' })); await h.service.scan(id);
   expect(h.service.scanRecord(id).status).toBe('denied'); expect(h.run).not.toHaveBeenCalled();
-  h.setApproval(async () => ({ decision: 'allow-once' })); const next = h.plan(); await h.service.scan(next);
+  h.setApproval(async prompt => approveAllGroups(prompt)); const next = h.plan(); await h.service.scan(next);
   expect(h.run).toHaveBeenCalledTimes(3); expect(h.approvals.at(-1)!.context.preview).toContain('Source grant');
   const scan = h.service.scanRecord(next); expect(scan.status).toBe('completed'); expect(scan.coverage.status).toBe('complete'); expect(scan.findings).toHaveLength(1);
   expect(scan.receipts).toHaveLength(3); h.manager.persistUserPromptBarrier(h.session.id, 'Preserve evidence');
@@ -23,7 +24,7 @@ it('plan is zero execution; denied scan launches nothing; approved native observ
 });
 it('refuses approval-time source changes and source denial with no native launch', async () => {
   const h = createSecurityHarness(); const id = h.plan();
-  h.setApproval(async () => { fs.appendFileSync(h.file, '// user edit\n'); return { decision: 'allow-once' }; });
+  h.setApproval(async prompt => { fs.appendFileSync(h.file, '// user edit\n'); return approveAllGroups(prompt); });
   await h.service.scan(id); expect(h.service.scanRecord(id).status).toBe('blocked'); expect(h.run).not.toHaveBeenCalled();
   const denied = new SecurityService({ ...h.host, sourceAccess: () => { throw new Error('source denied'); } });
   expect(() => denied.plan(h.executable, '1.30.2', h.rules, [h.file])).toThrow('source denied'); expect(h.run).not.toHaveBeenCalled();
@@ -56,7 +57,7 @@ it('denied exact repair leaves dirty/unrelated work; approved repair has actual 
   const proposal = h.service.propose(id, finding.fingerprint, patch).report!.facts.proposalId as string;
   h.setApproval(async () => ({ decision: 'deny' })); await h.service.apply(id, finding.fingerprint, proposal);
   expect(fs.readFileSync(h.file, 'utf8')).toContain('eval(input)'); expect(h.service.state().remediations[0]!.status).toBe('denied');
-  h.setApproval(async () => ({ decision: 'allow-once' })); await h.service.apply(id, finding.fingerprint, proposal);
+  h.setApproval(async prompt => approveAllGroups(prompt)); await h.service.apply(id, finding.fingerprint, proposal);
   const applied = h.service.state().remediations[0]!; expect(applied.status).toBe('applied'); expect(applied.operationId).toBeTruthy();
   expect(readOperation(captureOperationScope({ sessionId: h.session.id, workspaceRoot: h.root }), applied.operationId!).status).toBe('committed');
   expect(fs.readFileSync(path.join(h.root, 'unrelated.ts'), 'utf8')).toBe('// preserved dirty user work\n');

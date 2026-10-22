@@ -15,7 +15,7 @@ import type { CompactionSetup } from "../../turn/session.js";
 import type { RequestSigner } from "../../provider/request/fetch.js";
 import { createCacheWarmingRunner } from "../../turn/cacheWarm.js";
 import { loadCatalog } from '../../core/models/catalogStore.js';
-import { getSessionUsage, resetSessionUsage, totalTokens } from '../../observability/usageTelemetry.js';
+import { getSessionUsage, recordSessionUsage, resetSessionUsage, totalTokens } from '../../observability/usageTelemetry.js';
 
 const fixture = vi.hoisted(() => ({
   deps: undefined as SessionRuntimeDependencies | undefined,
@@ -151,6 +151,22 @@ it.each([true, false])("signs automatic history and prefix summaries (apiKey=%s)
   await fixture.compaction!.summarizeTurnPrefix!([], new AbortController().signal);
   expect(signed).toHaveLength(2);
   expect(received.map(request => request.signature)).toEqual(["signed-1", "signed-2"]);
+});
+
+it("declines a compaction measurement without the complete prompt identity", () => {
+  const deps = runtime(true);
+  deps.runPrompt('hello', new AbortController().signal);
+  const measure = fixture.compaction!.policy.measureContextTokens!;
+  recordSessionUsage('signed-summary', {
+    provider: 'fixture', model: 'fixture-model', promptTokens: 100, promptMessageCount: 0,
+    promptIdentity: {
+      provider: 'fixture', model: 'fixture-model', endpoint: 'test-signed-summary',
+      schemaDigest: 'schema', systemDigest: 'system',
+    },
+  });
+
+  expect(measure([], undefined)).toBeUndefined();
+  expect(measure([], { schemaDigest: 'schema', systemDigest: 'system' })).toBe(100);
 });
 
 it('uses one accepted catalogue per operation for requests and compaction after reload', () => {

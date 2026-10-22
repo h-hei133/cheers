@@ -15,6 +15,7 @@ import { createCoreToolRegistry } from '../core/tools/registry.js';
 import { approvalPicker, approvalPreview } from '../cli/interactive/picker/approval.js';
 import { languageLimits } from './contract.js';
 import { captureWorkspaceRoot } from '../core/workspace/roots.js';
+import { approveAllGroups } from '../test-utils/approval.js';
 
 const fixture = fileURLToPath(new URL('./fixtures/server.mjs', import.meta.url));
 const sessions = new SessionManager();
@@ -131,7 +132,7 @@ it('proposes immutable version-bound rename data and applies only through the ap
   expect(plan.status).toBe('proposed'); expect(plan.willWrite).toBe(false); expect(plan.targets[0]!.serverVersionVerified).toBe(true);
   expect(Object.isFrozen(plan)).toBe(true); expect(Object.isFrozen(plan.applyPatch)).toBe(true);
   expect(fs.readFileSync(test.file, 'utf8')).toBe(test.source);
-  const options = gate(test, { escalationPromptHandler: async prompt => ({ promptId: prompt.id, decision: 'allow-once', respondedAt: 1 }) });
+  const options = gate(test, { escalationPromptHandler: async prompt => approveAllGroups(prompt) });
   const definitions = new Map([['apply_patch', createPatchToolDefinition()]]); const [tool] = adaptTools(definitions, options); const hooks = createToolHooks(options, definitions);
   const args = tool.prepareArguments!(plan.applyPatch);
   expect(fs.readFileSync(test.file, 'utf8')).toBe(test.source);

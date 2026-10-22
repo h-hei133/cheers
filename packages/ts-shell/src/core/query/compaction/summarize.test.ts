@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { requestCompactionSummary } from "./summarize.js";
+import { prepareCompactionMessages, requestCompactionSummary } from "./summarize.js";
 import { parseFileFootprintXml } from "./fileFootprint.js";
 import { ModelAdmissionError } from '../../agent/request/model.js';
+import { SummaryAdmissionError } from '../../../session/compaction/contract.js';
+import { promptTokensFor } from '../../../context/request/budget.js';
 
 /**
  * What a compaction writes back is what the next one reads. The footprint is
@@ -166,5 +168,43 @@ describe("requestCompactionSummary", () => {
       messages: [readCall("src/a.ts")],
     });
     expect(result).toBeUndefined();
+  });
+
+  it("admits an exact summary budget and refuses one token over before fetch", async () => {
+    const messages = [{ role: "user" as const, content: "condense this history" }];
+    const maxOutputTokens = 10;
+    const prepared = prepareCompactionMessages({
+      messages,
+      maxOutputTokens,
+      provider: {},
+    });
+    const promptTokens = promptTokensFor({
+      messages: prepared.map(message => ({ ...message, content: message.content ?? "" })),
+    }).tokens;
+    const exact = {
+      provider: {
+        headers: {},
+        baseUrl: "https://provider.test/v1",
+        model: "m",
+        contextWindow: promptTokens + maxOutputTokens,
+        maxOutputTokens,
+        reserveTokens: 0,
+      },
+      messages,
+      fetchImpl: vi.fn(),
+    };
+
+    expect(() => prepareCompactionMessages(exact)).not.toThrow();
+    expect(() => prepareCompactionMessages({
+      ...exact,
+      provider: { ...exact.provider, contextWindow: exact.provider.contextWindow - 1 },
+    })).toThrow(SummaryAdmissionError);
+    const fetchImpl = vi.fn();
+    await expect(requestCompactionSummary({
+      ...exact,
+      provider: { ...exact.provider, contextWindow: exact.provider.contextWindow - 1 },
+      fetchImpl,
+    })).rejects.toBeInstanceOf(SummaryAdmissionError);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

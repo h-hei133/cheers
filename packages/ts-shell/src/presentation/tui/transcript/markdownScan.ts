@@ -16,6 +16,8 @@
 export interface TextBlock {
   readonly kind: "text";
   readonly line: string;
+  readonly sourceStart: number;
+  readonly sourceEnd: number;
 }
 
 export interface HeadingBlock {
@@ -23,10 +25,14 @@ export interface HeadingBlock {
   /** The marker's own length, which is the level. */
   readonly level: number;
   readonly text: string;
+  readonly sourceStart: number;
+  readonly sourceEnd: number;
 }
 
 export interface RuleBlock {
   readonly kind: "rule";
+  readonly sourceStart: number;
+  readonly sourceEnd: number;
 }
 
 /** A fenced block, with the language from its opening line when it named one. */
@@ -34,12 +40,16 @@ export interface FenceBlock {
   readonly kind: "fence";
   readonly language: string;
   readonly lines: readonly string[];
+  readonly sourceStart: number;
+  readonly sourceEnd: number;
 }
 
 export interface TableBlock {
   readonly kind: "table";
   readonly header: string;
   readonly rows: readonly string[];
+  readonly sourceStart: number;
+  readonly sourceEnd: number;
 }
 
 export interface MathBlock {
@@ -47,6 +57,8 @@ export interface MathBlock {
   readonly body: string;
   /** Complete source including delimiters, used when projection is unavailable. */
   readonly raw: string;
+  readonly sourceStart: number;
+  readonly sourceEnd: number;
 }
 
 /** A list item, with the marker kept because its shape is what a reader sees. */
@@ -55,11 +67,15 @@ export interface ListBlock {
   readonly indent: string;
   readonly marker: string;
   readonly text: string;
+  readonly sourceStart: number;
+  readonly sourceEnd: number;
 }
 
 export interface QuoteBlock {
   readonly kind: "quote";
   readonly text: string;
+  readonly sourceStart: number;
+  readonly sourceEnd: number;
 }
 
 export type MarkdownBlock =
@@ -96,6 +112,7 @@ export function scanBlocks(text: string): readonly MarkdownBlock[] {
   let index = 0;
   while (index < lines.length) {
     const line = lines[index]!;
+    const sourceStart = index;
 
     const displayMath = /^\s*(\$\$|\\\[)\s*$/.exec(line);
     if (displayMath) {
@@ -107,6 +124,8 @@ export function scanBlocks(text: string): readonly MarkdownBlock[] {
           kind: "math",
           body: lines.slice(index + 1, closingIndex).join("\n"),
           raw: lines.slice(index, closingIndex + 1).join("\n"),
+          sourceStart,
+          sourceEnd: closingIndex,
         });
         index = closingIndex + 1;
         continue;
@@ -115,7 +134,7 @@ export function scanBlocks(text: string): readonly MarkdownBlock[] {
       // it as math would consume the rest of the answer and drop the delimiter
       // the reader needs to copy.
       while (index < lines.length) {
-        blocks.push({ kind: "text", line: lines[index]! });
+        blocks.push({ kind: "text", line: lines[index]!, sourceStart: index, sourceEnd: index });
         index += 1;
       }
       break;
@@ -128,7 +147,7 @@ export function scanBlocks(text: string): readonly MarkdownBlock[] {
         rows.push(lines[cursor]!);
         cursor += 1;
       }
-      blocks.push({ kind: "table", header: line, rows });
+      blocks.push({ kind: "table", header: line, rows, sourceStart, sourceEnd: cursor - 1 });
       index = cursor;
       continue;
     }
@@ -142,47 +161,48 @@ export function scanBlocks(text: string): readonly MarkdownBlock[] {
         body.push(lines[index]!);
         index += 1;
       }
+      const sourceEnd = index < lines.length ? index : lines.length - 1;
       // Past the closing marker when there was one; at the end otherwise.
       index += 1;
-      blocks.push({ kind: "fence", language: fence[2] ?? "", lines: body });
+      blocks.push({ kind: "fence", language: fence[2] ?? "", lines: body, sourceStart, sourceEnd });
       continue;
     }
 
     const heading = HEADING.exec(line);
     if (heading) {
-      blocks.push({ kind: "heading", level: heading[1]!.length, text: heading[2]! });
+      blocks.push({ kind: "heading", level: heading[1]!.length, text: heading[2]!, sourceStart, sourceEnd: index });
       index += 1;
       continue;
     }
 
     if (RULE.test(line)) {
-      blocks.push({ kind: "rule" });
+      blocks.push({ kind: "rule", sourceStart, sourceEnd: index });
       index += 1;
       continue;
     }
 
     const bullet = BULLET.exec(line);
     if (bullet) {
-      blocks.push({ kind: "list", indent: bullet[1]!, marker: bullet[2]!, text: bullet[3]! });
+      blocks.push({ kind: "list", indent: bullet[1]!, marker: bullet[2]!, text: bullet[3]!, sourceStart, sourceEnd: index });
       index += 1;
       continue;
     }
 
     const ordered = ORDERED.exec(line);
     if (ordered) {
-      blocks.push({ kind: "list", indent: ordered[1]!, marker: `${ordered[2]}.`, text: ordered[3]! });
+      blocks.push({ kind: "list", indent: ordered[1]!, marker: `${ordered[2]}.`, text: ordered[3]!, sourceStart, sourceEnd: index });
       index += 1;
       continue;
     }
 
     const quote = QUOTE.exec(line);
     if (quote) {
-      blocks.push({ kind: "quote", text: quote[1]! });
+      blocks.push({ kind: "quote", text: quote[1]!, sourceStart, sourceEnd: index });
       index += 1;
       continue;
     }
 
-    blocks.push({ kind: "text", line });
+    blocks.push({ kind: "text", line, sourceStart, sourceEnd: index });
     index += 1;
   }
   return blocks;

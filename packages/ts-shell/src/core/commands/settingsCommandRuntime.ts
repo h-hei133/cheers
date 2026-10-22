@@ -5,9 +5,12 @@ import { CONFIG_SETTINGS, settingDefinition } from '../../config/settings.js';
 import type { CommandContext, LocalCommandResult } from './types.js';
 
 /** The command describes the same editable registry as the interactive panel. */
-export async function runSettingsCommand(args: string[], _context: CommandContext): Promise<LocalCommandResult> {
+export async function runSettingsCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
   const parsed = parseSyntax(settingsSyntax, args);
   if (!parsed.ok) return { kind: 'local', output: `Invalid /settings arguments: ${parsed.reason}\n${syntaxHelp(settingsSyntax)}` };
+  if (parsed.action.name === 'set') return context.settingsCommand
+    ? context.settingsCommand(args, context)
+    : { kind: 'local', output: 'Settings save requires a bound session runtime.' };
   const setting = settingDefinition(parsed.action.name);
   if (setting) return { kind: 'local', output: [
     `### ${setting.key}`, '', setting.description, '',
@@ -20,6 +23,6 @@ export async function runSettingsCommand(args: string[], _context: CommandContex
     'Choose a field and save scope, stage a value, then choose Apply. Credentials stay in /connect.', '',
     '| Group | Setting | What it does |', '| :--- | :--- | :--- |',
     ...CONFIG_SETTINGS.map(item => `| ${item.group} | ${item.key} | ${item.description} |`), '',
-    'Details: /settings <name>. This command does not write configuration.',
+    'Details: /settings <name>. The bare command and field details are read-only; /settings set writes explicitly.',
   ].join('\n') };
 }

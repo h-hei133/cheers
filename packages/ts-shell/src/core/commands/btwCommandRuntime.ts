@@ -150,7 +150,8 @@ export async function runBtwCommand(
   return {
     kind: "local",
     output: lines.join("\n"),
-    report: createReport({ title: 'Side question', facts: { question, delivered, providerRequest: attempted },
+    report: createReport({ title: 'Side question', facts: { question, delivered, providerRequest: attempted,
+      failure: failure ?? null },
       lines: [{ kind: 'text', spans: [span(answer, 'text')] },
         { kind: 'text', spans: [span('Out-of-band: this exchange is excluded from the main session history.', 'muted')] }] }),
   };

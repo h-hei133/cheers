@@ -35,11 +35,15 @@ import * as sessionNavigation from '../../session/query/navigation.js';
 import { parseKeyEvent } from '../../presentation/tui/input/keys.js';
 import type { SubmissionQueue } from './inputQueue.js';
 import type { InteractiveApprovalResult } from './picker/approval.js';
+import { textBlock } from '../../presentation/tui/transcript/blocks.js';
 import * as extensionRuntime from '../runtime/extensions.js';
 import * as mcpRuntime from '../runtime/mcp.js';
 import { pluginPicker } from './picker/plugins.js';
 import type { ExtensionManager } from '../../extensions/view/model.js';
 import { ShellCommandRuntime } from '../../core/shell/command.js';
+import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
+import { installUsageRuntime } from '../runtime/usage.js';
+import type { ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
@@ -89,6 +93,49 @@ function build(overrides: {
 }
 
 describe("session wiring", () => {
+  it('binds the usage picker to an interactive command context for local reset inspection', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { pickerHost(): PickerHost; options: { runtimeContext: ShellRuntimeContext } };
+    const runtime = host.options.runtimeContext;
+    const resolution: ProviderCredentialResolution = {
+      provider: 'openai',
+      model: 'fixture-model',
+      baseUrl: 'https://chatgpt.com/backend-api',
+      expectedEnvVarName: 'OPENAI_API_KEY',
+      credential: {
+        provider: 'openai',
+        source: 'config',
+        authMode: 'account-auth',
+        envVarName: 'OPENAI_API_KEY',
+        baseUrl: 'https://chatgpt.com/backend-api',
+        accountAuth: {
+          type: 'openai-chatgpt-account',
+          accessToken: 'synthetic-access',
+          refreshToken: 'synthetic-refresh',
+          accountId: 'synthetic-account',
+          expiresAt: Date.now() + 3_600_000,
+        },
+      },
+    };
+    Object.assign(runtime, { resolveConfigTarget: () => resolution });
+    installUsageRuntime(runtime, () => ({
+      workspaceRoot: runtime.projectRoot,
+      sessionId: runtime.session.id,
+      agentMode: 'build',
+      permissionScope: 'allow-all',
+      hooks: new HookDispatcher(),
+      denyRules: [],
+      emit: () => {},
+    }));
+    const port = host.pickerHost();
+    expect(port.commandContext.interactive).toBe(true);
+    const picker = pickerFor('/usage', { ...port, commandContext: { ...port.commandContext, admission: () => undefined } })!;
+    await picker.load();
+    const result = await picker.apply(['reset-status']);
+    expect(result?.note).toBeDefined();
+    expect(result?.note).not.toContain('requires the current bound interactive session');
+  });
+
   it('cancels an accepted exact MCP refresh through the actual terminal command lifecycle', async () => {
     const { mode, terminal } = build();
     const host = mode as unknown as { pickerHost(): PickerHost; overlay: OverlayHost; busy: boolean;
@@ -535,6 +582,23 @@ describe("session wiring", () => {
       expect(host.pager.active).toBe(false);
       expect(host.view.transcript.all().some(block => block.report === report)).toBe(false);
     } finally { mode.stop(); }
+  });
+
+  it('opens a retained report without appending or persisting a duplicate', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { view: InteractiveView; pager: Pager; applyPicker(picker: Picker, ids: readonly string[]): void };
+    const report = createReport({ title: 'Side question', facts: { question: 'Why?' },
+      lines: Array.from({ length: 80 }, (_, index) => ({ kind: 'text' as const, spans: [span(`line ${index}`, 'text')] })) });
+    host.view.transcript.append({ ...textBlock('command', 'retained report', 'Side question'), report });
+    mode.start();
+    try {
+      host.applyPicker({ title: 'Side questions', form: 'panel', empty: '', load: async () => [],
+        apply: async () => ({ report, reportRetained: true }) }, ['retained']);
+      await vi.waitFor(() => expect(host.pager.active).toBe(true));
+      expect(host.view.transcript.all().filter(block => block.report === report)).toHaveLength(1);
+    } finally {
+      mode.stop();
+    }
   });
 
   it('holds composer typing and paste until a delayed restore preview draft settles', async () => {

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { getRuntimeConfig, readUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 
 import { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
@@ -122,6 +122,25 @@ describe("interactive command router", () => {
     harness.lines.length = 0;
     await runNonInteractivePrompt({ ...harness.input, prompt: "/todo list", printMode });
     expect(harness.lines.join("\n")).toContain("No tasks currently");
+  });
+
+  it.each(["piped", "print"])("saves settings from the noninteractive %s path", async mode => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "command-settings-"));
+    vi.stubEnv("HOME", root);
+    vi.stubEnv("USERPROFILE", root);
+    try {
+      const harness = createHarness(root);
+      await runNonInteractivePrompt({
+        ...harness.input,
+        prompt: "/settings set maxTurns 7",
+        printMode: mode === "print",
+      });
+      expect(harness.lines.join("\n")).toContain("Saved to your user configuration");
+      expect(readUserRuntimeConfigFile().maxTurns).toBe(7);
+    } finally {
+      vi.unstubAllEnvs();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it.each(["interactive", "piped", "print"])("switches and reads the session view in %s mode", async (mode) => {

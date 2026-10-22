@@ -2,6 +2,7 @@ import { wrapToWidth } from "../text/layout.js";
 import { stripAnsi } from "../text/ansi.js";
 import type { Block } from "./blocks.js";
 import { layoutSideBySide } from "./diff.js";
+import { renderMarkdownWithSources } from "./markdown.js";
 
 /**
  * Semantic source behind a rendered row.
@@ -25,6 +26,12 @@ export interface SourceLine {
   readonly right?: string;
   /** Divider column; a selection left of it copies old, right copies new. */
   readonly split?: number;
+  /** Stable source node for structured rows that share one source line. */
+  readonly node?: number;
+  /** Visual row within that source node. */
+  readonly nodeRow?: number;
+  /** Total visual rows for the source node. */
+  readonly nodeRows?: number;
 }
 
 interface Projection {
@@ -76,6 +83,29 @@ export function sourceLinesFor(
   width: number,
   rows: readonly string[],
 ): readonly (SourceLine | undefined)[] {
+  if (block.kind === "assistant" && block.finalized) {
+    const projected = renderMarkdownWithSources(block.text.replace(/\s+$/, ""), Math.max(8, width));
+    const separator = rows.length > 0 && rows[rows.length - 1] === "" ? 1 : 0;
+    if (rows.length - separator === projected.rows.length
+      && projected.rows.every((row, index) => stripAnsi(row) === stripAnsi(rows[index] ?? ""))) {
+      return rows.map((_, index) => {
+        const line = projected.sources[index];
+        return line ? { ...line, block: blockIndex } : undefined;
+      });
+    }
+  }
+  if ((block.kind === "command" || block.kind === "error") && !block.report && !block.diff) {
+    const projected = renderMarkdownWithSources(block.text.replace(/\s+$/, ""), Math.max(8, width));
+    const separator = rows.length > 0 && rows[rows.length - 1] === "" ? 1 : 0;
+    const bodyRows = rows.slice(1, 1 + projected.rows.length);
+    if (rows.length - separator === projected.rows.length + 1
+      && projected.rows.every((row, index) => stripAnsi(row) === stripAnsi(bodyRows[index] ?? ""))) {
+      return rows.map((_, index) => {
+        const line = projected.sources[index - 1];
+        return line ? { ...line, block: blockIndex } : undefined;
+      });
+    }
+  }
   if (block.diff) {
     // Tool cards frame the diff in a box and use the inner width; command and
     // error blocks render it at full width. The split column is shifted by the
@@ -114,9 +144,15 @@ export function sourceLinesFor(
 /** Join fully selected source lines, honouring soft and logical breaks. */
 export function joinSourceLines(lines: readonly SourceLine[]): string {
   let text = "";
+  let previousNode: number | undefined;
   for (const line of lines) {
+    if (line.node !== undefined && line.node === previousNode) {
+      if (line.breakAfter === "logical") text += "\n";
+      continue;
+    }
     text += line.text;
     if (line.breakAfter === "logical") text += "\n";
+    previousNode = line.node;
   }
   return text.replace(/\n+$/, "");
 }

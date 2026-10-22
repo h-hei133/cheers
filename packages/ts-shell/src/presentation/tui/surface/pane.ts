@@ -209,6 +209,14 @@ export class TranscriptPane {
       selected.push(line);
     }
     if (selected.length === 0) return undefined;
+    const coverage = new Map<number, { readonly seen: Set<number>; readonly total: number }>();
+    for (const line of selected) {
+      if (line.node === undefined) continue;
+      const entry = coverage.get(line.node) ?? { seen: new Set<number>(), total: line.nodeRows ?? 1 };
+      entry.seen.add(line.nodeRow ?? 0);
+      coverage.set(line.node, entry);
+    }
+    if ([...coverage.values()].some(entry => entry.seen.size !== entry.total)) return undefined;
     const block = selected[0]!.block;
     if (selected.some((line) => line.block !== block)) return undefined;
     const text = joinSourceLines(selected);

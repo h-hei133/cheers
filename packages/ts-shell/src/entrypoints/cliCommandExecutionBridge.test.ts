@@ -145,6 +145,32 @@ describe("CLI command execution bridge", () => {
     ]);
   });
 
+  it("passes the bound settings save port to slash commands", async () => {
+    const output = renderer();
+    const settingsCommand = async () => ({ kind: "local" as const, output: "saved" });
+    const contextSeen: unknown[] = [];
+    await buildCliCommandExecution(
+      {
+        prompt: "/settings set maxTurns 7",
+        cwd: "/workspace",
+        renderer: output as StreamingRenderer,
+        printMode: true,
+        interactive: false,
+        settingsCommand,
+      },
+      {
+        routeSlashCommand: async (_prompt, context) => {
+          contextSeen.push(context);
+          return { kind: "local", output: "saved" };
+        },
+      },
+    );
+
+    expect(contextSeen).toEqual([
+      expect.objectContaining({ settingsCommand }),
+    ]);
+  });
+
   it("passes explicit browser receipt cache store from env to slash commands", async () => {
     const output = renderer();
     const cacheRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cli-browser-cache-"));

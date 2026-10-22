@@ -24,9 +24,14 @@ import { skillPicker } from "./skills.js";
 import { sourcePicker } from "./sources.js";
 import { sessionPicker } from "./session.js";
 import { hubPicker } from "./hub.js";
+import { jobsPicker } from "./jobs.js";
+import { agentsPicker } from "./agents.js";
 import { mcpAddWizard } from "./mcpAdd.js";
 import { advisorPicker } from "./advisor.js";
 import { thinkingPicker } from "./thinking.js";
+import { usagePicker } from "./usage.js";
+import { btwPicker } from "./btw.js";
+import { planPicker } from "./plan.js";
 import { statusItemPicker } from "./statusItems.js";
 import { settingsPicker, type SettingsHost } from "./settings.js";
 import { undoPicker } from './undo.js';
@@ -39,6 +44,7 @@ import { authPicker, type SignInCommand } from './auth.js';
 import { debugPicker } from './debug.js';
 import type { ExtensionManager } from '../../../extensions/view/model.js';
 import type { McpClientSnapshot, ScopedMcpServerConfig } from '../../../core/mcp/types.js';
+import type { AgentDefinitionRow, AgentDiscoveryView } from '../../runtime/agents.js';
 
 /**
  * Which commands open a chooser.
@@ -63,6 +69,8 @@ export interface PickerHost extends SettingsHost {
   readonly extensions?: ExtensionManager;
   readonly signIn?: SignInCommand;
   readonly jobs?: import('../../jobs/model.js').JobsComposition;
+  readonly agentDefinitions?: () => readonly AgentDefinitionRow[];
+  readonly agentDiscovery?: () => AgentDiscoveryView;
   readonly advisorState?: () => import('../../../advisor/model.js').AdvisorState | undefined;
   sessionContext(): SessionSelectionContext;
   resumeSession(sessionId: string): Promise<string | undefined>;
@@ -126,6 +134,11 @@ const PICKERS: Record<string, PickerFactory> = {
   settings: (host) => settingsPicker(host),
   thinking: host => thinkingPicker(host.commandContext),
   hub: host => host.jobs ? hubPicker(host.jobs) : undefined,
+  jobs: host => jobsPicker(host.jobs),
+  agents: host => agentsPicker(host.agentDefinitions, host.commandContext, host.agentDiscovery, host.jobs),
+  usage: host => usagePicker(host.commandContext),
+  btw: host => btwPicker(host.transcript),
+  'plan-review': host => planPicker(host.sessionManager, host.commandContext),
   advisor: host => { const state = host.advisorState?.(); return state ? advisorPicker(state) : undefined; },
   git: host => gitPicker(host.gitWorkbench),
   cleanse: host => cleansePicker(host.security),

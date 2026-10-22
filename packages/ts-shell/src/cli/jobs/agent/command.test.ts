@@ -127,6 +127,17 @@ it('redacts full retained context before taking text pages and withholds truncat
   expect(agentPage({ ...job, text }, 16384)).not.toContain('SYNTHETIC_SIDE_SECRET');
   expect(agentPage({ ...job, text: 'partial', truncated: true }, 0)).toContain('withheld');
 });
+it('pages agent text on UTF-8 boundaries without replacement characters', async () => {
+  await command('agent --queue UTF-8 fixture'); const job = jobsFor(context)!.agents.journal.list()[0]!;
+  const text = 'x'.repeat(16383) + 'é' + 'tail';
+  const first = agentPage({ ...job, text, output: 'complete' }, 0);
+  const cursor = Number(/next byte (\d+)\//.exec(first)?.[1]);
+  expect(cursor).toBe(16383);
+  const second = agentPage({ ...job, text, output: 'complete' }, cursor);
+  expect(first).not.toContain('\uFFFD');
+  expect(second).not.toContain('\uFFFD');
+  expect(second).toContain('é');
+});
 
 it('retains foreground execution uncertainty instead of confirming agent cancellation', async () => {
   vi.stubEnv('CHEERS_SYNTHETIC_TOOLS', '1');

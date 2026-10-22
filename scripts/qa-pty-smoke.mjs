@@ -419,7 +419,10 @@ async function runLineSmoke(target) {
       { command: "run printf qa-approval-ok", expected: "qa-approval-ok" },
       { command: "delegate task inspect qa fixture", expected: "Synthetic reply: delegate task inspect qa fixture" },
       { command: "discover and load skill qa-discovery", expected: "Synthetic reply: discover and load skill qa-discovery" },
-      { command: "/settings", expected: "does not write configuration" },
+      { command: "/settings", expected: "bare command and field details are read-only" },
+      { command: "/profile create work", expected: "Profile work: created" },
+      { command: "/profile switch work", expected: "requires an interactive terminal" },
+      { command: "/settings set maxTurns 7", expected: "Saved to your user configuration" },
       { command: '/restore preview --authority-id qa-restore --record qa-record', expected: ['Would restore', 'qa-restore.txt', 'Nothing was written.'] },
     ]) {
       const start = state.output.length;
@@ -431,9 +434,10 @@ async function runLineSmoke(target) {
     child.stdin.write("/exit\n");
     const code = await waitForExit(child, 20_000);
     if (code !== 0) throw new Error(`process exited ${code}`);
-    if (fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8") !== configBefore) {
-      throw new Error("line read-only settings changed the configuration");
-    }
+    const config = JSON.parse(fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8"));
+    if (config.maxTurns !== 7) throw new Error(`line settings save persisted maxTurns=${String(config.maxTurns)}`);
+    if (config.tuiMode !== JSON.parse(configBefore).tuiMode) throw new Error("line settings save changed the launch preference");
+    if (!fs.existsSync(path.join(home, ".cheers", "profiles", "work"))) throw new Error("line profile create did not persist the profile");
     assertRestoreUnchanged(restore);
     assertTranscript(home, sessionId, [
       "\"name\":\"bash\"",
@@ -470,6 +474,9 @@ async function runPipeSmoke(target) {
     "delegate task inspect qa fixture",
     "discover and load skill qa-discovery",
     "/settings",
+    "/profile create work",
+    "/profile switch work",
+    "/settings set maxTurns 7",
     '/restore preview --authority-id qa-restore --record qa-record',
     "/exit",
   ].join("\n") + "\n";
@@ -486,9 +493,10 @@ async function runPipeSmoke(target) {
   try {
     const code = await waitForExit(child, 60_000);
     if (code !== 0) throw new Error(`process exited ${code}`);
-    if (fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8") !== configBefore) {
-      throw new Error("pipe read-only settings changed the configuration");
-    }
+    const config = JSON.parse(fs.readFileSync(path.join(home, ".cheers", "config.json"), "utf8"));
+    if (config.maxTurns !== 7) throw new Error(`pipe settings save persisted maxTurns=${String(config.maxTurns)}`);
+    if (config.tuiMode !== JSON.parse(configBefore).tuiMode) throw new Error("pipe settings save changed the launch preference");
+    if (!fs.existsSync(path.join(home, ".cheers", "profiles", "work"))) throw new Error("pipe profile create did not persist the profile");
     const output = normalized(state.output);
     for (const expected of [
       "Current session",
@@ -496,7 +504,10 @@ async function runPipeSmoke(target) {
       "qa-approval-ok",
       "Synthetic reply: delegate task inspect qa fixture",
       "Synthetic reply: discover and load skill qa-discovery",
-      "does not write configuration",
+      "bare command and field details are read-only",
+      "Profile work: created",
+      "requires an interactive terminal",
+      "Saved to your user configuration",
       'Would restore',
       'qa-restore.txt',
       'Nothing was written.',

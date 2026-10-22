@@ -90,6 +90,85 @@ describe("createStepFunction", () => {
     expect(sent).toHaveLength(1); expect(sent[0]?.max_tokens).toBe(2048);
   });
 
+  it("refuses an over-window request before the provider is called", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] }));
+    const step = createStepFunction({
+      ...request,
+      contextWindow: 10,
+      maxOutputTokens: 1,
+      fetchImpl,
+    });
+
+    const result = await step([{ role: "user", content: "x".repeat(1_000) }], undefined, {}, { allowTools: false });
+
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toMatch(/^Context overflow:/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("records the exact message array sent so later measurements include new tool arguments", async () => {
+    const id = "step-prompt-message-count";
+    resetSessionUsage(id);
+    const bodies: Array<{ messages: Array<{ role: string; content?: string; tool_calls?: unknown[] }> }> = [];
+    const step = createStepFunction({
+      ...request,
+      sessionId: id,
+      fetchImpl: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)) as typeof bodies[number]);
+        return jsonResponse({
+          choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 100, completion_tokens: 1 },
+        });
+      },
+    });
+
+    try {
+      await step([{ role: "user", content: "first" }], undefined, {}, { allowTools: true });
+      expect(getSessionUsage(id).lastPromptMessageCount).toBe(1);
+
+      const withTool = [
+        { role: "user" as const, content: "first" },
+        { role: "assistant" as const, content: "", tool_calls: [{ id: "call-1", type: "function" as const,
+          function: { name: "read", arguments: '{"path":"src/a.ts"}' } }] },
+        { role: "tool" as const, tool_call_id: "call-1", content: "file" },
+      ];
+      await step(withTool, undefined, {}, { allowTools: true });
+      expect(getSessionUsage(id).lastPromptMessageCount).toBe(3);
+      expect(bodies[1]?.messages).toEqual(expect.arrayContaining([
+        expect.objectContaining({ role: "assistant", tool_calls: [expect.objectContaining({
+          function: expect.objectContaining({ arguments: '{"path":"src/a.ts"}' }),
+        })] }),
+      ]));
+    } finally {
+      resetSessionUsage(id);
+    }
+  });
+
+  it("distinguishes a no-tools measurement from the tool-enabled wire schema", async () => {
+    const id = "step-prompt-schema-gate";
+    resetSessionUsage(id);
+    const step = createStepFunction({
+      ...request,
+      sessionId: id,
+      tools: [{ type: "function", function: { name: "read", parameters: { type: "object" } } }],
+      fetchImpl: async () => jsonResponse({
+        choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 100, completion_tokens: 1 },
+      }),
+    });
+    try {
+      await step([{ role: "user", content: "first" }], undefined, {}, { allowTools: false });
+      const withoutTools = getSessionUsage(id).lastPromptIdentity?.schemaDigest;
+      await step([{ role: "user", content: "second" }], undefined, {}, { allowTools: true });
+      const withTools = getSessionUsage(id).lastPromptIdentity?.schemaDigest;
+      expect(withoutTools).toBeTruthy();
+      expect(withTools).toBeTruthy();
+      expect(withoutTools).not.toBe(withTools);
+    } finally {
+      resetSessionUsage(id);
+    }
+  });
+
   it.each(["max_tokens", "max_completion_tokens"] as const)("retains the catalog's %s field when the original ceiling is absent", async maxTokensField => {
     let captured: SentRequest | undefined;
     const step = createStepFunction({ ...request, provider: { ...request.provider, provider: "fixture" },

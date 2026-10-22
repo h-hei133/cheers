@@ -120,3 +120,20 @@ it('keeps every row inside the width at tiny widths', () => {
     for (const row of rows) expect(visibleWidth(row)).toBeLessThanOrEqual(width);
   }
 });
+
+it('neutralises control sequences in option and detail text', () => {
+  const value = new OptionModel();
+  value.setOptions([{ id: 'unsafe', label: 'unsafe\x1b[2J', detail: 'detail\nforged', note: 'bad\x85' }]);
+  const rows = renderPanel(value, {
+    title: 'Pick\x1b[2J',
+    empty: 'none',
+    multiple: false,
+    footer: 'footer\x1b[2J',
+    detail: () => ['detail\x1b[2J'],
+  }, 80, 8);
+  const output = rows.join('\n');
+  expect(output).not.toContain('\x1b[2J');
+  expect(output).toContain('\\x1b[2J');
+  expect(output).toContain('\\x0a');
+  expect(output).toContain('\\x85');
+});

@@ -9,6 +9,7 @@ import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import { withConfiguration } from "../../test-utils/configuration.js";
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
+import type { ProviderCredentialResolution } from '../../core/auth/credential.js';
 
 function context(sessionId: string, overrides: Partial<RuntimeConfig> = {}): ShellRuntimeContext {
   return withConfiguration({
@@ -116,6 +117,93 @@ describe("status facts", () => {
     expect(state.contextWindow).toBe(200_000);
     expect(state.costUsd).toBeGreaterThan(0);
     resetSessionUsage("used");
+  });
+
+  it("drops a measurement from a different endpoint identity", async () => {
+    const id = "status-stale-endpoint";
+    resetSessionUsage(id);
+    const runtime = context(id);
+    recordSessionUsage(id, { provider: "openai", model: "opus-5", promptTokens: 9_000, promptMessageCount: 1,
+      promptIdentity: { provider: "openai", model: "opus-5", endpoint: "openai-responses" } });
+    expect(readStatusFacts(runtime).contextUsed).toBeUndefined();
+    const report = await runContextCommand([], { cwd: runtime.projectRoot, sessionId: id,
+      runtimeConfig: runtime.runtimeConfig, readConfiguration: () => runtime.configuration.current,
+      getToolPool: async () => new Map() });
+    expect(report.report?.facts.prompt).toMatchObject({ status: "stale" });
+    resetSessionUsage(id);
+  });
+
+  it("drops a status measurement when the current endpoint cannot be resolved", () => {
+    const id = "status-unresolved-endpoint";
+    resetSessionUsage(id);
+    const runtime = context(id);
+    const resolution: ProviderCredentialResolution = {
+      provider: "github-copilot",
+      model: "opus-5",
+      baseUrl: "https://selected.invalid",
+      expectedEnvVarName: "GITHUB_COPILOT_TOKEN",
+      credential: {
+        provider: "github-copilot",
+        source: "config",
+        authMode: "account-auth",
+        envVarName: "GITHUB_COPILOT_TOKEN",
+        accountAuth: {
+          type: "subscription",
+          provider: "github-copilot",
+          accessToken: "synthetic-access",
+          refreshToken: "synthetic-refresh",
+          expiresAt: Date.now() + 60_000,
+          baseUrl: "https://api.individual.githubcopilot.com",
+        },
+      },
+    };
+    (runtime as unknown as { resolveConfigTarget: () => ProviderCredentialResolution }).resolveConfigTarget = () => resolution;
+    recordSessionUsage(id, { provider: "github-copilot", model: "opus-5", promptTokens: 9_000, promptMessageCount: 1,
+      promptIdentity: { provider: "github-copilot", model: "opus-5", endpoint: "copilot-chat-completions" } });
+    expect(readStatusFacts(runtime).contextUsed).toBeUndefined();
+    resetSessionUsage(id);
+  });
+
+  it("drops a context report measurement from a different effective schema", async () => {
+    const id = "status-stale-schema";
+    resetSessionUsage(id);
+    const runtime = context(id);
+    recordSessionUsage(id, { provider: "openai", model: "opus-5", promptTokens: 9_000, promptMessageCount: 1,
+      promptIdentity: { provider: "openai", model: "opus-5", endpoint: "openai-compatible",
+        schemaDigest: "f".repeat(64), systemDigest: "e".repeat(64) } });
+    const report = await runContextCommand([], { cwd: runtime.projectRoot, sessionId: id,
+      runtimeConfig: runtime.runtimeConfig, readConfiguration: () => runtime.configuration.current,
+      getToolPool: async () => new Map(), promptIdentity: { schemaDigest: "a".repeat(64), systemDigest: "e".repeat(64) } });
+    expect(report.report?.facts.prompt).toMatchObject({ status: "stale" });
+    resetSessionUsage(id);
+  });
+
+  it("reports a retained dynamic request identity across a nested working directory", async () => {
+    const id = "status-current-system";
+    resetSessionUsage(id);
+    const runtime = context(id);
+    recordSessionUsage(id, { provider: "openai", model: "opus-5", promptTokens: 9_000, promptMessageCount: 1,
+      promptIdentity: { provider: "openai", model: "opus-5", endpoint: "openai-compatible",
+        schemaDigest: "dynamic-request-schema", systemDigest: "request-system-prompt" } });
+    const report = await runContextCommand([], { cwd: `${runtime.projectRoot}/nested`, projectRoot: runtime.projectRoot, sessionId: id,
+      runtimeConfig: runtime.runtimeConfig, readConfiguration: () => runtime.configuration.current,
+      getToolPool: async () => new Map() });
+    expect(report.report?.facts.prompt).toMatchObject({ status: "measured", tokens: 9_000 });
+    resetSessionUsage(id);
+  });
+
+  it("drops a context report measurement without a current system identity", async () => {
+    const id = "status-stale-system";
+    resetSessionUsage(id);
+    const runtime = context(id);
+    recordSessionUsage(id, { provider: "openai", model: "opus-5", promptTokens: 9_000, promptMessageCount: 1,
+      promptIdentity: { provider: "openai", model: "opus-5", endpoint: "openai-compatible",
+        schemaDigest: "a".repeat(64), systemDigest: "e".repeat(64) } });
+    const report = await runContextCommand([], { cwd: runtime.projectRoot, sessionId: id,
+      runtimeConfig: runtime.runtimeConfig, readConfiguration: () => runtime.configuration.current,
+      getToolPool: async () => new Map(), promptIdentity: { schemaDigest: "a".repeat(64) } });
+    expect(report.report?.facts.prompt).toMatchObject({ status: "stale" });
+    resetSessionUsage(id);
   });
 
   it("carries branch and directory", () => {

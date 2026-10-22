@@ -1,6 +1,7 @@
 import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
+import { neutraliseForDisplay } from "../../../core/text/safety.js";
 import type { Option, OptionModel } from "./options.js";
 import type { ChipStrip } from "./chips.js";
 
@@ -66,7 +67,8 @@ export function renderPanel(
   }
   if (listRows === 0) return [...rows, ...footer];
   if (model.total === 0) {
-    const message = chrome.state === "error" ? defaultTheme.fg("error", chrome.empty) : defaultTheme.dim(chrome.empty);
+    const empty = neutraliseForDisplay(chrome.empty);
+    const message = chrome.state === "error" ? defaultTheme.fg("error", empty) : defaultTheme.dim(empty);
     rows.push(truncateToWidth(`  ${message}`, width));
     rows.push(...footer);
     return rows;
@@ -74,7 +76,7 @@ export function renderPanel(
   const twoColumn = chrome.detail !== undefined && width >= TWO_COLUMN_MIN_WIDTH;
   const listWidth = twoColumn ? Math.max(20, Math.floor(width * 0.45)) : width;
   const detailWidth = twoColumn ? Math.max(0, width - listWidth - 1) : 0;
-  const detailLines = chrome.detail?.(model.current()?.id) ?? [];
+  const detailLines = (chrome.detail?.(model.current()?.id) ?? []).map(neutraliseForDisplay);
   const previewRows = !twoColumn && listRows >= 4
     ? Math.min(12, listRows - 3, detailLines.length)
     : 0;
@@ -112,9 +114,9 @@ export function renderPanel(
 
 /** Title row, carrying the live filter and the match count. */
 function renderHeader(model: OptionModel, chrome: PanelChrome, width: number): string {
-  const filter = model.filter ? ` ${defaultTheme.fg("accent", model.filter)}` : "";
+  const filter = model.filter ? ` ${defaultTheme.fg("accent", neutraliseForDisplay(model.filter))}` : "";
   const count = chrome.hideCount ? "" : defaultTheme.dim(`${model.total}`);
-  const left = `  ${defaultTheme.bold(chrome.title)}${filter}`;
+  const left = `  ${defaultTheme.bold(neutraliseForDisplay(chrome.title))}${filter}`;
   if (!count) return truncateToWidth(left, width);
   const pad = Math.max(1, width - visibleWidth(left) - visibleWidth(count) - 2);
   return truncateToWidth(`${left}${" ".repeat(pad)}${count}`, width);
@@ -129,7 +131,8 @@ function renderRow(
   width: number,
 ): string {
   const marker = rowMarker(option, active, model, chrome);
-  const text = option.labelRole === "command" ? defaultTheme.fg("command", option.label) : option.label;
+  const labelText = neutraliseForDisplay(option.label);
+  const text = option.labelRole === "command" ? defaultTheme.fg("command", labelText) : labelText;
   const label = option.disabled
     ? defaultTheme.dim(text)
     : active
@@ -139,10 +142,10 @@ function renderRow(
   // pinned to the right and the detail gives way to it, rather than the note
   // being the first thing a long detail truncates away.
   const RIGHT_PAD = option.note ? 2 : 0;
-  const noteText = truncateToWidth(option.note ?? "", Math.max(0, Math.floor(width / 2) - RIGHT_PAD));
+  const noteText = truncateToWidth(neutraliseForDisplay(option.note ?? ""), Math.max(0, Math.floor(width / 2) - RIGHT_PAD));
   const noteWidth = option.note ? visibleWidth(noteText) + RIGHT_PAD : 0;
   const detailWidth = Math.max(0, width - visibleWidth(marker) - labelWidth - noteWidth);
-  const detail = option.detail ? defaultTheme.dim(truncateToWidth(option.detail, detailWidth)) : "";
+  const detail = option.detail ? defaultTheme.dim(truncateToWidth(neutraliseForDisplay(option.detail), detailWidth)) : "";
   const head = truncateToWidth(`${marker}${padToWidth(label, labelWidth)}${detail}`, width - noteWidth);
   const note = option.note ? defaultTheme.fg("border", noteText) : "";
   const gap = Math.max(0, width - visibleWidth(head) - visibleWidth(note) - RIGHT_PAD);
@@ -164,10 +167,10 @@ function renderFooterRows(chrome: PanelChrome, width: number, maxRows: number): 
       return [defaultTheme.dim(truncateToWidth('  Esc to close', width))];
     }
     const rows = chrome.groupHint
-      ? [defaultTheme.dim(truncateToWidth(`  ${chrome.groupHint}`, width))]
+      ? [defaultTheme.dim(truncateToWidth(`  ${neutraliseForDisplay(chrome.groupHint)}`, width))]
       : [];
     const footerRows = Math.max(1, maxRows - rows.length);
-    rows.push(...wrapToWidth(chrome.footer, Math.max(1, width - 4)).slice(0, footerRows)
+    rows.push(...wrapToWidth(neutraliseForDisplay(chrome.footer), Math.max(1, width - 4)).slice(0, footerRows)
       .map(line => defaultTheme.dim(truncateToWidth(`  ${line}`, width))));
     return rows.slice(0, maxRows);
   }

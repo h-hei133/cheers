@@ -1,6 +1,7 @@
 import type { CacheWarmingRunner } from "../turn/cacheWarm.js";
 import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
 import * as fs from "node:fs";
+import { createHash } from "node:crypto";
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
@@ -18,21 +19,10 @@ import { loadCatalog } from "../core/models/catalogStore.js";
 import { catalogProvider, type CatalogProvider } from "../core/models/catalog.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
-import { buildSystemPrompt, systemPromptSnapshot, type SystemPromptContext } from "../turn/prompt.js";
-import { readSessionModel } from '../session/model/state.js';
-import { skillPrompt } from '../core/commands/skillful.js';
+import { systemPromptSnapshot } from "../turn/prompt.js";
 import type { RequestOverhead } from "../session/context.js";
-import { renderSkillList, type Skill } from "../core/skills/skillLoader.js";
-import {
-  DEFAULT_INSTRUCTION_BUDGET_BYTES,
-  loadAppendedInstructionFiles,
-  renderAppendedInstructions,
-  loadInstructionFiles,
-  renderInstructionFiles,
-} from "../context/instructions/projectInstructions.js";
-import { createComponentLogger } from "../observability/structuredLogger.js";
+import { buildSystemPromptContext } from '../core/prompts/systemContext.js';
 import { neutraliseForDisplay } from "../core/text/safety.js";
-import { projectTrust } from "../core/security/projectTrust.js";
 import { pendingTurnInput } from "../turn/pendingInput.js";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
 import { runTurn, type CompactionSetup, type TurnRun, type TurnOptions } from "../turn/session.js";
@@ -297,64 +287,6 @@ function deferUntilReady(
 }
 
 /**
- * The project context that reaches the system prompt.
- *
- * Both parts are read here, once, at the point where the run's workspace and
- * configuration are already known. They are assembled into one value so the step
- * factory takes a single argument rather than reaching back into the filesystem
- * for material the caller has already gathered.
- *
- * Project instructions are withheld from an explicitly untrusted project for the
- * same reason as its skills: they are repository-controlled text going into the
- * system prompt.
- */
-function buildPromptContext(
-  request: CliRuntimeInvocationRequest,
-  skills: ReadonlyMap<string, Skill>,
-  toolNames: readonly string[],
-): SystemPromptContext {
-  const untrusted = projectTrust.isProjectUntrusted(request.workspaceRoot);
-  const instructions = untrusted
-    ? { files: [], truncated: false }
-    : loadInstructionFiles({
-        cwd: request.workspaceRoot,
-        // Absent means the loader's own default; zero is the opt-out.
-        maxBytes: request.runtimeConfig?.instructionBudgetBytes,
-      });
-
-  // Said out loud rather than swallowed: a project whose rules were cut short is
-  // one where the model is following a truncated version of them, and that is
-  // worth knowing before wondering why a rule was ignored.
-  if (instructions.truncated) {
-    createComponentLogger("project-instructions").warn(
-      `Instruction files exceeded the ${request.runtimeConfig?.instructionBudgetBytes ?? DEFAULT_INSTRUCTION_BUDGET_BYTES}-byte budget and were truncated.`,
-    );
-  }
-
-  // Appended instructions are withheld from an untrusted project for the same
-  // reason as the rule files: they are repository-controlled text entering the
-  // system prompt.
-  const appended = untrusted
-    ? { files: [], truncated: false }
-    : loadAppendedInstructionFiles({
-        cwd: request.workspaceRoot,
-        maxBytes: request.runtimeConfig?.instructionBudgetBytes,
-      });
-  if (appended.truncated) {
-    createComponentLogger("project-instructions").warn(
-      `Appended instruction files exceeded the ${request.runtimeConfig?.instructionBudgetBytes ?? DEFAULT_INSTRUCTION_BUDGET_BYTES}-byte budget and were truncated.`,
-    );
-  }
-
-  return {
-    instructions: renderInstructionFiles(instructions.files),
-    appendedInstructions: renderAppendedInstructions(appended.files),
-    skills: skillPrompt(skills, readSessionModel(request.sessionId)?.skillful),
-    toolNames,
-  };
-}
-
-/**
  * Ask the user whether one declared command may run.
  *
  * The command text is written by whoever wrote the repository, and it is shown at
@@ -410,12 +342,23 @@ async function approveDeclaredHook(
  * automatic threshold and the `/compact` command — sees the same number, which
  * is the reason the two share a policy in the first place.
  */
-function withRequestOverhead(
+export function withRequestOverhead(
   compaction: CompactionSetup | undefined,
   overhead: RequestOverhead,
+  currentOverhead?: () => RequestOverhead,
 ): CompactionSetup | undefined {
   if (!compaction) return undefined;
-  return { ...compaction, policy: { ...compaction.policy, overhead } };
+  const current = () => currentOverhead?.() ?? overhead;
+  const promptIdentity = () => {
+    const value = current();
+    return {
+      schemaDigest: createHash('sha256').update(JSON.stringify(value.tools ?? [])).digest('hex'),
+      systemDigest: createHash('sha256').update(value.systemPrompt ?? '').digest('hex'),
+    };
+  };
+  return { ...compaction, policy: { ...compaction.policy,
+    get overhead() { return current(); },
+    get promptIdentity() { return promptIdentity(); } } };
 }
 
 /**
@@ -450,17 +393,39 @@ async function startTurn(
     throw new Error(`Forced tool '${request.forcedTool}' is no longer available in the current tool pool.`);
   }
   assertAdmission(request.admission);
-  const promptContext = buildPromptContext(request, skills, [...tools.keys()]);
+  const allowedTools = request.allowedTools ? new Set(request.allowedTools) : undefined;
+  const effectiveTools = allowedTools
+    ? new Map([...tools].filter(([name]) => allowedTools.has(name)))
+    : tools;
+  const promptContext = buildSystemPromptContext({
+    workspaceRoot: request.workspaceRoot,
+    sessionId: request.sessionId,
+    runtimeConfig: request.runtimeConfig,
+    skills,
+    toolNames: [...effectiveTools.keys()],
+  });
   // What the request spends outside the conversation. Computed here because this
   // is the only place both facts exist: the instruction as it will be sent, and
   // the declarations of the tools actually in the pool after the user's own
   // filters have been applied. The compaction policy needs it for the estimate
   // it falls back to before any request has reported its usage, which is the
   // cold start — the moment those two are the bulk of the request.
-  const compaction = withRequestOverhead(request.compaction, {
-    systemPrompt: buildSystemPrompt(request.agentMode, promptContext),
-    tools: toolSchemas(tools),
-  });
+  const currentTools = () => {
+    const pool = discovery?.snapshot() ?? effectiveTools;
+    return allowedTools ? new Map([...pool].filter(([name]) => allowedTools.has(name))) : pool;
+  };
+  // The main turn sends this exact snapshot once for the whole run. Tool
+  // discovery may change the schema set between steps, but it must not change
+  // the system prompt the provider actually received.
+  const requestSystemPrompt = systemPromptSnapshot(request.agentMode, promptContext).text;
+  const currentOverhead = (): RequestOverhead => {
+    const schemas = toolSchemas(currentTools());
+    return {
+      systemPrompt: requestSystemPrompt,
+      tools: schemas,
+    };
+  };
+  const compaction = withRequestOverhead(request.compaction, currentOverhead(), currentOverhead);
   // The step and the tool set both exist here, so this is where a subagent's
   // run can be bound. The tool layer receives a function and never the model
   // side, which is what keeps a provider out of a layer that has no business

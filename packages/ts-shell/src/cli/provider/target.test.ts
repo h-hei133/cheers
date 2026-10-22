@@ -3,6 +3,9 @@ import { delegatedTarget } from './target.js';
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import type { ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
 import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
+import { captureSummaryRole } from './summary.js';
+import { resolveAdvisorSelection } from './advisor.js';
+import { delegatedSteps, type ProviderStepHost } from './step.js';
 
 beforeEach(() => { createAdvisorHarness(false, false); });
 afterEach(cleanupAdvisorHarnesses);
@@ -78,4 +81,29 @@ it('a parent pool refuses exact foreign-provider connections and roles while no-
   const unrestricted = { ...config, accountPool: undefined };
   expect(delegatedTarget('outside/requested-model', captured, unrestricted).credential?.connectionId).toBe(outside.id);
   expect(delegatedTarget(role, captured, unrestricted).credential?.connectionId).toBe(outside.id);
+});
+
+it('applies the parent pool to summary, advisor, and subagent role consumers', async () => {
+  const inside = { id: 'inside', provider: 'openai' as const, status: 'connected' as const, authType: 'api-key' as const,
+    apiKey: 'synthetic-inside', model: 'main', baseUrl: 'https://api.openai.com/v1', createdAt: '2026-10-01', updatedAt: '2026-10-01' };
+  const outside = { id: 'outside', provider: 'anthropic' as const, status: 'connected' as const, authType: 'api-key' as const,
+    apiKey: 'synthetic-outside', model: 'review', baseUrl: 'https://api.anthropic.com/v1', createdAt: '2026-10-01', updatedAt: '2026-10-01' };
+  const role = { provider: 'anthropic', connectionId: outside.id, model: 'review' };
+  const config = { ...getRuntimeConfig(), provider: 'openai' as const, activeProviderConnectionId: inside.id,
+    providerConnections: [inside, outside], providerCredentials: {},
+    accountPool: { openai: { connections: [inside.id] } }, sessionModelRoles: { summary: role, advisor: role } };
+  const catalog = [
+    { id: 'openai', models: [{ id: 'main' }] },
+    { id: 'anthropic', models: [{ id: 'review' }] },
+  ];
+  const main = { provider: 'openai' as const, model: 'main', baseUrl: inside.baseUrl,
+    expectedEnvVarName: 'OPENAI_API_KEY', credential: { provider: 'openai' as const, authMode: 'api-key' as const,
+      apiKey: inside.apiKey, model: 'main', baseUrl: inside.baseUrl, source: 'connection' as const, connectionId: inside.id,
+      envVarName: 'OPENAI_API_KEY' } };
+  const request: ProviderStepHost = { providerMode: 'real', providerCredentialResolution: main,
+    workspaceRoot: '/tmp', sessionId: 'pool-consumer-session', runtimeConfig: config, providerCatalog: catalog, agentMode: 'build' };
+
+  expect(() => captureSummaryRole({ config, catalog })).toThrow(/outside the parent account pool/);
+  expect(() => resolveAdvisorSelection({ config, catalog, main, revision: 'fixture' })).toThrow(/outside the parent account pool/);
+  await expect(delegatedSteps(request, new Map(), {}).prepare(role)).rejects.toThrow(/outside the parent account pool/);
 });

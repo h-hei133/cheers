@@ -69,11 +69,18 @@ export interface CommandContext {
   readonly agentsCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly mcpCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly usageCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>
+  /** Explicit noninteractive settings save through the same settings owner. */
+  readonly settingsCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>
   readonly worktreeCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly commitCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly cwd: string
   /** Current configured pool, resolved on demand by the CLI host. */
   readonly getToolPool?: () => Promise<ReadonlyMap<string, ToolDefinition>>
+  /** Current effective prompt identity, when the host can prove it. */
+  readonly promptIdentity?: {
+    readonly schemaDigest?: string
+    readonly systemDigest?: string
+  }
   /** False for scripted invocations; omitted by callers without a CLI host. */
   readonly interactive?: boolean
   /**

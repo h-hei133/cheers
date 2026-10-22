@@ -23,6 +23,7 @@ import { gitCommandFor, worktreeCommandFor, commitCommandFor } from '../cli/runt
 import { securityCommandFor } from '../cli/runtime/security.js';
 import { agentsCommandFor } from '../cli/runtime/agents.js';
 import { mcpCommandFor } from '../cli/runtime/mcp.js';
+import { settingsCommandFor } from '../cli/runtime/settings.js';
 import { collaborationCommandFor } from '../cli/runtime/collaboration.js';
 import { jobsCommandFor, workflowCommandFor } from '../cli/runtime/jobs.js';
 import { extensionCommandFor } from '../cli/runtime/extensions.js';
@@ -170,6 +171,7 @@ export async function runNonInteractivePrompt(options: {
     securityCommand: securityCommandFor(options.runtimeContext),
     agentsCommand: agentsCommandFor(options.runtimeContext),
     mcpCommand: mcpCommandFor(options.runtimeContext),
+    settingsCommand: settingsCommandFor(options.runtimeContext),
     collaborationCommand: collaborationCommandFor(options.runtimeContext),
     handoffCommand: handoffCommandFor(options.runtimeContext, options.sessionManager, options.sessionRuntime),
     directorCommand: directorCommandFor(options.runtimeContext),

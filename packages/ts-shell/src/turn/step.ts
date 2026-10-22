@@ -280,7 +280,11 @@ export function createStepFunction(request: StepRequest): StepFunction {
       ? request.systemPromptFor(options.agentMode, tools.map((tool) => tool.function.name))
       : request.systemPrompt;
     const overhead = { systemPrompt, tools };
-    const schemaDigest = createHash('sha256').update(JSON.stringify(tools)).digest('hex');
+    // The wire omits schemas when the closing step forbids tools. Hash what the
+    // endpoint actually sends so a no-tools measurement cannot authorize a
+    // later tool-enabled request with a stale prompt count.
+    const wireTools = options.allowTools ? tools : [];
+    const schemaDigest = createHash('sha256').update(JSON.stringify(wireTools)).digest('hex');
     const systemDigest = createHash('sha256').update(systemPrompt).digest('hex');
     // Steps this call returns all come from the same target, so the origin is
     // stamped once on whatever leaves — an answer, a refusal, or an abort —
@@ -585,9 +589,11 @@ export function createStepFunction(request: StepRequest): StepFunction {
             // the array actually sent: an extra one would skip the assistant
             // message and its tool arguments on the next measurement.
             promptMessageCount: messages.length,
+            // Use the effective schemas and system prompt, not the unfiltered
+            // declarations: allowed tools and agent mode can change what was
+            // actually sent, and a measurement from the wrong request is stale.
             promptIdentity: { provider: request.provider.provider ?? '', model: request.provider.model, endpoint,
-              schemaDigest: createHash('sha256').update(JSON.stringify(request.tools)).digest('hex'),
-              systemDigest: createHash('sha256').update(request.systemPrompt).digest('hex') },
+              schemaDigest, systemDigest },
           };
           if (options.agentMode && request.recordAuxiliaryUsage) request.recordAuxiliaryUsage(record);
           else recordSessionUsage(request.sessionId, record, { affectsContext: !options.agentMode,

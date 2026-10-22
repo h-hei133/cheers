@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { writeProjectState } from '../core/state/projectState.js';
 import { captureThinkingPreference } from '../core/models/preference.js';
 import * as turnSession from '../turn/session.js';
@@ -15,11 +16,14 @@ import { providerCredentialBaseUrl } from '../core/auth/account/target.js';
 import { BUILTIN_PROVIDERS } from '../core/models/catalog.js';
 import { recordSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 import { createTaskToolDefinition } from "../core/tools/taskTool.js";
+import { createToolDiscovery } from "../core/tools/discovery/state.js";
+import { toolSchemas } from "../turn/tools.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import {
   buildCliRuntimeInvocation,
   runCliRuntimeInvocation,
+  withRequestOverhead,
   type CliRuntimeInvocationDependencies,
   type CliRuntimeInvocationInput,
 } from "./cliRuntimeInvocation.js";
@@ -107,6 +111,85 @@ function dependencies(): { deps: CliRuntimeInvocationDependencies; calls: string
 }
 
 describe("CLI runtime invocation", () => {
+  it("binds compaction measurements to the effective schema and system prompt", () => {
+    const compaction = {
+      policy: { contextWindow: 10_000 },
+      summarize: async () => undefined,
+      onCompact: () => {},
+    };
+    const tools = [{ type: 'function', function: { name: 'read', parameters: { type: 'object' } } }];
+    const attached = withRequestOverhead(compaction, { systemPrompt: 'effective system', tools });
+
+    expect(attached?.policy.promptIdentity).toEqual({
+      schemaDigest: createHash('sha256').update(JSON.stringify(tools)).digest('hex'),
+      systemDigest: createHash('sha256').update('effective system').digest('hex'),
+    });
+  });
+
+  it("recomputes compaction identity after tool discovery changes the live snapshot", () => {
+    const compaction = {
+      policy: { contextWindow: 10_000 },
+      summarize: async () => undefined,
+      onCompact: () => {},
+    };
+    const catalog = new Map([
+      ['read', { name: 'read', description: 'read', argsSchema: {}, execute: async () => ({ success: true, output: '' }) }],
+      ['write', { name: 'write', description: 'write', argsSchema: {}, execute: async () => ({ success: true, output: '' }) }],
+    ]);
+    const discovery = createToolDiscovery({ catalog, pinned: ['read'] });
+    const attached = withRequestOverhead(compaction,
+      { systemPrompt: 'live system', tools: toolSchemas(discovery.snapshot()) },
+      () => ({ systemPrompt: 'live system', tools: toolSchemas(discovery.snapshot()) }));
+    const before = attached?.policy.promptIdentity?.schemaDigest;
+    const beforeTools = attached?.policy.overhead.tools?.map(tool => tool.function.name);
+    discovery.load(['write']);
+    const after = attached?.policy.promptIdentity?.schemaDigest;
+    const afterTools = attached?.policy.overhead.tools?.map(tool => tool.function.name);
+    expect(before).toBeDefined();
+    expect(after).toBeDefined();
+    expect(after).not.toBe(before);
+    expect(beforeTools).not.toContain('write');
+    expect(afterTools).toContain('write');
+  });
+
+  it("keeps compaction's system identity on the main request while discovery changes schemas", async () => {
+    const compaction = {
+      policy: { contextWindow: 10_000 },
+      summarize: async () => undefined,
+      onCompact: () => {},
+    };
+    const tools = new Map([
+      ['read', { name: 'read', description: 'read', argsSchema: { type: 'object' }, execute: async () => ({ success: true, output: '' }) }],
+      ['special', { name: 'special', description: 'special', argsSchema: { type: 'object' }, execute: async () => ({ success: true, output: '' }) }],
+    ]);
+    let captured: Parameters<typeof turnSession.runTurn>[0] | undefined;
+    const original = turnSession.runTurn;
+    const spy = vi.spyOn(turnSession, 'runTurn').mockImplementation(options => {
+      captured = options;
+      return original(options);
+    });
+    try {
+      await runCliRuntimeInvocation(baseInput({
+        providerModeEnv: 'synthetic',
+        runtimeConfig: { ...getRuntimeConfig(workspaceRoot), toolDiscovery: 'dynamic' },
+        compaction,
+      }), { ...dependencies().deps, tools: () => tools });
+      const load = captured?.tools.get('tool_load');
+      expect(load).toBeDefined();
+      const before = captured?.compaction?.policy.promptIdentity;
+      const beforeTools = captured?.compaction?.policy.overhead.tools?.map(tool => tool.function.name);
+      await load!.execute({ names: ['special'] }, { taskId: 'fixture', workspaceRoot });
+      const after = captured?.compaction?.policy.promptIdentity;
+      const afterTools = captured?.compaction?.policy.overhead.tools?.map(tool => tool.function.name);
+      expect(after?.systemDigest).toBe(before?.systemDigest);
+      expect(after?.schemaDigest).not.toBe(before?.schemaDigest);
+      expect(beforeTools).not.toContain('special');
+      expect(afterTools).toContain('special');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   for (const provider of ['openai', 'google'] as const) {
     it.each(['config', 'connection'] as const)(`preserves the ${provider} %s storage binding after readiness chooses a default endpoint`, async source => {
       vi.stubEnv('OPENAI_API_KEY', ''); vi.stubEnv('GOOGLE_API_KEY', '');

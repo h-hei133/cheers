@@ -7,6 +7,7 @@ import { createDefaultExecutionService, type CommandExecutionRequest, type Comma
 import { securityStore, type SecurityStore } from '../security/findings/store.js';
 import { SecurityService } from '../security/service.js';
 import type { EscalationPrompt, EscalationResponse } from '../core/shell/approval/contract.js';
+import { approveAllGroups } from './approval.js';
 
 const directories: string[] = [];
 export function analyzerResult(request: CommandExecutionRequest, stdout: string): CommandExecutionResult {
@@ -32,7 +33,7 @@ export function createSecurityHarness(native = false) {
   if (!native) fs.writeFileSync(executable, 'synthetic analyzer bytes');
   const manager = new SessionManager(); const session = manager.createNew(root); const boundStore = securityStore(manager, () => session);
   let store: SecurityStore = boundStore; let busy = false;
-  let approval: (prompt: EscalationPrompt) => Promise<EscalationResponse> = async () => ({ decision: 'allow-once' });
+  let approval: (prompt: EscalationPrompt) => Promise<EscalationResponse> = async prompt => approveAllGroups(prompt);
   const approvals: EscalationPrompt[] = [];
   const execution = createDefaultExecutionService();
   const run = native ? vi.fn(execution.runCommand) : vi.fn(async (request: CommandExecutionRequest) => {

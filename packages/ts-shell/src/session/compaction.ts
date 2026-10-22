@@ -3,11 +3,13 @@ import { ModelAdmissionError } from '../core/agent/request/model.js';
 import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateRequestTokens, estimateTokens, messageCharCount, type RequestOverhead } from "./context.js";
+import { requestBudget } from '../context/request/budget.js';
 import { digest } from './compaction/state.js';
 import { generateCompaction, CompactionStepUnknown } from './compaction/generation.js';
 import type { CompactionAuthority, CompactionOperationInput, CompactionSource, SummarizeHistory, SummarizeTurnPrefix } from './compaction/contract.js';
 import { CompactionPublicationError } from './compaction/contract.js';
 import { freezeDeep } from '../core/values/freeze.js';
+import type { PromptMeasurementIdentity } from '../observability/usage/model.js';
 
 export type { SummarizeHistory, SummarizeRequest, SummarizeTurnPrefix } from './compaction/contract.js';
 
@@ -20,6 +22,14 @@ export interface CompactionPolicy {
   readonly segmentTokens?: number;
   readonly contextWindow: number;
   readonly reserveTokens?: number;
+  /**
+   * The output ceiling of the request being budgeted.
+   *
+   * When present, the threshold uses the same `P + O + H <= W` calculation as
+   * the request path and fires at its soft band. Without it, callers retain the
+   * older reserve-only threshold.
+   */
+  readonly outputTokens?: number;
   /**
    * Tokens of recent history to keep verbatim.
    *
@@ -46,7 +56,10 @@ export interface CompactionPolicy {
    * the system prompt and tool schemas, so a conversation comfortably inside the
    * budget still produced a cut, and the cut shrank as that overhead grew.
    */
-  readonly measureContextTokens?: (messages: readonly AgentMessage[]) => number | undefined;
+  readonly measureContextTokens?: (messages: readonly AgentMessage[],
+    identity?: Pick<PromptMeasurementIdentity, 'schemaDigest' | 'systemDigest'>) => number | undefined;
+  /** Effective schema/system identity of the request that produced the measurement. */
+  readonly promptIdentity?: Pick<PromptMeasurementIdentity, 'schemaDigest' | 'systemDigest'>;
   /**
    * What the request carries besides the conversation: the instruction, and the
    * tool declarations.
@@ -122,6 +135,38 @@ export function shouldCompact(
     return false;
   }
   return tokens > contextWindow - reserveTokens;
+}
+
+/**
+ * Whether the request has reached the budget's soft band.
+ *
+ * The old reserve-only check could not see output headroom. A model with a
+ * large output ceiling could therefore be treated as having more input room
+ * than it did, and a model with a small ceiling compacted later than its soft
+ * budget. The budget owner already defines the shared calculation; this helper
+ * only decides whether it is a trigger.
+ */
+function reachedBudgetThreshold(tokens: number, policy: CompactionPolicy, measured: boolean): boolean {
+  if (policy.enabled === false) return false;
+  if (policy.outputTokens === undefined) {
+    return shouldCompact(tokens, policy.contextWindow, policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS,
+      policy.enabled ?? true);
+  }
+  const budget = requestBudget({
+    window: policy.contextWindow,
+    promptTokens: tokens,
+    outputTokens: policy.outputTokens,
+    reserveTokens: policy.reserveTokens,
+    measured,
+  });
+  if (budget.ok) return budget.soft;
+  // Unknown limits keep the old conservative behavior rather than claiming a
+  // threshold the runtime cannot prove.
+  if (budget.reason === 'unknown') {
+    return shouldCompact(tokens, policy.contextWindow, policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS,
+      policy.enabled ?? true);
+  }
+  return true;
 }
 
 /**
@@ -261,7 +306,7 @@ export function explainNoCut(
   policy: CompactionPolicy,
 ): "fits-budget" | "no-legal-cut" {
   const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
-  const available = Math.max(0, policy.contextWindow - reserve);
+  const available = Math.max(0, policy.contextWindow - reserve - (policy.outputTokens ?? 0));
   const keepRecent = Math.min(policy.keepRecentTokens ?? KEEP_RECENT_TOKENS, available);
   const found = locateCut(messages, keepRecent);
   return "cut" in found ? "no-legal-cut" : found.reason;
@@ -307,7 +352,7 @@ export function planCompactionCut(
   policy: CompactionPolicy,
 ): CompactionPlan | undefined {
   const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
-  const available = Math.max(0, policy.contextWindow - reserve);
+  const available = Math.max(0, policy.contextWindow - reserve - (policy.outputTokens ?? 0));
   const estimated = estimateTokens(messages);
   // A budget at or above what the window can hold would swallow the whole
   // conversation, so no cut would ever be found and compaction would never run
@@ -325,15 +370,16 @@ export function planCompaction(
   messages: readonly AgentMessage[],
   policy: CompactionPolicy,
 ): CompactionPlan | undefined {
-  const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
   const plan = planCompactionCut(messages, policy);
   if (!plan) {
     return undefined;
   }
   // The provider's own count wins when it exists: it measured the prompt that
   // was actually sent, while the estimate only measures the text we kept.
-  const tokensBefore = policy.measureContextTokens?.(messages) ?? estimateRequestTokens(messages, policy.overhead);
-  if (!shouldCompact(tokensBefore, policy.contextWindow, reserve, policy.enabled ?? true)) {
+  const measuredTokens = policy.measureContextTokens?.(messages, policy.promptIdentity);
+  const tokensBefore = measuredTokens ?? estimateRequestTokens(messages, policy.overhead);
+  const measured = measuredTokens !== undefined;
+  if (!reachedBudgetThreshold(tokensBefore, policy, measured)) {
     return undefined;
   }
   return { ...plan, tokensBefore };
@@ -351,9 +397,10 @@ function isBelowThreshold(
   messages: readonly AgentMessage[],
   policy: CompactionPolicy,
 ): boolean {
-  const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
-  const tokensBefore = policy.measureContextTokens?.(messages) ?? estimateRequestTokens(messages, policy.overhead);
-  return !shouldCompact(tokensBefore, policy.contextWindow, reserve, policy.enabled ?? true);
+  const measuredTokens = policy.measureContextTokens?.(messages, policy.promptIdentity);
+  const tokensBefore = measuredTokens ?? estimateRequestTokens(messages, policy.overhead);
+  const measured = measuredTokens !== undefined;
+  return !reachedBudgetThreshold(tokensBefore, policy, measured);
 }
 
 export interface CondensedContext {
@@ -506,7 +553,7 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
     source: captured.operation.source && { sessionId: captured.operation.source.sessionId,
       identity: captured.operation.source.replayIdentity ?? captured.operation.source.identity } },
     captured.messages, captured.instructions, captured.policy.summaryIdentity,
-    captured.policy.contextWindow, captured.policy.reserveTokens, captured.policy.keepRecentTokens, captured.policy.segmentTokens,
+    captured.policy.contextWindow, captured.policy.reserveTokens, captured.policy.outputTokens, captured.policy.keepRecentTokens, captured.policy.segmentTokens,
     captured.policy.enabled, Boolean(captured.summarizeTurnPrefix)]) : undefined;
   const joined = key ? pendingCompactions.get(key) : undefined;
   const pending = joined ?? generateContext(captured);
@@ -521,7 +568,7 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
     const plan = { ...result.plan, cut: result.plan.cut + offset,
       turnStart: result.plan.turnStart < 0 ? -1 : result.plan.turnStart + offset,
       tokensBefore: input.force ? estimateTokens(original)
-        : input.policy.measureContextTokens?.(original) ?? estimateRequestTokens(original, input.policy.overhead) };
+        : input.policy.measureContextTokens?.(original, input.policy.promptIdentity) ?? estimateRequestTokens(original, input.policy.overhead) };
     const messages = applyCompaction(original, plan, result.summary);
     return { ...result, plan, messages, tokensAfter: estimateTokens(messages) };
   } finally {
@@ -570,7 +617,7 @@ async function generateContext(input: CondenseInput): Promise<CondenseOutcome> {
   const history = input.messages.slice(historyStart, historyEnd);
   const prefix = plan.splitsTurn ? input.messages.slice(Math.max(plan.turnStart, head), plan.cut) : [];
   const operation = input.operation ? { ...input.operation,
-    policyDigest: digest([input.policy.contextWindow, input.policy.reserveTokens, input.policy.keepRecentTokens,
+    policyDigest: digest([input.policy.contextWindow, input.policy.reserveTokens, input.policy.outputTokens, input.policy.keepRecentTokens,
       input.policy.enabled, input.policy.summaryIdentity, input.policy.segmentTokens, input.instructions, plan,
       'bounded-segments-v2', Boolean(input.summarizeTurnPrefix),
       input.messages]) } : undefined;

@@ -3,6 +3,8 @@ import { textBlock } from './blocks.js';
 import { Transcript } from './container.js';
 import { TranscriptPane } from '../surface/pane.js';
 import { joinSourceLines, projectText, sourceLinesFor } from './source.js';
+import { stripAnsi } from '../text/ansi.js';
+import { renderMarkdown } from './markdown.js';
 
 it('marks every wrap point as soft and every source newline as logical', () => {
   const lines = projectText('abcdefgh\nij', 4);
@@ -38,4 +40,64 @@ it('does not copy when the selection starts mid-row or crosses a decoration row'
   expect(pane.extractSource({ row: 3, column: 3 }, { row: 3, column: 19 })).toBeUndefined();
   // Row 4 is the block's trailing separator and has no source line.
   expect(pane.extractSource({ row: 3, column: 0 }, { row: 4, column: 19 })).toBeUndefined();
+});
+
+it('copies a wrapped formatted table from its original Markdown source', () => {
+  const source = [
+    '| Name | Description |',
+    '| :--- | :--- |',
+    '| alpha | this is a long description that wraps |',
+  ].join('\n');
+  const transcript = new Transcript();
+  transcript.append(textBlock('assistant', source));
+  const pane = new TranscriptPane(transcript);
+  const painted = pane.render(40, 20, undefined);
+  const first = painted.findIndex(row => stripAnsi(row).includes('Name'));
+  const last = painted.findIndex((row, index) => index >= first && stripAnsi(row).includes('long description'));
+  const continuation = painted.findIndex((row, index) => index > last && row.trim().length > 0);
+  expect(first).toBeGreaterThanOrEqual(0);
+  expect(last).toBeGreaterThan(first);
+  expect(continuation).toBeGreaterThan(last);
+  expect(pane.extractSource({ row: first, column: 0 }, { row: continuation, column: 39 })).toBe(source);
+  expect(pane.extractSource({ row: continuation, column: 0 }, { row: continuation, column: 39 })).toBeUndefined();
+});
+
+it.each([
+  ['heading', '# a heading that wraps before the next source line\nnext line'],
+  ['paragraph', 'a paragraph that wraps before the next source line\nnext line'],
+  ['list', '- a list item that wraps before the next source line\nnext line'],
+  ['code', '```ts\nconst wrappedCodeLineThatIsLong = "abcdefghijklmnopqrstuvwxyz";\nnextCodeLine();\n```'],
+])('preserves the logical break after a wrapped Markdown %s node', (_kind, source) => {
+  const width = 24;
+  const block = textBlock('assistant', source);
+  const rows = renderMarkdown(source, width);
+  const projected = sourceLinesFor(block, 0, width, [...rows, '']);
+  expect(projected.some(line => line?.breakAfter === 'soft')).toBe(true);
+  expect(joinSourceLines(projected.filter(line => line !== undefined))).toBe(source);
+});
+
+it('copies a fenced block whose body contains a blank source line without decoration', () => {
+  const source = '```ts\na\n\nb\n```';
+  const transcript = new Transcript();
+  transcript.append(textBlock('assistant', source));
+  const pane = new TranscriptPane(transcript);
+  const painted = pane.render(20, 20, undefined);
+  const first = painted.findIndex(row => stripAnsi(row).includes('┌'));
+  const last = painted.findIndex(row => stripAnsi(row).includes('└'));
+  expect(first).toBeGreaterThanOrEqual(0);
+  expect(last).toBeGreaterThan(first);
+  expect(pane.extractSource({ row: first, column: 0 }, { row: last, column: 19 })).toBe(source);
+});
+
+it('copies an empty fenced block without inventing a body row', () => {
+  const source = '```ts\n```';
+  const transcript = new Transcript();
+  transcript.append(textBlock('assistant', source));
+  const pane = new TranscriptPane(transcript);
+  const painted = pane.render(20, 20, undefined);
+  const first = painted.findIndex(row => stripAnsi(row).includes('┌'));
+  const last = painted.findIndex(row => stripAnsi(row).includes('└'));
+  expect(first).toBeGreaterThanOrEqual(0);
+  expect(last).toBe(first + 1);
+  expect(pane.extractSource({ row: first, column: 0 }, { row: last, column: 19 })).toBe(source);
 });

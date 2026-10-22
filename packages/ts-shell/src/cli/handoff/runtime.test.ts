@@ -20,6 +20,7 @@ import { readBoundSessionState } from '../../session/store/bound.js';
 import { sessionRequestStore } from '../../session/store/requests.js';
 import { createRequestPolicy } from '../../core/agent/request/policy.js';
 import { getSessionUsage, resetSessionUsage, totalTokens } from '../../observability/usageTelemetry.js';
+import { approveAllGroups } from '../../test-utils/approval.js';
 
 let scratch: string; let root: string; let manager: SessionManager; let context: ShellRuntimeContext;
 let runtime: ShellSessionRuntime; let server: http.Server; let baseUrl: string;
@@ -80,8 +81,8 @@ async function drive(signal = new AbortController().signal, extra: { readonly be
       historyMessages: manager.getSession(context.session.id)!.turns, workspaceRoot: root, signal, maxTurns: 8,
       providerCredentialResolution: resolution, providerModeEnv: 'real', runtimeConfig: publication.config, providerCatalog: publication.catalog,
       requestPolicy: handoff ? handoff.policy(policy) : policy, admission: handoff?.admission, agentMode: 'build', permissionScope: 'ask',
-      escalationPromptHandler: async prompt => { approvals.push(prompt.context.toolName); extra.beforeApproval?.(); return { promptId: prompt.id,
-        decision: allowed ? 'allow-once' : 'deny', respondedAt: Date.now() }; },
+      escalationPromptHandler: async prompt => { approvals.push(prompt.context.toolName); extra.beforeApproval?.();
+        return allowed ? approveAllGroups(prompt) : { promptId: prompt.id, decision: 'deny', respondedAt: Date.now() }; },
       onPromptAccepted: () => { manager.persistUserPromptBarrier(context.session.id, 'KEEP_CONSTRAINT: preserve unrelated files and do ordered work'); handoff?.accept(); },
       onTurnMessage: message => { if (extra.failPersistence && message.role === 'tool') throw new Error('Injected transcript publication failure'); manager.addTurn(context.session.id, message); },
     }, { hooks, checkProviderReadiness: async () => ({ ok: true }), createReadinessTerminalEvent: createProviderReadinessCliTerminalEvent });

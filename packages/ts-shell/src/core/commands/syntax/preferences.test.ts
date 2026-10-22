@@ -51,7 +51,7 @@ it("shares status item IDs and preserves comma lists, catalogue order and dedupl
 
 it("only describes implemented settings and refuses extra arguments", async () => {
   const command = createCommandRegistry(root).get("settings")!;
-  expect(command.getArgumentCompletions?.("")?.map(item => item.value)).toEqual(CONFIG_SETTINGS.map(item => item.key));
+  expect(command.getArgumentCompletions?.("")?.map(item => item.value)).toEqual(["set", ...CONFIG_SETTINGS.map(item => item.key)]);
   expect((await runSettingsCommand(["attentionOnIdle"], { cwd: root })).output).toContain("### attentionOnIdle");
   expect((await runSettingsCommand(["temperature"], { cwd: root })).output).toContain('### temperature');
   for (const args of [["offline", "true"], ["providerCredentials"], ["attentionOnIdle", "extra"]]) {

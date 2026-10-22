@@ -2,6 +2,18 @@
 
 本文只记录有本地证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
+## 2026-10-22 面板、源投影与 W2/W3 本地返工（未提交）
+
+- 补齐 `/jobs`、`/agents`、`/usage`、`/plan-review`、`/btw` 的既有 picker consumer。`/agents` 通过 jobs owner 的 `agentProjection` 投影 live owner、detached、stored/running→unknown 与保留运行，通过 `agentPage` 提供脱敏、截断的文本页；同时展示 `SubagentLoader` 的有效定义和经安全投影的 discovery diagnostics，不借用 jobs 的本地任务身份；`/usage` 打开时只读本地账本，账户读取必须显式选行并在配置 revision 变化后丢弃迟到结果；`/plan-review` 绑定已加载版本，`/btw` 只读 transcript 中的保留报告。
+- `/settings set <key> <value> [--project]` 已沿交互、line、pipe/print 与 command bridge 接入同一 CAS writer；用户范围、显式项目范围、非法值、未知键和 session 变更拒绝均有回归。Linux Node/exe × regular/fullscreen/line/pipe 八格隔离 smoke 通过，line/pipe 覆盖 profile 创建、切换的显式非交互拒绝和 `maxTurns=7` 文件读回。
+- UI-04 保留 Markdown 原始行偏移并为表格、fence、标题、列表、引用、数学与分隔线生成 source mapping；换行后的标题、段落、列表和代码行保留逻辑换行，结构化行必须完整覆盖一个逻辑节点才能复制，fence 内空白源行也保留可复制身份，表格预算截断行不再产生可复制来源。
+- W3 将 compaction 阈值接到共享 `requestBudget()` 软带，`buildCompactionWiring` 传入实际 output ceiling；`enabled: false` 阻止软带触发，retained tail 也扣除 output headroom。step 记录实际发送的消息数与有效 wire schema/system 指纹；compaction 的测量身份在 schema/system 不完整时拒绝。读取时 schema identity 与回退 `overhead` 都从当前 discovery snapshot 和实际工具过滤重新计算，system identity 则固定为主 turn 实际发送的 system prompt，避免 tool_load 后把未发送的提示误当请求身份。`/context` 不重建请求身份，而是使用最后一次请求保留的 `lastPromptIdentity`；`CommandContext.promptIdentity` 仅作显式 host override。严格测量（`/context` 与 compaction）要求 endpoint/schema/system 完整且逐项相等，无身份或部分身份记录均 fail closed；只有非严格 legacy caller 保留无身份测量兼容。这样动态工具发现快照与嵌套 `cwd` 都对照实际请求，而非命令侧重建出的另一套配置；状态栏至少要求可解析 endpoint。opaque subscription token 的 issuer/audience 证明仍未闭合，不能据此宣称完整 PRV-03。
+- 独立复核先确认生产命令上下文缺少 system digest 会把正常测量误报为 stale；后续又证明按命令侧完整工具池重建在默认动态发现下错误，使用 `projectRoot` 重建也在请求采用 `runtimeContext.cwd` 时错误。最终修复保留请求侧共享 `core/prompts/systemContext.ts`，但 `/context` 只消费精确请求身份；动态 schema、回退 overhead 与嵌套目录正向回归、部分身份拒绝和显式冲突 override 回归均通过。另一轮独立复核发现严格 helper 仍接受无身份/同等部分身份、`/usage` picker 缺少 interactive binding、compaction identity 在 tool_load 后冻结、fence 空白行丢失来源、`/agents` 未满足 live view/diagnostics；这些均已修复并由对应回归覆盖，`/agents` 现在复用 jobs owner 的 liveness/output projection。
+- 最终聚焦 23 文件/430 项通过。最终字节的完整 `test:ts` 使用仓库外临时配置以 2 worker、1 次 retry 运行，实际 926 文件通过、1 文件跳过，9781 项通过、10 项跳过，804.69s，无失败或 retry 标记；这不等同于默认 8-worker 结果。此前默认并行下的 browser/CLI 负载型失败保留原分类，未用低并发结果冒充默认并行通过。旧提交 `5576b1d3` 的 CI `39717903140` 仍只证明旧 SHA。
+- `test:scripts` 106 项、`verify:result-contract` 6 套/154 项、golden main path、`verify:cli-entry` 19 项、cycles/config-consumers/declarations/Node-floor、strict docs/rules 与 `git diff --check` 通过；module facade 仍为既有 8 项 advisory，docs-source 仍为 118 项 advisory。NormProof 实际 exit 0/partial，blocking import/cycle 义务 satisfied、0 blocking，既有 8 项 function-ceiling advisory 保留。
+- 最终 TS build ID `faeb78a44674365c5490409b013b6eb7dfe9c7f71b9fbb23ab4dcadf3fc65e5e`，inputs digest `70aedc13fda716d9778be5460ef2e985ffb1a44aa4a1714e8f9e8199cef1a513`，artifact digest `813a2891a181c948e6e6b57a727c784008e59020406db2491d40f2b4c94d8c96`；exe 102,742,144 bytes、mode 755、SHA-256 `355d84e9e1d9c5f731fd82a76243670f629a52114d0d19cf333d8fca1eb6274f`。该产物 Node/exe × regular/fullscreen/line/pipe 八格隔离 PTY 全部 exit 0；最终 exe 上的 19 项 CLI hard gate 也全部通过。
+- CLI hard gate 的单 hunk 检查现在证明非交互无 group-selection host 时拒绝且零写入；正向单 hunk 应用仍由 patch/turn 聚焦回归覆盖，未把无选择宿主伪装成成功路径。已执行并恢复的最终反转包括 wrapped-node 逻辑换行、JSON list 设置、no-tools wire schema、compaction 身份与 opt-out、compaction 回退 overhead live getter、output-aware retained tail、context/status 身份、retained identity fallback、部分身份严格拒绝、interactive usage binding、live discovery compaction identity、fence blank-line source、agents live binding 与 owner projection、agents continuation syntax、UTF-8 分页、panel 控制字节、jobs workspace identity 和 `/btw` retained report。所有反转均取得真实失败，恢复后源码 SHA256 与反转前一致。当前批次 commit、push 与新 SHA CI 尚未执行；START-03、QA-02/03、TOOL-02 仍按用户允许的延期范围保留。
+
 ## 2026-10-22 MCP 服务器刷新与安全报告返工（PAN-08 部分）
 
 - 当前未提交批次的 21 个源码/测试 SHA256 与两份独立审查和最终构建绑定逐项相符，本次实际重跑 `mcp-picker/bind.mjs` 通过。原精确服务器身份、单次选择、原准入、host 取消、client 目录发布与 report-safe 投影已有最终证据；具体合同见 [MCP 交互式服务器选择与刷新](mcp.md#交互式服务器选择与刷新)。
@@ -144,7 +156,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
 | PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝；restore 100项分页/续页、全目录搜索、有界目录缓冲与记录保留、复合身份消歧、元数据digest重验、特殊路径参数及preview-only业务链；back 保留完整候选、25项展示续页、numeric/exact-ID定位、完整prompt搜索和共享捕获快照，沿既有草稿/分支回退；四格打包PTY核对60题全可达与文件不变 | history完整持久树沿既有query owner；undo saved-results已补40条续页/明确到头、scope和完整receipt revision重验，精确补偿沿原owner；copy已补完整block搜索/续页/到头/失败/取消及恢复会话早期源；其余identity/revision及资源边界继续复核；back完整候选保留/同步搜索随源大小增长，restore每页/搜索仍线性扫描目录，不宣称搜索延迟上界或原子目录快照 |
 | PAN-06 history | 裸 `/history` 复用完整持久树及废弃分支，选择只生成精确 `/tree -- <entry-id>` 草稿；空历史/无匹配/读取失败分开；真实排队焦点、禁用身份与取消无写回归；底栏任务存储读取失败显示 unavailable，恢复后重新读取 | 完整树/全文搜索仍同步且未设总字节/工作量界，10k模拟节点不证明真实大历史响应界；cleanse 面板、其余 identity/revision 及资源合同继续开放；本批293项、专用故障PTY与交付证据见开发日志 |
-| PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引）、watcher 注销与 unknown status 回归 | agents 专用操作仍归 `/jobs`；其余 journal/revision 边界继续复核 |
+| PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引）、watcher 注销与 unknown status 回归；`/agents` 复用 jobs owner 的 `agentProjection`/`agentPage`，覆盖 stale/detached 与脱敏输出页 | agents 控制操作仍归 `/jobs`；其余 journal/revision 边界继续复核 |
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
 

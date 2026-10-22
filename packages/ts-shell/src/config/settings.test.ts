@@ -63,6 +63,8 @@ it('parses each editor shape without quoting text or coercing list items', () =>
   expect(parseSettingInput(byKey('maxTurns'), 'abc').ok).toBe(false);
   expect(parseSettingInput(byKey('hiddenToolPrefixes'), 'mcp.\nbrowser.')).toEqual({ ok: true, value: ['mcp.', 'browser.'] });
   expect(parseSettingInput(byKey('allowedTools'), '').value).toEqual([]);
+  expect(parseSettingInput(byKey('allowedTools'), '["read","write"]')).toEqual({ ok: true, value: ['read', 'write'] });
+  expect(parseSettingInput(byKey('allowedTools'), "'[\"read\",\"write\"]'")).toEqual({ ok: true, value: ['read', 'write'] });
   expect(parseSettingInput(byKey('pathRules'), '{"path":"src","settings":{}}')).toEqual({ ok: true, value: [{ path: 'src', settings: {} }] });
   expect(parseSettingInput(byKey('pathRules'), 'not json').ok).toBe(false);
   expect(parseSettingInput(byKey('theme'), 'custom theme').value).toBe('custom theme');

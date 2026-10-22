@@ -156,6 +156,7 @@ export function buildCompactionWiring(input: {
         runtimeConfig.reserveTokens,
         DEFAULT_RESERVE_TOKENS,
       ),
+      outputTokens: configuredOutputLimit(runtimeConfig, provider.endpoint),
       keepRecentTokens: resolveTokenBudget(
         runtimeConfig.modelTokenBudgets,
         provider.providerId,
@@ -167,9 +168,9 @@ export function buildCompactionWiring(input: {
       // The provider's own count, plus whatever the conversation has gained
       // since that request. Falls back to the estimate inside planCompaction
       // when no request has reported usage yet.
-      measureContextTokens: (messages) => {
+      measureContextTokens: (messages, identity) => {
         const measured = measuredPromptContext(input.sessionId, { provider: provider.providerId, model: provider.model,
-          endpoint: provider.endpoint ?? 'openai-compatible' });
+          endpoint: provider.endpoint ?? 'openai-compatible', ...(identity ?? {}) }, { requireExpectedIdentity: true });
         if (!measured) return undefined;
         return measured.tokens + estimateTokens(messages.slice(measured.messageCount));
       },

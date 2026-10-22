@@ -26,6 +26,8 @@ export type PickerForm = "panel" | "modal";
 export interface PickerOutcome {
   /** Read-only documentation to retain in the transcript and open for reading. */
   readonly report?: CommandReport;
+  /** The report already exists in the transcript; open it without appending or persisting a copy. */
+  readonly reportRetained?: boolean;
   /** Continue a staged interaction in this same overlay without writing. */
   readonly next?: Picker;
   /** Text to append to the transcript. */

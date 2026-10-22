@@ -497,8 +497,8 @@ async function runPrintToolExecutionSurface() {
   return true
 }
 
-async function runNonInteractiveSingleHunkPatch() {
-  const name = 'cli-entry-non-interactive-single-hunk-patch'
+async function runNonInteractiveSingleHunkSelectionBoundary() {
+  const name = 'cli-entry-non-interactive-single-hunk-selection-boundary'
   fs.writeFileSync(patchFixturePath, 'before\n', 'utf8')
   const result = await runCli([
     '--project',
@@ -509,21 +509,34 @@ async function runNonInteractiveSingleHunkPatch() {
     '--print',
     'Apply patch to patch-fixture.txt replacing before with after',
   ])
-  const toolOk = assertJsonToolResult(
-    name,
-    result,
-    [],
-    'apply_patch',
-    ['committed'],
-    1,
-    true,
-  )
-  if (!toolOk) return false
+  if (result.code !== 0 || result.timedOut) {
+    printStep(name, 'product-regression', result.timedOut ? 'timed out' : `exit=${result.code}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  const events = parseJsonStream(result.stdout, name)
+  if (!events) return false
+  const approval = events.find((event) => event.eventType === 'approval.resolved'
+    && event.facts?.toolName === 'apply_patch')
+  const toolResult = events.find((event) => event.eventType === 'tool.result'
+    && event.facts?.toolName === 'apply_patch')
+  const completions = events.filter((event) => event.eventType === 'query.completed'
+    && event.facts?.result?.status === 'completed')
+  if (approval?.facts?.outcome !== 'denied'
+    || toolResult?.facts?.success !== false
+    || typeof toolResult?.facts?.output !== 'string'
+    || !toolResult.facts.output.includes('no interactive group-selection host is available')
+    || completions.length !== 0) {
+    printStep(name, 'product-regression', 'single-hunk patch was not refused by the explicit selection boundary')
+    console.log(summarizeOutput(result.output))
+    return false
+  }
   const content = fs.readFileSync(patchFixturePath, 'utf8')
-  if (content !== 'after\n') {
+  if (content !== 'before\n') {
     printStep(`${name}-content`, 'product-regression', `content=${JSON.stringify(content)}`)
     return false
   }
+  printStep(name, 'pass')
   printStep(`${name}-content`, 'pass')
   return true
 }
@@ -916,7 +929,7 @@ async function main() {
   checks.push(await runPrintReplayBoundary())
   checks.push(await runStdinPromptBoundary())
   checks.push(await runPrintToolExecutionSurface())
-  checks.push(await runNonInteractiveSingleHunkPatch())
+  checks.push(await runNonInteractiveSingleHunkSelectionBoundary())
   checks.push(await runNonInteractiveApprovalBoundary())
   checks.push(await runFailedToolFollowupSurface())
   checks.push(await runStoppedFailureFollowupRealPath())

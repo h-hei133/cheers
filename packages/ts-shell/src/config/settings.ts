@@ -118,8 +118,9 @@ export interface SettingInput {
  */
 export function parseSettingInput(setting: SettingDefinition, text: string): SettingInput {
   const editor = settingEditor(setting);
+  const decoded = decodeOuterQuotes(text);
   if (editor === "number") {
-    const trimmed = text.trim();
+    const trimmed = decoded.trim();
     if (!trimmed) return { ok: false, error: "Enter a number." };
     const value = Number(trimmed);
     if (!Number.isFinite(value)) return { ok: false, error: "Enter a finite number." };
@@ -128,8 +129,18 @@ export function parseSettingInput(setting: SettingDefinition, text: string): Set
     return invalid ? { ok: false, error: invalid } : { ok: true, value };
   }
   if (editor === "list") {
+    const trimmed = decoded.trim();
+    if (trimmed.startsWith("[")) {
+      try {
+        const value: unknown = JSON.parse(trimmed);
+        const invalid = validateSetting(setting, value);
+        return invalid ? { ok: false, error: invalid } : { ok: true, value };
+      } catch {
+        return { ok: false, error: "Enter a JSON array or one item per line." };
+      }
+    }
     const objectItems = (setting.schema.items as { type?: string } | undefined)?.type === "object";
-    const lines = text.split("\n").map(line => line.trim()).filter(Boolean);
+    const lines = decoded.split("\n").map(line => line.trim()).filter(Boolean);
     const items: unknown[] = [];
     for (const line of lines) {
       if (!objectItems) { items.push(line); continue; }
@@ -140,16 +151,33 @@ export function parseSettingInput(setting: SettingDefinition, text: string): Set
     return invalid ? { ok: false, error: invalid } : { ok: true, value: items };
   }
   if (editor === "text" || editor === "theme") {
-    const invalid = validateSetting(setting, text);
-    return invalid ? { ok: false, error: invalid } : { ok: true, value: text };
+    const invalid = validateSetting(setting, decoded);
+    return invalid ? { ok: false, error: invalid } : { ok: true, value: decoded };
   }
   try {
-    const value: unknown = JSON.parse(text);
+    const value: unknown = JSON.parse(decoded);
     const invalid = validateSetting(setting, value);
     return invalid ? { ok: false, error: invalid } : { ok: true, value };
   } catch {
     return { ok: false, error: "Enter a valid JSON value." };
   }
+}
+
+function decodeOuterQuotes(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.length < 2) return text;
+  const first = trimmed[0];
+  const last = trimmed[trimmed.length - 1];
+  if (first === '"' && last === '"') {
+    try {
+      const decoded: unknown = JSON.parse(trimmed);
+      if (typeof decoded === "string") return decoded;
+    } catch {
+      // Fall through to the single-quote/shell-token handling below.
+    }
+  }
+  if (first === "'" && last === "'") return trimmed.slice(1, -1);
+  return text;
 }
 
 export function formatSetting(value: unknown): string {
