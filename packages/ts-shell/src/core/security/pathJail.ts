@@ -95,14 +95,6 @@ export function verifyPathContainment(
   const relative = path.relative(normalizedWorkspace, resolvedTarget);
   const isDirectlyContained = relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 
-  if (!isDirectlyContained && resolvedTarget !== normalizedWorkspace) {
-    return {
-      allowed: false,
-      resolvedPath: resolvedTarget,
-      reason: `Path '${targetPath}' resolves outside workspace root '${normalizedWorkspace}'.`,
-    };
-  }
-
   // Check realpath if the file/dir exists to guard against symlink breakouts
   try {
     // A target that does not exist yet still has a directory that does, and that

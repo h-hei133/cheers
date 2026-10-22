@@ -191,6 +191,31 @@ describe("canonical directory casing", () => {
     }
   });
 
+  it("resolves a Windows short-name alias before rejecting lexical containment", () => {
+    const root = path.resolve("case-jail", "runneradmin", "workspace");
+    const alias = path.resolve("case-jail", "RUNNER~1", "workspace");
+    const target = path.join(alias, "existing.txt");
+    const canonicalTarget = path.join(root, "existing.txt");
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    const native = vi.spyOn(fs.realpathSync, "native").mockImplementation(file => {
+      const value = String(file);
+      return value === alias || value.startsWith(`${alias}${path.sep}`)
+        ? root + value.slice(alias.length) : root;
+    });
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      expect(verifyPathContainment(target, root)).toMatchObject({
+        allowed: true,
+        resolvedPath: canonicalTarget,
+      });
+      expect(native).toHaveBeenCalledWith(target);
+      expect(native).toHaveBeenCalledWith(root);
+    } finally {
+      Object.defineProperty(process, "platform", platform);
+      native.mockRestore();
+    }
+  });
+
   it("canonicalizes the existing ancestor of a new Windows workspace", () => {
     const parent = path.resolve("case-jail", "Root");
     const alias = path.resolve("case-jail", "root");
