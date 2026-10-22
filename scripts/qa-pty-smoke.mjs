@@ -112,8 +112,10 @@ function waitForExit(child, timeoutMs = 15_000) {
 }
 
 function createFixture(mode) {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "qa-cli-home-"));
-  const project = fs.mkdtempSync(path.join(os.tmpdir(), "qa-cli project '$`-"));
+  // macOS reports /var/... from mkdtemp but the runtime canonicalizes the same
+  // directory to /private/var/...; seed and live session identities must match.
+  const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "qa-cli-home-")));
+  const project = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "qa-cli project '$`-")));
   fs.mkdirSync(path.join(project, ".git"));
   fs.mkdirSync(path.join(project, ".agents", "skills", "qa-discovery"), { recursive: true });
   fs.writeFileSync(

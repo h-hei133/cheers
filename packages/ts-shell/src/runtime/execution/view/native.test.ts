@@ -8,6 +8,7 @@ import { listWorkspaceFilesViaGit, loadIgnoredViaGit } from '../ignoreRules.js';
 import { searchWithRipgrep, forgetRipgrepBinary } from '../../../core/tools/grepRipgrep.js';
 import { withNativeReadView } from './index.js';
 import { WalkBudget } from '../walk/budget.js';
+import { assertNativeReadSupported, NativeReadUnavailableError } from '../../../sandbox/read.js';
 
 let fixture: string;
 let root: string;
@@ -23,6 +24,11 @@ function git(...args: string[]): void {
   execFileSync('git', ['-C', root, ...args], { env: { PATH: process.env.PATH, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' } });
 }
 const linux = it.skipIf(process.platform !== 'linux');
+
+it('reports unsupported native read platforms before touching their filesystem', () => {
+  expect(() => assertNativeReadSupported('win32')).toThrow(NativeReadUnavailableError);
+  expect(() => assertNativeReadSupported('darwin')).toThrow(NativeReadUnavailableError);
+});
 
 it.each(['failure', 'cancel'])('settles a bounded placeholder batch before %s cleanup', async scenario => {
   for (let index = 0; index < 18; index++) fs.writeFileSync(path.join(root, `item-${index}.txt`), 'source bytes');

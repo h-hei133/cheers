@@ -2,7 +2,7 @@ import fs, { promises as fsp } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { closeReadHandle, ReadCleanupError } from '../read.js';
-import { planNativeRead } from '../../../sandbox/read.js';
+import { assertNativeReadSupported, planNativeRead } from '../../../sandbox/read.js';
 import { materializeView, type ViewSelection } from './tree.js';
 import { ViewSources, type NativeViewInput } from './source.js';
 import { verifyNativeExit } from './status.js';
@@ -16,6 +16,7 @@ export async function withNativeReadView<T>(input: NativeViewInput, consume: (so
   plan: (command: string, args: readonly string[], directory: string, detached?: boolean) => NativeReadPlan,
   materialize: (selection: ViewSelection) => Promise<void>) => Promise<T>): Promise<T> {
   input.budget.check();
+  assertNativeReadSupported();
   const root = fs.realpathSync(input.root);
   input.assertFileAccess(root);
   const mirror = await fsp.mkdtemp(path.join(os.tmpdir(), 'cheers-native-read-'));

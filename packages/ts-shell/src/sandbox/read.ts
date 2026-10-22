@@ -13,6 +13,13 @@ export class NativeReadUnavailableError extends Error {
   }
 }
 
+/** Fail before any platform-specific descriptor or directory setup runs. */
+export function assertNativeReadSupported(platform = process.platform): void {
+  if (platform !== 'linux') {
+    throw new NativeReadUnavailableError('Native file enumeration isolation is unavailable on this platform.');
+  }
+}
+
 function executable(command: string): string {
   const candidates = path.isAbsolute(command)
     ? [command]
@@ -36,9 +43,7 @@ function contains(root: string, target: string): boolean {
 export function planNativeRead(input: {
   command: string; args: readonly string[]; root: string; directory: string; descriptor: number; statusDescriptor: number;
 }) {
-  if (process.platform !== 'linux') {
-    throw new NativeReadUnavailableError('Native file enumeration isolation is unavailable on this platform.');
-  }
+  assertNativeReadSupported();
   const launcher = executable('bwrap');
   const command = executable(input.command);
   const runtime = [...LIBRARIES, LOADER].filter(file => fs.existsSync(file));
