@@ -89,6 +89,11 @@ export function resolveExecutableOutput(root, requested, windows = false) {
   return outfile;
 }
 
+/** Bun preserves a Windows executable suffix on --outfile instead of appending a second one. */
+export function compilerTemporaryPath(outfile, windowsTarget) {
+  return `${outfile}.${process.pid}.${randomUUID()}.tmp${windowsTarget ? ".exe" : ""}`;
+}
+
 function commandOnPath(command) {
   const extensions = process.platform === "win32"
     ? (process.env.PATHEXT ?? ".EXE;.CMD;.BAT;.COM").split(";").filter(Boolean)
@@ -120,7 +125,7 @@ function captureBunProvenance() {
   };
 }
 
-async function buildExecutable({ version, name, outfile, target, bunTarget }) {
+async function buildExecutable({ version, name, outfile, target, bunTarget, windowsTarget }) {
   let buildLock;
   try {
     buildLock = acquireBuildLock(repoRoot, dist);
@@ -158,7 +163,7 @@ async function buildExecutable({ version, name, outfile, target, bunTarget }) {
       console.error(`The executable output path is unsafe: ${error instanceof Error ? error.message : String(error)}`);
       return 1;
     }
-    temporary = `${outfile}.${process.pid}.${randomUUID()}.tmp`;
+    temporary = compilerTemporaryPath(outfile, windowsTarget);
     const compilerWithPath = captureBunProvenance();
     const { executable: bunExecutable, ...compiler } = compilerWithPath;
 
@@ -289,7 +294,7 @@ async function main() {
     return 2;
   }
   const target = options.target ?? `${process.platform}-${process.arch}`;
-  return buildExecutable({ version, name, outfile, target, bunTarget: options.target });
+  return buildExecutable({ version, name, outfile, target, bunTarget: options.target, windowsTarget: isWindowsTarget });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

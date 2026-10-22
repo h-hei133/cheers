@@ -5,6 +5,14 @@ import which from 'which';
 const LIBRARIES = ['/lib', '/lib64', '/usr/lib', '/usr/lib64'] as const;
 const LOADER = '/etc/ld.so.cache';
 
+/** The host cannot provide the private native read view; callers may use their documented fallback. */
+export class NativeReadUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NativeReadUnavailableError';
+  }
+}
+
 function executable(command: string): string {
   const candidates = path.isAbsolute(command)
     ? [command]
@@ -16,7 +24,7 @@ function executable(command: string): string {
       return fs.realpathSync(candidate);
     } catch { /* Try the next PATH entry. */ }
   }
-  throw new Error(`Native read executable is unavailable: ${command}.`);
+  throw new NativeReadUnavailableError(`Native read executable is unavailable: ${command}.`);
 }
 
 function contains(root: string, target: string): boolean {
@@ -28,7 +36,9 @@ function contains(root: string, target: string): boolean {
 export function planNativeRead(input: {
   command: string; args: readonly string[]; root: string; directory: string; descriptor: number; statusDescriptor: number;
 }) {
-  if (process.platform !== 'linux') throw new Error('Native file enumeration isolation is unavailable on this platform.');
+  if (process.platform !== 'linux') {
+    throw new NativeReadUnavailableError('Native file enumeration isolation is unavailable on this platform.');
+  }
   const launcher = executable('bwrap');
   const command = executable(input.command);
   const runtime = [...LIBRARIES, LOADER].filter(file => fs.existsSync(file));

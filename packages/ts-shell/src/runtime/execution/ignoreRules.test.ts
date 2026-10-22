@@ -2,6 +2,7 @@ import fs, { promises as fsp } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import ignore from 'ignore'
+import which from 'which'
 import { execFileSync } from 'node:child_process'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { loadDirectoryMatcher, loadIgnoreFile, loadIgnoredDirectories, loadIgnoredViaGit, listWorkspaceFilesViaGit } from './ignoreRules.js'
@@ -18,7 +19,7 @@ beforeEach(() => {
   fs.writeFileSync(file, 'original.txt\n')
   fs.writeFileSync(path.join(root, 'outside'), 'PRIVATE_PATTERN\n')
 })
-afterEach(() => { vi.restoreAllMocks(); fs.rmSync(root, { recursive: true, force: true }) })
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }) })
 it('does not discard a changed ignore source and expose excluded candidates', async () => {
   const open = fsp.open
   let captured: Awaited<ReturnType<typeof open>> | undefined
@@ -94,6 +95,27 @@ it('directory listing uses verified ignore reads instead of direct readFileSync'
   expect(result.entries.map(entry => entry.name)).not.toContain('original.txt')
   expect(opened).toHaveBeenCalledWith(file, expect.any(Number))
 })
+
+it('falls back to in-process ignore matching when native read isolation is unavailable', async () => {
+  fs.mkdirSync(path.join(workspace, '.git'))
+  fs.writeFileSync(path.join(workspace, '.gitignore'), 'hidden.tmp\n')
+  fs.writeFileSync(path.join(workspace, 'hidden.tmp'), 'hidden')
+  fs.writeFileSync(path.join(workspace, 'public.txt'), 'public')
+  const bin = path.join(root, 'bin')
+  fs.mkdirSync(bin)
+  const git = path.join(bin, process.platform === 'win32' ? 'git.exe' : 'git')
+  fs.writeFileSync(git, '')
+  fs.chmodSync(git, 0o755)
+  vi.stubEnv('PATH', bin)
+
+  const files = await listWorkspaceFiles(workspace)
+  expect(files).toContain('public.txt')
+  expect(files).not.toContain('hidden.tmp')
+  const listing = await listDirectoryEntries(workspace, workspace)
+  expect(listing.entries.map(entry => entry.name)).toContain('public.txt')
+  expect(listing.entries.map(entry => entry.name)).not.toContain('hidden.tmp')
+})
+
 it('does not swallow cancellation as missing ignore rules', async () => {
   const controller = new AbortController()
   controller.abort()

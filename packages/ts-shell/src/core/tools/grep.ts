@@ -120,7 +120,8 @@ export function createGrepToolDefinition(
         return deniedResult('Search stopped: a source file changed during reading. Retry with a stable source.');
       }
 
-      if (context.abortSignal?.aborted || viaRipgrep.reason !== "not-installed") {
+      if (context.abortSignal?.aborted
+        || (viaRipgrep.reason !== "not-installed" && viaRipgrep.reason !== "unavailable")) {
         return deniedResult(`Search stopped: ${context.abortSignal?.aborted ? "cancelled" : viaRipgrep.reason}.`);
       }
 

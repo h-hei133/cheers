@@ -6,6 +6,7 @@ import { verifyPathContainment } from '../security/pathJail.js';
 import { withNativeReadView, type NativeReadPlan } from '../../runtime/execution/view/index.js';
 import { WalkBudget, WalkLimitError } from '../../runtime/execution/walk/budget.js';
 import { ReadCleanupError } from '../../runtime/execution/read.js';
+import { NativeReadUnavailableError } from '../../sandbox/read.js';
 
 export function permittedSearchFile(root: string, file: string, check: (target: string) => void): string | undefined {
   const target = verifyPathContainment(path.resolve(root, file), root);
@@ -28,7 +29,7 @@ export function permittedSearchFile(root: string, file: string, check: (target: 
 export async function collectSearchFiles(input: {
   binary: string; args: readonly string[]; workspaceRoot: string; searchPath?: string;
   assertFileAccess: (target: string) => void; abortSignal?: AbortSignal; timeoutMs?: number;
-}): Promise<{ ok: true; files: readonly string[] } | { ok: false; reason: 'failed' | 'execution-failure' | 'read-cleanup-failed' | 'cancelled' | 'timeout' | 'output-limit'; readCleanupFailed?: true }> {
+}): Promise<{ ok: true; files: readonly string[] } | { ok: false; reason: 'failed' | 'unavailable' | 'execution-failure' | 'read-cleanup-failed' | 'cancelled' | 'timeout' | 'output-limit'; readCleanupFailed?: true }> {
   const budget = new WalkBudget(input.abortSignal, { timeoutMs: input.timeoutMs });
   let executionFailed = false;
   try {
@@ -45,6 +46,7 @@ export async function collectSearchFiles(input: {
       return result;
     });
   } catch (error) {
+    if (error instanceof NativeReadUnavailableError) return { ok: false, reason: 'unavailable' };
     if (executionFailed) return { ok: false, reason: 'execution-failure', ...(error instanceof ReadCleanupError ? { readCleanupFailed: true } : {}) };
     if (error instanceof ReadCleanupError) return { ok: false, reason: 'read-cleanup-failed' };
     if (input.abortSignal?.aborted) return { ok: false, reason: 'cancelled' };

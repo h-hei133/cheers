@@ -131,6 +131,16 @@ it("uses the existing file walk when no binary is installed", async () => {
   expect(result.output).toContain("a.txt:1: fallback needle");
 });
 
+it("uses the existing file walk when the native read view is unavailable", async () => {
+  await fs.unlink(path.join(root, "rg"));
+  await fs.symlink(which.sync("true"), path.join(root, "rg"));
+  vi.stubEnv("PATH", root);
+  const result = await createGrepToolDefinition(createDefaultExecutionService()).execute({ pattern: "needle" },
+    { taskId: "fixture", workspaceRoot: workspace });
+  expect(result.success).toBe(true);
+  expect(result.output).toContain("a.ts:1: 中文 needle");
+});
+
 it.each(['rewrite', 'replace', 'remove'])('does not return complete fallback matches after a child %s during capture', async mutation => {
   await fs.unlink(path.join(root, 'rg'));
   for (const command of ['git', 'bwrap']) await fs.symlink(which.sync(command), path.join(root, command));

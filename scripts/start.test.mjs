@@ -13,7 +13,7 @@ import {
   publishBuild,
   recoverBuildTransaction,
 } from "./build-manifest.mjs";
-import { isHostTarget, resolveExecutableOutput } from "./build-cli-executable.mjs";
+import { compilerTemporaryPath, isHostTarget, resolveExecutableOutput } from "./build-cli-executable.mjs";
 import { buildCli, compileTypeScript } from "./build-cli.mjs";
 import { LAUNCHER_CONTENT, writeCliLauncher } from "./build-cli-bin.mjs";
 import { buildInputDigest, listCompilerFiles, REQUIRED_BUILD_ASSETS, REQUIRED_PACKAGE_MAIN } from "./build-identity.mjs";
@@ -152,6 +152,12 @@ test("restricts executable output to a file directly inside dist/bin", () => {
   assert.throws(() => resolveExecutableOutput(root, "dist/cli.js"), /directly inside dist\/bin/);
   assert.throws(() => resolveExecutableOutput(root, "dist/bin/nested/cheers"), /directly inside dist\/bin/);
   rmSync(root, { recursive: true, force: true });
+});
+
+test("keeps the executable suffix Bun requires for a Windows compile target", () => {
+  const outfile = path.join(os.tmpdir(), "cheers.exe");
+  assert.match(compilerTemporaryPath(outfile, false), /\.tmp$/);
+  assert.match(compilerTemporaryPath(outfile, true), /\.tmp\.exe$/);
 });
 
 test("recognizes both host target spellings and keeps other targets cross-target", () => {

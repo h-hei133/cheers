@@ -48,6 +48,8 @@ export interface RipgrepMatch {
 export type RipgrepUnavailable =
   /** No `rg` on PATH. */
   | "not-installed"
+  /** The native read view cannot run here, so the caller should use the file walk. */
+  | "unavailable"
   /** The requested search path resolves outside the workspace root. */
   | "outside-workspace"
   /** `rg` ran and failed in a way that is not "no matches". */

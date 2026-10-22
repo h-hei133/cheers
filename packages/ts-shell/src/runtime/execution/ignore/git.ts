@@ -7,6 +7,7 @@ import { WalkBudget } from '../walk/budget.js'
 import { withNativeReadView, ViewSourceError, type NativeReadPlan } from '../view/index.js'
 import { configureGitView } from '../view/config.js'
 import { repositoryMarker } from '../view/git.js'
+import { NativeReadUnavailableError } from '../../../sandbox/read.js'
 
 /**
  * How long git may take before the caller gives up on it.
@@ -114,6 +115,10 @@ async function runGit(directory: string, args: readonly string[], input: string 
       return output.split('\0').filter(name => name && !parents.has(path.posix.normalize(name))).map(name => `${name}\0`).join('')
     })
   } catch (error) {
+    // No native launcher is a capability boundary, not an incomplete Git query.
+    // The in-process matcher is the documented fallback when native metadata
+    // isolation cannot run.
+    if (error instanceof NativeReadUnavailableError) return null
     if (executionError && error instanceof ReadCleanupError) {
       throw new AggregateError([executionError, error], `${executionError.message} Read cleanup also could not be verified.`)
     }
