@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { runContractGate } from './support/contract.mjs'
+import { runContractGateCli } from './support/contract.mjs'
 export { verifyContractReport } from './support/contract.mjs'
 
 export const contractSuites = [
@@ -14,7 +14,5 @@ export const contractSuites = [
 ]
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  runContractGate('result-contract', contractSuites).catch(error => {
-    console.error(error.message); process.exitCode = 1
-  })
+  void runContractGateCli('result-contract', contractSuites)
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { runContractGate } from './support/contract.mjs'
+import { runContractGateCli } from './support/contract.mjs'
 
 // Current owner suites include actual execution, rejection and durable-state assertions.
 // Every suite and assertion must execute; an empty or skipped selection cannot pass.
@@ -13,6 +13,4 @@ const suites = [
   'src/entrypoints/cliRuntimeInvocation.test.ts',
   'src/cli/runtime/cliRuntimeInvocationBridge.test.ts',
 ]
-runContractGate('query-orchestration', suites).catch(error => {
-  console.error(error.message); process.exitCode = 1
-})
+void runContractGateCli('query-orchestration', suites)

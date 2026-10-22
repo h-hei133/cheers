@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { runContractGate } from './support/contract.mjs'
+import { runContractGateCli } from './support/contract.mjs'
 
 // Current owner suites include actual execution, rejection and durable-state assertions.
 // Every suite and assertion must execute; an empty or skipped selection cannot pass.
@@ -12,6 +12,4 @@ const suites = [
   'src/cli/runtime/shutdown.test.ts',
   'src/cli/runtime/inputStream.test.ts',
 ]
-runContractGate('session-lifecycle', suites).catch(error => {
-  console.error(error.message); process.exitCode = 1
-})
+void runContractGateCli('session-lifecycle', suites)

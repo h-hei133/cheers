@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CoreMcpGateway } from "./gateway.js";
 import { CoreMcpClient } from "./client.js";
+import { createCoreToolRegistry } from "../tools/registry.js";
 
 const server = path.resolve("src/core/mcp/fixtures/mockMcpServer.mjs");
 let root: string;
@@ -143,6 +144,59 @@ describe("standard MCP connection lifetime", () => {
     expect(records().filter(event => event.event === "tools/call")).toHaveLength(1);
     expect(await owner.invokeTool("local", "echo_message", { message: "later" })).toEqual({ content: "echo:later" });
     expect(records().filter(event => event.event === "start")).toHaveLength(2);
+  });
+
+  it("rejects an old registry contract after refresh without calling the replacement tool", async () => {
+    configure(root);
+    const owner = gateway();
+    const original = await owner.snapshot();
+    const stale = createCoreToolRegistry({ mcpTools: original.tools, mcpGateway: owner });
+    const current = await owner.refresh("local");
+    expect(current.tools[0]?.contractId).not.toBe(original.tools[0]?.contractId);
+    const context = { taskId: "mcp-contract", workspaceRoot: root };
+    const rejected = await stale.get(original.tools[0]!.qualifiedName)!.execute({ message: "stale" }, context);
+    expect(rejected.success).toBe(false);
+    expect(rejected.metadata).toMatchObject({ mcpFailureClass: "tool-unavailable" });
+    expect(records().filter(event => event.event === "tools/call")).toHaveLength(0);
+    const fresh = createCoreToolRegistry({ mcpTools: current.tools, mcpGateway: owner });
+    expect(await fresh.get(current.tools[0]!.qualifiedName)!.execute({ message: "fresh" }, context))
+      .toMatchObject({ success: true, output: "echo:fresh" });
+    expect(records().filter(event => event.event === "tools/call")).toHaveLength(1);
+  });
+
+  it("withdraws unavailable catalogs and refuses old registry calls before dispatch", async () => {
+    configure(root);
+    const owner = gateway();
+    const original = await owner.snapshot();
+    const stale = createCoreToolRegistry({ mcpTools: original.tools, mcpGateway: owner });
+    const tool = stale.get(original.tools[0]!.qualifiedName)!;
+    for (const [extra, state, failure] of [
+      [{ enabled: false }, "disabled", "config"],
+      [{ authRequired: true }, "needs-auth", "permission-denied"],
+    ] as const) {
+      configure(root, config([], extra));
+      expect(await owner.snapshot()).toMatchObject({ clients: [{ type: state }], tools: [] });
+      const result = await tool.execute({ message: "stale" }, { taskId: "mcp-unavailable", workspaceRoot: root });
+      expect(result.success).toBe(false);
+      expect(result.metadata).toMatchObject({ mcpFailureClass: failure });
+      expect(records().filter(event => event.event === "tools/call")).toHaveLength(0);
+    }
+    fs.writeFileSync(path.join(root, ".cheers.mcp.json"), '{"mcpServers":{}}');
+    expect(await owner.snapshot()).toEqual({ clients: [], tools: [] });
+    const missing = await tool.execute({ message: "stale" }, { taskId: "mcp-missing", workspaceRoot: root });
+    expect(missing.success).toBe(false);
+    expect(missing.metadata).toMatchObject({ mcpFailureClass: "tool-unavailable" });
+    expect(records().filter(event => event.event === "tools/call")).toHaveLength(0);
+  });
+
+  it("refuses unknown tools before dispatch with an explicit unavailable classification", async () => {
+    configure(root);
+    const owner = gateway();
+    await owner.snapshot();
+    await expect(owner.invokeTool("local", "missing-tool", {})).rejects.toMatchObject({
+      mcpFailureClass: "tool-unavailable",
+    });
+    expect(records().filter(event => event.event === "tools/call")).toHaveLength(0);
   });
 
   it("preserves tool errors and structured results, and marks unsupported content explicitly", async () => {

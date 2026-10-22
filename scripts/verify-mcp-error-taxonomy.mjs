@@ -1,84 +1,30 @@
 #!/usr/bin/env node
-
-import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { getSyntheticHome } from './support/testPaths.mjs'
-import { resolveVitestPath } from './support/scriptRuntime.mjs'
+import { runContractGateCli } from './support/contract.mjs'
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
-const vitestPath = resolveVitestPath(repoRoot, tsShellRoot)
-const syntheticHome = getSyntheticHome()
-
-const scenarios = [
-  ['local-deterministic-success', 'true', 'true', 'true', 'true', 'not-requested', 'success', 'success', 'none'],
-  ['invalid-config', 'false', 'false', 'false', 'false', 'not-requested', 'config', 'stopped', 'user-config'],
-  ['missing-command-spawn-failure', 'true', 'true', 'false', 'false', 'not-requested', 'stdio-process', 'stopped', 'server-availability'],
-  ['auth-required-permission-denied', 'true', 'false', 'stale-descriptor', 'false', 'denied', 'permission-denied', 'stopped', 'permission'],
-  ['unknown-tool-unavailable', 'false', 'false', 'false', 'false', 'not-requested', 'tool-unavailable', 'stopped', 'tool-level'],
-  ['tool-is-error', 'true', 'true', 'true', 'true', 'not-requested', 'tool-is-error', 'stopped', 'tool-level'],
-  ['stdio-process-throw', 'true', 'true', 'true', 'true', 'not-requested', 'stdio-process', 'stopped', 'server-availability'],
-  ['malformed-tool-result', 'true', 'true', 'true', 'true', 'not-requested', 'malformed-result', 'stopped', 'protocol-level'],
-  ['malformed-list-tools-protocol', 'true', 'true', 'false', 'false', 'not-requested', 'protocol', 'stopped', 'protocol-level'],
+export const contractSuites = [
+  'src/core/mcp/errorTaxonomy.test.ts',
+  'src/core/mcp/lifecycle.test.ts',
+  'src/core/tools/mcpForwarding.test.ts',
+  'src/core/mcp/transportHonesty.test.ts',
+]
+export const requiredAssertions = [
+  {
+    file: contractSuites[0],
+    title: 'canonicalizes protocol diagnostics before redaction and safe report projection',
+    count: 2,
+  },
+  { file: contractSuites[1], title: 'does not report connected for a process that never completes initialize' },
+  { file: contractSuites[1], title: 'withdraws unavailable catalogs and refuses old registry calls before dispatch' },
+  { file: contractSuites[1], title: 'refuses unknown tools before dispatch with an explicit unavailable classification' },
+  { file: contractSuites[1], title: 'preserves tool errors and structured results, and marks unsupported content explicitly' },
+  { file: contractSuites[2], title: 'carries a server-side error as a failure, not as a canned success' },
+  { file: contractSuites[2], title: "answers a transport failure with the gateway's own next step" },
+  { file: contractSuites[3], title: 'classifies the refusal as a configuration problem' },
 ]
 
-function run(command, args, options = {}) {
-  return new Promise((resolve) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd ?? repoRoot,
-      env: options.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: false,
-    })
-    let output = ''
-    child.stdout.on('data', chunk => {
-      output += chunk.toString()
-    })
-    child.stderr.on('data', chunk => {
-      output += chunk.toString()
-    })
-    child.on('close', code => resolve({ code: code ?? 1, output }))
-    child.on('error', error => resolve({ code: 1, output: `${output}${error.message}` }))
-  })
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  console.log('surface=local-protocol-and-error-projection cli-entry-proof=not-covered real-provider=not-used')
+  void runContractGateCli('mcp-error-taxonomy', contractSuites, requiredAssertions)
 }
-
-console.log('gate name=mcp-error-taxonomy')
-console.log('mode=synthetic')
-console.log('status taxonomy: pass=0 product-regression=1 config-failure=3')
-console.log(`repo=${repoRoot}`)
-console.log(`synthetic HOME=${syntheticHome}`)
-console.log('realProviderTouched=false')
-console.log('externalMcpServerUsed=false')
-console.log('userMcpConfigUsed=false')
-console.log('externalMcpReadinessClaimed=false')
-console.log('defaultGateChanged=false')
-console.log('scenario|executionAttempted|serverProcessStarted|toolVisible|toolInvoked|permission|classification|terminalOutcome|failurePlane')
-for (const scenario of scenarios) {
-  console.log(scenario.join('|'))
-}
-
-const env = {}
-for (const [key, value] of Object.entries(process.env)) {
-  if (typeof value === 'string') env[key] = value
-}
-env.HOME = syntheticHome
-env.USERPROFILE = syntheticHome
-env.CHEERS_PROVIDER_MODE = 'synthetic'
-env.CHEERS_REAL_HOME = ''
-
-const result = await run(
-  process.execPath,
-  [vitestPath, 'run', 'src/core/mcp/errorTaxonomy.test.ts'],
-  { cwd: tsShellRoot, env },
-)
-
-if (result.code !== 0) {
-  console.log(`[product-regression] mcp-error-taxonomy-focused-tests - exit=${result.code}`)
-  console.log(result.output.split(/\r?\n/).filter(Boolean).slice(-24).join('\n'))
-  process.exit(1)
-}
-
-console.log('[pass] mcp-error-taxonomy-focused-tests')
-console.log('[pass] mcp-error-taxonomy')
-process.exit(0)
