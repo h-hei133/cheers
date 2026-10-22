@@ -8402,3 +8402,12 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 本次四项 cycles/config-consumers/declarations/Node-floor 实际重跑 exit0，保留 `*-current.log`。既有 NormProof exit0/partial，blocking imports/cycles satisfied、8项 ceiling advisory。独立 code APPROVE、architecture WATCH、综合 COMMENT，两报告 SHA已本次重核。源值 ABA、实际清理时限、任意编码、总资源界及继承函数上限债务仍保留；完整 PAN-08、其他 picker 与47项继续原范围。严格 docs/diff、commit/push/新SHA CI另取证。
 
 - 交付前实际 strict docs/diff exit0（保留原118项docs advisory），再次运行bind逐项相符。门禁脚本漂移独立处理，不改变本批产品源码和审查绑定。
+
+## [2026-10-22] fix | Phase 20 MCP 验证门返工与精确 patch 选集
+
+- 先复核三个 MCP 门禁仍引用已删除测试，改为当前 owner suites + required assertions：报告安全参数化两例、取消/shutdown、pre-aborted/queued cancellation、stale catalog、unknown tool、transport honesty 和 `/mcp` visibility 都必须真实执行；仅“runner exit 0”或 suite 有任意通过项不再足够。共享 `contract.mjs` 同时保留 0/1/2/3 分类，release-core 使用归一化退出码，成功隔离产物清理失败会显式报告 retained path。
+- `test:scripts` 106项、routing 5 suites/92项、local execution 3/26、error taxonomy 4/28、result-contract 6/154通过；四项静态门通过，`git diff --check`通过。MCP verifier 独立复核最终 APPROVE；完整 release-core 未运行，保留为未验范围。
+- 研究先复现 EDIT-01 P0：单组 `apply_patch` 在缺少 `selected` 时仍可经 approval gate 写入，CLI bridge 还会丢弃显式 selection。修复沿原 owner：picker 产出 group IDs + subset revision，CLI bridge 原样携带；turn gate 对非空/唯一/已知 ID 与 revision 做准入；patch owner 再做无选集、重复/空白/非字符串 ID 与 stale revision 检查；单组 fallback 全部移除。
+- 选择授权不再依赖 permission scope：selection-required prompt 绕过 `accept-edits`/`allow-all`、noninteractive policy、approval-mode object、allow-once cache 和 allow-always grant；无 group picker 时以 `selection-host-unavailable` deny，且 apply_patch allow-always 在持久化前降级为 deny。`accept-edits`/`allow-all` 真实 CLI handler composition 选择两 group 之一并仅写该组。
+- 最终六个聚焦文件/133项通过，生产 TypeScript、result-contract 154项、cycles/config-consumers/declarations/Node-floor通过；七项产品反转分别移除 bridge字段、turn/tool fallback、scope自动回答、直接执行重复/非法ID校验、apply_patch allow-always降级和 approval-mode 二次读取，均实际失败。最终 TS build `ad9988c1ee596bfe76481547521acefea43dfc293a543dd738c3ea96c48e312e`、exe SHA256 `4875859d1f893c0390d3941d075e156eea07237ffbdd1e1d7f9ca669161f42ad`；Node/exe × regular/fullscreen/line/pipe 八格隔离 PTY 全PASS/exit0。
+- 独立代码复核 APPROVE、架构 CLEAR；仅证明本轮门禁与精确 patch 选集，不闭合 PAN-08、EDIT-01 跨平台/真实模型项或其余47项。提交、推送与精确新 SHA CI 尚未执行，后续按实际证据补记。

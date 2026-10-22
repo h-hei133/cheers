@@ -10,6 +10,14 @@
 - 本次四项 cycles/config-consumers/declarations/Node-floor 实际重跑 exit 0。既有 result-contract 6 套/154 项通过；两个 MCP 门禁仍因删除前测试路径返回 exit 1，属于验证脚本漂移，原失败日志保留，单独修复。strict docs/diff、提交、推送和新 SHA CI 按后续实际证据记录。
 - 前批 help 精确 SHA `eeeb9268c5f879c457a43c3cdee96f43d2965173` 的 CI `39614206610` 和 Watch `39614206887` 已 completed/success，只证明前批。完整 PAN-08、其余既有 picker 与全部 47 项继续原范围复核；用户允许延期的四类环境/真实模型验收范围不扩大。
 
+## 2026-10-22 MCP 验证门返工与 EDIT-01 显式选集
+
+- 三个 MCP 验证门已从删除前的固定文件/场景清单迁回当前 owner 测试，并把关键成功、报告安全、取消、拒绝和 stale 场景作为必需断言逐项校验。共享 contract gate 现保留 `0=pass`、`1=product-regression`、`2=execution-inconclusive`、`3=config-failure`，release-core 使用归一化退出码；成功运行清理隔离产物，失败保留 `runner.log`/`tests.json`。`test:scripts` 106 项、MCP routing 92 项、local execution 26 项、error taxonomy 28 项及 result-contract 154 项通过。
+- EDIT-01 修复了单组 patch 的隐式选集：交互选择器和 CLI bridge 必须原样传递非空、去重、已知组 ID 与精确 `selectionRevision`；即使 `accept-edits`/`allow-all`、approval-mode、allow-once cache 或 allow-always grant 已存在，选择必需提示仍绕过这些权限自动回答。无 group picker 时明确 deny，apply_patch 的 allow-always 在持久化前降级为 deny。patch owner 再次拒绝无选集、重复/空白/非字符串 ID 和 stale revision，不能从单组数量推导授权。
+- 本地六个聚焦文件/133 项通过，生产 TypeScript 构建通过；七项有效反转分别移除 bridge 字段、恢复 turn/tool 单组 fallback、恢复 scope 自动回答、删除直接执行的重复/非法 ID 校验、删除 apply_patch allow-always 降级或恢复 approval-mode 二次读取，均取得真实失败。`result-contract` 154 项、`test:scripts` 106 项、cycles/config-consumers/declarations/Node-floor 通过，module facade 仍为既有 8 项 advisory。
+- 最终 TS build `ad9988c1ee596bfe76481547521acefea43dfc293a543dd738c3ea96c48e312e`，inputs digest `461d3a63c0a656a811f67446f2d8a79c1b9d9c1722f3b88c9f2ed1352ede8368`，artifact digest `7329d1bdbf4d98dc194132d5dc930a5502c78dbc68a6154bf3158708dfad461d`；exe 102,725,760 bytes、SHA-256 `4875859d1f893c0390d3941d075e156eea07237ffbdd1e1d7f9ca669161f42ad`。Node/exe × regular/fullscreen/line/pipe 八格隔离 PTY 全部 exit 0。
+- 独立 MCP verifier 复核 APPROVE；EDIT-01 代码复核 APPROVE、架构 CLEAR。以上只证明本轮门禁与精确 patch 选集，不闭合 PAN-08、EDIT-01 的跨平台/真实模型项或其余 47 项。commit、push 与精确 SHA CI 尚未执行，后续按实际结果补记。
+
 ## 返工复核（2026-10-18）
 
 复核基线为 `12a7d4e0`。先前“只剩四项未闭合”的结论撤回：下方旧记录包含部分实现、未完成验收及重复任务，不能证明全部裁决兑现。保留历史提交证据，逐批按决策文档重新验收；不以本轮少量回归通过重判整个任务完成。
