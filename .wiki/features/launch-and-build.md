@@ -70,3 +70,9 @@ manifest schema v2 的关键字段：
 - 本地反转：持有 `.build.lock` 时构建退出 1，原 lock 与 manifest 保留；临时 TypeScript 语法错误保留旧 launcher 并以 tsc 的退出码失败；编译期间新增源文件触发“inputs changed”，不替换 manifest；移除探针后 `npm start -- --version` 恢复 `0.1.0`。
 - 本地 Node 24.15 上连续 7 次进程内 `checkBuild` 的 p50 约 168 ms、最大约 619 ms（首样本）；这是校验预算观测，不是 START-03 的冷/热启动或 ready 基准。
 - `dist/cli.js` 与 `scripts/start.mjs` 都从 `packages/ts-shell/dist/build-manifest.json` 选择同一不可变入口；package `main` pointer 只 re-export 同一 buildId 的不可变 `index.js`。
+
+## 性能基准
+
+`npm run bench:start` 和 `npm run bench:interactive` 默认使用 `BENCH_CACHE_CONTROL=warm-uncontrolled`。设置 `BENCH_CACHE_CONTROL=global-cold` 后，每个样本在启动前执行 `sync`，并通过 `sudo -n tee /proc/sys/vm/drop_caches` 写入 `3`；缺少免密 sudo、非 Linux 或命令失败时在样本启动前退出。该模式只应用于可丢弃的隔离 runner，不应在共享主机上运行。
+
+`.github/workflows/performance.yml` 是手动触发的同一 runner warm/cold 基准：先构建 TypeScript 和宿主单文件入口，再依次运行 warm/cold process 与 warm/cold interactive，上传包含 build digest、cache evidence、原始样本和分位数的 JSON。基准不把 line/pipe 的首字节、runtime-ready 或退出延迟混入 regular/fullscreen 的首帧或键响应。

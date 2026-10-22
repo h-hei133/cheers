@@ -1,6 +1,23 @@
 # Phase 20 交付状态
 
-本文只记录有本地证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
+本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
+
+## 2026-10-23 START-03 受控冷/热启动基准（代码批 `2c55ec8b` 已推送；Performance/CI/Watch success）
+
+- 新增 `global-cold` 缓存控制：每个样本先执行 `sync`，再由 `sudo -n tee /proc/sys/vm/drop_caches` 写入 `3`；默认仍为 `warm-uncontrolled`。非 Linux、未知模式、缺少免密 sudo 或任一命令失败都会在启动样本前 fail-closed。`scripts/bench-cache.test.mjs` 6 项通过，`test:scripts` 135 项通过。
+- 手动 `Performance` 运行 `39817293051`/job `119959021646` 为 completed/success，耗时 18m30s，使用 GitHub `ubuntu-24.04`、Node `20.3.0`、Bun `1.3.14`、4 vCPU Xeon。它先跑 warm，再跑 cold；四份 JSON 使用同一 build ID `91c1045a9d1ad20a59d64780b6aada71419e6d53ef54b9050e32c92627c3bcc2`、inputs digest `663c429db5ebcd854cb53348c77763f2ab0f9120d551c94cf29695fd9ce58fa1`、artifact digest `aa25ff526e0ae405c011c1b91c7707907b5fa3f716fb596c66c7c378bc793db2` 和 exe SHA-256 `a3170741780421323d9e9677bfdae11fe6ba3cf200e69ac2a53993aefa2156dd`。
+- 进程启动各 30 次，Node warm p50/p95 `400.0/414.6ms`、cold `1869.3/1912.6ms`；exe warm `273.6/282.4ms`、cold `481.4/488.6ms`。cold 运行记录 60/60 次 cache drop，warm 为 0/60。
+- 交互启动各 target × 四模式各 30 次。regular/fullscreen 的首帧 p50/p95 如下；line/pipe 没有首帧或键响应，分别保留 first-byte、runtime-ready、exit 等独立字段，不混报为 TUI 指标。
+
+| target | mode | warm first frame | cold first frame | warm key response | cold key response |
+|---|---|---:|---:|---:|---:|
+| node | regular | 1857.9/1887.0ms | 3526.6/3591.5ms | 52.2/60.3ms | 54.0/62.3ms |
+| node | fullscreen | 1861.2/1879.8ms | 3534.4/5567.9ms | 50.7/67.3ms | 50.9/63.0ms |
+| exe | regular | 749.6/794.1ms | 996.1/1020.0ms | 48.8/49.8ms | 49.5/51.1ms |
+| exe | fullscreen | 747.7/762.7ms | 997.9/1071.6ms | 48.8/50.1ms | 50.1/52.6ms |
+
+- line first-byte p50/p95：Node warm `1766.4/1808.4ms`、cold `3435.3/3498.9ms`；exe warm `664.4/683.2ms`、cold `902.3/928.0ms`。pipe first-byte p50/p95：Node warm `1858.0/1885.6ms`、cold `3507.5/5476.6ms`；exe warm `760.2/788.3ms`、cold `999.2/1028.2ms`。interactive cold 记录 240/240 次 cache drop，warm 为 0/240。
+- 证据目录为 `.omx/artifacts/phase20-performance-39817293051/performance-39817293051/`；SHA-256 分别为 start-warm `acace637cf224b0a279cec7eb2aa5ce1683e77a49928c2354407b32e90c935d3`、start-cold `2ea259acaa501474a0b783e121331c3b98bdd28fbb3fd55af80eccbadb683fbc`、interactive-warm `69a047a08bbfc535e59de75817b3fcc5c617822aea228015eb77d3e7e3950e35`、interactive-cold `f0671f10deaa923365b0fa5c34d745952216dae13cfdd7dda52555d57a6ce1e1`。该运行闭合 START-03；此前 WSL warm 数据只保留为另一台机器的观测，不替代本 run 的同机 warm/cold 对照。
 
 ## 2026-10-23 Phase 20 本地返工与全量复核（代码批已推送；CI/Watch success；延期项保留）
 
@@ -12,7 +29,7 @@
 - 同 build 的 START-03 补充证据：`bench:start` 各 30 次，Node p50/p95 `405.6/415.8ms`、exe `214.5/231.9ms`；`bench:interactive` 保存 Node/exe × 四模式共 240 个样本，regular/fullscreen 均取得 runtime-ready、首帧和完整 UTF-8 键响应；`bench:responsiveness` 30 次通过 1000 项列表 p95 `<50ms` 与 math/table/diff 单次阻塞 `<100ms` 阈值。全部为 warm/uncontrolled 缓存，不能替代受控冷缓存。
 - NormProof 实际 exit 0/partial：blocking unresolved-specifier 与 cycle obligations satisfied，0 blocking；11 项 function-ceiling advisory 保留。委派 reviewer 使用指定模型多次遇到 429/503，不可用不等于批准；本轮结论来自本地自审和实际门禁，不声称独立 review approval。
 - 代码批 `0d42697d3aa6130412d57afdf76cf2ae15d0a539` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39810323144`/job `119934502881` 为 completed/success，耗时 17m35s；静态门、脚本门、构建、Chromium 安装、完整测试与 NormProof 均 success，CI 测试实际为 927 文件通过、1 文件跳过，9852 项通过、3 项跳过，967.66s。Architecture Watch `39810323104`/job `119934501742` 为 completed/success。两项只绑定上述代码 SHA；本段后续文档证据补记另提交，不扩大产品范围。
-- 仍未闭合：START-03 受控冷缓存；QA-02 Windows/macOS、IME、系统复制及非 Linux 平台矩阵；QA-03 正式 20 项 corpus、真实模型执行和双盲评分；TOOL-02 同模型总成本/cache/参数质量/多语言 tokenizer 校准。Phase 20 不因本批本地返工而宣称全部 47 项完成。
+- START-03 已由上方受控冷/热运行闭合；仍未闭合：QA-02 Windows/macOS、IME、系统复制及非 Linux 平台矩阵；QA-03 正式 20 项 corpus、真实模型执行和双盲评分；TOOL-02 同模型总成本/cache/参数质量/多语言 tokenizer 校准。Phase 20 不因本批本地返工而宣称全部 47 项完成。
 
 ## 2026-10-22 面板、源投影与 W2/W3 本地返工（代码批 `152d9ecc` 已推送；CI/Watch success）
 
@@ -24,7 +41,7 @@
 - 最终聚焦 23 文件/430 项通过。最终字节的完整 `test:ts` 使用仓库外临时配置以 2 worker、1 次 retry 运行，实际 926 文件通过、1 文件跳过，9781 项通过、10 项跳过，804.69s，无失败或 retry 标记；这不等同于默认 8-worker 结果。此前默认并行下的 browser/CLI 负载型失败保留原分类，未用低并发结果冒充默认并行通过。旧提交 `5576b1d3` 的 CI `39717903140` 仍只证明旧 SHA。
 - `test:scripts` 106 项、`verify:result-contract` 6 套/154 项、golden main path、`verify:cli-entry` 19 项、cycles/config-consumers/declarations/Node-floor、strict docs/rules 与 `git diff --check` 通过；module facade 仍为既有 8 项 advisory，docs-source 仍为 118 项 advisory。NormProof 实际 exit 0/partial，blocking import/cycle 义务 satisfied、0 blocking，既有 8 项 function-ceiling advisory 保留。
 - 最终 TS build ID `faeb78a44674365c5490409b013b6eb7dfe9c7f71b9fbb23ab4dcadf3fc65e5e`，inputs digest `70aedc13fda716d9778be5460ef2e985ffb1a44aa4a1714e8f9e8199cef1a513`，artifact digest `813a2891a181c948e6e6b57a727c784008e59020406db2491d40f2b4c94d8c96`；exe 102,742,144 bytes、mode 755、SHA-256 `355d84e9e1d9c5f731fd82a76243670f629a52114d0d19cf333d8fca1eb6274f`。该产物 Node/exe × regular/fullscreen/line/pipe 八格隔离 PTY 全部 exit 0；最终 exe 上的 19 项 CLI hard gate 也全部通过。
-- CLI hard gate 的单 hunk 检查现在证明非交互无 group-selection host 时拒绝且零写入；正向单 hunk 应用仍由 patch/turn 聚焦回归覆盖，未把无选择宿主伪装成成功路径。已执行并恢复的最终反转包括 wrapped-node 逻辑换行、JSON list 设置、no-tools wire schema、compaction 身份与 opt-out、compaction 回退 overhead live getter、output-aware retained tail、context/status 身份、retained identity fallback、部分身份严格拒绝、interactive usage binding、live discovery compaction identity、fence blank-line source、agents live binding 与 owner projection、agents continuation syntax、UTF-8 分页、panel 控制字节、jobs workspace identity 和 `/btw` retained report。所有反转均取得真实失败，恢复后源码 SHA256 与反转前一致。代码批 `152d9ecc7d55ff8ced88a338ff1db7eb153aa4f7` 已提交并推送；CI `39753892764`/job `119740926577` 与 Architecture Watch `39753892815`/job `119740927033` 均 completed/success，只绑定该代码 SHA。START-03、QA-02/03、TOOL-02 仍按用户允许的延期范围保留。
+- CLI hard gate 的单 hunk 检查现在证明非交互无 group-selection host 时拒绝且零写入；正向单 hunk 应用仍由 patch/turn 聚焦回归覆盖，未把无选择宿主伪装成成功路径。已执行并恢复的最终反转包括 wrapped-node 逻辑换行、JSON list 设置、no-tools wire schema、compaction 身份与 opt-out、compaction 回退 overhead live getter、output-aware retained tail、context/status 身份、retained identity fallback、部分身份严格拒绝、interactive usage binding、live discovery compaction identity、fence blank-line source、agents live binding 与 owner projection、agents continuation syntax、UTF-8 分页、panel 控制字节、jobs workspace identity 和 `/btw` retained report。所有反转均取得真实失败，恢复后源码 SHA256 与反转前一致。代码批 `152d9ecc7d55ff8ced88a338ff1db7eb153aa4f7` 已提交并推送；CI `39753892764`/job `119740926577` 与 Architecture Watch `39753892815`/job `119740927033` 均 completed/success，只绑定该代码 SHA。该历史批次当时保留 START-03、QA-02/03、TOOL-02；START-03 已于 2026-10-23 后续受控冷/热运行闭合。
 
 ## 2026-10-22 MCP 服务器刷新与安全报告返工（PAN-08 部分）
 
@@ -87,7 +104,7 @@ checkpoint 批已推送为 `c0f065385597e6cb3a5138b22a5fb7ba65360ad6`，Architec
 
 后续实际终态核对：辅助费用批 CI `39131315102` 为 failure，GitHub 注释 hosted runner lost communication；原始日志为空，没有测试失败断言证据，不能记为通过。checkpoint 批 CI `39133444370` 为 success；年龄保留批 `e4ae423de3a931b82b09a5dde137cc87565663f8` 的 CI `39134059372` 与 Architecture Watch `39134059381` 均 success。完整 SHA、时间与分类见日志。PRV-04 两独立进程的复制槽位复现仍发送两次刷新，新的谱系/grant/attempt/原生响应证据返工正在实施，尚未验收或交付。
 
-用户已允许后续验证的环境/真实模型项：START-03 受控冷缓存及剩余响应测量、QA-02 跨平台/IME/系统复制、QA-03 真实质量、TOOL-02 成本与 tokenizer 校准。**这项保留不覆盖可在本地完成的缺失实现和合成端到端验收。**
+用户曾允许后续验证的环境/真实模型项：START-03 受控冷缓存及剩余响应测量、QA-02 跨平台/IME/系统复制、QA-03 真实质量、TOOL-02 成本与 tokenizer 校准。**START-03 已于 2026-10-23 通过同机 warm/cold 运行闭合；以下三项仍保留，且该保留不覆盖可在本地完成的缺失实现和合成端到端验收。**
 
 2026-10-21 PAN-02 再次复现真实排队 `/tree` 的焦点错误：exclusive 包装的对象展开在 load 前读掉 `initialSelection` getter，Enter 因而选中旧节点。现在保留属性描述符及 prototype；真实 `InteractiveMode.run('/tree')` 回归先失败后通过，对象展开反转再次失败。受影响 4 文件/129 项、生产类型检查、双构建、打包入口 gate、静态门和 Linux 八格隔离 QA 通过；独立 code APPROVE、architecture CLEAR。该批提交与精确 SHA CI 仍按日志实际结果记录，不据此闭合全阶段。
 
@@ -174,7 +191,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 
 ## 未闭合
 
-- START-03：已保存八组各30次原始样本，渲染键响应关闭 PTY echo 并等待完整 UTF-8 字符；受控冷缓存仍需特权环境。当前 `bench:responsiveness` 提供 1000 项列表同步键路径与 math/table/diff 单次阻塞的 Node 宿主证据，不冒充 exe 或完整交互路径。
+START-03 已由 2026-10-23 的受控冷/热基准闭合；以下只列仍开放项。
 
 - QA-02：Linux Node/exe × regular/fullscreen/line/pipe 八格合成 CLI 在当前构建通过；TUI 覆盖会话/任务/发现/审批/settings 保存/profile 重启，line/pipe 覆盖任务/发现/显式审批和 settings 保存边界；Windows/macOS/IME/系统复制仍缺环境。
 - QA-03：`npm run qa:quality` 已提供 fail-closed harness、build-bound JSON、确定性/双盲评分和 10,000 次 paired bootstrap；当前 starter corpus 只有 6 项，正式 12 项发现任务加摘要/渲染/启动质量任务与真实模型执行仍缺。
@@ -209,7 +226,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | fullscreen | 1055.6ms | 1061.0ms | 1139.0ms | 1365.3ms | 1391.1ms | 161.1ms | 187.1ms |
 | pipe | 1081.5ms | 1035.7ms | 1082.0ms | 1402.3ms | 1682.6ms | 198.8ms | 480.6ms |
 
-未测：受控冷缓存（清页缓存需特权，首样本单列但不冒充冷启动）。
+此处旧基准未测受控冷缓存；2026-10-23 的 GitHub `Performance` 运行已另行补齐同机 warm/cold 证据，不能把本表旧 warm 数据与那次 cold 数据混在一起。
 
 ## 本地全量
 
@@ -259,7 +276,7 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 多轮定向反转分别产生 10、4、3、2 个实际失败：撤销 `stop` settlement、timeout 传播或 detach deadline 后 JOB 用例失败；把函数型 follow-up policy 退化为布尔值后 reload 用例失败；合并同文件 hunk、移除 hunk/add content identity 后 identity 用例失败；恢复 escaped/multi-run 误解析、link label 不递归、固定多计换行字节、纯 rename 早退或把 `---`/`+++` header 当改动后，最终 renderer 与 diff 边界用例失败；强制 bootstrap 调用 `listSessions` 后 0 会话探针失败。反转源码已恢复，`git diff --check` 通过。
 - 最终受影响 14 文件/303 项通过；fresh TS 构建 `fae6df0de84b`、exe 102,615,168 bytes/SHA-256 `a2ad338ad80429db850e5c98e930d19d8b63d9167ed87aaae0dcd3400a7de70d`，`verify:cli-entry` 全项与 Linux Node/exe × regular/fullscreen 四格 PTY 通过。`test:scripts` 91 项、TypeScript、import cycles、config consumers、declarations、Node floor、strict docs drift 与 `git diff --check` 通过；docs drift 保留 118 条既有 advisory。
 - 本批提交 `a425420aafdc46140075e4b4560c53727f929212` 已推送、远端 main 完整 SHA 读回。CI `39413554234`/job `118596969632` completed/success（16m12s）；Architecture Watch `39413554208`/job `118596969793` completed/success。该证据绑定上述精确 SHA，不改写此前任何失败记录。
-- 仍未闭合：START-01/02 的新提交/推送/精确 SHA CI；RENDER/PAN 其余消费者仍按原合同复核。START-03、QA-02/03、TOOL-02 的用户已允许环境/真实模型项继续延期，不把本轮合成测试替代它们。
+- 该历史节点仍未闭合：START-01/02 的新提交/推送/精确 SHA CI；RENDER/PAN 其余消费者仍按原合同复核。START-03、QA-02/03、TOOL-02 当时按用户允许的环境/真实模型项继续延期，不把本轮合成测试替代它们；START-03 已于 2026-10-23 后续闭合。
 
 ### 2026-10-20 START-02 首帧恢复提示与用户意图 fence
 
@@ -291,14 +308,14 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - tree picker 以当前健康 entry 为 initial focus，unavailable entry 仍 disabled；pin/unpin 经既有 metadata owner 原子写入、读回确认，并验证 transcript/state 字节不变。
 - non-TTY live stdin 不再绕过 recovery lifecycle：`runPromptInputStream` 在启动输出后报告 first frame，在首行输入时推进 user intent；`printModeRouter`/`cliRuntimeModule`/`cliProcessRunner` 传递同一 hooks。取消 recovery hint 不再吞掉已发现的 unreadable-directory 诊断；golden fixture 在首个 prompt 前等待 health 结果，避免把 fence 误当成产品成功。
 - 聚焦 13 文件/186 项、完整 `cli-baseline.test.ts` 41/41、`test:scripts` 92 项通过；import cycles、config consumers、declarations、Node floor、strict docs drift、`git diff --check` 通过，docs drift 保留 118 条既有 advisory，module facade 保持 8 项既有 advisory。fresh TS manifest `6c1e9a7232ce`，exe SHA-256 `687d4c069b0e0c1496fdccd883a166d29f6a9733cc2d1c067e09818c22c7aaa8`；Node/exe × regular/fullscreen PTY 四格、`verify:cli-entry` 19/19 通过。仓库 tgz NormProof 退出 0/partial，open obligations 为 0，保留 8 项 proof gap/既有 ceiling advisory。
-- 仍未闭合：fork/restore/delete 的组合 PTY 验收；START-03 的真实 ready/key/event-loop/raw sample/受控冷缓存仍缺，QA-02 的 line/pipe 五条业务链和跨平台/IME 仍缺，QA-03/TOOL-02 真实质量与 tokenizer 仍未验。本批 `20e6ee61` 已提交/推送，CI 与 Watch 已按精确 SHA 读回 success。
+- 该历史节点仍未闭合：fork/restore/delete 的组合 PTY 验收；START-03 的真实 ready/key/event-loop/raw sample/受控冷缓存当时仍缺，QA-02 的 line/pipe 五条业务链和跨平台/IME 仍缺，QA-03/TOOL-02 真实质量与 tokenizer 仍未验。本批 `20e6ee61` 已提交/推送，CI 与 Watch 已按精确 SHA 读回 success；START-03 已于 2026-10-23 后续闭合。
 
 
 ### 2026-10-21 QA-02 业务链与 START-03 测量返工
 
 - `qa:pty` 已扩至 Linux Node/exe × regular/fullscreen/line/pipe。TUI 合成链覆盖 seed recovery、fork、新旧会话切换、显式确认删除、resume/tools 关闭、bash、task、tool_search/tool_load/skill、逐次审批、settings 写后读回和 profile 重启后命名目录 session 读回；line/pipe 覆盖任务/发现/显式 allow-once 与 settings 文件字节不变。最终八格 exit 0，持久 transcript 按工具名、call ID、success 和实际 payload 关联。
 - 修复合成驱动跨轮次复用 call ID，以及旧 outstanding call 在新实例中被重新派发、无关 tool result 推进计划的问题。意图解析归 `turn/intents.ts`，入口只组装；持久 tool call 使用既有 function 形状，不新增执行路径。
-- 新 benchmark 区分首帧/输入提示/TUI listener/write/批处理首答/命令退出，键响应关闭 PTY echo 并等待完整 UTF-8 字符。原来首 chunk 命中、字段误读和旧构建拒绝的失败记录保留。最终基准保存8组各30次共240个原始样本与机器/构建摘要；runtime-ready、冷缓存、1000项列表和复杂stream阻塞、分位数不确定性仍未验。
+- 新 benchmark 区分首帧/输入提示/TUI listener/write/批处理首答/命令退出，键响应关闭 PTY echo 并等待完整 UTF-8 字符。原来首 chunk 命中、字段误读和旧构建拒绝的失败记录保留。最终基准保存8组各30次共240个原始样本与机器/构建摘要；runtime-ready、1000项列表和复杂stream阻塞、分位数不确定性当时仍未验。受控冷缓存随后由 2026-10-23 `Performance` 运行补齐，不改变本条历史状态。
 - 聚焦 7 文件/86 项通过；脚本 96 项通过，两种构建通过；静态 cycles/config/declarations/Node floor 通过。独立 code APPROVE、architecture WATCH，WATCH 为仍缺的验收指标、采样 histogram 与构建前后摘要的证据边界。本批提交/推送/CI 状态以日志中精确 SHA 读回为准；全部47项仍保持原范围复核。
 - 全量 TypeScript 实际为 9348 passed / 1 failed / 10 skipped（412.74s、exit 1）；唯一失败是 MCP 畸形配置四次 CLI 启动在并发下超过25秒。相同用例隔离 `--single-thread` 复跑 1 passed（16.63s），原失败日志保留，暂归并发负载夹具超时，不记为全量绿。
 
