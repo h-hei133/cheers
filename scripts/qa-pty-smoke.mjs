@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Linux end-to-end CLI smoke for both shipped launch forms and every local
- * input surface: regular, fullscreen, line-stream, and print-batch.
+ * Linux/macOS terminal and cross-platform line/pipe CLI smoke for both shipped
+ * launch forms; Windows is intentionally limited to line-stream and print-batch.
  *
- * The harness is synthetic and isolated. It proves local CLI/PTY wiring and
- * business chains; it is not a Windows/macOS, IME, system-copy, or real-model
- * quality matrix.
+ * The harness is synthetic and isolated. It proves platform CLI/PTY wiring and
+ * business chains; Windows interactive terminal, IME, system-copy, and real-model
+ * quality remain outside this matrix.
  */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { createQaPtyEnvironment } from "./qa-pty-env.mjs";
 import { seedRecoverySession, seedSavedSession, extractSessionId, currentSessionFromStore, assertTranscript } from "./qa/session.mjs";
 import { seedRestoreSnapshot, assertRestoreUnchanged, runRestorePreview } from './qa/restore.mjs';
+import { terminalSpawnSpec } from './qa/terminal.mjs';
 import { checkBuild } from './start-lib.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -238,9 +239,8 @@ async function runTerminalSmoke(target, mode) {
   const { home, project, restore } = createFixture(mode);
   const recoverySession = seedRecoverySession(home, project);
   const savedSession = seedSavedSession(home, project);
-  const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
-  const command = `stty rows 60 cols 120; exec ${[target.command, ...target.args].map(quote).join(" ")}`;
-  const child = spawn("script", ["-qec", command, "/dev/null"], {
+  const terminal = terminalSpawnSpec({ command: target.command, args: target.args, platform: process.platform });
+  const child = spawn(terminal.command, terminal.args, {
     cwd: project,
     env: qaEnvironment(home, project),
   });
@@ -336,8 +336,8 @@ async function runTerminalSmoke(target, mode) {
     await runInteractivePrompt(
       state,
       child,
-      "run printf qa-approval-ok",
-      ["qa-approval-ok", "Synthetic reply: run printf qa-approval-ok"],
+      "run echo qa-approval-ok",
+      ["qa-approval-ok", "Synthetic reply: run echo qa-approval-ok"],
     );
     await runInteractivePrompt(
       state,
@@ -441,7 +441,7 @@ async function runLineSmoke(target) {
     for (const step of [
       { command: "/sessions current", expected: "Current session" },
       { command: "/tools", expected: "Tools" },
-      { command: "run printf qa-approval-ok", expected: "qa-approval-ok" },
+      { command: "run echo qa-approval-ok", expected: "qa-approval-ok" },
       { command: "delegate task inspect qa fixture", expected: "Synthetic reply: delegate task inspect qa fixture" },
       { command: "discover and load skill qa-discovery", expected: "Synthetic reply: discover and load skill qa-discovery" },
       { command: "/settings", expected: "bare command and field details are read-only" },
@@ -496,7 +496,7 @@ async function runPipeSmoke(target) {
   const input = [
     "/sessions current",
     "/tools",
-    "run printf qa-approval-ok",
+    "run echo qa-approval-ok",
     "delegate task inspect qa fixture",
     "discover and load skill qa-discovery",
     "/settings",

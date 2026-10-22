@@ -1,0 +1,112 @@
+name: Platform QA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cli:
+    name: CLI ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+          - os: macos-14
+            platform: macos
+          - os: windows-2022
+            platform: windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.3.0
+          cache: npm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build:ts
+
+      - name: Build executable
+        run: npm run build:exe
+
+      - name: Node line stream
+        env:
+          QA_PTY_TARGET: node
+          QA_PTY_MODE: line
+          QA_PTY_OUTPUT_DIR: .omx/artifacts/platform-${{ github.run_id }}/${{ matrix.platform }}/node-line
+        run: npm run qa:pty
+
+      - name: Executable line stream
+        env:
+          QA_PTY_TARGET: exe
+          QA_PTY_MODE: line
+          QA_PTY_OUTPUT_DIR: .omx/artifacts/platform-${{ github.run_id }}/${{ matrix.platform }}/exe-line
+        run: npm run qa:pty
+
+      - name: Node print batch
+        env:
+          QA_PTY_TARGET: node
+          QA_PTY_MODE: pipe
+          QA_PTY_OUTPUT_DIR: .omx/artifacts/platform-${{ github.run_id }}/${{ matrix.platform }}/node-pipe
+        run: npm run qa:pty
+
+      - name: Executable print batch
+        env:
+          QA_PTY_TARGET: exe
+          QA_PTY_MODE: pipe
+          QA_PTY_OUTPUT_DIR: .omx/artifacts/platform-${{ github.run_id }}/${{ matrix.platform }}/exe-pipe
+        run: npm run qa:pty
+
+      - name: Node regular PTY
+        if: matrix.platform != 'windows'
+        env:
+          QA_PTY_TARGET: node
+          QA_PTY_MODE: regular
+          QA_PTY_OUTPUT_DIR: .omx/artifacts/platform-${{ github.run_id }}/${{ matrix.platform }}/node-regular
+        run: npm run qa:pty
+
+      - name: Executable regular PTY
+        if: matrix.platform != 'windows'
+        env:
+          QA_PTY_TARGET: exe
+          QA_PTY_MODE: regular
+          QA_PTY_OUTPUT_DIR: .omx/artifacts/platform-${{ github.run_id }}/${{ matrix.platform }}/exe-regular
+        run: npm run qa:pty
+
+      - name: Node fullscreen PTY
+        if: matrix.platform != 'windows'
+        env:
+          QA_PTY_TARGET: node
+          QA_PTY_MODE: fullscreen
+          QA_PTY_OUTPUT_DIR: .omx/artifacts/platform-${{ github.run_id }}/${{ matrix.platform }}/node-fullscreen
+        run: npm run qa:pty
+
+      - name: Executable fullscreen PTY
+        if: matrix.platform != 'windows'
+        env:
+          QA_PTY_TARGET: exe
+          QA_PTY_MODE: fullscreen
+          QA_PTY_OUTPUT_DIR: .omx/artifacts/platform-${{ github.run_id }}/${{ matrix.platform }}/exe-fullscreen
+        run: npm run qa:pty
+
+      - name: Upload platform evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-${{ github.run_id }}-${{ matrix.platform }}
+          path: .omx/artifacts/platform-${{ github.run_id }}/${{ matrix.platform }}
+          if-no-files-found: warn
+          retention-days: 30
