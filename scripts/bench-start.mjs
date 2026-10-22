@@ -5,9 +5,8 @@
  * This measures wall time from spawn to exit for `--version`, one fresh process
  * per sample. It does not measure the interactive first frame or key latency:
  * those need a PTY and a ready signal, and this repository has no PTY
- * dependency. The first sample is reported separately because the OS page cache
- * cannot be dropped without privileges; treat it as "first", not a controlled
- * cold-cache run.
+ * dependency. Warm and controlled global-cold modes are both reported explicitly;
+ * the latter requires passwordless sudo and is intended for an ephemeral runner.
  */
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -16,9 +15,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
+import { cacheEvidence, createCacheController } from './bench/cache.mjs';
 import { checkBuild } from './start-lib.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const cache = createCacheController();
 const runs = Number(process.env.BENCH_RUNS ?? 30);
 if (!Number.isSafeInteger(runs) || runs < 2) {
   console.error('BENCH_RUNS must be an integer of at least 2');
@@ -39,7 +40,7 @@ const targets = [
 const executable = path.join(root, verified.executable.path);
 const dist = path.join(root, 'packages/ts-shell/dist');
 const evidenceFiles = [path.join(root, 'dist/cli.js'), path.join(dist, 'build-manifest.json'), executable,
-  verified.entry, fileURLToPath(import.meta.url),
+  verified.entry, fileURLToPath(import.meta.url), path.join(root, 'scripts', 'bench', 'cache.mjs'),
   ...verified.manifest.artifacts.map(artifact => path.join(dist, artifact.path))];
 const evidence = () => evidenceFiles.map(file => createHash('sha256').update(fs.readFileSync(file)).digest('hex'));
 const evidenceBefore = evidence();
@@ -68,19 +69,23 @@ function bootstrapInterval(values, quantile, iterations = 1000) {
   return { low: round(percentile(estimates, 2.5)), high: round(percentile(estimates, 97.5)) };
 }
 async function sample(target) {
+  const cachePreparation = cache.prepare();
   const start = performance.now();
   await new Promise((resolve, reject) => {
     const child = spawn(target.command, target.args, { stdio: 'ignore' });
     child.on('exit', code => code === 0 ? resolve() : reject(new Error(`${target.name} exited ${code}`)));
     child.on('error', reject);
   });
-  return performance.now() - start;
+  return { elapsedMs: performance.now() - start, cachePreparation };
 }
 
 const report = [];
+const cachePreparations = [];
 for (const target of targets) {
-  const samples = [];
-  for (let index = 0; index < runs; index++) samples.push(await sample(target));
+  const observations = [];
+  for (let index = 0; index < runs; index++) observations.push(await sample(target));
+  const samples = observations.map(observation => observation.elapsedMs);
+  cachePreparations.push(...observations.map(observation => observation.cachePreparation));
   const sorted = [...samples].sort((a, b) => a - b);
   report.push({ target: target.name, runs, samples: samples.map(round), firstMs: round(samples[0]),
     p50Ms: round(percentile(sorted, 50)), p95Ms: round(percentile(sorted, 95)),
@@ -106,9 +111,10 @@ const output = {
     cpu: os.cpus()[0]?.model,
     runs,
     qualifying: runs >= minimumRuns,
-    cacheControl: 'warm-uncontrolled',
+    cacheControl: cache.control,
+    cacheEvidence: cacheEvidence(cache.control, cachePreparations, runs * targets.length),
     minimumRuns,
-    note: 'One fresh process per sample; wall time from spawn to successful --version exit. Warm OS cache; first sample is not controlled cold start.',
+    note: 'One fresh process per sample; wall time from spawn to successful --version exit. global-cold runs sync and drop_caches immediately before every sample.',
   },
   report,
 };

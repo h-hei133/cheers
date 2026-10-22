@@ -1,0 +1,84 @@
+name: Performance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  startup:
+    name: Startup & Interactive
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.3.0
+          cache: npm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build:ts
+
+      - name: Build executable
+        run: npm run build:exe
+
+      - name: Record environment
+        run: |
+          mkdir -p ".omx/artifacts/performance-${GITHUB_RUN_ID}"
+          {
+            printf 'commit=%s\n' "$GITHUB_SHA"
+            printf 'node=%s\n' "$(node --version)"
+            printf 'bun=%s\n' "$(bun --version)"
+            uname -a
+            nproc
+            lscpu
+            free -w
+          } > ".omx/artifacts/performance-${GITHUB_RUN_ID}/environment.txt"
+          dist/bin/cheers --version
+
+      - name: Warm process startup
+        env:
+          BENCH_CACHE_CONTROL: warm-uncontrolled
+          BENCH_OUTPUT: .omx/artifacts/performance-${{ github.run_id }}/start-warm.json
+          BENCH_RUNS: 30
+        run: npm run bench:start
+
+      - name: Warm interactive startup
+        env:
+          BENCH_CACHE_CONTROL: warm-uncontrolled
+          BENCH_OUTPUT: .omx/artifacts/performance-${{ github.run_id }}/interactive-warm.json
+          BENCH_RUNS: 30
+        run: npm run bench:interactive
+
+      - name: Cold process startup
+        env:
+          BENCH_CACHE_CONTROL: global-cold
+          BENCH_OUTPUT: .omx/artifacts/performance-${{ github.run_id }}/start-cold.json
+          BENCH_RUNS: 30
+        run: npm run bench:start
+
+      - name: Cold interactive startup
+        env:
+          BENCH_CACHE_CONTROL: global-cold
+          BENCH_OUTPUT: .omx/artifacts/performance-${{ github.run_id }}/interactive-cold.json
+          BENCH_RUNS: 30
+        run: npm run bench:interactive
+
+      - name: Upload performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-${{ github.run_id }}
+          path: .omx/artifacts/performance-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30

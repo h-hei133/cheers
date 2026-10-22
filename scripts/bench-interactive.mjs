@@ -15,11 +15,13 @@ import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
+import { cacheEvidence, createCacheController } from "./bench/cache.mjs";
 import { createQaPtyEnvironment } from "./qa-pty-env.mjs";
 import { renderedKeyAfter } from "./bench/observation.mjs";
 import { checkBuild } from "./start-lib.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const cache = createCacheController();
 const runs = Number(process.env.BENCH_RUNS ?? 30);
 if (!Number.isSafeInteger(runs) || runs < 2) {
   console.error("BENCH_RUNS must be an integer of at least 2");
@@ -55,7 +57,8 @@ if (selectedModes.some(mode => !modes.has(mode))) {
 const executableDigest = createHash("sha256").update(fs.readFileSync(executable)).digest("hex");
 const evidenceFiles = [path.join(root, "dist", "cli.js"),
   path.join(dist, "build-manifest.json"), executable, verified.entry,
-  fileURLToPath(import.meta.url), path.join(root, "scripts", "bench", "observation.mjs"),
+  fileURLToPath(import.meta.url), path.join(root, "scripts", "bench", "cache.mjs"),
+  path.join(root, "scripts", "bench", "observation.mjs"),
   path.join(root, "scripts", "qa-pty-env.mjs"),
   ...manifest.artifacts.map(artifact => path.join(dist, artifact.path))];
 const evidenceDigest = () => evidenceFiles.map(file => createHash("sha256").update(fs.readFileSync(file)).digest("hex"));
@@ -133,6 +136,7 @@ function startProcess(target, mode, home, project, timingPath) {
 async function sample(target, mode) {
   const { home, project } = createFixture(mode);
   const timingPath = path.join(home, "timing.json");
+  const cachePreparation = cache.prepare();
   const started = performance.now();
   const child = startProcess(target, mode, home, project, timingPath);
   child.on("error", error => { child.measurementError = error; });
@@ -205,6 +209,7 @@ async function sample(target, mode) {
       exitMs: round(state.exitAt),
       eventLoop: timing?.eventLoop,
       startupMarks: timing?.marks ?? [],
+      cachePreparation,
     };
   } catch (error) {
     fs.mkdirSync(path.join(root, ".omx", "artifacts"), { recursive: true });
@@ -270,10 +275,12 @@ function bootstrapInterval(values, quantile, iterations = 1000) {
 }
 
 const report = [];
+const cachePreparations = [];
 for (const target of targets) {
   for (const mode of selectedModes) {
     const samples = [];
     for (let index = 0; index < runs; index += 1) samples.push(await sample(target, mode));
+    cachePreparations.push(...samples.map(sample => sample.cachePreparation));
     report.push({ target: target.name, mode, runs, samples, summary: summarize(samples) });
   }
 }
@@ -300,10 +307,12 @@ const output = {
     columns: 120,
     runs,
     qualifying: runs >= minimumRuns,
-    cacheControl: "warm-uncontrolled",
+    cacheControl: cache.control,
+    cacheEvidence: cacheEvidence(cache.control, cachePreparations,
+      runs * targets.length * selectedModes.length),
     minimumRuns,
     modes: selectedModes,
-    note: "One fresh isolated process per sample; warm OS cache, empty session store. Parent observations include launcher/PTY transport. First frame and input announcement are separate parent-observed events; runtime-ready is a process-local mark after session-runtime construction. Process marks use a different clock origin. Pipe has a reply, no interactive frame or per-key metric. Key response waits for Ω in application output with PTY echo disabled. Event-loop samples cover the instrumented process lifetime and can miss work before the first observation cycle; Node and compiled runtime histograms are not assumed equivalent. Cold-cache control, complex-stream blocking and 1000-item list response are not measured.",
+    note: "One fresh isolated process per sample with an empty session store. global-cold runs sync and drop_caches immediately before every sample. Parent observations include launcher/PTY transport. First frame and input announcement are separate parent-observed events; runtime-ready is a process-local mark after session-runtime construction. Process marks use a different clock origin. Pipe has a reply, no interactive frame or per-key metric. Key response waits for Ω in application output with PTY echo disabled. Event-loop samples cover the instrumented process lifetime and can miss work before the first observation cycle; Node and compiled runtime histograms are not assumed equivalent. Complex-stream blocking and 1000-item list response are not measured here.",
   },
   report,
 };
