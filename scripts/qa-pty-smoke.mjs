@@ -170,7 +170,13 @@ async function assertFixtureSkillDiscovery(project) {
   const modulePath = path.join(buildRoot, "core", "skills", "skillLoader.js");
   const { SkillLoader } = await import(pathToFileURL(modulePath).href);
   const sources = [];
-  const loaded = await new SkillLoader(project, { onSource: target => sources.push(target) }).loadDetailed();
+  let discoveryError;
+  let loaded = { skills: new Map(), diagnostics: [], failures: [] };
+  try {
+    loaded = await new SkillLoader(project, { onSource: target => sources.push(target) }).loadDetailed();
+  } catch (error) {
+    discoveryError = describeError(error);
+  }
   if (loaded.skills.has("qa-discovery")) return;
   const skillDirectory = path.join(project, ".agents", "skills", "qa-discovery");
   const manifest = path.join(project, ".agents", "skills", "qa-discovery", "SKILL.md");
@@ -181,6 +187,7 @@ async function assertFixtureSkillDiscovery(project) {
   let manifestError;
   let containment;
   let realpaths;
+  let stats;
   try {
     const { readDirectory } = await import(pathToFileURL(path.join(buildRoot, "runtime", "execution", "directory.js")).href);
     directoryEntries = (await readDirectory(workspaceRoot, skillDirectory)).map(entry => entry.name);
@@ -205,6 +212,16 @@ async function assertFixtureSkillDiscovery(project) {
   } catch (error) {
     containment = { error: describeError(error) };
   }
+  try {
+    const before = fs.statSync(manifest, { bigint: true });
+    const handle = await fs.promises.open(manifest, "r");
+    const opened = await handle.stat({ bigint: true });
+    await handle.close();
+    const after = fs.statSync(manifest, { bigint: true });
+    stats = { before: describeStats(before), opened: describeStats(opened), after: describeStats(after) };
+  } catch (error) {
+    stats = { error: describeError(error) };
+  }
   throw new Error(`fixture skill discovery failed (${JSON.stringify({
     project,
     workspaceRoot,
@@ -216,10 +233,22 @@ async function assertFixtureSkillDiscovery(project) {
     manifestError,
     containment,
     realpaths,
+    stats,
+    discoveryError,
     sources,
     diagnostics: loaded.diagnostics,
     failures: loaded.failures,
   })})`);
+}
+
+function describeStats(stats) {
+  return {
+    dev: String(stats.dev),
+    ino: String(stats.ino),
+    size: String(stats.size),
+    mtimeNs: String(stats.mtimeNs),
+    ctimeNs: String(stats.ctimeNs),
+  };
 }
 
 function describeError(error) {
