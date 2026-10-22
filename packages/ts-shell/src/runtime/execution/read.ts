@@ -1,6 +1,6 @@
-import { constants, promises as fs, realpathSync, statSync, type BigIntStats } from 'node:fs'
+import { constants, promises as fs, statSync, type BigIntStats } from 'node:fs'
 import path from 'node:path'
-import { verifyPathContainment } from '../../core/security/pathJail.js'
+import { canonicalExistingPath, verifyPathContainment } from '../../core/security/pathJail.js'
 import type { FileHandle } from 'node:fs/promises'
 import type { TextFileReadExecutionRequest } from './types.js'
 
@@ -108,9 +108,9 @@ type ReadTarget = Pick<TextFileReadExecutionRequest, 'absolutePath' | 'workspace
 
 export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file' | 'directory', consume: (handle: FileHandle, verify: () => Promise<void>) => Promise<T>): Promise<T> {
   request.abortSignal?.throwIfAborted()
-  const workspace = realpathSync(request.workspaceRoot)
+  const workspace = canonicalExistingPath(request.workspaceRoot)
   const root = request.artifactDirectory
-    ? realpathSync(workspaceTarget(request.artifactDirectory, request.workspaceRoot, workspace)) : workspace
+    ? canonicalExistingPath(workspaceTarget(request.artifactDirectory, request.workspaceRoot, workspace)) : workspace
   const target = contained(workspaceTarget(request.absolutePath, request.workspaceRoot, workspace), root)
   request.assertFileAccess?.(target)
   const ancestors = process.platform === 'linux' ? [] : captureReadAncestors(target, root)
@@ -129,11 +129,11 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
     }
     const verify = async (): Promise<void> => {
       // Only Linux exposes the actual open object through this interface.
-      const actual = process.platform === 'linux' ? await fs.realpath(`/proc/self/fd/${handle.fd}`) : await fs.realpath(target)
+      const actual = process.platform === 'linux' ? await fs.realpath(`/proc/self/fd/${handle.fd}`) : canonicalExistingPath(target)
       const current = statSync(target, { bigint: true })
       verifyReadAncestors(ancestors)
       const checked = verifyPathContainment(actual, root)
-      if (!checked.allowed || checked.resolvedPath !== target || realpathSync(request.workspaceRoot) !== workspace
+      if (!checked.allowed || checked.resolvedPath !== target || canonicalExistingPath(request.workspaceRoot) !== workspace
         || !sameFile(opened, current)) {
         throw new ReadChangedError()
       }

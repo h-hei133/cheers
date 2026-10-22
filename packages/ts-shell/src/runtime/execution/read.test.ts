@@ -83,6 +83,28 @@ describe('verified text reads', () => {
       absolutePath: path.join(alias, 'source/file.txt') }))).toBe('\ufeffauthorized\r\n')
   })
 
+  it('keeps a Windows 8.3 workspace alias inside the natively canonical root', async () => {
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
+    const shortRoot = path.join(root, 'RUNNER~1')
+    const shortTarget = path.join(shortRoot, 'source/file.txt')
+    const native = fs.realpathSync.native
+    const isShort = (target: fs.PathLike): boolean => {
+      const value = String(target)
+      return value === shortRoot || value.startsWith(`${shortRoot}${path.sep}`)
+    }
+    Object.defineProperty(fs.realpathSync, 'native', { configurable: true, value: (target: fs.PathLike) =>
+      isShort(target) ? workspace + String(target).slice(shortRoot.length) : native(target) })
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    try {
+      expect(await service.readTextFile(request('source/file.txt', {
+        workspaceRoot: shortRoot, absolutePath: shortTarget,
+      }))).toBe('\ufeffauthorized\r\n')
+    } finally {
+      Object.defineProperty(process, 'platform', platform)
+      Object.defineProperty(fs.realpathSync, 'native', { configurable: true, value: native })
+    }
+  })
+
   it('rejects traversal, outside symlinks and non-files before opening', async () => {
     fs.symlinkSync(outside, path.join(workspace, 'escape'), 'dir')
     const open = vi.spyOn(fsp, 'open')

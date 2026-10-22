@@ -12,6 +12,11 @@ function canonicalPath(target: string): string {
   return fs.realpathSync(target);
 }
 
+/** Resolve an existing path with the filesystem's canonical spelling. */
+export function canonicalExistingPath(target: string): string {
+  return canonicalPath(target);
+}
+
 /**
  * The real path of the deepest ancestor of `target` that exists, with the
  * not-yet-existing remainder appended.
