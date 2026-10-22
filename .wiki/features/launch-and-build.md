@@ -71,6 +71,20 @@ manifest schema v2 的关键字段：
 - 本地 Node 24.15 上连续 7 次进程内 `checkBuild` 的 p50 约 168 ms、最大约 619 ms（首样本）；这是校验预算观测，不是 START-03 的冷/热启动或 ready 基准。
 - `dist/cli.js` 与 `scripts/start.mjs` 都从 `packages/ts-shell/dist/build-manifest.json` 选择同一不可变入口；package `main` pointer 只 re-export 同一 buildId 的不可变 `index.js`。
 
+## 跨平台 QA
+
+`.github/workflows/platform.yml` 是手动触发的合成 CLI 矩阵。它在同一 workflow 中构建 TypeScript 与宿主单文件入口，再对每个平台运行 `qa:pty`；每个单元格输出 JSON、终端文本和持久 transcript，`Upload platform evidence` 即使前序单元格失败也保留证据。
+
+| runner | platform/arch | Node/exe 模式 |
+|---|---|---|
+| `ubuntu-24.04` | `linux` / `x64` | regular、fullscreen、line、pipe |
+| `macos-14` | `darwin` / `arm64` | regular、fullscreen、line、pipe |
+| `windows-2022` | `win32` / `x64` | line、pipe |
+
+Linux 使用 `script`，macOS 使用 `scripts/qa/relay.py` 的 Python-stdlib PTY relay；Windows 不伪造交互 PTY，regular/fullscreen 步骤显式跳过。最终 `Platform QA` run `39834842595` 为 completed/success，20 个 JSON 全部 pass/exit 0，且逐项绑定 build ID、inputs digest、artifact digest 和 exe SHA-256；Linux/macOS 共享 artifact digest `a16dab3c…`，Windows 为 `ce766704…`。证据保存在 `.omx/artifacts/platform-39834842595/`。
+
+该矩阵证明支持平台上的 CLI 启动、line/pipe 业务链、Linux/macOS TUI 以及 fixture skill 读取；不证明 Windows 交互 PTY、真实 IME、系统复制或真实模型质量。平台矩阵通过也不能替代新提交的 CI 或 release 验收。
+
 ## 性能基准
 
 `npm run bench:start` 和 `npm run bench:interactive` 默认使用 `BENCH_CACHE_CONTROL=warm-uncontrolled`。设置 `BENCH_CACHE_CONTROL=global-cold` 后，每个样本在启动前执行 `sync`，并通过 `sudo -n tee /proc/sys/vm/drop_caches` 写入 `3`；缺少免密 sudo、非 Linux 或命令失败时在样本启动前退出。该模式只应用于可丢弃的隔离 runner，不应在共享主机上运行。

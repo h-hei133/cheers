@@ -2,6 +2,15 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
+## 2026-10-23 QA-02 跨平台 CLI 矩阵（代码批 `fa493e2e` 已推送；Platform QA/CI/Watch success）
+
+- `.github/workflows/platform.yml` 在 GitHub `ubuntu-24.04` x64、`macos-14` arm64 与 `windows-2022` x64 上使用 Node `20.3.0`、Bun `1.3.14`，覆盖 Linux/macOS Node/exe × regular/fullscreen/line/pipe 各八格，以及 Windows Node/exe × line/pipe 四格；Windows regular/fullscreen 明确标记为不支持的交互 PTY 路径，不伪装成跳过后的通过。
+- 首轮 Windows 失败不是断言放水：先暴露 `/tools` 在平台不兼容的原生读取前失败，修复后又暴露项目 skill 的 `Read target is outside the authorized directory`。根因是 Windows 8.3 短名 `RUNNER~1` 与 `realpathSync.native` 返回的 `runneradmin` 长名在 read root、containment 和 catalog 复核中混用；最终由 path owner 统一既有路径的 canonical spelling，并让 containment 在词法前缀不匹配时仍先尝试 native 解析。失败 run `39830583247`、`39831629803`、`39832079951`、`39832441907`、`39834065300`、`39834360782` 保留为反转证据，不覆盖为成功。
+- 最终手动 `Platform QA` run `39834842595` 为 completed/success；jobs 为 Linux `120020320612`、macOS `120020320517`、Windows `120020319978`。20 个 JSON 全部 `status=pass`、`exitCode=0`、bytes 为正，平台/架构/target/mode 与预期逐项一致；20 个 transcript 均包含成功的 `bash`、`task`、`tool_search`、`tool_load`、`skill` result、审批 resolution 和 `qa-skill-body` payload。
+- Linux/macOS 共享 TS build ID `58cca24b15858754afd2b576b5d7ac28c058b8aff40a476db756672308f14d24`、inputs digest `b0d80fb795665149129c17af6410f2faa46b8cbc0adfe4b220fcac60c532c660`、artifact digest `a16dab3c00554ed3712e8b6f1fc400530446a92125b938be9e565bc283a7e320`；Linux/macOS exe SHA-256 分别为 `31cdf84fcfc1fa46f7308c141e8407e8c7776f2bd22e985e0eaac25787876eb1`、`c0bd5072fc21454b184b8c69221d0ae80bd4efdc4579f220864eeb4a995e2146`。Windows build ID `da633dea4e9f70a9fd3d0596a753f5094811f60e59aa5429e57b850e8eea5c56`、inputs digest `1b84c7c343c2dce36b537a1e05abc93c1b259de137367247b551d6821ef42ecb`、artifact digest `ce7667041ce10b94984261048a404062ce812c7b3e85a9deecbfb12ab81be4fc`、exe SHA-256 `ac518a05f0e2c85d1125ce7dc3aa7ed9059e4b08c24339db9b694e53d78c9c02`。证据目录为 `.omx/artifacts/platform-39834842595/`。
+- 代码批 `fa493e2e8c6608e768ccb312204553c722467522` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39834842366`/job `120020311437` 为 completed/success，耗时 16m41s；完整测试实际 927 文件通过、1 文件跳过，9857 项通过、3 项跳过，测试耗时 918.53s，静态门、脚本门、构建、Chromium 安装与 NormProof 步骤均 success。Architecture Watch `39834842316`/job `120020311060` 为 completed/success。
+- 本矩阵闭合 QA-02 的跨平台合成 CLI 线/管道与 Linux/macOS TUI 路径，并验证 restore preview、settings 保存、命名 profile 创建/重启读回、任务、发现、审批和 skill payload。仍不闭合 Windows 交互 PTY、真实 IME 行为、系统复制，也不证明真实模型质量；Phase 20 其余开放项保持原范围。
+
 ## 2026-10-23 START-03 受控冷/热启动基准（代码批 `2c55ec8b` 已推送；Performance/CI/Watch success）
 
 - 新增 `global-cold` 缓存控制：每个样本先执行 `sync`，再由 `sudo -n tee /proc/sys/vm/drop_caches` 写入 `3`；默认仍为 `warm-uncontrolled`。非 Linux、未知模式、缺少免密 sudo 或任一命令失败都会在启动样本前 fail-closed。`scripts/bench-cache.test.mjs` 6 项通过，`test:scripts` 135 项通过。
@@ -29,7 +38,7 @@
 - 同 build 的 START-03 补充证据：`bench:start` 各 30 次，Node p50/p95 `405.6/415.8ms`、exe `214.5/231.9ms`；`bench:interactive` 保存 Node/exe × 四模式共 240 个样本，regular/fullscreen 均取得 runtime-ready、首帧和完整 UTF-8 键响应；`bench:responsiveness` 30 次通过 1000 项列表 p95 `<50ms` 与 math/table/diff 单次阻塞 `<100ms` 阈值。全部为 warm/uncontrolled 缓存，不能替代受控冷缓存。
 - NormProof 实际 exit 0/partial：blocking unresolved-specifier 与 cycle obligations satisfied，0 blocking；11 项 function-ceiling advisory 保留。委派 reviewer 使用指定模型多次遇到 429/503，不可用不等于批准；本轮结论来自本地自审和实际门禁，不声称独立 review approval。
 - 代码批 `0d42697d3aa6130412d57afdf76cf2ae15d0a539` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39810323144`/job `119934502881` 为 completed/success，耗时 17m35s；静态门、脚本门、构建、Chromium 安装、完整测试与 NormProof 均 success，CI 测试实际为 927 文件通过、1 文件跳过，9852 项通过、3 项跳过，967.66s。Architecture Watch `39810323104`/job `119934501742` 为 completed/success。两项只绑定上述代码 SHA；本段后续文档证据补记另提交，不扩大产品范围。
-- START-03 已由上方受控冷/热运行闭合；仍未闭合：QA-02 Windows/macOS、IME、系统复制及非 Linux 平台矩阵；QA-03 正式 20 项 corpus、真实模型执行和双盲评分；TOOL-02 同模型总成本/cache/参数质量/多语言 tokenizer 校准。Phase 20 不因本批本地返工而宣称全部 47 项完成。
+- START-03 已由上方受控冷/热运行闭合；QA-02 的 Linux/macOS/Windows 支持矩阵随后由 2026-10-23 `Platform QA` 闭合，但 Windows 交互 PTY、真实 IME 与系统复制仍未闭合；QA-03 正式 20 项 corpus、真实模型执行和双盲评分；TOOL-02 同模型总成本/cache/参数质量/多语言 tokenizer 校准。Phase 20 不因本批本地返工而宣称全部 47 项完成。
 
 ## 2026-10-22 面板、源投影与 W2/W3 本地返工（代码批 `152d9ecc` 已推送；CI/Watch success）
 
@@ -104,7 +113,7 @@ checkpoint 批已推送为 `c0f065385597e6cb3a5138b22a5fb7ba65360ad6`，Architec
 
 后续实际终态核对：辅助费用批 CI `39131315102` 为 failure，GitHub 注释 hosted runner lost communication；原始日志为空，没有测试失败断言证据，不能记为通过。checkpoint 批 CI `39133444370` 为 success；年龄保留批 `e4ae423de3a931b82b09a5dde137cc87565663f8` 的 CI `39134059372` 与 Architecture Watch `39134059381` 均 success。完整 SHA、时间与分类见日志。PRV-04 两独立进程的复制槽位复现仍发送两次刷新，新的谱系/grant/attempt/原生响应证据返工正在实施，尚未验收或交付。
 
-用户曾允许后续验证的环境/真实模型项：START-03 受控冷缓存及剩余响应测量、QA-02 跨平台/IME/系统复制、QA-03 真实质量、TOOL-02 成本与 tokenizer 校准。**START-03 已于 2026-10-23 通过同机 warm/cold 运行闭合；以下三项仍保留，且该保留不覆盖可在本地完成的缺失实现和合成端到端验收。**
+用户曾允许后续验证的环境/真实模型项：START-03 受控冷缓存及剩余响应测量、QA-02 跨平台/IME/系统复制、QA-03 真实质量、TOOL-02 成本与 tokenizer 校准。**START-03 已于 2026-10-23 通过同机 warm/cold 运行闭合；QA-02 的跨平台支持矩阵已由 `Platform QA` `39834842595` 闭合；IME、系统复制与 Windows 交互 PTY 仍保留，且该保留不覆盖可在本地完成的缺失实现和合成端到端验收。**
 
 2026-10-21 PAN-02 再次复现真实排队 `/tree` 的焦点错误：exclusive 包装的对象展开在 load 前读掉 `initialSelection` getter，Enter 因而选中旧节点。现在保留属性描述符及 prototype；真实 `InteractiveMode.run('/tree')` 回归先失败后通过，对象展开反转再次失败。受影响 4 文件/129 项、生产类型检查、双构建、打包入口 gate、静态门和 Linux 八格隔离 QA 通过；独立 code APPROVE、architecture CLEAR。该批提交与精确 SHA CI 仍按日志实际结果记录，不据此闭合全阶段。
 
@@ -193,10 +202,10 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 
 START-03 已由 2026-10-23 的受控冷/热基准闭合；以下只列仍开放项。
 
-- QA-02：Linux Node/exe × regular/fullscreen/line/pipe 八格合成 CLI 在当前构建通过；TUI 覆盖会话/任务/发现/审批/settings 保存/profile 重启，line/pipe 覆盖任务/发现/显式审批和 settings 保存边界；Windows/macOS/IME/系统复制仍缺环境。
+- QA-02：Linux/macOS 各 Node/exe × regular/fullscreen/line/pipe 八格与 Windows Node/exe × line/pipe 四格在 `Platform QA` `39834842595` 全部 pass/exit 0；20 个 JSON/transcript 已完成平台、架构、target/mode、构建摘要、工具 result 与 skill payload 审计。Windows 交互 PTY、真实 IME 和系统复制仍缺环境，不把 line/pipe 结果外推为完整 Windows TUI。
 - QA-03：`npm run qa:quality` 已提供 fail-closed harness、build-bound JSON、确定性/双盲评分和 10,000 次 paired bootstrap；当前 starter corpus 只有 6 项，正式 12 项发现任务加摘要/渲染/启动质量任务与真实模型执行仍缺。
 - TOOL-02：`/tools` 已按当前 endpoint 序列化协议声明，报告 description/schema payload、UTF-8 bytes 与 code-unit token estimate；有界 `recentRequests` 持久化 discovery purpose/input/output attribution。同模型质量/cache 对比、多语言 tokenizer 校准与真实总成本仍需真实模型。
-- QA-02 的 restore preview 已在 Linux 八格通过，并验证文件/记录/blob 字节不变；line/pipe 已覆盖 settings 保存、命名 profile 创建和重启读回，但非交互 profile switch/approval 与 TUI 的完整跨平台生命周期仍需按平台实际验证。QA-01 矩阵已补齐独立任务行，但仍不能作为 47 项全闭合证明。
+- QA-02 的 restore preview 已在 Linux/macOS 全部 16 格及 Windows line/pipe 4 格通过，并验证文件/记录/blob 字节不变；line/pipe 已覆盖 settings 保存、命名 profile 创建和重启读回，但非交互 profile switch/approval 与 Windows TUI 的完整生命周期仍需按平台实际验证。QA-01 矩阵已补齐独立任务行，但仍不能作为 47 项全闭合证明。
 
 ## CI
 
