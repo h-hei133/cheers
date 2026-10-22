@@ -2,7 +2,7 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
-## 2026-10-23 全 47 项复核与 QA-03/TOOL-02 harness 返工（本地通过；尚未提交）
+## 2026-10-23 全 47 项复核与 QA-03/TOOL-02 harness 返工（代码批 `6ed28019` 已推送；CI/Watch success；真实模型项仍 partial）
 
 - `scripts/phase20-requirements.json` 现在逐项记录决策表全部 47 个唯一 ID：27 项 `complete`、20 项 `partial`、0 项 `open`，整体仍为 `partial`。`scripts/phase20-requirements.mjs` 与 4 项回归强制矩阵 ID 和决策表完全相等，complete 行不得保留缺失证据，partial 行不得隐藏缺口。该矩阵明确保留 PRV-03/05、SET-03、PAN-01…08、INPUT-01、RENDER-01…03、TOOL-02、QA-01…04 的开放验收，不再把“未闭合”简化为 QA-03/TOOL-02 两项。
 - 默认 `npm run qa:quality` 改用 `scripts/qa-quality-formal.json` 的 20 项 qualifying corpus：12 项发现/执行、4 项摘要、4 项渲染；decoder 强制分类下限，starter corpus 只留作回归。`--validate-fixtures` 在不发 provider 请求的情况下准备 20 个隔离 home/project 并调用本地 `/tools`，实际 20/20 通过；固定 allowlist 下 MCP fixture 完整池 18 项、extension fixture 完整池 18 项，其余 18 个任务各 17 项。
@@ -12,6 +12,7 @@
 - 用当前构建生成 100 个合成 pair 后，`--resume --ratings` 在不调用 provider 的情况下重投影为 `complete`，manifest 从 revision 1 扩展到 revision 2、绑定 344 个 artifact，并把评分文件复制到 run private 目录。证据目录为 `.omx/artifacts/quality-runs/synthetic-manifest-validation/`，扩展后 manifest SHA-256 为 `9cffc2606b06331e2945a85e794df9f39a0ea3bdfb81ede525191ce10e252cc8`，绑定 exe SHA-256 `4fdfcb0836c7339e86ab0e3edab1699a9b1600eeb9f12df2466417542f3ba342`。该运行只证明 resume/评分/报告合同，不是模型质量证据。
 - `npm run test:scripts` 实际 157 项通过；`node --test scripts/qa-quality.test.mjs` 22 项、`node --test scripts/qa-quality-manifest.test.mjs` 3 项、`node --test scripts/phase20-requirements.test.mjs` 4 项、`node scripts/phase20-requirements.mjs` 均通过。dry-run 实际输出 `inconclusive`/exit 2，fixture validation 为 20/20。尚未执行真实 provider、双人盲评、100 个真实 pair、真实成本或四语言 tokenizer 数值，因此 QA-03/TOOL-02 仍为 partial。
 - 本轮重新核对 `complete` 行时，对最容易受历史状态漂移影响的任务补跑当前源码聚焦集：JOB 相关 47 项、EDIT-01 相关 67 项、START 相关 9 项均通过；其余 complete 行仍以其绑定测试、构建或精确 SHA CI 证据为准。指定 `cn:deepseek-v4.1-flash` 的独立 reviewer 再次返回 `503 Service Unavailable`，因此没有独立批准，不能把本矩阵当作 QA-04 或 Phase 20 完成。
+- 代码批 `6ed28019162c87260a32df251f1c2456bc595583` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39850665748`/job `120075621131` 为 completed/success，耗时 16m45s；完整测试实际 927 文件通过、1 文件跳过，9857 项通过、3 项跳过、921.47s，静态门、脚本门、构建、Chromium 安装与 NormProof 步骤均 success。Architecture Watch `39850665653`/job `120075621701` 为 completed/success。两项只绑定该代码 SHA；真实 provider、盲评、真实成本/cache 与 tokenizer 数值仍未运行，QA-03/TOOL-02 不因 CI success 转为 complete。
 
 ## 2026-10-23 QA-02 跨平台 CLI 矩阵（代码批 `fa493e2e` 已推送；Platform QA/CI/Watch success）
 
