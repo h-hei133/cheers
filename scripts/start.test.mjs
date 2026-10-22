@@ -167,6 +167,19 @@ test("recognizes both host target spellings and keeps other targets cross-target
   assert.equal(isHostTarget("bun-windows-x64", "linux", "x64"), false);
 });
 
+test("names immutable Windows executables with the .exe suffix", async () => {
+  for (const target of ["win32-x64", "bun-windows-x64"]) {
+    const value = await buildFixture();
+    const executable = path.join(value.root, "dist/bin/cheers.exe");
+    write(executable, "compiled executable\n");
+    const manifest = await attachExecutable({ root: value.root, dist: value.dist, executable,
+      expectedBuildId: value.manifest.buildId, expectedInputsDigest: value.inputsDigest, target, compiler: bunCompiler,
+      verification: { kind: "cross-target" } });
+    assert.match(manifest.executable.path, /\/cheers\.exe$/);
+    rmSync(value.root, { recursive: true, force: true });
+  }
+});
+
 test("restores the previous manifest when executable verification fails", async () => {
   const value = await buildFixture();
   const manifestFile = path.join(value.dist, "build-manifest.json");

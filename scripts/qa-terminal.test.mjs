@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { terminalSpawnSpec } from "./qa/terminal.mjs";
 
@@ -9,10 +10,11 @@ test("uses Linux script options for a real terminal", () => {
   });
 });
 
-test("uses BSD script syntax on macOS", () => {
+test("uses the Python PTY relay on macOS", () => {
+  const relay = fileURLToPath(new URL("./qa/relay.py", import.meta.url));
   assert.deepEqual(terminalSpawnSpec({ command: "/bin/cli", args: [], platform: "darwin" }), {
-    command: "script",
-    args: ["-q", "/dev/null", "/bin/sh", "-c", "stty rows 60 cols 120; exec '/bin/cli'"],
+    command: "python3",
+    args: [relay, "--", "/bin/cli"],
   });
 });
 

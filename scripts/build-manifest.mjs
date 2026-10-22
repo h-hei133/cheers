@@ -39,6 +39,10 @@ function targetMatchesHost(target) {
   return target === `${process.platform}-${process.arch}` || target === `bun-${process.platform}-${process.arch}`;
 }
 
+function windowsTarget(target) {
+  return target.startsWith("win32-") || target.includes("windows");
+}
+
 export function acquireBuildLock(root, dist) {
   const rootPath = path.resolve(root);
   const distPath = path.resolve(dist);
@@ -330,7 +334,7 @@ async function attachExecutableLocked(options) {
   if (first.size !== second.size || first.sha256 !== second.sha256) {
     throw new Error("The executable changed while it was being attached.");
   }
-  const executableName = options.target.includes("windows") ? "cheers.exe" : "cheers";
+  const executableName = windowsTarget(options.target) ? "cheers.exe" : "cheers";
   const immutable = path.join(rootPath, "dist", "executables", second.sha256, executableName);
   const immutableRelative = path.relative(rootPath, immutable).split(path.sep).join("/");
   if (!safeRelativePath(immutableRelative) || !immutableRelative.startsWith("dist/executables/")) {

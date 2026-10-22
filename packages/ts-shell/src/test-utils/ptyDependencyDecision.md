@@ -4,7 +4,9 @@ Checkpoint: `E. Dependency decision checkpoint`
 
 Decision: do not add `node-pty` or any equivalent native PTY dependency. Linux
 uses the installed `script` utility as an external PTY probe for the real CLI
-smoke; line and print-batch runs remain separate non-TTY surfaces.
+smoke; macOS uses the standard-library Python relay in `scripts/qa/relay.py`
+because BSD `script` refuses a socketpair as its own stdin. Line and
+print-batch runs remain separate non-TTY surfaces.
 
 ## Rationale
 
@@ -26,9 +28,12 @@ Adding a native PTY dependency would expand the risk boundary:
 ## Approved Strategy
 
 On Linux, `scripts/qa-pty-smoke.mjs` may use `script -qec` to allocate a real
-PTY for the packaged CLI and executable. It must keep the child environment
-isolated with `scripts/qa-pty-env.mjs`, wait for the actual first frame and
-prompt, exercise the shipped interaction surface, and prove a clean exit.
+PTY for the packaged CLI and executable. On macOS, `scripts/qa/relay.py` uses
+Python's standard-library `pty` module to allocate the controlling terminal and
+relay the Node harness's piped input/output. Both paths must keep the child
+environment isolated with `scripts/qa-pty-env.mjs`, wait for the actual first
+frame and prompt, exercise the shipped interaction surface, and prove a clean
+exit.
 
 The detector remains opt-in. Default calls continue to return:
 
@@ -43,7 +48,7 @@ Linux `script` run does not authorize a Windows or macOS claim.
 
 The following work still requires a separate platform decision:
 
-- Windows and macOS native PTY strategy.
+- Windows interactive PTY strategy.
 - Real IME composition and system copy behavior.
 - Platform-specific interrupt and terminal-capability attribution.
 

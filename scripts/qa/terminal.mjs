@@ -1,3 +1,7 @@
+import { fileURLToPath } from "node:url";
+
+const ptyRelay = fileURLToPath(new URL("./relay.py", import.meta.url));
+
 function quote(value) {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
@@ -9,7 +13,7 @@ export function terminalSpawnSpec({ command, args = [], platform = process.platf
     return { command: "script", args: ["-qec", shellCommand, "/dev/null"] };
   }
   if (platform === "darwin") {
-    return { command: "script", args: ["-q", "/dev/null", "/bin/sh", "-c", shellCommand] };
+    return { command: "python3", args: [ptyRelay, "--", command, ...args] };
   }
   throw new Error(`terminal PTY modes are unavailable on ${platform}; use line or pipe modes`);
 }
