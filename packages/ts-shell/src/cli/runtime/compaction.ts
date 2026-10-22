@@ -135,15 +135,17 @@ export function buildCompactionWiring(input: {
     baseUrl: provider.baseUrl,
     configured: runtimeConfig.contextWindow,
   });
+  const mainModel = catalogModel(input.catalog, provider.providerId, provider.model, provider.baseUrl);
   if (resolvedWindow.warning !== undefined) {
     windowLogger.warn(resolvedWindow.warning);
   }
-  const summaryLimits = summaryRole?.limits ?? { contextWindow: resolvedWindow.window,
+  const summaryLimits = summaryRole?.limits ?? { contextWindow: resolvedWindow.window, inputLimit: mainModel?.inputLimit,
     maxOutputTokens: configuredOutputLimit(runtimeConfig, provider.endpoint), reserveTokens: runtimeConfig.reserveTokens };
   return {
     policy: {
       summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([provider, summaryLimits])).digest('hex'),
       contextWindow: resolvedWindow.window,
+      inputLimit: mainModel?.inputLimit,
       // Per-model budgets where the user set them, the global value otherwise.
       // A single global budget cannot suit every model: the same "keep the last
       // twenty thousand tokens" is most of a small model's window and a

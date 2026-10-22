@@ -31,6 +31,8 @@ export interface SessionResumeProvenance {
 
 export interface ShellRuntimeContext {
   readonly profile?: import('../paths/profile/context.js').ProfileContext;
+  /** Identity of the request shape most recently prepared by this runtime. */
+  promptIdentity?: { readonly schemaDigest: string; readonly systemDigest: string };
   workspaceRevision?: number;
   workspaceIssue?: string;
   /** Durable workspace authority, supplied by the session store owner. */
@@ -174,7 +176,9 @@ export function createShellRuntimeContext(input: {
 
 /** Reload defaults, then apply the current session's durable model preference. */
 export function refreshShellRuntimeConfig(context: ShellRuntimeContext): ConfigReloadResult {
-  return refreshConfiguration(context);
+  const result = refreshConfiguration(context);
+  if (result.status === 'applied') context.promptIdentity = undefined;
+  return result;
 }
 
 export function switchActiveSession(
@@ -222,6 +226,10 @@ export function applyShellSubstrateTransition(
       gitContext: nextGitContext,
     })
 
+  // Any substrate transition can change the system prompt, tool visibility or
+  // workspace identity. A measurement from the previous substrate must not
+  // authorize the new one, even when the session id stays the same.
+  context.promptIdentity = undefined
   if (nextSession.id !== context.session.id) {
     restoreSessionUsage(nextSession.id, nextSession.usage)
     forgetSessionTodos(context.session.id)

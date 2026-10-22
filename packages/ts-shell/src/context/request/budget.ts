@@ -30,24 +30,27 @@ function count(value: number | undefined): value is number {
 }
 
 export function requestBudget(input: RequestBudgetInput): RequestBudgetResult {
-  if (!count(input.promptTokens) || !count(input.window) || input.window === 0 || !count(input.outputTokens)
-    || (input.reserveTokens !== undefined && !count(input.reserveTokens))
+  if (!count(input.promptTokens) || (input.reserveTokens !== undefined && !count(input.reserveTokens))
     || (input.inputLimit !== undefined && (!count(input.inputLimit) || input.inputLimit === 0))) {
     // An estimate cannot prove a ceiling; the provider's own refusal remains the
     // authority instead of a local guess pretending to be one.
     return { ok: false, reason: 'unknown', detail: 'The request size cannot be proven from the available model limits.' };
   }
   const reserve = input.reserveTokens ?? 0;
-  const total = input.promptTokens + input.outputTokens + reserve;
-  if (reserve >= input.window || input.outputTokens >= input.window || total > input.window) {
-    return { ok: false, reason: 'window',
-      detail: `Request needs ${input.promptTokens} input + ${input.outputTokens} output + ${reserve} reserved tokens, which does not fit a ${input.window}-token window.` };
-  }
   if (input.inputLimit !== undefined && input.promptTokens + reserve > input.inputLimit) {
     return { ok: false, reason: 'input',
       detail: `Request input of ${input.promptTokens} tokens with ${reserve} reserved exceeds the ${input.inputLimit}-token input limit.` };
   }
-  const availableInput = input.window - input.outputTokens - reserve;
+  if (!count(input.window) || input.window === 0 || !count(input.outputTokens)) {
+    return { ok: false, reason: 'unknown', detail: 'The request size cannot be proven from the available model limits.' };
+  }
+  const total = input.promptTokens + input.outputTokens + reserve;
+  if (reserve > input.window || input.outputTokens > input.window || total > input.window) {
+    return { ok: false, reason: 'window',
+      detail: `Request needs ${input.promptTokens} input + ${input.outputTokens} output + ${reserve} reserved tokens, which does not fit a ${input.window}-token window.` };
+  }
+  const availableInput = Math.max(0, Math.min(input.window - input.outputTokens - reserve,
+    input.inputLimit === undefined ? Number.POSITIVE_INFINITY : input.inputLimit - reserve));
   const fraction = input.softFraction === undefined || !(input.softFraction > 0 && input.softFraction < 1) ? 0.9 : input.softFraction;
   const softLimit = Math.min(Math.floor(input.window * fraction), availableInput);
   return { ok: true, soft: input.promptTokens >= softLimit, softLimit, availableInput,

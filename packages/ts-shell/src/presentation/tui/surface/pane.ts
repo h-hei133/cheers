@@ -42,6 +42,9 @@ export class TranscriptPane {
   private sources: readonly (SourceLine | undefined)[] = [];
   private paintedRows: readonly string[] = [];
   private owners: readonly number[] = [];
+  private selectionRevisionValue = 0;
+  private lastTranscriptRevision = -1;
+  private lastSelectionWidth = -1;
 
   constructor(private readonly transcript: Transcript) {}
 
@@ -58,11 +61,14 @@ export class TranscriptPane {
     layout: FrameLayout = "viewport",
   ): string[] {
     const document = this.transcript.all();
-    if (document !== this.document) {
+    const documentChanged = document !== this.document;
+    if (documentChanged) {
       this.scroller.scrollToEnd();
       this.document = document;
     }
     const safeWidth = Math.max(1, Math.floor(width));
+    const selectionLayoutChanged = documentChanged || safeWidth !== this.lastSelectionWidth
+      || this.transcript.revision !== this.lastTranscriptRevision;
     const hasScrollbar = layout === "viewport" && needsScrollbar(
       this.transcript.rowCount(safeWidth),
       Math.max(1, capacity),
@@ -83,6 +89,11 @@ export class TranscriptPane {
       if (start >= 0) this.scroller.scrollTo(Math.min(owners.length - 1, start + anchorOffset));
     }
     const top = this.scroller.scrollTop;
+    if (selectionLayoutChanged) {
+      this.selectionRevisionValue++;
+      this.lastSelectionWidth = safeWidth;
+      this.lastTranscriptRevision = this.transcript.revision;
+    }
     const visible = rows.slice(top, top + safeCapacity);
     const filler = Math.max(0, safeCapacity - visible.length);
     this.window = new TranscriptWindow({ top, filler, visible: visible.length, rows, owners });
@@ -169,6 +180,15 @@ export class TranscriptPane {
   contentRows(): readonly string[] {
     if (this.window.layout.rows.length > 0) return this.window.layout.rows;
     return this.transcript.render(this.geometry ? Math.max(1, this.width - 1) : this.width).rows;
+  }
+
+  /** Changes whenever source coordinates or their underlying transcript change. */
+  selectionRevision(): number {
+    return this.selectionRevisionValue;
+  }
+
+  selectionTop(): number {
+    return this.scroller.scrollTop;
   }
 
   /** The block under screen row `row`, or nothing for padding and chrome. */

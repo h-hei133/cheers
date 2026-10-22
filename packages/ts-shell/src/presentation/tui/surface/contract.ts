@@ -199,6 +199,10 @@ export interface InteractiveView extends TerminalFrameProvider {
   contentToScreenSpan(span: SelectionSpan): SelectionSpan | undefined;
   /** Rendered rows of the full transcript at the last width, for selection copying. */
   contentRows(): readonly string[];
+  /** Source-coordinate revision for rejecting a drag after reflow or streaming. */
+  selectionRevision?(): number;
+  /** Current transcript scroll position for rejecting an externally moved drag. */
+  selectionTop?(): number;
   /** The block under screen row `row`, for a click that lands on the transcript. */
   blockAtScreenRow(row: number): Block | undefined;
   /**

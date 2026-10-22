@@ -44,6 +44,55 @@ describe("provider credential resolution", () => {
     expect(JSON.stringify(result)).not.toContain('must-not-use');
   });
 
+  it("fences an errored selected connection before every credential fallback", () => {
+    const result = resolveProviderCredential({
+      runtimeConfig: {
+        ...createRuntimeConfig(), activeProviderConnectionId: "broken",
+        providerConnections: [{ id: "broken", provider: "openai", authType: "api-key", status: "error",
+          apiKey: "must-not-use-stale-key", baseUrl: "https://broken.invalid/v1", model: "broken-model",
+          createdAt: "2026-01-01", updatedAt: "2026-01-01" }],
+      },
+      cliApiKey: "must-not-use-cli-key", env: { OPENAI_API_KEY: "must-not-use-env-key" },
+    });
+    expect(result).toMatchObject({ blocked: "connection-unavailable", provider: "openai" });
+    expect(result.credential).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain("must-not-use");
+  });
+
+  it("does not borrow an API-key identity when a selected account-auth connection has no account", () => {
+    const result = resolveProviderCredential({
+      runtimeConfig: {
+        ...createRuntimeConfig(), activeProviderConnectionId: "missing-account",
+        providerConnections: [{ id: "missing-account", provider: "openai", authType: "account-auth", status: "connected",
+          baseUrl: "https://account.invalid/v1", model: "account-model",
+          createdAt: "2026-01-01", updatedAt: "2026-01-01" }],
+      },
+      env: { OPENAI_API_KEY: "must-not-use-env-key" },
+    });
+    expect(result).toMatchObject({ blocked: "connection-unavailable", provider: "openai" });
+    expect(result.credential).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain("must-not-use");
+  });
+
+  it("prefers a healthy fallback connection over pending and errored records", () => {
+    const result = resolveProviderCredential({
+      runtimeConfig: {
+        ...createRuntimeConfig(),
+        providerConnections: [
+          { id: "broken", provider: "openai", authType: "api-key", status: "error", apiKey: "must-not-use-error-key",
+            createdAt: "2026-01-01", updatedAt: "2026-01-04" },
+          { id: "pending", provider: "openai", authType: "api-key", status: "pending", apiKey: "must-not-use-pending-key",
+            createdAt: "2026-01-01", updatedAt: "2026-01-03" },
+          { id: "healthy", provider: "openai", authType: "api-key", status: "connected", apiKey: "healthy-key",
+            createdAt: "2026-01-01", updatedAt: "2026-01-02" },
+        ],
+      },
+      env: {},
+    });
+    expect(result.credential).toMatchObject({ source: "connection", connectionId: "healthy", apiKey: "healthy-key" });
+    expect(JSON.stringify(result)).not.toContain("must-not-use");
+  });
+
   it.each([
     { active: "other", selected: "openai" as const, key: "recent-key", base: "recent" },
     { active: "older", selected: "openai" as const, key: "older-key", base: "older" },

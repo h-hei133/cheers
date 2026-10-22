@@ -155,6 +155,14 @@ export class InteractiveSurface implements InteractiveView {
     return this.pane.contentRows();
   }
 
+  selectionRevision(): number {
+    return this.pane.selectionRevision();
+  }
+
+  selectionTop(): number {
+    return this.pane.selectionTop();
+  }
+
   blockAtScreenRow(row: number): Block | undefined {
     return this.pane.blockAtScreenRow(row);
   }

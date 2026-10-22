@@ -35,7 +35,7 @@ interface IndexProvider {
 /** One model as the index describes it. */
 interface IndexModel {
   readonly id?: string;
-  readonly limit?: { readonly context?: number };
+  readonly limit?: { readonly context?: number; readonly input?: number };
   /**
    * What the publisher charges, per million tokens.
    *
@@ -91,10 +91,12 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
       const resolved = model?.id ?? modelId;
       if (!resolved) continue;
       const context = model?.limit?.context;
+      const inputLimit = model?.limit?.input;
       const cost = projectCost(model?.cost);
       models.push({
         id: resolved,
         ...(context ? { contextWindow: context } : {}),
+        ...(inputLimit ? { inputLimit } : {}),
         ...(cost ? { cost } : {}),
       });
     }

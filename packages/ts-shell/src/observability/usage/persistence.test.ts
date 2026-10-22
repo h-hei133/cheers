@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { getSessionUsage, markContextUnknown, persistSessionUsage, recordSessionUsage, resetSessionUsage, restoreSessionUsage, totalTokens } from "../usageTelemetry.js";
 import type { SessionUsageSnapshot } from "./model.js";
-import { decodeUsageSnapshot } from "./snapshot.js";
+import { decodeUsageSnapshot, mergeUsageDelta } from "./snapshot.js";
 
 const A = "usage-persist-a";
 const B = "usage-persist-b";
@@ -26,7 +26,8 @@ describe("durable usage", () => {
     expect(resumed.toolCallsCount).toBe(2);
     expect(resumed.lastPromptTokens).toBeUndefined();
     expect(resumed.lastPromptMessageCount).toBe(0);
-    expect(resumed.recentRequests).toEqual([]);
+    expect(resumed.recentRequests.map(entry => ({ promptTokens: entry.promptTokens, purpose: entry.purpose })))
+      .toEqual([{ promptTokens: 105, purpose: "turn" }, { promptTokens: 205, purpose: "turn" }]);
     expect(saved).not.toHaveProperty("lastPromptTokens");
     record(A, 20);
     persistSessionUsage(A, saved, (next) => { saved = next; });
@@ -97,6 +98,68 @@ describe("durable usage", () => {
     expect(decodeUsageSnapshot(undefined)).toBeUndefined();
     for (const value of [null, {}, { byModel: [] }, { byModel: {}, lastBucketKey: "", turnsCount: -1, toolCallsCount: 0, lastUpdated: 1 }]) {
       expect(() => decodeUsageSnapshot(value)).toThrow("Invalid persisted session usage");
+    }
+  });
+
+  it("persists bounded request purpose and completion counts for attribution", () => {
+    recordSessionUsage(A, { provider: "first", model: "org/model", promptTokens: 12,
+      completionTokens: 3, purpose: "discovery-load" });
+    let saved: SessionUsageSnapshot | undefined;
+    persistSessionUsage(A, undefined, next => { saved = next; });
+    expect(saved?.recentRequests).toEqual([expect.objectContaining({
+      promptTokens: 12, completionTokens: 3, purpose: "discovery-load",
+    })]);
+    resetSessionUsage(A);
+    restoreSessionUsage(A, saved);
+    expect(getSessionUsage(A).recentRequests[0]).toMatchObject({
+      promptTokens: 12, completionTokens: 3, purpose: "discovery-load",
+    });
+  });
+
+  it("does not duplicate restored history on the next persistence pass", () => {
+    record(A, 10);
+    record(A, 20);
+    let saved: SessionUsageSnapshot | undefined;
+    persistSessionUsage(A, undefined, next => { saved = next; });
+    expect(saved?.recentRequests).toHaveLength(2);
+    record(A, 30);
+    persistSessionUsage(A, saved, next => { saved = next; });
+    expect(saved?.recentRequests).toHaveLength(3);
+  });
+
+  it("retains a new request after the bounded history is full", () => {
+    for (let index = 0; index < 64; index += 1) {
+      recordSessionUsage(A, { provider: "first", model: "org/model", promptTokens: index + 1 });
+    }
+    let saved: SessionUsageSnapshot | undefined;
+    persistSessionUsage(A, undefined, next => { saved = next; });
+    recordSessionUsage(A, { provider: "first", model: "org/model", promptTokens: 65 });
+    const merged = mergeUsageDelta(saved, getSessionUsage(A), saved);
+    expect(merged.recentRequests).toHaveLength(64);
+    expect(merged.recentRequests.at(-1)?.promptTokens).toBe(65);
+    expect(merged.recentRequests[0]?.promptTokens).toBe(2);
+  });
+
+  it("retains an identical request recorded in the same millisecond after history is full", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-22T15:00:00.000Z"));
+    try {
+      for (let index = 0; index < 64; index += 1) {
+        recordSessionUsage(A, { provider: "first", model: "org/model", promptTokens: 1, completionTokens: 1 });
+      }
+      let saved: SessionUsageSnapshot | undefined;
+      persistSessionUsage(A, undefined, next => { saved = next; });
+      const previousIds = getSessionUsage(A).recentRequests.map(entry => entry.id);
+      recordSessionUsage(A, { provider: "first", model: "org/model", promptTokens: 1, completionTokens: 1 });
+      const live = getSessionUsage(A);
+      const newestId = live.recentRequests.at(-1)?.id;
+      const merged = mergeUsageDelta(saved, live, saved);
+      expect(newestId).toBeDefined();
+      expect(newestId).not.toBe(previousIds.at(-1));
+      expect(merged.recentRequests.at(-1)?.id).toBe(newestId);
+      expect(merged.recentRequests[0]?.id).toBe(previousIds[1]);
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

@@ -98,6 +98,7 @@ describe("bucketing", () => {
     expect(measuredPromptContext(SESSION, { ...identity, systemDigest: 'd'.repeat(64) })).toBeUndefined();
     expect(measuredPromptContext(SESSION, { provider: 'openai', model: 'm', endpoint: 'openai-compatible',
       schemaDigest: identity.schemaDigest }, { requireExpectedIdentity: true })).toBeUndefined();
+    expect(measuredPromptContext(SESSION, { provider: 'openai', model: 'm', endpoint: 'openai-compatible' })).toBeUndefined();
     invalidatePromptMeasurement(SESSION);
     expect(measuredPromptContext(SESSION, identity)).toBeUndefined();
     expect(getSessionUsage(SESSION).lastPromptMessageCount).toBe(0);

@@ -42,7 +42,7 @@ export class ToolCards {
   approval(taskId: string, state: "awaiting" | "approved" | "denied"): void {
     const block = this.cards.get(taskId);
     if (!block) return;
-    block.approval = state;
+    this.transcript.update(block, current => { current.approval = state; });
     this.onChange();
   }
 
@@ -76,7 +76,7 @@ export class ToolCards {
   settle(taskId: string, success: boolean): void {
     const block = this.cards.get(taskId);
     if (!block) return;
-    block.status = success ? "ok" : "failed";
+    this.transcript.update(block, current => { current.status = success ? "ok" : "failed"; });
     this.onChange();
   }
 
@@ -91,16 +91,18 @@ export class ToolCards {
   finish(taskId: string, success: boolean, failureReason?: string, output?: string): void {
     const block = this.cards.get(taskId);
     if (!block) return;
-    block.status = success ? "ok" : "failed";
-    if (block.approval === "awaiting") block.approval = "interrupted";
     if (output !== undefined) {
       this.transcript.setText(block, output);
-      block.previewTruncated = false;
     }
-    block.failureReason = success ? undefined : failureReason;
     splitFencedDiff(block, this.transcript);
-    this.transcript.setCollapsed(block, success);
-    block.finalized = true;
+    this.transcript.update(block, current => {
+      current.status = success ? "ok" : "failed";
+      if (current.approval === "awaiting") current.approval = "interrupted";
+      if (output !== undefined) current.previewTruncated = false;
+      current.failureReason = success ? undefined : failureReason;
+      current.collapsed = success;
+      current.finalized = true;
+    });
     this.cards.delete(taskId);
     this.onChange();
   }

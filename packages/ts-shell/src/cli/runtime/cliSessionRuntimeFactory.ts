@@ -486,6 +486,9 @@ export function createCliSessionRuntime(input: {
         runtimeConfig: director?.config(config) ?? config,
         providerCatalog: catalog,
         prompt: promptWithAttachments,
+        onPromptIdentity: identity => {
+          if (input.runtimeContext.session.id === sessionId) input.runtimeContext.promptIdentity = identity;
+        },
         ...((continuityContext || handoff || director) ? { continuityContext: [continuityContext, handoff?.contextText, director?.contextText].filter(Boolean).join('\n\n') } : {}),
         onPromptAccepted: handoffAcceptance(handoff, () => {
           input.runtimeContext.transientContextAttachments = undefined;

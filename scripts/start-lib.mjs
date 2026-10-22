@@ -56,8 +56,30 @@ function validPackageMain(packageMain) {
     && SHA256.test(packageMain.sha256);
 }
 
+function validExecutable(executable) {
+  return executable && typeof executable === "object"
+    && safeRelativePath(executable.path)
+    && executable.path.startsWith("dist/executables/")
+    && Number.isSafeInteger(executable.size) && executable.size > 0
+    && SHA256.test(executable.sha256)
+    && typeof executable.target === "string" && /^[a-z0-9-]+$/.test(executable.target)
+    && executable.compiler && typeof executable.compiler === "object"
+    && executable.compiler.name === "bun"
+    && typeof executable.compiler.version === "string" && executable.compiler.version.length > 0
+    && SHA256.test(executable.compiler.sha256)
+    && typeof executable.builtAt === "string" && !Number.isNaN(Date.parse(executable.builtAt))
+    && executable.verification && typeof executable.verification === "object"
+    && (executable.verification.kind === "cross-target"
+      || (executable.verification.kind === "host"
+        && typeof executable.verification.version === "string" && executable.verification.version.length > 0));
+}
+
 function validCompilerInput(file) {
   return safeRelativePath(file);
+}
+
+function targetMatchesHost(target) {
+  return target === `${process.platform}-${process.arch}` || target === `bun-${process.platform}-${process.arch}`;
 }
 
 function readManifest(dist) {
@@ -72,6 +94,8 @@ function readManifest(dist) {
       || !SHA256.test(parsed.buildId) || !SHA256.test(parsed.inputsDigest) || !SHA256.test(parsed.artifactDigest)
       || !safeRelativePath(parsed.entry) || !validLauncher(parsed.launcher)
       || !validPackageMain(parsed.packageMain)
+      || (parsed.executable !== undefined && !validExecutable(parsed.executable))
+      || (parsed.executable?.verification?.kind === "host" && parsed.executable.verification.version !== parsed.version)
       || !Array.isArray(parsed.compilerInputs) || parsed.compilerInputs.some(file => !validCompilerInput(file))
       || !Array.isArray(parsed.artifacts) || parsed.artifacts.length === 0) return { state: "truncated" };
     const prefix = `builds/${parsed.buildId}/`;
@@ -100,8 +124,16 @@ function artifactError(state, reason) {
   return { ok: false, state, reason };
 }
 
-/** Whether the immutable build selected by the manifest may run. */
-export function checkBuild({ root, dist, version }) {
+/**
+ * Whether the immutable build selected by the manifest may run.
+ *
+ * `optional` verifies a recorded executable when present, `required` also
+ * requires one, and `ignore` exists only for rebuilding a broken executable.
+ */
+export function checkBuild({ root, dist, version, executablePolicy = "optional" }) {
+  if (!["optional", "required", "ignore"].includes(executablePolicy)) {
+    return artifactError("invalid-policy", `Unknown executable verification policy: ${String(executablePolicy)}`);
+  }
   try {
     assertNoSymlinkPath(root, path.join(dist, "build-manifest.json"));
   } catch (error) {
@@ -187,5 +219,28 @@ export function checkBuild({ root, dist, version }) {
   if (packageMain.size !== built.packageMain.size || packageMain.sha256 !== built.packageMain.sha256) {
     return artifactError("package-main-mismatch", "The package main pointer bytes do not match the manifest. Rebuild with npm run build:ts.");
   }
-  return { ok: true, state: "fresh", manifest: built, entry };
+  if (built.executable === undefined && executablePolicy === "required") {
+    return artifactError("missing-executable", "The published build has no verified single-file executable. Run npm run build:exe.");
+  }
+  if (built.executable?.verification?.kind === "cross-target" && executablePolicy === "required") {
+    return artifactError("executable-unverified",
+      "The published executable was cross-compiled and has not run on this host. Run npm run build:exe for the host target.");
+  }
+  if (built.executable?.verification?.kind === "host" && !targetMatchesHost(built.executable.target)) {
+    return artifactError("executable-unverified",
+      "The published executable claims host verification for a different target. Run npm run build:exe for this host.");
+  }
+  if (built.executable !== undefined && executablePolicy !== "ignore") {
+    let executable;
+    try {
+      assertNoSymlinkPath(root, path.join(root, built.executable.path));
+      executable = snapshotFile(path.join(root, built.executable.path), built.executable.path);
+    } catch (error) {
+      return artifactError("executable-mismatch", `The single-file executable cannot be verified: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (executable.size !== built.executable.size || executable.sha256 !== built.executable.sha256) {
+      return artifactError("executable-mismatch", "The single-file executable does not match the verified build. Run npm run build:exe.");
+    }
+  }
+  return { ok: true, state: "fresh", manifest: built, entry, executable: built.executable };
 }

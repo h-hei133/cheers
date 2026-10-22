@@ -34,6 +34,7 @@
 | CTX-03 | `session/compactionOperation.ts` | 操作测试（7） | unknown 步骤被重播时失败 |
 | CTX-04 | `context/report` | report（6）、sessionFacts（9） | stale 被当作当前值报告时失败 |
 | TOOL-01 | `core/tools/discovery/*`、`core/tools/catalog.ts` | discovery（10）、handoff/director | `todo` 或 run feature tool 不在首请求时失败 |
+| TOOL-02（部分） | `core/tools/discovery/evaluation.ts`、`provider/endpoints/toolSurface.ts`、`observability/usage/*`、`turn/{session,step}.ts` | endpoint-specific declaration bytes、code-unit estimate、quality status `not-measured/preserved/changed`、bounded request purpose/history；`evaluation.test`、`toolSurface.test`、`usage`/`turn` suites | 去掉真实 load 后 quality 不得为 `preserved`；把 UTF-8 bytes 当 code units、忽略 endpoint 协议或丢失 discovery purpose 时失败；真实模型成本/参数质量仍开放 |
 
 ## W4 布局
 
@@ -98,16 +99,15 @@
 | EDIT-01 | 稳定 group id、源基线、hunk indexes/content 与 add content 身份绑定、依赖组、同文件双 hunk 选集、重规划 revision 检查、显式 `selected`/`selectionRevision` 跨 CLI bridge、scope/policy/cache 绕过、无 picker 拒绝，以及 requested/selected/skipped receipt；`batch.test.ts` 45 项、CLI/approval 聚焦集 133 项通过。 | 移除 bridge 字段、恢复 turn/tool 单组 fallback、恢复 scope 自动回答或删除直接执行的重复/非法 ID 校验后，对应聚焦用例实际失败或拒绝。 |
 | START-01（本地证据闭合） | build manifest 已绑定 lockfile、构建配置、编译器/标准库、全部 emit 字节、五个运行资产和受控 entry；`start.test` 覆盖 journal 恢复、活动/stale build lock fail-closed、恢复期间竞争者拒绝、越界/未登记入口、篡改产物与 launcher/package-main 回滚。`--version`/`--help` 现在由轻量入口在加载 runtime 图前处理；组合参数、坏配置准入与 fresh packaged gate 均已通过。 | stale lock 仍需人工确认后清理；本地 packaged gate 不等于新提交的 CI，精确 SHA CI 另行取证。 |
 | START-02（本地证据闭合） | 10k catalog 首屏、持久 reentry 索引、0/100/1k/10k 不枚举探针；recovery hint 由实际 TUI `onFirstWrite`、line prompt write callback 或 non-TTY live first frame 启动；routing sink 与 transcript ownership 分离，line mode 保留 turn boundary 且 `/sessions` 仍走非交互 overview；用户键盘、鼠标、粘贴、picker 与 line 输入只推进一次 fence；teardown 在 sink 恢复前完成，失败路径不调用 `exit(0)`，cleanup 自身抛错或 logger 抛错也保证 sink 恢复；line prompt callback 与 stdout `error` 的异步失败均进入同一 rejection，不再静默挂起；真实 `GoalScheduler` drain 超时结算 captured host，line sink 在 goal dispatch 真正完成前保持 discard fence；MCP snapshot/refresh 在队列等待阶段即可取消，collaboration ticket/poll/propose 继承关闭 signal；`runCliProcess` 集成测试证明 fullscreen hint 经 transcript 且不直写 stdout；non-TTY live stream 现在把 first-frame/user-intent 接到同一 recovery lifecycle，取消 hint 时仍发布已发现的可读性诊断；Node/exe × regular/fullscreen seeded PTY 连续通过并匹配精确 current session。 | 真实跨平台/IME 仍归 QA-02；本行不把 Linux PTY 外推为平台矩阵完成。 |
-| START-03（部分） | `bench:interactive` 现在分别记录 Node/exe × regular/fullscreen/line/pipe 的首字节、首帧/输入提示、TUI listener/layout/write 进程观察点、渲染字符键响应、批处理首答和命令退出；保存每次原始样本、样本数、p50/p95、机器与构建摘要。键测量关闭 PTY echo，等待 UTF-8 字符进入实际输出；缺必需观察点拒绝。 | runtime-ready、受控冷缓存、1000项列表键响应、复杂stream单次阻塞和分位数不确定性仍未闭合。line/pipe没有TUI listener标记，null不兑换ready；进程采样delay不证明最初同步加载或单操作阻塞上界。 |
+| START-03（部分） | `bench:interactive` 分别记录 Node/exe × regular/fullscreen/line/pipe 的首字节、首帧/输入提示、TUI listener/layout/write 进程观察点、渲染字符键响应、批处理首答和命令退出；`bench:responsiveness` 记录 1000 项列表同步键路径及 math/table/diff 单次阻塞。两者保存样本、p50/p95、机器与构建摘要。键测量关闭 PTY echo 并等待完整 UTF-8 字符。 | 受控冷缓存仍缺；responsiveness 是 Node 宿主同步模块探针，不覆盖完整键盘/输入路径或 exe-specific 行为；line/pipe 无 TUI listener 标记，null 不兑换 ready，进程采样 delay 不证明最初同步加载或单操作阻塞上界。 |
 
 ## W10
 
 | 任务 | 证据 |
 |---|---|
 | QA-01 | 本矩阵 + 各反转测试；`CTX-02`、`TOOL-02`、`PAN-05`、`PAN-08`、`QA-03` 已拆成独立行；但行存在不等于任务完成，仍按各行状态累积。 |
-| QA-02 | Linux Node/exe × regular/fullscreen/line/pipe 八格合成CLI已通过；TUI覆盖会话fork/切换/确认删除、panel关闭、任务、发现/search/load/skill、审批、settings保存和profile受控重启；line/pipe覆盖任务/发现/显式allow-once以及settings只读字节对照。八格新增restore preview和文件/记录/blob精确字节对照；TUI另覆盖选择器取消、重新打开及显式提交draft。逐调用关联持久tool.result与成功输出，不以模型重复prompt替代结果。line/pipe完整profile切换/保存、跨平台/IME/系统复制仍未闭合；settings面板不由非TTY伪造。 |
-| QA-03 | START-03 启动数据、RENDER/INPUT 回归与合成 PTY 可作质量前置；§6 预注册指标、真实模型任务集和安全回归的真实质量证据仍缺，mock 不替代。 |
-| TOOL-02（部分） | `/tools` 报告 description/schema 的 UTF-8 字节数、逐工具成本列与文本摘要，明确 `tokens=not-measured`；同模型/任务/权限的总请求、发现额外成本、关键参数质量与 tokenizer/多语言误差仍待真实模型。 |
+| QA-02 | Linux Node/exe × regular/fullscreen/line/pipe 八格合成CLI已通过；TUI覆盖会话fork/切换/确认删除、panel关闭、任务、发现/search/load/skill、审批、settings保存和profile创建/切换/受控重启；line/pipe覆盖任务、发现、显式allow-once、settings保存、命名profile创建及重启读回。八格新增restore preview和文件/记录/blob精确字节对照；TUI另覆盖选择器取消、重新打开及显式提交draft。逐调用关联持久tool.result与成功输出，不以模型重复prompt替代结果。非交互profile switch/approval、跨平台/IME/系统复制仍未闭合；settings面板不由非TTY伪造。 |
+| QA-03 | `scripts/qa-quality.mjs` + `qa-quality-lib`/starter corpus 覆盖 pair 顺序、JSONL 边界、确定性/双盲分支、build identity、policy zero-tolerance 与 10,000 次 bootstrap；dry-run 固定 `inconclusive`。正式 12 项发现任务、摘要/渲染/启动质量任务、真实模型执行与双盲评分仍未完成，mock 不替代。 |
 | QA-04 | 本地门禁与精确提交；CI 以 run 结果为准 |
 
 | PAN-08 help（部分） | `core/commands/help/report.ts`、`picker/help.ts`、原slash registry/print owner、`slashSuggestions.ts` | immutable安全report与共享rows；raw ID本地保留、安全name才能插draft；alias搜索/named独立、单current selection；原admission读前/通知前/apply/真实host发布检查；精确cwd/session及builtin root；选中后usage安全；12文件189项、strict TS/双构建、四格合成扩展PTY/八格smoke | metadata/name/alias/single/before/apply/current/subscription/notification/root/print/removed/hint共13项有效反转；取消/查看/草稿不改session/源文件，不执行script或模型、不新增command-output。原完整registry/配置读取无总资源界，live config不等于accepted snapshot；独立codeAPPROVE/architectureWATCH，原hint泄露已实际复现修复；其余picker/PAN-08/47项继续 |

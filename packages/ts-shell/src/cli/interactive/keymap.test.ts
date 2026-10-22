@@ -1,7 +1,7 @@
 import { completionEdit } from "./completion.js";
 import { slashSuggestions } from "./slashSuggestions.js";
 import { describe, expect, it, vi } from "vitest";
-import { routeKey, type KeymapActions } from "./keymap.js";
+import { resetVimState, routeKey, type KeymapActions } from "./keymap.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { parseKeyEvent } from "../../presentation/tui/input/keys.js";
 import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
@@ -330,6 +330,15 @@ describe("vim mode", () => {
     press("i");
     press("a");
     expect(surface.editor.getText()).toBe("abc");
+  });
+
+  it("resets modal state when an external editor replaces the draft", () => {
+    const { press, surface } = build(false, false, true);
+    surface.editor.setText("abc");
+    press("\x1b");
+    resetVimState(surface.editor);
+    press("x");
+    expect(surface.editor.getText()).toBe("abxc");
   });
 
   it("matches a multi-codepoint grapheme after f through the real input buffer", () => {

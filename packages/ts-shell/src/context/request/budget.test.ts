@@ -5,6 +5,8 @@ import { promptTokensFor, requestBudget } from './budget.js';
 it('admits equality and rejects one token over the shared window', () => {
   expect(requestBudget({ window: 100, promptTokens: 60, outputTokens: 20, reserveTokens: 20, measured: true }))
     .toMatchObject({ ok: true, remaining: 0, soft: true, availableInput: 60, softLimit: 60 });
+  expect(requestBudget({ window: 100, promptTokens: 0, outputTokens: 100, reserveTokens: 0, measured: true }))
+    .toMatchObject({ ok: true, remaining: 0, availableInput: 0 });
   expect(requestBudget({ window: 100, promptTokens: 61, outputTokens: 20, reserveTokens: 20, measured: true }))
     .toMatchObject({ ok: false, reason: 'window' });
 });
@@ -20,6 +22,10 @@ it('enforces an independent input limit', () => {
     .toMatchObject({ ok: false, reason: 'input' });
   expect(requestBudget({ window: 1000, inputLimit: 200, promptTokens: 95, outputTokens: 10, reserveTokens: 10, measured: true }))
     .toMatchObject({ ok: true });
+  expect(requestBudget({ window: 1000, inputLimit: 120, promptTokens: 95, outputTokens: 10, reserveTokens: 10, measured: true }))
+    .toMatchObject({ ok: true, softLimit: 110, availableInput: 110 });
+  expect(requestBudget({ window: undefined, inputLimit: 100, promptTokens: 95, outputTokens: undefined, reserveTokens: 10, measured: true }))
+    .toMatchObject({ ok: false, reason: 'input' });
 });
 
 it('clamps the soft band to the available input budget', () => {
@@ -36,6 +42,7 @@ it('refuses to prove a budget without complete integer limits', () => {
     { window: undefined, promptTokens: 1, outputTokens: 1, measured: false },
     { window: 100, promptTokens: 1.5, outputTokens: 1, measured: false },
     { window: 100, promptTokens: 1, outputTokens: undefined, measured: false },
+    { window: undefined, inputLimit: 100, promptTokens: 1, outputTokens: undefined, measured: false },
     { window: 100, promptTokens: 1, outputTokens: 1, reserveTokens: -1, measured: false },
   ]) expect(requestBudget(input as never)).toMatchObject({ ok: false, reason: 'unknown' });
 });

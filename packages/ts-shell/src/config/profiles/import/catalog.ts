@@ -5,7 +5,7 @@ import { nonsecretUrl } from './config.js';
 
 const number = { type: 'number', minimum: 0 };
 const model = objectSchema({
-  id: nameSchema, contextWindow: positiveSchema, maxTokens: positiveSchema, reasoning: booleanSchema, vision: booleanSchema,
+  id: nameSchema, contextWindow: positiveSchema, inputLimit: positiveSchema, maxTokens: positiveSchema, reasoning: booleanSchema, vision: booleanSchema,
   serviceTiers: listSchema(nameSchema),
   cost: objectSchema({ promptPerMTok: number, completionPerMTok: number, cacheReadPerMTok: number, cacheWritePerMTok: number }, ['promptPerMTok', 'completionPerMTok']),
   promptCache: objectSchema({ short: positiveSchema, long: positiveSchema }),

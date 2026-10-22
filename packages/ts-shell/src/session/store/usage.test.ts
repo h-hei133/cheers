@@ -97,7 +97,7 @@ describe("session usage persistence seams", () => {
     const context = activate(load());
     expect(totalTokens(getSessionUsage(ID))).toBe(300);
     expect(getSessionUsage(ID).lastPromptTokens).toBeUndefined();
-    expect(getSessionUsage(ID).recentRequests).toEqual([]);
+    expect(getSessionUsage(ID).recentRequests.map(entry => entry.promptTokens)).toEqual([100, 200]);
     recordSessionUsage(ID, { provider: "one", model: "org/model", promptTokens: 10 });
     switchActiveSession(context, context.session);
     expect(getSessionUsage(ID).lastPromptTokens).toBe(10);

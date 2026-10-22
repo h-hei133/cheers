@@ -91,6 +91,26 @@ describe("command completions", () => {
     expect(matches?.some((match) => match.value === "off")).toBe(true);
   });
 
+  it("offers usage, git and worktree actions from their command syntax", () => {
+    expect(slashSuggestions("/usage ")?.map(item => item.value)).toEqual(["show", "account", "reset"]);
+    expect(slashSuggestions("/git ")?.map(item => item.value)).toEqual([
+      "status", "diff", "stage", "unstage", "commit", "branch", "merge", "push", "reconcile", "review", "goal",
+    ]);
+    expect(slashSuggestions("/wt ")?.map(item => item.value)).toEqual(["list", "create", "migrate", "switch", "delete"]);
+    expect(slashSuggestions("/usage apply ")).toBeNull();
+    expect(slashSuggestions("/git unknown ")).toBeNull();
+    expect(slashSuggestions("/wt create ")).toBeNull();
+  });
+
+  it("follows Git's nested grammar and validates each position", () => {
+    expect(slashSuggestions("/git diff ")?.map(item => item.value)).toEqual(["staged", "unstaged", "untracked"]);
+    expect(slashSuggestions("/git branch ")?.map(item => item.value)).toEqual(["create", "switch", "delete"]);
+    expect(slashSuggestions("/git branch create ")).toBeNull();
+    expect(slashSuggestions("/git stage ")).toBeNull();
+    expect(slashArgumentHint({ text: "/git ", cursor: 5, revision: 1 })).toContain("diff <staged|unstaged|untracked> <path>");
+    expect(slashArgumentHint({ text: "/git ", cursor: 5, revision: 1 })).toContain("branch <create|switch|delete> <branch>");
+  });
+
   it("filters argument completions by prefix", () => {
     const matches = slashSuggestions("/thinking l");
     expect(matches).toHaveLength(1);

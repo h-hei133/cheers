@@ -10,6 +10,12 @@
 import type { RequestContext } from '../../context/request/model.js';
 import type { ModelCostRates } from '../../core/models/catalog.js';
 
+/**
+ * Bound the durable per-request history as well as the live view. The history
+ * covers a cache lifetime at normal pace without growing for an all-day session.
+ */
+export const MAX_RECENT_REQUESTS = 64;
+
 export interface UsageAttribution {
   readonly provider: string;
   readonly model: string;
@@ -121,9 +127,15 @@ export interface SessionUsageTelemetry {
  * reported no cache activity at all can be told from one that reported zero.
  */
 export interface UsageHistoryEntry {
+  /** Stable identity for bounded-history merges; absent on legacy snapshots. */
+  readonly id?: string;
   readonly attribution?: UsageAttribution;
   /** The prompt the provider was sent, in total. */
   promptTokens: number;
+  /** Provider-reported output tokens for this request, when available. */
+  readonly completionTokens?: number;
+  /** Why the request was sent; only values the caller can prove are recorded. */
+  readonly purpose?: string;
   readonly cacheReadTokens: number;
   readonly cacheWriteTokens: number;
   /** Opaque accounting bucket key. Attribution distinguishes destination from price changes. */
@@ -152,6 +164,6 @@ export interface UsageHistoryEntry {
 }
 
 
-/** Durable cumulative counts. Context measurements belong to the live runtime. */
+/** Durable cumulative counts plus the bounded request history used by attribution. */
 export type SessionUsageSnapshot = Pick<SessionUsageTelemetry,
-  "schemaVersion" | "byModel" | "turnsCount" | "toolCallsCount" | "lastBucketKey" | "lastUpdated">;
+  "schemaVersion" | "byModel" | "turnsCount" | "toolCallsCount" | "lastBucketKey" | "lastUpdated" | "recentRequests">;

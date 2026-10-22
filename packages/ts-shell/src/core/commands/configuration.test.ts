@@ -101,7 +101,7 @@ it('keeps menus, completion, and context on the accepted catalogue until success
   expect((await connections.apply(['login:custom']))?.draft).toContain('--model accepted-only');
   const report = await runContextCommand([], context);
   expect(report.output).toContain('of 16,000 tokens');
-  expect(report.output).toContain('15,000 free before the 0-token reserve');
+  expect(report.output).toContain('13,976 free before the 0-token reserve');
   expect(report.output).toContain('0 current definitions');
   expect(report.output).not.toContain('Instructions and conversation');
   for (const args of [[], ['list'], ['list', 'google']]) {

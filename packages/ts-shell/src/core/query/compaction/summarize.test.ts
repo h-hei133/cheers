@@ -207,4 +207,12 @@ describe("requestCompactionSummary", () => {
     })).rejects.toBeInstanceOf(SummaryAdmissionError);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
+
+  it('refuses an input-only summary that exceeds the provider prompt ceiling', () => {
+    expect(() => prepareCompactionMessages({
+      messages: [{ role: "user", content: "x".repeat(10_000) }],
+      maxOutputTokens: 10,
+      provider: { inputLimit: 1, reserveTokens: 0 },
+    })).toThrow(SummaryAdmissionError);
+  });
 });

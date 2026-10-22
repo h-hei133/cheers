@@ -4,7 +4,7 @@ import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { createTaskToolDefinition } from "../core/tools/taskTool.js";
-import { runTurn, type TurnOptions } from "./session.js";
+import { requestPurposeFor, runTurn, type TurnOptions } from "./session.js";
 import type { StepFunction } from "./step.js";
 import { CONTEXT_OVERFLOW_PREFIX, createStepFunction } from "./step.js";
 import { getSessionUsage, markContextUnknown, persistSessionUsage, recordSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
@@ -73,6 +73,22 @@ async function drain(events: AsyncIterable<QueryEvent>): Promise<QueryEvent[]> {
 }
 
 describe("runTurn", () => {
+  it("attributes the request after a discovery result without inferring from prose", () => {
+    const search: SessionMessage[] = [
+      { role: "assistant", content: "", tool_calls: [{ id: "s", type: "function",
+        function: { name: "tool_search", arguments: "{}" } }] },
+      { role: "tool", tool_call_id: "s", content: "matches" },
+    ];
+    const load: SessionMessage[] = [
+      { role: "assistant", content: "", tool_calls: [{ id: "l", type: "function",
+        function: { name: "tool_load", arguments: "{}" } }] },
+      { role: "tool", tool_call_id: "l", content: "loaded" },
+    ];
+    expect(requestPurposeFor(search)).toBe("discovery-search");
+    expect(requestPurposeFor(load)).toBe("discovery-load");
+    expect(requestPurposeFor([{ role: "user", content: "loaded" }])).toBe("turn");
+  });
+
   it.each([undefined, 0, 21])('ties accepted request dimensions to its own usage (%s) and excludes durable snapshots', async promptTokens => {
     const sessionId = `context-receipt-${promptTokens}`;
     let body = '';
@@ -110,6 +126,17 @@ describe("runTurn", () => {
     await drain(runTurn(options({ sessionId, step })).events);
     expect(getSessionUsage(sessionId).requestContext).toBeUndefined();
     resetSessionUsage(sessionId);
+  });
+
+  it('publishes the exact accepted wire prompt identity', async () => {
+    const identity = { schemaDigest: 'schema-wire', systemDigest: 'system-wire' };
+    const notified = vi.fn();
+    const step: StepFunction = async (_messages, _signal, _listener, stepOptions) => {
+      stepOptions.onRequestSent?.({ url: 'https://fixture.test', headers: {}, body: '{}', promptIdentity: identity });
+      return { text: 'done', toolCalls: [], stopReason: 'stop' };
+    };
+    await drain(runTurn(options({ step, onPromptIdentity: notified })).events);
+    expect(notified).toHaveBeenCalledWith(identity);
   });
 
   it('keeps the foreground receipt when a shared step sends a delegated request', async () => {

@@ -5,7 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile, type ProviderConnectionConfig, type RuntimeConfig } from '../../../config/runtimeConfig.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
 import { credentialGeneration, credentialIdentityFor, selectPooledConnection } from './pool.js';
-import { noteCredentialRateLimit, resetCredentialBackoffForTests } from './backoff.js';
+import { credentialBackoffRemaining, noteCredentialRateLimit, resetCredentialBackoffForTests } from './backoff.js';
+import { createProfileContext, withProfile } from '../../paths/profile/context.js';
 
 let home: string;
 let root: string;
@@ -81,6 +82,27 @@ it('keeps session affinity and gives different sessions a deterministic order', 
   expect(again?.connection?.id).toBe(first?.connection?.id);
   const other = selectPooledConnection({ config: base, provider: 'openai', sessionId: 'session-two', env: {} });
   expect(['a', 'b', 'c']).toContain(other?.connection?.id);
+});
+
+it('does not share affinity or credential backoff across profile scopes', () => {
+  const homeA = path.join(home, 'profile-a'); const homeB = path.join(home, 'profile-b');
+  fs.mkdirSync(homeA); fs.mkdirSync(homeB);
+  const profileA = createProfileContext({ name: 'a', homeDir: homeA });
+  const profileB = createProfileContext({ name: 'b', homeDir: homeB });
+  const captured = { ...config(), provider: 'openai' as const,
+    providerConnections: [connection('a'), connection('b'), connection('c')],
+    accountPool: { openai: { connections: ['a', 'b', 'c'] } } } as RuntimeConfig;
+  const sessions = Array.from({ length: 16 }, (_, index) => `shared-${index}`);
+  const selections = sessions.map(sessionId => [
+    withProfile(profileA, () => selectPooledConnection({ config: captured, provider: 'openai', sessionId })?.connection?.id),
+    withProfile(profileB, () => selectPooledConnection({ config: captured, provider: 'openai', sessionId })?.connection?.id),
+  ] as const);
+  expect(selections.some(([a, b]) => a !== b)).toBe(true);
+
+  const key = credentialIdentityFor('openai', { connectionId: 'a', apiKey: 'key-a' })!;
+  withProfile(profileA, () => noteCredentialRateLimit(key, 30_000));
+  expect(withProfile(profileA, () => credentialBackoffRemaining(key))).toBeGreaterThan(0);
+  expect(withProfile(profileB, () => credentialBackoffRemaining(key))).toBe(0);
 });
 
 it('derives a stable credential identity and a rotation-sensitive generation', () => {

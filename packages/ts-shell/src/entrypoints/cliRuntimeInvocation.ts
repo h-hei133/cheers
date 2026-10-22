@@ -68,6 +68,8 @@ export interface CliRuntimeInvocationInput {
   readonly catalogContent?: CatalogContent;
   readonly onCommandSettled?: ToolCatalogInput['onCommandSettled'];
   readonly thinkingPreference?: ReturnType<typeof captureThinkingPreference>;
+  /** Receives the exact schema/system identity prepared for this run. */
+  readonly onPromptIdentity?: (identity: { readonly schemaDigest: string; readonly systemDigest: string }) => void;
   readonly background?: TurnOptions['background'];
   readonly featureTools?: readonly ToolDefinition[];
   /** One-use model tool restriction selected by `/force`; ordinary gates remain active. */
@@ -349,16 +351,17 @@ export function withRequestOverhead(
 ): CompactionSetup | undefined {
   if (!compaction) return undefined;
   const current = () => currentOverhead?.() ?? overhead;
-  const promptIdentity = () => {
-    const value = current();
-    return {
-      schemaDigest: createHash('sha256').update(JSON.stringify(value.tools ?? [])).digest('hex'),
-      systemDigest: createHash('sha256').update(value.systemPrompt ?? '').digest('hex'),
-    };
-  };
+  const promptIdentity = () => requestIdentity(current());
   return { ...compaction, policy: { ...compaction.policy,
     get overhead() { return current(); },
     get promptIdentity() { return promptIdentity(); } } };
+}
+
+export function requestIdentity(overhead: RequestOverhead): { readonly schemaDigest: string; readonly systemDigest: string } {
+  return {
+    schemaDigest: createHash('sha256').update(JSON.stringify(overhead.tools ?? [])).digest('hex'),
+    systemDigest: createHash('sha256').update(overhead.systemPrompt ?? '').digest('hex'),
+  };
 }
 
 /**
@@ -425,6 +428,11 @@ async function startTurn(
       tools: schemas,
     };
   };
+  const publishPromptIdentity = (): void => {
+    request.onPromptIdentity?.(requestIdentity(currentOverhead()));
+  };
+  publishPromptIdentity();
+  discovery?.subscribe(publishPromptIdentity);
   const compaction = withRequestOverhead(request.compaction, currentOverhead(), currentOverhead);
   // The step and the tool set both exist here, so this is where a subagent's
   // run can be bound. The tool layer receives a function and never the model
@@ -451,6 +459,7 @@ async function startTurn(
     background: request.background,
     checkpoint: request.checkpoint,
     checkpointError: request.checkpointError,
+    ...(request.onPromptIdentity ? { onPromptIdentity: request.onPromptIdentity } : {}),
     commandProof: request.commandProof,
     correlationId: request.correlationId,
     goalObjective: request.goalObjective,

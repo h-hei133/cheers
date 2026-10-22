@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { projectMath } from "./math.js";
+import { latexToDisplayText, projectMath } from "./math.js";
 
 it("converts common inline formulas to readable text", () => {
   expect(projectMath("$x^2 + y_1$")).toBe("x² + y₁");
@@ -27,4 +27,19 @@ it("keeps the raw formula when it exceeds a budget", () => {
   expect(projectMath(`$${body}$`)).toBe(`$${body}$`);
   const nested = "$" + "{".repeat(20) + "x" + "}".repeat(20) + "$";
   expect(projectMath(nested)).toBe(nested);
+});
+
+it("keeps malformed groups raw instead of rewriting them", () => {
+  expect(projectMath("$\\frac{a}{b$")).toBe("$\\frac{a}{b$");
+  expect(projectMath("$a}b$")).toBe("$a}b$");
+});
+
+it("keeps inline matrices on one row and lays out display matrices by row", () => {
+  expect(projectMath("$\\begin{bmatrix}1&20\\\\300&4\\end{bmatrix}$")).toBe("[ 1    20 ] | [ 300  4 ]");
+  expect(latexToDisplayText("\\begin{bmatrix}1&20\\\\300&4\\end{bmatrix}")).toBe([
+    "[ 1    20 ]",
+    "[ 300  4 ]",
+  ].join("\n"));
+  const oversized = `$$\\begin{matrix}${Array.from({ length: 13 }, () => "1").join("\\\\")}\\end{matrix}$$`;
+  expect(projectMath(oversized)).toBe(oversized);
 });

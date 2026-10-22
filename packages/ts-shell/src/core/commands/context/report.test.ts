@@ -55,6 +55,35 @@ it('retains independent measured, estimated and unknown context facts', () => {
   expect(reportText(stale)).toContain('First request estimate');
 });
 
+it('reports the same output-aware soft threshold used by compaction', () => {
+  const report = contextReport({ ...input, resolution: { window: 1000, source: 'catalog' }, reserve: 100,
+    outputTokens: 200, protocol: 'openai-compatible', used: 500 });
+  expect(report.facts.compactAtTokens).toBe(700);
+  expect(report.facts.protocol).toBe('openai-compatible');
+  expect(reportText(report)).toContain('about 700 tokens');
+});
+
+it('uses an independent input ceiling when the provider owns the output limit', () => {
+  const report = contextReport({ ...input, resolution: { window: 1000, source: 'catalog' }, reserve: 100,
+    inputLimit: 500, used: 300 });
+  expect(report.facts.compactAtTokens).toBe(400);
+  expect(reportText(report)).toContain('about 400 tokens');
+});
+
+it('reports no input capacity when the reserve exhausts the input ceiling', () => {
+  const report = contextReport({ ...input, resolution: { window: 1000, source: 'catalog' }, reserve: 500,
+    inputLimit: 400, used: 100 });
+  expect(report.facts.compactAtTokens).toBe(0);
+  expect(reportText(report)).toContain('about 0 tokens');
+});
+
+it('reports free input capacity against the independent input ceiling', () => {
+  const report = contextReport({ ...input, resolution: { window: 1_000_000, source: 'catalog' },
+    inputLimit: 200_000, outputTokens: 10_000, reserve: 8_000, used: 150_000 });
+  expect(report.facts.freeTokens).toBe(42_000);
+  expect(report.facts.compactAtTokens).toBe(192_000);
+});
+
 it.each([[49, 'normal'], [50, 'elevated'], [70, 'high'], [90, 'critical']] as const)(
   'assigns shared risk roles to %s percent without changing the number', (percent, role) => {
     const report = contextReport({ ...input, used: percent * 2000 });

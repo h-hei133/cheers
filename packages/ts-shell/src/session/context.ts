@@ -1,6 +1,16 @@
 import type { AgentMessage } from "../core/agent/state.js";
+import { messageToText } from "../model-adapters/multimodal.js";
 
 export const CHARS_PER_TOKEN = 3.5;
+/**
+ * A bounded, provider-agnostic allowance for one image block.
+ *
+ * Image tokenization depends on dimensions and provider policy, none of which a
+ * base64 payload states reliably. Charging a fixed ceiling keeps a multimodal
+ * request from looking nearly free without pretending that base64 byte length is
+ * a token count.
+ */
+export const IMAGE_ESTIMATE_TOKENS = 2_048;
 
 export const DEFAULT_RESERVE_TOKENS = 8000;
 
@@ -13,7 +23,11 @@ export const DEFAULT_RESERVE_TOKENS = 8000;
  * that a tool-heavy turn actually occupies.
  */
 export function messageCharCount(message: AgentMessage): number {
-  let chars = message.content?.length ?? 0;
+  let chars = messageToText(message.content).length;
+  if (Array.isArray(message.content)) {
+    chars += message.content.filter(block => block.type === "image").length
+      * IMAGE_ESTIMATE_TOKENS * CHARS_PER_TOKEN;
+  }
   if (message.tool_call_id) {
     chars += message.tool_call_id.length;
   }

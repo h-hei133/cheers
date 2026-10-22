@@ -101,6 +101,8 @@ export interface StepOptions {
   readonly allowTools: boolean;
   /** Restrict the bound tool schemas for this call; an empty list withdraws all tools. */
   readonly allowedTools?: readonly string[];
+  /** Why this request is being sent, when the caller can prove it from context. */
+  readonly requestPurpose?: string;
   /** Effective mode of a delegated run, established by its tool gate. */
   readonly agentMode?: "plan" | "build";
   /**
@@ -273,6 +275,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
   return async (messages, signal, listener, options): Promise<AssistantStep> => {
     const requestId = options.requestId ?? randomUUID();
     let requestAcceptedAt: number | undefined;
+    let acceptedResponse = false;
     const allowed = options.allowedTools && new Set(options.allowedTools);
     const declared = request.toolSnapshot?.() ?? request.tools;
     const tools = allowed ? declared.filter((tool) => allowed.has(tool.function.name)) : declared;
@@ -326,6 +329,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         model: request.provider.model, endpoint, schemaDigest, systemDigest });
       const prompt = promptTokensFor({ messages, overhead, ...(measured ? { measured } : {}) });
       const budget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
+        inputLimit: modelEntry?.inputLimit,
         promptTokens: prompt.tokens, outputTokens: output ?? shape.maxOutputCeiling,
         reserveTokens: request.reserveTokens, measured: prompt.measured });
       // A request that cannot fit is not sent: the same bounded overflow rescue
@@ -476,11 +480,13 @@ export function createStepFunction(request: StepRequest): StepFunction {
           );
           if (attemptResponse.ok) {
             requestAcceptedAt = Date.now();
+            acceptedResponse = true;
             traceLogger.info("provider request accepted", { requestId, endpoint, provider: request.provider.provider, model: request.provider.model, attempt });
             if (!options.agentMode) clearContextUsage(request.sessionId);
             response = attemptResponse;
             responseAttempt = modelAttempt;
             options.onRequestSent?.({
+              promptIdentity: { schemaDigest, systemDigest },
               context: requestContext({ body, endpoint, fields: endpointShape(endpoint).contextFields,
                 provider: request.provider.provider ?? '', model: request.provider.model,
                 ...(!(options.agentMode && request.systemPromptFor) && request.systemPromptSources
@@ -594,6 +600,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             // actually sent, and a measurement from the wrong request is stale.
             promptIdentity: { provider: request.provider.provider ?? '', model: request.provider.model, endpoint,
               schemaDigest, systemDigest },
+            purpose: options.requestPurpose ?? (options.agentMode ? 'subagent' : 'turn'),
           };
           if (options.agentMode && request.recordAuxiliaryUsage) request.recordAuxiliaryUsage(record);
           else recordSessionUsage(request.sessionId, record, { affectsContext: !options.agentMode,
@@ -612,7 +619,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         if (error instanceof ModelAdmissionError) return stamp({ ...failedStep(error.message, shown, undefined, true), admissionFailure: error.code });
         if (signal?.aborted) return stamp(abortedStep(shown));
         const detail = error instanceof Error ? error.message : String(error);
-        if (!shownAnything && !REFUSAL.test(detail) && streamAttempts < retry.maxRetries && /socket|connection|network|fetch|terminated|unexpected eof/i.test(detail)) {
+        if (!acceptedResponse && !shownAnything && !REFUSAL.test(detail) && streamAttempts < retry.maxRetries && /socket|connection|network|fetch|terminated|unexpected eof/i.test(detail)) {
           streamAttempts += 1;
           releaseAfterRead?.abort();
           const waited = await waitBeforeRetry(retryDelayMs(retry, streamAttempts, undefined), signal);
@@ -625,7 +632,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
         // and discarding it would take away what they already saw. Both facts
         // travel: the text is what was said, `stopReason` is that it stopped
         // early.
-        return stamp(failedStep(`Network error: ${error instanceof Error ? error.message : String(error)}`, shown, undefined, shownAnything || streamAttempts > 0));
+        return stamp(failedStep(`Network error: ${error instanceof Error ? error.message : String(error)}`, shown, undefined,
+          acceptedResponse || shownAnything || streamAttempts > 0));
       } finally {
         // Reading ends as soon as the answer is complete, which can be before
         // the host closes the stream — a keep-alive proxy holds the connection

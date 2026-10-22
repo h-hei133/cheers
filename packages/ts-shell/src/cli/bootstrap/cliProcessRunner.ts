@@ -326,6 +326,7 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       // is built.
       getPromptInteractiveApproval: () => interactiveApprovalPrompt,
     });
+    time("runtime ready");
     cancelRun = () => cancelGoalRunForShutdown(sessionRuntime);
     isBusy = () => sessionRuntime.getCurrentRunController() !== null;
     if (bootstrapRuntime.writeJsonEvent) {

@@ -178,6 +178,20 @@ describe("status facts", () => {
     resetSessionUsage(id);
   });
 
+  it("keeps the status measurement only when the live request identity matches", () => {
+    const id = "status-live-identity";
+    resetSessionUsage(id);
+    const runtime = context(id);
+    const identity = { provider: "openai", model: "opus-5", endpoint: "openai-compatible",
+      schemaDigest: "a".repeat(64), systemDigest: "b".repeat(64) };
+    recordSessionUsage(id, { promptTokens: 9_000, promptMessageCount: 1, promptIdentity: identity });
+    runtime.promptIdentity = { schemaDigest: "c".repeat(64), systemDigest: identity.systemDigest };
+    expect(readStatusFacts(runtime).contextUsed).toBeUndefined();
+    runtime.promptIdentity = { schemaDigest: identity.schemaDigest, systemDigest: identity.systemDigest };
+    expect(readStatusFacts(runtime).contextUsed).toBe(9_000);
+    resetSessionUsage(id);
+  });
+
   it("reports a retained dynamic request identity across a nested working directory", async () => {
     const id = "status-current-system";
     resetSessionUsage(id);
@@ -187,8 +201,23 @@ describe("status facts", () => {
         schemaDigest: "dynamic-request-schema", systemDigest: "request-system-prompt" } });
     const report = await runContextCommand([], { cwd: `${runtime.projectRoot}/nested`, projectRoot: runtime.projectRoot, sessionId: id,
       runtimeConfig: runtime.runtimeConfig, readConfiguration: () => runtime.configuration.current,
-      getToolPool: async () => new Map() });
+      getToolPool: async () => new Map(), promptIdentity: { schemaDigest: "dynamic-request-schema", systemDigest: "request-system-prompt" } });
     expect(report.report?.facts.prompt).toMatchObject({ status: "measured", tokens: 9_000 });
+    resetSessionUsage(id);
+  });
+
+  it("does not validate a stored identity after the live request identity is cleared", async () => {
+    const id = "status-cleared-live-identity";
+    resetSessionUsage(id);
+    const runtime = context(id);
+    recordSessionUsage(id, { provider: "openai", model: "opus-5", promptTokens: 9_000, promptMessageCount: 1,
+      promptIdentity: { provider: "openai", model: "opus-5", endpoint: "openai-compatible",
+        schemaDigest: "a".repeat(64), systemDigest: "b".repeat(64) } });
+    runtime.promptIdentity = undefined;
+    const report = await runContextCommand([], { cwd: runtime.projectRoot, sessionId: id,
+      runtimeConfig: runtime.runtimeConfig, readConfiguration: () => runtime.configuration.current,
+      getToolPool: async () => new Map() });
+    expect(report.report?.facts.prompt).toMatchObject({ status: "stale" });
     resetSessionUsage(id);
   });
 

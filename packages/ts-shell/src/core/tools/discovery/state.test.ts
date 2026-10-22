@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import type { ToolDefinition } from '../../../tools/types.js';
 import { createToolDiscovery, DISCOVERY_LOAD_TOOL, DISCOVERY_SEARCH_TOOL, PINNED_TOOL_NAMES } from './state.js';
 import { discoveryTools } from './tools.js';
@@ -39,6 +39,19 @@ it('loads a tool for the next request and refuses unknown names', () => {
   expect(value.load(['browser'])).toEqual({ loaded: ['browser'], rejected: [] });
 });
 
+it('notifies consumers only when the live schema snapshot changes', () => {
+  const value = createToolDiscovery({ catalog: catalog(), pinned: [] });
+  const listener = vi.fn();
+  const unsubscribe = value.subscribe(listener);
+  value.load(['write']);
+  expect(listener).toHaveBeenCalledTimes(1);
+  value.load(['write']);
+  expect(listener).toHaveBeenCalledTimes(1);
+  unsubscribe();
+  value.load(['read']);
+  expect(listener).toHaveBeenCalledTimes(1);
+});
+
 it('bounds the loaded set and keeps pinned tools out of the budget', () => {
   const many = new Map<string, ToolDefinition>([...catalog(), ...Array.from({ length: 40 }, (_, index) => [`extra_${index}`, tool(`extra_${index}`)] as const)]);
   const value = createToolDiscovery({ catalog: many });
@@ -52,6 +65,34 @@ it('uses a stable generation for the same visible catalogue and a different one 
   expect(createToolDiscovery({ catalog: catalog() }).generation).toBe(createToolDiscovery({ catalog: catalog() }).generation);
   const changed = catalog(); changed.set('read', { ...tool('read'), argsSchema: { type: 'object', properties: { path: { type: 'string' } } } });
   expect(createToolDiscovery({ catalog: changed }).generation).not.toBe(createToolDiscovery({ catalog: catalog() }).generation);
+});
+
+it('includes wire-visible descriptions in the generation identity', () => {
+  const changed = catalog();
+  changed.set('read', tool('read', 'updated description'));
+  expect(createToolDiscovery({ catalog: changed }).generation)
+    .not.toBe(createToolDiscovery({ catalog: catalog() }).generation);
+});
+
+it('refuses execution and preparation from a snapshot after its catalogue generation changes', async () => {
+  const mutable = catalog();
+  const value = createToolDiscovery({ catalog: mutable });
+  const staleRead = value.snapshot().get('read')!;
+  mutable.set('read', tool('read', 'changed after the snapshot'));
+  await expect(staleRead.execute({}, {} as never)).rejects.toThrow(/older discovery generation/);
+
+  const prepared = {
+    ...tool('write'),
+    prepare: () => ({
+      targets: [],
+      preview: 'write',
+      execute: async () => ({ success: true, output: 'must not run' }),
+    }),
+  } satisfies ToolDefinition;
+  mutable.set('write', prepared);
+  const staleWrite = createToolDiscovery({ catalog: mutable }).snapshot().get('write')!;
+  mutable.set('write', { ...prepared, description: 'changed after preparation' });
+  await expect(staleWrite.prepare!({}, {} as never)).rejects.toThrow(/older discovery generation/);
 });
 
 it('executes search and load through their declared argument shapes', async () => {

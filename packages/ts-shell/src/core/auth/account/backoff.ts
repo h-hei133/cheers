@@ -1,4 +1,6 @@
 /** One credential generation; a rotation starts a new, unblocked identity. */
+import { profileScope } from '../../paths/profile/scope.js';
+
 export interface CredentialKey {
   readonly credentialId: string;
   readonly generation: string;
@@ -7,7 +9,7 @@ export interface CredentialKey {
 const backoffUntil = new Map<string, number>();
 
 function keyOf(key: CredentialKey): string {
-  return `${key.credentialId}\u0000${key.generation}`;
+  return profileScope(`${key.credentialId}\u0000${key.generation}`);
 }
 
 /** A provider deadline belongs to the credential that received it. */

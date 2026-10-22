@@ -78,6 +78,22 @@ it('joins a concurrent duplicate instead of paying twice', async () => {
   expect(summarize).toHaveBeenCalledOnce();
 });
 
+it('does not join concurrent compactions with different input ceilings', async () => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const summarize = vi.fn(async () => { await pending; return 'summary'; });
+  const first = condenseContext({ messages: messages(),
+    policy: { contextWindow: 5_000, inputLimit: 500, reserveTokens: 0, keepRecentTokens: 10_000 },
+    summarize, force: true, operation: { sessionId } });
+  const second = condenseContext({ messages: messages(),
+    policy: { contextWindow: 5_000, inputLimit: 5_000, reserveTokens: 0, keepRecentTokens: 10_000 },
+    summarize, force: true, operation: { sessionId } });
+  release();
+  expect((await first).status).toBe('condensed');
+  expect((await second).status).toBe('condensed');
+  expect(summarize).toHaveBeenCalledTimes(2);
+});
+
 it('declines an unknown step without calling the summarizer again', async () => {
   const summarize = vi.fn(async () => undefined as string | undefined);
   const first = await condenseContext({ messages: messages(), policy, summarize, force: true, operation: { sessionId } });

@@ -12,9 +12,21 @@ export function splitTableRow(line: string): string[] {
   let codeSpanClose = -1;
   for (let index = 0; index < inner.length; index++) {
     const character = inner[index]!;
-    if (character === "\\" && inner[index + 1] === "|" && codeSpanClose < 0) {
-      current += "|";
-      index += 1;
+    if (character === "\\" && codeSpanClose < 0) {
+      let run = 1;
+      while (inner[index + run] === "\\") run += 1;
+      if (inner[index + run] === "|") {
+        current += "\\".repeat(Math.floor(run / 2));
+        if (run % 2 === 1) {
+          current += "|";
+          index += run;
+          continue;
+        }
+        index += run - 1;
+        continue;
+      }
+      current += "\\".repeat(run);
+      index += run - 1;
       continue;
     }
     if (character === "`") {

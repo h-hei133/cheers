@@ -32,6 +32,7 @@ import { readCompletion } from '../../../provider/response/read.js';
 export interface CompactionProvider {
   readonly shape?: ResolvedRequestShape;
   readonly contextWindow?: number;
+  readonly inputLimit?: number;
   readonly maxOutputTokens?: number;
   readonly reserveTokens?: number;
   readonly providerId?: string;
@@ -144,7 +145,7 @@ export interface CompactionRequest {
 
 /** Pure preflight uses the same complete messages as the eventual summary send. */
 export function prepareCompactionMessages(request: Pick<CompactionRequest, 'messages' | 'previousSummary' | 'instructions' | 'prompt' | 'maxOutputTokens'> & {
-  readonly provider: Pick<CompactionProvider, 'contextWindow' | 'maxOutputTokens' | 'reserveTokens'>;
+  readonly provider: Pick<CompactionProvider, 'contextWindow' | 'inputLimit' | 'maxOutputTokens' | 'reserveTokens'>;
 }): readonly CompactionChatMessage[] {
   const previousSummary = request.previousSummary?.trim();
   // Revising a checkpoint and summarizing from scratch are different questions,
@@ -159,8 +160,9 @@ export function prepareCompactionMessages(request: Pick<CompactionRequest, 'mess
     ...request.messages, { role: 'user' as const, content: prompt },
   ];
   const maxOutputTokens = request.provider.maxOutputTokens ?? request.maxOutputTokens;
-  if (request.provider.contextWindow !== undefined) {
-    const budget = requestBudget({ window: request.provider.contextWindow, outputTokens: maxOutputTokens,
+  if (request.provider.contextWindow !== undefined || request.provider.inputLimit !== undefined) {
+    const budget = requestBudget({ window: request.provider.contextWindow, inputLimit: request.provider.inputLimit,
+      outputTokens: maxOutputTokens,
       reserveTokens: request.provider.reserveTokens, promptTokens: promptTokensFor({ messages: messages.map(message => ({ ...message, content: message.content ?? '' })) }).tokens, measured: false });
     if (budget.ok === false && budget.reason !== 'unknown') throw new SummaryAdmissionError(`Summary request refused: ${budget.detail}`);
   }

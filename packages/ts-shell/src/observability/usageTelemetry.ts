@@ -1,4 +1,5 @@
 import { currentUsage, sessionTelemetries } from './usage/state.js';
+import { randomUUID } from 'node:crypto';
 import type { ModelCostRates } from "../core/models/catalog.js";
 import type { RequestContext } from '../context/request/model.js';
 import type { PromptMeasurementIdentity, UsageAttribution } from './usage/model.js';
@@ -7,18 +8,11 @@ export { splitBucketKey, usageBucketKey } from './usage/identity.js';
 
 export type { ModelCostRates };
 
-import type { ModelUsageBucket, SessionUsageTelemetry, UsageHistoryEntry, SessionUsageSnapshot } from "./usage/model.js";
+import { MAX_RECENT_REQUESTS, type ModelUsageBucket, type SessionUsageTelemetry,
+  type UsageHistoryEntry, type SessionUsageSnapshot } from "./usage/model.js";
 import { decodeUsageSnapshot, mergeUsageDelta } from "./usage/snapshot.js";
+export { MAX_RECENT_REQUESTS };
 export type { ModelUsageBucket, SessionUsageTelemetry, UsageHistoryEntry, SessionUsageSnapshot } from "./usage/model.js";
-
-/**
- * How many requests are kept.
- *
- * Enough to cover a cache's life at a normal pace — the TTL most providers use
- * is minutes, not hours — while keeping the memory this costs bounded for a
- * session that runs all day.
- */
-export const MAX_RECENT_REQUESTS = 64;
 
 /** Per-million-token rates used for the session cost estimate. */
 export const USAGE_RATES = { promptPerMTok: 0.14, completionPerMTok: 0.28 } as const;
@@ -125,6 +119,8 @@ export function recordSessionUsage(
     promptIdentity?: PromptMeasurementIdentity;
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
+    /** Why this request was sent, when the caller can prove it from the wire context. */
+    purpose?: string;
   },
   options: { readonly affectsContext?: boolean; readonly promptMeasured?: boolean;
     readonly scope?: Map<string, SessionUsageTelemetry> } = {},
@@ -192,6 +188,8 @@ export function recordSessionUsage(
   if (options.affectsContext !== false) {
     pushHistory(existing, {
       promptTokens: promptMeasured ? promptTotal : 0,
+      completionTokens: cTokens,
+      purpose: usage.purpose ?? "turn",
       cacheReadTokens: cacheRead,
       cacheWriteTokens: cacheWrite,
       bucketKey: key,
@@ -213,7 +211,7 @@ export type SessionUsageRecord = Parameters<typeof recordSessionUsage>[1];
 
 /** Append to the bounded history, dropping the oldest entry once it is full. */
 function pushHistory(telemetry: SessionUsageTelemetry, entry: UsageHistoryEntry): void {
-  telemetry.recentRequests.push(entry);
+  telemetry.recentRequests.push({ ...entry, id: randomUUID() });
   const excess = telemetry.recentRequests.length - MAX_RECENT_REQUESTS;
   if (excess > 0) telemetry.recentRequests.splice(0, excess);
 }
@@ -257,6 +255,12 @@ export function measuredPromptContext(sessionId: string, expected: {
       : { tokens: telemetry.lastPromptTokens, messageCount: telemetry.lastPromptMessageCount };
   }
   if (identity.provider !== expected.provider || identity.model !== expected.model) return undefined;
+  // A complete recorded identity cannot be checked against a provider/model-only
+  // query. Returning it here would let the status band present an old schema or
+  // system prompt as the current request.
+  if (identity.schemaDigest !== undefined || identity.systemDigest !== undefined) {
+    if (expected.schemaDigest === undefined || expected.systemDigest === undefined) return undefined;
+  }
   if (options.requireExpectedIdentity) {
     if (expected.endpoint === undefined || expected.schemaDigest === undefined || expected.systemDigest === undefined) return undefined;
     if (identity.endpoint !== expected.endpoint) return undefined;
@@ -311,6 +315,8 @@ export function markContextUnknown(sessionId: string, kind: 'context-reset' | 'u
   clearContextUsage(sessionId);
   pushHistory(existing, {
     promptTokens: 0,
+    completionTokens: 0,
+    purpose: kind,
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
     bucketKey: existing.lastBucketKey,

@@ -620,6 +620,30 @@ describe("session wiring", () => {
     } finally { mode.stop(); }
   });
 
+  it('resets Vim mode when a picker replaces the draft', async () => {
+    const scheduler = new ManualScheduler();
+    const { mode, terminal } = build({ scheduler });
+    const host = mode as unknown as { view: InteractiveView; overlay: OverlayHost;
+      options: { runtimeContext: ShellRuntimeContext };
+      applyPicker(picker: Picker, ids: readonly string[]): void };
+    host.options.runtimeContext.runtimeConfig.vimMode = true;
+    mode.start();
+    try {
+      host.view.editor.setText('old');
+      terminal.input('\x1b');
+      scheduler.flush();
+      const picker = { title: 'Draft', form: 'panel' as const, empty: '', load: async () => [],
+        apply: async () => ({ draft: 'new' }) };
+      host.overlay.open(picker);
+      host.applyPicker(picker, ['draft']);
+      await vi.waitFor(() => expect(host.view.editor.getText()).toBe('new'));
+      host.overlay.close();
+      terminal.input('x');
+      scheduler.flush();
+      expect(host.view.editor.getText()).toBe('newx');
+    } finally { mode.stop(); }
+  });
+
   it.each([['/models', '/model ', undefined, '/model'], ['/recall', '/recall ', '<query>', '/recall '], ['/exit', '/exit ', undefined, '/exit']])(
     'inserts the help choice %s and executes only on a second explicit submission', async (filter, command, usage, submitted) => {
       const exit = vi.fn(); const { mode, terminal } = build({ exit });

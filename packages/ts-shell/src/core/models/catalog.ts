@@ -22,6 +22,8 @@ export interface CatalogModel {
   readonly id: string;
   /** Context window in tokens, when the provider publishes one. */
   readonly contextWindow?: number;
+  /** Independent prompt ceiling when the endpoint publishes one. */
+  readonly inputLimit?: number;
   /**
    * What this model charges, when the publisher states it.
    *

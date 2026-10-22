@@ -30,6 +30,7 @@ function build(overrides: Partial<InteractiveView> = {}) {
     blockAtScreenRow: vi.fn(),
     transcript: {
       setCollapsed: vi.fn(),
+      revision: 0,
     },
     ...overrides,
   } as unknown as InteractiveView;
@@ -110,6 +111,50 @@ describe("pointer drag selection", () => {
     expect(copied.length).toBe(1);
     expect(copied[0]).toContain("line 1");
     expect(redraws()).toBeGreaterThanOrEqual(3);
+  });
+
+  it("invalidates a transcript drag when the source layout revision changes", () => {
+    let revision = 1;
+    const { pointer, copied } = build({ selectionRevision: () => revision });
+    pointer.handle(parseMouseReport("\x1b[<0;3;1M")!);
+    pointer.handle(parseMouseReport("\x1b[<32;21;2M")!);
+    expect(pointer.selection).toBeDefined();
+    revision += 1;
+    expect(pointer.selection).toBeUndefined();
+    pointer.handle(parseMouseReport("\x1b[<0;21;2m")!);
+    expect(copied).toEqual([]);
+  });
+
+  it("invalidates a transcript drag before the next frame when transcript text changes", () => {
+    const { pointer, copied, surface } = build();
+    pointer.handle(parseMouseReport("\x1b[<0;3;1M")!);
+    pointer.handle(parseMouseReport("\x1b[<32;21;2M")!);
+    expect(pointer.selection).toBeDefined();
+    (surface.transcript as unknown as { revision: number }).revision += 1;
+    pointer.handle(parseMouseReport("\x1b[<0;21;2m")!);
+    expect(copied).toEqual([]);
+  });
+
+  it("keeps pointer-owned auto-scroll current while rejecting an external scroll", () => {
+    let top = 0;
+    const scroll = vi.fn((delta: number) => {
+      top += delta;
+      return true;
+    });
+    const { pointer } = build({
+      scroll,
+      selectionTop: () => top,
+      composerGeometry: () => composerGeometry("one\ntwo", 15),
+    });
+    pointer.handle(parseMouseReport("\x1b[<0;11;6M")!);
+    pointer.handle(parseMouseReport("\x1b[<32;11;1M")!);
+    expect(scroll).toHaveBeenCalledWith(-1);
+    expect(pointer.selection).toBeDefined();
+    pointer.handle(parseMouseReport("\x1b[<32;11;2M")!);
+    expect(pointer.selection).toBeDefined();
+    top += 1;
+    expect(pointer.selection).toBeUndefined();
+    pointer.handle(parseMouseReport("\x1b[<0;11;2m")!);
   });
 
   it("clears selection on single click without drag", () => {

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   chmodSync,
   closeSync,
+  copyFileSync,
   existsSync,
   fstatSync,
   lstatSync,
@@ -33,6 +34,10 @@ const SHA256 = /^[a-f0-9]{64}$/;
 export const PUBLISH_JOURNAL = ".publish-journal.json";
 export const PACKAGE_MAIN_BACKUP = ".package-main.previous";
 export const BUILD_LOCK = ".build.lock";
+
+function targetMatchesHost(target) {
+  return target === `${process.platform}-${process.arch}` || target === `bun-${process.platform}-${process.arch}`;
+}
 
 export function acquireBuildLock(root, dist) {
   const rootPath = path.resolve(root);
@@ -266,6 +271,111 @@ export async function publishBuild(options) {
   } finally {
     lock.release();
   }
+}
+
+/** Bind the compiled single-file executable to the exact published build. */
+export async function attachExecutable(options) {
+  if (options.lockOwner !== undefined) return attachExecutableLocked(options);
+  const rootPath = path.resolve(options.root);
+  const distPath = path.resolve(options.dist);
+  const lock = acquireBuildLock(rootPath, distPath);
+  if (!lock) throw new Error("Another build is in progress; the executable was not attached.");
+  try {
+    return await attachExecutableLocked({ ...options, root: rootPath, dist: distPath, lockOwner: lock.owner });
+  } finally {
+    lock.release();
+  }
+}
+
+async function attachExecutableLocked(options) {
+  const rootPath = path.resolve(options.root);
+  const distPath = path.resolve(options.dist);
+  recoverBuildTransaction(rootPath, distPath, { lockOwner: options.lockOwner });
+  const manifestFile = path.join(distPath, "build-manifest.json");
+  assertNoSymlinkPath(rootPath, manifestFile);
+  const manifestState = readFileState(rootPath, manifestFile);
+  const manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
+  if (manifest?.schemaVersion !== 2 || manifest.buildId !== options.expectedBuildId
+    || manifest.inputsDigest !== options.expectedInputsDigest
+    || (options.expectedArtifactDigest !== undefined && manifest.artifactDigest !== options.expectedArtifactDigest)
+    || !Array.isArray(manifest.compilerInputs)) {
+    throw new Error("The published build changed before the executable could be attached.");
+  }
+  const executable = path.resolve(options.executable);
+  const relative = path.relative(rootPath, executable).split(path.sep).join("/");
+  if (!safeRelativePath(relative)) throw new Error("The executable must stay inside the repository.");
+  if (typeof options.target !== "string" || !/^[a-z0-9-]+$/.test(options.target)) {
+    throw new Error("The executable target is invalid.");
+  }
+  if (!options.compiler || options.compiler.name !== "bun"
+    || typeof options.compiler.version !== "string" || !options.compiler.version.trim()
+    || !SHA256.test(options.compiler.sha256 ?? "")) {
+    throw new Error("The executable compiler provenance is incomplete.");
+  }
+  if (!options.verification || (options.verification.kind !== "host" && options.verification.kind !== "cross-target")) {
+    throw new Error("The executable verification state is incomplete.");
+  }
+  if (options.verification.kind === "host"
+    && (typeof options.verification.version !== "string" || options.verification.version !== manifest.version
+      || !targetMatchesHost(options.target))) {
+    throw new Error("A host-verified executable must record the build version for the current host target.");
+  }
+  assertNoSymlinkPath(rootPath, executable);
+  const first = snapshotFile(executable, relative);
+  if (first.size === 0) throw new Error("The executable is empty.");
+  if (buildInputDigest(rootPath, manifest.compilerInputs).digest !== manifest.inputsDigest) {
+    throw new Error("Build inputs changed before the executable could be attached.");
+  }
+  const second = snapshotFile(executable, relative);
+  if (first.size !== second.size || first.sha256 !== second.sha256) {
+    throw new Error("The executable changed while it was being attached.");
+  }
+  const executableName = options.target.includes("windows") ? "cheers.exe" : "cheers";
+  const immutable = path.join(rootPath, "dist", "executables", second.sha256, executableName);
+  const immutableRelative = path.relative(rootPath, immutable).split(path.sep).join("/");
+  if (!safeRelativePath(immutableRelative) || !immutableRelative.startsWith("dist/executables/")) {
+    throw new Error("The immutable executable path is outside the executable store.");
+  }
+  assertNoSymlinkPath(rootPath, path.dirname(immutable));
+  if (existsSync(immutable)) {
+    const existing = snapshotFile(immutable, immutableRelative);
+    if (existing.size !== second.size || existing.sha256 !== second.sha256) {
+      throw new Error("The immutable executable path already contains different bytes.");
+    }
+  } else {
+    const temporary = `${immutable}.${process.pid}.${randomUUID()}.tmp`;
+    try {
+      mkdirSync(path.dirname(immutable), { recursive: true });
+      assertNoSymlinkPath(rootPath, path.dirname(immutable));
+      copyFileSync(executable, temporary);
+      chmodSync(temporary, 0o755);
+      renameSync(temporary, immutable);
+    } catch (error) {
+      rmSync(temporary, { force: true });
+      throw error;
+    }
+  }
+  await options.verifyCandidate?.(immutable);
+  const next = {
+    ...manifest,
+    executable: { path: immutableRelative, size: second.size, sha256: second.sha256,
+      target: options.target, compiler: { ...options.compiler }, builtAt: new Date().toISOString(),
+      verification: { ...options.verification } },
+  };
+  await writeAtomic(rootPath, manifestFile, `${JSON.stringify(next, null, 2)}\n`);
+  try {
+    const verified = await options.verify?.(next);
+    if (verified === false) throw new Error("Post-install executable verification failed.");
+  } catch (error) {
+    try {
+      restoreFile(manifestState);
+    } catch (rollbackError) {
+      throw new Error(`${error instanceof Error ? error.message : String(error)}; manifest rollback failed: ${
+        rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+    }
+    throw error;
+  }
+  return next;
 }
 
 async function publishBuildLocked({

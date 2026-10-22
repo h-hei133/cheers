@@ -3,6 +3,8 @@ import { toolPlanMode } from '../../query/toolPolicy.js';
 import type { CommandReport, ReportLine } from '../report/contract.js';
 import { createReport, span } from '../report/projection.js';
 import { reportMetadata } from '../report/metadata.js';
+import { compareDiscoveryCost } from '../../tools/discovery/evaluation.js';
+import { toolWireSurface } from '../../../provider/endpoints/toolSurface.js';
 
 const PERMISSIONS = "Eligible tools still require the session's permissions and approval.";
 
@@ -15,26 +17,40 @@ export function toolLabel(name: string, projectRoot = process.cwd()): string {
   return metadataText(name, projectRoot, 240);
 }
 
-export function toolsReport(pool: ReadonlyMap<string, ToolDefinition>, projectRoot = process.cwd()): CommandReport {
+export function toolsReport(
+  pool: ReadonlyMap<string, ToolDefinition>,
+  projectRoot = process.cwd(),
+  endpoint = 'openai-compatible',
+): CommandReport {
   const safe = (value: string, maxLength = 4096): string => metadataText(value, projectRoot, maxLength);
   const tools = [...pool.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const serialize = (values: readonly ToolDefinition[]) => toolWireSurface(values, endpoint);
+  const discovery = compareDiscoveryCost({ catalog: pool, serialize });
+  const surfaceFacts = (value: typeof discovery.full | null) => value ? {
+    tools: value.tools, bytes: value.bytes, characters: value.characters, estimatedTokens: value.estimatedTokens,
+  } : null;
   const measured = tools.map(tool => ({ name: tool.name, descriptionBytes: Buffer.byteLength(tool.description, 'utf8'),
-    schemaBytes: Buffer.byteLength(JSON.stringify(tool.argsSchema), 'utf8') }));
+    schemaBytes: Buffer.byteLength(JSON.stringify(tool.argsSchema), 'utf8'),
+    wireBytes: toolWireSurface([tool], endpoint).bytes }));
   const measurements = new Map(measured.map(item => [item.name, item]));
   return createReport({ title: `Tools (${tools.length})`,
     columns: [{ label: 'Tool', minWidth: 14 }, { label: 'Plan mode', minWidth: 10 },
       { label: 'Description bytes', minWidth: 8, align: 'right' }, { label: 'Schema bytes', minWidth: 8, align: 'right' },
+      { label: 'Wire bytes', minWidth: 8, align: 'right' },
       { label: 'What it does', minWidth: 24 }],
     lines: [
       ...tools.map((tool): ReportLine => ({ kind: 'columns', cells: [
         [span(safe(tool.name, 240), 'code')], [span(toolPlanMode(tool.name, tool))],
         [span(measurements.get(tool.name)!.descriptionBytes, 'number')],
         [span(measurements.get(tool.name)!.schemaBytes, 'number')],
+        [span(measurements.get(tool.name)!.wireBytes, 'number')],
         [span(toolSummary(tool.description, projectRoot))],
       ] })),
       { kind: 'space' },
-      { kind: 'text', spans: [span(`Static wire cost: ${measured.reduce((sum, tool) => sum + tool.descriptionBytes, 0)} description bytes + ${measured.reduce((sum, tool) => sum + tool.schemaBytes, 0)} schema bytes. `),
+      { kind: 'text', spans: [span(`Description + schema payload: ${measured.reduce((sum, tool) => sum + tool.descriptionBytes, 0)} description bytes + ${measured.reduce((sum, tool) => sum + tool.schemaBytes, 0)} schema bytes. Serialized ${endpoint} declarations: ${discovery.full.bytes} UTF-8 bytes. `),
         span('Token counts require the target model tokenizer and are not measured here.', 'muted')] },
+      { kind: 'text', spans: [span(`Discovery projection: full ${discovery.full.tools} tools/${discovery.full.bytes} bytes; initial ${discovery.initial.tools} tools/${discovery.initial.bytes} bytes; after load ${discovery.afterLoad ? `${discovery.afterLoad.tools} tools/${discovery.afterLoad.bytes} bytes` : 'not measured'}; ${discovery.discovery.calls} discovery call(s); schema round-trip ${discovery.quality.status}. `),
+        span('Estimated tokens use a characters-per-token method, not a model tokenizer.', 'muted')] },
       { kind: 'text', spans: [span('/tools <name>', 'command'), span(" shows one tool's arguments.")] },
       { kind: 'text', spans: [span('Plan mode permits only read-only bash commands and browser actions.')] },
       { kind: 'text', spans: [span(PERMISSIONS, 'warning')] },
@@ -44,7 +60,16 @@ export function toolsReport(pool: ReadonlyMap<string, ToolDefinition>, projectRo
       // Static wire cost only; a token count requires the model's tokenizer.
       size: { unit: 'utf8-bytes', tokens: 'not-measured',
         descriptionBytes: measured.reduce((sum, tool) => sum + tool.descriptionBytes, 0),
-        schemaBytes: measured.reduce((sum, tool) => sum + tool.schemaBytes, 0), perTool: measured.map(tool => ({ ...tool, name: safe(tool.name, 240) })) } },
+        schemaBytes: measured.reduce((sum, tool) => sum + tool.schemaBytes, 0), perTool: measured.map(tool => ({ ...tool, name: safe(tool.name, 240) })),
+        wire: { endpoint, bytes: discovery.full.bytes, characters: discovery.full.characters,
+          estimatedTokens: discovery.full.estimatedTokens },
+        discovery: { full: surfaceFacts(discovery.full), initial: surfaceFacts(discovery.initial),
+          afterLoad: surfaceFacts(discovery.afterLoad), calls: discovery.discovery.calls,
+          discoveryBytes: discovery.discovery.bytes, discoveryCharacters: discovery.discovery.characters,
+          discoveryEstimatedTokens: discovery.discovery.estimatedTokens,
+          deltaBytes: discovery.delta.bytes, deltaCharacters: discovery.delta.characters,
+          deltaEstimatedTokens: discovery.delta.estimatedTokens, method: discovery.method, divisor: discovery.divisor,
+          qualityStatus: discovery.quality.status, changed: discovery.quality.changed } } },
   });
 }
 
@@ -70,7 +95,7 @@ export function toolReport(tool: ToolDefinition, projectRoot = process.cwd()): C
     lines: [
       ...description.split(/\r?\n/).map((text): ReportLine => ({ kind: 'text', spans: [span(text)] })),
       { kind: 'space' },
-      { kind: 'text', spans: [span(`Static wire cost: ${descriptionBytes} description bytes + ${schemaBytes} schema bytes. Token count: not measured.`)] },
+      { kind: 'text', spans: [span(`Description + schema payload: ${descriptionBytes} description bytes + ${schemaBytes} schema bytes. Token count: not measured.`)] },
       { kind: 'text', spans: [span('Plan mode: '), span(planMode, planMode === 'blocked' ? 'warning' : 'text')] },
       { kind: 'text', spans: [span(PERMISSIONS, 'warning')] },
       { kind: 'space' },

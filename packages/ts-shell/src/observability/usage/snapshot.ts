@@ -1,5 +1,5 @@
 import { isRecord } from "../../core/values/record.js";
-import type { ModelUsageBucket, SessionUsageSnapshot } from "./model.js";
+import { MAX_RECENT_REQUESTS, type ModelUsageBucket, type SessionUsageSnapshot, type UsageHistoryEntry } from "./model.js";
 import { decodeAttribution, legacyBucketKey } from './identity.js';
 
 const bucketFields = ["promptTokens", "completionTokens", "totalTokens", "cacheReadTokens", "cacheWriteTokens", "turnsCount"] as const;
@@ -9,6 +9,10 @@ function count(value: unknown): number {
     throw new Error("Invalid persisted session usage count");
   }
   return value;
+}
+
+function text(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 16_384;
 }
 
 /** Copy and validate at the durable boundary; model keys remain opaque. */
@@ -27,6 +31,7 @@ export function decodeUsageSnapshot(value: unknown): SessionUsageSnapshot | unde
     for (const field of bucketFields) bucket[field] = count(raw[field]);
     byModel[key] = bucket;
   }
+  const recentRequests = history(value.recentRequests);
   return {
     schemaVersion: 2,
     byModel,
@@ -34,7 +39,83 @@ export function decodeUsageSnapshot(value: unknown): SessionUsageSnapshot | unde
     toolCallsCount: count(value.toolCallsCount),
     lastBucketKey: value.schemaVersion === 2 ? value.lastBucketKey : legacyBucketKey(value.lastBucketKey),
     lastUpdated: count(value.lastUpdated),
+    recentRequests,
   };
+}
+
+function history(value: unknown): UsageHistoryEntry[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > MAX_RECENT_REQUESTS) {
+    throw new Error("Invalid persisted session usage history");
+  }
+  return value.map(entry => {
+    if (!isRecord(entry) || typeof entry.bucketKey !== "string" || entry.bucketKey.length > 16_384
+      || typeof entry.reportedCache !== "boolean"
+      || !["request", "context-reset", "usage-gap"].includes(String(entry.kind))) {
+      throw new Error("Invalid persisted session usage history entry");
+    }
+    const promptTokens = count(entry.promptTokens);
+    const cacheReadTokens = count(entry.cacheReadTokens);
+    const cacheWriteTokens = count(entry.cacheWriteTokens);
+    const timestamp = count(entry.timestamp);
+    if (entry.purpose !== undefined && !text(entry.purpose)) {
+      throw new Error("Invalid persisted session usage purpose");
+    }
+    if (entry.id !== undefined && !text(entry.id)) {
+      throw new Error("Invalid persisted session usage history id");
+    }
+    const completionTokens = entry.completionTokens === undefined ? undefined : count(entry.completionTokens);
+    const attribution = decodeAttribution(entry.bucketKey, entry.attribution);
+    return {
+      ...(entry.id === undefined ? {} : { id: entry.id }),
+      promptTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
+      bucketKey: entry.bucketKey,
+      timestamp,
+      reportedCache: entry.reportedCache,
+      kind: entry.kind as UsageHistoryEntry["kind"],
+      ...(completionTokens === undefined ? {} : { completionTokens }),
+      ...(entry.purpose === undefined ? {} : { purpose: entry.purpose }),
+      ...(attribution ? { attribution } : {}),
+    };
+  });
+}
+
+function sameHistoryEntry(left: UsageHistoryEntry, right: UsageHistoryEntry): boolean {
+  if (left.id !== undefined || right.id !== undefined) return left.id === right.id;
+  return left.promptTokens === right.promptTokens
+    && left.completionTokens === right.completionTokens
+    && left.purpose === right.purpose
+    && left.cacheReadTokens === right.cacheReadTokens
+    && left.cacheWriteTokens === right.cacheWriteTokens
+    && left.bucketKey === right.bucketKey
+    && left.timestamp === right.timestamp
+    && left.reportedCache === right.reportedCache
+    && left.kind === right.kind
+    && JSON.stringify(left.attribution) === JSON.stringify(right.attribution);
+}
+
+function historyOverlap(left: readonly UsageHistoryEntry[], right: readonly UsageHistoryEntry[]): number {
+  for (let length = Math.min(left.length, right.length); length > 0; length -= 1) {
+    if (left.slice(-length).every((entry, index) => sameHistoryEntry(entry, right[index]!))) return length;
+  }
+  return 0;
+}
+
+/** Merge bounded histories without treating their capped length as a cursor. */
+function mergeRecentHistory(
+  current: readonly UsageHistoryEntry[],
+  live: readonly UsageHistoryEntry[],
+  baseline: readonly UsageHistoryEntry[],
+): UsageHistoryEntry[] {
+  let overlap = historyOverlap(current, live);
+  let appended = live.slice(overlap);
+  if (overlap === 0) {
+    overlap = historyOverlap(baseline, live);
+    appended = live.slice(overlap).filter(entry => !current.some(existing => sameHistoryEntry(existing, entry)));
+  }
+  return [...current, ...appended].slice(-MAX_RECENT_REQUESTS);
 }
 
 function addDelta(current: number, live: number, baseline: number): number {
@@ -55,7 +136,7 @@ export function mergeUsageDelta(
   const merged = decodeUsageSnapshot(current) ?? {
     schemaVersion: 2,
     byModel: Object.create(null) as Record<string, ModelUsageBucket>,
-    turnsCount: 0, toolCallsCount: 0, lastBucketKey: "", lastUpdated: 0,
+    turnsCount: 0, toolCallsCount: 0, lastBucketKey: "", lastUpdated: 0, recentRequests: [],
   };
   for (const [key, bucket] of Object.entries(live.byModel)) {
     const previous = baseline?.byModel[key];
@@ -71,6 +152,11 @@ export function mergeUsageDelta(
   }
   merged.turnsCount = addDelta(merged.turnsCount, live.turnsCount, baseline?.turnsCount ?? 0);
   merged.toolCallsCount = addDelta(merged.toolCallsCount, live.toolCallsCount, baseline?.toolCallsCount ?? 0);
+  merged.recentRequests = mergeRecentHistory(
+    merged.recentRequests,
+    live.recentRequests,
+    baseline?.recentRequests ?? [],
+  );
   if (live.turnsCount > (baseline?.turnsCount ?? 0) && live.lastUpdated >= merged.lastUpdated) {
     merged.lastBucketKey = live.lastBucketKey;
   }

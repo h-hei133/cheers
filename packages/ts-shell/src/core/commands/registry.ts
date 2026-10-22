@@ -81,6 +81,7 @@ import { runStatuslineCommand } from "./statuslineCommandRuntime.js";
 import { runTrustCommand } from "./trustCommandRuntime.js";
 import { runInitCommand } from "./initCommandRuntime.js";
 import { runCostCommand } from "./costCommandRuntime.js";
+import { usageSyntax } from "./usage/syntax.js";
 import { runUndoCommand } from "./undoCommandRuntime.js";
 import { undoSyntax } from './undo/syntax.js';
 import { runExportCommand } from "./exportCommandRuntime.js";
@@ -340,6 +341,7 @@ export function createCommandRegistry(
       group: "session",
       argumentMode: "raw",
       argumentHint: syntaxHint(continueSyntax),
+      getArgumentCompletions: (prefix) => navigationCompletions(continueSyntax, prefix),
       execute: (args, context) => runContinuePromptCommand(args, context),
     },
     {
@@ -561,6 +563,7 @@ export function createCommandRegistry(
     {
       name: 'usage', kind: 'local', supportsNonInteractive: true, availability: 'available', enabled: true,
       summary: 'show session usage, account quota and reset previews or saved receipts', group: 'session', argumentHint: '[show|account|reset [apply <preview-id>|status [request-id]]]',
+      getArgumentCompletions: prefix => syntaxCompletions(usageSyntax, prefix),
       execute: (args, context) => runUsageCommand(args, context),
     },
     {

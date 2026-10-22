@@ -9,9 +9,11 @@ import {
   BUILD_LOCK,
   PACKAGE_MAIN_BACKUP,
   PUBLISH_JOURNAL,
+  attachExecutable,
   publishBuild,
   recoverBuildTransaction,
 } from "./build-manifest.mjs";
+import { isHostTarget, resolveExecutableOutput } from "./build-cli-executable.mjs";
 import { buildCli, compileTypeScript } from "./build-cli.mjs";
 import { LAUNCHER_CONTENT, writeCliLauncher } from "./build-cli-bin.mjs";
 import { buildInputDigest, listCompilerFiles, REQUIRED_BUILD_ASSETS, REQUIRED_PACKAGE_MAIN } from "./build-identity.mjs";
@@ -29,6 +31,9 @@ function writeStaging(staging, entry = "// built\n") {
     write(path.join(staging, `presentation/themes/${asset}.json`), "{}\n");
   }
 }
+
+const bunCompiler = { name: "bun", version: "1.2.0", sha256: "c".repeat(64) };
+const hostTarget = `${process.platform}-${process.arch}`;
 
 test("preserves Node execution options when launching the verified child", () => {
   assert.deepEqual(
@@ -89,6 +94,7 @@ function fixture(version = "1.0.0") {
     "node_modules/typescript/lib/lib.es2024.d.ts",
     "node_modules/@types/node/index.d.ts",
     "scripts/build-cli.mjs",
+    "scripts/build-cli-executable.mjs",
     "scripts/build-cli-bin.mjs",
     "scripts/build-identity.mjs",
     "scripts/build-manifest.mjs",
@@ -118,6 +124,142 @@ test("accepts a complete immutable build and returns its contained entry", async
   assert.equal(result.ok, true);
   assert.match(result.entry, new RegExp(`builds/${value.manifest.buildId}/entrypoints/cli\\.js$`));
   assert.equal(existsSync(path.join(value.dist, "stale.js")), false);
+  rmSync(value.root, { recursive: true, force: true });
+});
+
+test("binds a single-file executable to the published build and rejects tampering", async () => {
+  const value = await buildFixture();
+  assert.equal(checkBuild({ root: value.root, dist: value.dist, version: value.version, executablePolicy: "required" }).state, "missing-executable");
+  const executable = path.join(value.root, "dist/bin/cheers");
+  write(executable, "compiled executable\n");
+  await attachExecutable({ root: value.root, dist: value.dist, executable,
+    expectedBuildId: value.manifest.buildId, expectedInputsDigest: value.inputsDigest, target: hostTarget, compiler: bunCompiler,
+    verification: { kind: "host", version: value.version } });
+  const checked = checkBuild({ root: value.root, dist: value.dist, version: value.version, executablePolicy: "required" });
+  assert.equal(checked.state, "fresh");
+  assert.equal(checked.executable.sha256, checked.manifest.executable.sha256);
+  assert.deepEqual(checked.manifest.executable.compiler, bunCompiler);
+  writeFileSync(path.join(value.root, checked.manifest.executable.path), "tampered executable\n");
+  assert.equal(checkBuild({ root: value.root, dist: value.dist, version: value.version }).state, "executable-mismatch");
+  assert.equal(checkBuild({ root: value.root, dist: value.dist, version: value.version, executablePolicy: "ignore" }).state, "fresh");
+  rmSync(value.root, { recursive: true, force: true });
+});
+
+test("restricts executable output to a file directly inside dist/bin", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "cheers-output-"));
+  assert.equal(resolveExecutableOutput(root, "dist/bin/cheers"), path.join(root, "dist/bin/cheers"));
+  assert.throws(() => resolveExecutableOutput(root, ".git/config"), /directly inside dist\/bin/);
+  assert.throws(() => resolveExecutableOutput(root, "dist/cli.js"), /directly inside dist\/bin/);
+  assert.throws(() => resolveExecutableOutput(root, "dist/bin/nested/cheers"), /directly inside dist\/bin/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("recognizes both host target spellings and keeps other targets cross-target", () => {
+  assert.equal(isHostTarget("linux-x64", "linux", "x64"), true);
+  assert.equal(isHostTarget("bun-linux-x64", "linux", "x64"), true);
+  assert.equal(isHostTarget("bun-linux-arm64", "linux", "x64"), false);
+  assert.equal(isHostTarget("bun-windows-x64", "linux", "x64"), false);
+});
+
+test("restores the previous manifest when executable verification fails", async () => {
+  const value = await buildFixture();
+  const manifestFile = path.join(value.dist, "build-manifest.json");
+  const before = readFileSync(manifestFile);
+  const executable = path.join(value.root, "dist/bin/cheers");
+  write(executable, "compiled executable\n");
+  await assert.rejects(() => attachExecutable({ root: value.root, dist: value.dist, executable,
+    expectedBuildId: value.manifest.buildId, expectedInputsDigest: value.inputsDigest, target: hostTarget, compiler: bunCompiler,
+    verification: { kind: "host", version: value.version },
+    verify: () => { throw new Error("post-install verification failed"); },
+  }), /post-install verification failed/);
+  assert.deepEqual(readFileSync(manifestFile), before);
+  assert.equal(checkBuild({ root: value.root, dist: value.dist, version: value.version }).state, "fresh");
+  rmSync(value.root, { recursive: true, force: true });
+});
+
+test("refuses to bind an executable without compiler provenance", async () => {
+  const value = await buildFixture();
+  const executable = path.join(value.root, "dist/bin/cheers");
+  write(executable, "compiled executable\n");
+  await assert.rejects(() => attachExecutable({ root: value.root, dist: value.dist, executable,
+    expectedBuildId: value.manifest.buildId, expectedInputsDigest: value.inputsDigest, target: hostTarget }),
+  /compiler provenance is incomplete/);
+  rmSync(value.root, { recursive: true, force: true });
+});
+
+test("refuses to attach an executable after build inputs change", async () => {
+  const value = await buildFixture();
+  const executable = path.join(value.root, "dist/bin/cheers");
+  write(executable, "compiled executable\n");
+  writeFileSync(path.join(value.root, "package-lock.json"), "changed before attach\n");
+  await assert.rejects(() => attachExecutable({ root: value.root, dist: value.dist, executable,
+    expectedBuildId: value.manifest.buildId, expectedInputsDigest: value.inputsDigest, target: hostTarget, compiler: bunCompiler,
+    verification: { kind: "host", version: value.version } }),
+  /Build inputs changed before the executable could be attached/);
+  assert.equal(checkBuild({ root: value.root, dist: value.dist, version: value.version }).state, "stale");
+  rmSync(value.root, { recursive: true, force: true });
+});
+
+test("rejects an empty executable and keeps the previous manifest", async () => {
+  const value = await buildFixture();
+  const manifestFile = path.join(value.dist, "build-manifest.json");
+  const before = readFileSync(manifestFile);
+  const executable = path.join(value.root, "dist/bin/empty");
+  write(executable, "");
+  await assert.rejects(() => attachExecutable({ root: value.root, dist: value.dist, executable,
+    expectedBuildId: value.manifest.buildId, expectedInputsDigest: value.inputsDigest, target: hostTarget,
+    compiler: bunCompiler, verification: { kind: "host", version: value.version } }),
+  /executable is empty/);
+  assert.deepEqual(readFileSync(manifestFile), before);
+  assert.equal(checkBuild({ root: value.root, dist: value.dist, version: value.version }).state, "fresh");
+  rmSync(value.root, { recursive: true, force: true });
+});
+
+test("does not claim a cross-target executable was host-verified", async () => {
+  const value = await buildFixture();
+  const executable = path.join(value.root, "dist/bin/cross");
+  write(executable, "cross target bytes\n");
+  await attachExecutable({ root: value.root, dist: value.dist, executable,
+    expectedBuildId: value.manifest.buildId, expectedInputsDigest: value.inputsDigest, target: "darwin-arm64",
+    compiler: bunCompiler, verification: { kind: "cross-target" } });
+  assert.equal(checkBuild({ root: value.root, dist: value.dist, version: value.version,
+    executablePolicy: "required" }).state, "executable-unverified");
+  assert.equal(checkBuild({ root: value.root, dist: value.dist, version: value.version }).state, "fresh");
+  rmSync(value.root, { recursive: true, force: true });
+});
+
+test("rejects host verification recorded for a different target", async () => {
+  const value = await buildFixture();
+  const executable = path.join(value.root, "dist/bin/wrong-host");
+  write(executable, "wrong host bytes\n");
+  await assert.rejects(() => attachExecutable({ root: value.root, dist: value.dist, executable,
+    expectedBuildId: value.manifest.buildId, expectedInputsDigest: value.inputsDigest, target: "darwin-arm64",
+    compiler: bunCompiler, verification: { kind: "host", version: value.version } }),
+  /host-verified executable/);
+  assert.equal(checkBuild({ root: value.root, dist: value.dist, version: value.version }).state, "fresh");
+  rmSync(value.root, { recursive: true, force: true });
+});
+
+test("rejects host verification recorded for a different build version", async () => {
+  const value = await buildFixture();
+  const executable = path.join(value.root, "dist/bin/wrong-version");
+  write(executable, "wrong version bytes\n");
+  await assert.rejects(() => attachExecutable({ root: value.root, dist: value.dist, executable,
+    expectedBuildId: value.manifest.buildId, expectedInputsDigest: value.inputsDigest, target: hostTarget,
+    compiler: bunCompiler, verification: { kind: "host", version: "9.9.9" } }),
+  /record the build version/);
+  assert.equal(checkBuild({ root: value.root, dist: value.dist, version: value.version }).state, "fresh");
+
+  await attachExecutable({ root: value.root, dist: value.dist, executable,
+    expectedBuildId: value.manifest.buildId, expectedInputsDigest: value.inputsDigest, target: hostTarget,
+    compiler: bunCompiler, verification: { kind: "host", version: value.version } });
+  const manifestFile = path.join(value.dist, "build-manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
+  writeFileSync(manifestFile, `${JSON.stringify({
+    ...manifest,
+    executable: { ...manifest.executable, verification: { kind: "host", version: "9.9.9" } },
+  }, null, 2)}\n`);
+  assert.equal(checkBuild({ root: value.root, dist: value.dist, version: value.version }).state, "truncated");
   rmSync(value.root, { recursive: true, force: true });
 });
 

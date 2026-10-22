@@ -139,14 +139,15 @@ catch (error) { console.log(error.code); }
     expect(scope()).toMatchObject({ inputTokens: 10, outputTokens: 2, nextSequence: 2, pending: {}, finalized: [[1, 1]] });
   });
 
-  it.each(['http-retry', 'reasoning-downgrade', 'empty-stream-retry'] as const)('admits only one send before %s consumes its reservation', async kind => {
+  it.each(['http-retry', 'reasoning-downgrade', 'empty-stream-retry'] as const)('admits only one send for %s', async kind => {
     await command(['budget', '20']);
     const fetchImpl = vi.fn(async () => kind === 'http-retry' ? new Response('try again', { status: 500 })
       : kind === 'reasoning-downgrade' ? new Response('reasoning_effort rejected', { status: 400 })
       : new Response(new ReadableStream<Uint8Array>({ start(controller) { controller.error(new Error('socket closed')); } }), { headers: { 'content-type': 'text/event-stream' } })) as unknown as typeof fetch;
     const result = await step(fetchImpl)([{ role: 'user', content: 'hello' }], undefined, {}, { allowTools: false });
     expect(fetchImpl).toHaveBeenCalledOnce(); expect(result).toMatchObject({ stopReason: 'error', retriesExhausted: true });
-    expect(result.errorMessage).toContain('exhausted'); expect(scope().pending['1']).toMatchObject({ dispatched: true });
+    expect(result.errorMessage).toContain(kind === 'empty-stream-retry' ? 'socket closed' : 'exhausted');
+    expect(scope().pending['1']).toMatchObject({ dispatched: true });
     expect(Object.keys(scope().pending)).toEqual(['1']);
   });
 

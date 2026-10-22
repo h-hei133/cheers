@@ -30,12 +30,15 @@ it('reports static description and schema bytes without claiming a token count',
   expect(text).toContain('Description bytes');
   expect(text).toContain('Schema bytes');
   expect(text).toContain('Token counts require the target model tokenizer and are not measured here.');
+  expect(text).toContain('Discovery projection: full');
+  expect(report.facts.size).toMatchObject({ discovery: { method: 'characters-per-token', divisor: 3.5,
+    qualityStatus: 'not-measured', changed: [] } });
 });
 
-it('shows one tool static wire cost without claiming a token count', () => {
+it('shows one tool payload size without claiming a wire or token count', () => {
   const report = toolReport(tool('a', 'first', { type: 'object', properties: { x: { type: 'string' } } }));
   const text = reportText(report);
-  expect(text).toContain('Static wire cost: 5 description bytes');
+  expect(text).toContain('Description + schema payload: 5 description bytes');
   expect(text).toContain('Token count: not measured.');
 });
 

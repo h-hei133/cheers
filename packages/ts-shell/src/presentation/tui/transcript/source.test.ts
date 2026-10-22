@@ -13,6 +13,27 @@ it('marks every wrap point as soft and every source newline as logical', () => {
   expect(joinSourceLines(lines.map(line => ({ ...line, block: 0 })))).toBe('abcdefgh\nij');
 });
 
+it('preserves trailing spaces and a final source newline exactly', () => {
+  for (const source of ['alpha\nbeta  ', 'alpha\nbeta\n', 'alpha\n\n']) {
+    const lines = projectText(source, 20);
+    expect(joinSourceLines(lines.map(line => ({ ...line, block: 0 })))).toBe(source);
+  }
+});
+
+it.each(['assistant', 'command', 'error', 'notice'] as const)(
+  'uses the renderer\'s deliberate trailing-whitespace trim for %s source',
+  kind => {
+    const block = textBlock(kind, 'alpha  ');
+    const transcript = new Transcript();
+    transcript.append(block);
+    const pane = new TranscriptPane(transcript);
+    const painted = pane.render(40, 8, undefined);
+    const row = painted.findIndex(value => stripAnsi(value).includes('alpha'));
+    expect(row).toBeGreaterThanOrEqual(0);
+    expect(pane.extractSource({ row, column: 0 }, { row, column: 39 })).toBe('alpha');
+  },
+);
+
 it('refuses a projection when rendered rows and source lines disagree', () => {
   const block = textBlock('assistant', 'one two');
   expect(sourceLinesFor(block, 0, 40, ['decorated', 'rows']).every(line => line === undefined)).toBe(true);
@@ -60,6 +81,36 @@ it('copies a wrapped formatted table from its original Markdown source', () => {
   expect(continuation).toBeGreaterThan(last);
   expect(pane.extractSource({ row: first, column: 0 }, { row: continuation, column: 39 })).toBe(source);
   expect(pane.extractSource({ row: continuation, column: 0 }, { row: continuation, column: 39 })).toBeUndefined();
+});
+
+it('copies a long unified diff line from source instead of its truncated display row', () => {
+  const source = 'x'.repeat(164);
+  const block = textBlock('command', '', 'edit');
+  block.diff = `@@ -1 +1 @@\n-${source}\n+${source.slice(0, -1)}y`;
+  const transcript = new Transcript();
+  transcript.append(block);
+  const pane = new TranscriptPane(transcript);
+  const painted = pane.render(80, 20, undefined);
+  const removed = painted.findIndex(row => stripAnsi(row).includes('xxxxxxxxxx'));
+  expect(removed).toBeGreaterThanOrEqual(0);
+  expect(stripAnsi(painted[removed]!)).toContain('…');
+  expect(pane.extractSource({ row: removed, column: 0 }, { row: removed, column: 79 })).toBe(source);
+});
+
+it('copies a complete newline-terminated diff without adding a second final newline', () => {
+  const source = '@@ -1 +1 @@\n-old\n+new\n';
+  const block = textBlock('command', '', 'edit');
+  block.diff = source;
+  const transcript = new Transcript();
+  transcript.append(block);
+  const pane = new TranscriptPane(transcript);
+  const painted = pane.render(80, 20, undefined);
+  const first = painted.findIndex(row => stripAnsi(row).includes('@@'));
+  const last = painted.findIndex(row => stripAnsi(row).includes('+new'));
+  expect(first).toBeGreaterThanOrEqual(0);
+  expect(last).toBeGreaterThan(first);
+  expect(pane.extractSource({ row: first, column: 0 }, { row: last, column: 79 }))
+    .toBe('@@ -1 +1 @@\nold\nnew\n');
 });
 
 it.each([

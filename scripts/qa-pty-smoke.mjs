@@ -8,6 +8,7 @@
  * quality matrix.
  */
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -15,25 +16,47 @@ import { fileURLToPath } from "node:url";
 import { createQaPtyEnvironment } from "./qa-pty-env.mjs";
 import { seedRecoverySession, seedSavedSession, extractSessionId, currentSessionFromStore, assertTranscript } from "./qa/session.mjs";
 import { seedRestoreSnapshot, assertRestoreUnchanged, runRestorePreview } from './qa/restore.mjs';
+import { checkBuild } from './start-lib.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const qaOutputDir = process.env.QA_PTY_OUTPUT_DIR?.trim();
-const targetCandidates = [
-  { name: "node", command: process.execPath, args: [path.join(root, "dist/cli.js")] },
-  { name: "exe", command: path.join(root, "dist/bin/cheers"), args: [] },
-];
-const missing = targetCandidates.filter(target => !fs.existsSync(target.name === "node" ? target.args[0] : target.command));
-if (missing.length > 0) {
-  console.error(`Build first: missing ${missing.map(target => target.name).join(", ")} target`);
+const pkg = JSON.parse(fs.readFileSync(path.join(root, "packages", "ts-shell", "package.json"), "utf8"));
+const requestedTarget = process.env.QA_PTY_TARGET?.trim();
+if (requestedTarget && requestedTarget !== "node" && requestedTarget !== "exe") {
+  console.error(`Unknown QA_PTY_TARGET: ${requestedTarget}`);
   process.exit(2);
 }
+const verified = checkBuild({ root, dist: path.join(root, "packages", "ts-shell", "dist"),
+  version: pkg.version, executablePolicy: requestedTarget === "node" ? "ignore" : "required" });
+if (!verified.ok) {
+  console.error(`Build first: ${verified.reason}`);
+  process.exit(2);
+}
+const qaOutputDir = process.env.QA_PTY_OUTPUT_DIR?.trim();
+const executableDigest = verified.executable
+  ? createHash("sha256").update(fs.readFileSync(path.join(root, verified.executable.path))).digest("hex")
+  : null;
+const buildEvidence = {
+  buildId: verified.manifest.buildId,
+  inputsDigest: verified.manifest.inputsDigest,
+  artifactDigest: verified.manifest.artifactDigest,
+  executableSha256: executableDigest,
+  platform: process.platform,
+  architecture: process.arch,
+  node: process.version,
+};
+const targetCandidates = [
+  { name: "node", command: process.execPath, args: [path.join(root, "dist/cli.js")] },
+  ...(verified.executable
+    ? [{ name: "exe", command: path.join(root, verified.executable.path), args: [] }]
+    : []),
+];
 
-const targets = targetCandidates.filter(target => !process.env.QA_PTY_TARGET || target.name === process.env.QA_PTY_TARGET);
+const targets = targetCandidates.filter(target => !requestedTarget || target.name === requestedTarget);
 const modes = process.env.QA_PTY_MODE ? [process.env.QA_PTY_MODE] : ["regular", "fullscreen", "line", "pipe"];
 const terminalModes = new Set(["regular", "fullscreen"]);
 const allModes = new Set([...terminalModes, "line", "pipe"]);
 if (targets.length === 0) {
-  console.error(`Unknown QA_PTY_TARGET: ${process.env.QA_PTY_TARGET}`);
+  console.error(`Unknown QA_PTY_TARGET: ${requestedTarget}`);
   process.exit(2);
 }
 if (modes.some(mode => !allModes.has(mode))) {
@@ -123,6 +146,8 @@ function recordResult(target, mode, state, status, exitCode, detail) {
   fs.writeFileSync(path.join(qaOutputDir, `${stem}.json`), `${JSON.stringify({
     target: target.name,
     mode,
+    command: { executable: target.command, args: target.args },
+    build: buildEvidence,
     status,
     exitCode,
     bytes: Buffer.byteLength(state.output, "utf8"),
@@ -438,6 +463,7 @@ async function runLineSmoke(target) {
     if (config.maxTurns !== 7) throw new Error(`line settings save persisted maxTurns=${String(config.maxTurns)}`);
     if (config.tuiMode !== JSON.parse(configBefore).tuiMode) throw new Error("line settings save changed the launch preference");
     if (!fs.existsSync(path.join(home, ".cheers", "profiles", "work"))) throw new Error("line profile create did not persist the profile");
+    await assertNamedProfileRestart(target, home, project, "line", state);
     assertRestoreUnchanged(restore);
     assertTranscript(home, sessionId, [
       "\"name\":\"bash\"",
@@ -497,6 +523,7 @@ async function runPipeSmoke(target) {
     if (config.maxTurns !== 7) throw new Error(`pipe settings save persisted maxTurns=${String(config.maxTurns)}`);
     if (config.tuiMode !== JSON.parse(configBefore).tuiMode) throw new Error("pipe settings save changed the launch preference");
     if (!fs.existsSync(path.join(home, ".cheers", "profiles", "work"))) throw new Error("pipe profile create did not persist the profile");
+    await assertNamedProfileRestart(target, home, project, "pipe", state);
     const output = normalized(state.output);
     for (const expected of [
       "Current session",
@@ -539,6 +566,37 @@ async function runPipeSmoke(target) {
   } finally {
     clearTimeout(hardTimeout);
     removeFixture(home, project);
+  }
+}
+
+async function assertNamedProfileRestart(target, home, project, mode, state) {
+  const child = spawn(target.command, [...target.args, "--profile", "work", "--print"], {
+    cwd: project,
+    env: qaEnvironment(home, project),
+  });
+  child.on("error", error => { child.probeError = error; });
+  let output = "";
+  child.stdout.on("data", chunk => { output += chunk.toString("utf8"); });
+  child.stderr.on("data", chunk => { output += chunk.toString("utf8"); });
+  child.stdin.end("/sessions current\n/exit\n");
+  try {
+    const code = await waitForExit(child, 30_000);
+    if (code !== 0) throw new Error(`profile follow-up exited ${code}`);
+    const clean = normalized(output);
+    if (!clean.includes("Current session")) throw new Error(`${mode} profile follow-up did not report a current session`);
+    const sessionId = extractSessionId(output);
+    if (!sessionId) throw new Error(`${mode} profile follow-up did not expose a session id`);
+    const sessionDir = path.join(home, ".cheers", "profiles", "work", "sessions", sessionId);
+    if (!fs.existsSync(path.join(sessionDir, "metadata.json")) || !fs.existsSync(path.join(sessionDir, "state.json"))
+      || !fs.existsSync(path.join(sessionDir, "transcript.jsonl"))) {
+      throw new Error(`${mode} profile follow-up session was not stored under the named profile: ${sessionId}`);
+    }
+    state.output += `\n--- named profile restart (${mode}) ---\n${output}`;
+  } finally {
+    if (child.exitCode === null) {
+      child.kill("SIGKILL");
+      await waitForExit(child, 2_000).catch(() => undefined);
+    }
   }
 }
 

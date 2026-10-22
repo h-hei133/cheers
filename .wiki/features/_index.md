@@ -52,6 +52,7 @@ confidence: high
 | [启动产物与构建校验](launch-and-build.md) | START-01 schema v2 输入/产物摘要、不可变构建、原子 pointer、锁感知事务恢复与 `start`/`start:dev` |
 | [Phase 20 交付状态](phase-20-status.md) | 已完成/部分/未开始与精确提交证据 |
 | [Phase 20 契约矩阵](phase-20-contract.md) | 任务→所有者→测试→反转条件 |
+| [Phase 20 质量评估预注册](phase-20-quality-evaluation.md) | QA-03/TOOL-02 的成对任务、评分与报告边界 |
 
 ### 0.2 本轮之前的历史文档（01–22）
 

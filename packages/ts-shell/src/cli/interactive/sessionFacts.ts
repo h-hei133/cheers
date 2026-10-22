@@ -64,7 +64,8 @@ export function readStatusFacts(
   }
   const usage = getSessionUsage(context.session.id);
   const measured = active.model && activeEndpoint ? measuredPromptContext(context.session.id, { provider: active.provider, model: active.model,
-    endpoint: activeEndpoint }) : undefined;
+    endpoint: activeEndpoint, ...(context.promptIdentity ?? {}) },
+    context.promptIdentity ? { requireExpectedIdentity: true } : {}) : undefined;
   // Summed across the models that answered, each at the rate published for the
   // provider that served it. A session that switched models — or providers — spent
   // tokens at more than one price, and the status band must not show the newest

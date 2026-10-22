@@ -6,6 +6,11 @@ import { createCoreToolRegistry } from "../tools/registry.js";
 import { toolReport, toolsReport } from "./tools/report.js";
 import { reportText } from "./report/projection.js";
 import { assertAdmission } from '../network/admission.js';
+import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { loadCatalog } from '../models/catalogStore.js';
+import { resolveProviderCredential } from '../shell/providerCredentials.js';
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../auth/account/target.js';
+import { DEFAULT_ENDPOINT_KIND } from '../../provider/endpoints/index.js';
 
 export const toolsSyntax = entitySyntax("tools");
 
@@ -42,8 +47,21 @@ export async function runToolsCommand(
     return { kind: "local", output: reportText(report), report };
   }
 
-  const report = toolsReport(registry, context.cwd);
+  const report = toolsReport(registry, context.cwd, resolveEndpoint(context));
   return { kind: "local", output: reportText(report), report };
+}
+
+function resolveEndpoint(context: CommandContext): string {
+  try {
+    const publication = context.readConfiguration?.();
+    const config = publication?.config ?? context.runtimeConfig ?? getRuntimeConfig(context.projectRoot ?? context.cwd);
+    const catalog = publication?.catalog ?? loadCatalog();
+    const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+    const baseUrl = providerCredentialBaseUrl(catalog, active);
+    return providerCredentialEndpoint(catalog, active, baseUrl) ?? DEFAULT_ENDPOINT_KIND;
+  } catch {
+    return DEFAULT_ENDPOINT_KIND;
+  }
 }
 
 /** Commands and choosers inspect the same current pool; neither executes it. */

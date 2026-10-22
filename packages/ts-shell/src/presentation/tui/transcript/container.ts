@@ -112,8 +112,7 @@ export class Transcript {
    * here is what makes that impossible to forget.
    */
   setCollapsed(block: Block, collapsed: boolean): void {
-    block.collapsed = collapsed;
-    this.cache.delete(block);
+    this.update(block, current => { current.collapsed = collapsed; });
   }
 
   /**
@@ -127,21 +126,22 @@ export class Transcript {
    * impossible to reintroduce by forgetting one of them.
    */
   setText(block: Block, text: string): void {
-    block.text = text;
-    this.revisionValue++;
-    this.cache.delete(block);
+    this.update(block, current => { current.text = text; });
   }
 
   /** Attach a diff below the body, forgetting the cached rows it changes. */
   setDiff(block: Block, diff: string): void {
-    block.diff = diff;
-    this.revisionValue++;
-    this.cache.delete(block);
+    this.update(block, current => { current.diff = diff; });
   }
 
   /** Drop the diff, forgetting the cached rows it was part of. */
   clearDiff(block: Block): void {
-    block.diff = undefined;
+    this.update(block, current => { current.diff = undefined; });
+  }
+
+  /** Apply any render-affecting block mutation through one revisioned path. */
+  update(block: Block, mutate: (block: Block) => void): void {
+    mutate(block);
     this.revisionValue++;
     this.cache.delete(block);
   }
@@ -149,6 +149,7 @@ export class Transcript {
   /** Mark every block finished, so its rendering is stable and cacheable. */
   finalizeAll(): void {
     for (const block of this.blocks) block.finalized = true;
+    this.revisionValue++;
   }
 
   /** Forget everything. */

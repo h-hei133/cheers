@@ -163,6 +163,7 @@ describe("CLI runtime invocation", () => {
       ['special', { name: 'special', description: 'special', argsSchema: { type: 'object' }, execute: async () => ({ success: true, output: '' }) }],
     ]);
     let captured: Parameters<typeof turnSession.runTurn>[0] | undefined;
+    let notifiedIdentity: { readonly schemaDigest: string; readonly systemDigest: string } | undefined;
     const original = turnSession.runTurn;
     const spy = vi.spyOn(turnSession, 'runTurn').mockImplementation(options => {
       captured = options;
@@ -173,6 +174,7 @@ describe("CLI runtime invocation", () => {
         providerModeEnv: 'synthetic',
         runtimeConfig: { ...getRuntimeConfig(workspaceRoot), toolDiscovery: 'dynamic' },
         compaction,
+        onPromptIdentity: identity => { notifiedIdentity = identity; },
       }), { ...dependencies().deps, tools: () => tools });
       const load = captured?.tools.get('tool_load');
       expect(load).toBeDefined();
@@ -185,6 +187,7 @@ describe("CLI runtime invocation", () => {
       expect(after?.schemaDigest).not.toBe(before?.schemaDigest);
       expect(beforeTools).not.toContain('special');
       expect(afterTools).toContain('special');
+      expect(notifiedIdentity).toEqual(after);
     } finally {
       spy.mockRestore();
     }

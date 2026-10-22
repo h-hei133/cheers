@@ -34,6 +34,13 @@ it("preserves quoted and multiline review focus through the alias router", async
   expect(git("status", "--short")).toBe("?? new.txt\n");
 });
 
+it("forwards a bare review without an empty focus argument", async () => {
+  const gitCommand = vi.fn(async () => ({ kind: "local" as const, output: "reviewed" }));
+  const result = await runReviewCommand([], { ...gitCommandContext(root), gitCommand });
+  expect(gitCommand).toHaveBeenCalledWith(["review"], expect.anything());
+  expect(result).toEqual({ kind: "local", output: "reviewed" });
+});
+
 it("retains staged and unstaged changes even when they cancel in diff HEAD", async () => {
   const file = path.join(root, "tracked.txt");
   await fs.writeFile(file, "original\n");

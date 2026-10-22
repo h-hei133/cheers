@@ -1,4 +1,5 @@
 import { resumeSyntax, forkSyntax, treeSyntax, entriesSyntax, parseNavigationArgs } from "../../../core/commands/navigation/syntax.js";
+import { continueSyntax } from "../../../core/commands/navigation/continuation.js";
 import { deleteSyntax } from '../../../core/commands/navigation/management.js';
 import { parseSyntax } from "../../../core/commands/syntax/parse.js";
 import { mcpCatalogKind } from './mcp.js';
@@ -81,6 +82,7 @@ export function catalogSuggestions(request: NonNullable<ReturnType<typeof catalo
 }
 
 function navigationKind(name: string | undefined, preceding: readonly string[], current: string, following: readonly string[]): CatalogKind | undefined {
+  if (name === "continue") return preceding.length === 0 ? "session" : undefined;
   const syntax = name === "resume" ? resumeSyntax : name === "fork" ? forkSyntax : name === 'delete' ? deleteSyntax : name === "tree" ? treeSyntax : name === "entries" ? entriesSyntax : undefined;
   if (!syntax) return undefined;
   if (!preceding.length && syntax.actions.some(item => item.name && (item.name === current.toLowerCase() || item.aliases?.includes(current.toLowerCase())))) return undefined;

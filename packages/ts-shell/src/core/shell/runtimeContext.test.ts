@@ -144,6 +144,31 @@ describe('shell runtime context', () => {
     })
   })
 
+  it('invalidates a prompt identity when the same session substrate changes', () => {
+    const context = createShellRuntimeContext({
+      cwd: 'D:/repo',
+      originalCwd: 'D:/repo',
+      projectRoot: 'D:/repo',
+      rootMode: 'git-root',
+      targetPathBase: 'D:/repo',
+      gitRoot: 'D:/repo',
+      runtimeConfig: getRuntimeConfig('D:/repo'),
+      gitContext: { insideGit: true, branch: 'main', isClean: true, root: 'D:/repo' },
+      session: {
+        id: 'sess_same',
+        createdAt: 'now',
+        updatedAt: 'now',
+        status: 'active',
+        turns: [],
+      },
+    })
+    context.promptIdentity = { schemaDigest: 'old-schema', systemDigest: 'old-system' }
+
+    applyShellSubstrateTransition(context, { cwd: 'D:/repo/packages/app' })
+
+    expect(context.promptIdentity).toBeUndefined()
+  })
+
   it('falls back to project root when legacy runtime context lacks target path base', () => {
     const context = createShellRuntimeContext({
       cwd: 'D:/repo',

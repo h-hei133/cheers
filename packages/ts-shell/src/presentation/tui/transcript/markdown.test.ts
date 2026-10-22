@@ -157,6 +157,13 @@ describe("block structure", () => {
     expect(plain(renderMarkdown(source, WIDTH))).toContain("x² + y₁");
   });
 
+  it("renders display matrices as separate physical rows", () => {
+    const rows = renderMarkdown("$$\n\\begin{bmatrix}1&20\\\\300&4\\end{bmatrix}\n$$", WIDTH);
+    const matrixRows = rows.map(stripAnsi).filter(row => row.includes("[") || row.includes("]"));
+    expect(matrixRows).toEqual(["[ 1    20 ]", "[ 300  4 ]"]);
+    expect(rows.every(row => !row.includes("\n"))).toBe(true);
+  });
+
   it.each([
     "$$\nx^2 + y_1",
     "\\[\nx^2 + y_1",

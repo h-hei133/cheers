@@ -36,6 +36,23 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 }
 
 describe("createStepFunction", () => {
+  it("reports the prompt identity from the wire request, including a no-tools step", async () => {
+    const identities: Array<{ schemaDigest: string; systemDigest: string }> = [];
+    const step = createStepFunction({ ...request, tools: [{
+      type: "function",
+      function: { name: "read", description: "read a file", parameters: { type: "object", properties: {} } },
+    }], fetchImpl: async () => jsonResponse({ choices: [{ message: { content: "ok" } }] }) });
+    await step([], undefined, {}, { allowTools: true, onRequestSent: sent => {
+      if (sent.promptIdentity) identities.push(sent.promptIdentity);
+    } });
+    await step([], undefined, {}, { allowTools: false, onRequestSent: sent => {
+      if (sent.promptIdentity) identities.push(sent.promptIdentity);
+    } });
+    expect(identities).toHaveLength(2);
+    expect(identities[0]!.systemDigest).toBe(identities[1]!.systemDigest);
+    expect(identities[0]!.schemaDigest).not.toBe(identities[1]!.schemaDigest);
+  });
+
   it('observes the exact accepted serialization and drops static source claims for delegated prompts', async () => {
     let body = ''; let captured: SentRequest | undefined;
     const step = createStepFunction({ ...request, systemPrompt: '规则🔒\n"quoted"',
@@ -103,6 +120,20 @@ describe("createStepFunction", () => {
 
     expect(result.stopReason).toBe("error");
     expect(result.errorMessage).toMatch(/^Context overflow:/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("refuses a prompt over the model's independent input limit before sending", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] }));
+    const step = createStepFunction({
+      ...request,
+      provider: { ...request.provider, provider: "fixture" },
+      catalog: [{ id: "fixture", models: [{ id: "m", contextWindow: 10_000, inputLimit: 50, maxTokens: 1 }] }],
+      fetchImpl,
+    });
+    const result = await step([{ role: "user", content: "x".repeat(1_000) }], undefined, {}, { allowTools: false });
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toMatch(/^Context overflow: .*input limit/);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -244,6 +275,28 @@ describe("createStepFunction", () => {
     expect(requests).toBe(1);
     expect(shown).toEqual(["already seen"]);
     expect(produced.at(-1)?.stopReason).toBe("error");
+  });
+
+  it("does not replay an accepted response whose body ends before any event", async () => {
+    let requests = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+      fetchImpl: async () => {
+        requests += 1;
+        return new Response(new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.error(new Error("socket hang up"));
+          },
+        }), { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    const produced = await runAgentLoop([{ role: "user", content: "hello" }], [], {
+      retry: { maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+      streamStep: (messages, signal) => step(messages, signal, {}, { allowTools: true }),
+    }, () => {}, undefined);
+    expect(requests).toBe(1);
+    expect(produced.at(-1)).toMatchObject({ stopReason: "error" });
   });
 
   it("marks returned error completions after visible output as non-retryable", async () => {
@@ -1261,33 +1314,25 @@ describe("the last step a run may act on", () => {
     expect(body).not.toHaveProperty("tools");
   });
 });
-  it("retries a stream that fails before delivering any text", async () => {
+  it("does not retry a stream after the provider accepted the request", async () => {
     let attempts = 0;
     const step = createStepFunction({
       ...request,
       retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 },
       fetchImpl: async () => {
         attempts += 1;
-        if (attempts === 1) {
-          const body = new ReadableStream<Uint8Array>({
-            start(controller) {
-              controller.error(new Error("socket hang up"));
-            },
-          });
-          return new Response(body, { headers: { "content-type": "text/event-stream" } });
-        }
-        return new Response(
-          `data: ${JSON.stringify({ choices: [{ delta: { content: "recovered" } }] })}\n\n` +
-            `data: ${JSON.stringify({ choices: [{ delta: { content: "" }, finish_reason: "stop" }] })}\n\n` +
-            "data: [DONE]\n\n",
-          { headers: { "content-type": "text/event-stream" } },
-        );
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.error(new Error("socket hang up"));
+          },
+        });
+        return new Response(body, { headers: { "content-type": "text/event-stream" } });
       },
     });
     const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
-    expect(attempts).toBe(2);
-    expect(result.stopReason).toBe("stop");
-    expect(result.text).toBe("recovered");
+    expect(attempts).toBe(1);
+    expect(result.stopReason).toBe("error");
+    expect(result.retriesExhausted).toBe(true);
   });
 
   it("does not retry a stream that already showed reasoning, only one that showed nothing", async () => {

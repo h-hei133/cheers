@@ -177,7 +177,7 @@ export class TurnSink implements RendererSink {
     const trimmed = text.replace(/\s+$/, "");
     if (!trimmed) return;
     const block = report || this.prose?.report ? this.openProse(report) : this.prose ?? this.openProse();
-    block.text = block.text ? `${block.text}\n${trimmed}` : trimmed;
+    this.transcript.setText(block, block.text ? `${block.text}\n${trimmed}` : trimmed);
     // Through the transcript, like the tool-card path: the split moves text out
     // of the body and into a diff, and a block whose rows are already cached
     // would keep showing the body that no longer has the diff in it. Prose here
@@ -204,15 +204,15 @@ export class TurnSink implements RendererSink {
       });
       this.label = "thinking";
     }
-    this.thinking.text += text;
     this.thinking.elapsedMs = this.now() - this.thinkingStartedAt;
+    this.transcript.setText(this.thinking, this.thinking.text + text);
     this.onChange();
   }
 
   chunk(text: string): void {
     if (!text) return;
     const block = this.assistant ?? this.openAssistant();
-    block.text += text;
+    this.transcript.setText(block, block.text + text);
     this.onChange();
   }
 
@@ -312,7 +312,7 @@ export class TurnSink implements RendererSink {
    */
   private settleThinking(): void {
     if (!this.thinking) return;
-    this.thinking.finalized = true;
+    this.transcript.update(this.thinking, block => { block.finalized = true; });
     this.thinking = undefined;
     this.label = "working";
   }
@@ -321,7 +321,7 @@ export class TurnSink implements RendererSink {
     // Whatever the model was working through is settled once it starts answering.
     this.settleThinking();
     if (!this.assistant) return;
-    this.assistant.finalized = true;
+    this.transcript.update(this.assistant, block => { block.finalized = true; });
     // `/copy` with no argument copies the last answer; without this it had
     // nothing recorded to copy.
     recordLastAssistantResponse(this.assistant.text);
@@ -390,7 +390,7 @@ export class TurnSink implements RendererSink {
    */
   private replaceAssistant(text: string): void {
     const block = this.assistant ?? this.openAssistant();
-    block.text = text;
+    this.transcript.setText(block, text);
     this.onChange();
   }
 

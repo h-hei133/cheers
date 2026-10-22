@@ -121,6 +121,8 @@
     "start:dev": "npm run start -w packages/ts-shell --",
     "bench:start": "node scripts/bench-start.mjs",
     "bench:interactive": "node scripts/bench-interactive.mjs",
+    "bench:responsiveness": "node scripts/bench-responsiveness.mjs",
+    "qa:quality": "node scripts/qa-quality.mjs",
     "qa:pty": "node scripts/qa-pty-smoke.mjs"
   },
   "engines": {

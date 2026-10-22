@@ -21,6 +21,8 @@ export interface CompactionPolicy {
   /** Maximum tokens per legal history/prefix/merge request. */
   readonly segmentTokens?: number;
   readonly contextWindow: number;
+  /** Independent prompt ceiling when the model publishes one. */
+  readonly inputLimit?: number;
   readonly reserveTokens?: number;
   /**
    * The output ceiling of the request being budgeted.
@@ -148,18 +150,28 @@ export function shouldCompact(
  */
 function reachedBudgetThreshold(tokens: number, policy: CompactionPolicy, measured: boolean): boolean {
   if (policy.enabled === false) return false;
-  if (policy.outputTokens === undefined) {
+  if (policy.outputTokens === undefined && policy.inputLimit === undefined) {
     return shouldCompact(tokens, policy.contextWindow, policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS,
       policy.enabled ?? true);
   }
   const budget = requestBudget({
     window: policy.contextWindow,
+    inputLimit: policy.inputLimit,
     promptTokens: tokens,
     outputTokens: policy.outputTokens,
     reserveTokens: policy.reserveTokens,
     measured,
   });
   if (budget.ok) return budget.soft;
+  // A provider-owned output ceiling leaves the full window unproven, but the
+  // independent input limit is still a usable bound. Apply the same soft band
+  // to that bound instead of falling back to the older reserve-only threshold.
+  if (budget.reason === 'unknown' && policy.inputLimit !== undefined) {
+    const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
+    const availableInput = Math.max(0, policy.inputLimit - reserve);
+    const softLimit = Math.min(Math.floor(policy.contextWindow * 0.9), availableInput);
+    return tokens >= softLimit || tokens + reserve > policy.inputLimit;
+  }
   // Unknown limits keep the old conservative behavior rather than claiming a
   // threshold the runtime cannot prove.
   if (budget.reason === 'unknown') {
@@ -167,6 +179,13 @@ function reachedBudgetThreshold(tokens: number, policy: CompactionPolicy, measur
       policy.enabled ?? true);
   }
   return true;
+}
+
+function availableTailTokens(policy: CompactionPolicy): number {
+  const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
+  const windowInput = policy.contextWindow - reserve - (policy.outputTokens ?? 0);
+  const limitInput = policy.inputLimit === undefined ? Number.POSITIVE_INFINITY : policy.inputLimit - reserve;
+  return Math.max(0, Math.min(windowInput, limitInput));
 }
 
 /**
@@ -305,8 +324,7 @@ export function explainNoCut(
   messages: readonly AgentMessage[],
   policy: CompactionPolicy,
 ): "fits-budget" | "no-legal-cut" {
-  const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
-  const available = Math.max(0, policy.contextWindow - reserve - (policy.outputTokens ?? 0));
+  const available = availableTailTokens(policy);
   const keepRecent = Math.min(policy.keepRecentTokens ?? KEEP_RECENT_TOKENS, available);
   const found = locateCut(messages, keepRecent);
   return "cut" in found ? "no-legal-cut" : found.reason;
@@ -351,8 +369,7 @@ export function planCompactionCut(
   messages: readonly AgentMessage[],
   policy: CompactionPolicy,
 ): CompactionPlan | undefined {
-  const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
-  const available = Math.max(0, policy.contextWindow - reserve - (policy.outputTokens ?? 0));
+  const available = availableTailTokens(policy);
   const estimated = estimateTokens(messages);
   // A budget at or above what the window can hold would swallow the whole
   // conversation, so no cut would ever be found and compaction would never run
@@ -553,7 +570,8 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
     source: captured.operation.source && { sessionId: captured.operation.source.sessionId,
       identity: captured.operation.source.replayIdentity ?? captured.operation.source.identity } },
     captured.messages, captured.instructions, captured.policy.summaryIdentity,
-    captured.policy.contextWindow, captured.policy.reserveTokens, captured.policy.outputTokens, captured.policy.keepRecentTokens, captured.policy.segmentTokens,
+    captured.policy.contextWindow, captured.policy.inputLimit, captured.policy.reserveTokens,
+    captured.policy.outputTokens, captured.policy.keepRecentTokens, captured.policy.segmentTokens,
     captured.policy.enabled, Boolean(captured.summarizeTurnPrefix)]) : undefined;
   const joined = key ? pendingCompactions.get(key) : undefined;
   const pending = joined ?? generateContext(captured);

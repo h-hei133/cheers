@@ -14,6 +14,9 @@ import { createCoreToolRegistry } from "../tools/registry.js";
 import { textSize } from '../../context/request/measure.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../auth/account/target.js';
 import { DEFAULT_ENDPOINT_KIND } from '../../provider/endpoints/index.js';
+import { catalogModel } from '../models/catalog.js';
+import { configuredOutputLimit } from '../../provider/request/output.js';
+import { endpointShape } from '../../provider/endpoints/index.js';
 
 /**
  * /context — how much of the window the last request used.
@@ -58,9 +61,13 @@ export async function runContextCommand(
   const catalog = publication?.catalog ?? loadCatalog();
   let activeBaseUrl = active.baseUrl;
   let activeEndpoint: string | undefined;
+  let outputTokens: number | undefined;
   try {
     activeBaseUrl = providerCredentialBaseUrl(catalog, active);
     activeEndpoint = providerCredentialEndpoint(catalog, active, activeBaseUrl) ?? DEFAULT_ENDPOINT_KIND;
+    outputTokens = endpointShape(activeEndpoint).outputControl === 'provider' ? undefined
+      : configuredOutputLimit(runtimeConfig, activeEndpoint)
+        ?? catalogModel(catalog, active.provider, active.model, activeBaseUrl)?.maxTokens;
   } catch {
     // The report can still describe the configured model when account routing
     // is unverifiable; it must not turn that uncertainty into a live measurement.
@@ -85,14 +92,13 @@ export async function runContextCommand(
   // command-side reconstruction from the full inspection pool would describe a
   // different request, not the one whose tokens are being reported.
   const recorded = sessionId ? getSessionUsage(sessionId).lastPromptIdentity : undefined;
-  const completeRecorded = recorded?.schemaDigest !== undefined && recorded.systemDigest !== undefined;
-  const expectedSchemaDigest = context.promptIdentity
-    ? context.promptIdentity.schemaDigest
-    : completeRecorded ? recorded.schemaDigest : undefined;
-  const expectedSystemDigest = context.promptIdentity
-    ? context.promptIdentity.systemDigest
-    : completeRecorded ? recorded.systemDigest : undefined;
+  const expectedSchemaDigest = context.promptIdentity?.schemaDigest;
+  const expectedSystemDigest = context.promptIdentity?.systemDigest;
   const hasExpectedIdentity = expectedSchemaDigest !== undefined && expectedSystemDigest !== undefined;
+  // A complete stored identity is not evidence that it still describes the
+  // current runtime. Only the live request identity can authorize it; otherwise
+  // a reload that cleared the live identity would validate the record against
+  // itself. Identity-free records remain the legacy compatibility path.
   const legacyMeasurement = recorded === undefined && context.promptIdentity === undefined;
 
   const measured = sessionId && active.model && activeEndpoint && (hasExpectedIdentity || legacyMeasurement)
@@ -103,7 +109,9 @@ export async function runContextCommand(
     : undefined;
   const measurement = measured ? 'measured' as const
     : telemetry?.lastPromptTokens !== undefined ? 'stale' as const : 'unknown' as const;
-  const report = contextReport({ resolution, used: measured?.tokens, measurement, reserve,
+  const report = contextReport({ resolution, used: measured?.tokens, measurement, reserve, outputTokens,
+    inputLimit: catalogModel(catalog, active.provider, active.model, activeBaseUrl)?.inputLimit,
+    protocol: activeEndpoint,
     schemaTokens, schemaSize, request: telemetry?.requestContext, toolCount: registry.size, totalTokens: telemetry ? totalTokens(telemetry) : 0,
     turns: telemetry?.turnsCount ?? 0 }, context.cwd);
   return { kind: "local", output: reportText(report), report };

@@ -1,7 +1,7 @@
 import { wrapToWidth } from "../text/layout.js";
 import { stripAnsi } from "../text/ansi.js";
 import type { Block } from "./blocks.js";
-import { layoutSideBySide } from "./diff.js";
+import { layoutDiff } from "./diff.js";
 import { renderMarkdownWithSources } from "./markdown.js";
 
 /**
@@ -20,6 +20,8 @@ export interface SourceLine {
   readonly text: string;
   /** `soft` continues the same source line; `logical` ends it. */
   readonly breakAfter: "soft" | "logical";
+  /** The source itself ended with this logical newline rather than a row boundary. */
+  readonly terminalNewline?: boolean;
   /** Old-side source for a side-by-side diff row. */
   readonly left?: string;
   /** New-side source for a side-by-side diff row. */
@@ -46,7 +48,7 @@ function bodyOf(block: Block, width: number): { text: string; width: number } | 
     case "user":
       return { text: block.text, width: Math.max(1, width - 4) };
     case "notice":
-      return { text: block.text, width: Math.max(1, width) };
+      return { text: block.text.replace(/\s+$/, ""), width: Math.max(1, width) };
     case "assistant":
       // A streaming answer can still gain a fence; only a finalized body has a
       // stable projection, and the markdown renderer may change the row count.
@@ -59,12 +61,17 @@ function bodyOf(block: Block, width: number): { text: string; width: number } | 
 /** Wrap `text` the same way the block renderer does, keeping source offsets. */
 export function projectText(text: string, width: number): readonly Omit<SourceLine, "block">[] {
   const lines: Omit<SourceLine, "block">[] = [];
-  const body = text.replace(/\s+$/, "");
-  if (!body) return lines;
-  for (const line of body.split("\n")) {
+  if (!text) return lines;
+  const terminalNewline = text.endsWith("\n");
+  const sourceLines = text.split("\n");
+  if (terminalNewline) sourceLines.pop();
+  for (let lineIndex = 0; lineIndex < sourceLines.length; lineIndex++) {
+    const line = sourceLines[lineIndex]!;
     const wrapped = wrapToWidth(line, Math.max(1, width));
     for (let index = 0; index < wrapped.length; index++) {
-      lines.push({ text: wrapped[index]!, breakAfter: index === wrapped.length - 1 ? "logical" : "soft" });
+      lines.push({ text: wrapped[index]!, breakAfter: index === wrapped.length - 1 ? "logical" : "soft",
+        ...(terminalNewline && lineIndex === sourceLines.length - 1 && index === wrapped.length - 1
+          ? { terminalNewline: true } : {}) });
     }
   }
   return lines;
@@ -90,7 +97,9 @@ export function sourceLinesFor(
       && projected.rows.every((row, index) => stripAnsi(row) === stripAnsi(rows[index] ?? ""))) {
       return rows.map((_, index) => {
         const line = projected.sources[index];
-        return line ? { ...line, block: blockIndex } : undefined;
+        return line ? { ...line, block: blockIndex,
+          ...(block.text.endsWith("\n") && index === projected.sources.findLastIndex(item => item !== undefined)
+            ? { terminalNewline: true } : {}) } : undefined;
       });
     }
   }
@@ -102,17 +111,20 @@ export function sourceLinesFor(
       && projected.rows.every((row, index) => stripAnsi(row) === stripAnsi(bodyRows[index] ?? ""))) {
       return rows.map((_, index) => {
         const line = projected.sources[index - 1];
-        return line ? { ...line, block: blockIndex } : undefined;
+        return line ? { ...line, block: blockIndex,
+          ...(block.text.endsWith("\n") && index - 1 === projected.sources.findLastIndex(item => item !== undefined)
+            ? { terminalNewline: true } : {}) } : undefined;
       });
     }
   }
   if (block.diff) {
+    const diff = block.diff;
     // Tool cards frame the diff in a box and use the inner width; command and
     // error blocks render it at full width. The split column is shifted by the
     // card's two-character prefix.
     const framed = block.kind === "tool" && block.collapsed !== true;
     const diffWidth = framed ? Math.max(8, Math.max(16, width - 2) - 2) : Math.max(1, width);
-    const layout = layoutSideBySide(block.diff, diffWidth, { sideBySide: diffWidth >= 100 });
+    const layout = layoutDiff(diff, diffWidth, { sideBySide: diffWidth >= 100 });
     const visible = (row: string): string => {
       const text = stripAnsi(row);
       return (framed ? text.slice(2, 2 + diffWidth) : text).trimEnd();
@@ -126,8 +138,10 @@ export function sourceLinesFor(
     if (offset < 0) return rows.map(() => undefined);
     return rows.map((_, index) => {
       const source = layout.sources[index - offset];
-      return source ? { block: blockIndex, text: source.left ?? source.right ?? "", breakAfter: "logical" as const,
-        ...source, ...(framed ? { split: source.split + 2 } : {}) } : undefined;
+      return source ? { block: blockIndex, ...source,
+        ...(diff.endsWith("\n") && index - offset === layout.sources.findLastIndex(item => item !== undefined)
+          ? { terminalNewline: true } : {}),
+        ...(source.split !== undefined && framed ? { split: source.split + 2 } : {}) } : undefined;
     });
   }
   const body = bodyOf(block, width);
@@ -154,5 +168,6 @@ export function joinSourceLines(lines: readonly SourceLine[]): string {
     if (line.breakAfter === "logical") text += "\n";
     previousNode = line.node;
   }
-  return text.replace(/\n+$/, "");
+  if (text.endsWith("\n") && lines.at(-1)?.terminalNewline !== true) return text.slice(0, -1);
+  return text;
 }

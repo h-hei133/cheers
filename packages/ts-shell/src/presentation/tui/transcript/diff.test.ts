@@ -89,6 +89,52 @@ describe("unified diff", () => {
       defaultTheme.apply(getDefaultTheme(), "none");
     }
   });
+
+  it("recognizes standard unprefixed file headers at the start of a diff", () => {
+    defaultTheme.apply(getDefaultTheme(), "truecolor");
+    try {
+      const rows = renderDiff("--- old.txt\n+++ new.txt\n@@ -1 +1 @@\n-old\n+new", WIDTH);
+      expect(rows[0]).toContain(defaultTheme.fg("muted", "--- old.txt"));
+      expect(rows[1]).toContain(defaultTheme.fg("muted", "+++ new.txt"));
+    } finally {
+      defaultTheme.apply(getDefaultTheme(), "none");
+    }
+  });
+
+  it("does not treat unprefixed marker-like content inside a hunk as a file header", () => {
+    defaultTheme.apply(getDefaultTheme(), "truecolor");
+    try {
+      const rows = renderDiff("@@ -1 +1 @@\n--- old.txt\n+++ new.txt", WIDTH);
+      expect(rows.join("")).toContain("\x1b[7m");
+      expect(rows[1]).not.toContain(defaultTheme.fg("muted", "--- old.txt"));
+    } finally {
+      defaultTheme.apply(getDefaultTheme(), "none");
+    }
+  });
+
+  it("does not mistake removed or added content beginning with dashes for a file header", () => {
+    defaultTheme.apply(getDefaultTheme(), "truecolor");
+    try {
+      const rows = renderDiff("--- actual removed\n+++ actual added", WIDTH);
+      expect(rows[0]).not.toContain(defaultTheme.fg("muted", "--- actual removed"));
+      expect(rows[1]).not.toContain(defaultTheme.fg("muted", "+++ actual added"));
+      expect(rows.join("")).toContain("\x1b[7m");
+    } finally {
+      defaultTheme.apply(getDefaultTheme(), "none");
+    }
+  });
+
+  it("does not mistake a/ b/ content inside a hunk for a file header", () => {
+    defaultTheme.apply(getDefaultTheme(), "truecolor");
+    try {
+      const rows = renderDiff("@@ -1 +1 @@\n--- a/not-a-header\n+++ b/not-a-header", WIDTH);
+      expect(rows[1]).not.toContain(defaultTheme.fg("muted", "--- a/not-a-header"));
+      expect(rows[2]).not.toContain(defaultTheme.fg("muted", "+++ b/not-a-header"));
+      expect(rows.join("")).toContain("\x1b[7m");
+    } finally {
+      defaultTheme.apply(getDefaultTheme(), "none");
+    }
+  });
 });
 
 describe("side-by-side diff", () => {

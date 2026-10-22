@@ -8,10 +8,15 @@
  * recognition, because `$5 and $10` is money, not a formula.
  */
 import { findCodeSpan } from "../text/codeSpan.js";
+import { padToWidth } from "../text/layout.js";
+import { visibleWidth } from "../text/measure.js";
 
 const MAX_FORMULA_BYTES = 4096;
 const MAX_TOKENS = 512;
 const MAX_DEPTH = 16;
+const MAX_MATRIX_ROWS = 12;
+const MAX_MATRIX_COLUMNS = 12;
+const MAX_MATRIX_CELLS = 64;
 
 const SYMBOLS: Readonly<Record<string, string>> = {
   alpha: "α", beta: "β", gamma: "γ", delta: "δ", epsilon: "ε", zeta: "ζ", eta: "η", theta: "θ",
@@ -39,19 +44,29 @@ interface Cursor { index: number; tokens: number }
 export function latexToText(body: string): string | undefined {
   if (Buffer.byteLength(body, "utf8") > MAX_FORMULA_BYTES) return undefined;
   const cursor: Cursor = { index: 0, tokens: 0 };
-  const text = readGroup(body, cursor, 0);
+  const text = readGroup(body, cursor, 0, false);
   if (text === undefined) return undefined;
   return text.replace(/\s+/g, " ").trim();
 }
 
-function readGroup(source: string, cursor: Cursor, depth: number): string | undefined {
+function readGroup(source: string, cursor: Cursor, depth: number, closingRequired: boolean): string | undefined {
   if (depth > MAX_DEPTH) return undefined;
   let output = "";
   while (cursor.index < source.length) {
     if (++cursor.tokens > MAX_TOKENS) return undefined;
     const character = source[cursor.index]!;
-    if (character === "}") return output;
-    if (character === "{") { cursor.index += 1; const inner = readGroup(source, cursor, depth + 1); if (inner === undefined) return undefined; if (source[cursor.index] === "}") cursor.index += 1; output += inner; continue; }
+    if (character === "}") {
+      if (!closingRequired) return undefined;
+      cursor.index += 1;
+      return output;
+    }
+    if (character === "{") {
+      cursor.index += 1;
+      const inner = readGroup(source, cursor, depth + 1, true);
+      if (inner === undefined) return undefined;
+      output += inner;
+      continue;
+    }
     if (character === "\\") { const command = readCommand(source, cursor); if (command === undefined) return undefined; output += command; continue; }
     if (character === "^" || character === "_") {
       cursor.index += 1;
@@ -63,7 +78,7 @@ function readGroup(source: string, cursor: Cursor, depth: number): string | unde
     output += character;
     cursor.index += 1;
   }
-  return output;
+  return closingRequired ? undefined : output;
 }
 
 function readCommand(source: string, cursor: Cursor): string | undefined {
@@ -101,10 +116,7 @@ function readArgument(source: string, cursor: Cursor, depth: number): string | u
   while (source[cursor.index] === " ") cursor.index += 1;
   if (source[cursor.index] === "{") {
     cursor.index += 1;
-    const inner = readGroup(source, cursor, depth + 1);
-    if (inner === undefined) return undefined;
-    if (source[cursor.index] === "}") cursor.index += 1;
-    return inner;
+    return readGroup(source, cursor, depth + 1, true);
   }
   const character = source[cursor.index];
   if (character === undefined) return "";
@@ -124,9 +136,39 @@ function subscript(text: string): string {
     : `_(${text})`;
 }
 
+/** Preserve display-math structure when a matrix can be laid out safely. */
+export function latexToDisplayText(body: string): string | undefined {
+  if (Buffer.byteLength(body, "utf8") > MAX_FORMULA_BYTES) return undefined;
+  const match = /^\s*\\begin\{(matrix|pmatrix|bmatrix|vmatrix|Vmatrix)\}([\s\S]*?)\\end\{\1\}\s*$/.exec(body);
+  if (!match) return latexToText(body);
+  const rows = match[2]!.split(/\\\\/).map(row => row.trim()).filter(Boolean);
+  if (rows.length === 0 || rows.length > MAX_MATRIX_ROWS) return undefined;
+  const cells = rows.map(row => row.split("&").map(cell => latexToText(cell)?.trim()));
+  const columns = Math.max(...cells.map(row => row.length));
+  if (columns === 0 || columns > MAX_MATRIX_COLUMNS || cells.reduce((total, row) => total + row.length, 0) > MAX_MATRIX_CELLS
+    || cells.some(row => row.some(cell => cell === undefined))) return undefined;
+  const widths = Array.from({ length: columns }, (_, column) =>
+    Math.max(...cells.map(row => visibleWidth(row[column] ?? ""))));
+  const [left, right] = match[1] === "pmatrix" ? ["(", ")"]
+    : match[1] === "bmatrix" ? ["[", "]"]
+      : match[1] === "vmatrix" ? ["|", "|"]
+        : match[1] === "Vmatrix" ? ["‖", "‖"] : ["", ""];
+  return cells.map(row => {
+    const line = Array.from({ length: columns }, (_, column) => padToWidth(row[column] ?? "", widths[column]!)).join("  ");
+    return left ? `${left} ${line.trimEnd()} ${right}` : line.trimEnd();
+  }).join("\n");
+}
+
+/** Inline math must remain one physical row, so matrix rows are joined explicitly. */
+export function latexToInlineText(body: string): string | undefined {
+  const projected = latexToDisplayText(body);
+  return projected?.includes("\n") ? projected.split("\n").join(" | ") : projected;
+}
+
 /**
- * Replace inline and single-line display math in `text`, leaving code spans,
- * escaped dollars and currency untouched.
+ * Replace inline and display math in `text`, leaving code spans, escaped dollars
+ * and currency untouched. Matrices retain their rows instead of becoming one
+ * linear expression; formulas outside the bounded layout remain raw.
  */
 export function projectMath(text: string): string {
   let output = "";
@@ -159,7 +201,9 @@ export function projectMath(text: string): string {
         else nextBracketClose = close;
       }
       if (close >= 0 && close - searchFrom <= MAX_FORMULA_BYTES) {
-        const converted = latexToText(text.slice(index + 2, close));
+        const converted = parenthesized
+          ? latexToText(text.slice(index + 2, close))
+          : latexToInlineText(text.slice(index + 2, close));
         output += converted ?? text.slice(index, close + 2);
         index = close + 2;
         const next = text.indexOf(closeMarker, index);
@@ -183,9 +227,9 @@ export function projectMath(text: string): string {
     const close = findClose(text, open, display);
     if (close < 0) { output += character; index += 1; continue; }
     const body = text.slice(open, close);
-    const converted = latexToText(body);
+    const converted = latexToInlineText(body);
     if (converted === undefined) { output += text.slice(index, close + (display ? 2 : 1)); index = close + (display ? 2 : 1); continue; }
-    output += display ? converted : converted;
+    output += converted;
     index = close + (display ? 2 : 1);
   }
   return output;

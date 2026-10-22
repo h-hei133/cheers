@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateRequestTokens, estimateTokens } from "./context.js";
+import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, IMAGE_ESTIMATE_TOKENS, estimateRequestTokens, estimateTokens } from "./context.js";
 import type { AgentMessage } from "../core/agent/state.js";
 
 function userMessage(content: string): AgentMessage {
@@ -39,6 +39,17 @@ describe("estimateTokens", () => {
     const plain = estimateTokens([{ role: "tool", content: "ok" }]);
     const linked = estimateTokens([{ role: "tool", tool_call_id: "call-1", content: "ok" }]);
     expect(linked).toBeGreaterThan(plain);
+  });
+
+  it("counts multimodal text blocks and gives each image a bounded allowance", () => {
+    const text = "a".repeat(70_000);
+    const textOnly = estimateTokens([{ role: "user", content: [{ type: "text", text }] }]);
+    const withImage = estimateTokens([{ role: "user", content: [
+      { type: "text", text },
+      { type: "image", data: "c3ludGhldGlj", mimeType: "image/png" },
+    ] }]);
+    expect(textOnly).toBe(Math.ceil(text.length / CHARS_PER_TOKEN));
+    expect(withImage).toBe(textOnly + IMAGE_ESTIMATE_TOKENS);
   });
 
   it("treats missing content as empty", () => {

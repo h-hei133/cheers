@@ -6,6 +6,7 @@ import type { RequestContext, TextSize } from '../../../context/request/model.js
 import { CHARS_PER_TOKEN } from '../../../session/context.js';
 import { requestDetails } from './request.js';
 import { reportMetadata } from '../report/metadata.js';
+import { requestBudget } from '../../../context/request/budget.js';
 
 export function contextReport(input: {
   readonly resolution: ResolvedContextWindow;
@@ -13,6 +14,9 @@ export function contextReport(input: {
   /** Whether the measurement describes the current request identity. */
   readonly measurement?: 'measured' | 'stale' | 'unknown';
   readonly reserve: number;
+  readonly outputTokens?: number;
+  readonly inputLimit?: number;
+  readonly protocol?: string;
   readonly schemaTokens: number;
   readonly schemaSize?: TextSize;
   readonly request?: RequestContext;
@@ -23,8 +27,23 @@ export function contextReport(input: {
   const { resolution, used, reserve, schemaTokens, toolCount } = input;
   const measurement = input.measurement ?? (used === undefined ? 'unknown' : 'measured');
   const window = resolution.window;
-  const free = used === undefined ? undefined : Math.max(0, window - used - reserve);
-  const compactAt = Math.max(0, window - reserve);
+  const inputCapacity = Math.max(0, Math.min(
+    window - (input.outputTokens ?? 0),
+    input.inputLimit ?? Number.POSITIVE_INFINITY,
+  ));
+  const free = used === undefined ? undefined : Math.max(0, inputCapacity - used - reserve);
+  const budget = input.outputTokens === undefined
+    ? input.inputLimit === undefined ? undefined : requestBudget({ window, promptTokens: 0,
+      inputLimit: input.inputLimit, outputTokens: 0, reserveTokens: reserve, measured: false })
+    : requestBudget({ window, promptTokens: 0, inputLimit: input.inputLimit,
+      outputTokens: input.outputTokens, reserveTokens: reserve, measured: false });
+  const compactAt = budget?.ok
+    ? budget.softLimit
+    : budget?.reason === "window"
+      ? 0
+      : input.inputLimit !== undefined
+        ? Math.max(0, Math.min(Math.floor(window * 0.9), input.inputLimit - reserve))
+        : Math.max(0, window - reserve);
   const warning = resolution.warning === undefined ? undefined : reportMetadata(resolution.warning, projectRoot);
   const lines: ReportLine[] = [
     { kind: 'text', bullet: true, spans: [span('Window: '), span(window.toLocaleString(), 'number'),
@@ -68,6 +87,8 @@ export function contextReport(input: {
         estimate: { status: 'estimated', tokens: schemaTokens, basis: 'current-tool-schemas' } }
         : { status: 'measured', tokens: used },
       reserveTokens: reserve, freeTokens: free ?? null, compactAtTokens: compactAt,
+      inputLimitTokens: input.inputLimit ?? null, outputReserveTokens: input.outputTokens ?? null,
+      protocol: input.protocol ?? null,
       toolSchemas: { status: 'estimate', method: 'characters', tokens: schemaTokens, toolCount,
         characterUnit: 'utf16-code-units', divisor: CHARS_PER_TOKEN, size: input.schemaSize ? { ...input.schemaSize } : null },
       request: request.facts,

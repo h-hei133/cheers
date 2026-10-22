@@ -102,6 +102,9 @@ function normalKey(state: VimState, key: VimKey, text: string, cursor: number): 
   }
   if (state.pending === "f" || state.pending === "F" || state.pending === "t" || state.pending === "T") {
     const target = findCharacter(text, cursor, character, state.pending, count);
+    if (state.operator && target !== undefined) {
+      return applyOperator(state, text, operatorRange(text, cursor, target, state.pending), false);
+    }
     return { state: clear(), effect: target === undefined ? { kind: "none" } : { kind: "cursor", offset: target } };
   }
 
@@ -132,9 +135,12 @@ function normalKey(state: VimState, key: VimKey, text: string, cursor: number): 
       return applyOperator(state, text, { from, to: end < text.length ? end + 1 : end, linewise: true }, false);
     }
     if (character === "i" || character === "a") return { state: { ...state, pending: character }, effect: { kind: "none" } };
+    if (character === "f" || character === "F" || character === "t" || character === "T") {
+      return { state: { ...state, pending: character }, effect: { kind: "none" } };
+    }
     const target = motionTarget(text, cursor, character, count);
     if (target === undefined) return { state: clear(), effect: { kind: "none" } };
-    return applyOperator(state, text, { from: Math.min(cursor, target), to: Math.max(cursor, target), linewise: false }, false);
+    return applyOperator(state, text, operatorRange(text, cursor, target, character), false);
   }
 
   switch (character) {
@@ -320,6 +326,18 @@ function motionTarget(text: string, cursor: number, character: string, count: nu
     case "G": return applyMotion(text, cursor, "doc-end", 1);
     default: return undefined;
   }
+}
+
+function operatorRange(text: string, cursor: number, target: number, motion: string):
+{ from: number; to: number; linewise: false } {
+  const forward = target >= cursor;
+  const inclusive = motion === "e" || motion === "$" || motion === "f" || motion === "t"
+    || motion === "F" || motion === "T";
+  const from = forward ? cursor : target;
+  const to = forward
+    ? inclusive ? nextOffset(text, target) : target
+    : inclusive ? nextOffset(text, cursor) : cursor;
+  return { from, to, linewise: false };
 }
 
 function applyMotion(text: string, cursor: number, motion: string, count: number): number {

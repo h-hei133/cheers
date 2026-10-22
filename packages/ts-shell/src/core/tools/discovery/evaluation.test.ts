@@ -25,17 +25,18 @@ it('compares full, initial and post-load surfaces with the discovery cost', () =
   expect(report.delta.bytes).toBeGreaterThan(0);
   expect(report.method).toBe('characters-per-token');
   expect(report.divisor).toBe(3.5);
-  expect(report.quality).toEqual({ schemaPreserved: true, changed: [] });
+  expect(report.quality).toEqual({ status: 'preserved', changed: [] });
 });
 
-it('reports a schema that loading changed instead of claiming preservation', () => {
+it('does not claim schema preservation when no load was requested', () => {
+  const report = compareDiscoveryCost({ catalog: catalog() });
+  expect(report.quality).toEqual({ status: 'not-measured', changed: [] });
+  expect(report.afterLoad).toBeNull();
+});
+
+it('does not claim schema preservation for a load that was rejected', () => {
   const report = compareDiscoveryCost({ catalog: catalog(), load: ['missing'] });
-  expect(report.quality.changed).toEqual([]);
-  const changed = new Map(catalog());
-  const original = changed.get('tool_2')!;
-  changed.set('tool_2', { ...original, argsSchema: { type: 'object', properties: {} } });
-  // The catalog is the authority for both surfaces; loading never rewrites it.
-  expect(compareDiscoveryCost({ catalog: changed, load: ['tool_2'] }).quality.schemaPreserved).toBe(true);
+  expect(report.quality).toEqual({ status: 'not-measured', changed: [] });
 });
 
 it('reports tokenizer error as an observed ratio, or unknown without samples', () => {
@@ -43,5 +44,16 @@ it('reports tokenizer error as an observed ratio, or unknown without samples', (
   const error = tokenEstimateError([{ estimated: 100, measured: 90 }, { estimated: 100, measured: 110 }]);
   expect(error).toMatchObject({ samples: 2, unknown: false });
   expect(error.ratio).toBeCloseTo(1.01, 2);
+  expect(error.bias).toBeCloseTo(0.01, 2);
+  expect(error.medianAbsoluteError).toBeGreaterThan(0);
+  expect(error.p95AbsoluteError).toBeGreaterThan(0);
+  expect(error.ratioInterval).toEqual(expect.objectContaining({ low: expect.any(Number), high: expect.any(Number) }));
   expect(error.note).toContain('not a token ceiling');
+});
+
+it('uses code units rather than UTF-8 bytes for the character estimate', () => {
+  const chinese = { ...tool('zh', 0), description: '中文说明' };
+  const report = compareDiscoveryCost({ catalog: new Map([['zh', chinese]]) });
+  expect(report.full.characters).toBeLessThan(report.full.bytes);
+  expect(report.full.estimatedTokens).toBeCloseTo(report.full.characters / 3.5, 1);
 });

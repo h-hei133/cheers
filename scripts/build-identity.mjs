@@ -18,6 +18,7 @@ export const REQUIRED_BUILD_INPUTS = [
   "node_modules/typescript/lib/lib.es2024.d.ts",
   "node_modules/@types/node/index.d.ts",
   "scripts/build-cli.mjs",
+  "scripts/build-cli-executable.mjs",
   "scripts/build-cli-bin.mjs",
   "scripts/build-identity.mjs",
   "scripts/build-manifest.mjs",

@@ -19,13 +19,14 @@ function request(text: string) { return catalogRequest({ text, cursor: text.leng
 
 describe("navigation candidate positions", () => {
   it.each([
+    ["/continue ", "session"],
     ["/resume ", "session"], ["/session use ", "session"], ["/sessions switch s", "session"],
     ["/delete ", "session"], ["/session delete ", "session"], ["/session rename ", "session"],
     ["/resume fork ", "session"], ["/fork ", "session"], ["/tree ", "tree"],
     ["/entries ", "entry"], ["/entries tree ", "thread"], ["/resume -- s", "session"],
   ])("resolves %s to the correct catalog", (text, kind) => { expect(request(text)?.kind).toBe(kind); });
 
-  it.each(["/resume list ", "/resume current ", "/resume help ", "/tree help ", "/entries help ",
+  it.each(["/continue session-id follow-up ", "/resume list ", "/resume current ", "/resume help ", "/tree help ", "/entries help ",
     "/resume switch first extra", "/entries tree first extra", "/resume -- switch extra", "/fork here extra"])("does not query for %s", text => {
     expect(request(text)).toBeUndefined();
   });

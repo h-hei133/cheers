@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { AccountPool, ProviderConnectionConfig, RuntimeConfig, RuntimeProvider } from '../../../config/runtimeConfig.js';
 import { credentialBackoffRemaining } from './backoff.js';
 import { ownedConnectionCredential } from './presence.js';
+import { profileScope } from '../../paths/profile/scope.js';
 
 /**
  * Explicit account authorization.
@@ -45,11 +46,15 @@ function poolSignature(entry: NonNullable<AccountPool[RuntimeProvider]>): string
 
 function order(candidates: readonly ProviderConnectionConfig[], input: PoolInput, signature: string): readonly ProviderConnectionConfig[] {
   if (!input.sessionId) return candidates;
-  const key = `${input.sessionId}\u0000${input.provider}\u0000${signature}`;
+  const key = affinityKey(input.sessionId, input.provider, signature);
   const remembered = affinity.get(key);
   const start = candidates.findIndex(candidate => `${candidate.id}\u0000${credentialGeneration(candidate)}` === remembered);
   const offset = start >= 0 ? start : createHash('sha256').update(key).digest().readUInt32BE(0) % candidates.length;
   return [...candidates.slice(offset), ...candidates.slice(0, offset)];
+}
+
+function affinityKey(sessionId: string, provider: RuntimeProvider, signature: string): string {
+  return profileScope(`${sessionId}\u0000${provider}\u0000${signature}`);
 }
 
 export function selectPooledConnection(input: PoolInput): PoolSelection | undefined {
@@ -59,7 +64,8 @@ export function selectPooledConnection(input: PoolInput): PoolSelection | undefi
   const members = availablePoolConnections(input);
   if (!members?.length) return { blocked: 'pool-unavailable' };
   const selected = order(members, input, poolSignature(entry))[0]!;
-  if (input.sessionId) remember(`${input.sessionId}\u0000${input.provider}\u0000${poolSignature(entry)}`, `${selected.id}\u0000${credentialGeneration(selected)}`);
+  if (input.sessionId) remember(affinityKey(input.sessionId, input.provider, poolSignature(entry)),
+    `${selected.id}\u0000${credentialGeneration(selected)}`);
   return { connection: selected, credentialId: credentialIdentity(selected), generation: credentialGeneration(selected) };
 }
 

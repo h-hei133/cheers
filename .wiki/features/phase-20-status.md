@@ -2,6 +2,17 @@
 
 本文只记录有本地证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
+## 2026-10-23 Phase 20 本地返工与全量复核（本地证据；提交/推送/CI 待补记）
+
+- 续接上一轮未提交工作树，完成 `/review` 空 focus、output-aware `/context` 与 runtime protocol facts、动态发现 generation/subscription、transcript pointer source revision、Vim operator motion、Markdown source/diff/math/table、bounded usage attribution、provider fallback/profile scope 和 executable manifest 绑定返工。自审又修复了 pointer 自动滚动被自身 revision 误失效、同一毫秒相同 usage 请求可能丢失、非法右花括号数学被静默截断，以及 host-verified executable 版本可与 build 不同的四个真实缺陷；均有修前回归或等价断言。
+- QA harness 现在要求 qualifying corpus 至少 20 项、确定性任务至少一个可观察检查、文件字节与 mode policy 证据、事件流 observation-only、每臂一致的 provider/model/endpoint、完整 protocol 探针、双独立盲评与明确裁决；`complete` 还要求 100 个正式 pair、唯一 ID、无执行失败、零 policy violation 和无限制项。starter corpus 保持 `qualifying:false` 的 6 项，dry-run 固定 `inconclusive`。
+- 最终聚焦复跑包括 129 项脚本测试、253 项 pointer/usage/renderer/turn 测试和 67 项 Git 集成测试；默认并行 `npm run test:ts` 实际为 927 文件通过、1 文件跳过，9845 项通过、10 项跳过，360.71s，无失败。`test:scripts`、`verify:result-contract` 6 套/158 项、golden main path、`verify:cli-entry` 19 项、cycles/config-consumers/declarations/Node-floor、strict docs/rules、`git diff --check` 均通过；docs-source 118 项与 module facade 11 项保留 advisory。
+- 最终 TS build ID `2ac423b5a8dac7aa1992bf6645a4aa3b000b83df3ea8cd20bc67f523c14ad8bb`，inputs digest `6a3ddbb67f142b5ca01126d5a8c595c957cdf235a96b655cb15a13de50fe3736`，artifact digest `aa25ff526e0ae405c011c1b91c7707907b5fa3f716fb596c66c7c378bc793db2`；immutable exe 102,758,528 bytes、mode 755、SHA-256 `2b9c04625b3b15c96a224d2f2bd0bdd7505bc9fb29a8ebd83033a894c78b868f`。`npm start -- --version`、stable exe 和 immutable exe 均输出 `0.1.0`。
+- 同 build 的 Linux Node/exe × regular/fullscreen/line/pipe 八格 PTY 全部 pass/exit 0，覆盖 settings 保存、命名 profile 创建与重启读回、任务、发现、逐次审批、会话和 restore 字节对照；所有 JSON 均绑定上述 build/artifact/exe。QA quality dry-run 为 `inconclusive`/exit 2，明确表示没有真实模型质量结果。
+- 同 build 的 START-03 补充证据：`bench:start` 各 30 次，Node p50/p95 `405.6/415.8ms`、exe `214.5/231.9ms`；`bench:interactive` 保存 Node/exe × 四模式共 240 个样本，regular/fullscreen 均取得 runtime-ready、首帧和完整 UTF-8 键响应；`bench:responsiveness` 30 次通过 1000 项列表 p95 `<50ms` 与 math/table/diff 单次阻塞 `<100ms` 阈值。全部为 warm/uncontrolled 缓存，不能替代受控冷缓存。
+- NormProof 实际 exit 0/partial：blocking unresolved-specifier 与 cycle obligations satisfied，0 blocking；11 项 function-ceiling advisory 保留。委派 reviewer 使用指定模型多次遇到 429/503，不可用不等于批准；本轮结论来自本地自审和实际门禁，不声称独立 review approval。
+- 仍未闭合：START-03 受控冷缓存；QA-02 Windows/macOS、IME、系统复制及非 Linux 平台矩阵；QA-03 正式 20 项 corpus、真实模型执行和双盲评分；TOOL-02 同模型总成本/cache/参数质量/多语言 tokenizer 校准。Phase 20 不因本批本地返工而宣称全部 47 项完成。
+
 ## 2026-10-22 面板、源投影与 W2/W3 本地返工（代码批 `152d9ecc` 已推送；CI/Watch success）
 
 - 补齐 `/jobs`、`/agents`、`/usage`、`/plan-review`、`/btw` 的既有 picker consumer。`/agents` 通过 jobs owner 的 `agentProjection` 投影 live owner、detached、stored/running→unknown 与保留运行，通过 `agentPage` 提供脱敏、截断的文本页；同时展示 `SubagentLoader` 的有效定义和经安全投影的 discovery diagnostics，不借用 jobs 的本地任务身份；`/usage` 打开时只读本地账本，账户读取必须显式选行并在配置 revision 变化后丢弃迟到结果；`/plan-review` 绑定已加载版本，`/btw` 只读 transcript 中的保留报告。
@@ -162,11 +173,12 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 
 ## 未闭合
 
-- START-03：已保存八组各30次原始样本，渲染键响应关闭 PTY echo 并等待完整 UTF-8 字符；runtime-ready、受控冷缓存、1000项列表键响应、复杂 stream 单次阻塞与分位数不确定性仍未验。
+- START-03：已保存八组各30次原始样本，渲染键响应关闭 PTY echo 并等待完整 UTF-8 字符；受控冷缓存仍需特权环境。当前 `bench:responsiveness` 提供 1000 项列表同步键路径与 math/table/diff 单次阻塞的 Node 宿主证据，不冒充 exe 或完整交互路径。
 
-- QA-02/03：Linux Node/exe × regular/fullscreen/line/pipe 八格合成 CLI 通过；TUI 覆盖会话/任务/发现/审批/settings 保存/profile 重启，line/pipe 覆盖任务/发现/显式审批和 settings 只读；Windows/macOS/IME/系统复制与真实质量仍缺环境/模型。
-- TOOL-02：静态描述/schema 字节成本已进 `/tools` 报告（`size.unit=utf8-bytes`，`tokens=not-measured`）；同模型质量/缓存对比与 tokenizer 校准仍需真实模型。
-- QA-02 的 restore preview 已在 Linux 八格通过，并验证文件/记录/blob 字节不变；line/pipe 完整 profile/save 仍缺。QA-01 矩阵已补齐独立任务行，但仍不能作为 47 项全闭合证明。
+- QA-02：Linux Node/exe × regular/fullscreen/line/pipe 八格合成 CLI 在当前构建通过；TUI 覆盖会话/任务/发现/审批/settings 保存/profile 重启，line/pipe 覆盖任务/发现/显式审批和 settings 保存边界；Windows/macOS/IME/系统复制仍缺环境。
+- QA-03：`npm run qa:quality` 已提供 fail-closed harness、build-bound JSON、确定性/双盲评分和 10,000 次 paired bootstrap；当前 starter corpus 只有 6 项，正式 12 项发现任务加摘要/渲染/启动质量任务与真实模型执行仍缺。
+- TOOL-02：`/tools` 已按当前 endpoint 序列化协议声明，报告 description/schema payload、UTF-8 bytes 与 code-unit token estimate；有界 `recentRequests` 持久化 discovery purpose/input/output attribution。同模型质量/cache 对比、多语言 tokenizer 校准与真实总成本仍需真实模型。
+- QA-02 的 restore preview 已在 Linux 八格通过，并验证文件/记录/blob 字节不变；line/pipe 已覆盖 settings 保存、命名 profile 创建和重启读回，但非交互 profile switch/approval 与 TUI 的完整跨平台生命周期仍需按平台实际验证。QA-01 矩阵已补齐独立任务行，但仍不能作为 47 项全闭合证明。
 
 ## CI
 

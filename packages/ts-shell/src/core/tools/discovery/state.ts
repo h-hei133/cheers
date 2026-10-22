@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { ToolDefinition } from '../../../tools/types.js';
+import type { ToolDefinition, ToolPreparation } from '../../../tools/types.js';
 
 /**
  * The tools a run starts with, and the catalogue it may load from.
@@ -25,10 +25,18 @@ export interface DiscoveryMatch {
 export interface ToolDiscovery {
   readonly generation: string;
   readonly catalog: ReadonlyMap<string, ToolDefinition>;
+  subscribe(listener: () => void): () => void;
   snapshot(): ReadonlyMap<string, ToolDefinition>;
   search(query: string, limit?: number): readonly DiscoveryMatch[];
   load(names: readonly string[]): { readonly loaded: readonly string[]; readonly rejected: readonly string[] };
   attachMeta(tools: readonly ToolDefinition[]): void;
+}
+
+export class ToolGenerationError extends Error {
+  constructor(toolName: string) {
+    super(`Tool '${toolName}' belongs to an older discovery generation and cannot execute.`);
+    this.name = 'ToolGenerationError';
+  }
 }
 
 export function createToolDiscovery(input: {
@@ -38,22 +46,61 @@ export function createToolDiscovery(input: {
 }): ToolDiscovery {
   const pinned = new Set(input.pinned ?? PINNED_TOOL_NAMES);
   const loaded = new Set((input.initial ?? []).filter(name => input.catalog.has(name)));
+  const listeners = new Set<() => void>();
   let meta: readonly ToolDefinition[] = [];
-  const generation = createHash('sha256').update(JSON.stringify([...input.catalog.entries()]
-    .map(([name, tool]) => [name, tool.argsSchema]).sort((left, right) => String(left[0]).localeCompare(String(right[0]))))).digest('hex');
+  const notify = (): void => {
+    for (const listener of [...listeners]) listener();
+  };
+  const generation = (): string => createHash('sha256').update(JSON.stringify([...input.catalog.entries()]
+    .map(([name, tool]) => [name, tool.description, tool.argsSchema])
+    .sort((left, right) => String(left[0]).localeCompare(String(right[0]))))).digest('hex');
+  const toolFingerprint = (tool: ToolDefinition): string => JSON.stringify([tool.description, tool.argsSchema]);
+
+  const guard = (tool: ToolDefinition, snapshotGeneration: string, catalogueOwned: boolean): ToolDefinition => {
+    const fingerprint = toolFingerprint(tool);
+    const verify = (): void => {
+      if (catalogueOwned) {
+        const current = input.catalog.get(tool.name);
+        if (!current || current !== tool || toolFingerprint(current) !== fingerprint) {
+          throw new ToolGenerationError(tool.name);
+        }
+      } else if (generation() !== snapshotGeneration) {
+        throw new ToolGenerationError(tool.name);
+      }
+    };
+    const prepare = tool.prepare
+      ? async (args: Record<string, unknown>, context: Parameters<NonNullable<ToolDefinition['prepare']>>[1]) => {
+          verify();
+          return guardPreparation(await tool.prepare!(args, context), verify);
+        }
+      : undefined;
+    return {
+      ...tool,
+      ...(prepare ? { prepare } : {}),
+      async execute(args, context) {
+        verify();
+        return tool.execute(args, context);
+      },
+    };
+  };
 
   const snapshot = (): ReadonlyMap<string, ToolDefinition> => {
+    const snapshotGeneration = generation();
     const selected = new Map<string, ToolDefinition>();
     for (const [name, tool] of input.catalog) {
-      if (pinned.has(name) || loaded.has(name)) selected.set(name, tool);
+      if (pinned.has(name) || loaded.has(name)) selected.set(name, guard(tool, snapshotGeneration, true));
     }
-    for (const tool of meta) selected.set(tool.name, tool);
+    for (const tool of meta) selected.set(tool.name, guard(tool, snapshotGeneration, false));
     return selected;
   };
 
   return {
-    generation,
+    get generation() { return generation(); },
     catalog: input.catalog,
+    subscribe: listener => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
     snapshot,
     search: (query, limit = 8) => {
       const text = query.trim().toLowerCase();
@@ -75,14 +122,30 @@ export function createToolDiscovery(input: {
     },
     load: names => {
       const accepted: string[] = []; const rejected: string[] = [];
+      const before = [...loaded].sort().join("\0");
       for (const raw of names) {
         const name = String(raw).trim();
         if (!name || name === DISCOVERY_SEARCH_TOOL || name === DISCOVERY_LOAD_TOOL || !input.catalog.has(name)) { rejected.push(name || '(empty)'); continue; }
         if (!pinned.has(name) && !loaded.has(name) && loaded.size >= LOADED_LIMIT) { rejected.push(name); continue; }
         loaded.add(name); accepted.push(name);
       }
+      if ([...loaded].sort().join("\0") !== before) notify();
       return { loaded: accepted, rejected };
     },
-    attachMeta: tools => { meta = tools; },
+    attachMeta: tools => {
+      const before = JSON.stringify(meta);
+      meta = tools;
+      if (JSON.stringify(meta) !== before) notify();
+    },
+  };
+}
+
+function guardPreparation(preparation: ToolPreparation, verify: () => void): ToolPreparation {
+  return {
+    ...preparation,
+    async execute(context, selection, approval) {
+      verify();
+      return preparation.execute(context, selection, approval);
+    },
   };
 }

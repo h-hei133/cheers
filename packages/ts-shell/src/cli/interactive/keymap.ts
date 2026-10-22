@@ -84,6 +84,11 @@ export function dispatchedKeyIds(): readonly string[] {
 
 const vimStates = new WeakMap<object, VimState>();
 
+/** An external draft replacement starts a fresh modal history for that editor. */
+export function resetVimState(editor: object): void {
+  vimStates.delete(editor);
+}
+
 /** Apply one keystroke to the view. */
 export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
   const { view, actions } = context;

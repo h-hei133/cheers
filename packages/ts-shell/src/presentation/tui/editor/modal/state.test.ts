@@ -40,6 +40,14 @@ it("supports dd, dw, yy/p, r and counts", () => {
   expect(run("abcdef", 0, [key("9"), key("9"), key("9"), key("9"), key("9"), key("l")]).cursor).toBe(5);
 });
 
+it("applies inclusive operator motions through their target", () => {
+  expect(run("one two", 0, [key("d"), key("e")]).text).toBe(" two");
+  expect(run("abc", 0, [key("d"), key("$")]).text).toBe("");
+  expect(run("a.b.c", 0, [key("d"), key("f"), key(".")]).text).toBe("b.c");
+  expect(run("a.b.c", 0, [key("d"), key("t"), key(".")]).text).toBe(".b.c");
+  expect(run("a.b.c", 4, [key("d"), key("F"), key(".")]).text).toBe("a.b");
+});
+
 it("edits a visual selection and keeps Enter inert", () => {
   expect(run("abcdef", 1, [key("v"), key("l"), key("l"), key("d")]).text).toBe("aef");
   expect(run("abc", 1, [key("v"), key("enter")]).text).toBe("abc");

@@ -46,6 +46,9 @@ export class Pointer {
   private readonly composerDrag: DragSelection;
   private composerAnchor: ComposerGeometry | undefined;
   private composerRange: SourceSelection | undefined;
+  private transcriptSelectionRevision: number | undefined;
+  private transcriptContentRevision: number | undefined;
+  private transcriptTop: number | undefined;
   private dragTarget: "transcript" | "composer" | undefined;
   private scrollbarDrag: { readonly grabOffset: number } | undefined;
   private autoScrollTimer: ReturnType<typeof setInterval> | undefined;
@@ -75,6 +78,7 @@ export class Pointer {
 
   /** What the pointer has covered in the transcript, for the frame to shade. */
   get selection(): SelectionSpan | undefined {
+    if (this.dragTarget === "transcript" && !this.transcriptSelectionCurrent()) return undefined;
     return this.dragTarget === "transcript" || (this.dragTarget === undefined && this.drag.span)
       ? this.drag.span
       : undefined;
@@ -95,6 +99,9 @@ export class Pointer {
     this.composerDrag.clear();
     this.composerAnchor = undefined;
     this.composerRange = undefined;
+    this.transcriptSelectionRevision = undefined;
+    this.transcriptContentRevision = undefined;
+    this.transcriptTop = undefined;
     this.dragTarget = undefined;
     return hadSelection;
   }
@@ -110,6 +117,10 @@ export class Pointer {
       return copied;
     }
     if (this.drag.span) {
+      if (!this.transcriptSelectionCurrent()) {
+        this.clearSelection();
+        return false;
+      }
       this.dragTarget = undefined;
       return this.drag.copyAndClear();
     }
@@ -201,6 +212,9 @@ export class Pointer {
       this.stopAutoScroll();
       if (isComposerRow && compGeo) {
         this.dragTarget = "composer";
+        this.transcriptSelectionRevision = undefined;
+        this.transcriptContentRevision = undefined;
+        this.transcriptTop = undefined;
         this.drag.clear();
         this.composerAnchor = compGeo;
         const coord = {
@@ -213,6 +227,9 @@ export class Pointer {
         return;
       }
       this.dragTarget = "transcript";
+      this.transcriptSelectionRevision = this.transcriptRevision(this.context.view());
+      this.transcriptContentRevision = this.context.view().transcript.revision;
+      this.transcriptTop = this.transcriptTopFor(this.context.view());
       this.composerDrag.clear();
       this.composerAnchor = undefined;
       this.composerRange = undefined;
@@ -237,12 +254,18 @@ export class Pointer {
       // A composer click must never toggle a transcript block beneath it.
       if (report.kind === "release") { this.context.redraw(); return; }
     } else if (this.dragTarget === "transcript") {
+      if (!this.transcriptSelectionCurrent()) {
+        this.clearSelection();
+        this.context.redraw();
+        return;
+      }
       const maxTranscriptRow = compGeo ? compGeo.top - 1 : Infinity;
       const isTopEdge = report.row <= 1;
       const isBottomEdge = report.row >= maxTranscriptRow - 1;
 
       if (isTopEdge) {
         this.context.view().scroll(-1);
+        this.transcriptTop = this.transcriptTopFor(this.context.view());
         const contentCoord = this.context.view().screenToContent(0, report.column);
         this.drag.handle(report, contentCoord);
         this.startAutoScroll(-1, 0, report.column);
@@ -252,6 +275,7 @@ export class Pointer {
 
       if (isBottomEdge) {
         this.context.view().scroll(1);
+        this.transcriptTop = this.transcriptTopFor(this.context.view());
         const clampedRow = Math.min(maxTranscriptRow, report.row);
         const contentCoord = this.context.view().screenToContent(clampedRow, report.column);
         this.drag.handle(report, contentCoord);
@@ -278,6 +302,22 @@ export class Pointer {
     }
   }
 
+  private transcriptSelectionCurrent(): boolean {
+    const view = this.context.view();
+    return this.transcriptSelectionRevision !== undefined
+      && this.transcriptContentRevision === view.transcript.revision
+      && this.transcriptTop === this.transcriptTopFor(view)
+      && this.transcriptRevision(view) === this.transcriptSelectionRevision;
+  }
+
+  private transcriptTopFor(view: InteractiveView): number {
+    return view.selectionTop?.() ?? 0;
+  }
+
+  private transcriptRevision(view: InteractiveView): number {
+    return view.selectionRevision?.() ?? view.transcript.revision ?? 0;
+  }
+
   private captureComposerRange(geometry: ComposerGeometry): void {
     const span = this.composerDrag.span;
     this.composerRange = span ? selectionFromPoints(geometry.layout, span.from, span.to) : undefined;
@@ -295,6 +335,7 @@ export class Pointer {
     this.autoScrollTimer = setInterval(() => {
       const moved = this.context.view().scroll(direction);
       if (moved) {
+        this.transcriptTop = this.transcriptTopFor(this.context.view());
         const contentCoord = this.context.view().screenToContent(targetRow, column);
         this.drag.handle(
           { kind: "drag", button: 0, row: targetRow, column, shift: false, alt: false, ctrl: false },

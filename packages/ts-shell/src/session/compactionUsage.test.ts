@@ -68,6 +68,43 @@ describe("the provider's measurement drives the threshold", () => {
     expect(planCompaction(messages, { ...base, outputTokens: 8_000, measureContextTokens: () => 47_999 })).toBeUndefined();
   });
 
+  it("fires at an independent input ceiling even below the shared soft band", () => {
+    const messages = longConversation(8);
+    expect(planCompaction(messages, {
+      contextWindow: 64_000,
+      inputLimit: 50_000,
+      reserveTokens: 8_000,
+      outputTokens: 8_000,
+      keepRecentTokens: 600,
+      measureContextTokens: () => 45_000,
+    })).not.toBeUndefined();
+    expect(planCompaction(messages, {
+      contextWindow: 64_000,
+      inputLimit: 50_000,
+      reserveTokens: 8_000,
+      keepRecentTokens: 600,
+      measureContextTokens: () => 45_000,
+    })).not.toBeUndefined();
+  });
+
+  it("applies the soft band to an input ceiling when output is provider-owned", () => {
+    const messages = longConversation(8);
+    expect(planCompaction(messages, {
+      contextWindow: 64_000,
+      inputLimit: 50_000,
+      reserveTokens: 8_000,
+      keepRecentTokens: 600,
+      measureContextTokens: () => 42_000,
+    })).not.toBeUndefined();
+    expect(planCompaction(messages, {
+      contextWindow: 64_000,
+      inputLimit: 50_000,
+      reserveTokens: 8_000,
+      keepRecentTokens: 600,
+      measureContextTokens: () => 41_999,
+    })).toBeUndefined();
+  });
+
   it("keeps an explicit disabled policy from triggering through the output-aware band", () => {
     const messages = longConversation(8);
     expect(planCompaction(messages, {
@@ -211,6 +248,24 @@ describe("a budget larger than the window", () => {
     expect(withoutOutput).not.toBeUndefined();
     expect(withOutput).not.toBeUndefined();
     expect(withOutput!.keptMessages).toBeLessThan(withoutOutput!.keptMessages);
+  });
+
+  it("leaves room for an independent input ceiling when clamping the retained tail", () => {
+    const messages = longConversation(30);
+    const withoutLimit = planCompactionCut(messages, {
+      contextWindow: 5_000,
+      reserveTokens: 100,
+      keepRecentTokens: 10_000,
+    });
+    const withLimit = planCompactionCut(messages, {
+      contextWindow: 5_000,
+      inputLimit: 800,
+      reserveTokens: 100,
+      keepRecentTokens: 10_000,
+    });
+    expect(withoutLimit).not.toBeUndefined();
+    expect(withLimit).not.toBeUndefined();
+    expect(withLimit!.keptMessages).toBeLessThan(withoutLimit!.keptMessages);
   });
 });
 

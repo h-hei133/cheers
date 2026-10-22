@@ -153,8 +153,17 @@ function resolveCredential(
       ...(boundConnection ? { connectionId: boundConnection.id } : {}),
       ...(input.cliBaseUrl !== undefined ? { baseUrl: input.cliBaseUrl } : {}) } };
 
+  if (activeConnectionProfile?.status === 'error') {
+    return { ...preference, provider, expectedEnvVarName, baseUrl, model, blocked: 'connection-unavailable' };
+  }
   if (activeConnectionProfile?.status === 'pending') {
     return { ...preference, provider, expectedEnvVarName, baseUrl, model, blocked: 'connection-pending' };
+  }
+  // A selected account-auth connection owns an identity, not merely a host.
+  // Falling through to an environment or profile API key would silently replace
+  // that account with a different principal.
+  if (activeConnectionProfile?.authType === 'account-auth' && !connectionAccountAuth) {
+    return { ...preference, provider, expectedEnvVarName, baseUrl, model, blocked: 'connection-unavailable' };
   }
 
   // A pool member's credential is the connection's own. An environment key or a
@@ -383,7 +392,13 @@ function pickFallbackConnection(
   }
 
   const connected = sameProvider.filter(
-    (connection) => connection.status !== "error",
+    (connection) => connection.status !== "error" && connection.status !== "pending",
+  );
+  const pending = sameProvider.filter(
+    (connection) => connection.status === "pending",
+  );
+  const errored = sameProvider.filter(
+    (connection) => connection.status === "error",
   );
   const accountAuthConnected = connected.filter(
     (connection) => connection.authType === "account-auth" && Boolean(resolveConnectionAccountAuth(connection)),
@@ -394,7 +409,9 @@ function pickFallbackConnection(
       ? accountAuthConnected
       : connected.length > 0
         ? connected
-        : sameProvider;
+        : pending.length > 0
+          ? pending
+          : errored;
 
   return [...candidates].sort((left, right) => {
     const leftTime = Date.parse(left.updatedAt || left.createdAt || "");

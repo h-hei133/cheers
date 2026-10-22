@@ -10,6 +10,9 @@ import type { GitStore } from './operation/store.js';
 import { prepareWorktree, prepareWorktreeSwitch, prepareWorktreeDelete, type WorktreeBinding } from './worktree/plan.js';
 import { gitReportResult, gitStatusReport, gitDiffReport } from './view/report.js';
 import { hashBytes } from './read/fingerprint.js';
+import { gitSyntax } from '../../core/commands/git/syntax.js';
+import { parseSyntax } from '../../core/commands/syntax/parse.js';
+import { syntaxHelp } from '../../core/commands/syntax/projection.js';
 
 export interface GitHost { readonly sourceAccess?: (absolute: string) => void; readonly store: GitStore; readonly binding: WorktreeBinding; readonly execute: (git: NativeGit, plan: GitPlan) => Promise<GitOperationResult>;
   readonly busy: () => boolean; readonly armCommit: (snapshot: GitSnapshot, index: string) => string; readonly currentRoot: () => string }
@@ -20,8 +23,11 @@ export class GitWorkbench {
   async execute(plan: GitPlan): Promise<GitOperationResult> { if (this.host.busy()) throw new Error('Wait for the current session operation.'); return this.host.execute(this.git(), plan); }
   async command(args: string[], context: CommandContext): Promise<CommandExecutionResult> {
     try {
-      const [action = 'status', ...rest] = args;
-      if (action === 'help') return { kind: 'local', output: '/git [status|diff <staged|unstaged|untracked> <path>|stage|unstage <path> [hunkId]|commit <message>|branch create|switch|delete <name>|merge <branch>|push <remote> <refs/heads/branch>|reconcile <id>|review [focus]|goal]' };
+      if (args[0] === 'help') return { kind: 'local', output: syntaxHelp(gitSyntax) };
+      const parsed = parseSyntax(gitSyntax, args);
+      if (!parsed.ok) return { kind: 'local', output: `Invalid Git operation: ${parsed.reason} Use ${syntaxHelp(gitSyntax)}. No write was attempted.` };
+      const action = parsed.action.name;
+      const rest = parsed.args;
       const snapshot = await this.snapshot(); const git = this.git();
       if (action === 'status' && !rest.length) return gitReportResult(gitStatusReport(snapshot));
       if (action === 'goal' && !rest.length) return context.goalCommand ? context.goalCommand(['status'], context) : { kind: 'local', output: 'Goal runtime unavailable.' };

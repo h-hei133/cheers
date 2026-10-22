@@ -35,6 +35,18 @@ describe("streaming assistant text", () => {
     sink.handleEvent({ type: "message.delta", role: "coder", delta: "x".repeat(400) } as QueryEvent);
     expect(sink.activity()?.tokens).toBe(0);
   });
+
+  it("advances the transcript revision for each streamed mutation", () => {
+    const { sink, transcript } = build();
+    sink.begin("turn", "turn");
+    sink.chunk("a");
+    const first = transcript.revision;
+    sink.chunk(" streamed");
+    expect(transcript.revision).toBeGreaterThan(first);
+    const replaced = transcript.revision;
+    sink.handleEvent({ type: "message.replace", role: "coder", text: "replaced" } as QueryEvent);
+    expect(transcript.revision).toBeGreaterThan(replaced);
+  });
 });
 
 describe("interruption", () => {
@@ -103,6 +115,18 @@ describe("tool lifecycle", () => {
     sink.handleEvent({ type: "tool.started", toolName: "write", taskId: "t1" } as QueryEvent);
     sink.handleEvent({ type: "approval.requested", toolName: "write", taskId: "t1" } as QueryEvent);
     expect(rows()).toContain("awaiting approval");
+  });
+
+  it("advances the transcript revision when tool status changes", () => {
+    const { sink, transcript } = build();
+    sink.begin("turn", "turn");
+    sink.handleEvent({ type: "tool.started", toolName: "read", taskId: "t1" } as QueryEvent);
+    const started = transcript.revision;
+    sink.handleEvent({ type: "approval.requested", toolName: "read", taskId: "t1" } as QueryEvent);
+    expect(transcript.revision).toBeGreaterThan(started);
+    const approval = transcript.revision;
+    sink.handleEvent({ type: "tool.settled", toolName: "read", taskId: "t1", success: true } as QueryEvent);
+    expect(transcript.revision).toBeGreaterThan(approval);
   });
 
   it("ignores a result for a task it never opened", () => {

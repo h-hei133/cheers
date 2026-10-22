@@ -68,7 +68,7 @@ import { openSettings } from "./settings.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
 import { promptApproval, type InteractiveApprovalResult } from "./picker/approval.js";
-import { routeKey } from "./keymap.js";
+import { resetVimState, routeKey } from "./keymap.js";
 import { InputPreferences } from "./inputPreferences.js";
 import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
@@ -170,7 +170,9 @@ export class InteractiveMode {
     },
     suspendTerminal: (run) => this.tui.suspend(run),
     workspaceRoot: () => this.options.runtimeContext.projectRoot,
-    adoptDraft: (text) => this.state.editor.setDraftText(text),
+    adoptDraft: (text) => {
+      this.replaceExternalDraft(text);
+    },
     redraw: () => this.tui.requestRender(),
     attachImage: (image) => {
       // The placeholder goes in the draft and the bytes are held beside it: the
@@ -220,7 +222,7 @@ export class InteractiveMode {
    * and follow-ups run after it, both through the runtime's input handle.
    */
   private readonly queue = new SubmissionQueue(() => this.options.runtimeContext.session, text => {
-    this.state.editor.setText([text, this.state.editor.getText()].filter(Boolean).join('\n\n'));
+    this.replaceExternalDraft([text, this.state.editor.getText()].filter(Boolean).join('\n\n'));
     this.state.transcript.append(textBlock('error', 'Queued input was not executed because the session changed; it was returned to the draft.'));
   });
   /** Stops the background-completion notice from reaching a disposed session. */
@@ -446,7 +448,7 @@ export class InteractiveMode {
         if (replaced === draft) {
           this.state.editor.insert(this.state.pastes.holdIfLong(text));
         } else {
-          this.state.editor.setDraftText(replaced);
+          this.replaceExternalDraft(replaced);
         }
       } else {
         this.state.editor.insert(this.state.pastes.holdIfLong(text));
@@ -982,7 +984,7 @@ export class InteractiveMode {
       }
       if (navigation?.changed) {
         this.state.transcript.append(textBlock("command", navigation.output, "/tree"));
-        if (navigation.draft !== undefined) this.state.editor.setText(navigation.draft);
+        if (navigation.draft !== undefined) this.replaceExternalDraft(navigation.draft);
       }
       this.tui.requestRender();
       const next = automatic || this.pickerPending || sessionManagement ? undefined : retrying ?? this.queue.shift();
@@ -1054,7 +1056,7 @@ export class InteractiveMode {
         if (outcome?.draft && !this.stopped && this.overlay.revision === revision) {
           // Insertion requires another explicit submission. Usage is only a
           // hint; loading argument candidates here could perform network I/O.
-          this.state.editor.setText(outcome.draft);
+          this.replaceExternalDraft(outcome.draft);
           this.view.setSuggesting(false);
           this.completionStatus = slashArgumentHint(this.state.editor.snapshot(), { root: this.options.runtimeContext.cwd, sessionId: this.options.runtimeContext.session.id });
         }
@@ -1091,6 +1093,9 @@ export class InteractiveMode {
         projectRoot: this.options.runtimeContext.projectRoot,
         runtimeConfig: this.options.runtimeContext.runtimeConfig,
         resolveConfigTarget: this.options.runtimeContext.resolveConfigTarget,
+        ...(this.options.runtimeContext.promptIdentity
+          ? { promptIdentity: this.options.runtimeContext.promptIdentity }
+          : {}),
         readConfiguration: () => this.options.runtimeContext.configuration.current,
         getToolPool: toolPoolFor(this.options.runtimeContext, this.options.initialMcpGateway),
         refreshRuntimeConfig: () => refreshShellRuntimeConfig(this.options.runtimeContext),
@@ -1190,8 +1195,14 @@ export class InteractiveMode {
     await this.options.sessionRuntime.cancelAndWait();
     if (undelivered.length === 0) return;
     const draft = this.state.editor.getText();
-    this.state.editor.setText([...undelivered, draft].filter((part) => part.trim()).join("\n\n"));
+    this.replaceExternalDraft([...undelivered, draft].filter((part) => part.trim()).join("\n\n"));
     this.tui.requestRender();
+  }
+
+  /** Programmatic replacements start a fresh Vim mode and undo-safe draft. */
+  private replaceExternalDraft(text: string): void {
+    resetVimState(this.state.editor);
+    this.state.editor.setDraftText(text);
   }
 
   /**

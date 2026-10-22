@@ -4,7 +4,7 @@ import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { graphemeBoundaries, visibleWidth } from "../text/measure.js";
 import { DIAGRAM_LANGUAGE, renderDiagram } from "./mermaid.js";
 import { scanBlocks } from "./markdownScan.js";
-import { latexToText, projectMath } from "./math.js";
+import { latexToDisplayText, projectMath } from "./math.js";
 import { splitTableRow } from "./table.js";
 import { inlineWithinBudget, transformInline, type InlineContext } from "../text/inline.js";
 /**
@@ -127,8 +127,10 @@ export function renderMarkdownWithSources(text: string, width: number): Markdown
         append(renderTableWithSources(block, cells, lines));
         break;
       case "math": {
-        const projected = latexToText(block.body) ?? block.raw;
-        pushNode(wrapWithIndent(defaultTheme.fg("mdHeading", projected), "", cells), block.raw, block.sourceStart);
+        const projected = latexToDisplayText(block.body) ?? block.raw;
+        const projectedRows = projected.split("\n").flatMap(line =>
+          wrapWithIndent(defaultTheme.fg("mdHeading", line), "", cells));
+        pushNode(projectedRows, block.raw, block.sourceStart);
         break;
       }
       case "fence":
