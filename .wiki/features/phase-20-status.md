@@ -21,13 +21,14 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-24 QA-01/PAN-06 跨任务预算与 restore 累计读取（本地证据；交付另绑定）
+## 2026-10-24 QA-01/PAN-06 跨任务预算与 restore 累计读取（代码批 `3cf010da` 已推送；CI/Watch success）
 
 - `CTX-02 × TOOL-01`：`cli/provider/step.test.ts` 通过本地 HTTP 发送首个仅含 `small` schema 的请求并取得 usage；随后 `ToolDiscovery.load(['large'])` 载入带 40,000 字符 schema 的工具。第二请求的 schema digest 已变化，prompt 预算在实际 dispatch 前以 `Context overflow` 拒绝，HTTP server 仍只收到一个请求。
 - 该测试绑定真实 `createProviderStep → createStepFunction → requestBudget` composition，而不是直接调用底层 budget。三个反转分别移除 `toolSnapshot` 读取、从 overhead 移除 `tools`、移除 provider 的 discovery 接线，均产生实际 AssertionError；恢复后同文件 `8/8` 通过。
 - PAN-06 restore catalogue 将一次 browse attempt 的初始 metadata 字节数保存为续页累计上限；每页 `readAccess.admit` 共享同一 `used`，超过上限在 body 读取前抛出 `RecoveryReadLimitError`。因此初始扫描≤32MiB、续页累计≤初始扫描，单 attempt 主动 metadata 读取≤64MiB。205 条三页样本确认续页不调用 `opendir`，并在第二页读取后增长第三页记录时 fail-closed；cursor revision 篡改也在读取前拒绝。
 - restore 的反转分别把每页 verification budget 重置为 `used: 0`、移除 continuation `readAccess`、移除 cursor revision/position 校验、移除内层 caller check；累计超限、续页重叠和 caller 撤销测试均失败。恢复后 `catalog.test.ts` 9项、`catalog/read.test.ts` 12项、`cli/provider/step.test.ts` 8项，共 `29/29` 通过。
 - build `88c051cd8afe48d5848d2f4b3e1d0641b4a0a2ebed050e154c54e98cdaa30c9f`，inputs `4bf89febb4526dcb6d5a231ea1f97e93bdebf621a3b48bb2e350904483e35554`，artifact `d7a098a374757d4fb278f4ddb2afd254ea11fbec09f69397b08e3501372c2bcf`，exe SHA-256 `a0d76c3dc09aa5cc629c3510590238f83c153d06f96ecd46cb28e067696208e5`；`build:ts`、`build:exe` 与 CLI 入口 19 项通过。本批未声称新的专用 PTY，内部 catalogue 路径由聚焦测试和既有 CLI 入口覆盖。
+- 代码批 `3cf010dad62cb872019852a2850355230e7dfa96` 已推送并精确读回远端 `main`。CI `40039157370` / job `120705867116` 于 2026-10-23T23:20:59Z–23:39:51Z completed/success；Watch `40039157330` / job `120705866893` 于 23:20:59Z–23:21:18Z completed/success。两项只绑定该 SHA，不扩展到随后文档 evidence 提交。
 - 本批只新增测试、restore attempt-local 读取预算及文档；不证明 tree/back/cleanse 的完整源读取、累计 physical I/O、瞬态 heap/最长响应或真实模型/MCP。矩阵仍为 `35 complete / 12 partial / 0 open`，QA-01 仍未闭合。
 
 ## 2026-10-24 PAN-02/PAN-06/PAN-07/PAN-08/INPUT-01 本地硬化与独立复审（代码批 `186fde15` 已推送；CI/Watch success）
