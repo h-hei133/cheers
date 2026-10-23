@@ -6,6 +6,7 @@ import {
   readRecoveryAuthorityRecord,
   type RecoveryAuthorityStoredRecord,
 } from "./recoveryAuthorityStore.js";
+import { assertRecoveryReadAccess, type RecoveryReadAccess } from './read.js';
 
 export type RecoveryAuthorityIndexBlockedReason =
   | "ledger-root-required"
@@ -97,8 +98,10 @@ export async function listRecoveryAuthorityRecords(input: {
   readonly authorityId?: string;
   readonly recordIds?: readonly string[];
   readonly signal?: AbortSignal;
+  readonly readAccess?: RecoveryReadAccess;
 }): Promise<RecoveryAuthorityRecordIndexResult> {
-  input.signal?.throwIfAborted();
+  const readAccess = { ...input.readAccess, signal: input.signal ?? input.readAccess?.signal };
+  assertRecoveryReadAccess(readAccess);
   const config = validateConfig(input);
   if (config.ok === false) {
     return blockedRecords(config.blockedReason, input.authorityId, []);
@@ -118,8 +121,11 @@ export async function listRecoveryAuthorityRecords(input: {
         .sort();
     }
   } catch (error) {
+    assertRecoveryReadAccess(readAccess);
     return blockedRecords(indexReadFailure(error), config.authorityId, []);
   }
+
+  assertRecoveryReadAccess(readAccess);
 
   if (recordIds.some((recordId) => !idPattern.test(recordId))) {
     return blockedRecords("invalid-id", config.authorityId, []);
@@ -128,12 +134,14 @@ export async function listRecoveryAuthorityRecords(input: {
   const records: RecoveryAuthorityRecordIndexEntry[] = [];
   const missingRecords: string[] = [];
   for (const recordId of recordIds) {
-    input.signal?.throwIfAborted();
+    assertRecoveryReadAccess(readAccess);
     const record = await readRecoveryAuthorityRecord({
       ledgerRoot: config.ledgerRoot,
       authorityId: config.authorityId,
       recordId,
+      readAccess,
     });
+    assertRecoveryReadAccess(readAccess);
     if (!record) {
       missingRecords.push(recordId);
       continue;
@@ -145,6 +153,8 @@ export async function listRecoveryAuthorityRecords(input: {
       missingRecords.push(recordId);
       continue;
     }
+    const hasContentBlob = await contentBlobExists(namespaceRoot, record);
+    assertRecoveryReadAccess(readAccess);
     records.push({
       recordDigest: hashContent(JSON.stringify(record)),
       recordId: record.recordId,
@@ -159,13 +169,13 @@ export async function listRecoveryAuthorityRecords(input: {
       ...(record.beforeContentSizeBytes !== undefined
         ? { beforeContentSizeBytes: record.beforeContentSizeBytes }
         : {}),
-      hasContentBlob: await contentBlobExists(namespaceRoot, record),
+      hasContentBlob,
       createdAt: record.createdAt,
       schemaVersion: record.schemaVersion,
     });
   }
 
-  input.signal?.throwIfAborted();
+  assertRecoveryReadAccess(readAccess);
 
   return {
     status: "listed",

@@ -8648,3 +8648,11 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - build9815ce293fe7、exe7b3732de81c7，同准确build四格PTY pass/exit0、前后身份相等；85条picker到头/cancel/stale/oversized及新第86operation实际确认恢复CRLF+emoji/durable result，最终command40/40/6，原文件和收据保持。精确证据status/phase20-undo-writer author-binding。
 - 尚缺store/其他consumer累计physical I/O、restore/cleanse目录/metadata预算及heap/同步响应/平台；384MiB不扩大为完整资源或崩溃原子性保证。35complete/12partial保持。上批e40da34ce8ad15b076f85e6b7e158dce867a865e推送读回，CI39956460655/job120423407252最后in_progress（12:51:08Z开始tests中），Watch39956460529/job120423407196success（12:51:08Z–12:51:29Z）。
 - 本批最终独立codeAPPROVE/architectureWATCH，综合COMMENT无BLOCK；三production+新test hashes两报告/反转绑定。code独跑101项/12探针，architecture29项/8production探针及366145预算算式、AST/cycles；首次root runner重复安装与serialized undefined夹具失败留存并分类，正常runner/精确比较通过，own fixtures已清除。
+
+## [2026-10-23] fix | PAN-06 restore catalogue累计准入与取消
+
+- 原streaming32-buffer catalogue每call32MiB metadata/20krecords/50kdir entries含无关名跨authority累计；opened descriptor预分配前扣量、失败不退款、整call拒绝不截页。原index可选readAccess/effective signal进actual metadata reader，read/stat后检查，default接受与fullreaddir不变；blob仅stat，无新writer/implicit恢复。
+- 独立审查实际复现root-open/iterator I/O错误遮盖取消，已修完整scan/root catch并保留EACCES/ENOENT/两levelEIO exact cancellation/close回归。最终67项、恢复12项、七有效反转五hash保持，原源码11AssertionError/1pass，scripts157/静态门/build/exe通过。outer check覆盖root单独反转green留存不计有效；review与commit/newSHA CI另绑定。
+- buildbee73a658dbb、exeddc7d9c2a978，同准确build四格205snapshot3pagePTY pass/exit0前后身份相同；最旧exact preview/全search/cancel/stalecursor/累计source拒绝，原workspace/metadata/blob字节保持。首次multiple More漏toggle夹具超时与中间source四格pass留存；最终源码重建重跑，精确status/author-binding。
+- 每page freshscan的累计交互physicalI/O/heap/latency仍缺，defaultindex数组、restorepicker生命周期/surface、cleanse继续本地工作；35complete/12partial保持。上批b11afed37ce6326a73e0e74932ce67318d19ceac已推送读回，CI39958229805/job120429334772in_progress，13:04:35Z开始，Watch39958229704/job120429334471success至13:05:00Z。preview e40da34c精确CI39956460655/job120423407252已completed/success，12:51:08Z–13:02:36Z；receipt eca77e90CI39953749814仍in_progress。
+- 本批最终独立codeAPPROVE/architectureWATCH、综合COMMENT无BLOCK；五source/test hashes两报告/反转绑定。code59项/14policy+6control独跑，architecture50项/12production独跑及AST/imports/cycles；pre-format sourceguard拒绝不计pass，最终hash前后一致且各自fixtures清除。本批commit/push/精确新SHA CI仍分别取证。

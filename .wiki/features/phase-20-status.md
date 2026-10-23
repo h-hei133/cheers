@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy/back已修；undo receipts扫描及preview准备已有source准入、分块取消和一次页面；锁内target检查已有独立累计准入；restore/cleanse目录/元数据累计资源及导航/query瞬态heap/时延仍缺 | 本地继续其余原consumer资源/身份边界及完整响应测量；来源byte cap不等于总heap/物理I/O保证 |
+| PAN-06 | history/copy/back、undo扫描/preview/locked target与restore catalogue每call准入已有批次证据；restore picker生命周期/surface、cleanse来源/目录累计资源及导航/query瞬态heap/时延仍缺 | 本地继续其余原consumer资源/身份边界与重复scan实际响应测量；source cap不等于总heap/physical I/O保证 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,7 +21,16 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-06 undo 锁内目标读取（本地与独立审查通过；提交待取证）
+## 2026-10-23 PAN-06 restore catalogue 来源与取消（本地与独立审查通过；提交待取证）
+
+- 原streaming catalogue每complete call最多32MiB metadata source bytes、20,000record candidates与50,000ledger/records目录项（含无关名称），跨全部authority累计；metadata128KiB单项限制保持，validated opened descriptor在分配/读取前计量，坏JSON/失败read不退款。超限整call拒绝，不返回已保留的100record page或空成功；原complete100项分页、全文query、revision/cursor、unavailable/empty/no-match区别保持，blob presence只stat，不读blob/current body，无新scanner/writer。
+- 原index加可选readAccess，effective signal进入已有metadata descriptor reader，在read/stat/readdir后重验，typed limit/control错误不被吞成missing。shared budget只新增可选limitMessage，catalogue错误不冒用undo文本；default index的full readdir数组和explicit consumer接受规则保持。目录buffer32及iterator/finally关闭保持；完整scan catch与root-open catch重验取消，EACCES/ENOENT或两层iterator EIO同时取消保留exact reason，无OS syscall cancellation deadline声明。
+- 原`b11afed3`源码最终11实际AssertionError/1pass；rootENOENT取消原本能在后续end check检测，不虚报新失败。最终10文件67项、恢复12项通过，七有效AssertionError反转均exit1且五source/test hash前后相同；root-open保护因outer scan catch覆盖而单独反转green，原日志保留不计有效。最初六/七反转分别绑定当时源码，final sweep重新绑定。scripts157、静态门/diff通过，NormProof packaged judge exit0/partial、0open/1failed advisory/10proof gaps。
+- build`bee73a658dbb955dd52cf10665646b5c1ff10161f9479342a55fb2879bea53f5`，inputs`6095f8578c7fca83d2f8ed7ec62b3e392264edf2dffe736b251e4c0d69bd1d64`，artifact`bdf8e9cd9e45688c0c3e5fcdc83c05873ca31856e203d1f1904bff33481196e5`，exe SHA-256`ddc7d9c2a97897ef927d3252fa17b7d8dd43f8064958de397c44f86458609979`。同准确build Node/exe regular/fullscreen四格PTY pass/exit0，build-before/after完全相等；205record三页到最旧exact read-only preview、全query找到另一页、取消不写、hidden metadata变化拒绝续页；300份120KiB坏JSON导致累计source拒绝，移除fixture后可重开。全部原205workspace/record及blob bytes保持。初次多选More漏space toggle超时留存，按原multiple语义修probe后中间build四格通过；最终control源码再次rebuild、四格重跑才绑定。证据`.omx/artifacts/phase20-restore-catalog/`及author-binding。
+- 独立code APPROVE/architecture WATCH，综合COMMENT无BLOCK，最终四production/newtest五hash匹配两报告/反转/final-binding。审查实际发现并修复root-open及iterator失败遮盖取消来源，两级actual Dir handle关闭回归保持。code独跑8文件59项、14实际production policy探针和六final control探针，实文件exact32MiB、20k/50k边界/default接受/完整分页及错误保真；首次pre-format hash guard拒绝留存不算pass。架构独跑6文件50项/12production探针，实文件exact32MiB+1、跨authority和typed错误；20k/50k exact/+1使用synthetic inventory接原reader，证明政策而非实盘scale/时延。所有import独立解析/AST职责上限及cycles通过；各自fixture已清除，不以supplied67项/PTY替代独跑。
+- WATCH/剩余：每page/query仍fresh complete scan，20krecord的200page可累计4,000,000metadata acquisition，32MiB/call不代表全过程heap/latency/physical I/O或cache正确性。fingerprint仍乐观mixed-epoch detector，选择沿原选中record fresh equality及preview draft，非原子snapshot。default index inventories及restore picker one-use/surface admission、cleanse资源仍待后续；参考选择器实际cancelLoads/late identity与本仓reader取消一致，checkpoint单JSON/Git不提供同类累计policy。35complete/12partial保持。
+
+## 2026-10-23 PAN-06 undo 锁内目标读取（`b11afed3`已推送；CI进行中/Watch success）
 
 - 原`operation/restore`在批准后refresh通过才建立384MiB累计target-source读取准入，每file64MiB，覆盖完整locked preflight与原`commitWorkspaceFile`的before/final-current/after三次检查。共享commit只加neutral可选admitBytes，默认调用保持原路径，maxBytes与opened-size分配前计量由原workspace inspector负责；失败不退款，absent零body。普通来源`current+blob+metadata<=128MiB`推出`3current+blob<=384MiB`，没有改变preview128MiB政策。
 - pre-intent全部target预检查超限明确blocked、receipt/target不变；durable intent之后沿原逐文件blocked/partial/unknown，已发布但读取验证拒绝保持unknown，不能升级success或自动重放。已restored-verified file仍进完整preflight但不再写；原exact approval、fresh revision/latest receipt、target/store locks、final state/path/identity/mode/content与temporary cleanup保持，无第二writer。
@@ -30,7 +39,9 @@
 - 独立code APPROVE/architecture WATCH，综合COMMENT，无BLOCK；最终三production和新test hash均匹配两报告/反转/final-binding。code独跑6文件101项与12实际source探针（准入growth/UTF8/absent/approval/locked stale/partial恢复/unknown重放）；architecture独跑3文件29项和八实际production探针（实际64MiB+1零read、完整verified target检查、仅剩余file重写、post-publication unknown），366,145整数MiB组合验证预算算式，cycles零及AST ceiling通过。两lane直接root Vitest重复安装问题/serialized undefined夹具失败分别保留分类，正常workspace runner及精确serialized比较后通过；各自清除synthetic fixture，不以supplied144项/PTY代替独跑。
 - 384MiB只是本attempt四处target-source准入，未覆盖store rereads、physical I/O/write bytes、其他explicit恢复consumer；保留原/refresh preview、同步inspection/hash/temporary内容仍非heap或最长响应保证。参考selected checkpoint+Git恢复无同类exact receipt累计界，本仓复用原maxBytes/admission/approval/writer，非whole-workspace snapshot。继续restore/cleanse/catalogue/heap/响应/平台缺口，35complete/12partial保持。
 
-## 2026-10-23 PAN-06 undo preview 准备读取（`e40da34c`已推送；CI进行中/Watch success）
+- 代码批`b11afed37ce6326a73e0e74932ce67318d19ceac`已commit/push并读回远端main；精确CI`39958229805`/job`120429334772`于13:04:35Z开始，最后读回in_progress（前13步success，tests运行中）；Watch`39958229704`/job`120429334471`completed/success，13:04:35Z–13:05:00Z。仅绑定此SHA。
+
+## 2026-10-23 PAN-06 undo preview 准备读取（`e40da34c`已推送；CI/Watch success）
 
 - 原recovery record/prepare/blob链承载read access，每次preview累计128MiB来源bytes，包含snapshot JSON、blob和current file；JSON仍128KiB、blob/current各64MiB。按已验证opened descriptor size在分配/读取前扣量，失败不退款；累计拒绝清除此前prepared/current bodies，完整receipt文件均显示`preview-source-limit`且不能恢复，不回退older receipt。原workspace inspector只加可选admitBytes，启用时读取恰好已准入的原size，后续growth由原final stat拒绝；其他调用保持原读取路径。
 - 原text reader改为exact validated size分配、64KiB异步分块，在metadata/blob操作及块之间检查signal/admission，前后验证path/inode/final stats并finally关闭。显式read-control错误穿过原metadata/blob catch，readAccess-only signal使用同一effective signal；原OperationAccess两次file assertion均经过同一typed admission，单次拒绝也不能被后续允许吞掉。preview revision按原`{receipt,files}`完整JSON字节增量hash，full current FileState身份/hash/mode/content绑定保持；原审批、refresh、target/store locks、receipt compensation与逐文件结果保持，无新writer/schema/executor。
@@ -39,7 +50,7 @@
 - 独立code APPROVE/architecture WATCH，综合COMMENT，无BLOCK；最终七production owner hash均匹配两报告，九source/test hash匹配反转与final-binding。code独跑十个exact limit/growth/approval/cancel/单次准入探针及3文件32项；architecture独跑growth实际回归、7文件49项、最终2文件16项及cycle/AST检查，全部owner不超过20声明。两lane实际发现并修复未计量growth、alternate signal吞取消、单次metadata及workspace admission吞拒绝；supplied与独跑证据分开记录。
 - WATCH/剩余：128MiB只是该call已准入source bytes，decode/reencode/per-file JSON仍有临时内存，approved和refreshed preview可共存；current inspection/hash同步，块间取消不保证OS I/O deadline。后续锁内target/commit inspection未有maxBytes，legacy explicit restore/cleanse未加入累计policy，不能宣称完整writer I/O、heap/latency或跨文件崩溃原子性。目标catalog reader已采用stat-size/64KiB/final-version机制，本批在recovery owner适配；参考checkpoint/Git restore未发现同类exact receipt累计政策。继续这些本地缺口，35complete/12partial保持。
 
-- 代码批`e40da34ce8ad15b076f85e6b7e158dce867a865e`已commit/push并读回远端main；精确CI`39956460655`/job`120423407252`于12:51:08Z开始，最后读回in_progress（前13步success，tests运行中）；Watch`39956460529`/job`120423407196`completed/success，12:51:08Z–12:51:29Z。锁内target缺口由后续本地批处理，仍不升级全PAN-06。
+- 代码批`e40da34ce8ad15b076f85e6b7e158dce867a865e`已commit/push并读回远端main；精确CI`39956460655`/job`120423407252`completed/success，12:51:08Z–13:02:36Z；Watch`39956460529`/job`120423407196`completed/success，12:51:08Z–12:51:29Z。锁内target缺口由后续批处理，仍不升级全PAN-06。
 
 ## 2026-10-23 PAN-06 undo receipt 扫描与一次页面（`eca77e90`已推送；CI进行中/Watch success）
 

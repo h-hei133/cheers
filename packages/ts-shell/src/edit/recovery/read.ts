@@ -5,7 +5,7 @@ export interface RecoveryReadAccess {
 }
 
 export class RecoveryReadLimitError extends Error {
-  constructor() { super('Undo preview exceeds its source size limit.'); this.name = 'RecoveryReadLimitError'; }
+  constructor(message = 'Undo preview exceeds its source size limit.') { super(message); this.name = 'RecoveryReadLimitError'; }
 }
 
 export class RecoveryReadControlError extends Error {
@@ -22,7 +22,7 @@ export function assertRecoveryReadAccess(access: RecoveryReadAccess): void {
 }
 
 /** Charges inspected source bytes before body reads, including failed preparations. */
-export function recoveryReadBudget(limit: number, signal?: AbortSignal, admission?: () => string | undefined) {
+export function recoveryReadBudget(limit: number, signal?: AbortSignal, admission?: () => string | undefined, limitMessage?: string) {
   let used = 0;
   const check = (): void => {
     signal?.throwIfAborted();
@@ -33,7 +33,7 @@ export function recoveryReadBudget(limit: number, signal?: AbortSignal, admissio
   };
   const admit = (bytes: number): void => {
     check();
-    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > limit - used) throw new RecoveryReadLimitError();
+    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > limit - used) throw new RecoveryReadLimitError(limitMessage);
     used += bytes;
   };
   return { signal, check, admit, remaining: () => limit - used };
