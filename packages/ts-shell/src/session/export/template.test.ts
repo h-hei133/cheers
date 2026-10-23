@@ -1,6 +1,6 @@
 import vm from "node:vm";
 import { describe, expect, it } from "vitest";
-import { PAGE_SCRIPT } from "./template.js";
+import { PAGE_SCRIPT, PAGE_STYLES } from "./template.js";
 
 class Element {
   children: Element[] = [];
@@ -62,6 +62,10 @@ function runPage(payload: unknown) {
 const call = (id: string) => ({ id, name: "read", arguments: "{}" });
 const entry = (id: string, role = "assistant", extras: Record<string, unknown> = {}) => ({ id, role, content: id, html: id, ...extras });
 const node = (id: string, parentId?: string) => ({ id, parentId, depth: 0, role: "assistant", kind: "turn-message", preview: id });
+
+it("preserves projected display-math rows in the exported page", () => {
+  expect(PAGE_STYLES).toMatch(/\.math\s*\{[^}]*white-space:\s*pre-wrap/);
+});
 
 describe("exported page branch traversal", () => {
   it('shows ancestor report observations by default without changing tool-result pairing', () => {

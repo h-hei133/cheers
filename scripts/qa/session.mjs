@@ -2,7 +2,23 @@ import fs from "node:fs";
 import path from "node:path";
 import { stripVTControlCharacters } from "node:util";
 
-export const SAVED_LINK_MARKDOWN = "qa-link-label [safe](https://example.com/qa-link)";
+const SAVED_LINK_MARKDOWN = "qa-link-label [safe](https://example.com/qa-link)";
+const SAVED_MATH_INLINE = "$x^2 + y_1$";
+const SAVED_MATH_UNKNOWN = "$\\unknown{x}+\\alpha$";
+const SAVED_MATH_MATRIX = [
+  "\\begin{bmatrix}",
+  "1&20\\\\300&4",
+  "\\end{bmatrix}",
+].join("\n");
+export const SAVED_ASSISTANT_MARKDOWN = [
+  SAVED_LINK_MARKDOWN,
+  "",
+  SAVED_MATH_INLINE,
+  "",
+  SAVED_MATH_UNKNOWN,
+  "",
+  SAVED_MATH_MATRIX,
+].join("\n");
 export const SAVED_DIFF_OLD = "qa-old-side-source";
 export const SAVED_DIFF_NEW = "qa-new-side-source";
 
@@ -79,11 +95,19 @@ export function seedSavedSession(home, project) {
         { id: `${sessionId}:root`, kind: "session-root", order: 0, timestamp },
         { id: "turn_saved_probe", parentId: `${sessionId}:root`, kind: "turn-message", role: "user", order: 1, timestamp },
         {
-          id: "turn_saved_probe_diff_call",
+          id: "turn_saved_probe_math",
           parentId: "turn_saved_probe",
           kind: "turn-message",
           role: "assistant",
           order: 2,
+          timestamp,
+        },
+        {
+          id: "turn_saved_probe_diff_call",
+          parentId: "turn_saved_probe_math",
+          kind: "turn-message",
+          role: "assistant",
+          order: 3,
           timestamp,
           toolCalls: [{
             id: SAVED_DIFF_CALL,
@@ -96,20 +120,12 @@ export function seedSavedSession(home, project) {
           parentId: "turn_saved_probe_diff_call",
           kind: "turn-message",
           role: "tool",
-          order: 3,
+          order: 4,
           timestamp,
           toolCallId: SAVED_DIFF_CALL,
         },
-        {
-          id: "turn_saved_probe_link",
-          parentId: "turn_saved_probe_diff_result",
-          kind: "turn-message",
-          role: "assistant",
-          order: 4,
-          timestamp,
-        },
       ],
-      activeLeafId: "turn_saved_probe_link",
+      activeLeafId: "turn_saved_probe_diff_result",
       branches: [],
       compactions: [],
     },
@@ -117,6 +133,7 @@ export function seedSavedSession(home, project) {
   fs.writeFileSync(path.join(sessionDir, "transcript.jsonl"), [
     JSON.stringify({ type: "session", version: 1, id: sessionId, timestamp, cwd: project }),
     JSON.stringify({ type: "message", id: "turn_saved_probe", role: "user", content: "Saved probe", timestamp }),
+    JSON.stringify({ type: "message", id: "turn_saved_probe_math", role: "assistant", content: SAVED_ASSISTANT_MARKDOWN, timestamp }),
     JSON.stringify({
       type: "message",
       id: "turn_saved_probe_diff_call",
@@ -137,7 +154,6 @@ export function seedSavedSession(home, project) {
       timestamp,
       tool_call_id: SAVED_DIFF_CALL,
     }),
-    JSON.stringify({ type: "message", id: "turn_saved_probe_link", role: "assistant", content: SAVED_LINK_MARKDOWN, timestamp }),
   ].join("\n") + "\n");
   return sessionId;
 }

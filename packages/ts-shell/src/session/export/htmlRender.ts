@@ -1,5 +1,5 @@
 import { scanBlocks, type MarkdownBlock } from "../../presentation/tui/transcript/markdownScan.js";
-import { latexToText } from "../../presentation/tui/transcript/math.js";
+import { createMathFinder, latexToDisplayText } from "../../presentation/tui/transcript/math.js";
 import { splitTableRow } from "../../presentation/tui/transcript/table.js";
 import { inlineWithinBudget, transformInline, type InlineContext } from "../../presentation/tui/text/inline.js";
 import { safeLinkUrl } from "../../presentation/tui/text/link.js";
@@ -70,6 +70,8 @@ function renderInlineHtmlAt(text: string, context?: InlineContext): string {
         ? renderedLabel
         : `<a href="${escapeHtml(url)}" rel="noreferrer noopener">${renderedLabel}</a>`;
     },
+    findMath: createMathFinder(text),
+    renderMath: escapeHtml,
   }, context);
 }
 
@@ -168,8 +170,10 @@ function renderBlockHtml(block: Grouped): string {
       return renderFenceHtml(block.lines, block.language);
     case "table":
       return renderTableHtml(block.header, block.rows);
-    case "math":
-      return `<div class="math">${escapeHtml(latexToText(block.body) === undefined ? block.raw : block.body)}</div>`;
+    case "math": {
+      const projected = latexToDisplayText(block.body);
+      return `<div class="math">${escapeHtml(projected ?? block.raw)}</div>`;
+    }
     case "list": {
       // The marker decided the list kind when the items were grouped; a terminal
       // prints the marker and a browser does not, so this is where they part.

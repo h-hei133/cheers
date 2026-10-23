@@ -97,6 +97,10 @@ table { border-collapse: collapse; margin: 8px 0; }
 th, td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; }
 th { background: var(--panel-2); }
 blockquote { margin: 8px 0; padding: 2px 12px; border-left: 3px solid var(--border); color: var(--muted); }
+.math {
+  margin: 8px 0; white-space: pre-wrap; word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 a { color: var(--user); }
 .call { margin: 8px 0; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
 .call > summary { cursor: pointer; padding: 6px 10px; font-size: 12.5px; color: var(--tool); }

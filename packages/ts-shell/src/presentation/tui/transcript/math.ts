@@ -17,6 +17,13 @@ const MAX_DEPTH = 16;
 const MAX_MATRIX_ROWS = 12;
 const MAX_MATRIX_COLUMNS = 12;
 const MAX_MATRIX_CELLS = 64;
+const MAX_DISPLAY_ROWS = 24;
+const MAX_DISPLAY_BYTES = 64 * 1024;
+
+export const MATH_ENVIRONMENTS: ReadonlySet<string> = new Set([
+  "matrix", "pmatrix", "bmatrix", "vmatrix", "Vmatrix",
+  "equation", "equation*", "align", "align*", "gather", "gather*", "multline", "multline*", "cases",
+]);
 
 const SYMBOLS: Readonly<Record<string, string>> = {
   alpha: "α", beta: "β", gamma: "γ", delta: "δ", epsilon: "ε", zeta: "ζ", eta: "η", theta: "θ",
@@ -39,6 +46,63 @@ const SUBSCRIPTS: Readonly<Record<string, string>> = {
 };
 
 interface Cursor { index: number; tokens: number }
+
+export interface MathToken {
+  readonly end: number;
+  readonly text: string;
+}
+
+/**
+ * Return a stateful finder for math openers in one source string.
+ *
+ * The cached close positions keep repeated unmatched openers linear instead of
+ * rescanning the remaining text at every character.
+ */
+export function createMathFinder(text: string): (start: number) => MathToken | undefined {
+  let nextParenClose = text.indexOf("\\)");
+  let nextBracketClose = text.indexOf("\\]");
+  const nextClose = (marker: string, current: number, from: number): number => {
+    while (current >= 0 && current < from) current = text.indexOf(marker, current + 2);
+    return current;
+  };
+  return (start: number): MathToken | undefined => {
+    if (text[start] === "\\" && (text[start + 1] === "(" || text[start + 1] === "[")) {
+      if (isEscaped(text, start)) return undefined;
+      const parenthesized = text[start + 1] === "(";
+      const closeMarker = parenthesized ? "\\)" : "\\]";
+      const searchFrom = start + 2;
+      let close = nextClose(closeMarker, parenthesized ? nextParenClose : nextBracketClose, searchFrom);
+      if (parenthesized) nextParenClose = close;
+      else nextBracketClose = close;
+      if (close < 0) return undefined;
+      const raw = text.slice(start, close + 2);
+      if (close - searchFrom > MAX_FORMULA_BYTES) return { end: close + 2, text: raw };
+      const converted = parenthesized
+        ? latexToText(text.slice(searchFrom, close))
+        : latexToDisplayText(text.slice(searchFrom, close));
+      const end = close + 2;
+      const next = text.indexOf(closeMarker, end);
+      if (parenthesized) nextParenClose = next;
+      else nextBracketClose = next;
+      return { end, text: converted ?? raw };
+    }
+    if (text[start] !== "$" || isEscaped(text, start)) return undefined;
+    const display = text[start + 1] === "$";
+    const open = start + (display ? 2 : 1);
+    if (!display && /[0-9]/.test(text[open] ?? "")) {
+      const close = text.indexOf("$", open);
+      if (close < 0 || close === open || text[close - 1] === " ") return undefined;
+    }
+    const close = findClose(text, open, display);
+    if (close < 0) return undefined;
+    const raw = text.slice(start, close + (display ? 2 : 1));
+    if (close - open > MAX_FORMULA_BYTES) return { end: close + (display ? 2 : 1), text: raw };
+    const converted = display
+      ? latexToDisplayText(text.slice(open, close))
+      : latexToInlineText(text.slice(open, close));
+    return { end: close + (display ? 2 : 1), text: converted ?? raw };
+  };
+}
 
 /** Convert one formula body, or return undefined when it is over budget. */
 export function latexToText(body: string): string | undefined {
@@ -98,16 +162,9 @@ function readCommand(source: string, cursor: Cursor): string | undefined {
   if (name === "text" || name === "mathrm" || name === "mathbf" || name === "operatorname") return readArgument(source, cursor, 1);
   const symbol = SYMBOLS[name];
   if (symbol) return symbol;
-  // Unknown commands keep their spelling and argument; silently dropping either
-  // loses meaning the reader may need to copy.
-  if (source[cursor.index] === "{") {
-    let depth = 0;
-    for (let index = cursor.index; index < source.length; index++) {
-      if (source[index] === "{") depth += 1;
-      else if (source[index] === "}") { depth -= 1; if (depth === 0) { const raw = source.slice(cursor.index, index + 1); cursor.index = index + 1; return `\\${name}${raw}`; } }
-    }
-  }
-  return `\\${name}`;
+  // Unknown commands make the whole formula fall back to its original source.
+  // A partial projection would silently mix converted and unparsed meaning.
+  return undefined;
 }
 
 /** Read `{...}` or a single token after a command. */
@@ -119,7 +176,7 @@ function readArgument(source: string, cursor: Cursor, depth: number): string | u
     return readGroup(source, cursor, depth + 1, true);
   }
   const character = source[cursor.index];
-  if (character === undefined) return "";
+  if (character === undefined) return undefined;
   cursor.index += 1;
   return character;
 }
@@ -136,12 +193,26 @@ function subscript(text: string): string {
     : `_(${text})`;
 }
 
-/** Preserve display-math structure when a matrix can be laid out safely. */
+/** Preserve display-math structure when a whitelisted environment fits. */
 export function latexToDisplayText(body: string): string | undefined {
   if (Buffer.byteLength(body, "utf8") > MAX_FORMULA_BYTES) return undefined;
-  const match = /^\s*\\begin\{(matrix|pmatrix|bmatrix|vmatrix|Vmatrix)\}([\s\S]*?)\\end\{\1\}\s*$/.exec(body);
-  if (!match) return latexToText(body);
-  const rows = match[2]!.split(/\\\\/).map(row => row.trim()).filter(Boolean);
+  const matrix = /^\s*\\begin\{(matrix|pmatrix|bmatrix|vmatrix|Vmatrix)\}([\s\S]*?)\\end\{\1\}\s*$/.exec(body);
+  if (matrix) {
+    if (matrix[2]!.includes("\\begin{")) return undefined;
+    return projectMatrix(matrix[1]!, matrix[2]!);
+  }
+  const environment = /^\s*\\begin\{([A-Za-z]+\*?)\}([\s\S]*?)\\end\{\1\}\s*$/.exec(body);
+  if (environment && MATH_ENVIRONMENTS.has(environment[1]!)) {
+    if (environment[2]!.includes("\\begin{")) return undefined;
+    const projected = projectEnvironment(environment[1]!, environment[2]!);
+    return projected !== undefined && displayWithinBudget(projected) ? projected : undefined;
+  }
+  const projected = latexToText(body);
+  return projected !== undefined && displayWithinBudget(projected) ? projected : undefined;
+}
+
+function projectMatrix(name: string, body: string): string | undefined {
+  const rows = body.split(/\\\\/).map(row => row.trim()).filter(Boolean);
   if (rows.length === 0 || rows.length > MAX_MATRIX_ROWS) return undefined;
   const cells = rows.map(row => row.split("&").map(cell => latexToText(cell)?.trim()));
   const columns = Math.max(...cells.map(row => row.length));
@@ -149,14 +220,30 @@ export function latexToDisplayText(body: string): string | undefined {
     || cells.some(row => row.some(cell => cell === undefined))) return undefined;
   const widths = Array.from({ length: columns }, (_, column) =>
     Math.max(...cells.map(row => visibleWidth(row[column] ?? ""))));
-  const [left, right] = match[1] === "pmatrix" ? ["(", ")"]
-    : match[1] === "bmatrix" ? ["[", "]"]
-      : match[1] === "vmatrix" ? ["|", "|"]
-        : match[1] === "Vmatrix" ? ["‖", "‖"] : ["", ""];
-  return cells.map(row => {
+  const [left, right] = name === "pmatrix" ? ["(", ")"]
+    : name === "bmatrix" ? ["[", "]"]
+      : name === "vmatrix" ? ["|", "|"]
+        : name === "Vmatrix" ? ["‖", "‖"] : ["", ""];
+  const projected = cells.map(row => {
     const line = Array.from({ length: columns }, (_, column) => padToWidth(row[column] ?? "", widths[column]!)).join("  ");
     return left ? `${left} ${line.trimEnd()} ${right}` : line.trimEnd();
   }).join("\n");
+  return displayWithinBudget(projected) ? projected : undefined;
+}
+
+function projectEnvironment(name: string, body: string): string | undefined {
+  const rows = body.split(/\\\\/).map(row => row.trim()).filter(Boolean);
+  if (rows.length === 0 || rows.length > MAX_DISPLAY_ROWS) return undefined;
+  const lines = rows.map(row => {
+    const cells = row.split("&").map(cell => latexToText(cell.trim()));
+    if (cells.some(cell => cell === undefined)) return undefined;
+    return name === "cases" ? cells.join(" | ") : cells.filter(Boolean).join(" ");
+  });
+  return lines.some(line => line === undefined) ? undefined : lines.join("\n");
+}
+
+function displayWithinBudget(text: string): boolean {
+  return text.split("\n").length <= MAX_DISPLAY_ROWS && Buffer.byteLength(text, "utf8") <= MAX_DISPLAY_BYTES;
 }
 
 /** Inline math must remain one physical row, so matrix rows are joined explicitly. */
@@ -171,10 +258,9 @@ export function latexToInlineText(body: string): string | undefined {
  * linear expression; formulas outside the bounded layout remain raw.
  */
 export function projectMath(text: string): string {
+  const findMath = createMathFinder(text);
   let output = "";
   let index = 0;
-  let nextParenClose = text.indexOf("\\)");
-  let nextBracketClose = text.indexOf("\\]");
   while (index < text.length) {
     const character = text[index]!;
     if (character === "`") {
@@ -190,47 +276,15 @@ export function projectMath(text: string): string {
       continue;
     }
     if (character === "\\" && text[index + 1] === "$") { output += "\\$"; index += 2; continue; }
-    if (character === "\\" && (text[index + 1] === "(" || text[index + 1] === "[")) {
-      const parenthesized = text[index + 1] === "(";
-      const closeMarker = parenthesized ? "\\)" : "\\]";
-      const searchFrom = index + 2;
-      let close = parenthesized ? nextParenClose : nextBracketClose;
-      while (close >= 0 && close < searchFrom) {
-        close = text.indexOf(closeMarker, close + 2);
-        if (parenthesized) nextParenClose = close;
-        else nextBracketClose = close;
-      }
-      if (close >= 0 && close - searchFrom <= MAX_FORMULA_BYTES) {
-        const converted = parenthesized
-          ? latexToText(text.slice(index + 2, close))
-          : latexToInlineText(text.slice(index + 2, close));
-        output += converted ?? text.slice(index, close + 2);
-        index = close + 2;
-        const next = text.indexOf(closeMarker, index);
-        if (parenthesized) nextParenClose = next;
-        else nextBracketClose = next;
-        continue;
-      }
-      output += text.slice(index, index + 2);
-      index += 2;
+    if (character !== "$" && character !== "\\") { output += character; index += 1; continue; }
+    const math = findMath(index);
+    if (math) {
+      output += math.text;
+      index = math.end;
       continue;
     }
-    if (character !== "$") { output += character; index += 1; continue; }
-    const display = text[index + 1] === "$";
-    const open = index + (display ? 2 : 1);
-    // Currency: a digit right after the opener is money unless a closing dollar
-    // follows a non-space; `$5 and $10` has no such pair.
-    if (!display && /[0-9]/.test(text[open] ?? "")) {
-      const close = text.indexOf("$", open);
-      if (close < 0 || close === open || text[close - 1] === " ") { output += character; index += 1; continue; }
-    }
-    const close = findClose(text, open, display);
-    if (close < 0) { output += character; index += 1; continue; }
-    const body = text.slice(open, close);
-    const converted = latexToInlineText(body);
-    if (converted === undefined) { output += text.slice(index, close + (display ? 2 : 1)); index = close + (display ? 2 : 1); continue; }
-    output += converted;
-    index = close + (display ? 2 : 1);
+    output += character;
+    index += 1;
   }
   return output;
 }
@@ -248,6 +302,12 @@ function findClose(text: string, from: number, display: boolean): number {
     if (text.startsWith(marker, index)) return index;
   }
   return -1;
+}
+
+function isEscaped(text: string, index: number): boolean {
+  let slashes = 0;
+  for (let cursor = index - 1; cursor >= 0 && text[cursor] === "\\"; cursor--) slashes++;
+  return slashes % 2 === 1;
 }
 
 function backtickRun(text: string, start: number): number {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { escapeHtml, renderInlineHtml, renderMarkdownHtml, safeUrl } from "./htmlRender.js";
+import { renderMarkdown } from "../../presentation/tui/transcript/markdown.js";
+import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 
 /**
  * Markdown as the exported page renders it.
@@ -121,7 +123,21 @@ describe("blocks", () => {
 
   it("keeps multiline display math as a bounded source block", () => {
     const html = renderMarkdownHtml("$$\nx^2 + y_1\n$$");
-    expect(html).toBe('<div class="math">x^2 + y_1</div>');
+    expect(html).toBe('<div class="math">x² + y₁</div>');
+  });
+
+  it("projects whitelisted standalone math environments", () => {
+    expect(renderMarkdownHtml("\\begin{equation}\n\\alpha+\\beta\n\\end{equation}"))
+      .toBe('<div class="math">α+β</div>');
+    const matrix = "\\begin{bmatrix}\n1&20\\\\300&4\n\\end{bmatrix}";
+    expect(renderMarkdownHtml(matrix)).toBe('<div class="math">[ 1    20 ]\n[ 300  4 ]</div>');
+    expect(renderMarkdown(matrix, 40).map(stripAnsi).filter(Boolean))
+      .toEqual(["[ 1    20 ]", "[ 300  4 ]"]);
+  });
+
+  it("keeps nested matrix source rather than corrupting it", () => {
+    const source = "$$\n\\begin{bmatrix}1&\\begin{matrix}2\\end{matrix}\\\\3&4\\end{bmatrix}\n$$";
+    expect(renderMarkdownHtml(source)).toBe(`<div class="math">${escapeHtml(source)}</div>`);
   });
 
   it("keeps an unterminated display-math delimiter in the exported source", () => {
@@ -210,11 +226,18 @@ describe("inline spans", () => {
   });
 
   it("distinguishes escaped, multi-run, and unmatched backticks", () => {
-    expect(renderInlineHtml("\\`text $x^2$\\`")).toBe("\\`text $x^2$\\`");
+    expect(renderInlineHtml("\\`text $x^2$\\`")).toBe("\\`text x²\\`");
     expect(renderInlineHtml("``code $x^2$``")).toBe("<code>code $x^2$</code>");
     expect(renderInlineHtml("`unmatched")).toBe("`unmatched");
     expect(renderInlineHtml("``unmatched")).toBe("``unmatched");
     expect(renderInlineHtml("``unmatched`")).toBe("``unmatched`");
+  });
+
+  it("projects inline math without interpreting its contents as Markdown", () => {
+    expect(renderInlineHtml("$x^2 + y_1$")).toBe("x² + y₁");
+    expect(renderInlineHtml("$a*b*c$")).toBe("a*b*c");
+    expect(renderInlineHtml("$[docs](https://example.test)$")).toBe("[docs](https://example.test)");
+    expect(renderInlineHtml("$\\unknown{x}+\\alpha$")).toBe("$\\unknown{x}+\\alpha$");
   });
 
   it("escapes code content and suppresses inline markup inside it", () => {

@@ -235,6 +235,26 @@ describe("export command", () => {
     expect(result.kind === "local" && result.output).toContain(`${payload.entries.length} messages`);
   });
 
+  it("projects inline and display math into the exported HTML payload", async () => {
+    const session = locateExistingSessionLayout(createSessionStoreLayout(home), sessionId);
+    appendTranscriptEvent(
+      session.transcriptPath,
+      createMessageTranscriptEvent({
+        role: "assistant",
+        content: "$x^2 + y_1$\n\n$$\n\\begin{bmatrix}1&20\\\\300&4\\end{bmatrix}\n$$",
+        timestamp: "t5",
+      }),
+    );
+
+    await runExportCommand(["html", "math.html"], context());
+    const html = fs.readFileSync(path.join(workdir, "math.html"), "utf8");
+    const encoded = /<script id="session-data" type="text\/plain">([^<]*)<\/script>/.exec(html);
+    expect(encoded).not.toBeNull();
+    const payload = JSON.parse(Buffer.from(encoded![1]!, "base64").toString("utf8"));
+    const math = payload.entries.find((entry: { content: string }) => entry.content.includes("$x^2"));
+    expect(math.html).toBe('<p>x² + y₁</p><div class="math">[ 1    20 ]\n[ 300  4 ]</div>');
+  });
+
   it.each(["html", "markdown", "jsonl"])("reports damaged input for %s", async format => {
     const session = locateExistingSessionLayout(createSessionStoreLayout(home), sessionId);
     fs.appendFileSync(session.transcriptPath, "{broken\n");

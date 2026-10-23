@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { setDiagramMode } from "./mermaid.js";
 import { renderInline, renderMarkdown, trimPartialFence } from "./markdown.js";
+import { scanBlocks } from "./markdownScan.js";
 import { visibleWidth } from "../text/measure.js";
 import { stripAnsi } from "../text/ansi.js";
 import { defaultTheme } from "../../theme/theme.js";
@@ -29,6 +30,20 @@ describe("inline styling", () => {
 
   it("does not apply emphasis inside a code span", () => {
     expect(stripAnsi(renderInline("`**literal**` and **bold**"))).toBe("**literal** and bold");
+  });
+
+  it("projects inline math as one opaque token", () => {
+    expect(stripAnsi(renderInline("$x^2 + y_1$"))).toBe("x² + y₁");
+    expect(stripAnsi(renderInline("$a*b*c$"))).toBe("a*b*c");
+    expect(stripAnsi(renderInline("$[docs](https://example.test)$"))).toBe("[docs](https://example.test)");
+    expect(renderInline("$[docs](https://example.test)$")).not.toContain("\x1b]8;;");
+  });
+
+  it("keeps the complete formula when projection cannot preserve it", () => {
+    const unknown = "$\\unknown{x}+\\alpha$";
+    const missing = "$\\frac{a}$";
+    expect(stripAnsi(renderInline(unknown))).toBe(unknown);
+    expect(stripAnsi(renderInline(missing))).toBe(missing);
   });
 
   it("allows emphasis to wrap code and link tokens", () => {
@@ -180,6 +195,21 @@ describe("block structure", () => {
     expect(rows.every(row => !row.includes("\n"))).toBe(true);
   });
 
+  it("renders whitelisted standalone environments without swallowing their delimiters", () => {
+    const equationSource = "\\begin{equation}\n\\alpha+\\beta\n\\end{equation}";
+    const equation = renderMarkdown(equationSource, WIDTH);
+    expect(equation.map(stripAnsi).filter(Boolean)).toEqual(["α+β"]);
+    expect(scanBlocks(equationSource)).toMatchObject([
+      { kind: "math", body: equationSource, raw: equationSource, sourceStart: 0, sourceEnd: 2 },
+    ]);
+
+    const cases = renderMarkdown("\\begin{cases}\nx&x>0\\\\-x&x\\le0\n\\end{cases}", WIDTH);
+    expect(cases.map(stripAnsi).filter(Boolean)).toEqual(["x | x>0", "-x | x≤0"]);
+
+    const matrix = renderMarkdown("\\begin{bmatrix}\n1&20\\\\300&4\n\\end{bmatrix}", WIDTH);
+    expect(matrix.map(stripAnsi).filter(Boolean)).toEqual(["[ 1    20 ]", "[ 300  4 ]"]);
+  });
+
   it.each([
     "$$\nx^2 + y_1",
     "\\[\nx^2 + y_1",
@@ -230,6 +260,13 @@ describe("tables", () => {
 });
 
 describe("streaming stability", () => {
+  it("keeps an incomplete formula visible and projects it once closed", () => {
+    for (const source of ["$", "$$", "$x", "$x^2 + y_1", "\\(", "\\[\\begin{matrix}1"]) {
+      expect(stripAnsi(renderInline(source))).toBe(source);
+    }
+    expect(stripAnsi(renderInline("$x^2 + y_1$"))).toBe("x² + y₁");
+  });
+
   it("drops a trailing partial fence", () => {
     expect(trimPartialFence("text\n``")).toBe("text");
     expect(trimPartialFence("text\n`")).toBe("text");

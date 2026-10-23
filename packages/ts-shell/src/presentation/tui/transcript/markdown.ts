@@ -4,7 +4,7 @@ import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { graphemeBoundaries, visibleWidth } from "../text/measure.js";
 import { DIAGRAM_LANGUAGE, renderDiagram } from "./mermaid.js";
 import { scanBlocks } from "./markdownScan.js";
-import { latexToDisplayText, projectMath } from "./math.js";
+import { createMathFinder, latexToDisplayText } from "./math.js";
 import { splitTableRow } from "./table.js";
 import { inlineWithinBudget, transformInline, type InlineContext } from "../text/inline.js";
 import { closeTerminalHyperlink, displayLinkUrl, terminalHyperlink } from "../text/link.js";
@@ -62,7 +62,7 @@ export function renderInline(text: string): string {
 
 function renderInlineAt(text: string, context?: InlineContext): string {
   if (!inlineWithinBudget(text, context)) return text;
-  return transformInline(projectMath(text), {
+  return transformInline(text, {
     renderCode: (code) => {
       if (code.includes("/") || code.includes("\\") || /\.[a-zA-Z0-9_-]+$/.test(code)) {
         return defaultTheme.fg("filename", code);
@@ -75,6 +75,7 @@ function renderInlineAt(text: string, context?: InlineContext): string {
       const visibleTarget = displayLinkUrl(href);
       return `${terminalHyperlink(renderedLabel, href)}${visibleTarget ? defaultTheme.fg("mdLinkUrl", ` (${visibleTarget})`) : ""}`;
     },
+    findMath: createMathFinder(text),
   }, context);
 }
 

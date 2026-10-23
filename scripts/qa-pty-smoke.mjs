@@ -15,7 +15,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createQaPtyEnvironment } from "./qa-pty-env.mjs";
 import { seedRecoverySession, seedSavedSession, extractSessionId, currentSessionFromStore, assertTranscript,
-  SAVED_LINK_MARKDOWN, SAVED_DIFF_OLD, SAVED_DIFF_NEW } from "./qa/session.mjs";
+  SAVED_ASSISTANT_MARKDOWN, SAVED_DIFF_OLD, SAVED_DIFF_NEW } from "./qa/session.mjs";
 import { seedRestoreSnapshot, assertRestoreUnchanged, runRestorePreview } from './qa/restore.mjs';
 import { terminalSpawnSpec } from './qa/terminal.mjs';
 import { checkBuild } from './start-lib.mjs';
@@ -389,31 +389,23 @@ async function runTerminalSmoke(target, mode) {
     if (!diffView.includes(SAVED_DIFF_OLD) || !diffView.includes(SAVED_DIFF_NEW)) {
       throw new Error("saved diff did not render both source sides");
     }
-
-    const copyStart = state.output.length;
-    child.stdin.write("/copy\r");
-    await waitForOutput(() => normalized(state.output.slice(copyStart)),
-      value => value.includes("Copy block") && value.toLowerCase().includes("assistant"),
-      "copy block picker");
-    child.stdin.write("\r");
-    await waitForOutput(() => normalized(state.output.slice(copyStart)),
-      value => value.includes("clipboard"),
-      "copy result");
-    const clipboard = /\x1b\]52;c;([A-Za-z0-9+/=]+)\x07/.exec(state.output.slice(copyStart));
-    const copied = clipboard ? Buffer.from(clipboard[1], "base64").toString("utf8") : undefined;
-    if (copied !== SAVED_LINK_MARKDOWN) {
-      throw new Error("copy picker did not emit the exact Markdown link source");
+    for (const expected of ["x\u00b2 + y\u2081", "\\unknown{x}+\\alpha", "[ 1    20 ]", "[ 300  4 ]"]) {
+      if (!normalized(resumedOutput).includes(expected)) {
+        throw new Error(`saved math did not render ${expected}`);
+      }
     }
 
     if (mode === "fullscreen") {
+      // The diff is the last transcript block here, so its row remains at the
+      // fixed fullscreen fixture coordinate until another command is entered.
       const diffCopyStart = state.output.length;
-      child.stdin.write("\x1b[<0;15;50M");
-      child.stdin.write("\x1b[<0;15;50m");
+      child.stdin.write("\x1b[<0;15;55M");
+      child.stdin.write("\x1b[<0;15;55m");
       await waitForOutput(() => state.output.slice(diffCopyStart),
         value => value.includes("\x1b]52;c;"),
         "old-side diff source copy");
-      child.stdin.write("\x1b[<0;70;50M");
-      child.stdin.write("\x1b[<0;70;50m");
+      child.stdin.write("\x1b[<0;70;55M");
+      child.stdin.write("\x1b[<0;70;55m");
       await waitForOutput(() => state.output.slice(diffCopyStart),
         value => [...value.matchAll(/\x1b\]52;c;([A-Za-z0-9+/=]+)\x07/g)].length >= 2,
         "new-side diff source copy");
@@ -421,6 +413,43 @@ async function runTerminalSmoke(target, mode) {
         .map(match => Buffer.from(match[1], "base64").toString("utf8"));
       if (copiedSides[0] !== SAVED_DIFF_OLD || copiedSides[1] !== SAVED_DIFF_NEW) {
         throw new Error(`side-by-side source copy mismatch: ${JSON.stringify(copiedSides)}`);
+      }
+    }
+
+    const copyStart = state.output.length;
+    child.stdin.write("/copy\r");
+    await waitForOutput(() => normalized(state.output.slice(copyStart)),
+      value => value.includes("Copy block") && value.toLowerCase().includes("assistant"),
+      "copy block picker");
+    // The newest block is the tool result; the assistant carrying the math and
+    // LaTeX source sits immediately below it in the picker.
+    child.stdin.write("\x1b[B\r");
+    await waitForOutput(() => normalized(state.output.slice(copyStart)),
+      value => value.includes("clipboard"),
+      "copy result");
+    const clipboard = /\x1b\]52;c;([A-Za-z0-9+/=]+)\x07/.exec(state.output.slice(copyStart));
+    const copied = clipboard ? Buffer.from(clipboard[1], "base64").toString("utf8") : undefined;
+    if (copied !== SAVED_ASSISTANT_MARKDOWN) {
+      throw new Error("copy picker did not emit the exact Markdown and LaTeX source");
+    }
+
+    start = state.output.length;
+    child.stdin.write("/export html qa-math.html\r");
+    await waitForOutput(() => normalized(state.output.slice(start)),
+      value => value.includes("Format: HTML") && value.includes("qa-math.html"),
+      "HTML math export");
+    const exportedHtml = fs.readFileSync(path.join(project, "qa-math.html"), "utf8");
+    if (!exportedHtml.includes("white-space: pre-wrap")) {
+      throw new Error("HTML export did not preserve projected math rows");
+    }
+    const encodedPayload = /<script id="session-data" type="text\/plain">([^<]*)<\/script>/.exec(exportedHtml)?.[1];
+    if (!encodedPayload) throw new Error("HTML export did not contain its session payload");
+    const exportedPayload = JSON.parse(Buffer.from(encodedPayload, "base64").toString("utf8"));
+    const exportedMath = exportedPayload.entries?.find(entry => entry.content === SAVED_ASSISTANT_MARKDOWN);
+    if (!exportedMath) throw new Error("HTML export did not retain the saved assistant source");
+    for (const expected of ["x\u00b2 + y\u2081", "\\unknown{x}+\\alpha", "[ 1    20 ]", "[ 300  4 ]"]) {
+      if (!exportedMath.html.includes(expected)) {
+        throw new Error(`HTML math export did not project ${expected}`);
       }
     }
 

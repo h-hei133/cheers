@@ -209,9 +209,9 @@
     },
     {
       "id": "RENDER-01",
-      "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W7; math/code-span/markdown/HTML tests",
-      "missing": "Full nested/display limits, streaming and packaged visual/export acceptance remain."
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W7; math 8, markdown 59, source 20, HTML 40, template 10 and export runtime 21 tests; nested/display budgets, opaque math, exact LaTeX copy; packaged Node/exe x regular/fullscreen PTY 4/4 verifies visual math, copy and HTML export; line/pipe 4/4 passes the existing business chain",
+      "missing": ""
     },
     {
       "id": "RENDER-02",

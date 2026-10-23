@@ -2,7 +2,7 @@
 
 每一行把任务绑定到所有者、当前测试与一个反转条件。测试通过只证明该行；没有真实 provider、PTY、跨平台或发布证据的行仍保持开放。
 
-2026-10-23 的机器可检查复核矩阵为 [scripts/phase20-requirements.json](../../scripts/phase20-requirements.json)，由 `npm run verify:phase20-requirements` 对照本规划逐 ID 校验：47 项中 32 项 `complete`、15 项 `partial`、0 项 `open`，整体仍为 `partial`。`complete` 只表示该行已取得当前约定的本地/构建/CI 证据，不替代 QA-02 的真实平台格、QA-03 的真实质量或 Phase 20 总完成。
+2026-10-23 的机器可检查复核矩阵为 [scripts/phase20-requirements.json](../../scripts/phase20-requirements.json)，由 `npm run verify:phase20-requirements` 对照本规划逐 ID 校验：47 项中 35 项 `complete`、12 项 `partial`、0 项 `open`，整体仍为 `partial`。`complete` 只表示该行已取得当前约定的本地/构建/CI 证据，不替代 QA-02 的真实平台格、QA-03 的真实质量或 Phase 20 总完成。
 
 2026-10-18 返工复核发现旧表有状态漂移：实现存在或测试数量不能替代完整裁决。当前复核范围及未闭合项见 [交付状态](phase-20-status.md#返工复核2026-10-18)；以下未重新验收的行均是历史证据索引。
 
@@ -85,7 +85,7 @@
 
 | 任务 | 所有者 | 证据 | 反转 |
 |---|---|---|---|
-| RENDER-01（部分） | `transcript/math.ts`、`text/{codeSpan,inline}.ts` | math（4）、markdown（51）、html（37）；最终 inline renderer 区分 escaped/multi-run/unmatched backtick，link label 内 code 可达，强调可跨 token 闭合，64 KiB 边界内 64k backtick/escaped-math run 线性处理，超 1 byte 原样保留，80k bracket/60k private-use run 受预算保护，label 内不生成嵌套链接，code span 内不投影公式、链接或强调 | 转义反引号被当成 code span、多 run 被拆坏、未闭合 run 吞掉后续文本、link label 丢 code、强调无法跨 token、超长输入平方扫描、超预算改写原文或嵌套 anchor 时失败 |
+| RENDER-01 | `transcript/{math,markdownScan}.ts`、`text/{codeSpan,inline}.ts`、`session/export/{htmlRender,template}.ts` | math（8）、markdown（59）、source（20）、html（40）、template（10）、export runtime（21）；code span 后的 math token 保持 opaque，未知/缺参数命令整段回原文；金额/escaped dollar/code span 优先；whitelisted equation/align/gather/multline/cases 与矩阵按行布局，nested/12 行/12 列/64 cell/24 行/64 KiB 超限回原文；TUI 与 HTML 共用 finder/projection，HTML 保留行；stream 未闭合公式即时可见；packaged Node/exe × regular/fullscreen 验证视觉、原始 `/copy` 与 HTML export；line/pipe 只回归既有业务链 | 移除 opaque math token 后 `$a*b*c$`/math-link/强调边界断言失败；HTML 改回 scalar conversion 后环境/矩阵投影失败；恢复 partial unknown-command projection 后整段原公式断言失败；escaped/multi-run/unmatched backtick、超预算改写原文或嵌套 anchor 时失败 |
 | RENDER-02 | `transcript/{markdown,table}.ts`、`session/export/htmlRender.ts`、`text/{codeSpan,inline}.ts` | markdown/table/html 回归；cell 先完成 inline 语义投影再按 ANSI-aware 宽度换行，链接跨软换行不留下 `](` 字面语法；OSC8 label 在每行关闭，packaged Node/exe × regular/fullscreen PTY 验证 OSC8 与 exact `/copy` source；raw fallback 以最终 `rows.join("\n")` 的 UTF-8 字节计预算 | 多反引号 code span pipe 被拆 cell、未闭合 run 吞掉后续 pipe、链接/样式跨软换行被拆坏、ANSI/行分隔符绕过预算或窄屏截断长尾时失败 |
 | RENDER-03 | `transcript/diff.ts`、`transcript/diffPage.ts`、`chrome/pager.ts`、`surface/pane.ts` | diff 回归；400 行/64 KiB 双预算与精确 UTF-8 边界，side-by-side 行号跨页、完整阅读器 PgUp/PgDn/滚轮/Home/End，左右源复制；packaged Node/exe × regular/fullscreen PTY 验证两侧 exact copy；CRLF terminator 不输出裸 `\r`，嵌入 ESC/C0/C1 以可读文本显示 | 零宽内容绕过字节预算、截断标记突破 rows、边界输入误截断、header 被当改动、facts 被吞掉或终端控制符进入渲染行时失败 |
 | INPUT-01（部分） | `editor/modal/state.ts`、`input/{terminal,stdinBuffer}.ts`、`cli/interactive/keymap.ts` | state（12）、keymap（63）、stdinBuffer（25）、terminal（7）；跨 UTF-8 chunk、fused/cross-chunk 字素、combining mark、keycap、paste/escape 后文本与纵向边界 | UTF-8 半码点产生替换字符、`f/F/t/T` 只收到首个 scalar、纵向移动落到 surrogate 中间或字素跨 chunk 被拆时失败；完整 IME/五模式合同仍待复核 |

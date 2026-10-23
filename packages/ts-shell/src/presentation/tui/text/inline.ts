@@ -4,6 +4,9 @@ export interface InlineRenderers {
   readonly renderCode: (code: string) => string;
   readonly renderText: (text: string) => string;
   readonly renderLink: (label: string, href: string, context: InlineContext) => string;
+  /** Find one math token at `start`; callers own the bounded parser. */
+  readonly findMath?: (start: number) => { readonly end: number; readonly text: string } | undefined;
+  readonly renderMath?: (text: string) => string;
 }
 
 export interface InlineContext {
@@ -54,6 +57,15 @@ export function transformInline(
       }
       index += backtickRun(text, index);
       continue;
+    }
+    if (render.findMath && (text[index] === "$" || text[index] === "\\")) {
+      const math = render.findMath(index);
+      if (math) {
+        addToken(render.renderMath ? render.renderMath(math.text) : math.text);
+        index = math.end;
+        cursor = index;
+        continue;
+      }
     }
     if (context.allowLinks && text[index] === "[") {
       const close = delimiters!.brackets.get(index);

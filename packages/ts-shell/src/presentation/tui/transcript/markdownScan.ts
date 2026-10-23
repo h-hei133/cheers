@@ -11,6 +11,7 @@
  * differently in the two views. So this answers "what is this" and nothing else;
  * neither renderer's concerns appear here.
  */
+import { MATH_ENVIRONMENTS } from "./math.js";
 
 /** One line that carries no structure of its own. */
 export interface TextBlock {
@@ -54,6 +55,10 @@ export interface TableBlock {
 
 export interface MathBlock {
   readonly kind: "math";
+  /**
+   * Display-math body. A standalone environment keeps its `\\begin`/`\\end`
+   * lines here so the renderer can distinguish a matrix from a scalar formula.
+   */
   readonly body: string;
   /** Complete source including delimiters, used when projection is unavailable. */
   readonly raw: string;
@@ -113,6 +118,31 @@ export function scanBlocks(text: string): readonly MarkdownBlock[] {
   while (index < lines.length) {
     const line = lines[index]!;
     const sourceStart = index;
+
+    const environment = /^\s*\\begin\{([A-Za-z]+\*?)\}\s*$/.exec(line);
+    if (environment && MATH_ENVIRONMENTS.has(environment[1]!)) {
+      const name = environment[1]!;
+      const closing = new RegExp(`^\\s*\\\\end\\{${name.replace("*", "\\*")}\\}\\s*$`);
+      let closingIndex = index + 1;
+      while (closingIndex < lines.length && !closing.test(lines[closingIndex]!)) closingIndex += 1;
+      if (closingIndex < lines.length) {
+        const raw = lines.slice(index, closingIndex + 1).join("\n");
+        blocks.push({
+          kind: "math",
+          body: raw,
+          raw,
+          sourceStart,
+          sourceEnd: closingIndex,
+        });
+        index = closingIndex + 1;
+        continue;
+      }
+      while (index < lines.length) {
+        blocks.push({ kind: "text", line: lines[index]!, sourceStart: index, sourceEnd: index });
+        index += 1;
+      }
+      break;
+    }
 
     const displayMath = /^\s*(\$\$|\\\[)\s*$/.exec(line);
     if (displayMath) {

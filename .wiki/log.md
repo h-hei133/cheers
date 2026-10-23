@@ -8559,3 +8559,12 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - Node/exe × regular/fullscreen 四格打包 PTY 全部 pass/exit 0，绑定同一 build；fullscreen 两份 raw output 的 OSC52 解码均精确得到 `qa-old-side-source` 与 `qa-new-side-source`。证据目录 `.omx/artifacts/phase20-render-diff-pty-69952ded38bf/`。
 - 代码批 `9250632d9946295d55215dc9941959174abb3af3` 已推送，远端 `main` 精确读回同 SHA。CI `39898564931`/job `120234580498` completed/success，耗时 17m06s；931 文件通过/1 跳过、9,900 项通过/3 跳过、943.98s；静态门、脚本门、构建、Chromium 安装、完整测试与 NormProof 步骤均 success。Architecture Watch `39898564927`/job `120234580519` completed/success；两项只绑定该代码 SHA。
 - `verify:phase20-requirements` 更新为 34 `complete`/13 `partial`/0 `open`。RENDER-02/03 闭合；Phase 20 整体仍为 `partial`，其余任务保留各自缺口。
+
+## [2026-10-23] fix | RENDER-01 math token、显示边界与打包导出
+
+- `transcript/math.ts` 新增共享有界 math finder；code span/escaped dollar/金额优先，未知或缺参数命令整段回原文。`equation`/`align`/`gather`/`multline`/`cases` 与五种矩阵环境按行投影，nested 环境、12 行/12 列/64 cell/24 行/64 KiB 超限保留完整源码。
+- `text/inline.ts` 在 code span 之后、link/emphasis 之前把公式作为 opaque token；TUI 与 HTML 共用 projection，HTML 再次转义并用 `pre-wrap` 保留矩阵行。裸 environment 由 scanner 作为单个 math node，未闭合公式在 stream 中立即显示；完整 matrix node 的 selection 返回原始 LaTeX。
+- 聚焦 6 文件/158 项通过。三组隔离反转均实际失败并恢复：移除 opaque math token 使 `$a*b*c$`/math-link/强调边界断言失败；HTML 改回 scalar conversion 使 environment/matrix 投影失败；恢复 partial unknown-command projection 使整段原公式断言失败。
+- 完整 `test:ts` 为 931 文件通过/1 跳过、9,905 项通过/10 跳过、359.32s。`test:scripts` 157/157；Node/exe × regular/fullscreen 四格打包 PTY 全部 pass/exit 0，验证 math 投影、原始 `/copy`、HTML export 与 fullscreen diff 源复制；Node/exe × line/pipe 另外四格只回归既有业务链。
+- TypeScript build `99e27b71db4bd5f9bf17edceec5e433bda2a058a9b836fd173a04e38f38e41f4`，inputs digest `616922d083cfdb4aab69b2f2c95467ec1332e3c4ea7f05f6b26d1a9661d08b87`，artifact digest `f30da6af85545cf13a7915e064679aa0d84ce95e25d3bd7bf2ad78798599cac8`，exe SHA-256 `506d47a52a7572a5e2589f0a4271bf6b43c26cfd5c4d899c9228341e816d7a49`。证据目录 `.omx/artifacts/phase20-render-math-pty-99e27b71db4b/`。
+- 矩阵更新为 35 `complete`/12 `partial`/0 `open`，RENDER-01 本地闭合；代码尚未提交，CI/Watch 结果待精确 SHA 取证。

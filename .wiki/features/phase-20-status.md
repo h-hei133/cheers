@@ -2,6 +2,16 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
+## 2026-10-23 RENDER-01 数学 token、显示边界与打包导出（本地代码批；CI pending）
+
+- `presentation/tui/transcript/math.ts` 现在拥有有界 math finder：代码 span、escaped dollar 和金额优先，未知/缺参数命令使整个公式回原文；`equation*`/`align*`/`gather*`/`multline*`/`cases` 与五种矩阵环境按行投影，nested 环境、12 行/12 列/64 cell/24 行/64 KiB 超限均保留完整源码。
+- `presentation/tui/text/inline.ts` 在 code span 之后、link/emphasis 之前把数学作为 opaque token 处理；`$a*b*c$` 不会被当成强调，公式内 Markdown link 不会生成 OSC8。`markdown.ts` 与 `session/export/htmlRender.ts` 共用同一 finder，HTML 对投影文本再次转义，`template.ts` 以 `white-space: pre-wrap` 保留矩阵行。
+- 裸 `\begin{...}` 由共享 scanner 识别为一个 math node，完整环境保留给投影和源复制；未闭合 opener 在逐字 stream 中立即显示，闭合后才投影。完整 matrix node 的 selection 通过 `block.raw` 返回原始 LaTeX。
+- 聚焦 6 文件/158 项通过：math 8、markdown 59、source 20、HTML 40、template 10、export runtime 21。三组有效反转均实际失败并恢复：移除 opaque math token；HTML 改回 scalar conversion；恢复 partial unknown-command projection。
+- 完整 `test:ts` 为 931 文件通过/1 跳过、9,905 项通过/10 跳过、359.32s。`test:scripts` 157/157；Node/exe × regular/fullscreen 四格打包 PTY 全部 pass/exit 0，验证 math 投影、`/copy` 原始 LaTeX、`/export html` payload，fullscreen 还验证矩阵行和旧/新 diff 源复制；Node/exe × line/pipe 另外四格 pass/exit 0，只回归既有业务链。
+- TypeScript build `99e27b71db4bd5f9bf17edceec5e433bda2a058a9b836fd173a04e38f38e41f4`，inputs digest `616922d083cfdb4aab69b2f2c95467ec1332e3c4ea7f05f6b26d1a9661d08b87`，artifact digest `f30da6af85545cf13a7915e064679aa0d84ce95e25d3bd7bf2ad78798599cac8`，executable SHA-256 `506d47a52a7572a5e2589f0a4271bf6b43c26cfd5c4d899c9228341e816d7a49`。证据目录 `.omx/artifacts/phase20-render-math-pty-99e27b71db4b/`。
+- 当前矩阵为 35 `complete`/12 `partial`/0 `open`；RENDER-01 已完成本地、完整测试、构建与打包验收。代码尚未提交/推送，精确 SHA CI 与 Architecture Watch 仍需后续证据。
+
 ## 2026-10-23 RENDER-03 大 diff 完整查看与 RENDER-02 CI 稳定化（代码批 `9250632d` 已推送；CI/Watch success）
 
 - `presentation/tui/transcript/diffPage.ts` 现在拥有 400 行/64 KiB 的源页预算、精确 UTF-8 边界和跨页 old/new 行号状态；`diff.ts` 在 `split` 前先按双预算扫描源，左右源选择的分界改为两内容 cell 之间的 divider，`diffLines.ts` 承接 header、EOL、byte 和终端安全显示辅助。

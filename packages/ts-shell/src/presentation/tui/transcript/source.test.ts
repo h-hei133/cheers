@@ -98,6 +98,23 @@ it('copies a wrapped formatted table from its original Markdown source', () => {
   expect(copyScreenRows(pane, continuation, continuation, 0, 39)).toBeUndefined();
 });
 
+it('copies a complete display-matrix node from its original LaTeX source', () => {
+  const source = [
+    '$$',
+    '\\begin{bmatrix}1&20\\\\300&4\\end{bmatrix}',
+    '$$',
+  ].join('\n');
+  const transcript = new Transcript();
+  transcript.append(textBlock('assistant', source));
+  const pane = new TranscriptPane(transcript);
+  const painted = pane.render(40, 12, undefined);
+  const first = painted.findIndex(row => stripAnsi(row).includes('[ 1    20 ]'));
+  const last = painted.findIndex(row => stripAnsi(row).includes('[ 300  4 ]'));
+  expect(first).toBeGreaterThanOrEqual(0);
+  expect(last).toBeGreaterThan(first);
+  expect(copyScreenRows(pane, first, last, 0, 39)).toBe(source);
+});
+
 it('copies raw Markdown links while table rows render terminal hyperlinks', () => {
   const source = [
     '| Name | Link |',
