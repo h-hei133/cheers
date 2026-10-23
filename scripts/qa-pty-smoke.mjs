@@ -429,6 +429,48 @@ async function runTerminalSmoke(target, mode) {
     child.stdin.write("\x1b");
     await new Promise(resolve => setTimeout(resolve, 250));
 
+    const transcriptPath = path.join(home, ".cheers", "sessions", activeSessionId, "transcript.jsonl");
+    const assistantMessages = () => fs.readFileSync(transcriptPath, "utf8").trim().split("\n")
+      .map(line => JSON.parse(line)).filter(event => event.type === "message" && event.role === "assistant").length;
+    const assistantMessagesBeforePanels = assistantMessages();
+
+    start = state.output.length;
+    child.stdin.write("/advisor on\r");
+    await waitForOutput(() => normalized(state.output.slice(start)),
+      value => value.includes("Advisor no-model; enabled setting."),
+      "advisor enable");
+
+    for (const [command, expected, marker] of [
+      ["/hub", "Jobs", "No jobs, agents or workflows in this session."],
+      ["/agents", "Agents", "Enter inspects a live agent or effective definition."],
+      ["/plan-review", "Plan review", "Show current plan"],
+      ["/btw", "Side questions", "No side questions have been retained."],
+      ["/advisor", "Advisor", "esc cancel"],
+    ]) {
+      start = state.output.length;
+      child.stdin.write(`${command}\r`);
+      await waitForOutput(() => normalized(state.output.slice(start)),
+        value => value.includes(expected) && value.toLowerCase().includes(marker.toLowerCase()),
+        `${command} read-only panel`, 25_000);
+      child.stdin.write("\x1b");
+      await new Promise(resolve => setTimeout(resolve, 250));
+      child.stdin.write("/sessions current\r");
+      await waitForOutput(() => normalized(state.output.slice(start)),
+        value => value.includes("Current session"),
+        `${command} panel close`);
+      child.stdin.write("\x1b");
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+
+    start = state.output.length;
+    child.stdin.write("/advisor off\r");
+    await waitForOutput(() => normalized(state.output.slice(start)),
+      value => value.includes("Advisor off; off."),
+      "advisor disable");
+    if (assistantMessages() !== assistantMessagesBeforePanels) {
+      throw new Error("read-only panel sequence appended an assistant/model message");
+    }
+
     await runRestorePreview(state, child, restore, normalized, waitForOutput);
 
     await runInteractivePrompt(

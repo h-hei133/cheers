@@ -2,6 +2,19 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
+## 2026-10-23 PAN-03/PAN-05 and RENDER-02/03 local rework（本地完成；提交/CI 待补）
+
+- `hubPicker` now rejects old-session applies, stops publishing after a same-id session/workspace rebind, exposes a stale status, and sends command/note/directory/output metadata through the existing report redactor before display. The agents subscriber applies the same rebind fence.
+- `advisorPicker` revalidates the exact advisor state on load/apply without doing filesystem reads during render, reports stale state, and redacts checkpoint/note metadata. `btwPicker` redacts retained question/failure metadata. Plan review continues to bind the exact plan version and side questions continue to bind transcript revision.
+- Table cells now finish inline Markdown rendering before ANSI-aware soft wrapping. Links and styles that cross a cell wrap no longer leak raw `](` syntax, and line-count budgets use the rendered cell.
+- Diff rendering strips CRLF terminators from display and spells embedded C0/C1/ESC controls as text while retaining the original UTF-8 byte accounting. A malicious carriage return or terminal escape cannot execute inside the rendered diff.
+- Focused panel tests passed 3 files/65 tests; renderer tests passed 5 files/115 tests; `test:scripts` passed 157 tests. Seven isolated product reversals produced the intended failures: raw hub command text, stale hub apply, stale advisor apply, raw advisor metadata, raw side-question metadata, raw table wrap, and raw diff controls. All source reversals were restored.
+- The final source passed the full TypeScript suite: 928 files passed, 1 skipped; 9,876 tests passed, 10 skipped. Import cycles, config consumers, declarations, Node floor, strict docs/rules, `git diff --check`, and repository-tgz NormProof (exit 0/partial, 11 existing ceiling advisories) passed.
+- TypeScript build `6e0b5dec32e306689aa3e314ca456f53da5e85fec779859cf85a90306fa16a02` and executable build passed; executable SHA-256 is `0db726b3513d2c20fb7504ae57af04f11d2481d32ccc287703d9757055be21f5`.
+- The isolated PTY harness now opens/closes `/hub`, `/agents`, `/plan-review`, `/btw`, and `/advisor` after enabling it, then disables it before the existing synthetic turn fixture. Node/exe × regular/fullscreen all passed 4/4, exit 0, on the build above; the sequence asserts the assistant message count did not change. Evidence is `.omx/artifacts/phase20-panel-pty-final-6e0b5dec32e3/`; intermediate failed runs are retained separately.
+- `verify:phase20-requirements` moves to 32 `complete`/15 `partial`/0 `open`. PAN-03 and PAN-05 are now complete; RENDER-02/03 remain partial for OSC8, packaged visual/source-copy, and full-view resource edges.
+- Three required `cn:deepseek-v4.1-flash` subagent audits all failed with HTTP 429 after retry exhaustion. No independent approval was obtained, and no substitute model was used.
+
 ## 2026-10-23 PAN-04 effort and quota acceptance（代码批 `2147cb6d` 已推送；CI/Watch success）
 
 - `picker/thinking.test.ts` now drives the capability-aware effort panel against an exact relay address. The relay's `high: null` mapping disables only `high`; directly applying that disabled level is refused, while `low` goes through the ordinary `/thinking` path and persists only the session preference.

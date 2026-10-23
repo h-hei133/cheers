@@ -81,8 +81,8 @@ function layoutUnifiedDiff(diff: string, width: number, options: DiffRenderOptio
     return true;
   };
   for (let index = 0; index < lineCount; index++) {
-    const line = lines[index]!;
-    const next = lines[index + 1];
+    const line = displayLine(lines, index);
+    const next = index + 1 < lineCount ? displayLine(lines, index + 1) : undefined;
     const fileHeader = isFileHeaderLine(lines, index, inHunk);
     const hunk = HUNK_PREFIXES.some((prefix) => line.startsWith(prefix)) || fileHeader;
     if (!hunk && line.startsWith("-") && next?.startsWith("+")) {
@@ -337,18 +337,18 @@ export function layoutSideBySide(diff: string, width: number, options: DiffRende
   };
   const split = numberWidth * 2 + 2;
   while (index < lineCount) {
-    const line = lines[index]!;
+    const line = displayLine(lines, index);
     const hunk = HUNK_PREFIXES.some(prefix => line.startsWith(prefix)) || isFileHeaderLine(lines, index, inHunk);
     if (!hunk && (line.startsWith('-') || line.startsWith('+'))) {
       const removed: string[] = [];
       const added: string[] = [];
       while (index < lineCount && lines[index]!.startsWith('-')
         && !isFileHeaderLine(lines, index, inHunk)) {
-        consumed += lineByteLength(lines, index); removed.push(lines[index]!.slice(1)); index += 1;
+        consumed += lineByteLength(lines, index); removed.push(displayLine(lines, index).slice(1)); index += 1;
       }
       while (index < lineCount && lines[index]!.startsWith('+')
         && !isFileHeaderLine(lines, index, inHunk)) {
-        consumed += lineByteLength(lines, index); added.push(lines[index]!.slice(1)); index += 1;
+        consumed += lineByteLength(lines, index); added.push(displayLine(lines, index).slice(1)); index += 1;
       }
       if (consumed > maxBytes) { truncated(); return { rows, sources }; }
       const count = Math.max(removed.length, added.length);
@@ -424,4 +424,19 @@ function pad(text: string, width: number): string {
 
 function lineByteLength(lines: readonly string[], index: number): number {
   return Buffer.byteLength(lines[index]!, "utf8") + (index + 1 < lines.length ? 1 : 0);
+}
+
+function displayLine(lines: readonly string[], index: number): string {
+  const raw = lines[index] ?? "";
+  const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
+  let output = "";
+  for (const character of line) {
+    const code = character.codePointAt(0) ?? 0;
+    const control = code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f)
+      || code === 0x2028 || code === 0x2029;
+    output += control
+      ? `\\x${code.toString(16).padStart(2, "0")}`
+      : character;
+  }
+  return output;
 }

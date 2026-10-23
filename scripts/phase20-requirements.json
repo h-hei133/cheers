@@ -167,9 +167,9 @@
     },
     {
       "id": "PAN-03",
-      "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; jobs/hub/agents projection and liveness tests",
-      "missing": "Remaining journal/revision boundaries need acceptance."
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W6; jobs/hub/agents projection and liveness tests; stale session/workspace subscription and apply rejection; report-redacted command/note/directory metadata; Node/exe x regular/fullscreen packaged PTY open/close",
+      "missing": ""
     },
     {
       "id": "PAN-04",
@@ -179,9 +179,9 @@
     },
     {
       "id": "PAN-05",
-      "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; advisor/plan-review/btw reports and authority tests",
-      "missing": "Current revision/stream isolation and packaged PTY acceptance remain."
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W6; advisor state revalidation on load/apply, plan-version and transcript-revision rejection, redacted metadata, and Node/exe x regular/fullscreen packaged PTY open/close with zero assistant/model messages",
+      "missing": ""
     },
     {
       "id": "PAN-06",
@@ -216,14 +216,14 @@
     {
       "id": "RENDER-02",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W7; markdown/table/HTML/code-span tests",
-      "missing": "Complete ANSI/OSC8/style-boundary and packaged visual/source-copy acceptance remain."
+      "evidence": ".wiki/features/phase-20-contract.md W7; markdown/table/HTML/code-span tests; inline Markdown is rendered before ANSI-aware soft-wrap so links and styles remain intact across table-cell rows",
+      "missing": "Complete OSC8 and packaged visual/source-copy acceptance remain."
     },
     {
       "id": "RENDER-03",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W7; diff rows/bytes/side-by-side tests",
-      "missing": "Packaged PTY visual/source-copy acceptance and remaining full-view resource edges remain."
+      "evidence": ".wiki/features/phase-20-contract.md W7; diff rows/bytes/side-by-side tests; CRLF terminators and embedded terminal controls are displayed as text without changing exact byte accounting",
+      "missing": "Packaged visual/source-copy acceptance and remaining full-view resource edges remain."
     },
     {
       "id": "EDIT-01",

@@ -139,7 +139,10 @@ const PICKERS: Record<string, PickerFactory> = {
   usage: host => usagePicker(host.commandContext),
   btw: host => btwPicker(host.transcript),
   'plan-review': host => planPicker(host.sessionManager, host.commandContext),
-  advisor: host => { const state = host.advisorState?.(); return state ? advisorPicker(state) : undefined; },
+  advisor: host => {
+    const state = host.advisorState?.();
+    return state ? advisorPicker(state, host.advisorState) : undefined;
+  },
   git: host => gitPicker(host.gitWorkbench),
   cleanse: host => cleansePicker(host.security),
 };

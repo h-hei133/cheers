@@ -1,4 +1,6 @@
 import { reportText } from '../../../core/commands/report/projection.js';
+import { neutraliseForDisplay } from '../../../core/text/safety.js';
+import { redactReportText } from '../../../core/security/redaction.js';
 import type { Transcript } from '../../../presentation/tui/transcript/container.js';
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import type { Picker } from '../overlay.js';
@@ -12,6 +14,7 @@ export function btwPicker(transcript: Transcript): Picker {
   let blocks: readonly { readonly id: string; readonly report: NonNullable<ReturnType<Transcript['all']>[number]['report']> }[] = [];
   let revision = transcript.revision;
   const isCurrent = (): boolean => transcript.revision === revision;
+  const safe = (value: string): string => neutraliseForDisplay(redactReportText(value, 512));
   return {
     isCurrent,
     title: 'Side questions',
@@ -30,10 +33,10 @@ export function btwPicker(transcript: Transcript): Picker {
         const question = report.facts.question;
         return {
           id,
-          label: typeof question === 'string' ? question : report.title,
+          label: typeof question === 'string' ? safe(question) : safe(report.title),
           detail: report.facts.providerRequest === true ? 'Provider request attempted' : 'No provider request was sent',
           note: report.facts.delivered === true ? 'answered'
-            : typeof report.facts.failure === 'string' ? `failure: ${report.facts.failure}` : 'no answer',
+            : typeof report.facts.failure === 'string' ? `failure: ${safe(report.facts.failure)}` : 'no answer',
         };
       });
     },

@@ -14,6 +14,8 @@ import { approvalPicker } from "./approval.js";
 import { opensPicker, pickerFor, type PickerHost } from "./registry.js";
 import { Transcript } from "../../../presentation/tui/transcript/container.js";
 import { textBlock } from "../../../presentation/tui/transcript/blocks.js";
+import { createReport, span } from "../../../core/commands/report/projection.js";
+import type { AdvisorState } from "../../../advisor/model.js";
 
 const CONTEXT = { cwd: "/workspace", sessionId: "sess_test" };
 
@@ -70,6 +72,68 @@ describe("which commands open a chooser", () => {
     expect(rows.map(row => row.id)).toEqual(['checkpoint:checkpoint-1', 'note:note-1']);
     expect(picker.detail?.('note:note-1')?.join('\n')).toContain('advice');
     expect((await picker.apply(['note:note-1']))?.note).toContain('Read-only');
+  });
+
+  it('invalidates an advisor inspector when its bound state changes', async () => {
+    const state = {
+      schemaVersion: 1, sessionId: 's', sessionCreatedAt: '2026-01-01T00:00:00.000Z',
+      workspace: { path: '/w', identity: 'i' }, epoch: 2, enabled: true, eligible: 1, captured: 1, status: 'reviewed',
+      checkpoints: [], notes: [],
+    } as unknown as AdvisorState;
+    let current = state;
+    const host = { commandContext: CONTEXT, advisorState: () => current } as unknown as PickerHost;
+    const picker = pickerFor('/advisor', host)!;
+    expect(picker.isCurrent?.()).toBe(true);
+
+    current = { ...state, epoch: 3 };
+    expect(await picker.apply(['note:old'])).toBeUndefined();
+    expect(picker.isCurrent?.()).toBe(false);
+    expect(picker.status?.()).toContain('changed');
+  });
+
+  it('redacts advisor and side-question metadata before projection', async () => {
+    const state = {
+      schemaVersion: 1, sessionId: 's', sessionCreatedAt: '2026-01-01T00:00:00.000Z',
+      workspace: { path: '/w', identity: 'i' }, epoch: 2, enabled: true, eligible: 1, captured: 1, status: 'reviewed',
+      checkpoints: [{
+        id: 'Authorization: Bearer SYNTHETIC_ADVISOR_ID', timestamp: '2026-01-01T00:00:00.000Z',
+        sourcePromptEntryId: 'Authorization: Bearer SYNTHETIC_ADVISOR_PROMPT', step: 1, willContinue: false,
+        failed: false, digest: 'a'.repeat(64), text: 'safe text', truncated: false,
+        frontier: 'b'.repeat(64), goal: 'c'.repeat(64),
+      }],
+      notes: [{
+        id: 'Authorization: Bearer SYNTHETIC_ADVISOR_NOTE_ID', checkpointId: 'checkpoint-1',
+        checkpointDigest: 'a'.repeat(64), epoch: 2, target: 'Authorization: Bearer SYNTHETIC_ADVISOR_TARGET',
+        timestamp: '2026-01-01T00:00:00.000Z', text: 'safe note',
+        coverage: { checkpoints: [{ id: 'checkpoint-1', digest: 'a'.repeat(64) }], truncated: false },
+      }],
+    } as unknown as AdvisorState;
+    const picker = pickerFor('/advisor', { commandContext: CONTEXT, advisorState: () => state } as unknown as PickerHost)!;
+    const rows = await picker.load();
+    const rendered = JSON.stringify({
+      rows: rows.map(row => ({ label: row.label, detail: row.detail, note: row.note })),
+      details: rows.map(row => picker.detail?.(row.id)),
+    });
+    expect(rendered).not.toContain('SYNTHETIC_ADVISOR_ID');
+    expect(rendered).not.toContain('SYNTHETIC_ADVISOR_PROMPT');
+    expect(rendered).not.toContain('SYNTHETIC_ADVISOR_NOTE_ID');
+    expect(rendered).not.toContain('SYNTHETIC_ADVISOR_TARGET');
+
+    const transcript = new Transcript();
+    transcript.append({
+      ...textBlock('command', 'side question output', 'Side question'),
+      report: createReport({
+        title: 'Side question',
+        facts: { question: 'Authorization: Bearer SYNTHETIC_BTW_QUESTION', delivered: false,
+          failure: 'Authorization: Bearer SYNTHETIC_BTW_FAILURE' },
+        lines: [{ kind: 'text', spans: [span('answer', 'text')] }],
+      }),
+    });
+    const sideQuestion = pickerFor('/btw', { commandContext: CONTEXT, transcript } as unknown as PickerHost)!;
+    const sideRows = await sideQuestion.load();
+    const sideRendered = JSON.stringify({ sideRows, detail: sideQuestion.detail?.(sideRows[0]!.id) });
+    expect(sideRendered).not.toContain('SYNTHETIC_BTW_QUESTION');
+    expect(sideRendered).not.toContain('SYNTHETIC_BTW_FAILURE');
   });
 
   it("opens the jobs hub only when a job composition exists", () => {

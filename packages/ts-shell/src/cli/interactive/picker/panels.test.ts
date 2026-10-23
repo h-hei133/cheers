@@ -181,6 +181,16 @@ describe('phase 20 panel consumers', () => {
     (jobs.context as unknown as { session: typeof session }).session = { ...session, createdAt: '2026-10-22T00:00:01.000Z' };
     expect(picker.isCurrent?.()).toBe(false);
     expect(await picker.apply(['agent:agent-live'])).toBeUndefined();
+    vi.useFakeTimers();
+    try {
+      const publish = vi.fn();
+      const stop = picker.subscribe!(publish);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(publish).not.toHaveBeenCalled();
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not fetch account quota merely by opening usage', async () => {

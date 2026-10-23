@@ -191,7 +191,8 @@ function renderTableWithSources(block: Extract<import("./markdownScan.js").Markd
     return rawTableWithSources(block, cells, lines);
   }
   const widths = columnWidths(rows, cells);
-  if (!tableCellsFit(rows, widths)) return rawTableWithSources(block, cells, lines);
+  const wrapped = tableCellsFit(rows, widths);
+  if (!wrapped) return rawTableWithSources(block, cells, lines);
   const line = defaultTheme.fg("border", widths.map((width) => "─".repeat(width)).join("─┼─"));
   const rendered: string[] = [];
   const sources: (MarkdownSourceLine | undefined)[] = [];
@@ -202,26 +203,31 @@ function renderTableWithSources(block: Extract<import("./markdownScan.js").Markd
         node, nodeRow: index, nodeRows: values.length });
     }
   };
-  push(formatRow(head, widths, true), lines[block.sourceStart]!, block.sourceStart);
+  push(formatRow(wrapped[0]!, widths, true), lines[block.sourceStart]!, block.sourceStart);
   push([line], lines[block.sourceStart + 1]!, block.sourceStart + 1);
   for (let index = 0; index < rowsOfCells.length; index++) {
     const sourceIndex = block.sourceStart + 2 + index;
-    push(formatRow(rowsOfCells[index]!, widths, false), lines[sourceIndex]!, sourceIndex);
+    push(formatRow(wrapped[index + 1]!, widths, false), lines[sourceIndex]!, sourceIndex);
   }
   return { rows: rendered, sources };
 }
 
-function tableCellsFit(rows: readonly string[][], widths: readonly number[]): boolean {
+function tableCellsFit(rows: readonly string[][], widths: readonly number[]): string[][][] | undefined {
+  const wrappedRows: string[][][] = [];
   for (const row of rows) {
+    const wrappedRow: string[][] = [];
     for (let column = 0; column < widths.length; column++) {
-      let lines = 0;
+      const lines: string[] = [];
       for (const segment of (row[column] ?? "").split(/<br\s*\/?>/i)) {
-        lines += wrapToWidth(segment, widths[column]!).length;
+        lines.push(...wrapToWidth(renderInline(segment), widths[column]!));
       }
-      if (lines > MAX_CELL_LINES) return false;
+      const cell = lines.length ? lines : [""];
+      if (cell.length > MAX_CELL_LINES) return undefined;
+      wrappedRow.push(cell);
     }
+    wrappedRows.push(wrappedRow);
   }
-  return true;
+  return wrappedRows;
 }
 
 /** The original table, wrapped rather than truncated, when layout cannot help. */
@@ -296,7 +302,8 @@ function columnWidths(rows: readonly string[][], cells: number): number[] {
   const widths = new Array<number>(count).fill(0);
   for (const row of rows) {
     for (let column = 0; column < count; column++) {
-      widths[column] = Math.max(widths[column]!, visibleWidth(row[column] ?? ""));
+      const rendered = (row[column] ?? "").split(/<br\s*\/?>/i).map(segment => renderInline(segment));
+      widths[column] = Math.max(widths[column]!, ...rendered.map(segment => visibleWidth(segment)));
     }
   }
   const separators = (count - 1) * 3;
@@ -316,23 +323,13 @@ function columnWidths(rows: readonly string[][], cells: number): number[] {
 }
 
 /** One logical row, wrapped to each column and padded to the tallest cell. */
-function formatRow(row: readonly string[], widths: readonly number[], header: boolean): string[] {
-  const wrapped = widths.map((width, column) => {
-    const source = row[column] ?? "";
-    const segments = source.split(/<br\s*\/?>/i);
-    const lines: string[] = [];
-    for (const segment of segments) {
-      for (const line of wrapToWidth(segment, width)) {
-        lines.push(header ? defaultTheme.bold(line) : renderInline(line));
-      }
-    }
-    return lines.length ? lines : [""];
-  });
+function formatRow(wrapped: readonly (readonly string[])[], widths: readonly number[], header: boolean): string[] {
   const height = Math.max(...wrapped.map(lines => lines.length));
   const rows: string[] = [];
   for (let line = 0; line < height; line++) {
     rows.push(wrapped.map((lines, column) =>
-      padToWidth(lines[line] ?? "", widths[column]!)).join(defaultTheme.fg("border", " │ ")));
+      padToWidth(header ? defaultTheme.bold(lines[line] ?? "") : lines[line] ?? "", widths[column]!))
+      .join(defaultTheme.fg("border", " │ ")));
   }
   return rows;
 }

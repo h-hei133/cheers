@@ -8516,3 +8516,14 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 最终相关集合 8 文件/149 项通过：thinking picker 3、usage 34、effort 26、progress 4、model target/request shape 24、panels 11、pickers 47。三项隔离反转均实际失败：移除 exact `baseUrl` 使 supported 变 unverified；unknown model 改 unsupported 使 unlisted rows 被禁用；null quota window 改 `0%` 使 unknown 断言失败。恢复后产品源码 diff 为空。
 - TypeScript build `fae9161112d0`、`test:scripts` 157 项、import cycles（2,765 files）、config consumers（53/53）、declarations（18/18 hooks、11/11 factories）、Node floor 与 `git diff --check` 通过。`verify:phase20-requirements` 为 30 `complete`/17 `partial`/0 `open`，整体仍为 `partial`。
 - 本批只新增验收测试并更新机器矩阵，不改产品源码。代码批 `2147cb6d5957441c9295cb5574d45167fee15911` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39878549205`/job `120170060403` completed/success，耗时 12m13s；928 文件通过/1 跳过、9876 项通过/3 项跳过、664.51s；Architecture Watch `39878549170`/job `120170060130` completed/success。两项只绑定该验收 SHA。
+
+## [2026-10-23] fix | Phase 20 read-only panels and renderer safety
+
+- 续接 PAN-03/PAN-05/RENDER-02/03 的剩余审计，先复核 hub/agents/advisor/plan/btw 的 owner 与测试，再以失败用例复现五类真实缺陷：hub 直接显示未脱敏 command/note/directory；同 id session/workspace rebind 后旧订阅仍发布且旧行仍可 apply；advisor/btw metadata 未脱敏且 advisor 不在 load/apply 重验 state；表格先换行后解析 inline Markdown，导致跨软换行链接留下 `](`；diff 输出 CRLF 的裸 `\r` 和嵌入终端控制符。
+- `hubPicker` 现统一复用 jobs report 脱敏，session/workspace rebind 后停止发布、显示 stale 并拒绝旧 apply；`agentsPicker` 同样在 rebind 后停止订阅。`advisorPicker` 在 load/apply 时做无渲染 I/O 的精确 state 比较，`btwPicker` 和 advisor metadata 均先脱敏；plan version 与 transcript revision 原有边界保留。
+- 表格 cell 现在先完成 inline 语义投影，再按 ANSI-aware 宽度换行，并用同一渲染结果计算行数预算。diff 只移除 CRLF terminator，不改变原始 UTF-8 byte 计数；嵌入 ESC/C0/C1 以可读转义文本显示，避免终端控制注入。
+- 聚焦 panel 3 文件/65 项、renderer 5 文件/115 项通过；七个隔离反转均取得实际断言失败并恢复：raw hub command、stale hub apply、stale advisor apply、raw advisor metadata、raw side-question metadata、raw table wrap、raw diff controls。`test:scripts` 157 项、cycles（2,765 files、0/0）、config consumers（53/53）、declarations（18/18、11/11）、Node floor 均通过。
+- 最终源码完整 `test:ts` 为 928 文件通过/1 跳过、9876 项通过/10 项跳过、372.07s；strict docs/rules、`git diff --check` 与仓库 tgz NormProof exit 0/partial（11 项既有 ceiling advisory）通过。
+- 新增 packaged PTY 面板链：在隔离 home/project 中打开/关闭 `/hub`、`/agents`、`/plan-review`、`/btw` 和启用后的 `/advisor`，随后关闭 advisor，断言 assistant message 数不变。Node/exe × regular/fullscreen 4/4 通过、exit 0；证据目录 `.omx/artifacts/phase20-panel-pty-final-6e0b5dec32e3/`。中间失败 run 独立保留，不覆盖为成功。
+- TypeScript build `6e0b5dec32e306689aa3e314ca456f53da5e85fec779859cf85a90306fa16a02`，executable SHA-256 `0db726b3513d2c20fb7504ae57af04f11d2481d32ccc287703d9757055be21f5`。矩阵更新为 32 `complete`/15 `partial`/0 `open`；PAN-03/PAN-05 闭合，RENDER-02/03 仍保留 OSC8、packaged visual/source-copy 与全量资源边界。
+- 指定 `cn:deepseek-v4.1-flash` 的三个独立 research/review 子代理均在 retry 后返回 HTTP 429，未产生意见或批准；未使用替代模型。本条写入时提交、推送、完整 `test:ts` 与新 SHA CI 尚未执行，后续按实际结果补记。

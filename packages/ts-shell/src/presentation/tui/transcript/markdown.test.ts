@@ -307,6 +307,14 @@ describe("table cell semantics", () => {
     expect(rows.some(row => row.includes("second"))).toBe(true);
   });
 
+  it("keeps inline links intact across soft-wrapped table-cell rows", () => {
+    const source = "| Link |\n|---|\n| [a long label](https://example.com/path) |";
+    const body = plain(renderMarkdown(source, 24));
+    expect(body).not.toContain("](");
+    expect(body).toContain("a long label");
+    expect(body.replace(/\s/g, "")).toContain("https://example.com/path");
+  });
+
   it("falls back to the raw table when a column cannot keep three cells", () => {
     const table = "| left | right |\n|---|---|\n| alpha | beta |";
     const rows = renderMarkdown(table, 12).map(stripAnsi);

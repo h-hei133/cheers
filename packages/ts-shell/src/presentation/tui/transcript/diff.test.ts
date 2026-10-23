@@ -49,6 +49,16 @@ describe("unified diff", () => {
     }
   });
 
+  it("does not emit carriage returns from CRLF input", () => {
+    for (const row of renderDiff("-old\r\n+new\r\n", WIDTH)) expect(row).not.toContain("\r");
+  });
+
+  it("shows embedded terminal controls as text", () => {
+    const rendered = renderDiff("+safe\x1b[2Jdanger", WIDTH).join("");
+    expect(rendered).not.toContain("\x1b[2J");
+    expect(rendered).toContain("\\x1b[2J");
+  });
+
   it("bounds unified rows and bytes independently", () => {
     const long = "+x\n".repeat(1000);
     const rows = renderDiff(long, WIDTH, { maxRows: 21 });
@@ -194,6 +204,10 @@ describe("side-by-side diff", () => {
   it("keeps every row inside the width, including wide glyphs", () => {
     const rows = renderSideBySide("@@ -1 +1 @@\n-中文内容\n+中文更新", 120);
     for (const row of rows) expect(visibleWidth(row)).toBeLessThanOrEqual(120);
+  });
+
+  it("does not emit carriage returns from CRLF input", () => {
+    for (const row of renderSideBySide("-old\r\n+new\r\n", 120)) expect(row).not.toContain("\r");
   });
 });
 

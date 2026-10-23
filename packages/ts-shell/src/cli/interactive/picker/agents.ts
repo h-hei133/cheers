@@ -152,7 +152,11 @@ export function agentsPicker(
     },
     subscribe(publish) {
       if (!jobs) return () => {};
-      const timer = setInterval(() => { try { publish(refresh()); } catch { /* Keep the last readable projection. */ } }, 1000);
+      if (!isCurrent()) return () => {};
+      const timer = setInterval(() => {
+        if (!isCurrent()) return;
+        try { publish(refresh()); } catch { /* Keep the last readable projection. */ }
+      }, 1000);
       timer.unref?.();
       return () => clearInterval(timer);
     },

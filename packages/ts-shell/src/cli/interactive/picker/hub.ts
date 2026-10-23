@@ -1,5 +1,5 @@
 import { hubProjection } from '../../jobs/hub.js';
-import { localPage } from '../../jobs/projection.js';
+import { localPage, report as safeReport } from '../../jobs/projection.js';
 import { createReport, span } from '../../../core/commands/report/projection.js';
 import type { JobsComposition } from '../../jobs/model.js';
 import type { Option } from '../../../presentation/tui/chrome/options.js';
@@ -34,6 +34,19 @@ export function hubPicker(jobs: JobsComposition): Picker {
   } catch {
     initialWorkspace = undefined;
   }
+  const isCurrent = (): boolean => {
+    try {
+      const current = jobs.context.session;
+      if (current !== initialSession || current.id !== initialSession?.id
+        || current.createdAt !== initialSession?.createdAt || current.projectRoot !== initialSession?.projectRoot
+        || !initialWorkspace) return false;
+      const workspace = captureWorkspaceRoot(current.projectRoot, current.projectRoot, 'read');
+      return workspace.path === initialWorkspace.path && workspace.identity === initialWorkspace.identity;
+    } catch {
+      return false;
+    }
+  };
+  const safe = (value: unknown, max: number): string => safeReport(value, max);
   const refresh = (): readonly Option[] => {
     const hub = hubProjection(jobs);
     rows.length = 0;
@@ -42,64 +55,60 @@ export function hubPicker(jobs: JobsComposition): Picker {
     for (const job of hub.jobs as readonly Record<string, unknown>[]) {
       const id = typeof job.id === 'string' ? job.id : '';
       if (!id) continue;
-      const kind = typeof job.backend === 'string' ? job.backend : typeof job.kind === 'string' ? job.kind : 'job';
-      const status = typeof job.status === 'string' ? job.status : 'unknown';
-      const summary = typeof job.command === 'string' ? job.command
-        : typeof job.note === 'string' ? job.note : `${kind} ${id.slice(0, 8)}`;
+      const kind = safe(typeof job.backend === 'string' ? job.backend : typeof job.kind === 'string' ? job.kind : 'job', 80);
+      const status = safe(typeof job.status === 'string' ? job.status : 'unknown', 80);
+      const storedStatus = typeof job.storedStatus === 'string' ? safe(job.storedStatus, 80) : undefined;
+      const summary = typeof job.command === 'string' ? safe(job.command, 240)
+        : typeof job.note === 'string' ? safe(job.note, 240) : `${kind} ${safe(id, 80).slice(0, 8)}`;
       const detail = [
-        `Status: ${status}${typeof job.storedStatus === 'string' && job.storedStatus !== status ? ` (stored ${job.storedStatus})` : ''}`,
+        `Status: ${status}${storedStatus && storedStatus !== status ? ` (stored ${storedStatus})` : ''}`,
         `Backend: ${kind}`,
-        ...(typeof job.directory === 'string' ? [`Directory: ${job.directory}`] : []),
+        ...(typeof job.directory === 'string' ? [`Directory: ${safe(job.directory, 4096)}`] : []),
         ...(typeof job.timeoutMs === 'number' ? [`Deadline: ${job.timeoutMs} ms`] : []),
         ...(typeof job.exitCode === 'number' ? [`Exit: ${job.exitCode}`] : []),
         ...(job.liveOwner === true ? ['Live owner: yes'] : []),
         ...(job.detached === true ? ['Detached from this session'] : []),
         ...(job.dispatchPossible === true ? ['Dispatch possible: yes'] : []),
-        `Output: ${typeof job.output === 'string' ? job.output : 'unknown'}`,
+        `Output: ${safe(typeof job.output === 'string' ? job.output : 'unknown', 80)}`,
       ];
       rows.push({ id, kind, status, summary, detail });
       details.set(id, detail);
       offered.add(id);
     }
-    return rows.map(row => ({ id: row.id, label: `${row.kind} ${row.id.slice(0, 8)}`, detail: row.summary, note: row.status }));
+    return rows.map(row => ({ id: row.id, label: `${row.kind} ${safe(row.id, 80).slice(0, 8)}`, detail: row.summary, note: row.status }));
   };
   return {
     title: 'Jobs',
     form: 'panel',
     empty: 'No jobs, agents or workflows in this session.',
-    async load() { return refresh(); },
+    isCurrent,
+    status: () => isCurrent() ? undefined : 'Session or workspace changed. Reopen /hub.',
+    async load() { return isCurrent() ? refresh() : []; },
     subscribe(publish) {
-      const timer = setInterval(() => { try { publish(refresh()); } catch { /* a journal that cannot be read keeps the last rows */ } }, 1000);
+      if (!isCurrent()) return () => {};
+      const timer = setInterval(() => {
+        if (!isCurrent()) return;
+        try { publish(refresh()); } catch { /* a journal that cannot be read keeps the last rows */ }
+      }, 1000);
       timer.unref?.();
       return () => clearInterval(timer);
     },
     detail: id => (id ? details.get(id) ?? [] : []),
     async apply(ids) {
       const id = ids[0];
-      if (!id || ids.length !== 1 || !offered.has(id)) return undefined;
+      if (!id || ids.length !== 1 || !offered.has(id) || !isCurrent()) return undefined;
       let job;
       try { job = jobs.local.get(id); } catch { job = undefined; }
       if (job) {
         // The pager scrolls this page; later offsets stay with `/jobs show`, which
         // applies the same redaction and truncation rules.
         const text = localPage(job, 'stdout', 0);
-        return { report: createReport({ title: `Output ${id!.slice(0, 8)}`, facts: { status: job.status, stream: 'stdout', offset: 0 },
+        return { report: createReport({ title: `Output ${safe(id, 80).slice(0, 8)}`,
+          facts: { status: safe(job.status, 80), stream: 'stdout', offset: 0 },
           lines: [...text.split('\n').map(line => ({ kind: 'text' as const, spans: [span(line, 'code')] })),
             { kind: 'text' as const, spans: [span('Later pages: /jobs show <id> stdout <offset>.', 'muted')] }] }) };
       }
       return { note: 'Read-only view. Use /jobs show <id> for output, or /jobs cancel <id> for a separately approved action.' };
-    },
-    isCurrent: () => {
-      try {
-        const current = jobs.context.session;
-        if (current !== initialSession || current.id !== initialSession?.id
-          || current.createdAt !== initialSession?.createdAt || current.projectRoot !== initialSession?.projectRoot
-          || !initialWorkspace) return false;
-        const workspace = captureWorkspaceRoot(current.projectRoot, current.projectRoot, 'read');
-        return workspace.path === initialWorkspace.path && workspace.identity === initialWorkspace.identity;
-      } catch {
-        return false;
-      }
     },
   };
 }
