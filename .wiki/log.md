@@ -8591,4 +8591,10 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 ## [2026-10-23] fix | PAN-02/PAN-06 保存管理动作准入
 
 - rename/delete/pin 在准备前、异步目录解析后及原锁内写前重验 surface/configuration；scripted rename 和带参数 `/pin` 同准入。取消清除一次性 preview/editor，合法交接保留权限；原 writer/lock 不变。
-- 受影响196项、六有效AssertionError反转且恢复hash、scripts157、静态门和build通过；独立APPROVE/CLEAR。build `1420dbb8c4801999484096de9c11a9bcfbdc60a56df9e6499a6a52e9ce1d42e1`、exe SHA-256 `cc3165dc2acf2e66694f5f2f5ae6f54d3f03b0865dfdcc4d06a5835783ff8f60`；同build Node/exe regular/fullscreen四格pass/exit0，delete取消、rename editor/write/readback/对话保持及tree/catalogue/stale choice链通过。方向键批量超时已改为实际逐行焦点同步；缺exe preflight与旧relay EPIPE失败保留，exe重建和原scripts重跑通过。提交/新SHA CI待取证，PAN-02/PAN-06仍partial。
+- 受影响196项、恢复后51项、六有效AssertionError反转且恢复hash、scripts157、静态门和build通过；独立APPROVE/CLEAR。build `1420dbb8c4801999484096de9c11a9bcfbdc60a56df9e6499a6a52e9ce1d42e1`、exe SHA-256 `cc3165dc2acf2e66694f5f2f5ae6f54d3f03b0865dfdcc4d06a5835783ff8f60`；同build Node/exe regular/fullscreen四格pass/exit0，delete取消、rename editor/write/readback/对话保持及tree/catalogue/stale choice链通过。方向键批量超时已改为实际逐行焦点同步；缺exe preflight与旧relay EPIPE失败保留，exe重建和原scripts重跑通过。代码批`4942064c3129ae9c48b2cb0ad4b8cac39f04aa74`已推送并精确读回；CI`39931286844`/job`120339906621`最后in_progress，09:21:40Z开始、前13步success、tests运行中；Watch`39931286854`completed/success。API EOF不升级CI状态，PAN-02/PAN-06仍partial。
+
+## [2026-10-23] fix | PAN-02/PAN-06 深树终端与摘要资源增长
+
+- 原深树terminal缩进生成约400.6MB输出，branch/长尾compaction重复复制累计消息。共用有界terminal投影保持完整ID/状态/持久depth，20k行/16MiB body/10显示层、嵌入行边界拒绝；消息tail窗口+反向checkpoint一次flatten，半buffer丢弃后按批回收。
+- 受影响10文件155项、scripts157、七有效AssertionError反转及hash恢复、独立APPROVE/CLEAR、静态门/build/exe通过。build `8e2c15e28017f75a95134dfe458dbd3406e221529ea7fb239c8dc7abab040f9b`、exe SHA-256 `42867873e0511a6ac06a4f83d7a1eff4f86605a737f135c160e27fd7abc5dcaa`；同build四格packaged PTY pass/exit0。harness retained焦点、首反转非assertion、测量夹具/脚本变化保护失败均保留。
+- 同build9组各30次compiled Node调用前后源码/脚本/fixture/artifact hash相等；输出约1.1MB，普通/branch/checkpoint acquisition p95为212.73/245.53/255.59ms，terminal tree/history p95范围227.04–394.59ms，每次6 descriptor read，30-call child peakRSS236,704–307,676KiB。历史仅单次20.30/27.71s acquisition，不能称baseline分布/统计内存改善。真实全屏性能/heap、catalogue累计I/O与剩余PAN-06消费者仍partial；提交/新SHA CI待取证。

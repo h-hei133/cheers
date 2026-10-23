@@ -8,6 +8,7 @@ import { sessionThreadPath } from "../../session/schema/sessionThread.js";
 import { SessionNavigationWarning } from '../../session/navigation/revert.js';
 import { normalizePathIdentity } from '../../session/continuation/roots.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
+import { navigationLines } from '../output/navigation.js';
 
 export interface SessionNavigationResult {
   /** The outcome of the saved branch navigation, separate from refreshing its view. */
@@ -48,8 +49,7 @@ export async function navigateSession(input: {
     return {
       status: 'unchanged',
       changed: false,
-      output: ["### Session tree", "", ...points.map((point) =>
-        `${"  ".repeat(point.depth)}- ${point.current ? "* " : ""}${point.entryId} ${point.label}${point.unavailable ? ` [unavailable: ${point.unavailable}]` : ""}`),
+      output: ["### Session tree", "", ...navigationLines(points),
       "", "Use /tree <entry-id> to continue from an entry. Other branches and files are kept."].join("\n"),
     };
   }

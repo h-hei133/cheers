@@ -112,3 +112,37 @@ it('rejects duplicate saved identities and retains a deep ordered path with no f
   expect(() => catchUpSessionThread(thread, { id: 'saved', turns: [{ id: 'new', role: 'user', content: 'missing' }] } as never, NAVIGATION_LIMITS.entries)).toThrow('entry limit');
   expect(() => projectSessionNavigation({ ...thread, entries: [thread.entries[0]!, thread.entries[0]!] }, [])).toThrow('duplicate');
 });
+
+it.each(['branch_summary', 'compaction'] as const)('acquires a 20,000-node chain with 30,000 %s records within the existing source limits', type => {
+  const { session, layout, cwd } = saved();
+  const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
+  const entries = Array.from({ length: 20_000 }, (_, index) => ({ id: `entry-${index}`, order: index,
+    kind: index ? 'turn-message' : 'session-root', ...(index ? { parentId: `entry-${index - 1}`, role: 'user' } : {}) }));
+  state.thread = { schemaVersion: 1, entries, activeLeafId: entries.at(-1)!.id, branches: [], compactions: [] };
+  fs.writeFileSync(layout.statePath, JSON.stringify(state));
+  const events = [
+    { type: 'session', version: 1, id: session.id, timestamp: session.createdAt, cwd },
+    ...entries.slice(1).map(entry => ({ type: 'message', id: entry.id, role: 'user', content: entry.id, timestamp: session.createdAt })),
+    ...Array.from({ length: 30_000 }, (_, index) => type === 'branch_summary'
+      ? { type, id: `summary-${index}`, summary: String(index), droppedTurns: 1, timestamp: session.createdAt }
+      : { type, id: `checkpoint-${index}`, summary: String(index), keptMessages: 50_000, timestamp: session.createdAt }),
+  ];
+  fs.writeFileSync(layout.transcriptPath, events.map(event => JSON.stringify(event)).join('\n') + '\n');
+  expect(events).toHaveLength(NAVIGATION_LIMITS.transcriptLines);
+  expect(fs.statSync(layout.statePath).size).toBeLessThan(NAVIGATION_LIMITS.stateBytes);
+  expect(fs.statSync(layout.transcriptPath).size).toBeLessThan(NAVIGATION_LIMITS.transcriptBytes);
+  const before = [layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file));
+  const snapshot = readSessionNavigation(session.id, cwd);
+  expect(snapshot.points).toHaveLength(20_000);
+  expect(snapshot.points.at(-1)).toMatchObject({ entryId: 'entry-19999', depth: 19_999, current: true });
+  expect(snapshot.session.turns).toHaveLength(49_999);
+  if (type === 'branch_summary') {
+    expect(snapshot.session.turns[19_999].content).toBe('[Earlier Path]\n0');
+    expect(snapshot.session.turns.at(-1)?.content).toBe('[Earlier Path]\n29999');
+  } else {
+    expect(snapshot.session.turns[0].content).toBe('[Context Checkpoint]\n29999');
+    expect(snapshot.session.turns[29_999].content).toBe('[Context Checkpoint]\n0');
+    expect(snapshot.session.turns.at(-1)?.content).toBe('entry-19999');
+  }
+  expect([layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file))).toEqual(before);
+});

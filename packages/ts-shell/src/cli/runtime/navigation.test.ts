@@ -15,6 +15,7 @@ import { routeInteractiveCommand } from "../interactive/interactiveCommandRouter
 import { runNonInteractivePrompt } from "../../entrypoints/cliRuntimeModule.js";
 import { treePicker } from "../interactive/picker/tree.js";
 import { navigateSession } from "./navigation.js";
+import { sessionCommandFor } from './sessionCommands.js';
 import { appendBranchSummaryEvent } from '../../session/transcript/sessionTranscript.js';
 import { sessionUsageSink } from '../../session/store/usage.js';
 
@@ -61,6 +62,48 @@ function harness() {
 }
 
 describe("session tree navigation", () => {
+  it('keeps every admitted deep entry in bounded tree and history terminal output without changing saved files', async () => {
+    const { input, session, layout } = harness();
+    const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
+    const entries = Array.from({ length: 20_000 }, (_, index) => ({ id: `deep-${index}`, order: index,
+      kind: index ? 'turn-message' : 'session-root', ...(index ? { parentId: `deep-${index - 1}`, role: 'user' } : {}) }));
+    state.thread = { schemaVersion: 1, entries, activeLeafId: entries.at(-1)!.id, branches: [], compactions: [] };
+    fs.writeFileSync(layout.statePath, JSON.stringify(state));
+    fs.writeFileSync(layout.transcriptPath, [
+      JSON.stringify({ type: 'session', version: 1, id: session.id, timestamp: session.createdAt, cwd: root }),
+      ...entries.slice(1).map(entry => JSON.stringify({ type: 'message', id: entry.id, role: 'user', content: entry.id, timestamp: session.createdAt })),
+    ].join('\n') + '\n');
+    const before = [layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file));
+    const tree = await navigateSession(input);
+    const command = sessionCommandFor({ ...input, sessionRuntime: { getCurrentRunController: () => null } })!;
+    const history = await command('history', []);
+    expect(history.kind).toBe('local');
+    for (const output of [tree.output, history.kind === 'local' ? history.output : '']) {
+      const rows = output.split('\n').filter(line => line.includes('- deep-') || line.includes('- * deep-'));
+      expect(rows).toHaveLength(20_000);
+      expect(Buffer.byteLength(output)).toBeLessThan(2 * 1024 * 1024);
+      expect(rows.at(-1)).toBe(`${'  '.repeat(10)}… - * deep-19999 user: deep-19999`);
+    }
+    expect(tree).toMatchObject({ status: 'unchanged', changed: false });
+    expect(input.runtimeContext.session.id).toBe(session.id);
+    expect([layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file))).toEqual(before);
+  });
+
+  it('refuses multiline saved identities in actual terminal callers without changing the saved tree', async () => {
+    const { input, session, layout } = harness();
+    const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
+    const id = `root${'\n'.repeat(20_001)}`;
+    state.thread = { schemaVersion: 1, entries: [{ id, kind: 'session-root', order: 0 }],
+      activeLeafId: id, branches: [], compactions: [] };
+    fs.writeFileSync(layout.statePath, JSON.stringify(state));
+    fs.writeFileSync(layout.transcriptPath, JSON.stringify({ type: 'session', version: 1, id: session.id, timestamp: session.createdAt, cwd: root }) + '\n');
+    const before = [layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file));
+    await expect(navigateSession(input)).rejects.toThrow('line boundary');
+    const command = sessionCommandFor({ ...input, sessionRuntime: { getCurrentRunController: () => null } })!;
+    expect(await command('history', [])).toMatchObject({ kind: 'local', output: expect.stringContaining('History is unavailable:') });
+    expect([layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file))).toEqual(before);
+  });
+
   it.each(['tree', 'fork', 'history'] as const)('refuses the offered %s entry after a branch round trip', async mode => {
     const { input, session, turns, layout } = harness();
     const action = vi.fn(async point => {

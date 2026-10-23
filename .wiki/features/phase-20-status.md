@@ -11,8 +11,8 @@
 | PRV-03 | 真实账户登录、刷新、失效、退出及跨连接隔离生命周期证据 | 需明确账户/provider、隔离 opt-in 运行条件；合成 token/audience 校验不替代实测 |
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
-| PAN-02 | tree 与完整授权目录固定页本地已实现；仍缺整体 heap/时延测量、累计 I/O 与其余选择动作边界逐项审计 | 本地量化真实 consumer；来源上限和固定候选不等同整体资源性能 |
-| PAN-06 | history/copy/back/undo/restore/cleanse 的累计同步 I/O、内存/时延界及未覆盖的身份边界 | 本地按原 owner 逐项量化/修复；分页行数不等于总资源上界 |
+| PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 本地继续全屏渲染/搜索/取消量化；已测 Node acquisition/terminal 输出不替代真实交互性能 |
+| PAN-06 | history 终端深树/摘要增长已修并测量；copy/back/undo/restore/cleanse 的累计 I/O、内存/时延及剩余身份边界 | 本地按原 owner 逐项量化/修复；分页行数不等于总资源上界 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,13 +21,23 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-02/PAN-06 保存管理动作准入（本地验证；提交/新 SHA CI 待取证）
+## 2026-10-23 PAN-02/PAN-06 深树终端与摘要资源增长（本地验证；提交/新 SHA CI 待取证）
+
+- `/tree` fallback 与 `/history` 共用 `cli/output/navigation.ts`：最多20,000条body行、16 MiB UTF-8 body，显示缩进最多10层加明确深层标记；完整entry ID/label/current/unavailable保留，持久树depth/parent不变。嵌入CR/LF/U+2028/U+2029行字段拒绝为unavailable，不截断成成功；实际20,000链与multiline保存ID同时验证两个caller及保存字节保持。
+- 原 branch_summary 每次spread累计messages，长尾compaction每次slice/spread；现在branch直接append，compaction使用顺序消息tail窗口与反向checkpoint前缀，最后一次flatten。丢弃前缀至少占buffer一半才copyWithin回收；累计移动可归于已丢弃消息，不重复复制长尾。undefined/空summary、timestamp、kept/reset及旧fractional/Infinity兼容保持；180递增参考前缀及独立37,500随机前缀一致。源准入夹具20,000节点+30,000 branch/compaction记录、50,000物理行均保持原文件。
+- 反转恢复后10文件155项通过（projection5），scripts157、静态门及build/exe通过；七有效AssertionError反转并恢复hash：indent、rows、bytes、line boundary、branch copy、compaction copy、reclaim。首次indent反转只触发预算Error，追加明确not.toThrow assertion后才计有效。独立代码APPROVE、架构CLEAR，综合APPROVE；此前discarded-prefix retention WATCH已由回收及40批/400移动引用回归解决。
+- build `8e2c15e28017f75a95134dfe458dbd3406e221529ea7fb239c8dc7abab040f9b`，inputs `bc7d8bc81e8294db2e1860f7339a838e7c405fb85ad6fd4e4ec9d1c1a26294d9`，artifact `267fc962f917a2627871b6a9edb8972aa8739d9fe50993e756f69e6fbd927520`，exe SHA-256 `42867873e0511a6ac06a4f83d7a1eff4f86605a737f135c160e27fd7abc5dcaa`。同build Node/exe regular/fullscreen四格pass/exit0，tree/catalogue/管理/stale-choice业务链通过。首次exe fullscreen保留query前第二行焦点导致first=00假设超时，harness读实际identity逐步Up至00再逐Down验证；失败保留，未改产品焦点。证据`.omx/artifacts/phase20-resource-synchronized-{node,exe}-{regular,fullscreen}/`。
+- 资源测量绑定同build compiled Node模块，固定isolated fixture在child外准备；parent/child脚本、所有源文件与compiled artifacts前后hash相等。9组每组30次同进程调用/强制GC，普通链、30k branch与30k保全tail checkpoint分别测acquisition/tree/history。body输出由历史400,597,883/873 B降至1,097,729/719 B；最终acquisition p95为212.73/245.53/255.59ms，tree/history p95范围227.04–394.59ms，整个30-call child peakRSS范围236,704–307,676KiB。每次6个descriptor read、实际源bytes4,164,940/7,772,728/7,862,732。peakRSS含imports/全部调用，heap只是阶段保留值；并非瞬态peak heap、冷盘、fresh-process分布或exe性能证明。
+- 历史build `1420dbb8c480…`仅9组各一个observed call，branch/checkpoint acquisition为20,303.92/27,709.43ms；无baseline p95/统计内存改善声明。早期未绑定脚本及夹具重写/脚本中途修改被version/hash保护拒绝的尝试保留，最终frozen baseline与reclaimed报告前后hash均相等。证据`.omx/artifacts/phase20-resource-measurements/{baseline,reclaimed}-summary.json`。9非文档输入冻结读回在resource-delivery；真实全屏interaction/search/render峰值、取消响应、完整catalogue累计I/O和其余PAN-06消费者仍缺，PAN-02/PAN-06与47项矩阵保持partial。
+
+## 2026-10-23 PAN-02/PAN-06 保存管理动作准入（代码批 `4942064c` 已推送；CI running/Watch success）
 
 - rename/delete/pin 复用原 lifecycle owner：准备前、异步目录解析后和原锁内写入前重验实际 surface/configuration 权限；带参数的 `/pin` 与 scripted rename 也捕获同一配置准入。已关闭、pending stop、停机或权限撤销拒绝迟到动作，保留保存字节和当前身份。
 - direct delete/rename 的 preview 仅消费一次；取消使旧 preview 和 title editor 失效，合法 parent→editor 交接保留准入。参考选择器的取消清除目标与 disposed 后拒绝迟到结果决策；本仓库继续使用现 writer/lock，不另建持久状态。
-- 受影响6文件196项通过，六有效反转均实际 AssertionError 并恢复 SHA-256：surface、locked admission、delete cancel、editor cancel、scripted rename、scripted pin。反转恢复后聚焦集合另读回；scripts157、syntax、cycles/config/declarations/Node floor及要求矩阵通过；NormProof exit0/partial，0 open/1 failed advisory/10 proof gaps。独立代码 APPROVE、架构 CLEAR，综合 APPROVE，只覆盖本批管理动作。
+- 受影响6文件196项通过，六有效反转均实际 AssertionError 并恢复 SHA-256：surface、locked admission、delete cancel、editor cancel、scripted rename、scripted pin。反转恢复后3文件51项通过；scripts157、syntax、cycles/config/declarations/Node floor及要求矩阵通过；NormProof exit0/partial，0 open/1 failed advisory/10 proof gaps。独立代码 APPROVE、架构 CLEAR，综合 APPROVE，只覆盖本批管理动作。
 - build `1420dbb8c4801999484096de9c11a9bcfbdc60a56df9e6499a6a52e9ce1d42e1`，inputs `2c325e9677ca10c0ff9d8f73c5030c75bdd81f101666d791707d9bb9ddafd39e`，artifact `b2f2a4e426ad6861b7d2f05ad158476a7096341486a356cc6b9d8d59a98b1239`，exe SHA-256 `cc3165dc2acf2e66694f5f2f5ae6f54d3f03b0865dfdcc4d06a5835783ff8f60`。同 build Node/exe × regular/fullscreen 四格 pass/exit0，删除取消 hash 不变、改名 editor 交接/写后 title 读回及对话/当前会话字节保持；tree、45匹配/固定40行目录续页及四种 stale choice 回归通过。证据 `.omx/artifacts/phase20-management-complete-{node,exe}-{regular,fullscreen}/`。
 - 首次 exe regular 批量方向键检查超时，改为逐行等待实际 Identity 与 next-page 焦点；rename probe 等待可选择动作行和 target ID 后再确认。最后一次 build 后缺 verified exe 的两项 preflight refusal 保留，重建 exe 后四格通过。scripts 首次旧 PTY relay 重复输入造成 EPIPE，未改该测试，原套件重跑157通过；保留失败分类。交付输入冻结及读回在 `.omx/artifacts/phase20-management-delivery/`，PAN-02/PAN-06 和47项总矩阵仍 partial。
+- 代码批`4942064c3129ae9c48b2cb0ad4b8cac39f04aa74`已推送，远端main精确读回；CI`39931286844`/job`120339906621`最后读回in_progress，2026-10-23T09:21:40Z开始，前13步success、tests运行中；Watch`39931286854`completed/success。间歇GitHub API EOF不升级CI状态，两项只绑定此SHA。
 
 ## 2026-10-23 PAN-02 完整授权目录与固定页（代码批 `d5e18253` 已推送；CI/Watch success）
 

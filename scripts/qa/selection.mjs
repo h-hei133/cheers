@@ -124,7 +124,15 @@ export async function browseSessionPages({ state, child, home, project, normaliz
     await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Resume session'), 'catalogue chooser');
     start = state.output.length; child.stdin.write('qa-catalog');
     await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('45 matches checked'), 'complete catalogue query');
-    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Identity: qa_catalog_00'), 'catalogue first focus');
+    const focused = () => [...normalized(state.output.slice(start)).matchAll(/Identity: qa_catalog_(\d{2})/g)].at(-1)?.[1];
+    await waitForOutput(focused, value => value !== undefined, 'catalogue query focus');
+    let selected = Number(focused());
+    while (selected > 0) {
+      start = state.output.length; child.stdin.write('\x1b[A');
+      selected--;
+      const identity = `Identity: qa_catalog_${selected.toString().padStart(2, '0')}`;
+      await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes(identity), `catalogue initial focus ${selected}`);
+    }
     for (let index = 1; index < 40; index++) {
       start = state.output.length; child.stdin.write('\x1b[B');
       const identity = `Identity: qa_catalog_${index.toString().padStart(2, '0')}`;

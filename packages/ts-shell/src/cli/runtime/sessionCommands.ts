@@ -14,6 +14,7 @@ import { planContextSelection, decodeContextSelection, type ContextSelectionMode
 import type { CommandDataTransfer } from '../../core/commands/transfer/contract.js';
 import { configurationAdmission } from '../../core/shell/configuration.js';
 import { updateContextSelection } from '../../session/context/state.js';
+import { navigationLines } from '../output/navigation.js';
 
 type SessionCommandInput = {
   readonly runtimeContext: ShellRuntimeContext;
@@ -69,7 +70,7 @@ async function historyCommand(args: readonly string[], input: SessionCommandInpu
   if (action === 'list') {
     try {
       const navigation = readSessionNavigation(input.runtimeContext.session.id, input.runtimeContext.cwd);
-      const lines = navigation.points.map(point => `${'  '.repeat(point.depth)}- ${point.current ? '* ' : ''}${point.entryId} ${point.label}`);
+      const lines = navigationLines(navigation.points);
       return local(['Session history', '', ...lines, '', 'Branches remain persisted; use /tree <entry-id> to continue from a point.'].join('\n'));
     } catch (error) { return local(`History is unavailable: ${safe(error)}`); }
   }

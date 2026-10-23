@@ -263,22 +263,37 @@ function ensureTranscriptHeader(
 export function projectTranscriptMessages(
   events: readonly TranscriptEvent[],
 ): SessionMessage[] {
-  let messages: SessionMessage[] = [];
+  const messages: SessionMessage[] = [];
+  const checkpoints: SessionMessage[] = [];
+  let firstMessage = 0;
 
   for (const event of publishedCompactionEvents(events)) {
     if (event.type === "compaction") {
       // Re-anchor context at the compaction checkpoint, keeping the most
       // recent messages verbatim behind it.
-      const kept = event.keptMessages && event.keptMessages > 0 ? messages.slice(-event.keptMessages) : [];
-      messages = [
-        {
-          role: "user",
-          content: `[Context Checkpoint]\n${event.summary}`,
-          metadata: { contextSummary: "compaction" },
-          timestamp: event.timestamp,
-        },
-        ...kept,
-      ];
+      // Checkpoints form a reversed prefix; ordinary messages form a forward
+      // tail. Adjust its window instead of copying a long kept tail per receipt.
+      const length = checkpoints.length + messages.length - firstMessage;
+      const offset = event.keptMessages && event.keptMessages > 0 ? Math.trunc(-event.keptMessages) : undefined;
+      const kept = offset === undefined ? 0 : offset < 0 ? Math.min(-offset, length) : length;
+      const tailLength = messages.length - firstMessage;
+      if (kept < tailLength) {
+        firstMessage = messages.length - kept;
+        checkpoints.length = 0;
+        // Reclaim an obsolete prefix only when at least half the buffer was
+        // dropped, so retained messages move at most once per discarded batch.
+        if (firstMessage >= messages.length / 2) {
+          messages.copyWithin(0, firstMessage);
+          messages.length = kept;
+          firstMessage = 0;
+        }
+      } else checkpoints.length = Math.min(checkpoints.length, kept - tailLength);
+      checkpoints.push({
+        role: "user",
+        content: `[Context Checkpoint]\n${event.summary}`,
+        metadata: { contextSummary: "compaction" },
+        timestamp: event.timestamp,
+      });
     } else if (event.type === "branch_summary") {
       // What the abandoned turns established, carried forward as a note. It is
       // not a turn the user took, so it reads as context rather than as speech.
@@ -286,15 +301,12 @@ export function projectTranscriptMessages(
       // carry, and inventing a placeholder would put a turn in the conversation
       // that nobody said.
       if (event.summary !== undefined) {
-        messages = [
-          ...messages,
-          {
-            role: "user",
-            content: `[Earlier Path]\n${event.summary}`,
-            metadata: { contextSummary: "branch" },
-            timestamp: event.timestamp,
-          },
-        ];
+        messages.push({
+          role: "user",
+          content: `[Earlier Path]\n${event.summary}`,
+          metadata: { contextSummary: "branch" },
+          timestamp: event.timestamp,
+        });
       }
     } else if (event.type === "message") {
       const msg = transcriptEventToSessionMessage(event);
@@ -304,7 +316,7 @@ export function projectTranscriptMessages(
     }
   }
 
-  return messages;
+  return checkpoints.reverse().concat(messages.slice(firstMessage));
 }
 
 export function appendCompactionEvent(
