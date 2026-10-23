@@ -31,6 +31,8 @@ interface RewindPage {
 
 export interface RewindPickerInput {
   readonly turns: readonly SessionMessage[];
+  readonly version?: string;
+  readonly unavailable?: boolean;
   readonly admission?: () => string | undefined;
   readonly signal?: AbortSignal;
   /** A one-based recent point, a stable entry id, or initial search text. */
@@ -47,9 +49,9 @@ export function rewindPicker(input: RewindPickerInput): Picker {
     catch { return 'Back selection is unavailable. Reopen /back.'; }
   };
   let source: RewindSource | undefined;
-  let unavailable = admission();
+  let unavailable = input.unavailable ? 'Questions are unavailable. Reopen /back.' : admission();
   if (!unavailable) {
-    try { source = new RewindSource(input.turns, input.signal); }
+    try { source = new RewindSource(input.turns, input.signal, input.version); }
     catch { unavailable = 'Questions are unavailable or beyond back browsing limits. No point was selected.'; }
   }
   const selector = input.selector?.trim();

@@ -549,6 +549,54 @@ describe("session wiring", () => {
     } finally { mode.stop(); }
   });
 
+  it('reports queued back source failures without claiming there are no questions', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void>;
+      options: { sessionManager: SessionManager }; pickerHost(): PickerHost };
+    host.options.sessionManager.getSession = () => undefined;
+    const original = host.pickerHost();
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, commandContext: { ...original.commandContext, admission: () => undefined } });
+    vi.spyOn(sessionNavigation, 'readSessionNavigation').mockImplementation(() => { throw new Error('PRIVATE_STORAGE_BODY'); });
+    mode.start();
+    try {
+      await host.run('/back');
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).toContain('Questions are unavailable'));
+      const frame = stripAnsi(host.overlay.render(100, 24).join('\n'));
+      expect(frame).not.toContain('PRIVATE_STORAGE_BODY');
+      expect(frame).not.toContain('Nothing to go back to yet');
+    } finally { mode.stop(); }
+  });
+
+  it('keeps a saved back version through the real host and refuses later changed content without navigation', async () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void>;
+      view: InteractiveView; options: { sessionManager: SessionManager; sessionRuntime: ShellSessionRuntime; runtimeContext: ShellRuntimeContext }; pickerHost(): PickerHost };
+    const revert = vi.fn(); host.options.sessionManager.revertTo = revert;
+    host.options.sessionManager.getSession = () => ({ id: 'sess_1', turns: [{ id: 'question', role: 'user', content: 'original question' }] } as never);
+    host.options.sessionRuntime.getState = () => 'idle';
+    const context = host.options.runtimeContext;
+    const binding = configurationBinding(context);
+    const ticket = context.configuration.begin(binding);
+    context.configuration.publish(ticket, context.configuration.current.config, binding);
+    const original = host.pickerHost();
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, commandContext: { ...original.commandContext, admission: () => undefined } });
+    let version = 'saved-v1';
+    vi.spyOn(sessionNavigation, 'readSessionNavigation').mockImplementation(() => ({ version,
+      session: { id: 'sess_1', projectRoot: '/workspace', turns: [{ id: 'question', role: 'user', content: 'original question' }] },
+      points: [{ entryId: 'question', depth: 0, label: 'Original question', current: true, prompt: 'original question' }],
+      thread: { entries: [{ id: 'question', kind: 'turn-message', role: 'user', order: 0, timestamp: 'now' }], activeLeafId: 'question' },
+    } as ReturnType<typeof sessionNavigation.readSessionNavigation>));
+    mode.start();
+    try {
+      await host.run('/back');
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).toContain('original question'));
+      version = 'saved-v2'; terminal.input('\r');
+      await vi.waitFor(() => expect(host.view.transcript.all().at(-1)?.text).toContain('saved conversation changed'));
+      expect(revert).not.toHaveBeenCalled();
+      expect(host.view.editor.getText()).toBe('');
+    } finally { mode.stop(); }
+  });
+
   it.each([true, false])('distinguishes queued history no-match from an empty tree (saved=%s)', async saved => {
     const { mode } = build();
     const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void>; pickerHost(): PickerHost };

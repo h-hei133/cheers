@@ -9,6 +9,25 @@ import { SessionNavigationWarning } from '../../session/navigation/revert.js';
 import { normalizePathIdentity } from '../../session/continuation/roots.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
 import { navigationLines } from '../output/navigation.js';
+import type { SessionMessage } from '../../session/schema/sessionMessage.js';
+
+/** The back chooser shares the bounded saved branch and its navigation version. */
+export function readBackSource(context: Pick<ShellRuntimeContext, 'session' | 'cwd' | 'projectRoot'>): {
+  readonly turns: readonly SessionMessage[];
+  readonly version: string;
+} {
+  const snapshot = readSessionNavigation(context.session.id, context.cwd);
+  const root = normalizePathIdentity(context.projectRoot);
+  if (!root || normalizePathIdentity(snapshot.session.projectRoot) !== root) {
+    throw new Error('The saved conversation belongs to a different project.');
+  }
+  const branch = sessionThreadPath(snapshot.thread);
+  const active = new Set(branch.path.map(entry => entry.id));
+  if (!branch.resolved || snapshot.points.some(point => active.has(point.entryId) && point.unavailable)) {
+    throw new Error('The saved conversation path is unavailable.');
+  }
+  return { turns: snapshot.session.turns, version: snapshot.version };
+}
 
 export interface SessionNavigationResult {
   /** The outcome of the saved branch navigation, separate from refreshing its view. */

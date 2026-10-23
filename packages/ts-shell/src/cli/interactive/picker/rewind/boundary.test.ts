@@ -75,3 +75,15 @@ it('gives numeric exact identities priority over ordinal selectors', async () =>
     { id: 'old', role: 'user', content: 'ordinal second' }].reverse(), selector: '2', rewind: vi.fn() });
   expect(newest.initialSelection).toBe('2');
 });
+
+it('keeps the opening saved version on every page and selection without reacquiring the source', async () => {
+  const read = vi.fn(() => ({ turns: turns(60), version: 'saved-v1' }));
+  const rewind = vi.fn(async () => ({ draft: 'original' }));
+  const first = pickerFor('/back', { commandContext: { cwd: '/workspace' }, sessionTurns: read, rewind } as never)!;
+  await first.load();
+  const second = (await first.apply(['__more__']))!.next!; await second.load();
+  const third = (await second.apply(['__more__']))!.next!; await third.load();
+  await third.apply(['question-0']);
+  expect(read).toHaveBeenCalledTimes(1);
+  expect(rewind).toHaveBeenCalledWith({ entryId: 'question-0', prompt: 'question 0\nARCHIVED', dropped: 59, version: 'saved-v1' });
+});

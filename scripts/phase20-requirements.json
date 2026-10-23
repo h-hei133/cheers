@@ -186,8 +186,8 @@
     {
       "id": "PAN-06",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; copy/history/back/undo/restore/cleanse tests and PTY evidence; bounded lazy copy source, one-use release, native fallback admission, 205 copy tests/11 reversals; back source limits, one-use pages, exact identities and original admission, 201 affected tests/11 reversals",
-      "missing": "Original back acquisition and saved-version fences, undo/restore/cleanse total resources and remaining identity edges; bounded copy/back query transient heap and actual system clipboard acceptance remain."
+      "evidence": ".wiki/features/phase-20-contract.md W6; copy/history/back/undo/restore/cleanse tests and PTY evidence; bounded lazy copy source, one-use release, native fallback admission, 205 copy tests/11 reversals; back source limits, one-use pages, exact identities and original admission, 201 affected tests/11 reversals; bounded persisted back source/version, active-path unavailable refusal, 223 affected tests/6 reversals",
+      "missing": "Full navigation acquisition transient heap/latency, undo/restore/cleanse total resources and remaining identity edges; bounded copy/back query transient heap and actual system clipboard acceptance remain."
     },
     {
       "id": "PAN-07",

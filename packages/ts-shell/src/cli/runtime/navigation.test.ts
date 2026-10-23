@@ -14,7 +14,8 @@ import { runEntriesCommand } from "../../core/commands/entriesCommandRuntime.js"
 import { routeInteractiveCommand } from "../interactive/interactiveCommandRouter.js";
 import { runNonInteractivePrompt } from "../../entrypoints/cliRuntimeModule.js";
 import { treePicker } from "../interactive/picker/tree.js";
-import { navigateSession } from "./navigation.js";
+import { navigateSession, readBackSource } from "./navigation.js";
+import { pickerFor } from '../interactive/picker/registry.js';
 import { sessionCommandFor } from './sessionCommands.js';
 import { appendBranchSummaryEvent } from '../../session/transcript/sessionTranscript.js';
 import { sessionUsageSink } from '../../session/store/usage.js';
@@ -62,6 +63,80 @@ function harness() {
 }
 
 describe("session tree navigation", () => {
+  it('binds back continuation to its saved version and refuses external changes before the original writer', async () => {
+    const { input, session, layout } = harness();
+    const source = readBackSource(input.runtimeContext);
+    expect(source.turns).toEqual(input.runtimeContext.session.turns);
+    const rewind = vi.fn(async point => {
+      const result = await navigateSession(input, point.entryId, point.version);
+      return { note: result.output, ...(result.draft !== undefined ? { draft: result.draft } : {}) };
+    });
+    const picker = pickerFor('/back', { commandContext: { cwd: root, admission: () => undefined },
+      sessionTurns: () => source, rewind } as never)!;
+    await picker.load();
+    const saved = [layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file));
+    fs.appendFileSync(layout.transcriptPath, JSON.stringify({ type: 'message', id: 'external', role: 'assistant', content: 'external change', timestamp: new Date().toISOString() }) + '\n');
+    const changed = fs.readFileSync(layout.transcriptPath);
+    const revert = vi.spyOn(input.sessionManager, 'revertTo');
+    const outcome = await picker.apply([source.turns.find(turn => turn.role === 'user')!.id!]);
+    expect(outcome?.note).toContain('saved conversation changed');
+    expect(rewind).toHaveBeenCalledWith(expect.objectContaining({ version: source.version }));
+    expect(revert).not.toHaveBeenCalled();
+    expect(outcome?.draft).toBeUndefined();
+    expect(fs.readFileSync(layout.metadataPath)).toEqual(saved[0]);
+    expect(fs.readFileSync(layout.statePath)).toEqual(saved[1]);
+    expect(fs.readFileSync(layout.transcriptPath)).toEqual(changed);
+    expect(input.runtimeContext.session.id).toBe(session.id);
+  });
+
+  it('uses the existing saved byte limits before reading back questions, and rejects wrong roots and damaged paths', () => {
+    const { input, layout } = harness();
+    expect(() => readBackSource({ ...input.runtimeContext, projectRoot: path.join(root, 'other') })).toThrow('different project');
+    const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
+    state.thread.activeLeafId = 'missing';
+    fs.writeFileSync(layout.statePath, JSON.stringify(state));
+    expect(() => readBackSource(input.runtimeContext)).toThrow();
+    fs.writeFileSync(layout.statePath, ' '.repeat(8 * 1024 * 1024 + 1));
+    expect(() => readBackSource(input.runtimeContext)).toThrow('navigation limits');
+  });
+
+  it('keeps legitimate empty saved back sources separate from unreadable source refusals', async () => {
+    const manager = new SessionManager(); const session = manager.createNew(root);
+    const source = readBackSource({ session, cwd: root, projectRoot: root });
+    expect(source.turns).toEqual([]); expect(source.version).toBeTruthy();
+    const rewind = vi.fn();
+    const host = { commandContext: { cwd: root }, rewind, sessionTurns: () => source } as never;
+    const empty = pickerFor('/back', host)!;
+    expect(await empty.load()).toEqual([]);
+    const unavailable = pickerFor('/back', { ...host, sessionTurns: () => { throw new Error('PRIVATE_STORAGE_BODY'); } } as never)!;
+    await expect(unavailable.load()).rejects.toThrow('Questions are unavailable');
+    expect(await unavailable.apply(['not-offered'])).toBeUndefined();
+    expect(rewind).not.toHaveBeenCalled();
+  });
+
+  it('rejects back sources with broken ancestry even when the existing tree can describe the damage', () => {
+    const { input, layout } = harness();
+    const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
+    state.thread.entries.find(entry => entry.id === state.thread.activeLeafId).parentId = 'missing-parent';
+    fs.writeFileSync(layout.statePath, JSON.stringify(state));
+    expect(readSessionNavigation(input.runtimeContext.session.id, root).points.some(point => point.unavailable)).toBe(true);
+    expect(() => readBackSource(input.runtimeContext)).toThrow('path is unavailable');
+  });
+
+  it('rejects missing active-path messages without hiding missing unrelated branches', () => {
+    const { input, layout } = harness();
+    const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
+    const missing = { id: 'missing-message', parentId: state.thread.activeLeafId, kind: 'turn-message', role: 'user',
+      order: state.thread.entries.length, timestamp: new Date().toISOString() };
+    state.thread.entries.push(missing);
+    fs.writeFileSync(layout.statePath, JSON.stringify(state));
+    expect(readBackSource(input.runtimeContext).turns).toEqual(input.runtimeContext.session.turns);
+    state.thread.activeLeafId = missing.id;
+    fs.writeFileSync(layout.statePath, JSON.stringify(state));
+    expect(readSessionNavigation(input.runtimeContext.session.id, root).points.find(point => point.entryId === missing.id)?.unavailable).toBe('message unavailable');
+    expect(() => readBackSource(input.runtimeContext)).toThrow('path is unavailable');
+  });
+
   it('keeps every admitted deep entry in bounded tree and history terminal output without changing saved files', async () => {
     const { input, session, layout } = harness();
     const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));

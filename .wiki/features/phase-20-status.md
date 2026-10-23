@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy及back来源与页面成本已修；back原持久获取/版本界、undo/restore/cleanse累计I/O和瞬态heap/时延仍缺 | 本地按原owner继续源读取/身份和资源边界；分页行数不等于总资源上界 |
+| PAN-06 | history/copy/back的来源与页面已修，back现复用有界持久读取并绑定开页版本；undo/restore/cleanse累计I/O及导航/query瞬态heap/时延仍缺 | 本地继续其余原owner资源/身份边界；来源byte cap不等于总heap/响应保证 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,7 +21,16 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-06 back 来源与页面生命周期（本地验证/独立审查通过；提交待取证）
+## 2026-10-23 PAN-06 back 持久来源与版本（本地与独立审查通过；提交待取证）
+
+- 真实host的sessionTurns复用原`readSessionNavigation`，经已有metadata256KiB/state8MiB/transcript16MiB、50k物理行/20k tree entry限制取得active turns与version；原`getSession`吞异常后空数组路径退出该consumer。读失败、错误project root、损坏父链及活跃路径缺失消息均拒绝为unavailable；不把缺失的活动消息筛成成功，非活跃无关分支缺失仍不阻断back。
+- opening version在同一source的每个RewindPoint保持，经分页选择传原`navigateSession`预读取检查及原revertTo/state-lock重验；已变化的来源不导航、不写文件、不回填draft；取消零导航。保留直接array picker API兼容，不加入第二套持久读取器/执行器。阅读参考active-branch/entry-ID/disposal决策后，本仓沿已有owner增加明确stat版本准入，实际draft仍来自原导航成功回读。
+- 修正真实trust夹具后，两条host回归在原`4dccf94a`源码均实际AssertionError，原始fixture失败另存；独立审查实际复现并修复active-path缺失消息漏项，该回归先失败后通过。最终8文件223项、six effective AssertionError反转/hash前后一致、scripts157和静态门通过；NormProof exit0/partial、0open/1failed advisory/10proof gaps。反转期间review修复使初次sweep source-change拒绝，日志保留，最终六组重跑绑定。
+- build`b9f4ce3848c0e5f3ded5fbfecad0dba201be306d036ff8ed450ff129beb89c55`，inputs`50a677650be71981020ba3f9a5a37974b6f29ec665589e31684773eca034fbbb`，artifact`65a9f00e03c8f4827ae2b5e0b47f383714d552ff067e1b17aae962f4c605e786`，exe SHA-256`8de4964af9783109f230a058d83b7628df55dc129769b7b46a34c474c29a354f`。同build Node/exe regular/fullscreen四格60题PTY全部pass/exit0：无效state明确unavailable、不改坏源；外部新增消息后选择拒绝且leaf保持；重新打开后确认原branch/draft，分页、取消与全部原消息/文件保持。build/源/hash前后相等；原构建中途测试改动freshness拒绝及exe stale拒绝留存后准确重建。证据`.omx/artifacts/phase20-back-binding/`。
+- 独立代码APPROVE/架构WATCH，综合COMMENT（无BLOCK）；两报告绑定最终五份生产owner hash。审查lane分别独立编译probe验证不可读/合法空/活跃消息缺失/无关分支容忍、三页原version及exact选择；supplied223项/PTY与reviewer自跑检查分开记录。
+- 完整已有navigation还构造所有branch投影，byte/record cap不证明瞬态heap或最长UI响应；stat version是乐观源身份，不是内容hash/跨文件原子快照。本批无新的性能改善声明；source/page性能只属于上批build。剩余undo/restore/cleanse及完整资源/平台/质量验收继续，不关闭PAN-06/47项，35complete/12partial保持。
+
+## 2026-10-23 PAN-06 back 来源与页面生命周期（`4dccf94a`已推送；CI running/Watch success）
 
 - 原`/back` opening捕获问题、原branch/navigation owner、完整raw prompt/ID/dropped、25项分页和全文搜索保持；新增source owner在构造候选及多模态join前计量：50,000来源turn、20,000候选、50,000 recorded non-context user content parts（有ID）、32Mi UTF-16 code units含ID/文本/分隔符。超限整份列表明确拒绝；同query匹配引用缓存跨页共享，取消/确认/交接释放原source/offered引用且旧页面一次消费。numeric literal ID先于ordinal，重复候选ID拒绝。
 - registry在原session/config admission及signal许可后才调用既有sessionTurns；picker枚举及load/apply重验原准入。无新导航writer、模型消息或文件撤销路径，成功草稿仍来自原owner的实际持久回读。source限额是访问候选的边界，不是heap或原getSession整个文件读取的边界。
@@ -31,7 +40,9 @@
 - 独立代码APPROVE/架构WATCH，综合COMMENT（无BLOCK）；两份报告逐一绑定三份最终owner hash。reviewer独立真实Overlay关闭/捕获分页/一次消费/准入/多模态界通过，并以300个混合role/context/multimodal用例逐项对照原构建；supplied测试/PTY与独立probe分开记录。
 - 剩余边界：原sessionTurns的getSession失败仍可映射空列表；构造前完整会话读取、打开时持久文件version、完整query同步/临时case-folding和heap仍待下一批。不以本批关闭PAN-06或47项；35complete/12partial保持。
 
-## 2026-10-23 PAN-06 复制来源与取消后派发（`c4cb2834`已推送；CI running/Watch success）
+- 代码批`4dccf94afe71d5bcf38710cd507ae0fcdf6aaf50`已commit/push并读回远端main；CI`39949109526`/job`120398929588`当前in_progress、11:52:04Z开始；Watch`39949109534`/job`120398929821`completed/success，11:52:04Z–11:52:24Z。仅绑定该SHA。
+
+## 2026-10-23 PAN-06 复制来源与取消后派发（`c4cb2834`已推送；CI/Watch success）
 
 - `/copy` 使用原 `Transcript` 来源和原剪贴板命令；打开只捕获 revision，admitted load 才枚举来源。每 opening 最多20,000个块及32 Mi UTF-16 code units（原文与label合计；不是heap bytes），超限明确拒绝，不截成成功。保留earlier来源、全文搜索、精确ID和原文；续页共享一个完整源快照及一个query匹配引用缓存，关闭/成功/交接使旧页不可复用并释放引用。摘要与复制行计数不再split全文成数组。
 - picker 的load/apply检查原session/config admission及signal；原文revision拒绝在同owner的真实 `InteractiveMode` 仍显示，换owner的迟到结果不回填。原剪贴板owner在终端offer前、每个fresh native fallback前和最后失败后重验；已经派发的成功仍为copied，终端offer保持offered，取消/blocked不能授权下一次程序派发。双系统单候选回归覆盖最后失败，不声称已派发动作可撤回。
@@ -40,7 +51,7 @@
 - build `3a6e68d86cda3b90d0f0ea0a48adacc0c81ad030ff5d8dbcd04d82d621e434a9`，inputs `4a1ed9fe8734fd78c10a2d574025ca47e741e813ce34031a2a005bbd899e5b0c`，artifact `35fe5e1b744fd64992c68108cc6b202217ed80f347510244b7353f267c5a6f6f`；exe SHA-256 `d051a88ec2db59d9048487370944edfc48c08c1e300bf4ad6d3acbaf5872abd4`。同build Node/exe × regular/fullscreen四格copy专用PTY pass/exit0，205原block完整三页及全文到最旧源、取消零clipboard、精确原文OSC52、原branch/工作区/205原消息保持；不声称真实系统剪贴板接受。证据 `.omx/artifacts/phase20-copy-boundary/`。NormProof exit0/partial，0 open、1 failed advisory、10 proof gaps。
 - WATCH：参考选择器的dispose和一次完整history成本边界已作只读比较；本仓保留完整分页可达及原copied/offered/unavailable状态。完整query仍同步扫描admitted text，临时大小写字符串/clipboard encoding和宿主已有transcript内存不是该source cap的heap保证；copy本批不扩大为全PAN-06闭合。矩阵仍35 complete/12 partial；其他导航消费者、真实系统复制与全阶段交付继续原范围。
 
-- 代码批 `c4cb28347313178f140849812139113ac78bb2ff` 已提交、推送并读回远端 main。CI `39946998111`/job `120391995287` 当前in_progress，11:34:20Z开始，静态门/build通过、tests运行；Watch `39946998109` completed/success，11:34:16Z–11:34:39Z。状态只绑定该SHA，不升级正在运行的CI。
+- 代码批 `c4cb28347313178f140849812139113ac78bb2ff` 已提交、推送并读回远端 main。CI `39946998111`/job `120391995287` completed/success，11:34:20Z–11:51:42Z；Watch `39946998109` completed/success，11:34:16Z–11:34:39Z。状态只绑定该SHA。
 
 ## 2026-10-23 PAN-02/PAN-06 树面板重复渲染（`3eed364f`已推送；CI/Watch success）
 

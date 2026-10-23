@@ -85,7 +85,7 @@ export interface PickerHost extends SettingsHost {
   /** Show `items` in the band without saving; `undefined` restores the saved band. */
   previewStatusItems(items: readonly StatusItemId[] | undefined): void;
   /** The current session's stored turns, for choosing a point to go back to. */
-  sessionTurns(): readonly SessionMessage[];
+  sessionTurns(): readonly SessionMessage[] | { readonly turns: readonly SessionMessage[]; readonly version: string };
   /** Navigate by stable identity and return only the confirmed note and draft. */
   readonly rewind: RewindPickerInput['rewind'];
   readonly fork?: (entryId: string, version?: string) => Promise<undefined>;
@@ -127,7 +127,17 @@ const PICKERS: Record<string, PickerFactory> = {
     let blocked = signal?.aborted ?? false;
     try { blocked ||= admission?.() !== undefined; }
     catch { blocked = true; }
-    return rewindPicker({ turns: blocked ? [] : host.sessionTurns(), rewind: host.rewind, selector, admission, signal });
+    let turns: readonly SessionMessage[] = [];
+    let version: string | undefined;
+    let unavailable = false;
+    if (!blocked) {
+      try {
+        const snapshot = host.sessionTurns();
+        if ('turns' in snapshot) { turns = snapshot.turns; version = snapshot.version; }
+        else turns = snapshot;
+      } catch { unavailable = true; }
+    }
+    return rewindPicker({ turns, version, unavailable, rewind: host.rewind, selector, admission, signal });
   },
   tree: (host) => treePicker(host.commandContext, host.rewind),
   history: (host) => treePicker(host.commandContext, host.rewind, "history"),

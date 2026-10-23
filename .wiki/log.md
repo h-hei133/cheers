@@ -8617,3 +8617,11 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 原branch/navigation owner保持；问题候选在多模态join前限制50kturn/20kquestion/50k有ID非context用户parts/32Mi UTF-16 units含ID与分隔符；完整raw/ID/dropped/25项分页保持。单query缓存共享，close/confirm/handoff一次消费释放，原准入在既有sessionTurns读取与动作前重验，literal numeric ID先于ordinal，重复候选ID拒绝。
 - 原代码六组真实断言失败；最终7文件201项、11有效反转/hash相等、恢复12项、scripts157与静态门通过。独立codeAPPROVE/architectureWATCH，无BLOCK，三owner hash绑定；同准确build四格60题PTY最终pass/exit0，最初exe/fullscreen重复footer同步超时留存后修probe重跑。固定2500题/30warm compiledNode，99续页总p95 708.70→1.33ms；build286e04001d95、exe6a779af96426，精确绑定见status/artifacts。
 - 原getSession失败=>empty、开页持久version、完整同步query/瞬态heap继续本地缺口，undo/restore/cleanse未据此完成。35complete/12partial保持，本批commit/push/newSHA CI待取证。上批copy c4cb28347313178f140849812139113ac78bb2ff已推送并读回；CI39946998111/job120391995287当前in_progress，Watch39946998109success，状态只绑定该SHA。
+
+## [2026-10-23] fix | PAN-06 back 持久读取与开页版本
+
+- 真实host复用已有bounded readSessionNavigation的active turns/version，退出getSession失败=>empty；错误root/path及活跃消息缺失拒绝，无关分支缺失保持。每页保留原version并交原navigateSession/locked revertTo拒绝变化，取消零导航、合法确认才原branch/draft。
+- 修正真实trust夹具后原提交两host断言失败；审查复现的缺失活跃消息另先失败后修。最终223项、六有效AssertionError反转/hash相等、scripts157/静态门、准确build/exe及同build四格60题hostilePTY通过；buildb9f4ce3848c0、exe8de4964af978，精确证据status。初始source-change反转与buildfreshness拒绝保留，不计最终证据。
+- 全graph投影/瞬态heap/UI响应、stat乐观版本边界及undo/restore/cleanse仍partial；35complete/12partial保持。本批review/commit/push/newSHA CI分别取证。上批4dccf94a已推送读回，CI39949109526/job120398929588in_progress、Watch39949109534success；copy c4cb2834精确CI39946998111/job120391995287于11:51:42Zcompleted/success（11:34:20Z开始），Watch同SHA success。
+
+- 本批独立codeAPPROVE/architectureWATCH，无BLOCK；最终五owner/两报告hash逐一绑定；原保存version比较在fresh acquisition后写前，原state-lock继续content/conversation/identity保护，不宣称跨文件原子快照。

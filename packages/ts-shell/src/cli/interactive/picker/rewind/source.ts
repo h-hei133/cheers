@@ -54,8 +54,10 @@ export class RewindSource {
   private matches: readonly RewindPoint[];
   readonly moreId: string;
 
-  constructor(turns: readonly SessionMessage[], signal?: AbortSignal) {
-    this.points = rewindPoints(turns, signal);
+  constructor(turns: readonly SessionMessage[], signal?: AbortSignal, version?: string) {
+    const points = rewindPoints(turns, signal);
+    if (version !== undefined) for (let index = 0; index < points.length; index++) points[index] = { ...points[index]!, version };
+    this.points = points;
     this.matches = this.points;
     const ids = new Set(this.points.map(point => point.entryId));
     let moreId = '__more__';

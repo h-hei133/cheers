@@ -92,7 +92,7 @@ import { undoPickerHost } from '../runtime/undo.js';
 import { updateAppearance } from "../../presentation/theme/selection.js";
 import { followTheme, type ThemeFollower } from "../../presentation/themes/watch.js";
 import { themePreferences } from "../../presentation/theme/preview.js";
-import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
+import { navigateSession, readBackSource, type SessionNavigationResult } from "../runtime/navigation.js";
 
 /**
  * Interactive session host.
@@ -1166,8 +1166,7 @@ export class InteractiveMode {
       signIn: args => this.runCommandLine(`/connect ${args.map(arg => quoteCompletion(arg, '"')).join(' ')}`),
       addMcpServer: mcpDefinitionFor(this.options.runtimeContext),
       revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
-      sessionTurns: () =>
-        this.options.sessionManager.getSession(this.options.runtimeContext.session.id)?.turns ?? [],
+      sessionTurns: () => readBackSource(this.options.runtimeContext),
       rewind: async (point) => {
         const result = await navigateSession(this.options, point.entryId, point.version, selectionAdmission);
         if (result.changed) {
