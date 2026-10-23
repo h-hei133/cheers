@@ -6,6 +6,8 @@ import { assertOperationFile, type OperationAccess } from './access.js';
 import type { OperationFile, OperationReceipt } from './model.js';
 import { latestOperation, previewOperation, type UndoPreview } from './preview.js';
 import { persistOperation, readOperation, withOperationStore } from './store.js';
+import { recoveryReadBudget } from '../read.js';
+import { UNDO_WRITE_READ_LIMITS } from './limits.js';
 
 export interface UndoApproval {
   readonly operationId: string;
@@ -32,13 +34,15 @@ export async function restoreOperation(preview: UndoPreview, approval: UndoAppro
     // Read and verify blobs again after approval, then take every shared file lock.
     const refreshed = await previewOperation(readOperation(original, original.operationId), access);
     if (!refreshed.canRestore || refreshed.revision !== preview.revision) return result('blocked', original);
+    const targetReads = recoveryReadBudget(UNDO_WRITE_READ_LIMITS.totalBytes, access.abortSignal, access.admission);
     return await withFileLocks(refreshed.files.map(entry => path.join(entry.file.workspace.path, entry.file.path)), async () => withOperationStore(original, () => {
       if (latestOperation(original)?.operationId !== original.operationId || JSON.stringify(readOperation(original, original.operationId)) !== JSON.stringify(original)) {
         return result('blocked', original);
       }
       for (const entry of refreshed.files) {
         assertOperationFile(original, entry.file, access);
-        const current = inspectWorkspaceFile(entry.file.workspace.path, entry.file.path, access.assertFileAccess);
+        const current = inspectWorkspaceFile(entry.file.workspace.path, entry.file.path, access.assertFileAccess,
+          UNDO_WRITE_READ_LIMITS.fileBytes, targetReads.admit);
         if (!entry.current || !matchesFileState(current, entry.current)) return result('blocked', original);
       }
       receipt = { ...original, undo: 'intent', revision: original.revision + 1,
@@ -54,6 +58,7 @@ export async function restoreOperation(preview: UndoPreview, approval: UndoAppro
           started = true;
           commitWorkspaceFile({ workspaceRoot: entry.file.workspace.path, relativePath: entry.file.path,
             expected: entry.current!, content: entry.prepared!.content, mode: entry.prepared!.mode,
+            maxBytes: UNDO_WRITE_READ_LIMITS.fileBytes, admitBytes: targetReads.admit,
             assertFileAccess: absolute => { assertOperationFile(original, entry.file, access); access.assertFileAccess?.(absolute); } });
           receipt = updateFile(receipt, entry.file.id, 'restored-verified');
           persistOperation(receipt);

@@ -7,3 +7,5 @@ export const OPERATION_READ_LIMITS = Object.freeze({
 });
 
 export const UNDO_PREVIEW_LIMITS = Object.freeze({ fileBytes: 64 * 1024 * 1024, totalBytes: 128 * 1024 * 1024 });
+
+export const UNDO_WRITE_READ_LIMITS = Object.freeze({ fileBytes: 64 * 1024 * 1024, totalBytes: 384 * 1024 * 1024 });

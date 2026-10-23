@@ -10,13 +10,14 @@ export function commitWorkspaceFile(input: {
   readonly expected: FileExpectation;
   readonly content: string | undefined;
   readonly maxBytes?: number;
+  readonly admitBytes?: (bytes: number) => void;
   readonly mode?: number;
   readonly assertFileAccess?: (absolutePath: string) => void;
 }): FileState {
   const root = fs.realpathSync(input.workspaceRoot);
   const absolute = workspaceFilePath(root, input.relativePath);
   input.assertFileAccess?.(absolute);
-  const before = inspectWorkspaceFile(root, input.relativePath, input.assertFileAccess, input.maxBytes);
+  const before = inspectWorkspaceFile(root, input.relativePath, input.assertFileAccess, input.maxBytes, input.admitBytes);
   if (!matchesFileState(before, input.expected)) throw new Error('File content changed before commit.');
   if (input.content === undefined && before.state === 'absent') return before;
   ensureWorkspaceDirectory(root, path.dirname(input.relativePath));
@@ -41,7 +42,7 @@ export function commitWorkspaceFile(input: {
     }
     // No asynchronous work separates this inspection from publication. The pinned
     // Linux directory also prevents a replaced ancestor from redirecting the write.
-    const current = inspectWorkspaceFile(root, input.relativePath, input.assertFileAccess, input.maxBytes);
+    const current = inspectWorkspaceFile(root, input.relativePath, input.assertFileAccess, input.maxBytes, input.admitBytes);
     if (!matchesFileState(current, input.expected) || !matchesFileState(current, before)
       || fileIdentity(fs.lstatSync(parent)) !== parentIdentity || descriptorPath(fd, parent) !== parent) {
       throw new Error('File target changed before commit.');
@@ -58,7 +59,7 @@ export function commitWorkspaceFile(input: {
       createdTemporary = false;
     }
     if (process.platform === 'linux') fs.fsyncSync(fd);
-    const after = inspectWorkspaceFile(root, input.relativePath, input.assertFileAccess, input.maxBytes);
+    const after = inspectWorkspaceFile(root, input.relativePath, input.assertFileAccess, input.maxBytes, input.admitBytes);
     if (!matchesFileState(after, input.content === undefined ? { state: 'absent' } : { state: 'exists', content: input.content,
       mode: input.mode ?? (before.state === 'exists' ? before.mode : undefined) })) {
       throw new Error('File commit could not be verified.');

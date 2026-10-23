@@ -8640,3 +8640,11 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - build25029c0492be、exef1443622f813，同准确build四格PTY pass/exit0且前后身份相等：初始85receipt完整三页、取消/stale/oversized拒绝；新建第86条operation，preview取消保持after/none，fresh明确确认恢复CRLF+emoji与durable restored-verified，最终command三页40/40/6。首次preview同步/index夹具失败留存后重跑，result85与command86区别写入final-binding，精确SHA见status。
 - 仍缺后续锁内重复target/commit I/O、legacy restore/cleanse累计资源、同步query/inspection/hash瞬态heap/响应与平台证据；来源byte cap不证明端到端资源或崩溃原子性。35complete/12partial保持，本批commit/push/newSHA CI待取证。
 - 上批eca77e90a2bc8c0f25605709ebb9c43a831f8538已推送读回；CI39953749814/job120414346135最后in_progress，12:29:56Z开始、tests运行中；Watch39953749731/job120414346195success，12:29:56Z–12:30:16Z。
+
+## [2026-10-23] fix | PAN-06 原undo writer锁内目标读取
+
+- 原批准后refresh与target/store lock链建立384MiB累计target-source预算，每file64MiB，完整preflight和原commit三处before/current/after均预分配前计量；共享commit只加neutral可选callback，默认consumer保持。pre-intent拒绝不写，intent后原blocked/partial/unknown；已发布但验证未读保持unknown不重放，已验证file仍预检查但不再写。
+- 原源码七项真实AssertionError；最终12文件144项、恢复8项、六有效反转/hash保持、scripts157/静态门/build/exe通过。首次晚throw导致green反转及growth锁hook缺ESM sync的夹具失败保留，改精确charge vector及syncBuiltinESMExports后有效。NormProof exit0/partial、原advisory保持。独立审查与本批commit/push/newSHA CI待取证。
+- build9815ce293fe7、exe7b3732de81c7，同准确build四格PTY pass/exit0、前后身份相等；85条picker到头/cancel/stale/oversized及新第86operation实际确认恢复CRLF+emoji/durable result，最终command40/40/6，原文件和收据保持。精确证据status/phase20-undo-writer author-binding。
+- 尚缺store/其他consumer累计physical I/O、restore/cleanse目录/metadata预算及heap/同步响应/平台；384MiB不扩大为完整资源或崩溃原子性保证。35complete/12partial保持。上批e40da34ce8ad15b076f85e6b7e158dce867a865e推送读回，CI39956460655/job120423407252最后in_progress（12:51:08Z开始tests中），Watch39956460529/job120423407196success（12:51:08Z–12:51:29Z）。
+- 本批最终独立codeAPPROVE/architectureWATCH，综合COMMENT无BLOCK；三production+新test hashes两报告/反转绑定。code独跑101项/12探针，architecture29项/8production探针及366145预算算式、AST/cycles；首次root runner重复安装与serialized undefined夹具失败留存并分类，正常runner/精确比较通过，own fixtures已清除。
