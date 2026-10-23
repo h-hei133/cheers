@@ -34,13 +34,15 @@
 - `verify:import-cycles` (2,764 files, 0 runtime/type cycles), `check:config-consumers` (53/53), `check:declarations` (18/18 hooks, 11/11 factories), `check:node-floor`, `test:scripts` (157), `verify:cli-entry` (19), TypeScript build, executable build, `git diff --check`, Node/exe × regular/fullscreen/line/pipe synthetic PTY smoke (8/8), and repository NormProof exit 0/partial with 11 existing function-ceiling advisories passed. SET-03 is now `complete`; Phase 20 remains `partial` because the other matrix rows retain their stated gaps.
 - 代码批 `286c961c3fcf319d95054c12cac69ae2cb281706` 已推送；CI `39867401287`/job `120132949473` 为 completed/failure，测试 9868 项通过、1 项失败、3 项跳过，耗时 766.52s；Architecture Watch `39867401240`/job `120132949040` 为 success。失败项是 theme stale-preview 文案被泛化，未把该 run 记成成功。
 - 修复批 `cbde43e0a7f9e1a34ade16b2487363351ad0d5e1` 已推送，远端 `main` 精确读回同 SHA。CI `39869615352`/job `120140442661` 为 completed/success，耗时 25m23s；完整测试 927 文件通过/1 跳过、9869 项通过/3 项跳过，测试耗时 819.25s，静态门、脚本门、构建、Chromium 安装与 NormProof 步骤均 success。Architecture Watch `39869615369`/job `120140443173` 为 completed/success。两项只绑定该修复 SHA。
+- 证据文档提交 `9678a3bb6d75b29d9507917bd25ed1406acb85a1` 已推送，远端 `main` 精确读回同 SHA。CI `39872599463`/job `120150383303` 为 completed/success，耗时 17m29s；完整测试 927 文件通过/1 跳过、9869 项通过/3 项跳过，测试耗时 966.52s。Architecture Watch `39872599468`/job `120150383395` 为 completed/success。该提交只补文档，不扩大产品行为证据。
 
-## 2026-10-23 PAN-01 revision-bound model search（本地验证；代码批待提交）
+## 2026-10-23 PAN-01 revision-bound model search（代码批 `aee2a1ab` 已推送；CI/Watch success）
 
 - `picker/model.test.ts` now drives the real `OverlayHost`: pasting `relay b` leaves only the relay-B model row, and pasting `review` leaves the named profile-role row. The displayed row is accepted through the ordinary Enter path rather than a synthetic direct apply.
 - After relay search, the test advances the accepted publication revision before Enter and requires `Model selection expired`; session model bytes remain unchanged. After role search, it replaces the same profile role with a different model, then requires `Model preset changed` instead of silently applying the new target; session model bytes remain unchanged.
 - Focused picker/model host set: 3 files/74 tests passed. Two isolated reversals failed as expected: removing connection ID/label from the row made relay search fail, and removing the preset-owner comparison made the changed role apply instead of being rejected. Both source reversals were restored.
 - No product source changed in this batch; it closes the previously missing PAN-01 search/revision acceptance. The matrix moves to 29 `complete`/18 `partial`/0 `open`; Phase 20 remains `partial` because the other rows retain their stated gaps.
+- 代码批 `aee2a1ab59f418d85d019656dfd14695543d7627` 已推送，远端 `main` 精确读回同 SHA。CI `39873115272`/job `120152093788` 为 completed/success，耗时 26m24s；完整测试 927 文件通过/1 跳过、9871 项通过/3 项跳过，测试耗时 868.04s，静态门、脚本门、构建、Chromium 安装与 NormProof 步骤均 success。Architecture Watch `39873115198`/job `120152093747` 为 completed/success。两项只绑定该验收 SHA。
 
 ## 2026-10-23 全 47 项复核与 QA-03/TOOL-02 harness 返工（代码批 `6ed28019` 已推送；CI/Watch success；真实模型项仍 partial）
 
