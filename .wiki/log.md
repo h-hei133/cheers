@@ -8535,4 +8535,15 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 同一代码 SHA 的上一轮 CI `39888154616` 已 success，但本次并非纯环境噪声：新增 `core/network/body.test.ts` 构造“解压字节越过预算且 decoder cleanup 同时报错”的确定性场景，原实现在该测试中稳定返回 `invalid_response`。根因是 decoder 错误处理器覆盖了 `response_limit` 终态，浏览器层因而归类为 `request-failed`。
 - `responseBody()` 现在让已发生的 `response_limit` 优先于后续 decoder/pipeline teardown error；未越界时仍把损坏压缩归一为 `invalid_response`。回归覆盖预算优先级，既有 connection 用例继续覆盖损坏流不泄露诊断。
 - 聚焦 44 项通过：body 1、connection/response 20、browser smoke 23。TypeScript build `2899cba44e0c`；`test:scripts` 157、cycles 2,766 文件/0/0、config consumers 53/53、declarations 18/18 + 11/11、Node floor、strict docs/rules 与 `git diff --check` 通过；docs-source 118 项 advisory。NormProof exit 0/partial，0 blocking、11 项既有 function-ceiling advisory。
-- 当前修复仍未提交、推送或取得新 SHA CI；失败 run 的 rerun 已启动，终态另行记录。
+- 失败 run 的 rerun `39889803714`/job `120210780809` 最终 completed/success，但只绑定旧证据 SHA。修复批 `7262c80f9386e8d74fe6ddece21d8615b2931ad7` 已推送，远端 `main` 精确读回；CI `39891648409`/job `120212557672` completed/success，929 文件通过/1 跳过、9884 项通过/3 跳过、947.35s；Architecture Watch `39891648398` completed/success。两项只绑定该修复 SHA。
+
+## [2026-10-23] fix | RENDER-02 OSC8 与打包源复制
+
+- 新增 `presentation/tui/text/link.ts` 作为 terminal/HTML 共用 URL 策略 owner：允许 http/https/mailto 与相对目标，拒绝可执行或本地文件 scheme，并剥离 C0/C1 控制符。Markdown link label 输出 OSC8；可见 URL 与 OSC8 目标均使用清洗后的同一 target，避免 BEL/ESC 注入。
+- ANSI-aware soft wrap 现在逐行关闭仍打开的 hyperlink，下一行由原 escape prefix 重新打开；表格 cell 在 padding 前再封闭，边框与后续列不会被链接污染。`session/export/htmlRender.ts` 复用同一 URL 策略，删除重复 allowlist。
+- source-copy 保持原 Markdown：表格行显示 OSC8，完整 selection 仍通过 source projection 返回 `[label](url)`。新增 link/table/source-copy 回归后，聚焦 6 文件/144 项通过。
+- 两项反转均实际失败并恢复：去掉 scheme guard 后 `javascript:` 进入 OSC8；去掉逐行 close 后，长 label 的首个换行行缺少 hyperlink close。
+- 最终完整 `test:ts` 为 930 文件通过/1 跳过、9883 项通过/10 跳过、382.96s。首次全量在源码更新后仍用旧 build，7 项 subprocess 均以 `Build inputs changed` 在 product path 前 fail closed；重建后同一完整套件通过，旧失败分类为 build-identity stale，不是产品失败。
+- `test:scripts` 157、cycles 2,768 文件/0/0、config consumers 53/53、declarations 18/18 + 11/11、Node floor、strict docs/rules、`git diff --check` 与仓库 tgz NormProof exit 0/partial（0 blocking、11 项既有 ceiling advisory）通过。
+- TypeScript build `bebadefb62b754b0f8d3aed2ada99271c2de536c615bfb519e0178d816050cfb`，exe SHA-256 `a260a038354d02c91df0d15afec50f6ef9af664707550bdbc7f8a683cfd80722`。Node/exe × regular/fullscreen 4/4 PTY pass/exit 0；每份 output 都有 OSC8，`/copy` OSC52 payload 解码为同一 49-byte Markdown source。证据目录 `.omx/artifacts/phase20-render-link-pty-bebadefb62b7/`。
+- 当前只完成 RENDER-02 本地、完整测试、构建与打包证据；代码尚未提交，矩阵仍为 32 `complete`/15 `partial`/0 `open`，待新 SHA CI 后再更新为 complete。

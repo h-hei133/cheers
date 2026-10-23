@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { stripVTControlCharacters } from "node:util";
 
+export const SAVED_LINK_MARKDOWN = "qa-link-label [safe](https://example.com/qa-link)";
+
 export function seedRecoverySession(home, project) {
   const sessionId = `sess_recovery_probe_${Date.now()}`;
   const sessionDir = path.join(home, ".cheers", "sessions", sessionId);
@@ -62,8 +64,9 @@ export function seedSavedSession(home, project) {
       entries: [
         { id: `${sessionId}:root`, kind: "session-root", order: 0, timestamp },
         { id: "turn_saved_probe", parentId: `${sessionId}:root`, kind: "turn-message", role: "user", order: 1, timestamp },
+        { id: "turn_saved_probe_link", parentId: "turn_saved_probe", kind: "turn-message", role: "assistant", order: 2, timestamp },
       ],
-      activeLeafId: "turn_saved_probe",
+      activeLeafId: "turn_saved_probe_link",
       branches: [],
       compactions: [],
     },
@@ -71,6 +74,7 @@ export function seedSavedSession(home, project) {
   fs.writeFileSync(path.join(sessionDir, "transcript.jsonl"), [
     JSON.stringify({ type: "session", version: 1, id: sessionId, timestamp, cwd: project }),
     JSON.stringify({ type: "message", id: "turn_saved_probe", role: "user", content: "Saved probe", timestamp }),
+    JSON.stringify({ type: "message", id: "turn_saved_probe_link", role: "assistant", content: SAVED_LINK_MARKDOWN, timestamp }),
   ].join("\n") + "\n");
   return sessionId;
 }

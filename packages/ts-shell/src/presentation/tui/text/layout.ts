@@ -1,4 +1,5 @@
 import { lineCells, sliceWithWidth, visibleWidth, type LineCell } from "./measure.js";
+import { closeTerminalHyperlink } from "./link.js";
 
 /**
  * Width-bounded line shaping: truncation, padding, and soft wrapping.
@@ -63,7 +64,7 @@ export function wrapToWidth(line: string, cells: number): string[] {
   const total = visibleWidth(line);
   if (total <= cells) return [line];
   return wrapSegments(lineCells(line), cells)
-    .map(segment => sliceWithWidth(line, segment.start, segment.width).text);
+    .map(segment => closeTerminalHyperlink(sliceWithWidth(line, segment.start, segment.width).text));
 }
 
 /** Shared wrapping boundaries, retaining each source cell as an indivisible unit. */

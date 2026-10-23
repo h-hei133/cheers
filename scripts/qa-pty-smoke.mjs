@@ -14,7 +14,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createQaPtyEnvironment } from "./qa-pty-env.mjs";
-import { seedRecoverySession, seedSavedSession, extractSessionId, currentSessionFromStore, assertTranscript } from "./qa/session.mjs";
+import { seedRecoverySession, seedSavedSession, extractSessionId, currentSessionFromStore, assertTranscript, SAVED_LINK_MARKDOWN } from "./qa/session.mjs";
 import { seedRestoreSnapshot, assertRestoreUnchanged, runRestorePreview } from './qa/restore.mjs';
 import { terminalSpawnSpec } from './qa/terminal.mjs';
 import { checkBuild } from './start-lib.mjs';
@@ -373,6 +373,30 @@ async function runTerminalSmoke(target, mode) {
     await waitForOutput(() => normalized(state.output.slice(start)),
       value => value.includes("Ask anything, or / for commands"),
       "saved session prompt");
+    await waitForOutput(() => normalized(state.output.slice(start)),
+      value => value.includes("qa-link-label") && value.includes("https://example.com/qa-link"),
+      "saved Markdown link");
+    const resumedOutput = state.output.slice(start);
+    if (!resumedOutput.includes("\x1b]8;;https://example.com/qa-link\x07")
+      || !normalized(resumedOutput).includes("qa-link-label")) {
+      throw new Error("saved Markdown link did not render as a terminal hyperlink");
+    }
+
+    const copyStart = state.output.length;
+    child.stdin.write("/copy\r");
+    await waitForOutput(() => normalized(state.output.slice(copyStart)),
+      value => value.includes("Copy block") && value.toLowerCase().includes("assistant"),
+      "copy block picker");
+    child.stdin.write("\r");
+    await waitForOutput(() => normalized(state.output.slice(copyStart)),
+      value => value.includes("clipboard"),
+      "copy result");
+    const clipboard = /\x1b\]52;c;([A-Za-z0-9+/=]+)\x07/.exec(state.output.slice(copyStart));
+    const copied = clipboard ? Buffer.from(clipboard[1], "base64").toString("utf8") : undefined;
+    if (copied !== SAVED_LINK_MARKDOWN) {
+      throw new Error("copy picker did not emit the exact Markdown link source");
+    }
+
     start = state.output.length;
     child.stdin.write(`/resume ${activeSessionId}\r`);
     await waitForOutput(() => currentSessionFromStore(home, project),

@@ -40,6 +40,16 @@ describe("inline styling", () => {
     expect(stripAnsi(renderInline("[docs](https://x/y)"))).toBe("docs (https://x/y)");
   });
 
+  it("emits a terminal hyperlink for a safe target and keeps unsafe targets inert", () => {
+    expect(renderInline("[docs](https://example.test/path)")).toContain(
+      "\x1b]8;;https://example.test/path\x07docs\x1b]8;;\x07",
+    );
+    expect(renderInline("[docs](javascript:alert(1))")).not.toContain("\x1b]8;;");
+    const sanitized = stripAnsi(renderInline("[docs](https://example.test/\u009dpath)"));
+    expect(sanitized).toBe("docs (https://example.test/path)");
+    expect(sanitized).not.toContain("\u009d");
+  });
+
   it("renders code spans inside link labels", () => {
     expect(stripAnsi(renderInline("[`x`](https://e.test)"))).toBe("x (https://e.test)");
     expect(stripAnsi(renderInline("[``x``](https://e.test)"))).toBe("x (https://e.test)");
@@ -313,6 +323,17 @@ describe("table cell semantics", () => {
     expect(body).not.toContain("](");
     expect(body).toContain("a long label");
     expect(body.replace(/\s/g, "")).toContain("https://example.com/path");
+  });
+
+  it("closes terminal hyperlinks independently on every wrapped table-cell row", () => {
+    const source = "| Link |\n|---|\n| [a very long label that must wrap across rows](https://example.com/path) |";
+    const rows = renderMarkdown(source, 24);
+    const linked = rows.filter(row => row.includes("\x1b]8;;https://example.com/path\x07"));
+    expect(linked.length).toBeGreaterThan(1);
+    for (const row of linked) {
+      expect(row).toContain("\x1b]8;;\x07");
+      expect(visibleWidth(row)).toBeLessThanOrEqual(24);
+    }
   });
 
   it("falls back to the raw table when a column cannot keep three cells", () => {

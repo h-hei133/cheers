@@ -7,6 +7,7 @@ import { scanBlocks } from "./markdownScan.js";
 import { latexToDisplayText, projectMath } from "./math.js";
 import { splitTableRow } from "./table.js";
 import { inlineWithinBudget, transformInline, type InlineContext } from "../text/inline.js";
+import { closeTerminalHyperlink, displayLinkUrl, terminalHyperlink } from "../text/link.js";
 /**
  * Markdown rendering for assistant prose.
  *
@@ -69,8 +70,11 @@ function renderInlineAt(text: string, context?: InlineContext): string {
       return defaultTheme.fg("mdCode", code);
     },
     renderText: renderPlainInline,
-    renderLink: (label, href, next) =>
-      `${defaultTheme.fg("mdLink", renderInlineAt(label, next))}${defaultTheme.fg("mdLinkUrl", ` (${href})`)}`,
+    renderLink: (label, href, next) => {
+      const renderedLabel = defaultTheme.fg("mdLink", renderInlineAt(label, next));
+      const visibleTarget = displayLinkUrl(href);
+      return `${terminalHyperlink(renderedLabel, href)}${visibleTarget ? defaultTheme.fg("mdLinkUrl", ` (${visibleTarget})`) : ""}`;
+    },
   }, context);
 }
 
@@ -328,7 +332,7 @@ function formatRow(wrapped: readonly (readonly string[])[], widths: readonly num
   const rows: string[] = [];
   for (let line = 0; line < height; line++) {
     rows.push(wrapped.map((lines, column) =>
-      padToWidth(header ? defaultTheme.bold(lines[line] ?? "") : lines[line] ?? "", widths[column]!))
+      padToWidth(closeTerminalHyperlink(header ? defaultTheme.bold(lines[line] ?? "") : lines[line] ?? ""), widths[column]!))
       .join(defaultTheme.fg("border", " │ ")));
   }
   return rows;

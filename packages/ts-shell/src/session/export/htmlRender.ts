@@ -2,6 +2,7 @@ import { scanBlocks, type MarkdownBlock } from "../../presentation/tui/transcrip
 import { latexToText } from "../../presentation/tui/transcript/math.js";
 import { splitTableRow } from "../../presentation/tui/transcript/table.js";
 import { inlineWithinBudget, transformInline, type InlineContext } from "../../presentation/tui/text/inline.js";
+import { safeLinkUrl } from "../../presentation/tui/text/link.js";
 
 /**
  * Markdown as HTML, for the exported page.
@@ -40,13 +41,7 @@ export function escapeHtml(text: string): string {
  * what a link in an answer usually means. Anything else returns nothing and the
  * caller renders the text without a link, rather than dropping the text.
  */
-export function safeUrl(value: string): string | undefined {
-  const trimmed = value.trim().replace(/[\u0000-\u001f\u007f]/g, "");
-  if (trimmed === "") return undefined;
-  const scheme = /^([A-Za-z][A-Za-z0-9+.-]*):/.exec(trimmed);
-  if (!scheme) return trimmed;
-  return /^(https?|mailto)$/i.test(scheme[1]!) ? trimmed : undefined;
-}
+export { safeLinkUrl as safeUrl };
 
 /**
  * Inline spans: links, code, and emphasis, escaped.
@@ -67,7 +62,7 @@ function renderInlineHtmlAt(text: string, context?: InlineContext): string {
     renderCode: (code) => `<code>${escapeHtml(code)}</code>`,
     renderText: (plain) => renderEmphasisHtml(escapeHtml(plain)),
     renderLink: (label, href, next) => {
-      const url = safeUrl(href);
+      const url = safeLinkUrl(href);
       const renderedLabel = renderInlineHtmlAt(label, next);
       // A refused scheme loses the link, not the words: the label is still what
       // the author wrote.

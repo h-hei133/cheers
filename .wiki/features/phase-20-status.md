@@ -2,13 +2,23 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
-## 2026-10-23 浏览器响应预算错误优先级修复（本地代码批；CI pending）
+## 2026-10-23 RENDER-02 OSC8 与打包源复制（本地代码批；CI pending）
+
+- `presentation/tui/text/link.ts` 现在由单一策略校验 terminal/HTML 共用链接目标：只允许 `http`、`https`、`mailto` 和无 scheme 相对目标，剥离 C0/C1 控制符，拒绝 `javascript:`、`data:`、`file:` 等可执行或本地文件 scheme。可见 URL 与 OSC8 目标都先经过该策略，恶意 BEL/ESC 不能闭合或改写终端超链接。
+- Markdown link label 通过 OSC8 投影；ANSI-aware 软换行会在每个物理行末关闭仍打开的 hyperlink，下一行由原 escape prefix 重新打开。表格 cell 在填充前再次封闭未完成 hyperlink，因此边框、padding 和后续列不会被链接污染。
+- `session/export/htmlRender.ts` 改为复用同一 URL 策略，不再维护第二套允许列表。源复制仍绑定原始 Markdown source：表格 row 显示 OSC8，但完整 source selection 返回原始 `[label](url)` 字节。
+- 聚焦 6 文件/144 项通过。两项隔离反转取得实际失败：移除 scheme guard 使 unsafe 用例把 `javascript:` 写入 OSC8；移除逐行关闭后，长 label 的首个换行行不再包含 hyperlink close。产品源码已恢复。
+- 最终完整 `test:ts` 为 930 文件通过/1 跳过、9,883 项通过/10 跳过、382.96s。`test:scripts` 157/157、cycles 2,768 文件/0 runtime/0 type、config consumers 53/53、declarations 18/18 + 11/11、Node floor、strict docs/rules、`git diff --check` 与仓库 tgz NormProof exit 0/partial（0 blocking、11 项既有 ceiling advisory）通过。
+- TypeScript build `bebadefb62b754b0f8d3aed2ada99271c2de536c615bfb519e0178d816050cfb`，executable SHA-256 `a260a038354d02c91df0d15afec50f6ef9af664707550bdbc7f8a683cfd80722`。Node/exe × regular/fullscreen 四格打包 PTY 均 pass/exit 0；四份 raw output 都含目标 OSC8，`/copy` 的 OSC52 payload 解码后均为 49-byte 原始 Markdown source。证据目录 `.omx/artifacts/phase20-render-link-pty-bebadefb62b7/`。
+- 本批只把 RENDER-02 的本地、完整测试、构建与打包证据闭合；提交、新 SHA CI 与矩阵更新尚未发生，因此矩阵暂时仍为 32 `complete`/15 `partial`/0 `open`，不提前宣称 complete。
+
+## 2026-10-23 浏览器响应预算错误优先级修复（代码批 `7262c80f` 已推送；CI/Watch success）
 
 - 证据文档提交 `eedd737028f139c587670ded008717c8eeecc000` 的 CI `39889803714`/job `120206584567` 在完整测试第 634 秒失败：`src/browser/smoke/request.test.ts` 的 gzip 解压预算用例期望 `unsafe-output`，实际得到 `request-failed`；其余 927 文件通过/1 跳过、9,882 项通过/3 跳过。该提交的 Architecture Watch `39889803712`/job `120206584691` 为 completed/success。失败 run 保留，不记为通过。
 - 同一代码 SHA 的上一轮 CI `39888154616` 已成功，说明该失败不是稳定功能回归；但新增 `core/network/body.test.ts` 用解压后超预算并伴随 decoder cleanup error 的确定性场景复现了真实竞态：原实现会把 `response_limit` 覆盖为 `invalid_response`，最终投影为 `request-failed`。
 - `responseBody()` 现在记录预算已越界这一终态事实；decoder cleanup 与 `pipeline` 收尾不得把该终态降级为通用解析错误。未越界时仍按原合同把损坏压缩流归一为 `invalid_response`，且不泄露 decoder 诊断。
 - 聚焦验证 44 项通过：body 回归 1、connection/response 20、browser smoke 23。`npm run build` 通过，build ID `2899cba44e0c`；`test:scripts` 157/157、import cycles 2,766 文件/0 runtime/0 type、config consumers 53/53、declarations 18/18 + 11/11、Node floor、strict docs/rules 与 `git diff --check` 通过；docs-source 118 项仍为 advisory。仓库 tgz NormProof exit 0/partial，0 blocking，保留 11 项既有 function-ceiling advisory。
-- 修复代码尚未提交或推送；该节不声称新 SHA CI、发布或 Phase 20 完成状态。失败 run 的 rerun 已启动，结果另记。
+- 失败 run 的 rerun 已完成：CI `39889803714`/job `120210780809` 为 completed/success，但只绑定旧证据 SHA `eedd7370`，不证明修复代码。修复批 `7262c80f9386e8d74fe6ddece21d8615b2931ad7` 已推送且远端 `main` 精确读回；CI `39891648409`/job `120212557672` 为 completed/success，929 文件通过/1 跳过、9,884 项通过/3 跳过、947.35s；Architecture Watch `39891648398` 为 completed/success。两项只绑定该修复 SHA。
 
 ## 2026-10-23 PAN-03/PAN-05 and RENDER-02/03 rework（代码批 `cd28d8ca` 已推送；CI/Watch success）
 

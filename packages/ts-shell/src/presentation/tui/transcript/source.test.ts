@@ -83,6 +83,25 @@ it('copies a wrapped formatted table from its original Markdown source', () => {
   expect(pane.extractSource({ row: continuation, column: 0 }, { row: continuation, column: 39 })).toBeUndefined();
 });
 
+it('copies raw Markdown links while table rows render terminal hyperlinks', () => {
+  const source = [
+    '| Name | Link |',
+    '| --- | --- |',
+    '| alpha | [a long label that wraps](https://example.com/path) |',
+  ].join('\n');
+  const transcript = new Transcript();
+  transcript.append(textBlock('assistant', source));
+  const pane = new TranscriptPane(transcript);
+  const painted = pane.render(40, 20, undefined);
+  const first = painted.findIndex(row => stripAnsi(row).includes('Nam'));
+  const separator = painted.findIndex((row, index) => index > first && row.trim() === '');
+  const last = separator < 0 ? painted.length - 1 : separator - 1;
+
+  expect(first).toBeGreaterThanOrEqual(0);
+  expect(painted.slice(first, last + 1).some(row => row.includes('\x1b]8;;https://example.com/path\x07'))).toBe(true);
+  expect(pane.extractSource({ row: first, column: 0 }, { row: last, column: 39 })).toBe(source);
+});
+
 it('copies a long unified diff line from source instead of its truncated display row', () => {
   const source = 'x'.repeat(164);
   const block = textBlock('command', '', 'edit');
