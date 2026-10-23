@@ -4,8 +4,9 @@ import { assertWorkspaceRoot, captureWorkspaceRoot } from '../../../core/workspa
 import { withFileLock } from '../../../session/store/sessionFileStore.js';
 import { commitWorkspaceFile } from '../../authority/commit.js';
 import { hashContent } from '../../authority/content.js';
-import { descriptorPath, ensureWorkspaceDirectory, inspectWorkspaceFile } from '../../authority/state.js';
+import { descriptorPath, ensureWorkspaceDirectory, inspectWorkspaceFile, workspaceFilePath } from '../../authority/state.js';
 import { decodeOperation } from './schema.js';
+import { OPERATION_READ_LIMITS } from './limits.js';
 import type { EditOperationIdentity, OperationReceipt, OperationScope } from './model.js';
 import { assertProfileStorage, captureProfileIdentity, currentProfile } from '../../../core/paths/profile/context.js';
 import { snapshotRoot } from '../root.js';
@@ -41,22 +42,44 @@ function checkScope(scope: OperationScope): void {
   assertProfileStorage(storageRoot(scope), scope.profile);
 }
 
-function readJson(scope: OperationScope, relative: string): unknown {
+interface ReadBudget { bytes: number; files: number }
+
+function readJson(scope: OperationScope, relative: string, budget?: ReadBudget): unknown {
   const root = storageRoot(scope);
   assertProfileStorage(path.join(root, relative), scope.profile);
-  const state = inspectWorkspaceFile(root, relative);
+  const maxBytes = Math.min(OPERATION_READ_LIMITS.jsonBytes, budget ? OPERATION_READ_LIMITS.totalBytes - budget.bytes : OPERATION_READ_LIMITS.jsonBytes);
+  const state = inspectWorkspaceFile(root, relative, undefined, maxBytes);
   if (state.state === 'absent') return undefined;
-  if (Buffer.byteLength(state.content) > 8 * 1024 * 1024) throw new Error('Edit operation ledger exceeds its size limit.');
+  if (budget) budget.bytes += Buffer.byteLength(state.content, 'utf8');
   return JSON.parse(state.content);
 }
 
-function readIndex(scope: OperationScope): OperationIndex {
-  const value = readJson(scope, path.join(directory(scope), 'index.json')) as OperationIndex | undefined;
+/** Undo scans bound all names; writer inventory keeps its existing acceptance semantics. */
+function inventory(scope: OperationScope, bounded = false): Set<string> {
+  const absolute = path.dirname(workspaceFilePath(storageRoot(scope), path.join(directory(scope), '.inventory')));
+  let fd: number;
+  try { fd = fs.openSync(absolute, fs.constants.O_RDONLY | (fs.constants.O_DIRECTORY ?? 0) | (fs.constants.O_NOFOLLOW ?? 0)); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return new Set(); throw error; }
+  try {
+    if (!fs.fstatSync(fd).isDirectory() || descriptorPath(fd, absolute) !== absolute) throw new Error('Edit operation store changed path.');
+    const cursor = fs.opendirSync(process.platform === 'linux' ? `/proc/self/fd/${fd}` : absolute, { bufferSize: 32 });
+    const names = new Set<string>();
+    try {
+      let count = 0;
+      for (let entry = cursor.readSync(); entry; entry = cursor.readSync()) {
+        if (++count > OPERATION_READ_LIMITS.directoryEntries && bounded) throw new Error('Edit operation directory exceeds its entry limit.');
+        if (entry.name.endsWith('.json')) names.add(entry.name);
+      }
+      if (descriptorPath(fd, absolute) !== absolute) throw new Error('Edit operation store changed path.');
+      return names;
+    } finally { cursor.closeSync(); }
+  } finally { fs.closeSync(fd); }
+}
+
+function readIndex(scope: OperationScope, budget?: ReadBudget): OperationIndex {
+  const value = readJson(scope, path.join(directory(scope), 'index.json'), budget) as OperationIndex | undefined;
   if (value === undefined) {
-    let files: string[] = [];
-    try { files = fs.readdirSync(path.join(storageRoot(scope), directory(scope))); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-    if (files.some(file => file.endsWith('.json'))) throw new Error('Edit operation index is missing; inspect the existing receipts.');
+    if (inventory(scope, budget !== undefined).size) throw new Error('Edit operation index is missing; inspect the existing receipts.');
     return { schemaVersion: 1, sequence: 0, operations: [] };
   }
   if (value.schemaVersion !== 1 || !Number.isSafeInteger(value.sequence) || value.sequence < 0 || !Array.isArray(value.operations)
@@ -65,25 +88,34 @@ function readIndex(scope: OperationScope): OperationIndex {
     || new Set(value.operations.map(entry => entry.operationId)).size !== value.operations.length
     || new Set(value.operations.map(entry => entry.sequence)).size !== value.operations.length) throw new Error('Edit operation index is invalid.');
   const indexed = new Set(['index.json', ...value.operations.map(entry => `${entry.operationId}.json`)]);
-  const stored = fs.readdirSync(path.join(storageRoot(scope), directory(scope))).filter(name => name.endsWith('.json'));
-  if (stored.length !== indexed.size || stored.some(name => !indexed.has(name))) throw new Error('Edit operation index does not account for every receipt.');
+  const stored = inventory(scope, budget !== undefined);
+  if (stored.size !== indexed.size || [...stored].some(name => !indexed.has(name))) throw new Error('Edit operation index does not account for every receipt.');
   return value;
 }
 
 export function readOperation(scope: OperationScope, operationId: string): OperationReceipt {
+  return readReceipt(scope, operationId);
+}
+
+function readReceipt(scope: OperationScope, operationId: string, budget?: ReadBudget): OperationReceipt {
   checkScope(scope);
   if (!/^[A-Za-z0-9_-][A-Za-z0-9._-]{0,199}$/.test(operationId)) throw new Error('Edit operation identity is invalid.');
-  const receipt = decodeOperation(readJson(scope, path.join(directory(scope), `${operationId}.json`)), scope);
+  const receipt = decodeOperation(readJson(scope, path.join(directory(scope), `${operationId}.json`), budget), scope);
   if (receipt.operationId !== operationId) throw new Error('Edit operation identity does not match its receipt.');
+  if (budget) {
+    budget.files += receipt.files.length;
+    if (budget.files > OPERATION_READ_LIMITS.files) throw new Error('Edit operation history exceeds its file limit.');
+  }
   return receipt;
 }
 
 /** Read-only selection never creates a ledger or adopts unowned legacy snapshots. */
 export function readOperations(scope: OperationScope): readonly OperationReceipt[] {
   checkScope(scope);
-  const index = readIndex(scope);
+  const budget: ReadBudget = { bytes: 0, files: 0 };
+  const index = readIndex(scope, budget);
   return [...index.operations].sort((a, b) => b.sequence - a.sequence).map(entry => {
-    const receipt = readOperation(scope, entry.operationId);
+    const receipt = readReceipt(scope, entry.operationId, budget);
     if (receipt.sequence !== entry.sequence) throw new Error('Edit operation order is inconsistent.');
     return receipt;
   });

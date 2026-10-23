@@ -117,7 +117,7 @@ const PICKERS: Record<string, PickerFactory> = {
   plugin: host => pluginPicker(host.extensions),
   marketplace: (host) => sourcePicker(host.commandContext),
   restore: (host) => restorePicker(host.projectRoot),
-  undo: (host) => undoPicker(host.undo),
+  undo: (host) => undoPicker(host.undo, host.commandContext?.admission),
   skill: (host) => skillPicker(host.commandContext),
   // Reachable either way: `/back`, or Escape twice on an empty prompt. The
   // gesture is fast once known; the command is how it becomes known.

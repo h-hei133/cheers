@@ -8625,3 +8625,10 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 全graph投影/瞬态heap/UI响应、stat乐观版本边界及undo/restore/cleanse仍partial；35complete/12partial保持。本批review/commit/push/newSHA CI分别取证。上批4dccf94a已推送读回，CI39949109526/job120398929588in_progress、Watch39949109534success；copy c4cb2834精确CI39946998111/job120391995287于11:51:42Zcompleted/success（11:34:20Z开始），Watch同SHA success。
 
 - 本批独立codeAPPROVE/architectureWATCH，无BLOCK；最终五owner/两报告hash逐一绑定；原保存version比较在fresh acquisition后写前，原state-lock继续content/conversation/identity保护，不宣称跨文件原子快照。
+
+## [2026-10-23] fix | PAN-06 undo receipt 扫描与一次页面
+
+- 原operation store以descriptor预读8MiB、scoped JSON32MiB含index、50k files/20k目录项限制完整receipt扫描；目录cap仅readOperations，原allocation接受/receipt barrier/writer保持。增量hash保持原完整JSON游标字节，不加入弱cache；root/history/confirmation取消/选择/handoff一次消费，原surface/scope/config准入沿现OperationAccess锁内重验。
+- 原源码六项真实断言失败；最终9文件246项、11有效AssertionError反转/11hash保持、scripts157/静态门/build/exe通过。独立codeAPPROVE/architectureWATCH，综合COMMENT无BLOCK；最终七owner哈希与两报告已绑定。准确buildacd77c67f3c9、exe37dbc0851968同build四格85receipt hostilePTY pass/exit0；完整三页、最旧ID、取消、外改stale与oversized拒绝、保存字节保持。首次PTY四格业务pass后的test-input freshness拒绝留存，重建重跑前后身份相等，详情status/artifacts。
+- source bytes与file admission不代表preview/blob累计heap/I/O/响应保证；mixed-epoch读取/同步取消与原恢复生命周期边界保持明确。下一批继续undo preview/snapshot和restore/cleanse资源，本批不关闭PAN-06/47项，35complete/12partial。本批commit/push/newSHA CI待取证。
+- back持久批cdce79a2精确CI39951053368/job120405317114已读回completed/success，12:08:09Z–12:25:47Z；back来源批4dccf94a精确CI39949109526/job120398929588success，11:52:04Z–12:19:19Z，两Watchsuccess。旧管理4942064c CI39931286844仍in_progress，不借年龄推定。

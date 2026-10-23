@@ -399,7 +399,12 @@ describe("session wiring", () => {
   it('shows undo preview above confirmation and requires a separate Restore selection', async () => {
     const { mode, terminal } = build();
     const host = mode as unknown as { overlay: OverlayHost; pager: Pager; view: InteractiveView;
-      openPicker(command: string): void };
+      openPicker(command: string): void; options: { runtimeContext: ShellRuntimeContext } };
+    // This UI fixture mocks persistence; explicitly supply its matching workspace owner.
+    vi.spyOn(undoService, 'undoScope').mockReturnValue({ sessionId: 'sess_1', workspace: { path: '/workspace', identity: '1:2:3' } });
+    const context = host.options.runtimeContext;
+    const binding = configurationBinding(context);
+    context.configuration.publish(context.configuration.begin(binding), context.configuration.current.config, binding);
     const receipt = { operationId: 'op-preview', sessionId: 'sess_1', createdAt: '2026-10-08T00:00:00Z',
       status: 'committed', undo: 'none', files: [{ path: 'a.txt', workspace: { path: '/workspace' }, kind: 'update',
         status: 'committed', undo: 'none', before: { state: 'exists', hash: 'a'.repeat(64), mode: 0o644 },
@@ -428,6 +433,23 @@ describe("session wiring", () => {
       terminal.input('\r\x1b[B\x1b[B\r');
       await vi.waitFor(() => expect(restore).toHaveBeenCalledOnce());
       await vi.waitFor(() => expect(host.view.transcript.all().some(block => block.report?.facts.status === 'restored-verified')).toBe(true));
+    } finally { mode.stop(); vi.restoreAllMocks(); }
+  });
+
+  it('binds the undo registry to the original selection surface before acquiring receipts', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { closing: boolean; pickerHost(): PickerHost; options: { runtimeContext: ShellRuntimeContext } };
+    vi.spyOn(undoService, 'undoScope').mockReturnValue({ sessionId: 'sess_1', workspace: { path: '/workspace', identity: '1:2:3' } });
+    const context = host.options.runtimeContext;
+    const binding = configurationBinding(context);
+    context.configuration.publish(context.configuration.begin(binding), context.configuration.current.config, binding);
+    const prepare = vi.spyOn(undoService, 'prepareUndo').mockResolvedValue({ note: 'No operation.' });
+    try {
+      const picker = pickerFor('/undo', host.pickerHost())!;
+      host.closing = true;
+      await expect(picker.load()).rejects.toThrow('unavailable');
+      expect(prepare).not.toHaveBeenCalled();
+      expect(await picker.apply(['history'])).toBeUndefined();
     } finally { mode.stop(); vi.restoreAllMocks(); }
   });
 

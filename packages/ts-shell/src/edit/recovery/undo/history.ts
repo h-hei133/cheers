@@ -1,4 +1,4 @@
-import { hashContent } from '../../authority/content.js';
+import { createHash } from 'node:crypto';
 import type { OperationReceipt, OperationScope } from '../operation/model.js';
 
 const PAGE_SIZE = 40;
@@ -17,7 +17,13 @@ export function validUndoHistoryCursor(value: unknown): value is string {
 
 /** A cursor is read authority for one unchanged scoped ledger, never write approval. */
 export function pageUndoHistory(scope: OperationScope, receipts: readonly OperationReceipt[], cursor?: string): UndoHistoryPage | undefined {
-  const revision = hashContent(JSON.stringify({ scope, receipts }));
+  // Hash the same JSON bytes incrementally; avoid a second ledger-sized string.
+  const digest = createHash('sha256').update(`{"scope":${JSON.stringify(scope)},"receipts":[`);
+  for (let index = 0; index < receipts.length; index++) {
+    if (index) digest.update(',');
+    digest.update(JSON.stringify(receipts[index]));
+  }
+  const revision = digest.update(']}').digest('hex');
   let offset = 0;
   if (cursor !== undefined) {
     if (!validUndoHistoryCursor(cursor) || cursor.slice(0, 64) !== revision) return undefined;

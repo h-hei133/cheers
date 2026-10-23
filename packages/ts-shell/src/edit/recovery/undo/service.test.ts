@@ -52,12 +52,16 @@ describe('file undo surface', () => {
     const confirmation = outcome!.next!; await confirmation.load(); expect(confirmation.initialSelection).toBe('cancel');
     expect(await confirmation.apply(['cancel'])).toBeUndefined();
     expect(fs.readFileSync(a, 'utf8')).toBe('new-a\n'); expect(receipts()[0]!.undo).toBe('none'); expect(publish).not.toHaveBeenCalled();
-    const restored = await confirmation.apply(['restore']); expect(restored!.report!.facts.status).toBe('restored-verified');
+    expect(await confirmation.apply(['restore'])).toBeUndefined();
+    await expect(confirmation.load()).rejects.toThrow('closed');
+    const reopened = undoPicker(runtime); await reopened.load();
+    const fresh = (await reopened.apply(['review']))!.next!; await fresh.load();
+    const restored = await fresh.apply(['restore']); expect(restored!.report!.facts.status).toBe('restored-verified');
     expect(fs.readFileSync(a, 'utf8')).toBe('old-a\n'); expect(fs.readFileSync(b, 'utf8')).toBe('old-b\n');
     expect(receipts()[0]!.undo).toBe('restored-verified'); expect(publish).toHaveBeenCalledOnce();
     expect((await prepareUndo(current)).preview).toBeUndefined();
     const status = await runUndoCommand(['status'], current); expect(status.report!.facts.count).toBe(1); expect(status.output).toContain('undo: restored-verified');
-    expect((await confirmation.apply(['restore']))!.report!.facts.status).toBe('blocked');
+    expect(await fresh.apply(['restore'])).toBeUndefined();
   });
 
   it.each(['stale-file', 'newer-operation', 'session-change', 'admission-change', 'busy'])('blocks confirmation after %s without overwriting other files', async kind => {
@@ -69,6 +73,47 @@ describe('file undo surface', () => {
     const result = await executeUndo(host({ busy: () => kind === 'busy' }), preview, true);
     expect(result.result.status).toBe('blocked'); expect(fs.readFileSync(a, 'utf8')).toBe('new-a\n');
     expect(fs.readFileSync(b, 'utf8')).toBe(kind === 'stale-file' ? 'external\n' : kind === 'newer-operation' ? 'later-b\n' : 'new-b\n');
+    expect(receipts()[0]!.undo).toBe('none');
+  });
+
+  it('releases a pending opening when closed before its preview returns', async () => {
+    await commit();
+    const picker = undoPicker(host());
+    const pending = picker.load();
+    picker.previewEnd!();
+    await expect(pending).rejects.toThrow('closed');
+    expect(await picker.apply(['review'])).toBeUndefined();
+    await expect(picker.load()).rejects.toThrow('closed');
+    expect(fs.readFileSync(a, 'utf8')).toBe('new-a\n');
+    expect(receipts()[0]!.undo).toBe('none');
+  });
+
+  it('refuses restoration when the opening admission was replaced by a permissive context', async () => {
+    await commit();
+    let blocked: string | undefined;
+    current = { ...current, admission: () => blocked };
+    const picker = undoPicker(host()); await picker.load();
+    const confirmation = (await picker.apply(['review']))!.next!; await confirmation.load();
+    blocked = 'Original grant revoked'; current = { ...current, admission: () => undefined };
+    expect((await confirmation.apply(['restore']))!.report!.facts.status).toBe('blocked');
+    expect(await confirmation.apply(['restore'])).toBeUndefined();
+    expect(fs.readFileSync(a, 'utf8')).toBe('new-a\n');
+    expect(receipts()[0]!.undo).toBe('none');
+  });
+
+  it('checks the original surface admission before acquisition and before confirmation', async () => {
+    await commit();
+    let blocked: string | undefined = 'Surface closed';
+    const context = vi.fn(() => current);
+    const opening = undoPicker(host({ context }), () => blocked);
+    await expect(opening.load()).rejects.toThrow('unavailable');
+    expect(context).not.toHaveBeenCalled();
+    blocked = undefined;
+    const fresh = undoPicker(host(), () => blocked); await fresh.load();
+    const confirmation = (await fresh.apply(['review']))!.next!; await confirmation.load();
+    blocked = 'Surface closed';
+    expect((await confirmation.apply(['restore']))!.report!.facts.status).toBe('blocked');
+    expect(fs.readFileSync(a, 'utf8')).toBe('new-a\n');
     expect(receipts()[0]!.undo).toBe('none');
   });
 

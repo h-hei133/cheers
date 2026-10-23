@@ -19,7 +19,7 @@ beforeEach(() => {
   fs.writeFileSync(path.join(directory, 'note.txt'), 'workspace stays unchanged\n');
   context = { cwd: directory, sessionId: 'history-session' };
 });
-afterEach(() => fs.rmSync(directory, { recursive: true, force: true }));
+afterEach(() => { vi.restoreAllMocks(); fs.rmSync(directory, { recursive: true, force: true }); });
 
 function seed(count: number, sessionId = context.sessionId!) {
   const scope = captureOperationScope({ sessionId, workspaceRoot: directory });
@@ -95,16 +95,19 @@ it('rejects changed receipts and foreign scopes without moving the saved-results
   const page = await picker();
   await page.load();
   const next = (await page.apply(['more:results']))!.next!;
+  expect(await page.apply(['operation-40'])).toBeUndefined();
+  await expect(page.load()).rejects.toThrow('closed');
+  const active = await picker(); await active.load();
   const scope = captureOperationScope({ sessionId: context.sessionId!, workspaceRoot: directory });
   const newest = readOperations(scope)[0]!;
   withOperationStore(scope, () => persistOperation({ ...newest, revision: newest.revision + 1, undo: 'unknown' }));
   const before = bytes();
   expect(readUndoHistoryPage(context, first.nextCursor)).toBeUndefined();
   expect((await runUndoCommand(['status', `--cursor=${first.nextCursor}`], context)).report!.facts.status).toBe('stale');
-  expect((await page.apply(['operation-40']))!.report!.facts.status).toBe('stale');
+  expect((await active.apply(['operation-40']))!.report!.facts.status).toBe('stale');
   await expect(next.load()).rejects.toThrow('changed');
   context = { ...context, sessionId: 'another-session' };
-  expect((await page.apply(['more:results']))!.report!.facts.status).toBe('stale');
+  expect(await active.apply(['more:results'])).toBeUndefined();
   expect((await runUndoCommand(['status', `--cursor=${first.nextCursor}`], context)).report!.facts.status).toBe('stale');
   expect(bytes()).toEqual(before);
 });
@@ -139,5 +142,35 @@ it('closes the real history overlay on cancellation and preserves workspace and 
   overlay.handleKey(parseKeyEvent('\x1b'), selected);
   expect(overlay.active).toBe(false);
   expect(selected).not.toHaveBeenCalled();
+  expect(await page.apply(['operation-40'])).toBeUndefined();
+  await expect(page.load()).rejects.toThrow('closed');
   expect(bytes()).toEqual(before);
+});
+
+it.each(['session', 'admission'])('binds history to the original opening after %s changes', async kind => {
+  seed(41);
+  let blocked: string | undefined;
+  context = { ...context, admission: () => blocked };
+  const page = await picker(); await page.load();
+  const before = bytes();
+  if (kind === 'session') context = { ...context, sessionId: 'other' };
+  else { blocked = 'Opening permission revoked'; context = { ...context, admission: () => undefined }; }
+  expect(page.isCurrent!()).toBe(kind !== 'session');
+  expect((await page.apply(['operation-40']))!.report!.facts.status).toBe('blocked');
+  expect(await page.apply(['more:results'])).toBeUndefined();
+  expect(bytes()).toEqual(before);
+});
+
+it('does not acquire or retain cancelled history pages', async () => {
+  seed(41);
+  const page = await picker();
+  const read = vi.spyOn(fs, 'readSync');
+  page.previewEnd!();
+  await expect(page.load()).rejects.toThrow('closed');
+  expect(read).not.toHaveBeenCalled();
+  const fresh = await picker();
+  const controller = new AbortController(); controller.abort();
+  read.mockClear();
+  await expect(fresh.load(controller.signal)).rejects.toThrow();
+  expect(read).not.toHaveBeenCalled();
 });
