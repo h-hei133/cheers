@@ -45,31 +45,48 @@ export function securityInspectorFor(context: ShellRuntimeContext): SecurityInsp
   const service = runtimes.get(context)?.service();
   if (!service) return undefined;
   const session = context.session; const root = context.cwd;
+  let failureRevision = 0n;
   const read = (): SecurityInspection => {
     if (context.session !== session || context.cwd !== root) return { state: 'stale' };
     try {
       const snapshot = service.inspection();
-      return snapshot.identity.sessionId === session.id && snapshot.identity.workspaceRoot === root
+      return context.session === session && context.cwd === root && snapshot.identity.sessionId === session.id && snapshot.identity.workspaceRoot === root
         ? { state: 'ready', snapshot } : { state: 'stale' };
     }
-    catch { return { state: 'unavailable' }; }
+    catch { failureRevision++; return { state: 'unavailable' }; }
+  };
+  const sourceRevision = (): string | undefined => {
+    if (context.session !== session || context.cwd !== root) return undefined;
+    try {
+      const revision = service.inspectionRevision();
+      return context.session === session && context.cwd === root && revision !== undefined
+        ? JSON.stringify([revision, String(failureRevision)]) : undefined;
+    } catch { return undefined; }
   };
   return { read, subscribe: listener => {
-    let released = false; let previous: string | undefined;
-    const publish = () => {
+    let released = false; let previous: string | undefined; let admitted: string | undefined; let generation = 0;
+    const publish = (force = false) => {
       if (released) return;
+      const current = ++generation;
+      const before = sourceRevision();
+      if (released || current !== generation) return;
+      if (!force && before !== undefined && before === admitted) return;
+      admitted = undefined;
       const inspection = read();
+      const after = inspection.state === 'ready' ? sourceRevision() : undefined;
+      if (released || current !== generation) return;
+      if (before !== undefined && before === after) admitted = after;
       const revision = inspection.state === 'ready' ? inspection.snapshot.version : inspection.state;
       if (revision === previous) return;
       previous = revision;
       try { listener(inspection); } catch { /* view delivery cannot affect the diagnostic owner */ }
     };
-    const release = service.subscribeInspection(publish);
+    const release = service.subscribeInspection(() => publish(true));
     // The persisted owner has no cross-process events. Observe external changes
     // only while this view is open; native publication updates remain immediate.
     const timer = setInterval(publish, 1000); timer.unref?.();
     publish();
-    return () => { released = true; clearInterval(timer); release(); };
+    return () => { if (released) return; released = true; admitted = undefined; previous = undefined; clearInterval(timer); release(); };
   } };
 }
 export function isSecurityControl(text: string): boolean { return /^\/security(?:\s+(?:status|cancel|scans|show|compare)(?:\s|$)|\s*$)/i.test(text.trim()); }

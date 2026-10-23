@@ -8712,3 +8712,11 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 本批finalsame-build0ffcf5a3c901/exe c74fcbcdc0a5四格PTY pass/exit0且before/after一致；原96retained、fullsearch/exactdraft/cancel无写/live恢复、actualsession8MiB+1/metadata256KiB+1拒绝与重开。最终独立架构WATCH/35probe/36focused四hash一致，代码最终绑定和新SHA交付另取证。
 
 - 最终独立codeAPPROVE（48host+48floor、JSON10delta/typecheck）、architectureWATCH（35probe/36finalfocused/AST/cycles），四hash报告逐项匹配，综合COMMENT无BLOCK；本批源码与构建均固定，commit/push/精确CI另取证。
+
+## [2026-10-24] fix | PAN-06 原security inspector未变化轮询
+
+- 原bound版本/祖先pathIdentity及workspace/session绑定组成可选revision，原publication通知计数/service live owner纳入，CLI只在成功fullread且前后修订一致后跳过未变化轮询；directreadfresh/nativeforce/失败重试/customstorefallback保持。独立复现directfailure旧token及revision内close仍read，现failure代次与revision返回后的close/generation检查修复；无新cache/reader/watch/writer/schema。
+- 固定十轮合成基线40descriptor/7920bytes/10inspection、最终0/0/0；外改/恢复/native/direct仍fullread，关闭后无work。最终48affected host/准确Node20.3、7有效AssertionError反转六hash保持、scripts157/静态门/CLI19/build/exe/NormProof0partial通过。单保护冗余green、架构mixedsource初始失败及代码真实directfailure分别留存；没有以中间结果替代final。
+- 独立codeAPPROVE（37host+37floor、finalruntime17floor/typecheck；早期8suite74明确在最后delta前）/architectureWATCH（29probe/final5suite49/AST/import/cycles），综合COMMENT无BLOCK。六hash两报告绑定；service20已到ceiling，runtime18/bound8/store11/publication6。stat乐观新鲜度、customproducer契约/token数量非字节界、变化轮询与整体heap/latency/I/O及平台仍WATCH，35complete/12partial保持。
+- same-build48d01c0ba325/exe aeb996d526d6四格PTY pass/exit0、before/after相同，96retained十秒浏览/fullsearch/exactdraft/cancel无写/live失效恢复/外改与actualsession8MiB+1/metadata256KiB+1拒绝重开；原session/workspace只读字节保持，source计量不冒作PTY总资源保证。status及phase20-cleanse-polling author-binding保存完整SHA；本批commit/push/newSHA CI另取证。
+- 上批8183a9dc9a312d825584c65e38f3d7bb2af4d54d已push/readback，精确CI39986691826/job120527589040success（16:25:51Z–16:39:55Z），Watch39986691815/job120527589327success至16:26:14Z；此成功不扩展到本批源码。

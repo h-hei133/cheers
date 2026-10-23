@@ -7,12 +7,15 @@ export class SecurityPublication {
   readonly scans = new Map<string, ScanRecord>();
   readonly remediations = new Map<string, Remediation>();
   private readonly listeners = new Set<() => void>();
+  private revisionValue = 0n;
   constructor(readonly store: SecurityStore) {}
+  get revision(): string { return String(this.revisionValue); }
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => { this.listeners.delete(listener); };
   }
   notify(): void {
+    this.revisionValue++;
     for (const listener of [...this.listeners]) {
       try { listener(); } catch { /* an inspector cannot break publication */ }
     }

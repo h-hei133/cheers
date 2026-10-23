@@ -40,6 +40,10 @@ export class SecurityService {
     const state = inspectionState(this.host.store.read(), this.publication.scans.values(), this.publication.remediations.values());
     return securityInspection(state, { sessionId: this.host.sessionId, workspaceRoot: this.host.root(), liveScanId: this.active?.id, liveRemediationId: this.applying });
   }
+  inspectionRevision(): string | undefined {
+    const source = this.host.store.revision?.();
+    return source === undefined ? undefined : JSON.stringify([source, this.host.root(), this.publication.revision, this.active?.id, this.applying]);
+  }
   subscribeInspection(listener: () => void): () => void {
     return this.publication.subscribe(listener);
   }

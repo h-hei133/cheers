@@ -1,11 +1,16 @@
 import { sameValue } from '../../config/values.js';
 import { freezeDeep } from '../../core/values/freeze.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
-import { readBoundSessionState, publishBoundSessionState, type BoundSessionHost } from '../../session/store/bound.js';
+import { readBoundSessionRevision, readBoundSessionState, publishBoundSessionState, type BoundSessionHost } from '../../session/store/bound.js';
 import { admitJsonSource, boundedJson } from '../analysis/json.js';
 import type { ScanRecord, SecurityState, Remediation } from '../analysis/model.js';
 
-export interface SecurityStore { read(): SecurityState; write(update: (state: SecurityState) => SecurityState): void }
+export interface SecurityStore {
+  read(): SecurityState;
+  /** No payload cache: optional source freshness for subscribed polling only. */
+  revision?(): string;
+  write(update: (state: SecurityState) => SecurityState): void;
+}
 /** The retained security document is embedded in a larger original session source. */
 export const SECURITY_SESSION_READ_LIMITS = Object.freeze({ metadataBytes: 256 * 1024, stateBytes: 8 * 1024 * 1024 });
 export function decodeSecurity(value: unknown): SecurityState {
@@ -22,7 +27,8 @@ export function decodeSecurity(value: unknown): SecurityState {
   return freezeDeep(state);
 }
 export function securityStore(host: BoundSessionHost, current: () => Session): SecurityStore {
-  return { read: () => decodeSecurity(readBoundSessionState(host, current(), SECURITY_SESSION_READ_LIMITS).state.security), write: update => {
+  return { read: () => decodeSecurity(readBoundSessionState(host, current(), SECURITY_SESSION_READ_LIMITS).state.security),
+    revision: () => readBoundSessionRevision(host, current()), write: update => {
     const session = current(); const baseline = readBoundSessionState(host, session);
     publishBoundSessionState(host, session, baseline, (state, previous) => sameValue(state.security, previous.security),
       state => ({ ...state, security: decodeSecurity(update(decodeSecurity(state.security))) }));

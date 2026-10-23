@@ -1,6 +1,7 @@
-import { lstatSync } from 'node:fs';
+import { lstatSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { captureWorkspaceRoot } from '../../core/workspace/roots.js';
+import { pathIdentity } from '../../core/workspace/files.js';
 import { freezeDeep } from '../../core/values/freeze.js';
 import { sameValue } from '../../config/values.js';
 import type { Session } from '../schema/sessionRecord.js';
@@ -25,6 +26,16 @@ class BoundState {
 }
 export type BoundSessionState = BoundState;
 export interface BoundSessionReadLimits { readonly metadataBytes: number; readonly stateBytes: number }
+
+/** Optimistic freshness only; a successful bound read must admit the actual payload. */
+export function readBoundSessionRevision(host: BoundSessionHost, session: Session): string {
+  try {
+    const layout = layoutFor(host, session.id);
+    const workspace = captureWorkspaceRoot(session.projectRoot, session.projectRoot, 'read');
+    return JSON.stringify([session.id, session.createdAt, session.projectRoot, workspace.path, workspace.identity,
+      pathIdentity(layout.sessionDir), realpathSync(layout.sessionDir), readSessionFileVersion(layout)]);
+  } catch (error) { throw error instanceof SessionPublicationError ? error : new SessionPublicationError('unavailable'); }
+}
 
 export function readBoundSessionState(host: BoundSessionHost, session: Session, limits?: BoundSessionReadLimits): BoundSessionState {
   try {

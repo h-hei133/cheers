@@ -2,7 +2,7 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
-## 当前剩余工作（2026-10-23）
+## 当前剩余工作（2026-10-24）
 
 范围只来自 [Phase 20 决策](phase-20-decisions.md) 及其引用要求。机器矩阵当前为 35 `complete` / 12 `partial` / 0 `open`；这些标签记录各批证据，不证明全阶段完成。以下 12 项仍未闭合，本地缺口可以继续执行，不能统称为等待真实环境。
 
@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy/back、undo扫描/preview/locked target、restore catalogue/index/picker/准备及执行source准入已有批次证据；cleanse已补投影source准入/选择生命周期/实时身份及原session获取每文件界，已补完整安全源序列化前准入，仍缺轮询累计界、导航/query瞬态heap/时延及整体physical I/O | 本地继续原cleanse完整序列化与重复scan/轮询、完整交互测量；source cap不等于总heap/physical I/O保证 |
+| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；cleanse已补来源准入、选择生命周期、序列化前准入和未变化轮询零正文读取；仍缺完整重复交互的heap/时延、变化轮询与导航/query累计physical I/O及平台证据 | 本地继续完整交互资源测量；stat修订是乐观新鲜度，source cap及固定十轮零正文读取不等于总资源保证 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,7 +21,17 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-24 PAN-06 完整security源序列化前准入（本地与独立审查通过；提交待取证）
+## 2026-10-24 PAN-06 原security inspector未变化轮询（本地及独立审查通过；提交待取证）
+
+- 原session owner提供可选修订接口，复用metadata/state/transcript文件版本、原路径祖先身份、canonical目录、session标量及workspace身份；原security publication维护通知修订，service组合来源与live owner，CLI只在成功实际读取且前后修订一致后跳过下一次未变化轮询。无snapshot cache/新watcher/reader/schema/writer；custom store缺失或失败修订时保持每轮读取。
+- 直接read始终fresh，原生notify立即强制检查；失败、前后修订不一致及直接read失败都使跳过权限失效。独立复现并修复直接read失败留下订阅旧标记、修订回调同步close后仍读正文；代次/关闭检查防止重入与queued回调发布旧画面，release清timer/listener/token。原unknown证据和实际writer/审批合同保持。
+- 合成固定十轮基线40次metadata/state descriptor读取、7,920bytes/10inspection，最终为0次/0bytes/0inspection；外改仍实际读取后才去重，失效两轮重试、恢复及原生通知/直接read均实际检查，关闭后十轮及通知为0。计量见`.omx/artifacts/phase20-cleanse-polling/`，不把小夹具字节量当完整I/O或延迟上界。
+- 最终7suite48项在Node24与准确20.3.0通过，7有效AssertionError反转exit1且六hash保持；单failure/native/notify/queued保护被其他guard兜底的green保留、不计有效，native与queued最终按共同保护反转。scripts157/静态门/CLI入口19/build/exe/NormProof exit0partial通过，0open/原1advisory failed及10proof gaps保持。独立codeAPPROVE（37host+37floor探针、finalruntime17floor/typecheck，8suite74在最后close delta前）；architectureWATCH（29probe、final5suite49/AST/import/cycles），综合COMMENT无BLOCK，六hash两报告匹配。service20/runtime18/bound8/store11/publication6不超ceiling。
+- finalbuild`48d01c0ba325e28bf01e116f66cfdfae613d3de771314c94b28ab3aafcf0359b`，inputs`f46a789eb0470f26149683132addee946d3fe94141af4c8abf0fde871ecf9974`，artifact`089d5d9ae6d328375e683da2b83b9957cd16cd0e92f28b56a8750916a58e6f70`，exeSHA`aeb996d526d683d1dffbf7262a50fde76920911508668ee1eb47311b2b525e33`；same-build Node/exe regular/fullscreen四格PTY pass/exit0且before/after一致：96retained、十秒浏览、exactdraft/search/cancel无写、live失效恢复/外改及实际session8MiB+1/metadata256KiB+1拒绝和重开。原session/workspace只读步骤字节保持；资源计量由source探针承担，PTY不冒作I/O计量。
+- WATCH：stat字段可能对同大小/同时间精度变化相同，不是content digest/原子快照；每轮仍做stat/path工作，变化/native通知仍fullread。每订阅一个token是数量界而非token字节/总heap界，BigInt计数长度随通知数增长，custom revision须遵守来源契约。物理workspace替换触发读取，但沿原reader重新捕获语义，不冒称所有替换拒绝。完整重复交互/heap/latency/累计physical I/O/平台仍缺，35complete/12partial保持。
+- 前批`8183a9dc9a312d825584c65e38f3d7bb2af4d54d`已commit/push/远端main读回；精确CI`39986691826`/job`120527589040`completed/success（16:25:51Z–16:39:55Z），Watch`39986691815`/job`120527589327`success至16:26:14Z。仅绑定此前序列化批；本批commit/push/newSHA CI分别取证。
+
+## 2026-10-24 PAN-06 完整security源序列化前准入（`8183a9dc`已推送；CI/Watch success）
 
 - 原security analysis JSON遍历复用为admitJsonSource，decodeSecurity在原JSON.stringify/4MiB encoded check前限制raw key/string UTF8累计4MiB、100knodes/depth24；inspection在count/map及原SHA256(JSON.stringify([context,state]))前对完整context/state累计8MiB，合并唯一unknown记录96项/97拒绝整源。合法parsed/security字段、原版本摘要/encoded4MiB、unknownreceipts与精确身份保持，无新serializer/schema/cache或writer。
 - 两lane实际复现toJSON/getter/Proxy/自定义数组iterator、nonenumrequired字段、arrayforEach、primitiveconversion及functioncustomprototype绕过。原owner现在按普通/nullproto own data descriptors、indexedarray、NodeisProxy检查拒绝执行hooks/accessors/nonordinaryprototype/customarraymethods；不可枚举data也按rawsource计量，普通sharedaliases/sparse/NaN/noncallabletoJSON与无hookfunction原JSONomission保留。typedpublicationIterable/全局intrinsics不冒作JavaScript隔离保证；Object.getOwnPropertyNames会分配namesarray，不承诺heap/time总界。
