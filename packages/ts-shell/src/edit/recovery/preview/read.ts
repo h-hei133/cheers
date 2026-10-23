@@ -2,6 +2,8 @@ import { captureWorkspaceRoot, assertWorkspaceRoot } from '../../../core/workspa
 import { assertCurrentProfile, currentProfile } from '../../../core/paths/profile/context.js';
 import { RecoveryReadControlError, RecoveryReadLimitError, recoveryReadBudget } from '../read.js';
 import { RESTORE_PREVIEW_LIMITS } from './limits.js';
+import fs from 'node:fs';
+import path from 'node:path';
 
 export interface RestorePreviewAccess {
   readonly signal?: AbortSignal;
@@ -13,13 +15,18 @@ export function previewReadAccess(workspaceRoot: string, input: RestorePreviewAc
   const budget = recoveryReadBudget(RESTORE_PREVIEW_LIMITS.totalBytes, input.signal, input.admission,
     'Restore preview exceeds its source size limit.');
   budget.check();
-  const workspace = captureWorkspaceRoot(workspaceRoot, workspaceRoot, 'read');
+  const originalRoot = path.resolve(workspaceRoot);
+  const workspace = captureWorkspaceRoot(originalRoot, originalRoot, 'read');
   const profile = currentProfile();
   let refused = false;
   let refusal: unknown;
   const check = (): void => {
     if (refused) throw refusal;
-    try { budget.check(); assertWorkspaceRoot(workspace); if (profile) assertCurrentProfile(profile); }
+    try {
+      budget.check(); assertWorkspaceRoot(workspace);
+      if (fs.realpathSync(originalRoot) !== workspace.path) throw new Error('Restore read workspace changed.');
+      if (profile) assertCurrentProfile(profile);
+    }
     catch (error) {
       refused = true;
       refusal = error instanceof RecoveryReadControlError || error instanceof RecoveryReadLimitError ? error : new RecoveryReadControlError(error);

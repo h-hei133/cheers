@@ -6,6 +6,7 @@ import { withFileLock } from '../../runtime/execution/fileLock.js';
 import { normalizeWorkspaceRelativePath, readRecoveryAuthorityRecord, type RecoveryAuthorityStoredRecord } from './recoveryAuthorityStore.js';
 import { readRecoveryBlob } from './record.js';
 import { assertRecoveryReadAccess, RecoveryReadControlError, RecoveryReadLimitError, type RecoveryReadAccess } from './read.js';
+import { restoreReadAccess } from './restore/read.js';
 
 export type RestorePrimitiveBlockedReason =
   | 'invalid-workspace-relative-path' | 'record-not-found' | 'record-path-mismatch'
@@ -75,21 +76,33 @@ export async function prepareRecoveryRestore(input: RestorePrimitiveInput): Prom
   return { record, relativePath, expected: state === 'absent' ? { state } : { state, hash, mode: record.expectedCurrentMode }, content, mode: record.beforeMode };
 }
 
-export async function restoreRecoveryAuthorityRecord(input: RestorePrimitiveInput): Promise<RestorePrimitiveResult> {
+export async function restoreRecoveryAuthorityRecord(input: RestorePrimitiveInput, reads?: ReturnType<typeof restoreReadAccess>): Promise<RestorePrimitiveResult> {
+  input = { ...input };
   let prepared: PreparedRestore;
-  try { prepared = await prepareRecoveryRestore(input); }
-  catch (error) { return blocked(error instanceof RestoreBlocked ? error.reason : 'file-system-error', []); }
+  let access: ReturnType<ReturnType<typeof restoreReadAccess>['bind']>;
+  try {
+    reads ??= restoreReadAccess(input);
+    access = reads.bind(input);
+    access.readAccess.check();
+    prepared = await prepareRecoveryRestore({ ...input, readAccess: access.readAccess });
+  }
+  catch (error) {
+    try { reads?.bind(input).readAccess.check(); } catch { /* Retain the shared owner's first refused source. */ }
+    return blocked(error instanceof RestoreBlocked ? error.reason : 'file-system-error', []);
+  }
   if (prepared.record.operation) return blocked('operation-receipt-required', [prepared.relativePath]);
   return withFileLock(path.resolve(input.workspaceRoot, prepared.relativePath), async () => {
-    const checkAccess = (absolute: string): void => { input.abortSignal?.throwIfAborted(); input.assertFileAccess?.(absolute); };
+    const checkAccess = access.assertFileAccess;
     let writerStarted = false;
     try {
-      const current = inspectWorkspaceFile(input.workspaceRoot, prepared.relativePath, checkAccess);
+      const current = inspectWorkspaceFile(input.workspaceRoot, prepared.relativePath, checkAccess, undefined, access.admitCurrent);
+      access.readAccess.check();
       if (current.state !== prepared.expected.state) return blocked('current-state-mismatch', [prepared.relativePath]);
       if (!matchesFileState(current, prepared.expected)) return blocked('current-content-hash-mismatch', [prepared.relativePath]);
       writerStarted = true;
       commitWorkspaceFile({ workspaceRoot: input.workspaceRoot, relativePath: prepared.relativePath,
-        expected: current, content: prepared.content, mode: prepared.mode, assertFileAccess: checkAccess });
+        expected: current, content: prepared.content, mode: prepared.mode, assertFileAccess: checkAccess, admitBytes: access.admitCurrent });
+      access.readAccess.check();
       return { restored: true, outcome: 'restored-verified', restoredFiles: [prepared.relativePath], inspectedFiles: [prepared.relativePath], rollbackAtomicityClaim: false,
         evidence: ['recovery-restore-primitive:explicit-call', 'recovery-restore-primitive:current-content-guard-passed',
           'recovery-restore-primitive:single-file-restore', 'recovery-restore-primitive:verified', 'recovery-restore-primitive:no-atomic-rollback'] };

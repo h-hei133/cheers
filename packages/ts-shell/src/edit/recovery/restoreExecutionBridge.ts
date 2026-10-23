@@ -10,6 +10,7 @@ import {
   type RestorePreviewResult,
 } from "./restorePreview.js";
 import { previewReadAccess, type RestorePreviewAccess } from './preview/read.js';
+import { restoreReadAccess } from './restore/read.js';
 
 export type RestoreExecutionMode = "preview" | "execute";
 
@@ -70,6 +71,7 @@ export async function runExplicitRestoreBridge(input: {
   const blockedFiles: RestorePreviewBlockedFile[] = [...preview.blockedFiles];
   const skippedFiles: RestorePreviewFile[] = [];
   const unknownFiles: RestorePreviewFile[] = [];
+  const reads = restoreReadAccess({ workspaceRoot: input.workspaceRoot, abortSignal: input.signal, readAccess: { check: access.check } });
 
   for (const file of reverseCaptureOrder(preview.restorableFiles)) {
     const result = await restoreRecoveryAuthorityRecord({
@@ -80,7 +82,7 @@ export async function runExplicitRestoreBridge(input: {
       workspaceRelativePath: file.workspaceRelativePath,
       assertFileAccess,
       abortSignal: input.signal,
-    });
+    }, reads);
     if (result.restored === true) {
       restoredFiles.push(...result.restoredFiles);
       continue;
