@@ -17,7 +17,8 @@ export function toolPoolFor(
   context: ShellRuntimeContext,
   supplied?: ToolCatalogInput["mcpGateway"],
 ): NonNullable<CommandContext["getToolPool"]> {
-  return async () => {
+  return async signal => {
+    signal?.throwIfAborted();
     const admission = configurationAdmission(context);
     assertAdmission(admission);
     refreshExtensionsFor(context);
@@ -25,7 +26,7 @@ export function toolPoolFor(
     const director = directorInspectionFor(context);
     const owned = !supplied && context.runtimeConfig.enableMcpTools ? new CoreMcpGateway(workspaceRoot, undefined, authorizationForMcp) : undefined;
     try {
-      return (await loadToolCatalog({ workspaceRoot, sessionId: context.session.id, runtimeConfig: director?.config ?? context.runtimeConfig, admission,
+      return (await loadToolCatalog({ workspaceRoot, sessionId: context.session.id, runtimeConfig: director?.config ?? context.runtimeConfig, admission, signal,
         featureTools: [...researchInspectionTools(context), ...securityFeatureTools(context), ...sshFeatureTools(context), ...evaluationFeatureTools(context), ...director?.tools ?? []],
         skillOptions: context.skillOptions, mcpGateway: supplied ?? owned })).tools;
     } finally {

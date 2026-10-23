@@ -16,3 +16,17 @@ it('keeps safe guide facts detached from raw identity and executable callbacks',
   expect(readReport(JSON.parse(JSON.stringify(report)))).toEqual(report);
   expect(reportText(report)).toContain('Keys');
 });
+
+it('bounds the help projection and reports omitted command rows', () => {
+  const commands = Array.from({ length: 250 }, (_, index) => ({
+    name: `command-${String(index).padStart(3, '0')}`,
+    aliases: [],
+    invocations: [],
+    group: 'workflow' as const,
+    summary: `Command ${index}`,
+    supportsNonInteractive: true,
+  }));
+  const report = helpReport(commands, process.cwd());
+  expect(report.facts).toMatchObject({ count: 250, total: 250, shown: 200, omitted: 50, coverage: 'partial' });
+  expect(reportText(report)).toContain('50 commands omitted');
+});

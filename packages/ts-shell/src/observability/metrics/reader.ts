@@ -1,4 +1,11 @@
-import { LOG_TAIL_BYTES, orderedLogFiles, tailLines } from '../logs/files.js';
+import {
+  LOG_DIRECTORY_ENTRIES,
+  LOG_FILE_LIMIT,
+  LOG_TOTAL_BYTES,
+  LOG_TAIL_BYTES,
+  orderedLogFiles,
+  tailLines,
+} from '../logs/files.js';
 import { METRIC_TAGS, type MetricSample } from './model.js';
 
 export interface MetricRead {
@@ -7,21 +14,34 @@ export interface MetricRead {
   readonly filesInspected: number;
   readonly unreadableFiles: number;
   readonly limit: number;
+  readonly filesTruncated?: boolean;
+  readonly bytesRead?: number;
 }
 
 /** Latest matching samples from bounded file tails, including prior processes and rotations. */
 export function readMetrics(directory: string, currentPath: string, limit: number): MetricRead {
-  let enumerationFailed = false; let unreadableFiles = 0;
-  const files = orderedLogFiles(directory, currentPath, { onUnavailable: target => {
-    if (target === 'directory') enumerationFailed = true; else unreadableFiles++;
-  } });
+  let enumerationFailed = false; let unreadableFiles = 0; let filesTruncated = false;
+  const files = orderedLogFiles(directory, currentPath, {
+    maxEntries: LOG_DIRECTORY_ENTRIES, maxFiles: LOG_FILE_LIMIT,
+    onTruncated: () => { filesTruncated = true; },
+    onUnavailable: target => {
+      if (target === 'directory') enumerationFailed = true; else unreadableFiles++;
+    },
+  });
   if (enumerationFailed) return { samples: [], status: 'unavailable', filesInspected: 0, unreadableFiles: 0, limit };
   const samples: MetricSample[] = [];
   let filesInspected = unreadableFiles;
+  let bytesRead = 0;
   for (const file of files.reverse()) {
+    const remaining = LOG_TOTAL_BYTES - bytesRead;
+    if (remaining <= 0) { filesTruncated = true; break; }
     filesInspected++;
     let lines: string[];
-    try { lines = tailLines(file, LOG_TAIL_BYTES, { strict: true }); }
+    try {
+      lines = tailLines(file, Math.min(LOG_TAIL_BYTES, remaining), {
+        strict: true, onBytes: bytes => { bytesRead += bytes; },
+      });
+    }
     catch { unreadableFiles++; continue; }
     for (let index = lines.length - 1; index >= 0 && samples.length < limit; index--) {
       const sample = parseMetric(lines[index]!);
@@ -29,8 +49,10 @@ export function readMetrics(directory: string, currentPath: string, limit: numbe
     }
     if (samples.length === limit) break;
   }
-  return { samples: samples.reverse(), filesInspected, unreadableFiles, limit,
-    status: unreadableFiles ? unreadableFiles === filesInspected ? 'unavailable' : 'partial' : 'reported' };
+  return { samples: samples.reverse(), filesInspected, unreadableFiles, limit, filesTruncated, bytesRead,
+    status: unreadableFiles || filesTruncated
+      ? unreadableFiles === filesInspected && samples.length === 0 ? 'unavailable' : 'partial'
+      : 'reported' };
 }
 
 function parseMetric(line: string): MetricSample | undefined {

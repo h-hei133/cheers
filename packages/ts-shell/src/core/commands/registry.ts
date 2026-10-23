@@ -1030,8 +1030,9 @@ export function createCommandRegistry(
 
 export function listVisibleCommands(
   cwd: string = process.cwd(),
+  runtimeConfig?: RuntimeConfig,
 ): CommandDefinition[] {
-  return Array.from(createCommandRegistry(cwd).values()).filter(
+  return Array.from(createCommandRegistry(cwd, runtimeConfig).values()).filter(
     (command) => command.availability !== "hidden" && command.enabled !== false,
   );
 }

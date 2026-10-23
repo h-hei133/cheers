@@ -32,11 +32,11 @@ export async function runToolsCommand(
 ): Promise<LocalCommandResult> {
   const parsed = parseSyntax(toolsSyntax, args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /tools arguments: ${parsed.reason}\n${syntaxHelp(toolsSyntax)}` };
-  const registry = await readToolPool(context);
+  const registry = await readToolPool(context, context.signal);
   const wanted = parsed.args[0];
 
   if (wanted) {
-    const tool = registry.get(wanted) ?? registry.get(wanted.toLowerCase());
+    const tool = registry.get(wanted);
     if (!tool) {
       return {
         kind: "local",
@@ -65,9 +65,11 @@ function resolveEndpoint(context: CommandContext): string {
 }
 
 /** Commands and choosers inspect the same current pool; neither executes it. */
-export async function readToolPool(context: CommandContext) {
+export async function readToolPool(context: CommandContext, signal?: AbortSignal) {
   assertAdmission(context.admission);
-  const pool = await (context.getToolPool ? context.getToolPool() : createCoreToolRegistry());
+  signal?.throwIfAborted();
+  const pool = await (context.getToolPool ? context.getToolPool(signal) : createCoreToolRegistry());
+  signal?.throwIfAborted();
   assertAdmission(context.admission);
   return pool;
 }

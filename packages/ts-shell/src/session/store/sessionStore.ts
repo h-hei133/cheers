@@ -9,7 +9,7 @@ import type { SessionMessage } from "../schema/sessionMessage.js";
 import { isSessionContextMessage } from '../schema/sessionMessage.js';
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { buildSessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
-import { projectBranchMessages, readTranscriptEvents } from "../transcript/sessionTranscript.js";
+import { projectBranchMessages, readTranscriptSnapshot } from "../transcript/sessionTranscript.js";
 import { createTranscriptHeader, type TranscriptEvent } from "../sessionEventCodec.js";
 import { sessionThreadPath } from "../schema/sessionThread.js";
 import { readJsonFileWithRetry, writeJsonFileAtomic } from "./sessionFileStore.js";
@@ -100,6 +100,7 @@ interface SessionReadInput {
   readonly layout: SessionFileLayout;
   readonly cwd: string;
   readonly limits?: SessionReadLimits;
+  readonly salvageTranscript?: boolean;
 }
 
 export interface SessionReadLimits {
@@ -114,6 +115,8 @@ export interface SessionRecordSnapshot {
   readonly session: Session;
   readonly state: SessionStateSnapshot;
   readonly events: readonly TranscriptEvent[];
+  readonly warnings: readonly string[];
+  readonly transcriptTruncated: boolean;
 }
 
 export function loadSessionRecord(input: SessionReadInput): Session {
@@ -150,9 +153,10 @@ export function readSessionRecordSnapshot(input: SessionReadInput): SessionRecor
     const branchPath = threadPath?.resolved === true
       ? threadPath.path.map((entry) => entry.id)
       : undefined;
-    const events = readTranscriptEvents(input.layout.transcriptPath, input.limits ? {
+    const transcript = readTranscriptSnapshot(input.layout.transcriptPath, input.limits ? {
       maxBytes: input.limits.transcriptBytes, maxLines: input.limits.transcriptLines,
-    } : undefined);
+    } : undefined, input.salvageTranscript === true);
+    const events = transcript.events;
     const turns = projectBranchMessages(
       events,
       branchPath,
@@ -176,7 +180,7 @@ export function readSessionRecordSnapshot(input: SessionReadInput): SessionRecor
       const timestamp = reports.at(-1)!.timestamp;
       if (Date.parse(timestamp) > Date.parse(session.updatedAt)) session.updatedAt = timestamp;
     }
-    return { session, state, events };
+    return { session, state, events, warnings: transcript.warnings, transcriptTruncated: transcript.truncated };
   } catch (error) {
     throw new Error(
       `Failed to load session ${input.sessionId}: ${error instanceof Error ? error.message : String(error)}`,

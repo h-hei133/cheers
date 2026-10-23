@@ -80,7 +80,12 @@ export class ExtensionService implements LifecycleHost {
     await this.cancel(except); if (revision === this.epoch && !this.closed && !this.drainUnknown) this.activate();
   }
   async cancel(except?: AbortSignal): Promise<void> {
-    if (!await this.calls.cancel(except)) { this.drainUnknown = true; this.errors.push('Extension calls did not drain within their bound; cleanup remains unknown.'); }
+    if (!await this.calls.cancel(except)) {
+      this.drainUnknown = true;
+      const detail = 'Extension calls did not drain within their bound; cleanup remains unknown.';
+      this.errors.push(detail);
+      try { this.store.recordUnknown({ effect: 'executed', detail }); } catch { /* The in-process flag still blocks. */ }
+    }
   }
   request<T>(action: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal): Promise<T> {
     return this.calls.run(async signal => { this.check(); if (this.snapshot() !== this.publication) await this.invalidate(signal); signal.throwIfAborted(); const result = await action(signal); signal.throwIfAborted(); this.check(); return result; }, signal);
@@ -93,7 +98,16 @@ export class ExtensionService implements LifecycleHost {
   async close(): Promise<void> {
     this.closed = true; this.watchers.splice(0).forEach(close => close()); this.epoch++;
     this.registrations.splice(0).forEach(close => close());
-    if (!await this.calls.cancel() || this.processCleanupUnknown) throw new Error('Extension cleanup remains unknown; runtime reentry is blocked.');
+    const drained = await this.calls.cancel();
+    if (!drained) {
+      this.drainUnknown = true;
+      const detail = 'Extension calls did not drain during shutdown; cleanup remains unknown.';
+      if (!this.store.outcomes.some(entry => entry.durability === 'unknown' && entry.effect === 'executed'
+        && entry.detail === detail)) {
+        try { this.store.recordUnknown({ effect: 'executed', detail }); } catch { /* The in-process flag still blocks. */ }
+      }
+    }
+    if (!drained || this.processCleanupUnknown) throw new Error('Extension cleanup remains unknown; runtime reentry is blocked.');
   }
   tool(record: PackageRecord, script: string, grant: string, selected = 'extension_run'): ToolDefinition {
     const epoch = this.epoch;
@@ -116,7 +130,13 @@ export class ExtensionService implements LifecycleHost {
     current();
     return this.calls.run(async signal => {
       const result = await executeScript({ file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules, execution: this.options.execution }, record.active, script, args, current, { ...context, abortSignal: signal });
-      if (result.metadata?.cleanup === 'unknown') { this.drainUnknown = true; this.processCleanupUnknown = true; this.epoch++; this.registrations.splice(0).forEach(unregister => unregister()); this.errors.push('Extension process or runtime-home cleanup is unknown; capabilities withheld.'); }
+      if (result.metadata?.cleanup === 'unknown') {
+        this.drainUnknown = true; this.processCleanupUnknown = true; this.epoch++;
+        this.registrations.splice(0).forEach(unregister => unregister());
+        const detail = 'Extension process or runtime-home cleanup is unknown; capabilities withheld.';
+        this.errors.push(detail);
+        try { this.store.recordUnknown({ effect: 'executed', detail }); } catch { /* The in-process flag still blocks. */ }
+      }
       try { current(); } catch { return { ...result, success: false, output: `${result.output}\nExtension authority changed after execution; actual receipt remains visible.` }; } return result;
     }, context.abortSignal);
   }
@@ -131,8 +151,10 @@ export class ExtensionService implements LifecycleHost {
           // Cleanup can become uncertain after a confirmed registry publication.
           // Retain that actual result alongside uncertain saves, so reopening a
           // view or command cannot offer a fresh mutation in the same runtime.
-          if (effect.durability === 'unknown' && !this.store.outcomes.some(entry => canonical(entry) === canonical(effect))) this.store.outcomes.push(effect);
-          return { success: effect.durability === 'confirmed', output: `${effect.detail}\nEffect: ${effect.effect}; durability: ${effect.durability}.`, metadata: { effect } };
+          const retained = effect.durability === 'unknown'
+            && !this.store.outcomes.some(entry => canonical(entry) === canonical(effect))
+            ? this.store.recordUnknown(effect) : effect;
+          return { success: retained.durability === 'confirmed', output: `${retained.detail}\nEffect: ${retained.effect}; durability: ${retained.durability}.`, metadata: { effect: retained } };
         } }),
       execute: async () => { throw new Error('Extension lifecycle requires its original prepared and approved call.'); } };
     return (await runPreparedTool(tool, {}, { ...gate, admission, permissionScope: 'ask' }, signal, undefined, 'Extension operation')).output;

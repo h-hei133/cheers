@@ -10,6 +10,7 @@ export class TreeModel {
   private readonly parents: Array<number | undefined> = [];
   private readonly ends: number[] = [];
   private readonly collapsed = new Set<string>();
+  private readonly haystacks = new WeakMap<Option, string>();
   private options: readonly Option[];
 
   constructor(private readonly source: readonly TreeOption[]) {
@@ -32,7 +33,7 @@ export class TreeModel {
   /** Search every admitted node, temporarily ignoring disclosure state. */
   filter(query: string, options: readonly Option[]): readonly Option[] {
     if (query) return options.filter(option =>
-      `${option.label} ${option.detail ?? ''} ${option.note ?? ''} ${option.searchText ?? ''}`.toLowerCase().includes(query));
+      this.haystack(option).includes(query));
     const visible: Option[] = [];
     for (let index = 0; index < options.length; index++) {
       const option = options[index]!;
@@ -40,6 +41,14 @@ export class TreeModel {
       if (this.collapsed.has(option.id)) index = this.ends[index]! - 1;
     }
     return visible;
+  }
+
+  private haystack(option: Option): string {
+    const cached = this.haystacks.get(option);
+    if (cached !== undefined) return cached;
+    const value = `${option.label} ${option.detail ?? ''} ${option.note ?? ''} ${option.searchText ?? ''}`.toLowerCase();
+    this.haystacks.set(option, value);
+    return value;
   }
 
   navigate(direction: 'left' | 'right', id: string, query: string): {

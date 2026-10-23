@@ -96,6 +96,24 @@ describe("resolveSkillCatalog", () => {
     finally { unregister(); release(); }
   });
 
+  it('aborts a contribution that ignores its cancellation signal', async () => {
+    let started!: () => void;
+    const began = new Promise<void>(resolve => { started = resolve; });
+    const unregister = registerCatalogContribution({ root: workspace, sessionId: 'capture', tools: [], commands: [], skills: async () => {
+      started();
+      return new Promise(() => {});
+    } });
+    const controller = new AbortController();
+    const pending = resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture', abortSignal: controller.signal });
+    try {
+      await began;
+      controller.abort();
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    } finally {
+      unregister();
+    }
+  });
+
   it('rechecks an earlier contribution after a later asynchronous capture', async () => {
     let release!: () => void; let began!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; }); const started = new Promise<void>(resolve => { began = resolve; });

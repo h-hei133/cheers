@@ -57,6 +57,7 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
   assertAdmission(input.admission);
   const { skills, tools: contributed } = input.catalogContent ?? await captureCatalogContent(input);
   const mcp = await mcpToolsForRun(input);
+  input.signal?.throwIfAborted();
   assertAdmission(input.admission);
   const registry = override?.() ?? createCoreToolRegistry({ skills,
     ...(input.onCommandSettled ? { executionService: createDefaultExecutionService(input.onCommandSettled) } : {}),
@@ -143,7 +144,7 @@ async function mcpToolsForRun(
   const gateway = request.mcpGateway;
   if (!gateway) return undefined;
   try {
-    const snapshot = await gateway.snapshot(request.admission);
+    const snapshot = await gateway.snapshot(request.admission, request.signal);
     // Servers that failed to connect are named here for the same reason a skill
     // that loaded nothing is: the run continues without their tools, and without
     // a line saying so, a server the user configured looks exactly like one the
@@ -161,6 +162,7 @@ async function mcpToolsForRun(
       invokeTool: (server, tool, args, _admission, options) => gateway.invokeTool!(server, tool, args, request.admission, options),
     } : undefined };
   } catch (error) {
+    request.signal?.throwIfAborted();
     // A snapshot that threw registers nothing, so the model is told nothing
     // exists rather than being handed tools that fail. Said out loud, because
     // the alternative is a run that silently has fewer tools than configured.

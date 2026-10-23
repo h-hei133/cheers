@@ -111,6 +111,28 @@ it('bounds directory discovery and summary dispatch per update and closes an aba
   await query.return(undefined); expect(closed).toBe(1);
 });
 
+it('reuses one browse attempt index instead of rediscovering every later page', async () => {
+  const { layout, context, catalog } = fixture();
+  seed(layout, 'current');
+  for (let index = 0; index < 120; index++) seed(layout, `saved-${String(index).padStart(3, '0')}`);
+  const first = catalog.list(context, undefined, 20, undefined, undefined, { needle: '' });
+  let page: SessionCatalogSnapshot | undefined;
+  for await (const snapshot of first) page = snapshot;
+  const after = page!.continuation!;
+  expect(after.attemptId).toBeTypeOf('string');
+
+  vi.mocked(io.opendir).mockClear();
+  vi.mocked(io.lstat).mockClear();
+  const second = catalog.list(context, undefined, 20, undefined, undefined, { needle: '', after });
+  let next: SessionCatalogSnapshot | undefined;
+  for await (const snapshot of second) next = snapshot;
+
+  expect(io.opendir).not.toHaveBeenCalled();
+  expect(io.lstat.mock.calls.length).toBeLessThan(200);
+  expect(next!.sessions).toHaveLength(21);
+  expect(next!.sessions[0]?.id).not.toBe(page!.sessions[0]?.id);
+});
+
 it('reports unreadable diagnostics discovered before a cancelled scan', async () => {
   const { layout, context, catalog } = fixture();
   seed(layout, 'current');

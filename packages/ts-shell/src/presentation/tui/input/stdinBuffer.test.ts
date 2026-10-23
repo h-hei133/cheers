@@ -5,17 +5,20 @@ interface Harness {
   readonly buffer: StdinBuffer;
   readonly keys: string[];
   readonly pastes: string[];
+  readonly issues: Array<"too-large" | undefined>;
   readonly delays: number[];
   fire(): void;
 }
 
-function harness(): Harness {
+function harness(options: { readonly maxPasteBytes?: number } = {}): Harness {
   let timers: Array<{ id: number; run: () => void }> = [];
   let nextId = 1;
   const keys: string[] = [];
   const pastes: string[] = [];
+  const issues: Array<"too-large" | undefined> = [];
   const delays: number[] = [];
   const buffer = new StdinBuffer({
+    maxPasteBytes: options.maxPasteBytes,
     setTimer: (run, delayMs) => {
       const id = nextId++;
       delays.push(delayMs);
@@ -27,11 +30,12 @@ function harness(): Harness {
     },
   });
   buffer.onKey((event) => keys.push(event.keyId));
-  buffer.onPaste((text) => pastes.push(text));
+  buffer.onPaste((text, issue) => { pastes.push(text); issues.push(issue); });
   return {
     buffer,
     keys,
     pastes,
+    issues,
     delays,
     fire: () => {
       const due = timers;
@@ -239,6 +243,25 @@ describe("bracketed paste", () => {
     expect(pastes).toEqual([]);
     fire();
     expect(pastes).toEqual(["abc"]);
+  });
+
+  it("refuses an oversized paste without delivering its body", () => {
+    const { buffer, keys, pastes, issues, fire } = harness({ maxPasteBytes: 5 });
+    buffer.feed("\x1b[200~123456\x1b[201~x");
+    expect(pastes).toEqual([""]);
+    expect(issues).toEqual(["too-large"]);
+    fire();
+    expect(keys).toEqual(["x"]);
+  });
+
+  it("keeps refusing an oversized paste split across chunks until its terminator", () => {
+    const { buffer, pastes, issues } = harness({ maxPasteBytes: 5 });
+    buffer.feed("\x1b[200~123");
+    buffer.feed("456");
+    expect(pastes).toEqual([]);
+    buffer.feed("\x1b[201~");
+    expect(pastes).toEqual([""]);
+    expect(issues).toEqual(["too-large"]);
   });
 
   it("holds a partial start marker without emitting its bytes", () => {

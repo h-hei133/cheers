@@ -26,7 +26,8 @@ export function pluginPicker(manager: ExtensionManager | undefined): Picker {
       if (inspection.state === 'stale') return stale;
       if (inspection.state === 'unavailable') return 'Extensions unavailable: a bound runtime and readable installation state are required.';
       return [...(!visible.length && query?.trim() ? ['No extensions match this search.'] : []),
-        ...(!offered?.items.length ? ['No extensions installed.'] : []), ...offered?.notices ?? []].join(' ');
+        ...(!offered?.items.length ? ['No extensions installed.'] : []), ...offered?.notices ?? [],
+        ...(offered ? [projectionStatus(offered)].filter((value): value is string => value !== undefined) : [])].join(' ');
     },
     async load(signal) { signal?.throwIfAborted(); return refresh(manager?.read() ?? { state: 'unavailable' }); },
     subscribe: publish => manager?.subscribe(next => publish(refresh(next))) ?? (() => undefined),
@@ -49,10 +50,23 @@ function packagePicker(manager: ExtensionManager, snapshot: ExtensionSnapshot, i
   return {
     title: `Extension — ${item.label}`, form: 'panel', empty: 'No extension actions.', exclusive: true,
     footer: 'Choose one action. Every change needs confirmation and ordinary approval.',
-    status: () => snapshot.mutationBlocked ? 'Publication durability unknown. Inspect retained state before another mutation.' : undefined,
+    status: () => [snapshot.mutationBlocked ? 'Publication durability unknown. Inspect retained state before another mutation.' : undefined,
+      projectionStatus(snapshot)].filter((value): value is string => value !== undefined).join(' ') || undefined,
     isCurrent: () => manager.read().state !== 'stale',
-    async load() { offered = true; return item.actions.map(action => ({ ...action, disabled: snapshot.mutationBlocked })); },
-    detail: id => [...item.detail, item.actions.find(action => action.id === id)?.detail ?? ''],
+    async load() {
+      offered = true;
+      const omittedActions = snapshot.omitted?.actions ?? 0;
+      return [...item.actions.map(action => ({ ...action, disabled: snapshot.mutationBlocked })),
+        ...(omittedActions > 0 ? [{
+          id: 'omitted-actions',
+          label: `${omittedActions} extension actions omitted from this bounded view`,
+          detail: 'Reduce package detail or installed packages, then reopen /plugin.',
+          disabled: true,
+        }] : [])];
+    },
+    detail: id => [...item.detail, id === 'omitted-actions'
+      ? `${snapshot.omitted?.actions ?? 0} actions were omitted by the projection budget.`
+      : item.actions.find(action => action.id === id)?.detail ?? ''],
     previewEnd: () => { offered = false; },
     async apply(ids) {
       if (!offered || snapshot.mutationBlocked || ids.length !== 1) return undefined;
@@ -62,6 +76,18 @@ function packagePicker(manager: ExtensionManager, snapshot: ExtensionSnapshot, i
       return action.input ? { next: releaseInput(manager, snapshot, action, item) } : prepareChoice(manager, snapshot, action, item);
     },
   };
+}
+
+function projectionStatus(snapshot: ExtensionSnapshot): string | undefined {
+  const notices = snapshot.omitted?.notices ?? 0;
+  const detailLines = snapshot.omitted?.detailLines ?? 0;
+  const actions = snapshot.omitted?.actions ?? 0;
+  const parts = [
+    ...(notices > 0 ? [`${notices} notices`] : []),
+    ...(detailLines > 0 ? [`${detailLines} detail lines`] : []),
+    ...(actions > 0 ? [`${actions} actions`] : []),
+  ];
+  return parts.length > 0 ? `Extension view is partial; ${parts.join(', ')} omitted by the display budget.` : undefined;
 }
 
 function releaseInput(manager: ExtensionManager, snapshot: ExtensionSnapshot, action: ExtensionAction, item?: ExtensionItem): Picker {

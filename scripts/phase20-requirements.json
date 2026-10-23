@@ -162,8 +162,8 @@
     {
       "id": "PAN-02",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; saved version/lifetime/readback boundaries; tree disclosure and bounded acquisition; authorized catalogue filter before fixed-page retention, exact live boundary, cancellation/query reset and action-ID compatibility; affected323, five catalogue reversals",
-      "missing": "Total heap/latency evidence, cumulative I/O and remaining action-boundary audit remain; fixed pages rescan live sources and do not promise a frozen catalogue snapshot."
+      "evidence": ".wiki/features/phase-20-contract.md W6; saved version/lifetime/readback boundaries; tree disclosure and bounded acquisition; authorized catalogue filter before fixed-page retention, exact live boundary, cancellation/query reset and action-ID compatibility; attempt-local boundary index for later pages with a 20k-entry cap, inherited partial status and exact boundary/version revalidation; affected323, five catalogue reversals",
+      "missing": "Total heap/latency evidence, cumulative I/O and remaining action-boundary audit remain; later pages reuse a bounded process-local index rather than rescanning discovery, but do not promise a frozen catalogue snapshot."
     },
     {
       "id": "PAN-03",
@@ -198,13 +198,13 @@
     {
       "id": "PAN-08",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; MCP/tools/skill/context/cost/help report tests",
-      "missing": "Real MCP connection/auth, remaining report consumers and total catalog/projection resource bounds remain."
+      "evidence": ".wiki/features/phase-20-contract.md W6; MCP/tools/skill/context/cost/help report tests; shared absolute deadline and cumulative 4 MiB/10k-tool catalog budget across client pages, gateway servers and peek; in-flight deadline cleanup preserves the blocking error; bounded producer reports expose omitted/partial output",
+      "missing": "Real MCP connection/auth, remaining report consumers and total catalog/projection heap/latency bounds remain."
     },
     {
       "id": "INPUT-01",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W7; Vim state, keymap, stdin and terminal tests",
+      "evidence": ".wiki/features/phase-20-contract.md W7; Vim state, keymap, stdin and terminal tests; bounded text/image paste store, exact issued-placeholder matching, visual source copy and modal count boundaries",
       "missing": "Complete IME/five-mode contract and actual platform IME evidence remain."
     },
     {

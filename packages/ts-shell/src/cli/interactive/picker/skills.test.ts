@@ -60,6 +60,16 @@ describe('skill inspection', () => {
     expect(selected.output).toContain('First line.\nSecond line. password=[redacted]');
   });
 
+  it('neutralizes terminal controls in a displayed instruction body without flattening Markdown', async () => {
+    const item = { ...skill(), body: 'normal\n\tindent\n\x1b]0;owned\x07safe\n\x1b[31mred\x00' };
+    vi.spyOn(catalog, 'resolveSkillCatalog').mockResolvedValue(result(item));
+
+    const selected = await runSkillCommand([item.name], { cwd: '/fixture' });
+
+    expect(selected.output).toContain('normal\n\tindent\nsafe\nred\\u0000');
+    expect(selected.output).not.toMatch(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/);
+  });
+
   it.each(['apply-before-load', 'unoffered', 'multiple', 'duplicate'] as const)('requires one offered, unused selection: %s', async phase => {
     const item = skill(), other = skill('other');
     const read = vi.spyOn(catalog, 'resolveSkillCatalog').mockResolvedValue(result(item, other));
@@ -159,7 +169,8 @@ describe('skill inspection', () => {
       expect(apply).toHaveBeenCalledWith(picker, ['fixture']); expect(signals[0]?.aborted).toBe(true);
       const selected = await picker.apply(['fixture']);
       expect(selected?.draft).toBe('/skill fixture '); expect(selected?.note).toContain(item.body);
-      expect(signals[1]).toBeUndefined();
+      expect(signals[1]).toBeDefined(); expect(signals[1]?.aborted).toBe(false);
+      expect(signals[1]).not.toBe(signals[0]);
     } finally { overlay.close(); }
   });
 });

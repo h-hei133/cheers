@@ -59,6 +59,40 @@ it('validates the boundary before and after a later live scan and rejects a chan
   await expect(finish(catalog, { needle: '', after })).rejects.toThrow(/page changed/);
 });
 
+it('keeps first-page partial status across a clean continuation page', async () => {
+  const { catalog, read } = fixture(90);
+  const original = read.getMockImplementation()!;
+  read.mockImplementation(async id => {
+    if (id === 'saved-00000') throw new Error('PRIVATE_SOURCE');
+    const summary = await original(id);
+    return id === 'saved-00001' && summary ? { ...summary, quality: 'limited' } : summary;
+  });
+  const first = await finish(catalog, { needle: '' });
+  expect(first).toMatchObject({ status: 'partial', unreadable: 1, limited: 1 });
+  expect(first.continuation).toBeDefined();
+
+  const second = await finish(catalog, { needle: '', after: first.continuation! });
+  expect(second).toMatchObject({ status: 'partial', unreadable: 1, limited: 1 });
+});
+
+it('bounds the retained browse index and reports the result as partial', async () => {
+  const { catalog } = fixture(CATALOG_LIMITS.attemptEntries + 1);
+  const result = await finish(catalog, { needle: '' });
+  expect(result).toMatchObject({
+    status: 'partial',
+    total: CATALOG_LIMITS.attemptEntries + 1,
+    hasMore: true,
+  });
+  expect(result.continuation).toBeDefined();
+  const next = await finish(catalog, { needle: '', after: result.continuation! });
+  expect(next).toMatchObject({
+    status: 'partial',
+    total: CATALOG_LIMITS.attemptEntries + 1,
+    hasMore: true,
+  });
+  expect(next.continuation).toBeDefined();
+});
+
 it('rejects anchor changes discovered after the scan before issuing a continuation', async () => {
   const { catalog, read } = fixture(90);
   const first = await finish(catalog, { needle: '' });
@@ -67,11 +101,11 @@ it('rejects anchor changes discovered after the scan before issuing a continuati
   let anchorReads = 0;
   read.mockImplementation(async id => {
     const summary = await original(id);
-    if (id === after.boundary.id && ++anchorReads === 3 && summary) return { ...summary, version: 'changed' };
+    if (id === after.boundary.id && ++anchorReads === 2 && summary) return { ...summary, version: 'changed' };
     return summary;
   });
   await expect(finish(catalog, { needle: '', after })).rejects.toThrow(/page changed/);
-  expect(anchorReads).toBe(3);
+  expect(anchorReads).toBe(2);
 });
 
 it('bounds diagnostic samples while preserving the complete failure count', async () => {

@@ -85,3 +85,37 @@ it('retains CRLF description lines while measuring their original bytes', () => 
   expect(report.facts.description).toBe('Read a note.\\u000aReturns its content.');
   expect(report.facts.size).toMatchObject({ descriptionBytes: Buffer.byteLength(description) });
 });
+
+it('bounds a large tool list and reports the omitted count instead of rejecting the report', () => {
+  const pool = new Map(Array.from({ length: 250 }, (_, index) => {
+    const name = `tool-${String(index).padStart(3, '0')}`;
+    return [name, tool(name, `Description for ${name}.`, { type: 'object' })] as const;
+  }));
+  const report = toolsReport(pool);
+  expect(report.facts).toMatchObject({
+    total: 250,
+    shown: 200,
+    omitted: 50,
+    coverage: 'partial',
+  });
+  expect(reportText(report)).toContain('50 tools omitted');
+});
+
+it('bounds a large tool detail before report projection and states omitted metadata', () => {
+  const properties = Object.fromEntries(Array.from({ length: 2_000 }, (_, index) => [
+    `argument-${index}`,
+    { type: 'string', description: `Argument ${index}` },
+  ]));
+  const report = toolReport(tool('large', 'x'.repeat(1_200_000), { type: 'object', properties }));
+  expect(report.facts).toMatchObject({
+    argumentsShown: 100,
+    argumentsOmitted: 1_900,
+    coverage: 'partial',
+    size: {
+      descriptionBytes: 1_200_000,
+      descriptionOmittedBytes: expect.any(Number),
+    },
+  });
+  expect(reportText(report)).toContain('1,900 arguments omitted');
+  expect(reportText(report)).toContain('description bytes omitted');
+});

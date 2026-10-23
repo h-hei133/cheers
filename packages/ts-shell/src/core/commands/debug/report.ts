@@ -15,10 +15,13 @@ export function logsReport(read: LogRead, projectRoot: string): CommandReport {
       ...(!rows.length ? [{ kind: 'text' as const, spans: [span(read.status === 'unavailable'
         ? 'Structured logs could not be read.' : 'No structured records found in the inspected log tails.')] }] : []),
       { kind: 'text', spans: [span(`Recent records only: at most 200 records, ${LOG_TAIL_BYTES} bytes per file; ${read.filesInspected} files inspected, ${read.unreadableFiles} unreadable.`, 'muted')] },
+      ...(read.filesTruncated ? [{ kind: 'text' as const, spans: [span('Log inspection reached its file or byte budget; older records were omitted.', 'warning')] }] : []),
     ],
     facts: { status: read.status, source: 'structured-log-tails', records: rows.map(row => ({ ...row,
       requestId: row.requestId ?? null, toolId: row.toolId ?? null, durationMs: row.durationMs ?? null })),
-      filesInspected: read.filesInspected, unreadableFiles: read.unreadableFiles, recordLimit: 200, bytesPerFile: LOG_TAIL_BYTES },
+      filesInspected: read.filesInspected, unreadableFiles: read.unreadableFiles,
+      filesTruncated: read.filesTruncated === true, bytesRead: read.bytesRead ?? null,
+      recordLimit: 200, bytesPerFile: LOG_TAIL_BYTES },
   });
 }
 

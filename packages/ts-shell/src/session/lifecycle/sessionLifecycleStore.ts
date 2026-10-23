@@ -32,13 +32,24 @@ interface SessionLifecycleCallbacks {
  * an explicit rename always wins over the derivation.
  */
 export function deriveSessionTitleFromPrompt(prompt: string): string {
-  const firstLine = prompt
-    .split("\n")
-    .map((line) => line.trim())
-    .find((line) => line.length > 0);
-  const collapsed = (firstLine ?? "").replace(/\s+/g, " ").trim();
-  if (collapsed.length === 0) return "";
-  return collapsed.length <= 60 ? collapsed : `${collapsed.slice(0, 59)}…`;
+  const title: string[] = [];
+  let pendingSpace = false;
+  for (const point of prompt) {
+    if (point === "\n") {
+      if (title.length > 0) break;
+      pendingSpace = false;
+      continue;
+    }
+    if (point.trim() === "") {
+      if (title.length > 0) pendingSpace = true;
+      continue;
+    }
+    if (pendingSpace) title.push(" ");
+    pendingSpace = false;
+    title.push(point);
+    if (title.length > 60) return `${title.slice(0, 59).join("")}…`;
+  }
+  return title.join("");
 }
 
 export function markSessionRunStarted(

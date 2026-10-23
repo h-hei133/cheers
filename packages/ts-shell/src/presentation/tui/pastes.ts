@@ -16,7 +16,7 @@ import type { ImageContent } from "../../model-adapters/multimodal.js";
 /** Length past which a paste is held aside rather than shown in full. */
 export const PASTE_PLACEHOLDER_THRESHOLD = 320;
 
-const PLACEHOLDER = /\[#(\d+) [^\]]*\]/g;
+const PLACEHOLDER = /\[#(\d+) (?:pasted|image) [^\]]*\]/g;
 
 /** Window in which a second paste of the same text means "show it in full". */
 const DOUBLE_PASTE_MS = 1200;
@@ -31,9 +31,14 @@ const DOUBLE_PASTE_MS = 1200;
  * that a recalled draft no longer resolves is the trade, and it is bounded.
  */
 const MAX_HELD = 128;
+const MAX_HELD_ENTRY_BYTES = 8 * 1024 * 1024;
+const MAX_HELD_BYTES = 32 * 1024 * 1024;
+const MAX_ISSUED = 1024;
+const MAX_ISSUED_VARIANTS = 8;
 
 export class PasteStore {
   private readonly held = new Map<number, string>();
+  private readonly heldSizes = new Map<number, number>();
   /**
    * Images held for this draft, keyed like the text pastes.
    *
@@ -44,8 +49,17 @@ export class PasteStore {
    * it had.
    */
   private readonly heldImages = new Map<number, ImageContent>();
+  private readonly heldImageSizes = new Map<number, number>();
+  private readonly order = new Map<number, "text" | "image">();
+  private readonly issued = new Map<number, Set<string>>();
+  private heldBytes = 0;
   private nextId = 1;
   private lastHeld: { readonly id: number; readonly text: string; readonly at: number } | undefined;
+
+  constructor(
+    private readonly maxHeld = MAX_HELD,
+    private readonly maxHeldBytes = MAX_HELD_BYTES,
+  ) {}
 
   /** Whether `text` is long enough to be worth holding aside. */
   static shouldHold(text: string): boolean {
@@ -55,11 +69,18 @@ export class PasteStore {
   /** Hold `text` and return the placeholder that stands for it. */
   hold(text: string, now: number = Date.now()): string {
     const clean = normalizePaste(text);
+    const bytes = Buffer.byteLength(clean, "utf8");
+    if (bytes > MAX_HELD_ENTRY_BYTES) throw new RangeError("Pasted text exceeds the input limit.");
     const id = this.nextId++;
     this.held.set(id, clean);
+    this.heldSizes.set(id, bytes);
+    this.order.set(id, "text");
+    this.heldBytes += bytes;
     this.evictOldest();
     this.lastHeld = { id, text: clean, at: now };
-    return placeholderFor(id, clean);
+    const placeholder = placeholderFor(id, clean);
+    this.rememberPlaceholder(id, placeholder);
+    return placeholder;
   }
 
   /**
@@ -71,9 +92,18 @@ export class PasteStore {
    * recalled long after its paste was cleared is already documented to be in.
    */
   private evictOldest(): void {
-    while (this.held.size > MAX_HELD) this.held.delete(this.held.keys().next().value!);
-    while (this.heldImages.size > MAX_HELD) {
-      this.heldImages.delete(this.heldImages.keys().next().value!);
+    while (this.order.size > this.maxHeld || this.heldBytes > this.maxHeldBytes) {
+      const [id, kind] = this.order.entries().next().value!;
+      this.order.delete(id);
+      if (kind === "text") {
+        this.held.delete(id);
+        this.heldBytes -= this.heldSizes.get(id) ?? 0;
+        this.heldSizes.delete(id);
+      } else {
+        this.heldImages.delete(id);
+        this.heldBytes -= this.heldImageSizes.get(id) ?? 0;
+        this.heldImageSizes.delete(id);
+      }
     }
   }
 
@@ -89,14 +119,27 @@ export class PasteStore {
     if (!last || last.text !== normalizePaste(text) || now - last.at > DOUBLE_PASTE_MS) return undefined;
     this.lastHeld = undefined;
     this.held.delete(last.id);
+    this.heldBytes -= this.heldSizes.get(last.id) ?? 0;
+    this.heldSizes.delete(last.id);
+    this.order.delete(last.id);
     return { find: placeholderFor(last.id, last.text), text: last.text };
   }
 
   /** Replace what a placeholder stands for, keeping its identity. */
   update(id: number, text: string): string {
     const clean = normalizePaste(text);
+    const bytes = Buffer.byteLength(clean, "utf8");
+    if (bytes > MAX_HELD_ENTRY_BYTES) throw new RangeError("Pasted text exceeds the input limit.");
+    this.heldBytes -= this.heldSizes.get(id) ?? 0;
     this.held.set(id, clean);
-    return placeholderFor(id, clean);
+    this.heldSizes.set(id, bytes);
+    this.order.delete(id);
+    this.order.set(id, "text");
+    this.heldBytes += bytes;
+    this.evictOldest();
+    const placeholder = placeholderFor(id, clean);
+    this.rememberPlaceholder(id, placeholder);
+    return placeholder;
   }
 
   get(id: number): string | undefined {
@@ -108,7 +151,17 @@ export class PasteStore {
     const ids: number[] = [];
     for (const match of draft.matchAll(PLACEHOLDER)) {
       const id = Number(match[1]);
-      if (this.held.has(id)) ids.push(id);
+      if (this.held.has(id) && this.issued.get(id)?.has(match[0])) ids.push(id);
+    }
+    return ids;
+  }
+
+  /** Placeholder ids that no longer resolve to retained text or an image. */
+  unresolved(draft: string): number[] {
+    const ids: number[] = [];
+    for (const match of draft.matchAll(PLACEHOLDER)) {
+      const id = Number(match[1]);
+      if (this.issued.get(id)?.has(match[0]) && !this.held.has(id) && !this.heldImages.has(id)) ids.push(id);
     }
     return ids;
   }
@@ -127,6 +180,7 @@ export class PasteStore {
   expand(draft: string): string {
     return draft.replace(PLACEHOLDER, (whole, raw: string) => {
       const id = Number(raw);
+      if (!this.issued.get(id)?.has(whole)) return whole;
       if (this.heldImages.has(id)) return "";
       return this.held.get(id) ?? whole;
     });
@@ -137,8 +191,10 @@ export class PasteStore {
    * recorded. Keeping the id is what lets the same paste be edited twice.
    */
   rewrite(draft: string, id: number, text: string): string {
+    let find: string | undefined;
+    for (const placeholder of this.issued.get(id) ?? []) find = placeholder;
     const placeholder = this.update(id, text);
-    return draft.replace(new RegExp(`\\[#${id} [^\\]]*\\]`), placeholder);
+    return find ? replaceLiteral(draft, find, placeholder) : draft;
   }
 
   /** Hold `text` when it is long enough to bury a draft, else return it as-is. */
@@ -154,18 +210,26 @@ export class PasteStore {
    * separately and never becomes part of the sentence.
    */
   holdImage(image: ImageContent): string {
+    const bytes = Buffer.byteLength(image.data, "utf8");
+    if (bytes > MAX_HELD_ENTRY_BYTES) throw new RangeError("Attached image exceeds the input limit.");
     const id = this.nextId++;
     this.heldImages.set(id, image);
+    this.heldImageSizes.set(id, bytes);
+    this.order.set(id, "image");
+    this.heldBytes += bytes;
     this.evictOldest();
     const sizeKb = Math.round((image.data.length * 0.75) / 1024);
-    return `[#${id} image ${image.mimeType} ${sizeKb}KB]`;
+    const placeholder = `[#${id} image ${image.mimeType} ${sizeKb}KB]`;
+    this.rememberPlaceholder(id, placeholder);
+    return placeholder;
   }
 
   /** The images a draft refers to, in the order their placeholders appear. */
   imagesIn(draft: string): readonly ImageContent[] {
     const images: ImageContent[] = [];
     for (const match of draft.matchAll(PLACEHOLDER)) {
-      const image = this.heldImages.get(Number(match[1]));
+      const id = Number(match[1]);
+      const image = this.issued.get(id)?.has(match[0]) ? this.heldImages.get(id) : undefined;
       if (image) images.push(image);
     }
     return images;
@@ -179,8 +243,21 @@ export class PasteStore {
   /** Forget everything; a submitted or discarded draft holds nothing. */
   clear(): void {
     this.held.clear();
+    this.heldSizes.clear();
     this.heldImages.clear();
+    this.heldImageSizes.clear();
+    this.order.clear();
+    this.heldBytes = 0;
     this.lastHeld = undefined;
+  }
+
+  private rememberPlaceholder(id: number, placeholder: string): void {
+    const variants = this.issued.get(id) ?? new Set<string>();
+    variants.add(placeholder);
+    while (variants.size > MAX_ISSUED_VARIANTS) variants.delete(variants.values().next().value!);
+    this.issued.delete(id);
+    this.issued.set(id, variants);
+    while (this.issued.size > MAX_ISSUED) this.issued.delete(this.issued.keys().next().value!);
   }
 }
 

@@ -27,7 +27,7 @@ it('refuses excess blocks and text without silently dropping older sources', () 
   expect(() => new CopySource(large)).toThrow('copy browsing limits');
 });
 
-it('reuses a complete-source search across pages and replaces it on query changes', () => {
+it('reuses normalized source search text across pages and query changes', () => {
   const transcript = new Transcript();
   for (let index = 0; index < 205; index++) transcript.append(textBlock('assistant', `answer ${index}\nARCHIVED`));
   const source = new CopySource(transcript);
@@ -43,7 +43,7 @@ it('reuses a complete-source search across pages and replaces it on query change
   expect(third.entries).toHaveLength(5);
   expect(repeatedReads).toBe(0);
   expect(changed.entries.map(entry => entry.id)).toEqual(['204']);
-  expect(changedReads).toBe(205);
+  expect(changedReads).toBe(0);
   expect(source.page('', 0, 100).total).toBe(205);
 });
 

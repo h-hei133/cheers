@@ -75,7 +75,7 @@ export interface CommandContext {
   readonly commitCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly cwd: string
   /** Current configured pool, resolved on demand by the CLI host. */
-  readonly getToolPool?: () => Promise<ReadonlyMap<string, ToolDefinition>>
+  readonly getToolPool?: (signal?: AbortSignal) => Promise<ReadonlyMap<string, ToolDefinition>>
   /** Current effective prompt identity, when the host can prove it. */
   readonly promptIdentity?: {
     readonly schemaDigest?: string

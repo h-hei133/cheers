@@ -1,4 +1,9 @@
 /** Plain, versioned command output. Presentation alone assigns terminal styles. */
+export const REPORT_BYTES = 1024 * 1024;
+export const REPORT_NODES = 20_000;
+export const REPORT_DEPTH = 32;
+export const REPORT_LINES = 20_000;
+
 export const REPORT_ROLES = ['text', 'command', 'argument', 'flag', 'key', 'path',
   'number', 'unit', 'muted', 'emphasis', 'subtle', 'heading', 'code', 'warning', 'error', 'success',
   'context-normal', 'context-elevated', 'context-high', 'context-critical'] as const;

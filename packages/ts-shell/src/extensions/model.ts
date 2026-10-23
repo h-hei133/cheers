@@ -55,4 +55,4 @@ export interface ExtensionState {
   readonly packages: readonly PackageRecord[];
   readonly imports: readonly { readonly name: string; readonly spec: string; readonly version: string; readonly status: 'unresolved' }[];
 }
-export interface EffectOutcome { readonly effect: 'published' | 'removed' | 'saved'; readonly durability: 'confirmed' | 'unknown'; readonly detail: string }
+export interface EffectOutcome { readonly effect: 'published' | 'removed' | 'saved' | 'executed'; readonly durability: 'confirmed' | 'unknown'; readonly detail: string }

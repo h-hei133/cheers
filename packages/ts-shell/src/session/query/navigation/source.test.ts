@@ -31,7 +31,7 @@ it('reads one admitted saved snapshot without changing durable files', () => {
   expect(targets.map(target => fs.readFileSync(target))).toEqual(before);
 });
 
-it.each(['metadataPath', 'statePath', 'transcriptPath'] as const)('rejects an oversized %s before any source read', key => {
+it.each(['metadataPath', 'statePath'] as const)('rejects an oversized %s before any source read', key => {
   const { session, layout, cwd } = saved();
   const limits = { metadataPath: NAVIGATION_LIMITS.metadataBytes, statePath: NAVIGATION_LIMITS.stateBytes, transcriptPath: NAVIGATION_LIMITS.transcriptBytes };
   fs.truncateSync(layout[key], limits[key] + 1);
@@ -49,11 +49,28 @@ it('enforces descriptor byte limits even without preflight and rejects links', (
   expect(() => readJsonFileWithRetry(layout.metadataPath, { required: true, parseErrorDetail: 'bad', maxBytes: 1000 })).toThrow();
 });
 
-it('refuses malformed transcript acquisition while ordinary replay retains its compatibility warnings', () => {
+it('shows a read-only partial transcript while ordinary replay retains its compatibility warnings', () => {
   const { session, layout, cwd } = saved();
   fs.appendFileSync(layout.transcriptPath, '{broken-json}\n');
   expect(parseTranscript(fs.readFileSync(layout.transcriptPath, 'utf8')).unreadableLines).toBe(1);
-  expect(() => readSessionNavigation(session.id, cwd)).toThrow('damaged');
+  const snapshot = readSessionNavigation(session.id, cwd);
+  expect(snapshot).toMatchObject({ quality: 'partial', actionSafe: false });
+  expect(snapshot.warnings.join(' ')).toContain('unreadable transcript');
+  expect(snapshot.points).toHaveLength(1);
+  expect(snapshot.points[0]).toMatchObject({ entryId: sessionThreadPath(snapshot.thread).path[0]?.id,
+    unavailable: 'partial transcript; reopen after repair' });
+});
+
+it('keeps a bounded readable transcript prefix instead of rejecting an oversized tail', () => {
+  const { session, layout, cwd } = saved();
+  fs.appendFileSync(layout.transcriptPath, JSON.stringify({
+    type: 'message', id: 'readable', role: 'user', content: 'readable prompt', timestamp: session.createdAt,
+  }) + '\n' + 'x'.repeat(2_000));
+  const snapshot = readSessionRecordSnapshot({ sessionId: session.id, layout, cwd,
+    limits: { ...NAVIGATION_LIMITS, transcriptBytes: 800, transcriptLines: 20 }, salvageTranscript: true });
+  expect(snapshot.transcriptTruncated).toBe(true);
+  expect(snapshot.warnings.join(' ')).toContain('readable prefix');
+  expect(snapshot.events.some(event => event.id === 'readable')).toBe(true);
 });
 
 it('refuses a persisted active leaf missing from an empty tree instead of reporting no history', () => {

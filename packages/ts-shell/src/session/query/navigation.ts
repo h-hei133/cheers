@@ -30,13 +30,18 @@ export function readSessionNavigation(sessionId: string, cwd: string, onSource?:
   readonly points: readonly SessionNavigationPoint[];
   readonly session: Session;
   readonly version: string;
+  readonly quality: 'complete' | 'partial';
+  readonly warnings: readonly string[];
+  readonly actionSafe: boolean;
 } {
   const store = createSessionStoreLayout();
   for (const sessionsDir of store.sessionsSearchDirs) onSource?.(projectSessionFileLayout({ sessionsDir, sessionId }).sessionDir);
   const layout = locateExistingSessionLayout(store, sessionId);
   const before = readSessionFileVersion(layout);
-  admitNavigationSource(layout);
-  const { session, state, events } = readSessionRecordSnapshot({ sessionId, layout, cwd, limits: NAVIGATION_LIMITS });
+  admitNavigationSource(layout, { allowTranscriptOverflow: true });
+  const { session, state, events, warnings, transcriptTruncated } = readSessionRecordSnapshot({
+    sessionId, layout, cwd, limits: NAVIGATION_LIMITS, salvageTranscript: true,
+  });
   if (session.id !== sessionId) throw new Error('The stored session identity does not match the requested session.');
   if (state.thread?.activeLeafId !== undefined &&
     !state.thread.entries.some(entry => entry.id === state.thread!.activeLeafId)) {
@@ -51,7 +56,17 @@ export function readSessionNavigation(sessionId: string, cwd: string, onSource?:
     throw new Error('The session changed while its navigation state was being read.');
   }
   const thread = catchUpSessionThread(state.thread ?? buildLinearSessionThreadSnapshot(session), session, NAVIGATION_LIMITS.entries);
-  return { thread, points: projectSessionNavigation(thread, messages), session, version: before };
+  const projected = projectSessionNavigation(thread, messages);
+  const partial = warnings.length > 0 || transcriptTruncated;
+  const points = partial
+    ? projected.map(point => ({ ...point, unavailable: point.unavailable ?? 'partial transcript; reopen after repair' }))
+    : projected;
+  return {
+    thread, points, session, version: before,
+    quality: partial ? 'partial' : 'complete',
+    warnings,
+    actionSafe: !partial,
+  };
 }
 
 /** A repaired display edge never grants permission to navigate a broken path. */

@@ -40,14 +40,17 @@ export interface SessionCatalogQuery {
   readonly after?: SessionCatalogContinuation;
 }
 
-/** A live rescan boundary; it does not claim a frozen catalogue snapshot. */
+export type SessionCatalogBoundary = Pick<SessionSummary, 'id' | 'version' | 'pinned' | 'updatedAt'>;
+
+/** A process-local browse attempt with a live version check for every offered row. */
 export interface SessionCatalogContinuation {
+  readonly attemptId: string;
   readonly sessionId: string;
   readonly projectRoot: string;
   readonly allProjects: boolean;
   readonly needle: string;
   readonly limit: number;
-  readonly boundary: Pick<SessionSummary, 'id' | 'version' | 'pinned' | 'updatedAt'>;
+  readonly boundary: SessionCatalogBoundary;
 }
 
 export interface SessionReferenceQuery {
@@ -73,5 +76,6 @@ export const CATALOG_LIMITS = Object.freeze({
   transcriptBytes: 2 * 1024 * 1024,
   readChunkBytes: 64 * 1024,
   pageSize: 40,
+  attemptEntries: 20_000,
   diagnosticSamples: 32,
 });

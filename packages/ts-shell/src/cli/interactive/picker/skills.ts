@@ -4,6 +4,8 @@ import type { CommandContext } from "../../../core/commands/types.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
 
+const SKILL_INSPECTION_TIMEOUT_MS = 30_000;
+
 /**
  * Skill chooser.
  *
@@ -42,7 +44,7 @@ export function skillPicker(context: CommandContext): Picker {
       if (ids.length !== 1 || !chosen || !offered.has(chosen) || !isCurrent()) return undefined;
       offered.clear();
       try {
-        const skill = (await readSkillCatalog(context)).get(chosen);
+        const skill = (await readSkillCatalog(context, AbortSignal.timeout(SKILL_INSPECTION_TIMEOUT_MS))).get(chosen);
         if (!isCurrent()) return undefined;
         if (!skill) return { note: 'This skill is no longer available. Reopen /skill to refresh.' };
         const draft = skillDraft(skill.name, context.cwd);

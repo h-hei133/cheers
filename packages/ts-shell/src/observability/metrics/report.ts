@@ -24,6 +24,7 @@ export function metricsReport(read: MetricRead, projectRoot = process.cwd()): Co
     ? 'Metrics unavailable; the structured logs could not be read.'
     : 'No metrics recorded yet in the inspected log tails. Counters and timings are written at the end of each turn.', read.status === 'unavailable' ? 'warning' : 'text')] });
   if (read.unreadableFiles) lines.push({ kind: 'text', spans: [span(`${read.unreadableFiles} log file(s) could not be read; available samples only.`, 'warning')] });
+  if (read.filesTruncated) lines.push({ kind: 'text', spans: [span('Metric inspection reached its file or byte budget; older samples were omitted.', 'warning')] });
   if (groups.some(entry => entry.count === null || entry.total === null || entry.max === null)) lines.push({ kind: 'text', spans: [span('Some aggregate values exceed numeric range and are unknown.', 'warning')] });
   lines.push({ kind: 'space' }, { kind: 'text', spans: [span(`Source: structured log tails across processes and sessions; at most ${LOG_TAIL_BYTES} bytes per file and ${read.limit} metric samples.`, 'muted')] },
     { kind: 'text', spans: [span('/log tail', 'command'), span(' shows timestamp, level, component and message without metric values.')] });
@@ -31,7 +32,9 @@ export function metricsReport(read: MetricRead, projectRoot = process.cwd()): Co
     { label: 'Count', minWidth: 6, align: 'right' }, { label: 'Measure', minWidth: 18 }], lines,
     facts: { source: 'structured-log-tails', scope: 'all-processes-and-sessions', status: read.status,
       bytesPerFile: LOG_TAIL_BYTES, sampleLimit: read.limit, samplesRead: read.samples.length,
-      filesInspected: read.filesInspected, unreadableFiles: read.unreadableFiles, groups: groups.map(entry => ({ ...entry, tags: { ...entry.tags } })) },
+      filesInspected: read.filesInspected, unreadableFiles: read.unreadableFiles,
+      filesTruncated: read.filesTruncated === true, bytesRead: read.bytesRead ?? null,
+      groups: groups.map(entry => ({ ...entry, tags: { ...entry.tags } })) },
   });
 }
 

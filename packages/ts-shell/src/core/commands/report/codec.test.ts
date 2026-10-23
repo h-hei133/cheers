@@ -17,7 +17,8 @@ it('declines unsupported, malformed and excessive semantics without dropping fal
   for (const invalid of [null, { ...report, version: 2 }, { ...report, lines: [null] },
     { ...report, lines: [{ kind: 'text', spans: [{ text: 'bad', role: 'new-role' }] }] },
     { ...report, columns: [{ label: 'bad', minWidth: -1 }] }, { ...report, facts: { value: Infinity } },
-    { ...report, title: 'x'.repeat(REPORT_BYTES + 1) }]) expect(readReport(invalid)).toBeUndefined();
+    { ...report, title: 'x'.repeat(REPORT_BYTES + 1) },
+    { ...report, title: '\0'.repeat(200_000) }]) expect(readReport(invalid)).toBeUndefined();
   const cycle: Record<string, unknown> = {}; cycle.self = cycle;
   expect(readReport({ ...report, facts: cycle })).toBeUndefined();
   const expanded = { ...report, columns: [{ label: 'x'.repeat(100000), minWidth: 1 }],

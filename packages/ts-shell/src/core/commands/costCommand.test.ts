@@ -156,6 +156,22 @@ describe("runCostCommand", () => {
     expect(result.output).toContain("nothing to count");
   });
 
+  it("keeps totals complete while bounding model detail to an explicit partial window", () => {
+    const session = 'cost-bounded-model-detail';
+    resetSessionUsage(session);
+    for (let index = 0; index < 70; index += 1) {
+      recordSessionUsage(session, { provider: 'fixture', model: `model-${String(index).padStart(2, '0')}`, promptTokens: 1 });
+    }
+    const report = costReport(costModel(getSessionUsage(session), []));
+    expect(report.facts).toMatchObject({
+      totalModels: 70,
+      shownModels: 64,
+      omittedModels: 6,
+      coverage: 'partial',
+    });
+    expect(reportText(report)).toContain('6 usage groups omitted');
+  });
+
   it("names the model when only one answered", async () => {
     const session = "sess_cost_one";
     resetSessionUsage(session);

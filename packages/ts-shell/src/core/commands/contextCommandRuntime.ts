@@ -9,9 +9,7 @@ import { resolveContextWindow, resolveTokenBudget } from "../models/window.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
 import { getSessionUsage, measuredPromptContext, totalTokens } from "../../observability/usageTelemetry.js";
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS } from "../../session/context.js";
-import { toolSchemas } from "../../turn/tools.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
-import { textSize } from '../../context/request/measure.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../auth/account/target.js';
 import { DEFAULT_ENDPOINT_KIND } from '../../provider/endpoints/index.js';
 import { catalogModel } from '../models/catalog.js';
@@ -81,11 +79,11 @@ export async function runContextCommand(
     configured: runtimeConfig.contextWindow,
   });
   const reserve = resolveTokenBudget(runtimeConfig.modelTokenBudgets, active.provider, active.model, "reserveTokens", runtimeConfig.reserveTokens, DEFAULT_RESERVE_TOKENS);
-  const registry = context.getToolPool ? await context.getToolPool() : createCoreToolRegistry();
+  const registry = context.getToolPool ? await context.getToolPool(context.signal) : createCoreToolRegistry();
+  context.signal?.throwIfAborted();
   const blocked = context.admission?.();
   if (blocked) return { kind: "local", output: blocked };
-  const schemas = toolSchemas(registry);
-  const schemaSize = textSize(JSON.stringify(schemas));
+  const schemaSize = measureToolSchemas(registry);
   const schemaTokens = Math.round(schemaSize.codeUnits / CHARS_PER_TOKEN);
   // The last request's identity is the only trustworthy source for dynamic
   // discovery snapshots and for a cwd that differs from the project root. A
@@ -115,4 +113,29 @@ export async function runContextCommand(
     schemaTokens, schemaSize, request: telemetry?.requestContext, toolCount: registry.size, totalTokens: telemetry ? totalTokens(telemetry) : 0,
     turns: telemetry?.turnsCount ?? 0 }, context.cwd);
   return { kind: "local", output: reportText(report), report };
+}
+
+/** Measure the exact JSON array without materializing every schema in one string. */
+function measureToolSchemas(registry: ReadonlyMap<string, import('../../tools/types.js').ToolDefinition>) {
+  let bytes = 2;
+  let codeUnits = 2;
+  let count = 0;
+  for (const tool of registry.values()) {
+    const serialized = JSON.stringify({
+      type: 'function',
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.argsSchema ?? { type: 'object', properties: {} },
+      },
+    });
+    if (count > 0) {
+      bytes += 1;
+      codeUnits += 1;
+    }
+    bytes += Buffer.byteLength(serialized, 'utf8');
+    codeUnits += serialized.length;
+    count += 1;
+  }
+  return { bytes, codeUnits };
 }

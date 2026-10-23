@@ -1,6 +1,7 @@
 import type { CursorMove, KillTarget } from "../../presentation/tui/editor.js";
 import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
 import type { InteractiveView, ViewActions } from "../../presentation/tui/surface/contract.js";
+import { graphemeBoundaries } from "../../presentation/tui/text/measure.js";
 import { KEY_ACTIONS, type Keybindings } from "./keybindings.js";
 import { getSlashInvocation } from "../../entrypoints/slashCommandRegistry.js";
 import { feedVim, initialVimState, type VimEffect, type VimKey, type VimState } from "../../presentation/tui/editor/modal/state.js";
@@ -92,26 +93,41 @@ export function resetVimState(editor: object): void {
 /** Apply one keystroke to the view. */
 export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
   const { view, actions } = context;
+  const action = context.keybindings.actionFor(event.keyId);
+  const explicitSubmit = context.vimMode && action === "tui.input.submit" && event.keyId !== "enter";
 
   if (context.vimMode) {
     const editor = view.editor;
     const state = vimStates.get(editor) ?? initialVimState("insert");
+    const quietNormalEscape = event.keyId === "escape" && state.mode === "normal"
+      && !state.pending && !state.operator && state.count === 0;
+    const hostCancel = event.keyId === "ctrl+c" && state.mode !== "insert";
+    const activeSelection = visualSelection(state, editor.snapshot());
+    const copiedVisual = hostCancel && activeSelection !== undefined
+      ? actions.copySelection?.(activeSelection) === true : false;
     // Insert mode keeps the ordinary editor, including submit and suggestions;
     // only Escape leaves it. Every other mode owns the key, so Enter cannot
-    // submit and a printable character cannot be typed into the draft.
-    if (state.mode !== "insert" || event.keyId === "escape") {
-      const result = feedVim(state, vimKey(event), editor.getText(), editor.snapshot().cursor);
+    // submit and a printable character cannot be typed into the draft. A quiet
+    // Normal Escape and the host cancel chord still belong to the application.
+    if (!explicitSubmit && !quietNormalEscape && (state.mode !== "insert" || event.keyId === "escape")) {
+      const result = feedVim(state, hostCancel ? { key: "escape" } : vimKey(event),
+        editor.getText(), editor.snapshot().cursor);
       vimStates.set(editor, result.state);
       applyVimEffect(result.effect, context);
+      actions.setSourceSelection?.(visualSelection(result.state, editor.snapshot()));
       actions.syncSuggestions(false);
       actions.redraw();
-      return;
+      if (!hostCancel) return;
+      if (copiedVisual) return;
     }
+    if (explicitSubmit) actions.setSourceSelection?.(undefined);
+  } else {
+    vimStates.delete(view.editor);
+    actions.setSourceSelection?.(undefined);
   }
 
   if (view.suggestionsOpen && consumeSuggestionKey(event, context)) return;
 
-  const action = context.keybindings.actionFor(event.keyId);
   if (action === undefined) {
     // Nothing claims this key, so it is text as far as the surface is concerned.
     applyTextKey(event, context);
@@ -389,11 +405,13 @@ function resync(event: ParsedKeyEvent, context: KeymapContext): void {
 
 function vimKey(event: ParsedKeyEvent): VimKey {
   const arrow = ({ left: "h", right: "l", up: "k", down: "j" } as const)[event.keyId as "left" | "right" | "up" | "down"];
-  if (arrow) return { key: arrow, text: arrow };
+  if (arrow) return { key: event.keyId };
+  if (event.keyId === "home") return { key: "line-start" };
+  if (event.keyId === "end") return { key: "line-end" };
   if (event.keyId === "escape") return { key: "escape" };
   if (event.keyId === "enter") return { key: "enter", text: "" };
-  if (event.keyId === "backspace") return { key: "X", text: "X" };
-  if (event.keyId === "delete") return { key: "x", text: "x" };
+  if (event.keyId === "backspace") return { key: "backspace" };
+  if (event.keyId === "delete") return { key: "delete" };
   // Control chords carry no text; their name is the letter (`ctrl+r` → `r`).
   if (event.ctrl) return { key: event.name, text: "", ctrl: true };
   const text = event.text ?? "";
@@ -420,6 +438,21 @@ function applyVimEffect(effect: VimEffect, context: KeymapContext): void {
     case "redo": editor.redo(); return;
     default: return;
   }
+}
+
+function visualSelection(state: VimState, snapshot: { readonly text: string; readonly cursor: number; readonly revision: number }) {
+  if ((state.mode !== "visual" && state.mode !== "visual-line") || state.anchor === undefined) return undefined;
+  const start = Math.min(state.anchor, snapshot.cursor);
+  let end = Math.max(state.anchor, snapshot.cursor);
+  if (state.mode === "visual-line") {
+    const lineStart = snapshot.text.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+    const lineEnd = snapshot.text.indexOf("\n", end);
+    return { sourceRevision: snapshot.revision, start: lineStart,
+      end: lineEnd < 0 ? snapshot.text.length : lineEnd + 1 };
+  }
+  const next = graphemeBoundaries(snapshot.text).find(boundary => boundary > end);
+  end = next ?? snapshot.text.length;
+  return { sourceRevision: snapshot.revision, start, end };
 }
 
 /** Printable text, which is what an unclaimed key is. */
@@ -471,6 +504,11 @@ function submitDraft(context: KeymapContext, disposition?: "steer" | "followUp")
   const { view, actions } = context;
   const source = view.editor.getText();
   if (!source.trim()) {
+    actions.redraw();
+    return;
+  }
+  if (view.pastes.unresolved(source).length > 0) {
+    actions.reportNotice?.("This draft refers to a paste that is no longer available. Paste it again or remove its placeholder.");
     actions.redraw();
     return;
   }

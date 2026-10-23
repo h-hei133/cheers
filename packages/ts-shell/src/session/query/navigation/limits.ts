@@ -11,14 +11,15 @@ export const NAVIGATION_LIMITS: SessionReadLimits = Object.freeze({
   entries: 20_000,
 });
 
-/** Reject oversized inputs before any of the saved files are parsed. */
-export function admitNavigationSource(layout: SessionFileLayout): void {
+/** Reject unsafe sources before parsing; transcript overflow can use a bounded readable prefix. */
+export function admitNavigationSource(layout: SessionFileLayout, options: { readonly allowTranscriptOverflow?: boolean } = {}): void {
   for (const [target, limit] of [
     [layout.metadataPath, NAVIGATION_LIMITS.metadataBytes],
     [layout.statePath, NAVIGATION_LIMITS.stateBytes],
     [layout.transcriptPath, NAVIGATION_LIMITS.transcriptBytes],
   ] as const) {
     const stat = lstatSync(target);
-    if (!stat.isFile() || stat.size > limit) throw new Error('The saved conversation exceeds navigation limits or is unavailable.');
+    const overflow = stat.size > limit && !(options.allowTranscriptOverflow && target === layout.transcriptPath);
+    if (!stat.isFile() || overflow) throw new Error('The saved conversation exceeds navigation limits or is unavailable.');
   }
 }

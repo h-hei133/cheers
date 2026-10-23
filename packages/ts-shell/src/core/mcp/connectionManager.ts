@@ -3,6 +3,7 @@ import { createStateChanges } from "../state/changes.js";
 import type { McpClientSnapshot, ScopedMcpServerConfig } from "./types.js";
 import type { McpNotificationSnapshot } from "./content/types.js";
 import type { McpHttpAuthorization } from './http/fetch.js';
+import { MCP_CATALOG_BYTES, MCP_CATALOG_TOOLS } from './catalogLimit.js';
 
 /** Owns all live connections; callers serialize config reconciliation and use. */
 export class CoreMcpConnectionManager {
@@ -19,11 +20,14 @@ export class CoreMcpConnectionManager {
   peekSnapshot(configs: Record<string, ScopedMcpServerConfig>): McpClientSnapshot | undefined {
     if (this.closed) return undefined;
     const snapshot: McpClientSnapshot = { clients: [], tools: [] };
+    let bytes = 0;
     for (const [name, config] of Object.entries(configs)) {
       const client = this.clients.get(name);
       if (!client || JSON.stringify(client.config) !== JSON.stringify(config)) return undefined;
       const tools = client.peekTools();
       if (!tools) return undefined;
+      bytes += Buffer.byteLength(JSON.stringify(tools), 'utf8');
+      if (bytes > MCP_CATALOG_BYTES || snapshot.tools.length + tools.length > MCP_CATALOG_TOOLS) return undefined;
       snapshot.clients.push({ type: "connected", name, config: structuredClone(config) });
       snapshot.tools.push(...tools);
     }

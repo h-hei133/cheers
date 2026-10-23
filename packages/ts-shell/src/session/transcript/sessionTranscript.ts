@@ -16,7 +16,7 @@ import {
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { Session } from "../schema/sessionRecord.js";
 import { publishedCompactionEvents } from '../compaction/publication.js';
-import { readTextFile } from '../../core/workspace/files.js';
+import { fileIdentity, readTextFile } from '../../core/workspace/files.js';
 
 export interface TranscriptReadLimits {
   readonly maxBytes: number;
@@ -37,8 +37,12 @@ export interface ReadTranscript {
   readonly warnings: readonly string[];
 }
 
+export interface TranscriptSnapshot extends ReadTranscript {
+  readonly truncated: boolean;
+}
+
 export function readTranscriptEvents(transcriptPath: string, limits?: TranscriptReadLimits): TranscriptEvent[] {
-  return readTranscript(transcriptPath, limits).events as TranscriptEvent[];
+  return readTranscriptSnapshot(transcriptPath, limits).events as TranscriptEvent[];
 }
 
 /**
@@ -51,13 +55,29 @@ export function readTranscriptEvents(transcriptPath: string, limits?: Transcript
  * either way.
  */
 export function readTranscript(transcriptPath: string, limits?: TranscriptReadLimits): ReadTranscript {
+  const { truncated: _truncated, ...result } = readTranscriptSnapshot(transcriptPath, limits);
+  return result;
+}
+
+export function readTranscriptSnapshot(
+  transcriptPath: string,
+  limits?: TranscriptReadLimits,
+  salvage = false,
+): TranscriptSnapshot {
   if (!fs.existsSync(transcriptPath)) {
-    return { version: 0, events: [], unreadableLines: 0, warnings: [] };
+    return { version: 0, events: [], unreadableLines: 0, warnings: [], truncated: false };
   }
-  const text = limits ? readTextFile(transcriptPath, limits.maxBytes) : fs.readFileSync(transcriptPath, "utf8");
-  if (text === undefined) throw new Error('The saved transcript is unavailable.');
-  const result = parseTranscript(text, limits?.maxLines);
-  if (limits && result.warnings.length > 0) throw new Error('The saved transcript is damaged or has uncertain provenance.');
+  const acquired = salvage && limits
+    ? readTranscriptPrefix(transcriptPath, limits)
+    : {
+      text: limits ? readTextFile(transcriptPath, limits.maxBytes) : fs.readFileSync(transcriptPath, "utf8"),
+      truncated: false,
+    };
+  if (acquired.text === undefined) throw new Error('The saved transcript is unavailable.');
+  const result = parseTranscript(acquired.text, limits?.maxLines);
+  const warnings = [...result.warnings];
+  if (acquired.truncated) warnings.push('The saved transcript exceeds the navigation limit; only its readable prefix is shown.');
+  if (limits && !salvage && warnings.length > 0) throw new Error('The saved transcript is damaged or has uncertain provenance.');
   if (limits) {
     const identities = new Set<string>();
     for (const event of result.events) {
@@ -65,7 +85,48 @@ export function readTranscript(transcriptPath: string, limits?: TranscriptReadLi
       if (event.id !== undefined) identities.add(event.id);
     }
   }
-  return result;
+  return { ...result, warnings, truncated: acquired.truncated };
+}
+
+function readTranscriptPrefix(transcriptPath: string, limits: TranscriptReadLimits): { text: string; truncated: boolean } {
+  const before = fs.lstatSync(transcriptPath);
+  if (!before.isFile()) throw new Error('The saved transcript is unavailable.');
+  const length = Math.min(before.size, limits.maxBytes);
+  const bytes = Buffer.alloc(length);
+  const fd = fs.openSync(transcriptPath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+  try {
+    const opened = fs.fstatSync(fd);
+    if (fileIdentity(opened) !== fileIdentity(before)) throw new Error('The saved transcript changed while it was being read.');
+    let offset = 0;
+    while (offset < bytes.length) {
+      const read = fs.readSync(fd, bytes, offset, bytes.length - offset, offset);
+      if (!read) throw new Error('The saved transcript changed while it was being read.');
+      offset += read;
+    }
+    const after = fs.fstatSync(fd);
+    if (fileIdentity(after) !== fileIdentity(opened) || after.size !== opened.size) {
+      throw new Error('The saved transcript changed while it was being read.');
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+  let truncated = before.size > limits.maxBytes;
+  let text = bytes.toString('utf8');
+  if (truncated) {
+    const end = text.lastIndexOf('\n');
+    text = end < 0 ? '' : text.slice(0, end + 1);
+  }
+  let lines = text.length === 0 ? 0 : 1;
+  for (let index = 0; index < text.length; index++) {
+    if (text.charCodeAt(index) !== 10 || index + 1 >= text.length) continue;
+    lines += 1;
+    if (lines > limits.maxLines) {
+      text = text.slice(0, index + 1);
+      truncated = true;
+      break;
+    }
+  }
+  return { text, truncated };
 }
 
 /** Decode already acquired text through the same compatibility rules as replay. */

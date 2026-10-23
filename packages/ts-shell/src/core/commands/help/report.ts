@@ -9,6 +9,7 @@ type GuideCommand = Pick<CommandDefinition, 'name' | 'aliases' | 'invocations' |
 const groups: Record<CommandDefinition['group'], string> = {
   session: 'Session', context: 'Context', workspace: 'Workspace', workflow: 'Workflow', diagnostics: 'Diagnostics',
 };
+const HELP_ROWS = 200;
 
 /** Raw IDs stay local to selection; every visible field is a detached projection. */
 export function guideRows(commands: readonly GuideCommand[], projectRoot: string) {
@@ -29,7 +30,11 @@ export function guideRows(commands: readonly GuideCommand[], projectRoot: string
 }
 
 export function helpReport(commands: readonly GuideCommand[], projectRoot: string) {
-  const rows = guideRows(commands, projectRoot), lines: ReportLine[] = [];
+  const totalRows = commands.reduce((total, command) =>
+    total + commandInvocations(command).filter(item => item.kind !== 'alias').length, 0);
+  const rows = guideRows(commands.slice(0, HELP_ROWS), projectRoot).slice(0, HELP_ROWS);
+  const omitted = totalRows - rows.length;
+  const lines: ReportLine[] = [];
   for (const [group, title] of Object.entries(groups)) {
     const members = rows.filter(row => row.group === group);
     if (!members.length) continue;
@@ -42,6 +47,8 @@ export function helpReport(commands: readonly GuideCommand[], projectRoot: strin
     ['/hotkey', 'every key, and which ones this terminal delivers']] as const) {
     lines.push({ kind: 'text', spans: [span(key, 'key'), span(`  ${description}`)] });
   }
-  return createReport({ title: 'Slash commands', lines, facts: { count: rows.length,
+  if (omitted > 0) lines.push({ kind: 'text', spans: [span(`${omitted} commands omitted from this bounded report.`, 'muted')] });
+  return createReport({ title: 'Slash commands', lines, facts: { count: totalRows, total: totalRows,
+    shown: rows.length, omitted, coverage: omitted > 0 ? 'partial' : 'complete',
     commands: rows.map(row => ({ invocation: row.label, detail: row.detail, group: row.group, note: row.note, draftAvailable: !row.disabled })) } });
 }

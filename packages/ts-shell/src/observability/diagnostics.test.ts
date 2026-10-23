@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readStructuredLogs, traceRows } from './diagnostics.js';
+import { LOG_TAIL_BYTES, LOG_TOTAL_BYTES, readStructuredLogs, traceRows } from './diagnostics.js';
 import { RotatingFileSink } from './rotatingFileSink.js';
+import { readMetrics } from './metrics/reader.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -41,5 +42,38 @@ describe('diagnostic trace projection', () => {
       fs.symlinkSync(path.join(directory, 'missing'), file);
       expect(readStructuredLogs(directory, file)).toMatchObject({ status: 'unavailable', filesInspected: 1, unreadableFiles: 1 });
     } finally { vi.restoreAllMocks(); fs.rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it('bounds log and metric enumeration with an explicit partial result', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-diag-bounded-'));
+    try {
+      const record = { timestamp: 't', level: 'info', traceId: 'trace', spanId: 'span', component: 'tool', message: 'm', fields: {} };
+      const metric = { timestamp: 't', level: 'info', traceId: 'trace', spanId: 'span', component: 'metric',
+        message: 'latency', fields: { metric: 'ms', value: 1 } };
+      for (let index = 0; index < 40; index++) {
+        fs.writeFileSync(path.join(directory, `${String(index).padStart(2, '0')}.log`),
+          `${JSON.stringify(index % 2 ? metric : record)}\n`);
+      }
+      const logs = readStructuredLogs(directory, path.join(directory, '39.log'));
+      expect(logs).toMatchObject({ status: 'partial', filesTruncated: true });
+      expect(logs.filesInspected).toBeLessThanOrEqual(32);
+      const metrics = readMetrics(directory, path.join(directory, '39.log'), 200);
+      expect(metrics).toMatchObject({ status: 'partial', filesTruncated: true });
+      expect(metrics.filesInspected).toBeLessThanOrEqual(32);
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it('bounds cumulative log and metric reads across every inspected shard', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-diag-bytes-'));
+    try {
+      for (let index = 0; index < 6; index++) {
+        fs.writeFileSync(path.join(directory, `${index}.log`), 'x'.repeat(LOG_TAIL_BYTES));
+      }
+      const current = path.join(directory, '5.log');
+      const logs = readStructuredLogs(directory, current, 100_000);
+      expect(logs).toMatchObject({ status: 'partial', filesTruncated: true, bytesRead: LOG_TOTAL_BYTES });
+      const metrics = readMetrics(directory, current, 100_000);
+      expect(metrics).toMatchObject({ status: 'partial', filesTruncated: true, bytesRead: LOG_TOTAL_BYTES });
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
   });
 });

@@ -14,7 +14,7 @@ import { validateArchive, FILE_BYTES } from './archive/validation.js';
 import { extractArchive } from './archive/storage.js';
 import { ExtensionStore, readState, versionPath } from './store/state.js';
 import { installOperation, removeOperation, rollbackOperation } from './lifecycle/install.js';
-import { activationOperation, migrationOperation } from './lifecycle/grants.js';
+import { activationOperation, migrationOperation, rootSignature } from './lifecycle/grants.js';
 import { ExtensionService } from './service.js';
 import { marketplaceCommand } from './command/marketplace.js';
 import { pluginCommand } from './command/plugin.js';
@@ -30,6 +30,7 @@ import { assertSourceAccess } from '../core/query/sourcePolicy.js';
 import { slashSuggestions } from '../cli/interactive/slashSuggestions.js';
 import { createDefaultExecutionService, type ExecutionService } from '../runtime/execution/service.js';
 import { extensionManager } from './view/manager.js';
+import { projectExtensions } from './view/projection.js';
 import type { ExtensionManager, ExtensionSnapshot } from './view/model.js';
 import { ShellCommandRuntime } from '../core/shell/command.js';
 
@@ -201,6 +202,26 @@ describe('guarded lifecycle and ordinary approval', () => {
     expect(readState().packages).toEqual([]); expect(fs.existsSync(path.join(root, 'owned/packages/sample', releases[0]!.digest, 'extension.json'))).toBe(true);
     expect((await pluginCommand(['list'], service)).output).toContain('durability unknown');
   });
+  it('retains unknown publication in a journal across a fresh store instance', async () => {
+    await service.close();
+    service = newService(new ExtensionStore(undefined, () => { throw new Error('synthetic save failure'); }));
+    await service.approve(await installOperation(service, 'fixture:sample@1.0.0'));
+
+    const restarted = new ExtensionStore();
+    expect(restarted.outcomes).toContainEqual(expect.objectContaining({
+      effect: 'published',
+      durability: 'unknown',
+    }));
+    let applied = false;
+    expect(() => restarted.locked(restarted.read(), () => { applied = true; }))
+      .toThrow('publication is uncertain');
+    expect(applied).toBe(false);
+
+    restarted.resolveUnknown();
+    expect(restarted.outcomes).toEqual([]);
+    expect(() => restarted.locked(restarted.read(), () => { applied = true; })).not.toThrow();
+    expect(applied).toBe(true);
+  });
   it('imports legacy registrations explicitly as unresolved without carrying old enabled flags', async () => {
     const legacy = [{ name: 'old', version: '1.2.3', source: 'path', spec: '/synthetic/legacy', resolved: true, enabled: true }]; const raw = JSON.stringify(legacy); fs.writeFileSync(path.join(root, 'legacy.json'), raw);
     await service.approve(migrationOperation(service)); expect(service.store.read().imports).toEqual([{ name: 'old', version: '1.2.3', spec: '/synthetic/legacy', status: 'unresolved' }]);
@@ -316,7 +337,15 @@ describe('actual capability grants, precedence and bounded unload', () => {
     const operation = service.request(() => { started(); return new Promise<void>(resolve => { release = resolve; }); });
     const outcome = operation.catch(error => error);
     await entered;
-    try { await expect(service.close()).rejects.toThrow('cleanup remains unknown'); }
+    try {
+      await expect(service.close()).rejects.toThrow('cleanup remains unknown');
+      const restarted = new ExtensionStore();
+      expect(restarted.outcomes).toContainEqual(expect.objectContaining({
+        effect: 'executed',
+        durability: 'unknown',
+      }));
+      expect(() => restarted.locked(restarted.read(), () => {})).toThrow('publication is uncertain');
+    }
     finally { release(); await outcome; }
     await expect(service.close()).resolves.toBeUndefined();
   });
@@ -363,6 +392,105 @@ describe('bound extension management views', () => {
     expect(safe).not.toContain('synthetic-secret'); expect(safe).not.toContain('\u009b');
   });
 
+  it('bounds package detail projection and reports omitted rows explicitly', async () => {
+    await install();
+    const state = service.store.read();
+    const record = state.packages[0]!;
+    const commands = Array.from({ length: 100 }, (_, index) => ({
+      name: `command-${index}`,
+      description: `Synthetic command ${index}`,
+      script: record.active.manifest.scripts[0]!.name,
+    }));
+    const inflated = {
+      ...state,
+      packages: [{
+        ...record,
+        active: { ...record.active, manifest: { ...record.active.manifest, commands } },
+      }],
+    };
+    const projected = projectExtensions(inflated, undefined, service.root, rootSignature(service.root),
+      'bounded-version', [], [], false);
+    expect(projected).toMatchObject({
+      partial: true,
+      omitted: { detailLines: expect.any(Number) },
+    });
+    expect(projected.omitted.detailLines).toBeGreaterThan(0);
+    expect(projected.items[0]!.detail.length).toBeLessThanOrEqual(33);
+    expect(projected.items[0]!.detail.at(-1)).toBe('[additional detail omitted]');
+  });
+
+  it('bounds notices and reports their omitted count', async () => {
+    await install();
+    const state = service.store.read();
+    const errors = Array.from({ length: 100 }, (_, index) => `synthetic error ${index}`);
+    const projected = projectExtensions(state, undefined, service.root, rootSignature(service.root),
+      'bounded-notices', errors, [], false);
+    expect(projected).toMatchObject({ partial: true, omitted: { notices: expect.any(Number) } });
+    expect(projected.omitted.notices).toBeGreaterThan(0);
+    expect(projected.notices.length).toBeLessThanOrEqual(65);
+    expect(projected.notices.at(-1)).toBe('[additional detail omitted]');
+  });
+
+  it('bounds the cumulative projection bytes across every package', async () => {
+    await install();
+    const state = service.store.read();
+    const record = state.packages[0]!;
+    const commands = Array.from({ length: 32 }, (_, index) => ({
+      name: `command-${index}`,
+      description: 'x'.repeat(2_048),
+      script: record.active.manifest.scripts[0]!.name,
+    }));
+    const packages = Array.from({ length: 12 }, (_, index) => ({
+      ...record,
+      name: `sample-${index}`,
+      active: { ...record.active, manifest: { ...record.active.manifest, commands } },
+    }));
+    const projected = projectExtensions({ ...state, packages }, undefined, service.root, rootSignature(service.root),
+      'bounded-bytes', [], [], false);
+    const bytes = [
+      projected.install.id, projected.install.label, projected.install.detail,
+      ...projected.notices,
+      ...projected.items.flatMap(item => [item.id, item.label, item.description, item.status, ...item.detail,
+        ...item.actions.flatMap(action => [action.id, action.label, action.detail, action.input ?? ''])]),
+    ]
+      .reduce((total, line) => total + Buffer.byteLength(line, 'utf8'), 0);
+    expect(projected.partial).toBe(true);
+    expect(projected.omitted.detailLines).toBeGreaterThan(0);
+    expect(bytes).toBeLessThanOrEqual(512 * 1024);
+  });
+
+  it('bounds action projection across the legal package maximum and reports omissions', async () => {
+    await install();
+    const state = service.store.read();
+    const record = state.packages[0]!;
+    const commands = Array.from({ length: 32 }, (_, index) => ({
+      name: `command-${index}`,
+      description: `Synthetic command ${index}`,
+      script: record.active.manifest.scripts[0]!.name,
+    }));
+    const tools = Array.from({ length: 32 }, (_, index) => ({
+      name: `tool-${index}`,
+      description: `Synthetic tool ${index}`,
+      script: record.active.manifest.scripts[0]!.name,
+    }));
+    const packages = Array.from({ length: 64 }, (_, index) => ({
+      ...record,
+      name: `sample-${index}`,
+      active: { ...record.active, manifest: { ...record.active.manifest, commands, tools } },
+    }));
+    const projected = projectExtensions({ ...state, packages }, undefined, service.root, rootSignature(service.root),
+      'bounded-actions', [], [], false);
+    expect(projected.partial).toBe(true);
+    expect(projected.omitted.actions).toBeGreaterThan(0);
+    const bytes = [
+      projected.install.id, projected.install.label, projected.install.detail,
+      ...projected.notices,
+      ...projected.items.flatMap(item => [item.id, item.label, item.description, item.status, ...item.detail,
+        ...item.actions.flatMap(action => [action.id, action.label, action.detail, action.input ?? ''])]),
+    ].reduce((total, line) => total + Buffer.byteLength(line, 'utf8'), 0);
+    expect(bytes).toBeLessThanOrEqual(512 * 1024);
+  });
+
   it('prepares one exact change without writes, uses ordinary approval and consumes once', async () => {
     await ready(); const view = manager(); const before = fs.readFileSync(service.store.file); approvals.length = 0;
     const prepared = await prepare(view, 'disable');
@@ -400,6 +528,11 @@ describe('bound extension management views', () => {
       expect(await plan.apply()).toContain('durability: unknown');
       expect(service.store.read().packages).toEqual([]); expect(fs.existsSync(owned)).toBe(true);
       expect(service.store.outcomes.some(entry => entry.durability === 'unknown' && entry.effect === 'removed')).toBe(true);
+      const restarted = new ExtensionStore();
+      expect(restarted.outcomes).toContainEqual(expect.objectContaining({
+        effect: 'removed',
+        durability: 'unknown',
+      }));
       const reopened = snapshot(manager());
       expect(reopened.mutationBlocked).toBe(true); expect(reopened.notices.join(' ')).toContain('cleanup of remaining versions is unknown');
       expect((await pluginCommand(['list'], service)).output).toContain('durability unknown');

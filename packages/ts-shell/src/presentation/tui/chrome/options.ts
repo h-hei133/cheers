@@ -37,6 +37,7 @@ export class OptionModel {
   private offset = 0;
   private query = "";
   private revision = 0;
+  private haystacks = new WeakMap<Option, string>();
   private readonly chosen = new Set<string>();
 
   constructor(private readonly filterOptions?: OptionFilter) {}
@@ -45,6 +46,7 @@ export class OptionModel {
   setOptions(options: readonly Option[]): void {
     const previous = new Set(this.all.map(option => option.id));
     this.all = options;
+    this.haystacks = new WeakMap();
     const enabled = new Set(options.filter(option => !option.disabled).map(option => option.id));
     for (const id of this.chosen) if (!enabled.has(id)) this.chosen.delete(id);
     for (const option of options) {
@@ -138,7 +140,7 @@ export class OptionModel {
     const focused = this.current()?.id;
     const needle = this.query.trim().toLowerCase();
     this.matches = this.filterOptions ? this.filterOptions(needle, this.all) : needle
-      ? this.all.filter((option) => haystack(option).includes(needle))
+      ? this.all.filter((option) => cachedHaystack(this.haystacks, option).includes(needle))
       : this.all;
     const retained = this.matches.findIndex(option => option.id === focused && !option.disabled);
     this.cursor = Math.max(0, retained >= 0 ? retained : this.matches.findIndex(option => !option.disabled));
@@ -147,4 +149,12 @@ export class OptionModel {
 
 function haystack(option: Option): string {
   return `${option.label} ${option.detail ?? ""} ${option.note ?? ""} ${option.searchText ?? ""}`.toLowerCase();
+}
+
+function cachedHaystack(cache: WeakMap<Option, string>, option: Option): string {
+  const cached = cache.get(option);
+  if (cached !== undefined) return cached;
+  const value = haystack(option);
+  cache.set(option, value);
+  return value;
 }

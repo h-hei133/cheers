@@ -12,6 +12,7 @@ export interface CopyEntry {
 /** One source snapshot and one matching-reference cache shared by its pages. */
 export class CopySource {
   private readonly entries: CopyEntry[] = [];
+  private readonly search: readonly string[];
   private needle = '';
   private matches: readonly CopyEntry[] = this.entries;
 
@@ -29,12 +30,13 @@ export class CopySource {
     }
     this.entries.reverse();
     for (let index = 0; index < this.entries.length; index++) this.entries[index] = { ...this.entries[index]!, id: String(index) };
+    this.search = this.entries.map(entry => `${entry.label} ${entry.text}`.toLowerCase());
   }
 
   page(query: string, offset: number, size: number): { readonly entries: readonly CopyEntry[]; readonly total: number } {
     if (query !== this.needle) {
       this.needle = query;
-      this.matches = query ? this.entries.filter(entry => `${entry.label} ${entry.text}`.toLowerCase().includes(query)) : this.entries;
+      this.matches = query ? this.entries.filter((_entry, index) => this.search[index]!.includes(query)) : this.entries;
     }
     return { entries: this.matches.slice(offset, offset + size), total: this.matches.length };
   }

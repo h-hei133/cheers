@@ -1,8 +1,8 @@
 import { isRecord } from '../../values/record.js';
-import { REPORT_ROLES, type CommandReport } from './contract.js';
+import { REPORT_BYTES, REPORT_ROLES, type CommandReport } from './contract.js';
 import { createReport, reportText } from './projection.js';
 
-export const REPORT_BYTES = 1024 * 1024;
+export { REPORT_BYTES } from './contract.js';
 const roles: ReadonlySet<unknown> = new Set(REPORT_ROLES);
 
 /** Persisted semantics are optional: unfamiliar or damaged data keeps its text fallback. */
@@ -10,9 +10,13 @@ export function readReport(value: unknown): CommandReport | undefined {
   if (!boundedJson(value) || !isRecord(value) || value.version !== 1 || typeof value.title !== 'string' ||
     !Array.isArray(value.lines) || !value.lines.every(line) || !isRecord(value.facts) ||
     (value.columns !== undefined && (!Array.isArray(value.columns) || !value.columns.every(column)))) return undefined;
-  const report = createReport(value as unknown as CommandReport);
-  try { reportText(report, REPORT_BYTES); } catch { return undefined; }
-  return Buffer.byteLength(JSON.stringify(report), 'utf8') <= REPORT_BYTES ? report : undefined;
+  try {
+    const report = createReport(value as unknown as CommandReport);
+    reportText(report, REPORT_BYTES);
+    return Buffer.byteLength(JSON.stringify(report), 'utf8') <= REPORT_BYTES ? report : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function spans(value: unknown): boolean {

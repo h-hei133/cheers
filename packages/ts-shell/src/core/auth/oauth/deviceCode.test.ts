@@ -190,6 +190,26 @@ describe("the polling loop", () => {
     ).rejects.toThrow(DeviceFlowError);
   });
 
+  it("stops while a provider poll is still waiting", async () => {
+    const controller = new AbortController();
+    let polls = 0;
+    let started!: () => void;
+    const polling = new Promise<void>(resolve => { started = resolve; });
+    const pending = pollDeviceFlow({
+      poll: () => {
+        polls += 1;
+        started();
+        return new Promise<PollOutcome<string>>(() => {});
+      },
+      signal: controller.signal,
+    });
+    await polling;
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ name: "DeviceFlowError", kind: "cancelled" });
+    expect(polls).toBe(1);
+  }, 1_000);
+
   it("does not poll after the code has expired", async () => {
     let polls = 0;
     await expect(

@@ -89,3 +89,24 @@ it.each([[49, 'normal'], [50, 'elevated'], [70, 'high'], [90, 'critical']] as co
     const report = contextReport({ ...input, used: percent * 2000 });
     expect(report.lines.flatMap(line => line.kind === 'text' ? line.spans : [])).toContainEqual({ text: `${percent}.0%`, role: `context-${role}` });
   });
+
+it('bounds request source detail while keeping its omitted count explicit', () => {
+  const request = requestContext({
+    body: '{"messages":[]}',
+    provider: 'fixture',
+    model: 'model',
+    endpoint: 'openai-compatible',
+    systemSources: Array.from({ length: 80 }, (_, index) => ({
+      kind: 'appended' as const,
+      bytes: index + 1,
+      codeUnits: index + 1,
+    })),
+  });
+  const report = contextReport({ ...input, used: undefined, request });
+  expect(report.facts.request).toMatchObject({
+    systemSourcesShown: 64,
+    systemSourcesOmitted: 16,
+    coverage: 'partial',
+  });
+  expect(reportText(report)).toContain('16 system sources omitted');
+});

@@ -8,6 +8,7 @@ const apply = vi.fn(async () => 'Effect: saved; durability: confirmed.');
 const prepare = vi.fn(async () => ({ title: 'disable alpha', preview: ['Exact alpha@1.0.0'], apply }));
 const snapshot: ExtensionSnapshot = { version: 'v1', mutationBlocked: false,
   install: { id: 'install', label: 'install', detail: 'exact signed release', input: 'release' }, notices: [],
+  partial: false, omitted: { notices: 0, detailLines: 0, actions: 0 },
   items: [{ id: 'opaque-alpha', label: 'alpha', description: 'first', status: 'enabled', detail: ['deep searchable detail'],
     actions: [{ id: 'disable-alpha', label: 'disable alpha', detail: 'one item' },
       { id: 'update-alpha', label: 'update alpha', detail: 'exact release', input: 'release' }] }] };
@@ -99,6 +100,21 @@ it('distinguishes unavailable, empty, stale and no search matches', async () => 
   expect(picker.status!([], 'nomatch')).not.toContain('No extensions installed');
   inspection = { state: 'stale' }; await picker.load();
   expect(picker.status!([])).toContain('changed');
+});
+
+it('surfaces omitted extension actions instead of silently dropping management', async () => {
+  inspection = { state: 'ready', snapshot: { ...snapshot, partial: true,
+    omitted: { notices: 0, detailLines: 0, actions: 2 } } };
+  const picker = pluginPicker(manager); await picker.load();
+  expect(picker.status!([])).toContain('2 actions omitted');
+  const child = (await picker.apply(['opaque-alpha']))!.next!;
+  const rows = await child.load();
+  expect(rows.at(-1)).toMatchObject({
+    id: 'omitted-actions',
+    disabled: true,
+  });
+  expect(child.status!([])).toContain('2 actions omitted');
+  expect(child.detail!('omitted-actions').join(' ')).toContain('omitted by the projection budget');
 });
 
 it('requires an exact release and only prepares it after explicit input submission', async () => {

@@ -377,7 +377,8 @@ export async function routeInteractiveCommand(
   }
 
   if (isShellAction(slashResult, "show-help")) {
-    renderUserHelp(input.renderer, { root: input.runtimeContext.cwd, sessionId: input.runtimeContext.session.id });
+    renderUserHelp(input.renderer, { root: input.runtimeContext.cwd, sessionId: input.runtimeContext.session.id,
+      runtimeConfig: input.runtimeContext.runtimeConfig });
     return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
   }
 

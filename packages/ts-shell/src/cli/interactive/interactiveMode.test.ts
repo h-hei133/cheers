@@ -46,6 +46,8 @@ import { ShellCommandRuntime } from '../../core/shell/command.js';
 import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import { installUsageRuntime } from '../runtime/usage.js';
 import type { ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
+import * as externalEditor from './externalEditor.js';
+import { Clipboard } from './clipboard.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
@@ -158,7 +160,8 @@ describe("session wiring", () => {
   it('cancels an accepted exact MCP refresh through the actual terminal command lifecycle', async () => {
     const { mode, terminal } = build();
     const host = mode as unknown as { pickerHost(): PickerHost; overlay: OverlayHost; busy: boolean;
-      options: { sessionRuntime: ShellSessionRuntime; initialMcpGateway: CliMcpGateway } };
+      options: { sessionRuntime: ShellSessionRuntime; initialMcpGateway: CliMcpGateway; runtimeContext: ShellRuntimeContext } };
+    host.options.runtimeContext.runtimeConfig.enableMcpTools = true;
     const commands = new ShellCommandRuntime();
     Object.assign(host.options.sessionRuntime, { commands, cancelAndWait: async () => {
       const active = commands.current; active?.controller.abort(new Error('MCP refresh cancelled'));
@@ -219,6 +222,23 @@ describe("session wiring", () => {
       expect(await pickerHost.addMcpServer!('project', 'local', { command: 'server', args: ['two words'] })).toBe('ordinary writer result');
       expect(add).toHaveBeenCalledWith('project', 'local', { command: 'server', args: ['two words'] });
     } finally { port.mockRestore(); }
+  });
+
+  it('does not open or connect the MCP picker when the accepted runtime config disables it', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { overlay: OverlayHost; options: { runtimeContext: ShellRuntimeContext;
+      initialMcpGateway: CliMcpGateway }; onSubmit(text: string): void };
+    host.options.runtimeContext.runtimeConfig.enableMcpTools = false;
+    const snapshot = vi.fn(async () => ({ clients: [], tools: [] }));
+    Object.assign(host.options.initialMcpGateway, { snapshot });
+    const open = vi.spyOn(host.overlay, 'open');
+    mode.start();
+    try {
+      host.onSubmit('/mcp');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(open).not.toHaveBeenCalled();
+      expect(snapshot).not.toHaveBeenCalled();
+    } finally { mode.stop(); }
   });
   it('binds the extension management port to both real picker aliases and retains the settled ordinary approval result', async () => {
     const { mode } = build();
@@ -701,6 +721,64 @@ describe("session wiring", () => {
       terminal.input('\x1b'); await vi.waitFor(() => expect(host.pager.active).toBe(false));
       expect(host.view.editor.getText()).toBe('original draft');
     } finally { mode.stop(); catalog.mockRestore(); }
+  });
+
+  it('binds accepted tool inspection to the real host lifecycle', async () => {
+    const tool = { name: 'lifecycle_tool', description: 'Lifecycle metadata.', argsSchema: { type: 'object' }, execute: vi.fn() };
+    const signals: AbortSignal[] = [];
+    const catalog = vi.spyOn(toolCatalog, 'loadToolCatalog').mockImplementation(async input => {
+      if (input.signal) signals.push(input.signal);
+      if (signals.length === 2) {
+        await new Promise((_resolve, reject) => input.signal!.addEventListener('abort', () => reject(input.signal!.reason), { once: true }));
+      }
+      return { skills: new Map(), tools: new Map([[tool.name, tool]]) };
+    });
+    const { mode } = build();
+    const host = mode as unknown as { overlay: OverlayHost; options: { runtimeContext: ShellRuntimeContext };
+      onSubmit(text: string): void };
+    const context = host.options.runtimeContext, binding = configurationBinding(context);
+    context.configuration.publish(context.configuration.begin(binding), context.configuration.current.config, binding);
+    mode.start();
+    try {
+      host.onSubmit('/tools');
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).toContain(tool.name));
+      const picker = (host.overlay as unknown as { picker?: Picker }).picker!;
+      const accepted = picker.apply([tool.name]);
+      await vi.waitFor(() => expect(signals).toHaveLength(2));
+      expect(signals[1]).toBeDefined();
+      expect(signals[1]!.aborted).toBe(false);
+      mode.stop();
+      await expect(accepted).resolves.toBeUndefined();
+      expect(signals[1]!.aborted).toBe(true);
+    } finally { mode.stop(); catalog.mockRestore(); }
+  });
+
+  it('transfers the picker lifecycle to a continuation page', async () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView; onSubmit(text: string): void;
+      options: { runtimeContext: ShellRuntimeContext } };
+    const context = host.options.runtimeContext, binding = configurationBinding(context);
+    context.configuration.publish(context.configuration.begin(binding), context.configuration.current.config, binding);
+    mode.start();
+    try {
+      for (let index = 0; index < 105; index++) {
+        host.view.transcript.append(textBlock('assistant', `copy block ${index}`));
+      }
+      host.onSubmit('/copy');
+      await vi.waitFor(() => expect(host.overlay.active).toBe(true));
+      await vi.waitFor(() => {
+        const model = (host.overlay as unknown as { model: { visible: readonly { id: string }[] } }).model;
+        expect(model.visible.some(option => option.id === '__more__')).toBe(true);
+      });
+      (host.overlay as unknown as { model: { focus(id: string): void } }).model.focus('__more__');
+      terminal.input('\r');
+      await vi.waitFor(() => {
+        const picker = (host.overlay as unknown as { picker?: Picker }).picker;
+        expect(picker?.isCurrent?.()).toBe(true);
+      });
+      const picker = (host.overlay as unknown as { picker?: Picker }).picker!;
+      expect(await picker.load()).not.toHaveLength(0);
+    } finally { mode.stop(); }
   });
 
   it.each(['replaced', 'question', 'stopped'] as const)('discards a delayed report after %s', async state => {
@@ -1221,6 +1299,103 @@ it('keeps pasted Vim commands literal and approval shortcuts outside Vim handlin
     terminal.input("y");
     scheduler.flush();
     await expect(decision).resolves.toEqual({ decision: "allow-once" });
+  } finally { mode.stop(); }
+});
+
+it('clears a pending Vim operator when a bracketed paste enters the draft', async () => {
+  const scheduler = new ManualScheduler();
+  const { mode, terminal } = build({ scheduler });
+  const host = mode as unknown as { view: InteractiveView; options: { runtimeContext: ShellRuntimeContext } };
+  host.options.runtimeContext.runtimeConfig.vimMode = true;
+  mode.start();
+  try {
+    terminal.input("\x1b");
+    scheduler.flush();
+    terminal.input("d");
+    terminal.input("\x1b[200~one two\x1b[201~");
+    terminal.input("w");
+    scheduler.flush();
+    expect(host.view.editor.getText()).toBe("one twow");
+  } finally { mode.stop(); }
+});
+
+it('copies the exact Visual grapheme through the real clipboard owner without clearing the draft', () => {
+  const scheduler = new ManualScheduler();
+  const copy = vi.spyOn(Clipboard.prototype, 'copy').mockImplementation(() => {});
+  const { mode, terminal } = build({ scheduler });
+  const host = mode as unknown as { view: InteractiveView; options: { runtimeContext: ShellRuntimeContext } };
+  host.options.runtimeContext.runtimeConfig.vimMode = true;
+  mode.start();
+  try {
+    host.view.editor.setText('👩‍💻b');
+    host.view.editor.move('doc-start');
+    terminal.input('\x1b');
+    scheduler.flush();
+    terminal.input('v');
+    scheduler.flush();
+    terminal.input('\x03');
+    scheduler.flush();
+    expect(copy).toHaveBeenCalledWith('👩‍💻');
+    expect(host.view.editor.getText()).toBe('👩‍💻b');
+  } finally { mode.stop(); }
+});
+
+it('resets pending Vim state when the real external-editor round trip adopts a draft', () => {
+  const scheduler = new ManualScheduler();
+  const { mode, terminal } = build({ scheduler });
+  const host = mode as unknown as { view: InteractiveView; preferences: { openExternalEditor(text: string): void };
+    options: { runtimeContext: ShellRuntimeContext } };
+  host.options.runtimeContext.runtimeConfig.vimMode = true;
+  vi.spyOn(externalEditor, 'editExternally').mockReturnValue({ text: 'fresh draft' });
+  mode.start();
+  try {
+    terminal.input('\x1b');
+    scheduler.flush();
+    terminal.input('d');
+    scheduler.flush();
+    host.preferences.openExternalEditor(host.view.editor.getText());
+    terminal.input('x');
+    scheduler.flush();
+    expect(host.view.editor.getText()).toBe('fresh draftx');
+  } finally { mode.stop(); }
+});
+
+it('answers runtime questions through the text channel while Vim is in Normal mode', async () => {
+  const scheduler = new ManualScheduler();
+  const { mode, terminal, readline } = build({ scheduler });
+  const host = mode as unknown as { options: { runtimeContext: ShellRuntimeContext } };
+  host.options.runtimeContext.runtimeConfig.vimMode = true;
+  mode.start();
+  try {
+    terminal.input("\x1b");
+    scheduler.flush();
+    let answer: string | undefined;
+    (readline.current as { question(query: string, callback: (value: string) => void): void })
+      .question("Need an answer", value => { answer = value; });
+    terminal.input("y");
+    scheduler.flush();
+    terminal.input("\r");
+    scheduler.flush();
+    await vi.waitFor(() => expect(answer).toBe("y"));
+  } finally { mode.stop(); }
+});
+
+it('starts Vim in Insert mode after it is disabled and enabled again', async () => {
+  const scheduler = new ManualScheduler();
+  const { mode, terminal } = build({ scheduler });
+  const host = mode as unknown as { view: InteractiveView; options: { runtimeContext: ShellRuntimeContext } };
+  host.options.runtimeContext.runtimeConfig.vimMode = true;
+  mode.start();
+  try {
+    terminal.input("\x1b");
+    scheduler.flush();
+    host.options.runtimeContext.runtimeConfig.vimMode = false;
+    terminal.input("x");
+    scheduler.flush();
+    host.options.runtimeContext.runtimeConfig.vimMode = true;
+    terminal.input("i");
+    scheduler.flush();
+    expect(host.view.editor.getText()).toBe("xi");
   } finally { mode.stop(); }
 });
 

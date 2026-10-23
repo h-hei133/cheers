@@ -3,20 +3,40 @@ import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 
 export const LOG_TAIL_BYTES = 512 * 1024;
+export const LOG_DIRECTORY_ENTRIES = 256;
+export const LOG_FILE_LIMIT = 32;
+export const LOG_TOTAL_BYTES = 2 * 1024 * 1024;
 
 /** Oldest first; callers choose a single live family or the full metrics history. */
 export function orderedLogFiles(directory: string, currentPath: string, options: {
-  familyOnly?: boolean; strict?: boolean; onUnavailable?: (target: 'directory' | 'file') => void;
+  familyOnly?: boolean; strict?: boolean; maxEntries?: number; maxFiles?: number;
+  onUnavailable?: (target: 'directory' | 'file') => void; onTruncated?: () => void;
 } = {}): string[] {
   let names: string[];
-  try { names = fs.readdirSync(directory); } catch (error) {
+  try {
+    if (options.maxEntries === undefined) names = fs.readdirSync(directory);
+    else {
+      names = [];
+      const entries = fs.opendirSync(directory, { bufferSize: 32 });
+      try {
+        while (names.length < options.maxEntries) {
+          const entry = entries.readSync();
+          if (!entry) break;
+          names.push(entry.name);
+        }
+        if (names.length === options.maxEntries && entries.readSync() !== null) options.onTruncated?.();
+      } finally {
+        entries.closeSync();
+      }
+    }
+  } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
     options.onUnavailable?.('directory');
     if (!options.strict) return [];
     throw error;
   }
   const base = path.basename(currentPath).replace(/\.log(?:\.\d+)?$/, ".log");
-  return names.filter((name) => /\.log(?:\.\d+)?$/.test(name)
+  const files = names.filter((name) => /\.log(?:\.\d+)?$/.test(name)
     && (!options.familyOnly || name === base || (name.startsWith(`${base}.`) && /^\d+$/.test(name.slice(base.length + 1)))))
     .flatMap((name) => {
       const file = path.join(directory, name);
@@ -28,12 +48,17 @@ export function orderedLogFiles(directory: string, currentPath: string, options:
     })
     .sort((left, right) => left.time - right.time
       || Number(left.file === currentPath) - Number(right.file === currentPath)
-      || left.file.localeCompare(right.file, undefined, { numeric: true }))
-    .map(({ file }) => file);
+      || left.file.localeCompare(right.file, undefined, { numeric: true }));
+  if (options.maxFiles !== undefined && files.length > options.maxFiles) {
+    options.onTruncated?.();
+    return files.slice(-options.maxFiles).map(({ file }) => file);
+  }
+  return files.map(({ file }) => file);
 }
 
 /** A bounded tail, retaining only whole lines and respecting short reads. */
-export function tailLines(file: string, maxBytes = LOG_TAIL_BYTES, options: { strict?: boolean } = {}): string[] {
+export function tailLines(file: string, maxBytes = LOG_TAIL_BYTES,
+  options: { strict?: boolean; onBytes?: (bytes: number) => void } = {}): string[] {
   let handle: number | undefined;
   try {
     handle = fs.openSync(file, "r");
@@ -46,6 +71,7 @@ export function tailLines(file: string, maxBytes = LOG_TAIL_BYTES, options: { st
       if (count === 0) break;
       read += count;
     }
+    options.onBytes?.(read);
     let text = buffer.toString("utf8", 0, read);
     if (start > 0) {
       const previous = Buffer.alloc(1);

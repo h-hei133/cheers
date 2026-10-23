@@ -8735,3 +8735,29 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 原tree修复failedreload旧选项、close复活及freshread后准入缺失三个实际AssertionError；load/投影/选择复验generation/browser/runtime控制，先消费后原rewind/fork/historydraft，正常accepted browser结束与cancel分开。原cleanse选择身份提炼到picker/selection/state并删除旧实现，registry只live accessor；明确projectRoot/cwd分离、物理两根及saved session id/root校验，原schema/reader/limits/writer不变。
 - 最终296host/准确20.3、10有效反转六hash保持、strict TS/双构建/静态门/CLI19/matrix/NormProof0partial；原冗余单guardgreen、不存在/workspace及后续旧projectRoot/source.session夹具失败、错误tsconfig路径与test变更后exe freshness拒绝保留。samebuild51cae2e97a93/exedc50bff756f4四格PTY pass/exit0 build前后一致，206messages全源分支search/精确quoted historydraft/cancel/失败重开/stale refusal/current native selection，文件/消息保持。独立code APPROVE（28两runtime/296focused/typecheck）/architecture源码CLEAR/资源WATCH（47两runtime/260focused/AST/import/cycles），六hash两报告绑定、fixtures清除，综合COMMENT无BLOCK；tree15/shared4/cleanse13、registry37原超限不增。commit/push/newSHA CI另绑定。
 - 生命周期后置fences不证明同步fullread/parse/hash抢占、总体heap/累计physical I/O/最长响应/跨平台；原24.25MiB/20kentries是单source合同，35complete/12partial保持，后续沿原navigation/query资源继续。参考controller identity/failedload clearing/disposal只用于此生命周期决定。
+
+## [2026-10-24] fix | PAN-02/PAN-06/PAN-08/INPUT-01 本地硬化与取消生命周期
+
+- INPUT-01 拆分 modal types/buffer/motion，修复 Replace 命名键与覆盖恢复、Normal Escape/Ctrl+C 交还宿主、question 绕过 Vim、Visual 源选区、失效 paste placeholder、8MiB 单次/32MiB 总量界、复合 count 上限及空白处 w/e；真实平台 IME 仍未验证。
+- PAN-02/PAN-06 将 preview 改为首个非空逻辑行与有界 code-point 扫描，Option/Tree/Copy/Rewind 缓存按候选对象的搜索文本且保持 20k label 懒测量。catalogue 每页 discovery/stat、tree/back 同步全读、restore 续页重扫与 history 超限整单拒绝仍是明确 partial 缺口。
+- PAN-08 在 report clone/freeze/render 前限制 1MiB/20k节点/20k行/深度32，持久报告超限回退安全文本；skill 正文保留 Markdown 语义但中和 OSC/CSI/C0；MCP tools 共享 deadline 并限制累计 4MiB/10k，SSE fatal UTF-8；help/picker 使用 accepted config，禁用 `/mcp` 不再绕过；tools 精确身份、host 取消 signal 及 `outcome.next` controller transfer 保持 copy/back/restore 多级续页。
+- 最终 21文件/411项通过；本轮18组实际反转先 exit1 后恢复。scripts157、result-contract158、CLI19、静态门、TS/exe构建通过；同 build `735cedb82fd5` 的 Node/exe × regular/fullscreen/line/pipe 八格 PTY pass/exit0，exe SHA-256 `89ef0aab206e59bd1b6374510958eca8255f412d601d4f155eb3d7ad9e1f1da4`。
+- 默认并行完整 `test:ts` 保留 3文件/7项失败（browser skills 3、browser healing 3、baseline streaming 1）；隔离重跑分别为5/5、12/12、1/1通过，未宣称完整套件 green。独立审查最终 no findings；未提交/推送/启动新 SHA CI，真实 MCP/IME、系统复制、Windows交互PTY及整体heap/累计I/O仍缺，35 complete/12 partial保持。
+
+## [2026-10-24] fix | PAN-02/PAN-06/PAN-07/PAN-08/INPUT-01 本地硬化收口
+
+- PAN-02/PAN-06 将 catalogue 与 restore 后续页绑定 attempt-local boundary/page index，分别最多保留 8/16 个 attempt；后续页只读取当前页并复验版本，不再每页 discovery 或整 ledger 重扫。损坏/超限 transcript 保留可读前缀，输出 `quality: partial`、warnings 和 `actionSafe: false`，所有导航点只读禁用。
+- PAN-08 补齐 MCP client 跨页、gateway 跨 server 与 peek 的统一 30 秒绝对期限、累计 4 MiB/10k tools fail-closed；`/tools`、`/skill`、`/cost`、`/help`、`/context` 增加 producer top-N/omitted/partial，`/context` 传播 signal 并按工具增量测量 schema JSON。debug logs/metrics 也限制目录项、shard 与累计读取字节。
+- PAN-07/INPUT-01 让 Visual/Visual-Line Ctrl+C 复制真实 source selection，文本/图片 paste 共享 128项/32MiB LRU，device-code poll 可 abort 且迟到 token 不发布；extension unknown outcome 跨进程 journal 恢复并 fail-closed，panel projection 将 notices、package 基础字段、actions 与 detail 全部计入 512KiB，并输出 partial/omitted。强化跨重启测试发现并修复 `ExtensionService.close()` 未 drain 时只留在内存、未写 journal 的真实缺口。
+- 最终改动测试集 30文件/566项通过；默认隔离线程完整 `test:ts` 为 955文件/10,288项通过、1文件/9项跳过、0失败。单线程尝试保留 6文件/12项失败分类：7项为测试前源码变更后的 build freshness 拒绝，5项为同进程 timer stub 泄漏；重建后对应 CLI 7/7 与 webRequests 44/44 隔离通过。
+- scripts157、result-contract 6套158项、CLI入口19项、cycles/config/declarations/Node floor 通过；27组实际反转均先 exit1 后恢复，`interactiveMode.ts` 从本轮峰值24个函数降至20以内。build `7c8c246ee194`、inputs `252e1822710e`、artifact `0248c36c1593`、exe SHA-256 `921560f54a0b`；同 build Node/exe × regular/fullscreen/line/pipe 八格 PTY 全部 pass/exit0，证据 `.omx/artifacts/phase20-local-hardening-7c8c246ee194/`。
+- 仍保留 tree/back/cleanse 完整源读取、跨全部页累计 physical I/O、瞬态 heap/最长响应、真实 MCP/认证、IME、系统剪贴板、Windows PTY 与真实评测缺口；`normproof judge` 当前不可用（exit127），独立审查、commit、push、新 SHA CI 均未完成，矩阵保持 35 complete/12 partial/0 open。
+
+## [2026-10-24] review | PAN-02/PAN-06/PAN-07/PAN-08/INPUT-01 独立复审与最终本地验证
+
+- 两轮只读独立复审累计提出 12 项 findings，覆盖 MCP 在途 deadline/cleanup blocker、catalogue partial/limited 续页继承与 20k index 上限、extension omitted actions 与旧快照类型、paste 普通文本/已签发 ID 碰撞、过期矩阵/contract 文案、`2dG`/`1dG` 及反转测试有效性。全部修复后两位 reviewer 对最终工作树均给出 no blocker。
+- MCP deadline 现在保留 parent abort reason；在途 `tools/list` 超时会关闭 transport 并返回 `McpGatewayBlockedError`，即使 cleanup reject 也不丢失 blocker/doNext。测试同时 spy 实际 `CoreMcpClient.close()` 并覆盖 cleanup 失败。
+- catalogue 续页累计继承 `unreadable/limited`，每个 browse attempt 最多保留20k boundary，超出显式 partial；20,001条、续页与 exact-boundary测试通过。paste 仅识别本 store 实际签发的完整 placeholder，普通 `[#1 appendix]` 和 payload 不同的同 ID 文本不误判，clear 后原 placeholder 仍报 stale。ExtensionSnapshot 新字段改为可选，旧 producer 可在运行时和类型层兼容。
+- 最终聚焦7文件/244项通过；首轮并发完整套件中两个无关长链测试失败，分别14/14、12/12隔离通过。按现有 `VITEST_MAX_THREADS=2 VITEST_MIN_THREADS=2` 最终完整 `test:ts` exit0：955文件通过/1跳过，10,295项通过/10跳过/0失败，860.48秒。scripts157、result-contract6套158项、CLI入口19、cycles/config/declarations/Node floor通过；facade与call reachability保持既有9/11 advisory。
+- 最终 build `4c2cd4069623760c8daa5974fc057ed8fc176609afe8e1324236507209fb0d31`，inputs `dc55921a92422c0b04396c897387b93110a571d2393b8e8423843f8c5a6aa2d9`，artifact `8a0990e5f6d1d9038e8398318be7a0bec75eb325118e58deb2dd6636276a5c9f`，exe SHA-256 `2bc092f5e32161c3cf30b3cac253c7d12579f00d77e9e8f7b59cfd579df0e3cb`。Node/exe × regular/fullscreen/line/pipe八格PTY全部pass/exit0，八份JSON绑定同build/exe，证据`.omx/artifacts/phase20-local-hardening-4c2cd4069623/`。
+- `normproof judge`仍exit127（不在PATH），不计通过。真实 MCP/auth、IME、系统剪贴板、Windows交互PTY、真实模型评测、完整heap/最长响应/累计physical I/O及剩余12项继续WATCH；此提交前记录不声称commit/push/新SHA CI或Phase20完成。

@@ -78,7 +78,7 @@ export async function pollDeviceFlow<T>(options: DeviceFlowOptions<T>): Promise<
   while (Date.now() < deadline) {
     if (options.signal?.aborted) throw new DeviceFlowError("The sign-in was cancelled.", "cancelled");
 
-    const outcome = await options.poll();
+    const outcome = await pollInterruptibly(options.poll, options.signal);
     if (outcome.status === "complete") return outcome.value;
     if (outcome.status === "failed") throw new DeviceFlowError(outcome.message, "refused");
     if (outcome.status === "slow_down") {
@@ -101,6 +101,42 @@ export async function pollDeviceFlow<T>(options: DeviceFlowOptions<T>): Promise<
         "timeout",
       )
     : new DeviceFlowError("The sign-in timed out before it was completed.", "timeout");
+}
+
+/** Let a pending provider request finish without publishing a late token. */
+function pollInterruptibly<T>(
+  poll: () => PollOutcome<T> | Promise<PollOutcome<T>>,
+  signal: AbortSignal | undefined,
+): Promise<PollOutcome<T>> {
+  const attempt = Promise.resolve().then(poll);
+  if (!signal) return attempt;
+  if (signal.aborted) return Promise.reject(new DeviceFlowError("The sign-in was cancelled.", "cancelled"));
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = (): void => signal.removeEventListener("abort", onAbort);
+    const onAbort = (): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new DeviceFlowError("The sign-in was cancelled.", "cancelled"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    attempt.then(
+      value => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value);
+      },
+      error => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      },
+    );
+  });
 }
 
 /**

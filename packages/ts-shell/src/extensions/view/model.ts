@@ -18,6 +18,13 @@ export interface ExtensionSnapshot {
   readonly notices: readonly string[];
   readonly install: ExtensionAction;
   readonly mutationBlocked: boolean;
+  /** Optional for persisted or mocked producers created before bounded projection. */
+  readonly partial?: boolean;
+  readonly omitted?: {
+    readonly notices: number;
+    readonly detailLines: number;
+    readonly actions: number;
+  };
 }
 export type ExtensionInspection = { readonly state: 'ready'; readonly snapshot: ExtensionSnapshot }
   | { readonly state: 'stale' | 'unavailable' };

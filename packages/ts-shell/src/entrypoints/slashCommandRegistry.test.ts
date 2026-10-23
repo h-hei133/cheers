@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { listVisibleCommands } from '../core/commands/registry.js';
 import { commandInvocations } from '../core/commands/invocation.js';
+import type { RuntimeConfig } from '../config/runtimeConfig.js';
 import {
   getSlashCommand,
   getSlashInvocation,
@@ -80,6 +81,13 @@ it("enumerates builtins, the interactive entry, aliases, and distinct invocation
   expect(getSlashInvocation("/extensions")).toMatchObject({ name: "extensions", commandName: "plugin", invocation: "/extensions", kind: "alias" });
   expect(getSlashInvocation("/RECALL")).toMatchObject({ name: "recall", commandName: "memory", invocation: "/recall", kind: "named", argumentHint: "<query>" });
   expect(capture(renderUserHelp).join("\n")).toContain("/recall");
+});
+
+it("projects command visibility from the accepted runtime config", () => {
+  const disabled = { enableMcpTools: false } as RuntimeConfig;
+  const enabled = { enableMcpTools: true } as RuntimeConfig;
+  expect(listSlashCommands({ root: '/workspace', runtimeConfig: disabled }).some(command => command.name === 'mcp')).toBe(false);
+  expect(listSlashCommands({ root: '/workspace', runtimeConfig: enabled }).some(command => command.name === 'mcp')).toBe(true);
 });
 
 it.each(["model", "models", "recall", "back"])("rejects an extension alias that shadows %s", (alias) => {

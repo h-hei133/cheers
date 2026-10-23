@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CoreMcpClient } from "./client.js";
+import { CoreMcpConnectionManager } from "./connectionManager.js";
 import { parseSyntax } from '../commands/syntax/parse.js';
 import { mcpSyntax } from '../commands/mcp/syntax.js';
 import { McpConfigLoadError, loadMcpConfigs } from "./config.js";
@@ -11,6 +12,7 @@ import {
   McpGatewayBlockedError,
   describeMcpConnectionState,
 } from "./gateway.js";
+import type { ScopedMcpServerConfig } from "./types.js";
 
 describe("core MCP gateway (W3)", () => {
   let fakeHomeDir = "";
@@ -31,6 +33,7 @@ describe("core MCP gateway (W3)", () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     await Promise.all(gateways.splice(0).map(gateway => gateway.close()));
     if (originalUserProfile === undefined) delete process.env.USERPROFILE;
@@ -276,6 +279,208 @@ describe("core MCP gateway (W3)", () => {
     await expect(gateway.invokeTool("localSdk", "search", {})).rejects.toThrow(
       "Unknown MCP server: localSdk",
     );
+  });
+
+  it("fails one snapshot when separate servers exceed the shared catalog budget", async () => {
+    fs.writeFileSync(path.join(workspaceRoot, ".cheers.mcp.json"), JSON.stringify({ mcpServers: {
+      first: { transport: "stdio", command: "never-spawn" },
+      second: { transport: "stdio", command: "never-spawn" },
+    } }));
+    vi.spyOn(CoreMcpClient.prototype, "connect").mockImplementation(async function () {
+      return { type: "connected", name: this.name, config: this.config };
+    });
+    vi.spyOn(CoreMcpClient.prototype, "listTools").mockImplementation(async function () {
+      const bytes = this.name === "first" ? 3 * 1024 * 1024 : 2 * 1024 * 1024;
+      return [{
+        serverName: this.name,
+        toolName: "large",
+        qualifiedName: `mcp__${this.name}__large`,
+        description: "x".repeat(bytes),
+        inputSchema: { type: "object" },
+      }];
+    });
+    const gateway = new CoreMcpGateway(workspaceRoot);
+    gateways.push(gateway);
+
+    await expect(gateway.snapshot()).rejects.toMatchObject({
+      name: "McpGatewayBlockedError",
+      mcpFailureClass: "protocol",
+    });
+    expect(gateway.peekSnapshot()).toBeUndefined();
+  });
+
+  it("fails one snapshot when separate servers exceed the shared tool-count budget", async () => {
+    fs.writeFileSync(path.join(workspaceRoot, ".cheers.mcp.json"), JSON.stringify({ mcpServers: {
+      first: { transport: "stdio", command: "never-spawn" },
+      second: { transport: "stdio", command: "never-spawn" },
+    } }));
+    vi.spyOn(CoreMcpClient.prototype, "connect").mockImplementation(async function () {
+      return { type: "connected", name: this.name, config: this.config };
+    });
+    vi.spyOn(CoreMcpClient.prototype, "listTools").mockImplementation(async function () {
+      return Array.from({ length: 5_001 }, (_, index) => ({
+        serverName: this.name,
+        toolName: `tool-${index}`,
+        qualifiedName: `mcp__${this.name}__tool-${index}`,
+        description: "",
+        inputSchema: { type: "object" },
+      }));
+    });
+    const gateway = new CoreMcpGateway(workspaceRoot);
+    gateways.push(gateway);
+
+    await expect(gateway.snapshot()).rejects.toMatchObject({
+      name: "McpGatewayBlockedError",
+      mcpFailureClass: "protocol",
+    });
+    expect(gateway.peekSnapshot()).toBeUndefined();
+  });
+
+  it("closes an in-flight catalog and preserves the blocking contract on deadline", async () => {
+    fs.writeFileSync(path.join(workspaceRoot, ".cheers.mcp.json"), JSON.stringify({ mcpServers: {
+      slow: { transport: "stdio", command: "never-spawn" },
+    } }));
+    vi.spyOn(CoreMcpClient.prototype, "connect").mockImplementation(async function () {
+      return { type: "connected", name: this.name, config: this.config };
+    });
+    vi.spyOn(CoreMcpClient.prototype, "listTools").mockImplementation(async function (_admission, signal) {
+      return await new Promise<never>((_resolve, reject) => {
+        const abort = () => reject(signal?.reason ?? new Error("aborted"));
+        if (signal?.aborted) abort();
+        else signal?.addEventListener("abort", abort, { once: true });
+      });
+    });
+    const close = vi.spyOn(CoreMcpClient.prototype, "close").mockResolvedValue();
+    const gateway = new CoreMcpGateway(workspaceRoot, undefined, undefined, 25);
+    gateways.push(gateway);
+
+    await expect(gateway.snapshot()).rejects.toMatchObject({
+      name: "McpGatewayBlockedError",
+      mcpFailureClass: "timeout-cancelled",
+    });
+    expect(close).toHaveBeenCalledOnce();
+    expect(gateway.peekSnapshot()).toBeUndefined();
+  });
+
+  it("preserves the deadline blocker when transport cleanup cannot be confirmed", async () => {
+    fs.writeFileSync(path.join(workspaceRoot, ".cheers.mcp.json"), JSON.stringify({ mcpServers: {
+      slow: { transport: "stdio", command: "never-spawn" },
+    } }));
+    vi.spyOn(CoreMcpClient.prototype, "connect").mockImplementation(async function () {
+      return { type: "connected", name: this.name, config: this.config };
+    });
+    vi.spyOn(CoreMcpClient.prototype, "listTools").mockImplementation(async function (_admission, signal) {
+      return await new Promise<never>((_resolve, reject) => {
+        const abort = () => reject(signal?.reason ?? new Error("aborted"));
+        if (signal?.aborted) abort();
+        else signal?.addEventListener("abort", abort, { once: true });
+      });
+    });
+    const close = vi.spyOn(CoreMcpClient.prototype, "close").mockRejectedValue(new Error("cleanup failed"));
+    const gateway = new CoreMcpGateway(workspaceRoot, undefined, undefined, 25);
+    gateways.push(gateway);
+    try {
+      await expect(gateway.snapshot()).rejects.toMatchObject({
+        name: "McpGatewayBlockedError",
+        mcpFailureClass: "timeout-cancelled",
+        message: expect.stringContaining("cleanup could not be confirmed"),
+      });
+      expect(close).toHaveBeenCalledOnce();
+    } finally {
+      close.mockRestore();
+    }
+  });
+
+  it("withholds a peeked snapshot when separate clients exceed the shared byte budget", async () => {
+    const manager = new CoreMcpConnectionManager();
+    const firstConfig: ScopedMcpServerConfig = { transport: "stdio", command: "never-spawn", scope: "user" };
+    const secondConfig: ScopedMcpServerConfig = { transport: "stdio", command: "never-spawn", scope: "user" };
+    const descriptor = (serverName: string) => ({
+      serverName,
+      toolName: "large",
+      qualifiedName: `mcp__${serverName}__large`,
+      description: "x".repeat(3 * 1024 * 1024),
+      inputSchema: { type: "object" },
+    });
+    vi.spyOn(manager.get("first", firstConfig, workspaceRoot), "peekTools").mockReturnValue([descriptor("first")]);
+    vi.spyOn(manager.get("second", secondConfig, workspaceRoot), "peekTools").mockReturnValue([descriptor("second")]);
+    try {
+      expect(manager.peekSnapshot({ first: firstConfig, second: secondConfig })).toBeUndefined();
+    } finally {
+      await manager.shutdown();
+    }
+  });
+
+  it("withholds a peeked snapshot when separate clients exceed the shared tool-count budget", async () => {
+    const manager = new CoreMcpConnectionManager();
+    const firstConfig: ScopedMcpServerConfig = { transport: "stdio", command: "never-spawn", scope: "user" };
+    const secondConfig: ScopedMcpServerConfig = { transport: "stdio", command: "never-spawn", scope: "user" };
+    const descriptors = (serverName: string) => Array.from({ length: 5_001 }, (_, index) => ({
+      serverName,
+      toolName: `tool-${index}`,
+      qualifiedName: `mcp__${serverName}__tool-${index}`,
+      description: "",
+      inputSchema: { type: "object" },
+    }));
+    vi.spyOn(manager.get("first", firstConfig, workspaceRoot), "peekTools").mockReturnValue(descriptors("first"));
+    vi.spyOn(manager.get("second", secondConfig, workspaceRoot), "peekTools").mockReturnValue(descriptors("second"));
+    try {
+      expect(manager.peekSnapshot({ first: firstConfig, second: secondConfig })).toBeUndefined();
+    } finally {
+      await manager.shutdown();
+    }
+  });
+
+  it("uses one absolute deadline across connection and catalog work for every server", async () => {
+    fs.writeFileSync(path.join(workspaceRoot, ".cheers.mcp.json"), JSON.stringify({ mcpServers: {
+      first: { transport: "stdio", command: "never-spawn" },
+      second: { transport: "stdio", command: "never-spawn" },
+    } }));
+    const connect = vi.spyOn(CoreMcpClient.prototype, "connect").mockImplementation(async function (_admission, signal) {
+      if (this.name === "first") await new Promise<void>((_resolve, reject) => {
+        signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+      });
+      return { type: "connected", name: this.name, config: this.config };
+    });
+    const list = vi.spyOn(CoreMcpClient.prototype, "listTools").mockResolvedValue([]);
+    const gateway = new CoreMcpGateway(workspaceRoot, undefined, undefined, 30);
+    gateways.push(gateway);
+
+    await expect(gateway.snapshot()).rejects.toMatchObject({
+      name: "McpGatewayBlockedError",
+      mcpFailureClass: "timeout-cancelled",
+    });
+    expect(connect.mock.instances.map(client => client.name)).toEqual(["first"]);
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it("shares one absolute lifecycle and deadline between servers", async () => {
+    fs.writeFileSync(path.join(workspaceRoot, ".cheers.mcp.json"), JSON.stringify({ mcpServers: {
+      first: { transport: "stdio", command: "never-spawn" },
+      second: { transport: "stdio", command: "never-spawn" },
+    } }));
+    const signals: AbortSignal[] = [];
+    const deadlines: number[] = [];
+    vi.spyOn(CoreMcpClient.prototype, "connect").mockImplementation(async function (_admission, signal) {
+      signals.push(signal!);
+      return { type: "connected", name: this.name, config: this.config };
+    });
+    vi.spyOn(CoreMcpClient.prototype, "listTools").mockImplementation(async function (_admission, signal, options) {
+      signals.push(signal!);
+      deadlines.push(options!.deadline!);
+      return [];
+    });
+    const started = Date.now();
+    const gateway = new CoreMcpGateway(workspaceRoot, undefined, undefined, 5_000);
+    gateways.push(gateway);
+
+    await gateway.snapshot();
+    expect(signals).toHaveLength(4);
+    expect(new Set(signals).size).toBe(1);
+    expect(deadlines).toHaveLength(2);
+    expect(new Set(deadlines).size).toBe(1);
+    expect(deadlines[0]).toBeGreaterThanOrEqual(started);
+    expect(deadlines[0]).toBeLessThanOrEqual(started + 6_000);
   });
 
   it("does not put a config's mock tools in front of the model", async () => {

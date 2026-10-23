@@ -7,6 +7,7 @@ import { readTextFile } from '../../core/workspace/files.js';
 import { canonical, digest, manifest, name, relativePath, release } from '../registry/validation.js';
 import type { ExtensionState, PackageRecord, VersionRecord, EffectOutcome } from '../model.js';
 import { assertStoragePath } from './paths.js';
+import { clearUnknownOutcomes, readUnknownOutcomes, unknownFile, writeUnknownOutcomes } from './unknown.js';
 export { assertStoragePath, storageIdentity, assertStorageIdentity } from './paths.js';
 
 const STATE_CHARACTERS = 2 * 1024 * 1024;
@@ -54,8 +55,13 @@ export function readState(file = extensionFile()): ExtensionState {
 export function stateIdentity(state: ExtensionState): string { return digest(canonical(state)); }
 export class ExtensionStore {
   private readonly profile = currentProfile();
-  readonly outcomes: EffectOutcome[] = [];
-  constructor(readonly file = extensionFile(), readonly save = writeJsonFileAtomic) { assertProfileStorage(file, this.profile); }
+  readonly outcomes: EffectOutcome[];
+  constructor(readonly file = extensionFile(), readonly save = writeJsonFileAtomic,
+    private readonly saveUnknown = writeUnknownOutcomes) {
+    assertProfileStorage(file, this.profile);
+    assertProfileStorage(unknownFile(file), this.profile);
+    this.outcomes = readUnknownOutcomes(unknownFile(file));
+  }
   read(): ExtensionState { assertProfileStorage(this.file, this.profile); return readState(this.file); }
   locked<T>(expected: ExtensionState, action: (state: ExtensionState) => T): T {
     assertProfileStorage(`${this.file}.lock`, this.profile);
@@ -66,7 +72,27 @@ export class ExtensionStore {
     assertProfileStorage(this.file, this.profile);
     const actual: EffectOutcome = { ...outcome, durability: 'confirmed' };
     try { this.save(this.file, { ...state, revision: state.revision + 1 }); assertProfileStorage(this.file, this.profile); }
-    catch { const unknown: EffectOutcome = { ...outcome, durability: 'unknown' }; this.outcomes.push(unknown); return unknown; }
+    catch { return this.recordUnknown(outcome); }
     this.outcomes.push(actual); if (this.outcomes.length > 32) this.outcomes.shift(); return actual;
+  }
+  recordUnknown(outcome: Omit<EffectOutcome, 'durability'>): EffectOutcome {
+    assertProfileStorage(this.file, this.profile);
+    assertProfileStorage(unknownFile(this.file), this.profile);
+    let unknown: EffectOutcome = { ...outcome, durability: 'unknown' };
+    const journaled = [...this.outcomes.filter(entry => entry.durability === 'unknown'), unknown].slice(-32);
+    try {
+      this.saveUnknown(unknownFile(this.file), journaled);
+    } catch {
+      unknown = { ...unknown, detail: `${unknown.detail} Unknown-outcome journal write failed; this process remains blocked.` };
+    }
+    this.outcomes.push(unknown);
+    if (this.outcomes.length > 32) this.outcomes.shift();
+    return unknown;
+  }
+  resolveUnknown(): void {
+    assertProfileStorage(unknownFile(this.file), this.profile);
+    clearUnknownOutcomes(unknownFile(this.file));
+    const confirmed = this.outcomes.filter(entry => entry.durability === 'confirmed');
+    this.outcomes.splice(0, this.outcomes.length, ...confirmed);
   }
 }

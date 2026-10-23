@@ -141,8 +141,12 @@ export interface ViewActions {
    * steals the arrow keys from prompt-history recall.
    */
   syncSuggestions(mayOpen: boolean): void;
-  /** Copy active mouse selection to clipboard and clear highlight. Returns true if copied. */
-  copySelection?(): boolean;
+  /** Copy an active source or mouse selection and clear its highlight. */
+  copySelection?(selection?: SourceSelection): boolean;
+  /** Report a non-fatal input refusal without changing the draft. */
+  reportNotice?(message: string): void;
+  /** Project or clear the modal editor's source selection. */
+  setSourceSelection?(selection: SourceSelection | undefined): void;
   /** Collapse or expand the reasoning blocks, or the tool output. */
   toggleCollapsed(only: "thinking" | "tool"): void;
   /**

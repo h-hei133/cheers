@@ -61,7 +61,7 @@ export async function resolveSkillCatalog(options: SkillCatalogOptions, onSource
   const skills = new Map(loaded.skills);
   const owners = new Map<string, CatalogContribution>();
   if (!options.noSkills) for (const entry of catalogContributions(options.workspaceRoot, options.sessionId)) {
-    const contributed = await entry.skills(options.abortSignal, discovery);
+    const contributed = await abortable(entry.skills(options.abortSignal, discovery), options.abortSignal);
     options.abortSignal?.throwIfAborted();
     if (!catalogContributions(options.workspaceRoot, options.sessionId).includes(entry)) continue;
     for (const skill of contributed) if (!skills.has(skill.name) && skill.isCurrent?.() !== false) {
@@ -83,4 +83,38 @@ export async function resolveSkillCatalog(options: SkillCatalogOptions, onSource
     diagnostics,
     failures,
   };
+}
+
+function abortable<T>(value: T | PromiseLike<T>, signal?: AbortSignal): Promise<T> {
+  const promise = Promise.resolve(value);
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    let abortTimer: ReturnType<typeof setTimeout> | undefined;
+    const cleanup = (): void => {
+      signal.removeEventListener('abort', abort);
+      if (abortTimer !== undefined) clearTimeout(abortTimer);
+    };
+    const abort = (): void => {
+      abortTimer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(signal.reason);
+      }, 0);
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    promise.then(value => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(value);
+    }, error => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    });
+  });
 }

@@ -32,12 +32,16 @@ describe('recovery catalogue pages', () => {
   it('reaches every record in bounded pages without loading complete directory arrays', async () => {
     const ledgerRoot = await ledger(205);
     vi.spyOn(fs, 'readdir').mockRejectedValue(new Error('Unbounded directory read forbidden'));
+    const list = vi.spyOn(index, 'listRecoveryAuthorityRecords');
     const first = await readRecoveryCatalogPage({ ledgerRoot });
     expect(first.records).toHaveLength(100);
     expect(first.matches).toBe(205);
     expect(first.records[0]?.recordId).toBe('record-204');
+    list.mockClear();
     const second = await readRecoveryCatalogPage({ ledgerRoot, after: first.next });
     const third = await readRecoveryCatalogPage({ ledgerRoot, after: second.next });
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(list.mock.calls.every(([input]) => input.recordIds?.length === 100 || input.recordIds?.length === 5)).toBe(true);
     expect(second.records).toHaveLength(100);
     expect(third.records).toHaveLength(5);
     expect(third.next).toBeUndefined();
@@ -49,10 +53,22 @@ describe('recovery catalogue pages', () => {
     expect(fs.readdir).not.toHaveBeenCalled();
   });
 
-  it('rejects a continuation after hidden metadata changes', async () => {
+  it('rejects a continuation after ledger membership changes', async () => {
     const ledgerRoot = await ledger(101);
     const first = await readRecoveryCatalogPage({ ledgerRoot });
-    const file = path.join(ledgerRoot, 'edit-a', 'records', 'record-000.json');
+    await captureRecoveryAuthorityRecord({
+      mode: 'non-default', ledgerRoot, authorityId: 'edit-a', recordId: 'record-new',
+      workspaceRelativePath: 'record-new.txt', operationKind: 'update', beforeState: 'exists',
+      beforeContent: 'before', expectedCurrentState: 'exists', expectedCurrentContent: 'after',
+      createdAt: '2026-10-22T00:00:00.000Z',
+    });
+    await expect(readRecoveryCatalogPage({ ledgerRoot, after: first.next })).rejects.toThrow('changed');
+  });
+
+  it('rejects a continuation when a page record changes before it is read', async () => {
+    const ledgerRoot = await ledger(205);
+    const first = await readRecoveryCatalogPage({ ledgerRoot });
+    const file = path.join(ledgerRoot, 'edit-a', 'records', 'record-104.json');
     const record = JSON.parse(await fs.readFile(file, 'utf8'));
     await fs.writeFile(file, JSON.stringify({ ...record, expectedCurrentMode: 0o600 }));
     await expect(readRecoveryCatalogPage({ ledgerRoot, after: first.next })).rejects.toThrow('changed');

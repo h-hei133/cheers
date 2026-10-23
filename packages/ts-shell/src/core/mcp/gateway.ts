@@ -19,6 +19,12 @@ import type {
 import {
   classifyMcpFailure,
 } from "./errorTaxonomy.js";
+import {
+  MCP_CATALOG_BYTES,
+  MCP_CATALOG_TIMEOUT_MS,
+  MCP_CATALOG_TOOLS,
+  McpCatalogLimitError,
+} from './catalogLimit.js';
 
 export { describeMcpConnectionState, McpGatewayBlockedError, type McpGatewayBlockerKind } from "./status.js";
 import { describeMcpConnectionState, McpGatewayBlockedError, unknownServer, failureClassForConnectionState } from "./status.js";
@@ -32,7 +38,8 @@ export class CoreMcpGateway {
   private readonly contentLifetime = new McpContentLifetime();
 
   constructor(private readonly root: string | (() => string), private readonly admissionForOperation?: () => Admission,
-    authorizationFor?: (name: string, config: ScopedMcpServerConfig) => McpHttpAuthorization | undefined) {
+    authorizationFor?: (name: string, config: ScopedMcpServerConfig) => McpHttpAuthorization | undefined,
+    private readonly snapshotTimeoutMs = MCP_CATALOG_TIMEOUT_MS) {
     this.workspaceRoot = typeof root === "string" ? root : root();
     this.connectionManager = new CoreMcpConnectionManager(authorizationFor);
   }
@@ -237,29 +244,63 @@ export class CoreMcpGateway {
   private async readSnapshot(configs: Record<string, ScopedMcpServerConfig>, admission?: Admission, signal?: AbortSignal): Promise<McpClientSnapshot> {
     const clients: McpConnectionState[] = [];
     const tools: McpClientSnapshot["tools"] = [];
-    for (const [name, config] of Object.entries(configs)) {
-      signal?.throwIfAborted();
-      assertAdmission(admission);
-      const client = this.connectionManager.get(name, config, this.workspaceRoot);
-      let state = await client.connect(admission, signal);
-      if (state.type === "connected") {
-        signal?.throwIfAborted();
+    const deadline = Date.now() + this.snapshotTimeoutMs;
+    const timeout = new AbortController();
+    const timer = setTimeout(() => timeout.abort(new McpCatalogLimitError('deadline')), Math.max(0, deadline - Date.now()));
+    const lifecycle = signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal;
+    let bytes = 0;
+    try {
+      for (const [name, config] of Object.entries(configs)) {
+        lifecycle.throwIfAborted();
         assertAdmission(admission);
-        try {
-          tools.push(...await client.listTools(admission, signal));
-        } catch (error) {
-          await this.connectionManager.close(name);
-          state = { type: "failed", name, config, error: classifyMcpFailure({
-            failureClass: "protocol",
-            detail: error instanceof Error ? error.message : String(error),
-          }).safeDetail };
+        const client = this.connectionManager.get(name, config, this.workspaceRoot);
+        let state = await client.connect(admission, lifecycle);
+        if (state.type === "connected") {
+          lifecycle.throwIfAborted();
+          assertAdmission(admission);
+          try {
+            const listed = await client.listTools(admission, lifecycle, { deadline });
+            const listedBytes = Buffer.byteLength(JSON.stringify(listed), 'utf8');
+            if (bytes + listedBytes > MCP_CATALOG_BYTES) throw new McpCatalogLimitError('bytes');
+            if (tools.length + listed.length > MCP_CATALOG_TOOLS) throw new McpCatalogLimitError('tools');
+            bytes += listedBytes;
+            tools.push(...listed);
+          } catch (error) {
+            if (error instanceof McpCatalogLimitError || lifecycle.aborted) throw error;
+            await this.connectionManager.close(name);
+            state = { type: "failed", name, config, error: classifyMcpFailure({
+              failureClass: "protocol",
+              detail: error instanceof Error ? error.message : String(error),
+            }).safeDetail };
+          }
         }
+        clients.push(state);
       }
-      clients.push(state);
+      lifecycle.throwIfAborted();
+      assertAdmission(admission);
+      return { clients, tools };
+    } catch (error) {
+      const limit = error instanceof McpCatalogLimitError ? error
+        : timeout.signal.aborted && timeout.signal.reason instanceof McpCatalogLimitError
+          ? timeout.signal.reason
+          : undefined;
+      if (limit) {
+        let cleanupUnconfirmed = false;
+        try { await this.connectionManager.close(); }
+        catch { cleanupUnconfirmed = true; }
+        throw new McpGatewayBlockedError({
+          message: limit.message + (cleanupUnconfirmed ? '; MCP connection cleanup could not be confirmed.' : ''),
+          blockerKind: 'environment-not-ready',
+          mcpFailureClass: limit.failureClass,
+          doNext: limit.kind === 'deadline'
+            ? 'Run /mcp refresh all after slow or unavailable servers respond, or reduce the configured server set.'
+            : 'Reduce configured MCP servers or exposed tools, then run /mcp refresh all.',
+        });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
     }
-    signal?.throwIfAborted();
-    assertAdmission(admission);
-    return { clients, tools };
   }
 
   private createUnavailableServerBlockedError(

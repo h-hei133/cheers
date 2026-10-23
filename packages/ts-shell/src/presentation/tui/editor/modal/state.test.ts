@@ -69,10 +69,52 @@ it("replaces characters in Replace mode and changes a whole line with S", () => 
   expect(run("one\ntwo", 0, [key("S")])).toMatchObject({ text: "\ntwo", state: { mode: "insert" } });
 });
 
+it("keeps named keys out of Replace text and restores overwritten graphemes", () => {
+  expect(run("abcd", 0, [
+    key("R"), key("X"), key("Y"), { key: "backspace" },
+  ])).toMatchObject({ text: "Xbcd", cursor: 1, state: { mode: "replace" } });
+  expect(run("abcd", 0, [
+    key("R"), key("X"), { key: "right" }, key("Y"),
+  ])).toMatchObject({ text: "XbYd", cursor: 3, state: { mode: "replace" } });
+  expect(run("abcd", 1, [key("R"), { key: "delete" }])).toMatchObject({ text: "acd", cursor: 1 });
+  expect(run("👩‍💻x", 0, [key("R"), key("Z"), key("escape")])).toMatchObject({
+    text: "Zx", cursor: 0, state: { mode: "normal" },
+  });
+});
+
 it("keeps counts across operators and text objects", () => {
   expect(run("one\ntwo\nthree\nfour", 0, [key("3"), key("d"), key("d")]).text).toBe("four");
   expect(run("one two three", 0, [key("d"), key("2"), key("i"), key("w")]).text).toBe(" three");
   expect(run("abcdef", 0, [key("3"), key("r"), key("X")])).toMatchObject({ text: "XXXdef", cursor: 2 });
+});
+
+it("multiplies operator and motion counts and supports operator g", () => {
+  expect(run("one two three four five", 0, [
+    key("2"), key("d"), key("2"), key("w"),
+  ]).text).toBe("five");
+  expect(run("a\nb\nc\nd", 6, [key("d"), key("g"), key("g")]).text).toBe("");
+});
+
+it("records deleted text for x and supports xp", () => {
+  expect(run("ab", 0, [key("x"), key("p")]).text).toBe("ba");
+});
+
+it("resolves a high horizontal count in one grapheme scan", () => {
+  const text = "a".repeat(20_000);
+  const started = performance.now();
+  const result = run(text, 0, [key("9"), key("9"), key("9"), key("9"), key("l")]);
+  expect(result.cursor).toBe(9_999);
+  expect(performance.now() - started).toBeLessThan(1_000);
+});
+
+it("bounds compound operator and motion counts", () => {
+  const text = "word ".repeat(20_000);
+  const started = performance.now();
+  const result = run(text, 0, [
+    key("9"), key("9"), key("9"), key("9"), key("d"), key("9"), key("9"), key("9"), key("9"), key("w"),
+  ]);
+  expect(result.text).toBe("word ".repeat(10_001));
+  expect(performance.now() - started).toBeLessThan(1_000);
 });
 
 it("uses counts for find, line jumps and line yank", () => {
@@ -93,15 +135,26 @@ it("does not replace a newline in Replace mode or miscount D/C", () => {
 
 it("passes the count through operator G", () => {
   expect(run("a\nb\nc\nd", 0, [key("d"), key("2"), key("G")]).text).toBe("c\nd");
+  expect(run("a\nb\nc\nd", 0, [key("2"), key("d"), key("G")]).text).toBe("c\nd");
+  expect(run("a\nb\nc\nd", 2, [key("1"), key("d"), key("G")]).text).toBe("c\nd");
 });
 
 it("moves by words and lines without crossing the buffer edges", () => {
   expect(run("one two", 0, [key("w")]).cursor).toBe(4);
   expect(run("one two", 4, [key("b")]).cursor).toBe(0);
   expect(run("one two", 0, [key("e")]).cursor).toBe(2);
+  expect(run("one two", 3, [key("w")]).cursor).toBe(4);
+  expect(run("one two", 3, [key("e")]).cursor).toBe(6);
+  expect(run("one\ntwo", 3, [key("w")]).cursor).toBe(4);
   expect(run("a\nb", 0, [key("j")]).cursor).toBe(2);
   expect(run("a\nb", 2, [key("k")]).cursor).toBe(0);
   expect(run("abc", 0, [key("h")]).cursor).toBe(0);
+});
+
+it("keeps an empty first line at offset zero", () => {
+  expect(run("\nabc", 0, [key("x")])).toMatchObject({ text: "\nabc", cursor: 0 });
+  expect(run("\nabc", 0, [key("$")]).cursor).toBe(0);
+  expect(run("\nabc", 0, [key("I")]).cursor).toBe(0);
 });
 
 it("keeps vertical motion on a grapheme boundary", () => {

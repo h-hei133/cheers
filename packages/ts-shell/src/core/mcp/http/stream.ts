@@ -1,7 +1,7 @@
 /** POST operations cannot resume. Drop only SSE resumption IDs; SDK retains framing. */
 export function withoutResumptionIds(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
   let pending = '';
-  const decoder = new TextDecoder(); const encoder = new TextEncoder();
+  const decoder = new TextDecoder('utf-8', { fatal: true }); const encoder = new TextEncoder();
   const consume = (text: string, controller: TransformStreamDefaultController<Uint8Array>) => {
     pending += text;
     let ending: RegExpExecArray | null;
@@ -19,4 +19,13 @@ export function withoutResumptionIds(body: ReadableStream<Uint8Array>): Readable
       if (line !== 'id' && !line.startsWith('id:')) controller.enqueue(encoder.encode(pending));
     },
   }));
+}
+
+export function classifyEventStreamContentType(value: string | undefined): "event-stream" | "other" | "invalid-charset" {
+  const [mediaType, ...parameters] = (value ?? '').split(';').map(part => part.trim());
+  if (mediaType?.toLowerCase() !== 'text/event-stream') return 'other';
+  const charset = parameters
+    .map(parameter => /^charset\s*=\s*"?([^";]+)"?$/i.exec(parameter)?.[1])
+    .find((candidate): candidate is string => candidate !== undefined);
+  return charset === undefined || /^utf-?8$/i.test(charset) ? 'event-stream' : 'invalid-charset';
 }

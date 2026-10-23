@@ -24,9 +24,11 @@ const PARTIAL_HOLD_MS = 40;
 const CLUSTER_HOLD_MS = 8;
 /** How long an unterminated paste block is held before it is released as text. */
 const PASTE_HOLD_MS = 1000;
+/** Largest bracketed paste retained before it is refused as one event. */
+export const MAX_PASTE_BYTES = 8 * 1024 * 1024;
 
 export type KeyListener = (event: ParsedKeyEvent) => void;
-export type PasteListener = (text: string) => void;
+export type PasteListener = (text: string, issue?: "too-large") => void;
 export type MouseListener = (report: MouseReport) => void;
 
 export interface StdinBufferOptions {
@@ -34,6 +36,7 @@ export interface StdinBufferOptions {
   readonly partialHoldMs?: number;
   readonly clusterHoldMs?: number;
   readonly pasteHoldMs?: number;
+  readonly maxPasteBytes?: number;
   readonly setTimer?: (callback: () => void, delayMs: number) => unknown;
   readonly clearTimer?: (handle: unknown) => void;
 }
@@ -44,6 +47,8 @@ export class StdinBuffer {
   private buffer = "";
   private pasting = false;
   private pasteBuffer = "";
+  private pasteBytes = 0;
+  private pasteRejected = false;
   private partialTimer: unknown;
   private pasteTimer: unknown;
   private holdingCluster = false;
@@ -54,6 +59,7 @@ export class StdinBuffer {
   private readonly partialHoldMs: number;
   private readonly clusterHoldMs: number;
   private readonly pasteHoldMs: number;
+  private readonly maxPasteBytes: number;
   private readonly setTimer: (callback: () => void, delayMs: number) => unknown;
   private readonly clearTimer: (handle: unknown) => void;
 
@@ -62,6 +68,7 @@ export class StdinBuffer {
     this.partialHoldMs = options.partialHoldMs ?? PARTIAL_HOLD_MS;
     this.clusterHoldMs = options.clusterHoldMs ?? CLUSTER_HOLD_MS;
     this.pasteHoldMs = options.pasteHoldMs ?? PASTE_HOLD_MS;
+    this.maxPasteBytes = options.maxPasteBytes ?? MAX_PASTE_BYTES;
     this.setTimer = options.setTimer ?? ((callback, delayMs) => setTimeout(callback, delayMs));
     this.clearTimer = options.clearTimer ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
   }
@@ -107,6 +114,8 @@ export class StdinBuffer {
     this.disposed = true;
     this.buffer = "";
     this.pasteBuffer = "";
+    this.pasteBytes = 0;
+    this.pasteRejected = false;
     this.clearTimer(this.partialTimer);
     this.clearTimer(this.pasteTimer);
     this.partialTimer = undefined;
@@ -128,6 +137,8 @@ export class StdinBuffer {
         this.buffer = this.buffer.slice(BRACKETED_PASTE_START.length);
         this.pasting = true;
         this.pasteBuffer = "";
+        this.pasteBytes = 0;
+        this.pasteRejected = false;
         this.clearTimer(this.pasteTimer);
         this.pasteTimer = this.setTimer(() => this.abortPaste(), this.pasteHoldMs);
         continue;
@@ -177,18 +188,42 @@ export class StdinBuffer {
     const end = this.buffer.indexOf(BRACKETED_PASTE_END);
     if (end < 0) {
       const safe = Math.max(0, this.buffer.length - BRACKETED_PASTE_END.length + 1);
-      this.pasteBuffer += this.buffer.slice(0, safe);
+      const content = this.buffer.slice(0, safe);
+      if (!this.pasteRejected) {
+        const bytes = Buffer.byteLength(content, "utf8");
+        if (this.pasteBytes + bytes > this.maxPasteBytes) {
+          this.pasteRejected = true;
+          this.pasteBuffer = "";
+        } else {
+          this.pasteBuffer += content;
+          this.pasteBytes += bytes;
+        }
+      }
       this.buffer = this.buffer.slice(safe);
       return false;
     }
-    this.pasteBuffer += this.buffer.slice(0, end);
+    const content = this.buffer.slice(0, end);
+    if (!this.pasteRejected) {
+      const bytes = Buffer.byteLength(content, "utf8");
+      if (this.pasteBytes + bytes > this.maxPasteBytes) this.pasteRejected = true;
+      else {
+        this.pasteBuffer += content;
+        this.pasteBytes += bytes;
+      }
+    }
     this.buffer = this.buffer.slice(end + BRACKETED_PASTE_END.length);
     this.pasting = false;
     this.clearTimer(this.pasteTimer);
     this.pasteTimer = undefined;
-    const text = this.pasteBuffer;
+    const text = this.pasteRejected ? "" : this.pasteBuffer;
+    const issue = this.pasteRejected ? "too-large" as const : undefined;
     this.pasteBuffer = "";
-    if (text.length > 0) for (const listener of this.pasteListeners) listener(text);
+    this.pasteBytes = 0;
+    this.pasteRejected = false;
+    if (text.length > 0 || issue) for (const listener of this.pasteListeners) {
+      if (issue) listener(text, issue);
+      else listener(text);
+    }
     return true;
   }
 
@@ -200,10 +235,16 @@ export class StdinBuffer {
     this.pasting = false;
     // Whatever is still buffered was withheld only in case the terminator was
     // split across chunks; with the paste abandoned it is content.
-    const text = this.pasteBuffer + this.buffer;
+    const text = this.pasteRejected ? "" : this.pasteBuffer + this.buffer;
+    const issue = this.pasteRejected ? "too-large" as const : undefined;
     this.pasteBuffer = "";
     this.buffer = "";
-    if (text.length > 0) for (const listener of this.pasteListeners) listener(text);
+    this.pasteBytes = 0;
+    this.pasteRejected = false;
+    if (text.length > 0 || issue) for (const listener of this.pasteListeners) {
+      if (issue) listener(text, issue);
+      else listener(text);
+    }
   }
 
   /**

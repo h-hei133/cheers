@@ -13,6 +13,45 @@ const fixture = () => ({ name: 'mcp__notes__Read', description: 'Read a note.\nR
   mcpAnnotations: { readOnlyHint: true }, execute: vi.fn(async () => ({ success: true })) });
 
 describe('tool inspection', () => {
+  it('forwards the picker load signal to the tool-pool owner', async () => {
+    const controller = new AbortController();
+    const tool = fixture();
+    const getToolPool = vi.fn(async (signal?: AbortSignal) => {
+      expect(signal).toBe(controller.signal);
+      return new Map([[tool.name, tool]]);
+    });
+    const picker = toolsPicker({ cwd: '/fixture', getToolPool });
+    await picker.load(controller.signal);
+    expect(getToolPool).toHaveBeenCalledOnce();
+  });
+
+  it('combines accepted inspection with the original cancellation signal', async () => {
+    const controller = new AbortController();
+    const getToolPool = vi.fn(async (signal?: AbortSignal) => {
+      expect(signal).not.toBe(controller.signal);
+      await new Promise((_resolve, reject) => signal!.addEventListener('abort', () => reject(signal!.reason), { once: true }));
+      return new Map();
+    });
+    const picker = toolsPicker({ cwd: '/fixture', signal: controller.signal, getToolPool });
+    const pending = picker.apply(['fixture']);
+    await vi.waitFor(() => expect(getToolPool).toHaveBeenCalledOnce());
+    controller.abort();
+    await expect(pending).resolves.toBeUndefined();
+    expect(picker.isCurrent?.()).toBe(false);
+  });
+
+  it('forwards command cancellation before and during direct tool discovery', async () => {
+    const controller = new AbortController();
+    const getToolPool = vi.fn(async (signal?: AbortSignal) => {
+      await new Promise((_resolve, reject) => signal!.addEventListener('abort', () => reject(signal!.reason), { once: true }));
+      return new Map();
+    });
+    const pending = runToolsCommand([], { cwd: '/fixture', signal: controller.signal, getToolPool });
+    await vi.waitFor(() => expect(getToolPool).toHaveBeenCalledOnce());
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
   it('routes only bare commands to the picker and never executes a selected tool', async () => {
     const tool = fixture(); const pool = new Map([[tool.name, tool]]);
     const getToolPool = vi.fn(async () => pool); const context = { cwd: '/fixture', getToolPool };
@@ -33,6 +72,16 @@ describe('tool inspection', () => {
     pool.delete(tool.name); pool.set(tool.name.toLowerCase(), { ...tool, name: tool.name.toLowerCase() });
     expect(await picker.apply([tool.name])).toEqual({ note: 'This tool is no longer available. Reopen /tools to refresh.' });
     expect(tool.execute).not.toHaveBeenCalled();
+  });
+
+  it('does not case-fold a direct tool identity', async () => {
+    const tool = { ...fixture(), name: 'mcp__notes__read' };
+    const result = await runToolsCommand(['MCP__NOTES__READ'], {
+      cwd: '/fixture',
+      getToolPool: async () => new Map([[tool.name, tool]]),
+    });
+    expect(result.output).toContain('No tool named');
+    expect(result.output).not.toContain('Read a note');
   });
 
   it('distinguishes catalog failure from an empty inventory without exposing exception bodies', async () => {

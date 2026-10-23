@@ -6,8 +6,12 @@ import type { CostModel } from './model.js';
 import { createHash } from 'node:crypto';
 import { reportMetadata } from '../report/metadata.js';
 
+const COST_BUCKETS = 64;
+
 export function costReport(model: CostModel, projectRoot = process.cwd()) {
-  const buckets = model.buckets.map(bucket => projectBucket(bucket, projectRoot));
+  const shownBuckets = model.buckets.slice(0, COST_BUCKETS);
+  const omittedBuckets = model.buckets.length - shownBuckets.length;
+  const buckets = shownBuckets.map(bucket => projectBucket(bucket, projectRoot));
   const lines: ReportLine[] = [];
   if (model.recordedTurns === 0 && model.buckets.length === 0) {
     lines.push({ kind: 'text', spans: [span('No usage has been recorded in this session yet, so there is nothing to count.')] });
@@ -26,11 +30,15 @@ export function costReport(model: CostModel, projectRoot = process.cwd()) {
       'Some rates are estimates at a fixed fallback that does not follow the model in use.', 'warning')] });
     if (model.estimate.coverage === 'partial') lines.push({ kind: 'text', spans: [span(
       'Partial estimate: unpriced or unclassified tokens are excluded. Unknown costs are not zero.', 'warning')] });
+    if (omittedBuckets > 0) lines.push({ kind: 'text', spans: [span(
+      `${omittedBuckets} usage groups omitted from model detail; session totals remain complete.`, 'muted')] });
     lines.push(...cacheLines(model.cache));
   }
   return createReport({ title: 'Usage', columns: [{ label: 'Category', minWidth: 12 }, { label: 'Tokens', minWidth: 8, align: 'right' },
     { label: 'Rate / million', minWidth: 14, align: 'right' }, { label: 'Estimated USD', minWidth: 14, align: 'right' }], lines,
     facts: { recordedTurns: model.recordedTurns, recordedTokens: model.recordedTokens, estimate: model.estimate,
+      totalModels: model.buckets.length, shownModels: buckets.length, omittedModels: omittedBuckets,
+      coverage: omittedBuckets > 0 ? 'partial' : 'complete',
       models: buckets.map(bucket => ({ ...bucket, attribution: bucket.attribution ? {
         ...bucket.attribution, rates: bucket.attribution.rates ? { ...bucket.attribution.rates } : null,
       } : null })),

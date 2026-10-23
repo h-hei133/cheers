@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { hashContent } from './recoveryAuthorityStore.js';
 import { listRecoveryAuthorityRecords, type RecoveryAuthorityRecordIndexEntry } from './recoveryAuthorityIndex.js';
 import { assertRecoveryReadAccess, recoveryReadBudget, RecoveryReadLimitError, type RecoveryReadAccess } from './read.js';
@@ -7,6 +8,7 @@ import { RECOVERY_CATALOG_LIMITS } from './catalog/limits.js';
 
 type RecordPosition = Pick<RecoveryAuthorityRecordIndexEntry, 'createdAt' | 'authorityId' | 'recordId'>;
 export interface RecoveryCatalogCursor extends RecordPosition {
+  readonly attemptId: string;
   readonly revision: string;
 }
 
@@ -22,6 +24,24 @@ interface ScanEntry {
   readonly record?: RecoveryAuthorityRecordIndexEntry;
 }
 
+interface DirectoryVersion {
+  readonly path: string;
+  readonly identity: string;
+}
+
+interface CatalogAttempt {
+  readonly ledgerRoot: string;
+  readonly query: string;
+  readonly revision: string;
+  readonly matches: number;
+  readonly unavailable: number;
+  readonly records: readonly RecoveryAuthorityRecordIndexEntry[];
+  readonly directories: readonly DirectoryVersion[];
+}
+
+const attempts = new Map<string, CatalogAttempt>();
+const MAX_ATTEMPTS = 16;
+
 /** Scan metadata with bounded directory buffers and retain only one sorted page. */
 export async function readRecoveryCatalogPage(input: {
   readonly ledgerRoot: string;
@@ -31,8 +51,35 @@ export async function readRecoveryCatalogPage(input: {
   readonly readAccess?: RecoveryReadAccess;
 }): Promise<RecoveryCatalogPage> {
   const pageSize = 100;
-  const records: RecoveryAuthorityRecordIndexEntry[] = [];
   const query = input.query?.trim().toLowerCase() ?? '';
+  const ledgerRoot = path.resolve(input.ledgerRoot);
+  const attemptId = input.after?.attemptId ?? randomUUID();
+  if (input.after) {
+    const attempt = attempts.get(attemptId);
+    if (!attempt || attempt.ledgerRoot !== ledgerRoot || attempt.query !== query) {
+      throw new Error('Snapshot page expired. Reopen /restore before continuing.');
+    }
+    attempts.delete(attemptId);
+    attempts.set(attemptId, attempt);
+    await validateDirectories(attempt.directories, input);
+    const remaining = entriesAfter(attempt.records, input.after);
+    const page = remaining.slice(0, pageSize);
+    const records = await verifyPage(page, input);
+    const last = records.at(-1);
+    return {
+      records,
+      matches: attempt.matches,
+      unavailable: attempt.unavailable,
+      ...(remaining.length > pageSize && last ? { next: {
+        attemptId,
+        createdAt: last.createdAt,
+        authorityId: last.authorityId,
+        recordId: last.recordId,
+        revision: attempt.revision,
+      } } : {}),
+    };
+  }
+  const records: RecoveryAuthorityRecordIndexEntry[] = [];
   let matches = 0;
   let unavailable = 0;
   let scanned = 0;
@@ -43,6 +90,7 @@ export async function readRecoveryCatalogPage(input: {
     'Snapshot browsing exceeds its source size limit.');
   let directoryEntries = 0;
   let candidates = 0;
+  const authorities = new Set<string>();
   const inventory = (record = false): void => {
     budget.check();
     if (++directoryEntries > RECOVERY_CATALOG_LIMITS.directoryEntries
@@ -52,28 +100,104 @@ export async function readRecoveryCatalogPage(input: {
   };
   try {
     for await (const entry of scanLedger(input.ledgerRoot, budget, inventory)) {
+      authorities.add(entry.key.split('/')[0]!);
       const record = entry.record;
       scanned++;
       fingerprint ^= BigInt(`0x${hashContent(JSON.stringify([entry.key, record?.recordDigest, record?.hasContentBlob]))}`);
       if (!record) { unavailable++; continue; }
       if (query && !`${record.workspaceRelativePath} ${record.authorityId} ${record.recordId} ${record.operationKind}`.toLowerCase().includes(query)) continue;
       matches++;
-      if (input.after && comparePosition(record, input.after) <= 0) continue;
-      retainRecord(records, record, pageSize + 1);
+      records.push(record);
     }
   } catch (error) { budget.check(); throw error; }
   budget.check();
   const revision = hashContent(`${scanned}:${fingerprint.toString(16)}`);
-  if (input.after && revision !== input.after.revision) throw new Error('Snapshot catalogue changed. Reopen /restore before continuing.');
   if (!scanned || scanned !== unavailable) {
+    records.sort(comparePosition);
+    const page = records.slice(0, pageSize);
     const hasMore = records.length > pageSize;
-    if (hasMore) records.pop();
-    const last = records.at(-1);
-    return { records, matches, unavailable, ...(hasMore && last ? { next: {
-      createdAt: last.createdAt, authorityId: last.authorityId, recordId: last.recordId, revision,
+    const last = page.at(-1);
+    if (hasMore) {
+      const directories = await directoryVersions(ledgerRoot, authorities, input);
+      attempts.set(attemptId, { ledgerRoot, query, revision, matches, unavailable, records, directories });
+      while (attempts.size > MAX_ATTEMPTS) attempts.delete(attempts.keys().next().value!);
+    }
+    return { records: page, matches, unavailable, ...(hasMore && last ? { next: {
+      attemptId, createdAt: last.createdAt, authorityId: last.authorityId, recordId: last.recordId, revision,
     } } : {}) };
   }
   throw new Error('No snapshot records could be read.');
+}
+
+async function verifyPage(page: readonly RecoveryAuthorityRecordIndexEntry[],
+  input: { readonly ledgerRoot: string; readonly signal?: AbortSignal; readonly readAccess?: RecoveryReadAccess }): Promise<RecoveryAuthorityRecordIndexEntry[]> {
+  const groups = new Map<string, RecoveryAuthorityRecordIndexEntry[]>();
+  for (const entry of page) {
+    const group = groups.get(entry.authorityId);
+    if (group) group.push(entry);
+    else groups.set(entry.authorityId, [entry]);
+  }
+  const current = new Map<string, RecoveryAuthorityRecordIndexEntry>();
+  for (const [authorityId, entries] of groups) {
+    input.signal?.throwIfAborted();
+    assertRecoveryReadAccess(input.readAccess ?? {});
+    const listed = await listRecoveryAuthorityRecords({
+      ledgerRoot: input.ledgerRoot,
+      authorityId,
+      recordIds: entries.map(entry => entry.recordId),
+      ...(input.signal ? { signal: input.signal } : {}),
+      ...(input.readAccess ? { readAccess: input.readAccess } : {}),
+    });
+    if (listed.status !== 'listed' || listed.missingRecords.length) {
+      throw new Error('Snapshot catalogue changed. Reopen /restore before continuing.');
+    }
+    for (const record of listed.records) current.set(`${record.authorityId}/${record.recordId}`, record);
+  }
+  return page.map(entry => {
+    const latest = current.get(`${entry.authorityId}/${entry.recordId}`);
+    if (!latest || latest.recordDigest !== entry.recordDigest) {
+      throw new Error('Snapshot catalogue changed. Reopen /restore before continuing.');
+    }
+    return latest;
+  });
+}
+
+async function directoryVersions(ledgerRoot: string, authorities: ReadonlySet<string>,
+  input: { readonly signal?: AbortSignal; readonly readAccess?: RecoveryReadAccess }): Promise<readonly DirectoryVersion[]> {
+  const paths = [ledgerRoot, ...[...authorities].map(authority => path.join(ledgerRoot, authority, 'records'))];
+  const versions: DirectoryVersion[] = [];
+  for (const target of paths) {
+    input.signal?.throwIfAborted();
+    assertRecoveryReadAccess(input.readAccess ?? {});
+    try {
+      const stat = await fs.lstat(target);
+      versions.push({ path: target, identity: JSON.stringify([stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs]) });
+    } catch (error) {
+      input.signal?.throwIfAborted();
+      assertRecoveryReadAccess(input.readAccess ?? {});
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') versions.push({ path: target, identity: 'missing' });
+      else throw error;
+    }
+  }
+  return versions;
+}
+
+async function validateDirectories(directories: readonly DirectoryVersion[],
+  input: { readonly signal?: AbortSignal; readonly readAccess?: RecoveryReadAccess }): Promise<void> {
+  for (const directory of directories) {
+    input.signal?.throwIfAborted();
+    assertRecoveryReadAccess(input.readAccess ?? {});
+    try {
+      const stat = await fs.lstat(directory.path);
+      const identity = JSON.stringify([stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs]);
+      if (identity !== directory.identity) throw new Error();
+    } catch (error) {
+      input.signal?.throwIfAborted();
+      assertRecoveryReadAccess(input.readAccess ?? {});
+      if (directory.identity === 'missing' && error instanceof Error && 'code' in error && error.code === 'ENOENT') continue;
+      throw new Error('Snapshot catalogue changed. Reopen /restore before continuing.');
+    }
+  }
 }
 
 async function* scanLedger(ledgerRoot: string, access: RecoveryReadAccess, inventory: (record?: boolean) => void): AsyncGenerator<ScanEntry> {
@@ -111,15 +235,14 @@ function comparePosition(left: RecordPosition, right: RecordPosition): number {
   return left.recordId === right.recordId ? 0 : left.recordId < right.recordId ? -1 : 1;
 }
 
-function retainRecord(records: RecoveryAuthorityRecordIndexEntry[], record: RecoveryAuthorityRecordIndexEntry, limit: number): void {
+function entriesAfter(records: readonly RecoveryAuthorityRecordIndexEntry[],
+  after: RecoveryCatalogCursor): readonly RecoveryAuthorityRecordIndexEntry[] {
   let low = 0;
   let high = records.length;
   while (low < high) {
     const middle = (low + high) >>> 1;
-    if (comparePosition(records[middle]!, record) <= 0) low = middle + 1;
+    if (comparePosition(records[middle]!, after) <= 0) low = middle + 1;
     else high = middle;
   }
-  if (low >= limit) return;
-  records.splice(low, 0, record);
-  if (records.length > limit) records.pop();
+  return records.slice(low);
 }

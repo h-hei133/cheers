@@ -12,11 +12,19 @@ import { McpContentChannel } from "./content/channel.js";
 import type { McpContentRequest, McpContentResult, McpNotificationSnapshot } from "./content/types.js";
 import { McpClassifiedError, classifyMcpFailure } from "./errorTaxonomy.js";
 import type { McpFailureClass } from "./errorTaxonomy.js";
+import {
+  MCP_CATALOG_BYTES,
+  MCP_CATALOG_TIMEOUT_MS,
+  MCP_CATALOG_TOOLS,
+  McpCatalogLimitError,
+} from './catalogLimit.js';
 import type { McpConnectionState, McpToolCallResult, McpToolDescriptor, McpToolInvocation, ScopedMcpServerConfig } from "./types.js";
 
-const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_TOOL_PAGES = 100;
-const MAX_TOOLS = 10_000;
+
+export interface McpToolListOptions {
+  readonly deadline?: number;
+}
 
 /** One standard MCP connection. Calls with unknown outcomes are never replayed. */
 export class CoreMcpClient {
@@ -37,7 +45,7 @@ export class CoreMcpClient {
     readonly name: string,
     readonly config: ScopedMcpServerConfig,
     private readonly workspaceRoot: string = process.cwd(),
-    private readonly timeoutMs: number = REQUEST_TIMEOUT_MS,
+    private readonly timeoutMs: number = MCP_CATALOG_TIMEOUT_MS,
     private readonly changed?: () => void,
     private readonly authorization?: McpHttpAuthorization,
   ) {}
@@ -120,7 +128,7 @@ export class CoreMcpClient {
     }
   }
 
-  async listTools(admission?: Admission, signal?: AbortSignal): Promise<McpToolDescriptor[]> {
+  async listTools(admission?: Admission, signal?: AbortSignal, options?: McpToolListOptions): Promise<McpToolDescriptor[]> {
     this.listedTools = undefined;
     this.changed?.();
     const client = await this.requireClient(admission, signal);
@@ -136,17 +144,24 @@ export class CoreMcpClient {
     const tools: McpToolDescriptor[] = [];
     const metadata: Tool[] = [];
     const cursors = new Set<string>();
+    const deadline = Math.min(Date.now() + this.timeoutMs, options?.deadline ?? Infinity);
+    let bytes = 0;
     let cursor: string | undefined;
     try {
       for (let page = 0; page < MAX_TOOL_PAGES; page++) {
         assertAdmission(admission);
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) throw new McpCatalogLimitError('deadline');
         // SDK listTools replaces its metadata cache per page; retain the complete catalog ourselves.
         const result = await this.withCancellation(signal => client.request(
           { method: "tools/list", params: cursor ? { cursor } : {} },
-          ListToolsResultSchema, { timeout: this.timeoutMs, signal }), signal);
+          ListToolsResultSchema, { timeout: remaining, signal }), signal);
         assertAdmission(admission);
         signal?.throwIfAborted();
         if (this.closed || !this.connected || revision !== this.catalogRevision) throw new Error("MCP tool catalog changed during listing");
+        bytes += Buffer.byteLength(JSON.stringify(result), "utf8");
+        if (bytes > MCP_CATALOG_BYTES) throw new McpCatalogLimitError('bytes');
+        if (tools.length + result.tools.length > MCP_CATALOG_TOOLS) throw new McpCatalogLimitError('tools');
         metadata.push(...result.tools);
         for (const tool of result.tools) tools.push({
           serverName: this.name,
@@ -156,7 +171,6 @@ export class CoreMcpClient {
           inputSchema: tool.inputSchema,
           ...(tool.annotations ? { annotations: tool.annotations } : {}),
         });
-        if (tools.length > MAX_TOOLS) throw new Error("MCP tool catalog exceeds tool limit");
         cursor = result.nextCursor;
         if (cursor === undefined) {
           this.catalog = new McpToolCatalog(metadata, this.contractCatalog);
@@ -171,6 +185,7 @@ export class CoreMcpClient {
       }
       throw new Error("MCP tool catalog exceeds page limit");
     } catch (error) {
+      if (error instanceof McpCatalogLimitError) throw error;
       throw protocolFailure(error, "protocol");
     }
   }
@@ -233,14 +248,22 @@ export class CoreMcpClient {
     // SDK request listeners stay on their signal after settlement. Give each
     // request its own signal, and release its link to the connection in finally.
     const controller = new AbortController();
-    const cancel = () => controller.abort();
-    if (this.abort.signal.aborted) cancel();
-    else this.abort.signal.addEventListener("abort", cancel, { once: true });
+    const close = () => controller.abort(this.abort.signal.reason);
+    const cancel = () => controller.abort(signal?.reason);
+    if (this.abort.signal.aborted) close();
+    else this.abort.signal.addEventListener("abort", close, { once: true });
     if (signal?.aborted) cancel();
     else signal?.addEventListener("abort", cancel, { once: true });
     try { return await operation(controller.signal); }
+    catch (error) {
+      // The SDK may surface its own timeout/AbortError after a caller-supplied
+      // reason has already fired. Preserve the reason that owns this boundary.
+      if (signal?.aborted) throw signal.reason ?? error;
+      if (this.abort.signal.aborted) throw this.abort.signal.reason ?? error;
+      throw error;
+    }
     finally {
-      this.abort.signal.removeEventListener("abort", cancel);
+      this.abort.signal.removeEventListener("abort", close);
       signal?.removeEventListener("abort", cancel);
     }
   }

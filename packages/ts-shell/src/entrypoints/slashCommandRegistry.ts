@@ -6,6 +6,7 @@ import type { CommandDefinition } from "../core/commands/types.js";
 import { catalogContributions, observeCatalogContributions } from '../core/catalog/contributions.js';
 import { helpReport } from '../core/commands/help/report.js';
 import { reportText } from '../core/commands/report/projection.js';
+import type { RuntimeConfig } from '../config/runtimeConfig.js';
 
 export interface SlashCommandCompletion {
   readonly value: string;
@@ -60,8 +61,8 @@ function project(command: CommandDefinition): SlashCommandSpec {
   };
 }
 
-function builtinCommands(root?: string): readonly SlashCommandSpec[] {
-  return listVisibleCommands(root).map(project);
+function builtinCommands(root?: string, runtimeConfig?: RuntimeConfig): readonly SlashCommandSpec[] {
+  return listVisibleCommands(root, runtimeConfig).map(project);
 }
 
 /**
@@ -86,12 +87,17 @@ const PICKER_ONLY: readonly SlashCommandSpec[] = [
 ];
 
 const extensions: SlashCommandSpec[] = [...PICKER_ONLY];
-export interface SlashCatalogScope { readonly root: string; readonly sessionId?: string }
+export interface SlashCatalogScope {
+  readonly root: string;
+  readonly sessionId?: string;
+  readonly runtimeConfig?: RuntimeConfig;
+}
 const listeners = new Set<() => void>();
 observeCatalogContributions(undefined, () => { for (const listener of listeners) listener(); });
 
 function allCommands(scope?: SlashCatalogScope): readonly SlashCommandSpec[] {
-  const builtins = [...builtinCommands(scope?.root), ...catalogContributions(scope?.root, scope?.sessionId).flatMap(entry => entry.commands).map(project)];
+  const builtins = [...builtinCommands(scope?.root, scope?.runtimeConfig),
+    ...catalogContributions(scope?.root, scope?.sessionId).flatMap(entry => entry.commands).map(project)];
   return extensions.length === 0 ? builtins : [...builtins, ...extensions];
 }
 

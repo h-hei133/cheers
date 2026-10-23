@@ -74,6 +74,42 @@ it.each(['before', 'after'] as const)('rejects obsolete context report admission
   if (phase === 'before') { expect(read).not.toHaveBeenCalled(); expect(getToolPool).not.toHaveBeenCalled(); }
 });
 
+it('forwards context cancellation to tool discovery and does not inspect schemas after abort', async () => {
+  const { context } = fixture();
+  const controller = new AbortController();
+  const getToolPool = vi.fn(async (signal?: AbortSignal) => {
+    expect(signal).toBe(controller.signal);
+    controller.abort();
+    return new Map([['read', {
+      name: 'read',
+      get description(): string { throw new Error('schema inspection continued after abort'); },
+      argsSchema: { type: 'object' },
+      execute: async () => ({ success: true, output: '' }),
+    }]]);
+  });
+
+  await expect(runContextCommand([], { ...context, signal: controller.signal, getToolPool }))
+    .rejects.toMatchObject({ name: 'AbortError' });
+  expect(getToolPool).toHaveBeenCalledOnce();
+});
+
+it('measures the exact tool-schema array size incrementally', async () => {
+  const { context } = fixture();
+  const tool = {
+    name: 'read',
+    description: 'Read 😀',
+    argsSchema: { type: 'object', properties: { path: { type: 'string' } } },
+    execute: async () => ({ success: true, output: '' }),
+  };
+  const expected = JSON.stringify([{ type: 'function', function: {
+    name: tool.name, description: tool.description, parameters: tool.argsSchema,
+  } }]);
+  const result = await runContextCommand([], { ...context, getToolPool: async () => new Map([[tool.name, tool]]) });
+  expect(result.report?.facts.toolSchemas).toMatchObject({
+    size: { bytes: Buffer.byteLength(expected, 'utf8'), codeUnits: expected.length },
+  });
+});
+
 it('uses the original workspace to project accepted request identity without changing raw measurements', async () => {
   const { context } = fixture();
   const captured = requestContext({ body: '{"messages":[],"unicode":"😀"}', provider: 'google', model: 'chosen', endpoint: `file://${root}/protocol` });

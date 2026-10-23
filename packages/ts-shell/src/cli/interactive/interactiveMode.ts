@@ -22,8 +22,9 @@ import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import { loadPromptHistory, appendPromptHistory } from "./historyStore.js";
 import type { StatusItemId } from "../../presentation/tui/chrome/items.js";
+import type { SourceSelection } from "../../presentation/tui/composer/contract.js";
 import { renderWelcome } from "../../presentation/tui/chrome/welcome.js";
-import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
+import { MAX_PASTE_BYTES, StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
 import { nextScope } from "../approval/permissionScope.js";
 import { Clipboard } from "./clipboard.js";
 import { Pointer } from "./pointer.js";
@@ -80,6 +81,8 @@ import { routeSearchKey, styleSearchRow } from "../../presentation/tui/transcrip
 import { OverlayHost, type Picker } from "./overlay.js";
 import { pickerIsCurrent } from './picker/current.js';
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
+import { PickerLifecycles } from './picker/lifecycle.js';
+import { catalogScope } from './catalogScope.js';
 import { ComposerPreference, readStatusItems, writeStatusItems } from "./tuiSettings.js";
 import type { ImageContent } from "../../model-adapters/multimodal.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
@@ -157,6 +160,7 @@ export class InteractiveMode {
   private readonly questions: QuestionBridge;
   private readonly readline: ReadlineInterface;
   private readonly gesture: { lastCancelAt?: number; lastEscapeAt?: number } = {};
+  private vimSelection: SourceSelection | undefined;
   /**
    * The bindings in force.
    *
@@ -177,13 +181,19 @@ export class InteractiveMode {
     attachImage: (image) => {
       // The placeholder goes in the draft and the bytes are held beside it: the
       // sentence keeps a short token, and the picture travels as a block.
-      this.state.editor.insert(
-        this.state.pastes.holdImage({
-          type: "image",
-          data: image.bytes.toString("base64"),
-          mimeType: image.mimeType,
-        }),
-      );
+      resetVimState(this.state.editor);
+      this.vimSelection = undefined;
+      try {
+        this.state.editor.insert(
+          this.state.pastes.holdImage({
+            type: "image",
+            data: image.bytes.toString("base64"),
+            mimeType: image.mimeType,
+          }),
+        );
+      } catch {
+        this.state.transcript.append(textBlock("notice", "Attached image is too large to accept."));
+      }
       this.tui.requestRender();
     },
   });
@@ -208,6 +218,7 @@ export class InteractiveMode {
   private busy = false;
   private pickerPending = false;
   private readonly pickerInputPending = new Map<number, number>();
+  private readonly pickerLifecycles = new PickerLifecycles();
   private toast?: string;
   private completionStatus?: string;
   private readonly catalogs: CatalogController;
@@ -335,7 +346,7 @@ export class InteractiveMode {
         overlayRows: (width, height, availableRows) =>
           this.pager.active ? this.pager.render(width, height, availableRows) : this.overlay.render(width, height, availableRows),
         selection: () => this.pointer.selection,
-        composerSelection: () => this.pointer.composerSelection,
+        composerSelection: () => this.pointer.composerSelection ?? this.vimSelection,
         hintStatus: () => ({ toast: this.toast, completion: this.completionStatus }),
         searchBar: () => {
           // Built before asking: the count and the position only exist once the
@@ -440,12 +451,23 @@ export class InteractiveMode {
     this.stdin.onKey((event) => this.onKey(event));
     this.stdin.onMouse((report) => {
       this.options.onUserIntent?.();
+      this.vimSelection = undefined;
       if (this.alternateScreen || this.pager.active || this.overlay.fullScreen) this.pointer.handle(report);
     });
-    this.stdin.onPaste((text) => {
+    this.stdin.onPaste((text, issue) => {
       this.options.onUserIntent?.();
+      if (issue) {
+        resetVimState(this.state.editor);
+        this.vimSelection = undefined;
+        this.state.transcript.append(textBlock("notice",
+          `Paste was too large to accept (${MAX_PASTE_BYTES / (1024 * 1024)} MiB limit).`));
+        this.tui.requestRender();
+        return;
+      }
       if (this.pager.handlePaste(text)) { this.tui.requestRender(); return; }
       if (this.overlay.handlePaste(text) || this.pickerInputPending.has(this.overlay.revision)) return;
+      resetVimState(this.state.editor);
+      this.vimSelection = undefined;
       // A paste while the full-screen editor is up belongs to it, whole; a paste
       // into the prompt is held aside once it is long enough to bury the draft.
       // Pasting the same thing twice in quick succession means "show it in full":
@@ -519,6 +541,7 @@ export class InteractiveMode {
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;
+    this.pickerLifecycles.abortAll();
     this.options.setStartupNotice?.(undefined);
     if (this.tick) clearInterval(this.tick);
     this.tick = undefined;
@@ -592,7 +615,7 @@ export class InteractiveMode {
       now: () => Date.now(),
       gesture: this.gesture,
       keybindings: this.preferences.keybindings,
-      vimMode: this.options.runtimeContext.runtimeConfig.vimMode === true,
+      vimMode: this.options.runtimeContext.runtimeConfig.vimMode === true && !this.questions.question(),
       actions: {
         submit: (text, disposition, attachments) => this.onSubmit(text, disposition, attachments),
         interrupt: () => void this.interrupt(),
@@ -633,7 +656,11 @@ export class InteractiveMode {
           setTimeout(() => this.tui.requestRender(), delayMs).unref?.();
         },
         syncSuggestions: (mayOpen) => this.syncSuggestions(mayOpen),
-        copySelection: () => this.pointer.copySelection(),
+        copySelection: selection => selection ? this.copySourceSelection(selection) : this.pointer.copySelection(),
+        reportNotice: (message) => {
+          this.state.transcript.append(textBlock("notice", message));
+        },
+        setSourceSelection: selection => { this.vimSelection = selection; },
         toggleCollapsed: (only) => this.view.toggleCollapsed(only),
         openExternalEditor: () => this.preferences.openExternalEditor(this.state.editor.getText()),
         attachClipboardImage: () => void this.preferences.attachClipboardImage(),
@@ -667,7 +694,7 @@ export class InteractiveMode {
     const draft = snapshot.text;
     this.completionStatus = undefined;
     if (this.catalogs.update(snapshot)) return;
-    const scope = { root: this.options.runtimeContext.cwd, sessionId: this.options.runtimeContext.session.id };
+    const scope = catalogScope(this.options.runtimeContext);
     const matches = slashSuggestions(draft, snapshot, scope);
     if (!matches) {
       this.completionStatus = slashArgumentHint(snapshot, scope);
@@ -864,7 +891,7 @@ export class InteractiveMode {
       this.openPicker(text);
       return;
     }
-    if (!this.busy && opensPicker(text)) {
+    if (!this.busy && opensPicker(text, catalogScope(this.options.runtimeContext))) {
       this.openPicker(text);
       return;
     }
@@ -906,7 +933,7 @@ export class InteractiveMode {
     this.overlay.close();
     // Queued input reaches this same dispatch point after the current operation
     // settles. A chooser still needs confirmation, even if its command waited.
-    if (opensPicker(text)) {
+    if (opensPicker(text, catalogScope(this.options.runtimeContext))) {
       this.openPicker(text, true);
       return;
     }
@@ -1032,13 +1059,15 @@ export class InteractiveMode {
 
   /** Open the chooser a bare command maps to. */
   private openPicker(command: string, waitForApply = false): void {
-    const picker = pickerFor(command, this.pickerHost());
-    if (!picker) return;
+    const controller = this.pickerLifecycles.begin();
+    const picker = pickerFor(command, this.pickerHost(controller.signal));
+    if (!picker) {
+      this.pickerLifecycles.abort(controller);
+      return;
+    }
+    const tracked = this.pickerLifecycles.track(picker, controller, waitForApply);
     // Picker getters may depend on load/search completing; keep them lazy.
-    this.overlay.open(waitForApply ? Object.create(Object.getPrototypeOf(picker), {
-      ...Object.getOwnPropertyDescriptors(picker),
-      exclusive: { value: true, enumerable: true },
-    }) as Picker : picker);
+    this.overlay.open(tracked);
   }
 
   /** Hand the choice to the picker that produced it and surface what it reports. */
@@ -1046,6 +1075,7 @@ export class InteractiveMode {
     this.options.onUserIntent?.();
     const revision = this.overlay.revision;
     const persistReport = reportWriter(this.options.sessionManager, this.options.runtimeContext.session.id);
+    let continuation: AbortController | undefined;
     if (picker.holdInput) this.pickerInputPending.set(revision, (this.pickerInputPending.get(revision) ?? 0) + 1);
     if (picker.exclusive) {
       this.pickerPending = true;
@@ -1075,9 +1105,17 @@ export class InteractiveMode {
           // hint; loading argument candidates here could perform network I/O.
           this.replaceExternalDraft(outcome.draft);
           this.view.setSuggesting(false);
-          this.completionStatus = slashArgumentHint(this.state.editor.snapshot(), { root: this.options.runtimeContext.cwd, sessionId: this.options.runtimeContext.session.id });
+          this.completionStatus = slashArgumentHint(this.state.editor.snapshot(),
+            catalogScope(this.options.runtimeContext));
         }
-        if (outcome?.next && !this.stopped && this.overlay.revision === revision) this.overlay.open(outcome.next);
+        if (outcome?.next && !this.stopped && this.overlay.revision === revision) {
+          const controller = this.pickerLifecycles.controllerFor(picker);
+          if (controller) {
+            const tracked = this.pickerLifecycles.track(outcome.next, controller, false);
+            this.overlay.open(tracked);
+            continuation = controller;
+          } else this.overlay.open(outcome.next);
+        }
       })
       .catch((error: unknown) => {
         if (picker.isCurrent && (this.stopped || this.overlay.revision !== revision || !pickerIsCurrent(picker))) return;
@@ -1086,6 +1124,7 @@ export class InteractiveMode {
         );
       })
       .finally(() => {
+        this.pickerLifecycles.finish(picker, continuation);
         if (picker.holdInput) {
           const pending = (this.pickerInputPending.get(revision) ?? 1) - 1;
           if (pending) this.pickerInputPending.set(revision, pending);
@@ -1103,7 +1142,7 @@ export class InteractiveMode {
   }
 
   /** Everything the pickers need from the session, resolved lazily. */
-  private pickerHost(): PickerHost {
+  private pickerHost(signal?: AbortSignal): PickerHost {
     const admission = configurationAdmission(this.options.runtimeContext);
     const selectionRevision = this.selectionRevision;
     const selectionAdmission = (): string | undefined => {
@@ -1116,6 +1155,7 @@ export class InteractiveMode {
     return {
       commandContext: {
         admission: selectionAdmission,
+        ...(signal ? { signal } : {}),
         projectRoot: this.options.runtimeContext.projectRoot,
         runtimeConfig: this.options.runtimeContext.runtimeConfig,
         resolveConfigTarget: this.options.runtimeContext.resolveConfigTarget,
@@ -1238,7 +1278,19 @@ export class InteractiveMode {
   /** Programmatic replacements start a fresh Vim mode and undo-safe draft. */
   private replaceExternalDraft(text: string): void {
     resetVimState(this.state.editor);
+    this.vimSelection = undefined;
     this.state.editor.setDraftText(text);
+  }
+
+  private copySourceSelection(selection: SourceSelection): boolean {
+    const snapshot = this.state.editor.snapshot();
+    this.vimSelection = undefined;
+    if (selection.sourceRevision !== snapshot.revision || selection.start < 0
+      || selection.end > snapshot.text.length || selection.start >= selection.end) return false;
+    const text = snapshot.text.slice(selection.start, selection.end);
+    if (!text) return false;
+    this.clipboard.copy(text);
+    return true;
   }
 
   /**

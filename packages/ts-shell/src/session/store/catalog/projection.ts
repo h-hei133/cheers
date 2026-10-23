@@ -69,8 +69,33 @@ function sessionPreview(session: Session): SessionSummary['preview'] | undefined
 }
 
 function boundedText(value: string, tail = false): string {
-  const compact = value.replace(/\s+/g, ' ').trim();
-  const points = Array.from(compact);
-  if (points.length <= 1200) return compact;
-  return tail ? `…${points.slice(-1200).join('')}` : points.slice(0, 1200).join('');
+  const limit = 1200;
+  const head: string[] = [];
+  const window = tail ? new Array<string>(limit) : undefined;
+  let windowIndex = 0;
+  let total = 0;
+  let pendingSpace = false;
+  const append = (point: string): void => {
+    if (head.length < limit) head.push(point);
+    if (window) {
+      window[windowIndex] = point;
+      windowIndex = (windowIndex + 1) % limit;
+    }
+    total += 1;
+  };
+  for (const point of value) {
+    if (point.trim() === '') {
+      if (total > 0) pendingSpace = true;
+      continue;
+    }
+    if (pendingSpace) append(' ');
+    pendingSpace = false;
+    append(point);
+    if (!tail && total > limit) break;
+  }
+  if (total === 0) return '';
+  if (!tail) return total > limit ? head.join('') : head.slice(0, total).join('');
+  const points = total < limit ? window!.slice(0, total)
+    : [...window!.slice(windowIndex), ...window!.slice(0, windowIndex)];
+  return total > limit ? `…${points.join('')}` : points.join('');
 }

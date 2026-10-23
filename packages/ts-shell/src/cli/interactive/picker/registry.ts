@@ -1,4 +1,4 @@
-import { getSlashInvocation } from "../../../entrypoints/slashCommandRegistry.js";
+import { getSlashInvocation, type SlashCatalogScope } from "../../../entrypoints/slashCommandRegistry.js";
 import type { ApprovalTrustPolicy } from "../../../core/shell/approvalTrustPolicy.js";
 import type { CommandContext } from "../../../core/commands/types.js";
 import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
@@ -94,7 +94,11 @@ export interface PickerHost extends SettingsHost {
 type PickerFactory = (host: PickerHost, argument?: string) => Picker | undefined;
 
 const PICKERS: Record<string, PickerFactory> = {
-  help: host => helpPicker(host.commandContext ? { root: host.commandContext.cwd, sessionId: host.commandContext.sessionId } : undefined,
+  help: host => helpPicker(host.commandContext ? {
+    root: host.commandContext.cwd,
+    sessionId: host.commandContext.sessionId,
+    runtimeConfig: host.commandContext.runtimeConfig,
+  } : undefined,
     host.commandContext?.admission),
   tools: (host) => toolsPicker(host.commandContext),
   model: (host) => modelPicker(host.commandContext),
@@ -180,16 +184,21 @@ function savedSessionPicker(host: PickerHost, action: 'resume' | 'pin'): Picker 
 /** Arguments belong to the picker when that command explicitly accepts them. */
 export function pickerFor(command: string, host: PickerHost): Picker | undefined {
   const [first = "", ...rest] = command.trim().split(/\s+/);
-  const invocation = getSlashInvocation(first);
+  const context = host.commandContext;
+  const invocation = getSlashInvocation(first, context ? {
+    root: context.cwd,
+    sessionId: context.sessionId,
+    runtimeConfig: context.runtimeConfig,
+  } : undefined);
   const name = invocation?.kind === "named" ? invocation.name : invocation?.commandName ?? "";
   return Object.hasOwn(PICKERS, name) ? PICKERS[name]!(host, rest.join(" ")) : undefined;
 }
 
 /** Back accepts a selector; other commands keep their direct argument forms. */
-export function opensPicker(line: string): boolean {
+export function opensPicker(line: string, scope?: SlashCatalogScope): boolean {
   const trimmed = line.trim();
   if (!trimmed.startsWith("/")) return false;
-  const invocation = getSlashInvocation(trimmed.slice(1).split(/\s+/)[0]!);
+  const invocation = getSlashInvocation(trimmed.slice(1).split(/\s+/)[0]!, scope);
   const name = invocation?.kind === "named" ? invocation.name : invocation?.commandName ?? "";
   return Object.hasOwn(PICKERS, name) && (name === "back" || !/\s/.test(trimmed));
 }

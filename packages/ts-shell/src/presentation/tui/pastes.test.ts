@@ -36,6 +36,38 @@ describe("held pastes", () => {
     expect(new PasteStore().expand("see [#7 pasted 1k chars]")).toBe("see [#7 pasted 1k chars]");
   });
 
+  it("reports placeholders whose retained payload has been cleared", () => {
+    const store = new PasteStore();
+    const placeholder = store.hold("x".repeat(400));
+
+    expect(store.unresolved(placeholder)).toEqual([]);
+    store.clear();
+    expect(store.unresolved(placeholder)).toEqual([1]);
+  });
+
+  it("does not mistake ordinary bracketed text for an expired paste", () => {
+    const store = new PasteStore();
+    const issued = store.hold("x".repeat(400));
+    store.clear();
+
+    expect(store.unresolved("Please see [#42 appendix]")).toEqual([]);
+    expect(store.unresolved("A literal [#1 appendix] remains text")).toEqual([]);
+    expect(store.unresolved("A literal [#999 pasted note] remains text")).toEqual([]);
+    expect(store.unresolved("A literal [#1 pasted note] remains text")).toEqual([]);
+    expect(store.expand("Please see [#42 appendix]")).toBe("Please see [#42 appendix]");
+    expect(store.unresolved(issued)).toEqual([1]);
+
+    const active = new PasteStore();
+    const actual = active.hold("y".repeat(400));
+    expect(active.unresolved("A literal [#1 pasted note] remains text")).toEqual([]);
+    expect(active.expand("A literal [#1 pasted note] remains text")).toBe("A literal [#1 pasted note] remains text");
+    expect(active.expand(actual)).toBe("y".repeat(400));
+  });
+
+  it("refuses a held entry beyond the byte limit", () => {
+    expect(() => new PasteStore().hold("x".repeat(8 * 1024 * 1024 + 1))).toThrow(/input limit/);
+  });
+
   it("keeps a paste's identity when its text is replaced", () => {
     const store = new PasteStore();
     const first = store.hold("before");
@@ -218,5 +250,15 @@ describe("the store is bounded", () => {
     for (let index = 0; index < 200; index += 1) store.holdImage(image);
 
     expect(store.imagesIn(first)).toEqual([]);
+  });
+
+  it("shares one byte budget across text and images", () => {
+    const store = new PasteStore(128, 20);
+    const text = store.hold("x".repeat(16));
+    const image = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+    const attachment = store.holdImage(image);
+
+    expect(store.expand(text)).toBe(text);
+    expect(store.imagesIn(attachment)).toEqual([image]);
   });
 });

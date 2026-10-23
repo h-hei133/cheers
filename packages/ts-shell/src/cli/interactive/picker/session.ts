@@ -76,7 +76,7 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
       ? [...rows, {
         id: 'action:more',
         label: 'Next session page',
-        detail: query ? `${total} matches checked; browse the next page` : 'Browse older sessions with a new live scan',
+        detail: query ? `${total} matches checked; browse the next indexed page` : 'Browse older sessions from this indexed attempt',
         note: 'more',
         ...(query ? { searchText: query } : {}),
       }]
@@ -136,7 +136,7 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     searchError: 'Session search could not be completed. The loaded results are incomplete.',
     footer: [options.action === 'pin' ? 'Enter: toggle pin.' : undefined,
       'Session files: logical size; excludes attachments.',
-      'Pages rescan saved sessions; reopen to include changes to earlier pages.'].filter(Boolean).join(' '),
+      'Pages reuse a bounded browse index; reopen to include changes to earlier pages.'].filter(Boolean).join(' '),
     get initialSelection() { return expected.sessionId; },
     get initialFilter() { return options.initialQuery?.trim() || undefined; },
     onSearchChange(query) {

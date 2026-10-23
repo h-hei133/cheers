@@ -11,15 +11,28 @@
 | PRV-03 | 真实账户登录、刷新、失效、退出及跨连接隔离生命周期证据 | 需明确账户/provider、隔离 opt-in 运行条件；合成 token/audience 校验不替代实测 |
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
-| PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；tree/fork/history补原选择生命周期与project/cwd/来源身份复验；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；tree/history/fork补关闭与重载失效、选择后fresh准入及根身份检查；cleanse补一次准入克隆与未变化轮询；仍缺整体heap/延迟上界、导航/query累计physical I/O及平台证据 | 本地继续原导航/query完整资源合同；cleanse的81k节点重复打开仍有约164ms样本p95，固定样本不代表硬上界 |
-| PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
-| PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
-| INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
-| QA-01 | 47 项逐任务反转矩阵与跨任务集成仍未全部闭合 | 随上述实现逐项补证；本批panel新增六项有效反转 |
+| PAN-02 | tree/目录/管理动作已有批次证据；本批把 catalogue 后续页绑定到一次 browse-attempt 的 compact boundary index，不再每页重新 discovery；仍缺跨全部页面的累计 physical I/O 预算及全屏真实 consumer 的 byte-tier heap/响应 | 继续原 catalogue/tree consumer 的累计资源测量；20k panel 样本不等于完整资源闭合 |
+| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；本批 restore 续页改为 attempt-local page index，不再整 ledger 重扫；损坏/超限 transcript 以只读 partial 展示并禁用导航动作；tree/back 与 cleanse 的完整源读取、跨页累计 I/O/heap/平台证据仍缺 | 继续原 navigation/query 的分段取消与累计 physical I/O 测量，不以单 source 上限替代端到端资源证明 |
+| PAN-07 | device-code poll 已可被 abort 立即取消且迟到 token 不发布；扩展 unknown outcome 已跨进程 journal 恢复，关闭未 drain 与 cleanup/lifecycle unknown 均阻断后续 mutation；真实账户登录/刷新/失效/退出生命周期仍缺 | 合成协议与扩展持久边界已本地验证；真实认证仍需明确账户/provider 与隔离 opt-in |
+| PAN-08 | 本批补齐 MCP 跨 server 累计 4MiB/10k tools、共享绝对 deadline、peek fail-closed、tools/skill/cost/help/context producer top-N/omitted，以及 context signal 传播和增量 schema 计量；真实 MCP 连接/认证与完整 producer heap/延迟证据仍缺 | 本地 producer 合同已覆盖；真实连接需 server/认证条件，资源结论不扩大为端到端保证 |
+| INPUT-01 | 本批补 Visual/Visual-Line Ctrl+C 复制真实 source selection、paste 文本/图片共享 128项/32MiB预算、device-code 取消及扩展投影总界；仍缺平台真实 IME、系统剪贴板与 Windows 交互 PTY | 本地五模式/字素/长输入合同继续；实机输入法、剪贴板与 Windows 需适用机器 |
+| QA-01 | 47 项逐任务反转矩阵与跨任务集成仍未全部闭合 | 本轮已记录 27 组实际反转并恢复；继续随剩余 PAN/PRV/TOOL 与外部环境逐项补证 |
 | QA-02 | Windows 交互 PTY、真实 IME、系统复制、非交互 profile 切换/审批生命周期 | 非交互合同可本地继续；Windows/IME/系统复制需适用机器和终端 |
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
+
+## 2026-10-24 PAN-02/PAN-06/PAN-07/PAN-08/INPUT-01 本地硬化与独立复审（提交前工作树；HEAD `f8dc5bc4`，未提交）
+
+- INPUT-01 将原 modal 状态按 types/buffer/motion 拆分；Replace 命名键不再被当作文字覆盖，Backspace 恢复最近覆盖字素；Normal 安静 Escape 与 Ctrl+C 交还宿主，question 输入绕过 Vim；Visual/Visual-Line 的 Ctrl+C 复制真实 source revision/range，host 拒绝过期范围；StdinBuffer 单次上限 8 MiB，PasteStore 文本与图片共享 128项/32 MiB LRU，失效 placeholder 阻止提交；复合 operator/motion count 钳到 9,999，`2dG`/`d2G` 与 `1dG` 的前置/动作 count 分开保留。
+- INPUT-01 的 paste 占位符按本 store 实际签发的完整字符串识别；普通方括号文本、未签发 ID，以及已签发 ID 但 payload 不同的手输文本不再被误判或展开，`clear()` 后真正失效的原占位符仍阻止提交。
+- PAN-07 的 device-code poll 可被 abort 立即取消，迟到 token 不发布；extension unknown outcome 写入独立持久 journal，新进程恢复后继续 fail-closed，只有显式 `resolveUnknown()` 清除；关闭未 drain、uninstall cleanup 和 lifecycle unknown 都保留跨重启阻断。extension panel 限制 64 notices、每包 32 detail 行及累计 512 KiB，并将 package 基础字段、actions 与 detail 全部计入预算，输出 partial/omitted；picker 明确显示被省略的 actions，并对旧快照缺省字段保持兼容。
+- PAN-02/PAN-06 的 preview 只扫描首个非空逻辑行并按需截取 1,200 字符；Option/Tree/Copy/Rewind 使用按候选对象缓存的搜索文本。`SessionCatalog` 保存最多 8 个 browse attempt、每个最多 20k 个有序 boundary 的 compact index，restore catalogue 保存最多 16 个 attempt-local index；后续页只读取当前页记录并复验 boundary/version，不再重新 discovery 或整 ledger 扫描。`partial/limited/unreadable` 状态跨续页累计继承；索引超限显式保持 partial。损坏/超限 transcript 保留可读前缀并作为 `actionSafe: false` 的只读 partial 展示。
+- PAN-08 在 clone/freeze/render 前限制 report 的 1 MiB/20k节点/20k行/深度32；持久报告超限回退安全文本；skill 正文使用 display-only Markdown 并中和 OSC/CSI/C0。MCP catalogue 统一 30 秒绝对期限、4 MiB/10k tools，client 跨页、gateway 跨 server 与 peek 均使用累计预算并 fail-closed；在途 deadline 保留 `McpGatewayBlockedError`，并关闭 transport；即使 cleanup 无法确认也保留 blocker 语义。`/tools`、`/skill`、`/cost`、`/help`、`/context` 增加 producer top-N/omitted/partial，`/context` 传播取消并按工具增量测量 schema JSON。
+- 两轮只读独立复审累计提出 12 项 findings：MCP deadline/cleanup、catalogue partial/20k/limited、extension omitted/legacy type、paste 普通文本与已签发 ID 碰撞、过期矩阵/contract、`2dG`，以及两项反转测试缺口。上述问题均已修复并加入可反转测试；两位 reviewer 对最终工作树均给出 no blocker。
+- 最终聚焦集 7文件/244项通过；两个无关长链测试在首轮并发全量中失败后分别 14/14、12/12 隔离通过，保留为并发负载分类。按既有 `VITEST_MAX_THREADS=2 VITEST_MIN_THREADS=2` 最终完整 `test:ts` 为 955文件/10,295项通过、1文件/10项跳过、0失败，耗时860.48秒。
+- `test:scripts`157、`verify:result-contract`6套158项、CLI入口19项、cycles、config 53/53、declarations 18+11、Node floor 均通过；`analyze:module-facades` 保持9个既有 advisory、call reachability 保持11个既有 advisory，均未新增本批文件。`interactiveMode.ts` 保持20个函数以内。
+- build `4c2cd4069623760c8daa5974fc057ed8fc176609afe8e1324236507209fb0d31`，inputs `dc55921a92422c0b04396c897387b93110a571d2393b8e8423843f8c5a6aa2d9`，artifact `8a0990e5f6d1d9038e8398318be7a0bec75eb325118e58deb2dd6636276a5c9f`，exe SHA-256 `2bc092f5e32161c3cf30b3cac253c7d12579f00d77e9e8f7b59cfd579df0e3cb`。同 build Node/exe × regular/fullscreen/line/pipe 八格 PTY 全部 pass/exit0，证据目录 `.omx/artifacts/phase20-local-hardening-4c2cd4069623/`。
+- 仍保留 WATCH：tree/back 与 cleanse 的完整源读取、跨全部 catalogue/restore 页面的累计 physical I/O、瞬态 heap/最长响应、真实 MCP/认证、真实 IME、系统剪贴板、Windows 交互 PTY、真实模型评测及剩余 PRV/TOOL/PAN/QA 外部验收。`rtk normproof judge` 当前 exit127（命令不在 PATH），不计通过。提交前工作树尚无 commit/push/新 SHA CI；机器矩阵继续为 35 `complete` / 12 `partial` / 0 `open`。
 
 ## 2026-10-24 PAN-02/PAN-06 原tree/history/fork选择生命周期（本地及独立审查通过；交付另绑定）
 

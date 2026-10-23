@@ -1,4 +1,11 @@
-import { orderedLogFiles, tailLines, LOG_TAIL_BYTES } from './logs/files.js';
+import {
+  LOG_DIRECTORY_ENTRIES,
+  LOG_FILE_LIMIT,
+  LOG_TOTAL_BYTES,
+  LOG_TAIL_BYTES,
+  orderedLogFiles,
+  tailLines,
+} from './logs/files.js';
 import type { StructuredLogEntry } from './types.js';
 import { redactReportText } from '../core/security/redaction.js';
 
@@ -7,22 +14,34 @@ export interface LogRead {
   readonly status: 'reported' | 'partial' | 'unavailable';
   readonly filesInspected: number;
   readonly unreadableFiles: number;
+  readonly filesTruncated?: boolean;
+  readonly bytesRead?: number;
 }
 
 /** Read bounded, already-redacted structured records from all log shards. */
 export function readStructuredLogs(directory: string, currentPath: string, limit = 200): LogRead {
   let directoryUnavailable = false;
   let unreadableFiles = 0;
+  let filesTruncated = false;
   const files = orderedLogFiles(directory, currentPath, {
     onUnavailable: target => { if (target === 'directory') directoryUnavailable = true; else unreadableFiles += 1; },
+    maxEntries: LOG_DIRECTORY_ENTRIES, maxFiles: LOG_FILE_LIMIT,
+    onTruncated: () => { filesTruncated = true; },
   }).reverse();
   if (directoryUnavailable) return { entries: [], status: 'unavailable', filesInspected: 0, unreadableFiles: 0 };
   const entries: StructuredLogEntry[] = [];
   let filesInspected = unreadableFiles;
+  let bytesRead = 0;
   for (const file of files) {
+    const remaining = LOG_TOTAL_BYTES - bytesRead;
+    if (remaining <= 0) { filesTruncated = true; break; }
     filesInspected += 1;
     let lines: string[];
-    try { lines = tailLines(file, LOG_TAIL_BYTES, { strict: true }); }
+    try {
+      lines = tailLines(file, Math.min(LOG_TAIL_BYTES, remaining), {
+        strict: true, onBytes: bytes => { bytesRead += bytes; },
+      });
+    }
     catch { unreadableFiles += 1; continue; }
     for (let index = lines.length - 1; index >= 0 && entries.length < limit; index -= 1) {
       const entry = parseEntry(lines[index]!);
@@ -30,8 +49,9 @@ export function readStructuredLogs(directory: string, currentPath: string, limit
     }
     if (entries.length >= limit) break;
   }
-  const status = unreadableFiles === 0 ? 'reported' : unreadableFiles === filesInspected ? 'unavailable' : 'partial';
-  return { entries: entries.reverse(), status, filesInspected, unreadableFiles };
+  const status = unreadableFiles === 0 && !filesTruncated ? 'reported'
+    : unreadableFiles === filesInspected && entries.length === 0 ? 'unavailable' : 'partial';
+  return { entries: entries.reverse(), status, filesInspected, unreadableFiles, filesTruncated, bytesRead };
 }
 
 function parseEntry(line: string): StructuredLogEntry | undefined {
@@ -72,4 +92,4 @@ function stringField(fields: Record<string, unknown>, key: string): string | und
   return typeof fields[key] === 'string' && fields[key] ? fields[key] as string : undefined;
 }
 
-export { LOG_TAIL_BYTES };
+export { LOG_TAIL_BYTES, LOG_DIRECTORY_ENTRIES, LOG_FILE_LIMIT, LOG_TOTAL_BYTES };

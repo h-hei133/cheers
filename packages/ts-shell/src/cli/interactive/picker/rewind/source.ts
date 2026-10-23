@@ -50,6 +50,7 @@ export function rewindPoints(turns: readonly SessionMessage[], signal?: AbortSig
 /** One captured source and one current-query cache shared by continuation pages. */
 export class RewindSource {
   private readonly points: readonly RewindPoint[];
+  private readonly search: readonly string[];
   private query = '';
   private matches: readonly RewindPoint[];
   readonly moreId: string;
@@ -58,6 +59,7 @@ export class RewindSource {
     const points = rewindPoints(turns, signal);
     if (version !== undefined) for (let index = 0; index < points.length; index++) points[index] = { ...points[index]!, version };
     this.points = points;
+    this.search = points.map(point => `${point.entryId} ${point.prompt}`.toLowerCase());
     this.matches = this.points;
     const ids = new Set(this.points.map(point => point.entryId));
     let moreId = '__more__';
@@ -76,7 +78,7 @@ export class RewindSource {
   page(query: string, offset: number, size: number): { readonly entries: readonly RewindPoint[]; readonly total: number } {
     if (query !== this.query) {
       this.query = query;
-      this.matches = query ? this.points.filter(point => `${point.entryId} ${point.prompt}`.toLowerCase().includes(query)) : this.points;
+      this.matches = query ? this.points.filter((_point, index) => this.search[index]!.includes(query)) : this.points;
     }
     return { entries: this.matches.slice(offset, offset + size), total: this.matches.length };
   }

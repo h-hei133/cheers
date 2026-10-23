@@ -27,6 +27,13 @@ describe("which commands open a chooser", () => {
     },
   );
 
+  it("uses the accepted runtime config before opening a gated picker", () => {
+    const runtimeConfig = { ...getRuntimeConfig("/workspace"), enableMcpTools: false };
+    const host = { commandContext: { ...CONTEXT, runtimeConfig } } as unknown as PickerHost;
+    expect(opensPicker("/mcp", { root: "/workspace", sessionId: "sess_test", runtimeConfig })).toBe(false);
+    expect(pickerFor("/mcp", host)).toBeUndefined();
+  });
+
   it('opens cleanse as a read-only retained-evidence inspector', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cleanse-picker-'));
     try {

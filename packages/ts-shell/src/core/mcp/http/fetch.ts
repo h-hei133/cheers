@@ -5,7 +5,7 @@ import { assertAdmission, type Admission } from '../../network/admission.js';
 import { parseResponseJson, readResponseText, discardResponse } from '../../network/response.js';
 import { mcpAddressPolicy, mcpHttpUrl } from './policy.js';
 import type { McpHttpRequests } from './requests.js';
-import { withoutResumptionIds } from './stream.js';
+import { classifyEventStreamContentType, withoutResumptionIds } from './stream.js';
 
 export interface McpHttpAuthorization {
   token(admission?: Admission, signal?: AbortSignal): Promise<string | undefined>;
@@ -50,7 +50,13 @@ export function mcpFetch(serverUrl: string, options: {
       }, scope, { admitUrl: () => true, admitAddress: mcpAddressPolicy(server, url) });
       scope.check();
       if (!response.ok || !response.body) { discardResponse(response); dispose(); return response; }
-      if (options.streaming === false || response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !== 'text/event-stream') {
+      const streamType = classifyEventStreamContentType(response.headers.get('content-type') ?? undefined);
+      if (streamType === 'invalid-charset') {
+        discardResponse(response);
+        dispose();
+        throw new Error('MCP event stream must use UTF-8.');
+      }
+      if (options.streaming === false || streamType !== 'event-stream') {
         const text = await readResponseText(response, scope, 4 * 1024 * 1024);
         if (text || response.status !== 202) parseResponseJson(text);
         dispose();

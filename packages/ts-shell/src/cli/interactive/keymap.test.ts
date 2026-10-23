@@ -9,7 +9,8 @@ import { KEY_BINDINGS } from "../../presentation/tui/chrome/keys.js";
 import { dispatchedKeyIds } from "./keymap.js";
 import { Keybindings } from "./keybindings.js";
 
-function build(busy = false, interruptible = false, vimMode = false): {
+function build(busy = false, interruptible = false, vimMode = false,
+  keybindings = new Keybindings()): {
   press: (data: string) => void;
   feed: (data: string) => void;
   flushInput: () => void;
@@ -46,6 +47,8 @@ function build(busy = false, interruptible = false, vimMode = false): {
     scrollPage: vi.fn(),
     scrollToEnd: vi.fn(),
     copySelection: vi.fn().mockReturnValue(false),
+    reportNotice: vi.fn(),
+    setSourceSelection: vi.fn(),
   };
   const clock = { now: 0 };
   const gesture: { lastCancelAt?: number } = {};
@@ -56,7 +59,7 @@ function build(busy = false, interruptible = false, vimMode = false): {
     interruptible,
     now: () => clock.now,
     gesture,
-    keybindings: new Keybindings(),
+    keybindings,
     vimMode,
   };
   const input = new StdinBuffer({ setTimer: () => undefined, clearTimer: () => undefined });
@@ -129,6 +132,18 @@ describe("submission", () => {
     expect(surface.editor.getText()).toBe("");
   });
 
+  it("refuses a draft whose paste placeholder no longer resolves", () => {
+    const { press, surface, actions } = build();
+    surface.editor.setText(surface.pastes.hold("x".repeat(400)));
+    surface.pastes.clear();
+
+    press("\r");
+
+    expect(actions.submit).not.toHaveBeenCalled();
+    expect(actions.reportNotice).toHaveBeenCalledWith(expect.stringContaining("no longer available"));
+    expect(surface.editor.getText()).toContain("pasted");
+  });
+
   it("carries an attached image beside the text, not inside it", () => {
     // The end of the chain the clipboard feeds: a draft holding an image must
     // hand the picture over as an attachment, and must not leave the placeholder
@@ -157,6 +172,16 @@ describe("submission", () => {
     const { press, actions } = build();
     press("\r");
     expect(actions.submit).not.toHaveBeenCalled();
+  });
+
+  it("submits ordinary bracketed text that resembles a placeholder", () => {
+    const { press, surface, actions } = build();
+    surface.pastes.hold("x".repeat(400));
+    surface.pastes.clear();
+    press("Please see [#1 appendix]");
+    press("\r");
+
+    expect(actions.submit).toHaveBeenCalledWith("Please see [#1 appendix]");
   });
 
   it("adds a newline for shift+enter instead of submitting", () => {
@@ -314,6 +339,49 @@ describe("vim mode", () => {
     expect(surface.editor.getText()).toBe("aef");
   });
 
+  it("projects Visual and Visual-Line ranges as source selections", () => {
+    const { press, surface, actions } = build(false, false, true);
+    surface.editor.setText("a👩‍💻b");
+    surface.editor.move("doc-start");
+    press("\x1b");
+    press("v");
+    press("l");
+    expect(actions.setSourceSelection).toHaveBeenLastCalledWith({
+      sourceRevision: surface.editor.snapshot().revision,
+      start: 0,
+      end: 6,
+    });
+
+    surface.editor.setText("ab\ncd\nef");
+    surface.editor.move("doc-start");
+    press("\x1b");
+    press("V");
+    press("j");
+    expect(actions.setSourceSelection).toHaveBeenLastCalledWith({
+      sourceRevision: surface.editor.snapshot().revision,
+      start: 0,
+      end: 6,
+    });
+  });
+
+  it("copies a Visual source range on Ctrl+C without clearing the draft", () => {
+    const { press, surface, actions } = build(false, false, true);
+    surface.editor.setText("a👩‍💻b");
+    surface.editor.move("doc-start");
+    press("\x1b");
+    press("v");
+    press("l");
+    actions.copySelection.mockReturnValueOnce(true);
+    press("\x03");
+    expect(actions.copySelection).toHaveBeenCalledWith({
+      sourceRevision: surface.editor.snapshot().revision,
+      start: 0,
+      end: 6,
+    });
+    expect(surface.editor.getText()).toBe("a👩‍💻b");
+    expect(actions.setSourceSelection).toHaveBeenLastCalledWith(undefined);
+  });
+
   it("maps Ctrl+R to redo in Normal", () => {
     const { press, surface } = build(false, false, true);
     const redo = vi.spyOn(surface.editor, "redo");
@@ -330,6 +398,45 @@ describe("vim mode", () => {
     press("i");
     press("a");
     expect(surface.editor.getText()).toBe("abc");
+  });
+
+  it("keeps named keys from overwriting Replace text and restores on backspace", () => {
+    const { press, surface } = build(false, false, true);
+    surface.editor.setText("abcd");
+    surface.editor.move("doc-start");
+    press("\x1b");
+    press("R");
+    press("X");
+    press("Y");
+    expect(surface.editor.getText()).toBe("XYcd");
+    press("\x7f");
+    expect(surface.editor.getText()).toBe("Xbcd");
+    press("\x1b[D");
+    press("Z");
+    expect(surface.editor.getText()).toBe("Zbcd");
+    press("\x1b[3~");
+    expect(surface.editor.getText()).toBe("Zcd");
+  });
+
+  it("gives quiet Normal Escape and Ctrl+C back to the running application", () => {
+    const escape = build(true, true, true);
+    escape.press("\x1b");
+    escape.press("\x1b");
+    expect(escape.actions.interrupt).toHaveBeenCalledOnce();
+
+    const cancel = build(true, true, true);
+    cancel.press("\x1b");
+    cancel.press("\x03");
+    expect(cancel.actions.interrupt).toHaveBeenCalledOnce();
+  });
+
+  it("lets an explicitly rebound submit action through Normal mode", () => {
+    const { press, surface, actions } = build(false, false, true,
+      new Keybindings({ "tui.input.submit": ["ctrl+s"] }));
+    surface.editor.setText("send this");
+    press("\x1b");
+    press("\x13");
+    expect(actions.submit).toHaveBeenCalledWith("send this");
   });
 
   it("resets modal state when an external editor replaces the draft", () => {
