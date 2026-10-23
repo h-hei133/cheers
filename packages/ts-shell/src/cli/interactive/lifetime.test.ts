@@ -78,3 +78,51 @@ it.each(['open', 'stopped', 'closing', 'cancelled', 'aborted'] as const)(
     expect(manager.getCurrentSessionForProject(root)?.id).toBe(state === 'open' ? target.id : current.id);
     if (state !== 'open') expect(bytes()).toEqual(before);
   });
+
+it.each(['rename', 'delete', 'pin'] as const)('rechecks the actual %s host while a saved action resolves after cancellation', async action => {
+  for (const state of ['open', 'stopped', 'closing', 'cancelled', 'aborted'] as const) {
+    const manager = new SessionManager();
+    const target = manager.createNew(root);
+    manager.addTurn(target.id, { role: 'user', content: `Saved ${action} ${state}` });
+    const current = manager.createNew(root);
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root,
+      rootMode: 'direct', targetPathBase: root, gitRoot: null,
+      gitContext: { insideGit: false, root: null, branch: null, isClean: true },
+      runtimeConfig: getRuntimeConfig(root), session: current });
+    const renderer = new StreamingRenderer();
+    vi.spyOn(renderer, 'renderLine').mockImplementation(() => {});
+    let activeController: AbortController | null = null;
+    const options = { runtimeContext: context, sessionManager: manager, renderer, terminal: new RecordingTerminal(),
+      setReadline: () => {}, sessionRuntime: { observeEvents: () => () => {}, getAgentMode: () => 'build',
+        getPermissionScope: () => 'ask', getCurrentRunController: () => activeController, cancelAndWait: async () => {} },
+      logger: { info: () => {}, warn: () => {}, error: () => {} }, approvalTrustPolicy: {}, initialMcpGateway: {} };
+    mode = new InteractiveMode(options as unknown as ConstructorParameters<typeof InteractiveMode>[0]);
+    const owner = mode as unknown as { pickerHost(): PickerHost; closing: boolean; interrupt(): Promise<void> };
+    let release!: () => void;
+    const resolve = manager.catalog.resolve.bind(manager.catalog);
+    vi.spyOn(manager.catalog, 'resolve').mockImplementationOnce(async (...args) => {
+      await new Promise<void>(done => { release = done; }); return resolve(...args);
+    });
+    const layout = locateExistingSessionLayout(createSessionStoreLayout(), target.id);
+    const bytes = () => [layout.statePath, layout.metadataPath, layout.transcriptPath,
+      path.join(root, '.cheers', 'current-session.json')].map(file => fs.readFileSync(file));
+    const before = bytes();
+    const ports = owner.pickerHost();
+    const pending = action === 'rename' ? ports.renameSession!(target.id, 'Accepted title')
+      : action === 'delete' ? ports.deleteSession!(target.id) : ports.pinSession!(target.id);
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    if (state === 'stopped') mode.stop();
+    if (state === 'closing') owner.closing = true;
+    if (state === 'cancelled') await owner.interrupt();
+    if (state === 'aborted') { activeController = new AbortController(); activeController.abort(); }
+    release(); const note = await pending;
+    if (state === 'open') {
+      expect(note).toBeUndefined();
+      if (action === 'rename') expect(manager.getSession(target.id)?.title).toBe('Accepted title');
+      if (action === 'delete') expect(manager.sessionExists(target.id)).toBe(false);
+      if (action === 'pin') expect(manager.getSession(target.id)?.pinned).toBe(true);
+    } else { expect(note).toMatch(/cancelled|closed/); expect(bytes()).toEqual(before); }
+    expect(context.session.id).toBe(current.id);
+    mode.stop(); mode = undefined;
+  }
+});

@@ -124,8 +124,14 @@ export async function browseSessionPages({ state, child, home, project, normaliz
     await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Resume session'), 'catalogue chooser');
     start = state.output.length; child.stdin.write('qa-catalog');
     await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('45 matches checked'), 'complete catalogue query');
-    start = state.output.length; child.stdin.write('\x1b[B'.repeat(40));
-    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Next session page'), 'catalogue next-page focus');
+    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Identity: qa_catalog_00'), 'catalogue first focus');
+    for (let index = 1; index < 40; index++) {
+      start = state.output.length; child.stdin.write('\x1b[B');
+      const identity = `Identity: qa_catalog_${index.toString().padStart(2, '0')}`;
+      await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes(identity), `catalogue focus ${index}`);
+    }
+    start = state.output.length; child.stdin.write('\x1b[B');
+    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('▸ Next session page'), 'catalogue next-page focus');
     start = state.output.length; child.stdin.write('\r');
     await waitForOutput(() => normalized(state.output.slice(start)), value =>
       value.includes('Selected session') && value.includes('qa-catalog-40'), 'older fixed catalogue page');
@@ -137,4 +143,29 @@ export async function browseSessionPages({ state, child, home, project, normaliz
   } finally {
     for (const directory of created) fs.rmSync(directory, { recursive: true, force: true });
   }
+}
+
+/** Direct rename/editor and deletion use explicit confirmation and retain saved source bytes. */
+export async function manageSavedSession({ state, child, home, sessionId, normalized, waitForOutput }) {
+  const metadataPath = path.join(home, '.cheers', 'sessions', sessionId, 'metadata.json');
+  const before = snapshot(home);
+  let start = state.output.length; child.stdin.write(`/delete ${sessionId}\r`);
+  await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Delete saved session'), 'saved delete preview');
+  start = state.output.length; child.stdin.write('\x1b');
+  await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Ask anything, or / for commands'), 'saved delete cancel');
+  if (JSON.stringify(snapshot(home)) !== JSON.stringify(before)) throw new Error('Cancelled deletion changed saved files.');
+  start = state.output.length; child.stdin.write(`/session rename ${sessionId}\r`);
+  await waitForOutput(() => normalized(state.output.slice(start)), value =>
+    value.includes('Rename saved session') && value.includes('Edit session title') && value.includes(sessionId), 'saved rename preview');
+  start = state.output.length; child.stdin.write('\x1b[B\r');
+  await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Session title'), 'saved title editor handoff');
+  start = state.output.length; child.stdin.write('\x15qa-managed-title\r');
+  await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Renamed session') && value.includes('qa-managed-title'), 'saved title write');
+  if (JSON.parse(fs.readFileSync(metadataPath, 'utf8')).title !== 'qa-managed-title') throw new Error('Saved title was not written.');
+  const after = snapshot(home);
+  if (JSON.stringify(after.filter(([file]) => !file.endsWith(`${sessionId}/metadata.json`)))
+    !== JSON.stringify(before.filter(([file]) => !file.endsWith(`${sessionId}/metadata.json`)))) {
+    throw new Error('Rename changed conversation files or the active session.');
+  }
+  state.managementChecks = { status: 'pass', deleteCancelUnchanged: true, titleEditorHandoff: true, titleReadback: true, conversationUnchanged: true };
 }

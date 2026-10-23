@@ -21,13 +21,21 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-02 完整授权目录与固定页（本地验证；提交/新 SHA CI 待取证）
+## 2026-10-23 PAN-02/PAN-06 保存管理动作准入（本地验证；提交/新 SHA CI 待取证）
+
+- rename/delete/pin 复用原 lifecycle owner：准备前、异步目录解析后和原锁内写入前重验实际 surface/configuration 权限；带参数的 `/pin` 与 scripted rename 也捕获同一配置准入。已关闭、pending stop、停机或权限撤销拒绝迟到动作，保留保存字节和当前身份。
+- direct delete/rename 的 preview 仅消费一次；取消使旧 preview 和 title editor 失效，合法 parent→editor 交接保留准入。参考选择器的取消清除目标与 disposed 后拒绝迟到结果决策；本仓库继续使用现 writer/lock，不另建持久状态。
+- 受影响6文件196项通过，六有效反转均实际 AssertionError 并恢复 SHA-256：surface、locked admission、delete cancel、editor cancel、scripted rename、scripted pin。反转恢复后聚焦集合另读回；scripts157、syntax、cycles/config/declarations/Node floor及要求矩阵通过；NormProof exit0/partial，0 open/1 failed advisory/10 proof gaps。独立代码 APPROVE、架构 CLEAR，综合 APPROVE，只覆盖本批管理动作。
+- build `1420dbb8c4801999484096de9c11a9bcfbdc60a56df9e6499a6a52e9ce1d42e1`，inputs `2c325e9677ca10c0ff9d8f73c5030c75bdd81f101666d791707d9bb9ddafd39e`，artifact `b2f2a4e426ad6861b7d2f05ad158476a7096341486a356cc6b9d8d59a98b1239`，exe SHA-256 `cc3165dc2acf2e66694f5f2f5ae6f54d3f03b0865dfdcc4d06a5835783ff8f60`。同 build Node/exe × regular/fullscreen 四格 pass/exit0，删除取消 hash 不变、改名 editor 交接/写后 title 读回及对话/当前会话字节保持；tree、45匹配/固定40行目录续页及四种 stale choice 回归通过。证据 `.omx/artifacts/phase20-management-complete-{node,exe}-{regular,fullscreen}/`。
+- 首次 exe regular 批量方向键检查超时，改为逐行等待实际 Identity 与 next-page 焦点；rename probe 等待可选择动作行和 target ID 后再确认。最后一次 build 后缺 verified exe 的两项 preflight refusal 保留，重建 exe 后四格通过。scripts 首次旧 PTY relay 重复输入造成 EPIPE，未改该测试，原套件重跑157通过；保留失败分类。交付输入冻结及读回在 `.omx/artifacts/phase20-management-delivery/`，PAN-02/PAN-06 和47项总矩阵仍 partial。
+
+## 2026-10-23 PAN-02 完整授权目录与固定页（代码批 `d5e18253` 已推送；CI/Watch success）
 
 - 原 search 在 newest 10k 之后过滤，完整 scan 仍可能将旧匹配报告为不存在；More 累加到10k即停止。现在原 catalogue 在scope/reentry/query过滤后保留最多41个排序候选，另保留matching current；输出最多40条普通行加current，cache512、diagnostic samples32、discovery16/64、concurrency4不随目录条数累加。
 - 固定页续接绑定session、normalized project、allProjects、query、page size以及原pinned/time/ID边界与exact source version；仅scan结束且anchor后二验后发布。下一页前后二验原anchor，变化/丢失要求reopen。每页是live rescan，不能证明冻结目录；新增/重排行落在前页范围时需刷新。complete表示扫描结束，partial源不宣称no-match或已到头。
 - query-clear停止continued base并推进generation，迟到订阅不能恢复旧页；scope/query/local pin重新从首批获取；原previewEnd释放，accepted选择先捕获target/version再释放请求/maps。action:more/action:refresh位于合法saved ID字母表之外，实际saved IDs more/refresh仍可恢复。current首帧/原writer/锁/版本准入保持；排序提取后保留原invalid-date回退语义。
 - 受影响8文件128项与原consumer6文件195项通过，scripts157、静态门与build通过；五有效反转均实际AssertionError并恢复hash：过滤前置、final-only cursor、anchor、query-clear subscription、action ID。独立代码APPROVE/架构WATCH，W6整体仍partial。
-- 最终排序兼容集合3文件80项通过；13个非文档输入hash读回相等。build `eec8d50d5356ec02122c00c9a565f620d30cc82131e391bb9315d33d287f388a`，inputs `05b61ddae181911b4c13df3b0a08edf1e233f00b6d81a5ee92a4aac739f7ac4a`，artifact `a8742320eca8be94d329c025078145c92be19c876f38bed61713b518264dcd0e`，exe SHA-256 `498d4a2caff7dd32b3eaafb25d9e52a67022eeba153a6833403691c4e20f5b5f`。Node/exe regular/fullscreen四格在同一build重验pass/exit0：45条真实chooser查询、40条首批、第二页和取消保存hash不变，同时回归四种stale choice、tree与既有业务链；证据`.omx/artifacts/phase20-catalog-order-{node,exe}-{regular,fullscreen}/`。首次旧narrow footer断言失败已分类为explicit end状态覆盖footer的旧预期并保留log，未改renderer。提交/新SHA CI待取证。
+- 最终排序兼容集合3文件80项通过；13个非文档输入hash读回相等。build `eec8d50d5356ec02122c00c9a565f620d30cc82131e391bb9315d33d287f388a`，inputs `05b61ddae181911b4c13df3b0a08edf1e233f00b6d81a5ee92a4aac739f7ac4a`，artifact `a8742320eca8be94d329c025078145c92be19c876f38bed61713b518264dcd0e`，exe SHA-256 `498d4a2caff7dd32b3eaafb25d9e52a67022eeba153a6833403691c4e20f5b5f`。Node/exe regular/fullscreen四格在同一build重验pass/exit0：45条真实chooser查询、40条首批、第二页和取消保存hash不变，同时回归四种stale choice、tree与既有业务链；证据`.omx/artifacts/phase20-catalog-order-{node,exe}-{regular,fullscreen}/`。首次旧narrow footer断言失败已分类为explicit end状态覆盖footer的旧预期并保留log，未改renderer。代码批 `d5e18253081fa59a513f422ba621dc5d122485b6` 已推送并精确读回；CI `39923165586`/job `120313029789` completed/success，08:13:41Z–08:31:01Z，937文件/9,986项通过、3项跳过、949.74s；Watch `39923165752`/job `120313030605` completed/success。两项只绑定该SHA。
 
 ## 2026-10-23 PAN-02 tree 表单与有界获取（代码批 `a0a38886` 已推送；CI/Watch success）
 

@@ -57,7 +57,8 @@ async function pinSession(args: readonly string[], input: SessionCommandInput): 
   const target = reference[0] && reference[0].toLowerCase() !== 'here' ? reference[0] : input.runtimeContext.session.id;
   const selected = reference[1] === undefined ? undefined : reference[1].toLowerCase() === 'on' ? true : reference[1].toLowerCase() === 'off' ? false : null;
   if (selected === null) return local('Invalid pin state. Use on or off.');
-  const prepared = await prepareSessionManagement(input.sessionManager, () => selectionContext(input), 'pin', target);
+  const admission = configurationAdmission(input.runtimeContext);
+  const prepared = await prepareSessionManagement(input.sessionManager, () => selectionContext(input), 'pin', target, undefined, admission);
   if (!prepared.preview) return local(prepared.note);
   const result = applySessionManagement(input.sessionManager, () => selectionContext(input), prepared.preview, undefined, selected);
   return local(result.note, { status: result.status });

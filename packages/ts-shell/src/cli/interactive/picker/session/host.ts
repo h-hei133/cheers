@@ -15,7 +15,9 @@ export function sessionPickerHost(input: {
 }): Pick<PickerHost, 'sessionContext' | 'resumeSession' | 'deleteSession' | 'renameSession' | 'pinSession'> {
   const context = () => ({ sessionId: input.runtimeContext.session.id, projectRoot: input.runtimeContext.projectRoot, busy: input.busy() });
   const change = async (action: 'rename' | 'delete' | 'pin', sessionId: string, version?: string, title?: string): Promise<string | undefined> => {
-    const result = await prepareSessionManagement(input.sessionManager, context, action, sessionId);
+    const configuration = configurationAdmission(input.runtimeContext);
+    const admission = () => input.admission?.() ?? configuration();
+    const result = await prepareSessionManagement(input.sessionManager, context, action, sessionId, undefined, admission);
     if (!result.preview) return result.note;
     if (version && result.preview.version !== version) return 'The saved session changed after the preview. Reopen the session picker.';
     const applied = applySessionManagement(input.sessionManager, context, result.preview, title);

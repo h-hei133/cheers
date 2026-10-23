@@ -19,18 +19,24 @@ export interface SessionManagementPreview {
   readonly expected: SessionSelectionContext;
   readonly layout: SessionFileLayout;
   readonly version: string;
+  readonly admission?: () => string | undefined;
 }
 export type SessionManagementResult = { readonly status: 'changed' | 'unchanged' | 'unknown'; readonly note: string };
 
 /** Resolve the entire saved catalog, then bind approval to one freshly read identity. */
 export async function prepareSessionManagement(manager: Manager, context: () => SessionSelectionContext,
   action: SessionManagementAction, reference?: string, signal?: AbortSignal,
+  admission?: () => string | undefined,
 ): Promise<{ readonly preview: SessionManagementPreview; readonly note?: never } | { readonly note: string; readonly preview?: never }> {
+  const unavailable = managementAdmission(admission);
+  if (unavailable) return { note: unavailable };
   const expected = { ...context() };
   if (expected.busy) return { note: 'A session operation is running. Wait before changing saved sessions.' };
   const resolved = await manager.catalog.resolve(reference?.trim() || expected.sessionId,
     { projectRoot: expected.projectRoot, strictProject: true, signal });
   signal?.throwIfAborted();
+  const expired = managementAdmission(admission);
+  if (expired) return { note: expired };
   if (!resolved.ok || !resolved.sessionId) return { note: resolved.reason === 'ambiguous'
     ? 'Session reference is ambiguous. Use an exact session ID.'
     : resolved.reason === 'incomplete' ? 'Saved sessions could not be fully checked. No session was changed.'
@@ -45,7 +51,9 @@ export async function prepareSessionManagement(manager: Manager, context: () => 
     if (version !== readSessionFileVersion(layout) || layoutFor(manager, resolved.sessionId).sessionDir !== layout.sessionDir) {
       return { note: 'The saved session changed while preparing the action. Try again.' };
     }
-    return { preview: { action, session: snapshot.session, expected, layout, version } };
+    const expired = managementAdmission(admission);
+    if (expired) return { note: expired };
+    return { preview: { action, session: snapshot.session, expected, layout, version, ...(admission ? { admission } : {}) } };
   } catch {
     signal?.throwIfAborted();
     return { note: 'The saved session is missing or unreadable. No session was changed.' };
@@ -72,6 +80,8 @@ export function applySessionManagement(manager: Manager, context: () => SessionS
       const note = block(preview.expected, context(), snapshot.session, id, preview.action, snapshot.state.status === 'active' ? snapshot.state.runPhase : undefined);
       if (note) return { status: 'unchanged', note };
       if (readSessionFileVersion(layout) !== preview.version) return { status: 'unchanged', note: 'The saved session changed after the preview. Reopen the action.' };
+      const expired = managementAdmission(preview.admission);
+      if (expired) return { status: 'unchanged', note: expired };
       started = true;
       if (preview.action === 'pin') {
         const selected = pinned ?? !snapshot.session.pinned;
@@ -104,6 +114,11 @@ export function applySessionManagement(manager: Manager, context: () => SessionS
       ? 'The session action was attempted, but its result could not be confirmed. Check the saved session before retrying.'
       : 'The saved session is unavailable or locked. No session action was started.' };
   }
+}
+
+function managementAdmission(admission?: () => string | undefined): string | undefined {
+  try { return admission?.(); }
+  catch { return 'Session action is unavailable. Reopen the saved session action.'; }
 }
 
 function directoryMissing(directory: string): boolean {

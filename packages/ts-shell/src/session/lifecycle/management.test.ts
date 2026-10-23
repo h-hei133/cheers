@@ -8,10 +8,14 @@ import { sessionManagementPicker } from '../../cli/interactive/picker/session/ma
 import { sessionPickerHost } from '../../cli/interactive/picker/session/host.js';
 import { pickerFor, type PickerHost } from '../../cli/interactive/picker/registry.js';
 import { runSessionManagement } from '../../cli/runtime/management.js';
+import { sessionCommandFor } from '../../cli/runtime/sessionCommands.js';
 import { OverlayHost } from '../../cli/interactive/overlay.js';
 import { parseKeyEvent } from '../../presentation/tui/input/keys.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { StreamingRenderer } from '../../presentation/terminal/streaming.js';
+import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { configurationBinding } from '../../core/shell/configuration.js';
+import { ConfigState } from '../../config/state.js';
 
 const roots: string[] = [];
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
@@ -23,7 +27,8 @@ function fixture() {
   manager.renameSession(target.id, 'Saved work');
   const context = { sessionId: current.id, projectRoot: root, busy: false };
   const host = { sessionManager: manager, sessionContext: () => ({ ...context }) };
-  const runtimeContext = { session: current, projectRoot: root } as ShellRuntimeContext;
+  const runtimeContext = { session: current, projectRoot: root, runtimeConfig: getRuntimeConfig(root) } as ShellRuntimeContext;
+  runtimeContext.configuration = new ConfigState(runtimeContext.runtimeConfig, configurationBinding(runtimeContext));
   return { root, manager, current, target, context, host, runtimeContext };
 }
 
@@ -154,6 +159,111 @@ it('binds session-list callbacks to the offered version and uses the same busy/c
   expect(h.manager.getSession(h.target.id)?.title).toBe('External title');
 });
 
+it.each(['rename', 'delete', 'pin'] as const)('honors surface admission before %s preparation and after its asynchronous resolution', async action => {
+  const h = fixture();
+  const directory = h.manager.getSessionDirPath(h.target.id);
+  const bytes = () => ['metadata.json', 'state.json', 'transcript.jsonl'].map(name => fs.readFileSync(path.join(directory, name)));
+  const before = bytes();
+  let issue: string | undefined = 'The surface was cancelled.';
+  const admission = vi.fn(() => issue);
+  const host = sessionPickerHost({ runtimeContext: h.runtimeContext, sessionManager: h.manager,
+    busy: () => false, admission, resume: async () => undefined });
+  const run = () => action === 'rename' ? host.renameSession(h.target.id, 'Changed')
+    : action === 'delete' ? host.deleteSession(h.target.id) : host.pinSession!(h.target.id);
+  const resolve = vi.spyOn(h.manager.catalog, 'resolve');
+  expect(await run()).toContain('cancelled');
+  expect(resolve).not.toHaveBeenCalled();
+  expect(bytes()).toEqual(before);
+  issue = undefined;
+  const original = h.manager.catalog.resolve.bind(h.manager.catalog);
+  resolve.mockRestore();
+  vi.spyOn(h.manager.catalog, 'resolve').mockImplementation(async (...args) => {
+    const result = await original(...args);
+    issue = 'The surface closed during resolution.';
+    return result;
+  });
+  expect(await run()).toContain('closed during resolution');
+  expect(bytes()).toEqual(before);
+  expect(admission.mock.calls.length).toBeGreaterThan(1);
+});
+
+it.each(['rename', 'delete', 'pin'] as const)('rechecks %s admission inside the original lock before starting a writer', async action => {
+  const h = fixture();
+  const directory = h.manager.getSessionDirPath(h.target.id);
+  const bytes = () => ['metadata.json', 'state.json', 'transcript.jsonl'].map(name => fs.readFileSync(path.join(directory, name)));
+  const before = bytes();
+  let issue: string | undefined;
+  const prepared = await prepareSessionManagement(h.manager, h.host.sessionContext, action, h.target.id, undefined, () => issue);
+  const locate = h.manager.getSessionDirPath.bind(h.manager);
+  vi.spyOn(h.manager, 'getSessionDirPath').mockImplementation(id => {
+    // apply resolves this path from inside the existing state lock.
+    issue = 'Session selection expired.';
+    return locate(id);
+  });
+  expect(applySessionManagement(h.manager, h.host.sessionContext, prepared.preview!, 'New title')).toMatchObject({ status: 'unchanged', note: issue });
+  expect(bytes()).toEqual(before);
+});
+
+it('does not retain direct delete authority after cancellation or apply it twice', async () => {
+  const h = fixture();
+  const remove = vi.spyOn(h.manager, 'deleteSession');
+  const picker = sessionManagementPicker(h.host, { kind: 'shell-action', action: 'manage-session', sessionOperation: 'delete', sessionId: h.target.id });
+  await picker.load();
+  await picker.apply(['cancel']);
+  expect((await picker.apply(['apply']))?.note).toContain('not offered');
+  expect(remove).not.toHaveBeenCalled();
+  await picker.load(); picker.previewEnd?.();
+  expect((await picker.apply(['apply']))?.note).toContain('not offered');
+  expect(remove).not.toHaveBeenCalled();
+  await picker.load();
+  expect((await picker.apply(['apply']))?.note).toContain('Deleted');
+  await picker.apply(['apply']);
+  expect(remove).toHaveBeenCalledOnce();
+});
+
+it('cancels or consumes a handed-off title editor without retaining its preview', async () => {
+  const h = fixture();
+  const rename = vi.spyOn(h.manager, 'renameSession');
+  const picker = sessionManagementPicker(h.host, { kind: 'shell-action', action: 'manage-session', sessionOperation: 'rename', sessionId: h.target.id });
+  await picker.load();
+  const editor = (await picker.apply(['apply']))!.next!;
+  editor.previewEnd?.();
+  expect((await editor.input!.apply('Cancelled'))?.note).toContain('expired');
+  expect(rename).not.toHaveBeenCalled();
+  await picker.load();
+  const accepted = (await picker.apply(['apply']))!.next!;
+  expect((await accepted.input!.apply('Accepted'))?.note).toContain('Renamed');
+  await accepted.input!.apply('Second');
+  expect(rename).toHaveBeenCalledOnce();
+  expect(h.manager.getSession(h.target.id)?.title).toBe('Accepted');
+});
+
+it('preserves outer admission through an actual parent-to-editor overlay handoff', async () => {
+  const h = fixture();
+  const picker = sessionManagementPicker(h.host, { kind: 'shell-action', action: 'manage-session', sessionOperation: 'rename', sessionId: h.target.id });
+  const overlay = new OverlayHost(() => {});
+  overlay.open(picker);
+  await vi.waitFor(() => expect(overlay.render(100, 24).join('\n')).toContain('Edit session title'));
+  const editor = (await picker.apply(['apply']))!.next!;
+  overlay.open(editor);
+  expect((await editor.input!.apply('Transferred title'))?.note).toContain('Renamed');
+  expect(h.manager.getSession(h.target.id)?.title).toBe('Transferred title');
+  overlay.close();
+});
+
+it('rejects a cancelled direct command preparation and safe-fails an admission exception', async () => {
+  const h = fixture();
+  const admission = vi.fn(() => 'Direct action closed.');
+  const picker = sessionManagementPicker({ ...h.host, commandContext: { admission } as PickerHost['commandContext'] },
+    { kind: 'shell-action', action: 'manage-session', sessionOperation: 'delete', sessionId: h.target.id });
+  expect((await picker.load()).map(row => row.id)).toEqual(['cancel']);
+  expect(h.manager.sessionExists(h.target.id)).toBe(true);
+  const prepared = await prepareSessionManagement(h.manager, h.host.sessionContext, 'delete', h.target.id, undefined,
+    () => { throw new Error('PRIVATE_REASON'); });
+  expect(prepared.note).toContain('unavailable');
+  expect(prepared.note).not.toContain('PRIVATE_REASON');
+});
+
 it('retains legacy-location data and refuses symlink substitution', async () => {
   const h = fixture(); const targetDir = h.manager.getSessionDirPath(h.target.id);
   const legacyDir = path.join(h.root, '.coding-agents', 'sessions'); fs.mkdirSync(legacyDir, { recursive: true });
@@ -177,6 +287,46 @@ it('keeps scripted deletion a preview and scripted explicit rename uses the same
   await runSessionManagement({ sessionManager: h.manager, runtimeContext: h.runtimeContext, renderer },
     { kind: 'shell-action', action: 'manage-session', sessionOperation: 'rename', sessionTitle: 'Scripted title' });
   expect(h.manager.getSession(h.current.id)?.title).toBe('Scripted title');
+});
+
+it('rejects scripted rename when configuration authority changes during resolution', async () => {
+  const h = fixture();
+  const before = fs.readFileSync(path.join(h.manager.getSessionDirPath(h.current.id), 'metadata.json'));
+  const resolve = h.manager.catalog.resolve.bind(h.manager.catalog);
+  vi.spyOn(h.manager.catalog, 'resolve').mockImplementationOnce(async (...args) => {
+    const result = await resolve(...args);
+    h.runtimeContext.workspaceIssue = 'Workspace authority revoked during resolution.';
+    return result;
+  });
+  const renderer = { renderLine: vi.fn() } as unknown as StreamingRenderer;
+  await runSessionManagement({ sessionManager: h.manager, runtimeContext: h.runtimeContext, renderer },
+    { kind: 'shell-action', action: 'manage-session', sessionOperation: 'rename', sessionTitle: 'Rejected title' });
+  expect(renderer.renderLine).toHaveBeenCalledWith(expect.stringContaining('authority revoked'));
+  expect(fs.readFileSync(path.join(h.manager.getSessionDirPath(h.current.id), 'metadata.json'))).toEqual(before);
+});
+
+it('rejects scripted pin when configuration authority changes during resolution and allows a fresh explicit pin', async () => {
+  const h = fixture();
+  const directory = h.manager.getSessionDirPath(h.target.id);
+  const before = fs.readFileSync(path.join(directory, 'metadata.json'));
+  const transcript = fs.readFileSync(path.join(directory, 'transcript.jsonl'));
+  const state = fs.readFileSync(path.join(directory, 'state.json'));
+  const resolve = h.manager.catalog.resolve.bind(h.manager.catalog);
+  vi.spyOn(h.manager.catalog, 'resolve').mockImplementationOnce(async (...args) => {
+    const result = await resolve(...args);
+    h.runtimeContext.workspaceIssue = 'Workspace authority revoked during resolution.';
+    return result;
+  });
+  const command = sessionCommandFor({ sessionManager: h.manager, runtimeContext: h.runtimeContext,
+    sessionRuntime: { getCurrentRunController: () => null } })!;
+  expect(await command('pin', [h.target.id, 'on'])).toMatchObject({ kind: 'local', output: expect.stringContaining('authority revoked') });
+  expect(fs.readFileSync(path.join(directory, 'metadata.json'))).toEqual(before);
+  h.runtimeContext.workspaceIssue = undefined;
+  expect(await command('pin', [h.target.id, 'on'])).toMatchObject({ kind: 'local', state: { status: 'changed' } });
+  expect(new SessionManager().getSession(h.target.id)?.pinned).toBe(true);
+  expect(fs.readFileSync(path.join(directory, 'transcript.jsonl'))).toEqual(transcript);
+  expect(fs.readFileSync(path.join(directory, 'state.json'))).toEqual(state);
+  expect(h.runtimeContext.session.id).toBe(h.current.id);
 });
 
 it.each(['', '\x1b[31munsafe', 'line\nline', 'x'.repeat(4097)])('rejects an invalid title without writing: %j', title => {

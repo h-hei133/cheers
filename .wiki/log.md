@@ -8586,4 +8586,9 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 ## [2026-10-23] fix | PAN-02 完整授权目录与固定页
 
 - 修复完整scan后旧匹配仍被newest10k淘汰及More累加至10k停止；原catalogue按授权/query过滤后只保留40+lookahead/current，原reader/cache/discovery复用。续页只有scan结束后才发，绑定scope/query/排序/原source version，前后二验anchor；live页不声称冻结目录。
-- query-clear迟到订阅、pin reset、取消/accepted release与合法saved IDs more/refresh保持；原offered version/writer不变。受影响323项、scripts157、五有效反转、独立APPROVE/WATCH；最终排序兼容3文件80项与同build Node/exe regular/fullscreen四格packaged chooser均pass/exit0，13非文档输入hash相等。build `eec8d50d5356ec02122c00c9a565f620d30cc82131e391bb9315d33d287f388a`、exe SHA-256 `498d4a2caff7dd32b3eaafb25d9e52a67022eeba153a6833403691c4e20f5b5f`。首次end状态替换footer导致旧断言失败log保留。提交与CI待取证，PAN-02/47项仍partial。
+- query-clear迟到订阅、pin reset、取消/accepted release与合法saved IDs more/refresh保持；原offered version/writer不变。受影响323项、scripts157、五有效反转、独立APPROVE/WATCH；最终排序兼容3文件80项与同build Node/exe regular/fullscreen四格packaged chooser均pass/exit0，13非文档输入hash相等。build `eec8d50d5356ec02122c00c9a565f620d30cc82131e391bb9315d33d287f388a`、exe SHA-256 `498d4a2caff7dd32b3eaafb25d9e52a67022eeba153a6833403691c4e20f5b5f`。首次end状态替换footer导致旧断言失败log保留。代码批 `d5e18253081fa59a513f422ba621dc5d122485b6` 已推送并精确读回；CI `39923165586`/job `120313029789` completed/success，08:13:41Z–08:31:01Z，937文件/9,986项通过、3项跳过、949.74s；Watch `39923165752`/job `120313030605` completed/success。两项只绑定该SHA，PAN-02/47项仍partial。
+
+## [2026-10-23] fix | PAN-02/PAN-06 保存管理动作准入
+
+- rename/delete/pin 在准备前、异步目录解析后及原锁内写前重验 surface/configuration；scripted rename 和带参数 `/pin` 同准入。取消清除一次性 preview/editor，合法交接保留权限；原 writer/lock 不变。
+- 受影响196项、六有效AssertionError反转且恢复hash、scripts157、静态门和build通过；独立APPROVE/CLEAR。build `1420dbb8c4801999484096de9c11a9bcfbdc60a56df9e6499a6a52e9ce1d42e1`、exe SHA-256 `cc3165dc2acf2e66694f5f2f5ae6f54d3f03b0865dfdcc4d06a5835783ff8f60`；同build Node/exe regular/fullscreen四格pass/exit0，delete取消、rename editor/write/readback/对话保持及tree/catalogue/stale choice链通过。方向键批量超时已改为实际逐行焦点同步；缺exe preflight与旧relay EPIPE失败保留，exe重建和原scripts重跑通过。提交/新SHA CI待取证，PAN-02/PAN-06仍partial。
