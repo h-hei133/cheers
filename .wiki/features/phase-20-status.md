@@ -21,7 +21,7 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-24 PAN-02/PAN-06/PAN-07/PAN-08/INPUT-01 本地硬化与独立复审（提交前工作树；HEAD `f8dc5bc4`，未提交）
+## 2026-10-24 PAN-02/PAN-06/PAN-07/PAN-08/INPUT-01 本地硬化与独立复审（代码批 `186fde15` 已推送；CI/Watch success）
 
 - INPUT-01 将原 modal 状态按 types/buffer/motion 拆分；Replace 命名键不再被当作文字覆盖，Backspace 恢复最近覆盖字素；Normal 安静 Escape 与 Ctrl+C 交还宿主，question 输入绕过 Vim；Visual/Visual-Line 的 Ctrl+C 复制真实 source revision/range，host 拒绝过期范围；StdinBuffer 单次上限 8 MiB，PasteStore 文本与图片共享 128项/32 MiB LRU，失效 placeholder 阻止提交；复合 operator/motion count 钳到 9,999，`2dG`/`d2G` 与 `1dG` 的前置/动作 count 分开保留。
 - INPUT-01 的 paste 占位符按本 store 实际签发的完整字符串识别；普通方括号文本、未签发 ID，以及已签发 ID 但 payload 不同的手输文本不再被误判或展开，`clear()` 后真正失效的原占位符仍阻止提交。
@@ -32,7 +32,8 @@
 - 最终聚焦集 7文件/244项通过；两个无关长链测试在首轮并发全量中失败后分别 14/14、12/12 隔离通过，保留为并发负载分类。按既有 `VITEST_MAX_THREADS=2 VITEST_MIN_THREADS=2` 最终完整 `test:ts` 为 955文件/10,295项通过、1文件/10项跳过、0失败，耗时860.48秒。
 - `test:scripts`157、`verify:result-contract`6套158项、CLI入口19项、cycles、config 53/53、declarations 18+11、Node floor 均通过；`analyze:module-facades` 保持9个既有 advisory、call reachability 保持11个既有 advisory，均未新增本批文件。`interactiveMode.ts` 保持20个函数以内。
 - build `4c2cd4069623760c8daa5974fc057ed8fc176609afe8e1324236507209fb0d31`，inputs `dc55921a92422c0b04396c897387b93110a571d2393b8e8423843f8c5a6aa2d9`，artifact `8a0990e5f6d1d9038e8398318be7a0bec75eb325118e58deb2dd6636276a5c9f`，exe SHA-256 `2bc092f5e32161c3cf30b3cac253c7d12579f00d77e9e8f7b59cfd579df0e3cb`。同 build Node/exe × regular/fullscreen/line/pipe 八格 PTY 全部 pass/exit0，证据目录 `.omx/artifacts/phase20-local-hardening-4c2cd4069623/`。
-- 仍保留 WATCH：tree/back 与 cleanse 的完整源读取、跨全部 catalogue/restore 页面的累计 physical I/O、瞬态 heap/最长响应、真实 MCP/认证、真实 IME、系统剪贴板、Windows 交互 PTY、真实模型评测及剩余 PRV/TOOL/PAN/QA 外部验收。`rtk normproof judge` 当前 exit127（命令不在 PATH），不计通过。提交前工作树尚无 commit/push/新 SHA CI；机器矩阵继续为 35 `complete` / 12 `partial` / 0 `open`。
+- 仍保留 WATCH：tree/back 与 cleanse 的完整源读取、跨全部 catalogue/restore 页面的累计 physical I/O、瞬态 heap/最长响应、真实 MCP/认证、真实 IME、系统剪贴板、Windows 交互 PTY、真实模型评测及剩余 PRV/TOOL/PAN/QA 外部验收。本地 `rtk normproof judge` 当前 exit127（命令不在 PATH），不计本地通过；CI 的自包含 NormProof Watch 已单独 success。
+- 代码批 `186fde15209c96b86d4e2e03803f72df421293c7` 已推送并精确读回远端 `main`。CI `40032612651` / job `120684290419` 于 2026-10-23T22:17:13Z–22:35:23Z completed/success；Watch `40032612536` / job `120684290044` 于 22:17:13Z–22:17:39Z completed/success。两项只绑定该 SHA，不扩展到随后文档提交；机器矩阵继续为 35 `complete` / 12 `partial` / 0 `open`。
 
 ## 2026-10-24 PAN-02/PAN-06 原tree/history/fork选择生命周期（本地及独立审查通过；交付另绑定）
 
