@@ -7,6 +7,7 @@ import { snapshotRoot } from "../../../edit/recovery/root.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
 import { quoteCompletion } from '../completion.js';
+import { restoreSelection, type RestorePickerAccess } from './restore/state.js';
 
 /**
  * Snapshot chooser for restoring an edit.
@@ -25,7 +26,12 @@ interface LedgerRecord extends RecoveryAuthorityRecordIndexEntry {
 
 const MORE_ID = ':more';
 
-export function restorePicker(workspaceRoot: string, continuation?: { after: RecoveryCatalogCursor; query?: string }): Picker {
+export function restorePicker(workspaceRoot: string, continuation?: { after: RecoveryCatalogCursor; query?: string }, access: RestorePickerAccess = {}): Picker {
+  return snapshotPicker(workspaceRoot, continuation, restoreSelection(access, workspaceRoot));
+}
+
+function snapshotPicker(workspaceRoot: string, continuation: { after: RecoveryCatalogCursor; query?: string } | undefined,
+  selection: ReturnType<typeof restoreSelection>): Picker {
   let offered: LedgerRecord[] = [];
   let page: RecoveryCatalogPage | undefined;
   let base: RecoveryCatalogPage | undefined;
@@ -33,14 +39,38 @@ export function restorePicker(workspaceRoot: string, continuation?: { after: Rec
   let generation = 0;
   let pending = false;
   let searchQuery = '';
-  const ledgerRoot = snapshotRoot(workspaceRoot);
+  let closed = false;
+  const controller = new AbortController();
+  const release = (): void => {
+    closed = true; controller.abort(); generation++; offered = []; page = undefined; base = undefined;
+    query = undefined; pending = false; searchQuery = '';
+  };
+  let ledgerRoot: string | undefined;
+  const readPage = async (filter?: string, after?: RecoveryCatalogCursor, signal?: AbortSignal): Promise<RecoveryCatalogPage> => {
+    if (closed) throw new Error('Snapshot picker is closed.');
+    selection.check(); signal?.throwIfAborted();
+    ledgerRoot ??= snapshotRoot(workspaceRoot);
+    const read = new AbortController();
+    const signals = [signal, controller.signal, selection.signal].filter((value): value is AbortSignal => value !== undefined);
+    const abort = (): void => read.abort(signals.find(value => value.aborted)?.reason);
+    for (const source of signals) source.addEventListener('abort', abort, { once: true });
+    try {
+      const listing = await readRecoveryCatalogPage({ ledgerRoot, query: filter, after, signal: read.signal, readAccess: selection });
+      if (closed) throw new Error('Snapshot picker is closed.');
+      selection.check(); signal?.throwIfAborted();
+      return listing;
+    } finally { for (const source of signals) source.removeEventListener('abort', abort); }
+  };
   const accept = (value: RecoveryCatalogPage, filter?: string): readonly Option[] => {
+    const root = ledgerRoot;
+    if (!root) throw new Error('Snapshot catalogue is unavailable. Reopen /restore.');
     page = value;
     query = filter;
-    offered = value.records.map(record => ({ ...record, ledgerRoot }));
+    offered = value.records.map(record => ({ ...record, ledgerRoot: root }));
     return catalogueRows(value, filter);
   };
   return {
+    isCurrent: selection.isCurrent,
     title: "Restore a snapshot",
     holdInput: true,
     form: "panel",
@@ -56,31 +86,38 @@ export function restorePicker(workspaceRoot: string, continuation?: { after: Rec
     },
     multiple: true,
     async load(signal): Promise<readonly Option[]> {
-      const listing = await readRecoveryCatalogPage({ ledgerRoot, signal, after: continuation?.query ? undefined : continuation?.after });
-      signal?.throwIfAborted();
+      const listing = await readPage(undefined, continuation?.query ? undefined : continuation?.after, signal);
+      if (closed) throw new Error('Snapshot picker is closed.');
+      selection.check(); signal?.throwIfAborted();
       base = listing;
       return pending || query ? catalogueRows(listing) : accept(listing);
     },
-    onSearchChange(filter) { generation++; pending = true; searchQuery = filter; },
+    onSearchChange(filter) { if (closed) return; generation++; pending = true; searchQuery = filter; },
     onSearchClear() {
+      if (closed) return undefined;
       generation++; pending = false; searchQuery = '';
       return base ? accept(base) : undefined;
     },
     async search(filter, signal) {
+      if (closed) throw new Error('Snapshot picker is closed.');
       const token = ++generation;
       pending = true; searchQuery = filter;
-      const listing = await readRecoveryCatalogPage({ ledgerRoot, query: filter, signal,
-        after: continuation?.query === filter ? continuation.after : undefined });
-      signal?.throwIfAborted();
+      const listing = await readPage(filter, continuation?.query === filter ? continuation.after : undefined, signal);
       if (token !== generation) throw new Error('Snapshot search changed.');
+      selection.check(); signal?.throwIfAborted();
       pending = false;
       return accept(listing, filter);
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
+      if (closed) return undefined;
+      try { selection.check(); }
+      catch { release(); return { note: 'The snapshot opening is unavailable or its owner changed. Reopen /restore.' }; }
       if (pending) return { note: 'Snapshot search is incomplete; wait or reopen /restore before choosing a record.' };
       if (ids.includes(MORE_ID)) {
         if (ids.length !== 1) return { note: 'Choose snapshots or another page separately; nothing was restored.' };
-        return page?.next ? { next: restorePicker(workspaceRoot, { after: page.next, query }) } : undefined;
+        if (!page?.next) return undefined;
+        const next = snapshotPicker(workspaceRoot, { after: page.next, query }, selection);
+        release(); return { next };
       }
       const selected = new Set(ids);
       const chosen = offered.filter((record) => selected.has(identity(record)));
@@ -95,10 +132,13 @@ export function restorePicker(workspaceRoot: string, continuation?: { after: Rec
           note: "Those records come from different edits. Restore one edit at a time so the preview can tell you what it would overwrite.",
         };
       }
+      release();
       const current = await listRecoveryAuthorityRecords({
         ledgerRoot: chosen[0]!.ledgerRoot, authorityId: authority,
         recordIds: chosen.map(record => record.recordId),
+        readAccess: selection,
       });
+      selection.check();
       const currentById = new Map(current.records.map(record => [record.recordId, record]));
       if (current.status !== 'listed' || current.missingRecords.length || chosen.some(record => {
         const latest = currentById.get(record.recordId);
@@ -111,6 +151,7 @@ export function restorePicker(workspaceRoot: string, continuation?: { after: Rec
         draft: `/restore preview --ledger-root ${quoteCompletion(chosen[0]!.ledgerRoot, '')} --workspace-root ${quoteCompletion(workspaceRoot, '')} --authority-id=${authority} --record=${records}`,
       };
     },
+    previewEnd: release,
   };
 }
 

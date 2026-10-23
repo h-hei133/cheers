@@ -60,7 +60,8 @@ describe('restore selection contract', () => {
     const rows = await picker.load();
     expect(new Set(rows.map(row => row.id)).size).toBe(2);
     for (const row of rows) {
-      const outcome = await picker.apply([row.id]);
+      const opening = restorePicker(root); await opening.load();
+      const outcome = await opening.apply([row.id]);
       expect(outcome?.draft).toBeDefined();
       const parsed = parseRestoreCommandArgs(tokenizeCommandArgs(outcome!.draft!).slice(1), { cwd: root });
       expect(row.searchText).toContain(parsed.authorityId);
@@ -119,13 +120,17 @@ describe('restore selection contract', () => {
     expect((await picker.apply([first[0]!.id, more.id]))?.draft).toBeUndefined();
     const next = (await picker.apply([more.id]))!.next!;
     expect(await next.load()).toHaveLength(5);
-    const matches = await picker.search!('record-104');
+    await expect(picker.load()).rejects.toThrow('closed');
+    const searchPicker = restorePicker(root); await searchPicker.load();
+    const matches = await searchPicker.search!('record-104');
     expect(matches.map(row => row.id)).toEqual(['edit-a:record-104']);
-    expect((await picker.apply([matches[0]!.id]))?.draft).toContain('--record=record-104');
-    expect(picker.onSearchClear!()).toHaveLength(101);
+    expect(searchPicker.onSearchClear!()).toHaveLength(101);
+    await searchPicker.search!('record-104');
+    expect((await searchPicker.apply([matches[0]!.id]))?.draft).toContain('--record=record-104');
 
-    const allMatches = await picker.search!('record-');
-    const searchedNext = (await picker.apply([allMatches.at(-1)!.id]))!.next!;
+    const allPicker = restorePicker(root); await allPicker.load();
+    const allMatches = await allPicker.search!('record-');
+    const searchedNext = (await allPicker.apply([allMatches.at(-1)!.id]))!.next!;
     expect(searchedNext.initialFilter).toBe('record-');
     await searchedNext.load();
     expect(await searchedNext.search!('record-')).toHaveLength(5);
@@ -189,8 +194,10 @@ describe('restore selection contract', () => {
     fs.writeFileSync(recordPath, JSON.stringify({ ...record, workspaceRelativePath: 'different.txt' }));
     expect((await picker.apply([rows[0]!.id]))?.note).toContain('changed');
     fs.rmSync(recordPath);
+    const missing = restorePicker(root);
+    expect(await missing.load()).toEqual([]);
     const result = await picker.apply([rows[0]!.id]);
-    expect(result?.note).toContain('changed');
+    expect(result).toBeUndefined();
     expect(result?.draft).toBeUndefined();
   });
 

@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { hashContent } from './recoveryAuthorityStore.js';
 import { listRecoveryAuthorityRecords, type RecoveryAuthorityRecordIndexEntry } from './recoveryAuthorityIndex.js';
-import { recoveryReadBudget, RecoveryReadLimitError, type RecoveryReadAccess } from './read.js';
+import { assertRecoveryReadAccess, recoveryReadBudget, RecoveryReadLimitError, type RecoveryReadAccess } from './read.js';
 import { RECOVERY_CATALOG_LIMITS } from './catalog/limits.js';
 
 type RecordPosition = Pick<RecoveryAuthorityRecordIndexEntry, 'createdAt' | 'authorityId' | 'recordId'>;
@@ -28,6 +28,7 @@ export async function readRecoveryCatalogPage(input: {
   readonly query?: string;
   readonly after?: RecoveryCatalogCursor;
   readonly signal?: AbortSignal;
+  readonly readAccess?: RecoveryReadAccess;
 }): Promise<RecoveryCatalogPage> {
   const pageSize = 100;
   const records: RecoveryAuthorityRecordIndexEntry[] = [];
@@ -37,7 +38,8 @@ export async function readRecoveryCatalogPage(input: {
   let scanned = 0;
   // Order-independent change detector; selection still revalidates its records.
   let fingerprint = 0n;
-  const budget = recoveryReadBudget(RECOVERY_CATALOG_LIMITS.metadataBytes, input.signal, undefined,
+  const budget = recoveryReadBudget(RECOVERY_CATALOG_LIMITS.metadataBytes, input.signal ?? input.readAccess?.signal,
+    () => { assertRecoveryReadAccess(input.readAccess ?? {}); return undefined; },
     'Snapshot browsing exceeds its source size limit.');
   let directoryEntries = 0;
   let candidates = 0;

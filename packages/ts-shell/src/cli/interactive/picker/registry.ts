@@ -116,7 +116,8 @@ const PICKERS: Record<string, PickerFactory> = {
     }),
   plugin: host => pluginPicker(host.extensions),
   marketplace: (host) => sourcePicker(host.commandContext),
-  restore: (host) => restorePicker(host.projectRoot),
+  restore: (host) => restorePicker(host.projectRoot, undefined, { context: host.sessionContext.bind(host),
+    admission: host.commandContext?.admission, signal: host.commandContext?.signal }),
   undo: (host) => undoPicker(host.undo, host.commandContext?.admission),
   skill: (host) => skillPicker(host.commandContext),
   // Reachable either way: `/back`, or Escape twice on an empty prompt. The

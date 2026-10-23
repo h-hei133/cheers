@@ -716,7 +716,7 @@ describe("session wiring", () => {
     mode.start();
     try {
       host.view.editor.setText('original draft');
-      host.applyPicker({ ...restorePicker('/workspace'), apply: () => pending }, ['edit-a:record-a']);
+      host.applyPicker({ ...restorePicker(process.cwd()), apply: () => pending }, ['edit-a:record-a']);
       terminal.input('typed\x1b[200~ pasted\x1b[201~');
       expect(host.view.editor.getText()).toBe('original draft');
       resolve({ draft: '/restore preview --authority-id=edit-a --record=record-a' });
@@ -724,6 +724,28 @@ describe("session wiring", () => {
       expect(host.view.editor.getText()).toContain('/restore preview');
       terminal.input('!');
       await vi.waitFor(() => expect(host.view.editor.getText()).toContain('--record=record-a!'));
+    } finally { mode.stop(); }
+  });
+
+  it.each([false, true])('reports a restore refusal only while its opening owner remains current: changed=%s', async changed => {
+    const { mode } = build();
+    const host = mode as unknown as { view: InteractiveView; applyPicker(picker: Picker, ids: readonly string[]): void };
+    const owner = { sessionId: 'restore-owner', projectRoot: process.cwd(), busy: false };
+    let blocked = false;
+    let resolve!: (value: PickerOutcome) => void;
+    const pending = new Promise<PickerOutcome>(done => { resolve = done; });
+    const picker = restorePicker(process.cwd(), undefined, { context: () => owner,
+      admission: () => blocked ? 'Changed admission' : undefined });
+    mode.start();
+    try {
+      host.view.editor.setText('original draft');
+      host.applyPicker({ ...picker, apply: () => pending }, ['edit-a:record-a']);
+      blocked = true;
+      if (changed) owner.sessionId = 'new-owner';
+      resolve({ note: 'Restore opening refused', ...(changed ? { draft: '/restore preview stale' } : {}) });
+      await new Promise(done => setTimeout(done, 0));
+      expect(host.view.transcript.all().some(block => block.text.includes('Restore opening refused'))).toBe(!changed);
+      expect(host.view.editor.getText()).toBe('original draft');
     } finally { mode.stop(); }
   });
 

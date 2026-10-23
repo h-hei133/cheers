@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy/back、undo扫描/preview/locked target与restore catalogue每call准入已有批次证据；restore picker生命周期/surface、cleanse来源/目录累计资源及导航/query瞬态heap/时延仍缺 | 本地继续其余原consumer资源/身份边界与重复scan实际响应测量；source cap不等于总heap/physical I/O保证 |
+| PAN-06 | history/copy/back、undo扫描/preview/locked target、restore catalogue每call准入及picker生命周期/surface已有批次证据；explicit restore准备、cleanse来源/目录累计资源及导航/query瞬态heap/时延仍缺 | 本地继续其余原consumer资源/身份边界与重复scan实际响应测量；source cap不等于总heap/physical I/O保证 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,7 +21,16 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-06 restore catalogue 来源与取消（本地与独立审查通过；提交待取证）
+## 2026-10-23 PAN-06 restore 选择来源与生命周期（本地与独立审查通过；提交待取证）
+
+- opening在原registry绑定session/project上下文副本、canonical workspace身份、profile身份与原command admission/signal；same-owner准入拒绝可显示，changed-owner迟到结果沿原host抑制。账本路径在准入后延迟解析，目录内metadata读取通过原readAccess重验，没有新增reader/cache/writer/schema或写批准。
+- 取消、有效选中和续页handoff一次消费旧page，abort浏览、失效generation并清offered/page/base/query；closed load/search拒绝，clear/apply不能复活。每call独立signal组合并finally移除listener，取消单个search可重试。界面先abort load再apply，接受动作因此只保留原opening access与选中metadata引用，沿原index fresh equality重读后产preview draft；多选同authority、quoted路径、hidden metadata digest、pending/invalid/mixed拒绝保持。
+- 两lane独立复现内层read返回至外层load继续之间的取消竞态；补load closed与load/search原准入/signal publication检查。失败探针保留，修复后独跑通过。build首次TS2322发现lazy ledgerRoot未收窄，补保存page前明确root guard后build通过；初次workspace反转因已有assertWorkspaceRoot兜底green、signal反转只得到AbortError均保留，改为真实identity/resolves合同断言，最终12有效AssertionError反转均exit1且七source/test hashes前后相同。原e435261d源码11项实际AssertionError/1pass，两state-only项排除；原代码已支持单search取消/accepted信号分离，不虚报新增失败。
+- 最终9文件258项、恢复14项、scripts157通过，cycles/config/declarations/Node floor/docs strict/47项矩阵/diff通过；packaged NormProof exit0/partial，0open/1failed advisory/10proof gaps，audit residue已恢复。独立code APPROVE/architecture WATCH，综合COMMENT无BLOCK；code137项/11探针/production typecheck，architecture50项/15production探针/3actual host项及AST/import/cycles，七hash与final-binding一致，各自fixtures清除。registry保持原37function-like names，restore16/state3/catalogue6，行为仍归本域。
+- build`52b4bdeeec0d143baf8d55f4b77da68744d5594f80d26e8c6f67ea1f954bb828`，inputs`28621998e4d9988adcbda23654140cc67c7aa9844f4bf93354d002c96bc40885`，artifact`8adbc704bd37c9e7ffbdd9fe8eb5906ae5938f4ed98e9d54db4a5c1c110d9805`，exe SHA-256`d93932da9146089bb1fadef7a172484ca0f8885d149b44eafcb5274b320a3881`。同准确build Node/exe regular/fullscreen四格PTY pass/exit0，build-before/after相等；205snapshot三页到最旧exact preview、全search、cancel/reopen、hidden metadata stale续页拒绝及累计source拒绝。全部原workspace/record/blob bytes保持。证据`.omx/artifacts/phase20-restore-selection/`与author-binding。
+- WATCH/剩余：每page/query仍fresh complete scan，source准入与释放引用不等于总heap/physical I/O/最长响应；explicit restore command准备与default index inventory、cleanse consumer仍本地待处理。registry已有超ceiling聚合未增加，不在本批扩展。PAN-06与47项保持35complete/12partial。
+
+## 2026-10-23 PAN-06 restore catalogue 来源与取消（`e435261d`已推送；CI/Watch success）
 
 - 原streaming catalogue每complete call最多32MiB metadata source bytes、20,000record candidates与50,000ledger/records目录项（含无关名称），跨全部authority累计；metadata128KiB单项限制保持，validated opened descriptor在分配/读取前计量，坏JSON/失败read不退款。超限整call拒绝，不返回已保留的100record page或空成功；原complete100项分页、全文query、revision/cursor、unavailable/empty/no-match区别保持，blob presence只stat，不读blob/current body，无新scanner/writer。
 - 原index加可选readAccess，effective signal进入已有metadata descriptor reader，在read/stat/readdir后重验，typed limit/control错误不被吞成missing。shared budget只新增可选limitMessage，catalogue错误不冒用undo文本；default index的full readdir数组和explicit consumer接受规则保持。目录buffer32及iterator/finally关闭保持；完整scan catch与root-open catch重验取消，EACCES/ENOENT或两层iterator EIO同时取消保留exact reason，无OS syscall cancellation deadline声明。
@@ -30,7 +39,9 @@
 - 独立code APPROVE/architecture WATCH，综合COMMENT无BLOCK，最终四production/newtest五hash匹配两报告/反转/final-binding。审查实际发现并修复root-open及iterator失败遮盖取消来源，两级actual Dir handle关闭回归保持。code独跑8文件59项、14实际production policy探针和六final control探针，实文件exact32MiB、20k/50k边界/default接受/完整分页及错误保真；首次pre-format hash guard拒绝留存不算pass。架构独跑6文件50项/12production探针，实文件exact32MiB+1、跨authority和typed错误；20k/50k exact/+1使用synthetic inventory接原reader，证明政策而非实盘scale/时延。所有import独立解析/AST职责上限及cycles通过；各自fixture已清除，不以supplied67项/PTY替代独跑。
 - WATCH/剩余：每page/query仍fresh complete scan，20krecord的200page可累计4,000,000metadata acquisition，32MiB/call不代表全过程heap/latency/physical I/O或cache正确性。fingerprint仍乐观mixed-epoch detector，选择沿原选中record fresh equality及preview draft，非原子snapshot。default index inventories及restore picker one-use/surface admission、cleanse资源仍待后续；参考选择器实际cancelLoads/late identity与本仓reader取消一致，checkpoint单JSON/Git不提供同类累计policy。35complete/12partial保持。
 
-## 2026-10-23 PAN-06 undo 锁内目标读取（`b11afed3`已推送；CI进行中/Watch success）
+- 代码批`e435261d55aa6a0c3d87c43c125a8e806d848cc8`已commit/push并读回远端main；精确CI`39960212912`/job`120436029565`completed/success，13:19:16Z–13:36:44Z；Watch`39960212790`/job`120436029146`completed/success，13:19:16Z–13:19:37Z。仅绑定此SHA。上段picker缺口由后续selection批处理，不能据此关闭PAN-06。
+
+## 2026-10-23 PAN-06 undo 锁内目标读取（`b11afed3`已推送；CI/Watch success）
 
 - 原`operation/restore`在批准后refresh通过才建立384MiB累计target-source读取准入，每file64MiB，覆盖完整locked preflight与原`commitWorkspaceFile`的before/final-current/after三次检查。共享commit只加neutral可选admitBytes，默认调用保持原路径，maxBytes与opened-size分配前计量由原workspace inspector负责；失败不退款，absent零body。普通来源`current+blob+metadata<=128MiB`推出`3current+blob<=384MiB`，没有改变preview128MiB政策。
 - pre-intent全部target预检查超限明确blocked、receipt/target不变；durable intent之后沿原逐文件blocked/partial/unknown，已发布但读取验证拒绝保持unknown，不能升级success或自动重放。已restored-verified file仍进完整preflight但不再写；原exact approval、fresh revision/latest receipt、target/store locks、final state/path/identity/mode/content与temporary cleanup保持，无第二writer。
@@ -39,7 +50,7 @@
 - 独立code APPROVE/architecture WATCH，综合COMMENT，无BLOCK；最终三production和新test hash均匹配两报告/反转/final-binding。code独跑6文件101项与12实际source探针（准入growth/UTF8/absent/approval/locked stale/partial恢复/unknown重放）；architecture独跑3文件29项和八实际production探针（实际64MiB+1零read、完整verified target检查、仅剩余file重写、post-publication unknown），366,145整数MiB组合验证预算算式，cycles零及AST ceiling通过。两lane直接root Vitest重复安装问题/serialized undefined夹具失败分别保留分类，正常workspace runner及精确serialized比较后通过；各自清除synthetic fixture，不以supplied144项/PTY代替独跑。
 - 384MiB只是本attempt四处target-source准入，未覆盖store rereads、physical I/O/write bytes、其他explicit恢复consumer；保留原/refresh preview、同步inspection/hash/temporary内容仍非heap或最长响应保证。参考selected checkpoint+Git恢复无同类exact receipt累计界，本仓复用原maxBytes/admission/approval/writer，非whole-workspace snapshot。继续restore/cleanse/catalogue/heap/响应/平台缺口，35complete/12partial保持。
 
-- 代码批`b11afed37ce6326a73e0e74932ce67318d19ceac`已commit/push并读回远端main；精确CI`39958229805`/job`120429334772`于13:04:35Z开始，最后读回in_progress（前13步success，tests运行中）；Watch`39958229704`/job`120429334471`completed/success，13:04:35Z–13:05:00Z。仅绑定此SHA。
+- 代码批`b11afed37ce6326a73e0e74932ce67318d19ceac`已commit/push并读回远端main；精确CI`39958229805`/job`120429334772`completed/success，13:04:35Z–13:21:39Z；Watch`39958229704`/job`120429334471`completed/success，13:04:35Z–13:05:00Z。仅绑定此SHA。
 
 ## 2026-10-23 PAN-06 undo preview 准备读取（`e40da34c`已推送；CI/Watch success）
 
