@@ -24,11 +24,12 @@ class BoundState {
     readonly state: SessionStateSnapshot) { freezeDeep(this); }
 }
 export type BoundSessionState = BoundState;
+export interface BoundSessionReadLimits { readonly metadataBytes: number; readonly stateBytes: number }
 
-export function readBoundSessionState(host: BoundSessionHost, session: Session): BoundSessionState {
+export function readBoundSessionState(host: BoundSessionHost, session: Session, limits?: BoundSessionReadLimits): BoundSessionState {
   try {
     const layout = layoutFor(host, session.id); const version = readSessionFileVersion(layout);
-    const current = readCurrent(layout, session);
+    const current = readCurrent(layout, session, limits);
     if (readSessionFileVersion(layout) !== version) throw new SessionPublicationError('conflict');
     return new BoundState(layout, directoryIdentity(layout), current.scope, current.state);
   } catch (error) { throw error instanceof SessionPublicationError ? error : new SessionPublicationError('unavailable'); }
@@ -74,8 +75,9 @@ function layoutFor(host: BoundSessionHost, sessionId: string): SessionFileLayout
   const layout = projectSessionFileLayout({ sessionsDir: path.dirname(directory), sessionId });
   if (layout.sessionDir !== directory) throw new SessionPublicationError('invalid'); return layout;
 }
-function readCurrent(layout: SessionFileLayout, expected: Session) {
-  const metadata = readSessionMetadataRecord(layout.metadataPath); const state = readStateSnapshotRequired(layout.statePath);
+function readCurrent(layout: SessionFileLayout, expected: Session, limits?: BoundSessionReadLimits) {
+  const metadata = readSessionMetadataRecord(layout.metadataPath, limits?.metadataBytes);
+  const state = readStateSnapshotRequired(layout.statePath, limits?.stateBytes);
   if (!metadata || metadata.id !== expected.id || metadata.createdAt !== expected.createdAt || !state || typeof state !== 'object'
     || Array.isArray(state) || !['active', 'interrupted', 'completed', 'error', 'terminated'].includes(state.status)
     || typeof metadata.projectRoot !== 'string' || typeof state.projectRoot !== 'string') throw new SessionPublicationError('unavailable');

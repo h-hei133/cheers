@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy/back、undo扫描/preview/locked target、restore catalogue/index/picker/准备及执行source准入已有批次证据；cleanse已补投影source准入/选择生命周期/实时身份，仍缺上游session获取/安全序列化/轮询总界、导航/query瞬态heap/时延及整体physical I/O | 本地继续原cleanse来源获取/序列化与重复scan、完整交互测量；source cap不等于总heap/physical I/O保证 |
+| PAN-06 | history/copy/back、undo扫描/preview/locked target、restore catalogue/index/picker/准备及执行source准入已有批次证据；cleanse已补投影source准入/选择生命周期/实时身份及原session获取每文件界，仍缺完整安全序列化/轮询总界、导航/query瞬态heap/时延及整体physical I/O | 本地继续原cleanse完整序列化与重复scan/轮询、完整交互测量；source cap不等于总heap/physical I/O保证 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,7 +21,15 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-06 cleanse选择、来源投影与原消费者（本地通过；提交待取证）
+## 2026-10-23 PAN-06 原security session来源读取（本地通过；提交待取证）
+
+- 原readBoundSessionState/readCurrent增加可选只读metadata/state limits，直接沿readSessionMetadataRecord/readStateSnapshotRequired→readTextFile描述符reader；SecurityStore.read采用已有navigation同级256KiB metadata/8MiB state。打开后size检查在body分配/读取与JSONparse前，exact可读/+1整源拒绝、UTF8/path/identity/version/retry保持。无limits的原consumer及writer/locked publication维持原合同，无新reader/schema/cache，也不截断或丢durability unknown证据。
+- 本地6suite42项在Node24及准确Node20.3.0均通过，3有效AssertionError反转（metadata/state/原caller）exit1且三hash保持；原初始global read计数误拒合法metadata先读，现按descriptor dev/ino只计超限target body，失败记录保留。静态gates/47matrix/diff、TS/exe构建/NormProof exit0partial通过；scripts157在前一批同日通过且本批未改gate/script。target现有navigation有界reader、参考有界header exactEOF决策对照；完整reference load仍无总界，未复制或伪称相同session schema。
+- same-build`61396d2fd6d093c64f15f7aee2949266fa081c3fbbe3baf4918dc481885eb3e4`，inputs`9a58c1706a96319d430d3a20b343def8dfd1c4945970ffd5601a457cdf2e37a0`，artifact`156c10172b3ef8af948ed4c9844f7b03b9b9e41c5115dbc4673c0c302ce95c00`，exeSHA`76502e6518b3f50ebb9e1f77e4b8b45b9ae8488d6a862c158b998a9d0b6df626`；Node/exe regular/fullscreen四格PTY pass/exit0、before/after相等：96原retained、exactdraft/search/cancel无写/livefailure恢复/外改、原decoder97record拒绝，实际8MiB+1state与256KiB+1metadata明确unavailable/恢复重开；所有只读步骤state/transcript/metadata/workspace原字节保持，无模型/工具调用。证据`.omx/artifacts/phase20-cleanse-acquisition/`及author-binding。
+- WATCH/剩余：约束单read文件来源，不保证累计physicalI/O、每秒poll/JSON序列化成本、瞬态heap/latency；security writer与其他无limitsconsumer不冒称受限。下一步完整security投影/轮询测量仍本地可执行，35complete/12partial保持；独立codeAPPROVE/architectureWATCH，综合COMMENT无BLOCK，三hash与报告读回一致；code26host+26准确20.3探针、66focused/typecheck，architecture24probe/34focused/AST/import/cycles，ownfixtures清除。commit/push/newSHA CI分别取证。
+- 前批`7528a3cfcf4c6acd815df0d68f0681a6ea2a83ab`已commit/push/readback；Watch`39980621185`completed/success至15:43:13Z，精确CI`39980621177`最近仍in_progress，不借用68c298f0 success。
+
+## 2026-10-23 PAN-06 cleanse选择、来源投影与原消费者（`7528a3cf`已推送；CI运行中）
 
 - 原SecurityInspector保持只读owner；opening捕获原session/workspace/profile/admission/signal，并使用既有实时sessionContext验证接受结果。source在option/search join前整源准入96items、8Mi UTF-16、4096detail lines，复制不可变精确目标后重验，不静默截断。load失败清offered；订阅获取前检查、重复立即释放、同步首发close及queued stop均安全；detail/status按原控制拒绝旧数据，close释放原source/context，accepted仅保留必要身份接口。
 - 原OverlayHost新增可选previewAccept，在正常接受前捕获且随后结束browser signal；直接已取消选择拒绝，父级signal/admission仍贯穿fresh read与draft publication。选项一次消费，fresh原身份/version/target匹配，保留原unknown/unavailable/stale与完整合法detail/search；仅生成quoted `/cleanse diagnose` 草稿，无工具/修复/隐式删除或native scan cancellation。独立复现并修复原真实InteractiveMode丢草稿、临时WeakRef context GC失效、mutable版本/target、source拒绝后复活及多种订阅/回调控制缺口。

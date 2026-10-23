@@ -8694,3 +8694,10 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 本地8suite237项host/准确Node20.3、最终19项断言增强两runtime、13有效AssertionError反转十hash保持、scripts157/静态门/matrix/build/exe/NormProof0partial通过。原current与stop测试遮蔽green、虚构root/config/消费复用fixture及错误closed分类分别保留；未以窄green替代合同。独立codeAPPROVE（34host+34floor、256focused/typecheck+19final）/architectureWATCH（44probe/GC、232focused+19final/AST/import/cycles），综合COMMENT十hash绑定。
 - same-build`096cb76f03f8`/exe`39a5e3962e2d`四格PTY pass/exit0且before/after相同，96retained exactsearch/draft、orphanunknown、cancel无写、live unavailable/recovery/externalrefresh、原decoder97项拒绝重开，state/transcript/metadata/workspace原字节保持。source cap不证明前置fullsession获取、安全序列化/polling/physicalI/O/heap/时延；下一步原source owner，35complete/12partial不变。
 - 前批68c298f02bf0b4fe61dae5b45f90a18299105b0b精确CI39975873837/job120490192135success至2026-10-23T15:36:48Z，Watch39975873905success；本批commit/push/newSHA CI另取证。完整失败/最终来源与构建绑定见status及phase20-cleanse-selection artifacts。
+
+
+## [2026-10-23] fix | PAN-06 原security session获取每文件准入
+
+- 原bound reader增加可选read-onlymetadata/state上界，SecurityStore.read256KiB/8MiB在descriptor body/JSON前拒绝；exact/+1/UTF8/path/version/原retry及unknown/unavailable保持。writer/defaultconsumer不变，无新reader/schema。target导航reader与reference有界header exactEOF对照，完整source轮询/JSON/hash/heap/I/O仍待本地处理，35complete/12partial保持。
+- 本地42项host/准确20.3、3有效AssertionError反转三hash保持、静态门/matrix/diff/build/exe/NormProof0partial；初始globalread计数混入合法metadata先读为harnessdrift，改成targetdescriptor身份计量，未放宽拒绝。same-build61396d2fd6d0/exe76502e6518b3四格PTY pass/exit0身份前后一致，96retained/read-only/cancel/draft/live恢复、actual8MiB+1state及256KiB+1metadataunavailable后恢复，原session/workspace bytes保持。独立codeAPPROVE（26host+26floor、66focused/typecheck）/architectureWATCH（24probe/34focused/AST/import/cycles），三hash两报告绑定、ownfixtures清除，综合COMMENT无BLOCK；commit/push/新SHA CI最终另取。
+- 前批7528a3cfcf4c6acd815df0d68f0681a6ea2a83ab已push/readback，Watch39980621185success（15:43:13Z），CI39980621177仍in_progress；不能据运行时长升级为success。

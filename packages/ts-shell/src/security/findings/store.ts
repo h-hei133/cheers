@@ -6,6 +6,8 @@ import { boundedJson } from '../analysis/json.js';
 import type { ScanRecord, SecurityState, Remediation } from '../analysis/model.js';
 
 export interface SecurityStore { read(): SecurityState; write(update: (state: SecurityState) => SecurityState): void }
+/** The retained security document is embedded in a larger original session source. */
+export const SECURITY_SESSION_READ_LIMITS = Object.freeze({ metadataBytes: 256 * 1024, stateBytes: 8 * 1024 * 1024 });
 export function decodeSecurity(value: unknown): SecurityState {
   if (value === undefined) return { version: 1, scans: [], dispositions: [], remediations: [] };
   const state = boundedJson(JSON.stringify(value)) as unknown as SecurityState;
@@ -19,7 +21,7 @@ export function decodeSecurity(value: unknown): SecurityState {
   return freezeDeep(state);
 }
 export function securityStore(host: BoundSessionHost, current: () => Session): SecurityStore {
-  return { read: () => decodeSecurity(readBoundSessionState(host, current()).state.security), write: update => {
+  return { read: () => decodeSecurity(readBoundSessionState(host, current(), SECURITY_SESSION_READ_LIMITS).state.security), write: update => {
     const session = current(); const baseline = readBoundSessionState(host, session);
     publishBoundSessionState(host, session, baseline, (state, previous) => sameValue(state.security, previous.security),
       state => ({ ...state, security: decodeSecurity(update(decodeSecurity(state.security))) }));
