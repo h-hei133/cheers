@@ -8506,3 +8506,13 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 聚焦 picker/model host 3 文件/74 项通过。两项隔离反转实际失败：删除 model row 的 connection ID/label 后 relay 搜索失败；删除 preset-owner 比较后改名的 role 被直接应用。反转均已恢复，`model.ts` 最终 diff 为空。
 - 本批只新增验收测试，不改产品源码；`scripts/phase20-requirements.json` 将 PAN-01 更新为 `complete`，矩阵为 29 `complete`/18 `partial`/0 `open`。Phase 20 整体仍为 `partial`；提交、推送与远端证据见下条。
 - 代码批 `aee2a1ab59f418d85d019656dfd14695543d7627` 已推送，远端 `main` 精确读回同 SHA。CI `39873115272`/job `120152093788` completed/success，耗时 26m24s；927 文件通过/1 跳过、9871 项通过/3 项跳过、868.04s；Architecture Watch `39873115198`/job `120152093747` completed/success。两项只绑定该验收 SHA。
+- 证据文档提交 `74c250a0477d3895350addb1f34e8ce5dba75a0e` 已推送，远端 `main` 精确读回同 SHA。CI `39876052475`/job `120161797308` completed/success，耗时 17m30s；927 文件通过/1 跳过、9871 项通过/3 项跳过、962.01s；Architecture Watch `39876052380`/job `120161797289` completed/success。该提交只补文档，不扩大产品行为证据。
+
+## [2026-10-23] test | Phase 20 PAN-04 effort and quota acceptance
+
+- 续接 PAN-04 唯一剩余验收：`/thinking` 已有 capability-aware picker，`/usage account` 已有 quota 进度投影，但缺少 exact relay、unknown model、ambiguous endpoint 及 unknown-vs-zero quota 的端到端断言。
+- 新增 `picker/thinking.test.ts`：同一 endpoint 的 relay 声明 `high: null` 时只禁用 high，直接 apply disabled high 仍被普通 `/thinking` 拒绝且零写；未列出的 custom model 保持可选择但每级均为 unverified；重复 catalogue owner 使所有行 ambiguous 并拒绝 auto。
+- `cli/runtime/usage.test.ts` 现在分别提交无 quota windows 与 `used_percent: 0` 的真实本机 HTTP 响应。前者只显示 unknown、不产生百分比；后者保留 measured `0%`。测试 helper 增加 usage reply fixture，不改变产品协议。
+- 最终相关集合 8 文件/149 项通过：thinking picker 3、usage 34、effort 26、progress 4、model target/request shape 24、panels 11、pickers 47。三项隔离反转均实际失败：移除 exact `baseUrl` 使 supported 变 unverified；unknown model 改 unsupported 使 unlisted rows 被禁用；null quota window 改 `0%` 使 unknown 断言失败。恢复后产品源码 diff 为空。
+- TypeScript build `fae9161112d0`、`test:scripts` 157 项、import cycles（2,765 files）、config consumers（53/53）、declarations（18/18 hooks、11/11 factories）、Node floor 与 `git diff --check` 通过。`verify:phase20-requirements` 为 30 `complete`/17 `partial`/0 `open`，整体仍为 `partial`。
+- 本批只新增验收测试并更新机器矩阵，不改产品源码。代码批 `2147cb6d5957441c9295cb5574d45167fee15911` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39878549205`/job `120170060403` completed/success，耗时 12m13s；928 文件通过/1 跳过、9876 项通过/3 项跳过、664.51s；Architecture Watch `39878549170`/job `120170060130` completed/success。两项只绑定该验收 SHA。

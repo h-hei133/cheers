@@ -2,6 +2,15 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
+## 2026-10-23 PAN-04 effort and quota acceptance（代码批 `2147cb6d` 已推送；CI/Watch success）
+
+- `picker/thinking.test.ts` now drives the capability-aware effort panel against an exact relay address. The relay's `high: null` mapping disables only `high`; directly applying that disabled level is refused, while `low` goes through the ordinary `/thinking` path and persists only the session preference.
+- An unlisted custom model keeps its effort rows actionable but reports every level as `unverified`; applying `medium` preserves the explicit warning instead of claiming support. Duplicate catalogue owners for the same endpoint disable every row as ambiguous and refuse `auto` without writing a session model.
+- `cli/runtime/usage.test.ts` now distinguishes a quota payload with no windows (`Account quota windows: unknown.`) from a measured `used_percent: 0`. The unknown case emits no percentage, while the measured zero remains a real `0%` observation.
+- The broader acceptance set passed 8 files/149 tests: thinking picker, usage, effort, progress, model target/request shape, panels and pickers. Three isolated reversals produced real failures: dropping endpoint binding changed supported to unverified; mapping an unknown model to unsupported disabled the unlisted rows; mapping a null quota window to zero removed the unknown text. All product reversals were restored; no product source changed.
+- `verify:phase20-requirements` now reports 30 `complete`/17 `partial`/0 `open`, with Phase 20 still `partial`. TypeScript build `fae9161112d0`, `test:scripts` (157), import cycles, config consumers, declarations, Node floor and `git diff --check` passed.
+- 代码批 `2147cb6d5957441c9295cb5574d45167fee15911` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39878549205`/job `120170060403` 为 completed/success，耗时 12m13s；928 文件通过/1 跳过、9876 项通过/3 项跳过，测试耗时 664.51s，静态门、脚本门、构建、Chromium 安装与 NormProof 步骤均 success。Architecture Watch `39878549170`/job `120170060130` 为 completed/success。两项只绑定该验收 SHA；后续证据文档不扩大产品范围。
+
 ## 2026-10-23 PRV-03 Copilot opaque token audience binding（代码批 `0e21c3f2` 已推送；CI/Watch success）
 
 - `core/auth/oauth/copilot/policy.ts` now parses the opaque session token's `tid` and `proxy-ep` metadata. Missing `tid`, duplicate fields, malformed fields, hostile hosts, and explicit empty audiences are refused; a token without `proxy-ep` may use only the native individual default, while business and enterprise accounts require an explicit audience.
@@ -43,6 +52,7 @@
 - Focused picker/model host set: 3 files/74 tests passed. Two isolated reversals failed as expected: removing connection ID/label from the row made relay search fail, and removing the preset-owner comparison made the changed role apply instead of being rejected. Both source reversals were restored.
 - No product source changed in this batch; it closes the previously missing PAN-01 search/revision acceptance. The matrix moves to 29 `complete`/18 `partial`/0 `open`; Phase 20 remains `partial` because the other rows retain their stated gaps.
 - 代码批 `aee2a1ab59f418d85d019656dfd14695543d7627` 已推送，远端 `main` 精确读回同 SHA。CI `39873115272`/job `120152093788` 为 completed/success，耗时 26m24s；完整测试 927 文件通过/1 跳过、9871 项通过/3 项跳过，测试耗时 868.04s，静态门、脚本门、构建、Chromium 安装与 NormProof 步骤均 success。Architecture Watch `39873115198`/job `120152093747` 为 completed/success。两项只绑定该验收 SHA。
+- 证据文档提交 `74c250a0477d3895350addb1f34e8ce5dba75a0e` 已推送，远端 `main` 精确读回同 SHA。CI `39876052475`/job `120161797308` 为 completed/success，耗时 17m30s；完整测试 927 文件通过/1 跳过、9871 项通过/3 项跳过，测试耗时 962.01s。Architecture Watch `39876052380`/job `120161797289` 为 completed/success。该提交只补文档，不扩大产品行为证据。
 
 ## 2026-10-23 全 47 项复核与 QA-03/TOOL-02 harness 返工（代码批 `6ed28019` 已推送；CI/Watch success；真实模型项仍 partial）
 
@@ -133,7 +143,7 @@
 | W2 | 连接/角色/目录、委派续期、主/cache/辅助费用及池限制/退避已有逐批证据；只读可用性现共用完整池拓扑、自身凭据与当前代次等待，active 不可用和无目录成员保真 | 本批提交/远端按日志记录；完整 consumer/publication 与 provider/endpoint/受众复核仍开放 |
 | W3 | CTX-03 有界分段/合并、永久重播证据、原生 source CAS 与精确发布证明已有本地及独立验收；自动/overflow 未验证发布停止 turn | 两项架构 WATCH 为容量拒绝和锁内同步 I/O，已记录取舍；本批提交/远端按日志；CTX-01/02/04、TOOL-01 继续复核 |
 | W5 | SET-02 已修复选中分组后无法搜索其他组的问题；复用文字匹配排序，跨组按最佳得分和固定组序展示；清空搜索回原组，从详情 Back 回字段所属组并聚焦 | CMD-01/02、SET-01/03 全部验收；SET-02 其余来源/状态细节继续按合同核查 |
-| W6 | modal 的项目范围切组现已可达；不能由此证明完整目录分页/搜索 | PAN-02…08 各动作、只读边界、分页和 revision；PAN-01 已由后续搜索/revision 验收闭合 |
+| W6 | modal 的项目范围切组现已可达；不能由此证明完整目录分页/搜索 | PAN-02、PAN-03、PAN-05…08 各动作、只读边界、分页和 revision；PAN-01 已由后续搜索/revision 验收闭合，PAN-04 已由 effort/quota 验收闭合 |
 | W7/W8/W9 | 2026-10-20 返工已补上同文件 hunk 的 baseline/content identity、detach 后保留晋升总期限、adopted settlement、follow-up 脱敏/reload、轻量 `--help`/`--version`、首帧 bootstrap 扫描探针，以及最终 Markdown/HTML code-span、diff rows/bytes/rename 与 copy 反例；START-02 现有 packaged 首帧恢复提示与用户意图 fence，START-01 fresh packaged gate 已在本工作树通过 | 其余 INPUT/RENDER consumer 仍按合同复核；START-01/02 的新提交 CI 与跨平台验收另行取证 |
 | W10 | 本批 135 文件/1813 测试通过；修改前实现使 20 项回归失败；两路独立复核通过；Node/exe × regular/fullscreen 的 settings/resume 切组、关闭与退出 PTY 通过 | QA-01/02/04 随后续返工累积；本批不等于全阶段交付 |
 
@@ -226,7 +236,7 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | RENDER-03（补强） | 本次 | 并排 diff、配对行号、严格 rows/bytes 双预算、精确 UTF-8 边界、窄屏 unified 回退、resize 锚点、左右源复制、纯 rename 与 rename/BOM/EOL/EOF facts |
 | RENDER-02（部分） | 本次 | 多行 cell、escaped/code pipe、`<br>`、最终 Markdown/HTML code-span 一致性、窄屏源码回退与预算 |
 | RENDER-01（部分） | 本次 | 内联数学投影、金额/代码保护、escaped/multi-run/unmatched backtick、未知命令与超预算保原文 |
-| PAN-04（部分） | `6736f402`、本次 | `/usage account` quota 进度投影、`/thinking` effort 选择器 |
+| PAN-04 | `6736f402`、`2147cb6d` | `/usage account` quota 进度投影、`/thinking` effort 选择器；exact relay/unknown/ambiguous effort 与 unknown-vs-zero quota 验收 |
 | PAN-06（部分） | `6736f402`、本次 | copy 移除 recent-30 窗口；restore 生成可解析的 preview draft，绑定项目及复合快照身份，提交前重读元数据，明确失败/部分目录与取消 |
 | PAN-07（部分） | 本次 | `/extensions` 为 `/plugin` 别名 |
 | START-01（补强） | `0afab79a`、本次 | build manifest、五种拒绝状态、`start`/`start:dev`；轻量 `--version`/`--help`、组合参数和坏配置准入；fresh packaged gate 通过 |
@@ -244,7 +254,6 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | 任务 | 已做 | 缺 |
 |---|---|---|
 | PAN-02 | 时间分组、pin、树形、跨项目完整授权目录搜索、10k 分页批处理、全屏事实/对话预览、窄屏 stacked preview、current tree focus、pin 持久化；Linux TUI fork/切换/确认删除组合通过 | 其余动作身份/revision 边界继续复核；restore preview 另归 PAN-06 |
-| PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
 | PAN-06 | copy 全量、pin；copy 100 项分页、continuation、源 revision 与 stale 拒绝；restore 100项分页/续页、全目录搜索、有界目录缓冲与记录保留、复合身份消歧、元数据digest重验、特殊路径参数及preview-only业务链；back 保留完整候选、25项展示续页、numeric/exact-ID定位、完整prompt搜索和共享捕获快照，沿既有草稿/分支回退；四格打包PTY核对60题全可达与文件不变 | history完整持久树沿既有query owner；undo saved-results已补40条续页/明确到头、scope和完整receipt revision重验，精确补偿沿原owner；copy已补完整block搜索/续页/到头/失败/取消及恢复会话早期源；其余identity/revision及资源边界继续复核；back完整候选保留/同步搜索随源大小增长，restore每页/搜索仍线性扫描目录，不宣称搜索延迟上界或原子目录快照 |
 | PAN-06 history | 裸 `/history` 复用完整持久树及废弃分支，选择只生成精确 `/tree -- <entry-id>` 草稿；空历史/无匹配/读取失败分开；真实排队焦点、禁用身份与取消无写回归；底栏任务存储读取失败显示 unavailable，恢复后重新读取 | 完整树/全文搜索仍同步且未设总字节/工作量界，10k模拟节点不证明真实大历史响应界；cleanse 面板、其余 identity/revision 及资源合同继续开放；本批293项、专用故障PTY与交付证据见开发日志 |
 | PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引）、watcher 注销与 unknown status 回归；`/agents` 复用 jobs owner 的 `agentProjection`/`agentPage`，覆盖 stale/detached 与脱敏输出页 | agents 控制操作仍归 `/jobs`；其余 journal/revision 边界继续复核 |
