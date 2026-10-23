@@ -140,9 +140,9 @@ const PICKERS: Record<string, PickerFactory> = {
     }
     return rewindPicker({ turns, version, unavailable, rewind: host.rewind, selector, admission, signal });
   },
-  tree: (host) => treePicker(host.commandContext, host.rewind),
-  history: (host) => treePicker(host.commandContext, host.rewind, "history"),
-  fork: host => treePicker(host.commandContext, point => host.fork?.(point.entryId, point.version) ?? Promise.resolve(undefined), "fork"),
+  tree: (host) => treePicker(host.commandContext, host.rewind, 'tree', host.sessionContext?.bind(host)),
+  history: (host) => treePicker(host.commandContext, host.rewind, "history", host.sessionContext?.bind(host)),
+  fork: host => treePicker(host.commandContext, point => host.fork?.(point.entryId, point.version) ?? Promise.resolve(undefined), "fork", host.sessionContext?.bind(host)),
   statusline: (host) =>
     statusItemPicker({
       current: host.statusItems,

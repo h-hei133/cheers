@@ -282,7 +282,7 @@ describe("session wiring", () => {
     const original = host.pickerHost(); const begin = vi.spyOn(host.sink, 'begin');
     const root = process.cwd();
     vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original,
-      commandContext: { ...original.commandContext, cwd: root, admission: () => undefined },
+      commandContext: { ...original.commandContext, cwd: root, projectRoot: root, admission: () => undefined },
       sessionContext: () => ({ sessionId: 'sess_1', projectRoot: root, busy: false }), security: {
       read: () => ({ state: 'ready', snapshot: { identity: { sessionId: 'sess_1', workspaceRoot: root }, version: 'v1', items: [] } }),
       subscribe: () => () => undefined,
@@ -543,9 +543,13 @@ describe("session wiring", () => {
     const { mode } = build();
     const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void>; pickerHost(): PickerHost };
     const original = host.pickerHost();
-    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, commandContext: { ...original.commandContext, admission: () => undefined } });
+    const root = process.cwd();
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original,
+      commandContext: { ...original.commandContext, cwd: root, projectRoot: root, admission: () => undefined },
+      sessionContext: () => ({ sessionId: 'sess_1', projectRoot: root, busy: false }),
+    });
     const navigation = vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({
-      version: 'saved-v1',
+      version: 'saved-v1', session: { id: 'sess_1', projectRoot: root },
       points: [
         { entryId: 'older', label: 'Older question', depth: 0, current: false, prompt: 'older' },
         { entryId: 'current', label: 'Current question', depth: 1, current: true, prompt: 'current' },
@@ -573,6 +577,29 @@ describe("session wiring", () => {
       expect(frame).not.toContain('PRIVATE_STORAGE_BODY');
       expect(frame).not.toContain('No saved session history');
     } finally { mode.stop(); }
+  });
+
+  it('publishes an exact history draft through actual acceptance after browser signal release', async () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void>;
+      pickerHost(): PickerHost; view: InteractiveView };
+    const original = host.pickerHost(), root = process.cwd(), rewind = vi.fn();
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, rewind,
+      commandContext: { ...original.commandContext, cwd: root, projectRoot: root, admission: () => undefined },
+      sessionContext: () => ({ sessionId: 'sess_1', projectRoot: root, busy: false }),
+    });
+    const navigation = vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({ version: 'saved-v1', session: { id: 'sess_1', projectRoot: root },
+      points: [{ entryId: 'entry with space', label: 'Exact saved question', depth: 0, current: true, prompt: 'question' }],
+    } as ReturnType<typeof sessionNavigation.readSessionNavigation>);
+    mode.start();
+    try {
+      await host.run('/history');
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).toContain('Exact saved question'));
+      terminal.input('\r');
+      await vi.waitFor(() => expect(host.view.editor.getText()).toBe('/tree -- "entry with space"'));
+      expect(navigation).toHaveBeenCalledTimes(2); expect(rewind).not.toHaveBeenCalled();
+      expect(host.overlay.active).toBe(false);
+    } finally { mode.stop(); navigation.mockRestore(); }
   });
 
   it('reports queued back source failures without claiming there are no questions', async () => {
@@ -627,8 +654,12 @@ describe("session wiring", () => {
     const { mode } = build();
     const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void>; pickerHost(): PickerHost };
     const original = host.pickerHost();
-    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, commandContext: { ...original.commandContext, admission: () => undefined } });
-    vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({ version: 'saved-v1', points: saved
+    const root = process.cwd();
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original,
+      commandContext: { ...original.commandContext, cwd: root, projectRoot: root, admission: () => undefined },
+      sessionContext: () => ({ sessionId: 'sess_1', projectRoot: root, busy: false }),
+    });
+    vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({ version: 'saved-v1', session: { id: 'sess_1', projectRoot: root }, points: saved
       ? [{ entryId: 'saved', depth: 0, label: 'Saved question', current: true }]
       : [] } as ReturnType<typeof sessionNavigation.readSessionNavigation>);
     mode.start();

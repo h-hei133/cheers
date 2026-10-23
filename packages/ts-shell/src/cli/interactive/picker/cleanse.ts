@@ -6,16 +6,16 @@ import { quoteCompletion } from '../completion.js';
 import type { Picker } from '../overlay.js';
 import type { CommandContext } from '../../../core/commands/types.js';
 import { captureCleanseSource } from './cleanse/source.js';
-import { cleanseSelection } from './cleanse/state.js';
+import { pickerSelection } from './selection/state.js';
 import type { SessionSelectionContext } from '../../../session/navigation/selection.js';
 
 const help = 'Enter to draft diagnosis; Esc closes the view. Repair, apply and verify require explicit commands.';
 const unavailable = 'Retained diagnostics are unavailable or the opening owner changed. Reopen /cleanse.';
 
 /** Read-only retained security evidence; repair and approval remain commands. */
-export function cleansePicker(inspector: SecurityInspector | undefined, context?: Pick<CommandContext, 'cwd' | 'sessionId' | 'admission' | 'signal'>,
+export function cleansePicker(inspector: SecurityInspector | undefined, context?: Pick<CommandContext, 'cwd' | 'projectRoot' | 'sessionId' | 'admission' | 'signal'>,
   current?: () => SessionSelectionContext): Picker {
-  const selection = cleanseSelection(context, current);
+  const selection = pickerSelection(context, current, 'Retained diagnostics owner changed. Reopen /cleanse.');
   current = undefined;
   let source = inspector;
   inspector = undefined;

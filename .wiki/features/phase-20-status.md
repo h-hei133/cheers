@@ -11,8 +11,8 @@
 | PRV-03 | 真实账户登录、刷新、失效、退出及跨连接隔离生命周期证据 | 需明确账户/provider、隔离 opt-in 运行条件；合成 token/audience 校验不替代实测 |
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
-| PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；cleanse已补来源准入、选择生命周期、序列化前准入、未变化轮询零正文读取及五档重复交互测量/一次准入克隆；仍缺整体heap/延迟上界、其他导航/query累计physical I/O及平台证据 | 本地继续history/tree真实来源与完整资源合同；cleanse的81k节点重复打开仍有约164ms样本p95，固定样本不代表硬上界 |
+| PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；tree/fork/history补原选择生命周期与project/cwd/来源身份复验；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
+| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；tree/history/fork补关闭与重载失效、选择后fresh准入及根身份检查；cleanse补一次准入克隆与未变化轮询；仍缺整体heap/延迟上界、导航/query累计physical I/O及平台证据 | 本地继续原导航/query完整资源合同；cleanse的81k节点重复打开仍有约164ms样本p95，固定样本不代表硬上界 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,7 +21,16 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-24 PAN-06 原security一次准入克隆与资源测量（本地与独立审查通过；交付另取证）
+## 2026-10-24 PAN-02/PAN-06 原tree/history/fork选择生命周期（本地及独立审查通过；交付另绑定）
+
+- 原tree owner在load开始撤销旧选项，failed reload、closed与generation改变不能恢复旧选择；加载/投影/实际fresh selection读取前后复验原signal、admission、session/profile及物理cwd/projectRoot。正常OverlayHost接受先捕获browser结束状态，仅解除该browser signal，原runtime控制不放宽；one-use先消费后沿原rewind/fork或精确history草稿，关闭清选项/detail/action引用。
+- 提炼原cleanse/state为共用picker/selection/state，移除旧实现；保留cleanse原消息与契约，增加明确projectRoot（legacy fallback cwd）、独立project/cwd物理身份及初始live root绑定。registry只透传原live session accessor，不新增中央行为。原readSessionNavigation fullsource/256KiB metadata/8MiB state/16MiB transcript/50klines/20kentries限制保持；tree在load和fresh读取检查saved session id/projectRoot，合法cwd子目录与projectRoot分离仍可用。
+- 原源码三个真实AssertionError复现failedreload旧draft、close后复活、freshread内准入撤销仍draft。最终10项有效反转exit1且六hash恢复一致；四个初始单保护被laterguard兜底green保留、不计有效，final共同保护反转重新绑定。早期四个不存在/workspace与后续explicit projectRoot/source.session旧夹具失败按harness drift修正，未削弱合同；typecheck错误config路径与test变更后exe freshness拒绝留存，不计构建通过。
+- 最终7suite296项在Node24与准确Node20.3.0通过，production strict TS、双构建/静态门/CLI入口19/47项matrix/NormProof exit0partial通过，原advisory与proof gaps保持。scripts/gates未改，157项为同日轮询批证据，不称本批重跑。独立code APPROVE（28actual-owner探针两runtime/296focused/typecheck）；architecture source CLEAR/resource WATCH（47探针两runtime/260focused/AST/import/cycles，含实际consumer迟到owner/surface/stop拒绝）。六hash与两报告绑定，综合COMMENT无BLOCK，ownfixtures清除。tree15/shared4/cleanse13不超ceiling、registry37为原超限未增；完整author-binding见`.omx/artifacts/phase20-tree-selection/`，commit/push/newSHA CI分别取证。
+- 同build`51cae2e97a93c5c8d4c37f6f7f8f68a96efd6ff90598cc5eb818238c0022de2f`，inputs`e7dc4717086968b78656e3009bb526ecf242b63e39cada5a21d1df3b02cbac48`，artifact`a3a0ba716404969ea427c3816ab4a2156c831d791677854a41a841d5db7eb988`，exe`dc50bff756f404f8dafb2162310ecf1a97ec82315b5ea7dddd5d6d6effceda8a`；Node/exe regular/fullscreen四格PTY pass/exit0且before/afterbuild一致。206messages/fullprompt弃置分支search、带空格ID精确historydraft、tree/fork取消无写、缺transcript拒绝重开、外改selection拒绝及current原生导航通过，原workspace bytes与消息保持。
+- 参考active controller在progress/settled前复验及failedload清列表、timer disposal/refresh释放旧children用于生命周期对照。同步fullsource仍不能在read/parse中途抢占；source caps、后置fences、释放引用不证明整体heap/最长响应/累计physical I/O/平台或crash atomicity。35complete/12partial保持，后续沿原navigation/query资源owner继续；不扩展审批/writer。
+
+## 2026-10-24 PAN-06 原security一次准入克隆与资源测量（`a15c8dc8`已推送；CI/Watch success）
 
 - 原JSON owner新增cloneJsonSource，将raw source准入、原JSON.stringify及encoded4MiB/parse/object检查放在同一操作，只省略本地inert clone的重复结构遍历。外部boundedJson仍完整准入且原错误顺序保持；完整inspection独立8MiB准入、decode schema/freeze/hash、unknown receipts和writer不变，无validation bypass参数/cache或限制下调。
 - 同准确脚本`5b5db59b055ddcd2774bcca4b5f74c0bed370743644c165263dc972c521301d3`各150process比较，五档每档30个导入后first-open、其中一个进程30次key/search/轮询/close/reopen；64KiB/1MiB/8MiB小security、8MiB大string、8MiB含40k小对象（81,254nodes）。corrected baseline已保存raw aggregate/script/build，clone样本及comparison见`.omx/artifacts/phase20-cleanse-resources/`。
@@ -31,6 +40,7 @@
 - 独立code APPROVE（54host+54floor探针、55focused/typecheck），architecture源码无findings、资源WATCH（两runtime各19checks+300generated shapes，原admission AST不变/7functions/private parse；独立96reachable/exactdraft/cancel queued0bytes/零gates）；三源码hash与两报告绑定。资源code另核实300reports/2700actions/45comparisons、分位数/bootstrap/memory/body计量及双immutable builds。综合COMMENT无BLOCK；上述测量是author执行，两lane分别审计，未冒称独立重跑150process。完整绑定见`.omx/artifacts/phase20-cleanse-clone/author-binding.json`；commit/push/newSHA CI分别取证。
 - finalbuild`628b5bbb1f4298976de68641d3a39f3da8a93d3295b2d941f75b2b13724f1ce2`，inputs`a52f6bcbadee9a41676bd7e65aa31bf0f7971885913f6bf98449a4d3cf41133f`，artifact`495148e1cfc90922c7575f6049e9f2c5cb52fcb9aa9a1e100925b09c6d6987c9`，exeSHA`2858b4f8db6f57902fa9eb4d833a2033528876d905bc50fc4212be1e0954a1d2`；同build四格PTY pass/exit0且before/after一致，96retained/search/exactdraft/cancel无写、live失效恢复/外改与actualsession8MiB+1/metadata256KiB+1拒绝及重开；metadata/state/transcript/workspace原只读字节保持。
 - 前批`5893dc4974ff7b58729fa04612086db10056d007`已commit/push/远端main读回；精确CI`39989467674`/job`120537159420`success至17:13:27Z，Watch`39989467406`/job`120537158458`success至16:46:11Z。仅绑定轮询批，不扩展到本批源码。
+- 本批`a15c8dc8fdd63ff3944bd1a7e1dee9c268a552a0`已commit/push并读回远端main；精确CI`39995822789`/job`120558952310`completed/success，17:31:54Z–17:49:24Z，Watch`39995822831`completed/success。仅绑定clone批。
 
 ## 2026-10-24 PAN-06 原security inspector未变化轮询（`5893dc49`已推送；CI/Watch success）
 
