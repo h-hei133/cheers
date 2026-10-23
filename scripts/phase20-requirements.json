@@ -215,15 +215,15 @@
     },
     {
       "id": "RENDER-02",
-      "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W7; markdown/table/HTML/code-span tests; inline Markdown is rendered before ANSI-aware soft-wrap so links and styles remain intact across table-cell rows",
-      "missing": "Complete OSC8 and packaged visual/source-copy acceptance remain."
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W7; markdown/table/HTML/code-span tests; OSC8 labels close per wrapped row; packaged Node/exe x regular/fullscreen PTY verifies OSC8 and exact /copy source",
+      "missing": ""
     },
     {
       "id": "RENDER-03",
-      "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W7; diff rows/bytes/side-by-side tests; CRLF terminators and embedded terminal controls are displayed as text without changing exact byte accounting",
-      "missing": "Packaged visual/source-copy acceptance and remaining full-view resource edges remain."
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W7; 400-row/64 KiB bounded pager, old/new line carry, side-by-side source copy; packaged Node/exe x regular/fullscreen PTY verifies exact old/new copies",
+      "missing": ""
     },
     {
       "id": "EDIT-01",

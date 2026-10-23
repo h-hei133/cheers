@@ -2,7 +2,7 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
-## 2026-10-23 RENDER-03 大 diff 完整查看与 RENDER-02 CI 稳定化（本地代码批；CI pending）
+## 2026-10-23 RENDER-03 大 diff 完整查看与 RENDER-02 CI 稳定化（代码批 `9250632d` 已推送；CI/Watch success）
 
 - `presentation/tui/transcript/diffPage.ts` 现在拥有 400 行/64 KiB 的源页预算、精确 UTF-8 边界和跨页 old/new 行号状态；`diff.ts` 在 `split` 前先按双预算扫描源，左右源选择的分界改为两内容 cell 之间的 divider，`diffLines.ts` 承接 header、EOL、byte 和终端安全显示辅助。
 - `chrome/pager.ts` 对超出 inline 预算的 diff 打开有界完整阅读器，支持 PgUp/PgDn、滚轮、Home/End 和分页续行；`surface/pane.ts` 将 pointer 的 content 坐标映射回 screen 行，修复填充行/滚动窗口下的源复制。`source.test.ts` 与 `paneDiffSource.test.ts` 已改为只通过 `screenToContent()` 传入 selection。
@@ -10,9 +10,10 @@
 - 聚焦 9 文件/199 项通过。三组真实反转均取得断言失败并恢复：移除有界源扫描使零宽超预算 diff 不再出现截断标记；恢复旧内容分界使左右源复制返回 `new line`；移除 content-to-screen 映射使两侧源复制返回 `undefined`。产品文件 SHA-256 已逐项读回恢复值。
 - 完整 `test:ts` 为 931 文件通过/1 跳过、9,893 项通过/10 跳过。`test:scripts` 157/157、cycles 2,771 文件/0 runtime/0 type、config consumers 53/53、declarations 18/18 + 11/11、Node floor、strict docs/rules 与 `git diff --check` 通过；NormProof exit 0/partial，0 open obligations、1 failed advisory obligation、10 proof gaps。
 - TypeScript build `69952ded38bf2b30096cb18b8d3470972aea0d7f8e6682ea1ac3865b92d7c6f2`，executable SHA-256 `09e49dd189a22a2b1e2bd263c3f0339df54747122962a99a11be572a8e518c54`。Node/exe × regular/fullscreen 四格打包 PTY 全部 pass/exit 0；两份 fullscreen raw output 的 OSC52 payload 解码后均精确为 `qa-old-side-source` 与 `qa-new-side-source`。证据目录 `.omx/artifacts/phase20-render-diff-pty-69952ded38bf/`。
-- RENDER-02 的精确提交 CI `39894148326`/job `120220534823` 为 completed/failure：929 文件通过/1 失败/1 跳过，9,889 项通过/1 失败/3 跳过；失败项就是上述 hyperlink 断言，并非 viewport 行为。该失败 run 保留。当前批仍是本地代码批，`verify:phase20-requirements` 维持 32 `complete`/15 `partial`/0 `open`；RENDER-02/03 不提前记为 complete。
+- RENDER-02 的精确提交 CI `39894148326`/job `120220534823` 为 completed/failure：929 文件通过/1 失败/1 跳过，9,889 项通过/1 失败/3 跳过；失败项就是上述 hyperlink 断言，并非 viewport 行为。该失败 run 保留。
+- 代码批 `9250632d9946295d55215dc9941959174abb3af3` 已推送，远端 `main` 精确读回同 SHA。CI `39898564931`/job `120234580498` 为 completed/success，耗时 17m06s；完整测试 931 文件通过/1 跳过、9,900 项通过/3 跳过，静态门、脚本门、构建、Chromium 安装、完整测试与 NormProof 步骤均 success。Architecture Watch `39898564927`/job `120234580519` 为 completed/success。两项只绑定该代码 SHA。`verify:phase20-requirements` 更新为 34 `complete`/13 `partial`/0 `open`，RENDER-02/03 闭合，Phase 20 整体仍为 `partial`。
 
-## 2026-10-23 RENDER-02 OSC8 与打包源复制（本地代码批；CI pending）
+## 2026-10-23 RENDER-02 OSC8 与打包源复制（前序本地代码批；后续结果见顶部）
 
 - `presentation/tui/text/link.ts` 现在由单一策略校验 terminal/HTML 共用链接目标：只允许 `http`、`https`、`mailto` 和无 scheme 相对目标，剥离 C0/C1 控制符，拒绝 `javascript:`、`data:`、`file:` 等可执行或本地文件 scheme。可见 URL 与 OSC8 目标都先经过该策略，恶意 BEL/ESC 不能闭合或改写终端超链接。
 - Markdown link label 通过 OSC8 投影；ANSI-aware 软换行会在每个物理行末关闭仍打开的 hyperlink，下一行由原 escape prefix 重新打开。表格 cell 在填充前再次封闭未完成 hyperlink，因此边框、padding 和后续列不会被链接污染。
@@ -20,7 +21,7 @@
 - 聚焦 6 文件/144 项通过。两项隔离反转取得实际失败：移除 scheme guard 使 unsafe 用例把 `javascript:` 写入 OSC8；移除逐行关闭后，长 label 的首个换行行不再包含 hyperlink close。产品源码已恢复。
 - 最终完整 `test:ts` 为 930 文件通过/1 跳过、9,883 项通过/10 跳过、382.96s。`test:scripts` 157/157、cycles 2,768 文件/0 runtime/0 type、config consumers 53/53、declarations 18/18 + 11/11、Node floor、strict docs/rules、`git diff --check` 与仓库 tgz NormProof exit 0/partial（0 blocking、11 项既有 ceiling advisory）通过。
 - TypeScript build `bebadefb62b754b0f8d3aed2ada99271c2de536c615bfb519e0178d816050cfb`，executable SHA-256 `a260a038354d02c91df0d15afec50f6ef9af664707550bdbc7f8a683cfd80722`。Node/exe × regular/fullscreen 四格打包 PTY 均 pass/exit 0；四份 raw output 都含目标 OSC8，`/copy` 的 OSC52 payload 解码后均为 49-byte 原始 Markdown source。证据目录 `.omx/artifacts/phase20-render-link-pty-bebadefb62b7/`。
-- 本批只把 RENDER-02 的本地、完整测试、构建与打包证据闭合；提交、新 SHA CI 与矩阵更新尚未发生，因此矩阵暂时仍为 32 `complete`/15 `partial`/0 `open`，不提前宣称 complete。
+- 本批当时只把 RENDER-02 的本地、完整测试、构建与打包证据闭合；后续 `9250632d` 批修复 CI 断言并完成矩阵更新，最终状态见顶部。
 
 ## 2026-10-23 浏览器响应预算错误优先级修复（代码批 `7262c80f` 已推送；CI/Watch success）
 
