@@ -1,8 +1,8 @@
-import { messageToText } from "../../../model-adapters/multimodal.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { SessionMessage } from "../../../session/schema/sessionMessage.js";
-import { isSessionContextMessage } from '../../../session/schema/sessionMessage.js';
 import type { Picker, PickerOutcome } from "../overlay.js";
+import { RewindSource, type RewindPoint } from './rewind/source.js';
+export { rewindPoints, type RewindPoint } from './rewind/source.js';
 
 /**
  * Going back to an earlier point in the conversation.
@@ -21,7 +21,6 @@ import type { Picker, PickerOutcome } from "../overlay.js";
  */
 
 const PAGE_SIZE = 25;
-const MORE_ID = "__more__";
 const SUMMARY_LENGTH = 72;
 
 interface RewindPage {
@@ -30,18 +29,10 @@ interface RewindPage {
   readonly selectedId?: string;
 }
 
-export interface RewindPoint {
-  /** The entry to make active, so the choice survives the turns moving. */
-  readonly entryId: string;
-  readonly prompt: string;
-  /** Turns that would be left behind. */
-  readonly dropped: number;
-  /** Saved source version offered by a persistent tree. */
-  readonly version?: string;
-}
-
 export interface RewindPickerInput {
   readonly turns: readonly SessionMessage[];
+  readonly admission?: () => string | undefined;
+  readonly signal?: AbortSignal;
   /** A one-based recent point, a stable entry id, or initial search text. */
   readonly selector?: string;
   /** Make `point` active again, and put its prompt back in the composer. */
@@ -49,47 +40,59 @@ export interface RewindPickerInput {
 }
 
 export function rewindPicker(input: RewindPickerInput): Picker {
-  const points = rewindPoints(input.turns);
+  const { signal, admission: originalAdmission } = input;
+  const admission = (): string | undefined => {
+    if (signal?.aborted) return 'Back selection was cancelled. Reopen /back.';
+    try { return originalAdmission?.(); }
+    catch { return 'Back selection is unavailable. Reopen /back.'; }
+  };
+  let source: RewindSource | undefined;
+  let unavailable = admission();
+  if (!unavailable) {
+    try { source = new RewindSource(input.turns, input.signal); }
+    catch { unavailable = 'Questions are unavailable or beyond back browsing limits. No point was selected.'; }
+  }
   const selector = input.selector?.trim();
-  const selectedIndex = selector && /^[1-9]\d*$/.test(selector)
-    ? Number(selector) - 1
-    : points.findIndex(point => point.entryId === selector);
-  const selected = points[selectedIndex];
-  return questionPage(points, input.rewind, selected
-    ? { offset: Math.floor(selectedIndex / PAGE_SIZE) * PAGE_SIZE, selectedId: selected.entryId }
-    : { query: selector });
+  const selected = source?.selection(selector);
+  return questionPage(source, input.rewind, admission, selected
+    ? { offset: Math.floor(selected.index / PAGE_SIZE) * PAGE_SIZE, selectedId: selected.point.entryId }
+    : { query: selector }, unavailable);
 }
 
 /** Pages share the captured points; a moving turns array cannot shift a continuation. */
-function questionPage(points: readonly RewindPoint[], rewind: RewindPickerInput['rewind'], page: RewindPage): Picker {
+function questionPage(source: RewindSource | undefined, rewind: RewindPickerInput['rewind'], admission: () => string | undefined,
+  page: RewindPage, unavailable?: string): Picker {
   let query = page.query?.trim().toLowerCase() ?? '';
   let offset = page.offset ?? 0;
   let offered: readonly RewindPoint[] = [];
   let total = 0;
-  let moreId = MORE_ID;
-  while (points.some(point => point.entryId === moreId)) moreId += '_';
+  const moreId = source?.moreId;
+  let closed = false;
+  const release = (): void => { closed = true; source = undefined; offered = []; };
   const project = (filter: string): readonly Option[] => {
     const needle = filter.trim().toLowerCase();
     if (needle !== query) offset = 0;
     query = needle;
-    const matches = query ? points.filter(point => `${point.entryId} ${point.prompt}`.toLowerCase().includes(query)) : points;
-    total = matches.length;
-    offered = matches.slice(offset, offset + PAGE_SIZE);
+    const result = source?.page(query, offset, PAGE_SIZE);
+    total = result?.total ?? 0;
+    offered = result?.entries ?? [];
     const rows = offered.map<Option>(point => ({
       id: point.entryId, label: summarise(point.prompt), detail: describeCost(point.dropped), note: 'keeps files',
     }));
-    if (offset + PAGE_SIZE < total) rows.push({ id: moreId, label: 'More questions',
+    if (moreId && offset + PAGE_SIZE < total) rows.push({ id: moreId, label: 'More questions',
       detail: 'Continue to older questions', note: `${total - offset - PAGE_SIZE} remaining` });
     return rows;
   };
   project(query);
   return {
+    isCurrent: () => admission() === undefined,
     title: "Ask again from",
     form: "panel",
     exclusive: true,
     initialSelection: page.selectedId,
     initialFilter: page.query,
     empty: 'No questions to show.',
+    loadError: 'Questions are unavailable, changed, or beyond back browsing limits. No point was selected.',
     status() {
       if (total === 0) return query ? 'No questions match this search.'
         : 'Nothing to go back to yet — no questions have been asked in this session.';
@@ -98,41 +101,28 @@ function questionPage(points: readonly RewindPoint[], rewind: RewindPickerInput[
     filterOptions: project,
     async load(signal): Promise<readonly Option[]> {
       signal?.throwIfAborted();
+      if (closed) throw new Error('Back picker is closed.');
+      const blocked = admission();
+      if (blocked || unavailable) { release(); throw new Error(blocked ?? unavailable); }
       return project(query);
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
-      if (ids.length !== 1) return undefined;
+      if (closed || ids.length !== 1) return undefined;
+      const blocked = admission();
+      if (blocked) { release(); return { note: blocked }; }
       if (ids[0] === moreId) {
-        return offset + PAGE_SIZE < total ? { next: questionPage(points, rewind, { offset: offset + PAGE_SIZE, query }) } : undefined;
+        if (!source || offset + PAGE_SIZE >= total) return undefined;
+        const next = questionPage(source, rewind, admission, { offset: offset + PAGE_SIZE, query });
+        release();
+        return { next };
       }
       const point = offered.find(candidate => candidate.entryId === ids[0]);
       if (!point) return undefined;
+      release();
       return rewind(point);
     },
+    previewEnd: release,
   };
-}
-
-/** The questions in a session, newest first, each with what going back would cost. */
-export function rewindPoints(turns: readonly SessionMessage[]): RewindPoint[] {
-  const points: RewindPoint[] = [];
-  const messages = turns.filter(turn => !isSessionContextMessage(turn));
-  for (let index = 0; index < messages.length; index++) {
-    const turn = messages[index]!;
-    // A turn always has an id once recorded, but a session written before ids
-    // existed does not. Those cannot be gone back to by name, so they are left
-    // out rather than offered as a choice that would not survive being made.
-    if (turn.id === undefined) continue;
-    if (turn.role !== "user" || messageToText(turn.content).trim().length === 0) continue;
-    points.push({
-      entryId: turn.id,
-      prompt: messageToText(turn.content),
-      // Counts what is left behind, which is everything after this question.
-      // The question itself stays — it is what goes back in the editor — so
-      // including it would overstate the cost by one every time.
-      dropped: messages.length - index - 1,
-    });
-  }
-  return points.reverse();
 }
 
 /**
@@ -151,7 +141,13 @@ function describeCost(dropped: number): string {
 }
 
 function summarise(prompt: string): string {
-  const first = prompt.split("\n").find((line) => line.trim().length > 0) ?? "";
-  const trimmed = first.trim();
-  return trimmed.length > SUMMARY_LENGTH ? `${trimmed.slice(0, SUMMARY_LENGTH - 1)}…` : trimmed;
+  let start = 0;
+  while (start < prompt.length) {
+    const newline = prompt.indexOf('\n', start);
+    const end = newline < 0 ? prompt.length : newline;
+    const line = prompt.slice(start, end).trim();
+    if (line) return line.length > SUMMARY_LENGTH ? `${line.slice(0, SUMMARY_LENGTH - 1)}…` : line;
+    start = end + 1;
+  }
+  return '';
 }

@@ -8611,3 +8611,9 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 原session/config/signal在load/apply与每次fresh clipboard fallback重验；已派发成功copied、OSC52 offered及取消/blocked各自保留。独立复核实际发现并修复同owner stale提示被吞、取消后fallback继续写与单候选末尾状态遗漏。
 - 最终205项、result158、scripts157、11有效AssertionError反转/hash保持、独立APPROVE/WATCH、静态门/build/exe及同build四格205块PTY通过。固定2500块同进程warm各30次，24续页总p95 222.66→0.76ms；完整query/瞬态heap/system clipboard仍partial。build `3a6e68d86cda3b90d0f0ea0a48adacc0c81ad030ff5d8dbcd04d82d621e434a9`、exe SHA-256 `d051a88ec2db59d9048487370944edfc48c08c1e300bf4ad6d3acbaf5872abd4`，精确证据见status。首次源码中途变化反转hash guard失败保留，最终重跑绑定；47项仍35 complete/12 partial。本批commit/push/精确CI待取证。
 - 上批树panel `3eed364f` 精确CI `39938115685`/job `120362573820` 与Watch `39938115906` 已读回completed/success；深树 `47b4f300` CI `39935676429`/job `120354498600` completed/success，09:57:59Z–10:12:08Z。管理批 `4942064c` CI `39931286844`仍in_progress，未升级为成功。
+
+## [2026-10-23] fix | PAN-06 back 来源与页面生命周期
+
+- 原branch/navigation owner保持；问题候选在多模态join前限制50kturn/20kquestion/50k有ID非context用户parts/32Mi UTF-16 units含ID与分隔符；完整raw/ID/dropped/25项分页保持。单query缓存共享，close/confirm/handoff一次消费释放，原准入在既有sessionTurns读取与动作前重验，literal numeric ID先于ordinal，重复候选ID拒绝。
+- 原代码六组真实断言失败；最终7文件201项、11有效反转/hash相等、恢复12项、scripts157与静态门通过。独立codeAPPROVE/architectureWATCH，无BLOCK，三owner hash绑定；同准确build四格60题PTY最终pass/exit0，最初exe/fullscreen重复footer同步超时留存后修probe重跑。固定2500题/30warm compiledNode，99续页总p95 708.70→1.33ms；build286e04001d95、exe6a779af96426，精确绑定见status/artifacts。
+- 原getSession失败=>empty、开页持久version、完整同步query/瞬态heap继续本地缺口，undo/restore/cleanse未据此完成。35complete/12partial保持，本批commit/push/newSHA CI待取证。上批copy c4cb28347313178f140849812139113ac78bb2ff已推送并读回；CI39946998111/job120391995287当前in_progress，Watch39946998109success，状态只绑定该SHA。

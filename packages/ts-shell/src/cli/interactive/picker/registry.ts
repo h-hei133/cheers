@@ -121,7 +121,14 @@ const PICKERS: Record<string, PickerFactory> = {
   skill: (host) => skillPicker(host.commandContext),
   // Reachable either way: `/back`, or Escape twice on an empty prompt. The
   // gesture is fast once known; the command is how it becomes known.
-  back: (host, selector) => rewindPicker({ turns: host.sessionTurns(), rewind: host.rewind, selector }),
+  back: (host, selector) => {
+    const admission = host.commandContext?.admission;
+    const signal = host.commandContext?.signal;
+    let blocked = signal?.aborted ?? false;
+    try { blocked ||= admission?.() !== undefined; }
+    catch { blocked = true; }
+    return rewindPicker({ turns: blocked ? [] : host.sessionTurns(), rewind: host.rewind, selector, admission, signal });
+  },
   tree: (host) => treePicker(host.commandContext, host.rewind),
   history: (host) => treePicker(host.commandContext, host.rewind, "history"),
   fork: host => treePicker(host.commandContext, point => host.fork?.(point.entryId, point.version) ?? Promise.resolve(undefined), "fork"),
