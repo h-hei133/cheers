@@ -8664,3 +8664,11 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 独立codeAPPROVE/architectureWATCH，综合COMMENT无BLOCK：code137项/11探针/typecheck，architecture50项/15探针/3actual host项/AST/import/cycles，最终七hash均绑定且各自fixtures清除。restore16/state3/catalogue6，registry既有37函数不增加。
 - build52b4bdeeec0d、exed93932da9146，同准确build四格205snapshot三页PTY pass/exit0且前后身份一致；最旧exact preview/fullsearch/cancel/stale与累计source拒绝，全部原workspace/record/blob字节保持。精确证据status与phase20-restore-selection author-binding。
 - PAN-06 explicit restore准备/default inventory、cleanse与完整重复scan physicalI/O/heap/latency继续本地处理，35complete/12partial保持。前批e435261d已push/readback，CI39960212912/job120436029565success（13:19:16Z–13:36:44Z），Watch39960212790/job120436029146success（13:19:16Z–13:19:37Z）；b11afed3 CI39958229805/job120429334772success至13:21:39Z；receipt eca77e90CI39953749814最后仍in_progress，不据运行时长推断。本selection批commit/push/newSHA CI分别取证。
+
+## [2026-10-23] fix | PAN-06 原恢复索引累计准入
+
+- 原index fullreaddir退出，owner内opendir32/Dir.read前后检查/finally关闭；每call32MiB metadata、20kID/names、50kdir entries含忽略项，显式ID准入后复制避免异步外改绕过。original caller双signal/check/admit保持，坏read不退款，原排序/缺失/invalid/blobpresence/catalogue语义保持，无新reader/schema/writer。
+- 独立复现namespace await后准入漏检、directory/metadata close EIO吞control/limit与mutable ID绕过；owner内原typed拒绝保留和public直接重放、外层check与copy修复。失败探针、green冗余反转/旧pattern setup失败及错误limit夹具均留存。最终12文件93项、恢复20项、13有效AssertionError反转四hash保持、原源码20AssertionError、scripts157/静态门/build/exe通过；NormProof exit0/partial原advisory/audit保持。
+- 独立codeAPPROVE/architectureWATCH，综合COMMENT无BLOCK；code91项/13actual boundary探针/typecheck，architecture58项/16probe/AST/import/cycles，四hash绑定，own fixtures清除。source cap与names cap不冒作content准备/heap/writer/全过程I/O时延保证；publicindex7/base7、read4/limits0。
+- build3a7c0d52d554、exe95664d44000c同准确build四格205snapshot三页PTY pass/exit0身份前后一致；exactpreview/fullsearch/cancel/stale/catalogue与explicitall累计source拒绝，原workspace/metadata/blob字节保持。证据status与phase20-restore-index author-binding。
+- 尚缺explicitrestore内容准备、cleanse及完整重复scan资源/平台证据，35complete/12partial保持。前批7e0b327de11235422c915d1037aff878a2092e2f已push/readback，CI39963636126/job120447709415success（13:43:54Z–13:56:15Z），Watch39963636176/job120447709765success（13:43:54Z–13:44:22Z）；receipt eca77e90CI39953749814最后仍in_progress。本index批commit/push/newSHA CI分别取证。

@@ -6,7 +6,9 @@ import {
   readRecoveryAuthorityRecord,
   type RecoveryAuthorityStoredRecord,
 } from "./recoveryAuthorityStore.js";
-import { assertRecoveryReadAccess, type RecoveryReadAccess } from './read.js';
+import { RecoveryReadControlError, RecoveryReadLimitError, type RecoveryReadAccess } from './read.js';
+import { indexReadAccess, readIndexNames } from './index/read.js';
+import { RECOVERY_INDEX_LIMITS } from './index/limits.js';
 
 export type RecoveryAuthorityIndexBlockedReason =
   | "ledger-root-required"
@@ -66,21 +68,21 @@ const idPattern = /^[A-Za-z0-9._-]+$/;
 
 export async function listRecoveryAuthorityNamespaces(input: {
   readonly ledgerRoot?: string;
+  readonly signal?: AbortSignal;
+  readonly readAccess?: RecoveryReadAccess;
 }): Promise<RecoveryAuthorityNamespaceIndexResult> {
+  const readAccess = indexReadAccess(input);
+  readAccess.check();
   if (!input.ledgerRoot) {
     return blockedNamespaces("ledger-root-required");
   }
 
   try {
-    const entries = await fs.readdir(path.resolve(input.ledgerRoot), {
-      withFileTypes: true,
-    });
+    const authorityIds = await readIndexNames(path.resolve(input.ledgerRoot), 'namespaces', readAccess);
+    readAccess.check();
     return {
       status: "listed",
-      authorityIds: entries
-        .filter((entry) => entry.isDirectory() && idPattern.test(entry.name))
-        .map((entry) => entry.name)
-        .sort(),
+      authorityIds,
       evidence: [
         "recovery-authority-index:explicit-ledger-root",
         "recovery-authority-index:namespaces-listed",
@@ -89,6 +91,8 @@ export async function listRecoveryAuthorityNamespaces(input: {
       ],
     };
   } catch (error) {
+    readAccess.check();
+    if (error instanceof RecoveryReadLimitError || error instanceof RecoveryReadControlError) throw error;
     return blockedNamespaces(indexReadFailure(error));
   }
 }
@@ -100,8 +104,8 @@ export async function listRecoveryAuthorityRecords(input: {
   readonly signal?: AbortSignal;
   readonly readAccess?: RecoveryReadAccess;
 }): Promise<RecoveryAuthorityRecordIndexResult> {
-  const readAccess = { ...input.readAccess, signal: input.signal ?? input.readAccess?.signal };
-  assertRecoveryReadAccess(readAccess);
+  const readAccess = indexReadAccess(input);
+  readAccess.check();
   const config = validateConfig(input);
   if (config.ok === false) {
     return blockedRecords(config.blockedReason, input.authorityId, []);
@@ -112,20 +116,18 @@ export async function listRecoveryAuthorityRecords(input: {
   let recordIds: readonly string[];
   try {
     if (input.recordIds) {
-      recordIds = input.recordIds;
+      if (input.recordIds.length > RECOVERY_INDEX_LIMITS.records) throw new RecoveryReadLimitError('Snapshot index exceeds its inventory limit.');
+      recordIds = [...input.recordIds];
     } else {
-      const entries = await fs.readdir(recordsRoot, { withFileTypes: true });
-      recordIds = entries
-        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-        .map((entry) => entry.name.slice(0, -".json".length))
-        .sort();
+      recordIds = await readIndexNames(recordsRoot, 'records', readAccess);
     }
   } catch (error) {
-    assertRecoveryReadAccess(readAccess);
+    readAccess.check();
+    if (error instanceof RecoveryReadLimitError || error instanceof RecoveryReadControlError) throw error;
     return blockedRecords(indexReadFailure(error), config.authorityId, []);
   }
 
-  assertRecoveryReadAccess(readAccess);
+  readAccess.check();
 
   if (recordIds.some((recordId) => !idPattern.test(recordId))) {
     return blockedRecords("invalid-id", config.authorityId, []);
@@ -134,14 +136,14 @@ export async function listRecoveryAuthorityRecords(input: {
   const records: RecoveryAuthorityRecordIndexEntry[] = [];
   const missingRecords: string[] = [];
   for (const recordId of recordIds) {
-    assertRecoveryReadAccess(readAccess);
+    readAccess.check();
     const record = await readRecoveryAuthorityRecord({
       ledgerRoot: config.ledgerRoot,
       authorityId: config.authorityId,
       recordId,
       readAccess,
     });
-    assertRecoveryReadAccess(readAccess);
+    readAccess.check();
     if (!record) {
       missingRecords.push(recordId);
       continue;
@@ -154,7 +156,7 @@ export async function listRecoveryAuthorityRecords(input: {
       continue;
     }
     const hasContentBlob = await contentBlobExists(namespaceRoot, record);
-    assertRecoveryReadAccess(readAccess);
+    readAccess.check();
     records.push({
       recordDigest: hashContent(JSON.stringify(record)),
       recordId: record.recordId,
@@ -175,7 +177,7 @@ export async function listRecoveryAuthorityRecords(input: {
     });
   }
 
-  assertRecoveryReadAccess(readAccess);
+  readAccess.check();
 
   return {
     status: "listed",

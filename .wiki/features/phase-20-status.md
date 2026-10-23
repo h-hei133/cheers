@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy/back、undo扫描/preview/locked target、restore catalogue每call准入及picker生命周期/surface已有批次证据；explicit restore准备、cleanse来源/目录累计资源及导航/query瞬态heap/时延仍缺 | 本地继续其余原consumer资源/身份边界与重复scan实际响应测量；source cap不等于总heap/physical I/O保证 |
+| PAN-06 | history/copy/back、undo扫描/preview/locked target、restore catalogue与default index每call准入及picker生命周期/surface已有批次证据；explicit restore内容准备、cleanse来源/目录累计资源及导航/query瞬态heap/时延仍缺 | 本地继续其余原consumer资源/身份边界与重复scan实际响应测量；source cap不等于总heap/physical I/O保证 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,7 +21,16 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-06 restore 选择来源与生命周期（本地与独立审查通过；提交待取证）
+## 2026-10-23 PAN-06 原恢复索引累计准入（本地与独立审查通过；提交待取证）
+
+- 原namespace/record index退出full readdir数组，owner内复用opendir32缓冲、Dir.read前后准入与finally close；每call32MiB metadata source、20k选中ID/接受names、50k全部实际direntries（含忽略项）。原显式ID先计数再复制，重复ID仍逐项计量，外部数组在异步metadata读取中追加不能扩大本次选集；完整排序、ID/filter/missing与filesystem区别、blob presence-only及原catalogue100页投影保持。
+- Local budget与caller readAccess两signal/check/admit组成原descriptor reader准入；坏JSON/重复失败读取不退款，超限整call拒绝，不返回已保留page或missing-only空成功。namespace新增optional control并在inner返回至public列出前再次检查。首次拒绝在本call保留，directory或metadata close EIO不能盖掉control/limit；public直接重放原limit类别，ordinary cleanup错误仍blocked，不声明拒绝时close成功。
+- 独立审查实际复现namespace publication、close吞拒绝及mutable selected ID绕过，均修复并保留失败证据。最终12文件93项、恢复20项、scripts157通过；13有效AssertionError反转exit1且四source/test hashes前后相同，原7e0b327d源码20项全部实际AssertionError。初次retained单保护因later explicit count兜底green、typed改动same-message green、latch改动后旧反转pattern setup失败及limit-check错误夹具均保留，不算有效；最终绑定actual retained/class、mutable selection等合同。cycles/config/declarations/Node floor/docs strict/47项矩阵/diff通过，packaged NormProof exit0/partial、0open/1failed advisory/10proof gaps，audit residue恢复。
+- 独立code APPROVE/architecture WATCH，综合COMMENT无BLOCK；code独跑10文件91项/13actual boundary/control探针/typecheck，实际32MiB+128KiB重复malformed opened reads、20kID+1、20k有效namespace+1与50k忽略项+1及large append；architecture6文件58项/16探针/AST/import/cycles，32MiB实read及20k/50k synthetic Dir.read inventory接原bridge。四hash两报告/final-binding一致，own fixtures清除。public index7函数等于base7、read4/limits0，不增加中央行为。
+- build`3a7c0d52d5545fc79d3f92a16f2b69e147e73e79ac10b9f106eef35bcd50cde9`，inputs`5f00d08720eea5c177b6a3ccbd6a74fb12cfbf2923909d1fd7ca1c3baaa256ea`，artifact`1c192883cd2035493c38ee8e84fa8a9052258fc1bd004e8b1ed552686a5e58c8`，exe SHA-256`95664d44000cfdd47fa2567132b7245ab2758d7504721a3a656bf2753359f482`。同准确build Node/exe regular/fullscreen四格PTY pass/exit0，build-before/after相等；205snapshot三页到最旧exact只读preview、全search/cancel/stale cursor/累计catalogue拒绝及原explicit `--all`来源超限明确拒绝，移除fixture可重开。全部原workspace/record/blob bytes保持。证据`.omx/artifacts/phase20-restore-index/`与author-binding。
+- WATCH/剩余：单index call source/names计量不证明blob/current content准备、writer I/O、decode/hash瞬态heap或重复交互physicalI/O/响应；explicit restore内容准备与cleanse仍本地后续，35complete/12partial保持。目标已有catalogue/session Dir.read取消及descriptor计量方案沿原owner适配，参考selected checkpoint JSON/Git无相同多record累计policy，未复制代码。
+
+## 2026-10-23 PAN-06 restore 选择来源与生命周期（`7e0b327d`已推送；CI/Watch success）
 
 - opening在原registry绑定session/project上下文副本、canonical workspace身份、profile身份与原command admission/signal；same-owner准入拒绝可显示，changed-owner迟到结果沿原host抑制。账本路径在准入后延迟解析，目录内metadata读取通过原readAccess重验，没有新增reader/cache/writer/schema或写批准。
 - 取消、有效选中和续页handoff一次消费旧page，abort浏览、失效generation并清offered/page/base/query；closed load/search拒绝，clear/apply不能复活。每call独立signal组合并finally移除listener，取消单个search可重试。界面先abort load再apply，接受动作因此只保留原opening access与选中metadata引用，沿原index fresh equality重读后产preview draft；多选同authority、quoted路径、hidden metadata digest、pending/invalid/mixed拒绝保持。
@@ -29,6 +38,8 @@
 - 最终9文件258项、恢复14项、scripts157通过，cycles/config/declarations/Node floor/docs strict/47项矩阵/diff通过；packaged NormProof exit0/partial，0open/1failed advisory/10proof gaps，audit residue已恢复。独立code APPROVE/architecture WATCH，综合COMMENT无BLOCK；code137项/11探针/production typecheck，architecture50项/15production探针/3actual host项及AST/import/cycles，七hash与final-binding一致，各自fixtures清除。registry保持原37function-like names，restore16/state3/catalogue6，行为仍归本域。
 - build`52b4bdeeec0d143baf8d55f4b77da68744d5594f80d26e8c6f67ea1f954bb828`，inputs`28621998e4d9988adcbda23654140cc67c7aa9844f4bf93354d002c96bc40885`，artifact`8adbc704bd37c9e7ffbdd9fe8eb5906ae5938f4ed98e9d54db4a5c1c110d9805`，exe SHA-256`d93932da9146089bb1fadef7a172484ca0f8885d149b44eafcb5274b320a3881`。同准确build Node/exe regular/fullscreen四格PTY pass/exit0，build-before/after相等；205snapshot三页到最旧exact preview、全search、cancel/reopen、hidden metadata stale续页拒绝及累计source拒绝。全部原workspace/record/blob bytes保持。证据`.omx/artifacts/phase20-restore-selection/`与author-binding。
 - WATCH/剩余：每page/query仍fresh complete scan，source准入与释放引用不等于总heap/physical I/O/最长响应；explicit restore command准备与default index inventory、cleanse consumer仍本地待处理。registry已有超ceiling聚合未增加，不在本批扩展。PAN-06与47项保持35complete/12partial。
+
+- 代码批`7e0b327de11235422c915d1037aff878a2092e2f`已commit/push并读回远端main；精确CI`39963636126`/job`120447709415`completed/success，13:43:54Z–13:56:15Z；Watch`39963636176`/job`120447709765`completed/success，13:43:54Z–13:44:22Z。仅绑定此SHA；原index后续批不扩大此CI证明范围。
 
 ## 2026-10-23 PAN-06 restore catalogue 来源与取消（`e435261d`已推送；CI/Watch success）
 
