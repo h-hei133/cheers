@@ -34,7 +34,7 @@ function harness(options: { decision?: 'allow-once' | 'allow-always' | 'deny'; m
   const command = { cwd: root, projectRoot: root, sessionId: session.id, interactive: true, usageCommand: usageCommandFor(context) };
   return { manager, session, context, command, approval, hooks, emit, run: (input: string) => routeSlashCommand(input, command) };
 }
-function protocol(options: { code?: string; creditReply?: unknown; creditStatus?: number; consumeThrows?: boolean; consume?: () => Promise<Response> } = {}) {
+function protocol(options: { code?: string; usageReply?: unknown; creditReply?: unknown; creditStatus?: number; consumeThrows?: boolean; consume?: () => Promise<Response> } = {}) {
   const calls: { url: string; init: network.PublicRequest }[] = [];
   const request = vi.spyOn(network, 'requestPublic').mockImplementation(async (url, init, scope) => {
     scope.check(); calls.push({ url, init });
@@ -45,7 +45,7 @@ function protocol(options: { code?: string; creditReply?: unknown; creditStatus?
       if (options.consumeThrows) throw new Error('SYNTHETIC_PRIVATE_RESPONSE_BODY');
       return new Response(JSON.stringify(options.code === undefined ? {} : { code: options.code }));
     }
-    if (url.endsWith('/wham/usage')) return new Response(JSON.stringify({ rate_limit: {
+    if (url.endsWith('/wham/usage')) return new Response(JSON.stringify(options.usageReply ?? { rate_limit: {
       primary_window: { used_percent: 25, reset_at: 1800000000 }, secondary_window: { used_percent: 40 } } }));
     return new Response(JSON.stringify(options.creditReply ?? { available_count: 2, credits: [
       { ...credit, id: 'credit-later', expires_at: '2031-01-01T00:00:00.000Z' }, credit] }), { status: options.creditStatus ?? 200 });
@@ -95,6 +95,28 @@ it('uses the real usage route, shows source/time and explicitly approves the exa
   expect(fs.readFileSync(receiptFile, 'utf8')).not.toMatch(/SYNTHETIC_(?:ACCOUNT|REFRESH)_TOKEN/);
   const replay = await setup.run(`/usage reset apply ${id}`); expect(replay).toMatchObject({ kind: 'local', output: expect.stringContaining('unavailable') });
   expect(remote.posts()).toHaveLength(1);
+});
+
+it.each([
+  {
+    state: 'unknown',
+    usageReply: { rate_limit: { primary_window: null, secondary_window: null } },
+    expected: 'Account quota windows: unknown.',
+    forbidden: '0%',
+  },
+  {
+    state: 'measured zero',
+    usageReply: { rate_limit: { primary_window: { used_percent: 0 } } },
+    expected: 'primary: 0% used',
+    forbidden: 'Account quota windows: unknown.',
+  },
+])('keeps $state quota distinct from an invented percentage', async ({ usageReply, expected, forbidden }) => {
+  const setup = harness();
+  protocol({ usageReply });
+  const result = await setup.run('/usage account');
+  const output = (result as { output: string }).output;
+  expect(output).toContain(expected);
+  expect(output).not.toContain(forbidden);
 });
 
 it.each(['denied', 'allow-always', 'missing-approval', 'plan', 'deny-rule', 'changed-account', 'changed-offer'])('dispatches no consume after %s', async scenario => {

@@ -173,9 +173,9 @@
     },
     {
       "id": "PAN-04",
-      "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; usage/quota and thinking tests",
-      "missing": "Effort/model joint constraints and additional unknown-nonzero model acceptance remain."
+      "status": "complete",
+      "evidence": ".wiki/features/phase-20-contract.md W6; exact relay effort capability, unknown model, ambiguous endpoint and unknown-versus-zero quota acceptance passed in 8 files/149 tests",
+      "missing": ""
     },
     {
       "id": "PAN-05",
