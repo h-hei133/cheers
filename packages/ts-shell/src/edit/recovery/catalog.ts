@@ -3,7 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { hashContent } from './recoveryAuthorityStore.js';
 import { listRecoveryAuthorityRecords, type RecoveryAuthorityRecordIndexEntry } from './recoveryAuthorityIndex.js';
-import { assertRecoveryReadAccess, recoveryReadBudget, RecoveryReadLimitError, type RecoveryReadAccess } from './read.js';
+import { assertRecoveryReadAccess, recoveryReadBudget, RecoveryReadControlError, RecoveryReadLimitError, type RecoveryReadAccess } from './read.js';
 import { RECOVERY_CATALOG_LIMITS } from './catalog/limits.js';
 
 type RecordPosition = Pick<RecoveryAuthorityRecordIndexEntry, 'createdAt' | 'authorityId' | 'recordId'>;
@@ -37,6 +37,8 @@ interface CatalogAttempt {
   readonly unavailable: number;
   readonly records: readonly RecoveryAuthorityRecordIndexEntry[];
   readonly directories: readonly DirectoryVersion[];
+  readonly verification: { readonly limit: number; used: number };
+  cursor: RecordPosition;
 }
 
 const attempts = new Map<string, CatalogAttempt>();
@@ -59,13 +61,20 @@ export async function readRecoveryCatalogPage(input: {
     if (!attempt || attempt.ledgerRoot !== ledgerRoot || attempt.query !== query) {
       throw new Error('Snapshot page expired. Reopen /restore before continuing.');
     }
+    if (attempt.revision !== input.after.revision) {
+      throw new Error('Snapshot catalogue changed. Reopen /restore before continuing.');
+    }
+    if (comparePosition(attempt.cursor, input.after) !== 0) {
+      throw new Error('Snapshot catalogue changed. Reopen /restore before continuing.');
+    }
     attempts.delete(attemptId);
     attempts.set(attemptId, attempt);
     await validateDirectories(attempt.directories, input);
     const remaining = entriesAfter(attempt.records, input.after);
     const page = remaining.slice(0, pageSize);
-    const records = await verifyPage(page, input);
+    const records = await verifyPage(page, input, attempt.verification);
     const last = records.at(-1);
+    if (remaining.length > pageSize && last) attempt.cursor = last;
     return {
       records,
       matches: attempt.matches,
@@ -119,7 +128,9 @@ export async function readRecoveryCatalogPage(input: {
     const last = page.at(-1);
     if (hasMore) {
       const directories = await directoryVersions(ledgerRoot, authorities, input);
-      attempts.set(attemptId, { ledgerRoot, query, revision, matches, unavailable, records, directories });
+      const admitted = RECOVERY_CATALOG_LIMITS.metadataBytes - budget.remaining();
+      attempts.set(attemptId, { ledgerRoot, query, revision, matches, unavailable, records, directories,
+        verification: { limit: admitted, used: 0 }, cursor: last! });
       while (attempts.size > MAX_ATTEMPTS) attempts.delete(attempts.keys().next().value!);
     }
     return { records: page, matches, unavailable, ...(hasMore && last ? { next: {
@@ -130,7 +141,8 @@ export async function readRecoveryCatalogPage(input: {
 }
 
 async function verifyPage(page: readonly RecoveryAuthorityRecordIndexEntry[],
-  input: { readonly ledgerRoot: string; readonly signal?: AbortSignal; readonly readAccess?: RecoveryReadAccess }): Promise<RecoveryAuthorityRecordIndexEntry[]> {
+  input: { readonly ledgerRoot: string; readonly signal?: AbortSignal; readonly readAccess?: RecoveryReadAccess },
+  verification: { readonly limit: number; used: number }): Promise<RecoveryAuthorityRecordIndexEntry[]> {
   const groups = new Map<string, RecoveryAuthorityRecordIndexEntry[]>();
   for (const entry of page) {
     const group = groups.get(entry.authorityId);
@@ -146,7 +158,7 @@ async function verifyPage(page: readonly RecoveryAuthorityRecordIndexEntry[],
       authorityId,
       recordIds: entries.map(entry => entry.recordId),
       ...(input.signal ? { signal: input.signal } : {}),
-      ...(input.readAccess ? { readAccess: input.readAccess } : {}),
+      readAccess: continuationReadAccess(input, verification),
     });
     if (listed.status !== 'listed' || listed.missingRecords.length) {
       throw new Error('Snapshot catalogue changed. Reopen /restore before continuing.');
@@ -160,6 +172,46 @@ async function verifyPage(page: readonly RecoveryAuthorityRecordIndexEntry[],
     }
     return latest;
   });
+}
+
+function continuationReadAccess(input: {
+  readonly signal?: AbortSignal;
+  readonly readAccess?: RecoveryReadAccess;
+}, verification: { readonly limit: number; used: number }): RecoveryReadAccess {
+  const caller = input.readAccess ?? {};
+  const signal = input.signal ?? caller.signal;
+  let refused = false;
+  let refusal: unknown;
+  const check = (): void => {
+    if (refused) throw refusal;
+    try {
+      signal?.throwIfAborted();
+      assertRecoveryReadAccess(caller);
+    } catch (error) {
+      refused = true;
+      refusal = error;
+      throw error;
+    }
+  };
+  const admit = (bytes: number): void => {
+    check();
+    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > verification.limit - verification.used) {
+      const error = new RecoveryReadLimitError('Snapshot continuation exceeds its cumulative source limit.');
+      refused = true;
+      refusal = error;
+      throw error;
+    }
+    try {
+      caller.admit?.(bytes);
+    } catch (error) {
+      refused = true;
+      refusal = error instanceof RecoveryReadLimitError || error instanceof RecoveryReadControlError
+        ? error : new RecoveryReadControlError(error);
+      throw refusal;
+    }
+    verification.used += bytes;
+  };
+  return { signal, check, admit };
 }
 
 async function directoryVersions(ledgerRoot: string, authorities: ReadonlySet<string>,

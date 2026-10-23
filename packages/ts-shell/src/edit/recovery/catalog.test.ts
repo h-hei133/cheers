@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { captureRecoveryAuthorityRecord } from './recoveryAuthorityStore.js';
 import * as index from './recoveryAuthorityIndex.js';
 import { readRecoveryCatalogPage } from './catalog.js';
+import { RecoveryReadControlError, RecoveryReadLimitError } from './read.js';
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -63,6 +64,70 @@ describe('recovery catalogue pages', () => {
       createdAt: '2026-10-22T00:00:00.000Z',
     });
     await expect(readRecoveryCatalogPage({ ledgerRoot, after: first.next })).rejects.toThrow('changed');
+  });
+
+  it('rejects a continuation whose cursor revision or position was altered', async () => {
+    const ledgerRoot = await ledger(101);
+    const first = await readRecoveryCatalogPage({ ledgerRoot });
+    expect(first.next).toBeDefined();
+    await expect(readRecoveryCatalogPage({ ledgerRoot,
+      after: { ...first.next!, revision: 'altered-cursor-revision' } })).rejects.toThrow('changed');
+    await expect(readRecoveryCatalogPage({ ledgerRoot,
+      after: { ...first.next!, recordId: first.records[0]!.recordId } })).rejects.toThrow('changed');
+  });
+
+  it('charges every continuation page to one cumulative source budget without rescanning directories', async () => {
+    const ledgerRoot = await ledger(205);
+    const first = await readRecoveryCatalogPage({ ledgerRoot });
+    expect(first.next).toBeDefined();
+    const opendir = vi.spyOn(fs, 'opendir');
+    const callerAdmissions: number[] = [];
+    const readAccess = { admit: (bytes: number): void => { callerAdmissions.push(bytes); } };
+    const second = await readRecoveryCatalogPage({ ledgerRoot, after: first.next, readAccess });
+    expect(opendir).not.toHaveBeenCalled();
+    expect(second.records).toHaveLength(100);
+    expect(second.next).toBeDefined();
+    expect(callerAdmissions).toHaveLength(100);
+    const file = path.join(ledgerRoot, 'edit-a', 'records', 'record-000.json');
+    const record = JSON.parse(await fs.readFile(file, 'utf8'));
+    await fs.writeFile(file, JSON.stringify({ ...record, padding: 'x'.repeat(96 * 1024) }));
+    await expect(readRecoveryCatalogPage({ ledgerRoot, after: second.next, readAccess })).rejects.toBeInstanceOf(RecoveryReadLimitError);
+    expect(opendir).not.toHaveBeenCalled();
+  });
+
+  it('preserves continuation caller cancellation and admission controls', async () => {
+    const ledgerRoot = await ledger(101);
+    const first = await readRecoveryCatalogPage({ ledgerRoot });
+    expect(first.next).toBeDefined();
+    const cancelled = new AbortController();
+    const reason = new Error('caller cancelled continuation');
+    cancelled.abort(reason);
+    await expect(readRecoveryCatalogPage({ ledgerRoot, after: first.next, readAccess: { signal: cancelled.signal } }))
+      .rejects.toBe(reason);
+    await expect(readRecoveryCatalogPage({ ledgerRoot, after: first.next,
+      readAccess: { check: () => { throw new Error('one-shot caller refusal'); } } }))
+      .rejects.toBeInstanceOf(RecoveryReadControlError);
+    await expect(readRecoveryCatalogPage({ ledgerRoot, after: first.next,
+      readAccess: { admit: () => { throw new Error('caller admission refusal'); } } }))
+      .rejects.toBeInstanceOf(RecoveryReadControlError);
+    const admitted: number[] = [];
+    const page = await readRecoveryCatalogPage({ ledgerRoot, after: first.next,
+      readAccess: { admit: bytes => { admitted.push(bytes); } } });
+    expect(page.records).toHaveLength(1);
+    expect(admitted).toHaveLength(1);
+  });
+
+  it('latches a caller check refusal during continuation verification', async () => {
+    const ledgerRoot = await ledger(101);
+    const first = await readRecoveryCatalogPage({ ledgerRoot });
+    expect(first.next).toBeDefined();
+    let checks = 0;
+    const readAccess = { check: (): void => {
+      if (++checks === 10) throw new Error('caller revoked during verification');
+    } };
+    await expect(readRecoveryCatalogPage({ ledgerRoot, after: first.next, readAccess }))
+      .rejects.toBeInstanceOf(RecoveryReadControlError);
+    expect(checks).toBe(10);
   });
 
   it('rejects a continuation when a page record changes before it is read', async () => {

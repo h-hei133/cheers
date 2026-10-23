@@ -12,14 +12,23 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据；本批把 catalogue 后续页绑定到一次 browse-attempt 的 compact boundary index，不再每页重新 discovery；仍缺跨全部页面的累计 physical I/O 预算及全屏真实 consumer 的 byte-tier heap/响应 | 继续原 catalogue/tree consumer 的累计资源测量；20k panel 样本不等于完整资源闭合 |
-| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；本批 restore 续页改为 attempt-local page index，不再整 ledger 重扫；损坏/超限 transcript 以只读 partial 展示并禁用导航动作；tree/back 与 cleanse 的完整源读取、跨页累计 I/O/heap/平台证据仍缺 | 继续原 navigation/query 的分段取消与累计 physical I/O 测量，不以单 source 上限替代端到端资源证明 |
+| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；restore 续页使用 attempt-local page index，并复验 cursor revision 与精确 position；初始 metadata 扫描≤32MiB，所有续页 metadata 读取共享不超过初始扫描字节的累计预算，单 attempt 主动 metadata 读取≤64MiB，超限整页拒绝且不重扫目录；损坏/超限 transcript 以只读 partial 展示并禁用导航动作；tree/back 与 cleanse 的完整源读取、累计 physical I/O/heap/平台证据仍缺 | 继续原 navigation/query 的分段取消与累计 physical I/O 测量，不以单 source 上限替代端到端资源证明 |
 | PAN-07 | device-code poll 已可被 abort 立即取消且迟到 token 不发布；扩展 unknown outcome 已跨进程 journal 恢复，关闭未 drain 与 cleanup/lifecycle unknown 均阻断后续 mutation；真实账户登录/刷新/失效/退出生命周期仍缺 | 合成协议与扩展持久边界已本地验证；真实认证仍需明确账户/provider 与隔离 opt-in |
 | PAN-08 | 本批补齐 MCP 跨 server 累计 4MiB/10k tools、共享绝对 deadline、peek fail-closed、tools/skill/cost/help/context producer top-N/omitted，以及 context signal 传播和增量 schema 计量；真实 MCP 连接/认证与完整 producer heap/延迟证据仍缺 | 本地 producer 合同已覆盖；真实连接需 server/认证条件，资源结论不扩大为端到端保证 |
 | INPUT-01 | 本批补 Visual/Visual-Line Ctrl+C 复制真实 source selection、paste 文本/图片共享 128项/32MiB预算、device-code 取消及扩展投影总界；仍缺平台真实 IME、系统剪贴板与 Windows 交互 PTY | 本地五模式/字素/长输入合同继续；实机输入法、剪贴板与 Windows 需适用机器 |
-| QA-01 | 47 项逐任务反转矩阵与跨任务集成仍未全部闭合 | 本轮已记录 27 组实际反转并恢复；继续随剩余 PAN/PRV/TOOL 与外部环境逐项补证 |
+| QA-01 | 47 项逐任务反转矩阵与跨任务集成仍未全部闭合；本批新增 `CTX-02 × TOOL-01` 实际 HTTP 集成及 restore 累计预算反转 | 继续随剩余 PAN/PRV/TOOL 与外部环境逐项补证；当前已明确关闭的跨任务行不得重复计数 |
 | QA-02 | Windows 交互 PTY、真实 IME、系统复制、非交互 profile 切换/审批生命周期 | 非交互合同可本地继续；Windows/IME/系统复制需适用机器和终端 |
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
+
+## 2026-10-24 QA-01/PAN-06 跨任务预算与 restore 累计读取（本地证据；交付另绑定）
+
+- `CTX-02 × TOOL-01`：`cli/provider/step.test.ts` 通过本地 HTTP 发送首个仅含 `small` schema 的请求并取得 usage；随后 `ToolDiscovery.load(['large'])` 载入带 40,000 字符 schema 的工具。第二请求的 schema digest 已变化，prompt 预算在实际 dispatch 前以 `Context overflow` 拒绝，HTTP server 仍只收到一个请求。
+- 该测试绑定真实 `createProviderStep → createStepFunction → requestBudget` composition，而不是直接调用底层 budget。三个反转分别移除 `toolSnapshot` 读取、从 overhead 移除 `tools`、移除 provider 的 discovery 接线，均产生实际 AssertionError；恢复后同文件 `8/8` 通过。
+- PAN-06 restore catalogue 将一次 browse attempt 的初始 metadata 字节数保存为续页累计上限；每页 `readAccess.admit` 共享同一 `used`，超过上限在 body 读取前抛出 `RecoveryReadLimitError`。因此初始扫描≤32MiB、续页累计≤初始扫描，单 attempt 主动 metadata 读取≤64MiB。205 条三页样本确认续页不调用 `opendir`，并在第二页读取后增长第三页记录时 fail-closed；cursor revision 篡改也在读取前拒绝。
+- restore 的反转分别把每页 verification budget 重置为 `used: 0`、移除 continuation `readAccess`、移除 cursor revision/position 校验、移除内层 caller check；累计超限、续页重叠和 caller 撤销测试均失败。恢复后 `catalog.test.ts` 9项、`catalog/read.test.ts` 12项、`cli/provider/step.test.ts` 8项，共 `29/29` 通过。
+- build `88c051cd8afe48d5848d2f4b3e1d0641b4a0a2ebed050e154c54e98cdaa30c9f`，inputs `4bf89febb4526dcb6d5a231ea1f97e93bdebf621a3b48bb2e350904483e35554`，artifact `d7a098a374757d4fb278f4ddb2afd254ea11fbec09f69397b08e3501372c2bcf`，exe SHA-256 `a0d76c3dc09aa5cc629c3510590238f83c153d06f96ecd46cb28e067696208e5`；`build:ts`、`build:exe` 与 CLI 入口 19 项通过。本批未声称新的专用 PTY，内部 catalogue 路径由聚焦测试和既有 CLI 入口覆盖。
+- 本批只新增测试、restore attempt-local 读取预算及文档；不证明 tree/back/cleanse 的完整源读取、累计 physical I/O、瞬态 heap/最长响应或真实模型/MCP。矩阵仍为 `35 complete / 12 partial / 0 open`，QA-01 仍未闭合。
 
 ## 2026-10-24 PAN-02/PAN-06/PAN-07/PAN-08/INPUT-01 本地硬化与独立复审（代码批 `186fde15` 已推送；CI/Watch success）
 

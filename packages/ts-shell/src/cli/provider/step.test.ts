@@ -1,6 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
 import { createSubagentRunner } from '../../turn/subagent.js';
@@ -16,6 +17,9 @@ import { createTaskToolDefinition } from '../../core/tools/taskTool.js';
 import { runTurn } from '../../turn/session.js';
 import { runAgentsCommand } from '../../core/subagents/command.js';
 import { getSessionUsage } from '../../observability/usageTelemetry.js';
+import { createToolDiscovery } from '../../core/tools/discovery/state.js';
+import { toolSchemas } from '../../turn/tools.js';
+import type { ToolDefinition } from '../../tools/types.js';
 
 const servers: http.Server[] = [];
 afterEach(async () => {
@@ -98,6 +102,35 @@ it('ordinary effort-only role keeps the exact parent model and changes only its 
   const server = await wire(setup, 200, true); await ordinaryTurn(setup, server).finished;
   expect(server.received.map(body => [body.model, body.reasoning_effort])).toEqual([['primary-model', 'low'], ['primary-model', 'high'], ['primary-model', 'low']]);
   expect(JSON.stringify(server.received[1])).toContain('EFFORT_ONLY_PROMPT');
+});
+it('charges a dynamically loaded schema to the next request budget and refuses before dispatch', async () => {
+  const setup = createAdvisorHarness(false, false);
+  const server = await wire(setup);
+  const tool = (name: string, description: string, properties: Record<string, unknown>): ToolDefinition => ({
+    name, description, argsSchema: { type: 'object', properties },
+    execute: async () => ({ success: true, output: 'ok' }),
+  });
+  const small = tool('small', 'small fixture', {});
+  const large = tool('large', 'large fixture', {
+    payload: { type: 'string', description: 'x'.repeat(40_000) },
+  });
+  const discovery = createToolDiscovery({ catalog: new Map([[small.name, small], [large.name, large]]), pinned: [small.name] });
+  const request = { ...server.request, runtimeConfig: { ...server.request.runtimeConfig!, contextWindow: 2_000, reserveTokens: 0 } };
+  const step = createProviderStep(request, new Map(), {}, discovery);
+  let firstSchemaDigest = '';
+  const first = await step([{ role: 'user', content: 'first' }], setup.signal, {}, {
+    allowTools: true, onRequestSent: sent => { firstSchemaDigest = sent.promptIdentity?.schemaDigest ?? ''; },
+  });
+  expect(first.stopReason, first.errorMessage).toBe('stop');
+  expect(firstSchemaDigest).not.toBe('');
+  expect(server.received).toHaveLength(1);
+  expect((server.received[0]!.tools as Array<{ function: { name: string } }> | undefined ?? []).map(item => item.function.name)).toEqual(['small']);
+  expect(discovery.load(['large'])).toEqual({ loaded: ['large'], rejected: [] });
+  const loadedDigest = createHash('sha256').update(JSON.stringify(toolSchemas(discovery.snapshot()))).digest('hex');
+  expect(loadedDigest).not.toBe(firstSchemaDigest);
+  const second = await step([{ role: 'user', content: 'second' }], setup.signal, {}, { allowTools: true });
+  expect(second).toMatchObject({ stopReason: 'error', errorMessage: expect.stringMatching(/^Context overflow:/) });
+  expect(server.received).toHaveLength(1);
 });
 it('disable cancels a held actual ordinary-task child request within its bounded cleanup window', async () => {
   const setup = createAdvisorHarness(false, false); fs.mkdirSync(path.join(setup.root, '.agents'));

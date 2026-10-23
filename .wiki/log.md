@@ -8762,3 +8762,12 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 最终 build `4c2cd4069623760c8daa5974fc057ed8fc176609afe8e1324236507209fb0d31`，inputs `dc55921a92422c0b04396c897387b93110a571d2393b8e8423843f8c5a6aa2d9`，artifact `8a0990e5f6d1d9038e8398318be7a0bec75eb325118e58deb2dd6636276a5c9f`，exe SHA-256 `2bc092f5e32161c3cf30b3cac253c7d12579f00d77e9e8f7b59cfd579df0e3cb`。Node/exe × regular/fullscreen/line/pipe八格PTY全部pass/exit0，八份JSON绑定同build/exe，证据`.omx/artifacts/phase20-local-hardening-4c2cd4069623/`。
 - `normproof judge`本地仍exit127（不在PATH），不计本地通过；CI自包含NormProof Watch单独success。真实 MCP/auth、IME、系统剪贴板、Windows交互PTY、真实模型评测、完整heap/最长响应/累计physical I/O及剩余12项继续WATCH，不声称Phase20完成。
 - 代码批`186fde15209c96b86d4e2e03803f72df421293c7`已push/readback远端main。精确CI`40032612651`/job`120684290419`于2026-10-23T22:17:13Z–22:35:23Z completed/success；Watch`40032612536`/job`120684290044`于22:17:13Z–22:17:39Z completed/success。两项只绑定该代码SHA，不扩展到随后文档evidence提交。
+
+## [2026-10-24] test | QA-01 CTX-02 x TOOL-01 与 restore 累计读取
+
+- `cli/provider/step.test.ts` 新增实际 HTTP 集成：首个请求只发送 `small` tool schema 并返回 usage；`ToolDiscovery.load(['large'])` 后 schema digest 改变，带 40,000 字符 schema 的第二请求在 `requestBudget` 处以 `Context overflow` 拒绝，server 仍只收到一个请求。测试覆盖 `createProviderStep -> createStepFunction -> requestBudget`，不是底层预算的单点调用。
+- 三个反转分别移除 `toolSnapshot` 读取、从 overhead 移除 `tools`、移除 provider 的 discovery 接线，均产生实际 AssertionError；恢复后同文件 8/8 通过。
+- PAN-06 restore catalogue 将初始 metadata 扫描字节保存为 attempt-local 续页累计上限；所有 continuation `readAccess.admit` 共享 `used`，超限在读取 body 前抛 `RecoveryReadLimitError`。初始扫描≤32MiB、续页累计≤初始扫描，单 attempt 主动 metadata 读取≤64MiB；205 条三页测试确认续页不调用 `opendir`，并在第二页后增长第三页记录时 fail-closed，cursor revision 和精确 position 篡改也在读取前拒绝。
+- restore 的反转分别重置每页 budget、移除 continuation readAccess、移除 cursor revision/position 校验、移除内层 caller check，累计超限、续页重叠和 caller 撤销测试均失败；恢复后 `catalog.test.ts` 9项、`catalog/read.test.ts` 12项、`cli/provider/step.test.ts` 8项，共 29/29 通过。
+- build `88c051cd8afe48d5848d2f4b3e1d0641b4a0a2ebed050e154c54e98cdaa30c9f`，inputs `4bf89febb4526dcb6d5a231ea1f97e93bdebf621a3b48bb2e350904483e35554`，artifact `d7a098a374757d4fb278f4ddb2afd254ea11fbec09f69397b08e3501372c2bcf`，exe SHA-256 `a0d76c3dc09aa5cc629c3510590238f83c153d06f96ecd46cb28e067696208e5`；build:ts、build:exe 与 CLI 入口 19 项通过，本批未声称新的专用 PTY。
+- 本批只关闭 `CTX-02 x TOOL-01` 的本地跨 owner 证据并加强 restore attempt-local 读取预算；tree/back/cleanse 完整源读取、累计 physical I/O、瞬态 heap/最长响应、真实模型/MCP 及剩余 QA-01 组合仍未闭合，矩阵保持 35 complete/12 partial/0 open。commit/push/CI 另取证。
