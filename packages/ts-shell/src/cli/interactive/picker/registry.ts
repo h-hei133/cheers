@@ -162,7 +162,7 @@ const PICKERS: Record<string, PickerFactory> = {
     return state ? advisorPicker(state, host.advisorState) : undefined;
   },
   git: host => gitPicker(host.gitWorkbench),
-  cleanse: host => cleansePicker(host.security),
+  cleanse: host => cleansePicker(host.security, host.commandContext, host.sessionContext),
 };
 
 function savedSessionPicker(host: PickerHost, action: 'resume' | 'pin'): Picker {

@@ -30,8 +30,10 @@ describe('cleanse picker', () => {
     expect(await picker.apply(['unoffered'])).toBeUndefined();
     expect(await picker.apply([rows[0]!.id, rows[0]!.id])).toBeUndefined();
 
+    const watching = cleansePicker(source.inspector);
+    await watching.load();
     const publish = vi.fn();
-    const unsubscribe = picker.subscribe!(options => publish(options));
+    const unsubscribe = watching.subscribe!(options => publish(options));
     source.publish(snapshot(2));
     expect(publish).toHaveBeenCalledTimes(1);
     unsubscribe();
@@ -46,8 +48,10 @@ describe('cleanse picker', () => {
     const row = (await picker.load())[0]!;
     source.publish(snapshot(2, '/other-workspace'));
     expect((await picker.apply([row.id]))?.note).toContain('session or workspace changed');
+    const reopened = cleansePicker(source.inspector);
+    const reopenedRow = (await reopened.load())[0]!;
     source.publish(snapshot(3));
-    expect((await picker.apply([row.id]))?.note).toContain('Retained evidence');
+    expect((await reopened.apply([reopenedRow.id]))?.note).toContain('Retained evidence');
   });
 
   it('keeps unavailable capability distinct from an empty retained history', async () => {

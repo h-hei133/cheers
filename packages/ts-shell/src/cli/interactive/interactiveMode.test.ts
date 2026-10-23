@@ -24,6 +24,7 @@ import { registerSlashCommand } from '../../entrypoints/slashCommandRegistry.js'
 import { toolsPicker } from './picker/tools.js';
 import { copyPicker } from './picker/copy.js';
 import { restorePicker } from './picker/restore.js';
+import { cleansePicker } from './picker/cleanse.js';
 import * as toolCatalog from '../../core/tools/catalog.js';
 import { createReport, span } from '../../core/commands/report/projection.js';
 import type { PickerOutcome } from './overlay.js';
@@ -279,8 +280,11 @@ describe("session wiring", () => {
     const { mode } = build();
     const host = mode as unknown as { overlay: OverlayHost; run(text: string): Promise<void>; pickerHost(): PickerHost; sink: { begin(): void } };
     const original = host.pickerHost(); const begin = vi.spyOn(host.sink, 'begin');
-    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, security: {
-      read: () => ({ state: 'ready', snapshot: { identity: { sessionId: 'sess_1', workspaceRoot: '/workspace' }, version: 'v1', items: [] } }),
+    const root = process.cwd();
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original,
+      commandContext: { ...original.commandContext, cwd: root, admission: () => undefined },
+      sessionContext: () => ({ sessionId: 'sess_1', projectRoot: root, busy: false }), security: {
+      read: () => ({ state: 'ready', snapshot: { identity: { sessionId: 'sess_1', workspaceRoot: root }, version: 'v1', items: [] } }),
       subscribe: () => () => undefined,
     } });
     await host.run('/cleanse');
@@ -1212,4 +1216,18 @@ it('yields a reader to runtime questions, permission prompts and queued pickers'
     expect(host.pager.active).toBe(false); expect(picker).toHaveBeenCalledWith('/settings', true);
     open(); mode.stop(); expect(host.pager.active).toBe(false);
   } finally { mode.stop(); }
+});
+
+it('publishes an accepted cleanse draft through the original interactive consumer and rejects a changed live owner', async () => {
+  const { mode } = build();
+  const host = mode as unknown as { applyPicker(picker: Picker, ids: readonly string[]): void; replaceExternalDraft(draft: string): void };
+  const root = process.cwd(); let sessionId = 'sess_1';
+  const inspector = { read: () => ({ state: 'ready' as const, snapshot: { identity: { sessionId: 'sess_1', workspaceRoot: root }, version: 'v1',
+    items: [{ identity: 'scan-row', kind: 'scan' as const, id: 'scan-a', targetId: 'scan-a', status: 'unknown', durability: 'unknown' as const,
+      owner: 'none' as const, summary: 'retained', detail: ['retained finding'] }] } }), subscribe: () => () => undefined };
+  const choose = () => cleansePicker(inspector, { cwd: root, sessionId: 'sess_1' }, () => ({ sessionId, projectRoot: root, busy: false }));
+  const replace = vi.spyOn(host, 'replaceExternalDraft'); const first = choose(), row = (await first.load())[0]!;
+  host.applyPicker(first, [row.id]); await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/cleanse diagnose "scan-a"'));
+  replace.mockClear(); const second = choose(); await second.load(); host.applyPicker(second, [row.id]); sessionId = 'sess_2';
+  await new Promise(resolve => setTimeout(resolve, 0)); expect(replace).not.toHaveBeenCalled();
 });

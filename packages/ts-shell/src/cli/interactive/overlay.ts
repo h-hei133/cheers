@@ -99,6 +99,8 @@ export interface Picker {
   subscribe?(publish: (options: readonly Option[]) => void): () => void;
   /** Apply the choice, reporting what to show or to draft next. */
   apply(ids: readonly string[]): Promise<PickerOutcome | undefined>;
+  /** Capture an accepted choice before the host releases its browser signal. */
+  previewAccept?(): void;
   /**
    * The selection changed but has not been applied. A picker whose subject is
    * visible on screen can show what the choice would look like here — nothing is
@@ -764,6 +766,7 @@ export class OverlayHost {
     const ids = directIds ?? (picker.multiple ? this.model.chosenIds() : idsOf(this.model.current()));
     const accepted = directIds !== undefined || ids.length > 0 ||
       (picker.multiple && this.model.visible.some(option => !option.disabled));
+    if (accepted) picker.previewAccept?.();
     this.release();
     this.onChange();
     if (accepted) {

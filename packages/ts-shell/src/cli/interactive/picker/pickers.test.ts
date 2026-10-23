@@ -28,14 +28,17 @@ describe("which commands open a chooser", () => {
   );
 
   it('opens cleanse as a read-only retained-evidence inspector', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cleanse-picker-'));
+    try {
     const host = {
-      commandContext: CONTEXT,
-      security: { read: () => ({ state: 'ready', snapshot: { identity: { sessionId: 's', workspaceRoot: '/workspace' }, version: '1', items: [] } }), subscribe: () => () => undefined },
+      commandContext: { cwd: root, sessionId: 's' },
+      security: { read: () => ({ state: 'ready', snapshot: { identity: { sessionId: 's', workspaceRoot: root }, version: '1', items: [] } }), subscribe: () => () => undefined },
     } as unknown as PickerHost;
     const picker = pickerFor('/cleanse', host)!;
     expect(picker.title).toContain('retained diagnostics');
     expect(await picker.load()).toEqual([]);
     expect(opensPicker('/cleanse diagnose scan-1')).toBe(false);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
 
   it("disables effort levels the selected model cannot honour", async () => {

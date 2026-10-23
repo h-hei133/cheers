@@ -981,3 +981,14 @@ describe("approval picker key routing", () => {
     expect(overlay.active).toBe(false);
   });
 });
+
+it('captures accepted choice before aborting browser load and never marks cancellation as acceptance', async () => {
+  let signal: AbortSignal | undefined; const accepted = vi.fn(() => expect(signal?.aborted).toBe(false));
+  const { overlay } = host(), apply = vi.fn();
+  overlay.open(picker({ load: async current => { signal = current; return options; }, previewAccept: accepted }));
+  await vi.waitFor(() => expect(stripAnsi(overlay.render(100, 25).join('\n'))).toContain('alpha'));
+  overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(accepted).toHaveBeenCalledOnce(); expect(signal?.aborted).toBe(true); expect(apply).toHaveBeenCalledOnce();
+  overlay.open(picker({ previewAccept: accepted })); await vi.waitFor(() => expect(stripAnsi(overlay.render(100, 25).join('\n'))).toContain('alpha'));
+  overlay.close(); expect(accepted).toHaveBeenCalledOnce();
+});

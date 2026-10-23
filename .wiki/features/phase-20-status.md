@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy/back、undo扫描/preview/locked target、restore catalogue/index/picker/准备及执行source准入已有批次证据；cleanse来源/目录总界、导航/query瞬态heap/时延及整体physical I/O仍缺 | 本地继续原cleanse consumer资源与身份边界、重复scan及完整交互测量；source cap不等于总heap/physical I/O保证 |
+| PAN-06 | history/copy/back、undo扫描/preview/locked target、restore catalogue/index/picker/准备及执行source准入已有批次证据；cleanse已补投影source准入/选择生命周期/实时身份，仍缺上游session获取/安全序列化/轮询总界、导航/query瞬态heap/时延及整体physical I/O | 本地继续原cleanse来源获取/序列化与重复scan、完整交互测量；source cap不等于总heap/physical I/O保证 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,7 +21,17 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-06 原restore执行读取与完整控制（本地与独立审查通过；提交待取证）
+## 2026-10-23 PAN-06 cleanse选择、来源投影与原消费者（本地通过；提交待取证）
+
+- 原SecurityInspector保持只读owner；opening捕获原session/workspace/profile/admission/signal，并使用既有实时sessionContext验证接受结果。source在option/search join前整源准入96items、8Mi UTF-16、4096detail lines，复制不可变精确目标后重验，不静默截断。load失败清offered；订阅获取前检查、重复立即释放、同步首发close及queued stop均安全；detail/status按原控制拒绝旧数据，close释放原source/context，accepted仅保留必要身份接口。
+- 原OverlayHost新增可选previewAccept，在正常接受前捕获且随后结束browser signal；直接已取消选择拒绝，父级signal/admission仍贯穿fresh read与draft publication。选项一次消费，fresh原身份/version/target匹配，保留原unknown/unavailable/stale与完整合法detail/search；仅生成quoted `/cleanse diagnose` 草稿，无工具/修复/隐式删除或native scan cancellation。独立复现并修复原真实InteractiveMode丢草稿、临时WeakRef context GC失效、mutable版本/target、source拒绝后复活及多种订阅/回调控制缺口。
+- 本地8文件237项在Node24与准确20.3.0均通过；最终一项订阅时序断言增强后19项两runtime重跑。13有效AssertionError反转exit1、十source/test hashes前后相同；current检查因source内再次check兜底green、replace反转被测试后来显式stop遮蔽green均保留，后者增强立即释放断言后有效。初始已消费picker复用、假/workspace物理/配置准入、callback close错误分类及中间构建测试input过期均留存，未削弱断言。scripts157/静态gates/47项matrix/diff通过，NormProof exit0/partial、0blocking、1原ceiling advisory/10gaps；原audit保持。
+- 独立code APPROVE/architecture WATCH，综合COMMENT，无BLOCK；code34host+34准确Node20.3探针、256focused/production typecheck及最终19项增强复验；architecture44production/control/consumer探针、GC释放、232focused及最终19项、AST/import/cycles。十hash与报告绑定。owning cleanse/source/state为13/2/4names，原registry37/overlay25未增。直接无live accessor的accepted caller保留其身份port到picker被回收；production使用实时owner，不持有完整commandContext。
+- build`096cb76f03f82f6bcdf3ec52d27f2e800d3d45b0ce6eb9c25d7a73175d3348cc`，inputs`25c89246585a0cf8080312e8f4d5b2c30c2a2e7ad4f1569f7afab999cf570bf2`，artifact`828bffe9a7194ba8baeabcc1e564e4695de6743b6dd3fa0a19123bf37a3887b9`，exe SHA-256`39a5e3962e2d1946d224a47cd4fe409441081caeab5c449c572df3a92bd76181`。same-build Node/exe regular/fullscreen四格PTY pass/exit0、before/after相等：32scan+64remediation、orphanunknown、完整detail/search/exact diagnosisdraft、cancel无写、live不可读恢复/外改refresh、原97record document拒绝与重开；state/transcript/metadata/workspace在只读步骤原字节保持，无模型/工具调用。hostile投影边界由实际source探针覆盖，PTY的97项属于原持久decoder拒绝，不冒作同一boundary。证据`.omx/artifacts/phase20-cleanse-selection/`及author-binding。
+- WATCH/剩余：投影cap不约束更早fullsession acquisition、完整security JSON/hash、每秒polling、总physical I/O/heap/latency或跨平台。原provider/审批/writer不扩展，本地下一步仍原source owner获取/序列化；35complete/12partial保持。本批commit/push/newSHA CI分别取证。
+- 前批`68c298f02bf0b4fe61dae5b45f90a18299105b0b`已commit/push/readback；精确CI`39975873837`/job`120490192135`completed/success至`2026-10-23T15:36:48Z`，Watch`39975873905`success。该成功仅绑定前批SHA。
+
+## 2026-10-23 PAN-06 原restore执行读取与完整控制（`68c298f0`已推送；CI/Watch success）
 
 - 原bridge完成preview后，one-use attempt共享128MiB fresh metadata/blob及独立384MiB locked target source预算，每file64MiB；原primitive preflight、commit before/current/after四次descriptor inspection分配/读取前计量，失败不退款。direct primitive默认同policy，原readAccess/abort/file-access与共享owner按单次调用组合，不双计同caller回调；原target locks/current equality/selected order/receipt-required/writer保持，无新schema/cache/commit实现。
 - 独立实际复现并修复共享owner忽略原call controls/bytes、异步cancel未latch、current body取消误报unknown、final verification body取消仍verified、one-shot file-access拒绝不保留及workspace alias转向另目录。已有preview identity owner增加原词法路径至原canonical root绑定，贯穿command/preview/bridge/execute；执行owner捕获original workspace string，primitive输入提前复制。control在admit回调后、prep catch、locked current读后与commit返回后检查；writer-start前blocked，之后unknown，先前已接受verified结果及后续blocked各自保留。
