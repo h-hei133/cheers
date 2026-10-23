@@ -8526,4 +8526,5 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 最终源码完整 `test:ts` 为 928 文件通过/1 跳过、9876 项通过/10 项跳过、372.07s；strict docs/rules、`git diff --check` 与仓库 tgz NormProof exit 0/partial（11 项既有 ceiling advisory）通过。
 - 新增 packaged PTY 面板链：在隔离 home/project 中打开/关闭 `/hub`、`/agents`、`/plan-review`、`/btw` 和启用后的 `/advisor`，随后关闭 advisor，断言 assistant message 数不变。Node/exe × regular/fullscreen 4/4 通过、exit 0；证据目录 `.omx/artifacts/phase20-panel-pty-final-6e0b5dec32e3/`。中间失败 run 独立保留，不覆盖为成功。
 - TypeScript build `6e0b5dec32e306689aa3e314ca456f53da5e85fec779859cf85a90306fa16a02`，executable SHA-256 `0db726b3513d2c20fb7504ae57af04f11d2481d32ccc287703d9757055be21f5`。矩阵更新为 32 `complete`/15 `partial`/0 `open`；PAN-03/PAN-05 闭合，RENDER-02/03 仍保留 OSC8、packaged visual/source-copy 与全量资源边界。
-- 指定 `cn:deepseek-v4.1-flash` 的三个独立 research/review 子代理均在 retry 后返回 HTTP 429，未产生意见或批准；未使用替代模型。本条写入时提交、推送、完整 `test:ts` 与新 SHA CI 尚未执行，后续按实际结果补记。
+- 指定 `cn:deepseek-v4.1-flash` 的三个独立 research/review 子代理均在 retry 后返回 HTTP 429，未产生意见或批准；未使用替代模型。
+- 代码批 `cd28d8ca662706137f34c281330d455d46eba772` 已提交并推送，远端 `main` 精确读回同 SHA。CI `39888154616`/job `120201145121` completed/success，耗时 16m46s；928 文件通过/1 跳过、9883 项通过/3 项跳过、916.72s，静态门、脚本门、构建、Chromium 安装、完整测试与 NormProof 步骤均 success。Architecture Watch `39888154776`/job `120201145625` completed/success。两项只绑定该代码 SHA；本证据文档提交不扩大产品范围。

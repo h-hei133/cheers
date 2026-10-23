@@ -2,7 +2,7 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
-## 2026-10-23 PAN-03/PAN-05 and RENDER-02/03 local rework（本地完成；提交/CI 待补）
+## 2026-10-23 PAN-03/PAN-05 and RENDER-02/03 rework（代码批 `cd28d8ca` 已推送；CI/Watch success）
 
 - `hubPicker` now rejects old-session applies, stops publishing after a same-id session/workspace rebind, exposes a stale status, and sends command/note/directory/output metadata through the existing report redactor before display. The agents subscriber applies the same rebind fence.
 - `advisorPicker` revalidates the exact advisor state on load/apply without doing filesystem reads during render, reports stale state, and redacts checkpoint/note metadata. `btwPicker` redacts retained question/failure metadata. Plan review continues to bind the exact plan version and side questions continue to bind transcript revision.
@@ -14,6 +14,7 @@
 - The isolated PTY harness now opens/closes `/hub`, `/agents`, `/plan-review`, `/btw`, and `/advisor` after enabling it, then disables it before the existing synthetic turn fixture. Node/exe × regular/fullscreen all passed 4/4, exit 0, on the build above; the sequence asserts the assistant message count did not change. Evidence is `.omx/artifacts/phase20-panel-pty-final-6e0b5dec32e3/`; intermediate failed runs are retained separately.
 - `verify:phase20-requirements` moves to 32 `complete`/15 `partial`/0 `open`. PAN-03 and PAN-05 are now complete; RENDER-02/03 remain partial for OSC8, packaged visual/source-copy, and full-view resource edges.
 - Three required `cn:deepseek-v4.1-flash` subagent audits all failed with HTTP 429 after retry exhaustion. No independent approval was obtained, and no substitute model was used.
+- Code batch `cd28d8ca662706137f34c281330d455d46eba772` is pushed and remote `main` reads back the same SHA. CI `39888154616`/job `120201145121` completed/success in 16m46s; the CI test run passed 928 files/1 skipped and 9,883 tests/3 skipped in 916.72s. Architecture Watch `39888154776`/job `120201145625` completed/success. Both results bind only this code SHA.
 
 ## 2026-10-23 PAN-04 effort and quota acceptance（代码批 `2147cb6d` 已推送；CI/Watch success）
 
