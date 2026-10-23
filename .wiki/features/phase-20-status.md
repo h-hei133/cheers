@@ -2,6 +2,14 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
+## 2026-10-23 浏览器响应预算错误优先级修复（本地代码批；CI pending）
+
+- 证据文档提交 `eedd737028f139c587670ded008717c8eeecc000` 的 CI `39889803714`/job `120206584567` 在完整测试第 634 秒失败：`src/browser/smoke/request.test.ts` 的 gzip 解压预算用例期望 `unsafe-output`，实际得到 `request-failed`；其余 927 文件通过/1 跳过、9,882 项通过/3 跳过。该提交的 Architecture Watch `39889803712`/job `120206584691` 为 completed/success。失败 run 保留，不记为通过。
+- 同一代码 SHA 的上一轮 CI `39888154616` 已成功，说明该失败不是稳定功能回归；但新增 `core/network/body.test.ts` 用解压后超预算并伴随 decoder cleanup error 的确定性场景复现了真实竞态：原实现会把 `response_limit` 覆盖为 `invalid_response`，最终投影为 `request-failed`。
+- `responseBody()` 现在记录预算已越界这一终态事实；decoder cleanup 与 `pipeline` 收尾不得把该终态降级为通用解析错误。未越界时仍按原合同把损坏压缩流归一为 `invalid_response`，且不泄露 decoder 诊断。
+- 聚焦验证 44 项通过：body 回归 1、connection/response 20、browser smoke 23。`npm run build` 通过，build ID `2899cba44e0c`；`test:scripts` 157/157、import cycles 2,766 文件/0 runtime/0 type、config consumers 53/53、declarations 18/18 + 11/11、Node floor、strict docs/rules 与 `git diff --check` 通过；docs-source 118 项仍为 advisory。仓库 tgz NormProof exit 0/partial，0 blocking，保留 11 项既有 function-ceiling advisory。
+- 修复代码尚未提交或推送；该节不声称新 SHA CI、发布或 Phase 20 完成状态。失败 run 的 rerun 已启动，结果另记。
+
 ## 2026-10-23 PAN-03/PAN-05 and RENDER-02/03 rework（代码批 `cd28d8ca` 已推送；CI/Watch success）
 
 - `hubPicker` now rejects old-session applies, stops publishing after a same-id session/workspace rebind, exposes a stale status, and sends command/note/directory/output metadata through the existing report redactor before display. The agents subscriber applies the same rebind fence.
