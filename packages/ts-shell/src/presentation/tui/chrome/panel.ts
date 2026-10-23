@@ -15,6 +15,7 @@ import type { ChipStrip } from "./chips.js";
  */
 
 const MARKER_WIDTH = 4;
+const labelMeasurements = new WeakMap<OptionModel, { revision: number; longest: number; measured: number }>();
 
 export interface PanelChrome {
   readonly filterable?: boolean;
@@ -87,7 +88,7 @@ export function renderPanel(
     optionRows = Math.max(1, optionRows - 1);
   }
   const window = model.window(twoColumn ? listRows : optionRows);
-  const labelWidth = measureLabelWidth(model.visible, listWidth);
+  const labelWidth = measureLabelWidth(model, listWidth);
   const bodyRows = twoColumn
     ? Math.min(listRows, Math.max(window.count, detailLines.length))
     : Math.min(optionRows, window.count);
@@ -182,8 +183,15 @@ function renderFooterRows(chrome: PanelChrome, width: number, maxRows: number): 
 }
 
 /** Column the detail text starts at, bounded so a long label cannot eat the row. */
-function measureLabelWidth(options: readonly Option[], width: number): number {
-  let longest = 0;
-  for (const option of options) longest = Math.max(longest, visibleWidth(option.label));
-  return Math.min(longest + 2, Math.max(8, Math.floor(width / 2) - MARKER_WIDTH));
+function measureLabelWidth(model: OptionModel, width: number): number {
+  const ceiling = Math.max(8, Math.floor(width / 2) - MARKER_WIDTH);
+  let cached = labelMeasurements.get(model);
+  if (!cached || cached.revision !== model.optionsRevision) {
+    cached = { revision: model.optionsRevision, longest: 2, measured: 0 };
+    labelMeasurements.set(model, cached);
+  }
+  while (cached.measured < model.visible.length && cached.longest < ceiling) {
+    cached.longest = Math.max(cached.longest, visibleWidth(model.visible[cached.measured++]!.label) + 2);
+  }
+  return Math.min(cached.longest, ceiling);
 }

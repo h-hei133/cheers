@@ -36,6 +36,7 @@ export class OptionModel {
   private cursor = 0;
   private offset = 0;
   private query = "";
+  private revision = 0;
   private readonly chosen = new Set<string>();
 
   constructor(private readonly filterOptions?: OptionFilter) {}
@@ -68,6 +69,9 @@ export class OptionModel {
   get visible(): readonly Option[] {
     return this.matches;
   }
+
+  /** Changes to candidates or query invalidate measurements; focus does not. */
+  get optionsRevision(): number { return this.revision; }
 
   current(): Option | undefined {
     const option = this.matches[this.cursor];
@@ -130,6 +134,7 @@ export class OptionModel {
   }
 
   private applyFilter(): void {
+    this.revision++;
     const focused = this.current()?.id;
     const needle = this.query.trim().toLowerCase();
     this.matches = this.filterOptions ? this.filterOptions(needle, this.all) : needle

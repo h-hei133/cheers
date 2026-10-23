@@ -137,3 +137,48 @@ it('neutralises control sequences in option and detail text', () => {
   expect(output).toContain('\\x0a');
   expect(output).toContain('\\x85');
 });
+
+it('reuses catalogue widths on focus changes and invalidates an in-place candidate refresh', () => {
+  const value = new OptionModel();
+  let measurements = 0;
+  let tailLabel = 'tail';
+  const candidates: Option[] = Array.from({ length: 20_000 }, (_, index) => ({ id: String(index),
+    detail: 'aligned detail',
+    get label() { if (index === 19_999) { measurements++; return tailLabel; } return 'row'; } }));
+  value.setOptions(candidates);
+  const chrome = { title: 'Pick', empty: 'none', multiple: false };
+  renderPanel(value, chrome, 120, 10);
+  expect(measurements).toBe(1);
+  for (let index = 0; index < 30; index++) { value.step(1); renderPanel(value, chrome, 120, 10); }
+  expect(measurements).toBe(1);
+  tailLabel = 'longer offscreen label';
+  value.setOptions(candidates);
+  const refreshed = renderPanel(value, chrome, 120, 10);
+  expect(measurements).toBe(2);
+  expect(stripAnsi(refreshed[1]!).indexOf('aligned detail')).toBe(4 + visibleWidth(tailLabel) + 2);
+  const fresh = new OptionModel(); fresh.setOptions(candidates); fresh.focus(value.current()!.id);
+  expect(refreshed).toEqual(renderPanel(fresh, chrome, 120, 10));
+});
+
+it('extends a saturated measurement on resize and recalculates after filtering', () => {
+  const value = new OptionModel();
+  let tailReads = 0;
+  const candidates: Option[] = [{ id: 'first', label: 'first moderately long label', detail: 'aligned detail' },
+    ...Array.from({ length: 100 }, (_, index) => ({ id: `row-${index}`, label: 'row', detail: 'aligned detail' })),
+    { id: 'tail', detail: 'aligned detail',
+      get label() { tailReads++; return 'the longest hidden label in the entire supplied catalogue'; } }];
+  value.setOptions(candidates);
+  const chrome = { title: 'Pick', empty: 'none', multiple: false };
+  renderPanel(value, chrome, 40, 10);
+  expect(tailReads).toBe(0);
+  const wide = renderPanel(value, chrome, 180, 10);
+  expect(tailReads).toBe(1);
+  expect(stripAnsi(wide[1]!).indexOf('aligned detail')).toBe(4 + visibleWidth(candidates.at(-1)!.label) + 2);
+  const fresh = new OptionModel(); fresh.setOptions(candidates);
+  expect(wide).toEqual(renderPanel(fresh, chrome, 180, 10));
+  value.setFilter('first');
+  const filtered = new OptionModel(); filtered.setOptions(candidates); filtered.setFilter('first');
+  const narrowed = renderPanel(value, chrome, 180, 10);
+  expect(stripAnsi(narrowed[1]!).indexOf('aligned detail')).toBe(4 + visibleWidth(candidates[0]!.label) + 2);
+  expect(narrowed).toEqual(renderPanel(filtered, chrome, 180, 10));
+});

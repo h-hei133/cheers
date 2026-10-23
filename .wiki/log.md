@@ -8597,4 +8597,10 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 
 - 原深树terminal缩进生成约400.6MB输出，branch/长尾compaction重复复制累计消息。共用有界terminal投影保持完整ID/状态/持久depth，20k行/16MiB body/10显示层、嵌入行边界拒绝；消息tail窗口+反向checkpoint一次flatten，半buffer丢弃后按批回收。
 - 受影响10文件155项、scripts157、七有效AssertionError反转及hash恢复、独立APPROVE/CLEAR、静态门/build/exe通过。build `8e2c15e28017f75a95134dfe458dbd3406e221529ea7fb239c8dc7abab040f9b`、exe SHA-256 `42867873e0511a6ac06a4f83d7a1eff4f86605a737f135c160e27fd7abc5dcaa`；同build四格packaged PTY pass/exit0。harness retained焦点、首反转非assertion、测量夹具/脚本变化保护失败均保留。
-- 同build9组各30次compiled Node调用前后源码/脚本/fixture/artifact hash相等；输出约1.1MB，普通/branch/checkpoint acquisition p95为212.73/245.53/255.59ms，terminal tree/history p95范围227.04–394.59ms，每次6 descriptor read，30-call child peakRSS236,704–307,676KiB。历史仅单次20.30/27.71s acquisition，不能称baseline分布/统计内存改善。真实全屏性能/heap、catalogue累计I/O与剩余PAN-06消费者仍partial；提交/新SHA CI待取证。
+- 同build9组各30次compiled Node调用前后源码/脚本/fixture/artifact hash相等；输出约1.1MB，普通/branch/checkpoint acquisition p95为212.73/245.53/255.59ms，terminal tree/history p95范围227.04–394.59ms，每次6 descriptor read，30-call child peakRSS236,704–307,676KiB。历史仅单次20.30/27.71s acquisition，不能称baseline分布/统计内存改善。真实全屏性能/heap、catalogue累计I/O与剩余PAN-06消费者仍partial；代码批`47b4f300f06d0a288f63ed9ed13ff081232fbe96`已推送并精确读回，CI`39935676429`/job`120354498600`最后in_progress，09:57:59Z开始、tests运行中；Watch`39935676371`success。
+
+## [2026-10-23] fix | PAN-02/PAN-06 树面板重复渲染
+
+- panel候选label宽度按OptionModel候选/filter revision缓存，焦点复用、same-array刷新失效、饱和早停和resize续测，保留全局详情列对齐。恢复后7文件203项、scripts157、六有效AssertionError反转并恢复hash、独立APPROVE/CLEAR、静态门/build/exe通过；NormProof exit0/partial，既有advisory保持。
+- 固定20k saved chain、真实treePicker+OverlayHost、120×40、30次Up/Down+render：历史p95203.02ms，最终8.38ms（p503.34/max18.16）；load210.86/search24.69/close0.28ms仅单次，peakRSS207,032KiB非瞬态heap。脚本/源/artifact前后hash相等；完整byte-tier、catalogue累计I/O、剩余PAN-06消费者仍partial。
+- build`de428d7ffd2d959f38a913bd8770dec99ab1c7c97cbf201e7f4b965623c3be7f`、exe SHA-256`a9caef548956536606a0260a882c61ca69ac0077828f4c797006733fb2cfbca2`；同build Node/exe regular/fullscreen四格pass/exit0，初次测试修改后的build freshness拒绝保留，最终重建通过。证据见phase20-status；提交/新SHA CI待取证，Phase20保持partial。
