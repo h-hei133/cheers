@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy/back、undo扫描/preview/locked target、restore catalogue/index/picker/准备及执行source准入已有批次证据；cleanse已补投影source准入/选择生命周期/实时身份及原session获取每文件界，仍缺完整安全序列化/轮询总界、导航/query瞬态heap/时延及整体physical I/O | 本地继续原cleanse完整序列化与重复scan/轮询、完整交互测量；source cap不等于总heap/physical I/O保证 |
+| PAN-06 | history/copy/back、undo扫描/preview/locked target、restore catalogue/index/picker/准备及执行source准入已有批次证据；cleanse已补投影source准入/选择生命周期/实时身份及原session获取每文件界，已补完整安全源序列化前准入，仍缺轮询累计界、导航/query瞬态heap/时延及整体physical I/O | 本地继续原cleanse完整序列化与重复scan/轮询、完整交互测量；source cap不等于总heap/physical I/O保证 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,7 +21,16 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-06 原security session来源读取（本地通过；提交待取证）
+## 2026-10-24 PAN-06 完整security源序列化前准入（本地与独立审查通过；提交待取证）
+
+- 原security analysis JSON遍历复用为admitJsonSource，decodeSecurity在原JSON.stringify/4MiB encoded check前限制raw key/string UTF8累计4MiB、100knodes/depth24；inspection在count/map及原SHA256(JSON.stringify([context,state]))前对完整context/state累计8MiB，合并唯一unknown记录96项/97拒绝整源。合法parsed/security字段、原版本摘要/encoded4MiB、unknownreceipts与精确身份保持，无新serializer/schema/cache或writer。
+- 两lane实际复现toJSON/getter/Proxy/自定义数组iterator、nonenumrequired字段、arrayforEach、primitiveconversion及functioncustomprototype绕过。原owner现在按普通/nullproto own data descriptors、indexedarray、NodeisProxy检查拒绝执行hooks/accessors/nonordinaryprototype/customarraymethods；不可枚举data也按rawsource计量，普通sharedaliases/sparse/NaN/noncallabletoJSON与无hookfunction原JSONomission保留。typedpublicationIterable/全局intrinsics不冒作JavaScript隔离保证；Object.getOwnPropertyNames会分配namesarray，不承诺heap/time总界。
+- 本地最终6suite40项pass，准确20.3.0先39项后finalfunction10项复验；4有效AssertionError反转exit1且四hash保持（decoder/inspection/97merge/hook）。单proxy保护被第二hookguard兜底green留存不计有效；中间mixedsource测试与旧floor/typecheck/hash漂移均不算final证据。静态gates/47matrix/diff/build/exe/NormProof0partial通过；ownerjson5/store9/inspection7低于20。独立codeAPPROVE/architectureWATCH，综合COMMENT，无BLOCK；code48host+48floor探针、finalJSON10floor/typecheck，原5suite35在最后delta前另列；architecture35probe/final5suite36/AST/import/cycles，四hash两报告一致。samebuildPTY与commit/push/newSHA CI分别绑定。
+- finalbuild`0ffcf5a3c901fd112069714fd8f458bcbf81401fcbdb5c4e2dc9d15c3df7e7cb`，inputs`a12483d2f2fd4c2d0932c72113128e4f8215b6b1f5b1f8684cd506ca62fff718`，artifact`09297c4c765a1567a7302ad8cac71d2fbd464c9f5235fc6bf4a50aea005b04bc`，exeSHA`c74fcbcdc0a5f08173b57cb87fcc73fbcaf25d9774f13b1e70b535d52ed1d4a1`。旧build四格业务pass后finalfreshness明确拒绝（functionprototype修复期间构建变动）；失败保留，finalsamebuild Node/exe regular/fullscreen四格pass/exit0、before/after完全相等，state/transcript/metadata/workspace只读步骤原字节保持；结果见author-binding/pty-function-final。sourcebudget实际边界及hook不执行由生产探针覆盖，PTY保留96records/fullsearch/draft/cancel/no-write及实际session/metadata超限回归。
+- WATCH/剩余：rawsource bytes不是精确encoded总界，普通admitted对象仍原JSON/string/hash；polling累计physicalI/O/瞬态heap/时延/平台仍本地缺口，35complete/12partial保持。下一步原inspector轮询与完整重复交互测量，不能把本批预准入当性能闭合。
+- 前批`ad3985c0ada79a9f2bc1b86f7bb85856e28ea54e`已commit/push/readback，精确CI`39983073147`/job`120515120233`于16:15:52Zsuccess、Watch`39983073161`16:00:42Zsuccess；选择批`7528a3cf`CI`39980621177`/job`120506638733`15:58:11Zsuccess，Watch39980621185success。分别仅绑定各自SHA。
+
+## 2026-10-23 PAN-06 原security session来源读取（`ad3985c0`已推送；CI/Watch success）
 
 - 原readBoundSessionState/readCurrent增加可选只读metadata/state limits，直接沿readSessionMetadataRecord/readStateSnapshotRequired→readTextFile描述符reader；SecurityStore.read采用已有navigation同级256KiB metadata/8MiB state。打开后size检查在body分配/读取与JSONparse前，exact可读/+1整源拒绝、UTF8/path/identity/version/retry保持。无limits的原consumer及writer/locked publication维持原合同，无新reader/schema/cache，也不截断或丢durability unknown证据。
 - 本地6suite42项在Node24及准确Node20.3.0均通过，3有效AssertionError反转（metadata/state/原caller）exit1且三hash保持；原初始global read计数误拒合法metadata先读，现按descriptor dev/ino只计超限target body，失败记录保留。静态gates/47matrix/diff、TS/exe构建/NormProof exit0partial通过；scripts157在前一批同日通过且本批未改gate/script。target现有navigation有界reader、参考有界header exactEOF决策对照；完整reference load仍无总界，未复制或伪称相同session schema。
@@ -29,7 +38,7 @@
 - WATCH/剩余：约束单read文件来源，不保证累计physicalI/O、每秒poll/JSON序列化成本、瞬态heap/latency；security writer与其他无limitsconsumer不冒称受限。下一步完整security投影/轮询测量仍本地可执行，35complete/12partial保持；独立codeAPPROVE/architectureWATCH，综合COMMENT无BLOCK，三hash与报告读回一致；code26host+26准确20.3探针、66focused/typecheck，architecture24probe/34focused/AST/import/cycles，ownfixtures清除。commit/push/newSHA CI分别取证。
 - 前批`7528a3cfcf4c6acd815df0d68f0681a6ea2a83ab`已commit/push/readback；Watch`39980621185`completed/success至15:43:13Z，精确CI`39980621177`最近仍in_progress，不借用68c298f0 success。
 
-## 2026-10-23 PAN-06 cleanse选择、来源投影与原消费者（`7528a3cf`已推送；CI运行中）
+## 2026-10-23 PAN-06 cleanse选择、来源投影与原消费者（`7528a3cf`已推送；CI/Watch success）
 
 - 原SecurityInspector保持只读owner；opening捕获原session/workspace/profile/admission/signal，并使用既有实时sessionContext验证接受结果。source在option/search join前整源准入96items、8Mi UTF-16、4096detail lines，复制不可变精确目标后重验，不静默截断。load失败清offered；订阅获取前检查、重复立即释放、同步首发close及queued stop均安全；detail/status按原控制拒绝旧数据，close释放原source/context，accepted仅保留必要身份接口。
 - 原OverlayHost新增可选previewAccept，在正常接受前捕获且随后结束browser signal；直接已取消选择拒绝，父级signal/admission仍贯穿fresh read与draft publication。选项一次消费，fresh原身份/version/target匹配，保留原unknown/unavailable/stale与完整合法detail/search；仅生成quoted `/cleanse diagnose` 草稿，无工具/修复/隐式删除或native scan cancellation。独立复现并修复原真实InteractiveMode丢草稿、临时WeakRef context GC失效、mutable版本/target、source拒绝后复活及多种订阅/回调控制缺口。

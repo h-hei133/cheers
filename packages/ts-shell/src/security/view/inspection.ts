@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { neutraliseForDisplay } from '../../core/text/safety.js';
 import { redactReportText } from '../../core/security/redaction.js';
 import type { Disposition, Remediation, ScanRecord, SecurityState } from '../analysis/model.js';
+import { admitJsonSource } from '../analysis/json.js';
 
 export interface SecurityInspectionItem {
   readonly identity: string;
@@ -82,6 +83,8 @@ function remediationItem(remediation: Remediation, context: SecurityInspectionCo
 }
 
 export function securityInspection(state: SecurityState, context: SecurityInspectionContext): SecurityInspectionSnapshot {
+  admitJsonSource([context, state], 8 * 1024 * 1024);
+  if (state.scans.length + state.remediations.length > 96) throw new Error('Retained diagnostics exceed source limits.');
   const items: SecurityInspectionItem[] = [];
   state.scans.forEach(scan => items.push(scanItem(scan, context, state.dispositions)));
   state.remediations.forEach(remediation => items.push(remediationItem(remediation, context)));
@@ -93,7 +96,14 @@ export function securityInspection(state: SecurityState, context: SecurityInspec
 export function inspectionState(saved: SecurityState, scans: Iterable<ScanRecord>, remediations: Iterable<Remediation>): SecurityState {
   const observedScans = new Map(saved.scans.map(scan => [scan.id, scan]));
   const observedRemediations = new Map(saved.remediations.map(item => [item.id, item]));
-  for (const scan of scans) if (scan.durability === 'unknown') observedScans.set(scan.id, scan);
-  for (const remediation of remediations) if (remediation.durability === 'unknown') observedRemediations.set(remediation.id, remediation);
+  if (observedScans.size + observedRemediations.size > 96) throw new Error('Retained diagnostics exceed source limits.');
+  for (const scan of scans) if (scan.durability === 'unknown') {
+    observedScans.set(scan.id, scan);
+    if (observedScans.size + observedRemediations.size > 96) throw new Error('Retained diagnostics exceed source limits.');
+  }
+  for (const remediation of remediations) if (remediation.durability === 'unknown') {
+    observedRemediations.set(remediation.id, remediation);
+    if (observedScans.size + observedRemediations.size > 96) throw new Error('Retained diagnostics exceed source limits.');
+  }
   return { ...saved, scans: [...observedScans.values()], remediations: [...observedRemediations.values()] };
 }

@@ -8701,3 +8701,14 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 原bound reader增加可选read-onlymetadata/state上界，SecurityStore.read256KiB/8MiB在descriptor body/JSON前拒绝；exact/+1/UTF8/path/version/原retry及unknown/unavailable保持。writer/defaultconsumer不变，无新reader/schema。target导航reader与reference有界header exactEOF对照，完整source轮询/JSON/hash/heap/I/O仍待本地处理，35complete/12partial保持。
 - 本地42项host/准确20.3、3有效AssertionError反转三hash保持、静态门/matrix/diff/build/exe/NormProof0partial；初始globalread计数混入合法metadata先读为harnessdrift，改成targetdescriptor身份计量，未放宽拒绝。same-build61396d2fd6d0/exe76502e6518b3四格PTY pass/exit0身份前后一致，96retained/read-only/cancel/draft/live恢复、actual8MiB+1state及256KiB+1metadataunavailable后恢复，原session/workspace bytes保持。独立codeAPPROVE（26host+26floor、66focused/typecheck）/architectureWATCH（24probe/34focused/AST/import/cycles），三hash两报告绑定、ownfixtures清除，综合COMMENT无BLOCK；commit/push/新SHA CI最终另取。
 - 前批7528a3cfcf4c6acd815df0d68f0681a6ea2a83ab已push/readback，Watch39980621185success（15:43:13Z），CI39980621177仍in_progress；不能据运行时长升级为success。
+
+
+## [2026-10-24] fix | PAN-06 完整security对象序列化前准入
+
+- 原JSONowner复用遍历，decoder4MiBraw/source、100knode/depth24，inspection完整context/state8MiB/96mergedunknown，原encodedlimit/hash/schema/receipt/诊断owner保持。独立动态toJSON/getter/Proxy/arraymethods/hiddenfields/coercion/functionprototype绕过均修复为普通inertdatadescriptor准入；原shared/sparse/NaN兼容保留，不称typedIterable/全局runtime为JSsandbox。
+- 本地final40项、准确Node20.3先39后10delta、4有效AssertionError反转四hash保持、静态门/matrix/build/exe/NormProof0partial通过。原proxy单保护被hook兜底green和旧源码/测试交错、oldbuild四格pass后freshness拒绝保留；最终review/hash/PTy及commit/push/newSHA CI分别取证。rawsource不是heap/encoded总界，pollingphysicalI/O/时延与全部47项继续active35complete/12partial。
+- 前批ad3985c0ada79a9f2bc1b86f7bb85856e28ea54e精确CI39983073147/job120515120233success（16:15:52Z）、Watch39983073161success（16:00:42Z）；7528a3cfCI39980621177/job120506638733success（15:58:11Z）、Watchsuccess，各自SHA证据不挪用。
+
+- 本批finalsame-build0ffcf5a3c901/exe c74fcbcdc0a5四格PTY pass/exit0且before/after一致；原96retained、fullsearch/exactdraft/cancel无写/live恢复、actualsession8MiB+1/metadata256KiB+1拒绝与重开。最终独立架构WATCH/35probe/36focused四hash一致，代码最终绑定和新SHA交付另取证。
+
+- 最终独立codeAPPROVE（48host+48floor、JSON10delta/typecheck）、architectureWATCH（35probe/36finalfocused/AST/cycles），四hash报告逐项匹配，综合COMMENT无BLOCK；本批源码与构建均固定，commit/push/精确CI另取证。
