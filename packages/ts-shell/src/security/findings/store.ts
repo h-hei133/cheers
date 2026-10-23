@@ -2,7 +2,7 @@ import { sameValue } from '../../config/values.js';
 import { freezeDeep } from '../../core/values/freeze.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
 import { readBoundSessionRevision, readBoundSessionState, publishBoundSessionState, type BoundSessionHost } from '../../session/store/bound.js';
-import { admitJsonSource, boundedJson } from '../analysis/json.js';
+import { cloneJsonSource } from '../analysis/json.js';
 import type { ScanRecord, SecurityState, Remediation } from '../analysis/model.js';
 
 export interface SecurityStore {
@@ -15,8 +15,7 @@ export interface SecurityStore {
 export const SECURITY_SESSION_READ_LIMITS = Object.freeze({ metadataBytes: 256 * 1024, stateBytes: 8 * 1024 * 1024 });
 export function decodeSecurity(value: unknown): SecurityState {
   if (value === undefined) return { version: 1, scans: [], dispositions: [], remediations: [] };
-  admitJsonSource(value);
-  const state = boundedJson(JSON.stringify(value)) as unknown as SecurityState;
+  const state = cloneJsonSource(value) as unknown as SecurityState;
   if (state.version !== 1 || !Array.isArray(state.scans) || state.scans.length > 32 || !Array.isArray(state.dispositions)
     || state.dispositions.length > 512 || !Array.isArray(state.remediations) || state.remediations.length > 64) throw new Error('Security session state is unavailable.');
   for (const scan of state.scans) if (!scan || typeof scan.id !== 'string' || scan.id !== scan.plan?.id || typeof scan.plan.root !== 'string'

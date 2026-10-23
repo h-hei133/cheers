@@ -1,10 +1,22 @@
 import { isRecord } from '../../core/values/record.js';
 import { types } from 'node:util';
 export function boundedJson(text: string): Record<string, unknown> {
-  if (Buffer.byteLength(text) > 4 * 1024 * 1024) throw new Error('Security report exceeds its 4 MiB limit.');
-  let value: unknown; try { value = JSON.parse(text); } catch { throw new Error('Security report contains malformed JSON.'); }
+  const value = parseJson(text);
   admitJsonSource(value);
   if (!isRecord(value)) throw new Error('Security report must be an object.'); return value;
+}
+
+/** Locally cloned inert data keeps its admitted source shape or omits fields. */
+export function cloneJsonSource(value: unknown): Record<string, unknown> {
+  admitJsonSource(value);
+  const clone = parseJson(JSON.stringify(value));
+  if (!isRecord(clone)) throw new Error('Security report must be an object.'); return clone;
+}
+
+function parseJson(text: string): unknown {
+  if (Buffer.byteLength(text) > 4 * 1024 * 1024) throw new Error('Security report exceeds its 4 MiB limit.');
+  let value: unknown; try { value = JSON.parse(text); } catch { throw new Error('Security report contains malformed JSON.'); }
+  return value;
 }
 
 /** Reject source growth before cloning or serializing the original retained object. */

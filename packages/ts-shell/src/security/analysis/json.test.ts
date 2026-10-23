@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { admitJsonSource, boundedJson } from './json.js';
+import { admitJsonSource, boundedJson, cloneJsonSource } from './json.js';
 import { decodeSecurity } from '../findings/store.js';
 import { inspectionState, securityInspection } from '../view/inspection.js';
 import type { SecurityState, ScanRecord } from './model.js';
@@ -87,4 +87,25 @@ it('refuses custom function prototypes before inherited primitive conversion', (
   const convert = vi.fn(() => 'retained'), value = () => undefined;
   Object.setPrototypeOf(value, { toString: convert });
   expect(() => admitJsonSource({ id: value })).toThrow('inert JSON source'); expect(convert).not.toHaveBeenCalled();
+});
+
+it('clones admitted inert data with original JSON omission and exact detached values', () => {
+  const shared = { text: 'retained' };
+  const source = Object.assign(Object.create(null), { version: 1, first: shared, second: shared, sparse: Array(3), count: NaN,
+    omitted: undefined, callable: () => undefined, toJSON: 'data' });
+  Object.defineProperty(source, 'hidden', { value: 'admitted but omitted' });
+  expect(cloneJsonSource(source)).toEqual({ version: 1, first: { text: 'retained' }, second: { text: 'retained' },
+    sparse: [null, null, null], count: null, toJSON: 'data' });
+  const clone = cloneJsonSource(source); shared.text = 'changed';
+  expect(clone.first).toEqual({ text: 'retained' }); expect(clone.first).not.toBe(clone.second);
+});
+
+it('checks exact encoded clone bytes and still admits untrusted external JSON structure', () => {
+  const exact = { text: '' }; exact.text = 'x'.repeat(4 * 1024 * 1024 - Buffer.byteLength(JSON.stringify(exact)));
+  expect(cloneJsonSource(exact)).toEqual(exact);
+  exact.text += 'x'; expect(() => cloneJsonSource(exact)).toThrow('4 MiB limit');
+  expect(() => cloneJsonSource({ text: '\x00'.repeat(1024 * 1024) })).toThrow('4 MiB limit');
+  let external: unknown = null; for (let index = 0; index < 25; index++) external = [external];
+  expect(() => boundedJson(JSON.stringify({ external }))).toThrow('structural limits');
+  expect(() => cloneJsonSource({ constructor: 'unsupported' })).toThrow('unsupported field');
 });

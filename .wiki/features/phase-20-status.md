@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；cleanse已补来源准入、选择生命周期、序列化前准入和未变化轮询零正文读取；仍缺完整重复交互的heap/时延、变化轮询与导航/query累计physical I/O及平台证据 | 本地继续完整交互资源测量；stat修订是乐观新鲜度，source cap及固定十轮零正文读取不等于总资源保证 |
+| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；cleanse已补来源准入、选择生命周期、序列化前准入、未变化轮询零正文读取及五档重复交互测量/一次准入克隆；仍缺整体heap/延迟上界、其他导航/query累计physical I/O及平台证据 | 本地继续history/tree真实来源与完整资源合同；cleanse的81k节点重复打开仍有约164ms样本p95，固定样本不代表硬上界 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,7 +21,18 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-24 PAN-06 原security inspector未变化轮询（本地及独立审查通过；提交待取证）
+## 2026-10-24 PAN-06 原security一次准入克隆与资源测量（本地与独立审查通过；交付另取证）
+
+- 原JSON owner新增cloneJsonSource，将raw source准入、原JSON.stringify及encoded4MiB/parse/object检查放在同一操作，只省略本地inert clone的重复结构遍历。外部boundedJson仍完整准入且原错误顺序保持；完整inspection独立8MiB准入、decode schema/freeze/hash、unknown receipts和writer不变，无validation bypass参数/cache或限制下调。
+- 同准确脚本`5b5db59b055ddcd2774bcca4b5f74c0bed370743644c165263dc972c521301d3`各150process比较，五档每档30个导入后first-open、其中一个进程30次key/search/轮询/close/reopen；64KiB/1MiB/8MiB小security、8MiB大string、8MiB含40k小对象（81,254nodes）。corrected baseline已保存raw aggregate/script/build，clone样本及comparison见`.omx/artifacts/phase20-cleanse-resources/`。
+- 样本p95（ms）：81k节点first-open278.3→258.8、reopen217.4→164.3、changed-poll121.9→98.1；8MiB小security reopen100.2→80.7、大string114.7→107.1。其他档位和key有双向波动，不能称全部性能改善；所有档位原source calls/bytes完全相同，idle轮询0body。一次打开仍read两次，8MiB约16MiB正文；一次变化轮询约8MiB，没有消除原fullsource成本。
+- 初始Ctrl+U夹具未清Overlay filter，相关key/search样本作废保留；改为真实backspace、96项恢复及match/no-match断言后重跑。baseline原cell文件名后来被candidate覆盖，冻结baseline.json仍保留每操作raw样本，不能声称旧cell文件逐项仍匹配。CPU profile使用旧夹具、whole cell含setup/fixture写/GC，只用于定位，不绑定最终时间。heap端点/GC后process delta含measurement数组与夹具，maxRSS新样本最高457,936KiB含导入/build/setup；不证明picker峰值或无泄漏。
+- 本地55项host及准确Node20.3.0通过，四有效AssertionError反转（preadmission/encoded/external/detached）exit1三hash保持；静态门/build/exe/CLI入口19/NormProof0partial通过。原脚本门157在同日轮询批通过且本批未改scripts/gates。totalheap/physicaldisk I/O/冷OScache/真实terminal paint/硬延迟与其他平台不据此闭合，35complete/12partial保持。
+- 独立code APPROVE（54host+54floor探针、55focused/typecheck），architecture源码无findings、资源WATCH（两runtime各19checks+300generated shapes，原admission AST不变/7functions/private parse；独立96reachable/exactdraft/cancel queued0bytes/零gates）；三源码hash与两报告绑定。资源code另核实300reports/2700actions/45comparisons、分位数/bootstrap/memory/body计量及双immutable builds。综合COMMENT无BLOCK；上述测量是author执行，两lane分别审计，未冒称独立重跑150process。完整绑定见`.omx/artifacts/phase20-cleanse-clone/author-binding.json`；commit/push/newSHA CI分别取证。
+- finalbuild`628b5bbb1f4298976de68641d3a39f3da8a93d3295b2d941f75b2b13724f1ce2`，inputs`a52f6bcbadee9a41676bd7e65aa31bf0f7971885913f6bf98449a4d3cf41133f`，artifact`495148e1cfc90922c7575f6049e9f2c5cb52fcb9aa9a1e100925b09c6d6987c9`，exeSHA`2858b4f8db6f57902fa9eb4d833a2033528876d905bc50fc4212be1e0954a1d2`；同build四格PTY pass/exit0且before/after一致，96retained/search/exactdraft/cancel无写、live失效恢复/外改与actualsession8MiB+1/metadata256KiB+1拒绝及重开；metadata/state/transcript/workspace原只读字节保持。
+- 前批`5893dc4974ff7b58729fa04612086db10056d007`已commit/push/远端main读回；精确CI`39989467674`/job`120537159420`success至17:13:27Z，Watch`39989467406`/job`120537158458`success至16:46:11Z。仅绑定轮询批，不扩展到本批源码。
+
+## 2026-10-24 PAN-06 原security inspector未变化轮询（`5893dc49`已推送；CI/Watch success）
 
 - 原session owner提供可选修订接口，复用metadata/state/transcript文件版本、原路径祖先身份、canonical目录、session标量及workspace身份；原security publication维护通知修订，service组合来源与live owner，CLI只在成功实际读取且前后修订一致后跳过下一次未变化轮询。无snapshot cache/新watcher/reader/schema/writer；custom store缺失或失败修订时保持每轮读取。
 - 直接read始终fresh，原生notify立即强制检查；失败、前后修订不一致及直接read失败都使跳过权限失效。独立复现并修复直接read失败留下订阅旧标记、修订回调同步close后仍读正文；代次/关闭检查防止重入与queued回调发布旧画面，release清timer/listener/token。原unknown证据和实际writer/审批合同保持。
