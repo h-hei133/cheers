@@ -8632,3 +8632,11 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 原源码六项真实断言失败；最终9文件246项、11有效AssertionError反转/11hash保持、scripts157/静态门/build/exe通过。独立codeAPPROVE/architectureWATCH，综合COMMENT无BLOCK；最终七owner哈希与两报告已绑定。准确buildacd77c67f3c9、exe37dbc0851968同build四格85receipt hostilePTY pass/exit0；完整三页、最旧ID、取消、外改stale与oversized拒绝、保存字节保持。首次PTY四格业务pass后的test-input freshness拒绝留存，重建重跑前后身份相等，详情status/artifacts。
 - source bytes与file admission不代表preview/blob累计heap/I/O/响应保证；mixed-epoch读取/同步取消与原恢复生命周期边界保持明确。下一批继续undo preview/snapshot和restore/cleanse资源，本批不关闭PAN-06/47项，35complete/12partial。本批commit/push/newSHA CI待取证。
 - back持久批cdce79a2精确CI39951053368/job120405317114已读回completed/success，12:08:09Z–12:25:47Z；back来源批4dccf94a精确CI39949109526/job120398929588success，11:52:04Z–12:19:19Z，两Watchsuccess。旧管理4942064c CI39931286844仍in_progress，不借年龄推定。
+
+## [2026-10-23] fix | PAN-06 undo preview 准备资源与读取控制
+
+- 原recovery读取/准备链按已验证descriptor size预分配前计量；每preview JSON/blob/current累计128MiB，JSON128KiB、blob/current64MiB保持。失败不退款，累计拒绝释放之前body、完整files明确blocked且不能恢复；text reader exact-size/64KiB分块、path/inode/final-stat检查及finally关闭。增量revision保留原全current FileState字节绑定；原审批/refresh/locks/writer/逐文件结果保持。
+- 独立lane实际发现并修复current growth未计量读取、readAccess-only取消映射错误、单次metadata/workspace admission被catch吞掉。最终codeAPPROVE/architectureWATCH，综合COMMENT无BLOCK；七production hashes两报告绑定，九source/test反转hash保持。原源码七真实AssertionError，最终16文件227项、恢复16项、12有效反转、scripts157/静态门及build/exe通过；早期green/syntax-error反转留存不计通过。
+- build25029c0492be、exef1443622f813，同准确build四格PTY pass/exit0且前后身份相等：初始85receipt完整三页、取消/stale/oversized拒绝；新建第86条operation，preview取消保持after/none，fresh明确确认恢复CRLF+emoji与durable restored-verified，最终command三页40/40/6。首次preview同步/index夹具失败留存后重跑，result85与command86区别写入final-binding，精确SHA见status。
+- 仍缺后续锁内重复target/commit I/O、legacy restore/cleanse累计资源、同步query/inspection/hash瞬态heap/响应与平台证据；来源byte cap不证明端到端资源或崩溃原子性。35complete/12partial保持，本批commit/push/newSHA CI待取证。
+- 上批eca77e90a2bc8c0f25605709ebb9c43a831f8538已推送读回；CI39953749814/job120414346135最后in_progress，12:29:56Z开始、tests运行中；Watch39953749731/job120414346195success，12:29:56Z–12:30:16Z。

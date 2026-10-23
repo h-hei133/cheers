@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy/back已修；undo receipts扫描现有单文件/累计byte与条目准入及一次页面生命周期；undo preview/snapshot、restore/cleanse累计资源及导航/query瞬态heap/时延仍缺 | 本地继续其余原owner资源/身份边界；来源byte cap不等于总heap/响应保证 |
+| PAN-06 | history/copy/back已修；undo receipts扫描及preview准备已有单文件/累计source byte准入、分块取消和一次页面生命周期；锁内恢复重复读取、restore/cleanse累计资源及导航/query瞬态heap/时延仍缺 | 本地继续原writer与其余consumer资源/身份边界；来源byte cap不等于总heap/响应保证 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,7 +21,16 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-06 undo receipt 扫描与一次页面（本地与独立审查通过；提交待取证）
+## 2026-10-23 PAN-06 undo preview 准备读取（本地与独立审查通过；提交待取证）
+
+- 原recovery record/prepare/blob链承载read access，每次preview累计128MiB来源bytes，包含snapshot JSON、blob和current file；JSON仍128KiB、blob/current各64MiB。按已验证opened descriptor size在分配/读取前扣量，失败不退款；累计拒绝清除此前prepared/current bodies，完整receipt文件均显示`preview-source-limit`且不能恢复，不回退older receipt。原workspace inspector只加可选admitBytes，启用时读取恰好已准入的原size，后续growth由原final stat拒绝；其他调用保持原读取路径。
+- 原text reader改为exact validated size分配、64KiB异步分块，在metadata/blob操作及块之间检查signal/admission，前后验证path/inode/final stats并finally关闭。显式read-control错误穿过原metadata/blob catch，readAccess-only signal使用同一effective signal；原OperationAccess两次file assertion均经过同一typed admission，单次拒绝也不能被后续允许吞掉。preview revision按原`{receipt,files}`完整JSON字节增量hash，full current FileState身份/hash/mode/content绑定保持；原审批、refresh、target/store locks、receipt compensation与逐文件结果保持，无新writer/schema/executor。
+- 原`eca77e90`源码七项实际AssertionError；最终16文件227项、恢复后2文件16项通过。12有效AssertionError反转均exit1且九份source/test hash前后相等；初次green/syntax-error反转尝试留存，不计有效证据。scripts157、cycles/config/declarations/Node floor/docs strict/diff通过；NormProof packaged judge exit0/partial，0open/1failed advisory/10proof gaps，裸CLI不可用不假报通过。证据`.omx/artifacts/phase20-undo-preview/`及final-binding。
+- build`25029c0492bebb678a5f9739498c8f3cdaec392215b299f85e4a83120c1aa268`，inputs`1fbbd653b89546dc9b587ac7f5a0f18c71e8b798e0cd99955c987f33f5f9999e`，artifact`4ae99ec1e06034e036bd9e418026df97f501c4d6324251a303d01ecad6989749`，exe SHA-256`f1443622f813122620586905b88b70f672a56d25457d6763f0a5d3dfa752cab0`。同准确build Node/exe regular/fullscreen四格PTY pass/exit0，build-before/after相等；初始85receipt三页/最旧ID、cancel、stale/oversized拒绝，随后原compiled owner实际创建第86条committed operation，preview取消保留after内容/undo none，fresh明确确认后恢复exact CRLF+emoji并持久`restored-verified`。最终direct command完整86条三页40/40/6；original workspace file及85份original receipt bytes保持，新增target和receipt的显式恢复分别断言。result旧字段receipts85仅指初始浏览，final-binding另记commandReceipts86。最初preview/confirmation同步和index85→86夹具失败原日志保留，修正后四格重跑。
+- 独立code APPROVE/architecture WATCH，综合COMMENT，无BLOCK；最终七production owner hash均匹配两报告，九source/test hash匹配反转与final-binding。code独跑十个exact limit/growth/approval/cancel/单次准入探针及3文件32项；architecture独跑growth实际回归、7文件49项、最终2文件16项及cycle/AST检查，全部owner不超过20声明。两lane实际发现并修复未计量growth、alternate signal吞取消、单次metadata及workspace admission吞拒绝；supplied与独跑证据分开记录。
+- WATCH/剩余：128MiB只是该call已准入source bytes，decode/reencode/per-file JSON仍有临时内存，approved和refreshed preview可共存；current inspection/hash同步，块间取消不保证OS I/O deadline。后续锁内target/commit inspection未有maxBytes，legacy explicit restore/cleanse未加入累计policy，不能宣称完整writer I/O、heap/latency或跨文件崩溃原子性。目标catalog reader已采用stat-size/64KiB/final-version机制，本批在recovery owner适配；参考checkpoint/Git restore未发现同类exact receipt累计政策。继续这些本地缺口，35complete/12partial保持。
+
+## 2026-10-23 PAN-06 undo receipt 扫描与一次页面（`eca77e90`已推送；CI进行中/Watch success）
 
 - 原operation store复用descriptor-bound `inspectWorkspaceFile`，index/receipt的8MiB限制移到读取前；每次完整scoped scan最多32MiB已准入UTF-8 JSON（含index）、50,000 receipt file entries和20,000目录项（含无关名称，opendir buffer32）。超限整份拒绝，不截断、不空成功；file数在单份最多256条的receipt解析后计入，允许检查一份超出累计条目预算的receipt才拒绝。目录cap只用于readOperations，allocateOperation沿原目录接受规则；直接readOperation仍可读合法单项。保留索引全receipt核对、顺序、profile/session/workspace及unknown/partial barrier和原写入器。
 - 完整receipt值增量JSON hash与原`JSON.stringify({scope,receipts})`字节相同，游标兼容；每次page/action仍 fresh full read/hash，避免额外整份序列化字符串，未增加失效不完整的cache。root/history/confirmation关闭、选中和handoff一次消费并释放引用，迟到preview不能复活；registry接原surface准入，原scope/config/surface检查跟随既有OperationAccess进入恢复owner。same-owner拒绝可显示，换owner迟到结果不回填；取消后Restore必须重开确认。
@@ -29,6 +38,8 @@
 - build`acd77c67f3c9c064d94c79af92f8849cabd19d64a2e34939560311ebe0048405`，inputs`8866c32bb5f1ab6917748146cf1dc341cb5ee609299ffd4fac706b806bb0ad47`，artifact`07df074af53bd20469b617d2b4df8474ee63c47d000a2241ba1c2ad9624a0995`，exe SHA-256`37dbc0851968a2d208bfb379fc9d6e8b3dd89ae4cf0ca1eddf45ea2ebbce1e03`。同准确build Node/exe regular/fullscreen四格PTY pass/exit0，85条三页及最旧ID、cancel、外改receipt stale拒绝、8MiB+1 receipt拒绝，workspace及receipt字节保持；直接print三页有序完整。首次四格业务通过后因新增test输入freshness拒绝整份证据，日志保留；重建后build-before/after相等。证据`.omx/artifacts/phase20-undo-boundary/`与final-binding。
 - 独立code APPROVE/architecture WATCH，综合COMMENT，无BLOCK；两报告绑定最终七owner hash。code独跑18个精确边界/身份/取消race探针、最终6文件124项；architecture独跑50 owner项、最终146 UI项、四probe组（100 cursor等价、reader-only cap与allocation分离、mixed epoch、生命周期）。归属清晰，不以supplied命令代替独立验证。实际owner最多15函数；registry既有37 property callbacks未新增，本批只改原薄delegate参数。
 - WATCH/剩余：32MiB是已准入source JSON bytes，不是decoded/临时heap、总物理I/O/最长响应；同步full read/hash不能在事件循环中途响应Esc。现undo preview还保留snapshot/body及current content并序列化revision，单blob64MiB/最多256文件未建立累计预算；恢复accept后的取消沿原owner。跨receipt可mixed-epoch，fresh hash是乐观重验，原restore locks/approval/逐文件验证继续保证写入准入，非原子账本/跨文件崩溃快照。继续preview/restore/cleanse/平台与完整资源验证，35complete/12partial保持。
+
+- 代码批`eca77e90a2bc8c0f25605709ebb9c43a831f8538`已commit/push并读回远端main；精确CI`39953749814`/job`120414346135`于12:29:56Z开始，最后读回in_progress（前13步success，tests运行中）；Watch`39953749731`/job`120414346195`completed/success，12:29:56Z–12:30:16Z。不升级CI状态；上段preview累计准备缺口由后续本地批处理，仍不等于PAN-06完成。
 
 ## 2026-10-23 PAN-06 back 持久来源与版本（`cdce79a2`已推送；CI/Watch success）
 

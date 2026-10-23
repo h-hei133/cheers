@@ -7,6 +7,7 @@ import { commitWorkspaceFile } from '../authority/commit.js';
 import { inspectWorkspaceFile } from '../authority/state.js';
 import { prepareLedgerDirectory, readLedgerText, safeRecoveryId, validRecoveryRecord } from './record.js';
 import { assertProfileStorage, currentProfile } from '../../core/paths/profile/context.js';
+import { RecoveryReadControlError, RecoveryReadLimitError, type RecoveryReadAccess } from './read.js';
 export { hashContent } from '../authority/content.js';
 import type {
   OriginalContentAuthorityRecord,
@@ -289,6 +290,7 @@ export async function readRecoveryAuthorityRecord(input: {
   readonly ledgerRoot: string;
   readonly authorityId: string;
   readonly recordId: string;
+  readonly readAccess?: RecoveryReadAccess;
 }): Promise<RecoveryAuthorityStoredRecord | undefined> {
   const config = validateNonDefaultConfig({
     mode: "non-default",
@@ -300,14 +302,16 @@ export async function readRecoveryAuthorityRecord(input: {
     return undefined;
   }
   try {
-    const raw = await readLedgerText(config.ledgerRoot, `${config.authorityId}/records/${input.recordId}.json`);
+    const raw = await readLedgerText(config.ledgerRoot, `${config.authorityId}/records/${input.recordId}.json`, 128 * 1024, input.readAccess);
     const parsed: unknown = JSON.parse(raw);
     if (!validRecoveryRecord(parsed, config.authorityId, input.recordId)
       || normalizeWorkspaceRelativePath(parsed.workspaceRelativePath) !== parsed.workspaceRelativePath) {
       return undefined;
     }
     return parsed;
-  } catch {
+  } catch (error) {
+    input.readAccess?.signal?.throwIfAborted();
+    if (error instanceof RecoveryReadLimitError || error instanceof RecoveryReadControlError) throw error;
     return undefined;
   }
 }

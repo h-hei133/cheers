@@ -5,6 +5,7 @@ import { inspectWorkspaceFile, matchesFileState, type FileExpectation } from '..
 import { withFileLock } from '../../runtime/execution/fileLock.js';
 import { normalizeWorkspaceRelativePath, readRecoveryAuthorityRecord, type RecoveryAuthorityStoredRecord } from './recoveryAuthorityStore.js';
 import { readRecoveryBlob } from './record.js';
+import { assertRecoveryReadAccess, RecoveryReadControlError, RecoveryReadLimitError, type RecoveryReadAccess } from './read.js';
 
 export type RestorePrimitiveBlockedReason =
   | 'invalid-workspace-relative-path' | 'record-not-found' | 'record-path-mismatch'
@@ -23,6 +24,7 @@ export interface RestorePrimitiveInput {
   readonly expectedCurrentContentHash?: string;
   readonly assertFileAccess?: (absolutePath: string) => void;
   readonly abortSignal?: AbortSignal;
+  readonly readAccess?: RecoveryReadAccess;
 }
 
 interface RestorePrimitiveFacts {
@@ -46,10 +48,12 @@ export interface PreparedRestore {
 
 /** Blob preparation completes before taking the same lock as ordinary file edits. */
 export async function prepareRecoveryRestore(input: RestorePrimitiveInput): Promise<PreparedRestore> {
-  input.abortSignal?.throwIfAborted();
+  const readAccess = { ...input.readAccess, signal: input.abortSignal ?? input.readAccess?.signal };
+  assertRecoveryReadAccess(readAccess);
   const relativePath = normalizeWorkspaceRelativePath(input.workspaceRelativePath);
   if (!relativePath) throw new RestoreBlocked('invalid-workspace-relative-path');
-  const record = await readRecoveryAuthorityRecord(input);
+  const record = await readRecoveryAuthorityRecord({ ...input, readAccess });
+  assertRecoveryReadAccess(readAccess);
   if (!record) throw new RestoreBlocked('record-not-found');
   if (record.workspaceRelativePath !== relativePath) throw new RestoreBlocked('record-path-mismatch');
   if (record.operation) {
@@ -61,9 +65,13 @@ export async function prepareRecoveryRestore(input: RestorePrimitiveInput): Prom
   if (state !== record.expectedCurrentState || hash !== record.expectedCurrentContentHash) throw new RestoreBlocked('record-path-mismatch');
   if (state === 'unknown' || (state === 'exists' && !hash)) throw new RestoreBlocked('current-version-unknown');
   let content: string | undefined;
-  try { content = await readRecoveryBlob(input.ledgerRoot, record); }
-  catch { throw new RestoreBlocked('original-content-invalid'); }
-  input.abortSignal?.throwIfAborted();
+  try { content = await readRecoveryBlob(input.ledgerRoot, record, readAccess); }
+  catch (error) {
+    readAccess.signal?.throwIfAborted();
+    if (error instanceof RecoveryReadLimitError || error instanceof RecoveryReadControlError) throw error;
+    throw new RestoreBlocked('original-content-invalid');
+  }
+  assertRecoveryReadAccess(readAccess);
   return { record, relativePath, expected: state === 'absent' ? { state } : { state, hash, mode: record.expectedCurrentMode }, content, mode: record.beforeMode };
 }
 
