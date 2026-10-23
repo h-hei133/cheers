@@ -1,6 +1,14 @@
 import { defaultTheme } from "../../theme/theme.js";
 import { truncateToWidth } from "../text/layout.js";
 import { graphemeBoundaries, visibleWidth } from "../text/measure.js";
+import { boundDiffLines, DIFF_PREVIEW_BYTES, DIFF_PREVIEW_ROWS } from "./diffPage.js";
+import {
+  displayLine,
+  endsWithLineBreak,
+  isFileHeaderLine,
+  lineByteLength,
+  lineEndingKind,
+} from "./diffLines.js";
 
 /**
  * Unified diff rendering with intra-line emphasis.
@@ -24,6 +32,12 @@ export interface DiffRenderOptions {
   /** Rows and input bytes are bounded independently; zero-width bytes still count. */
   readonly maxRows?: number;
   readonly maxBytes?: number;
+  /** Carry line counters when a pager renders the middle of a hunk. */
+  readonly initialLineNumbers?: {
+    readonly oldLine: number;
+    readonly newLine: number;
+    readonly inHunk: boolean;
+  };
 }
 
 export interface DiffFacts {
@@ -34,8 +48,6 @@ export interface DiffFacts {
 }
 
 const SIDE_BY_SIDE_MIN_WIDTH = 100;
-const DEFAULT_MAX_ROWS = 400;
-const DEFAULT_MAX_BYTES = 64 * 1024;
 
 export interface DiffLayoutSource {
   readonly text: string;
@@ -65,14 +77,15 @@ export function layoutDiff(diff: string, width: number, options: DiffRenderOptio
 
 function layoutUnifiedDiff(diff: string, width: number, options: DiffRenderOptions):
 { readonly rows: readonly string[]; readonly sources: readonly (DiffLayoutSource | undefined)[] } {
-  const maxRows = Math.max(1, options.maxRows ?? DEFAULT_MAX_ROWS);
-  const maxBytes = Math.max(1, options.maxBytes ?? DEFAULT_MAX_BYTES);
-  const lines = diff.split("\n");
-  const lineCount = diff.endsWith("\n") ? lines.length - 1 : lines.length;
+  const maxRows = Math.max(1, options.maxRows ?? DIFF_PREVIEW_ROWS);
+  const maxBytes = Math.max(1, options.maxBytes ?? DIFF_PREVIEW_BYTES);
+  const bounded = boundDiffLines(diff, maxBytes, maxRows);
+  const lines = bounded.lines;
+  const lineCount = bounded.truncated || !diff.endsWith("\n") ? lines.length : lines.length - 1;
   const rows: string[] = [];
   const sources: (DiffLayoutSource | undefined)[] = [];
   let consumed = 0;
-  let truncated = false;
+  let truncated = bounded.truncated;
   let inHunk = false;
   const push = (row: string, text?: string): boolean => {
     if (rows.length >= maxRows) { truncated = true; return false; }
@@ -247,34 +260,6 @@ export function createUnifiedDiff(
   return [...header, ...body].join("\n");
 }
 
-function lineEndingKind(text: string): "LF" | "CRLF" | "CR" | "mixed" | "none" {
-  let lf = 0;
-  let crlf = 0;
-  let cr = 0;
-  for (let index = 0; index < text.length; index++) {
-    if (text[index] === "\r") {
-      if (text[index + 1] === "\n") {
-        crlf++;
-        index++;
-      } else {
-        cr++;
-      }
-    } else if (text[index] === "\n") {
-      lf++;
-    }
-  }
-  const kinds = [lf, crlf, cr].filter(count => count > 0).length;
-  if (kinds > 1) return "mixed";
-  if (crlf > 0) return "CRLF";
-  if (cr > 0) return "CR";
-  return lf > 0 ? "LF" : "none";
-}
-
-function endsWithLineBreak(text: string): boolean {
-  return /(?:\r\n|\r|\n)$/.test(text);
-}
-
-
 /**
  * Two-column projection of a unified diff.
  *
@@ -300,11 +285,11 @@ export function renderSideBySide(diff: string, width: number, options: DiffRende
 /** Rows plus the source text behind each row, for selection copy. */
 export function layoutSideBySide(diff: string, width: number, options: DiffRenderOptions = {}):
 { readonly rows: readonly string[]; readonly sources: readonly (DiffRowSource | undefined)[] } {
-  const maxRows = Math.max(1, options.maxRows ?? DEFAULT_MAX_ROWS);
-  const maxBytes = Math.max(1, options.maxBytes ?? DEFAULT_MAX_BYTES);
-  const bytes = Buffer.byteLength(diff, 'utf8');
-  const lines = diff.split('\n');
-  const lineCount = diff.endsWith('\n') ? lines.length - 1 : lines.length;
+  const maxRows = Math.max(1, options.maxRows ?? DIFF_PREVIEW_ROWS);
+  const maxBytes = Math.max(1, options.maxBytes ?? DIFF_PREVIEW_BYTES);
+  const bounded = boundDiffLines(diff, maxBytes, maxRows);
+  const lines = bounded.lines;
+  const lineCount = bounded.truncated || !diff.endsWith('\n') ? lines.length : lines.length - 1;
   const rows: string[] = [];
   const sources: (DiffRowSource | undefined)[] = [];
   let truncatedShown = false;
@@ -324,18 +309,20 @@ export function layoutSideBySide(diff: string, width: number, options: DiffRende
   const cell = Math.max(8, Math.floor((width - numberWidth * 2 - 5) / 2));
   const gutter = (left: string, right: string): string =>
     defaultTheme.dim(`${left.padStart(numberWidth)} ${right.padStart(numberWidth)} │ `);
-  let oldLine = 0;
-  let newLine = 0;
+  let oldLine = options.initialLineNumbers?.oldLine ?? 0;
+  let newLine = options.initialLineNumbers?.newLine ?? 0;
   let index = 0;
   let consumed = 0;
-  let inHunk = false;
+  let inHunk = options.initialLineNumbers?.inHunk ?? false;
   const push = (row: string, source?: DiffRowSource): boolean => {
     if (rows.length >= maxRows) return false;
     rows.push(row);
     sources.push(source);
     return true;
   };
-  const split = numberWidth * 2 + 2;
+  // The first divider separates the paired line numbers from the left cell;
+  // source selection must split at the divider between the two content cells.
+  const split = numberWidth * 2 + 5 + cell;
   while (index < lineCount) {
     const line = displayLine(lines, index);
     const hunk = HUNK_PREFIXES.some(prefix => line.startsWith(prefix)) || isFileHeaderLine(lines, index, inHunk);
@@ -387,56 +374,11 @@ export function layoutSideBySide(diff: string, width: number, options: DiffRende
     if (!push(defaultTheme.dim(truncateToWidth(line, width)))) { truncated(); break; }
     index += 1;
   }
-  if (bytes > maxBytes) truncated();
+  if (bounded.truncated) truncated();
   return { rows, sources };
-}
-
-function isFileHeaderLine(lines: readonly string[], index: number, inHunk = false): boolean {
-  const line = lines[index] ?? "";
-  if (line.startsWith("--- ")) return isHeaderPair(line, lines[index + 1], inHunk);
-  if (line.startsWith("+++ ")) return isHeaderPair(lines[index - 1], line, inHunk);
-  return false;
-}
-
-function isHeaderPair(oldLine: string | undefined, newLine: string | undefined, inHunk: boolean): boolean {
-  if (!oldLine?.startsWith("--- ") || !newLine?.startsWith("+++ ")) return false;
-  if (inHunk) return false;
-  const oldPath = oldLine.slice(4);
-  const newPath = newLine.slice(4);
-  return (oldPath.startsWith("a/") && newPath.startsWith("b/"))
-    || oldPath === "/dev/null" || newPath === "/dev/null"
-    || (!inHunk && isUnprefixedHeaderPath(oldPath) && isUnprefixedHeaderPath(newPath));
-}
-
-function isUnprefixedHeaderPath(value: string): boolean {
-  const path = value.trimEnd();
-  if (!path || path.startsWith("-") || path.startsWith("+")) return false;
-  if (/^".+"$/.test(path)) return true;
-  const timestamp = path.indexOf("\t");
-  if (timestamp >= 0) return timestamp > 0;
-  return !/\s/.test(path);
 }
 
 /** Pad to the cell width without counting escape sequences as cells. */
 function pad(text: string, width: number): string {
   return text + ' '.repeat(Math.max(0, width - visibleWidth(text)));
-}
-
-function lineByteLength(lines: readonly string[], index: number): number {
-  return Buffer.byteLength(lines[index]!, "utf8") + (index + 1 < lines.length ? 1 : 0);
-}
-
-function displayLine(lines: readonly string[], index: number): string {
-  const raw = lines[index] ?? "";
-  const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
-  let output = "";
-  for (const character of line) {
-    const code = character.codePointAt(0) ?? 0;
-    const control = code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f)
-      || code === 0x2028 || code === 0x2029;
-    output += control
-      ? `\\x${code.toString(16).padStart(2, "0")}`
-      : character;
-  }
-  return output;
 }

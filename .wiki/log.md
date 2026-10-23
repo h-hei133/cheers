@@ -8547,3 +8547,13 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - `test:scripts` 157、cycles 2,768 文件/0/0、config consumers 53/53、declarations 18/18 + 11/11、Node floor、strict docs/rules、`git diff --check` 与仓库 tgz NormProof exit 0/partial（0 blocking、11 项既有 ceiling advisory）通过。
 - TypeScript build `bebadefb62b754b0f8d3aed2ada99271c2de536c615bfb519e0178d816050cfb`，exe SHA-256 `a260a038354d02c91df0d15afec50f6ef9af664707550bdbc7f8a683cfd80722`。Node/exe × regular/fullscreen 4/4 PTY pass/exit 0；每份 output 都有 OSC8，`/copy` OSC52 payload 解码为同一 49-byte Markdown source。证据目录 `.omx/artifacts/phase20-render-link-pty-bebadefb62b7/`。
 - 当前只完成 RENDER-02 本地、完整测试、构建与打包证据；代码尚未提交，矩阵仍为 32 `complete`/15 `partial`/0 `open`，待新 SHA CI 后再更新为 complete。
+
+## [2026-10-23] fix | Phase 20 RENDER-03 大 diff 完整查看与 RENDER-02 CI 稳定化
+
+- `transcript/diffPage.ts` 新增 400 行/64 KiB 双预算、UTF-8 精确边界和跨页 old/new 行号状态；`diff.ts` 先有界扫描源再布局，左右源分界改到内容 cell divider，并把行级分类/EOL/byte/终端安全显示辅助拆到 `diffLines.ts`。
+- `chrome/pager.ts` 对大 diff 打开有界完整阅读器，支持 PgUp/PgDn、滚轮、Home/End 与跨页续行；`surface/pane.ts` 将 pointer 的 content 坐标映射回 screen 行，修复 filler/滚动窗口下的源复制。相关 source/selection 测试只通过 `screenToContent()` 传入坐标。
+- `markdown.test.ts` 的超链接断言固定无颜色 theme snapshot。RENDER-02 的 CI `39894148326`/job `120220534823` 实际 completed/failure，929 文件通过/1 失败/1 跳过、9,889 项通过/1 失败/3 跳过；失败项已用 `FORCE_COLOR=3` 在本地复现，根因是测试要求 OSC8 open/label/close 连续，而 label 内含 SGR。修复后强制颜色模式 markdown 55/55 通过，失败 run 保留不记为成功。
+- 聚焦 9 文件/199 项通过。三组隔离反转均实际失败并恢复：去掉有界源扫描使零宽超预算 diff 缺少截断标记；恢复旧内容分界使左右源复制返回 `new line`；去掉 content-to-screen 映射使源复制返回 `undefined`。三个产品文件 SHA-256 已读回恢复值。
+- 完整 `test:ts` 为 931 文件通过/1 跳过、9,893 项通过/10 跳过。`test:scripts` 157/157、cycles 2,771 文件/0 runtime/0 type、config consumers 53/53、declarations 18/18 + 11/11、Node floor、strict docs/rules（118 项既有 docs-source advisory）与 `git diff --check` 通过；仓库 tgz NormProof exit 0/partial，0 open obligations、1 failed advisory obligation、10 proof gaps。
+- TypeScript build `69952ded38bf2b30096cb18b8d3470972aea0d7f8e6682ea1ac3865b92d7c6f2`，inputs digest `9b6eda85ae6ac1eb9dd03669a69e3cbf2dea369d03767df454a10893fb74b0ae`，executable SHA-256 `09e49dd189a22a2b1e2bd263c3f0339df54747122962a99a11be572a8e518c54`。
+- Node/exe × regular/fullscreen 四格打包 PTY 全部 pass/exit 0，绑定同一 build；fullscreen 两份 raw output 的 OSC52 解码均精确得到 `qa-old-side-source` 与 `qa-new-side-source`。证据目录 `.omx/artifacts/phase20-render-diff-pty-69952ded38bf/`。当前矩阵仍为 32 `complete`/15 `partial`/0 `open`，RENDER-02/03 待新 SHA CI 后再更新为 complete。

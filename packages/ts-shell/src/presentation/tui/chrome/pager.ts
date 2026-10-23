@@ -6,6 +6,13 @@ import { stripAnsi } from '../text/ansi.js';
 import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth, truncateToWidth } from "../text/layout.js";
 import { renderMarkdown } from "../transcript/markdown.js";
+import { layoutDiff } from "../transcript/diff.js";
+import {
+  countDiffLines,
+  diffNeedsFullView,
+  nextDiffPage,
+  type DiffPage,
+} from "../transcript/diffPage.js";
 
 /**
  * A read-only report host and full-screen reader for long legacy output.
@@ -29,6 +36,11 @@ export const PAGER_THRESHOLD_ROWS = 18;
  */
 export function pageLongOutput(pager: Pager, title: string, block: PageableBlock, transcript?: { clearDiff(block: PageableBlock): void; setText(block: PageableBlock, text: string): void; setCollapsed?(block: PageableBlock, collapsed: boolean): void }): boolean {
   const lines = block.text.split("\n").length;
+  if (!block.report && block.diff && diffNeedsFullView(block.diff)) {
+    pager.openDiff(title, block.diff);
+    summarisePagedBlock(block, lines, countDiffLines(block.diff), transcript);
+    return true;
+  }
   if (!block.report && lines < PAGER_THRESHOLD_ROWS) return false;
   pager.open(title, block.text, block.report);
   if (block.report) {
@@ -40,13 +52,31 @@ export function pageLongOutput(pager: Pager, title: string, block: PageableBlock
   // block's cached rows are keyed by width and theme and do not know that its
   // text changed underneath them.
   if (transcript) {
-    transcript.clearDiff(block);
     transcript.setText(block, `${lines} lines — shown in a full-screen view; esc closes it.`);
   } else {
     block.text = `${lines} lines — shown in a full-screen view; esc closes it.`;
-    block.diff = undefined;
   }
   return true;
+}
+
+function summarisePagedBlock(
+  block: PageableBlock,
+  lines: number,
+  diffLines: number,
+  transcript?: { clearDiff(block: PageableBlock): void; setText(block: PageableBlock, text: string): void },
+): void {
+  const summary = [
+    lines > 0 ? `${lines} ${lines === 1 ? "line" : "lines"}` : "",
+    diffLines > 0 ? `${diffLines} diff ${diffLines === 1 ? "line" : "lines"}` : "",
+  ].filter(Boolean).join(" and ");
+  const text = `${summary} - shown in a full-screen view; esc closes it.`;
+  if (transcript) {
+    transcript.clearDiff(block);
+    transcript.setText(block, text);
+  } else {
+    block.text = text;
+    block.diff = undefined;
+  }
 }
 
 export interface PageableBlock {
@@ -67,6 +97,9 @@ export class Pager {
   private filter = "";
   private pageRows = 1;
   private wholeScreen = true;
+  private diff: string | undefined;
+  private diffPageIndex = 0;
+  private diffPages: DiffPage[] = [];
 
   get active(): boolean {
     return this.rows.length > 0;
@@ -80,6 +113,9 @@ export class Pager {
   }
 
   open(title: string, markdown: string, report?: CommandReport): void {
+    this.diff = undefined;
+    this.diffPageIndex = 0;
+    this.diffPages = [];
     this.report = report;
     this.title = title;
     this.source = markdown;
@@ -90,11 +126,20 @@ export class Pager {
     this.rows = [{ text: "", source: -1 }];
   }
 
+  /** Open a bounded full reader for a diff preview that exceeded its inline budget. */
+  openDiff(title: string, diff: string): void {
+    this.open(title, diff);
+    this.diff = diff;
+  }
+
   close(): void {
     this.report = undefined;
     this.rows = [];
     this.source = "";
     this.filter = "";
+    this.diff = undefined;
+    this.diffPageIndex = 0;
+    this.diffPages = [];
   }
 
   /** Route one key. Returns false when the pager is closed and did not claim it. */
@@ -124,16 +169,16 @@ export class Pager {
         return true;
       case "pagedown":
       case "space":
-        this.scroll(page, page);
+        this.page(1, page);
         return true;
       case "pageup":
-        this.scroll(-page, page);
+        this.page(-1, page);
         return true;
       case "home":
-        this.top = 0;
+        this.home();
         return true;
       case "end":
-        this.top = Math.max(0, this.visible().length - page);
+        this.end(page);
         return true;
       case "backspace":
         this.filter = Array.from(this.filter).slice(0, -1).join("");
@@ -172,7 +217,9 @@ export class Pager {
     const reflow = this.width !== inner;
     if (reflow || this.revision !== defaultTheme.colorRevision) {
       const anchor = this.visible()[this.top]?.source;
-      if (this.report) {
+      if (this.diff) {
+        this.rows = this.diffRows(inner);
+      } else if (this.report) {
         const layout = layoutReport(this.report, inner);
         this.rows = layout.rows.map((text, index) => ({ text, source: layout.sources[index]! }));
       } else this.rows = renderMarkdown(this.source, inner).map((text, index) => ({ text, source: index }));
@@ -188,9 +235,13 @@ export class Pager {
     this.pageRows = Math.max(1, capacity - 3);
     this.top = Math.max(0, Math.min(this.top, Math.max(0, body.length - this.pageRows)));
     const shown = body.slice(this.top, this.top + this.pageRows);
-    const position = body.length > this.pageRows ? `${this.top + 1}–${this.top + shown.length} of ${body.length}` : '';
+    const position = [
+      body.length > this.pageRows ? `${this.top + 1}–${this.top + shown.length} of ${body.length}` : '',
+      this.diff ? `diff part ${this.diffPageIndex + 1}${this.currentDiffPage()?.next !== undefined ? '; more follows' : ''}` : '',
+    ].filter(Boolean).join(' · ');
     const head = `${inset}${defaultTheme.bold(this.title)}${this.filter ? ` ${defaultTheme.fg('accent', this.filter)}` : ''}`;
-    const navigation = body.length > this.pageRows ? ' · ↑↓ / PgUp PgDn / wheel scroll' : '';
+    const navigation = body.length > this.pageRows || this.currentDiffPage()?.next !== undefined
+      ? ' · ↑↓ / PgUp PgDn / wheel scroll' : '';
     const foot = defaultTheme.dim(`${inset}esc close${navigation} · type to filter`);
     const rows = [truncateToWidth(`${head}${gap(head, position, width)}${defaultTheme.dim(position)}`, width), '',
       ...shown.map(row => `${inset}${row.text}`)];
@@ -214,6 +265,77 @@ export class Pager {
   private scroll(by: number, page: number): void {
     const body = this.visible();
     this.top = Math.max(0, Math.min(this.top + by, Math.max(0, body.length - page)));
+  }
+
+  private page(direction: -1 | 1, page: number): void {
+    if (!this.diff) {
+      this.scroll(direction * page, page);
+      return;
+    }
+    const body = this.visible();
+    if (direction > 0 && this.top + page >= body.length && this.currentDiffPage()?.next !== undefined) {
+      this.diffPageIndex += 1;
+      this.rows = this.diffRows(this.width);
+      this.top = 0;
+      return;
+    }
+    if (direction < 0 && this.top === 0 && this.diffPageIndex > 0) {
+      this.diffPageIndex -= 1;
+      this.rows = this.diffRows(this.width);
+      this.top = Math.max(0, this.rows.length - page);
+      return;
+    }
+    this.scroll(direction * page, page);
+  }
+
+  private home(): void {
+    if (this.diff) {
+      this.diffPageIndex = 0;
+      this.rows = this.diffRows(this.width);
+    }
+    this.top = 0;
+  }
+
+  private end(page: number): void {
+    if (this.diff) {
+      while (this.currentDiffPage()?.next !== undefined) this.diffPageIndex += 1;
+      this.rows = this.diffRows(this.width);
+    }
+    this.top = Math.max(0, this.visible().length - page);
+  }
+
+  private currentDiffPage(): DiffPage | undefined {
+    if (!this.diff) return undefined;
+    const existing = this.diffPages[this.diffPageIndex];
+    if (existing) return existing;
+    const previous = this.diffPages[this.diffPageIndex - 1];
+    const page = nextDiffPage(
+      this.diff,
+      previous?.next ?? 0,
+      previous?.oldLine ?? 0,
+      previous?.newLine ?? 0,
+      previous?.inHunk ?? false,
+    );
+    this.diffPages[this.diffPageIndex] = page;
+    return page;
+  }
+
+  private diffRows(width: number): readonly { readonly text: string; readonly source: number }[] {
+    const page = this.currentDiffPage();
+    if (!page) return [];
+    const previous = this.diffPages[this.diffPageIndex - 1];
+    const safeWidth = Math.max(1, width);
+    const layout = layoutDiff(page.text, safeWidth, {
+      sideBySide: safeWidth >= 100,
+      maxRows: 400,
+      maxBytes: Math.max(1, Buffer.byteLength(page.text, "utf8")),
+      initialLineNumbers: {
+        oldLine: previous?.oldLine ?? 0,
+        newLine: previous?.newLine ?? 0,
+        inHunk: previous?.inHunk ?? false,
+      },
+    });
+    return layout.rows.map((text, source) => ({ text, source }));
   }
 }
 

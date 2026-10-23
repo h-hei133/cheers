@@ -41,13 +41,19 @@ describe("inline styling", () => {
   });
 
   it("emits a terminal hyperlink for a safe target and keeps unsafe targets inert", () => {
-    expect(renderInline("[docs](https://example.test/path)")).toContain(
-      "\x1b]8;;https://example.test/path\x07docs\x1b]8;;\x07",
-    );
-    expect(renderInline("[docs](javascript:alert(1))")).not.toContain("\x1b]8;;");
-    const sanitized = stripAnsi(renderInline("[docs](https://example.test/\u009dpath)"));
-    expect(sanitized).toBe("docs (https://example.test/path)");
-    expect(sanitized).not.toContain("\u009d");
+    const restore = defaultTheme.snapshot();
+    defaultTheme.apply(getDefaultTheme(), "none");
+    try {
+      expect(renderInline("[docs](https://example.test/path)")).toContain(
+        "\x1b]8;;https://example.test/path\x07docs\x1b]8;;\x07",
+      );
+      expect(renderInline("[docs](javascript:alert(1))")).not.toContain("\x1b]8;;");
+      const sanitized = stripAnsi(renderInline("[docs](https://example.test/\u009dpath)"));
+      expect(sanitized).toBe("docs (https://example.test/path)");
+      expect(sanitized).not.toContain("\u009d");
+    } finally {
+      restore();
+    }
   });
 
   it("renders code spans inside link labels", () => {

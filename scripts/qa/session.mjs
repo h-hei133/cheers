@@ -3,6 +3,20 @@ import path from "node:path";
 import { stripVTControlCharacters } from "node:util";
 
 export const SAVED_LINK_MARKDOWN = "qa-link-label [safe](https://example.com/qa-link)";
+export const SAVED_DIFF_OLD = "qa-old-side-source";
+export const SAVED_DIFF_NEW = "qa-new-side-source";
+
+const SAVED_DIFF_CALL = "qa-diff-call";
+const SAVED_DIFF_OUTPUT = [
+  "artifact: qa-diff.txt",
+  "```diff",
+  "--- a/qa-diff.txt",
+  "+++ b/qa-diff.txt",
+  "@@ -1 +1 @@",
+  `-${SAVED_DIFF_OLD}`,
+  `+${SAVED_DIFF_NEW}`,
+  "```",
+].join("\n");
 
 export function seedRecoverySession(home, project) {
   const sessionId = `sess_recovery_probe_${Date.now()}`;
@@ -64,7 +78,36 @@ export function seedSavedSession(home, project) {
       entries: [
         { id: `${sessionId}:root`, kind: "session-root", order: 0, timestamp },
         { id: "turn_saved_probe", parentId: `${sessionId}:root`, kind: "turn-message", role: "user", order: 1, timestamp },
-        { id: "turn_saved_probe_link", parentId: "turn_saved_probe", kind: "turn-message", role: "assistant", order: 2, timestamp },
+        {
+          id: "turn_saved_probe_diff_call",
+          parentId: "turn_saved_probe",
+          kind: "turn-message",
+          role: "assistant",
+          order: 2,
+          timestamp,
+          toolCalls: [{
+            id: SAVED_DIFF_CALL,
+            type: "function",
+            function: { name: "edit", arguments: JSON.stringify({ path: "qa-diff.txt" }) },
+          }],
+        },
+        {
+          id: "turn_saved_probe_diff_result",
+          parentId: "turn_saved_probe_diff_call",
+          kind: "turn-message",
+          role: "tool",
+          order: 3,
+          timestamp,
+          toolCallId: SAVED_DIFF_CALL,
+        },
+        {
+          id: "turn_saved_probe_link",
+          parentId: "turn_saved_probe_diff_result",
+          kind: "turn-message",
+          role: "assistant",
+          order: 4,
+          timestamp,
+        },
       ],
       activeLeafId: "turn_saved_probe_link",
       branches: [],
@@ -74,6 +117,26 @@ export function seedSavedSession(home, project) {
   fs.writeFileSync(path.join(sessionDir, "transcript.jsonl"), [
     JSON.stringify({ type: "session", version: 1, id: sessionId, timestamp, cwd: project }),
     JSON.stringify({ type: "message", id: "turn_saved_probe", role: "user", content: "Saved probe", timestamp }),
+    JSON.stringify({
+      type: "message",
+      id: "turn_saved_probe_diff_call",
+      role: "assistant",
+      content: "",
+      timestamp,
+      tool_calls: [{
+        id: SAVED_DIFF_CALL,
+        type: "function",
+        function: { name: "edit", arguments: JSON.stringify({ path: "qa-diff.txt" }) },
+      }],
+    }),
+    JSON.stringify({
+      type: "message",
+      id: "turn_saved_probe_diff_result",
+      role: "tool",
+      content: SAVED_DIFF_OUTPUT,
+      timestamp,
+      tool_call_id: SAVED_DIFF_CALL,
+    }),
     JSON.stringify({ type: "message", id: "turn_saved_probe_link", role: "assistant", content: SAVED_LINK_MARKDOWN, timestamp }),
   ].join("\n") + "\n");
   return sessionId;

@@ -205,8 +205,11 @@ export class TranscriptPane {
    * rendered-cell extraction rather than inventing text.
    */
   extractSource(anchor: SelectionPoint, focus: SelectionPoint): string | undefined {
-    const from = anchor.row <= focus.row ? anchor : focus;
-    const to = anchor.row <= focus.row ? focus : anchor;
+    const contentFrom = anchor.row <= focus.row ? anchor : focus;
+    const contentTo = anchor.row <= focus.row ? focus : anchor;
+    const from = this.contentToScreenPoint(contentFrom);
+    const to = this.contentToScreenPoint(contentTo);
+    if (!from || !to) return undefined;
     const first = this.sources[from.row];
     const sideSelectable = first?.split !== undefined;
     const side = sideSelectable && from.column > first!.split! ? "right" : "left";
@@ -241,5 +244,12 @@ export class TranscriptPane {
     if (selected.some((line) => line.block !== block)) return undefined;
     const text = joinSourceLines(selected);
     return text || undefined;
+  }
+
+  /** Source rows are painted in screen space; pointer selections use content space. */
+  private contentToScreenPoint(point: SelectionPoint): SelectionPoint | undefined {
+    const { top, filler, visible } = this.window.layout;
+    if (visible <= 0 || point.row < top || point.row >= top + visible) return undefined;
+    return { row: filler + point.row - top, column: point.column };
   }
 }

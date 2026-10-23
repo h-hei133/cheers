@@ -2,6 +2,16 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
+## 2026-10-23 RENDER-03 大 diff 完整查看与 RENDER-02 CI 稳定化（本地代码批；CI pending）
+
+- `presentation/tui/transcript/diffPage.ts` 现在拥有 400 行/64 KiB 的源页预算、精确 UTF-8 边界和跨页 old/new 行号状态；`diff.ts` 在 `split` 前先按双预算扫描源，左右源选择的分界改为两内容 cell 之间的 divider，`diffLines.ts` 承接 header、EOL、byte 和终端安全显示辅助。
+- `chrome/pager.ts` 对超出 inline 预算的 diff 打开有界完整阅读器，支持 PgUp/PgDn、滚轮、Home/End 和分页续行；`surface/pane.ts` 将 pointer 的 content 坐标映射回 screen 行，修复填充行/滚动窗口下的源复制。`source.test.ts` 与 `paneDiffSource.test.ts` 已改为只通过 `screenToContent()` 传入 selection。
+- `markdown.test.ts` 的超链接断言现在先快照并固定 `defaultTheme` 为无颜色模式。该 CI 失败已用 `FORCE_COLOR=3` 本地复现：颜色 SGR 位于 OSC8 label 内，旧断言错误地要求 open/label/close 连续。
+- 聚焦 9 文件/199 项通过。三组真实反转均取得断言失败并恢复：移除有界源扫描使零宽超预算 diff 不再出现截断标记；恢复旧内容分界使左右源复制返回 `new line`；移除 content-to-screen 映射使两侧源复制返回 `undefined`。产品文件 SHA-256 已逐项读回恢复值。
+- 完整 `test:ts` 为 931 文件通过/1 跳过、9,893 项通过/10 跳过。`test:scripts` 157/157、cycles 2,771 文件/0 runtime/0 type、config consumers 53/53、declarations 18/18 + 11/11、Node floor、strict docs/rules 与 `git diff --check` 通过；NormProof exit 0/partial，0 open obligations、1 failed advisory obligation、10 proof gaps。
+- TypeScript build `69952ded38bf2b30096cb18b8d3470972aea0d7f8e6682ea1ac3865b92d7c6f2`，executable SHA-256 `09e49dd189a22a2b1e2bd263c3f0339df54747122962a99a11be572a8e518c54`。Node/exe × regular/fullscreen 四格打包 PTY 全部 pass/exit 0；两份 fullscreen raw output 的 OSC52 payload 解码后均精确为 `qa-old-side-source` 与 `qa-new-side-source`。证据目录 `.omx/artifacts/phase20-render-diff-pty-69952ded38bf/`。
+- RENDER-02 的精确提交 CI `39894148326`/job `120220534823` 为 completed/failure：929 文件通过/1 失败/1 跳过，9,889 项通过/1 失败/3 跳过；失败项就是上述 hyperlink 断言，并非 viewport 行为。该失败 run 保留。当前批仍是本地代码批，`verify:phase20-requirements` 维持 32 `complete`/15 `partial`/0 `open`；RENDER-02/03 不提前记为 complete。
+
 ## 2026-10-23 RENDER-02 OSC8 与打包源复制（本地代码批；CI pending）
 
 - `presentation/tui/text/link.ts` 现在由单一策略校验 terminal/HTML 共用链接目标：只允许 `http`、`https`、`mailto` 和无 scheme 相对目标，剥离 C0/C1 控制符，拒绝 `javascript:`、`data:`、`file:` 等可执行或本地文件 scheme。可见 URL 与 OSC8 目标都先经过该策略，恶意 BEL/ESC 不能闭合或改写终端超链接。

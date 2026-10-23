@@ -12,10 +12,17 @@ it('copies the old or new side of a side-by-side diff row', () => {
   const rows = pane.render(120, 30, undefined);
   const row = rows.findIndex(line => stripAnsi(line).includes('old line'));
   expect(row).toBeGreaterThan(0);
-  expect(pane.extractSource({ row, column: 0 }, { row, column: 6 })).toBe('old line');
-  const divider = stripAnsi(rows[row]!).indexOf('│');
+  const oldColumn = stripAnsi(rows[row]!).indexOf('old line');
+  expect(pane.extractSource(
+    pane.screenToContent(row, oldColumn + 2),
+    pane.screenToContent(row, oldColumn + 5),
+  )).toBe('old line');
+  const divider = stripAnsi(rows[row]!).lastIndexOf('│');
   expect(divider).toBeGreaterThan(0);
-  expect(pane.extractSource({ row, column: divider + 2 }, { row, column: divider + 8 })).toBe('new line');
+  expect(pane.extractSource(
+    pane.screenToContent(row, divider + 2),
+    pane.screenToContent(row, divider + 8),
+  )).toBe('new line');
 });
 
 it('copies a side from a framed tool-card diff', () => {
@@ -25,8 +32,15 @@ it('copies a side from a framed tool-card diff', () => {
   const rows = pane.render(120, 30, undefined);
   const row = rows.findIndex(line => stripAnsi(line).includes('old line'));
   expect(row).toBeGreaterThan(0);
-  expect(pane.extractSource({ row, column: 0 }, { row, column: 6 })).toBe('old line');
-  const divider = stripAnsi(rows[row]!).indexOf('│', 2);
+  const oldColumn = stripAnsi(rows[row]!).indexOf('old line');
+  expect(pane.extractSource(
+    pane.screenToContent(row, oldColumn + 2),
+    pane.screenToContent(row, oldColumn + 5),
+  )).toBe('old line');
+  const divider = stripAnsi(rows[row]!).lastIndexOf('│');
   expect(divider).toBeGreaterThan(2);
-  expect(pane.extractSource({ row, column: divider + 2 }, { row, column: divider + 8 })).toBe('new line');
+  expect(pane.extractSource(
+    pane.screenToContent(row, divider + 2),
+    pane.screenToContent(row, divider + 8),
+  )).toBe('new line');
 });

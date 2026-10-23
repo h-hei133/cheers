@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createUnifiedDiff, renderDiff, renderSideBySide } from "./diff.js";
+import { nextDiffPage } from "./diffPage.js";
 import { stripAnsi } from "../text/ansi.js";
 import { visibleWidth } from "../text/measure.js";
 import { defaultTheme } from "../../theme/theme.js";
@@ -204,6 +205,17 @@ describe("side-by-side diff", () => {
   it("keeps every row inside the width, including wide glyphs", () => {
     const rows = renderSideBySide("@@ -1 +1 @@\n-中文内容\n+中文更新", 120);
     for (const row of rows) expect(visibleWidth(row)).toBeLessThanOrEqual(120);
+  });
+
+  it("continues old/new line numbers when a pager renders the next chunk", () => {
+    const diff = "@@ -1,2 +1,2 @@\n-old\n+new\n same";
+    const first = nextDiffPage(diff, 0, 0, 0, false, 2, 1024);
+    const second = nextDiffPage(diff, first.next!, first.oldLine, first.newLine, first.inHunk, 2, 1024);
+    const rows = renderSideBySide(second.text, 120, {
+      initialLineNumbers: { oldLine: first.oldLine, newLine: first.newLine, inHunk: first.inHunk },
+    }).map(stripAnsi);
+    expect(rows[0]).toMatch(/1\s+│/);
+    expect(rows[1]).toMatch(/2\s+2\s+│ same/);
   });
 
   it("does not emit carriage returns from CRLF input", () => {

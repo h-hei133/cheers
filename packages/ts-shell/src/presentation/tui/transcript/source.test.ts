@@ -6,6 +6,19 @@ import { joinSourceLines, projectText, sourceLinesFor } from './source.js';
 import { stripAnsi } from '../text/ansi.js';
 import { renderMarkdown } from './markdown.js';
 
+function copyScreenRows(
+  pane: TranscriptPane,
+  fromRow: number,
+  toRow: number,
+  fromColumn = 0,
+  toColumn = Number.MAX_SAFE_INTEGER,
+): string | undefined {
+  return pane.extractSource(
+    pane.screenToContent(fromRow, fromColumn),
+    pane.screenToContent(toRow, toColumn),
+  );
+}
+
 it('marks every wrap point as soft and every source newline as logical', () => {
   const lines = projectText('abcdefgh\nij', 4);
   expect(lines.map(line => line.text)).toEqual(['abcd', 'efgh', 'ij']);
@@ -30,7 +43,7 @@ it.each(['assistant', 'command', 'error', 'notice'] as const)(
     const painted = pane.render(40, 8, undefined);
     const row = painted.findIndex(value => stripAnsi(value).includes('alpha'));
     expect(row).toBeGreaterThanOrEqual(0);
-    expect(pane.extractSource({ row, column: 0 }, { row, column: 39 })).toBe('alpha');
+    expect(copyScreenRows(pane, row, row, 0, 39)).toBe('alpha');
   },
 );
 
@@ -49,7 +62,7 @@ it('copies a full-row selection from source, without padding or soft wraps', () 
   const painted = pane.render(20, 8, undefined);
   const first = painted.findIndex(row => row.includes('hello'));
   const last = painted.findIndex(row => row.includes('second line'));
-  const copy = pane.extractSource({ row: first, column: 0 }, { row: last, column: 19 });
+  const copy = copyScreenRows(pane, first, last, 0, 19);
   expect(copy).toBe('hello world this wraps\nsecond line');
 });
 
@@ -57,10 +70,12 @@ it('does not copy when the selection starts mid-row or crosses a decoration row'
   const transcript = new Transcript();
   transcript.append(textBlock('user', 'alpha'));
   const pane = new TranscriptPane(transcript);
-  pane.render(20, 4, undefined);
-  expect(pane.extractSource({ row: 3, column: 3 }, { row: 3, column: 19 })).toBeUndefined();
+  const painted = pane.render(20, 4, undefined);
+  const row = painted.findIndex(value => value.includes('alpha'));
+  expect(row).toBeGreaterThanOrEqual(0);
+  expect(copyScreenRows(pane, row, row, 3, 19)).toBeUndefined();
   // Row 4 is the block's trailing separator and has no source line.
-  expect(pane.extractSource({ row: 3, column: 0 }, { row: 4, column: 19 })).toBeUndefined();
+  expect(copyScreenRows(pane, row, row + 1, 0, 19)).toBeUndefined();
 });
 
 it('copies a wrapped formatted table from its original Markdown source', () => {
@@ -79,8 +94,8 @@ it('copies a wrapped formatted table from its original Markdown source', () => {
   expect(first).toBeGreaterThanOrEqual(0);
   expect(last).toBeGreaterThan(first);
   expect(continuation).toBeGreaterThan(last);
-  expect(pane.extractSource({ row: first, column: 0 }, { row: continuation, column: 39 })).toBe(source);
-  expect(pane.extractSource({ row: continuation, column: 0 }, { row: continuation, column: 39 })).toBeUndefined();
+  expect(copyScreenRows(pane, first, continuation, 0, 39)).toBe(source);
+  expect(copyScreenRows(pane, continuation, continuation, 0, 39)).toBeUndefined();
 });
 
 it('copies raw Markdown links while table rows render terminal hyperlinks', () => {
@@ -99,7 +114,7 @@ it('copies raw Markdown links while table rows render terminal hyperlinks', () =
 
   expect(first).toBeGreaterThanOrEqual(0);
   expect(painted.slice(first, last + 1).some(row => row.includes('\x1b]8;;https://example.com/path\x07'))).toBe(true);
-  expect(pane.extractSource({ row: first, column: 0 }, { row: last, column: 39 })).toBe(source);
+  expect(copyScreenRows(pane, first, last, 0, 39)).toBe(source);
 });
 
 it('copies a long unified diff line from source instead of its truncated display row', () => {
@@ -113,7 +128,7 @@ it('copies a long unified diff line from source instead of its truncated display
   const removed = painted.findIndex(row => stripAnsi(row).includes('xxxxxxxxxx'));
   expect(removed).toBeGreaterThanOrEqual(0);
   expect(stripAnsi(painted[removed]!)).toContain('…');
-  expect(pane.extractSource({ row: removed, column: 0 }, { row: removed, column: 79 })).toBe(source);
+  expect(copyScreenRows(pane, removed, removed, 0, 79)).toBe(source);
 });
 
 it('copies a complete newline-terminated diff without adding a second final newline', () => {
@@ -128,7 +143,7 @@ it('copies a complete newline-terminated diff without adding a second final newl
   const last = painted.findIndex(row => stripAnsi(row).includes('+new'));
   expect(first).toBeGreaterThanOrEqual(0);
   expect(last).toBeGreaterThan(first);
-  expect(pane.extractSource({ row: first, column: 0 }, { row: last, column: 79 }))
+  expect(copyScreenRows(pane, first, last, 0, 79))
     .toBe('@@ -1 +1 @@\nold\nnew\n');
 });
 
@@ -156,7 +171,7 @@ it('copies a fenced block whose body contains a blank source line without decora
   const last = painted.findIndex(row => stripAnsi(row).includes('└'));
   expect(first).toBeGreaterThanOrEqual(0);
   expect(last).toBeGreaterThan(first);
-  expect(pane.extractSource({ row: first, column: 0 }, { row: last, column: 19 })).toBe(source);
+  expect(copyScreenRows(pane, first, last, 0, 19)).toBe(source);
 });
 
 it('copies an empty fenced block without inventing a body row', () => {
@@ -169,5 +184,5 @@ it('copies an empty fenced block without inventing a body row', () => {
   const last = painted.findIndex(row => stripAnsi(row).includes('└'));
   expect(first).toBeGreaterThanOrEqual(0);
   expect(last).toBe(first + 1);
-  expect(pane.extractSource({ row: first, column: 0 }, { row: last, column: 19 })).toBe(source);
+  expect(copyScreenRows(pane, first, last, 0, 19)).toBe(source);
 });

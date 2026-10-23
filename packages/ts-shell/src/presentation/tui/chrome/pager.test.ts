@@ -18,7 +18,8 @@ describe("paging long output", () => {
     expect(pageLongOutput(pager, "/log", block)).toBe(true);
     expect(pager.active).toBe(true);
     expect(block.text).toContain("40 lines");
-    expect(block.diff).toBeUndefined();
+    expect(block.diff).toBe("some diff");
+    expect(pager.text).toBe(LONG);
   });
 
   it("leaves short output where it is", () => {
@@ -35,6 +36,29 @@ describe("paging long output", () => {
     pageLongOutput(pager, "/log", { text: LONG });
 
     expect(pager.text).toBe(LONG);
+  });
+
+  it("opens a bounded full reader for a diff that exceeds the inline budget", () => {
+    const pager = new Pager();
+    const diff = Array.from({ length: 500 }, (_, index) => `+line ${index}`).join("\n");
+    const block = { text: "short body", diff };
+    expect(pageLongOutput(pager, "/diff", block)).toBe(true);
+    expect(block.diff).toBeUndefined();
+    expect(block.text).toContain("500 diff lines");
+    expect(pager.text).toBe(diff);
+    const first = pager.render(WIDTH, HEIGHT);
+    expect(plain(first).join("\n")).toContain("diff part 1");
+    expect(plain(first).join("\n")).toContain("more follows");
+    pager.handleKey("end", undefined, HEIGHT);
+    expect(plain(pager.render(WIDTH, HEIGHT)).join("\n")).toContain("line 499");
+  });
+
+  it("keeps a small diff in the transcript when the body is also short", () => {
+    const pager = new Pager();
+    const block = { text: "short body", diff: "-old\n+new" };
+    expect(pageLongOutput(pager, "/diff", block)).toBe(false);
+    expect(pager.active).toBe(false);
+    expect(block.diff).toBe("-old\n+new");
   });
 
   it("uses a threshold that a normal answer does not cross", () => {
@@ -114,6 +138,19 @@ describe("reading in the pager", () => {
 
     expect(visibleWidth(narrow[2]!)).toBeLessThanOrEqual(30);
     expect(visibleWidth(wide[2]!)).toBeLessThanOrEqual(90);
+  });
+
+  it("pages a large diff without rendering more than one bounded chunk", () => {
+    const pager = new Pager();
+    const diff = Array.from({ length: 900 }, (_, index) => `+line ${index}`).join("\n");
+    pager.openDiff("/diff", diff);
+    const first = pager.render(WIDTH, HEIGHT);
+    expect(first).toHaveLength(HEIGHT);
+    expect(plain(first).join("\n")).toContain("line 0");
+    pager.handleKey("end", undefined, HEIGHT);
+    expect(plain(pager.render(WIDTH, HEIGHT)).join("\n")).toContain("line 899");
+    pager.handleKey("home", undefined, HEIGHT);
+    expect(plain(pager.render(WIDTH, HEIGHT)).join("\n")).toContain("line 0");
   });
 });
 
