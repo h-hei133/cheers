@@ -3,10 +3,11 @@ import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
 import { sessionSelectionBlock, type SessionSelectionContext } from '../../../session/navigation/selection.js';
 import type { SessionFileSize } from '../../../session/store/files.js';
-import type { SessionSummary } from '../../../session/store/catalog/model.js';
+import { CATALOG_LIMITS, type SessionCatalogContinuation, type SessionSummary } from '../../../session/store/catalog/model.js';
 import { sessionSizeLabel } from '../../../session/presentation/size.js';
 import { SessionListing, sessionListingStatus, type SessionListingPage } from './session/listing.js';
 import { displayText, sessionPreview } from './session/preview.js';
+import { normalizePathIdentity } from '../../../session/continuation/roots.js';
 
 /**
  * Session chooser for resuming.
@@ -29,8 +30,9 @@ export interface SessionPickerOptions {
   readonly rename?: (sessionId: string, title: string, version?: string) => Promise<string | undefined>;
   /** Toggle a session's pinned state. */
   readonly pin?: (sessionId: string, version?: string) => Promise<string | undefined>;
-  /** How many recent sessions the first page holds; the list can ask for more. */
+  /** Page size, bounded by the catalogue's forty-row presentation budget. */
   readonly initialLimit?: number;
+  readonly continuation?: SessionCatalogContinuation;
   /** Search every authorized project; actions still enforce the current scope. */
   readonly allProjects?: boolean;
   /** Resume the picker with a previously entered catalogue query. */
@@ -44,8 +46,10 @@ interface SessionProjection {
   readonly summaries: ReadonlyMap<string, SessionSummary>;
   readonly sizes: ReadonlyMap<string, SessionFileSize>;
   readonly incomplete: boolean;
+  readonly total?: number;
   readonly status?: string;
   readonly currentUnavailable?: string;
+  readonly continuation?: SessionCatalogContinuation;
 }
 
 export function sessionPicker(options: SessionPickerOptions): Picker {
@@ -56,17 +60,23 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
   let searchPending = false;
   let searchComplete = false;
   const listing = new SessionListing(options.sessionManager);
-  let limit = options.initialLimit ?? 40;
+  const limit = Math.min(options.initialLimit ?? CATALOG_LIMITS.pageSize, CATALOG_LIMITS.pageSize);
+  let continuation = options.continuation;
+  let continuedBase = continuation?.needle === '';
+  let loadGeneration = 0;
+  let searchGeneration = 0;
+  let refreshOffered = false;
   let lastQuery = options.initialQuery?.trim() || undefined;
   const accept = (page: SessionListingPage, source: 'base' | 'search'): readonly Option[] => {
+    refreshOffered = false;
     const total = page.total ?? page.snapshot.sessions.length;
     const rows = groupedOptions(page.snapshot.sessions, expected.sessionId, page.sizes);
     const query = source === 'search' ? lastQuery : undefined;
-    const projectedRows = total > limit && limit < 10_000
+    const projectedRows = page.snapshot.continuation
       ? [...rows, {
-        id: 'more',
-        label: 'Load more sessions',
-        detail: query ? `Showing ${page.snapshot.sessions.length} of ${total} matches` : `Showing the newest ${limit}; older sessions are still on disk`,
+        id: 'action:more',
+        label: 'Next session page',
+        detail: query ? `${total} matches checked; browse the next page` : 'Browse older sessions with a new live scan',
         note: 'more',
         ...(query ? { searchText: query } : {}),
       }]
@@ -78,8 +88,10 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
       summaries: new Map(page.snapshot.sessions.map(session => [session.id, session])),
       sizes: page.sizes,
       incomplete: page.stopped === true || page.snapshot.status !== 'complete',
+      total: page.total,
       ...(sessionListingStatus(page) ? { status: sessionListingStatus(page) } : {}),
       ...(page.snapshot.currentUnavailable ? { currentUnavailable: page.snapshot.currentUnavailable } : {}),
+      ...(page.snapshot.continuation ? { continuation: page.snapshot.continuation } : {}),
     };
     if (source === 'search') {
       searchProjection = projection;
@@ -108,34 +120,49 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     chips: {
       items: [{ id: "project", label: "This project" }, { id: "all", label: "All projects" }],
       active: allProjects ? "all" : "project",
-      select: id => sessionPicker({ ...options, allProjects: id === "all" }),
+      select: id => sessionPicker({ ...options, continuation: undefined, allProjects: id === "all" }),
     },
     get empty() {
       const projection = activeProjection();
       if (lastQuery) return searchPending || !searchComplete
         ? 'Search results are incomplete; no match is confirmed absent.'
+        : projection?.total ? 'No more matching sessions after this page boundary. Reopen to refresh earlier results.'
         : allProjects ? 'No sessions in authorized projects match this search.' : 'No sessions in this project match this search.';
+      if (continuation && projection?.incomplete === false) return 'No more sessions after this page boundary. Reopen to refresh earlier results.';
       return projection?.incomplete !== false ? 'No selectable sessions in the loaded results.'
         : allProjects ? 'No recoverable sessions in authorized projects.' : 'No recoverable sessions for this project.';
     },
     loadError: 'Saved sessions could not be loaded.',
     searchError: 'Session search could not be completed. The loaded results are incomplete.',
     footer: [options.action === 'pin' ? 'Enter: toggle pin.' : undefined,
-      'Session files: logical size; excludes attachments.'].filter(Boolean).join(' '),
+      'Session files: logical size; excludes attachments.',
+      'Pages rescan saved sessions; reopen to include changes to earlier pages.'].filter(Boolean).join(' '),
     get initialSelection() { return expected.sessionId; },
     get initialFilter() { return options.initialQuery?.trim() || undefined; },
     onSearchChange(query) {
+      searchGeneration++;
+      if (continuation?.needle !== query.trim().toLowerCase()) continuation = undefined;
       lastQuery = query.trim() || undefined;
       searchProjection = undefined;
       searchPending = true;
       searchComplete = false;
     },
     onSearchClear() {
+      searchGeneration++;
+      continuation = undefined;
       lastQuery = undefined;
       searchProjection = undefined;
       activeSource = 'base';
       searchPending = false;
       searchComplete = false;
+      if (continuedBase) {
+        continuedBase = false;
+        loadGeneration++;
+        listing.close();
+        baseProjection = undefined;
+        refreshOffered = true;
+        return [{ id: 'action:refresh', label: 'Reload newest session page', detail: 'The previous page boundary was cleared.' }];
+      }
       return baseProjection?.rows;
     },
     detail: id => {
@@ -145,7 +172,8 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     },
     status: (visible, query = '') => {
       const projection = activeProjection();
-      const noMatch = query.trim() && searchComplete && !searchPending && projection?.incomplete === false && visible.length === 0
+      const noMatch = query.trim() && searchComplete && !searchPending && projection?.incomplete === false
+        && projection.total === 0 && visible.length === 0
         ? allProjects ? 'No sessions in authorized projects match this search.' : 'No sessions in this project match this search.'
         : undefined;
       return [projection?.currentUnavailable ?? (visible.some(option => option.id === expected.sessionId)
@@ -154,8 +182,10 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     async load(signal): Promise<readonly Option[]> {
       signal?.throwIfAborted();
       const context = { ...options.context(), ...(allProjects ? { allProjects: true } : {}) };
-      const page = await listing.load(context, signal, limit);
+      const generation = ++loadGeneration;
+      const page = await listing.load(context, signal, limit, continuation?.needle === '' ? continuation : undefined);
       signal?.throwIfAborted();
+      if (generation !== loadGeneration || !sameContext(context, options.context())) throw new Error('Session listing expired. Reopen the session picker.');
       expected = context;
       return accept(page, 'base');
     },
@@ -166,43 +196,67 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
       searchPending = true;
       searchComplete = false;
       const context = { ...options.context(), ...(allProjects ? { allProjects: true } : {}) };
+      const generation = ++searchGeneration;
       try {
-        const page = await listing.search(context, query, signal, limit);
+        const page = await listing.search(context, query, signal, limit,
+          continuation?.needle === query.trim().toLowerCase() ? continuation : undefined);
         signal?.throwIfAborted();
+        if (generation !== searchGeneration || !sameContext(context, options.context())) throw new Error('Session search expired. Reopen the session picker.');
         expected = context;
         searchPending = false;
         searchComplete = page.snapshot.status === 'complete';
         return accept(page, 'search');
       } catch (error) {
-        searchPending = false;
-        searchComplete = false;
+        if (generation === searchGeneration) { searchPending = false; searchComplete = false; }
         throw error;
       }
     },
-    subscribe: publish => listing.subscribe(page => {
-      const rows = accept(page, 'base');
-      if (!lastQuery) publish(rows);
-    }),
+    subscribe: publish => {
+      const generation = loadGeneration;
+      return listing.subscribe(page => {
+        if (generation !== loadGeneration || !sameContext(expected, options.context())) return;
+        const rows = accept(page, 'base');
+        if (!lastQuery) publish(rows);
+      });
+    },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       if (ids.length !== 1) return undefined;
       const sessionId = ids[0];
       if (!sessionId) return undefined;
-      if (sessionId === 'more') return {
-        next: sessionPicker({
-          ...options,
-          initialLimit: Math.min(10_000, limit + 40),
-          ...(lastQuery ? { initialQuery: lastQuery } : {}),
-        }),
-      };
+      if (sessionId === 'action:refresh') {
+        if (!refreshOffered) return { note: 'This refresh action was not offered. Reopen the session picker.' };
+        refreshOffered = false;
+        return { next: sessionPicker({ ...options, continuation: undefined, initialQuery: undefined }) };
+      }
+      if (sessionId === 'action:more') {
+        const projection = activeProjection();
+        const next = projection?.continuation;
+        if (!next || searchPending || !projection.rows.some(row => row.id === 'action:more')) return { note: 'This page was not offered. Reopen the session picker.' };
+        const current = options.context();
+        let unavailable = false;
+        try { unavailable = !!options.admission?.(); } catch { unavailable = true; }
+        if (unavailable || current.busy || !sameContext(expected, current)) {
+          return { note: 'Session page expired. Reopen the session picker.' };
+        }
+        listing.close();
+        baseProjection = undefined;
+        searchProjection = undefined;
+        return { next: sessionPicker({ ...options, initialLimit: limit, continuation: next,
+          ...(lastQuery ? { initialQuery: lastQuery } : {}) }) };
+      }
       const action = options.action ?? 'resume';
       const block = blocked(sessionId, action);
       if (block) return { note: block };
+      const version = activeProjection()?.versions.get(sessionId);
+      listing.close();
+      baseProjection = undefined;
+      searchProjection = undefined;
       if (action === 'pin') {
         if (!options.pin) return { note: 'Session pinning is unavailable.' };
-        const note = await options.pin(sessionId, activeProjection()?.versions.get(sessionId));
-        return note ? { note } : { next: sessionPicker({ ...options, initialQuery: lastQuery }) };
+        const note = await options.pin(sessionId, version);
+        return note ? { note } : { next: sessionPicker({ ...options, continuation: undefined, initialQuery: lastQuery }) };
       }
-      const note = await options.resume(sessionId, activeProjection()?.versions.get(sessionId));
+      const note = await options.resume(sessionId, version);
       return note ? { note } : undefined;
     },
     onDelete: options.delete
@@ -212,9 +266,27 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
       ? async (sessionId: string, title: string) => blocked(sessionId, 'rename') ?? options.rename!(sessionId, title, activeProjection()?.versions.get(sessionId))
       : undefined,
     onPin: options.pin
-      ? async (sessionId: string) => blocked(sessionId, 'pin') ?? options.pin!(sessionId, activeProjection()?.versions.get(sessionId))
+      ? async (sessionId: string) => {
+        const note = blocked(sessionId, 'pin') ?? await options.pin!(sessionId, activeProjection()?.versions.get(sessionId));
+        if (!note) { continuation = undefined; continuedBase = false; baseProjection = undefined; searchProjection = undefined; }
+        return note;
+      }
       : undefined,
+    previewEnd() {
+      loadGeneration++;
+      searchGeneration++;
+      continuation = undefined;
+      continuedBase = false;
+      refreshOffered = false;
+      listing.close();
+      baseProjection = undefined;
+      searchProjection = undefined;
+    },
   };
+}
+
+function sameContext(expected: SessionSelectionContext, current: SessionSelectionContext): boolean {
+  return expected.sessionId === current.sessionId && normalizePathIdentity(expected.projectRoot) === normalizePathIdentity(current.projectRoot);
 }
 
 const DAY = 86_400_000;

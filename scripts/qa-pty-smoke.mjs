@@ -18,7 +18,7 @@ import { seedRecoverySession, seedSavedSession, extractSessionId, currentSession
   SAVED_ASSISTANT_MARKDOWN, SAVED_DIFF_OLD, SAVED_DIFF_NEW } from "./qa/session.mjs";
 import { seedRestoreSnapshot, assertRestoreUnchanged, runRestorePreview } from './qa/restore.mjs';
 import { terminalSpawnSpec } from './qa/terminal.mjs';
-import { rejectStaleSelection, browseSavedTree } from './qa/selection.mjs';
+import { rejectStaleSelection, browseSavedTree, browseSessionPages } from './qa/selection.mjs';
 import { checkBuild } from './start-lib.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -158,6 +158,7 @@ function recordResult(target, mode, state, status, exitCode, detail) {
     bytes: Buffer.byteLength(state.output, "utf8"),
     ...(state.selectionChecks ? { selectionChecks: state.selectionChecks } : {}),
     ...(state.treeChecks ? { treeChecks: state.treeChecks } : {}),
+    ...(state.catalogChecks ? { catalogChecks: state.catalogChecks } : {}),
     ...(detail ? { detail } : {}),
   }, null, 2)}\n`, "utf8");
 }
@@ -368,6 +369,8 @@ async function runTerminalSmoke(target, mode) {
       "fork current session");
     const activeSessionId = currentSessionFromStore(home, project);
     if (!activeSessionId) throw new Error("fork output did not expose the new session id");
+
+    await browseSessionPages({ state, child, home, project, normalized, waitForOutput });
 
     await rejectStaleSelection({ state, child, home, sessionId: savedSession,
       command: '/resume', query: savedSession, title: 'Resume session', normalized, waitForOutput });

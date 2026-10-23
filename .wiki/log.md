@@ -8581,4 +8581,9 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 
 - 复用full-screen panel/OptionModel，新增display TreeModel展开态、完整节点搜索与详情；原writer/lock不变，隐藏节点和重复选择拒绝，close/accept释放源。
 - 冻结metadata256KiB/state8MiB/transcript16MiB、20k节点/50k行准入，descriptor二验，catch-up预先计数，context summary不计节点；损坏transcript/重复ID/缺失active leaf拒绝。
-- 聚焦11文件261项、scripts157、静态门通过，七有效反转与Node/exe regular/fullscreen四格PTY通过；独立APPROVE/WATCH。最终完整测试exit0，935文件/9,955项通过、10项跳过，825.94s；17个非文档输入与冻结hash全部相等。提交/新SHA CI待取证，PAN-02及全阶段仍partial；构建与失败分类见状态页。
+- 聚焦11文件261项、scripts157、静态门通过，七有效反转与Node/exe regular/fullscreen四格PTY通过；独立APPROVE/WATCH。最终完整测试exit0，935文件/9,955项通过、10项跳过，825.94s；17个非文档输入与冻结hash全部相等。代码批 `a0a3888697dc669c32807bc9cbe0bd4c05728651` 已推送并精确读回；CI `39919466867`/job `120300924977` completed/success，07:41:36Z–07:58:43Z，935文件/9,962项通过、3项跳过、939.96s；Watch `39919466951`/job `120300925354` completed/success。两项只绑定该SHA；PAN-02及全阶段仍partial，构建与失败分类见状态页。
+
+## [2026-10-23] fix | PAN-02 完整授权目录与固定页
+
+- 修复完整scan后旧匹配仍被newest10k淘汰及More累加至10k停止；原catalogue按授权/query过滤后只保留40+lookahead/current，原reader/cache/discovery复用。续页只有scan结束后才发，绑定scope/query/排序/原source version，前后二验anchor；live页不声称冻结目录。
+- query-clear迟到订阅、pin reset、取消/accepted release与合法saved IDs more/refresh保持；原offered version/writer不变。受影响323项、scripts157、五有效反转、独立APPROVE/WATCH；最终排序兼容3文件80项与同build Node/exe regular/fullscreen四格packaged chooser均pass/exit0，13非文档输入hash相等。build `eec8d50d5356ec02122c00c9a565f620d30cc82131e391bb9315d33d287f388a`、exe SHA-256 `498d4a2caff7dd32b3eaafb25d9e52a67022eeba153a6833403691c4e20f5b5f`。首次end状态替换footer导致旧断言失败log保留。提交与CI待取证，PAN-02/47项仍partial。

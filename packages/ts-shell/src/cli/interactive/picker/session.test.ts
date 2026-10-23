@@ -7,6 +7,8 @@ import { OverlayHost } from '../overlay.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { sessionPicker } from './session.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
+import { SessionCatalogPage } from '../../../session/store/catalog/query.js';
+import type { SessionCatalogQuery } from '../../../session/store/catalog/model.js';
 
 function session(id: string, updatedAt = '2026-10-07T00:00:00.000Z', projectRoot = '/workspace'): Session {
   return { id, projectRoot, title: id, updatedAt, createdAt: updatedAt, status: 'completed', turns: [{ role: 'user', content: 'saved conversation' }] };
@@ -25,7 +27,13 @@ function fixture(
   const records = new Map(sessions.map(item => [item.id, item]));
   const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
   const resume = vi.fn(async () => undefined); const remove = vi.fn(async () => undefined); const rename = vi.fn(async () => undefined);
-  const manager = { catalog: { async *list(listContext: typeof context = context, _signal?: AbortSignal, limit = 40) { yield { ...sessionChoices([...records.values()].map(record => summarizeSession(record, 'version')), listContext, limit),
+  const manager = { catalog: { async *list(listContext: typeof context = context, _signal?: AbortSignal, limit = 40,
+    _source?: unknown, _diagnostic?: unknown, query?: SessionCatalogQuery) {
+    const summaries = [...records.values()].map(record => summarizeSession(record, 'version'));
+    const page = query ? new SessionCatalogPage(listContext, limit, query) : undefined;
+    if (query?.after) page!.assertBoundary(summaries.find(summary => summary.id === query.after!.boundary.id));
+    summaries.forEach(summary => page?.accept(summary));
+    yield { ...(page?.snapshot(true) ?? sessionChoices(summaries, listContext, limit)),
     scanned: records.size, unreadable: 0, limited: 0, status: overrides.listingStatus ?? 'complete' }; } }, getSession: (id: string) => records.get(id),
     files: { sizes: async (ids: readonly string[]) => new Map(ids.map(id => [id, { status: 'complete', bytes: 2048, sampledAt: '2026-10-07T00:00:00Z' }])) } } as unknown as SessionManager;
   return { records, context, resume, remove, rename,
@@ -37,7 +45,7 @@ it('focuses the current identity beyond the recent forty without importing anoth
   entries.push(session('current', '2025-01-01T00:00:00.000Z'), session('foreign', '2027-01-01T00:00:00.000Z', '/elsewhere'));
   const { picker } = fixture(entries);
   const choices = await picker.load();
-  const selectable = choices.filter(item => !item.disabled && item.id !== 'more');
+  const selectable = choices.filter(item => !item.disabled && item.id !== 'action:more');
   expect(selectable).toHaveLength(41);
   expect(selectable[0]?.id).toBe('recent-00'); expect(selectable.at(-1)?.id).toBe('current');
   expect(selectable.filter(item => item.note?.startsWith('current')).map(item => item.id)).toEqual(['current']);
@@ -121,7 +129,7 @@ it('keeps the current marker visible beside a long title at forty columns', asyn
   expect(output).toContain('Preview');
   expect(output).toContain('Prompt:');
   expect(output).toContain('saved conversation');
-  expect(output).toContain('Session files: logical size;'); expect(output).toContain('excludes attachments.');
+  expect(output).toContain('End of this session page range.');
 });
 
 it('keeps a latest-answer excerpt visible in the narrow stacked preview', async () => {
@@ -203,6 +211,7 @@ it('blocks current deletion while permitting explicit rename and normal complete
   expect(setup.remove).not.toHaveBeenCalled();
   await setup.picker.onRename?.('current', 'changed'); expect(setup.rename).toHaveBeenCalledWith('current', 'changed', 'version');
   await setup.picker.apply(['other']); expect(setup.resume).toHaveBeenCalledWith('other', 'version');
+  await setup.picker.load();
   await setup.picker.onDelete?.('other'); expect(setup.remove).toHaveBeenCalledWith('other', 'version');
   expect((await setup.picker.apply(['not-offered']))?.note).toContain('not offered');
   const overlay = new OverlayHost(() => {}); overlay.open(setup.picker); await new Promise(resolve => setTimeout(resolve, 0));
@@ -379,13 +388,14 @@ it('keeps search pagination reachable and carries the query into the next page',
   entries.forEach(entry => { entry.title = `Common result ${entry.id}`; });
   const { picker } = fixture(entries);
   const rows = await picker.search!('Common result');
-  expect(rows.some(row => row.id === 'more')).toBe(true);
-  const next = (await picker.apply(['more']))!.next!;
+  expect(rows.some(row => row.id === 'action:more')).toBe(true);
+  const next = (await picker.apply(['action:more']))!.next!;
   expect(next.initialFilter).toBe('Common result');
   const nextRows = await next.search!('Common result');
-  expect(nextRows.some(row => row.id === 'common-000')).toBe(true);
-  expect(nextRows.filter(row => !row.disabled && row.id !== 'more')).toHaveLength(80);
-  expect(nextRows.some(row => row.id === 'more')).toBe(true);
+  expect(nextRows.some(row => row.id === 'common-000')).toBe(false);
+  expect(nextRows.some(row => row.id === 'common-040')).toBe(true);
+  expect(nextRows.filter(row => !row.disabled && row.id !== 'action:more')).toHaveLength(40);
+  expect(nextRows.some(row => row.id === 'action:more')).toBe(true);
 });
 
 it('restores base pagination copy after clearing a search', async () => {
@@ -393,45 +403,141 @@ it('restores base pagination copy after clearing a search', async () => {
   const { picker } = fixture(entries);
   await picker.load();
   const searched = await picker.search!('session');
-  expect(searched.find(row => row.id === 'more')?.detail).toContain('of 100 matches');
+  expect(searched.find(row => row.id === 'action:more')?.detail).toContain('100 matches checked');
 
   const restored = picker.onSearchClear?.() ?? [];
-  expect(restored.find(row => row.id === 'more')?.detail).toContain('newest 40');
-  expect(restored.find(row => row.id === 'more')?.searchText).toBeUndefined();
+  expect(restored.find(row => row.id === 'action:more')?.detail).toContain('older sessions');
+  expect(restored.find(row => row.id === 'action:more')?.searchText).toBeUndefined();
 });
 
 it('loads older sessions through an explicit page row', async () => {
   const entries = Array.from({ length: 45 }, (_, index) => session(`recent-${index.toString().padStart(2, '0')}`, new Date(Date.now() - index * 1000).toISOString()));
   const { picker } = fixture(entries);
   const first = await picker.load();
-  expect(first.some(row => row.id === 'more')).toBe(true);
-  expect(first.filter(row => !row.disabled && row.id !== 'more')).toHaveLength(40);
-  const next = (await picker.apply(['more']))!.next!;
+  expect(first.some(row => row.id === 'action:more')).toBe(true);
+  expect(first.filter(row => !row.disabled && row.id !== 'action:more')).toHaveLength(40);
+  const next = (await picker.apply(['action:more']))!.next!;
   const second = await next.load();
-  expect(second.some(row => row.id === 'more')).toBe(false);
-  expect(second.filter(row => !row.disabled)).toHaveLength(45);
+  expect(second.some(row => row.id === 'action:more')).toBe(false);
+  expect(second.filter(row => !row.disabled)).toHaveLength(5);
+  expect(second.some(row => row.id === 'recent-00')).toBe(false);
 });
 
 it('does not offer another page when the result count equals the page limit', async () => {
   const entries = Array.from({ length: 40 }, (_, index) => session(`recent-${index.toString().padStart(2, '0')}`));
   const { picker } = fixture(entries);
   const rows = await picker.load();
-  expect(rows.some(row => row.id === 'more')).toBe(false);
+  expect(rows.some(row => row.id === 'action:more')).toBe(false);
   expect(rows.filter(row => !row.disabled)).toHaveLength(40);
 });
 
-it('reaches the final session at the 10000-row page limit', async () => {
-  const entries = Array.from({ length: 10_000 }, (_, index) => session(`recent-${index.toString().padStart(5, '0')}`));
-  const { picker } = fixture(entries, undefined, { initialLimit: 9_960 });
-  const first = await picker.load();
-  expect(first.some(row => row.id === 'more')).toBe(true);
-  expect(first.some(row => row.id === 'recent-09999')).toBe(false);
+it('requires an offered finished page and unchanged runtime before continuing', async () => {
+  const setup = fixture(Array.from({ length: 45 }, (_, index) => session(`recent-${index}`)));
+  expect((await setup.picker.apply(['action:more']))?.note).toContain('not offered');
+  await setup.picker.load();
+  setup.context.projectRoot = '/changed';
+  expect((await setup.picker.apply(['action:more']))?.note).toContain('expired');
+  expect(setup.resume).not.toHaveBeenCalled();
+});
 
-  const final = (await picker.apply(['more']))!.next!;
-  const rows = await final.load();
-  expect(rows.some(row => row.id === 'more')).toBe(false);
-  expect(rows.some(row => row.id === 'recent-09999')).toBe(true);
-  expect(rows.filter(row => !row.disabled)).toHaveLength(10_000);
+it('keeps valid saved IDs distinct from presentation actions', async () => {
+  const setup = fixture([session('current'), session('refresh'), session('more')]);
+  await setup.picker.load();
+  expect((await setup.picker.apply(['action:refresh']))?.note).toContain('not offered');
+  await setup.picker.apply(['refresh']);
+  expect(setup.resume).toHaveBeenCalledWith('refresh', 'version');
+  await setup.picker.load();
+  await setup.picker.apply(['more']);
+  expect(setup.resume).toHaveBeenCalledWith('more', 'version');
+});
+
+it('consumes an accepted page before a repeated apply and resets query-cleared continued base', async () => {
+  const setup = fixture(Array.from({ length: 90 }, (_, index) => session(`recent-${index.toString().padStart(2, '0')}`)));
+  await setup.picker.load();
+  const second = (await setup.picker.apply(['action:more']))!.next!;
+  expect((await setup.picker.apply(['action:more']))?.note).toContain('not offered');
+  const rows = await second.load();
+  expect(rows.some(row => row.id === 'recent-40')).toBe(true);
+  second.onSearchChange?.('recent');
+  await second.search!('recent');
+  const clear = second.onSearchClear!()!;
+  expect(clear.map(row => row.id)).toEqual(['action:refresh']);
+  expect((await second.apply(['action:more']))?.note).toContain('not offered');
+  const fresh = (await second.apply(['action:refresh']))!.next!;
+  expect((await fresh.load()).some(row => row.id === 'recent-00')).toBe(true);
+});
+
+it('clears local pin ordering boundaries before the same picker reloads', async () => {
+  const setup = fixture(Array.from({ length: 90 }, (_, index) => session(`recent-${index.toString().padStart(2, '0')}`)));
+  await setup.picker.load();
+  const second = (await setup.picker.apply(['action:more']))!.next!;
+  await second.load();
+  await second.onPin!('recent-40');
+  expect(setup.pin).toHaveBeenCalledWith('recent-40', 'version');
+  expect((await second.load()).some(row => row.id === 'recent-00')).toBe(true);
+});
+
+it('refuses a changed catalogue anchor and keeps cancellation from retaining action authority', async () => {
+  const setup = fixture(Array.from({ length: 45 }, (_, index) => session(`recent-${index.toString().padStart(2, '0')}`)));
+  await setup.picker.load();
+  const second = (await setup.picker.apply(['action:more']))!.next!;
+  setup.records.get('recent-39')!.pinned = true;
+  await expect(second.load()).rejects.toThrow(/page changed/);
+  const reopened = fixture();
+  await reopened.picker.load();
+  reopened.picker.previewEnd?.();
+  expect((await reopened.picker.apply(['other']))?.note).toContain('not offered');
+  expect(reopened.resume).not.toHaveBeenCalled();
+});
+
+it('does not resurrect a continued base page when its scan settles after query clear', async () => {
+  const summaries = Array.from({ length: 90 }, (_, index) => summarizeSession(session(`recent-${index.toString().padStart(2, '0')}`), 'version'));
+  const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
+  const first = new SessionCatalogPage(context, 40, { needle: '' });
+  summaries.forEach(summary => first.accept(summary));
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const pending = new Promise<void>(resolve => { entered = resolve; });
+  const manager = { catalog: { async *list(_context: typeof context, signal: AbortSignal, limit: number,
+    _source: unknown, _diagnostic: unknown, query: SessionCatalogQuery) {
+    const page = new SessionCatalogPage(context, limit, query);
+    summaries.forEach(summary => page.accept(summary));
+    if (!query.needle) {
+      yield { ...page.snapshot(false), scanned: 90, unreadable: 0, limited: 0, status: 'scanning' };
+      entered(); await gate;
+      signal.throwIfAborted();
+    }
+    yield { ...page.snapshot(true), scanned: 90, unreadable: 0, limited: 0, status: 'complete' };
+  } }, files: { sizes: async () => new Map() } } as unknown as SessionManager;
+  const picker = sessionPicker({ sessionManager: manager, context: () => context, resume: vi.fn(), continuation: first.snapshot(true).continuation });
+  await picker.load();
+  const publish = vi.fn(); const stop = picker.subscribe!(publish);
+  await pending;
+  picker.onSearchChange!('recent'); await picker.search!('recent');
+  expect(picker.onSearchClear!()!.map(row => row.id)).toEqual(['action:refresh']);
+  release();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(publish).not.toHaveBeenCalled();
+  expect((await picker.apply(['action:more']))?.note).toContain('not offered');
+  stop();
+});
+
+it('reaches sessions beyond ten thousand without retaining a growing prefix', async () => {
+  const entries = Array.from({ length: 10_045 }, (_, index) => session(`recent-${index.toString().padStart(5, '0')}`));
+  let picker = fixture(entries).picker;
+  let rows = await picker.load();
+  const seen = new Set<string>();
+  for (;;) {
+    const sessions = rows.filter(row => !row.disabled && row.id !== 'action:more');
+    expect(sessions.length).toBeLessThanOrEqual(40);
+    for (const row of sessions) { expect(seen.has(row.id)).toBe(false); seen.add(row.id); }
+    if (!rows.some(row => row.id === 'action:more')) break;
+    picker = (await picker.apply(['action:more']))!.next!;
+    rows = await picker.load();
+  }
+  expect(seen.size).toBe(10_045);
+  expect(seen.has('recent-10044')).toBe(true);
 });
 
 it('pins the focused session through the existing management path', async () => {

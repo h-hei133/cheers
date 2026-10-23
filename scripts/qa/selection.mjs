@@ -96,3 +96,45 @@ export async function browseSavedTree({ state, child, home, sessionId, normalize
   state.treeChecks = { status: 'pass', currentDetails: true, parentFocus: true, disclosure: true,
     fullSearchUnderCollapse: true, cancelUnchanged: true, files: actual };
 }
+
+/** Fixed catalogue pages search and cancel through the packaged chooser. */
+export async function browseSessionPages({ state, child, home, project, normalized, waitForOutput }) {
+  const created = [];
+  try {
+    for (let index = 0; index < 45; index++) {
+      const suffix = index.toString().padStart(2, '0');
+      const id = `qa_catalog_${suffix}`;
+      const directory = path.join(home, '.cheers', 'sessions', id);
+      const timestamp = new Date(Date.UTC(2020, 0, 2, 0, 0, -index)).toISOString();
+      fs.mkdirSync(directory); created.push(directory);
+      fs.writeFileSync(path.join(directory, 'metadata.json'), JSON.stringify({ id, projectRoot: project,
+        title: `qa-catalog-${suffix}`, createdAt: timestamp, updatedAt: timestamp }));
+      fs.writeFileSync(path.join(directory, 'state.json'), JSON.stringify({ status: 'completed', projectRoot: project,
+        runPhase: 'idle', thread: { schemaVersion: 1, entries: [
+          { id: `${id}:root`, kind: 'session-root', order: 0, timestamp },
+          { id: `${id}:message`, parentId: `${id}:root`, kind: 'turn-message', role: 'user', order: 1, timestamp },
+        ], activeLeafId: `${id}:message`, branches: [], compactions: [] } }));
+      fs.writeFileSync(path.join(directory, 'transcript.jsonl'), [
+        { type: 'session', version: 1, id, timestamp, cwd: project },
+        { type: 'message', id: `${id}:message`, role: 'user', content: `qa-catalog-${suffix}`, timestamp },
+      ].map(event => JSON.stringify(event)).join('\n') + '\n');
+    }
+    const expected = snapshot(home);
+    let start = state.output.length; child.stdin.write('/resume\r');
+    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Resume session'), 'catalogue chooser');
+    start = state.output.length; child.stdin.write('qa-catalog');
+    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('45 matches checked'), 'complete catalogue query');
+    start = state.output.length; child.stdin.write('\x1b[B'.repeat(40));
+    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Next session page'), 'catalogue next-page focus');
+    start = state.output.length; child.stdin.write('\r');
+    await waitForOutput(() => normalized(state.output.slice(start)), value =>
+      value.includes('Selected session') && value.includes('qa-catalog-40'), 'older fixed catalogue page');
+    start = state.output.length; child.stdin.write('\x1b');
+    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Ask anything, or / for commands'), 'catalogue cancellation');
+    const actual = snapshot(home);
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error('Catalogue browsing changed saved session files.');
+    state.catalogChecks = { status: 'pass', queryMatches: 45, fixedPage: 40, olderPage: true, cancelUnchanged: true, files: actual };
+  } finally {
+    for (const directory of created) fs.rmSync(directory, { recursive: true, force: true });
+  }
+}

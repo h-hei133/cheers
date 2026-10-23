@@ -3,11 +3,13 @@ import { sessionChoices, type SessionSelectionContext } from '../../navigation/s
 import type { SessionStoreLayout } from '../sessionFileLayout.js';
 import { discoverSessions } from './discovery.js';
 import { locateCatalogFiles, readCatalogFile } from './files.js';
-import { CATALOG_LIMITS, type SessionCatalogSnapshot, type SessionReferenceQuery, type SessionReferenceResolution, type SessionSummary } from './model.js';
+import { CATALOG_LIMITS, type SessionCatalogQuery, type SessionCatalogSnapshot, type SessionReferenceQuery, type SessionReferenceResolution, type SessionSummary } from './model.js';
 import { decodeSessionSummary } from './projection.js';
+import { SessionCatalogPage } from './query.js';
 import { resolveCatalogReference } from './reference.js';
 
 export interface SessionCatalogDiagnostic {
+  /** Bounded samples; snapshot.unreadable keeps the full source failure count. */
   readonly unreadableSessionIds: readonly string[];
   readonly unreadableDirectories: readonly string[];
 }
@@ -24,9 +26,11 @@ export class SessionCatalog {
 
   async *list(context: SessionSelectionContext, signal?: AbortSignal, limit = 40,
     onSource?: (target: string) => void,
-    onUnreadable?: (diagnostic: SessionCatalogDiagnostic) => void): AsyncGenerator<SessionCatalogSnapshot> {
+    onUnreadable?: (diagnostic: SessionCatalogDiagnostic) => void,
+    query?: SessionCatalogQuery): AsyncGenerator<SessionCatalogSnapshot> {
     signal?.throwIfAborted();
     if (!Number.isInteger(limit) || limit < 1 || limit > 10_000) throw new RangeError('Invalid session listing limit.');
+    const selection = query ? new SessionCatalogPage(context, limit, query) : undefined;
     let scanned = 0;
     let unreadable = 0;
     let limited = 0;
@@ -59,20 +63,22 @@ export class SessionCatalog {
         // post-frame hint scan starts. Its failure is not a historical entry
         // the user needs to repair, and the current projection already reports
         // it separately.
-        if (id !== context.sessionId) unreadableSessionIds.add(id);
+        if (id !== context.sessionId && unreadableSessionIds.size < CATALOG_LIMITS.diagnosticSamples) unreadableSessionIds.add(id);
         return undefined;
       }
     };
     try {
+      if (query?.after) selection!.assertBoundary(await this.read(query.after.boundary.id, signal));
       const current = context.sessionId ? await read(context.sessionId) : undefined;
       if (current) { recent = [current]; this.remember([current]); }
+      if (current) selection?.accept(current);
       const snapshot = (status: SessionCatalogSnapshot['status']): SessionCatalogSnapshot => ({
-        ...sessionChoices(recent, context, limit), scanned, unreadable, limited, status,
+        ...(selection?.snapshot(status !== 'scanning') ?? sessionChoices(recent, context, limit)), scanned, unreadable, limited, status,
       });
       // The runtime identity is available before historical discovery starts.
       yield snapshot('scanning');
       for await (const page of discoverSessions(this.layout, signal, onSource)) {
-        if (page.unreadable > 0) unreadableDirectories.add(page.directory);
+        if (page.unreadable > 0 && unreadableDirectories.size < CATALOG_LIMITS.diagnosticSamples) unreadableDirectories.add(page.directory);
         unreadable += page.unreadable;
         const ids = page.ids.filter(id => id !== context.sessionId);
         const loaded: SessionSummary[] = [];
@@ -88,14 +94,15 @@ export class SessionCatalog {
         signal?.throwIfAborted();
         const failure = settled.find(result => result.status === 'rejected');
         if (failure?.status === 'rejected') throw failure.reason;
-        const choices = sessionChoices([...recent, ...loaded], context, limit);
-        recent = choices.sessions;
+        if (selection) for (const summary of loaded) selection.accept(summary);
+        else recent = sessionChoices([...recent, ...loaded], context, limit).sessions;
         // Retain even an out-of-scope/empty current record solely for its explanation.
         if (current && !recent.some(item => item.id === current.id)) recent = [...recent, current];
         yield snapshot('scanning');
       }
       signal?.throwIfAborted();
-      this.remember(sessionChoices(recent, context, limit).sessions);
+      if (query?.after) selection!.assertBoundary(await this.read(query.after.boundary.id, signal));
+      this.remember(selection?.snapshot(true).sessions ?? sessionChoices(recent, context, limit).sessions);
       yield snapshot(unreadable || limited ? 'partial' : 'complete');
     } finally {
       diagnose();

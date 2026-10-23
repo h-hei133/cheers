@@ -29,6 +29,25 @@ export interface SessionCatalogSnapshot {
   readonly unreadable: number;
   readonly limited: number;
   readonly status: 'scanning' | 'complete' | 'partial';
+  /** Authorized matches checked so far, independently of page retention. */
+  readonly total?: number;
+  readonly continuation?: SessionCatalogContinuation;
+  readonly hasMore?: boolean;
+}
+
+export interface SessionCatalogQuery {
+  readonly needle: string;
+  readonly after?: SessionCatalogContinuation;
+}
+
+/** A live rescan boundary; it does not claim a frozen catalogue snapshot. */
+export interface SessionCatalogContinuation {
+  readonly sessionId: string;
+  readonly projectRoot: string;
+  readonly allProjects: boolean;
+  readonly needle: string;
+  readonly limit: number;
+  readonly boundary: Pick<SessionSummary, 'id' | 'version' | 'pinned' | 'updatedAt'>;
 }
 
 export interface SessionReferenceQuery {
@@ -53,4 +72,6 @@ export const CATALOG_LIMITS = Object.freeze({
   stateBytes: 1024 * 1024,
   transcriptBytes: 2 * 1024 * 1024,
   readChunkBytes: 64 * 1024,
+  pageSize: 40,
+  diagnosticSamples: 32,
 });

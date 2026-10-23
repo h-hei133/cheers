@@ -3,7 +3,17 @@ import type { SessionManager } from '../../../../session/SessionManager.js';
 import type { SessionCatalogSnapshot, SessionSummary } from '../../../../session/store/catalog/model.js';
 import type { SessionFileSize } from '../../../../session/store/files.js';
 import { SESSION_SIZE_BATCH } from '../../../../session/store/files.js';
-import { SessionListing } from './listing.js';
+import { SessionListing, sessionListingStatus } from './listing.js';
+import { SessionCatalogPage } from '../../../../session/store/catalog/query.js';
+import type { SessionCatalogQuery } from '../../../../session/store/catalog/model.js';
+import type { SessionSelectionContext } from '../../../../session/navigation/selection.js';
+
+function project(snapshot: SessionCatalogSnapshot, context: SessionSelectionContext, limit: number, query?: SessionCatalogQuery): SessionCatalogSnapshot {
+  if (!query) return snapshot;
+  const page = new SessionCatalogPage(context, limit, query);
+  snapshot.sessions.forEach(session => page.accept(session));
+  return { ...snapshot, ...page.snapshot(true) };
+}
 
 function summary(index: number): SessionSummary {
   const stamp = new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString();
@@ -20,7 +30,7 @@ function summary(index: number): SessionSummary {
   };
 }
 
-it('samples a 10000-session page in bounded batches', async () => {
+it('samples only the fixed visible page and matching current from ten thousand sessions', async () => {
   const sessions = Array.from({ length: 10_000 }, (_, index) => summary(index));
   const snapshot: SessionCatalogSnapshot = {
     sessions,
@@ -33,8 +43,8 @@ it('samples a 10000-session page in bounded batches', async () => {
   const size = (id: string): SessionFileSize => ({ status: 'complete', bytes: id.length, sampledAt: '2026-01-01T00:00:00.000Z' });
   const manager = {
     catalog: {
-      async *list() {
-        yield snapshot;
+      async *list(context: SessionSelectionContext, _signal: unknown, limit: number, _source: unknown, _diagnostic: unknown, query?: SessionCatalogQuery) {
+        yield project(snapshot, context, limit, query);
       },
     },
     files: {
@@ -48,9 +58,10 @@ it('samples a 10000-session page in bounded batches', async () => {
   const listing = new SessionListing(manager);
   const page = await listing.load({ sessionId: 'session-00000', projectRoot: '/workspace', busy: false }, undefined, 10_000);
 
-  expect(page.snapshot.sessions).toHaveLength(10_000);
-  expect(page.sizes.size).toBe(10_000);
-  expect(calls.length).toBe(Math.ceil(10_000 / SESSION_SIZE_BATCH));
+  expect(page.snapshot.sessions).toHaveLength(41);
+  expect(page.sizes.size).toBe(41);
+  expect(page.total).toBe(10_000);
+  expect(calls.length).toBe(Math.ceil(41 / SESSION_SIZE_BATCH));
   expect(Math.max(...calls)).toBe(SESSION_SIZE_BATCH);
   expect(calls.every(count => count > 0)).toBe(true);
 });
@@ -68,9 +79,9 @@ it('searches beyond the first page across the complete authorized snapshot', asy
   const sampled: string[][] = [];
   const manager = {
     catalog: {
-      async *list(_context: unknown, _signal?: AbortSignal, limit = 40) {
+      async *list(context: SessionSelectionContext, _signal?: AbortSignal, limit = 40, _source?: unknown, _diagnostic?: unknown, query?: SessionCatalogQuery) {
         limits.push(limit);
-        yield snapshot;
+        yield project(snapshot, context, limit, query);
       },
     },
     files: {
@@ -88,7 +99,7 @@ it('searches beyond the first page across the complete authorized snapshot', asy
     40,
   );
 
-  expect(limits).toEqual([10_000]);
+  expect(limits).toEqual([40]);
   expect(page.snapshot.sessions.map(session => session.id)).toEqual(['session-00075']);
   expect(page.total).toBe(1);
   expect(sampled).toEqual([['session-00075']]);
@@ -105,8 +116,8 @@ it('keeps the current match visible beyond the search page', async () => {
   };
   const manager = {
     catalog: {
-      async *list() {
-        yield snapshot;
+      async *list(context: SessionSelectionContext, _signal: unknown, limit: number, _source: unknown, _diagnostic: unknown, query?: SessionCatalogQuery) {
+        yield project(snapshot, context, limit, query);
       },
     },
     files: {
@@ -137,8 +148,8 @@ it('preserves partial search status instead of claiming the catalogue is complet
   };
   const manager = {
     catalog: {
-      async *list() {
-        yield snapshot;
+      async *list(context: SessionSelectionContext, _signal: unknown, limit: number, _source: unknown, _diagnostic: unknown, query?: SessionCatalogQuery) {
+        yield project(snapshot, context, limit, query);
       },
     },
     files: {
@@ -172,8 +183,8 @@ it('stops dispatching size batches after cancellation', async () => {
   });
   const manager = {
     catalog: {
-      async *list() {
-        yield snapshot;
+      async *list(context: SessionSelectionContext, _signal: unknown, limit: number, _source: unknown, _diagnostic: unknown, query?: SessionCatalogQuery) {
+        yield project(snapshot, context, limit, query);
       },
     },
     files: { sizes },
@@ -185,4 +196,13 @@ it('stops dispatching size batches after cancellation', async () => {
     10_000,
   )).rejects.toMatchObject({ name: 'AbortError' });
   expect(sizes).toHaveBeenCalledOnce();
+});
+
+it('shows confirmed page end separately from an exhausted partial scan', () => {
+  const snapshot: SessionCatalogSnapshot = { sessions: [summary(0)], scanned: 1, unreadable: 0, limited: 0,
+    total: 1, hasMore: false, status: 'complete' };
+  expect(sessionListingStatus({ snapshot, sizes: new Map() })).toContain('End of this session page range');
+  const partial = { ...snapshot, status: 'partial' as const, unreadable: 1 };
+  expect(sessionListingStatus({ snapshot: partial, sizes: new Map() })).toContain('end is unconfirmed');
+  expect(sessionListingStatus({ snapshot: partial, sizes: new Map() })).not.toContain('End of this session page range');
 });

@@ -23,10 +23,8 @@ export function sessionChoices<T extends Session | SessionSummary>(sessions: rea
   readonly currentUnavailable?: string;
 } {
   const root = normalizePathIdentity(context.projectRoot);
-  const scoped = sessions.filter(session => (context.allProjects === true || (root !== undefined && normalizePathIdentity(session.projectRoot) === root))
-    && ('reentry' in session ? session.reentry !== 'empty' : sessionHasReentrySurface(session)));
-  scoped.sort((left, right) => Number(right.pinned === true) - Number(left.pinned === true)
-    || (Date.parse(right.updatedAt) - Date.parse(left.updatedAt)) || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+  const scoped = sessions.filter(session => sessionSelectable(session, context));
+  scoped.sort(compareSessionChoices);
   const recent = scoped.slice(0, limit);
   const current = scoped.find(session => session.id === context.sessionId);
   if (current && !recent.includes(current)) recent.push(current);
@@ -36,6 +34,19 @@ export function sessionChoices<T extends Session | SessionSummary>(sessions: rea
     : normalizePathIdentity(stored.projectRoot) !== root ? 'Current session belongs to a different project.'
     : 'Current session has no saved conversation to reopen.';
   return { sessions: recent, currentUnavailable };
+}
+
+export function sessionSelectable(session: Session | SessionSummary, context: SessionSelectionContext): boolean {
+  const root = normalizePathIdentity(context.projectRoot);
+  return (context.allProjects === true || (root !== undefined && normalizePathIdentity(session.projectRoot) === root))
+    && ('reentry' in session ? session.reentry !== 'empty' : sessionHasReentrySurface(session));
+}
+
+export function compareSessionChoices(left: Pick<SessionSummary, 'id' | 'pinned' | 'updatedAt'>,
+  right: Pick<SessionSummary, 'id' | 'pinned' | 'updatedAt'>): number {
+  return Number(right.pinned === true) - Number(left.pinned === true)
+    || (Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+    || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
 }
 
 /** Validate the runtime identity and freshly read target before a selection action. */

@@ -11,7 +11,7 @@
 | PRV-03 | 真实账户登录、刷新、失效、退出及跨连接隔离生命周期证据 | 需明确账户/provider、隔离 opt-in 运行条件；合成 token/audience 校验不替代实测 |
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
-| PAN-02 | tree 展开/详情及源获取上限本地已实现；仍缺整体 heap/时延测量与其余选择动作边界逐项审计 | 本地继续 tree consumer 和有界读取；本批只闭合已保存选择的版本、取消及激活故障边界 |
+| PAN-02 | tree 与完整授权目录固定页本地已实现；仍缺整体 heap/时延测量、累计 I/O 与其余选择动作边界逐项审计 | 本地量化真实 consumer；来源上限和固定候选不等同整体资源性能 |
 | PAN-06 | history/copy/back/undo/restore/cleanse 的累计同步 I/O、内存/时延界及未覆盖的身份边界 | 本地按原 owner 逐项量化/修复；分页行数不等于总资源上界 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
@@ -21,7 +21,15 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-02 tree 表单与有界获取（本地完整验证通过；提交与 CI 待取证）
+## 2026-10-23 PAN-02 完整授权目录与固定页（本地验证；提交/新 SHA CI 待取证）
+
+- 原 search 在 newest 10k 之后过滤，完整 scan 仍可能将旧匹配报告为不存在；More 累加到10k即停止。现在原 catalogue 在scope/reentry/query过滤后保留最多41个排序候选，另保留matching current；输出最多40条普通行加current，cache512、diagnostic samples32、discovery16/64、concurrency4不随目录条数累加。
+- 固定页续接绑定session、normalized project、allProjects、query、page size以及原pinned/time/ID边界与exact source version；仅scan结束且anchor后二验后发布。下一页前后二验原anchor，变化/丢失要求reopen。每页是live rescan，不能证明冻结目录；新增/重排行落在前页范围时需刷新。complete表示扫描结束，partial源不宣称no-match或已到头。
+- query-clear停止continued base并推进generation，迟到订阅不能恢复旧页；scope/query/local pin重新从首批获取；原previewEnd释放，accepted选择先捕获target/version再释放请求/maps。action:more/action:refresh位于合法saved ID字母表之外，实际saved IDs more/refresh仍可恢复。current首帧/原writer/锁/版本准入保持；排序提取后保留原invalid-date回退语义。
+- 受影响8文件128项与原consumer6文件195项通过，scripts157、静态门与build通过；五有效反转均实际AssertionError并恢复hash：过滤前置、final-only cursor、anchor、query-clear subscription、action ID。独立代码APPROVE/架构WATCH，W6整体仍partial。
+- 最终排序兼容集合3文件80项通过；13个非文档输入hash读回相等。build `eec8d50d5356ec02122c00c9a565f620d30cc82131e391bb9315d33d287f388a`，inputs `05b61ddae181911b4c13df3b0a08edf1e233f00b6d81a5ee92a4aac739f7ac4a`，artifact `a8742320eca8be94d329c025078145c92be19c876f38bed61713b518264dcd0e`，exe SHA-256 `498d4a2caff7dd32b3eaafb25d9e52a67022eeba153a6833403691c4e20f5b5f`。Node/exe regular/fullscreen四格在同一build重验pass/exit0：45条真实chooser查询、40条首批、第二页和取消保存hash不变，同时回归四种stale choice、tree与既有业务链；证据`.omx/artifacts/phase20-catalog-order-{node,exe}-{regular,fullscreen}/`。首次旧narrow footer断言失败已分类为explicit end状态覆盖footer的旧预期并保留log，未改renderer。提交/新SHA CI待取证。
+
+## 2026-10-23 PAN-02 tree 表单与有界获取（代码批 `a0a38886` 已推送；CI/Watch success）
 
 - /tree 复用现 full-screen panel 的宽屏详情列与窄屏 Preview；TreeModel 只持有显示展开态和 parent/end 索引，Left 为 collapse/parent、Right 为 expand/child。搜索完整 admitted 节点文本，临时穿透折叠而不清除展开态；稳定 current focus、未展示节点不 apply、取消和已接受选择释放保存投影，重复 pending 选择零动作。fork/history 保留原动作表面。
 - 每次打开上限先冻结再实现：metadata 256 KiB、state 8 MiB、transcript 16 MiB，合计24.25 MiB源文本；20,000个树节点、50,000物理transcript行、1,200字符详情摘录。原 descriptor reader 在 open 后再次校验字节/UTF-8/identity；catch-up 在构建前比较既有与缺失节点总数，context summary 不算新节点。上限不代表已测heap或时延，超限报告 unavailable。
@@ -29,7 +37,7 @@
 - 聚焦11文件261项、脚本157项、cycles2,777文件零runtime/type、config53/53、declarations18/18+11/11、Node floor、strict docs/diff check通过；NormProof exit0/partial，0 open/1 failed advisory/10 proof gaps。独立代码APPROVE/架构WATCH，synthesis COMMENT；source bounds不是性能完成证据，既有overlay callable count23未增加。
 - 七组有效反转均实际assertion failure并恢复字节：collapse、full search、preflight size、descriptor size、damage warning、catch-up cap、accepted-choice cleanup。首次pending cleanup反转只触发timeout，不算有效，追加accepted-choice assertion反转后七项闭合。
 - build `2e2164f27b2d607cd1ebd6ec79e7b3d0820bb7ffcd0bbdd00054b74a69c988b8`，inputs `a93860d273b99e8552874a7d6fff2a214a15386cbd9fecbc52a4560214cd8abf`，artifact `1fa6c1f273594c629992f39d374a958978aa9c6b13a15f2361bc623101ee5521`，exe SHA-256 `cf40e424983d55b82f1629d77a85b2771faf7d0ac877f994a6616e9736591b61`。Node/exe × regular/fullscreen四格pass/exit0，tree details/keys/search/cancel与四种stale selection均取证，保存文件hash相等。证据 `.omx/artifacts/phase20-tree-2e2164-{node,exe}-{regular,fullscreen}/`；node regular成功retry另在后缀`-retry`目录。旧失败保留：两次harness误将collapse/parent和expand/child合一步；一次源码反转中运行导致build freshness拒绝；一次Node启动读取build transaction失败，单格retry通过。
-- 最终完整 `test:ts` exit0，935文件通过/1跳过，9,955项通过/10跳过，825.94s；采用现有Vitest环境变量限制为两worker，测试后17个非文档输入SHA-256全部与冻结快照相等。PAN-02保持partial：上述admission是源/记录上限，累计同步I/O、peak heap、交互响应与全部目录/动作合同未闭合。提交、推送与新SHA CI分别待取证。
+- 最终完整 `test:ts` exit0，935文件通过/1跳过，9,955项通过/10跳过，825.94s；采用现有Vitest环境变量限制为两worker，测试后17个非文档输入SHA-256全部与冻结快照相等。代码批 `a0a3888697dc669c32807bc9cbe0bd4c05728651` 已推送，远端main精确读回；CI `39919466867`/job `120300924977` completed/success，07:41:36Z–07:58:43Z，935文件/9,962项通过、3项跳过、939.96s；全部步骤success。Watch `39919466951`/job `120300925354` completed/success，两项只绑定该SHA。PAN-02保持partial：上述admission是源/记录上限，累计同步I/O、peak heap、交互响应与全部目录/动作合同未闭合。
 
 ## 2026-10-23 PAN-02/PAN-06 保存选择边界（代码批 `2e68fd54` 已推送；CI/Watch success）
 
