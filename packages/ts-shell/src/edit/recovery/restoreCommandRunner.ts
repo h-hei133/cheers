@@ -4,6 +4,7 @@ import {
   validateRestoreCommandRequest,
 } from "./restoreCommandContract.js";
 import { runExplicitRestoreBridge } from "./restoreExecutionBridge.js";
+import { previewReadAccess } from './preview/read.js';
 
 export async function runRestoreCommand(
   request: RestoreCommandRequest,
@@ -14,6 +15,7 @@ export async function runRestoreCommand(
   }
 
   const command = validation.command;
+  const access = previewReadAccess(command.workspaceRoot, request);
   const bridgeResult = await runExplicitRestoreBridge({
     mode: command.dryRun ? 'preview' : command.mode,
     ledgerRoot: command.ledgerRoot,
@@ -21,7 +23,10 @@ export async function runRestoreCommand(
     workspaceRoot: command.workspaceRoot,
     recordSelection: command.recordSelection,
     assertFileAccess: request.assertFileAccess,
+    signal: request.signal,
+    admission: request.admission,
   });
+  if (bridgeResult.mode === 'preview') access.check();
 
   return {
     mode: bridgeResult.mode,

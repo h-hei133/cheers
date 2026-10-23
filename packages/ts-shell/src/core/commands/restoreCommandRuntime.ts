@@ -1,5 +1,6 @@
 import { restoreSyntax } from "./restore/syntax.js";
 import { restoreAccess } from './restore/access.js';
+import { previewReadAccess } from '../../edit/recovery/preview/read.js';
 import { parseSyntax } from "./syntax/parse.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import {
@@ -34,7 +35,9 @@ export async function runRestoreLocalCommand(
     if (!(error instanceof SyntaxError)) throw error;
     return { kind: "local", output: `Invalid /restore arguments: ${error.message} Nothing was written.\n${syntaxHelp(restoreSyntax)}` };
   }
-  const result = await runRestoreCommand({ ...request, assertFileAccess: restoreAccess(context) });
+  const access = previewReadAccess(request.workspaceRoot ?? context.cwd, context);
+  const result = await runRestoreCommand({ ...request, assertFileAccess: restoreAccess(context), signal: context.signal, admission: context.admission });
+  if (result.mode === 'preview') access.check();
   return {
     kind: "local",
     output: formatRestoreCommandResult(result),

@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history/copy/back、undo扫描/preview/locked target、restore catalogue与default index每call准入及picker生命周期/surface已有批次证据；explicit restore内容准备、cleanse来源/目录累计资源及导航/query瞬态heap/时延仍缺 | 本地继续其余原consumer资源/身份边界与重复scan实际响应测量；source cap不等于总heap/physical I/O保证 |
+| PAN-06 | history/copy/back、undo扫描/preview/locked target、restore catalogue/default index/picker及explicit restore准备已有批次证据；仍缺restore执行阶段累计资源、cleanse来源/目录总界及导航/query瞬态heap/时延 | 本地继续原执行/cleanse consumer资源与身份边界、重复scan实际响应测量；source cap不等于总heap/physical I/O保证 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,7 +21,16 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-06 原恢复索引累计准入（本地与独立审查通过；提交待取证）
+## 2026-10-23 PAN-06 explicit restore准备与最终预览准入（本地与独立审查通过；提交待取证）
+
+- 原preview读取链复用recovery descriptor/budget，单call累计128MiB index、重复prepared metadata、before blob及current source，单current file64MiB；opened size在body分配/读取前扣量，失败不退款。selected IDs在await前复制，`--all`首次index和后续准备共用原owner与预算。普通缺失/path/content mismatch继续原逐文件诊断；资源/control拒绝整call，不能在后续execute恢复先前eligible子集。
+- 独立审查实际复现preview返回后准入撤销仍写文件、all首次读取未计量/捕获替换root及最外层command仍发布旧preview，均修复并保留失败探针。bridge在首次读取前捕获workspace/profile/signal/admission，after-await重验并传入原primitive file-access边界；runner/local command提前捕获原身份，只在preview返回前重验，原已执行/unknown结果完整保留。原selected顺序、显式execute、guarded writer及receipt-required语义保持，无新writer/schema/cache。
+- 最终14文件115项在Node24与准确Node20.3.0均通过；原write-access12项、commit consumer24项、result-contract158项、scripts157项通过。11有效AssertionError反转全部exit1、九source/test hashes前后相等；原5c79d6bc源码11项实际AssertionError。独立code APPROVE/architecture WATCH，综合COMMENT无BLOCK，十个最终source/test哈希与两报告绑定；code独跑78项/18production探针、准确Node20.3.0另31项，architecture60项/18production探针及AST/import/cycles，作用域全部低于20函数。Node20目录关闭测试一行修正另经两lane复核，未弱化ERR_DIR_CLOSED断言。
+- 上批index `5c79d6bc29f4533dc0f8fc78307e329fc2920815`已推送；精确CI`39967258892`/job`120460258412`于14:27:20Z failure，948文件/10133项通过、两项关闭目录测试失败，Watch`39967258922`success。本地准确20.3.0回放原断言同样两项ERR_DIR_CLOSED失败，修正Promise内调用以捕获同步throw后31项及完整受影响115项通过；属于测试跨版本捕获错误，不改production cleanup，也不将上批CI升为成功。
+- 最终build`5b0aced4cac9aa1679a8f1af569748a7ed759e8deca6dad95afc40a544301fd2`，inputs`204a56a524dac28f2c80b7bb9ecf4ae567134db33305ca21b28bbc73a61febb5`，artifact`c22c860db4a9370ff8376f8839fcf2abdb18d08fb48c5c37cda98a73c8110234`，exe SHA-256`64a8e183cca473a8d674a9d2d9c23b856eb51b67ca24a9fe3759da65fda388c8`。双构建及同build Node/exe regular/fullscreen四格PTY pass/exit0、before/after身份相等；205snapshot三页/最旧exact preview/search/cancel/stale与index超限拒绝，actual两33MiB before/current pairs导致128MiB准备拒绝、actual64MiB+1 current拒绝且零写，合法显式execute恢复一个selected CRLF+emoji target。全部原record/blob及其余workspace bytes保持。最终结果与author-binding见`.omx/artifacts/phase20-restore-preparation/`。初次旧build四格浏览pass、测试变更后的freshness拒绝及首次增强探针等待未渲染Markdown标记超时分别保留，不算最终证据。
+- WATCH/剩余：128MiB只约束preview准备，原primitive执行时再次metadata/blob、locked current/commit及physical write I/O不计入；JSON/hash/string瞬态heap、同步响应、重复scan、cleanse与跨文件崩溃原子性不据此保证。PAN-06及47项仍35complete/12partial；后续先原restore执行资源，再cleanse和完整测量。本批commit/push/newSHA CI分别取证。
+
+## 2026-10-23 PAN-06 原恢复索引累计准入（`5c79d6bc`已推送；CI测试失败，后续批修复）
 
 - 原namespace/record index退出full readdir数组，owner内复用opendir32缓冲、Dir.read前后准入与finally close；每call32MiB metadata source、20k选中ID/接受names、50k全部实际direntries（含忽略项）。原显式ID先计数再复制，重复ID仍逐项计量，外部数组在异步metadata读取中追加不能扩大本次选集；完整排序、ID/filter/missing与filesystem区别、blob presence-only及原catalogue100页投影保持。
 - Local budget与caller readAccess两signal/check/admit组成原descriptor reader准入；坏JSON/重复失败读取不退款，超限整call拒绝，不返回已保留page或missing-only空成功。namespace新增optional control并在inner返回至public列出前再次检查。首次拒绝在本call保留，directory或metadata close EIO不能盖掉control/limit；public直接重放原limit类别，ordinary cleanup错误仍blocked，不声明拒绝时close成功。

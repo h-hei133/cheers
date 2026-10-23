@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { RestorePreviewAccess } from './preview/read.js';
 import type {
   RestorePreviewBlockedFile,
   RestorePreviewFile,
@@ -10,7 +11,7 @@ export type RestoreCommandRecordSelection =
   | { readonly kind: "all" }
   | { readonly kind: "records"; readonly recordIds: readonly string[] };
 
-export interface RestoreCommandRequest {
+export interface RestoreCommandRequest extends RestorePreviewAccess {
   readonly assertFileAccess?: (absolutePath: string) => void;
   readonly mode: RestoreCommandMode;
   readonly ledgerRoot?: string;

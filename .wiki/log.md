@@ -8672,3 +8672,11 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 独立codeAPPROVE/architectureWATCH，综合COMMENT无BLOCK；code91项/13actual boundary探针/typecheck，architecture58项/16probe/AST/import/cycles，四hash绑定，own fixtures清除。source cap与names cap不冒作content准备/heap/writer/全过程I/O时延保证；publicindex7/base7、read4/limits0。
 - build3a7c0d52d554、exe95664d44000c同准确build四格205snapshot三页PTY pass/exit0身份前后一致；exactpreview/fullsearch/cancel/stale/catalogue与explicitall累计source拒绝，原workspace/metadata/blob字节保持。证据status与phase20-restore-index author-binding。
 - 尚缺explicitrestore内容准备、cleanse及完整重复scan资源/平台证据，35complete/12partial保持。前批7e0b327de11235422c915d1037aff878a2092e2f已push/readback，CI39963636126/job120447709415success（13:43:54Z–13:56:15Z），Watch39963636176/job120447709765success（13:43:54Z–13:44:22Z）；receipt eca77e90CI39953749814最后仍in_progress。本index批commit/push/newSHA CI分别取证。
+
+## [2026-10-23] fix | PAN-06 explicit restore准备与报告边界
+
+- 原recovery reader在opened descriptor分配/读取前累计128MiB metadata/blob/current，current64MiB；失败不退款，`--all`首次index共享预算与opening身份，IDs提前复制，资源拒绝整call零写入。原selected/path/content/显式execute/guarded primitive保持，无新writer/schema/cache。
+- 独立审查实际复现并修复bridge返回后准入撤销仍写、all读取漏计量/绑定替换root及最外层旧preview publication；原身份/control进primitive file-access，runner/local只重验preview，已执行与unknown原结果完整保留。codeAPPROVE/architectureWATCH、综合COMMENT无BLOCK，十个最终hash与两报告绑定。
+- 受影响115项在Node24及准确20.3.0通过，write-access12/原commit consumer24/result158/scripts157通过；11有效AssertionError反转九hash保持，原源码11AssertionError。独立code78项/18production探针及Node20.3另31项，architecture60项/18production探针/AST/import/cycles，模块ceiling保持。预览source cap不证明后续execute I/O/heap/latency或崩溃原子性，restore writer/cleanse仍本地缺口，35complete/12partial保持。
+- 上批index5c79d6bc精确CI39967258892/job120460258412已于14:27:20Zfailure（948文件10133项pass，两项closed Dir.read在Node20同步throw逃出测试捕获），Watch39967258922success；本地准确20.3回放两项失败，改为Promise内调用保留ERR_DIR_CLOSED断言后31项/受影响115项通过，测试修正也经两lane复核。不得借后续本地green覆盖上批远端failure。
+- 最终build5b0aced4cac9、exe64a8e183cca4，同准确build四格PTY pass/exit0且before/after相等：205snapshot三页及旧ID只读preview/cancel/stale/index拒绝，实际128MiB累计准备、64MiB+1 current拒绝零写，合法显式selected restore精确CRLF+emoji。原record/blob及其他workspace bytes保持。测试变更导致旧buildfreshness拒绝后双重建；初次增强PTY实际恢复成功但等待Markdown标记超时，失败留存后修输出断言重跑，完整SHA见status/author-binding。本批commit/push/newSHA CI另取证。

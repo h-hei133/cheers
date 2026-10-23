@@ -9,6 +9,7 @@ import {
   type RestorePreviewFile,
   type RestorePreviewResult,
 } from "./restorePreview.js";
+import { previewReadAccess, type RestorePreviewAccess } from './preview/read.js';
 
 export type RestoreExecutionMode = "preview" | "execute";
 
@@ -34,18 +35,25 @@ export async function runExplicitRestoreBridge(input: {
   readonly workspaceRoot: string;
   readonly recordSelection: readonly string[] | "all";
   readonly assertFileAccess?: (absolutePath: string) => void;
-}): Promise<RestoreExecutionBridgeResult> {
+} & RestorePreviewAccess): Promise<RestoreExecutionBridgeResult> {
+  input = { ...input, recordSelection: input.recordSelection === 'all' ? 'all' : [...input.recordSelection] };
+  const access = previewReadAccess(input.workspaceRoot, input);
+  const assertFileAccess = (absolute: string): void => { access.check(); input.assertFileAccess?.(absolute); access.check(); };
   const selectedRecordIds =
     input.recordSelection === "all"
-      ? await allRecordIds(input)
+      ? await allRecordIds(input, access)
       : [...input.recordSelection];
+  access.check();
   const preview = await previewRecoveryAuthorityRestore({
     ledgerRoot: input.ledgerRoot,
     authorityId: input.authorityId,
     workspaceRoot: input.workspaceRoot,
     recordIds: selectedRecordIds,
-    assertFileAccess: input.assertFileAccess,
-  });
+    assertFileAccess,
+    signal: input.signal,
+    admission: input.admission,
+  }, access);
+  access.check();
 
   if (input.mode === "preview") {
     return fromPreview(input.mode, preview, {
@@ -70,7 +78,8 @@ export async function runExplicitRestoreBridge(input: {
       recordId: file.recordId,
       workspaceRoot: input.workspaceRoot,
       workspaceRelativePath: file.workspaceRelativePath,
-      assertFileAccess: input.assertFileAccess,
+      assertFileAccess,
+      abortSignal: input.signal,
     });
     if (result.restored === true) {
       restoredFiles.push(...result.restoredFiles);
@@ -117,11 +126,13 @@ export async function runExplicitRestoreBridge(input: {
 async function allRecordIds(input: {
   readonly ledgerRoot: string;
   readonly authorityId: string;
-}): Promise<readonly string[]> {
+} & RestorePreviewAccess, access: ReturnType<typeof previewReadAccess>): Promise<readonly string[]> {
   const index = await listRecoveryAuthorityRecords({
     ledgerRoot: input.ledgerRoot,
     authorityId: input.authorityId,
+    readAccess: access,
   });
+  access.check();
   if (index.status === "blocked") {
     return [];
   }

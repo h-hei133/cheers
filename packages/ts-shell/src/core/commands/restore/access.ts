@@ -5,6 +5,7 @@ import type { CommandContext } from '../types.js';
 /** Explicit restore intent grants its selected write; existing workspace and deny rules still apply. */
 export function restoreAccess(context: CommandContext): (absolutePath: string) => void {
   return absolute => {
+    context.signal?.throwIfAborted();
     const blocked = context.admission?.();
     if (blocked) throw new Error(blocked);
     const primary = context.projectRoot ?? context.cwd;

@@ -8,6 +8,8 @@ import {
   listRecoveryAuthorityRecords,
   type RecoveryAuthorityRecordIndexEntry,
 } from "./recoveryAuthorityIndex.js";
+import { previewReadAccess, type RestorePreviewAccess } from './preview/read.js';
+import { RecoveryReadControlError, RecoveryReadLimitError } from './read.js';
 
 export type RestorePreviewBlockedReason = RestorePrimitiveBlockedReason;
 
@@ -42,12 +44,17 @@ export async function previewRecoveryAuthorityRestore(input: {
   readonly workspaceRoot: string;
   readonly recordIds: readonly string[];
   readonly assertFileAccess?: (absolutePath: string) => void;
-}): Promise<RestorePreviewResult> {
+} & RestorePreviewAccess, access = previewReadAccess(input.workspaceRoot, input)): Promise<RestorePreviewResult> {
+  input = { ...input, recordIds: [...input.recordIds] };
+  access.check();
+  const assertFileAccess = (absolute: string): void => { access.check(); input.assertFileAccess?.(absolute); access.check(); };
   const index = await listRecoveryAuthorityRecords({
     ledgerRoot: input.ledgerRoot,
     authorityId: input.authorityId,
     recordIds: input.recordIds,
+    readAccess: access,
   });
+  access.check();
 
   if (index.status === "blocked") {
     return {
@@ -75,6 +82,7 @@ export async function previewRecoveryAuthorityRestore(input: {
   const pathBoundaryFailures: string[] = [];
 
   for (const record of index.records) {
+    access.check();
     const previewFile = toPreviewFile(record);
     const relativePath = normalizeWorkspaceRelativePath(
       record.workspaceRelativePath,
@@ -108,14 +116,18 @@ export async function previewRecoveryAuthorityRestore(input: {
     }
 
     try {
-      const prepared = await prepareRecoveryRestore({ ...input, recordId: record.recordId, workspaceRelativePath: relativePath });
-      const current = inspectWorkspaceFile(input.workspaceRoot, relativePath, input.assertFileAccess);
+      const prepared = await prepareRecoveryRestore({ ...input, recordId: record.recordId, workspaceRelativePath: relativePath, abortSignal: input.signal, readAccess: access });
+      access.check();
+      const current = inspectWorkspaceFile(input.workspaceRoot, relativePath, assertFileAccess, undefined, access.admitCurrent);
+      access.check();
       if (!matchesFileState(current, prepared.expected)) {
         blockedFiles.push({ ...previewFile, blockedReason: current.state !== prepared.expected.state ? 'current-state-mismatch' : 'current-content-hash-mismatch' });
         currentContentMismatches.push(relativePath);
         continue;
       }
     } catch (error) {
+      access.check();
+      if (error instanceof RecoveryReadControlError || error instanceof RecoveryReadLimitError) throw error;
       const reason = error instanceof Error && 'reason' in error ? error.reason as RestorePrimitiveBlockedReason : 'file-system-error';
       blockedFiles.push({ ...previewFile, blockedReason: reason });
       continue;
@@ -130,6 +142,7 @@ export async function previewRecoveryAuthorityRestore(input: {
       ...(index.missingRecords.length > 0 ? ["record-not-found"] : []),
     ]),
   ];
+  access.check();
 
   return {
     canAttemptExplicitRestore: restorableFiles.length > 0,

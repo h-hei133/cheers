@@ -33,7 +33,7 @@ it.each(['namespaces', 'records'] as const)('counts ignored %s directory names a
   const directories: Awaited<ReturnType<typeof fs.opendir>>[] = []; const open = fs.opendir.bind(fs);
   vi.spyOn(fs, 'opendir').mockImplementation(async (...args: Parameters<typeof fs.opendir>) => { const value = await Reflect.apply(open, fs, args); directories.push(value); return value; });
   limits.directoryEntries = 5; await expect(read()).rejects.toThrow('inventory limit');
-  expect(directories).toHaveLength(1); await expect(directories[0]!.read()).rejects.toMatchObject({ code: 'ERR_DIR_CLOSED' });
+  expect(directories).toHaveLength(1); await expect(Promise.resolve().then(() => directories[0]!.read())).rejects.toMatchObject({ code: 'ERR_DIR_CLOSED' });
 });
 
 it('rejects explicit selected record count before metadata I/O and does not silently deduplicate', async () => {
