@@ -111,6 +111,9 @@ export async function runCopyCommand(
     return { kind: "local", output: "Nothing to copy: no recent response and no text given." };
   }
 
+  const initial = copyAdmission(context);
+  if (initial) return stoppedCopy(text, initial, false);
+
   let offered = false;
   if (clipboardSink || process.stdout?.isTTY) {
     try {
@@ -124,6 +127,8 @@ export async function runCopyCommand(
   }
 
   for (const candidate of clipboardCommands()) {
+    const stopped = copyAdmission(context);
+    if (stopped) return stoppedCopy(text, stopped, offered);
     if (await pipeTo(candidate, text)) {
       return {
         kind: "local",
@@ -133,6 +138,8 @@ export async function runCopyCommand(
     }
   }
 
+  const final = copyAdmission(context);
+  if (final) return stoppedCopy(text, final, offered);
   if (offered) {
     return {
       kind: "local",
@@ -143,8 +150,27 @@ export async function runCopyCommand(
   return { kind: "local", output: `Could not reach a clipboard for ${describe(text)}.`, state: { clipboard: 'unavailable' } };
 }
 
+/** A completed dispatch can settle; a new fallback must retain its authority. */
+function copyAdmission(context: CommandContext): 'cancelled' | 'blocked' | undefined {
+  if (context.signal?.aborted) return 'cancelled';
+  try { return context.admission?.() ? 'blocked' : undefined; }
+  catch { return 'blocked'; }
+}
+
+function stoppedCopy(text: string, reason: 'cancelled' | 'blocked', offered: boolean): LocalCommandResult {
+  return offered ? {
+    kind: 'local',
+    output: `Sent ${describe(text)} to the terminal clipboard. Further clipboard attempts were ${reason}.`,
+    state: { clipboard: 'offered', clipboardAttempts: reason },
+  } : {
+    kind: 'local', output: `Copy ${reason}; no further clipboard attempt was started.`,
+    state: { clipboard: 'unavailable', clipboardAttempts: reason },
+  };
+}
+
 /** How much text this is, in the terms a reader checks against what they selected. */
 function describe(text: string): string {
-  const lines = text.split("\n").length;
+  let lines = 1;
+  for (let index = 0; index < text.length; index++) if (text.charCodeAt(index) === 10) lines++;
   return `${text.length} characters${lines > 1 ? ` across ${lines} lines` : ""}`;
 }

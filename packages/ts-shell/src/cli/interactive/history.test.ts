@@ -72,6 +72,7 @@ describe("restoring a conversation", () => {
     appendConversation({ transcript }, { id: 'copy-history', turns } as never);
     expect(transcript.all()).toHaveLength(61);
     const picker = copyPicker(transcript, { cwd: '/workspace' });
+    await picker.load();
     const filtered = picker.filterOptions!('archived question 0', []);
     expect(filtered).toHaveLength(1);
     expect(filtered[0]!.detail).toBe('archived question 0');

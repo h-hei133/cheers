@@ -88,6 +88,12 @@ export class Transcript {
     return [...this.earlier, ...this.blocks];
   }
 
+  /** Visit retained source without allocating a combined history array. */
+  *copySources(): Generator<Block> {
+    yield* this.earlier;
+    yield* this.blocks;
+  }
+
   /** The most recently appended block, for streaming updates. */
   last(): Block | undefined {
     return this.blocks[this.blocks.length - 1];

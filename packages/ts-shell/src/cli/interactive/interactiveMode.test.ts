@@ -22,6 +22,7 @@ import { isThemePreviewActive, selectTheme } from '../../presentation/theme/sele
 import { helpPicker } from './picker/help.js';
 import { registerSlashCommand } from '../../entrypoints/slashCommandRegistry.js';
 import { toolsPicker } from './picker/tools.js';
+import { copyPicker } from './picker/copy.js';
 import { restorePicker } from './picker/restore.js';
 import * as toolCatalog from '../../core/tools/catalog.js';
 import { createReport, span } from '../../core/commands/report/projection.js';
@@ -322,6 +323,20 @@ describe("session wiring", () => {
     expect(host.pager.active).toBe(false);
     expect(save).not.toHaveBeenCalled();
     host.overlay.close();
+  });
+
+  it('shows a copy source revision refusal in its current host instead of closing silently', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { overlay: OverlayHost; applyPicker(picker: Picker, ids: readonly string[]): void;
+      view: InteractiveView };
+    const transcript = host.view.transcript;
+    const block = transcript.append(textBlock('assistant', 'original source'));
+    const picker = copyPicker(transcript, { cwd: '/workspace', admission: () => undefined });
+    await picker.load();
+    transcript.setText(block, 'changed source');
+    host.applyPicker(picker, ['0']);
+    await vi.waitFor(() => expect(transcript.all().at(-1)?.text).toContain('Transcript changed'));
+    expect(transcript.all().at(-1)?.kind).toBe('command');
   });
 
   it.each(['overlay', 'stopped', 'throw'])('suppresses obsolete guarded picker failure after %s without stranding input', async change => {

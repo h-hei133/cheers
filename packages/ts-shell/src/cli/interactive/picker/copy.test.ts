@@ -164,11 +164,13 @@ it('rejects a continuation after source replacement and copies only the selected
   setClipboardSink(sequence => captured.push(sequence));
   const picker = copyPicker(transcript, { cwd: '/workspace', rawCommandArgs: 'old command arguments' });
   await picker.load();
+  const stale = copyPicker(transcript, { cwd: '/workspace' });
+  await stale.load();
   expect((await picker.apply(['0']))?.note).toContain('Sent');
   expect(Buffer.from(/;c;([^\x07]+)\x07/.exec(captured[0]!)![1]!, 'base64').toString()).toBe(text);
   captured.length = 0;
   transcript.setText(block, 'changed');
-  expect((await picker.apply(['__more__']))?.note).toContain('Transcript changed');
+  expect((await stale.apply(['__more__']))?.note).toContain('Transcript changed');
   expect(captured).toHaveLength(0);
 });
 
@@ -187,10 +189,71 @@ it('preserves cancellation and reports clipboard failure without claiming a copy
   expect(selected).not.toHaveBeenCalled();
   expect(sink).not.toHaveBeenCalled();
   expect(exec).not.toHaveBeenCalled();
-  const result = await picker.apply(['0']);
+  expect(await picker.apply(['0'])).toBeUndefined();
+  const fresh = copyPicker(transcript, { cwd: '/workspace' });
+  await fresh.load();
+  const result = await fresh.apply(['0']);
   expect(result?.note).toBe('Could not reach a clipboard for 13 characters.');
   expect(result?.note).not.toMatch(/Copied|Sent|PRIVATE/);
   expect(transcript.all()[0]!.text).toBe('selected text');
+});
+
+it('rejects revoked session admission and a second consumption before any clipboard action', async () => {
+  const transcript = new Transcript();
+  transcript.append(textBlock('assistant', 'bound source'));
+  const sink = vi.fn();
+  setClipboardSink(sink);
+  let blocked: string | undefined;
+  const context = { cwd: '/workspace', admission: () => blocked };
+  const stale = copyPicker(transcript, context);
+  await stale.load();
+  blocked = 'The session selection changed.';
+  expect((await stale.apply(['0']))?.note).toBe(blocked);
+  expect(sink).not.toHaveBeenCalled();
+  expect(exec).not.toHaveBeenCalled();
+  blocked = undefined;
+  const fresh = copyPicker(transcript, context);
+  await fresh.load();
+  expect((await fresh.apply(['0']))?.note).toContain('Sent');
+  const attempts = vi.mocked(exec).mock.calls.length;
+  expect(await fresh.apply(['0'])).toBeUndefined();
+  expect(sink).toHaveBeenCalledOnce();
+  expect(exec).toHaveBeenCalledTimes(attempts);
+});
+
+it('refuses loading after cancellation or expired admission without reacquiring sources', async () => {
+  const transcript = new Transcript();
+  transcript.append(textBlock('assistant', 'private retained source'));
+  const picker = copyPicker(transcript, { cwd: '/workspace' });
+  await picker.load();
+  picker.previewEnd?.();
+  await expect(picker.load()).rejects.toThrow();
+  const denied = copyPicker(transcript, { cwd: '/workspace', admission: () => 'Session closed.' });
+  await expect(denied.load()).rejects.toThrow('Session closed.');
+  expect(exec).not.toHaveBeenCalled();
+});
+
+it('defers source acquisition until admitted load and refuses stale or aborted continuations', async () => {
+  const transcript = new Transcript();
+  for (let index = 0; index < 3; index++) transcript.append(textBlock('assistant', `source ${index}`));
+  const read = vi.spyOn(transcript, 'copySources');
+  const controller = new AbortController();
+  const picker = copyPicker(transcript, { cwd: '/workspace', signal: controller.signal }, { pageSize: 1 });
+  expect(read).not.toHaveBeenCalled();
+  await picker.load();
+  expect(read).toHaveBeenCalledOnce();
+  const next = (await picker.apply(['__more__']))!.next!;
+  expect(await picker.apply(['__more__'])).toBeUndefined();
+  await next.load();
+  expect(read).toHaveBeenCalledOnce();
+  controller.abort();
+  expect((await next.apply(['1']))?.note).toContain('Copy cancelled');
+  expect(exec).not.toHaveBeenCalled();
+  const stale = copyPicker(transcript, { cwd: '/workspace' });
+  transcript.append(textBlock('assistant', 'replacement'));
+  await expect(stale.load()).rejects.toThrow('Transcript changed');
+  expect(read).toHaveBeenCalledOnce();
+  read.mockRestore();
 });
 
 it('clamps caller page sizes and ignores invalid offsets', async () => {

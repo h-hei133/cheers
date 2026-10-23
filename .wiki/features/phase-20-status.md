@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据，terminal 深树与摘要增长已修；仍缺全屏真实 consumer 的 heap/响应及目录累计 I/O 总界 | 20k真实panel键/render已量化并修复；继续完整byte-tier heap/展开响应及catalogue累计I/O |
-| PAN-06 | history 终端深树/摘要增长已修并测量；copy/back/undo/restore/cleanse 的累计 I/O、内存/时延及剩余身份边界 | 本地按原 owner 逐项量化/修复；分页行数不等于总资源上界 |
+| PAN-06 | history 终端深树/摘要增长及 copy 一次消费/准入/有界来源已修；back/undo/restore/cleanse 的累计 I/O、内存/时延及剩余身份边界 | 本地按原 owner 逐项量化/修复；分页行数不等于总资源上界 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
 | INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
@@ -21,14 +21,25 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-02/PAN-06 树面板重复渲染（本地验证；提交/新 SHA CI 待取证）
+## 2026-10-23 PAN-06 复制来源与取消后派发（本地通过；本批提交/CI待取证）
+
+- `/copy` 使用原 `Transcript` 来源和原剪贴板命令；打开只捕获 revision，admitted load 才枚举来源。每 opening 最多20,000个块及32 Mi UTF-16 code units（原文与label合计；不是heap bytes），超限明确拒绝，不截成成功。保留earlier来源、全文搜索、精确ID和原文；续页共享一个完整源快照及一个query匹配引用缓存，关闭/成功/交接使旧页不可复用并释放引用。摘要与复制行计数不再split全文成数组。
+- picker 的load/apply检查原session/config admission及signal；原文revision拒绝在同owner的真实 `InteractiveMode` 仍显示，换owner的迟到结果不回填。原剪贴板owner在终端offer前、每个fresh native fallback前和最后失败后重验；已经派发的成功仍为copied，终端offer保持offered，取消/blocked不能授权下一次程序派发。双系统单候选回归覆盖最后失败，不声称已派发动作可撤回。
+- 最终8文件205项通过；result-contract 6套158项、scripts157及静态门通过。11组实际AssertionError反转绑定最终四份生产源码hash并保持字节不变；首次新增取消/准入用例在原代码3项失败。独立代码APPROVE/架构WATCH；复核发现并修复同owner拒绝提示被吞、异步fallback取消后继续派发及单候选末尾状态遗漏。反转首次扫描期间源码因这些修复变化，hash guard拒绝计为最终证据；最终重跑已绑定。
+- 固定2,500块、10,240,000源码units、每块820逻辑行，历史不可变build `de428d7ffd2d…` 与最终同机同Node各30次warm调用：24次续页总p95由222.66ms降至0.76ms，load p95由4.04ms降至0.88ms；最终search p95 6.59ms。无冷盘/fresh-process/exe分布声明；process peakRSS213,252/113,348KiB包含导入/fixture/全部调用，非瞬态heap峰值。脚本/生产源码/compiled artifacts前后hash相等。
+- build `3a6e68d86cda3b90d0f0ea0a48adacc0c81ad030ff5d8dbcd04d82d621e434a9`，inputs `4a1ed9fe8734fd78c10a2d574025ca47e741e813ce34031a2a005bbd899e5b0c`，artifact `35fe5e1b744fd64992c68108cc6b202217ed80f347510244b7353f267c5a6f6f`；exe SHA-256 `d051a88ec2db59d9048487370944edfc48c08c1e300bf4ad6d3acbaf5872abd4`。同build Node/exe × regular/fullscreen四格copy专用PTY pass/exit0，205原block完整三页及全文到最旧源、取消零clipboard、精确原文OSC52、原branch/工作区/205原消息保持；不声称真实系统剪贴板接受。证据 `.omx/artifacts/phase20-copy-boundary/`。NormProof exit0/partial，0 open、1 failed advisory、10 proof gaps。
+- WATCH：参考选择器的dispose和一次完整history成本边界已作只读比较；本仓保留完整分页可达及原copied/offered/unavailable状态。完整query仍同步扫描admitted text，临时大小写字符串/clipboard encoding和宿主已有transcript内存不是该source cap的heap保证；copy本批不扩大为全PAN-06闭合。矩阵仍35 complete/12 partial；其他导航消费者、真实系统复制与全阶段交付继续原范围。
+
+## 2026-10-23 PAN-02/PAN-06 树面板重复渲染（`3eed364f`已推送；CI/Watch success）
 
 - 原 `renderPanel` 每次焦点按键重新测量完整候选label。现 `OptionModel` 在候选/过滤应用时递增revision，panel以WeakMap保留三个数字（revision/longest/measured），焦点移动复用；饱和后停止扫描，扩大窗口后继续，same-array刷新也失效。保留原全局详情列对齐，未改成随viewport漂移。参考的visible-window渲染决策用于避免每帧catalogue工作；当前初次/过滤/展开仍单独评估。
 - 恢复后7文件203项、scripts157、静态门、build/exe、diff check通过。六有效AssertionError反转（复用、候选revision、filter revision、饱和、resize续测、详情列位置）均恢复原hash；详情非空、明确列起点和fresh filtered oracle防止伪等价。独立代码APPROVE/架构CLEAR，综合APPROVE；审查另60,000次width公式随机对照通过。
 - 固定20,000节点saved chain的实际 `treePicker+OverlayHost`，120×40、同Node进程30次交替Up/Down加render。历史build `8e2c15e28017…` p50/p95/max为172.12/203.02/287.96ms；最终build `de428d7ffd2d959f38a913bd8770dec99ab1c7c97cbf201e7f4b965623c3be7f` 为3.34/8.38/18.16ms。load210.86ms、完整尾部search24.69ms、close0.28ms均仅一个observed call；processPeakRSS207,032KiB含导入/全部调用，非瞬态heap。每份script/source/artifact前后hash相等；未声明冷盘/fresh-process/exe性能分布或完整byte-tier资源完成。报告 `.omx/artifacts/phase20-resource-measurements/panel-{baseline,final}.json`。
 - 最终inputs `e1a86ca2ee2a2a7d31ca07277981f8fd34e174ac76a96833801a46f99775e3a2`、artifact `95d807819c210aa05fe7af93fe899e3186ab6123efc6c4ef57d574d3ad054e1e`、exe SHA-256 `a9caef548956536606a0260a882c61ca69ac0077828f4c797006733fb2cfbca2`；Node/exe regular/fullscreen四格全部pass/exit0。证据 `.omx/artifacts/phase20-panel-de428d-{node,exe}-{regular,fullscreen}/`。补测试后首次两格build freshness拒绝保留，重建后通过。NormProof exit0/partial，0 open/1 failed advisory/10 proof gaps；矩阵仍35 complete/12 partial，PAN-02/PAN-06不因本批完成。
 
-## 2026-10-23 PAN-02/PAN-06 深树终端与摘要资源增长（代码批 `47b4f300` 已推送；CI running/Watch success）
+- 上批 `3eed364f04fb9b82f45d17f0fe2b94aba827b15b` 已从GitHub读回：CI `39938115685`/job `120362573820` completed/success，10:18:07Z–10:29:07Z；Watch `39938115906` completed/success。仅绑定该SHA。
+
+## 2026-10-23 PAN-02/PAN-06 深树终端与摘要资源增长（代码批 `47b4f300` 已推送；CI/Watch success）
 
 - `/tree` fallback 与 `/history` 共用 `cli/output/navigation.ts`：最多20,000条body行、16 MiB UTF-8 body，显示缩进最多10层加明确深层标记；完整entry ID/label/current/unavailable保留，持久树depth/parent不变。嵌入CR/LF/U+2028/U+2029行字段拒绝为unavailable，不截断成成功；实际20,000链与multiline保存ID同时验证两个caller及保存字节保持。
 - 原 branch_summary 每次spread累计messages，长尾compaction每次slice/spread；现在branch直接append，compaction使用顺序消息tail窗口与反向checkpoint前缀，最后一次flatten。丢弃前缀至少占buffer一半才copyWithin回收；累计移动可归于已丢弃消息，不重复复制长尾。undefined/空summary、timestamp、kept/reset及旧fractional/Infinity兼容保持；180递增参考前缀及独立37,500随机前缀一致。源准入夹具20,000节点+30,000 branch/compaction记录、50,000物理行均保持原文件。

@@ -8604,3 +8604,10 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - panel候选label宽度按OptionModel候选/filter revision缓存，焦点复用、same-array刷新失效、饱和早停和resize续测，保留全局详情列对齐。恢复后7文件203项、scripts157、六有效AssertionError反转并恢复hash、独立APPROVE/CLEAR、静态门/build/exe通过；NormProof exit0/partial，既有advisory保持。
 - 固定20k saved chain、真实treePicker+OverlayHost、120×40、30次Up/Down+render：历史p95203.02ms，最终8.38ms（p503.34/max18.16）；load210.86/search24.69/close0.28ms仅单次，peakRSS207,032KiB非瞬态heap。脚本/源/artifact前后hash相等；完整byte-tier、catalogue累计I/O、剩余PAN-06消费者仍partial。
 - build`de428d7ffd2d959f38a913bd8770dec99ab1c7c97cbf201e7f4b965623c3be7f`、exe SHA-256`a9caef548956536606a0260a882c61ca69ac0077828f4c797006733fb2cfbca2`；同build Node/exe regular/fullscreen四格pass/exit0，初次测试修改后的build freshness拒绝保留，最终重建通过。证据见phase20-status；提交/新SHA CI待取证，Phase20保持partial。
+
+## [2026-10-23] fix | PAN-06 复制来源与取消后派发
+
+- 保留原transcript/clipboard owner；lazy admitted source上限20k块/32Mi UTF-16 units含label，earlier/全文/精确ID/raw revision保持；one-use关闭/交接释放，单query缓存共享续页，摘要/行计数不split全文。
+- 原session/config/signal在load/apply与每次fresh clipboard fallback重验；已派发成功copied、OSC52 offered及取消/blocked各自保留。独立复核实际发现并修复同owner stale提示被吞、取消后fallback继续写与单候选末尾状态遗漏。
+- 最终205项、result158、scripts157、11有效AssertionError反转/hash保持、独立APPROVE/WATCH、静态门/build/exe及同build四格205块PTY通过。固定2500块同进程warm各30次，24续页总p95 222.66→0.76ms；完整query/瞬态heap/system clipboard仍partial。build `3a6e68d86cda3b90d0f0ea0a48adacc0c81ad030ff5d8dbcd04d82d621e434a9`、exe SHA-256 `d051a88ec2db59d9048487370944edfc48c08c1e300bf4ad6d3acbaf5872abd4`，精确证据见status。首次源码中途变化反转hash guard失败保留，最终重跑绑定；47项仍35 complete/12 partial。本批commit/push/精确CI待取证。
+- 上批树panel `3eed364f` 精确CI `39938115685`/job `120362573820` 与Watch `39938115906` 已读回completed/success；深树 `47b4f300` CI `39935676429`/job `120354498600` completed/success，09:57:59Z–10:12:08Z。管理批 `4942064c` CI `39931286844`仍in_progress，未升级为成功。
