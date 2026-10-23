@@ -211,13 +211,14 @@ export class SessionStoreAccess {
     }
   }
 
-  getCurrentSessionForProject(projectRoot: string): Session | null {
-    const resolution = this.resolveCurrentSessionForProject(projectRoot);
+  getCurrentSessionForProject(projectRoot: string, options?: { readonly readOnly?: boolean }): Session | null {
+    const resolution = this.resolveCurrentSessionForProject(projectRoot, options);
     return resolution.ok ? resolution.session : null;
   }
 
   resolveCurrentSessionForProject(
     projectRoot: string,
+    options?: { readonly readOnly?: boolean },
   ): CurrentSessionSelectionResolution {
     assertSessionStoreProfile(this.storeLayout, this.storeLayout.currentSessionStorePath);
     return resolveCurrentSessionForProject({
@@ -226,6 +227,7 @@ export class SessionStoreAccess {
       projectRoot,
       sessionExists: (sessionId) => this.sessionExists(sessionId),
       loadSession: (sessionId) => this.load(sessionId),
+      readOnly: options?.readOnly,
     });
   }
 

@@ -18,6 +18,7 @@ import { seedRecoverySession, seedSavedSession, extractSessionId, currentSession
   SAVED_ASSISTANT_MARKDOWN, SAVED_DIFF_OLD, SAVED_DIFF_NEW } from "./qa/session.mjs";
 import { seedRestoreSnapshot, assertRestoreUnchanged, runRestorePreview } from './qa/restore.mjs';
 import { terminalSpawnSpec } from './qa/terminal.mjs';
+import { rejectStaleSelection } from './qa/selection.mjs';
 import { checkBuild } from './start-lib.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -155,6 +156,7 @@ function recordResult(target, mode, state, status, exitCode, detail) {
     status,
     exitCode,
     bytes: Buffer.byteLength(state.output, "utf8"),
+    ...(state.selectionChecks ? { selectionChecks: state.selectionChecks } : {}),
     ...(detail ? { detail } : {}),
   }, null, 2)}\n`, "utf8");
 }
@@ -366,8 +368,17 @@ async function runTerminalSmoke(target, mode) {
     const activeSessionId = currentSessionFromStore(home, project);
     if (!activeSessionId) throw new Error("fork output did not expose the new session id");
 
+    await rejectStaleSelection({ state, child, home, sessionId: savedSession,
+      command: '/resume', query: savedSession, title: 'Resume session', normalized, waitForOutput });
+
     start = state.output.length;
-    child.stdin.write(`/resume ${savedSession}\r`);
+    child.stdin.write('/resume\r');
+    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Resume session'),
+      'saved session picker');
+    child.stdin.write(savedSession);
+    await waitForOutput(() => normalized(state.output.slice(start)), value => value.includes('Selected session') && value.includes(savedSession),
+      'exact saved session search');
+    child.stdin.write('\r');
     await waitForOutput(() => currentSessionFromStore(home, project),
       value => value === savedSession,
       "resume saved session");
@@ -451,6 +462,12 @@ async function runTerminalSmoke(target, mode) {
       if (!exportedMath.html.includes(expected)) {
         throw new Error(`HTML math export did not project ${expected}`);
       }
+    }
+
+    for (const [command, title] of [['/tree', 'Session tree'], ['/fork', 'Fork before saved question'],
+      ['/history', 'Session history']]) {
+      await rejectStaleSelection({ state, child, home, sessionId: savedSession,
+        command, query: 'user: Saved probe', title, normalized, waitForOutput });
     }
 
     start = state.output.length;

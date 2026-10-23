@@ -8567,4 +8567,12 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 聚焦 6 文件/158 项通过。三组隔离反转均实际失败并恢复：移除 opaque math token 使 `$a*b*c$`/math-link/强调边界断言失败；HTML 改回 scalar conversion 使 environment/matrix 投影失败；恢复 partial unknown-command projection 使整段原公式断言失败。
 - 完整 `test:ts` 为 931 文件通过/1 跳过、9,905 项通过/10 跳过、359.32s。`test:scripts` 157/157；Node/exe × regular/fullscreen 四格打包 PTY 全部 pass/exit 0，验证 math 投影、原始 `/copy`、HTML export 与 fullscreen diff 源复制；Node/exe × line/pipe 另外四格只回归既有业务链。
 - TypeScript build `99e27b71db4bd5f9bf17edceec5e433bda2a058a9b836fd173a04e38f38e41f4`，inputs digest `616922d083cfdb4aab69b2f2c95467ec1332e3c4ea7f05f6b26d1a9661d08b87`，artifact digest `f30da6af85545cf13a7915e064679aa0d84ce95e25d3bd7bf2ad78798599cac8`，exe SHA-256 `506d47a52a7572a5e2589f0a4271bf6b43c26cfd5c4d899c9228341e816d7a49`。证据目录 `.omx/artifacts/phase20-render-math-pty-99e27b71db4b/`。
-- 矩阵更新为 35 `complete`/12 `partial`/0 `open`，RENDER-01 本地闭合；代码尚未提交，CI/Watch 结果待精确 SHA 取证。
+- 矩阵更新为 35 `complete`/12 `partial`/0 `open`。代码批 `5150a63590275f76ff497e1b40a88fd928201d4a` 已推送；CI `39905250082`/job `120255608099` completed/success，05:20:55Z–05:32:36Z，全部步骤 success；Architecture Watch `39905249968`/job `120255607874` completed/success。结果已从 GitHub 读回，只绑定该 SHA。
+
+## [2026-10-23] fix | PAN-02/PAN-06 保存选择版本与激活故障边界
+
+- 实际 resume catalog 选择版本传到原恢复 owner；tree/fork/history 绑定 opening-time 保存版本，summary 后重验 metadata/transcript 与非计量 state。原锁和 writer 保留，合法 summary usage/ledger 写不误拒绝。
+- 原 interactive owner 拒绝 stop/closing/cancel/aborted 后迟到激活；激活后 cleanup 故障以精确保存版本和只读 registry 读回报告 verified warning 或 unknown，保留实际状态并阻止继续操作/自动恢复。
+- 受影响24文件398项通过，另3项 registry只读合同通过；result-contract 6套158项、script157项、六组有效反转通过并恢复字节。独立代码APPROVE/架构WATCH。
+- Node/exe × regular/fullscreen 四格 hostile PTY 全部 pass/exit0：每格拒绝 resume/tree/fork/history 过期选择，注入后保存文件及 current pointer 的SHA-256保持不变；合法恢复、math原文复制/HTML导出及既有业务链继续通过。
+- 构建 `e76a93d26bea083712065ebc14af837f8508b67bd5e6aef7d04d1e4f336e05d2`，inputs `cbc141ffb6843cc105a2fefd8f5ac210b3f69df36d1fe5461bbc88cbe5aa05f5`，artifact `5ccaf5f041fd7129e547b4ec66578925fbbc2d47cf955eb3a28e8fa49385b4c8`，exe SHA-256 `efaed6e1c5a5d86ff6f62043c3fbe823d0cd4f8f1712a6371b0f7ecd1414e7a9`。最终完整测试933文件/9,936项通过（10项跳过，877.36s）；首次并发全量的3文件5项失败与隔离22项通过仍保留，未改断言。提交/CI待取证；PAN-02/PAN-06与全阶段仍partial，12项剩余工作已列在状态页顶部。

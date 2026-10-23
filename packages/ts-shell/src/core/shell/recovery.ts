@@ -70,6 +70,7 @@ function guardRuntimeSeedForRecovery<
 }
 
 export async function resumeShellSession(input: {
+  readonly selection?: import('../../session/navigation/selection.js').SavedSessionSelection;
   requestedSessionId?: string;
   fallbackSessionId?: string;
   /** True for `/continue`, which recovers an interrupted run rather than opening a session. */
@@ -171,6 +172,20 @@ export async function resumeShellSession(input: {
     return { resumed: false };
   }
 
+  const validateSelection = (): void => {
+    if (!input.selection) return;
+    let blocked: string | undefined;
+    try { blocked = input.selection.admission(); }
+    catch { throw new Error('The saved session selection is unavailable. Reopen the session picker.'); }
+    if (blocked) throw new Error(blocked);
+    if (input.selection.sessionId !== requestedSessionId) throw new Error('The selected session changed. Reopen the session picker.');
+  };
+  try { validateSelection(); }
+  catch (error) {
+    input.renderer.renderLine(error instanceof Error ? error.message : 'The saved session selection is unavailable.');
+    return { resumed: false };
+  }
+
   // Already here. Saying so is the whole answer — the old path ran the recovery
   // gate, which refuses a session that is merely *fine*, and reported that as
   // "not recoverable" for the session the user was sitting in.
@@ -197,9 +212,11 @@ export async function resumeShellSession(input: {
   const resumeResult = input.sessionManager.tryResume(
     requestedSessionId,
     input.runtimeContext.projectRoot,
-    { mode: input.recoveryOnly === true ? "runtime-recovery" : "continuity-only" },
+    { mode: input.recoveryOnly === true ? "runtime-recovery" : "continuity-only",
+      ...(input.selection ? { expectedVersion: input.selection.version, beforeActivate: validateSelection } : {}) },
   );
   if (isFailedResume(resumeResult)) {
+    if (resumeResult.activation === 'unknown') input.runtimeContext.workspaceIssue = resumeResult.recoveryHint;
     input.renderer.renderLine(`\nResume failed: ${resumeResult.error}`);
     input.renderer.renderLine(`Hint: ${resumeResult.recoveryHint}\n`);
     return { resumed: false };
@@ -214,6 +231,11 @@ export async function resumeShellSession(input: {
     session: resumeResult.session,
     sessionProjectDir: resumedProjectRoot,
   });
+  if (resumeResult.warning) {
+    input.runtimeContext.workspaceIssue = resumeResult.warning;
+    input.renderer.renderLine(resumeResult.warning);
+    return { resumed: true, autoResume: null, disposition: 'not-resumable' };
+  }
   input.renderer.renderLine(
     `\nResumed session ${input.runtimeContext.session.id}`,
   );

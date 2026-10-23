@@ -10,6 +10,7 @@ export interface SessionForkOptions {
   readonly activate?: boolean;
   readonly sessionId?: string;
   readonly entryId?: string;
+  readonly expectedVersion?: string;
 }
 
 export class SessionForkError extends Error {
@@ -31,6 +32,9 @@ export function forkSession(input: {
   if (!store.sessionExists(sourceId)) throw new Error(`Cannot fork: session ${sourceId} does not exist`);
   const layout = store.stateLayout(sourceId);
   const version = readSessionFileVersion(layout);
+  if (options?.expectedVersion !== undefined && options.expectedVersion !== version) {
+    throw new Error('Cannot fork: source history changed after selection. Reopen its tree.');
+  }
   const source = store.load(sourceId);
   const thread = store.readStateSnapshotRequired(store.statePath(sourceId)).thread ?? buildLinearSessionThreadSnapshot(source);
   const events = readTranscriptEvents(store.transcriptPath(sourceId));

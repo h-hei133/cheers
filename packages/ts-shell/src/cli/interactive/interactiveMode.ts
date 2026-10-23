@@ -203,6 +203,7 @@ export class InteractiveMode {
   private previewItemsRevision: number | undefined;
   private stopped = false;
   private closing = false;
+  private selectionRevision = 0;
   private readonly alternateScreen: boolean;
   private busy = false;
   private pickerPending = false;
@@ -897,6 +898,7 @@ export class InteractiveMode {
     text: string,
     attachments?: { readonly images: readonly ImageContent[] },
     promptMetadata?: Record<string, unknown>,
+    sessionSelection?: import('../../session/navigation/selection.js').SavedSessionSelection,
   ): Promise<void> {
     const automatic = promptMetadata !== undefined;
     if (!automatic) this.options.onUserIntent?.();
@@ -936,6 +938,7 @@ export class InteractiveMode {
       const result = await routeInteractiveCommand({
         ...(promptMetadata ? { promptMetadata } : {}),
         prompt: text,
+        ...(sessionSelection ? { sessionSelection } : {}),
         readline: this.readline,
         mcpGateway: this.options.initialMcpGateway,
         fallbackSessionId: this.options.fallbackSessionId,
@@ -1101,9 +1104,18 @@ export class InteractiveMode {
 
   /** Everything the pickers need from the session, resolved lazily. */
   private pickerHost(): PickerHost {
+    const admission = configurationAdmission(this.options.runtimeContext);
+    const selectionRevision = this.selectionRevision;
+    const selectionAdmission = (): string | undefined => {
+      if (this.stopped || this.closing || this.selectionRevision !== selectionRevision
+        || this.options.sessionRuntime.getCurrentRunController()?.signal.aborted) {
+        return 'The session selection was cancelled or its surface closed. Reopen the picker.';
+      }
+      return admission();
+    };
     return {
       commandContext: {
-        admission: configurationAdmission(this.options.runtimeContext),
+        admission: selectionAdmission,
         projectRoot: this.options.runtimeContext.projectRoot,
         runtimeConfig: this.options.runtimeContext.runtimeConfig,
         resolveConfigTarget: this.options.runtimeContext.resolveConfigTarget,
@@ -1145,8 +1157,9 @@ export class InteractiveMode {
       agentDiscovery: () => agentDiscoveryFor(this.options.runtimeContext),
       advisorState: () => decodeAdvisor(readBoundSessionState(this.options.sessionManager, this.options.runtimeContext.session).state.advisor),
       ...sessionPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,
+        admission: selectionAdmission,
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null,
-        resume: sessionId => this.runCommandLine(`/resume ${sessionId}`),
+        resume: (sessionId, selection) => this.runCommandLine(`/resume -- ${quoteCompletion(sessionId, '')}`, selection),
       }),
       refreshServer: (serverName, expected, admission) => this.options.sessionRuntime.commands.run(signal => this.options.initialMcpGateway.refresh(serverName,
         { exactTarget: true, expectedConfig: expected, signal, ...(admission ? { admission } : {}) })),
@@ -1156,14 +1169,20 @@ export class InteractiveMode {
       sessionTurns: () =>
         this.options.sessionManager.getSession(this.options.runtimeContext.session.id)?.turns ?? [],
       rewind: async (point) => {
-        const result = await navigateSession(this.options, point.entryId);
+        const result = await navigateSession(this.options, point.entryId, point.version, selectionAdmission);
         if (result.changed) {
           showConversation(this.historyTarget(), this.options.runtimeContext.session);
           this.tui.requestRender({ force: true });
         }
         return { note: result.output, ...(result.draft !== undefined ? { draft: result.draft } : {}) };
       },
-      fork: entryId => this.runCommandLine(`/fork here --from ${entryId}`),
+      fork: (entryId, version) => {
+        if (!version) return Promise.resolve(undefined);
+        return this.runCommandLine(`/fork here --from ${quoteCompletion(entryId, '')}`, {
+          sessionId: this.options.runtimeContext.session.id, version,
+          admission: selectionAdmission,
+        });
+      },
       previewStatusItems: (items) => {
         this.previewItems = items;
         this.previewItemsRevision = items === undefined ? undefined : this.options.runtimeContext.configuration.current.revision;
@@ -1190,10 +1209,11 @@ export class InteractiveMode {
   }
 
   /** Route a command line as if the user had typed it, reusing the same path. */
-  private async runCommandLine(line: string): Promise<undefined> {
+  private async runCommandLine(line: string, selection?: import('../../session/navigation/selection.js').SavedSessionSelection): Promise<undefined> {
     this.state.transcript.append(textBlock("user", line));
     this.view.scrollToEnd();
-    await this.run(line);
+    if (selection) await this.run(line, undefined, undefined, selection);
+    else await this.run(line);
     return undefined;
   }
 
@@ -1202,6 +1222,7 @@ export class InteractiveMode {
    * than running against a turn the user just cancelled.
    */
   private async interrupt(): Promise<void> {
+    this.selectionRevision++;
     if (!this.busy) {
       if (schedulerForRuntime(this.options.sessionRuntime)?.ownerToken() || directorInterruptible(this.options.runtimeContext) || evaluationInterruptible(this.options.runtimeContext) || mediaInterruptible(this.options.runtimeContext)) this.options.sessionRuntime.cancelCurrentRun();
       return;

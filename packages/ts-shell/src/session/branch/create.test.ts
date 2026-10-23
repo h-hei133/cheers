@@ -48,3 +48,17 @@ it('rejects a non-user entry before creation and leaves a failed copy inactive w
   expect(manager.sessionExists('sess_partial_fork')).toBe(true);
   expect(manager.getCurrentSessionForProject(root)?.id).toBe(source.id);
 });
+
+it('rejects an obsolete fork source version before creating any session', () => {
+  const manager = new SessionManager(); const source = manager.createNew(root);
+  manager.addTurn(source.id, { role: 'user', content: 'offered question' });
+  const offered = readSessionNavigation(source.id, root);
+  manager.addTurn(source.id, { role: 'assistant', content: 'new answer' });
+  const count = manager.listSessions().length;
+  const events = manager.getTranscriptEvents(source.id);
+  expect(() => manager.fork(source.id, root, { entryId: offered.points.find(point => point.prompt)?.entryId,
+    expectedVersion: offered.version })).toThrow('changed after selection');
+  expect(manager.listSessions()).toHaveLength(count);
+  expect(manager.getTranscriptEvents(source.id)).toEqual(events);
+  expect(manager.getCurrentSessionForProject(root)?.id).toBe(source.id);
+});

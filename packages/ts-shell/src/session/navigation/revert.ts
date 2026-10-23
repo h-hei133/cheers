@@ -8,6 +8,8 @@ import { normalizePathIdentity } from '../continuation/roots.js';
 import { switchDurableSessionActiveLeaf } from '../store/threadState.js';
 import { appendBranchSummaryEvent } from '../transcript/sessionTranscript.js';
 import { withSessionStateLock } from '../store/sessionStateStore.js';
+import { sameValue } from '../../config/values.js';
+import type { SessionStateSnapshot } from '../schema/sessionStateSnapshot.js';
 
 /** A report-safe warning after a leaf write; callers must reread its actual outcome. */
 export class SessionNavigationWarning extends Error {
@@ -24,12 +26,17 @@ export async function revertSession(
   entryId: string,
   summarize?: (abandoned: readonly SessionMessage[]) => Promise<string | undefined>,
   beforeWrite?: () => void,
+  expectedVersion?: string,
 ): Promise<number> {
   beforeWrite?.();
   if (!store.sessionExists(sessionId)) return 0;
   const layout = store.stateLayout(sessionId);
   const version = readSessionFileVersion(layout);
+  if (expectedVersion !== undefined && expectedVersion !== version) {
+    throw new Error('The stored session changed after selection. Reopen its tree.');
+  }
   const { session, state } = readSessionRecordSnapshot({ sessionId, layout, cwd: process.cwd() });
+  const contentVersion = readSessionFileVersion(layout, { ignoreState: true });
   if (session.id !== sessionId || version !== readSessionFileVersion(layout)) {
     throw new Error('The stored session changed while preparing navigation.');
   }
@@ -55,6 +62,13 @@ export async function revertSession(
       if (store.stateLayout(sessionId).sessionDir !== layout.sessionDir) {
         throw new Error('The session location changed while preparing navigation.');
       }
+      // This request may update its own usage/ledger while summarizing. Those
+      // accounting writes do not change the saved conversation being selected.
+      const latest = readSessionRecordSnapshot({ sessionId, layout, cwd: process.cwd() }).state;
+      if (readSessionFileVersion(layout, { ignoreState: true }) !== contentVersion
+        || !sameValue(conversationState(state), conversationState(latest))) {
+        throw new Error('The stored session changed while preparing navigation.');
+      }
       const metadata = readSessionMetadataRecord(layout.metadataPath);
       if (metadata?.id !== sessionId || metadata.createdAt !== session.createdAt
         || normalizePathIdentity(metadata.projectRoot?.trim() || state.projectRoot || process.cwd()) !== normalizePathIdentity(session.projectRoot)) {
@@ -77,4 +91,9 @@ export async function revertSession(
     throw new SessionNavigationWarning('The previous branch could not be summarized.', abandoned.length);
   }
   return abandoned.length;
+}
+
+function conversationState(state: SessionStateSnapshot): Omit<SessionStateSnapshot, 'usage' | 'requestLedger'> {
+  const { usage: _usage, requestLedger: _requestLedger, ...conversation } = state;
+  return conversation;
 }

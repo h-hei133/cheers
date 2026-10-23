@@ -139,6 +139,8 @@ export function resolveCurrentSessionForProject(input: {
   readonly projectRoot: string;
   readonly sessionExists: (sessionId: string) => boolean;
   readonly loadSession: (sessionId: string) => Session;
+  /** Fault verification observes the selection without repairing it. */
+  readonly readOnly?: boolean;
 }): CurrentSessionSelectionResolution {
   const normalizedProjectRoot = normalizePathIdentity(input.projectRoot) ?? '';
   const registry = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]);
@@ -162,7 +164,7 @@ export function resolveCurrentSessionForProject(input: {
       selection,
       sessionExists: false,
     });
-    clearCurrentSessionSelection({
+    if (!input.readOnly) clearCurrentSessionSelection({
       storePath: input.storePath,
       normalizedProjectRoot,
     });
@@ -182,7 +184,7 @@ export function resolveCurrentSessionForProject(input: {
       sessionProjectRoot,
       normalizedSessionProjectRoot: normalizePathIdentity(sessionProjectRoot),
     });
-    if (!selectedProjection.resolution.ok) {
+    if (!selectedProjection.resolution.ok && !input.readOnly) {
       clearCurrentSessionSelection({
         storePath: input.storePath,
         normalizedProjectRoot,
@@ -198,7 +200,7 @@ export function resolveCurrentSessionForProject(input: {
       sessionExists: true,
       loadError: error,
     });
-    clearCurrentSessionSelection({
+    if (!input.readOnly) clearCurrentSessionSelection({
       storePath: input.storePath,
       normalizedProjectRoot,
     });

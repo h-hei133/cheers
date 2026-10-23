@@ -12,7 +12,7 @@ import { scanCommandArgs } from '../../../core/commands/arguments.js';
 
 const point = (entryId: string, depth: number): SessionNavigationPoint => ({ entryId, depth, label: entryId, current: false });
 
-beforeEach(() => navigation.readSessionNavigation.mockReset());
+beforeEach(() => { navigation.readSessionNavigation.mockReset(); });
 
 it('draws branch and continuation glyphs from the depth-first point list', () => {
   const points = [point('root-a', 0), point('child-a1', 1), point('child-a2', 1), point('root-b', 0)];
@@ -25,7 +25,7 @@ it('closes a branch when the next point is shallower', () => {
 });
 
 it('focuses the current point and only navigates to an offered healthy identity', async () => {
-  navigation.readSessionNavigation.mockReturnValue({
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v1',
     thread: {}, session: {}, points: [
       { ...point('root', 0), label: 'Session start' },
       { ...point('current', 1), label: 'user: current question', current: true, prompt: 'current question' },
@@ -42,11 +42,11 @@ it('focuses the current point and only navigates to an offered healthy identity'
   expect(await picker.apply(['broken'])).toBeUndefined();
   expect(rewind).not.toHaveBeenCalled();
   expect(await picker.apply(['current'])).toEqual({ note: 'rewound' });
-  expect(rewind).toHaveBeenCalledWith({ entryId: 'current', prompt: 'current question', dropped: 0 });
+  expect(rewind).toHaveBeenCalledWith({ entryId: 'current', prompt: 'current question', dropped: 0, version: 'saved-v1' });
 });
 
 it('offers only saved user prompts to the fork picker', async () => {
-  navigation.readSessionNavigation.mockReturnValue({
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v1',
     thread: {}, session: {}, points: [
       { ...point('assistant', 0), label: 'assistant: answer' },
       { ...point('question', 1), label: 'user: question', prompt: 'question' },
@@ -57,7 +57,7 @@ it('offers only saved user prompts to the fork picker', async () => {
 });
 
 it('browses the complete tree in history mode and stages an exact tree draft', async () => {
-  navigation.readSessionNavigation.mockReturnValue({
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v1',
     thread: {}, session: {}, points: [
       { ...point('root', 0), label: 'Session start' },
       { ...point('entry with space', 1), label: 'user: find the saved branch', prompt: 'find the saved branch' },
@@ -80,7 +80,7 @@ it('browses the complete tree in history mode and stages an exact tree draft', a
 });
 
 it.each(['help', '--help', 'entry "quoted" \\ $`', 'entry\nnext'])('drafts an exact positional entry ID: %s', async entryId => {
-  navigation.readSessionNavigation.mockReturnValue({ points: [point(entryId, 0)] });
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v1', points: [point(entryId, 0)] });
   const rewind = vi.fn();
   const picker = treePicker({ sessionId: 'session', cwd: '/workspace' } as never, rewind, 'history');
   await picker.load();
@@ -91,10 +91,54 @@ it.each(['help', '--help', 'entry "quoted" \\ $`', 'entry\nnext'])('drafts an ex
 
 it('keeps every deep history identity reachable with bounded visible indentation', async () => {
   const points = Array.from({ length: 10000 }, (_, index) => point(`entry-${index}`, index));
-  navigation.readSessionNavigation.mockReturnValue({ points });
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v1', points });
   const picker = treePicker({ sessionId: 'session', cwd: '/workspace' } as never, vi.fn(), 'history');
   const options = await picker.load();
   expect(options.map(option => option.id)).toEqual(points.map(point => point.entryId));
   expect(options.every(option => option.label.length <= option.id.length + 40)).toBe(true);
   expect(options.at(-1)!.label).toContain('…');
+});
+
+it.each(['tree', 'fork', 'history'] as const)('rejects a changed saved source before %s selection', async mode => {
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v1', points: [{ ...point('question', 0), prompt: 'old question' }] });
+  const action = vi.fn();
+  const picker = treePicker({ sessionId: 'session', cwd: '/workspace' } as never, action, mode);
+  await picker.load();
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v2', points: [{ ...point('question', 0), prompt: 'new question' }] });
+  const result = await picker.apply(['question']);
+  expect(result?.note).toContain('changed after this tree opened');
+  expect(result?.draft).toBeUndefined();
+  expect(action).not.toHaveBeenCalled();
+});
+
+it.each(['blocked', 'throw'] as const)('rejects stale runtime admission (%s) without rereading or acting', async state => {
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v1', points: [{ ...point('question', 0), prompt: 'question' }] });
+  let stale = false;
+  const action = vi.fn();
+  const picker = treePicker({ sessionId: 'session', cwd: '/workspace', admission: () => {
+    if (stale && state === 'throw') throw new Error('PRIVATE_STORAGE_ERROR');
+    return stale ? 'The owning session changed.' : undefined;
+  } } as never, action);
+  await picker.load();
+  stale = true;
+  const result = await picker.apply(['question']);
+  expect(result?.note).toBeTruthy();
+  expect(result?.note).not.toContain('PRIVATE_STORAGE_ERROR');
+  expect(navigation.readSessionNavigation).toHaveBeenCalledTimes(1);
+  expect(action).not.toHaveBeenCalled();
+});
+
+it('rejects canceled loads and unavailable selection sources without producing a draft', async () => {
+  const controller = new AbortController(); controller.abort();
+  const picker = treePicker({ sessionId: 'session', cwd: '/workspace' } as never, vi.fn(), 'history');
+  await expect(picker.load(controller.signal)).rejects.toThrow();
+  expect(navigation.readSessionNavigation).not.toHaveBeenCalled();
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v1', points: [point('entry', 0)] });
+  await picker.load();
+  navigation.readSessionNavigation.mockImplementation(() => { throw new Error('PRIVATE_STORAGE_ERROR'); });
+  const result = await picker.apply(['entry']);
+  expect(result?.note).toContain('unavailable');
+  expect(result?.draft).toBeUndefined();
+  expect(result?.note).not.toContain('PRIVATE_STORAGE_ERROR');
+  navigation.readSessionNavigation.mockReset();
 });

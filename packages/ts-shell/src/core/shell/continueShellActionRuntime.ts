@@ -29,6 +29,7 @@ function isFailedResumeResult(
 }
 
 export async function runResumeLikeShellAction(options: {
+  readonly sessionSelection?: import('../../session/navigation/selection.js').SavedSessionSelection;
   slashResult: ResumeLikeShellAction;
   source: "interactive" | "non-interactive";
   printMode: boolean;
@@ -130,6 +131,7 @@ export async function runResumeLikeShellAction(options: {
   }
 
   const resumed = await resumeShellSession({
+    ...(options.sessionSelection ? { selection: options.sessionSelection } : {}),
     requestedSessionId: options.slashResult.sessionId,
     fallbackSessionId: options.fallbackSessionId,
     sessionManager: options.sessionManager,

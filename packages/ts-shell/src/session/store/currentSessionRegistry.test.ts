@@ -14,6 +14,25 @@ import {
 } from "./currentSessionRegistry.js";
 
 describe("currentSessionRegistry", () => {
+  it.each(['missing', 'unreadable', 'different-project'] as const)(
+    'read-only verification preserves the selection when the target is %s', kind => {
+      const root = fs.mkdtempSync(path.join(process.cwd(), '.tmp-registry-readback-'));
+      try {
+        const storePath = path.join(root, 'current-session.json');
+        setCurrentSessionSelection({ storePath, projectRoot: root, sessionId: 'sess_saved', updatedAt: 'today' });
+        const before = fs.readFileSync(storePath);
+        const input = { storePath, projectRoot: root, sessionExists: () => kind !== 'missing',
+          loadSession: () => {
+            if (kind === 'unreadable') throw new Error('Unavailable session');
+            return { id: 'sess_saved', projectRoot: path.join(root, 'other') } as Session;
+          } };
+        expect(resolveCurrentSessionForProject({ ...input, readOnly: true }).ok).toBe(false);
+        expect(fs.readFileSync(storePath)).toEqual(before);
+        expect(resolveCurrentSessionForProject(input).ok).toBe(false);
+        expect(readSessionRegistryStore(storePath).store.byProjectRoot).toEqual({});
+      } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    });
+
   it('uses host path identity and only accepts legacy case-folded keys after checking the saved binding', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'registry-binding-'));
     try {

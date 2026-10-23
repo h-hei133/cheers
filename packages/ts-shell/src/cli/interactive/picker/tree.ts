@@ -44,6 +44,11 @@ export function treePicker(
 ): Picker {
   const userOnly = mode === "fork";
   let points: readonly SessionNavigationPoint[] = [];
+  let version: string | undefined;
+  const admission = (): string | undefined => {
+    try { return context.admission?.(); }
+    catch { return 'Session navigation is unavailable. Reopen the session tree.'; }
+  };
   return {
     title: mode === "fork" ? 'Fork before saved question'
       : mode === "history" ? 'Session history' : 'Session tree',
@@ -63,8 +68,14 @@ export function treePicker(
     get initialSelection() {
       return points.find(point => point.current && point.unavailable === undefined)?.entryId;
     },
-    async load() {
-      points = context.sessionId ? readSessionNavigation(context.sessionId, context.cwd).points.filter(point => !userOnly || point.prompt !== undefined) : [];
+    async load(signal) {
+      signal?.throwIfAborted();
+      const blocked = admission();
+      if (blocked) throw new Error(blocked);
+      const snapshot = context.sessionId ? readSessionNavigation(context.sessionId, context.cwd) : undefined;
+      signal?.throwIfAborted();
+      version = snapshot?.version;
+      points = snapshot?.points.filter(point => !userOnly || point.prompt !== undefined) ?? [];
       const prefixes = treePrefixes(points);
       return points.map((point, index) => ({
         id: point.entryId,
@@ -79,8 +90,18 @@ export function treePicker(
       if (ids.length !== 1) return undefined;
       const point = points.find((candidate) => candidate.entryId === ids[0]);
       if (!point || point.unavailable) return undefined;
+      const blocked = admission();
+      if (blocked) return { note: blocked };
+      try {
+        if (!context.sessionId || !version
+          || readSessionNavigation(context.sessionId, context.cwd).version !== version) {
+          return { note: 'The saved conversation changed after this tree opened. Reopen it before selecting an entry.' };
+        }
+      } catch {
+        return { note: 'The saved conversation is unavailable. Reopen the session tree.' };
+      }
       if (mode === "history") return { draft: `/tree -- ${quoteCompletion(point.entryId, "")}` };
-      return rewind({ entryId: point.entryId, prompt: point.prompt ?? "", dropped: 0 });
+      return rewind({ entryId: point.entryId, prompt: point.prompt ?? "", dropped: 0, version });
     },
   };
 }

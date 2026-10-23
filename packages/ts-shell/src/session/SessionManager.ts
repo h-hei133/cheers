@@ -131,6 +131,7 @@ export class SessionManager extends SessionReadSurface {
         this.host.store.writeSessionMetadata(session),
       setCurrentSessionForProject: (projectRoot: string, sessionId: string) =>
         this.setCurrentSessionForProject(projectRoot, sessionId),
+      getCurrentSessionForProject: (projectRoot: string) => this.host.store.getCurrentSessionForProject(projectRoot, { readOnly: true }),
       evaluateRecoveryTrustBoundary: (session: Session) =>
         this.evaluateRecoveryTrustBoundary(session),
       cwd: () => process.cwd(),
@@ -144,8 +145,9 @@ export class SessionManager extends SessionReadSurface {
     entryId: string,
     summarize?: (abandoned: readonly SessionMessage[]) => Promise<string | undefined>,
     beforeWrite?: () => void,
+    expectedVersion?: string,
   ): Promise<number> {
-    return revertSession(this.host.store, sessionId, entryId, summarize, beforeWrite);
+    return revertSession(this.host.store, sessionId, entryId, summarize, beforeWrite, expectedVersion);
   }
 
   createNewWithId(

@@ -16,6 +16,7 @@ import { runNonInteractivePrompt } from "../../entrypoints/cliRuntimeModule.js";
 import { treePicker } from "../interactive/picker/tree.js";
 import { navigateSession } from "./navigation.js";
 import { appendBranchSummaryEvent } from '../../session/transcript/sessionTranscript.js';
+import { sessionUsageSink } from '../../session/store/usage.js';
 
 vi.mock('../../session/transcript/sessionTranscript.js', async () => {
   const actual = await vi.importActual<typeof import('../../session/transcript/sessionTranscript.js')>('../../session/transcript/sessionTranscript.js');
@@ -60,6 +61,68 @@ function harness() {
 }
 
 describe("session tree navigation", () => {
+  it.each(['tree', 'fork', 'history'] as const)('refuses the offered %s entry after a branch round trip', async mode => {
+    const { input, session, turns, layout } = harness();
+    const action = vi.fn(async point => {
+      const result = await navigateSession(input, point.entryId, point.version);
+      return { note: result.output, draft: result.draft };
+    });
+    const picker = treePicker({ sessionId: session.id, cwd: root }, action, mode);
+    await picker.load();
+    await input.sessionManager.revertTo(session.id, turns[0]!.id!);
+    await input.sessionManager.revertTo(session.id, turns[3]!.id!);
+    const before = [layout.statePath, layout.transcriptPath, layout.metadataPath].map(file => fs.readFileSync(file));
+    const result = await picker.apply([turns[0]!.id!]);
+    expect(result?.note).toContain('changed after this tree opened');
+    expect(result?.draft).toBeUndefined();
+    expect(action).not.toHaveBeenCalled();
+    expect([layout.statePath, layout.transcriptPath, layout.metadataPath].map(file => fs.readFileSync(file))).toEqual(before);
+  });
+
+  it('refuses navigation when a transcript edit occurs during summary preparation', async () => {
+    const { input, session, turns, summarize, layout } = harness();
+    summarize.mockImplementationOnce(async () => {
+      const text = fs.readFileSync(layout.transcriptPath, 'utf8');
+      fs.writeFileSync(layout.transcriptPath, text.replace('First question', 'Edited question'));
+      return 'Prepared from stale messages';
+    });
+    const beforeState = fs.readFileSync(layout.statePath);
+    const result = await navigateSession(input, turns[0]!.id!);
+    expect(result).toMatchObject({ status: 'unchanged', changed: false });
+    expect(result.draft).toBeUndefined();
+    expect(fs.readFileSync(layout.statePath)).toEqual(beforeState);
+    expect(readSessionNavigation(session.id, root).thread.activeLeafId).toBe(turns[3]!.id);
+    expect(fs.readFileSync(layout.transcriptPath, 'utf8')).not.toContain('Prepared from stale messages');
+  });
+
+  it('keeps legitimate summary accounting while committing the unchanged selected conversation', async () => {
+    const { input, session, turns, summarize, layout } = harness();
+    summarize.mockImplementationOnce(async () => {
+      const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
+      fs.writeFileSync(layout.statePath, JSON.stringify({ ...state,
+        requestLedger: { summaryReceipt: 'measured' } }));
+      sessionUsageSink(session.id)({ provider: 'openai', model: 'summary', promptTokens: 4, completionTokens: 1 });
+      return 'Prepared with recorded accounting';
+    });
+    const result = await navigateSession(input, turns[0]!.id!);
+    expect(result).toMatchObject({ status: 'changed', changed: true, draft: turns[0]!.content });
+    expect(readSessionNavigation(session.id, root).thread.activeLeafId).toBe(turns[0]!.id);
+    expect(JSON.parse(fs.readFileSync(layout.statePath, 'utf8'))).toMatchObject({
+      requestLedger: { summaryReceipt: 'measured' }, usage: { byModel: { 'openai/summary': { promptTokens: 4, completionTokens: 1 } } },
+    });
+  });
+
+  it('refuses a source changed between picker validation and the navigation owner', async () => {
+    const { input, session, turns, layout } = harness();
+    const offered = readSessionNavigation(session.id, root);
+    input.sessionManager.addTurn(session.id, { role: 'user', content: 'new user input' });
+    const before = fs.readFileSync(layout.statePath);
+    const result = await navigateSession(input, turns[0]!.id!, offered.version);
+    expect(result).toMatchObject({ status: 'unchanged', changed: false });
+    expect(result.output).toContain('changed after selection');
+    expect(result.draft).toBeUndefined();
+    expect(fs.readFileSync(layout.statePath)).toEqual(before);
+  });
   it.each(["interactive", "piped", "print"])("routes a stable entry id in the %s host", async (mode) => {
     const { input, session, turns, summarize, lines, layout } = harness();
     const before = fs.readFileSync(layout.transcriptPath, "utf8");

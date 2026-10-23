@@ -68,6 +68,7 @@ import { reportWriter } from '../output/reports.js';
 import type { ShellActionResult } from '../../core/commands/types.js';
 
 export interface InteractiveCommandRouterInput {
+  readonly sessionSelection?: import('../../session/navigation/selection.js').SavedSessionSelection;
   readonly freshState?: import('../../core/commands/types.js').CommandContext['freshState'];
   readonly ruleControlsCommand?: import('../../core/commands/types.js').CommandContext['ruleControlsCommand'];
   readonly forceTool?: import('../../core/commands/types.js').CommandContext['forceTool'];
@@ -225,6 +226,7 @@ export async function routeInteractiveCommand(
   if (isResumeLikeShellAction(slashResult)) {
     const before = input.runtimeContext.session.id;
     const resumeResult = await runInteractiveResumeAction({
+      ...(input.sessionSelection ? { sessionSelection: input.sessionSelection } : {}),
       slashResult,
       fallbackSessionId: input.fallbackSessionId,
       sessionManager: input.sessionManager,
@@ -303,13 +305,18 @@ export async function routeInteractiveCommand(
     // would have them type into the wrong conversation.
     const sourceId = slashResult.sessionId ?? input.runtimeContext.session.id;
     try {
+      if (input.sessionSelection) {
+        const blocked = input.sessionSelection.admission();
+        if (blocked) throw new Error(blocked);
+        if (input.sessionSelection.sessionId !== sourceId) throw new Error('The selected fork source changed. Reopen its tree.');
+      }
       if (input.sessionRuntime.getCurrentRunController() !== null) throw new Error('Wait for the current turn before forking.');
       const point = slashResult.entryId === undefined ? undefined
         : readSessionNavigation(sourceId, input.runtimeContext.projectRoot).points.find(item => item.entryId === slashResult.entryId && item.prompt !== undefined && !item.unavailable);
       const forked = input.sessionManager.fork(
         sourceId,
         input.runtimeContext.projectRoot,
-        { entryId: slashResult.entryId },
+        { entryId: slashResult.entryId, ...(input.sessionSelection ? { expectedVersion: input.sessionSelection.version } : {}) },
       );
       switchRuntimeSessionProjectContext(input.runtimeContext, forked);
       renderProjectedLines(input.renderer, [

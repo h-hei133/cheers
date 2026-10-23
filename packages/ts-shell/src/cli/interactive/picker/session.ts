@@ -20,8 +20,9 @@ export interface SessionPickerOptions {
   readonly action?: 'resume' | 'pin';
   readonly sessionManager: SessionManager;
   readonly context: () => SessionSelectionContext;
+  readonly admission?: () => string | undefined;
   /** Resume the chosen session; the host owns how that is executed. */
-  readonly resume: (sessionId: string) => Promise<string | undefined>;
+  readonly resume: (sessionId: string, version?: string) => Promise<string | undefined>;
   /** Delete a session permanently, with confirmation handled by the host. */
   readonly delete?: (sessionId: string, version?: string) => Promise<string | undefined>;
   /** Rename a session. */
@@ -92,6 +93,10 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
   const activeProjection = (): SessionProjection | undefined =>
     activeSource === 'search' ? searchProjection ?? baseProjection : baseProjection;
   const blocked = (id: string, action: 'resume' | 'rename' | 'delete' | 'pin'): string | undefined => {
+    try {
+      const issue = options.admission?.();
+      if (issue) return issue;
+    } catch { return 'Session selection is unavailable. Reopen the session picker.'; }
     if (!activeProjection()?.offered.has(id)) return 'This session was not offered. Reopen the session picker.';
     return sessionSelectionBlock({ expected, current: options.context(), target: options.sessionManager.getSession(id), targetId: id, action });
   };
@@ -197,7 +202,7 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
         const note = await options.pin(sessionId, activeProjection()?.versions.get(sessionId));
         return note ? { note } : { next: sessionPicker({ ...options, initialQuery: lastQuery }) };
       }
-      const note = await options.resume(sessionId);
+      const note = await options.resume(sessionId, activeProjection()?.versions.get(sessionId));
       return note ? { note } : undefined;
     },
     onDelete: options.delete

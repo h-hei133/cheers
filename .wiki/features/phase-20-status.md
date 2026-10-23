@@ -2,7 +2,40 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
-## 2026-10-23 RENDER-01 数学 token、显示边界与打包导出（本地代码批；CI pending）
+## 当前剩余工作（2026-10-23）
+
+范围只来自 [Phase 20 决策](phase-20-decisions.md) 及其引用要求。机器矩阵当前为 35 `complete` / 12 `partial` / 0 `open`；这些标签记录各批证据，不证明全阶段完成。以下 12 项仍未闭合，本地缺口可以继续执行，不能统称为等待真实环境。
+
+| ID | 尚缺内容 | 下一步或所需输入 |
+|---|---|---|
+| PRV-03 | 真实账户登录、刷新、失效、退出及跨连接隔离生命周期证据 | 需明确账户/provider、隔离 opt-in 运行条件；合成 token/audience 校验不替代实测 |
+| PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
+| TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
+| PAN-02 | tree 展开/折叠与节点详情布局；完整持久树获取/搜索/保留的总资源界；其余选择动作边界逐项审计 | 本地继续 tree consumer 和有界读取；本批只闭合已保存选择的版本、取消及激活故障边界 |
+| PAN-06 | history/copy/back/undo/restore/cleanse 的累计同步 I/O、内存/时延界及未覆盖的身份边界 | 本地按原 owner 逐项量化/修复；分页行数不等于总资源上界 |
+| PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
+| PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
+| INPUT-01 | 完整五模式 Vim/IME 合同、字素与输入边界验收，平台真实 IME 证据 | 本地复核状态机和终端路径；实机输入法需平台/终端/IME 类型 |
+| QA-01 | 47 项逐任务反转矩阵与跨任务集成仍未全部闭合 | 随上述实现逐项补证；本批新增六项有效反转 |
+| QA-02 | Windows 交互 PTY、真实 IME、系统复制、非交互 profile 切换/审批生命周期 | 非交互合同可本地继续；Windows/IME/系统复制需适用机器和终端 |
+| QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
+| QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
+
+## 2026-10-23 PAN-02/PAN-06 保存选择边界（本地验证完成；提交与 CI 待取证）
+
+- resume/tree/fork/history 绑定实际展示时的 session ID、完整保存版本和原 admission；resume 在异步解析后及原 state lock 内重验，fork 在创建新目录前重验，tree 导航在 summary 后的原 writer 边界重验。分支 A→B→A 也使旧选择失效。
+- 导航比较 metadata/transcript 版本及除 usage/requestLedger 外的完整 state；实际 summary usage sink 的记账保留且不误拒绝自身计量，外部 transcript/state 修改仍拒绝。
+- 原 interactive owner 将 stop/closing、取消 revision、aborted controller 传入选择 admission，自身 command busy 不使合法选择失效。激活开始后的 writer/lock-cleanup 错误分开报告：精确文件版本与只读 registry 读回一致时采用目标并显示警告；无法验证时保留旧 runtime 并阻止继续操作。两者均不自动执行恢复任务，不暴露原异常正文。
+- 独立代码审查 APPROVE，架构 WATCH，无剩余阻断；WATCH 为既有职责上限及本批不闭合的 tree/资源范围。已有 drag/copy 的 42 项测试按 HEAD 原字节恢复，新生命周期用例独立放置。
+- 受影响集合 24 文件/398 项通过，新增 registry 三分支只读/普通修复合同 3 项通过；result-contract 6 套/158 项、脚本门 157 项通过。六组有效反转均实际断言失败并恢复原字节：resume offered version、tree stale、summary fence、surface lifetime、read-only registry、publication-start。
+- TypeScript build `e76a93d26bea083712065ebc14af837f8508b67bd5e6aef7d04d1e4f336e05d2`，inputs digest `cbc141ffb6843cc105a2fefd8f5ac210b3f69df36d1fe5461bbc88cbe5aa05f5`，artifact digest `5ccaf5f041fd7129e547b4ec66578925fbbc2d47cf955eb3a28e8fa49385b4c8`，exe SHA-256 `efaed6e1c5a5d86ff6f62043c3fbe823d0cd4f8f1712a6371b0f7ecd1414e7a9`。Node/exe × regular/fullscreen 四格全部 pass/exit 0，每格拒绝四种过期选择并记录注入后 metadata/state/transcript/current pointer 的 SHA-256 不变，同时保留合法恢复、数学源复制/导出及既有业务链。证据目录 `.omx/artifacts/phase20-selection-e76a93-{node,exe}-{regular,fullscreen}/`。
+- cycles 2,773 文件/零 runtime/type cycles、config 53/53、declarations 18/18与11/11、Node floor、strict docs 与 diff check 通过；NormProof exit 0/partial，零 open obligation、一个 failed advisory obligation及10个 proof gap，既有 ceiling 不改写为通过。首次误写不存在的 tgz 版本导致 ENOENT，改用仓库实际 `normproof-0.1.0.tgz` 后运行通过，未修改门禁。
+- Node/exe × line/pipe 另四格全部 pass/exit 0，仅回归既有命令、工具发现、任务与审批链，合计 Linux 八格通过。旧失败保留并分类：并发 executable build 的启动拒绝是构建调度；误将 `/resume panel` 报告面当选择器导致两格超时是 harness 入口错误，改用裸 `/resume` 后上述四格通过。
+- 首次完整 `test:ts` 实际失败：930文件通过/3失败/1跳过，9,931项通过/5失败/10跳过，535.64s。五项均位于三个浏览器CLI scenario文件，超时或缺预期输出；隔离重跑结果见下一项，不能将此轮记为通过。
+- 上述三个失败文件保持代码/断言不变，以 `--threads=false` 单独重跑3文件22项全部通过，163.95s；定位为并发负载下CLI子进程/超时失败。最终全量用 Vitest 现有 `VITEST_MAX_THREADS=2 VITEST_MIN_THREADS=2` 控制执行并发，未修改 package scripts/build/测试超时或断言；最终全量 exit 0，933 文件通过/1 跳过，9,936 项通过/10 跳过，877.36s。
+- 本批不将 PAN-02/PAN-06 改为 complete。最终完整测试已通过；提交、推送及精确 SHA CI 仍待取证。
+
+## 2026-10-23 RENDER-01 数学 token、显示边界与打包导出（代码批 `5150a635` 已推送；CI/Watch success）
 
 - `presentation/tui/transcript/math.ts` 现在拥有有界 math finder：代码 span、escaped dollar 和金额优先，未知/缺参数命令使整个公式回原文；`equation*`/`align*`/`gather*`/`multline*`/`cases` 与五种矩阵环境按行投影，nested 环境、12 行/12 列/64 cell/24 行/64 KiB 超限均保留完整源码。
 - `presentation/tui/text/inline.ts` 在 code span 之后、link/emphasis 之前把数学作为 opaque token 处理；`$a*b*c$` 不会被当成强调，公式内 Markdown link 不会生成 OSC8。`markdown.ts` 与 `session/export/htmlRender.ts` 共用同一 finder，HTML 对投影文本再次转义，`template.ts` 以 `white-space: pre-wrap` 保留矩阵行。
@@ -10,7 +43,7 @@
 - 聚焦 6 文件/158 项通过：math 8、markdown 59、source 20、HTML 40、template 10、export runtime 21。三组有效反转均实际失败并恢复：移除 opaque math token；HTML 改回 scalar conversion；恢复 partial unknown-command projection。
 - 完整 `test:ts` 为 931 文件通过/1 跳过、9,905 项通过/10 跳过、359.32s。`test:scripts` 157/157；Node/exe × regular/fullscreen 四格打包 PTY 全部 pass/exit 0，验证 math 投影、`/copy` 原始 LaTeX、`/export html` payload，fullscreen 还验证矩阵行和旧/新 diff 源复制；Node/exe × line/pipe 另外四格 pass/exit 0，只回归既有业务链。
 - TypeScript build `99e27b71db4bd5f9bf17edceec5e433bda2a058a9b836fd173a04e38f38e41f4`，inputs digest `616922d083cfdb4aab69b2f2c95467ec1332e3c4ea7f05f6b26d1a9661d08b87`，artifact digest `f30da6af85545cf13a7915e064679aa0d84ce95e25d3bd7bf2ad78798599cac8`，executable SHA-256 `506d47a52a7572a5e2589f0a4271bf6b43c26cfd5c4d899c9228341e816d7a49`。证据目录 `.omx/artifacts/phase20-render-math-pty-99e27b71db4b/`。
-- 当前矩阵为 35 `complete`/12 `partial`/0 `open`；RENDER-01 已完成本地、完整测试、构建与打包验收。代码尚未提交/推送，精确 SHA CI 与 Architecture Watch 仍需后续证据。
+- 当前矩阵为 35 `complete`/12 `partial`/0 `open`。代码批 `5150a63590275f76ff497e1b40a88fd928201d4a` 已推送；CI `39905250082`/job `120255608099` completed/success，全部步骤 success，05:20:55Z–05:32:36Z。Architecture Watch `39905249968`/job `120255607874` completed/success；两项结果仅绑定该 SHA。本次重新从 GitHub 读回结果，修正此前未提交/CI pending 的过期文字。
 
 ## 2026-10-23 RENDER-03 大 diff 完整查看与 RENDER-02 CI 稳定化（代码批 `9250632d` 已推送；CI/Watch success）
 

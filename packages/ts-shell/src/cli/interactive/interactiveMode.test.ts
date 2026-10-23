@@ -500,8 +500,11 @@ describe("session wiring", () => {
 
   it.each(['/tree', '/history'])('reads the current tree focus after loading %s through the queued command path', async command => {
     const { mode } = build();
-    const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void> };
+    const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void>; pickerHost(): PickerHost };
+    const original = host.pickerHost();
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, commandContext: { ...original.commandContext, admission: () => undefined } });
     const navigation = vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({
+      version: 'saved-v1',
       points: [
         { entryId: 'older', label: 'Older question', depth: 0, current: false, prompt: 'older' },
         { entryId: 'current', label: 'Current question', depth: 1, current: true, prompt: 'current' },
@@ -533,8 +536,10 @@ describe("session wiring", () => {
 
   it.each([true, false])('distinguishes queued history no-match from an empty tree (saved=%s)', async saved => {
     const { mode } = build();
-    const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void> };
-    vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({ points: saved
+    const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void>; pickerHost(): PickerHost };
+    const original = host.pickerHost();
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, commandContext: { ...original.commandContext, admission: () => undefined } });
+    vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({ version: 'saved-v1', points: saved
       ? [{ entryId: 'saved', depth: 0, label: 'Saved question', current: true }]
       : [] } as ReturnType<typeof sessionNavigation.readSessionNavigation>);
     mode.start();

@@ -11,6 +11,13 @@ export interface SessionSelectionContext {
   readonly allProjects?: boolean;
 }
 
+/** A saved picker choice, revalidated by the runtime after asynchronous resolution. */
+export interface SavedSessionSelection {
+  readonly sessionId: string;
+  readonly version: string;
+  readonly admission: () => string | undefined;
+}
+
 export function sessionChoices<T extends Session | SessionSummary>(sessions: readonly T[], context: SessionSelectionContext, limit = 40): {
   readonly sessions: readonly T[];
   readonly currentUnavailable?: string;

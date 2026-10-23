@@ -23,6 +23,7 @@ export function readSessionNavigation(sessionId: string, cwd: string, onSource?:
   readonly thread: SessionThreadSnapshot;
   readonly points: readonly SessionNavigationPoint[];
   readonly session: Session;
+  readonly version: string;
 } {
   const store = createSessionStoreLayout();
   for (const sessionsDir of store.sessionsSearchDirs) onSource?.(projectSessionFileLayout({ sessionsDir, sessionId }).sessionDir);
@@ -39,7 +40,7 @@ export function readSessionNavigation(sessionId: string, cwd: string, onSource?:
     throw new Error('The session changed while its navigation state was being read.');
   }
   const thread = catchUpSessionThread(state.thread ?? buildLinearSessionThreadSnapshot(session), session);
-  return { thread, points: projectSessionNavigation(thread, messages), session };
+  return { thread, points: projectSessionNavigation(thread, messages), session, version: before };
 }
 
 /** A repaired display edge never grants permission to navigate a broken path. */

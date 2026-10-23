@@ -36,6 +36,8 @@ export interface RewindPoint {
   readonly prompt: string;
   /** Turns that would be left behind. */
   readonly dropped: number;
+  /** Saved source version offered by a persistent tree. */
+  readonly version?: string;
 }
 
 export interface RewindPickerInput {

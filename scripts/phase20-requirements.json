@@ -162,8 +162,8 @@
     {
       "id": "PAN-02",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; resume grouping/search/paging/tree tests and PTY evidence",
-      "missing": "Remaining action identity/revision boundaries and total resource bounds remain; restore is tracked under PAN-06."
+      "evidence": ".wiki/features/phase-20-contract.md W6; actual catalog/picker/host resume version, tree/fork/history stale selection, surface lifetime and activation-failure readback tests; six reversals",
+      "missing": "Tree expansion/collapse and node detail layout, full saved-tree acquisition/search/retention resource bounds and remaining action-boundary audit remain; saved selection version/lifetime and activation-failure boundaries are repaired."
     },
     {
       "id": "PAN-03",

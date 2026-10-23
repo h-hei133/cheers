@@ -6,10 +6,10 @@ export function fileVersion(stat: Stats): readonly number[] {
 }
 
 /** Optimistic source version for a synchronous full-session acquisition. */
-export function readSessionFileVersion(layout: SessionFileLayout): string {
+export function readSessionFileVersion(layout: SessionFileLayout, options?: { readonly ignoreState?: boolean }): string {
   const directory = lstatSync(layout.sessionDir);
   if (!directory.isDirectory()) throw new Error('Session directory is unavailable.');
-  const files = [layout.metadataPath, layout.statePath, layout.transcriptPath].map(target => {
+  const files = [layout.metadataPath, ...(options?.ignoreState ? [] : [layout.statePath]), layout.transcriptPath].map(target => {
     const stat = lstatSync(target);
     if (!stat.isFile()) throw new Error('Session file is unavailable.');
     return fileVersion(stat);

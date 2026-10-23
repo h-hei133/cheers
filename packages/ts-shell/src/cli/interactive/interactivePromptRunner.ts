@@ -14,6 +14,7 @@ import { renderSessionCommandMap } from "../../entrypoints/slashCommandRegistry.
 import { switchRuntimeSessionProjectContext } from "../../entrypoints/cliSessionModule.js";
 
 export async function runInteractiveResumeAction(input: {
+  readonly sessionSelection?: import('../../session/navigation/selection.js').SavedSessionSelection;
   readonly slashResult: ResumeLikeShellAction;
   readonly fallbackSessionId?: string;
   readonly sessionManager: SessionManager;
@@ -27,6 +28,7 @@ export async function runInteractiveResumeAction(input: {
   ) => void;
 }): Promise<{ readonly turnNumber: number }> {
   const resumeBridge = await runResumeLikeShellAction({
+    ...(input.sessionSelection ? { sessionSelection: input.sessionSelection } : {}),
     slashResult: input.slashResult,
     source: "interactive",
     printMode: false,

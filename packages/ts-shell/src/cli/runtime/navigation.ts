@@ -23,12 +23,23 @@ export async function navigateSession(input: {
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionManager: Pick<SessionManager, "revertTo">;
   readonly sessionRuntime: Pick<ShellSessionRuntime, "getState" | "summarizeAbandonedTurns">;
-}, entryId?: string): Promise<SessionNavigationResult> {
+}, entryId?: string, expectedVersion?: string, admission?: () => string | undefined): Promise<SessionNavigationResult> {
   const { runtimeContext: context, sessionManager: manager, sessionRuntime: runtime } = input;
   const sessionId = context.session.id;
   const cwd = context.cwd;
   const projectRoot = context.projectRoot;
-  const { thread, points, session } = readSessionNavigation(sessionId, cwd);
+  const validate = (): void => {
+    let issue: string | undefined;
+    try { issue = admission?.(); }
+    catch { throw new Error('Session navigation is unavailable. Reopen its tree.'); }
+    if (issue) throw new Error(issue);
+  };
+  validate();
+  const { thread, points, session, version } = readSessionNavigation(sessionId, cwd);
+  if (expectedVersion !== undefined && expectedVersion !== version) return {
+    status: 'unchanged', changed: false,
+    output: 'The saved conversation changed after selection. Reopen the session tree before navigating.',
+  };
   const expectedRoot = normalizePathIdentity(projectRoot);
   if (!expectedRoot || normalizePathIdentity(session.projectRoot) !== expectedRoot) {
     throw new Error('The saved session belongs to a different project. Reopen it in that project before navigating.');
@@ -68,10 +79,11 @@ export async function navigateSession(input: {
     dropped = await manager.revertTo(sessionId, entryId,
       abandoned => runtime.summarizeAbandonedTurns(abandoned),
       () => {
+        validate();
         if (!isCurrent() || runtime.getState() === 'running') {
           throw new Error('The active session changed while preparing navigation.');
         }
-      });
+      }, version);
   } catch (error) {
     failed = true;
     if (error instanceof SessionNavigationWarning) { warning = error.message; dropped = error.dropped; }

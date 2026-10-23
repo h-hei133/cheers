@@ -73,7 +73,7 @@ export interface PickerHost extends SettingsHost {
   readonly agentDiscovery?: () => AgentDiscoveryView;
   readonly advisorState?: () => import('../../../advisor/model.js').AdvisorState | undefined;
   sessionContext(): SessionSelectionContext;
-  resumeSession(sessionId: string): Promise<string | undefined>;
+  resumeSession(sessionId: string, version?: string): Promise<string | undefined>;
   deleteSession(sessionId: string, version?: string): Promise<string | undefined>;
   renameSession(sessionId: string, title: string, version?: string): Promise<string | undefined>;
   pinSession?(sessionId: string, version?: string): Promise<string | undefined>;
@@ -88,7 +88,7 @@ export interface PickerHost extends SettingsHost {
   sessionTurns(): readonly SessionMessage[];
   /** Navigate by stable identity and return only the confirmed note and draft. */
   readonly rewind: RewindPickerInput['rewind'];
-  readonly fork?: (entryId: string) => Promise<undefined>;
+  readonly fork?: (entryId: string, version?: string) => Promise<undefined>;
 }
 
 type PickerFactory = (host: PickerHost, argument?: string) => Picker | undefined;
@@ -124,7 +124,7 @@ const PICKERS: Record<string, PickerFactory> = {
   back: (host, selector) => rewindPicker({ turns: host.sessionTurns(), rewind: host.rewind, selector }),
   tree: (host) => treePicker(host.commandContext, host.rewind),
   history: (host) => treePicker(host.commandContext, host.rewind, "history"),
-  fork: host => treePicker(host.commandContext, point => host.fork?.(point.entryId) ?? Promise.resolve(undefined), "fork"),
+  fork: host => treePicker(host.commandContext, point => host.fork?.(point.entryId, point.version) ?? Promise.resolve(undefined), "fork"),
   statusline: (host) =>
     statusItemPicker({
       current: host.statusItems,
@@ -152,6 +152,7 @@ function savedSessionPicker(host: PickerHost, action: 'resume' | 'pin'): Picker 
     sessionManager: host.sessionManager,
     context: host.sessionContext,
     resume: host.resumeSession,
+    admission: host.commandContext?.admission,
     pin: host.pinSession,
     action,
     ...(action === 'resume' ? { delete: host.deleteSession, rename: host.renameSession } : {}),
