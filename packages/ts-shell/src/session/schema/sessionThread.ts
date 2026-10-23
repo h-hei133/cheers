@@ -226,7 +226,7 @@ export function sessionThreadPath(
     // A cycle would otherwise hang the caller in a walk it cannot finish.
     if (seen.has(cursor.id)) return { path: [], resolved: false };
     seen.add(cursor.id);
-    path.unshift(cursor);
+    path.push(cursor);
     if (cursor.parentId === undefined) break;
     const parent = byId.get(cursor.parentId);
     // A parent named but absent: the chain is broken, so nothing below it can be
@@ -234,7 +234,7 @@ export function sessionThreadPath(
     if (parent === undefined) return { path: [], resolved: false };
     cursor = parent;
   }
-  return { path, resolved: true };
+  return { path: path.reverse(), resolved: true };
 }
 
 /**
@@ -253,12 +253,22 @@ export function sessionThreadPath(
 export function catchUpSessionThread(
   thread: SessionThreadSnapshot,
   session: Session,
+  maxEntries?: number,
 ): SessionThreadSnapshot {
   // A turn the tree already represents is not missing, whichever branch it is
   // on. Selecting by name rather than by counting from the end is what keeps a
   // turn that was stepped away from — and then returned to — from being added a
   // second time under a new parent.
   const known = new Set(thread.entries.map((entry) => entry.id));
+  if (maxEntries !== undefined) {
+    let count = thread.entries.length;
+    for (let index = 0; index < session.turns.length; index++) {
+      const turn = session.turns[index]!;
+      if (!isSessionContextMessage(turn) && !known.has(turn.id ?? sessionTurnEntryId(session.id, index + 1))) count++;
+      if (count > maxEntries) throw new Error('The saved tree exceeds the navigation entry limit.');
+    }
+    if (count > maxEntries) throw new Error('The saved tree exceeds the navigation entry limit.');
+  }
   const branch = sessionThreadPath(thread);
   // The name is decided here, once, and both the lookup and the entry use it.
   // Deriving it twice — from the turn's position to look for it, from the number

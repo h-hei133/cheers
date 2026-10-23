@@ -11,7 +11,7 @@
 | PRV-03 | 真实账户登录、刷新、失效、退出及跨连接隔离生命周期证据 | 需明确账户/provider、隔离 opt-in 运行条件；合成 token/audience 校验不替代实测 |
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
-| PAN-02 | tree 展开/折叠与节点详情布局；完整持久树获取/搜索/保留的总资源界；其余选择动作边界逐项审计 | 本地继续 tree consumer 和有界读取；本批只闭合已保存选择的版本、取消及激活故障边界 |
+| PAN-02 | tree 展开/详情及源获取上限本地已实现；仍缺整体 heap/时延测量与其余选择动作边界逐项审计 | 本地继续 tree consumer 和有界读取；本批只闭合已保存选择的版本、取消及激活故障边界 |
 | PAN-06 | history/copy/back/undo/restore/cleanse 的累计同步 I/O、内存/时延界及未覆盖的身份边界 | 本地按原 owner 逐项量化/修复；分页行数不等于总资源上界 |
 | PAN-07 | device-code 登录/退出端到端验收、完整认证生命周期；扩展总资源界及 unknown 跨重启保持 | 合成协议和扩展持久边界可本地继续；真实认证需账户/provider 条件 |
 | PAN-08 | 剩余 report consumer 的行为/安全/资源审计，完整 catalog/projection 总界；真实 MCP 连接/认证 | 本地继续消费者与资源界；真实连接需 server/认证条件 |
@@ -21,7 +21,17 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-23 PAN-02/PAN-06 保存选择边界（本地验证完成；提交与 CI 待取证）
+## 2026-10-23 PAN-02 tree 表单与有界获取（本地完整验证通过；提交与 CI 待取证）
+
+- /tree 复用现 full-screen panel 的宽屏详情列与窄屏 Preview；TreeModel 只持有显示展开态和 parent/end 索引，Left 为 collapse/parent、Right 为 expand/child。搜索完整 admitted 节点文本，临时穿透折叠而不清除展开态；稳定 current focus、未展示节点不 apply、取消和已接受选择释放保存投影，重复 pending 选择零动作。fork/history 保留原动作表面。
+- 每次打开上限先冻结再实现：metadata 256 KiB、state 8 MiB、transcript 16 MiB，合计24.25 MiB源文本；20,000个树节点、50,000物理transcript行、1,200字符详情摘录。原 descriptor reader 在 open 后再次校验字节/UTF-8/identity；catch-up 在构建前比较既有与缺失节点总数，context summary 不算新节点。上限不代表已测heap或时延，超限报告 unavailable。
+- bounded acquisition 拒绝损坏/未知provenance transcript、重复event ID、重复树ID及catch-up之前缺失的named active leaf；修复display edge的cycle/orphan仍显示disabled。原普通replay兼容与writer/lock保持。path改为push/reverse，深20,000节点验证不调用unshift。
+- 聚焦11文件261项、脚本157项、cycles2,777文件零runtime/type、config53/53、declarations18/18+11/11、Node floor、strict docs/diff check通过；NormProof exit0/partial，0 open/1 failed advisory/10 proof gaps。独立代码APPROVE/架构WATCH，synthesis COMMENT；source bounds不是性能完成证据，既有overlay callable count23未增加。
+- 七组有效反转均实际assertion failure并恢复字节：collapse、full search、preflight size、descriptor size、damage warning、catch-up cap、accepted-choice cleanup。首次pending cleanup反转只触发timeout，不算有效，追加accepted-choice assertion反转后七项闭合。
+- build `2e2164f27b2d607cd1ebd6ec79e7b3d0820bb7ffcd0bbdd00054b74a69c988b8`，inputs `a93860d273b99e8552874a7d6fff2a214a15386cbd9fecbc52a4560214cd8abf`，artifact `1fa6c1f273594c629992f39d374a958978aa9c6b13a15f2361bc623101ee5521`，exe SHA-256 `cf40e424983d55b82f1629d77a85b2771faf7d0ac877f994a6616e9736591b61`。Node/exe × regular/fullscreen四格pass/exit0，tree details/keys/search/cancel与四种stale selection均取证，保存文件hash相等。证据 `.omx/artifacts/phase20-tree-2e2164-{node,exe}-{regular,fullscreen}/`；node regular成功retry另在后缀`-retry`目录。旧失败保留：两次harness误将collapse/parent和expand/child合一步；一次源码反转中运行导致build freshness拒绝；一次Node启动读取build transaction失败，单格retry通过。
+- 最终完整 `test:ts` exit0，935文件通过/1跳过，9,955项通过/10跳过，825.94s；采用现有Vitest环境变量限制为两worker，测试后17个非文档输入SHA-256全部与冻结快照相等。PAN-02保持partial：上述admission是源/记录上限，累计同步I/O、peak heap、交互响应与全部目录/动作合同未闭合。提交、推送与新SHA CI分别待取证。
+
+## 2026-10-23 PAN-02/PAN-06 保存选择边界（代码批 `2e68fd54` 已推送；CI/Watch success）
 
 - resume/tree/fork/history 绑定实际展示时的 session ID、完整保存版本和原 admission；resume 在异步解析后及原 state lock 内重验，fork 在创建新目录前重验，tree 导航在 summary 后的原 writer 边界重验。分支 A→B→A 也使旧选择失效。
 - 导航比较 metadata/transcript 版本及除 usage/requestLedger 外的完整 state；实际 summary usage sink 的记账保留且不误拒绝自身计量，外部 transcript/state 修改仍拒绝。
@@ -33,7 +43,7 @@
 - Node/exe × line/pipe 另四格全部 pass/exit 0，仅回归既有命令、工具发现、任务与审批链，合计 Linux 八格通过。旧失败保留并分类：并发 executable build 的启动拒绝是构建调度；误将 `/resume panel` 报告面当选择器导致两格超时是 harness 入口错误，改用裸 `/resume` 后上述四格通过。
 - 首次完整 `test:ts` 实际失败：930文件通过/3失败/1跳过，9,931项通过/5失败/10跳过，535.64s。五项均位于三个浏览器CLI scenario文件，超时或缺预期输出；隔离重跑结果见下一项，不能将此轮记为通过。
 - 上述三个失败文件保持代码/断言不变，以 `--threads=false` 单独重跑3文件22项全部通过，163.95s；定位为并发负载下CLI子进程/超时失败。最终全量用 Vitest 现有 `VITEST_MAX_THREADS=2 VITEST_MIN_THREADS=2` 控制执行并发，未修改 package scripts/build/测试超时或断言；最终全量 exit 0，933 文件通过/1 跳过，9,936 项通过/10 跳过，877.36s。
-- 本批不将 PAN-02/PAN-06 改为 complete。最终完整测试已通过；提交、推送及精确 SHA CI 仍待取证。
+- 本批不将 PAN-02/PAN-06 改为 complete。最终完整测试已通过。代码批 `2e68fd54e2552121e41cf3044a06a2476146c086` 已推送，远端 main 精确读回；CI `39914569820` completed/success，933 文件/9,943 项通过（3 项跳过，917.30s），静态/脚本/构建/完整测试/NormProof 步骤均 success；Watch `39914569843`/job `120285089017` completed/success。CI job `120285088911` 后续读回 completed/success，06:56:18Z–07:13:00Z；先前 job 字段延迟现已同步。
 
 ## 2026-10-23 RENDER-01 数学 token、显示边界与打包导出（代码批 `5150a635` 已推送；CI/Watch success）
 

@@ -26,10 +26,11 @@ export function readStateSnapshotSafely(
   });
 }
 
-export function readStateSnapshotRequired(statePath: string): SessionStateSnapshot {
+export function readStateSnapshotRequired(statePath: string, maxBytes?: number): SessionStateSnapshot {
   const state = readJsonFileWithRetry<SessionStateSnapshot>(statePath, {
     required: true,
     parseErrorDetail: `Failed to load session state from ${statePath}`,
+    maxBytes,
   });
   if (!state) {
     throw new Error(`Session state missing at ${statePath}`);

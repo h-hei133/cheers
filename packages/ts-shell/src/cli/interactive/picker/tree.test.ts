@@ -9,10 +9,90 @@ vi.mock('../../../session/query/navigation.js', async importOriginal => {
 
 import { treePicker, treePrefixes } from './tree.js';
 import { scanCommandArgs } from '../../../core/commands/arguments.js';
+import { OverlayHost } from '../overlay.js';
+import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
+import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
+import { visibleWidth } from '../../../presentation/tui/text/measure.js';
 
 const point = (entryId: string, depth: number): SessionNavigationPoint => ({ entryId, depth, label: entryId, current: false });
 
 beforeEach(() => { navigation.readSessionNavigation.mockReset(); });
+
+it('routes disclosure through the real overlay and refuses an unoffered hidden descendant', async () => {
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v1', points: [
+    { ...point('root', 0), label: 'Session start', current: true },
+    { ...point('child', 1), label: 'saved answer', searchText: 'needle after preview', excerpt: 'detail excerpt', parentId: 'root' },
+  ] });
+  const action = vi.fn(); const picker = treePicker({ sessionId: 'session', cwd: '/workspace' } as never, action);
+  const host = new OverlayHost(() => {}); host.open(picker); await Promise.resolve(); await Promise.resolve();
+  const frame = () => host.render(120, 24).map(stripAnsi).join('\n');
+  expect(frame()).toContain('saved answer');
+  host.handleKey(parseKeyEvent('\x1b[D'), vi.fn());
+  expect(frame()).not.toContain('saved answer');
+  expect(await picker.apply(['child'])).toBeUndefined();
+  expect(action).not.toHaveBeenCalled();
+  host.handlePaste('needle');
+  expect(frame()).toContain('saved answer');
+  expect(frame()).toContain('detail excerpt');
+  host.handleKey(parseKeyEvent('\x1b[D'), vi.fn());
+  expect(frame()).toContain('detail excerpt');
+  for (let i = 0; i < 6; i++) host.handleKey(parseKeyEvent('\x7f'), vi.fn());
+  expect(frame()).not.toContain('saved answer');
+  host.handleKey(parseKeyEvent('\x1b[C'), vi.fn());
+  expect(frame()).toContain('saved answer');
+  host.close();
+  expect(await picker.apply(['root'])).toBeUndefined();
+  expect(action).not.toHaveBeenCalled();
+});
+
+it('fits node details to every prescribed rectangle and neutralises saved control characters', async () => {
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v1', points: [
+    { ...point('entry', 0), current: true, label: 'user: width界', excerpt: 'hello\x1b]52;inject\x07\nnext', timestamp: 'today' },
+  ] });
+  const host = new OverlayHost(() => {});
+  host.open(treePicker({ sessionId: 'session', cwd: '/workspace' } as never, vi.fn()));
+  await Promise.resolve(); await Promise.resolve();
+  for (const width of [20, 40, 80, 120, 200]) for (const height of [8, 24, 40, 80]) {
+    const rows = host.render(width, height);
+    expect(rows.length).toBeLessThanOrEqual(height);
+    expect(rows.every(row => visibleWidth(row) <= width)).toBe(true);
+  }
+  const wide = host.render(120, 24).join('\n');
+  expect(wide).toContain('Entry: entry');
+  expect(wide).toContain('\\x1b]52;inject\\x07\\x0anext');
+  expect(wide).not.toContain('\x1b]52;');
+  expect(host.render(40, 24).map(stripAnsi).join('\n')).toContain('Preview');
+  host.close();
+});
+
+it('releases accepted choices and details before a retained picker can be selected again', async () => {
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v1', points: [
+    { ...point('entry', 0), current: true, excerpt: 'saved detail' },
+  ] });
+  const action = vi.fn(async () => ({ note: 'navigated' }));
+  const picker = treePicker({ sessionId: 'session', cwd: '/workspace' } as never, action);
+  const host = new OverlayHost(() => {}); host.open(picker); await Promise.resolve(); await Promise.resolve();
+  let pending: Promise<unknown> | undefined;
+  host.handleKey(parseKeyEvent('\r'), (selected, ids) => { pending = selected.apply(ids); });
+  await pending;
+  expect(action).toHaveBeenCalledTimes(1);
+  expect(picker.detail?.('entry')).toEqual([]);
+  expect(await picker.apply(['entry'])).toBeUndefined();
+  expect(action).toHaveBeenCalledTimes(1);
+  expect(host.active).toBe(false);
+});
+
+it('consumes the choice before asynchronous navigation settles', async () => {
+  navigation.readSessionNavigation.mockReturnValue({ version: 'saved-v1', points: [point('entry', 0)] });
+  let finish!: () => void;
+  const action = vi.fn(() => new Promise<undefined>(resolve => { finish = () => resolve(undefined); }));
+  const picker = treePicker({ sessionId: 'session', cwd: '/workspace' } as never, action);
+  await picker.load(); const pending = picker.apply(['entry']);
+  expect(await picker.apply(['entry'])).toBeUndefined();
+  expect(picker.detail?.('entry')).toEqual([]);
+  expect(action).toHaveBeenCalledTimes(1);
+  finish(); await pending;
+});
 
 it('draws branch and continuation glyphs from the depth-first point list', () => {
   const points = [point('root-a', 0), point('child-a1', 1), point('child-a2', 1), point('root-b', 0)];

@@ -4,6 +4,7 @@ import type { Picker } from "../overlay.js";
 import type { RewindPickerInput } from "./rewind.js";
 import { quoteCompletion } from "../completion.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
+import { TreeModel } from '../../../presentation/tui/chrome/tree.js';
 
 export type TreePickerMode = "tree" | "fork" | "history";
 const MAX_VISIBLE_DEPTH = 10;
@@ -45,6 +46,8 @@ export function treePicker(
   const userOnly = mode === "fork";
   let points: readonly SessionNavigationPoint[] = [];
   let version: string | undefined;
+  let tree: TreeModel | undefined;
+  let query = '';
   const admission = (): string | undefined => {
     try { return context.admission?.(); }
     catch { return 'Session navigation is unavailable. Reopen the session tree.'; }
@@ -52,7 +55,27 @@ export function treePicker(
   return {
     title: mode === "fork" ? 'Fork before saved question'
       : mode === "history" ? 'Session history' : 'Session tree',
-    form: "modal",
+    form: mode === 'tree' ? 'panel' : 'modal',
+    ...(mode === 'tree' ? {
+      fullScreen: true,
+      footer: '← collapse/parent · → expand/child · Enter navigate · Esc to close. Files are kept.',
+      loadError: 'Session tree unavailable or beyond navigation limits. No entries were selected.',
+      filterOptions(filter: string, options: readonly Option[]) {
+        query = filter;
+        return tree?.filter(filter, options) ?? options;
+      },
+      navigate(direction: 'left' | 'right', id: string, filter: string) {
+        return tree?.navigate(direction, id, filter);
+      },
+      detail(id: string | undefined) {
+        const point = points.find(point => point.entryId === id);
+        if (!point) return [];
+        return [point.label, `Entry: ${point.entryId}`, `Parent: ${point.parentId ?? 'root'}`,
+          ...(point.timestamp ? [`Saved: ${point.timestamp}`] : []),
+          `State: ${point.unavailable ?? (point.current ? 'current' : 'available')}`,
+          'Navigating keeps files.', ...(point.excerpt ? [point.excerpt] : [])];
+      },
+    } : {}),
     exclusive: true,
     empty: mode === "history" ? "No session history entries to show." : "No session entries are available.",
     ...(mode === "history" ? {
@@ -77,31 +100,38 @@ export function treePicker(
       version = snapshot?.version;
       points = snapshot?.points.filter(point => !userOnly || point.prompt !== undefined) ?? [];
       const prefixes = treePrefixes(points);
-      return points.map((point, index) => ({
+      const options = points.map((point, index) => ({
         id: point.entryId,
+        depth: point.depth,
         label: `${prefixes[index]}${point.label}`,
         detail: point.entryId,
-        searchText: `${point.entryId} ${point.label} ${point.prompt ?? ""}`,
+        searchText: `${point.entryId} ${point.label} ${point.searchText ?? point.prompt ?? ""}`,
         note: point.unavailable ?? (point.current ? "current" : "keeps files"),
         disabled: point.unavailable !== undefined,
       }));
+      tree = mode === 'tree' ? new TreeModel(options) : undefined;
+      return tree?.catalogue ?? options;
     },
     async apply(ids) {
       if (ids.length !== 1) return undefined;
       const point = points.find((candidate) => candidate.entryId === ids[0]);
       if (!point || point.unavailable) return undefined;
+      if (tree && !tree.filter(query, tree.catalogue).some(option => option.id === point.entryId)) return undefined;
+      const offeredVersion = version;
+      points = []; tree = undefined; version = undefined; query = '';
       const blocked = admission();
       if (blocked) return { note: blocked };
       try {
-        if (!context.sessionId || !version
-          || readSessionNavigation(context.sessionId, context.cwd).version !== version) {
+        if (!context.sessionId || !offeredVersion
+          || readSessionNavigation(context.sessionId, context.cwd).version !== offeredVersion) {
           return { note: 'The saved conversation changed after this tree opened. Reopen it before selecting an entry.' };
         }
       } catch {
         return { note: 'The saved conversation is unavailable. Reopen the session tree.' };
       }
       if (mode === "history") return { draft: `/tree -- ${quoteCompletion(point.entryId, "")}` };
-      return rewind({ entryId: point.entryId, prompt: point.prompt ?? "", dropped: 0, version });
+      return await rewind({ entryId: point.entryId, prompt: point.prompt ?? "", dropped: 0, version: offeredVersion });
     },
+    previewEnd() { points = []; tree = undefined; version = undefined; query = ''; },
   };
 }

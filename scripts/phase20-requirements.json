@@ -162,8 +162,8 @@
     {
       "id": "PAN-02",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; actual catalog/picker/host resume version, tree/fork/history stale selection, surface lifetime and activation-failure readback tests; six reversals",
-      "missing": "Tree expansion/collapse and node detail layout, full saved-tree acquisition/search/retention resource bounds and remaining action-boundary audit remain; saved selection version/lifetime and activation-failure boundaries are repaired."
+      "evidence": ".wiki/features/phase-20-contract.md W6; saved version/lifetime/readback boundaries; tree disclosure/detail/full admitted-node search and bounded descriptor acquisition; focused261, seven tree reversals and four tree PTYs",
+      "missing": "Tree source admission implemented; total heap/latency evidence and complete authorized-catalog search/pagination beyond retained result limits, plus remaining action-boundary audit remain."
     },
     {
       "id": "PAN-03",

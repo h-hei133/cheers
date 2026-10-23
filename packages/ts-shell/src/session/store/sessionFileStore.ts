@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import os from "node:os";
 import * as path from "node:path";
 import { isLockStale, takeOverStaleLock, type LockRecovery } from "./lockStaleness.js";
+import { readTextFile } from '../../core/workspace/files.js';
 
 const STATE_IO_MAX_ATTEMPTS = 6;
 const STATE_IO_RETRY_DELAY_MS = 12;
@@ -11,7 +12,7 @@ const STATE_LOCK_RETRY_DELAY_MS = 20;
 
 export function readJsonFileWithRetry<T>(
   filePath: string,
-  options: { required: boolean; parseErrorDetail: string },
+  options: { required: boolean; parseErrorDetail: string; maxBytes?: number },
 ): T | undefined {
   for (let attempt = 1; attempt <= STATE_IO_MAX_ATTEMPTS; attempt += 1) {
     try {
@@ -25,7 +26,8 @@ export function readJsonFileWithRetry<T>(
         sleepBlocking(STATE_IO_RETRY_DELAY_MS);
         continue;
       }
-      const raw = fs.readFileSync(filePath, "utf8").trim();
+      const raw = (options.maxBytes === undefined ? fs.readFileSync(filePath, "utf8")
+        : readTextFile(filePath, options.maxBytes) ?? '').trim();
       if (raw.length === 0) {
         if (options.required && attempt === STATE_IO_MAX_ATTEMPTS) {
           throw new Error(`File empty at ${filePath}`);

@@ -6,6 +6,7 @@ import type { SessionMetadata } from "../schema/sessionMetadataCodec.js";
 import { projectSessionMetadata } from "../schema/sessionMetadataCodec.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
+import { isSessionContextMessage } from '../schema/sessionMessage.js';
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { buildSessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { projectBranchMessages, readTranscriptEvents } from "../transcript/sessionTranscript.js";
@@ -76,10 +77,11 @@ export function writeSessionMetadataRecord(input: {
   });
 }
 
-export function readSessionMetadataRecord(metadataPath: string): SessionMetadata | undefined {
+export function readSessionMetadataRecord(metadataPath: string, maxBytes?: number): SessionMetadata | undefined {
   return readJsonFileWithRetry<SessionMetadata>(metadataPath, {
     required: true,
     parseErrorDetail: "Failed to load session metadata",
+    maxBytes,
   });
 }
 
@@ -97,6 +99,15 @@ interface SessionReadInput {
   readonly sessionId: string;
   readonly layout: SessionFileLayout;
   readonly cwd: string;
+  readonly limits?: SessionReadLimits;
+}
+
+export interface SessionReadLimits {
+  readonly metadataBytes: number;
+  readonly stateBytes: number;
+  readonly transcriptBytes: number;
+  readonly transcriptLines: number;
+  readonly entries: number;
 }
 
 export interface SessionRecordSnapshot {
@@ -120,8 +131,12 @@ export function readSessionRecordSnapshot(input: SessionReadInput): SessionRecor
   }
 
   try {
-    const metadata = readSessionMetadataRecord(input.layout.metadataPath);
-    const state = readStateSnapshotRequired(input.layout.statePath);
+    const metadata = readSessionMetadataRecord(input.layout.metadataPath, input.limits?.metadataBytes);
+    const state = readStateSnapshotRequired(input.layout.statePath, input.limits?.stateBytes);
+    if (input.limits && state.thread !== undefined &&
+      (!Array.isArray(state.thread.entries) || state.thread.entries.length > input.limits.entries)) {
+      throw new Error('The saved tree exceeds the navigation entry limit or is damaged.');
+    }
     // Which branch is in view is a question about the thread, so the thread
     // answers it. Without a thread — a session recorded before any of this
     // existed — every message in the transcript is the conversation, as before.
@@ -135,12 +150,18 @@ export function readSessionRecordSnapshot(input: SessionReadInput): SessionRecor
     const branchPath = threadPath?.resolved === true
       ? threadPath.path.map((entry) => entry.id)
       : undefined;
-    const events = readTranscriptEvents(input.layout.transcriptPath);
+    const events = readTranscriptEvents(input.layout.transcriptPath, input.limits ? {
+      maxBytes: input.limits.transcriptBytes, maxLines: input.limits.transcriptLines,
+    } : undefined);
     const turns = projectBranchMessages(
       events,
       branchPath,
       state.thread?.entries.map((entry) => entry.id),
     );
+    if (input.limits && state.thread === undefined &&
+      turns.reduce((count, turn) => count + (isSessionContextMessage(turn) ? 0 : 1), 1) > input.limits.entries) {
+      throw new Error('The saved conversation exceeds the navigation entry limit.');
+    }
 
     const session = projectLoadedSession({
       metadata,

@@ -8575,4 +8575,10 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 原 interactive owner 拒绝 stop/closing/cancel/aborted 后迟到激活；激活后 cleanup 故障以精确保存版本和只读 registry 读回报告 verified warning 或 unknown，保留实际状态并阻止继续操作/自动恢复。
 - 受影响24文件398项通过，另3项 registry只读合同通过；result-contract 6套158项、script157项、六组有效反转通过并恢复字节。独立代码APPROVE/架构WATCH。
 - Node/exe × regular/fullscreen 四格 hostile PTY 全部 pass/exit0：每格拒绝 resume/tree/fork/history 过期选择，注入后保存文件及 current pointer 的SHA-256保持不变；合法恢复、math原文复制/HTML导出及既有业务链继续通过。
-- 构建 `e76a93d26bea083712065ebc14af837f8508b67bd5e6aef7d04d1e4f336e05d2`，inputs `cbc141ffb6843cc105a2fefd8f5ac210b3f69df36d1fe5461bbc88cbe5aa05f5`，artifact `5ccaf5f041fd7129e547b4ec66578925fbbc2d47cf955eb3a28e8fa49385b4c8`，exe SHA-256 `efaed6e1c5a5d86ff6f62043c3fbe823d0cd4f8f1712a6371b0f7ecd1414e7a9`。最终完整测试933文件/9,936项通过（10项跳过，877.36s）；首次并发全量的3文件5项失败与隔离22项通过仍保留，未改断言。提交/CI待取证；PAN-02/PAN-06与全阶段仍partial，12项剩余工作已列在状态页顶部。
+- 构建 `e76a93d26bea083712065ebc14af837f8508b67bd5e6aef7d04d1e4f336e05d2`，inputs `cbc141ffb6843cc105a2fefd8f5ac210b3f69df36d1fe5461bbc88cbe5aa05f5`，artifact `5ccaf5f041fd7129e547b4ec66578925fbbc2d47cf955eb3a28e8fa49385b4c8`，exe SHA-256 `efaed6e1c5a5d86ff6f62043c3fbe823d0cd4f8f1712a6371b0f7ecd1414e7a9`。最终完整测试933文件/9,936项通过（10项跳过，877.36s）；首次并发全量的3文件5项失败与隔离22项通过仍保留，未改断言。代码批 `2e68fd54e2552121e41cf3044a06a2476146c086` 已推送；CI `39914569820` completed/success，933文件/9,943项通过（3项跳过，917.30s），Watch `39914569843`/job `120285089017` success。CI job `120285088911` 后续读回completed/success，06:56:18Z–07:13:00Z，字段延迟已同步；PAN-02/PAN-06与全阶段仍partial，12项剩余工作已列在状态页顶部。
+
+## [2026-10-23] fix | PAN-02 tree 表单与有界获取
+
+- 复用full-screen panel/OptionModel，新增display TreeModel展开态、完整节点搜索与详情；原writer/lock不变，隐藏节点和重复选择拒绝，close/accept释放源。
+- 冻结metadata256KiB/state8MiB/transcript16MiB、20k节点/50k行准入，descriptor二验，catch-up预先计数，context summary不计节点；损坏transcript/重复ID/缺失active leaf拒绝。
+- 聚焦11文件261项、scripts157、静态门通过，七有效反转与Node/exe regular/fullscreen四格PTY通过；独立APPROVE/WATCH。最终完整测试exit0，935文件/9,955项通过、10项跳过，825.94s；17个非文档输入与冻结hash全部相等。提交/新SHA CI待取证，PAN-02及全阶段仍partial；构建与失败分类见状态页。

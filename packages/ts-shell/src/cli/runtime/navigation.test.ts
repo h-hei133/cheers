@@ -373,27 +373,31 @@ describe("session tree navigation", () => {
     await input.sessionManager.revertTo(session.id, turns[3]!.id!);
     const stateB = fs.readFileSync(layout.statePath, 'utf8');
     fs.writeFileSync(layout.statePath, stateA);
-    const read = fs.readFileSync;
+    const read = fs.readSync;
     const target = kind === 'state-aba' ? layout.statePath : layout.transcriptPath;
+    const identity = fs.statSync(target);
+    const transcript = fs.readFileSync(layout.transcriptPath, 'utf8');
     let reads = 0;
-    const spy = vi.spyOn(fs, 'readFileSync').mockImplementation(((file, ...args) => {
-      const result = read(file, ...args);
-      if (String(file) === target && ++reads === 1) {
+    const spy = vi.spyOn(fs, 'readSync').mockImplementation(((fd, ...args) => {
+      const result = read(fd, ...args);
+      const opened = fs.fstatSync(fd);
+      if (reads === 0 && result > 0 && opened.dev === identity.dev && opened.ino === identity.ino) {
+        reads++;
         if (kind === 'state-aba') {
           fs.writeFileSync(layout.statePath, stateB);
           fs.writeFileSync(layout.statePath, stateA);
         } else {
-          fs.writeFileSync(target, String(result).replace('First question', 'Revised question'));
+          fs.writeFileSync(target, transcript.replace('First question', 'Revised question'));
         }
         // Two immediate writes can share a filesystem clock tick; make the source version distinct.
         const stat = fs.statSync(target);
         fs.utimesSync(target, stat.atime, new Date(stat.mtimeMs + 1000));
       }
       return result;
-    }) as typeof fs.readFileSync);
+    }) as typeof fs.readSync);
     syncBuiltinESMExports();
     try {
-      expect(() => readSessionNavigation(session.id, root)).toThrow('changed while');
+      expect(() => readSessionNavigation(session.id, root)).toThrow(/changed during|changed while/);
       expect(reads).toBe(1);
     } finally {
       spy.mockRestore();

@@ -16,6 +16,12 @@ import {
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { Session } from "../schema/sessionRecord.js";
 import { publishedCompactionEvents } from '../compaction/publication.js';
+import { readTextFile } from '../../core/workspace/files.js';
+
+export interface TranscriptReadLimits {
+  readonly maxBytes: number;
+  readonly maxLines: number;
+}
 
 /**
  * The whole transcript: its format version, and the entries in order.
@@ -31,8 +37,8 @@ export interface ReadTranscript {
   readonly warnings: readonly string[];
 }
 
-export function readTranscriptEvents(transcriptPath: string): TranscriptEvent[] {
-  return readTranscript(transcriptPath).events as TranscriptEvent[];
+export function readTranscriptEvents(transcriptPath: string, limits?: TranscriptReadLimits): TranscriptEvent[] {
+  return readTranscript(transcriptPath, limits).events as TranscriptEvent[];
 }
 
 /**
@@ -44,15 +50,33 @@ export function readTranscriptEvents(transcriptPath: string): TranscriptEvent[] 
  * depending on whether a header happened to precede it. Entries start at one
  * either way.
  */
-export function readTranscript(transcriptPath: string): ReadTranscript {
+export function readTranscript(transcriptPath: string, limits?: TranscriptReadLimits): ReadTranscript {
   if (!fs.existsSync(transcriptPath)) {
     return { version: 0, events: [], unreadableLines: 0, warnings: [] };
   }
-  return parseTranscript(fs.readFileSync(transcriptPath, "utf8"));
+  const text = limits ? readTextFile(transcriptPath, limits.maxBytes) : fs.readFileSync(transcriptPath, "utf8");
+  if (text === undefined) throw new Error('The saved transcript is unavailable.');
+  const result = parseTranscript(text, limits?.maxLines);
+  if (limits && result.warnings.length > 0) throw new Error('The saved transcript is damaged or has uncertain provenance.');
+  if (limits) {
+    const identities = new Set<string>();
+    for (const event of result.events) {
+      if (event.id !== undefined && identities.has(event.id)) throw new Error('The saved transcript has duplicate entry identities.');
+      if (event.id !== undefined) identities.add(event.id);
+    }
+  }
+  return result;
 }
 
 /** Decode already acquired text through the same compatibility rules as replay. */
-export function parseTranscript(text: string): ReadTranscript {
+export function parseTranscript(text: string, maxLines?: number): ReadTranscript {
+  if (maxLines !== undefined) {
+    let lines = text.length === 0 ? 0 : 1;
+    for (let index = 0; index < text.length; index++) {
+      if (text.charCodeAt(index) === 10 && index + 1 < text.length) lines++;
+      if (lines > maxLines) throw new Error('The saved transcript exceeds the navigation line limit.');
+    }
+  }
   const events: TranscriptEvent[] = [];
   let header: TranscriptHeader | undefined;
   let lineNumber = 0;

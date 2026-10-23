@@ -86,6 +86,11 @@ export interface Picker {
   readonly detailRows?: number;
   /** A second column in the inline panel when the surface is wide enough. */
   readonly detail?: (id: string | undefined) => readonly string[];
+  /** Display-only hierarchy movement; returned identities still must be visible. */
+  navigate?(direction: 'left' | 'right', id: string, query: string): {
+    readonly options: readonly Option[];
+    readonly focus?: string;
+  } | undefined;
   /** A tab strip; selecting a chip opens the picker it returns. */
   readonly chips?: { readonly items: readonly Chip[]; readonly active: string; select(id: string): Picker | undefined };
   /** Options to offer; may hit the network or the filesystem. */
@@ -567,6 +572,19 @@ export class OverlayHost {
     }
 
     const groupAction = this.bindings.actionFor(event.keyId, 'overlay');
+    if (!isApprovalPicker && !this.loading && focused && picker.navigate &&
+      (event.keyId === 'left' || event.keyId === 'right')) {
+      const update = picker.navigate(event.keyId, focused, this.model.filter.trim().toLowerCase());
+      if (update) {
+        this.optionRows.clear();
+        this.baseOptions = update.options;
+        this.model.setOptions(update.options);
+        if (update.focus) this.model.focus(update.focus);
+        picker.previewChange?.(idsOf(this.model.current()));
+      }
+      this.onChange();
+      return true;
+    }
     if (!isApprovalPicker && picker.chips?.items.length &&
         (groupAction === 'tui.overlay.nextGroup' || groupAction === 'tui.overlay.previousGroup')) {
       const chips = picker.chips;
