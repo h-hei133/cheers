@@ -21,7 +21,7 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-undo 已改为逐条消费共享预算的 operation scan：历史页最多保留 40 条选中 receipt，latest/精确 ID 只保留所需结果，不再先保留整个解码数组。完整 receipt 校验与 revision 仍覆盖全部记录，32 MiB 仍是单次读取预算，后续每页仍重新扫描，不能宣称已有跨页累计读取上限、OS physical I/O 或总 heap 证明。当前 cleanse inspection 从 bound store 读取 metadata/state，版本检查还观察 transcript 变化但不获取其正文；一次活跃订阅中的强制刷新现已串行排空并合并为一个待刷新标志，仍不能以此宣称所有直接读取、跨视图重开或整体资源验收完成。
+undo 已改为逐条消费共享预算的 operation scan：历史页最多保留 40 条选中 receipt，latest/精确 ID 只保留所需结果，不再先保留整个解码数组。交互式历史读取现在每个receipt之间让出事件循环，关闭/撤销阻断下一条 acquisition，加载代际防止旧结果覆盖新页；结束时复核目录/index/receipt的紧凑source version，完整receipt digest及原跨进程cursor保持。32 MiB仍是单次读取预算，后续每页仍重新扫描，不能宣称已有跨页累计读取上限、OS physical I/O或总heap证明。单个JSON、index/inventory和最终stat复核仍同步有界，不是整段扫描的硬延迟保证。当前cleanse inspection从bound store读取metadata/state，版本检查还观察transcript变化但不获取其正文；一次活跃订阅的强制刷新串行排空并合并为一个待刷新标志，不外推直接读取、跨视图或整体资源验收。
 
 ### 剩余验收的范围与结束条件
 
@@ -35,6 +35,14 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 | 最终交付：QA-04 | 全范围验收闭合后汇总静态/结构检查、独立审查、文档、精确源码 SHA 的提交/推送/CI；原 §6.6 的最终跨域 `test:ts` 与两种构建仍需单独取证。本轮用户禁止本地全量回归的 OOM 红线优先，全套证据由适用远端 CI 承接。各批检查有效，不因本次纯测试/证据改动重复产品构建；用户要求的是提交至 GitHub，未要求新增公开 Release。 |
 
 累计 OS physical I/O、page-cache 与总 heap/最长响应是当前资源 WATCH 的补充观测维度；原决策没有要求在任意机器上证明这些量的统一绝对上界。后续测量必须说明它验证上述哪一项有界性；未测仍如实标注，不把“缺这项观测”写成新功能缺陷，也不以本次范围说明静默关闭已有资源验收。§6.5 的数值是需校准的候选目标；已闭合的 START-03 不因本次纯测试改动重新开放。
+
+## 2026-10-24 PAN-06 undo 历史可取消批次与源复核（本地实现与聚焦验证）
+
+- 原历史页同步消费整个ledger，即使只保留40条也无法处理receipt之间排队的关闭。三个真实小型receipt回归在原实现产生两项AssertionError：关闭来不及处理、已散列receipt随后变化仍返回成功页。新异步投影复用同一operation scan及共享digest/page accumulator，每receipt后让出事件循环；主命令同步接口、原canonical scope+receipts digest、跨进程cursor、unknown barrier和write/approval合同保持。
+- operation owner在单次32MiB扫描预算内保留目录、index及已读receipt的紧凑stat版本，单文件读取前后及完整扫描结束时复核；最多10002个source版本，不保留所有解码receipt。异步消费每次acquisition前后重检signal/admission/scope；picker load代际丢弃旧结果，旧失败不关闭新页，选择仍重读完整revision并复核opening host。
+- `undo/history.test.ts`补真实OverlayHost关闭、下一条receipt零返回字节、receipt/index/inventory在批次间变化拒绝、同步异步page/cursor一致、新旧load及撤销准入；损坏尾部和三页可达原断言保留。聚焦3文件42项通过；让出事件循环、禁止先收集全receipt、source复核、逐条准入和load代际五项保护反转有效。代际反转首次为直接抛错，改用明确resolves断言后产生AssertionError，未改变预期合同。
+- 对照参考逐文件signal检查、可取消stream和selector当前controller发布；本仓继续复用原同步descriptor reader与全ledger校验，不复制summary读取方案。单个JSON读取/parse/hash、index/inventory及结束stat pass仍为同步有界步骤，source version只是乐观新鲜度，不宣称跨文件原子快照、硬最长响应、physical I/O/总heap或跨页累计上界。Phase20保持35 complete /12 partial /0 open。
+- 最终恢复后的3文件42项、静态门/47项matrix及TS build串行通过，测试/构建V8 heap限制1536/2048MiB。build `be393c7a3f0623756ba501efb011034a34b7340c051b05532e344235295f9f50`，inputs `4379bacf767c917d2c8ac8fe1f7836778a1682f18355fbf1f380587b074eca87`，artifact `5a1f184d9397a622b84a8c86f5293e1bfb36029c9364f7819338a22582157993`。独立代码APPROVE/架构CLEAR，综合APPROVE；两路只读审查未执行验证，确认生产模块未超20函数上限。未跑全量回归、exe、PTY或真实20k消息压测；本批提交/推送/新SHA CI分别取证。
 
 ## 2026-10-24 PAN-06 cleanse 刷新排空与合并（`b2b72b57`；已推送、CI运行中）
 

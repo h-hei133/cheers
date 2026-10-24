@@ -6,7 +6,7 @@ import { latestOperation, previewOperation, type UndoPreview } from '../operatio
 import { restoreOperation, type UndoResult } from '../operation/restore.js';
 import type { OperationAccess } from '../operation/access.js';
 import type { OperationScope, OperationReceipt } from '../operation/model.js';
-import { pageUndoHistory } from './history.js';
+import { pageUndoHistory, pageUndoHistoryAsync } from './history.js';
 
 export interface UndoHost {
   context(): CommandContext;
@@ -54,6 +54,19 @@ export function undoHistory(context: CommandContext, operationId?: string): read
 export function readUndoHistoryPage(context: CommandContext, cursor?: string) {
   const scope = undoScope(context);
   return pageUndoHistory(scope, scanOperations(scope), cursor);
+}
+
+export async function readUndoHistoryPageAsync(context: CommandContext, cursor?: string, signal?: AbortSignal) {
+  signal?.throwIfAborted();
+  const scope = undoScope(context);
+  const identity = JSON.stringify(scope);
+  const check = (): void => {
+    signal?.throwIfAborted();
+    if (JSON.stringify(undoScope(context)) !== identity) throw new Error('Undo context changed during inspection.');
+  };
+  const page = await pageUndoHistoryAsync(scope, scanOperations(scope, check), cursor, signal);
+  check();
+  return page;
 }
 
 export async function executeUndo(host: UndoHost, preview: UndoPreview, confirmed: boolean): Promise<{ readonly result: UndoResult; readonly warning?: string }> {

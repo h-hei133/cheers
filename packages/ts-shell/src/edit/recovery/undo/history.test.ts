@@ -10,7 +10,7 @@ import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 import { allocateOperation, captureOperationScope, operationLedgerRoot, persistOperation, readOperations, withOperationStore } from '../operation/store.js';
 import { hashContent } from '../../authority/content.js';
 import { runUndoCommand } from './command.js';
-import { readUndoHistoryPage } from './service.js';
+import { readUndoHistoryPage, readUndoHistoryPageAsync } from './service.js';
 
 let directory: string;
 let context: CommandContext;
@@ -202,4 +202,99 @@ it('does not acquire or retain cancelled history pages', async () => {
   read.mockClear();
   await expect(fresh.load(controller.signal)).rejects.toThrow();
   expect(read).not.toHaveBeenCalled();
+});
+
+it('processes real overlay cancellation between receipt reads without publishing a history page', async () => {
+  seed(3);
+  const before = bytes(), page = await picker();
+  const unacquired = fs.statSync(receiptPath('operation-1')), read = fs.readSync;
+  let unacquiredBytes = 0;
+  vi.spyOn(fs, 'readSync').mockImplementation((...args: Parameters<typeof fs.readSync>) => {
+    const stat = fs.fstatSync(args[0]), count = Reflect.apply(read, fs, args);
+    if (stat.dev === unacquired.dev && stat.ino === unacquired.ino) unacquiredBytes += count;
+    return count;
+  });
+  const overlay = new OverlayHost(() => {}), loading = vi.spyOn(page, 'load');
+  const stringify = JSON.stringify, hashed: string[] = [];
+  vi.spyOn(JSON, 'stringify').mockImplementation((value, ...args) => {
+    if (typeof value?.operationId === 'string' && Array.isArray(value.files)) {
+      hashed.push(value.operationId);
+      if (hashed.length === 1) setImmediate(() => overlay.close());
+    }
+    return stringify(value, ...args);
+  });
+  overlay.open(page);
+  const pending = loading.mock.results[0]!.value as ReturnType<typeof page.load>;
+  try {
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(hashed).toEqual(['operation-2']);
+    expect(unacquiredBytes).toBe(0);
+    expect(overlay.render(100, 28)).toEqual([]);
+    expect(await page.apply(['operation-2'])).toBeUndefined();
+    expect(bytes()).toEqual(before);
+  } finally { overlay.close(); await pending.catch(() => {}); await new Promise<void>(resolve => setImmediate(resolve)); }
+});
+
+it.each(['receipt', 'index', 'inventory'] as const)('rejects a changed %s between acquisition batches', async kind => {
+  seed(3);
+  const page = await picker(), target = receiptPath('operation-2');
+  const stringify = JSON.stringify;
+  let changed = false;
+  vi.spyOn(JSON, 'stringify').mockImplementation((value, ...args) => {
+    if (!changed && value?.operationId === 'operation-2' && Array.isArray(value.files)) {
+      changed = true;
+      setImmediate(() => {
+        if (kind === 'inventory') fs.writeFileSync(path.join(path.dirname(target), 'unindexed.json'), '{}');
+        else fs.appendFileSync(kind === 'receipt' ? target : path.join(path.dirname(target), 'index.json'), '\n');
+      });
+    }
+    return stringify(value, ...args);
+  });
+  try {
+    await expect(page.load()).rejects.toThrow('changed');
+    expect(changed).toBe(true);
+    expect(await page.apply(['operation-2'])).toBeUndefined();
+  } finally { page.previewEnd?.(); await new Promise<void>(resolve => setImmediate(resolve)); }
+});
+
+it('keeps the async saved-results page and cursor identical to the synchronous command view', async () => {
+  seed(41);
+  const before = bytes();
+  const first = readUndoHistoryPage(context)!;
+  expect(await readUndoHistoryPageAsync(context)).toEqual(first);
+  expect(await readUndoHistoryPageAsync(context, first.nextCursor)).toEqual(readUndoHistoryPage(context, first.nextCursor));
+  expect(bytes()).toEqual(before);
+});
+
+it('keeps a superseded async load from closing the newer healthy history page', async () => {
+  seed(3);
+  const page = await picker();
+  const first = page.load(), replaced = expect(first).rejects.toThrow('replaced');
+  const second = page.load();
+  try {
+    await replaced;
+    await expect(second).resolves.toHaveLength(3);
+    expect((await page.apply(['operation-2']))?.report?.facts.count).toBe(1);
+  } finally { page.previewEnd?.(); await Promise.allSettled([first, second]); }
+});
+
+it('rechecks the opening admission before acquiring another receipt after a yielded batch', async () => {
+  seed(3);
+  let blocked: string | undefined;
+  context = { ...context, admission: () => blocked };
+  const page = await picker(), before = bytes(), stringify = JSON.stringify;
+  const hashed: string[] = [];
+  vi.spyOn(JSON, 'stringify').mockImplementation((value, ...args) => {
+    if (typeof value?.operationId === 'string' && Array.isArray(value.files)) {
+      hashed.push(value.operationId);
+      if (hashed.length === 1) setImmediate(() => { blocked = 'History admission revoked'; });
+    }
+    return stringify(value, ...args);
+  });
+  try {
+    await expect(page.load()).rejects.toThrow('changed');
+    expect(hashed).toEqual(['operation-2']);
+    expect(await page.apply(['operation-2'])).toBeUndefined();
+    expect(bytes()).toEqual(before);
+  } finally { page.previewEnd?.(); }
 });

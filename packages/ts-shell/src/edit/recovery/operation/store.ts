@@ -10,6 +10,7 @@ import { OPERATION_READ_LIMITS } from './limits.js';
 import type { EditOperationIdentity, OperationReceipt, OperationScope } from './model.js';
 import { assertProfileStorage, captureProfileIdentity, currentProfile } from '../../../core/paths/profile/context.js';
 import { snapshotRoot } from '../root.js';
+import { fileVersion } from '../../../session/store/version.js';
 
 interface OperationIndex {
   readonly schemaVersion: 1;
@@ -42,13 +43,24 @@ function checkScope(scope: OperationScope): void {
   assertProfileStorage(storageRoot(scope), scope.profile);
 }
 
-interface ReadBudget { bytes: number; files: number }
+interface ReadBudget { bytes: number; files: number; readonly sources: Map<string, string> }
+
+function sourceVersion(target: string): string {
+  try { return JSON.stringify(fileVersion(fs.lstatSync(target))); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'absent'; throw error; }
+}
 
 function readJson(scope: OperationScope, relative: string, budget?: ReadBudget): unknown {
   const root = storageRoot(scope);
   assertProfileStorage(path.join(root, relative), scope.profile);
+  const target = workspaceFilePath(root, relative);
+  const before = budget ? sourceVersion(target) : undefined;
   const maxBytes = Math.min(OPERATION_READ_LIMITS.jsonBytes, budget ? OPERATION_READ_LIMITS.totalBytes - budget.bytes : OPERATION_READ_LIMITS.jsonBytes);
   const state = inspectWorkspaceFile(root, relative, undefined, maxBytes);
+  if (budget) {
+    if (sourceVersion(target) !== before) throw new Error('Edit operation source changed during inspection.');
+    budget.sources.set(target, before!);
+  }
   if (state.state === 'absent') return undefined;
   if (budget) budget.bytes += Buffer.byteLength(state.content, 'utf8');
   return JSON.parse(state.content);
@@ -115,14 +127,24 @@ export function readOperations(scope: OperationScope): readonly OperationReceipt
 }
 
 /** Decode one receipt at a time while sharing the complete scan's read budget. */
-export function* scanOperations(scope: OperationScope): Generator<OperationReceipt> {
+export function* scanOperations(scope: OperationScope, check?: () => void): Generator<OperationReceipt> {
+  check?.();
   checkScope(scope);
-  const budget: ReadBudget = { bytes: 0, files: 0 };
+  const folder = path.dirname(workspaceFilePath(storageRoot(scope), path.join(directory(scope), 'index.json')));
+  const budget: ReadBudget = { bytes: 0, files: 0, sources: new Map([[folder, sourceVersion(folder)]]) };
   const index = readIndex(scope, budget);
   for (const entry of [...index.operations].sort((a, b) => b.sequence - a.sequence)) {
+    check?.();
     const receipt = readReceipt(scope, entry.operationId, budget);
+    check?.();
     if (receipt.sequence !== entry.sequence) throw new Error('Edit operation order is inconsistent.');
     yield receipt;
+  }
+  check?.();
+  checkScope(scope);
+  for (const [target, version] of budget.sources) {
+    check?.();
+    if (sourceVersion(target) !== version) throw new Error('Edit operation source changed during inspection.');
   }
 }
 

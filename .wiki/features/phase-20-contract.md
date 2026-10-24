@@ -20,6 +20,8 @@
 
 2026-10-24 PAN-06 cleanse 刷新队列补证：原强制通知在旧 descriptor 尚未排空时立即重启，50通知实际启动51 inspection。`cli/runtime/security.ts` 现在保留一个在途槽位直到settled，并合并一个尾随刷新；关闭丢弃队列。`cli/runtime/security/refresh.test.ts` 使用真实bound source及实际cleansePicker/OverlayHost，覆盖burst/latest、close/drop、失败后poll恢复，单订阅inspection峰值1，面板组合5descriptor/两次metadata+state正文、全关闭。与原runtime/picker共3文件37项通过，三项实际反转均AssertionError；通知用例排除普通poll与waitFor自动fake-timer兜底。静态门、TS build通过，原35 complete/12 partial保持；不冒充跨视图、总heap/physical I/O/终端输出证明。
 
+2026-10-24 PAN-06 undo历史取消补证：异步分页复用原完整operation scan和同一canonical digest/page accumulator，每receipt之间让出事件循环；signal/admission/scope在下一次acquisition前重检，源directory/index/receipt紧凑stat版本在读前后及结束复核，picker代际防止旧加载覆盖新页。主命令同步API/cursor、完整坏尾部拒绝、40项保留及原32MiB单scan预算保持；真实小型关闭/下一receipt零正文、三类源变化、同步异步cursor一致、load竞态和撤销准入使3文件42项通过，五项保护反转有效。单个JSON/index/inventory/最终stat pass仍同步有界，乐观source版本不代替全内容digest，不称原子快照或整段硬延迟，47项状态不变。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

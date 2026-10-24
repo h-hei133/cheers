@@ -69,3 +69,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A burst of native publication events starts many inspections while an older descriptor acquisition is still pending, even though every older AbortController was cancelled.
 - **Root Cause**: An abort invalidates the result but does not synchronously settle filesystem promises or release descriptors. Immediately replacing the pending controller loses the resource reservation too early.
 - **Rule**: Keep the active acquisition slot until its promise settles. Coalesce later refresh requests into one trailing flag, discard superseded results, and drop queued work on view closure. Test a real opened descriptor held before delivery, then verify both latest-result delivery and closure while queued.
+
+### 13. Cooperative Ledger Reads Exposing Changes To Earlier Receipts
+- **Symptom**: A paged history view yields between receipts but can publish a digest containing an earlier receipt that changed after it was hashed.
+- **Root Cause**: Descriptor checks cover each individual read. Once the scan yields, they no longer establish that previously consumed sources remain unchanged through the rest of the scan.
+- **Rule**: Keep the complete canonical receipt digest and compact source versions for the directory, index, and consumed receipts. Revalidate sources before publishing, recheck admission between acquisitions, and discard cancelled or replaced loads. Treat stat versions as optimistic freshness, not a substitute for content validation or a cross-file transaction.

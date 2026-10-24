@@ -8853,3 +8853,12 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 最终串行静态门、47项matrix、3文件37项聚焦测试及TS build通过，heap上限1536/2048MiB。build `a8bcdd32d28ad57e3548116edacd1ea6f75ded8244a359906d018bdc49776c52`，inputs `b5414419b3c0d438ff7059c1adf52f9caf40ecbbc7975ede988597ae152b7c5b`，artifact `dae1d5e4955c394331b0c1052f2f2b01a97ba9aa8744e7a00ac17f6a87cf20b7`。独立代码APPROVE/架构CLEAR，综合APPROVE，均只读不跑验证。
 - 与参考selector的active-load guard/current-controller publish做定向比较，保留本仓owner并用单trailing请求保留最新native通知。结论仅单订阅与该consumer夹具，非跨视图/总heap/physical I/O/最长响应证明；不会绕过未settle读取去启动下一次。未跑exe/PTY/全量回归/真实20k消息压测；Phase20仍35complete/12partial，commit/push新SHA CI另取证。
 - 代码提交 `b2b72b57c97be164bcd51aa6d392ccd761fb4e5b` 已push/readback远端main。CI `40084447090` / job `120844379409` 自2026-10-24T10:04:18Z仍in_progress；Watch `40084447084` / job `120844379500` 于10:04:18Z–10:04:44Z success。前批tree `6c79b86f9fc1956dade013c3823192d88073fad9` 的CI `40083284126` / job `120841026998` 于09:46:30Z–10:05:23Z completed/success，Watch `40083284139` success；各自精确绑定，不外推后续文档提交。同类只读检查extensions/agents/hub为同步刷新，无本批异步cancel/restart形态，不作无证据修改。
+
+
+## [2026-10-24] fix | PAN-06 undo 历史批次取消与源复核
+
+- 原history同步扫描整个ledger，三个真实receipt夹具中关闭/已hash源变化两项新回归实际AssertionError。异步分页复用原scan与同一digest/page accumulator，每receipt之间yield；signal/admission/scope阻断下一acquisition，picker代际拒绝旧结果且旧失败不关闭新页，selection重读完整revision并复核opening host。同步命令API、canonical cursor、全尾部校验和原write/approval合同保持。
+- operation owner在原32MiB scan预算中记录目录/index/receipt紧凑stat版本，读前后/结束复核，最多10002版本；仍只保留40条page receipt，不预取全部对象。版本为乐观freshness，不能冒充跨文件事务或替代内容digest。单JSON/index/inventory/最终stat pass仍同步有界，未声称整段扫描硬延迟。
+- 新test覆盖实际overlay关闭后下一receipt零正文、receipt/index/inventory批次间变化、sync/async page cursor一致、old/new load及admission撤销。取消yield、eager receipts、source复核、逐receipt准入、load代际五项保护反转实际AssertionError，产品四文件逐字节恢复；代际首轮直接throw不算AssertionError证据，改为明确resolves断言后有效反转。
+- 最终主代理串行静态门、47项matrix、3文件42项与TS build通过，heap1536/2048MiB。build `be393c7a3f0623756ba501efb011034a34b7340c051b05532e344235295f9f50`，inputs `4379bacf767c917d2c8ac8fe1f7836778a1682f18355fbf1f380587b074eca87`，artifact `5a1f184d9397a622b84a8c86f5293e1bfb36029c9364f7819338a22582157993`。独立代码APPROVE/架构CLEAR，综合APPROVE，两路只读无验证；函数上限与Node floor无新问题。
+- 定向比较参考逐文件signal、readstream取消和selector active-controller，不复制summary架构；HANDOFF记录yield后的旧receipt源变化陷阱。未跑全量回归/exe/PTY/真实20k压测；总heap/physical I/O/跨页累计与其余Phase20范围保持partial（35complete/12partial/0open），commit/push及新SHA CI另取证。
