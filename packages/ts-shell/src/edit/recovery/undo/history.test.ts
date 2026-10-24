@@ -7,7 +7,7 @@ import { undoPicker } from '../../../cli/interactive/picker/undo.js';
 import { OverlayHost } from '../../../cli/interactive/overlay.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
-import { allocateOperation, captureOperationScope, persistOperation, readOperations, withOperationStore } from '../operation/store.js';
+import { allocateOperation, captureOperationScope, operationLedgerRoot, persistOperation, readOperations, withOperationStore } from '../operation/store.js';
 import { hashContent } from '../../authority/content.js';
 import { runUndoCommand } from './command.js';
 import { readUndoHistoryPage } from './service.js';
@@ -15,7 +15,8 @@ import { readUndoHistoryPage } from './service.js';
 let directory: string;
 let context: CommandContext;
 beforeEach(() => {
-  directory = fs.mkdtempSync(path.join(os.tmpdir(), 'undo-history-'));
+  const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
+  directory = fs.mkdtempSync(path.join(scratch, 'undo-history-'));
   fs.writeFileSync(path.join(directory, 'note.txt'), 'workspace stays unchanged\n');
   context = { cwd: directory, sessionId: 'history-session' };
 });
@@ -48,6 +49,34 @@ async function picker() {
   await root.load();
   return (await root.apply(['history']))!.next!;
 }
+
+function receiptPath(id: string): string {
+  const scope = captureOperationScope({ sessionId: context.sessionId!, workspaceRoot: directory });
+  const store = path.join(operationLedgerRoot(scope), 'operations');
+  return path.join(store, fs.readdirSync(store)[0]!, `${id}.json`);
+}
+
+it('hashes a yielded receipt before acquiring the next receipt body', () => {
+  seed(3);
+  const older = receiptPath('operation-0');
+  const stringify = JSON.stringify;
+  let changed = false;
+  vi.spyOn(JSON, 'stringify').mockImplementation((value, ...args) => {
+    if (!changed && value?.operationId === 'operation-2' && Array.isArray(value.files)) {
+      changed = true;
+      fs.writeFileSync(older, '{}');
+    }
+    return stringify(value, ...args);
+  });
+  expect(() => readUndoHistoryPage(context)).toThrow('invalid');
+  expect(changed).toBe(true);
+});
+
+it('refuses an invalid tail even after filling the first display page', () => {
+  seed(41);
+  fs.writeFileSync(receiptPath('operation-0'), '{}');
+  expect(() => readUndoHistoryPage(context)).toThrow('invalid');
+});
 
 it('makes all saved receipts reachable through three bounded read-only command and picker pages', async () => {
   seed(85);

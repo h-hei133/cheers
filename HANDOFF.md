@@ -44,3 +44,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Moving source admission after transcript acquisition fails only one of the synchronous/asynchronous regression cases even though both paths read too early.
 - **Root Cause**: Spying on the default filesystem object does not reliably observe functions consumed through different module import forms.
 - **Rule**: Observe the runtime's transcript read exports when asserting acquisition order. Reverse the ordering and require both sync and async cases to fail on actual read calls; an unchanged rejection message alone does not prove early admission.
+
+### 8. Display Pagination Still Retaining Every Operation Receipt
+- **Symptom**: A 40-item undo page or one latest/exact-ID lookup retains the entire decoded operation ledger before selecting its result.
+- **Root Cause**: A bounded display slice runs after eager array acquisition. Incremental hashing alone does not remove that array.
+- **Rule**: Consume receipts through the shared budgeted scan and retain only the selected page or result. Continue validating every receipt and preserve the full-ledger cursor digest; stopping at a full page or first match can hide a damaged older receipt.

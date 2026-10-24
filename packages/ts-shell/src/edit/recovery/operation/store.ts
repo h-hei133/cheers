@@ -111,14 +111,19 @@ function readReceipt(scope: OperationScope, operationId: string, budget?: ReadBu
 
 /** Read-only selection never creates a ledger or adopts unowned legacy snapshots. */
 export function readOperations(scope: OperationScope): readonly OperationReceipt[] {
+  return [...scanOperations(scope)];
+}
+
+/** Decode one receipt at a time while sharing the complete scan's read budget. */
+export function* scanOperations(scope: OperationScope): Generator<OperationReceipt> {
   checkScope(scope);
   const budget: ReadBudget = { bytes: 0, files: 0 };
   const index = readIndex(scope, budget);
-  return [...index.operations].sort((a, b) => b.sequence - a.sequence).map(entry => {
+  for (const entry of [...index.operations].sort((a, b) => b.sequence - a.sequence)) {
     const receipt = readReceipt(scope, entry.operationId, budget);
     if (receipt.sequence !== entry.sequence) throw new Error('Edit operation order is inconsistent.');
-    return receipt;
-  });
+    yield receipt;
+  }
 }
 
 export function persistOperation(receipt: OperationReceipt): void {

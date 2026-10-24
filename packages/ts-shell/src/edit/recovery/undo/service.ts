@@ -1,7 +1,7 @@
 import type { CommandContext } from '../../../core/commands/types.js';
 import { restoreAccess } from '../../../core/commands/restore/access.js';
 import { markContextUnknown } from '../../../observability/usageTelemetry.js';
-import { captureOperationScope, readOperations } from '../operation/store.js';
+import { captureOperationScope, scanOperations } from '../operation/store.js';
 import { latestOperation, previewOperation, type UndoPreview } from '../operation/preview.js';
 import { restoreOperation, type UndoResult } from '../operation/restore.js';
 import type { OperationAccess } from '../operation/access.js';
@@ -43,11 +43,17 @@ export async function prepareUndo(context: CommandContext, signal?: AbortSignal)
     : 'This operation requires inspection. Its blocked or unknown results cannot be replayed automatically.' };
 }
 
-export function undoHistory(context: CommandContext) { return readOperations(undoScope(context)); }
+export function undoHistory(context: CommandContext, operationId?: string): readonly OperationReceipt[] {
+  const receipts: OperationReceipt[] = [];
+  for (const receipt of scanOperations(undoScope(context))) {
+    if (operationId === undefined || receipt.operationId === operationId) receipts.push(receipt);
+  }
+  return receipts;
+}
 
 export function readUndoHistoryPage(context: CommandContext, cursor?: string) {
   const scope = undoScope(context);
-  return pageUndoHistory(scope, readOperations(scope), cursor);
+  return pageUndoHistory(scope, scanOperations(scope), cursor);
 }
 
 export async function executeUndo(host: UndoHost, preview: UndoPreview, confirmed: boolean): Promise<{ readonly result: UndoResult; readonly warning?: string }> {

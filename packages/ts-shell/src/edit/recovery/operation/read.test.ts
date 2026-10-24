@@ -3,14 +3,19 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { hashContent } from '../../authority/content.js';
-import { allocateOperation, captureOperationScope, operationLedgerRoot, readOperation, readOperations, withOperationStore } from './store.js';
+import { allocateOperation, captureOperationScope, operationLedgerRoot, readOperation, readOperations, scanOperations, withOperationStore } from './store.js';
 import { OPERATION_READ_LIMITS } from './limits.js';
 import { runUndoCommand } from '../undo/command.js';
 import { pageUndoHistory } from '../undo/history.js';
 import type { OperationReceipt } from './model.js';
+import { latestOperation } from './preview.js';
+import { undoHistory } from '../undo/service.js';
 
 let root: string;
-beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), 'operation-read-')); });
+beforeEach(() => {
+  const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
+  root = fs.mkdtempSync(path.join(scratch, 'operation-read-'));
+});
 afterEach(() => { vi.restoreAllMocks(); fs.rmSync(root, { recursive: true, force: true }); });
 
 function fixture() {
@@ -31,6 +36,29 @@ function publish(directory: string, receipts: readonly OperationReceipt[]) {
   fs.writeFileSync(path.join(directory, 'index.json'), JSON.stringify({ schemaVersion: 1, sequence: receipts.length,
     operations: receipts.map(receipt => ({ operationId: receipt.operationId, sequence: receipt.sequence })) }));
 }
+
+function pair() {
+  const saved = fixture();
+  const newest = { ...saved.receipt, operationId: 'operation-1', sequence: 2,
+    files: saved.receipt.files.map(file => ({ ...file, snapshot: { ...file.snapshot, authorityId: 'operation-1' } })) };
+  publish(saved.directory, [saved.receipt, newest]);
+  return saved;
+}
+
+it('acquires each receipt only when the iterator advances', () => {
+  const { scope, file } = pair();
+  const source = scanOperations(scope);
+  expect(source.next().value?.operationId).toBe('operation-1');
+  fs.writeFileSync(file, '{}');
+  expect(() => source.next()).toThrow('invalid');
+});
+
+it.each(['latest', 'exact'] as const)('still validates receipts after finding the %s result', kind => {
+  const { scope, file } = pair();
+  fs.writeFileSync(file, '{}');
+  expect(() => kind === 'latest' ? latestOperation(scope)
+    : undoHistory({ cwd: root, sessionId: scope.sessionId }, 'operation-1')).toThrow('invalid');
+});
 
 it.each(['index', 'receipt'])('refuses an oversized %s at the descriptor before reading its content', kind => {
   const { scope, directory, file } = fixture();

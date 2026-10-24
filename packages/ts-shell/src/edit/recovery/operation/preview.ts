@@ -3,7 +3,7 @@ import { inspectWorkspaceFile, matchesFileState, type FileState } from '../../au
 import { prepareRecoveryRestore, type PreparedRestore } from '../restorePrimitive.js';
 import { assertOperationFile, type OperationAccess } from './access.js';
 import type { OperationFile, OperationReceipt, OperationScope } from './model.js';
-import { operationLedgerRoot, readOperation, readOperations } from './store.js';
+import { operationLedgerRoot, readOperation, scanOperations } from './store.js';
 import { RecoveryReadControlError, RecoveryReadLimitError, recoveryReadBudget } from '../read.js';
 import { UNDO_PREVIEW_LIMITS } from './limits.js';
 
@@ -24,7 +24,12 @@ export interface UndoPreview {
 
 /** An unresolved newer operation is a barrier; never silently fall back to older history. */
 export function latestOperation(scope: OperationScope): OperationReceipt | undefined {
-  return readOperations(scope).find(receipt => receipt.undo !== 'restored-verified' && receipt.status !== 'failed' && receipt.status !== 'restored');
+  let latest: OperationReceipt | undefined;
+  // Older receipts still participate in validation and the shared read budget.
+  for (const receipt of scanOperations(scope)) {
+    if (!latest && receipt.undo !== 'restored-verified' && receipt.status !== 'failed' && receipt.status !== 'restored') latest = receipt;
+  }
+  return latest;
 }
 
 export async function previewOperation(receipt: OperationReceipt, access: OperationAccess = {}): Promise<UndoPreview> {

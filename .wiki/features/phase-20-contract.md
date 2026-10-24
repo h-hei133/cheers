@@ -8,6 +8,8 @@
 
 2026-10-24 PAN-02/PAN-06 增量源读取补证：`session/transcript/source.ts` 逐行消费 bounded descriptor chunks，行数到限后停止读取；`session/store/sessionStore.ts` 在 transcript 打开前拒绝已超限的树。`transcript/source.test.ts`、`transcript/sessionTranscript.test.ts`、`query/navigation/source.test.ts` 共 51 项通过，移除行数停止/chunk 上限及后移节点检查三项反转均失败。此证据只覆盖本地源读取和兼容语义，不关闭累计 physical I/O、总 heap、最长响应或跨平台缺口。
 
+2026-10-24 PAN-06 undo 补证：operation 的共享预算扫描逐条交给 history/latest/exact-ID consumer，历史页保留最多 40 条，单项查询仅保留所需结果；仍校验完整 ledger 并生成原完整 revision，坏尾部不因已有结果而被跳过。`operation/read.test.ts`、`undo/history.test.ts`、`undo/service.test.ts` 共 35 项和四项实际反转覆盖 acquisition/hash 顺序、满页/已有结果后继续拒绝、原 cursor bytes、取消与恢复合同。此证据减少长期保留的 receipt 图，不宣称减少每页完整校验所需读取或关闭资源/平台缺口。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

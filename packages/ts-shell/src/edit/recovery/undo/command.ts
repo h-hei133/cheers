@@ -23,7 +23,7 @@ export async function runUndoCommand(args: string[], context: CommandContext): P
   try {
     if (parsed.action.name === 'status') {
       if (parsed.args[0]) {
-        const selected = undoHistory(context).filter(receipt => receipt.operationId === parsed.args[0]);
+        const selected = undoHistory(context, parsed.args[0]);
         return local(selected.length ? undoStatusReport(selected) : undoNotice('No recorded operation was found in this session and workspace.', 'empty'));
       }
       const page = readUndoHistoryPage(context, parsed.flags.get('cursor') as string | undefined);

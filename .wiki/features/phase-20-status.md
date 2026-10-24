@@ -21,7 +21,14 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-本地资源复核的下一处明确入口是 `edit/recovery/undo/service.ts` 的 `readUndoHistoryPage()`：每页重新 `readOperations()`，随后 `undo/history.ts` 对全部 receipt 重新生成 revision。当前 32 MiB 是单次 operation 读取预算，不是跨所有页面的累计预算。后续应在保留完整 receipt revision、跨进程 cursor 与 stale 拒绝语义的前提下测量/收紧浏览成本，不能用 40 条展示页宣称总源读取有界；cleanse 还需区分 retained state 与 session navigation 的合计成本。
+undo 已改为逐条消费共享预算的 operation scan：历史页最多保留 40 条选中 receipt，latest/精确 ID 只保留所需结果，不再先保留整个解码数组。完整 receipt 校验与 revision 仍覆盖全部记录，32 MiB 仍是单次读取预算，后续每页仍重新扫描，不能宣称已有跨页累计读取上限、OS physical I/O 或总 heap 证明；cleanse 还需区分 retained state 与 session navigation 的合计成本。
+
+## 2026-10-24 PAN-06 undo 逐条读取与有界结果保留（本地验证完成）
+
+- operation owner 新增 `scanOperations()`；原 `readOperations()` 数组接口复用同一扫描，保持原 8MiB 单 JSON、32MiB 单 scan、50k 文件与目录/index 校验。历史页对每条 receipt 立即生成 digest，仅保留 40 条当前页；latest 与精确 ID lookup 同样只保留所需结果，但仍读完并校验整个 ledger。
+- `revision:operationId` cursor、完整 scope/receipt 的 canonical JSON digest、85 条三页完整顺序、精确 ID、unknown barrier 和取消/字节不变合同保留。坏尾部不能因当前页已满或结果已找到而被跳过；没有改用 mtime 缓存或引入新的持久格式。
+- 3 文件/35 项以 `--threads false` 和 1536 MiB V8 heap 上限通过；提前读完 source、调用层收集全数组、latest 提前返回、满页停止校验四项反转均实际 AssertionError，源码逐字节恢复后再次通过。静态门禁与 TypeScript build（2048 MiB heap 上限）通过。build `68d3b93523cd42c50ba17b6f98cba01b473f57a8af4e48da41ee49df68690709`，inputs `002fdcb629e4f45d76e07b9338bc70197fb9cf2a47d7a84ca71a2edc0105da7b`，artifact `a556e7c488c531a01fede2269022d044c9bb491ee7a93f5468cac0040d6d3b67`。
+- 本批只证明 acquisition/hash 顺序、有界结果保留和完整拒绝语义；不证明全局 heap、最长响应或累计 physical I/O。未运行全量回归、exe 构建或真实 20k PTY；矩阵保持 35 complete / 12 partial / 0 open，不声称 PAN-06 或全阶段完成。
 
 ## 2026-10-24 PAN-02/PAN-06 增量可读前缀与提前节点准入（`855b9bf3`；CI 首次读回 in_progress / Watch success）
 

@@ -8805,3 +8805,10 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 静态门禁、TypeScript build（2048 MiB V8 heap 上限）与 NormProof blocking obligations 通过；judge exit0 但整体仍 partial，既有 1 failed advisory/9 proof gaps 不算通过。build `fabc645a95a4`，inputs `27392e2d92a1`，artifact `d9c6c1a2331c`。
 - 所有验证串行执行；未运行全量回归、exe 构建或 PTY，更未运行真实二进制 20k 消息压测。矩阵保持 `35 complete / 12 partial / 0 open`；累计 physical I/O、瞬态 heap、最长响应、undo/cleanse 总资源和外部环境仍缺，不声称 Phase 20 完成或借用旧 CI。
 - 代码提交 `855b9bf32b77d2aeba49ad7bd5c50d22fd80e311` 已推送并精确读回远端 `main`；推送后首次读取 CI `40077116994` 为 `in_progress`，Watch `40077116885` 为 `completed/success`。后续继续只读核对 undo/cleanse：undo history 每页重新读取 operations 并 hash 全 receipt，32MiB 是单次预算而非跨页累计；下一步须保留跨进程 cursor/full revision/stale 合同后测量浏览成本，不据此盲改 writer 或批准语义。
+
+## [2026-10-24] fix | PAN-06 undo 逐条读取与有界结果保留
+
+- `scanOperations()` 复用既有 scope/index/inventory/receipt 与累计预算守卫，逐条读取/解码；原完整数组接口委托同一扫描。history consumer 一边消费一边生成完整 digest，只保留当前 40 条；latest/exact-ID 只保留所需结果，仍扫描并验证所有 receipt。
+- 原 canonical scope+receipt digest、`revision:operationId` cursor、三页/精确 ID 顺序、unknown barrier、恢复审批和只读取消不变。没有以 metadata 缓存代替全文 revision，也没有在满页或命中结果后跳过坏尾部。
+- 单进程聚焦 3 文件/35 项、静态门禁、TypeScript build 通过；提前读完 source、调用层收集数组、latest 提前返回、满页停止校验四项反转实际 AssertionError，恢复后再次通过。build `68d3b93523cd`，inputs `002fdcb629e4`，artifact `a556e7c488c5`。测试/构建分别限制 V8 heap 为 1536/2048 MiB，所有命令串行；未运行全量回归、exe 构建或真实 20k PTY。
+- 本批证明逐条 acquisition/hash 与有界结果保留，不证明总 heap/最长响应/累计 physical I/O；单次 scan 32MiB 预算仍不等同跨全部页累计预算，PAN-06/QA-01 和 Phase 20 保持 partial，矩阵仍 35 complete / 12 partial / 0 open。

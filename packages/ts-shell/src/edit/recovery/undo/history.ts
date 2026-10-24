@@ -16,22 +16,28 @@ export function validUndoHistoryCursor(value: unknown): value is string {
 }
 
 /** A cursor is read authority for one unchanged scoped ledger, never write approval. */
-export function pageUndoHistory(scope: OperationScope, receipts: readonly OperationReceipt[], cursor?: string): UndoHistoryPage | undefined {
+export function pageUndoHistory(scope: OperationScope, receipts: Iterable<OperationReceipt>, cursor?: string): UndoHistoryPage | undefined {
+  if (cursor !== undefined && !validUndoHistoryCursor(cursor)) return undefined;
   // Hash the same JSON bytes incrementally; avoid a second ledger-sized string.
   const digest = createHash('sha256').update(`{"scope":${JSON.stringify(scope)},"receipts":[`);
-  for (let index = 0; index < receipts.length; index++) {
-    if (index) digest.update(',');
-    digest.update(JSON.stringify(receipts[index]));
+  const page: OperationReceipt[] = [];
+  const after = cursor?.slice(65);
+  let found = cursor === undefined;
+  let offset = 0;
+  let total = 0;
+  for (const receipt of receipts) {
+    if (total) digest.update(',');
+    digest.update(JSON.stringify(receipt));
+    if (found && page.length < PAGE_SIZE) page.push(receipt);
+    if (!found && receipt.operationId === after) {
+      found = true;
+      offset = total + 1;
+    }
+    total++;
   }
   const revision = digest.update(']}').digest('hex');
-  let offset = 0;
-  if (cursor !== undefined) {
-    if (!validUndoHistoryCursor(cursor) || cursor.slice(0, 64) !== revision) return undefined;
-    const index = receipts.findIndex(receipt => receipt.operationId === cursor.slice(65));
-    if (index < 0) return undefined;
-    offset = index + 1;
-  }
-  const page = receipts.slice(offset, offset + PAGE_SIZE);
-  return { receipts: page, offset, total: receipts.length, revision,
-    ...(offset + page.length < receipts.length ? { nextCursor: `${revision}:${page.at(-1)!.operationId}` } : {}) };
+  // Drain and validate the complete ledger even after filling this display page.
+  if (!found || cursor !== undefined && cursor.slice(0, 64) !== revision) return undefined;
+  return { receipts: page, offset, total, revision,
+    ...(offset + page.length < total ? { nextCursor: `${revision}:${page.at(-1)!.operationId}` } : {}) };
 }
