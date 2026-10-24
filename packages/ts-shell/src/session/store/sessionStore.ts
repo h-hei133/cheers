@@ -150,6 +150,7 @@ export function readSessionRecordSnapshot(input: SessionReadInput): SessionRecor
     input.signal?.throwIfAborted();
     const metadata = readSessionMetadataRecord(input.layout.metadataPath, input.limits?.metadataBytes, input.signal);
     const state = readStateSnapshotRequired(input.layout.statePath, input.limits?.stateBytes, input.signal);
+    assertSessionEntryLimit(state, input.limits);
     input.signal?.throwIfAborted();
     const transcript = readTranscriptSnapshot(input.layout.transcriptPath, input.limits ? {
       maxBytes: input.limits.transcriptBytes, maxLines: input.limits.transcriptLines,
@@ -169,6 +170,7 @@ export async function readSessionRecordSnapshotAsync(input: SessionReadInput): P
     await yieldForAbort(input.signal);
     const metadata = await readSessionMetadataRecordAsync(input.layout.metadataPath, input.limits?.metadataBytes, input.signal);
     const state = await readStateSnapshotRequiredAsync(input.layout.statePath, input.limits?.stateBytes, input.signal);
+    assertSessionEntryLimit(state, input.limits);
     await yieldForAbort(input.signal);
     const transcript = await readTranscriptSnapshotAsync(input.layout.transcriptPath, input.limits ? {
       maxBytes: input.limits.transcriptBytes, maxLines: input.limits.transcriptLines,
@@ -190,6 +192,13 @@ function assertSessionSources(input: SessionReadInput): void {
   }
 }
 
+function assertSessionEntryLimit(state: SessionStateSnapshot, limits?: SessionReadLimits): void {
+  if (limits && state.thread !== undefined &&
+    (!Array.isArray(state.thread.entries) || state.thread.entries.length > limits.entries)) {
+    throw new Error('The saved tree exceeds the navigation entry limit or is damaged.');
+  }
+}
+
 function projectSessionRecordSnapshot(
   input: SessionReadInput,
   metadata: SessionMetadata | undefined,
@@ -197,10 +206,6 @@ function projectSessionRecordSnapshot(
   transcript: ReturnType<typeof readTranscriptSnapshot>,
 ): SessionRecordSnapshot {
   input.signal?.throwIfAborted();
-  if (input.limits && state.thread !== undefined &&
-    (!Array.isArray(state.thread.entries) || state.thread.entries.length > input.limits.entries)) {
-    throw new Error('The saved tree exceeds the navigation entry limit or is damaged.');
-  }
   // Which branch is in view is a question about the thread, so the thread
   // answers it. Without a thread, every message is the conversation.
   const threadPath = state.thread === undefined ? undefined : sessionThreadPath(state.thread, undefined, input.signal);
@@ -243,10 +248,6 @@ async function projectSessionRecordSnapshotAsync(
 ): Promise<SessionRecordSnapshot> {
   input.signal?.throwIfAborted();
   await yieldForAbort(input.signal);
-  if (input.limits && state.thread !== undefined &&
-    (!Array.isArray(state.thread.entries) || state.thread.entries.length > input.limits.entries)) {
-    throw new Error('The saved tree exceeds the navigation entry limit or is damaged.');
-  }
   const threadPath = state.thread === undefined ? undefined : sessionThreadPath(state.thread, undefined, input.signal);
   await yieldForAbort(input.signal);
   let branchPath: string[] | undefined;

@@ -12,7 +12,7 @@
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
 | PAN-02 | tree/目录/管理动作已有批次证据；catalogue 后续页绑定一次 browse-attempt 的 compact boundary index，不再每页重新 discovery；一次 attempt 的 metadata/state/transcript body 累计读取≤64MiB，续页共享该预算，超限返回 `sourceLimited` partial 且不再发行 continuation；同一 cursor 并发重放被拒绝；仍缺跨全部页面的累计 physical I/O 测量及全屏真实 consumer 的 byte-tier heap/响应 | 继续原 catalogue/tree consumer 的累计 physical I/O/heap 测量；64MiB 是逻辑源字节准入，不冒充物理 I/O 或总 heap 上界 |
-| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；operation-owned snapshot 在 recovery index 中显式标记，`/restore` 禁用并指向既有 `/undo` receipt/current-content guard，standalone snapshot 仍保留 preview/显式 execute；restore 续页使用 attempt-local page index，并复验 cursor revision 与精确 position；初始 metadata 扫描≤32MiB，所有续页 metadata 读取共享不超过初始扫描字节的累计预算，单 attempt 主动 metadata 读取≤64MiB，超限整页拒绝且不重扫目录；同一 restore cursor 并发重放被拒绝；损坏/超限 transcript 以只读 partial 展示并禁用导航动作；tree/back 与 cleanse 的完整源读取、累计 physical I/O/heap/平台证据仍缺 | 继续原 navigation/query 的分段取消与累计 physical I/O 测量，不以单 source 上限替代端到端资源证明 |
+| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；operation-owned snapshot 在 recovery index 中显式标记，`/restore` 禁用并指向既有 `/undo` receipt/current-content guard，standalone snapshot 仍保留 preview/显式 execute；restore 续页使用 attempt-local page index，并复验 cursor revision 与精确 position；初始 metadata 扫描≤32MiB，所有续页 metadata 读取共享不超过初始扫描字节的累计预算，单 attempt 主动 metadata 读取≤64MiB，超限整页拒绝且不重扫目录；同一 restore cursor 并发重放被拒绝；损坏/超限 transcript 以只读 partial 展示并禁用导航动作；tree/back 与 cleanse 已补增量可读前缀、行数到限停止及提前树准入；累计 physical I/O/heap/平台证据仍缺 | 继续测量原 navigation/query 的累计 physical I/O、heap、最长响应及 undo/cleanse 总资源，不以单 source 上限替代端到端资源证明 |
 | PAN-07 | device-code poll 已可被 abort 立即取消且迟到 token 不发布；扩展 unknown outcome 已跨进程 journal 恢复，关闭未 drain 与 cleanup/lifecycle unknown 均阻断后续 mutation；真实账户登录/刷新/失效/退出生命周期仍缺 | 合成协议与扩展持久边界已本地验证；真实认证仍需明确账户/provider 与隔离 opt-in |
 | PAN-08 | 本批补齐 MCP 跨 server 累计 4MiB/10k tools、共享绝对 deadline、peek fail-closed、tools/skill/cost/help/context producer top-N/omitted，以及 context signal 传播和增量 schema 计量；真实 MCP 连接/认证与完整 producer heap/延迟证据仍缺 | 本地 producer 合同已覆盖；真实连接需 server/认证条件，资源结论不扩大为端到端保证 |
 | INPUT-01 | 本批补 Visual/Visual-Line Ctrl+C 复制真实 source selection、paste 文本/图片共享 128项/32MiB预算、device-code 取消及扩展投影总界；仍缺平台真实 IME、系统剪贴板与 Windows 交互 PTY | 本地五模式/字素/长输入合同继续；实机输入法、剪贴板与 Windows 需适用机器 |
@@ -20,6 +20,14 @@
 | QA-02 | Windows 交互 PTY、真实 IME、系统复制、非交互 profile 切换/审批生命周期 | 非交互合同可本地继续；Windows/IME/系统复制需适用机器和终端 |
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
+
+## 2026-10-24 PAN-02/PAN-06 增量可读前缀与提前节点准入（本地验证完成）
+
+- 异步 salvage 路径逐行消费最多 64 KiB 的 descriptor chunk，不再先分配整段 transcript buffer 或保留完整 source text；达到行数上限即停止后续读取。跨块 UTF-8、空行、CRLF、末行无换行、损坏行、重复身份及截断语义沿用原 codec；提前停止后仍检查文件身份、大小及 mtime/ctime，变化或取消不会发布结果。
+- 同步/异步 session snapshot 均在 state 读取后、transcript 打开前检查树节点上限；小夹具证明超限时不会获取 transcript body，不依赖真实大历史或终端进程。
+- 最终单进程 `vitest --threads false` 聚焦 3 文件/51 项通过；移除行数停止、取消 chunk 大小上限、将节点准入后移至投影的三项反转均实际 AssertionError，恢复后通过。静态门禁、TypeScript build 与 NormProof blocking obligations 通过；NormProof 整体仍 `partial`，保留既有 1 failed advisory/9 proof gaps。
+- build `fabc645a95a4c61736912ebcdfaf72ae4673c85172f402ada56ef3e91b7a77f0`，inputs `27392e2d92a139110d16f090ee9613bb8f62d7f7d8284cb8c2bf4adfb89e161c`，artifact `d9c6c1a2331c887c9f0c4477673dcd9b4e705e74f7b165ce89d01a5883153ac1`。本批未运行全量回归、exe 构建或 PTY；20k 边界只允许单元 Mock/切片验证，不运行真实二进制全量消息压测。
+- 这是源获取分配与逻辑读取证据，不是 OS physical I/O、总 heap、最长响应或真实平台证明。PAN-02/PAN-06、QA-01 与全阶段保持 partial，矩阵仍为 35 complete / 12 partial / 0 open；本节不借用旧 SHA 的 CI。
 
 ## 2026-10-24 PAN-02/PAN-06 可取消导航源读取（`b2720df6`；CI/Watch success）
 

@@ -8,11 +8,8 @@ import {
   type TranscriptHeader,
 } from "../sessionEventCodec.js";
 import { fileIdentity, readTextFile, readTextFileAsync } from '../../core/workspace/files.js';
-
-export interface TranscriptReadLimits {
-  readonly maxBytes: number;
-  readonly maxLines: number;
-}
+import { readTranscriptPrefixAsync, type TranscriptReadLimits } from './source.js';
+export type { TranscriptReadLimits } from './source.js';
 
 /**
  * The whole transcript: its format version, and the entries in order.
@@ -88,9 +85,15 @@ export async function readTranscriptSnapshotAsync(
   if (!fs.existsSync(transcriptPath)) {
     return { version: 0, events: [], unreadableLines: 0, warnings: [], truncated: false };
   }
+  if (salvage && limits) {
+    const parser = createTranscriptParser();
+    const truncated = await readTranscriptPrefixAsync(transcriptPath, limits, parser.accept, signal);
+    await yieldForAbort(signal);
+    return finaliseTranscriptSnapshot(parser.finish(), truncated, limits, salvage, signal);
+  }
   const acquired = !salvage && limits
     ? { text: await readTextFileAsync(transcriptPath, limits.maxBytes, signal), truncated: false }
-    : await readTranscriptPrefixAsync(transcriptPath, limits, signal);
+    : await readTranscriptTextAsync(transcriptPath, signal);
   if (acquired.text === undefined) throw new Error('The saved transcript is unavailable.');
   await yieldForAbort(signal);
   const result = await parseTranscriptAsync(acquired.text, limits?.maxLines, signal);
@@ -151,9 +154,8 @@ function readTranscriptPrefix(
   }
 }
 
-async function readTranscriptPrefixAsync(
+async function readTranscriptTextAsync(
   transcriptPath: string,
-  limits: TranscriptReadLimits | undefined,
   signal?: AbortSignal,
 ): Promise<{ text: string; truncated: boolean }> {
   const before = await fs.promises.lstat(transcriptPath);
@@ -161,14 +163,12 @@ async function readTranscriptPrefixAsync(
   const handle = await fs.promises.open(transcriptPath,
     fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0));
   let bytes: Buffer;
-  let sourceSize: number;
   try {
     const opened = await handle.stat();
     if (!opened.isFile() || fileIdentity(opened) !== fileIdentity(before)) {
       throw new Error('The saved transcript changed while it was being read.');
     }
-    const length = limits ? Math.min(opened.size, limits.maxBytes) : opened.size;
-    sourceSize = opened.size;
+    const length = opened.size;
     bytes = Buffer.alloc(length);
     let offset = 0;
     while (offset < bytes.length) {
@@ -185,9 +185,7 @@ async function readTranscriptPrefixAsync(
   } finally {
     await handle.close();
   }
-  return limits
-    ? decodeTranscriptPrefix(bytes, sourceSize!, limits, signal)
-    : { text: bytes.toString('utf8'), truncated: false };
+  return { text: bytes.toString('utf8'), truncated: false };
 }
 
 function decodeTranscriptPrefix(

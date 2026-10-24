@@ -6,6 +6,8 @@
 
 2026-10-18 返工复核发现旧表有状态漂移：实现存在或测试数量不能替代完整裁决。当前复核范围及未闭合项见 [交付状态](phase-20-status.md#返工复核2026-10-18)；以下未重新验收的行均是历史证据索引。
 
+2026-10-24 PAN-02/PAN-06 增量源读取补证：`session/transcript/source.ts` 逐行消费 bounded descriptor chunks，行数到限后停止读取；`session/store/sessionStore.ts` 在 transcript 打开前拒绝已超限的树。`transcript/source.test.ts`、`transcript/sessionTranscript.test.ts`、`query/navigation/source.test.ts` 共 51 项通过，移除行数停止/chunk 上限及后移节点检查三项反转均失败。此证据只覆盖本地源读取和兼容语义，不关闭累计 physical I/O、总 heap、最长响应或跨平台缺口。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

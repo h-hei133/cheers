@@ -34,3 +34,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: `.tmp-*` logs, PTY snapshots, or throwaway scripts accumulate in the repository root and pollute `git status`.
 - **Root Cause**: Diagnostic scripts or manual PTY runs write directly to `./.tmp-*` instead of a contained scratch directory and exit without cleanup.
 - **Rule**: Place all temporary test homes, logs, and throwaway scripts inside `.tmp/` (gitignored) or `/tmp/cheers-test/`, never as top-level `.tmp-*` files in the repo root. Remove temporary scripts/artifacts before yielding.
+
+### 6. Chunked Reads Still Allocating And Reading The Entire Navigation Prefix
+- **Symptom**: A navigation reader uses 64 KiB descriptor reads but allocates the full byte allowance and reads the remaining body before enforcing a much smaller line limit.
+- **Root Cause**: Chunking acquisition alone does not bound allocation or stop unnecessary work. Tree entry admission performed during projection also runs after transcript acquisition.
+- **Rule**: Consume complete lines incrementally, stop at the first reached byte/line bound, preserve UTF-8 across chunks, and revalidate the opened source before publishing. Reject an already over-limit tree before opening its transcript. Keep 20k boundary checks in unit mocks/slice logic; never feed 20k messages into a real terminal binary for a PTY probe.
+
+### 7. Built-In Filesystem Spies Missing A Read Boundary
+- **Symptom**: Moving source admission after transcript acquisition fails only one of the synchronous/asynchronous regression cases even though both paths read too early.
+- **Root Cause**: Spying on the default filesystem object does not reliably observe functions consumed through different module import forms.
+- **Rule**: Observe the runtime's transcript read exports when asserting acquisition order. Reverse the ordering and require both sync and async cases to fail on actual read calls; an unchanged rejection message alone does not prove early admission.

@@ -12,15 +12,17 @@ import { createSessionStoreLayout, locateExistingSessionLayout } from '../../sto
 import { NAVIGATION_LIMITS } from './limits.js';
 import { readJsonFileWithRetry } from '../../store/sessionFileStore.js';
 import { parseTranscript } from '../../transcript/sessionTranscript.js';
-import { readSessionRecordSnapshot } from '../../store/sessionStore.js';
+import { readSessionRecordSnapshot, readSessionRecordSnapshotAsync } from '../../store/sessionStore.js';
 import { catchUpSessionThread, sessionThreadPath, type SessionThreadSnapshot } from '../../schema/sessionThread.js';
 import * as sessionVersion from '../../store/version.js';
+import * as transcriptReader from '../../transcript/sessionTranscript.js';
 
 let root: string | undefined;
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); if (root) fs.rmSync(root, { recursive: true, force: true }); root = undefined; });
 
 function saved() {
-  root = fs.mkdtempSync(path.join(process.cwd(), '.tmp-navigation-'));
+  const scratch = path.join(process.cwd(), '.tmp'); fs.mkdirSync(scratch, { recursive: true });
+  root = fs.mkdtempSync(path.join(scratch, 'navigation-'));
   const home = path.join(root, 'home'); fs.mkdirSync(home);
   vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('CHEERS_TEST_ROOT', home);
   const manager = new SessionManager(); const session = manager.createNew(root);
@@ -171,6 +173,21 @@ it('refuses a node overflow before reading the transcript and a line overflow be
   expect(() => readSessionNavigation(session.id, cwd)).toThrow('entry limit');
   expect(() => parseTranscript('\n'.repeat(NAVIGATION_LIMITS.transcriptLines + 1), NAVIGATION_LIMITS.transcriptLines)).toThrow('line limit');
   expect(parseTranscript('\n\n', 2).events).toEqual([]);
+});
+
+it.each([false, true])('rejects a small over-limit tree before acquiring any transcript body (async=%s)', async asynchronous => {
+  const { session, layout, cwd } = saved();
+  const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
+  state.thread.entries.push({ id: 'extra', kind: 'session-root', order: 1 });
+  fs.writeFileSync(layout.statePath, JSON.stringify(state));
+  const syncRead = vi.spyOn(transcriptReader, 'readTranscriptSnapshot');
+  const asyncRead = vi.spyOn(transcriptReader, 'readTranscriptSnapshotAsync');
+  const input = { sessionId: session.id, layout, cwd, limits: { ...NAVIGATION_LIMITS, entries: 1 }, salvageTranscript: true };
+  if (asynchronous) await expect(readSessionRecordSnapshotAsync(input)).rejects.toThrow('entry limit');
+  else expect(() => readSessionRecordSnapshot(input)).toThrow('entry limit');
+  // Metadata and state may be read, but a known unsafe tree must never reach transcript acquisition.
+  expect(syncRead).not.toHaveBeenCalled();
+  expect(asyncRead).not.toHaveBeenCalled();
 });
 
 it('rejects duplicate saved identities and retains a deep ordered path with no front insertion', () => {

@@ -8796,3 +8796,11 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 聚焦集 12 个文件/318 项通过；静态门禁全部通过；TypeScript build 通过并生成 manifest `527c3fd1e468`。代码批 `b2720df618198e573d8eba23374b8e73a0e0eb90` 已提交并推送，远端 `main` 精确读回同一 SHA。
 - CI `40074158042` / job `120813841714` 于 2026-10-24T07:26:48Z–07:44:22Z completed/success：955 个测试文件通过、1 个跳过，10,348 项通过、3 项跳过；NormProof blocking job 成功但 verdict 为 `partial`（0 open obligations、1 failed advisory、9 proof gaps）。Watch `40074158133` / job `120813842071` 于 07:26:48Z–07:27:14Z completed/success。
 - 该批只增强本地取消、分块读取、变化检测和生命周期回归；PAN-02/PAN-06 的跨页累计 physical I/O、瞬态 heap、最长响应、平台输入和真实连接缺口仍保持，矩阵为 `35 complete / 12 partial / 0 open`。
+
+## [2026-10-24] fix | PAN-02/PAN-06 增量 transcript 前缀与提前树准入
+
+- 异步 salvage 逐行消费最多 64 KiB descriptor chunks；达到行数上限后不再读取后续 body，不先分配完整 transcript buffer 或保留完整 source text。跨块 UTF-8、末行无换行、空行/CRLF、损坏行、重复身份及 partial 语义保留；提前停止仍复验文件版本并关闭 descriptor。
+- 同步/异步 session snapshot 在 state 读取后、transcript 打开前拒绝超限树，避免已知不可用状态仍触发正文分配/读取。新源读取 owner 位于 `session/transcript/source.ts`，原公开类型保持 re-export 兼容；`HANDOFF.md` 记录 chunking 不等于分配/工作量有界的陷阱。
+- 最终聚焦 3 文件/51 项在 `--threads false`、1536 MiB V8 heap 上限下通过；移除行数停止、取消 chunk 分配上限、将树检查后移至投影三项反转均实际 AssertionError，恢复后再次通过。首轮新夹具缺少 timestamp，被 codec 正确拒绝，修正为合法事件后通过；未修改生产 codec 来容忍坏夹具。
+- 静态门禁、TypeScript build（2048 MiB V8 heap 上限）与 NormProof blocking obligations 通过；judge exit0 但整体仍 partial，既有 1 failed advisory/9 proof gaps 不算通过。build `fabc645a95a4`，inputs `27392e2d92a1`，artifact `d9c6c1a2331c`。
+- 所有验证串行执行；未运行全量回归、exe 构建或 PTY，更未运行真实二进制 20k 消息压测。矩阵保持 `35 complete / 12 partial / 0 open`；累计 physical I/O、瞬态 heap、最长响应、undo/cleanse 总资源和外部环境仍缺，不声称 Phase 20 完成或借用旧 CI。
