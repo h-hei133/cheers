@@ -4,6 +4,7 @@ import type { CommandContext } from "./types.js";
 import { inspectCrashLog } from '../../observability/crashLog.js';
 import { readStructuredLogs } from '../../observability/diagnostics.js';
 import { readMetrics } from '../../observability/metrics/reader.js';
+import { ShellCommandRuntime } from '../shell/command.js';
 
 const state = vi.hoisted(() => ({
   logs: {
@@ -55,6 +56,41 @@ function context(getToolPool: CommandContext["getToolPool"]): CommandContext {
 }
 
 describe("/debug", () => {
+  it.each(['summary', 'tools'])('uses one %s command owner while retaining ordinary source failures', async action => {
+    const commands = new ShellCommandRuntime(), pool = vi.fn(async () => { throw new Error('PRIVATE_SOURCE'); });
+    const run = vi.fn(<T>(operation: (signal: AbortSignal) => Promise<T>) => commands.run(operation));
+    const result = await runDebugCommand([action], { ...context(pool), runCancellable: run });
+    expect(run).toHaveBeenCalledOnce(); expect(pool).toHaveBeenCalledOnce(); expect(commands.current).toBeUndefined();
+    expect(result.output).toContain('unavailable'); expect(result.output).not.toContain('PRIVATE_SOURCE');
+  });
+
+  it.each(['summary', 'tools'])('preserves original cancellation within one registered %s owner', async action => {
+    const original = new AbortController(), commands = new ShellCommandRuntime();
+    const run = vi.fn(<T>(operation: (signal: AbortSignal) => Promise<T>) => commands.run(operation));
+    const pool = vi.fn(async (signal?: AbortSignal) => {
+      expect(commands.current).toBeDefined(); expect(signal).toBeDefined(); expect(signal).not.toBe(original.signal);
+      original.abort(); return new Map();
+    });
+    await expect(runDebugCommand([action], { ...context(pool), signal: original.signal, runCancellable: run }))
+      .rejects.toMatchObject({ name: 'AbortError' });
+    expect(run).toHaveBeenCalledOnce(); expect(commands.current).toBeUndefined();
+  });
+
+  it.each(['summary', 'tools'])('withholds %s fallback when tool acquisition invalidates admission', async action => {
+    let stale = false;
+    await expect(runDebugCommand([action], { ...context(async () => { stale = true; throw new Error('PRIVATE_SOURCE'); }),
+      admission: () => stale ? 'original binding changed' : undefined,
+    })).rejects.toThrow('original binding changed');
+  });
+
+  it.each(['summary', 'tools'])('rejects pre-cancelled %s before reading sources', async action => {
+    const controller = new AbortController(), pool = vi.fn(); controller.abort();
+    await expect(runDebugCommand([action], { ...context(pool), signal: controller.signal }))
+      .rejects.toMatchObject({ name: 'AbortError' });
+    expect(pool).not.toHaveBeenCalled(); expect(readStructuredLogs).not.toHaveBeenCalled();
+    expect(readMetrics).not.toHaveBeenCalled(); expect(inspectCrashLog).not.toHaveBeenCalled();
+  });
+
   it("keeps partial diagnostics and the actual tool-pool count visible", async () => {
     const result = await runDebugCommand([], context(async () => new Map([
       ["bash", {} as never],

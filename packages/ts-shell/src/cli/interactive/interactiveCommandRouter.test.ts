@@ -14,6 +14,7 @@ import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import type { CommandReport } from '../../core/commands/report/contract.js';
 import { reportText } from '../../core/commands/report/projection.js';
 import { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
+import { ShellCommandRuntime } from '../../core/shell/command.js';
 
 function createHarness(root = "/tmp/project-alpha") {
   const lines: string[] = [];
@@ -44,6 +45,7 @@ function createHarness(root = "/tmp/project-alpha") {
         renderReport: (report: CommandReport) => { reports.push(report); lines.push(reportText(report)); },
       } as never,
       sessionRuntime: {
+        commands: new ShellCommandRuntime(),
         getViewMode: () => viewMode,
         setViewMode: (nextMode: "compact" | "verbose") => { viewMode = nextMode; },
         getAgentMode: () => agentMode,
@@ -67,7 +69,7 @@ function createHarness(root = "/tmp/project-alpha") {
 }
 
 describe("interactive command router", () => {
-  it('cancels context discovery through the actual interactive command owner', async () => {
+  it.each(['/context', '/tools', '/tools mcp__fixture__Read', '/debug tools'])('cancels %s discovery through the actual interactive command owner', async prompt => {
     const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
     const root = fs.mkdtempSync(path.join(scratch, 'context-route-'));
     vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
@@ -90,7 +92,7 @@ describe("interactive command router", () => {
     Object.assign(harness.input.runtimeContext, { skillOptions: { noSkills: true },
       runtimeConfig: { ...getRuntimeConfig(root), enableMcpTools: true } });
     harness.input.mcpGateway = { snapshot } as never;
-    const pending = routeInteractiveCommand({ ...harness.input, sessionRuntime: runtime, prompt: '/context' });
+    const pending = routeInteractiveCommand({ ...harness.input, sessionRuntime: runtime, prompt });
     try {
       await vi.waitFor(() => expect(entered).toBe(true));
       expect(runtime.commands.current).toBeDefined(); expect(signal?.aborted).toBe(false);
@@ -101,6 +103,45 @@ describe("interactive command router", () => {
     } finally {
       runtime.commands.current?.controller.abort(); release(); await pending.catch(() => {});
       vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['/skill', '/skill fixture'])('drains the actual manifest read for cancelled %s', async prompt => {
+    const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
+    const root = fs.mkdtempSync(path.join(scratch, 'skill-route-'));
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const file = path.join(root, 'SKILL.md'), body = 'x'.repeat(128 * 1024);
+    fs.writeFileSync(file, `---\nname: fixture\ndescription: Fixture instructions\n---\n${body}`);
+    const before = fs.readFileSync(file), harness = createHarness(root);
+    Object.assign(harness.input.runtimeContext, { skillOptions: { noSkills: true, skillPaths: [file] } });
+    const runtime = new ShellSessionRuntime({ sessionManager: harness.input.sessionManager,
+      renderer: harness.input.renderer, runPrompt: () => { throw new Error('Unexpected provider call'); } });
+    let entered = false, closed = 0, bytes = 0, release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; }), open = fs.promises.open.bind(fs.promises);
+    const observed = vi.spyOn(fs.promises, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args);
+      if (String(args[0]) !== file) return handle;
+      const read = handle.read.bind(handle), close = handle.close.bind(handle);
+      handle.read = (async (buffer: Buffer, offset: number, length: number, position: number) => {
+        const result = await read(buffer, offset, length, position); bytes += result.bytesRead; entered = true; await gate; return result;
+      }) as typeof handle.read;
+      handle.close = async () => { await close(); closed++; };
+      return handle;
+    });
+    const pending = routeInteractiveCommand({ ...harness.input, sessionRuntime: runtime, prompt });
+    try {
+      await vi.waitFor(() => expect(entered).toBe(true));
+      expect(bytes).toBe(64 * 1024); expect(runtime.commands.current).toBeDefined();
+      const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+      const cancel = runtime.cancelAndWait();
+      expect(runtime.commands.current?.controller.signal.aborted).toBe(true);
+      expect(closed).toBe(0); release(); await cancel; await rejected;
+      expect(closed).toBe(1); expect(bytes).toBe(64 * 1024); expect(runtime.commands.current).toBeUndefined();
+      expect(harness.reports).toEqual([]); expect(harness.lines.join('\n')).not.toContain(body);
+      expect(fs.readFileSync(file)).toEqual(before);
+    } finally {
+      runtime.commands.current?.controller.abort(); release(); await pending.catch(() => {});
+      observed.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
     }
   });
 

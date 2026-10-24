@@ -12,6 +12,26 @@ const report = createReport({ title: 'Probe diagnostics', lines: [], facts: { st
 beforeEach(() => { vi.mocked(runDebugCommand).mockReset().mockResolvedValue({ kind: 'local', output: 'probe', report }); });
 
 describe('/debug picker', () => {
+  it('rejects the original cancellation before and inside menu admission', async () => {
+    const original = new AbortController();
+    const picker = debugPicker({ cwd: '/synthetic', signal: original.signal,
+      admission: () => { original.abort(); return undefined; } });
+    expect(await picker.load()).toEqual([]);
+    expect(picker.isCurrent?.()).toBe(false);
+    expect(await picker.apply(['summary'])).toBeUndefined();
+    expect(runDebugCommand).not.toHaveBeenCalled();
+  });
+
+  it.each(['success', 'failure'])('suppresses a late %s after original cancellation', async settlement => {
+    const original = new AbortController(); let finish!: () => void;
+    vi.mocked(runDebugCommand).mockImplementation(() => new Promise((resolve, reject) => {
+      finish = () => settlement === 'success' ? resolve({ kind: 'local', output: 'old owner', report }) : reject(new Error('private source'));
+    }));
+    const picker = debugPicker({ cwd: '/synthetic', signal: original.signal });
+    await picker.load(); const pending = picker.apply(['summary']);
+    original.abort(); finish(); expect(await pending).toBeUndefined();
+  });
+
   it('opens only the bare interactive invocation and retains direct argument routes', () => {
     expect(opensPicker('/debug')).toBe(true);
     expect(opensPicker('/debug summary')).toBe(false);

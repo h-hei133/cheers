@@ -10,6 +10,7 @@ import { reportText } from '../../../core/commands/report/projection.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { OverlayHost } from '../overlay.js';
 import { skillPicker } from './skills.js';
+import { ShellCommandRuntime } from '../../../core/shell/command.js';
 
 const skill = (name = 'fixture'): Skill => ({ name, description: 'Fixture instructions', body: 'Keep exact body\n\n```sh\npassword=body-is-intentional\n```',
   source: 'cli', filePath: '/fixture/SKILL.md', disableModelInvocation: false, unhonouredFields: [] });
@@ -18,6 +19,28 @@ const result = (...skills: Skill[]): catalog.SkillCatalogResult => ({ skills: ne
 afterEach(() => vi.restoreAllMocks());
 
 describe('skill inspection', () => {
+  it.each(['list', 'named'])('withholds direct skill output after final admission cancels %s', async mode => {
+    const args = mode === 'list' ? [] : ['fixture'];
+    const controller = new AbortController(); let checks = 0;
+    const item = skill(), read = vi.spyOn(catalog, 'resolveSkillCatalog').mockResolvedValue(result(item));
+    await expect(runSkillCommand(args, { cwd: '/fixture', signal: controller.signal,
+      admission: () => { if (++checks === 2) controller.abort(); return undefined; },
+    })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(checks).toBe(2); expect(read).toHaveBeenCalledOnce();
+  });
+
+  it('keeps original skill cancellation inside the registered command owner', async () => {
+    const original = new AbortController(), commands = new ShellCommandRuntime();
+    vi.spyOn(catalog, 'resolveSkillCatalog').mockImplementation(async options => {
+      expect(commands.current).toBeDefined(); expect(options.abortSignal).not.toBe(original.signal);
+      original.abort(); return result(skill());
+    });
+    await expect(runSkillCommand([], { cwd: '/fixture', signal: original.signal,
+      runCancellable: operation => commands.run(operation),
+    })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(commands.current).toBeUndefined();
+  });
+
   it.each(['file', 'fi\x1b[31mle'])('does not let decoded file URL controls reassemble metadata: %s', protocol => {
     const raw = `${protocol}:///fixture/sk-%C2%9B31msynthetic-sensitive`;
     const item = { ...skill(raw), description: raw };

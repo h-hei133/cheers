@@ -32,6 +32,8 @@
 
 2026-10-24 PAN-08 help/usage余项：两档summary各十轮真实help registry→picker→OverlayHost过滤/20矩形/live update/Esc，计入load与subscription首次publish两次读取，live update一次，绘制和关闭后update零listSlashCommands调用；只约束选中option，不外推所有内部枚举。真实usage ledger→accepted overview→cost report→Pager十轮证明reader释放与转录block保留分离、零账户fetch/绘制额外配置读取。两文件23项与两项实际AssertionError反转见status；生产bytes恢复，只增测试，无本批产品重建或完整资源/真实平台声明。
 
+2026-10-24 PAN-07/PAN-08直接检查取消补证：tools/skill解析成功后进入现有command owner、合并原signal，两次admission回调后及endpoint配置后重检；debug summary/tools沿单一owner、共享readToolPool，内部tools不重复注册，catch仅在signal/admission仍有效时降级unavailable。真实route/gateway port与held64KiB manifest取消、picker原signal/迟到结果回归覆盖；7文件135项、七项AssertionError反转、静态门和TS build串行通过，APPROVE/CLEAR。accepted tools/skill及真实pickerHost的owner接入仍为下一批本地缺口；不证明任意贡献Promise drain、真实认证、全目录options或总资源界，35complete/12partial保持。构建digest与精确SHA交付见status。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

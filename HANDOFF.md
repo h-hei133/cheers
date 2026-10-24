@@ -94,3 +94,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Supplied-signal tests pass, but cancelling a real interactive read cannot stop its catalogue acquisition; a retired picker can also still return accounting or account results.
 - **Root Cause**: The interactive bridge supplies a cancellable operation port, not an already active signal. A handler that never enters that port has no command controller to cancel. View generation checks suppress stale rendering but do not invalidate the picker's own actions. Admission and configuration callbacks can also synchronously abort after an earlier check.
 - **Rule**: Enrol asynchronous inspection in the existing command lifetime, combine any original signal, and test the real route/session cancellation boundary. Recheck cancellation after injected callbacks and before acquisition or publication. Preserve accepted work independently of the browser signal, and account for warm extension inventory rereads separately from parsed manifest cache hits.
+
+### 18. Diagnostic Fallbacks Can Hide Command Cancellation
+- **Symptom**: Ctrl+C cancels an inner tool inspection, but its debug caller publishes an unavailable report; a summary can also skip the shared reader's admission checks.
+- **Root Cause**: A catch-all source fallback treats cancellation and expired admission as ordinary source failure. Adding an owner to both delegate and caller can also create nested registration.
+- **Rule**: Keep one command owner across delegated inspection, recheck its signal/admission before fallback, and reuse the shared read owner. Test cancellation through the actual route separately from ordinary unavailable-source behavior.

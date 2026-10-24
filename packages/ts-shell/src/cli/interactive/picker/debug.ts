@@ -7,7 +7,7 @@ import type { Picker } from '../overlay.js';
 export function debugPicker(context: CommandContext): Picker {
   const offered = new Set<string>();
   const isCurrent = (): boolean => {
-    try { return context.admission?.() === undefined; } catch { return false; }
+    try { return !context.signal?.aborted && context.admission?.() === undefined && !context.signal?.aborted; } catch { return false; }
   };
   return {
     isCurrent,

@@ -11,29 +11,40 @@ import { reportText } from './report/projection.js';
 import { createReport, span } from './report/projection.js';
 import { crashesReport, logsReport, timingReport, unavailableToolsReport } from './debug/report.js';
 import { runMetricsCommand } from './metricsCommandRuntime.js';
-import { runToolsCommand } from './toolsCommandRuntime.js';
+import { readToolPool, runToolsCommand } from './toolsCommandRuntime.js';
 import { redactReportText } from '../security/redaction.js';
+import { assertAdmission } from '../network/admission.js';
 
 /** Read-only views of the existing diagnostic stores and current tool pool. */
 export async function runDebugCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
   const parsed = parseSyntax(debugSyntax, args);
   if (!parsed.ok) return { kind: 'local', output: `Invalid /debug arguments: ${parsed.reason}\n${syntaxHelp(debugSyntax)}` };
-  if (parsed.action.name === 'metrics') return runMetricsCommand([], context);
-  if (parsed.action.name === 'timings') return result(timingReport(formatTimingReport()));
-  if (parsed.action.name === 'crashes') return result(crashesReport(inspectCrashLog(), context.cwd));
-  if (parsed.action.name === 'tools') {
+  const action = parsed.action.name;
+  return context.runCancellable && (action === 'summary' || action === 'tools')
+    ? context.runCancellable(signal => inspectDebug(action, { ...context, runCancellable: undefined,
+      signal: context.signal ? AbortSignal.any([context.signal, signal]) : signal }))
+    : inspectDebug(action, context);
+}
+
+async function inspectDebug(action: string, context: CommandContext): Promise<LocalCommandResult> {
+  assertCurrent(context);
+  if (action === 'metrics') return runMetricsCommand([], context);
+  if (action === 'timings') return result(timingReport(formatTimingReport()));
+  if (action === 'crashes') return result(crashesReport(inspectCrashLog(), context.cwd));
+  if (action === 'tools') {
     try { return context.getToolPool ? await runToolsCommand([], context) : result(unavailableToolsReport()); }
-    catch { return result(unavailableToolsReport()); }
+    catch { assertCurrent(context); return result(unavailableToolsReport()); }
   }
   const sink = getGlobalRotatingFileSink();
   const logs = readStructuredLogs(sink.getLogDir(), sink.getCurrentFilePath());
-  if (parsed.action.name === 'logs') return result(logsReport(logs, context.cwd));
+  if (action === 'logs') return result(logsReport(logs, context.cwd));
   const metrics = readMetrics(sink.getLogDir(), sink.getCurrentFilePath(), 2000);
   const crashes = inspectCrashLog();
   let tools: readonly string[] = [];
   let toolsStatus: 'reported' | 'unavailable' = context.getToolPool ? 'reported' : 'unavailable';
-  try { if (context.getToolPool) tools = [...(await context.getToolPool()).keys()].sort().map(name => redactReportText(name, 240, { projectRoot: context.cwd })); }
-  catch { toolsStatus = 'unavailable'; }
+  try { if (context.getToolPool) tools = [...(await readToolPool(context)).keys()].sort().map(name => redactReportText(name, 240, { projectRoot: context.cwd })); }
+  catch { assertCurrent(context); toolsStatus = 'unavailable'; }
+  assertCurrent(context);
   const report = createReport({
     title: 'Debug diagnostics',
     columns: [{ label: 'Source', minWidth: 18 }, { label: 'Observed', minWidth: 12 }, { label: 'Status', minWidth: 18 }],
@@ -59,6 +70,12 @@ export async function runDebugCommand(args: string[], context: CommandContext): 
     },
   });
   return { kind: 'local', output: reportText(report), report };
+}
+
+function assertCurrent(context: CommandContext): void {
+  context.signal?.throwIfAborted();
+  assertAdmission(context.admission);
+  context.signal?.throwIfAborted();
 }
 
 function result(report: import('./report/contract.js').CommandReport): LocalCommandResult {

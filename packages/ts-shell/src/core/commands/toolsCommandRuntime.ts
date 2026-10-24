@@ -32,8 +32,15 @@ export async function runToolsCommand(
 ): Promise<LocalCommandResult> {
   const parsed = parseSyntax(toolsSyntax, args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /tools arguments: ${parsed.reason}\n${syntaxHelp(toolsSyntax)}` };
+  return context.runCancellable
+    ? context.runCancellable(signal => inspectTools(parsed.args[0], { ...context,
+      signal: context.signal ? AbortSignal.any([context.signal, signal]) : signal }))
+    : inspectTools(parsed.args[0], context);
+}
+
+async function inspectTools(wanted: string | undefined, context: CommandContext): Promise<LocalCommandResult> {
   const registry = await readToolPool(context, context.signal);
-  const wanted = parsed.args[0];
+  context.signal?.throwIfAborted();
 
   if (wanted) {
     const tool = registry.get(wanted);
@@ -47,7 +54,9 @@ export async function runToolsCommand(
     return { kind: "local", output: reportText(report), report };
   }
 
-  const report = toolsReport(registry, context.cwd, resolveEndpoint(context));
+  const endpoint = resolveEndpoint(context);
+  context.signal?.throwIfAborted();
+  const report = toolsReport(registry, context.cwd, endpoint);
   return { kind: "local", output: reportText(report), report };
 }
 
@@ -68,10 +77,12 @@ function resolveEndpoint(context: CommandContext): string {
 export async function readToolPool(context: CommandContext, loadSignal?: AbortSignal) {
   const signal = context.signal && loadSignal && context.signal !== loadSignal
     ? AbortSignal.any([context.signal, loadSignal]) : context.signal ?? loadSignal;
+  signal?.throwIfAborted();
   assertAdmission(context.admission);
   signal?.throwIfAborted();
   const pool = await (context.getToolPool ? context.getToolPool(signal) : createCoreToolRegistry());
   signal?.throwIfAborted();
   assertAdmission(context.admission);
+  signal?.throwIfAborted();
   return pool;
 }

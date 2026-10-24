@@ -8896,3 +8896,10 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - help实际registry→picker→OverlayHost两档summary各十轮filter/20矩形/live update/Esc，打开两次listSlashCommands（含subscription立即publish）、更新一次，绘制与关闭后更新零该入口调用；options/model/rows释放、选中option<5KiB/detail≤4096、raw summary保留，零Esc host apply。usage真实ledger→accepted overview→report→Pager十轮，reader释放、ledger及retained block不改，零account fetch/绘制配置获取。
 - 两项实际反转分别去掉unsubscribe释放及help detail安全投影，均AssertionError；生产bytes恢复，无scratch。首版忽略subscription立即publish与不存在execute字段归harness drift/测试设计，未改产品。独立只读APPROVE/CLEAR；恢复后最终2files23tests及静态/matrix串行通过；test/docs-only不重复产品build，矩阵35complete/12partial/0open保持。
 - 前批取消代码5bd0a5a05974ac56bcd8061a5d7efcb9d596ce0f已推送/main精确读回且当时clean，CI40088907743仍in_progress、Watch40088907727success；两项只绑定该SHA。
+
+## [2026-10-24] fix | PAN-07/PAN-08直接检查取消与debug降级
+
+- tools/skill valid invocation注册既有command owner并保留原signal，shared reader在admission后重检、endpoint回调取消不发布。真实route/gateway port及128KiB manifest挂起64KiB后取消实测原实现失败；descriptor排空、零下一chunk/迟到正文及源不改。
+- debug summary/tools单owner、summary共享readToolPool、内部委托不嵌套；catch复核signal/admission，原signal取消使picker迟到成功/失败均失效；新增debug十项原AssertionError。普通source失败仍安全unavailable。
+- 七项保护反转实际AssertionError、production bytes恢复；最终7files135tests/静态门/matrix/TS build串行通过，独立只读APPROVE/CLEAR，build ed1ce984b84fb938bfb218ba50ee0966e7a095a7d3da8a5ee24fc30b527394de，inputs e680fb11d17f49fb679d3ce5e188aa8c291303909f7cd5b4b8aa8db5c6718319，artifact 83692ba592aca6f4282b8462dd0a4fa6d7b29a8a3ec39f3aaa897af4645a47b1。harness参数展开/缺commands已分类修正，无全量/exe/PTY/20k压测。
+- 本地下一步accepted tools/skill和真实pickerHost owner接入，外部认证及原资源WATCH不外推；35complete/12partial保持。d81387c7 CI40087846921于11:08:24Z、5bd0a5a0 CI40088907743于11:25:28Z success；22fe64d9已推送，CI40089243043仍in_progress/Watch40089243040success。当前批交付另取证。

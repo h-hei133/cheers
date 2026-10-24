@@ -23,11 +23,18 @@ export async function runSkillCommand(
 ): Promise<LocalCommandResult> {
   const parsed = parseSyntax(skillSyntax, args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /skill arguments: ${parsed.reason}\n${syntaxHelp(skillSyntax)}` };
+  return context.runCancellable
+    ? context.runCancellable(signal => inspectSkill(parsed.args[0], { ...context,
+      signal: context.signal ? AbortSignal.any([context.signal, signal]) : signal }))
+    : inspectSkill(parsed.args[0], context);
+}
+
+async function inspectSkill(wanted: string | undefined, context: CommandContext): Promise<LocalCommandResult> {
   // The same catalog the prompt path and `/skill:` resolve through, so the list
   // read here is the list the model was given — a skill named with `--skill`
   // appears, and an untrusted project's skills do not.
   const skills = await readSkillCatalog(context);
-  const wanted = parsed.args[0];
+  context.signal?.throwIfAborted();
   if (!wanted) {
     const report = skillsReport([...skills.values()], context.cwd);
     return { kind: 'local', output: reportText(report), report };
@@ -48,6 +55,7 @@ export async function readSkillCatalog(context: CommandContext, loadSignal?: Abo
   const signal = context.signal && loadSignal ? AbortSignal.any([context.signal, loadSignal]) : context.signal ?? loadSignal;
   signal?.throwIfAborted();
   assertAdmission(context.admission);
+  signal?.throwIfAborted();
   const { skills } = await resolveSkillCatalog({ workspaceRoot: context.cwd, sessionId: context.sessionId,
     ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
     ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
@@ -55,6 +63,7 @@ export async function readSkillCatalog(context: CommandContext, loadSignal?: Abo
   });
   signal?.throwIfAborted();
   assertAdmission(context.admission);
+  signal?.throwIfAborted();
   return skills;
 }
 

@@ -7,12 +7,56 @@ import { renderReport } from '../../../presentation/tui/report/renderer.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 import { toolReport, toolSummary } from '../../../core/commands/tools/report.js';
 import { OverlayHost } from '../overlay.js';
+import { ShellCommandRuntime } from '../../../core/shell/command.js';
 
 const fixture = () => ({ name: 'mcp__notes__Read', description: 'Read a note.\nReturns its content.',
   argsSchema: { type: 'object', properties: { id: { type: 'string', description: 'The note identifier.' } }, required: ['id'] },
   mcpAnnotations: { readOnlyHint: true }, execute: vi.fn(async () => ({ success: true })) });
 
 describe('tool inspection', () => {
+  it('withholds picker metadata after final admission aborts the original signal', async () => {
+    const original = new AbortController(), description = vi.fn(() => 'Read metadata'); let checks = 0;
+    const item = { ...fixture(), get description() { return description(); } };
+    const picker = toolsPicker({ cwd: '/fixture', signal: original.signal,
+      getToolPool: async () => new Map([[item.name, item]]),
+      admission: () => { if (++checks === 2) original.abort(); return undefined; },
+    });
+    await expect(picker.load()).rejects.toMatchObject({ name: 'AbortError' });
+    expect(description).not.toHaveBeenCalled(); expect(item.execute).not.toHaveBeenCalled();
+  });
+
+  it.each(['list', 'named'])('withholds direct tool metadata after final admission cancels %s', async mode => {
+    const args = mode === 'list' ? [] : ['mcp__notes__Read'];
+    const controller = new AbortController(), description = vi.fn(() => 'Read metadata'); let checks = 0;
+    const item = { ...fixture(), get description() { return description(); } };
+    await expect(runToolsCommand(args, { cwd: '/fixture', signal: controller.signal,
+      getToolPool: async () => new Map([[item.name, item]]),
+      admission: () => { if (++checks === 2) controller.abort(); return undefined; },
+    })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(checks).toBe(2); expect(description).not.toHaveBeenCalled(); expect(item.execute).not.toHaveBeenCalled();
+  });
+
+  it('keeps original tool cancellation inside the registered command owner', async () => {
+    const original = new AbortController(), commands = new ShellCommandRuntime();
+    await expect(runToolsCommand([], { cwd: '/fixture', signal: original.signal,
+      runCancellable: operation => commands.run(operation),
+      getToolPool: async signal => {
+        expect(commands.current).toBeDefined(); expect(signal).not.toBe(original.signal);
+        original.abort(); return new Map();
+      },
+    })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(commands.current).toBeUndefined();
+  });
+
+  it('withholds the tool list when endpoint configuration cancels inspection', async () => {
+    const controller = new AbortController(), item = fixture();
+    const read = vi.fn(() => { controller.abort(); return { config: {} as never, catalog: [] }; });
+    await expect(runToolsCommand([], { cwd: '/fixture', signal: controller.signal,
+      getToolPool: async () => new Map([[item.name, item]]), readConfiguration: read,
+    })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(read).toHaveBeenCalledOnce(); expect(item.execute).not.toHaveBeenCalled();
+  });
+
   it('forwards the picker load signal to the tool-pool owner', async () => {
     const controller = new AbortController();
     const tool = fixture();
