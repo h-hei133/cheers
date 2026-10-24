@@ -8788,3 +8788,10 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 真实 patch operation、later-operation `current-content-changed`、缺 `--execute` 拒绝和目录迭代消失均有回归。移除 `operationOwned`、execute 确认或 current-content guard 三项均实际 AssertionError；最终 15 文件/255 项、result-contract 6 套/158 项、scripts 157、静态门和 NormProof blocking check 通过。build `b493ee119b5e`、exe SHA-256 `5ef977268e93` 的同 build Node/exe × regular/fullscreen 四格 PTY 全 pass/exit0，证据 `.omx/artifacts/phase20-restore-undo-routing/pty/`。
 - 代码批 `6c97eab602213815961a9d3e0c0be93b500ffa8a` 的 CI `40049468563` / job `120738649415` completed/failure：唯一失败是 collaboration fixture 的 `EADDRINUSE 127.0.0.1:36553`，分类为 `freePort()` 到 service rebind 的 TOCTOU，954 文件/10,314 项通过；Watch `40049468573` success。该失败保留，不改写。
 - 测试修正提交 `697c518ce7bf61f0190ce9eefdbc006511941f31` 增加仅针对 `EADDRINUSE` 的 fresh-port 重试及真实冲突回归；CI `40051091258` / job `120743717608` completed/success（955 文件通过/1 跳过、10,316 项通过/3 跳过），Watch `40051091265` success。此批只关闭一条 `PAN-06 restore × undo` 跨任务 QA-01 路由，矩阵仍 `35 complete / 12 partial / 0 open`。
+
+## [2026-10-24] fix | PAN-02/PAN-06 可取消导航源读取（本地验证，待提交）
+
+- 导航查询新增 `readSessionNavigationAsync` 与 transcript-only async source。metadata、state、transcript 采用可取消异步读取；transcript 按 64 KiB descriptor chunk 读取，在解析、树投影和结果投影之间检查 `AbortSignal`，并在读取前后复核文件身份、版本和 session 目录。未完成或已变化的读取不会发布部分导航结果。
+- tree、back、rewind、completion navigation、cleanse 和 security inspector 传递浏览器取消信号；被替换的 load、关闭后的订阅及 stale session/workspace 绑定会丢弃迟到结果。同步命令读取合同保持不变。
+- 聚焦集 12 个文件/318 项通过；静态门禁全部通过；TypeScript build 通过并生成 manifest `527c3fd1e468`。本批仍在工作树中，尚未提交，未宣称新的远端 CI/Watch、真实 PTY、provider 或物理 I/O/heap 证据。
+- 该批只增强本地取消、分块读取、变化检测和生命周期回归；PAN-02/PAN-06 的跨页累计 physical I/O、瞬态 heap、最长响应、平台输入和真实连接缺口仍保持，矩阵为 `35 complete / 12 partial / 0 open`。

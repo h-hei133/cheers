@@ -1,6 +1,6 @@
 import type { SessionManager } from "../../../session/SessionManager.js";
 import type { ShellRuntimeContext } from "../../../core/shell/runtimeContext.js";
-import { readSessionNavigation } from "../../../session/query/navigation.js";
+import { readSessionNavigationAsync, readSessionTranscriptEventsAsync } from "../../../session/query/navigation.js";
 import type { Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
 import type { SessionCatalogSnapshot } from '../../../session/store/catalog/model.js';
 import type { CatalogProgressSink } from './result.js';
@@ -26,9 +26,9 @@ export async function navigationCatalog(kind: "session" | "entry" | "tree" | "th
     if (!snapshot) throw new Error('Session catalog unavailable');
     return items;
   }
-  if (kind === "entry") return manager.getTranscriptEvents(context.session.id, onSource).flatMap(event =>
+  if (kind === "entry") return (await readSessionTranscriptEventsAsync(context.session.id, { onSource, signal })).flatMap(event =>
     event.id ? [{ value: event.id, label: event.id, detail: `${event.type} · ${event.timestamp}` }] : []);
-  const { thread, points } = readSessionNavigation(context.session.id, context.cwd, onSource);
+  const { thread, points } = await readSessionNavigationAsync(context.session.id, context.cwd, { onSource, signal });
   if (kind === "thread") return thread.entries.map(entry => ({ value: entry.id, label: entry.id, detail: entry.role ?? entry.kind }));
   return points.filter(point => !point.unavailable).map(point => ({ value: point.entryId, label: point.entryId, detail: point.label }));
 }

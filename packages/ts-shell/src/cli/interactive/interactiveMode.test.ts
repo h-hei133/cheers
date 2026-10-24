@@ -568,13 +568,13 @@ describe("session wiring", () => {
       commandContext: { ...original.commandContext, cwd: root, projectRoot: root, admission: () => undefined },
       sessionContext: () => ({ sessionId: 'sess_1', projectRoot: root, busy: false }),
     });
-    const navigation = vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({
+    const navigation = vi.spyOn(sessionNavigation, 'readSessionNavigationAsync').mockResolvedValue({
       version: 'saved-v1', session: { id: 'sess_1', projectRoot: root },
       points: [
         { entryId: 'older', label: 'Older question', depth: 0, current: false, prompt: 'older' },
         { entryId: 'current', label: 'Current question', depth: 1, current: true, prompt: 'current' },
       ],
-    } as ReturnType<typeof sessionNavigation.readSessionNavigation>);
+    } as Awaited<ReturnType<typeof sessionNavigation.readSessionNavigationAsync>>);
     mode.start();
     try {
       await host.run(command);
@@ -588,7 +588,7 @@ describe("session wiring", () => {
   it('reports queued history read failures without exposing storage errors or claiming empty history', async () => {
     const { mode } = build();
     const host = mode as unknown as { overlay: OverlayHost; run(command: string): Promise<void> };
-    vi.spyOn(sessionNavigation, 'readSessionNavigation').mockImplementation(() => { throw new Error('PRIVATE_STORAGE_BODY'); });
+    vi.spyOn(sessionNavigation, 'readSessionNavigationAsync').mockRejectedValue(new Error('PRIVATE_STORAGE_BODY'));
     mode.start();
     try {
       await host.run('/history');
@@ -608,9 +608,9 @@ describe("session wiring", () => {
       commandContext: { ...original.commandContext, cwd: root, projectRoot: root, admission: () => undefined },
       sessionContext: () => ({ sessionId: 'sess_1', projectRoot: root, busy: false }),
     });
-    const navigation = vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({ version: 'saved-v1', session: { id: 'sess_1', projectRoot: root },
+    const navigation = vi.spyOn(sessionNavigation, 'readSessionNavigationAsync').mockResolvedValue({ version: 'saved-v1', session: { id: 'sess_1', projectRoot: root },
       points: [{ entryId: 'entry with space', label: 'Exact saved question', depth: 0, current: true, prompt: 'question' }],
-    } as ReturnType<typeof sessionNavigation.readSessionNavigation>);
+    } as Awaited<ReturnType<typeof sessionNavigation.readSessionNavigationAsync>>);
     mode.start();
     try {
       await host.run('/history');
@@ -629,7 +629,7 @@ describe("session wiring", () => {
     host.options.sessionManager.getSession = () => undefined;
     const original = host.pickerHost();
     vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, commandContext: { ...original.commandContext, admission: () => undefined } });
-    vi.spyOn(sessionNavigation, 'readSessionNavigation').mockImplementation(() => { throw new Error('PRIVATE_STORAGE_BODY'); });
+    vi.spyOn(sessionNavigation, 'readSessionNavigationAsync').mockRejectedValue(new Error('PRIVATE_STORAGE_BODY'));
     mode.start();
     try {
       await host.run('/back');
@@ -654,11 +654,11 @@ describe("session wiring", () => {
     const original = host.pickerHost();
     vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, commandContext: { ...original.commandContext, admission: () => undefined } });
     let version = 'saved-v1';
-    vi.spyOn(sessionNavigation, 'readSessionNavigation').mockImplementation(() => ({ version,
+    vi.spyOn(sessionNavigation, 'readSessionNavigationAsync').mockImplementation(async () => ({ version,
       session: { id: 'sess_1', projectRoot: '/workspace', turns: [{ id: 'question', role: 'user', content: 'original question' }] },
       points: [{ entryId: 'question', depth: 0, label: 'Original question', current: true, prompt: 'original question' }],
       thread: { entries: [{ id: 'question', kind: 'turn-message', role: 'user', order: 0, timestamp: 'now' }], activeLeafId: 'question' },
-    } as ReturnType<typeof sessionNavigation.readSessionNavigation>));
+    } as Awaited<ReturnType<typeof sessionNavigation.readSessionNavigationAsync>>));
     mode.start();
     try {
       await host.run('/back');
@@ -679,9 +679,9 @@ describe("session wiring", () => {
       commandContext: { ...original.commandContext, cwd: root, projectRoot: root, admission: () => undefined },
       sessionContext: () => ({ sessionId: 'sess_1', projectRoot: root, busy: false }),
     });
-    vi.spyOn(sessionNavigation, 'readSessionNavigation').mockReturnValue({ version: 'saved-v1', session: { id: 'sess_1', projectRoot: root }, points: saved
+    vi.spyOn(sessionNavigation, 'readSessionNavigationAsync').mockResolvedValue({ version: 'saved-v1', session: { id: 'sess_1', projectRoot: root }, points: saved
       ? [{ entryId: 'saved', depth: 0, label: 'Saved question', current: true }]
-      : [] } as ReturnType<typeof sessionNavigation.readSessionNavigation>);
+      : [] } as Awaited<ReturnType<typeof sessionNavigation.readSessionNavigationAsync>>);
     mode.start();
     try {
       await host.run('/history');

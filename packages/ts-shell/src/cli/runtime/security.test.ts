@@ -7,7 +7,83 @@ import { createSecurityHarness, cleanupSecurityHarnesses } from '../../test-util
 import { installSecurityRuntime, securityInspectorFor } from './security.js';
 import { SecurityService } from '../../security/service.js';
 
-afterEach(() => { vi.useRealTimers(); cleanupSecurityHarnesses(); });
+afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); cleanupSecurityHarnesses(); });
+
+it('acquires retained security state through the cancellable inspector path', async () => {
+  const h = createSecurityHarness();
+  const context = { session: h.session, cwd: h.root } as ShellRuntimeContext;
+  installSecurityRuntime(context, h.manager, { getCurrentRunController: () => null } as unknown as ShellSessionRuntime, h.host.gate);
+  await expect(securityInspectorFor(context)!.readAsync!()).resolves.toMatchObject({
+    state: 'ready',
+    snapshot: { identity: { sessionId: h.session.id, workspaceRoot: h.root } },
+  });
+  expect(h.run).not.toHaveBeenCalled();
+});
+
+it('preserves async inspector cancellation instead of reporting stale data', async () => {
+  const h = createSecurityHarness();
+  const context = { session: h.session, cwd: h.root } as ShellRuntimeContext;
+  installSecurityRuntime(context, h.manager, { getCurrentRunController: () => null } as unknown as ShellSessionRuntime, h.host.gate);
+  const controller = new AbortController();
+  vi.spyOn(SecurityService.prototype, 'inspectionAsync').mockImplementation(async signal => {
+    await new Promise<void>((_resolve, reject) => signal?.addEventListener('abort', () => reject(signal.reason), { once: true }));
+    throw new Error('unreachable');
+  });
+  const pending = securityInspectorFor(context)!.readAsync!(controller.signal);
+  controller.abort(new Error('Security source cancelled'));
+  await expect(pending).rejects.toThrow('Security source cancelled');
+});
+
+it('uses cancellable acquisition for subscribed picker refreshes and stops on browser abort', async () => {
+  const h = createSecurityHarness();
+  const context = { session: h.session, cwd: h.root } as ShellRuntimeContext;
+  installSecurityRuntime(context, h.manager, { getCurrentRunController: () => null } as unknown as ShellSessionRuntime, h.host.gate);
+  const sync = vi.spyOn(SecurityService.prototype, 'inspection');
+  const original = SecurityService.prototype.inspectionAsync;
+  let owner!: SecurityService;
+  const inspect = vi.spyOn(SecurityService.prototype, 'inspectionAsync').mockImplementation(function (this: SecurityService, signal) {
+    owner = this;
+    return original.call(this, signal);
+  });
+  const browser = new AbortController();
+  const listener = vi.fn();
+  const release = securityInspectorFor(context)!.subscribe(listener, browser.signal);
+  await vi.waitFor(() => expect(listener).toHaveBeenCalledTimes(1));
+  expect(sync).not.toHaveBeenCalled();
+  let pendingSignal: AbortSignal | undefined;
+  inspect.mockImplementationOnce(async signal => {
+    pendingSignal = signal;
+    await new Promise<void>((_resolve, reject) => signal!.addEventListener('abort', () => reject(signal!.reason), { once: true }));
+    throw new Error('unreachable');
+  });
+  owner.publication.notify();
+  expect(pendingSignal?.aborted).toBe(false);
+  browser.abort();
+  expect(pendingSignal?.aborted).toBe(true);
+  await new Promise<void>(resolve => setImmediate(resolve));
+  owner.publication.notify();
+  expect(inspect).toHaveBeenCalledTimes(2);
+  expect(listener).toHaveBeenCalledTimes(1);
+  expect(sync).not.toHaveBeenCalled();
+  release();
+});
+
+it('rejects a subscribed async snapshot whose source changes during acquisition', async () => {
+  const h = createSecurityHarness();
+  const context = { session: h.session, cwd: h.root } as ShellRuntimeContext;
+  installSecurityRuntime(context, h.manager, { getCurrentRunController: () => null } as unknown as ShellSessionRuntime, h.host.gate);
+  const original = SecurityService.prototype.inspectionAsync;
+  vi.spyOn(SecurityService.prototype, 'inspectionAsync').mockImplementationOnce(async function (this: SecurityService, signal) {
+    const snapshot = await original.call(this, signal);
+    fs.appendFileSync(path.join(h.manager.getSessionDirPath(h.session.id), 'state.json'), '\n');
+    return snapshot;
+  });
+  const listener = vi.fn();
+  const release = securityInspectorFor(context)!.subscribe(listener, new AbortController().signal);
+  await vi.waitFor(() => expect(listener).toHaveBeenCalledTimes(1));
+  expect(listener.mock.lastCall![0]).toEqual({ state: 'stale' });
+  release();
+});
 
 function pollingHarness() {
   const h = createSecurityHarness();
@@ -123,7 +199,7 @@ it('rechecks an ancestor replacement even when original session files keep their
 });
 
 it('suppresses a queued native callback and publication after release during an inspection', () => {
-  const h = pollingHarness(); const subscribe = vi.spyOn(h.owner(), 'subscribeInspection');
+  const h = pollingHarness(); const subscribe = vi.spyOn(h.owner().publication, 'subscribe');
   const listener = vi.fn(); const release = h.inspector.subscribe(listener);
   const queued = subscribe.mock.calls[0]![0];
   const read = h.owner().host.store.read;

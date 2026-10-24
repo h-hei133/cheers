@@ -27,7 +27,9 @@ export type SecurityInspection = { readonly state: 'ready'; readonly snapshot: S
 
 export interface SecurityInspector {
   read(): SecurityInspection;
-  subscribe(listener: (inspection: SecurityInspection) => void): () => void;
+  /** Cancellable acquisition for interactive views; direct command reads remain synchronous. */
+  readAsync?(signal?: AbortSignal): Promise<SecurityInspection>;
+  subscribe(listener: (inspection: SecurityInspection) => void, signal?: AbortSignal): () => void;
 }
 
 export interface SecurityInspectionContext {
@@ -82,28 +84,81 @@ function remediationItem(remediation: Remediation, context: SecurityInspectionCo
     summary: safe(`${status} · ${remediation.fingerprint.slice(0, 12)}`), detail: detail.map(safe) };
 }
 
-export function securityInspection(state: SecurityState, context: SecurityInspectionContext): SecurityInspectionSnapshot {
+export function securityInspection(
+  state: SecurityState,
+  context: SecurityInspectionContext,
+  signal?: AbortSignal,
+): SecurityInspectionSnapshot {
+  signal?.throwIfAborted();
   admitJsonSource([context, state], 8 * 1024 * 1024);
+  signal?.throwIfAborted();
+  return projectSecurityInspection(state, context, signal);
+}
+
+/** Interactive acquisition yields around the bounded source admission and synchronous hash. */
+export async function securityInspectionAsync(
+  state: SecurityState,
+  context: SecurityInspectionContext,
+  signal?: AbortSignal,
+): Promise<SecurityInspectionSnapshot> {
+  await yieldForAbort(signal);
+  admitJsonSource([context, state], 8 * 1024 * 1024);
+  await yieldForAbort(signal);
+  const snapshot = projectSecurityInspection(state, context, signal);
+  await yieldForAbort(signal);
+  return snapshot;
+}
+
+function projectSecurityInspection(
+  state: SecurityState,
+  context: SecurityInspectionContext,
+  signal?: AbortSignal,
+): SecurityInspectionSnapshot {
+  signal?.throwIfAborted();
   if (state.scans.length + state.remediations.length > 96) throw new Error('Retained diagnostics exceed source limits.');
   const items: SecurityInspectionItem[] = [];
-  state.scans.forEach(scan => items.push(scanItem(scan, context, state.dispositions)));
-  state.remediations.forEach(remediation => items.push(remediationItem(remediation, context)));
+  for (const scan of state.scans) {
+    signal?.throwIfAborted();
+    items.push(scanItem(scan, context, state.dispositions));
+  }
+  for (const remediation of state.remediations) {
+    signal?.throwIfAborted();
+    items.push(remediationItem(remediation, context));
+  }
+  signal?.throwIfAborted();
   const version = createHash('sha256').update(JSON.stringify([context, state])).digest('hex');
+  signal?.throwIfAborted();
   return { identity: { sessionId: context.sessionId, workspaceRoot: context.workspaceRoot }, version, items };
 }
 
 /** Only unpersisted observed effects override fresh storage in an inspector. */
-export function inspectionState(saved: SecurityState, scans: Iterable<ScanRecord>, remediations: Iterable<Remediation>): SecurityState {
+export function inspectionState(
+  saved: SecurityState,
+  scans: Iterable<ScanRecord>,
+  remediations: Iterable<Remediation>,
+  signal?: AbortSignal,
+): SecurityState {
+  signal?.throwIfAborted();
   const observedScans = new Map(saved.scans.map(scan => [scan.id, scan]));
   const observedRemediations = new Map(saved.remediations.map(item => [item.id, item]));
   if (observedScans.size + observedRemediations.size > 96) throw new Error('Retained diagnostics exceed source limits.');
-  for (const scan of scans) if (scan.durability === 'unknown') {
+  for (const scan of scans) {
+    signal?.throwIfAborted();
+    if (scan.durability !== 'unknown') continue;
     observedScans.set(scan.id, scan);
     if (observedScans.size + observedRemediations.size > 96) throw new Error('Retained diagnostics exceed source limits.');
   }
-  for (const remediation of remediations) if (remediation.durability === 'unknown') {
+  for (const remediation of remediations) {
+    signal?.throwIfAborted();
+    if (remediation.durability !== 'unknown') continue;
     observedRemediations.set(remediation.id, remediation);
     if (observedScans.size + observedRemediations.size > 96) throw new Error('Retained diagnostics exceed source limits.');
   }
+  signal?.throwIfAborted();
   return { ...saved, scans: [...observedScans.values()], remediations: [...observedRemediations.values()] };
+}
+
+async function yieldForAbort(signal?: AbortSignal): Promise<void> {
+  await new Promise<void>(resolve => setImmediate(resolve));
+  signal?.throwIfAborted();
 }

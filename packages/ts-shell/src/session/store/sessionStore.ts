@@ -9,12 +9,17 @@ import type { SessionMessage } from "../schema/sessionMessage.js";
 import { isSessionContextMessage } from '../schema/sessionMessage.js';
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { buildSessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
-import { projectBranchMessages, readTranscriptSnapshot } from "../transcript/sessionTranscript.js";
+import { projectBranchMessages, readTranscriptSnapshot, readTranscriptSnapshotAsync } from "../transcript/sessionTranscript.js";
 import { createTranscriptHeader, type TranscriptEvent } from "../sessionEventCodec.js";
 import { sessionThreadPath } from "../schema/sessionThread.js";
-import { readJsonFileWithRetry, writeJsonFileAtomic } from "./sessionFileStore.js";
+import { readJsonFileWithRetry, readJsonFileWithRetryAsync, writeJsonFileAtomic } from "./sessionFileStore.js";
 import type { SessionFileLayout } from "./sessionFileLayout.js";
-import { readStateSnapshotRequired, writeSessionState, withSessionMetadataLock } from "./sessionStateStore.js";
+import {
+  readStateSnapshotRequired,
+  readStateSnapshotRequiredAsync,
+  writeSessionState,
+  withSessionMetadataLock,
+} from "./sessionStateStore.js";
 import { decodeContextEntries } from '../../context/attachment/entry.js';
 
 export function sessionExistsAtLayout(layout: Pick<SessionFileLayout, "sessionDir">): boolean {
@@ -77,11 +82,25 @@ export function writeSessionMetadataRecord(input: {
   });
 }
 
-export function readSessionMetadataRecord(metadataPath: string, maxBytes?: number): SessionMetadata | undefined {
+export function readSessionMetadataRecord(metadataPath: string, maxBytes?: number, signal?: AbortSignal): SessionMetadata | undefined {
   return readJsonFileWithRetry<SessionMetadata>(metadataPath, {
     required: true,
     parseErrorDetail: "Failed to load session metadata",
     maxBytes,
+    signal,
+  });
+}
+
+export function readSessionMetadataRecordAsync(
+  metadataPath: string,
+  maxBytes?: number,
+  signal?: AbortSignal,
+): Promise<SessionMetadata | undefined> {
+  return readJsonFileWithRetryAsync<SessionMetadata>(metadataPath, {
+    required: true,
+    parseErrorDetail: "Failed to load session metadata",
+    maxBytes,
+    signal,
   });
 }
 
@@ -101,6 +120,7 @@ interface SessionReadInput {
   readonly cwd: string;
   readonly limits?: SessionReadLimits;
   readonly salvageTranscript?: boolean;
+  readonly signal?: AbortSignal;
 }
 
 export interface SessionReadLimits {
@@ -125,6 +145,42 @@ export function loadSessionRecord(input: SessionReadInput): Session {
 
 /** All projections share these acquired values; no second transcript or state read. */
 export function readSessionRecordSnapshot(input: SessionReadInput): SessionRecordSnapshot {
+  assertSessionSources(input);
+  try {
+    input.signal?.throwIfAborted();
+    const metadata = readSessionMetadataRecord(input.layout.metadataPath, input.limits?.metadataBytes, input.signal);
+    const state = readStateSnapshotRequired(input.layout.statePath, input.limits?.stateBytes, input.signal);
+    input.signal?.throwIfAborted();
+    const transcript = readTranscriptSnapshot(input.layout.transcriptPath, input.limits ? {
+      maxBytes: input.limits.transcriptBytes, maxLines: input.limits.transcriptLines,
+    } : undefined, input.salvageTranscript === true, input.signal);
+    return projectSessionRecordSnapshot(input, metadata, state, transcript);
+  } catch (error) {
+    if (input.signal?.aborted) throw error;
+    throw sessionReadError(input.sessionId, error);
+  }
+}
+
+/** Cancellable counterpart for picker acquisition; transcript reads yield between chunks. */
+export async function readSessionRecordSnapshotAsync(input: SessionReadInput): Promise<SessionRecordSnapshot> {
+  input.signal?.throwIfAborted();
+  assertSessionSources(input);
+  try {
+    await yieldForAbort(input.signal);
+    const metadata = await readSessionMetadataRecordAsync(input.layout.metadataPath, input.limits?.metadataBytes, input.signal);
+    const state = await readStateSnapshotRequiredAsync(input.layout.statePath, input.limits?.stateBytes, input.signal);
+    await yieldForAbort(input.signal);
+    const transcript = await readTranscriptSnapshotAsync(input.layout.transcriptPath, input.limits ? {
+      maxBytes: input.limits.transcriptBytes, maxLines: input.limits.transcriptLines,
+    } : undefined, input.salvageTranscript === true, input.signal);
+    return await projectSessionRecordSnapshotAsync(input, metadata, state, transcript);
+  } catch (error) {
+    if (input.signal?.aborted) throw error;
+    throw sessionReadError(input.sessionId, error);
+  }
+}
+
+function assertSessionSources(input: SessionReadInput): void {
   if (
     !fs.existsSync(input.layout.sessionDir) ||
     !fs.existsSync(input.layout.metadataPath) ||
@@ -132,60 +188,120 @@ export function readSessionRecordSnapshot(input: SessionReadInput): SessionRecor
   ) {
     throw new Error(`Session ${input.sessionId} not found`);
   }
+}
 
-  try {
-    const metadata = readSessionMetadataRecord(input.layout.metadataPath, input.limits?.metadataBytes);
-    const state = readStateSnapshotRequired(input.layout.statePath, input.limits?.stateBytes);
-    if (input.limits && state.thread !== undefined &&
-      (!Array.isArray(state.thread.entries) || state.thread.entries.length > input.limits.entries)) {
-      throw new Error('The saved tree exceeds the navigation entry limit or is damaged.');
-    }
-    // Which branch is in view is a question about the thread, so the thread
-    // answers it. Without a thread — a session recorded before any of this
-    // existed — every message in the transcript is the conversation, as before.
-    //
-    // A thread whose path cannot be resolved is left to `undefined` rather than
-    // passed on as an empty path: an empty path is a branch with no messages,
-    // which would load the session as a conversation that said nothing. Passing
-    // nothing instead puts the transcript back in charge, which is the only
-    // other account of what the session contained.
-    const threadPath = state.thread === undefined ? undefined : sessionThreadPath(state.thread);
-    const branchPath = threadPath?.resolved === true
-      ? threadPath.path.map((entry) => entry.id)
-      : undefined;
-    const transcript = readTranscriptSnapshot(input.layout.transcriptPath, input.limits ? {
-      maxBytes: input.limits.transcriptBytes, maxLines: input.limits.transcriptLines,
-    } : undefined, input.salvageTranscript === true);
-    const events = transcript.events;
-    const turns = projectBranchMessages(
-      events,
-      branchPath,
-      state.thread?.entries.map((entry) => entry.id),
-    );
-    if (input.limits && state.thread === undefined &&
-      turns.reduce((count, turn) => count + (isSessionContextMessage(turn) ? 0 : 1), 1) > input.limits.entries) {
-      throw new Error('The saved conversation exceeds the navigation entry limit.');
-    }
-
-    const session = projectLoadedSession({
-      metadata,
-      state,
-      turns,
-      cwd: input.cwd,
-    });
-    const reports = selectSessionReports(events, session.id, state.thread);
-    if (events.some(event => event.type === 'command-output')) session.hasReportHistory = true;
-    if (reports.length) {
-      session.reports = reports;
-      const timestamp = reports.at(-1)!.timestamp;
-      if (Date.parse(timestamp) > Date.parse(session.updatedAt)) session.updatedAt = timestamp;
-    }
-    return { session, state, events, warnings: transcript.warnings, transcriptTruncated: transcript.truncated };
-  } catch (error) {
-    throw new Error(
-      `Failed to load session ${input.sessionId}: ${error instanceof Error ? error.message : String(error)}`,
-    );
+function projectSessionRecordSnapshot(
+  input: SessionReadInput,
+  metadata: SessionMetadata | undefined,
+  state: SessionStateSnapshot,
+  transcript: ReturnType<typeof readTranscriptSnapshot>,
+): SessionRecordSnapshot {
+  input.signal?.throwIfAborted();
+  if (input.limits && state.thread !== undefined &&
+    (!Array.isArray(state.thread.entries) || state.thread.entries.length > input.limits.entries)) {
+    throw new Error('The saved tree exceeds the navigation entry limit or is damaged.');
   }
+  // Which branch is in view is a question about the thread, so the thread
+  // answers it. Without a thread, every message is the conversation.
+  const threadPath = state.thread === undefined ? undefined : sessionThreadPath(state.thread, undefined, input.signal);
+  const branchPath = threadPath?.resolved === true
+    ? threadPath.path.map((entry) => entry.id)
+    : undefined;
+  const events = transcript.events;
+  const turns = projectBranchMessages(
+    events,
+    branchPath,
+    state.thread?.entries.map((entry) => entry.id),
+    input.signal,
+  );
+  if (input.limits && state.thread === undefined &&
+    turns.reduce((count, turn) => count + (isSessionContextMessage(turn) ? 0 : 1), 1) > input.limits.entries) {
+    throw new Error('The saved conversation exceeds the navigation entry limit.');
+  }
+
+  const session = projectLoadedSession({ metadata, state, turns, cwd: input.cwd });
+  input.signal?.throwIfAborted();
+  const reports = selectSessionReports(events, session.id, state.thread, input.signal);
+  if (events.some((event, index) => {
+    if ((index & 255) === 0) input.signal?.throwIfAborted();
+    return event.type === 'command-output';
+  })) session.hasReportHistory = true;
+  if (reports.length) {
+    session.reports = reports;
+    const timestamp = reports.at(-1)!.timestamp;
+    if (Date.parse(timestamp) > Date.parse(session.updatedAt)) session.updatedAt = timestamp;
+  }
+  input.signal?.throwIfAborted();
+  return { session, state, events, warnings: transcript.warnings, transcriptTruncated: transcript.truncated };
+}
+
+async function projectSessionRecordSnapshotAsync(
+  input: SessionReadInput,
+  metadata: SessionMetadata | undefined,
+  state: SessionStateSnapshot,
+  transcript: ReturnType<typeof readTranscriptSnapshot>,
+): Promise<SessionRecordSnapshot> {
+  input.signal?.throwIfAborted();
+  await yieldForAbort(input.signal);
+  if (input.limits && state.thread !== undefined &&
+    (!Array.isArray(state.thread.entries) || state.thread.entries.length > input.limits.entries)) {
+    throw new Error('The saved tree exceeds the navigation entry limit or is damaged.');
+  }
+  const threadPath = state.thread === undefined ? undefined : sessionThreadPath(state.thread, undefined, input.signal);
+  await yieldForAbort(input.signal);
+  let branchPath: string[] | undefined;
+  if (threadPath?.resolved === true) {
+    branchPath = [];
+    for (let index = 0; index < threadPath.path.length; index++) {
+      if ((index & 255) === 0) input.signal?.throwIfAborted();
+      branchPath.push(threadPath.path[index]!.id);
+    }
+  }
+  const knownEntryIds: string[] = [];
+  for (let index = 0; index < (state.thread?.entries.length ?? 0); index++) {
+    if ((index & 255) === 0) input.signal?.throwIfAborted();
+    knownEntryIds.push(state.thread!.entries[index]!.id);
+  }
+  const events = transcript.events;
+  const turns = projectBranchMessages(
+    events,
+    branchPath,
+    state.thread === undefined ? undefined : knownEntryIds,
+    input.signal,
+  );
+  await yieldForAbort(input.signal);
+  if (input.limits && state.thread === undefined) {
+    let count = 1;
+    for (let index = 0; index < turns.length; index++) {
+      if ((index & 255) === 0) input.signal?.throwIfAborted();
+      if (!isSessionContextMessage(turns[index]!)) count++;
+      if (count > input.limits.entries) throw new Error('The saved conversation exceeds the navigation entry limit.');
+    }
+  }
+
+  input.signal?.throwIfAborted();
+  const session = projectLoadedSession({ metadata, state, turns, cwd: input.cwd });
+  const reports = selectSessionReports(events, session.id, state.thread, input.signal);
+  if (events.some((event, index) => {
+    if ((index & 255) === 0) input.signal?.throwIfAborted();
+    return event.type === 'command-output';
+  })) session.hasReportHistory = true;
+  if (reports.length) {
+    session.reports = reports;
+    const timestamp = reports.at(-1)!.timestamp;
+    if (Date.parse(timestamp) > Date.parse(session.updatedAt)) session.updatedAt = timestamp;
+  }
+  input.signal?.throwIfAborted();
+  return { session, state, events, warnings: transcript.warnings, transcriptTruncated: transcript.truncated };
+}
+
+function sessionReadError(sessionId: string, error: unknown): Error {
+  return new Error(`Failed to load session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`);
+}
+
+async function yieldForAbort(signal?: AbortSignal): Promise<void> {
+  await new Promise<void>(resolve => setImmediate(resolve));
+  signal?.throwIfAborted();
 }
 
 export function projectLoadedSession(input: {

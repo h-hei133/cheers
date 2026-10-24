@@ -7,7 +7,11 @@ import type { SessionNavigationPoint } from '../../../session/query/navigation.j
 const navigation = vi.hoisted(() => ({ readSessionNavigation: vi.fn() }));
 vi.mock('../../../session/query/navigation.js', async importOriginal => {
   const actual = await importOriginal<typeof import('../../../session/query/navigation.js')>();
-  return { ...actual, readSessionNavigation: navigation.readSessionNavigation };
+  return {
+    ...actual,
+    readSessionNavigationAsync: async (...args: Parameters<typeof actual.readSessionNavigationAsync>) =>
+      navigation.readSessionNavigation(args[0], args[1], args[2]),
+  };
 });
 
 import { treePicker, treePrefixes } from './tree.js';
@@ -29,9 +33,9 @@ it('routes disclosure through the real overlay and refuses an unoffered hidden d
     { ...point('child', 1), label: 'saved answer', searchText: 'needle after preview', excerpt: 'detail excerpt', parentId: 'root' },
   ] });
   const action = vi.fn(); const picker = treePicker({ sessionId: 'session', cwd: root } as never, action);
-  const host = new OverlayHost(() => {}); host.open(picker); await Promise.resolve(); await Promise.resolve();
+  const host = new OverlayHost(() => {}); host.open(picker);
   const frame = () => host.render(120, 24).map(stripAnsi).join('\n');
-  expect(frame()).toContain('saved answer');
+  await vi.waitFor(() => expect(frame()).toContain('saved answer'));
   host.handleKey(parseKeyEvent('\x1b[D'), vi.fn());
   expect(frame()).not.toContain('saved answer');
   expect(await picker.apply(['child'])).toBeUndefined();
@@ -56,7 +60,7 @@ it('fits node details to every prescribed rectangle and neutralises saved contro
   ] });
   const host = new OverlayHost(() => {});
   host.open(treePicker({ sessionId: 'session', cwd: root } as never, vi.fn()));
-  await Promise.resolve(); await Promise.resolve();
+  await vi.waitFor(() => expect(host.render(120, 24).join('\n')).toContain('Entry: entry'));
   for (const width of [20, 40, 80, 120, 200]) for (const height of [8, 24, 40, 80]) {
     const rows = host.render(width, height);
     expect(rows.length).toBeLessThanOrEqual(height);
@@ -76,11 +80,12 @@ it('releases accepted choices and details before a retained picker can be select
   ] });
   const action = vi.fn(async () => ({ note: 'navigated' }));
   const picker = treePicker({ sessionId: 'session', cwd: root } as never, action);
-  const host = new OverlayHost(() => {}); host.open(picker); await Promise.resolve(); await Promise.resolve();
+  const host = new OverlayHost(() => {}); host.open(picker);
+  await vi.waitFor(() => expect(picker.detail?.('entry')).not.toEqual([]));
   let pending: Promise<unknown> | undefined;
   host.handleKey(parseKeyEvent('\r'), (selected, ids) => { pending = selected.apply(ids); });
+  await vi.waitFor(() => expect(action).toHaveBeenCalledTimes(1));
   await pending;
-  expect(action).toHaveBeenCalledTimes(1);
   expect(picker.detail?.('entry')).toEqual([]);
   expect(await picker.apply(['entry'])).toBeUndefined();
   expect(action).toHaveBeenCalledTimes(1);
@@ -95,7 +100,7 @@ it('consumes the choice before asynchronous navigation settles', async () => {
   await picker.load(); const pending = picker.apply(['entry']);
   expect(await picker.apply(['entry'])).toBeUndefined();
   expect(picker.detail?.('entry')).toEqual([]);
-  expect(action).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() => expect(action).toHaveBeenCalledTimes(1));
   finish(); await pending;
 });
 
@@ -264,6 +269,25 @@ it('rejects closure and signal cancellation during acquisition before publishing
   navigation.readSessionNavigation.mockImplementationOnce(() => { closed.previewEnd?.(); return snapshot; });
   await expect(closed.load()).rejects.toThrow('closed'); expect(closed.detail?.('entry')).toEqual([]);
   expect(await closed.apply(['entry'])).toBeUndefined();
+});
+
+it('publishes no tree rows when cancellation arrives while acquisition is pending', async () => {
+  const snapshot = { version: 'saved-v1', session: { id: 'session', projectRoot: root }, points: [point('entry', 0)] };
+  let resolveRead!: (value: typeof snapshot) => void;
+  navigation.readSessionNavigation.mockReturnValue(new Promise(resolve => { resolveRead = resolve; }));
+  const controller = new AbortController();
+  const picker = treePicker({ cwd: root, sessionId: 'session' } as never, vi.fn());
+
+  const loading = picker.load(controller.signal);
+  expect(navigation.readSessionNavigation.mock.calls[0]?.[2]).toMatchObject({ signal: controller.signal });
+  expect(picker.detail?.('entry')).toEqual([]);
+  controller.abort();
+  resolveRead(snapshot);
+
+  await expect(loading).rejects.toMatchObject({ name: 'AbortError' });
+  expect(picker.detail?.('entry')).toEqual([]);
+  expect(picker.filterOptions?.('', [])).toEqual([]);
+  expect(await picker.apply(['entry'])).toBeUndefined();
 });
 
 it('accepts host browser release while refusing actual cancellation', async () => {

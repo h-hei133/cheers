@@ -23,6 +23,7 @@ export function cleansePicker(inspector: SecurityInspector | undefined, context?
   let closed = false;
   let accepting = false;
   let browserSignal: AbortSignal | undefined;
+  let generation = 0;
   let unsubscribe: (() => void) | undefined;
   let inspection: SecurityInspection = { state: 'unavailable' };
   let offered: SecurityInspectionSnapshot | undefined;
@@ -30,6 +31,7 @@ export function cleansePicker(inspector: SecurityInspector | undefined, context?
   const invalidate = (): void => { offered = undefined; inspection = { state: 'unavailable' }; };
   const release = (accepted = false): void => {
     closed = true;
+    generation++;
     invalidate();
     openedIdentity = undefined;
     browserSignal = undefined;
@@ -47,6 +49,13 @@ export function cleansePicker(inspector: SecurityInspector | undefined, context?
     catch (error) { if (closed) throw new Error('Cleanse picker is closed.'); throw error; }
     if (closed) throw new Error('Cleanse picker is closed.');
     if (browsing) browserSignal?.throwIfAborted();
+  };
+  const acquire = async (signal?: AbortSignal): Promise<SecurityInspection> => {
+    check();
+    const next = source?.readAsync ? await source.readAsync(signal) : source?.read();
+    signal?.throwIfAborted();
+    check();
+    return next ?? { state: 'unavailable' };
   };
   const refresh = (next: SecurityInspection): readonly Option[] => {
     check();
@@ -82,14 +91,17 @@ export function cleansePicker(inspector: SecurityInspector | undefined, context?
         : !visible.length && query?.trim() ? 'No retained diagnostics match this search.' : `${visible.length} retained records.`} ${help}`;
     },
     async load(signal) {
+      const epoch = ++generation;
+      unsubscribe?.();
       invalidate();
       browserSignal = signal;
       try {
-        check();
-        const current = source?.read() ?? { state: 'unavailable' as const };
-        check();
-        return refresh(current);
-      } catch (error) { invalidate(); throw error; }
+        const next = await acquire(signal);
+        if (epoch !== generation) throw new Error('Cleanse load was replaced.');
+        const rows = refresh(next);
+        signal?.throwIfAborted();
+        return rows;
+      } catch (error) { if (epoch === generation) invalidate(); throw error; }
     },
     subscribe: publish => {
       try { check(); } catch { invalidate(); return () => undefined; }
@@ -116,7 +128,7 @@ export function cleansePicker(inspector: SecurityInspector | undefined, context?
             invalidate();
             if (!closed && !released && !browserSignal?.aborted) publish([]);
           }
-        }) ?? (() => undefined);
+        }, browserSignal) ?? (() => undefined);
         if (released) acquired();
         else originalStop = acquired;
         check();
@@ -142,7 +154,7 @@ export function cleansePicker(inspector: SecurityInspector | undefined, context?
       release(true);
       try {
         selection.check();
-        const current = acceptedSource?.read();
+        const current = acceptedSource?.readAsync ? await acceptedSource.readAsync() : acceptedSource?.read();
         selection.check();
         if (current?.state !== 'ready') return { note: 'Retained diagnostics are unavailable or the binding changed. Reopen /cleanse.' };
         const fresh = captureCleanseSource(current.snapshot, selection.check);

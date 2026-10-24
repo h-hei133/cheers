@@ -1,12 +1,20 @@
 import { sameValue } from '../../config/values.js';
 import { freezeDeep } from '../../core/values/freeze.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
-import { readBoundSessionRevision, readBoundSessionState, publishBoundSessionState, type BoundSessionHost } from '../../session/store/bound.js';
+import {
+  publishBoundSessionState,
+  readBoundSessionRevision,
+  readBoundSessionState,
+  readBoundSessionStateAsync,
+  type BoundSessionHost,
+} from '../../session/store/bound.js';
 import { cloneJsonSource } from '../analysis/json.js';
 import type { ScanRecord, SecurityState, Remediation } from '../analysis/model.js';
 
 export interface SecurityStore {
   read(): SecurityState;
+  /** Optional cancellable source acquisition for interactive inspection. */
+  readAsync?(signal?: AbortSignal): Promise<SecurityState>;
   /** No payload cache: optional source freshness for subscribed polling only. */
   revision?(): string;
   write(update: (state: SecurityState) => SecurityState): void;
@@ -27,6 +35,13 @@ export function decodeSecurity(value: unknown): SecurityState {
 }
 export function securityStore(host: BoundSessionHost, current: () => Session): SecurityStore {
   return { read: () => decodeSecurity(readBoundSessionState(host, current(), SECURITY_SESSION_READ_LIMITS).state.security),
+    readAsync: async signal => {
+      const state = (await readBoundSessionStateAsync(host, current(), SECURITY_SESSION_READ_LIMITS, signal)).state.security;
+      signal?.throwIfAborted();
+      const decoded = decodeSecurity(state);
+      signal?.throwIfAborted();
+      return decoded;
+    },
     revision: () => readBoundSessionRevision(host, current()), write: update => {
     const session = current(); const baseline = readBoundSessionState(host, session);
     publishBoundSessionState(host, session, baseline, (state, previous) => sameValue(state.security, previous.security),

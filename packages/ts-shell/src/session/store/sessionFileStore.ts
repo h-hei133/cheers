@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import os from "node:os";
 import * as path from "node:path";
 import { isLockStale, takeOverStaleLock, type LockRecovery } from "./lockStaleness.js";
-import { readTextFile } from '../../core/workspace/files.js';
+import { readTextFile, readTextFileAsync } from '../../core/workspace/files.js';
 
 const STATE_IO_MAX_ATTEMPTS = 6;
 const STATE_IO_RETRY_DELAY_MS = 12;
@@ -12,9 +12,10 @@ const STATE_LOCK_RETRY_DELAY_MS = 20;
 
 export function readJsonFileWithRetry<T>(
   filePath: string,
-  options: { required: boolean; parseErrorDetail: string; maxBytes?: number },
+  options: { required: boolean; parseErrorDetail: string; maxBytes?: number; signal?: AbortSignal },
 ): T | undefined {
   for (let attempt = 1; attempt <= STATE_IO_MAX_ATTEMPTS; attempt += 1) {
+    options.signal?.throwIfAborted();
     try {
       if (!fs.existsSync(filePath)) {
         if (options.required && attempt === STATE_IO_MAX_ATTEMPTS) {
@@ -28,6 +29,7 @@ export function readJsonFileWithRetry<T>(
       }
       const raw = (options.maxBytes === undefined ? fs.readFileSync(filePath, "utf8")
         : readTextFile(filePath, options.maxBytes) ?? '').trim();
+      options.signal?.throwIfAborted();
       if (raw.length === 0) {
         if (options.required && attempt === STATE_IO_MAX_ATTEMPTS) {
           throw new Error(`File empty at ${filePath}`);
@@ -38,7 +40,9 @@ export function readJsonFileWithRetry<T>(
         sleepBlocking(STATE_IO_RETRY_DELAY_MS);
         continue;
       }
-      return JSON.parse(raw) as T;
+      const decoded = JSON.parse(raw) as T;
+      options.signal?.throwIfAborted();
+      return decoded;
     } catch (error) {
       if (!isTransientIoError(error) || attempt === STATE_IO_MAX_ATTEMPTS) {
         if (error instanceof Error && /Unexpected token|JSON/.test(error.message)) {
@@ -50,6 +54,56 @@ export function readJsonFileWithRetry<T>(
         throw error;
       }
       sleepBlocking(STATE_IO_RETRY_DELAY_MS);
+    }
+  }
+  return undefined;
+}
+
+/** Cancellable JSON acquisition with the same retry and decode semantics as the sync reader. */
+export async function readJsonFileWithRetryAsync<T>(
+  filePath: string,
+  options: { required: boolean; parseErrorDetail: string; maxBytes?: number; signal?: AbortSignal },
+): Promise<T | undefined> {
+  for (let attempt = 1; attempt <= STATE_IO_MAX_ATTEMPTS; attempt += 1) {
+    options.signal?.throwIfAborted();
+    try {
+      if (!fs.existsSync(filePath)) {
+        if (options.required && attempt === STATE_IO_MAX_ATTEMPTS) {
+          throw new Error(`File missing at ${filePath}`);
+        }
+        if (!options.required) {
+          return undefined;
+        }
+        await sleepAsync(STATE_IO_RETRY_DELAY_MS, options.signal);
+        continue;
+      }
+      const raw = (options.maxBytes === undefined ? await fs.promises.readFile(filePath, "utf8")
+        : await readTextFileAsync(filePath, options.maxBytes, options.signal) ?? '').trim();
+      options.signal?.throwIfAborted();
+      if (raw.length === 0) {
+        if (options.required && attempt === STATE_IO_MAX_ATTEMPTS) {
+          throw new Error(`File empty at ${filePath}`);
+        }
+        if (!options.required) {
+          return undefined;
+        }
+        await sleepAsync(STATE_IO_RETRY_DELAY_MS, options.signal);
+        continue;
+      }
+      const decoded = JSON.parse(raw) as T;
+      options.signal?.throwIfAborted();
+      return decoded;
+    } catch (error) {
+      if (!isTransientIoError(error) || attempt === STATE_IO_MAX_ATTEMPTS) {
+        if (error instanceof Error && /Unexpected token|JSON/.test(error.message)) {
+          if (!options.required) {
+            return undefined;
+          }
+          throw new Error(`${options.parseErrorDetail}: ${error.message}`);
+        }
+        throw error;
+      }
+      await sleepAsync(STATE_IO_RETRY_DELAY_MS, options.signal);
     }
   }
   return undefined;
@@ -171,6 +225,11 @@ export function sleepBlocking(milliseconds: number): void {
   }
   const slot = new Int32Array(new SharedArrayBuffer(4));
   Atomics.wait(slot, 0, 0, milliseconds);
+}
+
+async function sleepAsync(milliseconds: number, signal?: AbortSignal): Promise<void> {
+  if (milliseconds > 0) await new Promise<void>(resolve => setTimeout(resolve, milliseconds));
+  signal?.throwIfAborted();
 }
 
 export function isTransientLockError(error: unknown): boolean {

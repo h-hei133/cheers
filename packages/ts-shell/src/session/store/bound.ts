@@ -5,11 +5,12 @@ import { pathIdentity } from '../../core/workspace/files.js';
 import { freezeDeep } from '../../core/values/freeze.js';
 import { sameValue } from '../../config/values.js';
 import type { Session } from '../schema/sessionRecord.js';
+import type { SessionMetadata } from '../schema/sessionMetadataCodec.js';
 import type { SessionStateSnapshot } from '../schema/sessionStateSnapshot.js';
 import { projectSessionFileLayout, validateSessionId, type SessionFileLayout } from './sessionFileLayout.js';
 import { readSessionFileVersion } from './version.js';
-import { readSessionMetadataRecord } from './sessionStore.js';
-import { readStateSnapshotRequired } from './sessionStateStore.js';
+import { readSessionMetadataRecord, readSessionMetadataRecordAsync } from './sessionStore.js';
+import { readStateSnapshotRequired, readStateSnapshotRequiredAsync } from './sessionStateStore.js';
 import { withFileLock, writeJsonFileAtomic } from './sessionFileStore.js';
 
 import type { BoundSessionHost, BoundSessionScope } from './contract.js';
@@ -44,6 +45,29 @@ export function readBoundSessionState(host: BoundSessionHost, session: Session, 
     if (readSessionFileVersion(layout) !== version) throw new SessionPublicationError('conflict');
     return new BoundState(layout, directoryIdentity(layout), current.scope, current.state);
   } catch (error) { throw error instanceof SessionPublicationError ? error : new SessionPublicationError('unavailable'); }
+}
+
+/** Cancellable state acquisition for interactive inspection; validation matches the sync owner. */
+export async function readBoundSessionStateAsync(
+  host: BoundSessionHost,
+  session: Session,
+  limits?: BoundSessionReadLimits,
+  signal?: AbortSignal,
+): Promise<BoundSessionState> {
+  try {
+    const layout = layoutFor(host, session.id); const version = readSessionFileVersion(layout);
+    signal?.throwIfAborted();
+    const metadata = await readSessionMetadataRecordAsync(layout.metadataPath, limits?.metadataBytes, signal);
+    const state = await readStateSnapshotRequiredAsync(layout.statePath, limits?.stateBytes, signal);
+    signal?.throwIfAborted();
+    const current = projectBoundRead(metadata, state, session);
+    signal?.throwIfAborted();
+    if (readSessionFileVersion(layout) !== version) throw new SessionPublicationError('conflict');
+    return new BoundState(layout, directoryIdentity(layout), current.scope, current.state);
+  } catch (error) {
+    if (signal?.aborted) signal.throwIfAborted();
+    throw error instanceof SessionPublicationError ? error : new SessionPublicationError('unavailable');
+  }
 }
 
 /** Publish one owner's payload under the existing session lock; retain newer unrelated state. */
@@ -89,6 +113,9 @@ function layoutFor(host: BoundSessionHost, sessionId: string): SessionFileLayout
 function readCurrent(layout: SessionFileLayout, expected: Session, limits?: BoundSessionReadLimits) {
   const metadata = readSessionMetadataRecord(layout.metadataPath, limits?.metadataBytes);
   const state = readStateSnapshotRequired(layout.statePath, limits?.stateBytes);
+  return projectBoundRead(metadata, state, expected);
+}
+function projectBoundRead(metadata: SessionMetadata | undefined, state: SessionStateSnapshot, expected: Session) {
   if (!metadata || metadata.id !== expected.id || metadata.createdAt !== expected.createdAt || !state || typeof state !== 'object'
     || Array.isArray(state) || !['active', 'interrupted', 'completed', 'error', 'terminated'].includes(state.status)
     || typeof metadata.projectRoot !== 'string' || typeof state.projectRoot !== 'string') throw new SessionPublicationError('unavailable');

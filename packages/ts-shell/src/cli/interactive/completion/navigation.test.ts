@@ -6,7 +6,9 @@ import { createSessionStoreLayout, locateExistingSessionLayout } from "../../../
 import * as navigation from "../../../session/query/navigation.js";
 import { navigationCatalog } from "./navigation.js";
 import { catalogRequest, catalogSuggestions } from "./request.js";
+import { createCatalogLoader } from "./catalog.js";
 import type { ShellRuntimeContext } from "../../../core/shell/runtimeContext.js";
+import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
 
 let root: string;
 beforeEach(() => {
@@ -63,12 +65,36 @@ describe("navigation catalog read ownership", () => {
   });
 
   it("never offers an unavailable navigation target", async () => {
-    vi.spyOn(navigation, "readSessionNavigation").mockReturnValue({ thread: { entries: [] }, points: [
+    vi.spyOn(navigation, "readSessionNavigationAsync").mockResolvedValue({ thread: { entries: [] }, points: [
       { entryId: "safe", label: "safe branch", current: false, depth: 0 },
       { entryId: "broken", label: "broken branch", current: false, depth: 0, unavailable: "broken ancestry" },
-    ] } as ReturnType<typeof navigation.readSessionNavigation>);
+    ] } as Awaited<ReturnType<typeof navigation.readSessionNavigationAsync>>);
     const context = { session: { id: "fixture" }, cwd: root } as ShellRuntimeContext;
     expect((await navigationCatalog("tree", context, {} as SessionManager)).map(item => item.value)).toEqual(["safe"]);
+  });
+
+  it('propagates completion cancellation into the async navigation reader', async () => {
+    const manager = new SessionManager(); const session = manager.createNew(root);
+    const context = {
+      session,
+      cwd: root,
+      projectRoot: root,
+      skillOptions: {},
+      configuration: { current: { revision: 1 } },
+      runtimeConfig: { enableMcpTools: false, allowedTools: [], disabledTools: [], hiddenToolPrefixes: [] },
+    } as unknown as ShellRuntimeContext;
+    const controller = new AbortController();
+    let received: AbortSignal | undefined;
+    vi.spyOn(navigation, 'readSessionNavigationAsync').mockImplementation((_id, _cwd, options) =>
+      new Promise((_resolve, reject) => {
+        received = options?.signal;
+        options?.signal?.addEventListener('abort', () => reject(options.signal!.reason), { once: true });
+      }));
+    const load = createCatalogLoader(() => context, {} as CliMcpGateway, [], manager);
+    const pending = load('tree', controller.signal);
+    await vi.waitFor(() => expect(received).toBe(controller.signal));
+    controller.abort(new Error('Completion cancelled'));
+    await expect(pending).rejects.toThrow('Completion cancelled');
   });
 
   it('keeps valid session candidates and a partial notice when another stored record is unreadable', async () => {

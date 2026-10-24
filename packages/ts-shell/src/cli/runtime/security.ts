@@ -55,6 +55,19 @@ export function securityInspectorFor(context: ShellRuntimeContext): SecurityInsp
     }
     catch { failureRevision++; return { state: 'unavailable' }; }
   };
+  const readAsync = async (signal?: AbortSignal): Promise<SecurityInspection> => {
+    if (context.session !== session || context.cwd !== root) return { state: 'stale' };
+    try {
+      const snapshot = await service.inspectionAsync(signal);
+      signal?.throwIfAborted();
+      return context.session === session && context.cwd === root && snapshot.identity.sessionId === session.id
+        && snapshot.identity.workspaceRoot === root ? { state: 'ready', snapshot } : { state: 'stale' };
+    } catch (error) {
+      if (signal?.aborted) signal.throwIfAborted();
+      failureRevision++;
+      return { state: 'unavailable' };
+    }
+  };
   const sourceRevision = (): string | undefined => {
     if (context.session !== session || context.cwd !== root) return undefined;
     try {
@@ -63,30 +76,55 @@ export function securityInspectorFor(context: ShellRuntimeContext): SecurityInsp
         ? JSON.stringify([revision, String(failureRevision)]) : undefined;
     } catch { return undefined; }
   };
-  return { read, subscribe: listener => {
+  return { read, readAsync, subscribe: (listener, signal) => {
     let released = false; let previous: string | undefined; let admitted: string | undefined; let generation = 0;
+    let pending: AbortController | undefined;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    let releaseOwner: (() => void) | undefined;
+    const stop = () => {
+      if (released) return;
+      released = true; generation++; admitted = undefined; previous = undefined;
+      pending?.abort(); pending = undefined;
+      if (timer !== undefined) clearInterval(timer);
+      releaseOwner?.();
+      signal?.removeEventListener('abort', stop);
+    };
     const publish = (force = false) => {
       if (released) return;
-      const current = ++generation;
       const before = sourceRevision();
-      if (released || current !== generation) return;
+      if (released) return;
       if (!force && before !== undefined && before === admitted) return;
+      if (!force && pending) return;
+      const current = ++generation;
+      pending?.abort();
+      const controller = signal === undefined ? undefined : new AbortController();
+      pending = controller;
       admitted = undefined;
-      const inspection = read();
-      const after = inspection.state === 'ready' ? sourceRevision() : undefined;
-      if (released || current !== generation) return;
-      if (before !== undefined && before === after) admitted = after;
-      const revision = inspection.state === 'ready' ? inspection.snapshot.version : inspection.state;
-      if (revision === previous) return;
-      previous = revision;
-      try { listener(inspection); } catch { /* view delivery cannot affect the diagnostic owner */ }
+      const deliver = (inspection: SecurityInspection) => {
+        if (released || current !== generation || controller?.signal.aborted) return;
+        pending = undefined;
+        const after = inspection.state === 'ready' ? sourceRevision() : undefined;
+        if (released || current !== generation) return;
+        if (before !== undefined && before === after) admitted = after;
+        else if (controller && inspection.state === 'ready') inspection = { state: 'stale' };
+        const revision = inspection.state === 'ready' ? inspection.snapshot.version : inspection.state;
+        if (revision === previous) return;
+        previous = revision;
+        try { listener(inspection); } catch { /* view delivery cannot affect the diagnostic owner */ }
+      };
+      if (controller) void readAsync(controller.signal).then(deliver, () => {
+        if (!released && current === generation && !controller.signal.aborted) deliver({ state: 'unavailable' });
+      });
+      else deliver(read());
     };
-    const release = service.subscribeInspection(() => publish(true));
+    if (signal?.aborted) return stop;
+    signal?.addEventListener('abort', stop, { once: true });
+    releaseOwner = service.publication.subscribe(() => publish(true));
     // The persisted owner has no cross-process events. Observe external changes
     // only while this view is open; native publication updates remain immediate.
-    const timer = setInterval(publish, 1000); timer.unref?.();
+    timer = setInterval(publish, 1000); timer.unref?.();
     publish();
-    return () => { if (released) return; released = true; admitted = undefined; previous = undefined; clearInterval(timer); release(); };
+    return stop;
   } };
 }
 export function isSecurityControl(text: string): boolean { return /^\/security(?:\s+(?:status|cancel|scans|show|compare)(?:\s|$)|\s*$)/i.test(text.trim()); }

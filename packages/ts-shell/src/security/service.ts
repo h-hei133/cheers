@@ -18,7 +18,7 @@ import { verifiesRemediation } from './remediation/verification.js';
 import { securityReport, scanReport, sortedFindings } from './view/report.js';
 import { exportReport, exportTool } from './view/export.js';
 import { SecurityPublication } from './findings/publication.js';
-import { inspectionState, securityInspection, type SecurityInspectionSnapshot } from './view/inspection.js';
+import { inspectionState, securityInspection, securityInspectionAsync, type SecurityInspectionSnapshot } from './view/inspection.js';
 import type { ExecutionService } from '../runtime/execution/types.js';
 import { readOperation, captureOperationScope } from '../edit/recovery/operation/store.js';
 
@@ -40,12 +40,21 @@ export class SecurityService {
     const state = inspectionState(this.host.store.read(), this.publication.scans.values(), this.publication.remediations.values());
     return securityInspection(state, { sessionId: this.host.sessionId, workspaceRoot: this.host.root(), liveScanId: this.active?.id, liveRemediationId: this.applying });
   }
+  async inspectionAsync(signal?: AbortSignal): Promise<SecurityInspectionSnapshot> {
+    await new Promise<void>(resolve => setImmediate(resolve));
+    signal?.throwIfAborted();
+    const saved = this.host.store.readAsync ? await this.host.store.readAsync(signal) : this.host.store.read();
+    signal?.throwIfAborted();
+    const state = inspectionState(saved, this.publication.scans.values(), this.publication.remediations.values(), signal);
+    return securityInspectionAsync(
+      state,
+      { sessionId: this.host.sessionId, workspaceRoot: this.host.root(), liveScanId: this.active?.id, liveRemediationId: this.applying },
+      signal,
+    );
+  }
   inspectionRevision(): string | undefined {
     const source = this.host.store.revision?.();
     return source === undefined ? undefined : JSON.stringify([source, this.host.root(), this.publication.revision, this.active?.id, this.applying]);
-  }
-  subscribeInspection(listener: () => void): () => void {
-    return this.publication.subscribe(listener);
   }
   plan(executable: string, version: string, rules: string, files: readonly string[]): LocalCommandResult {
     this.assertIdle(); const plan = prepareScan({ root: this.host.root(), executable, version, rules, files,

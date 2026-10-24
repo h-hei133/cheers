@@ -8,6 +8,7 @@ import {
 import type { Session } from "../schema/sessionRecord.js";
 import {
   readJsonFileWithRetry,
+  readJsonFileWithRetryAsync,
   withFileLock,
   writeJsonFileAtomic,
 } from "./sessionFileStore.js";
@@ -26,11 +27,29 @@ export function readStateSnapshotSafely(
   });
 }
 
-export function readStateSnapshotRequired(statePath: string, maxBytes?: number): SessionStateSnapshot {
+export function readStateSnapshotRequired(statePath: string, maxBytes?: number, signal?: AbortSignal): SessionStateSnapshot {
   const state = readJsonFileWithRetry<SessionStateSnapshot>(statePath, {
     required: true,
     parseErrorDetail: `Failed to load session state from ${statePath}`,
     maxBytes,
+    signal,
+  });
+  if (!state) {
+    throw new Error(`Session state missing at ${statePath}`);
+  }
+  return state;
+}
+
+export async function readStateSnapshotRequiredAsync(
+  statePath: string,
+  maxBytes?: number,
+  signal?: AbortSignal,
+): Promise<SessionStateSnapshot> {
+  const state = await readJsonFileWithRetryAsync<SessionStateSnapshot>(statePath, {
+    required: true,
+    parseErrorDetail: `Failed to load session state from ${statePath}`,
+    maxBytes,
+    signal,
   });
   if (!state) {
     throw new Error(`Session state missing at ${statePath}`);

@@ -1,16 +1,18 @@
 import type { CommandContext } from "../../../core/commands/types.js";
-import { readSessionNavigation, type SessionNavigationPoint } from "../../../session/query/navigation.js";
+import { readSessionNavigationAsync, type SessionNavigationPoint } from "../../../session/query/navigation.js";
 import type { Picker } from "../overlay.js";
 import type { RewindPickerInput } from "./rewind.js";
 import { quoteCompletion } from "../completion.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
-import { TreeModel } from '../../../presentation/tui/chrome/tree.js';
+import { TreeModel, type TreeOption } from '../../../presentation/tui/chrome/tree.js';
 import { pickerSelection } from './selection/state.js';
 import type { SessionSelectionContext } from '../../../session/navigation/selection.js';
 import { normalizePathIdentity } from '../../../session/continuation/roots.js';
 
 export type TreePickerMode = "tree" | "fork" | "history";
 const MAX_VISIBLE_DEPTH = 10;
+const CONTROL_CHECK_INTERVAL = 256;
+const YIELD_INTERVAL = 1024;
 
 /**
  * Tree connectors for a depth-first point list.
@@ -71,9 +73,9 @@ export function treePicker(
     if (closed || epoch !== generation) throw new Error('Session tree picker is closed or its load was replaced.');
     if (browsing) browserSignal?.throwIfAborted();
   };
-  const read = () => {
+  const read = async (signal?: AbortSignal) => {
     if (!selection.sessionId || !selection.root) return undefined;
-    const snapshot = readSessionNavigation(selection.sessionId, selection.root);
+    const snapshot = await readSessionNavigationAsync(selection.sessionId, selection.root, { signal });
     const root = normalizePathIdentity(selection.projectRoot!);
     if (!root || snapshot.session.id !== selection.sessionId || normalizePathIdentity(snapshot.session.projectRoot) !== root) {
       throw new Error('The saved session belongs to a different project or identity.');
@@ -132,20 +134,33 @@ export function treePicker(
       const epoch = ++generation;
       try {
         check(true, epoch);
-        const snapshot = read();
+        const snapshot = await read(signal);
         check(true, epoch);
-        const next = snapshot?.points.filter(point => !userOnly || point.prompt !== undefined).map(point => ({ ...point })) ?? [];
+        const next: SessionNavigationPoint[] = [];
+        for (let index = 0; index < (snapshot?.points.length ?? 0); index++) {
+          if ((index & (CONTROL_CHECK_INTERVAL - 1)) === 0) signal?.throwIfAborted();
+          if ((index & (YIELD_INTERVAL - 1)) === 0) await yieldForAbort(signal);
+          const point = snapshot!.points[index]!;
+          if (!userOnly || point.prompt !== undefined) next.push({ ...point });
+        }
         const prefixes = treePrefixes(next);
-        const options = next.map((point, index) => ({
-          id: point.entryId,
-          depth: point.depth,
-          label: `${prefixes[index]}${point.label}`,
-          detail: point.entryId,
-          searchText: `${point.entryId} ${point.label} ${point.searchText ?? point.prompt ?? ""}`,
-          note: point.unavailable ?? (point.current ? "current" : "keeps files"),
-          disabled: point.unavailable !== undefined,
-        }));
+        const options: TreeOption[] = [];
+        for (let index = 0; index < next.length; index++) {
+          if ((index & (CONTROL_CHECK_INTERVAL - 1)) === 0) signal?.throwIfAborted();
+          if ((index & (YIELD_INTERVAL - 1)) === 0) await yieldForAbort(signal);
+          const point = next[index]!;
+          options.push({
+            id: point.entryId,
+            depth: point.depth,
+            label: `${prefixes[index]}${point.label}`,
+            detail: point.entryId,
+            searchText: `${point.entryId} ${point.label} ${point.searchText ?? point.prompt ?? ""}`,
+            note: point.unavailable ?? (point.current ? "current" : "keeps files"),
+            disabled: point.unavailable !== undefined,
+          });
+        }
         const model = mode === 'tree' ? new TreeModel(options) : undefined;
+        await yieldForAbort(signal);
         check(true, epoch);
         version = snapshot?.version; points = next; tree = model;
         return tree?.catalogue ?? options;
@@ -165,7 +180,7 @@ export function treePicker(
       try {
         signal?.throwIfAborted();
         selection.check();
-        const fresh = read();
+        const fresh = await read(signal);
         selection.check();
         signal?.throwIfAborted();
         if (!offeredVersion || fresh?.version !== offeredVersion) {
@@ -182,4 +197,9 @@ export function treePicker(
     previewAccept() { try { check(); accepting = true; } catch { release(); } },
     previewEnd: () => release(),
   };
+}
+
+async function yieldForAbort(signal?: AbortSignal): Promise<void> {
+  await new Promise<void>(resolve => setImmediate(resolve));
+  signal?.throwIfAborted();
 }

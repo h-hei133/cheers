@@ -1206,7 +1206,7 @@ export class InteractiveMode {
       signIn: args => this.runCommandLine(`/connect ${args.map(arg => quoteCompletion(arg, '"')).join(' ')}`),
       addMcpServer: mcpDefinitionFor(this.options.runtimeContext),
       revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
-      sessionTurns: () => readBackSource(this.options.runtimeContext),
+      sessionTurns: signal => readBackSource(this.options.runtimeContext, signal),
       rewind: async (point) => {
         const result = await navigateSession(this.options, point.entryId, point.version, selectionAdmission);
         if (result.changed) {

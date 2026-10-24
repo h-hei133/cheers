@@ -21,6 +21,13 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
+## 2026-10-24 PAN-02/PAN-06 可取消导航源读取（本地验证，待提交）
+
+- 导航查询新增 `readSessionNavigationAsync` 和 transcript-only async source。metadata、state、transcript 通过可取消的异步读取；transcript 按 descriptor chunk 读取并在解析、树投影和结果投影之间检查 `AbortSignal`。读取前后继续复核文件身份、版本和 session 目录，取消或变化不会发布部分导航结果。
+- tree、back、rewind、completion navigation、cleanse 以及 security inspector 将浏览器的取消信号传到 source acquisition；替换中的 load、关闭后的订阅和 stale session/workspace 绑定会丢弃迟到结果。同步命令读取保持原有合同。
+- 聚焦验证为 12 个文件、318 项通过；静态门禁全部通过；TypeScript build 通过并生成 manifest `527c3fd1e468`。这批代码在本地工作树中尚未提交，尚无对应远端 CI/Watch 或新的真实 PTY。
+- 证据只覆盖本地取消、分块读取、变化检测和生命周期回归；不扩大为跨全部页面的 OS physical I/O、瞬态 heap、最长响应、平台输入、真实 provider/MCP 或 20k PTY 压测证明。矩阵仍为 35 `complete` / 12 `partial` / 0 `open`。
+
 ## 2026-10-24 PAN-06 restore × undo 操作快照路由（`6c97eab6` CI failure；`697c518c` 测试修正后 CI/Watch success）
 
 - recovery authority index 新增 `operationOwned`，由原始记录是否带 operation 身份生成。`/restore` 对 operation-owned snapshot 显示 `use /undo`，禁用该行并拒绝生成 preview draft；standalone snapshot 的 `/restore preview` 与显式 `/restore execute --execute` 保持不变。operation-owned snapshot 沿既有 `/undo` receipt、preview revision 和 current-content guard 恢复，不新增第二条恢复 writer。

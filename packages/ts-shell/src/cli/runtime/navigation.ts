@@ -3,7 +3,7 @@ import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import { markContextUnknown } from "../../observability/usageTelemetry.js";
 import type { SessionManager } from "../../session/SessionManager.js";
-import { readSessionNavigation } from "../../session/query/navigation.js";
+import { readSessionNavigationAsync } from "../../session/query/navigation.js";
 import { sessionThreadPath } from "../../session/schema/sessionThread.js";
 import { SessionNavigationWarning } from '../../session/navigation/revert.js';
 import { normalizePathIdentity } from '../../session/continuation/roots.js';
@@ -12,16 +12,28 @@ import { navigationLines } from '../output/navigation.js';
 import type { SessionMessage } from '../../session/schema/sessionMessage.js';
 
 /** The back chooser shares the bounded saved branch and its navigation version. */
-export function readBackSource(context: Pick<ShellRuntimeContext, 'session' | 'cwd' | 'projectRoot'>): {
+export async function readBackSource(
+  context: Pick<ShellRuntimeContext, 'session' | 'cwd' | 'projectRoot'>,
+  signal?: AbortSignal,
+): Promise<{
   readonly turns: readonly SessionMessage[];
   readonly version: string;
-} {
-  const snapshot = readSessionNavigation(context.session.id, context.cwd);
-  const root = normalizePathIdentity(context.projectRoot);
+}> {
+  const session = context.session;
+  const sessionProjectRoot = session.projectRoot;
+  const cwd = context.cwd;
+  const projectRoot = context.projectRoot;
+  const snapshot = await readSessionNavigationAsync(session.id, cwd, { signal });
+  signal?.throwIfAborted();
+  if (context.session !== session || context.cwd !== cwd || context.projectRoot !== projectRoot
+    || context.session.id !== session.id || context.session.projectRoot !== sessionProjectRoot) {
+    throw new Error('The active session changed while its back source was being read.');
+  }
+  const root = normalizePathIdentity(projectRoot);
   if (!root || normalizePathIdentity(snapshot.session.projectRoot) !== root) {
     throw new Error('The saved conversation belongs to a different project.');
   }
-  const branch = sessionThreadPath(snapshot.thread);
+  const branch = sessionThreadPath(snapshot.thread, undefined, signal);
   const active = new Set(branch.path.map(entry => entry.id));
   if (!branch.resolved || snapshot.points.some(point => active.has(point.entryId) && point.unavailable)) {
     throw new Error('The saved conversation path is unavailable.');
@@ -43,11 +55,16 @@ export async function navigateSession(input: {
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionManager: Pick<SessionManager, "revertTo">;
   readonly sessionRuntime: Pick<ShellSessionRuntime, "getState" | "summarizeAbandonedTurns">;
+  readonly signal?: AbortSignal;
 }, entryId?: string, expectedVersion?: string, admission?: () => string | undefined): Promise<SessionNavigationResult> {
-  const { runtimeContext: context, sessionManager: manager, sessionRuntime: runtime } = input;
+  const { runtimeContext: context, sessionManager: manager, sessionRuntime: runtime, signal } = input;
   const sessionId = context.session.id;
+  const boundSession = context.session;
+  const boundSessionProjectRoot = boundSession.projectRoot;
   const cwd = context.cwd;
   const projectRoot = context.projectRoot;
+  const isCurrent = (): boolean => context.session === boundSession && context.session.id === sessionId
+    && context.session.projectRoot === boundSessionProjectRoot && context.cwd === cwd && context.projectRoot === projectRoot;
   const validate = (): void => {
     let issue: string | undefined;
     try { issue = admission?.(); }
@@ -55,7 +72,11 @@ export async function navigateSession(input: {
     if (issue) throw new Error(issue);
   };
   validate();
-  const { thread, points, session, version } = readSessionNavigation(sessionId, cwd);
+  if (!isCurrent()) throw new Error('The active session changed before navigation could begin.');
+  const { thread, points, session, version } = await readSessionNavigationAsync(sessionId, cwd, { signal });
+  signal?.throwIfAborted();
+  validate();
+  if (!isCurrent()) throw new Error('The active session changed while its navigation state was being read.');
   if (expectedVersion !== undefined && expectedVersion !== version) return {
     status: 'unchanged', changed: false,
     output: 'The saved conversation changed after selection. Reopen the session tree before navigating.',
@@ -75,7 +96,7 @@ export async function navigateSession(input: {
   if (runtime.getState() === "running") throw new Error("Wait for the current turn to finish before navigating the session.");
   const point = points.find((candidate) => candidate.entryId === entryId);
   if (!point) throw new Error(`No entry with id ${entryId} in this session.`);
-  if (point.unavailable || !sessionThreadPath(thread, entryId).resolved) {
+  if (point.unavailable || !sessionThreadPath(thread, entryId, signal).resolved) {
     throw new Error(`Cannot navigate to ${entryId}: ${point.unavailable ?? "broken ancestry"}.`);
   }
   if (thread.activeLeafId === entryId) {
@@ -90,7 +111,6 @@ export async function navigateSession(input: {
       ...(point.prompt !== undefined ? { draft: point.prompt } : {}),
     };
   }
-  const isCurrent = (): boolean => context.session.id === sessionId && context.cwd === cwd && context.projectRoot === projectRoot;
   let dropped: number | undefined;
   let failed = false;
   let warning = 'A storage error was reported while navigating.';
@@ -98,6 +118,7 @@ export async function navigateSession(input: {
     dropped = await manager.revertTo(sessionId, entryId,
       abandoned => runtime.summarizeAbandonedTurns(abandoned),
       () => {
+        signal?.throwIfAborted();
         validate();
         if (!isCurrent() || runtime.getState() === 'running') {
           throw new Error('The active session changed while preparing navigation.');
@@ -107,17 +128,32 @@ export async function navigateSession(input: {
     failed = true;
     if (error instanceof SessionNavigationWarning) { warning = error.message; dropped = error.dropped; }
   }
-  if (!isCurrent()) return {
-    status: 'unknown', changed: false,
-    output: 'The active session changed while navigating. Its view was preserved; reopen the previous session to check the navigation outcome.',
-  };
+  try {
+    signal?.throwIfAborted();
+    validate();
+  } catch {
+    return {
+      status: 'unknown', changed: false,
+      output: 'Session navigation was cancelled after its write may have started. Its current view was preserved; reopen the previous session to check the navigation outcome.',
+    };
+  }
   if (runtime.getState() === 'running') return {
     status: 'unknown', changed: false,
     output: 'The session became busy while navigating. Its current view was preserved; reload the session tree when it is idle to check the navigation outcome.',
   };
-  let verified: ReturnType<typeof readSessionNavigation>;
+  if (!isCurrent()) return {
+    status: 'unknown', changed: false,
+    output: 'The active session changed while navigating. Its view was preserved; reopen the previous session to check the navigation outcome.',
+  };
+  let verified: Awaited<ReturnType<typeof readSessionNavigationAsync>>;
   try {
-    verified = readSessionNavigation(sessionId, cwd);
+    verified = await readSessionNavigationAsync(sessionId, cwd, { signal });
+    signal?.throwIfAborted();
+    validate();
+    if (!isCurrent()) return {
+      status: 'unknown', changed: false,
+      output: 'The active session changed while navigation was being verified. Its view was preserved; reopen the previous session to check the navigation outcome.',
+    };
     if (normalizePathIdentity(verified.session.projectRoot) !== expectedRoot) {
       return {
         status: 'unknown', changed: false,
@@ -125,7 +161,9 @@ export async function navigateSession(input: {
       };
     }
     const current = verified.points.find(candidate => candidate.current);
-    if (!current || current.unavailable || !sessionThreadPath(verified.thread).resolved) throw new Error('Unreadable active branch');
+    if (!current || current.unavailable || !sessionThreadPath(verified.thread, undefined, signal).resolved) {
+      throw new Error('Unreadable active branch');
+    }
   } catch {
     return {
       status: 'unknown', changed: false,
@@ -135,6 +173,14 @@ export async function navigateSession(input: {
   if (verified.thread.activeLeafId === thread.activeLeafId) return {
     status: 'unchanged', changed: false,
     output: 'The active conversation is unchanged. Navigation did not reach the requested entry; reload the session tree before retrying.',
+  };
+  if (!isCurrent()) return {
+    status: 'unknown', changed: false,
+    output: 'The active session changed before its verified view could be adopted. The current view was preserved; reopen the previous session to check the navigation outcome.',
+  };
+  if (runtime.getState() === 'running') return {
+    status: 'unknown', changed: false,
+    output: 'The session became busy while navigation was being verified. Its current view was preserved; reload the session tree when it is idle to check the navigation outcome.',
   };
   const restored = verified.session;
   adoptSession(context, restored);

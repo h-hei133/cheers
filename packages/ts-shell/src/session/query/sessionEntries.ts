@@ -95,23 +95,29 @@ export type SessionTreeFailure = "unknown-cursor";
 export function readSessionTree(
   entries: readonly SessionThreadEntry[],
   since?: string,
+  signal?: AbortSignal,
 ): readonly SessionTreeNodeView[] | SessionTreeFailure {
+  signal?.throwIfAborted();
   let scope: Set<string> | undefined;
   if (since !== undefined) {
     const target = entries.find((entry) => entry.id === since);
     if (!target) return "unknown-cursor";
-    scope = collectSubtree(entries, since);
+    scope = collectSubtree(entries, since, signal);
   }
 
   const included = scope ? entries.filter((entry) => scope.has(entry.id)) : entries;
   type MutableNode = { entry: SessionThreadEntry; children: MutableNode[] };
   const nodes = new Map<string, MutableNode>();
-  for (const entry of included) {
+  for (let index = 0; index < included.length; index++) {
+    if ((index & 255) === 0) signal?.throwIfAborted();
+    const entry = included[index]!;
     nodes.set(entry.id, { entry, children: [] });
   }
 
   const roots: MutableNode[] = [];
-  for (const entry of included) {
+  for (let index = 0; index < included.length; index++) {
+    if ((index & 255) === 0) signal?.throwIfAborted();
+    const entry = included[index]!;
     const node = nodes.get(entry.id)!;
     // An entry that names itself as its parent is a root, not its own child. The
     // chain a client walks has to end somewhere, and this is the shape a writer
@@ -134,6 +140,7 @@ export function readSessionTree(
   const mark = (node: MutableNode): void => {
     const pending = [node];
     while (pending.length > 0) {
+      signal?.throwIfAborted();
       const current = pending.pop()!;
       if (reachable.has(current.entry.id)) continue;
       reachable.add(current.entry.id);
@@ -142,7 +149,9 @@ export function readSessionTree(
   };
   for (const root of roots) mark(root);
 
-  for (const entry of included) {
+  for (let index = 0; index < included.length; index++) {
+    if ((index & 255) === 0) signal?.throwIfAborted();
+    const entry = included[index]!;
     if (reachable.has(entry.id)) continue;
     const node = nodes.get(entry.id)!;
     const parent = entry.parentId === undefined ? undefined : nodes.get(entry.parentId);
@@ -161,6 +170,7 @@ export function readSessionTree(
   const lists = [roots];
   const sorted = new Set<MutableNode>();
   while (lists.length > 0) {
+    signal?.throwIfAborted();
     const list = lists.pop()!;
     list.sort((left, right) => left.entry.order - right.entry.order);
     for (const node of list) {
@@ -173,9 +183,11 @@ export function readSessionTree(
 }
 
 /** Every entry reachable downward from `rootId`, including it. */
-function collectSubtree(entries: readonly SessionThreadEntry[], rootId: string): Set<string> {
+function collectSubtree(entries: readonly SessionThreadEntry[], rootId: string, signal?: AbortSignal): Set<string> {
   const childrenOf = new Map<string, string[]>();
-  for (const entry of entries) {
+  for (let index = 0; index < entries.length; index++) {
+    if ((index & 255) === 0) signal?.throwIfAborted();
+    const entry = entries[index]!;
     if (entry.parentId === undefined) continue;
     const list = childrenOf.get(entry.parentId);
     if (list) list.push(entry.id);
@@ -185,6 +197,7 @@ function collectSubtree(entries: readonly SessionThreadEntry[], rootId: string):
   const seen = new Set<string>();
   const queue = [rootId];
   while (queue.length > 0) {
+    signal?.throwIfAborted();
     const id = queue.pop()!;
     if (seen.has(id)) continue;
     seen.add(id);

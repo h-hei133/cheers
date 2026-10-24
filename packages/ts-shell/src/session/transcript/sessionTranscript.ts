@@ -1,176 +1,30 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
-  classifyTranscriptLine,
   createMessageTranscriptEvent,
   createTranscriptEntryId,
   createTranscriptHeader,
   encodeTranscriptEvent,
-  legacyTranscriptEntryId,
   transcriptEventToSessionMessage,
-  transcriptVersionOf,
-  TRANSCRIPT_FORMAT_VERSION,
   type TranscriptEvent,
-  type TranscriptHeader,
 } from "../sessionEventCodec.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { Session } from "../schema/sessionRecord.js";
 import { publishedCompactionEvents } from '../compaction/publication.js';
-import { fileIdentity, readTextFile } from '../../core/workspace/files.js';
 
-export interface TranscriptReadLimits {
-  readonly maxBytes: number;
-  readonly maxLines: number;
-}
+export {
+  parseTranscript,
+  parseTranscriptAsync,
+  readTranscript,
+  readTranscriptEvents,
+  readTranscriptSnapshot,
+  readTranscriptSnapshotAsync,
+  type ReadTranscript,
+  type TranscriptReadLimits,
+  type TranscriptSnapshot,
+} from './read.js';
 
-/**
- * The whole transcript: its format version, and the entries in order.
- *
- * The header is not returned as an entry. It describes the file rather than being
- * part of the conversation, and every caller here wants the conversation.
- */
-export interface ReadTranscript {
-  /** The format the file was written in; 0 when it has no header. */
-  readonly version: number;
-  readonly events: readonly TranscriptEvent[];
-  readonly unreadableLines: number;
-  readonly warnings: readonly string[];
-}
-
-export interface TranscriptSnapshot extends ReadTranscript {
-  readonly truncated: boolean;
-}
-
-export function readTranscriptEvents(transcriptPath: string, limits?: TranscriptReadLimits): TranscriptEvent[] {
-  return readTranscriptSnapshot(transcriptPath, limits).events as TranscriptEvent[];
-}
-
-/**
- * Read a transcript, header included in what is reported.
- *
- * Header lines are not numbered. The derived name an entry gets when it has no id
- * comes from its position, so counting a header would shift every such name by
- * one in a file that has one — the same entry would answer to a different name
- * depending on whether a header happened to precede it. Entries start at one
- * either way.
- */
-export function readTranscript(transcriptPath: string, limits?: TranscriptReadLimits): ReadTranscript {
-  const { truncated: _truncated, ...result } = readTranscriptSnapshot(transcriptPath, limits);
-  return result;
-}
-
-export function readTranscriptSnapshot(
-  transcriptPath: string,
-  limits?: TranscriptReadLimits,
-  salvage = false,
-): TranscriptSnapshot {
-  if (!fs.existsSync(transcriptPath)) {
-    return { version: 0, events: [], unreadableLines: 0, warnings: [], truncated: false };
-  }
-  const acquired = salvage && limits
-    ? readTranscriptPrefix(transcriptPath, limits)
-    : {
-      text: limits ? readTextFile(transcriptPath, limits.maxBytes) : fs.readFileSync(transcriptPath, "utf8"),
-      truncated: false,
-    };
-  if (acquired.text === undefined) throw new Error('The saved transcript is unavailable.');
-  const result = parseTranscript(acquired.text, limits?.maxLines);
-  const warnings = [...result.warnings];
-  if (acquired.truncated) warnings.push('The saved transcript exceeds the navigation limit; only its readable prefix is shown.');
-  if (limits && !salvage && warnings.length > 0) throw new Error('The saved transcript is damaged or has uncertain provenance.');
-  if (limits) {
-    const identities = new Set<string>();
-    for (const event of result.events) {
-      if (event.id !== undefined && identities.has(event.id)) throw new Error('The saved transcript has duplicate entry identities.');
-      if (event.id !== undefined) identities.add(event.id);
-    }
-  }
-  return { ...result, warnings, truncated: acquired.truncated };
-}
-
-function readTranscriptPrefix(transcriptPath: string, limits: TranscriptReadLimits): { text: string; truncated: boolean } {
-  const before = fs.lstatSync(transcriptPath);
-  if (!before.isFile()) throw new Error('The saved transcript is unavailable.');
-  const length = Math.min(before.size, limits.maxBytes);
-  const bytes = Buffer.alloc(length);
-  const fd = fs.openSync(transcriptPath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
-  try {
-    const opened = fs.fstatSync(fd);
-    if (fileIdentity(opened) !== fileIdentity(before)) throw new Error('The saved transcript changed while it was being read.');
-    let offset = 0;
-    while (offset < bytes.length) {
-      const read = fs.readSync(fd, bytes, offset, bytes.length - offset, offset);
-      if (!read) throw new Error('The saved transcript changed while it was being read.');
-      offset += read;
-    }
-    const after = fs.fstatSync(fd);
-    if (fileIdentity(after) !== fileIdentity(opened) || after.size !== opened.size) {
-      throw new Error('The saved transcript changed while it was being read.');
-    }
-  } finally {
-    fs.closeSync(fd);
-  }
-  let truncated = before.size > limits.maxBytes;
-  let text = bytes.toString('utf8');
-  if (truncated) {
-    const end = text.lastIndexOf('\n');
-    text = end < 0 ? '' : text.slice(0, end + 1);
-  }
-  let lines = text.length === 0 ? 0 : 1;
-  for (let index = 0; index < text.length; index++) {
-    if (text.charCodeAt(index) !== 10 || index + 1 >= text.length) continue;
-    lines += 1;
-    if (lines > limits.maxLines) {
-      text = text.slice(0, index + 1);
-      truncated = true;
-      break;
-    }
-  }
-  return { text, truncated };
-}
-
-/** Decode already acquired text through the same compatibility rules as replay. */
-export function parseTranscript(text: string, maxLines?: number): ReadTranscript {
-  if (maxLines !== undefined) {
-    let lines = text.length === 0 ? 0 : 1;
-    for (let index = 0; index < text.length; index++) {
-      if (text.charCodeAt(index) === 10 && index + 1 < text.length) lines++;
-      if (lines > maxLines) throw new Error('The saved transcript exceeds the navigation line limit.');
-    }
-  }
-  const events: TranscriptEvent[] = [];
-  let header: TranscriptHeader | undefined;
-  let lineNumber = 0;
-  let unreadableLines = 0;
-  const warnings = new Set<string>();
-  for (const line of text.split("\n")) {
-    if (!line) continue;
-    const decoded = classifyTranscriptLine(line);
-    if (decoded.kind === "header") {
-      if (header || lineNumber > 0) warnings.add("An unexpected transcript header was found; file provenance is uncertain.");
-      if (!Number.isInteger(decoded.header.version) || decoded.header.version < 0 || decoded.header.version > TRANSCRIPT_FORMAT_VERSION) {
-        warnings.add("The transcript format version is unsupported; only recognized entries are shown.");
-      }
-      // Only the first one counts. A second can only come from a concatenated
-      // file, and letting it overwrite the real header would report the wrong
-      // version for the entries that follow it.
-      header ??= decoded.header;
-      continue;
-    }
-    lineNumber += 1;
-    if (decoded.kind === "entry") {
-      events.push(
-        decoded.event.id === undefined
-          ? { ...decoded.event, id: legacyTranscriptEntryId(lineNumber) }
-          : decoded.event,
-      );
-    } else {
-      unreadableLines += 1;
-    }
-  }
-  if (unreadableLines > 0) warnings.add(`${unreadableLines} unreadable transcript ${unreadableLines === 1 ? "line was" : "lines were"} omitted.`);
-  return { version: transcriptVersionOf(header), events, unreadableLines, warnings: [...warnings] };
-}
+const CONTROL_CHECK_INTERVAL = 256;
 
 /**
  * The messages on the branch the thread is looking at.
@@ -190,14 +44,25 @@ export function projectBranchMessages(
   events: readonly TranscriptEvent[],
   activeEntryIds: readonly string[] | undefined,
   knownEntryIds?: readonly string[],
+  signal?: AbortSignal,
 ): SessionMessage[] {
+  signal?.throwIfAborted();
+  let checks = 0;
+  const check = (): void => { if ((checks++ & (CONTROL_CHECK_INTERVAL - 1)) === 0) signal?.throwIfAborted(); };
   if (activeEntryIds === undefined) return projectTranscriptMessages(
-    publishedCompactionEvents(events).filter(event => event.type !== 'compaction' || event.sourceActivePath === undefined),
+    publishedCompactionEvents(events, signal).filter(event => {
+      check();
+      return event.type !== 'compaction' || event.sourceActivePath === undefined;
+    }),
+    signal,
   );
   const onBranch = new Set(activeEntryIds);
   const known = knownEntryIds === undefined ? onBranch : new Set(knownEntryIds);
 
-  const messages = events.filter((event) => event.type === "message");
+  const messages = events.filter((event) => {
+    check();
+    return event.type === "message";
+  });
   // A thread that names none of these messages does not describe them — it was
   // written against some other transcript, or against a version of this one that
   // recorded no ids. Filtering by it would return an empty conversation, which
@@ -205,7 +70,11 @@ export function projectBranchMessages(
   // so the transcript wins.
   if (messages.length > 0 && !messages.some((event) => event.id !== undefined && known.has(event.id))) {
     return projectTranscriptMessages(
-      publishedCompactionEvents(events).filter(event => event.type !== 'compaction' || event.sourceActivePath === undefined),
+      publishedCompactionEvents(events, signal).filter(event => {
+        check();
+        return event.type !== 'compaction' || event.sourceActivePath === undefined;
+      }),
+      signal,
     );
   }
 
@@ -215,7 +84,8 @@ export function projectBranchMessages(
   // names are the test — a note whose abandoned turns are on the active path
   // describes the conversation in front of the reader, not one they left.
   return projectTranscriptMessages(
-    publishedCompactionEvents(events).filter((event) => {
+    publishedCompactionEvents(events, signal).filter((event) => {
+      check();
       if (event.type === "message") {
         return event.id !== undefined && onBranch.has(event.id);
       }
@@ -230,6 +100,7 @@ export function projectBranchMessages(
       }
       return true;
     }),
+    signal,
   );
 }
 
@@ -323,12 +194,15 @@ function ensureTranscriptHeader(
 
 export function projectTranscriptMessages(
   events: readonly TranscriptEvent[],
+  signal?: AbortSignal,
 ): SessionMessage[] {
   const messages: SessionMessage[] = [];
   const checkpoints: SessionMessage[] = [];
   let firstMessage = 0;
 
-  for (const event of publishedCompactionEvents(events)) {
+  let index = 0;
+  for (const event of publishedCompactionEvents(events, signal)) {
+    if ((index++ & (CONTROL_CHECK_INTERVAL - 1)) === 0) signal?.throwIfAborted();
     if (event.type === "compaction") {
       // Re-anchor context at the compaction checkpoint, keeping the most
       // recent messages verbatim behind it.

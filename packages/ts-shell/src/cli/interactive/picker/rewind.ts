@@ -30,7 +30,8 @@ interface RewindPage {
 }
 
 export interface RewindPickerInput {
-  readonly turns: readonly SessionMessage[];
+  readonly turns?: readonly SessionMessage[];
+  readonly readTurns?: (signal?: AbortSignal) => Promise<RewindTurns> | RewindTurns;
   readonly version?: string;
   readonly unavailable?: boolean;
   readonly admission?: () => string | undefined;
@@ -41,6 +42,11 @@ export interface RewindPickerInput {
   rewind(point: RewindPoint): Promise<PickerOutcome | undefined>;
 }
 
+type RewindTurns = readonly SessionMessage[] | {
+  readonly turns: readonly SessionMessage[];
+  readonly version?: string;
+};
+
 export function rewindPicker(input: RewindPickerInput): Picker {
   const { signal, admission: originalAdmission } = input;
   const admission = (): string | undefined => {
@@ -50,29 +56,82 @@ export function rewindPicker(input: RewindPickerInput): Picker {
   };
   let source: RewindSource | undefined;
   let unavailable = input.unavailable ? 'Questions are unavailable. Reopen /back.' : admission();
-  if (!unavailable) {
+  if (!unavailable && input.turns) {
     try { source = new RewindSource(input.turns, input.signal, input.version); }
     catch { unavailable = 'Questions are unavailable or beyond back browsing limits. No point was selected.'; }
   }
   const selector = input.selector?.trim();
-  const selected = source?.selection(selector);
-  return questionPage(source, input.rewind, admission, selected
-    ? { offset: Math.floor(selected.index / PAGE_SIZE) * PAGE_SIZE, selectedId: selected.point.entryId }
-    : { query: selector }, unavailable);
+  let sourcePending: Promise<RewindSource> | undefined;
+  const ensureSource = async (browserSignal?: AbortSignal): Promise<RewindSource> => {
+    if (source) return source;
+    if (!input.readTurns) throw new Error('Back source is unavailable.');
+    sourcePending ??= (async () => {
+      browserSignal?.throwIfAborted();
+      const loaded = await input.readTurns!(browserSignal);
+      browserSignal?.throwIfAborted();
+      const wrapped = isWrappedTurns(loaded);
+      const turns = wrapped ? loaded.turns : loaded;
+      const version = wrapped ? loaded.version : input.version;
+      return RewindSource.create(turns, browserSignal, version);
+    })();
+    try {
+      source = await sourcePending;
+      return source;
+    } catch {
+      sourcePending = undefined;
+      browserSignal?.throwIfAborted();
+      throw new Error('Questions are unavailable or beyond back browsing limits.');
+    }
+  };
+  return questionPage(
+    source,
+    ensureSource,
+    input.rewind,
+    admission,
+    { query: selector, selector },
+    unavailable,
+  );
+}
+
+function isWrappedTurns(value: RewindTurns): value is Exclude<RewindTurns, readonly SessionMessage[]> {
+  return !Array.isArray(value);
 }
 
 /** Pages share the captured points; a moving turns array cannot shift a continuation. */
-function questionPage(source: RewindSource | undefined, rewind: RewindPickerInput['rewind'], admission: () => string | undefined,
-  page: RewindPage, unavailable?: string): Picker {
+function questionPage(
+  initialSource: RewindSource | undefined,
+  ensureSource: (signal?: AbortSignal) => Promise<RewindSource>,
+  rewind: RewindPickerInput['rewind'],
+  admission: () => string | undefined,
+  page: RewindPage & { readonly selector?: string },
+  unavailable?: string,
+): Picker {
+  let source = initialSource;
   let query = page.query?.trim().toLowerCase() ?? '';
   let offset = page.offset ?? 0;
+  let selectedId = page.selectedId;
+  let resolvedFilter: string | undefined;
   let offered: readonly RewindPoint[] = [];
   let total = 0;
-  const moreId = source?.moreId;
+  let moreId = source?.moreId ?? '__more__';
+  let positioned = source !== undefined;
+  let pendingInitialFilter = false;
   let closed = false;
   const release = (): void => { closed = true; source = undefined; offered = []; };
+  const position = (): void => {
+    const selected = source?.selection(page.selector);
+    if (!selected || !source) return;
+    selectedId = selected.point.entryId;
+    resolvedFilter = '';
+    const index = source.indexOf('', selected.point.entryId);
+    offset = index === undefined ? 0 : Math.floor(index / PAGE_SIZE) * PAGE_SIZE;
+  };
   const project = (filter: string): readonly Option[] => {
-    const needle = filter.trim().toLowerCase();
+    let needle = filter.trim().toLowerCase();
+    if (pendingInitialFilter && needle === page.query?.trim().toLowerCase()) {
+      pendingInitialFilter = false;
+      needle = resolvedFilter ?? '';
+    }
     if (needle !== query) offset = 0;
     query = needle;
     const result = source?.page(query, offset, PAGE_SIZE);
@@ -85,14 +144,21 @@ function questionPage(source: RewindSource | undefined, rewind: RewindPickerInpu
       detail: 'Continue to older questions', note: `${total - offset - PAGE_SIZE} remaining` });
     return rows;
   };
-  project(query);
+  if (source) {
+    position();
+    positioned = true;
+    pendingInitialFilter = resolvedFilter !== undefined && page.query !== undefined;
+  }
+  if (resolvedFilter !== undefined) query = resolvedFilter;
+  project(resolvedFilter ?? query);
   return {
     isCurrent: () => admission() === undefined,
     title: "Ask again from",
     form: "panel",
     exclusive: true,
-    initialSelection: page.selectedId,
+    get initialSelection() { return selectedId; },
     initialFilter: page.query,
+    get resolvedFilter() { return resolvedFilter; },
     empty: 'No questions to show.',
     loadError: 'Questions are unavailable, changed, or beyond back browsing limits. No point was selected.',
     status() {
@@ -106,7 +172,25 @@ function questionPage(source: RewindSource | undefined, rewind: RewindPickerInpu
       if (closed) throw new Error('Back picker is closed.');
       const blocked = admission();
       if (blocked || unavailable) { release(); throw new Error(blocked ?? unavailable); }
-      return project(query);
+      if (!source) {
+        try {
+          source = await ensureSource(signal);
+          moreId = source.moreId;
+          if (!positioned) {
+            position();
+            positioned = true;
+          }
+        } catch (error) {
+          release();
+          throw error;
+        }
+      }
+      signal?.throwIfAborted();
+      if (closed) throw new Error('Back picker is closed.');
+      if (resolvedFilter !== undefined) query = resolvedFilter;
+      const rows = project(resolvedFilter ?? query);
+      pendingInitialFilter = false;
+      return rows;
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       if (closed || ids.length !== 1) return undefined;
@@ -114,7 +198,7 @@ function questionPage(source: RewindSource | undefined, rewind: RewindPickerInpu
       if (blocked) { release(); return { note: blocked }; }
       if (ids[0] === moreId) {
         if (!source || offset + PAGE_SIZE >= total) return undefined;
-        const next = questionPage(source, rewind, admission, { offset: offset + PAGE_SIZE, query });
+        const next = questionPage(source, ensureSource, rewind, admission, { offset: offset + PAGE_SIZE, query });
         release();
         return { next };
       }

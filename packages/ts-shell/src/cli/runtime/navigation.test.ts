@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionManager } from "../../session/SessionManager.js";
 import { createSessionStoreLayout, locateExistingSessionLayout } from "../../session/store/sessionFileLayout.js";
 import { readSessionNavigation } from "../../session/query/navigation.js";
+import * as sessionNavigation from "../../session/query/navigation.js";
 import { isSessionContextMessage } from "../../session/schema/sessionMessage.js";
 import { runEntriesCommand } from "../../core/commands/entriesCommandRuntime.js";
 import { routeInteractiveCommand } from "../interactive/interactiveCommandRouter.js";
@@ -63,9 +64,98 @@ function harness() {
 }
 
 describe("session tree navigation", () => {
+  it('refuses a back source after the active session changes during its async read', async () => {
+    const { input, session } = harness();
+    const snapshot = readSessionNavigation(session.id, root);
+    let resolveRead!: (value: ReturnType<typeof readSessionNavigation>) => void;
+    vi.spyOn(sessionNavigation, 'readSessionNavigationAsync').mockReturnValue(new Promise(resolve => { resolveRead = resolve; }));
+    const pending = readBackSource(input.runtimeContext);
+    input.runtimeContext.session = { ...input.runtimeContext.session, id: 'other-session' };
+    resolveRead(snapshot);
+    await expect(pending).rejects.toThrow('active session changed');
+  });
+
+  it('does not adopt an initial navigation snapshot after the active session changes', async () => {
+    const { input } = harness();
+    const snapshot = readSessionNavigation(input.runtimeContext.session.id, root);
+    let resolveRead!: (value: ReturnType<typeof readSessionNavigation>) => void;
+    vi.spyOn(sessionNavigation, 'readSessionNavigationAsync').mockReturnValue(new Promise(resolve => { resolveRead = resolve; }));
+    const revert = vi.spyOn(input.sessionManager, 'revertTo');
+    const pending = navigateSession(input, snapshot.thread.activeLeafId!);
+    input.runtimeContext.session = { ...input.runtimeContext.session, id: 'other-session', turns: [] };
+    resolveRead(snapshot);
+    await expect(pending).rejects.toThrow('active session changed');
+    expect(revert).not.toHaveBeenCalled();
+    expect(input.runtimeContext.session.id).toBe('other-session');
+  });
+
+  it('does not adopt a verified navigation snapshot after the active session changes', async () => {
+    const { input, turns } = harness();
+    const snapshot = readSessionNavigation(input.runtimeContext.session.id, root);
+    let resolveVerification!: (value: ReturnType<typeof readSessionNavigation>) => void;
+    const read = vi.spyOn(sessionNavigation, 'readSessionNavigationAsync')
+      .mockResolvedValueOnce(snapshot)
+      .mockReturnValueOnce(new Promise(resolve => { resolveVerification = resolve; }));
+    const revert = vi.spyOn(input.sessionManager, 'revertTo').mockResolvedValue(1);
+    const pending = navigateSession(input, turns[0]!.id!);
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+    input.runtimeContext.session = { ...input.runtimeContext.session, id: 'other-session' };
+    resolveVerification(snapshot);
+    await expect(pending).resolves.toMatchObject({ status: 'unknown', changed: false });
+    expect(revert).toHaveBeenCalledTimes(1);
+    expect(input.runtimeContext.session.id).toBe('other-session');
+  });
+
+  it('preserves same-session live turns started while navigation verification is pending', async () => {
+    const { input, turns, summarize } = harness();
+    let running = false;
+    input.sessionRuntime = {
+      getState: () => running ? 'running' : 'idle',
+      summarizeAbandonedTurns: summarize,
+    } as never;
+    const readAsync = sessionNavigation.readSessionNavigationAsync;
+    let resolveVerification: (() => void) | undefined;
+    vi.spyOn(sessionNavigation, 'readSessionNavigationAsync')
+      .mockImplementationOnce(readAsync)
+      .mockImplementationOnce(async (...args) => {
+        const snapshot = await readAsync(...args);
+        return new Promise(resolve => { resolveVerification = () => resolve(snapshot); });
+      });
+    const pending = navigateSession(input, turns[0]!.id!);
+    await vi.waitFor(() => expect(resolveVerification).toBeDefined());
+    const live = input.runtimeContext.session;
+    running = true;
+    live.turns.push({ id: 'live-pending', role: 'user', content: 'New live turn' });
+    resolveVerification!();
+    const result = await pending;
+    expect(result).toMatchObject({ status: 'unknown', changed: false });
+    expect(result.draft).toBeUndefined();
+    expect(result.output).toContain('became busy');
+    expect(input.runtimeContext.session).toBe(live);
+    expect(input.runtimeContext.session.turns.at(-1)?.id).toBe('live-pending');
+  });
+
+  it('cancels a prepared navigation before its durable write when only a signal is supplied', async () => {
+    const { input, turns, summarize, layout } = harness();
+    const before = [layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file));
+    const live = input.runtimeContext.session;
+    let finishSummary!: (value: string) => void;
+    summarize.mockImplementationOnce(() => new Promise(resolve => { finishSummary = resolve; }));
+    const controller = new AbortController();
+    const pending = navigateSession({ ...input, signal: controller.signal }, turns[0]!.id!);
+    await vi.waitFor(() => expect(summarize).toHaveBeenCalledTimes(1));
+    controller.abort();
+    finishSummary('Prepared summary');
+    const result = await pending;
+    expect(result).toMatchObject({ status: 'unknown', changed: false });
+    expect(result.draft).toBeUndefined();
+    expect(input.runtimeContext.session).toBe(live);
+    expect([layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file))).toEqual(before);
+  });
+
   it('binds back continuation to its saved version and refuses external changes before the original writer', async () => {
     const { input, session, layout } = harness();
-    const source = readBackSource(input.runtimeContext);
+    const source = await readBackSource(input.runtimeContext);
     expect(source.turns).toEqual(input.runtimeContext.session.turns);
     const rewind = vi.fn(async point => {
       const result = await navigateSession(input, point.entryId, point.version);
@@ -89,20 +179,20 @@ describe("session tree navigation", () => {
     expect(input.runtimeContext.session.id).toBe(session.id);
   });
 
-  it('uses the existing saved byte limits before reading back questions, and rejects wrong roots and damaged paths', () => {
+  it('uses the existing saved byte limits before reading back questions, and rejects wrong roots and damaged paths', async () => {
     const { input, layout } = harness();
-    expect(() => readBackSource({ ...input.runtimeContext, projectRoot: path.join(root, 'other') })).toThrow('different project');
+    await expect(readBackSource({ ...input.runtimeContext, projectRoot: path.join(root, 'other') })).rejects.toThrow('different project');
     const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
     state.thread.activeLeafId = 'missing';
     fs.writeFileSync(layout.statePath, JSON.stringify(state));
-    expect(() => readBackSource(input.runtimeContext)).toThrow();
+    await expect(readBackSource(input.runtimeContext)).rejects.toThrow();
     fs.writeFileSync(layout.statePath, ' '.repeat(8 * 1024 * 1024 + 1));
-    expect(() => readBackSource(input.runtimeContext)).toThrow('navigation limits');
+    await expect(readBackSource(input.runtimeContext)).rejects.toThrow('navigation limits');
   });
 
   it('keeps legitimate empty saved back sources separate from unreadable source refusals', async () => {
     const manager = new SessionManager(); const session = manager.createNew(root);
-    const source = readBackSource({ session, cwd: root, projectRoot: root });
+    const source = await readBackSource({ session, cwd: root, projectRoot: root });
     expect(source.turns).toEqual([]); expect(source.version).toBeTruthy();
     const rewind = vi.fn();
     const host = { commandContext: { cwd: root }, rewind, sessionTurns: () => source } as never;
@@ -114,27 +204,27 @@ describe("session tree navigation", () => {
     expect(rewind).not.toHaveBeenCalled();
   });
 
-  it('rejects back sources with broken ancestry even when the existing tree can describe the damage', () => {
+  it('rejects back sources with broken ancestry even when the existing tree can describe the damage', async () => {
     const { input, layout } = harness();
     const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
     state.thread.entries.find(entry => entry.id === state.thread.activeLeafId).parentId = 'missing-parent';
     fs.writeFileSync(layout.statePath, JSON.stringify(state));
     expect(readSessionNavigation(input.runtimeContext.session.id, root).points.some(point => point.unavailable)).toBe(true);
-    expect(() => readBackSource(input.runtimeContext)).toThrow('path is unavailable');
+    await expect(readBackSource(input.runtimeContext)).rejects.toThrow('path is unavailable');
   });
 
-  it('rejects missing active-path messages without hiding missing unrelated branches', () => {
+  it('rejects missing active-path messages without hiding missing unrelated branches', async () => {
     const { input, layout } = harness();
     const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
     const missing = { id: 'missing-message', parentId: state.thread.activeLeafId, kind: 'turn-message', role: 'user',
       order: state.thread.entries.length, timestamp: new Date().toISOString() };
     state.thread.entries.push(missing);
     fs.writeFileSync(layout.statePath, JSON.stringify(state));
-    expect(readBackSource(input.runtimeContext).turns).toEqual(input.runtimeContext.session.turns);
+    expect((await readBackSource(input.runtimeContext)).turns).toEqual(input.runtimeContext.session.turns);
     state.thread.activeLeafId = missing.id;
     fs.writeFileSync(layout.statePath, JSON.stringify(state));
     expect(readSessionNavigation(input.runtimeContext.session.id, root).points.find(point => point.entryId === missing.id)?.unavailable).toBe('message unavailable');
-    expect(() => readBackSource(input.runtimeContext)).toThrow('path is unavailable');
+    await expect(readBackSource(input.runtimeContext)).rejects.toThrow('path is unavailable');
   });
 
   it('keeps every admitted deep entry in bounded tree and history terminal output without changing saved files', async () => {

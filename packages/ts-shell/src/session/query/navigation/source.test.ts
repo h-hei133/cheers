@@ -2,13 +2,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../SessionManager.js';
-import { readSessionNavigation, projectSessionNavigation } from '../navigation.js';
+import {
+  projectSessionNavigation,
+  projectSessionNavigationAsync,
+  readSessionNavigation,
+  readSessionNavigationAsync,
+} from '../navigation.js';
 import { createSessionStoreLayout, locateExistingSessionLayout } from '../../store/sessionFileLayout.js';
 import { NAVIGATION_LIMITS } from './limits.js';
 import { readJsonFileWithRetry } from '../../store/sessionFileStore.js';
 import { parseTranscript } from '../../transcript/sessionTranscript.js';
 import { readSessionRecordSnapshot } from '../../store/sessionStore.js';
 import { catchUpSessionThread, sessionThreadPath, type SessionThreadSnapshot } from '../../schema/sessionThread.js';
+import * as sessionVersion from '../../store/version.js';
 
 let root: string | undefined;
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); if (root) fs.rmSync(root, { recursive: true, force: true }); root = undefined; });
@@ -30,6 +36,55 @@ it('reads one admitted saved snapshot without changing durable files', () => {
   expect(snapshot.points[0]).toMatchObject({ label: 'Session start', current: true });
   expect(targets.map(target => fs.readFileSync(target))).toEqual(before);
 });
+
+it('stops an asynchronous navigation read when its source admission is cancelled', async () => {
+  const { session, cwd } = saved();
+  const controller = new AbortController();
+  const loading = readSessionNavigationAsync(session.id, cwd, {
+    signal: controller.signal,
+    onSource: () => controller.abort(),
+  });
+  await expect(loading).rejects.toMatchObject({ name: 'AbortError' });
+});
+
+it('stops graph projection between yielded batches without publishing a partial point set', async () => {
+  const entries = Array.from({ length: 5_000 }, (_, index) => ({
+    id: `entry-${index}`,
+    order: index,
+    kind: index === 0 ? 'session-root' : 'turn-message',
+    ...(index === 0 ? {} : { parentId: `entry-${index - 1}`, role: 'user' as const }),
+  }));
+  const thread: SessionThreadSnapshot = {
+    schemaVersion: 1,
+    branches: [],
+    compactions: [],
+    activeLeafId: entries.at(-1)!.id,
+    entries,
+  };
+  const messages = entries.slice(1).map(entry => ({
+    id: entry.id,
+    role: 'user' as const,
+    content: entry.id,
+  }));
+  const controller = new AbortController();
+  const projection = projectSessionNavigationAsync(thread, messages, controller.signal);
+  setImmediate(() => controller.abort(new Error('Projection cancelled')));
+  await expect(projection).rejects.toThrow('Projection cancelled');
+});
+
+it.each(['metadataPath', 'statePath', 'transcriptPath'] as const)(
+  'rejects a %s change during asynchronous graph projection', async key => {
+    const { session, layout, cwd } = saved();
+    const readVersion = sessionVersion.readSessionFileVersion;
+    let reads = 0;
+    vi.spyOn(sessionVersion, 'readSessionFileVersion').mockImplementation((...args) => {
+      const version = readVersion(...args);
+      if (++reads === 2) setImmediate(() => fs.appendFileSync(layout[key], '\n'));
+      return version;
+    });
+    await expect(readSessionNavigationAsync(session.id, cwd)).rejects.toThrow('changed');
+  },
+);
 
 it.each(['metadataPath', 'statePath'] as const)('rejects an oversized %s before any source read', key => {
   const { session, layout, cwd } = saved();

@@ -42,7 +42,8 @@ function observeThemes(context: ShellRuntimeContext, themePaths: readonly string
 }
 
 async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gateway: CliMcpGateway,
-  themePaths: readonly string[], manager?: SessionCatalog, policy?: GrantCatalog, onSource?: (target: string) => void): Promise<readonly Suggestion[]> {
+  themePaths: readonly string[], manager?: SessionCatalog, policy?: GrantCatalog, onSource?: (target: string) => void,
+  signal?: AbortSignal): Promise<readonly Suggestion[]> {
   if (kind === "mcp") return serverCatalog(context.cwd);
   if (kind === "connection") return connectionCatalog();
   if (kind === "model" || kind === "provider") return modelCatalog(kind, context.configuration.current.catalog);
@@ -54,7 +55,7 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
   }
   if (kind === "session" || kind === "entry" || kind === "tree" || kind === "thread") {
     if (!manager) throw new Error("Session catalog unavailable");
-    return navigationCatalog(kind, context, manager, onSource);
+    return navigationCatalog(kind, context, manager, onSource, signal);
   }
   if (kind === "theme") return [...new Set(["auto", ...listThemes(context.cwd, themePaths)])].map(value => ({ value, label: value, detail: "Select theme" }));
   const snapshot = context.runtimeConfig.enableMcpTools ? gateway.peekSnapshot?.() : undefined;
@@ -88,11 +89,15 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
       if (!manager) throw new Error('Session catalog unavailable');
       return navigation.get(kind)!.read(track => navigationCatalog(kind, current, manager, track, signal, progress));
     }
+    if (kind === 'entry' || kind === 'tree' || kind === 'thread') {
+      if (!manager) throw new Error('Session catalog unavailable');
+      return navigation.get(kind)!.read(track => navigationCatalog(kind, current, manager, track, signal));
+    }
     const key = catalogIdentity(current, themePaths) + kind;
     if (!pending || pending.key !== key) {
       const observer = navigation.get(kind);
-      const task = observer ? observer.read(track => readCatalog(kind, current, gateway, themePaths, manager, policy, track))
-        : readCatalog(kind, current, gateway, themePaths, manager, policy);
+      const task = observer ? observer.read(track => readCatalog(kind, current, gateway, themePaths, manager, policy, track, signal))
+        : readCatalog(kind, current, gateway, themePaths, manager, policy, undefined, signal);
       pending = { key, task };
       void task.finally(() => { if (pending?.task === task) pending = undefined; }).catch(() => {});
     }

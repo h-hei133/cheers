@@ -16,15 +16,24 @@ export function restoreReport(event: ReportTranscriptEntry): SessionReport | und
 
 /** Display records follow ancestry, never the runtime-message/context projection. */
 export function selectSessionReports(events: readonly TranscriptEvent[], sessionId: string,
-  thread: SessionThreadSnapshot | undefined): SessionReport[] {
-  const selected = thread && sessionThreadPath(thread);
+  thread: SessionThreadSnapshot | undefined, signal?: AbortSignal): SessionReport[] {
+  signal?.throwIfAborted();
+  const selected = thread && sessionThreadPath(thread, undefined, signal);
   if (selected && !selected.resolved) return [];
   // Without an index only an unbranched transcript proves the visible ancestry.
-  if (!thread && events.some(event => event.type === 'branch_summary')) return [];
+  if (!thread && events.some((event, index) => {
+    if ((index & 255) === 0) signal?.throwIfAborted();
+    return event.type === 'branch_summary';
+  })) return [];
   const sources = new Set(selected ? selected.path.map(entry => entry.id)
-    : [sessionRootEntryId(sessionId), ...events.filter(event => event.type === 'message').map(event => event.id)]);
+    : [sessionRootEntryId(sessionId), ...events.filter((event, index) => {
+      if ((index & 255) === 0) signal?.throwIfAborted();
+      return event.type === 'message';
+    }).map(event => event.id)]);
   const reports: SessionReport[] = [];
-  for (const event of events) {
+  for (let index = 0; index < events.length; index++) {
+    if ((index & 255) === 0) signal?.throwIfAborted();
+    const event = events[index]!;
     if (event.type !== 'command-output' || !sources.has(event.sourceEntryId)) continue;
     const restored = restoreReport(event);
     if (restored) reports.push(restored);

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import type { FileHandle } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { verifyPathContainment } from '../security/pathJail.js';
@@ -97,6 +98,47 @@ export function inspectWorkspaceFile(root: string, relative: string, assertFileA
   } finally { fs.closeSync(fd); }
 }
 
+/** Cancellable counterpart for interactive reads; descriptor identity checks match the sync owner. */
+export async function inspectWorkspaceFileAsync(root: string, relative: string, assertFileAccess?: (absolutePath: string) => void,
+  maxBytes?: number, admitBytes?: (bytes: number) => void, signal?: AbortSignal): Promise<FileState> {
+  signal?.throwIfAborted();
+  const absolute = workspaceFilePath(root, relative);
+  assertFileAccess?.(absolute);
+  signal?.throwIfAborted();
+  let stat: fs.Stats;
+  try { stat = await fs.promises.lstat(absolute); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { state: 'absent' };
+    throw error;
+  }
+  if (!stat.isFile()) throw new Error('File target is not a regular file.');
+  const handle = await fs.promises.open(absolute,
+    fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0));
+  try {
+    const opened = await handle.stat();
+    if (!opened.isFile() || fileIdentity(opened) !== fileIdentity(stat)) throw new Error('File target changed identity.');
+    const actual = descriptorPath(handle.fd, absolute);
+    if (actual !== absolute) {
+      assertFileAccess?.(actual);
+      throw new Error('File target changed path.');
+    }
+    assertFileAccess?.(actual);
+    signal?.throwIfAborted();
+    if (maxBytes !== undefined && opened.size > maxBytes) throw new Error('File exceeds the edit size limit.');
+    admitBytes?.(opened.size);
+    const bytes = admitBytes ? await readBoundedAsync(handle, opened.size, opened.size, signal)
+      : maxBytes === undefined ? await readBoundedAsync(handle, opened.size, opened.size, signal)
+        : await readBoundedAsync(handle, maxBytes, undefined, signal);
+    const content = bytes.toString('utf8');
+    if (!Buffer.from(content, 'utf8').equals(bytes)) throw new Error('File target is not UTF-8 text.');
+    const final = await handle.stat();
+    if (opened.size !== final.size || opened.mtimeMs !== final.mtimeMs || opened.ctimeMs !== final.ctimeMs) {
+      throw new Error('File changed during inspection.');
+    }
+    return { state: 'exists', content, hash: hashContent(content), identity: fileIdentity(opened), mode: opened.mode };
+  } finally { await handle.close(); }
+}
+
 function readBounded(fd: number, maxBytes: number, admittedSize?: number): Buffer {
   const bytes = Buffer.alloc(admittedSize ?? Math.min(fs.fstatSync(fd).size + 1, maxBytes + 1));
   let offset = 0;
@@ -109,6 +151,30 @@ function readBounded(fd: number, maxBytes: number, admittedSize?: number): Buffe
     offset += count;
   }
   if (admittedSize === undefined && (offset > maxBytes || fs.readSync(fd, Buffer.alloc(1), 0, 1, null) > 0)) throw new Error('File exceeds the edit size limit or changed while reading.');
+  return bytes;
+}
+
+async function readBoundedAsync(handle: FileHandle, maxBytes: number, admittedSize: number | undefined,
+  signal?: AbortSignal): Promise<Buffer> {
+  const size = admittedSize ?? (await handle.stat()).size;
+  const bytes = Buffer.alloc(admittedSize ?? Math.min(size + 1, maxBytes + 1));
+  let offset = 0;
+  while (offset < bytes.length) {
+    signal?.throwIfAborted();
+    const count = (await handle.read(bytes, offset, Math.min(64 * 1024, bytes.length - offset), offset)).bytesRead;
+    if (!count) {
+      if (admittedSize !== undefined) throw new Error('File changed during inspection.');
+      return bytes.subarray(0, offset);
+    }
+    offset += count;
+  }
+  if (admittedSize === undefined) {
+    const extra = Buffer.alloc(1);
+    if (offset > maxBytes || (await handle.read(extra, 0, 1, offset)).bytesRead > 0) {
+      throw new Error('File exceeds the edit size limit or changed while reading.');
+    }
+  }
+  signal?.throwIfAborted();
   return bytes;
 }
 
@@ -131,6 +197,15 @@ export function readTextFile(target: string, maxBytes: number): string | undefin
   // Canonicalizing that parent as a new root would authorize its replacement.
   const root = path.parse(absolute).root;
   const state = inspectWorkspaceFile(root, path.relative(root, absolute), undefined, maxBytes);
+  return state.state === 'exists' ? state.content : undefined;
+}
+
+export async function readTextFileAsync(target: string, maxBytes: number, signal?: AbortSignal): Promise<string | undefined> {
+  signal?.throwIfAborted();
+  const absolute = path.resolve(target);
+  pathIdentity(absolute);
+  const root = path.parse(absolute).root;
+  const state = await inspectWorkspaceFileAsync(root, path.relative(root, absolute), undefined, maxBytes, undefined, signal);
   return state.state === 'exists' ? state.content : undefined;
 }
 

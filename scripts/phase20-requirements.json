@@ -162,8 +162,8 @@
     {
       "id": "PAN-02",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; saved version/lifetime/readback boundaries; tree disclosure and bounded acquisition; authorized catalogue filter before fixed-page retention, exact live boundary, cancellation/query reset and action-ID compatibility; attempt-local boundary index for later pages with a 20k-entry cap, inherited partial status and exact boundary/version revalidation; affected323, five catalogue reversals",
-      "missing": "Total heap/latency evidence, cumulative I/O and remaining action-boundary audit remain; later pages reuse a bounded process-local index rather than rescanning discovery, but do not promise a frozen catalogue snapshot."
+      "evidence": ".wiki/features/phase-20-contract.md W6; saved version/lifetime/readback boundaries; tree disclosure and bounded acquisition; authorized catalogue filter before fixed-page retention, exact live boundary, cancellation/query reset and action-ID compatibility; attempt-local boundary index for later pages with a 20k-entry cap, inherited partial status and exact boundary/version revalidation; cancellable async metadata/state/transcript navigation reads with chunked source checks, file identity/version revalidation and picker cancellation propagation; affected323, five catalogue reversals, plus 12-file/318-test local cancellation batch",
+      "missing": "Total heap/latency evidence, cumulative physical I/O, full-screen consumer byte-tier measurement and remaining action-boundary audit remain; later pages reuse a bounded process-local index rather than rescanning discovery, but do not promise a frozen catalogue snapshot."
     },
     {
       "id": "PAN-03",
@@ -186,8 +186,8 @@
     {
       "id": "PAN-06",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; copy/history/back/undo/restore/cleanse tests and PTY evidence; bounded lazy copy source, one-use release, native fallback admission, 205 copy tests/11 reversals; back source limits, one-use pages, exact identities and original admission, 201 affected tests/11 reversals; bounded persisted back source/version, active-path unavailable refusal, 223 affected tests/6 reversals; restore initial metadata <=32MiB and all continuation metadata <= the initial scan bytes, so one attempt actively reads <=64MiB with no directory rescan; cursor revision and exact position are revalidated with caller cancellation retained; operation-owned snapshots are marked in the recovery index, excluded from restore preview and routed through undo, while standalone restore keeps preview and explicit execute; 255 focused tests and three reversals",
-      "missing": "Full navigation acquisition transient heap/latency, undo/cleanse total resources, cumulative physical I/O and remaining identity edges; bounded copy/back query transient heap and actual system clipboard acceptance remain."
+      "evidence": ".wiki/features/phase-20-contract.md W6; copy/history/back/undo/restore/cleanse tests and PTY evidence; bounded lazy copy source, one-use release, native fallback admission, 205 copy tests/11 reversals; back source limits, one-use pages, exact identities and original admission, 201 affected tests/11 reversals; bounded persisted back source/version, active-path unavailable refusal, 223 affected tests/6 reversals; restore initial metadata <=32MiB and all continuation metadata <= the initial scan bytes, so one attempt actively reads <=64MiB with no directory rescan; cursor revision and exact position are revalidated with caller cancellation retained; operation-owned snapshots are marked in the recovery index, excluded from restore preview and routed through undo, while standalone restore keeps preview and explicit execute; cancellable async navigation/source and security inspection reads with stale binding guards; 255 focused tests and three reversals, plus 12-file/318-test local cancellation batch",
+      "missing": "Full navigation acquisition transient heap/latency, undo/cleanse total resources, cumulative physical I/O, remaining identity edges and actual system clipboard acceptance remain; local async cancellation tests do not establish those end-to-end bounds."
     },
     {
       "id": "PAN-07",

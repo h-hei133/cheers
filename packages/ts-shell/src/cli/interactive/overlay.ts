@@ -54,6 +54,8 @@ export interface Picker {
   readonly exclusive?: boolean;
   readonly initialSelection?: string;
   readonly initialFilter?: string;
+  /** Replace the initial filter after an asynchronous source resolves. */
+  readonly resolvedFilter?: string;
   /** Shown when the option set turns out to be empty. */
   readonly empty: string;
   /** Safe failure text when loading fails, distinct from a successful empty set. */
@@ -709,6 +711,8 @@ export class OverlayHost {
       if (this.picker !== picker || this.generation !== generation || this.loadController !== controller) return;
       this.loading = false;
       this.baseOptions = options;
+      const resolvedFilter = initial && this.model.filter === (picker.initialFilter ?? '') ? picker.resolvedFilter : undefined;
+      if (resolvedFilter !== undefined) this.model.setFilter(resolvedFilter);
       this.model.setOptions(options);
       if (initial && picker.initialSelection) this.model.focus(picker.initialSelection);
       if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));

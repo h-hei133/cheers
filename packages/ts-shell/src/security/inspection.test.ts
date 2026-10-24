@@ -23,7 +23,7 @@ describe('security inspection', () => {
   it('publishes a new structured snapshot and releases listeners', () => {
     const h = createSecurityHarness();
     const listener = vi.fn();
-    const release = h.service.subscribeInspection(() => listener(h.service.inspection()));
+    const release = h.service.publication.subscribe(() => listener(h.service.inspection()));
     h.plan();
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener.mock.calls[0]![0].items[0]!.kind).toBe('scan');
@@ -58,7 +58,7 @@ describe('security inspection', () => {
     const statePath = path.join(h.manager.getSessionDirPath(h.session.id), 'state.json');
     const bytes = fs.readFileSync(statePath); const fileBytes = fs.readFileSync(h.file);
     const picker = cleansePicker({ read: () => ({ state: 'ready', snapshot: h.service.inspection() }),
-      subscribe: listener => h.service.subscribeInspection(() => listener({ state: 'ready', snapshot: h.service.inspection() })) });
+      subscribe: listener => h.service.publication.subscribe(() => listener({ state: 'ready', snapshot: h.service.inspection() })) });
     const row = (await picker.load())[0]!;
     expect(row.note).toContain('permission-pending · live');
     const overlay = new OverlayHost(() => undefined); overlay.open(picker);

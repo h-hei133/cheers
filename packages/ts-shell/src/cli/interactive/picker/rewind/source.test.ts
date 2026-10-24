@@ -61,3 +61,20 @@ it('stops an aborted opening and refuses an unreadable source visibly', async ()
   expect(await picker.apply(['q'])).toBeUndefined();
   expect(rewind).not.toHaveBeenCalled();
 });
+
+it('stops search-index construction when cancelled between questions', async () => {
+  const controller = new AbortController();
+  const lower = vi.spyOn(String.prototype, 'toLowerCase');
+  lower.mockImplementationOnce(function (this: string) {
+    controller.abort();
+    return this.toString();
+  });
+  const turns = Array.from({ length: 300 }, (_, index) => ({
+    id: `question-${index}`,
+    role: 'user' as const,
+    content: `question ${index}`,
+  }));
+
+  await expect(RewindSource.create(turns, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+  expect(lower).toHaveBeenCalledTimes(1);
+});

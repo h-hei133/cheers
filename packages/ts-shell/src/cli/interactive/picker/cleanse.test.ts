@@ -63,6 +63,57 @@ describe('cleanse picker', () => {
     expect(empty.status?.([])).toContain('No retained security');
   });
 
+  it('awaits cancellable source acquisition and publishes no rows after browser cancellation', async () => {
+    const controller = new AbortController();
+    const readAsync = vi.fn((signal?: AbortSignal) => new Promise<SecurityInspection>((_resolve, reject) => {
+      signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }));
+    const picker = cleansePicker({
+      read: () => snapshot(1),
+      readAsync,
+      subscribe: () => () => undefined,
+    });
+    const loading = picker.load(controller.signal);
+    expect(readAsync).toHaveBeenCalledWith(controller.signal);
+    controller.abort(new Error('Clean source cancelled'));
+    await expect(loading).rejects.toThrow('Clean source cancelled');
+    expect(picker.detail?.('session-1/scan/scan-1')).toEqual([]);
+  });
+
+  it.each([false, true])('keeps an older cancelled load from clearing a newer source result (newer first=%s)', async newerFirst => {
+    const pending: Array<(value: SecurityInspection) => void> = [];
+    const readAsync = vi.fn(() => new Promise<SecurityInspection>(resolve => { pending.push(resolve); }));
+    const picker = cleansePicker({ read: () => snapshot(1), readAsync, subscribe: () => () => undefined });
+    const older = new AbortController();
+    const newer = new AbortController();
+    const first = picker.load(older.signal);
+    const second = picker.load(newer.signal);
+    if (newerFirst) {
+      pending[1]!(snapshot(2));
+      expect((await second)[0]?.id).toBe('session-1/scan/scan-1');
+    }
+    older.abort(new Error('Older load cancelled'));
+    pending[0]!(snapshot(1));
+    await expect(first).rejects.toThrow('Older load cancelled');
+    if (!newerFirst) {
+      pending[1]!(snapshot(2));
+      expect((await second)[0]?.id).toBe('session-1/scan/scan-1');
+    }
+    expect(picker.status?.([])).not.toContain('unavailable');
+    expect(picker.detail?.('session-1/scan/scan-1')).toEqual(['retained finding']);
+  });
+
+  it('passes the browser cancellation signal to retained source subscriptions', async () => {
+    const source = inspectorFor(snapshot(1));
+    const subscribe = vi.spyOn(source.inspector, 'subscribe');
+    const picker = cleansePicker(source.inspector);
+    const controller = new AbortController();
+    await picker.load(controller.signal);
+    const stop = picker.subscribe!(vi.fn());
+    expect(subscribe).toHaveBeenCalledWith(expect.any(Function), controller.signal);
+    stop();
+  });
+
   it.each(['scan-\x9b31m api_key=synthetic-draft-canary', 'api_key=synthetic-draft-canary', 'scan-\x1b[31m', 's'.repeat(300)])('refuses unsafe exact draft targets', async targetId => {
     const inspection = snapshot(1);
     if (inspection.state !== 'ready') throw new Error('fixture');

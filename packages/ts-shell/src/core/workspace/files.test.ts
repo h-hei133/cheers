@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { inspectWorkspaceFile, readTextFile, workspaceFilePath } from './files.js';
+import { inspectWorkspaceFile, readTextFile, readTextFileAsync, workspaceFilePath } from './files.js';
 import { createWorkspaceWriteAuthority } from '../../edit/authority/workspace.js';
 
 let fixture: string;
@@ -153,4 +153,26 @@ it.each(['after ancestry inspection', 'during descriptor acquisition'])('refuses
   expect(() => readTextFile(target, 1024)).toThrow();
   expect(replaced).toBe(true);
   expect(fs.readFileSync(path.join(sibling, 'inside.txt'), 'utf8')).toBe('outside same name');
+});
+
+it('stops cancellable text acquisition between descriptor chunks', async () => {
+  const target = path.join(workspace, 'large.txt');
+  fs.writeFileSync(target, 'x'.repeat(140 * 1024));
+  const controller = new AbortController();
+  const open = fs.promises.open;
+  let reads = 0;
+  vi.spyOn(fs.promises, 'open').mockImplementation((async (...args: Parameters<typeof fs.promises.open>) => {
+    const handle = await open(...args);
+    const read = handle.read.bind(handle);
+    handle.read = (async (...readArgs: Parameters<typeof read>) => {
+      const result = await read(...readArgs);
+      reads += 1;
+      if (reads === 2) controller.abort(new Error('Read cancelled'));
+      return result;
+    }) as typeof handle.read;
+    return handle;
+  }) as typeof fs.promises.open);
+
+  await expect(readTextFileAsync(target, 1024 * 1024, controller.signal)).rejects.toThrow('Read cancelled');
+  expect(reads).toBe(2);
 });

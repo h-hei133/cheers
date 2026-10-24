@@ -213,8 +213,15 @@ export function sessionTurnEntryId(sessionId: string, order: number): string {
 export function sessionThreadPath(
   thread: SessionThreadSnapshot,
   leafId?: string,
+  signal?: AbortSignal,
 ): { readonly path: readonly SessionThreadEntry[]; readonly resolved: boolean } {
-  const byId = new Map(thread.entries.map((entry) => [entry.id, entry]));
+  signal?.throwIfAborted();
+  const byId = new Map<string, SessionThreadEntry>();
+  for (let index = 0; index < thread.entries.length; index++) {
+    if ((index & 255) === 0) signal?.throwIfAborted();
+    const entry = thread.entries[index]!;
+    byId.set(entry.id, entry);
+  }
   const target = leafId ?? thread.activeLeafId;
   const leaf = target === undefined ? thread.entries.at(-1) : byId.get(target);
   if (leaf === undefined) return { path: [], resolved: target === undefined };
@@ -223,6 +230,7 @@ export function sessionThreadPath(
   const seen = new Set<string>();
   let cursor: SessionThreadEntry | undefined = leaf;
   while (cursor) {
+    signal?.throwIfAborted();
     // A cycle would otherwise hang the caller in a walk it cannot finish.
     if (seen.has(cursor.id)) return { path: [], resolved: false };
     seen.add(cursor.id);
@@ -254,35 +262,43 @@ export function catchUpSessionThread(
   thread: SessionThreadSnapshot,
   session: Session,
   maxEntries?: number,
+  signal?: AbortSignal,
 ): SessionThreadSnapshot {
+  signal?.throwIfAborted();
   // A turn the tree already represents is not missing, whichever branch it is
   // on. Selecting by name rather than by counting from the end is what keeps a
   // turn that was stepped away from — and then returned to — from being added a
   // second time under a new parent.
-  const known = new Set(thread.entries.map((entry) => entry.id));
+  const known = new Set<string>();
+  for (let index = 0; index < thread.entries.length; index++) {
+    if ((index & 255) === 0) signal?.throwIfAborted();
+    known.add(thread.entries[index]!.id);
+  }
   if (maxEntries !== undefined) {
     let count = thread.entries.length;
     for (let index = 0; index < session.turns.length; index++) {
+      if ((index & 255) === 0) signal?.throwIfAborted();
       const turn = session.turns[index]!;
       if (!isSessionContextMessage(turn) && !known.has(turn.id ?? sessionTurnEntryId(session.id, index + 1))) count++;
       if (count > maxEntries) throw new Error('The saved tree exceeds the navigation entry limit.');
     }
     if (count > maxEntries) throw new Error('The saved tree exceeds the navigation entry limit.');
   }
-  const branch = sessionThreadPath(thread);
+  const branch = sessionThreadPath(thread, undefined, signal);
   // The name is decided here, once, and both the lookup and the entry use it.
   // Deriving it twice — from the turn's position to look for it, from the number
   // of entries to record it — made the two disagree as soon as a branched thread
   // held more entries than the turn had position, so every read re-added the same
   // turn under a name nothing had looked for.
-  const missing = session.turns
-    .map((turn, index) => ({
-      turn,
-      // A turn with no id of its own — recorded before ids existed — takes its
-      // position, which is the name the linear builder gives it too.
-      id: turn.id ?? sessionTurnEntryId(session.id, index + 1),
-    }))
-    .filter((candidate) => !isSessionContextMessage(candidate.turn) && !known.has(candidate.id));
+  const missing: Array<{ turn: Session["turns"][number]; id: string }> = [];
+  for (let index = 0; index < session.turns.length; index++) {
+    if ((index & 255) === 0) signal?.throwIfAborted();
+    const turn = session.turns[index]!;
+    // A turn with no id of its own — recorded before ids existed — takes its
+    // position, which is the name the linear builder gives it too.
+    const id = turn.id ?? sessionTurnEntryId(session.id, index + 1);
+    if (!isSessionContextMessage(turn) && !known.has(id)) missing.push({ turn, id });
+  }
   if (missing.length === 0) return thread;
 
   const entries = [...thread.entries];
@@ -291,7 +307,9 @@ export function catchUpSessionThread(
   let leafId = branch.resolved && thread.activeLeafId !== undefined
     ? thread.activeLeafId
     : sessionRootEntryId(session.id);
-  missing.forEach(({ turn, id }) => {
+  for (let index = 0; index < missing.length; index++) {
+    if ((index & 255) === 0) signal?.throwIfAborted();
+    const { turn, id } = missing[index]!;
     entries.push({
       id,
       parentId: leafId,
@@ -301,7 +319,7 @@ export function catchUpSessionThread(
       ...(turn.timestamp ? { timestamp: turn.timestamp } : {}),
     });
     leafId = id;
-  });
+  }
 
   return freezeDeep({
     ...thread,

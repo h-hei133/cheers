@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { TRANSCRIPT_FORMAT_VERSION, createMessageTranscriptEvent, createTranscriptHeader } from "../sessionEventCodec.js";
 import type { Session } from "../schema/sessionRecord.js";
 import {
@@ -12,9 +12,88 @@ import {
   projectTranscriptMessages,
   readTranscript,
   readTranscriptEvents,
+  readTranscriptSnapshot,
+  readTranscriptSnapshotAsync,
 } from "./sessionTranscript.js";
 
+afterEach(() => vi.restoreAllMocks());
+
 describe("sessionTranscript", () => {
+  it('rejects malformed UTF-8 equally in bounded synchronous and asynchronous strict reads', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-transcript-utf8-'));
+    try {
+      const target = path.join(root, 'transcript.jsonl');
+      const bytes = Buffer.concat([
+        Buffer.from('{"type":"message","id":"bad","role":"user","content":"'),
+        Buffer.from([0xff]),
+        Buffer.from('","timestamp":"2026-05-28T00:00:00.000Z"}\n'),
+      ]);
+      fs.writeFileSync(target, bytes);
+      const limits = { maxBytes: 1024, maxLines: 10 };
+      expect(() => readTranscriptSnapshot(target, limits)).toThrow('UTF-8');
+      await expect(readTranscriptSnapshotAsync(target, limits)).rejects.toThrow('UTF-8');
+      expect(fs.readFileSync(target)).toEqual(bytes);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('includes admitted growth before opening instead of returning an unmarked prefix', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-transcript-growth-'));
+    try {
+      const target = path.join(root, 'transcript.jsonl');
+      const event = '{"type":"message","id":"first","role":"user","content":"original","timestamp":"2026-05-28T00:00:00.000Z"}\n';
+      fs.writeFileSync(target, event);
+      const open = fs.promises.open.bind(fs.promises);
+      vi.spyOn(fs.promises, 'open').mockImplementationOnce(async (...args) => {
+        fs.appendFileSync(target, event.replace('first', 'second'));
+        return open(...args);
+      });
+      const snapshot = await readTranscriptSnapshotAsync(target, { maxBytes: 1024, maxLines: 10 });
+      expect(snapshot.truncated).toBe(false);
+      expect(snapshot.events.map(event => event.id)).toEqual(['first', 'second']);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('rejects a linked transcript ancestor in both bounded strict readers', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-transcript-ancestor-'));
+    try {
+      const real = path.join(root, 'real');
+      fs.mkdirSync(real);
+      fs.writeFileSync(path.join(real, 'transcript.jsonl'), '{"type":"message","id":"first","role":"user","content":"original"}\n');
+      fs.symlinkSync(real, path.join(root, 'linked'), 'junction');
+      const target = path.join(root, 'linked/transcript.jsonl');
+      const limits = { maxBytes: 1024, maxLines: 10 };
+      expect(() => readTranscriptSnapshot(target, limits)).toThrow();
+      await expect(readTranscriptSnapshotAsync(target, limits)).rejects.toThrow();
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('rejects same-size in-place changes between asynchronous transcript chunks', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-transcript-inplace-'));
+    try {
+      const target = path.join(root, 'transcript.jsonl');
+      const event = JSON.stringify({ type: 'message', id: 'long', role: 'user', content: 'a'.repeat(100_000) }) + '\n';
+      fs.writeFileSync(target, event);
+      const open = fs.promises.open.bind(fs.promises);
+      vi.spyOn(fs.promises, 'open').mockImplementationOnce(async (...args) => {
+        const handle = await open(...args);
+        const read = handle.read.bind(handle);
+        let changed = false;
+        handle.read = (async (...readArgs: Parameters<typeof read>) => {
+          const result = await read(...readArgs);
+          if (!changed) {
+            changed = true;
+            fs.writeFileSync(target, event.replaceAll('a', 'b'));
+            const later = new Date(Date.now() + 2000);
+            fs.utimesSync(target, later, later);
+          }
+          return result;
+        }) as typeof handle.read;
+        return handle;
+      });
+      await expect(readTranscriptSnapshotAsync(target, { maxBytes: 200_000, maxLines: 10 })).rejects.toThrow('changed');
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
   it("preserves append order and message projection", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-transcript-"));
     try {
@@ -127,6 +206,80 @@ describe("sessionTranscript", () => {
     // Named on the way in, so the thread can point back at this turn.
     expect(typeof session.turns[0]?.id).toBe("string");
     expect(events).toEqual(["append", "metadata", "state"]);
+  });
+
+  it("stops a chunked read after the first transcript chunk before decoding or parsing", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-transcript-abort-"));
+    try {
+      const transcriptPath = path.join(root, "transcript.jsonl");
+      fs.writeFileSync(transcriptPath, `${"x".repeat(200 * 1024)}\n`, "utf8");
+      const controller = new AbortController();
+      const originalOpen = fs.promises.open.bind(fs.promises);
+      let reads = 0;
+      let firstReadBytes: number | undefined;
+      let firstReadLength: number | undefined;
+      vi.spyOn(fs.promises, "open").mockImplementation(async (...args) => {
+        const handle = await originalOpen(...args);
+        const originalRead = handle.read.bind(handle);
+        vi.spyOn(handle, "read").mockImplementation(async (...readArgs) => {
+          reads += 1;
+          if (reads === 1) firstReadLength = readArgs[2];
+          const result = await originalRead(...readArgs);
+          if (reads === 1) {
+            firstReadBytes = result.bytesRead;
+            controller.abort();
+          }
+          return result;
+        });
+        return handle;
+      });
+      const parse = vi.spyOn(JSON, "parse");
+
+      await expect(readTranscriptSnapshotAsync(transcriptPath, {
+        maxBytes: 256 * 1024,
+        maxLines: 10,
+      }, true, controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+
+      expect(reads).toBe(1);
+      expect(firstReadLength).toBe(64 * 1024);
+      expect(firstReadBytes).toBe(64 * 1024);
+      expect(parse).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("stops the non-salvage async read between descriptor chunks", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-transcript-async-strict-"));
+    try {
+      const transcriptPath = path.join(root, "transcript.jsonl");
+      fs.writeFileSync(transcriptPath, `${"x".repeat(200 * 1024)}\n`, "utf8");
+      const controller = new AbortController();
+      const originalOpen = fs.promises.open.bind(fs.promises);
+      let reads = 0;
+      vi.spyOn(fs.promises, "open").mockImplementation(async (...args) => {
+        const handle = await originalOpen(...args);
+        const originalRead = handle.read.bind(handle);
+        vi.spyOn(handle, "read").mockImplementation(async (...readArgs) => {
+          reads += 1;
+          const result = await originalRead(...readArgs);
+          if (reads === 1) controller.abort();
+          return result;
+        });
+        return handle;
+      });
+      const parse = vi.spyOn(JSON, "parse");
+
+      await expect(readTranscriptSnapshotAsync(transcriptPath, {
+        maxBytes: 256 * 1024,
+        maxLines: 10,
+      }, false, controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+
+      expect(reads).toBe(1);
+      expect(parse).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

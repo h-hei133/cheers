@@ -25,13 +25,46 @@ describe("back selectors", () => {
     } as never)!;
     const overlay = new OverlayHost(() => {});
     overlay.open(picker);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.waitFor(() => {
+      expect(strip(overlay)).toContain(selector === "older question" ? "Questions 1-1 of 1" : "Questions 1-2 of 2");
+    });
     expect(rewind).not.toHaveBeenCalled();
     const selected = vi.fn();
     overlay.handleKey(parseKeyEvent("\r"), selected);
     expect(selected).toHaveBeenCalledWith(picker, ["message-1"]);
     expect(await picker.apply(["message-1"])).toEqual({ note: "restored", draft: "older question" });
     expect(rewind).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads back questions lazily and publishes no rows after cancellation', async () => {
+    let resolveRead!: (value: {
+      readonly turns: readonly { id: string; role: "user"; content: string }[];
+      readonly version: string;
+    }) => void;
+    const sessionTurns = vi.fn(() => new Promise<{
+      readonly turns: readonly { id: string; role: "user"; content: string }[];
+      readonly version: string;
+    }>(resolve => { resolveRead = resolve; }));
+    const rewind = vi.fn();
+    const picker = pickerFor('/back', {
+      commandContext: { cwd: '/workspace' },
+      sessionTurns,
+      rewind,
+    } as never)!;
+    expect(sessionTurns).not.toHaveBeenCalled();
+
+    const controller = new AbortController();
+    const loading = picker.load(controller.signal);
+    expect(sessionTurns).toHaveBeenCalledTimes(1);
+    expect(sessionTurns).toHaveBeenCalledWith(controller.signal);
+    controller.abort();
+    resolveRead({ turns: [{ id: 'question', role: 'user', content: 'question' }], version: 'saved-v1' });
+
+    await expect(loading).rejects.toMatchObject({ name: 'AbortError' });
+    expect(picker.initialSelection).toBeUndefined();
+    expect(picker.filterOptions?.('', [])).toEqual([]);
+    expect(await picker.apply(['question'])).toBeUndefined();
+    expect(rewind).not.toHaveBeenCalled();
   });
 
   it('does not invent a draft when navigation reports an unknown outcome', async () => {
@@ -75,12 +108,64 @@ describe("back selectors", () => {
     const rewind = vi.fn(async () => ({ note: 'restored' }));
 
     const numeric = rewindPicker({ turns, selector: '26', rewind });
+    const numericOptions = await numeric.load();
     expect(numeric.initialSelection).toBe('question-34');
-    expect((await numeric.load())[0]?.id).toBe('question-34');
+    expect(numericOptions[0]?.id).toBe('question-34');
 
     const stable = rewindPicker({ turns, selector: 'question-0', rewind });
+    const stableOptions = await stable.load();
     expect(stable.initialSelection).toBe('question-0');
-    expect((await stable.load()).at(-1)?.id).toBe('question-0');
+    expect(stableOptions.at(-1)?.id).toBe('question-0');
+  });
+
+  it('clears a resolved ordinal filter while preserving its surrounding page', async () => {
+    const turns = Array.from({ length: 60 }, (_, index) => ({
+      id: `question-${index}`,
+      role: 'user' as const,
+      content: `question ${index}`,
+    }));
+    const picker = rewindPicker({ turns, selector: '26', rewind: vi.fn() });
+    expect(picker.initialSelection).toBe('question-34');
+    expect(picker.resolvedFilter).toBe('');
+    const overlay = new OverlayHost(() => {});
+    overlay.open(picker);
+    await vi.waitFor(() => expect(strip(overlay)).toContain('Questions 26-50 of 60'));
+    expect(strip(overlay)).toContain('question 34');
+    expect(strip(overlay)).not.toContain('Questions 26-26 of 1');
+  });
+
+  it('keeps text typed while a resolved ordinal is still loading', async () => {
+    const turns = Array.from({ length: 60 }, (_, index) => ({
+      id: `question-${index}`,
+      role: 'user' as const,
+      content: `question ${index}`,
+    }));
+    let resolveRead!: (value: typeof turns) => void;
+    const picker = pickerFor('/back 26', {
+      commandContext: { cwd: '/workspace' },
+      sessionTurns: () => new Promise(resolve => { resolveRead = resolve; }),
+      rewind: vi.fn(),
+    } as never)!;
+    const overlay = new OverlayHost(() => {});
+    overlay.open(picker);
+    overlay.handlePaste('rare');
+    resolveRead(turns);
+    await vi.waitFor(() => expect(strip(overlay)).toContain('No questions match'));
+    expect(strip(overlay)).not.toContain('question 34');
+    overlay.close();
+  });
+
+  it('falls back to search text when a numeric selector is out of range', async () => {
+    const turns = Array.from({ length: 3 }, (_, index) => ({
+      id: `question-${index}`,
+      role: 'user' as const,
+      content: `question ${index}`,
+    }));
+    const picker = rewindPicker({ turns, selector: '999', rewind: vi.fn() });
+    expect(await picker.load()).toEqual([]);
+    expect(picker.initialSelection).toBeUndefined();
+    expect(picker.initialFilter).toBe('999');
+    expect(picker.status?.([], '999')).toContain('No questions match');
   });
 
   it('gives an exact stable id priority over a newer prompt mentioning it', async () => {
