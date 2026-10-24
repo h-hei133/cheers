@@ -36,7 +36,7 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 
 累计 OS physical I/O、page-cache 与总 heap/最长响应是当前资源 WATCH 的补充观测维度；原决策没有要求在任意机器上证明这些量的统一绝对上界。后续测量必须说明它验证上述哪一项有界性；未测仍如实标注，不把“缺这项观测”写成新功能缺陷，也不以本次范围说明静默关闭已有资源验收。§6.5 的数值是需校准的候选目标；已闭合的 START-03 不因本次纯测试改动重新开放。
 
-## 2026-10-24 PAN-08 tools 原命令取消与真实目录生命周期（本地实现与聚焦验证）
+## 2026-10-24 PAN-08 tools 原命令取消与真实目录生命周期（`afcc4ce7`；已推送、CI运行中）
 
 - 原 `readToolPool` 只使用调用方传入的面板 signal，遗漏 `CommandContext.signal`。新增预先取消与真实 stdio `tools/list` 挂起期间原命令取消两个用例，在原实现均取得 AssertionError；现在共享读取入口合并两个生命周期，在 acquisition 前和返回后检查。显式文档选择仍使用独立 timeout，不复用已关闭面板的 signal；工具执行与权限合同保持。
 - `picker/tools/lifetime.test.ts` 连接原 `toolPoolFor`、catalogue、CoreMcpGateway、实际小型 stdio server、toolsPicker 和 OverlayHost。32字节/128KiB description 两档各十轮打开/过滤/20种规定矩形绘制/取消：每轮恰一次 `tools/list`，descriptor JSON 字节在 description bytes 与其加1024之间且十轮一致，保留一个小于512字节的安全 option；过滤/绘制/关闭零额外协议获取，host options/model/行索引清空，配置和定义 bytes 不变，零 `tools/call`。
@@ -44,6 +44,7 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 - 原 signal、host close abort、host retained options、detail 截短四项保护反转均实际 AssertionError，三个生产文件逐字节恢复；恢复后的3文件27项通过，测试heap上限1536MiB。独立代码APPROVE/架构CLEAR，综合APPROVE，两路均只读未执行验证。对照参考 selector 的 controller 传播、当前加载发布与关闭释放；本仓共享连接由 runtime owner 管理，不复制参考列表结构。
 - 本批只证明小型真实 catalogue→options→绘制函数→close 组合，不把descriptor JSON字节当成wire或physical I/O，不外推全目录交互options上界、总heap、最长响应、实际终端输出或真实账户/MCP认证。未跑全量回归、exe、PTY或真实20k消息压测。矩阵保持35 complete /12 partial /0 open。最终静态门与matrix、TS build串行通过，build heap上限2048MiB；build `23eca6e4b6a26bd34e4661cb1440f3b37b7ed4f17ccfc64c26161fa3dcfe4168`，inputs `c2f29a5b39c4d112b19bf94908079cc54ebaabb9e9512fca5966f60845b6bed4`，artifact `309262f74009cd19c5d688b6afe3cb8bb4142a39080d1f20403bab4cca585f46`。临时目录已清理；提交/推送和新SHA CI分别取证。
 - 前批文档SHA `c57daafc785d1efa07d3420d26174c41a3cd015c` 精确CI `40084588877` / job `120844792165` 于2026-10-24T10:06:26Z–10:21:05Z completed/success；该SHA的Watch `40084588937` completed/success。undo代码SHA `65660f16183222ed5d1fd7b5fa21562709359c77` 的CI `40085273785` / job `120846814871` 仍in_progress，Watch `40085273768` completed/success；cleanse代码SHA `b2b72b57` 的CI `40084447090` 仍in_progress，不借后续文档SHA替记成功。
+- 代码提交 `afcc4ce7d3a0b4a53ffc7d12c1a0cc61f64cbbeb` 已推送并精确读回远端main。CI `40086195986` / job `120849521362` 自2026-10-24T10:30:41Z仍in_progress；Watch `40086195984` / job `120849521387` 于10:30:41Z–10:31:03Z completed/success，只绑定该源码SHA。
 
 ## 2026-10-24 PAN-06 undo 历史可取消批次与源复核（本地实现与聚焦验证）
 
