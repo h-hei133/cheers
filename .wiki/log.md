@@ -8943,3 +8943,7 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 Platform QA40095404655（7bff50a4）实际17pass/2fail/1skip；Windows批处理4格、Linux/macOS常规PTY通过，两个fullscreen旧探针在第二侧复制超时。失败artifact确认复制结果toast使diff55→54且清空55，分类为QA固定坐标与异步结果paint竞态。QA-only helper改为等完整结果并按当前source行点击，保留两侧精确OSC；六项脚本回归及四项AssertionError反转通过、helper bytes恢复。分块覆盖与实际CUP+J清屏由独立review提出后补证；最终静态门/矩阵/脚本/Node fullscreen串行通过，独立APPROVE/CLEAR，本批SHA/远端结果另取证。未改provider/auth或产品复制源码，未运行本地全套/20k压力。详见phase-20-status真实连接记录。
 
 QA修复及连接记录已提交/推送d81926093a88aaf34740058e2c72d709968cc5a3，精确读回main且tracked clean。Platform QA40098086773绑定该SHA，于2026-10-24T13:28:30Z success：Linux/macOS各8、Windows4，共20支持CLI格全通过，三平台TS+exe构建成功；旧两项fullscreen失败与一项跳过已取得本SHA通过证据，原failure记录不删除。常规CI40098055650和前SHA的40095140860仍运行中，未称全套/结构验收通过；Windows交互/IME/真实clipboard、认证/质量/账单的剩余条件不变。本段后续文档提交不冒充新SHA平台复验。
+
+## [2026-10-24] docs | Phase 20 外部验收准备清单
+
+新增 `features/phase-20-inputs.md`：把11项partial所需外部条件归为账户认证、可信账单、正式模型质量、真实桌面交互、GitHub MCP网络五组，逐项列明用户提供信息、代理负责事项、已有配置及回填模板。正式质量按已有20任务×至少5次配对说明起始规模和辅助请求成本；无需用户另造语料、监控CI或运行20k真实PTY。按原PAN-08范围修正剩余表：缺用户指定HTTP Bearer的产品连接/只读调用，不额外索取OAuth MCP服务；账户OAuth生命周期仍归PRV-03/PAN-07。仅整理条件，不提高任务完成计数。
