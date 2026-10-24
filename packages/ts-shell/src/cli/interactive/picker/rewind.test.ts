@@ -6,6 +6,31 @@ import { rewindPicker } from './rewind.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 
 describe("back selectors", () => {
+  it.each(['cancel', 'stale'])('withholds pending back rows after original %s authority expires', async kind => {
+    const original = new AbortController(), browser = new AbortController(); let stale = false, release!: () => void;
+    let acquisitionSignal: AbortSignal | undefined;
+    const gate = new Promise<void>(resolve => { release = resolve; }), rewind = vi.fn();
+    const picker = rewindPicker({ signal: original.signal, admission: () => stale ? 'original binding changed' : undefined,
+      readTurns: async signal => { acquisitionSignal = signal; await gate;
+        return { turns: [{ id: 'question', role: 'user', content: 'Question' }], version: 'saved-v1' }; }, rewind });
+    const pending = picker.load(browser.signal);
+    expect(acquisitionSignal).toBeDefined();
+    if (kind === 'cancel') original.abort(); else stale = true;
+    release(); await expect(pending).rejects.toThrow();
+    expect(picker.initialSelection).toBeUndefined(); expect(picker.filterOptions?.('', [])).toEqual([]);
+    expect(await picker.apply(['question'])).toBeUndefined(); expect(rewind).not.toHaveBeenCalled();
+    if (kind === 'cancel') expect(acquisitionSignal?.aborted).toBe(true);
+    expect(browser.signal.aborted).toBe(false);
+  });
+
+  it('rejects an admission callback cancellation before back source acquisition', async () => {
+    const original = new AbortController(), readTurns = vi.fn(async () => []); let loading = false;
+    const picker = rewindPicker({ signal: original.signal, readTurns, rewind: vi.fn(),
+      admission: () => { if (loading) original.abort(); return undefined; } });
+    loading = true;
+    await expect(picker.load()).rejects.toThrow(); expect(readTurns).not.toHaveBeenCalled();
+  });
+
   it.each(["/back", "/back 2", "/BACK older", " /back message-1 "])("opens the chooser for %s", (line) => {
     expect(opensPicker(line)).toBe(true);
   });

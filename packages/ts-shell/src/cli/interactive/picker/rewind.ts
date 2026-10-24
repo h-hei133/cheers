@@ -51,7 +51,10 @@ export function rewindPicker(input: RewindPickerInput): Picker {
   const { signal, admission: originalAdmission } = input;
   const admission = (): string | undefined => {
     if (signal?.aborted) return 'Back selection was cancelled. Reopen /back.';
-    try { return originalAdmission?.(); }
+    try {
+      const blocked = originalAdmission?.();
+      return signal?.aborted ? 'Back selection was cancelled. Reopen /back.' : blocked;
+    }
     catch { return 'Back selection is unavailable. Reopen /back.'; }
   };
   let source: RewindSource | undefined;
@@ -65,21 +68,25 @@ export function rewindPicker(input: RewindPickerInput): Picker {
   const ensureSource = async (browserSignal?: AbortSignal): Promise<RewindSource> => {
     if (source) return source;
     if (!input.readTurns) throw new Error('Back source is unavailable.');
+    const current = signal && browserSignal ? AbortSignal.any([signal, browserSignal]) : signal ?? browserSignal;
     sourcePending ??= (async () => {
-      browserSignal?.throwIfAborted();
-      const loaded = await input.readTurns!(browserSignal);
-      browserSignal?.throwIfAborted();
+      current?.throwIfAborted();
+      const loaded = await input.readTurns!(current);
+      current?.throwIfAborted();
+      const blocked = admission();
+      if (blocked) throw new Error(blocked);
+      current?.throwIfAborted();
       const wrapped = isWrappedTurns(loaded);
       const turns = wrapped ? loaded.turns : loaded;
       const version = wrapped ? loaded.version : input.version;
-      return RewindSource.create(turns, browserSignal, version);
+      return RewindSource.create(turns, current, version);
     })();
     try {
       source = await sourcePending;
       return source;
     } catch {
       sourcePending = undefined;
-      browserSignal?.throwIfAborted();
+      current?.throwIfAborted();
       throw new Error('Questions are unavailable or beyond back browsing limits.');
     }
   };
@@ -175,6 +182,10 @@ function questionPage(
       if (!source) {
         try {
           source = await ensureSource(signal);
+          signal?.throwIfAborted();
+          const blocked = admission();
+          if (blocked) throw new Error(blocked);
+          if (closed) throw new Error('Back picker is closed.');
           moreId = source.moreId;
           if (!positioned) {
             position();
@@ -185,6 +196,9 @@ function questionPage(
           throw error;
         }
       }
+      signal?.throwIfAborted();
+      const final = admission();
+      if (final) { release(); throw new Error(final); }
       signal?.throwIfAborted();
       if (closed) throw new Error('Back picker is closed.');
       if (resolvedFilter !== undefined) query = resolvedFilter;

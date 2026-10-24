@@ -13,6 +13,8 @@ import { restoreOperation } from '../../../edit/recovery/operation/restore.js';
 import { restorePicker } from './restore.js';
 import { OverlayHost } from '../overlay.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
+import { restoreSelection } from './restore/state.js';
+import * as recoveryIndex from '../../../edit/recovery/recoveryAuthorityIndex.js';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -56,6 +58,27 @@ async function patch(root: string, before: string, after: string, taskId: string
 }
 
 describe('restore selection contract', () => {
+  it('rejects original cancellation triggered inside restore admission', () => {
+    const root = workspace(), controller = new AbortController();
+    const selection = restoreSelection({ signal: controller.signal,
+      admission: () => { controller.abort(); return undefined; } }, root);
+    expect(() => selection.check()).toThrow();
+  });
+
+  it('withholds an actual snapshot preview after final admission cancels the original signal', async () => {
+    const root = workspace(); await capture(root, 'edit-a', 'record-a');
+    const controller = new AbortController(); let acquired = false;
+    const picker = restorePicker(root, undefined, { signal: controller.signal,
+      admission: () => { if (acquired) controller.abort(); return undefined; } });
+    const rows = await picker.load(), read = recoveryIndex.listRecoveryAuthorityRecords;
+    const observed = vi.spyOn(recoveryIndex, 'listRecoveryAuthorityRecords').mockImplementation(async input => {
+      const result = await read(input); acquired = true; return result;
+    });
+    try { await expect(picker.apply([rows[0]!.id])).rejects.toMatchObject({ name: 'AbortError' }); }
+    finally { observed.mockRestore(); }
+    expect(controller.signal.aborted).toBe(true);
+  });
+
   it('routes an actual patch operation through undo instead of restore preview', async () => {
     const root = workspace();
     const target = path.join(root, 'record-a.txt');

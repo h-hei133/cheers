@@ -153,7 +153,10 @@ export async function runCopyCommand(
 /** A completed dispatch can settle; a new fallback must retain its authority. */
 function copyAdmission(context: CommandContext): 'cancelled' | 'blocked' | undefined {
   if (context.signal?.aborted) return 'cancelled';
-  try { return context.admission?.() ? 'blocked' : undefined; }
+  try {
+    const blocked = context.admission?.();
+    return context.signal?.aborted ? 'cancelled' : blocked ? 'blocked' : undefined;
+  }
   catch { return 'blocked'; }
 }
 

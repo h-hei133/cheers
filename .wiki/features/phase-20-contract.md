@@ -149,3 +149,11 @@
 | QA-04 | 本地门禁与精确提交；CI 以 run 结果为准 |
 
 | PAN-08 help（部分） | `core/commands/help/report.ts`、`picker/help.ts`、原slash registry/print owner、`slashSuggestions.ts` | immutable安全report与共享rows；raw ID本地保留、安全name才能插draft；alias搜索/named独立、单current selection；原admission读前/通知前/apply/真实host发布检查；精确cwd/session及builtin root；选中后usage安全；12文件189项、strict TS/双构建、四格合成扩展PTY/八格smoke | metadata/name/alias/single/before/apply/current/subscription/notification/root/print/removed/hint共13项有效反转；取消/查看/草稿不改session/源文件，不执行script或模型、不新增command-output。原完整registry/配置读取无总资源界，live config不等于accepted snapshot；独立codeAPPROVE/architectureWATCH，原hint泄露已实际复现修复；其余picker/PAN-08/47项继续 |
+
+## 2026-10-24 PAN-06 back/copy/restore 原始取消边界
+
+- 七个原实现回归实际 AssertionError：back pending read 后原始 signal 取消/准入过期仍返回 rows、准入回调取消后仍获取；copy 首次/下一 native 派发前准入回调取消仍继续；restore 准入回调取消未拒绝、实际 snapshot metadata 重读后的最终回调取消仍返回 preview draft。现 back 获取组合 original/browser signal，获取后和发布前复核；copy/restore 在准入回调后重检 original signal，已完成 copied/offered 的事实保持。
+- 四项有效反转（copy/restore 回调后检查、back original signal 转发、back 旧保护整组）均 exit1 + AssertionError，源码逐字节恢复。单独移除 back 回调后检查仍被后续 pre-read signal guard 拦住，未算有效反转。restore 初版回归取消过早而被 reader 拒绝、back 初版对 undefined 使用属性断言，均归测试设计修正，不作为产品失败证据。
+- 最终静态门/matrix、8 files/104 tests、TS build 串行通过，heap1536/2048MiB；独立只读代码 APPROVE/架构 CLEAR，两路无验证。build `0483fcd1214c7d45e76d6f8dbf17dd09a66b728537961948c342178766db30ff`，inputs `0f540a74d82c723a9bd184b91d322d5ccf935d0fa79b3daa242ff4bd3dbf72b4`，artifact `5a6c858004a3725852efed6c0b729b8f4e60152dc4c1998c51aa6e38cb227ebd`。未跑全量/exe/PTY/20k真实压力，无scratch残留；提交/推送/当前SHA CI另取证。
+- 本地下一步限于 copy/back、restore、undo 的 acquisition→page/search→draw→retain→close/reopen 组合，以及 QA-01 的47行证据复核；不把补充 physical I/O/heap/硬延迟 WATCH 升成新要求。矩阵35complete/12partial/0open保持。
+- 前批 `7097be968fef09ed46f4ba319e597218661001a7` CI `40091752154`/job `120865687043` 于2026-10-24T12:08:07Z completed/failure：10465pass/3skip/1fail，唯一失败为 browser/smoke/request 的 decompressed bytes 用例期望unsafe-output、实际request-failed，原因尚未分类；不记成成功，也不改无关browser产品。`b26773aa49d4372bd87b3cd7917bf6fb31f1fa05`已推送，CI `40092866173`仍in_progress、Watch `40092866172`success，各自绑定精确SHA。

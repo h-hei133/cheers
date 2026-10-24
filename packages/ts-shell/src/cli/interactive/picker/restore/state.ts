@@ -46,6 +46,7 @@ export function restoreSelection(access: RestorePickerAccess, workspaceRoot: str
     let blocked: string | undefined;
     try { blocked = access.admission?.(); }
     catch { blocked = 'unavailable'; }
+    access.signal?.throwIfAborted();
     if (blocked) throw new Error('The snapshot opening is unavailable. Reopen /restore.');
   };
   return { check, isCurrent, signal: access.signal };

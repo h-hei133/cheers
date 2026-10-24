@@ -78,6 +78,15 @@ it('refuses expired authority before terminal or native clipboard dispatch', asy
   expect(terminal).not.toHaveBeenCalled();
 });
 
+it.each([1, 2])('refuses clipboard dispatch when admission callback %s cancels the original signal', async phase => {
+  const controller = new AbortController(); let checks = 0;
+  const result = await runCopyCommand(['source'], { cwd: root, signal: controller.signal,
+    admission: () => { if (++checks === phase) controller.abort(); return undefined; } });
+  expect(exec).not.toHaveBeenCalled(); expect(terminal).toHaveBeenCalledTimes(phase === 1 ? 0 : 1);
+  expect(result.state).toEqual({ clipboard: phase === 1 ? 'unavailable' : 'offered', clipboardAttempts: 'cancelled' });
+  expect(result.output).not.toContain('Copied');
+});
+
 it('reports a successful already-dispatched native write after cancellation without another attempt', async () => {
   const controller = new AbortController();
   vi.mocked(exec).mockImplementation(((_command: string, _options: unknown, callback: (error: null) => void) => ({
