@@ -26,6 +26,8 @@
 
 2026-10-24 PAN-08 help行预算补证：原report对单command的全部named invocations脱敏后再slice，1000named夹具在原实现产生AssertionError（2002次而非400次metadata投影）。共享guideRows对report在label/detail投影前累计限制200行；picker默认完整目录与精确omitted/count保持。两文件14项通过；恢复末端slice/取消累计扣减两项反转均AssertionError，生产bytes恢复。独立APPROVE/CLEAR；只证明行metadata投影，不覆盖canonical枚举/计数、alias聚合、中间副本、交互全目录或总heap/硬延迟；任务状态不提高。
 
+2026-10-24 PAN-08 skill生命周期补证：previewEnd清空已提供选择，load发布前复核浏览/原命令signal及generation，拒绝final admission同步关闭后重填offered；accepted Enter仍独立timeout重读精确身份且一次消费。原completed-close双body-tier及初版post-admission host/direct回归均实际AssertionError。真实SkillLoader/manifest→picker→OverlayHost在两档body各十轮浏览/20矩形绘制/取消中逐轮manifest正文恰一次、一个<512字节无body option、manifest descriptor峰值1且全部关闭，旧apply零读；64KiB pending关闭排空、实际换名拒绝及accepted读回也覆盖。两文件32项通过，七项保护实际反转AssertionError，最终source恢复；APPROVE/CLEAR，早期WATCH已解决。只证明选中manifest及小型consumer，不外推目录/扩展总量、全目录options、physical I/O或总heap/硬延迟；35 complete /12 partial /0 open保持。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

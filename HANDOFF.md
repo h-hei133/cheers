@@ -84,3 +84,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A 200-row report still transforms thousands of omitted labels and details.
 - **Root Cause**: One command can expose many named invocations. Capping commands before expansion and rows after mapping does not limit row metadata work.
 - **Rule**: Charge the shared row window before expensive field projection, including across producer boundaries. Test one producer with many rows and multiple producers crossing the same limit; preserve exact omission counts separately and state which enumeration/alias work remains outside that bound.
+
+### 16. Source Admission Can Close A View Before Its Result Is Published
+- **Symptom**: Closing a loaded picker leaves an offered choice usable, or cleanup clears choices but a pending load repopulates them afterward.
+- **Root Cause**: Offered identities have their own lifetime. A loader's final admission callback can synchronously close the view after its cancellation check and before its caller commits those identities. Acceptance also retires the browser signal, so treating every abort as rejected selection breaks accepted reads.
+- **Rule**: Clear offers on the existing cancellation hook, invalidate the load generation, and recheck browser/original cancellation immediately before publishing. Keep accepted selection separate. Test closure from inside post-acquisition admission using real sources, including calls without a browser signal.

@@ -15,6 +15,7 @@ const SKILL_INSPECTION_TIMEOUT_MS = 30_000;
  */
 export function skillPicker(context: CommandContext): Picker {
   let offered = new Set<string>();
+  let generation = 0;
   const isCurrent = (): boolean => {
     try { return !context.signal?.aborted && context.admission?.() === undefined; } catch { return false; }
   };
@@ -28,9 +29,14 @@ export function skillPicker(context: CommandContext): Picker {
     footer: 'Enter to read · Esc to close',
     loadError: unavailable,
     empty: "No skills found. Put a SKILL.md under .agents/skills/<name>/ to add one.",
+    previewEnd() { generation++; offered.clear(); },
     async load(signal?: AbortSignal): Promise<readonly Option[]> {
+      const current = ++generation;
       offered.clear();
       const skills = [...(await readSkillCatalog(context, signal)).values()];
+      signal?.throwIfAborted();
+      context.signal?.throwIfAborted();
+      if (generation !== current) return [];
       offered = new Set(skills.map(skill => skill.name));
       return skills.map<Option>((skill) => ({
         id: skill.name,
