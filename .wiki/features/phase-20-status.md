@@ -11,8 +11,8 @@
 | PRV-03 | 真实账户登录、刷新、失效、退出及跨连接隔离生命周期证据 | 需明确账户/provider、隔离 opt-in 运行条件；合成 token/audience 校验不替代实测 |
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
-| PAN-02 | tree/目录/管理动作已有批次证据；本批把 catalogue 后续页绑定到一次 browse-attempt 的 compact boundary index，不再每页重新 discovery；仍缺跨全部页面的累计 physical I/O 预算及全屏真实 consumer 的 byte-tier heap/响应 | 继续原 catalogue/tree consumer 的累计资源测量；20k panel 样本不等于完整资源闭合 |
-| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；restore 续页使用 attempt-local page index，并复验 cursor revision 与精确 position；初始 metadata 扫描≤32MiB，所有续页 metadata 读取共享不超过初始扫描字节的累计预算，单 attempt 主动 metadata 读取≤64MiB，超限整页拒绝且不重扫目录；损坏/超限 transcript 以只读 partial 展示并禁用导航动作；tree/back 与 cleanse 的完整源读取、累计 physical I/O/heap/平台证据仍缺 | 继续原 navigation/query 的分段取消与累计 physical I/O 测量，不以单 source 上限替代端到端资源证明 |
+| PAN-02 | tree/目录/管理动作已有批次证据；catalogue 后续页绑定一次 browse-attempt 的 compact boundary index，不再每页重新 discovery；一次 attempt 的 metadata/state/transcript body 累计读取≤64MiB，续页共享该预算，超限返回 `sourceLimited` partial 且不再发行 continuation；同一 cursor 并发重放被拒绝；仍缺跨全部页面的累计 physical I/O 测量及全屏真实 consumer 的 byte-tier heap/响应 | 继续原 catalogue/tree consumer 的累计 physical I/O/heap 测量；64MiB 是逻辑源字节准入，不冒充物理 I/O 或总 heap 上界 |
+| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；restore 续页使用 attempt-local page index，并复验 cursor revision 与精确 position；初始 metadata 扫描≤32MiB，所有续页 metadata 读取共享不超过初始扫描字节的累计预算，单 attempt 主动 metadata 读取≤64MiB，超限整页拒绝且不重扫目录；同一 restore cursor 并发重放被拒绝；损坏/超限 transcript 以只读 partial 展示并禁用导航动作；tree/back 与 cleanse 的完整源读取、累计 physical I/O/heap/平台证据仍缺 | 继续原 navigation/query 的分段取消与累计 physical I/O 测量，不以单 source 上限替代端到端资源证明 |
 | PAN-07 | device-code poll 已可被 abort 立即取消且迟到 token 不发布；扩展 unknown outcome 已跨进程 journal 恢复，关闭未 drain 与 cleanup/lifecycle unknown 均阻断后续 mutation；真实账户登录/刷新/失效/退出生命周期仍缺 | 合成协议与扩展持久边界已本地验证；真实认证仍需明确账户/provider 与隔离 opt-in |
 | PAN-08 | 本批补齐 MCP 跨 server 累计 4MiB/10k tools、共享绝对 deadline、peek fail-closed、tools/skill/cost/help/context producer top-N/omitted，以及 context signal 传播和增量 schema 计量；真实 MCP 连接/认证与完整 producer heap/延迟证据仍缺 | 本地 producer 合同已覆盖；真实连接需 server/认证条件，资源结论不扩大为端到端保证 |
 | INPUT-01 | 本批补 Visual/Visual-Line Ctrl+C 复制真实 source selection、paste 文本/图片共享 128项/32MiB预算、device-code 取消及扩展投影总界；仍缺平台真实 IME、系统剪贴板与 Windows 交互 PTY | 本地五模式/字素/长输入合同继续；实机输入法、剪贴板与 Windows 需适用机器 |
@@ -20,6 +20,16 @@
 | QA-02 | Windows 交互 PTY、真实 IME、系统复制、非交互 profile 切换/审批生命周期 | 非交互合同可本地继续；Windows/IME/系统复制需适用机器和终端 |
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
+
+## 2026-10-24 PAN-02/PAN-06 累计源预算与 continuation one-use（代码批已推送；CI/Watch success）
+
+- `SessionCatalog` 新增 attempt-local 64MiB 逻辑源预算。每个 metadata/state/transcript 文件在分配和读取 body 前按 opened expected size 计费；失败不退款，续页共享同一预算。达到上限时返回 `sourceLimited: true` 的 `partial` 结果并停止发行 continuation，不把源拒绝伪装成空目录或 complete。
+- Session catalogue 与 restore catalogue 的 continuation 都改为一次消费：同一 cursor 在首轮读取完成前被并发重放时直接拒绝。成功返回下一页 cursor 后才释放下一次 claim；失败、取消或超限保持已消费，要求重新打开 picker。
+- 聚焦测试覆盖 exact budget、非法字节数、取消、累计续页超限、并发重放和 partial/end 状态；反向移除字节 admit 或移除任一 claim 检查均产生真实 AssertionError，恢复后通过。最终 11 文件/187 项 catalogue/picker 聚焦测试、`test:scripts` 157 项、`verify:result-contract` 6 套/158 项、CLI 入口 19 项和静态门禁通过。
+- build `178e73e86fd3304ae081bfe85bc401c7aa2d91341e4c9b5a719b15b288ca35fc`，inputs `35cd988d32dbc2a376fcf1fa4d61061a545a84a4012858ed5c3b384f2446df04`，artifact `c12b2e48b8f9453a205077d4b31f26a3a9634dfc5b3bee9973618e8ee43e3859`，exe SHA-256 `30a1f9fa83fb6119585594177f0c9acfd7c942af099a6d01ae5c24c6ec0a206b`。同 build Node/exe × regular/fullscreen 四格 PTY 全部 pass/exit0，`catalogChecks` 均为 45 matches、40 fixed page、older page 可达且取消后文件不变；证据目录 `.omx/artifacts/phase20-catalog-budget-178e73e86fd3/`。
+- 首个代码批 `bfcbf42653f561dc849053ad68aec2763b43f211` 已推送并精确读回远端 `main`。CI `40044155393` / job `120721880231` 于 2026-10-24T00:16:31Z–00:34:17Z completed/failure；全量测试为 954 个文件通过、1 个失败，10,311 项通过、1 项失败。唯一失败是 `restore.test.ts` 在已消费 cursor 上继续期待 `changed`，实际 one-use 保护返回 `Snapshot page is already being read`；这是测试未适配新合同，不是把并发重放放宽为允许。同 SHA Watch `40044155433` / job `120721880146` 于 00:16:31Z–00:16:53Z completed/success。
+- 测试对齐提交 `ea3c1fae71398da1aaf1dea655b8589f04a621c5` 先创建独立 continuation，再修改 ledger，保留真实 revision-change 断言，未削弱 one-use claim。该提交已推送并精确读回远端 `main`；CI `40045727856` / job `120726879977` 于 2026-10-24T00:35:27Z–00:48:52Z completed/success（13m22s），覆盖其父提交中的产品实现；Watch `40045727887` / job `120726879841` 于 00:35:27Z–00:36:04Z completed/success。两项只绑定 `ea3c1fae`，不回溯改写 `bfcbf426` 的失败记录。
+- 本批只证明逻辑源字节准入与 cursor 生命周期，不证明 OS physical I/O、page-cache 行为、总 heap、最长响应或跨平台；PAN-02/PAN-06 及 Phase 20 仍保持 `35 complete / 12 partial / 0 open`。
 
 ## 2026-10-24 QA-01/PAN-06 跨任务预算与 restore 累计读取（代码批 `3cf010da` 已推送；CI/Watch success）
 
