@@ -54,7 +54,8 @@ describe("browser process owners use native lifetime", () => {
       import { spawn } from 'node:child_process';
       import fs from 'node:fs';
       const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
-      fs.writeFileSync(${JSON.stringify(marker)}, JSON.stringify([process.pid, child.pid]));
+      fs.writeFileSync(${JSON.stringify(marker + '.pending')}, JSON.stringify([process.pid, child.pid]));
+      fs.renameSync(${JSON.stringify(marker + '.pending')}, ${JSON.stringify(marker)});
       setInterval(() => {}, 1000);
     `.replaceAll("import { spawn } from 'node:child_process';", owner === "runtime" ? "import { spawn } from 'node:child_process';" : "const { spawn } = require('node:child_process');")
       .replaceAll("import fs from 'node:fs';", owner === "runtime" ? "import fs from 'node:fs';" : "const fs = require('node:fs');"));

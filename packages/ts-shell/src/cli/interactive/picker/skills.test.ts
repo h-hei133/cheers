@@ -19,6 +19,47 @@ const result = (...skills: Skill[]): catalog.SkillCatalogResult => ({ skills: ne
 afterEach(() => vi.restoreAllMocks());
 
 describe('skill inspection', () => {
+  it('withholds source failure when fallback admission cancels the settled command', async () => {
+    const commands = new ShellCommandRuntime(); let controller: AbortController | undefined;
+    const read = vi.spyOn(catalog, 'resolveSkillCatalog').mockResolvedValueOnce(result(skill()));
+    const picker = skillPicker({ cwd: '/fixture', runCancellable: operation => commands.run(operation),
+      admission: () => { controller?.abort(); return undefined; } });
+    await picker.load();
+    read.mockImplementationOnce(async () => { controller = commands.current!.controller; throw new Error('PRIVATE_SOURCE'); });
+    expect(await picker.apply(['fixture'])).toBeUndefined(); expect(controller?.signal.aborted).toBe(true);
+  });
+
+  it('withholds accepted body when final publication admission cancels the command', async () => {
+    const commands = new ShellCommandRuntime(), original = new AbortController(), body = vi.fn(() => 'instructions');
+    const item = { ...skill(), get body() { return body(); } }; let acquired = false, checks = 0;
+    const read = vi.spyOn(catalog, 'resolveSkillCatalog').mockResolvedValue(result(item));
+    const picker = skillPicker({ cwd: '/fixture', signal: original.signal,
+      runCancellable: operation => commands.run(operation),
+      admission: () => { if (acquired && ++checks === 2) commands.current!.controller.abort(); return undefined; },
+    });
+    await picker.load();
+    read.mockImplementationOnce(async () => { acquired = true; return result(item); });
+    expect(await picker.apply([item.name])).toBeUndefined();
+    expect(body).not.toHaveBeenCalled(); expect(original.signal.aborted).toBe(false);
+  });
+
+  it('silently cancels an accepted command while the original picker signal stays live', async () => {
+    const original = new AbortController(), commands = new ShellCommandRuntime(), item = skill();
+    const read = vi.spyOn(catalog, 'resolveSkillCatalog').mockResolvedValueOnce(result(item));
+    const picker = skillPicker({ cwd: '/fixture', signal: original.signal,
+      runCancellable: operation => commands.run(operation) });
+    await picker.load();
+    read.mockImplementationOnce(async options => {
+      await new Promise((_resolve, reject) => options.abortSignal!.addEventListener('abort', () => reject(options.abortSignal!.reason), { once: true }));
+      return result(item);
+    });
+    const pending = picker.apply([item.name]);
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+    commands.current!.controller.abort(new Error('PRIVATE_CANCELLATION'));
+    expect(await pending).toBeUndefined(); expect(original.signal.aborted).toBe(false);
+    expect(commands.current).toBeUndefined(); expect(picker.isCurrent?.()).toBe(true);
+  });
+
   it.each(['list', 'named'])('withholds direct skill output after final admission cancels %s', async mode => {
     const args = mode === 'list' ? [] : ['fixture'];
     const controller = new AbortController(); let checks = 0;

@@ -34,6 +34,8 @@
 
 2026-10-24 PAN-07/PAN-08直接检查取消补证：tools/skill解析成功后进入现有command owner、合并原signal，两次admission回调后及endpoint配置后重检；debug summary/tools沿单一owner、共享readToolPool，内部tools不重复注册，catch仅在signal/admission仍有效时降级unavailable。真实route/gateway port与held64KiB manifest取消、picker原signal/迟到结果回归覆盖；7文件135项、七项AssertionError反转、静态门和TS build串行通过，APPROVE/CLEAR。accepted tools/skill及真实pickerHost的owner接入仍为下一批本地缺口；不证明任意贡献Promise drain、真实认证、全目录options或总资源界，35complete/12partial保持。构建digest与精确SHA交付见status。
 
+2026-10-24 PAN-07/PAN-08 accepted动作取消补证：真实pickerHost接入原commands.run，held input只对已有command开放interrupt/clear action，keymap识别local owner且idle interrupt等待cancelAndWait；tools/skill合并原signal/command/timeout，成功/fallback的admission回调后均重核。真实终端tools Ctrl+C/Escape、debug Ctrl+C与held64KiB skill descriptor drain、小body成功，另有pure-command取消及reentrant回归。八有效AssertionError反转、7文件178项、静态门/TS build串行通过，APPROVE/CLEAR；此前大body成功render主动终止，不计验证。CI旧SHA的browser marker创建/写入竞态只修test fixture为完整写完后rename，双PID与cleanup断言不变。本地剩余收敛为原producer合法overflow的可读partial，外部认证/平台仍原范围；矩阵不提高。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

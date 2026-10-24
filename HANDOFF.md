@@ -99,3 +99,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Ctrl+C cancels an inner tool inspection, but its debug caller publishes an unavailable report; a summary can also skip the shared reader's admission checks.
 - **Root Cause**: A catch-all source fallback treats cancellation and expired admission as ordinary source failure. Adding an owner to both delegate and caller can also create nested registration.
 - **Rule**: Keep one command owner across delegated inspection, recheck its signal/admission before fallback, and reuse the shared read owner. Test cancellation through the actual route separately from ordinary unavailable-source behavior.
+
+### 19. A Registered Picker Command Can Still Be Unreachable From The Keyboard
+- **Symptom**: An accepted read has a real command controller but terminal Ctrl+C never aborts it, or an idle interrupt only invalidates the result without draining acquisition.
+- **Root Cause**: Held input can swallow cancellation keys, and keymap/interrupt dispatch can consider only foreground turn busy state.
+- **Rule**: Test Enter and configured interruption through the actual terminal host. Permit interruption actions through held input only for an existing command owner, include it in interruptibility, and await its existing settlement boundary; preserve unrelated held drafts.
+
+### 20. Marker Existence Is Not A Completed Readiness Payload
+- **Symptom**: A process cancellation test finds its ready file but later reads empty/truncated JSON.
+- **Root Cause**: File creation becomes visible before writeFileSync has written and closed the marker; cancellation can kill the writer in that interval.
+- **Rule**: Publish readiness only after the complete payload is written, using a same-directory rename, or wait for a fully validated payload before cancelling. Keep the original process-cleanup assertions.

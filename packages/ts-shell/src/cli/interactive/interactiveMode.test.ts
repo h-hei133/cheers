@@ -3,11 +3,14 @@ import type { Pager } from '../../presentation/tui/chrome/pager.js';
 import { withConfiguration } from "../../test-utils/configuration.js";
 import { completionEdit } from "./completion.js";
 import { describe, expect, it, vi } from "vitest";
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { InteractiveMode } from "./interactiveMode.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
-import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
+import { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
@@ -73,6 +76,7 @@ function build(overrides: {
       runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64_000, configDiagnostics: [] },
     } as unknown as ShellRuntimeContext),
     sessionRuntime: {
+      commands: new ShellCommandRuntime(),
       observeEvents: overrides.observeEvents ?? (() => () => {}),
       cancelCurrentRun: () => {},
       getAgentMode: () => "build",
@@ -97,6 +101,141 @@ function build(overrides: {
 }
 
 describe("session wiring", () => {
+  it('keeps the draft held when a pending picker has no interruptible command owner', async () => {
+    const { mode, terminal } = build(); let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView; pickerInputPending: Map<number, number> };
+    mode.start();
+    try {
+      host.view.editor.setText('keep this draft');
+      host.overlay.open({ title: 'Read', holdInput: true, load: async () => [{ id: 'read', label: 'Read' }],
+        apply: async () => { await gate; return undefined; } });
+      await vi.waitFor(() => expect(host.overlay.render(100, 24).join('\n')).toContain('Read'));
+      terminal.input('\r');
+      await vi.waitFor(() => expect(host.pickerInputPending.size).toBe(1));
+      terminal.input('\x03'); expect(host.view.editor.getText()).toBe('keep this draft');
+      release(); await vi.waitFor(() => expect(host.pickerInputPending.size).toBe(0));
+    } finally { release(); mode.stop(); }
+  });
+
+  it.each([
+    { command: 'tools', key: '\x03', gesture: 'Ctrl+C' },
+    { command: 'tools', key: '\x1b', gesture: 'Escape' },
+    { command: 'debug', key: '\x03', gesture: 'Ctrl+C' },
+  ])('cancels accepted $command inspection through real terminal $gesture', async ({ command, key }) => {
+    const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
+    const root = fs.mkdtempSync(path.join(scratch, 'accepted-tools-'));
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const { mode, renderer, terminal } = build();
+    const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView; pickerInputPending: Map<number, number>;
+      onSubmit(text: string): void; options: { runtimeContext: ShellRuntimeContext; sessionRuntime: ShellSessionRuntime;
+        sessionManager: SessionManager; initialMcpGateway: CliMcpGateway } };
+    const context = host.options.runtimeContext;
+    Object.assign(context, { cwd: root, projectRoot: root, skillOptions: { noSkills: true },
+      runtimeConfig: { ...context.configuration.current.config, enableMcpTools: true, allowedTools: ['mcp__fixture__Read'] } });
+    const binding = configurationBinding(context);
+    context.configuration.publish(context.configuration.begin(binding), context.runtimeConfig, binding);
+    const provider = vi.fn(() => { throw new Error('Unexpected provider call'); });
+    const runtime = new ShellSessionRuntime({ sessionManager: host.options.sessionManager, renderer, runPrompt: provider });
+    host.options.sessionRuntime = runtime;
+    let signal: AbortSignal | undefined, release!: () => void, entered = false, finished = false, calls = 0;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    Object.assign(host.options.initialMcpGateway, { snapshot: async (_admission: unknown, current?: AbortSignal) => {
+      if (++calls === (command === 'tools' ? 2 : 1)) {
+        signal = current; entered = true;
+        try { await gate; signal?.throwIfAborted(); } finally { finished = true; }
+      }
+      return { clients: [], tools: [{ serverName: 'fixture', toolName: 'Read', qualifiedName: 'mcp__fixture__Read',
+        description: 'Read fixture metadata' }] };
+    } });
+    mode.start();
+    try {
+      host.onSubmit('/' + command);
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n')))
+        .toContain(command === 'tools' ? 'mcp__fixture__Read' : 'summary'));
+      (host.overlay as unknown as { model: { focus(id: string): void } }).model.focus(command === 'tools' ? 'mcp__fixture__Read' : 'tools');
+      host.view.editor.setText('original draft'); terminal.input('\r');
+      await vi.waitFor(() => expect(entered).toBe(true));
+      expect(host.overlay.active).toBe(false); expect(runtime.commands.current).toBeDefined();
+      expect(signal?.aborted).toBe(false); const before = [...host.view.transcript.all()];
+      if (command === 'tools') {
+        terminal.input('x\x1b[200~ignored paste\x1b[201~'); expect(host.view.editor.getText()).toBe('original draft');
+      }
+      terminal.input(key);
+      await vi.waitFor(() => expect(signal?.aborted).toBe(true));
+      expect(runtime.commands.current).toBeDefined(); expect(finished).toBe(false);
+      release(); await vi.waitFor(() => expect(runtime.commands.current).toBeUndefined());
+      await vi.waitFor(() => expect(host.pickerInputPending.size).toBe(0));
+      expect(finished).toBe(true); expect(host.view.transcript.all()).toEqual(before);
+      expect(host.view.editor.getText()).toBe('original draft'); expect(provider).not.toHaveBeenCalled();
+    } finally {
+      runtime.commands.current?.controller.abort(); release(); await runtime.commands.current?.settled.catch(() => {});
+      mode.stop(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['cancel', 'complete'])('keeps an accepted skill manifest owned until %s settles', async outcome => {
+    const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
+    const root = fs.mkdtempSync(path.join(scratch, 'accepted-skill-'));
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const file = path.join(root, 'SKILL.md');
+    const body = 'x'.repeat(outcome === 'cancel' ? 128 * 1024 : 32);
+    fs.writeFileSync(file, '---\nname: fixture\ndescription: Fixture instructions\n---\n' + body);
+    const beforeSource = fs.readFileSync(file), { mode, renderer, terminal } = build();
+    const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView; pickerInputPending: Map<number, number>;
+      onSubmit(text: string): void; options: { runtimeContext: ShellRuntimeContext; sessionRuntime: ShellSessionRuntime; sessionManager: SessionManager } };
+    const context = host.options.runtimeContext;
+    Object.assign(context, { cwd: root, projectRoot: root, skillOptions: { noSkills: true, skillPaths: [file] } });
+    const binding = configurationBinding(context);
+    context.configuration.publish(context.configuration.begin(binding), context.configuration.current.config, binding);
+    const provider = vi.fn(() => { throw new Error('Unexpected provider call'); });
+    const runtime = new ShellSessionRuntime({ sessionManager: host.options.sessionManager, renderer, runPrompt: provider });
+    host.options.sessionRuntime = runtime;
+    let opened = 0, closed = 0, acceptedBytes = 0, release!: () => void, entered = false;
+    const gate = new Promise<void>(resolve => { release = resolve; }), open = fs.promises.open.bind(fs.promises);
+    const observed = vi.spyOn(fs.promises, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args); if (String(args[0]) !== file) return handle;
+      const accepted = ++opened === 2, read = handle.read.bind(handle), close = handle.close.bind(handle);
+      handle.read = (async (buffer: Buffer, offset: number, length: number, position: number) => {
+        const result = await read(buffer, offset, length, position);
+        if (accepted) { acceptedBytes += result.bytesRead; entered = true; await gate; }
+        return result;
+      }) as typeof handle.read;
+      handle.close = async () => { await close(); closed++; }; return handle;
+    });
+    mode.start();
+    try {
+      host.onSubmit('/skill');
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).toContain('fixture'));
+      host.view.editor.setText('original draft'); terminal.input('\r');
+      await vi.waitFor(() => expect(entered).toBe(true));
+      expect(runtime.commands.current).toBeDefined(); expect(acceptedBytes).toBe(Math.min(64 * 1024, beforeSource.length)); expect(closed).toBe(1);
+      const before = [...host.view.transcript.all()];
+      terminal.input('x\x1b[200~ignored paste\x1b[201~');
+      expect(host.view.editor.getText()).toBe('original draft');
+      if (outcome === 'cancel') {
+        terminal.input('\x03');
+        await vi.waitFor(() => expect(runtime.commands.current?.controller.signal.aborted).toBe(true));
+      }
+      expect(closed).toBe(1); release();
+      await vi.waitFor(() => expect(runtime.commands.current).toBeUndefined());
+      await vi.waitFor(() => expect(host.pickerInputPending.size).toBe(0));
+      expect(opened).toBe(2); expect(closed).toBe(2);
+      if (outcome === 'cancel') {
+        expect(acceptedBytes).toBe(64 * 1024);
+        expect(host.view.transcript.all()).toEqual(before); expect(host.view.editor.getText()).toBe('original draft');
+      } else {
+        expect(acceptedBytes).toBe(beforeSource.length);
+        expect(host.view.transcript.last()?.text).toContain(body);
+        expect(host.view.editor.getText()).toBe('/skill fixture ');
+      }
+      expect(fs.readFileSync(file)).toEqual(beforeSource); expect(provider).not.toHaveBeenCalled();
+    } finally {
+      runtime.commands.current?.controller.abort(); release(); await runtime.commands.current?.settled.catch(() => {});
+      mode.stop(); observed.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("drops a status preview when an external configuration publication advances", () => {
     const { mode } = build();
     const host = mode as unknown as {

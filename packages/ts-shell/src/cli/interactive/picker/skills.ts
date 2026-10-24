@@ -17,7 +17,7 @@ export function skillPicker(context: CommandContext): Picker {
   let offered = new Set<string>();
   let generation = 0;
   const isCurrent = (): boolean => {
-    try { return !context.signal?.aborted && context.admission?.() === undefined; } catch { return false; }
+    try { return !context.signal?.aborted && context.admission?.() === undefined && !context.signal?.aborted; } catch { return false; }
   };
   const unavailable = 'Skill catalog unavailable. Reopen /skill to retry.';
   return {
@@ -49,14 +49,23 @@ export function skillPicker(context: CommandContext): Picker {
       const chosen = ids[0];
       if (ids.length !== 1 || !chosen || !offered.has(chosen) || !isCurrent()) return undefined;
       offered.clear();
+      let commandSignal: AbortSignal | undefined;
       try {
-        const skill = (await readSkillCatalog(context, AbortSignal.timeout(SKILL_INSPECTION_TIMEOUT_MS))).get(chosen);
-        if (!isCurrent()) return undefined;
-        if (!skill) return { note: 'This skill is no longer available. Reopen /skill to refresh.' };
-        const draft = skillDraft(skill.name, context.cwd);
-        return { note: skillInstructions(skill, context.cwd) + (draft ? '' : '\n\nNo draft was inserted because this skill name cannot be displayed unchanged.'),
-          ...(draft ? { draft } : {}) };
-      } catch { return isCurrent() ? { note: unavailable } : undefined; }
+        const inspect = async (signal?: AbortSignal): Promise<PickerOutcome | undefined> => {
+          commandSignal = signal;
+          const timeout = AbortSignal.timeout(SKILL_INSPECTION_TIMEOUT_MS);
+          const current = signal ? AbortSignal.any([signal, timeout]) : timeout;
+          const skill = (await readSkillCatalog(context, current)).get(chosen);
+          current.throwIfAborted();
+          if (!isCurrent()) return undefined;
+          current.throwIfAborted();
+          if (!skill) return { note: 'This skill is no longer available. Reopen /skill to refresh.' };
+          const draft = skillDraft(skill.name, context.cwd);
+          return { note: skillInstructions(skill, context.cwd) + (draft ? '' : '\n\nNo draft was inserted because this skill name cannot be displayed unchanged.'),
+            ...(draft ? { draft } : {}) };
+        };
+        return context.runCancellable ? await context.runCancellable(inspect) : await inspect();
+      } catch { return !commandSignal?.aborted && isCurrent() && !commandSignal?.aborted ? { note: unavailable } : undefined; }
     },
   };
 }

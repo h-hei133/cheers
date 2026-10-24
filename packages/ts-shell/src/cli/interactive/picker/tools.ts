@@ -11,7 +11,7 @@ const TOOL_INSPECTION_TIMEOUT_MS = 30_000;
 /** Selection opens documentation; it cannot call a tool or grant permission. */
 export function toolsPicker(context: CommandContext): Picker {
   const isCurrent = (): boolean => {
-    try { return !context.signal?.aborted && context.admission?.() === undefined; } catch { return false; }
+    try { return !context.signal?.aborted && context.admission?.() === undefined && !context.signal?.aborted; } catch { return false; }
   };
   return {
     isCurrent,
@@ -30,13 +30,23 @@ export function toolsPicker(context: CommandContext): Picker {
     },
     async apply(ids) {
       if (!ids[0] || !isCurrent()) return undefined;
+      let commandSignal: AbortSignal | undefined;
       try {
-        // Re-resolve exact identity: a removed mixed-case tool must not open a
-        // different lower-case tool or documentation from an obsolete pool.
-        const tool = (await readToolPool(context, AbortSignal.timeout(TOOL_INSPECTION_TIMEOUT_MS))).get(ids[0]);
-        return tool ? { report: toolReport(tool, context.cwd) }
-          : { note: 'This tool is no longer available. Reopen /tools to refresh.' };
-      } catch { return isCurrent() ? { note: UNAVAILABLE } : undefined; }
+        const inspect = async (signal?: AbortSignal) => {
+          commandSignal = signal;
+          const timeout = AbortSignal.timeout(TOOL_INSPECTION_TIMEOUT_MS);
+          const current = signal ? AbortSignal.any([signal, timeout]) : timeout;
+          // Re-resolve exact identity: a removed mixed-case tool must not open a
+          // different lower-case tool or documentation from an obsolete pool.
+          const tool = (await readToolPool(context, current)).get(ids[0]);
+          current.throwIfAborted();
+          if (!isCurrent()) return undefined;
+          current.throwIfAborted();
+          return tool ? { report: toolReport(tool, context.cwd) }
+            : { note: 'This tool is no longer available. Reopen /tools to refresh.' };
+        };
+        return context.runCancellable ? await context.runCancellable(inspect) : await inspect();
+      } catch { return !commandSignal?.aborted && isCurrent() && !commandSignal?.aborted ? { note: UNAVAILABLE } : undefined; }
     },
   };
 }

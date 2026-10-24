@@ -14,6 +14,42 @@ const fixture = () => ({ name: 'mcp__notes__Read', description: 'Read a note.\nR
   mcpAnnotations: { readOnlyHint: true }, execute: vi.fn(async () => ({ success: true })) });
 
 describe('tool inspection', () => {
+  it('withholds source failure when fallback admission cancels the settled command', async () => {
+    const commands = new ShellCommandRuntime(); let controller: AbortController | undefined;
+    const picker = toolsPicker({ cwd: '/fixture', runCancellable: operation => commands.run(operation),
+      getToolPool: async () => { controller = commands.current!.controller; throw new Error('PRIVATE_SOURCE'); },
+      admission: () => { controller?.abort(); return undefined; },
+    });
+    expect(await picker.apply(['fixture'])).toBeUndefined(); expect(controller?.signal.aborted).toBe(true);
+  });
+
+  it('withholds accepted metadata when final publication admission cancels the command', async () => {
+    const commands = new ShellCommandRuntime(), original = new AbortController(), description = vi.fn(() => 'metadata');
+    const item = { ...fixture(), get description() { return description(); } }; let acquired = false, checks = 0;
+    const picker = toolsPicker({ cwd: '/fixture', signal: original.signal,
+      runCancellable: operation => commands.run(operation),
+      getToolPool: async () => { acquired = true; return new Map([[item.name, item]]); },
+      admission: () => { if (acquired && ++checks === 2) commands.current!.controller.abort(); return undefined; },
+    });
+    expect(await picker.apply([item.name])).toBeUndefined();
+    expect(description).not.toHaveBeenCalled(); expect(original.signal.aborted).toBe(false);
+  });
+
+  it('silently cancels an accepted command while the original picker signal stays live', async () => {
+    const original = new AbortController(), commands = new ShellCommandRuntime();
+    const pool = vi.fn(async (signal?: AbortSignal) => {
+      await new Promise((_resolve, reject) => signal!.addEventListener('abort', () => reject(signal!.reason), { once: true }));
+      return new Map();
+    });
+    const picker = toolsPicker({ cwd: '/fixture', signal: original.signal, getToolPool: pool,
+      runCancellable: operation => commands.run(operation) });
+    const pending = picker.apply(['fixture']);
+    await vi.waitFor(() => expect(pool).toHaveBeenCalledOnce());
+    commands.current!.controller.abort(new Error('PRIVATE_CANCELLATION'));
+    expect(await pending).toBeUndefined(); expect(original.signal.aborted).toBe(false);
+    expect(commands.current).toBeUndefined(); expect(picker.isCurrent?.()).toBe(true);
+  });
+
   it('withholds picker metadata after final admission aborts the original signal', async () => {
     const original = new AbortController(), description = vi.fn(() => 'Read metadata'); let checks = 0;
     const item = { ...fixture(), get description() { return description(); } };

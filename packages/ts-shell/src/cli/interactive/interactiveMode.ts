@@ -572,7 +572,10 @@ export class InteractiveMode {
 
   private onKey(event: Parameters<typeof routeKey>[0]): void {
     this.options.onUserIntent?.();
-    if (this.pickerInputPending.has(this.overlay.revision) && !this.overlay.active) return;
+    if (this.pickerInputPending.has(this.overlay.revision) && !this.overlay.active) {
+      const action = this.preferences.keybindings.actionFor(event.keyId);
+      if (!this.options.sessionRuntime.commands?.current || (action !== 'app.interrupt' && action !== 'app.clear')) return;
+    }
     this.catalogs.cancel();
     this.completionStatus = undefined;
     // An open picker owns the keyboard: it needs the arrows, Enter, Escape, and
@@ -611,7 +614,8 @@ export class InteractiveMode {
     routeKey(event, {
       view: this.view,
       busy: this.busy,
-      interruptible: Boolean(schedulerForRuntime(this.options.sessionRuntime)?.ownerToken()) || directorInterruptible(this.options.runtimeContext),
+      interruptible: Boolean(this.options.sessionRuntime.commands?.current)
+        || Boolean(schedulerForRuntime(this.options.sessionRuntime)?.ownerToken()) || directorInterruptible(this.options.runtimeContext),
       now: () => Date.now(),
       gesture: this.gesture,
       keybindings: this.preferences.keybindings,
@@ -1154,6 +1158,7 @@ export class InteractiveMode {
     };
     return {
       commandContext: {
+        runCancellable: operation => this.options.sessionRuntime.commands.run(operation),
         admission: selectionAdmission,
         ...(signal ? { signal } : {}),
         projectRoot: this.options.runtimeContext.projectRoot,
@@ -1263,6 +1268,10 @@ export class InteractiveMode {
   private async interrupt(): Promise<void> {
     this.selectionRevision++;
     if (!this.busy) {
+      if (this.options.sessionRuntime.commands?.current) {
+        await this.options.sessionRuntime.cancelAndWait();
+        return;
+      }
       if (schedulerForRuntime(this.options.sessionRuntime)?.ownerToken() || directorInterruptible(this.options.runtimeContext) || evaluationInterruptible(this.options.runtimeContext) || mediaInterruptible(this.options.runtimeContext)) this.options.sessionRuntime.cancelCurrentRun();
       return;
     }
