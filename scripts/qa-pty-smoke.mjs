@@ -18,6 +18,7 @@ import { seedRecoverySession, seedSavedSession, extractSessionId, currentSession
   SAVED_ASSISTANT_MARKDOWN, SAVED_DIFF_OLD, SAVED_DIFF_NEW } from "./qa/session.mjs";
 import { seedRestoreSnapshot, assertRestoreUnchanged, runRestorePreview } from './qa/restore.mjs';
 import { terminalSpawnSpec } from './qa/terminal.mjs';
+import { copyDiffSources } from './qa/clipboard.mjs';
 import { rejectStaleSelection, browseSavedTree, browseSessionPages, manageSavedSession } from './qa/selection.mjs';
 import { checkBuild } from './start-lib.mjs';
 
@@ -413,24 +414,9 @@ async function runTerminalSmoke(target, mode) {
     }
 
     if (mode === "fullscreen") {
-      // The diff is the last transcript block here, so its row remains at the
-      // fixed fullscreen fixture coordinate until another command is entered.
-      const diffCopyStart = state.output.length;
-      child.stdin.write("\x1b[<0;15;55M");
-      child.stdin.write("\x1b[<0;15;55m");
-      await waitForOutput(() => state.output.slice(diffCopyStart),
-        value => value.includes("\x1b]52;c;"),
-        "old-side diff source copy");
-      child.stdin.write("\x1b[<0;70;55M");
-      child.stdin.write("\x1b[<0;70;55m");
-      await waitForOutput(() => state.output.slice(diffCopyStart),
-        value => [...value.matchAll(/\x1b\]52;c;([A-Za-z0-9+/=]+)\x07/g)].length >= 2,
-        "new-side diff source copy");
-      const copiedSides = [...state.output.slice(diffCopyStart).matchAll(/\x1b\]52;c;([A-Za-z0-9+/=]+)\x07/g)]
-        .map(match => Buffer.from(match[1], "base64").toString("utf8"));
-      if (copiedSides[0] !== SAVED_DIFF_OLD || copiedSides[1] !== SAVED_DIFF_NEW) {
-        throw new Error(`side-by-side source copy mismatch: ${JSON.stringify(copiedSides)}`);
-      }
+      await copyDiffSources({ read: () => state.output.slice(start),
+        write: data => child.stdin.write(data), waitForOutput, normalize: normalized,
+        oldSource: SAVED_DIFF_OLD, newSource: SAVED_DIFF_NEW });
     }
 
     const copyStart = state.output.length;

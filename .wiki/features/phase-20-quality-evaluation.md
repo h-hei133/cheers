@@ -13,6 +13,8 @@ confidence: high
 
 本文固定 QA-03 与 TOOL-02 后续真实模型评估的样本、对照、指标和报告格式。当前有预注册、20 项正式 corpus、四语言 tokenizer corpus 和 `npm run qa:quality` 的本地 harness；真实 provider 运行、双人盲评和真实成本/缓存证据仍未完成。合成 provider、PTY、单元测试和 `bench:responsiveness` 只证明确定性实现与资源路径，不能兑换本节质量结论。
 
+2026-10-24 用户现有配置的单次真实连通探针已经成功：原CLI在隔离home/project内返回预定标记，ledger记录一条turn request，provider/model为 `openai-compatible` / `auto`，无工具调用。详见[真实连接记录](phase-20-status.md#2026-10-24-用户指定真实连接与平台探针修复)。这只关闭“配置是否能请求”的疑问；没有full/dynamic配对、固定实际模型版本、四语言校准、可信结算或双盲评分，不计入本协议正式样本，以上正式质量未验状态不变。
+
 ## 0. 当前可执行边界
 
 - `npm run qa:quality -- --real --runs 5` 会要求 `CHEERS_PHASE20_QUALITY=1`、`CHEERS_REAL_HOME`、clean worktree 和新鲜单文件构建；不满足时只写 `inconclusive` 报告并退出非零。

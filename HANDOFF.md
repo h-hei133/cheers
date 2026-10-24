@@ -119,3 +119,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A queued back test presses Enter after the overlay is active/title visible, then observes no rewind call under CI load.
 - **Root Cause**: Opening publishes the overlay immediately; asynchronous source acquisition/projection and focus settle later. The title does not establish selectable state.
 - **Rule**: Before confirming a specific choice, wait for its actual focused stable ID. Preserve separate dismissal-during-loading coverage and the original queue/operation assertions. Metadata fixtures must also respect the per-record byte cap including JSON overhead, independently of the whole-catalogue budget.
+
+### 23. OSC52 Emission Can Precede A Copy Result That Moves Source Rows
+- **Symptom**: A fullscreen probe copies one diff side, then clicking the same fixed row for the other side produces no second clipboard sequence.
+- **Root Cause**: OSC52 is offered before asynchronous native clipboard attempts settle. The result toast adds chrome and moves the source row; a former source coordinate can now be blank. Transport output alone does not prove the result frame or its geometry is ready.
+- **Rule**: Before the next coordinate action, wait for the actual result paint and locate its current source row. For this renderer, consume complete CUP(row,1)…K rewrites, retire incomplete overwrites, and honor its CUP+J erase. Preserve exact ordered source-content assertions; do not replace readiness with a delay or another fixed row.

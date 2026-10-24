@@ -8,19 +8,30 @@
 
 | ID | 尚缺证据 | 所需输入或结束条件 |
 |---|---|---|
-| PRV-03 | 真实账户登录、刷新、失效、退出、跨连接隔离 | 指定账户/provider及隔离opt-in条件 |
+| PRV-03 | 真实账户登录、刷新、失效、退出、跨连接隔离 | 现有provider配置已成功发起一次真实请求；完整生命周期还需适用的OAuth/device账户及隔离条件 |
 | PRV-05 | 可信远端结算/账单与本地ledger对照 | 可信结算来源、可比较账期 |
 | TOOL-02 | 同模型full/dynamic真实配对、总量/cache成本、参数质量、四语言校准 | 固定模型/协议、预算和正式评测条件 |
 | PAN-06 | 实际系统剪贴板/平台接受结果 | 适用终端与系统复制实测；本地copy/back/restore/undo/cleanse有限生命周期已覆盖 |
-| PAN-07 | 真实认证完整生命周期 | 指定账户/provider及隔离opt-in；本地device poll/extension/unknown恢复已覆盖 |
-| PAN-08 | 真实MCP连接和认证 | 目标server、认证方式及运行条件；本地consumer、accepted owner和合法overflow已覆盖 |
+| PAN-07 | 真实认证完整生命周期 | 现有配置可请求；登录/刷新/退出还需适用的真实OAuth/device账户；本地device poll/extension/unknown恢复已覆盖 |
+| PAN-08 | 认证型HTTP MCP的真实认证生命周期 | 用户指定stdio服务已完成两轮连接/只读调用/进程关闭；该transport无OAuth，不替代认证型HTTP server验收 |
 | INPUT-01 | 真实IME、系统复制、Windows交互终端 | 适用机器、终端、输入法；本地五模式/字素/粘贴/源选区/外编合同已有证据 |
 | QA-01 | 上述真实账户/账单/质量/平台任务的适用验收 | 本地47行成功/拒绝/竞态/关键反转索引已有限复核；随对应外部任务补证，不重复发明本地组合 |
-| QA-02 | Windows交互PTY、真实IME、系统复制 | 适用平台与终端；已有20格支持矩阵保留 |
+| QA-02 | Windows交互PTY、真实IME、系统复制及当前平台修复复验 | 本轮远端20格为17 pass /2 fail /1 skipped；失败固定坐标已修探针，新的跨平台结果另取证 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
 | QA-04 | 全范围最终交付、精确SHA CI及结构/双构建/全套证据 | 外部验收完成后收口；当前历史CI失败保留，新SHA结果独立读回；不要求公开Release |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
+
+## 2026-10-24 用户指定真实连接与平台探针修复
+
+- 基于源码 `7bff50a4fe9ff44729247ffab455f48b8ce4d3b5` 及原 TS build `612f7166d0b41ab4e0b694d41922c965bb3db1cc5fc94506b77c0b9984c17b58`（inputs `6b7f3f0eab6a0609d2915907d6d0d8804d2f695e5e2d27adb4ff90220a16bb6c`、artifact `f7f1ce062002083170299bf59d9807c1c71d19135ac54aa848a1e7f7c19ed67a`）进行了真实验收。用户已指定本机 stdio MCP executable 和现有 provider 配置，并授权正常运行时调用。两者串行，HOME/USERPROFILE/XDG/session/cache/fixture均隔离；未打印密钥、token、headers或真实响应正文。
+- 真实 stdio MCP 经原 `CoreMcpGateway` 两轮连接，每轮发现23个工具；`search_for_pattern` 只读查找隔离项目 `probe.ts` 的已知标记，每次响应136 bytes、SHA-256 `057301218042488b3aea0d9fd8c90ef50e86d028176efd7504caeacf39ed0a34`。每轮 `gateway.close()` 后真实PID均为ESRCH，fixture源码bytes不变。首次诊断探针误选当前context不提供的工具、误用不存在的shutdown方法，外层120秒超时；这是探针错误，未当产品缺陷或通过，已检查无所属残留进程。修正工具/关闭方法后的两轮才计通过。
+- 已将用户给定配置转换为本项目 `.cheers.mcp.json`，命名 `code-index`、保留stdio启动参数并关闭自动dashboard；原runtime加载确认project scope、stdio、正确sourcePath和可用executable。该文件为本机配置，加入本地Git exclude，未进入提交；主provider配置未改。`startup_timeout_sec=60` 不属于本仓MCP schema，未静默写入，仍遵守原共享30秒catalogue deadline。连接证据来自小型隔离TS项目，不宣称已对整个产品仓库完成语义索引。
+- 模型经原 `node dist/cli.js --print --json --config <existing-config> --config <isolated-overlay> --project <isolated-project> --no-context-files --no-skills --non-interactive-approval deny --tools read <fixed-marker-prompt>` 完成一次真实请求。overlay只限制输出至128 tokens并关闭MCP，不改用户连接/凭据。exit0、completed/success、返回预定标记、0 tool calls、stderr0 bytes、7679ms；返回正文只在内存比对，报告只保留29 bytes和SHA-256 `dd37418ae3753a97702dfc221ab9827d0b3bc18b2dc6e77de606859b1f207037`。隔离ledger为1条turn request，attribution `openai-compatible` / `auto`，prompt1006、completion50；真实provider主配置stat版本与fixture源码不变。未核对可信账单，也未把配置别名auto当作固定实际模型版本。
+- 此服务不要求OAuth；连接成功不能验收OAuth登录/刷新/失效/退出。当前provider成功也不等于账号池完整生命周期或正式模型质量。PRV-03、PAN-07、PAN-08、TOOL-02及QA依赖继续partial；所缺输入已在顶部逐项缩窄，不再要求重复提供已成功使用的配置。
+- Platform QA `40095404655` 绑定上述源码SHA，20个受支持CLI格实际为17 pass /2 fail /1 skipped：Windows两种line/print启动共4格通过；Linux/macOS常规PTY均通过；macOS Node fullscreen与Linux executable fullscreen均在第二次diff source copy超时，macOS executable fullscreen随前一步失败跳过。保留这次failure，不以本地通过覆盖。
+- 实际失败artifact证明首次OSC52后，复制结果toast多占一行，diff由CUP row55移至row54且row55被清空；原探针“固定row55”假设错误，分类为harness readiness/geometry race。只修QA：等待完整复制结果行及当前完整source行，按renderer实际CUP(row,1)…K重写/清除定位下一次点击；初始分块、覆盖分块、原CUP+J清屏均使未完成行不可选。两侧精确OSC52源文顺序断言保留，未改产品复制、权限或渲染行为。
+- 最终静态五门、requirements矩阵、`node --test scripts/qa-clipboard.test.mjs`六项、harness语法检查及`QA_PTY_TARGET=node QA_PTY_MODE=fullscreen NODE_OPTIONS=--max-old-space-size=1536 node scripts/qa-pty-smoke.mjs`串行通过。最终Node fullscreen为Linux/x64/Node24.15.0、exit0，沿上述原TS build；不冒充Node floor20.3或新exe验证。恢复固定第二行、把OSC52当就绪、保留覆盖中旧行、忽略renderer原CUP+J清除四项反转均exit1且实际AssertionError，helper bytes逐项恢复；最终helper SHA-256 `5b92f381a49cf28f12aad515bcd22f141cda9e40c2d68adc32584cfa2c3d40ad`。定向对照参考复制owner以native settlement约束顺序操作的决定，本仓将等待放在QA动作间，保留原产品即时offer语义。独立只读代码APPROVE/架构CLEAR，指出的初始/覆盖分块与原清屏均已补回归。没有运行本地全套、重新构建exe或真实20k压力；本批不修改产品源码，沿用原TS artifact而不称新SHA重建。提交/推送和新的跨平台/CI结果仍分别取证，旧failure保留。
 
 ### 47行有限审计处置
 

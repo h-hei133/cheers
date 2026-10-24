@@ -8935,3 +8935,9 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 47行独立有限复核保留原35complete，PAN-02原范围目录/tree/管理/生命周期已有可追溯证据，升为complete；现36complete/11partial/0open。四条已识别本地生命周期链收口，已有跨任务组合不重复；QA-01仍随真实账户/质量/平台任务验收保持partial。矩阵、当前剩余表、CFG-03实际fixture及QA-03既有START-03聚合引用同步，不把额外physical I/O/heap/最长响应WATCH升成新硬门。
 - 精确`b26773aa49d4372bd87b3cd7917bf6fb31f1fa05` CI `40092866173`/job `120868960040`于12:29:21Z failure：10476pass/3skip/2fail，分别为browser/smoke/request解压状态与queued back confirm零rewind。后者fixture仅等待title/active，现确认前等待实际focus ID first，保留queue/rewind断言及loading dismiss。两个文件定向5项通过（其余110未选），browser未改生产，CI触发原因仍未确认，不从一次本地green推断flake/已根治。
 - 精确`e4b86ad0457791141abb12ce29639b8adb647732`已提交/推送且远端main一致，CI `40093579333`/job `120871082975`于2026-10-24T12:38:38Z completed/success，Watch `40093579354`success。该success不改写上述历史失败，也不替代本新批次SHA的CI；当前批提交/推送与新CI另读回，全阶段仍partial。
+
+## [2026-10-24] Phase 20 真实配置连通与 fullscreen QA 坐标修复
+
+用户指定的本机stdio MCP在隔离小型TS项目经原gateway两轮发现23工具、只读搜索和真实PID退出通过；现有provider配置通过原CLI完成一次固定标记请求，ledger单条turn、无tool、主配置版本不变。项目MCP转换配置仅本地保存并exclude，不提交机器路径。stdio无OAuth，现有模型别名auto不等于正式版本；真实认证生命周期、可信账单、正式配对/双盲和平台输入依赖仍partial，状态顶部已缩窄剩余条件。
+
+Platform QA40095404655（7bff50a4）实际17pass/2fail/1skip；Windows批处理4格、Linux/macOS常规PTY通过，两个fullscreen旧探针在第二侧复制超时。失败artifact确认复制结果toast使diff55→54且清空55，分类为QA固定坐标与异步结果paint竞态。QA-only helper改为等完整结果并按当前source行点击，保留两侧精确OSC；六项脚本回归及四项AssertionError反转通过、helper bytes恢复。分块覆盖与实际CUP+J清屏由独立review提出后补证；最终静态门/矩阵/脚本/Node fullscreen串行通过，独立APPROVE/CLEAR，本批SHA/远端结果另取证。未改provider/auth或产品复制源码，未运行本地全套/20k压力。详见phase-20-status真实连接记录。
