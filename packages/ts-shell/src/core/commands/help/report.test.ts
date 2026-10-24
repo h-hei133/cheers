@@ -4,6 +4,17 @@ import { reportText } from '../report/projection.js';
 import { readReport } from '../report/codec.js';
 import * as metadata from '../report/metadata.js';
 
+it('fits long legal help summaries into text and persisted report budgets', () => {
+  const commands = Array.from({ length: 200 }, (_, index) => ({ name: `long-${index}`, group: 'workflow' as const, summary: 'x'.repeat(4096) }));
+  const report = helpReport(commands, '/fixture');
+  expect(report.facts.total).toBe(200); expect(report.facts.shown).toBeGreaterThan(0);
+  expect(report.facts.omitted).toBeGreaterThan(0); expect(report.facts.coverage).toBe('partial');
+  expect(Number(report.facts.shown) + Number(report.facts.omitted)).toBe(200);
+  expect(reportText(report)).toContain('commands omitted');
+  expect(readReport(JSON.parse(JSON.stringify(report)))).toEqual(report);
+  expect(commands[0]!.summary).toHaveLength(4096);
+});
+
 it('keeps safe guide facts detached from raw identity and executable callbacks', () => {
   const execute = vi.fn();
   const command = { name: 'sk-synthetic-sensitive-command', aliases: ['guide-alias'], group: 'workflow' as const,

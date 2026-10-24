@@ -2,8 +2,20 @@ import { expect, it } from 'vitest';
 import { skillsReport } from './skill/report.js';
 import { reportText } from './report/projection.js';
 import { skillPrompt } from './skillful.js';
+import { readReport } from './report/codec.js';
 
 const skill = { name: 'review', description: 'review changes', body: 'inspect', filePath: '/tmp/review/SKILL.md', source: 'user' as const, disableModelInvocation: false, unhonouredFields: [] };
+
+it('fits legal multibyte skill descriptions into text and persisted report budgets', () => {
+  const skills = Array.from({ length: 200 }, (_, index) => ({ ...skill, name: `skill-${index}`, description: '界'.repeat(2048) }));
+  const report = skillsReport(skills, '/fixture');
+  expect(report.facts.total).toBe(200); expect(report.facts.shown).toBeGreaterThan(0);
+  expect(report.facts.omitted).toBeGreaterThan(0); expect(report.facts.coverage).toBe('partial');
+  expect(Number(report.facts.shown) + Number(report.facts.omitted)).toBe(200);
+  expect(reportText(report)).toContain('skills omitted');
+  expect(readReport(JSON.parse(JSON.stringify(report)))).toEqual(report);
+  expect(skills[0]!.description).toHaveLength(2048);
+});
 
 it('injects actual visible skill content when enabled', () => {
   expect(skillPrompt(new Map([[skill.name, skill]]), true)).toContain('<name>review</name>');

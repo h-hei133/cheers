@@ -1,6 +1,19 @@
 import { expect, it } from 'vitest';
 import { crashesReport, logsReport } from './report.js';
 import { reportText } from '../report/projection.js';
+import { readReport } from '../report/codec.js';
+
+it('fits legal multibyte log records into text and persisted report budgets', () => {
+  const text = '界'.repeat(240);
+  const entries = Array.from({ length: 200 }, () => ({ timestamp: text, level: 'error' as const, component: text, message: text,
+    traceId: text, spanId: text, fields: { requestId: text, toolCallId: text } }));
+  const report = logsReport({ status: 'reported', filesInspected: 1, unreadableFiles: 0, entries }, '/fixture');
+  expect(report.facts).toMatchObject({ status: 'reported', total: 200, coverage: 'partial' });
+  expect(report.facts.shown).toBeGreaterThan(0); expect(report.facts.omitted).toBeGreaterThan(0);
+  expect(Number(report.facts.shown) + Number(report.facts.omitted)).toBe(200);
+  expect(reportText(report)).toContain('log records omitted');
+  expect(readReport(JSON.parse(JSON.stringify(report)))).toEqual(report); expect(entries).toHaveLength(200);
+});
 
 it('redacts all log display and facts fields and preserves partial-source evidence', () => {
   const report = logsReport({ status: 'partial', filesInspected: 2, unreadableFiles: 1, entries: [{

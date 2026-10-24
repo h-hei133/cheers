@@ -2,26 +2,32 @@ import { redactReportText } from '../../security/redaction.js';
 import { traceRows, type LogRead, LOG_TAIL_BYTES } from '../../../observability/diagnostics.js';
 import { MAX_CRASH_RECORDS, type CrashRead } from '../../../observability/crashLog.js';
 import { createReport, span } from '../report/projection.js';
+import { boundedReport } from '../report/window.js';
 import type { CommandReport } from '../report/contract.js';
 
 export function logsReport(read: LogRead, projectRoot: string): CommandReport {
-  const rows = traceRows(read.entries, projectRoot).map((row, index) => ({ ...row, level: read.entries[index]!.level }));
-  return createReport({
-    title: 'Debug logs',
-    columns: [{ label: 'Time', minWidth: 14 }, { label: 'Level', minWidth: 6 }, { label: 'Component', minWidth: 12 }, { label: 'Message', minWidth: 24 }],
-    lines: [
-      { kind: 'text', spans: [span(`Status: ${read.status}`, read.status === 'reported' ? 'text' : 'warning')] },
-      ...rows.map(row => ({ kind: 'columns' as const, cells: [[span(row.timestamp)], [span(row.level)], [span(row.component)], [span(row.message)]] })),
-      ...(!rows.length ? [{ kind: 'text' as const, spans: [span(read.status === 'unavailable'
-        ? 'Structured logs could not be read.' : 'No structured records found in the inspected log tails.')] }] : []),
-      { kind: 'text', spans: [span(`Recent records only: at most 200 records, ${LOG_TAIL_BYTES} bytes per file; ${read.filesInspected} files inspected, ${read.unreadableFiles} unreadable.`, 'muted')] },
-      ...(read.filesTruncated ? [{ kind: 'text' as const, spans: [span('Log inspection reached its file or byte budget; older records were omitted.', 'warning')] }] : []),
-    ],
-    facts: { status: read.status, source: 'structured-log-tails', records: rows.map(row => ({ ...row,
-      requestId: row.requestId ?? null, toolId: row.toolId ?? null, durationMs: row.durationMs ?? null })),
-      filesInspected: read.filesInspected, unreadableFiles: read.unreadableFiles,
-      filesTruncated: read.filesTruncated === true, bytesRead: read.bytesRead ?? null,
-      recordLimit: 200, bytesPerFile: LOG_TAIL_BYTES },
+  const candidates = traceRows(read.entries, projectRoot).map((row, index) => ({ ...row, level: read.entries[index]!.level }));
+  return boundedReport(candidates, rows => {
+    const omitted = read.entries.length - rows.length;
+    return {
+      title: 'Debug logs',
+      columns: [{ label: 'Time', minWidth: 14 }, { label: 'Level', minWidth: 6 }, { label: 'Component', minWidth: 12 }, { label: 'Message', minWidth: 24 }],
+      lines: [
+        { kind: 'text', spans: [span(`Status: ${read.status}`, read.status === 'reported' ? 'text' : 'warning')] },
+        ...rows.map(row => ({ kind: 'columns' as const, cells: [[span(row.timestamp)], [span(row.level)], [span(row.component)], [span(row.message)]] })),
+        ...(!rows.length ? [{ kind: 'text' as const, spans: [span(read.status === 'unavailable'
+          ? 'Structured logs could not be read.' : read.entries.length ? 'Log records omitted from this bounded report.' : 'No structured records found in the inspected log tails.')] }] : []),
+        ...(omitted > 0 ? [{ kind: 'text' as const, spans: [span(`${omitted} log records omitted from this bounded report.`, 'muted')] }] : []),
+        { kind: 'text', spans: [span(`Recent records only: at most 200 records, ${LOG_TAIL_BYTES} bytes per file; ${read.filesInspected} files inspected, ${read.unreadableFiles} unreadable.`, 'muted')] },
+        ...(read.filesTruncated ? [{ kind: 'text' as const, spans: [span('Log inspection reached its file or byte budget; older records were omitted.', 'warning')] }] : []),
+      ],
+      facts: { status: read.status, source: 'structured-log-tails', total: read.entries.length, shown: rows.length, omitted,
+        coverage: omitted > 0 ? 'partial' : 'complete', records: rows.map(row => ({ ...row,
+        requestId: row.requestId ?? null, toolId: row.toolId ?? null, durationMs: row.durationMs ?? null })),
+        filesInspected: read.filesInspected, unreadableFiles: read.unreadableFiles,
+        filesTruncated: read.filesTruncated === true, bytesRead: read.bytesRead ?? null,
+        recordLimit: 200, bytesPerFile: LOG_TAIL_BYTES },
+    };
   });
 }
 

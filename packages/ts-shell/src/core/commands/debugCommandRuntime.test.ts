@@ -5,6 +5,7 @@ import { inspectCrashLog } from '../../observability/crashLog.js';
 import { readStructuredLogs } from '../../observability/diagnostics.js';
 import { readMetrics } from '../../observability/metrics/reader.js';
 import { ShellCommandRuntime } from '../shell/command.js';
+import { readReport } from './report/codec.js';
 
 const state = vi.hoisted(() => ({
   logs: {
@@ -56,6 +57,17 @@ function context(getToolPool: CommandContext["getToolPool"]): CommandContext {
 }
 
 describe("/debug", () => {
+  it('fits a legal large summary tool catalogue into text and persisted report budgets', async () => {
+    const pool = new Map(Array.from({ length: 10_000 }, (_, i) => [`tool-${i}`, {} as never]));
+    const pending = runDebugCommand(['summary'], context(async () => pool));
+    await expect(pending).resolves.toBeDefined();
+    const result = await pending, report = result.report!;
+    expect(report.facts.tools).toMatchObject({ status: 'reported', count: 10_000, coverage: 'partial', omitted: expect.any(Number) });
+    expect((report.facts.tools as { names: unknown[] }).names.length).toBeGreaterThan(0);
+    expect(result.output).toContain('tool names omitted');
+    expect(readReport(JSON.parse(JSON.stringify(report)))).toEqual(report); expect(pool.size).toBe(10_000);
+  });
+
   it.each(['summary', 'tools'])('uses one %s command owner while retaining ordinary source failures', async action => {
     const commands = new ShellCommandRuntime(), pool = vi.fn(async () => { throw new Error('PRIVATE_SOURCE'); });
     const run = vi.fn(<T>(operation: (signal: AbortSignal) => Promise<T>) => commands.run(operation));

@@ -41,8 +41,14 @@ async function inspectDebug(action: string, context: CommandContext): Promise<Lo
   const metrics = readMetrics(sink.getLogDir(), sink.getCurrentFilePath(), 2000);
   const crashes = inspectCrashLog();
   let tools: readonly string[] = [];
+  let toolsTotal = 0;
   let toolsStatus: 'reported' | 'unavailable' = context.getToolPool ? 'reported' : 'unavailable';
-  try { if (context.getToolPool) tools = [...(await readToolPool(context)).keys()].sort().map(name => redactReportText(name, 240, { projectRoot: context.cwd })); }
+  try {
+    if (context.getToolPool) {
+      const pool = await readToolPool(context); toolsTotal = pool.size;
+      tools = [...pool.keys()].sort().slice(0, 200).map(name => redactReportText(name, 240, { projectRoot: context.cwd }));
+    }
+  }
   catch { assertCurrent(context); toolsStatus = 'unavailable'; }
   assertCurrent(context);
   const report = createReport({
@@ -52,7 +58,8 @@ async function inspectDebug(action: string, context: CommandContext): Promise<Lo
       { kind: 'columns', cells: [[span('Structured logs')], [span(logs.status === 'unavailable' ? 'unknown' : logs.entries.length, 'number')], [span(logs.status, logs.status === 'reported' ? 'success' : 'warning')]] },
       { kind: 'columns', cells: [[span('Crash records')], [span(crashes.status === 'unavailable' ? 'unknown' : crashes.records.length, 'number')], [span(crashes.status, crashes.status === 'reported' ? 'success' : 'warning')]] },
       { kind: 'columns', cells: [[span('Metric samples')], [span(metrics.status === 'unavailable' ? 'unknown' : metrics.samples.length, 'number')], [span(metrics.status, metrics.status === 'reported' ? 'success' : 'warning')]] },
-      { kind: 'columns', cells: [[span('Available tools')], [span(toolsStatus === 'unavailable' ? 'unknown' : tools.length, 'number')], [span(toolsStatus, toolsStatus === 'reported' ? 'success' : 'warning')]] },
+      { kind: 'columns', cells: [[span('Available tools')], [span(toolsStatus === 'unavailable' ? 'unknown' : toolsTotal, 'number')], [span(toolsStatus, toolsStatus === 'reported' ? 'success' : 'warning')]] },
+      ...(toolsTotal > tools.length ? [{ kind: 'text' as const, spans: [span(`${toolsTotal - tools.length} tool names omitted from this bounded report.`, 'muted')] }] : []),
       { kind: 'text', spans: [span(`Timing: ${formatTimingReport().split('\n')[0]}`, 'muted')] },
       ...(logs.unreadableFiles ? [{ kind: 'text' as const, spans: [span(`${logs.unreadableFiles} log file(s) could not be read; counts are partial.`, 'warning')] }] : []),
       ...(metrics.unreadableFiles ? [{ kind: 'text' as const, spans: [span(`${metrics.unreadableFiles} metric log file(s) could not be read; values are partial.`, 'warning')] }] : []),
@@ -65,7 +72,8 @@ async function inspectDebug(action: string, context: CommandContext): Promise<Lo
       crashes: crashes.status === 'unavailable' ? null : crashes.records.length,
       crashSource: { status: crashes.status, reason: crashes.reason ?? null, invalidRecords: crashes.invalidRecords },
       metrics: { status: metrics.status, samples: metrics.status === 'unavailable' ? null : metrics.samples.length, filesInspected: metrics.filesInspected, unreadableFiles: metrics.unreadableFiles },
-      tools: { status: toolsStatus, count: toolsStatus === 'unavailable' ? null : tools.length, names: tools },
+      tools: { status: toolsStatus, count: toolsStatus === 'unavailable' ? null : toolsTotal, names: tools,
+        ...(toolsStatus === 'reported' ? { shown: tools.length, omitted: toolsTotal - tools.length, coverage: toolsTotal > tools.length ? 'partial' : 'complete' } : {}) },
       timing: formatTimingReport(),
     },
   });

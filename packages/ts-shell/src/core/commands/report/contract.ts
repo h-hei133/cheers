@@ -4,6 +4,9 @@ export const REPORT_NODES = 20_000;
 export const REPORT_DEPTH = 32;
 export const REPORT_LINES = 20_000;
 
+/** A projection may omit entries for these limits; malformed input still fails. */
+export class ReportLimitError extends RangeError {}
+
 export const REPORT_ROLES = ['text', 'command', 'argument', 'flag', 'key', 'path',
   'number', 'unit', 'muted', 'emphasis', 'subtle', 'heading', 'code', 'warning', 'error', 'success',
   'context-normal', 'context-elevated', 'context-high', 'context-critical'] as const;

@@ -109,3 +109,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A process cancellation test finds its ready file but later reads empty/truncated JSON.
 - **Root Cause**: File creation becomes visible before writeFileSync has written and closed the marker; cancellation can kill the writer in that interval.
 - **Rule**: Publish readiness only after the complete payload is written, using a same-directory rename, or wait for a fully validated payload before cancelling. Keep the original process-cleanup assertions.
+
+### 21. Independent Row And Character Caps Can Exceed The Report Envelope
+- **Symptom**: A legal catalogue/log/metric snapshot fails the whole report, or a renderable snapshot loses structured persistence.
+- **Root Cause**: Display and facts duplicate metadata, multibyte/control expansion changes byte costs, and codec structural nodes differ from a producer row count. A character cap also allows many short logical lines.
+- **Rule**: Fit captured metadata using the shared snapshot/text limits, reuse the codec's structure check, retain source totals/status separately from shown/omitted projection, and test text plus codec roundtrip. Retry only typed resource limits; encountered producer/type errors must propagate. Keep source reads and raw accounting outside retries.

@@ -2,6 +2,7 @@ import type { ToolDefinition } from '../../../tools/types.js';
 import { toolPlanMode } from '../../query/toolPolicy.js';
 import type { CommandReport, ReportLine } from '../report/contract.js';
 import { createReport, span } from '../report/projection.js';
+import { boundedReport } from '../report/window.js';
 import { reportMetadata } from '../report/metadata.js';
 import { compareDiscoveryCost } from '../../tools/discovery/evaluation.js';
 import { toolWireSurface } from '../../../provider/endpoints/toolSurface.js';
@@ -10,6 +11,7 @@ const PERMISSIONS = "Eligible tools still require the session's permissions and 
 const TOOL_ROWS = 200;
 const TOOL_ARGUMENTS = 100;
 const TOOL_DESCRIPTION_CHARS = 48_000;
+const TOOL_DESCRIPTION_LINES = 1_000;
 const TOOL_FACT_DESCRIPTION_CHARS = 512;
 
 /** Display canonicalization precedes scrubbing so removed ANSI cannot join secret fragments. */
@@ -88,9 +90,10 @@ export function toolsReport(
 export function toolReport(tool: ToolDefinition, projectRoot = process.cwd()): CommandReport {
   const safe = (value: string, maxLength = 4096): string => metadataText(value, projectRoot, maxLength);
   const descriptionBytes = Buffer.byteLength(tool.description, 'utf8');
-  const description = metadataText(tool.description, projectRoot, TOOL_DESCRIPTION_CHARS, true);
+  const descriptionLines = metadataText(tool.description, projectRoot, TOOL_DESCRIPTION_CHARS, true).split(/\r?\n/);
+  const description = descriptionLines.slice(0, TOOL_DESCRIPTION_LINES).join('\n');
   const shownDescriptionBytes = Buffer.byteLength(description, 'utf8');
-  const descriptionOmittedBytes = tool.description.length > TOOL_DESCRIPTION_CHARS
+  const descriptionOmittedBytes = tool.description.length > TOOL_DESCRIPTION_CHARS || descriptionLines.length > TOOL_DESCRIPTION_LINES
     ? Math.max(0, descriptionBytes - shownDescriptionBytes) : 0;
   const properties = tool.argsSchema.properties;
   const propertyMap = properties && typeof properties === 'object' && !Array.isArray(properties)
@@ -98,8 +101,7 @@ export function toolReport(tool: ToolDefinition, projectRoot = process.cwd()): C
   const required = new Set(Array.isArray(tool.argsSchema.required) ? tool.argsSchema.required : []);
   const propertyNames = propertyMap ? Object.keys(propertyMap) : [];
   const shownPropertyNames = propertyNames.slice(0, TOOL_ARGUMENTS);
-  const argumentsOmitted = propertyNames.length - shownPropertyNames.length;
-  const args = shownPropertyNames.map(name => {
+  const candidates = shownPropertyNames.map(name => {
       const value = propertyMap![name];
       const shape = value && typeof value === 'object' ? value as { type?: unknown; description?: unknown } : {};
       return { name: safe(name, 240), type: typeof shape.type === 'string' ? safe(shape.type, 80) : 'any', required: required.has(name),
@@ -108,25 +110,28 @@ export function toolReport(tool: ToolDefinition, projectRoot = process.cwd()): C
   const planMode = toolPlanMode(tool.name, tool);
   const schemaBytes = Buffer.byteLength(JSON.stringify(tool.argsSchema), 'utf8');
   const name = toolLabel(tool.name, projectRoot);
-  return createReport({ title: name,
-    columns: [{ label: 'Argument', minWidth: 14 }, { label: 'Type', minWidth: 8 },
-      { label: 'Required', minWidth: 8 }, { label: 'Description', minWidth: 24 }],
-    lines: [
-      ...description.split(/\r?\n/).map((text): ReportLine => ({ kind: 'text', spans: [span(text)] })),
-      { kind: 'space' },
-      { kind: 'text', spans: [span(`Description + schema payload: ${descriptionBytes} description bytes + ${schemaBytes} schema bytes. Token count: not measured.`)] },
-      ...(descriptionOmittedBytes > 0 ? [{ kind: 'text' as const, spans: [span(`${descriptionOmittedBytes.toLocaleString()} description bytes omitted from this bounded report.`, 'muted')] }] : []),
-      { kind: 'text', spans: [span('Plan mode: '), span(planMode, planMode === 'blocked' ? 'warning' : 'text')] },
-      { kind: 'text', spans: [span(PERMISSIONS, 'warning')] },
-      { kind: 'space' },
-      ...(args.length ? args.map((arg): ReportLine => ({ kind: 'columns', cells: [
-        [span(arg.name, 'argument')], [span(arg.type, 'code')], [span(arg.required ? 'yes' : 'no')], [span(arg.description)],
-      ] })) : [{ kind: 'text' as const, spans: [span('No top-level arguments are declared.')] }]),
-      ...(argumentsOmitted > 0 ? [{ kind: 'text' as const, spans: [span(`${argumentsOmitted.toLocaleString()} arguments omitted from this bounded report.`, 'muted')] }] : []),
-    ],
-    facts: { name, description, planMode, arguments: args, permission: 'not-evaluated',
-      argumentsShown: args.length, argumentsOmitted, coverage: argumentsOmitted > 0 || descriptionOmittedBytes > 0 ? 'partial' : 'complete',
-      size: { unit: 'utf8-bytes', tokens: 'not-measured', descriptionBytes, descriptionOmittedBytes, schemaBytes } },
+  return boundedReport(candidates, args => {
+    const argumentsOmitted = propertyNames.length - args.length;
+    return { title: name,
+      columns: [{ label: 'Argument', minWidth: 14 }, { label: 'Type', minWidth: 8 },
+        { label: 'Required', minWidth: 8 }, { label: 'Description', minWidth: 24 }],
+      lines: [
+        ...description.split(/\r?\n/).map((text): ReportLine => ({ kind: 'text', spans: [span(text)] })),
+        { kind: 'space' },
+        { kind: 'text', spans: [span(`Description + schema payload: ${descriptionBytes} description bytes + ${schemaBytes} schema bytes. Token count: not measured.`)] },
+        ...(descriptionOmittedBytes > 0 ? [{ kind: 'text' as const, spans: [span(`${descriptionOmittedBytes.toLocaleString()} description bytes omitted from this bounded report.`, 'muted')] }] : []),
+        { kind: 'text', spans: [span('Plan mode: '), span(planMode, planMode === 'blocked' ? 'warning' : 'text')] },
+        { kind: 'text', spans: [span(PERMISSIONS, 'warning')] },
+        { kind: 'space' },
+        ...(args.length ? args.map((arg): ReportLine => ({ kind: 'columns', cells: [
+          [span(arg.name, 'argument')], [span(arg.type, 'code')], [span(arg.required ? 'yes' : 'no')], [span(arg.description)],
+        ] })) : [{ kind: 'text' as const, spans: [span(propertyNames.length ? 'Arguments omitted from this bounded report.' : 'No top-level arguments are declared.')] }]),
+        ...(argumentsOmitted > 0 ? [{ kind: 'text' as const, spans: [span(`${argumentsOmitted.toLocaleString()} arguments omitted from this bounded report.`, 'muted')] }] : []),
+      ],
+      facts: { name, description, planMode, arguments: args, permission: 'not-evaluated',
+        argumentsShown: args.length, argumentsOmitted, coverage: argumentsOmitted > 0 || descriptionOmittedBytes > 0 ? 'partial' : 'complete',
+        size: { unit: 'utf8-bytes', tokens: 'not-measured', descriptionBytes, descriptionOmittedBytes, schemaBytes } },
+    };
   });
 }
 

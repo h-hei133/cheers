@@ -2,9 +2,44 @@ import { expect, it } from 'vitest';
 import { toolReport, toolsReport, toolSummary } from './report.js';
 import { reportText } from '../report/projection.js';
 import type { ToolDefinition } from '../../../tools/types.js';
+import { readReport } from '../report/codec.js';
 
 const tool = (name: string, description: string, argsSchema: Record<string, unknown>): ToolDefinition =>
   ({ name, description, argsSchema, execute: async () => ({ success: true, output: '' }) });
+
+it('fits legal multibyte tool-list metadata into text and persisted report budgets', () => {
+  const pool = new Map(Array.from({ length: 200 }, (_, i) => {
+    const name = `tool-${i}-${'界'.repeat(240)}`;
+    return [name, tool(name, '界'.repeat(512), { type: 'object' })] as const;
+  }));
+  const report = toolsReport(pool, '/fixture');
+  expect(report.facts).toMatchObject({ total: 200, shown: 200, omitted: 0, coverage: 'complete' });
+  expect(Number(report.facts.shown) + Number(report.facts.omitted)).toBe(200);
+  expect(reportText(report)).toContain('Tools (200)'); expect(pool.size).toBe(200);
+  expect(readReport(JSON.parse(JSON.stringify(report)))).toEqual(report);
+  expect(report.facts.size).toMatchObject({ descriptionBytes: 200 * 512 * 3,
+    perTool: expect.any(Array), discovery: { full: { tools: 200 } } });
+  expect((report.facts.size as { perTool: unknown[] }).perTool).toHaveLength(Number(report.facts.shown));
+});
+
+it('fits legal multibyte arguments into text and persisted report budgets', () => {
+  const properties = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`arg-${i}`, { type: 'string', description: '界'.repeat(4096) }]));
+  const item = tool('fixture', 'Description', { type: 'object', properties }), report = toolReport(item, '/fixture');
+  expect(report.facts.argumentsShown).toBeGreaterThan(0); expect(report.facts.argumentsOmitted).toBeGreaterThan(0);
+  expect(Number(report.facts.argumentsShown) + Number(report.facts.argumentsOmitted)).toBe(100);
+  expect(report.facts.coverage).toBe('partial'); expect(reportText(report)).toContain('arguments omitted');
+  expect(report.facts.size).toMatchObject({ schemaBytes: Buffer.byteLength(JSON.stringify(item.argsSchema)) });
+  expect(readReport(JSON.parse(JSON.stringify(report)))).toEqual(report);
+  expect(properties['arg-0']!.description).toHaveLength(4096);
+});
+
+it('fits legal many-line tool descriptions into text and persisted report budgets', () => {
+  const description = 'a\n'.repeat(24_000), produce = () => toolReport(tool('fixture', description, { type: 'object' }), '/fixture');
+  expect(produce).not.toThrow(); const report = produce();
+  expect(report.facts.coverage).toBe('partial'); expect(report.facts.size).toMatchObject({ descriptionBytes: 48_000 });
+  expect(reportText(report)).toContain('description bytes omitted');
+  expect(readReport(JSON.parse(JSON.stringify(report)))).toEqual(report);
+});
 
 it.each(['file', 'fi\x1b[31mle'])('scrubs decoded file URL controls before redaction: %s', protocol => {
   const raw = `${protocol}:///fixture/sk-%C2%9B31msynthetic-sensitive`;

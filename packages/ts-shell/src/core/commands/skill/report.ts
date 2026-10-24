@@ -1,5 +1,6 @@
 import type { Skill } from '../../skills/skillLoader.js';
-import { createReport, displayReportText, span } from '../report/projection.js';
+import { displayReportText, span } from '../report/projection.js';
+import { boundedReport } from '../report/window.js';
 import { reportMetadata } from '../report/metadata.js';
 
 const SKILL_ROWS = 200;
@@ -13,26 +14,28 @@ export function skillLabel(value: string, projectRoot: string, maxLength = 240, 
 
 export function skillsReport(skills: readonly Skill[], projectRoot: string) {
   const shown = skills.slice(0, SKILL_ROWS);
-  const omitted = skills.length - shown.length;
-  const items = shown.map(skill => {
+  const candidates = shown.map(skill => {
     const description = skillLabel(skill.description, projectRoot, SKILL_DESCRIPTION_CHARS) || '—';
     return { name: skillLabel(skill.name, projectRoot), source: skill.source, description,
       factDescription: skillLabel(skill.description, projectRoot, SKILL_FACT_DESCRIPTION_CHARS) || '—',
       descriptionOmittedBytes: skill.description.length > SKILL_DESCRIPTION_CHARS
         ? Math.max(0, Buffer.byteLength(skill.description, 'utf8') - Buffer.byteLength(description, 'utf8')) : 0 };
   });
-  return createReport({ title: 'Skills',
-    columns: [{ label: 'Skill', minWidth: 14 }, { label: 'From', minWidth: 8 }, { label: 'What it is for', minWidth: 24 }],
-    lines: items.length ? [...items.map(item => ({ kind: 'columns' as const,
-      cells: [[span(item.name)], [span(item.source)], [span(item.description)]] })),
-    ...(omitted > 0 ? [{ kind: 'text' as const, spans: [span(`${omitted} skills omitted from this bounded report.`, 'muted')] }] : []),
-    { kind: 'space' }, { kind: 'text', spans: [span('/skill <name>', 'command'), span(' reads one out.')] }]
-      : [{ kind: 'text', spans: [span('None found.')] }, { kind: 'space' },
-        { kind: 'text', spans: [span('Put a SKILL.md under ~/.cheers/skills/<name>/ or .agents/skills/<name>/ to add one.')] }],
-    facts: { count: skills.length, total: skills.length, shown: items.length, omitted,
-      coverage: omitted > 0 ? 'partial' : 'complete',
-      skills: items.map(item => ({ name: item.name, source: item.source, description: item.factDescription,
-        descriptionOmittedBytes: item.descriptionOmittedBytes })) },
+  return boundedReport(candidates, items => {
+    const omitted = skills.length - items.length;
+    return { title: 'Skills',
+      columns: [{ label: 'Skill', minWidth: 14 }, { label: 'From', minWidth: 8 }, { label: 'What it is for', minWidth: 24 }],
+      lines: skills.length ? [...items.map(item => ({ kind: 'columns' as const,
+        cells: [[span(item.name)], [span(item.source)], [span(item.description)]] })),
+      ...(omitted > 0 ? [{ kind: 'text' as const, spans: [span(`${omitted} skills omitted from this bounded report.`, 'muted')] }] : []),
+      { kind: 'space' }, { kind: 'text', spans: [span('/skill <name>', 'command'), span(' reads one out.')] }]
+        : [{ kind: 'text', spans: [span('None found.')] }, { kind: 'space' },
+          { kind: 'text', spans: [span('Put a SKILL.md under ~/.cheers/skills/<name>/ or .agents/skills/<name>/ to add one.')] }],
+      facts: { count: skills.length, total: skills.length, shown: items.length, omitted,
+        coverage: omitted > 0 ? 'partial' : 'complete',
+        skills: items.map(item => ({ name: item.name, source: item.source, description: item.factDescription,
+          descriptionOmittedBytes: item.descriptionOmittedBytes })) },
+    };
   });
 }
 

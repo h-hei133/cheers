@@ -36,6 +36,8 @@
 
 2026-10-24 PAN-07/PAN-08 accepted动作取消补证：真实pickerHost接入原commands.run，held input只对已有command开放interrupt/clear action，keymap识别local owner且idle interrupt等待cancelAndWait；tools/skill合并原signal/command/timeout，成功/fallback的admission回调后均重核。真实终端tools Ctrl+C/Escape、debug Ctrl+C与held64KiB skill descriptor drain、小body成功，另有pure-command取消及reentrant回归。八有效AssertionError反转、7文件178项、静态门/TS build串行通过，APPROVE/CLEAR；此前大body成功render主动终止，不计验证。CI旧SHA的browser marker创建/写入竞态只修test fixture为完整写完后rename，双PID与cleanup断言不变。本地剩余收敛为原producer合法overflow的可读partial，外部认证/平台仍原范围；矩阵不提高。
 
+2026-10-24 PAN-08 report overflow补证：七原producer合法边界真实RangeError后，复用createReport/reportText的typed prefix fitting，codec原结构预算抽取共享、源total/status/字节与显示shown/omitted分开；help/skills/tool detail/logs/metrics可读省略，debug summary200name/fullcount，tool description1000逻辑行。text与codec往返、遇到非法facts/普通错误传播、input不变均覆盖；七有效AssertionError反转，恢复后实际11文件106项/静态门/TS build通过，APPROVE/CLEAR。已有tools list200多字节项仍完整fit，未改其生产逻辑；不宣称最大prefix/全目录/总资源界。有限PAN-08动作/overflow两本地项已有证据，真实连接/认证仍partial；精确build/SHA/CI见status。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

@@ -1,7 +1,8 @@
 import type { CommandDefinition } from '../types.js';
 import { commandInvocations } from '../invocation.js';
 import { reportMetadata } from '../report/metadata.js';
-import { createReport, span } from '../report/projection.js';
+import { span } from '../report/projection.js';
+import { boundedReport } from '../report/window.js';
 import type { ReportLine } from '../report/contract.js';
 
 type GuideCommand = Pick<CommandDefinition, 'name' | 'aliases' | 'invocations' | 'group' | 'summary' | 'argumentHint' | 'supportsNonInteractive'>;
@@ -36,23 +37,25 @@ export function guideRows(commands: readonly GuideCommand[], projectRoot: string
 export function helpReport(commands: readonly GuideCommand[], projectRoot: string) {
   const totalRows = commands.reduce((total, command) =>
     total + commandInvocations(command).filter(item => item.kind !== 'alias').length, 0);
-  const rows = guideRows(commands.slice(0, HELP_ROWS), projectRoot, HELP_ROWS);
-  const omitted = totalRows - rows.length;
-  const lines: ReportLine[] = [];
-  for (const [group, title] of Object.entries(groups)) {
-    const members = rows.filter(row => row.group === group);
-    if (!members.length) continue;
-    lines.push({ kind: 'space' }, { kind: 'heading', spans: [span(title, 'heading')] });
-    for (const row of members) lines.push({ kind: 'text', spans: [span(row.label, 'command'), span(`  ${row.detail}`)] });
-  }
-  lines.push({ kind: 'space' }, { kind: 'heading', spans: [span('Keys', 'heading')] });
-  for (const [key, description] of [['shift+tab', 'switch between planning and building'],
-    ['alt+p', 'cycle how much a turn may do without asking'], ['ctrl+j', 'insert a newline without sending'],
-    ['/hotkey', 'every key, and which ones this terminal delivers']] as const) {
-    lines.push({ kind: 'text', spans: [span(key, 'key'), span(`  ${description}`)] });
-  }
-  if (omitted > 0) lines.push({ kind: 'text', spans: [span(`${omitted} commands omitted from this bounded report.`, 'muted')] });
-  return createReport({ title: 'Slash commands', lines, facts: { count: totalRows, total: totalRows,
-    shown: rows.length, omitted, coverage: omitted > 0 ? 'partial' : 'complete',
-    commands: rows.map(row => ({ invocation: row.label, detail: row.detail, group: row.group, note: row.note, draftAvailable: !row.disabled })) } });
+  const candidates = guideRows(commands.slice(0, HELP_ROWS), projectRoot, HELP_ROWS);
+  return boundedReport(candidates, rows => {
+    const omitted = totalRows - rows.length;
+    const lines: ReportLine[] = [];
+    for (const [group, title] of Object.entries(groups)) {
+      const members = rows.filter(row => row.group === group);
+      if (!members.length) continue;
+      lines.push({ kind: 'space' }, { kind: 'heading', spans: [span(title, 'heading')] });
+      for (const row of members) lines.push({ kind: 'text', spans: [span(row.label, 'command'), span(`  ${row.detail}`)] });
+    }
+    lines.push({ kind: 'space' }, { kind: 'heading', spans: [span('Keys', 'heading')] });
+    for (const [key, description] of [['shift+tab', 'switch between planning and building'],
+      ['alt+p', 'cycle how much a turn may do without asking'], ['ctrl+j', 'insert a newline without sending'],
+      ['/hotkey', 'every key, and which ones this terminal delivers']] as const) {
+      lines.push({ kind: 'text', spans: [span(key, 'key'), span(`  ${description}`)] });
+    }
+    if (omitted > 0) lines.push({ kind: 'text', spans: [span(`${omitted} commands omitted from this bounded report.`, 'muted')] });
+    return { title: 'Slash commands', lines, facts: { count: totalRows, total: totalRows,
+      shown: rows.length, omitted, coverage: omitted > 0 ? 'partial' : 'complete',
+      commands: rows.map(row => ({ invocation: row.label, detail: row.detail, group: row.group, note: row.note, draftAvailable: !row.disabled })) } };
+  });
 }

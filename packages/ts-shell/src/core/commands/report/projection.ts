@@ -1,6 +1,8 @@
 import { stripVTControlCharacters } from 'node:util';
 import { freezeDeep } from '../../values/freeze.js';
+import { withinReportLimits } from './limits.js';
 import {
+  ReportLimitError,
   REPORT_BYTES,
   REPORT_DEPTH,
   REPORT_LINES,
@@ -22,7 +24,7 @@ function charge(budget: ReportBudget | undefined, value: string, nodes = 1): voi
   budget.nodes += nodes;
   budget.bytes += Buffer.byteLength(value, 'utf8') + nodes * 16;
   if (budget.nodes > REPORT_NODES || budget.bytes > REPORT_BYTES) {
-    throw new RangeError('Command report exceeds its resource limit.');
+    throw new ReportLimitError('Command report exceeds its resource limit.');
   }
 }
 
@@ -56,7 +58,7 @@ function spanWithBudget(text: string | number, role: ReportRole, budget?: Report
 /** Detached immutable snapshot: later producer edits cannot stale render caches. */
 export function createReport(input: Omit<CommandReport, 'version'>): CommandReport {
   const budget: ReportBudget = { nodes: 0, bytes: 0 };
-  if (input.lines.length > REPORT_LINES) throw new RangeError('Command report exceeds its line limit.');
+  if (input.lines.length > REPORT_LINES) throw new ReportLimitError('Command report exceeds its line limit.');
   const report = {
     version: 1 as const,
     title: plain(input.title, budget),
@@ -78,20 +80,29 @@ export function createReport(input: Omit<CommandReport, 'version'>): CommandRepo
     ])),
   };
   const snapshot = freezeDeep(report);
-  if (Buffer.byteLength(JSON.stringify(snapshot), 'utf8') > REPORT_BYTES) {
-    throw new RangeError('Command report exceeds its resource limit.');
+  if (!withinReportLimits(snapshot) || Buffer.byteLength(JSON.stringify(snapshot), 'utf8') > REPORT_BYTES) {
+    throw new ReportLimitError('Command report exceeds its resource limit.');
   }
   return snapshot;
 }
 
-function copyValue(value: ReportValue, budget: ReportBudget, depth: number): ReportValue {
-  if (depth > REPORT_DEPTH) throw new RangeError('Command report exceeds its nesting limit.');
+function copyValue(value: ReportValue, budget: ReportBudget, depth: number, ancestors = new Set<object>()): ReportValue {
+  if (value !== null && !['string', 'number', 'boolean', 'object'].includes(typeof value)) {
+    throw new TypeError('Report facts must contain JSON values.');
+  }
+  if (value && typeof value === 'object' && ancestors.has(value)) throw new TypeError('Report facts must not contain cycles.');
+  if (depth > REPORT_DEPTH) throw new ReportLimitError('Command report exceeds its nesting limit.');
   charge(budget, '');
   if (typeof value === 'string') return plain(value, budget);
   if (typeof value === 'number' && !Number.isFinite(value)) throw new TypeError('Report numbers must be finite.');
-  if (Array.isArray(value)) return value.map(child => copyValue(child, budget, depth + 1));
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, child]) =>
-    [plain(key, budget), copyValue(child, budget, depth + 1)]));
+  if (value && typeof value === 'object') {
+    ancestors.add(value);
+    try {
+      return Array.isArray(value) ? value.map(child => copyValue(child, budget, depth + 1, ancestors))
+        : Object.fromEntries(Object.entries(value).map(([key, child]) =>
+          [plain(key, budget), copyValue(child, budget, depth + 1, ancestors)]));
+    } finally { ancestors.delete(value); }
+  }
   return value;
 }
 
@@ -105,7 +116,7 @@ export function reportText(report: CommandReport, maxBytes = REPORT_BYTES): stri
   const append = (...lines: string[]): void => {
     for (const line of lines) {
       bytes += Buffer.byteLength(line, 'utf8') + 1;
-      if (bytes > maxBytes) throw new RangeError('Report text exceeds its limit.');
+      if (bytes > maxBytes) throw new ReportLimitError('Report text exceeds its limit.');
       rows.push(line);
     }
   };
