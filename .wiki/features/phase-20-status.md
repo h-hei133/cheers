@@ -14,7 +14,7 @@
 | PAN-02 | tree/目录/管理动作已有批次证据；catalogue 后续页绑定一次 browse-attempt 的 compact boundary index，不再每页重新 discovery；一次 attempt 的 metadata/state/transcript body 累计读取≤64MiB，续页共享该预算，超限返回 `sourceLimited` partial 且不再发行 continuation；同一 cursor 并发重放被拒绝；catalogue→真实文件采样→picker 已补双 byte-tier、十轮全页浏览与关闭排空；真实小型保存树→navigation→picker→OverlayHost 绘制补齐双 byte-tier 十轮获取/过滤/折叠/关闭及逐文件读取计数；实际终端输出、累计 physical I/O 及总 heap/响应仍缺 | 继续清单内尚缺 consumer 的组合和资源观测；绘制函数及 descriptor bytes 不冒充真实终端、物理 I/O 或总 heap 上界 |
 | PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；operation-owned snapshot 在 recovery index 中显式标记，`/restore` 禁用并指向既有 `/undo` receipt/current-content guard，standalone snapshot 仍保留 preview/显式 execute；restore 续页使用 attempt-local page index，并复验 cursor revision 与精确 position；初始 metadata 扫描≤32MiB，所有续页 metadata 读取共享不超过初始扫描字节的累计预算，单 attempt 主动 metadata 读取≤64MiB，超限整页拒绝且不重扫目录；同一 restore cursor 并发重放被拒绝；损坏/超限 transcript 以只读 partial 展示并禁用导航动作；tree/back 与 cleanse 已补增量可读前缀、行数到限停止及提前树准入；累计 physical I/O/heap/平台证据仍缺 | 继续测量原 navigation/query 的累计 physical I/O、heap、最长响应及 undo/cleanse 总资源，不以单 source 上限替代端到端资源证明 |
 | PAN-07 | device-code poll 已可被 abort 立即取消且迟到 token 不发布；扩展 unknown outcome 已跨进程 journal 恢复，关闭未 drain 与 cleanup/lifecycle unknown 均阻断后续 mutation；真实账户登录/刷新/失效/退出生命周期仍缺 | 合成协议与扩展持久边界已本地验证；真实认证仍需明确账户/provider 与隔离 opt-in |
-| PAN-08 | 本批补齐 MCP 跨 server 累计 4MiB/10k tools、共享绝对 deadline、peek fail-closed、tools/skill/cost/help/context producer top-N/omitted，以及 context signal 传播和增量 schema 计量；真实 MCP 连接/认证与完整 producer heap/延迟证据仍缺 | 本地 producer 合同已覆盖；真实连接需 server/认证条件，资源结论不扩大为端到端保证 |
+| PAN-08 | 已有 MCP 跨 server 累计 4MiB/10k tools、共享绝对 deadline、peek fail-closed、通用 report producer top-N/omitted；本批补 tools 原命令/面板双取消与真实本地 MCP→catalogue→picker→绘制/关闭生命周期。其余 consumer 组合和真实 MCP 连接/认证仍缺，总 heap/延迟为补充观测 | 继续 help/skill/context/cost 等原 consumer 的获取、投影、保留与关闭组合；报告 top-N 不代表所有交互 options 已有同一上界。真实认证需 server/认证条件 |
 | INPUT-01 | 本批补 Visual/Visual-Line Ctrl+C 复制真实 source selection、paste 文本/图片共享 128项/32MiB预算、device-code 取消及扩展投影总界；仍缺平台真实 IME、系统剪贴板与 Windows 交互 PTY | 本地五模式/字素/长输入合同继续；实机输入法、剪贴板与 Windows 需适用机器 |
 | QA-01 | 47 项逐任务反转矩阵与跨任务集成仍未全部闭合；已新增 `CTX-02 × TOOL-01` 实际 HTTP 集成、restore 累计预算反转、`PAN-06 restore × undo` operation-owned 路由、catalogue/listing/files/picker 三个反转，以及 saved tree/navigation/picker/OverlayHost 资源生命周期组合四个反转 | 继续随剩余 PAN/PRV/TOOL 与外部环境逐项补证；当前已明确关闭的跨任务行不得重复计数 |
 | QA-02 | Windows 交互 PTY、真实 IME、系统复制；当前源码的 line/pipe profile 身份与审批生命周期已补证 | 既有跨平台合成矩阵不重复列为未验；Windows 交互/IME/系统复制仍需适用机器和终端 |
@@ -35,6 +35,15 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 | 最终交付：QA-04 | 全范围验收闭合后汇总静态/结构检查、独立审查、文档、精确源码 SHA 的提交/推送/CI；原 §6.6 的最终跨域 `test:ts` 与两种构建仍需单独取证。本轮用户禁止本地全量回归的 OOM 红线优先，全套证据由适用远端 CI 承接。各批检查有效，不因本次纯测试/证据改动重复产品构建；用户要求的是提交至 GitHub，未要求新增公开 Release。 |
 
 累计 OS physical I/O、page-cache 与总 heap/最长响应是当前资源 WATCH 的补充观测维度；原决策没有要求在任意机器上证明这些量的统一绝对上界。后续测量必须说明它验证上述哪一项有界性；未测仍如实标注，不把“缺这项观测”写成新功能缺陷，也不以本次范围说明静默关闭已有资源验收。§6.5 的数值是需校准的候选目标；已闭合的 START-03 不因本次纯测试改动重新开放。
+
+## 2026-10-24 PAN-08 tools 原命令取消与真实目录生命周期（本地实现与聚焦验证）
+
+- 原 `readToolPool` 只使用调用方传入的面板 signal，遗漏 `CommandContext.signal`。新增预先取消与真实 stdio `tools/list` 挂起期间原命令取消两个用例，在原实现均取得 AssertionError；现在共享读取入口合并两个生命周期，在 acquisition 前和返回后检查。显式文档选择仍使用独立 timeout，不复用已关闭面板的 signal；工具执行与权限合同保持。
+- `picker/tools/lifetime.test.ts` 连接原 `toolPoolFor`、catalogue、CoreMcpGateway、实际小型 stdio server、toolsPicker 和 OverlayHost。32字节/128KiB description 两档各十轮打开/过滤/20种规定矩形绘制/取消：每轮恰一次 `tools/list`，descriptor JSON 字节在 description bytes 与其加1024之间且十轮一致，保留一个小于512字节的安全 option；过滤/绘制/关闭零额外协议获取，host options/model/行索引清空，配置和定义 bytes 不变，零 `tools/call`。
+- 原命令与面板两类取消均观察真实 `listTools` 的 finally 和一次 `notifications/cancelled`，然后分别检查 runtime 共享连接仍存活及 owner.close 后退出。最初把外层 Promise 结束与子进程退出等同于面板 drain 的断言过强，按原连接 owner 合同修正，并按审查补内部请求观测；未改变 gateway 生命周期。忽略 signal 的任意外部贡献仍可能持续工作，本批不承诺强制抢占或硬 deadline。
+- 原 signal、host close abort、host retained options、detail 截短四项保护反转均实际 AssertionError，三个生产文件逐字节恢复；恢复后的3文件27项通过，测试heap上限1536MiB。独立代码APPROVE/架构CLEAR，综合APPROVE，两路均只读未执行验证。对照参考 selector 的 controller 传播、当前加载发布与关闭释放；本仓共享连接由 runtime owner 管理，不复制参考列表结构。
+- 本批只证明小型真实 catalogue→options→绘制函数→close 组合，不把descriptor JSON字节当成wire或physical I/O，不外推全目录交互options上界、总heap、最长响应、实际终端输出或真实账户/MCP认证。未跑全量回归、exe、PTY或真实20k消息压测。矩阵保持35 complete /12 partial /0 open。最终静态门与matrix、TS build串行通过，build heap上限2048MiB；build `23eca6e4b6a26bd34e4661cb1440f3b37b7ed4f17ccfc64c26161fa3dcfe4168`，inputs `c2f29a5b39c4d112b19bf94908079cc54ebaabb9e9512fca5966f60845b6bed4`，artifact `309262f74009cd19c5d688b6afe3cb8bb4142a39080d1f20403bab4cca585f46`。临时目录已清理；提交/推送和新SHA CI分别取证。
+- 前批文档SHA `c57daafc785d1efa07d3420d26174c41a3cd015c` 精确CI `40084588877` / job `120844792165` 于2026-10-24T10:06:26Z–10:21:05Z completed/success；该SHA的Watch `40084588937` completed/success。undo代码SHA `65660f16183222ed5d1fd7b5fa21562709359c77` 的CI `40085273785` / job `120846814871` 仍in_progress，Watch `40085273768` completed/success；cleanse代码SHA `b2b72b57` 的CI `40084447090` 仍in_progress，不借后续文档SHA替记成功。
 
 ## 2026-10-24 PAN-06 undo 历史可取消批次与源复核（本地实现与聚焦验证）
 

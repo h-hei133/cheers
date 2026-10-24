@@ -33,9 +33,7 @@ export function toolsPicker(context: CommandContext): Picker {
       try {
         // Re-resolve exact identity: a removed mixed-case tool must not open a
         // different lower-case tool or documentation from an obsolete pool.
-        const timeout = AbortSignal.timeout(TOOL_INSPECTION_TIMEOUT_MS);
-        const signal = context.signal ? AbortSignal.any([context.signal, timeout]) : timeout;
-        const tool = (await readToolPool(context, signal)).get(ids[0]);
+        const tool = (await readToolPool(context, AbortSignal.timeout(TOOL_INSPECTION_TIMEOUT_MS))).get(ids[0]);
         return tool ? { report: toolReport(tool, context.cwd) }
           : { note: 'This tool is no longer available. Reopen /tools to refresh.' };
       } catch { return isCurrent() ? { note: UNAVAILABLE } : undefined; }

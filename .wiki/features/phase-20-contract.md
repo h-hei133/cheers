@@ -22,6 +22,8 @@
 
 2026-10-24 PAN-06 undo历史取消补证：异步分页复用原完整operation scan和同一canonical digest/page accumulator，每receipt之间让出事件循环；signal/admission/scope在下一次acquisition前重检，源directory/index/receipt紧凑stat版本在读前后及结束复核，picker代际防止旧加载覆盖新页。主命令同步API/cursor、完整坏尾部拒绝、40项保留及原32MiB单scan预算保持；真实小型关闭/下一receipt零正文、三类源变化、同步异步cursor一致、load竞态和撤销准入使3文件42项通过，五项保护反转有效。单个JSON/index/inventory/最终stat pass仍同步有界，乐观source版本不代替全内容digest，不称原子快照或整段硬延迟，47项状态不变。
 
+2026-10-24 PAN-08 tools取消/资源组合补证：共享 `readToolPool` 合并原命令与面板signal，预先取消零acquisition，真实MCP挂起读取的两类取消观察内部listTools结束及一次协议取消通知；共享连接由runtime owner关闭。`picker/tools/lifetime.test.ts` 在32字节/128KiB description两档各十轮实际catalogue→picker→OverlayHost过滤/20矩形绘制/关闭，逐轮一次tools/list、一个小于512字节的option，绘制/关闭不再获取，host释放且配置/定义bytes不变，零tools/call。与原picker/report共3文件27项；原signal、close abort、retention及detail bound四项实际反转均AssertionError，源码恢复。独立APPROVE/CLEAR；不等同全目录options上界、wire/physical I/O、总heap/硬延迟或真实MCP认证，PAN-08仍为partial；矩阵保持35 complete /12 partial /0 open。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

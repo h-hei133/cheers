@@ -74,3 +74,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A paged history view yields between receipts but can publish a digest containing an earlier receipt that changed after it was hashed.
 - **Root Cause**: Descriptor checks cover each individual read. Once the scan yields, they no longer establish that previously consumed sources remain unchanged through the rest of the scan.
 - **Rule**: Keep the complete canonical receipt digest and compact source versions for the directory, index, and consumed receipts. Revalidate sources before publishing, recheck admission between acquisitions, and discard cancelled or replaced loads. Treat stat versions as optimistic freshness, not a substitute for content validation or a cross-file transaction.
+
+### 14. Caller Cancellation Settlement Is Not Internal Request Drain
+- **Symptom**: A catalogue cancellation test treats the outer promise settling as proof that the gateway's queued acquisition finished, or expects closing a view to kill a shared runtime connection.
+- **Root Cause**: The gateway can reject its caller on abort before its internal operation settles. A view owns its request; the runtime owns the shared connection.
+- **Rule**: Observe the real inner request's completion and cancellation protocol before claiming drain. Assert connection retention and explicit runtime-owner teardown separately. Combine original command and view cancellation at the shared read owner, while accepted selections use their own lifetime rather than the retired view signal.

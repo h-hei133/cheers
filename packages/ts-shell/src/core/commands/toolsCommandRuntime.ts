@@ -65,7 +65,9 @@ function resolveEndpoint(context: CommandContext): string {
 }
 
 /** Commands and choosers inspect the same current pool; neither executes it. */
-export async function readToolPool(context: CommandContext, signal?: AbortSignal) {
+export async function readToolPool(context: CommandContext, loadSignal?: AbortSignal) {
+  const signal = context.signal && loadSignal && context.signal !== loadSignal
+    ? AbortSignal.any([context.signal, loadSignal]) : context.signal ?? loadSignal;
   assertAdmission(context.admission);
   signal?.throwIfAborted();
   const pool = await (context.getToolPool ? context.getToolPool(signal) : createCoreToolRegistry());
