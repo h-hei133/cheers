@@ -16,6 +16,8 @@
 
 2026-10-24 PAN-02 资源组合补证：同三文件扩至 37 项，lifetime 直接连接真实 SessionFiles；四个小型 saved session 在 32 字节/128KiB prompt 附加文本两档各十轮完整四页浏览，实际打开十二个 descriptor，累计返回 body bytes 等于十二个 core file 大小之和且后续不再增加，续页不重扫目录，单页 session≤2、每次 size sample map≤2，cache=4、attempt≤8、compact boundary 总数≤32，所有文件/目录句柄关闭。关闭时排空已打开的历史 descriptor，不读其 body、不发布迟到页；关闭后详情/动作失效，重开可用。取消、projection 释放、续页重扫三项反转均 AssertionError，生产 bytes 恢复。此链覆盖 acquisition→projection→retention→close，不包含终端 renderer、tree、OS physical I/O 或总 heap/延迟，不提高任务状态。
 
+2026-10-24 PAN-02/PAN-06 tree 资源组合补证：`picker/tree/lifetime.test.ts` 以四条真实保存的分支消息连接 navigation/source、treePicker 和 OverlayHost 绘制。两档消息字节各十轮，逐文件 descriptor bytes 每轮等于三文件大小，搜索/折叠/20种矩形绘制零额外读取，关闭清空 host catalogue/model/行索引；pending transcript read 取消排空、读中源变化、选择前真实版本重读及 damaged partial 只读拒绝均覆盖。与原 tree/source 测试共3文件61项；close abort、host catalogue retention、row retention、choice revision 四项反转实际 AssertionError。只证明小型原 consumer 与绘制函数组合，不冒充实际终端输出、总 heap、physical I/O 或整个 PAN-06 完成。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

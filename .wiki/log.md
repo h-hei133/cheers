@@ -8834,3 +8834,12 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 恢复后聚焦 3 文件/37 项串行通过，Vitest `--threads false`、1536MiB heap；静态门禁通过。首轮夹具误计 disabled 分组行和误判空详情，按现有接口修正，未改产品逻辑。只有测试与证据改动，未跑构建、全量回归或 PTY；不外推 OS physical I/O、总 heap/延迟、tree 或终端绘制，矩阵仍 35 complete / 12 partial / 0 open。
 - 前批 `6ba4f994526b5676a815b4702cbbfd9e489ec0cb` 的 CI `40080028964` / job `120831469775` 于 2026-10-24T08:57:10Z–09:15:09Z completed/success，Watch `40080028970` success；只绑定该 SHA，不外推为本批 CI。
 - 独立代码 APPROVE / 架构 CLEAR，综合 APPROVE；两路均只读审查，未独立重跑。按审查建议将逐文件只读一次的表述收窄为实际打开数与累计返回字节，避免将 aggregate counters 冒充 per-path trace。
+
+
+## [2026-10-24] test | PAN-02/PAN-06 tree 真实源与绘制生命周期
+
+- 新增 `picker/tree/lifetime.test.ts`，四条真实保存的分支消息通过 navigation/source、treePicker 连接 OverlayHost 绘制；32字节/128KiB附加文本两档各十轮。逐文件 descriptor 返回字节每轮等于三个源文件大小，过滤/折叠/20种矩形绘制不增加读取；每轮三个descriptor、峰值一个、请求≤64KiB，全关闭。关闭后立即检查 host catalogue/model/行索引释放，旧picker详情/动作不可用；浏览不改原 bytes。
+- 真实首个transcript chunk读完但响应未返回时关闭，排空后无后续读取/迟到发布；读中源变化拒绝、选择前真实metadata版本重读拒绝、损坏历史五节点只读disabled均覆盖。close abort、catalogue retention、row retention、choice revision四项反转实际AssertionError，生产两个文件逐字节恢复。
+- 聚焦3文件/61项通过，Vitest包内入口、单进程、1536MiB heap，所有验证串行。初始根runner/包runner混用导致新旧测试均在hook注册失败，按环境问题修正入口；初始按键早于host发布，等待实际帧后操作。审查发现render会清行索引、无限等待会跳过清理，均修正并补有效反转。`HANDOFF.md`记录runner陷阱。
+- 独立代码APPROVE/架构CLEAR，综合APPROVE；两路只读审查未执行验证。仅补本地小型acquisition→projection→绘制函数→close；不外推真实终端输出、OS physical I/O、总heap/最长响应或其他consumer。未跑build/exe/PTY/全量回归/真实20k压测，原矩阵35 complete/12 partial/0 open保持。提交、推送与新SHA CI另取证。
+- 最终串行静态门与47项matrix通过（状态仍partial），恢复后的聚焦61项再次通过。前批 `60a3f2a57f3001a99ee0ea1e883c2067e0e51ad1` 的CI `40080965312` / job `120834257835` 于09:11:23Z–09:25:44Z completed/success，Watch `40080965258` success；`d9593a3ce9a056019d1c090b9b42f32ece40fcdd` 的CI `40081909194` / job `120837029305` 于09:25:46Z–09:40:48Z completed/success，Watch `40081909202` success，均为2026-10-24 UTC且只绑定各自SHA。
