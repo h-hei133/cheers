@@ -136,8 +136,12 @@ describe('restore selection contract', () => {
     expect(await searchedNext.search!('record-')).toHaveLength(5);
     expect(searchedNext.onSearchClear!()).toHaveLength(101);
 
+    const changedPicker = restorePicker(root);
+    const changedFirst = await changedPicker.load();
+    const changedMore = changedFirst.find(row => row.note !== 'restorable' && row.label === 'More snapshots')!;
     await capture(root, 'edit-a', 'another-record');
-    await expect(next.load()).rejects.toThrow('changed');
+    const changedNext = (await changedPicker.apply([changedMore.id]))!.next!;
+    await expect(changedNext.load()).rejects.toThrow('changed');
   });
 
   it('does not publish a delayed search after the query was cleared', async () => {
