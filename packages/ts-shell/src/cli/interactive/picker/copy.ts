@@ -45,7 +45,10 @@ function copyPage(transcript: Transcript, context: CommandContext, source: CopyS
   const release = (): void => { closed = true; source = undefined; offered = []; };
   const admission = (): string | undefined => {
     if (context.signal?.aborted) return 'Copy cancelled. Reopen /copy before choosing a source.';
-    try { return context.admission?.(); }
+    try {
+      const blocked = context.admission?.();
+      return context.signal?.aborted ? 'Copy cancelled. Reopen /copy before choosing a source.' : blocked;
+    }
     catch { return 'Copy is unavailable. Reopen /copy before choosing a source.'; }
   };
   const project = (filter: string): readonly Option[] => {
@@ -75,6 +78,8 @@ function copyPage(transcript: Transcript, context: CommandContext, source: CopyS
       if (closed) throw new Error('Copy picker is closed.');
       const blocked = admission();
       if (blocked) throw new Error(blocked);
+      signal?.throwIfAborted();
+      if (closed) throw new Error('Copy picker is closed.');
       if (transcript.revision !== revision) throw new Error('Transcript changed after this copy list opened.');
       if (!source) {
         source = new CopySource(transcript, signal);

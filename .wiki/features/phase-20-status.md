@@ -2,39 +2,43 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
-## 当前剩余工作（2026-10-24）
+## 当前剩余工作（2026-10-24，有界复核收口）
 
-范围只来自 [Phase 20 决策](phase-20-decisions.md) 及其引用要求。机器矩阵当前为 35 `complete` / 12 `partial` / 0 `open`；这些标签记录各批证据，不证明全阶段完成。以下 12 项仍未闭合，本地缺口可以继续执行，不能统称为等待真实环境。
+范围只来自 [Phase 20 决策](phase-20-decisions.md) 及其引用要求。机器矩阵当前为 **36 complete / 11 partial / 0 open**，整体 partial。原35项complete保留已有证据；PAN-02经两路独立有限复核确认原要求已覆盖，闭合该行。本轮识别的四条本地生命周期组合已补证；以下是仍缺的明确条件，不再重复泛列“其余动作/资源待审”。
 
-| ID | 尚缺内容 | 下一步或所需输入 |
+| ID | 尚缺证据 | 所需输入或结束条件 |
 |---|---|---|
-| PRV-03 | 真实账户登录、刷新、失效、退出及跨连接隔离生命周期证据 | 需明确账户/provider、隔离 opt-in 运行条件；合成 token/audience 校验不替代实测 |
-| PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
-| TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
-| PAN-02 | tree/目录/管理动作已有批次证据；catalogue 后续页绑定一次 browse-attempt 的 compact boundary index，不再每页重新 discovery；一次 attempt 的 metadata/state/transcript body 累计读取≤64MiB，续页共享该预算，超限返回 `sourceLimited` partial 且不再发行 continuation；同一 cursor 并发重放被拒绝；catalogue→真实文件采样→picker 已补双 byte-tier、十轮全页浏览与关闭排空；真实小型保存树→navigation→picker→OverlayHost 绘制补齐双 byte-tier 十轮获取/过滤/折叠/关闭及逐文件读取计数；实际终端输出、累计 physical I/O 及总 heap/响应仍缺 | 继续清单内尚缺 consumer 的组合和资源观测；绘制函数及 descriptor bytes 不冒充真实终端、物理 I/O 或总 heap 上界 |
-| PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；operation-owned snapshot 在 recovery index 中显式标记，`/restore` 禁用并指向既有 `/undo` receipt/current-content guard，standalone snapshot 仍保留 preview/显式 execute；restore 续页使用 attempt-local page index，并复验 cursor revision 与精确 position；初始 metadata 扫描≤32MiB，所有续页 metadata 读取共享不超过初始扫描字节的累计预算，单 attempt 主动 metadata 读取≤64MiB，超限整页拒绝且不重扫目录；同一 restore cursor 并发重放被拒绝；损坏/超限 transcript 以只读 partial 展示并禁用导航动作；tree/back 与 cleanse 已补增量可读前缀、行数到限停止及提前树准入；累计 physical I/O/heap/平台证据仍缺 | 继续测量原 navigation/query 的累计 physical I/O、heap、最长响应及 undo/cleanse 总资源，不以单 source 上限替代端到端资源证明 |
-| PAN-07 | device-code poll 已可被 abort 立即取消且迟到 token 不发布；扩展 unknown outcome 已跨进程 journal 恢复，关闭未 drain 与 cleanup/lifecycle unknown 均阻断后续 mutation；真实账户登录/刷新/失效/退出生命周期仍缺 | 合成协议与扩展持久边界已本地验证；真实认证仍需明确账户/provider 与隔离 opt-in |
-| PAN-08 | 已有 MCP 跨 server 累计 4MiB/10k tools、共享绝对 deadline、peek fail-closed、通用 report producer top-N/omitted；tools/具名 skill 已补真实 source→picker→绘制/关闭，help report 在行metadata投影前累计限制200行；skill取消清除offered并在发布前复核双signal/generation。其余 consumer 组合和真实 MCP 连接/认证仍缺，总 heap/延迟为补充观测 | help重复交互、context/cost/usage overview原report→Pager、扩展skill cold/warm→picker及直接tools/skill/debug取消已补；accepted tools/skill/debug及真实终端command owner已补；六类原report producer合法overflow/partial已补，本地动作/overflow审计收口；真实MCP连接/认证需外部条件，真实认证需server/认证条件；报告 top-N 不代表所有交互 options 已有同一上界。真实认证需 server/认证条件 |
-| INPUT-01 | 本批补 Visual/Visual-Line Ctrl+C 复制真实 source selection、paste 文本/图片共享 128项/32MiB预算、device-code 取消及扩展投影总界；仍缺平台真实 IME、系统剪贴板与 Windows 交互 PTY | 本地五模式/字素/长输入合同继续；实机输入法、剪贴板与 Windows 需适用机器 |
-| QA-01 | 47 项逐任务反转矩阵与跨任务集成仍未全部闭合；已新增 `CTX-02 × TOOL-01` 实际 HTTP 集成、restore 累计预算反转、`PAN-06 restore × undo` operation-owned 路由、catalogue/listing/files/picker 三个反转，以及 saved tree/navigation/picker/OverlayHost 资源生命周期组合四个反转 | 继续随剩余 PAN/PRV/TOOL 与外部环境逐项补证；当前已明确关闭的跨任务行不得重复计数 |
-| QA-02 | Windows 交互 PTY、真实 IME、系统复制；当前源码的 line/pipe profile 身份与审批生命周期已补证 | 既有跨平台合成矩阵不重复列为未验；Windows 交互/IME/系统复制仍需适用机器和终端 |
-| QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
-| QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
+| PRV-03 | 真实账户登录、刷新、失效、退出、跨连接隔离 | 指定账户/provider及隔离opt-in条件 |
+| PRV-05 | 可信远端结算/账单与本地ledger对照 | 可信结算来源、可比较账期 |
+| TOOL-02 | 同模型full/dynamic真实配对、总量/cache成本、参数质量、四语言校准 | 固定模型/协议、预算和正式评测条件 |
+| PAN-06 | 实际系统剪贴板/平台接受结果 | 适用终端与系统复制实测；本地copy/back/restore/undo/cleanse有限生命周期已覆盖 |
+| PAN-07 | 真实认证完整生命周期 | 指定账户/provider及隔离opt-in；本地device poll/extension/unknown恢复已覆盖 |
+| PAN-08 | 真实MCP连接和认证 | 目标server、认证方式及运行条件；本地consumer、accepted owner和合法overflow已覆盖 |
+| INPUT-01 | 真实IME、系统复制、Windows交互终端 | 适用机器、终端、输入法；本地五模式/字素/粘贴/源选区/外编合同已有证据 |
+| QA-01 | 上述真实账户/账单/质量/平台任务的适用验收 | 本地47行成功/拒绝/竞态/关键反转索引已有限复核；随对应外部任务补证，不重复发明本地组合 |
+| QA-02 | Windows交互PTY、真实IME、系统复制 | 适用平台与终端；已有20格支持矩阵保留 |
+| QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
+| QA-04 | 全范围最终交付、精确SHA CI及结构/双构建/全套证据 | 外部验收完成后收口；当前历史CI失败保留，新SHA结果独立读回；不要求公开Release |
 
-undo 已改为逐条消费共享预算的 operation scan：历史页最多保留 40 条选中 receipt，latest/精确 ID 只保留所需结果，不再先保留整个解码数组。交互式历史读取现在每个receipt之间让出事件循环，关闭/撤销阻断下一条 acquisition，加载代际防止旧结果覆盖新页；结束时复核目录/index/receipt的紧凑source version，完整receipt digest及原跨进程cursor保持。32 MiB仍是单次读取预算，后续每页仍重新扫描，不能宣称已有跨页累计读取上限、OS physical I/O或总heap证明。单个JSON、index/inventory和最终stat复核仍同步有界，不是整段扫描的硬延迟保证。当前cleanse inspection从bound store读取metadata/state，版本检查还观察transcript变化但不获取其正文；一次活跃订阅的强制刷新串行排空并合并为一个待刷新标志，不外推直接读取、跨视图或整体资源验收。
+累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
 
-### 剩余验收的范围与结束条件
+### 47行有限审计处置
 
-只按原决策 §5、§6 及其直接引用收口，不从历史 WATCH 文案自动追加新能力。上表保留 12 项 partial；本次纠正证据归类，不据此提高完成数。
+两路独立只读审计按原决策逐组复核源码/fixture/既有反转与交付索引；它们没有运行测试，以下保留证据不冒充新测试执行。`verify:phase20-requirements`只验证ID/状态/非空索引，不证明行为。
 
-| 剩余类别 | 原要求与明确结束条件 |
-|---|---|
-| 本地资源组合：PAN-02 / PAN-06 / PAN-07 / PAN-08 | §6.1、§6.5 与 35 的生命周期表要求解析、分页、缓存、绘制和队列有界，超限/取消/源变化结果真实。按原 consumer 记录 acquisition → projection → retained page → close 的计数/字节预算及释放，补齐尚未完成的组合与重复交互证据；不得拿单文件 cap 替代整条链。大数量边界用单元 Mock/切片；真实 CLI 只用小型夹具。 |
-| 本地组合：QA-01 | §6.1、QA-01 要求逐任务成功、拒绝/取消、失效/竞态及关键保护的实际反转。复核现有 47 行索引并只补未闭合的行/跨任务组合；已有 CTX-02 × TOOL-01、restore × undo 和本次 profile × approval 不重复列为缺失。 |
-| 外部条件：PRV-03 / PRV-05 / TOOL-02 / PAN-07 / PAN-08 / INPUT-01 / QA-02 / QA-03 | 真实账户及登录/刷新/失效/退出、可信结算来源与账期、MCP server/认证、固定模型/预算/盲评人、适用平台/输入法/系统剪贴板。合成证据不能替代这些输入；账户/结算保留项来源还包括原决策 §9 引用的 Phase 19 A13。 |
-| 最终交付：QA-04 | 全范围验收闭合后汇总静态/结构检查、独立审查、文档、精确源码 SHA 的提交/推送/CI；原 §6.6 的最终跨域 `test:ts` 与两种构建仍需单独取证。本轮用户禁止本地全量回归的 OOM 红线优先，全套证据由适用远端 CI 承接。各批检查有效，不因本次纯测试/证据改动重复产品构建；用户要求的是提交至 GitHub，未要求新增公开 Release。 |
+| 完成任务组 | 数量 | 处置 |
+|---|---:|---|
+| CFG-01…05 | 5 | 保留profile/input/scope/environment成功、拒绝与身份变化证据；CFG-03修正到真实inputs/runtime与publication fixture |
+| PRV-01/02/04 | 3 | 保留relay精确身份、原子preset、refresh unknown证据 |
+| CTX-01…04、TOOL-01 | 5 | 保留预算/compaction/report及实际HTTP动态schema组合 |
+| UI-01…04 | 4 | 保留几何、current hit、unknown progress及精确源复制 |
+| CMD-01/02、SET-01…03 | 5 | 保留语法、失效、typed editor及外部publication/preview |
+| PAN-01…05 | 5 | 保留已有身份/能力/任务/报告/PTY；PAN-02目录、tree、管理、分页、取消及真实source→host链有限复核闭合 |
+| RENDER-01…03、EDIT-01 | 4 | 保留源文、有界渲染、精确hunk审批及反转 |
+| JOB-01/02、START-01…03 | 5 | 保留生命周期、构建身份及已有性能结果 |
+| 上表11项partial | 11 | 外部条件及其最终验收依赖逐项保留；36+11=47 |
 
-累计 OS physical I/O、page-cache 与总 heap/最长响应是当前资源 WATCH 的补充观测维度；原决策没有要求在任意机器上证明这些量的统一绝对上界。后续测量必须说明它验证上述哪一项有界性；未测仍如实标注，不把“缺这项观测”写成新功能缺陷，也不以本次范围说明静默关闭已有资源验收。§6.5 的数值是需校准的候选目标；已闭合的 START-03 不因本次纯测试改动重新开放。
+已有CTX-02×TOOL-01、restore×undo、profile×approval、catalogue/listing/files、tree/navigation/OverlayHost、cleanse burst/drain、管理动作及PAN-08消费者不重复列为缺失。§6.1要求关键保护有效反转，并不要求另造47个独立mutation。全套与两种构建仍由适用远端CI承接，遵守本轮禁止本地全套/真实20k压力和严禁并行重验证的红线。
 
 ## 2026-10-24 PAN-08 原report合法超限的可读投影
 
@@ -1024,3 +1028,14 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 最终静态门/matrix、8 files/104 tests、TS build 串行通过，heap1536/2048MiB；独立只读代码 APPROVE/架构 CLEAR，两路无验证。build `0483fcd1214c7d45e76d6f8dbf17dd09a66b728537961948c342178766db30ff`，inputs `0f540a74d82c723a9bd184b91d322d5ccf935d0fa79b3daa242ff4bd3dbf72b4`，artifact `5a6c858004a3725852efed6c0b729b8f4e60152dc4c1998c51aa6e38cb227ebd`。未跑全量/exe/PTY/20k真实压力，无scratch残留；提交/推送/当前SHA CI另取证。
 - 本地下一步限于 copy/back、restore、undo 的 acquisition→page/search→draw→retain→close/reopen 组合，以及 QA-01 的47行证据复核；不把补充 physical I/O/heap/硬延迟 WATCH 升成新要求。矩阵35complete/12partial/0open保持。
 - 前批 `7097be968fef09ed46f4ba319e597218661001a7` CI `40091752154`/job `120865687043` 于2026-10-24T12:08:07Z completed/failure：10465pass/3skip/1fail，唯一失败为 browser/smoke/request 的 decompressed bytes 用例期望unsafe-output、实际request-failed，原因尚未分类；不记成成功，也不改无关browser产品。`b26773aa49d4372bd87b3cd7917bf6fb31f1fa05`已推送，CI `40092866173`仍in_progress、Watch `40092866172`success，各自绑定精确SHA。
+
+## 2026-10-24 PAN-06有限生命周期与47行证据复核
+
+- 新四个owner lifetime fixture连接真实Transcript→CopySource、保存26题→readBackSource/navigation→back、101个实际standalone recovery records→restore、41个实际persisted receipts→undo history，并进入原OverlayHost。copy/back的32字节/128KiB源两档各十轮，copy每次打开仅一次copySources、三项source/search及每页一项+more；back每次打开三个core descriptors，逻辑body bytes等于三文件大小，后续页/搜索/20矩形绘制不再获取，descriptor峰值1/全关闭。关闭检查host/model/row及旧动作，再开重新获取；没有source闭包不可达性或heap释放证明。
+- restore用32字节/96KiB metadata padding，两档各十轮：每轮初扫101metadata、续页仅复验末条1metadata且不opendir、host输入search再完整扫101；clear经真实退格键返回tail页、20矩形绘制零额外读取。每轮203 metadata opens、body bytes=两次初扫大小+末条大小，file descriptor峰值1/全关，全部directory关闭；record metadata及唯一共享blob字节保持。原128KiB padding加JSON超过单记录128KiB合法界，初版100rows属不合格夹具，不是产品漏页。
+- undo history每页/接受保持完整index+41 receipts校验；十轮两页及两次accept，共40次完整scan，逐inode body bytes精确为源大小×40，观察到的sync descriptors每次scan后均关闭；只保留40项+more或末条host页。真实patch preview在32字节/128KiB源两档各十轮经Pager→默认Cancel确认→关闭，不新增postload readSync/open、不写workspace/receipt/blob；不宣称preview精确body bytes/async descriptor排空。清空reader引用与原只读report事实分别检查。
+- 两个真实copy准入回调abort/close在原实现均仍获取并返回源，先红后修；picker owner现回调后复核original signal及browser signal/closed。copy两保护、copy/back source/offered释放四项反转均exit1+AssertionError，生产bytes恢复。定向参考selector的活跃controller才发布、清除加载状态决定，保留本仓分页/原剪贴板owner，不复制参考实现。两路独立只读APPROVE/CLEAR，先前restore search未进入host的WATCH经真实host输入/绘制修正，两路未跑验证。
+- 最终静态门/matrix、10 files/195 tests及TS build串行通过，heap1536/2048MiB；无本地全套/exe/PTY/20k真实压力，own scratch已清理。build `612f7166d0b41ab4e0b694d41922c965bb3db1cc5fc94506b77c0b9984c17b58`，inputs `6b7f3f0eab6a0609d2915907d6d0d8804d2f695e5e2d27adb4ff90220a16bb6c`，artifact `f7f1ce062002083170299bf59d9807c1c71d19135ac54aa848a1e7f7c19ed67a`。首版undo在host发布前断言baseOptions、restore误把搜索结果当baseOptions而非model.visible，均按实际宿主合同纠正。
+- 47行独立有限复核保留原35complete，PAN-02原范围目录/tree/管理/生命周期已有可追溯证据，升为complete；现36complete/11partial/0open。四条已识别本地生命周期链收口，已有跨任务组合不重复；QA-01仍随真实账户/质量/平台任务验收保持partial。矩阵、当前剩余表、CFG-03实际fixture及QA-03既有START-03聚合引用同步，不把额外physical I/O/heap/最长响应WATCH升成新硬门。
+- 精确`b26773aa49d4372bd87b3cd7917bf6fb31f1fa05` CI `40092866173`/job `120868960040`于12:29:21Z failure：10476pass/3skip/2fail，分别为browser/smoke/request解压状态与queued back confirm零rewind。后者fixture仅等待title/active，现确认前等待实际focus ID first，保留queue/rewind断言及loading dismiss。两个文件定向5项通过（其余110未选），browser未改生产，CI触发原因仍未确认，不从一次本地green推断flake/已根治。
+- 精确`e4b86ad0457791141abb12ce29639b8adb647732`已提交/推送且远端main一致，CI `40093579333`/job `120871082975`于2026-10-24T12:38:38Z completed/success，Watch `40093579354`success。该success不改写上述历史失败，也不替代本新批次SHA的CI；当前批提交/推送与新CI另读回，全阶段仍partial。

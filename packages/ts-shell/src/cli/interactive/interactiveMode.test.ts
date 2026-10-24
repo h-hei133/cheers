@@ -1255,6 +1255,7 @@ describe("session wiring", () => {
       expect(stripAnsi(host.overlay.render(100, 30).join("\n"))).toContain("Ask again from");
       expect(dispatched).not.toHaveBeenCalledWith("/help");
       if (action === "confirm") {
+        await vi.waitFor(() => expect(Reflect.get(host.overlay, 'model').current()?.id).toBe('first'));
         terminal.input("\r");
         await vi.waitFor(() => expect(rewind).toHaveBeenCalledWith(expect.objectContaining({ entryId: "first" })));
         expect(dispatched).not.toHaveBeenCalledWith("/help");

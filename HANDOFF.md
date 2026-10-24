@@ -114,3 +114,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A legal catalogue/log/metric snapshot fails the whole report, or a renderable snapshot loses structured persistence.
 - **Root Cause**: Display and facts duplicate metadata, multibyte/control expansion changes byte costs, and codec structural nodes differ from a producer row count. A character cap also allows many short logical lines.
 - **Rule**: Fit captured metadata using the shared snapshot/text limits, reuse the codec's structure check, retain source totals/status separately from shown/omitted projection, and test text plus codec roundtrip. Retry only typed resource limits; encountered producer/type errors must propagate. Keep source reads and raw accounting outside retries.
+
+### 22. A Picker Title Can Precede Selectable Source Readiness
+- **Symptom**: A queued back test presses Enter after the overlay is active/title visible, then observes no rewind call under CI load.
+- **Root Cause**: Opening publishes the overlay immediately; asynchronous source acquisition/projection and focus settle later. The title does not establish selectable state.
+- **Rule**: Before confirming a specific choice, wait for its actual focused stable ID. Preserve separate dismissal-during-loading coverage and the original queue/operation assertions. Metadata fixtures must also respect the per-record byte cap including JSON overhead, independently of the whole-catalogue budget.

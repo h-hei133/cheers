@@ -3,7 +3,7 @@ title: "Phase 20 动态发现、压缩、渲染与启动质量评估预注册"
 category: article
 sources: [phase-20-decisions.md, tool-discovery.md, request-budget.md, compaction-operations.md, 31-tui-capability-matrix.md, 29-startup-time.md]
 created: 2026-10-22
-updated: 2026-10-23
+updated: 2026-10-24
 tags: [features, phase-20, quality, evaluation, preregistration]
 summary: "QA-03 的成对任务、评分器、统计口径与报告格式已预注册；当前 harness 已包含 20 项正式任务、隔离 MCP/extension fixture、跨进程续接、四语言 tokenizer 校准与 TOOL-02 成本/参数/缓存指标。真实模型执行和双盲评分仍未完成。"
 confidence: high
@@ -135,3 +135,7 @@ harness 的自动 policy 证据只覆盖它能够证明的部分：fixture 项�
 - 现有 RENDER/INPUT、动态发现、压缩和权限回归证明确定性合同，不证明真实模型会正确选择工具、参数或摘要策略。
 - QA-03 的 harness、20 项正式 corpus、fixture validation、tokenizer decoder 和 starter corpus 已有本地回归，但真实质量评估与双盲评分仍未执行；TOOL-02 的真实总请求成本、参数质量、cache 对比和多语言 tokenizer 校准同样未执行。逐请求发现 token attribution 与 tokenizer 差分合同已具备，仍需要真实 provider 运行来证明实际数值。
 - 当前构建上的 100 个合成 pair 已通过 `--resume --ratings` 重投影，manifest 从 revision 1 扩展到 revision 2 并绑定评分文件，证明 artifact 验证、arm 重读、评分应用和 complete 判定合同；合成 pair 不是模型输出，不能替代真实质量证据。
+
+## 2026-10-24 已有启动性能结果归口
+
+START-03的独立证据见[合同W8/W9](phase-20-contract.md#w8w9)：Performance run `39817293051` 同runner/fixture完成warm/cold各30样本，process 60/60、interactive240/240次cache drop，保留机器、构建摘要及p50/p95。Node/exe×regular/fullscreen/line/pipe计时点分开，responsiveness为Node宿主同步探针，line/pipe无TUI listener标记；null不兑换ready。此处只聚合既有结果，不重跑benchmark、不宣称当前测试批获得新性能收益，也不替代真实模型paired/盲评质量。QA-03剩余为后者及其正式成本/参数/tokenizer证据。
