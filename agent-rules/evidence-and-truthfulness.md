@@ -29,8 +29,9 @@ User-visible success must be backed by evidence. Presentation layers must not cr
 - If verification is skipped, blocked, incomplete, or not run, report that state directly.
 - Do not claim validation or verification passed unless the command actually ran and passed.
 
-## Presentation
+## Presentation & Minimal UI (MUI)
 
+- **MUI (Minimal UI)**: Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining. Use spatial structure, alignment, hierarchy, and concise tokens rather than verbose explanatory prose or redundant chrome.
 - CLI, session, result, and report presentation must preserve truthfulness.
 - Terminal/session surfaces may summarize, but they must not upgrade a stopped, blocked, partial, failed, or unverified state into success.
 - Compact output should stay answer-first and actionable while preserving status, changed files, verification state, and next-step truth.

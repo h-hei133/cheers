@@ -1,37 +1,11 @@
 # Provider And Secret Boundary
 
-Real provider access is opt-in and tightly bounded.
+Live provider models are configured and permitted for development, debugging, and end-to-end verification.
 
-## Real Provider Home
+## Live Provider Usage & Isolation
 
-Real provider configuration may exist at:
-
-```text
-/home/wang/.private-agents-real
-```
-
-Never manually read, print, copy, summarize, clean, or modify files under this path. This includes provider env files, config files, keys, tokens, headers, credentials, session files, and any provider-auth material.
-
-## Opt-In Only
-
-Real provider configuration may be consumed only through explicit opt-in gates that set:
-
-```text
-CHEERS_REAL_HOME=/home/wang/.private-agents-real
-```
-
-`CHEERS_REAL_HOME` is a credential/config source, not a runtime home.
-
-Real-provider gates must use isolated runtime and test directories such as:
-
-```text
-CHEERS_TEST_ROOT=/tmp/cheers-test/<gate-name>
-HOME=/tmp/cheers-test/<gate-name>-home
-USERPROFILE=/tmp/cheers-test/<gate-name>-home
-```
-
-Provider defaults must remain off.
-
+1. **Real Interaction Allowed**: You may invoke configured live provider models during development, interactive smoke tests, and end-to-end verification whenever live model behavior or protocol verification is useful.
+2. **Isolated Test Homes**: Automated tests and verification gates that mutate session files, caches, or profile configs must use isolated temporary directories (such as `/tmp/cheers-test/<gate-name>` or `.tmp/`) for `HOME` / `USERPROFILE` / `CHEERS_TEST_ROOT` so test runs do not pollute the user's primary runtime state or leave dirty files in the repository.
 ## Redaction
 
 Do not print, record, summarize, or commit:

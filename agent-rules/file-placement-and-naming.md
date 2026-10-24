@@ -28,8 +28,8 @@ packages/ts-shell/src/session/recovery/sessionRecoveryRuntime.ts
 
 ## Owner Domains
 
-Use existing owner domains where possible. All top-level domains under
-`packages/ts-shell/src/` are owners:
+Use existing owner domains where possible. Feature and runtime domains under
+`packages/ts-shell/src/`:
 
 ```text
 core/
@@ -43,20 +43,25 @@ session/
 evidence/
 result/
 presentation/
-policy/
 edit/
 verification/
 repair/
+advisor/
+research/
+security/
+language/
+collaboration/
+extensions/
+media/
+desktop/
 ```
 
-These are owners too, but they are cross-cutting or boundary-shaped rather than
-feature domains, so prefer putting new behavior in a feature domain when one
-fits:
+Cross-cutting, surface, or boundary-shaped owners (prefer putting new feature
+behavior in a feature domain above when one fits):
 
 ```text
 browser/          integrated browser/Playwright execution surface
 cli/              interactive CLI surface and its reusable contracts
-daemon/           Rust daemon client, protocol, and parity boundary
 entrypoints/      executables and compatibility re-exports only
 memory/           project and context memory
 sandbox/          sandbox preflight and authority
@@ -64,11 +69,10 @@ config/           configuration loading and validation
 observability/    structured logging and tracing
 artifacts/        produced-artifact inventory and access
 eval/             offline evaluation surfaces
-workflow/         repository-level workflow helpers
+workflow/         repository-level workflow and git helpers
 model-adapters/   model provider adapter boundary
 test-utils/       test-only support; never imported by production code
 ```
-
 ### `core/` admission
 
 `core/` holds runtime substrate: shell and session surface, the agent loop kernel,
@@ -148,11 +152,9 @@ Prefer this:
 runtime/execution/receipt.ts
 runtime/execution/fileWalk.ts
 runtime/execution/fileLock.ts
-runtime/execution/receipt.ts
 presentation/terminal/streaming.ts
 provider/registry/provider.ts
 ```
-
 Over this:
 
 ```text
@@ -191,39 +193,26 @@ A module may keep more than the responsibility ceiling of function-like names on
 when it is a **thin facade**: an aggregation surface whose names delegate rather
 than own behaviour. Claiming that standing requires measurement, not assertion.
 
-A module is a thin facade only when all four hold:
+A module is a thin facade only when all three hold:
 
 1. **Delegation ratio >= 0.90.** At least 90% of its declarations are a single
    call, optionally returning or reading one property of that result.
 2. **No branching.** No declaration contains `if`, `for`, `while`, `switch`,
    `try`, a ternary, or `catch`.
 3. **No own state.** No `this.<field> =` assignment outside the constructor.
-4. **Bounded bodies.** Fewer than 15 physical lines per declared name.
 
 Otherwise the module is a real monolith and the ceiling applies: split it.
 
 Run `npm run analyze:module-facades` to compute all three clauses and classify
-every over-ceiling module. The delegation threshold is not arbitrary: on the
-current tree the classification has a clean gap - facade-shaped modules sit at a
-delegation ratio at or above 0.90 with zero branching, and every real monolith
-sits at 0.35 or below - so any cutoff inside that gap classifies identically.
+every over-ceiling module. On the current tree the classification has a clean
+gap — facade-shaped modules sit at a delegation ratio at or above 0.90 with zero
+branching, and real monoliths sit at 0.35 or below. Physical lines per declared
+name are printed for context only and are not part of the verdict, because long
+modules in this tree are mostly literal tables and doc comments rather than logic.
 
-The tool has one known measurement gap, recorded rather than papered over: a
-declaration whose return type is an object type is parsed as starting mid-annotation,
-so it can be reported branch-free when it is not. One declaration in the tree is
-affected today. The error direction is always "too generous" - a module may be
-excused as a facade when it owns a little behaviour - so treat a `thin-facade`
-verdict as a prompt to look, not as proof. Three fixes were attempted and reverted
-because each regressed more verdicts than it corrected; the limitation is documented
-in the script.
-
-A fourth clause, lines per declared name, was considered and is deliberately not
-part of the verdict. Length is reported for context but does not decide, because
-it does not separate the two shapes: over-ceiling modules range from 8.8 to 144.7
-lines per name with no gap in between, and most of the tree's long modules are
-long because of literal tables and doc comments rather than logic. A module is a
-monolith because of what its declarations do, not how tall the file is.
-
+Note: a declaration whose return type is an inline object type (`readonly { ... }[]`)
+can be parsed as starting mid-annotation and reported as branch-free. Treat a
+`thin-facade` verdict as a prompt to verify, not blind proof.
 Splitting is still a design act, not a mechanical one. A module whose functions
 form a safety-ordered write path, or whose state shape is an encoded contract
 consumed elsewhere, must be split along its existing seams and never by name

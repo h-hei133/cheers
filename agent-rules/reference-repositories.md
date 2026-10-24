@@ -14,8 +14,10 @@ Only the target repository may be modified.
 
 ```text
 /home/wang/projects/source-claudecode
+/home/wang/projects/codex
+/home/wang/projects/oh-my-pi
+/home/wang/projects/deepseek-harness
 /home/wang/projects/opencode
-/home/wang/projects/gemini-cli
 /home/wang/projects/OpenHands
 /home/wang/projects/stagehand
 /home/wang/projects/playwright-mcp
@@ -31,8 +33,10 @@ Only the target repository may be modified.
 ## What Each Reference Is Useful For
 
 - Claude Code: behavior, UX, tool-result surface, compact/resume, and permission-surface comparison.
+- codex: OpenAI local coding agent architecture, `execpolicy` execution rules, cross-platform sandbox boundaries (`bwrap`/Seatbelt/Windows), patch application, worktree coordination, and headless/TUI protocol comparison.
+- oh-my-pi: IDE-integrated terminal coding agent (Pi evolution), high-density TUI components, deep LSP/DAP tool integration, multi-subagent/workpool concurrency orchestration, streaming tool cards, and provider routing comparison.
+- deepseek-harness: modular full-stack agent harness, fine-grained domain package boundaries (`compaction` & image offload, `goal` round driver, `spill` output retention, `guard` repeat-tool/timeout policies, `subagent` in-process/forked execution, and PTC runtime) comparison.
 - opencode: open-source agent architecture, permission/tool execution, apply_patch, session processor, and provider-abstraction comparison.
-- Gemini CLI: CLI/core layering, ReAct loop, built-in tools, MCP, checkpoint/headless, and sandbox comparison.
 - OpenHands: browser/runtime events, action/observation surface, sandbox/tool execution, and recovery/reporting comparison.
 - Stagehand: browser observe/act/extract, action target metadata, selector repair, action cache, and web interaction comparison.
 - Playwright MCP: browser tool schema, browser context/session lifecycle, snapshots, accessibility tree, and MCP browser-runtime comparison.
@@ -43,7 +47,6 @@ Only the target repository may be modified.
 - mini-swe-agent: lightweight agent loop, CLI trajectory, subprocess/tool evidence, benchmark scenarios, and failure-report comparison.
 - pi: coding-agent/reference project for agent/runtime architecture comparison; exact useful parts must be determined by targeted inspection when a task needs it.
 - GitNexus: coding-agent/reference project for repository intelligence, graph/context, or developer workflow comparison; exact useful parts must be determined by targeted inspection when a task needs it.
-
 ## When To Inspect References
 
 Inspect references when the current task directly touches:

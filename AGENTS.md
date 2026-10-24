@@ -16,10 +16,18 @@ Only this repository may be modified. Reference repositories are read-only and a
 
 RTK command discipline is configured outside this repository. Follow the global Codex and RTK instructions when running shell commands.
 
+## Engineering Principles & Handoff Memory
+
+- **First-Principles Thinking**: Start from the fundamental problem. Confirm the real goal, hard constraints, and verifiable success criteria before acting. Do not blindly follow convention or copy legacy patterns when a simpler, direct path solves the root problem.
+- **Pitfall Memory (`HANDOFF.md`)**: Before starting a new task, read `HANDOFF.md` at the repository root to avoid repeating known pitfalls. When you encounter and solve a non-obvious trap during work, append the root cause and guardrail to `HANDOFF.md` before finishing.
+- **MUI (Minimal UI)**: Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.
+
 ## Non-Negotiable Safety
 
-- Do not manually read, print, copy, summarize, clean, or modify real provider configuration under `/home/wang/.private-agents-real`.
-- Use real provider configuration only through explicit opt-in gates that preserve isolated runtime homes, redaction, clean repository status, and precise failure attribution.
+- Live provider models are configured and permitted for development, debugging, and end-to-end verification.
+- Isolate temporary runtime state, diagnostic scripts, and test artifacts inside `.tmp/` or `/tmp/cheers-test/` — never scatter `.tmp-*` files or logs in the repository root, and clean up temporary residue before finalizing.
+- Never print, log, commit, or hardcode raw API keys, tokens, authorization headers, or secret credentials; preserve report-safe redaction.
+- Keep provider/network/auth failures distinct from product route failures.
 - Do not infer write authorization from prompt text.
 - Keep dry-run, preview, permission-pending, denied, blocked, approved-for-write, and write-success states distinct.
 - Do not hide unverified write outcomes behind success-like terminal or session states.
@@ -54,19 +62,21 @@ Detailed rules: [file placement and naming](agent-rules/file-placement-and-namin
 
 ## Validation Summary
 
+- **No Concurrent Heavy Execution (OOM Prevention)**: NEVER run compilation, test, or verification commands (`tsc`, `vitest`, `npm run build*`, `npm run test*`, `npm run verify:*`, `normproof`) concurrently across parallel tool calls, background jobs, or subagents. Concurrent heavy processes trigger the WSL2 Linux OOM-Killer and crash the session.
+- **Batch & Fast-Fail Serial Chaining**: Chain sequential checks with `&&`. Run sub-second static gates (`verify:import-cycles`, `check:*`, `verify:docs-drift:strict`) before heavy builds or `vitest` so failures short-circuit immediately. When testing multiple files, pass all target test files into a single `vitest run <fileA> <fileB>` invocation rather than spawning separate `vitest` processes.
+- **Subagent Execution Ban**: Delegated subagents (`task`) must NEVER run `build`, `vitest`, or `normproof` mid-flight. Subagents only research or edit their slice; the main agent runs verification serially once after integration.
 - Run focused validation tied to the files and behavior changed.
 - Do not default to full-repository validation when a focused gate covers the risk.
-- If only markdown files change, do not run build/tests.
+- If only markdown files change, do not run build/tests (except `npm run verify:docs-drift:strict` when editing rule/index docs).
 - Classify failing tests before changing implementation or tests.
 - Do not claim validation passed unless the command actually ran and passed.
 - Restore audit/history residue before finalizing.
-
 CI enforces these gates, and they exit non-zero on a violation:
 
 - `npm run verify:import-cycles` — dependency cycles. Note it checks cycles only; it does not report imports that fail to resolve.
 - `npm run check:config-consumers` — config fields declared with no production reader.
 - `npm run check:declarations` — hook events declared with no dispatch site, and tool factories the registry never calls.
-- `npm run check:node-floor` — a runtime API newer than the `engines.node` floor, which CI runs on. `Promise.withResolvers` reached three modules while the floor was 20.3 and every push was red for it.
+- `npm run check:node-floor` — enforces the `engines.node` floor (`>=20.3.0`, which CI runs on). Do not use Node 21/22+ APIs such as `Promise.withResolvers`, `Object.groupBy`, `Map.groupBy`, `Array.fromAsync`, `Set.prototype.union`/`intersection`/`difference`, `Symbol.dispose`, `process.getBuiltinModule`, or `fs.globSync`.
 - `npm run verify:docs-drift:strict` — dangling path references in binding rules and current-state docs.
 - `npm run test:ts` — the TypeScript suite.
 - `npm run test:scripts` — the gates' own tests, so a gate that stops detecting fails here rather than passing quietly.
@@ -81,8 +91,10 @@ Detailed rules: [testing and validation](agent-rules/testing-and-validation.md),
 Read-only references:
 
 - Claude Code
+- codex
+- oh-my-pi
+- deepseek-harness
 - opencode
-- Gemini CLI
 - OpenHands
 - Stagehand
 - Playwright MCP
@@ -93,8 +105,6 @@ Read-only references:
 - mini-swe-agent
 - pi: coding-agent/reference project for agent/runtime architecture comparison; exact useful parts must be determined by targeted inspection when a task needs it.
 - GitNexus: coding-agent/reference project for repository intelligence, graph/context, or developer workflow comparison; exact useful parts must be determined by targeted inspection when a task needs it.
-
-Use references only after inspecting the target implementation first, and only for task-relevant semantic comparison. Do not broad-scan references without a direct blocker. Do not mechanically copy implementation code or architecture wholesale.
 
 Use references only after inspecting the target implementation first, and only for task-relevant semantic comparison. Do not broad-scan references without a direct blocker. Do not mechanically copy implementation code or architecture wholesale. When a reference has already solved the same class of problem, compare its specific decisions against your plan before writing code, and keep a test that fails when a compared decision is reversed.
 
