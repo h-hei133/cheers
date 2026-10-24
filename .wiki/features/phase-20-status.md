@@ -36,6 +36,14 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 
 累计 OS physical I/O、page-cache 与总 heap/最长响应是当前资源 WATCH 的补充观测维度；原决策没有要求在任意机器上证明这些量的统一绝对上界。后续测量必须说明它验证上述哪一项有界性；未测仍如实标注，不把“缺这项观测”写成新功能缺陷，也不以本次范围说明静默关闭已有资源验收。§6.5 的数值是需校准的候选目标；已闭合的 START-03 不因本次纯测试改动重新开放。
 
+## 2026-10-24 PAN-02 续页取消与累计预算生命周期（本地验证完成）
+
+- 修复正常“下一页”交接失败：原 catalogue attempt 的累计读取预算捕获了第一页的 AbortSignal；`action:more` 关闭原 SessionListing 后，下一页沿共享预算再次检查该旧 signal，误报取消。累计字节 quota 现在独立于单页生命周期，原 discovery、boundary/cache hit、文件 body、batch 和发布继续使用当前页 signal。
+- 原 64MiB attempt 累计预算、超限 partial/no continuation、scope/version/boundary 与并发 claim 均保留，未为续页重置 quota。比较参考 selector 的 per-load controller，以及原 restore catalogue 的共享字节状态/当前调用准入；只采用生命周期分离，不复制其目录或分页架构。
+- 小型真实目录回归先在原实现产生普通/搜索续页两项 AssertionError，以及累计预算用例的旧取消错误；最终 3 文件/34 项通过，含实际 catalogue → SessionListing → picker 的下一页交接、当前页读前取消零正文/零发布和旧页关闭后累计超限。恢复旧 signal 绑定、逐页重置 quota 两项反转均实际 AssertionError，生产源码逐字节恢复后再次通过。
+- 静态门禁与 TypeScript build 通过。build `c2ab1e4c3cd34684ec623fe7b2031ce8335e5ea827090ed938568c765a6daf96`，inputs `2d066543fcd7637a0ea3707e19305c7e0ac5d49d125a28d97d98b4c6858869c0`，artifact `1d620ba4d822913b82719f80c88ad9b0904bb88f928dae5bd4d1ace779ee6a6b`。测试/构建串行，V8 heap 分别 1536/2048MiB；未跑全量回归、exe 或 PTY，大数量边界仍只允许单元 Mock/切片。
+- 独立代码 APPROVE / 架构 CLEAR，综合 APPROVE；两路只读源码审查未运行验证。本批关闭 PAN-02 的一处真实分页取消缺陷与对应 QA-01 组合，原资源链、实际平台和外部输入缺口仍保留，矩阵仍 35 complete / 12 partial / 0 open。
+
 ## 2026-10-24 QA-01/QA-02 非交互 profile 与审批生命周期（本地验证完成）
 
 - 新增 `cli/print/profile.test.ts`，line/pipe 各顺序启动四个实际源码 CLI 进程：alpha 显式 allow-once、alpha 默认拒绝、beta 默认拒绝、beta 显式 allow-once。每次使用同一精确目标并由夹具重置，验证审批、tool、terminal event 与文件 bytes/不存在一致；两份持久审批库无 grant，模型声称成功不能抬高拒绝结果。

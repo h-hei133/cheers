@@ -8819,3 +8819,10 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 恢复后的最终聚焦 2 文件/7 项通过，Vitest 1536MiB、新增场景每个实际子进程 512MiB heap；所有验证串行。移除非交互切换守卫、错误持久化 allow-once 两项反转实际 AssertionError，生产源码逐字节恢复。最初过滤全跳过和替换匹配检查未通过不计有效反转；历史 tool fixture 和不同目标 scope 的覆盖问题已修正，`HANDOFF.md` 记录 guardrail。未运行 build、exe、PTY 或全量回归。
 - 独立两路只读审查对最终测试分别 APPROVE / CLEAR；未运行验证，不冒称独立重跑。状态页新增剩余验收的原要求与结束条件，纠正已经有本地证据的非交互生命周期缺口；其余资源组合、逐任务/跨任务验收、真实账户/结算/MCP/模型质量及平台输入仍保留，47 项状态不变。
 - 前批代码 `855b9bf32b77d2aeba49ad7bd5c50d22fd80e311` 的 CI `40077116994` / job `120822759684` 于 2026-10-24T08:12:20Z–08:31:28Z completed/success；`518e5bb687a24324422beeffad0336b99d36bb85` 的 CI `40078459456` / job `120826791666` 于 08:32:49Z–08:50:33Z completed/success，两批 Watch `40077116885` / `40078459541` 均 success。undo 批独立代码 APPROVE / 架构 CLEAR，综合 APPROVE。上述 CI 只绑定各自源码 SHA，不外推到本批测试/文档提交。
+
+## [2026-10-24] fix | PAN-02 下一页交接不继承旧页面取消
+
+- 原 catalogue attempt 的共享 source quota 捕获第一页 signal，`action:more` 关闭旧 SessionListing 后使下一页误报 AbortError。quota 现在仅保存跨页累计字节；每次原读取、cache hit、boundary/version 与发布仍检查当前页 signal。64MiB attempt 上限、partial/no continuation 和 cursor/claim 保护保持。
+- 原实现的小夹具首先产生普通/搜索续页两项 AssertionError 和累计预算用例的旧取消错误。修复后 3 文件/34 项通过，实际 store/catalogue/listing/picker 交接、当前页读前取消零 body/发布与跨页预算均有覆盖；恢复旧绑定、逐页重置 quota 两项实际 AssertionError，源码逐字节恢复后再次通过。
+- 与参考 selector per-load cancellation 和原 restore catalogue 共享字节/每次调用控制作定向比较，未复制目录架构。`HANDOFF.md` 记录 quota 与 view cancellation 混用的陷阱；独立代码 APPROVE / 架构 CLEAR，均为只读审查。
+- 静态门与 TypeScript build 通过：build `c2ab1e4c3cd3`，inputs `2d066543fcd7`，artifact `1d620ba4d822`。全部验证串行并限制 heap；未跑全量回归、exe 或 PTY。仅关闭这一分页生命周期缺陷，Phase 20 仍 35 complete / 12 partial / 0 open。

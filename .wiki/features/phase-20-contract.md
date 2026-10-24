@@ -12,6 +12,8 @@
 
 2026-10-24 QA-01/QA-02 非交互组合补证：`cli/print/profile.test.ts` 在 line/pipe 各顺序启动四个源码 CLI 进程，验证 alpha/beta 的 HTTP connection/model/credential 归属、两种切换请求均拒绝且无 handoff、同精确路径上的 allow-once 后续默认拒绝、两份审批库无持久 grant、append-only transcript 的 approval/tool/terminal 与实际文件结果一致。与 `cli/print/result.test.ts` 共 2 文件/7 项通过；移除非交互切换守卫或错误持久化 allow-once 两项反转实际失败，源码逐字节恢复后通过。独立代码 APPROVE / 架构 CLEAR；只关闭这条本地组合，不冒充新的 exe/跨平台或真实账号证据。剩余范围与明确结束条件见 [交付状态](phase-20-status.md#剩余验收的范围与结束条件)。
 
+2026-10-24 PAN-02 续页生命周期补证：`session/store/catalog/index.ts` 的 attempt quota 只保留累计字节状态，不再捕获已关闭第一页的 AbortSignal；当前页取消仍贯穿原 source/cache/boundary/batch 与发布检查。`catalog/index.test.ts`、`picker/session/lifetime.test.ts`、`picker/session/listing.test.ts` 共 34 项证明普通/搜索后页、真实 picker 交接、当前取消与旧页关闭后的累计超限；恢复旧绑定或逐页重置 quota 两项反转实际失败。原 cursor、source budget 与所有 partial 状态不变，未以单页修复关闭总资源证明。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

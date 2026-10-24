@@ -29,7 +29,8 @@ afterEach(() => {
 });
 
 function fixture(attemptBytes?: number) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-catalog-')); roots.push(root);
+  const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
+  const root = fs.mkdtempSync(path.join(scratch, 'session-catalog-')); roots.push(root);
   const layout = createSessionStoreLayout(root);
   fs.mkdirSync(layout.sessionsDir, { recursive: true });
   const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
@@ -150,6 +151,46 @@ it('reuses one browse attempt index instead of rediscovering every later page', 
   expect(next!.sessions[0]?.id).not.toBe(page!.sessions[0]?.id);
 });
 
+it.each(['', 'saved'])('continues the %s query after the previous page signal is retired', async needle => {
+  const { layout, context, catalog } = fixture();
+  seed(layout, 'current');
+  for (let index = 0; index < 4; index++) seed(layout, `saved-${index}`);
+  const firstController = new AbortController();
+  let page: SessionCatalogSnapshot | undefined;
+  for await (const snapshot of catalog.list(context, firstController.signal, 1, undefined, undefined, { needle })) page = snapshot;
+  expect(page?.continuation).toBeDefined();
+  firstController.abort(new Error('Previous session page retired'));
+  const nextController = new AbortController();
+  const collect = async () => {
+    let next: SessionCatalogSnapshot | undefined;
+    for await (const snapshot of catalog.list(context, nextController.signal, 1, undefined, undefined,
+      { needle, after: page!.continuation })) next = snapshot;
+    return next;
+  };
+  await expect(collect()).resolves.toMatchObject({ status: 'complete', hasMore: true });
+});
+
+it('cancels continuation acquisition with the current page signal after the earlier page is retired', async () => {
+  const { layout, context, catalog } = fixture();
+  seed(layout, 'current'); seed(layout, 'saved-a'); seed(layout, 'saved-b');
+  const previous = new AbortController();
+  let page: SessionCatalogSnapshot | undefined;
+  for await (const snapshot of catalog.list(context, previous.signal, 1, undefined, undefined, { needle: '' })) page = snapshot;
+  expect(page?.continuation).toBeDefined();
+  previous.abort(new Error('Retired page'));
+  const current = new AbortController();
+  const reason = new Error('Current continuation cancelled');
+  const published: SessionCatalogSnapshot[] = [];
+  vi.mocked(io.open).mockClear();
+  const collect = async () => {
+    for await (const snapshot of catalog.list(context, current.signal, 1, () => current.abort(reason), undefined,
+      { needle: '', after: page!.continuation })) published.push(snapshot);
+  };
+  await expect(collect()).rejects.toBe(reason);
+  expect(published).toEqual([]);
+  expect(io.open).not.toHaveBeenCalled();
+});
+
 it('charges continuation reads to one attempt source budget and stops with an explicit partial result', async () => {
   const { layout, context } = fixture();
   const current = seed(layout, 'current');
@@ -159,14 +200,16 @@ it('charges continuation reads to one attempt source budget and stops with an ex
     total + [files.metadataPath, files.statePath, files.transcriptPath]
       .reduce((sum, file) => sum + fs.statSync(file).size, 0), 0);
   const catalog = new SessionCatalog(layout, initialBytes + 1);
-  const first = catalog.list(context, undefined, 1, undefined, undefined, { needle: '' });
+  const firstController = new AbortController();
+  const first = catalog.list(context, firstController.signal, 1, undefined, undefined, { needle: '' });
   let page: SessionCatalogSnapshot | undefined;
   for await (const snapshot of first) page = snapshot;
   expect(page?.continuation).toBeDefined();
+  firstController.abort(new Error('Previous page closed without resetting its source quota'));
 
   // Force the continuation to reacquire source bytes rather than reuse resident summaries.
   (catalog as unknown as { cache: Map<string, unknown> }).cache.clear();
-  const second = catalog.list(context, undefined, 1, undefined, undefined, { needle: '', after: page!.continuation });
+  const second = catalog.list(context, new AbortController().signal, 1, undefined, undefined, { needle: '', after: page!.continuation });
   const pages: SessionCatalogSnapshot[] = [];
   for await (const snapshot of second) pages.push(snapshot);
   expect(pages.at(-1)).toMatchObject({ status: 'partial', sourceLimited: true, hasMore: false });

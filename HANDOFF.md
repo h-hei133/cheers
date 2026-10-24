@@ -54,3 +54,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A loopback provider fixture returns its final answer before exercising the intended tool, or old transcript events satisfy a new process's assertions.
 - **Root Cause**: Normal startup can reenter the previous session. Testing whether any historical tool message exists mistakes an earlier turn for the current tool response; a new process does not imply a new transcript.
 - **Rule**: Match fixture replies to the current turn, and assert appended transcript events against a captured prefix. When checking approval lifetime, retry the same exact target scope and check the persisted grant store; changing target paths can hide an accidentally retained grant.
+
+### 10. Cross-Page Quotas Retaining A Retired Page's Cancellation
+- **Symptom**: Selecting the next session page fails with an abort error after the previous picker closes.
+- **Root Cause**: The browse attempt retains a shared byte quota whose checks capture the first page's AbortSignal. Normal page handoff cancels that signal before the next page starts.
+- **Rule**: Keep cumulative quota state independent of view cancellation. Each acquisition must check its current page's signal, while later pages keep the same used-byte count. Test the actual listing/picker handoff and quota exhaustion after retiring the previous page.

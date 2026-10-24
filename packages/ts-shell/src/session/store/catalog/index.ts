@@ -66,7 +66,9 @@ export class SessionCatalog {
     if (!Number.isInteger(limit) || limit < 1 || limit > 10_000) throw new RangeError('Invalid session listing limit.');
     const after = query?.after;
     const attempt = after ? this.readAttempt(after) : undefined;
-    const readBudget = attempt?.readBudget ?? sessionCatalogReadBudget(this.attemptBytes, signal);
+    // The quota spans pages; each read receives the current page's signal.
+    // Retiring an earlier view must not cancel the next page's acquisition.
+    const readBudget = attempt?.readBudget ?? sessionCatalogReadBudget(this.attemptBytes);
     const attemptId = after?.attemptId ?? randomUUID();
     const selection = query ? new SessionCatalogPage(context, limit, query, attemptId, attempt?.total,
       attempt?.indexTruncated) : undefined;
