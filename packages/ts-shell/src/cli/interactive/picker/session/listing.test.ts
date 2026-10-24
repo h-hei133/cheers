@@ -206,3 +206,11 @@ it('shows confirmed page end separately from an exhausted partial scan', () => {
   expect(sessionListingStatus({ snapshot: partial, sizes: new Map() })).toContain('end is unconfirmed');
   expect(sessionListingStatus({ snapshot: partial, sizes: new Map() })).not.toContain('End of this session page range');
 });
+
+it('reports an attempt source-budget stop without implying a complete scan', () => {
+  const snapshot: SessionCatalogSnapshot = { sessions: [], scanned: 12, unreadable: 0, limited: 0,
+    sourceLimited: true, status: 'partial' };
+  const status = sessionListingStatus({ snapshot, sizes: new Map() });
+  expect(status).toContain('source budget');
+  expect(status).not.toContain('End of this session page range');
+});

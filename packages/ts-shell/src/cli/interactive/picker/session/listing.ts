@@ -153,6 +153,7 @@ export function sessionListingStatus(page: SessionListingPage): string | undefin
   else if (snapshot.status === 'scanning') notes.push(`Loading sessions: ${snapshot.scanned} checked; results are incomplete.`);
   if (snapshot.unreadable) notes.push(`${snapshot.unreadable} session sources could not be read.`);
   if (snapshot.limited) notes.push(`${snapshot.limited} previews are limited; opening rechecks the saved session.`);
+  if (snapshot.sourceLimited) notes.push('Session browsing reached its source budget; reopen to refresh the page range.');
   if (!page.stopped && snapshot.status === 'complete' && snapshot.hasMore === false) {
     notes.push('End of this session page range. Reopen to refresh saved sessions.');
   }

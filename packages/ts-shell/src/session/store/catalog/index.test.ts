@@ -10,6 +10,7 @@ import { buildSessionStateSnapshot } from '../../schema/sessionStateSnapshot.js'
 import { sessionRootEntryId } from '../../schema/sessionThread.js';
 import { createSessionStoreLayout, projectSessionFileLayout, type SessionStoreLayout } from '../sessionFileLayout.js';
 import { loadSessionRecord } from '../sessionStore.js';
+import { SessionCatalogReadLimitError, sessionCatalogReadBudget } from './files.js';
 import { SessionCatalog } from './index.js';
 import { CATALOG_LIMITS, type SessionCatalogSnapshot } from './model.js';
 import { summarizeSession } from './projection.js';
@@ -27,12 +28,13 @@ afterEach(() => {
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
 });
 
-function fixture() {
+function fixture(attemptBytes?: number) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-catalog-')); roots.push(root);
   const layout = createSessionStoreLayout(root);
   fs.mkdirSync(layout.sessionsDir, { recursive: true });
   const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
-  return { root, layout, context, catalog: new SessionCatalog(layout) };
+  return { root, layout, context,
+    catalog: attemptBytes === undefined ? new SessionCatalog(layout) : new SessionCatalog(layout, attemptBytes) };
 }
 
 function seed(store: SessionStoreLayout, id: string, overrides: Partial<Session> = {}) {
@@ -53,6 +55,21 @@ async function finish(catalog: SessionCatalog, context: { sessionId: string; pro
   for await (const page of catalog.list(context)) pages.push(page);
   return { pages, last: pages.at(-1)! };
 }
+
+it('admits exact catalogue source bytes, rejects overflow, and preserves cancellation', () => {
+  const budget = sessionCatalogReadBudget(4);
+  budget.admit(3); budget.admit(1);
+  expect(() => budget.admit(1)).toThrow(SessionCatalogReadLimitError);
+  for (const bytes of [-1, NaN, Infinity, 0.5]) {
+    expect(() => sessionCatalogReadBudget(10).admit(bytes)).toThrow(SessionCatalogReadLimitError);
+  }
+  expect(() => sessionCatalogReadBudget(-1)).toThrow(RangeError);
+  const controller = new AbortController();
+  const reason = new Error('cancelled source budget');
+  const cancelled = sessionCatalogReadBudget(1, controller.signal);
+  controller.abort(reason);
+  expect(() => cancelled.admit(0)).toThrow(reason);
+});
 
 it('publishes the runtime current identity before discovery and preserves replay/report/legacy semantics', async () => {
   const { root, layout, context } = fixture();
@@ -131,6 +148,46 @@ it('reuses one browse attempt index instead of rediscovering every later page', 
   expect(io.lstat.mock.calls.length).toBeLessThan(200);
   expect(next!.sessions).toHaveLength(21);
   expect(next!.sessions[0]?.id).not.toBe(page!.sessions[0]?.id);
+});
+
+it('charges continuation reads to one attempt source budget and stops with an explicit partial result', async () => {
+  const { layout, context } = fixture();
+  const current = seed(layout, 'current');
+  const savedA = seed(layout, 'saved-a');
+  const savedB = seed(layout, 'saved-b');
+  const initialBytes = [current.layout, savedA.layout, savedB.layout].reduce((total, files) =>
+    total + [files.metadataPath, files.statePath, files.transcriptPath]
+      .reduce((sum, file) => sum + fs.statSync(file).size, 0), 0);
+  const catalog = new SessionCatalog(layout, initialBytes + 1);
+  const first = catalog.list(context, undefined, 1, undefined, undefined, { needle: '' });
+  let page: SessionCatalogSnapshot | undefined;
+  for await (const snapshot of first) page = snapshot;
+  expect(page?.continuation).toBeDefined();
+
+  // Force the continuation to reacquire source bytes rather than reuse resident summaries.
+  (catalog as unknown as { cache: Map<string, unknown> }).cache.clear();
+  const second = catalog.list(context, undefined, 1, undefined, undefined, { needle: '', after: page!.continuation });
+  const pages: SessionCatalogSnapshot[] = [];
+  for await (const snapshot of second) pages.push(snapshot);
+  expect(pages.at(-1)).toMatchObject({ status: 'partial', sourceLimited: true, hasMore: false });
+  expect(pages.at(-1)?.continuation).toBeUndefined();
+});
+
+it('refuses concurrent replay of the same continuation cursor', async () => {
+  const { layout, context, catalog } = fixture();
+  seed(layout, 'current');
+  for (let index = 0; index < 4; index++) seed(layout, `saved-${index}`);
+  const first = catalog.list(context, undefined, 1, undefined, undefined, { needle: '' });
+  let page: SessionCatalogSnapshot | undefined;
+  for await (const snapshot of first) page = snapshot;
+  expect(page?.continuation).toBeDefined();
+  const left = catalog.list(context, undefined, 1, undefined, undefined, { needle: '', after: page!.continuation });
+  const right = catalog.list(context, undefined, 1, undefined, undefined, { needle: '', after: page!.continuation });
+  const results = await Promise.allSettled([left.next(), right.next()]);
+  expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+  const rejected = results.find(result => result.status === 'rejected');
+  expect(rejected?.status === 'rejected' ? rejected.reason : undefined).toMatchObject({ message: expect.stringMatching(/already being read/) });
+  await Promise.allSettled([left.return(undefined), right.return(undefined)]);
 });
 
 it('reports unreadable diagnostics discovered before a cancelled scan', async () => {

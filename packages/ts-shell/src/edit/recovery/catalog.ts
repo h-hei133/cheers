@@ -38,6 +38,7 @@ interface CatalogAttempt {
   readonly records: readonly RecoveryAuthorityRecordIndexEntry[];
   readonly directories: readonly DirectoryVersion[];
   readonly verification: { readonly limit: number; used: number };
+  claimed: boolean;
   cursor: RecordPosition;
 }
 
@@ -67,6 +68,8 @@ export async function readRecoveryCatalogPage(input: {
     if (comparePosition(attempt.cursor, input.after) !== 0) {
       throw new Error('Snapshot catalogue changed. Reopen /restore before continuing.');
     }
+    if (attempt.claimed) throw new Error('Snapshot page is already being read. Reopen /restore before continuing.');
+    attempt.claimed = true;
     attempts.delete(attemptId);
     attempts.set(attemptId, attempt);
     await validateDirectories(attempt.directories, input);
@@ -74,7 +77,10 @@ export async function readRecoveryCatalogPage(input: {
     const page = remaining.slice(0, pageSize);
     const records = await verifyPage(page, input, attempt.verification);
     const last = records.at(-1);
-    if (remaining.length > pageSize && last) attempt.cursor = last;
+    if (remaining.length > pageSize && last) {
+      attempt.cursor = last;
+      attempt.claimed = false;
+    }
     return {
       records,
       matches: attempt.matches,
@@ -130,7 +136,7 @@ export async function readRecoveryCatalogPage(input: {
       const directories = await directoryVersions(ledgerRoot, authorities, input);
       const admitted = RECOVERY_CATALOG_LIMITS.metadataBytes - budget.remaining();
       attempts.set(attemptId, { ledgerRoot, query, revision, matches, unavailable, records, directories,
-        verification: { limit: admitted, used: 0 }, cursor: last! });
+        verification: { limit: admitted, used: 0 }, claimed: false, cursor: last! });
       while (attempts.size > MAX_ATTEMPTS) attempts.delete(attempts.keys().next().value!);
     }
     return { records: page, matches, unavailable, ...(hasMore && last ? { next: {

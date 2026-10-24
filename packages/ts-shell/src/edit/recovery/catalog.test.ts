@@ -95,23 +95,57 @@ describe('recovery catalogue pages', () => {
     expect(opendir).not.toHaveBeenCalled();
   });
 
-  it('preserves continuation caller cancellation and admission controls', async () => {
+  it('refuses concurrent replay of the same continuation cursor before reading a second page', async () => {
     const ledgerRoot = await ledger(101);
     const first = await readRecoveryCatalogPage({ ledgerRoot });
     expect(first.next).toBeDefined();
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let entered!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const original = index.listRecoveryAuthorityRecords;
+    const list = vi.spyOn(index, 'listRecoveryAuthorityRecords').mockImplementation(async input => {
+      entered();
+      await gate;
+      return original(input);
+    });
+    const left = readRecoveryCatalogPage({ ledgerRoot, after: first.next });
+    await started;
+    const replay = readRecoveryCatalogPage({ ledgerRoot, after: first.next });
+    let outcome: unknown;
+    try {
+      outcome = await Promise.race([
+        replay.then(() => 'fulfilled', error => error),
+        new Promise(resolve => setTimeout(() => resolve('pending'), 250)),
+      ]);
+      expect(outcome).toMatchObject({ message: expect.stringMatching(/already being read/) });
+    } finally {
+      release();
+      await Promise.allSettled([left, replay]);
+    }
+    expect(list).toHaveBeenCalledOnce();
+  });
+
+  it('preserves continuation caller cancellation and admission controls', async () => {
+    const ledgerRoot = await ledger(101);
+    const continuation = async () => {
+      const page = await readRecoveryCatalogPage({ ledgerRoot });
+      expect(page.next).toBeDefined();
+      return page.next!;
+    };
     const cancelled = new AbortController();
     const reason = new Error('caller cancelled continuation');
     cancelled.abort(reason);
-    await expect(readRecoveryCatalogPage({ ledgerRoot, after: first.next, readAccess: { signal: cancelled.signal } }))
+    await expect(readRecoveryCatalogPage({ ledgerRoot, after: await continuation(), readAccess: { signal: cancelled.signal } }))
       .rejects.toBe(reason);
-    await expect(readRecoveryCatalogPage({ ledgerRoot, after: first.next,
+    await expect(readRecoveryCatalogPage({ ledgerRoot, after: await continuation(),
       readAccess: { check: () => { throw new Error('one-shot caller refusal'); } } }))
       .rejects.toBeInstanceOf(RecoveryReadControlError);
-    await expect(readRecoveryCatalogPage({ ledgerRoot, after: first.next,
+    await expect(readRecoveryCatalogPage({ ledgerRoot, after: await continuation(),
       readAccess: { admit: () => { throw new Error('caller admission refusal'); } } }))
       .rejects.toBeInstanceOf(RecoveryReadControlError);
     const admitted: number[] = [];
-    const page = await readRecoveryCatalogPage({ ledgerRoot, after: first.next,
+    const page = await readRecoveryCatalogPage({ ledgerRoot, after: await continuation(),
       readAccess: { admit: bytes => { admitted.push(bytes); } } });
     expect(page.records).toHaveLength(1);
     expect(admitted).toHaveLength(1);

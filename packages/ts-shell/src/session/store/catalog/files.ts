@@ -14,6 +14,35 @@ export interface CatalogFiles extends CatalogDirectory {
   readonly version: string;
 }
 
+export interface SessionCatalogReadBudget {
+  readonly signal?: AbortSignal;
+  readonly check: () => void;
+  readonly admit: (bytes: number) => void;
+  readonly remaining: () => number;
+}
+
+export class SessionCatalogReadLimitError extends Error {
+  constructor(message = 'Session catalogue browsing exceeds its source size limit.') {
+    super(message);
+    this.name = 'SessionCatalogReadLimitError';
+  }
+}
+
+/** Charges inspected core-file bytes before allocation and reading. */
+export function sessionCatalogReadBudget(limit: number, signal?: AbortSignal): SessionCatalogReadBudget {
+  if (!Number.isSafeInteger(limit) || limit < 0) throw new RangeError('Invalid session catalogue source limit.');
+  let used = 0;
+  const check = (): void => { signal?.throwIfAborted(); };
+  const admit = (bytes: number): void => {
+    check();
+    if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > limit - used) {
+      throw new SessionCatalogReadLimitError();
+    }
+    used += bytes;
+  };
+  return { ...(signal ? { signal } : {}), check, admit, remaining: () => limit - used };
+}
+
 /** Physical identity remains usable even when the saved content needs recovery. */
 export async function locateCatalogDirectory(store: SessionStoreLayout, id: string, signal?: AbortSignal, onSource?: (target: string) => void): Promise<CatalogDirectory | undefined> {
   assertSessionStoreProfile(store);
@@ -56,23 +85,29 @@ export async function locateCatalogFiles(store: SessionStoreLayout, id: string, 
 }
 
 /** A finite acquisition bound, checked against the opened object as well as its path. */
-export async function readCatalogFile(target: string, expected: Stats, limit: number, signal?: AbortSignal): Promise<string | undefined> {
+export async function readCatalogFile(target: string, expected: Stats, limit: number, signal?: AbortSignal,
+  budget?: SessionCatalogReadBudget): Promise<string | undefined> {
   signal?.throwIfAborted();
+  budget?.check();
   if (expected.size > limit) return undefined;
+  budget?.admit(expected.size);
   const handle = await open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
     signal?.throwIfAborted();
+    budget?.check();
     const before = await handle.stat();
     if (JSON.stringify(fileVersion(before)) !== JSON.stringify(fileVersion(expected))) throw new Error('Session changed while reading.');
     const bytes = Buffer.alloc(expected.size);
     let offset = 0;
     while (offset < bytes.length) {
       signal?.throwIfAborted();
+      budget?.check();
       const read = await handle.read(bytes, offset, Math.min(CATALOG_LIMITS.readChunkBytes, bytes.length - offset), offset);
       if (!read.bytesRead) throw new Error('Session changed while reading.');
       offset += read.bytesRead;
     }
     signal?.throwIfAborted();
+    budget?.check();
     const after = await handle.stat();
     if (JSON.stringify(fileVersion(after)) !== JSON.stringify(fileVersion(expected))) throw new Error('Session changed while reading.');
     return bytes.toString('utf8');

@@ -29,6 +29,8 @@ export interface SessionCatalogSnapshot {
   readonly unreadable: number;
   readonly limited: number;
   readonly status: 'scanning' | 'complete' | 'partial';
+  /** The attempt-local source budget stopped acquisition before a complete index was built. */
+  readonly sourceLimited?: boolean;
   /** Authorized matches checked so far, independently of page retention. */
   readonly total?: number;
   readonly continuation?: SessionCatalogContinuation;
@@ -77,5 +79,6 @@ export const CATALOG_LIMITS = Object.freeze({
   readChunkBytes: 64 * 1024,
   pageSize: 40,
   attemptEntries: 20_000,
+  attemptBytes: 64 * 1024 * 1024,
   diagnosticSamples: 32,
 });
