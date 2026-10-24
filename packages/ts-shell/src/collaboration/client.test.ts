@@ -7,7 +7,7 @@ import { readProfile, canonicalOrigin } from './client/profile.js';
 import { CollaborationGuest } from './client/guest.js';
 import { readServiceConfig } from './service/config.js';
 import { startCollaborationService } from './service/listener.js';
-import { emptySnapshot, bound, fixture, freePort } from './__tests__/fixture.js';
+import { emptySnapshot, bound, fixture, startFixtureService } from './__tests__/fixture.js';
 import { object } from './contract/value.js';
 
 const cleanups: (() => Promise<void> | void)[] = [];
@@ -30,8 +30,18 @@ it('checks explicit loopback/TLS, private bytes and profile identity without any
   const configFile = path.join(s.root, 'service.json'); fs.writeFileSync(configFile, JSON.stringify({ ...s.config, host: '0.0.0.0' }), { mode: 0o600 });
   expect(() => readServiceConfig(configFile)).toThrow();
 });
+it('retries fixture startup on an occupied port and selects a different port', async () => {
+  const s = setup(); const attempted: number[] = [];
+  const service = await startFixtureService(s.config, async config => {
+    attempted.push(config.port);
+    if (attempted.length === 1) throw Object.assign(new Error('listen EADDRINUSE'), { code: 'EADDRINUSE' });
+    return startCollaborationService(config);
+  });
+  cleanups.push(service.close);
+  expect(attempted).toHaveLength(2); expect(attempted[0]).not.toBe(attempted[1]);
+});
 it('runs two authenticated native clients, rejects declared identity mismatch and denies a second listener', async () => {
-  const s = setup(); s.config.port = await freePort(); const service = await startCollaborationService(s.config); cleanups.push(service.close);
+  const s = setup(); const service = await startFixtureService(s.config); cleanups.push(service.close);
   const alice = new CollaborationClient(profile(s, 'alice', service.origin).selected); const bob = new CollaborationClient(profile(s, 'bob', service.origin).selected);
   cleanups.push(() => { alice.close(); bob.close(); });
   expect(object((await alice.request('hello', { data: {} })).result).principal).toBe('alice');

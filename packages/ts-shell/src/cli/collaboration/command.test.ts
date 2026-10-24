@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
-import { fixture, freePort } from '../../collaboration/__tests__/fixture.js';
+import { fixture, startFixtureService } from '../../collaboration/__tests__/fixture.js';
 import { startCollaborationService } from '../../collaboration/service/listener.js';
 import { readProfile } from '../../collaboration/client/profile.js';
 import { CollaborationClient } from '../../collaboration/client/service.js';
@@ -60,7 +60,7 @@ async function setup(withGoal = false) {
   const session = createAdvisorHarness(false, false); const serviceFixture = fixture(); cleanups.push(serviceFixture.cleanup);
   if (withGoal) await runSessionGoalCommand(['set', 'Meter explicitly adopted remote work'],
     { cwd: session.root, projectRoot: session.root, sessionId: session.session.id }, session.manager, session.session);
-  serviceFixture.config.port = await freePort(); const service = await startCollaborationService(serviceFixture.config); cleanups.push(service.close);
+  const service = await startFixtureService(serviceFixture.config); cleanups.push(service.close);
   const context = { cwd: session.root, projectRoot: session.root, session: session.session } as ShellRuntimeContext;
   let approve = true; let failBarrier = false; let failSave = false; let runs = 0; let purpose = ''; let outcomeSeen: unknown;
   const renderer = { renderLine() {}, renderChunk() {} } as never;

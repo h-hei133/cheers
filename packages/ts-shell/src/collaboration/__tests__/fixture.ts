@@ -4,10 +4,12 @@ import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:net';
 import { ServiceStore } from '../service/store.js';
 import { ServiceDispatcher } from '../service/dispatch.js';
+import { startCollaborationService } from '../service/listener.js';
 import type { ServiceConfig } from '../service/config.js';
 import type { ServiceRequest, Snapshot } from '../contract/model.js';
 import { hashText, object } from '../contract/value.js';
 
+type FixtureService = Awaited<ReturnType<typeof startCollaborationService>>;
 export const bound = { sessionId: 'session-fixture', sessionCreatedAt: '2026-10-09T00:00:00.000Z', projectId: 'a'.repeat(64) };
 export const emptySnapshot: Snapshot = { version: 1, consistency: 'partial', cutover: 0, entries: [], warnings: ['partial source'] };
 export function fixture() {
@@ -26,4 +28,18 @@ export async function freePort(): Promise<number> {
   const server = createServer(); await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('No fixture port');
   await new Promise<void>(resolve => server.close(() => resolve())); return address.port;
+}
+export async function startFixtureService(config: ServiceConfig,
+  start: (selected: ServiceConfig) => Promise<FixtureService> = startCollaborationService): Promise<FixtureService> {
+  const attempted = new Set<number>(); let lastError: unknown;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    let port: number; do port = await freePort(); while (attempted.has(port));
+    attempted.add(port); config.port = port;
+    try { return await start(config); }
+    catch (error) {
+      if (typeof error !== 'object' || error === null || !('code' in error) || error.code !== 'EADDRINUSE') throw error;
+      lastError = error;
+    }
+  }
+  throw lastError;
 }
