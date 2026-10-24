@@ -30,6 +30,8 @@
 
 2026-10-24 PAN-08消费链补证：context status进入现有runCancellable并保留原signal，在配置/目录获取前及final admission后复核；usage原signal使关闭/取消后的动作和迟到account结果失效，accepted Enter保持；cost在pre/admission/config回调取消后拒绝。原context两项、usage六项、cost三项及实际route缺controller均产生AssertionError。真实context/cost report→Pager各十轮获取/过滤/20矩形/关闭，reader释放与转录报告保留分开。实际安装扩展技能cold/warm→picker双body-tier、十轮交互及接受后的dirty/unregister拒绝覆盖；同步inventory重读与parsed manifest缓存分别记账，不宣称warm零I/O。十一项保护反转均AssertionError并逐bytes恢复；最终验证/复审与精确SHA交付见status，PAN-08仍partial。
 
+2026-10-24 PAN-08 help/usage余项：两档summary各十轮真实help registry→picker→OverlayHost过滤/20矩形/live update/Esc，计入load与subscription首次publish两次读取，live update一次，绘制和关闭后update零listSlashCommands调用；只约束选中option，不外推所有内部枚举。真实usage ledger→accepted overview→cost report→Pager十轮证明reader释放与转录block保留分离、零账户fetch/绘制额外配置读取。两文件23项与两项实际AssertionError反转见status；生产bytes恢复，只增测试，无本批产品重建或完整资源/真实平台声明。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

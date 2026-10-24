@@ -14,7 +14,7 @@
 | PAN-02 | tree/目录/管理动作已有批次证据；catalogue 后续页绑定一次 browse-attempt 的 compact boundary index，不再每页重新 discovery；一次 attempt 的 metadata/state/transcript body 累计读取≤64MiB，续页共享该预算，超限返回 `sourceLimited` partial 且不再发行 continuation；同一 cursor 并发重放被拒绝；catalogue→真实文件采样→picker 已补双 byte-tier、十轮全页浏览与关闭排空；真实小型保存树→navigation→picker→OverlayHost 绘制补齐双 byte-tier 十轮获取/过滤/折叠/关闭及逐文件读取计数；实际终端输出、累计 physical I/O 及总 heap/响应仍缺 | 继续清单内尚缺 consumer 的组合和资源观测；绘制函数及 descriptor bytes 不冒充真实终端、物理 I/O 或总 heap 上界 |
 | PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；operation-owned snapshot 在 recovery index 中显式标记，`/restore` 禁用并指向既有 `/undo` receipt/current-content guard，standalone snapshot 仍保留 preview/显式 execute；restore 续页使用 attempt-local page index，并复验 cursor revision 与精确 position；初始 metadata 扫描≤32MiB，所有续页 metadata 读取共享不超过初始扫描字节的累计预算，单 attempt 主动 metadata 读取≤64MiB，超限整页拒绝且不重扫目录；同一 restore cursor 并发重放被拒绝；损坏/超限 transcript 以只读 partial 展示并禁用导航动作；tree/back 与 cleanse 已补增量可读前缀、行数到限停止及提前树准入；累计 physical I/O/heap/平台证据仍缺 | 继续测量原 navigation/query 的累计 physical I/O、heap、最长响应及 undo/cleanse 总资源，不以单 source 上限替代端到端资源证明 |
 | PAN-07 | device-code poll 已可被 abort 立即取消且迟到 token 不发布；扩展 unknown outcome 已跨进程 journal 恢复，关闭未 drain 与 cleanup/lifecycle unknown 均阻断后续 mutation；真实账户登录/刷新/失效/退出生命周期仍缺 | 合成协议与扩展持久边界已本地验证；真实认证仍需明确账户/provider 与隔离 opt-in |
-| PAN-08 | 已有 MCP 跨 server 累计 4MiB/10k tools、共享绝对 deadline、peek fail-closed、通用 report producer top-N/omitted；tools/具名 skill 已补真实 source→picker→绘制/关闭，help report 在行metadata投影前累计限制200行；skill取消清除offered并在发布前复核双signal/generation。其余 consumer 组合和真实 MCP 连接/认证仍缺，总 heap/延迟为补充观测 | context/cost原report→Pager及扩展skill cold/warm→picker已补；继续help重复交互、usage overview及其余动作/超限组合；报告 top-N 不代表所有交互 options 已有同一上界。真实认证需 server/认证条件 |
+| PAN-08 | 已有 MCP 跨 server 累计 4MiB/10k tools、共享绝对 deadline、peek fail-closed、通用 report producer top-N/omitted；tools/具名 skill 已补真实 source→picker→绘制/关闭，help report 在行metadata投影前累计限制200行；skill取消清除offered并在发布前复核双signal/generation。其余 consumer 组合和真实 MCP 连接/认证仍缺，总 heap/延迟为补充观测 | help重复交互、context/cost/usage overview原report→Pager及扩展skill cold/warm→picker已补；继续其余动作/超限索引复核，真实认证需server/认证条件；报告 top-N 不代表所有交互 options 已有同一上界。真实认证需 server/认证条件 |
 | INPUT-01 | 本批补 Visual/Visual-Line Ctrl+C 复制真实 source selection、paste 文本/图片共享 128项/32MiB预算、device-code 取消及扩展投影总界；仍缺平台真实 IME、系统剪贴板与 Windows 交互 PTY | 本地五模式/字素/长输入合同继续；实机输入法、剪贴板与 Windows 需适用机器 |
 | QA-01 | 47 项逐任务反转矩阵与跨任务集成仍未全部闭合；已新增 `CTX-02 × TOOL-01` 实际 HTTP 集成、restore 累计预算反转、`PAN-06 restore × undo` operation-owned 路由、catalogue/listing/files/picker 三个反转，以及 saved tree/navigation/picker/OverlayHost 资源生命周期组合四个反转 | 继续随剩余 PAN/PRV/TOOL 与外部环境逐项补证；当前已明确关闭的跨任务行不得重复计数 |
 | QA-02 | Windows 交互 PTY、真实 IME、系统复制；当前源码的 line/pipe profile 身份与审批生命周期已补证 | 既有跨平台合成矩阵不重复列为未验；Windows 交互/IME/系统复制仍需适用机器和终端 |
@@ -36,7 +36,14 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 
 累计 OS physical I/O、page-cache 与总 heap/最长响应是当前资源 WATCH 的补充观测维度；原决策没有要求在任意机器上证明这些量的统一绝对上界。后续测量必须说明它验证上述哪一项有界性；未测仍如实标注，不把“缺这项观测”写成新功能缺陷，也不以本次范围说明静默关闭已有资源验收。§6.5 的数值是需校准的候选目标；已闭合的 START-03 不因本次纯测试改动重新开放。
 
-## 2026-10-24 PAN-08 context/cost/usage 取消与扩展技能组合（本地实现，最终交付待取证）
+## 2026-10-24 PAN-08 help 重复交互与usage overview（仅补聚焦验收）
+
+- 原helpPicker/registry/OverlayHost在32字节/128KiB两档summary各十轮打开、alias过滤、20规定矩形绘制、live registry update及Esc中计量。每次打开两次listSlashCommands（load一次、subscribe立即publish一次），每次live update再一次；过滤/绘制与关闭后update零新增该入口调用、零host apply，options/model/row索引清空。选中option<5KiB且detail≤4096字符、raw summary保持；不把入口调用次数当作内部所有枚举计数，也不宣称完整registry字节有界。
+- usage从真实本地usage ledger，经原PickerLifecycles/OverlayHost Enter接受、overview/costReport、真实Pager，各十轮过滤/20矩形/关闭。账本110 tokens/1 recorded request事实、转录block/report不变；reader report/source/rows/filter释放，绘制无额外readConfiguration、零account fetch。无真实账户调用或实际terminal输出声明。
+- 两项关键保护的实际反转（OverlayHost释放unsubscribe、help detail安全投影）均非零且AssertionError，生产文件逐bytes恢复；未创建scratch。原test误假定subscription不立即publish及未支持execute字段已按接口修正，分别计harness drift/测试设计，不当产品缺陷。恢复后的两文件23项、最终静态门与需求矩阵串行通过，独立只读APPROVE/CLEAR；只补测试与证据，不重复产品build，沿前批build绑定，不把它标为本SHA重建。
+- 已补help/context/cost/tools/具名及扩展skill/usage overview的小型获取→投影→保留→关闭链；全目录options、full-ledger投影、真实MCP认证与其余动作/超限索引复核仍按剩余表保留，35complete/12partial/0open不提高。
+
+## 2026-10-24 PAN-08 context/cost/usage 取消与扩展技能组合（`5bd0a5a0`；已推送、CI运行中）
 
 - 原`/context`仅在getToolPool后检查signal，真实交互桥虽传runCancellable但handler未进入，故等待MCP目录时没有命令controller。新增真实routeInteractiveCommand→ShellSessionRuntime→toolPool/catalog→挂起gateway port回归在原代码实际AssertionError。status现在沿现有命令owner运行并合并原signal；非status的rule-controls路由保持。pre-abort零配置/工具获取及final admission同步abort零schema访问也在原代码实际失败。
 - usage原signal未进入load/freshness检查，真实PickerLifecycles/OverlayHost关闭后旧overview/account/reset仍返回，已接受account在原owner取消后仍可发布成功/错误；六项原实现AssertionError。现在load与isCurrent复核原signal，配置只捕获一次；accepted Enter仍可沿独立浏览生命周期工作。cost同步路径的pre-abort、admission内abort、配置回调内abort三类原实现也实际AssertionError，现在分别拒绝；不称cost存在普通异步竞态。
@@ -44,6 +51,8 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 - 实际registerPackage→SkillLoader/catalog→skillPicker/OverlayHost补32字节/128KiB两档body各十轮cold/warm打开、过滤、20矩形绘制/取消，追踪同步assertInventory正文与异步manifest descriptor分别计数。缓存命中仍有inventory重读，不能宣称零正文I/O；parsed manifest只冷加载一次，单option<512字节、descriptor全部关闭，绘制/关闭/旧apply不新增获取。缓存后实际dirty或unregister发生在Enter接受之后，精确重解析均拒绝正文与draft。
 - 首轮六文件94项通过后补原signal与实际ShellCommandRuntime同时存在回归。十一项实际反转分别撤销context注册、早期取消、final admission检查、signal合并、cost两处、usage三处、扩展parsed cache及Pager report释放，均非零退出并产生AssertionError；每项后生产source逐字节恢复。初次usage等待host安装、gateway positional signal及路由拒绝预期按harness drift修正，不算产品缺陷。最终静态门/matrix、恢复后的六文件95项与TS build串行通过，测试/build heap上限1536/2048MiB；build `6c676985d8dc343ac1e22c1f7813b0c7804cf7c5f80b3ca8f671f3d944ef931b`，inputs `6385123fa01f1e97d525053a02da2b112298474a95b33e06f826f1e62bad6400`，artifact `35f29e69af0917770982ee61dd97abf1b83e68a429d485a12eb995a10f024869`。只读独立代码APPROVE/架构CLEAR，早期取消BLOCK已解决，两路均未执行验证；无临时反转文件残留，无全量回归、exe/CLI/PTY或真实20k压测；提交/推送另取证。
 - 只证明以上小型consumer、gateway port与真实本地扩展组合；不冒充MCP wire/认证、实际终端输出、全目录options、全ledger投影或总heap/physical I/O/硬延迟。help既有真实host更新/关闭订阅证据保留，重复交互及其余consumer动作仍按剩余表核对；35complete/12partial/0open不变。
+
+- 代码SHA `5bd0a5a05974ac56bcd8061a5d7efcb9d596ce0f` 已提交、推送并精确读回远端main，工作区当时干净；CI `40088907743` 仍in_progress，Watch `40088907727` completed/success，只绑定该SHA。
 
 ## 2026-10-24 PAN-08 skill 关闭失效与真实 manifest 生命周期（`d81387c7`；已推送、CI运行中）
 

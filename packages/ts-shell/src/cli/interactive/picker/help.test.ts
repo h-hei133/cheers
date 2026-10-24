@@ -9,6 +9,7 @@ import { stripAnsi } from "../../../presentation/tui/text/ansi.js";
 import { OverlayHost } from "../overlay.js";
 import { helpPicker } from "./help.js";
 import { opensPicker, pickerFor, type PickerHost } from "./registry.js";
+import { visibleWidth } from '../../../presentation/tui/text/measure.js';
 
 describe("command guide", () => {
   it("projects the shared inventory and matches aliases without duplicate choices", async () => {
@@ -128,4 +129,45 @@ it.each(['before', 'after'] as const)('retains original help admission %s loadin
 it('requires a single current guide selection while retaining draft-only apply without a prior load', async () => {
   expect(await helpPicker().apply(['/model', '/exit'])).toBeUndefined();
   expect(await helpPicker().apply(['/model'])).toEqual({ draft: '/model ' });
+});
+
+it.each([32, 128 * 1024])('keeps repeated help draws separate from registry acquisition and released subscriptions (%i summary bytes)', async bytes => {
+  const summary = 'x'.repeat(bytes);
+  const remove = registerSlashCommand({ name: 'guide-lifetime', aliases: ['guide-lifetime-alias'], group: 'workflow', summary,
+    invocations: [{ name: 'guide-lifetime-named', summary: 'Named lifetime guide' }] });
+  const read = vi.spyOn(registry, 'listSlashCommands');
+  try {
+    for (let round = 0; round < 10; round++) {
+      const picker = helpPicker(), load = vi.spyOn(picker, 'load'), changed = vi.fn(), host = new OverlayHost(changed);
+      const baseline = read.mock.calls.length;
+      host.open(picker);
+      let update: (() => void) | undefined;
+      try {
+        await load.mock.results[0]!.value;
+        const retained = host as unknown as { baseOptions: readonly { id: string; detail?: string }[]; model: { total: number }; optionRows: ReadonlyMap<number, unknown> };
+        await vi.waitFor(() => expect(retained.baseOptions.some(row => row.id === '/guide-lifetime')).toBe(true));
+        // The registry subscription deliberately publishes an initial snapshot,
+        // so opening acquires once for load and once for subscription.
+        expect(read).toHaveBeenCalledTimes(baseline + 2);
+        const row = retained.baseOptions.find(row => row.id === '/guide-lifetime')!;
+        expect(row.detail!.length).toBeLessThanOrEqual(4096);
+        expect(Buffer.byteLength(JSON.stringify(row))).toBeLessThan(5 * 1024);
+        host.handlePaste('guide-lifetime-alias');
+        for (const width of [20, 40, 80, 120, 200]) for (const height of [8, 24, 40, 80]) {
+          const frame = host.render(width, height);
+          expect(frame.length).toBeLessThanOrEqual(height); expect(frame.every(line => visibleWidth(line) <= width)).toBe(true);
+        }
+        expect(read).toHaveBeenCalledTimes(baseline + 2);
+        update = registerSlashCommand({ name: `guide-update-${round}`, group: 'workflow', summary: 'A live registry update' });
+        expect(read).toHaveBeenCalledTimes(baseline + 3);
+        expect(retained.baseOptions.some(row => row.id === `/guide-update-${round}`)).toBe(true);
+        const apply = vi.fn(); host.handleKey(parseKeyEvent('\x1b'), apply);
+        expect(apply).not.toHaveBeenCalled(); expect(host.active).toBe(false);
+        expect(retained.baseOptions).toEqual([]); expect(retained.model.total).toBe(0); expect(retained.optionRows.size).toBe(0);
+        changed.mockClear(); update(); update = undefined;
+        expect(read).toHaveBeenCalledTimes(baseline + 3); expect(changed).not.toHaveBeenCalled();
+        expect(registry.getSlashInvocation('guide-lifetime')?.summary).toBe(summary);
+      } finally { host.close(); update?.(); }
+    }
+  } finally { read.mockRestore(); remove(); }
 });

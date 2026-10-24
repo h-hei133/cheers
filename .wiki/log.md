@@ -8890,3 +8890,9 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 实际context/cost report→Pager各十轮过滤/20矩形/关闭，逐轮一次获取，reader释放而转录block保留原报告；实际安装扩展skill两档body各十轮cold/warm→picker，inventory同步正文与parsed manifest descriptor分开计数，dirty/unregister后接受动作拒绝。warm仍复验inventory，不冒充零I/O或整体资源界。
 - 首轮六文件94项通过，再补combined original/command signal回归；十一项保护反转实际AssertionError且生产bytes恢复。初次host安装等待、gateway signal参数与路由AbortError预期错误归为harness drift。HANDOFF记录真实命令owner与传递signal的区别；对照参考dialog signal取消后拒绝迟到结果、selector token/cleanup决定，复用本仓owner。最终静态门/matrix、恢复后的六文件95项与TS build串行通过，heap1536/2048MiB；build `6c676985d8dc343ac1e22c1f7813b0c7804cf7c5f80b3ca8f671f3d944ef931b`，inputs `6385123fa01f1e97d525053a02da2b112298474a95b33e06f826f1e62bad6400`，artifact `35f29e69af0917770982ee61dd97abf1b83e68a429d485a12eb995a10f024869`。只读独立APPROVE/CLEAR，早期BLOCK已解决，两路未执行验证；反转无临时文件残留，提交/推送另取证；矩阵35complete/12partial/0open保持。
 - 前批skill SHA `d81387c7ba4e486186eab6f6f986bef434d71bbd` 已推送且远端main精确一致；CI40087846921/job120854306178仍in_progress，Watch40087846911 success。tools afcc4ce7、help9f8d5b09及cleanse b2b72b57对应CI仍in_progress，未用后续SHA结果替代。
+
+## [2026-10-24] test | PAN-08 help与usage overview重复交互
+
+- help实际registry→picker→OverlayHost两档summary各十轮filter/20矩形/live update/Esc，打开两次listSlashCommands（含subscription立即publish）、更新一次，绘制与关闭后更新零该入口调用；options/model/rows释放、选中option<5KiB/detail≤4096、raw summary保留，零Esc host apply。usage真实ledger→accepted overview→report→Pager十轮，reader释放、ledger及retained block不改，零account fetch/绘制配置获取。
+- 两项实际反转分别去掉unsubscribe释放及help detail安全投影，均AssertionError；生产bytes恢复，无scratch。首版忽略subscription立即publish与不存在execute字段归harness drift/测试设计，未改产品。独立只读APPROVE/CLEAR；恢复后最终2files23tests及静态/matrix串行通过；test/docs-only不重复产品build，矩阵35complete/12partial/0open保持。
+- 前批取消代码5bd0a5a05974ac56bcd8061a5d7efcb9d596ce0f已推送/main精确读回且当时clean，CI40088907743仍in_progress、Watch40088907727success；两项只绑定该SHA。

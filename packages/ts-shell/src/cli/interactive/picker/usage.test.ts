@@ -4,6 +4,10 @@ import { OverlayHost } from '../overlay.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { PickerLifecycles } from './lifecycle.js';
 import { usagePicker } from './usage.js';
+import { getSessionUsage, recordSessionUsage, resetSessionUsage } from '../../../observability/usageTelemetry.js';
+import { Pager, pageLongOutput } from '../../../presentation/tui/chrome/pager.js';
+import { reportText } from '../../../core/commands/report/projection.js';
+import { visibleWidth } from '../../../presentation/tui/text/measure.js';
 
 afterEach(() => { vi.restoreAllMocks(); });
 
@@ -87,4 +91,38 @@ it('keeps accepted account work independent of the retired browser signal', asyn
     await expect(picker.apply(['account'])).resolves.toEqual({ note: 'Account result' });
     expect(account).toHaveBeenCalledOnce();
   } finally { host.close(); }
+});
+
+it('opens the actual usage overview reader repeatedly without account fetches or drawing acquisitions', async () => {
+  const sessionId = 'usage-cancellation'; resetSessionUsage(sessionId);
+  recordSessionUsage(sessionId, { provider: 'fixture', model: 'overview', promptTokens: 100, completionTokens: 10 });
+  const before = JSON.stringify(getSessionUsage(sessionId)), pager = new Pager();
+  try {
+    for (let round = 0; round < 10; round++) {
+      const { lifetimes, controller, read, account, picker } = fixture(), host = new OverlayHost(() => {});
+      const load = vi.spyOn(picker, 'load'); host.open(picker);
+      try {
+        await load.mock.results[0]!.value;
+        await vi.waitFor(() => expect((host as unknown as { model: { total: number } }).model.total).toBe(3));
+        const apply = vi.fn(); host.handleKey(parseKeyEvent('\r'), apply);
+        expect(apply).toHaveBeenCalledWith(picker, ['overview']); expect(controller.signal.aborted).toBe(false);
+        const outcome = await picker.apply(['overview']), report = outcome!.report!;
+        expect(report.facts).toMatchObject({ recordedTokens: 110, recordedTurns: 1, shownModels: 1 });
+        const block = { text: reportText(report), report, collapsed: false }, snapshot = JSON.stringify(report);
+        expect(pageLongOutput(pager, '/usage', block)).toBe(true); expect(block.collapsed).toBe(true);
+        const acquisitions = read.mock.calls.length;
+        pager.handlePaste('tokens');
+        for (const width of [20, 40, 80, 120, 200]) for (const height of [8, 24, 40, 80]) {
+          const frame = pager.render(width, height, height);
+          expect(frame.length).toBeLessThanOrEqual(height); expect(frame.every(line => visibleWidth(line) <= width)).toBe(true);
+        }
+        pager.handleKey('escape', undefined, 24);
+        expect(pager.active).toBe(false); expect(pager.text).toBe('');
+        expect(pager as unknown as { report?: unknown; rows: unknown[]; filter: string }).toMatchObject({ report: undefined, rows: [], filter: '' });
+        expect(read).toHaveBeenCalledTimes(acquisitions); expect(account).not.toHaveBeenCalled();
+        expect(block.report).toBe(report); expect(JSON.stringify(report)).toBe(snapshot);
+        expect(JSON.stringify(getSessionUsage(sessionId))).toBe(before);
+      } finally { host.close(); pager.close(); lifetimes.abortAll(); }
+    }
+  } finally { resetSessionUsage(sessionId); }
 });
