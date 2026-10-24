@@ -36,7 +36,7 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 
 累计 OS physical I/O、page-cache 与总 heap/最长响应是当前资源 WATCH 的补充观测维度；原决策没有要求在任意机器上证明这些量的统一绝对上界。后续测量必须说明它验证上述哪一项有界性；未测仍如实标注，不把“缺这项观测”写成新功能缺陷，也不以本次范围说明静默关闭已有资源验收。§6.5 的数值是需校准的候选目标；已闭合的 START-03 不因本次纯测试改动重新开放。
 
-## 2026-10-24 PAN-06 cleanse 刷新排空与合并（本地实现与聚焦验证）
+## 2026-10-24 PAN-06 cleanse 刷新排空与合并（`b2b72b57`；已推送、CI运行中）
 
 - 原订阅在每个强制 native publication 后 abort 旧读取，立即启动新 inspection。持有真实 metadata descriptor 尚未交回 source 时，50次通知实际启动51次 inspection，新用例在原实现产生两项 AssertionError；取消不等于 filesystem acquisition 已结束。
 - 原 `cli/runtime/security.ts` 保留 pending controller 到 promise 最终结束，期间强制通知撤销旧 generation、abort 并合并为一个 trailing 标志；排空后只补读一次最新来源。关闭订阅清除该标志、取消在途读取且不再启动。原同步读取、同源轮询跳过、revision 前后复核、失败恢复与 owner/draft 合同保持。
@@ -44,14 +44,16 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 - 绕过 pending guard、移除尾随刷新、移除排空后的 slot release 三项反转均产生实际 AssertionError，产品文件逐字节恢复。移除尾随刷新的前两次尝试被普通轮询及 `vi.waitFor` 自动推进 fake timer 兜底而误过，不计有效反转；通知用例改为可清理的真实 no-op timer，隔离轮询后才证明尾随保护。此修正只针对夹具，不改变产品poll周期。
 - 对照参考 selector 的单个作用域只保留一个活跃加载、当前 controller 才能发布及取消清理，沿用本仓 owner；额外保留一个 trailing native 请求以避免丢掉最新证据，不复制参考目录架构。只证明单订阅队列与本夹具 source acquisition，不外推全进程 heap、OS physical I/O、最长响应、跨视图或其他 consumer。矩阵仍35 complete / 12 partial / 0 open。
 - 恢复后的3文件37项、静态门与matrix、TypeScript build全部串行通过，测试/构建heap上限分别1536/2048MiB。build `a8bcdd32d28ad57e3548116edacd1ea6f75ded8244a359906d018bdc49776c52`，inputs `b5414419b3c0d438ff7059c1adf52f9caf40ecbbc7975ede988597ae152b7c5b`，artifact `dae1d5e4955c394331b0c1052f2f2b01a97ba9aa8744e7a00ac17f6a87cf20b7`。独立代码APPROVE/架构CLEAR，综合APPROVE，均只读审查未执行验证。未跑全量回归、exe、PTY或真实20k消息压测；若底层读取不settle，后续刷新会继续等待排空，不声称有新的硬deadline。
+- 代码提交 `b2b72b57c97be164bcd51aa6d392ccd761fb4e5b` 已推送并精确读回远端main；CI `40084447090` / job `120844379409` 自2026-10-24T10:04:18Z仍in_progress，未计成功。Watch `40084447084` / job `120844379500` 于10:04:18Z–10:04:44Z completed/success。结果仅绑定该代码SHA，不外推后续文档提交。
 
-## 2026-10-24 PAN-02/PAN-06 tree 真实读取与绘制生命周期（本地验证完成）
+## 2026-10-24 PAN-02/PAN-06 tree 真实读取与绘制生命周期（`6c79b86f`；CI/Watch success）
 
 - `picker/tree/lifetime.test.ts` 直接使用 SessionManager 保存记录、真实 navigation/source、treePicker 与 OverlayHost，不替换导航查询。四条分支消息加一个根节点，32 字节/128KiB 附加文本两档各打开十轮；逐路径 descriptor 返回字节每轮恰好等于三个源文件大小，过滤/折叠/20种规定矩形绘制不增加读取。每轮三个 descriptor、峰值一个、每次请求≤64KiB，全部关闭；host 清空保留的 options、model 和行索引，旧 picker 不再提供详情或选择。
 - 真实 transcript 首个64KiB read 已完成但响应仍 pending 时关闭，排空后不再读取下一块/发布迟到树，全部句柄关闭。读取中改变源被拒绝；选择前改变 metadata 后实际重读并拒绝版本差；损坏 transcript 保留五个只读 disabled 节点，浏览/拒绝不改变持久 bytes。
 - 撤掉 host close abort、保留关闭 host catalogue、保留关闭后的行索引、撤掉选择版本校验四项反转均产生 AssertionError；两个生产文件逐字节恢复。聚焦3文件/61项通过；Vitest 单进程、1536MiB heap，所有验证串行。初始根目录 Vitest 与包内 runner 混用导致原测试也在 hook 注册失败，改用包内入口；初始按键断言早于 host 发布，改为等待实际帧后操作，未修改产品行为。审查发现关闭后的 render 会清空行索引而掩盖释放断言，已改为关闭后立即检查，并新增对应有效反转；取消夹具改用有界等待，确保失败也进入 finally 排空。`HANDOFF.md` 记录 runner 陷阱。
 - 只补本地小型真实 acquisition→projection→绘制函数→close，不宣称实际终端输出、OS physical I/O、总 heap/最长响应或其他 consumer 验收完成。未运行构建、PTY、全量回归或真实二进制20k压测；矩阵仍为35 complete / 12 partial / 0 open。
 - 独立代码 APPROVE / 架构 CLEAR，综合 APPROVE；两路仅只读审查，未独立运行验证。
+- 提交 `6c79b86f9fc1956dade013c3823192d88073fad9` 已推送；精确CI `40083284126` / job `120841026998` 于2026-10-24T09:46:30Z–10:05:23Z completed/success，Watch `40083284139` completed/success。结果只绑定该SHA，不外推本批产品修复。
 
 ## 2026-10-24 PAN-02 picker 资源链与重复交互（`d9593a3c`；CI/Watch success）
 
