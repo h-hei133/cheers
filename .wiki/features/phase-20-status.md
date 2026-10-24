@@ -21,7 +21,7 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-undo 已改为逐条消费共享预算的 operation scan：历史页最多保留 40 条选中 receipt，latest/精确 ID 只保留所需结果，不再先保留整个解码数组。完整 receipt 校验与 revision 仍覆盖全部记录，32 MiB 仍是单次读取预算，后续每页仍重新扫描，不能宣称已有跨页累计读取上限、OS physical I/O 或总 heap 证明；cleanse 还需区分 retained state 与 session navigation 的合计成本。
+undo 已改为逐条消费共享预算的 operation scan：历史页最多保留 40 条选中 receipt，latest/精确 ID 只保留所需结果，不再先保留整个解码数组。完整 receipt 校验与 revision 仍覆盖全部记录，32 MiB 仍是单次读取预算，后续每页仍重新扫描，不能宣称已有跨页累计读取上限、OS physical I/O 或总 heap 证明。当前 cleanse inspection 从 bound store 读取 metadata/state，版本检查还观察 transcript 变化但不获取其正文；一次活跃订阅中的强制刷新现已串行排空并合并为一个待刷新标志，仍不能以此宣称所有直接读取、跨视图重开或整体资源验收完成。
 
 ### 剩余验收的范围与结束条件
 
@@ -35,6 +35,15 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 | 最终交付：QA-04 | 全范围验收闭合后汇总静态/结构检查、独立审查、文档、精确源码 SHA 的提交/推送/CI；原 §6.6 的最终跨域 `test:ts` 与两种构建仍需单独取证。本轮用户禁止本地全量回归的 OOM 红线优先，全套证据由适用远端 CI 承接。各批检查有效，不因本次纯测试/证据改动重复产品构建；用户要求的是提交至 GitHub，未要求新增公开 Release。 |
 
 累计 OS physical I/O、page-cache 与总 heap/最长响应是当前资源 WATCH 的补充观测维度；原决策没有要求在任意机器上证明这些量的统一绝对上界。后续测量必须说明它验证上述哪一项有界性；未测仍如实标注，不把“缺这项观测”写成新功能缺陷，也不以本次范围说明静默关闭已有资源验收。§6.5 的数值是需校准的候选目标；已闭合的 START-03 不因本次纯测试改动重新开放。
+
+## 2026-10-24 PAN-06 cleanse 刷新排空与合并（本地实现与聚焦验证）
+
+- 原订阅在每个强制 native publication 后 abort 旧读取，立即启动新 inspection。持有真实 metadata descriptor 尚未交回 source 时，50次通知实际启动51次 inspection，新用例在原实现产生两项 AssertionError；取消不等于 filesystem acquisition 已结束。
+- 原 `cli/runtime/security.ts` 保留 pending controller 到 promise 最终结束，期间强制通知撤销旧 generation、abort 并合并为一个 trailing 标志；排空后只补读一次最新来源。关闭订阅清除该标志、取消在途读取且不再启动。原同步读取、同源轮询跳过、revision 前后复核、失败恢复与 owner/draft 合同保持。
+- `cli/runtime/security/refresh.test.ts` 用真实 bound store/descriptor 验证突发期间一次活跃 inspection；排空后最后一条过程内 unknown-durability 证据可见。该夹具累计打开/关闭3个 descriptor，峰值1，返回正文恰好为一次 metadata+state 大小；关闭 queued 状态仅原 metadata descriptor 被关闭、零正文/发布。新增实际 inspector→cleansePicker→OverlayHost 组合，load、被取消的首次subscription及合并后refresh累计5个descriptor、正文恰为两次metadata+state、峰值1，最新证据进入detail和绘制，关闭后原owner通知零读/发布。失败后下一轮轮询恢复，unchanged idle 不读正文。首次修复后夹具缺 unknown durability，被原 inspectionState 正确忽略，补齐合法过程内证据而未修改 merge 合同。
+- 绕过 pending guard、移除尾随刷新、移除排空后的 slot release 三项反转均产生实际 AssertionError，产品文件逐字节恢复。移除尾随刷新的前两次尝试被普通轮询及 `vi.waitFor` 自动推进 fake timer 兜底而误过，不计有效反转；通知用例改为可清理的真实 no-op timer，隔离轮询后才证明尾随保护。此修正只针对夹具，不改变产品poll周期。
+- 对照参考 selector 的单个作用域只保留一个活跃加载、当前 controller 才能发布及取消清理，沿用本仓 owner；额外保留一个 trailing native 请求以避免丢掉最新证据，不复制参考目录架构。只证明单订阅队列与本夹具 source acquisition，不外推全进程 heap、OS physical I/O、最长响应、跨视图或其他 consumer。矩阵仍35 complete / 12 partial / 0 open。
+- 恢复后的3文件37项、静态门与matrix、TypeScript build全部串行通过，测试/构建heap上限分别1536/2048MiB。build `a8bcdd32d28ad57e3548116edacd1ea6f75ded8244a359906d018bdc49776c52`，inputs `b5414419b3c0d438ff7059c1adf52f9caf40ecbbc7975ede988597ae152b7c5b`，artifact `dae1d5e4955c394331b0c1052f2f2b01a97ba9aa8744e7a00ac17f6a87cf20b7`。独立代码APPROVE/架构CLEAR，综合APPROVE，均只读审查未执行验证。未跑全量回归、exe、PTY或真实20k消息压测；若底层读取不settle，后续刷新会继续等待排空，不声称有新的硬deadline。
 
 ## 2026-10-24 PAN-02/PAN-06 tree 真实读取与绘制生命周期（本地验证完成）
 

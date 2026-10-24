@@ -78,12 +78,12 @@ export function securityInspectorFor(context: ShellRuntimeContext): SecurityInsp
   };
   return { read, readAsync, subscribe: (listener, signal) => {
     let released = false; let previous: string | undefined; let admitted: string | undefined; let generation = 0;
-    let pending: AbortController | undefined;
+    let pending: AbortController | undefined; let refreshQueued = false;
     let timer: ReturnType<typeof setInterval> | undefined;
     let releaseOwner: (() => void) | undefined;
     const stop = () => {
       if (released) return;
-      released = true; generation++; admitted = undefined; previous = undefined;
+      released = true; generation++; admitted = undefined; previous = undefined; refreshQueued = false;
       pending?.abort(); pending = undefined;
       if (timer !== undefined) clearInterval(timer);
       releaseOwner?.();
@@ -91,18 +91,22 @@ export function securityInspectorFor(context: ShellRuntimeContext): SecurityInsp
     };
     const publish = (force = false) => {
       if (released) return;
+      if (pending) {
+        if (force) {
+          refreshQueued = true; admitted = undefined; generation++;
+          pending.abort();
+        }
+        return;
+      }
       const before = sourceRevision();
       if (released) return;
       if (!force && before !== undefined && before === admitted) return;
-      if (!force && pending) return;
       const current = ++generation;
-      pending?.abort();
       const controller = signal === undefined ? undefined : new AbortController();
       pending = controller;
       admitted = undefined;
       const deliver = (inspection: SecurityInspection) => {
         if (released || current !== generation || controller?.signal.aborted) return;
-        pending = undefined;
         const after = inspection.state === 'ready' ? sourceRevision() : undefined;
         if (released || current !== generation) return;
         if (before !== undefined && before === after) admitted = after;
@@ -114,6 +118,11 @@ export function securityInspectorFor(context: ShellRuntimeContext): SecurityInsp
       };
       if (controller) void readAsync(controller.signal).then(deliver, () => {
         if (!released && current === generation && !controller.signal.aborted) deliver({ state: 'unavailable' });
+      }).finally(() => {
+        // Cancellation invalidates the result; the next acquisition waits for
+        // its predecessor to release descriptors and finish source projection.
+        if (pending === controller) pending = undefined;
+        if (!released && refreshQueued) { refreshQueued = false; publish(true); }
       });
       else deliver(read());
     };
@@ -121,7 +130,8 @@ export function securityInspectorFor(context: ShellRuntimeContext): SecurityInsp
     signal?.addEventListener('abort', stop, { once: true });
     releaseOwner = service.publication.subscribe(() => publish(true));
     // The persisted owner has no cross-process events. Observe external changes
-    // only while this view is open; native publication updates remain immediate.
+    // only while this view is open. Native notices request a refresh without
+    // waiting for a poll; any active acquisition drains before its replacement.
     timer = setInterval(publish, 1000); timer.unref?.();
     publish();
     return stop;

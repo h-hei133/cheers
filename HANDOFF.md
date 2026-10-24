@@ -64,3 +64,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Both a new test and an unchanged test fail at `afterEach` with `Cannot read properties of undefined (reading 'on')`, before collecting any tests.
 - **Root Cause**: The root runner and the package-local Vitest resolve different runner instances in a workspace with both installed. Hook registration then cannot see the collecting suite.
 - **Rule**: Run focused tests from the owning package using its local Vitest executable. Classify collection failures separately from product assertions; do not change product code or dependencies to repair an incorrectly selected runner.
+
+### 12. Cancelling A Refresh Does Not Drain Its Acquisition
+- **Symptom**: A burst of native publication events starts many inspections while an older descriptor acquisition is still pending, even though every older AbortController was cancelled.
+- **Root Cause**: An abort invalidates the result but does not synchronously settle filesystem promises or release descriptors. Immediately replacing the pending controller loses the resource reservation too early.
+- **Rule**: Keep the active acquisition slot until its promise settles. Coalesce later refresh requests into one trailing flag, discard superseded results, and drop queued work on view closure. Test a real opened descriptor held before delivery, then verify both latest-result delivery and closure while queued.

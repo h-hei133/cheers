@@ -8843,3 +8843,12 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 聚焦3文件/61项通过，Vitest包内入口、单进程、1536MiB heap，所有验证串行。初始根runner/包runner混用导致新旧测试均在hook注册失败，按环境问题修正入口；初始按键早于host发布，等待实际帧后操作。审查发现render会清行索引、无限等待会跳过清理，均修正并补有效反转。`HANDOFF.md`记录runner陷阱。
 - 独立代码APPROVE/架构CLEAR，综合APPROVE；两路只读审查未执行验证。仅补本地小型acquisition→projection→绘制函数→close；不外推真实终端输出、OS physical I/O、总heap/最长响应或其他consumer。未跑build/exe/PTY/全量回归/真实20k压测，原矩阵35 complete/12 partial/0 open保持。提交、推送与新SHA CI另取证。
 - 最终串行静态门与47项matrix通过（状态仍partial），恢复后的聚焦61项再次通过。前批 `60a3f2a57f3001a99ee0ea1e883c2067e0e51ad1` 的CI `40080965312` / job `120834257835` 于09:11:23Z–09:25:44Z completed/success，Watch `40080965258` success；`d9593a3ce9a056019d1c090b9b42f32ece40fcdd` 的CI `40081909194` / job `120837029305` 于09:25:46Z–09:40:48Z completed/success，Watch `40081909202` success，均为2026-10-24 UTC且只绑定各自SHA。
+
+
+## [2026-10-24] fix | PAN-06 cleanse 原订阅刷新排空与合并
+
+- 原runtime subscription遇到强制native通知即abort并重启异步inspection，真实metadata descriptor尚未交回source时50次通知启动51次；两个新例原源码实际AssertionError。现保留在途controller直到promise settled，强制通知撤销generation/abort并合并为一个trailing标志，排空后只刷新一次最新证据，关闭丢弃队列。同步读、poll/revision与原permission/draft合同未改。
+- 新 `cli/runtime/security/refresh.test.ts` 真实bound source覆盖通知burst/latest/close、failed read后poll恢复，并连接实际cleansePicker/OverlayHost；单订阅inspection峰值1，面板组合5descriptor全关闭、body恰为两次metadata+state，最新过程内unknown证据到detail/绘制，关闭后无读取/发布。夹具初始缺unknown durability被原merge正确忽略，修正合法数据，未改merge语义。
+- 绕过pending guard、移除trailing refresh、移除slot release三项有效反转均AssertionError，产品源码逐字节恢复。早期trailing反转被poll及waitFor自动推进fake-timer兜底而误过，不计有效；改成可清理真实no-op timer隔离poll后重做。`HANDOFF.md`记录abort不等于排空的guardrail。
+- 最终串行静态门、47项matrix、3文件37项聚焦测试及TS build通过，heap上限1536/2048MiB。build `a8bcdd32d28ad57e3548116edacd1ea6f75ded8244a359906d018bdc49776c52`，inputs `b5414419b3c0d438ff7059c1adf52f9caf40ecbbc7975ede988597ae152b7c5b`，artifact `dae1d5e4955c394331b0c1052f2f2b01a97ba9aa8744e7a00ac17f6a87cf20b7`。独立代码APPROVE/架构CLEAR，综合APPROVE，均只读不跑验证。
+- 与参考selector的active-load guard/current-controller publish做定向比较，保留本仓owner并用单trailing请求保留最新native通知。结论仅单订阅与该consumer夹具，非跨视图/总heap/physical I/O/最长响应证明；不会绕过未settle读取去启动下一次。未跑exe/PTY/全量回归/真实20k消息压测；Phase20仍35complete/12partial，commit/push新SHA CI另取证。

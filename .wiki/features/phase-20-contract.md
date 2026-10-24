@@ -18,6 +18,8 @@
 
 2026-10-24 PAN-02/PAN-06 tree 资源组合补证：`picker/tree/lifetime.test.ts` 以四条真实保存的分支消息连接 navigation/source、treePicker 和 OverlayHost 绘制。两档消息字节各十轮，逐文件 descriptor bytes 每轮等于三文件大小，搜索/折叠/20种矩形绘制零额外读取，关闭清空 host catalogue/model/行索引；pending transcript read 取消排空、读中源变化、选择前真实版本重读及 damaged partial 只读拒绝均覆盖。与原 tree/source 测试共3文件61项；close abort、host catalogue retention、row retention、choice revision 四项反转实际 AssertionError。只证明小型原 consumer 与绘制函数组合，不冒充实际终端输出、总 heap、physical I/O 或整个 PAN-06 完成。
 
+2026-10-24 PAN-06 cleanse 刷新队列补证：原强制通知在旧 descriptor 尚未排空时立即重启，50通知实际启动51 inspection。`cli/runtime/security.ts` 现在保留一个在途槽位直到settled，并合并一个尾随刷新；关闭丢弃队列。`cli/runtime/security/refresh.test.ts` 使用真实bound source及实际cleansePicker/OverlayHost，覆盖burst/latest、close/drop、失败后poll恢复，单订阅inspection峰值1，面板组合5descriptor/两次metadata+state正文、全关闭。与原runtime/picker共3文件37项通过，三项实际反转均AssertionError；通知用例排除普通poll与waitFor自动fake-timer兜底。静态门、TS build通过，原35 complete/12 partial保持；不冒充跨视图、总heap/physical I/O/终端输出证明。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |
