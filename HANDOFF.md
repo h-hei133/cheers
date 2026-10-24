@@ -49,3 +49,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A 40-item undo page or one latest/exact-ID lookup retains the entire decoded operation ledger before selecting its result.
 - **Root Cause**: A bounded display slice runs after eager array acquisition. Incremental hashing alone does not remove that array.
 - **Rule**: Consume receipts through the shared budgeted scan and retain only the selected page or result. Continue validating every receipt and preserve the full-ledger cursor digest; stopping at a full page or first match can hide a damaged older receipt.
+
+### 9. Fresh CLI Processes Can Reenter Existing Conversation History
+- **Symptom**: A loopback provider fixture returns its final answer before exercising the intended tool, or old transcript events satisfy a new process's assertions.
+- **Root Cause**: Normal startup can reenter the previous session. Testing whether any historical tool message exists mistakes an earlier turn for the current tool response; a new process does not imply a new transcript.
+- **Rule**: Match fixture replies to the current turn, and assert appended transcript events against a captured prefix. When checking approval lifetime, retry the same exact target scope and check the persisted grant store; changing target paths can hide an accidentally retained grant.

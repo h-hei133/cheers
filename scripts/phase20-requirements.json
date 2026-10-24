@@ -264,14 +264,14 @@
     {
       "id": "QA-01",
       "status": "partial",
-      "evidence": "scripts/phase20-requirements.json plus .wiki/features/phase-20-contract.md; task-specific reversal evidence; CTX-02 x TOOL-01 actual HTTP schema-delta integration and three reversals; PAN-06 restore x undo operation-owned routing and three reversals",
-      "missing": "CTX-02 x TOOL-01 and PAN-06 restore x undo are now covered, but the remaining task-specific reversals and cross-task integration rows are not yet closed."
+      "evidence": "scripts/phase20-requirements.json plus .wiki/features/phase-20-contract.md; task-specific reversal evidence; CTX-02 x TOOL-01 actual HTTP schema-delta integration and three reversals; PAN-06 restore x undo operation-owned routing and three reversals; line/pipe profile x approval lifecycle via actual CLI and loopback HTTP, same-target retries, empty grant stores and two assertion-producing reversals; restored focused 2-file/7-test batch",
+      "missing": "CTX-02 x TOOL-01, PAN-06 restore x undo and local non-interactive profile x approval are covered; audit the remaining task-specific success/refusal/race/reversal and cross-task rows against the original decisions, without reopening already evidenced combinations."
     },
     {
       "id": "QA-02",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-status.md QA-02; Platform QA 39834842595 with 20 supported CLI cells",
-      "missing": "Windows interactive PTY, real IME behavior, system copy and non-interactive profile-switch/approval lifecycle remain unverified."
+      "evidence": ".wiki/features/phase-20-status.md QA-02; Platform QA 39834842595 with 20 supported CLI cells; current source CLI line/pipe profile x approval lifecycle in cli/print/profile.test.ts with actual per-profile loopback HTTP identity, non-interactive switch rejection and same-target default denial after allow-once; restored 2-file/7-test batch and two reversals",
+      "missing": "Windows interactive PTY, real IME behavior and system copy remain unverified. Current source-CLI local lifecycle evidence does not claim a new packaged-executable or cross-platform run."
     },
     {
       "id": "QA-03",

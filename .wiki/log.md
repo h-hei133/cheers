@@ -8812,3 +8812,10 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 原 canonical scope+receipt digest、`revision:operationId` cursor、三页/精确 ID 顺序、unknown barrier、恢复审批和只读取消不变。没有以 metadata 缓存代替全文 revision，也没有在满页或命中结果后跳过坏尾部。
 - 单进程聚焦 3 文件/35 项、静态门禁、TypeScript build 通过；提前读完 source、调用层收集数组、latest 提前返回、满页停止校验四项反转实际 AssertionError，恢复后再次通过。build `68d3b93523cd`，inputs `002fdcb629e4`，artifact `a556e7c488c5`。测试/构建分别限制 V8 heap 为 1536/2048 MiB，所有命令串行；未运行全量回归、exe 构建或真实 20k PTY。
 - 本批证明逐条 acquisition/hash 与有界结果保留，不证明总 heap/最长响应/累计 physical I/O；单次 scan 32MiB 预算仍不等同跨全部页累计预算，PAN-06/QA-01 和 Phase 20 保持 partial，矩阵仍 35 complete / 12 partial / 0 open。
+
+## [2026-10-24] test | QA-01/QA-02 非交互 profile 与审批生命周期
+
+- 新增源码 CLI line/pipe 组合：每格顺序启动 alpha allow-once、alpha 默认拒绝、beta 默认拒绝、beta allow-once 四个隔离进程，实际 loopback HTTP 核对 endpoint/model/合成凭据归属。相同精确目标重试、两份审批库无 grant、原 profile 状态和无 handoff，以及 transcript approval/tool/terminal 与文件 bytes/不存在均有断言；没有生产逻辑改动。
+- 恢复后的最终聚焦 2 文件/7 项通过，Vitest 1536MiB、新增场景每个实际子进程 512MiB heap；所有验证串行。移除非交互切换守卫、错误持久化 allow-once 两项反转实际 AssertionError，生产源码逐字节恢复。最初过滤全跳过和替换匹配检查未通过不计有效反转；历史 tool fixture 和不同目标 scope 的覆盖问题已修正，`HANDOFF.md` 记录 guardrail。未运行 build、exe、PTY 或全量回归。
+- 独立两路只读审查对最终测试分别 APPROVE / CLEAR；未运行验证，不冒称独立重跑。状态页新增剩余验收的原要求与结束条件，纠正已经有本地证据的非交互生命周期缺口；其余资源组合、逐任务/跨任务验收、真实账户/结算/MCP/模型质量及平台输入仍保留，47 项状态不变。
+- 前批代码 `855b9bf32b77d2aeba49ad7bd5c50d22fd80e311` 的 CI `40077116994` / job `120822759684` 于 2026-10-24T08:12:20Z–08:31:28Z completed/success；`518e5bb687a24324422beeffad0336b99d36bb85` 的 CI `40078459456` / job `120826791666` 于 08:32:49Z–08:50:33Z completed/success，两批 Watch `40077116885` / `40078459541` 均 success。undo 批独立代码 APPROVE / 架构 CLEAR，综合 APPROVE。上述 CI 只绑定各自源码 SHA，不外推到本批测试/文档提交。

@@ -10,6 +10,8 @@
 
 2026-10-24 PAN-06 undo 补证：operation 的共享预算扫描逐条交给 history/latest/exact-ID consumer，历史页保留最多 40 条，单项查询仅保留所需结果；仍校验完整 ledger 并生成原完整 revision，坏尾部不因已有结果而被跳过。`operation/read.test.ts`、`undo/history.test.ts`、`undo/service.test.ts` 共 35 项和四项实际反转覆盖 acquisition/hash 顺序、满页/已有结果后继续拒绝、原 cursor bytes、取消与恢复合同。此证据减少长期保留的 receipt 图，不宣称减少每页完整校验所需读取或关闭资源/平台缺口。
 
+2026-10-24 QA-01/QA-02 非交互组合补证：`cli/print/profile.test.ts` 在 line/pipe 各顺序启动四个源码 CLI 进程，验证 alpha/beta 的 HTTP connection/model/credential 归属、两种切换请求均拒绝且无 handoff、同精确路径上的 allow-once 后续默认拒绝、两份审批库无持久 grant、append-only transcript 的 approval/tool/terminal 与实际文件结果一致。与 `cli/print/result.test.ts` 共 2 文件/7 项通过；移除非交互切换守卫或错误持久化 allow-once 两项反转实际失败，源码逐字节恢复后通过。独立代码 APPROVE / 架构 CLEAR；只关闭这条本地组合，不冒充新的 exe/跨平台或真实账号证据。剩余范围与明确结束条件见 [交付状态](phase-20-status.md#剩余验收的范围与结束条件)。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

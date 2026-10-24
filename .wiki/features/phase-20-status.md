@@ -17,27 +17,49 @@
 | PAN-08 | 本批补齐 MCP 跨 server 累计 4MiB/10k tools、共享绝对 deadline、peek fail-closed、tools/skill/cost/help/context producer top-N/omitted，以及 context signal 传播和增量 schema 计量；真实 MCP 连接/认证与完整 producer heap/延迟证据仍缺 | 本地 producer 合同已覆盖；真实连接需 server/认证条件，资源结论不扩大为端到端保证 |
 | INPUT-01 | 本批补 Visual/Visual-Line Ctrl+C 复制真实 source selection、paste 文本/图片共享 128项/32MiB预算、device-code 取消及扩展投影总界；仍缺平台真实 IME、系统剪贴板与 Windows 交互 PTY | 本地五模式/字素/长输入合同继续；实机输入法、剪贴板与 Windows 需适用机器 |
 | QA-01 | 47 项逐任务反转矩阵与跨任务集成仍未全部闭合；已新增 `CTX-02 × TOOL-01` 实际 HTTP 集成、restore 累计预算反转，以及 `PAN-06 restore × undo` operation-owned 路由及三个反转 | 继续随剩余 PAN/PRV/TOOL 与外部环境逐项补证；当前已明确关闭的跨任务行不得重复计数 |
-| QA-02 | Windows 交互 PTY、真实 IME、系统复制、非交互 profile 切换/审批生命周期 | 非交互合同可本地继续；Windows/IME/系统复制需适用机器和终端 |
+| QA-02 | Windows 交互 PTY、真实 IME、系统复制；当前源码的 line/pipe profile 身份与审批生命周期已补证 | 既有跨平台合成矩阵不重复列为未验；Windows 交互/IME/系统复制仍需适用机器和终端 |
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
 undo 已改为逐条消费共享预算的 operation scan：历史页最多保留 40 条选中 receipt，latest/精确 ID 只保留所需结果，不再先保留整个解码数组。完整 receipt 校验与 revision 仍覆盖全部记录，32 MiB 仍是单次读取预算，后续每页仍重新扫描，不能宣称已有跨页累计读取上限、OS physical I/O 或总 heap 证明；cleanse 还需区分 retained state 与 session navigation 的合计成本。
 
-## 2026-10-24 PAN-06 undo 逐条读取与有界结果保留（本地验证完成）
+### 剩余验收的范围与结束条件
+
+只按原决策 §5、§6 及其直接引用收口，不从历史 WATCH 文案自动追加新能力。上表保留 12 项 partial；本次纠正证据归类，不据此提高完成数。
+
+| 剩余类别 | 原要求与明确结束条件 |
+|---|---|
+| 本地资源组合：PAN-02 / PAN-06 / PAN-07 / PAN-08 | §6.1、§6.5 与 35 的生命周期表要求解析、分页、缓存、绘制和队列有界，超限/取消/源变化结果真实。按原 consumer 记录 acquisition → projection → retained page → close 的计数/字节预算及释放，补齐尚未完成的组合与重复交互证据；不得拿单文件 cap 替代整条链。大数量边界用单元 Mock/切片；真实 CLI 只用小型夹具。 |
+| 本地组合：QA-01 | §6.1、QA-01 要求逐任务成功、拒绝/取消、失效/竞态及关键保护的实际反转。复核现有 47 行索引并只补未闭合的行/跨任务组合；已有 CTX-02 × TOOL-01、restore × undo 和本次 profile × approval 不重复列为缺失。 |
+| 外部条件：PRV-03 / PRV-05 / TOOL-02 / PAN-07 / PAN-08 / INPUT-01 / QA-02 / QA-03 | 真实账户及登录/刷新/失效/退出、可信结算来源与账期、MCP server/认证、固定模型/预算/盲评人、适用平台/输入法/系统剪贴板。合成证据不能替代这些输入；账户/结算保留项来源还包括原决策 §9 引用的 Phase 19 A13。 |
+| 最终交付：QA-04 | 全范围验收闭合后汇总静态/结构检查、独立审查、文档、精确源码 SHA 的提交/推送/CI；原 §6.6 的最终跨域 `test:ts` 与两种构建仍需单独取证。本轮用户禁止本地全量回归的 OOM 红线优先，全套证据由适用远端 CI 承接。各批检查有效，不因本次纯测试/证据改动重复产品构建；用户要求的是提交至 GitHub，未要求新增公开 Release。 |
+
+累计 OS physical I/O、page-cache 与总 heap/最长响应是当前资源 WATCH 的补充观测维度；原决策没有要求在任意机器上证明这些量的统一绝对上界。后续测量必须说明它验证上述哪一项有界性；未测仍如实标注，不把“缺这项观测”写成新功能缺陷，也不以本次范围说明静默关闭已有资源验收。§6.5 的数值是需校准的候选目标；已闭合的 START-03 不因本次纯测试改动重新开放。
+
+## 2026-10-24 QA-01/QA-02 非交互 profile 与审批生命周期（本地验证完成）
+
+- 新增 `cli/print/profile.test.ts`，line/pipe 各顺序启动四个实际源码 CLI 进程：alpha 显式 allow-once、alpha 默认拒绝、beta 默认拒绝、beta 显式 allow-once。每次使用同一精确目标并由夹具重置，验证审批、tool、terminal event 与文件 bytes/不存在一致；两份持久审批库无 grant，模型声称成功不能抬高拒绝结果。
+- 每个进程验证实际 HTTP endpoint、model 与合成凭据匹配自己的 profile；切换请求及带伪造 confirmation 的请求都被非交互守卫拒绝，原身份不变、不生成 handoff，未启动的 beta 存储与默认 profile session 不被使用。隔离 HOME 只含本地 fixture，未读取真实凭据或调用远端模型。
+- 恢复后的聚焦验证为 2 文件/7 项通过，其中新增 2 项顺序启动 8 个小型子进程。Vitest 单进程 1536 MiB、新增场景每个子进程 512 MiB heap 上限；没有并发验证、全量回归、构建或 PTY。移除非交互切换守卫、错误持久化 allow-once 两项反转均实际 AssertionError，原源码逐字节恢复。最初 `^pipe` 过滤导致全跳过，不计反转；精确替换检查未命中的尝试也不计通过。
+- 首轮夹具误将恢复历史中的旧 tool 当当前回应，随后又在审查中发现不同目标不能验证精确 grant 生命周期；两项均修正为当前 turn、append-only transcript delta 和同目标重试，未改生产逻辑。独立代码 APPROVE / 架构 CLEAR；两路只读审查未运行验证，不冒称独立重跑。
+- 现有 Platform QA `39834842595` 已证明其对应历史构建的 20 个支持平台格。本批只补当前源码的本地 line/pipe 组合，未声称新的 exe 或平台运行；QA-02 仍缺 Windows 交互 PTY、真实 IME、系统复制。47 项矩阵仍为 35 complete / 12 partial / 0 open。
+
+## 2026-10-24 PAN-06 undo 逐条读取与有界结果保留（`518e5bb6`；CI/Watch success）
 
 - operation owner 新增 `scanOperations()`；原 `readOperations()` 数组接口复用同一扫描，保持原 8MiB 单 JSON、32MiB 单 scan、50k 文件与目录/index 校验。历史页对每条 receipt 立即生成 digest，仅保留 40 条当前页；latest 与精确 ID lookup 同样只保留所需结果，但仍读完并校验整个 ledger。
 - `revision:operationId` cursor、完整 scope/receipt 的 canonical JSON digest、85 条三页完整顺序、精确 ID、unknown barrier 和取消/字节不变合同保留。坏尾部不能因当前页已满或结果已找到而被跳过；没有改用 mtime 缓存或引入新的持久格式。
 - 3 文件/35 项以 `--threads false` 和 1536 MiB V8 heap 上限通过；提前读完 source、调用层收集全数组、latest 提前返回、满页停止校验四项反转均实际 AssertionError，源码逐字节恢复后再次通过。静态门禁与 TypeScript build（2048 MiB heap 上限）通过。build `68d3b93523cd42c50ba17b6f98cba01b473f57a8af4e48da41ee49df68690709`，inputs `002fdcb629e4f45d76e07b9338bc70197fb9cf2a47d7a84ca71a2edc0105da7b`，artifact `a556e7c488c531a01fede2269022d044c9bb491ee7a93f5468cac0040d6d3b67`。
 - 本批只证明 acquisition/hash 顺序、有界结果保留和完整拒绝语义；不证明全局 heap、最长响应或累计 physical I/O。未运行全量回归、exe 构建或真实 20k PTY；矩阵保持 35 complete / 12 partial / 0 open，不声称 PAN-06 或全阶段完成。
+- 代码提交 `518e5bb687a24324422beeffad0336b99d36bb85` 已推送并精确读回远端 `main`；CI `40078459456` / job `120826791666` 于 2026-10-24T08:32:49Z–08:50:33Z completed/success，Watch `40078459541` completed/success。独立代码 APPROVE / 架构 CLEAR，综合 APPROVE；两路均为只读源码审查，不把作者测试/反转当独立执行。
 
-## 2026-10-24 PAN-02/PAN-06 增量可读前缀与提前节点准入（`855b9bf3`；CI 首次读回 in_progress / Watch success）
+## 2026-10-24 PAN-02/PAN-06 增量可读前缀与提前节点准入（`855b9bf3`；CI/Watch success）
 
 - 异步 salvage 路径逐行消费最多 64 KiB 的 descriptor chunk，不再先分配整段 transcript buffer 或保留完整 source text；达到行数上限即停止后续读取。跨块 UTF-8、空行、CRLF、末行无换行、损坏行、重复身份及截断语义沿用原 codec；提前停止后仍检查文件身份、大小及 mtime/ctime，变化或取消不会发布结果。
 - 同步/异步 session snapshot 均在 state 读取后、transcript 打开前检查树节点上限；小夹具证明超限时不会获取 transcript body，不依赖真实大历史或终端进程。
 - 最终单进程 `vitest --threads false` 聚焦 3 文件/51 项通过；移除行数停止、取消 chunk 大小上限、将节点准入后移至投影的三项反转均实际 AssertionError，恢复后通过。静态门禁、TypeScript build 与 NormProof blocking obligations 通过；NormProof 整体仍 `partial`，保留既有 1 failed advisory/9 proof gaps。
 - build `fabc645a95a4c61736912ebcdfaf72ae4673c85172f402ada56ef3e91b7a77f0`，inputs `27392e2d92a139110d16f090ee9613bb8f62d7f7d8284cb8c2bf4adfb89e161c`，artifact `d9c6c1a2331c887c9f0c4477673dcd9b4e705e74f7b165ce89d01a5883153ac1`。本批未运行全量回归、exe 构建或 PTY；20k 边界只允许单元 Mock/切片验证，不运行真实二进制全量消息压测。
 - 这是源获取分配与逻辑读取证据，不是 OS physical I/O、总 heap、最长响应或真实平台证明。PAN-02/PAN-06、QA-01 与全阶段保持 partial，矩阵仍为 35 complete / 12 partial / 0 open；本节不借用旧 SHA 的 CI。
-- 代码批 `855b9bf32b77d2aeba49ad7bd5c50d22fd80e311` 已提交、推送并精确读回远端 `main`。推送后首次读取：CI `40077116994` 为 `in_progress`，Architecture Watch `40077116885` 为 `completed/success`；不把进行中的 CI 计为通过，也不外推到后续文档提交。
+- 代码批 `855b9bf32b77d2aeba49ad7bd5c50d22fd80e311` 已提交、推送并精确读回远端 `main`。推送后首次读取 CI `40077116994` 为 `in_progress`；后续读回 job `120822759684` 于 2026-10-24T08:12:20Z–08:31:28Z completed/success，Architecture Watch `40077116885` 为 `completed/success`。结果只绑定该代码 SHA，不外推到后续提交。
 
 ## 2026-10-24 PAN-02/PAN-06 可取消导航源读取（`b2720df6`；CI/Watch success）
 
