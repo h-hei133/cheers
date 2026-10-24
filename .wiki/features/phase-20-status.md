@@ -21,13 +21,16 @@
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
 
-## 2026-10-24 PAN-02/PAN-06 增量可读前缀与提前节点准入（本地验证完成）
+本地资源复核的下一处明确入口是 `edit/recovery/undo/service.ts` 的 `readUndoHistoryPage()`：每页重新 `readOperations()`，随后 `undo/history.ts` 对全部 receipt 重新生成 revision。当前 32 MiB 是单次 operation 读取预算，不是跨所有页面的累计预算。后续应在保留完整 receipt revision、跨进程 cursor 与 stale 拒绝语义的前提下测量/收紧浏览成本，不能用 40 条展示页宣称总源读取有界；cleanse 还需区分 retained state 与 session navigation 的合计成本。
+
+## 2026-10-24 PAN-02/PAN-06 增量可读前缀与提前节点准入（`855b9bf3`；CI 首次读回 in_progress / Watch success）
 
 - 异步 salvage 路径逐行消费最多 64 KiB 的 descriptor chunk，不再先分配整段 transcript buffer 或保留完整 source text；达到行数上限即停止后续读取。跨块 UTF-8、空行、CRLF、末行无换行、损坏行、重复身份及截断语义沿用原 codec；提前停止后仍检查文件身份、大小及 mtime/ctime，变化或取消不会发布结果。
 - 同步/异步 session snapshot 均在 state 读取后、transcript 打开前检查树节点上限；小夹具证明超限时不会获取 transcript body，不依赖真实大历史或终端进程。
 - 最终单进程 `vitest --threads false` 聚焦 3 文件/51 项通过；移除行数停止、取消 chunk 大小上限、将节点准入后移至投影的三项反转均实际 AssertionError，恢复后通过。静态门禁、TypeScript build 与 NormProof blocking obligations 通过；NormProof 整体仍 `partial`，保留既有 1 failed advisory/9 proof gaps。
 - build `fabc645a95a4c61736912ebcdfaf72ae4673c85172f402ada56ef3e91b7a77f0`，inputs `27392e2d92a139110d16f090ee9613bb8f62d7f7d8284cb8c2bf4adfb89e161c`，artifact `d9c6c1a2331c887c9f0c4477673dcd9b4e705e74f7b165ce89d01a5883153ac1`。本批未运行全量回归、exe 构建或 PTY；20k 边界只允许单元 Mock/切片验证，不运行真实二进制全量消息压测。
 - 这是源获取分配与逻辑读取证据，不是 OS physical I/O、总 heap、最长响应或真实平台证明。PAN-02/PAN-06、QA-01 与全阶段保持 partial，矩阵仍为 35 complete / 12 partial / 0 open；本节不借用旧 SHA 的 CI。
+- 代码批 `855b9bf32b77d2aeba49ad7bd5c50d22fd80e311` 已提交、推送并精确读回远端 `main`。推送后首次读取：CI `40077116994` 为 `in_progress`，Architecture Watch `40077116885` 为 `completed/success`；不把进行中的 CI 计为通过，也不外推到后续文档提交。
 
 ## 2026-10-24 PAN-02/PAN-06 可取消导航源读取（`b2720df6`；CI/Watch success）
 
