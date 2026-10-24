@@ -42,7 +42,16 @@ export async function runContextCommand(
     return context.ruleControlsCommand ? context.ruleControlsCommand('context', args, context) as Promise<LocalCommandResult>
       : { kind: 'local', output: 'Extra context requires a bound source-read permission owner.' };
   }
+  return context.runCancellable
+    ? context.runCancellable(signal => inspectContext({ ...context,
+      signal: context.signal ? AbortSignal.any([context.signal, signal]) : signal }))
+    : inspectContext(context);
+}
+
+async function inspectContext(context: CommandContext): Promise<LocalCommandResult> {
+  context.signal?.throwIfAborted();
   const refused = context.admission?.();
+  context.signal?.throwIfAborted();
   if (refused) return { kind: 'local', output: refused };
   const sessionId = context.sessionId ?? "";
   const telemetry = sessionId ? getSessionUsage(sessionId) : undefined;
@@ -79,9 +88,11 @@ export async function runContextCommand(
     configured: runtimeConfig.contextWindow,
   });
   const reserve = resolveTokenBudget(runtimeConfig.modelTokenBudgets, active.provider, active.model, "reserveTokens", runtimeConfig.reserveTokens, DEFAULT_RESERVE_TOKENS);
+  context.signal?.throwIfAborted();
   const registry = context.getToolPool ? await context.getToolPool(context.signal) : createCoreToolRegistry();
   context.signal?.throwIfAborted();
   const blocked = context.admission?.();
+  context.signal?.throwIfAborted();
   if (blocked) return { kind: "local", output: blocked };
   const schemaSize = measureToolSchemas(registry);
   const schemaTokens = Math.round(schemaSize.codeUnits / CHARS_PER_TOKEN);

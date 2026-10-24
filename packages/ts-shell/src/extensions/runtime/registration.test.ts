@@ -11,11 +11,17 @@ import { assertInventory } from '../archive/storage.js';
 import { digest } from '../registry/validation.js';
 import { versionPath, storageIdentity } from '../store/state.js';
 import type { PackageRecord, VersionRecord } from '../model.js';
+import { skillPicker } from '../../cli/interactive/picker/skills.js';
+import { OverlayHost } from '../../cli/interactive/overlay.js';
+import { parseKeyEvent } from '../../presentation/tui/input/keys.js';
+import { visibleWidth } from '../../presentation/tui/text/measure.js';
+import { stripAnsi } from '../../presentation/tui/text/ansi.js';
 
 let fixture: string; let workspace: string; let registry: string;
 const closes: Array<() => void> = [];
 beforeEach(() => {
-  fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'registered-skills-')); workspace = path.join(fixture, 'workspace'); fs.mkdirSync(workspace);
+  const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
+  fixture = fs.mkdtempSync(path.join(scratch, 'registered-skills-')); workspace = path.join(fixture, 'workspace'); fs.mkdirSync(workspace);
   execFileSync('git', ['init', '-q', workspace]); registry = path.join(fixture, 'owned', 'registry.json');
   vi.stubEnv('HOME', path.join(fixture, 'home')); vi.stubEnv('USERPROFILE', path.join(fixture, 'home'));
 });
@@ -65,4 +71,76 @@ it('preserves actual manifest cleanup failure over concurrent cancellation befor
     expect(result).toMatchObject({ kind: 'immediate', result: { isError: true, output: expect.stringMatching(/cleanup could not be verified/) } });
     expect(JSON.stringify(result)).not.toContain('PRIVATE_CLOSE_DETAIL'); expect(permission).not.toHaveBeenCalled(); expect(captured!.fd).not.toBe(-1);
   } finally { await close?.(); }
+});
+
+
+it.each([32, 128 * 1024])('keeps installed skill cache checks separate from repeated picker rendering (%i body bytes)', async bytes => {
+  const file = installed('alpha', 1, bytes), before = fs.readFileSync(file);
+  const readSync = fs.readFileSync.bind(fs), open = fsp.open.bind(fsp);
+  let inventoryBytes = 0, manifestBytes = 0, active = 0, closed = 0;
+  vi.spyOn(fs, 'readFileSync').mockImplementation(((target, ...args) => {
+    const result = readSync(target, ...args);
+    if (String(target) === file) inventoryBytes += Buffer.byteLength(result);
+    return result;
+  }) as typeof fs.readFileSync);
+  vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args);
+    if (String(args[0]) !== file) return handle;
+    active++;
+    const read = handle.read.bind(handle), close = handle.close.bind(handle);
+    handle.read = (async (buffer: Buffer, offset: number, length: number, position: number) => {
+      const result = await read(buffer, offset, length, position); manifestBytes += result.bytesRead; return result;
+    }) as typeof handle.read;
+    handle.close = async () => { await close(); active--; closed++; };
+    return handle;
+  });
+  for (let round = 0; round < 10; round++) {
+    const picker = skillPicker({ cwd: workspace, sessionId: 'capture' });
+    const load = vi.spyOn(picker, 'load'), changed = vi.fn(), host = new OverlayHost(changed);
+    const priorInventory = inventoryBytes;
+    host.open(picker);
+    try {
+      await load.mock.results[0]!.value;
+      await vi.waitFor(() => expect(stripAnsi(host.render(80, 24).join('\n'))).toContain('alpha-0'));
+      // A warm parsed cache still revalidates the installed inventory. Account
+      // for those synchronous body reads separately from the descriptor loader.
+      expect(inventoryBytes).toBeGreaterThan(priorInventory);
+      expect(manifestBytes).toBe(before.length); expect(active).toBe(0); expect(closed).toBe(1);
+      const retained = host as unknown as { baseOptions: readonly { id: string; detail?: string }[]; model: { total: number } };
+      expect(retained.baseOptions).toHaveLength(1);
+      expect(Buffer.byteLength(JSON.stringify(retained.baseOptions))).toBeLessThan(512);
+      expect(JSON.stringify(retained.baseOptions)).not.toContain('x'.repeat(bytes));
+      const acquired = inventoryBytes;
+      host.handlePaste('alpha');
+      for (const width of [20, 40, 80, 120, 200]) for (const height of [8, 24, 40, 80]) {
+        const frame = host.render(width, height);
+        expect(frame.length).toBeLessThanOrEqual(height); expect(frame.every(line => visibleWidth(line) <= width)).toBe(true);
+      }
+      const apply = vi.fn(); host.handleKey(parseKeyEvent('\x1b'), apply);
+      expect(apply).not.toHaveBeenCalled(); expect(host.active).toBe(false);
+      expect(retained.baseOptions).toEqual([]); expect(retained.model.total).toBe(0);
+      await expect(picker.apply(['alpha-0'])).resolves.toBeUndefined();
+      expect(inventoryBytes).toBe(acquired); expect(manifestBytes).toBe(before.length);
+    } finally { host.close(); }
+  }
+  expect(readSync(file)).toEqual(before);
+});
+
+it.each(['dirty', 'unregistered'] as const)('withholds a cached installed skill %s after the picker accepted it', async change => {
+  const file = installed('alpha', 1, 32), before = fs.readFileSync(file);
+  const picker = skillPicker({ cwd: workspace, sessionId: 'capture' }), host = new OverlayHost(() => {});
+  const load = vi.spyOn(picker, 'load'); host.open(picker);
+  try {
+    await load.mock.results[0]!.value;
+    await vi.waitFor(() => expect(stripAnsi(host.render(80, 24).join('\n'))).toContain('alpha-0'));
+    const apply = vi.fn(); host.handleKey(parseKeyEvent('\r'), apply);
+    expect(apply).toHaveBeenCalledWith(picker, ['alpha-0']);
+    if (change === 'dirty') fs.appendFileSync(file, '\nCHANGED_PRIVATE_BODY');
+    else closes[0]!();
+    const result = await picker.apply(['alpha-0']);
+    expect(result?.draft).toBeUndefined(); expect(result?.note).not.toContain('x'.repeat(32));
+    expect(result?.note).not.toContain('CHANGED_PRIVATE_BODY');
+    expect(result?.note).toMatch(/unavailable|no longer available/);
+    expect(fs.readFileSync(file)).toEqual(change === 'dirty' ? Buffer.concat([before, Buffer.from('\nCHANGED_PRIVATE_BODY')]) : before);
+  } finally { host.close(); }
 });

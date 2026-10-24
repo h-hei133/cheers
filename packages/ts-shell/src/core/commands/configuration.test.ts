@@ -23,6 +23,10 @@ import { buildCliCommandExecution } from '../../entrypoints/cliCommandExecutionB
 import type { StreamingRenderer } from '../../presentation/terminal/streaming.js';
 import type { CliMcpGateway } from '../../entrypoints/cliMcpModule.js';
 import type { CommandContext } from './types.js';
+import { Pager, pageLongOutput } from '../../presentation/tui/chrome/pager.js';
+import { visibleWidth } from '../../presentation/tui/text/measure.js';
+import { reportText } from './report/projection.js';
+import { ShellCommandRuntime } from '../shell/command.js';
 
 let root: string;
 let file: string;
@@ -93,6 +97,33 @@ it('forwards context cancellation to tool discovery and does not inspect schemas
   expect(getToolPool).toHaveBeenCalledOnce();
 });
 
+it('rejects pre-cancelled context inspection before configuration and tool acquisition', async () => {
+  const { context } = fixture(), controller = new AbortController(); controller.abort();
+  const read = vi.fn(context.readConfiguration!), getToolPool = vi.fn(async () => new Map());
+  await expect(runContextCommand([], { ...context, signal: controller.signal, readConfiguration: read, getToolPool }))
+    .rejects.toMatchObject({ name: 'AbortError' });
+  expect(read).not.toHaveBeenCalled(); expect(getToolPool).not.toHaveBeenCalled();
+});
+
+it('withholds schema work when final context admission cancels the original command', async () => {
+  const { context } = fixture(), controller = new AbortController(); let checks = 0;
+  const description = vi.fn(() => 'Read a file');
+  const tool = { name: 'read', get description() { return description(); }, execute: async () => ({ success: true, output: '' }) };
+  await expect(runContextCommand([], { ...context, signal: controller.signal,
+    getToolPool: async () => new Map([[tool.name, tool]]),
+    admission: () => { if (++checks === 2) controller.abort(); return undefined; },
+  })).rejects.toMatchObject({ name: 'AbortError' });
+  expect(checks).toBe(2); expect(description).not.toHaveBeenCalled();
+});
+
+it('preserves original context cancellation inside the registered command lifetime', async () => {
+  const { context } = fixture(), original = new AbortController(), commands = new ShellCommandRuntime();
+  await expect(runContextCommand([], { ...context, signal: original.signal, runCancellable: operation => commands.run(operation),
+    getToolPool: async signal => { expect(signal?.aborted).toBe(false); original.abort(); return new Map(); },
+  })).rejects.toMatchObject({ name: 'AbortError' });
+  expect(commands.current).toBeUndefined();
+});
+
 it('measures the exact tool-schema array size incrementally', async () => {
   const { context } = fixture();
   const tool = {
@@ -108,6 +139,30 @@ it('measures the exact tool-schema array size incrementally', async () => {
   expect(result.report?.facts.toolSchemas).toMatchObject({
     size: { bytes: Buffer.byteLength(expected, 'utf8'), codeUnits: expected.length },
   });
+});
+
+it('keeps actual context report acquisition separate from repeated reader draws and close', async () => {
+  const { context } = fixture();
+  const tool = { name: 'read', description: 'Read 😀', argsSchema: { type: 'object' }, execute: async () => ({ success: true, output: '' }) };
+  const getToolPool = vi.fn(async () => new Map([[tool.name, tool]]));
+  const pager = new Pager();
+  for (let round = 0; round < 10; round++) {
+    const result = await runContextCommand([], { ...context, getToolPool });
+    expect(getToolPool).toHaveBeenCalledTimes(round + 1);
+    expect(result.report?.facts.toolSchemas).toMatchObject({ toolCount: 1 });
+    const report = result.report!, before = JSON.stringify(report), block = { text: reportText(report), report, collapsed: false };
+    expect(pageLongOutput(pager, '/context', block)).toBe(true); expect(block.collapsed).toBe(true);
+    pager.handlePaste('tool');
+    for (const width of [20, 40, 80, 120, 200]) for (const height of [8, 24, 40, 80]) {
+      const rows = pager.render(width, height, height);
+      expect(rows.length).toBeLessThanOrEqual(height); expect(rows.every(row => visibleWidth(row) <= width)).toBe(true);
+    }
+    pager.handleKey('escape', undefined, 24);
+    expect(pager.active).toBe(false); expect(pager.text).toBe('');
+    expect(pager as unknown as { report?: unknown; rows: unknown[]; filter: string }).toMatchObject({ report: undefined, rows: [], filter: '' });
+    expect(block.report).toBe(report); expect(JSON.stringify(block.report)).toBe(before);
+    expect(getToolPool).toHaveBeenCalledTimes(round + 1);
+  }
 });
 
 it('uses the original workspace to project accepted request identity without changing raw measurements', async () => {

@@ -19,10 +19,12 @@ export function usagePicker(context: CommandContext): Picker {
   let configurationRevision: number | undefined;
   const isCurrent = (): boolean => {
     try {
+      if (context.signal?.aborted) return false;
       if (context.admission?.() !== undefined) return false;
+      if (context.signal?.aborted) return false;
       if (context.sessionId !== sessionId) return false;
       const revision = context.readConfiguration?.().revision;
-      return revision === undefined || configurationRevision === undefined || revision === configurationRevision;
+      return !context.signal?.aborted && (revision === undefined || configurationRevision === undefined || revision === configurationRevision);
     } catch {
       return false;
     }
@@ -35,10 +37,17 @@ export function usagePicker(context: CommandContext): Picker {
     footer: 'Enter opens the measured report. Account quota is fetched only by its explicit row.',
     async load(signal) {
       signal?.throwIfAborted();
+      context.signal?.throwIfAborted();
+      const refused = context.admission?.();
+      context.signal?.throwIfAborted();
+      if (refused !== undefined) return [];
       sessionId = context.sessionId;
-      configurationRevision = context.readConfiguration?.().revision;
+      const publication = context.readConfiguration?.();
+      configurationRevision = publication?.revision;
+      signal?.throwIfAborted();
+      context.signal?.throwIfAborted();
       const usage = getSessionUsage(sessionId ?? '');
-      const catalog = context.readConfiguration?.().catalog ?? loadCatalog();
+      const catalog = publication?.catalog ?? loadCatalog();
       const model = costModel(usage, catalog);
       return [
         {
@@ -69,6 +78,7 @@ export function usagePicker(context: CommandContext): Picker {
       if (action === 'overview') {
         const usage = getSessionUsage(context.sessionId ?? '');
         const catalog = context.readConfiguration?.().catalog ?? loadCatalog();
+        if (context.signal?.aborted) return undefined;
         return { report: costReport(costModel(usage, catalog), context.cwd) };
       }
       if (action !== 'account' && action !== 'reset-status') return undefined;

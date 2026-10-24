@@ -67,6 +67,43 @@ function createHarness(root = "/tmp/project-alpha") {
 }
 
 describe("interactive command router", () => {
+  it('cancels context discovery through the actual interactive command owner', async () => {
+    const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
+    const root = fs.mkdtempSync(path.join(scratch, 'context-route-'));
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const harness = createHarness(root);
+    const runtime = new ShellSessionRuntime({ sessionManager: harness.input.sessionManager,
+      renderer: harness.input.renderer, runPrompt: () => { throw new Error('Unexpected provider call'); } });
+    let entered = false, release!: () => void, signal: AbortSignal | undefined, finished = false;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const snapshot = vi.fn(async (_admission?: () => string | undefined, current?: AbortSignal) => {
+      entered = true; signal = current;
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const abort = () => reject(signal?.reason);
+          signal?.addEventListener('abort', abort, { once: true });
+          gate.then(() => { signal?.removeEventListener('abort', abort); resolve(); });
+        });
+        return { clients: [], tools: [] };
+      } finally { finished = true; }
+    });
+    Object.assign(harness.input.runtimeContext, { skillOptions: { noSkills: true },
+      runtimeConfig: { ...getRuntimeConfig(root), enableMcpTools: true } });
+    harness.input.mcpGateway = { snapshot } as never;
+    const pending = routeInteractiveCommand({ ...harness.input, sessionRuntime: runtime, prompt: '/context' });
+    try {
+      await vi.waitFor(() => expect(entered).toBe(true));
+      expect(runtime.commands.current).toBeDefined(); expect(signal?.aborted).toBe(false);
+      const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+      await runtime.cancelAndWait(); await rejected;
+      expect(signal?.aborted).toBe(true); expect(finished).toBe(true);
+      expect(runtime.commands.current).toBeUndefined(); expect(harness.reports).toEqual([]);
+    } finally {
+      runtime.commands.current?.controller.abort(); release(); await pending.catch(() => {});
+      vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it.each(['interactive', 'piped', 'print'])('registers browser commands with the real %s session host', async mode => {
     const harness = createHarness();
     const runtime = new ShellSessionRuntime({ sessionManager: harness.input.sessionManager,

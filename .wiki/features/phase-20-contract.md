@@ -28,6 +28,8 @@
 
 2026-10-24 PAN-08 skill生命周期补证：previewEnd清空已提供选择，load发布前复核浏览/原命令signal及generation，拒绝final admission同步关闭后重填offered；accepted Enter仍独立timeout重读精确身份且一次消费。原completed-close双body-tier及初版post-admission host/direct回归均实际AssertionError。真实SkillLoader/manifest→picker→OverlayHost在两档body各十轮浏览/20矩形绘制/取消中逐轮manifest正文恰一次、一个<512字节无body option、manifest descriptor峰值1且全部关闭，旧apply零读；64KiB pending关闭排空、实际换名拒绝及accepted读回也覆盖。两文件32项通过，七项保护实际反转AssertionError，最终source恢复；APPROVE/CLEAR，早期WATCH已解决。只证明选中manifest及小型consumer，不外推目录/扩展总量、全目录options、physical I/O或总heap/硬延迟；35 complete /12 partial /0 open保持。
 
+2026-10-24 PAN-08消费链补证：context status进入现有runCancellable并保留原signal，在配置/目录获取前及final admission后复核；usage原signal使关闭/取消后的动作和迟到account结果失效，accepted Enter保持；cost在pre/admission/config回调取消后拒绝。原context两项、usage六项、cost三项及实际route缺controller均产生AssertionError。真实context/cost report→Pager各十轮获取/过滤/20矩形/关闭，reader释放与转录报告保留分开。实际安装扩展技能cold/warm→picker双body-tier、十轮交互及接受后的dirty/unregister拒绝覆盖；同步inventory重读与parsed manifest缓存分别记账，不宣称warm零I/O。十一项保护反转均AssertionError并逐bytes恢复；最终验证/复审与精确SHA交付见status，PAN-08仍partial。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

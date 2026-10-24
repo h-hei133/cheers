@@ -15,6 +15,8 @@ import { getSessionUsage } from '../../observability/usageTelemetry.js';
 import { costModel } from './cost/model.js';
 import { costReport } from './cost/report.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
+import { Pager, pageLongOutput } from '../../presentation/tui/chrome/pager.js';
+import { visibleWidth } from '../../presentation/tui/text/measure.js';
 
 /**
  * `/cost` renders one table per model.
@@ -49,6 +51,44 @@ afterEach(() => {
 });
 
 describe("runCostCommand", () => {
+  it('releases the actual cost reader without reacquiring or changing retained accounting', async () => {
+    const cwd = workspace(), sessionId = 'cost-reader-lifetime'; resetSessionUsage(sessionId);
+    recordSessionUsage(sessionId, { provider: 'fixture', model: 'reader', promptTokens: 100, completionTokens: 10 });
+    const before = JSON.stringify(getSessionUsage(sessionId));
+    const read = vi.fn(() => ({ config: {} as never, catalog: [] }));
+    const pager = new Pager();
+    for (let round = 0; round < 10; round++) {
+      const result = await runCostCommand([], { cwd, sessionId, readConfiguration: read });
+      expect(read).toHaveBeenCalledTimes(round + 1);
+      expect(result.report?.facts).toMatchObject({ recordedTokens: 110, recordedTurns: 1, shownModels: 1 });
+      const report = result.report!, snapshot = JSON.stringify(report), block = { text: result.output, report, collapsed: false };
+      expect(pageLongOutput(pager, '/cost', block)).toBe(true); expect(block.collapsed).toBe(true);
+      pager.handlePaste('tokens');
+      for (const width of [20, 40, 80, 120, 200]) for (const height of [8, 24, 40, 80]) {
+        const rows = pager.render(width, height, height);
+        expect(rows.length).toBeLessThanOrEqual(height); expect(rows.every(row => visibleWidth(row) <= width)).toBe(true);
+      }
+      pager.handleKey('escape', undefined, 24);
+      expect(pager.active).toBe(false); expect(pager.text).toBe('');
+      expect(pager as unknown as { report?: unknown; rows: unknown[]; filter: string }).toMatchObject({ report: undefined, rows: [], filter: '' });
+      expect(block.report).toBe(report); expect(JSON.stringify(block.report)).toBe(snapshot);
+      expect(read).toHaveBeenCalledTimes(round + 1); expect(JSON.stringify(getSessionUsage(sessionId))).toBe(before);
+    }
+  });
+
+  it.each(['before', 'admission', 'configuration'] as const)('withholds cost inspection cancelled at %s', async phase => {
+    const controller = new AbortController();
+    if (phase === 'before') controller.abort();
+    const read = vi.fn(() => {
+      if (phase === 'configuration') controller.abort();
+      return { config: {} as never, catalog: [] };
+    });
+    await expect(runCostCommand([], { cwd: workspace(), signal: controller.signal, readConfiguration: read,
+      admission: () => { if (phase === 'admission') controller.abort(); return undefined; },
+    })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(read).toHaveBeenCalledTimes(phase === 'configuration' ? 1 : 0);
+  });
+
   it('scrubs legacy and captured metadata only after exact grouping and price lookup', async () => {
     const session = 'cost-safe-metadata'; resetSessionUsage(session);
     const names = ['sk-\x1b[31msynthetic-sensitive-one', 'sk-\x1b[32msynthetic-sensitive-two', '@usage:sk-\x1b[31msynthetic-sensitive-legacy'];
