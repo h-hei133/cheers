@@ -30,6 +30,8 @@ export interface McpServerConfig {
   readonly args?: string[]
   readonly env?: Record<string, string>
   readonly headers?: Record<string, string>
+  /** External HTTP bearer credential; only the environment variable name is stored. */
+  readonly bearerTokenEnvVar?: string
   readonly url?: string
   readonly scope?: McpConfigScope
   readonly authRequired?: boolean

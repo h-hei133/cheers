@@ -13,7 +13,7 @@
 | TOOL-02 | 同模型full/dynamic真实配对、总量/cache成本、参数质量、四语言校准 | 固定模型/协议、预算和正式评测条件 |
 | PAN-06 | 实际系统剪贴板/平台接受结果 | 适用终端与系统复制实测；本地copy/back/restore/undo/cleanse有限生命周期已覆盖 |
 | PAN-07 | 真实认证完整生命周期 | 现有配置可请求；登录/刷新/退出还需适用的真实OAuth/device账户；本地device poll/extension/unknown恢复已覆盖 |
-| PAN-08 | 认证型HTTP MCP的真实认证生命周期 | 用户指定stdio服务已完成两轮连接/只读调用/进程关闭；该transport无OAuth，不替代认证型HTTP server验收 |
+| PAN-08 | 认证型HTTP MCP的真实认证生命周期 | 用户指定stdio服务已完成两轮连接/只读调用/进程关闭；Cheers 已支持仅保存环境变量名的 HTTP Bearer，但 GitHub 目标在本机严格出口策略下解析到特殊地址，产品连接/只读调用仍需允许该公共解析结果后复验；Bearer 不替代 OAuth 生命周期 |
 | INPUT-01 | 真实IME、系统复制、Windows交互终端 | 适用机器、终端、输入法；本地五模式/字素/粘贴/源选区/外编合同已有证据 |
 | QA-01 | 上述真实账户/账单/质量/平台任务的适用验收 | 本地47行成功/拒绝/竞态/关键反转索引已有限复核；随对应外部任务补证，不重复发明本地组合 |
 | QA-02 | Windows交互PTY、真实IME、系统复制 | 新Platform QA40098086773在d8192609的20个支持格全部通过；Windows仍只含line/print，未覆盖交互/IME/系统复制 |
@@ -23,6 +23,13 @@
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
 
 ## 2026-10-24 用户指定真实连接与平台探针修复
+
+### 用户指定 GitHub HTTP MCP Bearer 适配（本批）
+
+- `.cheers.mcp.json`（本机 Git 忽略）保留既有 `code-index` Serena stdio 定义，并加入 `github` HTTP 定义；只保存 `bearerTokenEnvVar = GITHUB_PAT_TOKEN`，不保存或打印 token。静态 Authorization 与环境引用冲突、非法变量名、非 HTTP transport 均拒绝。
+- HTTP transport 在物理连接创建时捕获并校验环境凭据；每次请求在准入后、发送前和响应继续使用前复核，缺失、非法或变化均拒绝且不咨询 OAuth、不重放、不把凭据发往其他路径。`/mcp auth` 与 `/mcp logout` 对外部 Bearer 返回 `unchanged` / `not-tested`，提示配置环境并显式重连。
+- 新增配置/HTTP 回归与既有 MCP/auth 测试共57项通过；四项有效反转（Bearer wiring、OAuth fallback、环境变化 fence、错误 auth/logout 路径）各以 AssertionError 失败，恢复后源码字节一致。静态五门与 TypeScript build 通过；独立只读代码审查 APPROVE。
+- 隔离 provider 探针未打印响应体或凭据：无凭据 GET 返回401，当前环境 Bearer 的直接 HTTPS 探针返回405，初始化 POST返回200。Cheers 产品探针被本机严格 DNS 出口策略拒绝（`api.githubcopilot.com` 解析为 `198.18.0.137` / `2001:2::85` 特殊地址），归类为 provider/network policy blocked，不冒充产品连接成功；待适用出口解析环境再复验真实只读工具发现和调用。该外部 Bearer 不证明 OAuth 登录、刷新、失效或退出。
 
 - 基于源码 `7bff50a4fe9ff44729247ffab455f48b8ce4d3b5` 及原 TS build `612f7166d0b41ab4e0b694d41922c965bb3db1cc5fc94506b77c0b9984c17b58`（inputs `6b7f3f0eab6a0609d2915907d6d0d8804d2f695e5e2d27adb4ff90220a16bb6c`、artifact `f7f1ce062002083170299bf59d9807c1c71d19135ac54aa848a1e7f7c19ed67a`）进行了真实验收。用户已指定本机 stdio MCP executable 和现有 provider 配置，并授权正常运行时调用。两者串行，HOME/USERPROFILE/XDG/session/cache/fixture均隔离；未打印密钥、token、headers或真实响应正文。
 - 真实 stdio MCP 经原 `CoreMcpGateway` 两轮连接，每轮发现23个工具；`search_for_pattern` 只读查找隔离项目 `probe.ts` 的已知标记，每次响应136 bytes、SHA-256 `057301218042488b3aea0d9fd8c90ef50e86d028176efd7504caeacf39ed0a34`。每轮 `gateway.close()` 后真实PID均为ESRCH，fixture源码bytes不变。首次诊断探针误选当前context不提供的工具、误用不存在的shutdown方法，外层120秒超时；这是探针错误，未当产品缺陷或通过，已检查无所属残留进程。修正工具/关闭方法后的两轮才计通过。

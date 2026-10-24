@@ -25,6 +25,11 @@ export async function runMcpAuthCommand(args: readonly string[], host: McpConfig
     if (host.trusted()) checkTarget(mcpConfigPath(host.root, 'project'), options, false);
     const name = parsed.args[0]!; const config = loadMcpConfigs(host.root, host.trusted())[name];
     if (!config || config.transport !== 'http' || !config.url) throw new Error('MCP authentication requires an existing HTTP server.');
+    if (config.bearerTokenEnvVar !== undefined) {
+      const output = 'This server uses an external bearer environment variable. Configure or remove it in the launching environment and restart or explicitly reconnect. Local OAuth sign-in and logout do not manage this credential; no credentials changed and connection not tested.';
+      return { kind: 'local', output, report: { version: 1, title: 'MCP authentication', facts: { status: 'unchanged', connection: 'not-tested' },
+        lines: [{ kind: 'text', spans: [{ text: output, role: 'text' }] }] } };
+    }
     if (parsed.action.name === 'auth' && (config.enabled === false || Object.keys(config.headers ?? {}).some(key => key.toLowerCase() === 'authorization')))
       throw new Error('Enable this server and remove its static Authorization header before OAuth sign-in.');
     if (parsed.action.name === 'auth' && !host.onAuthorizeUrl) throw new Error('This host cannot present an interactive MCP authorization URL.');

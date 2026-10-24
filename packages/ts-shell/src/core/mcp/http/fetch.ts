@@ -6,6 +6,7 @@ import { parseResponseJson, readResponseText, discardResponse } from '../../netw
 import { mcpAddressPolicy, mcpHttpUrl } from './policy.js';
 import type { McpHttpRequests } from './requests.js';
 import { classifyEventStreamContentType, withoutResumptionIds } from './stream.js';
+import { captureBearer } from './bearer.js';
 
 export interface McpHttpAuthorization {
   token(admission?: Admission, signal?: AbortSignal): Promise<string | undefined>;
@@ -15,10 +16,12 @@ export interface McpHttpAuthorization {
 export function mcpFetch(serverUrl: string, options: {
   readonly admission?: Admission; readonly headers?: Record<string, string>;
   readonly authorization?: McpHttpAuthorization; readonly authRequired?: boolean;
+  readonly bearerTokenEnvVar?: string;
   readonly streaming?: boolean;
   readonly requests?: McpHttpRequests;
 } = {}): FetchLike {
   const server = mcpHttpUrl(serverUrl);
+  const bearer = options.bearerTokenEnvVar === undefined ? undefined : captureBearer(options.bearerTokenEnvVar);
   return async (input, init) => {
     const url = mcpHttpUrl(String(input));
     const method = init?.method ?? 'GET';
@@ -33,13 +36,13 @@ export function mcpFetch(serverUrl: string, options: {
     for (const signal of parents) { signal?.addEventListener('abort', cancel, { once: true }); if (signal?.aborted) cancel(); }
     const lifetime = requestScope(15_000, parent.signal);
     const dispose = () => { lifetime.dispose(); request?.release(); for (const signal of parents) signal?.removeEventListener('abort', cancel); };
-    const scope = { ...lifetime, check: () => { lifetime.check(); assertAdmission(options.admission); } };
+    const scope = { ...lifetime, check: () => { lifetime.check(); assertAdmission(options.admission); if (url.href === server.href) bearer?.(); } };
     try {
       scope.check();
       const headers = new Headers(init?.headers);
       if (init?.body instanceof URLSearchParams && !headers.has('content-type')) headers.set('content-type', 'application/x-www-form-urlencoded');
       if (url.href === server.href) {
-        const token = await options.authorization?.token(options.admission, scope.signal);
+        const token = bearer ? bearer() : await options.authorization?.token(options.admission, scope.signal);
         if (token) headers.set('Authorization', `Bearer ${token}`);
         for (const [name, value] of Object.entries(options.headers ?? {})) headers.set(name, value);
         if (options.authRequired && !headers.has('authorization')) throw new Error('MCP authentication is required.');
@@ -48,7 +51,7 @@ export function mcpFetch(serverUrl: string, options: {
       const response = await requestBrowser(url.href, { method: method as 'GET' | 'POST' | 'DELETE',
         headers: Object.fromEntries(headers), body: body as string | undefined, maxBytes: 8 * 1024 * 1024,
       }, scope, { admitUrl: () => true, admitAddress: mcpAddressPolicy(server, url) });
-      scope.check();
+      try { scope.check(); } catch (error) { discardResponse(response); throw error; }
       if (!response.ok || !response.body) { discardResponse(response); dispose(); return response; }
       const streamType = classifyEventStreamContentType(response.headers.get('content-type') ?? undefined);
       if (streamType === 'invalid-charset') {

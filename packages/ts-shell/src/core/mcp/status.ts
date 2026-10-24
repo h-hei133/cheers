@@ -50,7 +50,9 @@ export function describeMcpConnectionState(state: McpConnectionState): {
     return {
       executable: false,
       reason,
-      doNext: state.config.transport === 'http'
+      doNext: state.config.bearerTokenEnvVar !== undefined
+        ? `Configure the bearer environment variable in the launching environment, then explicitly reconnect with /mcp test -- ${JSON.stringify(state.name)}.`
+        : state.config.transport === 'http'
         ? `Run /mcp auth -- ${JSON.stringify(state.name)}, then /mcp test -- ${JSON.stringify(state.name)}.`
         : `Interactive MCP authentication is unavailable for transport '${state.config.transport}'; use a supported transport before /mcp test -- ${JSON.stringify(state.name)}.`,
     };

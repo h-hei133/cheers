@@ -124,3 +124,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A fullscreen probe copies one diff side, then clicking the same fixed row for the other side produces no second clipboard sequence.
 - **Root Cause**: OSC52 is offered before asynchronous native clipboard attempts settle. The result toast adds chrome and moves the source row; a former source coordinate can now be blank. Transport output alone does not prove the result frame or its geometry is ready.
 - **Rule**: Before the next coordinate action, wait for the actual result paint and locate its current source row. For this renderer, consume complete CUP(row,1)…K rewrites, retire incomplete overwrites, and honor its CUP+J erase. Preserve exact ordered source-content assertions; do not replace readiness with a delay or another fixed row.
+
+### 24. External Bearer Credentials Need A Physical Identity Fence
+- **Symptom**: An HTTP MCP can keep sending a changed environment credential, silently fall back to OAuth, or direct `/mcp auth` to an external PAT that local storage cannot manage.
+- **Root Cause**: Reading an environment variable per request conflates a physical transport with mutable process state; generic auth recovery assumes every 401 is locally managed OAuth.
+- **Rule**: Store only the variable name, capture and validate its value when the physical transport is created, recheck it after admission and before dispatch/response use, reject changes without replay or OAuth fallback, and report external auth/logout as unchanged with environment/reconnect guidance. Keep real provider probes separate from strict egress policy failures.

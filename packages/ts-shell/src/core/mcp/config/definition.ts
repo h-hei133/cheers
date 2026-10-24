@@ -2,7 +2,7 @@ import { isRecord } from '../../values/record.js';
 import { inspectConfigDocument, parseConfigText } from '../../../config/syntax.js';
 import type { McpServerConfig } from '../types.js';
 
-const fields = new Set(['transport', 'enabled', 'command', 'args', 'url', 'env', 'headers', 'scope', 'authRequired']);
+const fields = new Set(['transport', 'enabled', 'command', 'args', 'url', 'env', 'headers', 'bearerTokenEnvVar', 'scope', 'authRequired']);
 
 export function mcpServerName(value: string): string {
   if (!value || value.length > 128 || value.trim() !== value || /[\x00-\x1f\x7f]/.test(value) || value.includes('__')
@@ -30,6 +30,9 @@ export function mcpServerDefinition(value: unknown, complete = false): McpServer
   if (value.scope !== undefined && value.scope !== 'user' && value.scope !== 'project') throw new Error('Invalid MCP scope.');
   const transport = value.transport ?? (value.command ? 'stdio' : value.url ? 'http' : undefined);
   if (!['stdio', 'http', 'ws', 'sdk'].includes(String(transport))) throw new Error('Expected an MCP transport or command/URL.');
+  if (value.bearerTokenEnvVar !== undefined && (transport !== 'http' || typeof value.bearerTokenEnvVar !== 'string'
+    || value.bearerTokenEnvVar.length > 128 || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(value.bearerTokenEnvVar)
+    || Object.keys(value.headers ?? {}).some(key => key.toLowerCase() === 'authorization'))) throw new Error('Invalid MCP bearer environment reference or competing Authorization header.');
   if (transport === 'stdio' && (value.url !== undefined || value.headers !== undefined) || transport === 'http' && (value.command !== undefined || value.args !== undefined || value.env !== undefined)) throw new Error('MCP transport fields cannot be mixed.');
   if (transport === 'http' && value.url !== undefined) {
     const url = new URL(value.url as string);
