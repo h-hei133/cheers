@@ -186,7 +186,7 @@
     {
       "id": "PAN-06",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; copy/history/back/undo/restore/cleanse tests and PTY evidence; bounded lazy copy source, one-use release, native fallback admission, 205 copy tests/11 reversals; back source limits, one-use pages, exact identities and original admission, 201 affected tests/11 reversals; bounded persisted back source/version, active-path unavailable refusal, 223 affected tests/6 reversals; restore initial metadata <=32MiB and all continuation metadata <= the initial scan bytes, so one attempt actively reads <=64MiB with no directory rescan; cursor revision and exact position are revalidated with caller cancellation retained",
+      "evidence": ".wiki/features/phase-20-contract.md W6; copy/history/back/undo/restore/cleanse tests and PTY evidence; bounded lazy copy source, one-use release, native fallback admission, 205 copy tests/11 reversals; back source limits, one-use pages, exact identities and original admission, 201 affected tests/11 reversals; bounded persisted back source/version, active-path unavailable refusal, 223 affected tests/6 reversals; restore initial metadata <=32MiB and all continuation metadata <= the initial scan bytes, so one attempt actively reads <=64MiB with no directory rescan; cursor revision and exact position are revalidated with caller cancellation retained; operation-owned snapshots are marked in the recovery index, excluded from restore preview and routed through undo, while standalone restore keeps preview and explicit execute; 255 focused tests and three reversals",
       "missing": "Full navigation acquisition transient heap/latency, undo/cleanse total resources, cumulative physical I/O and remaining identity edges; bounded copy/back query transient heap and actual system clipboard acceptance remain."
     },
     {
@@ -264,8 +264,8 @@
     {
       "id": "QA-01",
       "status": "partial",
-      "evidence": "scripts/phase20-requirements.json plus .wiki/features/phase-20-contract.md; task-specific reversal evidence; CTX-02 x TOOL-01 actual HTTP schema-delta integration and three reversals",
-      "missing": "CTX-02 x TOOL-01 is now covered, but the remaining task-specific reversals and cross-task integration rows are not yet closed."
+      "evidence": "scripts/phase20-requirements.json plus .wiki/features/phase-20-contract.md; task-specific reversal evidence; CTX-02 x TOOL-01 actual HTTP schema-delta integration and three reversals; PAN-06 restore x undo operation-owned routing and three reversals",
+      "missing": "CTX-02 x TOOL-01 and PAN-06 restore x undo are now covered, but the remaining task-specific reversals and cross-task integration rows are not yet closed."
     },
     {
       "id": "QA-02",
