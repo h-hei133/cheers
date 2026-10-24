@@ -11,12 +11,12 @@
 | PRV-03 | 真实账户登录、刷新、失效、退出及跨连接隔离生命周期证据 | 需明确账户/provider、隔离 opt-in 运行条件；合成 token/audience 校验不替代实测 |
 | PRV-05 | 可信远端结算/账单与本地 ledger 对照 | 需 provider 结算来源和可比较账期；本地成本、quota 不等同实付 |
 | TOOL-02 | 同模型 full/dynamic 的实际执行、缓存/总成本、参数质量和四语言 tokenizer 校准 | 需模型、预算、真实评测输入；现有 paired harness 可先只读复核 |
-| PAN-02 | tree/目录/管理动作已有批次证据；catalogue 后续页绑定一次 browse-attempt 的 compact boundary index，不再每页重新 discovery；一次 attempt 的 metadata/state/transcript body 累计读取≤64MiB，续页共享该预算，超限返回 `sourceLimited` partial 且不再发行 continuation；同一 cursor 并发重放被拒绝；仍缺跨全部页面的累计 physical I/O 测量及全屏真实 consumer 的 byte-tier heap/响应 | 继续原 catalogue/tree consumer 的累计 physical I/O/heap 测量；64MiB 是逻辑源字节准入，不冒充物理 I/O 或总 heap 上界 |
+| PAN-02 | tree/目录/管理动作已有批次证据；catalogue 后续页绑定一次 browse-attempt 的 compact boundary index，不再每页重新 discovery；一次 attempt 的 metadata/state/transcript body 累计读取≤64MiB，续页共享该预算，超限返回 `sourceLimited` partial 且不再发行 continuation；同一 cursor 并发重放被拒绝；catalogue→真实文件采样→picker 已补双 byte-tier、十轮全页浏览与关闭排空；tree/终端绘制组合、累计 physical I/O 及总 heap/响应仍缺 | 继续原 tree/终端 consumer 的资源组合与累计 physical I/O/heap 测量；descriptor bytes 和 64MiB 逻辑源准入不冒充物理 I/O 或总 heap 上界 |
 | PAN-06 | history/copy/back、undo及restore来源/控制已有批次证据；operation-owned snapshot 在 recovery index 中显式标记，`/restore` 禁用并指向既有 `/undo` receipt/current-content guard，standalone snapshot 仍保留 preview/显式 execute；restore 续页使用 attempt-local page index，并复验 cursor revision 与精确 position；初始 metadata 扫描≤32MiB，所有续页 metadata 读取共享不超过初始扫描字节的累计预算，单 attempt 主动 metadata 读取≤64MiB，超限整页拒绝且不重扫目录；同一 restore cursor 并发重放被拒绝；损坏/超限 transcript 以只读 partial 展示并禁用导航动作；tree/back 与 cleanse 已补增量可读前缀、行数到限停止及提前树准入；累计 physical I/O/heap/平台证据仍缺 | 继续测量原 navigation/query 的累计 physical I/O、heap、最长响应及 undo/cleanse 总资源，不以单 source 上限替代端到端资源证明 |
 | PAN-07 | device-code poll 已可被 abort 立即取消且迟到 token 不发布；扩展 unknown outcome 已跨进程 journal 恢复，关闭未 drain 与 cleanup/lifecycle unknown 均阻断后续 mutation；真实账户登录/刷新/失效/退出生命周期仍缺 | 合成协议与扩展持久边界已本地验证；真实认证仍需明确账户/provider 与隔离 opt-in |
 | PAN-08 | 本批补齐 MCP 跨 server 累计 4MiB/10k tools、共享绝对 deadline、peek fail-closed、tools/skill/cost/help/context producer top-N/omitted，以及 context signal 传播和增量 schema 计量；真实 MCP 连接/认证与完整 producer heap/延迟证据仍缺 | 本地 producer 合同已覆盖；真实连接需 server/认证条件，资源结论不扩大为端到端保证 |
 | INPUT-01 | 本批补 Visual/Visual-Line Ctrl+C 复制真实 source selection、paste 文本/图片共享 128项/32MiB预算、device-code 取消及扩展投影总界；仍缺平台真实 IME、系统剪贴板与 Windows 交互 PTY | 本地五模式/字素/长输入合同继续；实机输入法、剪贴板与 Windows 需适用机器 |
-| QA-01 | 47 项逐任务反转矩阵与跨任务集成仍未全部闭合；已新增 `CTX-02 × TOOL-01` 实际 HTTP 集成、restore 累计预算反转，以及 `PAN-06 restore × undo` operation-owned 路由及三个反转 | 继续随剩余 PAN/PRV/TOOL 与外部环境逐项补证；当前已明确关闭的跨任务行不得重复计数 |
+| QA-01 | 47 项逐任务反转矩阵与跨任务集成仍未全部闭合；已新增 `CTX-02 × TOOL-01` 实际 HTTP 集成、restore 累计预算反转、`PAN-06 restore × undo` operation-owned 路由，以及 catalogue/listing/files/picker 资源生命周期组合与三个反转 | 继续随剩余 PAN/PRV/TOOL 与外部环境逐项补证；当前已明确关闭的跨任务行不得重复计数 |
 | QA-02 | Windows 交互 PTY、真实 IME、系统复制；当前源码的 line/pipe profile 身份与审批生命周期已补证 | 既有跨平台合成矩阵不重复列为未验；Windows 交互/IME/系统复制仍需适用机器和终端 |
 | QA-03 | 真实 paired 执行、盲评、正式配对完成及启动/性能聚合 | 需模型/预算/评分者与正式运行条件；synthetic/dry-run 只证明 harness |
 | QA-04 | 全任务最终结构复核、独立审查、完成文档和发布证据 | 各批精确 SHA CI 继续读回；只有全范围闭合后才能做最终交付声明 |
@@ -36,6 +36,13 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 
 累计 OS physical I/O、page-cache 与总 heap/最长响应是当前资源 WATCH 的补充观测维度；原决策没有要求在任意机器上证明这些量的统一绝对上界。后续测量必须说明它验证上述哪一项有界性；未测仍如实标注，不把“缺这项观测”写成新功能缺陷，也不以本次范围说明静默关闭已有资源验收。§6.5 的数值是需校准的候选目标；已闭合的 START-03 不因本次纯测试改动重新开放。
 
+## 2026-10-24 PAN-02 picker 资源链与重复交互（本地验证完成）
+
+- `picker/session/lifetime.test.ts` 使用原 SessionCatalog、SessionFiles 和 sessionPicker，不再 mock 文件大小采样。四个真实 saved session、32 字节/128KiB prompt 附加文本两档各执行十轮四页浏览；实际打开十二个 descriptor，累计 body bytes 等于十二个 core file 的大小之和，后续页和重开不增加正文读取，每轮仅一次 discovery，所有文件和目录句柄均关闭。
+- 单页最多保留一个 page row 加 current，每次真实 size sample map 最多两项；summary cache 为四项，十轮后最多八个 browse attempt/三十二个 compact boundary。关闭后详情为空、原 offered action 拒绝。历史 metadata descriptor 已打开但尚未返回时关闭，排空后不读其 body、不发布迟到页，重新打开可正常完成。
+- 三项实际反转分别移除关闭时 abort、保留关闭后的 projection、强制续页重新 discovery，均产生 AssertionError；原三个生产文件逐字节恢复。恢复后串行聚焦 3 文件/37 项通过，Vitest `--threads false`、V8 heap 上限 1536MiB。静态门禁通过；只有测试/证据改动，未重复产品构建、全量回归或 PTY。
+- 比较参考 selector 的 per-load abort、释放已加载列表及 active-controller 发布检查；保留本仓分页/index owner。上述计数只证明小型真实 consumer 的 acquisition→projection→retained page→close，未运行终端绘制，不宣称 OS physical I/O、总 heap、任意数量延迟或 tree 链闭合；原 35 complete / 12 partial / 0 open 不变。首轮夹具把 disabled 分组行计为 session，并误期望关闭详情为 undefined；按既有空数组接口修正，未修改产品行为。独立代码 APPROVE / 架构 CLEAR，综合 APPROVE；均为只读审查，未独立重跑验证。
+
 ## 2026-10-24 PAN-02 续页取消与累计预算生命周期（本地验证完成）
 
 - 修复正常“下一页”交接失败：原 catalogue attempt 的累计读取预算捕获了第一页的 AbortSignal；`action:more` 关闭原 SessionListing 后，下一页沿共享预算再次检查该旧 signal，误报取消。累计字节 quota 现在独立于单页生命周期，原 discovery、boundary/cache hit、文件 body、batch 和发布继续使用当前页 signal。
@@ -44,13 +51,14 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 - 静态门禁与 TypeScript build 通过。build `c2ab1e4c3cd34684ec623fe7b2031ce8335e5ea827090ed938568c765a6daf96`，inputs `2d066543fcd7637a0ea3707e19305c7e0ac5d49d125a28d97d98b4c6858869c0`，artifact `1d620ba4d822913b82719f80c88ad9b0904bb88f928dae5bd4d1ace779ee6a6b`。测试/构建串行，V8 heap 分别 1536/2048MiB；未跑全量回归、exe 或 PTY，大数量边界仍只允许单元 Mock/切片。
 - 独立代码 APPROVE / 架构 CLEAR，综合 APPROVE；两路只读源码审查未运行验证。本批关闭 PAN-02 的一处真实分页取消缺陷与对应 QA-01 组合，原资源链、实际平台和外部输入缺口仍保留，矩阵仍 35 complete / 12 partial / 0 open。
 
-## 2026-10-24 QA-01/QA-02 非交互 profile 与审批生命周期（本地验证完成）
+## 2026-10-24 QA-01/QA-02 非交互 profile 与审批生命周期（`6ba4f994`；CI/Watch success）
 
 - 新增 `cli/print/profile.test.ts`，line/pipe 各顺序启动四个实际源码 CLI 进程：alpha 显式 allow-once、alpha 默认拒绝、beta 默认拒绝、beta 显式 allow-once。每次使用同一精确目标并由夹具重置，验证审批、tool、terminal event 与文件 bytes/不存在一致；两份持久审批库无 grant，模型声称成功不能抬高拒绝结果。
 - 每个进程验证实际 HTTP endpoint、model 与合成凭据匹配自己的 profile；切换请求及带伪造 confirmation 的请求都被非交互守卫拒绝，原身份不变、不生成 handoff，未启动的 beta 存储与默认 profile session 不被使用。隔离 HOME 只含本地 fixture，未读取真实凭据或调用远端模型。
 - 恢复后的聚焦验证为 2 文件/7 项通过，其中新增 2 项顺序启动 8 个小型子进程。Vitest 单进程 1536 MiB、新增场景每个子进程 512 MiB heap 上限；没有并发验证、全量回归、构建或 PTY。移除非交互切换守卫、错误持久化 allow-once 两项反转均实际 AssertionError，原源码逐字节恢复。最初 `^pipe` 过滤导致全跳过，不计反转；精确替换检查未命中的尝试也不计通过。
 - 首轮夹具误将恢复历史中的旧 tool 当当前回应，随后又在审查中发现不同目标不能验证精确 grant 生命周期；两项均修正为当前 turn、append-only transcript delta 和同目标重试，未改生产逻辑。独立代码 APPROVE / 架构 CLEAR；两路只读审查未运行验证，不冒称独立重跑。
 - 现有 Platform QA `39834842595` 已证明其对应历史构建的 20 个支持平台格。本批只补当前源码的本地 line/pipe 组合，未声称新的 exe 或平台运行；QA-02 仍缺 Windows 交互 PTY、真实 IME、系统复制。47 项矩阵仍为 35 complete / 12 partial / 0 open。
+- 提交 `6ba4f994526b5676a815b4702cbbfd9e489ec0cb` 已推送；精确 SHA 的 CI `40080028964` / job `120831469775` 于 2026-10-24T08:57:10Z–09:15:09Z completed/success，Watch `40080028970` success。此结果不外推到后续提交。
 
 ## 2026-10-24 PAN-06 undo 逐条读取与有界结果保留（`518e5bb6`；CI/Watch success）
 

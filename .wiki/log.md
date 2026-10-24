@@ -8826,3 +8826,11 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 原实现的小夹具首先产生普通/搜索续页两项 AssertionError 和累计预算用例的旧取消错误。修复后 3 文件/34 项通过，实际 store/catalogue/listing/picker 交接、当前页读前取消零 body/发布与跨页预算均有覆盖；恢复旧绑定、逐页重置 quota 两项实际 AssertionError，源码逐字节恢复后再次通过。
 - 与参考 selector per-load cancellation 和原 restore catalogue 共享字节/每次调用控制作定向比较，未复制目录架构。`HANDOFF.md` 记录 quota 与 view cancellation 混用的陷阱；独立代码 APPROVE / 架构 CLEAR，均为只读审查。
 - 静态门与 TypeScript build 通过：build `c2ab1e4c3cd3`，inputs `2d066543fcd7`，artifact `1d620ba4d822`。全部验证串行并限制 heap；未跑全量回归、exe 或 PTY。仅关闭这一分页生命周期缺陷，Phase 20 仍 35 complete / 12 partial / 0 open。
+
+## [2026-10-24] test | PAN-02 picker 资源链与重复交互
+
+- 原 catalogue/listing/真实文件大小采样/picker 以四个小型 saved session 连接；32 字节/128KiB prompt 附加文本两档各十轮四页浏览。实际打开十二个 descriptor，累计返回 body bytes 等于十二个 core file 大小之和且后续不再增加；续页不重扫目录，重开复用 summary cache，全部文件/目录句柄关闭。页面 session≤2、每次 size sample map≤2、cache=4、attempt≤8、compact boundary 总数≤32；关闭后的详情为空、动作不再 offered。
+- 在历史 metadata descriptor 打开但尚未返回时关闭，真实排空后零历史 body/迟到发布，重开完成；参考 per-load abort、已加载列表释放与 active-controller 发布检查，保留原分页/index owner。移除关闭 abort、保留旧 projection、强制续页 discovery 三项反转均实际 AssertionError，生产文件逐字节恢复。
+- 恢复后聚焦 3 文件/37 项串行通过，Vitest `--threads false`、1536MiB heap；静态门禁通过。首轮夹具误计 disabled 分组行和误判空详情，按现有接口修正，未改产品逻辑。只有测试与证据改动，未跑构建、全量回归或 PTY；不外推 OS physical I/O、总 heap/延迟、tree 或终端绘制，矩阵仍 35 complete / 12 partial / 0 open。
+- 前批 `6ba4f994526b5676a815b4702cbbfd9e489ec0cb` 的 CI `40080028964` / job `120831469775` 于 2026-10-24T08:57:10Z–09:15:09Z completed/success，Watch `40080028970` success；只绑定该 SHA，不外推为本批 CI。
+- 独立代码 APPROVE / 架构 CLEAR，综合 APPROVE；两路均只读审查，未独立重跑。按审查建议将逐文件只读一次的表述收窄为实际打开数与累计返回字节，避免将 aggregate counters 冒充 per-path trace。

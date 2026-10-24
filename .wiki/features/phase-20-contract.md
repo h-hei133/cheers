@@ -14,6 +14,8 @@
 
 2026-10-24 PAN-02 续页生命周期补证：`session/store/catalog/index.ts` 的 attempt quota 只保留累计字节状态，不再捕获已关闭第一页的 AbortSignal；当前页取消仍贯穿原 source/cache/boundary/batch 与发布检查。`catalog/index.test.ts`、`picker/session/lifetime.test.ts`、`picker/session/listing.test.ts` 共 34 项证明普通/搜索后页、真实 picker 交接、当前取消与旧页关闭后的累计超限；恢复旧绑定或逐页重置 quota 两项反转实际失败。原 cursor、source budget 与所有 partial 状态不变，未以单页修复关闭总资源证明。
 
+2026-10-24 PAN-02 资源组合补证：同三文件扩至 37 项，lifetime 直接连接真实 SessionFiles；四个小型 saved session 在 32 字节/128KiB prompt 附加文本两档各十轮完整四页浏览，实际打开十二个 descriptor，累计返回 body bytes 等于十二个 core file 大小之和且后续不再增加，续页不重扫目录，单页 session≤2、每次 size sample map≤2，cache=4、attempt≤8、compact boundary 总数≤32，所有文件/目录句柄关闭。关闭时排空已打开的历史 descriptor，不读其 body、不发布迟到页；关闭后详情/动作失效，重开可用。取消、projection 释放、续页重扫三项反转均 AssertionError，生产 bytes 恢复。此链覆盖 acquisition→projection→retention→close，不包含终端 renderer、tree、OS physical I/O 或总 heap/延迟，不提高任务状态。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |
