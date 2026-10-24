@@ -36,6 +36,12 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 
 累计 OS physical I/O、page-cache 与总 heap/最长响应是当前资源 WATCH 的补充观测维度；原决策没有要求在任意机器上证明这些量的统一绝对上界。后续测量必须说明它验证上述哪一项有界性；未测仍如实标注，不把“缺这项观测”写成新功能缺陷，也不以本次范围说明静默关闭已有资源验收。§6.5 的数值是需校准的候选目标；已闭合的 START-03 不因本次纯测试改动重新开放。
 
+## 2026-10-24 PAN-08 help 行预算前置（本地实现与聚焦验证）
+
+- 原report虽然最终最多200行，但一个command的1000个named invocations会先生成/脱敏1001行。新用例在原实现实际AssertionError：元数据投影2002次而非保留200行的400次。共享guideRows现在接受可选行预算，report在label/detail投影前累计消费200行，保留精确total/shown/omitted/partial与原安全投影；picker默认仍投影完整目录，alias搜索和named选择不变。
+- 单command展开与跨command共享预算均有回归；两文件14项通过。恢复末端slice或移除累计扣减两项反转均实际AssertionError，生产source逐字节恢复后通过。独立代码APPROVE/架构CLEAR，均只读未验证。对照参考selector先确定可见范围再转换行description的决定，沿用本仓report owner，不复制其列表结构。
+- 只约束最终报告保留行的label/detail投影；canonical invocation枚举/计数、alias聚合、源数组及中间副本仍不在此界内，不宣称全目录/交互options/总heap/硬延迟有界。无真实CLI/PTY/20k压测，矩阵保持35 complete /12 partial /0 open。最终静态门/matrix与TS build串行通过，测试/build heap上限1536/2048MiB；build `2eec7b1f03caf8c858f40382c7dc3a2e861674f6441798a4d33b63401946dde7`，inputs `76175470f2b3f1cd389ef38524c438a47a4908f5a0f5273d8a9fab4badf7eb03`，artifact `04b02d0ce7dc392c609ffc15cbafdb2b5da7080d9f4ceae4d90380dbdfdf8ce6`。临时目录已清理；提交/推送另取证。剩余原consumer组合继续按上表验收。
+
 ## 2026-10-24 PAN-08 tools 原命令取消与真实目录生命周期（`afcc4ce7`；已推送、CI运行中）
 
 - 原 `readToolPool` 只使用调用方传入的面板 signal，遗漏 `CommandContext.signal`。新增预先取消与真实 stdio `tools/list` 挂起期间原命令取消两个用例，在原实现均取得 AssertionError；现在共享读取入口合并两个生命周期，在 acquisition 前和返回后检查。显式文档选择仍使用独立 timeout，不复用已关闭面板的 signal；工具执行与权限合同保持。
@@ -46,13 +52,14 @@ undo 已改为逐条消费共享预算的 operation scan：历史页最多保留
 - 前批文档SHA `c57daafc785d1efa07d3420d26174c41a3cd015c` 精确CI `40084588877` / job `120844792165` 于2026-10-24T10:06:26Z–10:21:05Z completed/success；该SHA的Watch `40084588937` completed/success。undo代码SHA `65660f16183222ed5d1fd7b5fa21562709359c77` 的CI `40085273785` / job `120846814871` 仍in_progress，Watch `40085273768` completed/success；cleanse代码SHA `b2b72b57` 的CI `40084447090` 仍in_progress，不借后续文档SHA替记成功。
 - 代码提交 `afcc4ce7d3a0b4a53ffc7d12c1a0cc61f64cbbeb` 已推送并精确读回远端main。CI `40086195986` / job `120849521362` 自2026-10-24T10:30:41Z仍in_progress；Watch `40086195984` / job `120849521387` 于10:30:41Z–10:31:03Z completed/success，只绑定该源码SHA。
 
-## 2026-10-24 PAN-06 undo 历史可取消批次与源复核（本地实现与聚焦验证）
+## 2026-10-24 PAN-06 undo 历史可取消批次与源复核（`65660f16`；CI/Watch success）
 
 - 原历史页同步消费整个ledger，即使只保留40条也无法处理receipt之间排队的关闭。三个真实小型receipt回归在原实现产生两项AssertionError：关闭来不及处理、已散列receipt随后变化仍返回成功页。新异步投影复用同一operation scan及共享digest/page accumulator，每receipt后让出事件循环；主命令同步接口、原canonical scope+receipts digest、跨进程cursor、unknown barrier和write/approval合同保持。
 - operation owner在单次32MiB扫描预算内保留目录、index及已读receipt的紧凑stat版本，单文件读取前后及完整扫描结束时复核；最多10002个source版本，不保留所有解码receipt。异步消费每次acquisition前后重检signal/admission/scope；picker load代际丢弃旧结果，旧失败不关闭新页，选择仍重读完整revision并复核opening host。
 - `undo/history.test.ts`补真实OverlayHost关闭、下一条receipt零返回字节、receipt/index/inventory在批次间变化拒绝、同步异步page/cursor一致、新旧load及撤销准入；损坏尾部和三页可达原断言保留。聚焦3文件42项通过；让出事件循环、禁止先收集全receipt、source复核、逐条准入和load代际五项保护反转有效。代际反转首次为直接抛错，改用明确resolves断言后产生AssertionError，未改变预期合同。
 - 对照参考逐文件signal检查、可取消stream和selector当前controller发布；本仓继续复用原同步descriptor reader与全ledger校验，不复制summary读取方案。单个JSON读取/parse/hash、index/inventory及结束stat pass仍为同步有界步骤，source version只是乐观新鲜度，不宣称跨文件原子快照、硬最长响应、physical I/O/总heap或跨页累计上界。Phase20保持35 complete /12 partial /0 open。
 - 最终恢复后的3文件42项、静态门/47项matrix及TS build串行通过，测试/构建V8 heap限制1536/2048MiB。build `be393c7a3f0623756ba501efb011034a34b7340c051b05532e344235295f9f50`，inputs `4379bacf767c917d2c8ac8fe1f7836778a1682f18355fbf1f380587b074eca87`，artifact `5a1f184d9397a622b84a8c86f5293e1bfb36029c9364f7819338a22582157993`。独立代码APPROVE/架构CLEAR，综合APPROVE；两路只读审查未执行验证，确认生产模块未超20函数上限。未跑全量回归、exe、PTY或真实20k消息压测；本批提交/推送/新SHA CI分别取证。
+- 代码SHA `65660f16183222ed5d1fd7b5fa21562709359c77` 已推送；精确CI `40085273785` / job `120846814871` 于2026-10-24T10:16:46Z–10:36:13Z completed/success，Watch `40085273768` completed/success。覆盖本节旧pending记录，不外推后续tools/help源码。
 
 ## 2026-10-24 PAN-06 cleanse 刷新排空与合并（`b2b72b57`；已推送、CI运行中）
 

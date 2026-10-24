@@ -1,7 +1,8 @@
 import { expect, it, vi } from 'vitest';
-import { helpReport } from './report.js';
+import { guideRows, helpReport } from './report.js';
 import { reportText } from '../report/projection.js';
 import { readReport } from '../report/codec.js';
+import * as metadata from '../report/metadata.js';
 
 it('keeps safe guide facts detached from raw identity and executable callbacks', () => {
   const execute = vi.fn();
@@ -29,4 +30,35 @@ it('bounds the help projection and reports omitted command rows', () => {
   const report = helpReport(commands, process.cwd());
   expect(report.facts).toMatchObject({ count: 250, total: 250, shown: 200, omitted: 50, coverage: 'partial' });
   expect(reportText(report)).toContain('50 commands omitted');
+});
+
+it('projects only the report window when one command has many named invocations', () => {
+  const project = vi.spyOn(metadata, 'reportMetadata');
+  try {
+    const command = { name: 'fixture', group: 'workflow' as const, summary: 'Fixture command',
+      invocations: Array.from({ length: 1000 }, (_, index) => ({ name: `named-${index}`, summary: `Named command ${index}` })) };
+    const report = helpReport([command], '/guide-workspace');
+    expect(report.facts).toMatchObject({ total: 1001, shown: 200, omitted: 801, coverage: 'partial' });
+    expect(reportText(report)).toContain('/named-198');
+    expect(reportText(report)).not.toContain('/named-199');
+    expect(reportText(report)).toContain('801 commands omitted');
+    // Each retained row projects its visible label and detail once. Omitted
+    // rows must never enter metadata canonicalization/redaction.
+    expect(project).toHaveBeenCalledTimes(400);
+    expect(guideRows([command], '/guide-workspace')).toHaveLength(1001);
+  } finally { project.mockRestore(); }
+});
+
+it('shares the row window across commands without projecting later metadata', () => {
+  const project = vi.spyOn(metadata, 'reportMetadata');
+  try {
+    const commands = ['first', 'second'].map(name => ({ name, group: 'workflow' as const, summary: name,
+      invocations: Array.from({ length: 150 }, (_, index) => ({ name: `${name}-${index}`, summary: `${name} command ${index}` })) }));
+    const report = helpReport([...commands, { name: 'last', group: 'workflow', summary: 'Never projected' }], '/guide-workspace');
+    expect(report.facts).toMatchObject({ total: 303, shown: 200, omitted: 103, coverage: 'partial' });
+    const text = reportText(report);
+    expect(text).toContain('/second-47'); expect(text).not.toContain('/second-48');
+    expect(text).not.toContain('Never projected');
+    expect(project).toHaveBeenCalledTimes(400);
+  } finally { project.mockRestore(); }
 });

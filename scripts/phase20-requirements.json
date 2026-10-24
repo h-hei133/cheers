@@ -198,8 +198,8 @@
     {
       "id": "PAN-08",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-contract.md W6; MCP/tools/skill/context/cost/help report tests; shared absolute deadline and cumulative 4 MiB/10k-tool catalog budget across client pages, gateway servers and peek; in-flight deadline cleanup preserves the blocking error; bounded producer reports expose omitted/partial output",
-      "missing": "Real MCP connection/auth, remaining report consumers and total catalog/projection heap/latency bounds remain."
+      "evidence": ".wiki/features/phase-20-contract.md W6; MCP/tools/skill/context/cost/help report tests; shared absolute deadline and cumulative 4 MiB/10k-tool catalog budget across client pages, gateway servers and peek; in-flight deadline cleanup preserves the blocking error; bounded producer reports expose omitted/partial output; actual toolPoolFor/catalogue/MCP stdio/picker/OverlayHost lifetime covers original and overlay cancellation with inner request settlement and protocol cancellation, two description tiers and ten opens/draws/closes each, 3 files/27 tests and four assertion-producing reversals; help report applies its shared 200-row window before visible label/detail metadata projection, preserving exact omitted counts and the full picker inventory, 2 files/14 tests and two assertion-producing reversals",
+      "missing": "Real MCP connection/auth and remaining consumer acquisition/projection/retention/close and overflow combinations remain unverified. Full interactive catalogs, invocation enumeration/counting, aliases and intermediate copies are not bounded by report top-N; total heap, latency and physical I/O remain supplementary observations, without a universal absolute-bound requirement."
     },
     {
       "id": "INPUT-01",

@@ -24,6 +24,8 @@
 
 2026-10-24 PAN-08 tools取消/资源组合补证：共享 `readToolPool` 合并原命令与面板signal，预先取消零acquisition，真实MCP挂起读取的两类取消观察内部listTools结束及一次协议取消通知；共享连接由runtime owner关闭。`picker/tools/lifetime.test.ts` 在32字节/128KiB description两档各十轮实际catalogue→picker→OverlayHost过滤/20矩形绘制/关闭，逐轮一次tools/list、一个小于512字节的option，绘制/关闭不再获取，host释放且配置/定义bytes不变，零tools/call。与原picker/report共3文件27项；原signal、close abort、retention及detail bound四项实际反转均AssertionError，源码恢复。独立APPROVE/CLEAR；不等同全目录options上界、wire/physical I/O、总heap/硬延迟或真实MCP认证，PAN-08仍为partial；矩阵保持35 complete /12 partial /0 open。
 
+2026-10-24 PAN-08 help行预算补证：原report对单command的全部named invocations脱敏后再slice，1000named夹具在原实现产生AssertionError（2002次而非400次metadata投影）。共享guideRows对report在label/detail投影前累计限制200行；picker默认完整目录与精确omitted/count保持。两文件14项通过；恢复末端slice/取消累计扣减两项反转均AssertionError，生产bytes恢复。独立APPROVE/CLEAR；只证明行metadata投影，不覆盖canonical枚举/计数、alias聚合、中间副本、交互全目录或总heap/硬延迟；任务状态不提高。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |

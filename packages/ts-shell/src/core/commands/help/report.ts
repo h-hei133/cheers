@@ -11,14 +11,18 @@ const groups: Record<CommandDefinition['group'], string> = {
 };
 const HELP_ROWS = 200;
 
-/** Raw IDs stay local to selection; every visible field is a detached projection. */
-export function guideRows(commands: readonly GuideCommand[], projectRoot: string) {
+/** Reports reserve rows before metadata projection; pickers retain their full inventory. */
+export function guideRows(commands: readonly GuideCommand[], projectRoot: string, limit = Infinity) {
+  let remaining = limit;
   return commands.flatMap(command => {
+    if (remaining <= 0) return [];
     const invocations = commandInvocations(command);
     const aliases = invocations.filter(item => item.kind === 'alias').map(item => `/${reportMetadata(item.name, projectRoot)}`).join(' ');
     const mode = command.supportsNonInteractive === undefined ? 'registered'
       : command.supportsNonInteractive ? 'interactive + print' : 'interactive';
-    return invocations.filter(item => item.kind !== 'alias').map(item => {
+    const shown = invocations.filter(item => item.kind !== 'alias').slice(0, remaining);
+    remaining -= shown.length;
+    return shown.map(item => {
       const label = `/${reportMetadata(item.name, projectRoot)}`;
       const disabled = label !== item.invocation || !/^\/(?:[a-z0-9][a-z0-9:._-]*|\?)$/.test(item.invocation);
       return { id: item.invocation, label, labelRole: 'command' as const, group: item.group,
@@ -32,7 +36,7 @@ export function guideRows(commands: readonly GuideCommand[], projectRoot: string
 export function helpReport(commands: readonly GuideCommand[], projectRoot: string) {
   const totalRows = commands.reduce((total, command) =>
     total + commandInvocations(command).filter(item => item.kind !== 'alias').length, 0);
-  const rows = guideRows(commands.slice(0, HELP_ROWS), projectRoot).slice(0, HELP_ROWS);
+  const rows = guideRows(commands.slice(0, HELP_ROWS), projectRoot, HELP_ROWS);
   const omitted = totalRows - rows.length;
   const lines: ReportLine[] = [];
   for (const [group, title] of Object.entries(groups)) {
