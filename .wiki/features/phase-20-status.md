@@ -16,7 +16,7 @@
 | PAN-08 | 认证型HTTP MCP的真实认证生命周期 | 用户指定stdio服务已完成两轮连接/只读调用/进程关闭；该transport无OAuth，不替代认证型HTTP server验收 |
 | INPUT-01 | 真实IME、系统复制、Windows交互终端 | 适用机器、终端、输入法；本地五模式/字素/粘贴/源选区/外编合同已有证据 |
 | QA-01 | 上述真实账户/账单/质量/平台任务的适用验收 | 本地47行成功/拒绝/竞态/关键反转索引已有限复核；随对应外部任务补证，不重复发明本地组合 |
-| QA-02 | Windows交互PTY、真实IME、系统复制及当前平台修复复验 | 本轮远端20格为17 pass /2 fail /1 skipped；失败固定坐标已修探针，新的跨平台结果另取证 |
+| QA-02 | Windows交互PTY、真实IME、系统复制 | 新Platform QA40098086773在d8192609的20个支持格全部通过；Windows仍只含line/print，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
 | QA-04 | 全范围最终交付、精确SHA CI及结构/双构建/全套证据 | 外部验收完成后收口；当前历史CI失败保留，新SHA结果独立读回；不要求公开Release |
 
@@ -32,6 +32,8 @@
 - Platform QA `40095404655` 绑定上述源码SHA，20个受支持CLI格实际为17 pass /2 fail /1 skipped：Windows两种line/print启动共4格通过；Linux/macOS常规PTY均通过；macOS Node fullscreen与Linux executable fullscreen均在第二次diff source copy超时，macOS executable fullscreen随前一步失败跳过。保留这次failure，不以本地通过覆盖。
 - 实际失败artifact证明首次OSC52后，复制结果toast多占一行，diff由CUP row55移至row54且row55被清空；原探针“固定row55”假设错误，分类为harness readiness/geometry race。只修QA：等待完整复制结果行及当前完整source行，按renderer实际CUP(row,1)…K重写/清除定位下一次点击；初始分块、覆盖分块、原CUP+J清屏均使未完成行不可选。两侧精确OSC52源文顺序断言保留，未改产品复制、权限或渲染行为。
 - 最终静态五门、requirements矩阵、`node --test scripts/qa-clipboard.test.mjs`六项、harness语法检查及`QA_PTY_TARGET=node QA_PTY_MODE=fullscreen NODE_OPTIONS=--max-old-space-size=1536 node scripts/qa-pty-smoke.mjs`串行通过。最终Node fullscreen为Linux/x64/Node24.15.0、exit0，沿上述原TS build；不冒充Node floor20.3或新exe验证。恢复固定第二行、把OSC52当就绪、保留覆盖中旧行、忽略renderer原CUP+J清除四项反转均exit1且实际AssertionError，helper bytes逐项恢复；最终helper SHA-256 `5b92f381a49cf28f12aad515bcd22f141cda9e40c2d68adc32584cfa2c3d40ad`。定向对照参考复制owner以native settlement约束顺序操作的决定，本仓将等待放在QA动作间，保留原产品即时offer语义。独立只读代码APPROVE/架构CLEAR，指出的初始/覆盖分块与原清屏均已补回归。没有运行本地全套、重新构建exe或真实20k压力；本批不修改产品源码，沿用原TS artifact而不称新SHA重建。提交/推送和新的跨平台/CI结果仍分别取证，旧failure保留。
+
+- 交付读回：QA修复及真实连接记录已提交、推送为 `d81926093a88aaf34740058e2c72d709968cc5a3`，远端main精确一致且tracked worktree干净。新[Platform QA40098086773](https://github.com/h-hei133/cheers/actions/runs/40098086773)绑定该SHA，2026-10-24T13:28:30Z completed/success，20个支持CLI格全部success：Linux job120884441022与macOS job120884441258各8格，Windows job120884441245为4格；各平台TS及单文件exe构建也实际成功。两个旧失败的fullscreen格及原跳过的macOS executable fullscreen均已通过。只证明既有支持矩阵，不外推Windows交互/真实IME/系统clipboard；旧40095404655 failure继续保留。常规CI40098055650/job120884344406及前SHA7bff50a4的CI40095140860/job120875691133在本次读回时仍in_progress，不能称全套或NormProof通过。本次后续提交只记录这些结果，不宣称已对其新文档SHA重跑平台。
 
 ### 47行有限审计处置
 

@@ -8941,3 +8941,5 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 用户指定的本机stdio MCP在隔离小型TS项目经原gateway两轮发现23工具、只读搜索和真实PID退出通过；现有provider配置通过原CLI完成一次固定标记请求，ledger单条turn、无tool、主配置版本不变。项目MCP转换配置仅本地保存并exclude，不提交机器路径。stdio无OAuth，现有模型别名auto不等于正式版本；真实认证生命周期、可信账单、正式配对/双盲和平台输入依赖仍partial，状态顶部已缩窄剩余条件。
 
 Platform QA40095404655（7bff50a4）实际17pass/2fail/1skip；Windows批处理4格、Linux/macOS常规PTY通过，两个fullscreen旧探针在第二侧复制超时。失败artifact确认复制结果toast使diff55→54且清空55，分类为QA固定坐标与异步结果paint竞态。QA-only helper改为等完整结果并按当前source行点击，保留两侧精确OSC；六项脚本回归及四项AssertionError反转通过、helper bytes恢复。分块覆盖与实际CUP+J清屏由独立review提出后补证；最终静态门/矩阵/脚本/Node fullscreen串行通过，独立APPROVE/CLEAR，本批SHA/远端结果另取证。未改provider/auth或产品复制源码，未运行本地全套/20k压力。详见phase-20-status真实连接记录。
+
+QA修复及连接记录已提交/推送d81926093a88aaf34740058e2c72d709968cc5a3，精确读回main且tracked clean。Platform QA40098086773绑定该SHA，于2026-10-24T13:28:30Z success：Linux/macOS各8、Windows4，共20支持CLI格全通过，三平台TS+exe构建成功；旧两项fullscreen失败与一项跳过已取得本SHA通过证据，原failure记录不删除。常规CI40098055650和前SHA的40095140860仍运行中，未称全套/结构验收通过；Windows交互/IME/真实clipboard、认证/质量/账单的剩余条件不变。本段后续文档提交不冒充新SHA平台复验。

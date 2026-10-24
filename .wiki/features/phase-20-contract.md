@@ -38,7 +38,7 @@
 
 2026-10-24 PAN-08 report overflow补证：七原producer合法边界真实RangeError后，复用createReport/reportText的typed prefix fitting，codec原结构预算抽取共享、源total/status/字节与显示shown/omitted分开；help/skills/tool detail/logs/metrics可读省略，debug summary200name/fullcount，tool description1000逻辑行。text与codec往返、遇到非法facts/普通错误传播、input不变均覆盖；七有效AssertionError反转，恢复后实际11文件106项/静态门/TS build通过，APPROVE/CLEAR。已有tools list200多字节项仍完整fit，未改其生产逻辑；不宣称最大prefix/全目录/总资源界。有限PAN-08动作/overflow两本地项已有证据，真实连接/认证仍partial；精确build/SHA/CI见status。
 
-2026-10-24 真实连接增量：用户指定stdio MCP经原gateway两轮23-tool发现、隔离项目只读搜索、真实子进程关闭和源码不变验证通过；原CLI使用既有provider配置完成一次固定标记请求、单条持久usage且零tool。stdio无OAuth，provider配置别名auto未冻结实际模型，不能兑换完整认证/质量/账单格。原跨平台新运行17pass/2fail/1skip，实际toast把diff从55行移到54行，QA改为等待完整结果paint并按当前source行点击，保留精确两侧OSC；结果及所缺条件见[状态记录](phase-20-status.md#2026-10-24-用户指定真实连接与平台探针修复)，矩阵仍36complete/11partial。
+2026-10-24 真实连接增量：用户指定stdio MCP经原gateway两轮23-tool发现、隔离项目只读搜索、真实子进程关闭和源码不变验证通过；原CLI使用既有provider配置完成一次固定标记请求、单条持久usage且零tool。stdio无OAuth，provider配置别名auto未冻结实际模型，不能兑换完整认证/质量/账单格。历史平台运行17pass/2fail/1skip，实际toast把diff从55行移到54行，QA改为等待完整结果paint并按当前source行点击，保留精确两侧OSC；修复SHA d8192609的Platform QA40098086773已20/20支持格通过，Windows交互/IME/真实系统复制仍未验；结果及所缺条件见[状态记录](phase-20-status.md#2026-10-24-用户指定真实连接与平台探针修复)，矩阵仍36complete/11partial。
 
 ## W1 配置
 

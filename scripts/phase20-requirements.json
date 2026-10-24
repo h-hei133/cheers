@@ -270,8 +270,8 @@
     {
       "id": "QA-02",
       "status": "partial",
-      "evidence": ".wiki/features/phase-20-status.md QA-02; Platform QA 39834842595 with 20 supported CLI cells; current source CLI line/pipe profile x approval lifecycle in cli/print/profile.test.ts with actual per-profile loopback HTTP identity, non-interactive switch rejection and same-target default denial after allow-once; restored 2-file/7-test batch and two reversals; Platform QA40095404655 at7bff50a4 has17 pass/2 fail/1 skipped of20 supported cells; actual failed artifact proves toast source-row relocation, QA-only readiness/painted-row regression in qa-clipboard.test.mjs; repaired-helper six focused script cases and four effective AssertionError reversals with restored bytes, final local Node fullscreen passed against original verified TS artifact, independent APPROVE/CLEAR",
-      "missing": "Windows interactive PTY, real IME and system clipboard remain unverified. Platform QA40095404655 has two fullscreen fixed-coordinate harness failures and one skipped cell; the repaired probe requires new cross-platform results. Local Node fullscreen passing does not replace those failed cells."
+      "evidence": ".wiki/features/phase-20-status.md QA-02; Platform QA 39834842595 with 20 supported CLI cells; current source CLI line/pipe profile x approval lifecycle in cli/print/profile.test.ts with actual per-profile loopback HTTP identity, non-interactive switch rejection and same-target default denial after allow-once; restored 2-file/7-test batch and two reversals; Platform QA40095404655 at7bff50a4 has17 pass/2 fail/1 skipped of20 supported cells; actual failed artifact proves toast source-row relocation, QA-only readiness/painted-row regression in qa-clipboard.test.mjs; repaired-helper six focused script cases and four effective AssertionError reversals with restored bytes, final local Node fullscreen passed against original verified TS artifact, independent APPROVE/CLEAR; repaired QA SHA d81926093a88aaf34740058e2c72d709968cc5a3 Platform QA40098086773 completed/success at2026-10-24T13:28:30Z, all20 supported CLI cells and all three platforms TS+exe builds passed",
+      "missing": "Windows interactive PTY, real IME and actual system clipboard remain unverified. New Platform QA40098086773 at d8192609 passes all20 supported CLI cells; its Windows coverage is line/print only. Historical40095404655 fullscreen harness failures are preserved separately."
     },
     {
       "id": "QA-03",
@@ -283,7 +283,7 @@
       "id": "QA-04",
       "status": "partial",
       "evidence": "current static gates, CI/Watch and exact-SHA evidence in phase-20-status.md",
-      "missing": "Final whole-scope structural/review/docs and exact-SHA commit/push/CI acceptance remain downstream of external evidence. Full-suite and both-build evidence comes from remote CI under the no-local-full-suite constraint. Historical failures remain; e4b86ad0 CI succeeded, 7bff50a4 CI is still running and its Platform QA40095404655 failed two fullscreen cells; repaired-probe SHA results must be read separately. No public Release is requested."
+      "missing": "Final whole-scope structural/review/docs and exact-SHA commit/push/CI acceptance remain downstream of external evidence. Full-suite and both-build evidence comes from remote CI under the no-local-full-suite constraint. e4b86ad0 CI succeeded; 7bff50a4 CI40095140860 and QA-fix d8192609 CI40098055650 are still running at this readback. Platform QA40098086773 passes all20 cells and TS+exe builds at d8192609; old40095404655 failures remain historical. A later docs-only SHA does not inherit an exact-SHA full-suite result. No public Release is requested."
     }
   ]
 }
