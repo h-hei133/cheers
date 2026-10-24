@@ -44,6 +44,7 @@ interface CatalogAttempt {
 
 const attempts = new Map<string, CatalogAttempt>();
 const MAX_ATTEMPTS = 16;
+const RESERVED_AUTHORITY_NAMES = new Set(['operations']);
 
 /** Scan metadata with bounded directory buffers and retain only one sorted page. */
 export async function readRecoveryCatalogPage(input: {
@@ -269,7 +270,9 @@ async function* scanLedger(ledgerRoot: string, access: RecoveryReadAccess, inven
   }
   for await (const authority of directory) {
     inventory();
-    if (authority.isDirectory()) yield* scanAuthority(ledgerRoot, authority.name, access, inventory);
+    if (authority.isDirectory() && !RESERVED_AUTHORITY_NAMES.has(authority.name)) {
+      yield* scanAuthority(ledgerRoot, authority.name, access, inventory);
+    }
   }
 }
 
@@ -278,12 +281,21 @@ async function* scanAuthority(ledgerRoot: string, authorityId: string, access: R
   let directory;
   try { directory = await fs.opendir(path.join(ledgerRoot, authorityId, 'records'), { bufferSize: 32 }); }
   catch { access.check?.(); yield { key: authorityId }; return; }
-  for await (const file of directory) {
-    inventory(file.isFile() && file.name.endsWith('.json'));
-    if (!file.isFile() || !file.name.endsWith('.json')) continue;
-    const recordId = file.name.slice(0, -5);
-    const listed = await listRecoveryAuthorityRecords({ ledgerRoot, authorityId, recordIds: [recordId], readAccess: access });
-    yield { key: `${authorityId}/${recordId}`, record: listed.records[0] };
+  try {
+    for await (const file of directory) {
+      inventory(file.isFile() && file.name.endsWith('.json'));
+      if (!file.isFile() || !file.name.endsWith('.json')) continue;
+      const recordId = file.name.slice(0, -5);
+      const listed = await listRecoveryAuthorityRecords({ ledgerRoot, authorityId, recordIds: [recordId], readAccess: access });
+      yield { key: `${authorityId}/${recordId}`, record: listed.records[0] };
+    }
+  } catch (error) {
+    access.check?.();
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      yield { key: authorityId };
+      return;
+    }
+    throw error;
   }
 }
 

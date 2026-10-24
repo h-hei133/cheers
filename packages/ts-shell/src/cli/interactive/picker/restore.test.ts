@@ -6,6 +6,10 @@ import { captureRecoveryAuthorityRecord } from '../../../edit/recovery/recoveryA
 import { snapshotRoot } from '../../../edit/recovery/root.js';
 import { tokenizeCommandArgs } from '../../../core/commands/arguments.js';
 import { parseRestoreCommandArgs, runRestoreLocalCommand } from '../../../core/commands/restoreCommandRuntime.js';
+import { createPatchToolDefinition } from '../../../edit/patch/tool.js';
+import { captureOperationScope, readOperation } from '../../../edit/recovery/operation/store.js';
+import { latestOperation, previewOperation } from '../../../edit/recovery/operation/preview.js';
+import { restoreOperation } from '../../../edit/recovery/operation/restore.js';
 import { restorePicker } from './restore.js';
 import { OverlayHost } from '../overlay.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
@@ -32,7 +36,81 @@ async function capture(root: string, authorityId: string, recordId: string, befo
   expect(result.status).toBe('captured');
 }
 
+async function patch(root: string, before: string, after: string, taskId: string) {
+  const tool = createPatchToolDefinition();
+  const context = { workspaceRoot: root, sessionId: 'restore-patch-session', taskId } as never;
+  const prepared = tool.prepare!({
+    input: [
+      '*** Begin Patch',
+      '*** Update File: record-a.txt',
+      '@@',
+      `-${before}`,
+      `+${after}`,
+      '*** End Patch',
+    ].join('\n'),
+  }, context) as import('../../../tools/types.js').ToolPreparation;
+  const selection = prepared.selections?.[0];
+  expect(selection).toBeDefined();
+  const preview = prepared.selectionPreview!([selection!.id]);
+  return prepared.execute(context, [selection!.id], { revision: preview.revision });
+}
+
 describe('restore selection contract', () => {
+  it('routes an actual patch operation through undo instead of restore preview', async () => {
+    const root = workspace();
+    const target = path.join(root, 'record-a.txt');
+    fs.writeFileSync(target, 'before\n');
+    const patched = await patch(root, 'before', 'after', 'restore-patch-apply');
+    expect(patched.success).toBe(true);
+    const authorityId = (patched.metadata as { operationId?: string }).operationId;
+    expect(authorityId).toBeDefined();
+
+    const picker = restorePicker(root);
+    const rows = await picker.load();
+    const row = rows.find(candidate => candidate.searchText?.includes(authorityId!));
+    expect(row).toMatchObject({ disabled: true, note: 'use /undo' });
+    expect((await picker.apply([row!.id]))?.note).toContain('Use /undo');
+    expect(fs.readFileSync(target, 'utf8')).toBe('after\n');
+
+    const scope = captureOperationScope({ sessionId: 'restore-patch-session', workspaceRoot: root });
+    const receipt = latestOperation(scope);
+    expect(receipt).toBeDefined();
+    const preview = await previewOperation(receipt!);
+    expect(preview.canRestore).toBe(true);
+    const restored = await restoreOperation(preview, {
+      operationId: preview.receipt.operationId,
+      sessionId: preview.receipt.sessionId,
+      workspaceIdentity: preview.receipt.workspace.identity,
+      revision: preview.revision,
+    });
+    expect(restored.status).toBe('restored-verified');
+    expect(fs.readFileSync(target, 'utf8')).toBe('before\n');
+  });
+
+  it('keeps a later actual patch authoritative when undoing an earlier operation', async () => {
+    const root = workspace();
+    const target = path.join(root, 'record-a.txt');
+    fs.writeFileSync(target, 'before\n');
+    const first = await patch(root, 'before', 'after', 'restore-patch-first');
+    const second = await patch(root, 'after', 'later', 'restore-patch-second');
+    expect(first.success).toBe(true);
+    expect(second.success).toBe(true);
+    const scope = captureOperationScope({ sessionId: 'restore-patch-session', workspaceRoot: root });
+    const firstOperationId = (first.metadata as { operationId?: string }).operationId;
+    const firstReceipt = readOperation(scope, firstOperationId!);
+    const preview = await previewOperation(firstReceipt);
+    expect(preview.canRestore).toBe(false);
+    expect(preview.blockers.join(' ')).toContain('current-content-changed');
+    const restored = await restoreOperation(preview, {
+      operationId: preview.receipt.operationId,
+      sessionId: preview.receipt.sessionId,
+      workspaceIdentity: preview.receipt.workspace.identity,
+      revision: preview.revision,
+    });
+    expect(restored.status).toBe('blocked');
+    expect(fs.readFileSync(target, 'utf8')).toBe('later\n');
+  });
+
   it('round-trips special project paths and submits an actual read-only preview', async () => {
     const root = workspace();
     await capture(root, 'edit-a', 'record-a');
@@ -50,6 +128,17 @@ describe('restore selection contract', () => {
     expect(result.output).toContain('Would restore');
     expect(result.output).toContain('Nothing was written.');
     expect(fs.readFileSync(path.join(root, 'record-a.txt'), 'utf8')).toBe('after\n');
+
+    const executeArgs = ['execute', ...args.slice(1)];
+    const missingConfirmation = await runRestoreLocalCommand(executeArgs, { cwd: root });
+    expect(missingConfirmation.output).toContain('not executed');
+    expect(missingConfirmation.output).toContain('explicit-execute-intent-required');
+    expect(fs.readFileSync(path.join(root, 'record-a.txt'), 'utf8')).toBe('after\n');
+
+    const executed = await runRestoreLocalCommand([...executeArgs, '--execute'], { cwd: root });
+    expect(executed.output).toContain('Restore — executed');
+    expect(executed.output).toContain('**Restored**');
+    expect(fs.readFileSync(path.join(root, 'record-a.txt'), 'utf8')).toBe('before\n');
   });
 
   it('distinguishes identical record IDs from different edits', async () => {

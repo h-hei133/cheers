@@ -82,7 +82,10 @@ function snapshotPicker(workspaceRoot: string, continuation: { after: RecoveryCa
       const empty = page?.matches === 0 && !pending
         ? searchQuery ? 'No edit snapshots match this search. ' : 'No edit snapshots recorded for this project yet. '
         : '';
-      return `${visible.filter(row => row.id !== MORE_ID).length} shown of ${page?.matches ?? 0} snapshots${page?.next ? '; more pages available' : ''}${page?.unavailable ? `; ${page.unavailable} unavailable records or edits` : ''}. ${empty}Selection creates a preview draft.`;
+      const operationOwned = page?.records.some(record => record.operationOwned)
+        ? ' Operation-owned snapshots are restored through /undo.'
+        : '';
+      return `${visible.filter(row => row.id !== MORE_ID).length} shown of ${page?.matches ?? 0} snapshots${page?.next ? '; more pages available' : ''}${page?.unavailable ? `; ${page.unavailable} unavailable records or edits` : ''}.${operationOwned} ${empty}Selection creates a preview draft.`;
     },
     multiple: true,
     async load(signal): Promise<readonly Option[]> {
@@ -122,6 +125,9 @@ function snapshotPicker(workspaceRoot: string, continuation: { after: RecoveryCa
       const selected = new Set(ids);
       const chosen = offered.filter((record) => selected.has(identity(record)));
       if (chosen.length === 0) return { note: "Nothing selected, so nothing will be restored." };
+      if (chosen.some(record => record.operationOwned)) {
+        return { note: 'Those snapshots belong to a recorded edit operation. Use /undo to review and restore the operation receipt.' };
+      }
       if (chosen.length !== selected.size || chosen.some(record => !canPreview(record))) {
         return { note: 'The snapshot selection is unavailable; reopen /restore before previewing.' };
       }
@@ -160,7 +166,8 @@ function catalogueRows(page: RecoveryCatalogPage, filter?: string): readonly Opt
     id: identity(record), label: record.workspaceRelativePath,
     detail: `${record.operationKind} · was ${record.beforeState} · ${age(record.createdAt)}`,
     searchText: `${record.authorityId} ${record.recordId}`,
-    note: canPreview(record) ? 'restorable' : 'no content', disabled: !canPreview(record),
+    note: record.operationOwned ? 'use /undo' : canPreview(record) ? 'restorable' : 'no content',
+    disabled: !canPreview(record),
   }));
   if (page.next) rows.push({ id: MORE_ID, label: 'More snapshots', detail: 'Continue to the next page', searchText: filter });
   return rows;
@@ -171,7 +178,7 @@ function identity(record: RecoveryAuthorityRecordIndexEntry): string {
 }
 
 function canPreview(record: RecoveryAuthorityRecordIndexEntry): boolean {
-  return record.beforeState === 'absent' || record.hasContentBlob;
+  return !record.operationOwned && (record.beforeState === 'absent' || record.hasContentBlob);
 }
 
 /** How long ago a record was captured, in the coarsest unit that still says it. */

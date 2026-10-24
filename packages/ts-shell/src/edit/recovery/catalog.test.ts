@@ -66,6 +66,30 @@ describe('recovery catalogue pages', () => {
     await expect(readRecoveryCatalogPage({ ledgerRoot, after: first.next })).rejects.toThrow('changed');
   });
 
+  it('treats a records directory that disappears during iteration as unavailable', async () => {
+    const ledgerRoot = await ledger(1);
+    const operations = path.join(ledgerRoot, 'operations');
+    const transient = path.join(ledgerRoot, 'transient');
+    await fs.mkdir(operations);
+    await fs.mkdir(transient);
+    const open = fs.opendir.bind(fs);
+    vi.spyOn(fs, 'opendir').mockImplementation(async (directory, options) => {
+      if (String(directory).endsWith('/transient/records')) {
+        return {
+          async *[Symbol.asyncIterator]() {
+            throw Object.assign(new Error('records directory disappeared'), { code: 'ENOENT' });
+          },
+          async close() {},
+        } as never;
+      }
+      return open(directory, options);
+    });
+
+    const page = await readRecoveryCatalogPage({ ledgerRoot });
+    expect(page.records.map(record => record.recordId)).toEqual(['record-000']);
+    expect(page.unavailable).toBe(1);
+  });
+
   it('rejects a continuation whose cursor revision or position was altered', async () => {
     const ledgerRoot = await ledger(101);
     const first = await readRecoveryCatalogPage({ ledgerRoot });

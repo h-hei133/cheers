@@ -30,6 +30,7 @@ export interface RecoveryAuthorityRecordIndexEntry {
   readonly beforeContentHash?: string;
   readonly beforeContentSizeBytes?: number;
   readonly hasContentBlob: boolean;
+  readonly operationOwned: boolean;
   readonly createdAt: string;
   readonly schemaVersion: RecoveryAuthorityStoredRecord["schemaVersion"];
 }
@@ -172,6 +173,7 @@ export async function listRecoveryAuthorityRecords(input: {
         ? { beforeContentSizeBytes: record.beforeContentSizeBytes }
         : {}),
       hasContentBlob,
+      operationOwned: record.operation !== undefined,
       createdAt: record.createdAt,
       schemaVersion: record.schemaVersion,
     });

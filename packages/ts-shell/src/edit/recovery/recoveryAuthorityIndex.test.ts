@@ -45,6 +45,7 @@ describe("recovery authority index", () => {
         beforeState: "exists",
         expectedCurrentState: "exists",
         hasContentBlob: true,
+        operationOwned: false,
         schemaVersion: 1,
       }),
     ]);
