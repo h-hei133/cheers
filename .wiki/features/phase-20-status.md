@@ -16,9 +16,9 @@
 | PAN-06 | 实际系统剪贴板/平台接受结果 | 适用终端与系统复制实测；本地copy/back/restore/undo/cleanse有限生命周期已覆盖 |
 | INPUT-01 | 真实IME、系统复制、Windows交互终端 | 适用机器、终端、输入法；本地五模式/字素/粘贴/源选区/外编合同已有证据 |
 | QA-01 | 剩余多账号/账单/质量/平台任务的适用验收 | 本地47行索引及真实单账号OAuth、stdio/HTTP MCP已补证；随剩余外部任务更新 |
-| QA-02 | Windows交互PTY、真实IME、系统复制 | 最新Platform QA40159681786在85c98eaf的20个支持格全部通过，三平台双构建及原业务transcript已核对；Windows仍只含line/pipe，未覆盖交互/IME/系统复制 |
+| QA-02 | Windows交互PTY、真实IME、系统复制 | 当前58e1871e的Platform QA40178946206已20/20支持格、三平台双构建及原业务transcript通过；Windows仍只含line/pipe，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
-| QA-04 | 全范围最终交付与剩余任务验收 | 最新源码85c98eaf已提交/推送，CI40159668568 success（10532tests passed）、Watch实际proven/0gaps、Platform QA20/20支持格通过；工具卡片与STS分别独立APPROVE/CLEAR。历史gzip失败根因仍未证实；外部依赖仍partial |
+| QA-04 | 全范围最终交付与剩余任务验收 | 当前七项返工58e1871e已提交/推送，远端main精确一致；CI40178598492因1个旧alias候选断言failure（10563pass/1fail/3skip），已修正测试并本地134项通过，后续CI另绑定；Watch40178598494实际proven/三义务satisfied，Platform QA40178946206已20/20支持格通过；工具卡片与STS分别独立APPROVE/CLEAR。历史gzip失败根因仍未证实；外部依赖仍partial |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
 
@@ -45,6 +45,16 @@
 最终串行链静态五门、47行requirements、diff check、TS build、exe build均exit0；矩阵38/9/0。build `c25c13a684f65cfb55f3561ca991af7b139325b62f9cd945bd64650b8e1a37aa`、inputs `8dfcfff53484e0beaba525ba737afa15067393605ed63663e4775020c247b454`、artifact `80a3c28b5bd0b8a5e3b27cec994a16decb2f8da42cb4150d56b54377f91652dd`；Linux x64 Bun1.3.14 executable SHA256 `872b289b0aa994264eef408630620d38917ac5bda632fe428294f743cc476326`，实际不可变路径与hash经manifest读回。最终启动help及构建reader再验configValid/projectSource、2个project MCP与原字节均通过，无provider派发。验证使用本机Node24.15.0，实际Node floor运行由新SHA CI另证。
 
 首次复用旧scratch NormProof提取触发8192 edge/member上限、exit2/not_proven，分类为工具版本漂移，失败产物保留；未改规范或缩图。随后重新提取当前仓内tgz执行完整judge，exit0/proven、三义务satisfied、0gaps。已追加HANDOFF护栏；安全build summary、source hashes、迁移读回、四反转、独立review和实际verdict归Git忽略 `.omx/artifacts/phase20-interaction/`。两个own probe及本批validator提取清理，既有scratch与正式证据保留。独立review覆盖产品/指南，最后MCP帮助行与证据文档由主代理检查，未宣称逐hash独立签署。本地未跑全套或真实20k binary/PTY。
+
+### 本批提交与远端读回
+
+代码提交 `58e1871eeaff0918a79f335104d1c4403bfae902` 已推送当前main，实际ls-remote精确一致且推送后clean。CI40178598492 completed/failure：仅keymap的旧/reset可选补全断言，10563pass/1fail/3skip；CI judge因测试失败skipped。Watch40178598494 completed/success、artifact12592774828下载实际proven/三义务satisfied。Platform QA40178946206已按当前main提交，仅跑既有小型synthetic支持格，不运行20k消息测试，也不替代Windows交互/IME/系统复制。平台最终receipt见下段，后续测试/证据提交的CI另读回，不冒充本产品SHA复验。
+
+### CI旧候选断言与平台最终结果
+
+CI遗漏的keymap测试用find(/reset)!构造单项菜单；alias过滤后candidate不存在，不能再代表“Enter接受正式命令且不submit”。分类为stale expectation，保留原Enter/不submit/sync断言，改用实际/res候选，并加强resume首项及reset缺席断言；无产品代码改动。最终keymap/slash/firstFrame三文件134项串行通过，独立复核另见正式报告，后续测试/证据提交及CI另绑定。
+
+Platform QA40178946206在58e1871e completed/success。已下载20份原JSON与业务transcript：Linux8/macOS8/Windows4全部pass/exit0，bash/task/tool_search/tool_load/skill每次都有成功result，fixture bash/skill正文保留；三平台TS/exe构建均success、实际Node20.3.0，各平台格间build identity一致。Linux/macOS build `39649e89e3500aa98a7b74dc9f63dda31f61c1a0bb4ebec29013c18178863b15`，artifact与本地相同；Windows build `71cdc4f09f74f3dcba41cbfb680e829d9f24ed604c6f46ec9511e084ecb96f73`。原artifact IDs12592279950/12593705157/12592284833及三exe hash归安全summary。Windows4个regular/fullscreen步骤实际skipped，仍不算交互/IME/系统复制通过。38/9/0不变。
 
 ## 2026-10-25 START-02 损坏摘要索引准入
 
@@ -1157,3 +1167,5 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 47行独立有限复核保留原35complete，PAN-02原范围目录/tree/管理/生命周期已有可追溯证据，升为complete；现36complete/11partial/0open。四条已识别本地生命周期链收口，已有跨任务组合不重复；QA-01仍随真实账户/质量/平台任务验收保持partial。矩阵、当前剩余表、CFG-03实际fixture及QA-03既有START-03聚合引用同步，不把额外physical I/O/heap/最长响应WATCH升成新硬门。
 - 精确`b26773aa49d4372bd87b3cd7917bf6fb31f1fa05` CI `40092866173`/job `120868960040`于12:29:21Z failure：10476pass/3skip/2fail，分别为browser/smoke/request解压状态与queued back confirm零rewind。后者fixture仅等待title/active，现确认前等待实际focus ID first，保留queue/rewind断言及loading dismiss。两个文件定向5项通过（其余110未选），browser未改生产，CI触发原因仍未确认，不从一次本地green推断flake/已根治。
 - 精确`e4b86ad0457791141abb12ce29639b8adb647732`已提交/推送且远端main一致，CI `40093579333`/job `120871082975`于2026-10-24T12:38:38Z completed/success，Watch `40093579354`success。该success不改写上述历史失败，也不替代本新批次SHA的CI；当前批提交/推送与新CI另读回，全阶段仍partial。
+
+测试后续独立code review APPROVE，无产品源码变化。改测后npm start freshness拒绝旧inputs，已按原合同重新串行静态五门/requirements/diff→TS/exe build→start help全部exit0；新build `d8eb0a2f0c7d28c28c1f729887e7880fe47f5ca8f0e758367b4b6f6711b62ff2`、inputs `3af36d77538a6d8bb5e34370c5ddb3572de1f9ea3453e1aa3ce975ee8b8af5b0`、artifact `80a3c28b5bd0b8a5e3b27cec994a16decb2f8da42cb4150d56b54377f91652dd`（与产品批次相同）、exe `6cf7cee7b8366da90acac58d40b18d7e362a622ab152cfed03fc4d764fb49b04`。测试/证据后续提交CI另绑定。

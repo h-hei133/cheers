@@ -512,11 +512,13 @@ describe("completion interception", () => {
   it("accepts an incomplete command on Enter without submitting it", () => {
     const { press, surface, actions } = build();
     surface.editor.setText("/res");
-    const candidate = slashSuggestions("/res", surface.editor.snapshot())!.find(item => item.value === "/reset")!;
-    surface.suggestions.setItems([candidate]);
+    const candidates = slashSuggestions("/res", surface.editor.snapshot())!;
+    expect(candidates[0]?.value).toBe("/resume");
+    expect(candidates.some(item => item.value === "/reset")).toBe(false);
+    surface.suggestions.setItems(candidates);
     surface.setSuggesting(true);
     press("\r");
-    expect(surface.editor.getText()).toBe("/reset ");
+    expect(surface.editor.getText()).toBe("/resume ");
     expect(actions.submit).not.toHaveBeenCalled();
     expect(actions.syncSuggestions).toHaveBeenCalledWith(true);
   });
