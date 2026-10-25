@@ -51,11 +51,13 @@ function valueEditor(host: SettingsHost, draft: SettingsDraft, setting: SettingD
     const picker = statusItemPicker({ current: normalizeStatusItems(value as readonly string[] | undefined), save: async () => undefined,
       preview: items => { preview?.show(items); } });
     return { ...picker, title: 'Stage status items — Enter reviews; empty uses defaults', exclusive: true, holdInput: true,
+      back: () => settingDetail(host, draft, setting, pending),
       previewEnd: preview?.end,
       apply: async ids => validateSetting(setting, ids) ? undefined : ({ next: settingDetail(host, draft, setting, { value: normalizeStatusItems(ids) }) }) };
   }
   return {
     title: `Edit ${setting.label} — ${draft.scope}`, form: 'panel', exclusive: true, holdInput: true, empty: '',
+    back: () => settingDetail(host, draft, setting, pending),
     load: async () => [], apply: async () => undefined,
     input: {
       initial: editorText(setting, value),
@@ -69,9 +71,10 @@ function valueEditor(host: SettingsHost, draft: SettingsDraft, setting: SettingD
   };
 }
 
-function scopePicker(host: SettingsHost, setting: SettingDefinition, scope: SettingsScope): Picker {
+function scopePicker(host: SettingsHost, draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue): Picker {
   return {
-    title: 'Choose save scope — pending value will be discarded', form: 'panel', exclusive: true, holdInput: true, empty: '', initialSelection: scope,
+    title: 'Choose save scope — pending value will be discarded', form: 'panel', exclusive: true, holdInput: true, empty: '', initialSelection: draft.scope,
+    back: () => settingDetail(host, draft, setting, pending),
     load: async () => (['user', 'project'] as const).filter(scope => setting.policy.sources.includes(scope)).map(scope => ({ id: scope, label: scope === 'user' ? 'User configuration' : 'Project configuration' })),
     async apply(ids) {
       const scope = ids[0];
@@ -109,6 +112,7 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
   return {
     get title() { return `${setting.label}${preview ? ' preview' : ''} — save to ${draft.scope}${failure ? ' — Apply not confirmed' : ''}${previewError ? ' — Preview unavailable' : ''}`; },
     form: 'panel', exclusive: true, holdInput: true, empty: '', filterable: false,
+    back: () => settingsPicker(host, draft.scope, setting.group, setting.key),
     initialSelection: pending ? 'apply' : setting.choices ? `choice:${currentChoice}` : 'edit',
     load: async () => [ ...(failure ? [{ id: 'failure', label: failure, disabled: true }] : []), ...detailOptions(draft, setting, pending) ],
     ...(preview ? {
@@ -136,7 +140,7 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
       const id = ids[0];
       if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending) };
       if (id === 'unset') return { next: settingDetail(host, draft, setting, { value: undefined }, failure) };
-      if (id === 'scope' && setting.policy.sources.includes('project')) return { next: scopePicker(host, setting, draft.scope) };
+      if (id === 'scope' && setting.policy.sources.includes('project')) return { next: scopePicker(host, draft, setting, pending) };
       if (id === 'back' || id === 'discard') return { next: settingsPicker(host, draft.scope, setting.group, setting.key) };
       if (id === 'apply' && pending) {
         let current = draft;
@@ -150,7 +154,7 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
         const result = await current.save(setting.key, pending.value);
         return {
           note: `${setting.label}: ${result.note}`,
-          ...(!result.applied && preview
+          ...(!result.applied
             ? { next: settingDetail(host, current, setting, pending, result.note) }
             : result.applied ? { next: settingsPicker(host, draft.scope, setting.group, setting.key, result.note) } : {}),
         };

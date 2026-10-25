@@ -9112,3 +9112,11 @@ ADD-02补Roles中subagent/summary/advisor赋值与清除，现有session model�
 ADD-13沿共享inventory/nav加入help五分类/All、跨分类alias搜索、清空恢复、重开复位及安全焦点详情，Enter仍单草稿。theme/statusline说明指向settings Appearance，保留兼容owner；新增settings指南说明显式覆盖/有效来源/保存scope/应用时点/Apply Discard，更新themes和wiki入口。PTY发现说明截断及绝对路径脱敏影响显示，改分句详情与普通入口措辞；同步空placeholder的错误探针改为实际draft/Usage，未弱化零派发。
 
 主代理串行help13/report5共18pass，分类反转AssertionError/字节恢复后18pass；五静态门/diff/build5b8a14469ca4/责任上限0/正式打包judge三satisfied/proven，regular/fullscreen小PTY分类/alias/清空/持久偏好提示/单草稿通过，SIGTERM143。原Phase38/9与ADD面板/上下文partial保留，完整目标继续；第七批提交另绑定。
+
+第七批d1a8509e4ba236bf82607de75b9872a56747665f已推送/远端一致，CI40228208771待结果；Watch40228208737仅workflow success尚未读工件。
+
+## [2026-10-26] fix | 设置子编辑取消与失败后暂存
+
+ADD-03补input/status/scope/detail的Esc父面板路径：取消本次输入保留此前暂存，scope确认才丢暂存，详情退出撤preview回原字段。overlay先结束子preview再创建父视图；数字/list/object/choice沿真实owner保存/Discard读回，Apply失败统一保留暂存/失败note，冲突值不动、另一次显式Apply才刷新baseline重试。
+
+串行settings picker20/owner37/overlay74/model35共166pass；输入返回反转AssertionError/字节恢复165pass，新增冲突项166pass；静态五门/diff/build61e4338ecc21/责任上限0/正式judge proven三satisfied。两模式小型PTY取消字节不变、object/list Apply磁盘读回通过，长label探针改同步Field身份；SIGTERM143。settings完整scope/只读来源/桌面与model认证回返仍partial，原Phase38/9未变，详见addition15。

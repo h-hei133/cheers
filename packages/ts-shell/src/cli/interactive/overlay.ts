@@ -461,7 +461,11 @@ export class OverlayHost {
     if (this.loading && ['enter', 'delete', 'ctrl+d', 'ctrl+r', 'ctrl+p'].includes(event.keyId)) return true;
     const focused = this.model.current()?.id;
     if (this.input) {
-      if (event.keyId === 'escape' || event.keyId === 'ctrl+c') this.close();
+      if (event.keyId === 'escape' && picker.back) {
+        const back = picker.back;
+        this.close(); this.open(back());
+      }
+      else if (event.keyId === 'escape' || event.keyId === 'ctrl+c') this.close();
       else if (event.keyId === 'enter') {
         const value = this.input.value();
         if (value !== undefined) this.accept({ ...picker, apply: () => picker.input!.apply(value) }, apply, []);
@@ -601,7 +605,8 @@ export class OverlayHost {
 
     // An explicit parent owns Escape before a nested catalogue changes its focus domain.
     if (event.keyId === 'escape' && !isApprovalPicker && picker.back) {
-      this.open(picker.back());
+      const back = picker.back;
+      this.close(); this.open(back());
       return true;
     }
     const navigation = !isApprovalPicker && !this.loading ? picker.navigation?.key(event.keyId, focused, this.model.filter.trim().toLowerCase()) : undefined;

@@ -12,6 +12,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Root Cause**: Catalogue navigation consumes Esc before the explicit parent handler, and transcript notices are hidden while a returned full-screen picker is open.
 - **Rule**: Give opt-in parent navigation priority after input/approval/submode handling, retain the original row identity, and carry saved/application outcomes into the returned picker's status. Assert the focused parent row and visible outcome through the actual host; a changed title or persisted value alone does not prove the return path.
 
+### Parent Settings Snapshots After Preview Cancellation
+- **Symptom**: A parent settings view can capture a temporary display value while returning from a child preview; non-preview fields lose their staged value after Apply fails.
+- **Root Cause**: Function arguments construct the parent before open releases the old preview, and failure retention was conditional on a field having a preview.
+- **Rule**: End the child lease before constructing its parent, preserve prior staged values when cancelling a sub-editor, and retain failed staged changes for every field type. Verify display palette separately from accepted theme intent, and require a separate Apply to retry against a refreshed baseline.
+
 ### Startup Paint And Raw-Input Handoff
 - **Symptom**: Loading has been laid out but its write callback lands after runtime initialization; a key typed during heavy module evaluation is handled by the later host, or a split paste loses its framing on adoption.
 - **Root Cause**: Dynamic import evaluation delays stdout/stdin callbacks. Replacing or flushing StdinBuffer at the ownership boundary discards partial escape, paste and grapheme state; keeping it without subscribing to appearance reports loses theme updates.

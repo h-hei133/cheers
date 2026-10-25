@@ -16,6 +16,9 @@ import { Editor } from '../../presentation/tui/editor.js';
 import { layoutComposer } from '../../presentation/tui/composer/layout.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
 import { OptionModel } from '../../presentation/tui/chrome/options.js';
+import { themePreferences } from '../../presentation/theme/preview.js';
+import { selectTheme, selectedTheme } from '../../presentation/theme/selection.js';
+import { currentTheme } from '../../presentation/theme/theme.js';
 
 let root: string;
 let file: string;
@@ -34,6 +37,68 @@ function runtime(overrides?: RuntimeConfigOverrides) {
     session: { id: 'settings-session', createdAt: 'now', updatedAt: 'now', status: 'active', turns: [] },
   });
 }
+
+it('stages and reads back list, object and choice values through the real settings owner without saving discarded edits', async () => {
+  const context = runtime(), host = { openSettings: (scope?: 'user' | 'project') => openSettings(context, vi.fn(), scope) };
+  for (const [key, raw, expected] of [
+    ['disabledTools', 'fixture.a\nfixture.b', ['fixture.a', 'fixture.b']],
+    ['modelTokenBudgets', '{"openai/fixture":{"reserveTokens":1000,"keepRecentTokens":2000}}',
+      { 'openai/fixture': { reserveTokens: 1000, keepRecentTokens: 2000 } }],
+  ] as const) {
+    const before = fs.readFileSync(file);
+    const catalogue = settingsPicker(host); await catalogue.load();
+    const field = (await catalogue.apply([key]))!.next!, editor = (await field.apply(['edit']))!.next!;
+    expect(editor.input!.validate(raw)).toBeUndefined();
+    const pending = (await editor.input!.apply(raw))!.next!;
+    await pending.apply(['discard']); expect(fs.readFileSync(file)).toEqual(before);
+    const saved = await pending.apply(['apply']); expect(saved?.note).toContain('Saved');
+    expect(configFiles.readUserRuntimeConfigFile()).toMatchObject({ [key]: expected });
+    expect(openSettings(context, vi.fn()).values[key]).toMatchObject({ stored: expected, source: 'user' });
+  }
+  const catalogue = settingsPicker(host); await catalogue.load();
+  const field = (await catalogue.apply(['toolDiscovery']))!.next!;
+  const pending = (await field.apply(['choice:1']))!.next!;
+  const selected = (await pending.load()).find(row => row.id === 'pending')!.label;
+  expect((await pending.apply(['apply']))?.note).toContain('Saved');
+  expect(selected).toContain(configFiles.readUserRuntimeConfigFile().toolDiscovery!);
+});
+
+it('ends the child theme preview before constructing the parent after Escape', async () => {
+  selectTheme('dark', root);
+  const context = runtime(), redraw = vi.fn();
+  const themes = themePreferences({ workspaceRoot: root, redraw, follower: { stop: vi.fn(), refresh: vi.fn() } });
+  const overlay = new OverlayHost(redraw);
+  const host = { openSettings: () => openSettings(context, redraw), themes };
+  try {
+    const catalogue = settingsPicker(host); await catalogue.load();
+    const field = (await catalogue.apply(['theme']))!.next!;
+    const light = `choice:${themes.names().indexOf('light')}`;
+    overlay.open(field); await Promise.resolve(); await Promise.resolve();
+    field.previewChange!([light]); expect(currentTheme()).toBe('light'); expect(selectedTheme()).toBe('dark');
+    overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+    await Promise.resolve(); await Promise.resolve();
+    expect(currentTheme()).toBe('dark'); expect(selectedTheme()).toBe('dark');
+    const selected = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), selected);
+    expect(selected.mock.calls[0]?.[1]).toEqual(['theme']);
+    expect(fs.readFileSync(file, 'utf8')).toBe('{}');
+  } finally { overlay.close(); selectTheme('dark', root); }
+});
+
+it('retains a numeric draft after a real write conflict and requires a new Apply to overwrite the reloaded value', async () => {
+  const context = runtime(), host = { openSettings: () => openSettings(context, vi.fn()) };
+  const catalogue = settingsPicker(host); await catalogue.load();
+  const field = (await catalogue.apply(['maxTurns']))!.next!, editor = (await field.apply(['edit']))!.next!;
+  const pending = (await editor.input!.apply('42'))!.next!;
+  fs.writeFileSync(file, '{"maxTurns":17}');
+  const conflict = await pending.apply(['apply']);
+  expect(conflict?.note).toContain('conflict'); expect(conflict?.next).toBeDefined();
+  expect(configFiles.readUserRuntimeConfigFile().maxTurns).toBe(17);
+  const retained = conflict!.next!;
+  expect(retained.title).toContain('Apply not confirmed');
+  expect((await retained.load()).find(row => row.id === 'pending')?.label).toBe('Pending: 42');
+  expect((await retained.apply(['apply']))?.note).toContain('Saved');
+  expect(configFiles.readUserRuntimeConfigFile().maxTurns).toBe(42);
+});
 
 it('loads the default, project, user and explicit launch notification preference through validation', () => {
   expect(getRuntimeConfig(root).attentionOnIdle).toBe(false);

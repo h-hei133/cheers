@@ -213,7 +213,43 @@ describe('advanced settings picker', () => {
     overlay.handleKey(parseKeyEvent('\r'), (picker: Picker, ids) => { calls.push(picker.apply(ids).then(outcome => { if (outcome?.next) overlay.open(outcome.next); })); });
     await Promise.all(calls); await Promise.resolve();
     expect(overlay.render(80, 24).map(stripAnsi).join('\n')).toContain('Maximum turns');
-    overlay.handleKey(parseKeyEvent('\x1b'), vi.fn()); expect(overlay.active).toBe(false); expect(h.save).not.toHaveBeenCalled();
+    overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+    await Promise.resolve(); await Promise.resolve();
+    expect(overlay.active).toBe(true);
+    expect(overlay.render(100, 30).map(stripAnsi).join('\n')).toContain('Settings — user');
+    const selected = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), selected);
+    expect(selected.mock.calls[0]?.[1]).toEqual(['maxTurns']);
+    expect(h.save).not.toHaveBeenCalled(); overlay.close();
+  });
+  it('returns from an input editor without saving its draft and preserves an earlier staged value', async () => {
+    const h = host(), field = await detail(h, 'maxTurns');
+    const editor = (await field.apply(['edit']))!.next!;
+    const pending = (await editor.input!.apply('42'))!.next!;
+    const editAgain = (await pending.apply(['edit']))!.next!;
+    const overlay = new OverlayHost(() => {}); overlay.open(editAgain);
+    await Promise.resolve(); await Promise.resolve();
+    overlay.handleKey(parseKeyEvent('7'), vi.fn());
+    overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+    await Promise.resolve(); await Promise.resolve();
+    expect(overlay.active).toBe(true);
+    const frame = overlay.render(120, 32).map(stripAnsi).join('\n');
+    expect(frame).toContain('Pending: 42'); expect(frame).not.toContain('Pending: 427');
+    expect(h.save).not.toHaveBeenCalled(); overlay.close();
+  });
+  it('cancels scope selection back to the staged field and drops it only when returning to the catalogue', async () => {
+    const h = host(), field = await detail(h), staged = (await field.apply(['choice:0']))!.next!;
+    const scopes = (await staged.apply(['scope']))!.next!;
+    const overlay = new OverlayHost(() => {}); overlay.open(scopes);
+    await Promise.resolve(); await Promise.resolve();
+    overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+    await Promise.resolve(); await Promise.resolve();
+    expect(overlay.render(120, 32).map(stripAnsi).join('\n')).toContain('Pending: true');
+    overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+    await Promise.resolve(); await Promise.resolve();
+    expect(overlay.render(120, 32).map(stripAnsi).join('\n')).not.toContain('Pending: true');
+    const selected = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), selected);
+    expect(selected.mock.calls[0]?.[1]).toEqual(['attentionOnIdle']);
+    expect(h.save).not.toHaveBeenCalled(); overlay.close();
   });
   it.each([[], ['unknown'], ['maxTurns', 'offline']].map(ids => ({ ids })))('ignores invalid selections $ids', async ({ ids }) => {
     const h = host(); const picker = settingsPicker(h); await picker.load();
