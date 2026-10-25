@@ -16,7 +16,7 @@
 | PAN-06 | 实际系统剪贴板/平台接受结果 | 适用终端与系统复制实测；本地copy/back/restore/undo/cleanse有限生命周期已覆盖 |
 | INPUT-01 | 真实IME、系统复制、Windows交互终端 | 适用机器、终端、输入法；本地五模式/字素/粘贴/源选区/外编合同已有证据 |
 | QA-01 | 剩余多账号/账单/质量/平台任务的适用验收 | 本地47行索引及真实单账号OAuth、stdio/HTTP MCP已补证；随剩余外部任务更新 |
-| QA-02 | Windows交互PTY、真实IME、系统复制 | 新Platform QA40098086773在d8192609的20个支持格全部通过；Windows仍只含line/print，未覆盖交互/IME/系统复制 |
+| QA-02 | Windows交互PTY、真实IME、系统复制 | 最新Platform QA40157005332在b36e9b72的20个支持格全部通过；Windows仍只含line/pipe，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
 | QA-04 | 全范围最终交付、当前精确SHA CI及双构建/全套证据 | 本地完整judge已proven、3义务satisfied/0gaps；两路独立复核为代码APPROVE、架构WATCH，综合COMMENT。当前交付与外部依赖仍须分别补证；不要求公开Release |
 
@@ -24,7 +24,8 @@
 
 ## 2026-10-25 QA-04 剩余职责提取与独立复核
 
-- 本批代码 `b36e9b72cd8f5144385847f33a56aa08742591ad` 已提交并推送，远端main精确一致，推送后工作区clean。Watch40156902777 artifact12584641490已读回proven、三义务satisfied/0gaps；CI40156902798/job121060099683当前静态/script/TS build步骤success、全套运行中。Platform QA40157005332明确绑定同SHA，远端TS/exe及支持格运行中；未提前称通过。
+- 本批代码 `b36e9b72cd8f5144385847f33a56aa08742591ad` 已提交并推送，远端main精确一致，推送后工作区clean。Watch40156902777 artifact12584641490已读回proven、三义务satisfied/0gaps；CI40156902798/job121060099683当前静态/script/TS build步骤success、全套运行中。文档后续提交 `1889068b4ab2b7ed526d297c2f70fd1410432813` 也已推送/main精确一致；不把代码CI视作文档自身CI。
+- Platform QA40157005332在上述代码SHA于03:09:30Z completed/success；下载的20原JSON receipt全部pass/exit0：Linux8、macOS8、Windows4。三平台TS和exe构建步骤success、Node20.3.0/Bun1.3.14；各平台内所有格build identity一致。Linux/macOS build `e5798bddb07ffbb4d08b9135754abed85f0c1f783e46cbe3368dd541f23cba4e`、artifact与本地相同 `35a7bcb94f9e9dbf89a72074a3be1519e77257db9271b04cadc749c82974690e`；Windows build `31719cb7478791fb21a5f7da3d928e988907f595ade080d6c626cff7035dadd5`。三平台exe digest分别记录于安全平台摘要。Windows只line/pipe，其余8个交互格不支持且workflow skipped，未把它们当pass；真实IME/系统复制不由自动格替代。
 - 旧 `2331fc13` CI40155560322/job121056105206于03:02:06Z failure：969 files/10521 tests passed、1 failed/3 skipped；唯一失败为 `browser/smoke/request.test.ts` gzip解压超限用例，预期unsafe-output但收到request-failed。该network源码在旧提交与本批均未改变。本地原smoke23项在Node24通过；实际隔离Node20.3.0再验smoke及既有decoder清理反转共24项通过。失败原因仍未证实，未削弱断言、重跑旧CI或修改产品；结果与实际Node版本证据归artifacts。初次npx未切换Node而返回宿主24，不计floor证据；随后使用官方隔离20.3.0二进制，scratch已删除。
 - 既有reentry索引/发现/恢复问答移入 `session/recovery/reentry.ts`，SessionManager保留公开继承接口；prompt continuity选择移入既有future-turn projection，保留manager receiver、seed/interactive/print优先级及prompt持久化前顺序。store路径查询移入 `session/store/paths.ts`，构造捕获同一layout，持久化/锁仍归accessor。AWS STS移入 `provider/aws/sts.ts`，`contract.ts`只承载共享类型/同一CredentialsError，原路径兼容导出；凭据优先级、签名、请求/取消语义不变。CLI baseline只提取既有pipe/HTTP fixture至 `test-utils/cli/baseline.ts` / `http.ts`，原场景保留。
 - 聚焦原用例分别通过：reentry/manager/recovery 109、runtime/idle/boundary 59、store/manager/registry/files 95、AWS credentials/signature 40；baseline选中3项pipe启动/readiness重连/中断续跑通过，其余38项定向未运行；原process helper 2项通过。四个有效反转分别破坏stamp匹配、continuity选择、metadata路径、STS返回key，exit1及AssertionErrors为1/7/2/1，字节恢复后相关用例再过。首STS反转仅抛CredentialsError、0 AssertionErrors，不计有效反转。

@@ -8989,3 +8989,5 @@ PAN-07/PAN-08适用缺口闭合，矩阵38complete/9partial/0open；PRV-03保留
 ### 交付读回
 
 代码b36e9b72cd8f5144385847f33a56aa08742591ad已提交/推送，远端main精确一致，推送后clean。Watch40156902777/artifact12584641490实际proven、三义务satisfied/0gaps；CI40156902798/job121060099683静态/script/TS build success、全套仍运行，Platform QA40157005332在同SHA运行TS/exe支持格。旧2331fc13 CI40155560322于03:02:06Zfailure，10521通过/1失败/3跳过；browser/smoke/request.test.ts压缩响应超限预期unsafe-output而收到request-failed，相关network源码未改。本地Node24原23项及实际官方隔离Node20.3.0原smoke+既有decoder清理反转24项均通过，根因仍未证实；保留失败，不弱化断言或擅改产品。初npx返回宿主24不计floor证据，后实际20.3.0版本已验；scratch删除、报告artifacts保留。当前SHA全套/平台最终结果待读回。
+
+Platform QA40157005332已于03:09:30Zsuccess，原20个JSON receipt下载读回全pass/exit0：Linux8/macOS8/Windows4，三平台TS+exe构建success、每平台格间build identity一致。Linux/macOS build e5798bddb07ffbb4d08b9135754abed85f0c1f783e46cbe3368dd541f23cba4e，artifact与本地相同；Windows build31719cb7478791fb21a5f7da3d928e988907f595ade080d6c626cff7035dadd5。Windows交互四step skipped，不当作支持格通过，真实IME/系统复制仍缺。完整manifest/digest归安全artifact摘要。文档1889068b4ab2b7ed526d297c2f70fd1410432813已提交/推送/main精确一致、clean，其自身CI与代码CI分别报告；代码全套仍运行。
