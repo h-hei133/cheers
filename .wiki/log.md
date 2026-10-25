@@ -9053,3 +9053,9 @@ MCP测试/证据df0a8583cedcf22df497ecf768e17ee19b1aa03d已提交/推送、main�
 ## [2026-10-25] docs | 日常交互反馈逐项调查
 
 基线4f0f282f/main起始clean，新增[逐项核查](features/interaction-audit.md)回答第三及第八至十六项。当前resume默认当前会话、置顶/更新时间排序与新打开目录校验；settings已有七组，model仍平铺；输入箭头移除及padding1符合后续裁决。问号仍仅投影匹配provider计量，完整目录估算被称作首请求下界与dynamic实际子集不一致，登记报告措辞缺陷；model“只能Esc”、真实4.8k/1.7k差及当前WSL启动分相位耗时仍未复现。定向参考A/B只读比较，历史Performance原JSON与hash读回不冒充当前实测。未改产品、任务状态、个人配置，未启动产品/网络/测试/构建/20k真实PTY；后续修改范围交由用户审阅。
+
+## [2026-10-26] docs | 日常交互补充要求与规划
+
+新增[Phase 20补充规划](features/phase-20-addition.md)，14节/13项ADD任务详细记录settings/model整体看齐、未配置模型可选、resume自动/手动焦点、消息顶格/编辑箭头、提前TUI首帧、上下文估算/目录措辞、正文路径Tab补全、同提交多skill及准入slash组合，deep-research+skills为必达。修正调查中model现场根因的过强表述：上下键零可见交互是用户观察，单ready/禁用候选造成假象是源码支持的推测，仍需实际按键链验收。最新几何/面板要求覆盖旧裁决，决策和索引已链接，原47项状态不变。
+
+定向只读参考确认正文skill限定、局部token替换和路径后备；当前参考parseSkillInvocation/构造只处理一个skill，未将用户多skill观察冒充全量注入证据，补充任务要求检查实际多skill payload。新增文档39个本地链接、调查77个及关联文档/索引目标与源码行号检查通过，严格docs drift/diff check通过，既有118advisory保留。仅Markdown，未产品实施/测试/构建/provider/PTY，文档尚未提交。

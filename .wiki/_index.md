@@ -25,6 +25,7 @@ Last updated: 2026-10-17
 - [Phase 18 decisions and implementation evidence](features/phase-18-decisions.md)
 - [Phase 19 closeout and unfinished work](features/phase-19-decisions.md#11-阶段收尾2026-10-15)
 - [Phase 20 decisions and implementation plan](features/phase-20-decisions.md)
+- [Phase 20 interaction additions and acceptance criteria](features/phase-20-addition.md)
 - [Extension registry protocol and capability grants](features/extension-registry.md)
 - [Agent definitions, model routing and lifecycle](features/agent-definitions.md)
 - [SSH sessions, remote jobs and cancellation](features/ssh.md)

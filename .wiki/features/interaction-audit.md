@@ -2,19 +2,23 @@
 title: "日常交互问题逐项核查"
 category: article
 created: 2026-10-25
-updated: 2026-10-25
+updated: 2026-10-26
 tags: [features, interaction, investigation]
-summary: "回答第三及第八至十六项反馈，区分当前源码事实、既有裁决、实际能力差距和未复现现象。"
+summary: "结合用户补充观察定位 resume 渐进加载焦点、model 禁用行导航、启动首帧和上下文计量差异，记录面板对齐方向。"
 confidence: mixed
 ---
 
 # 日常交互问题逐项核查
 
-你反馈的现象里，既有真实能力差距，也有当前实现与预期不同的地方。**最明确的差距是 model 缺少分类导航、首轮完整上下文估算没有进入状态栏，以及部分命令入口的职责不容易看懂。** settings 当前已有分类；resume 当前默认选中的是正在使用的会话；`npm start` 当前不自动编译。
+你补充的现象让问题更明确了。**resume 的渐进目录更新会保留最初自动选中的旧会话；model 的实测是上下键没有任何可见交互，仅一个模型配置、其余候选禁用是可能的原因；fullscreen 首帧仍等运行时初始化，首轮上下文也没有本地估算展示。** settings 已有分类，但它和 model 的面板层次仍与参考有差距；两者向参考 A 面板看齐的方向已经明确。`npm start` 当前不自动编译。
 
 核查日期为 2026-10-25，源码基线为 `4f0f282feb0bc608dc8e57026fbfa32521e5a685`，开始时当前分支 main、工作区干净。先读启动规则、根部 HANDOFF、开发日志、重构计划及 Phase 20 决策，再沿具体调用链检查实现与测试源码。23–37 研究是此前的证据与规划来源，不能把其中旧版本的行数限制、启动命令和工具数量当作当前事实。Phase 20 当前状态见[交付记录](phase-20-status.md)，延期的真实条件验收继续延期。
 
-本文只交付调查结果，不修改产品。没有运行产品、测试、构建、远端 provider 或 PTY；仅有源码阅读、既有原始工件读回及静态检查。两条委派研究均只读，未执行验证。未运行真实二进制加载 20,000 条消息的压测。
+同日补充核查时 HEAD 为文档提交 `9e5db96e0829c078238a23d2ad037575cf4d6b04`，已有末尾汇总尚未提交，产品源码未变。新增用户观察是：resume 先选中两天前的会话，今天的三个会话随后出现但焦点不变；model 可以输入和 Esc，无法用上下键浏览未配置模型；参考启动后立即有约1.7k上下文，本项目先显示问号，对话后约4.9k。本次据此修正初轮“仅是当前会话聚焦设计”和“只能 Esc 的根因完全未知”的宽泛判断。
+
+2026-10-26再次更正：用户观察是 model 上下键完全没有可见交互；用户推测只有一个模型配置，其他候选不能选中，造成了失灵的假象。本文此前把“跳过禁用行”写成已确认的现场根因过于确定，应保留观察与推测的区别。用户已明确要求未配置模型也能选中浏览、settings/model整体参照 oh-my-pi，并要求已提交用户消息顶格、编辑框恢复箭头，增加正文路径补全、多 skill 与部分可组合 slash。详细要求和验收已汇总到[Phase 20补充规划](phase-20-addition.md)，本轮仍只交付文档。
+
+本文只交付调查结果，不修改产品。没有运行产品、测试、构建、远端 provider 或 PTY；仅有源码阅读、既有原始工件读回及静态检查。初轮两条委派研究均只读，补充轮未新增委派。未运行真实二进制加载 20,000 条消息的压测。
 
 下文的“证实”表示当前源码或原始工件直接支持；“推断”表示能解释现象但尚未捕获你的实际运行；“未验证”表示缺少本轮运行证据。源码里有测试，不等于本轮测试通过。
 
@@ -22,16 +26,16 @@ confidence: mixed
 
 | 原编号 | 当前结论 | 判断边界 |
 |---|---|---|
-| 第三 | resume 是分页会话目录；每次打开重新取目录，默认聚焦当前会话 | 加载机制和焦点规则证实；本机加载时长未测 |
-| 第八 | model 有键盘交互链，但“只能 Esc”根因未证实 | 不能宣布已修复，也不能从全部禁用直接推出键盘失灵 |
+| 第三 | resume 先发布当前会话，后台补充新会话；后续更新保留最初自动焦点 | 源码能解释“先旧后新且不改选中”；实际会话 ID 与加载时长未捕获 |
+| 第八 | 用户观察上下键完全没有可见交互；要求允许选中未配置模型 | 源码存在跳过 disabled 行的机制，是解释单可用模型时假象的候选原因，尚未现场确认 |
 | 第九 | model 没有分类导航 | 当前真实界面差距，高置信度 |
-| 第十 | settings 已有七组加 All；比参考的导航层次和覆盖范围少 | 无分类不符合当前源码，发现性不足是 UX 推断 |
-| 第十一 | 普通输入形态的箭头被明确移除 | 当前源码及既有裁决一致；是否恢复属于新选择 |
-| 第十二 | 问号源于仅显示身份匹配的 provider 实测；4.8k 与 1.7k 不具备直接比较条件 | 完整首轮估算展示缺失；工具目录报告还存在口径误导 |
-| 第十三 | `npm start` 用已构建 JavaScript，执行字节校验，不自动编译 | 命令没用错；当前机器耗时和参考速度差未实测 |
+| 第十 | settings 已有七组加 All；settings、model 均需向参考面板看齐 | 分类事实与用户方向明确；具体覆盖范围仍按本项目配置能力选择 |
+| 第十一 | 普通输入形态的箭头被明确移除；用户现已要求加回 | 本次新方向覆盖旧移除裁决，产品尚未修改 |
+| 第十二 | 本项目对话后约4.9k来自 provider 用量，参考启动约1.7k可来自本地估算 | 计量来源确实不同；数值差的组成未对齐，不能只归因工具数或公式 |
+| 第十三 | `npm start` 不自动编译；当前 fullscreen 在运行时初始化后才绘制 | 缺少参考式提前首帧是源码事实；当前机器各阶段耗时未实测 |
 | 第十四 | 存在重复入口和功能交集，但不全是重复实现 | 逐项说明见下表，不能只按名字删除 |
 | 第十五 | 配置文件存显式覆盖值；当前项目文件确实是空对象 | 不代表参数没实现；个人层与最终有效值未读取验证 |
-| 第十六 | 默认输入和已提交用户消息仍有一格左侧留白 | 现象成立；与既有 padding=1 裁决一致，并非漏掉缩进修复 |
+| 第十六 | 默认输入和已提交用户消息仍有一格左侧留白；用户要求修正顶格 | 已提交消息正文从第一列开始；编辑框去掉额外留白并保留恢复后的提示箭头 |
 
 ## 第三：resume 是什么，为什么每次加载，为什么没选最新一条？
 
@@ -39,30 +43,27 @@ confidence: mixed
 
 每次打开创建新的浏览生命周期，会重新获取并核查来源。单次浏览的后续页面复用有界目录索引；重新打开才能把更早页面的变化纳入新快照。这解释了“每次像重新加载”。它与启动恢复摘要的持久缓存是两条已有用途不同的路径：前者供显式选择，后者加快启动时恢复候选的发现。不能由面板出现 loading 推出“启动缓存没有使用”，也不能把 loading 本身说成启动更快的证据。
 
-**选中项与列表排序是两件事。** 排序为置顶优先，再按更新时间从新到旧，相同时间按 ID 稳定排序；初始焦点则明确取当前活动会话 ID。当前会话比其他会话旧时，打开后滚动到它符合现在的设计。若当前会话不在可选结果中，OptionModel 才保留或选择第一个可选项。因而“没有选最新”是可成立的观察，但当前证据支持的是预期差异，不是时间排序写反。
+**这次问题发生在渐进加载与默认焦点的组合上。** catalog 先读取当前会话并立即发布 scanning 快照，历史发现还没完成；listing 的 load 取这个首个快照便返回，overlay 随即按当前活动会话 ID 聚焦。历史会话再按批次加入、重新排序，订阅更新只替换 options；OptionModel 只要原 ID 仍可用就保留它，没有区分“首次自动选中”和“用户手动选中”。因此即使用户什么都没按，今天的会话随后出现也不会改变原来的旧会话焦点。这个链路与“两天前先选中，今天三个随后出现，选中不变”的观察吻合；未读取当时的实际 ID，不能声称已捕获完整运行。
 
-依据：[session picker](../../packages/ts-shell/src/cli/interactive/picker/session.ts#L140)、[目录加载](../../packages/ts-shell/src/cli/interactive/picker/session.ts#L182)、[排序](../../packages/ts-shell/src/session/navigation/selection.ts#L43)、[首次加载设置焦点](../../packages/ts-shell/src/cli/interactive/overlay.ts#L712)、[分页投影](../../packages/ts-shell/src/session/store/catalog/query.ts#L34)、[启动恢复缓存](../../packages/ts-shell/src/session/recovery/reentry.ts#L68)。已有测试源码特意覆盖“当前会话超过最近40条仍聚焦它”，见[对应测试](../../packages/ts-shell/src/cli/interactive/picker/session.test.ts#L43)。
+**排序没有写反，但默认焦点确有体验问题。** 排序仍是置顶优先、更新时间倒序、相同时间按 ID 稳定排序；新会话可以排到前面，焦点却留在旧 ID 上。初轮只解释“当前会话聚焦符合设计”不够：你的补充明确要求处理未手动选择时的最新候选，不能用旧规则否定这个问题。
 
-参考 B 把当前会话标记与默认选择分开：更新候选时，用户尚未动过选择则回到首项，手动选过才按稳定路径保留。这是与本项目不同的具体选择，不是必须复制的规则。Phase 20 的[消费者映射](phase-20-decisions.md)当前明确写了“当前会话聚焦”；改成默认最新应记录新裁决。
+依据：[先发布当前会话](../../packages/ts-shell/src/session/store/catalog/index.ts#L117)、[逐批加入历史](../../packages/ts-shell/src/session/store/catalog/index.ts#L183)、[首个快照返回](../../packages/ts-shell/src/cli/interactive/picker/session/listing.ts#L30)、[初始 ID 与后续订阅](../../packages/ts-shell/src/cli/interactive/picker/session.ts#L140)、[首次加载设置焦点](../../packages/ts-shell/src/cli/interactive/overlay.ts#L712)、[保留已有焦点](../../packages/ts-shell/src/presentation/tui/chrome/options.ts#L140)、[排序](../../packages/ts-shell/src/session/navigation/selection.ts#L43)、[启动恢复缓存](../../packages/ts-shell/src/session/recovery/reentry.ts#L68)。已有[测试](../../packages/ts-shell/src/cli/interactive/picker/session.test.ts#L43)覆盖当前会话超过最近40条仍聚焦，说明旧规则是有意实现，不代表当前期望已经满足。
 
-## 第八：model 为什么只能按 Esc？
+参考 B 区分 selectionTouched：用户尚未动过选择，候选更新后回到首项；手动选过，才按稳定路径保留。可参考这个分界，同时明确置顶与“最新”的关系，并保留当前会话标记。Phase 20 的[消费者映射](phase-20-decisions.md)仍记录旧“当前会话聚焦”规则；后续实施应同步新默认焦点裁决，本轮只记录差异与用户期望。
 
-**本轮没有复现你的真实终端，因此不能给出“键盘已修好”或单一根因结论。** 当前链路是 picker 注册 → OverlayHost 打开 → 异步加载 → overlay 优先接管输入；上下键、文字搜索、粘贴搜索及 Enter 接受都有实现。现有[model 测试源码](../../packages/ts-shell/src/cli/interactive/picker/model.test.ts#L248)也会打开真实 OverlayHost、搜索并按 Enter，但没有在本轮运行。
+## 第八：model 为什么可以输入，却不能用上下键浏览其他模型？
 
-需要区分这几个具体状态：
+**你的实测是上下键完全没有可见交互；只有一个模型配置是你的根因推测。** 当前源码将上下键交给 OptionModel.step；未配置模型被标为 disabled，step 会跳过这些行。如果只有一个模型可用，上下键会绕回它，视觉上没有移动；若全都禁用，遍历一圈后回到原 cursor，current 仍为空。这个机制支持你的推测，但本轮未捕获实际按键、overlay 状态及候选资格，不能宣称已经排除按键路由或输入焦点方面的其他问题。
 
-| 状态 | 当前行为 | 能否解释原现象 |
-|---|---|---|
-| loading 尚未完成 | Enter 和部分操作键被忽略，Esc 可关闭 | 能解释一部分，尚未证明你停在这里 |
-| 全部候选 disabled | 上下移动跳过禁用项，没有可操作 current | 能解释没有选择光标；加载完成后的 Enter 实际会关闭面板，不能完整解释“严格只能 Esc” |
-| actionPending | 仅 Esc/Ctrl+C 关闭，其他键被吞掉 | 是源码事实，但尚未证明普通 model 打开进入此状态 |
-| 行标记 active | 可能只是顶端的 disabled 当前请求说明 | active 标签不等于选中光标 |
+**问题是浏览焦点与模型启用资格绑在一起。** 凭据或连接缺失应该阻止实际切换，但仍应提供浏览原因和进入配置的路径；目前连聚焦查看都被同一 disabled 标志挡住。不能把缺少配置本身视为可以直接切换，也不能只补一个上下键监听就解决，因为监听已经存在。后续应在 model 的导航投影中区分可浏览与可接受，避免把其他面板的禁用标题一并变成可选项。
 
-模型行被禁用的明确条件包括没有匹配连接、连接 pending/error、账号池不可用、凭据不可用、目录 endpoint 歧义、reasoning effort 不受支持、没有可保存的活动会话 baseline。依据：[行准入](../../packages/ts-shell/src/cli/interactive/picker/model.ts#L71)、[当前请求只读行](../../packages/ts-shell/src/cli/interactive/picker/model.ts#L97)、[键盘状态分支](../../packages/ts-shell/src/cli/interactive/overlay.ts#L430)、[正常导航](../../packages/ts-shell/src/cli/interactive/overlay.ts#L645)、[接受与关闭](../../packages/ts-shell/src/cli/interactive/overlay.ts#L768)、[禁用行处理](../../packages/ts-shell/src/presentation/tui/chrome/options.ts#L78)。
+用户要求已明确：**允许上下键选中未配置模型，并整体参照参考面板。** 这里的选中包括可见焦点、滚动和详情查看；没有凭据时的实际模型启用继续受原准入约束，Enter 可导向配置/登录。验收必须覆盖“恰好一个模型配置、其余未配置”的面板打开及真实按键链，不能仅以 OptionModel 单元检查宣布现场问题解决。
+
+模型行被禁用的条件包括没有匹配连接、连接 pending/error、账号池不可用、凭据不可用、目录 endpoint 歧义、reasoning effort 不受支持、没有可保存的活动会话 baseline。依据：[行准入](../../packages/ts-shell/src/cli/interactive/picker/model.ts#L71)、[当前请求只读行](../../packages/ts-shell/src/cli/interactive/picker/model.ts#L97)、[上下键路由](../../packages/ts-shell/src/cli/interactive/overlay.ts#L648)、[跳过禁用行](../../packages/ts-shell/src/presentation/tui/chrome/options.ts#L113)、[禁用行不能聚焦或作为 current](../../packages/ts-shell/src/presentation/tui/chrome/options.ts#L78)。当前请求 active 说明行也是 disabled，active 标签不能当作实际选择光标。
 
 另一个真实限制：即使另一 provider 有环境凭据，当前活动 provider 不是它且没有命名连接时，该行仍可能显示 configure a connection。provider 的“凭据已发现”与 picker 的“这个精确目标可切换”不是同一条件，见[providerSlot](../../packages/ts-shell/src/cli/interactive/picker/model.ts#L47)。本轮没有擅自扩大凭据切换范围。
 
-下一次判别只需要小会话：捕获当前构建身份、面板状态、第一条可用行及按键后的选中 ID。无需真实模型请求，更不需要长历史压测。参考 A 允许进入 locked provider 浏览原因，并提供连接或登录入口，能减少“整页不可选却不知道怎么办”的体验；当前 model 主要显示原因，连接操作另在 `/connect`。
+参考 A 在未搜索时允许导航到 locked provider 分类，展示凭据缺失原因、配置指引及可用时的 OAuth 登录入口；这些模型并不会因此自动成为可启用候选，搜索期间还会跳过锁定分类。可借鉴的是分类浏览、诊断和实际启用分开。当前 model 主要显示原因，连接操作另在 `/connect`。loading/actionPending 是否也出现在你的那次运行仍未捕获，但不再妨碍确认上述禁用行浏览缺口；现有[model 测试](../../packages/ts-shell/src/cli/interactive/picker/model.test.ts#L248)也未在本轮运行。
 
 ## 第九：model 为什么仍然没有分类？
 
@@ -71,6 +72,8 @@ confidence: mixed
 依据：[model 面板定义](../../packages/ts-shell/src/cli/interactive/picker/model.ts#L25)、[候选展开](../../packages/ts-shell/src/cli/interactive/picker/model.ts#L42)、[预设追加](../../packages/ts-shell/src/cli/interactive/picker/model.ts#L106)。Phase 20 PAN-01 已实现精确连接、角色预设、搜索和两栏等部分，不能由这些能力推出参考式分类导航已经交付。
 
 参考 A 的具体做法是：左侧 Roles / All models / 可用 provider / 锁定 provider，主体保留模型列表及 detail；另有 model-kind tabs。首次打开先用当前 registry 快照使候选可选，再后台刷新，刷新后协调稳定身份。分类和搜索都是已有目录的投影，不应复制一套模型库存或另造选择事务。当前核查的固定入口没有 Recent，不能照着旧概述虚构已经存在的参考能力。
+
+本次用户已明确希望 model 向参考 A 看齐。后续方向是分类导航、列表与详情、未配置目标的诊断/连接入口及稳定的刷新焦点；实际切换继续沿现有精确连接与模型选择事务处理。本轮记录这个方向，尚未实现面板改动。
 
 ## 第十：settings 太简略，没有分类？
 
@@ -82,29 +85,36 @@ confidence: mixed
 
 参考 A 有十个主分类、二级 section、Plugins 页及动态 provider/model 等来源。其方向键、Tab 和左右键分别承担不同导航层次；本项目主要用 Tab 换分类，层次少。**“比参考简略”有客观依据；“各种设置都没实现”没有依据。** 默认 All 降低分类发现性是合理 UX 推断，需要实际终端确认。
 
+本次用户再次明确希望 settings 与 model 一起向参考 A 面板看齐，不再把分类层次当作待确认偏好。后续应对齐清晰的主分类、分区及键盘导航，把本项目已有设置映射进去，并保留 scope、来源、暂存/Apply 和连接 owner 的真实边界；参考独有的配置能力不能仅靠增加菜单名称宣称已实现。
+
 ## 第十一：输入框左侧箭头怎么没了？
 
 **当前是明确移除，不是字体无法显示。** default、borderless、top-rule 的 gutter 都是空字符串，绘制层不会凭空生成箭头。band 仍有自己的 `╰─ ` 装饰，框线形态另计算边界。
 
 依据：[形态定义](../../packages/ts-shell/src/presentation/tui/composer/shapes.ts#L18)、[gutter绘制及内容列](../../packages/ts-shell/src/presentation/tui/composer/row.ts#L44)。[2026-10-25 返工裁决](phase-20-decisions.md#2026-10-25-日常交互返工裁决)明确记录“移除输入提示符及已提交用户消息的黄色侧标”。这条后续裁决比原研究中带箭头的截图和几何优先。
 
-所以当前回答是：箭头确实被删了，而且实现符合现有裁决。若你希望保留输入提示符、仅移除已提交消息侧标，可以重新区分这两个位置；本文没有把你的疑问当作已批准恢复箭头。
+箭头确实被删了，旧实现符合当时裁决。**2026-10-26用户已明确要求恢复编辑框左侧箭头；这是新裁决，不再待确认。** 已提交消息的黄色侧标继续去掉，箭头和消息侧标分别处理。具体几何与验收见[补充规划](phase-20-addition.md#5-输入几何已提交消息顶格编辑框恢复箭头)。
 
-## 第十二：初始上下文4.8k，参考1.7k，正式对话前为什么是问号？
+## 第十二：参考启动显示1.7k，我们先是问号、对话后约4.9k，是公式不同吗？
 
-**问号表示当前输入用量未知。** 状态栏只显示身份匹配的 provider 输入计量；新会话没有计量，便渲染 `?/窗口`。模型、endpoint、schema或系统提示词身份不匹配时，旧计量不能继续显示为当前值；恢复或替换上下文另有清除计量的路径。它不是会话累计消耗，也不是每敲一个字都会更新的实时估算。
+**计量来源确实不同，但不能把数值差全部归因于公式。** 你指的是启动状态栏与对话后的状态栏，不是旧研究的工具目录估算。本项目只显示身份匹配的最近前景请求 provider 输入用量；参考在还没有 provider 用量时就计算本地上下文估算。因此参考可以在发起对话前有具体数值，本项目此时没有这条估算回退路径。
 
-依据：[读取匹配计量](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts#L68)、[问号绘制](../../packages/ts-shell/src/presentation/tui/chrome/items.ts#L154)、[计量身份与失效](../../packages/ts-shell/src/observability/usageTelemetry.ts#L244)。参考 A 启动占位同样给 percent=null，只是渲染窗口容量而不显示问号；进入完整会话后会用本地消息和非消息项估算。**没有问号不证明它已经获得 provider 实测。**
+| 显示位置 | 当前数据来源与计算方式 | 能说明什么 |
+|---|---|---|
+| 本项目启动的 `?` | 没有匹配的 provider 输入计量，contextUsed 未定义 | 还没有实测；不是上下文为0，也不是算错了一个已有数值 |
+| 本项目对话后约4.9k | 归一化 provider 用量中的 promptTokens + cacheReadTokens + cacheWriteTokens | 最近匹配请求的总输入，包含缓存输入；多步回合不保证它只代表第一步的初始上下文 |
+| 参考 A 完整会话启动后的具体数值 | 无实测 anchor 时，nonMessageTokens + tokenizer.countMessages(activeMessages) + pendingTokens | 本地估算能在首次请求前显示；有 anchor 后再结合实测和本地变化校准 |
+| 参考 A 最早的预绘制占位 | percent=null，此时只显示窗口容量；还可能使用缓存的 UI/status 快照 | 临时占位不显示问号；这与完整会话里的1.7k估算是不同阶段 |
 
-**4.8k 与1.7k目前不能直接相减。** 旧研究的4,952来自20个工具声明的 JSON 字符估算，既不是 provider 的精确 tokenizer，也不是完整初始请求。当前 `/context` 仍取完整检查工具池，按 UTF-16 code units ÷3.5估算；真实普通回合默认 dynamic，从 pinned 工具、显式能力和已加载工具构造当前发送集。实际输入还包含系统提示词、项目规则、skills、历史及协议开销。
+依据：[状态栏读取匹配计量](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts#L68)、[问号绘制](../../packages/ts-shell/src/presentation/tui/chrome/items.ts#L154)、[请求输入用量](../../packages/ts-shell/src/turn/session.ts#L304)、[计量身份与失效](../../packages/ts-shell/src/observability/usageTelemetry.ts#L244)。参考 A 的 session-stats 在没有 anchor 时仍返回 tokens 和 percent，启动占位只是更早的阶段；不能用“参考也有占位”解释你进入后每次都看到的具体数值，也不能把它称作已经获得 provider 实测。
 
-依据：[目录估算](../../packages/ts-shell/src/core/commands/contextCommandRuntime.ts#L93)、[检查工具池](../../packages/ts-shell/src/cli/runtime/tools.ts#L16)、[默认dynamic](../../packages/ts-shell/src/config/runtimeConfig.ts#L413)、[实际回合工具及prompt](../../packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts#L390)、[初始集合](../../packages/ts-shell/src/core/tools/catalog.ts#L73)、[pinned名单](../../packages/ts-shell/src/core/tools/discovery/state.ts#L13)。dynamic不保证消除全部固定成本：当前 pinned 名单本身有12个名字，另加搜索/加载元工具；实际集合还取决于允许列表和具体调用。
+参考的 nonMessageTokens 来自当前 systemPrompt 与 session.agent.state.tools：工具估算取 name、description、provider 规范化后的参数 schema 和 examples，再交给 tokenizer。已知编码可用 native tokenizer，否则可回退到 UTF-8 bytes/4；若具体模型明确 toolSchemasInContext=false，则这部分常驻 schema 估算为0。**这是条件分支，未验证你的模型是否走它。** Gemini 描述转移策略也不能推到所有模型上。工具菜单里有多少名字，不等于当次发送多少 schema，更不等于描述、参数及示例有多少 tokens。
 
-**这里有一处可以确认的报告缺陷：** 未计量时 `/context` 把完整检查目录估算写成 “First request estimate: at least …”。实际dynamic发送固定和已加载项，另加发现元工具，两边不是同一schema集合，因此目录估算没有建立首请求下界。这不证明你的真实总输入必然低于报告值，却会强化“我还没聊就占了4.8k”的误解，见[报告措辞](../../packages/ts-shell/src/core/commands/context/report.ts#L59)。正确的语义应区分“可发现工具目录估算”与“已组装请求估算”，本轮仅记录，不改实现。
+本项目实际普通回合默认 dynamic，从 pinned、显式能力和已加载工具构造发送集合；pinned 名单有12个名字，另有搜索/加载元工具。请求还包含系统提示词、项目规则、skills、用户消息、历史及协议开销。参考工具不少这一点并不矛盾，但没有同模型、同项目规则和同一份请求的分项数据，无法判断约4.9k与1.7k的差额分别来自哪些部分，也不能断言本项目实际浪费约3.2k。依据：[默认dynamic](../../packages/ts-shell/src/config/runtimeConfig.ts#L413)、[真实回合组装](../../packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts#L390)、[初始工具集合](../../packages/ts-shell/src/core/tools/catalog.ts#L73)、[pinned名单](../../packages/ts-shell/src/core/tools/discovery/state.ts#L13)。
 
-参考 A 按当前 roster、系统文本、skills、消息和 tokenizer revision缓存分类估计；已知模型可用 native tokenizer，未知模型有 bytes/4 fallback。其把工具描述移入prompt并剥离schema描述的自动策略主要针对Gemini，不能据此对所有模型删除描述。参考的1.7k究竟是哪类值、是否同模型和同项目，在本轮仍未知。
+**另有一处独立的 `/context` 报告缺陷仍然成立。** 旧研究的4,952来自20个工具声明的 JSON 字符估算；当前目录估算也仍按 UTF-16 code units ÷3.5计算。这不是产生你对话后状态栏约4.9k的公式。未计量时 `/context` 将完整检查工具池估算称作 “First request estimate: at least …”，但它与 dynamic 实际发送集不同，没有建立首请求下界。应区分可发现目录估算与已组装请求估算，见[目录估算](../../packages/ts-shell/src/core/commands/contextCommandRuntime.ts#L93)、[检查工具池](../../packages/ts-shell/src/cli/runtime/tools.ts#L16)、[报告措辞](../../packages/ts-shell/src/core/commands/context/report.ts#L59)。
 
-因此目前有两个独立结论：完整首轮估算没有进入状态栏是实际能力差距；“真实请求比参考多消耗3.1k”尚无证据。当前 `/context` 已有最后接受的前景请求 wire 分类、源尺寸和provider总输入usage，但源字节不能相加成provider各类精确tokens。后续比较应绑定同模型、协议、指令、skills、历史及实际工具集合，保留估算与实测各自口径。
+后续方向是首次请求前按实际组装内容显示本地估算，provider 返回后按身份切换或校准实测，模型/连接/上下文变化时使旧值失效。若要解释具体差额，应对齐同模型与同请求的本地分项和 provider 总输入；现有 `/context` 的 wire 分类与源字节可辅助排查，不能当作各类精确 tokens。本轮没有请求抓取或数值复测。
 
 ## 第十三：启动很慢，每次重新编译吗，npm start用错了吗？
 
@@ -113,6 +123,12 @@ confidence: mixed
 依据：[启动脚本](../../scripts/start.mjs#L10)、[校验入口](../../scripts/start-lib.mjs#L147)、[输入摘要](../../scripts/build-identity.mjs#L96)、[项目指南](../../PROJECT_GUIDE.md#L106)。根部 `node dist/cli.js` 也进入同一启动脚本，不能把它当作跳过校验的捷径。
 
 但“不编译”不等于“没有启动成本”：每次检查源码/JSON、编译器声明、依赖声明、必需构建输入、全部产物及已登记可执行文件的字节；之后还有Node模块加载、配置和运行时初始化。当前本地manifest登记1835个产物及102,869,120字节的可执行文件，这是读回的规模事实，**并未在本轮证明manifest新鲜度，更没有测出校验占你当前启动时间的比例。** `listCompilerFiles`中的tsc仅用于构建侧枚举，当前start调用的摘要计算使用已登记名单，不会执行它。
+
+**你指出的“先进入 TUI，再等待加载”确有可参考的实现，当前存在首帧时序差距。** 本项目入口先动态导入完整 cliProcessRunner，随后建立 bootstrap runtime、应用主题、处理输入和启动投影，再创建 sessionRuntime，最后才进入 interactive loop。fullscreen 路径的 startup surface 也刻意不打印控制台 intro，由完整 host 绘制。因此这里没有运行时就绪前的轻量 TUI 首帧。已有恢复提示扫描延后到 onFirstFrame，是一部分工作后移，不能等同于主启动链已提前绘制。依据：[入口导入](../../packages/ts-shell/src/entrypoints/cli.tsx#L24)、[bootstrap 初始化](../../packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts#L140)、[fullscreen 启动投影](../../packages/ts-shell/src/cli/bootstrap/cliStartupSurface.ts#L43)、[首帧后恢复提示](../../packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts#L284)、[runtime ready 与进入交互](../../packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts#L313)。
+
+参考 A 在符合条件的交互 TTY 入口先调用 beginStartupComposer，再加载网络 bootstrap 和完整命令图。这个 Composer 可用缓存外观和状态绘制，加载期间暂缓正式输入接管；配置就绪后更新外观并接管输入，完整 InteractiveMode 再通过 lease 接收同一个 Composer。它减少的是用户看见空白终端的等待，并不证明全部初始化更快。启动源码已支持这种差异，双方本机耗时没有实测。
+
+后续可沿本项目已有 TUI owner提前绘制输入区和明确加载状态，再完成初始化及交接；应分别计量“首次可见”和“可以派发请求”，就绪前不派发，并明确加载期间的输入保留与退出行为。print/help/replay 等入口继续按各自生命周期处理。这个方向已按你的补充记入文档，本轮没有修改启动或构建行为。
 
 已有原始工件能说明这组样本中分发形态对应不同启动速度。下表是2026-10-23隔离Linux runner、Node20.3.0/Bun1.3.14、空会话库、120×60、每格30次的fullscreen首帧数据，build ID为 `91c1045a9d1ad20a59d64780b6aada71419e6d53ef54b9050e32c92627c3bcc2`。它是历史版本的同机观测，不是当前WSL或当前HEAD复测，也没有包含npm父启动器。
 
@@ -173,26 +189,77 @@ confidence: mixed
 
 依据：[frame几何](../../packages/ts-shell/src/presentation/tui/composer/frame.ts#L29)、[正文起点](../../packages/ts-shell/src/presentation/tui/composer/row.ts#L47)、[用户消息绘制](../../packages/ts-shell/src/presentation/tui/transcript/blocks.ts#L132)、[对应源码断言](../../packages/ts-shell/src/presentation/tui/transcript/blocks.test.ts#L16)。源复制按正文映射，不把绘制padding当作用户原文；真实正文自带的空白不能被trim掉。
 
-参考 A 将prompt gutter与padding按形态分别配置，说明符号、边框、空白应独立决定。当前[返工裁决](phase-20-decisions.md#2026-10-25-日常交互返工裁决)仍要求每侧1cell。因此若“顶格”指正文从第一列开始，现实现与这个新预期有差异，但与既有规则一致；改成0需明确涵盖正在编辑的输入、已提交消息或两者。
+参考 A 将prompt gutter与padding按形态分别配置，说明符号、边框、空白应独立决定。旧[返工裁决](phase-20-decisions.md#2026-10-25-日常交互返工裁决)要求每侧1cell。**2026-10-26用户已要求修正删除黄色侧标后仍不顶格的问题，并恢复编辑框箭头。** 新要求覆盖旧几何：已提交消息去掉装饰性左侧留白，正文从第一列开始；编辑框提示箭头贴左，正文紧接必要的提示间隔，不再增加独立左侧 padding。正文自己输入的空白不得删除，右侧留白与有框形态不随此要求一律归零。
 
 ## 对照来源、边界与后续选择
 
-为保持新文档名称和产品用语干净，下面只以参考A/B标识此次只读快照；没有复制外部代码或引入外部产品标签。
+参考 A 是本次用户指定的 oh-my-pi，参考 B 是 pi；下表用 A/B 标识只读快照。项目名称只用于说明对照来源，没有复制外部代码或引入产品运行时标签。
 
 | 快照 | 本轮实际读取的关键位置 | 使用目的 |
 |---|---|---|
 | A：`0b5c27ab24719c86a5986b95ee55f4e75bc1aaa0` | packages/tui/src/overlays/model-hub.ts：532–556、731–781、890–900、2721–2758 | 模型分类、首个快照、锁定provider解释/连接 |
 | A：同上 | packages/tui/src/overlays/settings-defs.ts：4–44、66起；settings-selector.ts：108–141、546–578 | 主分类、section、动态设置来源 |
 | A：同上 | packages/tui/src/status-line/startup.ts：74–75；segments.ts：864–869；context-usage.ts：364–417 | 未知表现及分类估算 |
+| A：同上 | packages/tui/src/status-line/context-usage.ts：237–281；packages/coding-agent/src/session/session-stats.ts：367–389 | 实际 roster、条件性 schema 计量、首次请求前本地估算 |
 | A：同上 | packages/coding-agent/src/session/session-stats.ts：367–389；packages/agent/src/tokenizer.ts：268–273；packages/coding-agent/src/session/settings.ts：347–359 | 计量anchor、本地尾巴、tokenizer及描述策略 |
+| A：同上 | packages/coding-agent/src/cli.ts：522–555；src/modes/startup-composer.ts：69–99；src/main.ts：630–661 | 先绘制 Composer、后加载完整命令、交接同一终端界面 |
+| A：同上 | packages/tui/src/overlays/model-hub.ts：812–865、1048–1059、2721–2758 | 未搜索时锁定 provider 可导航；诊断/登录与模型启用分开 |
 | A：同上 | packages/tui/src/components/editor.ts：1138–1153 | gutter与padding分开决定 |
 | B：`38ff99177fba21e9c57a670f4e95adcf407c99c7` | packages/coding-agent/src/modes/interactive/components/session-selector.ts：363–394；src/core/session-manager.ts：920–921 | 默认首项、手动焦点保留、活动时间排序 |
 | B：同上 | packages/coding-agent/package.json：bin与build脚本 | 预构建bundle分发形态 |
 
 原始启动工件目录为 `.omx/artifacts/phase20-performance-39817293051/performance-39817293051/`。本轮读回 interactive-warm.json / interactive-cold.json，两者SHA256分别为 `69a047a08bbfc535e59de75817b3fcc5c617822aea228015eb77d3e7e3950e35` / `f0671f10deaa923365b0fa5c34d745952216dae13cfdd7dda52555d57a6ce1e1`，与已有交付记录一致。它们只支持自己的机器、版本和口径。
 
-尚未验证的三件事实保留为未知：你当时model停在哪个状态；两边4.8k/1.7k是否同一请求口径；当前机器npm启动各阶段到底耗时多少。它们不妨碍说明源码规则，也不能由本文变成“已修复”。
+补充观察明确了model上下键没有任何可见交互，单可用候选导致视觉假象是待验证推测；resume的现象与渐进发现后自动焦点不更新的机制吻合。仍未捕获真实会话 ID、终端按键事件、约4.9k/1.7k对应的请求内容与具体模型分支，以及本机各启动阶段耗时。源码支持候选机制，不能由本文变成“已动态复现”“现场根因已排他确认”或“已修复”。
 
-供你审阅的选择可以分开处理：先修model的可操作性和分类、工具目录报告口径；再决定resume默认当前还是最新、箭头与两处padding；命令发现入口收敛和settings分类层次则按日常使用范围裁决。若继续实施，应复用现有目录、OptionModel、配置保存和模型选择事务，使用小会话聚焦验证；20k边界只做mock/切片逻辑验证，验证由主代理单进程串行完成。
+已记录的后续方向是：settings/model 向参考 A 面板看齐，model 允许选中未配置目标；resume 区分自动焦点和手动选择；启动先给出 TUI 再完成加载；上下文首次请求前提供本地估算，之后接入实测。2026-10-26新增消息顶格、编辑框恢复箭头、正文路径补全、多 skill 与部分可组合 slash，见[补充任务](phase-20-addition.md)。若继续实施，应复用现有目录、TUI owner、配置保存和模型选择事务，使用小会话聚焦验证；20k边界只做mock/切片逻辑验证，验证由主代理单进程串行完成。本轮授权范围仍是定位和文档更新。
 
-本轮文档验证：全部十项编号齐全，66个本地链接的目标文件存在。主代理在同一串行链运行import cycles、config consumers、declarations、Node floor、严格docs drift及diff check，均exit0；既有118条未加根前缀文档引用advisory仍保留，不称全仓文档零漂移。两条只读复核确认面板与上下文结论，并精化scope筛选、发现元工具和计量失效的表述。没有改变Phase 20任务状态，也没有把调查当作产品修复验收。
+初轮文档验证：全部十项编号齐全，当时66个本地链接的目标文件存在。主代理在同一串行链运行import cycles、config consumers、declarations、Node floor、严格docs drift及diff check，均exit0；既有118条未加根前缀文档引用advisory仍保留，不称全仓文档零漂移。初轮两条只读复核确认面板与上下文结论，并精化scope筛选、发现元工具和计量失效的表述。补充轮只修改本文，验证记录与初轮分开；没有改变Phase 20任务状态，也没有把调查当作产品修复验收。
+
+补充轮文档验证：十项编号齐全，73个本地链接的目标文件存在，`git diff --check` 通过。未修改规则或索引，未运行测试、构建或新的启动基准；文档修改尚未提交。
+
+2026-10-26更正轮：本文77个本地链接目标存在，关联补充规划/决策/索引已校验，严格docs drift与diff check通过；118条既有advisory保留。未改产品，文档尚未提交。
+
+## 最后汇总：哪些问题确实存在，哪些并不存在？
+
+以下判断已吸收同日补充观察，替代初轮较宽泛的归因。“现象存在”“能力不足”和“实现违反现有裁决”分别说明；尚未捕获的运行细节不归入不存在。
+
+### 我认为确实存在的问题
+
+| 对应反馈 | 确实存在的问题 | 问题性质 |
+|---|---|---|
+| 第三 | resume 首次自动聚焦旧会话，渐进加入新会话后仍保留它，未区分用户是否手动选择 | 源码证实的焦点规则，能解释用户观察；与当前希望默认最新的期望有差距 |
+| 第八 | model 上下键没有可见交互是用户观察；源码另证实未配置候选不能聚焦浏览 | 前者未现场复现，后者是确定的能力缺口；单可用候选造成假象是待验证归因，允许选中未配置模型已明确 |
+| 第九 | model 缺少 provider、连接、角色等分类导航，模型与预设平铺在同一列表 | 源码证实的界面能力缺口 |
+| 第八、九 | model 对不可选目标主要给禁用原因，缺少从该位置进入连接配置或登录的操作；另一个provider有环境凭据也不保证能直接切换 | 源码证实的操作路径限制；是否扩大切换范围需要产品选择 |
+| 第十二 | 首轮上下文没有本地估算回退，provider用量返回前只有问号；参考完整会话可提前显示估算 | 源码证实的显示能力缺口；问号诚实表达未知，但信息不足 |
+| 第十二 | `/context` 将完整检查工具目录估算称作“首请求至少需要”，但实际dynamic发送集合不同，没有建立这个下界 | 明确的报告语义缺陷，容易让人误判初始开销 |
+| 第十三 | fullscreen 在完整 runtime 初始化后才绘制，缺少参考式轻量首帧与后续加载交接 | 源码证实的启动时序差距；实际延迟和收益尚未测量 |
+| 第十四 | theme、statusline与settings有重复发现入口，login/logout与connect有快捷入口重叠；view名称不容易说明诊断详略用途 | 入口交集是事实；我认为应改善入口组织和命名说明，不代表可以直接删除实现 |
+| 第十、十五 | settings分类层次和覆盖范围比参考少；稀疏配置文件本身无法展示完整默认值、来源及适用条件 | 能力范围差异是事实；用户已明确要求 settings/model 面板看齐参考，具体新增配置仍须有真实消费者 |
+| 第十一、十六 | 消息侧标移除后仍保留左侧空白，编辑框箭头也被移除 | 用户已要求消息顶格与恢复箭头；旧裁决解释历史实现，不能阻止这次修补 |
+
+后续优先处理 resume 的自动/手动焦点规则与 model 的浏览/启用分界，同时按已确认方向组织 settings/model；首帧提前绘制和上下文估算分别处理。命令发现入口与稀疏配置说明可随后改善。本轮这些都是定位与方向记录，尚未产品实施。
+
+### 我认为当前并不存在的实现缺陷
+
+| 原判断或归因 | 当前结论 |
+|---|---|
+| 源码完全没写 model 上下键处理 | 不成立：监听已存在；但不能因此否定上下键在真实终端没有任何可见交互，也未确认当时监听真的收到输入 |
+| settings完全没有分类 | 不成立：已有七组加All，以及切组和跨组搜索。你当时看不到分类的具体原因仍未确认 |
+| `npm start` 每次都会自动重新编译 | 不成立：当前只校验并启动已构建JavaScript，缺失或过期时要求手动构建 |
+| 使用 `npm start` 是命令用错了 | 不成立：这是当前支持的日常入口；它仍用Node，不会自动选择单文件二进制 |
+| 配置文件很少或为空，说明配置没有使用、参数都没实现 | 不成立：文件只存显式覆盖，字段注册、默认值、分层加载和运行时消费者均存在；不等于所有参数已做真实环境验收 |
+| `/view` 完全没有作用，重复命令都只是空壳 | 不成立：view有诊断与审批等实际消费者；快捷入口也可以委托同一owner，不是重复实现 |
+| resume没选最新，说明更新时间排序写反了 | 不成立：排序是置顶优先、更新时间倒序；问题是首个快照自动焦点被后续更新保留，不能由正确排序否认这个体验问题 |
+| resume每次loading，说明启动缓存没有工作 | 这个推断不成立：显式目录浏览和启动恢复摘要有不同生命周期；本机是否异常慢仍需测量 |
+| 对话后约4.9k就是 JSON 字符数÷3.5，参考1.7k证明工具更少 | 不成立：前者来自匹配的 provider 输入用量，后者启动时可来自本地估算；工具数量无法证明 schema token 数与请求内容相同 |
+| 箭头消失是字体故障、左侧留白没有源码来源 | 不成立：箭头被明确移除、padding及消息正文前空格都有明确来源；两者现已按用户新要求列入修补 |
+
+### 仍不能判定为存在或不存在的问题
+
+- **第三、八：当时的具体运行身份与状态。** 未捕获两天前会话的 ID、实际构建身份、loading/actionPending 状态和终端事件；渐进焦点与禁用行导航是源码支持的机制，不能据此排除现场按键路由或焦点故障。
+- **第十二：约4.9k与1.7k的差额究竟来自哪里。** 本地估算与 provider 用量的来源不同已确认，但模型、协议、规则、历史、实际工具 schema 和缓存口径未对齐，不能把约3.2k全归因于工具或 tokenizer。
+- **第十三：当前机器启动是否异常慢、主要耗时在哪里。** 校验和初始化有成本，历史Node入口也确实慢于单文件入口；当前WSL与参考的同条件耗时尚未测量。
+
+settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首轮上下文估算，以及2026-10-26新增的几何与输入组合要求，都已进入[Phase 20补充规划](phase-20-addition.md)。恢复箭头和消息顶格不再待确认；本文和补充规划均未宣称产品已经修复。

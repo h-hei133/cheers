@@ -3,7 +3,7 @@ title: "功能开发：pi 对照总索引"
 category: article
 sources: [repo-audit-2026-10-17, phase-19-decisions.md, phase-19-acceptance.md, phase-20-decisions.md, 32-defect-register-2026-10.md, verification-15-21.md]
 created: 2026-09-20
-updated: 2026-10-17
+updated: 2026-10-26
 tags: [features, gap-analysis, pi, index]
 summary: "功能研究与阶段规划总入口。23–37于2026-10-17完成源码及固定参考复核，修订登记见32，统一实施范围和验收见Phase20；本轮仅文档，未实现产品。01–22及旧阶段记录保留历史上下文，Phase19结束但仍有明确未完成项。"
 confidence: high
@@ -21,7 +21,8 @@ confidence: high
 
 | 文档 | 当前内容与边界 |
 |---|---|
-| [日常交互问题核查](interaction-audit.md) | 2026-10-25逐项回答第三及第八至十六项：当前源码、既有裁决、参考决策与未复现边界；只交付调查 |
+| [Phase 20日常交互补充规划](phase-20-addition.md) | 2026-10-26面板整体看齐、未配置模型可选、resume焦点、消息顶格/箭头、启动/上下文、路径、多skill与部分slash组合；详细需求与13项待实施任务 |
+| [日常交互问题核查](interaction-audit.md) | 2026-10-25核查及26日更正：保留model按键观察与根因推测区别，记录新几何及补全方向；只交付调查 |
 | [23 输入几何](23-input-surface-geometry.md) | padding1、16正文行的目标；gutter/viewport与应用内复制边界 |
 | [24 Slash与参数](24-slash-completion-defects.md) | canonical/alias、选择状态、共享语法与真实4路径补全 |
 | [25 配置与中转站](25-model-configuration-and-relays.md) | availability/connection身份；profile、预设、overlay、账号池、路径设置全纳入 |
