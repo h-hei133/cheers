@@ -9120,3 +9120,11 @@ ADD-13沿共享inventory/nav加入help五分类/All、跨分类alias搜索、清
 ADD-03补input/status/scope/detail的Esc父面板路径：取消本次输入保留此前暂存，scope确认才丢暂存，详情退出撤preview回原字段。overlay先结束子preview再创建父视图；数字/list/object/choice沿真实owner保存/Discard读回，Apply失败统一保留暂存/失败note，冲突值不动、另一次显式Apply才刷新baseline重试。
 
 串行settings picker20/owner37/overlay74/model35共166pass；输入返回反转AssertionError/字节恢复165pass，新增冲突项166pass；静态五门/diff/build61e4338ecc21/责任上限0/正式judge proven三satisfied。两模式小型PTY取消字节不变、object/list Apply磁盘读回通过，长label探针改同步Field身份；SIGTERM143。settings完整scope/只读来源/桌面与model认证回返仍partial，原Phase38/9未变，详见addition15。
+
+第八批1c5e1e64b5af8ae1f74ee5ca344e43da48c1ce20已推送/远端精确一致，CI40228718301仍运行；Watch40228718325仅workflow success未读工件。
+
+## [2026-10-26] feat | 自动角色独立reasoning编辑
+
+model角色新增真实effort编辑，具体绑定和精确relay能力准入，auto=null由provider决定；保存重捕事务/动作页、Esc原角色，保留default/siblings/presets/window/skillful。换角色模型保持自身受支持effort、不再复用默认effort，目标不支持时采用provider决定并显示。三个消费者已沿原链消费，不增重复传播；新增面板→subagent/advisor/summary实际loopback请求与shape、缓存失效证据。
+
+串行六文件137pass，两有效反转AssertionError/字节恢复model43pass；补fixture类型后provider9pass，五静态门/diff通过，首次联合类型build失败修正后最终3f1a12c8a029/责任上限0/正式judge proven三satisfied。两模式小PTYeffort保存/读回/取消/auto/清除/默认保留/原focus通过，零提交、SIGTERM143；完整面板认证/scope/桌面及ADD-08仍partial，原Phase38/9不变。第六CI40227521947已success10718pass/3skip；第七40228208771实际1fail/10718pass/3skip为help旧footer/Esc，修为两层返回并保留草稿断言、host聚焦1pass，历史失败保留。详见addition15第九批及thinking证据，本批交付另绑定。

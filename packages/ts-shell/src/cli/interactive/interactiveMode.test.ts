@@ -1169,8 +1169,10 @@ describe("session wiring", () => {
       host.toast = 'A session notice remains visible';
       await new Promise(resolve => setTimeout(resolve, 0));
       const frame = stripAnsi(host.view.renderFrame({ columns: 100, rows: 16 }).rows.join('\n'));
-      expect(frame).toContain('Slash commands'); expect(frame).toContain('more'); expect(frame).toContain('Esc to close');
+      expect(frame).toContain('Slash commands'); expect(frame).toContain('more'); expect(frame).toContain('Esc: back');
       expect(frame).toContain('A session notice remains visible');
+      terminal.input('\x1b');
+      expect(host.overlay.active).toBe(true); expect(host.view.editor.getText()).toBe(draft);
       terminal.input('\x1b'); await vi.waitFor(() => expect(host.overlay.active).toBe(false));
       expect(host.view.editor.getText()).toBe(draft);
     } finally { mode.stop(); }

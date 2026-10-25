@@ -24,6 +24,7 @@ import { advisorFor, advisorCheckpointFor } from './advisor.js';
 import * as authorization from '../../provider/request/authorization.js';
 import * as accounts from '../../core/auth/account/renewal.js';
 import * as modelState from '../../session/model/state.js';
+import { modelPicker } from '../interactive/picker/model.js';
 
 const servers: http.Server[] = [];
 afterEach(async () => {
@@ -124,6 +125,23 @@ it.each([false, true])('uses the automatic advisor role with explicit override %
   const scope = readGoalEdit(setup.manager, setup.session).goal!.id;
   expect(decodeRequestLedger(readBoundSessionState(setup.manager, setup.session).state.requestLedger)!.scopes[scope]).toMatchObject({ inputTokens: 12, outputTokens: 3, pending: {} });
   expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+});
+
+it('sends the role effort saved by the model panel and provider default without changing the main effort', async () => {
+  const setup = await fixture(); setup.advisor.setEnabled(true);
+  const before = modelState.readSessionModel(setup.session.id)!;
+  for (const level of ['low', 'auto'] as const) {
+    const picker = modelPicker(setup.command); await picker.load();
+    const role = (await picker.inspect!('role:advisor'))!.next!; await role.load();
+    const thinking = (await role.apply(['thinking']))!.next!; await thinking.load();
+    expect((await thinking.apply([level]))?.note).toContain('advisor uses');
+    expect(modelState.readSessionModel(setup.session.id)).toEqual({ ...before, roles: { ...before.roles,
+      advisor: { ...before.roles!.advisor!, thinkingEffort: level === 'auto' ? null : level } } });
+    await invoke(setup);
+  }
+  expect(setup.requests.map(row => [row.model, row.effort])).toEqual([
+    ['main', 'low'], ['namespace/advisor', 'low'], ['main', 'low'], ['namespace/advisor', undefined],
+  ]);
 });
 
 it('configure without a target clears an explicit override and stays off until enabled', async () => {

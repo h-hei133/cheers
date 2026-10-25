@@ -150,6 +150,25 @@ it('validates preset roles and summary limits against their own relay metadata',
   expect(requests).toHaveLength(0);
 });
 
+it('edits summary effort using the exact relay capability while preserving the default relay effort', async () => {
+  writeCatalogCache(loadCatalog().map(provider => provider.id === 'relay-b' ? { ...provider, endpoint: 'openai-compatible' } : provider));
+  expect((await runModelPresetCommand(['save', 'work', '--profile', 'default=a/shared@high', 'summary=b/shared@auto'], context())).output).toContain('saved');
+  expect((await runModelPresetCommand(['apply', 'work', '--all'], context())).output).toContain('all roles applied');
+  const before = readSessionModel(sessionId)!;
+  const picker = modelPicker(context()); await picker.load();
+  const role = (await picker.inspect!('role:summary'))!.next!; await role.load();
+  const thinking = (await role.apply(['thinking']))!.next!;
+  expect((await thinking.load()).map(row => row.id)).toEqual(['auto', 'low', 'medium']);
+  expect(await thinking.apply(['high'])).toBeUndefined();
+  expect((await thinking.apply(['low']))?.note).toContain('summary uses');
+  expect(readSessionModel(sessionId)).toEqual({ ...before, roles: { ...before.roles,
+    summary: { ...before.roles!.summary!, thinkingEffort: 'low' } } });
+  const config = projectSessionModel(getRuntimeConfig(home), sessionId);
+  expect(resolveProviderCredential({ runtimeConfig: config, env: {} }).thinkingEffort).toBe('high');
+  expect((await captureSummaryRole({ config, catalog: loadCatalog(), workspaceRoot: home })!.resolve()).shape.thinkingLevelName).toBe('low');
+  expect(requests).toHaveLength(0);
+});
+
 it('rejects duplicate endpoint catalogue claims before selection or HTTP dispatch', async () => {
   catalogue([{ id: 'duplicate', runtime: 'openai', baseUrl: `${baseUrl}/a/v1`, models: [{ id: 'shared' }] }]);
   const picker = modelPicker(context());

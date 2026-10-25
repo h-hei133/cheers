@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Automatic Role Browsing Reusing Default Reasoning
+- **Symptom**: Choosing a model for an automatic role overwrites its effort with the default request's effort, or blocks a nonreasoning model because the default uses high effort.
+- **Root Cause**: Assignment browsing reuses the ordinary model chooser's default preference; treating null with nullish fallback also reintroduces inheritance that the role consumers intentionally stop.
+- **Rule**: Carry the role preference explicitly through assignment browsing, preserve it only when the exact target confirms support, and use the role consumers' native provider-decided fallback otherwise. Edit the role through the existing session transaction and recapture it after saving. Verify actual subagent/advisor/summary requests as well as persisted roles and unchanged default preferences.
+
 ### Nested Catalogue Escape And Visible Mutation Results
 - **Symptom**: Esc in a role assignment browser only changes its navigation domain; a successful save returns to a full-screen catalogue with no visible result.
 - **Root Cause**: Catalogue navigation consumes Esc before the explicit parent handler, and transcript notices are hidden while a returned full-screen picker is open.

@@ -20,6 +20,10 @@ import { getSessionUsage } from '../../observability/usageTelemetry.js';
 import { createToolDiscovery } from '../../core/tools/discovery/state.js';
 import { toolSchemas } from '../../turn/tools.js';
 import type { ToolDefinition } from '../../tools/types.js';
+import { modelPicker } from '../interactive/picker/model.js';
+import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../session/model/state.js';
+import { writeCatalogCache } from '../../core/models/catalogStore.js';
+import { projectSessionModel } from '../../session/model/projection.js';
 
 const servers: http.Server[] = [];
 afterEach(async () => {
@@ -75,6 +79,34 @@ function ordinaryTurn(setup: ReturnType<typeof createAdvisorHarness>, server: Aw
     subagentHost: { step, stepForModel: delegatedSteps(request, tools, {}), defaultMaxSteps: 1, retry: { enabled: false, maxRetries: 0 } } });
   return { messages, finished: (async () => { for await (const _event of turn.events) { /* consume actual native turn */ } })() };
 }
+
+it('dispatches a subagent using the effort saved in the role panel while the main request keeps its own setting', async () => {
+  const setup = createAdvisorHarness(false, false); const server = await wire(setup);
+  const connection = { id: 'role-wire', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'synthetic-role-wire',
+    baseUrl: server.request.providerCredentialResolution.baseUrl, model: 'review-model', status: 'connected' as const,
+    createdAt: '2026-01-01', updatedAt: '2026-01-01' };
+  const config = { ...server.request.runtimeConfig!, activeProviderConnectionId: connection.id, providerConnections: [connection] };
+  const catalog = server.request.providerCatalog!;
+  writeCatalogCache(catalog);
+  writeSessionModel(setup.session.id, { connectionId: connection.id, provider: 'openai', model: 'primary-model', thinkingEffort: 'low',
+    roles: { subagent: { connectionId: connection.id, provider: 'openai', model: 'review-model', thinkingEffort: 'high' } } }, readSessionModelEdit(setup.session.id));
+  const picker = modelPicker({ cwd: setup.root, projectRoot: setup.root, sessionId: setup.session.id,
+    runtimeConfig: projectSessionModel(config, setup.session.id) }); await picker.load();
+  const role = (await picker.inspect!('role:subagent'))!.next!; await role.load();
+  const thinking = (await role.apply(['thinking']))!.next!; await thinking.load();
+  expect((await thinking.apply(['medium']))?.note).toContain('subagent uses');
+  const request = { ...server.request, runtimeConfig: config, thinkingEffort: 'low' as const, thinkingEffortExplicit: true };
+  const run = createSubagentRunner({ step: createProviderStep(request, new Map(), {}), stepForModel: delegatedSteps(request, new Map(), {}),
+    defaultMaxSteps: 1, defaultModel: readSessionModel(setup.session.id)!.roles!.subagent }, new Map(), {
+    sessionId: setup.session.id, workspaceRoot: setup.root, agentMode: 'plan', permissionScope: 'ask', hooks: new HookDispatcher(), emit: () => {},
+  });
+  const result = await run({ definition: { name: 'role-fixture', description: 'Check role', systemPrompt: 'Inspect role evidence',
+    source: 'builtin', tools: [], maxTurns: 1 }, prompt: 'Check role', workspace: setup.root });
+  expect(result.failed).toBe(false);
+  expect(result.selection).toMatchObject({ effort: 'medium', source: 'session-role' });
+  await createProviderStep(request, new Map(), {})([{ role: 'user', content: 'Main request' }], setup.signal, {}, { allowTools: false });
+  expect(server.received.map(body => [body.model, body.reasoning_effort])).toEqual([['review-model', 'medium'], ['primary-model', 'low']]);
+});
 
 it('ordinary main task dispatch consumes fresh role prompt, model and effort on actual HTTP and the same ledger without changing main effort', async () => {
   const setup = createAdvisorHarness(false, false); writeGoal(setup.manager, setup.session, readGoalEdit(setup.manager, setup.session), { type: 'set', objective: 'Ordinary roles' });

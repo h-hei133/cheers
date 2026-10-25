@@ -9,6 +9,10 @@ import type { SessionModelPolicy, SessionModelRole, SessionModelSelection } from
 import { sameValue } from '../../../config/values.js';
 import { SessionModelWriteError } from '../../../session/model/outcome.js';
 import { selectedModelMatches, selectionRequest } from './target.js';
+import { projectModelSelection } from '../../../session/model/projection.js';
+import { catalogModel } from '../../models/catalog.js';
+import { effortCapability } from '../../models/capability.js';
+import { isThinkingPreference, THINKING_LEVELS, type ThinkingPreference } from '../../models/effort.js';
 
 export type AutomaticModelRole = keyof SessionModelPolicy;
 export interface RoleResult { readonly output: string; readonly saved: boolean }
@@ -53,11 +57,24 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
       const notice = configurationApplicationNotice(context);
       return { saved: true, output: notice
         ? `Role assignment saved for this session.\n${notice}`
-        : `${role} ${target ? `uses ${target.provider}/${target.model} on connection ${target.connectionId}` : 'follows the default model'} for this session.` };
+        : `${role} ${target ? `uses ${target.provider}/${target.model} on connection ${target.connectionId}; reasoning effort: ${target.thinkingEffort ?? 'provider decides'}`
+          : 'follows the default model'} for this session.` };
     } catch (error) {
       return { saved: false, output: error instanceof SessionModelWriteError ? error.message
         : 'Role assignment outcome is unverified. Inspect the saved session before retrying.' };
     }
   };
-  return { assign: commit, current: (selection?.roles ?? choice.config.sessionModelRoles)?.[role] };
+  const current = (selection?.roles ?? choice.config.sessionModelRoles)?.[role];
+  const resolution = current ? resolveProviderCredential({ runtimeConfig: projectModelSelection(choice.config,
+    { ...current, connectionScope: 'session' }), env: {} }) : undefined;
+  const model = current ? catalogModel(choice.catalog, current.provider, current.model, resolution?.baseUrl) : undefined;
+  const levels = current && model?.reasoning !== false ? THINKING_LEVELS.filter(level =>
+    effortCapability(choice.catalog, current.provider, current.model, level, resolution?.baseUrl) === 'supported') : [];
+  const efforts: readonly ThinkingPreference[] = levels.length ? [null, ...levels] : [];
+  return { assign: commit, current, efforts, setEffort: (effort: ThinkingPreference): RoleResult => {
+    if (!current || !isThinkingPreference(effort) || !efforts.includes(effort)) {
+      return { saved: false, output: 'This role has no available setting for that reasoning effort.' };
+    }
+    return commit({ ...current, thinkingEffort: effort });
+  } };
 }

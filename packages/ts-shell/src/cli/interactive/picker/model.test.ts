@@ -39,6 +39,111 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { re
 const id = (connection = 'b', model = 'shared') => `model:${JSON.stringify([connection, 'openai', model])}`;
 const context = () => ({ cwd: home, projectRoot: home, sessionId });
 
+it.each(['subagent', 'summary', 'advisor'] as const)('edits %s effort and provider default without changing the default model or sibling policies', async name => {
+  const roles = { subagent: { connectionId: 'b', provider: 'openai', model: 'other', thinkingEffort: 'high' as const },
+    summary: { connectionId: 'b', provider: 'openai', model: 'other', thinkingEffort: 'high' as const },
+    advisor: { connectionId: 'b', provider: 'openai', model: 'other', thinkingEffort: 'high' as const } };
+  writeSessionModel(sessionId, { connectionId: 'a', provider: 'openai', model: 'shared', thinkingEffort: 'high',
+    roles, contextWindow: 100000, skillful: false, presets: { work: { roles: { default: roles.subagent } } } }, readSessionModelEdit(sessionId));
+  const original = readSessionModel(sessionId)!; const global = fs.readFileSync(getUserRuntimeConfigPath());
+  const picker = modelPicker(context()); await picker.load();
+  const role = (await picker.inspect!(`role:${name}`))!.next!; await role.load();
+  const thinking = (await role.apply(['thinking']))!.next!;
+  expect((await thinking.load()).map(row => row.id)).toEqual(['auto', 'low', 'medium', 'high']);
+  expect(thinking.initialSelection).toBe('high');
+  const changed = await thinking.apply(['low']);
+  expect(readSessionModel(sessionId)).toEqual({ ...original, roles: { ...roles, [name]: { ...roles[name], thinkingEffort: 'low' } } });
+  const parent = changed!.next!; await parent.load();
+  expect(parent.detail!('choose')).toContain('Reasoning effort: low');
+  expect(parent.status?.([], '')).toContain(`${name} uses`);
+  const revised = (await parent.apply(['thinking']))!.next!; await revised.load();
+  expect(revised.initialSelection).toBe('low');
+  const automatic = await revised.apply(['auto']);
+  expect(readSessionModel(sessionId)).toEqual({ ...original, roles: { ...roles, [name]: { ...roles[name], thinkingEffort: null } } });
+  const returned = automatic!.next!; await returned.load();
+  const catalogue = returned.back!(); await catalogue.load();
+  expect(catalogue.initialSelection).toBe(`role:${name}`);
+  expect(catalogue.detail!(`role:${name}`)).toContain('Reasoning effort: provider decides');
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+});
+
+it.each(['session', 'catalogue'] as const)('refuses a role effort captured before a competing %s change', async change => {
+  writeSessionModel(sessionId, { connectionId: 'a', provider: 'openai', model: 'shared',
+    roles: { advisor: { connectionId: 'b', provider: 'openai', model: 'other', thinkingEffort: 'high' } } }, readSessionModelEdit(sessionId));
+  const picker = modelPicker(context()); await picker.load();
+  const role = (await picker.inspect!('role:advisor'))!.next!; await role.load();
+  const thinking = (await role.apply(['thinking']))!.next!; await thinking.load();
+  if (change === 'session') writeSessionModel(sessionId, { ...readSessionModel(sessionId)!,
+    roles: { advisor: { connectionId: 'b', provider: 'openai', model: 'shared' } } }, readSessionModelEdit(sessionId));
+  else writeCatalogCache([{ id: 'openai', models: [{ id: 'shared', reasoning: true }, { id: 'other', reasoning: false }] }]);
+  const before = readSessionModelEdit(sessionId);
+  expect((await thinking.apply(['low']))?.note).toContain('expired');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+});
+
+it('keeps role effort independent while assigning a new model and leaves unassigned roles to the provider', async () => {
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'shared', reasoning: true }, { id: 'other', reasoning: true },
+    { id: 'plain', reasoning: false }] }]);
+  writeSessionModel(sessionId, { connectionId: 'a', provider: 'openai', model: 'shared', thinkingEffort: 'high',
+    roles: { advisor: { connectionId: 'b', provider: 'openai', model: 'other', thinkingEffort: 'low' } } }, readSessionModelEdit(sessionId));
+  const picker = modelPicker(context()); await picker.load();
+  const advisor = (await picker.inspect!('role:advisor'))!.next!; await advisor.load();
+  const browse = (await advisor.apply(['choose']))!.next!; await browse.load();
+  expect((await browse.apply([id('b', 'shared')]))?.note).toContain('advisor uses');
+  expect(readSessionModel(sessionId)).toMatchObject({ thinkingEffort: 'high', roles: { advisor: { model: 'shared', thinkingEffort: 'low' } } });
+  const returned = modelPicker(context()); await returned.load();
+  const summary = (await returned.inspect!('role:summary'))!.next!; await summary.load();
+  const plain = (await summary.apply(['choose']))!.next!;
+  expect((await plain.load()).find(row => row.id === id('b', 'plain'))?.disabled).not.toBe(true);
+  expect((await plain.apply([id('b', 'plain')]))?.note).toContain('summary uses');
+  expect(readSessionModel(sessionId)).toMatchObject({ thinkingEffort: 'high', roles: {
+    advisor: { thinkingEffort: 'low' }, summary: { model: 'plain', thinkingEffort: null } } });
+  const latest = modelPicker(context()); await latest.load();
+  const existing = (await latest.inspect!('role:advisor'))!.next!; await existing.load();
+  const nonreasoning = (await existing.apply(['choose']))!.next!;
+  expect((await nonreasoning.load()).find(row => row.id === id('b', 'plain'))?.disabled).not.toBe(true);
+  expect((await nonreasoning.apply([id('b', 'plain')]))?.note).toContain('reasoning effort: provider decides');
+  expect(readSessionModel(sessionId)).toMatchObject({ thinkingEffort: 'high', roles: { advisor: { model: 'plain', thinkingEffort: null } } });
+});
+
+it('offers only verified levels for the role endpoint and no thinking action for unassigned or nonreasoning roles', async () => {
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'shared', reasoning: false },
+    { id: 'other', reasoning: true, thinkingLevelMap: { high: null } }] }]);
+  writeSessionModel(sessionId, { connectionId: 'a', provider: 'openai', model: 'shared',
+    roles: { advisor: { connectionId: 'b', provider: 'openai', model: 'other' },
+      summary: { connectionId: 'a', provider: 'openai', model: 'shared' } } }, readSessionModelEdit(sessionId));
+  const picker = modelPicker(context()); await picker.load();
+  for (const name of ['subagent', 'summary']) {
+    const role = (await picker.inspect!(`role:${name}`))!.next!;
+    expect((await role.load()).some(row => row.id === 'thinking')).toBe(false);
+    expect(await role.apply(['thinking'])).toBeUndefined();
+  }
+  const role = (await picker.inspect!('role:advisor'))!.next!; await role.load();
+  const thinking = (await role.apply(['thinking']))!.next!;
+  expect((await thinking.load()).map(row => row.id)).toEqual(['auto', 'low', 'medium']);
+  const before = readSessionModelEdit(sessionId);
+  expect(await thinking.apply(['high'])).toBeUndefined();
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+});
+
+it('returns from role thinking through real Escape keys with no mutation and retains the original role focus', async () => {
+  writeSessionModel(sessionId, { connectionId: 'a', provider: 'openai', model: 'shared',
+    roles: { advisor: { connectionId: 'b', provider: 'openai', model: 'other', thinkingEffort: 'high' } } }, readSessionModelEdit(sessionId));
+  const picker = modelPicker(context()); await picker.load();
+  const role = (await picker.inspect!('role:advisor'))!.next!; await role.load();
+  const thinking = (await role.apply(['thinking']))!.next!;
+  const before = readSessionModelEdit(sessionId); const overlay = new OverlayHost(() => {}); overlay.open(thinking);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(stripAnsi(overlay.render(110, 30).join('\n'))).toContain('Reasoning effort: high');
+  expect(stripAnsi(overlay.render(110, 30).join('\n'))).toContain('▸ Choose model');
+  overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(stripAnsi(overlay.render(110, 30).join('\n'))).toContain('▸ Advisor');
+  expect(readSessionModelEdit(sessionId)).toEqual(before); overlay.close();
+});
+
 it('prepares exact model tokens and excludes credentials from endpoint drafts', () => {
   const draft = connectionDraft({ id: 'relay', label: 'Relay', runtime: 'openai', auth: 'api-key', models: [] },
     'model with "quotes"', 'https://user:synthetic-secret@example.invalid/v1?key=synthetic-secret', 'my relay');

@@ -25,6 +25,7 @@ import { credentialIdentityFor } from '../../core/auth/account/pool.js';
 import { compactionOperationsPath } from '../../session/compactionOperation.js';
 import { getSessionUsage, recordSessionUsage, totalTokens } from '../../observability/usageTelemetry.js';
 import { costModel } from '../../core/commands/cost/model.js';
+import { modelPicker } from '../interactive/picker/model.js';
 
 const observed = vi.hoisted(() => ({ deps: undefined as SessionRuntimeDependencies | undefined, compaction: undefined as CompactionSetup | undefined }));
 // Exercise the production composition and real summary engine without starting UI/scheduling loops.
@@ -202,8 +203,13 @@ it('does not reuse a completed summary after the role effort changes', async () 
   expect(await condenseContext({ messages, ...first, signal: setup.signal, operation: { sessionId: setup.session.id } })).toMatchObject({ status: 'condensed' });
   expect(await condenseContext({ messages, ...first, signal: setup.signal, operation: { sessionId: setup.session.id } })).toMatchObject({ status: 'condensed' });
   expect(setup.requests).toHaveLength(2);
-  await runModelPresetCommand(['save', 'revised', '--profile', 'default=a/main@low', 'summary=b/namespace/summary@low'], setup.context);
-  await runModelPresetCommand(['apply', 'revised', '--all'], setup.context);
+  const selection = readSessionModel(setup.session.id)!;
+  const picker = modelPicker(setup.context); await picker.load();
+  const role = (await picker.inspect!('role:summary'))!.next!; await role.load();
+  const thinking = (await role.apply(['thinking']))!.next!; await thinking.load();
+  expect((await thinking.apply(['low']))?.note).toContain('summary uses');
+  expect(readSessionModel(setup.session.id)).toEqual({ ...selection, roles: { ...selection.roles,
+    summary: { ...selection.roles!.summary!, thinkingEffort: 'low' } } });
   runtime(setup).deps.runPrompt('Continue', setup.signal);
   const revised = observed.compaction!;
   expect(await condenseContext({ messages, ...revised, signal: setup.signal, operation: { sessionId: setup.session.id } })).toMatchObject({ status: 'condensed' });
