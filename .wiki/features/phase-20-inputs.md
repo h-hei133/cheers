@@ -2,7 +2,7 @@
 
 依据：[原决策](phase-20-decisions.md)、[当前剩余表](phase-20-status.md)。2026-10-25补证后矩阵为38 complete / 9 partial / 0 open；本页保留五组准备条件及用户原答复。单账户OAuth和指定HTTP MCP已实际验收。外部剩余条件为多账号、可信账期、正式质量及桌面交互；QA-04结构judge已proven/0gaps，工具卡片与STS安全风险分别修复且独立APPROVE/CLEAR，原继承/cache WATCH及当前SHA远端交付复核由代理处理。诊断提交CI已success，历史gzip失败根因仍未证实。无需重新准备已验连接。
 
-当前head `df0a8583cedcf22df497ecf768e17ee19b1aa03d` 已推送main、远端精确一致。两笔旧CI的alias候选/迟到browser网络断言已分别修正，134/34项本地通过；当前CI40185786184已success（10564pass/3skip、CI judge proven），Watch40185786149实际proven/三义务satisfied。产品源码相对58e1871e保持，Platform QA40178946206已20/20支持格通过；Windows交互/IME/系统复制仍需下方手工步骤。剩余外部准备仍按表，不把Free quota当可信账单，也不恢复已暂缓的质量或多账号验收。
+最近代码提交 `df0a8583cedcf22df497ecf768e17ee19b1aa03d` 已推送main、远端精确一致。两笔旧CI的alias候选/迟到browser网络断言已分别修正，134/34项本地通过；当前CI40185786184已success（10564pass/3skip、CI judge proven），Watch40185786149实际proven/三义务satisfied。产品源码相对58e1871e保持，Platform QA40178946206已20/20支持格通过；Windows交互/IME/系统复制仍需下方手工步骤。剩余外部准备仍按表，不把Free quota当可信账单，也不恢复已暂缓的质量或多账号验收。
 
 ## 2026-10-25 执行结果与剩余输入
 

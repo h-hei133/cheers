@@ -18,7 +18,7 @@
 | QA-01 | 剩余多账号/账单/质量/平台任务的适用验收 | 本地47行索引及真实单账号OAuth、stdio/HTTP MCP已补证；随剩余外部任务更新 |
 | QA-02 | Windows交互PTY、真实IME、系统复制 | 当前58e1871e的Platform QA40178946206已20/20支持格、三平台双构建及原业务transcript通过；Windows仍只含line/pipe，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
-| QA-04 | 全范围最终交付与剩余任务验收 | 当前head df0a8583已提交/推送、远端精确一致；旧alias与迟到browser断言分别修正并134/34项本地通过。新CI40185786184 success（10564pass/3skip），CI judge proven；Watch40185786149实际proven/三义务satisfied；产品58e1871e的Platform QA40178946206已20/20支持格通过；工具卡片与STS分别独立APPROVE/CLEAR。历史gzip失败根因仍未证实；外部依赖仍partial |
+| QA-04 | 全范围最终交付与剩余任务验收 | 最近代码提交df0a8583已提交/推送、远端精确一致；旧alias与迟到browser断言分别修正并134/34项本地通过。新CI40185786184 success（10564pass/3skip），CI judge proven；Watch40185786149实际proven/三义务satisfied；产品58e1871e的Platform QA40178946206已20/20支持格通过；工具卡片与STS分别独立APPROVE/CLEAR。历史gzip失败根因仍未证实；外部依赖仍partial |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
 

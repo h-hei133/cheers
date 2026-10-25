@@ -9045,3 +9045,7 @@ MCP取消夹具修复独立code review APPROVE；最终静态五门/requirements
 MCP测试/证据df0a8583cedcf22df497ecf768e17ee19b1aa03d已提交/推送、main实际精确且当时clean。CI40185786184运行中；Watch40185786149/artifact12596022425下载actualproven/3satisfied，产品hash/TS artifact不变。Windows快速回填步骤已加入inputs，最终CI结果待另读回。
 
 最终代码df0a8583cedcf22df497ecf768e17ee19b1aa03d CI40185786184于10:59:18Zsuccess，972files/10564tests passed、1file/3tests skipped，静态/script/TS及完整CI judge success/actualproven，keymap和MCP取消/state均通过。前两CI失败保留分类，不宣称旧SHA被本次复验；Watch40185786149 actualproven及相同产品58e1871e的Platform QA20/20已分别绑定。Windows快速手工步骤与当前剩余38/9/0已同步，外部条件不变。后续纯文档提交仅交付证据，自己的scratch已清理。
+
+## [2026-10-25] docs | Phase 20交付证据索引收尾
+
+续轮按当前工作区与远端核对351bad81已推送/main精确、工作区起始clean，文档CI40187153129实际运行。47行仍38complete/9partial/0open，9个partial均归真实多账号、可信结算、正式配对质量和Windows桌面交互及其QA汇总。QA-02/QA-04机器索引仍引用早期平台/STS，已仅补最新58e1871e Platform QA40178946206的20原receipt/业务结果与df0a8583 CI40185786184的10564pass/3skip/judgeproven；历史失败与来源SHA保留。两份当前文档把“当前head”改为“最近代码提交”以免纯文档head误归代码复验，任务ID/status不变。公开启动指南、Windows回填、产品hash集合、本地配置未跟踪/0600及own scratch清理再核对；无新产品源码、无本地测试/构建/20k真实PTY。
