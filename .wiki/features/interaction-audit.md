@@ -366,3 +366,9 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 仍成立的缺口与用户要求保持：两个面板整体分类/导航/搜索/详情/修改配置/取消确认/重开读回、未配置具体模型可选、顶格与箭头、正文路径Tab、多skill及deep-research有限组合。原始skill核验的局部修补不代表这些整体已验收。不成立的解释仍是“没有上下键监听、resume排序反了、空配置等于未实现、npm start每次编译、4.9k就是本地公式、工具个数决定token数”。原现场唯一按键原因、真实token差额/启动收益/认证及cache writer/build并发来源继续未知。
 
 第二十一CI实际success996files/10840tests pass/3skip/结构proven已归档，第二十CI状态success但未读全日志/Watch工件；第二十二CI本批仍in_progress，各自只绑定原SHA。当前source附件/动态来源及总成本、tokenizer/研究preview、完整面板/桌面与真实provider证据继续待补，详见[第二十三批](phase-20-addition.md#15-实施与验证证据)及[文末完整任务](phase-20-addition.md#16-最新问题总和与必须完成的体验)。
+
+### 文末当前结论（第二十四批）
+
+核查更正：附件已经保存严格UTF-8正文digest并在准入重读，不能归为完全缺少字节校验。本批确认并修补的是preview同步verify反复读取附件正文与不能异步取消的缺口。现复用异步inspect owner逐项比对原digest，同步verify仅检查路径/身份/实时grant；sourceAccess每次刷新read gate，await后再准入，取消等待句柄关闭settlement。六文件47项、三有效反转/逐字节恢复、构建和结构proven通过；真实runtime附件与共享组装文本estimate相等、20次同步verify零附件body读、session文件不变/零MCP连接，无PTY或生产性能结论。
+
+确定修补的其他问题与不成立解释沿上节保留，settings/model整体看齐和正文路径/多skill/有限slash完整体验仍按[文末验收](phase-20-addition.md#16-最新问题总和与必须完成的体验)，不因本批局部绿色升级。仍未知：原现场唯一按键原因、真实token差额/冷热启动/认证接受、cache writer/build并发来源。第二十二/二十三CI本批实查仍运行，各自绑定SHA；动态/ignore/memory来源和总I/O、原生tokenizer/研究preview、面板完整字段/来源/桌面等继续待验，详见[第二十四批](phase-20-addition.md#15-实施与验证证据)。

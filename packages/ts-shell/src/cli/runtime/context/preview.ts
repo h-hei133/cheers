@@ -19,8 +19,9 @@ import { getSessionUsage } from '../../../observability/usageTelemetry.js';
 import { estimatePrompt } from '../../../context/request/estimate.js';
 import { requestIdentity } from '../../../context/request/identity.js';
 import { capturePromptSources } from '../../../context/request/sources.js';
-import { assertContextBounds, contextEntryStillAuthorized } from '../../../context/attachment/entry.js';
-import { sourceReaderFor } from '../../data/access.js';
+import { assertContextBounds, contextEntryPathWithinRoot } from '../../../context/attachment/entry.js';
+import { verifyContextEntries } from '../../../context/attachment/verify.js';
+import { sourceAccessFor, sourceReaderForAsync } from '../../data/access.js';
 import type { PromptAttachments } from '../../../core/shell/sessionRuntime.js';
 import { resolveProviderCredential } from '../../../core/shell/providerCredentials.js';
 import { finalStepMessages, outgoingMessages } from '../../../turn/messages.js';
@@ -83,7 +84,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const entries = [...context.contextAttachments ?? [], ...context.transientContextAttachments ?? []];
   const entryIdentity = JSON.stringify([context.contextAttachments, context.transientContextAttachments]);
   assertContextBounds(entries);
-  const reader = sourceReaderFor(context, signal);
+  const access = sourceAccessFor(context, signal);
   for (const entry of entries) sources.track(entry.path);
   const forcedTool = context.peekForcedTool?.();
   const features = foregroundTools(context);
@@ -134,6 +135,10 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     endpoint, endpointId, ...assembledIdentity }, getSessionUsage(expected.id), estimateWirePrompt(body, protocol.contextFields));
   const verify = () => {
     signal.throwIfAborted(); session.verify(); sources.verify(); skills.verify?.();
+    for (const entry of entries) {
+      if (!contextEntryPathWithinRoot(cwd, entry)) throw new Error('Context preview is stale.');
+      try { access(entry.path); } catch { throw new Error('Context preview is stale.'); }
+    }
     if ([...skills.skills.values()].some(skill => skill.isCurrent?.() === false)) throw new Error('Skill catalogue changed.');
     if (JSON.stringify(requestIdentity({ ...prepared.currentOverhead(), tools: allowTools ? toolSchemas(prepared.currentTools()) : [] })) !== JSON.stringify(assembledIdentity)
       || JSON.stringify(toolSchemas(new Map(foregroundTools(context).map(tool => [tool.name, tool])))) !== featureIdentity) {
@@ -143,8 +148,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
       || !injected.isCurrent() || context.peekForcedTool?.() !== forcedTool
       || JSON.stringify([context.contextAttachments, context.transientContextAttachments]) !== entryIdentity
       || catalogContributions(cwd, expected.id).some((entry, index) => entry !== contributions[index])
-      || catalogContributions(cwd, expected.id).length !== contributions.length
-      || entries.some(entry => !contextEntryStillAuthorized(cwd, entry, reader))) throw new Error('Context preview is stale.');
+      || catalogContributions(cwd, expected.id).length !== contributions.length) throw new Error('Context preview is stale.');
     const selected = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
     if (selected.blocked || selected.provider !== resolution.provider || selected.model !== resolution.model
       || selected.thinkingEffort !== resolution.thinkingEffort || providerCredentialBaseUrl(publication.catalog, selected) !== base
@@ -153,10 +157,12 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     }
     if (config.enableMcpTools && JSON.stringify(gateway.peekSnapshot?.()) !== JSON.stringify(snapshot)) throw new Error('MCP catalogue changed.');
   };
-  verify();
-  await sources.verifyContent(signal); verify();
   const verifyContent = async (checkingSignal: AbortSignal) => {
-    verify(); await sources.verifyContent(checkingSignal); verify();
+    checkingSignal.throwIfAborted(); verify();
+    await sources.verifyContent(checkingSignal);
+    await verifyContextEntries(cwd, entries, sourceReaderForAsync(context, checkingSignal), checkingSignal);
+    verify();
   };
+  await verifyContent(signal);
   return { estimate, verify, verifyContent };
 }

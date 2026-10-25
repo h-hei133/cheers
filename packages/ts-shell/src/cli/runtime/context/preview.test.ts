@@ -19,6 +19,8 @@ import { createMessageTranscriptEvent } from '../../../session/sessionEventCodec
 import { requestIdentity } from '../../../context/request/identity.js';
 import { routeSlashCommand } from '../../../core/commands/slashRouter.js';
 import * as revisions from '../../../runtime/execution/read.js';
+import * as workspaceFiles from '../../../core/workspace/files.js';
+import { promptWithContext } from '../prompt.js';
 
 let root: string;
 beforeEach(() => {
@@ -243,6 +245,37 @@ it('refuses unavailable MCP without connection and invalidates revoked attachmen
   const config = { ...context.configuration.current.config, enableMcpTools: true };
   Object.assign(context, { configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
   await expect(load()).rejects.toThrow('MCP catalogue'); expect(gateway.snapshot).not.toHaveBeenCalled();
+});
+
+it('estimates the exact attached snapshot with asynchronous content checks and no synchronous attachment read', async () => {
+  const { cwd, context, load, layout, gateway } = fixture(); const file = path.join(cwd, 'context.txt');
+  fs.writeFileSync(file, '\uFEFFattached\r\n中文 ' + 'facts '.repeat(100));
+  const entry = readContextEntry({ root: cwd, target: file }); context.contextAttachments = [entry];
+  const sync = vi.spyOn(workspaceFiles, 'inspectWorkspaceFile'); const asyncRead = vi.spyOn(workspaceFiles, 'inspectWorkspaceFileAsync');
+  const persisted = [layout.metadataPath, layout.statePath, layout.transcriptPath]; const before = persisted.map(target => fs.readFileSync(target));
+  const result = await load('question'); expect(result.estimate.tokens).toBeGreaterThan(100);
+  context.contextAttachments = undefined;
+  const assembled = await load(promptWithContext('question', [entry])); expect(assembled.estimate).toEqual(result.estimate);
+  context.contextAttachments = [entry];
+  expect(asyncRead).toHaveBeenCalledTimes(1); expect(sync).not.toHaveBeenCalled();
+  for (let i = 0; i < 20; i++) result.verify(); expect(asyncRead).toHaveBeenCalledTimes(1); expect(sync).not.toHaveBeenCalled();
+  await result.verifyContent(new AbortController().signal); expect(asyncRead).toHaveBeenCalledTimes(2);
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('facts', 'other'));
+  await expect(result.verifyContent(new AbortController().signal)).rejects.toThrow();
+  expect(persisted.map(target => fs.readFileSync(target))).toEqual(before); expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
+});
+
+it('rejects attachment revocation during asynchronous acquisition and cancelled byte verification', async () => {
+  const { cwd, context, load } = fixture(); const file = path.join(cwd, 'context.txt'); fs.writeFileSync(file, 'attached facts');
+  context.contextAttachments = [readContextEntry({ root: cwd, target: file })];
+  const result = await load('question'); const checking = new AbortController(); checking.abort();
+  const read = vi.spyOn(workspaceFiles, 'inspectWorkspaceFileAsync');
+  await expect(result.verifyContent(checking.signal)).rejects.toMatchObject({ name: 'AbortError' }); expect(read).not.toHaveBeenCalled();
+  const original = workspaceFiles.inspectWorkspaceFileAsync; read.mockRestore();
+  vi.spyOn(workspaceFiles, 'inspectWorkspaceFileAsync').mockImplementation(async (...args) => {
+    const fileState = await original(...args); installCommandGate(context, () => ({ permissionScope: 'ask', admission: () => 'revoked' })); return fileState;
+  });
+  await expect(result.verifyContent(new AbortController().signal)).rejects.toThrow('revoked');
 });
 
 it('invalidates imported instruction changes and creation of a higher priority source', async () => {

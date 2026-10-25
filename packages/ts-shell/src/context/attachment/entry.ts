@@ -86,9 +86,14 @@ export function renderContextEntry(entry: ContextEntry): string {
 }
 
 /** Recheck persisted paths after a session or workspace root changes. */
+export function contextEntryPathWithinRoot(root: string, entry: ContextEntry): boolean {
+  try { return within(fs.realpathSync(root), fs.realpathSync(entry.path)); }
+  catch { return false; }
+}
+
 export function contextEntryStillAuthorized(root: string, entry: ContextEntry, read?: (target: string, maxBytes: number) => FileState): boolean {
   try {
-    if (!within(fs.realpathSync(root), fs.realpathSync(entry.path))) return false;
+    if (!contextEntryPathWithinRoot(root, entry)) return false;
     const file = read ? read(entry.path, entry.bounds.maxBytes) : inspectWorkspaceFile(root, path.relative(root, entry.path), undefined, entry.bounds.maxBytes);
     return file.state === 'exists' && file.hash === entry.digest;
   } catch {

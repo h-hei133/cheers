@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Attachment Content Verification Is Separate From Live Read Admission
+- **Symptom**: Context preview rereads attachment bodies synchronously on every verification, cancellation cannot interrupt those reads, or an async reader returns content after grants or roots were revoked.
+- **Root Cause**: Content digest checks and permission checks shared one synchronous reader; a captured gate options object expires across await. Existing strict UTF-8 attachment digests already bind valid raw bytes, so treating this as missing content verification misclassifies the defect.
+- **Rule**: Keep the stored attachment digest and scope contract, reuse the existing asynchronous inspection owner, validate entries serially and retain descriptor settlement on cancellation. Separate metadata/path/live-grant checks from body rereads, obtain current read options at every admission and recheck after await. Preserve pinned ordinary-settings semantics; test actual substrate revocation rather than replacing an equivalent config object. State that frame reads are pure while background metadata/inventory checks still perform I/O.
+
 ### Nested Skill Loaders Must Retain The Enclosing Source Observer
 - **Symptom**: A cold extension manifest bypasses preview byte tracking, a local observer replaces the enclosing observer, or callback rejection becomes ordinary withheld content and publishes a partial estimate.
 - **Root Cause**: The shared discovery owns acquisition but returned decoded text; observer state belonged only to the outer loader, and broad fallback did not distinguish observation admission failure.

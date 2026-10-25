@@ -797,6 +797,28 @@ observer拒绝是完整目录准入失败，固定SkillSourceError会穿过普�
 
 仍缺context附件/其他动态来源完整字节绑定及目录/ignore/extension总发现与复验成本；原生tokenizer、其他独立命令/研究完整preview、真实同模型/协议/规则/schema的1.7k/4.9k拆分、Node/exe冷/热测量、完整settings/model字段/来源/编辑器/桌面/真实认证矩阵继续partial。第九cache writer退出1、第十七build并发来源仍未归因。原Phase20保留38 complete / 9 partial，ADD独立，整体目标active。
 
+### 第二十四批：附件预览异步内容复验与实时读取权限
+
+第二十三批已提交/推送`25f9dc06a9e8615c44efbf8b11984422ba25dab0`，接续工作区clean，本地/origin/远端精确一致。延迟实查第二十二CI `40243690372`与第二十三CI `40244427716`均仍in_progress；Watch工件未读取，不把workflow success或更早CI绿色转给本批。
+
+ADD-08核查纠正此前“附件完整字节绑定仍缺”的宽泛表述：[ContextEntry](../../packages/ts-shell/src/context/attachment/entry.ts)已经保存实际严格UTF-8内容及SHA-256，原同步[文件检查](../../packages/ts-shell/src/core/workspace/files.ts)拒绝不能原字节往返的非法UTF-8，包含BOM/CRLF的有效内容仍按原字节hash；contextEntryStillAuthorized会重读当前文件并比较digest。所以普通附件已有内容一致性验证，不能新登记成完全未实现或仅比较文件时间。确定缺口是preview.verify在每次同步复验中反复读取全部附件正文，取消不能中断同步读取；sourceReaderFor在一次读取内保留旧gate options，也不适于跨await读取。
+
+现[读取准入](../../packages/ts-shell/src/cli/data/access.ts)从原sourceReaderFor提取sourceAccessFor，不读取正文；每次check重新获取gate('read')，按现configurationAdmission、session/cwd/root identity及primary/additional roots/denyRules验证。原同步command reader保留签名、UTF-8/hash/大小与最终准入；新sourceReaderForAsync复用已有inspectWorkspaceFileAsync，打开前、实际句柄路径及读取settlement后继续check，取消通过原signal和close finally；没有新文件读取器、权限系统或配置owner。普通等价设置不构成安全撤销，真实substrate/root/trust/权限变化仍拒绝。
+
+[附件verify owner](../../packages/ts-shell/src/context/attachment/verify.ts)沿原最多16项/总512KiB/每项bounds，逐项检查原primary根内路径、异步读取实际文件、比较原digest并复验路径，取消不开始下一项，读取/cleanup错误直接传播。新增path-only检查复用原containment逻辑，不放宽附件到其他根；通用source reader仍支持已登记additional root读取。附件权限和内容分别检查，路径校验不是内容校验。
+
+[runtime preview](../../packages/ts-shell/src/cli/runtime/context/preview.ts)同步verify继续检查来源metadata、附件路径及实时准入，但不再调用附件正文reader；verifyContent在统一sources异步复验后逐项核验附件，再重验完整request/session/config/工具/注入身份。返回preview前必须通过相同异步核验。估算仍使用实际保存且准备发送的entry.content，经promptWithContext与openingMessage共享组装；没有发送模型/MCP请求、消费turn附件或改写session。实际提交cliSessionRuntimeFactory仍沿原attachmentAdmission与digest检查，不用preview成功旁路提交准入。
+
+只读参考A session-stats 276–310从实际session资源和pending snapshot构造计数；interactive-mode 8018–8031明确在bounded chunks之间让终端输入运行。本项目采用“实际准备内容计数”和“交互读取让出事件循环”，沿既有异步inspect owner完成，不复制参考的session renderer。参考片段没有与本项目ContextEntry相同的持久文件授权合同，不能声称其已证明本项目的source byte/root安全；新增反转分别检验digest、await后的准入和preview必经附件核验。
+
+最终六文件47项串行通过（source access9、attachment verify5、entry3、runtime preview18、rules3、context controller9）。同步/异步reader有效BOM/CRLF/中文结果相等，非法UTF-8及大小拒绝；独立access不调用content reader，缺owner/取消/越界在open前拒绝；await后deny/session/substrate变化、additional根移除及primary根替换拒绝旧内容。真实descriptor取消时仍open，release/settlement后close且AbortError，保持原串行controller覆盖。附件逐项peak1，原bounds/aggregate/等长变化/digest/前后path/取消及cleanup错误保真。
+
+实际runtime附件snapshot预览与手动同owner组装文本的完整estimate相等；20次同步verify零附件body读取，首次完整preview与显式内容复验各一次async inspect，修改后拒绝旧preview；session metadata/state/transcript字节不变、零MCP连接/refresh。取消的复验不获取内容，await后权限撤销拒绝。初轮44pass/1fail为新fixture将等价ConfigState替换当作安全撤销，与ordinary settings pinned合同不符；改为真实configuration.transition并保留断言后45通过，补root矩阵后47，重叠不累加。三个有效反转去掉digest比较、去掉async读取后check、去掉preview附件核验，均AssertionError/exit1且逐字节恢复，最终47再验通过。没有PTY或全仓本地回归，无生产延迟/桌面显示收益结论。
+
+四静态门、TS构建、当前tgz新目录解包正式judge实际exit0/proven且三项satisfied通过；build`d894c4696369b1058f9151103bbc1ce618cd63253eb2392c870ed978f88d7f01`，inputs`8f118ba36fe7ce11bf056873000610acdc4b8424c80b41f1af9fac5d654ebee8`，artifact`8861c56000ba9d1e2185ae727b643662582172a8c22dd1e95d8a7231a4b9bda7`。validator SHA-256仍`6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`；严格docs/diff实际通过、118既有advisory保留，addition117/audit95本地链接目标存在。工件归`.omx/artifacts/phase20-addition-attachments/`，Git交付另绑定，HANDOFF记录内容/准入分离和await后check。
+
+此处“同步verify不读附件正文”不等于整个verify无I/O：session/source metadata及extension inventory仍有既有检查，frame read才保持文件系统无访问。实际请求目前的附件准入仍同步，本批不宣称整个dispatch异步化。跨文件原子snapshot、所有动态/ignore/memory来源精确绑定、目录/正文/复验总I/O成本、原生tokenizer、其他独立命令/研究完整preview、真实1.7k/4.9k拆分、Node/exe冷/热测量、完整settings/model字段/来源/编辑器/桌面/真实认证仍缺。cache writer/build并发原因未归因；原Phase20保持38 complete / 9 partial，ADD独立、整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -809,7 +831,7 @@ observer拒绝是完整目录准入失败，固定SkillSourceError会穿过普�
 | resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。已有局部修补证据 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚 | 入口先建立重runtime再进入交互，造成可见等待。已采用早期真实composer及一次lease交接；仍需同机冷/热Node/exe的首帧、接管、ready及首请求取样，加载延迟夹具不证明生产收益 |
-| 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件/其他来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
+| 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
 
