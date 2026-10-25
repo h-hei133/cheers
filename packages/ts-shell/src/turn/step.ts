@@ -16,18 +16,19 @@ import { effortOutputFailure } from '../provider/endpoints/effort.js';
 import { effortCapability } from '../core/models/capability.js';
 import { outputLimitFailure } from '../core/models/limits.js';
 import type { ThinkingPreference } from '../core/models/effort.js';
-import { microcompactMessages } from "../core/query/microCompact.js";
 import { isEventStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
 import { DEFAULT_ENDPOINT_KIND, endpointKind, endpointShape, endpointTurnBody, endpointUrl, type EndpointKind } from "../provider/endpoints/index.js";
 import { requestReplayBinding } from '../provider/request/replay.js';
 import type { SentRequest } from "../provider/request/sentRequest.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../provider/registry/provider.js";
-import { toChatMessages, type ChatMessage } from "./prompt.js";
+import { type ChatMessage } from "./prompt.js";
+import { outgoingMessages, finalStepMessages } from './messages.js';
 import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
 import { resolveRequestShape } from "../core/models/requestShape.js";
 import type { CatalogProvider } from "../core/models/catalog.js";
 import type { PromptSource } from '../context/request/model.js';
 import { requestContext } from '../context/request/projection.js';
+import { historyDigest } from '../context/request/identity.js';
 import {
   REFUSAL,
   isRetryableStatus,
@@ -221,40 +222,7 @@ function endpointFor(request: StepRequest): EndpointKind {
   return endpointKind(request.provider.endpoint) ?? DEFAULT_ENDPOINT_KIND;
 }
 
-/**
- * Tell the model when this is the last step it may act on.
- *
- * Withdrawing the tools is not self-explanatory. The model sees the list it had
- * and cannot call from it, which reads as the harness being broken rather than
- * as a budget it has reached — and the useful thing for it to do at that point
- * is answer with what it has, which it cannot know to do unless told.
- *
- * Appended as the last user turn rather than put in the system prompt, because
- * it is true only of this request: the system instruction is built once for the
- * whole run, and a run's earlier steps may call tools freely.
- *
- * Sent only when there were tools to withdraw. A run configured with none — or
- * a caller that never offered any — is not one that reached a limit, and telling
- * its model about a budget it was never spending is a false statement the model
- * has no way to check.
- */
-function withFinalStepNotice(
-  messages: readonly ChatMessage[],
-  allowTools: boolean,
-  hadTools: boolean,
-): readonly ChatMessage[] {
-  if (allowTools || !hadTools) return messages;
-  return [
-    ...messages,
-    {
-      role: "user",
-      content:
-        "You have reached the limit of steps you may take. You cannot call any more tools on this turn. " +
-        "Answer now with what you have: say what you did, what you found, and what remains unfinished.",
-    },
-  ];
-}
-
+/** One captured target and reasoning preference, with per-step tool admission. */
 export function createStepFunction(request: StepRequest): StepFunction {
   const traceLogger = createComponentLogger("provider-request");
   let effortAccepted = true;
@@ -289,6 +257,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
     const wireTools = options.allowTools ? tools : [];
     const schemaDigest = createHash('sha256').update(JSON.stringify(wireTools)).digest('hex');
     const systemDigest = createHash('sha256').update(systemPrompt).digest('hex');
+    const messageDigest = historyDigest(messages);
     // Steps this call returns all come from the same target, so the origin is
     // stamped once on whatever leaves — an answer, a refusal, or an abort —
     // rather than threaded through each builder's signature. A `return` in
@@ -326,7 +295,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
       const usageAttribution = captureUsageAttribution({ provider: request.provider.provider ?? '', model: request.provider.model,
         baseUrl: request.provider.baseUrl, rates: modelEntry?.cost });
       const measured = options.agentMode ? undefined : measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
-        model: request.provider.model, endpoint, schemaDigest, systemDigest });
+        model: request.provider.model, endpoint, schemaDigest, systemDigest,
+        endpointId: usageAttribution.endpointId, historyDigest: messageDigest });
       const prompt = promptTokensFor({ messages, overhead, ...(measured ? { measured } : {}) });
       const budget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
         inputLimit: modelEntry?.inputLimit,
@@ -359,10 +329,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           provider: request.provider.provider,
           model: request.provider.model,
           systemPrompt,
-          messages: bridgeToolResults(
-            microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
-            shape.assistantAfterToolResult,
-          ),
+          messages: outgoingMessages(messages, shape.assistantAfterToolResult),
           tools,
           allowTools: options.allowTools,
           vision: shape.vision,
@@ -378,11 +345,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
           provider: request.provider.provider,
           replayBinding,
           systemPrompt,
-          messages: withFinalStepNotice(
-            bridgeToolResults(
-              microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
-              shape.assistantAfterToolResult,
-            ),
+          messages: finalStepMessages(
+            outgoingMessages(messages, shape.assistantAfterToolResult),
             options.allowTools,
             tools.length > 0,
           ),
@@ -486,7 +450,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             response = attemptResponse;
             responseAttempt = modelAttempt;
             options.onRequestSent?.({
-              promptIdentity: { schemaDigest, systemDigest },
+              promptIdentity: { schemaDigest, systemDigest, historyDigest: messageDigest },
               context: requestContext({ body, endpoint, fields: endpointShape(endpoint).contextFields,
                 provider: request.provider.provider ?? '', model: request.provider.model,
                 ...(!(options.agentMode && request.systemPromptFor) && request.systemPromptSources
@@ -599,7 +563,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             // declarations: allowed tools and agent mode can change what was
             // actually sent, and a measurement from the wrong request is stale.
             promptIdentity: { provider: request.provider.provider ?? '', model: request.provider.model, endpoint,
-              schemaDigest, systemDigest },
+              schemaDigest, systemDigest, historyDigest: messageDigest },
             purpose: options.requestPurpose ?? (options.agentMode ? 'subagent' : 'turn'),
           };
           if (options.agentMode && request.recordAuxiliaryUsage) request.recordAuxiliaryUsage(record);
@@ -643,33 +607,6 @@ export function createStepFunction(request: StepRequest): StepFunction {
       }
     }
   };
-}
-
-/**
- * Bridge tool results and a following user turn, for the endpoints that need it.
- *
- * Some providers reject a user message that directly follows tool results. The
- * bridge is a synthetic assistant turn rather than a reordering, because
- * reordering would change what the conversation says — moving the user's message
- * earlier would attribute it to a moment before the model had read the results.
- *
- * A no-op for every model that did not ask for it, which is all of them today.
- */
-
-function bridgeToolResults(
-  messages: readonly ChatMessage[],
-  enabled: boolean,
-): readonly ChatMessage[] {
-  if (!enabled) return messages;
-  const bridged: ChatMessage[] = [];
-  for (const message of messages) {
-    const previous = bridged[bridged.length - 1];
-    if (message.role === "user" && previous?.role === "tool") {
-      bridged.push({ role: "assistant", content: "I have processed the tool results." });
-    }
-    bridged.push(message);
-  }
-  return bridged;
 }
 
 async function readCompletion(

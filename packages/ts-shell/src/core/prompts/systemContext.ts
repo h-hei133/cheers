@@ -19,6 +19,7 @@ export interface SystemPromptContextInput {
   readonly runtimeConfig?: RuntimeConfig;
   readonly skills: ReadonlyMap<string, Skill>;
   readonly toolNames: readonly string[];
+  readonly onSource?: (target: string) => void;
 }
 
 /** Assemble the exact system-prompt inputs used by a model request. */
@@ -29,6 +30,7 @@ export function buildSystemPromptContext(input: SystemPromptContextInput): Syste
     : loadInstructionFiles({
         cwd: input.workspaceRoot,
         maxBytes: input.runtimeConfig?.instructionBudgetBytes,
+        onSource: input.onSource,
       });
 
   if (instructions.truncated) {
@@ -42,6 +44,7 @@ export function buildSystemPromptContext(input: SystemPromptContextInput): Syste
     : loadAppendedInstructionFiles({
         cwd: input.workspaceRoot,
         maxBytes: input.runtimeConfig?.instructionBudgetBytes,
+        onSource: input.onSource,
       });
   if (appended.truncated) {
     createComponentLogger('project-instructions').warn(

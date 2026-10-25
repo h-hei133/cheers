@@ -193,7 +193,8 @@ it('keeps menus, completion, and context on the accepted catalogue until success
   const report = await runContextCommand([], context);
   expect(report.output).toContain('of 16,000 tokens');
   expect(report.output).toContain('13,976 free before the 0-token reserve');
-  expect(report.output).toContain('0 current definitions');
+  expect(report.output).toContain('0 inspection definitions');
+  expect(report.report?.facts.toolSchemas).toMatchObject({ toolCount: 0, scope: 'inspection-catalogue', firstRequestLowerBound: false });
   expect(report.output).not.toContain('Instructions and conversation');
   for (const args of [[], ['list'], ['list', 'google']]) {
     const result = await runModelCommand(args, context);

@@ -11,7 +11,7 @@ export interface SentRequest {
   /** Size-only observation of this accepted request, independent of cache refresh replay. */
   readonly context?: RequestContext;
   /** Exact prompt shape sent to the provider, including whether tools were omitted. */
-  readonly promptIdentity?: { readonly schemaDigest: string; readonly systemDigest: string };
+  readonly promptIdentity?: { readonly schemaDigest: string; readonly systemDigest: string; readonly historyDigest?: string };
   readonly url: string;
   /** Provider authorization, replaced as a complete set on credential renewal. */
   readonly headers: Readonly<Record<string, string>>;

@@ -9,6 +9,7 @@ import { declareEndpoint } from "../provider/endpoints/index.js";
 import { crc32 } from "../provider/aws/eventStream.js";
 import { runAgentLoop } from "../core/agent/loop.js";
 import { sendSentRequest, type SentRequest } from "../provider/request/sentRequest.js";
+import { historyDigest } from '../context/request/identity.js';
 
 /**
  * The step is the only place a provider is spoken to. What matters here is
@@ -36,6 +37,19 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 }
 
 describe("createStepFunction", () => {
+  it('binds accepted request and provider measurement to the same selected history digest', async () => {
+    const id = 'history-step'; resetSessionUsage(id);
+    const messages = [{ role: 'user' as const, content: 'selected content' }];
+    let captured: SentRequest | undefined;
+    try {
+      const step = createStepFunction({ ...request, sessionId: id, fetchImpl: async () => jsonResponse({
+        choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 1 },
+      }) });
+      await step(messages, undefined, {}, { allowTools: false, onRequestSent: sent => { captured = sent; } });
+      expect(captured?.promptIdentity?.historyDigest).toBe(historyDigest(messages));
+      expect(getSessionUsage(id).lastPromptIdentity?.historyDigest).toBe(historyDigest(messages));
+    } finally { resetSessionUsage(id); }
+  });
   it("reports the prompt identity from the wire request, including a no-tools step", async () => {
     const identities: Array<{ schemaDigest: string; systemDigest: string }> = [];
     const step = createStepFunction({ ...request, tools: [{

@@ -36,6 +36,7 @@ export interface StatusFacts {
   readonly branch?: string;
   readonly directory?: string;
   readonly contextUsed?: number;
+  readonly contextSource?: 'estimated' | 'calibrated' | 'measured' | 'unknown' | 'stale';
   readonly contextWindow?: number;
   readonly contextWindowSource?: WindowSource;
   readonly contextWarning?: string;
@@ -151,9 +152,10 @@ function renderContext(facts: StatusFacts): string | undefined {
   const source = facts.contextWindowSource === 'default' ? ' assumed' : facts.contextWindowSource === 'config' ? ' config' : '';
   const warning = facts.contextWarning && facts.contextWindowSource !== 'default' ? ' ! /context' : '';
   const window = `${formatTokens(facts.contextWindow)}${source}${warning}`;
-  if (facts.contextUsed === undefined) return defaultTheme.fg('statusLineContext', `?/${window}`);
+  if (facts.contextUsed === undefined) return defaultTheme.fg('statusLineContext', `${facts.contextSource === 'stale' ? '? stale' : '?'}/${window}`);
   const percent = Math.min(100, Math.round((facts.contextUsed / facts.contextWindow) * 100));
-  const text = `${formatTokens(facts.contextUsed)}/${window} ${percent}%`;
+  const marker = facts.contextSource === 'estimated' || facts.contextSource === 'calibrated' ? '~' : '';
+  const text = `${marker}${formatTokens(facts.contextUsed)}/${window} ${percent}%`;
   const token = { normal: 'statusLineContext', elevated: 'accent', high: 'warning', critical: 'error' } as const;
   return defaultTheme.fg(token[contextPressure(facts.contextUsed, facts.contextWindow)], text);
 }

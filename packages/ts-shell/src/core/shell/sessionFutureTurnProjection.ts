@@ -1,5 +1,6 @@
 import type { SessionContinuitySnapshot } from "../../session/sessionContinuityTypes.js";
 import { profileScope } from '../paths/profile/scope.js';
+import { sameValue } from '../../config/values.js';
 import {
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
   getLatestCompactCheckpoint,
@@ -31,11 +32,14 @@ interface InjectionEffect {
 
 interface PreparedComponent {
   readonly prompt: string;
+  readonly current: () => boolean;
   readonly effect?: InjectionEffect;
 }
 
 export interface PreparedSessionPrompt {
   readonly prompt: string;
+  /** Non-consuming check for read-only preview publication. */
+  readonly isCurrent: () => boolean;
   /** Validate all prepared generations and consume them at kernel admission. */
   readonly accept: () => void;
 }
@@ -60,6 +64,7 @@ export async function buildPromptWithFutureTurnInjections(input: {
   let accepted = false;
   return {
     prompt: memory.prompt,
+    isCurrent: () => compact.current() && memory.current() && effects.every(effect => effect.isCurrent()),
     accept() {
       if (accepted) return;
       // Validate both generations before either synchronous state transition.
@@ -120,7 +125,8 @@ function buildPromptWithCompactInjection(input: {
         },
       }
     : undefined;
-  return { prompt, effect };
+  return { prompt, effect, current: () => sameValue(injectionStateStore.get(sessionScopeId), injectionState) &&
+    getLatestCompactCheckpoint(checkpointStore, sessionScopeId) === checkpoint };
 }
 
 async function buildPromptWithProjectMemoryInjection(input: {
@@ -154,7 +160,7 @@ async function buildPromptWithProjectMemoryInjection(input: {
       }
     : undefined;
   if (!plan.shouldInject || !plan.injectedContext) {
-    return { prompt: input.prompt, effect };
+    return { prompt: input.prompt, effect, current: () => sameValue(injectionStateStore.get(sessionScopeId), injectionState) };
   }
   if (input.prompt.includes("\n\n<user_request>")) {
     return {
@@ -163,9 +169,11 @@ async function buildPromptWithProjectMemoryInjection(input: {
         `\n\n${plan.injectedContext}\n\n<user_request>`,
       ),
       effect,
+      current: () => sameValue(injectionStateStore.get(sessionScopeId), injectionState),
     };
   }
-  return { prompt: [plan.injectedContext, "", input.prompt].join("\n"), effect };
+  return { prompt: [plan.injectedContext, "", input.prompt].join("\n"), effect,
+    current: () => sameValue(injectionStateStore.get(sessionScopeId), injectionState) };
 }
 
 function compactSessionScopeId(sessionId: string): string {

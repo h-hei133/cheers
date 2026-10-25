@@ -28,13 +28,14 @@ export const PROJECT_ROOT_MARKER = ".git";
  *
  * Outermost first, so a reader that applies each in turn lets the nearest one win.
  */
-export function projectDirectories(from: string): readonly string[] {
+export function projectDirectories(from: string, onSource?: (target: string) => void): readonly string[] {
   const chain: string[] = [];
   let current = path.resolve(from);
   let reachedRoot = false;
 
   for (;;) {
     chain.push(current);
+    onSource?.(path.join(current, PROJECT_ROOT_MARKER));
     if (fs.existsSync(path.join(current, PROJECT_ROOT_MARKER))) {
       reachedRoot = true;
       break;

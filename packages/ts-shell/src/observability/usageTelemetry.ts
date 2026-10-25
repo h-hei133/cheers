@@ -173,7 +173,8 @@ export function recordSessionUsage(
   if (options.affectsContext !== false) {
     existing.lastPromptTokens = promptMeasured ? promptTotal : undefined;
     existing.lastPromptMessageCount = promptMeasured ? usage.promptMessageCount ?? 0 : 0;
-    existing.lastPromptIdentity = promptMeasured && usage.promptIdentity ? usage.promptIdentity : undefined;
+    existing.lastPromptIdentity = promptMeasured && usage.promptIdentity
+      ? { ...usage.promptIdentity, ...(usage.attribution ? { endpointId: usage.attribution.endpointId } : {}) } : undefined;
   }
   existing.turnsCount += 1;
   existing.toolCallsCount += usage.toolCallsCount ?? 0;
@@ -243,6 +244,8 @@ function emptyTelemetry(): SessionUsageTelemetry {
 export function measuredPromptContext(sessionId: string, expected: {
   readonly provider: string; readonly model: string; readonly endpoint?: string;
   readonly schemaDigest?: string; readonly systemDigest?: string;
+  readonly historyDigest?: string;
+  readonly endpointId?: string;
 }, options: { readonly requireExpectedIdentity?: boolean } = {}): { readonly tokens: number; readonly messageCount: number } | undefined {
   const telemetry = getSessionUsage(sessionId);
   const identity = telemetry.lastPromptIdentity;
@@ -270,6 +273,8 @@ export function measuredPromptContext(sessionId: string, expected: {
   if (expected.endpoint !== undefined && identity.endpoint !== undefined && identity.endpoint !== expected.endpoint) return undefined;
   if (expected.schemaDigest !== undefined && identity.schemaDigest !== undefined && identity.schemaDigest !== expected.schemaDigest) return undefined;
   if (expected.systemDigest !== undefined && identity.systemDigest !== undefined && identity.systemDigest !== expected.systemDigest) return undefined;
+  if (expected.historyDigest !== undefined && identity.historyDigest !== expected.historyDigest) return undefined;
+  if (expected.endpointId !== undefined && identity.endpointId !== expected.endpointId) return undefined;
   return { tokens: telemetry.lastPromptTokens, messageCount: telemetry.lastPromptMessageCount };
 }
 

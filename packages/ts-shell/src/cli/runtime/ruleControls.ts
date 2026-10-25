@@ -40,6 +40,7 @@ export function installRuleControlRuntime(input: { readonly runtimeContext: Shel
     const selected = pending; pending = undefined;
     return selected?.current() ? selected.tool : undefined;
   };
+  context.peekForcedTool = () => pending?.current() ? pending.tool : undefined;
   context.ruleControlsCommand = async (name, args, commandContext) => {
     if (commandContext.sessionId !== context.session.id || commandContext.cwd !== context.cwd || commandContext.admission?.()) {
       return { kind: 'local', output: 'Command session or workspace changed.', state: { status: 'blocked' } };

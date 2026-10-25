@@ -14,6 +14,7 @@ import {
   type ModelCostRates,
 } from "./usageTelemetry.js";
 import { findCacheWaste } from './cacheWaste.js';
+import { captureUsageAttribution } from './usage/identity.js';
 
 /**
  * Usage is bucketed by model.
@@ -27,7 +28,27 @@ import { findCacheWaste } from './cacheWaste.js';
 
 const SESSION = "sess_bucket_test";
 
+it('rejects changed or unverified history while preserving the recorded request measurement', () => {
+  const identity = { provider: 'openai', model: 'm', endpoint: 'openai-compatible', schemaDigest: 'a'.repeat(64), systemDigest: 'b'.repeat(64), historyDigest: 'c'.repeat(64) };
+  recordSessionUsage(SESSION, { promptTokens: 500, promptIdentity: identity, promptMessageCount: 2 });
+  expect(measuredPromptContext(SESSION, identity)).toEqual({ tokens: 500, messageCount: 2 });
+  expect(measuredPromptContext(SESSION, { ...identity, historyDigest: 'd'.repeat(64) })).toBeUndefined();
+  expect(getSessionUsage(SESSION).lastPromptTokens).toBe(500);
+  recordSessionUsage(SESSION, { promptTokens: 600, promptIdentity: { ...identity, historyDigest: undefined } });
+  expect(measuredPromptContext(SESSION, identity)).toBeUndefined();
+});
+
 afterEach(() => resetSessionUsage(SESSION));
+
+it('binds prompt measurements to the actual relay without retaining its address', () => {
+  const identity = { provider: 'openai', model: 'm', endpoint: 'openai-compatible', schemaDigest: 'schema', systemDigest: 'system' };
+  const attribution = captureUsageAttribution({ provider: 'openai', model: 'm', baseUrl: 'https://fixture.invalid/relay-one' });
+  recordSessionUsage(SESSION, { model: 'm', provider: 'openai', promptTokens: 500, promptIdentity: identity, attribution });
+  expect(getSessionUsage(SESSION).lastPromptIdentity).toEqual({ ...identity, endpointId: attribution.endpointId });
+  expect(measuredPromptContext(SESSION, { ...identity, endpointId: attribution.endpointId })?.tokens).toBe(500);
+  const other = captureUsageAttribution({ provider: 'openai', model: 'm', baseUrl: 'https://fixture.invalid/relay-two' });
+  expect(measuredPromptContext(SESSION, { ...identity, endpointId: other.endpointId })).toBeUndefined();
+});
 
 it('breaks cache comparison across an unmeasured request without claiming a context rebuild', () => {
   recordSessionUsage(SESSION, { model: 'm', promptTokens: 9000, cacheReadTokens: 1000 });

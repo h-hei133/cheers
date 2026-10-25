@@ -32,7 +32,7 @@ export interface SessionResumeProvenance {
 export interface ShellRuntimeContext {
   readonly profile?: import('../paths/profile/context.js').ProfileContext;
   /** Identity of the request shape most recently prepared by this runtime. */
-  promptIdentity?: { readonly schemaDigest: string; readonly systemDigest: string };
+  promptIdentity?: { readonly schemaDigest: string; readonly systemDigest: string; readonly historyDigest?: string };
   workspaceRevision?: number;
   workspaceIssue?: string;
   /** Durable workspace authority, supplied by the session store owner. */
@@ -87,6 +87,11 @@ export interface ShellRuntimeContext {
   ruleControlsCommand?: CommandContext['ruleControlsCommand'];
   forceTool?: CommandContext['forceTool'];
   consumeForcedTool?: () => string | undefined;
+  peekForcedTool?: () => string | undefined;
+  /** Non-consuming future-turn preparation from the actual session runtime. */
+  preparePromptContext?: (prompt: string, signal: AbortSignal) => Promise<{
+    readonly prompt: string; readonly isCurrent: () => boolean;
+  }>;
   contextAttachments?: readonly ContextEntry[];
   transientContextAttachments?: readonly ContextEntry[];
   freshState?: CommandContext['freshState'];

@@ -1,7 +1,6 @@
 import type { CacheWarmingRunner } from "../turn/cacheWarm.js";
 import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
 import * as fs from "node:fs";
-import { createHash } from "node:crypto";
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
@@ -13,15 +12,16 @@ import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import { defaultHookDispatcher, type HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { setupBuiltinVerificationHooks } from "../core/hooks/builtin/index.js";
 import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/registration.js";
-import { loadToolCatalog, type CatalogContent, type ToolCatalogInput } from "../core/tools/catalog.js";
+import { type CatalogContent, type ToolCatalogInput } from "../core/tools/catalog.js";
 import type { ToolDiscovery } from "../core/tools/discovery/state.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
 import { catalogProvider, type CatalogProvider } from "../core/models/catalog.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
-import { systemPromptSnapshot } from "../turn/prompt.js";
 import type { RequestOverhead } from "../session/context.js";
-import { buildSystemPromptContext } from '../core/prompts/systemContext.js';
+import { preparePromptRequest } from '../core/prompts/request.js';
+import { requestIdentity } from '../context/request/identity.js';
+export { requestIdentity } from '../context/request/identity.js';
 import { neutraliseForDisplay } from "../core/text/safety.js";
 import { pendingTurnInput } from "../turn/pendingInput.js";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
@@ -69,7 +69,7 @@ export interface CliRuntimeInvocationInput {
   readonly onCommandSettled?: ToolCatalogInput['onCommandSettled'];
   readonly thinkingPreference?: ReturnType<typeof captureThinkingPreference>;
   /** Receives the exact schema/system identity prepared for this run. */
-  readonly onPromptIdentity?: (identity: { readonly schemaDigest: string; readonly systemDigest: string }) => void;
+  readonly onPromptIdentity?: (identity: { readonly schemaDigest: string; readonly systemDigest: string; readonly historyDigest?: string }) => void;
   readonly background?: TurnOptions['background'];
   readonly featureTools?: readonly ToolDefinition[];
   /** One-use model tool restriction selected by `/force`; ordinary gates remain active. */
@@ -357,13 +357,6 @@ export function withRequestOverhead(
     get promptIdentity() { return promptIdentity(); } } };
 }
 
-export function requestIdentity(overhead: RequestOverhead): { readonly schemaDigest: string; readonly systemDigest: string } {
-  return {
-    schemaDigest: createHash('sha256').update(JSON.stringify(overhead.tools ?? [])).digest('hex'),
-    systemDigest: createHash('sha256').update(overhead.systemPrompt ?? '').digest('hex'),
-  };
-}
-
 /**
  * Steps a delegated run gets when its definition declares none.
  *
@@ -387,47 +380,7 @@ async function startTurn(
     requestApproval: (hook) => approveDeclaredHook(request, hook),
     bypassed: request.runtimeConfig?.allowUntrustedHooks === true,
   });
-  const discover = request.runtimeConfig?.toolDiscovery !== 'full' && !request.forcedTool;
-  const { skills, tools: catalogTools, discovery } = await loadToolCatalog({ ...request, discover }, dependencies.tools);
-  const tools = request.forcedTool
-    ? new Map([...catalogTools].filter(([name]) => name === request.forcedTool))
-    : catalogTools;
-  if (request.forcedTool && !tools.has(request.forcedTool)) {
-    throw new Error(`Forced tool '${request.forcedTool}' is no longer available in the current tool pool.`);
-  }
-  assertAdmission(request.admission);
-  const allowedTools = request.allowedTools ? new Set(request.allowedTools) : undefined;
-  const effectiveTools = allowedTools
-    ? new Map([...tools].filter(([name]) => allowedTools.has(name)))
-    : tools;
-  const promptContext = buildSystemPromptContext({
-    workspaceRoot: request.workspaceRoot,
-    sessionId: request.sessionId,
-    runtimeConfig: request.runtimeConfig,
-    skills,
-    toolNames: [...effectiveTools.keys()],
-  });
-  // What the request spends outside the conversation. Computed here because this
-  // is the only place both facts exist: the instruction as it will be sent, and
-  // the declarations of the tools actually in the pool after the user's own
-  // filters have been applied. The compaction policy needs it for the estimate
-  // it falls back to before any request has reported its usage, which is the
-  // cold start — the moment those two are the bulk of the request.
-  const currentTools = () => {
-    const pool = discovery?.snapshot() ?? effectiveTools;
-    return allowedTools ? new Map([...pool].filter(([name]) => allowedTools.has(name))) : pool;
-  };
-  // The main turn sends this exact snapshot once for the whole run. Tool
-  // discovery may change the schema set between steps, but it must not change
-  // the system prompt the provider actually received.
-  const requestSystemPrompt = systemPromptSnapshot(request.agentMode, promptContext).text;
-  const currentOverhead = (): RequestOverhead => {
-    const schemas = toolSchemas(currentTools());
-    return {
-      systemPrompt: requestSystemPrompt,
-      tools: schemas,
-    };
-  };
+  const { tools, discovery, promptContext, currentOverhead } = await preparePromptRequest(request, dependencies.tools);
   const publishPromptIdentity = (): void => {
     request.onPromptIdentity?.(requestIdentity(currentOverhead()));
   };

@@ -42,9 +42,13 @@ export interface PromptMeasurementIdentity {
   readonly provider: string;
   readonly model: string;
   readonly endpoint?: string;
+  /** Opaque identity of the actual destination, independent of protocol name. */
+  readonly endpointId?: string;
   /** Serialized tool schema and assembled system text, hashed. */
   readonly schemaDigest?: string;
   readonly systemDigest?: string;
+  /** Ordered, selected messages before endpoint projection, hashed. */
+  readonly historyDigest?: string;
 }
 
 export interface SessionUsageTelemetry {

@@ -48,11 +48,12 @@ export function expandImports(
     readonly baseDirectory: string;
     /** The boundary a reference may not leave. */
     readonly projectRoot: string;
+    readonly onSource?: (target: string) => void;
   },
 ): ImportExpansion {
   const skipped: { reference: string; reason: string }[] = [];
   const seen = new Set<string>([realPathOf(path.resolve(options.baseDirectory)) ?? ""]);
-  const expanded = expand(content, options.baseDirectory, options.projectRoot, 0, seen, skipped);
+  const expanded = expand(content, options.baseDirectory, options.projectRoot, 0, seen, skipped, options.onSource);
   return { content: expanded, skipped };
 }
 
@@ -63,6 +64,7 @@ function expand(
   depth: number,
   seen: Set<string>,
   skipped: { reference: string; reason: string }[],
+  onSource?: (target: string) => void,
 ): string {
   if (depth >= MAX_DEPTH) return content;
 
@@ -75,6 +77,7 @@ function expand(
     if (codeRegions.some(([start, end]) => found.start >= start && found.start < end)) continue;
 
     const resolved = path.resolve(baseDirectory, found.reference);
+    onSource?.(resolved);
     const real = realPathOf(resolved);
     if (real === undefined) {
       skipped.push({ reference: found.reference, reason: "not found" });
@@ -101,7 +104,7 @@ function expand(
     pieces.push(content.slice(cursor, found.start));
     // Expanded against its own directory, so a referenced file's references are
     // relative to where it lives rather than to the file that referenced it.
-    pieces.push(expand(nested, path.dirname(real), projectRoot, depth + 1, seen, skipped));
+    pieces.push(expand(nested, path.dirname(real), projectRoot, depth + 1, seen, skipped, onSource));
     cursor = found.end;
   }
 

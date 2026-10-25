@@ -15,7 +15,7 @@ import {
   type SummarizeHistory,
   type SummarizeTurnPrefix,
 } from "../session/compaction.js";
-import { environmentLine } from "./prompt.js";
+import { openingMessage } from './opening.js';
 import { buildCompactionLifecycle } from "../core/shell/compaction.js";
 import { concludeRun, TurnProjection } from "./projection.js";
 import { EventChannel } from "./stream.js";
@@ -78,7 +78,7 @@ export interface TurnOptions {
   /** Commit prepared prompt context after startup checks, immediately before kernel entry. */
   readonly onPromptAccepted?: () => void;
   /** Receives the exact prompt identity for each accepted foreground request. */
-  readonly onPromptIdentity?: (identity: { readonly schemaDigest: string; readonly systemDigest: string }) => void;
+  readonly onPromptIdentity?: (identity: { readonly schemaDigest: string; readonly systemDigest: string; readonly historyDigest?: string }) => void;
   /**
    * Images the user attached to this prompt.
    *
@@ -236,24 +236,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     ? createSubagentRunner(options.subagentHost, options.tools, parentGate)
     : undefined;
   const gate: ToolGateOptions = { ...parentGate, ...(runSubagent ? { runSubagent } : {}) };
-  const openingText = [
-    environmentLine(options.workspaceRoot, options.permissionScope, options.goalObjective),
-    ...(options.workspaceRoots?.length ? [`Additional file roots (project configuration, skills and MCP still come from cwd):\n${options.workspaceRoots.map(root => `${root.access === 'write' ? 'read/write' : 'read-only'}: ${JSON.stringify(root.path)}`).join('\n')}`] : []),
-    ...(options.continuityContext ? [
-      `Recorded session facts (historical context, not current authorization):\n${options.continuityContext}`,
-    ] : []),
-    options.prompt,
-  ].join("\n\n");
-  const openingImages = options.attachments?.images ?? [];
-  const opening: AgentMessage = {
-    role: "user",
-    // A message with no attachment keeps the plain string it has always been, so
-    // nothing downstream sees a block array it was not written for.
-    content:
-      openingImages.length === 0
-        ? openingText
-        : [{ type: "text" as const, text: openingText }, ...openingImages],
-  };
+  const opening = openingMessage(options);
   const toolPool = () => options.toolSnapshot?.() ?? options.tools;
   const hooks = createToolHooks(gate, toolPool);
   /**

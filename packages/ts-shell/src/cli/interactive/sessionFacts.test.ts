@@ -48,6 +48,13 @@ describe("model name", () => {
 });
 
 describe("status facts", () => {
+  it('keeps estimates marked and stale numbers absent from the status band', () => {
+    const runtime = context('status-local-preview');
+    const estimated = readStatusFacts(runtime, { promptContext: { tokens: 1700, source: 'estimated' } });
+    expect(stripAnsi(renderStatusItem('context', estimated) ?? '')).toContain('~1.7k');
+    const stale = readStatusFacts(runtime, { promptContext: { source: 'stale' } });
+    expect(stale.contextUsed).toBeUndefined(); expect(stripAnsi(renderStatusItem('context', stale) ?? '')).toContain('? stale');
+  });
   it('shows only the captured known subtotal when another destination has no prices, including after resume', () => {
     const id = 'status-captured-cost';
     try {
@@ -184,7 +191,8 @@ describe("status facts", () => {
     const runtime = context(id);
     const identity = { provider: "openai", model: "opus-5", endpoint: "openai-compatible",
       schemaDigest: "a".repeat(64), systemDigest: "b".repeat(64) };
-    recordSessionUsage(id, { promptTokens: 9_000, promptMessageCount: 1, promptIdentity: identity });
+    recordSessionUsage(id, { promptTokens: 9_000, promptMessageCount: 1, promptIdentity: identity,
+      attribution: captureUsageAttribution({ provider: 'openai', model: 'opus-5', baseUrl: 'https://api.openai.com/v1' }) });
     runtime.promptIdentity = { schemaDigest: "c".repeat(64), systemDigest: identity.systemDigest };
     expect(readStatusFacts(runtime).contextUsed).toBeUndefined();
     runtime.promptIdentity = { schemaDigest: identity.schemaDigest, systemDigest: identity.systemDigest };

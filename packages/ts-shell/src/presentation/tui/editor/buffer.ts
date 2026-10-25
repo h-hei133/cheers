@@ -51,6 +51,9 @@ export abstract class EditorBuffer {
     return { text, cursor, revision: this.revision };
   }
 
+  /** Cheap freshness key for background observers; no text projection. */
+  get textRevision(): number { return this.revision; }
+
   replace(edit: DraftEdit): boolean {
     const next = replaceDraft(this.snapshot(), edit);
     if (!next) return false;

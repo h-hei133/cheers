@@ -99,6 +99,8 @@ import { undoPickerHost } from '../runtime/undo.js';
 import { updateAppearance } from "../../presentation/theme/selection.js";
 import { followTheme, type ThemeFollower } from "../../presentation/themes/watch.js";
 import { themePreferences } from "../../presentation/theme/preview.js";
+import { createContextController } from './context/controller.js';
+import { previewContext } from '../runtime/context/preview.js';
 import { navigateSession, readBackSource, type SessionNavigationResult } from "../runtime/navigation.js";
 
 /**
@@ -155,6 +157,7 @@ export interface InteractiveModeOptions {
 }
 
 export class InteractiveMode {
+  private readonly promptContext: ReturnType<typeof createContextController>;
   private readonly terminal: TerminalDevice;
   private readonly tui: TUI;
   private readonly view: InteractiveSurface;
@@ -320,6 +323,24 @@ export class InteractiveMode {
       const text = backgroundFollowUp(task);
       if (text) this.options.sessionRuntime.input?.()?.followUp(text, `background:${task.id}`);
     });
+    this.promptContext = createContextController({
+      identity: () => this.busy || this.stopped || this.pickerPending ? undefined : JSON.stringify([
+        this.options.runtimeContext.session.id, this.options.runtimeContext.session.createdAt, this.options.runtimeContext.cwd,
+        this.options.runtimeContext.configuration.current.revision, this.state.editor.textRevision,
+        this.options.runtimeContext.workspaceRevision, this.options.sessionRuntime.getAgentMode(), this.options.sessionRuntime.getPermissionScope(),
+        this.options.runtimeContext.peekForcedTool?.(), this.options.runtimeContext.promptIdentity,
+        this.options.runtimeContext.contextAttachments?.map(entry => [entry.path, entry.digest]),
+        this.options.runtimeContext.transientContextAttachments?.map(entry => [entry.path, entry.digest]),
+      ]),
+      load: signal => {
+        const draft = this.state.editor.getText();
+        const images = this.state.pastes.imagesIn(draft);
+        return previewContext(this.options.runtimeContext, this.options.sessionManager, this.options.initialMcpGateway,
+          this.state.pastes.expand(draft), images.length ? { images } : undefined,
+          this.options.sessionRuntime.getAgentMode(), this.options.sessionRuntime.getPermissionScope(), signal);
+      },
+      repaint: () => { if (!this.stopped) this.tui.requestRender(); },
+    });
     this.view = new InteractiveSurface(
       {
         facts: () =>
@@ -328,6 +349,7 @@ export class InteractiveMode {
             permissionScope: this.options.sessionRuntime.getPermissionScope(),
             queued: this.queue.length + (this.options.sessionRuntime.input?.()?.pending().followUps.length ?? 0),
             peers: readAmbientFacts(this.options.runtimeContext.session.id).peerSessions,
+            ...(!this.busy ? { promptContext: this.promptContext.read() } : {}),
           }),
         statusItems: () => {
           const revision = this.options.runtimeContext.configuration.current.revision;
@@ -549,12 +571,14 @@ export class InteractiveMode {
     // surface looks like, and a reload landing in the middle of it would be
     // recolouring something not yet on screen.
     this.theme.refresh();
+    this.promptContext.start();
   }
 
 
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;
+    this.promptContext.stop();
     this.pickerLifecycles.abortAll();
     this.options.setStartupNotice?.(undefined);
     if (this.tick) clearInterval(this.tick);
@@ -708,6 +732,7 @@ export class InteractiveMode {
    * History recall is excluded, so the arrows keep working on a recalled prompt.
    */
   private syncSuggestions(mayOpen: boolean): void {
+    this.promptContext.update();
     const snapshot = this.state.editor.snapshot();
     const draft = snapshot.text;
     this.completionStatus = undefined;

@@ -31,19 +31,19 @@ import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { researchRunFor } from './research.js';
-import { cancelGitFor, gitFeatureTools } from './git.js';
+import { cancelGitFor } from './git.js';
 import { installGitCliRuntime } from './gitGate.js';
 import { installDataTransfer } from '../data/transfer.js';
 import { selectModelContext } from '../../session/context/selection.js';
 import { installCollaborationRuntime } from './collaboration.js';
-import { installSshRuntime, sshFeatureTools, cancelSshFor } from './ssh.js';
+import { installSshRuntime, cancelSshFor } from './ssh.js';
 import { installJobsRuntime, jobsRunnerFor } from './jobs.js';
 import { directorRunFor, cancelDirectorFor } from './director.js';
 import { cancelMediaFor } from './media.js';
-import { evaluationFeatureTools, cancelEvaluationFor } from './evaluation.js';
+import { cancelEvaluationFor } from './evaluation.js';
 import { admitCollaborationPrompt, settleCollaborationPrompt } from '../collaboration/acceptance.js';
 import { collaborationAdmissionFor } from '../collaboration/policy.js';
-import { installSecurityRuntime, cancelSecurityFor, securityFeatureTools } from './security.js';
+import { installSecurityRuntime, cancelSecurityFor } from './security.js';
 import { installAgentsRuntime } from './agents.js';
 import { installMcpRuntime, cancelMcpFor } from './mcp.js';
 import { installExtensionRuntime, cancelExtensionsFor, refreshExtensionsFor } from './extensions.js';
@@ -82,7 +82,11 @@ import type { CompactionSetup } from "../../turn/session.js";
 import { buildCompactionWiring, nativeCompactionAuthority, toCompactionMessages, type CompactionProvider } from './compaction.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
 import { installRuleControlRuntime, takeForcedTool } from './ruleControls.js';
-import { contextEntryStillAuthorized, renderContextEntry, assertContextBounds } from '../../context/attachment/entry.js';
+import { contextEntryStillAuthorized, assertContextBounds } from '../../context/attachment/entry.js';
+import { foregroundTools, promptWithContext } from './prompt.js';
+import { buildPromptWithFutureTurnInjections } from '../../core/shell/sessionFutureTurnProjection.js';
+import { capturePromptSources } from '../../context/request/sources.js';
+import { recordsFileFor } from '../../memory/memoryPersistence.js';
 import { sourceReaderFor } from '../data/access.js';
 import { installUsageRuntime, usageResetApproval } from './usage.js';
 import { captureSummaryRole } from '../provider/summary.js';
@@ -238,6 +242,20 @@ export function createCliSessionRuntime(input: {
     return result.status === 'applied';
   };
   let goalScheduler: GoalScheduler | undefined;
+  const projectMemoryStore = createProjectMemoryLocalStore({
+    ref: { mode: 'explicit-local', root: projectMemoryRootFor(input.runtimeContext.projectRoot) },
+  });
+  input.runtimeContext.preparePromptContext = async (prompt, signal) => {
+    const sessionId = input.runtimeContext.session.id;
+    const sources = capturePromptSources(); sources.track(recordsFileFor(projectMemoryStore.ref));
+    signal.throwIfAborted();
+    const prepared = await buildPromptWithFutureTurnInjections({ deps: { projectMemoryStore }, sessionId, prompt });
+    signal.throwIfAborted(); sources.verify();
+    return { prompt: prepared.prompt, isCurrent: () => {
+      sources.verify();
+      return !signal.aborted && input.runtimeContext.session.id === sessionId && prepared.isCurrent();
+    } };
+  };
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     admitPrompt: admitCollaborationPrompt.bind(undefined, input.runtimeContext),
     promptSettled: handoffSettlement(input.runtimeContext, settleCollaborationPrompt.bind(undefined, input.runtimeContext)),
@@ -254,9 +272,7 @@ export function createCliSessionRuntime(input: {
     // repository rather than living only on the machine that recorded it. It
     // sits one level below the subagent memories, which name a directory after
     // each agent: the two must not share a path, and they do not.
-    projectMemoryStore: createProjectMemoryLocalStore({
-      ref: { mode: "explicit-local", root: projectMemoryRootFor(input.runtimeContext.projectRoot) },
-    }),
+    projectMemoryStore,
     compactHistory: (sessionId, signal, instructions) => {
       signal.throwIfAborted();
       const operation = configurationOperation(input.runtimeContext);
@@ -466,14 +482,12 @@ export function createCliSessionRuntime(input: {
       const attachmentRefusal = attachmentAdmission();
       if (attachmentRefusal) throw new Error(attachmentRefusal);
       const forcedTool = takeForcedTool(input.runtimeContext);
-      const promptWithAttachments = attachedContext.length
-        ? [attachedContext.map(renderContextEntry).join('\n\n'), '<user_request>', prompt, '</user_request>'].join('\n\n')
-        : prompt;
+      const promptWithAttachments = promptWithContext(prompt, attachedContext);
       const run = streamCliRuntimePrompt({
         stepControl: handoff?.control,
         onCommandSettled: handoff?.commandSettled.bind(handoff),
         background: jobsRunnerFor(input.runtimeContext),
-        featureTools: [...research.featureTools, ...gitFeatureTools(input.runtimeContext), ...securityFeatureTools(input.runtimeContext), ...sshFeatureTools(input.runtimeContext), ...evaluationFeatureTools(input.runtimeContext), ...director?.featureTools ?? []],
+        featureTools: foregroundTools(input.runtimeContext, research.featureTools, director?.featureTools),
         ...(forcedTool ? { allowedTools: [forcedTool] } : {}),
         checkpoint: advisorCheckpointFor(input.runtimeContext, input.sessionManager, input.renderer, promptEntryId),
         checkpointError: input.renderer.renderLine.bind(input.renderer),

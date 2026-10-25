@@ -9087,3 +9087,12 @@ ADD-07沿原Editor/ViewState/paste/parser/TUI在重模块图前显示Loading，a
 串行startup/context/stdin59、host3通过；此前firstFrame/loop/context/workflow53与loop/startup25属于重叠轮次。Editor移交与旧目录facts反转3有效失败、逐字节恢复后重验；无callback假设及无startup host误加await的harness/lifecycle失败均保留并纠正。隔离小PTY两模式加载输入/未知skill整拒、取消/故障还终端通过；无delay Node父进程首见Loading401/385ms、正式画面1526/1419ms，子进程首write111/114ms、ready1221/1130ms（单样本非冷/热矩阵，无旧版/exe对照）。加700ms只做时序测试。静态/最终build/结构/本批提交另绑定，细节见addition第15节。HANDOFF追加真实输入/写入移交护栏，无全仓本地回归/20k/provider/桌面证据。
 
 第四批最终静态五门/diff、TS build b748bf0e1232、责任上限0、打包judge proven/0 open/failed/gap串行exit0；本批提交和自身CI另绑定。
+
+
+## [2026-10-26] feat | 启动上下文近似值与当前请求身份
+
+第五批沿真实prompt/catalog/opening/message/protocol owner共享组装；非消费memory/compact prepare、有界完整session snapshot、规则递归source/缺失candidate/physical link及附件权限验证，MCP只peek。字符÷3.5和图片allowance保持estimated；安全destination及raw history绑定实测校准、真实step预算查同identity。TUI帧纯读、debounce/poll/TTL与单pending取消结算；empty/普通多skill可数，特殊命令未准备及opaque/超界保持unknown。regular/fullscreen隔离PTY首请求前约~4.1k、草稿~4.6k、命令问号/清空数值均通过，最终SIGTERM143不当作Ctrl+C新验收。
+
+主代理串行27/120项及恢复后36项聚焦验证（重叠不累加）、静态/build5421868d87b2/analyzer0、三有效反转字节恢复，最新打包judge proven/三satisfied。后补live4096/root一致性后最终检查另绑定。ADD-08仍partial：native tokenizer、特殊组合preview、源精确字节、template成本、真实差额/性能及桌面均缺；ADD-01…03完整roles/auth回返/全settings类型和ADD-13继续。第四05b77489 CI40221027491 failure10678/1/3唯一旧inspection措辞断言，本批保留accepted目录/计量/不联网并检查机器scope，configuration13pass；Watch40221027536/artifact12609002827实际proven，不替代行为failure。原47项38/9不变，无全仓本地/20k/provider/子代理验证，详见addition15。
+
+第五批最终live界限/根一致性补充后12项及静态/diff/build`6144005828a4`/责任上限0/打包judgeproven/npm start help串行exit0，inputs`ca401713d05cfc0e0d436ec06e056fc6fc78fb3da5511ab898beaf3e18c8a7de`、artifact`c0b002f7093b514dd7906b1ef7b6ad1624ffa84a57b8754a144bd309268ba0ec`。最终交付另绑定。

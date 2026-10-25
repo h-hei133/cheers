@@ -184,3 +184,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A cancelled-login test intermittently receives an HTTP response from its old redirect URL while the cancelled owner published no credentials or token request.
 - **Root Cause**: A freed ephemeral port may be reused; fetch resolves for error responses too. A request to that URL after shutdown does not identify the responder or prove the original owner accepted it.
 - **Rule**: Verify the captured callback owner's rejected completion and closed lifecycle directly. After a late request, recheck zero credential publication and token exchange; separately verify state mismatch. Keep unobserved response ownership or port reuse as unknown instead of weakening security assertions or diagnosing product acceptance from transport alone.
+
+### Context Preview Cancellation And Non-Consuming Freshness
+- **Symptom**: Cancelling a preview starts a second read before the first settles, or a no-pending injection preview is immediately stale.
+- **Root Cause**: Abort is only a request; asynchronous reads can still be active. Empty injection getters may return fresh value-equivalent objects, while newly pending generations must still invalidate the preview.
+- **Rule**: Retain the pending read slot through promise settlement. Compare empty generation snapshots by value, recheck both compact and memory generations, and never consume them during preview. Bind live history, context selection and roots to a complete bounded disk snapshot; obtain goal context from that same snapshot. Keep metadata freshness and tokenizer estimates explicitly approximate.

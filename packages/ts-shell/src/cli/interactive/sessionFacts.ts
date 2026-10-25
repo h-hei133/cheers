@@ -2,6 +2,7 @@ import { resolveContextWindow, resolveModelCost } from "../../core/models/window
 import { resolveProviderCredential } from "../../core/shell/providerCredentials.js";
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from "../../core/auth/account/target.js";
 import { DEFAULT_ENDPOINT_KIND } from "../../provider/endpoints/index.js";
+import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import path from "node:path";
 import os from "node:os";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
@@ -14,8 +15,8 @@ import { getSessionTodos } from "../../core/commands/todoCommandRuntime.js";
  * Session facts for the status band.
  *
  * The band must never invent a value: every field either reflects real runtime
- * state or is omitted. Token usage comes from recorded provider usage, so the
- * used amount stays unknown until a provider measurement is available. The
+ * state or is omitted. Idle request estimates are explicitly distinguished from
+ * recorded provider usage and unavailable or stale readings. The
  * window is resolved independently, with its configuration or catalog source.
  */
 
@@ -46,6 +47,7 @@ export interface LiveStatusFacts {
   readonly queued?: number;
   /** Other live sessions reachable for cross-session messaging. */
   readonly peers?: number;
+  readonly promptContext?: import('./context/controller.js').ContextReading;
 }
 
 export function readStatusFacts(
@@ -64,7 +66,8 @@ export function readStatusFacts(
   }
   const usage = getSessionUsage(context.session.id);
   const measured = active.model && activeEndpoint ? measuredPromptContext(context.session.id, { provider: active.provider, model: active.model,
-    endpoint: activeEndpoint, ...(context.promptIdentity ?? {}) },
+    endpoint: activeEndpoint, ...(activeBaseUrl ? { endpointId: captureUsageAttribution({ provider: active.provider,
+      model: active.model, baseUrl: activeBaseUrl }).endpointId } : {}), ...(context.promptIdentity ?? {}) },
     context.promptIdentity ? { requireExpectedIdentity: true } : {}) : undefined;
   // Summed across the models that answered, each at the rate published for the
   // provider that served it. A session that switched models — or providers — spent
@@ -92,7 +95,8 @@ export function readStatusFacts(
     contextWindow: window.window,
     contextWindowSource: window.source,
     contextWarning: window.warning,
-    ...(measured ? { contextUsed: measured.tokens } : {}),
+    ...(live.promptContext ? { contextUsed: live.promptContext.tokens, contextSource: live.promptContext.source }
+      : measured ? { contextUsed: measured.tokens, contextSource: 'measured' as const } : {}),
     ...(totalTokens(usage) > 0 ? { sessionTokens: totalTokens(usage) } : {}),
     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),
     ...(cost > 0 || zeroCostSupported

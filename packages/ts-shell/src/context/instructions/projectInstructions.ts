@@ -85,6 +85,8 @@ export interface InstructionLoadOptions {
   readonly homeDir?: string
   /** Total bytes allowed across all files. Zero loads nothing. */
   readonly maxBytes?: number
+  /** Selected, missing and higher-priority sources used by this read. */
+  readonly onSource?: (target: string) => void
 }
 
 /**
@@ -107,11 +109,11 @@ export function loadInstructionFiles(options: InstructionLoadOptions): Instructi
   // current one would drop the rules someone already wrote under an earlier name,
   // which is the same loss as deleting them.
   const userFile = userDataSearchDirsFor(homeDir)
-    .map((directory) => loadOneFrom(directory, CANDIDATES, true))
+    .map((directory) => loadOneFrom(directory, CANDIDATES, true, options.onSource))
     .find((file) => file !== undefined);
   if (userFile) ordered.push(userFile);
 
-  ordered.push(...loadAncestorFiles(path.resolve(options.cwd)));
+  ordered.push(...loadAncestorFiles(path.resolve(options.cwd), options.onSource));
 
   return spendBudget(ordered, maxBytes);
 }
@@ -124,21 +126,21 @@ export function loadInstructionFiles(options: InstructionLoadOptions): Instructi
  * a project, and reading instructions out of one would attribute rules to a
  * repository that never declared them.
  */
-function loadAncestorFiles(cwd: string): InstructionFile[] {
+function loadAncestorFiles(cwd: string, onSource?: (target: string) => void): InstructionFile[] {
   const files: InstructionFile[] = [];
   // The same chain skills are found along, so a repository cannot have its rules
   // honored from a directory while its skills are ignored from that directory.
-  const directories = projectDirectories(cwd);
+  const directories = projectDirectories(cwd, onSource);
   // The outermost directory of the chain is the project boundary: a reference
   // may reach anywhere inside the project and nowhere outside it.
   const projectRoot = directories[0];
   for (const directory of directories) {
-    const file = loadOneFrom(directory);
+    const file = loadOneFrom(directory, CANDIDATES, false, onSource);
     if (!file) continue;
     files.push(
       projectRoot === undefined
         ? file
-        : { ...file, content: expandImports(file.content, { baseDirectory: directory, projectRoot }).content },
+        : { ...file, content: expandImports(file.content, { baseDirectory: directory, projectRoot, onSource }).content },
     );
   }
   return files;
@@ -156,9 +158,11 @@ function loadOneFrom(
   directory: string,
   candidates: readonly string[] = CANDIDATES,
   user = false,
+  onSource?: (target: string) => void,
 ): InstructionFile | undefined {
   for (const candidate of candidates) {
     const filePath = path.join(directory, candidate);
+    onSource?.(filePath);
     if (user) assertProfileStorage(filePath);
     let stats: fs.Stats;
     try {
@@ -245,8 +249,8 @@ export function loadAppendedInstructionFiles(options: InstructionLoadOptions): I
   }
 
   const files: InstructionFile[] = [];
-  for (const directory of projectDirectories(path.resolve(options.cwd))) {
-    const file = loadOneFrom(directory, APPEND_CANDIDATES);
+  for (const directory of projectDirectories(path.resolve(options.cwd), options.onSource)) {
+    const file = loadOneFrom(directory, APPEND_CANDIDATES, false, options.onSource);
     if (file) files.push(file);
   }
   return spendBudget(files, maxBytes);
