@@ -9049,3 +9049,7 @@ MCP测试/证据df0a8583cedcf22df497ecf768e17ee19b1aa03d已提交/推送、main�
 ## [2026-10-25] docs | Phase 20交付证据索引收尾
 
 续轮按当前工作区与远端核对351bad81已推送/main精确、工作区起始clean，文档CI40187153129实际运行。47行仍38complete/9partial/0open，9个partial均归真实多账号、可信结算、正式配对质量和Windows桌面交互及其QA汇总。QA-02/QA-04机器索引仍引用早期平台/STS，已仅补最新58e1871e Platform QA40178946206的20原receipt/业务结果与df0a8583 CI40185786184的10564pass/3skip/judgeproven；历史失败与来源SHA保留。两份当前文档把“当前head”改为“最近代码提交”以免纯文档head误归代码复验，任务ID/status不变。公开启动指南、Windows回填、产品hash集合、本地配置未跟踪/0600及own scratch清理再核对；无新产品源码、无本地测试/构建/20k真实PTY。
+
+## [2026-10-25] docs | 日常交互反馈逐项调查
+
+基线4f0f282f/main起始clean，新增[逐项核查](features/interaction-audit.md)回答第三及第八至十六项。当前resume默认当前会话、置顶/更新时间排序与新打开目录校验；settings已有七组，model仍平铺；输入箭头移除及padding1符合后续裁决。问号仍仅投影匹配provider计量，完整目录估算被称作首请求下界与dynamic实际子集不一致，登记报告措辞缺陷；model“只能Esc”、真实4.8k/1.7k差及当前WSL启动分相位耗时仍未复现。定向参考A/B只读比较，历史Performance原JSON与hash读回不冒充当前实测。未改产品、任务状态、个人配置，未启动产品/网络/测试/构建/20k真实PTY；后续修改范围交由用户审阅。

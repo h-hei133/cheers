@@ -21,6 +21,7 @@ confidence: high
 
 | 文档 | 当前内容与边界 |
 |---|---|
+| [日常交互问题核查](interaction-audit.md) | 2026-10-25逐项回答第三及第八至十六项：当前源码、既有裁决、参考决策与未复现边界；只交付调查 |
 | [23 输入几何](23-input-surface-geometry.md) | padding1、16正文行的目标；gutter/viewport与应用内复制边界 |
 | [24 Slash与参数](24-slash-completion-defects.md) | canonical/alias、选择状态、共享语法与真实4路径补全 |
 | [25 配置与中转站](25-model-configuration-and-relays.md) | availability/connection身份；profile、预设、overlay、账号池、路径设置全纳入 |
