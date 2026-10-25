@@ -8963,3 +8963,10 @@ PAN-07/PAN-08适用缺口闭合，矩阵38complete/9partial/0open；PRV-03保留
 本批只提取session/compaction/checkpoint的既有marker及format/read；原协调器兼容导出保留、序列化格式不变，声明21→19。先查目标再对照参考的旧摘要显式修订决定，既有重复压缩回归保留。主代理串行静态五门/矩阵/diff check、compaction36项及TS build通过；恒拒绝识别的有效反转使3项AssertionError，源码字节恢复后36项再次通过。build2ca5e72aef8b，inputs02ef9a692b391316d2d1fe395085ae1ab2815b0623a49440468c3e62c59eb2ac，artifactb1035f821e4eb3b4190115692ea13c32e12624a28313b10f1174c0b212336140。默认judge executable缺失exit127，仓内既有tgz CLI实际exit0/partial，cycles/imports satisfied、8个函数上限proof gaps、0阻塞缺口；compaction不再报超限。其余8项显式列入status/QA-04，不笼统称只剩外部输入；矩阵38complete/9partial/0open不提高。安全证据保留Git忽略artifacts，scratch清理，无本地全套/20k真实PTY/子代理验证。
 
 前文档81987b36已推送/main精确一致；Watch40153576102 workflow success但artifact12583686700为partial/9gaps。CI40153576073仍在跑，静态/script及TS build已通过；本批源码提交和CI另读回，不沿用旧SHA成功。
+
+
+## [2026-10-25] Phase 20 QA-04 终端组合与本地job输出职责
+
+既有bottom chrome移入surface/chrome，transcript折叠移入pane，view22→20；原字节入账/live解码/提升前有界UTF-8 prefix移入local/stream，registry24→20，派发/提升/撤权/结算顺序和handle/PID仍同owner。先目标后参考，保留本仓renderer/journal合同，无第二套系统。恢复后视图48及job44项分两次串行通过；四项有效反转exit1+AssertionErrors2/1/2/2，源码精确恢复。静态五门/矩阵/diff check通过，EOF空行导致过一次diff exit2已清理；最终build9ca7aa7975a2及仓内CLI judge串行通过执行，verdict仍partial，cycles/imports satisfied、6gaps/0阻塞。证据保留artifacts、scratch删除，无独立reviewer批准、本地全套/exe/20k真实PTY；38/9/0不提高。
+
+81987b36 CI40153576073于02:28:53Z success，970 files/10522 tests passed、1file/3tests skipped，静态/script/TS/结构步骤通过，judge仍partial。00045d0e已提交/推送/main精确一致，CI40154519638运行，Watch40154519717 workflow success/artifact12583912037实际partial8gaps。旧SHA分别绑定，不归给本批源码；本批交付另读回。

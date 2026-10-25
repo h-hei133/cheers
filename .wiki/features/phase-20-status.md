@@ -18,9 +18,17 @@
 | QA-01 | 剩余多账号/账单/质量/平台任务的适用验收 | 本地47行索引及真实单账号OAuth、stdio/HTTP MCP已补证；随剩余外部任务更新 |
 | QA-02 | Windows交互PTY、真实IME、系统复制 | 新Platform QA40098086773在d8192609的20个支持格全部通过；Windows仍只含line/print，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
-| QA-04 | 全范围最终交付、精确SHA CI及结构/双构建/全套证据；函数数量超限仍有8个模块 | compaction检查点提取后21→19，本地judge仍partial；其余8项见下表，不能只归因于外部输入。历史CI失败保留，新SHA结果独立读回；不要求公开Release |
+| QA-04 | 全范围最终交付、精确SHA CI及结构/双构建/全套证据；函数数量超限仍有6个模块 | checkpoint、view、local stream职责已提取，本地judge仍partial；其余6项见下表，不能只归因于外部输入。历史CI失败保留，新SHA结果独立读回；不要求公开Release |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
+
+## 2026-10-25 QA-04 终端与本地任务输出职责
+
+- 底部chrome组合移入 `presentation/tui/surface/chrome.ts`，仍在原时序读host事实、suggestions状态；折叠行为移给既有TranscriptPane，InteractiveSurface保持原接口/几何/渲染。view声明22→20、pane17。对照参考的子组件组合及实际绘制高度的坐标决定，保留本仓剩余viewport分配与shape/revision hit-test fence，不引入另一套renderer。
+- 任务原始字节入journal、live解码投影与提升前有界UTF-8前缀移入 `workflow/jobs/local/stream.ts`；registry仍拥有dispatch fence、同一handle/PID、提升/撤权/结算顺序，sink无复制。registry声明24→20、stream4。对照参考的foreground waiter与job结果分层；沿本仓原执行owner和journal，不重启命令或引入第二套job系统。
+- 恢复后的视图3文件48项、任务3文件44项分两次串行通过。四个有效反转分别把composer行预算置1、忽略折叠kind、pending前缀cap置1、遗漏原始journal bytes；各exit1，AssertionErrors依次2/1/2/2；原源码精确恢复后对应suite再次通过。聚焦覆盖小尺寸/shape/overlay/复制源/scroll、单spawn/PID、UTF-8、cap、撤权、stop settlement及restart unknown。静态五门/diff check通过；中途diff check仅因registry EOF多空行exit2，已清理，无测试降格。
+- 最终TS build `9ca7aa7975a24bfcd962b0b83d344373bfff214a9e41d7234f2a10b73941a4b5`、inputs `694d75f0599d510be74dd931ad42e5201baa8d3d1c477d13616d8e7b26a4fe02`、artifact `00c1de107b5e2fa89a715765713fe99575186c44d0c58de0c89511c639c794ba`；同一仓内judge CLI串行exit0/partial，cycles/imports satisfied、6个函数上限gaps，0阻塞缺口，analyze也仅报6。无独立reviewer调用，不声称独立批准；无本地全套/exe/真实20k PTY。证据保留Git忽略 `.omx/artifacts/phase20-surface/`，任务scratch已删除，矩阵38/9/0不变。
+- 真实验收文档 `81987b36` CI40153576073/job121050021116于2026-10-25T02:28:53Z success：970 test files/10522 tests passed、1 file/3 tests skipped，静态/script/TS/结构步骤通过；judge仍partial。检查点提交 `00045d0e8ed054b70b82cd8c1815088929c2cba0` 已推送/main精确一致，CI40154519638仍运行；Watch40154519717 workflow success、artifact12583912037实际partial/8gaps。两者结果分别绑定旧SHA；本批提交及自身CI另读回。
 
 ## 2026-10-25 QA-04 检查点职责与结构证据
 
@@ -29,16 +37,14 @@
 - 主代理串行静态五门、47行矩阵、diff check通过；package-local compaction.test.ts共36项通过，TS build通过。有效反转把checkpoint识别guard改成恒拒绝，原suite有3个AssertionErrors（写入后识别、无system message识别、修订旧摘要）；恢复精确源码字节后36项再次通过。无本地全套、exe、真实20k PTY或子代理验证。
 - build `2ca5e72aef8b5c6abe30447cf7745975e61b60c0feaaf0c7e25ff9d3fc8cd89d`，inputs `02ef9a692b391316d2d1fe395085ae1ab2815b0623a49440468c3e62c59eb2ac`，artifact `b1035f821e4eb3b4190115692ea13c32e12624a28313b10f1174c0b212336140`；本地Node24.15.0，不替代远端Node floor证据。默认normproof executable缺失exit127是可用性问题；使用仓内既有tgz的同一CLI串行judge实际exit0/partial，无cycle/unresolved specifier，8个proof gaps、0阻塞缺口。analyze:module-facades也不再报告compaction。安全摘要、manifest和judge结果保存在Git忽略的 `.omx/artifacts/phase20-checkpoint/`，临时解包随后清理。本批提交/推送和自身CI另读回，QA-04不升为complete。
 
-| 当前函数上限finding（20） | 声明数 | 处理边界 |
+| 当前函数上限finding（20；终端/输出拆分后6项） | 声明数 | 处理边界 |
 |---|---|---|
 | cli-baseline.test.ts | 29 | 既有集成fixture；保留历史disposition，未拆场景 |
 | cli/interactive/turnSink.ts | 22 | 单turn输出状态；既有defer，不以记录当豁免 |
 | core/shell/sessionRuntime.ts | 21 | session公共状态面；既有defer，未改运行语义 |
-| presentation/tui/surface/view.ts | 22 | terminal view职责仍待复核 |
 | provider/aws/credentials.ts | 26 | provider签名/凭据owner；既有defer，不能用QA日志掩盖认证改动 |
 | session/SessionManager.ts | 24 | session facade，历史处置保留；judge仍报告 |
 | session/store/sessionStoreAccess.ts | 22 | store accessor/校验，既有defer；记录不改变verdict |
-| workflow/jobs/local/registry.ts | 24 | 本地job登记职责仍待复核 |
 
 ## 2026-10-25 允许执行的真实验收
 

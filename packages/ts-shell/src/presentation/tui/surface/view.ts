@@ -1,18 +1,11 @@
-import { layoutComposer } from "../composer/layout.js";
-import { composerStatus } from "../composer/status.js";
-import { highlightComposer } from "../composer/projection.js";
-import type { ComposerLayout } from "../composer/contract.js";
 import { truncateToWidth } from "../text/layout.js";
-import { renderHints } from "../chrome/hints.js";
-import { renderSearchBar } from "../chrome/searchBar.js";
 import type { FrameLayout, TerminalFramePlan, ViewportSize } from "../render/frame.js";
 import type { Block } from "../transcript/blocks.js";
-import { renderActivity } from "../transcript/live.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import type { ScrollbarGeometry } from "../transcript/viewport.js";
 import { createViewState, type ChoiceRegions, type ComposerGeometry, type InteractiveView, type ViewContext, type ViewState } from "./contract.js";
 import { TranscriptPane } from "./pane.js";
-import { MIN_TRANSCRIPT_ROWS, composerRowBudget } from "./budget.js";
+import { renderChrome } from "./chrome.js";
 
 /**
  * The surface: one frame from host-owned state.
@@ -65,7 +58,7 @@ export class InteractiveSurface implements InteractiveView {
       this.choiceRegions = {};
       return { rows: [], chromeRows: [] };
     }
-    const chrome = this.renderChrome(width, height);
+    const chrome = renderChrome(this.context, this, width, height);
     if (this.context.overlayFullScreen()) {
       this.choiceRegions = { overlay: { top: 0, height } };
       this.lastComposerGeometry = undefined;
@@ -168,17 +161,7 @@ export class InteractiveSurface implements InteractiveView {
   }
 
   toggleCollapsed(only?: "thinking" | "tool"): boolean {
-    const collapsible = this.transcript
-      .all()
-      .filter((block) => block.collapsed !== undefined)
-      .filter((block) => only === undefined || block.kind === only);
-    if (collapsible.length === 0) return false;
-    // One decision for the whole set, taken from the first: pressing the key
-    // again must undo what it just did, which it cannot if some blocks were
-    // already in the target state and flip the other way.
-    const collapsed = !collapsible[0]!.collapsed;
-    for (const block of collapsible) this.transcript.setCollapsed(block, collapsed);
-    return true;
+    return this.pane.toggleCollapsed(only);
   }
 
   transcriptSource(anchor: SelectionPoint, focus: SelectionPoint): string | undefined {
@@ -196,65 +179,5 @@ export class InteractiveSurface implements InteractiveView {
   invalidateLayout(): void {
     this.lastComposerGeometry = undefined;
     this.choiceRegions = {};
-  }
-
-  /**
-   * The fixed bottom block: activity, an open panel picker, the band, the prompt,
-   * and either completions or the hint row. The picker sits above the band so the
-   * prompt stays where the user's attention already is.
-   */
-  private renderChrome(width: number, height: number): {
-    readonly rows: string[];
-    readonly composerOffset: number;
-    readonly composerRows: string[];
-    readonly composerLayout: ComposerLayout;
-    readonly overlayOffset: number;
-    readonly overlayHeight: number;
-    readonly overlayRows: readonly string[];
-    readonly suggestionRows: number;
-  } {
-    const busy = this.context.busy();
-    const chromeCapacity = Math.max(1, height - MIN_TRANSCRIPT_ROWS);
-    const maxComposerRows = composerRowBudget(height);
-    const activityRows = renderActivity(this.context.activity(), this.context.now(), width);
-    const composerLayout = layoutComposer(
-      this.editor,
-      { busy, shape: this.context.composerShape?.() ?? "default", status: composerStatus(this.context.facts(), this.context.statusItems(), width) },
-      width,
-      maxComposerRows,
-    );
-    const composerRows = highlightComposer(composerLayout, this.context.composerSelection?.());
-    let remaining = chromeCapacity - composerRows.length;
-    const hintStatus = this.context.hintStatus?.();
-    const completionStatus = hintStatus?.completion;
-    const suggestionRows = this.suggestionsOpen ? this.suggestions.render(width, Math.max(0, remaining - Number(!!completionStatus))) : [];
-    remaining -= suggestionRows.length;
-    // The search bar takes the hint row rather than adding one: an open search is
-    // itself the hint, and the composer above it is where the user's text lives, so
-    // taking that row instead would lose whatever they had typed.
-    const searchBar = this.context.searchBar?.();
-    const hints = (searchBar ? renderSearchBar(searchBar, width) : renderHints(
-        {
-          busy,
-          suggesting: this.suggestionsOpen,
-          cancelArmed: this.context.cancelArmed(),
-          queued: this.context.queuedCount(),
-          steering: this.context.steeringCount?.() ?? 0,
-          toast: hintStatus?.toast ?? this.context.toast?.(),
-          completionStatus,
-        },
-        this.context.ambient(),
-        width,
-      )).slice(0, remaining);
-    remaining -= hints.length;
-    const overlayRows = this.context.overlayRows(width, height, Math.max(0, remaining - activityRows.length));
-    const statusRows = [...activityRows, ...overlayRows];
-    const visibleStatus = remaining > 0 ? statusRows.slice(-remaining) : [];
-    const droppedStatus = statusRows.length - visibleStatus.length;
-    return {
-      rows: [...visibleStatus, ...composerRows, ...suggestionRows, ...hints].map(row => truncateToWidth(row, width)),
-      composerOffset: visibleStatus.length, composerRows, composerLayout,
-      overlayOffset: activityRows.length - droppedStatus, overlayHeight: overlayRows.length, overlayRows, suggestionRows: suggestionRows.length,
-    };
   }
 }

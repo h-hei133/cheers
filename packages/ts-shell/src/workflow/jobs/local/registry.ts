@@ -3,15 +3,13 @@ import { randomUUID } from 'node:crypto';
 import type { LocalExecutionHandle } from '../../../runtime/execution/types.js';
 import { createDefaultExecutionService } from '../../../runtime/execution/service.js';
 import type { CommandExecutionResult, ExecutionService } from '../../../runtime/execution/types.js';
-import { createOutputSink, type OutputSink } from './output.js';
+import { createOutputSink } from './output.js';
+import { appendAdoptedOutput, appendOutput, type OperationOutput } from './stream.js';
 import type { BackgroundInput, BackgroundRunner, BackgroundTask, LocalJournalPort } from './model.js';
 import { taskSnapshot } from './snapshot.js';
 import { closeOutput } from './settlement.js';
 
-const PENDING_OUTPUT_LIMIT = 65536;
-
-interface Operation { readonly controller: AbortController; readonly sink: OutputSink; readonly stdout: StringDecoder;
-  readonly stderr: StringDecoder; readonly pendingOutput: Buffer[]; pendingBytes: number; pendingTruncated: boolean;
+interface Operation extends OperationOutput { readonly controller: AbortController;
   settlement: Promise<void>; readonly handle?: LocalExecutionHandle; readonly input?: BackgroundInput; readonly adopted?: boolean; watch?: ReturnType<typeof setInterval>; }
 
 /** Live handles belong to this owner; restart never signals a numeric PID from a journal. */
@@ -63,7 +61,10 @@ export class TaskRegistry implements BackgroundRunner {
     let resolvePromotion!: (outcome: 'promoted' | 'settled' | 'refused') => void;
     const promotion = new Promise<'promoted' | 'settled' | 'refused'>(resolve => { resolvePromotion = resolve; });
     this.promotion.set(id, { promise: promotion, resolve: resolvePromotion });
-    const off = handle.onOutput(text => this.appendAdopted(id, text));
+    const off = handle.onOutput(text => {
+      const output = this.operations.get(id);
+      if (output) appendAdoptedOutput(id, text, output, this.tasks, this.journal, this.promoted.has(id));
+    });
     const settle = async (result: Pick<CommandExecutionResult, 'status' | 'exitCode' | 'terminationFailed' | 'outputFailed' | 'spawnErrorCode'>): Promise<void> => {
       off();
       if (operation.watch) { clearInterval(operation.watch); operation.watch = undefined; }
@@ -175,7 +176,8 @@ export class TaskRegistry implements BackgroundRunner {
       timeoutMs: input.timeoutMs ?? 300000, abortSignal: operation.controller.signal, captureOutput: false, cleanupTreeOnExit: true,
       ...(input.env ? { env: { ...Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)), ...input.env } } : {}),
       onStarted: pid => { this.journal?.started(id); this.tasks.set(id, { ...this.tasks.get(id)!, pid, state: 'running' }); },
-      onStdout: bytes => this.append(id, 'stdout', bytes), onStderr: bytes => this.append(id, 'stderr', bytes) });
+      onStdout: bytes => appendOutput(id, 'stdout', bytes, this.operations.get(id)!, this.tasks, this.journal),
+      onStderr: bytes => appendOutput(id, 'stderr', bytes, this.operations.get(id)!, this.tasks, this.journal) });
     operation.settlement = run().then(result => this.finish(id, result)).catch(async () => {
       try { await closeOutput(operation.sink); } catch { /* Failed persistence cannot prove command settlement. */ }
       try { this.journal?.unverified(id); } catch { /* The original dispatch tombstone remains. */ }
@@ -197,36 +199,6 @@ export class TaskRegistry implements BackgroundRunner {
       else operation.controller.abort();
     }
     await Promise.allSettled(selected.map(operation => operation.settlement));
-  }
-  private appendAdopted(id: string, text: string): void {
-    const operation = this.operations.get(id); if (!operation) return;
-    const bytes = Buffer.from(text);
-    if (this.promoted.has(id)) this.journal?.output(id, 'stdout', bytes);
-    else {
-      const remaining = PENDING_OUTPUT_LIMIT - operation.pendingBytes;
-      if (remaining > 0) {
-        const prefix = utf8Prefix(bytes, remaining);
-        if (prefix.length > 0) {
-          operation.pendingOutput.push(prefix);
-          operation.pendingBytes += prefix.length;
-        }
-        if (prefix.length < bytes.length) operation.pendingTruncated = true;
-      } else {
-        operation.pendingTruncated = true;
-      }
-    }
-    void operation.sink.append(text);
-    this.tasks.set(id, { ...this.tasks.get(id)!, output: operation.sink.tail, outputTruncated: operation.sink.truncated,
-      get outputPath() { return operation.sink.spillPath; } });
-  }
-
-  private append(id: string, stream: 'stdout' | 'stderr', bytes: Buffer): void | Promise<void> {
-    const operation = this.operations.get(id)!;
-    this.journal?.output(id, stream, bytes);
-    const pending = operation.sink.append(operation[stream].write(bytes));
-    this.tasks.set(id, { ...this.tasks.get(id)!, output: operation.sink.tail, outputTruncated: operation.sink.truncated,
-      get outputPath() { return operation.sink.spillPath; } });
-    return pending;
   }
   private async finish(id: string, result: Pick<CommandExecutionResult, 'status' | 'exitCode' | 'terminationFailed' | 'outputFailed' | 'spawnErrorCode'>): Promise<void> {
     const operation = this.operations.get(id)!;
@@ -264,12 +236,4 @@ export class TaskRegistry implements BackgroundRunner {
     let excess = [...this.tasks.values()].filter(value => !this.operations.has(value.id) || value.id === task.id).length - 100;
     for (const [id] of this.tasks) { if (excess <= 0) break; if (!this.operations.has(id) || id === task.id) { this.tasks.delete(id); excess--; } }
   }
-}
-
-/** Keep a prefix that ends on a complete UTF-8 code point. */
-function utf8Prefix(bytes: Buffer, maxBytes: number): Buffer {
-  if (bytes.length <= maxBytes) return bytes;
-  let end = Math.max(0, maxBytes);
-  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end--;
-  return bytes.subarray(0, end);
 }
