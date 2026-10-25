@@ -18,9 +18,15 @@
 | QA-01 | 剩余多账号/账单/质量/平台任务的适用验收 | 本地47行索引及真实单账号OAuth、stdio/HTTP MCP已补证；随剩余外部任务更新 |
 | QA-02 | Windows交互PTY、真实IME、系统复制 | 新Platform QA40098086773在d8192609的20个支持格全部通过；Windows仍只含line/print，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
-| QA-04 | 全范围最终交付、精确SHA CI及结构/双构建/全套证据；函数数量超限仍有6个模块 | checkpoint、view、local stream职责已提取，本地judge仍partial；其余6项见下表，不能只归因于外部输入。历史CI失败保留，新SHA结果独立读回；不要求公开Release |
+| QA-04 | 全范围最终交付、精确SHA CI及结构/双构建/全套证据；函数数量超限仍有5个模块 | checkpoint、view、local stream及tool card缓冲职责已归位，本地judge仍partial；其余5项见下表，不能只归因于外部输入。历史CI失败保留，新SHA结果独立读回；不要求公开Release |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
+
+## 2026-10-25 QA-04 工具卡片刷新职责
+
+- 既有100ms工具输出buffer/flush归回ToolCards，TurnSink保留路由与result前flush调用；原tool card/live preview、最终body及source行为不变。删除旧buffer方法及状态，未增加第二套缓冲。TurnSink声明22→20、ToolCards12；对照参考的tool component输出与preview分层，沿本仓原卡片owner适配。卡片clear仍只清原cards，未顺带改变旧buffer生命周期。
+- package-local两文件54项通过。有效反转阻止pending flush写到cards，exit1/3 AssertionErrors；恢复后54项通过，删除首轮遗留旧方法后54项再次通过。误在package cwd调用根脚本build:ts得到Missing script/exit1，是命令目录错误；纠正到根后静态五门、build及同一judge串行执行成功。build `9b1f0db676fa9ba1ef44b16eb3dc4775ed26ff82707e6d6d1cf06d59fd2bdc67`、inputs `67e8d19a11fc397c651350781b2bd7c8d65785d89edabf81a09a22e1cd965e7e`、artifact `db19ce60aa38a03284097085dbea32044af0e208aecb063aaf7a72c924debe8a`；judge exit0/partial，cycles/imports satisfied，5gaps/0阻塞。证据在Git忽略 `.omx/artifacts/phase20-cards/`，scratch删除；不称独立review通过或全phase完成。
+- 前批终端/stream源码 `85e50c621f8ac4281f26f3a471c5b47b849eef96` 已提交/推送/main精确一致，CI40155244712仍在运行；Watch40155244710 workflow success但verdict另以artifact12583978091读回。本批自身提交/推送/CI另核对，38/9/0不变。
 
 ## 2026-10-25 QA-04 终端与本地任务输出职责
 
@@ -37,10 +43,9 @@
 - 主代理串行静态五门、47行矩阵、diff check通过；package-local compaction.test.ts共36项通过，TS build通过。有效反转把checkpoint识别guard改成恒拒绝，原suite有3个AssertionErrors（写入后识别、无system message识别、修订旧摘要）；恢复精确源码字节后36项再次通过。无本地全套、exe、真实20k PTY或子代理验证。
 - build `2ca5e72aef8b5c6abe30447cf7745975e61b60c0feaaf0c7e25ff9d3fc8cd89d`，inputs `02ef9a692b391316d2d1fe395085ae1ab2815b0623a49440468c3e62c59eb2ac`，artifact `b1035f821e4eb3b4190115692ea13c32e12624a28313b10f1174c0b212336140`；本地Node24.15.0，不替代远端Node floor证据。默认normproof executable缺失exit127是可用性问题；使用仓内既有tgz的同一CLI串行judge实际exit0/partial，无cycle/unresolved specifier，8个proof gaps、0阻塞缺口。analyze:module-facades也不再报告compaction。安全摘要、manifest和judge结果保存在Git忽略的 `.omx/artifacts/phase20-checkpoint/`，临时解包随后清理。本批提交/推送和自身CI另读回，QA-04不升为complete。
 
-| 当前函数上限finding（20；终端/输出拆分后6项） | 声明数 | 处理边界 |
+| 当前函数上限finding（20；工具卡片拆分后5项） | 声明数 | 处理边界 |
 |---|---|---|
 | cli-baseline.test.ts | 29 | 既有集成fixture；保留历史disposition，未拆场景 |
-| cli/interactive/turnSink.ts | 22 | 单turn输出状态；既有defer，不以记录当豁免 |
 | core/shell/sessionRuntime.ts | 21 | session公共状态面；既有defer，未改运行语义 |
 | provider/aws/credentials.ts | 26 | provider签名/凭据owner；既有defer，不能用QA日志掩盖认证改动 |
 | session/SessionManager.ts | 24 | session facade，历史处置保留；judge仍报告 |

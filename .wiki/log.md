@@ -8970,3 +8970,8 @@ PAN-07/PAN-08适用缺口闭合，矩阵38complete/9partial/0open；PRV-03保留
 既有bottom chrome移入surface/chrome，transcript折叠移入pane，view22→20；原字节入账/live解码/提升前有界UTF-8 prefix移入local/stream，registry24→20，派发/提升/撤权/结算顺序和handle/PID仍同owner。先目标后参考，保留本仓renderer/journal合同，无第二套系统。恢复后视图48及job44项分两次串行通过；四项有效反转exit1+AssertionErrors2/1/2/2，源码精确恢复。静态五门/矩阵/diff check通过，EOF空行导致过一次diff exit2已清理；最终build9ca7aa7975a2及仓内CLI judge串行通过执行，verdict仍partial，cycles/imports satisfied、6gaps/0阻塞。证据保留artifacts、scratch删除，无独立reviewer批准、本地全套/exe/20k真实PTY；38/9/0不提高。
 
 81987b36 CI40153576073于02:28:53Z success，970 files/10522 tests passed、1file/3tests skipped，静态/script/TS/结构步骤通过，judge仍partial。00045d0e已提交/推送/main精确一致，CI40154519638运行，Watch40154519717 workflow success/artifact12583912037实际partial8gaps。旧SHA分别绑定，不归给本批源码；本批交付另读回。
+
+
+## [2026-10-25] Phase 20 QA-04 工具卡片缓冲归位
+
+原100ms output buffer/flush移回既有ToolCards，TurnSink只保留event路由及result前flush，旧方法/状态删除；22→20、ToolCards12。两文件54项通过，阻断pending写卡有效反转exit1/3 AssertionErrors，恢复后54项；首轮遗留方法删除后54项再次通过。误在package cwd跑根build:ts得到Missing script/exit1，回根修正后静态/build/judge串行成功，build9b1f0db676fa/inputs67e8d19a11fc397c651350781b2bd7c8d65785d89edabf81a09a22e1cd965e7e/artifactdb19ce60aa38a03284097085dbea32044af0e208aecb063aaf7a72c924debe8a。judge仍partial、5gaps/0阻塞、cycles/imports satisfied；证据artifacts保留/scratch清理，无独立review通过声明，38/9/0不变。前批85e50c62已推送/main精确一致，CI40155244712运行、Watch40155244710success/artifact12583978091待实际verdict读回；本批自身交付另核对。

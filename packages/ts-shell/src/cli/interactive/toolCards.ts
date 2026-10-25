@@ -13,12 +13,23 @@ import type { Transcript } from "../../presentation/tui/transcript/container.js"
 const LIVE_OUTPUT_LINES = 40;
 const LIVE_OUTPUT_CHARS = 16_000;
 
+/**
+ * How often a running tool's output repaints.
+ *
+ * Fast enough to look live, slow enough that a command emitting thousands of
+ * chunks a second cannot spend the frame budget on redraws.
+ */
+const OUTPUT_FLUSH_MS = 100;
+
 export class ToolCards {
   private readonly cards = new Map<string, Block>();
+  private readonly outputBuffer = new Map<string, string>();
+  private outputFlushAt = 0;
 
   constructor(
     private readonly transcript: Transcript,
     private readonly onChange: () => void,
+    private readonly now: () => number = Date.now,
   ) {}
 
   /** Open a card for a call that just started. */
@@ -64,6 +75,32 @@ export class ToolCards {
     if (clipped.length < text.length) block.previewTruncated = true;
     this.transcript.setText(block, clipped);
     this.onChange();
+  }
+
+  /**
+   * Collect a running tool's output, repainting at a fixed cadence.
+   *
+   * A command can emit thousands of small chunks a second. Repainting for each
+   * one spends the frame budget on redraws nobody can read, and the screen ends
+   * up further behind than the output. Everything is kept; only the repaint is
+   * rate-limited, so nothing is lost by waiting.
+   */
+  buffer(taskId: string, chunk: string): void {
+    this.outputBuffer.set(taskId, (this.outputBuffer.get(taskId) ?? "") + chunk);
+    const now = this.now();
+    if (now < this.outputFlushAt) return;
+    this.outputFlushAt = now + OUTPUT_FLUSH_MS;
+    this.flush();
+  }
+
+  /** Move buffered output onto its cards, now. */
+  flush(): void {
+    if (this.outputBuffer.size === 0) return;
+    const pending = [...this.outputBuffer.entries()];
+    this.outputBuffer.clear();
+    for (const [taskId, chunk] of pending) {
+      this.append(taskId, chunk);
+    }
   }
 
   /**
