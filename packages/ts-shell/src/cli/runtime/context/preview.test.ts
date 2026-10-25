@@ -17,6 +17,7 @@ import { installCommandGate } from '../../data/access.js';
 import { appendTranscriptEvent } from '../../../session/transcript/sessionTranscript.js';
 import { createMessageTranscriptEvent } from '../../../session/sessionEventCodec.js';
 import { requestIdentity } from '../../../context/request/identity.js';
+import { routeSlashCommand } from '../../../core/commands/slashRouter.js';
 
 let root: string;
 beforeEach(() => {
@@ -63,7 +64,93 @@ it('includes all explicit skills and invalidates their manifests and target chan
   expect(expanded.estimate.tokens).toBeGreaterThan(plain.estimate.tokens + 1500);
   expanded.verify(); fs.writeFileSync(files[1]!, 'changed'); expect(() => expanded.verify()).toThrow();
   const beforeTarget = await load('question'); target.baseUrl = 'https://other.invalid/v1'; expect(() => beforeTarget.verify()).toThrow('target changed');
-  await expect(load('question /skill:missing')).rejects.toThrow('unavailable');
+  await expect(load('question /skill:missing')).rejects.toThrow('Unknown skill: missing');
+});
+
+it('previews the exact submitted modifier, template and skill prompt without command dispatch or writes', async () => {
+  const { cwd, context, load, layout, gateway } = fixture();
+  const directory = path.join(cwd, '.agents', 'prompts'); fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(path.join(directory, 'evidence.md'), '---\ncomposable: true\n---\nCheck counterexamples for $@');
+  const file = path.join(cwd, 'method.md'); fs.writeFileSync(file, '---\nname: method\ndescription: method\n---\nCheck sources.');
+  context.skillOptions = { noSkills: true, skillPaths: [file] };
+  const input = 'Compare approaches /brainstorm /evidence\n/skill:method';
+  const submitted = await routeSlashCommand(input, { cwd, skillOptions: context.skillOptions });
+  if (submitted?.kind !== 'prompt') throw new Error('Fixture composition was not prepared.');
+  const prepare = vi.fn(context.preparePromptContext!); context.preparePromptContext = prepare;
+  const files = [layout.metadataPath, layout.statePath, layout.transcriptPath];
+  const before = files.map(target => fs.readFileSync(target));
+  const preview = await load(input); preview.verify();
+  expect(prepare).toHaveBeenCalledWith(submitted.prompt, expect.any(AbortSignal));
+  expect(submitted.prompt).toContain('Design exploration');
+  expect(submitted.prompt).toContain('Check counterexamples for Compare approaches');
+  expect(submitted.prompt).toContain('<skill name="method">');
+  const actual = await load(submitted.prompt);
+  expect(preview.estimate).toEqual(actual.estimate);
+  expect(files.map(target => fs.readFileSync(target))).toEqual(before);
+  expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
+});
+
+it('invalidates selected template edits, higher-priority overrides and newly discovered command collisions', async () => {
+  const { cwd, load } = fixture();
+  const directory = path.join(cwd, '.agents', 'prompts'); fs.mkdirSync(directory, { recursive: true });
+  const file = path.join(directory, 'evidence.md');
+  fs.writeFileSync(file, '---\ncomposable: true\n---\nCheck $@');
+  const first = await load('question /evidence'); first.verify();
+  fs.writeFileSync(file, '---\ncomposable: true\n---\nOther $@');
+  expect(() => first.verify()).toThrow('source changed');
+  const second = await load('question /evidence');
+  fs.writeFileSync(path.join(directory, 'home.md'), '---\ncomposable: true\n---\nDirectory method $@');
+  expect(() => second.verify()).toThrow('source changed');
+  const pathText = await load('question /unknown-path');
+  fs.writeFileSync(path.join(directory, 'unknown-path.md'), '---\ncomposable: true\n---\nNow a method $@');
+  expect(() => pathText.verify()).toThrow('source changed');
+  const nested = path.join(cwd, 'nested'); fs.mkdirSync(nested); // Same project, nearer template wins.
+  const { TemplateLoader } = await import('../../../core/prompts/templateLoader.js');
+  const { capturePromptSources } = await import('../../../context/request/sources.js');
+  const sources = capturePromptSources();
+  expect(new TemplateLoader(nested, sources.track).load().get('evidence')?.content).toBe('Other $@');
+  const nearer = path.join(nested, '.agents', 'prompts'); fs.mkdirSync(nearer, { recursive: true });
+  fs.writeFileSync(path.join(nearer, 'evidence.md'), '---\ncomposable: true\n---\nNearer $@');
+  expect(() => sources.verify()).toThrow('source changed');
+});
+
+it('keeps inline functional names as prose while opening commands and composed controls remain unavailable', async () => {
+  const { load, context } = fixture();
+  const prepare = vi.fn(context.preparePromptContext!); context.preparePromptContext = prepare;
+  for (const input of [' /settings', '\n/model', 'question /model', 'quote `/brainstorm` /home']) {
+    const preview = await load(input); preview.verify();
+    expect(prepare).toHaveBeenLastCalledWith(input, expect.any(AbortSignal));
+  }
+  for (const input of ['/unknown-command', '/settings /skill:missing', 'question /brainstorm /settings',
+    'question /brainstorm --save', 'question /deep-research /skill:missing']) {
+    const calls = prepare.mock.calls.length;
+    await expect(load(input)).rejects.toThrow();
+    expect(prepare).toHaveBeenCalledTimes(calls);
+  }
+});
+
+it('applies the submission budget before previewing partial skills or modifiers', async () => {
+  const { cwd, context, load } = fixture();
+  const file = path.join(cwd, 'large.md');
+  fs.writeFileSync(file, `---\nname: large\ndescription: large\n---\n${'x'.repeat(65537)}`);
+  context.skillOptions = { noSkills: true, skillPaths: [file] };
+  const prepare = vi.fn(context.preparePromptContext!); context.preparePromptContext = prepare;
+  await expect(load('question /skill:large')).rejects.toThrow('budget');
+  await expect(load(`${'q'.repeat(32769)} /brainstorm`)).rejects.toThrow('budget');
+  expect(prepare).not.toHaveBeenCalled();
+});
+
+it('invalidates a newly created personal template candidate without changing legacy precedence', async () => {
+  const { load } = fixture();
+  const { userDataSearchDirs } = await import('../../../core/paths/userHome.js');
+  const directories = userDataSearchDirs().map(directory => path.join(directory, 'prompts'));
+  if (directories.length < 2) throw new Error('Fixture requires the default profile candidate roots.');
+  fs.mkdirSync(directories[1]!, { recursive: true });
+  fs.writeFileSync(path.join(directories[1]!, 'evidence.md'), '---\ncomposable: true\n---\nLegacy evidence $@');
+  const before = await load('question /evidence'); before.verify();
+  fs.mkdirSync(directories[0]!, { recursive: true });
+  fs.writeFileSync(path.join(directories[0]!, 'new-method.md'), '---\ncomposable: true\n---\nNew method $@');
+  expect(() => before.verify()).toThrow('source changed');
 });
 
 it('counts non-command paths and vision fallback, but does not start workflow commands', async () => {

@@ -308,3 +308,5 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 “允许选中未配置模型”始终指具体候选可获得焦点并进入配置流程；不能改回跳过它们。两个面板整体向oh-my-pi看齐的要求保留，验收仍按完整操作路径而非外观标签。第十一批`ea4715b6`已推送；第十/十一批CI本轮实际读回仍in_progress。当前实现、历史失败、验证边界与后续修补统一见[补充规划第15节第十二批](phase-20-addition.md#15-实施与验证证据)。
 
 已有pending/error连接无法再次配置的确定缺口本轮已补：具体行保留setup状态并可进入key配置或适用的native登录；新增连接返回原model，旧连接不被虚报修复，会话仍需显式启用。两模式十条小型真实Node PTY及最终五文件90项通过，OAuth/key使用synthetic fixture；原现场精确按键故障、真实provider和整体面板/性能验收仍未完成。第十CI实际success，第十一CI实际navigation无endpoint旧fixture期待失败，已补精确地址与返回身份断言，历史失败保留；第十二CI仍pending。细节与剩余边界见[补充规划第15节第十三批](phase-20-addition.md#15-实施与验证证据)。
+
+当前追加核查：纯modifier/composable模板草稿的预览拒绝，以及按原草稿而非展开prompt分类continuity的偏差已修；同一输入预览与实际提交的完整估算/digest相等检查通过，模板源变化撤销旧值。正文普通功能名称按实际路由保留文本；独立开头命令和研究driver仍不提供完整预览。50项聚焦和两模式小型PTY通过，后者约4.3k→9.0k→12k只说明隔离夹具的组成变化，不能解释用户现场1.7k/4.9k。精确源字节、原生tokenizer、真实差额及完整面板/性能证据仍缺。第十二CI已实际failure10766pass/1fail/3skip，同已在第十三修补的navigation旧夹具；第十三自身CI仍运行。详见[第十四批](phase-20-addition.md#15-实施与验证证据)。

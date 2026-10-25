@@ -1,6 +1,6 @@
 import { resolveSkillCatalog } from '../skills/skillCatalog.js';
-import { expandSkills, skillBlock } from '../prompts/skills.js';
 import { compositionPlan } from './composition/plan.js';
+import { prepareComposition } from './composition/prepare.js';
 import type { CommandContext, CommandDefinition, CommandExecutionResult } from './types.js';
 
 export function needsComposition(input: string, commands: readonly CommandDefinition[]): boolean {
@@ -27,26 +27,14 @@ export async function composePrompt(input: string, context: CommandContext, comm
     const catalog = plan.skills.length ? await resolveSkillCatalog({ workspaceRoot: context.cwd, sessionId: context.sessionId,
       ...context.skillOptions, abortSignal: signal }) : undefined;
     signal?.throwIfAborted();
-    const expanded = expandSkills(input, catalog?.skills ?? new Map(), plan.skills);
-    if (expanded.unknownSkill) return blocked(`Unknown skill: ${expanded.unknownSkill}. No skill named ${expanded.unknownSkill}. Run /skill to see what is available. ${catalog?.skills.size ? `Available: ${[...catalog.skills.keys()].sort().map(name => `/skill:${name}`).join(', ')}` : 'No skills are installed.'}`);
-    const modifiers: Array<{ name: string; instruction: string }> = [];
-    let driver: { method: typeof plan.methods[number]; args: readonly string[] } | undefined;
-    for (const method of plan.methods) {
-      if (context.interactive === false && method.definition.supportsNonInteractive !== true) return blocked(`/${method.invocation.name} cannot be composed in this host.`);
-      const prepared = method.invocation.composition!.prepare(method.args, plan.prose);
-      if ('error' in prepared) return blocked(prepared.error);
-      if ('instruction' in prepared) modifiers.push({ name: method.invocation.name, instruction: prepared.instruction });
-      else driver = { method, args: prepared.args };
-    }
+    const prepared = prepareComposition(input, plan, catalog?.skills ?? new Map(), context.interactive !== false);
+    if (prepared.error !== undefined) return blocked(prepared.error);
+    const { expanded, modifiers, driver, metadata } = prepared;
     const refusal = context.admission?.();
     catalog?.verify?.();
-    const methodSize = expanded.instructions.reduce((size, skill) => size + skill.body.length, 0) + modifiers.reduce((size, method) => size + method.instruction.length, 0);
-    if (expanded.instructions.length > 16 || modifiers.length > 16 || methodSize > 65536 || input.length > 32768) return blocked('Composed methods exceed the input budget; no method was truncated or submitted.');
     if (refusal || revision !== context.readConfiguration?.().revision) return blocked(refusal ?? 'Configuration changed during composition.');
     if (expanded.instructions.some(skill => catalog?.skills.get(skill.name)?.isCurrent?.() === false)) return blocked('A selected skill was revoked during composition.');
     signal?.throwIfAborted();
-    const metadata = { originalInput: input, skillInvocations: plan.skills.map(token => ({ from: token.from, to: token.to, name: token.raw.slice('/skill:'.length) })),
-      skills: expanded.instructions.map(({ body: _body, ...identity }) => identity), methods: plan.methods.map(method => ({ name: method.invocation.name, from: method.token.from, to: method.token.to })) };
     if (driver) {
       dispatched = true;
       const result = await driver.method.definition.execute([...driver.args], { ...context, signal,
@@ -55,9 +43,7 @@ export async function composePrompt(input: string, context: CommandContext, comm
       return result.kind === 'prompt' ? { ...result, promptMetadata: { ...result.promptMetadata, ...metadata } }
         : { ...result, ...(result.kind === 'local' ? { retryDraft: input } : {}) };
     }
-    const blocks = [...expanded.instructions.map(skillBlock), ...modifiers.map(method => method.instruction)];
-    const prose = plan.methods.length ? plan.prose : expanded.prose ?? plan.prose;
-    return { kind: 'prompt', prompt: blocks.join('\n\n') + (prose.trim() ? `\n\n${prose}` : ''),
+    return { kind: 'prompt', prompt: prepared.prompt,
       notice: `Prepared ${expanded.instructions.length + modifiers.length} methods for one task.`, promptMetadata: metadata };
   };
   try { return context.runCancellable ? await context.runCancellable(prepare) : await prepare(context.signal); }

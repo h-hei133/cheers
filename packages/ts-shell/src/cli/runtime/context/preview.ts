@@ -5,8 +5,10 @@ import { configurationOperation } from '../../../core/shell/scope.js';
 import { readPromptPreview } from '../../../session/context/preview.js';
 import { resolveSkillCatalog } from '../../../core/skills/skillCatalog.js';
 import { catalogContributions } from '../../../core/catalog/contributions.js';
-import { expandSkills } from '../../../core/prompts/skills.js';
 import { promptTokens } from '../../../core/prompts/tokens.js';
+import { needsComposition } from '../../../core/commands/composition.js';
+import { compositionPlan } from '../../../core/commands/composition/plan.js';
+import { prepareComposition } from '../../../core/commands/composition/prepare.js';
 import { preparePromptRequest } from '../../../core/prompts/request.js';
 import { foregroundTools, promptWithContext } from '../prompt.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../../core/auth/account/target.js';
@@ -44,30 +46,35 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const { config, publication, admission } = operation;
   const expected = context.session; const cwd = context.cwd;
   const sources = capturePromptSources();
-  // Stateful command preparation has not happened; its request cannot yet be predicted.
-  const tokens = promptTokens(draft).filter(token => !token.literal && token.raw.startsWith('/') && !token.raw.startsWith('/skill:'));
-  const commands = tokens.length ? [...createCommandRegistry(cwd, config).values(),
-    ...catalogContributions(cwd, expected.id).flatMap(entry => entry.commands)] : [];
-  if (tokens.some(token => !token.literal && !token.raw.startsWith('/skill:')
-    && (resolveCommandInvocation(commands, token.raw) || token.from === 0 && /^\/[A-Za-z0-9:._?-]+$/.test(token.raw)))) {
+  const contributions = catalogContributions(cwd, expected.id);
+  const tokens = promptTokens(draft).filter(token => !token.literal && token.raw.startsWith('/'));
+  const commands = tokens.length ? [...createCommandRegistry(cwd, config, sources.track).values(),
+    ...contributions.flatMap(entry => entry.commands)] : [];
+  const opening = /^\/([^\s/]+)(?:\s|$)/.exec(draft)?.[1];
+  const first = opening ? resolveCommandInvocation(commands, opening) : undefined;
+  const composed = (!first || !!first.composition) && needsComposition(draft, commands);
+  const plan = compositionPlan(draft, commands);
+  // Match dispatch eligibility without invoking standalone handlers or workflow drivers.
+  if ((!composed && draft.startsWith('/') && !/^\/[^\s]*[\/\\]/.test(draft))
+    || (composed && plan.methods.some(method => method.invocation.composition?.kind === 'driver'))) {
     throw new Error('Command request preparation is pending.');
   }
   const snapshot = config.enableMcpTools ? gateway.peekSnapshot?.() : undefined;
   if (config.enableMcpTools && (!snapshot || snapshot.clients.some(client => client.type !== 'connected'))) {
     throw new Error('MCP catalogue is not ready for a complete estimate.');
   }
-  const session = await readPromptPreview(manager, expected, cwd, draft, signal, sources.track);
+  const skills = await resolveSkillCatalog({ workspaceRoot: cwd, sessionId: expected.id, ...context.skillOptions, abortSignal: signal }, sources.track);
+  const composition = composed ? prepareComposition(draft, plan, skills.skills) : undefined;
+  if (composition?.error !== undefined) throw new Error(composition.error);
+  const effectivePrompt = composition?.prompt ?? draft;
+  const session = await readPromptPreview(manager, expected, cwd, effectivePrompt, signal, sources.track);
   // These modes rewrite the run configuration or context at admission.
   if (decodeHandoffs(session.state.handoffs, session.scope).cycles.some(row => !row.retired && ['armed', 'running', 'switched', 'unknown'].includes(row.phase))
     || decodeDirectors(session.state.directors, session.scope).cycles.some(row => !row.retired && row.phase !== 'disabled')) {
     throw new Error('Workflow request preparation is pending.');
   }
-  const contributions = catalogContributions(cwd, expected.id);
-  const skills = await resolveSkillCatalog({ workspaceRoot: cwd, sessionId: expected.id, ...context.skillOptions, abortSignal: signal }, sources.track);
-  const expanded = expandSkills(draft, skills.skills);
-  if (expanded.unknownSkill) throw new Error('Selected skill is unavailable.');
   if (!context.preparePromptContext) throw new Error('Session prompt preview is unavailable.');
-  const injected = await context.preparePromptContext(expanded.text, signal);
+  const injected = await context.preparePromptContext(effectivePrompt, signal);
   const entries = [...context.contextAttachments ?? [], ...context.transientContextAttachments ?? []];
   const entryIdentity = JSON.stringify([context.contextAttachments, context.transientContextAttachments]);
   assertContextBounds(entries);

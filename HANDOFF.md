@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Context Composition Must Precede Continuity Classification
+- **Symptom**: Preview and submission use the same expanded instructions but produce different opening-message digests and context estimates.
+- **Root Cause**: Continuity was classified from the raw draft in preview and from the expanded prompt in dispatch. Template discovery also omitted absent personal candidates, so a newly created source could change routing without invalidating the preview.
+- **Rule**: Share pure composition preparation, classify continuity from the effective prompt before future-turn injection, and capture candidate directories plus read sources through the existing tracker. Never run command handlers to obtain a preview. PTY fixtures need a real isolated Git root, explicit project arguments and transcript byte comparisons; Ctrl+U clears only the current line of a multiline draft.
+
 ### Concrete Connection Login Eligibility
 - **Symptom**: Failed connection rows are focusable but offer no recovery, or a canonical provider catalogue offers builtin login for a custom relay.
 - **Root Cause**: Setup state was overwritten by missing-credential projection; recovery only admitted absent connections. Catalogue runtime identity does not establish the selected connection's endpoint identity.

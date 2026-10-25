@@ -3,8 +3,8 @@ import { expandTemplate, parseArguments, substituteArguments } from './expansion
 import { TemplateLoader } from './templateLoader.js';
 
 /** The discovered template owner supplies the same capabilities to menu and dispatcher. */
-export function templateCommands(cwd: string): CommandDefinition[] {
-  return [...new TemplateLoader(cwd).load().values()].map(template => ({
+export function templateCommands(cwd: string, onSource?: (target: string) => void): CommandDefinition[] {
+  return [...new TemplateLoader(cwd, onSource).load().values()].map(template => ({
     name: template.name, kind: 'prompt', supportsNonInteractive: true, group: 'workflow', argumentMode: 'raw',
     summary: template.description || 'apply a prompt template', argumentHint: template.argumentHint,
     ...(template.composable ? { composition: { kind: 'modifier' as const, prepare: (_args: readonly string[], prose: string) => ({

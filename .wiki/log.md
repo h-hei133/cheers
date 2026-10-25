@@ -9160,3 +9160,11 @@ ADD-03字段增加Values and sources，经共享有界InputForm只读换行/滚�
 model保留pending/error显示事实，三类missing/pending/error行允许遮罩配置；native登录加具体connection endpoint护栏，canonical目录里的relay不误获OAuth。复用connect新增事务，旧record不变、新connection返回具体model、显式随后启用；不引入原地credential writer。参考locked provider登录委托决策，保留具体行浏览增强。
 
 最终五文件90pass，两个有效反转AssertionError/字节恢复后24pass（重叠）；初版relay fixture残留active ID被配置保护拒绝后纠正。两模式error账号success/failure/实际Ctrl+C六条、pending key save/Esc四条小PTY通过，旧record/新状态/readback/零选择回合/遮罩/历史无key均核验，synthetic认证非真实provider，结束143。四静态门/diff/责任上限0/build/正式judge proven三satisfied，最终身份另绑定。第十CI40232077709实际success10752pass/3skip；第十一40232991686唯一navigation无endpoint旧fixture失败10760pass/1fail/3skip，补HTTPS及Esc原身份断言并纳入90pass，历史失败不追改。第十二CI仍运行，第九cache子进程根因仍未知；整体ADD和原Phase38/9边界保留，详见addition15第十三批。
+
+## [2026-10-26] fix | 纯组合草稿的上下文预览与模板失效
+
+ADD-08复用组合域纯prepare，让正文brainstorm/composable模板和多skill按实际提交prompt估算；continuity改在有效prompt后分类，保留严格estimate/digest相等、同一session snapshot、非消费注入及零execute。模板原loader补候选/目录/源前后revision追踪，正文功能名按路由保留文本，独立开头命令与研究driver继续无完整估算。四文件50pass、两有效反转/精确恢复、两模式小Node PTY4.3k→9k→12k/研究? stale/零消息/配置transcript字节不变通过；早期continuity偏差、推断error build失败及PTY项目/Git根/头记录/清行/状态regex误假设保留分类记录。静态门、责任上限0、最终build94b27501b9be通过，正式judge/文档校验另读回。原Phase38/9与完整面板/性能/真实差额边界保留，详见addition15第十四批。
+
+第十三3dc20e04e114e101fc4c6ccdeb3c7d0943a85d3c已推送，自身CI40235334827本轮实际in_progress、Watch40235334790仅workflow success未读工件；第十二40234533173实际failure991files pass/1fail/1skip，10766pass/1fail/3skip，为同一navigation无endpoint旧夹具，已在第十三修补，不追改历史结果。
+
+本批正式judge实际proven/三satisfied、严格docs drift/diff通过，保留118既有advisory；addition76/audit83本地链接存在。两PTY绑定最终build94b27501b9be与源码身份，工件归档composition，临时addition-n清理；本批Git交付与CI后续实际绑定。

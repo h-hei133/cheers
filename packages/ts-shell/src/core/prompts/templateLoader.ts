@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { resolveAllUserDataFiles, userDataDir } from "../paths/userHome.js";
+import { resolveAllUserDataFiles, userDataDir, userDataSearchDirs } from "../paths/userHome.js";
 import { assertProfileIdentity, assertProfileStorage, currentProfile } from '../paths/profile/context.js';
 import { projectDirectories } from "../project/directories.js";
 import type { PromptTemplate } from "./expansion.js";
@@ -50,7 +50,7 @@ export class TemplateLoader {
   private readonly userRoots: ReadonlySet<string>;
   private readonly roots: readonly string[];
 
-  constructor(workspaceRoot: string = process.cwd()) {
+  constructor(workspaceRoot: string = process.cwd(), private readonly onSource?: (target: string) => void) {
     // User templates first, then project ones, so a later root overrides an earlier
     // one — the same precedence the skill loader applies and for the same reason.
     //
@@ -60,8 +60,9 @@ export class TemplateLoader {
     // the project works. Reversing here would give the outermost project the last
     // word instead, so a file written for a subdirectory would lose to the repository
     // root — the opposite of the rule stated above.
+    for (const directory of userDataSearchDirs()) onSource?.(path.join(directory, 'prompts'));
     const userDirs = resolveAllUserDataFiles("prompts");
-    const projectDirs = projectDirectories(workspaceRoot).map((dir) =>
+    const projectDirs = projectDirectories(workspaceRoot, onSource).map((dir) =>
       path.join(dir, ".agents", "prompts"),
     );
     this.userRoots = new Set(userDirs.length > 0 ? userDirs : [path.join(userDataDir(), 'prompts')]);
@@ -98,12 +99,14 @@ export class TemplateLoader {
         }
 
         let raw: string;
+        this.onSource?.(file);
         try {
           raw = fs.readFileSync(file, "utf8");
         } catch {
           diagnostics.push({ name, filePath: file, message: "The file could not be read." });
           continue;
         }
+        this.onSource?.(file);
 
         const match = FRONTMATTER.exec(raw);
         const fields = match ? frontmatterFields(match[1]!) : new Map<string, string>();
@@ -129,6 +132,7 @@ export class TemplateLoader {
   }
 
   private listMarkdown(root: string): readonly string[] {
+    this.onSource?.(root);
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(root, { withFileTypes: true });
@@ -138,6 +142,7 @@ export class TemplateLoader {
       // directory the user never created.
       return [];
     }
+    this.onSource?.(root);
     return entries
       .filter((entry) => entry.isFile() && /\.md$/i.test(entry.name))
       .map((entry) => path.join(root, entry.name))

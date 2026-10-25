@@ -145,6 +145,7 @@ import { templateCommands } from '../prompts/commands.js';
 export function createCommandRegistry(
   cwd: string = process.cwd(),
   runtimeConfig: RuntimeConfig = getRuntimeConfig(cwd),
+  onSource?: (target: string) => void,
 ): ReadonlyMap<string, CommandDefinition> {
   const commands: CommandDefinition[] = [
     ...sessionCommandDefinitions(),
@@ -1028,7 +1029,7 @@ export function createCommandRegistry(
   ];
 
   const reserved = new Set(commands.flatMap(command => [command.name, ...(command.aliases ?? []), ...(command.invocations?.map(invocation => invocation.name) ?? [])]));
-  return new Map([...commands, ...templateCommands(cwd).filter(template => !reserved.has(template.name))].map((command) => [command.name, command]));
+  return new Map([...commands, ...templateCommands(cwd, onSource).filter(template => !reserved.has(template.name))].map((command) => [command.name, command]));
 }
 
 export function listVisibleCommands(
