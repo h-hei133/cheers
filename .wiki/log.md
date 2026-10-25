@@ -9017,3 +9017,9 @@ Platform QA40157005332已于03:09:30Zsuccess，原20个JSON receipt下载读回�
 前卡片3f339683 CI40159042967于03:58:47Zsuccess，970files/10529tests passed、1file/3tests skipped，完整judge proven；分别绑定SHA，不删除历史gzip失败。38complete/9partial/0open及继承/cache WATCH保留。
 
 STS85c98eaf CI40159668568于04:09:20Z completed/success：971files/10532tests passed、1file/3tests skipped，静态/script/TS build及CI完整judge success、actualproven。主代理持续watch串行结束exit0，最终安全日志摘要/结构artifact/平台receipt已归档。代码main交付已验证，后续只补文档读回；Phase整体仍partial，剩余真实多账号（暂缓）、可信账单、正式质量（暂缓）及Windows桌面IME/系统复制条件见inputs，无本地全套/20k真实PTY。
+
+## [2026-10-25] fix | START-02 损坏会话摘要cache回退
+
+复核既有WATCH发现object-only cached summary准入会接受错误字段/错ID，已用fresh manager证实8坏行失败（3TypeErrors、5行为断言）。原damaged JSON测试重用warm manager未触盘，已修测试。沿reentry/codec校验当前字段类型/枚举/非负safe step及key identity，坏行miss后仅重算该行并回写，健康v1缓存/可选字段及原stat策略保留。对照参考metadata准入/坏文件隔离决定，未复制scanner/引入schema框架/新继承。9新增场景，三文件104项通过；原读取owner反转5行为场景失败/3AssertionError块，精确恢复后104项再过。
+
+静态五门/analyzer0/diff→根build→完整judge串行exit0，buildb62b4c74c61d9b86fa8488cb3c6c30f3b516c265d7706cdc086c59666349f98d、inputsf44f5da0ec9829540156d5d9255fe02efa412588a3a0e177e3171d517d7719b0、artifact85292fc8c99aa7d4978a196de898f8a2dd1089e8aa18cd982bd300289f0b2ad3；proven/3satisfied/0gaps。独立gpt-6.1-sol codeAPPROVE/architecture最终WATCH→综合COMMENT，Summary与decoder同步维护风险保留，复用测试名称按review纠正为不重算summary，不称无读取。证据归artifacts，HANDOFF追加warm cache测试护栏；原mtime freshness/继承WATCH及38/9/0不变，本批交付另绑定。

@@ -36,9 +36,46 @@ it('drops summaries for sessions that no longer exist', () => {
   expect(index.entries[second.id]).toBeDefined();
 });
 
-it('treats a damaged index as a cache miss', () => {
+it('treats a damaged index as a cache miss in a fresh manager', () => {
   const session = manager.createNew(root); manager.renameSession(session.id, 'Still readable');
   manager.listReentrySummaries({ includeUntouched: true });
   fs.writeFileSync(path.join(createSessionStoreLayout().sessionsDir, '.reentry-index.json'), '{not json');
-  expect(manager.listReentrySummaries({ includeUntouched: true }).find(summary => summary.id === session.id)?.title).toBe('Still readable');
+  expect(new SessionManager().listReentrySummaries({ includeUntouched: true }).find(summary => summary.id === session.id)?.title).toBe('Still readable');
+});
+
+it.each([
+  { name: 'missing project root', patch: { projectRoot: undefined } },
+  { name: 'wrong project root type', patch: { projectRoot: 42 } },
+  { name: 'mismatched session identity', patch: { id: 'another-session' } },
+  { name: 'wrong prompt type', patch: { pendingPrompt: {} } },
+  { name: 'wrong recoverability type', patch: { recoverable: 'false' } },
+  { name: 'unknown resume disposition', patch: { resumeDisposition: 'ready' } },
+  { name: 'wrong report history type', patch: { hasReportHistory: 'true' } },
+  { name: 'negative repair step', patch: { stagedRepairStepCount: -1 } },
+])('recomputes a cached summary with $name without losing healthy entries', ({ patch }) => {
+  const session = manager.createNew(root); manager.renameSession(session.id, 'Actual title');
+  const healthy = manager.createNew(root); manager.renameSession(healthy.id, 'Healthy title');
+  const expected = manager.listReentrySummaries({ includeUntouched: true, preferredProjectRoot: root });
+  const file = path.join(createSessionStoreLayout().sessionsDir, '.reentry-index.json');
+  const index = JSON.parse(fs.readFileSync(file, 'utf8'));
+  index.entries[session.id].summary = { ...index.entries[session.id].summary, title: 'Damaged title', ...patch };
+  fs.writeFileSync(file, JSON.stringify(index));
+
+  const reopened = new SessionManager();
+  const describe = vi.spyOn(reopened, 'describeSessionReentry');
+  expect(reopened.listReentrySummaries({ includeUntouched: true, preferredProjectRoot: root })).toEqual(expected);
+  expect(describe).toHaveBeenCalledTimes(1);
+  expect(describe).toHaveBeenCalledWith(session.id);
+  const repaired = JSON.parse(fs.readFileSync(file, 'utf8'));
+  expect(repaired.entries[session.id].summary).toEqual(expected.find(summary => summary.id === session.id));
+  expect(repaired.entries[healthy.id]).toEqual(index.entries[healthy.id]);
+});
+
+it('reuses a valid persisted summary without recomputing it', () => {
+  const session = manager.createNew(root); manager.renameSession(session.id, 'Cached title');
+  const expected = manager.listReentrySummaries({ includeUntouched: true });
+  const reopened = new SessionManager();
+  const describe = vi.spyOn(reopened, 'describeSessionReentry');
+  expect(reopened.listReentrySummaries({ includeUntouched: true })).toEqual(expected);
+  expect(describe).not.toHaveBeenCalled();
 });

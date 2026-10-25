@@ -149,3 +149,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A rejected credential exchange exposes arbitrary response text in its error, or waits indefinitely for an error body or cleanup to finish.
 - **Root Cause**: Consuming the failed body before projecting the credential error admits remote XML Message or raw text into the error surface and couples failure reporting to an untrusted stream.
 - **Rule**: On HTTP failure, use the shared nonawaited response discard and report only fixed source plus numeric status. Preserve the credential error identity and successful parsing path. Test both exchange routes, zero body consumption, rejected cleanup and cleanup that never settles; requesting cancellation is not proof that cleanup completed.
+
+### 29. A Warm Manager Can Hide Broken Persisted Cache Admission
+- **Symptom**: A damaged-index test passes while a fresh process accepts malformed cached fields, throws during sorting, or returns the wrong session identity.
+- **Root Cause**: The existing manager keeps a parsed index in memory, so corrupting the file and reusing that manager never exercises disk decoding. An object-only guard also does not establish the summary contract.
+- **Rule**: Reopen the actual owner to test persisted cache loading. Bind the decoded summary ID to its index key and validate every consumed field before admission; reject only bad rows and recompute from the source. Check healthy-row reuse and repaired persistence separately. A skipped summary computation is not zero source or stat I/O.

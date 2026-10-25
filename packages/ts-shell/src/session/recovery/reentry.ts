@@ -18,6 +18,7 @@ import {
   projectRecoveryTrustBoundaryBlockForSession,
 } from './sessionRecoveryRuntime.js';
 import { selectAsyncReentryHint, type AsyncReentryHint } from './asyncReentryHint.js';
+import { decodeReentrySummary } from './reentry/codec.js';
 
 /** Stored-session discovery and recovery questions share one read surface. */
 export abstract class SessionReentrySurface extends SessionReadSurface {
@@ -87,8 +88,9 @@ export abstract class SessionReentrySurface extends SessionReadSurface {
         entries?: Record<string, { stamp?: unknown; summary?: unknown }> };
       if (parsed.version === 1 && parsed.entries && typeof parsed.entries === 'object') {
         for (const [id, entry] of Object.entries(parsed.entries)) {
-          if (typeof entry?.stamp === 'string' && entry.summary && typeof entry.summary === 'object')
-            index.set(id, { stamp: entry.stamp, summary: entry.summary as SessionReentrySummary });
+          const summary = decodeReentrySummary(entry?.summary, id);
+          if (typeof entry?.stamp === 'string' && summary)
+            index.set(id, { stamp: entry.stamp, summary });
         }
       }
     } catch { /* A missing or damaged index is a cache miss. */ }

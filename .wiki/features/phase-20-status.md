@@ -22,6 +22,12 @@
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
 
+## 2026-10-25 START-02 损坏摘要索引准入
+
+- 原reentry缓存只验证summary是object，缺失/错误projectRoot和pendingPrompt可令排序抛TypeError，错ID/布尔/枚举/repair step仍可进入恢复选择。按原“损坏索引为cache miss”合同，在既有reentry owner下增加codec，用共享isRecord逐项检查当前Summary字段类型、枚举、非负safe step和summary.id===索引key；坏行不入缓存，原stamp命中逻辑重算该行并回写，健康行与v1格式/可选字段保留。参考的metadata准入/坏文件隔离决定用于可丢弃cache，未复制scanner或添加新缓存/继承层。
+- 原damaged JSON回归改用fresh manager，避免内存cache绕过磁盘。新增8个坏行和1个有效行复用场景；新12项在旧源码下8失败/4通过，其中3TypeErrors，5个行为断言场景。修复后reentry index/selection/manager三文件104项通过；有效反转只恢复原读取owner、跑5个行为场景，exit1/5失败/3段AssertionError，字节恢复后104项再过。复用断言只证明不重算summary，listSessions/stat读取仍发生，不称零I/O。
+- 静态五门/analyzer0/diff check、根TS build及完整judge串行exit0，proven/三义务satisfied/0gaps；build `b62b4c74c61d9b86fa8488cb3c6c30f3b516c265d7706cdc086c59666349f98d`、inputs `f44f5da0ec9829540156d5d9255fe02efa412588a3a0e177e3171d517d7719b0`、artifact `85292fc8c99aa7d4978a196de898f8a2dd1089e8aa18cd982bd300289f0b2ad3`。独立gpt-6.1-sol两路代码APPROVE/架构最终WATCH，综合COMMENT；decoder字段/枚举须随Summary合同维护的非阻塞风险保留；报告/反转/hash/manifest/judge归Git忽略 `.omx/artifacts/phase20-reentry-cache/`。原size/mtime freshness和四层继承WATCH保持，不把shape校验称内容身份证明；提交/推送/本SHA CI另核对。38/9/0不提高，外部依赖不变。
+
 ## 2026-10-25 QA-04 STS失败响应安全
 
 - 两种STS交换在HTTP非成功时复用core/network的discardResponse，请求取消正文后立即抛同一CredentialsError，只含固定source与数值HTTP status。失败正文、XML Message、statusText及URL均不进入错误面；不读取正文，也不等待清理完成。成功XML解析、签名、请求构造、原signal及错误类兼容导出保持原合同。参考方案的有界原始错误正文仍不符合本仓secret boundary，未引入。
