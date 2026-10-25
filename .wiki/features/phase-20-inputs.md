@@ -2,7 +2,7 @@
 
 依据：[原决策](phase-20-decisions.md)、[当前剩余表](phase-20-status.md)。2026-10-25补证后矩阵为38 complete / 9 partial / 0 open；本页保留五组准备条件及用户原答复。单账户OAuth和指定HTTP MCP已实际验收。外部剩余条件为多账号、可信账期、正式质量及桌面交互；QA-04结构judge已proven/0gaps，工具卡片与STS安全风险分别修复且独立APPROVE/CLEAR，原继承/cache WATCH及当前SHA远端交付复核由代理处理。诊断提交CI已success，历史gzip失败根因仍未证实。无需重新准备已验连接。
 
-当前七项返工提交 `58e1871eeaff0918a79f335104d1c4403bfae902` 已推送main且远端精确一致；旧alias断言已修并134项本地通过；测试/证据36ea1577的CI40181739162仅MCP迟到browser网络断言failure（10563pass/1fail/3skip），已改为owner证据并34项本地通过，后续CI另绑定；Watch40178598494/artifact12592774828实际proven/三义务satisfied，Platform QA40178946206已20/20支持格通过。原START-02提交1fb5480e的CI40161718432、Watch40161718447和Platform QA40161814429已success，只绑定旧SHA。剩余外部准备仍按下表，不把Free quota当可信账单，也不恢复已暂缓的质量或多账号验收。
+当前head `df0a8583cedcf22df497ecf768e17ee19b1aa03d` 已推送main、远端精确一致。两笔旧CI的alias候选/迟到browser网络断言已分别修正，134/34项本地通过；当前CI40185786184已success（10564pass/3skip、CI judge proven），Watch40185786149实际proven/三义务satisfied。产品源码相对58e1871e保持，Platform QA40178946206已20/20支持格通过；Windows交互/IME/系统复制仍需下方手工步骤。剩余外部准备仍按表，不把Free quota当可信账单，也不恢复已暂缓的质量或多账号验收。
 
 ## 2026-10-25 执行结果与剩余输入
 
@@ -84,6 +84,23 @@ openai 的官方用量/结算来源你自行去官网查询；
 这一部分暂且不做；
 
 ## 4. 真实平台交互：PAN-06、INPUT-01、QA-02
+
+### Windows快速回填
+
+先记录提交SHA、Windows/终端/输入法版本、原生Windows或WSL、启动方式及regular/fullscreen模式。同一结果不跨环境归算。
+
+| 步骤 | 通过条件 |
+|---|---|
+| 用 `npm start` 或已构建的单文件程序启动 | 启动成功；缺失/过期构建给出明确重建提示 |
+| 输入 `/`，下移三项，再输入 `res`，按Tab | 草稿为 `/resume `，没有沿用旧选中位置 |
+| 输入 `/reset` 观察候选，不执行命令 | 别名 `/reset` 不成为可选项；相匹配的正式命令可继续显示 |
+| 查看普通输入与已有用户消息，调整窄/宽窗口 | 普通输入每侧1格留白；左侧黄色提示符/用户消息rail消失；文字和caret不越界 |
+| 打开、关闭并再次打开 `/resume` | 目录可加载、搜索与取消；关闭后回到当前会话；再次检查目录不作为启动cache失败 |
+| 用真实输入法组合中文、确认/取消候选，再粘贴 `中文🙂👨‍👩‍👧‍👦` | 输入与caret正确，组合/粘贴不执行模式键或意外提交；如使用Vim，另核对当前五模式 |
+| 执行 `/copy 中文🙂`，在桌面文本编辑器粘贴；再从已有消息选区复制 | 原文、换行及emoji一致；仅“offered”提示不算系统复制已证，必须实际粘贴核对 |
+| 查看项目配置来源 | 普通工作目录识别 `.cheers/config.json` 与 `.cheers/mcp.json`；配置保存结果与作用域分别记录，无需回传私密内容 |
+
+每行回填pass/fail/unverified与必要的现象；未执行的模式或功能保持unverified。真实消息选区、系统剪贴板、IME结果只覆盖实际操作环境，不由自动20格receipt替代。
 
 - [ ] 提供有实际桌面会话的Windows机器，说明Windows版本、终端名称/版本、shell，以及Cheers运行在原生Windows还是WSL。两者分别标记，WSL结果不直接算原生Windows结果。
 - [ ] 指定操作方式：你在本机按步骤操作并回传结果，或已有授权的远程桌面/终端访问。仅SSH/headless环境不足以验系统IME与桌面剪贴板；无需发送登录密码。

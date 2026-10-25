@@ -18,7 +18,7 @@
 | QA-01 | 剩余多账号/账单/质量/平台任务的适用验收 | 本地47行索引及真实单账号OAuth、stdio/HTTP MCP已补证；随剩余外部任务更新 |
 | QA-02 | Windows交互PTY、真实IME、系统复制 | 当前58e1871e的Platform QA40178946206已20/20支持格、三平台双构建及原业务transcript通过；Windows仍只含line/pipe，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
-| QA-04 | 全范围最终交付与剩余任务验收 | 当前七项返工58e1871e已提交/推送，远端main精确一致；旧CI40178598492的alias断言已修并134项通过；测试提交36ea1577/CI40181739162仅MCP迟到browser网络断言failure（10563pass/1fail/3skip），已改为owner证据并34项本地通过，后续CI另绑定；Watch40178598494实际proven/三义务satisfied，Platform QA40178946206已20/20支持格通过；工具卡片与STS分别独立APPROVE/CLEAR。历史gzip失败根因仍未证实；外部依赖仍partial |
+| QA-04 | 全范围最终交付与剩余任务验收 | 当前head df0a8583已提交/推送、远端精确一致；旧alias与迟到browser断言分别修正并134/34项本地通过。新CI40185786184 success（10564pass/3skip），CI judge proven；Watch40185786149实际proven/三义务satisfied；产品58e1871e的Platform QA40178946206已20/20支持格通过；工具卡片与STS分别独立APPROVE/CLEAR。历史gzip失败根因仍未证实；外部依赖仍partial |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
 
@@ -61,6 +61,14 @@ Platform QA40178946206在58e1871e completed/success。已下载20份原JSON与�
 测试/证据提交 `36ea15776f81f34784563d4ede14cb39d4a4a8dd` 已推送main并实际远端精确一致、当时clean。Watch40181739111下载actualproven/三义务satisfied。CI40181739162 completed/failure：keymap已通过，唯一core/mcp/http.test.ts:169要求迟到browser必网络拒绝，10563pass/1fail/3skip，CI judge skipped；取消unverified、零凭据与零/token断言已通过，错误state段未到达。该test/callback/service相对1fb5480e未改。原两文件34项本地通过，不能把未复现称CI通过。
 
 浏览器助手忽略HTTP状态，resolved undefined只证明有响应；释放ephemeral端口后的响应归属未知，端口复用是可能解释，未证实。改测捕获实际callback owner：received在close完成后必须AbortError；观察迟到browser后再次零凭据/零token，错误state另验owner拒绝和零交换；spy finally恢复，无产品改动。修后两文件34项串行通过，独立review另归报告。callback handler在已settled后被另一个已排队请求调用时可能写200的源码WATCH保留，本CI场景没预排请求，未称根因或已修。HANDOFF追加port identity护栏；后续提交/CI另绑定。
+
+### 当前后续交付
+
+MCP取消测试/证据提交 `df0a8583cedcf22df497ecf768e17ee19b1aa03d` 已推送main、远端SHA精确一致且当时clean。当前CI40185786184 completed/success（972files/10564tests passed、1file/3tests skipped），CI judge proven；Watch40185786149 completed/success、artifact12596022425下载actualproven/三义务satisfied。相对已平台验收产品58e1871e只改keymap与HTTP两份测试，产品source hash集合匹配、artifactDigest保持；不把旧失败CI称成功，也不复用其SHA作为当前CI结果。Windows快速回填步骤已加入inputs，系统交互仍等实际操作。
+
+### 最终代码CI读回
+
+`df0a8583cedcf22df497ecf768e17ee19b1aa03d` 的CI40185786184于10:59:18Z completed/success：972files/10564tests passed、1file/3tests skipped，静态/script/TS build及完整NormProof步骤均success，CI实际verdict proven。keymap与MCP取消/state场景均通过；安全日志摘要、jobs及Watch原verdict已归artifacts。前两笔CI失败按原事实保留，不把本次success称旧失败SHA复验。相同产品源码的58e1871e三平台20支持格证据保持；后续纯文档提交不冒充新产品复验。38/9/0与四组外部条件不变，own scratch已清理。
 
 ## 2026-10-25 START-02 损坏摘要索引准入
 
