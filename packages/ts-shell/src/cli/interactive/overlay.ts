@@ -68,6 +68,8 @@ export interface Picker {
   /** Safe failure text when loading fails, distinct from a successful empty set. */
   readonly loadError?: string;
   readonly footer?: string;
+  /** An explicit parent for nested browsing; Escape returns without applying. */
+  readonly back?: () => Picker;
   /** Context that depends on which identities remain visible after filtering. */
   status?(visible: readonly Option[], query?: string): string | undefined;
   /** True when the picker collects several answers before applying. */
@@ -597,6 +599,11 @@ export class OverlayHost {
       }
     }
 
+    // An explicit parent owns Escape before a nested catalogue changes its focus domain.
+    if (event.keyId === 'escape' && !isApprovalPicker && picker.back) {
+      this.open(picker.back());
+      return true;
+    }
     const navigation = !isApprovalPicker && !this.loading ? picker.navigation?.key(event.keyId, focused, this.model.filter.trim().toLowerCase()) : undefined;
     if (navigation) {
       this.optionRows.clear(); this.chipRows.clear();

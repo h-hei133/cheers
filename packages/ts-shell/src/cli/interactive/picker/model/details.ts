@@ -5,8 +5,9 @@ export function modelDetailsPicker(label: string, lines: readonly string[], back
   let offered = false;
   return {
     title: label, form: 'panel', empty: '', filterable: false,
+    back,
     detail: () => lines,
-    footer: 'Enter reviews the next step. Esc closes without changing the active model.',
+    footer: 'Enter reviews the next step · Esc returns',
     async load() {
       offered = true;
       return [{ id: 'back', label: 'Back to models' },

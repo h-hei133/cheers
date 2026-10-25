@@ -11,7 +11,7 @@ import type { Picker, PickerOutcome } from "../overlay.js";
 import { applyModelPreset, resolveModelPreset, wholePresetFailure } from "../../../core/commands/model/preset.js";
 import { readProfilePresets } from "../../../core/commands/model/presetStore.js";
 import { readSessionModel } from "../../../session/model/state.js";
-import type { SessionModelTarget } from "../../../session/model/contract.js";
+import type { SessionModelRole, SessionModelTarget } from "../../../session/model/contract.js";
 import { scopedModelTarget } from "../../../core/commands/model/target.js";
 import { captureModelChoice } from "../../../core/commands/model/choice.js";
 import { setModelTarget } from "../../../core/commands/model/selection.js";
@@ -21,23 +21,34 @@ import { connectionDraft } from './connections.js';
 import { modelDetailsPicker } from './model/details.js';
 import { CatalogNavigation, type NavigationGroup } from './navigation.js';
 import { watchModels } from './model/watch.js';
+import { prepareModelRole, type AutomaticModelRole, type RoleResult } from '../../../core/commands/model/role.js';
+import { modelRolePicker } from './model/role.js';
+
+interface RoleSelection {
+  readonly role: AutomaticModelRole;
+  readonly assign: (target: SessionModelRole) => RoleResult;
+  readonly back: (notice?: string) => Picker;
+}
 
 /** Every actionable row retains its exact target and the inputs used to display it. */
-export function modelPicker(context: CommandContext, focus?: string, navigation = new CatalogNavigation()): Picker {
+export function modelPicker(context: CommandContext, focus?: string, navigation = new CatalogNavigation(), assigning?: RoleSelection, notice?: string): Picker {
   const details = new Map<string, readonly string[]>();
   const actions = new Map<string, () => Promise<string>>();
   const inspections = new Map<string, () => Picker>();
+  const assignments = new Map<string, () => RoleResult>();
   let activeFocus = focus;
   const picker: Picker = {
-    title: "Model",
+    title: assigning ? `${assigning.role} model` : "Model",
     form: "panel",
     empty: "No providers in the catalogue.",
     navigation, fullScreen: true,
+    ...(assigning ? { back: assigning.back } : {}),
     get initialSelection() { return activeFocus; },
+    ...(notice ? { status: () => notice } : {}),
     filterOptions: query => navigation.project(query),
     footer: '↑↓ browse · Tab: navigation/content · ←→: parent/content · Enter: inspect or activate · Esc: back',
     async load(): Promise<readonly Option[]> {
-      details.clear(); actions.clear(); inspections.clear();
+      details.clear(); actions.clear(); inspections.clear(); assignments.clear();
       let choice: ReturnType<typeof captureModelChoice> | undefined;
       try { choice = captureModelChoice(context); } catch { /* Read-only discovery still works without a saved session. */ }
       const publication = context.readConfiguration?.();
@@ -81,7 +92,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             const selected = Boolean(!active.blocked && active.credential
               && connection?.connectionId === active.credential.connectionId && provider.runtime === active.provider && model.id === active.model
               && resolution?.baseUrl === active.baseUrl && sameValue(resolution?.credential, active.credential));
-            const reason = !connection && !providerSlot ? 'configure a connection' : connection && connection.state !== 'ready' ? availabilityLabel(connection.state)
+            const reason = assigning && !connection ? 'role assignment requires a configured connection'
+              : !connection && !providerSlot ? 'configure a connection' : connection && connection.state !== 'ready' ? availabilityLabel(connection.state)
               : resolution?.blocked || !resolution?.credential ? 'credential unavailable'
               : ambiguous ? 'model catalogue endpoint is ambiguous'
               : unsupported ? 'reasoning effort unsupported' : !choice?.baseline ? 'active session required' : undefined;
@@ -100,9 +112,11 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               const endpoint = config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
               const draft = !connection && !providerSlot || reason === 'credential unavailable' || connection?.state === 'credential-missing'
                 ? connectionDraft(provider, model.id, endpoint, connection?.label ?? provider.id) : undefined;
-              inspections.set(id, () => modelDetailsPicker(model.id, details.get(id) ?? [], () => modelPicker(context, id, navigation), draft));
+              inspections.set(id, () => modelDetailsPicker(model.id, details.get(id) ?? [], () => modelPicker(context, id, navigation, assigning), draft));
             }
-            if (!reason && choice) {
+            if (!reason && assigning && connection) {
+              assignments.set(id, () => assigning.assign({ connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort }));
+            } else if (!reason && choice) {
               const captured = choice;
               actions.set(id, async () => captured.admission() ?? setModelTarget(target,
                 { ...context, admission: captured.admission }, captured.baseline));
@@ -122,14 +136,14 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         details.set(id, [`Provider: ${active.provider}`, `Model: ${active.model}`, `Status: ${note}`, `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
           ...(active.credential ? [`Credential source: ${active.credential.source}`] : []), ...(endpoint ? [`Endpoint: ${endpoint}`] : []),
           'Remote availability: unverified']);
-        inspections.set(id, () => modelDetailsPicker(active.model!, details.get(id) ?? [], () => modelPicker(context, id, navigation)));
+        inspections.set(id, () => modelDetailsPicker(active.model!, details.get(id) ?? [], () => modelPicker(context, id, navigation, assigning)));
       }
-      if (context.sessionId) {
+      if (context.sessionId && !assigning) {
         try {
           const selection = readSessionModel(context.sessionId);
           for (const role of ['default', 'subagent', 'summary', 'advisor'] as const) {
             const target = role === 'default' ? { provider: active.provider, model: active.model, connectionId: active.credential?.connectionId }
-              : selection?.roles?.[role];
+              : (selection?.roles ?? config.sessionModelRoles)?.[role];
             const id = `role:${role}`;
             rows.push({ id, label: role === 'default' ? 'Default' : role[0].toUpperCase() + role.slice(1),
               detail: target?.model ? `${target.provider}/${target.model}` : 'Uses default model', disabled: true, focusable: true });
@@ -137,7 +151,17 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             details.set(id, [`Role: ${role}`, target?.model ? `Model: ${target.provider}/${target.model}` : 'Model: follows the default',
               ...(target?.connectionId ? [`Connection: ${target.connectionId}`] : []),
               'Role assignments and presets share the existing session model owner.']);
-            inspections.set(id, () => modelDetailsPicker(role, details.get(id) ?? [], () => modelPicker(context, id, navigation)));
+            if (role === 'default') {
+              inspections.set(id, () => Object.assign(modelPicker(context, undefined, new CatalogNavigation()),
+                { back: () => modelPicker(context, id, navigation) }));
+            } else {
+              inspections.set(id, () => {
+                const edit = prepareModelRole(context, role);
+                const back = (note?: string) => modelPicker(context, id, navigation, undefined, note);
+                return modelRolePicker(role, edit.current, edit.assign,
+                  () => modelPicker(context, undefined, new CatalogNavigation(), { role, assign: edit.assign, back }), back);
+              });
+            }
           }
           const presets = { ...readProfilePresets(), ...(selection?.presets ?? {}) };
           for (const [name, preset] of Object.entries(presets)) {
@@ -179,7 +203,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         }
       }
       activeFocus = focus ?? rows.find(row => row.note === 'active')?.id;
-      navigation.set(rows, groups, [{ id: 'roles', label: 'Roles' }, { id: 'all', label: 'All models' },
+      navigation.set(rows, groups, [...(assigning ? [] : [{ id: 'roles', label: 'Roles' }]), { id: 'all', label: 'All models' },
         ...ordered.map(provider => ({ id: provider.id, label: provider.label,
           note: availability.providers.find(item => item.provider === provider.runtime)?.state === 'ready' ? undefined : '○' }))]);
       return rows;
@@ -189,6 +213,11 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
     async inspect(id) { const next = inspections.get(id)?.(); return next ? { next } : undefined; },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       if (!ids[0]) return undefined;
+      const assignment = assignments.get(ids[0]);
+      if (assignment && assigning) {
+        const result = assignment();
+        return { note: result.output, ...(result.saved ? { next: assigning.back(result.output) } : {}) };
+      }
       const action = actions.get(ids[0]);
       return { note: action ? await action() : 'Model selection unavailable. Reopen the picker in an active session.' };
     },

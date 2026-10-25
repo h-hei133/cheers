@@ -47,6 +47,105 @@ it('prepares exact model tokens and excludes credentials from endpoint drafts', 
     '--model', 'model with "quotes"', '--label', 'my relay', '--api-key']);
 });
 
+it('assigns an automatic role through the catalogue without switching the default, then clears it and retains siblings', async () => {
+  const selected = modelPicker(context()); await selected.load(); await selected.apply([id('a')]);
+  const before = readSessionModel(sessionId)!;
+  writeSessionModel(sessionId, { ...before, serviceTier: 'default', contextWindow: 100000, skillful: false,
+    roles: { advisor: { connectionId: 'a', provider: 'openai', model: 'other' } },
+    presets: { work: { roles: { default: { connectionId: 'a', provider: 'openai', model: 'shared' } } } } }, readSessionModelEdit(sessionId));
+  const original = readSessionModel(sessionId)!; const global = fs.readFileSync(getUserRuntimeConfigPath());
+  const picker = modelPicker(context()); await picker.load();
+  const role = (await picker.inspect!('role:subagent'))?.next!; await role.load();
+  const browse = (await role.apply(['choose']))?.next!; await browse.load();
+  const outcome = await browse.apply([id('b', 'other')]);
+  expect(outcome?.note).toContain('subagent uses openai/other on connection b');
+  expect(outcome?.next?.initialSelection).toBe('role:subagent');
+  expect(outcome?.next?.status?.([], '')).toContain('subagent uses');
+  expect(readSessionModel(sessionId)).toEqual({ ...original, roles: { ...original.roles,
+    subagent: { connectionId: 'b', provider: 'openai', model: 'other', thinkingEffort: null } } });
+  const returned = outcome!.next!; await returned.load();
+  const reset = (await returned.inspect!('role:subagent'))?.next!; await reset.load();
+  const cleared = await reset.apply(['default']);
+  expect(cleared?.note).toContain('follows the default model');
+  expect(cleared?.next?.initialSelection).toBe('role:subagent');
+  expect(cleared?.next?.status?.([], '')).toContain('follows the default model');
+  expect(readSessionModel(sessionId)).toEqual(original);
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+});
+
+it('starts role editing in an empty session and permits browsing an unconfigured model without assignment', async () => {
+  const publication = { config: { ...getRuntimeConfig(home), contextWindow: 90000,
+    sessionModelRoles: { advisor: { connectionId: 'a', provider: 'openai', model: 'other' } } }, catalog: [...loadCatalog(), {
+    id: 'anthropic', label: 'Anthropic', runtime: 'anthropic' as const, auth: 'api-key' as const, models: [{ id: 'missing' }] }], revision: 1 };
+  const picker = modelPicker({ ...context(), readConfiguration: () => publication }); await picker.load();
+  const role = (await picker.inspect!('role:summary'))?.next!; await role.load();
+  const browse = (await role.apply(['choose']))?.next!; const rows = await browse.load();
+  const missing = rows.find(row => row.label === 'missing')!;
+  expect(missing).toMatchObject({ disabled: true, focusable: true });
+  const details = (await browse.inspect!(missing.id))?.next!; await details.load();
+  expect(details.detail?.('back').join('\n')).toContain('configured connection');
+  expect(readSessionModel(sessionId)).toBeUndefined();
+  expect(browse.navigation!.items.map(item => item.id)).not.toContain('roles');
+  const saved = await browse.apply([id('b', 'other')]);
+  expect(saved?.note).toContain('summary uses');
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'a', model: 'shared', contextWindow: 90000, roles: {
+    summary: { connectionId: 'b', model: 'other' }, advisor: { connectionId: 'a', model: 'other' } } });
+});
+
+it('rejects a role action captured before a competing session selection', async () => {
+  const picker = modelPicker(context()); await picker.load();
+  const role = (await picker.inspect!('role:advisor'))?.next!; await role.load();
+  const browse = (await role.apply(['choose']))?.next!; await browse.load();
+  writeSessionModel(sessionId, { connectionId: 'a', provider: 'openai', model: 'other' }, readSessionModelEdit(sessionId));
+  const before = readSessionModelEdit(sessionId);
+  expect((await browse.apply([id('b')]))?.note).toContain('expired');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+});
+
+it('refuses role edits when a legacy saved default differs from the current request', async () => {
+  writeSessionModel(sessionId, { connectionId: 'b', provider: 'openai', model: 'other' }, readSessionModelEdit(sessionId));
+  const before = readSessionModelEdit(sessionId);
+  const picker = modelPicker(context()); await picker.load();
+  const role = (await picker.inspect!('role:advisor'))?.next!; await role.load();
+  expect((await role.apply(['default']))?.note).toContain('saved default differs');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+});
+
+it('reports a persisted role separately when runtime publication throws', async () => {
+  const picker = modelPicker({ ...context(), refreshRuntimeConfig: () => { throw new Error('synthetic publication failure'); } });
+  await picker.load(); const role = (await picker.inspect!('role:summary'))?.next!; await role.load();
+  const browse = (await role.apply(['choose']))?.next!; await browse.load();
+  const result = await browse.apply([id('b')]);
+  expect(result?.note).toContain('Role assignment saved');
+  expect(result?.note).toContain('application outcome is unverified');
+  expect(result?.note).not.toContain('summary uses');
+  expect(result?.next?.status?.([], '')).toContain('application outcome is unverified');
+  expect(readSessionModel(sessionId)?.roles?.summary).toMatchObject({ connectionId: 'b', model: 'shared' });
+});
+
+it('publishes role policy to the real runtime configuration and returns through Escape without writing', async () => {
+  const shell = createShellRuntimeContext({ cwd: home, originalCwd: home, projectRoot: home, targetPathBase: home,
+    rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+    session: manager.getSession(sessionId)!, runtimeConfig: getRuntimeConfig(home) });
+  const commands = { ...context(), readConfiguration: () => shell.configuration.current,
+    refreshRuntimeConfig: () => refreshShellRuntimeConfig(shell) };
+  const picker = modelPicker(commands); await picker.load();
+  const role = (await picker.inspect!('role:advisor'))?.next!; await role.load();
+  const browse = (await role.apply(['choose']))?.next!; await browse.load();
+  const before = readSessionModelEdit(sessionId);
+  const overlay = new OverlayHost(() => {}); overlay.open(browse);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(overlay.active).toBe(true);
+  const parent = stripAnsi(overlay.render(110, 30).join('\n'));
+  expect(parent).toContain('▸ Advisor'); expect(parent).not.toContain('Choose model');
+  expect(readSessionModelEdit(sessionId)).toEqual(before); overlay.close();
+  expect((await browse.apply([id('b')]))?.note).toContain('advisor uses');
+  expect(shell.runtimeConfig.sessionModelRoles?.advisor).toMatchObject({ connectionId: 'b', model: 'shared' });
+  expect(resolveProviderCredential({ runtimeConfig: shell.runtimeConfig, env: {} }).credential?.connectionId).toBe('a');
+});
+
 it.each([false, true])('browses unconfigured models through real overlay keys (all missing: %s)', async allMissing => {
   const catalog = [{ id: 'openai', label: 'OpenAI', runtime: 'openai' as const, auth: 'api-key' as const, models: [{ id: 'shared', reasoning: true }] },
     { id: 'anthropic', label: 'Anthropic', runtime: 'anthropic' as const, auth: 'api-key' as const,

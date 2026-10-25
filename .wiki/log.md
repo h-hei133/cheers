@@ -9098,3 +9098,9 @@ ADD-07沿原Editor/ViewState/paste/parser/TUI在重模块图前显示Loading，a
 第五批最终live界限/根一致性补充后12项及静态/diff/build`6144005828a4`/责任上限0/打包judgeproven/npm start help串行exit0，inputs`ca401713d05cfc0e0d436ec06e056fc6fc78fb3da5511ab898beaf3e18c8a7de`、artifact`c0b002f7093b514dd7906b1ef7b6ad1624ffa84a57b8754a144bd309268ba0ec`。最终交付另绑定。
 
 第五批`d2db8559f5a48ab36bd55668345ac363d477aa4d`已提交/推送，origin/main精确一致、当时clean；自身CI另读回，原Phase和ADD partial边界保留。
+
+## [2026-10-26] feat | 模型自动角色编辑与父面板返回
+
+ADD-02补Roles中subagent/summary/advisor赋值与清除，现有session model事务保留默认、siblings、presets、effort/tier/context/skillful；空会话种入当前精确默认，过期/竞争或旧默认不一致拒写。未配置行仍focusable，named connection准入与浏览分开。嵌套Esc在目录navigation之前返回父面板，保存/应用结果回原状态区，修复真实PTY发现的notice遮挡。角色独立thinking、认证成功回返、settings全编辑类型及桌面仍partial。
+
+主代理串行model35/overlay74/state26共135pass，两有效反转分别AssertionError、字节精确恢复后model35pass；静态五门/diff/build8ea15599e100/责任上限0，正式CLI读workspace profile的打包judge实际proven/三satisfied/零缺口。直接sidecar缺profile的首次exit1保留记录。小型regular/fullscreen PTY角色赋值/清除/默认保留/Esc原行/全局不变通过，SIGTERM143非Ctrl+C验收。第五代码CI40226046847仍运行，Watch40226046850实际工件proven；不升级原Phase38/9或ADD完整对齐。详情和证据见addition15，第六批提交另绑定。

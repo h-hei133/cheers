@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Nested Catalogue Escape And Visible Mutation Results
+- **Symptom**: Esc in a role assignment browser only changes its navigation domain; a successful save returns to a full-screen catalogue with no visible result.
+- **Root Cause**: Catalogue navigation consumes Esc before the explicit parent handler, and transcript notices are hidden while a returned full-screen picker is open.
+- **Rule**: Give opt-in parent navigation priority after input/approval/submode handling, retain the original row identity, and carry saved/application outcomes into the returned picker's status. Assert the focused parent row and visible outcome through the actual host; a changed title or persisted value alone does not prove the return path.
+
 ### Startup Paint And Raw-Input Handoff
 - **Symptom**: Loading has been laid out but its write callback lands after runtime initialization; a key typed during heavy module evaluation is handled by the later host, or a split paste loses its framing on adoption.
 - **Root Cause**: Dynamic import evaluation delays stdout/stdin callbacks. Replacing or flushing StdinBuffer at the ownership boundary discards partial escape, paste and grapheme state; keeping it without subscribing to appearance reports loses theme updates.
