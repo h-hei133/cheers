@@ -9174,3 +9174,11 @@ ADD-08复用组合域纯prepare，让正文brainstorm/composable模板和多skil
 第十四a412dadca38efe51f506c87367502eb0ea68c70d已推送/main一致且clean，自身CI40236655044实际in_progress，Watch40236655025仅workflow success未读工件。第十三40235334827实际success992files/10774tests pass、3skip/结构proven；Watch40235334790工件实际proven三satisfied，历史第十一十二失败保留。
 
 ADD-01/02当前request报告接原exact connection inspection，保存显式失败target名称作blocked展示，ID/provider/model/catalog端点歧义/删除/pool/override不猜其他relay，点击恢复再次复验choice准入。原遮罩/native认证→精确model回返→另显式启用事务保留。最终四文件78pass、两有效反转字节恢复后11pass、两模式save/Esc四小Node PTY精确broken/other原record保留、零session切换/遮罩/provider未调用通过；fixture activeID合法性、截断文本、native目录遗漏已纠正并记录。静态门/责任上限0/build ae1932b64191通过，正式judge实际proven三satisfied，严格docs/diff通过、118既有advisory保留；加强旧record存在及prompt-history断言后四PTY再次通过，不累加轮次。Git交付另实际读回。工件current保留，原Phase38/9、完整面板/性能/计量/真实网络partial边界不变，详见addition15第十五批。
+
+第十五98f13a76abb7cf9d23b53ee93a681803eb640ea1已推送/main远端精确一致且clean，CI40237636395仍in_progress、Watch40237636347仅workflow success未读工件；第十四40236655044实际仍in_progress。
+
+## [2026-10-26] fix | 独立提示词模板的纯展开预览
+
+ADD-08模板声明增加显式preparePrompt，原execute和preview复用expandTemplate；raw命令源解析提取到原invocation owner供route/preview共享，保留引号/多行/未闭合引号/兼容源语法。纯能力与prompt kind/组合资格分别准入，builtin保留名及普通正文模板语义保留，零handler执行/递归命令。参考模板展开与custom/extension执行分离的具体决定。
+
+串行四文件96pass、两有效反转/精确恢复后14pass（重叠）；两模式小Node PTY4.3k→6.6k→模板改动9.4k/研究问号/恢复数字/配置transcript字节不变/零message-provider通过，退出143。四静态门/责任上限0/build3acc4696c965/正式judge proven三satisfied，严格docs/diff通过、118既有advisory保留，addition80/audit85本地链接存在；Git结果另绑定。工件templates保留；审计末尾按已修补、仍缺、不成立、未确认总括。原Phase38/9、完整面板/真实性能/其他command-research preview/精确source字节与真实token差额边界保留，详见addition15第十六批。

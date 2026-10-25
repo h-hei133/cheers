@@ -1,4 +1,4 @@
-import { commandInvocations, resolveCommandInvocation } from "./invocation.js";
+import { commandInvocations, parseCommandSource, resolveCommandInvocation } from "./invocation.js";
 import { createCommandRegistry } from "./registry.js";
 import { composePrompt } from './composition.js';
 import type { CommandContext, CommandExecutionResult, CommandDefinition } from "./types.js";
@@ -20,9 +20,9 @@ export async function routeSlashCommand(
   }
   if (!input.startsWith('/') || /^\/[^\s]*[\/\\]/.test(input)) return null;
 
-  const invocation = /^\/\s*(\S+)(?:(?:\r\n|\s)([\s\S]*))?$/.exec(input);
-  const rawName = invocation?.[1];
-  const rawCommandArgs = invocation?.[2] ?? "";
+  const invocation = parseCommandSource(input);
+  const rawName = invocation?.name;
+  const rawCommandArgs = invocation?.argsText ?? "";
   if (!rawName) {
     return {
       kind: "local",

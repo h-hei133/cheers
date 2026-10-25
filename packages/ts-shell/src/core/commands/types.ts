@@ -256,6 +256,8 @@ export type CommandExecutionResult = LocalCommandResult | PromptCommandResult | 
 /** A distinct invocation handled by the same owner, not a synonymous alias. */
 export interface NamedCommandInvocation {
   readonly composition?: CommandComposition;
+  /** Pure standalone expansion; preview must never invoke execute to obtain a prompt. */
+  readonly preparePrompt?: (rawArgs: string) => string;
   readonly name: string
   readonly summary: string
   readonly argumentHint?: string
@@ -265,6 +267,8 @@ export interface NamedCommandInvocation {
 
 export interface CommandDefinition {
   readonly composition?: CommandComposition;
+  /** Pure standalone expansion, shared by this command's handler and local preview. */
+  readonly preparePrompt?: (rawArgs: string) => string;
   readonly name: string
   readonly aliases?: readonly string[]
   readonly invocations?: readonly NamedCommandInvocation[]

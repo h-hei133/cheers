@@ -1,6 +1,6 @@
 import type { CommandDefinition, NamedCommandInvocation } from "./types.js";
 
-type CommandIdentity = Pick<CommandDefinition, "group" | "name" | "aliases" | "invocations" | "summary" | "argumentHint" | "argumentMode" | "getArgumentCompletions" | 'composition'>;
+type CommandIdentity = Pick<CommandDefinition, "group" | "name" | "aliases" | "invocations" | "summary" | "argumentHint" | "argumentMode" | "getArgumentCompletions" | 'composition' | 'preparePrompt'>;
 
 export interface CommandInvocation extends NamedCommandInvocation {
   /** The handler's owner, distinct from the spelling that must be dispatched. */
@@ -17,6 +17,7 @@ export function commandInvocations(command: CommandIdentity): CommandInvocation[
     summary: command.summary, argumentHint: command.argumentHint, getArgumentCompletions: command.getArgumentCompletions,
     argumentMode: command.argumentMode,
     composition: command.composition,
+    preparePrompt: command.preparePrompt,
   }];
   for (const alias of command.aliases ?? []) {
     if (names.has(alias)) continue;
@@ -38,4 +39,10 @@ export function resolveCommandInvocation(commands: readonly CommandIdentity[], n
     if (invocation) return invocation;
   }
   return undefined;
+}
+
+/** Preserve the same raw argument source for standalone dispatch and pure preview. */
+export function parseCommandSource(input: string): { readonly name: string; readonly argsText: string } | undefined {
+  const match = /^\/\s*(\S+)(?:(?:\r\n|\s)([\s\S]*))?$/.exec(input);
+  return match?.[1] ? { name: match[1], argsText: match[2] ?? '' } : undefined;
 }

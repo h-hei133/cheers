@@ -634,3 +634,21 @@ ADD-01/02第十三批配置了具体失败connection行，但独立`model:curren
 普通/全屏×key保存/Esc四条小型真实Node PTY通过：从搜索后实际focused当前报告进入精确broken record，遮罩提交/取消，旧broken与other relay原record不变，新增connection精确address/model读回，原session selection保持无值；终端不含key，不调用provider。认证动作没有被当作prompt回合；退出143为SIGTERM清理。单元键盘检查另验证返回后显式Enter才写session模型，PTY未冒充这一部分的真实provider调用。所有源码验证串行，无20k真实PTY或全仓本地回归。
 
 四静态门、module facade责任上限0及TS build通过；最终build`ae1932b641917ce9b02a54bbea0216a50ee453e575a7ed5b69c0afe56f220b0e`，inputs`dd15ff442dc42676db3b4cf57e224cd3ac74a13aae9b961b992fe15201e39ab2`，artifact`9f3e6ee485b11c736038221db9357c0764b3f39ef8bcbdff146d3172f257bfbd`。正式judge实际读回proven，三个结构义务均satisfied、无open/failed/gap；严格docs drift与diff检查通过，118条既有advisory保留。加强旧记录必须存在且不变、输入历史无key的断言后，四条小型PTY再次串行通过；重叠轮次不累加。Git交付由实际读回另绑定。本批工件保留`.omx/artifacts/phase20-addition-current/`。真实OAuth/network、完整面板字段/来源/鼠标/resize/桌面矩阵、冷/热Node/exe性能、独立命令/研究完整上下文preview、原生tokenizer与实际1.7k/4.9k差额仍partial；原Phase20保持38 complete / 9 partial，ADD独立。
+
+第十五批已提交并推送`98f13a76abb7cf9d23b53ee93a681803eb640ea1`，实际读回main与origin/main精确一致且工作区clean，交付receipt保留current工件。随后读取自身CI`40237636395`仍in_progress；Watch`40237636347`为workflow success但未读工件。第十四CI`40236655044`本轮再次读取仍in_progress，未将本地检查或Watch状态代替行为CI。
+
+### 第十六批：独立提示词模板的完整本地预览
+
+ADD-08此前只预览正文纯modifier、显式composable模板与多skill。普通文件模板即使只执行纯文本替换，也因首位slash统一拒绝而保留问号；这是确定的能力缺口。本批针对普通独立模板补齐，未宣称所有独立命令或研究driver已有完整预览。
+
+[模板声明owner](../../packages/ts-shell/src/core/prompts/commands.ts)为已发现模板提供显式纯`preparePrompt(rawArgs)`；原execute与[上下文预览](../../packages/ts-shell/src/cli/runtime/context/preview.ts)复用同一expandTemplate，不调用execute获取估算。[命令源解析](../../packages/ts-shell/src/core/commands/invocation.ts)提取原slashRouter的raw-name/raw-args语法，实际路由与预览共享，保留引号、CRLF、多行、未闭合引号及原兼容语法。canonical/alias携带该纯能力，named invocation独立声明；`kind=prompt`本身不代表可预览，隐藏/禁用命令也不因存在函数放行。没有第二套模板加载、配置、skill或命令执行系统。
+
+独立模板预览先得到真实展开prompt，再按第十四批共享continuity和实际请求组装计算；沿原source tracker撤销模板修改、目录创建及近层覆盖。模板body中的slash保持展开结果，不递归启动skill、配置或研究。普通模板不因此获得正文组合资格，仍需`composable: true`才能作为modifier；与builtin同名的模板仍遵守registry保留名优先。参考A agent-session 7782–7813把extension/custom执行与文件模板展开分开，沿纯展开和运行handler的边界，本项目明确增加纯能力声明并沿自己的参数/路由owner处理，未机械引入其执行顺序。
+
+主代理串行四文件96项通过（runtime preview14、slashRouter49、templateLoader10、expansion23）。新增验证将全部registry execute替换成抛错探针，确认纯预览零handler调用；模板输入与真实routeSlashCommand输出逐一比较prepare输入及完整estimate/digest，配置会话三文件字节不变、零MCP连接；builtin命名冲突、正文普通模板不组合、非法组合仍拒绝。两有效反转分别移除实际展开和纯模板准入，前者触发严格提示词AssertionError，后者在新增场景报preparation pending并exit1；逐字节恢复后preview14项再次通过，与96项重叠不累加。
+
+普通/全屏两条小型真实Node PTY通过：启动/普通草稿约4.3k，独立模板含引号与多行约6.6k，模板文件修改后约9.4k；研究草稿显示问号/stale，换回模板恢复约9.4k。配置与transcript原字节不变、零message/研究/provider调用，退出143为SIGTERM清理。数值只属于隔离synthetic夹具的字符估算，**没有解释用户真实1.7k与4.9k差额**。
+
+四静态门、责任上限0、TS build及正式CLI judge通过，实际verdict proven/三个结构义务satisfied。最终build`3acc4696c965ccbd964a5d0ecb5edd4339eb6bb4174002746c8e01ec974924f4`，inputs`6def2092f6cfeaeee552e38fadfafec5f88a89adaabe17fbc9afb10b0f621b32`，artifact`3d088e607445acece5d3450c7037e5b7f537e737788153d6b8f735de37678d96`；validator archive`6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`使用全新scratch提取。严格docs drift与diff检查通过，118条既有advisory保留；addition80、audit85个本地链接目标存在。工件归档`.omx/artifacts/phase20-addition-templates/`，Git交付由实际读回另绑定。
+
+完整settings/model的字段/编辑器/来源/鼠标/resize/桌面矩阵仍需补证；明确的未配置模型可选、面板整体看齐、消息顶格与箭头、正文path、多skill和有限slash组合需求不缩小。ADD-07冷/热Node/exe、ADD-08其他独立命令/研究完整preview、精确source字节与发现成本、原生tokenizer及真实差额仍partial；第九browser-cache writer退出1仍未归因，未运行WSL并发重压、全仓本地回归或20k真实PTY。原Phase20保持38 complete / 9 partial，ADD独立，完整目标继续。

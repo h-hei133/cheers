@@ -28,7 +28,7 @@ import { resolveRequestShape } from '../../../core/models/requestShape.js';
 import { captureUsageAttribution } from '../../../observability/usage/identity.js';
 import { estimateWirePrompt } from '../../../context/request/wire.js';
 import { createCommandRegistry } from '../../../core/commands/registry.js';
-import { resolveCommandInvocation } from '../../../core/commands/invocation.js';
+import { parseCommandSource, resolveCommandInvocation } from '../../../core/commands/invocation.js';
 import { decodeHandoffs } from '../../../workflow/handoff/codec.js';
 import { decodeDirectors } from '../../../workflow/director/codec.js';
 import { requestReplayBinding } from '../../../provider/request/replay.js';
@@ -54,8 +54,13 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const first = opening ? resolveCommandInvocation(commands, opening) : undefined;
   const composed = (!first || !!first.composition) && needsComposition(draft, commands);
   const plan = compositionPlan(draft, commands);
+  const source = parseCommandSource(draft);
+  const standalone = !composed && source ? resolveCommandInvocation(commands, source.name) : undefined;
+  const definition = commands.find(command => command.name === standalone?.commandName);
+  const pureStandalone = definition?.kind === 'prompt' && definition.enabled !== false && definition.availability !== 'hidden'
+    ? standalone?.preparePrompt : undefined;
   // Match dispatch eligibility without invoking standalone handlers or workflow drivers.
-  if ((!composed && draft.startsWith('/') && !/^\/[^\s]*[\/\\]/.test(draft))
+  if ((!composed && !pureStandalone && draft.startsWith('/') && !/^\/[^\s]*[\/\\]/.test(draft))
     || (composed && plan.methods.some(method => method.invocation.composition?.kind === 'driver'))) {
     throw new Error('Command request preparation is pending.');
   }
@@ -66,7 +71,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const skills = await resolveSkillCatalog({ workspaceRoot: cwd, sessionId: expected.id, ...context.skillOptions, abortSignal: signal }, sources.track);
   const composition = composed ? prepareComposition(draft, plan, skills.skills) : undefined;
   if (composition?.error !== undefined) throw new Error(composition.error);
-  const effectivePrompt = composition?.prompt ?? draft;
+  const effectivePrompt = composition?.prompt ?? (pureStandalone && source ? pureStandalone(source.argsText) : draft);
   const session = await readPromptPreview(manager, expected, cwd, effectivePrompt, signal, sources.track);
   // These modes rewrite the run configuration or context at admission.
   if (decodeHandoffs(session.state.handoffs, session.scope).cycles.some(row => !row.retired && ['armed', 'running', 'switched', 'unknown'].includes(row.phase))

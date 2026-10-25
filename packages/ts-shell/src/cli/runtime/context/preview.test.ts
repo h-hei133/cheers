@@ -24,7 +24,7 @@ beforeEach(() => {
   fs.mkdirSync('/tmp/cheers-test', { recursive: true }); root = fs.mkdtempSync('/tmp/cheers-test/runtime-preview-');
   const home = path.join(root, 'home'); fs.mkdirSync(home); vi.stubEnv('CHEERS_TEST_ROOT', home); vi.stubEnv('USERPROFILE', home);
 });
-afterEach(() => { vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 const fixture = () => {
   const cwd = path.join(root, 'workspace'); fs.mkdirSync(cwd); fs.mkdirSync(path.join(cwd, '.git'));
   const session: Session = { id: 'sess_preview', projectRoot: cwd, status: 'active', rootMode: 'direct', turns: [],
@@ -112,6 +112,50 @@ it('invalidates selected template edits, higher-priority overrides and newly dis
   const nearer = path.join(nested, '.agents', 'prompts'); fs.mkdirSync(nearer, { recursive: true });
   fs.writeFileSync(path.join(nearer, 'evidence.md'), '---\ncomposable: true\n---\nNearer $@');
   expect(() => sources.verify()).toThrow('source changed');
+});
+
+it('previews ordinary standalone templates with exact dispatch arguments and no handler execution', async () => {
+  const { cwd, context, load, layout, gateway } = fixture();
+  const directory = path.join(cwd, '.agents', 'prompts'); fs.mkdirSync(directory, { recursive: true });
+  const file = path.join(directory, 'ordinary.md');
+  fs.writeFileSync(file, 'Compare $1 | ${@:2} | ${3:-fallback}\nLiteral /model');
+  const inputs = ['/ordinary "two words" tail\r\n中文', '/ordinary unfinished\'s prose', '/ordinary', '/ ordinary  padded\nbody'];
+  const submitted = await Promise.all(inputs.map(input => routeSlashCommand(input, { cwd })));
+  const registry = await import('../../../core/commands/registry.js');
+  const create = registry.createCommandRegistry;
+  const execute = vi.fn(() => { throw new Error('Preview executed a command handler.'); });
+  vi.spyOn(registry, 'createCommandRegistry').mockImplementation((...args) => new Map([...create(...args)]
+    .map(([name, command]) => [name, { ...command, execute }])));
+  const prepare = vi.fn(context.preparePromptContext!); context.preparePromptContext = prepare;
+  const files = [layout.metadataPath, layout.statePath, layout.transcriptPath]; const before = files.map(target => fs.readFileSync(target));
+  for (const [index, input] of inputs.entries()) {
+    const actual = submitted[index]; if (actual?.kind !== 'prompt') throw new Error('Fixture template did not dispatch.');
+    const preview = await load(input); preview.verify();
+    expect(prepare).toHaveBeenLastCalledWith(actual.prompt, expect.any(AbortSignal));
+    expect(preview.estimate).toEqual((await load(actual.prompt)).estimate);
+    expect(actual.prompt).toContain('Literal /model');
+  }
+  fs.writeFileSync(path.join(directory, 'literal.md'), 'Literal /skill:absent /settings /deep-research');
+  const literal = await load('/literal'); literal.verify();
+  expect(prepare).toHaveBeenLastCalledWith('Literal /skill:absent /settings /deep-research', expect.any(AbortSignal));
+  expect(execute).not.toHaveBeenCalled(); expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
+  expect(files.map(target => fs.readFileSync(target))).toEqual(before);
+  const captured = await load('/ordinary value');
+  fs.writeFileSync(file, 'Changed $@'); expect(() => captured.verify()).toThrow('source changed');
+});
+
+it('keeps template discovery distinct from builtin commands and inline composition permission', async () => {
+  const { cwd, load, context } = fixture();
+  const directory = path.join(cwd, '.agents', 'prompts'); fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(path.join(directory, 'settings.md'), 'Do not replace the builtin.');
+  fs.writeFileSync(path.join(directory, 'ordinary.md'), 'Inspect $@');
+  const prepare = vi.fn(context.preparePromptContext!); context.preparePromptContext = prepare;
+  await expect(load('/settings')).rejects.toThrow('preparation');
+  await expect(load('question /brainstorm /ordinary')).rejects.toThrow('cannot be composed');
+  expect(prepare).not.toHaveBeenCalled();
+  const input = 'question /ordinary'; const preview = await load(input); preview.verify();
+  expect(prepare).toHaveBeenLastCalledWith(input, expect.any(AbortSignal));
+  expect(await routeSlashCommand(input, { cwd })).toBeNull();
 });
 
 it('keeps inline functional names as prose while opening commands and composed controls remain unavailable', async () => {
