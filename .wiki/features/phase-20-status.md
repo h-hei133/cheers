@@ -24,6 +24,8 @@
 
 ## 2026-10-25 QA-04 剩余职责提取与独立复核
 
+- 本批代码 `b36e9b72cd8f5144385847f33a56aa08742591ad` 已提交并推送，远端main精确一致，推送后工作区clean。Watch40156902777 artifact12584641490已读回proven、三义务satisfied/0gaps；CI40156902798/job121060099683当前静态/script/TS build步骤success、全套运行中。Platform QA40157005332明确绑定同SHA，远端TS/exe及支持格运行中；未提前称通过。
+- 旧 `2331fc13` CI40155560322/job121056105206于03:02:06Z failure：969 files/10521 tests passed、1 failed/3 skipped；唯一失败为 `browser/smoke/request.test.ts` gzip解压超限用例，预期unsafe-output但收到request-failed。该network源码在旧提交与本批均未改变。本地原smoke23项在Node24通过；实际隔离Node20.3.0再验smoke及既有decoder清理反转共24项通过。失败原因仍未证实，未削弱断言、重跑旧CI或修改产品；结果与实际Node版本证据归artifacts。初次npx未切换Node而返回宿主24，不计floor证据；随后使用官方隔离20.3.0二进制，scratch已删除。
 - 既有reentry索引/发现/恢复问答移入 `session/recovery/reentry.ts`，SessionManager保留公开继承接口；prompt continuity选择移入既有future-turn projection，保留manager receiver、seed/interactive/print优先级及prompt持久化前顺序。store路径查询移入 `session/store/paths.ts`，构造捕获同一layout，持久化/锁仍归accessor。AWS STS移入 `provider/aws/sts.ts`，`contract.ts`只承载共享类型/同一CredentialsError，原路径兼容导出；凭据优先级、签名、请求/取消语义不变。CLI baseline只提取既有pipe/HTTP fixture至 `test-utils/cli/baseline.ts` / `http.ts`，原场景保留。
 - 聚焦原用例分别通过：reentry/manager/recovery 109、runtime/idle/boundary 59、store/manager/registry/files 95、AWS credentials/signature 40；baseline选中3项pipe启动/readiness重连/中断续跑通过，其余38项定向未运行；原process helper 2项通过。四个有效反转分别破坏stamp匹配、continuity选择、metadata路径、STS返回key，exit1及AssertionErrors为1/7/2/1，字节恢复后相关用例再过。首STS反转仅抛CredentialsError、0 AssertionErrors，不计有效反转。
 - 提取时误覆盖既有 `test-utils/cli/process.ts`，已按HEAD字节恢复，最终无diff；新fixture改用未占用文件名并保留全部常量。review识别时钟receiver差异后以 `() => this.now()`保留原TurnSink接收者，最终相关两文件54项通过。曾在一个judge yielded后误启动后续验证，构成本批早段串行红线违规；已等待所有进程结束，最终静态五门→analyzer→TS build→完整judge在同一串行命令中完成exit0。不能把本批所有执行概括为严格串行。

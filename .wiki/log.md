@@ -8985,3 +8985,7 @@ PAN-07/PAN-08适用缺口闭合，矩阵38complete/9partial/0open；PRV-03保留
 两独立gpt-6.1-sol只读复核81987b36→当前源码，代码APPROVE/架构WATCH→综合COMMENT，无新增阻塞；SessionManager四层继承、既有reentry缓存、STS任意响应Message进入错误面及clear保留pending输出分别保留WATCH/风险，未称已修。完整review/manifest/source hashes/judge/反转日志归Git忽略artifacts，scratch清理；无本地全套/exe/真实20k PTY。矩阵38complete/9partial/0open不变。
 
 旧00045d0e CI40154519638于02:46:27Zsuccess，85e50c62 CI40155244712/job121055147652于02:52:13Zsuccess，静态/script/TS/全套/结构步骤success；Watch40155244710 artifact12583978091实际partial6gaps。2331fc13已推送，Watch40155560323 artifact12584487560实际partial5gaps，CI40155560322读回仍运行；分别绑定旧SHA。本批提交/推送与自身远端结果另核对，不继承旧成功。
+
+### 交付读回
+
+代码b36e9b72cd8f5144385847f33a56aa08742591ad已提交/推送，远端main精确一致，推送后clean。Watch40156902777/artifact12584641490实际proven、三义务satisfied/0gaps；CI40156902798/job121060099683静态/script/TS build success、全套仍运行，Platform QA40157005332在同SHA运行TS/exe支持格。旧2331fc13 CI40155560322于03:02:06Zfailure，10521通过/1失败/3跳过；browser/smoke/request.test.ts压缩响应超限预期unsafe-output而收到request-failed，相关network源码未改。本地Node24原23项及实际官方隔离Node20.3.0原smoke+既有decoder清理反转24项均通过，根因仍未证实；保留失败，不弱化断言或擅改产品。初npx返回宿主24不计floor证据，后实际20.3.0版本已验；scratch删除、报告artifacts保留。当前SHA全套/平台最终结果待读回。
