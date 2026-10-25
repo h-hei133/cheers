@@ -112,3 +112,32 @@ it('retains the launch override after a user Apply and shows accepted versus sto
   const shown = h.render(); expect(shown).toContain('Effective: false'); expect(shown).toContain('Accepted: false');
   expect(shown).toContain('Source: override'); expect(shown).toContain('Stored: true'); h.overlay.close();
 });
+
+it.each([
+  { field: 'disabledTools', chunks: ['fixture.a', 'fixture.b', 'fixture.c'], value: ['fixture.a', 'fixture.b', 'fixture.c'] },
+  { field: 'modelTokenBudgets', chunks: ['{', '"openai/fixture": {"reserveTokens": 1000, "keepRecentTokens": 2000}', '}'],
+    value: { 'openai/fixture': { reserveTokens: 1000, keepRecentTokens: 2000 } } },
+])('types multiple lines for $field, stages without writing, cancels a second edit and saves only on Apply', async ({ field, chunks, value }) => {
+  const h = panel(false), original = fs.readFileSync(user), projectBytes = fs.readFileSync(project), inputBytes = fs.readFileSync(input);
+  await h.open(field); await h.choose('Edit value'); await h.key('\x15');
+  for (let index = 0; index < chunks.length; index++) {
+    await h.key(chunks[index]!);
+    if (index < chunks.length - 1) await h.key(index === 0 ? '\x1b[13;2u' : '\n');
+  }
+  expect(h.render()).toContain('Shift+Enter/Ctrl+J');
+  expect(fs.readFileSync(user)).toEqual(original);
+  await h.key('\r'); expect(h.render()).toContain('Pending:');
+  expect(fs.readFileSync(user)).toEqual(original);
+  await h.choose('Edit value'); await h.key('\n'); await h.key('discard-me');
+  await h.key('\x1b'); expect(h.render()).toContain('Pending:');
+  expect(fs.readFileSync(user)).toEqual(original);
+  expect((await h.choose('Apply'))?.note).toContain('Saved to your user configuration');
+  expect(readUserRuntimeConfigFile()[field as 'disabledTools' | 'modelTokenBudgets']).toEqual(value);
+  expect(fs.readFileSync(user, 'utf8')).toContain('/* retain */');
+  expect(fs.readFileSync(project)).toEqual(projectBytes); expect(fs.readFileSync(input)).toEqual(inputBytes);
+  await h.open(field); await h.choose('Edit value');
+  const shown = h.render(120);
+  expect(shown).not.toContain('discard-me');
+  expect(shown).toContain(field === 'disabledTools' ? 'fixture.c' : 'keepRecentTokens');
+  h.overlay.close();
+});

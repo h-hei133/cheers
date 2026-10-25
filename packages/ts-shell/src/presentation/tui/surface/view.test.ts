@@ -13,6 +13,7 @@ import { COMPOSER_SHAPES } from "../composer/shapes.js";
 import type { ComposerShapeId } from "../composer/contract.js";
 import { Pointer } from "../../../cli/interactive/pointer.js";
 import { OverlayHost } from "../../../cli/interactive/overlay.js";
+import { parseKeyEvent } from '../input/keys.js';
 
 /** Facts a test can change between frames; the surface reads them at paint time. */
 interface Facts {
@@ -151,6 +152,33 @@ describe("the document a main-screen frame reports", () => {
 });
 
 describe("frame composition", () => {
+  it('fits input forms to the remaining chrome budget and retains the form caret when resizing', async () => {
+    const overlay = new OverlayHost(() => {});
+    overlay.open({ title: 'Edit list', form: 'panel', empty: '', load: async () => [], apply: async () => undefined,
+      input: { initial: 'first\nsecond\nlast!', label: 'List', multiline: true, validate: () => undefined, apply: async () => undefined } });
+    await Promise.resolve(); await Promise.resolve();
+    let available = 0;
+    const { view } = surface({ overlayRows: (width, height, budget = 0) => {
+      available = budget; const rendered = overlay.render(width, height, budget);
+      expect(rendered.length).toBeLessThanOrEqual(budget);
+      return rendered;
+    } });
+    view.editor.setText('held draft\nnext line');
+    for (const columns of [8, 40, 8]) {
+      for (const rows of [8, 12, 24]) {
+        const plan = view.renderFrame({ columns, rows });
+        expect(plan.rows.length).toBeLessThanOrEqual(rows);
+        expect(available).toBeGreaterThan(0);
+        expect(plan.rows.some(row => row.includes(`last!${CURSOR_MARKER}`))).toBe(true);
+        expect(view.editor.snapshot().text).toBe('held draft\nnext line');
+      }
+    }
+    overlay.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+    const moved = view.renderFrame({ columns: 40, rows: 8 });
+    expect(moved.rows.some(row => row.includes(`secon${CURSOR_MARKER}d`))).toBe(true);
+    overlay.close();
+  });
+
   it('allocates a real panel from the remaining viewport alongside a long draft', async () => {
     const overlay = new OverlayHost(() => {});
     overlay.open({ title: 'Models', form: 'panel', empty: 'none', apply: async () => undefined,

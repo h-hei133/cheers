@@ -63,6 +63,7 @@ function valueEditor(host: SettingsHost, draft: SettingsDraft, setting: SettingD
     input: {
       initial: editorText(setting, value),
       label: editorLabel(setting),
+      multiline: ['list', 'object'].includes(settingEditor(setting)),
       validate: text => inputError(setting, text),
       apply: async text => {
         const parsed = parseSettingInput(setting, text);

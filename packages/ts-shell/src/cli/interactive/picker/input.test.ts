@@ -59,3 +59,68 @@ it('scrolls a read-only value from the start and absorbs every editing path', ()
   expect(scrolled).toContain('source-20'); expect(scrolled).not.toContain('source-0\n');
   expect(form.value()).toBe(initial);
 });
+
+it('inserts modified Enter at the caret in multiline forms without submitting, and undoes the newline', () => {
+  const form = new InputForm({ initial: 'ab', label: 'List', multiline: true, validate: () => undefined });
+  form.key(parseKeyEvent('\x1b[D'));
+  form.key(parseKeyEvent('\x1b[13;2u'));
+  expect(form.value()).toBe('a\nb');
+  form.key(parseKeyEvent('\x1a')); expect(form.value()).toBe('ab');
+  form.key(parseKeyEvent('\n')); expect(form.value()).toBe('a\nb');
+  form.key(parseKeyEvent('\r')); expect(form.value()).toBe('a\nb');
+});
+
+it('absorbs newline keys in single-line, masked and read-only forms and bounds multiline insertion', () => {
+  for (const options of [{}, { multiline: true, masked: true }, { multiline: true, readOnly: true }]) {
+    const form = new InputForm({ initial: 'original', label: '', validate: () => undefined, ...options });
+    for (const raw of ['\n', '\x1b[13;2u']) form.key(parseKeyEvent(raw));
+    expect(form.value()).toBe('original');
+  }
+  const form = new InputForm({ initial: 'x'.repeat(65536), label: '', multiline: true, validate: () => undefined });
+  form.key(parseKeyEvent('\n'));
+  expect(form.value()).toHaveLength(65536);
+});
+
+it.each([1, 2, 3, 4, 6, 12])('keeps the caret inside a %i-row viewport while wrapping, moving and resizing', height => {
+  const form = new InputForm({ initial: '中文😀\nsecond\nlast', label: 'List', multiline: true, validate: () => undefined });
+  for (const width of [4, 18, 4]) {
+    const rows = form.render('Edit', width, height);
+    expect(rows.length).toBeLessThanOrEqual(height);
+    expect(cursorTarget(rows, 0, height)).not.toBeNull();
+    form.key(parseKeyEvent('\x1b[A'));
+    const moved = form.render('Edit', width, height);
+    expect(moved.length).toBeLessThanOrEqual(height);
+    expect(cursorTarget(moved, 0, height)).not.toBeNull();
+  }
+  expect(form.value()).toBe('中文😀\nsecond\nlast');
+  expect(form.render('Edit', 18, 0)).toEqual([]);
+  expect(form.render('Edit', 0, height)).toEqual([]);
+});
+
+it('never submits an empty replacement for an oversized initial value without an explicit edit', async () => {
+  const submit = vi.fn(async () => undefined), overlay = new OverlayHost(() => {});
+  overlay.open({ title: 'Edit', form: 'panel', empty: '', load: async () => [], apply: async () => undefined,
+    input: { initial: 'x'.repeat(65537), label: 'List', multiline: true, validate: () => undefined, apply: submit } });
+  await Promise.resolve(); await Promise.resolve();
+  const invoke = vi.fn((picker, ids) => { void picker.apply(ids); });
+  overlay.handleKey(parseKeyEvent('\r'), invoke);
+  expect(overlay.active).toBe(true); expect(invoke).not.toHaveBeenCalled();
+  expect(overlay.render(100, 8).map(stripAnsi).join('\n')).toContain('Value is too large');
+  overlay.handleKey(parseKeyEvent('\x15'), invoke);
+  overlay.handleKey(parseKeyEvent('\r'), invoke);
+  expect(submit).toHaveBeenCalledWith(''); expect(overlay.active).toBe(false);
+});
+
+it('uses the remaining row budget for ordinary forms and the whole viewport for fullscreen forms', () => {
+  for (const fullScreen of [false, true]) {
+    const overlay = new OverlayHost(() => {});
+    overlay.open({ title: 'Edit', form: 'panel', fullScreen, empty: '', load: async () => [], apply: async () => undefined,
+      input: { initial: 'first\nlast', label: 'List', multiline: true, validate: () => undefined, apply: async () => undefined } });
+    const rows = overlay.render(40, 10, 1);
+    expect(rows.length).toBeLessThanOrEqual(fullScreen ? 10 : 1);
+    expect(rows.map(stripAnsi).join('\n')).toContain('last');
+    expect(cursorTarget(rows, 0, 10)).not.toBeNull();
+    expect(rows.map(stripAnsi).join('\n').includes('Edit')).toBe(fullScreen);
+    overlay.close();
+  }
+});

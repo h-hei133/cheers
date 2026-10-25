@@ -108,6 +108,8 @@ ADD-03将现[七组加All](../../packages/ts-shell/src/cli/interactive/picker/se
 
 复用[设置元数据](../../packages/ts-shell/src/config/settings.ts)、已有数值/列表/对象编辑器与[保存owner](../../packages/ts-shell/src/cli/runtime/settings.ts)。暂存、Apply、Discard、预览撤回、user/project scope、只读来源、需要restart的字段各自保真。未知/过时值不能被打开面板偷偷规范化；空项目配置继承默认，不能显示为空能力。
 
+列表与JSON对象编辑必须支持键盘直接构造多行，不能只靠粘贴才能输入“一项一行”。Shift+Enter或Ctrl+J在光标位置换行，普通Enter验证并暂存完整值，Apply另行保存；方向键属于子编辑器，Esc保留进入本次编辑前已有的暂存值。主界面与全屏表单按各自实际行预算绘制，极矮窗口优先保留光标所在编辑行，标题/说明可退化；超过编辑上限的原值必须明确拒绝，不能让Enter把未显示的原值覆盖成空值。该补充是完整编辑路径的实施细化，不能扩大为未配置模型可自动启用或认证表单允许多行秘密。
+
 验收选取每种编辑器至少一个字段，覆盖切分类→section→修改→Apply→重开读回及Discard撤回；还要验证无权限来源、窄屏导航、搜索清空、输入编辑器方向键和preview取消。
 
 ## 4. resume：渐进加载后的合理默认焦点
@@ -670,3 +672,23 @@ ADD-02/03定向核查发现两处确定交互缺口：[CatalogNavigation](../../
 普通/全屏两条小型真实Node PTY通过实际SGR点击：Model分类→上下分类→Maximum turns内容→Down输出limit→Enter精确字段→Esc返回/关闭；provider分类→missing-b→Up missing-a→Enter原配置详情。磁盘config原字节不变、零session modelSelection、零message/provider调用，退出143为SIGTERM清理。当前PTY为120×60，40列/极矮/resize在真实overlay host场景验证，未冒充真实桌面缩放。探针首次忽略regular相对绘制、cursor-only CUP覆盖、stored ●和子详情回regular，又用旧screen条件提前满足后续等待；已按当前alternate-screen生命周期、完整CUP+K行和动作后的新输出同步修正。反转后测试文件变动还触发launcher freshness拒绝，重新构建后再验，未绕过校验。
 
 四静态门、责任上限0、TS build、正式CLI judge proven/三satisfied通过。最终build`6a06f16db5e6d032c38a9d45d89c10decd8033c119d5706a0b0733bae3cc758d`，inputs`5faf272d81455cfd900bc35f8df109d6d1aa31508181e7ba9b4bf4e9eb147922`，artifact`9000a82ace0e16330bec24e4716d9fb1e687ff14203ab3408854a7a52ca658ff`。严格docs drift与diff通过，118条既有advisory保留；addition83、audit86个本地链接目标存在。工件归档`.omx/artifacts/phase20-addition-pointer/`；Git交付按实际读回绑定。完整面板全部字段/编辑器/来源/桌面矩阵、真实认证、启动冷/热Node/exe、原生tokenizer、其他独立命令/研究preview与精确source/真实差额仍partial；第九writer退出1仍未归因，原Phase20保持38 complete / 9 partial，ADD独立。
+
+### 第十八批：设置多行键盘编辑与实际视口预算
+
+第十七批`1c87bbbb5416cfc2e6d35aa0c0bbfb1d6f9b9337`已推送；本批开始与定向延迟检查时其CI `40239145932`仍in_progress，不能把前一批结构检查或Watch workflow success当作该CI通过。第十五`40237636395`及第十六`40238165109`随后已实际读回completed/success；本批实现与Git交付另绑定。
+
+ADD-03核查确认三个相关缺口：[InputForm](../../packages/ts-shell/src/cli/interactive/picker/input.ts)未处理Shift+Enter/Ctrl+J，列表“一项一行”只能通过粘贴构造；表单强制至少一编辑行却同时保留标题/标签/footer，并且[OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts)传整屏height而非主界面实际分配行数，短窗口可能裁掉光标；超过64KiB的原值拒绝预填后，value校验覆盖该错误，允许空值通过部分字段的验证。这些是可定位源码缺口，不能归为用户原model上下键无交互的唯一现场原因。
+
+[settings valueEditor](../../packages/ts-shell/src/cli/interactive/picker/settings.ts)仅为list/object声明multiline；InputForm复用原Editor插入换行、字素导航、undo与caret-follow滚动，Shift+Enter和Ctrl+J不走提交，普通Enter仍由原host验证并暂存，Apply委托原settings保存事务。masked秘密和read-only视图不接受换行编辑；其他字段不新增换行键，原粘贴合同保留。普通form使用availableRows，全屏form使用整屏height；有行预算时优先保留编辑行，逐步省略标题/标签/footer，零预算不绘制。拒绝的超大原值保持不可提交，直到用户明确清空或输入替换，避免浏览后Enter意外覆盖原值。
+
+只读参考A settings-selector 159–180将设置文本交给共享TextFormField、保留预填/遮罩/提交/取消；components/editor 2100–2134区分modified Enter/newline与普通submit，并保留配置submit优先级及bare-LF fallback。本项目采用共享编辑器和分开的换行/提交决定，按自身ParsedKeyEvent将LF作为Ctrl+J；保留Enter暂存/Apply保存的事务。本批没有证明参考项目通用settings字段全部支持多行，也没有扩展主composer按键配置或引入另一套表单编辑器。
+
+最终五文件157项串行通过（input15、settings20、settings/source7、overlay74、surface/view41）。新增验证经真实键盘事件与settings writer输入三行字符串列表、多行对象JSON，Enter前后配置字节不变，重新编辑后Esc保留先前暂存，Apply后磁盘读回并重开编辑器，项目/显式input原字节保留；覆盖单行/遮罩/只读拒绝换行、64KiB上限、超大原值空提交拒绝、1/2/3/4/6/12行与中文emoji、换宽度导航，以及实际InteractiveSurface剩余预算和held主草稿保留。首次114pass/1fail为oversize夹具尚未等待load结束，host正确吞掉loading期间Enter；补来源就绪后通过。后续115/156与最终157重叠不累加。
+
+三个有效反转分别移除换行、恢复整屏height、移除rejected-prefill准入，新增行为断言均AssertionError/exit1；产品文件逐字节恢复后完成最终157项。两模式120×60小型真实Node PTY均通过键盘三项list、多行object、暂存不写、编辑Esc保留暂存、Apply磁盘读回和重开完整list；零message、无session modelSelection、无provider请求，结束143是SIGTERM清理。首次regular最后期待完整Stored串超时，因为详情原compact36截断，改重开编辑器读取完整值；随后fullscreen在清空已空字段后期待未变化hint重绘超时，改依输入顺序发送并等待新值/焦点及磁盘结果，未改产品以迁就探针。两份失败记录保留；小窗口/resize在真实host/surface测试验证，未冒充桌面终端缩放。
+
+四静态门、责任上限0、TS build与正式CLI judge proven/三satisfied通过，validator由当前归档重新解包。最终build`130a4fb12c18fe5208ac6cff88454116687192baa5ef2fb90a47b542c95d03e4`，inputs`8bb3f560e1fad9c87650e6edd6fbd59d1be68120a51e313bc182ebd6e3d3ca18`，artifact`44d755df4a5316220f3fb137ed3fb66e8ace9b1e80c04a727342623abbf223e9`。工件归档`.omx/artifacts/phase20-addition-editor/`，指南补充实际按键，HANDOFF记录预算/拒绝预填/差分绘制陷阱。严格docs drift、链接检查及Git交付按随后实际结果记录。
+
+完整settings/model看齐继续按第3节全部路径验收；允许选中具体未配置模型的要求不改回跳过导航，消息顶格与箭头、正文path suggestion/Tab、多skill与准入slash组合包括deep-research均保留。当前完整字段/来源/鼠标/resize/桌面、真实认证、冷/热Node/exe性能、原生tokenizer、其他独立命令/研究preview、精确source字节与发现成本及用户真实1.7k/4.9k差额仍待补证。第九browser-cache writer退出1仍未归因；未运行全仓本地回归、并发重验证或20k真实PTY。原Phase20保持38 complete / 9 partial，ADD单独跟踪，整体目标保持active。
+
+本批严格docs drift与diff实际通过，保留118条既有advisory；addition86/audit87/guide1本地链接目标存在。第十五CI完整日志实际993files/10790tests通过、3skip，第十六993files/10792tests通过、3skip，两者结构proven；日志归档editor，不转记本批或第十七提交，也不将未读取的Watch工件称已通过。

@@ -9190,3 +9190,11 @@ ADD-08模板声明增加显式preparePrompt，原execute和preview复用expandTe
 ADD-02/03原navigation select/内容click遗漏焦点域交接，现侧栏categories、内容rows、settings section独立point，保留search和精确行；overlay即时废弃旧hit，导航height≤2不登记被裁掉项。参考scope/list焦点与可见frame命中，保留点击聚焦/Enter操作，未新增hover/wheel或自动auth。
 
 四文件144pass、三有效反转/字节恢复后7pass（重叠），普通/全屏实际SGR两小PTY分类→内容→键盘→精确setting/model详情、原config字节/零model切换/零message通过，结束143；40列/极矮/resize属于overlay host而非桌面。夹具同名详情坐标/字段误期望、早期无效height反转及PTY绘制/同步/freshness修正保留分类。静态门/责任上限0/build6a06f16db5e6/正式judge proven三satisfied、严格docs/diff通过、118既有advisory保留，addition83/audit86本地链接存在；Git另绑定。原Phase38/9和完整面板/性能/真实计量边界不变，详见addition15第十七批。
+
+## [2026-10-26] fix | 设置多行键盘编辑与实际行预算
+
+ADD-03 list/object复用原Editor支持Shift+Enter/Ctrl+J，Enter暂存/Apply保存/Esc保留之前暂存；普通form使用availableRows，全屏使用height，短窗口保留caret并退化标题。拒绝超大预填保持不可提交至明确替换/清空，避免空值覆盖。参考共享form与独立newline/submit决定，保留本项目设置事务与遮罩/只读边界。
+
+五文件157pass、三有效反转/字节恢复、两模式小Node PTY键盘三项list与多行object/不写暂存/取消/Apply读回重开/零message-model切换通过，SIGTERM143；初轮来源未就绪、Stored截断、fullscreen不重绘不变hint的夹具错误保留分类。四静态门/责任上限0/build130a4fb12c18/正式judge proven三satisfied通过；严格docs/链接与Git另绑定。addition第3节明确多行/预算/超大原值验收，第15节第十八批记证据，audit末尾刷新存在/不成立/未知总括。第十五/十六CI实际success，第十七仍运行；原Phase38/9及完整面板/性能/计量partial边界不变。
+
+严格docs/diff随后实际通过、118既有advisory保留，addition86/audit87/guide1本地链接存在。第十五完整CI993files/10790tests pass、第十六993files/10792tests pass、各3skip/结构proven，日志归档editor；不转记本批或读取未检查的Watch工件。

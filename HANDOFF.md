@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Input Forms Need Remaining Rows And Safe Rejected Prefills
+- **Symptom**: A settings editor loses its caret in short windows, cannot type a list newline, or Enter stages an empty value after an oversized prefill was refused.
+- **Root Cause**: The form budget used terminal height instead of available chrome rows, modified Enter never reached the shared editor, and validation replaced the constructor's rejection state. Fullscreen differential painting also does not repaint unchanged hints after clearing an already empty field.
+- **Rule**: Use the remaining row allocation for ordinary forms, retain the fullscreen viewport allocation, and prioritize the shared editor's caret row before optional headings. Opt in multiline fields while keeping Enter stage and Apply save distinct. Keep rejected-prefill admission until explicit replacement or clear. PTY probes should synchronize on changed value/focus or persisted bytes rather than require unchanged hints to repaint.
+
 ### Pointer Focus Must Follow The Painted Navigation Pane
 - **Symptom**: Clicking a content row changes the visible selection, but subsequent arrows still move sidebar categories; very short frames can retain a hit target for a row that was clipped away.
 - **Root Cause**: OptionModel focus and catalogue navigation domains were updated independently. Hit registration also forced one item even when the viewport had no item capacity.

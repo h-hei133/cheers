@@ -248,7 +248,7 @@ export class OverlayHost {
     this.renderedWidth = width;
     const picker = this.picker;
     if (!picker) return [];
-    if (this.input) return this.input.render(picker.title, width, height);
+    if (this.input) return this.input.render(picker.title, width, this.fullScreen ? height : availableRows);
 
     if (this.subMode === "confirm-delete") {
       return this.renderConfirmDelete(width, height);
