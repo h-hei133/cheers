@@ -306,3 +306,5 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 | 尚未确认 | 用户原现场无按键交互的精确原因；相同模型/协议/规则/工具schema下1.7k与4.9k差额；真实冷/热Node/exe和桌面启动收益；真实OAuth/key provider接受；第九批browser-cache多进程writer退出1的具体原因。无证据时既不写成已修复，也不写成不存在 |
 
 “允许选中未配置模型”始终指具体候选可获得焦点并进入配置流程；不能改回跳过它们。两个面板整体向oh-my-pi看齐的要求保留，验收仍按完整操作路径而非外观标签。第十一批`ea4715b6`已推送；第十/十一批CI本轮实际读回仍in_progress。当前实现、历史失败、验证边界与后续修补统一见[补充规划第15节第十二批](phase-20-addition.md#15-实施与验证证据)。
+
+已有pending/error连接无法再次配置的确定缺口本轮已补：具体行保留setup状态并可进入key配置或适用的native登录；新增连接返回原model，旧连接不被虚报修复，会话仍需显式启用。两模式十条小型真实Node PTY及最终五文件90项通过，OAuth/key使用synthetic fixture；原现场精确按键故障、真实provider和整体面板/性能验收仍未完成。第十CI实际success，第十一CI实际navigation无endpoint旧fixture期待失败，已补精确地址与返回身份断言，历史失败保留；第十二CI仍pending。细节与剩余边界见[补充规划第15节第十三批](phase-20-addition.md#15-实施与验证证据)。

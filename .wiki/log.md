@@ -9152,3 +9152,11 @@ model配置入口用单行遮罩InputForm，字符映射为字素圆点/caret，
 ADD-03字段增加Values and sources，经共享有界InputForm只读换行/滚动查看Effective/Accepted/Stored、来源、scope、应用/信任；编辑/paste/清空/undo阻断，Enter/Esc保留暂存回原字段，显式input/环境只读、保存仍走primary user/project原事务。长来源后的有效差异说明曾被footer截掉，调整为先报结果；参考焦点/编辑/preview决策，保留本项目分层语义。
 
 串行六文件150pass、两有效反转AssertionError/字节恢复后10pass（重叠），提示调整后150重验，四静态门/diff、责任上限0、最终build0391e135b3ad/正式judge proven三satisfied。两模式×两信任四条小型Node PTY来源查看不写、实际project scope/Apply/重开Stored22、user/input字节不变、有效31/11保留通过，退出143；fixture root/newline及JSONC/override误假设纠正记录于addition15第十二批。没有provider/全仓本地/20k/桌面证据；完整面板、上下文及性能仍partial，原Phase38/9不变，本批实际交付另绑定。
+
+第十二9de2aef8399caaeb730b4d5308eeec2646ffd42d已推送/main远端一致且clean，CI40234533173随后实际in_progress；Watch40234533171仅workflow success未读工件。
+
+## [2026-10-26] fix | 已有失败模型连接的配置恢复入口
+
+model保留pending/error显示事实，三类missing/pending/error行允许遮罩配置；native登录加具体connection endpoint护栏，canonical目录里的relay不误获OAuth。复用connect新增事务，旧record不变、新connection返回具体model、显式随后启用；不引入原地credential writer。参考locked provider登录委托决策，保留具体行浏览增强。
+
+最终五文件90pass，两个有效反转AssertionError/字节恢复后24pass（重叠）；初版relay fixture残留active ID被配置保护拒绝后纠正。两模式error账号success/failure/实际Ctrl+C六条、pending key save/Esc四条小PTY通过，旧record/新状态/readback/零选择回合/遮罩/历史无key均核验，synthetic认证非真实provider，结束143。四静态门/diff/责任上限0/build/正式judge proven三satisfied，最终身份另绑定。第十CI40232077709实际success10752pass/3skip；第十一40232991686唯一navigation无endpoint旧fixture失败10760pass/1fail/3skip，补HTTPS及Esc原身份断言并纳入90pass，历史失败不追改。第十二CI仍运行，第九cache子进程根因仍未知；整体ADD和原Phase38/9边界保留，详见addition15第十三批。

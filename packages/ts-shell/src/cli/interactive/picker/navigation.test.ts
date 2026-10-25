@@ -59,6 +59,7 @@ it('navigates category/section/row domains, edits a real number, discards and re
 it('browses an unavailable provider through navigation then returns from inspection at narrow and wide sizes', async () => {
   const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
   const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'anthropic' as const, auth: 'api-key' as const,
+    baseUrl: 'https://fixture.example.invalid/v1',
     models: [{ id: 'missing-a' }, { id: 'missing-b' }] }];
   const picker = modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) });
   const overlay = new OverlayHost(() => {}); overlay.open(picker); await settle();
@@ -75,5 +76,9 @@ it('browses an unavailable provider through navigation then returns from inspect
     if (result?.next) overlay.open(result.next);
   }); });
   await pending; await settle(); expect(view(overlay)).toContain('Configure connection');
+  overlay.handleKey(parseKeyEvent('\x1b'), vi.fn()); await settle();
+  expect(view(overlay)).toContain('▸ missing-b'); expect(view(overlay, 40)).toContain('missing-b');
+  const retained = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), retained);
+  expect(retained.mock.calls[0]?.[1]).toEqual([`model:${JSON.stringify([null, 'fixture', 'missing-b'])}`]);
   overlay.close();
 });

@@ -18,10 +18,11 @@ export interface ModelKey {
 export type ModelSignIn = (provider: RuntimeProvider, key?: ModelKey) => Promise<{ readonly context: CommandContext; readonly note: string }>;
 
 /** Native account login never authenticates a custom relay sharing the same runtime. */
-export function modelAccountSignIn(provider: CatalogProvider, model: string): boolean {
+export function modelAccountSignIn(provider: CatalogProvider, model: string, endpoint = provider.baseUrl): boolean {
   const builtin = BUILTIN_PROVIDERS.find(entry => entry.id === provider.runtime);
   const allowed = providerFacts(provider.runtime).accountAuthAllowedModels;
   return provider.id === provider.runtime && provider.baseUrl === builtin?.baseUrl
+    && Boolean(endpoint && builtin?.baseUrl && endpoint.replace(/\/+$/, '') === builtin.baseUrl.replace(/\/+$/, ''))
     && Boolean(resolveProviderAuthContract(provider.runtime)) && (!allowed || allowed.includes(model));
 }
 

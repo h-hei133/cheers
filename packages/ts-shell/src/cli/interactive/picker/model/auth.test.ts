@@ -7,7 +7,8 @@ import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, wr
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
 import { runConnectCommand, __setOpenAIAccountAuthRunnerForTest } from '../../../../core/commands/connectCommandRuntime.js';
-import { modelSignInPicker, modelSignInStatus } from './auth.js';
+import { modelSignInPicker, modelSignInStatus, modelAccountSignIn } from './auth.js';
+import { BUILTIN_PROVIDERS } from '../../../../core/models/catalog.js';
 import type { CommandContext } from '../../../../core/commands/types.js';
 import { OverlayHost } from '../../overlay.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
@@ -158,6 +159,44 @@ it.each(['session', 'workspace'] as const)('does not reopen a model after the si
     ...original, ...(change === 'session' ? { sessionId: 'other' } : { cwd: `${home}/other`, projectRoot: `${home}/other` }) } }), current => modelPicker(current));
   await picker.load(); const result = await picker.apply(['start']);
   expect(result).toEqual({ note: 'Authentication result retained' });
+});
+
+it.each(['credential-missing', 'pending', 'error'] as const)('offers native sign-in for an existing %s builtin account connection without changing its old state', async state => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const previous = { id: 'account-broken', provider: 'openai' as const, authType: 'account-auth' as const, model: 'gpt-5.4-mini',
+    status: state === 'credential-missing' ? 'connected' as const : state, createdAt: '2026-01-01', updatedAt: '2026-01-01' };
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: undefined, providerConnections: [previous], providerCredentials: {} }, edit);
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'gpt-5.4-mini', reasoning: true }] }]);
+  __setOpenAIAccountAuthRunnerForTest(async () => ({ accessToken: 'synthetic-reconnect-account', refreshToken: 'synthetic-reconnect-refresh',
+    expiresAt: Date.now() + 3600000, authorizeUrl: 'https://auth.openai.com/authorize', callbackUrl: 'http://localhost:1455/auth/callback' }));
+  const signIn = async (provider: import('../../../../config/runtimeConfig.js').RuntimeProvider) => ({
+    context: context(), note: (await runConnectCommand(['login', provider, '--account'], context())).output,
+  });
+  const picker = modelPicker(context(), undefined, undefined, undefined, undefined, signIn);
+  const model = (await picker.load()).find(row => row.id === id('account-broken', 'gpt-5.4-mini'))!;
+  expect(model).toMatchObject({ disabled: true, focusable: true });
+  const details = (await picker.inspect!(model.id))!.next!;
+  expect((await details.load()).some(row => row.id === 'account')).toBe(true);
+  const confirmation = (await details.apply(['account']))!.next!; await confirmation.load();
+  const result = (await confirmation.apply(['start']))!; await result.next!.load();
+  const connections = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerConnections!;
+  expect(connections.find(row => row.id === previous.id)).toEqual(previous);
+  expect(result.next!.initialSelection).toBe(id(connections[0]!.id, 'gpt-5.4-mini'));
+  expect(readSessionModel(sessionId)).toBeUndefined();
+});
+
+it('excludes a custom relay address from builtin account sign-in even when its catalogue uses the canonical provider id', async () => {
+  const builtin = BUILTIN_PROVIDERS.find(provider => provider.id === 'openai')!;
+  expect(modelAccountSignIn(builtin, 'gpt-5.4-mini', builtin.baseUrl + '/')).toBe(true);
+  expect(modelAccountSignIn(builtin, 'gpt-5.4-mini', 'https://relay.example.invalid/v1')).toBe(false);
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: undefined, providerConnections: [{ ...edit.values.providerConnections![0]!,
+    id: 'relay-error', status: 'error', model: 'gpt-5.4-mini' }] }, edit);
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'gpt-5.4-mini', reasoning: true }] }]);
+  const picker = modelPicker(context(), undefined, undefined, undefined, undefined, vi.fn());
+  const model = (await picker.load()).find(row => row.id === id('relay-error', 'gpt-5.4-mini'))!;
+  const details = (await picker.inspect!(model.id))!.next!;
+  expect((await details.load()).map(row => row.id)).toEqual(['back', 'configure']);
 });
 
 it('rejects an expired model sign-in confirmation and does not offer native account login for a custom relay', async () => {

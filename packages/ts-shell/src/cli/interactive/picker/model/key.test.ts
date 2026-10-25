@@ -92,3 +92,31 @@ it('does not fall back to a builtin credential endpoint when a relay has no usab
   expect((await details.load()).map(row => row.id)).toEqual(['back']);
   expect(await details.apply(['configure'])).toBeUndefined();
 });
+
+it.each(['credential-missing', 'pending', 'error'] as const)('offers masked reconnection for an existing %s relay while retaining its exact target and old record', async state => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const previous = { id: 'broken', provider: 'openai' as const, model: 'relay-model', label: 'Relay exact', authType: 'api-key' as const,
+    baseUrl: 'https://relay.example.invalid/v1', status: state === 'credential-missing' ? 'connected' as const : state,
+    ...(state === 'credential-missing' ? {} : { apiKey: 'synthetic-old-key' }), createdAt: '2026-01-01', updatedAt: '2026-01-01' };
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [...edit.values.providerConnections!, previous] }, edit);
+  const original = readSessionModel(sessionId);
+  const signIn: ModelSignIn = async (provider, key) => ({ context: context(), note: (await runConnectCommand([
+    'login', provider, '--api-key', key!.apiKey, '--model', key!.model, '--base-url', key!.baseUrl!, '--label', key!.label,
+  ], context())).output.split('\n').filter(line => !line.startsWith('Saved key:')).join('\n') });
+  const picker = modelPicker(context(), undefined, undefined, undefined, undefined, signIn);
+  const target = (await picker.load()).find(row => row.id === `model:${JSON.stringify(['broken', 'custom', 'relay-model'])}`)!;
+  expect(target).toMatchObject({ disabled: true, focusable: true });
+  expect(picker.detail!(target.id)).toContain(`Availability: ${state === 'pending' ? 'setup pending' : state === 'error' ? 'setup error' : 'credential missing'}`);
+  const details = (await picker.inspect!(target.id))!.next!;
+  expect((await details.load()).map(row => row.id)).toEqual(['back', 'configure']);
+  const form = (await details.apply(['configure']))!.next!; await form.load(); expect(form.input?.masked).toBe(true);
+  const result = (await form.input!.apply('synthetic-reconnected-key'))!;
+  const config = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+  expect(config.providerConnections!.find(row => row.id === 'broken')).toEqual(previous);
+  const next = config.providerConnections![0]!;
+  expect(next).toMatchObject({ label: 'Relay exact', baseUrl: previous.baseUrl, model: previous.model, status: 'connected' });
+  expect(next.id).not.toBe('broken'); expect(readSessionModel(sessionId)).toEqual(original);
+  await result.next!.load(); expect(result.next!.initialSelection).toBe(`model:${JSON.stringify([next.id, 'custom', 'relay-model'])}`);
+  expect((await result.next!.apply([result.next!.initialSelection!]))?.note).toContain('relay-model');
+  expect(readSessionModel(sessionId)?.connectionId).toBe(next.id);
+});

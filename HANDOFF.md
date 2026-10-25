@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Concrete Connection Login Eligibility
+- **Symptom**: Failed connection rows are focusable but offer no recovery, or a canonical provider catalogue offers builtin login for a custom relay.
+- **Root Cause**: Setup state was overwritten by missing-credential projection; recovery only admitted absent connections. Catalogue runtime identity does not establish the selected connection's endpoint identity.
+- **Rule**: Preserve pending/error state, admit explicit credential setup for those rows, and check the concrete endpoint against builtin auth policy. Delegate to the existing connect transaction, retain old records, return the newly created exact connection and require separate session activation. PTY probes must synchronize on connection identity because a same-model current-request report may be focused first.
+
 ### Settings Outcome Before Long Provenance
 - **Symptom**: A configuration save succeeds but a long explicit-input path pushes the effective-value mismatch beyond the visible footer; the source itself is truncated in a row note.
 - **Root Cause**: Single-row notes have a width ceiling and status footers have a fixed line budget. Putting the entire origin before the result hides the information needed to assess the save.

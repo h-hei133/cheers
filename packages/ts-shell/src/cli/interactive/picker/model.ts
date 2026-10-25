@@ -111,7 +111,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
                 metadata?.contextWindow ? `${Math.round(metadata.contextWindow / 1000)}k` : undefined].filter(Boolean).join(' · '),
               note: selected ? 'active' : reason ?? (connection ? availabilityLabel(connection.state) : 'ready'),
               ...(reason ? { disabled: true, focusable: true } : {}) });
-            const displayed = connection && (resolution?.blocked || !resolution?.credential)
+            const displayed = connection?.state === 'ready' && (resolution?.blocked || !resolution?.credential)
               ? { ...connection, state: 'credential-missing' as const, reason: 'This explicit connection needs its own credential.' } : connection;
             details.set(id, [...modelDetails(provider, displayed, !connection ? resolution?.credential?.source : undefined),
               ...(!connection && resolution?.baseUrl ? [`Endpoint: ${endpointLabel(resolution.baseUrl)}`] : []), `Reasoning effort: ${assignedEffort ?? 'auto'}`,
@@ -119,10 +119,11 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             if (reason) {
               const endpoint = config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
               const safeEndpoint = connectionEndpoint(endpoint);
-              const canConfigure = !connection && !providerSlot || reason === 'credential unavailable' || connection?.state === 'credential-missing';
+              const canConfigure = !connection && !providerSlot || reason === 'credential unavailable'
+                || Boolean(connection && ['credential-missing', 'pending', 'error'].includes(connection.state));
               const draft = canConfigure && (!endpoint || safeEndpoint) && (provider.id === provider.runtime || safeEndpoint)
                 ? connectionDraft(provider, model.id, endpoint, connection?.label ?? provider.id) : undefined;
-              const account = signIn && !connection && !resolution?.credential && modelAccountSignIn(provider, model.id);
+              const account = signIn && canConfigure && modelAccountSignIn(provider, model.id, endpoint);
               const back = (fresh: CommandContext, result?: string, connectionId?: string) => {
                 const refreshed = assigning ? { ...assigning, assign: prepareModelRole(fresh, assigning.role).assign,
                   back: (note?: string) => assigning.back(note, fresh) } : undefined;
