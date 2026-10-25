@@ -44,11 +44,12 @@ export function contentRow(
   const accent = state.busy ? "warning" : "accent";
   const gutter = first ? defaultTheme.fg(accent, sliceWithWidth(shape.gutter, 0, frame.gutter).text) : " ".repeat(frame.gutter);
   const left = frame.left ? defaultTheme.fg(shape.filled ? accent : "border", sideGlyph(shape, true, merged)) : "";
-  const padding = " ".repeat(frame.padding);
-  const contentColumn = frame.left + frame.gutter + frame.padding;
+  const paddingLeft = " ".repeat(frame.paddingLeft);
+  const paddingRight = " ".repeat(frame.paddingRight);
+  const contentColumn = frame.left + frame.gutter + frame.paddingLeft;
   const fill = " ".repeat(Math.max(0, frame.text - visibleWidth(content)));
-  let interior = gutter + padding + content;
-  if (!imeSafeCursorTail) interior += merged ? padding + "─".repeat(fill.length) : fill + padding;
+  let interior = gutter + paddingLeft + content;
+  if (!imeSafeCursorTail) interior += merged ? paddingRight + "─".repeat(fill.length) : fill + paddingRight;
   if (shape.filled && frame.left > 0) interior = defaultTheme.bg("statusBandBg", interior);
   const right = !imeSafeCursorTail && frame.right > 0
     ? defaultTheme.fg(scrollbarThumb ? "scrollbarThumb" : shape.filled ? accent : "border", scrollbarThumb ? "█" : sideGlyph(shape, false, merged)) : "";

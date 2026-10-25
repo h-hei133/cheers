@@ -2,7 +2,7 @@ import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { neutraliseForDisplay } from "../../../core/text/safety.js";
-import type { Option, OptionModel } from "./options.js";
+import { isFocusable, type Option, type OptionModel } from "./options.js";
 import type { ChipStrip } from "./chips.js";
 
 /**
@@ -95,7 +95,7 @@ export function renderPanel(
   for (let rowIndex = 0; rowIndex < bodyRows; rowIndex++) {
     const index = window.offset + rowIndex;
     const option = model.visible[index];
-    if (option && !option.disabled) chrome.onOptionRow?.(rows.length, option.id, 0, listWidth);
+    if (option && isFocusable(option)) chrome.onOptionRow?.(rows.length, option.id, 0, listWidth);
     const row = option ? renderRow(option, index === model.selectedIndex, model, chrome, labelWidth, listWidth) : "";
     rows.push(twoColumn
       ? padToWidth(truncateToWidth(row, listWidth), listWidth) + defaultTheme.fg("border", "│")

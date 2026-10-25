@@ -9059,3 +9059,9 @@ MCP测试/证据df0a8583cedcf22df497ecf768e17ee19b1aa03d已提交/推送、main�
 新增[Phase 20补充规划](features/phase-20-addition.md)，14节/13项ADD任务详细记录settings/model整体看齐、未配置模型可选、resume自动/手动焦点、消息顶格/编辑箭头、提前TUI首帧、上下文估算/目录措辞、正文路径Tab补全、同提交多skill及准入slash组合，deep-research+skills为必达。修正调查中model现场根因的过强表述：上下键零可见交互是用户观察，单ready/禁用候选造成假象是源码支持的推测，仍需实际按键链验收。最新几何/面板要求覆盖旧裁决，决策和索引已链接，原47项状态不变。
 
 定向只读参考确认正文skill限定、局部token替换和路径后备；当前参考parseSkillInvocation/构造只处理一个skill，未将用户多skill观察冒充全量注入证据，补充任务要求检查实际多skill payload。新增文档39个本地链接、调查77个及关联文档/索引目标与源码行号检查通过，严格docs drift/diff check通过，既有118advisory保留。仅Markdown，未产品实施/测试/构建/provider/PTY，文档尚未提交。
+
+## [2026-10-26] fix | 首批交互增补
+
+需求文档基线`0f12984`已提交。实现未配置模型可聚焦/详情与启用准入分离，Enter进入inspection，精确模型配置草稿复用connect、返回保留ID；resume untouched默认随渐进结果取最新，手动焦点保留且重开清搜索；已提交消息全宽顶格、末尾换行复制源对齐，普通composer恢复箭头并独立左右padding。ADD-01部分，ADD-04/05/06本地实现验证通过，其余任务继续；原47项验收不变。
+
+主代理串行静态五门/diff通过（118既有advisory），模块责任上限0。最终受影响六文件147pass、overlay/options94pass、此前geometry/layout18pass；六源码旧实现有效反转各行为失败并逐字节恢复。TS build`adf30efee228`，Linux隔离regular/fullscreen小型真实PTY↑↓/Enter/Back/Esc及arrow通过，活动连接未改。无真实provider、全仓回归或20k真实PTY，桌面IME/系统剪贴板和完整模型配置回返仍缺，代码提交/推送另绑定。

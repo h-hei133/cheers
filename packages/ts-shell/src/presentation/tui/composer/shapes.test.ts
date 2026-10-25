@@ -40,12 +40,12 @@ describe("composer shapes", () => {
     const rows = layoutComposer(draft("x"), { busy: false }, 40).rows.map((row) => stripAnsi(row.rendered));
     expect(rows).toHaveLength(3);
     expect(rows[0]).toBe("─".repeat(40));
-    expect(rows[1]).toMatch(/^ x/);
+    expect(rows[1]).toMatch(/^❯ x/);
     expect(rows[2]).toBe("─".repeat(40));
   });
 
   it("reserves real whitespace independently from gutter and side decoration", () => {
-    const expected = { default: 38, band: 35, borderless: 38, "top-rule": 38, "padded-rules": 38, field: 36, rail: 37, box: 36 };
+    const expected = { default: 37, band: 35, borderless: 37, "top-rule": 37, "padded-rules": 38, field: 36, rail: 37, box: 36 };
     for (const shape of shapes) {
       expect(composerTextWidth(40, shape)).toBe(expected[shape]);
       const row = contents(layoutComposer(draft("x", false), { busy: false, shape }, 40))[0]!;
@@ -53,6 +53,16 @@ describe("composer shapes", () => {
       expect(plain.slice(row.contentColumn - 1, row.contentColumn)).toBe(" ");
       expect(plain.slice(row.cells[0]!.columnEnd, row.cells[0]!.columnEnd + 1)).toBe(" ");
     }
+  });
+
+  it.each(['default', 'borderless', 'top-rule'] as const)('starts the %s arrow at the boundary and aligns continuation text', shape => {
+    const layout = layoutComposer(draft('first\n  中e\u0301👩‍💻'), { busy: false, shape }, 40);
+    const rows = contents(layout);
+    expect(stripAnsi(rows[0]!.rendered)).toMatch(/^❯ first/);
+    expect(stripAnsi(rows[1]!.rendered)).toMatch(/^    中/);
+    expect(rows.map(row => row.contentColumn)).toEqual([2, 2]);
+    const marker = rows[1]!.rendered.indexOf(CURSOR_MARKER);
+    expect(visibleWidth(rows[1]!.rendered.slice(0, marker))).toBe(9);
   });
 
   it("attaches the correct status groups, rules, gap and filled band", () => {

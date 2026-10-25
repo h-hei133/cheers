@@ -69,6 +69,15 @@ describe("filtering", () => {
 });
 
 describe("cursor", () => {
+  it('browses unavailable models while retaining disabled multi-select admission', () => {
+    const list = new OptionModel();
+    list.setOptions([{ id: 'ready', label: 'ready' }, { id: 'missing', label: 'missing', disabled: true, focusable: true }]);
+    list.step(1); expect(list.current()?.id).toBe('missing');
+    list.toggle(); expect(list.chosenIds()).toEqual([]);
+    list.setOptions([{ id: 'missing', label: 'missing', disabled: true, focusable: true }]);
+    expect(list.current()?.id).toBe('missing');
+    list.focus('missing'); expect(list.current()?.disabled).toBe(true);
+  });
   it("skips rows that cannot be chosen", () => {
     const list = model();
     list.step(1);

@@ -7,6 +7,8 @@ import { availabilityLabel, availabilitySnapshot } from "../../../core/models/av
 import type { CommandContext } from "../../../core/commands/types.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
+import { quoteCompletion } from '../completion.js';
+import type { CatalogProvider } from '../../../core/models/catalog.js';
 
 /**
  * Provider chooser.
@@ -84,13 +86,23 @@ export function connectionPicker(context: CommandContext): Picker {
       // catalogue: the request shape, the endpoint, and a model to start on.
       const provider = (context.readConfiguration?.().catalog ?? loadCatalog()).find((candidate) => candidate.id === target);
       if (!provider) return undefined;
-      const parts = [`/connect login ${provider.runtime}`];
-      if (provider.baseUrl) parts.push(`--base-url ${provider.baseUrl}`);
-      if (provider.models[0]) parts.push(`--model ${provider.models[0].id}`);
-      parts.push(`--label ${provider.id}`, "--api-key ");
-      return { draft: parts.join(" ") };
+      return { draft: connectionDraft(provider, provider.models[0]?.id) };
     },
   };
+}
+
+/** Exact catalogue target; preparing a command never authenticates or persists. */
+export function connectionDraft(provider: CatalogProvider, model?: string, endpoint = provider.baseUrl, label = provider.id): string {
+  const parts = [`/connect login ${provider.runtime}`];
+  let safeEndpoint: string | undefined;
+  try {
+    const url = new URL(endpoint ?? '');
+    if (url.protocol === 'http:' || url.protocol === 'https:') safeEndpoint = `${url.origin}${url.pathname}`;
+  } catch { /* A missing or invalid endpoint is supplied explicitly by the user. */ }
+  if (safeEndpoint) parts.push(`--base-url ${quoteCompletion(safeEndpoint, '')}`);
+  if (model) parts.push(`--model ${quoteCompletion(model, '')}`);
+  parts.push(`--label ${quoteCompletion(label, '')}`, '--api-key ');
+  return parts.join(' ');
 }
 
 function splitChoice(choice: string): [string, string] {

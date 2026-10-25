@@ -66,6 +66,17 @@ it('copies a full-row selection from source, without padding or soft wraps', () 
   expect(copy).toBe('hello world this wraps\nsecond line');
 });
 
+it('copies boundary-width user text with its original indentation and logical newline', () => {
+  const source = 'abcdefgh\n  中e\u0301👩‍💻  \n';
+  const transcript = new Transcript(); transcript.append(textBlock('user', source));
+  const pane = new TranscriptPane(transcript);
+  const rows = pane.render(8, 10, undefined);
+  const first = rows.findIndex(row => stripAnsi(row) === 'abcdefgh');
+  const last = rows.findLastIndex(row => stripAnsi(row).includes('中'));
+  expect(first).toBeGreaterThanOrEqual(0);
+  expect(copyScreenRows(pane, first, last + 1, 0, 7)).toBe(source);
+});
+
 it('does not copy when the selection starts mid-row or crosses a decoration row', () => {
   const transcript = new Transcript();
   transcript.append(textBlock('user', 'alpha'));

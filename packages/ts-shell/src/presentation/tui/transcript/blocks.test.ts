@@ -18,9 +18,15 @@ describe("prompt echo", () => {
     // turn boundary; padding it to the frame width makes the prompt a board.
     const rows = renderBlock(textBlock("user", "hello"), WIDTH);
     expect(rows[0]).not.toContain("▌");
-    expect(stripAnsi(rows[0]!)).toBe(' hello' + ' '.repeat(WIDTH - 6));
+    expect(stripAnsi(rows[0]!)).toBe('hello' + ' '.repeat(WIDTH - 5));
     expect(rows[0]).toContain("\x1b[48;");
     expect(visibleWidth(rows[0]!)).toBe(WIDTH);
+  });
+
+  it('wraps against the whole width and retains source indentation without decoration', () => {
+    const rows = renderBlock(textBlock('user', 'abcdefgh\n  中e\u0301👩‍💻'), 8).map(stripAnsi);
+    expect(rows[0]).toBe('abcdefgh');
+    expect(rows[1]).toBe('  中e\u0301👩‍💻 ');
   });
 
   it("wraps within the frame for wide characters too", () => {

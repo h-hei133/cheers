@@ -38,10 +38,11 @@ it('never exceeds the terminal width or the supplied row budget across shapes an
   }
 });
 
-it('uses one cell of padding on each side instead of two', () => {
+it('uses only the cue gap for ordinary composers and preserves other shapes', () => {
+  const columns = { default: 2, band: 4, borderless: 2, 'top-rule': 2, 'padded-rules': 1, field: 2, rail: 2, box: 2 };
   for (const shape of shapes) {
     const layout = layoutComposer(new Editor(), { busy: false, shape }, 120);
     const content = layout.rows.find(row => row.kind === 'content');
-    if (content) expect(content.contentColumn).toBeLessThanOrEqual(4 + COMPOSER_SHAPES[shape].gutter.length);
+    expect(content?.contentColumn).toBe(columns[shape]);
   }
 });

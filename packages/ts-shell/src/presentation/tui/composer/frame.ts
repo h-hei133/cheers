@@ -9,7 +9,8 @@ export interface ComposerFrame {
   readonly gutter: number;
   readonly left: number;
   readonly right: number;
-  readonly padding: number;
+  readonly paddingLeft: number;
+  readonly paddingRight: number;
   readonly text: number;
 }
 
@@ -24,17 +25,17 @@ export interface ComposerChrome {
   readonly contentRows: number | undefined;
 }
 
-/** Drop decoration before reducing the two whitespace paddings together. */
+/** Drop decoration first; an ordinary prompt's cue already separates its text. */
 export function composerFrame(width: number, shape: ComposerShape, scrolling: boolean): ComposerFrame {
   const bounded = Math.max(0, Math.floor(width));
   let left = shape.side === "none" ? 0 : 1;
   let right = shape.side === "caps" || shape.side === "round" || (shape.side === "rail" && scrolling) ? 1 : 0;
   if (bounded < left + right + 5) left = right = 0;
   const gutter = Math.min(visibleWidth(shape.gutter), Math.max(0, bounded - left - right - 5));
-  // One cell on each side: the gutter already separates the prompt mark, and a
-  // second blank column pushed the text further right than the design allows.
   const padding = Math.min(1, Math.max(0, Math.floor((bounded - left - right - gutter - 1) / 2)));
-  return { width: bounded, left, right, gutter, padding, text: bounded - left - right - gutter - 2 * padding };
+  const paddingLeft = shape.id === 'default' || shape.id === 'borderless' || shape.id === 'top-rule' ? 0 : padding;
+  return { width: bounded, left, right, gutter, paddingLeft, paddingRight: padding,
+    text: bounded - left - right - gutter - paddingLeft - padding };
 }
 
 /** The total budget always leaves an editable row before optional chrome. */

@@ -30,6 +30,20 @@ const press = (overlay: OverlayHost, data: string, apply = vi.fn()): boolean =>
   overlay.handleKey(parseKeyEvent(data), apply);
 
 describe("pointer focus", () => {
+  it('routes Enter on a browsable disabled row to inspection and never activation', async () => {
+    const { overlay } = host();
+    const activate = vi.fn(); const inspect = vi.fn(async () => ({ note: 'configure exact target' }));
+    const chosen = picker({ inspect, apply: activate, load: async () => [
+      { id: 'ready', label: 'ready' }, { id: 'missing', label: 'missing', disabled: true, focusable: true },
+    ], detail: id => [id ?? 'none'] });
+    overlay.open(chosen); await Promise.resolve(); await Promise.resolve();
+    press(overlay, '\x1b[B');
+    expect(stripAnsi(overlay.render(100, 20).join('\n'))).toContain('▸ missing');
+    let outcome: Promise<unknown> | undefined;
+    press(overlay, '\r', (selected: Picker, ids: readonly string[]) => { outcome = selected.apply(ids); });
+    await outcome;
+    expect(inspect).toHaveBeenCalledWith('missing'); expect(activate).not.toHaveBeenCalled();
+  });
   it('starts each new picker with its own selection and cursor state', async () => {
     const { overlay } = host(); const apply = vi.fn();
     overlay.open(picker({ multiple: true })); await Promise.resolve(); await Promise.resolve();

@@ -114,6 +114,13 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
   };
   const allProjects = options.allProjects === true;
   return {
+    onOpen() {
+      lastQuery = options.initialQuery?.trim() || undefined;
+      searchProjection = undefined;
+      activeSource = 'base';
+      searchPending = false;
+      searchComplete = false;
+    },
     title: options.action === 'pin' ? 'Pin saved session' : 'Resume session',
     form: "panel",
     fullScreen: true,
@@ -137,7 +144,12 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     footer: [options.action === 'pin' ? 'Enter: toggle pin.' : undefined,
       'Session files: logical size; excludes attachments.',
       'Pages reuse a bounded browse index; reopen to include changes to earlier pages.'].filter(Boolean).join(' '),
-    get initialSelection() { return expected.sessionId; },
+    defaultSelection: rows => {
+      const summaries = activeProjection()?.summaries;
+      return rows.filter(row => !row.disabled && summaries?.has(row.id))
+        .sort((left, right) => (summaries!.get(right.id)!.updatedAt ?? '').localeCompare(summaries!.get(left.id)!.updatedAt ?? '')
+          || left.id.localeCompare(right.id))[0]?.id;
+    },
     get initialFilter() { return options.initialQuery?.trim() || undefined; },
     onSearchChange(query) {
       searchGeneration++;

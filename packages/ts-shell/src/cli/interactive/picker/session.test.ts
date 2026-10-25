@@ -40,7 +40,7 @@ function fixture(
     pin, picker: sessionPicker({ sessionManager: manager, context: () => ({ ...context }), resume, delete: remove, rename, pin, ...overrides }) };
 }
 
-it('focuses the current identity beyond the recent forty without importing another project', async () => {
+it('keeps current visible beyond forty while defaulting to the latest authorized session', async () => {
   const entries = Array.from({ length: 45 }, (_, index) => session(`recent-${index.toString().padStart(2, '0')}`));
   entries.push(session('current', '2025-01-01T00:00:00.000Z'), session('foreign', '2027-01-01T00:00:00.000Z', '/elsewhere'));
   const { picker } = fixture(entries);
@@ -52,7 +52,32 @@ it('focuses the current identity beyond the recent forty without importing anoth
   expect(selectable[0]?.detail).toContain('2.0 KiB'); expect(selectable[0]?.detail).not.toMatch(/turns?/);
   const overlay = new OverlayHost(() => {}); overlay.open(picker); await new Promise(resolve => setTimeout(resolve, 0));
   const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
-  expect(apply).toHaveBeenCalledWith(picker, ['current']);
+  expect(apply).toHaveBeenCalledWith(picker, ['recent-00']);
+});
+
+it.each([false, true])('follows newest progressive results unless the user touches selection (%s)', async touched => {
+  const older = session('current', '2026-10-24T00:00:00Z'); older.pinned = true;
+  const latest = ['09', '11', '10'].map(hour => session(`today-${hour}`, `2026-10-26T${hour}:00:00Z`));
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
+  const records = new Map([older, ...latest].map(item => [item.id, item]));
+  const manager = { catalog: { async *list() {
+    yield { ...sessionChoices([summarizeSession(older, 'version')], context, 40), scanned: 1, unreadable: 0, limited: 0, status: 'scanning' };
+    await gate;
+    for (let index = 0; index < latest.length; index++) yield {
+      ...sessionChoices([older, ...latest.slice(0, index + 1)].map(item => summarizeSession(item, 'version')), context, 40),
+      scanned: index + 2, unreadable: 0, limited: 0, status: index === 2 ? 'complete' : 'scanning',
+    };
+  } }, getSession: (id: string) => records.get(id), files: { sizes: async () => new Map() } } as unknown as SessionManager;
+  const chosen = sessionPicker({ sessionManager: manager, context: () => context, resume: vi.fn() });
+  const overlay = new OverlayHost(() => {}); overlay.open(chosen);
+  await vi.waitFor(() => expect(stripAnsi(overlay.render(100, 24).join('\n'))).toContain('Loading sessions: 1'));
+  if (touched) overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn()); // even a one-row wrap is explicit intent
+  release();
+  await vi.waitFor(() => expect(stripAnsi(overlay.render(100, 24).join('\n'))).toContain('today-11'));
+  const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(apply).toHaveBeenCalledWith(chosen, [touched ? 'current' : 'today-11']);
 });
 
 it('pins through the offered version, preserves the query and refreshes the same action without resuming', async () => {
@@ -324,7 +349,6 @@ it('restores base action authority after clearing a completed search', async () 
     for (let index = 0; index < 'other'.length; index++) overlay.handleKey(parseKeyEvent('\x7f'), vi.fn());
     await vi.advanceTimersByTimeAsync(100);
 
-    overlay.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
     const apply = vi.fn();
     overlay.handleKey(parseKeyEvent('\r'), apply);
     expect(apply).toHaveBeenCalledWith(setup.picker, ['current']);
@@ -374,7 +398,6 @@ it('keeps search authority through a mutation reload and restores base authority
 
     for (let index = 0; index < 'other'.length; index++) overlay.handleKey(parseKeyEvent('\x7f'), vi.fn());
     await new Promise(resolve => setTimeout(resolve, 0));
-    overlay.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
     const apply = vi.fn();
     overlay.handleKey(parseKeyEvent('\r'), apply);
     expect(apply).toHaveBeenCalledWith(setup.picker, ['current']);

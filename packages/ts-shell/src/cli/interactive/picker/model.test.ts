@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { modelPicker } from './model.js';
@@ -14,7 +13,8 @@ import { createShellRuntimeContext, refreshShellRuntimeConfig, switchActiveSessi
 import { createCliProviderRuntimeBridge } from '../../provider/cliProviderRuntimeBridge.js';
 import { saveProfileModelPreset } from '../../../core/commands/model/preset.js';
 import { runModelCommand } from '../../../core/commands/modelCommandRuntime.js';
-import { connectionPicker } from './connections.js';
+import { connectionDraft, connectionPicker } from './connections.js';
+import { tokenizeCommandArgs } from '../../../core/commands/arguments.js';
 import { OverlayHost } from '../overlay.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
@@ -23,7 +23,8 @@ let home: string;
 let manager: SessionManager;
 let sessionId: string;
 beforeEach(() => {
-  home = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-model-choice-'));
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  home = fs.mkdtempSync(path.join('/tmp/cheers-test', 'model-choice-'));
   vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
   writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'a', providerConnections: ['a', 'b'].map(id => ({
     id, provider: 'openai' as const, label: `Relay ${id}`, authType: 'api-key' as const, apiKey: `synthetic-${id}`,
@@ -37,6 +38,48 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { re
 
 const id = (connection = 'b', model = 'shared') => `model:${JSON.stringify([connection, 'openai', model])}`;
 const context = () => ({ cwd: home, projectRoot: home, sessionId });
+
+it('prepares exact model tokens and excludes credentials from endpoint drafts', () => {
+  const draft = connectionDraft({ id: 'relay', label: 'Relay', runtime: 'openai', auth: 'api-key', models: [] },
+    'model with "quotes"', 'https://user:synthetic-secret@example.invalid/v1?key=synthetic-secret', 'my relay');
+  expect(draft).not.toContain('synthetic-secret');
+  expect(tokenizeCommandArgs(draft)).toEqual(['/connect', 'login', 'openai', '--base-url', 'https://example.invalid/v1',
+    '--model', 'model with "quotes"', '--label', 'my relay', '--api-key']);
+});
+
+it.each([false, true])('browses unconfigured models through real overlay keys (all missing: %s)', async allMissing => {
+  const catalog = [{ id: 'openai', label: 'OpenAI', runtime: 'openai' as const, auth: 'api-key' as const, models: [{ id: 'shared', reasoning: true }] },
+    { id: 'anthropic', label: 'Anthropic', runtime: 'anthropic' as const, auth: 'api-key' as const,
+      models: ['missing-1', 'missing-2', 'missing-3'].map(id => ({ id, reasoning: true })) }];
+  const configured = getRuntimeConfig(home);
+  const runtimeConfig = { ...configured, activeProviderConnectionId: allMissing ? undefined : 'a',
+    providerConnections: allMissing ? [] : [configured.providerConnections[0]!] };
+  const picker = modelPicker({ ...context(), readConfiguration: () => ({ config: runtimeConfig, catalog, revision: 1 }) });
+  const rows = await picker.load();
+  const target = rows.find(row => row.label === 'missing-2')!;
+  expect(target).toMatchObject({ disabled: true, focusable: true });
+  const before = readSessionModelEdit(sessionId); const global = fs.readFileSync(getUserRuntimeConfigPath());
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected probe'));
+  const overlay = new OverlayHost(() => {}); overlay.open(picker);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  overlay.handlePaste('missing');
+  overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+  const visible = stripAnsi(overlay.render(100, 24).join('\n'));
+  expect(visible).toContain('▸ missing-2'); expect(visible).toContain('configure a connection');
+  let result: ReturnType<typeof picker.apply> | undefined;
+  overlay.handleKey(parseKeyEvent('\r'), (selected, ids) => { result = selected.apply(ids); });
+  const detail = (await result!)?.next!;
+  expect(detail).toBeDefined(); await detail.load();
+  const back = (await detail.apply(['back']))?.next!;
+  expect(back.initialSelection).toBe(target.id);
+  const draft = (await detail.apply(['configure']))?.draft;
+  expect(draft).toContain('/connect login anthropic'); expect(draft).toContain('--model missing-2');
+  overlay.open(back); await new Promise(resolve => setTimeout(resolve, 0));
+  expect(stripAnsi(overlay.render(40, 20).join('\n'))).toContain('▸ missing-2');
+  overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global); expect(fetch).not.toHaveBeenCalled();
+});
 
 it('shows an active pool-outside connection as unavailable and only allows a pool member', async () => {
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
@@ -273,7 +316,7 @@ it('searches a named role and rejects it after the preset owner changes', async 
   const overlay = new OverlayHost(() => {});
   overlay.open(picker);
   await new Promise(resolve => setTimeout(resolve, 0));
-  overlay.handlePaste('review');
+  overlay.handlePaste('Preset: work / review');
   expect(stripAnsi(overlay.render(120, 30).join('\n'))).toContain('Preset: work / review');
 
   expect(saveProfileModelPreset('work', {

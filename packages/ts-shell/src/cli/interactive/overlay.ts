@@ -41,6 +41,8 @@ export interface PickerOutcome {
 }
 
 export interface Picker {
+  /** Start a fresh browsing lifecycle; mutation reloads do not call this. */
+  onOpen?(): void;
   /** Suppress stale UI results; this check never grants write or execution authority. */
   readonly isCurrent?: () => boolean;
   /** Keep typed/pasted input within a staged interaction while its step applies. */
@@ -53,6 +55,8 @@ export interface Picker {
   /** Queue new submissions until a conversation-changing selection has settled. */
   readonly exclusive?: boolean;
   readonly initialSelection?: string;
+  /** Untouched focus follows an owner's preferred candidate as rows arrive. */
+  readonly defaultSelection?: (options: readonly Option[]) => string | undefined;
   readonly initialFilter?: string;
   /** Replace the initial filter after an asynchronous source resolves. */
   readonly resolvedFilter?: string;
@@ -101,6 +105,8 @@ export interface Picker {
   subscribe?(publish: (options: readonly Option[]) => void): () => void;
   /** Apply the choice, reporting what to show or to draft next. */
   apply(ids: readonly string[]): Promise<PickerOutcome | undefined>;
+  /** Browse a disabled-but-focusable row without authorizing its normal action. */
+  inspect?(id: string): Promise<PickerOutcome | undefined>;
   /** Capture an accepted choice before the host releases its browser signal. */
   previewAccept?(): void;
   /**
@@ -173,7 +179,7 @@ export class OverlayHost {
   open(picker: Picker): void {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
-    this.model = new OptionModel(picker.filterOptions);
+    this.model = new OptionModel(picker.filterOptions, picker.defaultSelection);
     ++this.generation;
     this.actionPending = false;
     this.actionNotice = undefined;
@@ -184,6 +190,7 @@ export class OverlayHost {
     this.chipRows.clear();
     this.picker?.previewEnd?.();
     this.picker = picker;
+    picker.onOpen?.();
     this.loading = true;
     this.loadFailed = false;
     this.subMode = "none";
@@ -328,7 +335,7 @@ export class OverlayHost {
       if (this.loading) return true;
       const hit = this.optionRows.get(report.row - top);
       if (hit && report.column >= hit.from && report.column < hit.to) {
-        this.model.focus(hit.id);
+        this.model.focus(hit.id, true);
         if (!this.picker.multiple) this.picker.previewChange?.(idsOf(this.model.current()));
         this.onChange();
       }
@@ -767,6 +774,15 @@ export class OverlayHost {
 
   private accept(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void, directIds?: readonly string[]): void {
     if (directIds?.some(id => !this.model.visible.some(option => option.id === id && !option.disabled))) return;
+    const current = this.model.current();
+    if (directIds === undefined && !picker.multiple && current?.disabled) {
+      if (!picker.inspect) return;
+      const inspect = picker.inspect;
+      this.release();
+      this.onChange();
+      apply({ ...picker, previewAccept: undefined, apply: () => inspect(current.id) }, [current.id]);
+      return;
+    }
     const ids = directIds ?? (picker.multiple ? this.model.chosenIds() : idsOf(this.model.current()));
     const accepted = directIds !== undefined || ids.length > 0 ||
       (picker.multiple && this.model.visible.some(option => !option.disabled));

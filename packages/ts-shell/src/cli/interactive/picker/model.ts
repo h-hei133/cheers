@@ -17,17 +17,21 @@ import { captureModelChoice } from "../../../core/commands/model/choice.js";
 import { setModelTarget } from "../../../core/commands/model/selection.js";
 import { captureThinkingPreference } from "../../../core/models/preference.js";
 import { sameValue } from "../../../config/values.js";
+import { connectionDraft } from './connections.js';
+import { modelDetailsPicker } from './model/details.js';
 
 /** Every actionable row retains its exact target and the inputs used to display it. */
-export function modelPicker(context: CommandContext): Picker {
+export function modelPicker(context: CommandContext, focus?: string): Picker {
   const details = new Map<string, readonly string[]>();
   const actions = new Map<string, () => Promise<string>>();
+  const inspections = new Map<string, () => Picker>();
   return {
     title: "Model",
     form: "panel",
     empty: "No providers in the catalogue.",
+    get initialSelection() { return focus; },
     async load(): Promise<readonly Option[]> {
-      details.clear(); actions.clear();
+      details.clear(); actions.clear(); inspections.clear();
       let choice: ReturnType<typeof captureModelChoice> | undefined;
       try { choice = captureModelChoice(context); } catch { /* Read-only discovery still works without a saved session. */ }
       const publication = context.readConfiguration?.();
@@ -77,12 +81,18 @@ export function modelPicker(context: CommandContext): Picker {
               detail: [connection?.connectionId ?? (resolution?.credential ? `${resolution.credential.source} credential` : undefined), connection?.label, provider.label, connection?.endpoint ?? endpointLabel(resolution?.baseUrl),
                 metadata?.contextWindow ? `${Math.round(metadata.contextWindow / 1000)}k` : undefined].filter(Boolean).join(' · '),
               note: selected ? 'active' : reason ?? (connection ? availabilityLabel(connection.state) : 'ready'),
-              ...(reason ? { disabled: true } : {}) });
+              ...(reason ? { disabled: true, focusable: true } : {}) });
             const displayed = connection && (resolution?.blocked || !resolution?.credential)
               ? { ...connection, state: 'credential-missing' as const, reason: 'This explicit connection needs its own credential.' } : connection;
             details.set(id, [...modelDetails(provider, displayed, !connection ? resolution?.credential?.source : undefined),
               ...(!connection && resolution?.baseUrl ? [`Endpoint: ${endpointLabel(resolution.baseUrl)}`] : []), `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
               ...(metadata?.contextWindow ? [`Context: ${metadata.contextWindow} tokens`] : []), ...(reason ? [reason] : [])]);
+            if (reason) {
+              const endpoint = config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
+              const draft = !connection && !providerSlot || reason === 'credential unavailable' || connection?.state === 'credential-missing'
+                ? connectionDraft(provider, model.id, endpoint, connection?.label ?? provider.id) : undefined;
+              inspections.set(id, () => modelDetailsPicker(model.id, details.get(id) ?? [], () => modelPicker(context, id), draft));
+            }
             if (!reason && choice) {
               const captured = choice;
               actions.set(id, async () => captured.admission() ?? setModelTarget(target,
@@ -98,10 +108,11 @@ export function modelPicker(context: CommandContext): Picker {
         const endpoint = endpointLabel(active.baseUrl);
         const note = active.blocked ? 'request blocked' : active.credential ? 'active' : 'credential missing';
         rows.unshift({ id, label: active.model, detail: [active.credential ? `${active.credential.source} credential` : 'Current request', active.provider, endpoint].filter(Boolean).join(' · '),
-          note, disabled: true });
+          note, disabled: true, focusable: true });
         details.set(id, [`Provider: ${active.provider}`, `Model: ${active.model}`, `Status: ${note}`, `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
           ...(active.credential ? [`Credential source: ${active.credential.source}`] : []), ...(endpoint ? [`Endpoint: ${endpoint}`] : []),
           'Remote availability: unverified']);
+        inspections.set(id, () => modelDetailsPicker(active.model!, details.get(id) ?? [], () => modelPicker(context, id)));
       }
       if (context.sessionId) {
         try {
@@ -145,6 +156,7 @@ export function modelPicker(context: CommandContext): Picker {
       return rows;
     },
     detail: id => (id ? details.get(id) ?? [] : []),
+    async inspect(id) { const next = inspections.get(id)?.(); return next ? { next } : undefined; },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       if (!ids[0]) return undefined;
       const action = actions.get(ids[0]);

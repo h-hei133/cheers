@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Picker Reopen And Transcript Terminal-Newline Projection
+- **Symptom**: Reopening the same picker retains a completed search; user text ending in a newline cannot be copied through semantic source rows.
+- **Root Cause**: Host-owned filtering resets but the picker owner's query projection survives, while rendering keeps a final empty split item that source projection deliberately removes.
+- **Rule**: Separate fresh-open lifecycle from mutation reload, and reset query state only on the former. Keep rendered user body rows and semantic source rows in agreement for terminal newlines; do not trim source indentation or content to obtain visual alignment.
+
 ### 1. WSL2 OOM-Killer Crash Under Concurrent Build / Test Execution
 - **Symptom**: WSL2 abruptly terminates `vitest`, `tsc`, `node`, or the entire agent process without a JS stack trace (`Killed` / exit 137).
 - **Root Cause**: `vitest` worker pools, full-graph `tsc`, and `normproof judge` (10,000+ AST edges) each consume 1.5 GB–4 GB+ peak RSS. Running multiple heavy commands concurrently (via parallel tool calls, background `&` jobs, or multiple subagents running tests simultaneously) exhausts WSL2 memory and triggers the Linux kernel OOM-Killer.

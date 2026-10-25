@@ -2,7 +2,7 @@ import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { CURSOR_MARKER } from "../render/paint.js";
-import type { Option, OptionModel } from "./options.js";
+import { isFocusable, type Option, type OptionModel } from "./options.js";
 import type { ChipStrip } from './chips.js';
 
 /**
@@ -65,7 +65,7 @@ export function renderModal(
       if (!option) break;
       if (index > window.offset) rows.push(edge(inner));
       const optionLines = optionRows(option, index === model.selectedIndex, chrome, inner);
-      if (!option.disabled) {
+      if (isFocusable(option)) {
         for (let row = rows.length; row < Math.min(height, rows.length + optionLines.length); row++) {
           chrome.onOptionRow?.(row, option.id);
         }

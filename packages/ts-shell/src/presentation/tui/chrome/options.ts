@@ -1,4 +1,6 @@
 import { scrollWindow, type ListWindow } from "./window.js";
+import { isFocusable } from './option.js';
+export { isFocusable } from './option.js';
 
 /**
  * Selection model behind every picker.
@@ -25,6 +27,8 @@ export interface Option {
   readonly selected?: boolean;
   /** Shown but not choosable. */
   readonly disabled?: boolean;
+  /** Disabled activation may still expose a model's details or configuration. */
+  readonly focusable?: boolean;
 }
 
 /** A picker may project its loaded options for a query without reloading them. */
@@ -39,8 +43,10 @@ export class OptionModel {
   private revision = 0;
   private haystacks = new WeakMap<Option, string>();
   private readonly chosen = new Set<string>();
+  private selectionTouched = false;
 
-  constructor(private readonly filterOptions?: OptionFilter) {}
+  constructor(private readonly filterOptions?: OptionFilter,
+    private readonly defaultSelection?: (options: readonly Option[]) => string | undefined) {}
 
   /** Replace the option set, keeping any prior multi-select state. */
   setOptions(options: readonly Option[]): void {
@@ -77,13 +83,16 @@ export class OptionModel {
 
   current(): Option | undefined {
     const option = this.matches[this.cursor];
-    return option?.disabled ? undefined : option;
+    return isFocusable(option) ? option : undefined;
   }
 
   /** Focus a named, choosable option without accepting it. */
-  focus(id: string): void {
-    const index = this.matches.findIndex((option) => option.id === id && !option.disabled);
-    if (index >= 0) this.cursor = index;
+  focus(id: string, manual = false): void {
+    const index = this.matches.findIndex((option) => option.id === id && isFocusable(option));
+    if (index >= 0) {
+      this.cursor = index;
+      if (manual) this.selectionTouched = true;
+    }
   }
 
   /** Ids toggled on, in the order the options were supplied. */
@@ -96,6 +105,7 @@ export class OptionModel {
   }
 
   setFilter(query: string): void {
+    if (query !== this.query && this.defaultSelection) this.selectionTouched = false;
     this.query = query;
     this.applyFilter();
   }
@@ -114,9 +124,10 @@ export class OptionModel {
   step(delta: 1 | -1): void {
     const count = this.matches.length;
     if (count === 0) return;
+    this.selectionTouched = true;
     for (let attempt = 0; attempt < count; attempt++) {
       this.cursor = (this.cursor + delta + count) % count;
-      if (!this.matches[this.cursor]?.disabled) break;
+      if (isFocusable(this.matches[this.cursor])) break;
     }
   }
 
@@ -142,8 +153,11 @@ export class OptionModel {
     this.matches = this.filterOptions ? this.filterOptions(needle, this.all) : needle
       ? this.all.filter((option) => cachedHaystack(this.haystacks, option).includes(needle))
       : this.all;
-    const retained = this.matches.findIndex(option => option.id === focused && !option.disabled);
-    this.cursor = Math.max(0, retained >= 0 ? retained : this.matches.findIndex(option => !option.disabled));
+    const preferred = !this.selectionTouched ? this.defaultSelection?.(this.matches) : undefined;
+    const retained = this.matches.findIndex(option => option.id === (preferred ?? focused) && isFocusable(option));
+    const fallback = retained < 0 ? this.defaultSelection?.(this.matches) : undefined;
+    const replacement = this.matches.findIndex(option => option.id === fallback && isFocusable(option));
+    this.cursor = Math.max(0, retained >= 0 ? retained : replacement >= 0 ? replacement : this.matches.findIndex(isFocusable));
   }
 }
 
