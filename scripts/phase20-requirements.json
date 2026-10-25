@@ -6,7 +6,7 @@
     {
       "id": "CFG-01",
       "status": "complete",
-      "evidence": ".wiki/features/phase-20-contract.md W1; config/runtimeConfig and profile/path tests",
+      "evidence": ".wiki/features/phase-20-contract.md W1; config/runtimeConfig and profile/path tests; phase-20-status 2026-10-25 seven user feedback: focused interaction/project source tests and guide",
       "missing": ""
     },
     {
@@ -18,7 +18,7 @@
     {
       "id": "CFG-03",
       "status": "complete",
-      "evidence": ".wiki/features/phase-20-contract.md W1; config/layers tests",
+      "evidence": ".wiki/features/phase-20-contract.md W1; config/layers tests; phase-20-status 2026-10-25 seven user feedback: focused interaction/project source tests and guide",
       "missing": ""
     },
     {
@@ -30,7 +30,7 @@
     {
       "id": "CFG-05",
       "status": "complete",
-      "evidence": ".wiki/features/phase-20-contract.md W1; config/fields and environment tests",
+      "evidence": ".wiki/features/phase-20-contract.md W1; config/fields and environment tests; phase-20-status 2026-10-25 seven user feedback: focused interaction/project source tests and guide",
       "missing": ""
     },
     {
@@ -102,7 +102,7 @@
     {
       "id": "UI-01",
       "status": "complete",
-      "evidence": ".wiki/features/phase-20-contract.md W4; composer geometry tests",
+      "evidence": ".wiki/features/phase-20-contract.md W4; composer geometry tests; phase-20-status 2026-10-25 seven user feedback: focused interaction/project source tests and guide",
       "missing": ""
     },
     {
@@ -120,13 +120,13 @@
     {
       "id": "UI-04",
       "status": "complete",
-      "evidence": ".wiki/features/phase-20-contract.md W4; transcript source mapping tests",
+      "evidence": ".wiki/features/phase-20-contract.md W4; transcript source mapping tests; phase-20-status 2026-10-25 seven user feedback: focused interaction/project source tests and guide",
       "missing": ""
     },
     {
       "id": "CMD-01",
       "status": "complete",
-      "evidence": ".wiki/features/phase-20-contract.md W5; suggestions/keymap tests",
+      "evidence": ".wiki/features/phase-20-contract.md W5; suggestions/keymap tests; phase-20-status 2026-10-25 seven user feedback: focused interaction/project source tests and guide",
       "missing": ""
     },
     {
@@ -198,7 +198,7 @@
     {
       "id": "PAN-08",
       "status": "complete",
-      "evidence": ".wiki/features/phase-20-contract.md W6; MCP/tools/skill/context/cost/help report tests; shared absolute deadline and cumulative 4 MiB/10k-tool catalog budget across client pages, gateway servers and peek; in-flight deadline cleanup preserves the blocking error; bounded producer reports expose omitted/partial output; actual toolPoolFor/catalogue/MCP stdio/picker/OverlayHost lifetime covers original and overlay cancellation with inner request settlement and protocol cancellation, two description tiers and ten opens/draws/closes each, 3 files/27 tests and four assertion-producing reversals; help report applies its shared 200-row window before visible label/detail metadata projection, preserving exact omitted counts and the full picker inventory, 2 files/14 tests and two assertion-producing reversals; actual named-skill manifest/loader/picker/OverlayHost lifetime covers two body tiers with ten browses/draws/cancels each, exact manifest body-byte accounting, descriptor closure and body-free compact options, pending64KiB cancellation, accepted independent reread and real identity replacement refusal; offers clear on view closure and publish checks both signals plus load generation, including synchronous closure inside final admission; 2 files/32 tests and seven assertion-producing reversals, independent APPROVE/CLEAR after resolving the initial reentrant-admission WATCH; context status now enrolls in the real command cancellation owner and combines the original signal, usage and cost honor original cancellation across callback boundaries; actual context/cost report-to-Pager repeated acquisition/filter/geometry/close distinguishes released reader state from retained transcript reports; installed extension skill cold/warm picker lifecycle separates inventory body rereads from parsed manifest cache and refuses dirty/unregistered accepted selections; 6 files/95 tests, eleven assertion-producing reversals restored source bytes, final static gates/TS build and independent read-only APPROVE/CLEAR; repeated real help registry/picker/OverlayHost and accepted usage overview/report/Pager each cover ten rounds and twenty geometries, explicit open/subscription counts, released view state and preserved source/ledger, two assertion-producing reversals restored production bytes; direct tools/skill command-owner registration and affected debug fallback cancellation, real route and held64KiB manifest, 7-file/135-test batch with seven effective reversals; accepted tools/skill/debug through real pickerHost and terminal interrupt, held64KiB descriptor drain, 7-file/178-test batch and eight effective reversals; legal report overflow fitted through shared snapshot/text/codec limits with source totals and explicit omissions, seven original failures and seven effective reversals, final 11-file/106-test batch; user-specified real local stdio server completes two actual gateway connect/discover/read-only-search/close rounds with 23 tools, unchanged fixture source and observed process exit, phase-20-status real connections section; phase-20-status 2026-10-25 supplied GitHub HTTP bearer MCP completes two original gateway connect/discover/read-only repository-search/close rounds, 49 tools, exact repository match, released snapshot, unchanged source config/fixture; network corrected without changing product egress or TLS rules; no additional OAuth MCP requirement",
+      "evidence": ".wiki/features/phase-20-contract.md W6; MCP/tools/skill/context/cost/help report tests; shared absolute deadline and cumulative 4 MiB/10k-tool catalog budget across client pages, gateway servers and peek; in-flight deadline cleanup preserves the blocking error; bounded producer reports expose omitted/partial output; actual toolPoolFor/catalogue/MCP stdio/picker/OverlayHost lifetime covers original and overlay cancellation with inner request settlement and protocol cancellation, two description tiers and ten opens/draws/closes each, 3 files/27 tests and four assertion-producing reversals; help report applies its shared 200-row window before visible label/detail metadata projection, preserving exact omitted counts and the full picker inventory, 2 files/14 tests and two assertion-producing reversals; actual named-skill manifest/loader/picker/OverlayHost lifetime covers two body tiers with ten browses/draws/cancels each, exact manifest body-byte accounting, descriptor closure and body-free compact options, pending64KiB cancellation, accepted independent reread and real identity replacement refusal; offers clear on view closure and publish checks both signals plus load generation, including synchronous closure inside final admission; 2 files/32 tests and seven assertion-producing reversals, independent APPROVE/CLEAR after resolving the initial reentrant-admission WATCH; context status now enrolls in the real command cancellation owner and combines the original signal, usage and cost honor original cancellation across callback boundaries; actual context/cost report-to-Pager repeated acquisition/filter/geometry/close distinguishes released reader state from retained transcript reports; installed extension skill cold/warm picker lifecycle separates inventory body rereads from parsed manifest cache and refuses dirty/unregistered accepted selections; 6 files/95 tests, eleven assertion-producing reversals restored source bytes, final static gates/TS build and independent read-only APPROVE/CLEAR; repeated real help registry/picker/OverlayHost and accepted usage overview/report/Pager each cover ten rounds and twenty geometries, explicit open/subscription counts, released view state and preserved source/ledger, two assertion-producing reversals restored production bytes; direct tools/skill command-owner registration and affected debug fallback cancellation, real route and held64KiB manifest, 7-file/135-test batch with seven effective reversals; accepted tools/skill/debug through real pickerHost and terminal interrupt, held64KiB descriptor drain, 7-file/178-test batch and eight effective reversals; legal report overflow fitted through shared snapshot/text/codec limits with source totals and explicit omissions, seven original failures and seven effective reversals, final 11-file/106-test batch; user-specified real local stdio server completes two actual gateway connect/discover/read-only-search/close rounds with 23 tools, unchanged fixture source and observed process exit, phase-20-status real connections section; phase-20-status 2026-10-25 supplied GitHub HTTP bearer MCP completes two original gateway connect/discover/read-only repository-search/close rounds, 49 tools, exact repository match, released snapshot, unchanged source config/fixture; network corrected without changing product egress or TLS rules; no additional OAuth MCP requirement; phase-20-status 2026-10-25 seven user feedback: focused interaction/project source tests and guide",
       "missing": ""
     },
     {
@@ -258,13 +258,13 @@
     {
       "id": "START-03",
       "status": "complete",
-      "evidence": ".wiki/features/phase-20-status.md START-03; Performance run 39817293051 with 30 warm/cold samples per target/mode",
+      "evidence": ".wiki/features/phase-20-status.md START-03; Performance run 39817293051 with 30 warm/cold samples per target/mode; phase-20-status 2026-10-25 seven user feedback: focused interaction/project source tests and guide",
       "missing": ""
     },
     {
       "id": "QA-01",
       "status": "partial",
-      "evidence": "scripts/phase20-requirements.json plus .wiki/features/phase-20-contract.md; task-specific reversal evidence; CTX-02 x TOOL-01 actual HTTP schema-delta integration and three reversals; PAN-06 restore x undo operation-owned routing and three reversals; line/pipe profile x approval lifecycle via actual CLI and loopback HTTP, same-target retries, empty grant stores and two assertion-producing reversals; restored focused 2-file/7-test batch; PAN-02 actual catalogue/listing/picker page handoff with retired signal and shared source quota, plus two assertion-producing reversals; back/copy/restore original cancellation boundaries and four effective reversals, 8 files/104 tests; finite all-47-row audit in phase-20-status plus actual four remaining local lifecycle chains; existing complete rows retained on source/fixture evidence, PAN-02 reconciled, no invented 47-mutation requirement; final 10-file/195-test serial batch, four effective AssertionError reversals and restored bytes, independent APPROVE/CLEAR; real supplied stdio MCP two-round lifecycle and one isolated configured-provider turn in phase-20-status; phase-20-status 2026-10-25 real single-account OAuth and HTTP MCP two-round lifecycle",
+      "evidence": "scripts/phase20-requirements.json plus .wiki/features/phase-20-contract.md; task-specific reversal evidence; CTX-02 x TOOL-01 actual HTTP schema-delta integration and three reversals; PAN-06 restore x undo operation-owned routing and three reversals; line/pipe profile x approval lifecycle via actual CLI and loopback HTTP, same-target retries, empty grant stores and two assertion-producing reversals; restored focused 2-file/7-test batch; PAN-02 actual catalogue/listing/picker page handoff with retired signal and shared source quota, plus two assertion-producing reversals; back/copy/restore original cancellation boundaries and four effective reversals, 8 files/104 tests; finite all-47-row audit in phase-20-status plus actual four remaining local lifecycle chains; existing complete rows retained on source/fixture evidence, PAN-02 reconciled, no invented 47-mutation requirement; final 10-file/195-test serial batch, four effective AssertionError reversals and restored bytes, independent APPROVE/CLEAR; real supplied stdio MCP two-round lifecycle and one isolated configured-provider turn in phase-20-status; phase-20-status 2026-10-25 real single-account OAuth and HTTP MCP two-round lifecycle; phase-20-status 2026-10-25 seven user feedback: focused interaction/project source tests and guide",
       "missing": "Remaining real multi-account, billing, model-quality and desktop evidence follows PRV-03/05, TOOL-02, INPUT-01 and QA-02/03. Native single-account OAuth and supplied stdio/HTTP MCP lifecycles are covered; the matrix validator only checks indices."
     },
     {

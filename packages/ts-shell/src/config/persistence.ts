@@ -79,6 +79,7 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
       // Also guard absence and exact trivia. No CAS claim against an editor
       // that changes the path between this check and the atomic rename.
       if (readConfigSnapshot(baseline.path)?.text !== current?.text) throw new ConfigWriteError('conflict', 'unchanged');
+      if (precondition && !precondition(freezeDeep(current?.values ?? {}) as Readonly<T>)) throw new ConfigWriteError('conflict', 'unchanged');
       if (text !== current?.text) {
         assertOwner(baseline.path, profile);
         state = 'unknown'; code = 'write-failed';

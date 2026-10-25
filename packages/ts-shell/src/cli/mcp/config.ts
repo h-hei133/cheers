@@ -109,7 +109,11 @@ async function runConfigOperation(action: string, values: readonly string[], hos
     };
     validateNext();
     const currentAdmission = () => {
-      try { checkTarget(target, options); return scope === 'project' && !host.trusted() ? 'MCP project trust changed.' : undefined; }
+      try {
+        checkTarget(target, options);
+        if (mcpConfigPath(host.root, scope) !== target) return 'FILE_CONTENT_CHANGED: MCP configuration source changed.';
+        return scope === 'project' && !host.trusted() ? 'MCP project trust changed.' : undefined;
+      }
       catch (error) { return error instanceof Error ? error.message : 'MCP configuration admission refused.'; }
     };
     const admission = () => {

@@ -107,24 +107,49 @@ timeline
 ```bash
 npm run build:ts
 ```
-编译产物自动生成于 `dist/cli.js`。
+构建发布入口 `dist/cli.js` 与带身份清单的不可变 TypeScript 产物。需要无需 Node 的单文件版本时，再串行执行 `npm run build:exe`；可执行文件的实际路径记录在 `packages/ts-shell/dist/build-manifest.json` 的 `executable.path` 中（相对仓库根）。
 
 ### 2. 运行自动化测试套件
+日常返工只验证相关文件，使用包内 Vitest 并限制一个 worker：
+
 ```bash
-npm test
+cd packages/ts-shell
+NODE_OPTIONS=--max-old-space-size=1536 VITEST_MAX_THREADS=1 VITEST_MIN_THREADS=1 \
+  ./node_modules/.bin/vitest run src/cli/interactive/slashSuggestions.test.ts
 ```
-全量执行 `packages/ts-shell/src` 下的测试文件（当前 540 个），保证 100% 绿色通过。
+
+验证与构建必须串行，禁止子代理运行验证，禁止真实二进制加载20,000条消息的PTY压力测试。全量套件由CI运行；不能从聚焦通过推断全项目通过。
 
 ### 3. 执行 NormProof 形式化架构判定
 ```bash
 npx --package .normproof/normproof-0.1.0.tgz normproof judge
 ```
-验证全仓单向无环依赖（Acyclic）与单文件函数数约束（$\le 20$）。
+读取实际 verdict 与义务结果；进程退出0不等于整个Phase验收完成。约束包括依赖无环、导入解析与单模块最多20个函数名；本地规则详见 `AGENTS.md`。
 
 ### 4. 启动终端编码助手
 ```bash
-node dist/cli.js
+npm start
 ```
+
+`npm start` 检查构建输入、入口与产物字节是否仍匹配。缺失或过期时明确要求重新执行 `npm run build:ts`；不会自动构建。直接入口也可用 `node dist/cli.js`。指定工作目录时使用 `npm start -- --project /absolute/workspace`；已链接CLI可在工作目录执行 `cheers`。
+
+源码开发用 `npm run start:dev`，自动重载用 `npm run dev`。只查看当前参数可执行 `npm start -- --help`。
+
+### 5. 用户与项目配置
+
+| 作用域 | 运行配置 | MCP定义 |
+|---|---|---|
+| 用户默认 | `~/.cheers/config.json` | `~/.cheers/mcp.json` |
+| 命名profile | `~/.cheers/profiles/<name>/config.json` | `~/.cheers/profiles/<name>/mcp.json` |
+| 项目 | `<workspace>/.cheers/config.json` | `<workspace>/.cheers/mcp.json` |
+
+项目目录按需创建。`/settings set maxTurns 20 --project` 或Settings面板的project scope经原保存流程写项目配置；MCP通过 `/mcp` 向导或 `/mcp add project <name> <definition-file>` 预览、授权后保存。保存定义不会启动服务器或批准远端操作；显式 `/mcp test <name>` 才测试连接。用 `/trust` 检查项目资源与信任状态。
+
+同一工作目录的旧 `.cheers.json`、`.cheers.mcp.json` 仍可读取和编辑；对应目录文件存在时优先使用目录文件，错误文件会报告错误。两种位置不会合并。若打开用户HOME或profile父目录作为工作目录，项目文件与用户文件不能共用身份，项目作用域继续用根部旧文件名以隔离个人配置。
+
+配置支持JSONC。个人凭据留在用户/profile作用域，项目MCP引用环境变量（例如 `bearerTokenEnvVar`），不把真实密钥放入可提交文件。多个 `--config <path>` 可显式提供额外overlay，其来源、信任和优先级仍由现有配置规则决定。
+
+`/resume` 打开当前工作目录的分页会话浏览器，可搜索、预览、管理和恢复会话；每次打开重新检查目录，关闭会取消加载。启动自动恢复使用独立的摘要缓存，打开浏览器出现加载提示不表示启动缓存失效。
 
 ---
 

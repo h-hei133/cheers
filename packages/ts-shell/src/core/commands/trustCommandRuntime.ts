@@ -2,6 +2,7 @@ import { trustSyntax } from "./trust/syntax.js";
 import { parseSyntax } from "./syntax/parse.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import path from "node:path";
+import { resolveProjectConfigFile } from '../paths/project.js';
 import { projectTrust, TrustWriteError } from "../security/projectTrust.js";
 import { neutraliseForDisplay } from "../text/safety.js";
 import { loadHookDeclarations } from "../hooks/config.js";
@@ -65,7 +66,7 @@ function describeTrust(root: string): string {
     "",
   ];
 
-  const mcpConfig = path.join(root, ".cheers.mcp.json");
+  const mcpConfig = resolveProjectConfigFile(root, 'mcp.json');
   lines.push(
     projectTrust.hasSensitiveProjectResources(root)
       ? "This project declares resources that would run on your machine."

@@ -12,16 +12,19 @@ import * as themes from '../presentation/theme/selection.js';
 let root: string;
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'config-trust-'));
-  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_MAX_TURNS', '');
+  vi.stubEnv('HOME', path.join(root, 'home')); vi.stubEnv('USERPROFILE', path.join(root, 'home')); vi.stubEnv('CHEERS_MAX_TURNS', '');
   fs.mkdirSync(path.join(root, '.agents'));
+  fs.mkdirSync(path.join(root, '.cheers'));
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
-function project(value: unknown, directory = root) { fs.writeFileSync(getProjectConfigPath(directory), JSON.stringify(value)); }
+function project(value: unknown, directory = root) {
+  const target = getProjectConfigPath(directory); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, JSON.stringify(value));
+}
 function user(value: unknown) { const file = getUserRuntimeConfigPath(); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(value)); }
 
 it.each(['undecided', 'untrusted', 'unavailable'])('filters sensitive project inputs under %s while preserving valid personal values and diagnostic privacy', decision => {
   if (decision === 'untrusted') projectTrust.setProjectTrust(root, 'untrusted');
-  if (decision === 'unavailable') { user({}); fs.writeFileSync(path.join(root, '.cheers', 'trust.json'), '{PRIVATE_TRUST_CONTENT'); }
+  if (decision === 'unavailable') { user({}); fs.writeFileSync(path.join(path.dirname(getUserRuntimeConfigPath()), 'trust.json'), '{PRIVATE_TRUST_CONTENT'); }
   project({ theme: 'PRIVATE_THEME', maxTurns: 77, temperature: 0.3, maxOutputTokens: 2222, contextWindow: 12345,
     modelTokenBudgets: { PRIVATE_MODEL: { reserveTokens: 999 } }, instructionBudgetBytes: 222, agentMode: 'build', offline: false,
     retryEnabled: true, retryMaxRetries: 6, providerBodyTimeoutMs: 1234, steeringMode: 'all' });

@@ -130,11 +130,10 @@ export function renderBlock(
  * padding never reaches the clipboard.
  */
 function renderUser(block: Block, width: number, options: BlockRenderOptions = {}): readonly string[] {
-  const rail = defaultTheme.fg("accent", "▌");
-  const bodyWidth = Math.max(1, width - 4);
+  const bodyWidth = Math.max(1, width - 2);
   const wrapped = block.text.split("\n").flatMap((line) => wrapToWidth(line, bodyWidth));
   const rows = wrapped.map((line) => {
-    const padded = padToWidth(`${GUTTER}${rail} ${defaultTheme.fg("userMessageText", line)}`, width);
+    const padded = padToWidth(` ${defaultTheme.fg("userMessageText", line)}`, width);
     return `${defaultTheme.bg("userMessageBg", padded)}\x1b[0m`;
   });
   // Images drawn inline ride on their own rows, after the words: the protocol
@@ -146,11 +145,11 @@ function renderUser(block: Block, width: number, options: BlockRenderOptions = {
         columns: Math.max(4, Math.min(bodyWidth, 48)),
         imageId: imageIdForData(image.data),
       });
-      const padded = padToWidth(`${GUTTER}${rail} `, width);
+      const padded = padToWidth(" ", width);
       rows.push(`${defaultTheme.bg("userMessageBg", padded + sequence)}\x1b[0m`);
     } else {
       const label = `${image.mimeType}, ${Math.round((image.data.length * 3) / 4 / 1024)} KB`;
-      const padded = padToWidth(`${GUTTER}${rail} ${defaultTheme.fg("userMessageText", `image attachment: ${label}`)}`, width);
+      const padded = padToWidth(` ${defaultTheme.fg("userMessageText", `image attachment: ${label}`)}`, width);
       rows.push(`${defaultTheme.bg("userMessageBg", padded)}\x1b[0m`);
     }
   }

@@ -56,11 +56,16 @@ describe("command completions", () => {
 
   it("ranks the typed prefix first", () => {
     expect(slashSuggestions("/mod")?.[0]?.value).toBe("/model");
+    expect(slashSuggestions("/res")?.[0]?.value).toBe("/resume");
   });
 
-  it("completes aliases and resolves their argument candidates through the registry", () => {
-    expect(slashSuggestions("/qu")?.[0]?.value).toBe("/quit");
-    expect(slashSuggestions("/qu")?.[0]?.detail).toContain("alias of /exit");
+  it("hides aliases for every query while resolving their arguments through the registry", () => {
+    for (const alias of listSlashInvocations().filter(item => item.kind === 'alias')) {
+      for (const draft of ['/', alias.invocation.slice(0, 3), alias.invocation]) {
+        expect(slashSuggestions(draft)?.some(item => item.value === alias.invocation) ?? false).toBe(false);
+      }
+      expect(getSlashCommand(alias.invocation)).toBeDefined();
+    }
     expect(slashSuggestions("/where re")?.map(item => item.value)).toEqual(slashSuggestions("/workspace re")?.map(item => item.value));
     expect(slashSuggestions("/WHERE rece")?.[0]?.value).toBe("recent");
   });
@@ -73,7 +78,7 @@ describe("command completions", () => {
       getArgumentCompletions: () => [{ value: "item", label: "item" }],
     });
     try {
-      expect(slashSuggestions("/sample-alias")?.filter((entry) => entry.value === "/sample-alias")).toHaveLength(1);
+      expect(slashSuggestions("/sample-alias")?.some(entry => entry.value === "/sample-alias") ?? false).toBe(false);
       expect(slashSuggestions("/sample-alias ")?.[0]?.value).toBe("item");
     } finally {
       remove();
@@ -198,9 +203,9 @@ it("preserves independent recall/retain invocations and does not borrow memory s
   expect(slashSuggestions("/retain ")).toBeNull();
   expect(slashSuggestions("/recall")?.[0]).toMatchObject({ value: "/recall", detail: "search retained memory facts <query>" });
   expect(slashSuggestions("/mem ")?.map(item => item.value)).toEqual(slashSuggestions("/memory ")?.map(item => item.value));
-  expect(slashSuggestions("/quit")?.[0]?.value).toBe("/quit");
+  expect(slashSuggestions("/quit")?.some(item => item.value === "/quit") ?? false).toBe(false);
   expect(slashSuggestions("/")?.some(item => item.value === "/quit")).toBe(false);
-  expect(slashSuggestions("/?")?.[0]?.value).toBe("/?");
+  expect(slashSuggestions("/?")?.some(item => item.value === "/?") ?? false).toBe(false);
 });
 
 
@@ -209,7 +214,8 @@ it("refreshes default and filtered candidates for named extension invocations", 
   const remove = registerSlashCommand({ name: "fixture", aliases: ["fixture-alias"], invocations: [{ name: "fixture-special", summary: "separate action" }], group: "workflow", summary: "fixture" });
   try {
     expect(slashSuggestions("/")?.some(item => item.value === "/fixture-special")).toBe(true);
-    expect(slashSuggestions("/fixture-alias")?.[0]?.value).toBe("/fixture-alias");
+    expect(slashSuggestions("/fixture-alias")?.some(item => item.value === "/fixture-alias") ?? false).toBe(false);
+    expect(slashSuggestions("/fixture-special")?.[0]?.value).toBe("/fixture-special");
   } finally { remove(); }
   expect(slashSuggestions("/fixture-special")).toBeNull();
   expect(slashSuggestions("/")?.some(item => item.value.startsWith("/fixture"))).toBe(false);

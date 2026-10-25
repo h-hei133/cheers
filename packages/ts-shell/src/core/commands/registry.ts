@@ -262,18 +262,6 @@ export function createCommandRegistry(
       execute: (args, context) => runModelPresetCommand(args, context),
     },
     {
-      name: "restore",
-      kind: "local",
-      supportsNonInteractive: true,
-      availability: "available",
-      enabled: true,
-      summary: "preview or execute guarded recovery authority restore",
-      group: "session",
-      argumentHint: syntaxHint(restoreSyntax),
-      getArgumentCompletions: (prefix) => syntaxCompletions(restoreSyntax, prefix),
-      execute: (args, context) => runRestoreLocalCommand(args, context),
-    },
-    {
       name: "tree",
       aliases: ['branch'],
       kind: "shell-action",
@@ -310,6 +298,18 @@ export function createCommandRegistry(
       argumentHint: syntaxHint(resumeSyntax),
       getArgumentCompletions: (prefix) => navigationCompletions(resumeSyntax, prefix),
       execute: (args, context) => runResumeCommand(args, context),
+    },
+    {
+      name: "restore",
+      kind: "local",
+      supportsNonInteractive: true,
+      availability: "available",
+      enabled: true,
+      summary: "preview or execute guarded recovery authority restore",
+      group: "session",
+      argumentHint: syntaxHint(restoreSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(restoreSyntax, prefix),
+      execute: (args, context) => runRestoreLocalCommand(args, context),
     },
     ...(['rename', 'delete'] as const).map(name => {
       const syntax = name === 'rename' ? renameSyntax : deleteSyntax;

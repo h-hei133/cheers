@@ -8,6 +8,7 @@ import { resolveCatalogDirectory } from "./paths.js";
 import type { CatalogKind } from "./request.js";
 import { memoryCatalogStore } from "./memory.js";
 import { getMcpConfigPaths } from "../../../core/mcp/config.js";
+import { projectConfigCandidates } from '../../../core/paths/project.js';
 
 interface Sources {
   readonly cwd: string;
@@ -24,8 +25,8 @@ function userFiles(...files: string[]): string[] {
 export function catalogSources(kind: CatalogKind, sources: Sources, query?: string): readonly string[] {
   const { cwd, projectRoot, themePaths = [], grantPath } = sources;
   if (kind === "mcp" || kind === "tools") {
-    const [user, project] = getMcpConfigPaths(cwd);
-    return [...userFiles(user!, resolveUserDataFile("trust.json")), project!];
+    const [user] = getMcpConfigPaths(cwd);
+    return [...userFiles(user!, resolveUserDataFile("trust.json")), ...projectConfigCandidates(cwd, 'mcp.json')];
   }
   if (kind === "grant") return grantPath ? [grantPath] : [];
   if (kind === "record" || kind === "invalidatable") return [memoryCatalogStore(projectRoot).ref.recordsFile!];

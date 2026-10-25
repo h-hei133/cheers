@@ -38,6 +38,27 @@ describe("ranking", () => {
 });
 
 describe("selection", () => {
+  it('focuses the best slash match after typing into a previously moved list', () => {
+    const list = new SuggestionList();
+    const forDraft = (text: string, revision: number, values: string[]): Suggestion[] => values.map(value => ({
+      value, label: value, edit: { snapshot: { text, cursor: text.length, revision }, from: 0, to: text.length, text: value + ' ' },
+    }));
+    list.setItems(forDraft('/', 1, ['/model', '/memory', '/restore', '/resume']));
+    list.step(1); list.step(1);
+    list.setItems(forDraft('/res', 2, ['/resume', '/restore']));
+    expect(list.current()?.value).toBe('/resume');
+    expect(list.chosen).toBe(false);
+    expect(list.render(40)[0]).toContain('❯');
+  });
+
+  it('returns to the best match if a chosen edit disappears from the same draft', () => {
+    const list = new SuggestionList();
+    list.setItems(commands); list.step(-1);
+    list.setItems(commands.slice(0, 2));
+    expect(list.current()?.value).toBe('/model');
+    expect(list.chosen).toBe(false);
+  });
+
   it('keeps the explicitly chosen edit through incremental reordering but releases it for another draft', () => {
     const snapshot = { text: '/resume s', cursor: 9, revision: 1 };
     const item = (value: string): Suggestion => ({ value, label: value, edit: { snapshot, from: 8, to: 9, text: value + ' ' } });

@@ -46,7 +46,7 @@ function bodyOf(block: Block, width: number): { text: string; width: number } | 
   if (block.rows) return undefined;
   switch (block.kind) {
     case "user":
-      return { text: block.text, width: Math.max(1, width - 4) };
+      return { text: block.text, width: Math.max(1, width - 2) };
     case "notice":
       return { text: block.text.replace(/\s+$/, ""), width: Math.max(1, width) };
     case "assistant":

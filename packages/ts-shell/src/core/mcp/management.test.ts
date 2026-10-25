@@ -14,6 +14,7 @@ const owners: CoreMcpGateway[] = [];
 afterEach(async () => { await Promise.all(owners.splice(0).map(owner => owner.close())); cleanupAdvisorHarnesses(); });
 function fixture(approve?: ToolGateOptions['escalationPromptHandler']) {
   const setup = createAdvisorHarness(false, false); let trusted = true;
+  fs.mkdirSync(path.join(setup.root, '.cheers'));
   const gate: ToolGateOptions = { sessionId: setup.session.id, workspaceRoot: setup.root, agentMode: 'build', permissionScope: approve ? 'ask' : 'allow-all',
     hooks: new HookDispatcher(), emit: () => {}, escalationPromptHandler: approve };
   const gateway = new CoreMcpGateway(setup.root); owners.push(gateway);

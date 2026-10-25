@@ -36,7 +36,8 @@ it('uses the existing exact-byte approval and writer without a temporary definit
   f.allow(); expect(await f.add('project', 'local', definition)).toContain('explicit /mcp test or /mcp reconnect starts discovery');
   expect(loadMcpConfigs(f.root, true).local).toMatchObject(definition);
   expect(f.approve).toHaveBeenCalledTimes(2); expect(f.changed).toHaveBeenCalledTimes(1);
-  expect(fs.readdirSync(f.root).filter(name => !before.includes(name))).toEqual(['.cheers.mcp.json']);
+  expect(fs.existsSync(path.join(f.root, '.cheers', 'mcp.json'))).toBe(true);
+  expect(fs.existsSync(path.join(f.root, '.cheers.mcp.json'))).toBe(false);
 });
 
 it.each(['session', 'root', 'substrate', 'revalidated'])('rejects an original wizard after its %s binding changes before approval', async kind => {
@@ -66,7 +67,7 @@ it('shares the original pending command cancellation boundary and refuses overla
 it.each(['state', 'cancel', 'owner'])('rechecks %s after the ordinary approval before publishing', async kind => {
   const f = fixture(); f.allow();
   f.effect(() => {
-    if (kind === 'state') fs.writeFileSync(f.target, '{"mcpServers":{},"external":true}');
+    if (kind === 'state') { fs.mkdirSync(path.dirname(f.target), { recursive: true }); fs.writeFileSync(f.target, '{"mcpServers":{},"external":true}'); }
     else if (kind === 'cancel') cancelMcpFor(f.context);
     else f.context.session = { ...f.context.session, id: 'different' };
   });
@@ -98,4 +99,15 @@ it('does not leak typed URL query values into approval or results', async () => 
   expect(JSON.stringify([prompts, result])).not.toContain('synthetic-private-value');
   expect(prompts.join('')).toContain('SHA-256');
   expect(loadMcpConfigs(f.root, true).local!.url).toContain('synthetic-private-value');
+});
+
+it('rejects approval after a directory configuration shadows the captured legacy source', async () => {
+  const f = fixture(); const legacy = path.join(f.root, '.cheers.mcp.json');
+  fs.writeFileSync(legacy, '{"mcpServers":{}}'); f.allow();
+  const current = path.join(f.root, '.cheers', 'mcp.json');
+  f.effect(() => { fs.mkdirSync(path.dirname(current), { recursive: true }); fs.writeFileSync(current, '{"mcpServers":{},"external":true}'); });
+  expect(await f.add('project', 'local', { command: 'server', args: [] })).toContain('FILE_CONTENT_CHANGED');
+  expect(fs.readFileSync(legacy, 'utf8')).toBe('{"mcpServers":{}}');
+  expect(fs.readFileSync(current, 'utf8')).toBe('{"mcpServers":{},"external":true}');
+  expect(f.changed).not.toHaveBeenCalled();
 });

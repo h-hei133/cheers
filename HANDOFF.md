@@ -154,3 +154,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A damaged-index test passes while a fresh process accepts malformed cached fields, throws during sorting, or returns the wrong session identity.
 - **Root Cause**: The existing manager keeps a parsed index in memory, so corrupting the file and reusing that manager never exercises disk decoding. An object-only guard also does not establish the summary contract.
 - **Rule**: Reopen the actual owner to test persisted cache loading. Bind the decoded summary ID to its index key and validate every consumed field before admission; reject only bad rows and recompute from the source. Check healthy-row reuse and repaired persistence separately. A skipped summary computation is not zero source or stat I/O.
+
+### 30. Project Configuration Directories Can Alias Personal Storage
+- **Symptom**: A project save in HOME changes global settings, adopts default-profile MCP definitions, or writes a legacy file after a preferred source appeared.
+- **Root Cause**: The workspace configuration directory can be the personal destination, including a destination that does not exist yet while a legacy personal file is selected. An unlocked source check also expires while acquiring the write lock. Watching only the selected filename misses creation of a preferred file in an existing directory.
+- **Rule**: Compare project destinations against canonical active and default personal destinations plus selected fallbacks, preserving separate scope when HOME is a workspace. Recheck selected sources during acquisition, inside the existing write lock and before publication; observe all candidates and update trust inspection. Reject dangling selected entries rather than treating them as absent. Keep test HOME and workspace distinct, then add explicit HOME/profile collision tests.
+
+### 31. An Old Extracted Validator Can Misrepresent The Current Package
+- **Symptom**: A structural check reports evidence-capacity failures while CI and the current packaged validator accept the same source graph.
+- **Root Cause**: A reusable scratch extraction contains an older collector or evaluator despite sharing the same CLI entrypoint bytes; checking that entrypoint alone does not identify the whole tool.
+- **Rule**: Run the checked-in validator package through the documented command or extract it into a fresh task directory. Preserve and classify the stale-tool failure, then read the current verdict and obligations. Never narrow the source graph or change product code merely to bypass an obsolete validator limit.

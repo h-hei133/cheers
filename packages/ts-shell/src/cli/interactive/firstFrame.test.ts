@@ -100,7 +100,7 @@ describe("transcript search ownership", () => {
       terminal.input("draft");
       scheduler.flush();
       const typed = stripAnsi(terminal.drain());
-      expect(typed).toContain("❯  draft");
+      expect(typed).toContain(" draft");
       expect(typed).not.toContain("find:");
     } finally {
       mode.stop();
@@ -233,7 +233,7 @@ describe("first painted frame", () => {
     mode.stop();
   });
 
-  it("holds the intro, the status band, and the prompt cue", () => {
+  it("holds the intro and the status band without a prompt cue", () => {
     const { mode, terminal, scheduler } = boot();
     mode.start();
     scheduler.flush();
@@ -241,7 +241,7 @@ describe("first painted frame", () => {
     expect(output).toContain("Cheers");
     expect(output).toContain("opus-5");
     expect(output).toContain("main");
-    expect(output).toContain("❯");
+    expect(output).not.toContain("❯");
     mode.stop();
   });
 
@@ -297,6 +297,21 @@ describe("first painted frame", () => {
     mode.stop();
   });
 
+  it('focuses resume after changing a moved slash query and completes it with Tab', () => {
+    const { mode, terminal, scheduler } = boot();
+    mode.start(); scheduler.flush(); terminal.drain();
+    try {
+      terminal.input('/'); scheduler.flush();
+      terminal.input('\x1b[B'); terminal.input('\x1b[B'); terminal.input('\x1b[B');
+      scheduler.flush(); terminal.drain();
+      terminal.input('res'); scheduler.flush(); terminal.drain();
+      terminal.input('\t'); scheduler.flush();
+      const output = stripAnsi(terminal.drain());
+      expect(output).toContain('/resume ');
+      expect(output).not.toContain('/restore ');
+    } finally { mode.stop(); }
+  });
+
   it("leaves the conversation in the terminal on stop", () => {
     const { mode, terminal, scheduler } = boot();
     mode.start();
@@ -342,7 +357,7 @@ it.each(["regular", "fullscreen"] as const)("repaints the %s host when a late ap
     scheduler.flush();
     expect(currentTheme()).toBe("light");
     const output = terminal.drain();
-    expect(stripAnsi(output)).toContain("❯  draft");
+    expect(stripAnsi(output)).toContain(" draft");
     expect(stripAnsi(output)).not.toContain("997");
   } finally { mode.stop(); selectTheme("dark"); updateAppearance("dark"); }
 });

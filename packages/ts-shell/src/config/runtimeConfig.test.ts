@@ -423,7 +423,7 @@ describe("runtime config", () => {
     // resolves under the current name, not that it is a particular string.
     const candidates = getCandidateConfigPaths(fakeRoot);
     expect(candidates[0]).toContain(".cheers");
-    expect(candidates[1]).toBe(path.join(fakeRoot, ".cheers.json"));
+    expect(candidates[1]).toBe(path.join(fakeRoot, ".cheers", "config.json"));
   });
 
   it("uses the same user config path for connection writes and runtime reads", () => {

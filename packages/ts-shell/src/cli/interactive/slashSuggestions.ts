@@ -11,38 +11,36 @@ import {
 } from "../../entrypoints/slashCommandRegistry.js";
 
 let cached: readonly Suggestion[] | undefined;
-let defaults: readonly Suggestion[] | undefined;
 let unsubscribe: (() => void) | undefined;
 let cachedScope: string | undefined;
 
-function candidates(includeAliases: boolean, scope?: SlashCatalogScope): readonly Suggestion[] {
+function candidates(scope?: SlashCatalogScope): readonly Suggestion[] {
   unsubscribe ??= subscribeSlashCommands(() => {
     cached = undefined;
-    defaults = undefined;
   });
   const selected = JSON.stringify(scope ?? { root: process.cwd() });
-  if (cachedScope !== selected) { cached = undefined; defaults = undefined; cachedScope = selected; }
+  if (cachedScope !== selected) { cached = undefined; cachedScope = selected; }
   if (!cached) {
     const suggestions = new Map<string, Suggestion>();
     const invocations = listSlashInvocations(scope);
     for (const invocation of invocations) {
+      if (invocation.kind === "alias") continue;
       const detail = invocation.argumentHint ? `${invocation.summary} ${invocation.argumentHint}` : invocation.summary;
       suggestions.set(invocation.name, {
         value: invocation.invocation,
         label: invocation.invocation,
-        detail: invocation.kind === "alias" ? `${detail} (alias of /${invocation.commandName})` : detail,
+        detail,
       });
     }
     cached = [...suggestions.values()];
-    defaults = invocations.filter(invocation => invocation.kind !== "alias").map(invocation => suggestions.get(invocation.name)!);
   }
-  return includeAliases ? cached : defaults!;
+  return cached;
 }
 
 export function slashSuggestions(draft: string, snapshot: DraftSnapshot = { text: draft, cursor: draft.length, revision: 0 }, scope?: SlashCatalogScope): Suggestion[] | null {
   const token = completionToken(draft, snapshot.cursor);
   if (token.before.length === 0 && COMMAND_DRAFT.test(token.prefix)) {
-    const matches = matchSuggestions(token.prefix, candidates(token.prefix !== "/", scope));
+    const matches = matchSuggestions(token.prefix, candidates(scope));
     return matches.length ? matches.map(candidate => completionEdit(candidate, snapshot, token.from, token.to)) : null;
   }
   const command = token.before[0];

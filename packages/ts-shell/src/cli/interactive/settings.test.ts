@@ -21,7 +21,8 @@ let root: string;
 let file: string;
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'settings-'));
-  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root);
+  vi.stubEnv('HOME', path.join(root, 'home')); vi.stubEnv('USERPROFILE', path.join(root, 'home'));
+  fs.mkdirSync(path.join(root, '.cheers'));
   file = getUserRuntimeConfigPath(); fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, '{}');
 });
@@ -139,6 +140,14 @@ it('invalidates a menu after a substrate transition and consumes an applied choi
   expect(getRuntimeConfig(root).attentionOnIdle).toBe(true);
 });
 
+it('rejects a project menu when a new directory document shadows its captured legacy source', async () => {
+  const legacy = path.join(root, '.cheers.json'); fs.writeFileSync(legacy, '{"maxTurns":19}');
+  const menu = openSettings(runtime(), () => {}, 'project');
+  fs.writeFileSync(path.join(root, '.cheers', 'config.json'), '{"maxTurns":21}');
+  expect(await menu.save('maxTurns', 22)).toMatchObject({ applied: false, note: expect.stringContaining('source changed') });
+  expect(fs.readFileSync(legacy, 'utf8')).toBe('{"maxTurns":19}');
+});
+
 it('validates advanced numbers before writing and applies a valid request setting', async () => {
   const context = runtime(); const applied = vi.fn(); const draft = openSettings(context, applied);
   expect((await draft.save('maxTurns', 0)).note).toContain('Invalid value');
@@ -242,10 +251,10 @@ it('previews actual shapes without writing, restores on cancel, and publishes on
     });
     await Promise.all(work); await settle();
   };
-  await open(); expect(render()).toContain('❯');
+  await open(); expect(render()).not.toContain('❯');
   await press('\x1b[B'); expect(preference.read()).toBe('band'); expect(render()).toContain('╰─');
   expect(fs.readFileSync(file, 'utf8')).toBe('{}');
-  await press('\x1b'); expect(preference.read()).toBe('default'); expect(render()).toContain('❯');
+  await press('\x1b'); expect(preference.read()).toBe('default'); expect(render()).not.toContain('❯');
   await open(); await press('\x1b[B'); await press('\r');
   expect(preference.read()).toBe('band'); expect(fs.readFileSync(file, 'utf8')).toBe('{}');
   await press('\r');

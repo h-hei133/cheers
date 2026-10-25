@@ -2,7 +2,7 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
-## 当前剩余工作（2026-10-25，真实认证与HTTP连接补证）
+## 当前剩余工作（2026-10-25，日常交互与项目配置返工）
 
 范围只来自 [Phase 20 决策](phase-20-decisions.md) 及其引用要求。机器矩阵当前为 **38 complete / 9 partial / 0 open**，整体 partial。原36项complete保留已有证据；PAN-07以真实OpenAI登录/取消/刷新/撤销失效/本地退出补证，PAN-08以用户指定HTTP MCP两轮产品连接/发现/只读调用/关闭补证。正式质量、真实多账号及桌面交互按用户决定延后，不兑换成完成。
 
@@ -21,6 +21,30 @@
 | QA-04 | 全范围最终交付与剩余任务验收 | 最新源码85c98eaf已提交/推送，CI40159668568 success（10532tests passed）、Watch实际proven/0gaps、Platform QA20/20支持格通过；工具卡片与STS分别独立APPROVE/CLEAR。历史gzip失败根因仍未证实；外部依赖仍partial |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
+
+## 2026-10-25 七项用户反馈闭环
+
+| 反馈 | 当前证据与处理 | Phase 20归口 |
+|---|---|---|
+| slash别名仍可选 | 原实现非空查询切换含alias候选池；现在所有查询过滤alias，直接执行/参数补全与named入口保留 | CMD-01 |
+| 下移后输入res仍选下面项 | 原索引钳制保留旧位置；现在新draft回到首项、同snapshot完整edit身份才保留手选。resume注册在restore前，真实终端宿主下移三次→输入res→Tab得到resume | CMD-01 |
+| resume每次打开加载 | 原分页目录重新校验会话来源，取消/分页/关闭由既有owner负责；启动恢复摘要已有独立cache。未发现要另造缓存的缺陷，指南说明两种生命周期 | PAN-02、START-02 |
+| 输入两侧留白 | 原frame已是每侧1 cell；default/borderless/top-rule移除提示符后普通输入起始为1格，八形态源映射/窄屏仍沿原布局 | UI-01 |
+| 用户输入左侧黄标 | composer提示符及已提交user bubble的accent rail移除；user source投影同步width−2，背景与原文复制保留 | UI-01/04 |
+| 启动命令与指南 | 指南改为npm start（检查fresh build）、源码start:dev/dev、双构建与项目配置；删除540测试/全绿声明。实际npm start -- --help exit0 | START-03、QA-01 |
+| 专门项目配置目录 | 现支持.cheers/config.json与.cheers/mcp.json，新文件优先，缺失用原散文件；信任展示、双候选观察、加载/锁内/发布前source fence保持。HOME与named profile不能把个人路径变成project。实际本地MCP按原字节迁移、2servers原scope/source经构建reader读回，空{}项目配置继承个人值，两文件Git忽略 | CFG-01/03/05、PAN-08 |
+
+原旧源码下别名/索引共6个AssertionError；后续真实host暴露res排序、scope fixture暴露HOME同路径、悬空文件暴露ENOENT误分类，均按实际合同修复。初命令使用不支持的maxWorkers选项未收集测试，随后改为包内Vitest0.34.6及1-thread环境；新scope fixture缺trusted、错误compat export、trust双root路径、named HOME重复mkdir和首次built index缺非公开export均属夹具/探针错误，纠正后通过，未削弱产品断言。
+
+最终分组聚焦：配置/Settings/MCP98项、宿主/原消费者/slash143项、锁/CAS/信任/观察90项、四反转后恢复126项；数字不相加为独立场景。四有效反转分别破坏selection、alias filter、personal destination fence、user rail，均exit1+AssertionError且原字节恢复。代码独立APPROVE/架构CLEAR，两lane仅gpt-6.1-sol只读，无验证。静态五门/analyzer0、TS build及启动help通过；最终双构建与结构结果见下段；提交/推送/新SHA CI分别记录，不复用旧SHA。
+
+本地MCP SHA256 `7c67ae9ec46500cd091f7a7b1a2be6a18223d4072c77abdaf8041c1ee5a7e6b8`，无凭据输出或provider派发；source摘要 configValid/projectSource=true、serverCount2/scopeproject/bytesUnchanged=true。原START-02源码 `1fb5480ea0749d153be30a709e9c8427dd833d51` 精确CI40161718432、Watch40161718447及Platform QA40161814429本轮GitHub读回completed/success，只绑定原SHA。本批38complete/9partial/0open不变，外部剩余仍见上表与inputs。
+
+### 本批最终本地验证
+
+最终串行链静态五门、47行requirements、diff check、TS build、exe build均exit0；矩阵38/9/0。build `c25c13a684f65cfb55f3561ca991af7b139325b62f9cd945bd64650b8e1a37aa`、inputs `8dfcfff53484e0beaba525ba737afa15067393605ed63663e4775020c247b454`、artifact `80a3c28b5bd0b8a5e3b27cec994a16decb2f8da42cb4150d56b54377f91652dd`；Linux x64 Bun1.3.14 executable SHA256 `872b289b0aa994264eef408630620d38917ac5bda632fe428294f743cc476326`，实际不可变路径与hash经manifest读回。最终启动help及构建reader再验configValid/projectSource、2个project MCP与原字节均通过，无provider派发。验证使用本机Node24.15.0，实际Node floor运行由新SHA CI另证。
+
+首次复用旧scratch NormProof提取触发8192 edge/member上限、exit2/not_proven，分类为工具版本漂移，失败产物保留；未改规范或缩图。随后重新提取当前仓内tgz执行完整judge，exit0/proven、三义务satisfied、0gaps。已追加HANDOFF护栏；安全build summary、source hashes、迁移读回、四反转、独立review和实际verdict归Git忽略 `.omx/artifacts/phase20-interaction/`。两个own probe及本批validator提取清理，既有scratch与正式证据保留。独立review覆盖产品/指南，最后MCP帮助行与证据文档由主代理检查，未宣称逐hash独立签署。本地未跑全套或真实20k binary/PTY。
 
 ## 2026-10-25 START-02 损坏摘要索引准入
 

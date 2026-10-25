@@ -1,5 +1,6 @@
-import path from 'node:path';
+import fs from 'node:fs';
 import { resolveUserDataFile } from '../../paths/userHome.js';
+import { resolveProjectConfigFile } from '../../paths/project.js';
 import { CONFIG_MAX_BYTES, parseConfigText } from '../../../config/syntax.js';
 import type { ConfigSnapshot } from '../../../config/document.js';
 import { readTextFile } from '../../workspace/files.js';
@@ -17,7 +18,7 @@ export class McpConfigLoadError extends Error {
 }
 export function isMcpConfigLoadError(error: unknown): error is McpConfigLoadError { return error instanceof McpConfigLoadError; }
 export function getMcpConfigPaths(workspaceRoot: string): string[] {
-  return [resolveUserDataFile('mcp.json'), path.join(workspaceRoot, '.cheers.mcp.json')];
+  return [resolveUserDataFile('mcp.json'), resolveProjectConfigFile(workspaceRoot, 'mcp.json')];
 }
 export function mcpConfigPath(root: string, scope: McpConfigScope): string {
   return getMcpConfigPaths(root)[scope === 'user' ? 0 : 1]!;
@@ -26,7 +27,12 @@ export function mcpConfigPath(root: string, scope: McpConfigScope): string {
 export function readMcpDocument(target: string, validate = true): ConfigSnapshot | undefined {
   try {
     const text = readTextFile(target, CONFIG_MAX_BYTES);
-    return text === undefined ? undefined : parseMcpDocument(target, text, validate);
+    if (text === undefined) {
+      try { fs.lstatSync(target); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined; throw error; }
+      throw new Error('unreadable document');
+    }
+    return parseMcpDocument(target, text, validate);
   } catch (error) { throw error instanceof McpConfigLoadError ? error : new McpConfigLoadError(target, error); }
 }
 
@@ -46,9 +52,10 @@ export function parseMcpDocument(target: string, text: string, validate = true):
 /** Project definitions replace user definitions; an enabled-only override retains its source identity. */
 export function loadMcpConfigs(root: string, allowProjectScope: boolean, replacement?: { scope: McpConfigScope; text: string }): Record<string, ScopedMcpServerConfig> {
   const merged: Record<string, ScopedMcpServerConfig> = Object.create(null);
+  const projectPath = allowProjectScope ? mcpConfigPath(root, 'project') : undefined;
   for (const scope of ['user', 'project'] as const) {
     if (scope === 'project' && !allowProjectScope) continue;
-    const target = mcpConfigPath(root, scope);
+    const target = scope === 'project' ? projectPath! : mcpConfigPath(root, scope);
     const document = replacement?.scope === scope ? parseMcpDocument(target, replacement.text) : readMcpDocument(target);
     for (const [name, definition] of Object.entries(document?.values.mcpServers ?? {})) {
       if (isMcpEnableOverride(definition)) {
@@ -57,5 +64,6 @@ export function loadMcpConfigs(root: string, allowProjectScope: boolean, replace
       } else merged[name] = { ...mcpServerDefinition(definition), scope, sourcePath: target };
     }
   }
+  if (projectPath !== undefined && mcpConfigPath(root, 'project') !== projectPath) throw new McpConfigLoadError(projectPath, new Error('configuration source changed; retry acquisition'));
   return merged;
 }

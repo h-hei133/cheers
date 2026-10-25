@@ -97,8 +97,10 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
       const invalid = validateSetting(setting, value);
       if (invalid) return unapplied(invalid);
       if (consumed || substrate !== context.configuration.substrateRevision) return unapplied('Settings changed or the session moved. Reopen Settings before saving.');
+      if (scope === 'project' && getProjectConfigPath(context.projectRoot) !== file) return unapplied('Project configuration source changed. Reopen Settings before saving.');
       consumed = true;
-      try { writeRuntimeConfigFileAt(file, settingPatch(edit.values, setting, value), edit); }
+      const sourceCurrent = () => scope !== 'project' || getProjectConfigPath(context.projectRoot) === file;
+      try { writeRuntimeConfigFileAt(file, settingPatch(edit.values, setting, value), edit, sourceCurrent); }
       catch (error) {
         return unapplied(error instanceof ConfigWriteError ? `${error.message} Current settings were not refreshed.` : 'Settings save outcome is unverified. Current settings were not refreshed.');
       }
@@ -107,6 +109,7 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
         if (!sameValue(settingValue(readRuntimeConfigEditAt(edit.path).values, setting), value)) return unapplied(`The selected value is not confirmed in your ${scope} configuration. Current settings were not refreshed; reopen Settings.`);
       } catch { return unapplied(`The selected value could not be verified in your ${scope} configuration. Current settings were not refreshed; reopen Settings.`); }
       const saved = `Saved to your ${scope} configuration.`;
+      if (!sourceCurrent()) return unapplied(`${saved} Project configuration source changed; application is unconfirmed. Reopen Settings.`);
       try {
         const result = refreshShellRuntimeConfig(context);
         if (result.status !== 'applied') return unapplied(`${saved} Configuration was not applied (${result.status}).${result.admissionBlocked ? ' New actions are blocked until a valid configuration is loaded.' : ''}`);

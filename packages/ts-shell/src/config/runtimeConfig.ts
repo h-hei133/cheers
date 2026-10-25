@@ -14,6 +14,8 @@ import { loadConfigLayers, validateRawConfig } from "./layers.js";
 import { captureConfigTrust, type ConfigTrustBinding } from './trust.js';
 import type { ConfigProvenance } from './provenance/model.js';
 import { projectConfigOrigins } from './provenance/projection.js';
+import { resolveProjectConfigFile } from '../core/paths/project.js';
+import { ConfigInputError } from './inputs/model.js';
 import type { ComposerShapeId } from '../presentation/tui/composer/contract.js';
 import type { ConfigInputs } from './inputs/model.js';
 import type { ConfigScopes } from './scope/model.js';
@@ -482,8 +484,9 @@ export function getRuntimeConfig(
   inputs?: ConfigInputs,
 ): RuntimeConfig {
   const configTrust = captureConfigTrust(rootDir);
+  const projectPath = getProjectConfigPath(configTrust.workspaceRoot);
   const layer = loadConfigLayers([
-    { path: getProjectConfigPath(configTrust.workspaceRoot), source: "project" },
+    { path: projectPath, source: "project" },
     { path: getUserConfigPath(), source: "user" },
   ], overrides, CONFIG_FIELDS, configTrust.decision, inputs, configTrust.workspaceRoot);
   // Every accepted field has passed its registry schema before this projection.
@@ -565,6 +568,7 @@ export function getRuntimeConfig(
     configSources: sources,
   };
   layer.verify();
+  if (getProjectConfigPath(configTrust.workspaceRoot) !== projectPath) throw new ConfigInputError('content-changed', projectPath);
   return { ...config, configProvenance: projectConfigOrigins(layer.values, config, layer.origins, CONFIG_FIELDS) };
 }
 
@@ -581,7 +585,7 @@ export function getUserConfigPath(): string {
 }
 
 export function getProjectConfigPath(rootDir: string = process.cwd()): string {
-  return path.join(rootDir, ".cheers.json");
+  return resolveProjectConfigFile(rootDir, 'config.json');
 }
 
 export function getCandidateConfigPaths(
@@ -649,8 +653,9 @@ export function writeRuntimeConfigFileAt(
   configPath: string,
   config: RuntimeConfigFile,
   baseline: ConfigEdit<RuntimeConfigFile>,
+  precondition?: () => boolean,
 ): string {
-  return persistConfigEdit(configPath, config, baseline, CONFIG_FIELDS);
+  return persistConfigEdit(configPath, config, baseline, CONFIG_FIELDS, precondition);
 }
 
 /** Persist to the user's config file after validating its edit baseline. */
@@ -664,7 +669,8 @@ export function writeProjectRuntimeConfigFile(
   config: RuntimeConfigFile,
   baseline: ConfigEdit<RuntimeConfigFile>,
 ): string {
-  return writeRuntimeConfigFileAt(getProjectConfigPath(rootDir), config, baseline);
+  return writeRuntimeConfigFileAt(getProjectConfigPath(rootDir), config, baseline,
+    () => path.resolve(getProjectConfigPath(rootDir)) === baseline.path);
 }
 
 function normalizeProviderCredentials(

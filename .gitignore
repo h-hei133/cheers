@@ -61,3 +61,9 @@ packages/ts-shell/undefined/
 .claude/
 .sisyphus/
 .tmp/
+
+# Local project settings and MCP definitions may reference personal services.
+/.cheers/config.json
+/.cheers/mcp.json
+/.cheers.json
+/.cheers.mcp.json

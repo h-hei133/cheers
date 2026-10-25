@@ -70,6 +70,18 @@ it("tracks every trust-file fallback without creating files or traversing home",
   expect(fs.readdirSync(root)).toEqual([]);
 });
 
+it('observes preferred MCP creation inside an existing project directory and its later deletion', async () => {
+  const workspace = path.join(root, 'workspace'); fs.mkdirSync(path.join(workspace, '.cheers'), { recursive: true });
+  const legacy = path.join(workspace, '.cheers.mcp.json'); fs.writeFileSync(legacy, '{"mcpServers":{}}');
+  const current = path.join(workspace, '.cheers', 'mcp.json');
+  expect(catalogSources('mcp', { cwd: workspace, projectRoot: workspace })).toEqual(expect.arrayContaining([current, legacy]));
+  const context = withConfiguration({ cwd: workspace, projectRoot: workspace, session: { id: 'mcp' }, runtimeConfig: {} } as ShellRuntimeContext);
+  const load = createCatalogLoader(() => context, {} as CliMcpGateway, []);
+  const changed = vi.fn(); const stop = load.observe('mcp', undefined, changed)!; stops.push(stop);
+  fs.writeFileSync(current, '{"mcpServers":{}}'); await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+  changed.mockClear(); fs.unlinkSync(current); await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+});
+
 it('refreshes theme completions when trust is saved and revoked', async () => {
   fs.mkdirSync(path.join(root, '.git')); const themes = path.join(root, '.agents', 'themes');
   fs.mkdirSync(themes, { recursive: true }); fs.writeFileSync(path.join(themes, 'custom.json'), JSON.stringify({ colors: {} }));

@@ -23,6 +23,16 @@ function host() {
   return { ...source, configuration: new ConfigState(getRuntimeConfig(root, source.runtimeConfigOverrides), configurationBinding(source)) };
 }
 
+it('detects and reports the directory MCP source before a trust decision', async () => {
+  const file = path.join(root, '.cheers', 'mcp.json'); fs.mkdirSync(path.dirname(file));
+  fs.writeFileSync(file, '{"mcpServers":{"local":{"command":"synthetic-server"}}}');
+  expect(projectTrust.hasSensitiveProjectResources(root)).toBe(true);
+  const result = await runTrustCommand([], { cwd: root });
+  expect(result.output).toContain('declares resources that would run');
+  expect(result.output).toContain(`mcp config: ${file}`);
+  expect(result.output).not.toContain('No project resources');
+});
+
 it('reports the new effective decision for the configured workspace and refreshes its binding', async () => {
   const context = host(); const oldAdmission = configurationAdmission(context); const background = context.configuration.backgroundSignal;
   const result = await runTrustCommand(['off'], { cwd: path.join(root, 'nested'), projectRoot: root,

@@ -27,7 +27,11 @@ function readConfigText(filePath: string): { text: string; revision: string; fin
       revision: createHash('sha256').update(captured).digest('hex'), fingerprint: fingerprint(before), bytes: used }; }
     catch { throw new ConfigDocumentError('invalid-utf8'); }
   } catch (error) {
-    if (fd === undefined && (error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    if (fd === undefined && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      try { fs.lstatSync(filePath); }
+      catch (missing) { if ((missing as NodeJS.ErrnoException).code === 'ENOENT') return undefined; }
+      throw new ConfigDocumentError('unreadable');
+    }
     throw error instanceof ConfigDocumentError ? error : new ConfigDocumentError('unreadable');
   } finally {
     if (fd !== undefined) fs.closeSync(fd);

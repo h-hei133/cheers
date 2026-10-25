@@ -59,7 +59,7 @@ export class SuggestionList {
     const retained = selected?.edit ? items.findIndex(item => item.value === selected.value && sameEdit(item.edit, selected.edit)) : -1;
     this.renderedItems = [];
     this.items = items;
-    this.selected = retained >= 0 ? retained : Math.min(this.selected, Math.max(0, items.length - 1));
+    this.selected = retained >= 0 ? retained : 0;
     this.moved = retained >= 0;
     this.scrollToSelection();
   }

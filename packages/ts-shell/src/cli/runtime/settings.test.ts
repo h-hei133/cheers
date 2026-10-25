@@ -11,8 +11,8 @@ let root: string;
 
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'runtime-settings-'));
-  vi.stubEnv('HOME', root);
-  vi.stubEnv('USERPROFILE', root);
+  vi.stubEnv('HOME', path.join(root, 'home'));
+  vi.stubEnv('USERPROFILE', path.join(root, 'home'));
 });
 
 afterEach(() => {

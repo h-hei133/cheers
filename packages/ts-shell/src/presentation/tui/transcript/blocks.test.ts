@@ -17,7 +17,8 @@ describe("prompt echo", () => {
     // A shade that stops at the last character reads as a highlight, not as a
     // turn boundary; padding it to the frame width makes the prompt a board.
     const rows = renderBlock(textBlock("user", "hello"), WIDTH);
-    expect(rows[0]).toContain("▌");
+    expect(rows[0]).not.toContain("▌");
+    expect(stripAnsi(rows[0]!)).toBe(' hello' + ' '.repeat(WIDTH - 6));
     expect(rows[0]).toContain("\x1b[48;");
     expect(visibleWidth(rows[0]!)).toBe(WIDTH);
   });
@@ -38,7 +39,7 @@ describe("prompt echo", () => {
     expect(visibleWidth(row!)).toBe(WIDTH);
   });
 
-  it("keeps the rail, body and padding on one background without mid-row global resets", () => {
+  it("keeps the body and padding on one background without mid-row global resets", () => {
     const [row] = renderBlock(textBlock("user", "hello"), WIDTH);
     expect(row!.indexOf("\x1b[0m")).toBe(row!.length - "\x1b[0m".length);
     expect(stripAnsi(row!).endsWith(" ")).toBe(true);

@@ -9023,3 +9023,11 @@ STS85c98eaf CI40159668568于04:09:20Z completed/success：971files/10532tests pa
 复核既有WATCH发现object-only cached summary准入会接受错误字段/错ID，已用fresh manager证实8坏行失败（3TypeErrors、5行为断言）。原damaged JSON测试重用warm manager未触盘，已修测试。沿reentry/codec校验当前字段类型/枚举/非负safe step及key identity，坏行miss后仅重算该行并回写，健康v1缓存/可选字段及原stat策略保留。对照参考metadata准入/坏文件隔离决定，未复制scanner/引入schema框架/新继承。9新增场景，三文件104项通过；原读取owner反转5行为场景失败/3AssertionError块，精确恢复后104项再过。
 
 静态五门/analyzer0/diff→根build→完整judge串行exit0，buildb62b4c74c61d9b86fa8488cb3c6c30f3b516c265d7706cdc086c59666349f98d、inputsf44f5da0ec9829540156d5d9255fe02efa412588a3a0e177e3171d517d7719b0、artifact85292fc8c99aa7d4978a196de898f8a2dd1089e8aa18cd982bd300289f0b2ad3；proven/3satisfied/0gaps。独立gpt-6.1-sol codeAPPROVE/architecture最终WATCH→综合COMMENT，Summary与decoder同步维护风险保留，复用测试名称按review纠正为不重算summary，不称无读取。证据归artifacts，HANDOFF追加warm cache测试护栏；原mtime freshness/继承WATCH及38/9/0不变，本批交付另绑定。
+
+## [2026-10-25] fix | Phase 20 七项交互反馈与项目配置目录
+
+slash所有查询排除可选alias；新draft选首项，res排序与真实host Tab场景得到resume。输入框保留每侧1cell，移除普通输入cue及user bubble黄色rail，源投影同步width−2。resume仍为每次打开重新校验的分页目录，启动摘要cache独立；指南更新npm start、源码开发及双构建。项目config/MCP优先.cheers/config.json与.cheers/mcp.json，缺失保留旧散文件读取/编辑；原信任/CAS/授权与加载/锁内/发布前source fence保留，双候选观察及HOME/default/named-profile隔离补齐。本地MCP精确迁移、2server scope/source读回，项目{}继承个人设置，两个0600文件Git忽略，无secret输出或provider派发。
+
+分组聚焦98/143/90/126项通过（有重叠，不相加）；selection/alias/personal destination/user rail四有效反转exit1+AssertionError，原字节恢复。独立gpt-6.1-sol只读codeAPPROVE/architectureCLEAR。最终静态五门、requirements38/9/0、diff、TS/exe串行exit0；build c25c13a684f65cfb55f3561ca991af7b139325b62f9cd945bd64650b8e1a37aa、inputs8dfcfff53484e0beaba525ba737afa15067393605ed63663e4775020c247b454、artifact80a3c28b5bd0b8a5e3b27cec994a16decb2f8da42cb4150d56b54377f91652dd、exe872b289b0aa994264eef408630620d38917ac5bda632fe428294f743cc476326。旧scratch validator容量失败已分类/归档；当前仓内tgz完整judge proven/3satisfied/0gaps，未缩图或改规范。最终npm start help与构建reader通过，证据归phase20-interaction artifacts、own probe清理；无本地全套/真实20k PTY。
+
+原1fb5480ea0749d153be30a709e9c8427dd833d51的CI40161718432、Watch40161718447及Platform QA40161814429本轮实际读回success，仅绑定旧SHA。本批提交/推送/CI另读回。38complete/9partial/0open保持；真实多账号、可信账单、正式配对评分及Windows交互/IME/系统复制仍见phase-20-status与inputs，不扩大Phase范围。

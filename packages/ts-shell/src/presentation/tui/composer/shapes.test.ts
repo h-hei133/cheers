@@ -33,19 +33,19 @@ describe("composer shapes", () => {
       expect(wrap).toHaveBeenCalledOnce();
     }
   });
-  it("registers exactly the eight neutral IDs and defaults to the rule-and-gutter shape", () => {
+  it("registers exactly the eight neutral IDs and defaults to the rule shape", () => {
     expect(shapes).toEqual(["default", "band", "borderless", "top-rule", "padded-rules", "field", "rail", "box"]);
     for (const shape of shapes) expect(isComposerShape(shape)).toBe(true);
     for (const unknown of ["constructor", "toString", "unknown", "", null, 1]) expect(isComposerShape(unknown)).toBe(false);
     const rows = layoutComposer(draft("x"), { busy: false }, 40).rows.map((row) => stripAnsi(row.rendered));
     expect(rows).toHaveLength(3);
     expect(rows[0]).toBe("─".repeat(40));
-    expect(rows[1]).toMatch(/^❯  x/);
+    expect(rows[1]).toMatch(/^ x/);
     expect(rows[2]).toBe("─".repeat(40));
   });
 
   it("reserves real whitespace independently from gutter and side decoration", () => {
-    const expected = { default: 36, band: 35, borderless: 36, "top-rule": 36, "padded-rules": 38, field: 36, rail: 37, box: 36 };
+    const expected = { default: 38, band: 35, borderless: 38, "top-rule": 38, "padded-rules": 38, field: 36, rail: 37, box: 36 };
     for (const shape of shapes) {
       expect(composerTextWidth(40, shape)).toBe(expected[shape]);
       const row = contents(layoutComposer(draft("x", false), { busy: false, shape }, 40))[0]!;

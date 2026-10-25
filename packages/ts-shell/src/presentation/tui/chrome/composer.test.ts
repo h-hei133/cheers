@@ -10,14 +10,15 @@ import { CURSOR_MARKER } from "../render/paint.js";
 const idle = { busy: false };
 
 describe("prompt block", () => {
-  it("marks the first row with the prompt cue and indents continuations", () => {
+  it("aligns source rows with one blank cell and no prompt cue", () => {
     const editor = new Editor();
     editor.insert("line1");
     editor.newline();
     editor.insert("line2");
     const rows = renderComposer(editor, idle, 40);
     expect(rows[0]).toContain("─");
-    expect(rows[1]).toContain("❯");
+    expect(stripAnsi(rows[1]!)).toMatch(/^ /);
+    expect(rows[1]).not.toContain("❯");
     expect(rows[2]).not.toContain("❯");
   });
 
@@ -26,7 +27,7 @@ describe("prompt block", () => {
     editor.insert("你好");
     const rows = renderComposer(editor, idle, 40);
     expect(rows.every(row => visibleWidth(row) <= 40)).toBe(true);
-    expect(stripAnsi(rows[1]!)).toBe("❯  你好" + " ".repeat(33));
+    expect(stripAnsi(rows[1]!)).toBe(" 你好" + " ".repeat(35));
   });
 
   it("carries the cursor marker through for the renderer to place", () => {
@@ -35,8 +36,8 @@ describe("prompt block", () => {
     expect(renderComposer(editor, idle, 40).join("")).toContain(CURSOR_MARKER);
   });
 
-  it("reserves the cue and both padding sides from the text budget", () => {
-    expect(composerTextWidth(40)).toBe(36);
+  it("reserves both padding sides from the text budget", () => {
+    expect(composerTextWidth(40)).toBe(38);
   });
 
   it("bounds composer output to maxRows and tracks cursor", () => {
@@ -45,7 +46,8 @@ describe("prompt block", () => {
     const rows = renderComposer(editor, idle, 40, 4);
     expect(rows).toHaveLength(4);
     expect(rows[0]).toContain("─");
-    expect(rows[1]).toContain("❯");
+    expect(stripAnsi(rows[1]!)).toMatch(/^ /);
+    expect(rows[1]).not.toContain("❯");
     expect(stripAnsi(rows[2]!)).toContain("prompt line 14");
     expect(stripAnsi(rows[3]!)).toBe("─".repeat(40));
     expect(rows.join("")).toContain(CURSOR_MARKER);

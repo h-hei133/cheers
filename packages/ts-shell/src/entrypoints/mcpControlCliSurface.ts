@@ -61,7 +61,7 @@ export function renderMcpStatusControlPlane(
   if (snapshot.clients.length === 0) {
     renderer.renderLine("- No MCP servers configured for this project.");
     renderer.renderLine(
-      "- Add project servers in .cheers.mcp.json or user servers in ~/.cheers/mcp.json.",
+      "- Add project servers in .cheers/mcp.json (legacy .cheers.mcp.json remains readable) or user servers in ~/.cheers/mcp.json.",
     );
     renderer.renderLine("");
     return;
