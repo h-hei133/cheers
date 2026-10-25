@@ -27,6 +27,7 @@ export interface ModalChrome {
   readonly actionHints?: string;
   readonly status?: string;
   readonly onOptionRow?: (row: number, id: string) => void;
+  readonly onListRow?: (row: number, from: number, to: number) => void;
   readonly chips?: ChipStrip;
   readonly groupHint?: string;
   readonly onChipRow?: (row: number, id: string, from: number, to: number) => void;
@@ -65,6 +66,9 @@ export function renderModal(
       if (!option) break;
       if (index > window.offset) rows.push(edge(inner));
       const optionLines = optionRows(option, index === model.selectedIndex, chrome, inner);
+      for (let row = rows.length; row < Math.min(height, rows.length + optionLines.length); row++) {
+        chrome.onListRow?.(row, 1, width - 1);
+      }
       if (isFocusable(option)) {
         for (let row = rows.length; row < Math.min(height, rows.length + optionLines.length); row++) {
           chrome.onOptionRow?.(row, option.id);

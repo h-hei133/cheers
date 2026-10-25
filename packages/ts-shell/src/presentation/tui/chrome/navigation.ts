@@ -30,7 +30,9 @@ export function renderNavigation(model: OptionModel, chrome: PanelChrome, naviga
     rows.push(active ? defaultTheme.bg('selectedBg', line) : line);
   }
   if (narrow) return [...rows, truncateToWidth('Enter: content · Esc: close', width)].slice(0, height);
-  const body = renderPanel(model, { ...chrome, onOptionRow: (row, id, from = 0, to = width) =>
+  const body = renderPanel(model, { ...chrome,
+    onListRow: (row, from, to) => chrome.onListRow?.(row, navWidth + 1 + from, navWidth + 1 + to),
+    onOptionRow: (row, id, from = 0, to = width) =>
     chrome.onOptionRow?.(row, id, navWidth + 1 + from, navWidth + 1 + to) }, width - navWidth - 1, height);
   return Array.from({ length: Math.min(height, Math.max(rows.length, body.length)) }, (_, row) =>
     padToWidth(rows[row] ?? '', navWidth) + defaultTheme.fg('border', '│') + (body[row] ?? ''));

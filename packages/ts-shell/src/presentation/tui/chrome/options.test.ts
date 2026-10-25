@@ -69,6 +69,20 @@ describe("filtering", () => {
 });
 
 describe("cursor", () => {
+  it('stops wheel movement at focusable ends without changing keyboard wrapping', () => {
+    const list = new OptionModel();
+    list.setOptions([{ id: 'header', label: 'header', disabled: true }, { id: 'ready', label: 'ready' },
+      { id: 'blocked', label: 'blocked', disabled: true }, { id: 'missing', label: 'missing', disabled: true, focusable: true },
+      { id: 'footer', label: 'footer', disabled: true }]);
+    list.step(-1, false); expect(list.current()?.id).toBe('ready');
+    list.step(1, false); expect(list.current()?.id).toBe('missing');
+    list.step(1, false); expect(list.current()?.id).toBe('missing');
+    list.step(-1, false); expect(list.current()?.id).toBe('ready');
+    list.step(-1); expect(list.current()?.id).toBe('missing');
+    list.setOptions([{ id: 'header', label: 'header', disabled: true }]);
+    list.step(1, false); expect(list.current()).toBeUndefined();
+  });
+
   it('browses unavailable models while retaining disabled multi-select admission', () => {
     const list = new OptionModel();
     list.setOptions([{ id: 'ready', label: 'ready' }, { id: 'missing', label: 'missing', disabled: true, focusable: true }]);

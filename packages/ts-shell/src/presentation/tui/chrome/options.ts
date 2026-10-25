@@ -120,14 +120,17 @@ export class OptionModel {
     this.setFilter(this.query.slice(0, -1));
   }
 
-  /** Move the cursor over choosable rows, wrapping at both ends. */
-  step(delta: 1 | -1): void {
+  /** Move over focusable rows; wheel navigation stops at the ends. */
+  step(delta: 1 | -1, wrap = true): void {
     const count = this.matches.length;
     if (count === 0) return;
     this.selectionTouched = true;
+    let cursor = this.cursor;
     for (let attempt = 0; attempt < count; attempt++) {
-      this.cursor = (this.cursor + delta + count) % count;
-      if (isFocusable(this.matches[this.cursor])) break;
+      const next = cursor + delta;
+      if (!wrap && (next < 0 || next >= count)) return;
+      cursor = (next + count) % count;
+      if (isFocusable(this.matches[cursor])) { this.cursor = cursor; return; }
     }
   }
 

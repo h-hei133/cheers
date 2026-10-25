@@ -61,6 +61,8 @@ confidence: mixed
 | 动作 | 可用目标启用；不可用目标配置；设置暂存与Apply/Discard | 保留现有连接、模型事务、scope、信任、配置保存及取消契约 |
 | 连续性 | 刷新、resize、进入子编辑器后返回，保持稳定身份和可见焦点 | 用provider/connection/model/key身份，不以显示label回查 |
 
+鼠标对齐包括实际内容区滚轮浏览：一格移动一项可浏览候选，停在首尾，能够从分类/section焦点回到内容行；滚动不启用模型、不保存设置，也不切换multi-select勾选。命中来自当前已绘制列表区域，不能用“disabled不可点击”阻断section模式的内容滚轮；标题、footer、详情、过时画面及正在加载/提交/编辑的子流程各自保持正确边界。侧栏独立视口滚动、hover和桌面矩阵单独核查，不能把内容滚轮补齐写成完整鼠标能力已对齐。
+
 参考A使用Roles / All models /可用provider /锁定provider及model-kind tabs；settings使用Appearance、Model、Interaction、Context、Memory、Files、Shell、Tools、Tasks、Providers十类及各自section。**分类结构要看齐，内容必须对应本项目真实能力。** 参考特有的服务、插件、语言运行时或配置字段不能靠加一个空菜单宣称支持；暂不适用的分类应清晰省略，不能呈现似可设置的假选项。
 
 ### 3.2 model：允许选中未配置模型
@@ -692,3 +694,21 @@ ADD-03核查确认三个相关缺口：[InputForm](../../packages/ts-shell/src/c
 完整settings/model看齐继续按第3节全部路径验收；允许选中具体未配置模型的要求不改回跳过导航，消息顶格与箭头、正文path suggestion/Tab、多skill与准入slash组合包括deep-research均保留。当前完整字段/来源/鼠标/resize/桌面、真实认证、冷/热Node/exe性能、原生tokenizer、其他独立命令/研究preview、精确source字节与发现成本及用户真实1.7k/4.9k差额仍待补证。第九browser-cache writer退出1仍未归因；未运行全仓本地回归、并发重验证或20k真实PTY。原Phase20保持38 complete / 9 partial，ADD单独跟踪，整体目标保持active。
 
 本批严格docs drift与diff实际通过，保留118条既有advisory；addition86/audit87/guide1本地链接目标存在。第十五CI完整日志实际993files/10790tests通过、3skip，第十六993files/10792tests通过、3skip，两者结构proven；日志归档editor，不转记本批或第十七提交，也不将未读取的Watch工件称已通过。
+
+### 第十九批：面板内容滚轮与非循环焦点
+
+第十八批`e71448e7ad0fe08d526809956db16b9ff75524c6`已推送，main/远端精确一致且clean；本批延迟检查其CI `40240194248`仍in_progress，Watch只记录运行状态，工件未读。第十七CI `40239145932`随后实际failure：991files/10795tests通过、2fail/3skip。两失败分别为navigation点击夹具未限制侧栏而命中同名文本（期望Browse失败），以及print/research启动被另一活跃build lock拒绝；后者stderr明确“A build is in progress…transaction was not recovered”，未归因为产品研究路由失败、flaky或锁协议错误。历史失败保留；本批修navigation夹具按侧栏/内容列定位，锁并发来源仍待归因，不改变构建保护以绕过失败。
+
+ADD-02/03定向核查确认[OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts)接收鼠标后仅处理press，wheel直接吞掉，列表无变化。现滚轮一格沿原[OptionModel](../../packages/ts-shell/src/presentation/tui/chrome/options.ts)移动一项，显式wrap=false在可聚焦首尾停止；原键盘上下循环保留，disabled+focusable的具体未配置模型仍可浏览，普通不可聚焦行跳过。滚动不调用apply、inspect、登录/配置，也不改变多选chosen；单选按原preview契约报告焦点变化。
+
+复用[CatalogNavigation](../../packages/ts-shell/src/cli/interactive/picker/navigation.ts)接wheel方向事件，categories/sections转rows并保留规范化search，settings section还原正常字段可浏览性。[panel](../../packages/ts-shell/src/presentation/tui/chrome/panel.ts)、[modal](../../packages/ts-shell/src/presentation/tui/chrome/modal.ts)登记实际已绘制list span，与click的focusable span各自保真；[navigation renderer](../../packages/ts-shell/src/presentation/tui/chrome/navigation.ts)平移内容坐标。标题/footer、detail/sidebar、修改键、无origin、极矮无列表、加载/actionPending及InputForm不滚动；滤词、数据刷新、scope/domain、滚轮/键盘可能移动窗口后立即撤销旧list/option命中，再次绘制才接收。未引入第二套列表、目录、配置或pointer owner。
+
+只读参考A settings-selector 1225–1282按实际内容区域路由，submenu优先；settings-list 395–409滚轮回rows并moveSelection(delta,false)，detail/sidebar区域拒绝；model-hub 2332–2347内容角色/模型使用非循环焦点，而侧栏只pan viewport、不自动换scope。本项目采用内容区域、子流程优先、回rows、非循环与零自动操作决定；原点击只聚焦/Enter明确操作保留。侧栏pan和hover尚未实现，不能用本批忽略侧栏宣称这两项已对齐；主屏regular仍按原terminal scrollback策略，仅借用alternate-screen面板时接管pointer。
+
+最终六文件144项串行通过（wheel10、navigation7、overlay74、options21、panel14、pointer18）。覆盖SGR滚轮方向、具体未配置模型详情、section→字段、multi-select chosen不变/preview不触发、单选preview、首尾不循环、disabled跳过、屏幕origin平移、side/detail/header/modified拒绝、过时filter/keyboard/wheel命中、loading/input/actionPending与零apply/save。初轮104pass/3fail中section场景检出真实设计遗漏（只登记click行），补独立painted list spans；另外两个为multi-select期待箭头以及忘清open/filter的既有preview调用的夹具误期望，改断言精确detail ID/chosen及动作后调用。后续106/107/143与最终144重叠不累加。
+
+三个有效反转分别恢复wheel wrap、移除section域交接、保留旧wheel spans，新增行为AssertionError/exit1，产品文件逐字节恢复；最终又补键盘移动后坐标失效并通过144项。普通/全屏两条120×60小型真实Node PTY经SGR wheel验证settings分类→sections→wheel到maxOutputTokens→Enter精确详情，以及provider分类→wheel missing-b→Up missing-a→Enter精确配置详情；config原字节、零session modelSelection、零message/provider，SIGTERM143仅清理。最后键盘保护变动后重建再验两PTY通过；首尾/窄屏/旧frame/输入编辑边界来自host测试，未伪称真实桌面scroll/resize。
+
+四静态门、责任上限0与TS构建通过；最终build`198895857a0ec77ef55fcb6ff62119ef888cf611938c410eab02187bfbbfde21`，inputs`2ba48afedcb438a7f4fea005d06d64113b5b178f6b6c5a264bb9a2c93a3a6eac`，artifact`e702eb99d9f1d4b0a3d9560d483bf4d0f4520ebbb17c3612a371b7623b7460f9`。最终正式judge实际exit0、proven且三项satisfied；严格docs及diff检查通过，保留118条既有advisory，addition92/audit88/guide1个本地链接目标存在。Git交付另绑定；工件归档`.omx/artifacts/phase20-addition-wheel/`。指南和HANDOFF记录实际滚轮路径及命中边界。
+
+完整面板字段/来源、侧栏pan/hover/desktop、真实OAuth/key、冷/热Node/exe、原生tokenizer、其他独立命令/研究preview、精确source字节/发现成本与用户1.7k/4.9k真实差额继续待证；第九cache writer退出1与第十七活跃build lock来源未归因。不运行并发重验证、全仓本地回归或20k真实PTY。原Phase20仍38 complete / 9 partial，ADD独立，整体目标active。

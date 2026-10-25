@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Wheel Targets Include Painted Non-Clickable List Rows
+- **Symptom**: Wheel over settings content is ignored while section focus disables setting clicks, or a stale report moves focus after a window-changing keyboard action.
+- **Root Cause**: Click admission alone does not describe the painted list region. A list wheel also needs navigation-domain transfer and nonwrapping selection, while cached geometry expires after focus changes can scroll its window.
+- **Rule**: Register painted wheel spans independently from click-focus spans, preserving disabled activation. Transfer section/category focus into content rows without applying, stop at focusable ends, and retire both maps on source/filter/navigation/window changes. Test exact focused identity, preview calls, disabled browsing and zero saves; multi-select renders checkboxes rather than a cursor arrow. Pointer fixtures must select the intended pane before resolving same-name labels.
+
 ### Input Forms Need Remaining Rows And Safe Rejected Prefills
 - **Symptom**: A settings editor loses its caret in short windows, cannot type a list newline, or Enter stages an empty value after an oversized prefill was refused.
 - **Root Cause**: The form budget used terminal height instead of available chrome rows, modified Enter never reached the shared editor, and validation replaced the constructor's rejection state. Fullscreen differential painting also does not repaint unchanged hints after clearing an already empty field.

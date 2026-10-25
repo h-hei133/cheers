@@ -9198,3 +9198,9 @@ ADD-03 list/object复用原Editor支持Shift+Enter/Ctrl+J，Enter暂存/Apply保
 五文件157pass、三有效反转/字节恢复、两模式小Node PTY键盘三项list与多行object/不写暂存/取消/Apply读回重开/零message-model切换通过，SIGTERM143；初轮来源未就绪、Stored截断、fullscreen不重绘不变hint的夹具错误保留分类。四静态门/责任上限0/build130a4fb12c18/正式judge proven三satisfied通过；严格docs/链接与Git另绑定。addition第3节明确多行/预算/超大原值验收，第15节第十八批记证据，audit末尾刷新存在/不成立/未知总括。第十五/十六CI实际success，第十七仍运行；原Phase38/9及完整面板/性能/计量partial边界不变。
 
 严格docs/diff随后实际通过、118既有advisory保留，addition86/audit87/guide1本地链接存在。第十五完整CI993files/10790tests pass、第十六993files/10792tests pass、各3skip/结构proven，日志归档editor；不转记本批或读取未检查的Watch工件。
+
+## [2026-10-26] fix | 面板内容滚轮与非循环焦点
+
+ADD-02/03沿原OptionModel加nonwrap step、CatalogNavigation wheel回rows，panel/modal登记painted list spans并保持disabled click准入，overlay按实际content/origin一格移动、preview/零apply，多选chosen保留。旧filter/source/domain/wheel/keyboard命中撤销；sidebar/detail/header/修改键/loading/pending/input吸收，侧栏pan/hover仍待补。参考内容区域、submenu优先和非循环决定，指南/HANDOFF同步。
+
+最终六文件144pass、三有效反转/精确恢复、两模式SGR小PTY精确setting/model详情/原config/零model切换-message通过，SIGTERM143；初轮section-only click设计遗漏已修，multi-select箭头和open/filter preview夹具错误分类保留。四静态门/责任上限0/build198895857a0e通过，最终正式judge实际exit0、proven三satisfied，严格docs/diff通过、118既有advisory保留，addition92/audit88/guide1本地链接存在；Git另实际绑定。第十八e71448e7已推送仍CI运行；第十七CI实际navigation同名点错pane及print/research活跃build lock两失败，前者修夹具，后者来源未知，历史991files/10795tests pass/2fail/3skip保留。原Phase38/9及完整面板/性能/计量partial边界不变，详见addition15第十九批。

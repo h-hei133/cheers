@@ -31,6 +31,8 @@ export interface PanelChrome {
   readonly hideCount?: boolean;
   /** Records selectable rows and their horizontal span in the frame being rendered. */
   readonly onOptionRow?: (row: number, id: string, from?: number, to?: number) => void;
+  /** Painted list rows include disabled labels for wheel routing, without granting click focus. */
+  readonly onListRow?: (row: number, from: number, to: number) => void;
   /** A second column, when the surface is wide enough to afford one. */
   readonly detail?: (id: string | undefined) => readonly string[];
   /** A tab strip above the list. */
@@ -95,6 +97,7 @@ export function renderPanel(
   for (let rowIndex = 0; rowIndex < bodyRows; rowIndex++) {
     const index = window.offset + rowIndex;
     const option = model.visible[index];
+    if (option) chrome.onListRow?.(rows.length, 0, listWidth);
     if (option && isFocusable(option)) chrome.onOptionRow?.(rows.length, option.id, 0, listWidth);
     const row = option ? renderRow(option, index === model.selectedIndex, model, chrome, labelWidth, listWidth) : "";
     rows.push(twoColumn

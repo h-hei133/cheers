@@ -337,3 +337,7 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 | 未确认，不能写成不存在或已解决 | 原现场model上下键零可见交互的唯一根因；用户同模型/协议/规则/实际工具schema下1.7k与4.9k真实差额；实际冷/热启动收益、真实OAuth/key接受，以及第九browser-cache writer退出1原因。合成夹具的估算数字、结构检查或局部PTY不能替代这些数据 |
 
 第十八批设置支持Shift+Enter/Ctrl+J换行，Enter暂存、Apply保存、Esc保留本次编辑前暂存；普通form按主界面剩余预算，全屏form按整屏预算。两模式小PTY零对话/零切模型，SIGTERM143仅属清理；小窗口/resize证据来自host/surface测试。第十五/十六CI本轮已读回success，第十七CI仍在运行，本批交付另绑定。当前任务与证据详见[补充规划第15节第十八批](phase-20-addition.md#15-实施与验证证据)，整体看齐与真实上下文差额继续待验。
+
+第十九批追加确认并修补：面板wheel直接吞掉、settings section时只用click命中导致内容不能滚动，以及键盘移动窗口后的旧wheel坐标。现按当前painted内容区域一格移动一可浏览项，首尾停止，section/category回rows，未配置模型保留焦点；零自动保存/启用/多选勾选。144项聚焦、三有效反转及两模式SGR小PTY通过。侧栏独立pan、hover、桌面和完整面板仍缺，不能写为全部看齐。
+
+最新证据边界：第十七CI实际2fail/10795pass/3skip，navigation同名点击夹具已按pane定位；print/research被活跃build lock拒绝，其并发来源尚未归因，不改构建拒绝协议。第十八CI仍运行。仍不成立的判断保留“没有上下键监听、排序反了、4.9k是本地字符公式”等；仍未知的包括原现场唯一按键原因、真实token差额/性能/认证及cache writer/活跃build来源，详见[补充规划第15节第十九批](phase-20-addition.md#15-实施与验证证据)。

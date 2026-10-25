@@ -159,6 +159,7 @@ export class OverlayHost {
   private searching = false;
   private searchFailed = false;
   private readonly optionRows = new Map<number, { readonly id: string; readonly from: number; readonly to: number }>();
+  private readonly listRows = new Map<number, { readonly from: number; readonly to: number }>();
   private readonly chipRows = new Map<number, Array<{ readonly id: string; readonly from: number; readonly to: number }>>();
   private renderedWidth = 0;
 
@@ -191,7 +192,7 @@ export class OverlayHost {
     this.input = picker.input ? new InputForm(picker.input) : undefined;
     this.baseOptions = [];
     this.cancelSearch();
-    this.optionRows.clear();
+    this.optionRows.clear(); this.listRows.clear();
     this.chipRows.clear();
     this.picker?.previewEnd?.();
     this.picker = picker;
@@ -229,7 +230,7 @@ export class OverlayHost {
     this.input = undefined;
     this.model = new OptionModel();
     this.baseOptions = [];
-    this.optionRows.clear();
+    this.optionRows.clear(); this.listRows.clear();
     this.chipRows.clear();
     this.renderedWidth = 0;
     this.picker = undefined;
@@ -243,7 +244,7 @@ export class OverlayHost {
 
   /** Rows for the open picker at the given geometry, or none when closed. */
   render(width: number, height: number, availableRows = Math.max(0, height - 6)): string[] {
-    this.optionRows.clear();
+    this.optionRows.clear(); this.listRows.clear();
     this.chipRows.clear();
     this.renderedWidth = width;
     const picker = this.picker;
@@ -294,6 +295,7 @@ export class OverlayHost {
           detailRows: picker.detailRows ?? 2,
           ...chipChrome,
           onOptionRow: (row, id) => this.optionRows.set(row, { id, from: 0, to: width }),
+          onListRow: (row, from, to) => this.listRows.set(row, { from, to }),
           ...(status ? { status } : picker.footer ? { status: picker.footer } : {}),
           ...(actionHints ? { actionHints } : {}),
         },
@@ -322,6 +324,7 @@ export class OverlayHost {
         ...(picker.detail ? { detail: picker.detail } : {}),
         ...chipChrome,
         onOptionRow: (row, id, from, to) => this.optionRows.set(row, { id, from: from ?? 0, to: to ?? width }),
+        onListRow: (row, from, to) => this.listRows.set(row, { from, to }),
       },
       width,
       this.fullScreen ? height : Math.max(0, Math.min(height, availableRows)),
@@ -332,6 +335,22 @@ export class OverlayHost {
   handlePointer(report: MouseReport, top?: number): boolean {
     if (!this.picker) return false;
     if (this.input) return true;
+    if (report.kind === 'wheel') {
+      const hit = top === undefined ? undefined : this.listRows.get(report.row - top);
+      if (this.actionPending || this.loading || this.subMode !== 'none' || report.shift || report.alt || report.ctrl
+        || !hit || report.column < hit.from || report.column >= hit.to || ![-1, 1].includes(report.button)) return true;
+      const before = this.model.current()?.id;
+      const update = this.picker.navigation?.key(report.button < 0 ? 'wheel-up' : 'wheel-down', before, this.model.filter.trim().toLowerCase());
+      if (update) {
+        this.baseOptions = update.options; this.model.setOptions(update.options);
+        if (update.focus) this.model.focus(update.focus, true);
+      }
+      this.model.step(report.button as -1 | 1, false);
+      this.picker.navigation?.focus(this.model.current()?.id);
+      if (!this.picker.multiple && before !== this.model.current()?.id) this.picker.previewChange?.(idsOf(this.model.current()));
+      this.optionRows.clear(); this.listRows.clear(); this.chipRows.clear();
+      this.onChange(); return true;
+    }
     if (!this.actionPending && this.subMode === "none" && top !== undefined &&
         report.kind === "press" && report.button === 0 && !report.shift && !report.alt && !report.ctrl &&
         report.column >= 0 && report.column < this.renderedWidth) {
@@ -339,7 +358,7 @@ export class OverlayHost {
       if (chip) {
         const update = this.picker.navigation?.select(chip.id);
         if (update) {
-          this.optionRows.clear(); this.chipRows.clear();
+          this.optionRows.clear(); this.listRows.clear(); this.chipRows.clear();
           this.model.setFilter(update.query ?? this.model.filter);
           this.baseOptions = update.options; this.model.setOptions(update.options);
           if (update.focus) this.model.focus(update.focus, true);
@@ -354,7 +373,7 @@ export class OverlayHost {
       if (hit && report.column >= hit.from && report.column < hit.to) {
         const update = this.picker.navigation?.point(hit.id, this.model.filter);
         if (update) {
-          this.optionRows.clear(); this.chipRows.clear();
+          this.optionRows.clear(); this.listRows.clear(); this.chipRows.clear();
           this.baseOptions = update.options; this.model.setOptions(update.options);
         }
         this.model.focus(hit.id, true);
@@ -617,7 +636,7 @@ export class OverlayHost {
     }
     const navigation = !isApprovalPicker && !this.loading ? picker.navigation?.key(event.keyId, focused, this.model.filter.trim().toLowerCase()) : undefined;
     if (navigation) {
-      this.optionRows.clear(); this.chipRows.clear();
+      this.optionRows.clear(); this.listRows.clear(); this.chipRows.clear();
       this.model.setFilter(navigation.query ?? this.model.filter);
       this.baseOptions = navigation.options; this.model.setOptions(navigation.options);
       if (navigation.focus) this.model.focus(navigation.focus, true);
@@ -628,7 +647,7 @@ export class OverlayHost {
       (event.keyId === 'left' || event.keyId === 'right')) {
       const update = picker.navigate(event.keyId, focused, this.model.filter.trim().toLowerCase());
       if (update) {
-        this.optionRows.clear();
+        this.optionRows.clear(); this.listRows.clear();
         this.baseOptions = update.options;
         this.model.setOptions(update.options);
         if (update.focus) this.model.focus(update.focus);
@@ -734,7 +753,10 @@ export class OverlayHost {
           return true;
         }
     }
-    if (!picker.multiple && focused !== this.model.current()?.id) picker.previewChange?.(idsOf(this.model.current()));
+    if (focused !== this.model.current()?.id) {
+      this.optionRows.clear(); this.listRows.clear();
+      if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
+    }
     picker.navigation?.focus(this.model.current()?.id);
     this.onChange();
     return true;
@@ -752,7 +774,7 @@ export class OverlayHost {
     const generation = this.generation;
     this.loading = true;
     this.loadFailed = false;
-    this.optionRows.clear();
+    this.optionRows.clear(); this.listRows.clear();
     let pending: Promise<readonly Option[]>;
     try { pending = picker.load(controller.signal); }
     catch (error) { pending = Promise.reject(error); }
@@ -768,7 +790,7 @@ export class OverlayHost {
       if (this.picker !== picker || this.generation !== generation || this.loadController !== controller) return;
       const unsubscribe = picker.subscribe?.(options => {
         if (this.picker !== picker || this.generation !== generation || this.loadController !== controller) return;
-        this.optionRows.clear();
+        this.optionRows.clear(); this.listRows.clear();
         this.baseOptions = options;
         if (!this.model.filter.trim() || !picker.search) this.model.setOptions(options);
         if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
@@ -783,7 +805,7 @@ export class OverlayHost {
       this.loading = false;
       this.loadFailed = true;
       this.cancelSearch();
-      this.optionRows.clear();
+      this.optionRows.clear(); this.listRows.clear();
       this.model.setOptions([]);
       picker.previewEnd?.();
       this.onChange();
@@ -796,7 +818,7 @@ export class OverlayHost {
     const generation = this.generation;
     this.actionPending = true;
     this.actionNotice = undefined;
-    this.optionRows.clear();
+    this.optionRows.clear(); this.listRows.clear();
     let pending: Promise<string | undefined> | void;
     try { pending = action(); }
     catch { pending = Promise.reject(); }
@@ -838,7 +860,7 @@ export class OverlayHost {
     }
   }
   private changeFilter(change: () => void): void {
-    this.optionRows.clear();
+    this.optionRows.clear(); this.listRows.clear();
     this.picker?.navigation?.focus(this.model.current()?.id);
     this.model.setOptions(this.baseOptions);
     change();
@@ -884,7 +906,7 @@ export class OverlayHost {
           || controller.signal.aborted) return;
         this.searching = false;
         this.searchController = undefined;
-        this.optionRows.clear();
+        this.optionRows.clear(); this.listRows.clear();
         this.model.setOptions(options);
         if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
         this.onChange();
@@ -895,7 +917,7 @@ export class OverlayHost {
         this.searching = false;
         this.searchFailed = true;
         this.searchController = undefined;
-        this.optionRows.clear();
+        this.optionRows.clear(); this.listRows.clear();
         this.onChange();
       });
     }, Math.max(0, picker.searchDebounceMs ?? 100));

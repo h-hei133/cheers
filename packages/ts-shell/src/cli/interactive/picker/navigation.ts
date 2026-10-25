@@ -81,6 +81,10 @@ export class CatalogNavigation implements PickerNavigation {
   }
 
   key(key: string, current: string | undefined, query: string): NavigationUpdate | undefined {
+    if (key === 'wheel-up' || key === 'wheel-down') {
+      this.domain = 'rows';
+      return { options: this.project(query), ...(current?.startsWith('section:') ? { focus: this.rowFocus.get(this.category) } : {}) };
+    }
     if (!['tab', 'shift+tab', 'left', 'right', 'up', 'down', 'enter', 'escape'].includes(key)) return undefined;
     if (!this.searching && this.domain === 'rows' && current && !current.startsWith('section:')) this.rowFocus.set(this.category, current);
     if (query && !['left', 'right', 'tab', 'shift+tab'].includes(key)) return undefined;

@@ -133,13 +133,15 @@ it('clicks an unconfigured model from category focus then opens its exact inspec
     baseUrl: 'https://fixture.example.invalid/v1', models: [{ id: 'missing-a' }, { id: 'missing-b' }] }];
   const picker = modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) });
   const overlay = new OverlayHost(() => {}); overlay.open(picker); await settle(); const apply = vi.fn();
-  const click = (label: string, width = 120) => {
-    const frame = overlay.render(width, 30).map(stripAnsi); const row = frame.findIndex(text => text.includes(label));
+  const click = (label: string, pane: 'navigation' | 'content', width = 120) => {
+    const frame = overlay.render(width, 30).map(stripAnsi);
+    const row = frame.findIndex(text => (pane === 'navigation' ? text.split('│')[0] : text.split('│')[1])?.includes(label));
+    expect(row).toBeGreaterThanOrEqual(0);
     const column = frame[row]!.indexOf(label);
     overlay.handlePointer(parseMouseReport(`\x1b[<0;${column + 1};${row + 1}M`)!, 0);
   };
-  click('Fixture provider'); expect(view(overlay, 40)).toContain('Browse');
-  click('missing-b'); expect(view(overlay, 40)).toContain('▸ missing-b'); expect(view(overlay, 40)).not.toContain('Browse');
+  click('Fixture provider', 'navigation'); expect(view(overlay, 40)).toContain('Browse');
+  click('missing-b', 'content'); expect(view(overlay, 40)).toContain('▸ missing-b'); expect(view(overlay, 40)).not.toContain('Browse');
   overlay.handleKey(parseKeyEvent('\x1b[A'), apply); expect(view(overlay)).toContain('▸ missing-a');
   expect(view(overlay)).toContain('• Fixture provider'); expect(apply).not.toHaveBeenCalled();
   let pending: Promise<unknown> | undefined;
