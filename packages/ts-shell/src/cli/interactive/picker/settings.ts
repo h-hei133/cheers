@@ -176,7 +176,7 @@ const SETTINGS_GROUPS: readonly string[] = GROUP_ORDER.filter(group => CONFIG_SE
 export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user', group?: string, selected?: string, notice?: string): Picker {
   let draft: SettingsDraft | undefined;
   const active = group && SETTINGS_GROUPS.includes(group) ? group : 'all';
-  const navigation = new CatalogNavigation(active, true);
+  const navigation = new CatalogNavigation(active, true, true);
   let searching = false;
   const groups = new Map<string, string>();
   return {

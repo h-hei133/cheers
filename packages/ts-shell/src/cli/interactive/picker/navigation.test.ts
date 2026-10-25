@@ -7,6 +7,7 @@ import { settingsPicker } from './settings.js';
 import { modelPicker } from './model.js';
 import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
 import { parseMouseReport } from '../../../presentation/tui/input/mouse.js';
+import type { Option } from '../../../presentation/tui/chrome/options.js';
 
 function settings() {
   const save = vi.fn(async () => ({ applied: true, note: 'saved' }));
@@ -175,4 +176,125 @@ it('preserves an uppercase settings search after clicking its result', async () 
   const selected = view(overlay); expect(selected).toContain('MAX'); expect(selected).toContain('▸ Output token');
   overlay.handleKey(parseKeyEvent('\r'), apply);
   expect(apply).toHaveBeenCalledWith(expect.anything(), ['maxOutputTokens']); expect(h.save).not.toHaveBeenCalled(); overlay.close();
+});
+
+it.each(['categories', 'sections'] as const)('restores the settings %s focus after clearing an empty-result search', async domain => {
+  const h = settings(); const overlay = new OverlayHost(() => {}); const apply = vi.fn();
+  const picker = settingsPicker(h, 'user', 'Model'); overlay.open(picker); await settle();
+  overlay.handleKey(parseKeyEvent('\t'), apply); // sections
+  overlay.handleKey(parseKeyEvent('\x1b[B'), apply); // Sampling
+  if (domain === 'categories') overlay.handleKey(parseKeyEvent('\t'), apply);
+  expect(view(overlay)).toContain(domain === 'sections' ? '▸ Model / Sampling' : '▸ Model');
+  overlay.handlePaste('no-such-setting');
+  expect(view(overlay)).not.toContain('▸ Model / Sampling');
+  for (const character of 'no-such-setting') overlay.handleKey(parseKeyEvent('\x7f'), apply);
+  expect(picker.navigation?.focused).toBe(domain === 'categories');
+  expect(view(overlay, 40)).toContain(domain === 'sections' ? '▸ Model / Sampling' : 'Browse');
+  overlay.handleKey(parseKeyEvent(domain === 'sections' ? '\r' : '\x1b[B'), apply);
+  expect(view(overlay)).toContain(domain === 'sections' ? '▸ Temperature' : '▸ Interaction');
+  expect(apply).not.toHaveBeenCalled(); expect(h.save).not.toHaveBeenCalled(); overlay.close();
+});
+
+it('leaves settings search at the selected result without closing or applying it', async () => {
+  const h = settings(); const overlay = new OverlayHost(() => {}); const apply = vi.fn();
+  const picker = settingsPicker(h, 'project', 'Interaction'); overlay.open(picker); await settle();
+  overlay.handlePaste('maxTurns'); expect(view(overlay)).toContain('▸ Maximum turns');
+  overlay.handleKey(parseKeyEvent('\x1b'), apply);
+  expect(overlay.active).toBe(true); expect(picker.navigation?.active).toBe('Model');
+  expect(view(overlay, 40)).toContain('▸ Maximum turns'); expect(view(overlay)).not.toContain('Search all groups');
+  expect(apply).not.toHaveBeenCalled(); expect(h.save).not.toHaveBeenCalled();
+  overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(apply).toHaveBeenCalledWith(picker, ['maxTurns']); overlay.close();
+});
+
+it('clears an empty model search before leaving the unconfigured provider', async () => {
+  const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
+  const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'anthropic' as const, auth: 'api-key' as const,
+    baseUrl: 'https://fixture.example.invalid/v1', models: [{ id: 'missing-a' }, { id: 'missing-b' }] }];
+  const picker = modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) });
+  const overlay = new OverlayHost(() => {}); const apply = vi.fn(); overlay.open(picker); await settle();
+  overlay.handleKey(parseKeyEvent('\t'), apply); overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+  overlay.handleKey(parseKeyEvent('\r'), apply); overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+  expect(view(overlay)).toContain('▸ missing-b');
+  overlay.handlePaste('no-such-model'); overlay.handleKey(parseKeyEvent('\x1b'), apply);
+  expect(overlay.active).toBe(true); expect(picker.navigation?.active).toBe('fixture');
+  expect(view(overlay, 40)).toContain('▸ missing-b'); expect(view(overlay)).not.toContain('no-such-model');
+  expect(apply).not.toHaveBeenCalled();
+  overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(apply).toHaveBeenCalledWith(expect.anything(), [`model:${JSON.stringify([null, 'fixture', 'missing-b'])}`]);
+  const result = await (apply.mock.calls[0]![0] as Picker).apply(apply.mock.calls[0]![1]);
+  expect(result?.next?.title).toContain('missing-b'); overlay.close();
+});
+
+it('returns from a model search inspection to the exact content row after searching from the sidebar', async () => {
+  const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
+  const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'anthropic' as const, auth: 'api-key' as const,
+    baseUrl: 'https://fixture.example.invalid/v1', models: [{ id: 'missing-a' }, { id: 'missing-b' }] }];
+  const overlay = new OverlayHost(() => {}); const apply = vi.fn();
+  overlay.open(modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) })); await settle();
+  overlay.handleKey(parseKeyEvent('\t'), apply); expect(view(overlay, 40)).toContain('Browse');
+  overlay.handlePaste('missing-b'); expect(view(overlay, 40)).toContain('▸ missing-b');
+  let pending: Promise<unknown> | undefined;
+  overlay.handleKey(parseKeyEvent('\r'), (picker, ids) => { pending = picker.apply(ids).then(outcome => {
+    if (outcome?.next) overlay.open(outcome.next);
+  }); });
+  await pending; await settle(); expect(view(overlay)).toContain('Configure connection');
+  overlay.handleKey(parseKeyEvent('\x1b'), apply); await settle();
+  expect(view(overlay, 40)).toContain('▸ missing-b'); expect(view(overlay, 40)).not.toContain('Browse');
+  expect(apply).not.toHaveBeenCalled(); overlay.close();
+});
+
+it('keeps explicit hierarchy navigation when leaving search and returning models reload without stealing sidebar focus', async () => {
+  const h = settings(); const overlay = new OverlayHost(() => {}); const apply = vi.fn();
+  const settingsView = settingsPicker(h, 'user', 'Model'); overlay.open(settingsView); await settle();
+  overlay.handleKey(parseKeyEvent('\t'), apply); // sections
+  overlay.handlePaste('maxTurns'); overlay.handleKey(parseKeyEvent('\x1b[C'), apply);
+  expect(settingsView.navigation?.active).toBe('Interaction');
+  expect(view(overlay)).not.toContain('Search all groups');
+  overlay.handleKey(parseKeyEvent('\x1b[B'), apply); expect(view(overlay)).toContain('▸ Attention on idle');
+  overlay.close(); expect(h.save).not.toHaveBeenCalled();
+
+  const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
+  const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'anthropic' as const, auth: 'api-key' as const,
+    baseUrl: 'https://fixture.example.invalid/v1', models: [{ id: 'missing-a' }, { id: 'missing-b' }] }];
+  const target = `model:${JSON.stringify([null, 'fixture', 'missing-b'])}`;
+  const picker = modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) }, target);
+  let publish: ((options: readonly Option[]) => void) | undefined;
+  overlay.open({ ...picker, subscribe: callback => { publish = callback; return () => {}; } }); await settle();
+  expect(view(overlay, 40)).toContain('▸ missing-b');
+  overlay.handleKey(parseKeyEvent('\t'), apply); expect(view(overlay, 40)).toContain('Browse');
+  publish!(await picker.load()); expect(view(overlay, 40)).toContain('Browse');
+  expect(picker.navigation?.focused).toBe(true); expect(apply).not.toHaveBeenCalled(); overlay.close();
+});
+
+it('returns a nested model browser directly to its parent even while a search is active', async () => {
+  const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
+  const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'anthropic' as const, auth: 'api-key' as const,
+    baseUrl: 'https://fixture.example.invalid/v1', models: [{ id: 'missing-a' }] }];
+  const parent: Picker = { title: 'Parent', empty: '', load: async () => [{ id: 'return', label: 'Returned' }], apply: vi.fn() };
+  const assigning = { role: 'subagent' as const, thinkingEffort: null, assign: vi.fn(), back: vi.fn(() => parent) };
+  const picker = modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) }, undefined, undefined, assigning);
+  const overlay = new OverlayHost(() => {}); const apply = vi.fn(); overlay.open(picker); await settle();
+  overlay.handlePaste('missing'); overlay.handleKey(parseKeyEvent('\x1b'), apply); await settle();
+  expect(view(overlay)).toContain('Parent'); expect(assigning.back).toHaveBeenCalledOnce();
+  expect(assigning.assign).not.toHaveBeenCalled(); expect(apply).not.toHaveBeenCalled(); overlay.close();
+});
+
+it('returns from a cross-provider search inspection in the selected model provider', async () => {
+  const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
+  const catalog = ['first', 'second'].map(id => ({ id, label: `${id} provider`, runtime: 'anthropic' as const, auth: 'api-key' as const,
+    baseUrl: `https://${id}.example.invalid/v1`, models: [{ id: `${id}-model` }] }));
+  const overlay = new OverlayHost(() => {}); const apply = vi.fn();
+  overlay.open(modelPicker({ cwd: '/tmp/cheers-test', readConfiguration: () => ({ config, catalog }) })); await settle();
+  overlay.handleKey(parseKeyEvent('\t'), apply); overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+  overlay.handleKey(parseKeyEvent('\r'), apply); expect(view(overlay)).toContain('▸ first-model');
+  overlay.handlePaste('second-model'); expect(view(overlay)).toContain('▸ second-model');
+  let pending: Promise<unknown> | undefined;
+  overlay.handleKey(parseKeyEvent('\r'), (picker, ids) => { pending = picker.apply(ids).then(outcome => {
+    if (outcome?.next) overlay.open(outcome.next);
+  }); });
+  await pending; await settle(); expect(view(overlay)).toContain('Configure connection');
+  overlay.handleKey(parseKeyEvent('\x1b'), apply); await settle();
+  expect(view(overlay, 40)).toContain('▸ second-model'); expect(view(overlay)).toContain('• second provider');
+  expect(apply).not.toHaveBeenCalled(); overlay.close();
 });

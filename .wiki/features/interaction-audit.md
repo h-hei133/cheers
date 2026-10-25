@@ -372,3 +372,22 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 核查更正：附件已经保存严格UTF-8正文digest并在准入重读，不能归为完全缺少字节校验。本批确认并修补的是preview同步verify反复读取附件正文与不能异步取消的缺口。现复用异步inspect owner逐项比对原digest，同步verify仅检查路径/身份/实时grant；sourceAccess每次刷新read gate，await后再准入，取消等待句柄关闭settlement。六文件47项、三有效反转/逐字节恢复、构建和结构proven通过；真实runtime附件与共享组装文本estimate相等、20次同步verify零附件body读、session文件不变/零MCP连接，无PTY或生产性能结论。
 
 确定修补的其他问题与不成立解释沿上节保留，settings/model整体看齐和正文路径/多skill/有限slash完整体验仍按[文末验收](phase-20-addition.md#16-最新问题总和与必须完成的体验)，不因本批局部绿色升级。仍未知：原现场唯一按键原因、真实token差额/冷热启动/认证接受、cache writer/build并发来源。第二十二/二十三CI本批实查仍运行，各自绑定SHA；动态/ignore/memory来源和总I/O、原生tokenizer/研究preview、面板完整字段/来源/桌面等继续待验，详见[第二十四批](phase-20-addition.md#15-实施与验证证据)。
+
+### 文末当前结论（第二十五批）
+
+本批确认并修补三项面板操作问题：搜索清空丢失原分类/section焦点域；搜索Esc直接关闭；从model侧栏搜索进入详情再返回，窄屏只显示侧栏而隐藏原模型行。沿[原导航](../../packages/ts-shell/src/cli/interactive/picker/navigation.ts)保存搜索前焦点域/section，settings Esc转到所选结果所属分类，model Esc先清搜索；[模型返回](../../packages/ts-shell/src/cli/interactive/picker/model.ts)在本次open精确定位内容行，后续publication不抢手动侧栏焦点。明确parent/子编辑器取消继续优先，未配置具体model仍可选中详情/配置，认证与启用分开。
+
+跨provider返回追加用例修补前实际14pass/1fail：A分类搜到B模型再从详情返回仍过滤A。明确回返现按精确row group定位B，All范围保持All；已纳入最终聚焦与反转验证。
+
+九文件196项、三有效反转/逐字节恢复、四静态门/构建/正式judge proven三satisfied通过；regular/fullscreen真实Node入口隔离PTY均证明settings搜索退出/section恢复和未配置model上下键/清搜索/详情返回，配置不写、活动模型不变、零message派发，两进程已退出。探针stored标记/regular详情识别/内置provider排序错误已修正并保留失败证据，不归为产品缺陷。详情见[第二十五批](phase-20-addition.md#15-实施与验证证据)。
+
+| 分类 | 当前结论 |
+|---|---|
+| 确实存在且已有局部修补 | 未配置模型原先不能聚焦；resume渐进加载锁住旧自动焦点；黄条删除后残留绘制空白、编辑箭头缺失；启动先重初始化后首帧；初始context缺本地估算；原正文路径/多skill/有限方法组合缺口；本批搜索退出与模型详情返回缺口。不能将历史存在写成当前从未修补，也不能以局部验证宣称用户环境全部通过 |
+| 确实仍需完善 | settings/model完整分类→导航→搜索→详情→编辑/配置→取消/确认→重开读回，全部字段/来源/scope/编辑器/桌面/真实认证矩阵；动态来源新鲜度/总I/O、原生tokenizer、研究完整preview、冷/热Node/exe及真实上下文差额 |
+| 不成立的判断 | “model没有上下键监听”“resume时间排序反了”“settings完全没有分类”“稀疏配置等于功能没实现”“npm start每次编译或用户入口用错”“对话后4.9k就是本地字符公式”“工具数相近必然上下文相同”。原路径证据不支持这些解释；新探针失败也不能代替产品故障证据 |
+| 尚未确认 | 原现场零可见按键的唯一根因、同模型/协议/规则/schema下真实1.7k/4.9k差额、生产冷热启动收益、真实认证接受、cache writer退出1和活跃build lock并发来源。不能写为不存在或已解决 |
+
+用户明确要求继续保留：未配置具体模型可选、两个面板向oh-my-pi整体看齐、已提交正文顶格且编辑箭头恢复、源首位完整slash、正文路径suggestion/连续Tab、同提交所有明确skill生效，以及deep-research等有限方法命令与多skill组合，正文功能命令不执行。[完整要求](phase-20-addition.md#16-最新问题总和与必须完成的体验)及ADD任务状态独立于原Phase20的38 complete / 9 partial。
+
+第二十二/二十三CI延迟实查已success，各绑定原SHA，仅读状态、未读全日志/Watch工件；第二十四CI实查仍运行。本批严格docs/diff通过，118既有advisory保留，addition120/audit99本地链接存在；提交推送和CI结果以phase20-addition-navigation的delivery.json另行登记，搜索/返回局部绿色不代表全部补充任务完成。

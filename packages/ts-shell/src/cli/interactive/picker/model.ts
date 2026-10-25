@@ -42,12 +42,14 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
   const inspections = new Map<string, () => Picker>();
   const assignments = new Map<string, () => RoleResult>();
   let activeFocus = focus;
+  let returnFocus = focus;
   const picker: Picker = {
     title: assigning ? `${assigning.role} model` : "Model",
     form: "panel",
     empty: "No providers in the catalogue.",
     navigation, fullScreen: true,
     ...(assigning ? { back: assigning.back } : {}),
+    onOpen() { returnFocus = focus; },
     get initialSelection() { return activeFocus; },
     ...(notice ? { status: () => notice } : {}),
     filterOptions: query => navigation.project(query),
@@ -248,6 +250,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       navigation.set(rows, groups, [...(assigning ? [] : [{ id: 'roles', label: 'Roles' }]), { id: 'all', label: 'All models' },
         ...ordered.map(provider => ({ id: provider.id, label: provider.label,
           note: availability.providers.find(item => item.provider === provider.runtime)?.state === 'ready' ? undefined : '○' }))]);
+      if (returnFocus) { navigation.point(returnFocus, ''); returnFocus = undefined; }
       return rows;
     },
     detail: id => (id ? details.get(id) ?? [] : []),

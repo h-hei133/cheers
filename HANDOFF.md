@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Search Projection Must Preserve Navigation And Explicit Return Ownership
+- **Symptom**: Clearing a search loses category/section focus, Esc closes the catalogue, or returning from model inspection shows only the narrow sidebar despite retaining the model ID.
+- **Root Cause**: Search overwrites the navigation domain; a new host filter clears projection state while a shared navigation object still carries the old search mode. Reapplying explicit return focus on every load also steals later manual sidebar navigation.
+- **Rule**: Capture the pre-search domain once, retain real section identity, and distinguish clear-to-origin from selected-result navigation. Retire the snapshot on explicit hierarchy movement. Restore model content focus once per explicit open/return after the catalogue is loaded; keep publication refresh separate. Preserve child/parent Escape priority. PTY fixtures must account for stored-value markers, borrowed-screen exit, regular detail output and merged builtin provider ordering.
+
 ### Attachment Content Verification Is Separate From Live Read Admission
 - **Symptom**: Context preview rereads attachment bodies synchronously on every verification, cancellation cannot interrupt those reads, or an async reader returns content after grants or roots were revoked.
 - **Root Cause**: Content digest checks and permission checks shared one synchronous reader; a captured gate options object expires across await. Existing strict UTF-8 attachment digests already bind valid raw bytes, so treating this as missing content verification misclassifies the defect.

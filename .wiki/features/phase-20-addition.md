@@ -61,6 +61,8 @@ confidence: mixed
 | 动作 | 可用目标启用；不可用目标配置；设置暂存与Apply/Discard | 保留现有连接、模型事务、scope、信任、配置保存及取消契约 |
 | 连续性 | 刷新、resize、进入子编辑器后返回，保持稳定身份和可见焦点 | 用provider/connection/model/key身份，不以显示label回查 |
 
+搜索退出须区分三个动作：退格清空恢复搜索前分类、焦点域及字段/section；settings搜索中Esc回到所选结果的所属分类并聚焦该字段，无匹配则恢复原位置；model搜索中Esc先清搜索并恢复原浏览位置，再按Esc沿既有导航退出。分类键和显式分类点击仍按用户新选择离开搜索。进入模型详情再返回应显示原具体模型所在内容页，不能只保留隐藏在侧栏后的行ID；后续目录刷新不重复执行返回定位。带明确parent的角色浏览器及子编辑器保留原Esc返回/取消优先级，不被根目录搜索退出拦截。
+
 鼠标对齐包括实际内容区滚轮浏览：一格移动一项可浏览候选，停在首尾，能够从分类/section焦点回到内容行；滚动不启用模型、不保存设置，也不切换multi-select勾选。命中来自当前已绘制列表区域，不能用“disabled不可点击”阻断section模式的内容滚轮；标题、footer、详情、过时画面及正在加载/提交/编辑的子流程各自保持正确边界。侧栏滚轮仅移动独立视口，不选择分类；点击命中滚动后实际绘制的身份，键盘返回或重开时露出活动分类，刷新重排保留可见锚点并限制边界。hover和桌面矩阵单独核查，不能把内容与侧栏滚轮补齐写成完整鼠标能力已对齐。
 
 悬停须贯通终端报告、解码、pointer路由和实际绘制：未按按钮的移动只高亮指针下已绘制category或内容行，状态与键盘选中分开，Enter仍操作原选中项；不触发preview/保存/认证/启用。离开列表或进入另一列、详情、section标题时撤回旧高亮，刷新/filter/resize/返回后不沿用旧坐标。面板关闭、外部终端交接及停止时恢复普通鼠标模式；主屏regular的scrollback保持原策略，已请求但迟到的motion不变成release或完成拖拽。
@@ -819,6 +821,28 @@ ADD-08核查纠正此前“附件完整字节绑定仍缺”的宽泛表述：[C
 
 此处“同步verify不读附件正文”不等于整个verify无I/O：session/source metadata及extension inventory仍有既有检查，frame read才保持文件系统无访问。实际请求目前的附件准入仍同步，本批不宣称整个dispatch异步化。跨文件原子snapshot、所有动态/ignore/memory来源精确绑定、目录/正文/复验总I/O成本、原生tokenizer、其他独立命令/研究完整preview、真实1.7k/4.9k拆分、Node/exe冷/热测量、完整settings/model字段/来源/编辑器/桌面/真实认证仍缺。cache writer/build并发原因未归因；原Phase20保持38 complete / 9 partial，ADD独立、整体active。
 
+### 第二十五批：面板搜索退出、焦点恢复与模型详情返回
+
+第二十四批`71e8d26babea2a754cd5945195a0d42b1ec14187`接续工作区clean。本批延迟实查第二十二CI `40243690372`、第二十三CI `40244427716`已completed/success，分别绑定`62dfe53d`、`25f9dc06`；仅读状态，未取两批全日志或Watch工件。第二十四CI `40245017599`实查仍in_progress。历史状态不赋予本批CI成功。
+
+ADD-02/03核查[导航owner](../../packages/ts-shell/src/cli/interactive/picker/navigation.ts)和实际[OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts)，确认三项操作缺口：搜索将categories/sections无条件改成rows，退格清空后只恢复分类和字段ID，丢失原焦点域及所选section；搜索中Esc未被navigation消费，直接进入host关闭；model从侧栏搜索进入详情后，返回复用旧navigation但host用空filter重新投影，窄屏落回侧栏，原模型虽保留ID却不可见。新增四条搜索操作用例首次7pass/4fail，追加模型返回用例11pass/1fail，均在对应实际画面或host状态断言失败。
+
+现沿CatalogNavigation保留单次搜索前domain和真实section身份，搜索重复投影/结果移动不覆盖原位置；清空恢复domain及preferred。settings用显式searchSelection策略使Esc转到当前结果所属分类/字段，无匹配恢复原位置；model Esc先清搜索，保留当前provider及原模型。明确分类点击/左右/Tab离开搜索时退役旧snapshot，不回跳。原host子编辑器与明确parent先处理Esc，审批/认证/取消合同继续保持。
+
+[model picker](../../packages/ts-shell/src/cli/interactive/picker/model.ts)仅在带精确focus的本次open/load回返中将navigation转到内容行并退役旧search状态；后续load/publication不重复定位。因此进入未配置详情后Esc可直接看见原模型，手动回侧栏后刷新不抢焦点。具体未配置模型仍disabled activation/focusable inspection，认证与显式模型启用分开，未新增目录/配置/输入owner。
+
+追加跨provider回返用例另在14pass/1fail中确认：从A分类搜到B具体模型，返回虽转rows但仍过滤A，B的ID不能成为可见焦点。明确返回的point在非All分类中按精确row group转所属provider；All浏览保持All，普通search点击不改原分类。修补后纳入最终196项，并在末次源码上重跑三有效反转/聚焦检查/构建/judge及PTY。
+
+只读参考A `packages/tui/src/overlays/settings-selector.ts`1292–1328、1384–1406、1971–2000：搜索独立结果list，清空回pre-search tab，Esc可落到所选结果；`model-hub.ts`2087–2110先退出子状态/清query/再关闭，1674–1694显式赋值浏览进入list。采用清空和结果导航分开、取消分层及精确内容定位。Cheers保留自身分类/section焦点和明确parent契约，模型清搜索后恢复原浏览位置而非套用settings的跨分类跳转；刷新定位只执行一次。参照片段不证明本项目完整桌面或真实认证验收。
+
+最终九文件196项串行通过（navigation15、settings20、model43、overlay74、wheel12、hover7、model auth16、key8、watch1）。覆盖categories/sections空结果搜索清空、settings结果Esc/Enter、未配置model空搜索与精确详情、侧栏搜索返回、窄屏/宽屏、显式分类键、返回后publication不抢侧栏、角色parent优先取消及既有pointer/credential事务。一次73pass/1fail为新测试错误要求disabled inspection必须返回原picker对象；host原本包装inspect callback，改为断言实际精确ID和详情结果，不改变产品准入。三次有效反转分别删除search-domain恢复、Esc消费、model返回定位，均AssertionError/exit1，源文件逐字节恢复。
+
+实际Node入口regular/fullscreen隔离PTY均通过：settings结果Esc→详情→返回→section搜索清空、未配置模型上下键→空搜索Esc→侧栏搜索→精确详情→返回原missing-b；配置原字节不变、会话modelSelection未写、零message/模型派发，两子进程均已退出。探针首次漏算stored标记，随后修正借用全屏退出返回类型/regular详情识别，以及合并内置provider后用实际焦点逐项导航的上限；失败日志保留，不将这些探针缺陷归为产品故障。PTY只证明此小型隔离路径，不代表桌面鼠标、真实OAuth/API-key或全字段矩阵。
+
+四静态门、TS构建实际通过，build`b62347ac84548e4639dfdfd9b2ac3b9dbf877d7660fed58e3fc19280955e793a`，inputs`8cfabbd57adfdd1d2783c325cb0e3ae2beb7aa1557d147bdcc34a0c35abf0eb2`，artifact`2f448abd2de5262f820544daa794ffe0a5e7d7a10ddd703ddf984afadcc89c53`；当前validator SHA-256`6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`新目录解包正式judge实际exit0/proven，三项satisfied。工件归`.omx/artifacts/phase20-addition-navigation/`；文档检查与Git交付单独绑定。本批只闭合上述搜索/返回路径，完整面板字段/来源/scope/编辑器/桌面/真实认证、启动测量、真实token差额、动态来源/I/O、tokenizer及研究preview仍待验；原Phase20保留38 complete / 9 partial，ADD独立、整体active。
+
+严格docs/diff实际通过，118既有docs-source advisory保留；addition120/audit99本地链接目标存在。最终build上的regular/fullscreen PTY已再次通过，检查进程均已settle。提交/推送SHA、远端读回及本批CI状态以该工件目录的delivery.json另行记录，不从本地绿色推定CI结果。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -832,7 +856,7 @@ ADD-08核查纠正此前“附件完整字节绑定仍缺”的宽泛表述：[C
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚 | 入口先建立重runtime再进入交互，造成可见等待。已采用早期真实composer及一次lease交接；仍需同机冷/热Node/exe的首帧、接管、ready及首请求取样，加载延迟夹具不证明生产收益 |
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
-| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
+| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。本批另确认并修补搜索清空丢焦点域/section、Esc直接关闭、模型详情返回落回侧栏；九文件196项及regular/fullscreen隔离PTY通过。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
 
 ### 16.2 不成立的判断与仍未确认的原因

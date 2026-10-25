@@ -28,15 +28,19 @@ export class CatalogNavigation implements PickerNavigation {
   private readonly rowFocus = new Map<string, string>();
   private section?: string;
   private searching = false;
+  private searchDomain?: 'categories' | 'sections' | 'rows';
 
-  constructor(category = 'all', private readonly sectionFocus = false) { this.category = category; }
+  constructor(category = 'all', private readonly sectionFocus = false,
+    private readonly searchSelection = false) { this.category = category; }
   get items(): readonly NavigationItem[] { return this.categories; }
   get active(): string { return this.category; }
   get focused(): boolean { return this.domain === 'categories'; }
   get all(): readonly Option[] { return this.rows; }
-  get preferred(): string | undefined { return this.rowFocus.get(this.category); }
+  get preferred(): string | undefined { return this.domain === 'sections' ? this.section : this.rowFocus.get(this.category); }
   focus(id: string | undefined): void {
-    if (!this.searching && id && !id.startsWith('section:')) this.rowFocus.set(this.category, id);
+    if (this.searching || !id) return;
+    if (id.startsWith('section:')) this.section = id;
+    else this.rowFocus.set(this.category, id);
   }
 
   set(rows: readonly Option[], groups: ReadonlyMap<string, NavigationGroup>, categories: readonly NavigationItem[]): void {
@@ -45,6 +49,11 @@ export class CatalogNavigation implements PickerNavigation {
   }
 
   project(query: string): readonly Option[] {
+    if (query && !this.searching) this.searchDomain = this.domain;
+    else if (!query && this.searching) {
+      this.domain = this.searchDomain ?? this.domain;
+      this.searchDomain = undefined;
+    }
     this.searching = Boolean(query);
     if (query) {
       this.domain = 'rows';
@@ -67,6 +76,7 @@ export class CatalogNavigation implements PickerNavigation {
   select(id: string): NavigationUpdate | undefined {
     if (!this.categories.some(item => item.id === id)) return undefined;
     this.category = id;
+    this.searching = false; this.searchDomain = undefined;
     this.domain = 'categories';
     this.viewport.reveal();
     return { options: this.project(''), focus: this.rowFocus.get(id), query: '' };
@@ -79,6 +89,11 @@ export class CatalogNavigation implements PickerNavigation {
       return { options: this.project(''), focus: id };
     }
     if (!this.rows.some(row => row.id === id)) return undefined;
+    if (!query) {
+      this.searching = false; this.searchDomain = undefined;
+      const group = this.groups.get(id);
+      if (this.category !== 'all' && group && this.categories.some(item => item.id === group.category)) this.category = group.category;
+    }
     this.domain = 'rows';
     this.focus(id);
     return { options: this.project(query.trim().toLowerCase()), focus: id };
@@ -90,8 +105,20 @@ export class CatalogNavigation implements PickerNavigation {
       return { options: this.project(query), ...(current?.startsWith('section:') ? { focus: this.rowFocus.get(this.category) } : {}) };
     }
     if (!['tab', 'shift+tab', 'left', 'right', 'up', 'down', 'enter', 'escape'].includes(key)) return undefined;
+    if (query && key === 'escape') {
+      const group = current ? this.groups.get(current) : undefined;
+      if (this.searchSelection && current && group) {
+        this.category = group.category; this.domain = 'rows';
+        this.searching = false; this.searchDomain = undefined;
+        this.rowFocus.set(this.category, current);
+      }
+      const options = this.project('');
+      this.viewport.reveal();
+      return { options, focus: this.preferred, query: '' };
+    }
     if (!this.searching && this.domain === 'rows' && current && !current.startsWith('section:')) this.rowFocus.set(this.category, current);
     if (query && !['left', 'right', 'tab', 'shift+tab'].includes(key)) return undefined;
+    if (query) { this.searching = false; this.searchDomain = undefined; }
     if (key === 'tab' || key === 'shift+tab') {
       const domains: readonly ('categories' | 'sections' | 'rows')[] = this.sectionFocus ? ['categories', 'rows', 'sections'] : ['categories', 'rows'];
       const index = domains.indexOf(this.domain);

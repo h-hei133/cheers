@@ -9234,3 +9234,9 @@ ADD-08/11现有SkillDiscovery verified-handle读返回raw Buffer，loader解析�
 ADD-08更正附件原已严格UTF-8 digest核验，真实缺口是preview同步verify反复读正文/不可取消。沿原source reader提取仅准入access，每次刷新read gate；异步reader复用inspectWorkspaceFileAsync，await后session/root/grant再验。attachment verify逐项检查原scope/bounds/digest，preview返回及周期异步复验必经，同步不再读附件body，实际dispatch准入仍原合同。
 
 六文件47pass、三个有效反转/逐字节恢复、四静态门/TS构建d894c4696369/正式judge proven三satisfied及严格docs/diff通过，118既有advisory保留，addition117/audit95本地链接存在。初轮44pass/1fail为等价config对象替换的错误撤销fixture，改实际substrate transition保留断言；45/47重叠不累加。真实descriptor取消等settlement关闭、await后deny/session/root/additional-root撤销、BOM/CRLF/非法UTF-8及大小通过；runtime组装完整estimate相等、20次同步零附件body、session不变/零MCP。无PTY/全仓回归，第二十二/二十三CI仍运行；Git另绑定。归档phase20-addition-attachments；整体面板/动态来源总成本/tokenizer/研究preview/真实差额性能认证/cache-build并发仍待证，原Phase38/9和ADD独立/active保留。
+
+## [2026-10-26] fix | 面板搜索退出、分区焦点与模型详情返回
+
+ADD-02/03确认并修补搜索清空丢categories/sections与section身份、Esc直接关闭、model侧栏搜索详情返回藏住原模型行。复用CatalogNavigation单次搜索snapshot，settings Esc落所选结果、model先清搜索；model精确返回只在本次open/load定位内容，publication不抢侧栏。明确parent/子编辑器取消优先、未配置model可聚焦与显式启用分开。
+
+九文件196pass、三个有效反转/逐字节恢复、四静态门/TS构建b62347ac8454/正式judge proven三satisfied通过。regular/fullscreen隔离Node入口PTY均通过搜索Esc/section恢复与未配置model导航/精确详情返回，配置及modelSelection不写、零message、进程已退出；探针stored标记/regular画面/内置provider次序错误分类并保留失败日志。第二十二/二十三CI状态success，仅读状态；第二十四仍运行，各绑定原SHA。归档phase20-addition-navigation，Git与文档检查另绑定；完整面板/桌面/真实认证及其余ADD继续待验，原Phase38/9与ADD独立/整体active，详见addition15第二十五批及16文末总和。
