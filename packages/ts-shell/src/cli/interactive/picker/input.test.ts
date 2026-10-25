@@ -46,3 +46,16 @@ it('cancel drops the form without invoking its submit callback', () => {
     input: { initial: '23', label: '', validate: () => undefined, apply: submit } });
   overlay.handleKey(parseKeyEvent('\x1b'), vi.fn()); expect(overlay.active).toBe(false); expect(submit).not.toHaveBeenCalled();
 });
+
+it('scrolls a read-only value from the start and absorbs every editing path', () => {
+  const initial = Array.from({ length: 30 }, (_, index) => `source-${index}`).join('\n');
+  const form = new InputForm({ initial, label: 'Read-only', readOnly: true, validate: () => undefined });
+  expect(form.render('Sources', 30, 10).map(stripAnsi).join('\n')).toContain('source-0');
+  form.paste('replacement');
+  for (const key of ['x', '\x15', '\x1a', '\x7f', '\x1b[3~']) form.key(parseKeyEvent(key));
+  expect(form.value()).toBe(initial);
+  for (let index = 0; index < 20; index++) form.key(parseKeyEvent('\x1b[B'));
+  const scrolled = form.render('Sources', 30, 10).map(stripAnsi).join('\n');
+  expect(scrolled).toContain('source-20'); expect(scrolled).not.toContain('source-0\n');
+  expect(form.value()).toBe(initial);
+});

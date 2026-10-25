@@ -8,6 +8,8 @@ export interface PickerInput<T> {
   readonly label: string;
   /** Single-line credentials render only bullets and never enter prompt history. */
   readonly masked?: boolean;
+  /** Inspect bounded text with the same wrapping and cursor navigation, without editing. */
+  readonly readOnly?: boolean;
   readonly hint?: string;
   validate(text: string): string | undefined;
   apply(text: string): Promise<T>;
@@ -21,17 +23,21 @@ export class InputForm {
   private readonly display = new Editor();
   private error: string | undefined;
   constructor(readonly input: Omit<PickerInput<unknown>, 'apply'>) {
-    if (Buffer.byteLength(input.initial) <= MAX_BYTES) this.editor.setText(input.initial);
+    if (Buffer.byteLength(input.initial) <= MAX_BYTES) {
+      this.editor.setText(input.initial);
+      if (input.readOnly) this.editor.setCursorOffset(0);
+    }
     else this.error = 'Value is too large for this editor. Edit the configuration file instead.';
   }
 
   render(title: string, width: number, height: number): string[] {
-    const rows = [title, this.input.label, ...this.renderInput(width, Math.max(1, Math.min(6, height - 5))),
+    const rows = [title, this.input.label, ...this.renderInput(width, Math.max(1, this.input.readOnly ? height - 3 : Math.min(6, height - 5))),
       this.error ?? this.input.hint ?? 'Enter: stage value    Esc: cancel    Ctrl+U: clear'];
     return rows.map(row => truncateToWidth(row, width));
   }
 
   paste(text: string): void {
+    if (this.input.readOnly) return;
     if (this.input.masked && /[\r\n\t]/.test(text)) { this.error = 'Enter a single-line value.'; return; }
     if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(text)) { this.error = 'Control characters are not accepted.'; return; }
     if (Buffer.byteLength(this.editor.getText()) + Buffer.byteLength(text) > MAX_BYTES) { this.error = 'Value exceeds the editor size limit.'; return; }
@@ -39,6 +45,7 @@ export class InputForm {
   }
 
   key(event: ParsedKeyEvent): void {
+    if (this.input.readOnly && !['left', 'right', 'up', 'down', 'home', 'end', 'ctrl+a', 'ctrl+e'].includes(event.keyId)) return;
     if (this.input.masked && ['up', 'down'].includes(event.keyId)) {
       this.syncDisplay();
       this.display.move(event.keyId as 'up' | 'down');

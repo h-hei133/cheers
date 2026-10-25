@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Settings Outcome Before Long Provenance
+- **Symptom**: A configuration save succeeds but a long explicit-input path pushes the effective-value mismatch beyond the visible footer; the source itself is truncated in a row note.
+- **Root Cause**: Single-row notes have a width ceiling and status footers have a fixed line budget. Putting the entire origin before the result hides the information needed to assess the save.
+- **Rule**: Put saved-versus-effective outcome before long provenance. Provide bounded read-only inspection through the existing wrapped editor, retain pending edits on return, and verify user/project targets and explicit-input bytes separately through actual keyboard/terminal paths.
+
 
 ### Masked Credential Forms Must Precede Prompt Persistence
 - **Symptom**: Filling an API-key command draft exposes credentials in terminal output, prompt history or transcript; a painted mask still leaves raw text available to a display consumer.

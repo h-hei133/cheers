@@ -9,6 +9,7 @@ import { normalizeStatusItems } from '../../../presentation/tui/chrome/items.js'
 import { statusItemPicker } from './statusItems.js';
 import { settingPreview, type PreferenceHost } from './preview.js';
 import { CatalogNavigation, type NavigationGroup } from './navigation.js';
+import { settingSources } from './settings/source.js';
 
 export interface SettingsHost extends PreferenceHost {
   openSettings(scope?: SettingsScope): SettingsDraft;
@@ -93,6 +94,7 @@ function detailOptions(draft: SettingsDraft, setting: SettingDefinition, pending
   ];
   if (current.projectTrustNotice) options.push({ id: 'trust', label: 'Project value inactive', detail: `${current.projectTrustNotice} Use /trust to inspect.`, disabled: true });
   if (pending) options.push({ id: 'pending', label: `Pending: ${compact(pending.value)}`, note: setting.policy.application, disabled: true });
+  options.push({ id: 'inspect', label: 'Values and sources', detail: 'Read full values and configuration origins' });
   if (setting.choices) setting.choices.forEach((value, index) => options.push({ id: `choice:${index}`, label: `Choose ${formatSetting(value)}`, detail: 'Stage without saving' }));
   else options.push({ id: 'edit', label: 'Edit value', detail: setting.key === 'tui.statusItems' ? 'Choose supported items; stage without saving' : `JSON ${setting.schema.type}; stage without saving` });
   options.push({ id: 'unset', label: 'Remove stored value', detail: 'Stage removal; other layers or defaults will apply' });
@@ -138,6 +140,7 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
         next: settingDetail(host, draft, setting, pending, failure),
       };
       const id = ids[0];
+      if (id === 'inspect') return { next: settingSources(draft, setting, () => settingDetail(host, draft, setting, pending, failure)) };
       if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending) };
       if (id === 'unset') return { next: settingDetail(host, draft, setting, { value: undefined }, failure) };
       if (id === 'scope' && setting.policy.sources.includes('project')) return { next: scopePicker(host, draft, setting, pending) };

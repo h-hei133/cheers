@@ -70,7 +70,7 @@ function applicationNotice(context: ShellRuntimeContext, setting: SettingDefinit
   if (value !== undefined && !sameValue(actual, value)) {
     if (setting.key === 'offline' && process.env[OFFLINE_ENV] !== undefined) return `The current session uses the ${OFFLINE_ENV} environment override; change or remove it to use the saved value.`;
     if (setting.policy.merge === 'replace' && source(context, setting).includes('override')) return 'The current session keeps its launch override; restart without that override to use the saved value.';
-    return `The effective value follows ${source(context, setting)} policy and differs from the saved choice. Reopen Settings to inspect it.`;
+    return `The effective value differs from the saved choice; follows ${source(context, setting)} policy. Reopen Settings to inspect it.`;
   }
   return setting.policy.application === 'immediate' ? 'Applied to the running surface.'
     : setting.policy.application === 'restart' ? 'Matches the installed setting.' : 'Effective for the next operation.';

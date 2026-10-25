@@ -9144,3 +9144,11 @@ builtin未配置模型详情可进入原connect/auth原生登录，canonical pro
 model配置入口用单行遮罩InputForm，字符映射为字素圆点/caret，Ctrl+U清除后undo不恢复秘密；API-key不进composer/prompt历史/transcript，明确Enter复用connect事务、安全endpoint与新connection回返，之后显式启用，角色重捕事务。原生登录共享attempt，provider/auth owner不重复实现；普通connect命令入口保持其独立路径。
 
 串行六文件244pass、有效遮罩/connection-ID反转AssertionError/字节恢复，恢复后四文件41pass；四静态门/diff、责任上限0、build88296adab957/正式judge proven三satisfied。两模式四条小型Node PTY保存/取消/磁盘读回/遮罩/提示历史无密钥/零提交通过，synthetic key不是真实provider验证，结束143。现失败连接重认证、settings全scope/桌面、上下文差额与性能仍partial，原Phase38/9不变，第十CI待结果，详见addition15第十一批。本批提交与推送另绑定。
+
+第十一批ea4715b6a1e6d20a1fce1abdcdc5eebbbe1ab68f已推送，main与origin/main精确一致；自身CI40232991686及第十40232077709本轮实际读回仍in_progress。第十auth工件源hash已从对应提交字节恢复，不将新源绑定旧build。
+
+## [2026-10-26] fix | 设置完整来源查看与保存结果可见
+
+ADD-03字段增加Values and sources，经共享有界InputForm只读换行/滚动查看Effective/Accepted/Stored、来源、scope、应用/信任；编辑/paste/清空/undo阻断，Enter/Esc保留暂存回原字段，显式input/环境只读、保存仍走primary user/project原事务。长来源后的有效差异说明曾被footer截掉，调整为先报结果；参考焦点/编辑/preview决策，保留本项目分层语义。
+
+串行六文件150pass、两有效反转AssertionError/字节恢复后10pass（重叠），提示调整后150重验，四静态门/diff、责任上限0、最终build0391e135b3ad/正式judge proven三satisfied。两模式×两信任四条小型Node PTY来源查看不写、实际project scope/Apply/重开Stored22、user/input字节不变、有效31/11保留通过，退出143；fixture root/newline及JSONC/override误假设纠正记录于addition15第十二批。没有provider/全仓本地/20k/桌面证据；完整面板、上下文及性能仍partial，原Phase38/9不变，本批实际交付另绑定。
