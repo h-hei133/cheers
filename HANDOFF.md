@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Unbuttoned Motion Is Not A Release Or A Selection
+- **Symptom**: Hover reports complete a drag or clear the editor selection; a hover test passes its color assertion with an empty background sequence.
+- **Root Cause**: Mouse motion with button bits 3 was decoded as release, pointer routing shared gesture handling, and color-disabled fixtures make bgOpen empty.
+- **Rule**: Decode unbuttoned motion independently and route only to the active capture. Keep hover identity separate from focus/preview, clear it across pane or geometry changes, and restore any-motion reporting at the terminal owner boundary. Verify rendered bands with a fixed palette and nonempty background sequence, restore palette state, and test Enter still targets the keyboard selection.
+
 ### Hidden Sidebars Still Need Focus-Lifecycle Updates
 - **Symptom**: A panned sidebar keeps its active category offscreen after Tab returns from a narrow content page, or content wheel spans overwrite sidebar spans on the same row.
 - **Root Cause**: The narrow renderer returned before updating the sidebar viewport; a row-indexed single span cannot describe both panes.

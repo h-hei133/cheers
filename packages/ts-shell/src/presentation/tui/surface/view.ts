@@ -64,7 +64,8 @@ export class InteractiveSurface implements InteractiveView {
       this.lastComposerGeometry = undefined;
       // A full-screen overlay owns every row, so there is no fixed block to
       // redraw separately.
-      return { rows: chrome.overlayRows.slice(0, height).map(row => truncateToWidth(row, width)), fullScreen: true };
+      return { rows: chrome.overlayRows.slice(0, height).map(row => truncateToWidth(row, width)), fullScreen: true,
+        pointerMotion: this.context.overlayPointerMotion?.() === true };
     }
     const capacity = Math.max(0, height - chrome.rows.length);
     const transcriptRows = capacity === 0 && layout !== "document" ? [] : this.pane.render(
@@ -99,6 +100,7 @@ export class InteractiveSurface implements InteractiveView {
       rows: [...transcriptRows, ...chrome.rows],
       sensitiveRows: this.pane.sensitiveRows,
       chromeRows: chrome.rows,
+      pointerMotion: this.context.overlayPointerMotion?.() === true,
     };
   }
 

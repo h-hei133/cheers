@@ -63,6 +63,8 @@ confidence: mixed
 
 鼠标对齐包括实际内容区滚轮浏览：一格移动一项可浏览候选，停在首尾，能够从分类/section焦点回到内容行；滚动不启用模型、不保存设置，也不切换multi-select勾选。命中来自当前已绘制列表区域，不能用“disabled不可点击”阻断section模式的内容滚轮；标题、footer、详情、过时画面及正在加载/提交/编辑的子流程各自保持正确边界。侧栏滚轮仅移动独立视口，不选择分类；点击命中滚动后实际绘制的身份，键盘返回或重开时露出活动分类，刷新重排保留可见锚点并限制边界。hover和桌面矩阵单独核查，不能把内容与侧栏滚轮补齐写成完整鼠标能力已对齐。
 
+悬停须贯通终端报告、解码、pointer路由和实际绘制：未按按钮的移动只高亮指针下已绘制category或内容行，状态与键盘选中分开，Enter仍操作原选中项；不触发preview/保存/认证/启用。离开列表或进入另一列、详情、section标题时撤回旧高亮，刷新/filter/resize/返回后不沿用旧坐标。面板关闭、外部终端交接及停止时恢复普通鼠标模式；主屏regular的scrollback保持原策略，已请求但迟到的motion不变成release或完成拖拽。
+
 参考A使用Roles / All models /可用provider /锁定provider及model-kind tabs；settings使用Appearance、Model、Interaction、Context、Memory、Files、Shell、Tools、Tasks、Providers十类及各自section。**分类结构要看齐，内容必须对应本项目真实能力。** 参考特有的服务、插件、语言运行时或配置字段不能靠加一个空菜单宣称支持；暂不适用的分类应清晰省略，不能呈现似可设置的假选项。
 
 ### 3.2 model：允许选中未配置模型
@@ -730,3 +732,23 @@ OverlayHost沿现painted list map按同一行保存侧栏和内容各自的横�
 四静态门、责任上限0、TS构建通过；build`ab0acbb64c07071801dcc67d3266e61e30a9d4c9e235b2e52b3d84132813e22e`，inputs`6c63ae7aa4da4e414811d61cc08b1d7a233eb4b3cfc394f23a5647b35775b798`，artifact`7d6081798d57f6564f79ee149ac311e3846a5a9da0f0a07886d440936cc816bd`。正式judge实际exit0、proven且三项satisfied，严格docs/diff通过、118既有advisory保留；addition95/audit89/guide1本地链接目标存在。证据归`.omx/artifacts/phase20-addition-sidebar/`，Git交付另绑定。指南与HANDOFF同步真实行为和隐藏侧栏/同一行双span陷阱。
 
 ADD-01/02/03整体仍partial：hover、完整字段/来源/编辑器及真实桌面/认证矩阵待证。ADD-07冷/热Node/exe性能、ADD-08原生tokenizer/其他命令与研究完整preview、精确source字节/发现成本及用户1.7k/4.9k真实差额继续缺；第九cache writer与第十七build并发来源未归因。原Phase20仍38 complete / 9 partial，ADD独立，完整目标继续active。
+
+### 第二十一批：面板悬停与终端报告生命周期
+
+第二十批已提交/推送`8218e40b82c1c23ff0087d52d4a34682315a00fa`，本地、origin/main与远端一致、工作区clean；自身CI `40241932127`本批首检in_progress，Watch `40241932303`只确认workflow success、工件未读。第十九CI `40241260392`延迟实查success，完整日志994files/10821tests通过、3skip且结构proven，归档本批hover目录；这些历史CI证据只绑定`92f7fefa`，不赋予第二十/二十一批。
+
+ADD-02/03确认悬停链路此前不存在：[mouse解码](../../packages/ts-shell/src/presentation/tui/input/mouse.ts)只请求1002按住按钮的移动，把SGR 35的无按钮motion当release；[OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts)没有独立hover状态。现增加move事件，保留SGR/X10的press/drag/release/wheel区别；原[TUI](../../packages/ts-shell/src/presentation/tui/render/engine.ts)沿[frame契约](../../packages/ts-shell/src/presentation/tui/render/frame.ts)接pointerMotion，实际picker帧在已持有的alternate screen开启1003，退出picker恢复1002，交接外部终端/stop释放motion。主屏regular不接管鼠标/scrollback，借用面板屏幕后才启用；没有另设终端owner。
+
+[InteractiveSurface](../../packages/ts-shell/src/presentation/tui/surface/view.ts)在实际overlay绘制后投影该意图；interactive host不把move登记为执行意图或清除vim选区。[Pointer](../../packages/ts-shell/src/cli/interactive/pointer.ts)优先只交capture，不让迟到或未捕获motion完成拖拽、滚动、toggle/copy或重复redraw。overlay只在hover身份/所属pane变化时requestRender，沿现painted spans取得真实ID；两个pane同一行仍分横向命中。hover独立于OptionModel current、chosen、category/domain以及preview；Enter继续对键盘选中项操作。
+
+[panel](../../packages/ts-shell/src/presentation/tui/chrome/panel.ts)、[modal](../../packages/ts-shell/src/presentation/tui/chrome/modal.ts)和navigation采用已有statusBandBg画独立hover band，selectedBg及箭头仍表示实际焦点；不新增主题schema或另一套候选库存。具体未配置模型可hover，settings section时普通字段仍可高亮但不获click/apply准入，section标题不高亮。进入detail/header/footer/另一pane或失去origin清除旧hover；filter、source、wheel、keyboard、resize、pending/loading/input/submode和replacement按现生命周期过期，不改保存/认证/启用契约。
+
+只读参考A的tui 106–111明确1003报告无按钮motion；model-hub 2349–2365独立sidebar/browser hover并在离开内容时clear；settings-selector 1242–1270先给submenu，排除tabs/sidebar/section并按实际frame命中；select-list 271–274独立hover index。采用独立hover、不移动选中、跨pane清除、子流程优先及真实geometry；参考在应用范围开启mouse，本项目按已持有的picker帧恢复/释放以保留regular scrollback，不复制另一套TUI。
+
+最终八文件165项串行通过（hover7、wheel12、picker/navigation7、mouse9、pointer19、engine55、surface42、panel14）；覆盖SGR/X10 move区别、迟到motion不结束选区、不变焦点/preview/apply、side→content→detail清除、section不可高亮、重复motion零额外redraw、filter/source/resize/replacement/旧坐标、narrow隐藏侧栏、input/loading/pending，以及主屏不请求motion、两screen模式启用/关闭、suspend/stop释放。初轮127pass/4fail来自颜色关闭夹具，bgOpen为空让负向断言失败、正向断言无效；固定独立16色并每测试恢复palette后通过，未削弱显示断言。随后131/164/165重叠不累加。
+
+三个有效反转分别把move恢复为release、hover同步修改OptionModel focus、离开内容仍保留旧hover；均AssertionError/exit1，源文件逐字节恢复，最终165通过。普通/fullscreen两条120×60小型真实Node PTY经独立SGR背景观察验证category hover→click→missing-b hover→移到详情清除→Enter仍选missing-a→精确配置详情→返回关闭；1003真实开启并在关闭时释放。config原字节、零session modelSelection、零message/provider通过，退出143仅SIGTERM清理。本批真实PTY覆盖Linux报告链路，不能代替桌面指针、跨平台输入法或真实认证矩阵。
+
+四静态门、责任上限0、TS构建及正式judge实际exit0、proven三satisfied通过；build`ead28413c41b9199fdb6a86a50a7a75fd7cff580050d255f41f627be06f85ae1`，inputs`dcf9d99962c5686ea3bc338a387faa3ac6bf8b0b86857d038c87d91c617ff302`，artifact`83ab5b07774aa8485b73060023685a50d8fb38adec15c5963a0a78d5fe289c81`。严格docs/diff实际通过，118既有advisory保留；addition103/audit90/guide1本地链接目标存在。工件归`.omx/artifacts/phase20-addition-hover/`，Git交付另实际绑定；指南与HANDOFF同步报告/gesture/颜色夹具边界。
+
+ADD-01/02/03完整面板仍partial，完整字段/来源/编辑器及真实desktop/OAuth/key验收待证；ADD-07冷/热Node/exe性能、ADD-08原生tokenizer/其他独立命令及研究完整preview、精确source字节/发现成本和真实1.7k/4.9k差额继续待证。第九cache writer与第十七build并发来源未归因；原Phase20仍38 complete / 9 partial，ADD独立，完整目标active。

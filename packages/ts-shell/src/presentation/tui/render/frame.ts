@@ -21,6 +21,8 @@ export interface TerminalFramePlan {
   readonly documentId?: object;
   /** A bounded overlay must not become permanent terminal scrollback. */
   readonly fullScreen?: boolean;
+  /** An open picker needs unbuttoned pointer motion; ordinary views keep drag-only reports. */
+  readonly pointerMotion?: boolean;
   /** Exactly the requested document or viewport rows, including the fixed tail. */
   readonly rows: readonly string[]
   /** Rows containing user input, including wrapped/selected transcript echoes. */

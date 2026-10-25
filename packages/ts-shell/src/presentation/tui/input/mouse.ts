@@ -7,16 +7,18 @@
  * terminals still answer with, and is decoded so a stray report never reaches
  * the editor as typed text.
  *
- * Only button-event tracking is requested: motion is reported while a button is
- * held and not otherwise, which is exactly what a drag needs and nothing more.
+ * Ordinary views request button-event tracking. An open picker can opt into
+ * unbuttoned motion for hover without turning it into a selection gesture.
  */
 
 /** Ask for button-event tracking with SGR coordinates. */
 export const ENABLE_MOUSE = "\x1b[?1002h\x1b[?1006h";
 /** Give the mouse back to the terminal, in reverse order. */
 export const DISABLE_MOUSE = "\x1b[?1006l\x1b[?1002l";
+export const ENABLE_MOUSE_MOTION = "\x1b[?1002l\x1b[?1003h\x1b[?1006h";
+export const DISABLE_MOUSE_MOTION = "\x1b[?1003l";
 
-export type MouseKind = "press" | "drag" | "release" | "wheel";
+export type MouseKind = "press" | "drag" | "release" | "wheel" | "move";
 
 export interface MouseReport {
   readonly kind: MouseKind;
@@ -63,6 +65,7 @@ function decode(flags: number, column: number, row: number, released: boolean): 
   const button = flags & 3;
   const position = { column: Math.max(0, column), row: Math.max(0, row), shift, alt, ctrl };
   if (wheeling) return { kind: "wheel", button: button === 0 ? -1 : 1, ...position };
+  if (moving && button === 3 && !released) return { kind: 'move', button, ...position };
   // X10 cannot report a release per button: it sets the button field to 3.
   if (released || button === 3) return { kind: "release", button, ...position };
   return { kind: moving ? "drag" : "press", button, ...position };

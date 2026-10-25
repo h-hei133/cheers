@@ -375,6 +375,7 @@ export class InteractiveMode {
           this.gesture.lastCancelAt !== undefined &&
           Date.now() - this.gesture.lastCancelAt < CANCEL_ARMED_MS,
         overlayFullScreen: () => this.pager.fullScreen || this.overlay.fullScreen,
+        overlayPointerMotion: () => this.overlay.active && !this.pager.active,
         overlayRows: (width, height, availableRows) =>
           this.pager.active ? this.pager.render(width, height, availableRows) : this.overlay.render(width, height, availableRows),
         selection: () => this.pointer.selection,
@@ -483,8 +484,10 @@ export class InteractiveMode {
     );
     this.stdin.onKey((event) => this.onKey(event));
     this.stdin.onMouse((report) => {
-      this.options.onUserIntent?.();
-      this.vimSelection = undefined;
+      if (report.kind !== 'move') {
+        this.options.onUserIntent?.();
+        this.vimSelection = undefined;
+      }
       if (this.alternateScreen || this.pager.active || this.overlay.fullScreen) this.pointer.handle(report);
     });
     this.stdin.onPaste((text, issue) => {

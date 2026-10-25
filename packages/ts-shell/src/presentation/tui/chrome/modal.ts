@@ -17,6 +17,7 @@ import type { ChipStrip } from './chips.js';
 const FRAME_ROWS = 8;
 
 export interface ModalChrome {
+  readonly hovered?: string;
   readonly title: string;
   readonly empty: string;
   /** Distinguishes a failed load from a genuinely empty set. */
@@ -27,7 +28,7 @@ export interface ModalChrome {
   readonly actionHints?: string;
   readonly status?: string;
   readonly onOptionRow?: (row: number, id: string) => void;
-  readonly onListRow?: (row: number, from: number, to: number) => void;
+  readonly onListRow?: (row: number, from: number, to: number, id: string) => void;
   readonly chips?: ChipStrip;
   readonly groupHint?: string;
   readonly onChipRow?: (row: number, id: string, from: number, to: number) => void;
@@ -67,7 +68,7 @@ export function renderModal(
       if (index > window.offset) rows.push(edge(inner));
       const optionLines = optionRows(option, index === model.selectedIndex, chrome, inner);
       for (let row = rows.length; row < Math.min(height, rows.length + optionLines.length); row++) {
-        chrome.onListRow?.(row, 1, width - 1);
+        chrome.onListRow?.(row, 1, width - 1, option.id);
       }
       if (isFocusable(option)) {
         for (let row = rows.length; row < Math.min(height, rows.length + optionLines.length); row++) {
@@ -94,7 +95,8 @@ function optionRows(option: Option, active: boolean, chrome: ModalChrome, inner:
   const noteWidth = noteText ? visibleWidth(noteText) + 2 : 0;
   const note = noteText ? `  ${defaultTheme.fg("border", noteText)}` : "";
   const head = `${padToWidth(truncateToWidth(`${marker}${label}`, inner - 2 - noteWidth), inner - 2 - noteWidth)}${note}`;
-  const rows = [body(active ? highlight(head, inner) : head, inner)];
+  const rows = [body(active ? highlight(head, inner) : chrome.hovered === option.id
+    ? defaultTheme.bg('statusBandBg', head) : head, inner)];
   if (!option.detail || chrome.detailRows === 0) return rows;
   const detailWidth = Math.max(8, inner - 6);
   for (const line of wrapToWidth(option.detail, detailWidth).slice(0, chrome.detailRows)) {

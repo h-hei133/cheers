@@ -1,4 +1,4 @@
-import { DISABLE_MOUSE, ENABLE_MOUSE } from "../input/mouse.js";
+import { DISABLE_MOUSE, ENABLE_MOUSE, DISABLE_MOUSE_MOTION, ENABLE_MOUSE_MOTION } from "../input/mouse.js";
 import { kittyDeleteAllImages, kittyDeleteImage, swapTransmittedForPlacement, transmissionsIn } from "../image.js";
 import type { TerminalDevice, TerminalStartOptions } from "../terminal.js";
 import { processTerminal } from "../terminal.js";
@@ -81,6 +81,7 @@ export class TUI {
   private lastFrameCostMs = 0;
   private forceNextFrame = false;
   private mouseTracking = false;
+  private mouseMotion = false;
   /**
    * Set when the surface runs on the terminal's own screen.
    *
@@ -348,6 +349,7 @@ export class TUI {
       this.painted = false;
       this.window = [];
     }
+    this.setMouseTracking(this.alternateScreen || overlayScreen, frame.pointerMotion === true);
     if (this.mainScreen && !this.overlayScreen) {
       // The fixed block is redrawn in place; the content was appended to the
       // scrollback when it was first composed and is left alone. The whole
@@ -367,10 +369,12 @@ export class TUI {
   }
 
   /** Ask for mouse reports, or give the mouse back to the terminal. */
-  setMouseTracking(enabled: boolean): void {
-    if (this.mouseTracking === enabled) return;
-    this.mouseTracking = enabled;
-    this.terminal.write(enabled ? ENABLE_MOUSE : DISABLE_MOUSE);
+  setMouseTracking(enabled: boolean, motion = false): void {
+    motion = enabled && motion;
+    if (this.mouseTracking === enabled && this.mouseMotion === motion) return;
+    const releaseMotion = this.mouseMotion && !motion ? DISABLE_MOUSE_MOTION : '';
+    this.mouseTracking = enabled; this.mouseMotion = motion;
+    this.terminal.write(releaseMotion + (enabled ? motion ? ENABLE_MOUSE_MOTION : ENABLE_MOUSE : DISABLE_MOUSE));
   }
 
   private onResize(): void {

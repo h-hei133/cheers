@@ -4,6 +4,8 @@ Open `/settings` to browse the available preferences. Appearance contains themes
 
 In settings and model lists, the mouse wheel moves focus through the content rows and stops at the first or last candidate. Enter performs the focused operation. Wheeling over the sidebar pans its visible categories without selecting one; click or use the keyboard to change category. Returning keyboard focus to the sidebar reveals the active category. The detail column and input editor retain their own interaction boundaries.
 
+Moving the pointer over a category or content row highlights it separately from the keyboard selection. Hovering does not select a model, preview a setting or save a value. Enter still acts on the keyboard selection. Moving into the detail column or away from the list clears the highlight; closing the picker restores the terminal's ordinary mouse behavior.
+
 Enter a setting to inspect its effective value, stored override, source, save scope and application timing. Values and sources opens a read-only view with wrapped values and origins; use the arrows to scroll and Enter or Esc to return with your staged choice retained. Choose Edit, stage a value and Apply to save; Discard removes the staged change and restores a preview. Saved and applied are separate outcomes: check the returned notice when a startup override, configuration input or validation issue affects the effective value. A restart setting takes effect after restarting.
 
 List and JSON object editors accept Shift+Enter or Ctrl+J to insert a newline at the cursor. Enter stages the complete value; Apply saves it. Esc leaves the editor and retains any value staged before that edit. Small windows keep the cursor's line visible as text wraps and scrolls.

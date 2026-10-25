@@ -18,6 +18,7 @@ const MARKER_WIDTH = 4;
 const labelMeasurements = new WeakMap<OptionModel, { revision: number; longest: number; measured: number }>();
 
 export interface PanelChrome {
+  readonly hovered?: string;
   readonly filterable?: boolean;
   readonly title: string;
   /** Shown when the option set is empty. */
@@ -32,7 +33,7 @@ export interface PanelChrome {
   /** Records selectable rows and their horizontal span in the frame being rendered. */
   readonly onOptionRow?: (row: number, id: string, from?: number, to?: number) => void;
   /** Painted list rows include disabled labels for wheel routing, without granting click focus. */
-  readonly onListRow?: (row: number, from: number, to: number) => void;
+  readonly onListRow?: (row: number, from: number, to: number, id: string) => void;
   /** A second column, when the surface is wide enough to afford one. */
   readonly detail?: (id: string | undefined) => readonly string[];
   /** A tab strip above the list. */
@@ -97,7 +98,7 @@ export function renderPanel(
   for (let rowIndex = 0; rowIndex < bodyRows; rowIndex++) {
     const index = window.offset + rowIndex;
     const option = model.visible[index];
-    if (option) chrome.onListRow?.(rows.length, 0, listWidth);
+    if (option) chrome.onListRow?.(rows.length, 0, listWidth, option.id);
     if (option && isFocusable(option)) chrome.onOptionRow?.(rows.length, option.id, 0, listWidth);
     const row = option ? renderRow(option, index === model.selectedIndex, model, chrome, labelWidth, listWidth) : "";
     rows.push(twoColumn
@@ -155,7 +156,8 @@ function renderRow(
   const gap = Math.max(0, width - visibleWidth(head) - visibleWidth(note) - RIGHT_PAD);
   const trailingPad = " ".repeat(RIGHT_PAD);
   const fitted = truncateToWidth(`${head}${" ".repeat(gap)}${note}${trailingPad}`, width);
-  return active ? `${defaultTheme.bgOpen("selectedBg")}${padToWidth(fitted, width)}\x1b[0m` : fitted;
+  return active ? `${defaultTheme.bgOpen("selectedBg")}${padToWidth(fitted, width)}\x1b[0m`
+    : chrome.hovered === option.id ? defaultTheme.bg('statusBandBg', padToWidth(fitted, width)) : fitted;
 }
 
 /** Cursor arrow, or a checkbox when the picker takes several answers. */

@@ -44,6 +44,18 @@ function build(overrides: Partial<InteractiveView> = {}) {
   return { pointer, surface, copied, redraws: () => redrawn, rows };
 }
 
+it('ignores uncaptured motion without clearing a drag, toggling a block or redrawing the transcript', () => {
+  const { pointer, surface, redraws } = build();
+  pointer.handle(parseMouseReport('\x1b[<0;3;1M')!);
+  pointer.handle(parseMouseReport('\x1b[<32;8;3M')!);
+  const selection = pointer.selection, before = redraws();
+  pointer.handle(parseMouseReport('\x1b[<35;5;2M')!);
+  expect(pointer.selection).toEqual(selection);
+  expect(redraws()).toBe(before); expect(surface.blockAtScreenRow).not.toHaveBeenCalled();
+  expect(surface.transcript.setCollapsed).not.toHaveBeenCalled();
+  pointer.clearSelection();
+});
+
 describe("pointer drag selection", () => {
   it("selects a completion row and consumes the rest of its gesture", () => {
     const suggestions = new SuggestionList();

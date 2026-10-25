@@ -1,4 +1,4 @@
-import { ENABLE_MOUSE, DISABLE_MOUSE } from '../input/mouse.js';
+import { ENABLE_MOUSE, DISABLE_MOUSE, ENABLE_MOUSE_MOTION, DISABLE_MOUSE_MOTION } from '../input/mouse.js';
 import { describe, expect, it, vi } from "vitest";
 import { TUI } from "./engine.js";
 import { CURSOR_MARKER } from "./paint.js";
@@ -11,10 +11,11 @@ class StubProvider implements TerminalFrameProvider {
   chrome: string[] = [];
   layouts: FrameLayout[] = [];
   fullScreen = false;
+  pointerMotion = false;
 
   renderFrame(_dimensions: ViewportSize, layout: FrameLayout = "viewport"): TerminalFramePlan {
     this.layouts.push(layout);
-    if (this.chrome.length === 0) return { rows: this.rows, fullScreen: this.fullScreen };
+    if (this.chrome.length === 0) return { rows: this.rows, fullScreen: this.fullScreen, pointerMotion: this.pointerMotion };
     return {
       rows: [...this.rows, ...this.chrome],
       chromeRows: this.chrome,
@@ -37,6 +38,38 @@ function boot(): {
 }
 
 describe("keeping the terminal's own screen", () => {
+  it.each([false, true])('requests hover only for an owned picker frame and restores drag reports in alternate=%s', useAlternateScreen => {
+    const { tui, terminal, provider } = boot();
+    tui.start({ useAlternateScreen }); tui.renderNow(); terminal.drain();
+    provider.pointerMotion = true;
+    tui.renderNow();
+    if (useAlternateScreen) expect(terminal.drain()).toContain(ENABLE_MOUSE_MOTION);
+    else expect(terminal.drain()).not.toContain(ENABLE_MOUSE_MOTION);
+    provider.fullScreen = true; tui.renderNow();
+    const entered = terminal.drain();
+    if (!useAlternateScreen) expect(entered).toContain(ENABLE_MOUSE_MOTION);
+    // A full-screen session already owns reports even when its picker is inline.
+    if (useAlternateScreen) {
+      provider.pointerMotion = false; tui.renderNow(); terminal.drain();
+      provider.pointerMotion = true; tui.renderNow(); expect(terminal.drain()).toContain(ENABLE_MOUSE_MOTION);
+    }
+    tui.renderNow(); expect(terminal.drain()).not.toContain(ENABLE_MOUSE_MOTION);
+    provider.pointerMotion = false; provider.fullScreen = false; tui.renderNow();
+    const restored = terminal.drain(); expect(restored).toContain(DISABLE_MOUSE_MOTION);
+    expect(restored).toContain(useAlternateScreen ? ENABLE_MOUSE : DISABLE_MOUSE);
+    tui.stop();
+  });
+
+  it.each(['stop', 'suspend'])('releases any-motion reports before %s and restores them only after a picker repaint', action => {
+    const { tui, terminal, provider } = boot();
+    tui.start(); provider.pointerMotion = true; tui.renderNow(); terminal.drain();
+    if (action === 'stop') { tui.stop(); expect(terminal.drain()).toContain(DISABLE_MOUSE_MOTION); }
+    else {
+      tui.suspend(() => { expect(terminal.drain()).toContain(DISABLE_MOUSE_MOTION); });
+      expect(terminal.drain()).not.toContain(ENABLE_MOUSE_MOTION);
+      tui.renderNow(); expect(terminal.drain()).toContain(ENABLE_MOUSE_MOTION); tui.stop();
+    }
+  });
   it.each([false, true])('reports first layout and actual stream completion separately in alternate=%s', useAlternateScreen => {
     const { tui, terminal, scheduler } = boot();
     const layout = vi.fn(); const written = vi.fn(); const completions: Array<() => void> = [];

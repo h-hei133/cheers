@@ -331,6 +331,16 @@ describe("frame composition", () => {
     expect(frame(view).join("\n")).toContain("hidden while");
   });
 
+  it('projects hover reporting intent after overlay composition and clears it when the picker closes', () => {
+    let motion = false;
+    const { view, live } = surface({ overlayPointerMotion: () => motion });
+    motion = true; live.fullScreen = true;
+    expect(view.renderFrame(SIZE).pointerMotion).toBe(true);
+    live.fullScreen = false; expect(view.renderFrame(SIZE).pointerMotion).toBe(true);
+    motion = false; expect(view.renderFrame(SIZE).pointerMotion).toBe(false);
+    expect(view.renderFrame({ columns: 0, rows: 0 }).pointerMotion).toBeUndefined();
+  });
+
   it("shows the toast, then the exit hint, in place of the hint row", () => {
     const { view, live } = surface();
     live.toast = "Copied 42 characters to clipboard";

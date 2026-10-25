@@ -343,3 +343,5 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 最新证据边界：第十七CI实际2fail/10795pass/3skip，navigation同名点击夹具已按pane定位；print/research被活跃build lock拒绝，其并发来源尚未归因，不改构建拒绝协议。第十八CI仍运行。仍不成立的判断保留“没有上下键监听、排序反了、4.9k是本地字符公式”等；仍未知的包括原现场唯一按键原因、真实token差额/性能/认证及cache writer/活跃build来源，详见[补充规划第15节第十九批](phase-20-addition.md#15-实施与验证证据)。
 
 第二十批追加修补侧栏缺少独立滚动视口，以及窄屏返回后活动分类仍被隐藏的实际边界。现wheel只pan显示窗口，点击/键盘才选分类；110项聚焦、三个有效反转和普通/全屏两小PTY支持滚动→新画面精确点击→未配置模型详情，零自动保存/切模型/请求。hover、完整面板和真实桌面/认证仍缺。第十九`92f7fefa`已推送、自身CI仍运行；第十八CI实际10809pass/1fail/3skip，同名点击夹具失败已由第十九修正，历史红色记录保留。第十七活跃build来源仍未知，不因第十八未复发而称其已解决；详见[第二十批](phase-20-addition.md#15-实施与验证证据)。
+
+第二十一批确认并补齐面板hover报告/显示链路：无按钮motion独立move，picker帧1003与关闭/交接时恢复，独立band不改变键盘选中或触发preview，进入detail/另一pane及旧frame清除。165项聚焦、三有效反转和两模式实际SGR背景观察小PTY通过，hover missing-b后Enter仍打开missing-a精确详情，零保存/启用/对话。第十九CI现实际success10821pass/3skip/结构proven；第二十自身CI首检仍运行，未读Watch工件。完整面板/desktop/真实认证、原现场按键唯一原因、实际token差额/性能及cache writer/build并发来源仍待证，详见[第二十一批](phase-20-addition.md#15-实施与验证证据)。

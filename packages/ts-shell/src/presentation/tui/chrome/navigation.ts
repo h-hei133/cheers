@@ -44,6 +44,7 @@ export interface NavigationChrome {
   readonly active: string;
   readonly focused: boolean;
   readonly viewport?: NavigationViewport;
+  readonly hovered?: string;
   readonly onItem: (row: number, id: string, from: number, to: number) => void;
   readonly onSidebarRow?: (row: number, from: number, to: number) => void;
 }
@@ -66,11 +67,11 @@ export function renderNavigation(model: OptionModel, chrome: PanelChrome, naviga
     const line = padToWidth(truncateToWidth(text, navWidth), navWidth);
     navigation.onItem(rows.length, item.id, 0, navWidth);
     navigation.onSidebarRow?.(rows.length, 0, navWidth);
-    rows.push(active ? defaultTheme.bg('selectedBg', line) : line);
+    rows.push(active ? defaultTheme.bg('selectedBg', line) : navigation.hovered === item.id ? defaultTheme.bg('statusBandBg', line) : line);
   }
   if (narrow) return [...rows, truncateToWidth('Enter: content · Esc: close', width)].slice(0, height);
   const body = renderPanel(model, { ...chrome,
-    onListRow: (row, from, to) => chrome.onListRow?.(row, navWidth + 1 + from, navWidth + 1 + to),
+    onListRow: (row, from, to, id) => chrome.onListRow?.(row, navWidth + 1 + from, navWidth + 1 + to, id),
     onOptionRow: (row, id, from = 0, to = width) =>
     chrome.onOptionRow?.(row, id, navWidth + 1 + from, navWidth + 1 + to) }, width - navWidth - 1, height);
   return Array.from({ length: Math.min(height, Math.max(rows.length, body.length)) }, (_, row) =>

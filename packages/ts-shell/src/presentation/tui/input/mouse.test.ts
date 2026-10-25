@@ -19,6 +19,13 @@ describe("mouse report decoding", () => {
     expect(parseMouseReport("\x1b[<0;12;5M")?.kind).toBe("press");
   });
 
+  it('separates unbuttoned motion from drag and release in SGR and X10 reports', () => {
+    expect(parseMouseReport('\x1b[<35;12;5M')).toMatchObject({ kind: 'move', button: 3, column: 11, row: 4 });
+    expect(parseMouseReport('\x1b[<35;12;5m')?.kind).toBe('release');
+    expect(parseMouseReport(`\x1b[M${String.fromCharCode(67, 44, 37)}`)?.kind).toBe('move');
+    expect(parseMouseReport('\x1b[<32;12;5M')?.kind).toBe('drag');
+  });
+
   it("reads a release from the lowercase terminator", () => {
     expect(parseMouseReport("\x1b[<0;12;5m")?.kind).toBe("release");
   });

@@ -129,6 +129,7 @@ export class Pointer {
 
   /** Handle one report. */
   handle(report: MouseReport): void {
+    if (report.kind === 'move') { this.context.capture?.(report); return; }
     if (this.composerAnchor && !sameComposer(this.context.view().composerGeometry?.(), this.composerAnchor)) {
       this.clearSelection();
       if (report.kind !== "press") {
