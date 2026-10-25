@@ -7,6 +7,7 @@ import { CONFIG_SETTINGS } from '../../../config/settings.js';
 import { settingsPicker } from '../picker/settings.js';
 import { modelPicker } from '../picker/model.js';
 import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
+import { CatalogNavigation } from '../picker/navigation.js';
 
 const settle = async () => { await Promise.resolve(); await Promise.resolve(); };
 const wheel = (overlay: OverlayHost, raw: string, top: number | undefined = 0) => overlay.handlePointer(parseMouseReport(raw)!, top);
@@ -174,4 +175,48 @@ it('retires wheel geometry when keyboard navigation can move the visible window'
   overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn()); preview.mockClear();
   wheel(overlay, report({ row, column: 5 }, 1));
   expect(preview).not.toHaveBeenCalled(); expect(painted(overlay).join('\n')).toContain('▸ beta'); overlay.close();
+});
+
+it('pans the sidebar without selecting a category or previewing, then clicks the newly painted category', async () => {
+  const overlay = new OverlayHost(() => {}), preview = vi.fn(), apply = vi.fn();
+  const navigation = new CatalogNavigation('0');
+  const categories = Array.from({ length: 12 }, (_, index) => ({ id: String(index), label: `Category ${index}` }));
+  const options = categories.map(category => ({ id: `row-${category.id}`, label: `Content ${category.id}` }));
+  navigation.set(options, new Map(options.map((row, index) => [row.id, { category: String(index) }])), categories);
+  overlay.open({ title: 'Candidates', form: 'panel', empty: '', navigation, previewChange: preview, apply,
+    load: async () => navigation.project('') });
+  await settle(); overlay.handleKey(parseKeyEvent('\t'), apply); preview.mockClear();
+  const frame = overlay.render(100, 12, 5).map(stripAnsi), sidebar = { row: 1, column: 3 }, top = 7;
+  expect(frame[1]!.split('│')[0]).toContain('Category 0');
+  wheel(overlay, report(sidebar, 1, top), top);
+  wheel(overlay, report(sidebar, 1, top), top); // The first pan retires its old geometry.
+  const panned = overlay.render(100, 12, 5).map(stripAnsi);
+  expect(panned[1]!.split('│')[0]).toContain('Category 1');
+  expect(navigation.active).toBe('0'); expect(navigation.focused).toBe(true);
+  expect(preview).not.toHaveBeenCalled(); expect(apply).not.toHaveBeenCalled();
+  overlay.handlePointer(parseMouseReport(`\x1b[<0;4;${top + 2}M`)!, top);
+  expect(navigation.active).toBe('1');
+  expect(overlay.render(100, 12, 5).map(stripAnsi).join('\n')).toContain('Content 1');
+  overlay.handleKey(parseKeyEvent('\r'), apply); // Enter transfers to content.
+  overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(apply).toHaveBeenCalledWith(expect.anything(), ['row-1']); overlay.close();
+});
+
+it('pans the narrow navigation page and restores the active category when keyboard focus returns', async () => {
+  const overlay = new OverlayHost(() => {}), navigation = new CatalogNavigation('0'), apply = vi.fn();
+  const categories = Array.from({ length: 12 }, (_, index) => ({ id: String(index), label: `Category ${index}` }));
+  navigation.set([{ id: 'row', label: 'Content' }], new Map([['row', { category: '0' }]]), categories);
+  const picker: Picker = { title: 'Candidates', form: 'panel', empty: '', navigation, apply, load: async () => navigation.project('') };
+  overlay.open(picker);
+  await settle(); overlay.handleKey(parseKeyEvent('\t'), apply);
+  const paint = () => overlay.render(40, 10, 5).map(stripAnsi).join('\n');
+  paint(); wheel(overlay, report({ row: 1, column: 3 }, 1));
+  expect(paint()).not.toContain('Category 0'); expect(navigation.active).toBe('0');
+  overlay.handleKey(parseKeyEvent('\t'), apply); expect(paint()).toContain('Content');
+  overlay.handleKey(parseKeyEvent('\t'), apply); expect(paint()).toContain('▸ Category 0');
+  const before = paint(); wheel(overlay, '\x1b[<69;4;2M'); expect(paint()).toBe(before);
+  wheel(overlay, '\x1b[<65;4;2M'); expect(paint()).not.toContain('Category 0');
+  overlay.close(); overlay.open(picker); await settle(); expect(paint()).toContain('▸ Category 0');
+  overlay.render(40, 1, 1); wheel(overlay, '\x1b[<65;4;2M');
+  expect(navigation.active).toBe('0'); expect(apply).not.toHaveBeenCalled(); overlay.close();
 });

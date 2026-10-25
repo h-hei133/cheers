@@ -2,7 +2,7 @@
 
 Open `/settings` to browse the available preferences. Appearance contains themes, composer shape and status band items; Model and Context contain the registered request and context controls. Categories with no supported settings are omitted. Use the arrows or Tab to move between navigation and rows. Typing searches across categories, including field names and descriptions.
 
-In settings and model lists, the mouse wheel moves focus through the content rows and stops at the first or last candidate. Enter performs the focused operation. Wheeling over the sidebar, detail column or an input editor leaves the selection unchanged.
+In settings and model lists, the mouse wheel moves focus through the content rows and stops at the first or last candidate. Enter performs the focused operation. Wheeling over the sidebar pans its visible categories without selecting one; click or use the keyboard to change category. Returning keyboard focus to the sidebar reveals the active category. The detail column and input editor retain their own interaction boundaries.
 
 Enter a setting to inspect its effective value, stored override, source, save scope and application timing. Values and sources opens a read-only view with wrapped values and origins; use the arrows to scroll and Enter or Esc to return with your staged choice retained. Choose Edit, stage a value and Apply to save; Discard removes the staged change and restores a preview. Saved and applied are separate outcomes: check the returned notice when a startup override, configuration input or validation issue affects the effective value. A restart setting takes effect after restarting.
 

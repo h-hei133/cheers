@@ -159,7 +159,7 @@ export class OverlayHost {
   private searching = false;
   private searchFailed = false;
   private readonly optionRows = new Map<number, { readonly id: string; readonly from: number; readonly to: number }>();
-  private readonly listRows = new Map<number, { readonly from: number; readonly to: number }>();
+  private readonly listRows = new Map<number, Array<{ readonly from: number; readonly to: number; readonly sidebar?: boolean }>>();
   private readonly chipRows = new Map<number, Array<{ readonly id: string; readonly from: number; readonly to: number }>>();
   private renderedWidth = 0;
 
@@ -183,6 +183,7 @@ export class OverlayHost {
 
   /** Open `picker`, loading its options in the background. */
   open(picker: Picker): void {
+    picker.navigation?.viewport.reveal();
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.model = new OptionModel(picker.filterOptions, picker.defaultSelection);
@@ -295,7 +296,7 @@ export class OverlayHost {
           detailRows: picker.detailRows ?? 2,
           ...chipChrome,
           onOptionRow: (row, id) => this.optionRows.set(row, { id, from: 0, to: width }),
-          onListRow: (row, from, to) => this.listRows.set(row, { from, to }),
+          onListRow: (row, from, to) => this.listRows.set(row, [{ from, to }]),
           ...(status ? { status } : picker.footer ? { status: picker.footer } : {}),
           ...(actionHints ? { actionHints } : {}),
         },
@@ -310,6 +311,8 @@ export class OverlayHost {
     const renderer = picker.navigation ? (model: OptionModel, chrome: Parameters<typeof renderPanel>[1], width: number, height: number) =>
       renderNavigation(model, chrome, { ...picker.navigation!,
         items: picker.navigation!.items, active: picker.navigation!.active, focused: picker.navigation!.focused,
+        viewport: picker.navigation!.viewport,
+        onSidebarRow: (row, from, to) => this.listRows.set(row, [{ from, to, sidebar: true }]),
         onItem: (row, id, from, to) => { this.chipRows.set(row, [{ id, from, to }]); } }, width, height) : renderPanel;
     return renderer(
       this.model,
@@ -324,7 +327,7 @@ export class OverlayHost {
         ...(picker.detail ? { detail: picker.detail } : {}),
         ...chipChrome,
         onOptionRow: (row, id, from, to) => this.optionRows.set(row, { id, from: from ?? 0, to: to ?? width }),
-        onListRow: (row, from, to) => this.listRows.set(row, { from, to }),
+        onListRow: (row, from, to) => this.listRows.set(row, [...this.listRows.get(row) ?? [], { from, to }]),
       },
       width,
       this.fullScreen ? height : Math.max(0, Math.min(height, availableRows)),
@@ -336,9 +339,16 @@ export class OverlayHost {
     if (!this.picker) return false;
     if (this.input) return true;
     if (report.kind === 'wheel') {
-      const hit = top === undefined ? undefined : this.listRows.get(report.row - top);
+      const hit = top === undefined ? undefined : this.listRows.get(report.row - top)?.find(span => report.column >= span.from && report.column < span.to);
       if (this.actionPending || this.loading || this.subMode !== 'none' || report.shift || report.alt || report.ctrl
         || !hit || report.column < hit.from || report.column >= hit.to || ![-1, 1].includes(report.button)) return true;
+      if (hit.sidebar) {
+        if (this.picker.navigation?.viewport.pan(report.button as -1 | 1)) {
+          this.optionRows.clear(); this.listRows.clear(); this.chipRows.clear();
+          this.onChange();
+        }
+        return true;
+      }
       const before = this.model.current()?.id;
       const update = this.picker.navigation?.key(report.button < 0 ? 'wheel-up' : 'wheel-down', before, this.model.filter.trim().toLowerCase());
       if (update) {

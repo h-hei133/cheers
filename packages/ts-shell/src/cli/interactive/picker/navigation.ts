@@ -1,9 +1,11 @@
 import type { Option } from '../../../presentation/tui/chrome/options.js';
+import { NavigationViewport } from '../../../presentation/tui/chrome/navigation.js';
 
 export interface NavigationItem { readonly id: string; readonly label: string; readonly note?: string }
 export interface NavigationGroup { readonly category: string; readonly section?: string }
 export interface NavigationUpdate { readonly options: readonly Option[]; readonly focus?: string; readonly query?: string }
 export interface PickerNavigation {
+  readonly viewport: NavigationViewport;
   readonly items: readonly NavigationItem[];
   readonly active: string;
   readonly focused: boolean;
@@ -17,6 +19,7 @@ export interface PickerNavigation {
 
 /** Display navigation retains row identities; it never applies a setting or model. */
 export class CatalogNavigation implements PickerNavigation {
+  readonly viewport = new NavigationViewport();
   private rows: readonly Option[] = [];
   private groups: ReadonlyMap<string, NavigationGroup> = new Map();
   private categories: readonly NavigationItem[] = [];
@@ -65,6 +68,7 @@ export class CatalogNavigation implements PickerNavigation {
     if (!this.categories.some(item => item.id === id)) return undefined;
     this.category = id;
     this.domain = 'categories';
+    this.viewport.reveal();
     return { options: this.project(''), focus: this.rowFocus.get(id), query: '' };
   }
 
@@ -113,6 +117,7 @@ export class CatalogNavigation implements PickerNavigation {
       this.domain = 'rows';
     } else if (key === 'escape' && this.domain !== 'categories') this.domain = 'categories';
     else return undefined;
+    if (this.domain === 'categories') this.viewport.reveal();
     const options = this.project('');
     return { options, query: '', focus: this.domain === 'sections'
       ? this.section ?? options.find(row => row.id.startsWith('section:'))?.id : this.rowFocus.get(this.category) };

@@ -9204,3 +9204,9 @@ ADD-03 list/object复用原Editor支持Shift+Enter/Ctrl+J，Enter暂存/Apply保
 ADD-02/03沿原OptionModel加nonwrap step、CatalogNavigation wheel回rows，panel/modal登记painted list spans并保持disabled click准入，overlay按实际content/origin一格移动、preview/零apply，多选chosen保留。旧filter/source/domain/wheel/keyboard命中撤销；sidebar/detail/header/修改键/loading/pending/input吸收，侧栏pan/hover仍待补。参考内容区域、submenu优先和非循环决定，指南/HANDOFF同步。
 
 最终六文件144pass、三有效反转/精确恢复、两模式SGR小PTY精确setting/model详情/原config/零model切换-message通过，SIGTERM143；初轮section-only click设计遗漏已修，multi-select箭头和open/filter preview夹具错误分类保留。四静态门/责任上限0/build198895857a0e通过，最终正式judge实际exit0、proven三satisfied，严格docs/diff通过、118既有advisory保留，addition92/audit88/guide1本地链接存在；Git另实际绑定。第十八e71448e7已推送仍CI运行；第十七CI实际navigation同名点错pane及print/research活跃build lock两失败，前者修夹具，后者来源未知，历史991files/10795tests pass/2fail/3skip保留。原Phase38/9及完整面板/性能/计量partial边界不变，详见addition15第十九批。
+
+## [2026-10-26] fix | 面板侧栏独立滚动与焦点返回
+
+ADD-02/03沿原navigation绘制增加有界viewport，侧栏wheel只pan、click/键盘才换分类；键盘返回/resize/重开露出活动项，重排保留可见ID锚点、删除限制边界。原OverlayHost按同一行双pane span路由，pan废弃旧hit，无preview/apply。参考独立pan与follow-active决定，保留现有模型/设置事务；hover与桌面仍partial。
+
+五文件110pass、三有效反转/逐字节恢复、普通/全屏两小SGR PTY侧栏上下→新画面点击→content wheel→精确未配置模型详情、原config/零model切换-message通过，SIGTERM143。初轮109pass/1fail检出窄屏early return遗漏焦点状态，已修；四静态门/责任上限0/buildab0acbb64c07/正式judge proven三satisfied通过，严格docs/diff通过、118既有advisory保留，addition95/audit89/guide1本地链接存在；Git另绑定。第十九92f7fefa已推送、自身CI40241260392运行、Watch仅workflow success未读工件；第十八CI实际992files/10809tests pass/1fail/3skip为第十九已修pane夹具，第十七活跃build来源仍未知。原Phase38/9及面板整体、性能、真实上下文差额待证边界保留，详见addition15第二十批。

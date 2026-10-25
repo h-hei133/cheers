@@ -61,7 +61,7 @@ confidence: mixed
 | 动作 | 可用目标启用；不可用目标配置；设置暂存与Apply/Discard | 保留现有连接、模型事务、scope、信任、配置保存及取消契约 |
 | 连续性 | 刷新、resize、进入子编辑器后返回，保持稳定身份和可见焦点 | 用provider/connection/model/key身份，不以显示label回查 |
 
-鼠标对齐包括实际内容区滚轮浏览：一格移动一项可浏览候选，停在首尾，能够从分类/section焦点回到内容行；滚动不启用模型、不保存设置，也不切换multi-select勾选。命中来自当前已绘制列表区域，不能用“disabled不可点击”阻断section模式的内容滚轮；标题、footer、详情、过时画面及正在加载/提交/编辑的子流程各自保持正确边界。侧栏独立视口滚动、hover和桌面矩阵单独核查，不能把内容滚轮补齐写成完整鼠标能力已对齐。
+鼠标对齐包括实际内容区滚轮浏览：一格移动一项可浏览候选，停在首尾，能够从分类/section焦点回到内容行；滚动不启用模型、不保存设置，也不切换multi-select勾选。命中来自当前已绘制列表区域，不能用“disabled不可点击”阻断section模式的内容滚轮；标题、footer、详情、过时画面及正在加载/提交/编辑的子流程各自保持正确边界。侧栏滚轮仅移动独立视口，不选择分类；点击命中滚动后实际绘制的身份，键盘返回或重开时露出活动分类，刷新重排保留可见锚点并限制边界。hover和桌面矩阵单独核查，不能把内容与侧栏滚轮补齐写成完整鼠标能力已对齐。
 
 参考A使用Roles / All models /可用provider /锁定provider及model-kind tabs；settings使用Appearance、Model、Interaction、Context、Memory、Files、Shell、Tools、Tasks、Providers十类及各自section。**分类结构要看齐，内容必须对应本项目真实能力。** 参考特有的服务、插件、语言运行时或配置字段不能靠加一个空菜单宣称支持；暂不适用的分类应清晰省略，不能呈现似可设置的假选项。
 
@@ -712,3 +712,21 @@ ADD-02/03定向核查确认[OverlayHost](../../packages/ts-shell/src/cli/interac
 四静态门、责任上限0与TS构建通过；最终build`198895857a0ec77ef55fcb6ff62119ef888cf611938c410eab02187bfbbfde21`，inputs`2ba48afedcb438a7f4fea005d06d64113b5b178f6b6c5a264bb9a2c93a3a6eac`，artifact`e702eb99d9f1d4b0a3d9560d483bf4d0f4520ebbb17c3612a371b7623b7460f9`。最终正式judge实际exit0、proven且三项satisfied；严格docs及diff检查通过，保留118条既有advisory，addition92/audit88/guide1个本地链接目标存在。Git交付另绑定；工件归档`.omx/artifacts/phase20-addition-wheel/`。指南和HANDOFF记录实际滚轮路径及命中边界。
 
 完整面板字段/来源、侧栏pan/hover/desktop、真实OAuth/key、冷/热Node/exe、原生tokenizer、其他独立命令/研究preview、精确source字节/发现成本与用户1.7k/4.9k真实差额继续待证；第九cache writer退出1与第十七活跃build lock来源未归因。不运行并发重验证、全仓本地回归或20k真实PTY。原Phase20仍38 complete / 9 partial，ADD独立，整体目标active。
+
+### 第二十批：侧栏独立滚动与焦点返回
+
+第十九批已提交/推送`92f7fefa380fef73fa26102e325cf213df5dfc8e`，本地、origin/main和远端精确一致、工作区clean；其CI `40241260392`本批实际in_progress，Watch `40241260528`仅workflow success、工件未读。第十八CI `40240194248`随后实际failure，992files/10809tests通过、1fail/3skip；唯一失败为第十七批引入的navigation同名点击夹具，已在第十九批限定pane修正。第十八日志未再次出现print/research活跃build锁拒绝；不据此消除第十七的历史失败，也不推断其并发来源已查明。
+
+ADD-02/03确认[导航绘制](../../packages/ts-shell/src/presentation/tui/chrome/navigation.ts)此前每帧按活动分类重新居中，没有独立侧栏视口，wheel只能吞掉。现由同一绘制模块的NavigationViewport保存有界offset，沿原[scrollWindow](../../packages/ts-shell/src/presentation/tui/chrome/window.ts)保持活动分类可见；[CatalogNavigation](../../packages/ts-shell/src/cli/interactive/picker/navigation.ts)持有该显示状态，沿原分类/row owner操作。侧栏wheel每格只pan一项、不换category/domain/row、不触发preview或apply；点击以滚动后已绘制ID选分类，再由Enter进入内容/执行原操作。活动分类变化、键盘返回、窄宽布局变化、可用高度变化及重开/子面板返回时露出活动分类；刷新重排保留顶部可见ID锚点，删除/空目录限制offset。
+
+OverlayHost沿现painted list map按同一行保存侧栏和内容各自的横向span，不能让内容覆盖侧栏；origin、修改键、pending/loading/input/submode边界继续由同一pointer入口处理。pan后即时撤销旧option/list/chip命中，下一帧才按新身份接受；不接管主屏regular的terminal scrollback。仅实际绘制侧栏项可滚动或点击，title/footer/窄屏内容页/极矮无列表无侧栏命中。
+
+只读参考A的model-hub 2332–2347明确“wheel pans the sidebar viewport; picking a scope is click/keys only”；hub-frame 208–212限制offset，230–245把follow-active与pan分开。采用独立viewport、非循环边界和显式选择；本项目继续保留click聚焦/Enter操作及现有事务，不复制参考整体frame或模型目录。参考hover没有在本批实现，真实桌面输入/resize矩阵也未补齐。
+
+最终五文件110项串行通过（wheel12、navigation7、chrome/navigation3、overlay74、panel14）。覆盖side/content同一行span、pan不改变分类/preview/apply、旧坐标拒绝、滚动后点击精确ID、Enter进入内容、窄屏Tab返回/重开、resize可见性、重排锚点/删除/空目录及height0/1/2零不可见hit。初轮109pass/1fail检出真实遗漏：窄屏内容页early return没有同步viewport焦点，Tab返回仍隐藏活动分类；已把状态更新放到退化绘制之前。后续110重叠不累加。
+
+三个有效反转分别去掉侧栏路由、去掉焦点返回判定、保留旧side wheel span；均AssertionError/exit1并逐字节恢复，再验最终110通过。120×60普通/全屏两条小型真实Node PTY使用64个合成provider/65个模型、零历史消息，验证侧栏上下pan→滚动后点击Provider 00→内容wheel上下→Enter精确missing-a详情。config原字节、零session modelSelection、零message/provider均通过；退出143是SIGTERM清理。窄屏/重排/边界来自host及显示owner测试，未当作桌面平台证据。
+
+四静态门、责任上限0、TS构建通过；build`ab0acbb64c07071801dcc67d3266e61e30a9d4c9e235b2e52b3d84132813e22e`，inputs`6c63ae7aa4da4e414811d61cc08b1d7a233eb4b3cfc394f23a5647b35775b798`，artifact`7d6081798d57f6564f79ee149ac311e3846a5a9da0f0a07886d440936cc816bd`。正式judge实际exit0、proven且三项satisfied，严格docs/diff通过、118既有advisory保留；addition95/audit89/guide1本地链接目标存在。证据归`.omx/artifacts/phase20-addition-sidebar/`，Git交付另绑定。指南与HANDOFF同步真实行为和隐藏侧栏/同一行双span陷阱。
+
+ADD-01/02/03整体仍partial：hover、完整字段/来源/编辑器及真实桌面/认证矩阵待证。ADD-07冷/热Node/exe性能、ADD-08原生tokenizer/其他命令与研究完整preview、精确source字节/发现成本及用户1.7k/4.9k真实差额继续缺；第九cache writer与第十七build并发来源未归因。原Phase20仍38 complete / 9 partial，ADD独立，完整目标继续active。

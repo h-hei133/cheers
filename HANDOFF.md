@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Hidden Sidebars Still Need Focus-Lifecycle Updates
+- **Symptom**: A panned sidebar keeps its active category offscreen after Tab returns from a narrow content page, or content wheel spans overwrite sidebar spans on the same row.
+- **Root Cause**: The narrow renderer returned before updating the sidebar viewport; a row-indexed single span cannot describe both panes.
+- **Rule**: Update viewport focus and geometry even while the narrow sidebar is hidden. Keep a per-row collection of painted spans, pan without changing category or preview, reveal on keyboard return/reopen, and retire old pane hits after panning. Preserve a visible identity anchor on category reorder and clamp on removal.
+
 ### Wheel Targets Include Painted Non-Clickable List Rows
 - **Symptom**: Wheel over settings content is ignored while section focus disables setting clicks, or a stale report moves focus after a window-changing keyboard action.
 - **Root Cause**: Click admission alone does not describe the painted list region. A list wheel also needs navigation-domain transfer and nonwrapping selection, while cached geometry expires after focus changes can scroll its window.
