@@ -2,27 +2,36 @@
 
 本文只记录有实际证据的状态，不把实现等同于交付。提交、推送与 CI 分别列出；未运行的真实 provider、PTY、跨平台与发布验收不算通过。
 
-## 当前剩余工作（2026-10-24，有界复核收口）
+## 当前剩余工作（2026-10-25，真实认证与HTTP连接补证）
 
-范围只来自 [Phase 20 决策](phase-20-decisions.md) 及其引用要求。机器矩阵当前为 **36 complete / 11 partial / 0 open**，整体 partial。原35项complete保留已有证据；PAN-02经两路独立有限复核确认原要求已覆盖，闭合该行。本轮识别的四条本地生命周期组合已补证；以下是仍缺的明确条件，不再重复泛列“其余动作/资源待审”。
+范围只来自 [Phase 20 决策](phase-20-decisions.md) 及其引用要求。机器矩阵当前为 **38 complete / 9 partial / 0 open**，整体 partial。原36项complete保留已有证据；PAN-07以真实OpenAI登录/取消/刷新/撤销失效/本地退出补证，PAN-08以用户指定HTTP MCP两轮产品连接/发现/只读调用/关闭补证。正式质量、真实多账号及桌面交互按用户决定延后，不兑换成完成。
 
 用户需要准备的信息、环境和回填模板见 [剩余验收准备清单](phase-20-inputs.md)；已有配置不重复索取，QA收口由代理负责。
 
 | ID | 尚缺证据 | 所需输入或结束条件 |
 |---|---|---|
-| PRV-03 | 真实账户登录、刷新、失效、退出、跨连接隔离 | 现有provider配置已成功发起一次真实请求；完整生命周期还需适用的OAuth/device账户及隔离条件 |
-| PRV-05 | 可信远端结算/账单与本地ledger对照 | 可信结算来源、可比较账期 |
+| PRV-03 | 两个可区分真实账号的池选择/切换与隔离 | 同一账户的两次独立OAuth登录、刷新、撤销后失效、本地退出及跨profile拒绝已验；用户暂缓多账号，不把两profile称两账号 |
+| PRV-05 | 可信远端结算/账单与本地ledger对照 | 官方API Usage/Costs入口已核对；本轮账户接口只返回quota。仍需可访问的账户/项目账期或脱敏导出，OAuth Free配额不能当USD结算 |
 | TOOL-02 | 同模型full/dynamic真实配对、总量/cache成本、参数质量、四语言校准 | 固定模型/协议、预算和正式评测条件 |
 | PAN-06 | 实际系统剪贴板/平台接受结果 | 适用终端与系统复制实测；本地copy/back/restore/undo/cleanse有限生命周期已覆盖 |
-| PAN-07 | 真实认证完整生命周期 | 现有配置可请求；登录/刷新/退出还需适用的真实OAuth/device账户；本地device poll/extension/unknown恢复已覆盖 |
-| PAN-08 | 用户指定认证型HTTP MCP的产品连接及只读调用 | stdio服务已有真实验收；GitHub Bearer配置已适配，仍需域名解析结果满足现有公网出口策略的环境以复验产品路径。不要求另供OAuth MCP服务；账户OAuth生命周期另属PRV-03/PAN-07 |
 | INPUT-01 | 真实IME、系统复制、Windows交互终端 | 适用机器、终端、输入法；本地五模式/字素/粘贴/源选区/外编合同已有证据 |
-| QA-01 | 上述真实账户/账单/质量/平台任务的适用验收 | 本地47行成功/拒绝/竞态/关键反转索引已有限复核；随对应外部任务补证，不重复发明本地组合 |
+| QA-01 | 剩余多账号/账单/质量/平台任务的适用验收 | 本地47行索引及真实单账号OAuth、stdio/HTTP MCP已补证；随剩余外部任务更新 |
 | QA-02 | Windows交互PTY、真实IME、系统复制 | 新Platform QA40098086773在d8192609的20个支持格全部通过；Windows仍只含line/print，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
 | QA-04 | 全范围最终交付、精确SHA CI及结构/双构建/全套证据 | 外部验收完成后收口；当前历史CI失败保留，新SHA结果独立读回；不要求公开Release |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
+
+## 2026-10-25 允许执行的真实验收
+
+- 源码基线 `b60631add93dd98b6b8b3a720e7d49a71e02ab35`，本轮通过本地tsx执行原TypeScript owner，没有修改产品或构建，也不声称生成新二进制。全部探针主代理串行、Node heap限768MiB、状态隔离在 `.tmp/phase20-live-auth`；没有子代理验证、本地全套或20k真实PTY。安全摘要及私有网络回滚备份保存在Git忽略的 `.omx/artifacts/phase20-live-lifecycle/`，正文不保留API响应、账户值、凭据或headers。
+- Windows Chrome实际完成两次独立profile授权（同一Free账户）：原 `runProviderAccountAuthLogin` → PKCE/loopback callback → issuer token exchange → pending/connected条件保存成功。两次均有access/refresh与账户claim、约10天有效期，主配置SHA-256未变。另一次原登录在progress回调取消：pending→error，无凭据，原accepted连接与mirror字节语义不变，1455 listener关闭。对照本地参考的PKCE、精确issuer及loopback决定；本轮不改既有协议常量或callback实现。
+- 两次原 `renewStoredAccount` 各只发送一次真实refresh请求，HTTP200、access及refresh变化、账户claim不变、writeState persisted、原rotation receipt确认、无cleanupFailed。探针仅临时把Date.now推进到本地expiry gate，在真实HTTP发送前恢复时钟；响应有效期/持久阶段按真实时间处理。证明真实刷新协议及原lease/CAS owner，不称自然等候10天过期。异profile持同一旧resolution尝试刷新在发送前拒绝，0 HTTP、无异profile config、原config不改；这是owner隔离，不是两真实账号切换。
+- 用户授权的两次专用grant撤销，固定issuer `/oauth/revoke` 均HTTP200（诊断调用，不宣称产品新增撤销动作）。撤销后原续期各HTTP401、stored false/writeState unchanged；第二轮在同一到期gate重复调用，累计HTTP仍1，failure保留；lease文件实际为rotated-persisted及unknown。随后原 `removeConnection` 删除精确连接，写后无连接、无accountAuth、空env重新解析无凭据；主配置不变。第一轮探针误断言HTTP400而真实为401，exit1且后续未执行；保留该harness错误，第二轮修正400/401语义后完整exit0，不以新通过改写旧失败。旧resolution重复请求保护有第二轮实测；多账号仍延后。
+- Windows有效DNS确认fake-IP blacklist、IPv4 `198.18.0.1/16`、IPv6 `2001:2::0/64`；两端初始GitHub解析 `198.18.0.149` / `2001:2::96`，原策略拒绝。用户随后明确授权直接修改Windows配置：在既有全局脚本追加两域名例外，保留原三条；chatgpt.com的上游受污染，追加该域名经已有proxy group访问Google DoH的policy。两份原配置备份0600，最终generated YAML除dns.fake-ip-filter及该policy外逐值相等；原TUN、rule mode、mixed port7897不变。通过实际service named pipe重载HTTP204并读回控制状态；配置文件的sidecar pipe已失效，读取实际pipe后才连接，reload payload保留实际production pipe。原出口策略/TLS没有放宽。最终GitHub解析140.82.114.21；chatgpt解析172.64.155.209/104.18.32.47及对应IPv6，和独立公开DoH一致。依据[DNS例外与加密查询官方规则](https://wiki.metacubex.one/config/dns/)。
+- GitHub沿原 `CoreMcpGateway` 两轮创建独立HTTP连接，继承环境变量名GITHUB_PAT_TOKEN；每轮connected、49工具（29有readOnlyHint），固定search_repositories查询 `repo:h-hei133/cheers`，实际命中、isError false、响应391 bytes、SHA-256 `b6c8f9cb73baf162b64b14bb09fe9082c40ef3a553b4bc35f9cac29e3288111c`。每轮await gateway.close后peekSnapshot undefined，原本机MCP配置和隔离fixture未改；不称环境Bearer有OAuth刷新，也不称远端连接DELETE receipt已验。PAN-08原缺HTTP产品路径已覆盖。
+- 第二轮原 `loadAccountUsage` 在DNS修正后成功：primary usedPercent0、resetAt2026-11-24T02:06:59Z，reset creditStatus available/count0。这是当前quota窗口，不是token消费/结算账单；本轮未调用模型、未消耗正式评测预算。官方[认证](https://learn.chatgpt.com/docs/auth)、[计划用量](https://learn.chatgpt.com/docs/pricing)、[API Usage](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage)与[API Costs](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage/methods/costs)分别核对：API-key计费与ChatGPT计划额度分离；Usage含token/cache/model/project及请求聚合，Costs含amount/currency/project/line_item/time bucket、使用Admin key。网页[API用量入口](https://platform.openai.com/usage)需账户权限（匿名读取403）；没有账期/项目或导出不能完成PRV-05。当前Free官方说明Luna桌面rollout，不以登录成功推断Cheers可调用哪些模型。
+- 精确基线CI40102647934于2026-10-24T14:47:45Z success（Build & Test120897783546，静态/script tests/TS/单元/结构步骤均success）；Watch40102647931于14:28:53Z success是workflow结论，不兑换全部结构义务satisfied。前代码0951b1c9 CI40100450408同样completed/success。新文档提交/推送及其CI另读回，未继承为新SHA结果；38/9/0是适用补证后的任务计数，不是阶段全通过。
 
 ## 2026-10-24 用户指定真实连接与平台探针修复
 

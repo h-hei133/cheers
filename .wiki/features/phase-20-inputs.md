@@ -1,6 +1,20 @@
 # Phase 20 剩余验收准备清单
 
-依据：[原决策](phase-20-decisions.md)、[当前剩余表](phase-20-status.md)。当前矩阵为36 complete / 11 partial / 0 open；这11项共用下列五组条件，并非11套独立环境。没有的条件填写“暂无”，相应部分保持未验。
+依据：[原决策](phase-20-decisions.md)、[当前剩余表](phase-20-status.md)。2026-10-25补证后矩阵为38 complete / 9 partial / 0 open；本页保留五组准备条件及用户原答复。单账户OAuth和指定HTTP MCP已实际验收，剩余9项主要依赖多账号、可信账期、正式质量及桌面交互，不需要重新准备已验连接。
+
+## 2026-10-25 执行结果与剩余输入
+
+| 事项 | 已执行 | 还需准备/用户裁决 |
+|---|---|---|
+| OpenAI OAuth | Windows Chrome两次独立profile授权、两次真实刷新、取消零凭据、跨profile零发送、专用grant撤销后401拒绝/零重播、原本地logout无凭据；日常配置不改 | 同账户两profile不算多账号；多账号切换按用户决定暂缓，PRV-03保留partial。PAN-07的原消费者认证生命周期已闭合 |
+| 官方用量/费用 | 已核对官方API Usage/Costs与ChatGPT计划用量；原账户接口返回quota和0张reset credit | PRV-05仍缺可访问的账户/项目账期、可比较费用字段或脱敏导出；Free quota不是USD账单，不需要发Admin key到对话 |
+| 正式质量 | 未运行正式模型请求 | TOOL-02/QA-03暂缓；恢复时固定实际模型/预算/评分者 |
+| 桌面交互 | 原支持平台自动格保留；本轮只实际完成Windows浏览器→WSL回调 | 用户后续Windows验IME/系统复制；macOS暂无机器，不增加操作要求 |
+| GitHub HTTP MCP | 用户授权代理直接修改既有Windows DNS脚本，两域名例外及chatgpt加密DNS，原规则保留；原gateway两轮49工具、只读查cheers、关闭 | PAN-08闭合，无需再调整网络或提供token。回滚备份仅本机Git忽略目录0600保留，报告见phase-20-status |
+
+官方入口：[API Usage](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage)、[API Costs](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage/methods/costs)、[API用量控制台](https://platform.openai.com/usage)、[ChatGPT计划用量](https://learn.chatgpt.com/docs/pricing)。API-key调用和ChatGPT登录额度是不同来源；能读取quota不证明可访问费用或每请求账单。
+
+以下原准备项与用户答复保留为历史输入，当前待办以上表及phase-20-status顶部为准。
 
 ## 已有信息，无需重复准备
 
@@ -12,7 +26,7 @@
 
 密钥、token、密码、Cookie、Authorization值、验证码及完整私密配置均不需要发到对话中。只提供名称、变量名、配置位置或必要的脱敏证据；浏览器登录和验证码由你在自己的界面完成。
 
-## 1. 真实账户认证：PRV-03、PAN-07
+## 1. 真实账户认证：PRV-03（单账户已验，真实多账号暂缓）
 
 - [ ] 指定一个可供Cheers实际登录的provider名称及认证方式：OAuth或device code。先选择一个即可；我会核对该流程实际支持的操作。
 - [ ] 指定测试账户代号、必要的订阅/模型使用权限，以及配置位置或环境变量名，不提供密码或token。
@@ -35,6 +49,9 @@
 
 我负责：隔离profile/连接、登录成功与取消、刷新、失效、退出和隔离证据。已有API key或GitHub PAT连通不能代替OAuth刷新生命周期。
 
+我选择 openai，采用 OAuth 方式；账户代号无所谓，订阅则是 free，所以模型没有多少额度可以使用，大概也就只能用 luna 系列的模型；
+你直接在 `.tmp/` 下创建专用运行目录，浏览器为运行到 Windows 侧的 Chrome 浏览器；允许本地退出、撤销本次专用授权；先不搞多账号切换；
+
 ## 2. 可信用量与账单：PRV-05
 
 - [ ] 指定provider官方用量/结算来源：控制台入口、只读API或导出文件位置；说明是已结算账单、暂估费用、token用量还是quota。
@@ -46,6 +63,8 @@
 你提供：可信来源及访问方式、对照范围、实际字段和可取得时间。
 
 我负责：记录测试窗口、整理本地ledger、匹配可比较字段，分别报告远端结算、本地估算及差异。无需付款信息或完整账单历史。
+
+openai 的官方用量/结算来源你自行去官网查询；
 
 ## 3. 正式模型质量：TOOL-02、QA-03
 
@@ -60,6 +79,8 @@
 
 我负责：同模型/协议/权限/初始状态的full与dynamic配对、隔离工具夹具、顺序与统计报告，以及英文/中文/代码/CJK混合emoji四类tokenizer校准。原门槛包含安全违规不增加、任务成功率差的成对95%置信区间下界不低于−5个百分点；小批成功不能替代正式质量结论。
 
+这一部分暂且不做；
+
 ## 4. 真实平台交互：PAN-06、INPUT-01、QA-02
 
 - [ ] 提供有实际桌面会话的Windows机器，说明Windows版本、终端名称/版本、shell，以及Cheers运行在原生Windows还是WSL。两者分别标记，WSL结果不直接算原生Windows结果。
@@ -73,7 +94,9 @@
 
 我负责：构建/源码绑定、步骤、短小会话和验收记录。不会运行真实二进制20,000条消息压测；20k边界仅用单元Mock/切片验证。
 
-## 5. GitHub HTTP MCP网络：PAN-08
+后续我去 Windows 侧进行测试，macOS 暂且不用做过多考虑，我目前没有 macOS 机器用来测试；
+
+## 5. GitHub HTTP MCP网络：PAN-08（已验，原输入保留）
 
 - [ ] 提供能从Cheers进程访问该HTTPS端点、且域名解析结果满足现有公网出口策略的运行环境。此前解析到 `198.18.0.137` / `2001:2::85` 特殊地址，Cheers拒绝发送；直接HTTPS探针不替代产品路径验收。
 - [ ] 若使用代理/TUN/fake-IP DNS，说明网络方式，并为 `api.githubcopilot.com` 准备真实公网解析条件，例如该域名的DNS例外；由网络管理员准备也可。无需整个代理配置或绕过现有出口策略。
@@ -83,6 +106,8 @@
 你提供：网络/运行环境、必要的域名解析调整已完成说明、只读目标。
 
 我负责：使用已有配置，经原gateway完成真实连接、发现、明确只读的调用和关闭，保留安全摘要。PAN-08不要求另找OAuth MCP服务；账户OAuth生命周期由第1组单独覆盖。
+
+这个可能主要因为我才用了 Clash Verge 的 TUN 模式，你自行研究，如果要真实 ip 之类的，可以给我命令我去 Windows 侧执行后给你结果；还是沿用 `h-hei133/cheers`
 
 ## 无需你另行准备的收口项
 

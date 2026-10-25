@@ -8947,3 +8947,12 @@ QA修复及连接记录已提交/推送d81926093a88aaf34740058e2c72d709968cc5a3�
 ## [2026-10-24] docs | Phase 20 外部验收准备清单
 
 新增 `features/phase-20-inputs.md`：把11项partial所需外部条件归为账户认证、可信账单、正式模型质量、真实桌面交互、GitHub MCP网络五组，逐项列明用户提供信息、代理负责事项、已有配置及回填模板。正式质量按已有20任务×至少5次配对说明起始规模和辅助请求成本；无需用户另造语料、监控CI或运行20k真实PTY。按原PAN-08范围修正剩余表：缺用户指定HTTP Bearer的产品连接/只读调用，不额外索取OAuth MCP服务；账户OAuth生命周期仍归PRV-03/PAN-07。仅整理条件，不提高任务完成计数。
+
+
+## [2026-10-25] Phase 20 真实OAuth生命周期与HTTP MCP收口
+
+按用户phase-20-inputs决定执行单账户OAuth、官方费用来源与GitHub HTTP MCP；正式质量、多账号和桌面交互延后。两独立profile的Windows Chrome授权均原owner connected、约10天expiry；两次真实refresh各HTTP200/persisted/rotation receipt且account不变。local expiry gate诱导后HTTP发送前恢复真实时钟，不算自然过期。原login取消error/无凭据/listener关闭、跨profile旧resolution零发送/无config；专用grant撤销200→原refresh401/unchanged，第二轮同gate重复调用总HTTP仍1；原connect logout两profile均无连接/凭据，主配置始终不变。首探针误定400而收到401导致exit1，后续未执行，第二轮修正后完整exit0；历史错误保留。
+
+用户随后明确要求代理直接修改Windows网络。已有全局script的原三条DNS例外保留，追加GitHub MCP/chatgpt；chatgpt受污染上游改为该域名经已有proxy group访问Google DoH，原TLS/路由/TUN/端口不变。generated sidecar pipe非实际service pipe，探针读实际production pipe后controller200/reload204并读回；最终YAML只两DNS字段变化，备份0600。GitHub原gateway两轮49tools/29readOnly hints，search_repositories只读命中h-hei133/cheers，各391bytes/相同digest，await close后snapshot释放、配置fixture不变。账户原usage取得quota窗口used0/reset2026-11-24T02:06:59Z、reset credits0，不冒充账单。官方Usage/Costs及计划额度来源核对，仍需账期/项目/可信导出。
+
+PAN-07/PAN-08适用缺口闭合，矩阵38complete/9partial/0open；PRV-03保留真实多账号，PRV-05保留可信账单，质量/桌面及QA依赖不变。安全摘要/精确源码hash/探针源码与私有网络回滚备份留在Git忽略artifacts；scratch随后清理。仅文档及矩阵数据变更，无产品代码/构建变化。静态五门、47行矩阵及diff check串行通过；无本地全套/20k真实PTY/子代理验证。精确基线b60631ad CI40102647934于2026-10-24T14:47:45Z success，Watch40102647931 workflow success不兑换全部义务通过；本批提交/推送/新SHA CI另读回。
