@@ -310,3 +310,5 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 已有pending/error连接无法再次配置的确定缺口本轮已补：具体行保留setup状态并可进入key配置或适用的native登录；新增连接返回原model，旧连接不被虚报修复，会话仍需显式启用。两模式十条小型真实Node PTY及最终五文件90项通过，OAuth/key使用synthetic fixture；原现场精确按键故障、真实provider和整体面板/性能验收仍未完成。第十CI实际success，第十一CI实际navigation无endpoint旧fixture期待失败，已补精确地址与返回身份断言，历史失败保留；第十二CI仍pending。细节与剩余边界见[补充规划第15节第十三批](phase-20-addition.md#15-实施与验证证据)。
 
 当前追加核查：纯modifier/composable模板草稿的预览拒绝，以及按原草稿而非展开prompt分类continuity的偏差已修；同一输入预览与实际提交的完整估算/digest相等检查通过，模板源变化撤销旧值。正文普通功能名称按实际路由保留文本；独立开头命令和研究driver仍不提供完整预览。50项聚焦和两模式小型PTY通过，后者约4.3k→9.0k→12k只说明隔离夹具的组成变化，不能解释用户现场1.7k/4.9k。精确源字节、原生tokenizer、真实差额及完整面板/性能证据仍缺。第十二CI已实际failure10766pass/1fail/3skip，同已在第十三修补的navigation旧夹具；第十三自身CI仍运行。详见[第十四批](phase-20-addition.md#15-实施与验证证据)。
+
+本轮当前汇总更新：当前阻断报告只有Back、显式失败session target标签丢失的缺口已修，报告可进入原精确connection详情及配置；删除/provider变更/端点歧义/pool/override不猜其他relay，过时动作再次准入拒绝。78项聚焦、两有效反转/精确恢复及两模式保存/取消四条小PTY通过；配置恢复不自动启用session模型。第十三自身CI现已实际success10774pass/3skip，Watch工件proven/三satisfied；第十四a412dadc已推送，自身CI仍运行。真实认证、整体面板/性能与精确token差额仍缺；本轮不能据此宣称原按键现场原因已排他确认或全部补充验收完成，见[第十五批](phase-20-addition.md#15-实施与验证证据)。

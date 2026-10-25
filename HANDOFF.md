@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Blocked Current Model Reports Need Exact Record Recovery
+- **Symptom**: The first current-request row reports blocked credentials but only offers Back, or a failed explicit session binding loses its model label because resolution deliberately omits the target.
+- **Root Cause**: The report was separate from the concrete catalogue inspections. Credential resolution is an admission result, so rejected bindings do not always retain their presentation identity.
+- **Rule**: Keep a saved explicit target visibly blocked, and link its report only to an existing exact connection/provider/model inspection with unambiguous endpoint metadata. Revalidate admission before entering it; missing/provider-changed records, overrides and pool failures must not choose another relay. Preserve authentication and explicit activation as separate transactions. Keyboard fixtures must synchronize on focused identity or full details, because row notes can truncate and Enter delegates disabled rows through the host's apply callback.
+
 ### Context Composition Must Precede Continuity Classification
 - **Symptom**: Preview and submission use the same expanded instructions but produce different opening-message digests and context estimates.
 - **Root Cause**: Continuity was classified from the raw draft in preview and from the expanded prompt in dispatch. Template discovery also omitted absent personal candidates, so a newly created source could change routing without invalidating the preview.

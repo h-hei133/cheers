@@ -148,17 +148,37 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       }
       // Overrides and legacy credentials can supply a current request without a
       // matching named connection. Keep that fact visible without inventing one.
-      if (active.model && !rows.some(row => row.note === 'active')) {
+      const savedTarget = choice?.baseline?.selection;
+      const currentModel = active.model ?? (active.blocked && savedTarget?.connectionScope === 'session' ? savedTarget.model : undefined);
+      const currentProvider = !active.model && active.blocked && savedTarget?.connectionScope === 'session' ? savedTarget.provider : active.provider;
+      const currentConnection = active.credential && !active.blocked ? active.credential.connectionId
+        : active.selection?.connectionId ?? config.sessionConnection?.id
+          ?? (active.selection?.credentialScope !== 'provider' ? config.activeProviderConnectionId : undefined);
+      if (currentModel && !rows.some(row => row.note === 'active')) {
         const id = 'model:current';
-        groups.set(id, { category: active.provider });
+        groups.set(id, { category: currentProvider });
         const endpoint = endpointLabel(active.baseUrl);
         const note = active.blocked ? 'request blocked' : active.credential ? 'active' : 'credential missing';
-        rows.unshift({ id, label: active.model, detail: [active.credential ? `${active.credential.source} credential` : 'Current request', active.provider, endpoint].filter(Boolean).join(' · '),
+        const connection = config.providerConnections.find(item => item.id === currentConnection && item.provider === currentProvider);
+        const exactCatalog = connection ? catalogProvider(catalog, currentProvider, connection.baseUrl) : undefined;
+        const targetId = exactCatalog?.entry && !exactCatalog.ambiguous ? rowId(connection!.id, exactCatalog.entry.id, currentModel) : undefined;
+        // A report offers the existing exact-record inspection; labels and runtime
+        // aliases cannot choose another relay, deleted record or pool member.
+        const recovery = (!active.credential || active.blocked) && (!active.blocked || ['connection-pending', 'connection-unavailable'].includes(active.blocked))
+          && targetId ? inspections.get(targetId) : undefined;
+        rows.unshift({ id, label: currentModel, detail: [active.credential ? `${active.credential.source} credential` : 'Current request', currentProvider, currentConnection, endpoint].filter(Boolean).join(' · '),
           note, disabled: true, focusable: true });
-        details.set(id, [`Provider: ${active.provider}`, `Model: ${active.model}`, `Status: ${note}`, `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
+        details.set(id, [`Provider: ${currentProvider}`, `Model: ${currentModel}`, `Status: ${note}`, `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
+          ...(currentConnection ? [`Selected connection: ${currentConnection}`] : []),
           ...(active.credential ? [`Credential source: ${active.credential.source}`] : []), ...(endpoint ? [`Endpoint: ${endpoint}`] : []),
+          ...(active.blocked ? [`Request blocker: ${active.blocked}`] : []),
           'Remote availability: unverified']);
-        inspections.set(id, () => modelDetailsPicker(active.model!, details.get(id) ?? [], () => modelPicker(context, id, navigation, assigning, undefined, signIn)));
+        inspections.set(id, () => modelDetailsPicker(currentModel, details.get(id) ?? [],
+          () => modelPicker(context, id, navigation, assigning, undefined, signIn), undefined, undefined, undefined,
+          recovery ? () => {
+            const refusal = choice?.admission() ?? context.admission?.();
+            return refusal ? { note: refusal } : { next: recovery() };
+          } : undefined));
       }
       if (context.sessionId && !assigning) {
         try {
