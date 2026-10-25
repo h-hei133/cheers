@@ -27,7 +27,7 @@ import { endpointShape } from '../../provider/endpoints/index.js';
  * whatever was left after subtracting the other two. Numbers like that cannot be
  * checked, and a context report exists to be checked.
  *
- * Current tool definitions are an estimate from the active pool, while prompt
+ * Discoverable tool definitions are an estimate from the inspection pool, while prompt
  * usage belongs to the last request. They may describe different configurations,
  * so the current estimate is never subtracted to invent a historical breakdown.
  */

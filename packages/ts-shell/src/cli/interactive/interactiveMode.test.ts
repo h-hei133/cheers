@@ -52,11 +52,13 @@ import type { ProviderCredentialResolution } from '../../core/shell/providerCred
 import * as externalEditor from './externalEditor.js';
 import { Clipboard } from './clipboard.js';
 import * as promptRunner from './interactivePromptRunner.js';
+import { StartupSurface } from './startup.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
   exit?: (code?: number) => void;
   scheduler?: ManualScheduler;
+  startup?: StartupSurface;
 } = {}): {
   mode: InteractiveMode;
   renderer: StreamingRenderer;
@@ -93,6 +95,7 @@ function build(overrides: {
     terminal,
     exit: overrides.exit,
     scheduler: overrides.scheduler,
+    startup: overrides.startup,
     setInteractiveApprovalPrompt: handler => { approval.current = handler; },
     setReadline: (value) => {
       readline.current = value;
@@ -164,6 +167,33 @@ it('restores queued composed images and text when the active turn is interrupted
     expect(host.view.editor.getText()).toBe('  正文 /skill:a\n/skill:b  \n\n[image:fixture]\n\nnew draft');
     expect(host.queue.length).toBe(0);
   } finally { hold.mockRestore(); mode.stop(); }
+});
+
+it.each(['regular', 'fullscreen'])('adopts the same startup editor and terminal engine in %s mode', async kind => {
+  const terminal = new RecordingTerminal(), scheduler = new ManualScheduler();
+  const start = vi.spyOn(terminal, 'start'); const startup = new StartupSurface(terminal, scheduler, vi.fn());
+  terminal.input('retained\rinput');
+  const { mode } = build({ startup, scheduler });
+  const host = mode as unknown as { state: unknown; tui: unknown; view: InteractiveView; options: { runtimeContext: ShellRuntimeContext }; alternateScreen: boolean };
+  host.alternateScreen = kind === 'fullscreen';
+  try {
+    mode.start(); scheduler.flush();
+    expect(host.state).toBe(startup.state); expect(host.tui).toBe(startup.tui);
+    await vi.waitFor(() => expect(host.view.editor.getText()).toBe('retained\ninput'));
+    expect(start).toHaveBeenCalledTimes(1);
+    terminal.input('!'); scheduler.flush(); await vi.waitFor(() => expect(host.view.editor.getText()).toBe('retained\ninput!'));
+  } finally { mode.stop(); startup.dispose(); }
+  expect(terminal.stopped).toBe(true);
+});
+
+it('preserves a bracketed paste split across startup adoption', () => {
+  const terminal = new RecordingTerminal(), scheduler = new ManualScheduler();
+  const startup = new StartupSurface(terminal, scheduler, vi.fn()); terminal.input('\x1b[200~first');
+  const { mode } = build({ startup, scheduler }); const host = mode as unknown as { view: InteractiveView };
+  try {
+    mode.start(); terminal.input(' second\x1b[201~'); scheduler.flush();
+    expect(host.view.editor.getText()).toBe('first second');
+  } finally { mode.stop(); startup.dispose(); }
 });
 
 describe("session wiring", () => {
@@ -720,9 +750,9 @@ describe("session wiring", () => {
       await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 30).join('\n'))).toContain('Edit session title'));
       host.queue.push('/help'); terminal.input('\x1b[B'); terminal.input('\r');
       await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 30).join('\n'))).toContain('Session title'));
-      expect(dispatch).not.toHaveBeenCalledWith('/help'); expect(host.queue.control.entries().map(entry => entry.text)).toEqual(['/help']);
+      expect(dispatch).not.toHaveBeenCalledWith('/help', undefined); expect(host.queue.control.entries().map(entry => entry.text)).toEqual(['/help']);
       terminal.input('\x1b');
-      await vi.waitFor(() => expect(dispatch).toHaveBeenCalledWith('/help'));
+      await vi.waitFor(() => expect(dispatch).toHaveBeenCalledWith('/help', undefined));
       expect(host.queue.control.entries()).toEqual([]);
     } finally { mode.stop(); vi.restoreAllMocks(); }
   });
@@ -1091,7 +1121,7 @@ describe("session wiring", () => {
     } finally { mode.stop(); }
   });
 
-  it.each([['/models', '/model ', undefined, '/model'], ['/recall', '/recall ', '<query>', '/recall '], ['/exit', '/exit ', undefined, '/exit']])(
+  it.each([['/models', '/model ', undefined, '/model '], ['/recall', '/recall ', '<query>', '/recall '], ['/exit', '/exit ', undefined, '/exit ']])(
     'inserts the help choice %s and executes only on a second explicit submission', async (filter, command, usage, submitted) => {
       const exit = vi.fn(); const { mode, terminal } = build({ exit });
       const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView; onSubmit(text: string): void };
@@ -1319,18 +1349,18 @@ describe("session wiring", () => {
       finish();
       await vi.waitFor(() => expect(host.overlay.active).toBe(true));
       expect(stripAnsi(host.overlay.render(100, 30).join("\n"))).toContain("Ask again from");
-      expect(dispatched).not.toHaveBeenCalledWith("/help");
+      expect(dispatched).not.toHaveBeenCalledWith("/help", undefined);
       if (action === "confirm") {
         await vi.waitFor(() => expect(Reflect.get(host.overlay, 'model').current()?.id).toBe('first'));
         terminal.input("\r");
         await vi.waitFor(() => expect(rewind).toHaveBeenCalledWith(expect.objectContaining({ entryId: "first" })));
-        expect(dispatched).not.toHaveBeenCalledWith("/help");
+        expect(dispatched).not.toHaveBeenCalledWith("/help", undefined);
         finishNext();
       } else {
         terminal.input("\x1b");
         expect(rewind).not.toHaveBeenCalled();
       }
-      await vi.waitFor(() => expect(dispatched).toHaveBeenCalledWith("/help"));
+      await vi.waitFor(() => expect(dispatched).toHaveBeenCalledWith("/help", undefined));
       expect(host.queue.control.entries()).toEqual([]);
     } finally { mode.stop(); }
   });

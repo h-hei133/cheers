@@ -152,6 +152,17 @@ export class TUI {
     this.requestRender({ force: true });
   }
 
+  /** Transfer a live startup engine without taking stdin or repainting history twice. */
+  transfer(alternateScreen: boolean, onFirstWrite?: () => void): void {
+    if (!this.started || this.stopped) throw new Error('The terminal engine is no longer active.');
+    this.startup?.cancel(); this.startup = onFirstWrite ? new FrameStartup({ onFirstWrite }) : undefined;
+    if (alternateScreen !== this.alternateScreen) {
+      this.leaveScreen(); this.alternateScreen = alternateScreen; this.enterScreen();
+      this.painted = false; this.window = [];
+    }
+    this.setMouseTracking(alternateScreen); this.requestRender({ force: true });
+  }
+
   /**
    * Take the screen the session paints on.
    *

@@ -9077,3 +9077,13 @@ MCP测试/证据df0a8583cedcf22df497ecf768e17ee19b1aa03d已提交/推送、main�
 读回纠正：CI40215134369和40215968841实际均6fail，来自旧箭头/padding断言及Apply后队列时机；本批相应四文件86pass，不追改旧SHA证据。Watch40215134377和40215968887工件已读回，均proven/三结构obligation满足，不代替行为CI。
 
 第三批最终静态五门/diff通过（118既有advisory），责任上限0，TS build78f07c26242d，当前打包NormProof judge proven/0 open/failed/gap；构建后两模式小型PTY再次通过。提交/推送另绑定，不从本地证据宣称新CI通过。
+
+## [2026-10-26] feat | 提前TUI首帧与上下文目录口径
+
+第三批3841998de322e93b884eac38a36560cd4ea7746d已提交/推送。自身CI40219107288于18:18:49Z失败（11fail/10640pass/3skip），实际日志为前导空白功能补全/back、help尾空白、队列新增附件参数及裸debug名称等旧契约断言；按原文保留/offset=0/附件契约修测，原队列顺序、零提前执行和次数断言保留，三文件60项、对应host8+startup3项通过。Watch40219107300工件读回proven/三个结构义务满足，不代替失败的行为CI。
+
+ADD-07沿原Editor/ViewState/paste/parser/TUI在重模块图前显示Loading，await首帧write后导入，poll交回滞留stdin后单次移交。Enter加载期仅换行、32768字符bound/超量paste整拒，取消130；同parser保留split paste/组合字/appearance，真实配置校正regular/fullscreen，异常/退出先还终端后输出错误。ADD-09目录估算改inspection-catalogue，明确非首请求/非下界，独立机器facts；ADD-08实际请求估算尚待实现，未以措辞或warm memory预览冒充完成。面板/角色/认证回返/全编辑类型及ADD-13后续，47项38/9/0不变。
+
+串行startup/context/stdin59、host3通过；此前firstFrame/loop/context/workflow53与loop/startup25属于重叠轮次。Editor移交与旧目录facts反转3有效失败、逐字节恢复后重验；无callback假设及无startup host误加await的harness/lifecycle失败均保留并纠正。隔离小PTY两模式加载输入/未知skill整拒、取消/故障还终端通过；无delay Node父进程首见Loading401/385ms、正式画面1526/1419ms，子进程首write111/114ms、ready1221/1130ms（单样本非冷/热矩阵，无旧版/exe对照）。加700ms只做时序测试。静态/最终build/结构/本批提交另绑定，细节见addition第15节。HANDOFF追加真实输入/写入移交护栏，无全仓本地回归/20k/provider/桌面证据。
+
+第四批最终静态五门/diff、TS build b748bf0e1232、责任上限0、打包judge proven/0 open/failed/gap串行exit0；本批提交和自身CI另绑定。

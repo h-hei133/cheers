@@ -3,6 +3,7 @@ import { quoteCompletion } from './completion.js';
 import { sessionManagementPicker } from './picker/session/management.js';
 import type { ShellActionResult } from '../../core/commands/types.js';
 import { CatalogController } from "./completion/controller.js";
+import type { StartupSurface } from './startup.js';
 import { catalogIdentity, createCatalogLoader } from "./completion/catalog.js";
 import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
 import { configurationAdmission } from '../../core/shell/configuration.js';
@@ -74,7 +75,7 @@ import { InputPreferences } from "./inputPreferences.js";
 import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
 import { appendConversation, showConversation, startFreshSession, type HistoryTarget } from "./history.js";
-import { startupObservers } from '../../observability/startupTiming.js';
+import { startupObservers, time } from '../../observability/startupTiming.js';
 import { Pager, pageLongOutput } from "../../presentation/tui/chrome/pager.js";
 import { TranscriptSearch } from "../../presentation/tui/transcript/searchState.js";
 import { routeSearchKey, styleSearchRow } from "../../presentation/tui/transcript/searchHost.js";
@@ -122,6 +123,7 @@ const CANCEL_ARMED_MS = 600;
 const ATTENTION_AFTER_MS = 30_000;
 
 export interface InteractiveModeOptions {
+  readonly startup?: StartupSurface;
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionRuntime: ShellSessionRuntime;
   readonly sessionManager: SessionManager;
@@ -260,7 +262,7 @@ export class InteractiveMode {
 
   constructor(private readonly options: InteractiveModeOptions) {
     this.alternateScreen = options.runtimeContext.runtimeConfig.tuiMode !== "regular";
-    this.terminal = options.terminal ?? processTerminal;
+    this.terminal = options.startup?.terminal ?? options.terminal ?? processTerminal;
     this.composerPreference = new ComposerPreference(
       () => this.options.runtimeContext.runtimeConfig,
       () => {
@@ -281,7 +283,7 @@ export class InteractiveMode {
       write: (data) => this.terminal.write(data),
     });
     this.overlay = new OverlayHost(() => this.tui.requestRender(), this.preferences.keybindings);
-    this.tui = new TUI(this.terminal, options.scheduler);
+    this.tui = options.startup?.tui ?? new TUI(this.terminal, options.scheduler);
     this.theme = followTheme({
       workspaceRoot: options.runtimeContext.projectRoot,
       ...(options.themePaths ? { extraPaths: options.themePaths } : {}),
@@ -290,22 +292,22 @@ export class InteractiveMode {
       // does not.
       onReload: () => this.tui.requestRender({ force: true }),
     });
-    this.stdin = new StdinBuffer({
-      onAppearance: (appearance) => {
-        if (!updateAppearance(appearance)) return;
-        this.theme.refresh();
-        this.tui.requestRender({ force: true });
-      },
+    this.stdin = options.startup?.input ?? new StdinBuffer({
       ...(options.scheduler ? {
         setTimer: (callback: () => void, delayMs: number) => options.scheduler?.setTimeout(callback, delayMs),
         clearTimer: (handle: unknown) => options.scheduler?.clearTimeout(handle),
       } : {}),
     });
+    this.stdin.onAppearance(appearance => {
+      if (!updateAppearance(appearance)) return;
+      this.theme.refresh();
+      this.tui.requestRender({ force: true });
+    });
     this.tui.setDisconnectHandler(() => { void this.shutdown(); });
     // Build the transcript before subscribing to the live job owner. A native
     // runner may settle during construction; completion notices must have a
     // valid storage target even in that narrow window.
-    this.state = createViewState();
+    this.state = options.startup?.state ?? createViewState();
     excludeRecordingInput(options.runtimeContext, () => this.stopped || Boolean(this.state.editor.getText() || this.questions.question() || this.overlay.active || this.pager.active || this.search.active));
     // Completion is a scoped local notice. Output does not become new user intent
     // or silently dispatch a model request; taskOutput exposes the retained facts.
@@ -525,7 +527,13 @@ export class InteractiveMode {
     // the private screen.
     const observers = startupObservers();
     const onFirstWrite = observers.onFirstWrite;
-    this.tui.start({
+    if (this.options.startup) {
+      this.options.startup.adopt(this.alternateScreen, () => {
+        time('runtime frame write completed');
+        this.options.onFirstFrame?.();
+      });
+      this.tui.renderNow();
+    } else this.tui.start({
       useAlternateScreen: this.alternateScreen,
       ...observers,
       ...(this.options.onFirstFrame

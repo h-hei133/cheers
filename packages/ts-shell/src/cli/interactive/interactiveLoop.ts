@@ -14,6 +14,7 @@ import { runLineLoop } from "./lineLoop.js";
 import { supportsFullScreenSurface } from "./surfaceCapability.js";
 import type { RenderScheduler } from "../../presentation/tui/render/frame.js";
 import type { TerminalDevice } from "../../presentation/tui/terminal.js";
+import { settleStartupInput, stopStartupSurface, takeStartupSurface } from './startup.js';
 
 /**
  * Interactive session entry point.
@@ -73,6 +74,7 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
   };
 
   if (!supportsFullScreenSurface(stdin, stdout)) {
+    stopStartupSurface();
     await runLineLoop({
       stdin,
       stdout,
@@ -95,30 +97,37 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
     return;
   }
 
+  const settling = settleStartupInput();
+  if (settling) await settling;
+  const startup = takeStartupSurface();
   await new Promise<void>((resolve, reject) => {
-  const mode = new InteractiveMode({
-    runtimeContext: input.runtimeContext,
-    sessionRuntime: input.sessionRuntime,
-    sessionManager: input.sessionManager,
-    renderer: input.renderer,
-    logger: input.logger,
-    approvalTrustPolicy: input.approvalTrustPolicy,
-    fallbackSessionId: input.fallbackSessionId,
-    onFirstFrame: input.onFirstFrame,
-    onUserIntent: input.onUserIntent,
-    setStartupNotice: input.setStartupNotice,
-    initialMcpGateway: input.initialMcpGateway,
-    terminal: input.terminal,
-    scheduler: input.scheduler,
-    setReadline: input.setReadline,
-    setInteractiveApprovalPrompt: input.setInteractiveApprovalPrompt,
-    setActiveNonInteractiveApprovalMode: input.setActiveNonInteractiveApprovalMode,
-    exit: code => { release(); exit(code); resolve(); },
-  });
-  const stop = () => { release(); mode.stop(); resolve(); };
-  const release = () => input.stopSignal?.removeEventListener('abort', stop);
-  input.stopSignal?.addEventListener('abort', stop, { once: true });
-  try { mode.start(); if (input.stopSignal?.aborted) stop(); }
-  catch (error) { release(); mode.stop(); reject(error); }
+    let mode: InteractiveMode;
+    try {
+      mode = new InteractiveMode({
+        startup,
+        runtimeContext: input.runtimeContext,
+        sessionRuntime: input.sessionRuntime,
+        sessionManager: input.sessionManager,
+        renderer: input.renderer,
+        logger: input.logger,
+        approvalTrustPolicy: input.approvalTrustPolicy,
+        fallbackSessionId: input.fallbackSessionId,
+        onFirstFrame: input.onFirstFrame,
+        onUserIntent: input.onUserIntent,
+        setStartupNotice: input.setStartupNotice,
+        initialMcpGateway: input.initialMcpGateway,
+        terminal: input.terminal,
+        scheduler: input.scheduler,
+        setReadline: input.setReadline,
+        setInteractiveApprovalPrompt: input.setInteractiveApprovalPrompt,
+        setActiveNonInteractiveApprovalMode: input.setActiveNonInteractiveApprovalMode,
+        exit: code => { release(); exit(code); resolve(); },
+      });
+    } catch (error) { startup?.dispose(); reject(error); return; }
+    const stop = () => { release(); mode.stop(); resolve(); };
+    const release = () => input.stopSignal?.removeEventListener('abort', stop);
+    input.stopSignal?.addEventListener('abort', stop, { once: true });
+    try { mode.start(); if (input.stopSignal?.aborted) stop(); }
+    catch (error) { release(); mode.stop(); reject(error); }
   });
 }

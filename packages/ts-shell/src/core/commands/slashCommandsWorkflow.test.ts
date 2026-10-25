@@ -136,7 +136,7 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
       expect(result.kind).toBe("local");
       expect(result.output).toContain("Current prompt usage is unknown");
       expect(result.output).toContain("64,000 tokens");
-      expect(result.output).toMatch(/Current tool schema estimate: ~\d/);
+      expect(result.output).toMatch(/Discoverable tool catalogue estimate: ~\d/);
     });
   });
 

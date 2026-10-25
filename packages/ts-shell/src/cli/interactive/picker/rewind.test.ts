@@ -31,11 +31,11 @@ describe("back selectors", () => {
     await expect(picker.load()).rejects.toThrow(); expect(readTurns).not.toHaveBeenCalled();
   });
 
-  it.each(["/back", "/back 2", "/BACK older", " /back message-1 "])("opens the chooser for %s", (line) => {
+  it.each(["/back", "/back 2", "/BACK older", "/back message-1 "])("opens the chooser for %s", (line) => {
     expect(opensPicker(line)).toBe(true);
   });
 
-  it.each(["/backlog 2", "/constructor", "/resume session-1", "/model use model-1", "/tree message-1"])(
+  it.each([" /back message-1 ", "\n/back 2", "/backlog 2", "/constructor", "/resume session-1", "/model use model-1", "/tree message-1"])(
     "keeps %s out of picker interception", (line) => expect(opensPicker(line)).toBe(false),
   );
 

@@ -36,7 +36,8 @@ describe('/debug picker', () => {
     expect(opensPicker('/debug')).toBe(true);
     expect(opensPicker('/debug summary')).toBe(false);
     expect(opensPicker('/debug logs')).toBe(false);
-    const picker = pickerFor('debug', { commandContext: { cwd: '/synthetic' } } as PickerHost);
+    expect(pickerFor('debug', { commandContext: { cwd: '/synthetic' } } as PickerHost)).toBeUndefined();
+    const picker = pickerFor('/debug', { commandContext: { cwd: '/synthetic' } } as PickerHost);
     expect(picker?.title).toBe('Debug diagnostics');
   });
 

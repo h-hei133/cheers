@@ -13,6 +13,7 @@ import type { SessionManager } from "../../session/SessionManager.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import type { Picker } from "./overlay.js";
+import { StartupSurface } from './startup.js';
 
 /**
  * Boot the real host against a recording device.
@@ -341,10 +342,12 @@ describe("first painted frame", () => {
 });
 
 
-it.each(["regular", "fullscreen"] as const)("repaints the %s host when a late appearance report arrives", (screen) => {
+it.each(["regular", "fullscreen"] as const)("repaints the %s adopted host when a late appearance report arrives", (screen) => {
   updateAppearance("dark");
   selectTheme("auto");
-  const { mode, terminal, scheduler } = boot({}, screen);
+  const terminal = new RecordingTerminal(), scheduler = new ManualScheduler();
+  const startup = new StartupSurface(terminal, scheduler, vi.fn());
+  const { mode } = boot({ startup, scheduler }, screen);
   try {
     mode.start();
     scheduler.flush();
@@ -359,5 +362,5 @@ it.each(["regular", "fullscreen"] as const)("repaints the %s host when a late ap
     const output = terminal.drain();
     expect(stripAnsi(output)).toContain(" draft");
     expect(stripAnsi(output)).not.toContain("997");
-  } finally { mode.stop(); selectTheme("dark"); updateAppearance("dark"); }
+  } finally { mode.stop(); startup.dispose(); selectTheme("dark"); updateAppearance("dark"); }
 });

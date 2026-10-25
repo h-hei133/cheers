@@ -56,6 +56,8 @@ export class StdinBuffer {
   private readonly keyListeners = new Set<KeyListener>();
   private readonly pasteListeners = new Set<PasteListener>();
   private readonly mouseListeners = new Set<MouseListener>();
+  private readonly appearanceListeners = new Set<(appearance: 'dark' | 'light') => void>();
+  private latestAppearance?: 'dark' | 'light';
   private readonly partialHoldMs: number;
   private readonly clusterHoldMs: number;
   private readonly pasteHoldMs: number;
@@ -64,7 +66,11 @@ export class StdinBuffer {
   private readonly clearTimer: (handle: unknown) => void;
 
   constructor(options: StdinBufferOptions = {}) {
-    this.appearance = new AppearanceReports(options.onAppearance);
+    this.appearance = new AppearanceReports(appearance => {
+      this.latestAppearance = appearance;
+      options.onAppearance?.(appearance);
+      for (const listener of this.appearanceListeners) listener(appearance);
+    });
     this.partialHoldMs = options.partialHoldMs ?? PARTIAL_HOLD_MS;
     this.clusterHoldMs = options.clusterHoldMs ?? CLUSTER_HOLD_MS;
     this.pasteHoldMs = options.pasteHoldMs ?? PASTE_HOLD_MS;
@@ -86,6 +92,14 @@ export class StdinBuffer {
   onMouse(listener: MouseListener): () => void {
     this.mouseListeners.add(listener);
     return () => this.mouseListeners.delete(listener);
+  }
+
+  /** A transferred parser retains both partial reports and the last accepted appearance. */
+  onAppearance(listener: (appearance: 'dark' | 'light') => void): () => void {
+    if (this.disposed) return () => {};
+    this.appearanceListeners.add(listener);
+    if (this.latestAppearance) listener(this.latestAppearance);
+    return () => this.appearanceListeners.delete(listener);
   }
 
   feed(chunk: string): void {
@@ -123,6 +137,8 @@ export class StdinBuffer {
     this.keyListeners.clear();
     this.pasteListeners.clear();
     this.mouseListeners.clear();
+    this.appearanceListeners.clear();
+    this.latestAppearance = undefined;
   }
 
   /** Consume every sequence the buffer can complete, leaving any partial behind. */

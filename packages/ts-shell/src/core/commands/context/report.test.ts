@@ -46,13 +46,14 @@ it('retains independent measured, estimated and unknown context facts', () => {
   ]));
   expect(reportText(report)).toContain('119,000 free before the 17,000-token reserve');
   const unknown = contextReport({ ...input, used: undefined });
-  expect(unknown.facts.prompt).toMatchObject({ status: 'unknown', estimate: { status: 'estimated', tokens: 8000, basis: 'current-tool-schemas' } });
+  expect(unknown.facts.prompt).toEqual({ status: 'unknown' });
+  expect(unknown.facts.toolSchemas).toMatchObject({ tokens: 8000, scope: 'inspection-catalogue', firstRequestLowerBound: false });
   expect(unknown.facts.session).toEqual({ recordedTokens: 72000, recordedTurns: 2 });
   expect(contextReport({ ...input, used: 0 }).facts.prompt).toEqual({ status: 'measured', tokens: 0 });
   const stale = contextReport({ ...input, used: undefined, measurement: 'stale' });
-  expect(stale.facts.prompt).toMatchObject({ status: 'stale', estimate: { status: 'estimated', basis: 'current-tool-schemas' } });
+  expect(stale.facts.prompt).toEqual({ status: 'stale' });
   expect(reportText(stale)).toContain('different model, endpoint or schema');
-  expect(reportText(stale)).toContain('First request estimate');
+  expect(reportText(stale)).toContain('not a first-request estimate or a lower bound');
 });
 
 it('reports the same output-aware soft threshold used by compaction', () => {

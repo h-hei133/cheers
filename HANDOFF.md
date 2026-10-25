@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Startup Paint And Raw-Input Handoff
+- **Symptom**: Loading has been laid out but its write callback lands after runtime initialization; a key typed during heavy module evaluation is handled by the later host, or a split paste loses its framing on adoption.
+- **Root Cause**: Dynamic import evaluation delays stdout/stdin callbacks. Replacing or flushing StdinBuffer at the ownership boundary discards partial escape, paste and grapheme state; keeping it without subscribing to appearance reports loses theme updates.
+- **Rule**: Await the early frame's device write before importing the heavy graph, then give pending startup input one poll opportunity before taking the lease. Transfer the same editor, parser and terminal once; retain accepted appearance and partial reports, remove old listeners, and restore the terminal before printing bootstrap errors. Keep no-startup host timing unchanged. Record first write and runtime readiness separately; injected load delays prove ordering, not production latency.
+
 ### Prompt Position And Composed Submission Boundaries
 - **Symptom**: A second-line slash becomes a functional command after submission/history recall; inline skill markers reach an active turn without expansion, or queued images disappear.
 - **Root Cause**: Trimming source before routing changes invocation offsets; direct follow-up delivery bypasses the command preparation owner, and text-only pending entries omit attachments.

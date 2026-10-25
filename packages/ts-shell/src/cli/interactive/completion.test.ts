@@ -6,8 +6,8 @@ import { slashSuggestions } from "./slashSuggestions.js";
 
 describe("completion source ranges", () => {
   it.each([
-    ["  /thi rest 中文", 6, "  /thinking rest 中文", "/thinking"],
-    ["\t/thinking\t\tlo  中文👩‍💻", 14, "\t/thinking\t\tlow  中文👩‍💻", "low"],
+    ["/thi   rest 中文", 4, "/thinking   rest 中文", "/thinking"],
+    ["/thinking\t\tlo  中文👩‍💻", 13, "/thinking\t\tlow  中文👩‍💻", "low"],
     ['/thinking "lo" suffix', 13, '/thinking "low" suffix', "low"],
     ["/shell\tuse   ba suffix", 15, "/shell\tuse   bash suffix", "bash"],
   ])("preserves the prefix and suffix in %s", (draft, cursor, expected, value) => {
@@ -20,6 +20,11 @@ describe("completion source ranges", () => {
     expect(editor.replace(candidate!.edit!)).toBe(true);
     expect(editor.getText()).toBe(expected);
   });
+
+  it.each(['  /thi rest 中文', '\t/thinking\t\tlo  中文👩‍💻', '\n/thinking low'])(
+    'keeps functional completions out of an indented or later-line draft: %s', draft => {
+      expect(slashSuggestions(draft)?.some(item => item.value === '/thinking' || item.value === 'low')).not.toBe(true);
+    });
 
   it("ranges over the complete quoted file token while querying only the prefix", () => {
     const draft = '查看 @"dir/my file.ts" 后缀';
