@@ -652,3 +652,21 @@ ADD-08此前只预览正文纯modifier、显式composable模板与多skill。普
 四静态门、责任上限0、TS build及正式CLI judge通过，实际verdict proven/三个结构义务satisfied。最终build`3acc4696c965ccbd964a5d0ecb5edd4339eb6bb4174002746c8e01ec974924f4`，inputs`6def2092f6cfeaeee552e38fadfafec5f88a89adaabe17fbc9afb10b0f621b32`，artifact`3d088e607445acece5d3450c7037e5b7f537e737788153d6b8f735de37678d96`；validator archive`6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`使用全新scratch提取。严格docs drift与diff检查通过，118条既有advisory保留；addition80、audit85个本地链接目标存在。工件归档`.omx/artifacts/phase20-addition-templates/`，Git交付由实际读回另绑定。
 
 完整settings/model的字段/编辑器/来源/鼠标/resize/桌面矩阵仍需补证；明确的未配置模型可选、面板整体看齐、消息顶格与箭头、正文path、多skill和有限slash组合需求不缩小。ADD-07冷/热Node/exe、ADD-08其他独立命令/研究完整preview、精确source字节与发现成本、原生tokenizer及真实差额仍partial；第九browser-cache writer退出1仍未归因，未运行WSL并发重压、全仓本地回归或20k真实PTY。原Phase20保持38 complete / 9 partial，ADD独立，完整目标继续。
+
+第十六批已提交并推送`641f26645fabad5aeee61af0a31e2b0751032540`，实际main与origin/main一致且clean。自身CI`40238165109`本轮实际仍in_progress，Watch`40238165083`仅workflow success未读工件。第十四`a412dadc`行为CI`40236655044`现已实际success：992 files passed/1 skipped、10779 tests passed/3 skipped，结构proven；完整日志保留第十七批工件。不把该结果转记给第十五、十六或本批源码。
+
+### 第十七批：面板鼠标选择后的键盘焦点与绘制边界
+
+ADD-02/03定向核查发现两处确定交互缺口：[CatalogNavigation](../../packages/ts-shell/src/cli/interactive/picker/navigation.ts)侧栏select不更新焦点域；[OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts)点击内容行只改OptionModel current，不把导航从categories切入rows。因此内容行看似选中后，上下键仍可能切分类；窄屏也可能继续停在Browse。另有[导航绘制](../../packages/ts-shell/src/presentation/tui/chrome/navigation.ts)height=1仍为被slice掉的侧栏项登记hit，出现不可见目标可被点击的边界缺口。原终端“上下键没有任何交互”的唯一现场根因仍未捕获，本批不能事后归因为同一问题。
+
+修补由原navigation owner接收point(id, query)：侧栏点击进入categories，具体内容行进入rows，settings section点击留在sections且Enter后才进入字段；搜索原文保留、投影沿既有小写匹配口径。overlay按更新重投影，同一画面失效后立即清option/chip hit spans，等待下一次绘制；不在pointer回调保存配置、激活模型或自动登录。height≤2不登记未绘制侧栏项；原默认/手动行身份、disabled可浏览与实际启用准入保留。
+
+只读参考A model-hub 829–842、2315–2408：分类scope改变维持scope焦点，角色/具体内容点击把焦点交给list，mouse命中来自实际frame，assignment pending阻断动作。本项目沿焦点跟随区域、可见命中及pending保护；保留自身“点击只聚焦、Enter明确操作”的合同，不复制二次点击locked provider即登录的行为，也未增加hover/wheel能力。
+
+最终四文件144项串行通过（navigation7、overlay74、model43、settings20）；新增覆盖侧栏点击→上下分类、内容点击→上下行/Enter精确字段、settings section→Enter、未配置模型精确inspection、120↔40列焦点页、MAX大写搜索、旧坐标失效、height0/1/2不调用select。初轮140pass/2fail属于夹具定位/期待错误：同名Maximum turns先命中详情列、期待不存在的Maximum tool output及Model字段；改实际内容列/metadata key与原详情能力，不削弱焦点域/精确ID断言。后续143/144及恢复7项重叠不累加。
+
+三个有效反转分别移除category域切换、content point调用、height hit预算，均AssertionError/exit1，产品源码逐字节恢复后navigation7项通过。初版height反转仍绿色，因为点击的是当前分类；补select未调用断言后真正检出不可见hit，保留这一轮无效记录，不能将早期无效反转写成有效。
+
+普通/全屏两条小型真实Node PTY通过实际SGR点击：Model分类→上下分类→Maximum turns内容→Down输出limit→Enter精确字段→Esc返回/关闭；provider分类→missing-b→Up missing-a→Enter原配置详情。磁盘config原字节不变、零session modelSelection、零message/provider调用，退出143为SIGTERM清理。当前PTY为120×60，40列/极矮/resize在真实overlay host场景验证，未冒充真实桌面缩放。探针首次忽略regular相对绘制、cursor-only CUP覆盖、stored ●和子详情回regular，又用旧screen条件提前满足后续等待；已按当前alternate-screen生命周期、完整CUP+K行和动作后的新输出同步修正。反转后测试文件变动还触发launcher freshness拒绝，重新构建后再验，未绕过校验。
+
+四静态门、责任上限0、TS build、正式CLI judge proven/三satisfied通过。最终build`6a06f16db5e6d032c38a9d45d89c10decd8033c119d5706a0b0733bae3cc758d`，inputs`5faf272d81455cfd900bc35f8df109d6d1aa31508181e7ba9b4bf4e9eb147922`，artifact`9000a82ace0e16330bec24e4716d9fb1e687ff14203ab3408854a7a52ca658ff`。严格docs drift与diff通过，118条既有advisory保留；addition83、audit86个本地链接目标存在。工件归档`.omx/artifacts/phase20-addition-pointer/`；Git交付按实际读回绑定。完整面板全部字段/编辑器/来源/桌面矩阵、真实认证、启动冷/热Node/exe、原生tokenizer、其他独立命令/研究preview与精确source/真实差额仍partial；第九writer退出1仍未归因，原Phase20保持38 complete / 9 partial，ADD独立。

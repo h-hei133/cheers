@@ -18,7 +18,7 @@ export function renderNavigation(model: OptionModel, chrome: PanelChrome, naviga
   if (narrow && !navigation.focused) return renderPanel(model, chrome, width, height);
   const navWidth = narrow ? width : Math.min(24, Math.max(18, Math.floor(width / 5)));
   const current = Math.max(0, navigation.items.findIndex(item => item.id === navigation.active));
-  const capacity = Math.max(1, height - 2);
+  const capacity = Math.max(0, height - 2);
   const offset = Math.max(0, Math.min(current - Math.floor(capacity / 2), navigation.items.length - capacity));
   const rows = [defaultTheme.bold(truncateToWidth('  Browse', navWidth))];
   for (const item of navigation.items.slice(offset, offset + capacity)) {

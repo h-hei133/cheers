@@ -9182,3 +9182,11 @@ ADD-01/02当前request报告接原exact connection inspection，保存显式失�
 ADD-08模板声明增加显式preparePrompt，原execute和preview复用expandTemplate；raw命令源解析提取到原invocation owner供route/preview共享，保留引号/多行/未闭合引号/兼容源语法。纯能力与prompt kind/组合资格分别准入，builtin保留名及普通正文模板语义保留，零handler执行/递归命令。参考模板展开与custom/extension执行分离的具体决定。
 
 串行四文件96pass、两有效反转/精确恢复后14pass（重叠）；两模式小Node PTY4.3k→6.6k→模板改动9.4k/研究问号/恢复数字/配置transcript字节不变/零message-provider通过，退出143。四静态门/责任上限0/build3acc4696c965/正式judge proven三satisfied，严格docs/diff通过、118既有advisory保留，addition80/audit85本地链接存在；Git结果另绑定。工件templates保留；审计末尾按已修补、仍缺、不成立、未确认总括。原Phase38/9、完整面板/真实性能/其他command-research preview/精确source字节与真实token差额边界保留，详见addition15第十六批。
+
+第十六641f26645fabad5aeee61af0a31e2b0751032540已推送/main远端一致且clean，自身CI40238165109实际in_progress、Watch40238165083仅workflow success未读工件。第十四40236655044现实际success992files/10779tests pass、3skip/结构proven，日志归档pointer，不转记后续提交。
+
+## [2026-10-26] fix | 面板鼠标选择的焦点域与可见命中
+
+ADD-02/03原navigation select/内容click遗漏焦点域交接，现侧栏categories、内容rows、settings section独立point，保留search和精确行；overlay即时废弃旧hit，导航height≤2不登记被裁掉项。参考scope/list焦点与可见frame命中，保留点击聚焦/Enter操作，未新增hover/wheel或自动auth。
+
+四文件144pass、三有效反转/字节恢复后7pass（重叠），普通/全屏实际SGR两小PTY分类→内容→键盘→精确setting/model详情、原config字节/零model切换/零message通过，结束143；40列/极矮/resize属于overlay host而非桌面。夹具同名详情坐标/字段误期望、早期无效height反转及PTY绘制/同步/freshness修正保留分类。静态门/责任上限0/build6a06f16db5e6/正式judge proven三satisfied、严格docs/diff通过、118既有advisory保留，addition83/audit86本地链接存在；Git另绑定。原Phase38/9和完整面板/性能/真实计量边界不变，详见addition15第十七批。

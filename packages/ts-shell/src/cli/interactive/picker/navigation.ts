@@ -11,6 +11,8 @@ export interface PickerNavigation {
   focus(id: string | undefined): void;
   key(key: string, current: string | undefined, query: string): NavigationUpdate | undefined;
   select(id: string): NavigationUpdate | undefined;
+  /** A painted content row transfers keyboard focus into its navigation domain. */
+  point(id: string, query: string): NavigationUpdate | undefined;
 }
 
 /** Display navigation retains row identities; it never applies a setting or model. */
@@ -62,7 +64,20 @@ export class CatalogNavigation implements PickerNavigation {
   select(id: string): NavigationUpdate | undefined {
     if (!this.categories.some(item => item.id === id)) return undefined;
     this.category = id;
+    this.domain = 'categories';
     return { options: this.project(''), focus: this.rowFocus.get(id), query: '' };
+  }
+
+  point(id: string, query: string): NavigationUpdate | undefined {
+    if (id.startsWith('section:')) {
+      if (!this.project('').some(row => row.id === id)) return undefined;
+      this.domain = 'sections'; this.section = id;
+      return { options: this.project(''), focus: id };
+    }
+    if (!this.rows.some(row => row.id === id)) return undefined;
+    this.domain = 'rows';
+    this.focus(id);
+    return { options: this.project(query.trim().toLowerCase()), focus: id };
   }
 
   key(key: string, current: string | undefined, query: string): NavigationUpdate | undefined {

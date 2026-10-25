@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Pointer Focus Must Follow The Painted Navigation Pane
+- **Symptom**: Clicking a content row changes the visible selection, but subsequent arrows still move sidebar categories; very short frames can retain a hit target for a row that was clipped away.
+- **Root Cause**: OptionModel focus and catalogue navigation domains were updated independently. Hit registration also forced one item even when the viewport had no item capacity.
+- **Rule**: Transfer the navigation domain with the clicked category, section or row, preserve the search projection, and retire old hit maps until repaint. Register only painted items. PTY probes must distinguish regular relative output from borrowed alternate-screen frames, retain rows during cursor-only CUP, clear retired screen state and wait for new output after each action.
+
 ### Blocked Current Model Reports Need Exact Record Recovery
 - **Symptom**: The first current-request row reports blocked credentials but only offers Back, or a failed explicit session binding loses its model label because resolution deliberately omits the target.
 - **Root Cause**: The report was separate from the concrete catalogue inspections. Credential resolution is an admission result, so rejected bindings do not always retain their presentation identity.

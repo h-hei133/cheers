@@ -339,6 +339,7 @@ export class OverlayHost {
       if (chip) {
         const update = this.picker.navigation?.select(chip.id);
         if (update) {
+          this.optionRows.clear(); this.chipRows.clear();
           this.model.setFilter(update.query ?? this.model.filter);
           this.baseOptions = update.options; this.model.setOptions(update.options);
           if (update.focus) this.model.focus(update.focus, true);
@@ -351,6 +352,11 @@ export class OverlayHost {
       if (this.loading) return true;
       const hit = this.optionRows.get(report.row - top);
       if (hit && report.column >= hit.from && report.column < hit.to) {
+        const update = this.picker.navigation?.point(hit.id, this.model.filter);
+        if (update) {
+          this.optionRows.clear(); this.chipRows.clear();
+          this.baseOptions = update.options; this.model.setOptions(update.options);
+        }
         this.model.focus(hit.id, true);
         this.picker.navigation?.focus(this.model.current()?.id);
         if (!this.picker.multiple) this.picker.previewChange?.(idsOf(this.model.current()));
