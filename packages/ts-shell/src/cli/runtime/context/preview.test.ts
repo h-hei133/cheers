@@ -18,6 +18,7 @@ import { appendTranscriptEvent } from '../../../session/transcript/sessionTransc
 import { createMessageTranscriptEvent } from '../../../session/sessionEventCodec.js';
 import { requestIdentity } from '../../../context/request/identity.js';
 import { routeSlashCommand } from '../../../core/commands/slashRouter.js';
+import * as revisions from '../../../runtime/execution/read.js';
 
 let root: string;
 beforeEach(() => {
@@ -233,6 +234,24 @@ it('invalidates imported instruction changes and creation of a higher priority s
   expect(() => before.verify()).toThrow('changed');
   const next = await load('question'); fs.writeFileSync(path.join(cwd, 'AGENTS.override.md'), 'override');
   expect(() => next.verify()).toThrow('changed');
+});
+
+it('invalidates actual instruction, import, append and template bytes with unchanged metadata', async () => {
+  const { cwd, load, layout, gateway } = fixture();
+  const directory = path.join(cwd, '.agents', 'prompts'); fs.mkdirSync(directory, { recursive: true });
+  const files = [path.join(cwd, 'AGENTS.md'), path.join(cwd, 'nested.md'), path.join(cwd, 'APPEND_SYSTEM.md'), path.join(directory, 'ordinary.md')];
+  fs.writeFileSync(files[0]!, '@./nested.md\nfirst rules'); fs.writeFileSync(files[1]!, 'first nested');
+  fs.writeFileSync(files[2]!, 'first append'); fs.writeFileSync(files[3]!, 'first template $@');
+  vi.spyOn(revisions, 'readRevision').mockReturnValue('stable');
+  const persisted = [layout.metadataPath, layout.statePath, layout.transcriptPath]; const before = persisted.map(file => fs.readFileSync(file));
+  for (const file of files) {
+    const result = await load('/ordinary question'); await result.verifyContent(new AbortController().signal);
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('first', 'other'));
+    expect(() => result.verify()).not.toThrow();
+    await expect(result.verifyContent(new AbortController().signal)).rejects.toThrow('bytes changed');
+  }
+  expect(persisted.map(file => fs.readFileSync(file))).toEqual(before);
+  expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
 });
 
 it('does not turn opaque saved reasoning or malformed workflow state into an estimate', async () => {

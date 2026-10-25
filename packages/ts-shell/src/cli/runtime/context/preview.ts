@@ -154,5 +154,9 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     if (config.enableMcpTools && JSON.stringify(gateway.peekSnapshot?.()) !== JSON.stringify(snapshot)) throw new Error('MCP catalogue changed.');
   };
   verify();
-  return { estimate, verify };
+  await sources.verifyContent(signal); verify();
+  const verifyContent = async (checkingSignal: AbortSignal) => {
+    verify(); await sources.verifyContent(checkingSignal); verify();
+  };
+  return { estimate, verify, verifyContent };
 }

@@ -86,7 +86,7 @@ export interface InstructionLoadOptions {
   /** Total bytes allowed across all files. Zero loads nothing. */
   readonly maxBytes?: number
   /** Selected, missing and higher-priority sources used by this read. */
-  readonly onSource?: (target: string) => void
+  readonly onSource?: (target: string, content?: Buffer) => void
 }
 
 /**
@@ -126,7 +126,7 @@ export function loadInstructionFiles(options: InstructionLoadOptions): Instructi
  * a project, and reading instructions out of one would attribute rules to a
  * repository that never declared them.
  */
-function loadAncestorFiles(cwd: string, onSource?: (target: string) => void): InstructionFile[] {
+function loadAncestorFiles(cwd: string, onSource?: (target: string, content?: Buffer) => void): InstructionFile[] {
   const files: InstructionFile[] = [];
   // The same chain skills are found along, so a repository cannot have its rules
   // honored from a directory while its skills are ignored from that directory.
@@ -158,7 +158,7 @@ function loadOneFrom(
   directory: string,
   candidates: readonly string[] = CANDIDATES,
   user = false,
-  onSource?: (target: string) => void,
+  onSource?: (target: string, content?: Buffer) => void,
 ): InstructionFile | undefined {
   for (const candidate of candidates) {
     const filePath = path.join(directory, candidate);
@@ -171,15 +171,16 @@ function loadOneFrom(
       continue;
     }
     if (!stats.isFile()) continue;
-    let raw: string;
+    let bytes: Buffer;
     try {
-      raw = fs.readFileSync(filePath, "utf8");
+      bytes = fs.readFileSync(filePath);
     } catch {
       continue;
     }
+    onSource?.(filePath, bytes);
     // The mark is a transport artefact; leaving it in puts an invisible
     // character at the start of the prompt.
-    return { filePath, content: splitByteOrderMark(raw).text };
+    return { filePath, content: splitByteOrderMark(bytes.toString('utf8')).text };
   }
   return undefined;
 }

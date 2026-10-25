@@ -19,7 +19,7 @@ export interface SystemPromptContextInput {
   readonly runtimeConfig?: RuntimeConfig;
   readonly skills: ReadonlyMap<string, Skill>;
   readonly toolNames: readonly string[];
-  readonly onSource?: (target: string) => void;
+  readonly onSource?: (target: string, content?: Buffer) => void;
 }
 
 /** Assemble the exact system-prompt inputs used by a model request. */

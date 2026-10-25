@@ -10,7 +10,7 @@ export interface PromptRequestInput extends ToolCatalogInput {
   readonly agentMode?: 'plan' | 'build';
   readonly forcedTool?: string;
   readonly allowedTools?: readonly string[];
-  readonly onSource?: (target: string) => void;
+  readonly onSource?: (target: string, content?: Buffer) => void;
 }
 
 /** Shared by dispatch and read-only preview; callers supply the MCP lifecycle. */

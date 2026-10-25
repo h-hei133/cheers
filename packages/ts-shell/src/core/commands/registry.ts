@@ -145,7 +145,7 @@ import { templateCommands } from '../prompts/commands.js';
 export function createCommandRegistry(
   cwd: string = process.cwd(),
   runtimeConfig: RuntimeConfig = getRuntimeConfig(cwd),
-  onSource?: (target: string) => void,
+  onSource?: (target: string, content?: Buffer) => void,
 ): ReadonlyMap<string, CommandDefinition> {
   const commands: CommandDefinition[] = [
     ...sessionCommandDefinitions(),

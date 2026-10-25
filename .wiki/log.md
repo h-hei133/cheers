@@ -9216,3 +9216,9 @@ ADD-02/03沿原navigation绘制增加有界viewport，侧栏wheel只pan、click/
 ADD-02/03无按钮motion独立move，沿frame/surface/TUI仅已持有的picker屏幕请求1003，关闭恢复drag、suspend/stop释放。pointer只交capture，不结束drag/清vim/派发意图；overlay沿painted ID独立hover，跨pane/detail/section/旧geometry清除、重复motion零额外redraw。panel/modal/sidebar复用statusBandBg，selected/current/preview/保存/启用分开。
 
 八文件165pass、三有效反转/字节恢复、普通/全屏两小SGR PTY背景观察category与missing-b hover→detail清除→Enter仍选missing-a精确详情→关闭motion释放通过，原config/零model-message，退出143。初轮颜色关闭造成4个无效正向/失败负向夹具，固定16色并恢复palette后通过；四静态门/责任上限0/buildead28413c41b/正式judge proven三satisfied通过，严格docs/diff通过、118既有advisory保留，addition103/audit90/guide1本地链接存在；Git另绑定。第二十8218e40b已推送自身CI首检运行；第十九完整CI994files/10821tests pass/3skip/结构proven实读归档，不转给后续提交。原Phase38/9及完整面板/真实平台认证/性能计量边界保留，详见addition15第二十一批。
+
+## [2026-10-26] fix | 上下文规则与模板原始字节核验
+
+ADD-08规则/import/append/template在实际读后、转换/裁剪前交原onSource链路捕获有界SHA-256/长度；复用verified-handle snapshot串行重读、前后重验原alias。读后准入异常不进入不可读fallback。controller周期内容检查仍一个pending槽，取消等待settlement，expiry/超时立即撤值、迟到不能发布、成功不延长20秒有效期，frame读取无文件I/O。全文末尾更新明确问题、不成立判断、未知原因与用户完整验收任务。
+
+八文件89pass、三个有效反转/逐字节恢复、四静态门/TS构建711b9bced736/正式judge proven三satisfied、严格docs/diff通过；118既有advisory保留，addition110/audit91本地链接存在。初轮85pass/3fail为新controller夹具误期望状态/定时窗口，保留既有stale与重试契约后补测通过；未运行PTY，不宣称生产显示/性能已验。规则/模板字节覆盖不代表skills/附件等全来源或原生token计数已完成；实际1.7k/4.9k、全source I/O成本、面板整体/桌面/真实认证及cache writer/build并发仍待证。第二十/二十一自身CI实际仍运行；Git另绑定，归档phase20-addition-sources，原Phase38/9与ADD独立/整体active边界保留，详见addition15第二十二批及16文末总和。

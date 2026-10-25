@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Prompt Source Bytes And Async Expiry Need Separate Checks
+- **Symptom**: Equal decoded text hides changed raw source bytes, a post-read admission failure is skipped as an unreadable file, or a periodic check republishes an expired estimate.
+- **Root Cause**: Metadata alone does not bind loaded content; UTF-8/BOM/frontmatter/budget transformations lose raw-byte identity. A pending read can cross the preview lifetime, and abort does not imply settlement.
+- **Rule**: Capture bounded raw-byte digests from the actual loader read before transformation, keep admission callbacks outside I/O fallback catches, and recheck the original alias around serial verified-handle reads. Withdraw expired/timed-out estimates while retaining the pending slot until settlement; periodic checks never extend the original expiry and frame reads remain filesystem-free. Keep untracked source coverage and cumulative I/O costs explicit.
+
 ### Unbuttoned Motion Is Not A Release Or A Selection
 - **Symptom**: Hover reports complete a drag or clear the editor selection; a hover test passes its color assertion with an empty background sequence.
 - **Root Cause**: Mouse motion with button bits 3 was decoded as release, pointer routing shared gesture handling, and color-disabled fixtures make bgOpen empty.

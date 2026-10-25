@@ -50,7 +50,7 @@ export class TemplateLoader {
   private readonly userRoots: ReadonlySet<string>;
   private readonly roots: readonly string[];
 
-  constructor(workspaceRoot: string = process.cwd(), private readonly onSource?: (target: string) => void) {
+  constructor(workspaceRoot: string = process.cwd(), private readonly onSource?: (target: string, content?: Buffer) => void) {
     // User templates first, then project ones, so a later root overrides an earlier
     // one — the same precedence the skill loader applies and for the same reason.
     //
@@ -98,15 +98,16 @@ export class TemplateLoader {
           continue;
         }
 
-        let raw: string;
+        let bytes: Buffer;
         this.onSource?.(file);
         try {
-          raw = fs.readFileSync(file, "utf8");
+          bytes = fs.readFileSync(file);
         } catch {
           diagnostics.push({ name, filePath: file, message: "The file could not be read." });
           continue;
         }
-        this.onSource?.(file);
+        this.onSource?.(file, bytes);
+        const raw = bytes.toString('utf8');
 
         const match = FRONTMATTER.exec(raw);
         const fields = match ? frontmatterFields(match[1]!) : new Map<string, string>();

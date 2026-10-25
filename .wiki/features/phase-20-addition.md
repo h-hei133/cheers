@@ -752,3 +752,67 @@ ADD-02/03确认悬停链路此前不存在：[mouse解码](../../packages/ts-she
 四静态门、责任上限0、TS构建及正式judge实际exit0、proven三satisfied通过；build`ead28413c41b9199fdb6a86a50a7a75fd7cff580050d255f41f627be06f85ae1`，inputs`dcf9d99962c5686ea3bc338a387faa3ac6bf8b0b86857d038c87d91c617ff302`，artifact`83ab5b07774aa8485b73060023685a50d8fb38adec15c5963a0a78d5fe289c81`。严格docs/diff实际通过，118既有advisory保留；addition103/audit90/guide1本地链接目标存在。工件归`.omx/artifacts/phase20-addition-hover/`，Git交付另实际绑定；指南与HANDOFF同步报告/gesture/颜色夹具边界。
 
 ADD-01/02/03完整面板仍partial，完整字段/来源/编辑器及真实desktop/OAuth/key验收待证；ADD-07冷/热Node/exe性能、ADD-08原生tokenizer/其他独立命令及研究完整preview、精确source字节/发现成本和真实1.7k/4.9k差额继续待证。第九cache writer与第十七build并发来源未归因；原Phase20仍38 complete / 9 partial，ADD独立，完整目标active。
+
+### 第二十二批：上下文估算绑定实际规则与模板字节
+
+第二十一批已提交/推送`aebbdaa7fe74437f8e54ff5729b772ff6128607e`，本批接续时工作区仅有六个初始上下文改动，尚无验证或交付证据。延迟实查第二十CI `40241932127`与第二十一CI `40242628366`均仍in_progress，分别绑定`8218e40b`与`aebbdaa7`；未读取这两批Watch工件，不能借用第十九绿色结论。本批验证与Git交付分别记录。
+
+ADD-08确认[来源捕获](../../packages/ts-shell/src/context/request/sources.ts)原先保存lstat/realpath/stat及缺失候选父目录revision，未绑定读取到的原始文件字节。[规则读取](../../packages/ts-shell/src/context/instructions/projectInstructions.ts)与[import展开](../../packages/ts-shell/src/context/instructions/importExpansion.ts)只有读前回调；[模板读取](../../packages/ts-shell/src/core/prompts/templateLoader.ts)虽有读后回调，仍只比较元数据。这是确定的覆盖缺口，与估算新鲜度相关；不证明用户的1.7k/4.9k来自源文件变化，也不意味着普通文件编辑原先都检测不到。
+
+现规则、APPEND_SYSTEM、import及模板读取原始Buffer后，将同一次实际读取的字节交给原onSource链路，再进行BOM处理、UTF-8解码、预算裁剪、frontmatter及模板展开。读后准入回调位于文件读取catch之外，源变化或预算拒绝不会被误报成“文件不可读”后继续发布部分估算。import以原resolved alias捕获，保留物理目标、项目边界、深度及去重规则；模板仍保留现有候选优先级，不另建规则/模板目录。
+
+同一capture保存SHA-256与长度，不保留原文副本；最多512个路径、每文件512KiB、全部记录8MiB，重复相同来源不重复扣字节，超限撤回完整估算而不修改实际提交路径。异步verifyContent串行复用[已验证文件句柄读取](../../packages/ts-shell/src/runtime/execution/snapshot.ts)，核对实际字节并前后重验原alias和所有元数据；每次读取按捕获长度限制，空文件也验证，取消不开始下一来源。覆盖的是已登记来源在检查窗口中的字节一致性，不承诺整个文件系统跨文件原子快照。
+
+[runtime preview](../../packages/ts-shell/src/cli/runtime/context/preview.ts)在返回前核对内容，并提供异步复验；[状态栏controller](../../packages/ts-shell/src/cli/interactive/context/controller.ts)周期复用已有一个pending槽位，取消/超时请求后仍等待读取settlement，不提前开始第二个读取。检查前后重验身份，过期/内容失败撤回值，检查成功不延长原20秒有效期；10秒超时立即撤回，迟到结果不能发布。frame read只读内存身份和值，不执行元数据检查、内容读取或网络。最初六文件草稿还遗漏了pending检查跨过expiry的撤值及超时无拒绝时的撤值，这两处在本批核验中补齐。
+
+只读参考pi resource-loader 196–231采用实际读取的规则内容、override优先、跳过非文件/不可读及BOM处理；参考A session-stats 276–310从实际session资源与tokenizer形成非消息分项并绑定pending/provider anchor。采用“核算真实加载内容”的决定，保留本项目来源owner与更强的异步句柄/失效检查。参考片段未提供精确字节新鲜度证明；本批未引入其tokenizer或改变characters/3.5公式，也未完成真实token差额调查。
+
+最终八文件89项串行通过（sources7、capture5、controller9、runtime preview15、project instructions20、import19、templates10、prompt request4）。新增覆盖BOM/非法UTF-8解码相同但字节不同、模拟元数据相同的等长编辑、完整原始字节在裁剪前捕获、所有loader读后准入错误传播、alias读后重定向、空文件、单源/总字节上限、取消中止后续读取；实际runtime对规则/import/append/template逐个等长变化拒绝旧preview，session文件逐字节不变、零MCP连接/refresh。controller验证周期检查串行、取消等待、迟到发布拒绝、原expiry不延长、超时撤值和frame读取不调用复验。
+
+初轮85pass/3fail为新controller夹具错误期待：已有值换身份后应stale，expiry与500ms轮询/150msdebounce/既有5秒失败重试存在窗口，周期检查开始点不能用任意固定等待假定。按实际契约修正精确状态和窗口，另补已发布值的异步检查失败覆盖；随后89与反转后89重叠不累加。三个有效反转分别去掉digest比较、去掉规则读后内容准入、取消后提前释放pending，均AssertionError/exit1，源文件逐字节恢复。未运行PTY：这批无布局变化，文件新鲜度及controller生命周期由真实隔离文件与fake-timer集成检查；不能据此声称真实桌面显示/启动收益已验。
+
+四静态门、TS构建、正式judge实际exit0/proven且三项satisfied通过；build`711b9bced736cab2f63a606cf0695dd2347719a328f737c391f7406660561c7b`，inputs`8912cb16dd02902d3e467cdca7075ca8b93e77ec609797ee38706082ec3ab0d8`，artifact`70b9ca14bc3cbf7c347592700631815ab1769a6c2d7a527c3d57f309f4f27749`。validator使用本批新目录解包的当前tgz，SHA-256`6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`。严格docs/diff实际通过，118条既有source advisory保留，addition110/audit91个本地链接目标存在。工件归`.omx/artifacts/phase20-addition-sources/`，Git交付另绑定；HANDOFF记录读后内容捕获与异步expiry陷阱。
+
+本批不宣称全部source精确覆盖：skill discovery/body、context附件、其他动态来源的完整字节绑定和总发现/复验I/O成本仍需审计；规则原文件过大可使preview不可用，不能隐藏为精确数值或改变实际提交规则预算。原生tokenizer、研究及其他独立命令完整preview、同模型/协议/规则/schema的真实1.7k/4.9k拆分、冷/热Node/exe性能、完整面板字段/来源/编辑器/desktop/真实认证继续partial。cache writer及活跃build lock来源仍未知；原Phase20保持38 complete / 9 partial，ADD独立，整体目标active。
+
+## 16. 最新问题总和与必须完成的体验
+
+本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
+
+### 16.1 确实存在的问题及修补方向
+
+| 问题 | 确认的机制、修补方向与剩余边界 |
+|---|---|
+| model上下键看起来无交互 | 原disabled跳过具体未配置模型是确定缺口；只有一行ready与该观察相容，原现场按键是否进入此分支仍未排他确认。必须允许未配置具体模型获得焦点、进入详情和配置，不能改回跳过它们；浏览、认证成功与显式启用分开。已有局部修补及真实host/隔离PTY证据，原环境仍需复验 |
+| resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。已有局部修补证据 |
+| 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
+| TUI首帧过晚 | 入口先建立重runtime再进入交互，造成可见等待。已采用早期真实composer及一次lease交接；仍需同机冷/热Node/exe的首帧、接管、ready及首请求取样，加载延迟夹具不证明生产收益 |
+| 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则与模板原先仅元数据复验的缺口本批补字节绑定；其他来源完整覆盖、读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
+| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
+| 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
+
+### 16.2 不成立的判断与仍未确认的原因
+
+| 判断 | 当前结论 |
+|---|---|
+| “model压根没有上下键监听” | 源码有监听及导航；原来跳过disabled能导致无可见变化。不能用监听存在否认用户观察，也不能把“跳过未配置”当作用户意愿 |
+| “resume按时间排序反了” | 时间倒序机制存在，确定缺口在渐进自动焦点保留；修补焦点而非反转排序 |
+| “settings完全没有分类、稀疏配置说明字段没实现” | 既有分类、默认继承与真实消费者存在；需要改善整体导航和发现性，而不是制造空设置或把所有默认值写回 |
+| “npm start每次编译，或用户入口用错” | 既有入口证据不支持。应改首帧时序并测实际耗时，不能把慢启动归咎于用户 |
+| “对话后4.9k就是字符÷3.5” | 对话后值有provider归一化输入用量来源；本地估算另有公式。两者需逐项对齐，不能混为同一公式结果 |
+| “工具数差不多，所以两个项目上下文必然相同” | 实际发送schema、规则、消息、协议与计数器决定成本，工具个数不足以推导token数 |
+| 原现场零可见按键的唯一根因、真实1.7k/4.9k差额、生产启动收益 | 仍未确认，继续取证；不能归为不存在，也不能用合成数字或局部PTY称已解决 |
+| 真实OAuth/key接受、cache writer退出1、活跃build lock并发来源 | 仍未确认，保留认证与产品路由、历史CI与当前验证的证据边界 |
+
+### 16.3 用户要求的最终验收任务
+
+| 范围 | 必须达成的完整体验 |
+|---|---|
+| model看齐 | Roles/All models/provider层次可辨；分类→搜索→未配置具体模型→详情→精确连接配置/适用登录→返回原模型→显式启用→重开读回。全部未配置仍能导航；同名relay按精确身份区分；取消/失败不虚报成功；键盘/点击/wheel/hover/窄屏/resize保持同一目标 |
+| settings看齐 | 真实主分类与section覆盖已有能力；跨分类搜索后回所属位置；布尔/枚举/数值/列表/对象等真实编辑器→Enter暂存→Apply保存或Discard/取消→重开读回。user/project scope、只读与显式来源、effective/stored、预览撤回及restart时点保真；窄屏先保留caret，不以标签换皮完成 |
+| 输入位置与路径新增 | 只有源文本第一行第一位置开放完整功能slash；正文`/home`给实际目录suggestion，上下选择或Tab接受并连续补全。只替换光标token，保留前后/多行/缩进；代码、URL、词内slash和转义不触发命令；迟到结果不覆盖新草稿 |
+| 多skill新增 | 首位、正文与后续行可发现skill，同一次输入的全部明确skill实际加载并进入同一任务，稳定去重、保留正文/附件；未知、失效、拒绝、超预算时报告并可重试，不能只运行第一个或递归执行skill正文slash |
+| 有限slash组合改进 | 在参考正文skill限制上，允许显式声明的无副作用方法命令组合；deep-research研究入口必须可与两个及更多skill搭配，也支持兼容modifier组合成一个任务。一个工作流driver拥有预算/取消/持久状态；研究control/save按原独立准入，settings/model/connect/resume等功能命令不进入正文执行 |
+| 启动与上下文 | 先看到真实输入区/loading，再接管一次草稿，ready前零模型/工具派发；首请求本地估算来自实际有效规则/消息/tool schema及协议。实测返回后按身份衔接，来源变更撤值；分别测首帧和ready，并用同模型/协议/规则/schema拆分真实差额，不设必须等于1.7k的假目标 |
+
+以上任务继续沿ADD-01至13推进；完成证据以完整操作链、正确持久/应用状态、实际请求内容及相应环境测量为准。原47项Phase 20矩阵与补充任务状态分开，全文不以局部修补替代整体验收。

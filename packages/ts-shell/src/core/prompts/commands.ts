@@ -3,7 +3,7 @@ import { expandTemplate, parseArguments, substituteArguments } from './expansion
 import { TemplateLoader } from './templateLoader.js';
 
 /** The discovered template owner supplies the same capabilities to menu and dispatcher. */
-export function templateCommands(cwd: string, onSource?: (target: string) => void): CommandDefinition[] {
+export function templateCommands(cwd: string, onSource?: (target: string, content?: Buffer) => void): CommandDefinition[] {
   return [...new TemplateLoader(cwd, onSource).load().values()].map((template): CommandDefinition => {
     const preparePrompt = (rawArgs: string) => expandTemplate(`/${template.name} ${rawArgs}`, new Map([[template.name, template]])).text;
     return {
