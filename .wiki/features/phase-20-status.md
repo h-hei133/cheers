@@ -18,12 +18,14 @@
 | QA-01 | 剩余多账号/账单/质量/平台任务的适用验收 | 本地47行索引及真实单账号OAuth、stdio/HTTP MCP已补证；随剩余外部任务更新 |
 | QA-02 | Windows交互PTY、真实IME、系统复制 | 最新Platform QA40157005332在b36e9b72的20个支持格全部通过；Windows仍只含line/pipe，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
-| QA-04 | 全范围最终交付、当前精确SHA CI及双构建/全套证据 | 本地完整judge已proven、3义务satisfied/0gaps；两路独立复核为代码APPROVE、架构WATCH，综合COMMENT。当前交付与外部依赖仍须分别补证；不要求公开Release |
+| QA-04 | 全范围最终交付与远端全套失败定位 | 本地及远端结构proven、0gaps，TS/exe平台20支持格通过；两路独立复核综合COMMENT。代码CI仅gzip超限用例失败，QA诊断已补、根因未证实；外部依赖仍partial |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
 
 ## 2026-10-25 QA-04 剩余职责提取与独立复核
 
+- 后续代码CI40156902798/job121060099683于03:24:02Z completed/failure，仍只 `browser/smoke/request.test.ts` 同一gzip状态不匹配，10521pass/1fail/3skip。静态/script/TS步骤通过，因测试失败最后CI judge step未执行；独立Watch proven已单列。该network owner在本批未改，不能声称整笔CI通过。
+- 根因补查：历史同症状曾修decoder teardown优先级，当前既有回归仍通过；独立只读复核发现pipeline首错误可能先毁output，但没有CI中的实际触发条件，不把条件路径称根因。本地2-worker原24项、实际Node20.3.0原24项以及40次有界gzip诊断重复都通过。临时40次参数化已恢复，最终只给原gzip测试添加显式常量allowlist的错误code/owned-class布尔诊断，原classifier/全部断言保留、spy在finally恢复；安全修正后实际Node20.3原24项通过，独立代码review APPROVE。无产品network改动，后续CI若失败可据安全代码定位。诊断与源码/报告归artifacts；不将新增诊断称修复或全套绿。
 - 本批代码 `b36e9b72cd8f5144385847f33a56aa08742591ad` 已提交并推送，远端main精确一致，推送后工作区clean。Watch40156902777 artifact12584641490已读回proven、三义务satisfied/0gaps；CI40156902798/job121060099683当前静态/script/TS build步骤success、全套运行中。文档后续提交 `1889068b4ab2b7ed526d297c2f70fd1410432813` 也已推送/main精确一致；不把代码CI视作文档自身CI。
 - Platform QA40157005332在上述代码SHA于03:09:30Z completed/success；下载的20原JSON receipt全部pass/exit0：Linux8、macOS8、Windows4。三平台TS和exe构建步骤success、Node20.3.0/Bun1.3.14；各平台内所有格build identity一致。Linux/macOS build `e5798bddb07ffbb4d08b9135754abed85f0c1f783e46cbe3368dd541f23cba4e`、artifact与本地相同 `35a7bcb94f9e9dbf89a72074a3be1519e77257db9271b04cadc749c82974690e`；Windows build `31719cb7478791fb21a5f7da3d928e988907f595ade080d6c626cff7035dadd5`。三平台exe digest分别记录于安全平台摘要。Windows只line/pipe，其余8个交互格不支持且workflow skipped，未把它们当pass；真实IME/系统复制不由自动格替代。
 - 旧 `2331fc13` CI40155560322/job121056105206于03:02:06Z failure：969 files/10521 tests passed、1 failed/3 skipped；唯一失败为 `browser/smoke/request.test.ts` gzip解压超限用例，预期unsafe-output但收到request-failed。该network源码在旧提交与本批均未改变。本地原smoke23项在Node24通过；实际隔离Node20.3.0再验smoke及既有decoder清理反转共24项通过。失败原因仍未证实，未削弱断言、重跑旧CI或修改产品；结果与实际Node版本证据归artifacts。初次npx未切换Node而返回宿主24，不计floor证据；随后使用官方隔离20.3.0二进制，scratch已删除。

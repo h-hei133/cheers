@@ -5,6 +5,7 @@ import { createServer, type RequestOptions, type Server } from 'node:https';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { LookupFunction } from 'node:net';
 import { gzipSync } from 'node:zlib';
+import * as networkErrors from '../../core/network/error.js';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { parseBrowserPublicReadOnlyWebSmokeConfig } from './config.js';
 import { renderBrowserPublicReadOnlyWebSmokeReport } from './report.js';
@@ -190,12 +191,28 @@ it('stops a chunked producer before consuming its complete over-budget body', as
 });
 
 it('bounds decompressed bytes and reports the response without retaining its body', async () => {
+  const originalFailure = networkErrors.networkFailure;
+  const failures: Array<{ code: string; owned: boolean }> = [];
+  const safeCodes = new Set([
+    'cancelled', 'timeout', 'response_limit', 'invalid_response', 'rate_limited',
+    'denied', 'http_error', 'network_error', 'redirect_limit',
+    'ERR_STREAM_PREMATURE_CLOSE', 'ERR_STREAM_DESTROYED', 'ABORT_ERR', 'ECONNRESET',
+    'Z_DATA_ERROR', 'Z_BUF_ERROR',
+  ]);
+  const failureSpy = vi.spyOn(networkErrors, 'networkFailure').mockImplementation(error => {
+    const code = (error as { code?: unknown } | null)?.code;
+    failures.push({
+      code: typeof code === 'string' && safeCodes.has(code) ? code : 'unknown',
+      owned: error instanceof networkErrors.NetworkError,
+    });
+    return originalFailure(error);
+  });
   handle = (_request, response) => {
     response.writeHead(200, { 'content-type': 'text/plain', 'content-encoding': 'gzip' });
     response.end(gzipSync('PRIVATE_RESPONSE_MARKER'.repeat(100)));
   };
-  const result = await run();
-  expect(result.receipt?.requestStatus).toBe('unsafe-output');
+  const result = await run().finally(() => failureSpy.mockRestore());
+  expect(result.receipt?.requestStatus, JSON.stringify(failures)).toBe('unsafe-output');
   expect(result.publicNetworkUsed).toBe(true); expect(requests).toHaveLength(1);
   expect(JSON.stringify(result)).not.toContain('PRIVATE_RESPONSE_MARKER');
 });
