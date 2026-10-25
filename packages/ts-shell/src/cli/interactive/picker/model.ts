@@ -21,19 +21,21 @@ import { connectionDraft } from './connections.js';
 import { modelDetailsPicker } from './model/details.js';
 import { CatalogNavigation, type NavigationGroup } from './navigation.js';
 import { watchModels } from './model/watch.js';
-import type { AutomaticModelRole, RoleResult } from '../../../core/commands/model/role.js';
+import { prepareModelRole, type AutomaticModelRole, type RoleResult } from '../../../core/commands/model/role.js';
 import { modelRoleEditor } from './model/role.js';
 import type { ThinkingPreference } from '../../../core/models/effort.js';
+import { modelAccountSignIn, modelSignInPicker, modelSignInStatus, type ModelSignIn } from './model/auth.js';
 
 interface RoleSelection {
   readonly role: AutomaticModelRole;
   readonly assign: (target: SessionModelRole) => RoleResult;
-  readonly back: (notice?: string) => Picker;
+  readonly back: (notice?: string, context?: CommandContext) => Picker;
   readonly thinkingEffort: ThinkingPreference;
 }
 
 /** Every actionable row retains its exact target and the inputs used to display it. */
-export function modelPicker(context: CommandContext, focus?: string, navigation = new CatalogNavigation(), assigning?: RoleSelection, notice?: string): Picker {
+export function modelPicker(context: CommandContext, focus?: string, navigation = new CatalogNavigation(), assigning?: RoleSelection,
+  notice?: string, signIn?: ModelSignIn): Picker {
   const details = new Map<string, readonly string[]>();
   const actions = new Map<string, () => Promise<string>>();
   const inspections = new Map<string, () => Picker>();
@@ -117,7 +119,15 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               const endpoint = config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
               const draft = !connection && !providerSlot || reason === 'credential unavailable' || connection?.state === 'credential-missing'
                 ? connectionDraft(provider, model.id, endpoint, connection?.label ?? provider.id) : undefined;
-              inspections.set(id, () => modelDetailsPicker(model.id, details.get(id) ?? [], () => modelPicker(context, id, navigation, assigning), draft));
+              const account = signIn && !connection && !resolution?.credential && modelAccountSignIn(provider, model.id);
+              inspections.set(id, () => modelDetailsPicker(model.id, details.get(id) ?? [],
+                () => modelPicker(context, id, navigation, assigning, undefined, signIn), draft,
+                account ? () => modelSignInPicker(context, provider.runtime, signIn, (fresh, result, connectionId) => {
+                  const refreshed = assigning ? { ...assigning, assign: prepareModelRole(fresh, assigning.role).assign,
+                    back: (note?: string) => assigning.back(note, fresh) } : undefined;
+                  return modelPicker(fresh, connectionId ? rowId(connectionId, provider.id, model.id) : id, navigation, refreshed,
+                    result ? modelSignInStatus(result) : undefined, signIn);
+                }) : undefined));
             }
             if (!reason && assigning && connection) {
               assignments.set(id, () => assigning.assign({ connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort: assignedEffort }));
@@ -141,7 +151,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         details.set(id, [`Provider: ${active.provider}`, `Model: ${active.model}`, `Status: ${note}`, `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
           ...(active.credential ? [`Credential source: ${active.credential.source}`] : []), ...(endpoint ? [`Endpoint: ${endpoint}`] : []),
           'Remote availability: unverified']);
-        inspections.set(id, () => modelDetailsPicker(active.model!, details.get(id) ?? [], () => modelPicker(context, id, navigation, assigning)));
+        inspections.set(id, () => modelDetailsPicker(active.model!, details.get(id) ?? [], () => modelPicker(context, id, navigation, assigning, undefined, signIn)));
       }
       if (context.sessionId && !assigning) {
         try {
@@ -158,13 +168,13 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               ...(role !== 'default' && target ? [`Reasoning effort: ${target.thinkingEffort ?? 'provider decides'}`] : []),
               'Role assignments and presets share the existing session model owner.']);
             if (role === 'default') {
-              inspections.set(id, () => Object.assign(modelPicker(context, undefined, new CatalogNavigation()),
-                { back: () => modelPicker(context, id, navigation) }));
+              inspections.set(id, () => Object.assign(modelPicker(context, undefined, new CatalogNavigation(), undefined, undefined, signIn),
+                { back: () => modelPicker(context, id, navigation, undefined, undefined, signIn) }));
             } else {
               inspections.set(id, () => {
-                const back = (note?: string) => modelPicker(context, id, navigation, undefined, note);
+                const back = (note?: string, fresh = context) => modelPicker(fresh, id, navigation, undefined, note, signIn);
                 return modelRoleEditor(context, role,
-                  (assign, thinkingEffort) => modelPicker(context, undefined, new CatalogNavigation(), { role, assign, back, thinkingEffort }), back);
+                  (assign, thinkingEffort) => modelPicker(context, undefined, new CatalogNavigation(), { role, assign, back, thinkingEffort }, undefined, signIn), back);
               });
             }
           }

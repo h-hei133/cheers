@@ -281,4 +281,11 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 
 ### 2026-10-26实现后补充：角色reasoning与CI读回
 
-绑定具体模型的自动角色已有独立effort编辑，按精确relay能力提供等级及provider决定；保存、重新编辑、取消和返回原角色均沿现session事务，不改默认模型或其他角色。角色换模型保留受支持的自身effort，新角色和不支持原effort的目标采用provider决定。六文件137项、有效反转及regular/fullscreen小型PTY通过，并观察面板保存后三个消费者的实际请求/shape；仍不能宣称面板整体看齐，认证回返、settings来源/scope及桌面证据继续partial。第六批CI已success，第七批CI实际一项help旧契约失败；修测保留两层Esc和草稿不变，历史失败不追改。详细证据与第八批pending见补充规划第15节第九批。
+绑定具体模型的自动角色已有独立effort编辑，按精确relay能力提供等级及provider决定；保存、重新编辑、取消和返回原角色均沿现session事务，不改默认模型或其他角色。角色换模型保留受支持的自身effort，新角色和不支持原effort的目标采用provider决定。六文件137项、有效反转及regular/fullscreen小型PTY通过，并观察面板保存后三个消费者的实际请求/shape；仍不能宣称面板整体看齐，认证回返、settings来源/scope及桌面证据继续partial。第六批CI已success，第七批CI实际一项help旧契约失败；修测保留两层Esc和草稿不变，历史失败不追改。当时第八批仍pending；后续CI失败、认证回返与剩余缺口见补充规划第15节第十批。
+
+
+### 2026-10-26实现后补充：原生账号认证返回
+
+未配置builtin模型可浏览、进入原生账号登录并返回原具体模型，成功/失败/实际Ctrl+C取消均刷新真实connection状态；三个自动角色可在返回后沿新事务继续显式赋值，默认模型保持原会话绑定。配置未应用或应用未确认优先显示，custom relay没有builtin登录入口。五文件254项、有效反转及两模式六条小型真实Node PTY通过；原生认证使用synthetic fixture，API-key草稿提交回返、真实OAuth及面板全部来源/scope/桌面路径仍缺，因此“未配置行不能聚焦”的确定缺口已有修补证据，但“原终端故障根因已完全捕获”“两个面板已全部看齐”仍不能成立。
+
+第八批CI实际一项help旧契约失败；第九批CI实际一项browser cache多进程writer退出1，cache完整性健康、未超时，具体原因未由日志确定。不能把聚焦绿色或Watch workflow success升级为全量CI成功。最新实现、交付与未完成边界统一见[补充规划第15节第十批](phase-20-addition.md#15-实施与验证证据)。

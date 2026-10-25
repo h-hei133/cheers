@@ -11,7 +11,7 @@ import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.j
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
-import type { SessionManager } from "../../session/SessionManager.js";
+import { SessionManager } from "../../session/SessionManager.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import { ManualScheduler, RecordingTerminal } from "../../test-utils/terminalDouble.js";
@@ -53,6 +53,11 @@ import * as externalEditor from './externalEditor.js';
 import { Clipboard } from './clipboard.js';
 import * as promptRunner from './interactivePromptRunner.js';
 import { StartupSurface } from './startup.js';
+import { createShellRuntimeContext } from '../../core/shell/runtimeContext.js';
+import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
+import { writeCatalogCache } from '../../core/models/catalogStore.js';
+import { __setOpenAIProviderAuthLoginForTest } from '../../core/auth/providerAuthRuntime.js';
+import { ConfigWriteError } from '../../config/outcome.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
@@ -197,6 +202,88 @@ it('preserves a bracketed paste split across startup adoption', () => {
 });
 
 describe("session wiring", () => {
+  it.each([false, true])('reports a thrown model sign-in without exposing underlying errors (config write: %s)', async configWrite => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true }); const directory = fs.mkdtempSync('/tmp/cheers-test/model-auth-error-');
+    const home = path.join(directory, 'home'), project = path.join(directory, 'project');
+    fs.mkdirSync(home); fs.mkdirSync(project); vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home);
+    const manager = new SessionManager(); const session = manager.createNew(project);
+    const { mode } = build();
+    const host = mode as unknown as { pickerHost(): PickerHost; options: { runtimeContext: ShellRuntimeContext; sessionRuntime: ShellSessionRuntime } };
+    host.options.runtimeContext = createShellRuntimeContext({ cwd: project, originalCwd: project, projectRoot: project, targetPathBase: project,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+      session, runtimeConfig: getRuntimeConfig(project) });
+    const failure = configWrite ? new ConfigWriteError('verification-failed', 'unknown') : new Error('synthetic-sensitive-native-exception');
+    const run = vi.spyOn(host.options.sessionRuntime.commands, 'run').mockRejectedValue(failure);
+    mode.start();
+    try {
+      const result = await host.pickerHost().modelSignIn!('openai');
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(result.note).toBe(configWrite ? failure.message
+        : 'Account sign-in outcome is unverified. Inspect the saved connections before retrying.');
+      expect(result.note).not.toContain('synthetic-sensitive-native-exception');
+      expect(result.context.sessionId).toBe(session.id);
+    } finally { run.mockRestore(); mode.stop(); vi.unstubAllEnvs(); fs.rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it.each(['success', 'failure', 'cancel'] as const)('returns a native model sign-in %s through the real host and retains its request-free draft', async outcome => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true }); const directory = fs.mkdtempSync('/tmp/cheers-test/model-auth-host-');
+    const home = path.join(directory, 'home'), project = path.join(directory, 'project');
+    fs.mkdirSync(home); fs.mkdirSync(project); vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', providerConnections: [], providerCredentials: {} }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    writeCatalogCache([{ id: 'openai', models: [{ id: 'gpt-5.4', reasoning: true }, { id: 'gpt-5.4-mini', reasoning: true }] }]);
+    const manager = new SessionManager(); const session = manager.createNew(project);
+    const context = createShellRuntimeContext({ cwd: project, originalCwd: project, projectRoot: project, targetPathBase: project,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+      session, runtimeConfig: getRuntimeConfig(project) });
+    const { mode, terminal } = build();
+    const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView; busy: boolean;
+      options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager; sessionRuntime: ShellSessionRuntime } };
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const commands = new ShellCommandRuntime();
+    Object.assign(host.options.sessionRuntime, { commands, cancelAndWait: async () => {
+      const current = commands.current; current?.controller.abort(new DOMException('Sign-in cancelled', 'AbortError'));
+      await current?.settled.catch(() => {});
+    } });
+    let signal: AbortSignal | undefined;
+    __setOpenAIProviderAuthLoginForTest(async options => {
+      signal = options?.signal;
+      options?.onProgress?.({ authorizeUrl: 'https://auth.openai.com/authorize' });
+      if (outcome === 'cancel') await new Promise((_resolve, reject) => signal!.addEventListener('abort', () => reject(signal!.reason), { once: true }));
+      if (outcome === 'failure') throw new Error('synthetic-sensitive-auth-error');
+      return { accessToken: 'synthetic-model-host-account', refreshToken: 'synthetic-model-host-refresh', expiresAt: Date.now() + 3600000,
+        authorizeUrl: 'https://auth.openai.com/authorize', callbackUrl: 'http://localhost:1455/auth/callback', accountId: 'fixture' };
+    });
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    mode.start();
+    try {
+      terminal.input('/model\r');
+      await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('gpt-5.4-mini'); await vi.waitFor(() => expect(frame()).toContain('▸ gpt-5.4-mini'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Account sign-in'));
+      terminal.input('\x1b[B'); terminal.input('\r');
+      await vi.waitFor(() => expect(frame()).toContain('Confirm account sign-in'));
+      terminal.input('\x1b[B'); terminal.input('\r');
+      await vi.waitFor(() => expect(signal).toBeDefined());
+      if (outcome === 'cancel') {
+        expect(host.busy).toBe(true); host.view.editor.setText('retained draft');
+        terminal.input('\x03'); await vi.waitFor(() => expect(signal!.aborted).toBe(true));
+      }
+      await vi.waitFor(() => expect(commands.current).toBeUndefined());
+      await vi.waitFor(() => expect(host.busy).toBe(false));
+      await vi.waitFor(() => expect(frame()).toContain('▸ gpt-5.4-mini'));
+      expect(frame()).toContain(outcome === 'success' ? 'account-auth connected' : 'account-auth login failed');
+      expect(host.view.transcript.all().some(block => 'text' in block && block.text.includes(
+        outcome === 'success' ? 'pending -> connected' : 'pending -> error'))).toBe(true);
+      const config = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+      expect(config.providerConnections?.[0]?.status).toBe(outcome === 'success' ? 'connected' : 'error');
+      expect(context.runtimeConfig.providerConnections[0]?.status).toBe(config.providerConnections?.[0]?.status);
+      expect(frame()).not.toMatch(/synthetic-model-host-account|synthetic-model-host-refresh|synthetic-sensitive-auth-error/);
+      expect(manager.getSession(session.id)?.turns).toHaveLength(0);
+      if (outcome === 'cancel') expect(host.view.editor.getText()).toBe('retained draft');
+    } finally { commands.current?.controller.abort(); mode.stop(); __setOpenAIProviderAuthLoginForTest(undefined);
+      vi.unstubAllEnvs(); fs.rmSync(directory, { recursive: true, force: true }); }
+  });
+
   it('keeps the draft held when a pending picker has no interruptible command owner', async () => {
     const { mode, terminal } = build(); let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });

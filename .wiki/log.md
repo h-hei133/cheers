@@ -9128,3 +9128,10 @@ ADD-03补input/status/scope/detail的Esc父面板路径：取消本次输入保�
 model角色新增真实effort编辑，具体绑定和精确relay能力准入，auto=null由provider决定；保存重捕事务/动作页、Esc原角色，保留default/siblings/presets/window/skillful。换角色模型保持自身受支持effort、不再复用默认effort，目标不支持时采用provider决定并显示。三个消费者已沿原链消费，不增重复传播；新增面板→subagent/advisor/summary实际loopback请求与shape、缓存失效证据。
 
 串行六文件137pass，两有效反转AssertionError/字节恢复model43pass；补fixture类型后provider9pass，五静态门/diff通过，首次联合类型build失败修正后最终3f1a12c8a029/责任上限0/正式judge proven三satisfied。两模式小PTYeffort保存/读回/取消/auto/清除/默认保留/原focus通过，零提交、SIGTERM143；完整面板认证/scope/桌面及ADD-08仍partial，原Phase38/9不变。第六CI40227521947已success10718pass/3skip；第七40228208771实际1fail/10718pass/3skip为help旧footer/Esc，修为两层返回并保留草稿断言、host聚焦1pass，历史失败保留。详见addition15第九批及thinking证据，本批交付另绑定。
+
+
+## [2026-10-26] feat | 模型原生账号登录与精确返回
+
+builtin未配置模型详情可进入原connect/auth原生登录，canonical provider/endpoint/账号模型准入，custom relay不误获OAuth。确认默认Cancel、单次Start、关闭失效；成功/失败/Ctrl+C回具体model和本次connection，保存/应用状态分别报告，原会话归属变更不重开。三个角色认证后重捕赋值事务、保留default与siblings；登录零会话选择/零回合，API-key草稿回返仍待完善。
+
+串行五文件254pass，两个有效反转AssertionError/字节恢复；认证场景移至model/auth.test.ts消除责任上限24，最终0/proven三satisfied。最终build4dc852158376，五静态门/diff与两模式六条小型Node PTY成功/失败/实际Ctrl+C通过，native fixture不是真实账号OAuth。第八CI40228718301实际help旧契约1fail/10723pass/3skip；第九694d3bf9 CI40230025325实际browser cache多进程writer exit1，1fail/10734pass/3skip，cache健康/未超时，根因未确认，不在WSL运行并发压测。本批交付另绑定；ADD面板、上下文及性能仍partial，原Phase38/9不变。详见addition15第十批及auth证据。

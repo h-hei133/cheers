@@ -41,6 +41,7 @@ import { gitPicker } from './git.js';
 import type { SecurityInspector } from '../../../security/view/inspection.js';
 import { cleansePicker } from './cleanse.js';
 import { authPicker, type SignInCommand } from './auth.js';
+import type { ModelSignIn } from './model/auth.js';
 import { debugPicker } from './debug.js';
 import type { ExtensionManager } from '../../../extensions/view/model.js';
 import type { McpClientSnapshot, ScopedMcpServerConfig } from '../../../core/mcp/types.js';
@@ -68,6 +69,7 @@ export interface PickerHost extends SettingsHost {
   readonly security?: SecurityInspector;
   readonly extensions?: ExtensionManager;
   readonly signIn?: SignInCommand;
+  readonly modelSignIn?: ModelSignIn;
   readonly jobs?: import('../../jobs/model.js').JobsComposition;
   readonly agentDefinitions?: () => readonly AgentDefinitionRow[];
   readonly agentDiscovery?: () => AgentDiscoveryView;
@@ -102,7 +104,7 @@ const PICKERS: Record<string, PickerFactory> = {
   } : undefined,
     host.commandContext?.admission),
   tools: (host) => toolsPicker(host.commandContext),
-  model: (host) => modelPicker(host.commandContext),
+  model: (host) => modelPicker(host.commandContext, undefined, undefined, undefined, undefined, host.modelSignIn),
   copy: (host) => copyPicker(host.transcript, host.commandContext),
   resume: host => savedSessionPicker(host, 'resume'),
   pin: host => savedSessionPicker(host, 'pin'),

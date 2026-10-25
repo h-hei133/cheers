@@ -1,0 +1,172 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { modelPicker } from '../model.js';
+import { SessionManager } from '../../../../session/SessionManager.js';
+import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
+import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
+import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
+import { runConnectCommand, __setOpenAIAccountAuthRunnerForTest } from '../../../../core/commands/connectCommandRuntime.js';
+import { modelSignInPicker, modelSignInStatus } from './auth.js';
+import type { CommandContext } from '../../../../core/commands/types.js';
+import { OverlayHost } from '../../overlay.js';
+import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
+import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
+
+let home: string;
+let manager: SessionManager;
+let sessionId: string;
+beforeEach(() => {
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  home = fs.mkdtempSync(path.join('/tmp/cheers-test', 'model-choice-'));
+  vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
+  writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'a', providerConnections: ['a', 'b'].map(id => ({
+    id, provider: 'openai' as const, label: `Relay ${id}`, authType: 'api-key' as const, apiKey: `synthetic-${id}`,
+    baseUrl: `https://${id}.example.invalid/v1`, model: 'shared', status: 'connected' as const,
+    createdAt: '2026-01-01', updatedAt: '2026-01-01',
+  })) }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'shared', reasoning: true }, { id: 'other', reasoning: true }] }]);
+  manager = new SessionManager(); sessionId = manager.createNew(home).id;
+});
+afterEach(() => { __setOpenAIAccountAuthRunnerForTest(undefined); vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { recursive: true, force: true }); });
+
+const id = (connection = 'b', model = 'shared') => `model:${JSON.stringify([connection, 'openai', model])}`;
+const context = () => ({ cwd: home, projectRoot: home, sessionId });
+
+it.each(['subagent', 'summary', 'advisor'] as const)('continues %s assignment after native sign-in with a fresh transaction and unchanged default', async role => {
+  const baseline = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...baseline.values, provider: 'anthropic', activeProviderConnectionId: 'default', providerConnections: [{
+    id: 'default', provider: 'anthropic', label: 'Default', authType: 'api-key', apiKey: 'synthetic-default',
+    model: 'claude-test', status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+  }] }, baseline);
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'gpt-5.4-mini', reasoning: true }] },
+    { id: 'anthropic', models: [{ id: 'claude-test', reasoning: true }] }]);
+  const original = { connectionScope: 'session' as const, connectionId: 'default', provider: 'anthropic' as const, model: 'claude-test', thinkingEffort: 'high' as const,
+    contextWindow: 90000, skillful: false, roles: { subagent: { connectionId: 'default', provider: 'anthropic' as const,
+      model: 'claude-test', thinkingEffort: 'low' as const }, summary: { connectionId: 'default', provider: 'anthropic' as const,
+      model: 'claude-test', thinkingEffort: 'low' as const }, advisor: { connectionId: 'default', provider: 'anthropic' as const,
+      model: 'claude-test', thinkingEffort: 'low' as const } } };
+  writeSessionModel(sessionId, original, readSessionModelEdit(sessionId));
+  __setOpenAIAccountAuthRunnerForTest(async () => ({ accessToken: 'synthetic-role-account', refreshToken: 'synthetic-role-refresh',
+    expiresAt: Date.now() + 3600000, authorizeUrl: 'https://auth.openai.com/authorize', callbackUrl: 'http://localhost:1455/auth/callback' }));
+  const signIn = async (provider: import('../../../../config/runtimeConfig.js').RuntimeProvider) => ({
+    context: context(), note: (await runConnectCommand(['login', provider, '--account'], context())).output,
+  });
+  const picker = modelPicker(context(), undefined, undefined, undefined, undefined, signIn); await picker.load();
+  const actions = (await picker.inspect!(`role:${role}`))!.next!; await actions.load();
+  const browse = (await actions.apply(['choose']))!.next!;
+  const missing = (await browse.load()).find(row => row.label === 'gpt-5.4-mini')!;
+  const details = (await browse.inspect!(missing.id))!.next!; await details.load();
+  const confirmation = (await details.apply(['account']))!.next!; await confirmation.load();
+  const returned = (await confirmation.apply(['start']))!.next!; await returned.load();
+  expect(readSessionModel(sessionId)).toEqual(original);
+  const connection = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerConnections!.find(row => row.provider === 'openai')!;
+  expect(returned.initialSelection).toBe(id(connection.id, 'gpt-5.4-mini'));
+  const saved = await returned.apply([returned.initialSelection!]);
+  expect(saved?.note).toContain(`${role} uses`); expect(saved?.next?.initialSelection).toBe(`role:${role}`);
+  expect(readSessionModel(sessionId)).toEqual({ ...original, roles: { ...original.roles,
+    [role]: { connectionId: connection.id, provider: 'openai', model: 'gpt-5.4-mini', thinkingEffort: 'low' } } });
+});
+
+it.each(['success', 'failure', 'cancel'] as const)('returns a native account %s to the precise model and refreshes real connection state', async outcome => {
+  const baseline = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...baseline.values, provider: 'openai', activeProviderConnectionId: undefined,
+    providerConnections: [], providerCredentials: {} }, baseline);
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'gpt-5.4', reasoning: true }, { id: 'gpt-5.4-mini', reasoning: true }] }]);
+  const controller = new AbortController(); let starts = 0;
+  __setOpenAIAccountAuthRunnerForTest(async () => {
+    starts++;
+    expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerConnections?.[0]?.status).toBe('pending');
+    if (outcome === 'cancel') controller.abort();
+    if (outcome !== 'success') throw new DOMException('synthetic-only-failure', 'AbortError');
+    return { accessToken: 'synthetic-account-only', refreshToken: 'synthetic-refresh-only', expiresAt: Date.now() + 3600000,
+      authorizeUrl: 'https://auth.openai.com/authorize', callbackUrl: 'http://localhost:1455/auth/callback', accountId: 'synthetic' };
+  });
+  const signIn = async (provider: import('../../../../config/runtimeConfig.js').RuntimeProvider) => {
+    const result = await runConnectCommand(['login', provider, '--account'], { ...context(), runCancellable: operation => operation(controller.signal) });
+    return { context: context(), note: result.output };
+  };
+  const picker = modelPicker(context(), undefined, undefined, undefined, undefined, signIn); const rows = await picker.load();
+  const model = rows.find(row => row.label === 'gpt-5.4-mini')!;
+  const details = (await picker.inspect!(model.id))!.next!;
+  expect((await details.load()).map(row => row.id)).toContain('account');
+  const confirmation = (await details.apply(['account']))!.next!;
+  expect(confirmation.initialSelection).toBe('cancel');
+  expect(await confirmation.apply(['start'])).toBeUndefined();
+  await confirmation.load();
+  const result = await confirmation.apply(['start']);
+  const connections = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerConnections!;
+  const returned = result!.next!; const refreshed = await returned.load();
+  expect(returned.initialSelection).toBe(`model:${JSON.stringify([connections[0]!.id, 'openai', 'gpt-5.4-mini'])}`);
+  expect(returned.status?.([], '')).toBe(modelSignInStatus(result!.note!));
+  expect(result!.note).not.toContain('synthetic-account-only');
+  expect(result!.note).not.toContain('synthetic-refresh-only');
+  expect(refreshed.find(row => row.id === returned.initialSelection)?.disabled).toBe(outcome === 'success' ? undefined : true);
+  expect(connections[0]!.status).toBe(outcome === 'success' ? 'connected' : 'error');
+  expect(result!.note).toContain(outcome === 'success' ? 'pending -> connected' : 'pending -> error');
+  expect(readSessionModel(sessionId)).toBeUndefined();
+  expect(starts).toBe(1); expect(await confirmation.apply(['start'])).toBeUndefined();
+});
+
+it('cancels model sign-in through real Escape and the default cancel action without authenticating or writing', async () => {
+  const signIn = vi.fn(); const picker = modelSignInPicker(context(), 'openai', signIn, current => modelPicker(current));
+  const original = fs.readFileSync(getUserRuntimeConfigPath());
+  await picker.load(); expect((await picker.apply(['cancel']))?.next?.title).toBe('Model');
+  expect(await picker.apply(['start'])).toBeUndefined();
+  const overlay = new OverlayHost(() => {}); overlay.open(modelSignInPicker(context(), 'openai', signIn, current => modelPicker(current)));
+  await new Promise(resolve => setTimeout(resolve, 0)); overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(stripAnsi(overlay.render(110, 30).join('\n'))).toContain('All models'); overlay.close();
+  expect(signIn).not.toHaveBeenCalled(); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+});
+
+it('retains configuration publication failure in the visible authentication result and invalidates dismissed confirmations', async () => {
+  expect(modelSignInStatus('Account connected.\nConnection ID: fixture\nConfiguration application outcome is unverified.'))
+    .toBe('Configuration application outcome is unverified. Account connected.');
+  const signIn = vi.fn(); const picker = modelSignInPicker(context(), 'openai', signIn, current => modelPicker(current));
+  const overlay = new OverlayHost(() => {}); overlay.open(picker);
+  await new Promise(resolve => setTimeout(resolve, 0)); overlay.close();
+  expect(await picker.apply(['start'])).toBeUndefined(); expect(signIn).not.toHaveBeenCalled();
+});
+
+it('returns a saved native connection with its unverified publication visible and no session activation', async () => {
+  const baseline = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...baseline.values, provider: 'openai', activeProviderConnectionId: undefined,
+    providerConnections: [], providerCredentials: {} }, baseline);
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'gpt-5.4-mini', reasoning: true }] }]);
+  __setOpenAIAccountAuthRunnerForTest(async () => ({ accessToken: 'synthetic-unpublished-account', refreshToken: 'synthetic-unpublished-refresh',
+    expiresAt: Date.now() + 3600000, authorizeUrl: 'https://auth.openai.com/authorize', callbackUrl: 'http://localhost:1455/auth/callback' }));
+  const pinned = { ...context(), runtimeConfig: getRuntimeConfig(home), refreshRuntimeConfig: () => { throw new Error('synthetic-publication-error'); } };
+  const signIn = async (provider: import('../../../../config/runtimeConfig.js').RuntimeProvider) => ({
+    context: pinned, note: (await runConnectCommand(['login', provider, '--account'], pinned)).output,
+  });
+  const picker = modelPicker(pinned, undefined, undefined, undefined, undefined, signIn);
+  const model = (await picker.load()).find(row => row.label === 'gpt-5.4-mini')!;
+  const details = (await picker.inspect!(model.id))!.next!; await details.load();
+  const confirmation = (await details.apply(['account']))!.next!; await confirmation.load();
+  const result = (await confirmation.apply(['start']))!;
+  expect(result.note).toContain('Configuration application outcome is unverified.');
+  expect(result.next!.status!([], '')).toMatch(/^Configuration application outcome is unverified\./);
+  expect((await result.next!.load()).find(row => row.id === result.next!.initialSelection)?.disabled).toBe(true);
+  expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerConnections![0]!.status).toBe('connected');
+  expect(readSessionModel(sessionId)).toBeUndefined(); expect(result.note).not.toContain('synthetic-publication-error');
+});
+
+it.each(['session', 'workspace'] as const)('does not reopen a model after the sign-in host changes %s identity', async change => {
+  const original: CommandContext = context();
+  const picker = modelSignInPicker(original, 'openai', async () => ({ note: 'Authentication result retained', context: {
+    ...original, ...(change === 'session' ? { sessionId: 'other' } : { cwd: `${home}/other`, projectRoot: `${home}/other` }) } }), current => modelPicker(current));
+  await picker.load(); const result = await picker.apply(['start']);
+  expect(result).toEqual({ note: 'Authentication result retained' });
+});
+
+it('rejects an expired model sign-in confirmation and does not offer native account login for a custom relay', async () => {
+  const signIn = vi.fn(); const picker = modelSignInPicker(context(), 'openai', signIn, current => modelPicker(current));
+  await picker.load(); writeCatalogCache([{ id: 'openai', models: [{ id: 'changed' }] }]);
+  expect((await picker.apply(['start']))?.note).toContain('expired'); expect(signIn).not.toHaveBeenCalled();
+  const catalog = [{ id: 'custom', runtime: 'openai' as const, baseUrl: 'https://custom.example.invalid/v1', models: [{ id: 'gpt-5.4' }] }];
+  writeCatalogCache(catalog);
+  const models = modelPicker(context(), undefined, undefined, undefined, undefined, signIn); const rows = await models.load();
+  const detail = (await models.inspect!(rows.find(row => row.label === 'gpt-5.4')!.id))!.next!;
+  expect((await detail.load()).some(row => row.id === 'account')).toBe(false);
+});

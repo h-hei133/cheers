@@ -7,6 +7,12 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+
+### Native Model Sign-In Eligibility And Return Transactions
+- **Symptom**: Builtin models hide native login, authentication returns to the wrong connection, or a role assignment expires immediately after login.
+- **Root Cause**: Builtin catalogues already carry base URLs; native eligibility cannot assume an absent URL. Login publishes configuration and creates a new connection, invalidating the captured model/role transaction. A full-screen result can also truncate publication warnings behind success diagnostics.
+- **Rule**: Compare canonical provider and builtin endpoint plus its auth/model contract, exclude custom relays, and reuse the native auth owner. Return with the unique newly added connection identity, fence session/workspace/profile, recapture role transactions and carry fresh context to parents. Put publication uncertainty before the concise success summary; verify disk state, accepted state and explicit model activation separately.
+
 ### Automatic Role Browsing Reusing Default Reasoning
 - **Symptom**: Choosing a model for an automatic role overwrites its effort with the default request's effort, or blocks a nonreasoning model because the default uses high effort.
 - **Root Cause**: Assignment browsing reuses the ordinary model chooser's default preference; treating null with nullish fallback also reintroduces inheritance that the role consumers intentionally stop.

@@ -33,6 +33,9 @@ import { TUI } from "../../presentation/tui/render/engine.js";
 import { processTerminal, type TerminalDevice } from "../../presentation/tui/terminal.js";
 import { textBlock } from "../../presentation/tui/transcript/blocks.js";
 import { transcriptLineRenderer } from "../../presentation/tui/transcript/output.js";
+import { runConnectCommand } from '../../core/commands/connectCommandRuntime.js';
+import { renderSignInProgress } from '../output/command.js';
+import { ConfigWriteError } from '../../config/outcome.js';
 import { reportText } from '../../core/commands/report/projection.js';
 import { toolPoolFor } from '../runtime/tools.js';
 import type { RenderScheduler } from "../../presentation/tui/render/frame.js";
@@ -1259,6 +1262,22 @@ export class InteractiveMode {
       refreshServer: (serverName, expected, admission) => this.options.sessionRuntime.commands.run(signal => this.options.initialMcpGateway.refresh(serverName,
         { exactTarget: true, expectedConfig: expected, signal, ...(admission ? { admission } : {}) })),
       signIn: args => this.runCommandLine(`/connect ${args.map(arg => quoteCompletion(arg, '"')).join(' ')}`),
+      modelSignIn: async provider => {
+        const commands = this.pickerHost().commandContext;
+        const refusal = commands.admission?.();
+        if (refusal) return { context: commands, note: refusal };
+        const progress = transcriptLineRenderer(this.state.transcript, this.tui, 'Account sign-in');
+        let note: string;
+        try {
+          const result = await runConnectCommand(['login', provider, '--account'], { ...commands,
+            signInProgress: value => renderSignInProgress(progress, value) });
+          note = result.output;
+        } catch (error) {
+          note = error instanceof ConfigWriteError ? error.message : 'Account sign-in outcome is unverified. Inspect the saved connections before retrying.';
+        }
+        this.catalogs.invalidate(); this.view.invalidateLayout();
+        return { context: this.pickerHost().commandContext, note };
+      },
       addMcpServer: mcpDefinitionFor(this.options.runtimeContext),
       revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
       sessionTurns: signal => readBackSource(this.options.runtimeContext, signal),
