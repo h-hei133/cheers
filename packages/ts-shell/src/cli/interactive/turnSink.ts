@@ -98,7 +98,10 @@ export class TurnSink implements RendererSink {
     }
     this.cancelling = false;
     if (discard) this.failed = false;
-    else this.transcript.finalizeAll();
+    else {
+      this.tools.end();
+      this.transcript.finalizeAll();
+    }
     this.assistant = undefined;
     this.thinking = undefined;
     this.prose = undefined;

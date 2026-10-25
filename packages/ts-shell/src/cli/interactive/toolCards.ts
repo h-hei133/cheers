@@ -86,6 +86,7 @@ export class ToolCards {
    * rate-limited, so nothing is lost by waiting.
    */
   buffer(taskId: string, chunk: string): void {
+    if (!this.cards.has(taskId) || !chunk) return;
     this.outputBuffer.set(taskId, (this.outputBuffer.get(taskId) ?? "") + chunk);
     const now = this.now();
     if (now < this.outputFlushAt) return;
@@ -128,6 +129,9 @@ export class ToolCards {
   finish(taskId: string, success: boolean, failureReason?: string, output?: string): void {
     const block = this.cards.get(taskId);
     if (!block) return;
+    const pending = this.outputBuffer.get(taskId);
+    this.outputBuffer.delete(taskId);
+    if (output === undefined && pending) this.append(taskId, pending);
     if (output !== undefined) {
       this.transcript.setText(block, output);
     }
@@ -144,9 +148,20 @@ export class ToolCards {
     this.onChange();
   }
 
+  /** Publish remaining evidence and retire calls before forgetting their owner. */
+  end(): void {
+    this.flush();
+    for (const [taskId, block] of this.cards) {
+      this.finish(taskId, block.status === "ok", block.failureReason
+        ?? "Turn ended before a tool result was reported.");
+    }
+  }
+
   /** Forget every open card; the turn is over or the transcript is gone. */
   clear(): void {
     this.cards.clear();
+    this.outputBuffer.clear();
+    this.outputFlushAt = 0;
   }
 }
 

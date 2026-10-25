@@ -8997,3 +8997,9 @@ Platform QA40157005332已于03:09:30Zsuccess，原20个JSON receipt下载读回�
 代码b36e9b72 CI40156902798于03:24:02Z failure：10521pass/1fail/3skip，唯一仍是原gzip超限预期unsafe-output收到request-failed。同症状历史decoder优先级修复仍在且既有回归通过；独立源码复核有pipeline首错误先毁output的条件路径，没有实际CI触发证据，根因未证实。原network无本批diff，不称结构提取引入或环境偶发。Node24两worker原24、实际Node20.3原24及40次有界gzip诊断重复全部通过；原用例数量已恢复。
 
 只给原测试增加显式错误常量allowlist或unknown与owned-class布尔诊断，调用原classifier、原断言保留且finally恢复spy；首次字符regex被独立review指出不是value allowlist，改为明确常量Set后代码lane APPROVE、实际Node20.3原24项再次通过。无产品network改动，也不把诊断提交称修复成功。结构Watch和20平台支持格已通过，整批全套failure及后续CI单独报告；QA-04/全phase仍partial。安全诊断/验证/独立源码分析归artifacts，scratch清理。
+
+## [2026-10-25] fix | 工具输出结束与丢弃生命周期
+
+修复独立review的旧pending输出保留/中断丢失：正常end先发布缓冲，既有finish处理未回result卡片，保留已观察ok，未知完成显示failed及未收到结果说明、awaiting→interrupted；discard不发布并清owner/buffer/cadence。finish无canonical时收自己pending、显式空body仍权威；closed/unknown id迟到输出拒绝。对照参考的terminal update-before-delete，沿原ToolCards owner实现。新增7场景，最终61项聚焦通过；旧源码反转6行为场景失败/5段AssertionError（canonical变体合并），缺新增end的TypeError不计有效。另反转finish loop得2 AssertionErrors，字节恢复后61项再过。错误approval事件及reporter计数harness错误保留，均纠正且无断言降格。
+
+静态五门/analyzer0/diff check、TS build/完整judge串行通过，build069daee5d0c78f688e950405a99c4d25ba147a43d42b6d398fccae3068e4a5d7、inputsfb76c6a187db0f3770753da55f3a80f8045b7f4371c03317ed67d7f4d750dec4、artifact57a6cd92c8e459582b9b580cb49c872f2266ae6b286d2a532cd284818ab1d188；proven/3satisfied/0gaps。独立gpt-6.1-sol两路APPROVE/CLEAR，安全报告/manifest/反转日志归artifacts、scratch清理。此修复不证明gzip CI根因，也不补外部多账号/账单/质量/IME/复制；38/9/0不变，本批提交/自身CI另核对。

@@ -11,6 +11,58 @@ function setup() {
 }
 
 describe("tool bodies and state", () => {
+  it("ends unfinished cards without changing an observed completion outcome", () => {
+    const transcript = new Transcript();
+    const cards = new ToolCards(transcript, () => {}, () => 0);
+    cards.start("bash", "pending");
+    const pending = transcript.last()!;
+    cards.approval("pending", "awaiting");
+    cards.start("read", "done");
+    const done = transcript.last()!;
+    cards.settle("done", true);
+    cards.end();
+    expect(pending.status).toBe("failed");
+    expect(pending.approval).toBe("interrupted");
+    expect(pending.failureReason).toBe("Turn ended before a tool result was reported.");
+    expect(pending.finalized).toBe(true);
+    expect(done.status).toBe("ok");
+    expect(done.failureReason).toBeUndefined();
+    expect(done.finalized).toBe(true);
+  });
+
+  it("forgets buffered chunks and cadence when clearing a turn", () => {
+    const transcript = new Transcript();
+    const cards = new ToolCards(transcript, () => {}, () => 0);
+    cards.start("bash", "one");
+    cards.buffer("one", "published");
+    cards.buffer("one", "old pending");
+    cards.clear();
+    cards.buffer("one", "late old output");
+    cards.start("bash", "one");
+    const next = transcript.last()!;
+    cards.buffer("one", "new output");
+    expect(next.text).toBe("new output");
+    cards.flush();
+    expect(next.text).toBe("new output");
+  });
+
+  it.each([undefined, "", "canonical"])("settles buffered output with final %s without leaking to a reused id", output => {
+    const transcript = new Transcript();
+    const cards = new ToolCards(transcript, () => {}, () => 0);
+    cards.start("bash", "one");
+    const first = transcript.last()!;
+    cards.buffer("one", "published");
+    cards.buffer("one", " pending");
+    cards.finish("one", false, "cancelled", output);
+    expect(first.text).toBe(output ?? "published pending");
+    expect(first.failureReason).toBe("cancelled");
+    cards.buffer("one", "late");
+    cards.start("bash", "one");
+    const next = transcript.last()!;
+    cards.flush();
+    expect(next.text).toBe("");
+  });
+
   it("keeps approval out of the body and replaces preview with one canonical final", () => {
     const { cards, block, transcript } = setup();
     cards.approval("one", "awaiting");

@@ -468,6 +468,32 @@ describe("a tool card when its call settles", () => {
 });
 
 describe("live output from a running tool", () => {
+  it.each([false, true])("settles pending chunks on turn end with discard=%s", discard => {
+    const transcript = new Transcript();
+    const sink = new TurnSink(transcript, () => {}, () => 0);
+    sink.begin("turn", "turn");
+    sink.handleEvent({ type: "tool.started", toolName: "bash", taskId: "one" } as QueryEvent);
+    const first = transcript.last()!;
+    sink.handleEvent({ type: "approval.requested", toolName: "bash", taskId: "one" });
+    sink.handleEvent({ type: "tool.output", toolName: "bash", taskId: "one", chunk: "published" } as QueryEvent);
+    sink.handleEvent({ type: "tool.output", toolName: "bash", taskId: "one", chunk: " pending" } as QueryEvent);
+    sink.markCancelling();
+    sink.end(discard);
+    expect(first.text).toBe(discard ? "published" : "published pending");
+    if (!discard) {
+      expect(first.finalized).toBe(true);
+      expect(first.status).toBe("failed");
+      expect(first.approval).toBe("interrupted");
+      expect(first.failureReason).toBe("Turn ended before a tool result was reported.");
+    }
+    sink.begin("turn", "next");
+    sink.handleEvent({ type: "tool.started", toolName: "bash", taskId: "one" } as QueryEvent);
+    const next = transcript.last()!;
+    sink.handleEvent({ type: "tool.output", toolName: "bash", taskId: "one", chunk: "new output" } as QueryEvent);
+    sink.handleEvent({ type: "tool.result", toolName: "bash", taskId: "one", success: true } as QueryEvent);
+    expect(next.text).toBe("new output");
+  });
+
   it("shows output as it arrives rather than only at the end", () => {
     const transcript = new Transcript();
     let clock = 0;
