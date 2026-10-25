@@ -1,6 +1,6 @@
 # Phase 20 剩余验收准备清单
 
-依据：[原决策](phase-20-decisions.md)、[当前剩余表](phase-20-status.md)。2026-10-25补证后矩阵为38 complete / 9 partial / 0 open；本页保留五组准备条件及用户原答复。单账户OAuth和指定HTTP MCP已实际验收。外部剩余条件为多账号、可信账期、正式质量及桌面交互；QA-04本地结构judge已proven/0gaps，两路独立复核综合COMMENT，仍保留架构/既有风险WATCH及当前SHA远端交付复核，由代理处理。无需重新准备已验连接。
+依据：[原决策](phase-20-decisions.md)、[当前剩余表](phase-20-status.md)。2026-10-25补证后矩阵为38 complete / 9 partial / 0 open；本页保留五组准备条件及用户原答复。单账户OAuth和指定HTTP MCP已实际验收。外部剩余条件为多账号、可信账期、正式质量及桌面交互；QA-04结构judge已proven/0gaps，工具卡片与STS安全风险分别修复且独立APPROVE/CLEAR，原继承/cache WATCH及当前SHA远端交付复核由代理处理。诊断提交CI已success，历史gzip失败根因仍未证实。无需重新准备已验连接。
 
 ## 2026-10-25 执行结果与剩余输入
 

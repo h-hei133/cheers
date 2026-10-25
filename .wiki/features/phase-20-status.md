@@ -18,9 +18,15 @@
 | QA-01 | 剩余多账号/账单/质量/平台任务的适用验收 | 本地47行索引及真实单账号OAuth、stdio/HTTP MCP已补证；随剩余外部任务更新 |
 | QA-02 | Windows交互PTY、真实IME、系统复制 | 最新Platform QA40157005332在b36e9b72的20个支持格全部通过；Windows仍只含line/pipe，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
-| QA-04 | 全范围最终交付与远端全套失败定位 | 本地及远端结构proven、0gaps，TS/exe平台20支持格通过；两路独立复核综合COMMENT。代码CI仅gzip超限用例失败，QA诊断已补、根因未证实；外部依赖仍partial |
+| QA-04 | 全范围最终交付与剩余任务验收 | 当前结构proven、0gaps；工具卡片与STS安全风险分别有独立APPROVE/CLEAR及聚焦反转证据。诊断提交0b161bdc的CI40158395848已success，历史gzip失败根因仍未证实；最新源码交付与平台复验单独绑定，外部依赖仍partial |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
+
+## 2026-10-25 QA-04 STS失败响应安全
+
+- 两种STS交换在HTTP非成功时复用core/network的discardResponse，请求取消正文后立即抛同一CredentialsError，只含固定source与数值HTTP status。失败正文、XML Message、statusText及URL均不进入错误面；不读取正文，也不等待清理完成。成功XML解析、签名、请求构造、原signal及错误类兼容导出保持原合同。参考方案的有界原始错误正文仍不符合本仓secret boundary，未引入。
+- 新增3项覆盖signed role/web identity的错误脱敏、正文零消费、取消拒绝被吸收，以及永不settle的取消不阻塞失败。原版本在新测试下出现2项AssertionError和1项超时；有效反转只跑两条泄露用例，exit1/2 AssertionErrors，恢复精确源码字节后最终3文件43项全部通过。静态五门/analyzer0/diff check→根TS build→完整仓内judge串行exit0，proven/三义务satisfied/0gaps。build `8cef6d62c23c2c46f4a4341df6d499dbe3def0545dcd625c604c49f88564c21c`、inputs `99fec6dc6f24b42156d39adfe2c9802b2a016e65e12d65859c77a0c9fd99f595`、artifact `d36de43b984491e5e3b93f049a63f1bc2ad4aae76fab819683c1745bb4e3e003`。独立既有gpt-6.1-sol两路APPROVE/CLEAR；验证、manifest、source hashes、反转及报告归Git忽略 `.omx/artifacts/phase20-sts-safety/`。仅请求取消，不宣称清理完成；不增加继承层或重做既有cache。本批提交/推送/精确SHA CI另读回，38/9/0不变。
+- 前诊断提交 `0b161bdcac00381111688258a68bbe39326ea4e7` 的CI40158395848于03:42:13Z completed/success，970 files/10522 tests passed、1file/3tests skipped，CI完整judge三义务满足。该结果只证明本SHA全套通过，不解释或删除历史gzip failure。工具卡片提交 `3f339683f4d7c6c7782f28299f80767c9c57de70` 已提交/推送/main精确一致且当时clean，Watch40159042970/artifact12585775136实际proven/三义务satisfied；CI40159042967尚在全套运行，结果另读回。
 
 ## 2026-10-25 QA-04 剩余职责提取与独立复核
 
@@ -35,7 +41,7 @@
 - 聚焦原用例分别通过：reentry/manager/recovery 109、runtime/idle/boundary 59、store/manager/registry/files 95、AWS credentials/signature 40；baseline选中3项pipe启动/readiness重连/中断续跑通过，其余38项定向未运行；原process helper 2项通过。四个有效反转分别破坏stamp匹配、continuity选择、metadata路径、STS返回key，exit1及AssertionErrors为1/7/2/1，字节恢复后相关用例再过。首STS反转仅抛CredentialsError、0 AssertionErrors，不计有效反转。
 - 提取时误覆盖既有 `test-utils/cli/process.ts`，已按HEAD字节恢复，最终无diff；新fixture改用未占用文件名并保留全部常量。review识别时钟receiver差异后以 `() => this.now()`保留原TurnSink接收者，最终相关两文件54项通过。曾在一个judge yielded后误启动后续验证，构成本批早段串行红线违规；已等待所有进程结束，最终静态五门→analyzer→TS build→完整judge在同一串行命令中完成exit0。不能把本批所有执行概括为严格串行。
 - 新文件contract的EOF空行在staged diff check时发现并清理，未提交；最终build与完整judge随后再次串行通过。最终build `39c7b1f9d9363dce863443704c950391751006c87f532564322d0f305d06ab41`、inputs `d161e57e8be98e7ea0581612de63f3666876eab408259f93a8d13e6f8c8183ab`、artifact `35a7bcb94f9e9dbf89a72074a3be1519e77257db9271b04cadc749c82974690e`；Node24.15.0。原仓内tgz的完整judge实际proven：cycles/imports/function ceiling三义务均satisfied，0gaps；analyzer reported0。这是当前collector/规范的结构结论，不替代全Phase验收或历史callback-inclusive库存。安全manifest、source hashes、反转日志和review保留Git忽略 `.omx/artifacts/phase20-reentry/`。
-- 两路独立gpt-6.1-sol只读复核覆盖 `81987b36` 至当时源码：代码APPROVE、架构WATCH，按skill规则综合COMMENT。无新增阻塞。WATCH包括SessionManager四层继承、既有reentry缓存浅校验/mtime假设、既有STS原响应Message进入CredentialsError的条件泄密风险，以及既有clear保留pending输出的生命周期风险。最后一项随后按上方生命周期修复；STS风险尚未修，不能称全产品安全审查通过。暂不追加继承层，后续安全修复需要独立合同及回归。
+- 两路独立gpt-6.1-sol只读复核覆盖 `81987b36` 至当时源码：代码APPROVE、架构WATCH，按skill规则综合COMMENT。无新增阻塞。WATCH包括SessionManager四层继承、既有reentry缓存浅校验/mtime假设、既有STS原响应Message进入CredentialsError的条件泄密风险，以及既有clear保留pending输出的生命周期风险。pending输出和STS两项随后分别按上方独立修复与回归闭合；继承/cache观察保留，不称全产品安全审查通过，也不追加继承层。
 - 旧源码 `00045d0e` CI40154519638于02:46:27Z success；`85e50c62` CI40155244712/job121055147652于02:52:13Z success，静态/script/TS/全套/结构步骤均success，Watch40155244710 artifact12583978091实际partial/6gaps。`2331fc13`已推送，Watch40155560323 artifact12584487560实际partial/5gaps，CI40155560322在本轮读回时仍运行。旧SHA不代表本批交付；本批提交/推送/自身CI另核对。未运行本地全套、exe或真实20k PTY，38/9/0不变。
 
 ## 2026-10-25 QA-04 工具卡片刷新职责

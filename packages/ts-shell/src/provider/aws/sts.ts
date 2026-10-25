@@ -1,5 +1,6 @@
 import { signAwsRequest } from "./signature.js";
 import { CredentialsError, type Credentials, type ResolveOptions } from "./contract.js";
+import { discardResponse } from '../../core/network/response.js';
 
 /**
  * Exchange base credentials for a role's.
@@ -43,7 +44,7 @@ export async function assumeRoleWithWebIdentity(
     body: body.toString(),
     ...(options.signal ? { signal: options.signal } : {}),
   });
-  return readStsResponse(await response.text(), response.ok, "web identity");
+  return readStsResponse(response, "web identity");
 }
 
 /** Where the token service for a region lives. */
@@ -80,7 +81,7 @@ async function callSts(
     body,
     ...(options.signal ? { signal: options.signal } : {}),
   });
-  return readStsResponse(await response.text(), response.ok, source);
+  return readStsResponse(response, source);
 }
 
 /**
@@ -90,11 +91,12 @@ async function callSts(
  * parsing the document is deliberate: the document is one level deep and fixed,
  * and a general parser would be a dependency for three field lookups.
  */
-function readStsResponse(xml: string, ok: boolean, source: string): Credentials {
-  if (!ok) {
-    const message = tagValue(xml, "Message") ?? xml.slice(0, 200);
-    throw new CredentialsError(`the ${source} request failed: ${message}`, source);
+async function readStsResponse(response: Response, source: string): Promise<Credentials> {
+  if (!response.ok) {
+    discardResponse(response);
+    throw new CredentialsError(`the ${source} request failed (HTTP ${response.status})`, source);
   }
+  const xml = await response.text();
   const accessKeyId = tagValue(xml, "AccessKeyId");
   const secretAccessKey = tagValue(xml, "SecretAccessKey");
   const sessionToken = tagValue(xml, "SessionToken");

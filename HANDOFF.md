@@ -144,3 +144,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A newly extracted CLI fixture overwrites an existing helper, or passes product build while omitting constants used only by tests.
 - **Root Cause**: A plausible destination name already belongs to another owner, and the product build excludes tests.
 - **Rule**: Check destination existence and all existing consumers before creating a file. Preserve any occupied helper byte-exact, choose an unoccupied responsibility name, and carry every referenced fixture constant with correctly rebased paths. Run focused scenario and original-helper tests; product build alone is insufficient.
+
+### 28. Reading A Failed Credential Response Can Leak Or Delay The Error
+- **Symptom**: A rejected credential exchange exposes arbitrary response text in its error, or waits indefinitely for an error body or cleanup to finish.
+- **Root Cause**: Consuming the failed body before projecting the credential error admits remote XML Message or raw text into the error surface and couples failure reporting to an untrusted stream.
+- **Rule**: On HTTP failure, use the shared nonawaited response discard and report only fixed source plus numeric status. Preserve the credential error identity and successful parsing path. Test both exchange routes, zero body consumption, rejected cleanup and cleanup that never settles; requesting cancellation is not proof that cleanup completed.
