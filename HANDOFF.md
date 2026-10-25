@@ -164,3 +164,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A structural check reports evidence-capacity failures while CI and the current packaged validator accept the same source graph.
 - **Root Cause**: A reusable scratch extraction contains an older collector or evaluator despite sharing the same CLI entrypoint bytes; checking that entrypoint alone does not identify the whole tool.
 - **Rule**: Run the checked-in validator package through the documented command or extract it into a fresh task directory. Preserve and classify the stale-tool failure, then read the current verdict and obligations. Never narrow the source graph or change product code merely to bypass an obsolete validator limit.
+
+### 32. A Released Loopback Port Does Not Identify The Cancelled Owner
+- **Symptom**: A cancelled-login test intermittently receives an HTTP response from its old redirect URL while the cancelled owner published no credentials or token request.
+- **Root Cause**: A freed ephemeral port may be reused; fetch resolves for error responses too. A request to that URL after shutdown does not identify the responder or prove the original owner accepted it.
+- **Rule**: Verify the captured callback owner's rejected completion and closed lifecycle directly. After a late request, recheck zero credential publication and token exchange; separately verify state mismatch. Keep unobserved response ownership or port reuse as unknown instead of weakening security assertions or diagnosing product acceptance from transport alone.

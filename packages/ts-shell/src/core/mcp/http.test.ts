@@ -19,6 +19,7 @@ import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import { installRuleControlRuntime, takeForcedTool } from '../../cli/runtime/ruleControls.js';
 import { createCliMcpGateway } from '../../entrypoints/cliMcpModule.js';
 import { toolPoolFor } from '../../cli/runtime/tools.js';
+import * as callbackOwner from '../auth/oauth/callback.js';
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { vi.useRealTimers(); await Promise.all(cleanups.splice(0).reverse().map(cleanup => cleanup())); cleanupAdvisorHarnesses(); });
@@ -161,14 +162,28 @@ it('uses the authenticated gateway for force selection and the next tool call, t
 });
 
 it('cancels sign-in with no late token publication and refuses a mismatched callback state', async () => {
-  const f = await fixture(); const abort = new AbortController(); let url!: URL; let offered!: () => void;
-  const available = new Promise<void>(resolve => { offered = resolve; });
-  const pending = runMcpAuthCommand(['auth', 'remote'], { ...f.host, signal: abort.signal, onAuthorizeUrl: value => { url = new URL(value); offered(); } });
-  await available; abort.abort(); expect((await pending).report?.facts.status).toBe('unverified');
-  expect(fs.existsSync(f.service.target)).toBe(false); expect(f.calls.some(call => call.route === '/token')).toBe(false);
-  await expect(f.browser(url)).rejects.toThrow();
-  const rejected = await runMcpAuthCommand(['auth', 'remote'], { ...f.host, onAuthorizeUrl: value => { void f.browser(new URL(value), 'wrong-state'); } });
-  expect(rejected.report?.facts.status).toBe('unverified'); expect(fs.existsSync(f.service.target)).toBe(false);
+  const callbacks: callbackOwner.CallbackServer[] = [];
+  const start = callbackOwner.startCallbackServer;
+  const callback = vi.spyOn(callbackOwner, 'startCallbackServer').mockImplementation(async options => {
+    const server = await start(options); callbacks.push(server); return server;
+  });
+  try {
+    const f = await fixture(); const abort = new AbortController(); let url!: URL; let offered!: () => void;
+    const available = new Promise<void>(resolve => { offered = resolve; });
+    const pending = runMcpAuthCommand(['auth', 'remote'], { ...f.host, signal: abort.signal, onAuthorizeUrl: value => { url = new URL(value); offered(); } });
+    await available; abort.abort(); expect((await pending).report?.facts.status).toBe('unverified');
+    expect(fs.existsSync(f.service.target)).toBe(false); expect(f.calls.some(call => call.route === '/token')).toBe(false);
+    expect(callbacks).toHaveLength(1);
+    await expect(callbacks[0]!.received).rejects.toMatchObject({ name: 'AbortError' });
+    // The released ephemeral port can belong to another listener by this point.
+    await f.browser(url).catch(() => undefined);
+    expect(fs.existsSync(f.service.target)).toBe(false); expect(f.calls.some(call => call.route === '/token')).toBe(false);
+    const rejected = await runMcpAuthCommand(['auth', 'remote'], { ...f.host, onAuthorizeUrl: value => { void f.browser(new URL(value), 'wrong-state'); } });
+    expect(rejected.report?.facts.status).toBe('unverified'); expect(fs.existsSync(f.service.target)).toBe(false);
+    expect(callbacks).toHaveLength(2);
+    await expect(callbacks[1]!.received).rejects.toThrow(/state did not match/);
+    expect(f.calls.some(call => call.route === '/token')).toBe(false);
+  } finally { callback.mockRestore(); }
 });
 
 it('guards issuer endpoints, source revocation, configured header scope and HTTP redirects', async () => {

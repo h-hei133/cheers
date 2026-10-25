@@ -18,7 +18,7 @@
 | QA-01 | 剩余多账号/账单/质量/平台任务的适用验收 | 本地47行索引及真实单账号OAuth、stdio/HTTP MCP已补证；随剩余外部任务更新 |
 | QA-02 | Windows交互PTY、真实IME、系统复制 | 当前58e1871e的Platform QA40178946206已20/20支持格、三平台双构建及原业务transcript通过；Windows仍只含line/pipe，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
-| QA-04 | 全范围最终交付与剩余任务验收 | 当前七项返工58e1871e已提交/推送，远端main精确一致；CI40178598492因1个旧alias候选断言failure（10563pass/1fail/3skip），已修正测试并本地134项通过，后续CI另绑定；Watch40178598494实际proven/三义务satisfied，Platform QA40178946206已20/20支持格通过；工具卡片与STS分别独立APPROVE/CLEAR。历史gzip失败根因仍未证实；外部依赖仍partial |
+| QA-04 | 全范围最终交付与剩余任务验收 | 当前七项返工58e1871e已提交/推送，远端main精确一致；旧CI40178598492的alias断言已修并134项通过；测试提交36ea1577/CI40181739162仅MCP迟到browser网络断言failure（10563pass/1fail/3skip），已改为owner证据并34项本地通过，后续CI另绑定；Watch40178598494实际proven/三义务satisfied，Platform QA40178946206已20/20支持格通过；工具卡片与STS分别独立APPROVE/CLEAR。历史gzip失败根因仍未证实；外部依赖仍partial |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
 
@@ -55,6 +55,12 @@
 CI遗漏的keymap测试用find(/reset)!构造单项菜单；alias过滤后candidate不存在，不能再代表“Enter接受正式命令且不submit”。分类为stale expectation，保留原Enter/不submit/sync断言，改用实际/res候选，并加强resume首项及reset缺席断言；无产品代码改动。最终keymap/slash/firstFrame三文件134项串行通过，独立复核另见正式报告，后续测试/证据提交及CI另绑定。
 
 Platform QA40178946206在58e1871e completed/success。已下载20份原JSON与业务transcript：Linux8/macOS8/Windows4全部pass/exit0，bash/task/tool_search/tool_load/skill每次都有成功result，fixture bash/skill正文保留；三平台TS/exe构建均success、实际Node20.3.0，各平台格间build identity一致。Linux/macOS build `39649e89e3500aa98a7b74dc9f63dda31f61c1a0bb4ebec29013c18178863b15`，artifact与本地相同；Windows build `71cdc4f09f74f3dcba41cbfb680e829d9f24ed604c6f46ec9511e084ecb96f73`。原artifact IDs12592279950/12593705157/12592284833及三exe hash归安全summary。Windows4个regular/fullscreen步骤实际skipped，仍不算交互/IME/系统复制通过。38/9/0不变。
+
+### 第二笔CI取消夹具与owner证据
+
+测试/证据提交 `36ea15776f81f34784563d4ede14cb39d4a4a8dd` 已推送main并实际远端精确一致、当时clean。Watch40181739111下载actualproven/三义务satisfied。CI40181739162 completed/failure：keymap已通过，唯一core/mcp/http.test.ts:169要求迟到browser必网络拒绝，10563pass/1fail/3skip，CI judge skipped；取消unverified、零凭据与零/token断言已通过，错误state段未到达。该test/callback/service相对1fb5480e未改。原两文件34项本地通过，不能把未复现称CI通过。
+
+浏览器助手忽略HTTP状态，resolved undefined只证明有响应；释放ephemeral端口后的响应归属未知，端口复用是可能解释，未证实。改测捕获实际callback owner：received在close完成后必须AbortError；观察迟到browser后再次零凭据/零token，错误state另验owner拒绝和零交换；spy finally恢复，无产品改动。修后两文件34项串行通过，独立review另归报告。callback handler在已settled后被另一个已排队请求调用时可能写200的源码WATCH保留，本CI场景没预排请求，未称根因或已修。HANDOFF追加port identity护栏；后续提交/CI另绑定。
 
 ## 2026-10-25 START-02 损坏摘要索引准入
 
@@ -1169,3 +1175,5 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 精确`e4b86ad0457791141abb12ce29639b8adb647732`已提交/推送且远端main一致，CI `40093579333`/job `120871082975`于2026-10-24T12:38:38Z completed/success，Watch `40093579354`success。该success不改写上述历史失败，也不替代本新批次SHA的CI；当前批提交/推送与新CI另读回，全阶段仍partial。
 
 测试后续独立code review APPROVE，无产品源码变化。改测后npm start freshness拒绝旧inputs，已按原合同重新串行静态五门/requirements/diff→TS/exe build→start help全部exit0；新build `d8eb0a2f0c7d28c28c1f729887e7880fe47f5ca8f0e758367b4b6f6711b62ff2`、inputs `3af36d77538a6d8bb5e34370c5ddb3572de1f9ea3453e1aa3ce975ee8b8af5b0`、artifact `80a3c28b5bd0b8a5e3b27cec994a16decb2f8da42cb4150d56b54377f91652dd`（与产品批次相同）、exe `6cf7cee7b8366da90acac58d40b18d7e362a622ab152cfed03fc4d764fb49b04`。测试/证据后续提交CI另绑定。
+
+MCP取消夹具修复独立code review APPROVE；最终静态五门/requirements/diff、双构建及start help串行exit0。build `1239efd9b49e96ad9b5b4d3a76ffdb6ca1e82a60ff31e0846fa2511e461c038a`、inputs `779a03f172228b25e9a2c9eff03dd40cee76dab5d04ecc7abc37e68cbf623a33`、artifact `80a3c28b5bd0b8a5e3b27cec994a16decb2f8da42cb4150d56b54377f91652dd`（产品字节保持）、exe `b0a98e2d2537710840126d67324a58b9d71f09a6d9d0f5f8232fdd2d40a456b5`；仅test/文档/护栏变化，新提交CI另绑定。
