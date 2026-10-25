@@ -282,8 +282,8 @@
     {
       "id": "QA-04",
       "status": "partial",
-      "evidence": "current static gates, CI/Watch and exact-SHA evidence in phase-20-status.md; baseline b60631add93dd98b6b8b3a720e7d49a71e02ab35 CI40102647934 completed/success 2026-10-24T14:47:45Z, Watch40102647931 completed/success; real lifecycle/source binding in phase-20-status 2026-10-25",
-      "missing": "Final whole-scope structural/review/docs and exact-SHA commit/push/CI acceptance remain downstream of deferred/missing external evidence. Full-suite and both-build evidence stays remote under the no-local-full-suite constraint. Baseline b60631ad CI40102647934 succeeded; later documentation SHA requires its own readback. Platform QA40098086773 passes all20 supported cells and TS+exe builds at d8192609; historical failures retained. No public Release is requested."
+      "evidence": "current static gates, CI/Watch and exact-SHA evidence in phase-20-status.md; baseline b60631add93dd98b6b8b3a720e7d49a71e02ab35 CI40102647934 completed/success; 81987b36 Watch40153576102 workflow success with partial verdict/9 ceiling gaps; real lifecycle/source binding and QA-04 checkpoint owner extraction in phase-20-status 2026-10-25: coordinator21 to19, 36 focused tests, reversal3 AssertionErrors, TS build2ca5e72aef8b, local judge exit0/partial with8 gaps and satisfied cycle/import obligations",
+      "missing": "Eight function-ceiling findings remain explicitly listed in phase-20-status.md; they are agent-owned structural work, not missing user inputs. Final whole-scope structural/review/docs and exact-SHA commit/push/CI acceptance also depend on deferred/missing external evidence. Full-suite and both-build evidence stays remote under the no-local-full-suite constraint. 81987b36 CI40153576073 is in progress; checkpoint source commit requires its own readback. Platform QA40098086773 passes all20 supported cells and TS+exe builds at d8192609; historical failures retained. No public Release is requested."
     }
   ]
 }

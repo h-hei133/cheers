@@ -5,6 +5,7 @@ import type { AgentMessage } from "../core/agent/state.js";
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateRequestTokens, estimateTokens, messageCharCount, type RequestOverhead } from "./context.js";
 import { requestBudget } from '../context/request/budget.js';
 import { digest } from './compaction/state.js';
+import { formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
 import { generateCompaction, CompactionStepUnknown } from './compaction/generation.js';
 import type { CompactionAuthority, CompactionOperationInput, CompactionSource, SummarizeHistory, SummarizeTurnPrefix } from './compaction/contract.js';
 import { CompactionPublicationError } from './compaction/contract.js';
@@ -12,6 +13,7 @@ import { freezeDeep } from '../core/values/freeze.js';
 import type { PromptMeasurementIdentity } from '../observability/usage/model.js';
 
 export type { SummarizeHistory, SummarizeRequest, SummarizeTurnPrefix } from './compaction/contract.js';
+export { CONTEXT_CHECKPOINT_MARKER, formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
 
 export const KEEP_RECENT_TOKENS = 20_000;
 
@@ -428,29 +430,6 @@ export interface CondensedContext {
   readonly summarized: number;
   /** What the context is estimated to cost after the checkpoint replaces the head. */
   readonly tokensAfter: number;
-}
-
-/** Opens the message a compaction leaves in place of the history it condensed. */
-export const CONTEXT_CHECKPOINT_MARKER = "[Context Checkpoint]";
-
-/** The message that stands in for a span of condensed history. */
-export function formatContextCheckpoint(summary: string): string {
-  return `${CONTEXT_CHECKPOINT_MARKER}\n${summary}`;
-}
-
-/**
- * The summary a checkpoint message carries, or nothing when it is not one.
- *
- * A conversation that has already been compacted opens with its own checkpoint,
- * so a later compaction has to recognize it. That text is itself a summary, and
- * condensing a condensation loses a little of what it said every time, so the
- * engine hands it back as the checkpoint to revise rather than as history.
- */
-export function readContextCheckpoint(content: string): string | undefined {
-  if (!content.startsWith(CONTEXT_CHECKPOINT_MARKER)) {
-    return undefined;
-  }
-  return content.slice(CONTEXT_CHECKPOINT_MARKER.length).replace(/^\n/, "");
 }
 
 /**

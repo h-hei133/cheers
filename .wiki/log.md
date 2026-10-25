@@ -8956,3 +8956,10 @@ QA修复及连接记录已提交/推送d81926093a88aaf34740058e2c72d709968cc5a3�
 用户随后明确要求代理直接修改Windows网络。已有全局script的原三条DNS例外保留，追加GitHub MCP/chatgpt；chatgpt受污染上游改为该域名经已有proxy group访问Google DoH，原TLS/路由/TUN/端口不变。generated sidecar pipe非实际service pipe，探针读实际production pipe后controller200/reload204并读回；最终YAML只两DNS字段变化，备份0600。GitHub原gateway两轮49tools/29readOnly hints，search_repositories只读命中h-hei133/cheers，各391bytes/相同digest，await close后snapshot释放、配置fixture不变。账户原usage取得quota窗口used0/reset2026-11-24T02:06:59Z、reset credits0，不冒充账单。官方Usage/Costs及计划额度来源核对，仍需账期/项目/可信导出。
 
 PAN-07/PAN-08适用缺口闭合，矩阵38complete/9partial/0open；PRV-03保留真实多账号，PRV-05保留可信账单，质量/桌面及QA依赖不变。安全摘要/精确源码hash/探针源码与私有网络回滚备份留在Git忽略artifacts；scratch随后清理。仅文档及矩阵数据变更，无产品代码/构建变化。静态五门、47行矩阵及diff check串行通过；无本地全套/20k真实PTY/子代理验证。精确基线b60631ad CI40102647934于2026-10-24T14:47:45Z success，Watch40102647931 workflow success不兑换全部义务通过；本批提交/推送/新SHA CI另读回。
+
+
+## [2026-10-25] Phase 20 QA-04 检查点职责拆分与结构缺口
+
+本批只提取session/compaction/checkpoint的既有marker及format/read；原协调器兼容导出保留、序列化格式不变，声明21→19。先查目标再对照参考的旧摘要显式修订决定，既有重复压缩回归保留。主代理串行静态五门/矩阵/diff check、compaction36项及TS build通过；恒拒绝识别的有效反转使3项AssertionError，源码字节恢复后36项再次通过。build2ca5e72aef8b，inputs02ef9a692b391316d2d1fe395085ae1ab2815b0623a49440468c3e62c59eb2ac，artifactb1035f821e4eb3b4190115692ea13c32e12624a28313b10f1174c0b212336140。默认judge executable缺失exit127，仓内既有tgz CLI实际exit0/partial，cycles/imports satisfied、8个函数上限proof gaps、0阻塞缺口；compaction不再报超限。其余8项显式列入status/QA-04，不笼统称只剩外部输入；矩阵38complete/9partial/0open不提高。安全证据保留Git忽略artifacts，scratch清理，无本地全套/20k真实PTY/子代理验证。
+
+前文档81987b36已推送/main精确一致；Watch40153576102 workflow success但artifact12583686700为partial/9gaps。CI40153576073仍在跑，静态/script及TS build已通过；本批源码提交和CI另读回，不沿用旧SHA成功。
