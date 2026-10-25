@@ -1,0 +1,22 @@
+# Settings and command discovery
+
+Open `/settings` to browse the available preferences. Appearance contains themes, composer shape and status band items; Model and Context contain the registered request and context controls. Categories with no supported settings are omitted. Use the arrows or Tab to move between navigation and rows. Typing searches across categories, including field names and descriptions.
+
+Enter a setting to inspect its effective value, stored override, source, save scope and application timing. Choose Edit, stage a value and Apply to save; Discard removes the staged change and restores a preview. Saved and applied are separate outcomes: check the returned notice when a startup override, configuration input or validation issue affects the effective value. A restart setting takes effect after restarting.
+
+The initial panel saves to user configuration. `/settings set maxTurns 20` explicitly saves a user override; `/settings set maxTurns 20 --project` saves a project override. `/settings maxTurns` describes the field's registered type, scope and application timing; inspect the current value in the panel. Project settings follow the existing trust and field-scope rules; a field that the project may not own is refused. Never paste credentials into a general settings editor; use `/connect` for connections.
+
+Configuration files store explicit overrides. A small or empty file can inherit working defaults, user preferences and startup inputs. Inspect Source and Effective in the panel instead of filling the file with every default. Some values apply only to a compatible provider or to the next request; the description and application timing identify these cases.
+
+`/help` opens the command catalogue. Browse Session, Context, Workspace, Workflow or Diagnostics, or type a name, alias or description to search the entire catalogue. Enter inserts one canonical command into the composer; submit it separately to execute. Removed or unavailable extension commands cannot be inserted from a stale selection. Esc returns to category navigation or closes the guide.
+
+| Entry | Purpose and persistence |
+|---|---|
+| `/settings` | Main preference browser with staged Apply/Discard and source details |
+| `/theme` | Current-session palette chooser; save a lasting choice through settings Appearance |
+| `/statusline` | Status band chooser; also available in settings Appearance. Direct `use` saves through its existing configuration owner |
+| `/connect`, `/login`, `/logout` | Connection management and its login/logout shortcuts |
+| `/model` | Session model choice and supported automatic roles; retains the session model owner |
+| `/view` | Inspect or change user/developer output, including diagnostic and permission detail |
+
+The catalogue and settings panel expose supported entries. Their presence does not establish that every provider, desktop terminal or configuration scope has been tested. Current implementation evidence and remaining interaction work are recorded in [Phase 20 additions](../features/phase-20-addition.md#15-实施与验证证据).

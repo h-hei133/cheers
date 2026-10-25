@@ -12,6 +12,34 @@ import { opensPicker, pickerFor, type PickerHost } from "./registry.js";
 import { visibleWidth } from '../../../presentation/tui/text/measure.js';
 
 describe("command guide", () => {
+  it('browses categories, searches aliases across them, and clears search back to the original category', async () => {
+    const picker = helpPicker(), overlay = new OverlayHost(() => {});
+    overlay.open(picker); await new Promise(resolve => setTimeout(resolve, 0));
+    const apply = vi.fn();
+    overlay.handleKey(parseKeyEvent('\t'), apply);
+    for (let count = 0; count < 3; count++) overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+    overlay.handleKey(parseKeyEvent('\r'), apply);
+    expect(picker.navigation!.active).toBe('workspace');
+    expect(apply).not.toHaveBeenCalled();
+    const local = picker.filterOptions!('', await picker.load());
+    expect(local.length).toBeGreaterThan(0); expect(local.every(row => row.group === 'workspace')).toBe(true);
+    const remove = registerSlashCommand({ name: 'guide-category', aliases: ['category-alias'], group: 'workflow', summary: 'A cross-category command' });
+    try {
+      overlay.handlePaste('category-alias');
+      expect(stripAnsi(overlay.render(110, 30).join('\n'))).toContain('▸ /guide-category');
+      for (const _ of 'category-alias') overlay.handleKey(parseKeyEvent('\x7f'), apply);
+      expect(picker.navigation!.active).toBe('workspace');
+      expect(stripAnsi(overlay.render(110, 30).join('\n'))).not.toContain('/guide-category');
+      overlay.handlePaste('category-alias');
+      overlay.handleKey(parseKeyEvent('\r'), apply);
+      expect(apply).toHaveBeenCalledWith(picker, ['/guide-category']);
+      expect(await picker.apply(['/guide-category'])).toEqual({ draft: '/guide-category ' });
+      overlay.open(picker); await new Promise(resolve => setTimeout(resolve, 0));
+      expect(picker.navigation!.active).toBe('all');
+      expect(picker.detail?.('/theme').join('\n')).toContain('settings Appearance');
+    } finally { remove(); overlay.close(); }
+  });
+
   it("projects the shared inventory and matches aliases without duplicate choices", async () => {
     const options = await helpPicker().load();
     expect(options.map(option => option.id)).toEqual(listSlashInvocations().filter(item => item.kind !== "alias").map(item => item.invocation));

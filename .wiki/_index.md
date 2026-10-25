@@ -22,6 +22,7 @@ Last updated: 2026-10-17
 
 - [Keyboard shortcuts and rebinding](guides/keybindings.md)
 - [Themes and automatic appearance](guides/themes.md)
+- [Settings and command discovery](guides/settings.md)
 - [Phase 18 decisions and implementation evidence](features/phase-18-decisions.md)
 - [Phase 19 closeout and unfinished work](features/phase-19-decisions.md#11-阶段收尾2026-10-15)
 - [Phase 20 decisions and implementation plan](features/phase-20-decisions.md)

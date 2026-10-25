@@ -1,6 +1,8 @@
 # Themes
 
-Use `/theme` to list palettes, `/theme light` or `/theme dark` to choose one, and `/theme auto` to follow terminal appearance. A command changes the current session. To keep the choice for future sessions, set `"theme": "auto"` (or a theme name) in your configuration; `/reload` applies an edited setting. `--use-theme <name>` overrides the saved choice at startup.
+Use `/settings`, then Appearance, to choose and save a palette for future sessions. Enter the Theme setting, choose a value, then Apply; Discard restores the preview. The details show the save scope, stored value, effective value and source. An explicit startup override can still supply the effective choice after a save.
+
+`/theme` lists palettes, `/theme light` or `/theme dark` selects one for the current session, and `/theme auto` follows terminal appearance. You can also edit `"theme": "auto"` (or a theme name) in your configuration and run `/reload`. `--use-theme <name>` overrides the saved choice at startup. See [settings and command discovery](settings.md) for other preferences and their persistence rules.
 
 Automatic mode uses the bundled light/dark pair. A terminal that reports its appearance can switch the palette during the session; background-color replies provide an initial fallback. Terminals without these reports use dark. The first frame does not wait for a reply, so a light terminal may briefly display the dark palette. A named choice stays fixed even if terminal appearance changes.
 

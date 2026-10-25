@@ -7,7 +7,7 @@ import type { ReportLine } from '../report/contract.js';
 
 type GuideCommand = Pick<CommandDefinition, 'name' | 'aliases' | 'invocations' | 'group' | 'summary' | 'argumentHint' | 'supportsNonInteractive'>;
 
-const groups: Record<CommandDefinition['group'], string> = {
+export const COMMAND_GROUPS: Readonly<Record<CommandDefinition['group'], string>> = {
   session: 'Session', context: 'Context', workspace: 'Workspace', workflow: 'Workflow', diagnostics: 'Diagnostics',
 };
 const HELP_ROWS = 200;
@@ -41,7 +41,7 @@ export function helpReport(commands: readonly GuideCommand[], projectRoot: strin
   return boundedReport(candidates, rows => {
     const omitted = totalRows - rows.length;
     const lines: ReportLine[] = [];
-    for (const [group, title] of Object.entries(groups)) {
+    for (const [group, title] of Object.entries(COMMAND_GROUPS)) {
       const members = rows.filter(row => row.group === group);
       if (!members.length) continue;
       lines.push({ kind: 'space' }, { kind: 'heading', spans: [span(title, 'heading')] });

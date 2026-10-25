@@ -9104,3 +9104,11 @@ ADD-07沿原Editor/ViewState/paste/parser/TUI在重模块图前显示Loading，a
 ADD-02补Roles中subagent/summary/advisor赋值与清除，现有session model事务保留默认、siblings、presets、effort/tier/context/skillful；空会话种入当前精确默认，过期/竞争或旧默认不一致拒写。未配置行仍focusable，named connection准入与浏览分开。嵌套Esc在目录navigation之前返回父面板，保存/应用结果回原状态区，修复真实PTY发现的notice遮挡。角色独立thinking、认证成功回返、settings全编辑类型及桌面仍partial。
 
 主代理串行model35/overlay74/state26共135pass，两有效反转分别AssertionError、字节精确恢复后model35pass；静态五门/diff/build8ea15599e100/责任上限0，正式CLI读workspace profile的打包judge实际proven/三satisfied/零缺口。直接sidecar缺profile的首次exit1保留记录。小型regular/fullscreen PTY角色赋值/清除/默认保留/Esc原行/全局不变通过，SIGTERM143非Ctrl+C验收。第五代码CI40226046847仍运行，Watch40226046850实际工件proven；不升级原Phase38/9或ADD完整对齐。详情和证据见addition15，第六批提交另绑定。
+
+第六批67283e9b4402f70cac8241f74f3772f6b8a96fbe已推送/远端精确一致，最终build9d0ef97d76cd/结构/两模式PTY通过。角色CI40227521947待结果、Watch40227521912实际工件proven/三satisfied。第五code d2db8559及docs f7bc5c02各自CI40226046847/40226150557已实际success，989文件pass/1skip、10712测试pass/3skip，架构proven；旧失败SHA不追改。
+
+## [2026-10-26] feat | 命令指南分类与配置发现入口
+
+ADD-13沿共享inventory/nav加入help五分类/All、跨分类alias搜索、清空恢复、重开复位及安全焦点详情，Enter仍单草稿。theme/statusline说明指向settings Appearance，保留兼容owner；新增settings指南说明显式覆盖/有效来源/保存scope/应用时点/Apply Discard，更新themes和wiki入口。PTY发现说明截断及绝对路径脱敏影响显示，改分句详情与普通入口措辞；同步空placeholder的错误探针改为实际draft/Usage，未弱化零派发。
+
+主代理串行help13/report5共18pass，分类反转AssertionError/字节恢复后18pass；五静态门/diff/build5b8a14469ca4/责任上限0/正式打包judge三satisfied/proven，regular/fullscreen小PTY分类/alias/清空/持久偏好提示/单草稿通过，SIGTERM143。原Phase38/9与ADD面板/上下文partial保留，完整目标继续；第七批提交另绑定。
