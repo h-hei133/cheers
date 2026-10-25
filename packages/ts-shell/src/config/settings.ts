@@ -7,6 +7,7 @@ export type SettingsScope = 'user' | 'project';
 export interface SettingDefinition {
   readonly key: string;
   readonly group: string;
+  readonly section: string;
   readonly label: string;
   readonly description: string;
   readonly path: readonly [keyof RuntimeConfigFile, string?];
@@ -61,9 +62,24 @@ export const CONFIG_SETTINGS: readonly SettingDefinition[] = Object.entries(desc
   const rootPolicy = CONFIG_FIELDS[root];
   const policy = leaf ? { ...rootPolicy, application: tuiFields[leaf].application } : rootPolicy;
   const schema = leaf ? tuiFields[leaf].schema : policy.schema;
-  return { key, group, label, description, path: [root, leaf] as const, policy, schema,
+  const navigation = settingNavigation(key, group);
+  return { key, ...navigation, label, description, path: [root, leaf] as const, policy, schema,
     choices: schema.type === 'boolean' ? [true, false] : schema.enum };
 }).sort((left, right) => left.group.localeCompare(right.group));
+
+function settingNavigation(key: string, group: string): { group: string; section: string } {
+  if (key === 'theme') return { group: 'Appearance', section: 'Theme' };
+  if (key.startsWith('tui.') || key === 'tuiMode') return { group: 'Appearance', section: key.includes('status') ? 'Status line' : key.includes('composer') ? 'Composer' : 'Display' };
+  if (key === 'vimMode') return { group: 'Interaction', section: 'Input' };
+  if (key === 'attentionOnIdle') return { group: 'Interaction', section: 'Notifications' };
+  if (key === 'offline') return { group: 'Interaction', section: 'Requests' };
+  if (key === 'pathRules') return { group: 'Files', section: 'Path policies' };
+  if (group === 'Session') return { group: 'Tasks', section: key === 'cacheWarming' ? 'Background requests' : 'Delivery' };
+  if (group === 'Request') return { group: 'Model', section: key === 'temperature' || key === 'topP' ? 'Sampling' : 'Limits' };
+  if (group === 'Context') return { group, section: key === 'instructionBudgetBytes' ? 'Instructions' : 'Budgets' };
+  if (group === 'Retries' || group === 'Network') return { group: 'Providers', section: group === 'Retries' ? 'Retries' : 'Timeouts' };
+  return { group, section: key === 'toolDiscovery' || key === 'enableMcpTools' ? 'Discovery' : 'Access' };
+}
 
 export function settingDefinition(key: string): SettingDefinition | undefined {
   return CONFIG_SETTINGS.find(item => item.key === key);

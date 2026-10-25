@@ -24,7 +24,7 @@ async function detail(h = host(), key = 'attentionOnIdle') {
 describe('advanced settings picker', () => {
   it('searches every group with literal-first fuzzy ranking and restores the selected group when cleared', async () => {
     const h = host();
-    const picker = settingsPicker(h, 'user', 'Session');
+    const picker = settingsPicker(h, 'user', 'Interaction');
     const options = await picker.load();
     expect(picker.filterOptions!('', options).some(option => option.id === 'maxTurns')).toBe(false);
     const fuzzy = picker.filterOptions!('mxtrns', options);
@@ -35,9 +35,9 @@ describe('advanced settings picker', () => {
     expect(picker.filterOptions!('no-such-setting', options)).toEqual([]);
     const restored = picker.filterOptions!('', options);
     expect(restored.length).toBeGreaterThan(0);
-    expect(restored.every(option => option.label.includes('Session ·'))).toBe(true);
-    expect(picker.chips?.active).toBe('Session');
-    expect(picker.title).toContain(' — Session');
+    expect(restored.some(option => option.id === 'section:Interaction / Input')).toBe(true);
+    expect(picker.chips?.active).toBe('Interaction');
+    expect(picker.title).toContain(' — Interaction');
     expect(h.save).not.toHaveBeenCalled();
   });
   it('keeps cross-group matches grouped by best rank with stable ties', async () => {
@@ -52,7 +52,7 @@ describe('advanced settings picker', () => {
   });
   it('routes typed and pasted cross-group searches through the real overlay without saving', async () => {
     const h = host(); const overlay = new OverlayHost(() => {});
-    overlay.open(settingsPicker(h, 'user', 'Session'));
+    overlay.open(settingsPicker(h, 'user', 'Interaction'));
     await Promise.resolve(); await Promise.resolve();
     overlay.handlePaste('mxtrns');
     let output = overlay.render(120, 40).map(stripAnsi).join('\n');
@@ -60,7 +60,7 @@ describe('advanced settings picker', () => {
     expect(output).toContain('Maximum turns');
     for (let index = 0; index < 6; index++) overlay.handleKey(parseKeyEvent('\x7f'), vi.fn());
     output = overlay.render(120, 40).map(stripAnsi).join('\n');
-    expect(output).toContain('[Session]');
+    expect(output).toContain('Interaction');
     expect(output).not.toContain('Maximum turns');
     overlay.handleKey(parseKeyEvent('maxTurns'), vi.fn());
     const applied: Promise<void>[] = [];
@@ -72,10 +72,10 @@ describe('advanced settings picker', () => {
     overlay.close(); expect(h.save).not.toHaveBeenCalled();
   });
   it('returns from a search result to its owning group with that field focused', async () => {
-    const h = host(); const picker = settingsPicker(h, 'user', 'Session'); await picker.load();
+    const h = host(); const picker = settingsPicker(h, 'user', 'Interaction'); await picker.load();
     const detail = (await picker.apply(['maxTurns']))!.next!;
     const back = (await detail.apply(['back']))!.next!;
-    expect(back.chips?.active).toBe('Request');
+    expect(back.chips?.active).toBe('Model');
     expect(back.initialSelection).toBe('maxTurns');
     const overlay = new OverlayHost(() => {}); overlay.open(back);
     await Promise.resolve(); await Promise.resolve();
@@ -85,7 +85,7 @@ describe('advanced settings picker', () => {
   });
   it('lists searchable grouped advanced fields without personal credentials or CLI exemptions', async () => {
     const h = host(); const picker = settingsPicker(h); const options = await picker.load();
-    expect(options.some(item => item.id === 'maxOutputTokens' && item.label.includes('Request'))).toBe(true);
+    expect(options.some(item => item.id === 'maxOutputTokens' && item.label.includes('Output token limit'))).toBe(true);
     expect(options.some(item => item.id === 'providerConnections' || item.id === 'allowUntrustedHooks')).toBe(false);
     expect(h.save).not.toHaveBeenCalled();
   });

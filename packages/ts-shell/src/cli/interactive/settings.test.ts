@@ -251,10 +251,10 @@ it('previews actual shapes without writing, restores on cancel, and publishes on
     });
     await Promise.all(work); await settle();
   };
-  await open(); expect(render()).not.toContain('❯');
+  await open(); expect(render()).toContain('❯');
   await press('\x1b[B'); expect(preference.read()).toBe('band'); expect(render()).toContain('╰─');
   expect(fs.readFileSync(file, 'utf8')).toBe('{}');
-  await press('\x1b'); expect(preference.read()).toBe('default'); expect(render()).not.toContain('❯');
+  await press('\x1b'); expect(preference.read()).toBe('default'); expect(render()).toContain('❯');
   await open(); await press('\x1b[B'); await press('\r');
   expect(preference.read()).toBe('band'); expect(fs.readFileSync(file, 'utf8')).toBe('{}');
   await press('\r');
@@ -321,21 +321,21 @@ it('keeps project shape precedence and exposes the user shape when the project c
 });
 
 
-it('exposes the seven settings groups as tabs and marks stored values', async () => {
+it('exposes applicable settings categories and sections and marks stored values', async () => {
   fs.writeFileSync(file, '{"offline":true}');
   const context = runtime();
   const host = { openSettings: () => openSettings(context, vi.fn()) };
   const all = settingsPicker(host);
   const allItems = await all.load();
-  expect(all.chips?.items.map(item => item.id)).toEqual(['all', 'Session', 'Request', 'Context', 'Retries', 'Network', 'Tools', 'Display']);
+  expect(all.chips?.items.map(item => item.id)).toEqual(['all', 'Appearance', 'Model', 'Interaction', 'Context', 'Files', 'Tools', 'Tasks', 'Providers']);
   expect(all.chips?.active).toBe('all');
   expect(allItems.find(item => item.id === 'offline')?.label.startsWith('● ')).toBe(true);
-  const session = all.chips!.select('Session')!;
+  const session = all.chips!.select('Interaction')!;
   const list = new OptionModel(session.filterOptions);
   list.setOptions(await session.load());
   const sessionItems = list.visible;
   expect(sessionItems.length).toBeGreaterThan(0);
-  expect(sessionItems.every(item => item.label.includes('Session'))).toBe(true);
+  expect(sessionItems.filter(item => item.disabled).every(item => item.label.startsWith('Interaction /'))).toBe(true);
   expect(sessionItems.find(item => item.id === 'offline')?.label.startsWith('● ')).toBe(true);
   list.setFilter('maxTurns');
   expect(list.visible[0]?.id).toBe('maxTurns');
@@ -365,6 +365,6 @@ it('restores the accepted shape after save failure and retains a retryable pendi
   expect(writer).toHaveBeenCalledOnce();
   reader.mockRestore(); writer.mockRestore();
   const retry = await unreadable!.next!.apply(['apply']);
-  expect(retry!.next).toBeUndefined(); expect(retry!.note).toContain('Applied to the running surface');
+  expect(retry!.next?.initialSelection).toBe('tui.composerShape'); expect(retry!.note).toContain('Applied to the running surface');
   expect(preference.read()).toBe('box'); expect(getRuntimeConfig(root).tui?.composerShape).toBe('box');
 });

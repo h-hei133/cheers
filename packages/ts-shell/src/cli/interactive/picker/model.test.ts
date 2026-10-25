@@ -76,7 +76,7 @@ it.each([false, true])('browses unconfigured models through real overlay keys (a
   expect(draft).toContain('/connect login anthropic'); expect(draft).toContain('--model missing-2');
   overlay.open(back); await new Promise(resolve => setTimeout(resolve, 0));
   expect(stripAnsi(overlay.render(40, 20).join('\n'))).toContain('▸ missing-2');
-  overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+  overlay.close();
   expect(readSessionModelEdit(sessionId)).toEqual(before);
   expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global); expect(fetch).not.toHaveBeenCalled();
 });

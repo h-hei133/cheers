@@ -1,6 +1,8 @@
 import { OptionModel, type Option, type OptionFilter } from "../../presentation/tui/chrome/options.js";
 import { renderModal, modalBody } from "../../presentation/tui/chrome/modal.js";
 import { renderPanel } from "../../presentation/tui/chrome/panel.js";
+import { renderNavigation } from '../../presentation/tui/chrome/navigation.js';
+import type { PickerNavigation } from './picker/navigation.js';
 import { chipStrip, type Chip } from "../../presentation/tui/chrome/chips.js";
 import { Keybindings } from './keybindings.js';
 import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
@@ -41,6 +43,7 @@ export interface PickerOutcome {
 }
 
 export interface Picker {
+  readonly navigation?: PickerNavigation;
   /** Start a fresh browsing lifecycle; mutation reloads do not call this. */
   onOpen?(): void;
   /** Suppress stale UI results; this check never grants write or execution authority. */
@@ -267,10 +270,10 @@ export class OverlayHost {
     const searchStatus = this.searching ? 'Searching…' : this.searchFailed ? picker.searchError ?? 'Search could not be completed.' : undefined;
     const status = this.actionPending ? 'Updating…' : this.actionNotice ??
       ([searchStatus, pickerStatus].filter(Boolean).join(' ') || undefined);
-    const groupKeys = picker.chips ? ['tui.overlay.previousGroup', 'tui.overlay.nextGroup'].flatMap(id =>
+    const groupKeys = picker.chips && !picker.navigation ? ['tui.overlay.previousGroup', 'tui.overlay.nextGroup'].flatMap(id =>
       this.bindings.keysFor(id).filter(key => this.bindings.actionFor(key, 'overlay') === id)) : [];
     const chipChrome = {
-      ...(picker.chips ? { chips: chipStrip(picker.chips.items, picker.chips.active, picker.form === 'modal' ? Math.max(0, width - 4) : width) } : {}),
+      ...(picker.chips && !picker.navigation ? { chips: chipStrip(picker.chips.items, picker.chips.active, picker.form === 'modal' ? Math.max(0, width - 4) : width) } : {}),
       ...(groupKeys.length ? { groupHint: `${groupKeys.join('/')} group` } : {}),
       onChipRow: (row: number, id: string, from: number, to: number) => {
         const spans = this.chipRows.get(row) ?? [];
@@ -300,7 +303,11 @@ export class OverlayHost {
       picker.title.startsWith("Permission:") ||
       (this.model.visible.some((o) => o.id === "allow-once") &&
         this.model.visible.some((o) => o.id === "deny"));
-    return renderPanel(
+    const renderer = picker.navigation ? (model: OptionModel, chrome: Parameters<typeof renderPanel>[1], width: number, height: number) =>
+      renderNavigation(model, chrome, { ...picker.navigation!,
+        items: picker.navigation!.items, active: picker.navigation!.active, focused: picker.navigation!.focused,
+        onItem: (row, id, from, to) => { this.chipRows.set(row, [{ id, from, to }]); } }, width, height) : renderPanel;
+    return renderer(
       this.model,
       {
         title: picker.title,
@@ -328,6 +335,13 @@ export class OverlayHost {
         report.column >= 0 && report.column < this.renderedWidth) {
       const chip = this.chipRows.get(report.row - top)?.find(span => report.column >= span.from && report.column < span.to);
       if (chip) {
+        const update = this.picker.navigation?.select(chip.id);
+        if (update) {
+          this.model.setFilter(update.query ?? this.model.filter);
+          this.baseOptions = update.options; this.model.setOptions(update.options);
+          if (update.focus) this.model.focus(update.focus, true);
+          this.onChange(); return true;
+        }
         const next = this.picker.chips?.select(chip.id);
         if (next) this.open(next);
         return true;
@@ -336,6 +350,7 @@ export class OverlayHost {
       const hit = this.optionRows.get(report.row - top);
       if (hit && report.column >= hit.from && report.column < hit.to) {
         this.model.focus(hit.id, true);
+        this.picker.navigation?.focus(this.model.current()?.id);
         if (!this.picker.multiple) this.picker.previewChange?.(idsOf(this.model.current()));
         this.onChange();
       }
@@ -582,6 +597,14 @@ export class OverlayHost {
       }
     }
 
+    const navigation = !isApprovalPicker && !this.loading ? picker.navigation?.key(event.keyId, focused, this.model.filter.trim().toLowerCase()) : undefined;
+    if (navigation) {
+      this.optionRows.clear(); this.chipRows.clear();
+      this.model.setFilter(navigation.query ?? this.model.filter);
+      this.baseOptions = navigation.options; this.model.setOptions(navigation.options);
+      if (navigation.focus) this.model.focus(navigation.focus, true);
+      this.onChange(); return true;
+    }
     const groupAction = this.bindings.actionFor(event.keyId, 'overlay');
     if (!isApprovalPicker && !this.loading && focused && picker.navigate &&
       (event.keyId === 'left' || event.keyId === 'right')) {
@@ -694,6 +717,7 @@ export class OverlayHost {
         }
     }
     if (!picker.multiple && focused !== this.model.current()?.id) picker.previewChange?.(idsOf(this.model.current()));
+    picker.navigation?.focus(this.model.current()?.id);
     this.onChange();
     return true;
   }
@@ -797,8 +821,13 @@ export class OverlayHost {
   }
   private changeFilter(change: () => void): void {
     this.optionRows.clear();
+    this.picker?.navigation?.focus(this.model.current()?.id);
     this.model.setOptions(this.baseOptions);
     change();
+    if (!this.model.filter && this.picker?.navigation) {
+      const preferred = this.picker.navigation.preferred;
+      if (preferred) this.model.focus(preferred);
+    }
     this.scheduleSearch();
   }
 

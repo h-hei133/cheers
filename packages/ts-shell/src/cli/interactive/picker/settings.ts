@@ -8,6 +8,7 @@ import { CONFIG_SETTINGS } from '../../../config/settings.js';
 import { normalizeStatusItems } from '../../../presentation/tui/chrome/items.js';
 import { statusItemPicker } from './statusItems.js';
 import { settingPreview, type PreferenceHost } from './preview.js';
+import { CatalogNavigation, type NavigationGroup } from './navigation.js';
 
 export interface SettingsHost extends PreferenceHost {
   openSettings(scope?: SettingsScope): SettingsDraft;
@@ -95,6 +96,7 @@ function detailOptions(draft: SettingsDraft, setting: SettingDefinition, pending
   if (setting.policy.sources.includes('project')) options.push({ id: 'scope', label: 'Change save scope', note: draft.scope });
   options.push({ id: 'apply', label: 'Apply', detail: pending ? `Save pending change to ${draft.scope} configuration` : 'Stage a value first', disabled: !pending });
   options.push({ id: 'back', label: 'Back to settings', detail: 'Discard pending value' });
+  if (pending) options.push({ id: 'discard', label: 'Discard', detail: 'Return without saving the pending value' });
   return options;
 }
 
@@ -135,7 +137,7 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
       if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending) };
       if (id === 'unset') return { next: settingDetail(host, draft, setting, { value: undefined }, failure) };
       if (id === 'scope' && setting.policy.sources.includes('project')) return { next: scopePicker(host, setting, draft.scope) };
-      if (id === 'back') return { next: settingsPicker(host, draft.scope, setting.group, setting.key) };
+      if (id === 'back' || id === 'discard') return { next: settingsPicker(host, draft.scope, setting.group, setting.key) };
       if (id === 'apply' && pending) {
         let current = draft;
         if (failure) {
@@ -149,7 +151,8 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
         return {
           note: `${setting.label}: ${result.note}`,
           ...(!result.applied && preview
-            ? { next: settingDetail(host, current, setting, pending, result.note) } : {}),
+            ? { next: settingDetail(host, current, setting, pending, result.note) }
+            : result.applied ? { next: settingsPicker(host, draft.scope, setting.group, setting.key, result.note) } : {}),
         };
       }
       if (index >= 0) return { next: settingDetail(host, draft, setting, { value: setting.choices![index] }, failure) };
@@ -158,39 +161,57 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
   };
 }
 
-const GROUP_ORDER = ['Session', 'Request', 'Context', 'Retries', 'Network', 'Tools', 'Display'] as const;
+const GROUP_ORDER = ['Appearance', 'Model', 'Interaction', 'Context', 'Memory', 'Files', 'Shell', 'Tools', 'Tasks', 'Providers'] as const;
 const SETTINGS_GROUPS: readonly string[] = GROUP_ORDER.filter(group => CONFIG_SETTINGS.some(setting => setting.group === group));
 
 /** Searchable grouped fields; selecting a row starts an explicit staged edit. */
-export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user', group?: string, selected?: string): Picker {
+export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user', group?: string, selected?: string, notice?: string): Picker {
   let draft: SettingsDraft | undefined;
   const active = group && SETTINGS_GROUPS.includes(group) ? group : 'all';
+  const navigation = new CatalogNavigation(active, true);
   let searching = false;
   const groups = new Map<string, string>();
   return {
-    get title() { return `Settings — ${scope} configuration${searching ? ' — Search all groups' : active === 'all' ? '' : ` — ${active}`}`; },
-    form: 'panel', exclusive: true, holdInput: true,
+    get title() { return `Settings — ${scope} configuration${searching ? ' — Search all groups' : navigation.active === 'all' ? '' : ` — ${navigation.active}`}`; },
+    form: 'panel', fullScreen: true, exclusive: true, holdInput: true, navigation,
+    footer: [notice, '←→ categories · Tab: sections/rows/navigation · ↑↓ move · Enter: edit · Esc: back'].filter(Boolean).join(' '),
     ...(selected ? { initialSelection: selected } : {}),
     empty: 'Settings could not be loaded. Check your configuration and retry.',
     chips: {
       items: [{ id: 'all', label: 'All' }, ...SETTINGS_GROUPS.map(name => ({ id: name, label: name }))],
-      get active() { return searching ? 'all' : active; },
+      get active() { return searching ? 'all' : navigation.active; },
       select: id => settingsPicker(host, scope, id === 'all' ? undefined : id),
     },
     filterOptions(query, options) {
       searching = query.length > 0;
-      if (!searching) return active === 'all' ? options : options.filter(option => groups.get(option.id) === active);
-      return searchSettings(query, options, groups);
+      navigation.project(query);
+      if (!searching) return navigation.project('');
+      return searchSettings(query, navigation.all, groups);
     },
     async load(): Promise<readonly Option[]> {
       draft = host.openSettings(scope);
       groups.clear();
-      return draft.definitions.map(setting => {
+      const positions = new Map<string, NavigationGroup>();
+      const rows = [...draft.definitions].sort((a, b) => GROUP_ORDER.indexOf(a.group as typeof GROUP_ORDER[number]) - GROUP_ORDER.indexOf(b.group as typeof GROUP_ORDER[number])
+        || a.section.localeCompare(b.section)).map(setting => {
         groups.set(setting.key, setting.group);
+        positions.set(setting.key, { category: setting.group, section: `${setting.group} / ${setting.section}` });
         const value = draft!.values[setting.key]!;
-        return { id: setting.key, label: `${value.stored !== undefined ? '● ' : ''}${setting.group} · ${setting.label}`,
-          detail: `${setting.key}. ${setting.description}`, note: `${compact(value.effective)} · ${value.source}` };
+        return { id: setting.key, label: `${value.stored !== undefined ? '● ' : ''}${setting.label}`,
+          searchText: `${setting.group} ${setting.section} ${setting.key} ${setting.description}`,
+          note: compact(value.effective) };
       });
+      navigation.set(rows, positions, [{ id: 'all', label: 'All' }, ...SETTINGS_GROUPS.map(id => ({ id, label: id }))]);
+      return rows;
+    },
+    detail: id => {
+      const setting = draft?.definitions.find(item => item.key === id);
+      if (!setting || !draft) return [];
+      const value = draft.values[setting.key];
+      return [setting.description, `${setting.group} / ${setting.section}`, `Field: ${setting.key}`,
+        `Effective: ${compact(value.effective)}`, `Stored: ${compact(value.stored)}`, `Source: ${value.source}`,
+        `Save scope: ${scope}`, `Application: ${setting.policy.application}`,
+        ...(value.projectTrustNotice ? [value.projectTrustNotice] : [])];
     },
     async apply(ids): Promise<PickerOutcome | undefined> {
       if (!draft || ids.length !== 1) return undefined;

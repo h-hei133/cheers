@@ -9065,3 +9065,7 @@ MCP测试/证据df0a8583cedcf22df497ecf768e17ee19b1aa03d已提交/推送、main�
 需求文档基线`0f12984`已提交。实现未配置模型可聚焦/详情与启用准入分离，Enter进入inspection，精确模型配置草稿复用connect、返回保留ID；resume untouched默认随渐进结果取最新，手动焦点保留且重开清搜索；已提交消息全宽顶格、末尾换行复制源对齐，普通composer恢复箭头并独立左右padding。ADD-01部分，ADD-04/05/06本地实现验证通过，其余任务继续；原47项验收不变。
 
 主代理串行静态五门/diff通过（118既有advisory），模块责任上限0。最终受影响六文件147pass、overlay/options94pass、此前geometry/layout18pass；六源码旧实现有效反转各行为失败并逐字节恢复。TS build`adf30efee228`，Linux隔离regular/fullscreen小型真实PTY↑↓/Enter/Back/Esc及arrow通过，活动连接未改。无真实provider、全仓回归或20k真实PTY，桌面IME/系统剪贴板和完整模型配置回返仍缺，代码提交/推送另绑定。
+
+第二批在共享navigation owner建立model Roles/All models/provider与settings真实主分类/section，宽屏分类栏、窄屏焦点页，Tab/左右/上下/Enter/Esc各域，搜索清空恢复焦点。模型详情增加connection label，真实角色policy/既有预设，publication刷新及关闭迟到丢弃；settings保留原scope/CAS/preview/Apply，显式Discard，保存后回字段并显示结果。ADD-02/03仍partial，完整角色编辑、配置回返及全编辑类型/桌面覆盖待补，不升级全部看齐。
+
+聚焦model/settings/overlay/config测试绿色，导航2/watch1通过；两个picker平铺反转两路径失败、字节精确恢复后通过。TS build`9c0de397c212`；regular/fullscreen实际PTY model↑↓/详情/返回及settings search/edit/stage/Apply/值7磁盘读回通过。初次PTY保存结果被全屏遮住，修补可见notice后通过；无真provider/长历史。首批42d90f08已推送，CI40215134369运行中，Watch40215134377workflow success未读工件；本批提交另绑定。
