@@ -229,8 +229,8 @@ describe("skill discovery", () => {
     fs.writeFileSync(file, original);
     let observed = 0;
     const open = vi.spyOn(fsp, 'open');
-    const loader = new SkillLoader(workspace, { disableDiscovery: true, extraPaths: [file, file], onSource: target => {
-      if (target === file && ++observed === 2) execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], process.argv[2])', file, original.replace('original', 'revised!')]);
+    const loader = new SkillLoader(workspace, { disableDiscovery: true, extraPaths: [file, file], onSource: (target, content) => {
+      if (content === undefined && target === file && ++observed === 2) execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], process.argv[2])', file, original.replace('original', 'revised!')]);
     } });
     await expect(loader.loadDetailed()).rejects.toMatchObject({ name: 'ReadChangedError' });
     expect(observed).toBe(2);

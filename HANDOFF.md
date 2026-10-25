@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Nested Skill Loaders Must Retain The Enclosing Source Observer
+- **Symptom**: A cold extension manifest bypasses preview byte tracking, a local observer replaces the enclosing observer, or callback rejection becomes ordinary withheld content and publishes a partial estimate.
+- **Root Cause**: The shared discovery owns acquisition but returned decoded text; observer state belonged only to the outer loader, and broad fallback did not distinguish observation admission failure.
+- **Rule**: Pass raw bytes from the existing verified reader to observers before parsing. Retain enclosing and distinct local observers, deduplicate the same function, and recheck cancellation between callbacks. Propagate fixed observation errors through loader/extension fallback without private callback text. Preserve warm inventory validation and account for its synchronous reads separately. Metadata-equality fixtures must pin actual target stats, not only one exported revision function while an internal reader uses the original.
+
 ### Prompt Source Bytes And Async Expiry Need Separate Checks
 - **Symptom**: Equal decoded text hides changed raw source bytes, a post-read admission failure is skipped as an unreadable file, or a periodic check republishes an expired estimate.
 - **Root Cause**: Metadata alone does not bind loaded content; UTF-8/BOM/frontmatter/budget transformations lose raw-byte identity. A pending read can cross the preview lifetime, and abort does not imply settlement.

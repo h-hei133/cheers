@@ -13,6 +13,10 @@ export class SkillDiscoveryError extends Error {
   constructor() { super('Skill discovery stopped at its resource limit; no complete catalog is available.'); }
 }
 
+export class SkillSourceError extends Error {
+  constructor() { super('Skill source observation failed; no complete catalog is available.'); this.name = 'SkillSourceError'; }
+}
+
 /** One catalog read owns the traversal budget and its selected root identities. */
 export class SkillDiscovery {
   readonly budget: WalkBudget;
@@ -20,8 +24,21 @@ export class SkillDiscovery {
   private readonly captured = new Map<string, CapturedReadSource>();
   private bytes = 0;
   private files = 0;
-  constructor(readonly signal?: AbortSignal, limits?: WalkLimits) {
+  constructor(readonly signal?: AbortSignal, limits?: WalkLimits, private readonly onSource?: (target: string, content?: Buffer) => void) {
     this.budget = new WalkBudget(signal, limits);
+  }
+
+  /** Observer rejection is admission failure, not an unreadable manifest fallback. */
+  observe(target: string, content?: Buffer, observer?: (target: string, content?: Buffer) => void): void {
+    this.budget.check();
+    try { this.onSource?.(target, content); }
+    catch { throw new SkillSourceError(); }
+    this.budget.check();
+    if (observer && observer !== this.onSource) {
+      try { observer(target, content); }
+      catch { throw new SkillSourceError(); }
+      this.budget.check();
+    }
   }
 
   root(boundary: string): string {
@@ -106,7 +123,7 @@ export class SkillDiscovery {
     return entries;
   }
 
-  async content(boundary: string, file: string): Promise<string> {
+  async content(boundary: string, file: string): Promise<Buffer> {
     const root = this.root(boundary);
     const captured = this.captured.get(file);
     if (captured) this.verifySource(captured);
@@ -118,7 +135,7 @@ export class SkillDiscovery {
     }, maximum);
     this.bytes += bytes.length;
     this.root(boundary);
-    return bytes.toString('utf8');
+    return bytes;
   }
 
   /** Retained cached fields still occupy this catalog's manifest budget. */
@@ -134,7 +151,7 @@ export class SkillDiscovery {
   rethrow(error: unknown): void {
     if (error instanceof SnapshotLimitError) throw new SkillDiscoveryError();
     if (isReadResourceFailure(error)) throw new SkillDiscoveryError();
-    if (error instanceof ReadCleanupError || error instanceof ReadChangedError || error instanceof SkillDiscoveryError || error instanceof WalkLimitError
+    if (error instanceof ReadCleanupError || error instanceof ReadChangedError || error instanceof SkillDiscoveryError || error instanceof SkillSourceError || error instanceof WalkLimitError
       || error instanceof DirectoryReadError && error.reason !== 'unavailable') throw error;
     this.signal?.throwIfAborted();
     this.budget.check();

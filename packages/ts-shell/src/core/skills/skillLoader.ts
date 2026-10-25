@@ -130,7 +130,7 @@ export class SkillLoader {
   private readonly extraPaths: readonly string[];
   /** Whether the discovered roots are read at all. */
   private readonly disableDiscovery: boolean;
-  private readonly onSource?: (target: string) => void;
+  private readonly onSource?: (target: string, content?: Buffer) => void;
   private readonly signal?: AbortSignal;
   private readonly limits?: WalkLimits;
   private readonly discovery?: SkillDiscovery;
@@ -150,8 +150,8 @@ export class SkillLoader {
       readonly extraPaths?: readonly string[];
       /** Skip every discovered root; only named paths are read. */
       readonly disableDiscovery?: boolean;
-      /** Report paths actually visited, before reading, for optional change observation. */
-      readonly onSource?: (target: string) => void;
+      /** Report visited paths and actual raw manifest bytes before parsing. */
+      readonly onSource?: (target: string, content?: Buffer) => void;
       readonly abortSignal?: AbortSignal;
       readonly limits?: WalkLimits;
       /** An enclosing catalog shares one budget across builtins and extensions. */
@@ -225,7 +225,7 @@ export class SkillLoader {
     const collisions: SkillCollision[] = [];
     const diagnostics: SkillDiagnostic[] = [];
     const failures: { filePath: string; message: string }[] = [];
-    const discovery = this.discovery ?? new SkillDiscovery(this.signal, this.limits);
+    const discovery = this.discovery ?? new SkillDiscovery(this.signal, this.limits, this.onSource);
     // Named paths last, so an explicit file wins a name a discovered skill
     // shares: the user pointed at it, and that is the more specific statement.
     for (const root of [
@@ -271,7 +271,7 @@ export class SkillLoader {
    */
   private async loadRoot(dirOrFile: string, source: SkillSource, boundary: string | undefined, discovery: SkillDiscovery,
     failures: { filePath: string; message: string }[]): Promise<Skill[]> {
-    this.onSource?.(dirOrFile);
+    discovery.observe(dirOrFile, undefined, this.onSource);
     // Only a path the user named can be reported missing. A discovered root that
     // is absent is the ordinary state of a fresh install — nobody asked for
     // `~/.cheers/skills`, so its absence says nothing worth saying.
@@ -345,7 +345,7 @@ export class SkillLoader {
    */
   private async scan(dir: string, source: SkillSource, isRoot: boolean, boundary: string, discovery: SkillDiscovery, depth: number): Promise<Skill[]> {
     if (source === 'user') assertProfileStorage(dir, this.profile);
-    this.onSource?.(dir);
+    discovery.observe(dir, undefined, this.onSource);
     let entries: fs.Dirent[];
     try {
       entries = await discovery.directory(boundary, dir, depth);
@@ -369,7 +369,7 @@ export class SkillLoader {
       try {
         ignored = await loadIgnoredDirectories(discovery.root(boundary), dir,
           candidates.map(entry => entry.name), { abortSignal: this.signal, assertFileAccess: absolute => {
-            this.onSource?.(absolute); discovery.root(boundary);
+            discovery.observe(absolute, undefined, this.onSource); discovery.root(boundary);
           }, onCapturedSource: captured => { discovery.capture(captured); } }, discovery.budget);
       } catch (error) {
         discovery.rethrow(error);
@@ -406,13 +406,15 @@ export class SkillLoader {
   }
 
   private async readSkill(file: string, dirName: string | undefined, source: SkillSource, boundary: string, discovery: SkillDiscovery): Promise<Skill | undefined> {
+    let bytes: Buffer;
     try {
       if (source === 'user') assertProfileStorage(file, this.profile);
-      const content = await discovery.content(boundary, file);
+      bytes = await discovery.content(boundary, file);
       if (source === 'user') assertProfileStorage(file, this.profile);
-      return parseSkill(content, file, dirName, source);
     }
     catch (error) { discovery.rethrow(error); return undefined; }
+    discovery.observe(file, bytes, this.onSource);
+    return parseSkill(bytes.toString('utf8'), file, dirName, source);
   }
 }
 

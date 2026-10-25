@@ -48,8 +48,8 @@ export interface SkillCatalogResult {
  * are the paths the user named on the command line — a named file is a direct
  * instruction, whatever directory it happens to live in.
  */
-export async function resolveSkillCatalog(options: SkillCatalogOptions, onSource?: (target: string) => void): Promise<SkillCatalogResult> {
-  const discovery = new SkillDiscovery(options.abortSignal);
+export async function resolveSkillCatalog(options: SkillCatalogOptions, onSource?: (target: string, content?: Buffer) => void): Promise<SkillCatalogResult> {
+  const discovery = new SkillDiscovery(options.abortSignal, undefined, onSource);
   const loader = new SkillLoader(options.workspaceRoot, {
     ...(options.skillPaths && options.skillPaths.length > 0 ? { extraPaths: options.skillPaths } : {}),
     ...(options.noSkills ? { disableDiscovery: true } : {}),

@@ -68,6 +68,25 @@ it('includes all explicit skills and invalidates their manifests and target chan
   await expect(load('question /skill:missing')).rejects.toThrow('Unknown skill: missing');
 });
 
+it('withdraws a multi-skill preview on raw manifest edits even when metadata stays equal', async () => {
+  const { cwd, context, load, layout, gateway } = fixture();
+  const files = ['one', 'two'].map(name => { const file = path.join(cwd, `${name}.md`);
+    fs.writeFileSync(file, `---\nname: ${name}\ndescription: first\n---\nfirst body`); return file; });
+  context.skillOptions = { noSkills: true, skillPaths: files };
+  const stat = fs.statSync.bind(fs); const lstat = fs.lstatSync.bind(fs);
+  const metadata = new Map<string, fs.BigIntStats>(); const entries = new Map<string, fs.BigIntStats>();
+  vi.spyOn(fs, 'statSync').mockImplementation(((target, options) => options?.bigint && metadata.has(String(target)) ? metadata.get(String(target))! : stat(target, options)) as typeof fs.statSync);
+  vi.spyOn(fs, 'lstatSync').mockImplementation(((target, options) => options?.bigint && entries.has(String(target)) ? entries.get(String(target))! : lstat(target, options)) as typeof fs.lstatSync);
+  const persisted = [layout.metadataPath, layout.statePath, layout.transcriptPath]; const before = persisted.map(file => fs.readFileSync(file));
+  for (const file of files) {
+    for (const target of files) { metadata.set(target, stat(target, { bigint: true })); entries.set(target, lstat(target, { bigint: true })); }
+    const result = await load('question /skill:one /skill:two'); await result.verifyContent(new AbortController().signal);
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replaceAll('first', 'other'));
+    expect(() => result.verify()).not.toThrow(); await expect(result.verifyContent(new AbortController().signal)).rejects.toThrow('bytes changed');
+  }
+  expect(persisted.map(file => fs.readFileSync(file))).toEqual(before); expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
+});
+
 it('previews the exact submitted modifier, template and skill prompt without command dispatch or writes', async () => {
   const { cwd, context, load, layout, gateway } = fixture();
   const directory = path.join(cwd, '.agents', 'prompts'); fs.mkdirSync(directory, { recursive: true });

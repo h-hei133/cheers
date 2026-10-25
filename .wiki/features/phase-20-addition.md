@@ -775,6 +775,28 @@ ADD-08确认[来源捕获](../../packages/ts-shell/src/context/request/sources.t
 
 本批不宣称全部source精确覆盖：skill discovery/body、context附件、其他动态来源的完整字节绑定和总发现/复验I/O成本仍需审计；规则原文件过大可使preview不可用，不能隐藏为精确数值或改变实际提交规则预算。原生tokenizer、研究及其他独立命令完整preview、同模型/协议/规则/schema的真实1.7k/4.9k拆分、冷/热Node/exe性能、完整面板字段/来源/编辑器/desktop/真实认证继续partial。cache writer及活跃build lock来源仍未知；原Phase20保持38 complete / 9 partial，ADD独立，整体目标active。
 
+### 第二十三批：skill原始清单进入上下文来源核验
+
+第二十二批已提交/推送`62dfe53d3359b56ac39c6438d3c4cd0de2b75963`，本地/origin/远端一致且接续工作区clean；自身CI `40243690372`本批实查仍in_progress。第二十一CI `40242628366`延迟实查success，完整日志996files/10840tests通过、3skip且结构proven已归档，绑定`aebbdaa7`；第二十CI `40241932127`亦读回success，但本批未取其完整日志或Watch工件，不借此给本批赋予CI成功。
+
+ADD-08/11确认普通skill清单此前由[SkillDiscovery](../../packages/ts-shell/src/core/skills/discovery.ts)共享有界verified-handle读取，目录/root/metadata依赖完整，但返回已解码字符串；[SkillLoader](../../packages/ts-shell/src/core/skills/skillLoader.ts)的onSource只报访问路径，没有将实际清单字节交给preview来源捕获。具体嵌套manifest也未按原始内容登记。扩展冷读取共用同一discovery，热parsed cache另外通过host.current/isCurrent复验安装包全inventory；后者已有实际内容摘要，不能把热缓存归为完全没有字节检查。
+
+现discovery.content返回同一次verified-handle读取的原始Buffer，loader在frontmatter/body解析前调用原source观察链，再UTF-8解码；目录、named文件及其原alias观察继续保留。包含enabled=false候选：清单虽不显示，也可能因编辑改变有效目录。resolveSkillCatalog把observer放入已有共享discovery，内层extension loader即使没有本地observer也能将冷清单传回外层；两者不同则分别调用，同一函数只调用一次，外层失败/取消后不继续本地观察。没有新增读取owner或复制skill目录。
+
+observer拒绝是完整目录准入失败，固定SkillSourceError会穿过普通loader与extension withholding fallback，不能静默删掉某个skill后发布部分估算，也不在错误文本/嵌套cause暴露任意回调内容。观察前后沿原budget检查取消/期限；解析放在I/O catch之外，原manifest读取的ReadChanged/Cleanup/资源错误契约保留。显式path/noSkills、项目trust、命名冲突、skill参数/组合及模型权限均沿原owner，不因来源核验而执行命令或扩大权限。
+
+只读参考pi skills 279–305先读取实际rawContent，I/O与frontmatter失败分开；参考A extensibility/skills 668–685在调用时读取实际skill文件、只取body并保留用户invocation来源。采用实际内容先于转换及失败分层的决定。本项目已有一次catalog捕获与多skill统一展开，保留这份内容并绑定原始字节，而不机械改为每个invocation再次读盘；异步复验负责撤回旧preview。参考片段不证明持久字节新鲜度，本批不据此声称完整source覆盖或原生token计数完成。
+
+最终五文件99项串行通过（skill observation10、loader54、catalog11、extension registration8、runtime preview16）。验证原始非法UTF-8相同解码/不同字节、嵌套discovery、disabled candidate、extension共享observer、不同/相同回调、拒绝固定报错、取消后不读下一个manifest、raw reader边界、named alias重定向及实际multi-skill preview逐文件等长变化撤销；session字节不变、零MCP连接/refresh。安装扩展冷读有原始Buffer观察，warm不重复descriptor读取但dirty清单使cold/warm skill的isCurrent均false，回调失败不落入普通withheld。
+
+小型两清单I/O夹具另验证：catalog读取恰好各一次，20次同步verify不增manifest正文读取，异步verifyContent再各读一次且maximum为捕获长度，peak active=1、最终active=0；这仅界定本夹具的descriptor返回字节，不代表物理磁盘I/O、所有目录枚举或扩展inventory无读。热扩展仍会同步扫描全安装inventory，读取成本继续单独待审计，不将cache复用写成零I/O。
+
+初轮92pass/2fail来自新夹具只mock外部readRevision，而verified reader在同模块捕获真实revision，造成被正确拒绝的不一致source；改为固定目标stat/lstat真实元数据，保留handle校验后94通过。随后补外层/本地observer共存、安装扩展冷/热与I/O边界后98/99重叠不累加。三个有效反转分别不传raw manifest、内层observer覆盖外层、SkillSourceError不在rethrow传播，均AssertionError/exit1，源文件逐字节恢复，最终99再验通过。无PTY：本批无绘制改动，不宣称桌面输入或生产性能验证。
+
+四静态门、TS构建、当前tgz新目录解包的正式judge实际exit0/proven且三项satisfied通过；build`efb6fb19e5ddae0b9c491fff325b71be930f56dc1450c75dd96a19c7f361aa34`，inputs`4b7095987aef311c34b78be5daf6f43e155a8877b3a4bc26295ffc5f8ecf7052`，artifact`6c478f08024fa018ea47624c12d83aab224087e42a85d731b63a0c088e91655f`。validator SHA-256仍`6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`；严格docs/diff实际通过，118既有advisory保留，addition112/audit93本地链接目标存在。工件归`.omx/artifacts/phase20-addition-skills/`，Git交付另绑定，HANDOFF追加共享observer/fallback陷阱。
+
+仍缺context附件/其他动态来源完整字节绑定及目录/ignore/extension总发现与复验成本；原生tokenizer、其他独立命令/研究完整preview、真实同模型/协议/规则/schema的1.7k/4.9k拆分、Node/exe冷/热测量、完整settings/model字段/来源/编辑器/桌面/真实认证矩阵继续partial。第九cache writer退出1、第十七build并发来源仍未归因。原Phase20保留38 complete / 9 partial，ADD独立，整体目标active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -787,7 +809,7 @@ ADD-08确认[来源捕获](../../packages/ts-shell/src/context/request/sources.t
 | resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。已有局部修补证据 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚 | 入口先建立重runtime再进入交互，造成可见等待。已采用早期真实composer及一次lease交接；仍需同机冷/热Node/exe的首帧、接管、ready及首请求取样，加载延迟夹具不证明生产收益 |
-| 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则与模板原先仅元数据复验的缺口本批补字节绑定；其他来源完整覆盖、读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
+| 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件/其他来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
 

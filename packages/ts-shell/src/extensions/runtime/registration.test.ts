@@ -16,6 +16,7 @@ import { OverlayHost } from '../../cli/interactive/overlay.js';
 import { parseKeyEvent } from '../../presentation/tui/input/keys.js';
 import { visibleWidth } from '../../presentation/tui/text/measure.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
+import { capturePromptSources } from '../../context/request/sources.js';
 
 let fixture: string; let workspace: string; let registry: string;
 const closes: Array<() => void> = [];
@@ -50,6 +51,24 @@ it('enforces the shared manifest budget for cold and prewarmed extension catalog
   await expect(resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture' })).rejects.toThrow(/no complete catalog/);
   for (const contribution of catalogContributions(workspace, 'capture')) expect(await contribution.skills()).toHaveLength(9);
   await expect(resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture' })).rejects.toThrow(/no complete catalog/);
+});
+
+it('observes actual installed manifest bytes on cold acquisition and retains warm inventory freshness', async () => {
+  const file = installed('alpha', 1, 32); const sources = capturePromptSources(); const observed = vi.fn(sources.track);
+  const cold = await resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture' }, observed);
+  expect(observed).toHaveBeenCalledWith(file, fs.readFileSync(file)); await sources.verifyContent(new AbortController().signal);
+  const warmObserved = vi.fn(); const warm = await resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture' }, warmObserved);
+  expect(warmObserved.mock.calls.some(([, bytes]) => Buffer.isBuffer(bytes))).toBe(false);
+  expect(warm.skills.get('alpha-0')?.isCurrent?.()).toBe(true);
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('cached', 'edited'));
+  expect(cold.skills.get('alpha-0')?.isCurrent?.()).toBe(false); expect(warm.skills.get('alpha-0')?.isCurrent?.()).toBe(false);
+});
+
+it('propagates an installed skill observer rejection without invoking ordinary withholding', async () => {
+  installed('alpha', 1, 32);
+  await expect(resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture' }, (_target, bytes) => {
+    if (bytes) throw new Error('PRIVATE_OBSERVER_DETAIL');
+  })).rejects.toMatchObject({ name: 'SkillSourceError', message: 'Skill source observation failed; no complete catalog is available.' });
 });
 
 it('preserves actual manifest cleanup failure over concurrent cancellation before permission', async () => {

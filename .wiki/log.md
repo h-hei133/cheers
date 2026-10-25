@@ -9222,3 +9222,9 @@ ADD-02/03无按钮motion独立move，沿frame/surface/TUI仅已持有的picker�
 ADD-08规则/import/append/template在实际读后、转换/裁剪前交原onSource链路捕获有界SHA-256/长度；复用verified-handle snapshot串行重读、前后重验原alias。读后准入异常不进入不可读fallback。controller周期内容检查仍一个pending槽，取消等待settlement，expiry/超时立即撤值、迟到不能发布、成功不延长20秒有效期，frame读取无文件I/O。全文末尾更新明确问题、不成立判断、未知原因与用户完整验收任务。
 
 八文件89pass、三个有效反转/逐字节恢复、四静态门/TS构建711b9bced736/正式judge proven三satisfied、严格docs/diff通过；118既有advisory保留，addition110/audit91本地链接存在。初轮85pass/3fail为新controller夹具误期望状态/定时窗口，保留既有stale与重试契约后补测通过；未运行PTY，不宣称生产显示/性能已验。规则/模板字节覆盖不代表skills/附件等全来源或原生token计数已完成；实际1.7k/4.9k、全source I/O成本、面板整体/桌面/真实认证及cache writer/build并发仍待证。第二十/二十一自身CI实际仍运行；Git另绑定，归档phase20-addition-sources，原Phase38/9与ADD独立/整体active边界保留，详见addition15第二十二批及16文末总和。
+
+## [2026-10-26] fix | skill清单原始字节与共享来源观察
+
+ADD-08/11现有SkillDiscovery verified-handle读返回raw Buffer，loader解析前交source链；共享discovery保留外层/不同本地observer，同函数一次，回调失败固定准入错误穿过extension withholding，取消后不开始下一manifest。嵌套/disabled/named alias与cold extension清单进入preview摘要，warm沿原全inventory/isCurrent失效。
+
+五文件99pass、三有效反转/逐字节恢复、四静态门/TS构建efb6fb19e5dd/正式judge proven三satisfied/严格docs及diff通过，118既有advisory保留，addition112/audit93本地链接存在。初轮92pass/2fail为只mock外部revision的夹具与内部真实revision不一致，改目标stat/lstat固定且保留handle检查；94/98/99重叠不累加。两小清单首次/复验各一次descriptor读、20次同步verify不增正文、peak1；无PTY，不替代物理I/O/全source成本或桌面验收。第二十一CI996files/10840pass/3skip/结构proven实读归档，第二十仅状态success，第二十二CI仍运行；Git另绑定。归档phase20-addition-skills；附件/动态source/成本、tokenizer/研究preview、真实差额/性能、完整面板/认证和cache/build并发仍待证，原Phase38/9与ADD独立/active保留。

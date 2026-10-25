@@ -358,3 +358,11 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 | 尚未确认 | 原现场model无可见交互的唯一根因、真实同模型/协议/规则/实际schema下1.7k/4.9k差额、生产冷/热启动收益、真实provider认证接受、cache writer退出1及活跃build lock并发来源。不能写为不存在或已解决 |
 
 第二十/二十一CI本批实查仍in_progress，各自绑定原SHA，未读Watch工件。当前详细需求、修补证据和验收任务集中在[补充规划文末总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)；第二十二批只补规则/模板字节核验，不扩大为全部上下文精确计算或所有ADD完成。
+
+### 文末当前结论（第二十三批）
+
+本批另确认并修补普通skill清单没有将实际读取字节传入preview摘要，以及内层extension loader缺少外层observer链路。现在同一verified-handle读取返回raw Buffer，解析前观察，外层/本地回调分别保留并去重；固定准入拒绝穿过fallback，不能静默发布少一个skill的估算。五文件99项、三有效反转/逐字节恢复、构建及结构proven通过；无PTY。冷extension清单有字节观察，warm仍按实际全inventory/isCurrent撤值，不把缓存写成零I/O。两小清单夹具证明首次/复验各一次descriptor读取、20次同步verify不增正文读、peak1；不能代替全部source或物理I/O证据。
+
+仍成立的缺口与用户要求保持：两个面板整体分类/导航/搜索/详情/修改配置/取消确认/重开读回、未配置具体模型可选、顶格与箭头、正文路径Tab、多skill及deep-research有限组合。原始skill核验的局部修补不代表这些整体已验收。不成立的解释仍是“没有上下键监听、resume排序反了、空配置等于未实现、npm start每次编译、4.9k就是本地公式、工具个数决定token数”。原现场唯一按键原因、真实token差额/启动收益/认证及cache writer/build并发来源继续未知。
+
+第二十一CI实际success996files/10840tests pass/3skip/结构proven已归档，第二十CI状态success但未读全日志/Watch工件；第二十二CI本批仍in_progress，各自只绑定原SHA。当前source附件/动态来源及总成本、tokenizer/研究preview、完整面板/桌面与真实provider证据继续待补，详见[第二十三批](phase-20-addition.md#15-实施与验证证据)及[文末完整任务](phase-20-addition.md#16-最新问题总和与必须完成的体验)。
