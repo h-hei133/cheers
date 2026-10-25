@@ -134,3 +134,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A controller connection times out despite a running service, or a DNS exception removes fake IPs but returns poisoned public addresses.
 - **Root Cause**: The desktop-generated configuration can name its sidecar pipe while the service owns a production pipe. A real-IP exception also retains its upstream resolver; it does not make that resolver trustworthy or route encrypted DNS through a proxy.
 - **Rule**: After explicit authorization to change external networking, back up its sources privately, identify the actual live controller, and preserve that endpoint in reload payloads. Verify effective state and OS DNS separately. Use a domain-specific encrypted resolver through the existing proxy route when necessary, preserve TLS checks, and compare its answers before provider dispatch. Do not treat HTTP reload success or a public-looking IP alone as provider connectivity evidence.
+
+### 26. Yielded Verification Still Holds The Serial Execution Slot
+- **Symptom**: A later build or test starts while an earlier judge remains running after its tool response yields.
+- **Root Cause**: A returned session ID means the process is still active, even if it already printed a verdict fragment.
+- **Rule**: Resume that session until an explicit process exit before starting another verification. Prefer one fast-fail `&&` chain for static gates, focused tests and structural checks; never infer completion from output alone.
+
+### 27. Fixture Extractions Can Collide With Existing Shared Helpers
+- **Symptom**: A newly extracted CLI fixture overwrites an existing helper, or passes product build while omitting constants used only by tests.
+- **Root Cause**: A plausible destination name already belongs to another owner, and the product build excludes tests.
+- **Rule**: Check destination existence and all existing consumers before creating a file. Preserve any occupied helper byte-exact, choose an unoccupied responsibility name, and carry every referenced fixture constant with correctly rebased paths. Run focused scenario and original-helper tests; product build alone is insufficient.

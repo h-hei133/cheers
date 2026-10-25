@@ -40,7 +40,7 @@ export class TurnSink implements RendererSink {
     this.transcript = transcript;
     this.onChange = onChange;
     this.now = now;
-    this.tools = new ToolCards(transcript, onChange, now);
+    this.tools = new ToolCards(transcript, onChange, () => this.now());
   }
 
   /** Open a block that collects prose for one submitted input. */

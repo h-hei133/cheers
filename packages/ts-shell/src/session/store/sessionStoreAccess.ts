@@ -12,18 +12,13 @@ import {
   setCurrentSessionSelection,
 } from "./currentSessionRegistry.js";
 import {
-  createSessionId,
   createSessionStoreLayout,
-  ensureSessionStoreLayout,
   locateExistingSessionLayout,
-  projectSessionFileLayout,
-  validateSessionId,
   assertSessionStoreProfile,
-  type SessionFileLayout,
-  type SessionStoreLayout,
 } from "./sessionFileLayout.js";
 import { writeJsonFileAtomic } from "./sessionFileStore.js";
 import { SessionFiles } from './files.js';
+import { SessionStorePaths } from './paths.js';
 import {
   SessionCatalog,
   type SessionCatalogDiagnostic,
@@ -50,64 +45,19 @@ import {
   formatUnreadableSessionDirectoryWarning,
 } from "../presentation/sessionWarningSurface.js";
 
-export class SessionStoreAccess {
+export class SessionStoreAccess extends SessionStorePaths {
   readonly files: SessionFiles;
   readonly catalog: SessionCatalog;
-  private readonly storeLayout: SessionStoreLayout;
   private readonly listWarningState: SessionListWarningState = {
     warnedUnreadableSessionDirs: new Set<string>(),
     didWarnListSessionsFailure: false,
   };
 
   constructor() {
-    this.storeLayout = createSessionStoreLayout();
+    super(createSessionStoreLayout());
     this.files = new SessionFiles(this.storeLayout);
     this.catalog = new SessionCatalog(this.storeLayout);
     this.ensureLayout();
-  }
-
-  /** Directory that holds session directories; the reentry index lives beside them. */
-  get sessionsDir(): string { return this.storeLayout.sessionsDir; }
-
-  ensureLayout(): void {
-    ensureSessionStoreLayout(this.storeLayout);
-  }
-
-  createSessionId(): string {
-    return createSessionId();
-  }
-
-  validateSessionId(sessionId: string): string {
-    return validateSessionId(sessionId);
-  }
-
-  sessionDir(sessionId: string): string {
-    return locateExistingSessionLayout(this.storeLayout, sessionId).sessionDir;
-  }
-
-  metadataPath(sessionId: string): string {
-    return locateExistingSessionLayout(this.storeLayout, sessionId).metadataPath;
-  }
-
-  transcriptPath(sessionId: string, onSource?: (target: string) => void): string {
-    for (const sessionsDir of this.storeLayout.sessionsSearchDirs) {
-      onSource?.(projectSessionFileLayout({ sessionsDir, sessionId }).sessionDir);
-    }
-    return locateExistingSessionLayout(this.storeLayout, sessionId).transcriptPath;
-  }
-
-  statePath(sessionId: string): string {
-    return locateExistingSessionLayout(this.storeLayout, sessionId).statePath;
-  }
-
-  /**
-   * Where a session's state lives, for the callers that read and write it whole.
-   *
-   * The thread operations need the path and its lock together, and resolving them
-   * separately would let the two disagree if the layout were located twice.
-   */
-  stateLayout(sessionId: string): SessionFileLayout {
-    return locateExistingSessionLayout(this.storeLayout, sessionId);
   }
 
   sessionExists(sessionId: string): boolean {

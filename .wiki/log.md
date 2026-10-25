@@ -8975,3 +8975,13 @@ PAN-07/PAN-08适用缺口闭合，矩阵38complete/9partial/0open；PRV-03保留
 ## [2026-10-25] Phase 20 QA-04 工具卡片缓冲归位
 
 原100ms output buffer/flush移回既有ToolCards，TurnSink只保留event路由及result前flush，旧方法/状态删除；22→20、ToolCards12。两文件54项通过，阻断pending写卡有效反转exit1/3 AssertionErrors，恢复后54项；首轮遗留方法删除后54项再次通过。误在package cwd跑根build:ts得到Missing script/exit1，回根修正后静态/build/judge串行成功，build9b1f0db676fa/inputs67e8d19a11fc397c651350781b2bd7c8d65785d89edabf81a09a22e1cd965e7e/artifactdb19ce60aa38a03284097085dbea32044af0e208aecb063aaf7a72c924debe8a。judge仍partial、5gaps/0阻塞、cycles/imports satisfied；证据artifacts保留/scratch清理，无独立review通过声明，38/9/0不变。前批85e50c62已推送/main精确一致，CI40155244712运行、Watch40155244710success/artifact12583978091待实际verdict读回；本批自身交付另核对。
+
+## [2026-10-25] Phase 20 QA-04 剩余职责与独立复核
+
+既有reentry发现/索引/恢复问答归recovery/reentry，prompt选择归既有future-turn projection，store路径归store/paths，STS归aws/sts，共享CredentialsError归contract并兼容导出。baseline只提取原pipe/HTTP fixture，原场景不删。占用process.ts误覆盖已按HEAD字节恢复，新baseline/http保留路径常量；原process两用例通过。聚焦109/59/95/40及baseline选中3项通过；有效反转AssertionErrors1/7/2/1，恢复字节后对应测试通过。首STS反转只有CredentialsError不计有效。review时钟receiver差异用TurnSink闭包修复，最终54项通过。
+
+最终静态五门→analyzer→TS build→完整judge同一串行链exit0；build39c7b1f9d9363dce863443704c950391751006c87f532564322d0f305d06ab41，inputsd161e57e8be98e7ea0581612de63f3666876eab408259f93a8d13e6f8c8183ab，artifact35a7bcb94f9e9dbf89a72074a3be1519e77257db9271b04cadc749c82974690e。原tgz collector的cycles/imports/function ceiling三义务satisfied、proven/0gaps，analyzer0；不覆盖历史callback-inclusive库存或全Phase。早段judge yielded后错误启动后续验证，已向用户说明、结束进程并补最终串行链；本批不能声称全部严格串行。HANDOFF追加yield等待exit与fixture占用检查护栏。
+
+两独立gpt-6.1-sol只读复核81987b36→当前源码，代码APPROVE/架构WATCH→综合COMMENT，无新增阻塞；SessionManager四层继承、既有reentry缓存、STS任意响应Message进入错误面及clear保留pending输出分别保留WATCH/风险，未称已修。完整review/manifest/source hashes/judge/反转日志归Git忽略artifacts，scratch清理；无本地全套/exe/真实20k PTY。矩阵38complete/9partial/0open不变。
+
+旧00045d0e CI40154519638于02:46:27Zsuccess，85e50c62 CI40155244712/job121055147652于02:52:13Zsuccess，静态/script/TS/全套/结构步骤success；Watch40155244710 artifact12583978091实际partial6gaps。2331fc13已推送，Watch40155560323 artifact12584487560实际partial5gaps，CI40155560322读回仍运行；分别绑定旧SHA。本批提交/推送与自身远端结果另核对，不继承旧成功。

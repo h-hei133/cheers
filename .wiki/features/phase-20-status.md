@@ -18,9 +18,18 @@
 | QA-01 | 剩余多账号/账单/质量/平台任务的适用验收 | 本地47行索引及真实单账号OAuth、stdio/HTTP MCP已补证；随剩余外部任务更新 |
 | QA-02 | Windows交互PTY、真实IME、系统复制 | 新Platform QA40098086773在d8192609的20个支持格全部通过；Windows仍只含line/print，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
-| QA-04 | 全范围最终交付、精确SHA CI及结构/双构建/全套证据；函数数量超限仍有5个模块 | checkpoint、view、local stream及tool card缓冲职责已归位，本地judge仍partial；其余5项见下表，不能只归因于外部输入。历史CI失败保留，新SHA结果独立读回；不要求公开Release |
+| QA-04 | 全范围最终交付、当前精确SHA CI及双构建/全套证据 | 本地完整judge已proven、3义务satisfied/0gaps；两路独立复核为代码APPROVE、架构WATCH，综合COMMENT。当前交付与外部依赖仍须分别补证；不要求公开Release |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
+
+## 2026-10-25 QA-04 剩余职责提取与独立复核
+
+- 既有reentry索引/发现/恢复问答移入 `session/recovery/reentry.ts`，SessionManager保留公开继承接口；prompt continuity选择移入既有future-turn projection，保留manager receiver、seed/interactive/print优先级及prompt持久化前顺序。store路径查询移入 `session/store/paths.ts`，构造捕获同一layout，持久化/锁仍归accessor。AWS STS移入 `provider/aws/sts.ts`，`contract.ts`只承载共享类型/同一CredentialsError，原路径兼容导出；凭据优先级、签名、请求/取消语义不变。CLI baseline只提取既有pipe/HTTP fixture至 `test-utils/cli/baseline.ts` / `http.ts`，原场景保留。
+- 聚焦原用例分别通过：reentry/manager/recovery 109、runtime/idle/boundary 59、store/manager/registry/files 95、AWS credentials/signature 40；baseline选中3项pipe启动/readiness重连/中断续跑通过，其余38项定向未运行；原process helper 2项通过。四个有效反转分别破坏stamp匹配、continuity选择、metadata路径、STS返回key，exit1及AssertionErrors为1/7/2/1，字节恢复后相关用例再过。首STS反转仅抛CredentialsError、0 AssertionErrors，不计有效反转。
+- 提取时误覆盖既有 `test-utils/cli/process.ts`，已按HEAD字节恢复，最终无diff；新fixture改用未占用文件名并保留全部常量。review识别时钟receiver差异后以 `() => this.now()`保留原TurnSink接收者，最终相关两文件54项通过。曾在一个judge yielded后误启动后续验证，构成本批早段串行红线违规；已等待所有进程结束，最终静态五门→analyzer→TS build→完整judge在同一串行命令中完成exit0。不能把本批所有执行概括为严格串行。
+- 新文件contract的EOF空行在staged diff check时发现并清理，未提交；最终build与完整judge随后再次串行通过。最终build `39c7b1f9d9363dce863443704c950391751006c87f532564322d0f305d06ab41`、inputs `d161e57e8be98e7ea0581612de63f3666876eab408259f93a8d13e6f8c8183ab`、artifact `35a7bcb94f9e9dbf89a72074a3be1519e77257db9271b04cadc749c82974690e`；Node24.15.0。原仓内tgz的完整judge实际proven：cycles/imports/function ceiling三义务均satisfied，0gaps；analyzer reported0。这是当前collector/规范的结构结论，不替代全Phase验收或历史callback-inclusive库存。安全manifest、source hashes、反转日志和review保留Git忽略 `.omx/artifacts/phase20-reentry/`。
+- 两路独立gpt-6.1-sol只读复核覆盖 `81987b36` 至当前源码：代码APPROVE、架构WATCH，按skill规则综合COMMENT。无新增阻塞。WATCH包括SessionManager四层继承、既有reentry缓存浅校验/mtime假设、既有STS原响应Message进入CredentialsError的条件泄密风险，以及既有clear保留pending输出的生命周期风险；后两项未经本批修复，不能称全产品安全审查通过。暂不追加继承层；后续安全/生命周期修复需要各自合同及回归。
+- 旧源码 `00045d0e` CI40154519638于02:46:27Z success；`85e50c62` CI40155244712/job121055147652于02:52:13Z success，静态/script/TS/全套/结构步骤均success，Watch40155244710 artifact12583978091实际partial/6gaps。`2331fc13`已推送，Watch40155560323 artifact12584487560实际partial/5gaps，CI40155560322在本轮读回时仍运行。旧SHA不代表本批交付；本批提交/推送/自身CI另核对。未运行本地全套、exe或真实20k PTY，38/9/0不变。
 
 ## 2026-10-25 QA-04 工具卡片刷新职责
 
@@ -43,13 +52,13 @@
 - 主代理串行静态五门、47行矩阵、diff check通过；package-local compaction.test.ts共36项通过，TS build通过。有效反转把checkpoint识别guard改成恒拒绝，原suite有3个AssertionErrors（写入后识别、无system message识别、修订旧摘要）；恢复精确源码字节后36项再次通过。无本地全套、exe、真实20k PTY或子代理验证。
 - build `2ca5e72aef8b5c6abe30447cf7745975e61b60c0feaaf0c7e25ff9d3fc8cd89d`，inputs `02ef9a692b391316d2d1fe395085ae1ab2815b0623a49440468c3e62c59eb2ac`，artifact `b1035f821e4eb3b4190115692ea13c32e12624a28313b10f1174c0b212336140`；本地Node24.15.0，不替代远端Node floor证据。默认normproof executable缺失exit127是可用性问题；使用仓内既有tgz的同一CLI串行judge实际exit0/partial，无cycle/unresolved specifier，8个proof gaps、0阻塞缺口。analyze:module-facades也不再报告compaction。安全摘要、manifest和judge结果保存在Git忽略的 `.omx/artifacts/phase20-checkpoint/`，临时解包随后清理。本批提交/推送和自身CI另读回，QA-04不升为complete。
 
-| 当前函数上限finding（20；工具卡片拆分后5项） | 声明数 | 处理边界 |
+| 原剩余函数上限finding（当前judge均不再报告） | 当前独立named inventory | 处理边界 |
 |---|---|---|
-| cli-baseline.test.ts | 29 | 既有集成fixture；保留历史disposition，未拆场景 |
-| core/shell/sessionRuntime.ts | 21 | session公共状态面；既有defer，未改运行语义 |
-| provider/aws/credentials.ts | 26 | provider签名/凭据owner；既有defer，不能用QA日志掩盖认证改动 |
-| session/SessionManager.ts | 24 | session facade，历史处置保留；judge仍报告 |
-| session/store/sessionStoreAccess.ts | 22 | store accessor/校验，既有defer；记录不改变verdict |
+| cli-baseline.test.ts | 17 | 场景保留，baseline8/http4；原process helper不改 |
+| core/shell/sessionRuntime.ts | 19 | 选择归既有projection，原调用顺序保留 |
+| provider/aws/credentials.ts | 19 | STS6，contract共享同一错误身份；旧response风险单列 |
+| session/SessionManager.ts | 12 | reentry15；四层继承列WATCH，历史disposition保留 |
+| session/store/sessionStoreAccess.ts | 16 | paths9；捕获同一layout，持久化与锁不搬 |
 
 ## 2026-10-25 允许执行的真实验收
 

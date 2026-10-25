@@ -1,3 +1,4 @@
+import type { SessionContinuitySnapshot } from "../../session/sessionContinuityTypes.js";
 import { profileScope } from '../paths/profile/scope.js';
 import {
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
@@ -169,4 +170,46 @@ async function buildPromptWithProjectMemoryInjection(input: {
 
 function compactSessionScopeId(sessionId: string): string {
   return profileScope(`session:${sessionId}`);
+}
+
+interface PromptContinuityReader {
+  buildPromptContinuitySnapshot?(sessionId: string, currentPrompt: string): SessionContinuitySnapshot | undefined;
+  buildContinuitySnapshot?(sessionId: string): SessionContinuitySnapshot;
+}
+
+/** Choose the original session snapshot before the current prompt is persisted. */
+export function selectPromptContinuity(
+  manager: PromptContinuityReader,
+  sessionId: string,
+  prompt: string,
+  options?: { readonly runtimeSeed?: unknown; readonly continuityState?: SessionContinuitySnapshot; readonly outputMode?: "interactive" | "print" },
+): SessionContinuitySnapshot | undefined {
+  const continuityBuilder = manager.buildPromptContinuitySnapshot;
+  const activeContinuityBuilder = manager.buildContinuitySnapshot;
+  const outputMode = options?.outputMode ?? "interactive";
+  let continuityState = options?.continuityState;
+  if (!continuityState) {
+    continuityState =
+      !options?.runtimeSeed && outputMode === "interactive"
+        ? typeof activeContinuityBuilder === "function"
+          ? activeContinuityBuilder.call(
+              manager,
+              sessionId,
+            )
+          : typeof continuityBuilder === "function"
+            ? continuityBuilder.call(
+                manager,
+                sessionId,
+                prompt,
+              )
+            : undefined
+        : !options?.runtimeSeed && typeof continuityBuilder === "function"
+          ? continuityBuilder.call(
+              manager,
+              sessionId,
+              prompt,
+            )
+          : undefined;
+  }
+  return continuityState;
 }

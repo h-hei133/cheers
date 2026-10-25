@@ -17,7 +17,7 @@ import {
   type RuntimeEventDigest,
   updateRuntimeEventDigest,
 } from "./sessionEventSurface.js";
-import { buildPromptWithFutureTurnInjections } from "./sessionFutureTurnProjection.js";
+import { buildPromptWithFutureTurnInjections, selectPromptContinuity } from "./sessionFutureTurnProjection.js";
 import { buildSessionResumeContext } from "../../session/continuation/sessionPromptContinuity.js";
 import {
   projectCompletedSessionSave,
@@ -237,49 +237,7 @@ export class ShellSessionRuntime {
     let provenanceOutcome: 'completed' | 'failed' | 'cancelled' | 'unknown' = 'unknown';
 
     try {
-      const continuityBuilder = (
-        this.deps.sessionManager as SessionManager & {
-          buildPromptContinuitySnapshot?: (
-            sessionId: string,
-            currentPrompt: string,
-          ) => SessionContinuitySnapshot | undefined;
-          buildContinuitySnapshot?: (
-            sessionId: string,
-          ) => SessionContinuitySnapshot;
-        }
-      ).buildPromptContinuitySnapshot;
-      const activeContinuityBuilder = (
-        this.deps.sessionManager as SessionManager & {
-          buildContinuitySnapshot?: (
-            sessionId: string,
-          ) => SessionContinuitySnapshot;
-        }
-      ).buildContinuitySnapshot;
-      const outputMode = options?.outputMode ?? "interactive";
-      let continuityState = options?.continuityState;
-      if (!continuityState) {
-        continuityState =
-          !options?.runtimeSeed && outputMode === "interactive"
-            ? typeof activeContinuityBuilder === "function"
-              ? activeContinuityBuilder.call(
-                  this.deps.sessionManager,
-                  sessionId,
-                )
-              : typeof continuityBuilder === "function"
-                ? continuityBuilder.call(
-                    this.deps.sessionManager,
-                    sessionId,
-                    prompt,
-                  )
-                : undefined
-            : !options?.runtimeSeed && typeof continuityBuilder === "function"
-              ? continuityBuilder.call(
-                  this.deps.sessionManager,
-                  sessionId,
-                  prompt,
-                )
-              : undefined;
-      }
+      const continuityState = selectPromptContinuity(this.deps.sessionManager, sessionId, prompt, options);
 
       const preparedPrompt = !options?.runtimeSeed
         ? await buildPromptWithFutureTurnInjections({
