@@ -8,6 +8,12 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 ## Pitfalls & Guardrails
 
 
+### Masked Credential Forms Must Precede Prompt Persistence
+- **Symptom**: Filling an API-key command draft exposes credentials in terminal output, prompt history or transcript; a painted mask still leaves raw text available to a display consumer.
+- **Root Cause**: Ordinary submissions persist and echo the full command before routing. Masking after rendering or sharing the normal editor/history path is too late.
+- **Rule**: Keep model credential entry in the bounded input-form owner, map graphemes and caret onto a separate bullet-only display, and pass the key only to the existing credential transaction after explicit submission. Cancel without writing, clear secret undo on Ctrl+U, suppress key summaries and verify actual host/terminal/history output. Reuse the same credential-free endpoint projection as command drafts and retain exact catalogue identity checks.
+
+
 ### Native Model Sign-In Eligibility And Return Transactions
 - **Symptom**: Builtin models hide native login, authentication returns to the wrong connection, or a role assignment expires immediately after login.
 - **Root Cause**: Builtin catalogues already carry base URLs; native eligibility cannot assume an absent URL. Login publishes configuration and creates a new connection, invalidating the captured model/role transaction. A full-screen result can also truncate publication warnings behind success diagnostics.

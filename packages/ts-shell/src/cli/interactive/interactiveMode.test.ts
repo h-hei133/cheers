@@ -202,6 +202,49 @@ it('preserves a bracketed paste split across startup adoption', () => {
 });
 
 describe("session wiring", () => {
+  it.each(['save', 'escape', 'failure'] as const)('handles a model API key through masked host input without prompt history (%s)', async outcome => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true }); const directory = fs.mkdtempSync('/tmp/cheers-test/model-key-host-');
+    const home = path.join(directory, 'home'), project = path.join(directory, 'project');
+    fs.mkdirSync(home); fs.mkdirSync(project); vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', providerConnections: [], providerCredentials: {} }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    writeCatalogCache([{ id: 'openai', models: [{ id: 'key-model', reasoning: true }] }]);
+    const manager = new SessionManager(), session = manager.createNew(project);
+    const { mode, terminal } = build();
+    const host = mode as unknown as { view: InteractiveView; busy: boolean; options: { runtimeContext: ShellRuntimeContext;
+      sessionManager: SessionManager; sessionRuntime: ShellSessionRuntime } };
+    const context = createShellRuntimeContext({ cwd: project, originalCwd: project, projectRoot: project, targetPathBase: project,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null }, session, runtimeConfig: getRuntimeConfig(project) });
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const run = outcome === 'failure' ? vi.spyOn(host.options.sessionRuntime.commands, 'run')
+      .mockRejectedValue(new ConfigWriteError('conflict', 'unchanged')) : undefined;
+    const original = fs.readFileSync(getUserRuntimeConfigPath());
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    mode.start();
+    try {
+      terminal.input('/model\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('key-model'); await vi.waitFor(() => expect(frame()).toContain('▸ key-model'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Configure connection'));
+      terminal.input('\x1b[B'); terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
+      terminal.input('synthetic-host-key'); await vi.waitFor(() => expect(frame()).toContain('••••'));
+      expect(frame()).not.toContain('synthetic-host-key');
+      terminal.input(outcome === 'escape' ? '\x1b' : '\r');
+      await vi.waitFor(() => expect(frame()).toContain('▸ key-model')); await vi.waitFor(() => expect(host.busy).toBe(false));
+      const config = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+      if (outcome === 'save') {
+        expect(config.providerConnections![0]).toMatchObject({ model: 'key-model', apiKey: 'synthetic-host-key', status: 'connected' });
+        expect(context.runtimeConfig.providerConnections[0]!.model).toBe('key-model');
+      } else expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+      if (outcome === 'failure') expect(frame()).toContain('this attempt did not write');
+      const transcript = JSON.stringify(host.view.transcript.all()); expect(transcript).not.toContain('synthetic-host-key');
+      expect(transcript).not.toContain('Saved key:'); expect(transcript).not.toContain('--api-key');
+      expect(host.view.editor.getHistory()).not.toContain('synthetic-host-key');
+      const history = path.join(project, '.ts-shell', 'prompt-history.txt');
+      expect(fs.existsSync(history) ? fs.readFileSync(history, 'utf8') : '').not.toContain('synthetic-host-key');
+      expect(manager.getSession(session.id)?.turns).toHaveLength(0);
+      expect(host.view.editor.getText()).toBe('');
+    } finally { run?.mockRestore(); mode.stop(); vi.unstubAllEnvs(); fs.rmSync(directory, { recursive: true, force: true }); }
+  });
+
   it.each([false, true])('reports a thrown model sign-in without exposing underlying errors (config write: %s)', async configWrite => {
     fs.mkdirSync('/tmp/cheers-test', { recursive: true }); const directory = fs.mkdtempSync('/tmp/cheers-test/model-auth-error-');
     const home = path.join(directory, 'home'), project = path.join(directory, 'project');

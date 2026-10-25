@@ -3,6 +3,20 @@ import { OverlayHost } from '../overlay.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 import { InputForm } from './input.js';
+import { cursorTarget } from '../../../presentation/tui/render/paint.js';
+
+it('masks graphemes before painting, maps the caret and drops cleared credentials from undo', () => {
+  const form = new InputForm({ initial: '', label: 'API key', masked: true, validate: () => undefined });
+  form.paste('a😀éz');
+  const rows = form.render('Configure', 20, 10);
+  expect(rows.map(stripAnsi).join('\n')).toContain('••••');
+  expect(rows.join('\n')).not.toContain('a😀éz'); expect(cursorTarget(rows, 0, 10)).toEqual({ row: 2, column: 4 });
+  form.key(parseKeyEvent('\x1b[D'));
+  expect(cursorTarget(form.render('Configure', 20, 10), 0, 10)).toEqual({ row: 2, column: 3 });
+  form.key(parseKeyEvent('\x7f')); expect(form.value()).toBe('a😀z');
+  form.paste('\nsecret'); expect(form.value()).toBe('a😀z');
+  form.key(parseKeyEvent('\x15')); form.key(parseKeyEvent('\x1a')); expect(form.value()).toBe('');
+});
 
 it('keeps invalid input open, routes paste to the editor, and only submits validated text', async () => {
   const submit = vi.fn(async () => undefined); const overlay = new OverlayHost(() => {});

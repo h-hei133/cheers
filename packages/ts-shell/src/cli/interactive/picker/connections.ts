@@ -94,15 +94,19 @@ export function connectionPicker(context: CommandContext): Picker {
 /** Exact catalogue target; preparing a command never authenticates or persists. */
 export function connectionDraft(provider: CatalogProvider, model?: string, endpoint = provider.baseUrl, label = provider.id): string {
   const parts = [`/connect login ${provider.runtime}`];
-  let safeEndpoint: string | undefined;
-  try {
-    const url = new URL(endpoint ?? '');
-    if (url.protocol === 'http:' || url.protocol === 'https:') safeEndpoint = `${url.origin}${url.pathname}`;
-  } catch { /* A missing or invalid endpoint is supplied explicitly by the user. */ }
+  const safeEndpoint = connectionEndpoint(endpoint);
   if (safeEndpoint) parts.push(`--base-url ${quoteCompletion(safeEndpoint, '')}`);
   if (model) parts.push(`--model ${quoteCompletion(model, '')}`);
   parts.push(`--label ${quoteCompletion(label, '')}`, '--api-key ');
   return parts.join(' ');
+}
+
+/** Model forms and command drafts use the same credential-free endpoint. */
+export function connectionEndpoint(endpoint?: string): string | undefined {
+  try {
+    const url = new URL(endpoint ?? '');
+    return url.protocol === 'http:' || url.protocol === 'https:' ? `${url.origin}${url.pathname}` : undefined;
+  } catch { return undefined; }
 }
 
 function splitChoice(choice: string): [string, string] {

@@ -1,7 +1,7 @@
 import type { Picker } from '../../overlay.js';
 
-/** Inspection has no activation path; configuration is an explicit command draft. */
-export function modelDetailsPicker(label: string, lines: readonly string[], back: () => Picker, draft?: string, signIn?: () => Picker): Picker {
+/** Inspection offers explicit credential entry or a command draft before activation. */
+export function modelDetailsPicker(label: string, lines: readonly string[], back: () => Picker, draft?: string, signIn?: () => Picker, key?: () => Picker): Picker {
   let offered = false;
   return {
     title: label, form: 'panel', empty: '', filterable: false,
@@ -12,12 +12,12 @@ export function modelDetailsPicker(label: string, lines: readonly string[], back
       offered = true;
       return [{ id: 'back', label: 'Back to models' },
         ...(signIn ? [{ id: 'account', label: 'Account sign-in' }] : []),
-        ...(draft ? [{ id: 'configure', label: 'Configure connection', detail: 'Prepare a login command for this exact model.' }] : [])];
+        ...(key || draft ? [{ id: 'configure', label: 'Configure connection', ...(key ? {} : { detail: 'Prepare a login command for this exact model.' }) }] : [])];
     },
     async apply(ids) {
       if (!offered || ids.length !== 1) return undefined;
       return ids[0] === 'back' ? { next: back() } : ids[0] === 'account' && signIn ? { next: signIn() }
-        : ids[0] === 'configure' && draft ? { draft } : undefined;
+        : ids[0] === 'configure' && key ? { next: key() } : ids[0] === 'configure' && draft ? { draft } : undefined;
     },
   };
 }

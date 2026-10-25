@@ -17,7 +17,7 @@ import { captureModelChoice } from "../../../core/commands/model/choice.js";
 import { setModelTarget } from "../../../core/commands/model/selection.js";
 import { captureThinkingPreference } from "../../../core/models/preference.js";
 import { sameValue } from "../../../config/values.js";
-import { connectionDraft } from './connections.js';
+import { connectionDraft, connectionEndpoint } from './connections.js';
 import { modelDetailsPicker } from './model/details.js';
 import { CatalogNavigation, type NavigationGroup } from './navigation.js';
 import { watchModels } from './model/watch.js';
@@ -25,6 +25,7 @@ import { prepareModelRole, type AutomaticModelRole, type RoleResult } from '../.
 import { modelRoleEditor } from './model/role.js';
 import type { ThinkingPreference } from '../../../core/models/effort.js';
 import { modelAccountSignIn, modelSignInPicker, modelSignInStatus, type ModelSignIn } from './model/auth.js';
+import { modelKeyPicker } from './model/key.js';
 
 interface RoleSelection {
   readonly role: AutomaticModelRole;
@@ -117,17 +118,22 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               ...(metadata?.contextWindow ? [`Context: ${metadata.contextWindow} tokens`] : []), ...(reason ? [reason] : [])]);
             if (reason) {
               const endpoint = config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
-              const draft = !connection && !providerSlot || reason === 'credential unavailable' || connection?.state === 'credential-missing'
+              const safeEndpoint = connectionEndpoint(endpoint);
+              const canConfigure = !connection && !providerSlot || reason === 'credential unavailable' || connection?.state === 'credential-missing';
+              const draft = canConfigure && (!endpoint || safeEndpoint) && (provider.id === provider.runtime || safeEndpoint)
                 ? connectionDraft(provider, model.id, endpoint, connection?.label ?? provider.id) : undefined;
               const account = signIn && !connection && !resolution?.credential && modelAccountSignIn(provider, model.id);
+              const back = (fresh: CommandContext, result?: string, connectionId?: string) => {
+                const refreshed = assigning ? { ...assigning, assign: prepareModelRole(fresh, assigning.role).assign,
+                  back: (note?: string) => assigning.back(note, fresh) } : undefined;
+                return modelPicker(fresh, connectionId ? rowId(connectionId, provider.id, model.id) : id, navigation, refreshed,
+                  result ? modelSignInStatus(result) : undefined, signIn);
+              };
               inspections.set(id, () => modelDetailsPicker(model.id, details.get(id) ?? [],
                 () => modelPicker(context, id, navigation, assigning, undefined, signIn), draft,
-                account ? () => modelSignInPicker(context, provider.runtime, signIn, (fresh, result, connectionId) => {
-                  const refreshed = assigning ? { ...assigning, assign: prepareModelRole(fresh, assigning.role).assign,
-                    back: (note?: string) => assigning.back(note, fresh) } : undefined;
-                  return modelPicker(fresh, connectionId ? rowId(connectionId, provider.id, model.id) : id, navigation, refreshed,
-                    result ? modelSignInStatus(result) : undefined, signIn);
-                }) : undefined));
+                account ? () => modelSignInPicker(context, provider.runtime, signIn, back) : undefined,
+                draft && signIn ? () => modelKeyPicker(context, provider.runtime,
+                  { model: model.id, label: connection?.label ?? provider.id, baseUrl: safeEndpoint }, signIn, back) : undefined));
             }
             if (!reason && assigning && connection) {
               assignments.set(id, () => assigning.assign({ connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort: assignedEffort }));

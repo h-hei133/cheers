@@ -1262,18 +1262,21 @@ export class InteractiveMode {
       refreshServer: (serverName, expected, admission) => this.options.sessionRuntime.commands.run(signal => this.options.initialMcpGateway.refresh(serverName,
         { exactTarget: true, expectedConfig: expected, signal, ...(admission ? { admission } : {}) })),
       signIn: args => this.runCommandLine(`/connect ${args.map(arg => quoteCompletion(arg, '"')).join(' ')}`),
-      modelSignIn: async provider => {
+      modelSignIn: async (provider, key) => {
         const commands = this.pickerHost().commandContext;
         const refusal = commands.admission?.();
         if (refusal) return { context: commands, note: refusal };
         const progress = transcriptLineRenderer(this.state.transcript, this.tui, 'Account sign-in');
         let note: string;
         try {
-          const result = await runConnectCommand(['login', provider, '--account'], { ...commands,
+          const args = key ? ['login', provider, '--api-key', key.apiKey, '--model', key.model, '--label', key.label,
+            ...(key.baseUrl ? ['--base-url', key.baseUrl] : [])] : ['login', provider, '--account'];
+          const result = await runConnectCommand(args, { ...commands,
             signInProgress: value => renderSignInProgress(progress, value) });
-          note = result.output;
+          note = key ? result.output.split('\n').filter(line => !line.startsWith('Saved key:')).join('\n') : result.output;
         } catch (error) {
-          note = error instanceof ConfigWriteError ? error.message : 'Account sign-in outcome is unverified. Inspect the saved connections before retrying.';
+          note = error instanceof ConfigWriteError ? error.message
+            : `${key ? 'Connection save' : 'Account sign-in'} outcome is unverified. Inspect the saved connections before retrying.`;
         }
         this.catalogs.invalidate(); this.view.invalidateLayout();
         return { context: this.pickerHost().commandContext, note };

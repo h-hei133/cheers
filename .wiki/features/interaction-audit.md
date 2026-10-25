@@ -289,3 +289,8 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 未配置builtin模型可浏览、进入原生账号登录并返回原具体模型，成功/失败/实际Ctrl+C取消均刷新真实connection状态；三个自动角色可在返回后沿新事务继续显式赋值，默认模型保持原会话绑定。配置未应用或应用未确认优先显示，custom relay没有builtin登录入口。五文件254项、有效反转及两模式六条小型真实Node PTY通过；原生认证使用synthetic fixture，API-key草稿提交回返、真实OAuth及面板全部来源/scope/桌面路径仍缺，因此“未配置行不能聚焦”的确定缺口已有修补证据，但“原终端故障根因已完全捕获”“两个面板已全部看齐”仍不能成立。
 
 第八批CI实际一项help旧契约失败；第九批CI实际一项browser cache多进程writer退出1，cache完整性健康、未超时，具体原因未由日志确定。不能把聚焦绿色或Watch workflow success升级为全量CI成功。最新实现、交付与未完成边界统一见[补充规划第15节第十批](phase-20-addition.md#15-实施与验证证据)。
+
+
+### 2026-10-26实现后补充：模型API-key配置
+
+模型详情的Configure connection已补单行遮罩输入，明确Enter沿原connect事务保存，返回原具体model与本次connection，随后显式启用；Esc取消配置字节不变。真实host与两模式四条小型Node PTY验证密钥不进入terminal明文、主composer、prompt历史或transcript，角色配置后也可继续赋值。六文件244项及两个有效反转通过，仍无真实provider认证证据；现有失败连接重认证、settings全来源/scope/桌面及上下文性能缺口保留。第十批代码已推送1f1342e7，其CI仍pending，不能借局部绿色宣称面板整体看齐。详细边界见补充规划第15节第十一批。

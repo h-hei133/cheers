@@ -8,8 +8,14 @@ import { resolveProviderAuthContract } from '../../../../core/auth/providerAuthR
 import { providerFacts } from '../../../../core/providers/facts.js';
 import { readFreshConfiguration } from '../../../../core/commands/configuration.js';
 
-/** The native host returns its current context; no credential travels through this port. */
-export type ModelSignIn = (provider: RuntimeProvider) => Promise<{ readonly context: CommandContext; readonly note: string }>;
+/** Credentials are input-only; the host returns only current context and safe outcome text. */
+export interface ModelKey {
+  readonly apiKey: string;
+  readonly model: string;
+  readonly baseUrl?: string;
+  readonly label: string;
+}
+export type ModelSignIn = (provider: RuntimeProvider, key?: ModelKey) => Promise<{ readonly context: CommandContext; readonly note: string }>;
 
 /** Native account login never authenticates a custom relay sharing the same runtime. */
 export function modelAccountSignIn(provider: CatalogProvider, model: string): boolean {
@@ -27,24 +33,37 @@ export function modelSignInStatus(note: string): string {
 
 export function modelSignInPicker(context: CommandContext, provider: RuntimeProvider, signIn: ModelSignIn,
   back: (current: CommandContext, note?: string, connectionId?: string) => Picker): Picker {
-  const choice = captureModelChoice(context);
-  const owner = pickerSelection(context);
-  let offered = false, used = false;
+  const attempt = modelAuthentication(context, provider, signIn, back);
   return {
     title: 'Confirm account sign-in', form: 'panel', empty: '', filterable: false,
     initialSelection: 'cancel', exclusive: true, holdInput: true,
     back: () => back(context),
-    previewEnd: () => { offered = false; owner.release(); },
+    previewEnd: attempt.close,
     footer: 'Start uses native sign-in and saves its connection. Cancel returns to the model.',
-    async load() { offered = true; return [{ id: 'cancel', label: 'Cancel' }, { id: 'start', label: `Sign in to ${provider}` }]; },
+    async load() { attempt.offer(); return [{ id: 'cancel', label: 'Cancel' }, { id: 'start', label: `Sign in to ${provider}` }]; },
     async apply(ids) {
-      if (!offered || used || ids.length !== 1) return undefined;
-      if (ids[0] === 'cancel') { used = true; return { next: back(context) }; }
-      if (ids[0] !== 'start') return undefined;
+      if (ids.length !== 1) return undefined;
+      return ids[0] === 'cancel' ? attempt.cancel() : ids[0] === 'start' ? attempt.start() : undefined;
+    },
+  };
+}
+
+/** Both credential routes retain the same admission, identity and return contract. */
+export function modelAuthentication(context: CommandContext, provider: RuntimeProvider, signIn: ModelSignIn,
+  back: (current: CommandContext, note?: string, connectionId?: string) => Picker) {
+  const choice = captureModelChoice(context);
+  const owner = pickerSelection(context);
+  let offered = false, used = false;
+  return {
+    offer: () => { offered = true; },
+    close: () => { offered = false; owner.release(); },
+    cancel: () => { if (!offered || used) return undefined; used = true; return { next: back(context) }; },
+    async start(key?: ModelKey) {
+      if (!offered || used) return undefined;
       const refusal = choice.admission();
       if (refusal) return { note: refusal };
       owner.check(); used = true;
-      const result = await signIn(provider);
+      const result = await signIn(provider, key);
       const current = result.context;
       // Authentication may publish configuration and may be cancelled. Those changes
       // do not authorize reopening on another session, workspace or physical profile.

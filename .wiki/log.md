@@ -9135,3 +9135,12 @@ model角色新增真实effort编辑，具体绑定和精确relay能力准入，a
 builtin未配置模型详情可进入原connect/auth原生登录，canonical provider/endpoint/账号模型准入，custom relay不误获OAuth。确认默认Cancel、单次Start、关闭失效；成功/失败/Ctrl+C回具体model和本次connection，保存/应用状态分别报告，原会话归属变更不重开。三个角色认证后重捕赋值事务、保留default与siblings；登录零会话选择/零回合，API-key草稿回返仍待完善。
 
 串行五文件254pass，两个有效反转AssertionError/字节恢复；认证场景移至model/auth.test.ts消除责任上限24，最终0/proven三satisfied。最终build4dc852158376，五静态门/diff与两模式六条小型Node PTY成功/失败/实际Ctrl+C通过，native fixture不是真实账号OAuth。第八CI40228718301实际help旧契约1fail/10723pass/3skip；第九694d3bf9 CI40230025325实际browser cache多进程writer exit1，1fail/10734pass/3skip，cache健康/未超时，根因未确认，不在WSL运行并发压测。本批交付另绑定；ADD面板、上下文及性能仍partial，原Phase38/9不变。详见addition15第十批及auth证据。
+
+
+第十批1f1342e7ffe3e372f06f26c081b1d72d147031bb已推送/远端精确一致，CI40232077709仍运行；Watch40232077781仅workflow success未读工件。
+
+## [2026-10-26] feat | 模型API-key遮罩配置与回返
+
+model配置入口用单行遮罩InputForm，字符映射为字素圆点/caret，Ctrl+U清除后undo不恢复秘密；API-key不进composer/prompt历史/transcript，明确Enter复用connect事务、安全endpoint与新connection回返，之后显式启用，角色重捕事务。原生登录共享attempt，provider/auth owner不重复实现；普通connect命令入口保持其独立路径。
+
+串行六文件244pass、有效遮罩/connection-ID反转AssertionError/字节恢复，恢复后四文件41pass；四静态门/diff、责任上限0、build88296adab957/正式judge proven三satisfied。两模式四条小型Node PTY保存/取消/磁盘读回/遮罩/提示历史无密钥/零提交通过，synthetic key不是真实provider验证，结束143。现失败连接重认证、settings全scope/桌面、上下文差额与性能仍partial，原Phase38/9不变，第十CI待结果，详见addition15第十一批。本批提交与推送另绑定。
