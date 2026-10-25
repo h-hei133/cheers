@@ -16,9 +16,9 @@
 | PAN-06 | 实际系统剪贴板/平台接受结果 | 适用终端与系统复制实测；本地copy/back/restore/undo/cleanse有限生命周期已覆盖 |
 | INPUT-01 | 真实IME、系统复制、Windows交互终端 | 适用机器、终端、输入法；本地五模式/字素/粘贴/源选区/外编合同已有证据 |
 | QA-01 | 剩余多账号/账单/质量/平台任务的适用验收 | 本地47行索引及真实单账号OAuth、stdio/HTTP MCP已补证；随剩余外部任务更新 |
-| QA-02 | Windows交互PTY、真实IME、系统复制 | 最新Platform QA40157005332在b36e9b72的20个支持格全部通过；Windows仍只含line/pipe，未覆盖交互/IME/系统复制 |
+| QA-02 | Windows交互PTY、真实IME、系统复制 | 最新Platform QA40159681786在85c98eaf的20个支持格全部通过，三平台双构建及原业务transcript已核对；Windows仍只含line/pipe，未覆盖交互/IME/系统复制 |
 | QA-03 | 真实配对运行与双盲评分 | 固定模型/预算、评分者；启动性能已有独立START-03结果并已索引 |
-| QA-04 | 全范围最终交付与剩余任务验收 | 当前结构proven、0gaps；工具卡片与STS安全风险分别有独立APPROVE/CLEAR及聚焦反转证据。诊断提交0b161bdc的CI40158395848已success，历史gzip失败根因仍未证实；最新源码交付与平台复验单独绑定，外部依赖仍partial |
+| QA-04 | 全范围最终交付与剩余任务验收 | 最新源码85c98eaf已提交/推送，CI40159668568 success（10532tests passed）、Watch实际proven/0gaps、Platform QA20/20支持格通过；工具卡片与STS分别独立APPROVE/CLEAR。历史gzip失败根因仍未证实；外部依赖仍partial |
 
 累计OS physical I/O、page cache、总heap、最长响应仍为补充WATCH；原规划没有要求在任意机器证明其统一绝对上界。观察到的逻辑body bytes、owner缓存/页数、source cap、句柄及绘制矩形分别报告，不互相替代。back外层source/sourcePending闭包仍有源码上的保留疑虑；本轮未测可达性，不称已证明泄漏或heap释放，也不据此新增隐式功能要求。restore运行时attempt index有既有16个上限，关闭单面板不要求清空全局cache；undo每次接受/翻页仍按原合同完整重验ledger，不追加跨页累计读取cap。
 
@@ -27,6 +27,12 @@
 - 两种STS交换在HTTP非成功时复用core/network的discardResponse，请求取消正文后立即抛同一CredentialsError，只含固定source与数值HTTP status。失败正文、XML Message、statusText及URL均不进入错误面；不读取正文，也不等待清理完成。成功XML解析、签名、请求构造、原signal及错误类兼容导出保持原合同。参考方案的有界原始错误正文仍不符合本仓secret boundary，未引入。
 - 新增3项覆盖signed role/web identity的错误脱敏、正文零消费、取消拒绝被吸收，以及永不settle的取消不阻塞失败。原版本在新测试下出现2项AssertionError和1项超时；有效反转只跑两条泄露用例，exit1/2 AssertionErrors，恢复精确源码字节后最终3文件43项全部通过。静态五门/analyzer0/diff check→根TS build→完整仓内judge串行exit0，proven/三义务satisfied/0gaps。build `8cef6d62c23c2c46f4a4341df6d499dbe3def0545dcd625c604c49f88564c21c`、inputs `99fec6dc6f24b42156d39adfe2c9802b2a016e65e12d65859c77a0c9fd99f595`、artifact `d36de43b984491e5e3b93f049a63f1bc2ad4aae76fab819683c1745bb4e3e003`。独立既有gpt-6.1-sol两路APPROVE/CLEAR；验证、manifest、source hashes、反转及报告归Git忽略 `.omx/artifacts/phase20-sts-safety/`。仅请求取消，不宣称清理完成；不增加继承层或重做既有cache。本批提交/推送/精确SHA CI另读回，38/9/0不变。
 - 前诊断提交 `0b161bdcac00381111688258a68bbe39326ea4e7` 的CI40158395848于03:42:13Z completed/success，970 files/10522 tests passed、1file/3tests skipped，CI完整judge三义务满足。该结果只证明本SHA全套通过，不解释或删除历史gzip failure。工具卡片提交 `3f339683f4d7c6c7782f28299f80767c9c57de70` 已提交/推送/main精确一致且当时clean，Watch40159042970/artifact12585775136实际proven/三义务satisfied；CI40159042967尚在全套运行，结果另读回。
+
+### 本批交付读回
+
+STS修复 `85c98eaf3c68cc1d2c81c1145ae984146a57e1ae` 已提交/推送，远端main精确一致且推送后clean。Watch40159668515/artifact12585955871下载实际proven/三义务satisfied；Platform QA40159681786于03:53:13Z completed/success，20份原JSON全部pass/exit0，Linux8/macOS8/Windows4。各平台TS/exe构建success、格间identity一致，20份业务transcript均有成功bash/task/tool_search/tool_load/skill及fixture body。Linux/macOS build `bf8345baf8504ad714a7b9ea34cc4e8a4d1c4370c590d711c1bc2c69f9aac60c`、artifact与本地相同；Windows build `4356edc30b88562abcd37e0b8bbf01944dca008a3a3eb366c80b1b6448fb5f31`。Windows四个regular/fullscreen步骤skipped，不计IME或系统复制通过。源码/测试hash与本地43项验证仍匹配，任务scratch已清理，formal artifacts保留。
+
+前卡片提交3f339683的CI40159042967于03:58:47Z completed/success：970files/10529tests passed、1file/3tests skipped，完整judge proven。当前STS提交CI40159668568于04:09:20Z completed/success：971files/10532tests passed、1file/3tests skipped，静态/script/TS build和完整judge均success，judge实际proven。结果与日志安全摘要已归artifacts；后续文档提交不冒充新产品SHA复验。历史gzip失败仍保留为根因未证实，38/9/0不变；剩余继承/cache WATCH不因collector proven被豁免。
 
 ## 2026-10-25 QA-04 剩余职责提取与独立复核
 

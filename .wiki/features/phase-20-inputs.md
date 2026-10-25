@@ -2,6 +2,8 @@
 
 依据：[原决策](phase-20-decisions.md)、[当前剩余表](phase-20-status.md)。2026-10-25补证后矩阵为38 complete / 9 partial / 0 open；本页保留五组准备条件及用户原答复。单账户OAuth和指定HTTP MCP已实际验收。外部剩余条件为多账号、可信账期、正式质量及桌面交互；QA-04结构judge已proven/0gaps，工具卡片与STS安全风险分别修复且独立APPROVE/CLEAR，原继承/cache WATCH及当前SHA远端交付复核由代理处理。诊断提交CI已success，历史gzip失败根因仍未证实。无需重新准备已验连接。
 
+最新产品提交 `85c98eaf` 的CI40159668568已success（10532tests passed）、Watch实际proven、Platform QA40159681786的20支持格全部通过。允许执行的连接与本地修复已交付；剩余外部准备仍按下表，不把Free quota当可信账单，也不恢复已暂缓的质量或多账号验收。
+
 ## 2026-10-25 执行结果与剩余输入
 
 | 事项 | 已执行 | 还需准备/用户裁决 |
@@ -9,7 +11,7 @@
 | OpenAI OAuth | Windows Chrome两次独立profile授权、两次真实刷新、取消零凭据、跨profile零发送、专用grant撤销后401拒绝/零重播、原本地logout无凭据；日常配置不改 | 同账户两profile不算多账号；多账号切换按用户决定暂缓，PRV-03保留partial。PAN-07的原消费者认证生命周期已闭合 |
 | 官方用量/费用 | 已核对官方API Usage/Costs与ChatGPT计划用量；原账户接口返回quota和0张reset credit | PRV-05仍缺可访问的账户/项目账期、可比较费用字段或脱敏导出；Free quota不是USD账单，不需要发Admin key到对话 |
 | 正式质量 | 未运行正式模型请求 | TOOL-02/QA-03暂缓；恢复时固定实际模型/预算/评分者 |
-| 桌面交互 | 原支持平台自动格保留；本轮只实际完成Windows浏览器→WSL回调 | 用户后续Windows验IME/系统复制；macOS暂无机器，不增加操作要求 |
+| 桌面交互 | 最新85c98eaf的Platform QA40159681786已20/20支持格通过，三平台TS/exe及原业务transcript已核对；真实桌面只实际完成Windows浏览器→WSL回调 | 用户后续Windows验IME/系统复制；macOS暂无机器，不增加操作要求 |
 | GitHub HTTP MCP | 用户授权代理直接修改既有Windows DNS脚本，两域名例外及chatgpt加密DNS，原规则保留；原gateway两轮49工具、只读查cheers、关闭 | PAN-08闭合，无需再调整网络或提供token。回滚备份仅本机Git忽略目录0600保留，报告见phase-20-status |
 
 官方入口：[API Usage](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage)、[API Costs](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage/methods/costs)、[API用量控制台](https://platform.openai.com/usage)、[ChatGPT计划用量](https://learn.chatgpt.com/docs/pricing)。API-key调用和ChatGPT登录额度是不同来源；能读取quota不证明可访问费用或每请求账单。

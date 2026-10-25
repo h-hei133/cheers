@@ -9009,3 +9009,11 @@ Platform QA40157005332已于03:09:30Zsuccess，原20个JSON receipt下载读回�
 沿原provider/aws/sts owner修复两种credential交换：非成功HTTP请求取消正文，不读XML Message/raw body、不等待清理，以固定source+HTTP数值投影同一CredentialsError。成功解析、签名、signal与原路径类身份保持；参考有界原始错误正文不符合本仓secret boundary，未引入。新3项在旧版本出现2 AssertionErrors/1 timeout；两条泄露有效反转exit1/2 AssertionErrors，精确字节恢复后3文件43项全通过。主代理静态五门/analyzer0/diff→根TS build→完整judge串行exit0，build8cef6d62c23c2c46f4a4341df6d499dbe3def0545dcd625c604c49f88564c21c、inputs99fec6dc6f24b42156d39adfe2c9802b2a016e65e12d65859c77a0c9fd99f595、artifactd36de43b984491e5e3b93f049a63f1bc2ad4aae76fab819683c1745bb4e3e003；proven/三义务satisfied/0gaps。既有独立gpt-6.1-sol两路APPROVE/CLEAR，无子代理验证。安全证据归artifacts，HANDOFF追加失败正文/清理等待护栏；不宣称清理完成、全产品安全或全Phase完成。原继承/cache WATCH及38/9/0保留，本批交付另绑定。
 
 前诊断0b161bdcac00381111688258a68bbe39326ea4e7 CI40158395848于03:42:13Z success，970files/10522tests passed、1file/3tests skipped、完整judge三义务满足；只证明此SHA成功，不确定历史gzip失败根因。工具卡片3f339683f4d7c6c7782f28299f80767c9c57de70已推送/main精确且当时clean，Watch40159042970/artifact12585775136实际proven/三义务satisfied，CI40159042967仍全套运行。本批自身提交/CI另读回，无本地全套/真实20k PTY。
+
+### STS交付与平台读回
+
+85c98eaf3c68cc1d2c81c1145ae984146a57e1ae已提交/推送，远端main精确一致且推送后clean。Watch40159668515/artifact12585955871下载actualproven/三义务satisfied；同SHA Platform QA40159681786于03:53:13Zsuccess，20原receipt全pass/exit0（Linux8/macOS8/Windows4）、三平台TS/exe build success，20业务transcript成功工具/skill payload已核对。Linux/macOS buildbf8345baf8504ad714a7b9ea34cc4e8a4d1c4370c590d711c1bc2c69f9aac60c、artifact与本地相同；Windows build4356edc30b88562abcd37e0b8bbf01944dca008a3a3eb366c80b1b6448fb5f31。Windows4个交互step skipped，IME/系统复制仍缺。源码/测试hash匹配本地验证，两个own scratch删除、artifacts保留。CI40159668568静态/script/TS已过、全套运行，最终结果另读回。
+
+前卡片3f339683 CI40159042967于03:58:47Zsuccess，970files/10529tests passed、1file/3tests skipped，完整judge proven；分别绑定SHA，不删除历史gzip失败。38complete/9partial/0open及继承/cache WATCH保留。
+
+STS85c98eaf CI40159668568于04:09:20Z completed/success：971files/10532tests passed、1file/3tests skipped，静态/script/TS build及CI完整judge success、actualproven。主代理持续watch串行结束exit0，最终安全日志摘要/结构artifact/平台receipt已归档。代码main交付已验证，后续只补文档读回；Phase整体仍partial，剩余真实多账号（暂缓）、可信账单、正式质量（暂缓）及Windows桌面IME/系统复制条件见inputs，无本地全套/20k真实PTY。
