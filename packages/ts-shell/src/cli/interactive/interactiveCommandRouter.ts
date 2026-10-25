@@ -105,6 +105,7 @@ export interface InteractiveCommandRouterInput {
 }
 
 export interface InteractiveCommandRouterResult {
+  readonly retryDraft?: string;
   readonly sessionManagement?: ShellActionResult;
   readonly turnNumber: number;
   readonly navigation?: SessionNavigationResult;
@@ -219,7 +220,7 @@ export async function routeInteractiveCommand(
   });
   const themeChanged = defaultTheme.colorRevision !== themeBefore;
   if (resolved.kind === "handled") {
-    return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
+    return { turnNumber: nextTurnNumber, ...(resolved.retryDraft !== undefined ? { retryDraft: resolved.retryDraft } : {}), ...(themeChanged ? { themeChanged: true } : {}) };
   }
   const slashResult = resolved.kind === "shell-action" ? resolved.slashResult : null;
 

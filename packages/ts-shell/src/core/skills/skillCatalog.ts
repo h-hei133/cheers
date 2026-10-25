@@ -30,6 +30,8 @@ export interface SkillCatalogOptions {
 }
 
 export interface SkillCatalogResult {
+  /** Revalidate the same captured discovery dependencies immediately before admission. */
+  readonly verify?: () => void;
   readonly skills: ReadonlyMap<string, Skill>;
   readonly collisions: readonly SkillCollision[];
   readonly diagnostics: readonly SkillDiagnostic[];
@@ -75,13 +77,14 @@ export async function resolveSkillCatalog(options: SkillCatalogOptions, onSource
     if (skill.isCurrent?.() === false || owners.has(name) && !current.has(owners.get(name)!)) skills.delete(name);
   }
   if (!projectTrust.isProjectUntrusted(options.workspaceRoot)) {
-    return { skills, collisions, diagnostics, failures };
+    return { skills, collisions, diagnostics, failures, verify: () => discovery.verify() };
   }
   return {
     skills: new Map([...skills].filter(([, skill]) => skill.source === "user" || skill.source === "cli" || skill.source === 'extension')),
     collisions,
     diagnostics,
     failures,
+    verify: () => discovery.verify(),
   };
 }
 

@@ -3,7 +3,7 @@ import { serverCatalog } from "./servers.js";
 import { grantCatalog, type GrantCatalog } from "./grants.js";
 import { connectionCatalog } from "./connections.js";
 import { memoryCatalog, observeMemoryCatalog } from "./memory.js";
-import { pathCatalog } from "./paths.js";
+import { pathCatalog, resolveCatalogDirectory } from "./paths.js";
 import { observeDirectory } from "./watch.js";
 import { catalogSources } from "./sources.js";
 import { modelCatalog } from "./models.js";
@@ -74,6 +74,17 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
   const load = async (kind: CatalogKind, signal: AbortSignal, query?: string, progress?: CatalogProgressSink): Promise<readonly Suggestion[]> => {
     signal.throwIfAborted();
     const current = context();
+    if (kind === 'path') return pathCatalog(current.cwd, query ?? '', false, signal);
+    if (kind === 'inline-skill') return (await skills.read(current, signal)).map(item => ({ ...item, value: `/skill:${item.value}`, label: `/skill:${item.label}` }));
+    if (kind === 'prose') {
+      const results = await Promise.allSettled([pathCatalog(current.cwd, query ?? '', false, signal), skills.read(current, signal)]);
+      signal.throwIfAborted();
+      const paths = results[0].status === 'fulfilled' ? results[0].value : [];
+      const entries = results[1].status === 'fulfilled' ? results[1].value.map(item => ({ ...item, value: `/skill:${item.value}`, label: `/skill:${item.label}` })) : [];
+      const items = [...paths, ...entries].slice(0, 5000);
+      if (results.some(result => result.status === 'rejected')) progress?.({ items, status: 'Some paths or skills are unavailable.' });
+      return items;
+    }
     if (kind === "reference") {
       const files = await listWorkspaceFiles(current.projectRoot, { abortSignal: signal });
       signal.throwIfAborted();
@@ -108,7 +119,12 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
   return Object.assign(load, {
     invalidate: () => { pending = undefined; },
     observe: (kind: CatalogKind, query: string | undefined, changed: () => void) => {
-      if (kind === "skill") return skills.observe(changed);
+      if (kind === "skill" || kind === 'inline-skill') return skills.observe(changed);
+      if (kind === 'prose') {
+        const close = skills.observe(changed);
+        const directory = observeDirectory(resolveCatalogDirectory(context().cwd, query ?? '', false), changed);
+        return () => { close(); directory(); };
+      }
       const observer = navigation.get(kind);
       if (observer) return observer.observe(changed);
       const current = context();

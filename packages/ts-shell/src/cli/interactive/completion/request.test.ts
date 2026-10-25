@@ -42,12 +42,12 @@ it.each([
 });
 
 it("replaces only the quoted ID and leaves alias, tabs, spacing and reason intact", () => {
-  const marked = '  /MEM\tdelete "pm|r:old"  理由 👩‍💻\tend  ';
+  const marked = '/MEM\tdelete "pm|r:old"  理由 👩‍💻\tend  ';
   const req = request(marked)!;
   expect(req).toBeDefined();
   const edit = catalogSuggestions(req, [{ value: "pmr:new", label: "pmr:new" }])[0]!.edit!;
   const result = req.snapshot.text.slice(0, edit.from) + edit.text + req.snapshot.text.slice(edit.to);
-  expect(result).toBe('  /MEM\tdelete "pmr:new"  理由 👩‍💻\tend  ');
+  expect(result).toBe('/MEM\tdelete "pmr:new"  理由 👩‍💻\tend  ');
   expect(parseSyntax(memorySyntax, tokenizeCommandArgs(result).slice(1))).toMatchObject({
     ok: true, action: { name: "delete" }, args: ["pmr:new", "理由", "👩‍💻", "end"],
   });

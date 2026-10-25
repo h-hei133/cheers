@@ -110,7 +110,7 @@ import { runPluginCommand } from "./pluginCommandRuntime.js";
 import { runMemoryCommand, recallSyntax, retainSyntax } from "./memoryCommandRuntime.js";
 import { runWorkflowCommand } from "./workflowCommandRuntime.js";
 import { runDeepResearchCommand, webResearchSyntax } from "./deepResearchCommandRuntime.js";
-import { runBrainstormCommand } from "./brainstormCommandRuntime.js";
+import { runBrainstormCommand, prepareBrainstorm } from "./brainstormCommandRuntime.js";
 import { runCommitCommand, commitSyntax } from "./commitCommandRuntime.js";
 import { runThinkingCommand } from "./thinkingCommandRuntime.js";
 import { runToolsCommand, toolsSyntax } from "./toolsCommandRuntime.js";
@@ -140,6 +140,7 @@ import {
   runWorkspaceShellAction,
 } from "./shellActionRuntime.js";
 import type { CommandContext, CommandDefinition } from "./types.js";
+import { templateCommands } from '../prompts/commands.js';
 
 export function createCommandRegistry(
   cwd: string = process.cwd(),
@@ -891,6 +892,7 @@ export function createCommandRegistry(
     },
     {
       name: "brainstorm",
+      composition: { kind: 'modifier', flags: brainstormSyntax.flags, prepare: prepareBrainstorm },
       aliases: ["explore", "brainstorming"],
       // It expands into a prompt: the exploration is the model's work, because
       // trade-offs for a specific problem cannot come from a local template.
@@ -1025,7 +1027,8 @@ export function createCommandRegistry(
     },
   ];
 
-  return new Map(commands.map((command) => [command.name, command]));
+  const reserved = new Set(commands.flatMap(command => [command.name, ...(command.aliases ?? []), ...(command.invocations?.map(invocation => invocation.name) ?? [])]));
+  return new Map([...commands, ...templateCommands(cwd).filter(template => !reserved.has(template.name))].map((command) => [command.name, command]));
 }
 
 export function listVisibleCommands(

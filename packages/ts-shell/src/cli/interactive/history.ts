@@ -45,8 +45,8 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
         blocks.push(textBlock('notice', `Goal continuation (round ${String(turn.metadata.round)}).`));
         continue;
       }
-      const content = messageToText(turn.content).trim();
-      if (content) {
+      const content = typeof turn.metadata?.originalInput === 'string' ? turn.metadata.originalInput : messageToText(turn.content);
+      if (content.trim()) {
         blocks.push(textBlock("user", content));
       }
     } else if (turn.role === "assistant") {
@@ -161,7 +161,7 @@ export function appendConversation(target: Pick<HistoryTarget, 'transcript' | 'e
   target.transcript.finalizeAll();
   const userPrompts = session.turns
     .filter((turn) => turn.role === "user" && messageToText(turn.content).trim().length > 0)
-    .map((turn) => messageToText(turn.content).trim());
+    .map((turn) => typeof turn.metadata?.originalInput === 'string' ? turn.metadata.originalInput : messageToText(turn.content));
   target.editor?.loadHistory(userPrompts);
 }
 

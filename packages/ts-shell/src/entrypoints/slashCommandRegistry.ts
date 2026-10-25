@@ -19,6 +19,7 @@ export interface SlashCommandLineRenderer {
 }
 
 export interface SlashCommandSpec {
+  readonly composition?: CommandDefinition['composition'];
   readonly name: string;
   readonly aliases?: readonly string[];
   readonly invocations?: CommandDefinition["invocations"];
@@ -48,6 +49,7 @@ export interface SlashCommandSpec {
 function project(command: CommandDefinition): SlashCommandSpec {
   return {
     name: command.name,
+    ...(command.composition ? { composition: command.composition } : {}),
     ...(command.aliases ? { aliases: command.aliases } : {}),
     ...(command.invocations ? { invocations: command.invocations } : {}),
     group: command.group,

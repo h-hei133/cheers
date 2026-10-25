@@ -4,6 +4,7 @@ import { catalogRequest, catalogSuggestions, type CatalogKind } from "./request.
 import type { CatalogProgress, CatalogProgressSink } from './result.js';
 
 interface Options {
+  readonly scope?: () => import('../../../entrypoints/slashCommandRegistry.js').SlashCatalogScope;
   readonly identity: () => string;
   readonly draft: () => DraftSnapshot;
   readonly load: ((kind: CatalogKind, signal: AbortSignal, query?: string, progress?: CatalogProgressSink) => Promise<readonly Suggestion[]>) & {
@@ -48,7 +49,7 @@ export class CatalogController {
 
   update(snapshot: DraftSnapshot): boolean {
     this.cancel();
-    const request = catalogRequest(snapshot);
+    const request = catalogRequest(snapshot, this.options.scope?.());
     if (!request) return false;
     const identity = this.options.identity();
     if (identity !== this.identity) { this.invalidate(); this.identity = identity; }

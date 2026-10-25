@@ -1,6 +1,6 @@
 import type { CommandDefinition, NamedCommandInvocation } from "./types.js";
 
-type CommandIdentity = Pick<CommandDefinition, "group" | "name" | "aliases" | "invocations" | "summary" | "argumentHint" | "argumentMode" | "getArgumentCompletions">;
+type CommandIdentity = Pick<CommandDefinition, "group" | "name" | "aliases" | "invocations" | "summary" | "argumentHint" | "argumentMode" | "getArgumentCompletions" | 'composition'>;
 
 export interface CommandInvocation extends NamedCommandInvocation {
   /** The handler's owner, distinct from the spelling that must be dispatched. */
@@ -16,6 +16,7 @@ export function commandInvocations(command: CommandIdentity): CommandInvocation[
     group: command.group, name: command.name, commandName: command.name, invocation: `/${command.name}`, kind: "command",
     summary: command.summary, argumentHint: command.argumentHint, getArgumentCompletions: command.getArgumentCompletions,
     argumentMode: command.argumentMode,
+    composition: command.composition,
   }];
   for (const alias of command.aliases ?? []) {
     if (names.has(alias)) continue;

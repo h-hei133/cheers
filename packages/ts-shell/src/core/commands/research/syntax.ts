@@ -23,3 +23,14 @@ export function parseResearchArgs(args: readonly string[]) {
   const control = researchSyntax.actions.some(action => action.name && action.name === first);
   return parseSyntax(researchSyntax, args.length && !control ? ['', ...args] : args);
 }
+
+/** Pure driver admission. Controls and save keep their independent command path. */
+export function prepareResearch(args: readonly string[], prose: string): { args: readonly string[] } | { error: string } {
+  const control = args[0]?.toLowerCase();
+  if (researchSyntax.actions.some(action => action.name && action.name === control)) return { error: 'Research control actions cannot be composed.' };
+  if (!prose.trim()) return { error: 'Research composition requires a shared question.' };
+  const parsed = parseResearchArgs([...args, prose]);
+  if (!parsed.ok) return { error: `Invalid research composition: ${parsed.reason}` };
+  if (parsed.flags.has('save') || parsed.flags.has('help')) return { error: 'Research save/help must be used separately.' };
+  return { args: [...args, prose] };
+}

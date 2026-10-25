@@ -117,6 +117,7 @@ export class TemplateLoader {
         templates.set(name, {
           name,
           description: fields.get("description") ?? "",
+          ...(fields.get('composable') === 'true' ? { composable: true } : {}),
           ...(argumentHint ? { argumentHint } : {}),
           content,
           filePath: file,

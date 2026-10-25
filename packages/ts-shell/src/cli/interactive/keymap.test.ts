@@ -1,5 +1,6 @@
 import { completionEdit } from "./completion.js";
 import { slashSuggestions } from "./slashSuggestions.js";
+import { catalogRequest, catalogSuggestions } from './completion/request.js';
 import { describe, expect, it, vi } from "vitest";
 import { resetVimState, routeKey, type KeymapActions } from "./keymap.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
@@ -92,6 +93,19 @@ describe("scrolling", () => {
 });
 
 describe("text entry", () => {
+  it('Tab replaces a prose path token and consumes the key without submitting', () => {
+    const { press, surface, actions } = build(); surface.editor.insert('阅读 /home');
+    const request = catalogRequest(surface.editor.snapshot())!;
+    surface.suggestions.setItems(catalogSuggestions(request, [{ value: '/home/', label: '/home/', kind: 'path' }]));
+    surface.setSuggesting(true); press('\t');
+    expect(surface.editor.getText()).toBe('阅读 /home/'); expect(actions.submit).not.toHaveBeenCalled();
+  });
+  it('preserves source offsets and history on submission', () => {
+    const { press, surface, actions } = build();
+    surface.editor.insert('  \n/model  '); press('\r');
+    expect(actions.submit).toHaveBeenCalledWith('  \n/model  ');
+    press('\x1b[A'); expect(surface.editor.getText()).toBe('  \n/model  ');
+  });
   it("inserts printable characters", () => {
     const { press, surface } = build();
     press("h");
@@ -155,7 +169,7 @@ describe("submission", () => {
     press("\r");
 
     const [text, , attachments] = actions.submit.mock.calls[0]!;
-    expect(text).toBe("look at this");
+    expect(text).toBe("look at this ");
     expect(attachments).toEqual({ images: [image] });
   });
 
@@ -505,7 +519,7 @@ describe("completion interception", () => {
     expect(surface.suggestions.current()?.value).toBe("--outside");
     surface.setSuggesting(true);
     press("\r");
-    expect(actions.submit).toHaveBeenCalledWith("/export markdown");
+    expect(actions.submit).toHaveBeenCalledWith("/export markdown ");
     expect(actions.submit).not.toHaveBeenCalledWith(expect.stringContaining("--outside"));
   });
 

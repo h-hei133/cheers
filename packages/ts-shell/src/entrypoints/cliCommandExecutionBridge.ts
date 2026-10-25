@@ -33,7 +33,7 @@ import { renderLocalCommand, renderSignInProgress } from '../cli/output/command.
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
 
 export type CliCommandExecution =
-  | { readonly kind: "handled" }
+  | { readonly kind: "handled"; readonly retryDraft?: string }
   | {
       readonly kind: "shell-action";
       readonly slashResult: Extract<SlashRouteResult, { kind: "shell-action" }>;
@@ -236,7 +236,7 @@ export async function buildCliCommandExecution(
   });
   if (slashResult?.kind === "local") {
     renderLocalCommand({ ...input, result: slashResult });
-    return { kind: "handled" };
+    return { kind: "handled", ...(slashResult.retryDraft !== undefined ? { retryDraft: slashResult.retryDraft } : {}) };
   }
 
   if (slashResult?.kind === "shell-action") {

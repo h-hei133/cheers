@@ -18,7 +18,7 @@ export function createSkillCatalog() {
       }
       for (const directory of userDataSearchDirs()) track(path.join(directory, "trust.json"));
       const catalog = await resolveSkillCatalog({ workspaceRoot: context.cwd, sessionId: context.session.id, ...context.skillOptions, abortSignal: signal }, track);
-      return [...catalog.skills.values()].map(skill => ({ value: skill.name, label: skill.name, detail: skill.description }));
+      return [...catalog.skills.values()].map(skill => ({ value: skill.name, label: skill.name, kind: 'skill' as const, identity: skill.filePath, detail: skill.description }));
     }),
   };
 }

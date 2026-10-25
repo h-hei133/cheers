@@ -17,6 +17,8 @@ export interface Suggestion {
   readonly value: string;
   readonly label: string;
   readonly detail?: string;
+  readonly kind?: 'path' | 'skill' | 'command';
+  readonly identity?: string;
   /** Snapshot-bound replacement; unbound display candidates cannot be accepted. */
   readonly edit?: DraftEdit;
 }
@@ -56,7 +58,7 @@ export class SuggestionList {
   /** Keep an explicit selection through progress updates for the same draft and edit. */
   setItems(items: readonly Suggestion[]): void {
     const selected = this.moved ? this.current() : undefined;
-    const retained = selected?.edit ? items.findIndex(item => item.value === selected.value && sameEdit(item.edit, selected.edit)) : -1;
+    const retained = selected?.edit ? items.findIndex(item => item.value === selected.value && item.kind === selected.kind && item.identity === selected.identity && sameEdit(item.edit, selected.edit)) : -1;
     this.renderedItems = [];
     this.items = items;
     this.selected = retained >= 0 ? retained : 0;

@@ -21,6 +21,13 @@ describe("prompt history persistence", () => {
   it("loads empty history when no file exists", () => {
     expect(loadPromptHistory(tmpDir)).toEqual([]);
   });
+  it('preserves source positions, multiline drafts and literal escapes across restarts', () => {
+    const source = '  \n/model  \\n  ';
+    appendPromptHistory(tmpDir, source);
+    expect(loadPromptHistory(tmpDir)).toEqual([source]);
+    const editor = new Editor(); editor.loadHistory(loadPromptHistory(tmpDir)); editor.recall(-1);
+    expect(editor.getText()).toBe(source);
+  });
 
   it("appends and loads prompt history across restarts", () => {
     appendPromptHistory(tmpDir, "git status");

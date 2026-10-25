@@ -29,6 +29,13 @@ function write(root: string, name: string, content: string): void {
 }
 
 describe("finding templates", () => {
+  it('requires explicit opt-in before a template can be composed inline', () => {
+    const root = workspace(); write(root, 'ordinary', 'Ordinary body.');
+    write(root, 'method', '---\ncomposable: true\n---\nMethod body.');
+    const templates = new TemplateLoader(root).load();
+    expect(templates.get('ordinary')?.composable).toBeUndefined();
+    expect(templates.get('method')?.composable).toBe(true);
+  });
   it("takes the file name as the invocation name", () => {
     const root = workspace();
     write(root, "review", "Review the code.");

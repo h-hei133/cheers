@@ -35,6 +35,13 @@ const CONVERSATION = [
 ];
 
 describe("restoring a conversation", () => {
+  it('restores original composed source and indentation into the transcript and editor history', () => {
+    const source = '  问题 /skill:a\n/skill:b  ';
+    const message = { ...turn('user', '<skill>expanded instructions</skill>'), metadata: { originalInput: source } };
+    const transcript = new Transcript(); const loadHistory = (entries: readonly string[]) => expect(entries).toEqual([source]);
+    appendConversation({ transcript, editor: { loadHistory } }, { id: 'original', turns: [message] } as never);
+    expect(transcript.last()?.text).toBe(source);
+  });
   it("rebuilds what was said, in order", () => {
     const { blocks } = restoreConversation(CONVERSATION);
 

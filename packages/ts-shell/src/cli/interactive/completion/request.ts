@@ -18,22 +18,26 @@ import { getSlashInvocation } from "../../../entrypoints/slashCommandRegistry.js
 import type { DraftSnapshot } from "../../../presentation/tui/editor/replacement.js";
 import { matchSuggestions, type Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
 import { fileReferenceAt, fileSuggestions } from "../fileSuggestions.js";
+import { proseRequest, proseSuggestions } from './prose.js';
+import type { SlashCatalogScope } from '../../../entrypoints/slashCommandRegistry.js';
 
-export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant" | "connection" | "file" | "directory" | "reference" | "model" | "provider" | "workflow" | MemoryCatalogKind;
+export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant" | "connection" | "file" | "directory" | "reference" | "model" | "provider" | "workflow" | 'inline-skill' | 'prose' | 'path' | MemoryCatalogKind;
 
-export function catalogRequest(snapshot: DraftSnapshot) {
-  const command = commandCatalogRequest(snapshot);
+export function catalogRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScope) {
+  const command = commandCatalogRequest(snapshot, scope);
   if (command) return command;
+  const prose = proseRequest(snapshot, scope);
+  if (prose) return prose;
   if (!fileReferenceAt(snapshot.text, snapshot.cursor)) return undefined;
   return { kind: "reference" as const, token: completionToken(snapshot.text, snapshot.cursor), snapshot,
     fixed: [] as Suggestion[], query: undefined };
 }
 
-function commandCatalogRequest(snapshot: DraftSnapshot) {
+function commandCatalogRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScope) {
   const token = completionToken(snapshot.text, snapshot.cursor);
   const command = token.before[0];
-  if (!command || !/^\/[A-Za-z0-9:._?-]+$/.test(snapshot.text.slice(command.from, command.to))) return undefined;
-  const invocation = getSlashInvocation(command.value);
+  if (!command || command.from !== 0 || !/^\/[A-Za-z0-9:._?-]+$/.test(snapshot.text.slice(command.from, command.to))) return undefined;
+  const invocation = getSlashInvocation(command.value, scope);
   if (!invocation || invocation.kind === "named") return undefined;
   const name = invocation?.commandName;
   const preceding = token.before.slice(1).map(item => item.value);
@@ -70,6 +74,7 @@ function commandCatalogRequest(snapshot: DraftSnapshot) {
 }
 
 export function catalogSuggestions(request: NonNullable<ReturnType<typeof catalogRequest>>, items: readonly Suggestion[]) {
+  if (request.kind === 'inline-skill' || request.kind === 'prose' || request.kind === 'path') return proseSuggestions(request, items);
   if (request.kind === "reference") return fileSuggestions(request.snapshot.text, items.map(item => item.value), request.snapshot) ?? [];
   return matchSuggestions(request.token.value, [...request.fixed, ...items]).slice(0, 100).map(item => {
     const text = (item.value.startsWith("-") && !request.token.before.some(token => token.value === "--") ? "-- " : "") + quoteCompletion(item.value, request.token.prefix);

@@ -10,24 +10,24 @@ import { CURSOR_MARKER } from "../render/paint.js";
 const idle = { busy: false };
 
 describe("prompt block", () => {
-  it("aligns source rows with one blank cell and no prompt cue", () => {
+  it("places the prompt arrow at the left edge and aligns continuation text", () => {
     const editor = new Editor();
     editor.insert("line1");
     editor.newline();
     editor.insert("line2");
     const rows = renderComposer(editor, idle, 40);
     expect(rows[0]).toContain("─");
-    expect(stripAnsi(rows[1]!)).toMatch(/^ /);
-    expect(rows[1]).not.toContain("❯");
+    expect(stripAnsi(rows[1]!)).toMatch(/^❯ line1/);
+    expect(stripAnsi(rows[2]!)).toMatch(/^  line2/);
     expect(rows[2]).not.toContain("❯");
   });
 
-  it("keeps one padding cell around source text within the real width", () => {
+  it("reserves the arrow gutter and right padding within the real width", () => {
     const editor = new Editor();
     editor.insert("你好");
     const rows = renderComposer(editor, idle, 40);
     expect(rows.every(row => visibleWidth(row) <= 40)).toBe(true);
-    expect(stripAnsi(rows[1]!)).toBe(" 你好" + " ".repeat(35));
+    expect(stripAnsi(rows[1]!)).toBe("❯ 你好" + " ".repeat(34));
   });
 
   it("carries the cursor marker through for the renderer to place", () => {
@@ -36,8 +36,8 @@ describe("prompt block", () => {
     expect(renderComposer(editor, idle, 40).join("")).toContain(CURSOR_MARKER);
   });
 
-  it("reserves both padding sides from the text budget", () => {
-    expect(composerTextWidth(40)).toBe(38);
+  it("reserves the two-cell gutter and right padding from the text budget", () => {
+    expect(composerTextWidth(40)).toBe(37);
   });
 
   it("bounds composer output to maxRows and tracks cursor", () => {
@@ -46,8 +46,7 @@ describe("prompt block", () => {
     const rows = renderComposer(editor, idle, 40, 4);
     expect(rows).toHaveLength(4);
     expect(rows[0]).toContain("─");
-    expect(stripAnsi(rows[1]!)).toMatch(/^ /);
-    expect(rows[1]).not.toContain("❯");
+    expect(stripAnsi(rows[1]!)).toMatch(/^❯ /);
     expect(stripAnsi(rows[2]!)).toContain("prompt line 14");
     expect(stripAnsi(rows[3]!)).toBe("─".repeat(40));
     expect(rows.join("")).toContain(CURSOR_MARKER);

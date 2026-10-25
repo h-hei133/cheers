@@ -24,8 +24,12 @@ export function loadPromptHistory(projectRoot: string): string[] {
     const content = fs.readFileSync(file, "utf8");
     const lines = content
       .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+      .map((line) => {
+        if (!line.startsWith('"')) return line;
+        try { const entry: unknown = JSON.parse(line); return typeof entry === 'string' ? entry : line; }
+        catch { return line; }
+      })
+      .filter((line) => line.trim().length > 0);
     return lines.slice(Math.max(0, lines.length - MAX_HISTORY_LINES));
   } catch {
     return [];
@@ -36,15 +40,14 @@ export function loadPromptHistory(projectRoot: string): string[] {
  * Append a submitted prompt or command to the disk history file.
  */
 export function appendPromptHistory(projectRoot: string, prompt: string): void {
-  const trimmed = prompt.trim();
-  if (!trimmed) return;
+  if (!prompt.trim()) return;
   try {
     const file = historyPath(projectRoot);
     const dir = path.dirname(file);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    const singleLine = trimmed.replace(/\r?\n/g, "\\n");
+    const singleLine = JSON.stringify(prompt);
     assertProfileStorage(file);
     fs.appendFileSync(file, `${singleLine}\n`, "utf8");
   } catch {

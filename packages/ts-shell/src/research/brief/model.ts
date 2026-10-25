@@ -5,6 +5,12 @@ export interface ResearchRequest {
   readonly depth: 'quick' | 'deep';
   readonly briefPath?: string;
   readonly save: boolean;
+  /** User-selected methods are immutable instructions, separate from retrieved evidence. */
+  readonly methods?: {
+    readonly originalInput: string;
+    readonly skills: readonly import('../../core/prompts/skills.js').SkillInstruction[];
+    readonly modifiers: readonly { readonly name: string; readonly instruction: string }[];
+  };
 }
 export interface ResearchBrief {
   readonly revision: number;

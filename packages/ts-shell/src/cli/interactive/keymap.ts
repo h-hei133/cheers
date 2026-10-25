@@ -478,13 +478,13 @@ function consumeSuggestionKey(event: ParsedKeyEvent, context: KeymapContext): bo
   const snapshot = view.editor.snapshot();
   const edit = chosen?.edit;
   const written = edit ? snapshot.text.slice(edit.from, edit.to) : "";
-  const insertion = edit ? (edit.to === edit.snapshot.text.length ? edit.text.slice(0, -1) : edit.text) : "";
+  const insertion = edit ? (edit.to === edit.snapshot.text.length && edit.text.endsWith(' ') ? edit.text.slice(0, -1) : edit.text) : "";
   const incomplete = edit !== undefined && written.length > 0 && (written.startsWith("/")
     ? written.toLowerCase() !== insertion.toLowerCase()
     : written !== insertion);
   // A whole command typed out submits, even if the list was navigated earlier:
   // accepting an old candidate here would execute something the user did not type.
-  const complete = edit !== undefined && written.startsWith("/") &&
+  const complete = edit !== undefined && edit.from === 0 && chosen?.kind !== 'path' && written.startsWith("/") &&
     getSlashInvocation(written.toLowerCase()) !== undefined;
   const accepts = action === "tui.input.tab" ||
     (action === "tui.input.submit" && !complete && (view.suggestions.chosen || incomplete));
@@ -514,11 +514,8 @@ function submitDraft(context: KeymapContext, disposition?: "steer" | "followUp")
   }
   // History keeps the draft as it looked, so recalling it brings back a short line
   // rather than the whole pasted file. What is sent is the expansion.
-  const expanded = view.pastes.expand(source).trimStart();
-  const command = /^\/\s*(\S+)/.exec(expanded)?.[1];
-  const literal = command && getSlashInvocation(command)?.argumentMode === "raw";
-  const draft = literal ? source.trimStart() : source.trim();
-  const submission = literal ? expanded : expanded.trim();
+  const draft = source;
+  const submission = view.pastes.expand(source);
   // Images are collected beside the text rather than from it: the placeholder
   // stands for an attachment, and expanding the draft turns it back into the
   // words it stood for, which for an image is nothing.

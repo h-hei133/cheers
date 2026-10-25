@@ -177,6 +177,7 @@ function savedSessionPicker(host: PickerHost, action: 'resume' | 'pin'): Picker 
 
 /** Arguments belong to the picker when that command explicitly accepts them. */
 export function pickerFor(command: string, host: PickerHost): Picker | undefined {
+  if (!command.startsWith('/')) return undefined;
   const [first = "", ...rest] = command.trim().split(/\s+/);
   const context = host.commandContext;
   const invocation = getSlashInvocation(first, context ? {
@@ -190,6 +191,7 @@ export function pickerFor(command: string, host: PickerHost): Picker | undefined
 
 /** Back accepts a selector; other commands keep their direct argument forms. */
 export function opensPicker(line: string, scope?: SlashCatalogScope): boolean {
+  if (!line.startsWith('/')) return false;
   const trimmed = line.trim();
   if (!trimmed.startsWith("/")) return false;
   const invocation = getSlashInvocation(trimmed.slice(1).split(/\s+/)[0]!, scope);

@@ -1,8 +1,6 @@
 import { commandInvocations, resolveCommandInvocation } from "./invocation.js";
 import { createCommandRegistry } from "./registry.js";
-import { resolveSkillCatalog } from "../skills/skillCatalog.js";
-import { TemplateLoader } from "../prompts/templateLoader.js";
-import { expandSkill, expandTemplate } from "../prompts/expansion.js";
+import { composePrompt } from './composition.js';
 import type { CommandContext, CommandExecutionResult, CommandDefinition } from "./types.js";
 import { tokenizeCommandArgs } from "./arguments.js";
 import { catalogContributions } from '../catalog/contributions.js';
@@ -11,9 +9,16 @@ export async function routeSlashCommand(
   input: string,
   context: CommandContext,
 ): Promise<CommandExecutionResult | null> {
-  if (!input.startsWith("/")) {
-    return null;
+  const registry = createCommandRegistry(context.cwd, context.runtimeConfig);
+  const opening = /^\/([^\s/]+)(?:\s|$)/.exec(input)?.[1];
+  const openingCommand = opening ? resolveCommandInvocation([...registry.values()], opening) : undefined;
+  const dynamic = catalogContributions(context.cwd, context.sessionId).flatMap(entry => entry.commands);
+  const first = openingCommand ?? (opening ? resolveCommandInvocation(dynamic, opening) : undefined);
+  if (!first || first.composition) {
+    const composed = await composePrompt(input, context, [...registry.values(), ...dynamic]);
+    if (composed) return composed;
   }
+  if (!input.startsWith('/') || /^\/[^\s]*[\/\\]/.test(input)) return null;
 
   const invocation = /^\/\s*(\S+)(?:(?:\r\n|\s)([\s\S]*))?$/.exec(input);
   const rawName = invocation?.[1];
@@ -25,50 +30,6 @@ export async function routeSlashCommand(
     };
   }
 
-  // A skill invocation expands into a prompt. It is not a command and has no entry
-  // in the registry, so it has to be recognised before the unknown-command branch
-  // below — which treats every unregistered word as a mistake, and is what made
-  // `/skill:name` answer "Unknown slash command" while the same name worked through
-  // the `/skill` command.
-  //
-  // Resolved through the same catalog the prompt path uses, so the skills named
-  // here are exactly the ones the model was told about: `--skill` loads a file
-  // the model can already use, and an untrusted project's skills are absent from
-  // both lists rather than only from one.
-  const skills = input.startsWith('/skill:') ? (await resolveSkillCatalog({
-    workspaceRoot: context.cwd,
-    sessionId: context.sessionId,
-    ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
-    ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
-  })).skills : new Map();
-  const skill = expandSkill(input, skills);
-  if (skill.skill) {
-    return {
-      kind: "prompt",
-      prompt: skill.text,
-      notice: `Expanded skill \`${skill.skill}\` into a prompt.`,
-    };
-  }
-  if (skill.unknownSkill) {
-    const available = [...skills.keys()].sort();
-    return {
-      kind: "local",
-      output: [
-        "Result",
-        "- Outcome: blocked",
-        "- BlockerKind: command-not-allowlisted",
-        `- Reason: Unknown skill: ${skill.unknownSkill}`,
-        "- DoNext: Run /skill to see what is available, then retry.",
-        "",
-        `No skill named \`${skill.unknownSkill}\`.`,
-        available.length > 0
-          ? `Available: ${available.map((name) => `/skill:${name}`).join(", ")}`
-          : "No skills are installed. Put one under `.agents/skills/<name>/SKILL.md`.",
-      ].join("\n"),
-    };
-  }
-
-  const registry = createCommandRegistry(context.cwd, context.runtimeConfig);
   const resolved = resolveCommandInvocation([...registry.values()], rawName);
   const command = resolved ? registry.get(resolved.commandName) : undefined;
 
@@ -105,20 +66,6 @@ export async function routeSlashCommand(
     });
   }
 
-  // Only once nothing in the registry claims the name: a built-in command is a
-  // promise the product made, and a file in a prompts directory must not quietly
-  // take its name away. The template is looked up with the slash the user typed,
-  // which is the form the file is documented in.
-  const expanded = expandTemplate(input, new TemplateLoader(context.cwd).load());
-  if (expanded.template) {
-    return {
-      kind: "prompt",
-      prompt: expanded.text,
-      notice: `Expanded template \`${expanded.template}\` into a prompt.`,
-    };
-  }
-
-  const dynamic = catalogContributions(context.cwd, context.sessionId).flatMap(entry => entry.commands);
   const extension = resolveCommandInvocation(dynamic, rawName);
   const handler = dynamic.find(entry => entry.name === extension?.commandName);
   if (handler) {

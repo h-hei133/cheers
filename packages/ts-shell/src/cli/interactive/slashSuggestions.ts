@@ -39,12 +39,12 @@ function candidates(scope?: SlashCatalogScope): readonly Suggestion[] {
 
 export function slashSuggestions(draft: string, snapshot: DraftSnapshot = { text: draft, cursor: draft.length, revision: 0 }, scope?: SlashCatalogScope): Suggestion[] | null {
   const token = completionToken(draft, snapshot.cursor);
-  if (token.before.length === 0 && COMMAND_DRAFT.test(token.prefix)) {
+  if (token.from === 0 && token.before.length === 0 && COMMAND_DRAFT.test(token.prefix)) {
     const matches = matchSuggestions(token.prefix, candidates(scope));
     return matches.length ? matches.map(candidate => completionEdit(candidate, snapshot, token.from, token.to)) : null;
   }
   const command = token.before[0];
-  if (!command || !COMMAND_DRAFT.test(draft.slice(command.from, command.to))) return null;
+  if (!command || command.from !== 0 || !COMMAND_DRAFT.test(draft.slice(command.from, command.to))) return null;
   const invocation = getSlashInvocation(command.value, scope);
   const prefix = [...token.before.slice(1).map(item => item.value), token.value].join(" ");
   const values = invocation?.getArgumentCompletions?.(prefix);
@@ -55,7 +55,7 @@ export function slashSuggestions(draft: string, snapshot: DraftSnapshot = { text
 /** Usage is informational: it must never become a selectable or executable entry. */
 export function slashArgumentHint(snapshot: DraftSnapshot, scope?: SlashCatalogScope): string | undefined {
   const command = completionToken(snapshot.text, snapshot.cursor).before[0];
-  if (!command || !COMMAND_DRAFT.test(snapshot.text.slice(command.from, command.to))) return undefined;
+  if (!command || command.from !== 0 || !COMMAND_DRAFT.test(snapshot.text.slice(command.from, command.to))) return undefined;
   const invocation = getSlashInvocation(command.value, scope);
   if (!invocation?.argumentHint) return undefined;
   const root = scope?.root ?? process.cwd();
@@ -80,5 +80,5 @@ const COMMAND_DRAFT = /^\/[A-Za-z0-9:._?-]*$/;
  * treated as a gesture that may not open anything.
  */
 export function couldBeCommand(draft: string): boolean {
-  return COMMAND_DRAFT.test(draft.trimStart());
+  return COMMAND_DRAFT.test(draft);
 }

@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Prompt Position And Composed Submission Boundaries
+- **Symptom**: A second-line slash becomes a functional command after submission/history recall; inline skill markers reach an active turn without expansion, or queued images disappear.
+- **Root Cause**: Trimming source before routing changes invocation offsets; direct follow-up delivery bypasses the command preparation owner, and text-only pending entries omit attachments.
+- **Rule**: Preserve original source through editor and durable history. Functional commands require source offset zero. Route explicit composed methods through the same preparation boundary after the active turn settles, and retain attachments with the exact pending entry. Persist selected research methods in the native request and render them in every child stage, separately from evidence.
+
 ### Picker Reopen And Transcript Terminal-Newline Projection
 - **Symptom**: Reopening the same picker retains a completed search; user text ending in a newline cannot be copied through semantic source rows.
 - **Root Cause**: Host-owned filtering resets but the picker owner's query projection survives, while rendering keeps a final empty split item that source projection deliberately removes.

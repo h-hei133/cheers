@@ -16,5 +16,17 @@ export const briefSchema = {
 export const requestSchema = {
   type: 'object', additionalProperties: false, required: ['question', 'depth', 'save'],
   properties: { question: text, mode: { enum: ['software', 'paper', 'mixed'] }, depth: { enum: ['quick', 'deep'] },
-    briefPath: { type: 'string', minLength: 1, maxLength: 2048 }, save: { type: 'boolean' } },
+    briefPath: { type: 'string', minLength: 1, maxLength: 2048 }, save: { type: 'boolean' },
+    methods: { type: 'object', additionalProperties: false, required: ['originalInput', 'skills', 'modifiers'], properties: {
+      originalInput: { type: 'string', minLength: 1, maxLength: 32768 },
+      skills: { type: 'array', maxItems: 16, items: { type: 'object', additionalProperties: false,
+        required: ['name', 'identity', 'source', 'digest', 'body'], properties: {
+          name: { type: 'string', minLength: 1, maxLength: 128 }, identity: { type: 'string', minLength: 1, maxLength: 4096 },
+          source: { enum: ['user', 'project', 'cli', 'extension'] }, digest: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+          body: { type: 'string', maxLength: 65536 },
+        } } },
+      modifiers: { type: 'array', maxItems: 16, items: { type: 'object', additionalProperties: false,
+        required: ['name', 'instruction'], properties: { name: identifier, instruction: { type: 'string', minLength: 1, maxLength: 32768 } } } },
+    } },
+  },
 };

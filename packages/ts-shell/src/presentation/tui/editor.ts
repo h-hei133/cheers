@@ -222,16 +222,14 @@ export class Editor extends EditorBuffer {
 
   /** Record a submitted prompt for later recall. */
   pushHistory(text: string): void {
-    const trimmed = text.trim();
-    if (trimmed && this.history[this.history.length - 1] !== trimmed) this.history.push(trimmed);
+    if (text.trim() && this.history[this.history.length - 1] !== text) this.history.push(text);
     this.historyIndex = -1;
   }
 
   /** Populate prompt history from stored entries. */
   loadHistory(entries: readonly string[]): void {
     for (const entry of entries) {
-      const trimmed = entry.trim();
-      if (trimmed && this.history[this.history.length - 1] !== trimmed) this.history.push(trimmed);
+      if (entry.trim() && this.history[this.history.length - 1] !== entry) this.history.push(entry);
     }
     this.historyIndex = -1;
   }

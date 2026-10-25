@@ -24,6 +24,15 @@ import path from "node:path";
 /** Approaches worth contrasting before one is chosen. */
 const APPROACH_COUNT = 3;
 
+/** Composition excludes save/help and prepares instructions without executing a handler. */
+export function prepareBrainstorm(args: readonly string[], prose: string): { instruction: string } | { error: string } {
+  const parsed = parseSyntax(brainstormSyntax, args);
+  if (!parsed.ok) return { error: `Invalid /brainstorm composition: ${parsed.reason}` };
+  if (parsed.flags.has('save') || parsed.flags.has('help')) return { error: '/brainstorm save/help must be used separately.' };
+  if (!prose.trim()) return { error: '/brainstorm composition requires a shared problem.' };
+  return { instruction: parsed.flags.has('interactive') ? elicitationPrompt(prose) : explorationPrompt(prose) };
+}
+
 export async function runBrainstormCommand(
   args: string[],
   context: CommandContext,

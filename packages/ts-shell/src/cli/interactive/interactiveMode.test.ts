@@ -51,6 +51,7 @@ import { installUsageRuntime } from '../runtime/usage.js';
 import type { ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
 import * as externalEditor from './externalEditor.js';
 import { Clipboard } from './clipboard.js';
+import * as promptRunner from './interactivePromptRunner.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
@@ -99,6 +100,71 @@ function build(overrides: {
   });
   return { mode, renderer, readline, terminal, approval };
 }
+
+it('retains composed prose for the submission boundary instead of sending raw markers to a busy turn', () => {
+  const { mode } = build();
+  const host = mode as unknown as { busy: boolean; onSubmit(text: string): void; queue: SubmissionQueue;
+    options: { sessionRuntime: ShellSessionRuntime }; view: InteractiveView };
+  const followUp = vi.fn(), steer = vi.fn(); host.busy = true;
+  host.options.sessionRuntime.input = () => ({ followUp, steer }) as never;
+  try {
+    host.onSubmit('正文 /skill:a /skill:b');
+    expect(host.queue.shift()).toBe('正文 /skill:a /skill:b');
+    expect(followUp).not.toHaveBeenCalled(); expect(steer).not.toHaveBeenCalled();
+  } finally { mode.stop(); }
+});
+
+it('passes leading whitespace and second-line functional markers to prose dispatch', () => {
+  const { mode } = build(); const host = mode as unknown as { busy: boolean; onSubmit(text: string): void; queue: SubmissionQueue };
+  host.busy = true;
+  try {
+    host.onSubmit(' \n/model'); expect(host.queue.shift()).toBe(' \n/model');
+    host.onSubmit(' /queue clear'); expect(host.queue.shift()).toBe(' /queue clear');
+  } finally { mode.stop(); }
+});
+
+it('delivers all composed instructions and images through the real interactive route once', async () => {
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true }); const root = fs.mkdtempSync('/tmp/cheers-test/interactive-methods-');
+  const skillPaths = ['a', 'b'].map(name => {
+    const file = path.join(root, name, 'SKILL.md'); fs.mkdirSync(path.dirname(file));
+    fs.writeFileSync(file, `---\nname: ${name}\ndescription: method\n---\nBODY ${name}`); return file;
+  });
+  const { mode } = build(); const host = mode as unknown as { run(text: string, attachments?: unknown): Promise<void>;
+    lastPrompt?: string; lastAttachments?: unknown;
+    options: { runtimeContext: ShellRuntimeContext } };
+  const context = host.options.runtimeContext;
+  Object.assign(context, { cwd: root, projectRoot: root, skillOptions: { skillPaths, noSkills: true } });
+  const binding = configurationBinding(context); context.configuration.publish(context.configuration.begin(binding), context.configuration.current.config, binding);
+  const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+  const attachments = { images: [{ type: 'image' as const, data: 'AA==', mimeType: 'image/png' }] };
+  const source = '/skill:a\n/skill:b  正文  ';
+  try {
+    await host.run(source, attachments);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch.mock.calls[0]?.[0]).toMatchObject({ effectivePrompt: expect.stringContaining('BODY a'), attachments,
+      promptMetadata: { originalInput: source, skills: [{ name: 'a' }, { name: 'b' }] } });
+    expect(dispatch.mock.calls[0]?.[0].effectivePrompt).toContain('BODY b');
+    expect(host.lastPrompt).toBe(source); expect(host.lastAttachments).toEqual(attachments);
+    await host.run('local failure /skill:missing', attachments);
+    expect(dispatch).toHaveBeenCalledTimes(1); expect(host.lastPrompt).toBe(source);
+  } finally { dispatch.mockRestore(); mode.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+it('restores queued composed images and text when the active turn is interrupted', async () => {
+  const { mode } = build(); const host = mode as unknown as { busy: boolean; interrupt(): Promise<void>;
+    queue: SubmissionQueue; view: InteractiveView; state: { pastes: { holdImage(image: unknown): string } };
+    options: { sessionRuntime: ShellSessionRuntime } };
+  host.busy = true; host.options.sessionRuntime.cancelAndWait = vi.fn(async () => {});
+  const image = { type: 'image' as const, data: 'AA==', mimeType: 'image/png' };
+  const hold = vi.spyOn(host.state.pastes, 'holdImage').mockReturnValue('[image:fixture]');
+  try {
+    host.queue.push('  正文 /skill:a\n/skill:b  ', { images: [image] }); host.view.editor.setText('new draft');
+    await host.interrupt();
+    expect(hold).toHaveBeenCalledWith(image);
+    expect(host.view.editor.getText()).toBe('  正文 /skill:a\n/skill:b  \n\n[image:fixture]\n\nnew draft');
+    expect(host.queue.length).toBe(0);
+  } finally { hold.mockRestore(); mode.stop(); }
+});
 
 describe("session wiring", () => {
   it('keeps the draft held when a pending picker has no interruptible command owner', async () => {

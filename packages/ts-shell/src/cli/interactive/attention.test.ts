@@ -124,6 +124,9 @@ it('keeps pasted advanced values out of the prompt and queues work until Apply f
   expect(context.runtimeConfig.maxTurns).toBe(15); expect(host.view.editor.getText()).toBe('');
   expect(route).not.toHaveBeenCalled(); terminal.input('\r');
   await vi.waitFor(() => expect(context.runtimeConfig.maxTurns).toBe(27));
+  expect(route).not.toHaveBeenCalled();
+  await vi.waitFor(() => expect(screen()).toContain('Settings'));
+  terminal.input('\x1b'); terminal.input('\x1b');
   await vi.waitFor(() => expect(route).toHaveBeenCalledOnce());
 });
 

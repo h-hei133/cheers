@@ -1,6 +1,6 @@
 import type { Skill } from "../skills/skillLoader.js";
 import { tokenizeCommandArgs } from "../commands/arguments.js";
-import { escapeAttribute, neutraliseTagBoundaries } from '../text/safety.js';
+import { expandSkills } from './skills.js';
 
 /**
  * Turning a typed line into what the model receives.
@@ -19,6 +19,8 @@ import { escapeAttribute, neutraliseTagBoundaries } from '../text/safety.js';
 
 /** A prompt template held in memory, discovered from disk. */
 export interface PromptTemplate {
+  /** Inline composition is opt-in; ordinary templates keep their standalone grammar. */
+  readonly composable?: boolean;
   readonly name: string;
   readonly description: string;
   /** What the user is expected to supply, shown in completion. */
@@ -26,9 +28,6 @@ export interface PromptTemplate {
   readonly content: string;
   readonly filePath: string;
 }
-
-/** The prefix that marks a skill invocation. */
-const SKILL_PREFIX = "/skill:";
 
 /**
  * Split a command line into its name and its arguments, honouring quotes.
@@ -85,13 +84,6 @@ export function substituteArguments(content: string, args: readonly string[]): s
   );
 }
 
-/** The body of a skill as the model should see it, with its location named. */
-function skillBlock(skill: Skill): string {
-  // The same shape a template uses, for the same reason: the model has to be able
-  // to tell instructions it was handed from words the user says.
-  return [`<skill name="${escapeAttribute(skill.name)}">`, neutraliseTagBoundaries(skill.body), "</skill>"].join("\n");
-}
-
 /** The name a line invokes, and the text after it. */
 function splitInvocation(text: string): { readonly name: string; readonly argsText: string } {
   const spaceAt = text.search(/\s/);
@@ -117,12 +109,9 @@ export function expandSkill(
   text: string,
   skills: ReadonlyMap<string, Skill>,
 ): { readonly text: string; readonly skill?: string; readonly unknownSkill?: string } {
-  if (!text.startsWith(SKILL_PREFIX)) return { text };
-  const { name, argsText } = splitInvocation(text.slice(SKILL_PREFIX.length));
-  const skill = skills.get(name);
-  if (!skill || skill.isCurrent?.() === false) return { text, unknownSkill: name };
-  const args = argsText.trim();
-  return { text: args ? `${skillBlock(skill)}\n\n${args}` : skillBlock(skill), skill: name };
+  const expanded = expandSkills(text, skills);
+  return { text: expanded.text, ...(expanded.unknownSkill ? { unknownSkill: expanded.unknownSkill } : {}),
+    ...(expanded.instructions[0] ? { skill: expanded.instructions[0].name } : {}) };
 }
 
 /**

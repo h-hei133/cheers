@@ -233,7 +233,7 @@ describe("first painted frame", () => {
     mode.stop();
   });
 
-  it("holds the intro and the status band without a prompt cue", () => {
+  it("holds the intro and status band with the restored prompt arrow", () => {
     const { mode, terminal, scheduler } = boot();
     mode.start();
     scheduler.flush();
@@ -241,7 +241,7 @@ describe("first painted frame", () => {
     expect(output).toContain("Cheers");
     expect(output).toContain("opus-5");
     expect(output).toContain("main");
-    expect(output).not.toContain("❯");
+    expect(output).toContain("❯");
     mode.stop();
   });
 

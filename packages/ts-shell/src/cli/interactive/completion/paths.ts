@@ -9,7 +9,7 @@ export function pathDirectory(value: string): string {
 
 export function resolveCatalogDirectory(root: string, prefix: string, directoriesOnly: boolean): string {
   const home = process.env.HOME ?? process.env.USERPROFILE;
-  const expanded = !directoriesOnly && prefix.startsWith("~/") && home ? path.join(home, prefix.slice(2)) : prefix;
+  const expanded = prefix.startsWith("~/") && home ? path.join(home, prefix.slice(2)) : prefix;
   return path.resolve(root, expanded || ".");
 }
 
@@ -31,7 +31,7 @@ export async function pathCatalog(root: string, prefix: string, directoriesOnly:
     }
     if (!isDirectory && (directoriesOnly || !isFile)) continue;
     const value = prefix + entry.name + (isDirectory ? "/" : "");
-    items.push({ value, label: value, detail: isDirectory ? "directory" : "file" });
+    items.push({ value, label: value, kind: 'path', identity: path.join(directory, entry.name), detail: isDirectory ? "directory" : "file" });
   }
   signal.throwIfAborted();
   return items.sort((a, b) => a.value.localeCompare(b.value));

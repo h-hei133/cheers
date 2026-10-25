@@ -33,7 +33,26 @@ import type { SidebarLiveEventStore } from '../../presentation/sidebar/sidebarLi
 
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
+/** Explicit pure preparation, shared by discovery and dispatch. Undefined opts out. */
+export type CommandComposition = {
+  readonly kind: 'modifier';
+  readonly flags?: readonly import('./syntax/model.js').CommandFlag[];
+  prepare(args: readonly string[], prose: string): { readonly instruction: string } | { readonly error: string };
+} | {
+  readonly kind: 'driver';
+  readonly flags?: readonly import('./syntax/model.js').CommandFlag[];
+  readonly actions?: readonly string[];
+  prepare(args: readonly string[], prose: string): { readonly args: readonly string[] } | { readonly error: string };
+};
+
 export interface CommandContext {
+  /** Validated user methods for one native workflow; this conveys no tool authority. */
+  readonly composedPrompt?: {
+    readonly originalInput: string;
+    readonly prose: string;
+    readonly skills: readonly import('../prompts/skills.js').SkillInstruction[];
+    readonly modifiers: readonly { readonly name: string; readonly instruction: string }[];
+  };
   /** Transient native sign-in instructions; displayed without adding model context. */
   readonly signInProgress?: (progress: import('../auth/providerAuthContract.js').SignInProgress) => void;
   /** The host registers local work until its result and cleanup have settled. */
@@ -170,6 +189,8 @@ export interface CommandContext {
 export interface LocalCommandResult {
   readonly kind: 'local'
   readonly output: string
+  /** Preparation failed before submission; restore the user's original source. */
+  readonly retryDraft?: string
   readonly report?: CommandReport
   /** State changed by this command, recorded with its result for session replay. */
   readonly state?: Record<string, unknown>
@@ -234,6 +255,7 @@ export type CommandExecutionResult = LocalCommandResult | PromptCommandResult | 
 
 /** A distinct invocation handled by the same owner, not a synonymous alias. */
 export interface NamedCommandInvocation {
+  readonly composition?: CommandComposition;
   readonly name: string
   readonly summary: string
   readonly argumentHint?: string
@@ -242,6 +264,7 @@ export interface NamedCommandInvocation {
 }
 
 export interface CommandDefinition {
+  readonly composition?: CommandComposition;
   readonly name: string
   readonly aliases?: readonly string[]
   readonly invocations?: readonly NamedCommandInvocation[]

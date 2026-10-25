@@ -89,6 +89,9 @@ import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
 import { couldBeCommand, slashArgumentHint, slashSuggestions } from "./slashSuggestions.js";
 import { couldBeFileReference } from "./fileSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
+import { needsComposition } from '../../core/commands/composition.js';
+import { createCommandRegistry } from '../../core/commands/registry.js';
+import { catalogContributions } from '../../core/catalog/contributions.js';
 import { TurnSink } from "./turnSink.js";
 import { reportWriter, reportSaveNotice } from '../output/reports.js';
 import { undoPickerHost } from '../runtime/undo.js';
@@ -228,14 +231,16 @@ export class InteractiveMode {
   private turnNumber = 0;
   /** The last thing submitted that was a prompt rather than a command. */
   private lastPrompt: string | undefined;
+  private lastAttachments?: { readonly images: readonly ImageContent[] };
   /**
    * Input submitted while a run that takes none is in flight — a slash
    * command, say. It runs as its own turn once the current one settles. A
    * model turn takes input directly: steering reaches it before its next step
    * and follow-ups run after it, both through the runtime's input handle.
    */
-  private readonly queue = new SubmissionQueue(() => this.options.runtimeContext.session, text => {
-    this.replaceExternalDraft([text, this.state.editor.getText()].filter(Boolean).join('\n\n'));
+  private readonly queue = new SubmissionQueue(() => this.options.runtimeContext.session, (text, attachments) => {
+    const images = attachments?.images.map(image => this.state.pastes.holdImage(image)).join(' ') ?? '';
+    this.replaceExternalDraft([text, images, this.state.editor.getText()].filter(Boolean).join('\n\n'));
     this.state.transcript.append(textBlock('error', 'Queued input was not executed because the session changed; it was returned to the draft.'));
   });
   /** Stops the background-completion notice from reaching a disposed session. */
@@ -367,6 +372,7 @@ export class InteractiveMode {
       this.state,
     );
     this.catalogs = new CatalogController({
+      scope: () => catalogScope(this.options.runtimeContext),
       identity: () => catalogIdentity(this.options.runtimeContext, this.options.themePaths) + this.options.sessionRuntime.getPermissionScope() + this.options.sessionRuntime.getAgentMode(),
       draft: () => this.state.editor.snapshot(),
       load: createCatalogLoader(() => this.options.runtimeContext, this.options.initialMcpGateway, this.options.themePaths ?? [], this.options.sessionManager, this.options.approvalTrustPolicy),
@@ -493,7 +499,7 @@ export class InteractiveMode {
     });
     this.tui.onInput((data) => this.stdin.feed(data));
     this.releaseEvents = this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
-    this.releaseInputQueue = attachSubmissionQueue(this.options.sessionRuntime, this.queue, this.run.bind(this),
+    this.releaseInputQueue = attachSubmissionQueue(this.options.sessionRuntime, this.queue, text => this.run(text, this.queue.takeAttachments()),
       () => !(this.busy || this.pickerPending || this.overlay.active || this.stopped || this.questions.question()));
     this.releaseGoalSubmission = attachGoalSubmission(this.options.sessionRuntime, {
       ready: () => !this.stopped && !this.closing && !this.busy && !this.pickerPending && !this.overlay.active
@@ -503,7 +509,7 @@ export class InteractiveMode {
       settled: () => {
         this.busy = this.pickerPending;
         const next = this.pickerPending || this.overlay.active || this.stopped ? undefined : this.queue.shift();
-        if (next !== undefined) void this.run(next);
+        if (next !== undefined) void this.run(next, this.queue.takeAttachments());
         this.tui.requestRender();
       },
     });
@@ -588,7 +594,7 @@ export class InteractiveMode {
     if (this.overlay.handleKey(event, (picker, ids) => this.applyPicker(picker, ids))) {
       if (!this.overlay.active && !this.busy) {
         const next = this.queue.shift();
-        if (next !== undefined) void this.run(next);
+        if (next !== undefined) void this.run(next, this.queue.takeAttachments());
       }
       return;
     }
@@ -724,7 +730,8 @@ export class InteractiveMode {
     this.completionStatus = undefined;
     this.catalogs.invalidate();
     appendPromptHistory(this.options.runtimeContext.projectRoot, text);
-    if (isQueueControl(text)) {
+    const controlSource = text.startsWith('/') ? text : '';
+    if (isQueueControl(controlSource)) {
       this.state.transcript.append(textBlock('user', text));
       const context = this.options.runtimeContext;
       const rawCommandArgs = text.trim().replace(/^\/queue(?:\s|$)/i, '');
@@ -736,7 +743,7 @@ export class InteractiveMode {
       });
       return;
     }
-    if (isGoalControl(text) && (this.busy || this.questions.question())) {
+    if (isGoalControl(controlSource) && (this.busy || this.questions.question())) {
       this.state.transcript.append(textBlock('user', text));
       const context = this.options.runtimeContext;
       void goalCommandFor(context, this.options.sessionManager)(text.trim().split(/\s+/).slice(1), {
@@ -750,7 +757,7 @@ export class InteractiveMode {
       });
       return;
     }
-    if (handoffControl(text) && (this.busy || this.questions.question())) {
+    if (handoffControl(controlSource) && (this.busy || this.questions.question())) {
       const context = this.options.runtimeContext;
       void handoffCommandFor(context, this.options.sessionManager, this.options.sessionRuntime)(tokenizeCommandArgs(text.trim().replace(/^\/handover\s*/i, '')), {
         cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
@@ -759,8 +766,8 @@ export class InteractiveMode {
       });
       return;
     }
-    const evaluation = evaluationControl(text);
-    const media = mediaControl(text);
+    const evaluation = evaluationControl(controlSource);
+    const media = mediaControl(controlSource);
     if (media?.stop) this.queue.cancelWhere(value => new RegExp(`^/${media.name}(?:\\s|$)`, 'i').test(value.trim()));
     if (media && (this.busy || this.questions.question())) {
       if (media.stop) cancelMediaCommand(this.options.runtimeContext, media.name, media.args[0]?.toLowerCase() === 'stop' ? 'stopped' : 'cancelled');
@@ -777,7 +784,7 @@ export class InteractiveMode {
       }).then(result => { this.state.transcript.append(textBlock('command', result.output, '/improve')); this.tui.requestRender(); });
       return;
     }
-    if (directorControl(text) && (this.busy || this.questions.question())) {
+    if (directorControl(controlSource) && (this.busy || this.questions.question())) {
       if (this.questions.question() && !/^\/director(?:\s+(?:status|off|show|output)(?:\s|$)|\s*$)/i.test(text.trim())) {
         this.state.transcript.append(textBlock('command', 'Director assignment waits for the pending approval or question.', '/director'));
         this.tui.requestRender(); return;
@@ -789,7 +796,7 @@ export class InteractiveMode {
       });
       return;
     }
-    if (isPlanningControl(text) && (this.busy || this.questions.question())) {
+    if (isPlanningControl(controlSource) && (this.busy || this.questions.question())) {
       const match = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(text.trim())!;
       const context = this.options.runtimeContext;
       void planningCommandFor(context, this.options.sessionManager, this.options.sessionRuntime, this.readline)(
@@ -801,18 +808,18 @@ export class InteractiveMode {
         });
       return;
     }
-    const mcp = mcpControl(text);
-    if (jobsControl(text) && (this.busy || this.questions.question())) {
+    const mcp = mcpControl(controlSource);
+    if (jobsControl(controlSource) && (this.busy || this.questions.question())) {
       void runJobsControl(text, this.options.runtimeContext, transcriptLineRenderer(this.state.transcript, this.tui, '/jobs'),
         Boolean(this.questions.question() || this.overlay.active)); return;
     }
-    const ssh = sshControl(text);
+    const ssh = sshControl(controlSource);
     if (ssh && (this.busy || this.questions.question() || ssh.action === 'cancel-pending')) {
       if (ssh.action === 'cancel-pending') this.queue.cancelWhere(value => /^\/ssh(?:\s|$)/i.test(value.trim()));
       void runSshControl(text, this.options.runtimeContext, transcriptLineRenderer(this.state.transcript, this.tui, '/ssh'),
         Boolean(this.questions.question() || this.overlay.active)); return;
     }
-    if (isCollaborationControl(text) && (this.busy || this.questions.question())) {
+    if (isCollaborationControl(controlSource) && (this.busy || this.questions.question())) {
       void runCollaborationControl(text, this.options.runtimeContext, transcriptLineRenderer(this.state.transcript, this.tui, '/collab'), Boolean(this.questions.question() || this.overlay.active));
       return;
     }
@@ -826,11 +833,11 @@ export class InteractiveMode {
       });
       return;
     }
-    if (isMcpConfiguration(text) && (this.busy || this.questions.question())) {
+    if (isMcpConfiguration(controlSource) && (this.busy || this.questions.question())) {
       void runMcpConfigurationControl(text, this.options.runtimeContext, transcriptLineRenderer(this.state.transcript, this.tui, '/mcp'), Boolean(this.questions.question()));
       return;
     }
-    if (isAgentsControl(text) && (this.busy || this.questions.question())) {
+    if (isAgentsControl(controlSource) && (this.busy || this.questions.question())) {
       if (this.questions.question() || this.overlay.active) {
         this.state.transcript.append(textBlock('command', 'Agent control refused while another approval or question is pending; answer it first.', '/agents'));
         this.tui.requestRender(); return;
@@ -847,7 +854,7 @@ export class InteractiveMode {
       });
       return;
     }
-    if (isSecurityControl(text) && (this.busy || this.questions.question())) {
+    if (isSecurityControl(controlSource) && (this.busy || this.questions.question())) {
       const context = this.options.runtimeContext;
       void securityCommandFor(context)(tokenizeCommandArgs(text.trim().replace(/^\/security(?:\s|$)/i, '')), {
         cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
@@ -857,7 +864,7 @@ export class InteractiveMode {
       });
       return;
     }
-    if (isExtensionControl(text) && (this.busy || this.questions.question())) {
+    if (isExtensionControl(controlSource) && (this.busy || this.questions.question())) {
       const context = this.options.runtimeContext;
       const args = /^\/reload-plugins/i.test(text.trim()) ? ['reload'] : tokenizeCommandArgs(text.trim().replace(/^\/\S+(?:\s|$)/, ''));
       void extensionCommandFor(context)('plugin', args, { cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true }).then(result => {
@@ -865,7 +872,7 @@ export class InteractiveMode {
       });
       return;
     }
-    if (isAdvisorControl(text) && (this.busy || this.questions.question())) {
+    if (isAdvisorControl(controlSource) && (this.busy || this.questions.question())) {
       const context = this.options.runtimeContext;
       void advisorCommandFor(context, this.options.sessionManager, this.options.sessionRuntime, this.options.renderer)(
         tokenizeCommandArgs(text.trim().replace(/^\/advisor(?:\s|$)/i, '')), {
@@ -876,7 +883,7 @@ export class InteractiveMode {
         });
       return;
     }
-    if (isResearchControl(text) && (this.busy || this.questions.question())) {
+    if (isResearchControl(controlSource) && (this.busy || this.questions.question())) {
       const context = this.options.runtimeContext;
       void researchCommandFor(context, this.options.sessionManager, this.options.sessionRuntime, this.options.renderer)(
         tokenizeCommandArgs(text.trim().replace(/^\/\S+(?:\s|$)/, '')), {
@@ -891,7 +898,7 @@ export class InteractiveMode {
       this.tui.requestRender();
       return;
     }
-    if (this.busy && !this.pickerPending && !this.questions.question() && !this.overlay.active && /^\/(?:cleanse|debug)$/i.test(text.trim())) {
+    if (text.startsWith('/') && this.busy && !this.pickerPending && !this.questions.question() && !this.overlay.active && /^\/(?:cleanse|debug)$/i.test(text.trim())) {
       this.openPicker(text);
       return;
     }
@@ -913,8 +920,10 @@ export class InteractiveMode {
       jobsFor(this.options.runtimeContext)?.registry.promoteForeground?.();
       // A command is never steered: it is not a message for the model, so it
       // waits for the run boundary, like any input to a run that takes none.
-      const input = text.startsWith("/") ? undefined : this.options.sessionRuntime.input?.();
-      if (!input) this.queue.push(text);
+      const composed = needsComposition(text, [...createCommandRegistry(this.options.runtimeContext.cwd, this.options.runtimeContext.runtimeConfig).values(),
+        ...catalogContributions(this.options.runtimeContext.cwd, this.options.runtimeContext.session.id).flatMap(entry => entry.commands)]);
+      const input = text.startsWith("/") || composed || attachments?.images.length ? undefined : this.options.sessionRuntime.input?.();
+      if (!input) this.queue.push(text, attachments);
       else if (disposition === "steer") input.steer(text);
       else input.followUp(text);
       this.tui.requestRender();
@@ -960,7 +969,6 @@ export class InteractiveMode {
     // `begin` clears the failure flag for the turn that is starting, so whether
     // the *previous* turn failed has to be read before that happens.
     const previousTurnFailed = this.sink.lastTurnFailed;
-    if (!automatic && !text.startsWith("/")) this.lastPrompt = text;
     const command = text.startsWith("/") ? text.split(/\s+/)[0]! : "turn";
     const configurationRevision = this.options.runtimeContext.configuration.current.revision;
     this.sink.begin(text.startsWith("/") ? "command" : "turn", command);
@@ -969,6 +977,7 @@ export class InteractiveMode {
       const result = await routeInteractiveCommand({
         ...(promptMetadata ? { promptMetadata } : {}),
         prompt: text,
+        ...(attachments ? { attachments } : {}),
         ...(sessionSelection ? { sessionSelection } : {}),
         readline: this.readline,
         mcpGateway: this.options.initialMcpGateway,
@@ -987,7 +996,15 @@ export class InteractiveMode {
         refreshKeybindings: () => this.preferences.reload(),
       });
       this.catalogs.invalidate();
+      if (!automatic && result.turnNumber > this.turnNumber) {
+        this.lastPrompt = text;
+        this.lastAttachments = attachments;
+      }
       this.turnNumber = result.turnNumber;
+      if (result.retryDraft !== undefined) {
+        const images = attachments?.images.map(image => this.state.pastes.holdImage(image)).join(' ') ?? '';
+        this.replaceExternalDraft([result.retryDraft, images, this.state.editor.getText()].filter(Boolean).join('\n\n'));
+      }
       if (configurationRevision !== this.options.runtimeContext.configuration.current.revision) this.view.invalidateLayout();
       if (result.refreshMcpGateway) await this.options.initialMcpGateway.syncWorkspace?.();
       // `/theme` and `/reload` both change which file is worth following, and the
@@ -1047,7 +1064,7 @@ export class InteractiveMode {
           );
         }
       }
-      if (next !== undefined) void this.run(next);
+      if (next !== undefined) void this.run(next, retrying !== undefined ? this.lastAttachments : this.queue.takeAttachments());
     }
   }
 
@@ -1141,7 +1158,7 @@ export class InteractiveMode {
         }
         this.tui.requestRender();
         const next = picker.exclusive && !this.stopped && !this.overlay.active ? this.queue.shift() : undefined;
-        if (next !== undefined) void this.run(next);
+        if (next !== undefined) void this.run(next, this.queue.takeAttachments());
       });
   }
 
@@ -1276,7 +1293,10 @@ export class InteractiveMode {
       return;
     }
     this.sink.markCancelling();
-    const undelivered = [...(this.options.sessionRuntime.input?.()?.clearQueue() ?? []), ...this.queue.splice(0)];
+    const undelivered = [...(this.options.sessionRuntime.input?.()?.clearQueue() ?? []), ...this.queue.release().map(submission => {
+      const images = submission.attachments?.images.map(image => this.state.pastes.holdImage(image)).join(' ');
+      return [submission.text, images].filter(Boolean).join('\n\n');
+    })];
     await this.options.sessionRuntime.cancelAndWait();
     if (undelivered.length === 0) return;
     const draft = this.state.editor.getText();

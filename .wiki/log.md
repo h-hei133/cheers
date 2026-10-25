@@ -9069,3 +9069,11 @@ MCP测试/证据df0a8583cedcf22df497ecf768e17ee19b1aa03d已提交/推送、main�
 第二批在共享navigation owner建立model Roles/All models/provider与settings真实主分类/section，宽屏分类栏、窄屏焦点页，Tab/左右/上下/Enter/Esc各域，搜索清空恢复焦点。模型详情增加connection label，真实角色policy/既有预设，publication刷新及关闭迟到丢弃；settings保留原scope/CAS/preview/Apply，显式Discard，保存后回字段并显示结果。ADD-02/03仍partial，完整角色编辑、配置回返及全编辑类型/桌面覆盖待补，不升级全部看齐。
 
 聚焦model/settings/overlay/config测试绿色，导航2/watch1通过；两个picker平铺反转两路径失败、字节精确恢复后通过。TS build`9c0de397c212`；regular/fullscreen实际PTY model↑↓/详情/返回及settings search/edit/stage/Apply/值7磁盘读回通过。初次PTY保存结果被全屏遮住，修补可见notice后通过；无真provider/长历史。首批42d90f08已推送，CI40215134369运行中，Watch40215134377workflow success未读工件；本批提交另绑定。
+
+第三批以已推送a513333f为基线：ADD-10正文路径及offset=0功能菜单，ADD-11所有明确skill统一展开与失败原草稿，ADD-12显式modifier/单research driver声明。brainstorm与composable模板准入，review仍拒绝；两skill在首位/正文研究入口传入真实native request并持久化、逐子阶段注入。保留原文缩进/多行历史；修补实际InteractiveMode遗漏图片转交、取消排队丢附件及开头skill失败回合retry原文。未知skill/控制/save/冲突/双driver/来源变化/预算在准备阶段阻止，派发后异常不伪装未派发。
+
+最终新增边界46pass，真实interactive组合图片/取消/busy/源位置4pass；此前completion/router96、research24、旧CI行为四文件86、恢复反转76pass分别记录不累加。四源码反转22fail/36pass后字节精确恢复；regular/fullscreen小型真实PTY正文目录连续Tab、未知第二skill阻止及原草稿恢复通过，无provider/全仓/20k。最终静态/构建和提交另绑定。ADD-01…03仍partial；ADD-07/08/09/13继续。
+
+读回纠正：CI40215134369和40215968841实际均6fail，来自旧箭头/padding断言及Apply后队列时机；本批相应四文件86pass，不追改旧SHA证据。Watch40215134377和40215968887工件已读回，均proven/三结构obligation满足，不代替行为CI。
+
+第三批最终静态五门/diff通过（118既有advisory），责任上限0，TS build78f07c26242d，当前打包NormProof judge proven/0 open/failed/gap；构建后两模式小型PTY再次通过。提交/推送另绑定，不从本地证据宣称新CI通过。

@@ -235,6 +235,10 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
           logger: options.logger, approvalTrustPolicy: options.approvalTrustPolicy, turnNumber,
           setActiveNonInteractiveApprovalMode: options.setActiveNonInteractiveApprovalMode });
         turnNumber = result.turnNumber;
+        if (result.retryDraft !== undefined && !closed) {
+          input.write(result.retryDraft);
+          options.renderer.renderLine('Composition was not submitted; the original draft is available for retry.');
+        }
         if (result.exitRequested) { input.close(); return; }
         if (result.refreshMcpGateway) await mcpGateway.syncWorkspace?.();
         if (result.refreshPromptChrome) refreshInteractivePromptChrome({ readline: input, projectRoot: options.runtimeContext.projectRoot,
@@ -352,11 +356,12 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
     reportFirstFrameAfterPrompt();
     input.on("line", (line) => {
       try {
-        const text = line.trim();
-        const mcp = mcpControl(text);
-        const ssh = sshControl(text);
-        const evaluation = evaluationControl(text);
-        const media = mediaControl(text);
+        const text = line;
+        const controlSource = text.startsWith('/') ? text : '';
+        const mcp = mcpControl(controlSource);
+        const ssh = sshControl(controlSource);
+        const evaluation = evaluationControl(controlSource);
+        const media = mediaControl(controlSource);
         if (media?.stop) { queue.cancelWhere(value => new RegExp(`^/${media.name}(?:\\s|$)`, 'i').test(value.trim())); cancelMediaCommand(options.runtimeContext, media.name, media.args[0]?.toLowerCase() === 'stop' ? 'stopped' : 'cancelled'); }
         if (evaluation === 'stop') {
           queue.cancelWhere(value => /^\/improve(?:\s|$)/i.test(value.trim())); cancelEvaluationFor(options.runtimeContext);
@@ -367,7 +372,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
             .then(() => { if (!closed) input.prompt(); }));
           return;
         }
-        if (isCollaborationControl(text) && (busy || questions.question())) {
+        if (isCollaborationControl(controlSource) && (busy || questions.question())) {
           trackControl(runCollaborationControl(text, options.runtimeContext, options.renderer, Boolean(questions.question()))
             .then(() => { if (!closed) input.prompt(); }));
           return;
@@ -382,19 +387,19 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
           );
           return;
         }
-        if (isMcpConfiguration(text) && questions.question()) {
+        if (isMcpConfiguration(controlSource) && questions.question()) {
           options.renderer.renderLine('MCP configuration control refused while another approval or question is pending; answer it first.'); input.prompt(); return;
         }
-        if (isAgentsControl(text) && questions.question()) {
+        if (isAgentsControl(controlSource) && questions.question()) {
           options.renderer.renderLine('Agent control refused while another approval or question is pending; answer it first.'); input.prompt(); return;
         }
-        if (directorControl(text) && questions.question() && !/^\/director(?:\s+(?:status|off|show|output)(?:\s|$)|\s*$)/i.test(text.trim())) {
+        if (directorControl(controlSource) && questions.question() && !/^\/director(?:\s+(?:status|off|show|output)(?:\s|$)|\s*$)/i.test(text.trim())) {
           options.renderer.renderLine('Director assignment waits for the pending approval or question.'); input.prompt(); return;
         }
         // Serialise turns: readline delivers the next line as soon as it arrives,
         // and two concurrent turns would interleave their output and their session
         // writes.
-        if (isQueueControl(text) || (busy || questions.question()) && (media || evaluation || isGoalControl(text) || isPlanningControl(text) || handoffControl(text) || directorControl(text) || isAdvisorControl(text) || isSecurityControl(text) || isAgentsControl(text) || isResearchControl(text) || isExtensionControl(text) || isMcpConfiguration(text))) {
+        if (isQueueControl(controlSource) || (busy || questions.question()) && (media || evaluation || isGoalControl(controlSource) || isPlanningControl(controlSource) || handoffControl(controlSource) || directorControl(controlSource) || isAdvisorControl(controlSource) || isSecurityControl(controlSource) || isAgentsControl(controlSource) || isResearchControl(controlSource) || isExtensionControl(controlSource) || isMcpConfiguration(controlSource))) {
           trackControl(routeInteractiveCommand({ prompt: text, signal: controlAbort.signal, readline: activeQuestionInput, mcpGateway, sessionManager: options.sessionManager,
             runtimeContext: options.runtimeContext, renderer: options.renderer, sessionRuntime: options.sessionRuntime,
             logger: options.logger, approvalTrustPolicy: options.approvalTrustPolicy, turnNumber,
@@ -404,7 +409,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
           return;
         }
         if (questions.answer(line)) return;
-        if (!text) { input.prompt(); return; }
+        if (!text.trim()) { input.prompt(); return; }
         queue.push(text); scheduleDrain();
       } catch (error) {
         handleLineFailure(error);
