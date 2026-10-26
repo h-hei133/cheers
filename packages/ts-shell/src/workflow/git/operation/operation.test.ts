@@ -89,6 +89,74 @@ describe('exact native Git approval', () => {
     expect(fixture.git(['diff', '--cached'])).toBe(''); expect(gitRequestMode({ role: 'user', content: 'Implement this change.' })).toBeUndefined();
     expect((await runNativeGit(git, plan, gitGate(fixture.root, 'allow-once', { agentMode: 'build' }), () => {})).status).toBe('succeeded');
   });
+  it('rejects a review prompt when the worktree changes while diffs are read', async () => {
+    fs.appendFileSync(path.join(fixture.root, 'a.txt'), 'review target\n');
+    const original = NativeGit.prototype.text;
+    let diffReads = 0;
+    vi.spyOn(NativeGit.prototype, 'text').mockImplementation(async function (args, options) {
+      const result = await original.call(this, args, options);
+      if (args.includes('diff') && ++diffReads === 2) fs.appendFileSync(path.join(fixture.root, 'a.txt'), 'changed during read\n');
+      return result;
+    });
+    const host = new GitWorkbench({ currentRoot: () => fixture.root, store: memoryGitStore(), busy: () => false,
+      armCommit: () => 'unused', binding: { owns: () => false, remember: () => {}, migrate: () => ({ changed: false, note: 'unused' }) },
+      execute: async () => { throw new Error('No write expected.'); } });
+    expect(await host.command(['review'], { cwd: fixture.root })).toMatchObject({
+      kind: 'local', output: expect.stringContaining('GIT_STATE_CHANGED'),
+    });
+  });
+  it('rejects a reserved clean review when the worktree changes after review preparation', async () => {
+    const host = new GitWorkbench({ currentRoot: () => fixture.root, store: memoryGitStore(), busy: () => false,
+      armCommit: () => 'unused', binding: { owns: () => false, remember: () => {}, migrate: () => ({ changed: false, note: 'unused' }) },
+      execute: async () => { throw new Error('No write expected.'); } });
+    host.reserveReview(await host.snapshot(), 'clean');
+    const review = host.review.bind(host);
+    vi.spyOn(host, 'review').mockImplementation(async (...args) => {
+      const result = await review(...args);
+      fs.writeFileSync(path.join(fixture.root, 'a.txt'), 'changed after clean review\n');
+      return result;
+    });
+    expect(await host.command(['review', 'clean'], { cwd: fixture.root })).toMatchObject({
+      kind: 'local', output: expect.stringContaining('GIT_STATE_CHANGED'),
+    });
+  });
+  it('refuses an expired reservation after its timer fires instead of taking a fresh snapshot', async () => {
+    const host = new GitWorkbench({ currentRoot: () => fixture.root, store: memoryGitStore(), busy: () => false,
+      armCommit: () => 'unused', binding: { owns: () => false, remember: () => {}, migrate: () => ({ changed: false, note: 'unused' }) },
+      execute: async () => { throw new Error('No write expected.'); } });
+    const snapshot = await host.snapshot();
+    const fresh = vi.spyOn(host, 'snapshot');
+    vi.useFakeTimers();
+    try {
+      const reservation = host.reserveReview(snapshot, 'expired');
+      await vi.advanceTimersByTimeAsync(20_001);
+      host.clearReviewReservation(reservation.token);
+      host.clearReviewReservation();
+      expect(await host.command(['review', 'expired'], { cwd: fixture.root })).toMatchObject({
+        kind: 'local', output: expect.stringContaining('Review preparation expired'),
+      });
+      expect(fresh).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('rejects a reserved review when its binding changes during diff collection', async () => {
+    fs.appendFileSync(path.join(fixture.root, 'a.txt'), 'review target\n');
+    let binding = 'first';
+    const host = new GitWorkbench({ currentRoot: () => fixture.root, store: memoryGitStore(), busy: () => false,
+      armCommit: () => 'unused', binding: { owns: () => false, remember: () => {}, migrate: () => ({ changed: false, note: 'unused' }) },
+      execute: async () => { throw new Error('No write expected.'); }, reviewBinding: () => binding });
+    host.reserveReview(await host.snapshot(), 'bound');
+    const review = host.review.bind(host);
+    vi.spyOn(host, 'review').mockImplementation(async (...args) => {
+      const result = await review(...args);
+      binding = 'second';
+      return result;
+    });
+    expect(await host.command(['review', 'bound'], { cwd: fixture.root })).toMatchObject({
+      kind: 'local', output: expect.stringContaining('Review preparation changed'),
+    });
+  });
   it('retains real commit status/hash/receipts when final durable publication fails, without a second commit or save', async () => {
     fs.appendFileSync(path.join(fixture.root, 'a.txt'), 'staged\n'); fixture.git(['add', '--', 'a.txt']); const git = new NativeGit(fixture.root);
     const before = fixture.git(['rev-list', '--count', 'HEAD']); const published: string[] = [];

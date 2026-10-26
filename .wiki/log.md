@@ -9480,3 +9480,9 @@ projection10、wire3、context report14、session29、step90、runtime preview30
 ADD-08确认有效脏工作树上的`/review`仍显示unknown：preview只允许deep-research driver，standalone review也没有纯`preparePrompt`。现preview显式准入review standalone/driver，复用review request owner的正文、skill、modifier与focus准备，并从原Git workbench取得snapshot与最终review prompt；不调用通用`gitCommand`、`runReviewCommand`或`execute`。preview按实际dispatch的`gitRequestMode`使用plan mode，Git读取传播取消信号，内容复验以原`assertGitSnapshot`核对完整fingerprint。
 
 有效脏工作树得到本地数值；clean/unreadable、缺少Git workbench、第二个driver、无效请求与取消仍在模型准备前拒绝。五文件93项单worker通过；恢复旧driver门触发8项失败，移除plan override触发4项失败，均逐字节恢复并重验preview39项。五静态门/diff、责任上限0、TS build 134c5c64ce2b（inputs 509863f0359e、artifact d4ceddb3a987）及签入validator正式judge proven/0 open-failed-gap通过。预览与提交仍各取一次Git snapshot，未共享one-use reservation；未运行真实provider、全仓、exe、桌面或PTY。HANDOFF/addition第五十七批/audit更新；Git/CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-27] fix | review预览的one-use Git snapshot reservation
+
+第五十七批后，review预览与提交仍各取一次Git snapshot，工作树变化会使数值和实际prompt漂移。现Git workbench持有不持久化的one-use slot；完整request/source验证通过后才发布，dispatch只在focus、20秒期限和canonical session/config/workspace/history/attachment binding仍匹配时消费。过期、binding变化或diff期间工作树变化明确拒绝，不静默换snapshot；完整preview guard在消费时重跑，source/injection/attachment或Git验证失败都会丢弃slot，controller timeout/stop会dispose未settle的preview。过期tombstone保留到成功替换或同focus消费，图片附件纳入摘要，standalone review失败恢复原始draft。
+
+九文件222项单worker通过：controller13、runtime preview50、review runtime14、composition24、Git read3、Git operation20、command execution bridge13、slash router49、interactive command router36。三个新增有效反转分别移除完整preview guard、expired tombstone和controller in-flight dispose，各触发1项失败，均逐字节恢复并重验222项。五静态门/diff、责任上限0、TS build 9e23fa7256ee（inputs 823648b90f2a、artifact 1cece9167270）及签入validator正式judge proven/0 open-failed-gap通过。未运行真实provider、全仓、exe、桌面或PTY；真实并发Git工作树、平台矩阵和1.7k/4.9k差额继续待证。HANDOFF/addition第五十八批/audit更新；Git/CI另绑定，原Phase38/9、ADD独立且整体active。

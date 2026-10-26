@@ -4,6 +4,10 @@ export interface ContextPreview {
   readonly estimate: PromptEstimate;
   readonly verify: () => void;
   readonly verifyContent?: (signal: AbortSignal) => Promise<void>;
+  /** Absolute expiry shared with the owning request reservation, when present. */
+  readonly expiresAt?: number;
+  /** Release any reservation or retained preview state when this reading is retired. */
+  readonly dispose?: () => void;
 }
 export interface ContextReading {
   readonly tokens?: number;
@@ -19,6 +23,7 @@ export function createContextController(input: {
   let stopped = false;
   let key: string | undefined;
   let previous: ContextPreview | undefined;
+  let activeValue: ContextPreview | undefined;
   let pending: AbortController | undefined;
   let scheduled: ReturnType<typeof setTimeout> | undefined;
   let interval: ReturnType<typeof setInterval> | undefined;
@@ -26,11 +31,20 @@ export function createContextController(input: {
   let retryAt = 0;
   let checkedAt = 0;
   let expiresAt = 0;
+  const disposed = new WeakSet<object>();
+  const discard = (value: ContextPreview | undefined) => {
+    if (!value || disposed.has(value)) return;
+    disposed.add(value);
+    try { value.dispose?.(); } catch { /* Cleanup must not break the next reading. */ }
+  };
   const invalidate = () => {
     // Cancellation is not settlement: keep the serial read slot until finally.
     pending?.abort();
     if (scheduled) clearTimeout(scheduled); scheduled = undefined;
-    source = previous ? 'stale' : 'unknown'; previous = undefined;
+    const retired = previous;
+    const inFlight = activeValue;
+    source = retired ? 'stale' : 'unknown'; previous = undefined;
+    activeValue = undefined; discard(retired); discard(inFlight);
   };
   const request = () => {
     if (stopped) return;
@@ -58,23 +72,39 @@ export function createContextController(input: {
       const timeout = setTimeout(() => {
         controller.abort();
         if (!stopped && pending === controller && key === captured) {
-          if (previous) source = 'stale';
-          previous = undefined; retryAt = Date.now() + 5000; input.repaint();
+          const retired = previous;
+          const inFlight = activeValue;
+          if (retired) source = 'stale';
+          previous = undefined; activeValue = undefined; discard(retired); discard(inFlight); retryAt = Date.now() + 5000; input.repaint();
         }
       }, 10000); timeout.unref?.();
+      let currentValue: ContextPreview | undefined;
       void Promise.resolve().then(() => checking ?? input.load(controller.signal)).then(async value => {
-        if (stopped || controller.signal.aborted || pending !== controller || input.identity() !== captured) return;
-        value.verify(); await value.verifyContent?.(controller.signal); value.verify();
-        if (stopped || controller.signal.aborted || pending !== controller || input.identity() !== captured) return;
-        if (checking && Date.now() >= expiresAt) throw new Error('Context preview expired.');
-        previous = value; source = value.estimate.source;
-        checkedAt = Date.now(); if (!checking) expiresAt = checkedAt + 20000; input.repaint();
-      }).catch(() => {
-        if (!stopped && !controller.signal.aborted && pending === controller && key === captured) {
-          if (previous) source = 'stale';
-          previous = undefined; retryAt = Date.now() + 5000; input.repaint();
+        currentValue = value;
+        activeValue = value;
+        if (stopped || controller.signal.aborted || pending !== controller || input.identity() !== captured) {
+          discard(value); if (activeValue === value) activeValue = undefined; return;
         }
-      }).finally(() => { clearTimeout(timeout); if (pending === controller) pending = undefined; });
+        value.verify(); await value.verifyContent?.(controller.signal); value.verify();
+        if (stopped || controller.signal.aborted || pending !== controller || input.identity() !== captured) {
+          discard(value); if (activeValue === value) activeValue = undefined; return;
+        }
+        if (checking && Date.now() >= expiresAt) throw new Error('Context preview expired.');
+        if (!checking && value.expiresAt !== undefined && Date.now() >= value.expiresAt) throw new Error('Context preview expired.');
+        previous = value; source = value.estimate.source;
+        checkedAt = Date.now(); if (!checking) expiresAt = value.expiresAt ?? checkedAt + 20000; input.repaint();
+      }).catch(() => {
+        discard(currentValue);
+        discard(activeValue); activeValue = undefined;
+        const retired = previous;
+        if (!stopped && !controller.signal.aborted && pending === controller && key === captured) {
+          if (retired) source = 'stale';
+          previous = undefined; discard(retired); retryAt = Date.now() + 5000; input.repaint();
+        }
+      }).finally(() => {
+        if (activeValue === currentValue) activeValue = undefined;
+        currentValue = undefined; clearTimeout(timeout); if (pending === controller) pending = undefined;
+      });
     }, 150);
     scheduled.unref?.();
   };

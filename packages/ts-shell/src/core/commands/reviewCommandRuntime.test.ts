@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { runReviewCommand } from "./reviewCommandRuntime.js";
+import { gitCommandFor } from "../../cli/runtime/git.js";
 import { gitCommandContext, stubGitEnvironment, gitFixture } from "../../test-utils/git.js";
 import { routeSlashCommand } from "./slashRouter.js";
 
@@ -39,6 +40,24 @@ it("forwards a bare review without an empty focus argument", async () => {
   const result = await runReviewCommand([], { ...gitCommandContext(root), gitCommand });
   expect(gitCommand).toHaveBeenCalledWith(["review"], expect.anything());
   expect(result).toEqual({ kind: "local", output: "reviewed" });
+});
+
+it("restores the exact standalone slash source when native Git preparation fails", async () => {
+  const gitCommand = vi.fn(async () => ({ kind: "local" as const, output: "Git unavailable or refused: review preparation changed" }));
+  const result = await routeSlashCommand("/audit focus", { ...gitCommandContext(root), gitCommand });
+  expect(result).toMatchObject({ kind: "local", retryDraft: "/audit focus" });
+});
+
+it("restores the exact malformed standalone review source", async () => {
+  const result = await routeSlashCommand("/audit   ", gitCommandContext(root));
+  expect(result).toMatchObject({ kind: "local", retryDraft: "/audit   " });
+});
+
+it("restores the draft when the interactive Git command has no bound workbench", async () => {
+  const result = await routeSlashCommand("/audit focus", {
+    ...gitCommandContext(root), gitCommand: gitCommandFor({} as never),
+  });
+  expect(result).toMatchObject({ kind: "local", retryDraft: "/audit focus" });
 });
 
 it("carries composed prose, modifiers and skill instructions into the one native review request", async () => {

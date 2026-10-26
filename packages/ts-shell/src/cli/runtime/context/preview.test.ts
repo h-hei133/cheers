@@ -17,6 +17,7 @@ import { installCommandGate } from '../../data/access.js';
 import { appendTranscriptEvent } from '../../../session/transcript/sessionTranscript.js';
 import { createMessageTranscriptEvent } from '../../../session/sessionEventCodec.js';
 import { requestIdentity } from '../../../context/request/identity.js';
+import { capturePromptSources } from '../../../context/request/sources.js';
 import { routeSlashCommand } from '../../../core/commands/slashRouter.js';
 import * as revisions from '../../../runtime/execution/read.js';
 import * as workspaceFiles from '../../../core/workspace/files.js';
@@ -198,6 +199,7 @@ it.each(['review', 'audit', 'check'])('previews the exact composed %s prompt thr
   const workbench = gitWorkbenchFor(context)!;
   const execute = vi.spyOn(workbench, 'execute');
   const command = vi.spyOn(workbench, 'command');
+  const snapshot = vi.spyOn(workbench, 'snapshot');
   const files = [layout.metadataPath, layout.statePath, layout.transcriptPath], before = files.map(file => fs.readFileSync(file));
   const status = workbench.git().text(['status', '--short']);
   const preview = await load(input); preview.verify();
@@ -211,6 +213,7 @@ it.each(['review', 'audit', 'check'])('previews the exact composed %s prompt thr
   expect(actual.prompt).toContain('<method name="brainstorm">');
   expect(actual.prompt).toContain('检查证据');
   expect(preview.estimate).toEqual((await load(actual.prompt, undefined, undefined, 'plan')).estimate);
+  expect(snapshot).toHaveBeenCalledTimes(1);
   expect(execute).not.toHaveBeenCalled();
   expect(files.map(file => fs.readFileSync(file))).toEqual(before);
   expect(await status).toBe(await workbench.git().text(['status', '--short']));
@@ -238,6 +241,143 @@ it('invalidates a review preview when the native Git snapshot changes', async ()
   preview.verify();
   fs.writeFileSync(path.join(cwd, 'first.txt'), 'second evidence\n');
   await expect(preview.verifyContent(new AbortController().signal)).rejects.toThrow('GIT_STATE_CHANGED');
+});
+
+it('refuses dispatch when the reserved review snapshot changed after preview', async () => {
+  const { cwd, context, load, session } = fixture({ git: true });
+  const file = path.join(cwd, 'reserved.txt'); fs.writeFileSync(file, 'before reservation\n');
+  await load('/review reservation');
+  fs.writeFileSync(file, 'after reservation\n');
+  const actual = await routeSlashCommand('/review reservation', { cwd, sessionId: session.id, gitCommand: gitCommandFor(context) });
+  expect(actual).toMatchObject({ kind: 'local', output: expect.stringContaining('GIT_STATE_CHANGED') });
+});
+
+it('consumes a review reservation once and refreshes on a later dispatch', async () => {
+  const { cwd, context, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'once.txt'), 'one use\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  await load('/review one use');
+  const command = gitCommandFor(context);
+  expect(await command(['review', 'one use'], { cwd })).toMatchObject({ kind: 'prompt' });
+  expect(snapshot).toHaveBeenCalledTimes(1);
+  expect(await command(['review', 'one use'], { cwd })).toMatchObject({ kind: 'prompt' });
+  expect(snapshot).toHaveBeenCalledTimes(2);
+});
+
+it('refuses an expired review reservation without taking a fresh snapshot', async () => {
+  const { cwd, context, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'expiry.txt'), 'expiry bound\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  await load('/review expiry');
+  vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 20_001);
+  expect(await gitCommandFor(context)(['review', 'expiry'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Review preparation expired'),
+  });
+  expect(snapshot).toHaveBeenCalledTimes(1);
+});
+
+it('does not reuse a review reservation after configuration replacement', async () => {
+  const { cwd, context, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'config.txt'), 'configuration bound\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  await load('/review configuration');
+  Object.assign(context, { configuration: new ConfigState(context.runtimeConfig, configurationBinding(context), context.configuration.current.catalog) });
+  expect(await gitCommandFor(context)(['review', 'configuration'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Review preparation changed'),
+  });
+  expect(snapshot).toHaveBeenCalledTimes(1);
+});
+
+it('detects an in-place context-selection change before consuming a review reservation', async () => {
+  const { cwd, context, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'selection.txt'), 'selection bound\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  await load('/review selection');
+  context.session.contextSelection = { version: 1, revision: 1, entries: [] };
+  expect(await gitCommandFor(context)(['review', 'selection'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Review preparation changed'),
+  });
+  expect(snapshot).toHaveBeenCalledTimes(1);
+});
+
+it('drops a review reservation when a different draft starts previewing', async () => {
+  const { cwd, context, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'draft.txt'), 'draft bound\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  await load('/review draft');
+  await load('ordinary prompt');
+  expect(await gitCommandFor(context)(['review', 'draft'], { cwd })).toMatchObject({ kind: 'prompt' });
+  expect(snapshot).toHaveBeenCalledTimes(2);
+});
+
+it('discards a published review reservation when another preview source fails verification', async () => {
+  const { cwd, context, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'source.txt'), 'source bound\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  const preview = await load('/review source');
+  fs.writeFileSync(path.join(cwd, 'AGENTS.md'), 'changed instructions');
+  await expect(preview.verifyContent(new AbortController().signal)).rejects.toThrow();
+  expect(await gitCommandFor(context)(['review', 'source'], { cwd })).toMatchObject({ kind: 'prompt' });
+  expect(snapshot).toHaveBeenCalledTimes(2);
+});
+
+it('discards a published review reservation when generic verification fails', async () => {
+  const { cwd, context, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'source.txt'), 'source bound\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  const preview = await load('/review source');
+  fs.writeFileSync(path.join(cwd, 'AGENTS.md'), 'changed instructions');
+  expect(() => preview.verify()).toThrow();
+  expect(await gitCommandFor(context)(['review', 'source'], { cwd })).toMatchObject({ kind: 'prompt' });
+  expect(snapshot).toHaveBeenCalledTimes(2);
+});
+
+it('runs the full preview guard before consuming a review reservation', async () => {
+  const { cwd, context, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'source.txt'), 'source bound\n');
+  const guardFile = path.join(root, 'guard.txt');
+  fs.writeFileSync(guardFile, 'guard bound\n');
+  const sources = capturePromptSources();
+  sources.track(guardFile);
+  const original = context.preparePromptContext!;
+  context.preparePromptContext = async (prompt, signal) => {
+    const prepared = await original(prompt, signal);
+    return { ...prepared, verifyContent: (checkingSignal: AbortSignal) => sources.verifyContent(checkingSignal) };
+  };
+  await load('/review source');
+  fs.writeFileSync(guardFile, 'changed instructions');
+  expect(await gitCommandFor(context)(['review', 'source'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Prompt source changed'),
+  });
+});
+
+it('binds a review reservation to the image attachments beside the draft', async () => {
+  const { cwd, context, load, session } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'image.txt'), 'image bound\n');
+  const image = (data: string) => ({ type: 'image' as const, mimeType: 'image/png', data });
+  await load('/review image', { images: [image('first-image')] });
+  const actual = await routeSlashCommand('/review image', {
+    cwd, sessionId: session.id, attachments: { images: [image('second-image')] }, gitCommand: gitCommandFor(context),
+  });
+  expect(actual).toMatchObject({ kind: 'local', output: expect.stringContaining('Review preparation changed') });
+});
+
+it('disposes a published review reservation through the preview owner', async () => {
+  const { cwd, context, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'source.txt'), 'source bound\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  const preview = await load('/review source');
+  preview.dispose?.();
+  expect(await gitCommandFor(context)(['review', 'source'], { cwd })).toMatchObject({ kind: 'prompt' });
+  expect(snapshot).toHaveBeenCalledTimes(2);
 });
 
 it('keeps review unknown when the native Git owner is unavailable or the tree is clean', async () => {

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import type { SessionManager } from '../../session/SessionManager.js';
@@ -12,9 +13,12 @@ import type { CommandContext } from '../../core/commands/types.js';
 import { GitCommitIntent } from '../../workflow/git/operation/intent.js';
 import { checkoutIdentity, sameCheckout } from '../../workflow/git/worktree/identity.js';
 import { assertSourceAccess } from '../../core/query/sourcePolicy.js';
+import { historyDigest } from '../../context/request/identity.js';
 
 interface GitRuntime { readonly workbench: GitWorkbench; readonly cancel: () => void; readonly tools: () => readonly ToolDefinition[] }
 const runtimes = new WeakMap<ShellRuntimeContext, GitRuntime>();
+const identities = new WeakMap<object, number>();
+let nextIdentity = 1;
 export function installGitRuntime(context: ShellRuntimeContext, manager: SessionManager, runtime: ShellSessionRuntime,
   gate: () => ToolGateOptions): void {
   const store = gitStore(manager, () => context.session);
@@ -23,6 +27,7 @@ export function installGitRuntime(context: ShellRuntimeContext, manager: Session
   const busy = () => runtime.getCurrentRunController() !== null || active !== undefined;
   const workbench = new GitWorkbench({ store, busy, currentRoot: () => context.cwd,
     sourceAccess: absolute => assertSourceAccess(absolute, context.cwd, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules),
+    reviewBinding: () => reviewBinding(context, manager, runtime),
     armCommit: intent.arm.bind(intent),
     binding: { migrate: target => migrateWorkspaceSession(manager, context, target, () => runtime.getCurrentRunController() !== null),
       owns: (target, branch, head) => store.read().worktrees.some(item => item.path === target && sameCheckout(target, item)
@@ -56,3 +61,26 @@ export function commitCommandFor(context: ShellRuntimeContext): NonNullable<Comm
 }
 export function cancelGitFor(context: ShellRuntimeContext): void { runtimes.get(context)?.cancel(); }
 export function gitFeatureTools(context: ShellRuntimeContext): readonly ToolDefinition[] { return runtimes.get(context)?.tools() ?? []; }
+
+function reviewBinding(context: ShellRuntimeContext, manager: SessionManager, runtime: ShellSessionRuntime): string {
+  const session = manager.getSession(context.session.id) ?? context.session;
+  return createHash('sha256').update(JSON.stringify([
+    identityOf(context.session), identityOf(context.configuration.current),
+    session.id, session.createdAt, session.projectRoot,
+    session.workspaceRoots, session.contextSelection, historyDigest(session.turns),
+    context.configuration.current.revision, context.configuration.current.binding,
+    context.configuration.current.config, context.configuration.current.catalog,
+    context.projectRoot, context.cwd, context.workspaceRevision, context.peekForcedTool?.(),
+    context.promptIdentity, context.workspaceIssue, context.skillOptions, runtime.getAgentMode(), runtime.getPermissionScope(),
+    context.contextAttachments?.map(entry => [entry.path, entry.digest, entry.source, entry.bounds, entry.persistence]),
+    context.transientContextAttachments?.map(entry => [entry.path, entry.digest, entry.source, entry.bounds, entry.persistence]),
+  ])).digest('hex');
+}
+
+function identityOf(value: object): number {
+  const existing = identities.get(value);
+  if (existing !== undefined) return existing;
+  const id = nextIdentity++;
+  identities.set(value, id);
+  return id;
+}

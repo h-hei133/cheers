@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
 import type { CommandContext, CommandExecutionResult, LocalCommandResult, PromptCommandResult } from '../../core/commands/types.js';
+import type { PromptAttachments } from '../../core/shell/sessionRuntime.js';
 import type { GitSnapshot } from './read/model.js';
 import { NativeGit } from './read/native.js';
-import { readGitSnapshot } from './read/snapshot.js';
+import { assertGitSnapshot, readGitSnapshot } from './read/snapshot.js';
 import { readGitDiff } from './read/diff.js';
 import { prepareBranch, prepareCommit, prepareFileChange, gitPlan } from './operation/plan.js';
 import type { GitPlan, GitOperationResult } from './operation/model.js';
@@ -15,12 +17,98 @@ import { parseSyntax } from '../../core/commands/syntax/parse.js';
 import { syntaxHelp } from '../../core/commands/syntax/projection.js';
 
 export interface GitHost { readonly sourceAccess?: (absolute: string) => void; readonly store: GitStore; readonly binding: WorktreeBinding; readonly execute: (git: NativeGit, plan: GitPlan) => Promise<GitOperationResult>;
-  readonly busy: () => boolean; readonly armCommit: (snapshot: GitSnapshot, index: string) => string; readonly currentRoot: () => string }
+  readonly busy: () => boolean; readonly armCommit: (snapshot: GitSnapshot, index: string) => string; readonly currentRoot: () => string;
+  /** Stable values that must still match when a preview snapshot is consumed. */
+  readonly reviewBinding?: () => string }
+interface ReviewReservation {
+  readonly snapshot: GitSnapshot;
+  readonly focus: string;
+  readonly binding: string;
+  readonly expiresAt: number;
+  readonly verifyContent?: (signal: AbortSignal) => Promise<void>;
+  readonly attachmentBinding: string;
+  expiryTimer?: ReturnType<typeof setTimeout>;
+}
+interface ExpiredReviewReservation {
+  readonly token: object;
+  readonly focus: string;
+}
+type ReviewTake = { readonly kind: 'none' }
+  | { readonly kind: 'reserved'; readonly snapshot: GitSnapshot; readonly binding: string; readonly attachmentBinding: string }
+  | { readonly kind: 'invalid'; readonly reason: string };
 export class GitWorkbench {
+  private reviewReservation?: ReviewReservation;
+  private expiredReviewReservation?: ExpiredReviewReservation;
   constructor(readonly host: GitHost) {}
   git(): NativeGit { return new NativeGit(this.host.currentRoot(), undefined, this.host.sourceAccess); }
   async snapshot(signal?: AbortSignal): Promise<GitSnapshot> { return readGitSnapshot(this.git(), false, undefined, signal); }
   async execute(plan: GitPlan): Promise<GitOperationResult> { if (this.host.busy()) throw new Error('Wait for the current session operation.'); return this.host.execute(this.git(), plan); }
+  reserveReview(snapshot: GitSnapshot, focus: string, verifyContent?: (signal: AbortSignal) => Promise<void>, attachments?: PromptAttachments) {
+    if (this.reviewReservation?.expiryTimer) clearTimeout(this.reviewReservation.expiryTimer);
+    this.expiredReviewReservation = undefined;
+    const expiresAt = Date.now() + 20_000;
+    const reservation: ReviewReservation = { snapshot, focus, binding: this.host.reviewBinding?.() ?? '', expiresAt,
+      verifyContent, attachmentBinding: attachmentBinding(attachments) };
+    const expiryTimer = setTimeout(() => {
+      if (this.reviewReservation === reservation) {
+        this.reviewReservation = undefined;
+        this.expiredReviewReservation = { token: reservation, focus: reservation.focus };
+      }
+    }, 20_000);
+    expiryTimer.unref?.();
+    reservation.expiryTimer = expiryTimer;
+    this.reviewReservation = reservation;
+    return { token: reservation, expiresAt: reservation.expiresAt };
+  }
+  clearReviewReservation(reservation?: object): void {
+    if (!reservation) {
+      if (this.reviewReservation?.expiryTimer) clearTimeout(this.reviewReservation.expiryTimer);
+      this.reviewReservation = undefined;
+      return;
+    }
+    if (this.reviewReservation === reservation) {
+      if (this.reviewReservation.expiryTimer) clearTimeout(this.reviewReservation.expiryTimer);
+      this.reviewReservation = undefined;
+    }
+  }
+  clearExpiredReviewReservation(): void {
+    this.expiredReviewReservation = undefined;
+  }
+  private async takeReviewSnapshot(focus: string, signal?: AbortSignal, attachments?: PromptAttachments): Promise<ReviewTake> {
+    const reservation = this.reviewReservation;
+    if (!reservation) {
+      const expired = this.expiredReviewReservation;
+      if (!expired) return { kind: 'none' };
+      this.expiredReviewReservation = undefined;
+      return expired.focus === focus
+        ? { kind: 'invalid', reason: 'Review preparation expired; retry the original draft.' }
+        : { kind: 'none' };
+    }
+    if (reservation.expiryTimer) clearTimeout(reservation.expiryTimer);
+    this.reviewReservation = undefined;
+    this.expiredReviewReservation = undefined;
+    if (reservation.focus !== focus) return { kind: 'none' };
+    if (reservation.attachmentBinding !== attachmentBinding(attachments)) {
+      return { kind: 'invalid', reason: 'Review preparation changed; retry the original draft.' };
+    }
+    if (Date.now() >= reservation.expiresAt) return { kind: 'invalid', reason: 'Review preparation expired; retry the original draft.' };
+    if (reservation.binding !== (this.host.reviewBinding?.() ?? '')) {
+      return { kind: 'invalid', reason: 'Review preparation changed; retry the original draft.' };
+    }
+    signal?.throwIfAborted();
+    await assertGitSnapshot(this.git(), reservation.snapshot, false, undefined, signal);
+    await reservation.verifyContent?.(signal ?? new AbortController().signal);
+    signal?.throwIfAborted();
+    if (Date.now() >= reservation.expiresAt) return { kind: 'invalid', reason: 'Review preparation expired; retry the original draft.' };
+    if (reservation.attachmentBinding !== attachmentBinding(attachments)) {
+      return { kind: 'invalid', reason: 'Review preparation changed; retry the original draft.' };
+    }
+    if (reservation.binding !== (this.host.reviewBinding?.() ?? '')) {
+      return { kind: 'invalid', reason: 'Review preparation changed; retry the original draft.' };
+    }
+    return { kind: 'reserved', snapshot: reservation.snapshot, binding: reservation.binding,
+      attachmentBinding: reservation.attachmentBinding };
+  }
   async command(args: string[], context: CommandContext): Promise<CommandExecutionResult> {
     try {
       if (args[0] === 'help') return { kind: 'local', output: syntaxHelp(gitSyntax) };
@@ -28,10 +116,36 @@ export class GitWorkbench {
       if (!parsed.ok) return { kind: 'local', output: `Invalid Git operation: ${parsed.reason} Use ${syntaxHelp(gitSyntax)}. No write was attempted.` };
       const action = parsed.action.name;
       const rest = parsed.args;
-      const snapshot = await this.snapshot(); const git = this.git();
+      const reviewFocus = action === 'review' ? rest.join(' ') : undefined;
+      let snapshot: GitSnapshot;
+      let reviewBinding: string | undefined;
+      let reviewAttachmentBinding: string | undefined;
+      if (reviewFocus === undefined) snapshot = await this.snapshot();
+      else {
+        const take = await this.takeReviewSnapshot(reviewFocus, context.signal, context.attachments);
+        if (take.kind === 'invalid') throw new Error(take.reason);
+        if (take.kind === 'reserved') {
+          snapshot = take.snapshot;
+          reviewBinding = take.binding;
+          reviewAttachmentBinding = take.attachmentBinding;
+        } else snapshot = await this.snapshot(context.signal);
+      }
+      const git = this.git();
       if (action === 'status' && !rest.length) return gitReportResult(gitStatusReport(snapshot));
       if (action === 'goal' && !rest.length) return context.goalCommand ? context.goalCommand(['status'], context) : { kind: 'local', output: 'Goal runtime unavailable.' };
-      if (action === 'review') return await this.review(snapshot, rest.join(' '), context.signal);
+      if (action === 'review') {
+        const result = await this.review(snapshot, rest.join(' '), context.signal);
+        if (result.kind === 'prompt' || reviewBinding !== undefined) {
+          await assertGitSnapshot(this.git(), snapshot, false, undefined, context.signal);
+          if (reviewBinding !== undefined && reviewBinding !== (this.host.reviewBinding?.() ?? '')) {
+            throw new Error('Review preparation changed; retry the original draft.');
+          }
+          if (reviewAttachmentBinding !== undefined && reviewAttachmentBinding !== attachmentBinding(context.attachments)) {
+            throw new Error('Review preparation changed; retry the original draft.');
+          }
+        }
+        return result;
+      }
       if (action === 'diff' && rest.length === 2 && ['staged', 'unstaged', 'untracked'].includes(rest[0]!)) return gitReportResult(gitDiffReport(await readGitDiff(git, snapshot, rest[0] as 'staged', rest[1]!)));
       let plan: GitPlan;
       if (['stage', 'unstage'].includes(action) && rest.length >= 1 && rest.length <= 2) plan = await prepareFileChange(git, snapshot, action as 'stage', rest[0]!, rest[1]);
@@ -83,4 +197,14 @@ export class GitWorkbench {
   }
 }
 function clipReview(text: string): string { return text.length > 24000 ? text.slice(0, 24000) + '\n[Truncated at 24000 characters; retrieve the remainder before reviewing.]' : text || '(none)'; }
+function attachmentBinding(attachments?: PromptAttachments): string {
+  if (!attachments?.images.length) return '';
+  const digest = createHash('sha256');
+  for (const image of attachments.images) {
+    digest.update(image.type); digest.update('\0');
+    digest.update(image.mimeType); digest.update('\0');
+    digest.update(image.data); digest.update('\0');
+  }
+  return digest.digest('hex');
+}
 import path from 'node:path';

@@ -8,15 +8,49 @@ const preview = (tokens: number, verify = () => {}): ContextPreview => ({ estima
 it('debounces drafts, serializes cancelled reads and discards late results', async () => {
   let key = 'a'; let finish!: (value: ContextPreview) => void;
   const signals: AbortSignal[] = [];
+  const lateDispose = vi.fn();
   const load = vi.fn((signal: AbortSignal) => { signals.push(signal); return new Promise<ContextPreview>(resolve => { finish = resolve; }); });
   const controller = createContextController({ identity: () => key, load, repaint: vi.fn() }); controller.start();
   await vi.advanceTimersByTimeAsync(150); expect(load).toHaveBeenCalledTimes(1);
   key = 'b'; controller.update(); expect(signals[0]!.aborted).toBe(true);
   await vi.advanceTimersByTimeAsync(1000); expect(load).toHaveBeenCalledTimes(1);
-  finish(preview(100)); await vi.advanceTimersByTimeAsync(500); expect(controller.read()).toEqual({ source: 'unknown' });
+  finish({ ...preview(100), dispose: lateDispose }); await vi.advanceTimersByTimeAsync(500); expect(controller.read()).toEqual({ source: 'unknown' });
+  expect(lateDispose).toHaveBeenCalledTimes(1);
   await vi.advanceTimersByTimeAsync(150); expect(load).toHaveBeenCalledTimes(2);
   finish(preview(200)); await vi.advanceTimersByTimeAsync(0); expect(controller.read()).toEqual({ tokens: 200, source: 'estimated' });
   controller.stop(); expect(controller.read()).toEqual({ source: 'stale' });
+});
+
+it('disposes a published preview when its identity changes or the controller stops', async () => {
+  let key = 'a'; const dispose = vi.fn(); const value = { ...preview(100), dispose };
+  const controller = createContextController({ identity: () => key, load: async () => value, repaint: vi.fn() }); controller.start();
+  await vi.advanceTimersByTimeAsync(150); expect(controller.read().tokens).toBe(100);
+  key = 'b'; controller.update(); expect(dispose).toHaveBeenCalledTimes(1);
+  controller.stop(); expect(dispose).toHaveBeenCalledTimes(1);
+});
+
+it('uses the request reservation expiry for the displayed preview', async () => {
+  const value = { ...preview(100), expiresAt: Date.now() + 1000, verifyContent: vi.fn(async () => {}) };
+  const controller = createContextController({ identity: () => 'a', load: async () => value, repaint: vi.fn() }); controller.start();
+  await vi.advanceTimersByTimeAsync(150); expect(controller.read().tokens).toBe(100);
+  await vi.advanceTimersByTimeAsync(900); expect(controller.read()).toEqual({ source: 'stale' });
+  controller.stop();
+});
+
+it('disposes an in-flight preview when verification times out', async () => {
+  const dispose = vi.fn();
+  const value = { ...preview(100), dispose, verifyContent: vi.fn(() => new Promise<void>(() => {})) };
+  const controller = createContextController({ identity: () => 'a', load: async () => value, repaint: vi.fn() }); controller.start();
+  await vi.advanceTimersByTimeAsync(150); expect(controller.read()).toEqual({ source: 'unknown' });
+  await vi.advanceTimersByTimeAsync(10000); expect(dispose).toHaveBeenCalledTimes(1);
+  controller.stop(); expect(dispose).toHaveBeenCalledTimes(1);
+});
+
+it('disposes an in-flight preview when the controller stops before verification settles', async () => {
+  const dispose = vi.fn();
+  const value = { ...preview(100), dispose, verifyContent: vi.fn(() => new Promise<void>(() => {})) };
+  const controller = createContextController({ identity: () => 'a', load: async () => value, repaint: vi.fn() }); controller.start();
+  await vi.advanceTimersByTimeAsync(150); controller.stop(); expect(dispose).toHaveBeenCalledTimes(1);
 });
 
 it('keeps frame reads pure and drops stale values after source checks', async () => {

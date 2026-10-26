@@ -692,3 +692,9 @@ ADD-09确认`/context`虽能显示目录估算、请求字节和provider用量�
 ADD-08确认有效脏工作树上的standalone与正文review仍显示unknown：preview只放行deep-research driver，且review不是`preparePrompt`模板。现preview显式准入review driver/standalone，与dispatch共用review request focus准备；从原Git workbench取一次snapshot和review prompt，强制与`gitRequestMode`一致的plan mode，传播取消信号，并在内容复验时用原`assertGitSnapshot`核对完整fingerprint。clean/unreadable、缺少workbench、第二driver和取消仍在模型准备前拒绝；不调用通用`gitCommand`、`runReviewCommand`或`execute`。
 
 五文件93项、两个有效反转/逐字节恢复及独立只读review有局部证据；旧driver门反转出现8项失败，移除plan override出现4项失败。五静态门、责任上限0、TS build `134c5c64ce2b`、inputs `509863f0359e`和正式judge proven另绑定。预览与提交仍各取一次Git snapshot，未共享one-use reservation；真实provider、全仓、exe、桌面和PTY未验。见[第五十七批](phase-20-addition.md#第五十七批review预览复用真实git-prompt)。原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第五十八批）
+
+review preview与dispatch原先各取一次Git snapshot，预览数值可能对应旧工作树。现Git workbench持有不持久化的one-use slot；完整预览验证通过后才发布，dispatch只在focus、20秒期限和canonical session/config/workspace/history/attachment binding仍匹配时消费。过期、binding变化或diff期间工作树变化明确拒绝，不静默换snapshot；完整preview guard在消费时重跑，source/injection/attachment或Git验证失败都会丢弃slot，controller timeout/stop也会dispose未settle的preview。过期tombstone会保留到成功替换或同focus消费，图片附件纳入摘要，standalone review失败恢复原始draft。
+
+九文件222项、三个新增有效反转/逐字节恢复及最终独立只读review无findings有局部证据；移除完整preview guard触发preview 1项失败，移除expired tombstone触发Git operation 1项失败，移除controller in-flight dispose触发controller 1项失败。五静态门、责任上限0、TS build `9e23fa7256ee`、inputs `823648b90f2a`和正式judge proven另绑定。未运行真实provider、全仓、exe、桌面或PTY，真实并发Git工作树与平台矩阵仍待验。见[第五十八批](phase-20-addition.md#第五十八批review预览的one-use-git-snapshot-reservation)。原Phase38/9、ADD独立且整体active。

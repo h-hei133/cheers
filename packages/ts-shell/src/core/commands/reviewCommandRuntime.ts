@@ -33,10 +33,20 @@ export function prepareReviewRequest(
 /** Advisory review uses the same native Git snapshot as the workbench. */
 export async function runReviewCommand(args: string[], context: CommandContext): Promise<CommandExecutionResult> {
   const request = prepareReviewRequest(args, context);
-  if (!request.ok) return { kind: 'local', output: `Invalid /review arguments: ${request.reason}\n${syntaxHelp(reviewSyntax)}` };
+  if (!request.ok) return { kind: 'local', retryDraft: reviewRetryDraft(context),
+    output: `Invalid /review arguments: ${request.reason}\n${syntaxHelp(reviewSyntax)}` };
   // A bare review has no focus parameter. Forwarding an empty string makes the
   // native Git syntax parser reject the request before it can inspect changes.
   const forwarded = request.focus ? ['review', request.focus] : ['review'];
-  return context.gitCommand ? context.gitCommand(forwarded, context)
-    : { kind: 'local', output: 'Git review requires a bound session runtime; review was not started.' };
+  if (!context.gitCommand) return { kind: 'local', retryDraft: reviewRetryDraft(context),
+    output: 'Git review requires a bound session runtime; review was not started.' };
+  const result = await context.gitCommand(forwarded, context);
+  if (result.kind !== 'local' || (!result.output.startsWith('Git unavailable or refused:')
+    && !result.output.startsWith('Git workbench requires a bound session runtime.'))) return result;
+  return { ...result, retryDraft: reviewRetryDraft(context) };
+}
+
+function reviewRetryDraft(context: CommandContext): string {
+  return context.rawCommandInput ?? context.composedPrompt?.originalInput
+    ?? `/${context.rawCommandName ?? 'review'}${context.rawCommandArgs ? ` ${context.rawCommandArgs}` : ''}`;
 }

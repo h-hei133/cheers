@@ -210,6 +210,7 @@ export async function buildCliCommandExecution(
     projectRoot,
     projectMemoryStore,
     sessionId: input.sessionId,
+    ...(input.attachments ? { attachments: input.attachments } : {}),
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     ...(input.themePaths ? { themePaths: input.themePaths } : {}),
     modifierKeysReported: input.modifierKeysReported,

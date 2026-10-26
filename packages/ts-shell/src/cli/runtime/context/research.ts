@@ -23,7 +23,9 @@ export function prepareResearchPreview(context: ShellRuntimeContext, snapshot: A
   const verify = () => {
     if (!current(entry) || !researchReservationCurrent(reservation, request)) throw new Error('Research entry preparation expired or changed.');
   };
-  return { run, verify, publish: () => { verify(); entries.set(context, entry); } };
+  return { run, verify,
+    publish: () => { verify(); entries.set(context, entry); },
+    discard: () => { if (entries.get(context) === entry) entries.delete(context); } };
 }
 
 /** Submission still resolves methods again and admits state through the research owner. */
@@ -33,6 +35,11 @@ export function takeResearchPreview(context: ShellRuntimeContext, request: Resea
   if (!entry || !researchReservationCurrent(entry.reservation, request)) return undefined;
   if (!current(entry)) throw new Error('Research entry configuration or session changed before submission.');
   return entry.reservation;
+}
+
+/** Drop an unpublished or invalidated research entry without touching a newer owner. */
+export function clearResearchPreview(context: ShellRuntimeContext): void {
+  entries.delete(context);
 }
 
 function current(entry: PreviewEntry): boolean {

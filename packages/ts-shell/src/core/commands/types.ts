@@ -136,8 +136,12 @@ export interface CommandContext {
   readonly keyGuide?: readonly KeyBinding[];
   readonly modifierKeysReported?: boolean
   readonly rawCommandName?: string
+  /** Exact slash source before routing, for draft restoration on preparation failure. */
+  readonly rawCommandInput?: string
   /** Original argument source for commands that accept shell syntax. */
   readonly rawCommandArgs?: string
+  /** Images carried beside the draft and the final model prompt. */
+  readonly attachments?: { readonly images: readonly import('../../model-adapters/multimodal.js').ImageContent[] }
   readonly compactCheckpointStore?: CompactLiveCheckpointStore
   readonly compactInjectionStateStore?: CompactInjectionStateStore
   readonly projectMemoryReviewStateStore?: ProjectMemoryReviewStateStore

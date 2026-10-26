@@ -42,14 +42,16 @@ import { tokenizeCommandArgs } from '../../../core/commands/arguments.js';
 import { parseResearchArgs } from '../../../core/commands/research/syntax.js';
 import { researchEntryRequest, researchTurnPrompt } from '../../../research/run/entry.js';
 import { researchPreviewTools } from '../../../research/run/tools.js';
-import { prepareResearchPreview } from './research.js';
-import { prepareReviewPreview } from './review.js';
+import { clearResearchPreview, prepareResearchPreview } from './research.js';
+import { clearExpiredReviewPreview, clearReviewPreview, prepareReviewPreview } from './review.js';
 
 /** A local estimate never connects MCP, accepts an injection or starts a driver. */
 export async function previewContext(context: ShellRuntimeContext, manager: SessionManager, gateway: CliMcpGateway,
   draft: string, attachments: PromptAttachments | undefined, agentMode: 'plan' | 'build', permissionScope: import('../../approval/permissionScope.js').PermissionScope,
   signal: AbortSignal) {
   signal.throwIfAborted();
+  clearReviewPreview(context);
+  clearResearchPreview(context);
   const operation = configurationOperation(context);
   const { config, publication, admission } = operation;
   const expected = context.session; const cwd = context.cwd;
@@ -166,38 +168,52 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const estimate = estimatePrompt(messages, overhead, { provider: resolution.provider, model: resolution.model,
     endpoint, endpointId, ...assembledIdentity }, getSessionUsage(expected.id), estimateWirePrompt(body, protocol.contextFields));
   const verify = () => {
-    signal.throwIfAborted(); session.verify(); sources.verify(); skills.verify?.(); research?.verify();
-    for (const entry of entries) {
-      if (!contextEntryPathWithinRoot(cwd, entry)) throw new Error('Context preview is stale.');
-      try { access(entry.path); } catch { throw new Error('Context preview is stale.'); }
+    try {
+      signal.throwIfAborted(); session.verify(); sources.verify(); skills.verify?.(); research?.verify();
+      for (const entry of entries) {
+        if (!contextEntryPathWithinRoot(cwd, entry)) throw new Error('Context preview is stale.');
+        try { access(entry.path); } catch { throw new Error('Context preview is stale.'); }
+      }
+      if ([...skills.skills.values()].some(skill => skill.isCurrent?.() === false)) throw new Error('Skill catalogue changed.');
+      if (JSON.stringify(requestIdentity({ ...prepared.currentOverhead(), tools: allowTools ? toolSchemas(prepared.currentTools()) : [] })) !== JSON.stringify(assembledIdentity)
+        || JSON.stringify(toolSchemas(new Map(foregroundTools(context).map(tool => [tool.name, tool])))) !== featureIdentity) {
+        throw new Error('Request tool schemas changed.');
+      }
+      if (admission() || context.configuration.current !== publication || context.session !== expected || context.cwd !== cwd
+        || !injected.isCurrent() || context.peekForcedTool?.() !== forcedTool
+        || JSON.stringify([context.contextAttachments, context.transientContextAttachments]) !== entryIdentity
+        || catalogContributions(cwd, expected.id).some((entry, index) => entry !== contributions[index])
+        || catalogContributions(cwd, expected.id).length !== contributions.length) throw new Error('Context preview is stale.');
+      const selected = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+      if (selected.blocked || selected.provider !== resolution.provider || selected.model !== resolution.model
+        || selected.thinkingEffort !== resolution.thinkingEffort || providerCredentialBaseUrl(publication.catalog, selected) !== base
+        || (providerCredentialEndpoint(publication.catalog, selected, base) ?? DEFAULT_ENDPOINT_KIND) !== endpoint) {
+        throw new Error('Model request target changed.');
+      }
+      if (config.enableMcpTools && JSON.stringify(gateway.peekSnapshot?.()) !== JSON.stringify(snapshot)) throw new Error('MCP catalogue changed.');
+    } catch (error) {
+      review?.discard();
+      throw error;
     }
-    if ([...skills.skills.values()].some(skill => skill.isCurrent?.() === false)) throw new Error('Skill catalogue changed.');
-    if (JSON.stringify(requestIdentity({ ...prepared.currentOverhead(), tools: allowTools ? toolSchemas(prepared.currentTools()) : [] })) !== JSON.stringify(assembledIdentity)
-      || JSON.stringify(toolSchemas(new Map(foregroundTools(context).map(tool => [tool.name, tool])))) !== featureIdentity) {
-      throw new Error('Request tool schemas changed.');
-    }
-    if (admission() || context.configuration.current !== publication || context.session !== expected || context.cwd !== cwd
-      || !injected.isCurrent() || context.peekForcedTool?.() !== forcedTool
-      || JSON.stringify([context.contextAttachments, context.transientContextAttachments]) !== entryIdentity
-      || catalogContributions(cwd, expected.id).some((entry, index) => entry !== contributions[index])
-      || catalogContributions(cwd, expected.id).length !== contributions.length) throw new Error('Context preview is stale.');
-    const selected = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
-    if (selected.blocked || selected.provider !== resolution.provider || selected.model !== resolution.model
-      || selected.thinkingEffort !== resolution.thinkingEffort || providerCredentialBaseUrl(publication.catalog, selected) !== base
-      || (providerCredentialEndpoint(publication.catalog, selected, base) ?? DEFAULT_ENDPOINT_KIND) !== endpoint) {
-      throw new Error('Model request target changed.');
-    }
-    if (config.enableMcpTools && JSON.stringify(gateway.peekSnapshot?.()) !== JSON.stringify(snapshot)) throw new Error('MCP catalogue changed.');
   };
   const verifyContent = async (checkingSignal: AbortSignal) => {
-    checkingSignal.throwIfAborted(); verify();
-    await sources.verifyContent(checkingSignal);
-    await injected.verifyContent?.(checkingSignal);
-    await verifyContextEntries(cwd, entries, sourceReaderForAsync(context, checkingSignal), checkingSignal);
-    await review?.verifyContent(checkingSignal);
-    verify();
+    try {
+      checkingSignal.throwIfAborted(); verify();
+      await sources.verifyContent(checkingSignal);
+      await injected.verifyContent?.(checkingSignal);
+      await verifyContextEntries(cwd, entries, sourceReaderForAsync(context, checkingSignal), checkingSignal);
+      await review?.verifyContent(checkingSignal);
+      verify();
+    } catch (error) {
+      review?.discard();
+      throw error;
+    }
   };
   await verifyContent(signal);
   research?.publish();
-  return { estimate, verify, verifyContent };
+  if (!review) clearExpiredReviewPreview(context);
+  const reviewExpiresAt = review?.publish(verifyContent, attachments);
+  return { estimate, verify, verifyContent,
+    ...(reviewExpiresAt !== undefined ? { expiresAt: reviewExpiresAt } : {}),
+    dispose: () => { review?.discard(); research?.discard(); } };
 }

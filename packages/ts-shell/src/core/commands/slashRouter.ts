@@ -57,11 +57,13 @@ export async function routeSlashCommand(
         : tokenizeCommandArgs(rawCommandArgs);
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
-      return { kind: "local", output: `Invalid /${rawName} arguments: ${error.message}` };
+      return { kind: "local", output: `Invalid /${rawName} arguments: ${error.message}`,
+        ...(resolved!.name === 'review' ? { retryDraft: input } : {}) };
     }
     return command.execute(args, {
       ...context,
       rawCommandName: resolved!.name,
+      rawCommandInput: input,
       rawCommandArgs,
     });
   }
@@ -72,7 +74,7 @@ export async function routeSlashCommand(
     let args: string[];
     try { args = tokenizeCommandArgs(rawCommandArgs); }
     catch { return { kind: 'local', output: 'Invalid extension command arguments.' }; }
-    return handler.execute(args, { ...context, rawCommandName: rawName, rawCommandArgs });
+    return handler.execute(args, { ...context, rawCommandName: rawName, rawCommandInput: input, rawCommandArgs });
   }
 
   return {
