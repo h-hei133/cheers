@@ -720,3 +720,9 @@ ADD-08确认review preview失效标记仍按focus/expiry分散保存，changed f
 ADD-08继续确认提交竞态：用户提交已发布的review preview后，busy身份变化可能让context controller在500ms轮询中自动invalidate reservation；同时reviewTake在diff前提前清空会让post-admission失败回落fresh snapshot。现controller支持suspend/resume，preview verifier在suspended abort时不把取消误记为来源失败；Git workbench保留reviewTake到prompt/diff与最终检查完成，失败按epoch留下stale marker，Git resolution失败在消费前返回。
 
 五文件234项、三个有效反转/源码恢复及最终独立只读复审无findings有局部证据；五静态门、责任上限0、TS build `07e2421013da`、inputs `22fefb1161e4`、artifact `a69987ef6b00`和正式judge proven另绑定。真实I/O/timing stress、真实provider、全仓、exe、桌面或PTY未验；见[第六十二批](phase-20-addition.md#第六十二批提交期preview生命周期与review租约)。原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第六十三批）
+
+ADD-10/11新增确认正文非首位file与slash命令同名时仍可能以裸路径接受，随后被组合解析当作命令；代码、转义slash和URL命令参数也可能请求路径目录。现非目录file只在非首位执行精确命令碰撞并加引号，directory不触发精确命令/模板读取；literal过滤在path catalog前生效，quoted Unix/相对/Windows drive/UNC路径共用同一谓词。`/home`测试不再读取宿主目录。
+
+三文件122项、四个有效反转/逐字节恢复及最终稳定只读review无findings有局部证据；非组合命令夹具的复审缺口已改为真实`/brainstorm`正反对照。五静态门、责任上限0、Phase 20脚本38 complete / 9 partial / 0 open、TS build `1e15b8d6239e`、inputs `cd0db660bc77`、artifact `94310bb1b156`、manifest fresh 460/1882和正式judge proven另绑定。非`scheme://` URI、Windows真实目录枚举、有界模板发现成本和用户原终端未验；见[第六十三批](phase-20-addition.md#第六十三批正文路径碰撞字面量与windows引号边界)。原Phase38/9、ADD独立且整体active。

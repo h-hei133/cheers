@@ -9508,3 +9508,11 @@ runtime preview66、Git operation22、review runtime14、controller16共四文�
 ADD-08确认busy身份变化会让context controller的500ms轮询在用户提交`/review`时自动invalidate已发布reservation；reviewTake提前清空也会让diff后失败回落fresh snapshot。现controller提供suspend/resume，preview verifier对suspended abort不误报来源变更；Git workbench保留take到prompt/diff与最终检查完成，失败按epoch留stale，Git resolution失败在消费前返回。
 
 五文件234项单worker通过：controller18、InteractiveMode111、Git operation24、runtime preview67、review runtime14。三个有效反转分别移除busy suspend、恢复take提前清空和移除suspended verifier guard，均出现对应失败并逐字节恢复。指定`cn:deepseek-v4.1-flash`只读复审最终无findings；残余风险为未做真实I/O/timing stress，永不settle的verifier仍会占用pending slot。五静态门/diff、责任上限0、Phase 20 38 complete / 9 partial / 0 open、TS build 07e2421013da（inputs 22fefb1161e4、artifact a69987ef6b00）及正式judge proven/0 open-failed-gap通过。未运行真实provider、全仓、exe、桌面或PTY；HANDOFF/addition第六十二批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-27] fix | 正文路径碰撞、字面量与 Windows 引号边界
+
+ADD-10/11确认正文非首位file与slash命令同名时仍可能以裸路径接受，随后被组合解析重新当作命令；代码、转义slash和URL命令参数也会错误请求path catalog。现prose completion只对非目录、slash开头且命中精确命令或skill的file加引号，directory不执行精确命令/模板查找；command catalog request在创建路径目录前排除code、非Windows escape和`scheme://` URL。quoted Unix/相对/Windows drive/UNC路径统一经剥离quote后的`pathLike`谓词，`/home`测试改用mock目标而非宿主目录。
+
+prose completion32、completion controller14、keymap76共三文件122项单worker通过。四个有效反转分别移除非首位碰撞检查、关闭literal过滤、移除UNC谓词及恢复目录精确命令查找，均出现对应失败并逐字节恢复；最终源码hash一致。独立`cn:deepseek-v4.1-flash`只读复审指出初版碰撞夹具未使用真实可组合命令，改用`/brainstorm`后锁定未引号正文生成prompt、接受引号path保持字面量；稳定源码最终无findings。
+
+五静态门/diff、责任上限0、Phase 20 38 complete / 9 partial / 0 open、TS build 1e15b8d6239e（inputs cd0db660bc77、artifact 94310bb1b156）、manifest fresh 460 compiler input/1882 immutable artifact及正式judge proven/0 open-failed-gap通过。未运行真实provider、全仓、exe、桌面、PTY或Windows；非`scheme://` URI、Windows目录枚举、碰撞文件的有界模板发现成本和用户原终端继续待验。HANDOFF/addition第六十三批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。

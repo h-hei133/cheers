@@ -15,6 +15,7 @@ import { workflowSyntax } from "../../../core/workflow/syntax.js";
 import { scanCommandArgs } from "../../../core/commands/arguments.js";
 import { completionToken, completionEdit, quoteCompletion } from "../completion.js";
 import { getSlashInvocation } from "../../../entrypoints/slashCommandRegistry.js";
+import { promptTokenAt } from "../../../core/prompts/tokens.js";
 import type { DraftSnapshot } from "../../../presentation/tui/editor/replacement.js";
 import { matchSuggestions, type Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
 import { fileReferenceAt, fileSuggestions } from "../fileSuggestions.js";
@@ -35,6 +36,7 @@ export function catalogRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScop
 
 function commandCatalogRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScope) {
   const token = completionToken(snapshot.text, snapshot.cursor);
+  const literal = promptTokenAt(snapshot.text, snapshot.cursor);
   const command = token.before[0];
   if (!command || command.from !== 0 || !/^\/[A-Za-z0-9:._?-]+$/.test(snapshot.text.slice(command.from, command.to))) return undefined;
   const invocation = getSlashInvocation(command.value, scope);
@@ -67,7 +69,9 @@ function commandCatalogRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScop
     if (!parsed || (name === "memory" && !memoryKind)) return undefined;
     kind = name === "connect" ? "connection" : name === "memory" ? memoryKind : name === "workflow" ? "workflow" : "grant";
   } else {
-    kind = pathKind(name, preceding, following) ?? navigationKind(name, preceding, token.value, following);
+    const path = pathKind(name, preceding, following);
+    if (path && nonPathLiteral(token.value, literal)) return undefined;
+    kind = path ?? navigationKind(name, preceding, token.value, following);
   }
   if (!kind || (!preceding.includes("--") && token.value.startsWith("-"))) return undefined;
   const prefix = snapshot.text.slice(command.to, snapshot.cursor).trimStart();
@@ -75,6 +79,13 @@ function commandCatalogRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScop
     ...(kind === "approved" ? [{ value: "approved", label: "approved", detail: "save all approved candidates" }] : [])];
   return { kind, token, snapshot, fixed, query: kind === "file" || kind === "directory" ? pathDirectory(token.value) : undefined };
 
+}
+
+function nonPathLiteral(value: string, token: ReturnType<typeof promptTokenAt>): boolean {
+  if (!token) return false;
+  if (token.literal === 'code') return true;
+  if (token.literal === 'escape' && !/^(?:[A-Za-z]:[\\/]|\\\\)/.test(token.raw)) return true;
+  return /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value);
 }
 
 export function catalogSuggestions(request: NonNullable<ReturnType<typeof catalogRequest>>, items: readonly Suggestion[]) {

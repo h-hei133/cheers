@@ -39,6 +39,7 @@ function mockPathTarget(target: string, kind: 'file' | 'directory') {
 }
 
 it('suppresses suggestions inside a fenced example and restores local skill/path suggestions after its complete closing line', () => {
+  mockPathTarget('/home', 'directory');
   const code = '````text\nexample ```` /skill:missing\n/ho\n```` trailing\n`````';
   expect(request(`${code.replace('/ho', '/ho|')}\n正文 /skill:a`)).toBeUndefined();
   const req = request(`${code}\n正文 /rev|\n后文`)!;
@@ -68,6 +69,7 @@ it('preserves prefix, suffix and newlines through consecutive quoted directory r
 });
 
 it('keeps a real /home path alongside a same-name skill without fuzzy description capture', () => {
+  mockPathTarget('/home', 'directory');
   const req = request('阅读 /home')!;
   expect(req).toMatchObject({ kind: 'prose', query: '/' });
   const matches = catalogSuggestions(req, [
@@ -181,6 +183,17 @@ it('quotes a file when a longer command prefix makes direct submission look like
   }
 });
 
+it('quotes a command-colliding prose file at a nonzero source offset', async () => {
+  mockPathTarget('/brainstorm', 'file');
+  const req = request('问题 /brainst|orm')!;
+  const path = catalogSuggestions(req, [
+    { value: '/brainstorm', label: '/brainstorm', kind: 'path', identity: '/brainstorm', detail: 'file' },
+  ]).find(item => item.kind === 'path')!;
+  expect(path.edit?.text).toBe('"/brainstorm" ');
+  expect(await routeSlashCommand('问题 /brainstorm', { cwd: root })).toMatchObject({ kind: 'prompt' });
+  expect(await routeSlashCommand('问题 "/brainstorm"', { cwd: root })).toBeNull();
+});
+
 it('quotes an isolated absolute file so first-position path acceptance remains a path', async () => {
   mockPathTarget('/fixture-solo', 'file');
   const req = request('/fixture-solo')!;
@@ -216,6 +229,19 @@ it('continues explicit relative and absolute path prefixes at source offset zero
 it('retains Windows separators in the path query without interpreting them as invocation escapes', () => {
   const req = request('读取 C:\\Users\\wa');
   expect(req).toMatchObject({ kind: 'path', token: { value: 'C:\\Users\\wa' } });
+});
+
+it('recognizes quoted Windows drive and UNC paths in prose', () => {
+  expect(request('读取 "C:\\Users\\wa|')).toMatchObject({ kind: 'path', token: { value: 'C:\\Users\\wa' } });
+  expect(request("读取 'C:/Users/wa|")).toMatchObject({ kind: 'path', token: { value: 'C:/Users/wa' } });
+  expect(request('读取 "\\\\server\\share\\fo|')).toMatchObject({ kind: 'path' });
+});
+
+it('does not request path catalogs for code, escape, or URL command arguments', () => {
+  expect(request('/cd `/ho|`')).toBeUndefined();
+  expect(request('/cd \\`/ho|\\`')).toBeUndefined();
+  expect(request('/report https://example.test/fi|le')).toBeUndefined();
+  expect(request('/export md fi|le')).toMatchObject({ kind: 'file' });
 });
 
 it('offers only declared inline commands and retains a real same-name path', () => {

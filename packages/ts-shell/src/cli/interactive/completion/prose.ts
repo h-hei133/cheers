@@ -8,14 +8,15 @@ import { pathDirectory, pathTargetExists } from './paths.js';
 
 export function proseRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScope) {
   const source = promptTokenAt(snapshot.text, snapshot.cursor);
-  const windows = source && /^[A-Za-z]:\\/.test(source.raw);
+  const prefix = source ? snapshot.text.slice(source.from, snapshot.cursor) : '';
+  const quoted = source?.literal === 'quote';
+  const quotedBody = quoted ? prefix.slice(1) : prefix;
+  const pathPrefix = quoted && quotedBody.endsWith(prefix[0]!) ? quotedBody.slice(0, -1) : quotedBody;
+  const windows = /^(?:[A-Za-z]:[\\/]|\\\\|\/\/)/.test(pathPrefix);
   if (!source || source.literal && source.literal !== 'quote' && !(windows && source.literal === 'escape')) return undefined;
-  const prefix = snapshot.text.slice(source.from, snapshot.cursor);
-  const value = windows ? prefix : scanCommandArgs(prefix, true)[0]?.value ?? '';
-  const quoted = source.literal === 'quote';
-  if (quoted && /^\/skill:/.test(value)) return undefined;
-  if (quoted && !/^["'](?:\/|~\/|\.\.?\/)/.test(prefix)) return undefined;
-  if (!/^(?:\/|~\/|\.\.?\/|[A-Za-z]:[\\/])/.test(value)) return undefined;
+  const value = windows ? pathPrefix : scanCommandArgs(prefix, true)[0]?.value ?? '';
+  if (quoted && (!pathLike(value) || /^\/skill:/.test(value))) return undefined;
+  if (!pathLike(value)) return undefined;
   const pathExists = source.from === 0 && value.length > 1 &&
     pathTargetExists(scope?.root ?? process.cwd(), value);
   const opening = /^\/([^\s/]+)(?:\s|$)/.exec(snapshot.text)?.[1];
@@ -56,14 +57,20 @@ export function proseSuggestions(request: { readonly kind: string; readonly snap
       : 'skill:'.startsWith(bare) || name.split('-').some(segment => segment.startsWith(bare));
   }).slice(0, 100).map(item => {
     const singleComponentAbsolute = item.value.startsWith('/') && !item.value.slice(1).includes('/');
-    const pathCollision = item.kind === 'path' && request.token.from === 0 && !item.value.endsWith('/') &&
-      (commandPrefix || singleComponentAbsolute);
+    const directory = item.kind === 'path' && item.value.endsWith('/');
+    const pathCollision = item.kind === 'path' && !directory &&
+      (request.token.from === 0 ? commandPrefix || singleComponentAbsolute
+        : item.value.startsWith('/') && (item.value.startsWith('/skill:') ||
+          getSlashInvocation(item.value.slice(1), request.scope) !== undefined));
     const text = item.kind === 'skill' ? item.value
       : pathCollision ? quoteCompletion(item.value, '"')
       : quoteCompletion(item.value, request.token.prefix);
-    const directory = item.kind === 'path' && item.value.endsWith('/');
     const insertion = text + (!directory && request.token.to === request.snapshot.text.length ? ' ' : '');
     return { ...item, edit: { snapshot: request.snapshot, from: request.token.from, to: request.token.to, text: insertion,
       ...(directory ? { cursorOffset: text.length - (/['"]$/.test(text) ? 1 : 0) } : {}) } };
   });
+}
+
+function pathLike(value: string): boolean {
+  return /^(?:\/|~\/|\.\.?\/|[A-Za-z]:[\\/]|\\\\|\/\/)/.test(value);
 }
