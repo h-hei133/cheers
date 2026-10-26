@@ -29,30 +29,34 @@ interface ReviewReservation {
   readonly attachmentBinding: string;
   expiryTimer?: ReturnType<typeof setTimeout>;
 }
-interface ExpiredReviewReservation {
-  readonly token: object;
-  readonly focus: string;
+interface ReviewInvalidation {
+  readonly reason: string;
 }
 type ReviewTake = { readonly kind: 'none' }
-  | { readonly kind: 'reserved'; readonly snapshot: GitSnapshot; readonly binding: string; readonly attachmentBinding: string }
+  | { readonly kind: 'reserved'; readonly snapshot: GitSnapshot; readonly binding: string; readonly attachmentBinding: string; readonly epoch: number }
   | { readonly kind: 'invalid'; readonly reason: string };
 export class GitWorkbench {
   private reviewReservation?: ReviewReservation;
-  private expiredReviewReservation?: ExpiredReviewReservation;
+  private reviewInvalidation?: ReviewInvalidation;
+  private reviewEpoch = 0;
+  private reviewTake?: { readonly reservation: ReviewReservation; readonly epoch: number };
   constructor(readonly host: GitHost) {}
   git(): NativeGit { return new NativeGit(this.host.currentRoot(), undefined, this.host.sourceAccess); }
   async snapshot(signal?: AbortSignal): Promise<GitSnapshot> { return readGitSnapshot(this.git(), false, undefined, signal); }
   async execute(plan: GitPlan): Promise<GitOperationResult> { if (this.host.busy()) throw new Error('Wait for the current session operation.'); return this.host.execute(this.git(), plan); }
   reserveReview(snapshot: GitSnapshot, focus: string, verifyContent?: (signal: AbortSignal) => Promise<void>, attachments?: PromptAttachments) {
     if (this.reviewReservation?.expiryTimer) clearTimeout(this.reviewReservation.expiryTimer);
-    this.expiredReviewReservation = undefined;
+    this.reviewEpoch++;
+    this.reviewInvalidation = undefined;
+    this.reviewTake = undefined;
     const expiresAt = Date.now() + 20_000;
     const reservation: ReviewReservation = { snapshot, focus, binding: this.host.reviewBinding?.() ?? '', expiresAt,
       verifyContent, attachmentBinding: attachmentBinding(attachments) };
     const expiryTimer = setTimeout(() => {
       if (this.reviewReservation === reservation) {
         this.reviewReservation = undefined;
-        this.expiredReviewReservation = { token: reservation, focus: reservation.focus };
+        this.reviewEpoch++;
+        this.reviewInvalidation = { reason: 'Review preparation expired; retry the original draft.' };
       }
     }, 20_000);
     expiryTimer.unref?.();
@@ -62,52 +66,92 @@ export class GitWorkbench {
   }
   clearReviewReservation(reservation?: object): void {
     if (!reservation) {
-      if (this.reviewReservation?.expiryTimer) clearTimeout(this.reviewReservation.expiryTimer);
-      this.reviewReservation = undefined;
+      this.reviewEpoch++;
+      const active = this.reviewReservation;
+      if (active) {
+        if (active.expiryTimer) clearTimeout(active.expiryTimer);
+        this.reviewReservation = undefined;
+        this.reviewInvalidation = { reason: 'Review preparation changed; retry the original draft.' };
+      }
+      this.reviewTake = undefined;
       return;
     }
-    if (this.reviewReservation === reservation) {
-      if (this.reviewReservation.expiryTimer) clearTimeout(this.reviewReservation.expiryTimer);
+    const active = this.reviewReservation;
+    const taking = this.reviewTake?.reservation === reservation;
+    if (active === reservation) {
+      if (active.expiryTimer) clearTimeout(active.expiryTimer);
       this.reviewReservation = undefined;
     }
+    if (active === reservation || taking) this.reviewEpoch++;
+    if (taking) this.reviewTake = undefined;
   }
-  clearExpiredReviewReservation(): void {
-    this.expiredReviewReservation = undefined;
+  clearStaleReviewReservation(): void {
+    this.reviewInvalidation = undefined;
+  }
+  invalidateReviewReservation(reservation: object, reason = 'Review preparation changed; retry the original draft.'): void {
+    const active = this.reviewReservation;
+    const taking = this.reviewTake?.reservation === reservation;
+    if (active !== reservation && !taking) return;
+    if (active === reservation) {
+      if (active.expiryTimer) clearTimeout(active.expiryTimer);
+      this.reviewReservation = undefined;
+    }
+    if (taking) this.reviewTake = undefined;
+    this.reviewEpoch++;
+    this.reviewInvalidation = { reason };
+  }
+  private invalidateTake(reservation: ReviewReservation, epoch: number, reason: string): ReviewTake {
+    if (this.reviewEpoch === epoch && this.reviewTake?.reservation === reservation) {
+      this.reviewTake = undefined;
+      this.reviewEpoch++;
+      this.reviewInvalidation = { reason };
+    }
+    return { kind: 'invalid', reason };
   }
   private async takeReviewSnapshot(focus: string, signal?: AbortSignal, attachments?: PromptAttachments): Promise<ReviewTake> {
     const reservation = this.reviewReservation;
     if (!reservation) {
-      const expired = this.expiredReviewReservation;
-      if (!expired) return { kind: 'none' };
-      this.expiredReviewReservation = undefined;
-      return expired.focus === focus
-        ? { kind: 'invalid', reason: 'Review preparation expired; retry the original draft.' }
+      if (this.reviewTake) return { kind: 'invalid', reason: 'Review preparation is being consumed; retry the original draft.' };
+      return this.reviewInvalidation
+        ? { kind: 'invalid', reason: this.reviewInvalidation.reason }
         : { kind: 'none' };
     }
     if (reservation.expiryTimer) clearTimeout(reservation.expiryTimer);
     this.reviewReservation = undefined;
-    this.expiredReviewReservation = undefined;
-    if (reservation.focus !== focus) return { kind: 'none' };
+    const epoch = this.reviewEpoch;
+    this.reviewTake = { reservation, epoch };
+    this.reviewInvalidation = { reason: 'Review preparation is being consumed; retry the original draft.' };
+    if (reservation.focus !== focus) {
+      return this.invalidateTake(reservation, epoch, 'Review preparation changed; retry the original draft.');
+    }
     if (reservation.attachmentBinding !== attachmentBinding(attachments)) {
-      return { kind: 'invalid', reason: 'Review preparation changed; retry the original draft.' };
+      return this.invalidateTake(reservation, epoch, 'Review preparation changed; retry the original draft.');
     }
-    if (Date.now() >= reservation.expiresAt) return { kind: 'invalid', reason: 'Review preparation expired; retry the original draft.' };
+    if (Date.now() >= reservation.expiresAt) return this.invalidateTake(reservation, epoch, 'Review preparation expired; retry the original draft.');
     if (reservation.binding !== (this.host.reviewBinding?.() ?? '')) {
-      return { kind: 'invalid', reason: 'Review preparation changed; retry the original draft.' };
+      return this.invalidateTake(reservation, epoch, 'Review preparation changed; retry the original draft.');
     }
-    signal?.throwIfAborted();
-    await assertGitSnapshot(this.git(), reservation.snapshot, false, undefined, signal);
-    await reservation.verifyContent?.(signal ?? new AbortController().signal);
-    signal?.throwIfAborted();
-    if (Date.now() >= reservation.expiresAt) return { kind: 'invalid', reason: 'Review preparation expired; retry the original draft.' };
+    try {
+      signal?.throwIfAborted();
+      await assertGitSnapshot(this.git(), reservation.snapshot, false, undefined, signal);
+      await reservation.verifyContent?.(signal ?? new AbortController().signal);
+      signal?.throwIfAborted();
+      if (this.reviewEpoch !== epoch) throw new Error('Review preparation changed; retry the original draft.');
+    } catch (error) {
+      this.invalidateTake(reservation, epoch, 'Review preparation changed; retry the original draft.');
+      throw error;
+    }
+    if (Date.now() >= reservation.expiresAt) return this.invalidateTake(reservation, epoch, 'Review preparation expired; retry the original draft.');
     if (reservation.attachmentBinding !== attachmentBinding(attachments)) {
-      return { kind: 'invalid', reason: 'Review preparation changed; retry the original draft.' };
+      return this.invalidateTake(reservation, epoch, 'Review preparation changed; retry the original draft.');
     }
     if (reservation.binding !== (this.host.reviewBinding?.() ?? '')) {
-      return { kind: 'invalid', reason: 'Review preparation changed; retry the original draft.' };
+      return this.invalidateTake(reservation, epoch, 'Review preparation changed; retry the original draft.');
     }
+    this.reviewTake = undefined;
+    this.reviewInvalidation = undefined;
     return { kind: 'reserved', snapshot: reservation.snapshot, binding: reservation.binding,
-      attachmentBinding: reservation.attachmentBinding };
+      attachmentBinding: reservation.attachmentBinding, epoch };
   }
   async command(args: string[], context: CommandContext): Promise<CommandExecutionResult> {
     try {
@@ -120,6 +164,7 @@ export class GitWorkbench {
       let snapshot: GitSnapshot;
       let reviewBinding: string | undefined;
       let reviewAttachmentBinding: string | undefined;
+      let reviewEpoch: number | undefined;
       if (reviewFocus === undefined) snapshot = await this.snapshot();
       else {
         const take = await this.takeReviewSnapshot(reviewFocus, context.signal, context.attachments);
@@ -128,6 +173,7 @@ export class GitWorkbench {
           snapshot = take.snapshot;
           reviewBinding = take.binding;
           reviewAttachmentBinding = take.attachmentBinding;
+          reviewEpoch = take.epoch;
         } else snapshot = await this.snapshot(context.signal);
       }
       const git = this.git();
@@ -135,6 +181,9 @@ export class GitWorkbench {
       if (action === 'goal' && !rest.length) return context.goalCommand ? context.goalCommand(['status'], context) : { kind: 'local', output: 'Goal runtime unavailable.' };
       if (action === 'review') {
         const result = await this.review(snapshot, rest.join(' '), context.signal);
+        if (reviewEpoch !== undefined && reviewEpoch !== this.reviewEpoch) {
+          throw new Error('Review preparation changed; retry the original draft.');
+        }
         if (result.kind === 'prompt' || reviewBinding !== undefined) {
           await assertGitSnapshot(this.git(), snapshot, false, undefined, context.signal);
           if (reviewBinding !== undefined && reviewBinding !== (this.host.reviewBinding?.() ?? '')) {

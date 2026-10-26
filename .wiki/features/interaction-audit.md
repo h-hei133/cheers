@@ -708,3 +708,9 @@ ADD-08确认deep-research preview的reservation消费只复核metadata，未执�
 ### 文末当前问题判断（第六十批）
 
 ADD-02确认模型认证await后只调用`owner.isCurrent()`，因此原admission撤销或原signal取消而session/workspace身份不变时，仍可能返回model continuation并重开picker。现[模型认证 owner](../../packages/ts-shell/src/cli/interactive/picker/model/auth.ts)在sign-in返回后调用`owner.check()`，拒绝只保留安全note、不返回next；成功/失败认证仍沿原回返路径，真实host取消不重开。三文件137项、有效反转/逐字节恢复及独立只读review无findings有局部证据；五静态门、责任上限0、TS build `a3dd8c19d4b2`、inputs `af270b6ddc7b`、artifact `391db3bd812d`和正式judge proven另绑定。未运行真实provider、全仓、exe、桌面或PTY；见[第六十批](phase-20-addition.md#第六十批模型认证取消后的原始准入)。原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第六十一批）
+
+ADD-08确认review preview失效标记仍按focus/expiry分散保存，changed focus、replacement preview失败、verification失败或controller自动退休可能让后续`/review`静默取得fresh Git snapshot；旧异步verification也可能覆盖replacement reservation。现[Git workbench](../../packages/ts-shell/src/workflow/git/service.ts)使用workbench级invalidation，并以`reviewTake`/`reviewEpoch`贯穿reservation消费、完整preview复验和prompt/diff构造；成功review或已验证非review preview才清除，显式`dispose`仍释放slot。controller automatic retirement调用`invalidate`，保留stale owner state；显式cleanup保持原路径。
+
+四文件118项、有效反转/源码逐字节恢复有局部证据；五静态门、责任上限0、TS build `8ff6550a60e7`、inputs `03894378e856`、artifact `07f593317543`和正式judge proven另绑定。首个delegated review未返回，替换review因模型账户cooldown不可用，不能记为review approval或no-findings。未运行真实provider、全仓、exe、桌面或PTY；见[第六十一批](phase-20-addition.md#第六十一批review-stale-marker-与异步准入代次)。原Phase38/9、ADD独立且整体active。

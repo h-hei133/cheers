@@ -219,6 +219,35 @@ it.each(['review', 'audit', 'check'])('previews the exact composed %s prompt thr
   expect(await status).toBe(await workbench.git().text(['status', '--short']));
 });
 
+it('refuses a composed review dispatch when a selected skill changes after preview', async () => {
+  const { cwd, context, load, session } = fixture({ git: true });
+  const file = path.join(cwd, 'review-method.md');
+  fs.writeFileSync(file, `---\nname: review-method\ndescription: review method\n---\nOLD REVIEW METHOD`);
+  context.skillOptions = { noSkills: true, skillPaths: [file] };
+  const input = '检查证据 /brainstorm /review /skill:review-method';
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  const review = vi.spyOn(workbench, 'review');
+  await load(input);
+  fs.writeFileSync(file, `---\nname: review-method\ndescription: review method\n---\nNEW REVIEW METHOD`);
+  expect(await routeSlashCommand(input, { cwd, sessionId: session.id, skillOptions: context.skillOptions,
+    gitCommand: gitCommandFor(context) })).toMatchObject({
+    kind: 'local', retryDraft: input, output: expect.stringContaining('Review preparation changed'),
+  });
+  expect(snapshot).toHaveBeenCalledTimes(1);
+  expect(review).toHaveBeenCalledTimes(1);
+  expect(await routeSlashCommand(input, { cwd, sessionId: session.id, skillOptions: context.skillOptions,
+    gitCommand: gitCommandFor(context) })).toMatchObject({
+    kind: 'local', retryDraft: input, output: expect.stringContaining('Review preparation changed'),
+  });
+  expect(snapshot).toHaveBeenCalledTimes(1);
+  await load(input);
+  expect(await routeSlashCommand(input, { cwd, sessionId: session.id, skillOptions: context.skillOptions,
+    gitCommand: gitCommandFor(context) })).toMatchObject({ kind: 'prompt' });
+  expect(snapshot).toHaveBeenCalledTimes(2);
+  expect(review).toHaveBeenCalledTimes(3);
+});
+
 it('previews a standalone review focus with the same native prompt as dispatch', async () => {
   const { cwd, context, gateway, load, manager, session } = fixture({ git: true });
   fs.writeFileSync(path.join(cwd, 'new.txt'), 'standalone evidence\n');
@@ -246,10 +275,15 @@ it('invalidates a review preview when the native Git snapshot changes', async ()
 it('refuses dispatch when the reserved review snapshot changed after preview', async () => {
   const { cwd, context, load, session } = fixture({ git: true });
   const file = path.join(cwd, 'reserved.txt'); fs.writeFileSync(file, 'before reservation\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
   await load('/review reservation');
   fs.writeFileSync(file, 'after reservation\n');
   const actual = await routeSlashCommand('/review reservation', { cwd, sessionId: session.id, gitCommand: gitCommandFor(context) });
   expect(actual).toMatchObject({ kind: 'local', output: expect.stringContaining('GIT_STATE_CHANGED') });
+  expect(await routeSlashCommand('/review reservation', { cwd, sessionId: session.id, gitCommand: gitCommandFor(context) }))
+    .toMatchObject({ kind: 'local', output: expect.stringContaining('Review preparation changed') });
+  expect(snapshot).toHaveBeenCalledTimes(1);
 });
 
 it('consumes a review reservation once and refreshes on a later dispatch', async () => {
@@ -275,6 +309,9 @@ it('refuses an expired review reservation without taking a fresh snapshot', asyn
   expect(await gitCommandFor(context)(['review', 'expiry'], { cwd })).toMatchObject({
     kind: 'local', output: expect.stringContaining('Review preparation expired'),
   });
+  expect(await gitCommandFor(context)(['review', 'expiry'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Review preparation expired'),
+  });
   expect(snapshot).toHaveBeenCalledTimes(1);
 });
 
@@ -285,6 +322,9 @@ it('does not reuse a review reservation after configuration replacement', async 
   const snapshot = vi.spyOn(workbench, 'snapshot');
   await load('/review configuration');
   Object.assign(context, { configuration: new ConfigState(context.runtimeConfig, configurationBinding(context), context.configuration.current.catalog) });
+  expect(await gitCommandFor(context)(['review', 'configuration'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Review preparation changed'),
+  });
   expect(await gitCommandFor(context)(['review', 'configuration'], { cwd })).toMatchObject({
     kind: 'local', output: expect.stringContaining('Review preparation changed'),
   });
@@ -315,7 +355,7 @@ it('drops a review reservation when a different draft starts previewing', async 
   expect(snapshot).toHaveBeenCalledTimes(2);
 });
 
-it('discards a published review reservation when another preview source fails verification', async () => {
+it('keeps a stale review marker when another preview source fails verification', async () => {
   const { cwd, context, load } = fixture({ git: true });
   fs.writeFileSync(path.join(cwd, 'source.txt'), 'source bound\n');
   const workbench = gitWorkbenchFor(context)!;
@@ -323,11 +363,16 @@ it('discards a published review reservation when another preview source fails ve
   const preview = await load('/review source');
   fs.writeFileSync(path.join(cwd, 'AGENTS.md'), 'changed instructions');
   await expect(preview.verifyContent(new AbortController().signal)).rejects.toThrow();
-  expect(await gitCommandFor(context)(['review', 'source'], { cwd })).toMatchObject({ kind: 'prompt' });
-  expect(snapshot).toHaveBeenCalledTimes(2);
+  expect(await gitCommandFor(context)(['review', 'source'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Review preparation changed'),
+  });
+  expect(await gitCommandFor(context)(['review', 'source'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Review preparation changed'),
+  });
+  expect(snapshot).toHaveBeenCalledTimes(1);
 });
 
-it('discards a published review reservation when generic verification fails', async () => {
+it('keeps a stale review marker when generic verification fails', async () => {
   const { cwd, context, load } = fixture({ git: true });
   fs.writeFileSync(path.join(cwd, 'source.txt'), 'source bound\n');
   const workbench = gitWorkbenchFor(context)!;
@@ -335,7 +380,50 @@ it('discards a published review reservation when generic verification fails', as
   const preview = await load('/review source');
   fs.writeFileSync(path.join(cwd, 'AGENTS.md'), 'changed instructions');
   expect(() => preview.verify()).toThrow();
-  expect(await gitCommandFor(context)(['review', 'source'], { cwd })).toMatchObject({ kind: 'prompt' });
+  expect(await gitCommandFor(context)(['review', 'source'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Review preparation changed'),
+  });
+  expect(await gitCommandFor(context)(['review', 'source'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Review preparation changed'),
+  });
+  expect(snapshot).toHaveBeenCalledTimes(1);
+});
+
+it('keeps a stale review marker when a replacement preview fails before publication', async () => {
+  const { cwd, context, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'source.txt'), 'source bound\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  await load('/review source');
+  const original = context.preparePromptContext!;
+  context.preparePromptContext = async () => { throw new Error('replacement preview failed'); };
+  await expect(load('ordinary prompt')).rejects.toThrow('replacement preview failed');
+  context.preparePromptContext = original;
+  expect(await gitCommandFor(context)(['review', 'source'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Review preparation changed'),
+  });
+  expect(snapshot).toHaveBeenCalledTimes(1);
+});
+
+it('keeps a stale review marker when a replacement review focus fails before publication', async () => {
+  const { cwd, context, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'source.txt'), 'source bound\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  await load('/review first');
+  const original = context.preparePromptContext!;
+  context.preparePromptContext = async (prompt, signal) => {
+    if (prompt.includes('User focus: second')) throw new Error('replacement review failed');
+    return original(prompt, signal);
+  };
+  await expect(load('/review second')).rejects.toThrow('replacement review failed');
+  context.preparePromptContext = original;
+  expect(await gitCommandFor(context)(['review', 'second'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Review preparation changed'),
+  });
+  expect(await gitCommandFor(context)(['review', 'second'], { cwd })).toMatchObject({
+    kind: 'local', output: expect.stringContaining('Review preparation changed'),
+  });
   expect(snapshot).toHaveBeenCalledTimes(2);
 });
 

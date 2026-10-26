@@ -6,6 +6,8 @@ export interface ContextPreview {
   readonly verifyContent?: (signal: AbortSignal) => Promise<void>;
   /** Absolute expiry shared with the owning request reservation, when present. */
   readonly expiresAt?: number;
+  /** Retire an automatically invalidated reading and preserve any stale owner state. */
+  readonly invalidate?: () => void;
   /** Release any reservation or retained preview state when this reading is retired. */
   readonly dispose?: () => void;
 }
@@ -32,10 +34,13 @@ export function createContextController(input: {
   let checkedAt = 0;
   let expiresAt = 0;
   const disposed = new WeakSet<object>();
-  const discard = (value: ContextPreview | undefined) => {
+  const discard = (value: ContextPreview | undefined, automatic = false) => {
     if (!value || disposed.has(value)) return;
     disposed.add(value);
-    try { value.dispose?.(); } catch { /* Cleanup must not break the next reading. */ }
+    try {
+      if (automatic && value.invalidate) value.invalidate();
+      else value.dispose?.();
+    } catch { /* Cleanup must not break the next reading. */ }
   };
   const invalidate = () => {
     // Cancellation is not settlement: keep the serial read slot until finally.
@@ -44,7 +49,7 @@ export function createContextController(input: {
     const retired = previous;
     const inFlight = activeValue;
     source = retired ? 'stale' : 'unknown'; previous = undefined;
-    activeValue = undefined; discard(retired); discard(inFlight);
+    activeValue = undefined; discard(retired, true); discard(inFlight, true);
   };
   const request = () => {
     if (stopped) return;
@@ -75,7 +80,7 @@ export function createContextController(input: {
           const retired = previous;
           const inFlight = activeValue;
           if (retired) source = 'stale';
-          previous = undefined; activeValue = undefined; discard(retired); discard(inFlight); retryAt = Date.now() + 5000; input.repaint();
+          previous = undefined; activeValue = undefined; discard(retired, true); discard(inFlight, true); retryAt = Date.now() + 5000; input.repaint();
         }
       }, 10000); timeout.unref?.();
       let currentValue: ContextPreview | undefined;
@@ -83,23 +88,23 @@ export function createContextController(input: {
         currentValue = value;
         activeValue = value;
         if (stopped || controller.signal.aborted || pending !== controller || input.identity() !== captured) {
-          discard(value); if (activeValue === value) activeValue = undefined; return;
+          discard(value, true); if (activeValue === value) activeValue = undefined; return;
         }
         value.verify(); await value.verifyContent?.(controller.signal); value.verify();
         if (stopped || controller.signal.aborted || pending !== controller || input.identity() !== captured) {
-          discard(value); if (activeValue === value) activeValue = undefined; return;
+          discard(value, true); if (activeValue === value) activeValue = undefined; return;
         }
         if (checking && Date.now() >= expiresAt) throw new Error('Context preview expired.');
         if (!checking && value.expiresAt !== undefined && Date.now() >= value.expiresAt) throw new Error('Context preview expired.');
         previous = value; source = value.estimate.source;
         checkedAt = Date.now(); if (!checking) expiresAt = value.expiresAt ?? checkedAt + 20000; input.repaint();
       }).catch(() => {
-        discard(currentValue);
-        discard(activeValue); activeValue = undefined;
+        discard(currentValue, true);
+        discard(activeValue, true); activeValue = undefined;
         const retired = previous;
         if (!stopped && !controller.signal.aborted && pending === controller && key === captured) {
           if (retired) source = 'stale';
-          previous = undefined; discard(retired); retryAt = Date.now() + 5000; input.repaint();
+          previous = undefined; discard(retired, true); retryAt = Date.now() + 5000; input.repaint();
         }
       }).finally(() => {
         if (activeValue === currentValue) activeValue = undefined;

@@ -43,7 +43,7 @@ import { parseResearchArgs } from '../../../core/commands/research/syntax.js';
 import { researchEntryRequest, researchTurnPrompt } from '../../../research/run/entry.js';
 import { researchPreviewTools } from '../../../research/run/tools.js';
 import { clearResearchPreview, prepareResearchPreview } from './research.js';
-import { clearExpiredReviewPreview, clearReviewPreview, prepareReviewPreview } from './review.js';
+import { clearReviewPreview, clearStaleReviewPreview, prepareReviewPreview } from './review.js';
 
 /** A local estimate never connects MCP, accepts an injection or starts a driver. */
 export async function previewContext(context: ShellRuntimeContext, manager: SessionManager, gateway: CliMcpGateway,
@@ -192,7 +192,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
       }
       if (config.enableMcpTools && JSON.stringify(gateway.peekSnapshot?.()) !== JSON.stringify(snapshot)) throw new Error('MCP catalogue changed.');
     } catch (error) {
-      review?.discard();
+      review?.invalidate();
       throw error;
     }
   };
@@ -205,15 +205,16 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
       await review?.verifyContent(checkingSignal);
       verify();
     } catch (error) {
-      review?.discard();
+      review?.invalidate();
       throw error;
     }
   };
   await verifyContent(signal);
   research?.publish(verifyContent);
-  if (!review) clearExpiredReviewPreview(context);
+  if (!review) clearStaleReviewPreview(context);
   const reviewExpiresAt = review?.publish(verifyContent, attachments);
   return { estimate, verify, verifyContent,
     ...(reviewExpiresAt !== undefined ? { expiresAt: reviewExpiresAt } : {}),
+    invalidate: () => { review?.invalidate(); research?.discard(); },
     dispose: () => { review?.discard(); research?.discard(); } };
 }

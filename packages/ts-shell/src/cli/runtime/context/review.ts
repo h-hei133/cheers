@@ -10,9 +10,9 @@ export function clearReviewPreview(context: ShellRuntimeContext): void {
   gitWorkbenchFor(context)?.clearReviewReservation();
 }
 
-/** A verified non-review preview owns the current draft and retires an older expiry. */
-export function clearExpiredReviewPreview(context: ShellRuntimeContext): void {
-  gitWorkbenchFor(context)?.clearExpiredReviewReservation();
+/** A verified non-review preview owns the current draft and retires an older stale marker. */
+export function clearStaleReviewPreview(context: ShellRuntimeContext): void {
+  gitWorkbenchFor(context)?.clearStaleReviewReservation();
 }
 
 /** Prepare the same native review prompt without invoking its command handler. */
@@ -38,7 +38,7 @@ export async function prepareReviewPreview(
       checkingSignal.throwIfAborted();
       if (gitWorkbenchFor(context) !== workbench) throw new Error('Review request owner changed.');
       try { await assertGitSnapshot(workbench.git(), snapshot, false, undefined, checkingSignal); }
-      catch (error) { if (reservation) workbench.clearReviewReservation(reservation); throw error; }
+      catch (error) { if (reservation) workbench.invalidateReviewReservation(reservation); throw error; }
       checkingSignal.throwIfAborted();
     },
     publish: (verifyContent: (checkingSignal: AbortSignal) => Promise<void>, attachments?: PromptAttachments) => {
@@ -48,6 +48,7 @@ export async function prepareReviewPreview(
       reservation = published.token;
       return published.expiresAt;
     },
+    invalidate: () => { if (reservation) workbench.invalidateReviewReservation(reservation); },
     discard: () => { if (reservation) workbench.clearReviewReservation(reservation); },
   };
 }

@@ -9496,3 +9496,9 @@ ADD-08确认deep-research preview的reservation消费只复核request/session/co
 ## [2026-10-27] fix | 模型认证取消后的原始准入
 
 ADD-02确认模型认证await后只检查`owner.isCurrent()`，原admission或原signal在身份不变时失效，仍可返回model continuation并重开picker。现模型认证在sign-in返回后调用`owner.check()`，拒绝只保留安全note、不返回next；成功/失败仍沿原回返，真实host取消不重开。auth18、key9、InteractiveMode110共三文件137项单worker通过；恢复旧`isCurrent()`后三项有效失败，源码逐字节恢复并重验。独立只读review无findings。五静态门/diff、责任上限0、TS build a3dd8c19d4b2（inputs af270b6ddc7b、artifact 391db3bd812d）及正式judge proven/0 open-failed-gap通过。未运行真实provider、全仓、exe、桌面或PTY；HANDOFF/addition第六十批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-27] fix | review stale marker 与异步准入代次
+
+ADD-08确认review preview只在focus/expiry局部保留失效证据；changed focus、replacement preview失败、verification失败或controller自动退休后可回落fresh Git snapshot，旧verification也可能覆盖replacement reservation。现Git workbench使用全局review invalidation，并以`reviewTake`/`reviewEpoch`绑定异步消费；旧verification、prompt/diff构造后均重查，成功review或已验证非review preview才清除。controller automatic `invalidate`与显式`dispose`分离。
+
+runtime preview66、Git operation22、review runtime14、controller16共四文件118项单worker通过。移除`reserveReview`的epoch推进后，旧verification在replacement发布后错误返回reserved prompt，新增断言失败；源码逐字节恢复（sha256 `6674cf86c8a9c4e78c3c60b9165fe8a65dab37da4a8964b5f67aa3685efe7315`）并重验118项。首个delegated review未返回，替换review因模型账户cooldown不可用，不记为approval或no-findings。五静态门/diff、责任上限0、Phase 20 38 complete / 9 partial / 0 open、TS build 8ff6550a60e7（inputs 03894378e856、artifact 07f593317543）及正式judge proven/0 open-failed-gap通过。未运行真实provider、全仓、exe、桌面或PTY；HANDOFF/addition第六十一批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。

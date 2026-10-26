@@ -29,6 +29,16 @@ it('disposes a published preview when its identity changes or the controller sto
   controller.stop(); expect(dispose).toHaveBeenCalledTimes(1);
 });
 
+it('invalidates rather than disposes a published preview when its identity changes', async () => {
+  let key = 'a'; const invalidate = vi.fn(); const dispose = vi.fn();
+  const value = { ...preview(100), invalidate, dispose };
+  const controller = createContextController({ identity: () => key, load: async () => value, repaint: vi.fn() }); controller.start();
+  await vi.advanceTimersByTimeAsync(150); expect(controller.read().tokens).toBe(100);
+  key = 'b'; controller.update();
+  expect(invalidate).toHaveBeenCalledTimes(1); expect(dispose).not.toHaveBeenCalled();
+  controller.stop();
+});
+
 it('uses the request reservation expiry for the displayed preview', async () => {
   const value = { ...preview(100), expiresAt: Date.now() + 1000, verifyContent: vi.fn(async () => {}) };
   const controller = createContextController({ identity: () => 'a', load: async () => value, repaint: vi.fn() }); controller.start();
@@ -44,6 +54,16 @@ it('disposes an in-flight preview when verification times out', async () => {
   await vi.advanceTimersByTimeAsync(150); expect(controller.read()).toEqual({ source: 'unknown' });
   await vi.advanceTimersByTimeAsync(10000); expect(dispose).toHaveBeenCalledTimes(1);
   controller.stop(); expect(dispose).toHaveBeenCalledTimes(1);
+});
+
+it('invalidates rather than disposes an in-flight preview when verification times out', async () => {
+  let finish!: () => void; const invalidate = vi.fn(); const dispose = vi.fn();
+  const value = { ...preview(100), invalidate, dispose, verifyContent: vi.fn(() => new Promise<void>(resolve => { finish = resolve; })) };
+  const controller = createContextController({ identity: () => 'a', load: async () => value, repaint: vi.fn() }); controller.start();
+  await vi.advanceTimersByTimeAsync(150); expect(controller.read()).toEqual({ source: 'unknown' });
+  await vi.advanceTimersByTimeAsync(10000);
+  expect(invalidate).toHaveBeenCalledTimes(1); expect(dispose).not.toHaveBeenCalled();
+  finish(); await vi.advanceTimersByTimeAsync(0); controller.stop();
 });
 
 it('disposes an in-flight preview when the controller stops before verification settles', async () => {
@@ -138,4 +158,13 @@ it('withdraws a published estimate when its periodic content check fails', async
   await vi.advanceTimersByTimeAsync(150); expect(controller.read().tokens).toBe(200);
   value.verifyContent.mockRejectedValue(new Error('Source changed.')); await vi.advanceTimersByTimeAsync(2500);
   expect(controller.read()).toEqual({ source: 'stale' }); expect(load).toHaveBeenCalledTimes(1); controller.stop();
+});
+
+it('invalidates rather than disposes a preview when verification fails', async () => {
+  const invalidate = vi.fn(); const dispose = vi.fn();
+  const value = { ...preview(100), invalidate, dispose, verifyContent: vi.fn(async () => { throw new Error('Source changed.'); }) };
+  const controller = createContextController({ identity: () => 'a', load: async () => value, repaint: vi.fn() }); controller.start();
+  await vi.advanceTimersByTimeAsync(150);
+  expect(invalidate).toHaveBeenCalledTimes(1); expect(dispose).not.toHaveBeenCalled();
+  expect(controller.read()).toEqual({ source: 'unknown' }); controller.stop();
 });
