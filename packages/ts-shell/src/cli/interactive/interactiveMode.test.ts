@@ -59,6 +59,8 @@ import { writeCatalogCache } from '../../core/models/catalogStore.js';
 import { __setOpenAIProviderAuthLoginForTest } from '../../core/auth/providerAuthRuntime.js';
 import { ConfigWriteError } from '../../config/outcome.js';
 import * as startupTiming from '../../observability/startupTiming.js';
+import * as contextPreview from '../runtime/context/preview.js';
+import { contextMessageHash } from '../../session/context/selection.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
@@ -132,6 +134,40 @@ it('passes leading whitespace and second-line functional markers to prose dispat
     host.onSubmit(' \n/model'); expect(host.queue.shift()).toBe(' \n/model');
     host.onSubmit(' /queue clear'); expect(host.queue.shift()).toBe(' /queue clear');
   } finally { mode.stop(); }
+});
+
+it('withdraws the prompt estimate when context selection changes', async () => {
+  vi.useFakeTimers();
+  const preview = {
+    estimate: { tokens: 100, source: 'estimated' as const, identity: { provider: 'openai', model: 'fixture' }, method: 'characters/3.5' as const },
+    verify: vi.fn(),
+  };
+  const load = vi.spyOn(contextPreview, 'previewContext').mockResolvedValue(preview);
+  const { mode } = build();
+  const host = mode as unknown as {
+    promptContext: { start(): void; update(): void; read(): { tokens?: number; source: string }; stop(): void };
+    options: { runtimeContext: ShellRuntimeContext };
+  };
+  try {
+    const first = { id: 'first', role: 'tool' as const, content: 'x'.repeat(4096) };
+    host.options.runtimeContext.session = { ...host.options.runtimeContext.session, turns: [first] };
+    host.promptContext.start();
+    await vi.advanceTimersByTimeAsync(150);
+    expect(host.promptContext.read()).toEqual({ tokens: 100, source: 'estimated' });
+    host.options.runtimeContext.session = { ...host.options.runtimeContext.session,
+      contextSelection: { version: 1, revision: 1, entries: [] } };
+    host.promptContext.update();
+    expect(host.promptContext.read()).toEqual({ tokens: 100, source: 'estimated' });
+    host.options.runtimeContext.session = { ...host.options.runtimeContext.session,
+      contextSelection: { version: 1, revision: 2, entries: [{ id: first.id, hash: contextMessageHash(first), modes: ['elide'] }] } };
+    host.promptContext.update();
+    expect(host.promptContext.read()).toEqual({ source: 'stale' });
+  } finally {
+    host.promptContext.stop();
+    mode.stop();
+    load.mockRestore();
+    vi.useRealTimers();
+  }
 });
 
 it('delivers all composed instructions and images through the real interactive route once', async () => {

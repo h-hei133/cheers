@@ -1344,6 +1344,16 @@ ADD-12继续检查组合输入原文。原[组合计划](../../packages/ts-shell
 
 五静态门与diff通过，责任上限0；TS build `a0dc9a90154f`（inputs `25df253e4dd1`、artifact `dde6d53df1ea`）通过，最终3496个build input的digest仍相同，immutable build的1880个artifact digest仍相同。签入的已适配validator正式judge exit0/proven、0 open/failed obligation及0 proof gap。工件`.omx/artifacts/phase20-addition-offset-path-ambiguity/`保存聚焦、反转摘要、源码hash、静态/build/freshness/judge收据。未运行全仓、exe、真实provider、桌面或PTY；真实路径fixture证明本地路由，不证明用户原终端、Windows或桌面IME。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第五十五批：上下文选择后的测量失效与有效条目身份
+
+ADD-08确认`/shake apply|restore`替换会话上下文选择后，旧provider prompt measurement仍可能被`/context`和状态栏当作当前值；交互估算身份也没有绑定`contextSelection`。现[选择owner](../../packages/ts-shell/src/session/context/selection.ts)提供`effectiveContextSelection`：只保留hash仍匹配且实际改变消息投影的条目，空选择、stale条目和无效果模式不构成prompt identity；`planContextSelection`在`changed=0`时不推进revision。交互owner使用该有效身份，避免空/stale选择误使有效估算变stale。
+
+[session command](../../packages/ts-shell/src/cli/runtime/sessionCommands.ts)在`apply`真正改变投影后调用原`markContextUnknown`并清空`promptIdentity`；无变化返回`unchanged`且不写状态。`restore`在存在有效选择时才发布并失效测量；已空或只有stale/无效果条目直接返回`unchanged`，不绕过或错误消费准入。`status`报告有效条目数及被忽略条目数，不把revision或原始entries当作有效上下文。
+
+主代理单进程串行四文件118项通过：sessionCommands2、interactiveMode110、selection4、state2。三个有效反转分别移除测量失效、交互`contextSelection`身份和`changed=0`门，均出现对应失败并逐字节恢复。独立只读review先后指出no-op revision、空/stale条目和status计数问题；修正后最终复审无findings，review本身未运行测试。
+
+五静态门与diff通过，责任上限0；TS build `aa7aec1ced32`、inputs `3fed547d9fb4`通过，当前已适配validator正式judge exit0/proven、0 open/failed obligation及0 proof gap。未运行全仓、exe、真实provider、桌面或PTY；有效选择缓存以selection对象和turns数组身份绑定，若消息在数组内原地变更而选择对象不变，仍需重新取得选择或后续更强的内容身份；真实1.7k/4.9k差额与生产性能继续待证。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1445,4 +1455,4 @@ ADD-12继续检查组合输入原文。原[组合计划](../../packages/ts-shell
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。

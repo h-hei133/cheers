@@ -9458,3 +9458,11 @@ ADD-10/08确认正文`/home`的prose suggestions仍无候选调用完整slash re
 ADD-10确认首位`/home`同时像slash命令和真实绝对路径时，原先只能保留其中一类；同名命令/alias会吞掉path，仅合成composition候选又会隐藏普通命令。现对当前完整目标做一次file/directory存在性检查，missing或broken link降级；真实目标存在时合并command与path，命令优先、alias隐藏但参与碰撞。Enter仍提交精确命令/alias，Tab接受path。孤立绝对file加引号防止slash误路由，带第二分隔符的路径与directory保留原表达。
 
 prose completion29、path catalog18、keymap76、InteractiveMode109、completion13共五文件245项单worker通过；七个有效反转覆盖命令吞路径、composition-only、path-first、collision引号、跨前缀碰撞、孤立文件引号和keymap path例外，均出现对应失败并逐字节恢复。五静态门/diff、责任上限0、TS build a0dc9a90154f（inputs 25df253e4dd1、artifact dde6d53df1ea）、3496输入与1880 artifact freshness及正式judge proven通过。工件phase20-addition-offset-path-ambiguity归档聚焦/反转/source hash/static/build/judge；HANDOFF/addition第五十四批/audit更新。未运行全仓、exe、真实provider、桌面、PTY或Windows，原Phase38/9、ADD独立且整体active，Git/本批CI另绑定。
+
+## [2026-10-27] fix | 上下文选择后的测量失效与有效条目身份
+
+ADD-08确认`/shake apply|restore`改变派生上下文后，旧provider prompt measurement仍可能被`/context`和状态栏当作当前值，交互估算身份也未绑定`contextSelection`。现选择owner只承认hash有效且实际改变消息投影的条目，空/stale/无效果条目不构成prompt identity；`planContextSelection`无变化不推进revision。交互owner使用有效身份，空/stale变化不误使有效估算变stale。
+
+session command在apply真正改变后调用`markContextUnknown`并清空`promptIdentity`；无变化不写状态。restore在无有效选择时直接返回unchanged，不消费准入；status分别报告有效与被忽略条目。四文件118项串行通过；三个有效反转分别移除测量失效、交互身份和changed=0门，均失败后逐字节恢复。独立只读review先后指出no-op revision、空/stale条目和status计数问题，修正后最终no findings，review未运行测试。
+
+五静态门/diff、责任上限0、TS build aa7aec1ced32（inputs 3fed547d9fb4）及已适配validator正式judge proven/0 open-failed-gap通过。未运行全仓、exe、真实provider、桌面或PTY；有效选择缓存以selection对象和turns数组身份绑定，消息在数组内原地变更的极端路径仍需后续更强内容身份。HANDOFF/addition第五十五批/audit更新；原Phase38/9、ADD独立且整体active，Git/CI另绑定。

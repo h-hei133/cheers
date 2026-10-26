@@ -10,11 +10,12 @@ import { redactUnsafeReportText } from '../../core/security/reportText.js';
 import { readSessionNavigation } from '../../session/query/navigation.js';
 import { exportHistory, parseHistory } from '../../session/history/model.js';
 import { importHistory } from '../../session/history/import.js';
-import { planContextSelection, decodeContextSelection, type ContextSelectionMode } from '../../session/context/selection.js';
+import { planContextSelection, decodeContextSelection, effectiveContextSelection, type ContextSelectionMode } from '../../session/context/selection.js';
 import type { CommandDataTransfer } from '../../core/commands/transfer/contract.js';
 import { configurationAdmission } from '../../core/shell/configuration.js';
 import { updateContextSelection } from '../../session/context/state.js';
 import { navigationLines } from '../output/navigation.js';
+import { markContextUnknown } from '../../observability/usageTelemetry.js';
 
 type SessionCommandInput = {
   readonly runtimeContext: ShellRuntimeContext;
@@ -123,7 +124,9 @@ async function shakeCommand(args: readonly string[], input: SessionCommandInput)
   const action = args[0]?.toLowerCase() || 'preview';
   if (action === 'status') {
     const selection = decodeContextSelection(input.runtimeContext.session.contextSelection);
-    return local(`Context selection revision ${selection.revision}: ${selection.entries.length} entries selected.`);
+    const effective = effectiveContextSelection(input.runtimeContext.session)?.entries.length ?? 0;
+    const ignored = selection.entries.length - effective;
+    return local(`Context selection revision ${selection.revision}: ${effective} effective entries selected${ignored ? `; ${ignored} ignored entries` : ''}.`);
   }
   const mode = (args[1] || 'elide').toLowerCase() as ContextSelectionMode;
   if (!['elide', 'images', 'thinking'].includes(mode)) return local('Usage: /shake [preview|apply|status|restore] [elide|images|thinking]');
@@ -132,12 +135,21 @@ async function shakeCommand(args: readonly string[], input: SessionCommandInput)
     const current = input.sessionManager.getSession(input.runtimeContext.session.id);
     if (!current) return local('The current saved session is unavailable.');
     if (action === 'restore') {
-      input.runtimeContext.session = updateContextSelection(input.sessionManager, current, undefined, configurationAdmission(input.runtimeContext));
+      const hadSelection = effectiveContextSelection(current) !== undefined;
+      if (!hadSelection) return local('Context selection was already empty; original history remains intact.', { status: 'unchanged' });
+      const saved = updateContextSelection(input.sessionManager, current, undefined, configurationAdmission(input.runtimeContext));
+      markContextUnknown(saved.id);
+      input.runtimeContext.promptIdentity = undefined;
+      input.runtimeContext.session = saved;
       return local('Context selection restored; original history remains intact.', { status: 'changed' });
     }
     const planned = planContextSelection(current, mode);
     if (action !== 'apply') return local(`Context preview: ${planned.changed} messages, about ${planned.estimatedTokens} tokens omitted; ${planned.signed} signed reasoning items protected.`);
-    input.runtimeContext.session = updateContextSelection(input.sessionManager, current, planned.selection, configurationAdmission(input.runtimeContext));
+    if (planned.changed === 0) return local('Context selection unchanged; no messages were affected.', { status: 'unchanged' });
+    const saved = updateContextSelection(input.sessionManager, current, planned.selection, configurationAdmission(input.runtimeContext));
+    markContextUnknown(saved.id);
+    input.runtimeContext.promptIdentity = undefined;
+    input.runtimeContext.session = saved;
     return local(`Context selection applied at revision ${planned.selection.revision}; ${planned.changed} messages affected. Original history remains available.`, { status: 'changed' });
   } catch (error) { return local(`Context selection failed: ${safe(error)}`); }
 }

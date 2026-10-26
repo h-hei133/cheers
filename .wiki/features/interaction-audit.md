@@ -674,3 +674,9 @@ ADD-10/08新增确认正文`/home`补全和首位自定义可组合模板查找�
 ADD-10确认首位`/home`同时存在命令与真实路径时，原先不是吞掉path，就是只保留composition命令，无法在同一菜单中安全选择。现只对当前完整目标执行一次file/directory存在性检查；真实目标存在时合并command与path，命令优先，alias隐藏但参与碰撞。Enter仍提交精确命令，Tab接受path。孤立绝对file加引号，带第二分隔符的路径与directory保持原表达式，避免接受后误触发slash路由。
 
 五文件245项、七个有效反转/逐字节恢复及最终独立只读review无findings有局部证据；五静态门、责任上限0、TS build `a0dc9a90154f`、inputs/artifact freshness和正式judge proven另绑定。未运行全仓、exe、真实provider、桌面、PTY或Windows；见[第五十四批](phase-20-addition.md#第五十四批首位命令与真实路径歧义)。原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第五十五批）
+
+ADD-08新增确认`/shake apply|restore`改变派生上下文后，旧provider prompt measurement仍可被`/context`和状态栏当作当前值，交互估算身份也未绑定`contextSelection`。现选择owner只承认hash有效且实际改变投影的条目；空/stale/无效果选择不构成prompt identity。`apply`只在真实变化后`markContextUnknown`并清除`promptIdentity`，无变化不写状态；`restore`在无有效选择时直接返回`unchanged`，不消费准入；`status`分别报告有效与被忽略条目。
+
+四文件118项、三个有效反转/逐字节恢复及最终独立只读review无findings有局部证据；五静态门、责任上限0、TS build `aa7aec1ced32`和正式judge proven另绑定。缓存仍以selection对象与turns数组身份绑定，原地改消息的极端路径未覆盖；未运行全仓、exe、真实provider、桌面或PTY。见[第五十五批](phase-20-addition.md#第五十五批上下文选择后的测量失效与有效条目身份)。原Phase38/9、ADD独立且整体active。

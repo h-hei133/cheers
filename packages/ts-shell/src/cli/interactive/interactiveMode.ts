@@ -105,6 +105,7 @@ import { themePreferences } from "../../presentation/theme/preview.js";
 import { createContextController } from './context/controller.js';
 import { previewContext } from '../runtime/context/preview.js';
 import { navigateSession, readBackSource, type SessionNavigationResult } from "../runtime/navigation.js";
+import { contextSelectionIdentity } from '../../session/context/selection.js';
 
 /**
  * Interactive session host.
@@ -332,6 +333,7 @@ export class InteractiveMode {
         this.options.runtimeContext.configuration.current.revision, this.state.editor.textRevision,
         this.options.runtimeContext.workspaceRevision, this.options.sessionRuntime.getAgentMode(), this.options.sessionRuntime.getPermissionScope(),
         this.options.runtimeContext.peekForcedTool?.(), this.options.runtimeContext.promptIdentity,
+        contextSelectionIdentity(this.options.runtimeContext.session),
         this.options.runtimeContext.contextAttachments?.map(entry => [entry.path, entry.digest]),
         this.options.runtimeContext.transientContextAttachments?.map(entry => [entry.path, entry.digest]),
       ]),

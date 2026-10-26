@@ -9,8 +9,14 @@ export interface ContextSelection {
   readonly revision: number;
   readonly entries: readonly { readonly id: string; readonly hash: string; readonly modes: readonly ContextSelectionMode[] }[];
 }
+type ContextSelectionSession = Pick<Session, 'turns' | 'contextSelection'>;
 const MODES: readonly ContextSelectionMode[] = ['elide', 'images', 'thinking'];
 export const SELECTION_LIMIT = 4096;
+const effectiveSelectionCache = new WeakMap<object, {
+  readonly turns: readonly SessionMessage[];
+  readonly fingerprint: string;
+  readonly selection: ContextSelection | undefined;
+}>();
 
 export function decodeContextSelection(value: unknown): ContextSelection {
   if (value === undefined) return { version: 1, revision: 0, entries: [] };
@@ -55,11 +61,37 @@ export function planContextSelection(session: Session, mode: ContextSelectionMod
     entries.set(message.id, { id: message.id, hash, modes });
   }
   if (entries.size > SELECTION_LIMIT) throw new Error('Context selection exceeds 4096 messages; compact or restore existing selections first.');
-  return { selection: { version: 1, revision: current.revision + 1, entries: [...entries.values()] }, changed, estimatedTokens, signed };
+  return { selection: { version: 1, revision: changed === 0 ? current.revision : current.revision + 1, entries: [...entries.values()] }, changed, estimatedTokens, signed };
 }
 
 export function contextMessageHash(message: SessionMessage): string {
   return createHash('sha256').update(JSON.stringify([message.role, message.content, message.reasoning, message.tool_calls, message.tool_call_id])).digest('hex');
+}
+
+/** Return only hash-valid entries that actually change the model projection. */
+export function effectiveContextSelection(session: ContextSelectionSession): ContextSelection | undefined {
+  const value = session.contextSelection;
+  const cacheKey = typeof value === 'object' && value !== null ? value : undefined;
+  const selection = decodeContextSelection(value);
+  const fingerprint = `${selection.revision}:${selection.entries.map(entry =>
+    `${entry.id}:${entry.hash}:${entry.modes.join('+')}`).join('|')}`;
+  const cached = cacheKey ? effectiveSelectionCache.get(cacheKey) : undefined;
+  if (cached?.turns === session.turns && cached.fingerprint === fingerprint) return cached.selection;
+  const messages = new Map(session.turns.flatMap(message => message.id ? [[message.id, message] as const] : []));
+  const entries = selection.entries.filter(entry => {
+    const message = messages.get(entry.id);
+    if (!message || entry.hash !== contextMessageHash(message)) return false;
+    return contextMessageHash(omitContext(message, entry.modes)) !== entry.hash;
+  });
+  const effective = entries.length ? { ...selection, entries } : undefined;
+  if (cacheKey) effectiveSelectionCache.set(cacheKey, { turns: session.turns, fingerprint, selection: effective });
+  return effective;
+}
+
+/** A revision or stale entry is not a prompt identity; only effective entries are. */
+export function contextSelectionIdentity(session: ContextSelectionSession): unknown {
+  const effective = effectiveContextSelection(session);
+  return effective ? { version: 1, entries: effective.entries } : undefined;
 }
 
 function omitContext(message: SessionMessage, modes: readonly ContextSelectionMode[]): SessionMessage {
