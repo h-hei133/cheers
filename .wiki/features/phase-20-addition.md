@@ -1282,6 +1282,12 @@ ADD-13后续验收确认`/login`、`/logout`虽然都委托现有`/connect`认�
 
 四静态门、严格docs、diff、责任上限0、TS build `e82d27547840`及当前包正式judge proven通过；Git/本批CI另实际绑定。未运行全仓、真实认证、exe或桌面PTY；认证成功/失败/取消仍以原connect owner证据为准，本批只收口入口发现性和语法边界。ADD-13的本地入口组织、默认/来源发现指南和兼容入口证据增强，真实provider/桌面矩阵仍不能由本批替代。
 
+### 第四十八批：ADD-13入口发现性合同
+
+在不新增产品入口或第二套配置的前提下，补注册表合同测试锁定现有owner的可见性：`theme`与`statusline`继续指向settings Appearance，`connect`与login/logout快捷入口继续说明其连接owner，`view`继续说明用户/开发者输出消费者；settings元数据中的`theme`和`tui.statusItems`必须仍分别归属Appearance的Theme与Status line section。该合同防止后续帮助生成或设置分类重构时把兼容入口删除、改名或移入无真实能力的分类。
+
+`slashCommandRegistry.test.ts` 13项单进程通过。此批是ADD-13的本地发现性/组织合同，不新增认证、主题、状态栏或视图行为，也不证明真实provider、桌面终端或所有平台；未运行全仓、exe、真实认证或20k PTY。四静态门、严格docs、TS build `5b0748c65edf`及fresh、当前包judge proven通过，Git/本批CI另实际绑定。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1297,7 +1303,7 @@ ADD-13后续验收确认`/login`、`/logout`虽然都委托现有`/connect`认�
 | 角色已存档位不可用时默认Enter覆盖原值 | 第四十三批三个自动角色实际host复现缺失high回auto。现保留active · unavailable只读焦点，Enter及直接旧值apply不写，明确移动才保存支持值；三文件67项、有效反转及普通/全屏Node小PTY有局部证据，全部能力/桌面矩阵未验 |
 | 普通档位旧动作或待定hook跨关闭/重开仍可写入 | 第四十四批七条host baseline失败确认无浏览代次/退役/pending门。现每动作原choice/revision准入贯穿原事务，新开可捕获最新值，旧动作不能提交/重开父级，已确认写通知保留；35项/四有效反转及两模式Node小PTY有局部证据，完整矩阵未验 |
 | resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。第四十六批另修跨时区/小数秒字符串排序，默认焦点按实际时刻选择；搜索/scope换代重置自动规则，手动渐进刷新仍保持。已有局部夹具证据，桌面平台与用户原环境现场仍待验 |
-| 认证快捷入口缺少参数发现 | 第四十七批确认`/login`、`/logout`只有委托执行而没有顶层提示/补全。现从原`connectSyntax`派生快捷语法：login提供provider与认证flag，logout发现保存连接，并排除不属于顶层语法的action alias；执行仍只走原认证owner。73项及两有效反转有局部证据，真实认证/桌面仍待验 |
+| 认证快捷入口缺少参数发现 | 第四十七批确认`/login`、`/logout`只有委托执行而没有顶层提示/补全。现从原`connectSyntax`派生快捷语法：login提供provider与认证flag，logout发现保存连接，并排除不属于顶层语法的action alias；执行仍只走原认证owner。第四十八批再以registry合同锁定theme/statusline/connect/login/logout/view与settings元数据的owner可见性。73项、13项合同及两有效反转有局部证据，真实认证/桌面仍待验 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |

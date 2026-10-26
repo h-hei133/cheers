@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { listVisibleCommands } from '../core/commands/registry.js';
 import { commandInvocations } from '../core/commands/invocation.js';
 import type { RuntimeConfig } from '../config/runtimeConfig.js';
+import { CONFIG_SETTINGS } from '../config/settings.js';
 import {
   getSlashCommand,
   getSlashInvocation,
@@ -69,6 +70,20 @@ describe("slash command registry CLI surface", () => {
     const lines = capture(renderUserHelp).join("\n");
     expect(lines).toContain("shift+tab");
     expect(lines).toContain("ctrl+j");
+  });
+
+  it("keeps compatibility entries discoverable through their owning surfaces", () => {
+    const commands = new Map(listSlashCommands().map(command => [command.name, command]));
+    expect(commands.get("theme")?.summary).toContain("settings Appearance");
+    expect(commands.get("statusline")?.summary).toContain("settings Appearance");
+    expect(commands.get("connect")?.summary).toContain("connection");
+    expect(commands.get("login")?.summary).toContain("existing provider connection owner");
+    expect(commands.get("logout")?.summary).toContain("existing provider connection owner");
+    expect(commands.get("view")?.summary).toContain("user and developer output");
+
+    const settings = new Map(CONFIG_SETTINGS.map(setting => [setting.key, setting]));
+    expect(settings.get("theme")).toMatchObject({ group: "Appearance", section: "Theme" });
+    expect(settings.get("tui.statusItems")).toMatchObject({ group: "Appearance", section: "Status line" });
   });
 });
 

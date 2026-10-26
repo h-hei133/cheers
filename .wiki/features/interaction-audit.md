@@ -638,3 +638,7 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 ### 文末当前问题判断（第四十七批）
 
 新增确认认证快捷入口的发现性缺口：`/login`、`/logout`虽委托现有连接owner，却没有provider/flag提示或saved-connection补全，且不能把`/connect logout`的动作别名直接泄漏到顶层语法。现从`connectSyntax`派生login/logout快捷语法，登录补全provider与认证flags，登出复用连接目录，执行仍只走原认证路径。registry/suggestions/connection三文件73项通过，移除两处投影后各有1项有效失败并逐字节恢复。四静态门、构建、结构judge与严格docs另绑定；真实认证、全仓、exe和桌面PTY未验。见[第四十七批](phase-20-addition.md#第四十七批认证快捷入口的语法与连接发现性)。ADD-13入口发现性增强，真实环境矩阵继续active。
+
+### 文末当前问题判断（第四十八批）
+
+补ADD-13注册表合同，锁定theme/statusline继续从settings Appearance发现，connect与login/logout继续说明原连接owner，view继续说明用户/开发者输出消费者，`theme`与`tui.statusItems`仍归属正确settings section。该合同不新增第二套主题、状态栏、认证或视图实现，也不把菜单存在冒充真实provider/桌面通过。registry13项通过，见[第四十八批](phase-20-addition.md#第四十八批add-13入口发现性合同)。ADD-13本地组织与兼容入口合同已收口，完整ADD及真实环境证据继续保持active。

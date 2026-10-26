@@ -9414,3 +9414,9 @@ session55项与lifetime4项共59项串行通过；临时恢复旧比较器后4�
 ADD-13后续验收确认`/login`、`/logout`只有认证委托而没有参数提示或补全。现从`connectSyntax`派生login/logout快捷语法，login提供provider与认证flags，logout接入saved-connection catalog；派生的单action语法清除外层不适用的action aliases，执行仍只调用原connect owner，不新增凭据路径。
 
 registry12、slash suggestions41、connection completion20共73项单进程串行通过；临时移除login补全和logout catalog分支后两类断言各失败1项，源码逐字节恢复。HANDOFF/addition第四十七批/audit/settings指南更新；四静态门、责任上限0、TS build e82d27547840及fresh、当前包judge proven、严格docs通过，Git/本批CI另绑定。未运行全仓、真实认证、exe或桌面PTY，ADD整体继续active。
+
+## [2026-10-26] test | ADD-13入口发现性合同
+
+补registry合同测试锁定theme/statusline继续指向settings Appearance，connect与login/logout说明原连接owner，view说明用户/开发者输出消费者，`theme`和`tui.statusItems`仍归属正确settings section。合同防止帮助或分类重构删除、改名或移入无真实能力的兼容入口，不新增第二套主题、状态栏、认证或视图实现。
+
+slashCommandRegistry13项单进程通过；四静态门、责任上限0、TS build 5b0748c65edf及fresh、当前包judge proven、严格docs通过，Git/本批CI另绑定。未运行全仓、exe、真实认证、桌面或20k PTY；ADD-13本地组织合同收口，完整ADD与真实环境验收继续active。
