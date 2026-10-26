@@ -9270,3 +9270,5 @@ ADD-03确认form吞wheel、64KiB编辑保护拒绝只读三值来源且Enter无�
 ADD-09/11/12确认字符串查找提前关闭代码围栏、较长合法关闭遗留反引号及行内run误配对，示例slash可能误调用且后续真实skill被吞。提示词owner按独立同字符/足够长关闭行判断，行内复用既有精确run匹配器移入core/text、旧presentation入口重导出；保留CRLF/原源范围和未闭合保守规则，不扩展Markdown显示解析。
 
 七文件151pass、两有效反转/字节恢复、四静态门、最终build1935ca8b0131/新解包正式judge proven三satisfied通过。两模式实际Node小PTY示例driver不调用、合法关闭后双skill估算恢复、配置/transcript不写、零message/provider，143退出均settle；实际研究driver数字preview仍不支持。首次build提前与反转重叠被输入变更检查拒绝，退出/恢复后重建通过，保留失败与操作偏差。隔离4.3k/6.4k不代表真实上下文拆分；归档phase20-addition-prompt-literals，docs/Git另绑定，上一批自身CI仍运行。原Phase38/9与ADD独立/active，完整面板/认证/性能/计量验收继续待证。
+
+产品交付c107c5d3已推送、本地/origin/远端精确一致且clean，自身CI40250943151/Watch40250943038初查运行。研究preview随后只读定位到create/arm新UUID后的入口提示词及runId绑定工具schema，单删拦截会低估；补充原研究owner纯准备/零写派发/最终身份交接和入口与child成本分开的验收方向，尚未实施该preview。文档补充另绑定delivery-followup.json，不升级整体完成状态。

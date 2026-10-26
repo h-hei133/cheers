@@ -931,6 +931,12 @@ ADD-09/11/12确认[提示词扫描](../../packages/ts-shell/src/core/prompts/tok
 
 归档`.omx/artifacts/phase20-addition-prompt-literals/`；文档与Git交付另绑定。完整settings/model字段/来源/scope/桌面/真实认证、冷热启动、原生tokenizer、研究完整preview、动态来源新鲜度与总物理I/O、真实上下文差额、历史cache writer和build lock来源仍待证。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+本批交付已提交并推送`c107c5d3c57e20812dcb3012f7671d2c84fa0531`，本地HEAD、origin/main与实际远端main读回一致，工作区干净。自身CI `40250943151`及Watch `40250943038`首次实查均in_progress，Watch工件未读；不借历史CI升级本批结论。严格docs/diff通过，118既有advisory保留，addition135/audit106本地链接均存在。
+
+随后定向核查研究preview边界：[preview](../../packages/ts-shell/src/cli/runtime/context/preview.ts)在实际driver组合时明确拒绝数字；[研究命令](../../packages/ts-shell/src/research/command.ts)调用runtime.create持久化新任务后才构造researchTurnPrompt；[runtime](../../packages/ts-shell/src/research/run/runtime.ts)生成随机UUID，[工具owner](../../packages/ts-shell/src/research/run/tools.ts)据已arm的具体run加入带runId常量的research_run schema，save请求还加入独立研究保存工具。[实际入口](../../packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts)使用这份workflow featureTools，普通preview默认roster仅有未绑定的来源工具。因此去掉driver拦截或只估prepareComposition.prompt会漏掉真实入口提示词与工具schema，不能作为修补。
+
+下一步ADD-08研究预览须在原研究owner提取纯请求准备，覆盖最终入口提示词、具体工具schema、方法与附件、配置/模型身份、取消及来源新鲜度；预览不得调用create/arm、写研究状态或ledger、执行handler、启动child/provider。预览身份与实际提交的run绑定必须有明确重验/交接，不能伪造已armed任务。分开报告首个研究入口请求与随后每个研究child的独立上下文，禁止将入口估算称为全部研究总token或预算；control/save继续按独立准入，无法完整准备时保持unknown。此次仅完成源码定位，尚未实施或动态验收该研究preview路径。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。

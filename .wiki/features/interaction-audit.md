@@ -435,3 +435,5 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 | 尚未确认 | 原现场唯一按键根因、生产启动收益、同模型/协议/规则/schema真实上下文差额、真实OAuth/API-key接受、历史cache writer退出1及活跃build lock来源；这些不能归为不存在 |
 
 完整用户要求继续见[文末任务总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)：未配置模型可选、两个面板整体看齐、正文顶格与编辑箭头、首位完整slash和正文真实路径suggestion/Tab、同次全部明确skill及deep-research有限方法组合；正文功能命令不执行。代码示例内的driver保持字面量，实际研究driver完整数字preview仍待实现。隔离约4.3k/6.4k不替代用户真实数值拆分。本轮延迟实查`66fd7a4c`自身CI `40250056359`仍in_progress，Git另绑定，原Phase38/9与ADD独立/整体active。
+
+第二十九批实际交付`c107c5d3c57e20812dcb3012f7671d2c84fa0531`已推送且远端精确一致、工作区干净；自身CI `40250943151`与Watch `40250943038`首次实查仍运行，工件未读。研究数字preview仍未知的具体缺口已定位：真实提交先create/arm新UUID，再加入绑定runId的研究工具及入口提示词；普通组合preview没有这些请求输入。修补须沿研究owner纯准备并重验最终请求，不能单删拦截以生成偏小数字；此次只定位，尚未实施，详见addition第二十九批。
