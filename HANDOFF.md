@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Reopening A Model Picker Must Refresh Its Accepted Catalogue
+- **Symptom**: An old model detail enters a new credential form with its stale endpoint, or rejects correctly but reopening still displays and recaptures that endpoint; exited details remain callable.
+- **Root Cause**: Target closures and child admission have different lifetimes. Capturing both an old accepted catalogue and fresh disk catalogue does not update the accepted publication. A later load can also revive a closed detail owner.
+- **Rule**: Recheck the original target admission before constructing children, retire details on exit and consume their actions once, including after admission callbacks close the host. Reopen through the existing configuration publication with a catalogue-only update that preserves ordinary accepted settings and validates active model constraints. Test with the actual runtime publication and external catalogue edits; disk-only fixtures miss this defect. Keep cancelled key entry, real authentication and explicit activation separate.
+
 ### Picker Defaults Must Use Accepted Values Without Normalizing Them
 - **Symptom**: Opening a boolean, enum or thinking chooser and pressing Enter stages the first value instead of the current value; obsolete or unsupported preferences silently fall back.
 - **Root Cause**: Choice focus was derived only for preview fields, and an effort picker did not supply initial focus. Stored/requested values can also differ from the installed effective value.

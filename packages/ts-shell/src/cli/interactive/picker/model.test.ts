@@ -276,7 +276,9 @@ it.each([false, true])('browses unconfigured models through real overlay keys (a
   expect(detail).toBeDefined(); await detail.load();
   const back = (await detail.apply(['back']))?.next!;
   expect(back.initialSelection).toBe(target.id);
-  const draft = (await detail.apply(['configure']))?.draft;
+  await back.load();
+  const reopened = (await back.inspect!(target.id))!.next!; await reopened.load();
+  const draft = (await reopened.apply(['configure']))?.draft;
   expect(draft).toContain('/connect login anthropic'); expect(draft).toContain('--model missing-2');
   overlay.open(back); await new Promise(resolve => setTimeout(resolve, 0));
   expect(stripAnsi(overlay.render(40, 20).join('\n'))).toContain('▸ missing-2');

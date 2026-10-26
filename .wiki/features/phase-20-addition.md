@@ -1035,6 +1035,24 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 
 归档`.omx/artifacts/phase20-addition-model-metadata/`，docs/Git另绑定。完整settings/model字段/来源/scope/desktop/真实认证、model类别与完整请求能力矩阵、研究control/其他driver/child成本、原生tokenizer/动态来源累计I/O、冷热启动及真实1.7k/4.9k差额仍待验；历史cache/build来源unknown。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第三十五批：模型详情过期准入、退出生命周期与重开目录发布
+
+接续已推送`ae7836084f6c32206a989b93c91e5c960bbb6d54`，本批修补ADD-01/02的具体模型→详情→配置操作链。原列表/详情闭包保留旧目录地址，目录在打开配置子面板前变化时，子面板重新捕获准入却接收旧地址，使过期目标被当作当前目标；详情在Back、Esc或被替换后也仍可调用，迟到load可重新开放动作。八项新回归修补前全部失败。
+
+[model picker](../../packages/ts-shell/src/cli/interactive/picker/model.ts)现在检查打开列表时捕获的原model-choice准入，普通详情和current-report详情共用该捕获；检查前后复验取消，不先构造子面板。[详情owner](../../packages/ts-shell/src/cli/interactive/picker/model/details.ts)只接收实际提供的动作，在进入API-key、account或connection子面板前重验目标；Back仍可从过期详情返回。动作一次消费，previewEnd终止owner，后续load不能复活；准入回调同步关闭真实host时也不能继续handoff。两项旧测试原在Back之后复用已退出详情，已改为返回浏览器后重新打开同一具体模型，保留原命令草稿及零写入断言。
+
+实际Node普通PTY进一步检出产品缺口：过期配置已拒绝，但再次`/model`仍显示旧地址。真实ShellRuntimeContext回归两项修补前失败，确认不是探针文本假设；原capture同时记录旧accepted catalogue与新disk catalogue，重开未更新发布，能把旧目标重新标成当前。[目录发布衔接](../../packages/ts-shell/src/cli/interactive/picker/model/publication.ts)仅在本地目录与accepted publication不同时，通过已有refreshRuntimeConfig端口请求catalog范围更新；[原配置owner](../../packages/ts-shell/src/core/shell/configuration.ts)保留accepted requested普通设置、绑定及会话模型，使用当前目录重新检查原模型约束，再由原ConfigState ticket/publish发布。不能直接用磁盘目录绕过accepted publication，也不能借重开model隐式加载其他普通设置。取消、过期owner、发布后再改目录、约束拒绝均阻止捕获子面板；目录相同不重复发布，不联网拉取目录。
+
+只读对照oh-my-pi `packages/tui/src/overlays/model-hub.ts`1143–1156、1220–1269：参考先更新registry再读取其内存快照，异步完成后检查disposed owner；本项目采用这两个决策，保留自己的不可变配置发布、精确连接与准入指纹，不声称参考实现了同样的fingerprint。对应重开及退出反转均有失败证据。
+
+最终单进程串行九文件136项通过：model43、auth16、settings/session14、current11、key8、admission11、publication5、config constraints19、explicit-input publication9。真实owner覆盖外部目录更改→旧详情拒绝→重开新地址→遮蔽key子面板→取消返回同模型，另验证普通磁盘maxTurns编辑未被采用、相同目录不重复发布、违反active output约束保留旧配置/目录，以及取消/再变化/过期拒绝。七有效反转全部AssertionError/exit1后逐字节恢复：列表检查、详情检查、退出retirement、准入后生命周期、accepted目录刷新、普通设置保留、当前模型约束。
+
+四静态门及最终TS build通过：build`aeb31a9888f87db560a1d9739bda35346b911981e6f7fbbc16e7fde8b5b8837e`、inputs`673a7e7eb85bf4a725983fc37dfa49bb0c21645a29561ba6a3b539e1e659fbb1`、artifact`77ffd57e80d10975c8244f46e74ffb600c77f5d1e28e7d66bb45032525953277`。当前validator包SHA-256`6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`新目录解包，正式judge实际exit0/proven、三结构义务satisfied，完整结果另归档。无并发验证、全仓回归或20k真实PTY。
+
+普通/全屏实际Node隔离小PTY最终均通过：旧详情拒绝、新地址重开、遮蔽输入不回显synthetic key、取消返回新具体模型，config原字节与session modelSelection不变、零message/provider，两个SIGTERM143均settle。首次普通重开旧地址属上述产品缺口；后续全屏要求拒绝时重复输出未变化输入提示而超时，终端实际已显示拒绝，后续成功重开证明已可交互，属探针readiness假设；两类失败分别保留。
+
+归档`.omx/artifacts/phase20-addition-model-admission/`；docs/Git/当前CI另绑定。延迟检查确认前两批CI `40256984501`与`40258165621`均completed/success；Architecture Watch workflow也success，但其artifact未读取，不作为独立审查批准。本批未运行真实认证/provider，完整settings/model字段/来源/scope/能力/类别/桌面/真实认证、研究control/其他driver/child成本、tokenizer/动态来源累计I/O、冷热启动及真实1.7k/4.9k拆分仍未验。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1056,6 +1074,7 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 | 研究入口无法完整预览 | 第三十三批已接有界新建入口准备、一次性prospective ID到实际同ID提交、完整prompt/run/save schema及协议估算、来源与取消复验，87项/四有效反转/两模式实际隔离PTY通过。只覆盖新建入口，不代表control、其他driver、后续独立child或研究总费用已可预览 |
 | 组合研究把自身command owner误判为忙 | 实际终端Enter拒绝且真实ShellCommandRuntime路由回归可复现。第三十三批改为controller与signal双重身份匹配，自身可继续，其他命令与取消仍拒绝；不能只删除全部busy保护 |
 | 未配置或阻断relay模型详情错用官方能力 | 第三十四批确认缺resolution地址时回退canonical目录，导致同名模型32k误显示400k或已有能力丢失。现沿真实连接/所浏览目录地址共用精确元数据，补上限/图片/reasoning设置/档位/已声明价格，未知与地址歧义保真；78项/三反转/两模式实际隔离PTY有局部证据，完整能力与平台矩阵仍待验 |
+| 模型详情过期配置、退出后仍可操作与重开旧目录 | 第三十五批确认列表/详情旧地址进入新准入子面板、退出load复活动作，以及实际重开仍用旧accepted目录。现原捕获准入/取消复验、详情一次消费和退出retirement；重开仅通过原配置发布刷新catalog，保留普通设置并检查active模型约束。九文件136项、七反转、两模式实际Node隔离PTY有局部证据；真实认证与完整面板矩阵仍待验 |
 
 ### 16.2 不成立的判断与仍未确认的原因
 

@@ -85,10 +85,17 @@ export function configurationAdmission(context: ConfigurationContext): () => str
 }
 
 /** Prepare all fallible resources before publishing the next immutable settings. */
-export function refreshConfiguration(context: ConfigurationContext): ConfigReloadResult {
+export function refreshConfiguration(context: ConfigurationContext, scope?: 'catalog'): ConfigReloadResult {
   const state = context.configuration;
   const ticket = state.begin(configurationBinding(context));
   const catalog = loadCatalog();
+  if (scope === 'catalog') {
+    const refusal = configurationAdmission(context)();
+    if (refusal) return state.rejectCandidate(ticket, configurationBinding(context), [refusal], true);
+    const accepted = state.current.requested;
+    const target = context.resolveConfigTarget?.(accepted) ?? resolveProviderCredential({ runtimeConfig: accepted });
+    return state.publish(ticket, constrainRuntimeConfig(accepted, target, catalog), configurationBinding(context), undefined, catalog);
+  }
   let candidate: RuntimeConfig;
   try { candidate = validateCandidate(getRuntimeConfig(context.projectRoot, context.runtimeConfigOverrides, ticket.binding.inputs), context, catalog); }
   catch (error) {

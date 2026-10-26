@@ -209,8 +209,8 @@ export async function runNonInteractivePrompt(options: {
     resolveConfigTarget: options.runtimeContext.resolveConfigTarget,
     readConfiguration: () => options.runtimeContext.configuration.current,
     admission: configurationAdmission(options.runtimeContext),
-    refreshRuntimeConfig: () => {
-      return refreshShellRuntimeConfig(options.runtimeContext);
+    refreshRuntimeConfig: scope => {
+      return refreshShellRuntimeConfig(options.runtimeContext, scope);
     },
   });
   if (resolved.kind === "handled") {

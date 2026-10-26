@@ -1225,7 +1225,7 @@ export class InteractiveMode {
           : {}),
         readConfiguration: () => this.options.runtimeContext.configuration.current,
         getToolPool: toolPoolFor(this.options.runtimeContext, this.options.initialMcpGateway),
-        refreshRuntimeConfig: () => refreshShellRuntimeConfig(this.options.runtimeContext),
+        refreshRuntimeConfig: scope => refreshShellRuntimeConfig(this.options.runtimeContext, scope),
         cwd: this.options.runtimeContext.cwd,
         sessionId: this.options.runtimeContext.session.id,
         interactive: true,

@@ -9302,3 +9302,9 @@ ADD-08研究owner从有界snapshot准备20秒一次性身份，完整prompt/run/
 ADD-01/02未配置/pending/error relay缺resolution地址，原详情回退canonical同名模型；新回归四失败及blocked三失败分别定位。model metadata沿真实保存连接/所浏览目录地址解析，无地址只用具体声明、歧义不猜；补context/input/output/图片/reasoning设置档位/声明价格，core共用已解析model能力政策，null原合同保留。未配置可聚焦、原认证/显式启用/scope/角色返回不变。
 
 六文件78pass、三有效反转/字节恢复、四静态门/buildd8c88f4d3c8a/新解包正式judge proven三satisfied通过。普通/全屏实际Node小PTY同名官方400k/relay32k、具体24k input/4096 output/图片与设置能力、unknown保真及返回焦点、config/session未写/零message-provider、143退出settle；首轮regular探针画面/主屏输出误判保留分类。证据phase20-addition-model-metadata，docs/Git/CI另绑定；完整面板/桌面/真实认证及能力矩阵、研究control/其他driver/child成本、计量/动态I/O/冷热启动与真实差额仍待验，原Phase38/9与ADD独立/active。
+
+## [2026-10-26] fix | 模型详情过期准入与重开目录发布
+
+ADD-01/02确认旧详情地址进入新准入配置子面板、退出后load复活动作；原捕获准入与取消复验、一次消费/退出retirement现已补齐。实际普通PTY进一步检出重开仍读旧accepted目录；真实配置owner回归后，沿原refresh端口/catalog范围与ConfigState发布更新目录，保留普通accepted设置、重新验证active模型约束，取消/再变化/拒绝不构造子面板。
+
+最终九文件136pass、七有效反转/字节恢复、四静态门/buildaeb31a9888f8及新解包正式judge proven通过；普通/全屏实际Node小PTY旧详情拒绝→新地址重开→遮蔽key→取消返回，config/session model未写、零message/provider、143退出settle。全屏探针等待未变化提示的超时单独保留分类；前两批CI延迟确认success，本批交付另绑定。归档phase20-addition-model-admission；完整面板/桌面/真实认证、研究control/其他driver/child成本、tokenizer/动态I/O/冷热启动和真实差额仍待验，原Phase38/9与ADD独立/active。

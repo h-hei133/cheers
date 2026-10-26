@@ -208,8 +208,8 @@ export async function routeInteractiveCommand(
     ...(input.runtimeContext.promptIdentity ? { promptIdentity: input.runtimeContext.promptIdentity } : {}),
     readConfiguration: () => input.runtimeContext.configuration.current,
     admission: configurationAdmission(input.runtimeContext),
-    refreshRuntimeConfig: () => {
-      const result = refreshShellRuntimeConfig(input.runtimeContext);
+    refreshRuntimeConfig: scope => {
+      const result = refreshShellRuntimeConfig(input.runtimeContext, scope);
       if (result.status === "applied") {
         try { input.refreshKeybindings?.(); }
         catch { return { ...result, status: 'application-unverified' as const,

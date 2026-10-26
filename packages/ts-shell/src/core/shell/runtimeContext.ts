@@ -181,8 +181,8 @@ export function createShellRuntimeContext(input: {
 }
 
 /** Reload defaults, then apply the current session's durable model preference. */
-export function refreshShellRuntimeConfig(context: ShellRuntimeContext): ConfigReloadResult {
-  const result = refreshConfiguration(context);
+export function refreshShellRuntimeConfig(context: ShellRuntimeContext, scope?: 'catalog'): ConfigReloadResult {
+  const result = refreshConfiguration(context, scope);
   if (result.status === 'applied') context.promptIdentity = undefined;
   return result;
 }

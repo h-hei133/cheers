@@ -21,6 +21,7 @@ import { connectionDraft, connectionEndpoint } from './connections.js';
 import { modelDetailsPicker } from './model/details.js';
 import { CatalogNavigation, type NavigationGroup } from './navigation.js';
 import { watchModels } from './model/watch.js';
+import { refreshModelCatalog } from './model/publication.js';
 import { prepareModelRole, type AutomaticModelRole, type RoleResult } from '../../../core/commands/model/role.js';
 import { modelRoleEditor } from './model/role.js';
 import type { ThinkingPreference } from '../../../core/models/effort.js';
@@ -44,6 +45,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
   const assignments = new Map<string, () => RoleResult>();
   let activeFocus = focus;
   let returnFocus = focus;
+  let inspectionAdmission: (() => string | undefined) | undefined;
   const picker: Picker = {
     title: assigning ? `${assigning.role} model` : "Model",
     form: "panel",
@@ -56,9 +58,17 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
     filterOptions: query => navigation.project(query),
     footer: '↑↓ browse · Tab: navigation/content · ←→: parent/content · Enter: inspect or activate · Esc: back',
     async load(): Promise<readonly Option[]> {
+      inspectionAdmission = undefined;
       details.clear(); actions.clear(); inspections.clear(); assignments.clear();
+      refreshModelCatalog(context);
       let choice: ReturnType<typeof captureModelChoice> | undefined;
       try { choice = captureModelChoice(context); } catch { /* Read-only discovery still works without a saved session. */ }
+      const admitInspection = () => {
+        if (context.signal?.aborted) return 'Model inspection cancelled. Reopen the model picker.';
+        const refusal = choice?.admission() ?? context.admission?.();
+        return context.signal?.aborted ? 'Model inspection cancelled. Reopen the model picker.' : refusal;
+      };
+      inspectionAdmission = admitInspection;
       const publication = context.readConfiguration?.();
       const config = choice?.config ?? publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
       const catalog = choice?.catalog ?? publication?.catalog ?? loadCatalog();
@@ -139,7 +149,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
                 () => modelPicker(context, id, navigation, assigning, undefined, signIn, parent), draft,
                 account ? () => modelSignInPicker(context, provider.runtime, signIn, back) : undefined,
                 draft && signIn ? () => modelKeyPicker(context, provider.runtime,
-                  { model: model.id, label: connection?.label ?? provider.id, baseUrl: safeEndpoint }, signIn, back) : undefined));
+                  { model: model.id, label: connection?.label ?? provider.id, baseUrl: safeEndpoint }, signIn, back) : undefined,
+                undefined, admitInspection));
             }
             if (!reason && assigning && connection) {
               assignments.set(id, () => assigning.assign({ connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort: assignedEffort }));
@@ -183,7 +194,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
           recovery ? () => {
             const refusal = choice?.admission() ?? context.admission?.();
             return refusal ? { note: refusal } : { next: recovery() };
-          } : undefined));
+          } : undefined, admitInspection));
       }
       if (context.sessionId && !assigning) {
         try {
@@ -258,7 +269,11 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
     },
     detail: id => (id ? details.get(id) ?? [] : []),
     subscribe: publish => watchModels(context, () => picker.load(), publish),
-    async inspect(id) { const next = inspections.get(id)?.(); return next ? { next } : undefined; },
+    async inspect(id) {
+      const refusal = inspectionAdmission?.();
+      if (refusal) return { note: refusal };
+      const next = inspections.get(id)?.(); return next ? { next } : undefined;
+    },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       if (!ids[0]) return undefined;
       const assignment = assignments.get(ids[0]);

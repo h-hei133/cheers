@@ -176,7 +176,8 @@ export interface CommandContext {
   /** Read the configuration and catalogue from one accepted publication. */
   readonly readConfiguration?: () => { readonly config: RuntimeConfig; readonly catalog: readonly CatalogProvider[]; readonly revision?: number; readonly binding?: import('../../config/state.js').ConfigBinding }
   readonly admission?: () => string | undefined
-  readonly refreshRuntimeConfig?: () => import('../../config/application.js').ConfigReloadResult
+  /** Catalogue-only refresh retains ordinary accepted settings and rechecks model constraints. */
+  readonly refreshRuntimeConfig?: (scope?: 'catalog') => import('../../config/application.js').ConfigReloadResult
   /** Local transport/cursor/cache owners used by `/fresh`; transcript is never part of this port. */
   readonly freshState?: import('./fresh.js').FreshStateOwner
   /** Bootstrap-owned restart handoff; the command only requests it. */
