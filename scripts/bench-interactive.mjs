@@ -17,7 +17,8 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 import { cacheEvidence, createCacheController } from "./bench/cache.mjs";
 import { createQaPtyEnvironment } from "./qa-pty-env.mjs";
-import { renderedKeyAfter } from "./bench/observation.mjs";
+import { renderedKeyAfter, StartupObservation, terminalStartupTimes } from "./bench/observation.mjs";
+import { processSettlement } from "./bench/process.mjs";
 import { checkBuild } from "./start-lib.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -59,15 +60,12 @@ const evidenceFiles = [path.join(root, "dist", "cli.js"),
   path.join(dist, "build-manifest.json"), executable, verified.entry,
   fileURLToPath(import.meta.url), path.join(root, "scripts", "bench", "cache.mjs"),
   path.join(root, "scripts", "bench", "observation.mjs"),
+  path.join(root, "scripts", "bench", "process.mjs"),
   path.join(root, "scripts", "qa-pty-env.mjs"),
   ...manifest.artifacts.map(artifact => path.join(dist, artifact.path))];
 const evidenceDigest = () => evidenceFiles.map(file => createHash("sha256").update(fs.readFileSync(file)).digest("hex"));
 const evidenceBefore = evidenceDigest();
 const measurementSha256 = createHash("sha256").update(JSON.stringify(evidenceBefore)).digest("hex");
-const plain = value => value.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
-const normalized = value => plain(value)
-  .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
-  .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "");
 
 function percentile(sorted, p) {
   return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1))];
@@ -87,30 +85,18 @@ function waitFor(read, predicate, timeoutMs, label) {
   });
 }
 
-function waitForExit(child, timeoutMs) {
-  if (child.measurementError) return Promise.reject(child.measurementError);
-  if (child.exitCode !== null) return Promise.resolve(child.exitCode);
-  return new Promise((resolve, reject) => {
-    const onError = error => { clearTimeout(timer); reject(error); };
-    const timer = setTimeout(() => { child.off("error", onError); reject(new Error("process did not exit")); }, timeoutMs);
-    child.once("error", onError);
-    child.once("exit", code => {
-      clearTimeout(timer);
-      child.off("error", onError);
-      resolve(code);
-    });
-  });
-}
-
 function createFixture(mode) {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-interactive-home-"));
-  const project = fs.mkdtempSync(path.join(os.tmpdir(), "bench-interactive-project-"));
+  const scratch = path.join(root, ".tmp", "bench-interactive");
+  fs.mkdirSync(scratch, { recursive: true });
+  const fixture = fs.mkdtempSync(path.join(scratch, "sample-"));
+  const home = path.join(fixture, "home"), project = path.join(fixture, "project");
+  fs.mkdirSync(project);
   fs.mkdirSync(path.join(project, ".git"));
   fs.mkdirSync(path.join(home, ".cheers"), { recursive: true });
   fs.writeFileSync(path.join(home, ".cheers", "config.json"), JSON.stringify({
     tuiMode: mode === "fullscreen" ? "fullscreen" : "regular",
   }));
-  return { home, project };
+  return { home, project, fixture };
 }
 
 function benchEnvironment(home, project, timingPath) {
@@ -134,65 +120,57 @@ function startProcess(target, mode, home, project, timingPath) {
 }
 
 async function sample(target, mode) {
-  const { home, project } = createFixture(mode);
+  const { home, project, fixture } = createFixture(mode);
   const timingPath = path.join(home, "timing.json");
-  const cachePreparation = cache.prepare();
-  const started = performance.now();
-  const child = startProcess(target, mode, home, project, timingPath);
-  child.on("error", error => { child.measurementError = error; });
-  const state = { output: "", firstByteAt: undefined, firstFrameAt: undefined, inputAnnouncementAt: undefined,
-    keyResponseMs: undefined, exitAt: undefined };
-  const hardTimeout = setTimeout(() => child.kill("SIGKILL"), 30_000);
+  let lifetime, observationError;
+  const state = new StartupObservation(mode);
   try {
-    if (mode === "pipe") child.stdin.end("hello\n/exit\n");
-    const frameMarker = mode === "pipe" ? undefined : mode === "line" ? "Cheers Shell" : "openai";
-    const announcement = mode === "line" ? "waiting for newline-delimited prompts."
-      : mode === "pipe" ? undefined : "Ask anything, or / for commands";
-    const onData = chunk => {
-      const at = performance.now() - started;
-      if (state.firstByteAt === undefined) state.firstByteAt = at;
-      state.output += chunk.toString("utf8");
-      const output = normalized(state.output);
-      if (frameMarker && state.firstFrameAt === undefined && output.includes(frameMarker)) state.firstFrameAt = at;
-      if (announcement && state.inputAnnouncementAt === undefined && output.includes(announcement)) state.inputAnnouncementAt = at;
-      if (state.firstReplyAt === undefined && output.includes("Synthetic reply:")) state.firstReplyAt = at;
+    const cachePreparation = cache.prepare();
+    const started = performance.now();
+    const child = startProcess(target, mode, home, project, timingPath);
+    lifetime = processSettlement(child);
+    const terminal = mode === "regular" || mode === "fullscreen";
+    const onData = stream => chunk => {
+      if (observationError) return;
+      try { state.feed(stream, chunk, performance.now() - started); }
+      catch (error) { observationError = error; child.kill("SIGTERM"); }
     };
-    child.stdout.on("data", onData);
-    child.stderr.on("data", onData);
+    child.stdout.on("data", onData("stdout"));
+    child.stderr.on("data", onData("stderr"));
+    if (mode === "pipe") child.stdin.end("hello\n/exit\n");
 
     if (mode === "pipe") {
-      const code = await waitForExit(child, 20_000);
-      if (code !== 0) throw new Error(`process exited ${code}`);
+      const ended = await lifetime.wait();
+      if (ended.launchError) throw ended.launchError;
+      if (ended.code !== 0 || ended.signal || ended.interrupted) throw new Error(`process exited ${ended.code}, signal ${ended.signal}, interrupted ${ended.interrupted}`);
       state.exitAt = performance.now() - started;
     } else {
       await waitFor(() => {
-        if (child.measurementError) throw child.measurementError;
-        if (child.exitCode !== null || child.signalCode !== null) throw new Error(`process ended before input announcement (exit ${child.exitCode}, signal ${child.signalCode})`);
+        if (observationError) throw observationError;
+        lifetime.assertRunning();
         return state.inputAnnouncementAt;
       }, value => value !== undefined, 15_000, "input announcement");
 
-      if (mode === "regular" || mode === "fullscreen") {
+      if (terminal) {
         state.keyResponseMs = await renderedKeyAfter(child.stdout, () => child.stdin.write("Ω"), "Ω");
         child.stdin.write("\x15");
       }
       const exitStarted = performance.now();
       child.stdin.write(mode === "line" ? "/exit\n" : "/exit\r");
-      const code = await waitForExit(child, 20_000);
-      if (code !== 0) throw new Error(`process exited ${code}`);
+      const ended = await lifetime.wait();
+      if (ended.launchError) throw ended.launchError;
+      if (ended.code !== 0 || ended.signal || ended.interrupted) throw new Error(`process exited ${ended.code}, signal ${ended.signal}, interrupted ${ended.interrupted}`);
       state.exitAt = performance.now() - started;
       state.commandToExitMs = performance.now() - exitStarted;
     }
+    if (observationError) throw observationError;
     await waitFor(() => fs.existsSync(timingPath), value => value, 2_000, "timing snapshot");
     const timing = JSON.parse(fs.readFileSync(timingPath, "utf8"));
     if (!timing.enabled || !timing.marks?.length) throw new Error("timing snapshot contains no startup marks");
-    if ((mode === "regular" || mode === "fullscreen")
-      && ["runtime ready", "input listener ready", "first frame layout", "first frame write completed"]
-        .some(label => !timing.marks.some(mark => mark.label === label))) {
-      throw new Error("terminal timing snapshot is missing observer marks");
-    }
+    const processTimes = terminal ? terminalStartupTimes(timing.marks) : {};
     if (mode === "pipe" && state.firstReplyAt === undefined) throw new Error("pipe produced no synthetic reply");
-    if ((mode === "regular" || mode === "fullscreen") && state.firstFrameAt === undefined) {
-      throw new Error("terminal benchmark did not observe the first frame");
+    if (terminal && (state.firstFrameAt === undefined || state.firstFrameAt > state.inputAnnouncementAt)) {
+      throw new Error("terminal benchmark did not observe the early editor before runtime input");
     }
     return {
       mode,
@@ -201,8 +179,7 @@ async function sample(target, mode) {
       firstFrameMs: round(state.firstFrameAt),
       inputAnnouncementMs: round(state.inputAnnouncementAt),
       runtimeReadyProcessMs: round(timing.marks.find(mark => mark.label === "runtime ready")?.elapsedMs),
-      inputListenerReadyProcessMs: round(timing.marks.find(mark => mark.label === "input listener ready")?.elapsedMs),
-      firstFrameWriteProcessMs: round(timing.marks.find(mark => mark.label === "first frame write completed")?.elapsedMs),
+      ...Object.fromEntries(Object.entries(processTimes).map(([key, value]) => [key, round(value)])),
       firstReplyMs: round(state.firstReplyAt),
       keyResponseMs: round(state.keyResponseMs),
       commandToExitMs: round(state.commandToExitMs),
@@ -216,18 +193,8 @@ async function sample(target, mode) {
     fs.writeFileSync(path.join(root, ".omx", "artifacts", `bench-failure-${target.name}-${mode}.txt`), state.output, "utf8");
     throw new Error(`${target.name}/${mode}: ${error.message}`, { cause: error });
   } finally {
-    clearTimeout(hardTimeout);
-    if (child.exitCode === null) {
-      child.kill("SIGKILL");
-      await waitForExit(child, 2_000).catch(() => undefined);
-    }
-    for (const targetPath of [home, project]) {
-      try {
-        fs.rmSync(targetPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
-      } catch {
-        // A killed launcher can outlive one cleanup attempt; this sample is already isolated.
-      }
-    }
+    await lifetime?.stop();
+    fs.rmSync(fixture, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   }
 }
 
@@ -238,7 +205,9 @@ function round(value) {
 function summarize(samples) {
   const pick = key => samples.map(sample => sample[key]).filter(value => typeof value === "number");
   const metrics = {};
-  for (const key of ["firstByteMs", "firstFrameMs", "inputAnnouncementMs", "runtimeReadyProcessMs", "inputListenerReadyProcessMs", "firstFrameWriteProcessMs", "firstReplyMs", "keyResponseMs", "commandToExitMs", "exitMs"]) {
+  for (const key of ["firstByteMs", "firstFrameMs", "inputAnnouncementMs", "runtimeReadyProcessMs", "inputListenerReadyProcessMs",
+    "firstFrameLayoutProcessMs", "firstFrameWriteProcessMs", "runtimeInputAdoptedProcessMs", "runtimeFrameWriteProcessMs",
+    "firstReplyMs", "keyResponseMs", "commandToExitMs", "exitMs"]) {
     const values = pick(key).sort((left, right) => left - right);
     metrics[key] = values.length === 0 ? null : {
       count: values.length,
@@ -279,7 +248,10 @@ const cachePreparations = [];
 for (const target of targets) {
   for (const mode of selectedModes) {
     const samples = [];
-    for (let index = 0; index < runs; index += 1) samples.push(await sample(target, mode));
+    for (let index = 0; index < runs; index += 1) {
+      samples.push(await sample(target, mode));
+      process.stderr.write(`benchmark ${target.name}/${mode}: ${index + 1}/${runs} settled\n`);
+    }
     cachePreparations.push(...samples.map(sample => sample.cachePreparation));
     report.push({ target: target.name, mode, runs, samples, summary: summarize(samples) });
   }
@@ -312,7 +284,7 @@ const output = {
       runs * targets.length * selectedModes.length),
     minimumRuns,
     modes: selectedModes,
-    note: "One fresh isolated process per sample with an empty session store. global-cold runs sync and drop_caches immediately before every sample. Parent observations include launcher/PTY transport. First frame and input announcement are separate parent-observed events; runtime-ready is a process-local mark after session-runtime construction. Process marks use a different clock origin. Pipe has a reply, no interactive frame or per-key metric. Key response waits for Ω in application output with PTY echo disabled. Event-loop samples cover the instrumented process lifetime and can miss work before the first observation cycle; Node and compiled runtime histograms are not assumed equivalent. Complex-stream blocking and 1000-item list response are not measured here.",
+    note: "One fresh isolated process per sample with an empty session store; each target is closed and fixture removed before the next sample. global-cold runs sync and drop_caches immediately before every sample; warm-uncontrolled supplies no cold-cache claim. Parent observations include launcher/PTY transport. Terminal firstFrameMs observes the actual Loading editor and status; inputAnnouncementMs observes the later runtime placeholder. Stream receipt is not a terminal pixel acknowledgement. Process-local marks separately bind early listener/layout/write, runtime construction, input adoption and runtime write; their clock origin differs from parent observations. Pipe has a reply, no interactive frame or per-key metric. Key response waits for Ω in application output with PTY echo disabled. Event-loop samples cover the instrumented process lifetime and can miss work before the first observation cycle; Node and compiled runtime histograms are not assumed equivalent. Complex-stream blocking and 1000-item list response are not measured here.",
   },
   report,
 };

@@ -560,18 +560,20 @@ export class InteractiveMode {
         time('runtime frame write completed');
         this.options.onFirstFrame?.();
       });
+      time('runtime input adopted');
       this.tui.renderNow();
     } else this.tui.start({
       useAlternateScreen: this.alternateScreen,
       ...observers,
-      ...(this.options.onFirstFrame
-        ? {
-            onFirstWrite: () => {
-              onFirstWrite?.();
-              this.options.onFirstFrame?.();
-            },
-          }
-        : {}),
+      onInputReady: () => {
+        observers.onInputReady?.();
+        time('runtime input adopted');
+      },
+      onFirstWrite: () => {
+        onFirstWrite?.();
+        time('runtime frame write completed');
+        this.options.onFirstFrame?.();
+      },
     });
     // After the first frame, not before it: the first paint decides what the
     // surface looks like, and a reload landing in the middle of it would be

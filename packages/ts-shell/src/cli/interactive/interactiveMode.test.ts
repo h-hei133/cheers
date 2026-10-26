@@ -58,12 +58,14 @@ import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, wr
 import { writeCatalogCache } from '../../core/models/catalogStore.js';
 import { __setOpenAIProviderAuthLoginForTest } from '../../core/auth/providerAuthRuntime.js';
 import { ConfigWriteError } from '../../config/outcome.js';
+import * as startupTiming from '../../observability/startupTiming.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
   exit?: (code?: number) => void;
   scheduler?: ManualScheduler;
   startup?: StartupSurface;
+  onFirstFrame?: () => void;
 } = {}): {
   mode: InteractiveMode;
   renderer: StreamingRenderer;
@@ -101,6 +103,7 @@ function build(overrides: {
     exit: overrides.exit,
     scheduler: overrides.scheduler,
     startup: overrides.startup,
+    onFirstFrame: overrides.onFirstFrame,
     setInteractiveApprovalPrompt: handler => { approval.current = handler; },
     setReadline: (value) => {
       readline.current = value;
@@ -199,6 +202,36 @@ it('preserves a bracketed paste split across startup adoption', () => {
     mode.start(); terminal.input(' second\x1b[201~'); scheduler.flush();
     expect(host.view.editor.getText()).toBe('first second');
   } finally { mode.stop(); startup.dispose(); }
+});
+
+it.each([true, false])('records runtime adoption separately from its completed write (prepaint %s)', async prepaint => {
+  const timing = vi.spyOn(startupTiming, 'time').mockImplementation(() => {});
+  const terminal = new RecordingTerminal(), scheduler = new ManualScheduler();
+  const writes: Array<() => void> = [];
+  vi.spyOn(terminal, 'write').mockImplementation((data, callback) => { terminal.writes.push(data); if (callback) writes.push(callback); });
+  const startup = prepaint ? new StartupSurface(terminal, scheduler, vi.fn()) : undefined;
+  if (startup) { writes[0]?.(); await startup.firstPaint; writes.length = 0; }
+  const callback = vi.fn();
+  const { mode, terminal: ordinary } = build({ startup, scheduler, onFirstFrame: callback });
+  if (!startup) {
+    const start = ordinary.start.bind(ordinary);
+    vi.spyOn(ordinary, 'start').mockImplementation((input, resize, disconnect, options) => {
+      start(input, resize, disconnect, options); options?.onInputReady?.();
+    });
+    vi.spyOn(ordinary, 'write').mockImplementation((data, written) => { ordinary.writes.push(data); if (written) writes.push(written); });
+  }
+  try {
+    mode.start(); scheduler.flush();
+    expect(timing.mock.calls.filter(([label]) => label === 'runtime input adopted')).toHaveLength(1);
+    expect(timing.mock.calls.filter(([label]) => label === 'runtime frame write completed')).toHaveLength(0);
+    expect(callback).not.toHaveBeenCalled();
+    expect(writes.length).toBeGreaterThan(0);
+    writes[0]();
+    expect(timing.mock.calls.filter(([label]) => label === 'runtime frame write completed')).toHaveLength(1);
+    expect(callback).toHaveBeenCalledOnce();
+    mode.stop(); writes[0]();
+    expect(timing.mock.calls.filter(([label]) => label === 'runtime frame write completed')).toHaveLength(1);
+  } finally { mode.stop(); startup?.dispose(); timing.mockRestore(); }
 });
 
 describe("session wiring", () => {

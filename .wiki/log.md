@@ -9318,3 +9318,11 @@ ADD-01/02 configured目标因当前档位不兼容而详情只剩Back。现Choos
 按用户本轮要求只定位和更新文档，核对HEAD为2a5cf994。phase-20-addition明确未配置具体模型允许聚焦，补settings/model完整导航、详情、配置/编辑、取消返回、保存重开及键鼠窗口清单；文末补正文顶格/编辑箭头、正文路径Tab、多skill与有限slash组合样例。修正前部将初次定位行为写成当前行为的措辞，保留全部历史实现证据与ADD独立状态。interaction-audit文末按确定原问题、不成立判断、未确认原因汇总。
 
 定向源码比较确认本地计数方式不同，但不足以据此解释真实1.7k/4.9k；另确认启动基准仍用后期openai标记识别首帧，登记为ADD-07测量缺口，需修口径后再取样。未改运行时代码，未运行产品测试/构建/PTY/基准或真实认证。四个静态门、diff与strict docs检查通过，118条既有来源引用advisory保留；299个本地链接、46个Markdown标题和ADD-01…13完整性检查通过。首轮自编链接探针误解析历史日志正则/旧路径、将源码行锚点当Markdown标题，已限定日志新增行并识别行锚点后通过，未改历史日志掩盖失败。Git交付另按实际记录。
+
+## [2026-10-26] fix | 真实早期首帧测量与输入接管证据
+
+ADD-07原基准以后期模型名当firstFrame。现真实Loading编辑区/状态与runtime输入提示分开观察，stream分段UTF-8/2MiB上限、runtime input adopted与runtime frame write独立标记、阶段唯一/顺序检查；每样本close与清理后再启动，Linux实际PTY终止证实target退出。20脚本/133交互-startup-timing、四有效反转/字节恢复通过，TS与exe builddc57666092b6。两样本pilot后Node/exe×两模式各30空会话串行取样，首帧p50 480/537/285/278ms、正式输入1599/1785/780/791ms；cache warm-uncontrolled，无冷/前后节省量/真实桌面声明；line/pipe8样本通过。
+
+前两批CI40259916832/40261257582延迟确认failure，唯一旧configuration菜单断言本地复现。修fixture保留catalog scope和按授权重开发布合同测试，新增普通设置不隐式接受/原CLI目标/失败reload保真，三文件68pass；丢scope反转准入拒绝/恢复重验。首轮终端double未发inputReady与反转探针只认AssertionError分别分类，日志保留，未弱化产品。四静态门/docs/diff及当前打包judge proven三satisfied，证据phase20-addition-startup-measurement，Git当前CI另绑定；原Phase38/9与ADD独立/active，完整面板/认证/研究/计量及启动剩余缺口继续待验。
+
+最终checkBuild因新增测试进入输入摘要拒绝旧build；曾在失败后先做本地提交，未推送，现已串行补TS/exe build eb885e2d0902，TS artifact与120样本测量build相同。当前四形态×Node/exe各两样本共16次通过，required executable新鲜度通过。旧120样本仍绑定dc576660，当前仅小样本；两个manifest分别归档，临时目录清理后再交付。

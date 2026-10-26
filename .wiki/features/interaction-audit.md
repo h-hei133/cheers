@@ -541,3 +541,11 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 | 仍未确认 | 原现场按键唯一根因、真实1.7k/4.9k组成、生产冷热收益、真实认证与桌面体验 | 继续取证，不能列为“不存在”或用合成数字与局部终端结果宣布已解决 |
 
 最新需求详细清单见[补充规划第3.5节](phase-20-addition.md#35-面板看齐的交付清单)与[文末验收样例](phase-20-addition.md#164-用户输入样例与组合验收)：两个面板整体参照oh-my-pi；允许未配置具体模型选中；正文顶格并恢复编辑箭头；首位完整slash、正文实际路径suggestion和Tab；首位/正文/后续行使用多个skill；在正文skill限制上开放明确声明可组合的方法命令，deep-research与多个skill形成一个任务，功能/控制命令保持原独立路径。
+
+### 文末当前结论（第三十七批）
+
+确认原交互基准用后期模型名误标firstFrame，现按真实Loading编辑区/状态与正式输入提示分开观察，增加runtime接管/正式写入事件；逐sample等待close与清理，Linux实际PTY终止确认target退出。20项脚本、133项交互/startup/timing、四有效反转/字节恢复通过。Node/exe×regular/fullscreen各30个warm-uncontrolled空会话样本完成，父进程首帧p50分别480.1/537.4/284.5/278.1ms，正式输入提示1598.8/1784.6/779.9/790.8ms；冷缓存、前后节省量、真实桌面像素与项目加载量仍未证明。
+
+延迟确认前两批CI在同一configuration旧catalog断言失败，本地复现；不是本地通过即可称CI成功，也不能为旧测试回退“重开刷新目录”要求。fixture保留catalog scope，新回归验证仅更新catalog而不接受普通settings编辑；三个相关文件68项通过，丢scope反转拒绝/恢复重验。ordinary终端double未发inputReady及反转探针过窄错误分开分类并保留失败日志。build/exe、静态门/docs与正式judge proven已通过，当前Git/CI另绑定。
+
+所有用户明确要求继续保留；完整面板/桌面/真实认证、研究control/其他driver/child成本、原生tokenizer/全部动态来源累计I/O、真实上下文差额及生产冷热收益仍需完善。原现场按键唯一根因仍未确认；原Phase38/9、ADD独立且整体active。

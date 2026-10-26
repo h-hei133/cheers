@@ -61,7 +61,7 @@ function fixture() {
   const context: CommandContext = { cwd: root, projectRoot: root, sessionId: shell.session.id,
     runtimeConfig: shell.runtimeConfig, readConfiguration: () => shell.configuration.current,
     resolveConfigTarget: shell.resolveConfigTarget, admission: configurationAdmission(shell),
-    refreshRuntimeConfig: () => refreshShellRuntimeConfig(shell), getToolPool: async () => new Map() };
+    refreshRuntimeConfig: scope => refreshShellRuntimeConfig(shell, scope), getToolPool: async () => new Map() };
   return { shell, context };
 }
 
@@ -180,6 +180,10 @@ it('keeps menus, completion, and context on the accepted catalogue until success
   const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no implicit network'));
   const loader = createCatalogLoader(() => shell, {} as CliMcpGateway, []);
   const identity = catalogIdentity(shell);
+  const models = await modelPicker(context).load();
+  expect(models.find(row => row.note === 'active')).toMatchObject({ label: 'chosen', detail: expect.stringContaining('cli') });
+  expect(models.some(row => row.label === 'accepted-only')).toBe(true);
+  expect(models.some(row => row.label === 'pending-only')).toBe(false);
   catalog('pending-only', 24000);
   recordSessionUsage(shell.session.id, { promptTokens: 1000, completionTokens: 10, provider: 'google', model: 'chosen' });
   const facts = readStatusFacts(shell);
@@ -200,10 +204,6 @@ it('keeps menus, completion, and context on the accepted catalogue until success
     const result = await runModelCommand(args, context);
     expect(result.output).toContain('accepted-only'); expect(result.output).not.toContain('pending-only');
   }
-  const models = await modelPicker(context).load();
-  expect(models.find(row => row.note === 'active')).toMatchObject({ label: 'chosen', detail: expect.stringContaining('cli') });
-  expect(models.some(row => row.label === 'accepted-only')).toBe(true);
-  expect(models.some(row => row.label === 'pending-only')).toBe(false);
   expect((await loader('model', new AbortController().signal)).map(row => row.value)).toContain('google/accepted-only');
   expect(fetch).not.toHaveBeenCalled();
   fs.writeFileSync(file, JSON.stringify({ ...settings, maxOutputTokens: 3000 }));
@@ -221,6 +221,39 @@ it('keeps menus, completion, and context on the accepted catalogue until success
   expect(readStatusFacts(shell).costUsd).toBeCloseTo(0.024);
   expect((await connections.load()).find(row => row.id === 'login:custom')?.detail).toContain('pending-only');
   expect((await connections.apply(['login:custom']))?.draft).toContain('--model pending-only');
+});
+
+it('reopens models through catalogue-only publication while ordinary settings remain accepted', async () => {
+  const { shell, context } = fixture();
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no implicit network'));
+  const refreshConfig = vi.fn(context.refreshRuntimeConfig!);
+  const loader = createCatalogLoader(() => shell, {} as CliMcpGateway, []);
+  const previous = shell.configuration.current;
+  const model = await modelPicker(context).load();
+  expect(model.some(row => row.label === 'accepted-only')).toBe(true);
+  expect(refreshConfig).not.toHaveBeenCalled();
+  catalog('pending-only', 24000);
+  const changed = JSON.stringify({ ...settings, maxOutputTokens: 3000 });
+  fs.writeFileSync(file, changed);
+  const reopened = await modelPicker({ ...context, refreshRuntimeConfig: refreshConfig }).load();
+  expect(refreshConfig).toHaveBeenCalledOnce();
+  expect(refreshConfig).toHaveBeenCalledWith('catalog');
+  expect(reopened.find(row => row.note === 'active')).toMatchObject({ label: 'chosen', detail: expect.stringContaining('cli') });
+  expect(reopened.some(row => row.label === 'pending-only')).toBe(true);
+  expect(reopened.some(row => row.label === 'accepted-only')).toBe(false);
+  expect(shell.configuration.current).not.toBe(previous);
+  expect(shell.configuration.current.requested.maxOutputTokens).toBe(previous.requested.maxOutputTokens);
+  expect(shell.configuration.current.config.maxOutputTokens).toBe(1024);
+  expect(shell.configuration.current.requested.providerConnections).toEqual(previous.requested.providerConnections);
+  expect(readStatusFacts(shell)).toMatchObject({ model: 'chosen', contextWindow: 24000 });
+  expect((await runModelCommand(['list'], context)).output).toContain('pending-only');
+  expect((await loader('model', new AbortController().signal)).map(row => row.value)).toContain('google/pending-only');
+  const accepted = shell.configuration.current;
+  expect(refreshShellRuntimeConfig(shell).status).toBe('rejected');
+  expect(shell.configuration.current.catalog).toEqual(accepted.catalog);
+  expect(shell.configuration.current.config.maxOutputTokens).toBe(1024);
+  expect(fs.readFileSync(file, 'utf8')).toBe(changed);
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 it('uses the host credential and one accepted configuration for a side question through the command bridge', async () => {

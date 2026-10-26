@@ -1091,6 +1091,37 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 
 归档`.omx/artifacts/phase20-addition-model-effort/`，docs/Git与延迟CI另绑定。本批无真实认证/provider或桌面平台验收；完整settings/model字段/来源/scope/类别/能力/真实认证、research control/其他driver/child成本、tokenizer/动态来源累计I/O、Node/exe冷热启动和真实1.7k/4.9k分解继续待验。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第三十七批：实际早期首帧测量、输入接管与目录测试合同
+
+接续已推送`d34451ed6ec87980adccc9c0178d15f5abde1448`。本批推进ADD-07生产形态启动证据，修补原[交互基准](../../scripts/bench-interactive.mjs)将后期`openai`模型状态当作firstFrame的测量缺口；现观察实际箭头、Loading编辑区及加载状态，正式输入placeholder单独计时。沿原[observation](../../scripts/bench/observation.mjs)处理每个stream分段UTF-8与VT控制符，输出有2MiB上限；不使用模型名推断首帧，也不从一行普通loading文字推断编辑区已呈现。
+
+[InteractiveMode](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)在原StartupSurface成功adopt后记录runtime input adopted；无prepaint入口在真实设备input-ready回调记录同一事件，第一次流写入完成独立记录runtime frame write completed。原编辑器、输入缓冲、onFirstFrame与退出合同保留。基准检查早期listener/layout/write→runtime构造ready→输入接管→runtime写入事件各有一个有效计时且顺序正确；父进程收到字节和进程内部monotonic计时保持不同起点，均不代表终端像素确认。
+
+[process settlement](../../scripts/bench/process.mjs)从spawn后立即记录error/close，signal结束不能被exitCode=null误当仍运行，正常exit不代替stream close。超时/中断转发TERM，由Linux script结束其PTY目标；仍不能确认close就停止整次基准，不能继续下一样本或隐藏清理失败。临时home/project集中在`.tmp/bench-interactive/sample-*`，每个样本关闭并删除后才串行启动下一个。真实Linux小PTY终止测试确认包装进程close后实际target PID不存在，不是仅凭发送kill判成功。
+
+参考A的`packages/coding-agent/src/modes/startup-composer.ts`43–99分别负责begin、一次adopt和未接管dispose；本项目沿这个生命周期分离原则定位测量，保留自身已授权的加载期编辑合同，不复制参考deferInput行为或引入第二个Composer。有效反转恢复旧模型名标记、删除事件顺序检查、删除runtime接管计时、跳过close等待均产生测试失败，随后逐字节恢复。正式脚本测试20项通过，真实交互/startup/timing三个文件133项通过，恢复后的受影响检查通过。
+
+串行TS build与host executable编译通过，使用同一manifest buildId `dc57666092b6cc2d4e2a0457efab4b6f8029908187ab740b2bd6afc0fcb73cc6`，inputs `586fa3c1744ecd71e0cd524aa65e2246af273cd8b445608d1eba55cac9ddb7e9`、artifact `06c1049c96aa7c5925e5e5ccbdd49b5cb30af681b082924abad16bf8f7fefb2c`、exe SHA256 `a722826aa9493f8a19352112cfb632d24a22089aca3c9ca3a5a5dd4d7edad6f3`。测量输入前后digest相同，measurement SHA256 `baab63d69f30ff49fd6a824acb3d0af7dc87e9f07b685a37fc5087cfd96ed639`。两个样本pilot共8次终端启动通过后，每个Node/exe×regular/fullscreen组合30个空会话进程串行取样，共120次；line/pipe各两个样本另8次通过。
+
+本机Linux WSL2 6.6.87.2、Ryzen 7 7840H、Node v24.15.0，固定60×120、隔离配置/空session store/synthetic provider，cache control为**warm-uncontrolled**，120次均没有drop cache。下表是当前构建的父进程transport观察，单位ms；不是用户真实项目或修补前后节省量。原始样本与bootstrap区间归档于`.omx/artifacts/phase20-addition-startup-measurement/`。
+
+| 目标/形态 | Loading首帧p50 / p95 | 正式输入提示p50 / p95 | 每样本输入减首帧的p50 |
+|---|---|---|---|
+| Node / regular | 480.1 / 514.3 | 1598.8 / 1666.8 | 1122.5 |
+| Node / fullscreen | 537.4 / 572.5 | 1784.6 / 1862.6 | 1243.7 |
+| exe / regular | 284.5 / 302.3 | 779.9 / 830.9 | 493.9 |
+| exe / fullscreen | 278.1 / 311.8 | 790.8 / 838.9 | 503.6 |
+
+120个样本均观察到早期写入不晚于runtime-ready/接管/正式写入，目标正常close并清理。30次满足现基准的样本数要求，**不代表ADD-07整体验收完成**；冷缓存、同条件修补前对照、真实桌面像素/输入、不同项目加载量以及完整首请求准入性能仍待证据。两组按顺序测量，热/负载漂移也不能被当作Node/exe因果速度比。未运行真实provider或20k长历史PTY。
+
+延迟检查前两批CI `40259916832`（`8a03ac3e`）和`40261257582`（`2a5cf994`）均completed/failure，静态门/build通过，唯一失败是[configuration测试](../../packages/ts-shell/src/core/commands/configuration.test.ts)仍要求打开model后保留旧catalog。本地聚焦复现同一断言，分类为旧测试合同与第三十五批“重开接受新目录”的已授权行为冲突，且fixture refresh端口丢弃catalog scope。现旧测试在目录变化前检查首次模型菜单，保留普通命令/补全/报告在接受发布前使用旧目录的断言；新增真实owner场景验证重开仅接受catalog、CLI目标不变、pending普通settings不加载、普通reload拒绝仍保留已接受catalog与maxOutputTokens，并且零网络/配置写入。configuration14、model43、admission11共68项通过。
+
+范围参数反转导致原publication拒绝加载，证明新回归会拦住丢scope；反转探针最初只接受AssertionError，误将这个产品准入拒绝报为探针失败，日志保留，源码逐字节恢复后重验通过。启动计时测试首轮ordinary RecordingTerminal不发inputReady，132pass/1fail；仅在该fixture补实际设备事件后133pass，不修改产品迁就double。四有效行为断言反转与这一范围拒绝反转分开记录。
+
+最终新鲜度复查发现新增configuration测试也进入buildInputDigest，先前测量build不能作为当前构建；失败后曾先创建本地提交，尚未推送，随后补建。当前buildId `eb885e2d090231e7ee88ef5535dcc6b9fd47f78beb98f6e8870562712041fba9`、inputs `7350e642247c2f105ababe6e86b4be83a16989d2021b6533ddf25c2409ce3f48`，TS artifact与测量build相同；当前exe SHA256 `f70d12754f4677e88a69583bc806a14f2af3ba4654b2ce5a4a6eb0ab68fea2b6`。当前Node/exe×四形态各两个样本、共16次串行小验证通过，measurement `7c8079a17b5fa72a21891dc5fa5024995c855d0b182c768f3c99242e49907c86`，checkBuild required-executable通过。原120样本继续绑定dc576660，不冒充当前build的30样本验收；current-build-pilot、两个manifest与复查均归档。
+
+四静态门、最终diff/docs检查、当前正式打包judge为proven/三项satisfied；judge不代表独立产品审查。本批Git/当前CI交付另实际绑定。完整settings/model字段/来源/scope/能力/类别/桌面/真实认证、研究control/其他driver/child成本、原生tokenizer/动态来源累计I/O、真实1.7k/4.9k分解及上述启动缺口继续未验；原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1102,7 +1133,7 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 | model上下键看起来无交互 | 原disabled跳过具体未配置模型是确定缺口；只有一行ready与该观察相容，原现场按键是否进入此分支仍未排他确认。必须允许未配置具体模型获得焦点、进入详情和配置，不能改回跳过它们；浏览、认证成功与显式启用分开。已有局部修补及真实host/隔离PTY证据，原环境仍需复验 |
 | resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。已有局部修补证据 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
-| TUI首帧过晚 | 入口先建立重runtime再进入交互，造成可见等待。已采用早期真实composer及一次lease交接；仍需同机冷/热Node/exe的首帧、接管、ready及首请求取样，加载延迟夹具不证明生产收益 |
+| TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。第二十五批修补搜索退出/焦点域/模型详情返回；第二十六批再补Model / Session两个真实owner入口及取消/保存/角色返回，六文件104项通过；第二十七批补普通choice/effort当前值焦点、七类编辑器保存重开与help退出夹具，五文件112项通过。第二十八批再补只读来源内容wheel、翻页/首尾、有界大值阅读及拒绝后返回，五文件118项和两模式隔离PTY通过；只读文本仍有4MiB上限。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
@@ -1126,6 +1157,7 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 | “对话后4.9k就是字符÷3.5” | 对话后值有provider归一化输入用量来源；本地估算另有公式。两者需逐项对齐，不能混为同一公式结果 |
 | “工具数差不多，所以两个项目上下文必然相同” | 实际发送schema、规则、消息、协议与计数器决定成本，工具个数不足以推导token数 |
 | “一次输入只能使用一个skill” | 当前已有两份skill进入同一prompt及实际研究durable request/所有child stage的证据；原代码边界可导致误调用或漏调用，已局部修补。不能从参考首个regex匹配推导本项目必然只加载第一个 |
+| “前两批本地通过等于CI已通过”“模型面板重开必须保留旧目录” | 第三十七批延迟确认两次CI同一旧catalog测试失败并本地复现。按新要求修fixture scope和回归合同，保留普通设置接受边界；当前CI仍须绑定实际提交，不能回退授权体验迎合旧断言 |
 | 原现场零可见按键的唯一根因、真实1.7k/4.9k差额、生产启动收益 | 仍未确认，继续取证；不能归为不存在，也不能用合成数字或局部PTY称已解决 |
 | 真实OAuth/key接受、cache writer退出1、活跃build lock并发来源 | 仍未确认，保留认证与产品路由、历史CI与当前验证的证据边界 |
 

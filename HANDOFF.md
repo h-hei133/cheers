@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Startup Metrics Must Follow The Actual Surface And Configuration Scope
+- **Symptom**: A benchmark calls the later model label its first frame, or a configuration test demands an old model catalogue after reopening and accidentally reloads ordinary settings.
+- **Root Cause**: Prepaint/adoption changed the lifecycle without updating measurement markers and a fixture dropped the catalogue-only refresh parameter. Listener installation, runtime construction, adoption and stream write completion are different events; process exit can precede stream close.
+- **Rule**: Observe the actual Loading editor, record runtime adoption separately, validate unique ordered marks and keep parent/process clock origins separate. Wait for target close and fixture cleanup before the next sample; verify actual PTY termination. Model reopening must pass catalogue scope through the original publication and retain accepted ordinary values. Keep ordinary command pinning tests separate from explicit reopening, and record cache control and absent before/after evidence honestly.
+
 ### Prospective Model Effort Must Be Selected Before Its Atomic Switch
 - **Symptom**: A configured model blocked by the current reasoning preference offers only Back, or recovery changes the current model's effort before target selection succeeds.
 - **Root Cause**: Credential setup and capability recovery share a disabled-row presentation, while the ordinary thinking command edits the active target. Same-name canonical metadata also cannot decide a relay's supported levels.
