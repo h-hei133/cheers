@@ -4,6 +4,84 @@ import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 import { InputForm } from './input.js';
 import { cursorTarget } from '../../../presentation/tui/render/paint.js';
+import { parseMouseReport } from '../../../presentation/tui/input/mouse.js';
+import { Editor } from '../../../presentation/tui/editor.js';
+
+it('reads sources larger than the editable cap with bounded shared-editor layout and document navigation', () => {
+  const initial = 'BEGIN\n' + '中文😀é '.repeat(9000) + '\nEND';
+  const layout = vi.spyOn(Editor.prototype, 'layout');
+  try {
+    const form = new InputForm({ initial, label: 'Read-only', readOnly: true, validate: () => undefined });
+    expect(form.render('Sources', 40, 10).map(stripAnsi).join('\n')).toContain('BEGIN');
+    form.key(parseKeyEvent('\x1b[6~'));
+    expect(form.render('Sources', 40, 10).map(stripAnsi).join('\n')).not.toContain('BEGIN');
+    form.key(parseKeyEvent('\x1b[1;5F'));
+    expect(form.render('Sources', 40, 10).map(stripAnsi).join('\n')).toContain('END');
+    form.key(parseKeyEvent('\x1b[1;5H'));
+    expect(form.render('Sources', 18, 4).map(stripAnsi).join('\n')).toContain('BEGIN');
+    expect(form.value()).toBe(initial);
+    expect(layout.mock.instances.length).toBeGreaterThan(0);
+    for (const editor of layout.mock.instances) expect(Buffer.byteLength(editor.getText())).toBeLessThanOrEqual(16 * 1024);
+  } finally { layout.mockRestore(); }
+});
+
+it('scrolls only painted read-only content and retires wheel hits until repaint', async () => {
+  const overlay = new OverlayHost(() => {}), submit = vi.fn(async () => undefined), invoke = vi.fn();
+  const initial = Array.from({ length: 40 }, (_, i) => `source-${i}`).join('\n');
+  overlay.open({ title: 'Sources', form: 'panel', fullScreen: true, empty: '', load: async () => [], apply: invoke,
+    input: { initial, label: 'Read-only', readOnly: true, validate: () => undefined, apply: submit } });
+  await Promise.resolve(); await Promise.resolve();
+  const frame = () => overlay.render(40, 10).map(stripAnsi);
+  const first = frame(), point = first.findIndex(row => row.includes('source-0'));
+  const wheel = (row: number, column: number, button: number, top: number | undefined) =>
+    overlay.handlePointer(parseMouseReport(`\x1b[<${button};${column + 1};${row + 8}M`)!, top);
+  for (const [row, column, button, top] of [[0, 3, 65, 7], [9, 3, 65, 7], [point, 40, 65, 7],
+    [point, 3, 69, 7], [point, 3, 65, undefined]] as const) wheel(row, column, button, top);
+  expect(frame()).toEqual(first);
+  wheel(point, 3, 65, 7); wheel(point, 3, 65, 7);
+  const moved = frame(); expect(moved.join('\n')).toContain('source-3'); expect(moved.join('\n')).not.toContain('source-0\n');
+  overlay.handleKey(parseKeyEvent('\x1b[6~'), invoke); wheel(point, 3, 65, 7);
+  const paged = frame(); expect(paged.join('\n')).toContain('source-10');
+  expect(submit).not.toHaveBeenCalled(); expect(invoke).not.toHaveBeenCalled();
+  overlay.handleKey(parseKeyEvent('\x1b'), invoke); expect(overlay.active).toBe(false);
+});
+
+it('keeps readonly Enter a return even when source admission fails, and explains the inspection limit', async () => {
+  const initial = 'x'.repeat(4 * 1024 * 1024 + 1), submit = vi.fn(async () => undefined);
+  const overlay = new OverlayHost(() => {});
+  overlay.open({ title: 'Sources', form: 'panel', fullScreen: true, empty: '', load: async () => [], apply: async () => undefined,
+    input: { initial, label: 'Read-only', readOnly: true, validate: () => undefined, apply: submit } });
+  await Promise.resolve(); await Promise.resolve();
+  expect(overlay.render(100, 8).map(stripAnsi).join('\n')).toContain('read-only view limit');
+  overlay.handlePaste('replacement'); overlay.handleKey(parseKeyEvent('\x15'), vi.fn());
+  overlay.handleKey(parseKeyEvent('\r'), (picker, ids) => { void picker.apply(ids); });
+  expect(submit).toHaveBeenCalledWith(initial); expect(overlay.active).toBe(false);
+});
+
+it.each([{ readOnly: true, masked: false }, { readOnly: false, masked: false }, { readOnly: false, masked: true }])(
+  'blocks wheel before load and confines readonly navigation to the painted region: $readOnly/$masked', async options => {
+    const initial = Array.from({ length: 30 }, (_, i) => `row-${i}`).join('\n'), submit = vi.fn(async () => undefined);
+    let resolve!: (rows: []) => void;
+    const overlay = new OverlayHost(() => {}), invoke = vi.fn();
+    overlay.open({ title: 'Form', form: 'panel', fullScreen: true, empty: '', load: () => new Promise<[]>(r => { resolve = r; }), apply: invoke,
+      input: { initial, label: 'Value', validate: () => undefined, apply: submit, ...options } });
+    const before = overlay.render(30, 6).map(stripAnsi);
+    const wheel = () => overlay.handlePointer(parseMouseReport('\x1b[<65;3;3M')!, 0);
+    wheel(); expect(overlay.render(30, 6).map(stripAnsi)).toEqual(before);
+    resolve([]); await Promise.resolve(); await Promise.resolve();
+    if (options.readOnly) {
+      overlay.render(30, 6); wheel();
+      const after = overlay.render(30, 6).map(stripAnsi).join('\n'); expect(after).toContain('row-3'); expect(after).not.toContain('row-0\n');
+      overlay.render(8, 1); // Only its single painted row admits wheel now.
+      wheel(); const resized = overlay.render(8, 1);
+      expect(cursorTarget(resized, 0, 1)).not.toBeNull();
+    } else {
+      overlay.render(30, 6); wheel(); expect(overlay.render(30, 6).map(stripAnsi)).toEqual(before);
+      overlay.handleKey(parseKeyEvent('\x1b[6~'), invoke); overlay.handleKey(parseKeyEvent('\x1b[1;5H'), invoke);
+    }
+    overlay.handleKey(parseKeyEvent('\r'), (picker, ids) => { void picker.apply(ids); });
+    expect(submit).toHaveBeenCalledWith(initial); expect(invoke).not.toHaveBeenCalled();
+  });
 
 it('masks graphemes before painting, maps the caret and drops cleared credentials from undo', () => {
   const form = new InputForm({ initial: '', label: 'API key', masked: true, validate: () => undefined });

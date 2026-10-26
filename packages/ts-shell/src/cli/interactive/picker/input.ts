@@ -2,6 +2,8 @@ import { Editor } from '../../../presentation/tui/editor.js';
 import { truncateToWidth } from '../../../presentation/tui/text/layout.js';
 import type { ParsedKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { graphemeBoundaries } from '../../../presentation/tui/text/measure.js';
+import type { MouseReport } from '../../../presentation/tui/input/mouse.js';
+import { InputReader, READ_ONLY_MAX_BYTES } from './input/reader.js';
 
 export interface PickerInput<T> {
   readonly initial: string;
@@ -25,8 +27,16 @@ export class InputForm {
   private readonly display = new Editor();
   private error: string | undefined;
   private initialRejected = false;
+  private reader?: InputReader;
+  private painted?: { readonly from: number; readonly to: number; readonly width: number };
   constructor(readonly input: Omit<PickerInput<unknown>, 'apply'>) {
-    if (Buffer.byteLength(input.initial) <= MAX_BYTES) {
+    if (input.readOnly && !input.masked) {
+      try {
+        if (Buffer.byteLength(input.initial) > READ_ONLY_MAX_BYTES) throw new Error('Value exceeds the read-only view limit. Inspect the configuration file instead.');
+        this.reader = new InputReader(input.initial);
+      } catch (error) { this.error = (error as Error).message; }
+    }
+    else if (Buffer.byteLength(input.initial) <= MAX_BYTES) {
       this.editor.setText(input.initial);
       if (input.readOnly) this.editor.setCursorOffset(0);
     }
@@ -37,19 +47,23 @@ export class InputForm {
   }
 
   render(title: string, width: number, height: number): string[] {
+    this.painted = undefined;
     const budget = Math.max(0, Math.floor(height));
     if (budget === 0 || width <= 0) return [];
     const header = budget >= 4 ? [title, this.input.label] : budget === 3 ? [this.input.label] : [];
     const hint = this.input.multiline && !this.input.masked
       ? 'Enter: stage    Shift+Enter/Ctrl+J: newline    Esc: cancel    Ctrl+U: clear'
       : 'Enter: stage value    Esc: cancel    Ctrl+U: clear';
-    const footer = budget >= 2 ? [this.error ?? this.input.hint ?? hint] : [];
+    const footer = budget >= 2 ? [this.error ?? [this.reader?.position, this.input.hint ?? hint].filter(Boolean).join(' · ')] : [];
     const capacity = budget - header.length - footer.length;
-    const rows = [...header, ...this.renderInput(width, this.input.readOnly ? capacity : Math.min(6, capacity)), ...footer];
+    const content = this.renderInput(width, this.input.readOnly ? capacity : Math.min(6, capacity));
+    if (this.reader && content.length) this.painted = { from: header.length, to: header.length + content.length, width };
+    const rows = [...header, ...content, ...footer];
     return rows.map(row => truncateToWidth(row, width));
   }
 
   paste(text: string): void {
+    this.painted = undefined;
     if (this.input.readOnly) return;
     if (this.input.masked && /[\r\n\t]/.test(text)) { this.error = 'Enter a single-line value.'; return; }
     if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(text)) { this.error = 'Control characters are not accepted.'; return; }
@@ -60,6 +74,12 @@ export class InputForm {
   }
 
   key(event: ParsedKeyEvent): void {
+    this.painted = undefined;
+    if (this.reader) {
+      try { this.reader.key(event.keyId); }
+      catch (error) { this.error = (error as Error).message; }
+      return;
+    }
     if (this.input.readOnly && !['left', 'right', 'up', 'down', 'home', 'end', 'ctrl+a', 'ctrl+e'].includes(event.keyId)) return;
     if (this.input.masked && ['up', 'down'].includes(event.keyId)) {
       this.syncDisplay();
@@ -84,6 +104,7 @@ export class InputForm {
   }
 
   value(): string | undefined {
+    if (this.input.readOnly) return this.input.initial;
     if (this.initialRejected) return undefined;
     const text = this.editor.getText();
     this.error = this.input.validate(text);
@@ -91,6 +112,7 @@ export class InputForm {
   }
 
   private renderInput(width: number, height: number): string[] {
+    if (this.reader) return this.reader.render(width, height);
     if (!this.input.masked) return this.editor.render(width, height);
     this.syncDisplay();
     return this.display.render(width, height);
@@ -100,5 +122,16 @@ export class InputForm {
     const snapshot = this.editor.snapshot(), offsets = graphemeBoundaries(snapshot.text);
     this.display.setText('•'.repeat(offsets.length - 1));
     this.display.setCursorOffset(offsets.indexOf(snapshot.cursor));
+  }
+
+  handlePointer(report: MouseReport, top?: number): boolean {
+    const hit = this.painted;
+    if (!this.reader || !hit || top === undefined || report.kind !== 'wheel' || report.shift || report.alt || report.ctrl
+      || ![-1, 1].includes(report.button) || report.row - top < hit.from || report.row - top >= hit.to
+      || report.column < 0 || report.column >= hit.width) return false;
+    this.painted = undefined;
+    try { this.reader.pan(report.button * 3); }
+    catch (error) { this.error = (error as Error).message; }
+    return true;
   }
 }

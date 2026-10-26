@@ -357,7 +357,10 @@ export class OverlayHost {
       return true;
     }
     this.hovered = undefined;
-    if (this.input) return true;
+    if (this.input) {
+      if (!this.actionPending && !this.loading && this.subMode === 'none' && this.input.handlePointer(report, top)) this.onChange();
+      return true;
+    }
     if (report.kind === 'wheel') {
       const hit = top === undefined ? undefined : this.listRows.get(report.row - top)?.find(span => report.column >= span.from && report.column < span.to);
       if (this.actionPending || this.loading || this.subMode !== 'none' || report.shift || report.alt || report.ctrl

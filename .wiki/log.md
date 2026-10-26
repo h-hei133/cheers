@@ -9256,3 +9256,9 @@ ADD-03普通settings choice原默认首项、thinking默认auto，现按effectiv
 五文件112pass、三有效反转/字节恢复、四静态门/TS构建8942b4c741e1通过；实际PTY/judge/docs/Git另绑定。第二十五历史10892pass/2fail/3skip归档、第二十六CI仍运行/Watch仅读success状态。证据phase20-addition-settings-choice；完整面板/认证/性能/计量继续待验，原Phase38/9与ADD独立/active。
 
 最终普通/全屏Node隔离PTY分别验证false/all/medium默认焦点、取消不写、显式true保存重开，其他config保留/零message-provider/modelSelection不写，143退出均settle；正式judge实际exit0/proven三satisfied。探针缩略label误断言已分类修正。docs与Git另绑定。
+
+## [2026-10-26] fix | 设置来源滚轮与有界只读分页
+
+ADD-03确认form吞wheel、64KiB编辑保护拒绝只读三值来源且Enter无法返回。复用Editor按最多4096单元/完整字素源片段布局，内容命中wheel、PgUp/PgDn、Ctrl+Home/End及Enter/Esc保留暂存；只读总量4MiB并明确拒绝，编辑与masked64KiB仍保留。基线旧boolean期待按实际effective焦点显式选择true后验证覆盖。
+
+五文件118pass、三有效反转/字节恢复、四静态门/TS构建c27b7b21ca2e及新解包正式judge proven三satisfied通过。普通/全屏实际Node隔离PTY均通过大值拒绝→只读翻页/首尾/wheel→Enter/Esc保留pending，config原字节不变/零message-provider/modelSelection不写，143退出均settle。失败夹具日志保留。证据phase20-addition-settings-source；docs/Git另绑定，第二十七CI仍运行，完整面板/真实认证/计量性能等仍待验，原Phase38/9和ADD独立/active。

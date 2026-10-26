@@ -414,3 +414,9 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 第二十五CI实际help生命周期两失败/10892pass/3skip，旧夹具与已批准的搜索→分类→关闭合同不符，现更正且保留订阅释放检查；第二十六CI仍运行。其余确定问题和用户要求沿[文末总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)继续保留。没有上下键监听、resume排序反了、空配置等于没实现、每次编译、4.9k就是字符公式、工具数决定token数等解释仍不成立；现场唯一按键根因、真实token差额/启动收益/认证及cache-build来源继续未知。原Phase38/9与ADD独立。
 
 最终实际Node入口regular/fullscreen小型隔离PTY均通过：已有false布尔/all枚举/medium effort按真实焦点打开、Enter保留当前值并stage、Esc取消不写；显式选择true→stage未写→Apply保存→重开聚焦true，枚举及其余config保留，session modelSelection未写、零message/provider派发。两进程SIGTERM143均settle。首轮探针错误要求两栏缩略label全长，按真实绘制与字段详情纠正，失败日志保留，不归为产品导航故障。此为隔离synthetic路径，不代表实际桌面/认证或全部字段矩阵。 正式judge实际exit0/proven、三satisfied。生产启动收益/真实token差额/认证及完整面板验收边界不变。
+
+### 文末当前结论（第二十八批）
+
+本批确认设置来源表单吞掉wheel，64KiB可编辑保护同时拒绝较大的只读三值来源，并阻止Enter返回。现只对绘制内容路由滚轮，复用共享Editor按4096单元/完整字素边界分页；PgUp/PgDn、Ctrl+Home/End与Enter/Esc回原详情保留暂存。只读总量上限4MiB，超限明确提示检查文件，编辑与密钥64KiB保护保留。五文件118项、三有效反转/字节恢复、四静态门/构建及正式judge proven三satisfied通过；普通/全屏实际Node隔离PTY验证大值编辑拒绝、来源wheel/翻页/首尾、两种返回及config原字节、零message/provider。详见[第二十八批](phase-20-addition.md#15-实施与验证证据)。
+
+本批未证明完整面板已看齐或极限大配置全部可在面板检查。未配置模型可选、输入顶格与箭头、正文路径、多skill及有限方法slash组合继续依[文末总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)验收；没有上下键监听、resume排序反了、每次编译、4.9k等于字符公式、工具数决定token数等解释仍不成立。现场唯一根因、真实token差额/启动收益/认证、cache-build来源继续未知。第二十七CI延迟检查仍in_progress，原Phase38/9与ADD独立、整体active。

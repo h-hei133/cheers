@@ -291,3 +291,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Cancelling a preview starts a second read before the first settles, or a no-pending injection preview is immediately stale.
 - **Root Cause**: Abort is only a request; asynchronous reads can still be active. Empty injection getters may return fresh value-equivalent objects, while newly pending generations must still invalidate the preview.
 - **Rule**: Retain the pending read slot through promise settlement. Compare empty generation snapshots by value, recheck both compact and memory generations, and never consume them during preview. Bind live history, context selection and roots to a complete bounded disk snapshot; obtain goal context from that same snapshot. Keep metadata freshness and tokenizer estimates explicitly approximate.
+
+### Read-Only Sources Need Separate Admission And Bounded Layout
+- **Symptom**: Wheel is swallowed by a form, a large provenance view is empty, and Enter cannot return after its prefill was refused.
+- **Root Cause**: The writable editor cap also gates read-only inspection; whole-source grapheme layout scales with repeated values, while form chrome has no content-local pointer boundary.
+- **Rule**: Keep writable/secret caps, admit read-only text separately, and lay out bounded source slices with complete grapheme boundaries and explicit continuation or rejection. Route wheel only over the current painted content and expire hits after motion. Return through the read-only owner even on rejection; test full source reconstruction, pending retention and unchanged file bytes.

@@ -104,13 +104,31 @@ it('keeps an untrusted project save inactive and makes the reason readable witho
 });
 
 it('retains the launch override after a user Apply and shows accepted versus stored values in the read-only view', async () => {
-  const h = panel(false, true); await h.open('attentionOnIdle'); await h.key('\r');
+  const h = panel(false, true); await h.open('attentionOnIdle'); await h.choose('Choose true');
   expect((await h.key('\r'))?.note).toContain('keeps its launch override');
   expect(h.context.runtimeConfig.attentionOnIdle).toBe(false); expect(readUserRuntimeConfigFile().attentionOnIdle).toBe(true);
   expect(fs.readFileSync(user, 'utf8')).toContain('/* retain */');
   await h.key('\r'); await h.choose('Values and sources');
   const shown = h.render(); expect(shown).toContain('Effective: false'); expect(shown).toContain('Accepted: false');
   expect(shown).toContain('Source: override'); expect(shown).toContain('Stored: true'); h.overlay.close();
+});
+
+it('reads a large effective/accepted/stored value to the end with real settings owners, retaining pending edits and all file bytes', async () => {
+  const entries = Array.from({ length: 160 }, (_, i) => `fixture-${i}-` + 'x'.repeat(500));
+  fs.writeFileSync(user, JSON.stringify({ offline: true, disabledTools: entries }));
+  const h = panel(false), bytes = [user, project, input].map(file => fs.readFileSync(file));
+  await h.open('disabledTools'); await h.choose('Remove stored value'); await h.choose('Values and sources');
+  expect(h.render().replace(/\n/g, '')).toContain('Effective: ['); expect(h.render()).not.toContain('Value is too large');
+  await h.key('\x1b[1;5F');
+  expect(h.render()).toContain('Save scope: user'); expect(h.render()).toContain('Application:');
+  expect(h.render()).toContain('end');
+  await h.key('\x1b[1;5H'); expect(h.render()).toContain('Field: disabledTools');
+  await h.key('\x1b[6~'); expect(h.render()).not.toContain('Field: disabledTools');
+  await h.key('\x1b'); expect(h.render()).toContain('Pending: unset');
+  await h.choose('Values and sources'); await h.key('\x1b[1;5F'); await h.key('\r');
+  expect(h.render()).toContain('Pending: unset');
+  expect([user, project, input].map(file => fs.readFileSync(file))).toEqual(bytes);
+  expect(h.context.runtimeConfig.disabledTools).toEqual(entries); h.overlay.close();
 });
 
 it.each([

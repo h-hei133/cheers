@@ -891,6 +891,26 @@ ADD-03进一步确认[settings](../../packages/ts-shell/src/cli/interactive/pick
 
 本批只补当前值默认焦点与上述类型链路，不代表完整字段/来源/scope/桌面/真实认证矩阵完成；冷/热启动、真实1.7k/4.9k、tokenizer/研究preview/dynamic source总I/O等仍待证。原Phase20 38 complete / 9 partial，ADD独立、整体active。
 
+### 第二十八批：设置来源只读滚动与有界分页
+
+接续第二十七批`9646a0914d12afcaacbb08fb30b4c3b99f92cb32`，工作区开始时干净。延迟实查该批CI `40248313306`仍in_progress，绑定相同HEAD；不从Watch或本地验证推定其完成。
+
+ADD-03确认[OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts)在InputForm分支直接吞掉wheel；[InputForm](../../packages/ts-shell/src/cli/interactive/picker/input.ts)的64KiB编辑保护也拒绝来源的effective/accepted/stored合并文本，原只读Enter因initialRejected无法返回。新增长来源与实际painted content轮动断言修补前均失败，属于确定的来源检查缺口。另一个基线失败为上一批当前值焦点修正后的旧布尔夹具：原双Enter现在保留false，现显式选择Choose true后再Apply，继续验证launch override与stored true，不削弱覆盖断言。
+
+复用既有Editor与InputForm生命周期，在[input/reader](../../packages/ts-shell/src/cli/interactive/picker/input/reader.ts)按最多4096 UTF-16单元、自然换行或完整字素边界取源片段；每次只对一个片段布局，长单行不再触发全值字素展开。只读总文本上限4MiB，未放宽可编辑及masked表单64KiB保护。分段箭头、PgUp/PgDn、Ctrl+Home/End与wheel可连续阅读；显示Part/more follows/end，超过总量或单字素界限明确提示检查配置文件，不以空值或静默省略冒充已读。来源仍只读，Enter/Esc返回原详情，拒绝浏览也能Enter返回；不进入prompt/history或保存事务。超过4MiB仍须文件检查，不能将此写成所有极限配置都可完整面板浏览。
+
+wheel只接当前实际绘制内容行与列，按屏幕origin换算；标题、footer、范围外、无origin、修改键、loading/actionPending及可编辑/秘密表单不滚动。键盘、paste和有效wheel立即撤销旧命中，resize重画注册当前范围；滚动不提交、不产生preview写入。参考只读检视A `packages/tui/src/components/form.ts`238–266将field-local行映射到control-local，周围chrome不路由；326–386沿共享Input预填并由owner负责submit/cancel。本项目采用共享编辑器、内容命中和owner回调，不采用单行Input承担大来源；既有[diff分页](../../packages/ts-shell/src/presentation/tui/transcript/diffPage.ts)提供有界源片段的本地决策参照，但其超长行截断不符合来源完整阅读，故不复用截断合同。
+
+最终五文件118项串行通过：reader3、sources8、InputForm21、wheel12、OverlayHost74。包含约240KiB实际设置三值来源读首/尾/翻页、暂存unset的Enter/Esc保留、配置原字节与effective不变；Unicode/emoji/组合字符跨页逐段拼回原文、自然换行、宽窄resize及caret、总量/单字素拒绝、只读编辑吸收、可编辑与masked保护。初轮source布尔label漏Choose前缀、无origin测试默认参数误转有效origin、共享word wrap把Effective与值分行、窄屏尾段仅一个字符的旧预期均已按真实owner/绘制分类纠正，失败日志保留；短片段边界随后改用局部查换行，避免起始Field行独占第一页与反复全前缀扫描。
+
+三个有效反转分别删除form wheel路由、恢复64KiB只读拒绝、删除PgUp/PgDn，每次AssertionError/exit1，源码逐字节恢复。四静态门、TS构建通过，build`c27b7b21ca2ef2b88deb884f87815d135932c5f46f34b084874939ba8301c71d`，inputs`7a8e40ac5840a54a4451d93daa5fa52dbb3d44e52edf2937b2b5a285fc0fc32e`，artifact`7e53ff424df27826d19605b573d9a57f89282df2e369907ecf7e018383ecb2ca`。当前validator tgz SHA-256`6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`新目录解包正式judge实际exit0/proven，三义务satisfied。
+
+最终实际Node入口regular/fullscreen小型隔离PTY均通过：大值编辑拒绝并Esc返回→stage removal不写→完整来源打开→PgDn→Ctrl+End/首→内容wheel→Esc保留pending→重开/Enter保留pending。config原字节、modelSelection未写、零message/provider派发，两进程SIGTERM143均settle。这是隔离synthetic证据，不能替代真实桌面、完整字段矩阵或OAuth/key接受。归档`.omx/artifacts/phase20-addition-settings-source/`；严格docs/diff、Git提交推送与远端读回分别记录，CI仍按实际状态报告。
+
+原用户要求持续有效：未配置模型可选中；settings/model向参考整体看齐；正文顶格/编辑箭头；首位完整slash、正文路径suggestion/Tab、多skill同次生效及deep-research有限方法组合。完整字段/来源/scope/编辑器/桌面/真实认证、冷热启动、原生tokenizer/完整研究preview、动态source总I/O、真实1.7k/4.9k拆分和cache/build并发原因继续待证。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
+严格docs/diff实际通过，118既有docs-source advisory保留，addition131/audit104本地链接均存在；提交/推送/远端读回绑定delivery.json，不用本地验证替代CI。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -904,7 +924,7 @@ ADD-03进一步确认[settings](../../packages/ts-shell/src/cli/interactive/pick
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚 | 入口先建立重runtime再进入交互，造成可见等待。已采用早期真实composer及一次lease交接；仍需同机冷/热Node/exe的首帧、接管、ready及首请求取样，加载延迟夹具不证明生产收益 |
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
-| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。第二十五批修补搜索退出/焦点域/模型详情返回；第二十六批再补Model / Session两个真实owner入口及取消/保存/角色返回，六文件104项通过；第二十七批补普通choice/effort当前值焦点、七类编辑器保存重开与help退出夹具，五文件112项通过。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
+| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。第二十五批修补搜索退出/焦点域/模型详情返回；第二十六批再补Model / Session两个真实owner入口及取消/保存/角色返回，六文件104项通过；第二十七批补普通choice/effort当前值焦点、七类编辑器保存重开与help退出夹具，五文件112项通过。第二十八批再补只读来源内容wheel、翻页/首尾、有界大值阅读及拒绝后返回，五文件118项和两模式隔离PTY通过；只读文本仍有4MiB上限。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
 
 ### 16.2 不成立的判断与仍未确认的原因

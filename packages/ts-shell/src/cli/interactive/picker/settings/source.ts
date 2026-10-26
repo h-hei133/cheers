@@ -24,7 +24,7 @@ export function settingSources(draft: SettingsDraft, setting: SettingDefinition,
     load: async () => [], apply: async () => undefined,
     input: {
       initial: lines.map(neutraliseForDisplay).join('\n'), label: 'Read-only', readOnly: true,
-      hint: '↑↓ scroll · Enter / Esc: return', validate: () => undefined,
+      hint: '↑↓ / PgUp PgDn / wheel · Ctrl+Home/End · Enter / Esc: return', validate: () => undefined,
       apply: async () => ({ next: back() }),
     },
   };
