@@ -495,7 +495,7 @@ owner：[启动界面](../../packages/ts-shell/src/cli/interactive/startup.ts)�
 
 - 当前字符近似不是参考的native tokenizer，也不是provider精确计量；未同模型/协议/规则/历史/实际schemas/cache口径分解用户的1.7k/4.9k差额，不能归因工具个数或公式单项。
 - modifier/template/deep-research的纯组合准备preview尚未实现；这些输入保持unknown，不执行工作流以计数。已选native研究、collaboration admission、hook拒绝、模型pool/认证续期、自动压缩等后续准入变化不承诺与预览完全相同。
-- 普通无slash草稿不加载command template图；正文路径判别仍会经实际registry/template discovery，模板目录/文件读取尚未增加本preview专用成本界限，需复用其owner补齐。没有以异步函数名或10秒abort承诺整个同步图可被中途取消。
+- 普通无slash草稿不加载command template图；第五十一批已将正文路径从完整模板图收窄为候选名精确探测，并补目录revision、候选/字节预算及同步步骤取消检查。同名模板存在时仍按原registry优先级参与，未声称路径/模板歧义已消除，也没有以异步函数名或10秒abort承诺整个同步图可被中途取消。
 - 源新鲜度检查依赖metadata/physical identity及skill verifier；metadata保留的字节改写未证明必检出。每2秒源poll和20秒TTL存在短暂显示窗口；帧纯读不能叫每帧精确磁盘snapshot。
 - 大会话/超过界限、MCP未就绪、opaque replay或目录/权限变化保留unknown/stale。冷/热Node/exe启动、估算成本/heap矩阵以及Windows桌面输入仍缺。
 
@@ -1304,6 +1304,16 @@ ADD-12继续收口。定向检查确认review不是纯modifier：它先读取真
 
 最终三文件54项单进程通过：review runtime11、composition22、prose completion21。临时移除driver声明后正文组合、两个alias、双driver拒绝和prose候选共5项有效失败，源码恢复后重验通过。未运行真实provider、全仓、exe、桌面或20k PTY；四静态门、严格docs、TS build `686381afc994`及fresh、当前包judge proven通过，Git/本批CI另实际绑定。
 
+### 第五十一批：模板候选发现成本与取消边界
+
+ADD-08继续收口。原[上下文预览](../../packages/ts-shell/src/cli/runtime/context/preview.ts)只要草稿含非字面slash token就构造完整command registry；因此正文`/home`也会触发[模板loader](../../packages/ts-shell/src/core/prompts/templateLoader.ts)枚举模板目录并读取无关模板。普通无slash草稿本来不加载模板，但这个路径歧义和全量发现成本仍是确定缺口；同步读取也不能靠外层10秒abort或async函数名证明可中途取消。
+
+现在预览从源token和兼容`/ ordinary`命令源派生候选名，只把候选名传给[命令registry](../../packages/ts-shell/src/core/commands/registry.ts)。[模板loader](../../packages/ts-shell/src/core/prompts/templateLoader.ts)新增按候选名的精确探测：不枚举模板目录、不读取无关文件，只检查候选路径并保留原有用户/项目优先级；每个候选根目录仍进入source revision，新增同名模板、覆盖或命令碰撞会撤销旧估算。候选数上限512、单文件512 KiB、总读取8 MiB，读取前后在同步步骤之间检查`AbortSignal`；不声称单个`readFileSync`内部可被中断。`/ ordinary`兼容语法、普通独立模板和正文显式`composable: true`模板仍走原预览/展开owner，没有第二套模板系统。
+
+主代理串行验证：`templateLoader`12项、`preview`30项、composition22、slashRouter49、prose completion21、keymap73共207项通过；随后source capture/sources 12项通过。反转把preview改回完整registry后，超限模板测试在读取前失败；移除同步取消检查后，候选取消测试失败；两次均恢复源码并重新通过。四静态门、严格docs、diff、责任上限0、TS build `17253bcaa529`（inputs `ea1665b9fdb69fab86192ce4ebd15b5abed802ebf861996e23aac06aa08f4b5d`）及当前包正式judge proven通过。
+
+本批只补本地模板发现成本、候选新鲜度和取消边界；未运行全仓、exe、真实20k PTY、真实provider或桌面平台。ADD-08的原生tokenizer、真实1.7k/4.9k分项差额、其他独立命令/研究工作流完整preview和完整动态来源总成本仍未验收；原Phase20保持38 complete / 9 partial，ADD整体继续active。工件`.omx/artifacts/phase20-addition-template-discovery/`保留验证摘要。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1322,7 +1332,7 @@ ADD-12继续收口。定向检查确认review不是纯modifier：它先读取真
 | 认证快捷入口缺少参数发现 | 第四十七批确认`/login`、`/logout`只有委托执行而没有顶层提示/补全。现从原`connectSyntax`派生快捷语法：login提供provider与认证flag，logout发现保存连接，并排除不属于顶层语法的action alias；执行仍只走原认证owner。第四十八批再以registry合同锁定theme/statusline/connect/login/logout/view与settings元数据的owner可见性。73项、13项合同及两有效反转有局部证据，真实认证/桌面仍待验 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |
-| 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
+| 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，预览补异步/cancellable复验和实时准入。第五十一批再把模板发现收窄为候选精确探测，补目录revision、候选/单文件/总字节界限及同步步骤取消；同名路径/模板歧义仍未消除。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。第三十八批新增settings全部37项/user37-project36基本键盘链及七个跨来源政策场景，第三十九批补17个代表性冲突/失效/取消/范围场景，第四十九批补Memory/Shell只读命令入口。完整字段×来源×编辑器×窗口/桌面及model能力/角色/真实认证矩阵仍未完成；只读入口不伪装可编辑字段，也不能将局部绿色写成“整体已看齐” |
 | 设置搜索新查询仍保留较弱匹配焦点 | 第三十八批确认typed/pasted `topP`排名第一但Enter打开Input shape。现新查询自动聚焦最强匹配，同查询手动选择保持，清空回原字段；178项聚焦、一有效反转及两模式实际Node PTY有证据。不是用户原model按键现场唯一原因的证明 |
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |

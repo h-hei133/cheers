@@ -48,19 +48,29 @@ import { prepareResearchPreview } from './research.js';
 export async function previewContext(context: ShellRuntimeContext, manager: SessionManager, gateway: CliMcpGateway,
   draft: string, attachments: PromptAttachments | undefined, agentMode: 'plan' | 'build', permissionScope: import('../../approval/permissionScope.js').PermissionScope,
   signal: AbortSignal) {
+  signal.throwIfAborted();
   const operation = configurationOperation(context);
   const { config, publication, admission } = operation;
   const expected = context.session; const cwd = context.cwd;
   const sources = capturePromptSources();
   const contributions = catalogContributions(cwd, expected.id);
-  const tokens = promptTokens(draft).filter(token => !token.literal && token.raw.startsWith('/'));
-  const commands = tokens.length ? [...createCommandRegistry(cwd, config, sources.track).values(),
+  const source = parseCommandSource(draft);
+  const sourceName = source?.name && /^[A-Za-z0-9:._?-]+$/.test(source.name) ? source.name.toLowerCase() : undefined;
+  const commandTokens = promptTokens(draft).filter(token => !token.literal && /^\/[A-Za-z0-9:._?-]+$/.test(token.raw));
+  const templateNames = new Set(commandTokens.filter(token => !token.raw.startsWith('/skill:'))
+    .map(token => token.raw.slice(1).toLowerCase()));
+  if (sourceName && !sourceName.startsWith('skill:')) templateNames.add(sourceName);
+  const needsCommands = commandTokens.some(token => token.from === 0 || !token.raw.startsWith('/skill:'))
+    || (sourceName !== undefined && !sourceName.startsWith('skill:'));
+  const commands = needsCommands ? [...createCommandRegistry(cwd, config, sources.track, {
+    templates: { names: templateNames, signal },
+  }).values(),
     ...contributions.flatMap(entry => entry.commands)] : [];
+  signal.throwIfAborted();
   const opening = /^\/([^\s/]+)(?:\s|$)/.exec(draft)?.[1];
   const first = opening ? resolveCommandInvocation(commands, opening) : undefined;
   const composed = (!first || !!first.composition) && needsComposition(draft, commands);
   const plan = compositionPlan(draft, commands);
-  const source = parseCommandSource(draft);
   const standalone = !composed && source ? resolveCommandInvocation(commands, source.name) : undefined;
   const definition = commands.find(command => command.name === standalone?.commandName);
   const pureStandalone = definition?.kind === 'prompt' && definition.enabled !== false && definition.availability !== 'hidden'

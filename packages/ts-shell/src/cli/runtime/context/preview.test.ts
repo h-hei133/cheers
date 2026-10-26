@@ -62,7 +62,8 @@ const fixture = () => {
   };
   installCommandGate(context, () => ({ permissionScope: 'ask' }));
   const gateway: CliMcpGateway = { snapshot: vi.fn(() => { throw new Error('No connection permitted'); }), refresh: vi.fn() };
-  const load = (draft = '', attachments?: Parameters<typeof previewContext>[4]) => previewContext(context, manager, gateway, draft, attachments, 'build', 'ask', new AbortController().signal);
+  const load = (draft = '', attachments?: Parameters<typeof previewContext>[4], signal = new AbortController().signal) =>
+    previewContext(context, manager, gateway, draft, attachments, 'build', 'ask', signal);
   return { cwd, context, session, layout, target, gateway, load, manager };
 };
 
@@ -277,6 +278,34 @@ it('invalidates a newly created personal template candidate without changing leg
   fs.mkdirSync(directories[0]!, { recursive: true });
   fs.writeFileSync(path.join(directories[0]!, 'new-method.md'), '---\ncomposable: true\n---\nNew method $@');
   expect(() => before.verify()).toThrow('source changed');
+});
+
+it('does not load the template graph for ordinary prose or a body path', async () => {
+  const { cwd, load } = fixture();
+  const directory = path.join(cwd, '.agents', 'prompts'); fs.mkdirSync(directory, { recursive: true });
+  const unrelated = path.join(directory, 'unrelated.md');
+  fs.writeFileSync(unrelated, 'This body must not be read by a path preview.');
+  const read = vi.spyOn(fs, 'readFileSync');
+  await load('question');
+  await load('Inspect /home');
+  expect(read.mock.calls.some(([target]) => target === unrelated)).toBe(false);
+});
+
+it('does not start template discovery for an already-cancelled preview', async () => {
+  const { cwd, load } = fixture();
+  const directory = path.join(cwd, '.agents', 'prompts'); fs.mkdirSync(directory, { recursive: true });
+  const file = path.join(directory, 'ordinary.md'); fs.writeFileSync(file, 'Ordinary body.');
+  const read = vi.spyOn(fs, 'readFileSync');
+  const controller = new AbortController(); controller.abort();
+  await expect(load('/ordinary', undefined, controller.signal)).rejects.toThrow();
+  expect(read.mock.calls.some(([target]) => target === file)).toBe(false);
+});
+
+it('bounds template discovery before reading an oversized candidate', async () => {
+  const { cwd, load } = fixture();
+  const directory = path.join(cwd, '.agents', 'prompts'); fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(path.join(directory, 'ordinary.md'), 'x'.repeat(512 * 1024 + 1));
+  await expect(load('/ordinary')).rejects.toThrow('byte budget');
 });
 
 it('counts non-command paths and vision fallback, but does not run functional commands', async () => {

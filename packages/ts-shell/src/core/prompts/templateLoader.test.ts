@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { TemplateLoader } from "./templateLoader.js";
 
 /**
@@ -13,6 +13,7 @@ import { TemplateLoader } from "./templateLoader.js";
 const tempDirs: string[] = [];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -104,6 +105,35 @@ describe("finding templates", () => {
     // Not an error: most projects have no templates, and failing a prompt over a
     // directory the user never created would be wrong.
     expect(new TemplateLoader(workspace()).load().size).toBe(0);
+  });
+
+  it("checks only named candidates without enumerating the template directory", () => {
+    const root = workspace();
+    write(root, "chosen", "Chosen body.");
+    write(root, "other", "Other body.");
+    const readdir = vi.spyOn(fs, "readdirSync");
+    const templates = new TemplateLoader(root, undefined, { names: new Set(["chosen"]) }).load();
+    expect(templates.get("chosen")?.content).toBe("Chosen body.");
+    expect(templates.has("other")).toBe(false);
+    expect(readdir).not.toHaveBeenCalled();
+  });
+
+  it("bounds named discovery and observes cancellation between synchronous steps", () => {
+    const root = workspace();
+    write(root, "first", "First body.");
+    write(root, "second", "Second body.");
+    expect(() => new TemplateLoader(root, undefined, { names: new Set(["first", "second"]), maxCandidates: 1 }).load())
+      .toThrow("candidate budget");
+    expect(() => new TemplateLoader(root, undefined, { names: new Set(["first"]), maxFileBytes: 1 }).load())
+      .toThrow("per-file byte budget");
+    expect(() => new TemplateLoader(root, undefined, { names: new Set(["first", "second"]), maxTotalBytes: 5 }).load())
+      .toThrow("total byte budget");
+
+    const controller = new AbortController();
+    const loader = new TemplateLoader(root, target => {
+      if (target.endsWith("first.md")) controller.abort();
+    }, { names: new Set(["first", "second"]), signal: controller.signal });
+    expect(() => loader.load()).toThrow();
   });
 
   it("lets the nearest project directory win over one further up", () => {

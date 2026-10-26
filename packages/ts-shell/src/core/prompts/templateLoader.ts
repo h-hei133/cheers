@@ -34,6 +34,28 @@ export interface LoadedTemplates {
   readonly diagnostics: readonly TemplateDiagnostic[];
 }
 
+export interface TemplateLoadOptions {
+  readonly signal?: AbortSignal;
+  /** When present, only these names are checked instead of walking every root. */
+  readonly names?: ReadonlySet<string>;
+  readonly maxCandidates?: number;
+  readonly maxFileBytes?: number;
+  readonly maxTotalBytes?: number;
+}
+
+export class TemplateDiscoveryBudgetError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TemplateDiscoveryBudgetError';
+  }
+}
+
+const NAMED_DISCOVERY_LIMITS = {
+  maxCandidates: 512,
+  maxFileBytes: 512 * 1024,
+  maxTotalBytes: 8 * 1024 * 1024,
+} as const;
+
 /** Read `key: value` pairs from a frontmatter block, if there is one. */
 function frontmatterFields(block: string): Map<string, string> {
   const fields = new Map<string, string>();
@@ -50,7 +72,8 @@ export class TemplateLoader {
   private readonly userRoots: ReadonlySet<string>;
   private readonly roots: readonly string[];
 
-  constructor(workspaceRoot: string = process.cwd(), private readonly onSource?: (target: string, content?: Buffer) => void) {
+  constructor(workspaceRoot: string = process.cwd(), private readonly onSource?: (target: string, content?: Buffer) => void,
+    private readonly options: TemplateLoadOptions = {}) {
     // User templates first, then project ones, so a later root overrides an earlier
     // one — the same precedence the skill loader applies and for the same reason.
     //
@@ -77,13 +100,21 @@ export class TemplateLoader {
   }
 
   loadDetailed(): LoadedTemplates {
+    this.checkCancelled();
     if (this.profile) assertProfileIdentity(this.profile);
     const templates = new Map<string, PromptTemplate>();
     const diagnostics: TemplateDiagnostic[] = [];
 
+    if (this.options.names) {
+      this.loadNamed(templates, diagnostics);
+      return { templates, diagnostics };
+    }
+
     for (const root of this.roots) {
+      this.checkCancelled();
       if (this.userRoots.has(root)) assertProfileStorage(root, this.profile);
       for (const file of this.listMarkdown(root)) {
+        this.checkCancelled();
         if (this.userRoots.has(root)) assertProfileStorage(file, this.profile);
         const name = path.basename(file, path.extname(file));
         if (!VALID_NAME.test(name)) {
@@ -98,41 +129,112 @@ export class TemplateLoader {
           continue;
         }
 
-        let bytes: Buffer;
-        this.onSource?.(file);
-        try {
-          bytes = fs.readFileSync(file);
-        } catch {
-          diagnostics.push({ name, filePath: file, message: "The file could not be read." });
-          continue;
-        }
-        this.onSource?.(file, bytes);
-        const raw = bytes.toString('utf8');
-
-        const match = FRONTMATTER.exec(raw);
-        const fields = match ? frontmatterFields(match[1]!) : new Map<string, string>();
-        const content = (match ? raw.slice(match[0].length) : raw).trim();
-        if (!content) {
-          diagnostics.push({ name, filePath: file, message: "The template is empty." });
-          continue;
-        }
-
-        const argumentHint = fields.get("argument-hint");
-        templates.set(name, {
-          name,
-          description: fields.get("description") ?? "",
-          ...(fields.get('composable') === 'true' ? { composable: true } : {}),
-          ...(argumentHint ? { argumentHint } : {}),
-          content,
-          filePath: file,
-        });
+        const loaded = this.readTemplate(file, name, diagnostics);
+        if (loaded.template) templates.set(name, loaded.template);
       }
     }
 
     return { templates, diagnostics };
   }
 
+  private loadNamed(templates: Map<string, PromptTemplate>, diagnostics: TemplateDiagnostic[]): void {
+    const names = [...(this.options.names ?? [])]
+      .map(name => name.toLowerCase())
+      .filter(name => VALID_NAME.test(name))
+      .sort();
+    if (!names.length) return;
+
+    const limits = {
+      maxCandidates: this.options.maxCandidates ?? NAMED_DISCOVERY_LIMITS.maxCandidates,
+      maxFileBytes: this.options.maxFileBytes ?? NAMED_DISCOVERY_LIMITS.maxFileBytes,
+      maxTotalBytes: this.options.maxTotalBytes ?? NAMED_DISCOVERY_LIMITS.maxTotalBytes,
+    };
+    let candidates = 0;
+    let totalBytes = 0;
+
+    for (const root of this.roots) {
+      this.checkCancelled();
+      if (this.userRoots.has(root)) assertProfileStorage(root, this.profile);
+      this.onSource?.(root);
+      for (const name of names) {
+        this.checkCancelled();
+        if (++candidates > limits.maxCandidates) {
+          throw new TemplateDiscoveryBudgetError('Template discovery exceeded its candidate budget.');
+        }
+        const file = path.join(root, `${name}.md`);
+        this.onSource?.(file);
+        this.checkCancelled();
+        let entry: fs.Stats;
+        try {
+          entry = fs.lstatSync(file);
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code;
+          if (code === 'ENOENT' || code === 'ENOTDIR') continue;
+          throw error;
+        }
+        if (!entry.isFile()) continue;
+        if (entry.size > limits.maxFileBytes) {
+          throw new TemplateDiscoveryBudgetError('Template discovery exceeded its per-file byte budget.');
+        }
+        if (this.userRoots.has(root)) assertProfileStorage(file, this.profile);
+        const loaded = this.readTemplate(file, name, diagnostics, limits.maxFileBytes);
+        totalBytes += loaded.bytes;
+        if (totalBytes > limits.maxTotalBytes) {
+          throw new TemplateDiscoveryBudgetError('Template discovery exceeded its total byte budget.');
+        }
+        if (loaded.template) templates.set(name, loaded.template);
+      }
+    }
+  }
+
+  private readTemplate(file: string, name: string, diagnostics: TemplateDiagnostic[],
+    maxFileBytes?: number): { readonly template?: PromptTemplate; readonly bytes: number } {
+    this.checkCancelled();
+    this.onSource?.(file);
+    this.checkCancelled();
+    let bytes: Buffer;
+    try {
+      bytes = fs.readFileSync(file);
+    } catch {
+      diagnostics.push({ name, filePath: file, message: "The file could not be read." });
+      return { bytes: 0 };
+    }
+    this.checkCancelled();
+    this.onSource?.(file, bytes);
+    if (maxFileBytes !== undefined && bytes.length > maxFileBytes) {
+      throw new TemplateDiscoveryBudgetError('Template discovery exceeded its per-file byte budget.');
+    }
+    const raw = bytes.toString('utf8');
+
+    const match = FRONTMATTER.exec(raw);
+    const fields = match ? frontmatterFields(match[1]!) : new Map<string, string>();
+    const content = (match ? raw.slice(match[0].length) : raw).trim();
+    if (!content) {
+      diagnostics.push({ name, filePath: file, message: "The template is empty." });
+      return { bytes: bytes.length };
+    }
+
+    const argumentHint = fields.get("argument-hint");
+    return {
+      bytes: bytes.length,
+      template: {
+        name,
+        description: fields.get("description") ?? "",
+        ...(fields.get('composable') === 'true' ? { composable: true } : {}),
+        ...(argumentHint ? { argumentHint } : {}),
+        content,
+        filePath: file,
+      },
+    };
+  }
+
+  private checkCancelled(): void {
+    // Discovery is synchronous; cancellation is observed between bounded I/O steps.
+    this.options.signal?.throwIfAborted();
+  }
+
   private listMarkdown(root: string): readonly string[] {
+    this.checkCancelled();
     this.onSource?.(root);
     let entries: fs.Dirent[];
     try {
@@ -143,6 +245,7 @@ export class TemplateLoader {
       // directory the user never created.
       return [];
     }
+    this.checkCancelled();
     this.onSource?.(root);
     return entries
       .filter((entry) => entry.isFile() && /\.md$/i.test(entry.name))

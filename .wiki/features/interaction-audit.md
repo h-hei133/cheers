@@ -650,3 +650,9 @@ settings根目录现补Memory / Review与Shell / Diagnostics两个只读入口�
 ### 文末当前问题判断（第五十批）
 
 review被确认不是纯modifier：它读取真实Git snapshot并生成一份只读review prompt。现`/review`及audit/check别名声明为单一driver，正文组合时消费共享问题、brainstorm指令和全部skill，再由原Git workbench生成一次prompt；第二个driver在派发前拒绝，独立首位命令不变。真实Git fixture验证untracked证据、skill/modifier/prose进入同一review，review runtime/composition/prose三文件54项通过；移除driver声明后5项有效失败并恢复。见[第五十批](phase-20-addition.md#第五十批review作为单一git-review-driver)。未运行真实provider、全仓、exe或桌面PTY；ADD-12局部边界增强，整体及真实环境验收继续active。
+
+### 文末当前问题判断（第五十一批）
+
+ADD-08确认正文`/home`仍会让preview构造完整command registry，从而枚举模板目录并读取无关模板；普通无slash草稿不加载模板这一点不能掩盖该成本缺口。现preview从源token及兼容`/ ordinary`命令源派生候选名，[命令registry](../../packages/ts-shell/src/core/commands/registry.ts)只按候选名调用原模板loader；精确探测不枚举无关文件，跟踪候选根目录revision，并限制512候选、单文件512 KiB、总读取8 MiB。`AbortSignal`在同步步骤之间检查，不声称`readFileSync`内部可中断。
+
+`templateLoader`12项、`preview`30项及其相关组合/路由/补全/keymap共207项通过，另source capture/sources 12项通过。把preview恢复为完整registry后超限模板测试失败，移除同步取消检查后候选取消测试失败，均恢复源码并重验。见[第五十一批](phase-20-addition.md#第五十一批模板候选发现成本与取消边界)。同名路径与可组合模板的提交歧义仍保留，原生tokenizer、真实差额、其他driver完整preview和完整动态来源总成本仍未验收；ADD整体及真实环境证据继续active。

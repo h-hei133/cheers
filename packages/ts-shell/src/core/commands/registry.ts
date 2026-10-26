@@ -147,11 +147,17 @@ import {
 } from "./shellActionRuntime.js";
 import type { CommandContext, CommandDefinition } from "./types.js";
 import { templateCommands } from '../prompts/commands.js';
+import type { TemplateLoadOptions } from '../prompts/templateLoader.js';
+
+export interface CommandRegistryOptions {
+  readonly templates?: TemplateLoadOptions;
+}
 
 export function createCommandRegistry(
   cwd: string = process.cwd(),
   runtimeConfig: RuntimeConfig = getRuntimeConfig(cwd),
   onSource?: (target: string, content?: Buffer) => void,
+  options: CommandRegistryOptions = {},
 ): ReadonlyMap<string, CommandDefinition> {
   const commands: CommandDefinition[] = [
     ...sessionCommandDefinitions(),
@@ -1039,7 +1045,7 @@ export function createCommandRegistry(
   ];
 
   const reserved = new Set(commands.flatMap(command => [command.name, ...(command.aliases ?? []), ...(command.invocations?.map(invocation => invocation.name) ?? [])]));
-  return new Map([...commands, ...templateCommands(cwd, onSource).filter(template => !reserved.has(template.name))].map((command) => [command.name, command]));
+  return new Map([...commands, ...templateCommands(cwd, onSource, options.templates).filter(template => !reserved.has(template.name))].map((command) => [command.name, command]));
 }
 
 export function listVisibleCommands(

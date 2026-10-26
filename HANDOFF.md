@@ -411,3 +411,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A review command in composed prose loses the user's question or skill instructions, or runs beside another workflow that also claims the task.
 - **Root Cause**: The command reads repository state and creates the final model prompt, so treating it as a pure text modifier bypasses evidence collection or permits two owners.
 - **Rule**: Declare state-reading prompt builders as one driver that consumes the shared prose, modifiers and skills into its native prompt. Keep its standalone route unchanged, share aliases, and reject a second driver before either handler runs.
+
+### Named Template Discovery Must Preserve Directory Freshness
+- **Symptom**: A preview of a body path reads every template body, or a newly added higher-priority template does not invalidate the old estimate.
+- **Root Cause**: A full registry walk reads unrelated templates, while an exact-name probe that does not track the containing directory can miss later template discovery or collisions. An `AbortSignal` checked only by an async wrapper cannot interrupt synchronous directory/file work.
+- **Rule**: Derive exact template candidates from source tokens, probe only those names without enumerating unrelated entries, and track each candidate root revision. Bound candidate count and raw bytes, and check cancellation between synchronous steps; do not claim an in-flight synchronous read was interrupted.
