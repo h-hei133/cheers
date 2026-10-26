@@ -463,7 +463,10 @@ it('exposes applicable settings categories and sections and marks stored values'
   const host = { openSettings: () => openSettings(context, vi.fn()) };
   const all = settingsPicker(host);
   const allItems = await all.load();
-  expect(all.chips?.items.map(item => item.id)).toEqual(['all', 'Appearance', 'Model', 'Interaction', 'Context', 'Files', 'Tools', 'Tasks', 'Providers']);
+  expect(all.chips?.items.map(item => item.id)).toEqual([
+    'all', 'Appearance', 'Model', 'Interaction', 'Context', 'Memory',
+    'Files', 'Shell', 'Tools', 'Tasks', 'Providers',
+  ]);
   expect(all.chips?.active).toBe('all');
   expect(allItems.find(item => item.id === 'offline')?.label.startsWith('● ')).toBe(true);
   const session = all.chips!.select('Interaction')!;
