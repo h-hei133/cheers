@@ -391,3 +391,18 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 用户明确要求继续保留：未配置具体模型可选、两个面板向oh-my-pi整体看齐、已提交正文顶格且编辑箭头恢复、源首位完整slash、正文路径suggestion/连续Tab、同提交所有明确skill生效，以及deep-research等有限方法命令与多skill组合，正文功能命令不执行。[完整要求](phase-20-addition.md#16-最新问题总和与必须完成的体验)及ADD任务状态独立于原Phase20的38 complete / 9 partial。
 
 第二十二/二十三CI延迟实查已success，各绑定原SHA，仅读状态、未读全日志/Watch工件；第二十四CI实查仍运行。本批严格docs/diff通过，118既有advisory保留，addition120/audit99本地链接存在；提交推送和CI结果以phase20-addition-navigation的delivery.json另行登记，搜索/返回局部绿色不代表全部补充任务完成。
+
+### 文末当前结论（第二十六批）
+
+本批确认设置Model分类缺少模型/角色和当前thinking的真实入口，补Model / Session→原model/thinking owner→取消/保存/过期拒绝→settings原scope/具体入口，结果包括角色保存与已保存但应用未确认。未配置具体模型的详情、key/account取消和Default嵌套浏览均保留父链；不是通过新增配置字段模拟session状态。六文件104项、四有效反转/逐字节恢复、静态门/构建/正式judge proven三satisfied通过，详见[第二十六批](phase-20-addition.md#15-实施与验证证据)。
+
+| 分类 | 当前结论 |
+|---|---|
+| 确实存在且有局部修补 | 原未配置model不能聚焦、resume渐进自动焦点停旧会话、去黄条后的留白与箭头缺失、首帧/初始估算缺口、正文路径/多skill/有限slash组合，以及面板搜索/返回和设置缺少会话模型入口。保留历史与当前修补区别，不能称全现场已解决 |
+| 确实仍需完善 | settings/model完整分类→导航→搜索→详情→编辑配置→取消确认→重开读回；全部字段/来源/scope/桌面/真实认证矩阵。动态source新鲜度和总I/O、原生tokenizer、研究完整preview、冷/热Node/exe和实际上下文差额 |
+| 不成立的解释 | model完全无上下键监听、resume时间排序反了、settings完全无分类、稀疏配置等于功能未实现、npm start每次编译或用户入口用错、实测4.9k就是本地字符公式、工具数相近必然同token成本。源码不支持这些解释；监听存在不否认用户无可见交互 |
+| 未确认 | 原现场唯一按键根因、同模型/协议/规则/schema下真实1.7k/4.9k、生产冷热启动收益、真实OAuth/API-key接受、历史cache writer退出1及活跃build lock来源。保留unknown，不能归为不存在 |
+
+用户要求继续完整保留：未配置具体model可选、两个面板向oh-my-pi整体看齐、正文顶格与编辑箭头、首位完整slash/正文实际路径suggestion与Tab、多skill同次生效及deep-research有限方法组合。第二十四CI状态success，第二十五CI仍运行，Watch仅状态success；本批交付以对应delivery工件绑定，不从历史CI推定。原Phase20 38 complete / 9 partial与ADD独立。
+
+最终regular/fullscreen实际Node隔离PTY通过上述Model / Session链路：未配置详情/key取消、advisor保存后结果回settings、thinking取消/low保存；全局配置原字节不变、默认shared/角色other/effort low读回、零message/provider，两进程SIGTERM143已settle。严格docs/diff通过，118既有advisory保留。本批仍只是局部路径验收。

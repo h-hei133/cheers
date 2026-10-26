@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Parent Returns Must Survive Nested Model Reconstruction
+- **Symptom**: A settings child returns to the shell after nested model details, Default browsing, or credential cancellation; a saved role notice disappears on the next Escape.
+- **Root Cause**: A back callback patched onto one picker instance is lost when nested owners rebuild the catalogue; session controls are also easy to mistake for file-scoped settings.
+- **Rule**: Pass parent returns through the original picker owner and all recursive reconstruction paths, retaining outcome notices. Delegate session choices and runtime refresh to existing owners, identify their scope separately from settings files, and test registry-to-overlay cancel/save/expired paths with the actual configuration publication.
+
 ### Search Projection Must Preserve Navigation And Explicit Return Ownership
 - **Symptom**: Clearing a search loses category/section focus, Esc closes the catalogue, or returning from model inspection shows only the narrow sidebar despite retaining the model ID.
 - **Root Cause**: Search overwrites the navigation domain; a new host filter clears projection state while a shared navigation object still carries the old search mode. Reapplying explicit return focus on every load also steals later manual sidebar navigation.

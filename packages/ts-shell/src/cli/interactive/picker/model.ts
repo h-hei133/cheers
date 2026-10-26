@@ -36,7 +36,7 @@ interface RoleSelection {
 
 /** Every actionable row retains its exact target and the inputs used to display it. */
 export function modelPicker(context: CommandContext, focus?: string, navigation = new CatalogNavigation(), assigning?: RoleSelection,
-  notice?: string, signIn?: ModelSignIn): Picker {
+  notice?: string, signIn?: ModelSignIn, parent?: (notice?: string) => Picker): Picker {
   const details = new Map<string, readonly string[]>();
   const actions = new Map<string, () => Promise<string>>();
   const inspections = new Map<string, () => Picker>();
@@ -48,7 +48,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
     form: "panel",
     empty: "No providers in the catalogue.",
     navigation, fullScreen: true,
-    ...(assigning ? { back: assigning.back } : {}),
+    ...(assigning ? { back: assigning.back } : parent ? { back: () => parent(notice) } : {}),
     onOpen() { returnFocus = focus; },
     get initialSelection() { return activeFocus; },
     ...(notice ? { status: () => notice } : {}),
@@ -130,10 +130,10 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
                 const refreshed = assigning ? { ...assigning, assign: prepareModelRole(fresh, assigning.role).assign,
                   back: (note?: string) => assigning.back(note, fresh) } : undefined;
                 return modelPicker(fresh, connectionId ? rowId(connectionId, provider.id, model.id) : id, navigation, refreshed,
-                  result ? modelSignInStatus(result) : undefined, signIn);
+                  result ? modelSignInStatus(result) : undefined, signIn, parent);
               };
               inspections.set(id, () => modelDetailsPicker(model.id, details.get(id) ?? [],
-                () => modelPicker(context, id, navigation, assigning, undefined, signIn), draft,
+                () => modelPicker(context, id, navigation, assigning, undefined, signIn, parent), draft,
                 account ? () => modelSignInPicker(context, provider.runtime, signIn, back) : undefined,
                 draft && signIn ? () => modelKeyPicker(context, provider.runtime,
                   { model: model.id, label: connection?.label ?? provider.id, baseUrl: safeEndpoint }, signIn, back) : undefined));
@@ -176,7 +176,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
           ...(active.blocked ? [`Request blocker: ${active.blocked}`] : []),
           'Remote availability: unverified']);
         inspections.set(id, () => modelDetailsPicker(currentModel, details.get(id) ?? [],
-          () => modelPicker(context, id, navigation, assigning, undefined, signIn), undefined, undefined, undefined,
+          () => modelPicker(context, id, navigation, assigning, undefined, signIn, parent), undefined, undefined, undefined,
           recovery ? () => {
             const refusal = choice?.admission() ?? context.admission?.();
             return refusal ? { note: refusal } : { next: recovery() };
@@ -197,11 +197,11 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               ...(role !== 'default' && target ? [`Reasoning effort: ${target.thinkingEffort ?? 'provider decides'}`] : []),
               'Role assignments and presets share the existing session model owner.']);
             if (role === 'default') {
-              inspections.set(id, () => Object.assign(modelPicker(context, undefined, new CatalogNavigation(), undefined, undefined, signIn),
-                { back: () => modelPicker(context, id, navigation, undefined, undefined, signIn) }));
+              inspections.set(id, () => modelPicker(context, undefined, new CatalogNavigation(), undefined, undefined, signIn,
+                note => modelPicker(context, id, navigation, undefined, note, signIn, parent)));
             } else {
               inspections.set(id, () => {
-                const back = (note?: string, fresh = context) => modelPicker(fresh, id, navigation, undefined, note, signIn);
+                const back = (note?: string, fresh = context) => modelPicker(fresh, id, navigation, undefined, note, signIn, parent);
                 return modelRoleEditor(context, role,
                   (assign, thinkingEffort) => modelPicker(context, undefined, new CatalogNavigation(), { role, assign, back, thinkingEffort }, undefined, signIn), back);
               });
@@ -264,7 +264,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         return { note: result.output, ...(result.saved ? { next: assigning.back(result.output) } : {}) };
       }
       const action = actions.get(ids[0]);
-      return { note: action ? await action() : 'Model selection unavailable. Reopen the picker in an active session.' };
+      const note = action ? await action() : 'Model selection unavailable. Reopen the picker in an active session.';
+      return { note, ...(parent ? { next: parent(note) } : {}) };
     },
   };
   return picker;

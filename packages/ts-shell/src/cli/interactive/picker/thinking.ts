@@ -22,11 +22,12 @@ const LEVELS = ['auto', 'low', 'medium', 'high'] as const;
  * supported. Selecting a level goes through the ordinary `/thinking` command,
  * so the same session/connection precedence applies.
  */
-export function thinkingPicker(context: CommandContext): Picker {
+export function thinkingPicker(context: CommandContext, back?: (notice?: string) => Picker): Picker {
   let choice: ReturnType<typeof captureModelChoice> | undefined;
   return {
     title: 'Thinking effort',
     form: 'panel',
+    ...(back ? { back, footer: 'Enter saves for the current session · Esc returns to settings' } : {}),
     empty: 'No effort levels are available for the selected model.',
     async load(): Promise<readonly Option[]> {
       try { choice = captureModelChoice(context); } catch { choice = undefined; }
@@ -54,9 +55,9 @@ export function thinkingPicker(context: CommandContext): Picker {
       const level = ids[0];
       if (!level || !(LEVELS as readonly string[]).includes(level)) return undefined;
       const expired = choice?.admission();
-      if (expired) return { note: expired };
+      if (expired) return { note: expired, ...(back ? { next: back(expired) } : {}) };
       const result = await runThinkingCommand([level === 'auto' ? 'off' : level], { ...context, ...(choice ? { admission: choice.admission } : {}) });
-      return result.kind === 'local' ? { note: result.output } : undefined;
+      return result.kind === 'local' ? { note: result.output, ...(back ? { next: back(result.output) } : {}) } : undefined;
     },
   };
 }

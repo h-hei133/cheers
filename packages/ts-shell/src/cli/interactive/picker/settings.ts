@@ -13,6 +13,8 @@ import { settingSources } from './settings/source.js';
 
 export interface SettingsHost extends PreferenceHost {
   openSettings(scope?: SettingsScope): SettingsDraft;
+  modelSettings?(back: (notice?: string) => Picker): Picker;
+  thinkingSettings?(back: (notice?: string) => Picker): Picker;
 }
 interface StagedValue { readonly value: unknown }
 
@@ -200,8 +202,7 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
       draft = host.openSettings(scope);
       groups.clear();
       const positions = new Map<string, NavigationGroup>();
-      const rows = [...draft.definitions].sort((a, b) => GROUP_ORDER.indexOf(a.group as typeof GROUP_ORDER[number]) - GROUP_ORDER.indexOf(b.group as typeof GROUP_ORDER[number])
-        || a.section.localeCompare(b.section)).map(setting => {
+      const rows: Option[] = draft.definitions.map(setting => {
         groups.set(setting.key, setting.group);
         positions.set(setting.key, { category: setting.group, section: `${setting.group} / ${setting.section}` });
         const value = draft!.values[setting.key]!;
@@ -209,10 +210,20 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
           searchText: `${setting.group} ${setting.section} ${setting.key} ${setting.description}`,
           note: compact(value.effective) };
       });
+      for (const [id, label, available] of [['settings:model', 'Models and roles', host.modelSettings],
+        ['settings:thinking', 'Thinking effort', host.thinkingSettings]] as const) {
+        if (!available) continue;
+        groups.set(id, 'Model'); positions.set(id, { category: 'Model', section: 'Model / Session' });
+        rows.push({ id, label, note: 'current session', searchText: `Model Session ${id === 'settings:model' ? 'provider connection model roles /model' : 'reasoning thinking /thinking'}` });
+      }
+      rows.sort((a, b) => GROUP_ORDER.indexOf(groups.get(a.id) as typeof GROUP_ORDER[number]) - GROUP_ORDER.indexOf(groups.get(b.id) as typeof GROUP_ORDER[number])
+        || (positions.get(a.id)?.section ?? '').localeCompare(positions.get(b.id)?.section ?? ''));
       navigation.set(rows, positions, [{ id: 'all', label: 'All' }, ...SETTINGS_GROUPS.map(id => ({ id, label: id }))]);
       return rows;
     },
     detail: id => {
+      if (id === 'settings:model') return ['Browse models, configure connections and assign model roles.', 'Model and role choices apply to the current session and are saved for resume.', 'Connection configuration uses its own save scope; the settings file scope does not change it.'];
+      if (id === 'settings:thinking') return ['Choose reasoning effort for the current request model.', 'Changes apply to the current session and are saved for resume.', 'Supported levels follow the exact model and connection.'];
       const setting = draft?.definitions.find(item => item.key === id);
       if (!setting || !draft) return [];
       const value = draft.values[setting.key];
@@ -223,6 +234,9 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
     },
     async apply(ids): Promise<PickerOutcome | undefined> {
       if (!draft || ids.length !== 1) return undefined;
+      const back = (note?: string) => settingsPicker(host, scope, 'Model', ids[0], note);
+      if (ids[0] === 'settings:model' && host.modelSettings) return { next: host.modelSettings(back) };
+      if (ids[0] === 'settings:thinking' && host.thinkingSettings) return { next: host.thinkingSettings(back) };
       const setting = draft.definitions.find(item => item.key === ids[0]);
       return setting ? { next: settingDetail(host, draft, setting) } : undefined;
     },
@@ -231,7 +245,7 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
 
 function searchSettings(query: string, options: readonly Option[], groups: ReadonlyMap<string, string>): readonly Option[] {
   const ranked = options.map((option, order) => ({ option, order, group: groups.get(option.id) ?? '',
-    rank: Math.max(matchRank(query, option.id), matchRank(query, option.label, `${option.detail ?? ''} ${option.note ?? ''}`)),
+    rank: Math.max(matchRank(query, option.id), matchRank(query, option.label, `${option.detail ?? ''} ${option.note ?? ''} ${option.searchText ?? ''}`)),
   })).filter(entry => entry.rank > 0);
   const best = new Map<string, number>();
   for (const entry of ranked) best.set(entry.group, Math.max(best.get(entry.group) ?? 0, entry.rank));

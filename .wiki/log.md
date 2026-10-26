@@ -9240,3 +9240,11 @@ ADD-08更正附件原已严格UTF-8 digest核验，真实缺口是preview同步v
 ADD-02/03确认并修补搜索清空丢categories/sections与section身份、Esc直接关闭、model侧栏搜索详情返回藏住原模型行。复用CatalogNavigation单次搜索snapshot，settings Esc落所选结果、model先清搜索；model精确返回只在本次open/load定位内容，publication不抢侧栏。明确parent/子编辑器取消优先、未配置model可聚焦与显式启用分开。
 
 九文件196pass、三个有效反转/逐字节恢复、四静态门/TS构建b62347ac8454/正式judge proven三satisfied通过。regular/fullscreen隔离Node入口PTY均通过搜索Esc/section恢复与未配置model导航/精确详情返回，配置及modelSelection不写、零message、进程已退出；探针stored标记/regular画面/内置provider次序错误分类并保留失败日志。第二十二/二十三CI状态success，仅读状态；第二十四仍运行，各绑定原SHA。归档phase20-addition-navigation，Git与文档检查另绑定；完整面板/桌面/真实认证及其余ADD继续待验，原Phase38/9与ADD独立/整体active，详见addition15第二十五批及16文末总和。
+
+## [2026-10-26] feat | 设置中的会话模型入口与连续返回
+
+ADD-03设置Model / Session增加Models and roles、Thinking effort，委托原model/effort owner；标明session范围，连接配置沿自己的scope，user/project文件保存不混用。model原生parent贯穿未配置详情/credential取消/Default嵌套/role返回，thinking保存与expired拒绝返回精确设置入口，role结果保留，application unknown不显示已切换。
+
+六文件104pass、四有效反转/字节恢复、四静态门/TS构建9e94acab7489/正式judge proven三satisfied通过。新14项通过实际registry、OverlayHost和运行时configuration，初轮错误夹具已分类，失败日志保留。第二十四CI状态success，第二十五自身CI仍运行/Watch仅状态success；最终PTY、docs与Git另绑定。证据归phase20-addition-session-settings，完整面板/desktop/认证/性能计量继续待证；原Phase38/9与ADD独立/active。
+
+最终build普通/全屏Node小PTY均通过会话模型/未配置详情-key取消/role结果/effort保存原入口，config不变/零message-provider，退出143均settle；strict docs/diff通过，118既有advisory保留。Git另绑定。

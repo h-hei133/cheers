@@ -101,7 +101,7 @@ ADD-03将现[七组加All](../../packages/ts-shell/src/cli/interactive/picker/se
 | 目标分类 | 本项目应归入的真实能力 |
 |---|---|
 | Appearance | theme、输入形态、状态项、diagram与已有显示设置 |
-| Model | 模型相关采样、输出、reasoning及已有角色/预设入口 |
+| Model | 模型相关采样、输出、reasoning及已有角色/预设入口；Model / Session提供Models and roles、Thinking effort，委托原会话owner，明确区别user/project文件scope |
 | Interaction | 输入/Vim、审批与已有交互选项；路径/skill补全策略仅在真实实现后纳入 |
 | Context | contextWindow/reserve、指令预算、压缩与上下文显示 |
 | Memory | 已有记忆设置与只读状态；操作委托原memory owner |
@@ -109,6 +109,8 @@ ADD-03将现[七组加All](../../packages/ts-shell/src/cli/interactive/picker/se
 | Tools | allowed/disabled tools、动态发现、MCP/extension相关配置入口 |
 | Tasks | 现有任务/后台/协作设置及命令组合策略 |
 | Providers | 网络重试/超时及精确连接入口；凭据继续由connect owner管理 |
+
+Model / Session必须可从类别浏览及全局搜索找到；model/roles和当前模型thinking沿原面板与运行时能力进入，不能新造全局或project字段承接会话状态。返回须覆盖取消、未配置具体模型详情、API-key编辑取消、适用account确认取消、Default二次浏览、自动角色赋值、模型/effort保存与过期拒绝。保留原scope和具体入口焦点，重开读回实际接受状态；返回结果包括“已保存但应用未确认”，不可变成已切换。连接配置继续使用连接owner自己的scope，不能因从project settings进入而隐式改其保存目标。
 
 分类中有section标题，用户可在section和设置行之间切焦点；左右切主分类，Tab跳section/设置，Enter打开编辑器，Esc返回。搜索跨分类，并能从结果回到所属section。列表展示人能读懂的名称与值，技术字段路径、Effective/Stored/来源/应用时点集中在详情；必要的scope与Pending保留，MUI要求不因“对齐”而增添多余第二标签。
 
@@ -843,6 +845,26 @@ ADD-02/03核查[导航owner](../../packages/ts-shell/src/cli/interactive/picker/
 
 严格docs/diff实际通过，118既有docs-source advisory保留；addition120/audit99本地链接目标存在。最终build上的regular/fullscreen PTY已再次通过，检查进程均已settle。提交/推送SHA、远端读回及本批CI状态以该工件目录的delivery.json另行记录，不从本地绿色推定CI结果。
 
+### 第二十六批：设置模型入口、会话范围与子面板返回
+
+接续第二十五批`ba9171ea2a8e8b0b00f789cbbabf7cd9aa6fe7ab`。延迟实查第二十四CI `40245017599`已completed/success；第二十五CI `40246308906`仍in_progress，Watch `40246308965`状态success但未读工件。仅读状态，各绑定原SHA，不赋予本批CI成功。
+
+ADD-03确认设置Model分类只有采样/输出/限制字段，缺少既有模型/角色浏览与当前模型thinking入口；用户需要离开settings另记slash。现在[设置面板](../../packages/ts-shell/src/cli/interactive/picker/settings.ts)在Model / Session加入Models and roles、Thinking effort，标明current session，从分类与搜索均可进入；reasoning等搜索词沿原searchText排序。由[registry](../../packages/ts-shell/src/cli/interactive/picker/registry.ts)委托原model/thinking面板，不增配置字段或第二存储。user/project文件scope仅用于其他设置；连接配置按原连接owner范围处理。
+
+[model](../../packages/ts-shell/src/cli/interactive/picker/model.ts)原生parent贯穿未配置详情、credential返回、当前模型诊断、Default嵌套浏览及自动role返回；替代Default仅事后覆盖back的包装。模型保存返回settings精确入口，角色保存先回role/model再Esc回settings，结果提示保留。[thinking](../../packages/ts-shell/src/cli/interactive/picker/thinking.ts)选择和过期拒绝均带真实结果回settings。取消优先沿明确parent处理；未配置具体模型仍可聚焦/详情/配置，浏览不等于激活；持久成功但runtime application未确认保留原notice。
+
+只读参考A `packages/tui/src/overlays/settings-selector.ts`550–578将session thinking及runtime levels与文件Settings分开，1545–1559动态取实际支持effort并加auto，回调交原owner。采用会话owner委托与真实能力来源；本项目保留原model capability/会话事务/文件scope/暂存保存语义，不复制参考字段或扩展一个重复store。Default父链和会话刷新由可反转的真实owner测试约束。
+
+最终六文件104项串行通过：新[settings/session](../../packages/ts-shell/src/cli/interactive/picker/settings/session.test.ts)14，settings20、thinking3、model43、model auth16、key8。实际registry→OverlayHost搜索/Enter/Esc覆盖user/project→原入口、未配置详情/key/account取消、Default取消及保存、advisor赋值、原模型/effortowner保存并刷新真实configuration publication、重开effort读回、过期选择不覆写，以及已持久但application未确认不显示Model switched。初轮失败是夹具调用不存在的manager.load；随后错用虚构runtimeConfig.modelSelection、把不支持account的provider当夹具、从settings root直接切scope及用status读footer，均已分类修正，保留日志。四有效反转删thinking父链/model保存回返/expired返回/role结果传递，各AssertionError/exit1，源码逐字节恢复。
+
+最终四静态门、TS构建、当前validator新目录解包正式judge实际exit0/proven，三项satisfied；build`9e94acab74897515b4ae8921978021acb49e47a287fccf6ad0a2eef41bbee11e`，inputs`72168e01043b3c68fa697a3534c7a5fe68a0fff28220bc5eaf1695862fcae73a`，artifact`abc0fef610ef0f184b2335d4cb8297ec8b18c1f0b5e3f92aacdec02e38e679e2`。validator SHA-256`6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`。证据归`.omx/artifacts/phase20-addition-session-settings/`；最终PTY、文档与Git交付单独登记。
+
+实际Node入口regular/fullscreen小型隔离PTY在最终build均通过：settings搜索→model未配置missing详情→API-key编辑取消→精确模型→settings；advisor选择other→model角色→settings结果保留；thinking取消/重新打开→low保存→原settings入口。默认shared保留、advisor other与effort low持久读回，全局config原字节相同，零message/provider派发，两进程SIGTERM143均settle。首次regular探针只读借用全屏而忽略普通详情raw输出误报account row超时，已纠正保留失败日志。此为隔离synthetic路径，不证明真实认证或全部桌面验收。
+
+严格docs/diff通过，118既有docs-source advisory保留；addition125/audit100本地链接存在。提交推送/远端读回及CI另登记delivery.json，不从本地绿色推定CI。
+
+本批局部闭合Model / Session发现与返回，整体settings/model全字段/来源/scope/编辑器/桌面/真实认证矩阵仍待验；冷/热Node/exe、原生tokenizer、完整研究preview、动态source/I/O、实际1.7k/4.9k及cache/build原因继续待证。原Phase20保持38 complete / 9 partial，ADD独立，整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -856,7 +878,7 @@ ADD-02/03核查[导航owner](../../packages/ts-shell/src/cli/interactive/picker/
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚 | 入口先建立重runtime再进入交互，造成可见等待。已采用早期真实composer及一次lease交接；仍需同机冷/热Node/exe的首帧、接管、ready及首请求取样，加载延迟夹具不证明生产收益 |
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
-| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。本批另确认并修补搜索清空丢焦点域/section、Esc直接关闭、模型详情返回落回侧栏；九文件196项及regular/fullscreen隔离PTY通过。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
+| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。第二十五批修补搜索退出/焦点域/模型详情返回；第二十六批再补Model / Session两个真实owner入口及取消/保存/角色返回，六文件104项通过。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
 
 ### 16.2 不成立的判断与仍未确认的原因
