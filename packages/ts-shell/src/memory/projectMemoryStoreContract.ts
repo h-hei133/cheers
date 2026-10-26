@@ -127,14 +127,19 @@ export interface ProjectMemoryStoreHealth {
   readonly evidence: readonly string[];
 }
 
-export interface ProjectMemoryStore {
+export interface ProjectMemoryReader {
   readonly ref: ProjectMemoryStoreRef;
-  write(request: ProjectMemoryWriteRequest): Promise<ProjectMemoryWriteResult>;
   list(options?: ProjectMemoryListOptions): Promise<ProjectMemoryListResult>;
   get(id: ProjectMemoryRecordId, readOptions?: ProjectMemoryReadOptions): Promise<ProjectMemoryRecord | undefined>;
+  health(readOptions?: ProjectMemoryReadOptions): Promise<ProjectMemoryStoreHealth>;
+}
+
+export interface ProjectMemoryStore extends ProjectMemoryReader {
+  /** One preparation owns this read-only snapshot; it never replaces live reads. */
+  snapshot?(readOptions: ProjectMemoryReadOptions): Promise<ProjectMemoryReader>;
+  write(request: ProjectMemoryWriteRequest): Promise<ProjectMemoryWriteResult>;
   invalidate?(request: ProjectMemoryInvalidateRequest): Promise<ProjectMemoryInvalidateResult>;
   delete?(request: ProjectMemoryDeleteRequest): Promise<ProjectMemoryDeleteResult>;
-  health(readOptions?: ProjectMemoryReadOptions): Promise<ProjectMemoryStoreHealth>;
 }
 
 export function projectMemoryStoreRefIsWritable(

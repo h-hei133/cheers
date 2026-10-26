@@ -1,6 +1,6 @@
 import type {
   ProjectMemoryRecord,
-  ProjectMemoryStore,
+  ProjectMemoryReader,
   ProjectMemoryReadOptions,
 } from "./projectMemoryStoreContract.js";
 import type {
@@ -43,7 +43,7 @@ const DEFAULT_MAX_RESULTS = 5;
 const MAX_RESULT_LIMIT = 20;
 
 export async function retrieveProjectMemoryRecords(
-  store: ProjectMemoryStore,
+  store: ProjectMemoryReader,
   request: ProjectMemoryRetrievalRequest = {},
   readOptions?: ProjectMemoryReadOptions,
 ): Promise<ProjectMemoryRetrievalResult> {

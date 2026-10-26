@@ -4,20 +4,17 @@ import path from "node:path";
 import { writeTextFileAtomic } from "../session/store/sessionFileStore.js";
 import { withMemoryStoreLock } from "./store/transaction.js";
 import { captureMemoryOwner, assertMemoryOwner } from './store/owner.js';
+import { memoryReadSnapshot, readMemoryRecords, readMemoryHealth } from './store/read.js';
 import type {
-  ProjectMemoryListResult,
   ProjectMemoryLifecycleTombstone,
   ProjectMemoryDeleteRequest,
   ProjectMemoryDeleteResult,
   ProjectMemoryInvalidateRequest,
   ProjectMemoryInvalidateResult,
-  ProjectMemoryListOptions,
   ProjectMemoryRecord,
   ProjectMemoryRecordId,
   ProjectMemoryStore,
-  ProjectMemoryStoreHealth,
   ProjectMemoryStoreRef,
-  ProjectMemoryReadOptions,
   ProjectMemoryWriteRequest,
   ProjectMemoryWriteResult,
 } from "./projectMemoryStoreContract.js";
@@ -31,7 +28,6 @@ import {
   foldProjectMemoryEntries,
   isMemoryRecord,
   readEntriesSync,
-  readEntries,
   recordsFileFor,
 } from "./memoryPersistence.js";
 
@@ -46,17 +42,18 @@ export function createProjectMemoryLocalStore(
   const ref = captureMemoryOwner(normalizeRef(options.ref));
   return {
     ref,
+    snapshot: readOptions => memoryReadSnapshot(ref, readOptions),
     async write(request) {
       assertMemoryOwner(ref);
       return writeRecord(ref, request);
     },
     async list(listOptions) {
       assertMemoryOwner(ref);
-      const result = await readRecords(ref, listOptions); assertMemoryOwner(ref); return result;
+      const result = await readMemoryRecords(ref, listOptions); assertMemoryOwner(ref); return result;
     },
     async get(id, readOptions) {
       assertMemoryOwner(ref);
-      const result = await readRecords(ref, { includeInvalidated: true, readOptions }); assertMemoryOwner(ref);
+      const result = await readMemoryRecords(ref, { includeInvalidated: true, readOptions }); assertMemoryOwner(ref);
       return result.records.find((record) => record.id === id);
     },
     async invalidate(request) {
@@ -69,7 +66,7 @@ export function createProjectMemoryLocalStore(
     },
     async health(readOptions) {
       assertMemoryOwner(ref);
-      const result = await storeHealth(ref, readOptions); assertMemoryOwner(ref); return result;
+      const result = await readMemoryHealth(ref, readOptions); assertMemoryOwner(ref); return result;
     },
   };
 }
@@ -315,59 +312,6 @@ function deleteRecord(
       evidence: ["project-memory-local-store:delete-unavailable"],
     };
   }
-}
-
-async function readRecords(
-  ref: ProjectMemoryStoreRef,
-  options: ProjectMemoryListOptions = {},
-): Promise<ProjectMemoryListResult> {
-  const snapshot = await readEntries(ref, options.readOptions);
-  return {
-    records: foldProjectMemoryEntries(snapshot.entries, options),
-    diagnostics: snapshot.diagnostics,
-    evidence: [
-      "project-memory-local-store:list",
-      ...snapshot.diagnostics,
-      options.includeInvalidated
-        ? "project-memory-local-store:include-invalidated-explicit"
-        : "project-memory-local-store:exclude-invalidated-default",
-      "project-memory-local-store:no-retrieval-injection",
-    ],
-  };
-}
-
-async function storeHealth(ref: ProjectMemoryStoreRef, readOptions?: ProjectMemoryReadOptions): Promise<ProjectMemoryStoreHealth> {
-  if (!projectMemoryStoreRefIsWritable(ref)) {
-    return {
-      mode: ref.mode,
-      ok: ref.mode === "disabled",
-      writable: false,
-      readable: false,
-      detail: "No explicit local memory store root configured.",
-      evidence: [
-        "project-memory-local-store:disabled",
-        "project-memory-local-store:no-default-path",
-      ],
-    };
-  }
-  const recordsFile = recordsFileFor(ref);
-  const snapshot = await readEntries(ref, readOptions);
-  return {
-    mode: ref.mode,
-    ok: snapshot.readable && snapshot.diagnostics.length === 0,
-    writable: snapshot.readable && snapshot.diagnostics.length === 0,
-    readable: snapshot.readable,
-    diagnostics: snapshot.diagnostics,
-    recordCount: foldProjectMemoryEntries(snapshot.entries, { includeInvalidated: true }).length,
-    storeRoot: ref.root,
-    recordsFile,
-    detail: snapshot.diagnostics.join(" ") || "Explicit local JSONL memory store is configured.",
-    evidence: [
-      "project-memory-local-store:health",
-      ...snapshot.diagnostics,
-      "project-memory-local-store:explicit-local",
-    ],
-  };
 }
 
 function blocked(evidence: string, blocker: string): ProjectMemoryWriteResult {

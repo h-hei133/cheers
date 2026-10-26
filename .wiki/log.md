@@ -9278,3 +9278,9 @@ ADD-09/11/12确认字符串查找提前关闭代码围栏、较长合法关闭�
 ADD-08原已有记忆元数据/generation保护，确认缺raw复验及同步无界preview读。context/injection委托原future-turn owner，经memory store可选readOptions以512KiB单文件上限/signal/raw observer复用verified-handle snapshot、同decoder/fold，runtime异步复验不消费pending；同ID session换对象拒绝，profile前后检查。未pending零body，普通命令/提交原读取保留。
 
 六文件73pass、三有效反转/字节恢复、四静态门/build3815cb6d31fd/新解包正式judge proven三satisfied通过；两模式实际Node小PTY记忆修改/超限撤旧、恢复数字、view仍pending，preview transcript/config/memory不写、零provider，退出143均settle。初轮fixture无evidence被quality正确拒绝、PTY inspect查错事实owner已分类，失败保留。单记录首次4次读/peak1、20同步检查零body、复验追加1，整体多记录I/O优化仍待做；隔离数值不代表真实差额。证据phase20-addition-memory-preview，docs/Git另绑定，上一批自身CI仍运行；原Phase38/9与ADD独立/active。
+
+## [2026-10-26] perf | 单次记忆预览共享读取快照
+
+ADD-08原health/候选/每pending lifecycle重复读同recordsFile，12记录15读。现原store一次有界snapshot→只读Reader health/list/get，共享fold/ID索引、返回记录/诊断分离，每query取消/profile重验；普通live读保留、每次准备新取、最终preview raw字节核验保留，12pending首次2读/peak1、20同步检查零body、复验追加1。
+
+六文件75pass、三有效反转/逐字节恢复、四静态门/buildb3be27281c1c/新解包judge proven三satisfied通过；两模式实际Node小PTY修改/超限撤旧、恢复数字、view pending不消费、preview config/memory/transcript不写、零provider，143退出settle。初轮8pass/2fail中diagnostic显示预期非原prompt合同，改查原health/list；重复read断言实际15→2。证据phase20-addition-memory-snapshot，docs/Git另绑定，上一批CI仍运行；全preview/controller/动态源累计I/O与面板/认证/性能计量仍待验，原Phase38/9和ADD独立/active。

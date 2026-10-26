@@ -16,6 +16,7 @@ import { retrieveProjectMemoryRecords } from "./projectMemoryRetrieval.js";
 import type {
   ProjectMemoryRecord,
   ProjectMemoryStore,
+  ProjectMemoryReader,
   ProjectMemoryReadOptions,
 } from "./projectMemoryStoreContract.js";
 import { buildProjectMemoryWakeupPreview } from "./projectMemoryWakeup.js";
@@ -72,7 +73,9 @@ export async function planProjectMemoryFutureTurnInjection(
   if (!input.memoryStore) {
     return invalid(input, "memory-store-missing", "Explicit local memory store is required.", baseEvidence);
   }
-  const health = await input.memoryStore.health(input.readOptions);
+  const memoryStore = input.readOptions && input.memoryStore.snapshot
+    ? await input.memoryStore.snapshot(input.readOptions) : input.memoryStore;
+  const health = await memoryStore.health(input.readOptions);
   if (!(health.readable ?? health.writable)) {
     return invalid(input, "memory-store-not-writable", "Explicit local memory store is not writable.", [
       ...baseEvidence,
@@ -81,7 +84,7 @@ export async function planProjectMemoryFutureTurnInjection(
   }
 
   const { candidate, selectedRecords } = await buildCurrentCandidate({
-    memoryStore: input.memoryStore,
+    memoryStore,
     state,
     readOptions: input.readOptions,
   });
@@ -99,7 +102,7 @@ export async function planProjectMemoryFutureTurnInjection(
     ]);
   }
 
-  const lifecycle = await resolvePendingRecordLifecycle(input.memoryStore, state.recordIds, input.readOptions);
+  const lifecycle = await resolvePendingRecordLifecycle(memoryStore, state.recordIds, input.readOptions);
   const conflicts = detectProjectMemoryConflicts({ records: selectedRecords });
   const merge = planProjectMemoryInjectionMerge({
     injectionState: state,
@@ -242,7 +245,7 @@ function containsUnsafeContent(value: string): boolean {
 }
 
 async function buildCurrentCandidate(input: {
-  readonly memoryStore: ProjectMemoryStore;
+  readonly memoryStore: ProjectMemoryReader;
   readonly state: ProjectMemoryInjectionState;
   readonly readOptions?: ProjectMemoryReadOptions;
 }): Promise<{
@@ -275,7 +278,7 @@ async function buildCurrentCandidate(input: {
 }
 
 async function resolvePendingRecordLifecycle(
-  memoryStore: ProjectMemoryStore,
+  memoryStore: ProjectMemoryReader,
   recordIds: readonly string[],
   readOptions?: ProjectMemoryReadOptions,
 ): Promise<readonly ProjectMemoryPendingRecordLifecycle[]> {

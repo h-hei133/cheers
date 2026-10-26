@@ -1,6 +1,6 @@
 import type {
   ProjectMemoryRecord,
-  ProjectMemoryStore,
+  ProjectMemoryReader,
   ProjectMemoryReadOptions,
 } from "./projectMemoryStoreContract.js";
 import { compareMemoryRecordRecency } from "./projectMemoryRetrieval.js";
@@ -26,7 +26,7 @@ const MAX_L0_RECORDS = 5;
 const MAX_L1_RECORDS = 8;
 
 export async function buildProjectMemoryWakeupPreview(
-  store: ProjectMemoryStore,
+  store: ProjectMemoryReader,
   readOptions?: ProjectMemoryReadOptions,
 ): Promise<ProjectMemoryWakeupPreview> {
   const list = await store.list(readOptions ? { readOptions } : undefined);

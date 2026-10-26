@@ -450,3 +450,16 @@ ADD-08确认待注入记忆原已有recordsFile元数据与generation检查，�
 | 尚未确认 | 原现场唯一按键根因、真实同模型/协议/规则/schema1.7k/4.9k、生产冷热收益、真实OAuth/API-key接受、历史cache writer与build lock来源。继续保留unknown |
 
 用户完整验收方向仍见[全文末尾任务](phase-20-addition.md#16-最新问题总和与必须完成的体验)：未配置具体模型可选、两个面板整体看齐、正文顶格/编辑箭头、首位完整slash/正文路径Tab、多skill实际生效及有限研究组合。隔离4.3k/4.6k不是用户真实成本证据。本轮延迟实查f8418fb9自身CI40251165765仍运行，本批Git另绑定；原Phase38/9与ADD独立且active。
+
+### 文末当前结论（第三十一批）
+
+本批确认并修补一次memory preview的重复body acquisition，原12pending health/候选/lifecycle共15读，现原store一次有界snapshot加发布前raw复验共2读，后续内容复验追加1。只读接口不含变更方法，每次准备新捕获，返回record/诊断分离、cached lookup取消/profile重验、发布前raw变化拒绝，pending不消费。六文件75项/三有效反转、四静态门/最终build/正式judge proven三satisfied通过；两模式实际Node隔离PTY修改/超限撤旧→恢复数字→view仍pending，preview期间config/memory/transcript不写、零provider、143退出settle。详见[第三十一批](phase-20-addition.md#15-实施与验证证据)。
+
+| 分类 | 当前结论 |
+|---|---|
+| 确实存在、有局部修补 | 未配置model焦点、resume渐进默认焦点、输入留白/箭头、首帧/初始估算、面板完整操作不足、正文路径/多skill/有限组合/代码边界，以及记忆raw与重复读。局部修补及隔离证据不替代原现场全验收 |
+| 确实仍需完善 | 全settings/model字段/来源/scope/desktop/真实认证、完整研究preview、tokenizer、全部动态来源及全请求/controller累计物理I/O、生产冷热启动与真实上下文拆分；本地memory两次读只覆盖本次单域 |
+| 不成立的判断 | model没有上下键监听、resume排序反了、settings全无分类、空配置没功能、start每次编译/用户入口用错、4.9k就是字符公式、工具数决定token数、当前只加载一skill、原记忆全无变更保护；这些解释不支持，但不否认用户原观察 |
+| 尚未确认 | 原现场唯一按键根因、同模型/协议/规则/schema真实1.7k/4.9k、生产冷热收益、真实OAuth/API-key接受、历史cache writer及build lock来源，保留unknown |
+
+用户未配置具体model可选、两面板整体看齐、正文顶格与编辑箭头、首位完整slash/正文实际路径suggestion与Tab、多skill实际生效/有限研究组合要求继续保留于[文末总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)。本轮延迟实查1dc3b0c7自身CI40252257668仍运行，Git另绑定，原Phase38/9与ADD独立/active。

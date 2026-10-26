@@ -106,8 +106,12 @@ it('binds an absent file and refuses alias retargeting during acquisition', asyn
   await expect(prepareContextInjection(context, store, 'question', new AbortController().signal, deps)).rejects.toThrow('source changed');
 });
 
-it('accounts for each serial memory read and keeps synchronous current checks free of body acquisition', async () => {
-  const { load } = fixture(); const original = snapshots.readBinarySnapshot;
+it('uses one acquisition snapshot plus verification regardless of pending record count, keeping current checks free of body reads', async () => {
+  const { file, states, pending, load } = fixture();
+  const records = Array.from({ length: 12 }, (_, index) => ({ ...record, id: `fact-${index}` }));
+  fs.writeFileSync(file, records.map(row => JSON.stringify(row)).join('\n') + '\n');
+  states.markPending({ sessionScopeId: pending.sessionScopeId, sourceCommand: '/memory use', mode: 'wake', recordIds: records.map(row => row.id) });
+  const original = snapshots.readBinarySnapshot;
   let active = 0, peak = 0, bytes = 0;
   const read = vi.spyOn(snapshots, 'readBinarySnapshot').mockImplementation(async (...args) => {
     active++; peak = Math.max(peak, active);
@@ -115,13 +119,24 @@ it('accounts for each serial memory read and keeps synchronous current checks fr
     finally { active--; }
   });
   const prepared = await load();
-  // health, candidates, one lifecycle record, and initial content verification.
-  expect(read).toHaveBeenCalledTimes(4); expect(peak).toBe(1); expect(active).toBe(0); expect(bytes).toBeGreaterThan(0);
+  expect(read).toHaveBeenCalledTimes(2); expect(peak).toBe(1); expect(active).toBe(0); expect(bytes).toBeGreaterThan(0);
   const before = bytes;
   for (let index = 0; index < 20; index++) expect(prepared.isCurrent()).toBe(true);
-  expect(read).toHaveBeenCalledTimes(4); expect(bytes).toBe(before);
+  expect(read).toHaveBeenCalledTimes(2); expect(bytes).toBe(before);
   await prepared.verifyContent(new AbortController().signal);
-  expect(read).toHaveBeenCalledTimes(5); expect(bytes).toBe(before * 5 / 4);
+  expect(read).toHaveBeenCalledTimes(3); expect(bytes).toBe(before * 3 / 2);
+});
+
+it('captures a fresh snapshot for every preparation and preserves damaged-store diagnostics and lifecycle folds', async () => {
+  const { file, store, load } = fixture();
+  const original = fs.readFileSync(file, 'utf8');
+  fs.writeFileSync(file, original + 'BROKEN\n' + JSON.stringify({ ...record, id: 'old' }) + '\n'
+    + JSON.stringify({ entryKind: 'project-memory-lifecycle', version: 1, recordId: 'old', operation: 'invalidate', createdAt: '2026-10-26', sourceCommand: '/memory' }) + '\n');
+  const first = await load(); expect(first.prompt).toContain(record.memoryText);
+  expect((await store.health()).ok).toBe(false); expect((await store.list()).records.map(row => row.id)).toEqual(['fact']);
+  fs.writeFileSync(file, original.replace('strict', 'looser'));
+  const second = await load(); expect(second.prompt).toContain('looser validation');
+  expect(() => first.isCurrent()).toThrow('source changed'); expect(second.isCurrent()).toBe(true);
 });
 
 it('does not acquire unused memory bodies when no injection is pending', async () => {
@@ -131,4 +146,15 @@ it('does not acquire unused memory bodies when no injection is pending', async (
   const prepared = await prepareContextInjection(context, store, 'question', new AbortController().signal, deps);
   expect(prepared.prompt).toBe('question'); expect(prepared.isCurrent()).toBe(true);
   await prepared.verifyContent(new AbortController().signal); expect(read).not.toHaveBeenCalled();
+});
+
+it('rejects changed raw bytes between a consistent memory snapshot and final preview publication', async () => {
+  const { file, store, states, pending, load } = fixture(); const capture = store.snapshot!.bind(store);
+  vi.spyOn(revisions, 'readRevision').mockReturnValue('stable');
+  vi.spyOn(store, 'snapshot').mockImplementation(async options => {
+    const reader = await capture(options);
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('strict', 'looser'));
+    return reader;
+  });
+  await expect(load()).rejects.toThrow('bytes changed'); expect(states.get(pending.sessionScopeId)).toBe(pending);
 });
