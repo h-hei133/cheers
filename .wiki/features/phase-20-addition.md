@@ -1314,6 +1314,16 @@ ADD-08继续收口。原[上下文预览](../../packages/ts-shell/src/cli/runtim
 
 本批只补本地模板发现成本、候选新鲜度和取消边界；未运行全仓、exe、真实20k PTY、真实provider或桌面平台。ADD-08的原生tokenizer、真实1.7k/4.9k分项差额、其他独立命令/研究工作流完整preview和完整动态来源总成本仍未验收；原Phase20保持38 complete / 9 partial，ADD整体继续active。工件`.omx/artifacts/phase20-addition-template-discovery/`保留验证摘要。
 
+### 第五十二批：flagless组合正文与设置分类CI合同
+
+接续已推送`a70c494f`。延迟实查前序提交时，`78f026f5`的CI只因[设置分类测试](../../packages/ts-shell/src/cli/interactive/settings.test.ts)仍期待旧八类而失败；产品实际已由第四十九批加入Memory与Shell两个只读入口。本批只同步测试期望为当前`all / Appearance / Model / Interaction / Context / Memory / Files / Shell / Tools / Tasks / Providers`，没有新增可编辑字段或改变入口行为。`e0116e86`的同次CI另出现四个浏览器smoke请求失败，但该批未修改浏览器/网络代码，且同一smoke套件在前一提交通过；当前证据不足以归因产品回归，端口生命周期、负载下流错误归一化与偶发原生`ECONNRESET`仍未分离，不能通过放宽状态断言掩盖。
+
+ADD-12继续检查组合输入原文。原[组合计划](../../packages/ts-shell/src/core/commands/composition/plan.ts)只要方法后出现非字面`-`开头token，就将其按option消费，即使该方法没有声明任何flag；`prepareReviewComposition`和无flag可组合模板不会接收这些被移除的token，因此`检查证据 /review --keep-this /skill:a`会静默丢失`--keep-this`，与独立review把其当作文本正文的语义冲突。现仅在`composition.flags`非空时进入option扫描；flagless driver/modifier把dash token留在共享正文，声明flags的brainstorm/research仍严格拒绝未知选项，不把严格语法降级为任意prose。
+
+[组合回归](../../packages/ts-shell/src/core/commands/composition.test.ts)新增flagless review与可组合模板两个保留路径，以及声明flags方法仍拒绝未知option的负向保护。首轮四文件90项中1项失败来自测试要求`--keep-this`在整个含brainstorm的组合focus中只出现一次；既有语义会把它同时带入modifier指令和最终review正文，因此改用只有review driver的最小路径断言恰好一次，不修改产品去重。最终composition24、研究composition12、review runtime11、settings44共91项单进程单worker通过。恢复无条件dash消费后两个新增保留用例实际AssertionError/exit1，逐字节恢复后composition24项再通过；plan/test/settings SHA256分别为`7a068ba2...`、`e927b43e...`、`2194ca7e...`（证据文件保存完整值）。
+
+四静态门与diff通过，责任上限0；TS build `f2ea3c05143d`、inputs `e075e02050c3`、artifact `e11372f82fd6`。签入的已适配validator直接解包后正式judge exit0/proven、三项结构义务satisfied；首次再交给`.normproof/package.mjs`被原归档SHA拒绝，按已适配tgz不能作为原始基线输入分类，未改validator。独立只读review未发现正确性/兼容/安全问题。未运行真实PTY、exe、真实provider、全仓或桌面；测试使用原router、真实本地Git/skill fixture，但不证明终端像素或用户原环境。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1338,6 +1348,7 @@ ADD-08继续收口。原[上下文预览](../../packages/ts-shell/src/cli/runtim
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
 | review正文组合原先未准入 | 第五十批确认review会读取真实Git snapshot，不能当纯modifier。现声明为单一driver，消费共享正文、brainstorm和全部skill并生成一份review prompt；audit/check共用声明，第二个driver在派发前拒绝。54项、5项有效反转和真实Git fixture有局部证据，真实provider/桌面仍待验 |
+| 无flag组合方法静默吞掉dash正文 | 第五十二批确认option扫描未先检查方法是否声明flags，review与可组合模板会丢失`--keep-this`/`--counterexample`，而声明flags的方法仍需严格拒绝未知option。现只对非空flag声明解析，flagless正文完整进入共享prompt；91项、两个有效反转及独立review有局部证据，真实终端/平台仍未验 |
 | 代码示例误调用及合法关闭后漏skill | 原字符串查找将围栏正文误当关闭，或以不同长度反引号闭合；第二十九批改为独立关闭行与精确行内run，示例保持字面量，合法关闭后所有skill恢复解析。第三十三批再补实际研究新建入口数字preview，control/其他driver/child总成本仍待覆盖 |
 | 待注入记忆预览缺raw字节与可取消读取 | 原已有路径/元数据及generation保护；第三十批补原始字节追踪、有界async verified-handle读取及完整preview异步复验。六文件73项、三有效反转、两模式实际隔离PTY有局部证据。普通删除/invalidated原并非全无保护；第三十一批已补单次多记录共享读取，完整preview/controller累计I/O与所有动态来源验收仍未完成 |
 | 一次记忆预览反复读取相同文件 | 第三十一批沿原store共享单次有界只读snapshot，health/候选/lifecycle共用，12pending的binary acquisition从15降2，复验仍追加1；75项/三反转/两模式PTY有局部证据。全preview/controller和动态来源总读取成本仍待验，不能扩成全请求两次读 |
@@ -1414,4 +1425,4 @@ ADD-08继续收口。原[上下文预览](../../packages/ts-shell/src/cli/runtim
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。

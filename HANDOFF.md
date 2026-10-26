@@ -416,3 +416,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A preview of a body path reads every template body, or a newly added higher-priority template does not invalidate the old estimate.
 - **Root Cause**: A full registry walk reads unrelated templates, while an exact-name probe that does not track the containing directory can miss later template discovery or collisions. An `AbortSignal` checked only by an async wrapper cannot interrupt synchronous directory/file work.
 - **Rule**: Derive exact template candidates from source tokens, probe only those names without enumerating unrelated entries, and track each candidate root revision. Bound candidate count and raw bytes, and check cancellation between synchronous steps; do not claim an in-flight synchronous read was interrupted.
+
+### Flagless Composition Methods Must Preserve Dash-Prefixed Prose
+- **Symptom**: A composed review or prompt template silently drops literal text such as `--keep-this`, while the standalone command preserves it.
+- **Root Cause**: The composition planner consumed every following `-` token as a method option before checking whether that method declared an option grammar; the driver later discarded those unowned arguments.
+- **Rule**: Enter option parsing only when the method declares flags. Keep dash-prefixed prose in the shared source for flagless drivers/modifiers, while retaining strict rejection of unknown options for methods that do declare flags. Test both a flagless driver and a flagless composable template, plus the strict-flag negative case.

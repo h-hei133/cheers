@@ -76,11 +76,11 @@ it('passes both instruction bodies and attachments through the real execution br
 it('combines two compatible pure modifiers without executing their handlers', async () => {
   const directory = path.join(root, '.agents', 'prompts'); fs.mkdirSync(directory, { recursive: true });
   fs.writeFileSync(path.join(directory, 'evidence.md'), '---\ncomposable: true\ndescription: Evidence method\n---\nCheck counterexamples for $@');
-  const input = '比较两种架构 /brainstorm /evidence /skill:a';
+  const input = '比较两种架构 /brainstorm /evidence --counterexample /skill:a';
   const commands = [...createCommandRegistry(root).values()].map(command => ({ ...command, execute: vi.fn(command.execute) }));
   const result = await composePrompt(input, { cwd: root, skillOptions: { skillPaths, noSkills: true } }, commands);
   expect(result).toMatchObject({ kind: 'prompt', prompt: expect.stringContaining('Design exploration') });
-  expect(result).toMatchObject({ prompt: expect.stringContaining('Check counterexamples for 比较两种架构') });
+  expect(result).toMatchObject({ prompt: expect.stringContaining('Check counterexamples for 比较两种架构 --counterexample') });
   expect(commands.every(command => !command.execute.mock.calls.length)).toBe(true);
 });
 
@@ -102,6 +102,39 @@ it('routes review as one driver carrying prose, modifiers and every selected ski
     prompt: expect.stringContaining('BODY a'),
     promptMetadata: { source: 'git-review', originalInput: input, skills: [{ name: 'a' }] },
   });
+});
+
+it('preserves dash-prefixed prose for a flagless review driver', async () => {
+  const input = '检查证据 /review --keep-this /skill:a';
+  const gitCommand = vi.fn(async (args: readonly string[]) => ({
+    kind: 'prompt' as const,
+    prompt: args[1] ?? '',
+    promptMetadata: { source: 'git-review' },
+  }));
+  const result = await routeSlashCommand(input, {
+    cwd: root, skillOptions: { skillPaths, noSkills: true }, gitCommand,
+  });
+  const focus = gitCommand.mock.calls[0]?.[0]?.[1];
+  expect(gitCommand).toHaveBeenCalledOnce();
+  expect(focus).toContain('BODY a');
+  expect(focus).toContain('检查证据');
+  expect(focus?.match(/--keep-this/g)).toHaveLength(1);
+  expect(result).toMatchObject({
+    kind: 'prompt',
+    promptMetadata: { source: 'git-review', originalInput: input, skills: [{ name: 'a' }] },
+  });
+});
+
+it('keeps strict option rejection for composed methods that declare flags', async () => {
+  const input = '问题 /brainstorm --counterexample /skill:a';
+  const commands = [...createCommandRegistry(root).values()].map(command => ({ ...command, execute: vi.fn(command.execute) }));
+  const result = await composePrompt(input, { cwd: root, skillOptions: { skillPaths, noSkills: true } }, commands);
+  expect(result).toMatchObject({
+    kind: 'local',
+    retryDraft: input,
+    output: expect.stringContaining('Invalid /brainstorm composition'),
+  });
+  expect(commands.every(command => !command.execute.mock.calls.length)).toBe(true);
 });
 
 it.each(['audit', 'check'])('uses the review driver for the /%s alias in composed prose', async name => {

@@ -9438,3 +9438,9 @@ ADD-12继续收口。review会读取真实Git snapshot并构造只读review prom
 ADD-08继续收口。preview原先遇到正文`/home`仍构造完整command registry并读取无关模板；现按源token及兼容`/ ordinary`命令源派生候选名，只让模板loader精确检查候选文件，不枚举无关目录。候选根目录revision仍进入source freshness，新增同名模板或覆盖会撤销旧估算；候选数、单文件字节和总读取有界，`AbortSignal`在同步步骤之间检查，不冒充单个同步读取可中断。普通独立模板、正文可组合模板和兼容命令源继续复用原owner。
 
 templateLoader12、preview30、composition22、slashRouter49、prose completion21、keymap73共207项及source capture/sources12项单进程通过；恢复完整registry或移除取消检查分别触发有效失败并逐字节恢复。四静态门、责任上限0、TS build 17253bcaa529（inputs ea1665b9fdb69fab86192ce4ebd15b5abed802ebf861996e23aac06aa08f4b5d）及当前包judge proven通过。HANDOFF/addition第五十一批/audit更新；未运行全仓、exe、真实provider、桌面或20k PTY，ADD整体及真实差额继续active。
+
+## [2026-10-26] fix | flagless组合正文与设置分类合同
+
+ADD-12确认组合planner只要方法后出现dash token就按option消费，未先检查方法是否声明flags；无flag的review/可组合模板因此静默丢失`--keep-this`/`--counterexample`，与独立命令把其当正文冲突。现仅非空flag声明进入严格option扫描，flagless方法把token留在共享prose，brainstorm/research未知flag仍由原语法拒绝。composition24、研究composition12、review runtime11、settings44共91项单worker通过；恢复无条件消费后两个新增保留用例AssertionError/exit1，源码逐字节恢复。初轮唯一失败是测试要求含brainstorm的整个focus只出现一次，既有语义会在modifier与最终正文各带一次，改用只有review driver的最小路径，不修改产品去重。独立只读review无findings。
+
+同一批把settings测试从旧八类同步到第四十九批Memory/Shell只读入口后的当前分类，解决78f026f5的CI唯一设置失败；不改产品分类/字段。e0116e86另四个浏览器smoke失败仍无产品回归证据：该提交未改浏览器代码，前一提交同套件通过，保留端口/负载/流错误归一化unknown，不以放宽断言掩盖。四静态门/diff、责任上限0、TS build f2ea3c05143d（inputs e075e02050c3、artifact e11372f82fd6）及适配validator正式judge proven通过；未跑真实PTY、exe、真实provider、全仓或桌面。HANDOFF/addition第五十二批/audit更新，ADD整体继续active。

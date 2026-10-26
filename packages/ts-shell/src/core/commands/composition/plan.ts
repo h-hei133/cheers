@@ -30,10 +30,11 @@ export function compositionPlan(input: string, commands: readonly CommandDefinit
     }
     removed.push(token);
     const args: string[] = [];
-    while (tokens[index + 1]?.raw.startsWith('-') && !tokens[index + 1]?.literal) {
+    const declaredFlags = invocation.composition.flags ?? [];
+    while (declaredFlags.length > 0 && tokens[index + 1]?.raw.startsWith('-') && !tokens[index + 1]?.literal) {
       const option = tokens[++index]!; removed.push(option); args.push(option.raw);
       const [name] = option.raw.replace(/^--?/, '').split('=');
-      const flag = invocation.composition.flags?.find(item => item.name === name || item.short === name || item.aliases?.includes(name!));
+      const flag = declaredFlags.find(item => item.name === name || item.short === name || item.aliases?.includes(name!));
       const next = tokens[index + 1];
       const boundary = next && !next.literal && next.raw.startsWith('/') &&
         (next.raw.startsWith('/skill:') || resolveCommandInvocation(commands, next.raw));

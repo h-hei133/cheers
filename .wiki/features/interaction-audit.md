@@ -656,3 +656,9 @@ review被确认不是纯modifier：它读取真实Git snapshot并生成一份只
 ADD-08确认正文`/home`仍会让preview构造完整command registry，从而枚举模板目录并读取无关模板；普通无slash草稿不加载模板这一点不能掩盖该成本缺口。现preview从源token及兼容`/ ordinary`命令源派生候选名，[命令registry](../../packages/ts-shell/src/core/commands/registry.ts)只按候选名调用原模板loader；精确探测不枚举无关文件，跟踪候选根目录revision，并限制512候选、单文件512 KiB、总读取8 MiB。`AbortSignal`在同步步骤之间检查，不声称`readFileSync`内部可中断。
 
 `templateLoader`12项、`preview`30项及其相关组合/路由/补全/keymap共207项通过，另source capture/sources 12项通过。把preview恢复为完整registry后超限模板测试失败，移除同步取消检查后候选取消测试失败，均恢复源码并重验。见[第五十一批](phase-20-addition.md#第五十一批模板候选发现成本与取消边界)。同名路径与可组合模板的提交歧义仍保留，原生tokenizer、真实差额、其他driver完整preview和完整动态来源总成本仍未验收；ADD整体及真实环境证据继续active。
+
+### 文末当前问题判断（第五十二批）
+
+组合解析确认一个会静默改写用户输入的确定缺口：方法没有声明任何flags时，紧随其后的`-`开头正文仍被当成option移除；review与可组合模板因此丢失`--keep-this`/`--counterexample`。现只有声明flags的方法进入严格option扫描，flagless driver/modifier保留共享prose；brainstorm/research未知flag仍拒绝。91项聚焦、两个有效反转/字节恢复和独立只读review有局部证据，真实终端未另跑。
+
+同一轮把settings测试从旧八类同步到Memory/Shell只读入口后的当前十一类，解决`78f026f5`的CI唯一设置失败；没有改产品分类或增加可编辑字段。`e0116e86`另四个浏览器smoke失败在未改浏览器代码的提交出现、前一提交同套件通过，仍归类证据不足的负载/夹具/潜在流边界问题，不将`ECONNRESET`直接重分类为unsafe output，也不称产品回归或已修复。见[第五十二批](phase-20-addition.md#第五十二批flagless组合正文与设置分类ci合同)。ADD整体及真实环境验收继续active。
