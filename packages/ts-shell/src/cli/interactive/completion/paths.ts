@@ -1,3 +1,4 @@
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
@@ -11,6 +12,16 @@ export function resolveCatalogDirectory(root: string, prefix: string, directorie
   const home = process.env.HOME ?? process.env.USERPROFILE;
   const expanded = prefix.startsWith("~/") && home ? path.join(home, prefix.slice(2)) : prefix;
   return path.resolve(root, expanded || ".");
+}
+
+/** A single local existence check for command/path ambiguity; this never enumerates. */
+export function pathTargetExists(root: string, prefix: string): boolean {
+  try {
+    const target = fsSync.statSync(resolveCatalogDirectory(root, prefix, false));
+    return target.isFile() || target.isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 /** One directory, bounded and cancellable between entries; never traverse a tree. */

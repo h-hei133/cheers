@@ -3,12 +3,13 @@ import path from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { createCatalogLoader } from "./catalog.js";
 import type { ShellRuntimeContext } from "../../../core/shell/runtimeContext.js";
-import { pathCatalog } from "./paths.js";
+import { pathCatalog, pathTargetExists } from "./paths.js";
 import { catalogRequest, catalogSuggestions } from "./request.js";
 import { replaceDraft } from "../../../presentation/tui/editor/replacement.js";
 let root: string;
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(process.cwd(), ".tmp-path-catalog-"));
+  fs.mkdirSync("/tmp/cheers-test", { recursive: true });
+  root = fs.mkdtempSync("/tmp/cheers-test/path-catalog-");
   fs.mkdirSync(path.join(root, "space dir")); fs.mkdirSync(path.join(root, "space dir", "child"));
   fs.writeFileSync(path.join(root, "file.txt"), "fixture");
   fs.symlinkSync("space dir", path.join(root, "alias"));
@@ -27,6 +28,13 @@ it("lists a single directory, follows directory links, and never creates destina
   expect(fs.existsSync(path.join(root, "absent"))).toBe(false);
   const abort = new AbortController(); abort.abort();
   await expect(pathCatalog(root, "", true, abort.signal)).rejects.toThrow();
+});
+it("probes one existing target without enumerating and reports missing or broken targets", () => {
+  expect(pathTargetExists(root, "file.txt")).toBe(true);
+  expect(pathTargetExists(root, "space dir")).toBe(true);
+  expect(pathTargetExists(root, "alias")).toBe(true);
+  expect(pathTargetExists(root, "missing")).toBe(false);
+  expect(pathTargetExists(root, "broken")).toBe(false);
 });
 it("keeps the caret inside quotes for continued directory completion", async () => {
   const req = request('/cd "sp')!;

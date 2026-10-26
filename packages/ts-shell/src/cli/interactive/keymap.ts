@@ -3,7 +3,7 @@ import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
 import type { InteractiveView, ViewActions } from "../../presentation/tui/surface/contract.js";
 import { graphemeBoundaries } from "../../presentation/tui/text/measure.js";
 import { KEY_ACTIONS, type Keybindings } from "./keybindings.js";
-import { getSlashInvocation } from "../../entrypoints/slashCommandRegistry.js";
+import { getSlashInvocation, type SlashCatalogScope } from "../../entrypoints/slashCommandRegistry.js";
 import { feedVim, initialVimState, type VimEffect, type VimKey, type VimState } from "../../presentation/tui/editor/modal/state.js";
 
 /**
@@ -68,6 +68,8 @@ export interface KeymapContext {
   readonly keybindings: Keybindings;
   /** Modal editing in the prompt; Insert is the starting mode. */
   readonly vimMode?: boolean;
+  /** Current workspace/session catalog ownership for exact invocation recognition. */
+  readonly slashScope?: SlashCatalogScope;
 }
 
 /**
@@ -484,8 +486,8 @@ function consumeSuggestionKey(event: ParsedKeyEvent, context: KeymapContext): bo
     : written !== insertion);
   // A whole command typed out submits, even if the list was navigated earlier:
   // accepting an old candidate here would execute something the user did not type.
-  const complete = edit !== undefined && edit.from === 0 && chosen?.kind !== 'path' && written.startsWith("/") &&
-    getSlashInvocation(written.toLowerCase()) !== undefined;
+  const complete = edit !== undefined && edit.from === 0 && written.startsWith("/") &&
+    getSlashInvocation(written.toLowerCase(), context.slashScope) !== undefined;
   const accepts = action === "tui.input.tab" ||
     (action === "tui.input.submit" && !complete && (view.suggestions.chosen || incomplete));
   if (accepts) {

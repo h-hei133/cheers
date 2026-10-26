@@ -606,6 +606,44 @@ describe("completion interception", () => {
     expect(surface.editor.getText()).toBe("");
   });
 
+  it("submits a complete command when a mixed path candidate follows it", () => {
+    const { press, surface, actions } = build();
+    surface.editor.setText("/help");
+    const snapshot = surface.editor.snapshot();
+    surface.suggestions.setItems([
+      completionEdit({ value: "/help", label: "/help", kind: "command" }, snapshot, 0, 5),
+      completionEdit({ value: "/help/", label: "/help/", kind: "path" }, snapshot, 0, 5),
+    ]);
+    surface.setSuggesting(true);
+    press("\r");
+    expect(actions.submit).toHaveBeenCalledWith("/help");
+  });
+
+  it("submits an exact hidden alias on Enter even when a same-name path candidate is current", () => {
+    const { press, surface, actions } = build();
+    surface.editor.setText("/models");
+    const snapshot = surface.editor.snapshot();
+    surface.suggestions.setItems([
+      completionEdit({ value: '"/models"', label: "/models", kind: "path" }, snapshot, 0, 7),
+    ]);
+    surface.setSuggesting(true);
+    press("\r");
+    expect(actions.submit).toHaveBeenCalledWith("/models");
+  });
+
+  it("keeps Tab as the path gesture for an exact alias/path collision", () => {
+    const { press, surface, actions } = build();
+    surface.editor.setText("/models");
+    const snapshot = surface.editor.snapshot();
+    surface.suggestions.setItems([
+      completionEdit({ value: '"/models"', label: "/models", kind: "path" }, snapshot, 0, 7),
+    ]);
+    surface.setSuggesting(true);
+    press("\t");
+    expect(surface.editor.getText()).toBe('"/models" ');
+    expect(actions.submit).not.toHaveBeenCalled();
+  });
+
   it("accepts the selection on enter once the user has navigated the list", () => {
     const { press, surface, actions } = build();
     surface.suggestions.setItems([

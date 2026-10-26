@@ -8,7 +8,8 @@ import { replaceDraft } from '../../../presentation/tui/editor/replacement.js';
 import { createCatalogLoader } from './catalog.js';
 import type { ShellRuntimeContext } from '../../../core/shell/runtimeContext.js';
 import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
-import { getSlashInvocation } from '../../../entrypoints/slashCommandRegistry.js';
+import { getSlashInvocation, registerSlashCommand } from '../../../entrypoints/slashCommandRegistry.js';
+import { routeSlashCommand } from '../../../core/commands/slashRouter.js';
 let root: string;
 let scope: { root: string; runtimeConfig: ReturnType<typeof getRuntimeConfig> };
 beforeEach(() => {
@@ -25,6 +26,16 @@ afterEach(() => {
 function request(marked: string) {
   const cursor = marked.indexOf('|'); const text = marked.replace('|', '');
   return catalogRequest({ text, cursor: cursor < 0 ? text.length : cursor, revision: 1 }, scope);
+}
+function mockPathTarget(target: string, kind: 'file' | 'directory') {
+  const original = fs.statSync.bind(fs) as typeof fs.statSync;
+  vi.spyOn(fs, 'statSync').mockImplementation(((candidate: Parameters<typeof fs.statSync>[0],
+    options?: Parameters<typeof fs.statSync>[1]) => {
+    if (String(candidate) === target) {
+      return { isFile: () => kind === 'file', isDirectory: () => kind === 'directory' } as fs.Stats;
+    }
+    return original(candidate, options as never);
+  }) as typeof fs.statSync);
 }
 
 it('suppresses suggestions inside a fenced example and restores local skill/path suggestions after its complete closing line', () => {
@@ -112,6 +123,81 @@ it('resolves a built-in command before an oversized same-name template', () => {
   fs.mkdirSync(prompts, { recursive: true });
   fs.writeFileSync(path.join(prompts, 'review.md'), 'x'.repeat(512 * 1024 + 1));
   expect(getSlashInvocation('review', scope)).toMatchObject({ commandName: 'review' });
+});
+
+it('merges a real offset-zero path with command candidates and preserves command-only behavior without a path', () => {
+  const remove = registerSlashCommand({ name: 'fixture-home', group: 'workflow', summary: 'fixture command' });
+  const removeNoPath = registerSlashCommand({ name: 'fixture-no-path', group: 'workflow', summary: 'fixture command' });
+  mockPathTarget('/fixture-home', 'directory');
+  try {
+    const req = request('/fixture-home')!;
+    expect(catalogSuggestions(req, []).map(item => item.value)).toEqual(['/fixture-home']);
+    const matches = catalogSuggestions(req, [
+      { value: '/fixture-home/', label: '/fixture-home/', kind: 'path', identity: root, detail: 'directory' },
+    ]);
+    expect(matches.map(item => item.kind)).toEqual(['command', 'path']);
+    expect(matches.map(item => item.value)).toEqual(['/fixture-home', '/fixture-home/']);
+    expect(matches.find(item => item.kind === 'path')?.edit?.text).toBe('/fixture-home/');
+    expect(request('/fixture-no-path')).toBeUndefined();
+  } finally {
+    removeNoPath();
+    remove();
+  }
+});
+
+it('quotes same-spelling path files so accepting the path cannot execute a command or hidden alias', () => {
+  const remove = registerSlashCommand({
+    name: 'fixture-owner',
+    aliases: ['fixture-alias'],
+    group: 'workflow',
+    summary: 'fixture command',
+  });
+  mockPathTarget('/fixture-alias', 'file');
+  try {
+    const req = request('/fixture-alias')!;
+    expect(req.kind).toBe('prose');
+    const matches = catalogSuggestions(req, [
+      { value: '/fixture-alias', label: '/fixture-alias', kind: 'path', identity: '/fixture-alias', detail: 'file' },
+    ]);
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toMatchObject({ kind: 'path', edit: { text: '"/fixture-alias" ' } });
+  } finally {
+    remove();
+  }
+});
+
+it('quotes a file when a longer command prefix makes direct submission look like a slash command', async () => {
+  const remove = registerSlashCommand({ name: 'fixture-command', group: 'workflow', summary: 'fixture command' });
+  mockPathTarget('/fixture', 'file');
+  try {
+    const req = request('/fixture')!;
+    const path = catalogSuggestions(req, [
+      { value: '/fixture', label: '/fixture', kind: 'path', identity: '/fixture', detail: 'file' },
+    ]).find(item => item.kind === 'path')!;
+    expect(path.edit?.text).toBe('"/fixture" ');
+    expect(await routeSlashCommand(path.edit!.text.trimEnd(), { cwd: root })).toBeNull();
+  } finally {
+    remove();
+  }
+});
+
+it('quotes an isolated absolute file so first-position path acceptance remains a path', async () => {
+  mockPathTarget('/fixture-solo', 'file');
+  const req = request('/fixture-solo')!;
+  const path = catalogSuggestions(req, [
+    { value: '/fixture-solo', label: '/fixture-solo', kind: 'path', identity: '/fixture-solo', detail: 'file' },
+  ]).find(item => item.kind === 'path')!;
+  expect(path.edit?.text).toBe('"/fixture-solo" ');
+  expect(await routeSlashCommand(path.edit!.text.trimEnd(), { cwd: root })).toBeNull();
+});
+
+it('keeps already slash-delimited absolute files unquoted at source offset zero', () => {
+  mockPathTarget('/tmp', 'directory');
+  const req = request('/tmp')!;
+  const path = catalogSuggestions(req, [
+    { value: '/tmp/example.txt', label: '/tmp/example.txt', kind: 'path', identity: '/tmp/example.txt', detail: 'file' },
+  ]).find(item => item.kind === 'path')!;
+  expect(path.edit?.text).toBe('/tmp/example.txt ');
 });
 
 it('inserts canonical skills in the middle of source without replacing other invocations', () => {

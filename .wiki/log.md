@@ -9452,3 +9452,9 @@ ADD-10/08确认正文`/home`的prose suggestions仍无候选调用完整slash re
 最终templateLoader17、prose completion24、request30、slash suggestions41、registry14、capture5、preview30，共七文件161项单worker通过。六个有效反转分别移除精确名称、目录入口上限、高优先级发现、预算遮蔽、builtin优先和注册严格碰撞，均有对应失败并逐字节恢复。独立只读review完成五轮纠错后最终no findings，review本身未运行测试。
 
 四静态门、diff、责任上限0及TS build f17e7f7ce533（inputs 4740f0c3eb74、artifact fc68dd6ae376）通过；签入的已适配validator直接执行judge exit0/proven、0 open/failed/gap。工件phase20-addition-completion-discovery归档聚焦/反转摘要/源码hash/静态/build/judge收据；HANDOFF/addition第五十三批/audit更新。未运行全仓、exe、真实provider、桌面或20k PTY；真实终端输入/像素、平台矩阵和完整上下文差额继续待验。原Phase38/9、ADD独立且整体active，Git/本批CI另绑定。
+
+## [2026-10-26] fix | 首位命令与真实路径歧义
+
+ADD-10确认首位`/home`同时像slash命令和真实绝对路径时，原先只能保留其中一类；同名命令/alias会吞掉path，仅合成composition候选又会隐藏普通命令。现对当前完整目标做一次file/directory存在性检查，missing或broken link降级；真实目标存在时合并command与path，命令优先、alias隐藏但参与碰撞。Enter仍提交精确命令/alias，Tab接受path。孤立绝对file加引号防止slash误路由，带第二分隔符的路径与directory保留原表达。
+
+prose completion29、path catalog18、keymap76、InteractiveMode109、completion13共五文件245项单worker通过；七个有效反转覆盖命令吞路径、composition-only、path-first、collision引号、跨前缀碰撞、孤立文件引号和keymap path例外，均出现对应失败并逐字节恢复。五静态门/diff、责任上限0、TS build a0dc9a90154f（inputs 25df253e4dd1、artifact dde6d53df1ea）、3496输入与1880 artifact freshness及正式judge proven通过。工件phase20-addition-offset-path-ambiguity归档聚焦/反转/source hash/static/build/judge；HANDOFF/addition第五十四批/audit更新。未运行全仓、exe、真实provider、桌面、PTY或Windows，原Phase38/9、ADD独立且整体active，Git/本批CI另绑定。

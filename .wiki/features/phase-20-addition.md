@@ -435,7 +435,7 @@ ADD-02/03现有共享CatalogNavigation和导航绘制owner：宽屏分类栏/内
 
 | ID | 当前状态 | 实现与边界 |
 |---|---|---|
-| ADD-10 | 本地实现验证通过 | 统一源位置token，完整功能菜单/命令参数只认offset=0；正文绝对/相对/home/Windows路径、引号目录连续Tab和局部替换复用现有path owner。裸slash只提供匹配skill名及已声明组合方法，路径优先，显式`/skill:`可搜描述。候选有path/skill/command类型和身份，保留现有异步snapshot与取消准入；真实Windows终端仍缺 |
+| ADD-10 | 本地实现验证通过 | 统一源位置token，完整功能菜单/命令参数只认offset=0；正文绝对/相对/home/Windows路径、引号目录连续Tab和局部替换复用现有path owner。第五十四批起，首位真实路径可与命令/alias候选并存，命令优先，Enter保留精确命令而Tab可选路径；隔离文件加引号防止被slash parser误当作命令。裸slash只提供匹配skill名及已声明组合方法，显式`/skill:`可搜描述。候选有path/skill/command类型和身份，保留现有异步snapshot与取消准入；真实Windows终端仍缺 |
 | ADD-11 | 本地实现验证通过 | 同提交加载全部明确skill，按稳定身份去重、记录源range及body digest；统一校验失败、配置变化、来源撤销、取消或预算超限则不部分提交，返回原草稿。保留原文缩进/换行及多行持久历史；忙碌输入等待同一提交边界，附件随排队/编辑/派发/取消恢复保留。真正交互路由检查两份body和一份图片，未请求真实provider |
 | ADD-12 | 本地实现验证通过，准入范围明确 | brainstorm纯方法与显式`composable: true`模板可组合；deep-research首位/正文/alias支持多skill，创建一个真实native research，持久化所选方法并将指令送入每个实际子阶段。review现声明为单一driver，消费共享正文、modifier与全部skill并生成一份真实Git review prompt；research控制/save/help、功能命令混入、两个driver及非法参数在派发前拒绝；driver派发后异常不伪装零派发，意外shell-action不交给功能路由 |
 | ADD-07/08/09/13 | 待实施/验证 | 提前首帧、启动估算、context目录口径与发现入口继续按第12节处理；不能从本批多skill绿色提升 |
@@ -1334,6 +1334,16 @@ ADD-12继续检查组合输入原文。原[组合计划](../../packages/ts-shell
 
 四静态门、diff、责任上限0及TS build `f17e7f7ce533`（inputs `4740f0c3eb74`、artifact `fc68dd6ae376`）通过；签入的已适配validator正式judge exit0/proven、0 open/failed obligation及0 proof gap。工件`.omx/artifacts/phase20-addition-completion-discovery/`保存聚焦、反转摘要、源码hash、静态/build/judge收据。未运行全仓、exe、真实provider、桌面或20k PTY；真实终端像素、平台输入与完整上下文差额仍不能由本批替代。原Phase20保持38 complete / 9 partial，ADD整体继续active。
 
+### 第五十四批：首位命令与真实路径歧义
+
+接续已推送`585904d4`。ADD-10确认首位`/home`同时具有slash命令和真实绝对路径语义时，原先只允许其中一类候选：有同名命令或alias时真实路径被吞掉，仅合成composition候选又可能隐藏普通命令。现[prose request](../../packages/ts-shell/src/cli/interactive/completion/prose.ts)在源文本offset=0先对当前完整目标做一次[单目标存在性检查](../../packages/ts-shell/src/cli/interactive/completion/paths.ts)，只接受现存file/directory并降级missing/broken link，不枚举目录；存在真实目标时才让path与匹配命令/alias候选合并。
+
+合并结果保持command-first，alias仍不显示在发现列表但参与碰撞判断。单一component的绝对file统一加引号，例如`"/fixture" `，避免接受后被slash parser当作未知命令；已有第二个分隔符的`/tmp/example.txt`保持原样，directory保留尾部`/`以继续补全。[keymap](../../packages/ts-shell/src/cli/interactive/keymap.ts)把完整命令/alias的Enter与path候选分开：即使当前焦点是同名path，Enter仍提交用户实际输入的精确命令，Tab才接受path；交互owner现在传入[catalog scope](../../packages/ts-shell/src/cli/interactive/catalogScope.ts)，使catalog/template命令按当前workspace与session解析。
+
+主代理单进程、单worker运行prose completion29、path catalog18、keymap76、InteractiveMode109、completion13，共五文件245项通过。七个有效反转分别恢复无条件命令吞路径、仅composition顶层候选、path-first排序、只按精确collision加引号、取消跨前缀collision检测、取消孤立file引号及恢复keymap path例外；均出现对应断言失败并逐字节恢复。独立只读review最终未发现正确性缺陷，但未运行测试。
+
+五静态门与diff通过，责任上限0；TS build `a0dc9a90154f`（inputs `25df253e4dd1`、artifact `dde6d53df1ea`）通过，最终3496个build input的digest仍相同，immutable build的1880个artifact digest仍相同。签入的已适配validator正式judge exit0/proven、0 open/failed obligation及0 proof gap。工件`.omx/artifacts/phase20-addition-offset-path-ambiguity/`保存聚焦、反转摘要、源码hash、静态/build/freshness/judge收据。未运行全仓、exe、真实provider、桌面或PTY；真实路径fixture证明本地路由，不证明用户原终端、Windows或桌面IME。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1352,7 +1362,7 @@ ADD-12继续检查组合输入原文。原[组合计划](../../packages/ts-shell
 | 认证快捷入口缺少参数发现 | 第四十七批确认`/login`、`/logout`只有委托执行而没有顶层提示/补全。现从原`connectSyntax`派生快捷语法：login提供provider与认证flag，logout发现保存连接，并排除不属于顶层语法的action alias；执行仍只走原认证owner。第四十八批再以registry合同锁定theme/statusline/connect/login/logout/view与settings元数据的owner可见性。73项、13项合同及两有效反转有局部证据，真实认证/桌面仍待验 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |
-| 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，预览补异步/cancellable复验和实时准入。第五十一批把preview模板发现收窄为候选精确探测，第五十三批再收窄正文补全与单命令查找，并补目录入口、优先级遮蔽和注册归属；同名路径/模板歧义仍未消除。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
+| 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，预览补异步/cancellable复验和实时准入。第五十一批把preview模板发现收窄为候选精确探测，第五十三批再收窄正文补全与单命令查找，并补目录入口、优先级遮蔽和注册归属；第五十四批补首位真实路径/命令合并、command-first及文件引号防误路由。同名模板/路径提交歧义和完整终端矩阵仍未消除。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。第三十八批新增settings全部37项/user37-project36基本键盘链及七个跨来源政策场景，第三十九批补17个代表性冲突/失效/取消/范围场景，第四十九批补Memory/Shell只读命令入口。完整字段×来源×编辑器×窗口/桌面及model能力/角色/真实认证矩阵仍未完成；只读入口不伪装可编辑字段，也不能将局部绿色写成“整体已看齐” |
 | 设置搜索新查询仍保留较弱匹配焦点 | 第三十八批确认typed/pasted `topP`排名第一但Enter打开Input shape。现新查询自动聚焦最强匹配，同查询手动选择保持，清空回原字段；178项聚焦、一有效反转及两模式实际Node PTY有证据。不是用户原model按键现场唯一原因的证明 |
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |

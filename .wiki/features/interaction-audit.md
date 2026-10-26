@@ -668,3 +668,9 @@ ADD-08确认正文`/home`仍会让preview构造完整command registry，从而�
 ADD-10/08新增确认正文`/home`补全和首位自定义可组合模板查找都仍会构建完整command registry并读取无关模板body。现只对当前命令做精确模板查找；前缀补全使用有界目录迭代，512名称/4096入口/512 KiB单文件/8 MiB总读取上限，入口间检查取消。高优先级同名模板超预算时遮蔽低优先级元数据，builtin先于模板解析；扩展注册继续严格精确碰撞查找，避免预算拒绝释放已有名称。七文件161项、六个有效反转/逐字节恢复及独立复审no findings有局部证据。
 
 四静态门、责任上限0、TS build `f17e7f7ce533`和正式judge proven另绑定；未运行真实provider、全仓、exe、桌面或20k PTY。正文路径/Tab、多skill和组合的完整真实终端矩阵仍未完成，原Phase38/9、ADD独立且整体active。见[第五十三批](phase-20-addition.md#第五十三批正文补全的模板候选与命令归属边界)。
+
+### 文末当前问题判断（第五十四批）
+
+ADD-10确认首位`/home`同时存在命令与真实路径时，原先不是吞掉path，就是只保留composition命令，无法在同一菜单中安全选择。现只对当前完整目标执行一次file/directory存在性检查；真实目标存在时合并command与path，命令优先，alias隐藏但参与碰撞。Enter仍提交精确命令，Tab接受path。孤立绝对file加引号，带第二分隔符的路径与directory保持原表达式，避免接受后误触发slash路由。
+
+五文件245项、七个有效反转/逐字节恢复及最终独立只读review无findings有局部证据；五静态门、责任上限0、TS build `a0dc9a90154f`、inputs/artifact freshness和正式judge proven另绑定。未运行全仓、exe、真实provider、桌面、PTY或Windows；见[第五十四批](phase-20-addition.md#第五十四批首位命令与真实路径歧义)。原Phase38/9、ADD独立且整体active。

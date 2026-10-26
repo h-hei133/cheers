@@ -666,6 +666,7 @@ export class InteractiveMode {
       gesture: this.gesture,
       keybindings: this.preferences.keybindings,
       vimMode: this.options.runtimeContext.runtimeConfig.vimMode === true && !this.questions.question(),
+      slashScope: catalogScope(this.options.runtimeContext),
       actions: {
         submit: (text, disposition, attachments) => this.onSubmit(text, disposition, attachments),
         interrupt: () => void this.interrupt(),
