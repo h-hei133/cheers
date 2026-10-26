@@ -686,3 +686,9 @@ ADD-08新增确认`/shake apply|restore`改变派生上下文后，旧provider p
 ADD-09确认`/context`虽能显示目录估算、请求字节和provider用量，却没有实际组装请求的独立本地token估算。现发送时的request projection只保留冻结的数字摘要，按协议字段计算`assembled-request`估算；图片使用固定allowance且不按base64长度计数，opaque reasoning/不兼容字段保持unavailable。报告将目录、实际请求和provider用量分成独立事实，不把本地字符估算冒充provider测量。
 
 六文件176项、两个有效反转/逐字节恢复及最终独立只读review无findings有局部证据；五静态门、责任上限0、TS build `abc97ad25d30`、inputs `a16517030700`和正式judge proven另绑定。固定图片allowance和字符估算仍不是原生tokenizer，真实1.7k/4.9k差额、真实provider及生产性能未验。见[第五十六批](phase-20-addition.md#第五十六批实际组装请求的本地估算事实)。原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第五十七批）
+
+ADD-08确认有效脏工作树上的standalone与正文review仍显示unknown：preview只放行deep-research driver，且review不是`preparePrompt`模板。现preview显式准入review driver/standalone，与dispatch共用review request focus准备；从原Git workbench取一次snapshot和review prompt，强制与`gitRequestMode`一致的plan mode，传播取消信号，并在内容复验时用原`assertGitSnapshot`核对完整fingerprint。clean/unreadable、缺少workbench、第二driver和取消仍在模型准备前拒绝；不调用通用`gitCommand`、`runReviewCommand`或`execute`。
+
+五文件93项、两个有效反转/逐字节恢复及独立只读review有局部证据；旧driver门反转出现8项失败，移除plan override出现4项失败。五静态门、责任上限0、TS build `134c5c64ce2b`、inputs `509863f0359e`和正式judge proven另绑定。预览与提交仍各取一次Git snapshot，未共享one-use reservation；真实provider、全仓、exe、桌面和PTY未验。见[第五十七批](phase-20-addition.md#第五十七批review预览复用真实git-prompt)。原Phase38/9、ADD独立且整体active。

@@ -43,6 +43,7 @@ import { parseResearchArgs } from '../../../core/commands/research/syntax.js';
 import { researchEntryRequest, researchTurnPrompt } from '../../../research/run/entry.js';
 import { researchPreviewTools } from '../../../research/run/tools.js';
 import { prepareResearchPreview } from './research.js';
+import { prepareReviewPreview } from './review.js';
 
 /** A local estimate never connects MCP, accepts an injection or starts a driver. */
 export async function previewContext(context: ShellRuntimeContext, manager: SessionManager, gateway: CliMcpGateway,
@@ -76,9 +77,11 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const pureStandalone = definition?.kind === 'prompt' && definition.enabled !== false && definition.availability !== 'hidden'
     ? standalone?.preparePrompt : undefined;
   const researchStandalone = definition?.name === 'deep-research' && definition.enabled !== false && definition.availability !== 'hidden';
+  const reviewStandalone = definition?.name === 'review' && definition.enabled !== false && definition.availability !== 'hidden';
   // Match dispatch eligibility without invoking standalone handlers or workflow drivers.
-  if ((!composed && !pureStandalone && !researchStandalone && draft.startsWith('/') && !/^\/[^\s]*[\/\\]/.test(draft))
-    || (composed && plan.methods.some(method => method.invocation.composition?.kind === 'driver' && method.definition.name !== 'deep-research'))) {
+  if ((!composed && !pureStandalone && !researchStandalone && !reviewStandalone && draft.startsWith('/') && !/^\/[^\s]*[\/\\]/.test(draft))
+    || (composed && plan.methods.some(method => method.invocation.composition?.kind === 'driver'
+      && method.definition.name !== 'deep-research' && method.definition.name !== 'review'))) {
     throw new Error('Command request preparation is pending.');
   }
   const snapshot = config.enableMcpTools ? gateway.peekSnapshot?.() : undefined;
@@ -89,6 +92,11 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const composition = composed ? prepareComposition(draft, plan, skills.skills) : undefined;
   if (composition?.error !== undefined) throw new Error(composition.error);
   let effectivePrompt = composition?.prompt ?? (pureStandalone && source ? pureStandalone(source.argsText) : draft);
+  const review = reviewStandalone ? await prepareReviewPreview(context, source?.argsText ? [source.argsText] : [], undefined, signal)
+    : composition?.driver?.method.definition.name === 'review' ? await prepareReviewPreview(context, composition.driver.args, {
+      originalInput: draft, prose: plan.prose, skills: composition.expanded.instructions, modifiers: composition.modifiers,
+    }, signal) : undefined;
+  if (review) effectivePrompt = review.prompt;
   const session = await readPromptPreview(manager, expected, cwd, effectivePrompt, signal, sources.track);
   const researchArgs = composition?.driver?.method.definition.name === 'deep-research' ? composition.driver.args
     : researchStandalone && source ? tokenizeCommandArgs(source.argsText) : undefined;
@@ -113,7 +121,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const ordinaryFeatures = foregroundTools(context);
   const features = research ? foregroundTools(context, researchPreviewTools(research.run)) : ordinaryFeatures;
   const featureIdentity = JSON.stringify(toolSchemas(new Map(ordinaryFeatures.map(tool => [tool.name, tool]))));
-  const prepared = await preparePromptRequest({ workspaceRoot: cwd, sessionId: expected.id, runtimeConfig: config, agentMode,
+  const prepared = await preparePromptRequest({ workspaceRoot: cwd, sessionId: expected.id, runtimeConfig: config, agentMode: review ? 'plan' : agentMode,
     catalogContent: { skills: skills.skills, tools: contributions.flatMap(entry => entry.tools), ...(snapshot ? { mcpTools: snapshot.tools } : {}) },
     ...(snapshot ? { mcpGateway: { snapshot: async () => snapshot } } : {}),
     featureTools: features, admission, signal, onSource: sources.track,
@@ -186,6 +194,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     await sources.verifyContent(checkingSignal);
     await injected.verifyContent?.(checkingSignal);
     await verifyContextEntries(cwd, entries, sourceReaderForAsync(context, checkingSignal), checkingSignal);
+    await review?.verifyContent(checkingSignal);
     verify();
   };
   await verifyContent(signal);

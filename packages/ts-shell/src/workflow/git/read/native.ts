@@ -49,8 +49,8 @@ export class NativeGit {
     }
     return result.stdout;
   }
-  async assertPassive(): Promise<void> {
-    const result = await this.run({ args: ['config', '--get-regexp', '^filter\\..*\\.(clean|smudge|process)$'] });
+  async assertPassive(signal?: AbortSignal): Promise<void> {
+    const result = await this.run({ args: ['config', '--get-regexp', '^filter\\..*\\.(clean|smudge|process)$'], signal });
     if (result.exitCode === 1 && result.status === 'failed') return;
     if (result.exitCode !== 0 || result.status !== 'completed') throw new Error('Cannot inspect Git helper configuration.');
     if (result.stdout.split('\n').some(line => /^filter\.\S+\s+\S/.test(line))) {

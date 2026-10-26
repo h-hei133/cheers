@@ -19,15 +19,24 @@ function composedReviewFocus(composed: NonNullable<CommandContext['composedPromp
   return [...composed.skills.map(skillBlock), ...methods, composed.prose.trim()].filter(Boolean).join('\n\n');
 }
 
+/** Share argument and focus preparation between dispatch and the read-only preview. */
+export function prepareReviewRequest(
+  args: readonly string[],
+  context: Pick<CommandContext, 'rawCommandArgs' | 'composedPrompt'>,
+): { readonly ok: true; readonly focus: string } | { readonly ok: false; readonly reason: string } {
+  const parsed = parseTextArgs(reviewSyntax, args, context.rawCommandArgs);
+  if (!parsed.ok) return { ok: false, reason: parsed.reason };
+  const composed = context.composedPrompt ? composedReviewFocus(context.composedPrompt) : '';
+  return { ok: true, focus: [parsed.text, composed].filter(Boolean).join('\n\n') };
+}
+
 /** Advisory review uses the same native Git snapshot as the workbench. */
 export async function runReviewCommand(args: string[], context: CommandContext): Promise<CommandExecutionResult> {
-  const parsed = parseTextArgs(reviewSyntax, args, context.rawCommandArgs);
-  if (!parsed.ok) return { kind: 'local', output: `Invalid /review arguments: ${parsed.reason}\n${syntaxHelp(reviewSyntax)}` };
-  const composed = context.composedPrompt ? composedReviewFocus(context.composedPrompt) : '';
-  const focus = [parsed.text, composed].filter(Boolean).join('\n\n');
+  const request = prepareReviewRequest(args, context);
+  if (!request.ok) return { kind: 'local', output: `Invalid /review arguments: ${request.reason}\n${syntaxHelp(reviewSyntax)}` };
   // A bare review has no focus parameter. Forwarding an empty string makes the
   // native Git syntax parser reject the request before it can inspect changes.
-  const forwarded = focus ? ['review', focus] : ['review'];
+  const forwarded = request.focus ? ['review', request.focus] : ['review'];
   return context.gitCommand ? context.gitCommand(forwarded, context)
     : { kind: 'local', output: 'Git review requires a bound session runtime; review was not started.' };
 }

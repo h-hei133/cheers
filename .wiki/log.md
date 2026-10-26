@@ -9474,3 +9474,9 @@ ADD-09确认`/context`缺少实际组装请求的独立本地估算。现request
 projection10、wire3、context report14、session29、step90、runtime preview30共六文件176项单worker通过；两个有效反转分别移除localEstimate和恢复图片原文计数，前者10个失败、后者图片长度断言失败，均逐字节恢复并重验。独立只读review先后指出数值测试、图片来源、opaque reasoning、Responses覆盖和图片allowance契约问题，修正后最终无findings。
 
 五静态门/diff、责任上限0、TS build abc97ad25d30（inputs a16517030700）及已适配validator正式judge proven/0 open-failed-gap通过。未运行真实provider、全仓、exe、桌面或PTY；固定图片allowance不是模型真实图片token，未引入原生tokenizer，也不能解释真实1.7k/4.9k差额。HANDOFF/addition第五十六批/audit更新；Git/CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-27] fix | review预览复用真实Git prompt
+
+ADD-08确认有效脏工作树上的`/review`仍显示unknown：preview只允许deep-research driver，standalone review也没有纯`preparePrompt`。现preview显式准入review standalone/driver，复用review request owner的正文、skill、modifier与focus准备，并从原Git workbench取得snapshot与最终review prompt；不调用通用`gitCommand`、`runReviewCommand`或`execute`。preview按实际dispatch的`gitRequestMode`使用plan mode，Git读取传播取消信号，内容复验以原`assertGitSnapshot`核对完整fingerprint。
+
+有效脏工作树得到本地数值；clean/unreadable、缺少Git workbench、第二个driver、无效请求与取消仍在模型准备前拒绝。五文件93项单worker通过；恢复旧driver门触发8项失败，移除plan override触发4项失败，均逐字节恢复并重验preview39项。五静态门/diff、责任上限0、TS build 134c5c64ce2b（inputs 509863f0359e、artifact d4ceddb3a987）及签入validator正式judge proven/0 open-failed-gap通过。预览与提交仍各取一次Git snapshot，未共享one-use reservation；未运行真实provider、全仓、exe、桌面或PTY。HANDOFF/addition第五十七批/audit更新；Git/CI另绑定，原Phase38/9、ADD独立且整体active。

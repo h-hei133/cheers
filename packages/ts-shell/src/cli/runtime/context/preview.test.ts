@@ -37,33 +37,45 @@ import { toolSchemas } from '../../../turn/tools.js';
 import { openingMessage } from '../../../turn/opening.js';
 import { readPromptPreview } from '../../../session/context/preview.js';
 import { estimateWirePrompt } from '../../../context/request/wire.js';
+import { gitCommandFor, gitWorkbenchFor, installGitRuntime } from '../git.js';
+import { gitFixture, gitGate, stubGitEnvironment } from '../../../test-utils/git.js';
 
 let root: string;
+let repositories: ReturnType<typeof gitFixture>[] = [];
 beforeEach(() => {
   fs.mkdirSync('/tmp/cheers-test', { recursive: true }); root = fs.mkdtempSync('/tmp/cheers-test/runtime-preview-');
   const home = path.join(root, 'home'); fs.mkdirSync(home); vi.stubEnv('CHEERS_TEST_ROOT', home); vi.stubEnv('USERPROFILE', home);
+  repositories = [];
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
-const fixture = () => {
-  const cwd = path.join(root, 'workspace'); fs.mkdirSync(cwd); fs.mkdirSync(path.join(cwd, '.git'));
+afterEach(() => {
+  vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+  for (const repository of repositories) repository.cleanup();
+});
+const fixture = (options: { readonly git?: boolean } = {}) => {
+  const cwd = options.git ? (() => {
+    const repository = gitFixture(true); repositories.push(repository); stubGitEnvironment(repository.home); return repository.root;
+  })() : path.join(root, 'workspace');
+  if (!options.git) { fs.mkdirSync(cwd); fs.mkdirSync(path.join(cwd, '.git')); }
   const session: Session = { id: 'sess_preview', projectRoot: cwd, status: 'active', rootMode: 'direct', turns: [],
     createdAt: '2026-10-26T00:00:00.000Z', updatedAt: '2026-10-26T00:00:00.000Z' };
   const layout = projectSessionFileLayout({ sessionsDir: path.join(root, 'sessions'), sessionId: session.id }); writeSessionRecord({ session, layout });
-  const manager = { getSessionDirPath: () => layout.sessionDir } as unknown as SessionManager;
+  const manager = { getSessionDirPath: () => layout.sessionDir, getSession: () => session } as unknown as SessionManager;
   const config = { ...getRuntimeConfig(cwd), enableMcpTools: false, toolDiscovery: 'dynamic' as const };
   const target = { provider: 'openai', model: 'fixture', baseUrl: 'https://fixture.invalid/v1', expectedEnvVarName: 'FIXTURE', thinkingEffort: null };
   const context = { cwd, projectRoot: cwd, session, skillOptions: { noSkills: true }, runtimeConfig: config,
     resolveConfigTarget: () => target } as unknown as ShellRuntimeContext;
   Object.assign(context, { configuration: new ConfigState(config, configurationBinding(context), [{ id: 'openai', name: 'Fixture', baseUrl: target.baseUrl,
     models: [{ id: 'fixture', name: 'Fixture', vision: false }] }]) });
+  if (options.git) installGitRuntime(context, manager, new ShellSessionRuntime({} as never), () => gitGate(cwd));
   context.preparePromptContext = async (prompt, signal) => {
     const prepared = await buildPromptWithFutureTurnInjections({ deps: {}, sessionId: session.id, prompt });
     return { prompt: prepared.prompt, isCurrent: () => !signal.aborted && prepared.isCurrent() };
   };
   installCommandGate(context, () => ({ permissionScope: 'ask' }));
   const gateway: CliMcpGateway = { snapshot: vi.fn(() => { throw new Error('No connection permitted'); }), refresh: vi.fn() };
-  const load = (draft = '', attachments?: Parameters<typeof previewContext>[4], signal = new AbortController().signal) =>
-    previewContext(context, manager, gateway, draft, attachments, 'build', 'ask', signal);
+  const load = (draft = '', attachments?: Parameters<typeof previewContext>[4], signal = new AbortController().signal,
+    agentMode: 'plan' | 'build' = 'build') =>
+    previewContext(context, manager, gateway, draft, attachments, agentMode, 'ask', signal);
   return { cwd, context, session, layout, target, gateway, load, manager };
 };
 
@@ -171,6 +183,105 @@ it('previews the exact submitted modifier, template and skill prompt without com
   expect(preview.estimate).toEqual(actual.estimate);
   expect(files.map(target => fs.readFileSync(target))).toEqual(before);
   expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
+});
+
+it.each(['review', 'audit', 'check'])('previews the exact composed %s prompt through the native Git owner without dispatch or writes', async name => {
+  const { cwd, context, load, layout, session } = fixture({ git: true });
+  const paths = ['review-a', 'review-b'].map(skillName => {
+    const file = path.join(cwd, `${skillName}.md`);
+    fs.writeFileSync(file, `---\nname: ${skillName}\ndescription: ${skillName}\n---\nMETHOD ${skillName}`);
+    return file;
+  });
+  context.skillOptions = { noSkills: true, skillPaths: paths };
+  const input = `检查证据 /brainstorm /${name} /skill:review-a /skill:review-b`;
+  const prepare = vi.fn(context.preparePromptContext!); context.preparePromptContext = prepare;
+  const workbench = gitWorkbenchFor(context)!;
+  const execute = vi.spyOn(workbench, 'execute');
+  const command = vi.spyOn(workbench, 'command');
+  const files = [layout.metadataPath, layout.statePath, layout.transcriptPath], before = files.map(file => fs.readFileSync(file));
+  const status = workbench.git().text(['status', '--short']);
+  const preview = await load(input); preview.verify();
+  expect(command).not.toHaveBeenCalled();
+  const actual = await routeSlashCommand(input, { cwd, sessionId: session.id, skillOptions: context.skillOptions,
+    gitCommand: gitCommandFor(context) });
+  if (actual?.kind !== 'prompt') throw new Error('Expected the native review prompt.');
+  expect(prepare).toHaveBeenCalledWith(actual.prompt, expect.any(AbortSignal));
+  expect(actual.prompt).toContain('<skill name="review-a">');
+  expect(actual.prompt).toContain('<skill name="review-b">');
+  expect(actual.prompt).toContain('<method name="brainstorm">');
+  expect(actual.prompt).toContain('检查证据');
+  expect(preview.estimate).toEqual((await load(actual.prompt, undefined, undefined, 'plan')).estimate);
+  expect(execute).not.toHaveBeenCalled();
+  expect(files.map(file => fs.readFileSync(file))).toEqual(before);
+  expect(await status).toBe(await workbench.git().text(['status', '--short']));
+});
+
+it('previews a standalone review focus with the same native prompt as dispatch', async () => {
+  const { cwd, context, gateway, load, manager, session } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'new.txt'), 'standalone evidence\n');
+  const prepare = vi.fn(context.preparePromptContext!); context.preparePromptContext = prepare;
+  const preview = await load('/review inspect this');
+  preview.verify();
+  const plan = await previewContext(context, manager, gateway, '/review inspect this', undefined, 'plan', 'ask', new AbortController().signal);
+  expect(plan.estimate).toEqual(preview.estimate);
+  const actual = await routeSlashCommand('/review inspect this', { cwd, sessionId: session.id, gitCommand: gitCommandFor(context) });
+  if (actual?.kind !== 'prompt') throw new Error('Expected the native review prompt.');
+  expect(prepare).toHaveBeenCalledWith(actual.prompt, expect.any(AbortSignal));
+  expect(actual.prompt).toContain('User focus: inspect this');
+  expect(preview.estimate).toEqual((await load(actual.prompt, undefined, undefined, 'plan')).estimate);
+});
+
+it('invalidates a review preview when the native Git snapshot changes', async () => {
+  const { cwd, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'first.txt'), 'first evidence\n');
+  const preview = await load('检查证据 /review');
+  preview.verify();
+  fs.writeFileSync(path.join(cwd, 'first.txt'), 'second evidence\n');
+  await expect(preview.verifyContent(new AbortController().signal)).rejects.toThrow('GIT_STATE_CHANGED');
+});
+
+it('keeps review unknown when the native Git owner is unavailable or the tree is clean', async () => {
+  const unavailable = fixture();
+  const prepare = vi.fn(unavailable.context.preparePromptContext!); unavailable.context.preparePromptContext = prepare;
+  await expect(unavailable.load('检查证据 /review')).rejects.toThrow('Review request preparation is unavailable');
+  expect(prepare).not.toHaveBeenCalled();
+  const clean = fixture({ git: true });
+  const cleanPrepare = vi.fn(clean.context.preparePromptContext!); clean.context.preparePromptContext = cleanPrepare;
+  await expect(clean.load('检查证据 /review')).rejects.toThrow('Working tree clean');
+  expect(cleanPrepare).not.toHaveBeenCalled();
+});
+
+it('does not inspect Git for an already-cancelled review preview', async () => {
+  const { load, context } = fixture({ git: true });
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  const controller = new AbortController(); controller.abort();
+  await expect(load('/review', undefined, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+  expect(snapshot).not.toHaveBeenCalled();
+});
+
+it('does not prepare a review prompt when Git snapshot acquisition is cancelled', async () => {
+  const { load, context } = fixture({ git: true });
+  fs.writeFileSync(path.join(context.cwd, 'cancelled.txt'), 'evidence\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = workbench.snapshot.bind(workbench);
+  const controller = new AbortController();
+  vi.spyOn(workbench, 'snapshot').mockImplementation(async signal => {
+    const value = await snapshot(signal);
+    controller.abort();
+    return value;
+  });
+  const prepare = vi.fn(context.preparePromptContext!); context.preparePromptContext = prepare;
+  await expect(load('/review', undefined, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+  expect(prepare).not.toHaveBeenCalled();
+});
+
+it('rejects a second composed driver before the review owner takes a snapshot', async () => {
+  const { load, context } = fixture({ git: true });
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  await expect(load('检查证据 /deep-research /review')).rejects.toThrow('Only one workflow driver');
+  expect(snapshot).not.toHaveBeenCalled();
 });
 
 it('invalidates selected template edits, higher-priority overrides and newly discovered command collisions', async () => {
