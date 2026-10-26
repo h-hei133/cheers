@@ -4,8 +4,11 @@ import { syntaxHelp } from '../core/commands/syntax/projection.js';
 import type { ResearchRuntime } from './run/runtime.js';
 import type { ResearchRun } from './run/model.js';
 import { researchEntryRequest, researchTurnPrompt } from './run/entry.js';
+import type { ResearchRequest } from './brief/model.js';
+import type { ResearchReservation } from './run/reservation.js';
 
-export async function runResearchCommand(args: readonly string[], context: CommandContext, runtime: ResearchRuntime, busy: boolean): Promise<CommandExecutionResult> {
+export async function runResearchCommand(args: readonly string[], context: CommandContext, runtime: ResearchRuntime, busy: boolean,
+  reservation?: (request: ResearchRequest) => ResearchReservation | undefined): Promise<CommandExecutionResult> {
   const parsed = parseResearchArgs(args);
   if (!parsed.ok || parsed.flags.has('help')) return { kind: 'local', output: `${!parsed.ok ? `Invalid research arguments: ${parsed.reason}\n` : ''}${syntaxHelp(researchSyntax)}` };
   const action = parsed.action.name;
@@ -17,8 +20,9 @@ export async function runResearchCommand(args: readonly string[], context: Comma
     if (action === 'pause') return { kind: 'local', output: showResearch(runtime.pause()) };
     if (action === 'reconcile') return { kind: 'local', output: showResearch(runtime.discard()) };
     if (busy) return { kind: 'local', output: 'Research was not submitted: wait for the active turn to settle.' };
+    const request = action ? undefined : researchEntryRequest(parsed, context.composedPrompt);
     const run = action === 'resume' ? runtime.resume() : action === 'steer' ? runtime.steer(parsed.args.join(' '))
-      : runtime.create(researchEntryRequest(parsed, context.composedPrompt));
+      : runtime.create(request!, reservation?.(request!));
     return { kind: 'prompt', prompt: researchTurnPrompt(run), notice: `Research ${run.id} armed; ordinary model, tool and permission gates apply.`,
       promptMetadata: { source: 'deep-research', researchRunId: run.id, researchEpoch: run.epoch } };
   } catch (error) { return { kind: 'local', output: `Research action refused: ${error instanceof Error ? error.message : 'state unavailable'}` }; }

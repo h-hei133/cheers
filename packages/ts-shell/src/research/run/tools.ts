@@ -18,6 +18,12 @@ export function researchEntryDescriptors(run: Pick<ResearchRun, 'id' | 'save'>):
     .concat([researchRunDescriptor(run.id), ...(run.save.requested ? [researchSaveDescriptor(run.id)] : [])]);
 }
 
+/** Share the existing catalogue projection while refusing any preview execution. */
+export function researchPreviewTools(run: Pick<ResearchRun, 'id' | 'save'>): readonly ToolDefinition[] {
+  return researchEntryDescriptors(run).map(descriptor => ({ ...descriptor,
+    async execute() { throw new Error('Research preview tools cannot execute.'); } }));
+}
+
 export function researchTools(runtime?: ResearchRuntime, runId?: unknown): readonly ToolDefinition[] {
   const sourceTools = [createPaperSearchTool(), createDocumentReadTool()];
   const run = runtime?.selected(runId);

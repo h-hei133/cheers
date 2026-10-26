@@ -12,6 +12,7 @@ import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from '../approval/sessionApprova
 import { buildSessionResumeContext } from '../continuation/sessionPromptContinuity.js';
 import { historyDigest } from '../../context/request/identity.js';
 import { decodeGoal, goalMatchesScope } from '../../planning/goal/codec.js';
+import { directoryIdentity } from '../store/bound.js';
 
 /** Small, complete read only. Larger histories remain unknown rather than truncated. */
 export async function readPromptPreview(host: BoundSessionHost, expected: Session, cwd: string, prompt: string,
@@ -22,6 +23,7 @@ export async function readPromptPreview(host: BoundSessionHost, expected: Sessio
   const root = captureWorkspaceRoot(expected.projectRoot, expected.projectRoot, 'read');
   for (const target of [layout.metadataPath, layout.statePath, layout.transcriptPath]) onSource?.(target);
   const version = readSessionFileVersion(layout);
+  const capturedDirectoryIdentity = directoryIdentity(layout);
   const expectedTurns = expected.turns;
   if (expectedTurns.length > 4096) throw new Error('Live session exceeds the context preview limit.');
   const expectedHistory = historyDigest(expectedTurns);
@@ -57,7 +59,8 @@ export async function readPromptPreview(host: BoundSessionHost, expected: Sessio
     workspace: { path: root.path, identity: root.identity } };
   const goal = state.goal === undefined ? undefined : decodeGoal(state.goal);
   if (state.goal !== undefined && !goal) throw new Error('Saved goal is invalid.');
-  return { session, state, scope,
+  return { session, state, scope, directoryIdentity: capturedDirectoryIdentity,
     goalObjective: goal && goalMatchesScope(goal, scope) && goal.phase === 'active' ? goal.objective : undefined,
+    continuityContextFor: (currentPrompt: string) => buildSessionResumeContext({ currentPrompt, snapshot: continuity }),
     continuityContext: buildSessionResumeContext({ currentPrompt: prompt, snapshot: continuity }), verify };
 }

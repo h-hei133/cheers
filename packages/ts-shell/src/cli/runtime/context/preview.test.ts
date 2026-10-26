@@ -27,6 +27,16 @@ import { createProjectMemoryInjectionStateStore } from '../../../memory/projectM
 import { createCompactLiveCheckpointStore } from '../../../context/compact/checkpoint/compactLiveCheckpoint.js';
 import { createCompactInjectionStateStore } from '../../../context/compact/injection/compactInjectionState.js';
 import type { ProjectMemoryRecord } from '../../../memory/projectMemoryStoreContract.js';
+import { researchCommandFor, researchFor } from '../research.js';
+import { researchEntryDescriptors } from '../../../research/run/tools.js';
+import { preparePromptRequest } from '../../../core/prompts/request.js';
+import { foregroundTools } from '../prompt.js';
+import { ShellSessionRuntime } from '../../../core/shell/sessionRuntime.js';
+import * as endpoints from '../../../provider/endpoints/index.js';
+import { toolSchemas } from '../../../turn/tools.js';
+import { openingMessage } from '../../../turn/opening.js';
+import { readPromptPreview } from '../../../session/context/preview.js';
+import { estimateWirePrompt } from '../../../context/request/wire.js';
 
 let root: string;
 beforeEach(() => {
@@ -53,7 +63,7 @@ const fixture = () => {
   installCommandGate(context, () => ({ permissionScope: 'ask' }));
   const gateway: CliMcpGateway = { snapshot: vi.fn(() => { throw new Error('No connection permitted'); }), refresh: vi.fn() };
   const load = (draft = '', attachments?: Parameters<typeof previewContext>[4]) => previewContext(context, manager, gateway, draft, attachments, 'build', 'ask', new AbortController().signal);
-  return { cwd, context, session, layout, target, gateway, load };
+  return { cwd, context, session, layout, target, gateway, load, manager };
 };
 
 it('estimates an empty startup through the actual tool projection without provider, MCP or persistence', async () => {
@@ -269,12 +279,103 @@ it('invalidates a newly created personal template candidate without changing leg
   expect(() => before.verify()).toThrow('source changed');
 });
 
-it('counts non-command paths and vision fallback, but does not start workflow commands', async () => {
+it('counts non-command paths and vision fallback, but does not run functional commands', async () => {
   const { load } = fixture(); const text = await load('Inspect /home');
   const image = await load('Inspect /home', { images: [{ type: 'image', mimeType: 'image/png', data: 'AA==', description: 'diagram' }] });
   expect(image.estimate.tokens).toBeLessThan(text.estimate.tokens + 100);
-  await expect(load('question /deep-research')).rejects.toThrow('preparation');
+  const research = await load('question /deep-research'); research.verify(); expect(research.estimate.tokens).toBeGreaterThan(text.estimate.tokens);
   await expect(load('/model')).rejects.toThrow('preparation');
+});
+
+it.each([
+  '/deep-research --mode software question /skill:one /skill:two',
+  'question /deep /skill:one /skill:two\nInspect counterexamples',
+  '/research --save "Question with /home and quoted /model"',
+])('previews and submits one exact native research entry without early state or network effects: %s', async input => {
+  const { cwd, context, session, layout, load, manager, gateway } = fixture();
+  const paths = ['one', 'two'].map(name => { const file = path.join(cwd, `${name}.md`); fs.writeFileSync(file, `---\nname: ${name}\ndescription: method\n---\nMETHOD ${name}`); return file; });
+  context.skillOptions = { noSkills: true, skillPaths: paths };
+  const files = [layout.metadataPath, layout.statePath, layout.transcriptPath], before = files.map(file => fs.readFileSync(file));
+  const renderer = { renderLine: vi.fn() };
+  const runtime = researchFor(context, manager, renderer);
+  const created = vi.spyOn(runtime, 'create'), arm = vi.spyOn(runtime, 'arm'), execute = vi.spyOn(runtime, 'run');
+  const injection = vi.fn(context.preparePromptContext!); context.preparePromptContext = injection;
+  const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+  const preview = await load(input); preview.verify(); await preview.verifyContent(new AbortController().signal);
+  const [endpoint, wireInput] = wire.mock.calls.at(-1)!;
+  const expectedPrompt = injection.mock.calls.at(-1)![0];
+  const prospectiveId = /native research run ([a-f0-9-]+)/.exec(expectedPrompt)![1]!;
+  const capturedSession = await readPromptPreview(manager, session, cwd, expectedPrompt);
+  expect(files.map(file => fs.readFileSync(file))).toEqual(before); expect(fs.existsSync(layout.stateLockPath)).toBe(false);
+  expect(created).not.toHaveBeenCalled(); expect(arm).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled();
+  expect(runtime.selected(prospectiveId)).toBeUndefined(); expect(renderer.renderLine).not.toHaveBeenCalled();
+  const host = new ShellSessionRuntime({} as never);
+  const researchCommand = researchCommandFor(context, manager, host, renderer);
+  const result = await routeSlashCommand(input, { cwd, projectRoot: cwd, sessionId: session.id, skillOptions: context.skillOptions,
+    researchCommand, runCancellable: operation => host.commands.run(operation) });
+  expect(result).toMatchObject({ kind: 'prompt', prompt: expectedPrompt, promptMetadata: { researchRunId: prospectiveId } });
+  const admitted = runtime.selected(prospectiveId)!;
+  expect(admitted.id).toBe(prospectiveId); expect(created).toHaveBeenCalledTimes(1); expect(arm).toHaveBeenCalledTimes(1);
+  const descriptors = researchEntryDescriptors(admitted);
+  const tools = descriptors.map(descriptor => ({ ...descriptor, execute: vi.fn(async () => ({ success: false })) }));
+  const actual = await preparePromptRequest({ workspaceRoot: cwd, sessionId: session.id, runtimeConfig: context.runtimeConfig,
+    skillOptions: context.skillOptions, agentMode: 'build', featureTools: foregroundTools(context, tools) });
+  expect(preview.estimate.identity.schemaDigest).toBe(requestIdentity(actual.currentOverhead()).schemaDigest);
+  expect(preview.estimate.identity.systemDigest).toBe(requestIdentity(actual.currentOverhead()).systemDigest);
+  const actualMessages = [openingMessage({ workspaceRoot: cwd, permissionScope: 'ask', prompt: expectedPrompt,
+    continuityContext: capturedSession.continuityContextFor(expectedPrompt), goalObjective: capturedSession.goalObjective })];
+  const actualBody = endpoints.endpointTurnBody(endpoint, { ...wireInput, messages: actualMessages,
+    systemPrompt: actual.currentOverhead().systemPrompt!, tools: toolSchemas(actual.currentTools()) });
+  expect(preview.estimate.tokens).toBe(estimateWirePrompt(actualBody, endpoints.endpointShape(endpoint).contextFields));
+  if (input.includes('/skill:')) expect(admitted.request.methods?.skills.map(skill => skill.name)).toEqual(['one', 'two']);
+  expect(descriptors.some(tool => tool.name === 'research_save')).toBe(input.includes('--save'));
+  expect(execute).not.toHaveBeenCalled(); expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
+  expect(() => preview.verify()).toThrow();
+});
+
+it('rejects malformed research and control actions before publishing an entry identity', async () => {
+  const { load, layout } = fixture(), before = fs.readFileSync(layout.statePath);
+  for (const input of ['/deep-research status', '/deep-research resume', '/deep-research --depth invalid question',
+    'question /deep-research --save', 'question /deep-research /research']) await expect(load(input)).rejects.toThrow();
+  expect(fs.readFileSync(layout.statePath)).toEqual(before);
+});
+
+it('refuses an exact published research entry after configuration replacement without creating state', async () => {
+  const { cwd, context, session, layout, manager, load } = fixture();
+  const input = '/deep-research question'; const preview = await load(input);
+  Object.assign(context, { configuration: new ConfigState(context.runtimeConfig, configurationBinding(context), context.configuration.current.catalog) });
+  expect(() => preview.verify()).toThrow('expired or changed');
+  const before = fs.readFileSync(layout.statePath), renderer = { renderLine: vi.fn() };
+  const researchCommand = researchCommandFor(context, manager, { getCurrentRunController: () => null } as unknown as ShellSessionRuntime, renderer);
+  const result = await routeSlashCommand(input, { cwd, projectRoot: cwd, sessionId: session.id, researchCommand });
+  expect(result).toMatchObject({ kind: 'local', output: expect.stringContaining('configuration or session changed') });
+  expect(fs.readFileSync(layout.statePath)).toEqual(before);
+});
+
+it('does not publish a cancelled research preparation and later admits a fresh current entry', async () => {
+  const { cwd, context, session, layout, manager, gateway, load } = fixture();
+  const original = context.preparePromptContext!; const cancelled = new AbortController();
+  context.preparePromptContext = async (prompt, signal) => { const prepared = await original(prompt, signal); cancelled.abort(); return prepared; };
+  await expect(previewContext(context, manager, gateway, '/deep-research question', undefined, 'build', 'ask', cancelled.signal)).rejects.toThrow();
+  const before = fs.readFileSync(layout.statePath); context.preparePromptContext = original;
+  const preview = await load('/deep-research question'); preview.verify();
+  const renderer = { renderLine: vi.fn() }, researchCommand = researchCommandFor(context, manager,
+    { getCurrentRunController: () => null } as unknown as ShellSessionRuntime, renderer);
+  expect(fs.readFileSync(layout.statePath)).toEqual(before);
+  expect(await routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id, researchCommand })).toMatchObject({ kind: 'prompt' });
+});
+
+it('keeps another local command busy and rejects cancelled owned research dispatch', async () => {
+  const { cwd, context, session, layout, manager } = fixture(), renderer = { renderLine: vi.fn() };
+  const host = new ShellSessionRuntime({} as never), researchCommand = researchCommandFor(context, manager, host, renderer);
+  const before = fs.readFileSync(layout.statePath);
+  await host.commands.run(async signal => {
+    const result = await researchCommand(['question'], { cwd, projectRoot: cwd, sessionId: session.id });
+    expect(result).toMatchObject({ kind: 'local', output: expect.stringContaining('active turn') });
+    host.commands.current!.controller.abort();
+    await expect(researchCommand(['question'], { cwd, projectRoot: cwd, sessionId: session.id, signal })).rejects.toMatchObject({ name: 'AbortError' });
+  });
+  expect(fs.readFileSync(layout.statePath)).toEqual(before); expect(host.getCurrentRunController()).toBeNull();
 });
 
 it('uses the closing request schema identity when no tool steps are allowed', async () => {

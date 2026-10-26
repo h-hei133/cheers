@@ -14,6 +14,7 @@ import { runResearchChild } from './child.js';
 import type { ResearchRun } from './model.js';
 import { recoverResearchSave } from '../report/recovery.js';
 import { prepareResearchRun } from './preparation.js';
+import { admitResearchReservation, type ResearchReservation } from './reservation.js';
 
 export interface ResearchHost {
   readonly store: BoundSessionHost;
@@ -36,12 +37,15 @@ export class ResearchRuntime {
     if (!run) throw new Error('No research run is bound to this session.');
     return { host: this.host.store, session: this.host.current(), id: run.id };
   }
-  create(request: ResearchRequest): ResearchRun {
+  create(request: ResearchRequest, reservation?: ResearchReservation): ResearchRun {
     this.recover();
     const session = this.host.current(); const edit = readResearch(this.host.store, session);
     if (this.active || currentResearch(edit)?.pending || currentResearch(edit)?.owner) throw new Error('Research has a pending owner or child outcome; pause and reconcile it before new work.');
-    const run = prepareResearchRun({ scope: edit.bound.scope, goal: edit.bound.state.goal }, request);
-    writeResearch(this.host.store, session, edit, replaceResearch(edit, run), undefined, run.goal ? undefined : run.id);
+    const prepared = reservation ? admitResearchReservation(reservation, { session, scope: edit.bound.scope,
+      state: edit.bound.state, directoryIdentity: edit.bound.directoryIdentity }, request) : undefined;
+    const run = prepareResearchRun({ scope: edit.bound.scope, goal: edit.bound.state.goal }, request,
+      prepared ? { id: prepared.id, now: Date.now() } : undefined);
+    writeResearch(this.host.store, session, edit, replaceResearch(edit, run), prepared?.guard, run.goal ? undefined : run.id);
     this.arm(run); return run;
   }
   arm(run: ResearchRun): void {

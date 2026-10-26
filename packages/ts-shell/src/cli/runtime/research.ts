@@ -8,6 +8,7 @@ import { ResearchRuntime } from '../../research/run/runtime.js';
 import { runResearchCommand } from '../../research/command.js';
 import { researchTools } from '../../research/run/tools.js';
 import { parseResearchArgs, researchAliases } from '../../core/commands/research/syntax.js';
+import { takeResearchPreview } from './context/research.js';
 
 const runtimes = new WeakMap<ShellRuntimeContext, ResearchRuntime>();
 export function researchFor(context: ShellRuntimeContext, store: SessionManager, renderer: Pick<StreamingRenderer, 'renderLine'>): ResearchRuntime {
@@ -17,7 +18,13 @@ export function researchFor(context: ShellRuntimeContext, store: SessionManager,
 }
 export function researchCommandFor(context: ShellRuntimeContext, store: SessionManager, sessionRuntime: ShellSessionRuntime,
   renderer: Pick<StreamingRenderer, 'renderLine'>): NonNullable<CommandContext['researchCommand']> {
-  return (args, commandContext) => runResearchCommand(args, commandContext, researchFor(context, store, renderer), sessionRuntime.getCurrentRunController() !== null);
+  return async (args, commandContext) => {
+    commandContext.signal?.throwIfAborted();
+    const active = sessionRuntime.getCurrentRunController();
+    const owned = active !== null && active === sessionRuntime.commands.current?.controller && active.signal === commandContext.signal;
+    return runResearchCommand(args, commandContext, researchFor(context, store, renderer),
+      active !== null && !owned, request => takeResearchPreview(context, request));
+  };
 }
 export function researchRunFor(context: ShellRuntimeContext, store: SessionManager, renderer: Pick<StreamingRenderer, 'renderLine'>,
   inherited?: RequestPolicy) {

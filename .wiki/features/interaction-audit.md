@@ -476,3 +476,16 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 | 尚未确认 | 原现场唯一按键根因、同模型/协议/规则/schema真实1.7k/4.9k、真实OAuth/API-key接受、历史cache writer与build lock来源，保留unknown |
 
 用户全部交互要求与整体验收仍见[文末任务总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)。本轮延迟实查e56e47d5自身CI40253191131仍运行；当前Git另绑定，不升级ADD整体完成或原Phase38/9。
+
+### 文末当前结论（第三十三批）
+
+本批补齐研究新建入口的本地数字preview：有界捕获、一用20秒prospective ID、实际同ID提交、完整入口prompt/run/save schema、原协议准备及来源/取消复验。预览不写研究/账本、不arm、不执行child/provider。实际终端还确认组合命令将自身command controller当成其他忙任务，已按controller与signal双重身份修补，其他任务与取消保护保留。最终九文件87项、四有效反转/逐字节恢复、四静态门/最终构建和正式judge proven三satisfied通过；普通/全屏实际Node小PTY均证明数字、零提前写入、唯一run/双skill、绑定transcript、assistant持久化、无pending及终端ready，143退出均settle。详见[第三十三批](phase-20-addition.md#15-实施与验证证据)。
+
+| 分类 | 当前结论 |
+|---|---|
+| 确实存在、有局部修补 | 原未配置model焦点、resume渐进默认焦点、输入留白/箭头、首帧/初始估算、面板操作不足、正文路径/多skill/有限组合/代码边界、memory raw/重复读，以及研究新建入口缺完整preview和自身command忙误判。局部隔离证据不替代原现场全验收 |
+| 确实仍需完善 | 两面板完整字段/来源/scope/desktop/真实认证、研究control/其他driver/child独立成本、原生tokenizer、全部动态来源/累计物理I/O、生产冷热启动及真实上下文拆分 |
+| 不成立的判断 | model没有上下键监听、resume排序反了、settings无分类/空配置无功能、start每次编译/用户入口用错、4.9k就是字符公式、工具数决定token数、当前只有一skill生效、原memory全无变更保护；现在“研究新建入口一律不能显示数字”也不再成立。描述、数字及armed仍不能作为执行完毕或文件保存权限证据 |
+| 尚未确认 | 原现场唯一按键根因、真实同模型/协议/规则/schema1.7k/4.9k、生产冷热收益、真实OAuth/API-key接受、历史cache writer及活跃build lock来源。不能将这些unknown写成不存在 |
+
+用户的未配置模型可选、两个面板整体参照、正文顶格/编辑箭头、首位完整slash/正文真实路径suggestion与Tab、同次全部明确skill和deep-research有限方法组合要求全部保留于[文末任务总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)。隔离6.8k研究/4.9k save入口不是用户真实差额，也不是研究总token；初轮回复前缀滚出视口和提交后强求立即数字属于探针readiness错误，保留失败分类。Git及延迟CI另实际绑定，原Phase38/9、ADD独立且整体active。

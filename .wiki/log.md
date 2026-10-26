@@ -9290,3 +9290,9 @@ ADD-08原health/候选/每pending lifecycle重复读同recordsFile，12记录15�
 ADD-08沿原研究owner提取entry参数/全方法与提示词、prospective run/deadline/goal账本关联、run/save描述，实际create/prompt/工具也共用。准备不持有store/runtime、不写状态或账本、不arm、不派发，描述没有执行/保存权限；实际锁/ledger/create及control/resume/steer/save准入保留。
 
 五文件37pass、三有效反转/逐字节恢复、四静态门/最终build3723a348eef5/新解包正式judge proven三satisfied通过。新增fixture身份/it.each参数/help syntax失败已分类保留；judge错误路径MODULE_NOT_FOUND后按包真实入口修正，未改产品。研究数字preview仍拒绝，ID交接/有界准入/完整协议工具请求/复验尚未接入；本批无PTY或真实provider，不宣称终端已支持研究估算。证据phase20-addition-research-entry，docs/Git另绑定，上一批CI仍运行；完整面板/认证/性能/计量等继续未验，原Phase38/9与ADD独立/active。
+
+## [2026-10-26] fix | 研究入口数字预览与实际身份交接
+
+ADD-08研究owner从有界snapshot准备20秒一次性身份，完整prompt/run/save schema接原协议估算；发布前raw/附件/模型/配置/取消复验，实际create同ID、提交时起deadline、原锁内状态guard。preview零研究/账本写入、零arm/child/provider。实际Node Enter检出自身组合command误判busy，现controller及signal双重匹配自身owner，其他命令与取消仍拒绝。
+
+最终九文件87pass、四有效反转/逐字节恢复、四静态门/build43a837219c11/新解包正式judge proven三satisfied通过。普通/全屏实际Node隔离小PTY数字6.8k研究/4.9k save、preview config/transcript不写、唯一run双skill/绑定transcript/assistant持久化/ledger无pending/终端ready、143退出settle。早期实际busy故障与回调同步throw、视口前缀及提交后数字readiness探针错误保留分类；synthetic数字不解释用户真实差额，不证明child研究完成/保存。归档phase20-addition-research-preview，docs/Git/CI另绑定；完整面板/桌面/真实认证、研究control/其他driver/child成本、原生tokenizer/动态源累计I/O、冷热启动/真实上下文继续待验，原Phase38/9与ADD独立/active。

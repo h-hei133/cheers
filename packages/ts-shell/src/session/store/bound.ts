@@ -128,7 +128,7 @@ function projectBoundRead(metadata: SessionMetadata | undefined, state: SessionS
     workspace: { path: workspace.path, identity: workspace.identity } };
   return { scope, state };
 }
-function directoryIdentity(layout: SessionFileLayout): string {
+export function directoryIdentity(layout: SessionFileLayout): string {
   const stat = lstatSync(layout.sessionDir, { bigint: true });
   if (!stat.isDirectory()) throw new SessionPublicationError('unavailable'); return `${stat.dev}:${stat.ino}:${stat.birthtimeMs}`;
 }

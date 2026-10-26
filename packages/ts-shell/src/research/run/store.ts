@@ -6,15 +6,19 @@ import type { ResearchRun, ResearchState } from './model.js';
 import { decodeResearchState } from './codec.js';
 import { createRequestLedger, initializeRequestScope } from '../../core/agent/request/ledger.js';
 import { decodeRequestLedger } from '../../core/agent/request/codec.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 
 export interface ResearchEdit { readonly bound: BoundSessionState; readonly state: ResearchState }
 export function readResearch(host: BoundSessionHost, session: Session): ResearchEdit {
   const bound = readBoundSessionState(host, session);
-  const value = bound.state.research;
-  const state = value === undefined ? { ...bound.scope, schemaVersion: 1 as const, runs: [] } : decodeResearchState(value);
-  if (!state || state.sessionId !== bound.scope.sessionId || state.sessionCreatedAt !== bound.scope.sessionCreatedAt
-    || !sameValue(state.workspace, bound.scope.workspace)) throw new Error('Research state binding is unavailable.');
-  return { bound, state };
+  return { bound, state: researchStateFor(bound.scope, bound.state.research) };
+}
+/** Admit the same owner payload from an already bounded session snapshot. */
+export function researchStateFor(scope: BoundSessionScope, value: unknown): ResearchState {
+  const state = value === undefined ? { ...scope, schemaVersion: 1 as const, runs: [] } : decodeResearchState(value);
+  if (!state || state.sessionId !== scope.sessionId || state.sessionCreatedAt !== scope.sessionCreatedAt
+    || !sameValue(state.workspace, scope.workspace)) throw new Error('Research state binding is unavailable.');
+  return state;
 }
 export function writeResearch(host: BoundSessionHost, session: Session, edit: ResearchEdit, state: ResearchState,
   guard?: (current: SessionStateSnapshot) => boolean, freshScopeId?: string): ResearchEdit {

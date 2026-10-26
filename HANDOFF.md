@@ -316,3 +316,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A context estimate needs a driver-specific prompt and run-bound tool schema, but invoking the original command would create or arm persisted work.
 - **Root Cause**: Entry transformation, identity construction and tool descriptors are embedded in runtime mutation or executable tool factories; ordinary prompt preparation cannot represent the actual first request.
 - **Rule**: Extract shared entry/run and descriptor projections in the original workflow domain, with no store/runtime or execution callbacks. Compare them against actual admitted prompts and descriptors, including all methods and optional save. Keep numeric preview withheld until the same prospective identity is handed to actual submission and every original admission/freshness boundary is preserved; an arbitrary equal-length ID does not prove request identity.
+
+### A Command Can See Its Own Controller As An Active Turn
+- **Symptom**: A composed workflow passes direct handler tests but real terminal Enter refuses it as busy.
+- **Root Cause**: The shared current-controller accessor includes local command controllers; composition runs inside that owner, so a nonnull check mistakes its own operation for unrelated work.
+- **Rule**: Admit the current command only when both the controller and supplied signal match its actual owner, check cancellation first, and retain rejection for other commands/model turns. Test through the real command runtime, then verify terminal submission and persisted outcomes. A fullscreen reply prefix can scroll away, and a settled turn can temporarily withdraw its estimate; combine persistence and terminal readiness instead of requiring an immediately numeric gauge.

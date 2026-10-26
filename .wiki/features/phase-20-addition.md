@@ -1001,6 +1001,24 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 
 归档`.omx/artifacts/phase20-addition-research-entry/`；strict docs/diff、本地链接、Git与CI另绑定。未配置具体model可选、两个面板完整看齐、消息顶格/编辑箭头、首位slash/正文路径Tab、所有skill生效及受限研究组合要求全部保留。完整settings/model字段/来源/scope/desktop/真实认证、研究完整preview、原生tokenizer、全动态来源和累计物理I/O、生产冷热启动及真实1.7k/4.9k差额继续未验，原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第三十三批：研究新建入口数字预览与实际身份交接
+
+接续已推送`97f591af6a628d6811fff221fd2f8c94008e9dde`，本批处理ADD-08中真实研究入口仍显示问号的缺口，同时保留ADD-11/12多skill与有限方法组合合同。
+
+[研究reservation owner](../../packages/ts-shell/src/research/run/reservation.ts)从既有有界session snapshot捕获scope、目录身份、goal/研究/账本及上下文状态，生成一次性prospective ID和新run；token用WeakMap归属、冻结请求、20秒有效期与一次消费保护，不写状态、不初始化ledger、不arm。提交仍由原ResearchRuntime恢复/读取/检查pending与owner，并重新验证请求、session对象、历史、root/selection、目录和捕获状态；原发布锁内再检查状态digest，不能覆盖锁等待期间改变的goal/研究/账本。真正提交使用同一个ID，deadline从实际提交开始；入口prompt和schema中没有时间字段，因此保持第一请求投影一致。伪造、复用、过期或已改变的身份不能作为当前准备结果使用。
+
+[runtime预览衔接](../../packages/ts-shell/src/cli/runtime/context/research.ts)只保留当前context最近一次完整验证后的entry，并绑定原config publication、session对象、cwd、forced tool及附件身份。[preview](../../packages/ts-shell/src/cli/runtime/context/preview.ts)沿实际解析器认定deep-research及别名、先验证全部skill/modifier，再使用共用researchTurnPrompt与完整run/save工具描述，经原preparePromptRequest和endpointTurnBody准备本地估算；continuity使用同一个已读快照按最终研究prompt重新分类。来源raw、附件异步读取准入、模型/config、工具、取消与发布前内容复验继续保留。preview工具只有拒绝执行的边界，不含prepare/onRefusal，不连接MCP或执行研究。control/help、其他未支持driver与不完整请求继续unknown；正文save仍不允许，独立`--save`新建入口包含保存工具描述但不授予文件写权限。
+
+真实Node终端发现并修补另一处产品问题：[researchCommandFor](../../packages/ts-shell/src/cli/runtime/research.ts)原把`ShellCommandRuntime.run`登记的自身组合命令controller视为其他忙任务，导致按Enter拒绝研究。现在仅当当前controller与命令owner及传入signal同时相同，才允许自身命令继续；其他命令仍busy，已取消signal先抛AbortError。只读参考pi的`core/agent-session.ts`2090–2120分开命令派发与compaction准入，本项目保留自己的controller、研究锁与账本，不从参考代码推导它已实现持久研究ID交接。
+
+最终单进程串行九文件87项通过：runtime preview27、reservation12、runtime10、research composition12、save3、resume3、preparation9、session preview5、sessionIdle6。测试以实际`ShellSessionRuntime.commands.run`经过路由提交，确认唯一create/arm、同ID/同prompt/同system/tool schema、全部两份skill、save描述；并用实际opening/continuity及prepared schema重建endpoint请求，token估算与其wire估算严格相等。预览不写metadata/state/transcript、不建lock/研究/ledger、不执行child/provider；配置换代、取消、请求/历史/root/selection变化、无工具步数和锁内并发修改都有拒绝证据。初次真实owner回归1pass/2fail以及回调同步throw的测试失败已分类并保留，最终异步owner合同通过。
+
+四有效反转均产生AssertionError后逐字节恢复：撤销自身command准入、丢弃实际保留ID、移除锁内guard、遗漏研究工具roster。四静态门、最终TS构建`43a837219c11ec6f6da7aab72fa041769c3a0f9816da5c4ee90fb57d7ff9ad4e`通过；新解包checked-in validator实际exit0，正式judge为proven，三结构义务satisfied。未运行全仓回归或20k真实PTY。
+
+普通/全屏两个实际Node隔离小PTY均通过：初始约4.3k、方法/模板/双skill约9.0k，修改模板后12k，研究双skill新建入口6.8k，独立save新建入口4.9k；功能`/model`仍unknown，恢复研究草稿后恢复数字。预览期间config/transcript原字节不变、研究/账本不存在；Enter后一个native run保留两份skill，user transcript绑定该run，synthetic assistant已持久化，ledger无pending，真实输入区恢复；零研究child/source，两进程SIGTERM143均settle。早期按视口前缀等待全文回复，以及提交后强求立即恢复数字，属于探针readiness误假设，失败保留；最终用持久化回复、账本与终端ready共同判断。这些数字来自隔离synthetic夹具，不能解释用户真实1.7k/4.9k差额，也不能证明研究已完成或保存成功。
+
+归档`.omx/artifacts/phase20-addition-research-preview/`，文档/Git交付另绑定。研究**新建入口**数字preview与身份衔接有局部完整证据，control/其他driver/后续独立child及研究总费用仍待覆盖。settings/model全字段/来源/scope/desktop/真实认证、冷热Node/exe、原生tokenizer、全部动态来源和累计物理I/O、真实同模型/协议/规则/schema上下文差额仍未验；历史cache writer与build lock来源保留unknown。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1016,10 +1034,11 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。第二十五批修补搜索退出/焦点域/模型详情返回；第二十六批再补Model / Session两个真实owner入口及取消/保存/角色返回，六文件104项通过；第二十七批补普通choice/effort当前值焦点、七类编辑器保存重开与help退出夹具，五文件112项通过。第二十八批再补只读来源内容wheel、翻页/首尾、有界大值阅读及拒绝后返回，五文件118项和两模式隔离PTY通过；只读文本仍有4MiB上限。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
-| 代码示例误调用及合法关闭后漏skill | 原字符串查找将围栏正文误当关闭，或以不同长度反引号闭合；第二十九批改为独立关闭行与精确行内run，示例保持字面量，合法关闭后所有skill恢复解析。七文件151项、两有效反转和两模式隔离PTY有局部证据；实际研究driver完整数字preview仍待实现 |
+| 代码示例误调用及合法关闭后漏skill | 原字符串查找将围栏正文误当关闭，或以不同长度反引号闭合；第二十九批改为独立关闭行与精确行内run，示例保持字面量，合法关闭后所有skill恢复解析。第三十三批再补实际研究新建入口数字preview，control/其他driver/child总成本仍待覆盖 |
 | 待注入记忆预览缺raw字节与可取消读取 | 原已有路径/元数据及generation保护；第三十批补原始字节追踪、有界async verified-handle读取及完整preview异步复验。六文件73项、三有效反转、两模式实际隔离PTY有局部证据。普通删除/invalidated原并非全无保护；第三十一批已补单次多记录共享读取，完整preview/controller累计I/O与所有动态来源验收仍未完成 |
 | 一次记忆预览反复读取相同文件 | 第三十一批沿原store共享单次有界只读snapshot，health/候选/lifecycle共用，12pending的binary acquisition从15降2，复验仍追加1；75项/三反转/两模式PTY有局部证据。全preview/controller和动态来源总读取成本仍待验，不能扩成全请求两次读 |
-| 研究入口无法完整预览 | 已确认实际create/arm后的消息与runId绑定工具不同于普通preview；第三十二批已补研究owner的参数/新run纯准备、共用入口提示词和无执行能力工具描述，37项及三有效反转有局部证据。preview仍拒绝数字，prospective ID与提交身份交接、完整请求准备及有界准入/复验尚未接入 |
+| 研究入口无法完整预览 | 第三十三批已接有界新建入口准备、一次性prospective ID到实际同ID提交、完整prompt/run/save schema及协议估算、来源与取消复验，87项/四有效反转/两模式实际隔离PTY通过。只覆盖新建入口，不代表control、其他driver、后续独立child或研究总费用已可预览 |
+| 组合研究把自身command owner误判为忙 | 实际终端Enter拒绝且真实ShellCommandRuntime路由回归可复现。第三十三批改为controller与signal双重身份匹配，自身可继续，其他命令与取消仍拒绝；不能只删除全部busy保护 |
 
 ### 16.2 不成立的判断与仍未确认的原因
 

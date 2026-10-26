@@ -38,6 +38,11 @@ import { toolSchemas } from '../../../turn/tools.js';
 import { projectStatePath } from '../../../core/state/projectState.js';
 import { configuredOutputLimit } from '../../../provider/request/output.js';
 import { serviceTierCapability } from '../../../core/models/serviceTier.js';
+import { tokenizeCommandArgs } from '../../../core/commands/arguments.js';
+import { parseResearchArgs } from '../../../core/commands/research/syntax.js';
+import { researchEntryRequest, researchTurnPrompt } from '../../../research/run/entry.js';
+import { researchPreviewTools } from '../../../research/run/tools.js';
+import { prepareResearchPreview } from './research.js';
 
 /** A local estimate never connects MCP, accepts an injection or starts a driver. */
 export async function previewContext(context: ShellRuntimeContext, manager: SessionManager, gateway: CliMcpGateway,
@@ -60,9 +65,10 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const definition = commands.find(command => command.name === standalone?.commandName);
   const pureStandalone = definition?.kind === 'prompt' && definition.enabled !== false && definition.availability !== 'hidden'
     ? standalone?.preparePrompt : undefined;
+  const researchStandalone = definition?.name === 'deep-research' && definition.enabled !== false && definition.availability !== 'hidden';
   // Match dispatch eligibility without invoking standalone handlers or workflow drivers.
-  if ((!composed && !pureStandalone && draft.startsWith('/') && !/^\/[^\s]*[\/\\]/.test(draft))
-    || (composed && plan.methods.some(method => method.invocation.composition?.kind === 'driver'))) {
+  if ((!composed && !pureStandalone && !researchStandalone && draft.startsWith('/') && !/^\/[^\s]*[\/\\]/.test(draft))
+    || (composed && plan.methods.some(method => method.invocation.composition?.kind === 'driver' && method.definition.name !== 'deep-research'))) {
     throw new Error('Command request preparation is pending.');
   }
   const snapshot = config.enableMcpTools ? gateway.peekSnapshot?.() : undefined;
@@ -72,8 +78,15 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const skills = await resolveSkillCatalog({ workspaceRoot: cwd, sessionId: expected.id, ...context.skillOptions, abortSignal: signal }, sources.track);
   const composition = composed ? prepareComposition(draft, plan, skills.skills) : undefined;
   if (composition?.error !== undefined) throw new Error(composition.error);
-  const effectivePrompt = composition?.prompt ?? (pureStandalone && source ? pureStandalone(source.argsText) : draft);
+  let effectivePrompt = composition?.prompt ?? (pureStandalone && source ? pureStandalone(source.argsText) : draft);
   const session = await readPromptPreview(manager, expected, cwd, effectivePrompt, signal, sources.track);
+  const researchArgs = composition?.driver?.method.definition.name === 'deep-research' ? composition.driver.args
+    : researchStandalone && source ? tokenizeCommandArgs(source.argsText) : undefined;
+  const parsedResearch = researchArgs ? parseResearchArgs(researchArgs) : undefined;
+  if (parsedResearch && !parsedResearch.ok) throw new Error('Research command request preparation is pending.');
+  const research = parsedResearch?.ok ? prepareResearchPreview(context, session, researchEntryRequest(parsedResearch,
+    composition?.driver ? { originalInput: draft, prose: plan.prose, skills: composition.expanded.instructions, modifiers: composition.modifiers } : undefined)) : undefined;
+  if (research) effectivePrompt = researchTurnPrompt(research.run);
   // These modes rewrite the run configuration or context at admission.
   if (decodeHandoffs(session.state.handoffs, session.scope).cycles.some(row => !row.retired && ['armed', 'running', 'switched', 'unknown'].includes(row.phase))
     || decodeDirectors(session.state.directors, session.scope).cycles.some(row => !row.retired && row.phase !== 'disabled')) {
@@ -87,8 +100,9 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const access = sourceAccessFor(context, signal);
   for (const entry of entries) sources.track(entry.path);
   const forcedTool = context.peekForcedTool?.();
-  const features = foregroundTools(context);
-  const featureIdentity = JSON.stringify(toolSchemas(new Map(features.map(tool => [tool.name, tool]))));
+  const ordinaryFeatures = foregroundTools(context);
+  const features = research ? foregroundTools(context, researchPreviewTools(research.run)) : ordinaryFeatures;
+  const featureIdentity = JSON.stringify(toolSchemas(new Map(ordinaryFeatures.map(tool => [tool.name, tool]))));
   const prepared = await preparePromptRequest({ workspaceRoot: cwd, sessionId: expected.id, runtimeConfig: config, agentMode,
     catalogContent: { skills: skills.skills, tools: contributions.flatMap(entry => entry.tools), ...(snapshot ? { mcpTools: snapshot.tools } : {}) },
     ...(snapshot ? { mcpGateway: { snapshot: async () => snapshot } } : {}),
@@ -101,7 +115,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const endpoint = providerCredentialEndpoint(publication.catalog, resolution, base) ?? DEFAULT_ENDPOINT_KIND;
   const protocol = endpointShape(endpoint);
   const messages = [...selectModelContext(session.session), openingMessage({ workspaceRoot: cwd,
-    workspaceRoots: expected.workspaceRoots, permissionScope, goalObjective: session.goalObjective, continuityContext: session.continuityContext,
+    workspaceRoots: expected.workspaceRoots, permissionScope, goalObjective: session.goalObjective, continuityContext: session.continuityContextFor(effectivePrompt),
     prompt: promptWithContext(injected.prompt, entries), attachments })];
   if (messages.some(message => message.origin?.replayBinding || message.reasoning?.signature || message.reasoning?.redacted)) {
     throw new Error('Opaque replay has no complete local token estimate.');
@@ -134,7 +148,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const estimate = estimatePrompt(messages, overhead, { provider: resolution.provider, model: resolution.model,
     endpoint, endpointId, ...assembledIdentity }, getSessionUsage(expected.id), estimateWirePrompt(body, protocol.contextFields));
   const verify = () => {
-    signal.throwIfAborted(); session.verify(); sources.verify(); skills.verify?.();
+    signal.throwIfAborted(); session.verify(); sources.verify(); skills.verify?.(); research?.verify();
     for (const entry of entries) {
       if (!contextEntryPathWithinRoot(cwd, entry)) throw new Error('Context preview is stale.');
       try { access(entry.path); } catch { throw new Error('Context preview is stale.'); }
@@ -165,5 +179,6 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     verify();
   };
   await verifyContent(signal);
+  research?.publish();
   return { estimate, verify, verifyContent };
 }
