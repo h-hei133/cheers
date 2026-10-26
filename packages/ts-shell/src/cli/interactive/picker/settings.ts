@@ -188,6 +188,7 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
     form: 'panel', fullScreen: true, exclusive: true, holdInput: true, navigation,
     footer: [notice, '←→ categories · Tab: sections/rows/navigation · ↑↓ move · Enter: edit · Esc: back'].filter(Boolean).join(' '),
     ...(selected ? { initialSelection: selected } : {}),
+    defaultSelection: options => searching ? options.find(option => !option.disabled)?.id : undefined,
     empty: 'Settings could not be loaded. Check your configuration and retry.',
     chips: {
       items: [{ id: 'all', label: 'All' }, ...SETTINGS_GROUPS.map(name => ({ id: name, label: name }))],

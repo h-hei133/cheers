@@ -572,3 +572,13 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 用户最终要求已集中到[面板盘点与剩余验收](phase-20-addition.md#36-当前面板盘点与剩余验收范围)、[输入样例](phase-20-addition.md#164-用户输入样例与组合验收)和[本轮需求收口](phase-20-addition.md#165-本轮需求收口与实施边界)：两个面板整体参照oh-my-pi；未配置具体模型允许聚焦；resume默认最新且不抢手动焦点；已提交正文顶格、编辑箭头恢复；完整功能slash仅在源首位，正文路径suggestion/Tab；同一输入的多skill实际共同生效；多个兼容方法与一个研究入口组成一份任务。启动先显示真实TUI/loading，初始上下文按实际请求本地估算并与实测正确接续。
 
 本轮延迟读取`4abe6f11`自身CI：CI [40264741138](https://github.com/h-hei133/cheers/actions/runs/40264741138)仍in_progress，Architecture Watch [40264741044](https://github.com/h-hei133/cheers/actions/runs/40264741044)已success。两者不等于ADD整体验收；原Phase20保持38 complete / 9 partial，补充任务独立且整体active。
+
+### 文末当前问题判断（第三十八批）
+
+新增确认并修补的缺陷是**settings搜索焦点**：逐字输入或粘贴`topP`已将Top P排第一，但旧焦点仍留在同样模糊匹配的Input shape，Enter打开错误设置。沿原OptionModel默认选择政策让新查询聚焦最强结果，同查询用户手选保留，清空回搜索前字段；未改model可浏览性，也不能把这个缺陷认定为原现场model上下键失灵的唯一原因。
+
+第三十八批四文件178项通过：全部37个设置/user37-project36共73条实际OverlayHost键盘链，涵盖搜索、编辑、暂存取消、Apply、effective/requested/stored读回、移除和重开；七个跨来源政策场景另走原save owner验证。有效反转使两个断言失败并逐字节恢复。普通/全屏实际Node PTY代表性Top P路径取消不写、Apply仅存0.8、重开读回、零message/model切换/provider调用通过。初轮Vitest环境字符串导致配置拒绝、stored标记和来源预期、PTY标题不符分别按夹具/探针错误分类；没有为这些失败修改产品来源政策。
+
+构建新鲜度、责任上限0及打包judge proven/三satisfied通过。两面板完整来源/失效/窗口/桌面和模型能力/角色/真实认证仍待验；全部基本字段链不代表整体验收。已明确要求继续保留：未配置模型可选、resume自动最新/手动不抢、正文顶格/编辑箭头、正文路径/Tab、多skill实际共同生效及有限slash组合。
+
+本批延迟实查`4abe6f11`自身CI40264741138/Watch40264741044、文档`91f0d3d3`自身CI40265697710/Watch40265697734均completed/success，覆盖对应历史提交，未读完整日志/Watch工件，也不赋予本批源码CI结果。真实1.7k/4.9k分解、原现场唯一按键根因及生产冷热收益依然**未确认**；“model没有上下键监听”“resume排序反了”“稀疏配置说明字段没实现”“工具数相近就应相同tokens”等笼统解释仍不成立。证据及剩余矩阵见[第三十八批](phase-20-addition.md#第三十八批全部设置字段操作链与搜索默认焦点)，原Phase38/9与ADD独立/active不变。

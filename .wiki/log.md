@@ -9332,3 +9332,13 @@ ADD-07原基准以后期模型名当firstFrame。现真实Loading编辑区/状�
 按用户最新要求只定位并完善文档，产品基线4abe6f11、参考快照未变。phase-20-addition校正旧HEAD与已过时首帧标记结论，补settings37项/八个真实分类、user37/project36政策及两个会话入口盘点；Memory/Shell缺菜单名不独立判缺陷，继续核查原owner发现入口。明确brainstorm、deep-research入口与显式composable模板的当前组合声明，review保留扩展示例；文末集中完整面板操作链、未配置可选、resume默认/手动焦点、正文顶格/箭头、路径Tab、多skill/有限slash、启动/计量验收。interaction-audit文末分已确认原问题/剩余任务/不成立解释/未确认原因，保留所有历史实施证据。
 
 本轮未改运行时代码、未跑产品测试/构建/PTY/基准/真实认证。延迟读取原HEAD自身CI40264741138仍运行，Architecture Watch40264741044已success；不等于ADD整体通过。313个本地链接、49个标题锚点、ADD-01…13/37项清单检查通过；首个内联链接探针双重转义误报0链接/缺ID，修探针并加非零断言后通过，未改文档掩盖失败。四静态门、strict docs和diff通过，118条既有引用advisory保留。原Phase38/9、ADD独立且active，Git交付按实际记录。
+
+## [2026-10-26] fix | 全部设置字段操作链与搜索默认焦点
+
+ADD-03按37项元数据补user37/project36共73条OverlayHost键盘链：搜索→原编辑器→暂存取消→Apply→有效/请求/存储值及restart读回→重开→移除→重开；另一scope、JSONC注释和兄弟字段保留。七个双来源政策场景另验证原save端口。新场景确认typed/pasted topP排名首位却保留Input shape焦点，沿原OptionModel defaultSelection一行修补新查询自动最佳、同查询手选保持、清空返回；定向比较参考分组排名/稳定ID决定，未改全局列表或配置政策。
+
+四文件178项、一个有效反转/字节恢复、普通及fullscreen代表性Top P小型实际Node PTY取消不写/Apply0.8/重开/零message-model-provider通过。Vitest把undefined字符串化导致配置拒绝、host Enter释放/已存储标记/来源期望、探针等待错误搜索标题分开分类并保留失败日志；HANDOFF补环境输入陷阱。TS build a3a165c2470b及checkBuild新鲜度、责任上限0、正式当前打包judge proven/三satisfied通过，本批未构建exe或运行全仓本地/20k真实PTY。完整面板来源冲突/失效/窗口/桌面、模型能力/角色/真实认证、研究control/其他driver/child成本、原生tokenizer/动态I/O、真实上下文差额及冷热收益继续待验。工件phase20-addition-settings-fields；docs/Git/本批CI另按实际记录。
+
+延迟实查产品4abe6f11的CI40264741138/Watch40264741044、文档91f0d3d3的CI40265697710/Watch40265697734均success，未读完整日志/Watch工件，不转记本批。原Phase38/9、ADD独立且整体active。
+
+四静态门、strict docs/diff及317个链接/50标题/68行锚点检查通过，118条既有来源advisory保留。链接探针初轮把旧Markdown行锚点误作标题，修探针后通过，旧链接未改；Git交付另实际绑定。

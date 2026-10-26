@@ -22,6 +22,32 @@ async function detail(h: SettingsHost = host(), key = 'attentionOnIdle') {
 }
 
 describe('advanced settings picker', () => {
+  it.each(['typed', 'pasted'] as const)('focuses the strongest result for a new %s search instead of retaining an unrelated match', async input => {
+    const h = host(); const picker = settingsPicker(h); const overlay = new OverlayHost(() => {});
+    overlay.open(picker); await Promise.resolve(); await Promise.resolve();
+    if (input === 'pasted') overlay.handlePaste('topP');
+    else for (const character of 'topP') overlay.handleKey(parseKeyEvent(character), vi.fn());
+    expect(overlay.render(120, 40).map(stripAnsi).join('\n')).toMatch(/▸ (?:● )?Top P/);
+    const selected = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), selected);
+    expect(selected).toHaveBeenCalledWith(picker, ['topP']);
+    expect(h.save).not.toHaveBeenCalled(); overlay.close();
+  });
+  it('retains manually chosen search focus until the query changes and restores the pre-search field when cleared', async () => {
+    const h = host(); const picker = settingsPicker(h, 'user', 'Model', 'temperature');
+    const overlay = new OverlayHost(() => {}); overlay.open(picker); await Promise.resolve(); await Promise.resolve();
+    const focus = () => overlay.render(120, 40).map(stripAnsi).find(row => row.includes('▸ '))?.split('▸ ')[1]?.trim();
+    expect(focus()).toContain('Temperature');
+    overlay.handlePaste('topP'); overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+    const manual = focus(); expect(manual).toBeDefined(); expect(manual).not.toContain('Top P');
+    overlay.handlePaste('');
+    expect(focus()).toBe(manual);
+    overlay.handleKey(parseKeyEvent('\x7f'), vi.fn()); overlay.handlePaste('P');
+    expect(focus()).toContain('Top P');
+    for (const character of 'topP') overlay.handleKey(parseKeyEvent('\x7f'), vi.fn());
+    const restored = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), restored);
+    expect(restored).toHaveBeenCalledWith(picker, ['temperature']);
+    expect(h.save).not.toHaveBeenCalled(); overlay.close();
+  });
   it.each(CONFIG_SETTINGS.filter(setting => setting.choices && setting.key !== 'theme').map(setting => ({ setting })))('opens $setting.key on its effective choice without staging or writing', async ({ setting }) => {
     const value = setting.choices![setting.choices!.length - 1]; const base = host();
     const h = { ...base, openSettings(scope?: 'user' | 'project') {

@@ -341,3 +341,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Browsing a relay without credentials shows the context or capability of a same-name official model, or loses declarations already present in its own catalogue.
 - **Root Cause**: Blocked request resolution omits the address, and a runtime-only metadata lookup falls back to the canonical provider; a displayed endpoint label cannot restore request identity.
 - **Rule**: Resolve display metadata using the selected connection's saved address or the listed provider address, preserve same-address ambiguity, and use only the listed declaration when its address is not configured. Share the capability policy with existing consumers, keep missing data unverified, and verify list/detail/return with same-name models having different limits. This does not authorize activation or establish remote capability.
+
+### Optional Environment Inputs Must Be Absent In Older Vitest Fixtures
+- **Symptom**: All settings saves reach disk but configuration publication rejects them, leaving requested/effective values unchanged.
+- **Root Cause**: The installed Vitest stringifies `vi.stubEnv(name, undefined)` into the environment value `undefined`; optional numeric inputs then fail configuration validation.
+- **Rule**: Register the original environment value with a temporary string, then delete the optional input explicitly and restore with `unstubAllEnvs`. Assert initial configuration validity/admission before exercising saves; classify fixture environment rejection separately from product focus or persistence failures.
