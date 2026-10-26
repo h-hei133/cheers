@@ -9402,3 +9402,9 @@ ADD-03七条真实host baseline失败确认普通Thinking chooser退出旧apply/
 ADD-07延迟实查9702faa3 CI40315494878 failure，唯一脚本bench-process第75行kill(pid,0)缺预期ESRCH，未到后续产品测试；Watch40315494959 success。原六项本地pass、六次串行小观察target absent，不冒充CI残留复现。确定性fork zombie夹具证明退出待reap仍可kill0成功，live父进程仍被拒绝；现测试捕获target starttime并有界观察absent/换身份/Z或active失败，Z不等于reaped。参考真实wait/保留reap waiter，未改benchmark/processSettlement/relay、package/release/build或产品代码。
 
 bench-process7/bench-observation8共15脚本断言、原PID反转Missing expected exception/exit1与字节恢复、四静态门通过；未跑build/Vitest/产品PTY/基准/20k。HANDOFF/addition第四十五批/audit更新，工件phase20-addition-pty-settlement含CI失败和观察/反转收据，主代理非独立审阅，docs/Git/本批CI另绑定。36971a16 CI40312626823/Watch40312627151 success；156491b1 CI40313929179仍运行、Watch40313929393 success。resume后续验收和完整ADD/真实环境缺口继续，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-26] fix | resume默认焦点按实际时刻选择
+
+ADD-04后续验收确认session picker对有效ISO时间做字符串比较，跨时区偏移或小数秒会把较早会话误作最新。现按Date.parse的epoch排序并以稳定ID处理同刻；置顶仍只影响展示顺序，搜索/project scope换代重置自动焦点，渐进刷新中的手动选择继续保留，current、可恢复性、Enter身份/版本重验不变。
+
+session55项与lifetime4项共59项串行通过；临时恢复旧比较器后4个断言失败并逐字节恢复，最终源码sha256 c4ed68bf520dc498f1ae3212b5f818d40bf4ed59298d0980d898965b1c5e1dbe。四静态门、diff、责任上限0、TS build 834bb33dc026及当前包正式judge proven通过；未跑全仓、exe、真实20k PTY或桌面平台。HANDOFF/addition第四十六批/audit更新，工件phase20-addition-session-time保留baseline/聚焦/反转/静态门/build/judge收据，审阅为主代理非独立审查；docs/Git/本批CI另绑定，ADD整体继续active。

@@ -1266,6 +1266,14 @@ ADD-07验证跟进。延迟实查第四十四批`9702faa3`的CI40315494878 compl
 
 工件`.omx/artifacts/phase20-addition-pty-settlement/`保留原CI失败日志、原六项通过、六次absent观察、确定性反转及最终15项收据，HANDOFF记录PID/退出/reap边界，审阅为主代理。docs/Git/本批CI另实际绑定。resume下一组默认/手动/scope/search验收仍待继续；完整ADD模型/设置/真实认证/桌面/计量/性能缺口与原Phase20 38 complete / 9 partial保持，ADD独立且整体active。
 
+### 第四十六批：resume默认焦点的实际时刻语义
+
+ADD-04后续验收。原[session picker](../../packages/ts-shell/src/cli/interactive/picker/session.ts)的`defaultSelection`对已校验ISO时间做字符串`localeCompare`，只对统一UTC、统一小数精度的文本偶然正确；不同时区偏移或有无小数秒可让较早的实际时刻排到前面。现按`Date.parse`后的实际epoch取最新，并以稳定ID打破同一时刻的并列。置顶仍只影响列表展示顺序，不压过未触摸时的默认最新规则。
+
+回归从真实`OverlayHost`键盘路径覆盖负/正时区偏移、小数秒、不同时区表示同一时刻、渐进刷新中手选保持，以及搜索和project scope换代后的自动焦点重置；未改变current标记、可恢复性过滤、Enter身份/版本重验或分页owner。最终session55项与session lifetime4项共59项串行通过。临时恢复旧字符串比较后4个断言失败（三类实际时刻及同一时刻稳定ID），源码逐字节恢复，sha256为`c4ed68bf520dc498f1ae3212b5f818d40bf4ed59298d0980d898965b1c5e1dbe`。
+
+四静态门、严格diff、责任上限0、TS build `834bb33dc026`及当前包正式judge proven通过；没有运行全仓本地、exe、真实20k PTY或桌面跨平台验收。工件`.omx/artifacts/phase20-addition-session-time/`保留baseline/最终聚焦/反转/静态门/build/judge收据，审阅为主代理，不是独立审查；docs/Git/本批CI另实际绑定。ADD-04逻辑边界和真实时区夹具证据增强，但桌面平台与用户原环境现场仍不能由本批替代，ADD整体继续active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1280,7 +1288,7 @@ ADD-07验证跟进。延迟实查第四十四批`9702faa3`的CI40315494878 compl
 | 角色旧动作在退出后仍可保存，子面板取消后父级失效 | 第四十二批确认role/thinking没有永久退役与子入口准入、共享controller在Escape被取消、action wrapper丢owner。现退役/一次消费/原事务取消复验，显式返回转交父controller，wrapper保留不透明身份；152项/六有效反转及普通/全屏Node小PTY有局部证据。完整角色/认证/桌面矩阵未验 |
 | 角色已存档位不可用时默认Enter覆盖原值 | 第四十三批三个自动角色实际host复现缺失high回auto。现保留active · unavailable只读焦点，Enter及直接旧值apply不写，明确移动才保存支持值；三文件67项、有效反转及普通/全屏Node小PTY有局部证据，全部能力/桌面矩阵未验 |
 | 普通档位旧动作或待定hook跨关闭/重开仍可写入 | 第四十四批七条host baseline失败确认无浏览代次/退役/pending门。现每动作原choice/revision准入贯穿原事务，新开可捕获最新值，旧动作不能提交/重开父级，已确认写通知保留；35项/四有效反转及两模式Node小PTY有局部证据，完整矩阵未验 |
-| resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。已有局部修补证据 |
+| resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。第四十六批另修跨时区/小数秒字符串排序，默认焦点按实际时刻选择；搜索/scope换代重置自动规则，手动渐进刷新仍保持。已有局部夹具证据，桌面平台与用户原环境现场仍待验 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |

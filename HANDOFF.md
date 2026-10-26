@@ -391,3 +391,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A staged setting is refused after a session or workspace change, but a second Apply saves it; confirming an already-open scope chooser can do the same. A legacy user file stays writable after a preferred file appears.
 - **Root Cause**: Retrying through the ambient host captures a new binding and discards the draft's original ownership. Checking only project source selection leaves the user legacy/preferred selector unfenced.
 - **Rule**: Refresh retries and scope choices through the original draft, checking its binding, substrate, physical profile and selected user/project source before recapture, inside the existing write lock and before publication. Preserve explicit retry for same-source conflicts, retaining comments and siblings. Cancel or unreadable scope keeps pending and its original scope; a successful scope confirmation discards pending. Report a confirmed write separately from unconfirmed application after a binding change.
+
+### ISO Timestamp Text Is Not A Recency Order
+- **Symptom**: Resume defaults to an older session when records use different timezone offsets or fractional seconds, even though each timestamp is valid ISO text.
+- **Root Cause**: Lexicographic comparison orders the encoded date and time text, not the represented instant; offsets and fractional precision can reverse the visible date order.
+- **Rule**: Compare validated session timestamps by parsed epoch time, with a stable identity tie-break for equal instants. Keep pinned state in presentation ordering and let untouched default focus follow actual recency; reset automatic focus only through an explicit search or scope lifecycle.

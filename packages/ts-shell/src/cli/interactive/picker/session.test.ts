@@ -80,6 +80,54 @@ it.each([false, true])('follows newest progressive results unless the user touch
   expect(apply).toHaveBeenCalledWith(chosen, [touched ? 'current' : 'today-11']);
 });
 
+it.each([
+  { name: 'negative offset', older: '2026-10-26T10:00:00Z', latest: '2026-10-26T09:30:00-05:00' },
+  { name: 'positive offset', older: '2026-10-26T18:00:00+08:00', latest: '2026-10-26T11:00:00Z' },
+  { name: 'fractional timestamp', older: '2026-10-26T11:00:00Z', latest: '2026-10-26T11:00:00.500Z' },
+])('defaults to the latest actual session time across a %s without changing pinned ordering', async entry => {
+  const pinned = session('older', entry.older); pinned.pinned = true;
+  const latest = session('latest', entry.latest);
+  const setup = fixture([session('current', '2026-10-24T00:00:00Z'), pinned, latest]);
+  expect((await setup.picker.load()).filter(row => !row.disabled).map(row => row.id).slice(0, 2)).toEqual(['older', 'latest']);
+  const host = new OverlayHost(() => {}); host.open(setup.picker); await new Promise(resolve => setTimeout(resolve, 0));
+  try {
+    const apply = vi.fn(); host.handleKey(parseKeyEvent('\r'), apply);
+    expect(apply).toHaveBeenCalledWith(setup.picker, ['latest']); expect(setup.resume).not.toHaveBeenCalled();
+    host.open(setup.picker); await new Promise(resolve => setTimeout(resolve, 0));
+    host.handleKey(parseKeyEvent('\x1b[A'), vi.fn()); const manual = vi.fn(); host.handleKey(parseKeyEvent('\r'), manual);
+    expect(manual).toHaveBeenCalledWith(setup.picker, ['older']);
+  } finally { host.close(); }
+});
+
+it('recomputes newest actual-time focus after search and project scope changes without treating prior manual focus as activation', async () => {
+  const older = session('older', '2026-10-26T18:00:00+08:00'); older.pinned = true;
+  const setup = fixture([session('current', '2026-10-24T00:00:00Z'), older,
+    session('latest', '2026-10-26T11:00:00Z'), session('foreign', '2026-10-26T09:30:00-05:00', '/elsewhere')]);
+  const host = new OverlayHost(() => {}); host.open(setup.picker); await new Promise(resolve => setTimeout(resolve, 0));
+  try {
+    host.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+    expect(stripAnsi(host.render(100, 24).join('\n'))).toContain('▸ older');
+    host.handlePaste('latest'); await vi.waitFor(() => expect(stripAnsi(host.render(100, 24).join('\n'))).toContain('▸ latest'));
+    for (let index = 0; index < 'latest'.length; index++) host.handleKey(parseKeyEvent('\x7f'), vi.fn());
+    await vi.waitFor(() => expect(stripAnsi(host.render(100, 24).join('\n'))).toContain('▸ latest'));
+    host.handleKey(parseKeyEvent('\t'), vi.fn());
+    await vi.waitFor(() => expect(stripAnsi(host.render(100, 24).join('\n'))).toContain('▸ foreign'));
+    host.handleKey(parseKeyEvent('\x1b[Z'), vi.fn());
+    await vi.waitFor(() => expect(stripAnsi(host.render(100, 24).join('\n'))).toContain('▸ latest'));
+    const apply = vi.fn(); host.handleKey(parseKeyEvent('\r'), apply);
+    expect(apply.mock.calls[0]?.[1]).toEqual(['latest']); expect(setup.resume).not.toHaveBeenCalled();
+  } finally { host.close(); }
+});
+
+it('uses stable identity as a tie break for equal instants expressed in different time zones', async () => {
+  const setup = fixture([session('current', '2026-10-24T00:00:00Z'),
+    session('a-latest', '2026-10-26T11:00:00Z'), session('z-latest', '2026-10-26T19:00:00+08:00')]);
+  const host = new OverlayHost(() => {}); host.open(setup.picker); await new Promise(resolve => setTimeout(resolve, 0));
+  try { const apply = vi.fn(); host.handleKey(parseKeyEvent('\r'), apply);
+    expect(apply).toHaveBeenCalledWith(setup.picker, ['a-latest']); }
+  finally { host.close(); }
+});
+
 it('pins through the offered version, preserves the query and refreshes the same action without resuming', async () => {
   const pin = vi.fn(async () => undefined);
   const setup = fixture(undefined, pin, { action: 'pin' });

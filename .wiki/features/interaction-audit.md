@@ -630,3 +630,7 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 ### 文末当前问题判断（第四十五批）
 
 9702faa3 CI40315494878实际失败在脚本终止断言，未到后续产品测试。原kill(pid,0)将PID存在当作目标仍运行；新确定性zombie夹具证明退出但未reap时也成功。测试改为原starttime身份及/proc state有界检查，并用live父进程验证仍能拒绝活目标；原CI那次残留状态仍未知，本地原测试和六次小观察均absent，不称已复现它。15脚本断言/有效反转/字节恢复通过，没有改变benchmark/relay/product执行或重跑产品验收。见[第四十五批](phase-20-addition.md#第四十五批ci终止探针的实际目标身份与退出状态)。36971a16 CI/Watch已success，156491b1 CI仍运行、Watch成功；当前修补CI另绑定。ADD整体及真实环境缺口继续active。
+
+### 文末当前问题判断（第四十六批）
+
+新增确认resume默认焦点仍有一个实际时刻排序缺口：有效ISO时间被当作字符串比较，不同时区偏移或小数秒可让较早会话排到最新。现沿原session picker按`Date.parse`的epoch取最新并以稳定ID处理同刻；置顶继续只影响列表顺序。真实OverlayHost路径覆盖渐进刷新自动/手动、搜索与project scope换代；session55项加lifetime4项通过，恢复旧比较器后4个断言失败并逐字节恢复。四静态门、责任上限0、TS build与结构judge通过，未运行全仓、exe、真实20k PTY或桌面平台。见[第四十六批](phase-20-addition.md#第四十六批resume默认焦点的实际时刻语义)。ADD-04逻辑边界增强，但整体及真实环境验收继续active。

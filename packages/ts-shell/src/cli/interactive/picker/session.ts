@@ -147,7 +147,7 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     defaultSelection: rows => {
       const summaries = activeProjection()?.summaries;
       return rows.filter(row => !row.disabled && summaries?.has(row.id))
-        .sort((left, right) => (summaries!.get(right.id)!.updatedAt ?? '').localeCompare(summaries!.get(left.id)!.updatedAt ?? '')
+        .sort((left, right) => Date.parse(summaries!.get(right.id)!.updatedAt) - Date.parse(summaries!.get(left.id)!.updatedAt)
           || left.id.localeCompare(right.id))[0]?.id;
     },
     get initialFilter() { return options.initialQuery?.trim() || undefined; },
