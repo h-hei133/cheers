@@ -9444,3 +9444,11 @@ templateLoader12、preview30、composition22、slashRouter49、prose completion2
 ADD-12确认组合planner只要方法后出现dash token就按option消费，未先检查方法是否声明flags；无flag的review/可组合模板因此静默丢失`--keep-this`/`--counterexample`，与独立命令把其当正文冲突。现仅非空flag声明进入严格option扫描，flagless方法把token留在共享prose，brainstorm/research未知flag仍由原语法拒绝。composition24、研究composition12、review runtime11、settings44共91项单worker通过；恢复无条件消费后两个新增保留用例AssertionError/exit1，源码逐字节恢复。初轮唯一失败是测试要求含brainstorm的整个focus只出现一次，既有语义会在modifier与最终正文各带一次，改用只有review driver的最小路径，不修改产品去重。独立只读review无findings。
 
 同一批把settings测试从旧八类同步到第四十九批Memory/Shell只读入口后的当前分类，解决78f026f5的CI唯一设置失败；不改产品分类/字段。e0116e86另四个浏览器smoke失败仍无产品回归证据：该提交未改浏览器代码，前一提交同套件通过，保留端口/负载/流错误归一化unknown，不以放宽断言掩盖。四静态门/diff、责任上限0、TS build f2ea3c05143d（inputs e075e02050c3、artifact e11372f82fd6）及适配validator正式judge proven通过；未跑真实PTY、exe、真实provider、全仓或桌面。HANDOFF/addition第五十二批/audit更新，ADD整体继续active。
+
+## [2026-10-26] fix | 正文补全按候选发现模板并保留命令归属
+
+ADD-10/08确认正文`/home`的prose suggestions仍无候选调用完整slash registry，首位自定义可组合模板也经`getSlashInvocation`读取全部template body。现单命令先解析builtin/catalog/extension，再按精确名称查模板；前缀模式以`opendirSync`有界遍历，限制512名称、4096目录入口、单文件512 KiB和总读取8 MiB，入口间检查取消。发现及有效解析均从最近项目向用户根反向进行；高优先级同名模板超预算时遮蔽低优先级元数据，不发布与dispatch不一致的候选。扩展注册使用严格精确碰撞检查，预算拒绝不会释放已占用名称。
+
+最终templateLoader17、prose completion24、request30、slash suggestions41、registry14、capture5、preview30，共七文件161项单worker通过。六个有效反转分别移除精确名称、目录入口上限、高优先级发现、预算遮蔽、builtin优先和注册严格碰撞，均有对应失败并逐字节恢复。独立只读review完成五轮纠错后最终no findings，review本身未运行测试。
+
+四静态门、diff、责任上限0及TS build f17e7f7ce533（inputs 4740f0c3eb74、artifact fc68dd6ae376）通过；签入的已适配validator直接执行judge exit0/proven、0 open/failed/gap。工件phase20-addition-completion-discovery归档聚焦/反转摘要/源码hash/静态/build/judge收据；HANDOFF/addition第五十三批/audit更新。未运行全仓、exe、真实provider、桌面或20k PTY；真实终端输入/像素、平台矩阵和完整上下文差额继续待验。原Phase38/9、ADD独立且整体active，Git/本批CI另绑定。

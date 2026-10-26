@@ -11,7 +11,8 @@ export function proseRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScope)
   const windows = source && /^[A-Za-z]:\\/.test(source.raw);
   if (!source || source.literal && source.literal !== 'quote' && !(windows && source.literal === 'escape')) return undefined;
   const opening = /^\/([^\s/]+)(?:\s|$)/.exec(snapshot.text)?.[1];
-  if (opening && getSlashInvocation(opening, scope) && !getSlashInvocation(opening, scope)?.composition && !opening.startsWith('skill:')) return undefined;
+  const openingInvocation = opening ? getSlashInvocation(opening, scope) : undefined;
+  if (opening && openingInvocation && !openingInvocation.composition && !opening.startsWith('skill:')) return undefined;
   const prefix = snapshot.text.slice(source.from, snapshot.cursor);
   const value = windows ? prefix : scanCommandArgs(prefix, true)[0]?.value ?? '';
   const quoted = source.literal === 'quote';
@@ -21,7 +22,9 @@ export function proseRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScope)
   const explicitSkill = !quoted && value.startsWith('/skill:');
   // Offset zero command names belong to the synchronous slash menu.
   if (source.from === 0 && !explicitSkill && /^\/[A-Za-z0-9:._?-]*$/.test(prefix) &&
-    listSlashInvocations(scope).some(item => item.kind !== 'alias' && item.invocation.startsWith(prefix))) return undefined;
+    listSlashInvocations(scope, {
+      templates: { namePrefix: prefix.slice(1).toLowerCase() },
+    }).some(item => item.kind !== 'alias' && item.invocation.startsWith(prefix))) return undefined;
   const kind = explicitSkill ? 'inline-skill' as const : !quoted && /^\/[A-Za-z0-9:._?-]*$/.test(value)
     ? 'prose' as const : 'path' as const;
   return { kind, token: { from: source.from, to: source.to, prefix, value, before: [] }, snapshot,
@@ -34,7 +37,9 @@ export function proseSuggestions(request: { readonly kind: string; readonly snap
   const value = request.token.value.toLowerCase();
   const explicit = value.startsWith('/skill:');
   const bare = value.slice(1);
-  const commands: Suggestion[] = request.kind === 'prose' ? listSlashInvocations(request.scope).filter(item => item.kind !== 'alias' && item.composition)
+  const commands: Suggestion[] = request.kind === 'prose' ? listSlashInvocations(request.scope, {
+    templates: { namePrefix: value.slice(1) },
+  }).filter(item => item.kind !== 'alias' && item.composition)
     .map(item => ({ value: item.invocation, label: item.invocation, kind: 'command', identity: item.name, detail: item.summary })) : [];
   return [...items, ...commands].filter(item => {
     if (item.kind === 'command') return item.value.toLowerCase().startsWith(value);

@@ -1,22 +1,30 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { catalogRequest, catalogSuggestions } from './request.js';
 import { pathCatalog } from './paths.js';
 import { slashSuggestions } from '../slashSuggestions.js';
 import { replaceDraft } from '../../../presentation/tui/editor/replacement.js';
 import { createCatalogLoader } from './catalog.js';
 import type { ShellRuntimeContext } from '../../../core/shell/runtimeContext.js';
+import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
+import { getSlashInvocation } from '../../../entrypoints/slashCommandRegistry.js';
 let root: string;
+let scope: { root: string; runtimeConfig: ReturnType<typeof getRuntimeConfig> };
 beforeEach(() => {
   fs.mkdirSync('/tmp/cheers-test', { recursive: true });
   root = fs.mkdtempSync('/tmp/cheers-test/prose-');
+  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+  scope = { root, runtimeConfig: getRuntimeConfig(root) };
   fs.mkdirSync(path.join(root, 'home space', 'child'), { recursive: true });
 });
-afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+afterEach(() => {
+  vi.restoreAllMocks(); vi.unstubAllEnvs();
+  fs.rmSync(root, { recursive: true, force: true });
+});
 function request(marked: string) {
   const cursor = marked.indexOf('|'); const text = marked.replace('|', '');
-  return catalogRequest({ text, cursor: cursor < 0 ? text.length : cursor, revision: 1 });
+  return catalogRequest({ text, cursor: cursor < 0 ? text.length : cursor, revision: 1 }, scope);
 }
 
 it('suppresses suggestions inside a fenced example and restores local skill/path suggestions after its complete closing line', () => {
@@ -58,6 +66,52 @@ it('keeps a real /home path alongside a same-name skill without fuzzy descriptio
   ]);
   expect(matches.map(item => item.value)).toEqual(['/home/', '/skill:home']);
   expect(matches.map(item => item.edit?.text)).toEqual(['/home/', '/skill:home ']);
+});
+
+it('reads only prefix-matching template bodies for ambiguous path completion', () => {
+  const prompts = path.join(root, '.agents', 'prompts');
+  fs.mkdirSync(prompts, { recursive: true });
+  fs.writeFileSync(path.join(prompts, 'home-method.md'), '---\ncomposable: true\n---\nHome method.');
+  fs.writeFileSync(path.join(prompts, 'unrelated.md'), '---\ncomposable: true\n---\nUnrelated method.');
+  const read = vi.spyOn(fs, 'readFileSync');
+  const req = request('阅读 /home')!;
+  const matches = catalogSuggestions(req, [
+    { value: '/home/', label: '/home/', kind: 'path', identity: path.join(root, 'home space'), detail: 'directory' },
+  ]);
+  expect(matches.map(item => item.value)).toEqual(['/home/', '/home-method']);
+  const projectReads = read.mock.calls
+    .map(call => String(call[0]))
+    .filter(target => target.startsWith(prompts));
+  expect(projectReads).toEqual([path.join(prompts, 'home-method.md')]);
+});
+
+it('keeps composed prose completion on exact and prefix template reads', () => {
+  const prompts = path.join(root, '.agents', 'prompts');
+  fs.mkdirSync(prompts, { recursive: true });
+  fs.writeFileSync(path.join(prompts, 'method.md'), '---\ncomposable: true\n---\nMethod.');
+  fs.writeFileSync(path.join(prompts, 'home-method.md'), '---\ncomposable: true\n---\nHome method.');
+  fs.writeFileSync(path.join(prompts, 'unrelated.md'), '---\ncomposable: true\n---\nUnrelated method.');
+  const read = vi.spyOn(fs, 'readFileSync');
+  const req = request('/method 检查证据 /home')!;
+  const matches = catalogSuggestions(req, [
+    { value: '/home/', label: '/home/', kind: 'path', identity: path.join(root, 'home space'), detail: 'directory' },
+  ]);
+  expect(matches.map(item => item.value)).toEqual(['/home/', '/home-method']);
+  const projectReads = read.mock.calls
+    .map(call => String(call[0]))
+    .filter(target => target.startsWith(prompts));
+  expect(projectReads).toEqual([
+    path.join(prompts, 'method.md'),
+    path.join(prompts, 'method.md'),
+    path.join(prompts, 'home-method.md'),
+  ]);
+});
+
+it('resolves a built-in command before an oversized same-name template', () => {
+  const prompts = path.join(root, '.agents', 'prompts');
+  fs.mkdirSync(prompts, { recursive: true });
+  fs.writeFileSync(path.join(prompts, 'review.md'), 'x'.repeat(512 * 1024 + 1));
+  expect(getSlashInvocation('review', scope)).toMatchObject({ commandName: 'review' });
 });
 
 it('inserts canonical skills in the middle of source without replacing other invocations', () => {

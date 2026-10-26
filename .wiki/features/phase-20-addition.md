@@ -1324,6 +1324,16 @@ ADD-12继续检查组合输入原文。原[组合计划](../../packages/ts-shell
 
 四静态门与diff通过，责任上限0；TS build `f2ea3c05143d`、inputs `e075e02050c3`、artifact `e11372f82fd6`。签入的已适配validator直接解包后正式judge exit0/proven、三项结构义务satisfied；首次再交给`.normproof/package.mjs`被原归档SHA拒绝，按已适配tgz不能作为原始基线输入分类，未改validator。独立只读review未发现正确性/兼容/安全问题。未运行真实PTY、exe、真实provider、全仓或桌面；测试使用原router、真实本地Git/skill fixture，但不证明终端像素或用户原环境。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第五十三批：正文补全的模板候选与命令归属边界
+
+接续已推送`3ad3434c`。ADD-10/08继续收口：正文`/home`进入[prose completion](../../packages/ts-shell/src/cli/interactive/completion/prose.ts)后仍无候选地调用`listSlashInvocations`，为判断组合能力读取全部模板body；首位自定义可组合模板也经`getSlashInvocation`构造完整registry。现[模板loader](../../packages/ts-shell/src/core/prompts/templateLoader.ts)按名称前缀使用`opendirSync`逐项发现，名称上限512、目录入口4096、单文件512 KiB、总读取8 MiB，并在入口间检查取消；同名模板按用户→外层项目→最近项目的优先级反向解析，高优先级文件超出字节预算时遮蔽低优先级元数据，不回退成与提交owner不一致的候选。
+
+[命令registry](../../packages/ts-shell/src/entrypoints/slashCommandRegistry.ts)先解析不依赖模板的builtin/catalog/extension，再用精确名称读取单个模板；默认查找在发现预算拒绝时返回不可解析，而扩展注册仍使用严格精确查找，避免超预算同名模板被误判为未占用。正文补全与dispatch继续复用原模板、命令和路径owner，没有增加第二套发现或执行路径。
+
+最终七文件161项单worker通过：templateLoader17、prose completion24、request30、slash suggestions41、registry14、capture5、preview30。六个有效反转分别移除精确名称、目录入口上限、高优先级发现顺序、预算遮蔽、builtin优先及注册严格碰撞检查，均出现对应失败并逐字节恢复。独立只读review先后发现首位模板全量读取、候选/优先级、builtin预算及注册归属问题；修正后最终复审无findings，review本身未运行测试。
+
+四静态门、diff、责任上限0及TS build `f17e7f7ce533`（inputs `4740f0c3eb74`、artifact `fc68dd6ae376`）通过；签入的已适配validator正式judge exit0/proven、0 open/failed obligation及0 proof gap。工件`.omx/artifacts/phase20-addition-completion-discovery/`保存聚焦、反转摘要、源码hash、静态/build/judge收据。未运行全仓、exe、真实provider、桌面或20k PTY；真实终端像素、平台输入与完整上下文差额仍不能由本批替代。原Phase20保持38 complete / 9 partial，ADD整体继续active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1342,7 +1352,7 @@ ADD-12继续检查组合输入原文。原[组合计划](../../packages/ts-shell
 | 认证快捷入口缺少参数发现 | 第四十七批确认`/login`、`/logout`只有委托执行而没有顶层提示/补全。现从原`connectSyntax`派生快捷语法：login提供provider与认证flag，logout发现保存连接，并排除不属于顶层语法的action alias；执行仍只走原认证owner。第四十八批再以registry合同锁定theme/statusline/connect/login/logout/view与settings元数据的owner可见性。73项、13项合同及两有效反转有局部证据，真实认证/桌面仍待验 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |
-| 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，预览补异步/cancellable复验和实时准入。第五十一批再把模板发现收窄为候选精确探测，补目录revision、候选/单文件/总字节界限及同步步骤取消；同名路径/模板歧义仍未消除。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
+| 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，预览补异步/cancellable复验和实时准入。第五十一批把preview模板发现收窄为候选精确探测，第五十三批再收窄正文补全与单命令查找，并补目录入口、优先级遮蔽和注册归属；同名路径/模板歧义仍未消除。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。第三十八批新增settings全部37项/user37-project36基本键盘链及七个跨来源政策场景，第三十九批补17个代表性冲突/失效/取消/范围场景，第四十九批补Memory/Shell只读命令入口。完整字段×来源×编辑器×窗口/桌面及model能力/角色/真实认证矩阵仍未完成；只读入口不伪装可编辑字段，也不能将局部绿色写成“整体已看齐” |
 | 设置搜索新查询仍保留较弱匹配焦点 | 第三十八批确认typed/pasted `topP`排名第一但Enter打开Input shape。现新查询自动聚焦最强匹配，同查询手动选择保持，清空回原字段；178项聚焦、一有效反转及两模式实际Node PTY有证据。不是用户原model按键现场唯一原因的证明 |
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
@@ -1425,4 +1435,4 @@ ADD-12继续检查组合输入原文。原[组合计划](../../packages/ts-shell
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。

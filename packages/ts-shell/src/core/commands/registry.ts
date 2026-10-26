@@ -151,6 +151,8 @@ import type { TemplateLoadOptions } from '../prompts/templateLoader.js';
 
 export interface CommandRegistryOptions {
   readonly templates?: TemplateLoadOptions;
+  /** Skip template discovery when only built-in/catalog ownership is needed. */
+  readonly includeTemplates?: boolean;
 }
 
 export function createCommandRegistry(
@@ -1045,14 +1047,16 @@ export function createCommandRegistry(
   ];
 
   const reserved = new Set(commands.flatMap(command => [command.name, ...(command.aliases ?? []), ...(command.invocations?.map(invocation => invocation.name) ?? [])]));
-  return new Map([...commands, ...templateCommands(cwd, onSource, options.templates).filter(template => !reserved.has(template.name))].map((command) => [command.name, command]));
+  const templates = options.includeTemplates === false ? [] : templateCommands(cwd, onSource, options.templates);
+  return new Map([...commands, ...templates.filter(template => !reserved.has(template.name))].map((command) => [command.name, command]));
 }
 
 export function listVisibleCommands(
   cwd: string = process.cwd(),
   runtimeConfig?: RuntimeConfig,
+  options: CommandRegistryOptions = {},
 ): CommandDefinition[] {
-  return Array.from(createCommandRegistry(cwd, runtimeConfig).values()).filter(
+  return Array.from(createCommandRegistry(cwd, runtimeConfig, undefined, options).values()).filter(
     (command) => command.availability !== "hidden" && command.enabled !== false,
   );
 }

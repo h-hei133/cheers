@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import { listVisibleCommands } from '../core/commands/registry.js';
 import { commandInvocations } from '../core/commands/invocation.js';
 import type { RuntimeConfig } from '../config/runtimeConfig.js';
@@ -119,4 +121,24 @@ it("owns extension names and drops all invocation lookups on removal", () => {
     expect(getSlashInvocation("fixture-special")?.kind).toBe("named");
   } finally { remove(); }
   for (const name of ["fixture", "fixture-alias", "fixture-special"]) expect(getSlashInvocation(name)).toBeUndefined();
+});
+
+it("does not let a budget-blocked template release its extension name", () => {
+  fs.mkdirSync("/tmp/cheers-test", { recursive: true });
+  const root = fs.mkdtempSync("/tmp/cheers-test/registry-");
+  const prompts = path.join(root, ".agents", "prompts");
+  fs.mkdirSync(prompts, { recursive: true });
+  fs.writeFileSync(path.join(prompts, "fixture-budget.md"), "x".repeat(512 * 1024 + 1));
+  const cwd = vi.spyOn(process, "cwd").mockReturnValue(root);
+  try {
+    expect(() => registerSlashCommand({
+      name: "fixture-budget",
+      group: "workflow",
+      summary: "fixture",
+    })).toThrow(/byte budget/);
+  } finally {
+    cwd.mockRestore();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+  expect(listSlashCommands().some(command => command.name === "fixture-budget")).toBe(false);
 });

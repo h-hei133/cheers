@@ -118,6 +118,87 @@ describe("finding templates", () => {
     expect(readdir).not.toHaveBeenCalled();
   });
 
+  it("reads only template bodies whose names match a completion prefix", () => {
+    const root = workspace();
+    write(root, "home-main", "Main body.");
+    write(root, "home-extra", "Extra body.");
+    write(root, "unrelated", "Unrelated body.");
+    const read = vi.spyOn(fs, "readFileSync");
+    const templates = new TemplateLoader(root, undefined, { namePrefix: "home" }).load();
+    expect([...templates.keys()].sort()).toEqual(["home-extra", "home-main"]);
+    const projectReads = read.mock.calls
+      .map(call => String(call[0]))
+      .filter(target => target.startsWith(root))
+      .sort();
+    expect(projectReads).toEqual([
+      path.join(root, ".agents", "prompts", "home-extra.md"),
+      path.join(root, ".agents", "prompts", "home-main.md"),
+    ]);
+  });
+
+  it("bounds prefix discovery without failing the completion path", () => {
+    const root = workspace();
+    write(root, "home-a", "A body.");
+    write(root, "home-b", "B body.");
+    write(root, "home-c", "C body.");
+    const templates = new TemplateLoader(root, undefined, { namePrefix: "home", maxCandidates: 2 }).load();
+    expect(templates.size).toBe(2);
+    expect([...templates.keys()].every(name => name.startsWith("home-"))).toBe(true);
+  });
+
+  it("bounds directory entries inspected during prefix discovery", () => {
+    const root = workspace();
+    write(root, "home-a", "A body.");
+    write(root, "home-b", "B body.");
+    const read = vi.fn();
+    const open = fs.opendirSync.bind(fs);
+    vi.spyOn(fs, "opendirSync").mockImplementation(target => {
+      const directory = open(target);
+      const next = directory.readSync.bind(directory);
+      directory.readSync = () => {
+        read();
+        return next();
+      };
+      return directory;
+    });
+    new TemplateLoader(root, undefined, {
+      namePrefix: "home",
+      maxCandidates: 10,
+      maxDirectoryEntries: 1,
+    }).load();
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  it("prefers higher-priority names and templates when prefix discovery is capped", () => {
+    const root = workspace();
+    fs.mkdirSync(path.join(root, ".git"), { recursive: true });
+    const nested = path.join(root, "packages", "app");
+    write(root, "home-low", "Low body.");
+    write(nested, "home-high", "High body.");
+    expect([...new TemplateLoader(nested, undefined, { namePrefix: "home", maxCandidates: 1 }).load().keys()])
+      .toEqual(["home-high"]);
+
+    write(root, "home-shared", "Root");
+    write(nested, "home-shared", "Nearest body that exceeds the byte budget.");
+    const shared = new TemplateLoader(nested, undefined, {
+      namePrefix: "home",
+      maxCandidates: 2,
+      maxFileBytes: 8,
+    }).load();
+    expect(shared.has("home-shared")).toBe(false);
+  });
+
+  it("observes prefix-discovery cancellation before reading matching bodies", () => {
+    const root = workspace();
+    write(root, "home-main", "Main body.");
+    const prompts = path.join(root, ".agents", "prompts");
+    const controller = new AbortController();
+    const loader = new TemplateLoader(root, target => {
+      if (target === prompts) controller.abort();
+    }, { namePrefix: "home", signal: controller.signal });
+    expect(() => loader.load()).toThrow();
+  });
+
   it("bounds named discovery and observes cancellation between synchronous steps", () => {
     const root = workspace();
     write(root, "first", "First body.");

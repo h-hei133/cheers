@@ -1,4 +1,4 @@
-import * as fs from "node:fs";
+import fs from "node:fs";
 import * as path from "node:path";
 import { resolveAllUserDataFiles, userDataDir, userDataSearchDirs } from "../paths/userHome.js";
 import { assertProfileIdentity, assertProfileStorage, currentProfile } from '../paths/profile/context.js';
@@ -38,7 +38,11 @@ export interface TemplateLoadOptions {
   readonly signal?: AbortSignal;
   /** When present, only these names are checked instead of walking every root. */
   readonly names?: ReadonlySet<string>;
+  /** When present, unrelated template bodies are not read while matching invocation names are discovered. */
+  readonly namePrefix?: string;
   readonly maxCandidates?: number;
+  /** Prefix discovery stops after this many directory entries; exact-name discovery does not enumerate. */
+  readonly maxDirectoryEntries?: number;
   readonly maxFileBytes?: number;
   readonly maxTotalBytes?: number;
 }
@@ -54,6 +58,10 @@ const NAMED_DISCOVERY_LIMITS = {
   maxCandidates: 512,
   maxFileBytes: 512 * 1024,
   maxTotalBytes: 8 * 1024 * 1024,
+} as const;
+
+const PREFIX_DISCOVERY_LIMITS = {
+  maxDirectoryEntries: 4096,
 } as const;
 
 /** Read `key: value` pairs from a frontmatter block, if there is one. */
@@ -109,6 +117,10 @@ export class TemplateLoader {
       this.loadNamed(templates, diagnostics);
       return { templates, diagnostics };
     }
+    if (this.options.namePrefix !== undefined) {
+      this.loadPrefixed(templates, diagnostics);
+      return { templates, diagnostics };
+    }
 
     for (const root of this.roots) {
       this.checkCancelled();
@@ -138,18 +150,74 @@ export class TemplateLoader {
   }
 
   private loadNamed(templates: Map<string, PromptTemplate>, diagnostics: TemplateDiagnostic[]): void {
-    const names = [...(this.options.names ?? [])]
+    this.loadNames([...(this.options.names ?? [])], templates, diagnostics);
+  }
+
+  private loadPrefixed(templates: Map<string, PromptTemplate>, diagnostics: TemplateDiagnostic[]): void {
+    const prefix = (this.options.namePrefix ?? '').toLowerCase();
+    const limits = this.discoveryLimits();
+    const candidateLimit = Math.max(0, Math.floor(limits.maxCandidates));
+    const entryLimit = Math.max(0, Math.floor(limits.maxDirectoryEntries));
+    const names = new Set<string>();
+    let entryCount = 0;
+    let lastRoot = this.roots.at(-1);
+
+    // Prefer the nearest project/user root when a cap prevents a complete listing.
+    for (const root of [...this.roots].reverse()) {
+      lastRoot = root;
+      if (names.size >= candidateLimit || entryCount >= entryLimit) break;
+      this.checkCancelled();
+      if (this.userRoots.has(root)) assertProfileStorage(root, this.profile);
+      this.onSource?.(root);
+      this.checkCancelled();
+      let directory: ReturnType<typeof fs.opendirSync>;
+      try {
+        directory = fs.opendirSync(root);
+      } catch {
+        continue;
+      }
+      try {
+        while (names.size < candidateLimit && entryCount < entryLimit) {
+          this.checkCancelled();
+          const entry = directory.readSync();
+          if (!entry) break;
+          entryCount++;
+          if (!entry.isFile() || !/\.md$/i.test(entry.name)) continue;
+          const name = path.basename(entry.name, path.extname(entry.name));
+          if (VALID_NAME.test(name) && name.toLowerCase().startsWith(prefix)) names.add(name);
+        }
+      } finally {
+        directory.closeSync();
+      }
+      this.checkCancelled();
+      this.onSource?.(root);
+    }
+
+    if (entryCount >= entryLimit && lastRoot) {
+      diagnostics.push({ name: prefix, filePath: lastRoot, message: 'Template discovery reached its directory-entry budget.' });
+    }
+
+    // Resolve each discovered name from highest to lowest priority. An over-budget
+    // higher-priority file shadows the name instead of exposing stale lower metadata.
+    const totalBytes = { value: 0 };
+    for (const name of [...names].sort()) {
+      for (const root of [...this.roots].reverse()) {
+        const outcome = this.loadPrefixedName(name, root, templates, diagnostics, limits, totalBytes);
+        if (outcome !== 'continue') break;
+      }
+    }
+  }
+
+  private loadNames(requestedNames: readonly string[], templates: Map<string, PromptTemplate>,
+    diagnostics: TemplateDiagnostic[]): void {
+    const names = requestedNames
       .map(name => name.toLowerCase())
       .filter(name => VALID_NAME.test(name))
       .sort();
     if (!names.length) return;
 
-    const limits = {
-      maxCandidates: this.options.maxCandidates ?? NAMED_DISCOVERY_LIMITS.maxCandidates,
-      maxFileBytes: this.options.maxFileBytes ?? NAMED_DISCOVERY_LIMITS.maxFileBytes,
-      maxTotalBytes: this.options.maxTotalBytes ?? NAMED_DISCOVERY_LIMITS.maxTotalBytes,
-    };
-    let candidates = 0;
+    const limits = this.discoveryLimits();
+    let candidateCount = 0;
     let totalBytes = 0;
 
     for (const root of this.roots) {
@@ -158,13 +226,13 @@ export class TemplateLoader {
       this.onSource?.(root);
       for (const name of names) {
         this.checkCancelled();
-        if (++candidates > limits.maxCandidates) {
+        if (++candidateCount > limits.maxCandidates) {
           throw new TemplateDiscoveryBudgetError('Template discovery exceeded its candidate budget.');
         }
         const file = path.join(root, `${name}.md`);
         this.onSource?.(file);
         this.checkCancelled();
-        let entry: fs.Stats;
+        let entry: ReturnType<typeof fs.lstatSync>;
         try {
           entry = fs.lstatSync(file);
         } catch (error) {
@@ -185,6 +253,66 @@ export class TemplateLoader {
         if (loaded.template) templates.set(name, loaded.template);
       }
     }
+  }
+
+  private loadPrefixedName(name: string, root: string, templates: Map<string, PromptTemplate>,
+    diagnostics: TemplateDiagnostic[], limits: { readonly maxFileBytes: number; readonly maxTotalBytes: number },
+    totalBytes: { value: number }): 'loaded' | 'continue' | 'shadowed' {
+    this.checkCancelled();
+    if (this.userRoots.has(root)) assertProfileStorage(root, this.profile);
+    const file = path.join(root, `${name}.md`);
+    this.onSource?.(file);
+    this.checkCancelled();
+    let entry: ReturnType<typeof fs.lstatSync>;
+    try {
+      entry = fs.lstatSync(file);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT' || code === 'ENOTDIR') return 'continue';
+      throw error;
+    }
+    if (!entry.isFile()) return 'continue';
+    if (entry.size > limits.maxFileBytes) {
+      diagnostics.push({ name, filePath: file, message: 'The template exceeds the discovery byte budget.' });
+      return 'shadowed';
+    }
+    if (totalBytes.value + entry.size > limits.maxTotalBytes) {
+      diagnostics.push({ name, filePath: file, message: 'The template exceeds the discovery total-byte budget.' });
+      return 'shadowed';
+    }
+    if (this.userRoots.has(root)) assertProfileStorage(file, this.profile);
+    let loaded: ReturnType<TemplateLoader['readTemplate']>;
+    try {
+      loaded = this.readTemplate(file, name, diagnostics, limits.maxFileBytes);
+    } catch (error) {
+      if (error instanceof TemplateDiscoveryBudgetError) {
+        diagnostics.push({ name, filePath: file, message: 'The template exceeds the discovery byte budget.' });
+        return 'shadowed';
+      }
+      throw error;
+    }
+    if (totalBytes.value + loaded.bytes > limits.maxTotalBytes) {
+      diagnostics.push({ name, filePath: file, message: 'The template exceeds the discovery total-byte budget.' });
+      return 'shadowed';
+    }
+    totalBytes.value += loaded.bytes;
+    if (!loaded.template) return 'continue';
+    templates.set(name, loaded.template);
+    return 'loaded';
+  }
+
+  private discoveryLimits(): {
+    readonly maxCandidates: number;
+    readonly maxDirectoryEntries: number;
+    readonly maxFileBytes: number;
+    readonly maxTotalBytes: number;
+  } {
+    return {
+      maxCandidates: this.options.maxCandidates ?? NAMED_DISCOVERY_LIMITS.maxCandidates,
+      maxDirectoryEntries: this.options.maxDirectoryEntries ?? PREFIX_DISCOVERY_LIMITS.maxDirectoryEntries,
+      maxFileBytes: this.options.maxFileBytes ?? NAMED_DISCOVERY_LIMITS.maxFileBytes,
+      maxTotalBytes: this.options.maxTotalBytes ?? NAMED_DISCOVERY_LIMITS.maxTotalBytes,
+    };
   }
 
   private readTemplate(file: string, name: string, diagnostics: TemplateDiagnostic[],

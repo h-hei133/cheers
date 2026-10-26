@@ -2,11 +2,13 @@ import { resumeSyntax, forkSyntax } from "../core/commands/navigation/syntax.js"
 import { syntaxHelp } from "../core/commands/syntax/projection.js";
 import { commandInvocations, resolveCommandInvocation, type CommandInvocation } from "../core/commands/invocation.js";
 import { listVisibleCommands } from "../core/commands/registry.js";
+import { TemplateDiscoveryBudgetError } from "../core/prompts/templateLoader.js";
 import type { CommandDefinition } from "../core/commands/types.js";
 import { catalogContributions, observeCatalogContributions } from '../core/catalog/contributions.js';
 import { helpReport } from '../core/commands/help/report.js';
 import { reportText } from '../core/commands/report/projection.js';
 import type { RuntimeConfig } from '../config/runtimeConfig.js';
+import type { CommandRegistryOptions } from '../core/commands/registry.js';
 
 export interface SlashCommandCompletion {
   readonly value: string;
@@ -63,8 +65,9 @@ function project(command: CommandDefinition): SlashCommandSpec {
   };
 }
 
-function builtinCommands(root?: string, runtimeConfig?: RuntimeConfig): readonly SlashCommandSpec[] {
-  return listVisibleCommands(root, runtimeConfig).map(project);
+function builtinCommands(root?: string, runtimeConfig?: RuntimeConfig,
+  options?: CommandRegistryOptions): readonly SlashCommandSpec[] {
+  return listVisibleCommands(root, runtimeConfig, options).map(project);
 }
 
 /**
@@ -97,10 +100,14 @@ export interface SlashCatalogScope {
 const listeners = new Set<() => void>();
 observeCatalogContributions(undefined, () => { for (const listener of listeners) listener(); });
 
-function allCommands(scope?: SlashCatalogScope): readonly SlashCommandSpec[] {
-  const builtins = [...builtinCommands(scope?.root, scope?.runtimeConfig),
+function allCommands(scope?: SlashCatalogScope, options?: CommandRegistryOptions): readonly SlashCommandSpec[] {
+  const builtins = [...builtinCommands(scope?.root, scope?.runtimeConfig, options),
     ...catalogContributions(scope?.root, scope?.sessionId).flatMap(entry => entry.commands).map(project)];
   return extensions.length === 0 ? builtins : [...builtins, ...extensions];
+}
+
+function exactTemplateOptions(name: string): CommandRegistryOptions {
+  return { templates: { names: new Set([name.replace(/^\//, '').trim().toLowerCase()]) } };
 }
 
 export function listSlashCommands(scope?: SlashCatalogScope): readonly SlashCommandSpec[] {
@@ -116,7 +123,9 @@ export function registerSlashCommand(command: SlashCommandSpec): () => void {
   });
   for (const invocation of commandInvocations(registered)) {
     if (!/^(?:[a-z0-9][a-z0-9:._-]*|\?)$/.test(invocation.name)) throw new Error(`Invalid slash command name: ${invocation.name}`);
-    if (getSlashInvocation(invocation.name)) throw new Error(`Slash command already registered: ${invocation.name}`);
+    if (getSlashInvocation(invocation.name, undefined, exactTemplateOptions(invocation.name))) {
+      throw new Error(`Slash command already registered: ${invocation.name}`);
+    }
   }
   extensions.push(registered);
   for (const listener of listeners) listener();
@@ -135,12 +144,22 @@ export function subscribeSlashCommands(listener: (commands: readonly SlashComman
   return () => listeners.delete(changed);
 }
 
-export function listSlashInvocations(scope?: SlashCatalogScope): readonly CommandInvocation[] {
-  return allCommands(scope).flatMap(commandInvocations);
+export function listSlashInvocations(scope?: SlashCatalogScope,
+  options?: CommandRegistryOptions): readonly CommandInvocation[] {
+  return allCommands(scope, options).flatMap(commandInvocations);
 }
 
-export function getSlashInvocation(name: string, scope?: SlashCatalogScope): CommandInvocation | undefined {
-  return resolveCommandInvocation(allCommands(scope), name);
+export function getSlashInvocation(name: string, scope?: SlashCatalogScope,
+  options?: CommandRegistryOptions): CommandInvocation | undefined {
+  const builtin = resolveCommandInvocation(allCommands(scope, { includeTemplates: false }), name);
+  if (builtin) return builtin;
+  const exact = options ?? exactTemplateOptions(name);
+  try {
+    return resolveCommandInvocation(allCommands(scope, exact), name);
+  } catch (error) {
+    if (!options && error instanceof TemplateDiscoveryBudgetError) return undefined;
+    throw error;
+  }
 }
 
 export function getSlashCommand(name: string, scope?: SlashCatalogScope): SlashCommandSpec | undefined {

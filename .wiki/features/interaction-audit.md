@@ -662,3 +662,9 @@ ADD-08确认正文`/home`仍会让preview构造完整command registry，从而�
 组合解析确认一个会静默改写用户输入的确定缺口：方法没有声明任何flags时，紧随其后的`-`开头正文仍被当成option移除；review与可组合模板因此丢失`--keep-this`/`--counterexample`。现只有声明flags的方法进入严格option扫描，flagless driver/modifier保留共享prose；brainstorm/research未知flag仍拒绝。91项聚焦、两个有效反转/字节恢复和独立只读review有局部证据，真实终端未另跑。
 
 同一轮把settings测试从旧八类同步到Memory/Shell只读入口后的当前十一类，解决`78f026f5`的CI唯一设置失败；没有改产品分类或增加可编辑字段。`e0116e86`另四个浏览器smoke失败在未改浏览器代码的提交出现、前一提交同套件通过，仍归类证据不足的负载/夹具/潜在流边界问题，不将`ECONNRESET`直接重分类为unsafe output，也不称产品回归或已修复。见[第五十二批](phase-20-addition.md#第五十二批flagless组合正文与设置分类ci合同)。ADD整体及真实环境验收继续active。
+
+### 文末当前问题判断（第五十三批）
+
+ADD-10/08新增确认正文`/home`补全和首位自定义可组合模板查找都仍会构建完整command registry并读取无关模板body。现只对当前命令做精确模板查找；前缀补全使用有界目录迭代，512名称/4096入口/512 KiB单文件/8 MiB总读取上限，入口间检查取消。高优先级同名模板超预算时遮蔽低优先级元数据，builtin先于模板解析；扩展注册继续严格精确碰撞查找，避免预算拒绝释放已有名称。七文件161项、六个有效反转/逐字节恢复及独立复审no findings有局部证据。
+
+四静态门、责任上限0、TS build `f17e7f7ce533`和正式judge proven另绑定；未运行真实provider、全仓、exe、桌面或20k PTY。正文路径/Tab、多skill和组合的完整真实终端矩阵仍未完成，原Phase38/9、ADD独立且整体active。见[第五十三批](phase-20-addition.md#第五十三批正文补全的模板候选与命令归属边界)。
