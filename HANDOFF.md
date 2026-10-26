@@ -7,6 +7,16 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Unavailable Saved Choices Must Retain Their Read-Only Focus
+- **Symptom**: A role effort saved as high opens on auto after its exact catalogue removes high support; default Enter can overwrite the accepted preference.
+- **Root Cause**: The supported-choice list omits the current value, so initialSelection cannot find it and the generic list falls back to the first row.
+- **Rule**: Retain an unavailable current value as a disabled, focusable row. Keep it out of accepted write choices and require explicit movement to a supported value. Test default Enter, direct refusal, explicit save and readback with all automatic roles. For PTY byte comparisons, capture state after startup restoration settles and check the model selection separately across startup.
+
+### Evidence Source Snapshots Must Not Become Discoverable Tests
+- **Symptom**: A focused Vitest command discovers archived test copies or resolves the wrong package's Vitest hooks, producing zero-test failures.
+- **Root Cause**: Evidence snapshots retain executable `.test.ts` names, and invoking a package binary from the repository root changes discovery and module resolution.
+- **Rule**: Archive source as non-executable text snapshots and run the owning package's local Vitest from that package directory. Classify discovery/invocation failures before changing product code; preserve their logs separately from behavioral baselines.
+
 ### Child Cancellation Must Retire Actions Without Cancelling Its Parent
 - **Symptom**: Role actions still save after a panel closes, or returning from a child with Escape leaves its parent unable to save. Disabled-row and input continuations can also lose cancellation tracking.
 - **Root Cause**: Local action admission survives host dismissal, while parent and child share a browser controller. Overlay action wrappers copy the picker and lose a WeakMap keyed only by the original object.

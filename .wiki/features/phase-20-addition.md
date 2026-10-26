@@ -1228,6 +1228,20 @@ ADD-02/03沿[角色编辑器](../../packages/ts-shell/src/cli/interactive/picker
 
 延迟实查第四十批`f6582038`的CI40305668414/Watch40305668560、第四十一批`af282d5e`的CI40308877629/Watch40308877544均completed/success，未读完整日志/Watch工件，不能赋予本批CI结果。完整模型目标/角色/能力/真实认证/桌面及settings交叉矩阵、研究control/其他driver/child成本、原生tokenizer/动态来源累计I/O、真实1.7k/4.9k分解和冷热/修补前启动收益继续待验。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第四十三批：不可用已存角色档位的只读默认焦点
+
+ADD-02继续检查“默认Enter不偷偷改当前值”。实际host回归确认：role已存high，精确relay目录仍支持low/medium但将high声明为不支持；[角色档位面板](../../packages/ts-shell/src/cli/interactive/picker/model/thinking.ts)过滤high后initialSelection没有对应行，打开落到auto，直接Enter可提交auto。三个自动角色均复现，不属于第四十二批取消缺陷。现仅在当前值不在准入列表时补只读行，显示active · unavailable并保留disabled/focusable焦点；apply仍只接受原支持列表，Enter不关闭/不写，明确移到low才保存，保留默认模型/档位、兄弟角色和个人config。
+
+先检查本项目原档位和prospective恢复owner的不可用当前值焦点，再只读比较参考`model-hub.ts`1421–1437按实际current预选、1637–1650把预选确认与改变区分的决定。采用“先表现当前值、改变需明确选择”，本项目按第3.5节更强合同保留不可用current为只读焦点，没有照搬参考找不到current时回首项。未改角色可用性政策、connection/auth、持久事务或普通档位chooser。
+
+[角色回归](../../packages/ts-shell/src/cli/interactive/picker/model/role.test.ts)新增三个真实host操作链：不可用high默认Enter拒绝、直接旧值apply拒绝、方向键选low→保存→父级读回。与已有role/lifetime15、model43及thinking6合并单进程串行三文件67项通过；原thinking源码raw HEAD反转重现三个AssertionError/exit1，源码逐字节恢复。初轮在根目录调用包Vitest，错误发现正式工件内`.test.ts`副本并混用hook解析，零test不作为产品基线；现工件以非可执行`.snapshot.txt`保存、验证在owning package运行，错误日志保留。
+
+最终普通/全屏两个隔离实际Node小PTY用原SessionManager/state writer建立小型已存角色，再以session-id启动：精确目录high不可用仍聚焦high；Enter后state字节不变，显式low保存，返回重开读回；default medium、summary low及个人config保持，零message/provider请求，143退出close确认。首轮将启动恢复前state与子面板Enter后比较，误把正常恢复写入认作Enter写入；按真实子面板打开后的基线重测，同时独立断言启动前后modelSelection不变。保留失败，不改产品恢复合同。
+
+四静态门、责任上限0、TS build `a9ffb9087e20d8f316ab0830d853ee88b41e3190f1e77a5346273e8112da6d2e`、inputs `f2e754ef9aab9ad886797a2c293501e9c2ccda7cd44a74338ec20e169d3fa283`、artifact `04049c20cdd31b01ef2d84256b01911c9ebb8d177341849dafa67eca54cb9358`及checkBuild fresh通过；当前正式包judge exit0/proven、三结构义务satisfied。审阅为主代理，没有独立审查；工件`.omx/artifacts/phase20-addition-role-focus/`保留baseline/反转/最终PTY/源码hash与脚本，docs/Git/本批CI另绑定。不运行全仓本地、exe、真实20k PTY或真实认证。
+
+第四十二批`36971a16`已提交/推送并远端readback，当前CI待后续检查；其CI不由本批本地检查替代。完整model/settings目标、角色、能力、来源、窗口/桌面与认证矩阵及研究/计量/启动剩余证据继续待验，原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1240,6 +1254,7 @@ ADD-02/03沿[角色编辑器](../../packages/ts-shell/src/cli/interactive/picker
 | 同协议relay分类错误标为可用 | 第四十批确认runtime级凭据聚合不能代表精确分类。现从分类自身已准入模型行派生状态和ready优先顺序；阻断模型仍可浏览，刷新保留手动身份。五文件84项、原源码有效反转及四条实际Node小型PTY有证据；完整模型/认证/桌面验收继续待证 |
 | 目录删除后焦点回首项且没有提示 | 第四十一批实际host/publication复现，现缺失焦点刷新按旧可见模型ID取幸存邻居，navigation清理旧ID并显示目录变化；生存手动身份与搜索失去匹配保留原语义，空占位不能启用。136项/三有效反转有证据，真实桌面/终端删除场景未验 |
 | 角色旧动作在退出后仍可保存，子面板取消后父级失效 | 第四十二批确认role/thinking没有永久退役与子入口准入、共享controller在Escape被取消、action wrapper丢owner。现退役/一次消费/原事务取消复验，显式返回转交父controller，wrapper保留不透明身份；152项/六有效反转及普通/全屏Node小PTY有局部证据。完整角色/认证/桌面矩阵未验 |
+| 角色已存档位不可用时默认Enter覆盖原值 | 第四十三批三个自动角色实际host复现缺失high回auto。现保留active · unavailable只读焦点，Enter及直接旧值apply不写，明确移动才保存支持值；三文件67项、有效反转及普通/全屏Node小PTY有局部证据，全部能力/桌面矩阵未验 |
 | resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。已有局部修补证据 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |

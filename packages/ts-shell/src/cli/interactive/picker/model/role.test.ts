@@ -145,3 +145,33 @@ it('rechecks role cancellation after an admission callback aborts without return
   expect(edit.assign(undefined)).toMatchObject({ saved: false, output: expect.stringContaining('cancelled') });
   expect(readSessionModelEdit(sessionId)).toEqual(before);
 });
+
+it.each(['subagent', 'summary', 'advisor'] as const)('keeps an unavailable saved %s effort as read-only focus until an explicit supported choice', async name => {
+  const before = readSessionModelEdit(sessionId);
+  writeSessionModel(sessionId, { ...before.selection!, roles: { ...before.selection!.roles,
+    [name]: { connectionId: 'ready', provider: 'openai', model: 'shared', thinkingEffort: 'high' } } }, before);
+  writeCatalogCache([{ id: 'relay', runtime: 'openai', baseUrl: 'https://relay.invalid/v1',
+    models: [{ id: 'shared', reasoning: true, thinkingLevelMap: { high: null } }] }]);
+  const catalogue = modelPicker(commands()); await catalogue.load();
+  const role = (await catalogue.inspect!(`role:${name}`))!.next!; await role.load();
+  const thinking = (await role.apply(['thinking']))!.next!, host = new OverlayHost(() => {});
+  const rows = await thinking.load();
+  const saved = readSessionModelEdit(sessionId), config = fs.readFileSync(getUserRuntimeConfigPath());
+  host.open(thinking); await settle();
+  try {
+    const untouched = vi.fn(); host.handleKey(parseKeyEvent('\r'), untouched);
+    expect(untouched).not.toHaveBeenCalled(); expect(host.active).toBe(true);
+    expect(rows.find(row => row.id === 'high')).toMatchObject({ disabled: true, focusable: true, note: expect.stringContaining('active') });
+    expect(stripAnsi(host.render(100, 20).join('\n'))).toContain('▸ high');
+    expect(await thinking.apply(['high'])).toBeUndefined(); expect(readSessionModelEdit(sessionId)).toEqual(saved);
+    host.handleKey(parseKeyEvent('\x1b[A'), vi.fn()); host.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+    let action: Promise<unknown> | undefined;
+    host.handleKey(parseKeyEvent('\r'), (selected, ids) => {
+      expect(ids).toEqual(['low']); action = selected.apply(ids).then(outcome => { if (outcome?.next) host.open(outcome.next); });
+    }); await action; await settle();
+    expect(readSessionModelEdit(sessionId).selection).toEqual({ ...saved.selection!, roles: { ...saved.selection!.roles,
+      [name]: { ...saved.selection!.roles![name]!, thinkingEffort: 'low' } } });
+    expect(host.render(100, 20).map(stripAnsi).join('\n')).toContain('Reasoning effort: low');
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+  } finally { host.close(); }
+});

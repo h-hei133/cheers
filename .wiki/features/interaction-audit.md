@@ -618,3 +618,7 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 新增确认role/thinking在Escape、close或替换后仍接受旧动作、load复活，子入口未复验原目录；原事务未检查signal。现永久退役/一次消费，子入口与writer沿原准入检查取消和失效。实际跟踪链另确认子Escape取消父共享controller、disabled inspection和input action复制丢WeakMap身份；现显式返回转交父生命周期、本地preview退休，根关闭/构建失败/shutdown取消，action wrapper携带不透明owner。角色保存继续保留默认模型、其他角色和个人配置，见[第四十二批](phase-20-addition.md#第四十二批角色动作退役与子面板返回生命周期)。
 
 单进程串行五文件152项、六有效反转/字节恢复、最终TS fresh及结构judge proven通过。最终普通/全屏实际Node小型PTY覆盖赋值取消/重开保存、档位取消/重开low保存/返回读回及清除，零message/provider请求、个人config不变、143退出close确认。初轮regular屏解析超时及input夹具漏validate分别归类探针/夹具错误；没有真实认证、exe或桌面结论。延迟查f6582038及af282d5e自身CI/Watch均success，未读完整日志/Watch工件，本批CI另绑定。完整两个面板交叉矩阵及计量、性能、真实环境缺口保留，原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第四十三批）
+
+新增确认已存角色high在目录仍支持low/medium但禁用high时被chooser漏掉，default Enter落到auto并可覆盖原值。现保留active · unavailable只读焦点，Enter/直接旧值apply拒绝，用户明确移动到支持档位才写；三个自动角色host操作及普通/全屏实际Node小PTY均保留默认档位、兄弟角色和个人config。三文件67项与原源码有效反转/字节恢复、TS fresh和结构judge proven通过，见[第四十三批](phase-20-addition.md#第四十三批不可用已存角色档位的只读默认焦点)。零test invocation及启动前state基线误判分别分类，不修改产品政策或恢复合同迎合探针。完整模型/设置/认证/桌面及计量性能矩阵仍待验；第四十二批36971a16已远端确认，CI待后续实查。原Phase38/9、ADD独立且整体active。

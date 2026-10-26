@@ -9380,3 +9380,11 @@ ADD-02/03实际host确认角色/档位退出旧动作仍可保存、load复活�
 五文件152项、六有效反转/源码字节恢复、四静态门、责任上限0、TS build36f4f499d0fb及fresh、当前包judge proven三satisfied通过。最终普通/fullscreen两个隔离Node小PTY覆盖赋值取消→重开保存、档位取消→重开low保存→返回读回→清除；default fixture-ready与个人config保留、零message/provider请求、143退出close确认。早期regular使用fullscreen解析超时和input夹具漏validate分别保留/分类；未跑exe、全仓本地、真实20k PTY或真实认证。
 
 addition第四十二批/当前摘要、audit、settings指南和HANDOFF同步，工件phase20-addition-role-lifetime归档源码hash/脚本与主代理非独立审阅，docs/Git/本批CI另绑定。延迟实查f6582038的CI40305668414/Watch40305668560及af282d5e的CI40308877629/Watch40308877544均success，未读完整日志/Watch工件。完整面板目标/角色/能力/来源/桌面/认证、研究control/其他driver/child成本、tokenizer/动态I/O、真实上下文差额和冷热收益继续未验，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-26] fix | 不可用已存角色档位的只读默认焦点
+
+ADD-02三个自动角色实际host确认保存high后目录禁用high而仍支持low/medium，chooser漏high让默认Enter提交auto。现原角色档位owner仅补不可用current为disabled/focusable、active · unavailable；Enter及直接旧值apply不写，方向键明确low才保存并返回读回，保留默认模型/档位、兄弟角色及个人config。比较原普通/prospective chooser及参考current预选/确认与改变区别，采用本项目更强的只读current焦点，未改auth/事务/可用性政策。
+
+串行三文件67项、原源码有效反转三个AssertionError/字节恢复、四静态门/责任上限0、TS build a9ffb9087e20/fresh、正式judge proven三satisfied通过。普通/全屏两个小型实际Node PTY用原owner建已存角色、session-id启动，默认Enter state字节不变、显式low保存/重开读回、零message/provider请求、143退出close确认。根目录调用包Vitest混入工件test副本零test及startup恢复前state基线误判分别保留/分类；快照改非执行txt，owning package验证，未改产品。HANDOFF补两陷阱，工件phase20-addition-role-focus；docs/Git/本批CI另绑定。
+
+第四十二批36971a16已提交/推送/远端readback，当前CI待后续实查；完整两面板能力/角色/来源/窗口/桌面/认证与研究/计量/性能剩余证据继续未验，未跑exe、全仓或真实20k PTY，原Phase38/9、ADD独立且整体active。
