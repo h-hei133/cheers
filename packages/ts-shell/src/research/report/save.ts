@@ -7,10 +7,15 @@ import { researchReportDigest } from '../run/prompts.js';
 import { createProcessOwner } from '../../core/state/owner.js';
 import { savedOperationOutcome } from './recovery.js';
 
+/** Schema projection has no runtime, approval or file-operation authority. */
+export function researchSaveDescriptor(runId: string): Pick<ToolDefinition, 'name' | 'description' | 'argsSchema'> {
+  return { name: 'research_save', description: 'Prepare the complete current native research report as one exclusive new file. Truncated projections are refused. Requires ordinary write permission and an unchanged run. Existing files are never overwritten; only an actual committed edit receipt counts as saved. Content is native; do not pass model prose.',
+    argsSchema: { type: 'object', additionalProperties: false, required: ['runId', 'path'],
+      properties: { runId: { const: runId }, path: { type: 'string', minLength: 1, maxLength: 4096 } } } };
+}
+
 export function researchSaveTool(runtime: ResearchRuntime, runId: string): ToolDefinition {
-  const schema = { type: 'object', additionalProperties: false, required: ['runId', 'path'],
-    properties: { runId: { const: runId }, path: { type: 'string', minLength: 1, maxLength: 4096 } } };
-  return { name: 'research_save', description: 'Prepare the complete current native research report as one exclusive new file. Truncated projections are refused. Requires ordinary write permission and an unchanged run. Existing files are never overwritten; only an actual committed edit receipt counts as saved. Content is native; do not pass model prose.', argsSchema: schema,
+  return { ...researchSaveDescriptor(runId),
     onRefusal(args, context, outcome) {
       if (args.runId !== runId) return;
       const run = runtime.current();

@@ -981,6 +981,26 @@ ADD-08继续处理第三十批明确保留的重复读取：原health、wake/rec
 
 严格docs/diff实际通过，118既有advisory保留；addition151/audit110本地Markdown链接均存在。提交、推送、远端读回与自身CI另记录于delivery.json。
 
+### 第三十二批：研究入口纯准备与共用工具描述
+
+接续已推送`e56e47d526362f317542f1fe2b3d9714d1be65fc`；本地HEAD、origin/main和实际远端main读回一致，交付时工作区干净，自身CI `40253191131`及Watch `40253191144`初查均in_progress。此批稍后延迟实查该CI仍in_progress，不借历史Watch或本地验证推定完成。
+
+ADD-08沿第二十九批确认的研究preview缺口推进前置实现：[研究命令](../../packages/ts-shell/src/research/command.ts)原把参数投影和researchTurnPrompt留在create/arm后的命令内，[runtime](../../packages/ts-shell/src/research/run/runtime.ts)内联随机ID、新run、deadline及goal账本关联，[工具](../../packages/ts-shell/src/research/run/tools.ts)与[保存工具](../../packages/ts-shell/src/research/report/save.ts)把描述/schema和执行回调绑在同一构造中。若预览调用这些运行方法会创建/恢复/arm状态；只删除preview的driver拒绝则漏掉真实提示词与runId常量工具，仍不正确。
+
+现由研究自己的[entry](../../packages/ts-shell/src/research/run/entry.ts)投影已解析参数与全部skill/modifier，并生成同一入口提示词；[preparation](../../packages/ts-shell/src/research/run/preparation.ts)接受捕获的scope/goal，生成prospective run、随机ID、原quick/deep deadline及原goal ledger关联，不持有store/runtime，也不写状态或初始化账本。实际create仍在原owner中先recover/读取/验证pending，再使用同一prepare结果按原锁和ledger合同持久化、arm；resume/steer/control/save继续原独立路径，未增加实际preview接管接口。
+
+research_run和research_save提取原name/description/argsSchema投影；实际可执行工具也使用这些投影。researchEntryDescriptors返回来源工具及所需run/save描述，只有三个字段，没有execute/prepare/onRefusal；新准备不能靠描述获得运行、保存或权限能力。带save才描述保存工具，无save保持只读研究入口。所有明确skill与modifier进入第一条实际研究消息，并继续保留原durable request与child stage注入。
+
+只读参考pi `packages/coding-agent/src/core/prompt-templates.ts`309–327用独立expand函数投影输入，`core/agent-session.ts`2128–2134在送入任务前调用同一展开函数。本项目采用输入转换共用的决定，研究run/ledger与tool authority仍由本项目原owner负责；这些参考代码没有持久研究ID交接，不能用它们宣称完整研究preview已完成。
+
+最终五文件37项串行通过：preparation9、composition12、runtime10、resume3、save3。新测试从实际runResearchCommand创建结果捕获最终ID/时间，以相同身份重建prospective entry，验证request、deadline、完整prompt与工具描述精确相等；覆盖save开/关、两份skill和modifier、所有child阶段、control/help拒绝及捕获goal关联。纯准备前后metadata/state/transcript原字节相同，无state lock、零create/arm/run、没有report回调；已有run的arm与账本字节不受新准备影响。初轮30pass/6fail为新增fixture遗漏SkillInstruction身份字段及it.each将args数组展开为单个参数；纠正后35pass/1fail为help无question先由原syntax拒绝，改提供合法question来测entry拒绝。均为新夹具合同错误，失败日志保留，未放宽运行准入。
+
+三个有效反转分别移除methods投影、放宽research_run的runId const、无save时也暴露保存工具，均AssertionError/exit1，源文件逐字节恢复。四静态门与最终TS build通过；build`3723a348eef5ec79cfc4daa57ab78d6bcd57c825a771486a0a8dc77e88a994ba`、inputs`1169dedca41d19d401baf55abef7841d3ad76bd6318310ab16ef34d2ddf74156`、artifact`a806856becfa2df94a7d73ca5ff5fe17ac44059dff573fb6ec49f939fc7e6d0e`。当前validator tgz SHA-256`6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`新目录解包，正式judge实际exit0/proven三satisfied；首次judge误用不存在的CLI路径，MODULE_NOT_FOUND/exit1属调用错误，随后按包真实adapters/cli入口运行，失败日志保留。无并发验证、全仓回归或20k真实PTY。
+
+本批未更改终端或preview控制器，未运行PTY或真实provider；不把owner测试写成数字已在研究草稿显示。**研究数字preview仍明确拒绝**：尚须绑定prospective ID与真正提交的同一ID、以有界已读session/goal验证创建资格并重新准入、将完整描述接入原tool catalogue/协议请求准备、保留来源/cancellation/取消settlement和发布前复验。入口第一请求估算与后续独立child上下文/总费用继续分开；不能另造示例UUID冒充真正请求身份。
+
+归档`.omx/artifacts/phase20-addition-research-entry/`；strict docs/diff、本地链接、Git与CI另绑定。未配置具体model可选、两个面板完整看齐、消息顶格/编辑箭头、首位slash/正文路径Tab、所有skill生效及受限研究组合要求全部保留。完整settings/model字段/来源/scope/desktop/真实认证、研究完整preview、原生tokenizer、全动态来源和累计物理I/O、生产冷热启动及真实1.7k/4.9k差额继续未验，原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -999,6 +1019,7 @@ ADD-08继续处理第三十批明确保留的重复读取：原health、wake/rec
 | 代码示例误调用及合法关闭后漏skill | 原字符串查找将围栏正文误当关闭，或以不同长度反引号闭合；第二十九批改为独立关闭行与精确行内run，示例保持字面量，合法关闭后所有skill恢复解析。七文件151项、两有效反转和两模式隔离PTY有局部证据；实际研究driver完整数字preview仍待实现 |
 | 待注入记忆预览缺raw字节与可取消读取 | 原已有路径/元数据及generation保护；第三十批补原始字节追踪、有界async verified-handle读取及完整preview异步复验。六文件73项、三有效反转、两模式实际隔离PTY有局部证据。普通删除/invalidated原并非全无保护；第三十一批已补单次多记录共享读取，完整preview/controller累计I/O与所有动态来源验收仍未完成 |
 | 一次记忆预览反复读取相同文件 | 第三十一批沿原store共享单次有界只读snapshot，health/候选/lifecycle共用，12pending的binary acquisition从15降2，复验仍追加1；75项/三反转/两模式PTY有局部证据。全preview/controller和动态来源总读取成本仍待验，不能扩成全请求两次读 |
+| 研究入口无法完整预览 | 已确认实际create/arm后的消息与runId绑定工具不同于普通preview；第三十二批已补研究owner的参数/新run纯准备、共用入口提示词和无执行能力工具描述，37项及三有效反转有局部证据。preview仍拒绝数字，prospective ID与提交身份交接、完整请求准备及有界准入/复验尚未接入 |
 
 ### 16.2 不成立的判断与仍未确认的原因
 

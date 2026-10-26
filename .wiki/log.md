@@ -9284,3 +9284,9 @@ ADD-08原已有记忆元数据/generation保护，确认缺raw复验及同步无
 ADD-08原health/候选/每pending lifecycle重复读同recordsFile，12记录15读。现原store一次有界snapshot→只读Reader health/list/get，共享fold/ID索引、返回记录/诊断分离，每query取消/profile重验；普通live读保留、每次准备新取、最终preview raw字节核验保留，12pending首次2读/peak1、20同步检查零body、复验追加1。
 
 六文件75pass、三有效反转/逐字节恢复、四静态门/buildb3be27281c1c/新解包judge proven三satisfied通过；两模式实际Node小PTY修改/超限撤旧、恢复数字、view pending不消费、preview config/memory/transcript不写、零provider，143退出settle。初轮8pass/2fail中diagnostic显示预期非原prompt合同，改查原health/list；重复read断言实际15→2。证据phase20-addition-memory-snapshot，docs/Git另绑定，上一批CI仍运行；全preview/controller/动态源累计I/O与面板/认证/性能计量仍待验，原Phase38/9和ADD独立/active。
+
+## [2026-10-26] refactor | 研究入口纯准备与共用工具描述
+
+ADD-08沿原研究owner提取entry参数/全方法与提示词、prospective run/deadline/goal账本关联、run/save描述，实际create/prompt/工具也共用。准备不持有store/runtime、不写状态或账本、不arm、不派发，描述没有执行/保存权限；实际锁/ledger/create及control/resume/steer/save准入保留。
+
+五文件37pass、三有效反转/逐字节恢复、四静态门/最终build3723a348eef5/新解包正式judge proven三satisfied通过。新增fixture身份/it.each参数/help syntax失败已分类保留；judge错误路径MODULE_NOT_FOUND后按包真实入口修正，未改产品。研究数字preview仍拒绝，ID交接/有界准入/完整协议工具请求/复验尚未接入；本批无PTY或真实provider，不宣称终端已支持研究估算。证据phase20-addition-research-entry，docs/Git另绑定，上一批CI仍运行；完整面板/认证/性能/计量等继续未验，原Phase38/9与ADD独立/active。

@@ -1,11 +1,9 @@
-import { randomUUID } from 'node:crypto';
 import type { BoundSessionHost } from '../../session/store/bound.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
 import type { RequestPolicy } from '../../core/agent/request/model.js';
 import type { ToolExecutionContext } from '../../tools/types.js';
-import { decodeGoal } from '../../planning/goal/codec.js';
 import { createProcessOwner, processOwnerDisposition } from '../../core/state/owner.js';
-import { researchLimits, type ResearchRequest } from '../brief/model.js';
+import type { ResearchRequest } from '../brief/model.js';
 import { safeText } from '../evidence/producer.js';
 import { researchReportProjection } from '../report/renderer.js';
 import { researchReportDigest } from './prompts.js';
@@ -15,6 +13,7 @@ import { researchLedger, researchRequestPolicy } from './policy.js';
 import { runResearchChild } from './child.js';
 import type { ResearchRun } from './model.js';
 import { recoverResearchSave } from '../report/recovery.js';
+import { prepareResearchRun } from './preparation.js';
 
 export interface ResearchHost {
   readonly store: BoundSessionHost;
@@ -41,16 +40,8 @@ export class ResearchRuntime {
     this.recover();
     const session = this.host.current(); const edit = readResearch(this.host.store, session);
     if (this.active || currentResearch(edit)?.pending || currentResearch(edit)?.owner) throw new Error('Research has a pending owner or child outcome; pause and reconcile it before new work.');
-    const now = Date.now(); const goal = decodeGoal(edit.bound.state.goal);
-    const associated = goal && !['complete', 'dropped'].includes(goal.phase) ? goal : undefined;
-    const id = randomUUID();
-    const run = runEvent({ ...edit.bound.scope, schemaVersion: 1, id, revision: 0, epoch: 0,
-      createdAt: new Date(now).toISOString(), deadlineAt: new Date(now + researchLimits[request.depth].deadlineMs).toISOString(), request,
-      ledgerScopeId: associated?.id ?? id, ...(associated ? { goal: { id: associated.id, controlRevision: associated.controlRevision } } : {}),
-      briefRevision: 1, briefs: [], status: 'ready', stage: 'brief', investigationRounds: 0, gapQuestions: [],
-      sources: [], claims: [], fragments: [], children: [], events: [],
-      save: { requested: request.save, status: request.save ? 'pending' : 'not-requested' } }, 'created', request.question);
-    writeResearch(this.host.store, session, edit, replaceResearch(edit, run), undefined, associated ? undefined : id);
+    const run = prepareResearchRun({ scope: edit.bound.scope, goal: edit.bound.state.goal }, request);
+    writeResearch(this.host.store, session, edit, replaceResearch(edit, run), undefined, run.goal ? undefined : run.id);
     this.arm(run); return run;
   }
   arm(run: ResearchRun): void {

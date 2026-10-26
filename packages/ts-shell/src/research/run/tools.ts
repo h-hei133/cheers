@@ -2,15 +2,27 @@ import type { ToolDefinition } from '../../tools/types.js';
 import { readOnlyTool } from '../../core/tools/capability.js';
 import { createPaperSearchTool } from '../sources/papers.js';
 import { createDocumentReadTool } from '../sources/document.js';
-import { researchSaveTool } from '../report/save.js';
+import { researchSaveTool, researchSaveDescriptor } from '../report/save.js';
 import type { ResearchRuntime } from './runtime.js';
+import type { ResearchRun } from './model.js';
+
+/** A prospective entry can inspect this schema without an armed runtime. */
+export function researchRunDescriptor(runId: string): Pick<ToolDefinition, 'name' | 'description' | 'argsSchema'> {
+  return { name: 'research_run', description: 'Execute the exact user-armed durable research run through sequential native read-only stages and independent adversarial review. Uses the current shared request ledger; cannot authorize shell, writes, nested tasks or new runs. Returns truthful partial/cancelled outcomes and validated citations.',
+    argsSchema: { type: 'object', additionalProperties: false, required: ['runId'], properties: { runId: { const: runId } } } };
+}
+
+/** Descriptors intentionally omit execute, prepare and refusal callbacks. */
+export function researchEntryDescriptors(run: Pick<ResearchRun, 'id' | 'save'>): readonly Pick<ToolDefinition, 'name' | 'description' | 'argsSchema'>[] {
+  return [createPaperSearchTool(), createDocumentReadTool()].map(({ name, description, argsSchema }) => ({ name, description, argsSchema }))
+    .concat([researchRunDescriptor(run.id), ...(run.save.requested ? [researchSaveDescriptor(run.id)] : [])]);
+}
 
 export function researchTools(runtime?: ResearchRuntime, runId?: unknown): readonly ToolDefinition[] {
   const sourceTools = [createPaperSearchTool(), createDocumentReadTool()];
   const run = runtime?.selected(runId);
   if (!run) return sourceTools;
-  const execute = readOnlyTool({ name: 'research_run', description: 'Execute the exact user-armed durable research run through sequential native read-only stages and independent adversarial review. Uses the current shared request ledger; cannot authorize shell, writes, nested tasks or new runs. Returns truthful partial/cancelled outcomes and validated citations.',
-    argsSchema: { type: 'object', additionalProperties: false, required: ['runId'], properties: { runId: { const: run.id } } },
+  const execute = readOnlyTool({ ...researchRunDescriptor(run.id),
     async execute(args, context) {
       if (args.runId !== run.id) return { success: false, error: 'Research run identity changed.' };
       try {
