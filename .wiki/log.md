@@ -9408,3 +9408,9 @@ bench-process7/bench-observation8共15脚本断言、原PID反转Missing expecte
 ADD-04后续验收确认session picker对有效ISO时间做字符串比较，跨时区偏移或小数秒会把较早会话误作最新。现按Date.parse的epoch排序并以稳定ID处理同刻；置顶仍只影响展示顺序，搜索/project scope换代重置自动焦点，渐进刷新中的手动选择继续保留，current、可恢复性、Enter身份/版本重验不变。
 
 session55项与lifetime4项共59项串行通过；临时恢复旧比较器后4个断言失败并逐字节恢复，最终源码sha256 c4ed68bf520dc498f1ae3212b5f818d40bf4ed59298d0980d898965b1c5e1dbe。四静态门、diff、责任上限0、TS build 834bb33dc026及当前包正式judge proven通过；未跑全仓、exe、真实20k PTY或桌面平台。HANDOFF/addition第四十六批/audit更新，工件phase20-addition-session-time保留baseline/聚焦/反转/静态门/build/judge收据，审阅为主代理非独立审查；docs/Git/本批CI另绑定，ADD整体继续active。
+
+## [2026-10-26] fix | 认证快捷入口复用连接语法
+
+ADD-13后续验收确认`/login`、`/logout`只有认证委托而没有参数提示或补全。现从`connectSyntax`派生login/logout快捷语法，login提供provider与认证flags，logout接入saved-connection catalog；派生的单action语法清除外层不适用的action aliases，执行仍只调用原connect owner，不新增凭据路径。
+
+registry12、slash suggestions41、connection completion20共73项单进程串行通过；临时移除login补全和logout catalog分支后两类断言各失败1项，源码逐字节恢复。HANDOFF/addition第四十七批/audit/settings指南更新；四静态门、责任上限0、TS build e82d27547840及fresh、当前包judge proven、严格docs通过，Git/本批CI另绑定。未运行全仓、真实认证、exe或桌面PTY，ADD整体继续active。

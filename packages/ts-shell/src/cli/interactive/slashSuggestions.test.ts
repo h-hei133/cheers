@@ -96,6 +96,18 @@ describe("command completions", () => {
     expect(matches?.some((match) => match.value === "off")).toBe(true);
   });
 
+  it("derives login providers and flags from the connection grammar", () => {
+    expect(slashSuggestions("/login o")?.map(item => item.value)).toEqual(expect.arrayContaining([
+      "openai",
+      "openai-compatible",
+    ]));
+    expect(slashSuggestions("/login openai --a")?.map(item => item.value)).toContain("--api-key");
+    expect(slashArgumentHint({ text: "/login ", cursor: 7, revision: 1 })).toContain("<provider>");
+    expect(slashArgumentHint({ text: "/logout ", cursor: 8, revision: 1 })).toBe(
+      "Usage: /logout <connection-id|provider>",
+    );
+  });
+
   it("offers usage, git and worktree actions from their command syntax", () => {
     expect(slashSuggestions("/usage ")?.map(item => item.value)).toEqual(["show", "account", "reset"]);
     expect(slashSuggestions("/git ")?.map(item => item.value)).toEqual([

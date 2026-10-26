@@ -14,10 +14,10 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 function request(text: string) { return catalogRequest({ text, cursor: text.length, revision: 1 }); }
-it.each(["/connect use ", "/connect activate ", "/connect logout ", "/connect remove ", "/connect rm ", "/connect use -- -"])("offers saved connections for %s", text => {
+it.each(["/connect use ", "/connect activate ", "/connect logout ", "/connect remove ", "/connect rm ", "/connect use -- -", "/logout "])("offers saved connections for %s", text => {
   expect(request(text)?.kind).toBe("connection");
 });
-it.each(["/auth use ", "/connect ", "/connect login openai ", "/connect set openai ", "/connect status ", "/connect use first extra", "/connect use --bad ", "/connect use first "])("does not query for %s", text => {
+it.each(["/auth use ", "/connect ", "/connect login openai ", "/connect set openai ", "/connect status ", "/connect use first extra", "/connect use --bad ", "/connect use first ", "/logout first extra", "/logout first ", "/logout remove "])("does not query for %s", text => {
   expect(request(text)).toBeUndefined();
 });
 it("matches labels but accepts exact IDs without revealing credentials or mutating configuration", () => {

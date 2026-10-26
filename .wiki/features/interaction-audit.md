@@ -634,3 +634,7 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 ### 文末当前问题判断（第四十六批）
 
 新增确认resume默认焦点仍有一个实际时刻排序缺口：有效ISO时间被当作字符串比较，不同时区偏移或小数秒可让较早会话排到最新。现沿原session picker按`Date.parse`的epoch取最新并以稳定ID处理同刻；置顶继续只影响列表顺序。真实OverlayHost路径覆盖渐进刷新自动/手动、搜索与project scope换代；session55项加lifetime4项通过，恢复旧比较器后4个断言失败并逐字节恢复。四静态门、责任上限0、TS build与结构judge通过，未运行全仓、exe、真实20k PTY或桌面平台。见[第四十六批](phase-20-addition.md#第四十六批resume默认焦点的实际时刻语义)。ADD-04逻辑边界增强，但整体及真实环境验收继续active。
+
+### 文末当前问题判断（第四十七批）
+
+新增确认认证快捷入口的发现性缺口：`/login`、`/logout`虽委托现有连接owner，却没有provider/flag提示或saved-connection补全，且不能把`/connect logout`的动作别名直接泄漏到顶层语法。现从`connectSyntax`派生login/logout快捷语法，登录补全provider与认证flags，登出复用连接目录，执行仍只走原认证路径。registry/suggestions/connection三文件73项通过，移除两处投影后各有1项有效失败并逐字节恢复。四静态门、构建、结构judge与严格docs另绑定；真实认证、全仓、exe和桌面PTY未验。见[第四十七批](phase-20-addition.md#第四十七批认证快捷入口的语法与连接发现性)。ADD-13入口发现性增强，真实环境矩阵继续active。

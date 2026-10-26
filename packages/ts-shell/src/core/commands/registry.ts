@@ -1,6 +1,12 @@
 import { browserSyntax } from "../../browser/command/syntax.js";
 import { browserCompletions } from "../../browser/command/completion.js";
-import { connectSyntax, connectCompletions } from "./connect/syntax.js";
+import {
+  connectSyntax,
+  connectCompletions,
+  loginShortcutCompletions,
+  loginShortcutSyntax,
+  logoutShortcutSyntax,
+} from "./connect/syntax.js";
 import { loopSyntax, loopArgumentCompletions } from "./loop/syntax.js";
 import { brainstormSyntax } from "./brainstorm/syntax.js";
 import { goalCommandAliases, goalSyntax } from "./goal/syntax.js";
@@ -230,11 +236,14 @@ export function createCommandRegistry(
     {
       name: 'login', kind: 'local', supportsNonInteractive: true, availability: 'available', enabled: true,
       summary: 'log in through the existing provider connection owner', group: 'session',
+      argumentHint: syntaxHint(loginShortcutSyntax),
+      getArgumentCompletions: loginShortcutCompletions,
       execute: (args, context) => runLoginShortcut(args, context),
     },
     {
       name: 'logout', kind: 'local', supportsNonInteractive: true, availability: 'available', enabled: true,
       summary: 'log out through the existing provider connection owner', group: 'session',
+      argumentHint: syntaxHint(logoutShortcutSyntax),
       execute: (args, context) => runLogoutShortcut(args, context),
     },
     {

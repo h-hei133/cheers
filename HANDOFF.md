@@ -396,3 +396,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Resume defaults to an older session when records use different timezone offsets or fractional seconds, even though each timestamp is valid ISO text.
 - **Root Cause**: Lexicographic comparison orders the encoded date and time text, not the represented instant; offsets and fractional precision can reverse the visible date order.
 - **Rule**: Compare validated session timestamps by parsed epoch time, with a stable identity tie-break for equal instants. Keep pinned state in presentation ordering and let untouched default focus follow actual recency; reset automatic focus only through an explicit search or scope lifecycle.
+
+### Shortcut Grammars Must Not Leak Owner Action Aliases
+- **Symptom**: A top-level authentication shortcut offers no provider or saved-connection completion, or treats an owner action alias such as `remove` as an argument.
+- **Root Cause**: The shortcut prepends an action to the full command runtime but projects no shortcut-specific grammar; copying the whole action also carries aliases that are not valid at the shortcut's outer position.
+- **Rule**: Derive shortcut hints and argument completions from the owning command action, strip outer-position action aliases, and keep execution delegated to the same owner. Test valid provider/flag positions, saved-connection completion, and invalid leaked aliases separately.

@@ -1,4 +1,4 @@
-import type { CommandSyntax } from "../syntax/model.js";
+import type { CommandAction, CommandSyntax } from "../syntax/model.js";
 import { parseSyntax } from "../syntax/parse.js";
 import { syntaxCompletions } from "../syntax/projection.js";
 import { CONNECT_PRESETS, resolveProviderTarget } from "./preset.js";
@@ -25,6 +25,23 @@ export const connectSyntax: CommandSyntax = {
   ],
 };
 
+function shortcutAction(name: "login" | "logout"): CommandAction {
+  const action = connectSyntax.actions.find(candidate => candidate.name === name);
+  if (!action) throw new Error(`Missing ${name} connection action.`);
+  return { ...action, name: "", aliases: undefined };
+}
+
+/** Shortcut usage is derived from the connection grammar, never duplicated. */
+export const loginShortcutSyntax: CommandSyntax = {
+  name: "login",
+  actions: [shortcutAction("login")],
+};
+
+export const logoutShortcutSyntax: CommandSyntax = {
+  name: "logout",
+  actions: [shortcutAction("logout")],
+};
+
 export function parseConnectArgs(args: readonly string[]) {
   const parsed = parseSyntax(connectSyntax, args);
   if (parsed.ok && (parsed.action.name === "login" || parsed.action.name === "set") && !resolveProviderTarget(parsed.args[0])) return { ok: false as const, reason: "Unknown provider or preset." };
@@ -35,4 +52,8 @@ export function connectCompletions(prefix: string) {
   const values = [...CONNECT_PRESETS.map(preset => preset.id), "openai-compatible", "gemini"];
   return syntaxCompletions({ ...connectSyntax, actions: connectSyntax.actions.map(action => action.name === "login" || action.name === "set"
     ? { ...action, parameters: action.parameters?.map(parameter => parameter.name === "provider" ? { ...parameter, values } : parameter) } : action) }, prefix);
+}
+
+export function loginShortcutCompletions(prefix: string) {
+  return connectCompletions(`login ${prefix}`);
 }

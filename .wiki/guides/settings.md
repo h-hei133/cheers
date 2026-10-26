@@ -25,7 +25,7 @@ Configuration files store explicit overrides. A small or empty file can inherit 
 | `/settings` | Main preference browser with staged Apply/Discard and source details |
 | `/theme` | Current-session palette chooser; save a lasting choice through settings Appearance |
 | `/statusline` | Status band chooser; also available in settings Appearance. Direct `use` saves through its existing configuration owner |
-| `/connect`, `/login`, `/logout` | Connection management and its login/logout shortcuts |
+| `/connect`, `/login`, `/logout` | Connection management and its login/logout shortcuts; `/login` completes providers and authentication flags, while `/logout` completes saved connections |
 | `/model` | Session model choice and supported automatic roles; retains the session model owner |
 | `/view` | Inspect or change user/developer output, including diagnostic and permission detail |
 
@@ -34,3 +34,5 @@ In `/model`, choose an automatic role to assign its model, change its supported 
 If a role's saved thinking effort is no longer available, its row stays focused and is marked unavailable. Enter leaves it unchanged. Move to a supported effort to save an explicit replacement.
 
 The catalogue and settings panel expose supported entries. Their presence does not establish that every provider, desktop terminal or configuration scope has been tested. Current implementation evidence and remaining interaction work are recorded in [Phase 20 additions](../features/phase-20-addition.md#15-实施与验证证据).
+
+The login and logout shortcuts reuse the connection command's grammar and credential owner. Their help text and completions are projections, not a second authentication path.

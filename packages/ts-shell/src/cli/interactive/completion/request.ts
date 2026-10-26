@@ -4,7 +4,7 @@ import { deleteSyntax } from '../../../core/commands/navigation/management.js';
 import { parseSyntax } from "../../../core/commands/syntax/parse.js";
 import { mcpCatalogKind } from './mcp.js';
 import { permissionsSyntax } from "../../../core/commands/permissions/syntax.js";
-import { connectSyntax } from "../../../core/commands/connect/syntax.js";
+import { connectSyntax, logoutShortcutSyntax } from "../../../core/commands/connect/syntax.js";
 import { memorySyntax } from "../../../memory/commands/syntax.js";
 import type { MemoryCatalogKind } from "./memory.js";
 import { pathKind } from "./pathRequest.js";
@@ -52,6 +52,10 @@ function commandCatalogRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScop
     kind = modelKind(preceding, token.value, following);
   } else if (name === "mcp") {
     kind = mcpCatalogKind(preceding, following);
+  } else if (name === "logout") {
+    const parsed = firstParameter(input => parseSyntax(logoutShortcutSyntax, input), preceding, following);
+    if (!parsed) return undefined;
+    kind = "connection";
   } else if (name === "permissions" || name === "connect" || name === "memory" || name === "workflow") {
     const syntax = name === "connect" ? connectSyntax : name === "memory" ? memorySyntax : name === "workflow" ? workflowSyntax : permissionsSyntax;
     const parsed = firstParameter(input => parseSyntax(syntax, input), preceding, following);
