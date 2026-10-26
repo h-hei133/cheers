@@ -2,11 +2,32 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { test } from "node:test";
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import { renderedKeyAfter } from "./bench/observation.mjs";
 import { processSettlement } from "./bench/process.mjs";
 
 function child() {
   return Object.assign(new EventEmitter(), { exitCode: null, signalCode: null, kill: () => true });
+}
+
+function targetIdentity(pid) {
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+    const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+    return { state: fields[0], started: fields[19] };
+  } catch (error) { if (error.code === "ENOENT") return undefined; throw error; }
+}
+
+async function assertTargetStopped(pid, started) {
+  const deadline = Date.now() + 2_000;
+  let current;
+  do {
+    current = targetIdentity(pid);
+    // kill(pid, 0) also succeeds for exited zombies and a reused PID.
+    if (!current || current.started !== started || current.state === "Z") return;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  } while (Date.now() < deadline);
+  assert.fail(`PTY target remains active after wrapper close (${current?.state ?? "unknown"}).`);
 }
 
 test("process settlement waits for stream close, including a signal exit", async () => {
@@ -71,8 +92,38 @@ test("Linux PTY termination closes the wrapper and its actual target", { skip: p
     await renderedKeyAfter(process.stdout, () => {}, "target-ready:");
     const pid = Number(/target-ready:(\d+)/.exec(output)?.[1]);
     assert.ok(Number.isSafeInteger(pid) && pid > 0);
+    const identity = targetIdentity(pid);
+    assert.ok(identity?.started);
     await lifetime.stop();
-    assert.throws(() => globalThis.process.kill(pid, 0), { code: "ESRCH" });
+    await assertTargetStopped(pid, identity.started);
     assert.ok(process.stdout.readableEnded);
+  } finally { await lifetime.stop(); }
+});
+
+test("Linux target observation distinguishes a zombie from a running process", { skip: process.platform !== "linux" }, async () => {
+  const program = String.raw`import os, time, signal
+child = os.fork()
+if child == 0:
+    os._exit(0)
+def stop(signum, frame):
+    os.waitpid(child, 0)
+    raise SystemExit(0)
+signal.signal(signal.SIGTERM, stop)
+print("zombie-ready:" + str(child), flush=True)
+while True:
+    time.sleep(1)
+`;
+  const wrapper = spawn("python3", ["-c", program]), lifetime = processSettlement(wrapper);
+  let output = ""; wrapper.stdout.on("data", data => { output += data.toString(); }); wrapper.stderr.resume();
+  try {
+    await renderedKeyAfter(wrapper.stdout, () => {}, "zombie-ready:");
+    const pid = Number(/zombie-ready:(\d+)/.exec(output)?.[1]);
+    assert.ok(Number.isSafeInteger(pid) && pid > 0);
+    await assertTargetStopped(pid, targetIdentity(pid)?.started);
+    assert.equal(targetIdentity(pid)?.state, "Z");
+    assert.doesNotThrow(() => process.kill(pid, 0));
+    const live = targetIdentity(wrapper.pid);
+    assert.ok(live?.started && live.state !== "Z");
+    await assert.rejects(assertTargetStopped(wrapper.pid, live.started), /remains active/);
   } finally { await lifetime.stop(); }
 });

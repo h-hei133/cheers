@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### PID Existence Does Not Prove A Terminated Target Is Running
+- **Symptom**: A PTY wrapper and its streams close, but a termination test fails because kill(pid, 0) still succeeds.
+- **Root Cause**: Linux keeps an exited zombie's PID until reaping; PID reuse also makes the same number identify a different process. A wrapper close alone does not resolve these cases.
+- **Rule**: Capture the actual target's start identity while live, then observe absence, identity change or zombie state with a bounded deadline after wrapper close. Keep an active original target as failure. Verify the observer against a controlled zombie and a live process; do not diagnose an unobserved CI residual as zombie or claim that zombie observation proves reaping.
+
 ### Reopened Pickers Need Operation Generations And Durable Write Notices
 - **Symptom**: A dismissed thinking chooser still saves, or its old pending hook commits after the same picker instance reopens. Dropping every late outcome can also hide a write that completed before a post-switch hook closed the panel.
 - **Root Cause**: Mutable current-choice state is reused across browser lifetimes, and UI lifetime is mistaken for the persistence outcome.

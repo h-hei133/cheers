@@ -1256,6 +1256,16 @@ ADD-03沿[原Thinking effort chooser](../../packages/ts-shell/src/cli/interactiv
 
 延迟检查36971a16的CI40312626823及156491b1的CI40313929179仍in_progress，对应Watch40312627151/40313929393已success，不互相替代。完整model/settings字段/目标/角色/能力/来源/窗口/桌面/认证及研究/计量/启动剩余证据继续待验，原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第四十五批：CI终止探针的实际目标身份与退出状态
+
+ADD-07验证跟进。延迟实查第四十四批`9702faa3`的CI40315494878 completed/failure，失败仅在Check the gates still detect的[bench-process测试](../../scripts/bench-process.test.mjs)“Linux PTY termination closes the wrapper and its actual target”，`kill(pid, 0)`缺预期ESRCH；该CI尚未执行后续产品测试，Watch40315494959 success不能替代。第四十二批36971a16 CI40312626823/Watch40312627151 success，第四十三批156491b1 CI40313929179仍in_progress、Watch40313929393 success，均只对应自身提交。
+
+本地原六项测试通过，六个额外串行小进程观察均在script wrapper close后目标absent；不能据此声称复现CI残留或其一定是zombie。确定性新夹具以fork建立已退出且待waitpid的子进程，确认`kill(pid, 0)`仍成功；同一夹具真正运行的父进程须被观察器拒绝。现仅测试观察改为捕获/proc stat实际target starttime，wrapper/stream close后有界等待：原身份absent、PID已换身份或state Z说明原目标不再运行，原目标仍active明确失败。Z结论不代表已reap，本项目原benchmark/relay/processSettlement行为及package/release/build政策未改。
+
+目标检查后只读参考PTY process waiter以child.wait取得真实exit，terminate不取消待reap waiter；采用“运行、退出、回收与stream drain分开”的决定，当前Node测试通过原身份观察补其断言，不引入第二执行平面。新zombie/live场景反转回原ESRCH断言后Missing expected exception/exit1，源码逐字节恢复；bench-process7与bench-observation8共15个脚本断言串行通过，四静态门通过。没有产品代码变化，未构建、运行Vitest/产品PTY/基准或20k消息；此修补不是原CI重新通过或性能验收。
+
+工件`.omx/artifacts/phase20-addition-pty-settlement/`保留原CI失败日志、原六项通过、六次absent观察、确定性反转及最终15项收据，HANDOFF记录PID/退出/reap边界，审阅为主代理。docs/Git/本批CI另实际绑定。resume下一组默认/手动/scope/search验收仍待继续；完整ADD模型/设置/真实认证/桌面/计量/性能缺口与原Phase20 38 complete / 9 partial保持，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。

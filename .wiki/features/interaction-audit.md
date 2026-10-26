@@ -626,3 +626,7 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 ### 文末当前问题判断（第四十四批）
 
 普通Thinking chooser新增七条host baseline失败确认退出旧apply/load、未load/多ID、准入内close及待定hook跨close/同实例重开没有边界。现原choice/浏览代次捕获并传原事务准入，等待动作互斥；显式新开可获最新值，旧动作不能写入或重开父级。保留写后关闭的确认通知，不把UI生命周期当持久结果。三文件35项、四有效反转/源码恢复、最终两模式Node小PTY取消/重开medium/明确low保存/重开读回、TS fresh与结构judge proven通过；roles/config保留、零请求。fullscreen未重绘hint超时为探针同步错误，根相对脚本路径/内联引号错误为未执行探针，均不改变产品政策。见[第四十四批](phase-20-addition.md#第四十四批普通档位面板的浏览代次与异步提交边界)。36971a16/156491b1的CI仍运行、各Watch成功，本批CI另绑定；完整交叉矩阵/真实认证/桌面与计量性能未验，原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第四十五批）
+
+9702faa3 CI40315494878实际失败在脚本终止断言，未到后续产品测试。原kill(pid,0)将PID存在当作目标仍运行；新确定性zombie夹具证明退出但未reap时也成功。测试改为原starttime身份及/proc state有界检查，并用live父进程验证仍能拒绝活目标；原CI那次残留状态仍未知，本地原测试和六次小观察均absent，不称已复现它。15脚本断言/有效反转/字节恢复通过，没有改变benchmark/relay/product执行或重跑产品验收。见[第四十五批](phase-20-addition.md#第四十五批ci终止探针的实际目标身份与退出状态)。36971a16 CI/Watch已success，156491b1 CI仍运行、Watch成功；当前修补CI另绑定。ADD整体及真实环境缺口继续active。

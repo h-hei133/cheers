@@ -9396,3 +9396,9 @@ ADD-03七条真实host baseline失败确认普通Thinking chooser退出旧apply/
 串行三文件35项、四有效反转/字节恢复、四静态门/责任上限0、TS build e7f7390070e8/fresh与正式judge proven三satisfied通过。最终普通/fullscreen两个Node小PTY medium取消/重开→明确low保存→重开low读回，roles/config保留、零message/provider请求、143退出close确认。fullscreen等待未重绘hint超时和早期脚本根相对路径/内联引号错误分别分类；旧测试scratch移入/tmp/cheers-test后重建及重测最终摘要。HANDOFF补代次/写通知陷阱，addition第四十四批/当前摘要与audit更新，工件phase20-addition-thinking-lifetime归档主代理非独立审阅/源码hash；docs/Git/本批CI另绑定。
 
 延迟查36971a16 CI40312626823及156491b1 CI40313929179仍in_progress，对应Watch40312627151/40313929393 success，不能替代CI。完整面板/真实认证/桌面与研究/计量/启动缺口继续未验，未跑exe、全仓或真实20k PTY，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-26] test | PTY终止观察区分PID存在与实际运行
+
+ADD-07延迟实查9702faa3 CI40315494878 failure，唯一脚本bench-process第75行kill(pid,0)缺预期ESRCH，未到后续产品测试；Watch40315494959 success。原六项本地pass、六次串行小观察target absent，不冒充CI残留复现。确定性fork zombie夹具证明退出待reap仍可kill0成功，live父进程仍被拒绝；现测试捕获target starttime并有界观察absent/换身份/Z或active失败，Z不等于reaped。参考真实wait/保留reap waiter，未改benchmark/processSettlement/relay、package/release/build或产品代码。
+
+bench-process7/bench-observation8共15脚本断言、原PID反转Missing expected exception/exit1与字节恢复、四静态门通过；未跑build/Vitest/产品PTY/基准/20k。HANDOFF/addition第四十五批/audit更新，工件phase20-addition-pty-settlement含CI失败和观察/反转收据，主代理非独立审阅，docs/Git/本批CI另绑定。36971a16 CI40312626823/Watch40312627151 success；156491b1 CI40313929179仍运行、Watch40313929393 success。resume后续验收和完整ADD/真实环境缺口继续，原Phase38/9、ADD独立且整体active。
