@@ -1354,6 +1354,16 @@ ADD-08确认`/shake apply|restore`替换会话上下文选择后，旧provider p
 
 五静态门与diff通过，责任上限0；TS build `aa7aec1ced32`、inputs `3fed547d9fb4`通过，当前已适配validator正式judge exit0/proven、0 open/failed obligation及0 proof gap。未运行全仓、exe、真实provider、桌面或PTY；有效选择缓存以selection对象和turns数组身份绑定，若消息在数组内原地变更而选择对象不变，仍需重新取得选择或后续更强的内容身份；真实1.7k/4.9k差额与生产性能继续待证。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第五十六批：实际组装请求的本地估算事实
+
+ADD-09继续收口`/context`。发送时已经捕获的实际请求body现在由[request projection](../../packages/ts-shell/src/context/request/projection.ts)计算`localEstimate`：只保存冻结的tokens、`characters/3.5`方法、`assembled-request` scope及图片固定allowance的嵌套摘要，不保存原文。图片base64长度不进入计数，每个图片块使用现有固定allowance；不兼容的字段声明、opaque reasoning或未知协议不伪造数字。
+
+[wire estimate](../../packages/ts-shell/src/context/request/wire.ts)增加带图片来源的detail结果，原数字API继续委托它，预览/真实请求不新增第二套计数器。`requestContext`只吞掉字段不可用和opaque reasoning两种已知不可用错误，其他异常继续抛出；[context report](../../packages/ts-shell/src/core/commands/context/request.ts)把“Assembled request estimate”作为独立事实显示，明确它是本地字符估算而非provider usage，并在图片请求中报告固定allowance。
+
+主代理单进程串行六文件176项通过：projection10、wire3、context report14、session29、step90、runtime preview30。两个有效反转分别移除localEstimate和恢复图片原文计数，前者出现10个失败、后者图片长度断言失败，均逐字节恢复并重验。独立只读review先后指出数值测试、图片来源、opaque reasoning、Responses覆盖和图片allowance契约问题；修正后最终无findings。
+
+五静态门与diff通过，责任上限0；TS build `abc97ad25d30`、inputs `a16517030700`通过，当前已适配validator正式judge exit0/proven、0 open/failed obligation及0 proof gap。未运行真实provider、全仓、exe、桌面或PTY；固定图片allowance不是模型真实图片token，未引入原生tokenizer，也不能解释用户真实1.7k/4.9k差额。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1455,4 +1465,4 @@ ADD-08确认`/shake apply|restore`替换会话上下文选择后，旧provider p
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。

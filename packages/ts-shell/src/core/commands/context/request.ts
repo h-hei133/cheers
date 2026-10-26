@@ -28,6 +28,13 @@ export function requestDetails(request: RequestContext | undefined, projectRoot 
     }
     if (omittedParts > 0) lines.push({ kind: 'text', spans: [span(`${omittedParts} wire categories omitted from this bounded report.`, 'muted')] });
   } else lines.push({ kind: 'text', spans: [span('Wire category breakdown is unavailable for this protocol.')] });
+  if (request.localEstimate) {
+    lines.push({ kind: 'columns', cells: [[span('Assembled request estimate')],
+      [span(`~${request.localEstimate.tokens.toLocaleString()}`, 'number')],
+      [span(`local characters/3.5${request.localEstimate.image ? `; ${request.localEstimate.image.count} image(s) use a fixed ${request.localEstimate.image.allowanceTokens.toLocaleString()}-token allowance` : ''}; not provider usage`)]] });
+  } else {
+    lines.push({ kind: 'text', spans: [span('Assembled request estimate is unavailable for this protocol or opaque reasoning.')] });
+  }
   lines.push({ kind: 'text', spans: [span('Wire categories plus envelope equal the captured body. Envelope includes JSON framing and request settings; media bytes are not token counts.')] });
   const systemSources = request.systemSources?.slice(0, REQUEST_ROWS);
   const omittedSources = (request.systemSources?.length ?? 0) - (systemSources?.length ?? 0);
@@ -44,6 +51,7 @@ export function requestDetails(request: RequestContext | undefined, projectRoot 
   { kind: 'text', spans: [span('Tokenizer count unavailable. Provider usage is aggregate; no per-source token allocation is inferred.')] });
   return { lines, facts: { status: 'accepted', scope: 'foreground', provider, model, endpoint,
     capturedAt, body: { ...request.body }, byteEncoding: 'utf8', characterUnit: 'utf16-code-units',
+    localEstimate: request.localEstimate ? { status: 'estimated', ...request.localEstimate } : { status: 'unavailable' },
     parts: shownParts ? Object.fromEntries(shownParts.map(([name, size]) => [name, { ...size }])) : null,
     partsShown: shownParts?.length ?? 0, partsOmitted: omittedParts,
     systemSources: systemSources?.map(source => ({ ...source, estimatedTokens: Math.round(source.codeUnits / CHARS_PER_TOKEN) })) ?? null,

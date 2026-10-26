@@ -27,13 +27,32 @@ it('keeps exact wire dimensions, raw estimates, tokenizer absence and provider u
   });
   const report = contextReport({ ...input, used: undefined, schemaSize: { bytes: 120, codeUnits: 100 }, request: { ...request, promptTokens: 0 } });
   expect(report.facts.request).toMatchObject({ status: 'accepted', body: request.body, tokenizer: { status: 'unavailable' }, usage: { status: 'reported', promptTokens: 0 } });
+  expect(report.facts.request).toMatchObject({ localEstimate: { status: 'estimated', method: 'characters/3.5', scope: 'assembled-request' } });
   expect(report.facts.toolSchemas).toMatchObject({ characterUnit: 'utf16-code-units', divisor: 3.5, size: { bytes: 120, codeUnits: 100 } });
   expect(reportText(report)).toContain('raw source sizes are not additive to wire sizes');
   expect(reportText(report)).toContain('Provider reported 0 input tokens');
   expect(reportText(report)).toContain('Last accepted foreground request');
+  expect(reportText(report)).toContain('Assembled request estimate');
   expect(reportText(report)).toContain('context gauge can include delegated requests');
   expect(JSON.stringify(report)).not.toMatch(/PRIVATE_INSTRUCTIONS|FIXTURE_SECRET/);
   expect(contextReport({ ...input, used: undefined, request }).facts.request).toMatchObject({ usage: { status: 'unknown' } });
+});
+
+it('reports an unavailable assembled estimate for opaque reasoning', () => {
+  const request = requestContext({ body: JSON.stringify({ messages: [{ role: 'assistant', content: 'answer', reasoning: { signature: 'opaque' } }] }),
+    provider: 'fixture', model: 'm', endpoint: 'openai-compatible', fields: { conversation: 'messages' } });
+  const report = contextReport({ ...input, used: undefined, request });
+  expect(report.facts.request).toMatchObject({ localEstimate: { status: 'unavailable' } });
+  expect(reportText(report)).toContain('Assembled request estimate is unavailable');
+});
+
+it('names the fixed image allowance in the assembled estimate', () => {
+  const request = requestContext({ body: JSON.stringify({ messages: [{ role: 'user', content: [
+    { type: 'image', source: { media_type: 'image/png', data: 'AA==' } },
+  ] }] }), provider: 'fixture', model: 'm', endpoint: 'openai-compatible', fields: { conversation: 'messages' } });
+  const report = contextReport({ ...input, used: undefined, request });
+  expect(report.facts.request).toMatchObject({ localEstimate: { image: { count: 1, allowanceTokens: 2_048 } } });
+  expect(reportText(report)).toContain('1 image(s) use a fixed 2,048-token allowance');
 });
 
 it('retains independent measured, estimated and unknown context facts', () => {

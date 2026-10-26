@@ -25,5 +25,15 @@ export interface RequestContext {
   readonly parts?: Readonly<Record<'system' | 'conversation' | 'tools' | 'envelope', TextSize>>;
   /** Raw assembled system text before protocol serialization; not additive to body bytes. */
   readonly systemSources?: readonly PromptSource[];
+  /** Local count of the serialized request body, never a provider measurement. */
+  readonly localEstimate?: {
+    readonly tokens: number;
+    readonly method: 'characters/3.5';
+    readonly scope: 'assembled-request';
+    readonly image?: {
+      readonly count: number;
+      readonly allowanceTokens: number;
+    };
+  };
   readonly promptTokens?: number;
 }

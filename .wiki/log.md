@@ -9466,3 +9466,11 @@ ADD-08确认`/shake apply|restore`改变派生上下文后，旧provider prompt 
 session command在apply真正改变后调用`markContextUnknown`并清空`promptIdentity`；无变化不写状态。restore在无有效选择时直接返回unchanged，不消费准入；status分别报告有效与被忽略条目。四文件118项串行通过；三个有效反转分别移除测量失效、交互身份和changed=0门，均失败后逐字节恢复。独立只读review先后指出no-op revision、空/stale条目和status计数问题，修正后最终no findings，review未运行测试。
 
 五静态门/diff、责任上限0、TS build aa7aec1ced32（inputs 3fed547d9fb4）及已适配validator正式judge proven/0 open-failed-gap通过。未运行全仓、exe、真实provider、桌面或PTY；有效选择缓存以selection对象和turns数组身份绑定，消息在数组内原地变更的极端路径仍需后续更强内容身份。HANDOFF/addition第五十五批/audit更新；原Phase38/9、ADD独立且整体active，Git/CI另绑定。
+
+## [2026-10-27] fix | 实际组装请求的本地估算事实
+
+ADD-09确认`/context`缺少实际组装请求的独立本地估算。现request projection从发送时已捕获的body按协议字段计算`localEstimate`，只保存冻结数字摘要；图片base64不按长度计数，使用现有固定allowance并显式记录来源，opaque reasoning和不兼容字段保持unavailable，未知estimator异常继续抛出。context report将目录估算、assembled-request估算和provider usage分开显示，不保留或展示原始请求正文。
+
+projection10、wire3、context report14、session29、step90、runtime preview30共六文件176项单worker通过；两个有效反转分别移除localEstimate和恢复图片原文计数，前者10个失败、后者图片长度断言失败，均逐字节恢复并重验。独立只读review先后指出数值测试、图片来源、opaque reasoning、Responses覆盖和图片allowance契约问题，修正后最终无findings。
+
+五静态门/diff、责任上限0、TS build abc97ad25d30（inputs a16517030700）及已适配validator正式judge proven/0 open-failed-gap通过。未运行真实provider、全仓、exe、桌面或PTY；固定图片allowance不是模型真实图片token，未引入原生tokenizer，也不能解释真实1.7k/4.9k差额。HANDOFF/addition第五十六批/audit更新；Git/CI另绑定，原Phase38/9、ADD独立且整体active。

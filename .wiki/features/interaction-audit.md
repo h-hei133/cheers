@@ -680,3 +680,9 @@ ADD-10确认首位`/home`同时存在命令与真实路径时，原先不是吞�
 ADD-08新增确认`/shake apply|restore`改变派生上下文后，旧provider prompt measurement仍可被`/context`和状态栏当作当前值，交互估算身份也未绑定`contextSelection`。现选择owner只承认hash有效且实际改变投影的条目；空/stale/无效果选择不构成prompt identity。`apply`只在真实变化后`markContextUnknown`并清除`promptIdentity`，无变化不写状态；`restore`在无有效选择时直接返回`unchanged`，不消费准入；`status`分别报告有效与被忽略条目。
 
 四文件118项、三个有效反转/逐字节恢复及最终独立只读review无findings有局部证据；五静态门、责任上限0、TS build `aa7aec1ced32`和正式judge proven另绑定。缓存仍以selection对象与turns数组身份绑定，原地改消息的极端路径未覆盖；未运行全仓、exe、真实provider、桌面或PTY。见[第五十五批](phase-20-addition.md#第五十五批上下文选择后的测量失效与有效条目身份)。原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第五十六批）
+
+ADD-09确认`/context`虽能显示目录估算、请求字节和provider用量，却没有实际组装请求的独立本地token估算。现发送时的request projection只保留冻结的数字摘要，按协议字段计算`assembled-request`估算；图片使用固定allowance且不按base64长度计数，opaque reasoning/不兼容字段保持unavailable。报告将目录、实际请求和provider用量分成独立事实，不把本地字符估算冒充provider测量。
+
+六文件176项、两个有效反转/逐字节恢复及最终独立只读review无findings有局部证据；五静态门、责任上限0、TS build `abc97ad25d30`、inputs `a16517030700`和正式judge proven另绑定。固定图片allowance和字符估算仍不是原生tokenizer，真实1.7k/4.9k差额、真实provider及生产性能未验。见[第五十六批](phase-20-addition.md#第五十六批实际组装请求的本地估算事实)。原Phase38/9、ADD独立且整体active。
