@@ -913,6 +913,24 @@ wheel只接当前实际绘制内容行与列，按屏幕origin换算；标题、
 
 交付后远端读回`4967fe9c303edbbd468226d347f84f28c1b8295b`，工作区干净，CI `40249904982`与Watch `40249904967`均in_progress。此时第二十七CI `40248313306`完成为failure：999文件/10931项通过、2fail/3skip；两失败为sources旧双Enter覆盖夹具（本批已修）及attention真实输入夹具直接Enter期待true。后者本地14项13pass/1fail复现，现先确认▸ Choose false，再实际上键并确认▸ Choose true，继续原stage不写→Apply生效→下次30s通知断言；两文件22项串行结果通过，未改产品代码。基线未完全退出便启动后轮导致短暂测试重叠，已核实所有进程退出，后续仅串行；该操作偏差保留于工件。历史CI红色保留，后续提交/推送与CI另绑定delivery-followup.json。
 
+### 第二十九批：代码字面量边界与多skill组合
+
+接续已推送`66fd7a4cc926a9ccd36c8577b74f5fa6b5515682`。本轮延迟实查其CI `40250056359`仍in_progress且headSha一致，未将历史Watch状态当作行为验收。
+
+ADD-09/11/12确认[提示词扫描](../../packages/ts-shell/src/core/prompts/tokens.ts)原用`indexOf(marker)`寻找代码结束：代码正文行里出现同样围栏字符就提前闭合，示例中的`/skill:missing`或`/deep-research`因此可能成为真实调用；较长合法关闭围栏又可能留下一个反引号，将后面的真实skill吞进未闭合代码。行内不同长度的反引号也被错误配对。三文件新增场景修补前39pass/8fail，区分了“示例误调用”和“合法关闭后漏掉调用”两种实际缺口。
+
+现由[提示词字面量owner](../../packages/ts-shell/src/core/prompts/literal.ts)认定围栏：开头位于行首空白之后、至少三个同字符；关闭独占一行、字符相同且长度不少于开头，仅允许尾随空白。嵌入正文、较短、混合字符或尾随正文均不关闭。CRLF与更长合法关闭保留原源范围。行内代码复用本地既有精确反引号run匹配器，将其原字节移入[core/text](../../packages/ts-shell/src/core/text/codeSpan.ts)，旧[presentation入口](../../packages/ts-shell/src/presentation/tui/text/codeSpan.ts)仅重导出；避免core依赖presentation或另造匹配器，不扩展Markdown显示解析范围。未闭合提示词代码仍按原保守政策保留字面量直到末尾，与显示解析的未匹配行内回退分开。
+
+只读参考A `packages/coding-agent/src/extensibility/skills.ts`639–671按首位或首个正文regex匹配展开skill，保留周围正文；`packages/tui/src/autocomplete.ts`825–855对正文canonical skill仅替换当前局部token。本项目采用局部替换决定，但保留完整原文、所有明确skill和更严格代码边界；这些参考片段没有解决此次围栏缺口，不机械照搬其单次匹配行为。
+
+最终七文件151项通过：tokens9、composition18、prose20、skills14、markdown59、runtime preview19、research composition12。代码示例中的driver和不存在skill不执行；合法关闭后的两份skill进入同一prompt，研究实际durable request及所有child stage均保留两份指令和原示例；代码内无候选，关闭后恢复路径/skill候选，局部接受不吞后文或换行。preview与实际prepared prompt估算一致，config/transcript原字节及零MCP保留。首轮修补后118pass/2fail仅为CRLF夹具漏算关闭行的`\r`，更正源范围预期，未删源字符。
+
+两个有效反转分别把关闭判定改成行内包含marker、把行内匹配改成允许更长run，每次AssertionError/exit1；两个源文件逐字节恢复，SHA-256见归档receipts。四静态门通过；首次build在反转尚未结束时被提前启动，实际拒绝“Build inputs changed during compilation; previous build kept”。已等两进程退出并核验恢复字节，再串行重建通过，保留该操作偏差及失败日志，不能宣称全程验证均串行。最终build`1935ca8b0131a3358d4862054145a2386a5060d31faa757ccc3c9b7db0b38eb1`、inputs`1984d4d613db6261db150a9774c558fc1d930e18d0c2b19a8dde3066fdf4dce5`、artifact`394a307c7a07ac7b31610a4dfc8d3ae1430aef3e823b1f12f42af242aac7a084`。当前validator tgz SHA-256`6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`新目录解包judge实际exit0/proven、三义务satisfied。
+
+普通/全屏实际Node隔离PTY均通过：四反引号开头/五反引号关闭及tilde示例内driver不阻断本地数字，合法关闭后的双skill估算一致，未闭合代码保持字面量；实际正文driver仍不支持数字preview，恢复纯skill组合后恢复估算。config/transcript不写、零message/provider、无研究状态，两进程SIGTERM143已settle。约4.3k/6.4k只是隔离夹具值，不是用户真实1.7k/4.9k拆分证据。
+
+归档`.omx/artifacts/phase20-addition-prompt-literals/`；文档与Git交付另绑定。完整settings/model字段/来源/scope/桌面/真实认证、冷热启动、原生tokenizer、研究完整preview、动态来源新鲜度与总物理I/O、真实上下文差额、历史cache writer和build lock来源仍待证。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -928,6 +946,7 @@ wheel只接当前实际绘制内容行与列，按屏幕origin换算；标题、
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。第二十五批修补搜索退出/焦点域/模型详情返回；第二十六批再补Model / Session两个真实owner入口及取消/保存/角色返回，六文件104项通过；第二十七批补普通choice/effort当前值焦点、七类编辑器保存重开与help退出夹具，五文件112项通过。第二十八批再补只读来源内容wheel、翻页/首尾、有界大值阅读及拒绝后返回，五文件118项和两模式隔离PTY通过；只读文本仍有4MiB上限。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
+| 代码示例误调用及合法关闭后漏skill | 原字符串查找将围栏正文误当关闭，或以不同长度反引号闭合；第二十九批改为独立关闭行与精确行内run，示例保持字面量，合法关闭后所有skill恢复解析。七文件151项、两有效反转和两模式隔离PTY有局部证据；实际研究driver完整数字preview仍待实现 |
 
 ### 16.2 不成立的判断与仍未确认的原因
 
@@ -939,6 +958,7 @@ wheel只接当前实际绘制内容行与列，按屏幕origin换算；标题、
 | “npm start每次编译，或用户入口用错” | 既有入口证据不支持。应改首帧时序并测实际耗时，不能把慢启动归咎于用户 |
 | “对话后4.9k就是字符÷3.5” | 对话后值有provider归一化输入用量来源；本地估算另有公式。两者需逐项对齐，不能混为同一公式结果 |
 | “工具数差不多，所以两个项目上下文必然相同” | 实际发送schema、规则、消息、协议与计数器决定成本，工具个数不足以推导token数 |
+| “一次输入只能使用一个skill” | 当前已有两份skill进入同一prompt及实际研究durable request/所有child stage的证据；原代码边界可导致误调用或漏调用，已局部修补。不能从参考首个regex匹配推导本项目必然只加载第一个 |
 | 原现场零可见按键的唯一根因、真实1.7k/4.9k差额、生产启动收益 | 仍未确认，继续取证；不能归为不存在，也不能用合成数字或局部PTY称已解决 |
 | 真实OAuth/key接受、cache writer退出1、活跃build lock并发来源 | 仍未确认，保留认证与产品路由、历史CI与当前验证的证据边界 |
 
@@ -949,7 +969,7 @@ wheel只接当前实际绘制内容行与列，按屏幕origin换算；标题、
 | model看齐 | Roles/All models/provider层次可辨；分类→搜索→未配置具体模型→详情→精确连接配置/适用登录→返回原模型→显式启用→重开读回。全部未配置仍能导航；同名relay按精确身份区分；取消/失败不虚报成功；键盘/点击/wheel/hover/窄屏/resize保持同一目标 |
 | settings看齐 | 真实主分类与section覆盖已有能力；跨分类搜索后回所属位置；布尔/枚举/数值/列表/对象等真实编辑器→Enter暂存→Apply保存或Discard/取消→重开读回。user/project scope、只读与显式来源、effective/stored、预览撤回及restart时点保真；窄屏先保留caret，不以标签换皮完成 |
 | 输入位置与路径新增 | 只有源文本第一行第一位置开放完整功能slash；正文`/home`给实际目录suggestion，上下选择或Tab接受并连续补全。只替换光标token，保留前后/多行/缩进；代码、URL、词内slash和转义不触发命令；迟到结果不覆盖新草稿 |
-| 多skill新增 | 首位、正文与后续行可发现skill，同一次输入的全部明确skill实际加载并进入同一任务，稳定去重、保留正文/附件；未知、失效、拒绝、超预算时报告并可重试，不能只运行第一个或递归执行skill正文slash |
+| 多skill新增 | 首位、正文与后续行可发现skill，同一次输入的全部明确skill实际加载并进入同一任务，稳定去重、保留正文/附件；未知、失效、拒绝、超预算时报告并可重试，不能只运行第一个或递归执行skill正文slash。代码示例内不补全或调用，短/混合/嵌入关闭不结束围栏；合法较长关闭及CRLF后恢复真实skill，行内按完整相等反引号run配对 |
 | 有限slash组合改进 | 在参考正文skill限制上，允许显式声明的无副作用方法命令组合；deep-research研究入口必须可与两个及更多skill搭配，也支持兼容modifier组合成一个任务。一个工作流driver拥有预算/取消/持久状态；研究control/save按原独立准入，settings/model/connect/resume等功能命令不进入正文执行 |
 | 启动与上下文 | 先看到真实输入区/loading，再接管一次草稿，ready前零模型/工具派发；首请求本地估算来自实际有效规则/消息/tool schema及协议。实测返回后按身份衔接，来源变更撤值；分别测首帧和ready，并用同模型/协议/规则/schema拆分真实差额，不设必须等于1.7k的假目标 |
 

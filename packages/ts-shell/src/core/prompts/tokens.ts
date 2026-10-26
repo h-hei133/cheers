@@ -1,3 +1,5 @@
+import { promptCodeEnd } from './literal.js';
+
 export interface PromptToken {
   readonly from: number;
   readonly to: number;
@@ -17,12 +19,9 @@ export function promptTokens(text: string): PromptToken[] {
       if (char === '\\') {
         literal ??= 'escape'; index += Math.min(2, text.length - index); continue;
       }
-      if (char === '`' || (char === '~' && text.startsWith('~~~', index) && /^\s*$/.test(text.slice(text.lastIndexOf('\n', index - 1) + 1, index)))) {
-        literal = 'code';
-        const marker = /^(?:`+|~+)/.exec(text.slice(index))![0];
-        const end = text.indexOf(marker, index + marker.length);
-        index = end < 0 ? text.length : end + marker.length;
-        continue;
+      if (char === '`' || char === '~' && text.startsWith('~~~', index)) {
+        const end = promptCodeEnd(text, index);
+        if (end !== undefined) { literal = 'code'; index = end; continue; }
       }
       if (index === from && (char === '"' || char === "'")) {
         literal = 'quote'; index++;

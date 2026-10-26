@@ -9264,3 +9264,9 @@ ADD-03确认form吞wheel、64KiB编辑保护拒绝只读三值来源且Enter无�
 五文件118pass、三有效反转/字节恢复、四静态门/TS构建c27b7b21ca2e及新解包正式judge proven三satisfied通过。普通/全屏实际Node隔离PTY均通过大值拒绝→只读翻页/首尾/wheel→Enter/Esc保留pending，config原字节不变/零message-provider/modelSelection不写，143退出均settle。失败夹具日志保留。证据phase20-addition-settings-source；docs/Git另绑定，第二十七CI仍运行，完整面板/真实认证/计量性能等仍待验，原Phase38/9和ADD独立/active。
 
 交付后上一批CI完成红色10931pass/2fail/3skip，两失败为来源与提醒旧焦点夹具。来源本批已修，attention补真实上键选true并保留stage/Apply/下次通知断言，两文件22pass；不改变产品。上一批失败归档，当前CI仍运行，补充提交另绑定。基线未退出便启动后轮的短暂重叠已纠正并记录。
+
+## [2026-10-26] fix | 提示词代码边界与多skill组合
+
+ADD-09/11/12确认字符串查找提前关闭代码围栏、较长合法关闭遗留反引号及行内run误配对，示例slash可能误调用且后续真实skill被吞。提示词owner按独立同字符/足够长关闭行判断，行内复用既有精确run匹配器移入core/text、旧presentation入口重导出；保留CRLF/原源范围和未闭合保守规则，不扩展Markdown显示解析。
+
+七文件151pass、两有效反转/字节恢复、四静态门、最终build1935ca8b0131/新解包正式judge proven三satisfied通过。两模式实际Node小PTY示例driver不调用、合法关闭后双skill估算恢复、配置/transcript不写、零message/provider，143退出均settle；实际研究driver数字preview仍不支持。首次build提前与反转重叠被输入变更检查拒绝，退出/恢复后重建通过，保留失败与操作偏差。隔离4.3k/6.4k不代表真实上下文拆分；归档phase20-addition-prompt-literals，docs/Git另绑定，上一批自身CI仍运行。原Phase38/9与ADD独立/active，完整面板/认证/性能/计量验收继续待证。

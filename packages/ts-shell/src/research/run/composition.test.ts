@@ -28,6 +28,7 @@ it.each([
   '/deep-research --mode software --depth deep /skill:research-a /skill:review-b 比较两种架构',
   '请比较两种架构 /deep-research /skill:research-a /skill:review-b\n重点检查可验证证据和反例',
   '请比较 /deep /skill:research-a /skill:review-b 反例',
+  '检查示例\n````text\nexample ```` /research /skill:missing\n`````\n/deep-research /skill:research-a /skill:review-b',
 ])('binds one native research with every skill in durable request and every child stage: %s', async input => {
   const setup = fixture(); const result = await routeSlashCommand(input, setup.context);
   expect(setup.researchCommand).toHaveBeenCalledTimes(1);

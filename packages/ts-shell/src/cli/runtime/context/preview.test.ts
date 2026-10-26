@@ -70,6 +70,26 @@ it('includes all explicit skills and invalidates their manifests and target chan
   await expect(load('question /skill:missing')).rejects.toThrow('Unknown skill: missing');
 });
 
+it('previews the same two-skill payload after a fenced example without preparing its literal driver or missing skill', async () => {
+  const { cwd, context, load, layout, gateway } = fixture();
+  const files = ['one', 'two'].map(name => {
+    const file = path.join(cwd, `${name}.md`); fs.writeFileSync(file, `---\nname: ${name}\ndescription: ${name}\n---\nMETHOD ${name}`); return file;
+  });
+  context.skillOptions = { noSkills: true, skillPaths: files };
+  const example = '~~~~text\nexample ~~~~ /skill:missing\n/deep-research\n~~~~ trailing\n~~~~~';
+  const input = `检查示例\n${example}\n/skill:one /skill:two`;
+  const submitted = await routeSlashCommand(input, { cwd, skillOptions: context.skillOptions });
+  if (submitted?.kind !== 'prompt') throw new Error('Fixture composition was not prepared.');
+  const prepare = vi.fn(context.preparePromptContext!); context.preparePromptContext = prepare;
+  const persisted = [layout.metadataPath, layout.statePath, layout.transcriptPath], before = persisted.map(file => fs.readFileSync(file));
+  const preview = await load(input); preview.verify();
+  expect(prepare).toHaveBeenCalledWith(submitted.prompt, expect.any(AbortSignal));
+  expect(submitted.prompt).toContain(example); expect(submitted.prompt).toContain('METHOD one'); expect(submitted.prompt).toContain('METHOD two');
+  expect(submitted.promptMetadata?.skills).toMatchObject([{ name: 'one' }, { name: 'two' }]);
+  const actual = await load(submitted.prompt); expect(preview.estimate).toEqual(actual.estimate);
+  expect(persisted.map(file => fs.readFileSync(file))).toEqual(before); expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
+});
+
 it('withdraws a multi-skill preview on raw manifest edits even when metadata stays equal', async () => {
   const { cwd, context, load, layout, gateway } = fixture();
   const files = ['one', 'two'].map(name => { const file = path.join(cwd, `${name}.md`);

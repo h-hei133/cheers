@@ -18,6 +18,18 @@ beforeEach(() => {
 });
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
+it('prepares only the two skills after a real closing fence, preserving every code example without dispatching its driver', async () => {
+  const example = '````text\nexample ```` /skill:missing\n/deep-research\n```` trailing\n/skill:missing\n`````';
+  const input = `检查示例\n${example}\n/skill:a /skill:b`;
+  const researchCommand = vi.fn();
+  const result = await routeSlashCommand(input, { cwd: root, skillOptions: { skillPaths, noSkills: true }, researchCommand });
+  expect(result).toMatchObject({ kind: 'prompt', promptMetadata: { originalInput: input, skills: [{ name: 'a' }, { name: 'b' }], methods: [] } });
+  expect(result).toMatchObject({ prompt: expect.stringContaining(example) });
+  expect(result).toMatchObject({ prompt: expect.stringContaining('BODY a') });
+  expect(result).toMatchObject({ prompt: expect.stringContaining('BODY b') });
+  expect(researchCommand).not.toHaveBeenCalled();
+});
+
 it.each(['/skill:a /skill:b 问题', '请比较 /skill:a\n再检查 /skill:b 反例'])(
   'routes all skills into one prompt with original provenance: %s', async input => {
     const result = await routeSlashCommand(input, { cwd: root, skillOptions: { skillPaths, noSkills: true } });

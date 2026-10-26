@@ -19,6 +19,16 @@ function request(marked: string) {
   return catalogRequest({ text, cursor: cursor < 0 ? text.length : cursor, revision: 1 });
 }
 
+it('suppresses suggestions inside a fenced example and restores local skill/path suggestions after its complete closing line', () => {
+  const code = '````text\nexample ```` /skill:missing\n/ho\n```` trailing\n`````';
+  expect(request(`${code.replace('/ho', '/ho|')}\n正文 /skill:a`)).toBeUndefined();
+  const req = request(`${code}\n正文 /rev|\n后文`)!;
+  expect(req.kind).toBe('prose');
+  const item = catalogSuggestions(req, [{ value: '/skill:review-b', label: '/skill:review-b', kind: 'skill' }])[0]!;
+  expect(replaceDraft(req.snapshot, item.edit!)?.text).toBe(`${code}\n正文 /skill:review-b\n后文`);
+  expect(request(`${code}\n正文 /home|`)?.query).toBe('/');
+});
+
 it.each([' /mod', '\n/mod', '正文 /mod', '正文\n/model', ' /thinking h'])(
   'limits functional discovery to source offset zero: %s', text => expect(slashSuggestions(text)).toBeNull());
 

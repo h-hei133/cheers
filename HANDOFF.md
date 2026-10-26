@@ -296,3 +296,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Wheel is swallowed by a form, a large provenance view is empty, and Enter cannot return after its prefill was refused.
 - **Root Cause**: The writable editor cap also gates read-only inspection; whole-source grapheme layout scales with repeated values, while form chrome has no content-local pointer boundary.
 - **Rule**: Keep writable/secret caps, admit read-only text separately, and lay out bounded source slices with complete grapheme boundaries and explicit continuation or rejection. Route wheel only over the current painted content and expire hits after motion. Return through the read-only owner even on rejection; test full source reconstruction, pending retention and unchanged file bytes.
+
+### Prompt Code Closures Need Complete Delimiter Boundaries
+- **Symptom**: Slash examples inside code activate methods or missing skills, while real skills after a longer legal closing fence disappear from composition.
+- **Root Cause**: Searching for the opening marker anywhere in the remaining text closes on an embedded body run or leaves extra closing ticks; inline spans also require equal complete runs.
+- **Rule**: Recognize fenced closes only on independent same-character lines with sufficient run length and no trailing prose. Share the existing exact-run inline matcher through a lower owning domain, preserve source offsets and CRLF, and test completion, prepared prompts, previews and durable research stages with two real skills after the example. Keep unfinished prompt literal policy separate from display fallback.

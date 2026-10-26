@@ -422,3 +422,16 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 本批未证明完整面板已看齐或极限大配置全部可在面板检查。未配置模型可选、输入顶格与箭头、正文路径、多skill及有限方法slash组合继续依[文末总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)验收；没有上下键监听、resume排序反了、每次编译、4.9k等于字符公式、工具数决定token数等解释仍不成立。现场唯一根因、真实token差额/启动收益/认证、cache-build来源继续未知。第二十七CI延迟检查仍in_progress，原Phase38/9与ADD独立、整体active。
 
 交付后的延迟实查：第二十七CI `40248313306`实际failure，999文件/10931pass/2fail/3skip；source与attention旧焦点夹具均默认Enter期待true。source已在`4967fe9c`修正，attention现用真实上键显式选true，本地基线13pass/1fail后两文件22pass；不修改当前值焦点产品合同。`4967fe9c`远端相同/工作区干净，CI `40249904982`仍in_progress；补充提交交付另绑定，不借历史Watch success替代测试。
+
+### 文末当前结论（第二十九批）
+
+本批确认并局部修补代码围栏提前闭合、较长合法关闭遗留反引号及行内run误配对，避免示例斜杠误调用或代码后的真实skill被吞掉。复用core共享精确run匹配器，提示词围栏按独立关闭行判断，保留完整源范围及未闭合保守规则。七文件151项、两有效反转/字节恢复、四静态门、最终构建及正式judge proven三satisfied通过；普通/全屏实际Node隔离PTY保持配置/transcript不写、零message/provider、143退出已settle。首次build提前与反转重叠，构建正确拒绝输入变更；退出并恢复后重建通过，操作偏差与失败保留。详情见[第二十九批](phase-20-addition.md#15-实施与验证证据)。
+
+| 分类 | 当前结论 |
+|---|---|
+| 确实存在且有局部修补 | 未配置具体model原不能聚焦，resume渐进自动焦点停旧记录，去黄条后的留白和箭头缺失，首帧/初始估算缺口，面板导航/搜索/返回/真实编辑器与来源阅读不足，正文路径/多skill/有限方法组合及代码边界误调用、漏skill。保留原缺口、修补证据和现场待复验的区别 |
+| 确实仍需完善 | settings/model完整字段、来源、scope、编辑器、桌面和真实认证矩阵；冷热Node/exe、原生tokenizer、完整研究preview、全部动态来源与累计物理I/O、真实1.7k/4.9k差额 |
+| 不成立的判断 | model完全无上下键监听、resume时间排序反了、settings完全无分类、空配置等于没实现、npm start每次编译或用户入口用错、实测4.9k必然来自字符公式、工具数相近必然同token成本，以及当前只能加载一个skill。监听存在不否认原无可见交互；双skill已有实际prompt/研究请求及所有child stage证据 |
+| 尚未确认 | 原现场唯一按键根因、生产启动收益、同模型/协议/规则/schema真实上下文差额、真实OAuth/API-key接受、历史cache writer退出1及活跃build lock来源；这些不能归为不存在 |
+
+完整用户要求继续见[文末任务总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)：未配置模型可选、两个面板整体看齐、正文顶格与编辑箭头、首位完整slash和正文真实路径suggestion/Tab、同次全部明确skill及deep-research有限方法组合；正文功能命令不执行。代码示例内的driver保持字面量，实际研究driver完整数字preview仍待实现。隔离约4.3k/6.4k不替代用户真实数值拆分。本轮延迟实查`66fd7a4c`自身CI `40250056359`仍in_progress，Git另绑定，原Phase38/9与ADD独立/整体active。
