@@ -2,7 +2,7 @@ import { projectModelSelection, projectSessionModel } from "../../../session/mod
 import { getRuntimeConfig } from "../../../config/runtimeConfig.js";
 import { loadCatalog } from "../../../core/models/catalogStore.js";
 import { availabilityLabel, availabilitySnapshot, endpointLabel, type ConnectionAvailability } from "../../../core/models/availability.js";
-import { catalogBaseUrl, catalogModel, catalogProvider, type CatalogProvider } from "../../../core/models/catalog.js";
+import { catalogBaseUrl, catalogProvider, type CatalogProvider } from "../../../core/models/catalog.js";
 import { effortCapability } from "../../../core/models/capability.js";
 import { resolveProviderCredential } from "../../../core/shell/providerCredentials.js";
 import type { CommandContext } from "../../../core/commands/types.js";
@@ -26,6 +26,7 @@ import { modelRoleEditor } from './model/role.js';
 import type { ThinkingPreference } from '../../../core/models/effort.js';
 import { modelAccountSignIn, modelSignInPicker, modelSignInStatus, type ModelSignIn } from './model/auth.js';
 import { modelKeyPicker } from './model/key.js';
+import { listedModelMetadata, modelMetadataDetails } from './model/metadata.js';
 
 interface RoleSelection {
   readonly role: AutomaticModelRole;
@@ -107,7 +108,9 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               : resolution?.blocked || !resolution?.credential ? 'credential unavailable'
               : ambiguous ? 'model catalogue endpoint is ambiguous'
               : unsupported ? 'reasoning effort unsupported' : !choice?.baseline ? 'active session required' : undefined;
-            const metadata = catalogModel(catalog, provider.runtime, model.id, catalogBaseUrl(catalog, provider.runtime, resolution?.baseUrl));
+            const modelAddress = resolution?.baseUrl
+              ?? config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
+            const metadata = listedModelMetadata(catalog, provider, model.id, modelAddress);
             rows.push({ id, label: model.id,
               detail: [connection?.connectionId ?? (resolution?.credential ? `${resolution.credential.source} credential` : undefined), connection?.label, provider.label, connection?.endpoint ?? endpointLabel(resolution?.baseUrl),
                 metadata?.contextWindow ? `${Math.round(metadata.contextWindow / 1000)}k` : undefined].filter(Boolean).join(' · '),
@@ -116,8 +119,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             const displayed = connection?.state === 'ready' && (resolution?.blocked || !resolution?.credential)
               ? { ...connection, state: 'credential-missing' as const, reason: 'This explicit connection needs its own credential.' } : connection;
             details.set(id, [...modelDetails(provider, displayed, !connection ? resolution?.credential?.source : undefined),
-              ...(!connection && resolution?.baseUrl ? [`Endpoint: ${endpointLabel(resolution.baseUrl)}`] : []), `Reasoning effort: ${assignedEffort ?? 'auto'}`,
-              ...(metadata?.contextWindow ? [`Context: ${metadata.contextWindow} tokens`] : []), ...(reason ? [reason] : [])]);
+              ...(!connection && (resolution?.baseUrl ?? provider.baseUrl) ? [`Endpoint: ${endpointLabel(resolution?.baseUrl ?? provider.baseUrl)}`] : []),
+              `Reasoning effort: ${assignedEffort ?? 'auto'}`, ...modelMetadataDetails(catalog, provider, model.id, modelAddress), ...(reason ? [reason] : [])]);
             if (reason) {
               const endpoint = config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
               const safeEndpoint = connectionEndpoint(endpoint);

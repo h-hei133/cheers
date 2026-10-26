@@ -92,6 +92,8 @@ ADD-02须把目前平铺的provider→connection→model及角色预设组织成
 
 默认打开时能定位当前模型，并清楚区分“当前活动”“键盘焦点”“尚未配置”。可用与未配置分类都可访问。两栏详情要跟随焦点，显示名称、精确连接、模型能力、reasoning约束及阻止启用的原因；模型类别tabs仅在目录有真实分类数据时提供，不根据名字臆测。目录刷新不抢手动焦点，目标失效时落到邻近可浏览项并说明状态。
 
+详情必须使用所浏览模型的精确目录：未配置relay以其目录地址、pending/error连接以其真实保存地址查找；同名官方模型不能替代relay的能力与上限。同地址存在歧义时不猜数据，地址未配置时仅展示当前具体目录条目已声明的信息。容量、独立输入上限、最大输出、图片输入、reasoning设置与各档位、已声明价格应可检查；未知能力显示unverified，缺价格不称免费。当前reasoning偏好与模型是否接受该设置分开；不接受reasoning参数不等于模型没有内部推理能力。
+
 验收从Roles进入预设、从provider浏览未配置模型、All models搜索同名relay、切换分类后清搜索、鼠标/键盘到同一目标、异步刷新和子面板返回。保存仍验证精确target与revision，不按label提交。
 
 ### 3.4 settings：主分类、section与真实编辑器
@@ -1019,6 +1021,20 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 
 归档`.omx/artifacts/phase20-addition-research-preview/`，文档/Git交付另绑定。研究**新建入口**数字preview与身份衔接有局部完整证据，control/其他driver/后续独立child及研究总费用仍待覆盖。settings/model全字段/来源/scope/desktop/真实认证、冷热Node/exe、原生tokenizer、全部动态来源和累计物理I/O、真实同模型/协议/规则/schema上下文差额仍未验；历史cache writer与build lock来源保留unknown。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第三十四批：模型详情的精确目录归属与能力信息
+
+接续已推送`a05e513e5f877bd9c28ad78ab1f3c543eca49ebc`，本批沿ADD-01/02完整模型选择链修补详情。原[model picker](../../packages/ts-shell/src/cli/interactive/picker/model.ts)在未配置relay或pending/error连接没有resolution.baseUrl时，先用runtime的canonical地址查元数据，同名官方模型会覆盖所浏览relay的context信息；没有canonical同名条目时又丢掉实际已有的relay声明。新增回归修补前四项全失败，补未配置目录地址后四项通过；pending/error/credential-missing三场景仍失败，进一步确认必须沿所选连接保存地址取数据。
+
+现在[metadata owner](../../packages/ts-shell/src/cli/interactive/picker/model/metadata.ts)优先实际请求地址、精确连接保存地址、所浏览provider目录地址，通过原catalogModel处理relay归属及同地址歧义；完全未配置地址时仅使用所浏览自定义条目，不能回退到别的provider。列表容量与详情共用这份解析，详情补context、inputLimit、maxTokens、images、reasoning设置/档位及已声明input/output/cache价格；缺能力保留unverified，缺上限/价格不造值，零价格原样显示。[core capability](../../packages/ts-shell/src/core/models/capability.ts)提取已有已解析model的档位判定，原effortCapability继续同一规则与null早返回，避免另造reasoning政策。reasoning设置拒绝与模型内部推理能力分开，实际启用/认证/事务仍由原owner负责。
+
+只读参考A的`packages/tui/src/overlays/model-browser.ts`1600–1620及2230–2255将context、max output、price、input、reasoning作为当前具体model的详情事实；本项目采用按目标展示声明事实的决定，不引入参考独有的速度/评分或不存在的模型类别，也不从缺数据推导免费/不支持。角色及连接返回、未配置可聚焦、显式启用与原scope均保留。
+
+最终四文件70项通过（metadata8、model43、current11、key8），共用capability既有消费者两文件8项另通过，合计六文件78项。覆盖同名官方/relay不同上限、全部未配置、pending/error/缺凭据两种目录行、无地址声明、同地址歧义、重新load后目录修改、未知能力与零价格、真实OverlayHost键盘Enter/返回/窄屏；配置/session模型及网络无副作用。三有效反转撤掉精确目录地址、撤掉blocked连接保存地址、将未知image误判支持，均AssertionError后逐字节恢复。
+
+四静态门及TS build`d8c88f4d3c8af703855786107e3673827d36ec5f47d96a51fa01e891d422b420`通过；新解包正式judge实际exit0/proven、三结构义务satisfied。普通/全屏实际Node隔离小PTY均证明官方400k与relay32k分开、relay详情24k input/4096 output/图片unsupported/reasoning设置supported、unknown能力unverified及返回原焦点；config原字节、session modelSelection未写、零message/provider，两个SIGTERM143已settle。首轮探针只读借用屏幕状态、忽略regular详情实际写入主屏而失败，已改成检查本次原输出及完整事实再返回，失败保留，不判为产品能力缺失。
+
+归档`.omx/artifacts/phase20-addition-model-metadata/`，docs/Git另绑定。完整settings/model字段/来源/scope/desktop/真实认证、model类别与完整请求能力矩阵、研究control/其他driver/child成本、原生tokenizer/动态来源累计I/O、冷热启动及真实1.7k/4.9k差额仍待验；历史cache/build来源unknown。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1039,6 +1055,7 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 | 一次记忆预览反复读取相同文件 | 第三十一批沿原store共享单次有界只读snapshot，health/候选/lifecycle共用，12pending的binary acquisition从15降2，复验仍追加1；75项/三反转/两模式PTY有局部证据。全preview/controller和动态来源总读取成本仍待验，不能扩成全请求两次读 |
 | 研究入口无法完整预览 | 第三十三批已接有界新建入口准备、一次性prospective ID到实际同ID提交、完整prompt/run/save schema及协议估算、来源与取消复验，87项/四有效反转/两模式实际隔离PTY通过。只覆盖新建入口，不代表control、其他driver、后续独立child或研究总费用已可预览 |
 | 组合研究把自身command owner误判为忙 | 实际终端Enter拒绝且真实ShellCommandRuntime路由回归可复现。第三十三批改为controller与signal双重身份匹配，自身可继续，其他命令与取消仍拒绝；不能只删除全部busy保护 |
+| 未配置或阻断relay模型详情错用官方能力 | 第三十四批确认缺resolution地址时回退canonical目录，导致同名模型32k误显示400k或已有能力丢失。现沿真实连接/所浏览目录地址共用精确元数据，补上限/图片/reasoning设置/档位/已声明价格，未知与地址歧义保真；78项/三反转/两模式实际隔离PTY有局部证据，完整能力与平台矩阵仍待验 |
 
 ### 16.2 不成立的判断与仍未确认的原因
 

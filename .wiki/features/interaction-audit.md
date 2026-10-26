@@ -489,3 +489,16 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 | 尚未确认 | 原现场唯一按键根因、真实同模型/协议/规则/schema1.7k/4.9k、生产冷热收益、真实OAuth/API-key接受、历史cache writer及活跃build lock来源。不能将这些unknown写成不存在 |
 
 用户的未配置模型可选、两个面板整体参照、正文顶格/编辑箭头、首位完整slash/正文真实路径suggestion与Tab、同次全部明确skill和deep-research有限方法组合要求全部保留于[文末任务总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)。隔离6.8k研究/4.9k save入口不是用户真实差额，也不是研究总token；初轮回复前缀滚出视口和提交后强求立即数字属于探针readiness错误，保留失败分类。Git及延迟CI另实际绑定，原Phase38/9、ADD独立且整体active。
+
+### 文末当前结论（第三十四批）
+
+确认未配置/pending/error relay模型缺请求地址时，详情元数据错误回退官方同名模型，32k可误显示400k；不是排序或键盘故障。现沿所浏览目录/真实保存连接地址解析，同地址歧义不猜，无地址仅保留当前条目声明；补容量/输入输出上限/图片/reasoning设置档位及声明价格，未知保真。六文件78项、三有效反转/字节恢复、四静态门/最终构建及正式judge proven三satisfied通过；普通/全屏实际Node小PTY详情与返回通过，配置/会话模型未写、零消息/provider、143退出settle。regular探针借用屏幕与主屏输出误判已纠正且失败保留。详见[第三十四批](phase-20-addition.md#15-实施与验证证据)。
+
+| 分类 | 当前结论 |
+|---|---|
+| 确实存在、有局部修补 | 未配置模型焦点、resume渐进焦点、留白/箭头、首帧/估算、面板操作、正文路径/多skill/有限组合/代码边界、memory raw/重复读、研究entry preview/自身command忙误判，以及本批relay详情错误归属与能力发现不足 |
+| 确实仍需完善 | 完整settings/model字段/来源/scope/能力/类别/桌面/真实认证，研究control/其他driver/child成本，tokenizer/动态来源累计I/O、生产冷热启动及真实上下文差额 |
+| 不成立的解释 | model无按键监听、resume排序反了、settings无分类/空配置无功能、start每次编译/入口用错、4.9k等于字符公式、工具数决定token成本、当前只能生效一skill、原memory全无变更保护、研究新建入口一律无数字；缺模型价格也不等于免费，不接受reasoning设置不等于没有内部推理 |
+| 未确认 | 原现场唯一按键根因、同模型/协议/规则/schema真实1.7k/4.9k、冷热收益、真实认证接受及历史cache writer/build lock来源，继续unknown |
+
+全部用户要求继续见[文末任务总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)，完整面板不能从本批详情修补宣布已看齐。当前Git/CI另绑定，原Phase38/9与ADD独立且active。

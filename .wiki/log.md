@@ -9296,3 +9296,9 @@ ADD-08沿原研究owner提取entry参数/全方法与提示词、prospective run
 ADD-08研究owner从有界snapshot准备20秒一次性身份，完整prompt/run/save schema接原协议估算；发布前raw/附件/模型/配置/取消复验，实际create同ID、提交时起deadline、原锁内状态guard。preview零研究/账本写入、零arm/child/provider。实际Node Enter检出自身组合command误判busy，现controller及signal双重匹配自身owner，其他命令与取消仍拒绝。
 
 最终九文件87pass、四有效反转/逐字节恢复、四静态门/build43a837219c11/新解包正式judge proven三satisfied通过。普通/全屏实际Node隔离小PTY数字6.8k研究/4.9k save、preview config/transcript不写、唯一run双skill/绑定transcript/assistant持久化/ledger无pending/终端ready、143退出settle。早期实际busy故障与回调同步throw、视口前缀及提交后数字readiness探针错误保留分类；synthetic数字不解释用户真实差额，不证明child研究完成/保存。归档phase20-addition-research-preview，docs/Git/CI另绑定；完整面板/桌面/真实认证、研究control/其他driver/child成本、原生tokenizer/动态源累计I/O、冷热启动/真实上下文继续待验，原Phase38/9与ADD独立/active。
+
+## [2026-10-26] fix | 模型详情精确目录归属与能力发现
+
+ADD-01/02未配置/pending/error relay缺resolution地址，原详情回退canonical同名模型；新回归四失败及blocked三失败分别定位。model metadata沿真实保存连接/所浏览目录地址解析，无地址只用具体声明、歧义不猜；补context/input/output/图片/reasoning设置档位/声明价格，core共用已解析model能力政策，null原合同保留。未配置可聚焦、原认证/显式启用/scope/角色返回不变。
+
+六文件78pass、三有效反转/字节恢复、四静态门/buildd8c88f4d3c8a/新解包正式judge proven三satisfied通过。普通/全屏实际Node小PTY同名官方400k/relay32k、具体24k input/4096 output/图片与设置能力、unknown保真及返回焦点、config/session未写/零message-provider、143退出settle；首轮regular探针画面/主屏输出误判保留分类。证据phase20-addition-model-metadata，docs/Git/CI另绑定；完整面板/桌面/真实认证及能力矩阵、研究control/其他driver/child成本、计量/动态I/O/冷热启动与真实差额仍待验，原Phase38/9与ADD独立/active。
