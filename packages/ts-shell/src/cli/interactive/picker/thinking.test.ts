@@ -7,8 +7,11 @@ import { loadCatalog, writeCatalogCache } from '../../../core/models/catalogStor
 import { resolveProviderCredential } from '../../../core/shell/providerCredentials.js';
 import { SessionManager } from '../../../session/SessionManager.js';
 import { readSessionModel } from '../../../session/model/state.js';
+import { projectSessionModel } from '../../../session/model/projection.js';
 import type { CommandContext } from '../../../core/commands/types.js';
 import { thinkingPicker } from './thinking.js';
+import { OverlayHost } from '../overlay.js';
+import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 
 let home: string;
 let manager: SessionManager;
@@ -119,4 +122,34 @@ it('does not guess between duplicate relay owners', async () => {
 
   expect((await picker.apply(['auto']))?.note).toContain('multiple catalogue entries');
   expect(readSessionModel(sessionId)).toBeUndefined();
+});
+
+it('focuses the actual thinking preference on open without saving', async () => {
+  const config = getUserRuntimeConfigPath(); const edit = readRuntimeConfigEditAt(config);
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.map(row => ({ ...row, thinkingEffort: 'medium' })) }, edit);
+  const picker = thinkingPicker(context()); const overlay = new OverlayHost(() => {});
+  overlay.open(picker); await Promise.resolve(); await Promise.resolve();
+  const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(apply.mock.calls[0]?.[1]).toEqual(['medium']);
+  expect(readSessionModel(sessionId)).toBeUndefined(); overlay.close();
+});
+
+it('retains an unsupported active effort as read-only focus instead of offering auto on Enter', async () => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.map(row => ({ ...row, thinkingEffort: 'high' })) }, edit);
+  const picker = thinkingPicker(context()); const rows = await picker.load();
+  expect(rows.find(row => row.id === 'high')).toMatchObject({ disabled: true, focusable: true });
+  const overlay = new OverlayHost(() => {}); overlay.open(picker); await Promise.resolve(); await Promise.resolve();
+  const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(apply).not.toHaveBeenCalled(); expect(readSessionModel(sessionId)).toBeUndefined(); overlay.close();
+});
+
+it('reopens the same picker on its freshly accepted session effort', async () => {
+  const current: CommandContext = { ...context(), readConfiguration: () => ({
+    config: projectSessionModel(getRuntimeConfig(home), sessionId), catalog: loadCatalog() }) };
+  const picker = thinkingPicker(current); await picker.load();
+  expect((await picker.apply(['medium']))?.note).toContain('Reasoning effort: medium');
+  const overlay = new OverlayHost(() => {}); overlay.open(picker); await Promise.resolve(); await Promise.resolve();
+  const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(apply.mock.calls[0]?.[1]).toEqual(['medium']); overlay.close();
 });

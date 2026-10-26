@@ -24,9 +24,11 @@ const LEVELS = ['auto', 'low', 'medium', 'high'] as const;
  */
 export function thinkingPicker(context: CommandContext, back?: (notice?: string) => Picker): Picker {
   let choice: ReturnType<typeof captureModelChoice> | undefined;
+  let initial: string | undefined;
   return {
     title: 'Thinking effort',
     form: 'panel',
+    get initialSelection() { return initial; },
     ...(back ? { back, footer: 'Enter saves for the current session · Esc returns to settings' } : {}),
     empty: 'No effort levels are available for the selected model.',
     async load(): Promise<readonly Option[]> {
@@ -37,6 +39,7 @@ export function thinkingPicker(context: CommandContext, back?: (notice?: string)
       const target = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
       const { provider, model, baseUrl } = target;
       const current = captureThinkingPreference(context.projectRoot ?? context.cwd, target.thinkingEffort);
+      initial = current.thinkingEffort ?? 'auto';
       const ambiguous = catalogProvider(catalog, provider, baseUrl).ambiguous;
       return LEVELS.map(level => {
         const effort = level === 'auto' ? null : level;
@@ -48,6 +51,7 @@ export function thinkingPicker(context: CommandContext, back?: (notice?: string)
           detail: level === 'auto' ? 'No explicit effort is sent.' : `Request ${level} reasoning effort.`,
           note: ambiguous ? 'model catalogue endpoint is ambiguous' : active ? 'active' : capability,
           disabled: ambiguous || capability === 'unsupported',
+          ...(active && (ambiguous || capability === 'unsupported') ? { focusable: true } : {}),
         };
       });
     },

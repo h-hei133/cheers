@@ -10,12 +10,14 @@ import { createShellRuntimeContext, refreshShellRuntimeConfig, applyShellSubstra
 import { openSettings } from './settings.js';
 import { ComposerPreference } from './tuiSettings.js';
 import { settingsPicker } from './picker/settings.js';
+import { CONFIG_SETTINGS, formatSetting, settingEditor } from '../../config/settings.js';
 import { OverlayHost, type Picker } from './overlay.js';
 import { parseKeyEvent } from '../../presentation/tui/input/keys.js';
 import { Editor } from '../../presentation/tui/editor.js';
 import { layoutComposer } from '../../presentation/tui/composer/layout.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
 import { OptionModel } from '../../presentation/tui/chrome/options.js';
+import { truncateToWidth } from '../../presentation/tui/text/layout.js';
 import { themePreferences } from '../../presentation/theme/preview.js';
 import { selectTheme, selectedTheme } from '../../presentation/theme/selection.js';
 import { currentTheme } from '../../presentation/theme/theme.js';
@@ -37,6 +39,75 @@ function runtime(overrides?: RuntimeConfigOverrides) {
     session: { id: 'settings-session', createdAt: 'now', updatedAt: 'now', status: 'active', turns: [] },
   });
 }
+
+it.each([
+  { key: 'attentionOnIdle', value: true, raw: undefined },
+  { key: 'steeringMode', value: 'all', raw: undefined },
+  { key: 'maxTurns', value: 24, raw: '24' },
+  { key: 'disabledTools', value: ['fixture.a', 'fixture.b'], raw: 'fixture.a\nfixture.b' },
+  { key: 'modelTokenBudgets', value: { 'openai/fixture': { reserveTokens: 1000, keepRecentTokens: 2000 } },
+    raw: '{"openai/fixture":{"reserveTokens":1000,"keepRecentTokens":2000}}' },
+  { key: 'tui.statusItems', value: ['model', 'cost'], raw: undefined },
+  { key: 'theme', value: 'light', raw: undefined },
+])('stages, discards, saves and reopens $key through keyboard and the real settings owner', async ({ key, value, raw }) => {
+  selectTheme('dark', root); const context = runtime(); const redraw = vi.fn();
+  const host = { openSettings: () => openSettings(context, redraw), themes: themePreferences({ workspaceRoot: root, redraw,
+    follower: { stop() {}, refresh() {} } }) };
+  const setting = CONFIG_SETTINGS.find(item => item.key === key)!;
+  const overlay = new OverlayHost(redraw); const settle = async () => { await Promise.resolve(); await Promise.resolve(); };
+  let active: Picker;
+  const show = async (picker: Picker) => { active = picker; overlay.open(picker); await settle(); };
+  const press = async (text: string) => {
+    let pending: Promise<unknown> | undefined;
+    overlay.handleKey(parseKeyEvent(text), (picker, ids) => { pending = picker.apply(ids).then(async outcome => {
+      if (outcome?.next) await show(outcome.next);
+    }); });
+    await pending; await settle();
+  };
+  const open = async () => {
+    const catalogue = settingsPicker(host); await catalogue.load();
+    await show((await catalogue.apply([key]))!.next!);
+  };
+  const stage = async () => {
+    if (raw !== undefined) {
+      await press('\r'); await press('\x15'); overlay.handlePaste(raw); await press('\r');
+    } else if (key === 'tui.statusItems') {
+      await press('\r');
+      const chosen = active!;
+      const options = await chosen.load();
+      for (let index = 0; index < options.length; index++) {
+        const option = options[index];
+        if (Boolean(option.selected) !== (value as string[]).includes(option.id)) {
+          await press(' ');
+        }
+        if (index < options.length - 1) await press('\x1b[B');
+      }
+      await press('\r');
+    } else {
+      const label = `Choose ${formatSetting(value)}`;
+      for (let attempt = 0; attempt < 25; attempt++) {
+        if (stripAnsi(overlay.render(120, 40).join('\n')).includes(`▸ ${label}`)) break;
+        await press('\x1b[B');
+      }
+      expect(stripAnsi(overlay.render(120, 40).join('\n'))).toContain(`▸ ${label}`); await press('\r');
+    }
+    expect(stripAnsi(overlay.render(120, 40).join('\n'))).toContain(`Pending: ${truncateToWidth(formatSetting(value), 36)}`);
+  };
+  const before = fs.readFileSync(file);
+  try {
+    await open(); await stage(); expect(fs.readFileSync(file)).toEqual(before);
+    await press('\x1b'); expect(fs.readFileSync(file)).toEqual(before);
+    await open(); await stage(); await press('\r');
+    expect(openSettings(context, redraw).values[key].stored).toEqual(value);
+    await open(); const capture = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), capture);
+    if (setting.choices || key === 'theme') {
+      const choices = key === 'theme' ? host.themes.names() : setting.choices!;
+      expect(capture.mock.calls[0]?.[1]).toEqual([`choice:${choices.indexOf(value)}`]);
+    } else expect(capture.mock.calls[0]?.[1]).toEqual(['edit']);
+    const nextEditor = (await active!.apply(['edit']))?.next;
+    if (nextEditor?.input) expect(nextEditor.input.initial).toContain(settingEditor(setting) === 'list' ? 'fixture.a\nfixture.b' : raw!);
+  } finally { overlay.close(); selectTheme('dark', root); }
+});
 
 it('stages and reads back list, object and choice values through the real settings owner without saving discarded edits', async () => {
   const context = runtime(), host = { openSettings: (scope?: 'user' | 'project') => openSettings(context, vi.fn(), scope) };

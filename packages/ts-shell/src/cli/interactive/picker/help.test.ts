@@ -172,7 +172,7 @@ it.each([32, 128 * 1024])('keeps repeated help draws separate from registry acqu
       let update: (() => void) | undefined;
       try {
         await load.mock.results[0]!.value;
-        const retained = host as unknown as { baseOptions: readonly { id: string; detail?: string }[]; model: { total: number }; optionRows: ReadonlyMap<number, unknown> };
+        const retained = host as unknown as { baseOptions: readonly { id: string; detail?: string }[]; model: { total: number; filter: string }; optionRows: ReadonlyMap<number, unknown> };
         await vi.waitFor(() => expect(retained.baseOptions.some(row => row.id === '/guide-lifetime')).toBe(true));
         // The registry subscription deliberately publishes an initial snapshot,
         // so opening acquires once for load and once for subscription.
@@ -190,6 +190,12 @@ it.each([32, 128 * 1024])('keeps repeated help draws separate from registry acqu
         expect(read).toHaveBeenCalledTimes(baseline + 3);
         expect(retained.baseOptions.some(row => row.id === `/guide-update-${round}`)).toBe(true);
         const apply = vi.fn(); host.handleKey(parseKeyEvent('\x1b'), apply);
+        expect(apply).not.toHaveBeenCalled(); expect(host.active).toBe(true);
+        expect(retained.model.filter).toBe('');
+        expect(read).toHaveBeenCalledTimes(baseline + 3);
+        host.handleKey(parseKeyEvent('\x1b'), apply);
+        expect(host.active).toBe(true); expect(picker.navigation!.focused).toBe(true);
+        host.handleKey(parseKeyEvent('\x1b'), apply);
         expect(apply).not.toHaveBeenCalled(); expect(host.active).toBe(false);
         expect(retained.baseOptions).toEqual([]); expect(retained.model.total).toBe(0); expect(retained.optionRows.size).toBe(0);
         changed.mockClear(); update(); update = undefined;

@@ -406,3 +406,11 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 用户要求继续完整保留：未配置具体model可选、两个面板向oh-my-pi整体看齐、正文顶格与编辑箭头、首位完整slash/正文实际路径suggestion与Tab、多skill同次生效及deep-research有限方法组合。第二十四CI状态success，第二十五CI仍运行，Watch仅状态success；本批交付以对应delivery工件绑定，不从历史CI推定。原Phase20 38 complete / 9 partial与ADD独立。
 
 最终regular/fullscreen实际Node隔离PTY通过上述Model / Session链路：未配置详情/key取消、advisor保存后结果回settings、thinking取消/low保存；全局配置原字节不变、默认shared/角色other/effort low读回、零message/provider，两进程SIGTERM143已settle。严格docs/diff通过，118既有advisory保留。本批仍只是局部路径验收。
+
+### 文末当前结论（第二十七批）
+
+本批确认并修补普通布尔/枚举settings默认choice0及thinking默认auto，打开再Enter会偏离当前effective的缺口。现在按原owner当前值聚焦；未知enum先来源检查，unsupported effort只读焦点且不能提交，pending继续Apply。五文件112项、三有效反转/精确恢复、静态门/构建通过；七类真实键盘stage→discard→save→reopen有证据，仍不代表全部字段/来源/scope/desktop/认证已看齐。详情见[第二十七批](phase-20-addition.md#15-实施与验证证据)。
+
+第二十五CI实际help生命周期两失败/10892pass/3skip，旧夹具与已批准的搜索→分类→关闭合同不符，现更正且保留订阅释放检查；第二十六CI仍运行。其余确定问题和用户要求沿[文末总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)继续保留。没有上下键监听、resume排序反了、空配置等于没实现、每次编译、4.9k就是字符公式、工具数决定token数等解释仍不成立；现场唯一按键根因、真实token差额/启动收益/认证及cache-build来源继续未知。原Phase38/9与ADD独立。
+
+最终实际Node入口regular/fullscreen小型隔离PTY均通过：已有false布尔/all枚举/medium effort按真实焦点打开、Enter保留当前值并stage、Esc取消不写；显式选择true→stage未写→Apply保存→重开聚焦true，枚举及其余config保留，session modelSelection未写、零message/provider派发。两进程SIGTERM143均settle。首轮探针错误要求两栏缩略label全长，按真实绘制与字段详情纠正，失败日志保留，不归为产品导航故障。此为隔离synthetic路径，不代表实际桌面/认证或全部字段矩阵。 正式judge实际exit0/proven、三satisfied。生产启动收益/真实token差额/认证及完整面板验收边界不变。

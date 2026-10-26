@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Picker Defaults Must Use Accepted Values Without Normalizing Them
+- **Symptom**: Opening a boolean, enum or thinking chooser and pressing Enter stages the first value instead of the current value; obsolete or unsupported preferences silently fall back.
+- **Root Cause**: Choice focus was derived only for preview fields, and an effort picker did not supply initial focus. Stored/requested values can also differ from the installed effective value.
+- **Rule**: Resolve initial focus from the owning effective value or theme intent on each open; inspect unmatched values and retain unsupported active effort as read-only focus. Keep pending Apply separate and test default Enter plus discard/save/reopen with real owners. Navigation Escape tests must cover search, category and close layers before asserting subscription release.
+
 ### Parent Returns Must Survive Nested Model Reconstruction
 - **Symptom**: A settings child returns to the shell after nested model details, Default browsing, or credential cancellation; a saved role notice disappears on the next Escape.
 - **Root Cause**: A back callback patched onto one picker instance is lost when nested owners rebuild the catalogue; session controls are also easy to mistake for file-scoped settings.

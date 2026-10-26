@@ -116,6 +116,8 @@ Model / Session必须可从类别浏览及全局搜索找到；model/roles和当
 
 复用[设置元数据](../../packages/ts-shell/src/config/settings.ts)、已有数值/列表/对象编辑器与[保存owner](../../packages/ts-shell/src/cli/runtime/settings.ts)。暂存、Apply、Discard、预览撤回、user/project scope、只读来源、需要restart的字段各自保真。未知/过时值不能被打开面板偷偷规范化；空项目配置继承默认，不能显示为空能力。
 
+布尔/枚举子面板初次打开应聚焦真实effective值，而不是第一个choice；stored/requested与effective不同时保留来源差别，不能靠Enter默认覆盖。当前值无匹配时先聚焦Values and sources。暂存之后仍默认Apply，取消返回不保存；主题按accepted intent定位，尚不支持的当前thinking以只读焦点保留，Enter不替换为auto。重开按最新owner状态重新定位。
+
 列表与JSON对象编辑必须支持键盘直接构造多行，不能只靠粘贴才能输入“一项一行”。Shift+Enter或Ctrl+J在光标位置换行，普通Enter验证并暂存完整值，Apply另行保存；方向键属于子编辑器，Esc保留进入本次编辑前已有的暂存值。主界面与全屏表单按各自实际行预算绘制，极矮窗口优先保留光标所在编辑行，标题/说明可退化；超过编辑上限的原值必须明确拒绝，不能让Enter把未显示的原值覆盖成空值。该补充是完整编辑路径的实施细化，不能扩大为未配置模型可自动启用或认证表单允许多行秘密。
 
 验收选取每种编辑器至少一个字段，覆盖切分类→section→修改→Apply→重开读回及Discard撤回；还要验证无权限来源、窄屏导航、搜索清空、输入编辑器方向键和preview取消。
@@ -865,6 +867,30 @@ ADD-03确认设置Model分类只有采样/输出/限制字段，缺少既有模�
 
 本批局部闭合Model / Session发现与返回，整体settings/model全字段/来源/scope/编辑器/桌面/真实认证矩阵仍待验；冷/热Node/exe、原生tokenizer、完整研究preview、动态source/I/O、实际1.7k/4.9k及cache/build原因继续待证。原Phase20保持38 complete / 9 partial，ADD独立，整体active。
 
+### 第二十七批：设置当前值焦点与真实编辑器读回
+
+接续第二十六批`4a876b7836004c01aba1accbfba39823da1b7c5b`。延迟实查该批CI `40247485945`仍in_progress，Watch `40247486083`状态success未读工件。第二十五CI `40246308906`实际failure：999文件/10892项通过、help生命周期两项失败、3skip；已归档失败日志，不从Watch success替代CI结论。
+
+ADD-03进一步确认[settings](../../packages/ts-shell/src/cli/interactive/picker/settings.ts)仅preview字段按current定位，普通布尔/枚举统一choice0；[thinking](../../packages/ts-shell/src/cli/interactive/picker/thinking.ts)没有initialSelection，默认auto。用户打开再Enter可能将false或其他enum/effort改成首项。新增全部非theme choice逐项用例、未知值和medium真实按键用例修补前24pass/15fail，实际画面/提交ID断言证明缺口。
+
+现复用sameValue按实际effective选初始choice；theme仍以原theme owner的accepted intent定位，active标记与同一值比较。stored/requested不同不取代effective，未知值先Values and sources；pending仍Apply，Esc仍丢本次暂存。thinking每次load重新取原owner的当前effort，unsupported/ambiguous当前行可只读聚焦，但禁用提交与能力准入继续保持，Enter不回退auto。未增加配置字段、存储或第二picker状态机。
+
+只读参考A `packages/tui/src/overlays/settings-selector.ts`190–219把currentValue交SelectFormField，1572–1670保留accepted主题与取消回调。采用基于实际当前值定位并保留preview owner；Cheers继续显式暂存/Apply/Discard，而非改为参考的即时写入。未知/unsupported值保留检查与只读焦点是本项目保真边界。
+
+五文件112项串行通过：settings picker35、thinking6、真实settings owner44、settings/session14、help13。全部非theme choice以最后选项为effective、首项为stored/requested，真实OverlayHost按Enter仍提交effective ID；thinking medium/unsupported high/重开最新session验证。七类真实键盘流程覆盖boolean、enum、number、list、object、status-items、theme：stage不写→Esc不写→再次stage/Apply→stored读回→重开焦点/预填。原来源、scope、conflict、restart与preview撤回继续通过。新增长object缩略显示及status名称过滤歧义两夹具已按现绘制和实际顺序修正，失败日志保留。
+
+第二十五CI两失败为旧help夹具认为搜索Esc立刻关闭。现断言既有三步：清搜索、回categories、关闭；每步零apply，清搜索无重新registry读取，关闭后row/model/hit清空及released subscription不再读取/重绘。初次修夹具遗漏categories一步110pass/2fail，已补齐而不改变产品退出合同。三有效反转退回choice0/effort auto/删除unsupported只读焦点，各AssertionError/exit1、源码逐字节恢复。
+
+四静态门、TS构建通过；build`8942b4c741e1dfc1c55bf1ca9abcafa3fbb1917059870b17e884754af85dc928`，inputs`1aa3a5ab209314fefaf04839c7cf0191309225ef8b2c2cb0469638c3c8f4facd`，artifact`09e1cfcd97395bcec39a651a34f1102d98216cc0a812551cb0f0dc3a5ba8b8ff`。证据归`.omx/artifacts/phase20-addition-settings-choice/`；实际PTY、正式judge、文档及交付分别登记，不预写结果。
+
+最终实际Node入口regular/fullscreen小型隔离PTY均通过：已有false布尔/all枚举/medium effort按真实焦点打开、Enter保留当前值并stage、Esc取消不写；显式选择true→stage未写→Apply保存→重开聚焦true，枚举及其余config保留，session modelSelection未写、零message/provider派发。两进程SIGTERM143均settle。首轮探针错误要求两栏缩略label全长，按真实绘制与字段详情纠正，失败日志保留，不归为产品导航故障。此为隔离synthetic路径，不代表实际桌面/认证或全部字段矩阵。
+
+当前validator SHA-256`6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`新目录解包正式judge实际exit0/proven，三项satisfied。最终docs/diff及Git交付分别绑定工件，不从本地绿色推定CI。
+
+严格docs/diff实际通过，118既有advisory保留，addition127/audit102本地链接存在；交付SHA与CI状态另登记delivery.json。
+
+本批只补当前值默认焦点与上述类型链路，不代表完整字段/来源/scope/桌面/真实认证矩阵完成；冷/热启动、真实1.7k/4.9k、tokenizer/研究preview/dynamic source总I/O等仍待证。原Phase20 38 complete / 9 partial，ADD独立、整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -878,7 +904,7 @@ ADD-03确认设置Model分类只有采样/输出/限制字段，缺少既有模�
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚 | 入口先建立重runtime再进入交互，造成可见等待。已采用早期真实composer及一次lease交接；仍需同机冷/热Node/exe的首帧、接管、ready及首请求取样，加载延迟夹具不证明生产收益 |
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
-| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。第二十五批修补搜索退出/焦点域/模型详情返回；第二十六批再补Model / Session两个真实owner入口及取消/保存/角色返回，六文件104项通过。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
+| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。第二十五批修补搜索退出/焦点域/模型详情返回；第二十六批再补Model / Session两个真实owner入口及取消/保存/角色返回，六文件104项通过；第二十七批补普通choice/effort当前值焦点、七类编辑器保存重开与help退出夹具，五文件112项通过。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
 
 ### 16.2 不成立的判断与仍未确认的原因

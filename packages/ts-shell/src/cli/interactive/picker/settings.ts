@@ -10,6 +10,7 @@ import { statusItemPicker } from './statusItems.js';
 import { settingPreview, type PreferenceHost } from './preview.js';
 import { CatalogNavigation, type NavigationGroup } from './navigation.js';
 import { settingSources } from './settings/source.js';
+import { sameValue } from '../../../config/values.js';
 
 export interface SettingsHost extends PreferenceHost {
   openSettings(scope?: SettingsScope): SettingsDraft;
@@ -88,7 +89,7 @@ function scopePicker(host: SettingsHost, draft: SettingsDraft, setting: SettingD
   };
 }
 
-function detailOptions(draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue): Option[] {
+function detailOptions(draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue, active?: unknown): Option[] {
   const current = draft.values[setting.key];
   const options: Option[] = [
     { id: 'effective', label: `Effective: ${compact(current.effective)}`, note: current.source, disabled: true },
@@ -98,7 +99,8 @@ function detailOptions(draft: SettingsDraft, setting: SettingDefinition, pending
   if (current.projectTrustNotice) options.push({ id: 'trust', label: 'Project value inactive', detail: `${current.projectTrustNotice} Use /trust to inspect.`, disabled: true });
   if (pending) options.push({ id: 'pending', label: `Pending: ${compact(pending.value)}`, note: setting.policy.application, disabled: true });
   options.push({ id: 'inspect', label: 'Values and sources', detail: 'Read full values and configuration origins' });
-  if (setting.choices) setting.choices.forEach((value, index) => options.push({ id: `choice:${index}`, label: `Choose ${formatSetting(value)}`, detail: 'Stage without saving' }));
+  if (setting.choices) setting.choices.forEach((value, index) => options.push({ id: `choice:${index}`, label: `Choose ${formatSetting(value)}`, detail: 'Stage without saving',
+    ...(sameValue(active, value) ? { note: 'active' } : {}) }));
   else options.push({ id: 'edit', label: 'Edit value', detail: setting.key === 'tui.statusItems' ? 'Choose supported items; stage without saving' : `JSON ${setting.schema.type}; stage without saving` });
   options.push({ id: 'unset', label: 'Remove stored value', detail: 'Stage removal; other layers or defaults will apply' });
   if (setting.policy.sources.includes('project')) options.push({ id: 'scope', label: 'Change save scope', note: draft.scope });
@@ -112,14 +114,14 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
   if (setting.key === 'theme' && host.themes) setting = { ...setting, choices: host.themes.names() };
   const preview = settingPreview(host, setting.key);
   const accepted = setting.key === 'theme' ? host.themes?.selected() : draft.values[setting.key].effective;
-  const currentChoice = preview ? Math.max(0, setting.choices?.findIndex(value => value === accepted) ?? 0) : 0;
+  const currentChoice = setting.choices?.findIndex(value => sameValue(value, accepted)) ?? -1;
   let previewError = false;
   return {
     get title() { return `${setting.label}${preview ? ' preview' : ''} — save to ${draft.scope}${failure ? ' — Apply not confirmed' : ''}${previewError ? ' — Preview unavailable' : ''}`; },
     form: 'panel', exclusive: true, holdInput: true, empty: '', filterable: false,
     back: () => settingsPicker(host, draft.scope, setting.group, setting.key),
-    initialSelection: pending ? 'apply' : setting.choices ? `choice:${currentChoice}` : 'edit',
-    load: async () => [ ...(failure ? [{ id: 'failure', label: failure, disabled: true }] : []), ...detailOptions(draft, setting, pending) ],
+    initialSelection: pending ? 'apply' : setting.choices ? currentChoice >= 0 ? `choice:${currentChoice}` : 'inspect' : 'edit',
+    load: async () => [ ...(failure ? [{ id: 'failure', label: failure, disabled: true }] : []), ...detailOptions(draft, setting, pending, accepted) ],
     ...(preview ? {
       previewChange(ids: readonly string[]) {
         if (failure && !ids[0]?.startsWith('choice:')) return;

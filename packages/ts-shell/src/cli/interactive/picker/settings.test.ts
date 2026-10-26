@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CONFIG_SETTINGS } from '../../../config/settings.js';
-import { settingsPicker } from './settings.js';
+import { CONFIG_SETTINGS, formatSetting } from '../../../config/settings.js';
+import { settingsPicker, type SettingsHost } from './settings.js';
 import { OverlayHost, type Picker } from '../overlay.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
@@ -16,12 +16,34 @@ function host() {
   }) };
 }
 
-async function detail(h = host(), key = 'attentionOnIdle') {
+async function detail(h: SettingsHost = host(), key = 'attentionOnIdle') {
   const root = settingsPicker(h); await root.load();
   return (await root.apply([key]))!.next!;
 }
 
 describe('advanced settings picker', () => {
+  it.each(CONFIG_SETTINGS.filter(setting => setting.choices && setting.key !== 'theme').map(setting => ({ setting })))('opens $setting.key on its effective choice without staging or writing', async ({ setting }) => {
+    const value = setting.choices![setting.choices!.length - 1]; const base = host();
+    const h = { ...base, openSettings(scope?: 'user' | 'project') {
+      const draft = base.openSettings(scope);
+      return { ...draft, values: { ...draft.values, [setting.key]: { ...draft.values[setting.key],
+        effective: value, requested: setting.choices![0], stored: setting.choices![0] } } };
+    } };
+    const field = await detail(h, setting.key); const overlay = new OverlayHost(() => {});
+    overlay.open(field); await Promise.resolve(); await Promise.resolve();
+    const rows = overlay.render(120, 40).map(stripAnsi).join('\n');
+    expect(rows).toContain(`▸ Choose ${formatSetting(value)}`);
+    const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
+    expect(apply.mock.calls[0]?.[1]).toEqual([`choice:${setting.choices!.length - 1}`]);
+    expect(h.save).not.toHaveBeenCalled(); overlay.close();
+  });
+  it('focuses value inspection when the effective enum value has no declared choice', async () => {
+    const h = host(); const field = await detail(h, 'toolDiscovery'); const overlay = new OverlayHost(() => {});
+    overlay.open(field); await Promise.resolve(); await Promise.resolve();
+    const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
+    expect(apply.mock.calls[0]?.[1]).toEqual(['inspect']);
+    expect(h.save).not.toHaveBeenCalled(); overlay.close();
+  });
   it('searches every group with literal-first fuzzy ranking and restores the selected group when cleared', async () => {
     const h = host();
     const picker = settingsPicker(h, 'user', 'Interaction');

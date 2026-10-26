@@ -9248,3 +9248,11 @@ ADD-03设置Model / Session增加Models and roles、Thinking effort，委托原m
 六文件104pass、四有效反转/字节恢复、四静态门/TS构建9e94acab7489/正式judge proven三satisfied通过。新14项通过实际registry、OverlayHost和运行时configuration，初轮错误夹具已分类，失败日志保留。第二十四CI状态success，第二十五自身CI仍运行/Watch仅状态success；最终PTY、docs与Git另绑定。证据归phase20-addition-session-settings，完整面板/desktop/认证/性能计量继续待证；原Phase38/9与ADD独立/active。
 
 最终build普通/全屏Node小PTY均通过会话模型/未配置详情-key取消/role结果/effort保存原入口，config不变/零message-provider，退出143均settle；strict docs/diff通过，118既有advisory保留。Git另绑定。
+
+## [2026-10-26] fix | 设置与思考强度按当前值定位
+
+ADD-03普通settings choice原默认首项、thinking默认auto，现按effective/accepted owner值定位，未知enum先inspect、unsupported当前effort只读焦点，pending仍Apply。七类真实键盘stage/discard/save/reopen及全部非theme enum当前值测试通过。第二十五CIhelp两失败是旧关闭夹具，补搜索/分类/关闭分层与订阅释放，产品合同保留。
+
+五文件112pass、三有效反转/字节恢复、四静态门/TS构建8942b4c741e1通过；实际PTY/judge/docs/Git另绑定。第二十五历史10892pass/2fail/3skip归档、第二十六CI仍运行/Watch仅读success状态。证据phase20-addition-settings-choice；完整面板/认证/性能/计量继续待验，原Phase38/9与ADD独立/active。
+
+最终普通/全屏Node隔离PTY分别验证false/all/medium默认焦点、取消不写、显式true保存重开，其他config保留/零message-provider/modelSelection不写，143退出均settle；正式judge实际exit0/proven三satisfied。探针缩略label误断言已分类修正。docs与Git另绑定。
