@@ -3,7 +3,7 @@ title: "Phase 20 日常交互补充要求与任务规划"
 category: article
 sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
-updated: 2026-10-26
+updated: 2026-10-27
 tags: [features, phase-20, additions, interaction, panels, completion]
 summary: "汇总用户最新要求：settings/model看齐oh-my-pi，允许选中未配置模型，resume默认焦点修补，消息顶格及箭头恢复，提前TUI首帧、上下文估算、路径补全、多skill与部分slash组合。逐项记录实现方向、边界与验收。"
 confidence: mixed
@@ -1382,6 +1382,16 @@ review dispatch经`gitRequestMode`强制plan mode，因此[preview组装](../../
 
 五静态门/diff、责任上限0、TS build `9e23fa7256ee`（inputs `823648b90f2a`、artifact `1cece9167270`）及签入validator正式judge `proven`、0 open/failed/gap通过；type-only cycle由NormProof发现并改为结构化图片类型后恢复proven。未运行真实provider、全仓、exe、桌面或PTY；真实并发Git工作树/平台矩阵和1.7k/4.9k差额继续待证。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第五十九批：研究预览的原始来源与one-use准入
+
+接续已推送`427aab28`。ADD-08确认deep-research preview虽然已经计算并发布prospective reservation，但提交时`takeResearchPreview`只复核request、session、configuration、history和attachment metadata；附件、记忆、指令或模板正文在预览与`runtime.create`之间变化时，实际run仍可能使用新字节，而界面保留旧估算。现[research preview](../../packages/ts-shell/src/cli/runtime/context/research.ts)在发布时保留detached request、图片摘要和完整`verifyContent` guard，提交先消费entry，再以command signal等待原始来源、注入和附件复验；复验后再次核对live context、attachment与reservation。请求不匹配、被discard、过期或变更会留下context-scoped stale tombstone，必须成功发布新preview后才能再次准入，不静默创建fresh run。
+
+[research command](../../packages/ts-shell/src/research/command.ts)只在reservation准入完成后调用原`runtime.create`；来源变更、配置/会话变化或取消不会创建run、写state或ledger，取消沿原signal抛出而不是伪装成local refusal，pre-submission refusal返回原始`retryDraft`。[reservation owner](../../packages/ts-shell/src/research/run/reservation.ts)返回冻结的captured request；[attachment binding](../../packages/ts-shell/src/context/attachment/binding.ts)由research与review共用，不保存图片正文。[CLI bridge](../../packages/ts-shell/src/entrypoints/cliCommandExecutionBridge.ts)传播父取消信号；没有父signal的standalone dispatch在session command owner内运行，使真实Ctrl+C能中断来源复验。
+
+主代理单进程串行13文件214项通过：runtime preview63、research reservation12、research composition12、research preparation9、core composition24、research syntax1、interactive command router36、command execution bridge14、attachment binding1、attachment verify5、review runtime14、Git operation20、Git read3。七个有效反转分别移除内容复验、过期拒绝、取消传播、discard tombstone、请求不匹配拒绝、图片绑定和standalone command-owner包装；另有create失败保留stale、父signal链接、busy拒绝和取消前preflight保护，均有对应失败并逐字节恢复。多轮独立只读review先定位四项缺口，修正后再次审查；末轮复核定位并修正取消期间tombstone清理，复核最终无findings。
+
+五静态门/diff、责任上限0、TS build `901bcffeef12`（inputs `8d18923e65a4`、artifact `c2145971d843`）及签入validator正式judge `proven`、0 open/failed/gap通过。未运行真实provider、全仓、exe、桌面或PTY；测试使用真实attachment/session fixture和原research runtime，不证明真实provider、平台或用户原环境的完整来源成本。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1411,6 +1421,7 @@ review dispatch经`gitRequestMode`强制plan mode，因此[preview组装](../../
 | 待注入记忆预览缺raw字节与可取消读取 | 原已有路径/元数据及generation保护；第三十批补原始字节追踪、有界async verified-handle读取及完整preview异步复验。六文件73项、三有效反转、两模式实际隔离PTY有局部证据。普通删除/invalidated原并非全无保护；第三十一批已补单次多记录共享读取，完整preview/controller累计I/O与所有动态来源验收仍未完成 |
 | 一次记忆预览反复读取相同文件 | 第三十一批沿原store共享单次有界只读snapshot，health/候选/lifecycle共用，12pending的binary acquisition从15降2，复验仍追加1；75项/三反转/两模式PTY有局部证据。全preview/controller和动态来源总读取成本仍待验，不能扩成全请求两次读 |
 | 研究入口无法完整预览 | 第三十三批已接有界新建入口准备、一次性prospective ID到实际同ID提交、完整prompt/run/save schema及协议估算、来源与取消复验，87项/四有效反转/两模式实际隔离PTY通过。只覆盖新建入口，不代表control、其他driver、后续独立child或研究总费用已可预览 |
+| 研究预览与提交之间原始来源可漂移 | 第五十九批确认preview的完整内容guard没有进入reservation消费；现发布时保留detached request、图片摘要和verifyContent，dispatch消费后以command signal等待原始来源、注入和附件复验，再创建run；请求不匹配、discard、过期或变更留下stale tombstone，必须成功新preview后才可重试，取消沿command owner传播并恢复retryDraft。214项/七有效反转及本地真实fixture有证据，真实provider/平台未验 |
 | 组合研究把自身command owner误判为忙 | 实际终端Enter拒绝且真实ShellCommandRuntime路由回归可复现。第三十三批改为controller与signal双重身份匹配，自身可继续，其他命令与取消仍拒绝；不能只删除全部busy保护 |
 | 未配置或阻断relay模型详情错用官方能力 | 第三十四批确认缺resolution地址时回退canonical目录，导致同名模型32k误显示400k或已有能力丢失。现沿真实连接/所浏览目录地址共用精确元数据，补上限/图片/reasoning设置/档位/已声明价格，未知与地址歧义保真；78项/三反转/两模式实际隔离PTY有局部证据，完整能力与平台矩阵仍待验 |
 | 模型详情过期配置、退出后仍可操作与重开旧目录 | 第三十五批确认列表/详情旧地址进入新准入子面板、退出load复活动作，以及实际重开仍用旧accepted目录。现原捕获准入/取消复验、详情一次消费和退出retirement；重开仅通过原配置发布刷新catalog，保留普通设置并检查active模型约束。九文件136项、七反转、两模式实际Node隔离PTY有局部证据；真实认证与完整面板矩阵仍待验 |
@@ -1483,4 +1494,4 @@ review dispatch经`gitRequestMode`强制plan mode，因此[preview组装](../../
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。

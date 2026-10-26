@@ -152,6 +152,7 @@ export async function routeInteractiveCommand(
 
   const resolved = await buildCliCommandExecution({
     runCancellable: operation => input.sessionRuntime.commands.run(operation),
+    signal: input.signal,
     freshState: input.freshState ?? input.runtimeContext.freshState,
     restart: input.runtimeContext.restart,
     profileSwitch: input.runtimeContext.profileSwitch,

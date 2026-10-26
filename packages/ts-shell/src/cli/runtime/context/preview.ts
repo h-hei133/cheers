@@ -105,7 +105,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const parsedResearch = researchArgs ? parseResearchArgs(researchArgs) : undefined;
   if (parsedResearch && !parsedResearch.ok) throw new Error('Research command request preparation is pending.');
   const research = parsedResearch?.ok ? prepareResearchPreview(context, session, researchEntryRequest(parsedResearch,
-    composition?.driver ? { originalInput: draft, prose: plan.prose, skills: composition.expanded.instructions, modifiers: composition.modifiers } : undefined)) : undefined;
+    composition?.driver ? { originalInput: draft, prose: plan.prose, skills: composition.expanded.instructions, modifiers: composition.modifiers } : undefined), attachments) : undefined;
   if (research) effectivePrompt = researchTurnPrompt(research.run);
   // These modes rewrite the run configuration or context at admission.
   if (decodeHandoffs(session.state.handoffs, session.scope).cycles.some(row => !row.retired && ['armed', 'running', 'switched', 'unknown'].includes(row.phase))
@@ -210,7 +210,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     }
   };
   await verifyContent(signal);
-  research?.publish();
+  research?.publish(verifyContent);
   if (!review) clearExpiredReviewPreview(context);
   const reviewExpiresAt = review?.publish(verifyContent, attachments);
   return { estimate, verify, verifyContent,

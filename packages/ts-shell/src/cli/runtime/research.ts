@@ -22,8 +22,34 @@ export function researchCommandFor(context: ShellRuntimeContext, store: SessionM
     commandContext.signal?.throwIfAborted();
     const active = sessionRuntime.getCurrentRunController();
     const owned = active !== null && active === sessionRuntime.commands.current?.controller && active.signal === commandContext.signal;
-    return runResearchCommand(args, commandContext, researchFor(context, store, renderer),
-      active !== null && !owned, request => takeResearchPreview(context, request));
+    const execute = (signal?: AbortSignal) => runResearchCommand(args,
+      signal ? { ...commandContext, signal } : commandContext, researchFor(context, store, renderer),
+      active !== null && !owned, (request, checkingSignal) => takeResearchPreview(context, request, checkingSignal, commandContext.attachments));
+    if (active !== null) return execute(commandContext.signal);
+    if (commandContext.runCancellable) {
+      return commandContext.runCancellable(async operationSignal => {
+        const linked = linkSignals(operationSignal, commandContext.signal);
+        try { return await execute(linked.signal); }
+        finally { linked.dispose(); }
+      });
+    }
+    return execute();
+  };
+}
+
+function linkSignals(primary: AbortSignal, secondary?: AbortSignal) {
+  if (!secondary || primary === secondary) return { signal: primary, dispose: () => undefined };
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  primary.addEventListener('abort', abort, { once: true });
+  secondary.addEventListener('abort', abort, { once: true });
+  if (primary.aborted || secondary.aborted) abort();
+  return {
+    signal: controller.signal,
+    dispose: () => {
+      primary.removeEventListener('abort', abort);
+      secondary.removeEventListener('abort', abort);
+    },
   };
 }
 export function researchRunFor(context: ShellRuntimeContext, store: SessionManager, renderer: Pick<StreamingRenderer, 'renderLine'>,

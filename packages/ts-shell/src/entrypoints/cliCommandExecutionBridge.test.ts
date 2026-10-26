@@ -112,6 +112,22 @@ describe("CLI command execution bridge", () => {
     expect(output.lines).toEqual(["\nProject root: /workspace\n"]);
   });
 
+  it("passes the parent cancellation signal into slash command context", async () => {
+    const controller = new AbortController();
+    let observed: AbortSignal | undefined;
+    await buildCliCommandExecution({
+      prompt: "/research question",
+      cwd: "/workspace",
+      renderer: renderer() as StreamingRenderer,
+      printMode: false,
+      interactive: true,
+      signal: controller.signal,
+    }, {
+      routeSlashCommand: async (_prompt, context) => { observed = context.signal; return null; },
+    });
+    expect(observed).toBe(controller.signal);
+  });
+
   it("passes session-scoped compact stores to slash commands", async () => {
     const output = renderer();
     const contextSeen: unknown[] = [];

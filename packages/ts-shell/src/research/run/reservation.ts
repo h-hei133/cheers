@@ -12,6 +12,10 @@ import { decodeResearchState } from './codec.js';
 import { historyDigest } from '../../context/request/identity.js';
 
 export interface ResearchReservation { readonly id: string }
+export interface ResearchReservationAdmission {
+  readonly reservation: ResearchReservation;
+  readonly commit: () => void;
+}
 interface Capture {
   readonly session: Session;
   readonly scope: BoundSessionScope;
@@ -55,7 +59,7 @@ export function reserveResearchEntry(capture: Capture, request: ResearchRequest)
     directoryIdentity: capture.directoryIdentity }, request: detached,
     stateDigest: digest(capture.state), history: historyDigest(capture.session.turns), binding: binding(capture.session),
     expiresAt: Date.now() + 20000, consumed: false });
-  return { reservation, run };
+  return { reservation, run, request: detached };
 }
 
 export function researchReservationCurrent(reservation: ResearchReservation, request?: ResearchRequest): boolean {

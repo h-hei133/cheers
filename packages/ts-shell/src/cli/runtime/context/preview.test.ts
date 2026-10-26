@@ -613,6 +613,235 @@ it.each([
   expect(() => preview.verify()).toThrow();
 });
 
+it('refuses a published research entry after attached source bytes change without creating state', async () => {
+  const { cwd, context, session, layout, manager, load } = fixture();
+  const file = path.join(cwd, 'research-context.txt'); fs.writeFileSync(file, 'before attachment');
+  context.contextAttachments = [readContextEntry({ root: cwd, target: file })];
+  const before = fs.readFileSync(layout.statePath);
+  const runtime = researchFor(context, manager, { renderLine: vi.fn() });
+  const create = vi.spyOn(runtime, 'create');
+  const command = researchCommandFor(context, manager, { getCurrentRunController: () => null } as never, { renderLine: vi.fn() });
+  const preview = await load('/deep-research question'); preview.verify();
+  fs.writeFileSync(file, 'after attachment');
+  expect(await routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id, researchCommand: command })).toMatchObject({
+    kind: 'local', retryDraft: '/deep-research question', output: expect.stringContaining('changed'),
+  });
+  expect(create).not.toHaveBeenCalled();
+  expect(fs.readFileSync(layout.statePath)).toEqual(before);
+});
+
+it('refuses an expired published research entry instead of starting a fresh run', async () => {
+  const { cwd, context, session, layout, manager, load } = fixture();
+  const runtime = researchFor(context, manager, { renderLine: vi.fn() });
+  const create = vi.spyOn(runtime, 'create');
+  const command = researchCommandFor(context, manager, { getCurrentRunController: () => null } as never, { renderLine: vi.fn() });
+  const before = fs.readFileSync(layout.statePath);
+  await load('/deep-research question');
+  vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 20_001);
+  expect(await routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id, researchCommand: command })).toMatchObject({
+    kind: 'local', retryDraft: '/deep-research question', output: expect.stringContaining('expired'),
+  });
+  expect(create).not.toHaveBeenCalled();
+  expect(fs.readFileSync(layout.statePath)).toEqual(before);
+});
+
+it('refuses a discarded research preview instead of starting a fresh run', async () => {
+  const { cwd, context, session, layout, manager, load } = fixture();
+  const runtime = researchFor(context, manager, { renderLine: vi.fn() });
+  const create = vi.spyOn(runtime, 'create');
+  const command = researchCommandFor(context, manager, { getCurrentRunController: () => null } as never, { renderLine: vi.fn() });
+  const before = fs.readFileSync(layout.statePath);
+  const preview = await load('/deep-research question'); preview.dispose?.();
+  expect(await routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id, researchCommand: command })).toMatchObject({
+    kind: 'local', retryDraft: '/deep-research question', output: expect.stringContaining('expired'),
+  });
+  expect(create).not.toHaveBeenCalled();
+  expect(fs.readFileSync(layout.statePath)).toEqual(before);
+});
+
+it('refuses a changed research request while an old preview is published', async () => {
+  const { cwd, context, session, layout, manager, load } = fixture();
+  const runtime = researchFor(context, manager, { renderLine: vi.fn() });
+  const create = vi.spyOn(runtime, 'create');
+  const command = researchCommandFor(context, manager, { getCurrentRunController: () => null } as never, { renderLine: vi.fn() });
+  const before = fs.readFileSync(layout.statePath);
+  await load('/deep-research question');
+  expect(await routeSlashCommand('/deep-research different', { cwd, projectRoot: cwd, sessionId: session.id, researchCommand: command })).toMatchObject({
+    kind: 'local', retryDraft: '/deep-research different', output: expect.stringContaining('request changed'),
+  });
+  expect(await routeSlashCommand('/deep-research another', { cwd, projectRoot: cwd, sessionId: session.id, researchCommand: command })).toMatchObject({
+    kind: 'local', retryDraft: '/deep-research another', output: expect.stringContaining('expired'),
+  });
+  expect(create).not.toHaveBeenCalled();
+  expect(fs.readFileSync(layout.statePath)).toEqual(before);
+});
+
+it('binds a published research entry to image attachments', async () => {
+  const { cwd, context, session, layout, manager, load } = fixture();
+  const runtime = researchFor(context, manager, { renderLine: vi.fn() });
+  const create = vi.spyOn(runtime, 'create');
+  const command = researchCommandFor(context, manager, { getCurrentRunController: () => null } as never, { renderLine: vi.fn() });
+  const image = (data: string) => ({ type: 'image' as const, mimeType: 'image/png', data });
+  const before = fs.readFileSync(layout.statePath);
+  await load('/deep-research question', { images: [image('first-image')] });
+  expect(await routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id,
+    researchCommand: command, attachments: { images: [image('second-image')] } })).toMatchObject({
+    kind: 'local', retryDraft: '/deep-research question', output: expect.stringContaining('changed'),
+  });
+  expect(create).not.toHaveBeenCalled();
+  expect(fs.readFileSync(layout.statePath)).toEqual(before);
+});
+
+it('keeps a stale tombstone when reservation consumption fails to create a run', async () => {
+  const { cwd, context, session, layout, manager, load } = fixture();
+  const runtime = researchFor(context, manager, { renderLine: vi.fn() });
+  const create = vi.spyOn(runtime, 'create');
+  const command = researchCommandFor(context, manager, { getCurrentRunController: () => null } as never, { renderLine: vi.fn() });
+  const before = fs.readFileSync(layout.statePath);
+  await load('/deep-research question');
+  create.mockImplementationOnce(() => { throw new Error('Research has a pending owner.'); });
+  expect(await routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id, researchCommand: command })).toMatchObject({
+    kind: 'local', retryDraft: '/deep-research question', output: expect.stringContaining('pending owner'),
+  });
+  expect(await routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id, researchCommand: command })).toMatchObject({
+    kind: 'local', retryDraft: '/deep-research question', output: expect.stringContaining('expired'),
+  });
+  expect(create).toHaveBeenCalledTimes(1);
+  expect(fs.readFileSync(layout.statePath)).toEqual(before);
+});
+
+it('propagates cancellation while verifying a published research entry and consumes it', async () => {
+  const { cwd, context, session, layout, manager, load } = fixture();
+  const file = path.join(cwd, 'research-cancel.txt'); fs.writeFileSync(file, 'attached facts');
+  context.contextAttachments = [readContextEntry({ root: cwd, target: file })];
+  const runtime = researchFor(context, manager, { renderLine: vi.fn() });
+  const create = vi.spyOn(runtime, 'create');
+  const command = researchCommandFor(context, manager, { getCurrentRunController: () => null } as never, { renderLine: vi.fn() });
+  await load('/deep-research question');
+  const controller = new AbortController();
+  const original = workspaceFiles.inspectWorkspaceFileAsync;
+  vi.spyOn(workspaceFiles, 'inspectWorkspaceFileAsync').mockImplementation(async (...args) => {
+    const result = await original(...args); controller.abort(); return result;
+  });
+  const before = fs.readFileSync(layout.statePath);
+  await expect(command(['question'], { cwd, projectRoot: cwd, sessionId: session.id, signal: controller.signal }))
+    .rejects.toMatchObject({ name: 'AbortError' });
+  expect(create).not.toHaveBeenCalled();
+  expect(fs.readFileSync(layout.statePath)).toEqual(before);
+  expect(await routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id,
+    researchCommand: command })).toMatchObject({ kind: 'local', retryDraft: '/deep-research question',
+    output: expect.stringContaining('expired') });
+  expect(create).not.toHaveBeenCalled();
+  vi.mocked(workspaceFiles.inspectWorkspaceFileAsync).mockRestore();
+  await load('/deep-research question');
+  expect(await routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id,
+    researchCommand: command })).toMatchObject({ kind: 'prompt' });
+  expect(create).toHaveBeenCalledTimes(1);
+});
+
+it('runs standalone research source verification under the session command owner', async () => {
+  const { cwd, context, session, layout, manager, load } = fixture();
+  const file = path.join(cwd, 'research-route-cancel.txt'); fs.writeFileSync(file, 'attached facts');
+  context.contextAttachments = [readContextEntry({ root: cwd, target: file })];
+  const runtime = researchFor(context, manager, { renderLine: vi.fn() });
+  const create = vi.spyOn(runtime, 'create');
+  const host = new ShellSessionRuntime({} as never);
+  const command = researchCommandFor(context, manager, host, { renderLine: vi.fn() });
+  await load('/deep-research question');
+  const parent = new AbortController();
+  let entered = false;
+  vi.spyOn(workspaceFiles, 'inspectWorkspaceFileAsync').mockImplementation(async (...args) => {
+    entered = true;
+    const signal = args.find(value => value instanceof AbortSignal);
+    await new Promise<void>((_, reject) => {
+      const abort = () => reject(new DOMException('Aborted', 'AbortError'));
+      if (signal?.aborted) abort();
+      else signal?.addEventListener('abort', abort, { once: true });
+    });
+    return undefined as never;
+  });
+  const before = fs.readFileSync(layout.statePath);
+  const pending = routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id,
+    signal: parent.signal, researchCommand: command, runCancellable: operation => host.commands.run(operation) });
+  try {
+    await vi.waitFor(() => expect(entered).toBe(true));
+    expect(host.commands.current).toBeDefined();
+    parent.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(create).not.toHaveBeenCalled();
+    expect(fs.readFileSync(layout.statePath)).toEqual(before);
+  } finally {
+    host.commands.current?.controller.abort();
+    await pending.catch(() => {});
+  }
+});
+
+it('preserves local busy refusal when another command owns the session', async () => {
+  const { cwd, context, session, manager } = fixture();
+  const host = new ShellSessionRuntime({} as never);
+  const command = researchCommandFor(context, manager, host, { renderLine: vi.fn() });
+  let release!: () => void;
+  const pending = host.commands.run(() => new Promise<void>(resolve => { release = resolve; }));
+  const result = await routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id,
+    researchCommand: command, runCancellable: operation => host.commands.run(operation) });
+  expect(result).toMatchObject({ kind: 'local', retryDraft: '/deep-research question', output: expect.stringContaining('active turn') });
+  release();
+  await pending;
+});
+
+it('refuses a concurrent research dispatch while the first verification is in flight', async () => {
+  const { cwd, context, session, layout, manager, load } = fixture();
+  const file = path.join(cwd, 'research-concurrent.txt'); fs.writeFileSync(file, 'attached facts');
+  context.contextAttachments = [readContextEntry({ root: cwd, target: file })];
+  const runtime = researchFor(context, manager, { renderLine: vi.fn() });
+  const create = vi.spyOn(runtime, 'create');
+  const host = new ShellSessionRuntime({} as never);
+  const firstCommand = researchCommandFor(context, manager, host, { renderLine: vi.fn() });
+  const secondCommand = researchCommandFor(context, manager, { getCurrentRunController: () => null } as never, { renderLine: vi.fn() });
+  await load('/deep-research question');
+  const before = fs.readFileSync(layout.statePath);
+  let entered = false, release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const original = workspaceFiles.inspectWorkspaceFileAsync;
+  vi.spyOn(workspaceFiles, 'inspectWorkspaceFileAsync').mockImplementation(async (...args) => {
+    entered = true; await gate; return original(...args);
+  });
+  const first = routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id,
+    researchCommand: firstCommand, runCancellable: operation => host.commands.run(operation) });
+  await vi.waitFor(() => expect(entered).toBe(true));
+  expect(await routeSlashCommand('/deep-research question', { cwd, projectRoot: cwd, sessionId: session.id,
+    researchCommand: secondCommand })).toMatchObject({ kind: 'local', retryDraft: '/deep-research question',
+    output: expect.stringContaining('expired') });
+  release();
+  await expect(first).resolves.toMatchObject({ kind: 'prompt' });
+  expect(create).toHaveBeenCalledTimes(1);
+  expect(fs.readFileSync(layout.statePath)).not.toEqual(before);
+});
+
+it('does not create a research run when the command signal is already aborted', async () => {
+  const { cwd, context, session, manager } = fixture();
+  const runtime = researchFor(context, manager, { renderLine: vi.fn() });
+  const create = vi.spyOn(runtime, 'create');
+  const command = researchCommandFor(context, manager, { getCurrentRunController: () => null } as never, { renderLine: vi.fn() });
+  const aborted = new AbortController(); aborted.abort();
+  await expect(command(['question'], { cwd, projectRoot: cwd, sessionId: session.id,
+    runCancellable: async operation => operation(aborted.signal) })).rejects.toMatchObject({ name: 'AbortError' });
+  expect(create).not.toHaveBeenCalled();
+});
+
+it.each(['pause', 'reconcile'])('does not execute an aborted %s research action', async action => {
+  const { cwd, context, session, manager } = fixture();
+  const runtime = researchFor(context, manager, { renderLine: vi.fn() });
+  const pause = vi.spyOn(runtime, 'pause');
+  const discard = vi.spyOn(runtime, 'discard');
+  const command = researchCommandFor(context, manager, { getCurrentRunController: () => null } as never, { renderLine: vi.fn() });
+  const aborted = new AbortController(); aborted.abort();
+  await expect(command(action === 'reconcile' ? [action, 'discard'] : [action], { cwd, projectRoot: cwd, sessionId: session.id,
+    runCancellable: async operation => operation(aborted.signal) })).rejects.toMatchObject({ name: 'AbortError' });
+  expect(pause).not.toHaveBeenCalled();
+  expect(discard).not.toHaveBeenCalled();
+});
+
 it('rejects malformed research and control actions before publishing an entry identity', async () => {
   const { load, layout } = fixture(), before = fs.readFileSync(layout.statePath);
   for (const input of ['/deep-research status', '/deep-research resume', '/deep-research --depth invalid question',

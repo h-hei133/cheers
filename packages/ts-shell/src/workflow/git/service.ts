@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto';
 import type { CommandContext, CommandExecutionResult, LocalCommandResult, PromptCommandResult } from '../../core/commands/types.js';
 import type { PromptAttachments } from '../../core/shell/sessionRuntime.js';
+import { attachmentBinding } from '../../context/attachment/binding.js';
 import type { GitSnapshot } from './read/model.js';
 import { NativeGit } from './read/native.js';
 import { assertGitSnapshot, readGitSnapshot } from './read/snapshot.js';
@@ -197,14 +197,4 @@ export class GitWorkbench {
   }
 }
 function clipReview(text: string): string { return text.length > 24000 ? text.slice(0, 24000) + '\n[Truncated at 24000 characters; retrieve the remainder before reviewing.]' : text || '(none)'; }
-function attachmentBinding(attachments?: PromptAttachments): string {
-  if (!attachments?.images.length) return '';
-  const digest = createHash('sha256');
-  for (const image of attachments.images) {
-    digest.update(image.type); digest.update('\0');
-    digest.update(image.mimeType); digest.update('\0');
-    digest.update(image.data); digest.update('\0');
-  }
-  return digest.digest('hex');
-}
 import path from 'node:path';

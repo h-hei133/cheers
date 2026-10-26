@@ -48,6 +48,7 @@ export type CliCommandExecution =
 
 export interface BuildCliCommandExecutionInput {
   readonly runCancellable?: CommandContext['runCancellable'];
+  readonly signal?: CommandContext['signal'];
   readonly freshState?: CommandContext['freshState'];
   readonly restart?: CommandContext['restart'];
   readonly profileSwitch?: CommandContext['profileSwitch'];
@@ -174,6 +175,7 @@ export async function buildCliCommandExecution(
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
     signInProgress: progress => renderSignInProgress(input.renderer, progress),
     runCancellable: input.runCancellable,
+    ...(input.signal ? { signal: input.signal } : {}),
     freshState: input.freshState,
     restart: input.restart,
     profileSwitch: input.profileSwitch,
