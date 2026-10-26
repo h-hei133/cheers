@@ -7,6 +7,16 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Exact Model Categories Must Follow Their Own Admitted Rows
+- **Symptom**: Every relay using one protocol is labelled available when only one has a usable connection, and unavailable relays precede the ready one.
+- **Root Cause**: Protocol-level availability aggregates credentials for all of its connections; it cannot determine availability of an exact catalogue category.
+- **Rule**: Derive category readiness from its own admitted model rows and preserve stable order within each availability group. Keep blocked models browsable and preserve manual identity across refresh. Catalogue cache writes replace the supplied provider set; ambiguity fixtures must include both conflicting entries.
+
+### Raw Baselines And Live Return Frames Need Exact Observation
+- **Symptom**: A source reversal fails to compile, or a terminal probe sends search text before a detail has returned to the model catalogue.
+- **Root Cause**: A filtered Git display is not raw source. Detail and catalogue frames share endpoint text; an Escape may also still be buffered when subsequent text arrives.
+- **Rule**: Use raw Git output when restoring source bytes. Synchronize terminal return on the focused model row, then send the next action. After test edits, recheck build freshness because test inputs also belong to the build digest. Theme retry fixtures must implement the original draft's reopen port and distinguish it from fresh host acquisition.
+
 ### Startup Metrics Must Follow The Actual Surface And Configuration Scope
 - **Symptom**: A benchmark calls the later model label its first frame, or a configuration test demands an old model catalogue after reopening and accidentally reloads ordinary settings.
 - **Root Cause**: Prepaint/adoption changed the lifecycle without updating measurement markers and a fixture dropped the catalogue-only refresh parameter. Listener installation, runtime construction, adoption and stream write completion are different events; process exit can precede stream close.

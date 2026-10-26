@@ -602,3 +602,9 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 | 仍未确认 | 用户原终端按键无交互的唯一原因、真实1.7k/4.9k分项差额、同条件冷热/修补前启动收益、真实桌面IME/剪贴板与认证接受。不能列为“不存在”或“已经解决”，不由合成PTY、结构judge或历史CI补造证据 |
 
 详细需求与验收仍集中在[phase-20-addition文末](phase-20-addition.md#16-最新问题总和与必须完成的体验)：未配置模型可选；两个面板整体看齐；已提交正文顶格、编辑箭头贴左且续行对齐；正文`/home` suggestion/Tab；首位与正文多skill真实共同生效；兼容modifier与deep-research入口组合为同一任务；启动先显示真实TUI/loading、上下文按实际请求本地估算再衔接实测。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
+### 文末当前问题判断（第四十批）
+
+新增确认同协议relay分类使用runtime级凭据聚合，错误把未配置分类标为可用并排在真实ready分类之前。现分类从自身精确已准入模型行派生状态、ready优先且组内稳定；具体未配置/阻断行仍可浏览，刷新保持手动身份。分类12项及相关五文件84项、原源码有效反转/恢复、普通/全屏×有ready/全部缺失四条实际Node小型PTY通过；配置/模型不写、零message/provider请求、进程close已确认。见[第四十批](phase-20-addition.md#第四十批模型分类的精确可用性与主题原草稿重试)。
+
+上一提交CI实际因主题测试旧host重捕获夹具失败，本地同断言复现；按原draft.reopen合同修夹具，补拒绝重开不保存并保留pending，未回退产品归属保护。TS build当前fresh与结构judge proven只作为各自证据。完整model/roles/能力/认证/桌面及settings交叉矩阵、上下文真实差额和性能仍未验收，原Phase38/9、ADD独立且整体active。

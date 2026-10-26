@@ -81,8 +81,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       const rows: Option[] = [];
       const groups = new Map<string, NavigationGroup>();
       const seen = new Set<string>();
-      const ordered = [...catalog].sort((left, right) => Number(!availability.providers.some(item => item.provider === left.runtime && item.state === 'ready'))
-        - Number(!availability.providers.some(item => item.provider === right.runtime && item.state === 'ready')));
+      const ordered = [...catalog];
       for (const provider of ordered) {
         const entry = availability.providers.find(item => item.provider === provider.runtime);
         const connections = (entry?.connections ?? []).filter(connection => matchesCatalog(provider, connection, config.providerConnections, catalog));
@@ -170,6 +169,12 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
           }
         }
       }
+      // A protocol's credential cannot make a different relay category usable.
+      // Derive category readiness from its exact, admitted model rows.
+      const readyCategories = new Set(rows.filter(row => !row.disabled).map(row => groups.get(row.id)?.category));
+      ordered.sort((left, right) => Number(!readyCategories.has(left.id)) - Number(!readyCategories.has(right.id)));
+      rows.sort((left, right) => Number(!readyCategories.has(groups.get(left.id)?.category))
+        - Number(!readyCategories.has(groups.get(right.id)?.category)));
       // Overrides and legacy credentials can supply a current request without a
       // matching named connection. Keep that fact visible without inventing one.
       const savedTarget = choice?.baseline?.selection;
@@ -271,7 +276,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       activeFocus = focus ?? rows.find(row => row.note === 'active')?.id;
       navigation.set(rows, groups, [...(assigning ? [] : [{ id: 'roles', label: 'Roles' }]), { id: 'all', label: 'All models' },
         ...ordered.map(provider => ({ id: provider.id, label: provider.label,
-          note: availability.providers.find(item => item.provider === provider.runtime)?.state === 'ready' ? undefined : '○' }))]);
+          note: readyCategories.has(provider.id) ? undefined : '○' }))]);
       if (returnFocus) { navigation.point(returnFocus, ''); returnFocus = undefined; }
       return rows;
     },

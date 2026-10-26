@@ -9354,3 +9354,13 @@ TS build ae02a58d6af6及当前新鲜度、四静态门、责任上限0、当前�
 延迟实查上一批05ecc6c8的CI40268138916与Watch40268138889均success，未读完整日志/Watch工件，不转记本批。完整字段/来源/编辑器/窗口/桌面与model目标/能力/角色/真实认证、研究control/其他driver/child总成本、原生tokenizer/动态I/O、真实1.7k/4.9k分解、冷热/修补前启动收益和原model按键现场唯一原因继续待证；原Phase38/9和ADD独立/active。
 
 最终四静态门、strict docs/diff、324个链接/53标题/68行锚点、ADD-01…13完整性与恢复源码hash通过，118条既有来源advisory保留。自编final探针先用根dist、再把buildId当顶层返回字段，两次失败均为探针错误；按真实package dist和manifest合同修正后新鲜度通过，产品未改、未重跑已通过重验证。源码/脚本/hash及主代理非独立审阅收据已归档，owned scratch清理后交付。
+
+## [2026-10-26] fix | 模型分类精确可用性与主题原草稿重试
+
+接续已有工作区改动，ADD-01/02分类由runtime级凭据聚合改为自身已准入模型行，ready分类优先、组内目录/连接稳定。缺凭据、pending/error、歧义、空目录和effort阻断各自保持；具体未配置模型仍可浏览，刷新不抢手动目标。只读参考比较available行派生provider资格与可用/锁定分组；保留本项目精确连接及未配置模型浏览合同。
+
+ADD-03主题旧夹具要求重试再次openSettings，与原draft.reopen合同冲突。上一提交6a19ae66的CI40270478751唯一失败为该断言，本地六项原测试同样复现；修夹具并补原draft拒绝时pending保留、零第二次保存，不回退原归属保护。该提交Watch40270478690/40280908739均success，与CI失败分开。
+
+主代理单进程串行五文件84项、四静态门/strict docs、责任上限0、TS build ac65a82636ac及fresh、当前包正式judge proven通过。原model源码反转AssertionError/exit1、逐字节恢复；早期过滤Git反转零test及已适配包误作原archive SHA拒绝均记为无效探针。普通/全屏×一ready三缺失/全部缺失四条最终构建实际Node小PTY通过分类、详情、原模型返回、空搜索清除；config原字节/modelSelection不变、零message/provider请求，143退出close确认。详情返回探针同步错误保留；未构建exe、全仓本地或20k真实PTY。
+
+addition第四十批与audit同步；工件phase20-addition-model-category及源码hash/主代理非独立审阅归档，Git/本批CI另绑定。完整两面板交叉矩阵、真实认证/桌面、研究总成本、动态I/O/原生tokenizer、真实1.7k/4.9k及冷热收益仍待验，原Phase38/9、ADD独立且整体active。

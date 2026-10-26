@@ -1188,6 +1188,20 @@ ADD-03沿[原设置草稿](../../packages/ts-shell/src/cli/interactive/settings.
 
 settings基本73条链及以上代表性生命周期场景已有证据，全部来源/字段/编辑器/窗口/桌面组合仍需补齐。model精确目标/能力/角色/真实认证，研究control/其他driver/child及总成本，原生tokenizer/动态来源累计I/O，真实1.7k/4.9k组成、冷热与修补前启动对照、原现场model零交互唯一原因继续未确认。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第四十批：模型分类的精确可用性与主题原草稿重试
+
+接续`6a19ae66`及已有工作区改动。ADD-01/02确认分类使用runtime级凭据汇总，导致同协议的未配置relay分类没有阻断标记、先于真实可用分类。现[模型面板](../../packages/ts-shell/src/cli/interactive/picker/model.ts)从各分类自己的已准入模型行派生可用性，可用分类在前，同组目录及连接顺序稳定；分类标记与可启用资格一致。pending/error/缺凭据、环境fallback不能替代的显式连接、地址歧义、空目录和当前effort阻断均保留各自状态，具体阻断模型仍可浏览/配置或恢复档位。当前请求报告和Roles继续独立投影；分类重排不抢手动模型身份。
+
+只读参考面板`model-hub.ts`659–682从availableModels按具体provider计数，再区分有目录但无available行的分类，743–748分别组织可用/锁定分类；采用“自身可用行决定分类资格、可用在前”的决定。本项目以原精确catalog/provider/connection身份替代runtime汇总，保留原目录顺序及用户要求的未配置具体模型浏览能力，不照搬参考仅available模型的浏览边界。[分类回归](../../packages/ts-shell/src/cli/interactive/picker/model/category.test.ts)反转当前`model.ts`到原HEAD后AssertionError/exit1，源码SHA256逐字节恢复一致；早期过滤Git输出造成零test的反转为无效探针，单独保留。
+
+ADD-03同时修正[主题测试](../../packages/ts-shell/src/cli/interactive/picker/theme.test.ts)的旧host重捕获夹具，补原SettingsDraft.reopen及失败重开拒绝/保留pending/不再保存。上一提交CI `40270478751`实际completed/failure，唯一失败为该旧夹具期待第二次openSettings；本地原六项同一断言复现，按第三十九批原draft合同修夹具，未回退产品归属保护。该提交Watch `40270478690`和后续`40280908739`均success，与CI失败分开。
+
+本次主代理串行五文件84项通过，分类12、model43、current11、recovery11、theme7。四静态门、strict docs（118既有来源advisory）、责任上限0通过；TS build `ac65a82636ac6320578c32aedf5a7732bf1b2cfd090cd699ca98cf8a5eb19f76`，inputs `97d8d75c4fc1e9d95fef8ff2e1b82700a8745392276ea9e55bdd60adb3f0f045`，checkBuild当前fresh。当前包正式npx judge exit0/proven，结构证明不作为ADD验收。早期误把已适配tgz当package脚本原始输入导致SHA拒绝，是验证调用错误，保留日志；未改validator或构建策略。
+
+最终新构建普通/全屏×一ready三缺失/全部缺失四条实际Node小型隔离PTY通过：分类可达、未配置详情/配置入口、返回原模型、无匹配搜索清空；config原字节不变、modelSelection未写、零message/provider请求，四进程SIGTERM143/close已settle。先前探针把详情endpoint当列表返回、Escape尚未完成时输入搜索导致超时，修为等待实际focused模型行后通过；失败保留，不算产品修补或认证成功。本批未构建exe、跑全仓本地回归或真实20k PTY。
+
+证据归`.omx/artifacts/phase20-addition-model-category/`，主代理审阅及恢复hash已归档，Git/本批CI另按实际交付绑定。完整model目标/角色/能力/认证及桌面矩阵、settings完整交叉矩阵、研究control/其他driver/child成本、动态来源累计I/O/原生tokenizer、真实上下文差额与冷热启动对照继续待验。原47项38 complete / 9 partial保持，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1197,6 +1211,7 @@ settings基本73条链及以上代表性生命周期场景已有证据，全部�
 | 问题 | 确认的机制、修补方向与剩余边界 |
 |---|---|
 | model上下键看起来无交互 | 原disabled跳过具体未配置模型是确定缺口；只有一行ready与该观察相容，原现场按键是否进入此分支仍未排他确认。必须允许未配置具体模型获得焦点、进入详情和配置，不能改回跳过它们；浏览、认证成功与显式启用分开。已有局部修补及真实host/隔离PTY证据，原环境仍需复验 |
+| 同协议relay分类错误标为可用 | 第四十批确认runtime级凭据聚合不能代表精确分类。现从分类自身已准入模型行派生状态和ready优先顺序；阻断模型仍可浏览，刷新保留手动身份。五文件84项、原源码有效反转及四条实际Node小型PTY有证据；完整模型/认证/桌面验收继续待证 |
 | resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。已有局部修补证据 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |

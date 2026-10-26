@@ -6,7 +6,7 @@ import { currentTheme } from '../../../presentation/theme/theme.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { settingsPicker } from './settings.js';
 import { OverlayHost } from '../overlay.js';
-import type { SettingsSaveResult } from '../settings.js';
+import type { SettingsDraft, SettingsSaveResult } from '../settings.js';
 
 beforeEach(() => { selectTheme('dark'); });
 afterEach(() => { selectTheme('dark'); });
@@ -18,11 +18,12 @@ function host() {
     return { note: 'Saved.', applied: true };
   });
   const themes = themePreferences({ workspaceRoot: process.cwd(), follower: { stop() {}, refresh() {} }, redraw() {} });
-  const openSettings = vi.fn((scope: 'user' | 'project' = 'user') => ({ scope, save,
+  const reopen = vi.fn((scope: 'user' | 'project' = 'user'): SettingsDraft | undefined => ({ scope, save, reopen,
     definitions: CONFIG_SETTINGS.filter(item => item.key === 'theme'),
     values: { theme: { effective: currentTheme(), requested: selectedTheme(), stored: selectedTheme(), source: 'user', requestedSource: 'user', restartRequired: false } },
   }));
-  return { themes, save, openSettings };
+  const openSettings = vi.fn((scope: 'user' | 'project' = 'user') => reopen(scope)!);
+  return { themes, save, openSettings, reopen };
 }
 async function detail(h: ReturnType<typeof host>) {
   const picker = settingsPicker(h); await picker.load(); return (await picker.apply(['theme']))!.next!;
@@ -52,14 +53,28 @@ it('stages, previews the pending theme, and ends preview before explicit Apply',
   picker.previewEnd!(); staged.previewEnd!(); expect(currentTheme()).toBe('light');
 });
 
-it('retains a failed Apply choice, restores accepted appearance, and reacquires only on retry', async () => {
+it('retains a failed Apply choice, restores accepted appearance, and reopens its original draft only on retry', async () => {
   const h = host(); h.save.mockResolvedValueOnce({ note: 'Saved. Application not confirmed.', applied: false });
   const picker = await detail(h); const staged = (await picker.apply([await choice(picker, 'light')]))!.next!;
   staged.previewChange!(['apply']); const result = await staged.apply(['apply']); const retry = result!.next!;
   expect(currentTheme()).toBe('dark'); expect(retry.title).toContain('Apply not confirmed');
   expect((await retry.load()).find(option => option.id === 'pending')?.label).toContain('light');
   retry.previewChange!(['apply']); expect(currentTheme()).toBe('dark'); expect(h.openSettings).toHaveBeenCalledOnce();
-  await retry.apply(['apply']); expect(h.openSettings).toHaveBeenCalledTimes(2); expect(selectedTheme()).toBe('light');
+  expect(h.reopen).toHaveBeenCalledOnce();
+  await retry.apply(['apply']); expect(h.openSettings).toHaveBeenCalledOnce(); expect(h.reopen).toHaveBeenCalledTimes(2);
+  expect(h.save).toHaveBeenCalledTimes(2); expect(h.save).toHaveBeenLastCalledWith('theme', 'light'); expect(selectedTheme()).toBe('light');
+});
+
+it('retains a failed theme choice when its original draft cannot reopen and never acquires another host', async () => {
+  const h = host(); h.save.mockResolvedValueOnce({ note: 'Apply failed.', applied: false });
+  const picker = await detail(h); const staged = (await picker.apply([await choice(picker, 'light')]))!.next!;
+  const retry = (await staged.apply(['apply']))!.next!;
+  h.reopen.mockReturnValueOnce(undefined);
+  const refused = await retry.apply(['apply']);
+  expect(refused?.note).toContain('Settings changed or the session moved');
+  expect(h.openSettings).toHaveBeenCalledOnce(); expect(h.reopen).toHaveBeenCalledTimes(2); expect(h.save).toHaveBeenCalledOnce();
+  expect((await refused!.next!.load()).find(row => row.id === 'pending')?.label).toContain('light');
+  expect(selectedTheme()).toBe('dark'); expect(currentTheme()).toBe('dark');
 });
 
 it('reports invalid previews safely and never stages an unavailable theme', async () => {
