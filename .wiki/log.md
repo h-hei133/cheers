@@ -9420,3 +9420,9 @@ registry12、slash suggestions41、connection completion20共73项单进程串�
 补registry合同测试锁定theme/statusline继续指向settings Appearance，connect与login/logout说明原连接owner，view说明用户/开发者输出消费者，`theme`和`tui.statusItems`仍归属正确settings section。合同防止帮助或分类重构删除、改名或移入无真实能力的兼容入口，不新增第二套主题、状态栏、认证或视图实现。
 
 slashCommandRegistry13项单进程通过；四静态门、责任上限0、TS build 5b0748c65edf及fresh、当前包judge proven、严格docs通过，Git/本批CI另绑定。未运行全仓、exe、真实认证、桌面或20k PTY；ADD-13本地组织合同收口，完整ADD与真实环境验收继续active。
+
+## [2026-10-26] feat | Memory与Shell只读命令入口
+
+ADD-03/13继续收口。settings新增Memory / Review与Shell / Diagnostics只读入口，分别插入`/memory status`、`/shell status`草稿；入口可搜索和分类导航，但零状态读取、零配置保存，也不复制原命令实现。分类存在由真实只读消费者支撑，不伪装成可编辑字段。
+
+真实OverlayHost分类/Enter/说明路径通过；settings39、fields98、session14、source8共159项最终单进程串行通过，移除capability rows后新增断言有效失败并恢复。settings指南/addition第四十九批/audit更新；四静态门、责任上限0、TS build d448a4c6a269及fresh、当前包judge proven、严格docs通过，Git/本批CI另绑定。未运行全仓、实际memory/shell输出、真实provider/沙箱、exe或桌面PTY，ADD整体继续active。

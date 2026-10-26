@@ -401,3 +401,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A top-level authentication shortcut offers no provider or saved-connection completion, or treats an owner action alias such as `remove` as an argument.
 - **Root Cause**: The shortcut prepends an action to the full command runtime but projects no shortcut-specific grammar; copying the whole action also carries aliases that are not valid at the shortcut's outer position.
 - **Rule**: Derive shortcut hints and argument completions from the owning command action, strip outer-position action aliases, and keep execution delegated to the same owner. Test valid provider/flag positions, saved-connection completion, and invalid leaked aliases separately.
+
+### Read-Only Settings Entries Must Delegate Through Drafts
+- **Symptom**: A settings category is missing even though the product has a real status command, or adding it creates a fake editable field or eagerly performs owner I/O.
+- **Root Cause**: Settings rows and configuration fields were treated as the same kind of capability, conflating discoverability with writable schema ownership.
+- **Rule**: Expose a read-only capability as a searchable, categorized row that returns the canonical command draft and performs no owner read or write until submission. Do not create config keys merely to fill a reference category.

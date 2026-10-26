@@ -1,6 +1,6 @@
 # Settings and command discovery
 
-Open `/settings` to browse the available preferences. Appearance contains themes, composer shape and status band items; Model and Context contain the registered request and context controls. Categories with no supported settings are omitted. Use the arrows or Tab to move between navigation and rows. Typing searches across categories, including field names and descriptions.
+Open `/settings` to browse the available preferences. Appearance contains themes, composer shape and status band items; Model and Context contain the registered request and context controls. Categories can also expose read-only owner entry points without pretending to be editable fields. Use the arrows or Tab to move between navigation and rows. Typing searches across categories, including field names and descriptions.
 
 In settings and model lists, the mouse wheel moves focus through the content rows and stops at the first or last candidate. Enter performs the focused operation. Wheeling over the sidebar pans its visible categories without selecting one; click or use the keyboard to change category. Returning keyboard focus to the sidebar reveals the active category. The detail column and input editor retain their own interaction boundaries.
 
@@ -23,6 +23,8 @@ Configuration files store explicit overrides. A small or empty file can inherit 
 | Entry | Purpose and persistence |
 |---|---|
 | `/settings` | Main preference browser with staged Apply/Discard and source details |
+| Settings → Memory | Inserts `/memory status`; health, candidates and facts remain owned by the memory command |
+| Settings → Shell | Inserts `/shell status`; backend and execution diagnostics remain owned by the shell command |
 | `/theme` | Current-session palette chooser; save a lasting choice through settings Appearance |
 | `/statusline` | Status band chooser; also available in settings Appearance. Direct `use` saves through its existing configuration owner |
 | `/connect`, `/login`, `/logout` | Connection management and its login/logout shortcuts; `/login` completes providers and authentication flags, while `/logout` completes saved connections |

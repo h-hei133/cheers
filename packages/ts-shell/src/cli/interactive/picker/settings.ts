@@ -189,7 +189,22 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
 }
 
 const GROUP_ORDER = ['Appearance', 'Model', 'Interaction', 'Context', 'Memory', 'Files', 'Shell', 'Tools', 'Tasks', 'Providers'] as const;
-const SETTINGS_GROUPS: readonly string[] = GROUP_ORDER.filter(group => CONFIG_SETTINGS.some(setting => setting.group === group));
+const CAPABILITY_ENTRIES = [
+  {
+    id: 'settings:memory', group: 'Memory', section: 'Memory / Review', label: 'Memory status', note: 'read-only',
+    searchText: 'Memory status health candidates facts recall review /memory',
+    detail: 'Insert /memory status to inspect memory health, candidates and saved facts through the memory owner.',
+    draft: '/memory status',
+  },
+  {
+    id: 'settings:shell', group: 'Shell', section: 'Shell / Diagnostics', label: 'Shell diagnostics', note: 'read-only',
+    searchText: 'Shell diagnostics backend execution sandbox /shell',
+    detail: 'Insert /shell status to inspect the selected backend and execution diagnostics through the shell owner.',
+    draft: '/shell status',
+  },
+] as const;
+const SETTINGS_GROUPS: readonly string[] = GROUP_ORDER.filter(group => CONFIG_SETTINGS.some(setting => setting.group === group)
+  || CAPABILITY_ENTRIES.some(entry => entry.group === group));
 
 /** Searchable grouped fields; selecting a row starts an explicit staged edit. */
 export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user', group?: string, selected?: string, notice?: string): Picker {
@@ -234,6 +249,10 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
         groups.set(id, 'Model'); positions.set(id, { category: 'Model', section: 'Model / Session' });
         rows.push({ id, label, note: 'current session', searchText: `Model Session ${id === 'settings:model' ? 'provider connection model roles /model' : 'reasoning thinking /thinking'}` });
       }
+      for (const entry of CAPABILITY_ENTRIES) {
+        groups.set(entry.id, entry.group); positions.set(entry.id, { category: entry.group, section: entry.section });
+        rows.push({ id: entry.id, label: entry.label, note: entry.note, searchText: entry.searchText });
+      }
       rows.sort((a, b) => GROUP_ORDER.indexOf(groups.get(a.id) as typeof GROUP_ORDER[number]) - GROUP_ORDER.indexOf(groups.get(b.id) as typeof GROUP_ORDER[number])
         || (positions.get(a.id)?.section ?? '').localeCompare(positions.get(b.id)?.section ?? ''));
       navigation.set(rows, positions, [{ id: 'all', label: 'All' }, ...SETTINGS_GROUPS.map(id => ({ id, label: id }))]);
@@ -242,6 +261,8 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
     detail: id => {
       if (id === 'settings:model') return ['Browse models, configure connections and assign model roles.', 'Model and role choices apply to the current session and are saved for resume.', 'Connection configuration uses its own save scope; the settings file scope does not change it.'];
       if (id === 'settings:thinking') return ['Choose reasoning effort for the current request model.', 'Changes apply to the current session and are saved for resume.', 'Supported levels follow the exact model and connection.'];
+      const capability = CAPABILITY_ENTRIES.find(entry => entry.id === id);
+      if (capability) return [capability.detail];
       const setting = draft?.definitions.find(item => item.key === id);
       if (!setting || !draft) return [];
       const value = draft.values[setting.key];
@@ -255,6 +276,8 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
       const back = (note?: string) => settingsPicker(host, scope, 'Model', ids[0], note);
       if (ids[0] === 'settings:model' && host.modelSettings) return { next: host.modelSettings(back) };
       if (ids[0] === 'settings:thinking' && host.thinkingSettings) return { next: host.thinkingSettings(back) };
+      const capability = CAPABILITY_ENTRIES.find(entry => entry.id === ids[0]);
+      if (capability) return { draft: capability.draft };
       const setting = draft.definitions.find(item => item.key === ids[0]);
       return setting ? { next: settingDetail(host, draft, setting) } : undefined;
     },

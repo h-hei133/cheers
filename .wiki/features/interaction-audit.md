@@ -562,9 +562,9 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 | 确实存在的原问题，有局部修补 | 首帧过晚、初始无本地数值、旧基准误标首帧 | 已采用早期真实composer及本地估算；第三十七批已修旧`openai`标记，当前观察实际Loading编辑区及runtime接管。120个warm-uncontrolled样本绑定原测量build，最终build另有16个pilot；旧“基准仍误标”的本轮结论已过时 |
 | 确实存在的原问题，有局部修补 | 正文路径、多skill、有限slash组合及代码边界缺口 | 当前补全与统一组合owner已有推进。多skill检查全部body进入一份任务；deep-research保持真实driver，brainstorm和显式可组合模板作为modifier，控制/保存/功能动作沿原独立准入 |
 | 确实存在的后续缺口，有局部修补 | 预览来源/raw字节、重复记忆读取、研究新建入口准备、模型精确能力/旧详情/重开目录及档位恢复 | 前述批次各有聚焦与隔离证据；继续复用原读取、研究、模型事务和配置发布owner。不能以局部修补推导全动态来源、所有研究动作或真实认证已验收 |
-| 明确仍需完善 | settings/model完整操作链与场景覆盖 | 当前settings37项、八个真实分类，另有两个Model / Session入口；按全部字段/来源/scope及model精确目标/角色/能力/配置/返回清单验收，覆盖普通/全屏、键鼠/窗口及真实环境，不以截图或同名分类作为整体完成 |
+| 明确仍需完善 | settings/model完整操作链与场景覆盖 | 当前settings37项、真实配置分类、两个Model / Session入口及Memory/Shell只读命令入口；按全部字段/来源/scope及model精确目标/角色/能力/配置/返回清单验收，覆盖普通/全屏、键鼠/窗口及真实环境，不以截图或同名分类作为整体完成 |
 | 不成立的源码解释 | “model没有上下键监听”“resume排序反了”“settings完全没有分类” | 源码有相应导航、时间倒序和分类。排除这些笼统解释不等于否认用户观察；真正缺口在可聚焦性、自动焦点和完整操作链 |
-| 不成立的能力推断 | “少Memory/Shell两个分类就是故障”“稀疏配置表示字段没有实现” | 当前元数据没有这两个分类的独立可编辑字段；原schema、默认继承和消费者存在。对应owner的发现入口仍需核查，不能用假菜单补齐十个名称 |
+| 不成立的能力推断 | “少Memory/Shell两个分类就是故障”“稀疏配置表示字段没有实现” | 当前元数据没有这两个分类的独立可编辑字段；原schema、默认继承和消费者存在。第四十九批已提供只读命令入口，仍不能用假编辑字段补齐十个名称 |
 | 不成立的计量或启动推导 | “工具数相近就该同tokens”“1.7k/4.9k仅因字符公式”“npm start每次编译/用户入口用错” | 本地计数方式有差异，但工具schema、规则/历史/协议、provider/cache口径和实际输入集合须对齐；公式不足以独自解释真实差额。已有入口证据也不支持每次编译或用户误用 |
 | 不成立的当前功能判断 | “只会生效第一个skill”“所有prompt类slash都能组合”“所有方法命令已经支持组合” | 当前有两份及更多skill的逐批payload证据。组合由实际能力声明准入，brainstorm、deep-research入口及`composable: true`模板已有声明；review等示例不构成支持承诺 |
 | 仍未确认 | 原现场唯一按键根因、真实1.7k/4.9k组成、生产冷热收益、桌面输入与认证接受 | 缺证据就继续未确认，不能写成“不存在”或“已解决”；真实provider失败与产品路由故障仍分开 |
@@ -642,3 +642,7 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 ### 文末当前问题判断（第四十八批）
 
 补ADD-13注册表合同，锁定theme/statusline继续从settings Appearance发现，connect与login/logout继续说明原连接owner，view继续说明用户/开发者输出消费者，`theme`与`tui.statusItems`仍归属正确settings section。该合同不新增第二套主题、状态栏、认证或视图实现，也不把菜单存在冒充真实provider/桌面通过。registry13项通过，见[第四十八批](phase-20-addition.md#第四十八批add-13入口发现性合同)。ADD-13本地组织与兼容入口合同已收口，完整ADD及真实环境证据继续保持active。
+
+### 文末当前问题判断（第四十九批）
+
+settings根目录现补Memory / Review与Shell / Diagnostics两个只读入口，分别插入`/memory status`和`/shell status`草稿。入口可搜索、分类导航并说明真实owner，但不读取状态、不保存配置，也不是新增可编辑字段；实际输出仍需用户提交原命令。真实OverlayHost分类/Enter/零保存路径及settings39、fields98、session14、source8共159项通过，移除capability rows可触发有效失败并恢复。见[第四十九批](phase-20-addition.md#第四十九批memory与shell的只读owner入口)。四静态门、构建、judge和docs另绑定；完整面板及真实命令/桌面环境继续active。

@@ -161,7 +161,7 @@ Model / Session必须可从类别浏览及全局搜索找到；model/roles和当
 | Tasks | cacheWarming、agentMode、steeringMode、followUpMode、backgroundFollowUp | user/project适用性、默认模式与会话选择、后台请求实际应用时点 |
 | Providers | retryEnabled、retryMaxRetries、providerRetryMaxRetries、retryBaseDelayMs、retryMaxDelayMs、providerConnect/Headers/BodyTimeoutMs | 各重试层与超时对应真实消费者；连接/凭据仍走原connect owner |
 
-当前`GROUP_ORDER`声明参考十类顺序，`SETTINGS_GROUPS`只显示有真实元数据的八类，Memory和Shell未显示；本轮所读`CONFIG_FIELDS`没有独立memory/shell可编辑字段。**缺这两个名字本身不是已确认故障，也不说明相关产品能力不存在。** ADD-03需继续核查相应原owner是否有适合从settings发现的真实设置或只读状态：有就委托入口并标明scope，没有就省略，不造空菜单或重复字段。今后新增真实字段时仍复用原schema/来源政策，不能另建面板配置体系。
+初次实现时`GROUP_ORDER`声明参考十类顺序，`SETTINGS_GROUPS`只显示有真实元数据的八类，Memory和Shell未显示；所读`CONFIG_FIELDS`没有独立memory/shell可编辑字段。**缺这两个名字本身不是已确认故障，也不说明相关产品能力不存在。** 后续第四十九批已沿原`/memory status`与`/shell status`命令补只读发现入口：它们插入命令草稿，不伪装成可编辑字段，也不复制状态读取或保存owner。今后新增真实字段时仍复用原schema/来源政策，不能另建面板配置体系。
 
 后续实施须以37项清单和原scope政策补齐字段、来源及保存读回矩阵：第三十八批已覆盖每项搜索发现→详情→暂存→取消→再暂存/Apply→effective/requested/stored读回→重开→移除→重开，以及七个跨来源政策场景。第三十九批新增17项，覆盖代表性user/project同源冲突重试、scope取消/确认/不可读、session/workspace/profile失效、legacy/preferred换代、真实锁内复验、写入后应用未确认及无效数值取消恢复；这几类不再是完全无证据。所属category/section导航有前述批次证据；全部字段/编辑器与各来源冲突、无效值、失效、编辑窗口及桌面的交叉组合仍待验，不能把73条基本路径或17项新增场景记为完整矩阵。已有第15节证据可复用，未覆盖组合写明未验，不重复全仓回归。
 
@@ -1288,6 +1288,14 @@ ADD-13后续验收确认`/login`、`/logout`虽然都委托现有`/connect`认�
 
 `slashCommandRegistry.test.ts` 13项单进程通过。此批是ADD-13的本地发现性/组织合同，不新增认证、主题、状态栏或视图行为，也不证明真实provider、桌面终端或所有平台；未运行全仓、exe、真实认证或20k PTY。四静态门、严格docs、TS build `5b0748c65edf`及fresh、当前包judge proven通过，Git/本批CI另实际绑定。
 
+### 第四十九批：Memory与Shell的只读owner入口
+
+ADD-03/13继续收口。settings根目录新增Memory / Review与Shell / Diagnostics两个只读能力入口：`Memory status`插入`/memory status`草稿，`Shell diagnostics`插入`/shell status`草稿。入口可搜索、可分类导航、可查看说明，但不读取状态、不写配置，也不复制memory/shell命令实现；用户仍需显式提交原命令。分类存在是因为有真实只读消费者，不是用空菜单冒充十个参考分类。
+
+真实OverlayHost路径覆盖Memory分类默认焦点、Enter选择及只读说明；直接应用返回精确草稿，零settings保存。settings39、fields98、session14、source8共159项分两段单进程串行通过。临时移除capability rows后新增rows/OverlayHost断言失败，恢复后重验通过。
+
+此批不把只读入口当作memory/shell状态动态验收；实际命令输出、真实provider/沙箱、桌面和全仓仍未运行。四静态门、严格docs、TS build `d448a4c6a269`及fresh、当前包judge proven通过，Git/本批CI另实际绑定。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1307,7 +1315,7 @@ ADD-13后续验收确认`/login`、`/logout`虽然都委托现有`/connect`认�
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
-| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。第三十八批新增settings全部37项/user37-project36基本键盘链及七个跨来源政策场景，第三十九批补17个代表性冲突/失效/取消/范围场景。完整字段×来源×编辑器×窗口/桌面及model能力/角色/真实认证矩阵仍未完成；Memory/Shell缺名字本身不是故障，不能将局部绿色写成“整体已看齐” |
+| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。第三十八批新增settings全部37项/user37-project36基本键盘链及七个跨来源政策场景，第三十九批补17个代表性冲突/失效/取消/范围场景，第四十九批补Memory/Shell只读命令入口。完整字段×来源×编辑器×窗口/桌面及model能力/角色/真实认证矩阵仍未完成；只读入口不伪装可编辑字段，也不能将局部绿色写成“整体已看齐” |
 | 设置搜索新查询仍保留较弱匹配焦点 | 第三十八批确认typed/pasted `topP`排名第一但Enter打开Input shape。现新查询自动聚焦最强匹配，同查询手动选择保持，清空回原字段；178项聚焦、一有效反转及两模式实际Node PTY有证据。不是用户原model按键现场唯一原因的证明 |
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
@@ -1326,7 +1334,7 @@ ADD-13后续验收确认`/login`、`/logout`虽然都委托现有`/connect`认�
 |---|---|
 | “model压根没有上下键监听” | 源码有监听及导航；原来跳过disabled能导致无可见变化。不能用监听存在否认用户观察，也不能把“跳过未配置”当作用户意愿 |
 | “resume按时间排序反了” | 时间倒序机制存在，确定缺口在渐进自动焦点保留；修补焦点而非反转排序 |
-| “settings完全没有分类、稀疏配置说明字段没实现”“参考十类必须全部显示” | 当前八类/37项与两个会话入口来自真实元数据及原owner，默认继承和真实消费者存在。Memory/Shell未显示不单独证明缺陷；对应能力的发现入口仍需核查，不能添加假字段或把所有默认值写回 |
+| “settings完全没有分类、稀疏配置说明字段没实现”“参考十类必须全部显示” | 当前配置字段与两个会话入口来自真实元数据及原owner，默认继承和真实消费者存在；Memory/Shell现由第四十九批提供只读命令入口。分类存在不等于有可编辑字段，不能添加假字段或把所有默认值写回 |
 | “失败后所有第二次Apply都应禁止”“取消scope必须清空暂存” | 同源字段冲突可以保留pending并由用户明确重试；取消scope按原合同保留pending。第三十九批拒绝的是归属/来源换代，成功scope确认才按提示撤销pending；不能以粗暴禁止重试掩盖原重捕获缺陷 |
 | “npm start每次编译，或用户入口用错” | 既有入口证据不支持。应改首帧时序并测实际耗时，不能把慢启动归咎于用户 |
 | “对话后4.9k就是字符÷3.5” | 对话后值有provider归一化输入用量来源；本地估算另有公式。两者需逐项对齐，不能混为同一公式结果 |

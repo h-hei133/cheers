@@ -24,6 +24,31 @@ async function detail(h: SettingsHost = host(), key = 'attentionOnIdle') {
 }
 
 describe('advanced settings picker', () => {
+  it('exposes memory and shell diagnostics as read-only drafts owned by their commands', async () => {
+    const h = host();
+    const picker = settingsPicker(h);
+    const rows = await picker.load();
+    expect(picker.chips?.items.map(item => item.id)).toEqual(expect.arrayContaining(['Memory', 'Shell']));
+    expect(rows.find(row => row.id === 'settings:memory')).toMatchObject({ label: 'Memory status', note: 'read-only' });
+    expect(rows.find(row => row.id === 'settings:shell')).toMatchObject({ label: 'Shell diagnostics', note: 'read-only' });
+    expect(picker.filterOptions!('memory', rows)[0]?.id).toBe('settings:memory');
+    expect(picker.detail?.('settings:memory')).toEqual([
+      'Insert /memory status to inspect memory health, candidates and saved facts through the memory owner.',
+    ]);
+    expect(await picker.apply(['settings:memory'])).toEqual({ draft: '/memory status' });
+    expect(await picker.apply(['settings:shell'])).toEqual({ draft: '/shell status' });
+    expect(h.save).not.toHaveBeenCalled();
+
+    const memory = settingsPicker(h, 'user', 'Memory');
+    const overlay = new OverlayHost(() => {});
+    overlay.open(memory); await Promise.resolve(); await Promise.resolve();
+    expect(overlay.render(100, 30).map(stripAnsi).join('\n')).toContain('Memory status');
+    const selected = vi.fn();
+    overlay.handleKey(parseKeyEvent('\r'), selected);
+    expect(selected).toHaveBeenCalledWith(memory, ['settings:memory']);
+    overlay.close();
+  });
+
   it.each(['typed', 'pasted'] as const)('focuses the strongest result for a new %s search instead of retaining an unrelated match', async input => {
     const h = host(); const picker = settingsPicker(h); const overlay = new OverlayHost(() => {});
     overlay.open(picker); await Promise.resolve(); await Promise.resolve();
