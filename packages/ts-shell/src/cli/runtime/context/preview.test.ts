@@ -389,6 +389,20 @@ it('keeps a stale review marker when generic verification fails', async () => {
   expect(snapshot).toHaveBeenCalledTimes(1);
 });
 
+it('does not retire a review reservation when a suspended preview check is aborted', async () => {
+  const { cwd, context, load } = fixture({ git: true });
+  fs.writeFileSync(path.join(cwd, 'source.txt'), 'source bound\n');
+  const workbench = gitWorkbenchFor(context)!;
+  const snapshot = vi.spyOn(workbench, 'snapshot');
+  const preview = await load('/review source');
+  preview.suspend?.();
+  const controller = new AbortController(); controller.abort();
+  await expect(preview.verifyContent!(controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+  preview.resume?.();
+  expect(await gitCommandFor(context)(['review', 'source'], { cwd })).toMatchObject({ kind: 'prompt' });
+  expect(snapshot).toHaveBeenCalledTimes(1);
+});
+
 it('keeps a stale review marker when a replacement preview fails before publication', async () => {
   const { cwd, context, load } = fixture({ git: true });
   fs.writeFileSync(path.join(cwd, 'source.txt'), 'source bound\n');

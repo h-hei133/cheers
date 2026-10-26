@@ -994,6 +994,7 @@ export class InteractiveMode {
       this.openPicker(text, true);
       return;
     }
+    this.promptContext.suspend();
     this.busy = true;
     // When the turn began, so an idle signal can say how long the work took
     // rather than firing on every turn however brief.
@@ -1074,6 +1075,7 @@ export class InteractiveMode {
       if (output) pageLongOutput(this.pager, output.title, output.block, this.state.transcript);
       this.sink.end();
       this.busy = automatic || this.pickerPending;
+      this.promptContext.resume();
       if (sessionManagement && !this.stopped) this.overlay.open(sessionManagementPicker(this.pickerHost(), sessionManagement));
       if (exiting) {
         this.shutdown();

@@ -60,6 +60,7 @@ import { __setOpenAIProviderAuthLoginForTest } from '../../core/auth/providerAut
 import { ConfigWriteError } from '../../config/outcome.js';
 import * as startupTiming from '../../observability/startupTiming.js';
 import * as contextPreview from '../runtime/context/preview.js';
+import * as commandRouter from './interactiveCommandRouter.js';
 import { contextMessageHash } from '../../session/context/selection.js';
 
 function build(overrides: {
@@ -167,6 +168,44 @@ it('withdraws the prompt estimate when context selection changes', async () => {
     mode.stop();
     load.mockRestore();
     vi.useRealTimers();
+  }
+});
+
+it('keeps a published preview reservation while a user submission is busy', async () => {
+  vi.useFakeTimers();
+  const invalidate = vi.fn();
+  const preview = {
+    estimate: { tokens: 100, source: 'estimated' as const, identity: { provider: 'openai', model: 'fixture' }, method: 'characters/3.5' as const },
+    verify: vi.fn(), invalidate,
+  };
+  const load = vi.spyOn(contextPreview, 'previewContext').mockResolvedValue(preview);
+  let finish!: () => void;
+  const route = vi.spyOn(commandRouter, 'routeInteractiveCommand').mockImplementation(() => new Promise(resolve => {
+    finish = () => resolve({ turnNumber: 0 });
+  }));
+  const { mode } = build();
+  const host = mode as unknown as {
+    busy: boolean;
+    promptContext: { start(): void; update(): void; suspend(): void; resume(): void; read(): { tokens?: number }; stop(): void };
+    options: { runtimeContext: ShellRuntimeContext };
+    run(text: string): Promise<void>;
+  };
+  try {
+    host.options.runtimeContext.session = { ...host.options.runtimeContext.session, turns: [] };
+    host.promptContext.start();
+    await vi.advanceTimersByTimeAsync(150);
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(host.promptContext.read().tokens).toBe(100);
+    const running = host.run('/review');
+    expect(route).toHaveBeenCalledTimes(1);
+    expect(host.busy).toBe(true);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(invalidate).not.toHaveBeenCalled();
+    finish();
+    await running;
+    expect(invalidate).not.toHaveBeenCalled();
+  } finally {
+    host.promptContext.stop(); mode.stop(); route.mockRestore(); load.mockRestore(); vi.useRealTimers();
   }
 });
 

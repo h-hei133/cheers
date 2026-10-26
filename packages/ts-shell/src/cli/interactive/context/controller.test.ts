@@ -39,6 +39,36 @@ it('invalidates rather than disposes a published preview when its identity chang
   controller.stop();
 });
 
+it('suspends automatic invalidation until the caller resumes', async () => {
+  let key = 'a'; const suspend = vi.fn(); const resume = vi.fn(); const invalidate = vi.fn(); const dispose = vi.fn();
+  const value = { ...preview(100), suspend, resume, invalidate, dispose };
+  const controller = createContextController({ identity: () => key, load: async () => value, repaint: vi.fn() }); controller.start();
+  await vi.advanceTimersByTimeAsync(150); expect(controller.read().tokens).toBe(100);
+  controller.suspend();
+  expect(suspend).toHaveBeenCalledTimes(1);
+  key = 'b'; controller.update();
+  expect(invalidate).not.toHaveBeenCalled(); expect(dispose).not.toHaveBeenCalled();
+  controller.resume();
+  expect(resume).toHaveBeenCalledTimes(1);
+  expect(invalidate).toHaveBeenCalledTimes(1); expect(dispose).not.toHaveBeenCalled();
+  controller.stop();
+});
+
+it('does not invalidate a published preview when a suspended check settles after resume', async () => {
+  let finish!: () => void; const suspend = vi.fn(); const resume = vi.fn(); const invalidate = vi.fn(); const dispose = vi.fn();
+  const value = { ...preview(100), suspend, resume, invalidate, dispose, verifyContent: vi.fn(async () => {}) };
+  const controller = createContextController({ identity: () => 'a', load: async () => value, repaint: vi.fn() }); controller.start();
+  await vi.advanceTimersByTimeAsync(150);
+  value.verifyContent.mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+  await vi.advanceTimersByTimeAsync(2500);
+  controller.suspend(); await vi.advanceTimersByTimeAsync(10000);
+  expect(invalidate).not.toHaveBeenCalled(); expect(dispose).not.toHaveBeenCalled();
+  controller.resume();
+  finish(); await vi.advanceTimersByTimeAsync(0);
+  expect(invalidate).not.toHaveBeenCalled(); expect(dispose).not.toHaveBeenCalled();
+  controller.stop();
+});
+
 it('uses the request reservation expiry for the displayed preview', async () => {
   const value = { ...preview(100), expiresAt: Date.now() + 1000, verifyContent: vi.fn(async () => {}) };
   const controller = createContextController({ identity: () => 'a', load: async () => value, repaint: vi.fn() }); controller.start();

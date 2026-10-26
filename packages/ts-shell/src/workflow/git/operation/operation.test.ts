@@ -167,6 +167,7 @@ describe('exact native Git approval', () => {
       armCommit: () => 'unused', binding: { owns: () => false, remember: () => {}, migrate: () => ({ changed: false, note: 'unused' }) },
       execute: async () => { throw new Error('No write expected.'); }, reviewBinding: () => binding });
     host.reserveReview(await host.snapshot(), 'bound');
+    const fresh = vi.spyOn(host, 'snapshot');
     const review = host.review.bind(host);
     vi.spyOn(host, 'review').mockImplementation(async (...args) => {
       const result = await review(...args);
@@ -176,6 +177,41 @@ describe('exact native Git approval', () => {
     expect(await host.command(['review', 'bound'], { cwd: fixture.root })).toMatchObject({
       kind: 'local', output: expect.stringContaining('Review preparation changed'),
     });
+    expect(await host.command(['review', 'bound'], { cwd: fixture.root })).toMatchObject({
+      kind: 'local', output: expect.stringContaining('Review preparation changed'),
+    });
+    expect(fresh).not.toHaveBeenCalled();
+  });
+  it('keeps a stale marker when a reserved review fails after admission', async () => {
+    fs.appendFileSync(path.join(fixture.root, 'a.txt'), 'review target\n');
+    const host = new GitWorkbench({ currentRoot: () => fixture.root, store: memoryGitStore(), busy: () => false,
+      armCommit: () => 'unused', binding: { owns: () => false, remember: () => {}, migrate: () => ({ changed: false, note: 'unused' }) },
+      execute: async () => { throw new Error('No write expected.'); } });
+    host.reserveReview(await host.snapshot(), 'failure');
+    const fresh = vi.spyOn(host, 'snapshot');
+    vi.spyOn(host, 'review').mockRejectedValue(new Error('synthetic review read failed'));
+    expect(await host.command(['review', 'failure'], { cwd: fixture.root })).toMatchObject({
+      kind: 'local', output: expect.stringContaining('synthetic review read failed'),
+    });
+    expect(await host.command(['review', 'failure'], { cwd: fixture.root })).toMatchObject({
+      kind: 'local', output: expect.stringContaining('Review preparation changed'),
+    });
+    expect(fresh).not.toHaveBeenCalled();
+  });
+  it('does not consume a reservation when Git resolution fails before admission', async () => {
+    fs.appendFileSync(path.join(fixture.root, 'a.txt'), 'review target\n');
+    const host = new GitWorkbench({ currentRoot: () => fixture.root, store: memoryGitStore(), busy: () => false,
+      armCommit: () => 'unused', binding: { owns: () => false, remember: () => {}, migrate: () => ({ changed: false, note: 'unused' }) },
+      execute: async () => { throw new Error('No write expected.'); } });
+    host.reserveReview(await host.snapshot(), 'resolution');
+    const resolve = vi.spyOn(host, 'git').mockImplementationOnce(() => { throw new Error('synthetic git unavailable'); });
+    expect(await host.command(['review', 'resolution'], { cwd: fixture.root })).toMatchObject({
+      kind: 'local', output: expect.stringContaining('synthetic git unavailable'),
+    });
+    resolve.mockRestore();
+    const fresh = vi.spyOn(host, 'snapshot');
+    expect(await host.command(['review', 'resolution'], { cwd: fixture.root })).toMatchObject({ kind: 'prompt' });
+    expect(fresh).not.toHaveBeenCalled();
   });
   it('rejects an older reservation when a replacement publishes during verification', async () => {
     fs.appendFileSync(path.join(fixture.root, 'a.txt'), 'review target\n');

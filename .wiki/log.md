@@ -9502,3 +9502,9 @@ ADD-02确认模型认证await后只检查`owner.isCurrent()`，原admission或�
 ADD-08确认review preview只在focus/expiry局部保留失效证据；changed focus、replacement preview失败、verification失败或controller自动退休后可回落fresh Git snapshot，旧verification也可能覆盖replacement reservation。现Git workbench使用全局review invalidation，并以`reviewTake`/`reviewEpoch`绑定异步消费；旧verification、prompt/diff构造后均重查，成功review或已验证非review preview才清除。controller automatic `invalidate`与显式`dispose`分离。
 
 runtime preview66、Git operation22、review runtime14、controller16共四文件118项单worker通过。移除`reserveReview`的epoch推进后，旧verification在replacement发布后错误返回reserved prompt，新增断言失败；源码逐字节恢复（sha256 `6674cf86c8a9c4e78c3c60b9165fe8a65dab37da4a8964b5f67aa3685efe7315`）并重验118项。首个delegated review未返回，替换review因模型账户cooldown不可用，不记为approval或no-findings。五静态门/diff、责任上限0、Phase 20 38 complete / 9 partial / 0 open、TS build 8ff6550a60e7（inputs 03894378e856、artifact 07f593317543）及正式judge proven/0 open-failed-gap通过。未运行真实provider、全仓、exe、桌面或PTY；HANDOFF/addition第六十一批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-27] fix | 提交期preview生命周期与review租约
+
+ADD-08确认busy身份变化会让context controller的500ms轮询在用户提交`/review`时自动invalidate已发布reservation；reviewTake提前清空也会让diff后失败回落fresh snapshot。现controller提供suspend/resume，preview verifier对suspended abort不误报来源变更；Git workbench保留take到prompt/diff与最终检查完成，失败按epoch留stale，Git resolution失败在消费前返回。
+
+五文件234项单worker通过：controller18、InteractiveMode111、Git operation24、runtime preview67、review runtime14。三个有效反转分别移除busy suspend、恢复take提前清空和移除suspended verifier guard，均出现对应失败并逐字节恢复。指定`cn:deepseek-v4.1-flash`只读复审最终无findings；残余风险为未做真实I/O/timing stress，永不settle的verifier仍会占用pending slot。五静态门/diff、责任上限0、Phase 20 38 complete / 9 partial / 0 open、TS build 07e2421013da（inputs 22fefb1161e4、artifact a69987ef6b00）及正式judge proven/0 open-failed-gap通过。未运行真实provider、全仓、exe、桌面或PTY；HANDOFF/addition第六十二批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。

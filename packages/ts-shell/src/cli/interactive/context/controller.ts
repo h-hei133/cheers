@@ -6,6 +6,10 @@ export interface ContextPreview {
   readonly verifyContent?: (signal: AbortSignal) => Promise<void>;
   /** Absolute expiry shared with the owning request reservation, when present. */
   readonly expiresAt?: number;
+  /** Pause owner-side cancellation semantics while a submitted turn is busy. */
+  readonly suspend?: () => void;
+  /** Resume owner-side cancellation semantics after the submitted turn settles. */
+  readonly resume?: () => void;
   /** Retire an automatically invalidated reading and preserve any stale owner state. */
   readonly invalidate?: () => void;
   /** Release any reservation or retained preview state when this reading is retired. */
@@ -23,6 +27,8 @@ export function createContextController(input: {
   readonly repaint: () => void;
 }) {
   let stopped = false;
+  let suspended = false;
+  let started = false;
   let key: string | undefined;
   let previous: ContextPreview | undefined;
   let activeValue: ContextPreview | undefined;
@@ -34,6 +40,16 @@ export function createContextController(input: {
   let checkedAt = 0;
   let expiresAt = 0;
   const disposed = new WeakSet<object>();
+  const suspendedChecks = new WeakSet<AbortController>();
+  const suspendedPreviews = new WeakSet<object>();
+  const suspendPreview = (value: ContextPreview | undefined) => {
+    if (!value || suspendedPreviews.has(value)) return;
+    suspendedPreviews.add(value); value.suspend?.();
+  };
+  const resumePreview = (value: ContextPreview | undefined) => {
+    if (!value || !suspendedPreviews.has(value)) return;
+    suspendedPreviews.delete(value); value.resume?.();
+  };
   const discard = (value: ContextPreview | undefined, automatic = false) => {
     if (!value || disposed.has(value)) return;
     disposed.add(value);
@@ -52,7 +68,7 @@ export function createContextController(input: {
     activeValue = undefined; discard(retired, true); discard(inFlight, true);
   };
   const request = () => {
-    if (stopped) return;
+    if (stopped || suspended) return;
     let actual: string | undefined;
     try { actual = input.identity(); } catch { actual = undefined; }
     if (actual !== key) { invalidate(); key = actual; retryAt = 0; input.repaint(); }
@@ -76,7 +92,7 @@ export function createContextController(input: {
       const controller = new AbortController(); pending = controller;
       const timeout = setTimeout(() => {
         controller.abort();
-        if (!stopped && pending === controller && key === captured) {
+        if (!stopped && !suspended && pending === controller && key === captured) {
           const retired = previous;
           const inFlight = activeValue;
           if (retired) source = 'stale';
@@ -87,26 +103,32 @@ export function createContextController(input: {
       void Promise.resolve().then(() => checking ?? input.load(controller.signal)).then(async value => {
         currentValue = value;
         activeValue = value;
+        const preserve = suspendedChecks.has(controller) && value === previous;
         if (stopped || controller.signal.aborted || pending !== controller || input.identity() !== captured) {
-          discard(value, true); if (activeValue === value) activeValue = undefined; return;
+          if (!preserve) discard(value, true);
+          if (activeValue === value) activeValue = undefined; return;
         }
         value.verify(); await value.verifyContent?.(controller.signal); value.verify();
+        const preserveAfterVerify = suspendedChecks.has(controller) && value === previous;
         if (stopped || controller.signal.aborted || pending !== controller || input.identity() !== captured) {
-          discard(value, true); if (activeValue === value) activeValue = undefined; return;
+          if (!preserveAfterVerify) discard(value, true);
+          if (activeValue === value) activeValue = undefined; return;
         }
         if (checking && Date.now() >= expiresAt) throw new Error('Context preview expired.');
         if (!checking && value.expiresAt !== undefined && Date.now() >= value.expiresAt) throw new Error('Context preview expired.');
         previous = value; source = value.estimate.source;
         checkedAt = Date.now(); if (!checking) expiresAt = value.expiresAt ?? checkedAt + 20000; input.repaint();
       }).catch(() => {
-        discard(currentValue, true);
-        discard(activeValue, true); activeValue = undefined;
+        const preserve = suspendedChecks.has(controller) && (currentValue === previous || activeValue === previous);
+        if (!preserve) { discard(currentValue, true); discard(activeValue, true); }
+        activeValue = undefined;
         const retired = previous;
-        if (!stopped && !controller.signal.aborted && pending === controller && key === captured) {
+        if (!preserve && !stopped && !controller.signal.aborted && pending === controller && key === captured) {
           if (retired) source = 'stale';
           previous = undefined; discard(retired, true); retryAt = Date.now() + 5000; input.repaint();
         }
       }).finally(() => {
+        resumePreview(currentValue ?? activeValue);
         if (activeValue === currentValue) activeValue = undefined;
         currentValue = undefined; clearTimeout(timeout); if (pending === controller) pending = undefined;
       });
@@ -114,8 +136,28 @@ export function createContextController(input: {
     scheduled.unref?.();
   };
   return {
-    start: () => { if (stopped || interval) return; request(); interval = setInterval(request, 500); interval.unref?.(); },
+    start: () => {
+      if (stopped || started) return;
+      started = true; request();
+      interval = setInterval(request, 500); interval.unref?.();
+    },
     update: request,
+    suspend: () => {
+      if (stopped || suspended) return;
+      suspended = true;
+      suspendPreview(previous);
+      if (activeValue !== previous) suspendPreview(activeValue);
+      if (pending) { suspendedChecks.add(pending); pending.abort(); }
+      if (scheduled) clearTimeout(scheduled); scheduled = undefined;
+      if (interval) clearInterval(interval); interval = undefined;
+    },
+    resume: () => {
+      if (stopped || !suspended) return;
+      suspended = false;
+      if (!pending) { resumePreview(previous); resumePreview(activeValue); }
+      if (!started) return;
+      request(); interval = setInterval(request, 500); interval.unref?.();
+    },
     read: (): ContextReading => {
       // Draft/config changes are noticed synchronously, without inspecting their sources.
       let current: string | undefined;
@@ -124,6 +166,9 @@ export function createContextController(input: {
       if (previous && Date.now() >= expiresAt) return { source: 'stale' };
       return previous ? { tokens: previous.estimate.tokens, source: previous.estimate.source } : { source };
     },
-    stop: () => { stopped = true; invalidate(); if (interval) clearInterval(interval); interval = undefined; },
+    stop: () => {
+      stopped = true; suspended = false; started = false; invalidate();
+      if (interval) clearInterval(interval); interval = undefined;
+    },
   };
 }

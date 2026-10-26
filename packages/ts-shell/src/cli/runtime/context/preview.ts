@@ -167,6 +167,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const endpointId = captureUsageAttribution({ provider: resolution.provider, model: resolution.model, baseUrl: base }).endpointId;
   const estimate = estimatePrompt(messages, overhead, { provider: resolution.provider, model: resolution.model,
     endpoint, endpointId, ...assembledIdentity }, getSessionUsage(expected.id), estimateWirePrompt(body, protocol.contextFields));
+  let suspended = false;
   const verify = () => {
     try {
       signal.throwIfAborted(); session.verify(); sources.verify(); skills.verify?.(); research?.verify();
@@ -192,7 +193,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
       }
       if (config.enableMcpTools && JSON.stringify(gateway.peekSnapshot?.()) !== JSON.stringify(snapshot)) throw new Error('MCP catalogue changed.');
     } catch (error) {
-      review?.invalidate();
+      if (!suspended) review?.invalidate();
       throw error;
     }
   };
@@ -205,7 +206,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
       await review?.verifyContent(checkingSignal);
       verify();
     } catch (error) {
-      review?.invalidate();
+      if (!suspended) review?.invalidate();
       throw error;
     }
   };
@@ -215,6 +216,8 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const reviewExpiresAt = review?.publish(verifyContent, attachments);
   return { estimate, verify, verifyContent,
     ...(reviewExpiresAt !== undefined ? { expiresAt: reviewExpiresAt } : {}),
+    suspend: () => { suspended = true; },
+    resume: () => { suspended = false; },
     invalidate: () => { review?.invalidate(); research?.discard(); },
     dispose: () => { review?.discard(); research?.discard(); } };
 }

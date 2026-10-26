@@ -714,3 +714,9 @@ ADD-02确认模型认证await后只调用`owner.isCurrent()`，因此原admissio
 ADD-08确认review preview失效标记仍按focus/expiry分散保存，changed focus、replacement preview失败、verification失败或controller自动退休可能让后续`/review`静默取得fresh Git snapshot；旧异步verification也可能覆盖replacement reservation。现[Git workbench](../../packages/ts-shell/src/workflow/git/service.ts)使用workbench级invalidation，并以`reviewTake`/`reviewEpoch`贯穿reservation消费、完整preview复验和prompt/diff构造；成功review或已验证非review preview才清除，显式`dispose`仍释放slot。controller automatic retirement调用`invalidate`，保留stale owner state；显式cleanup保持原路径。
 
 四文件118项、有效反转/源码逐字节恢复有局部证据；五静态门、责任上限0、TS build `8ff6550a60e7`、inputs `03894378e856`、artifact `07f593317543`和正式judge proven另绑定。首个delegated review未返回，替换review因模型账户cooldown不可用，不能记为review approval或no-findings。未运行真实provider、全仓、exe、桌面或PTY；见[第六十一批](phase-20-addition.md#第六十一批review-stale-marker-与异步准入代次)。原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第六十二批）
+
+ADD-08继续确认提交竞态：用户提交已发布的review preview后，busy身份变化可能让context controller在500ms轮询中自动invalidate reservation；同时reviewTake在diff前提前清空会让post-admission失败回落fresh snapshot。现controller支持suspend/resume，preview verifier在suspended abort时不把取消误记为来源失败；Git workbench保留reviewTake到prompt/diff与最终检查完成，失败按epoch留下stale marker，Git resolution失败在消费前返回。
+
+五文件234项、三个有效反转/源码恢复及最终独立只读复审无findings有局部证据；五静态门、责任上限0、TS build `07e2421013da`、inputs `22fefb1161e4`、artifact `a69987ef6b00`和正式judge proven另绑定。真实I/O/timing stress、真实provider、全仓、exe、桌面或PTY未验；见[第六十二批](phase-20-addition.md#第六十二批提交期preview生命周期与review租约)。原Phase38/9、ADD独立且整体active。

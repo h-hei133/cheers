@@ -101,12 +101,19 @@ export class GitWorkbench {
     this.reviewInvalidation = { reason };
   }
   private invalidateTake(reservation: ReviewReservation, epoch: number, reason: string): ReviewTake {
-    if (this.reviewEpoch === epoch && this.reviewTake?.reservation === reservation) {
-      this.reviewTake = undefined;
-      this.reviewEpoch++;
-      this.reviewInvalidation = { reason };
-    }
+    if (this.reviewTake?.reservation === reservation) this.failReviewTake(epoch, reason);
     return { kind: 'invalid', reason };
+  }
+  private failReviewTake(epoch: number, reason: string): void {
+    if (this.reviewEpoch !== epoch || this.reviewTake?.epoch !== epoch) return;
+    this.reviewTake = undefined;
+    this.reviewEpoch++;
+    this.reviewInvalidation = { reason };
+  }
+  private completeReviewTake(epoch: number): void {
+    if (this.reviewEpoch !== epoch || this.reviewTake?.epoch !== epoch) return;
+    this.reviewTake = undefined;
+    this.reviewInvalidation = undefined;
   }
   private async takeReviewSnapshot(focus: string, signal?: AbortSignal, attachments?: PromptAttachments): Promise<ReviewTake> {
     const reservation = this.reviewReservation;
@@ -148,8 +155,6 @@ export class GitWorkbench {
     if (reservation.binding !== (this.host.reviewBinding?.() ?? '')) {
       return this.invalidateTake(reservation, epoch, 'Review preparation changed; retry the original draft.');
     }
-    this.reviewTake = undefined;
-    this.reviewInvalidation = undefined;
     return { kind: 'reserved', snapshot: reservation.snapshot, binding: reservation.binding,
       attachmentBinding: reservation.attachmentBinding, epoch };
   }
@@ -165,6 +170,7 @@ export class GitWorkbench {
       let reviewBinding: string | undefined;
       let reviewAttachmentBinding: string | undefined;
       let reviewEpoch: number | undefined;
+      const git = this.git();
       if (reviewFocus === undefined) snapshot = await this.snapshot();
       else {
         const take = await this.takeReviewSnapshot(reviewFocus, context.signal, context.attachments);
@@ -176,24 +182,29 @@ export class GitWorkbench {
           reviewEpoch = take.epoch;
         } else snapshot = await this.snapshot(context.signal);
       }
-      const git = this.git();
       if (action === 'status' && !rest.length) return gitReportResult(gitStatusReport(snapshot));
       if (action === 'goal' && !rest.length) return context.goalCommand ? context.goalCommand(['status'], context) : { kind: 'local', output: 'Goal runtime unavailable.' };
       if (action === 'review') {
-        const result = await this.review(snapshot, rest.join(' '), context.signal);
-        if (reviewEpoch !== undefined && reviewEpoch !== this.reviewEpoch) {
-          throw new Error('Review preparation changed; retry the original draft.');
-        }
-        if (result.kind === 'prompt' || reviewBinding !== undefined) {
-          await assertGitSnapshot(this.git(), snapshot, false, undefined, context.signal);
-          if (reviewBinding !== undefined && reviewBinding !== (this.host.reviewBinding?.() ?? '')) {
+        try {
+          const result = await this.review(snapshot, rest.join(' '), context.signal);
+          if (reviewEpoch !== undefined && reviewEpoch !== this.reviewEpoch) {
             throw new Error('Review preparation changed; retry the original draft.');
           }
-          if (reviewAttachmentBinding !== undefined && reviewAttachmentBinding !== attachmentBinding(context.attachments)) {
-            throw new Error('Review preparation changed; retry the original draft.');
+          if (result.kind === 'prompt' || reviewBinding !== undefined) {
+            await assertGitSnapshot(this.git(), snapshot, false, undefined, context.signal);
+            if (reviewBinding !== undefined && reviewBinding !== (this.host.reviewBinding?.() ?? '')) {
+              throw new Error('Review preparation changed; retry the original draft.');
+            }
+            if (reviewAttachmentBinding !== undefined && reviewAttachmentBinding !== attachmentBinding(context.attachments)) {
+              throw new Error('Review preparation changed; retry the original draft.');
+            }
           }
+          if (reviewEpoch !== undefined) this.completeReviewTake(reviewEpoch);
+          return result;
+        } catch (error) {
+          if (reviewEpoch !== undefined) this.failReviewTake(reviewEpoch, 'Review preparation changed; retry the original draft.');
+          throw error;
         }
-        return result;
       }
       if (action === 'diff' && rest.length === 2 && ['staged', 'unstaged', 'untracked'].includes(rest[0]!)) return gitReportResult(gitDiffReport(await readGitDiff(git, snapshot, rest[0] as 'staged', rest[1]!)));
       let plan: GitPlan;
