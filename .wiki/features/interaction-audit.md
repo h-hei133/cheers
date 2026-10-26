@@ -608,3 +608,7 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 新增确认同协议relay分类使用runtime级凭据聚合，错误把未配置分类标为可用并排在真实ready分类之前。现分类从自身精确已准入模型行派生状态、ready优先且组内稳定；具体未配置/阻断行仍可浏览，刷新保持手动身份。分类12项及相关五文件84项、原源码有效反转/恢复、普通/全屏×有ready/全部缺失四条实际Node小型PTY通过；配置/模型不写、零message/provider请求、进程close已确认。见[第四十批](phase-20-addition.md#第四十批模型分类的精确可用性与主题原草稿重试)。
 
 上一提交CI实际因主题测试旧host重捕获夹具失败，本地同断言复现；按原draft.reopen合同修夹具，补拒绝重开不保存并保留pending，未回退产品归属保护。TS build当前fresh与结构judge proven只作为各自证据。完整model/roles/能力/认证/桌面及settings交叉矩阵、上下文真实差额和性能仍未验收，原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第四十一批）
+
+新增确认目录删除手动焦点后回首项、navigation保留旧ID且无提示。现实际host数据刷新仅在旧焦点失去浏览资格时调用model owner；确认离开完整目录后按旧可见精确ID选幸存邻居并提示，搜索失去匹配不能报删除，生存身份/手选继续保留，禁用空占位Enter拒绝。最终五文件136项、三个有效反转/恢复、TS构建fresh及结构judge proven通过；本批没有真实桌面/终端目录删除PTY或认证证据。见[第四十一批](phase-20-addition.md#第四十一批目录删除后的邻近模型焦点与状态)。完整追加体验及真实环境缺口保留，原Phase38/9、ADD独立且整体active。

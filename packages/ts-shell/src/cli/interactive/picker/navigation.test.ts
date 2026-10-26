@@ -9,6 +9,7 @@ import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
 import { parseMouseReport } from '../../../presentation/tui/input/mouse.js';
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import type { SettingsDraft } from '../settings.js';
+import { CatalogNavigation } from './navigation.js';
 
 function settings() {
   const save = vi.fn(async () => ({ applied: true, note: 'saved' }));
@@ -20,6 +21,18 @@ function settings() {
 
 const settle = async () => { await Promise.resolve(); await Promise.resolve(); };
 const view = (host: OverlayHost, width = 120) => stripAnsi(host.render(width, 30).join('\n'));
+
+it('drops removed row identities from every category while retaining surviving focus', () => {
+  const navigation = new CatalogNavigation();
+  const rows = [{ id: 'a', label: 'a' }, { id: 'b', label: 'b' }];
+  const groups = new Map([['a', { category: 'first' }], ['b', { category: 'second' }]]);
+  const categories = [{ id: 'all', label: 'All' }, { id: 'first', label: 'First' }, { id: 'second', label: 'Second' }];
+  navigation.set(rows, groups, categories);
+  navigation.focus('a'); navigation.select('first'); navigation.focus('a'); navigation.select('second'); navigation.focus('b');
+  navigation.set([rows[1]!], groups, categories);
+  expect(navigation.preferred).toBe('b'); navigation.select('first'); expect(navigation.preferred).toBeUndefined();
+  navigation.select('all'); expect(navigation.preferred).toBeUndefined();
+});
 
 it('navigates category/section/row domains, edits a real number, discards and reopens the exact field', async () => {
   const h = settings(); const overlay = new OverlayHost(() => {});

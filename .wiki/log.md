@@ -9364,3 +9364,11 @@ ADD-03主题旧夹具要求重试再次openSettings，与原draft.reopen合同�
 主代理单进程串行五文件84项、四静态门/strict docs、责任上限0、TS build ac65a82636ac及fresh、当前包正式judge proven通过。原model源码反转AssertionError/exit1、逐字节恢复；早期过滤Git反转零test及已适配包误作原archive SHA拒绝均记为无效探针。普通/全屏×一ready三缺失/全部缺失四条最终构建实际Node小PTY通过分类、详情、原模型返回、空搜索清除；config原字节/modelSelection不变、零message/provider请求，143退出close确认。详情返回探针同步错误保留；未构建exe、全仓本地或20k真实PTY。
 
 addition第四十批与audit同步；工件phase20-addition-model-category及源码hash/主代理非独立审阅归档，Git/本批CI另绑定。完整两面板交叉矩阵、真实认证/桌面、研究总成本、动态I/O/原生tokenizer、真实1.7k/4.9k及冷热收益仍待验，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-26] fix | 目录删除后的邻近模型焦点
+
+ADD-02实际host/watchModels publication确认删去手动焦点后回首项、navigation留旧ID且无提示。现OptionModel仅刷新丢焦点时调用owner fallback，model按旧可见精确ID选随后/之前幸存邻居，并确认目标离开完整目录才报变化；搜索失去匹配不报删除，生存手动身份不变，空占位不能Enter。navigation清理已删除各分类ID，新开撤回提示；复用原列表/host/目录，无provider/auth修改。
+
+最终五文件136项（focus12/category12/navigation16/options22/overlay74）、三有效反转/逐字节恢复、四静态门、责任上限0、TS build2cdda4030cbc/fresh、当前包judge proven通过。另有集成model43项通过。初轮夹具漏导航手动焦点及侧栏箭头误断言分别归档，不修改产品迎合夹具。只读参考stable selector/menu selectedKey保留，按本任务更强要求将缺失后的首项回退补为邻近回退与提示。
+
+addition第四十一批、audit与HANDOFF同步；工件phase20-addition-model-focus保存源码hash与主代理非独立审阅。未跑本批PTY/exe/全仓/20k真实终端；真实目录变更桌面/终端及完整模型/设置/认证矩阵仍待验。延迟查f6582038的CI40305668414仍in_progress，Watch40305668560success，不能互相替代。Git/本批CI另绑定，原Phase38/9、ADD独立且整体active。

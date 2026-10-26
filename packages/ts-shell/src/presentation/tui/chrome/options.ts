@@ -46,7 +46,8 @@ export class OptionModel {
   private selectionTouched = false;
 
   constructor(private readonly filterOptions?: OptionFilter,
-    private readonly defaultSelection?: (options: readonly Option[]) => string | undefined) {}
+    private readonly defaultSelection?: (options: readonly Option[]) => string | undefined,
+    private readonly replacementSelection?: (options: readonly Option[], previous: readonly Option[], focused: string) => string | undefined) {}
 
   /** Replace the option set, keeping any prior multi-select state. */
   setOptions(options: readonly Option[]): void {
@@ -58,7 +59,7 @@ export class OptionModel {
     for (const option of options) {
       if (option.selected && !option.disabled && !previous.has(option.id)) this.chosen.add(option.id);
     }
-    this.applyFilter();
+    this.applyFilter(true);
   }
 
   get filter(): string {
@@ -149,16 +150,18 @@ export class OptionModel {
     return result;
   }
 
-  private applyFilter(): void {
+  private applyFilter(refresh = false): void {
     this.revision++;
     const focused = this.current()?.id;
+    const previous = this.matches;
     const needle = this.query.trim().toLowerCase();
     this.matches = this.filterOptions ? this.filterOptions(needle, this.all) : needle
       ? this.all.filter((option) => cachedHaystack(this.haystacks, option).includes(needle))
       : this.all;
     const preferred = !this.selectionTouched ? this.defaultSelection?.(this.matches) : undefined;
     const retained = this.matches.findIndex(option => option.id === (preferred ?? focused) && isFocusable(option));
-    const fallback = retained < 0 ? this.defaultSelection?.(this.matches) : undefined;
+    const fallback = retained < 0 ? (refresh && focused ? this.replacementSelection?.(this.matches, previous, focused) : undefined)
+      ?? this.defaultSelection?.(this.matches) : undefined;
     const replacement = this.matches.findIndex(option => option.id === fallback && isFocusable(option));
     this.cursor = Math.max(0, retained >= 0 ? retained : replacement >= 0 ? replacement : this.matches.findIndex(isFocusable));
   }

@@ -45,6 +45,8 @@ export class CatalogNavigation implements PickerNavigation {
 
   set(rows: readonly Option[], groups: ReadonlyMap<string, NavigationGroup>, categories: readonly NavigationItem[]): void {
     this.rows = rows; this.groups = groups; this.categories = categories;
+    const present = new Set(rows.map(row => row.id));
+    for (const [category, id] of this.rowFocus) if (!present.has(id)) this.rowFocus.delete(category);
     if (!categories.some(item => item.id === this.category)) this.category = categories[0]?.id ?? 'all';
   }
 

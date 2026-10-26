@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { OptionModel, type Option } from "./options.js";
 import { scrollWindow } from "./window.js";
 
@@ -69,6 +69,18 @@ describe("filtering", () => {
 });
 
 describe("cursor", () => {
+  it('reconciles a missing focus only on catalogue refresh, preserving surviving manual focus and ordinary search semantics', () => {
+    const replacement = vi.fn((_options: readonly Option[], previous: readonly Option[], focused: string) => {
+      expect(previous.map(option => option.id)).toEqual(['a', 'b', 'c']); expect(focused).toBe('b'); return 'c';
+    });
+    const list = new OptionModel(undefined, undefined, replacement);
+    const rows = [{ id: 'a', label: 'alpha' }, { id: 'b', label: 'beta' }, { id: 'c', label: 'gamma' }];
+    list.setOptions(rows); list.focus('b', true); list.setOptions([rows[2]!, rows[1]!, rows[0]!]);
+    expect(list.current()?.id).toBe('b'); expect(replacement).not.toHaveBeenCalled();
+    list.setOptions(rows); list.setOptions([rows[0]!, rows[2]!]);
+    expect(list.current()?.id).toBe('c'); expect(replacement).toHaveBeenCalledOnce();
+    list.setFilter('alpha'); expect(list.current()?.id).toBe('a'); expect(replacement).toHaveBeenCalledOnce();
+  });
   it('stops wheel movement at focusable ends without changing keyboard wrapping', () => {
     const list = new OptionModel();
     list.setOptions([{ id: 'header', label: 'header', disabled: true }, { id: 'ready', label: 'ready' },

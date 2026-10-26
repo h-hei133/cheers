@@ -1202,6 +1202,18 @@ ADD-03同时修正[主题测试](../../packages/ts-shell/src/cli/interactive/pic
 
 证据归`.omx/artifacts/phase20-addition-model-category/`，主代理审阅及恢复hash已归档，Git/本批CI另按实际交付绑定。完整model目标/角色/能力/认证及桌面矩阵、settings完整交叉矩阵、研究control/其他driver/child成本、动态来源累计I/O/原生tokenizer、真实上下文差额与冷热启动对照继续待验。原47项38 complete / 9 partial保持，ADD独立且整体active。
 
+### 第四十一批：目录删除后的邻近模型焦点与状态
+
+ADD-02继续补目标消失路径。实际OverlayHost和watchModels目录publication回归确认：手动聚焦delta后删去它，All及精确分类均回首项，navigation仍留旧ID，未显示目录变化。现[列表选择owner](../../packages/ts-shell/src/presentation/tui/chrome/options.ts)提供仅数据刷新且旧焦点缺失时的replacementSelection，由原[overlay](../../packages/ts-shell/src/cli/interactive/overlay.ts)传递；[model焦点owner](../../packages/ts-shell/src/cli/interactive/picker/model/focus.ts)按刷新前可见模型ID先取随后幸存行、再取之前幸存行，仅所有旧邻居消失时用新行有界位置回退。模型面板先验证目标确已离开完整目录，搜索失去匹配不能报删除；生存手动身份由原列表保留，回退不启用模型。空分类禁用占位不接受Enter；[navigation](../../packages/ts-shell/src/cli/interactive/picker/navigation.ts)清理所有分类已删除的行ID。重新打开撤回旧提示，未引入第二目录或修改provider/auth。
+
+只读参考`model-browser.ts`1173–1201沿stable selector取/选实际菜单，`menu-selection.ts`134–140数据替换保留selectedKey，224–232缺失后回首个可选行。采用其稳定ID/数据与选择owner分离的决定；本项目按明确ADD要求将“首项回退”补为“邻近回退并提示”，不能把参考已有首项行为当作本任务完成。夹具从真实configuration publication刷新和host键盘开始，未仅测独立数组函数。
+
+最终五文件136项串行通过：focus12、category12、navigation16、options22、overlay74；改进集成前另有model43一起通过，完整五文件104项。覆盖All/精确分类、中间/末项/多个邻居删除、旧模型全替换、刷新后继续手动选择再重排、生存ID重排、空目录Enter拒绝、搜索元数据变更不报删除、disabled邻居仍可浏览及导航退休。三个有效反转分别禁用model回退、保留旧navigation ID、删除完整目录存在检查，均AssertionError/exit1并逐字节恢复。初轮空目录夹具未登记导航焦点、后轮将侧栏箭头误作占位row箭头，是夹具错误；修为实际手动事件/Enter拒绝/owner ID断言，失败日志保留。没有以改断言隐藏产品缺失。
+
+四静态门、责任上限0、TS build `2cdda4030cbc9e81234a41ac117d706caf2c6753f98c2210d7c20caa9b2f7ce8`、inputs `bdbf81845bda3f0e09a2f81d89cd880350f003cc8eac352851647863af0bcf61`、checkBuild fresh及当前包正式judge exit0/proven通过。没有全仓本地回归、真实20k PTY、exe构建或本批PTY；目录删除证据来自实际OverlayHost和隔离synthetic publication，真实桌面/终端目录变更仍未验。工件`.omx/artifacts/phase20-addition-model-focus/`保存源码hash、三反转与主代理非独立审阅；strict docs/Git/本批CI另绑定。
+
+延迟实查第四十批`f6582038`的CI `40305668414`仍in_progress、Watch `40305668560`completed/success，不借Watch称CI通过。完整model能力/角色/认证和两面板交叉矩阵、研究总成本、动态I/O/tokenizer、真实上下文差额及冷热启动继续待验；原47项38 complete / 9 partial保持，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1212,6 +1224,7 @@ ADD-03同时修正[主题测试](../../packages/ts-shell/src/cli/interactive/pic
 |---|---|
 | model上下键看起来无交互 | 原disabled跳过具体未配置模型是确定缺口；只有一行ready与该观察相容，原现场按键是否进入此分支仍未排他确认。必须允许未配置具体模型获得焦点、进入详情和配置，不能改回跳过它们；浏览、认证成功与显式启用分开。已有局部修补及真实host/隔离PTY证据，原环境仍需复验 |
 | 同协议relay分类错误标为可用 | 第四十批确认runtime级凭据聚合不能代表精确分类。现从分类自身已准入模型行派生状态和ready优先顺序；阻断模型仍可浏览，刷新保留手动身份。五文件84项、原源码有效反转及四条实际Node小型PTY有证据；完整模型/认证/桌面验收继续待证 |
+| 目录删除后焦点回首项且没有提示 | 第四十一批实际host/publication复现，现缺失焦点刷新按旧可见模型ID取幸存邻居，navigation清理旧ID并显示目录变化；生存手动身份与搜索失去匹配保留原语义，空占位不能启用。136项/三有效反转有证据，真实桌面/终端删除场景未验 |
 | resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。已有局部修补证据 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |

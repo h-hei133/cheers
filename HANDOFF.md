@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Catalogue Refresh Fallback Must Observe The Actual Missing Focus
+- **Symptom**: Deleting the focused model jumps to the first row, leaves a deleted navigation ID, or announces removal when only a search match disappears.
+- **Root Cause**: Stable-ID retention has no owner-specific missing-ID fallback; navigation remembers IDs independently of the displayed filtered list. A default selection callback also runs when a surviving focus is present.
+- **Rule**: Reconcile only a missing focus during data refresh using the preceding visible rows; leave ordinary search and surviving manual focus with their original owner. Recheck that the model truly left the full catalogue, choose surviving neighbours by exact ID, remove retired navigation IDs, and keep selection separate from activation. Test empty categories by Enter refusal and owner identity because sidebar and row focus both paint arrows.
+
 ### Exact Model Categories Must Follow Their Own Admitted Rows
 - **Symptom**: Every relay using one protocol is labelled available when only one has a usable connection, and unavailable relays precede the ready one.
 - **Root Cause**: Protocol-level availability aggregates credentials for all of its connections; it cannot determine availability of an exact catalogue category.

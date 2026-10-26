@@ -29,6 +29,7 @@ import type { ThinkingPreference } from '../../../core/models/effort.js';
 import { modelAccountSignIn, modelSignInPicker, modelSignInStatus, type ModelSignIn } from './model/auth.js';
 import { modelKeyPicker } from './model/key.js';
 import { listedModelMetadata, modelMetadataDetails } from './model/metadata.js';
+import { ModelFocus } from './model/focus.js';
 
 interface RoleSelection {
   readonly role: AutomaticModelRole;
@@ -44,6 +45,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
   const actions = new Map<string, () => Promise<string>>();
   const inspections = new Map<string, () => Picker>();
   const assignments = new Map<string, () => RoleResult>();
+  const focusState = new ModelFocus();
   let activeFocus = focus;
   let returnFocus = focus;
   let inspectionAdmission: (() => string | undefined) | undefined;
@@ -53,9 +55,15 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
     empty: "No providers in the catalogue.",
     navigation, fullScreen: true,
     ...(assigning ? { back: assigning.back } : parent ? { back: () => parent(notice) } : {}),
-    onOpen() { returnFocus = focus; },
+    onOpen() { returnFocus = focus; focusState.reset(); },
     get initialSelection() { return activeFocus; },
-    ...(notice ? { status: () => notice } : {}),
+    replacementSelection: (options, previous, focused) => {
+      if (navigation.all.some(row => row.id === focused)) return undefined;
+      const replacement = focusState.select(options, previous, focused);
+      if (replacement) navigation.focus(replacement);
+      return replacement;
+    },
+    status: () => [focusState.notice, notice].filter(Boolean).join(' ') || undefined,
     filterOptions: query => navigation.project(query),
     footer: '↑↓ browse · Tab: navigation/content · ←→: parent/content · Enter: inspect or activate · Esc: back',
     async load(): Promise<readonly Option[]> {

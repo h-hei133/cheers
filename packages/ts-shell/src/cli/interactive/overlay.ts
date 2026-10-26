@@ -60,6 +60,8 @@ export interface Picker {
   readonly initialSelection?: string;
   /** Untouched focus follows an owner's preferred candidate as rows arrive. */
   readonly defaultSelection?: (options: readonly Option[]) => string | undefined;
+  /** Reconcile a disappeared focus against the preceding visible rows on refresh. */
+  readonly replacementSelection?: (options: readonly Option[], previous: readonly Option[], focused: string) => string | undefined;
   readonly initialFilter?: string;
   /** Replace the initial filter after an asynchronous source resolves. */
   readonly resolvedFilter?: string;
@@ -188,7 +190,7 @@ export class OverlayHost {
     picker.navigation?.viewport.reveal();
     this.unsubscribe?.();
     this.unsubscribe = undefined;
-    this.model = new OptionModel(picker.filterOptions, picker.defaultSelection);
+    this.model = new OptionModel(picker.filterOptions, picker.defaultSelection, picker.replacementSelection);
     ++this.generation;
     this.actionPending = false;
     this.actionNotice = undefined;
