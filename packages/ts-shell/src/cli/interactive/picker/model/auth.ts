@@ -68,7 +68,8 @@ export function modelAuthentication(context: CommandContext, provider: RuntimePr
       const current = result.context;
       // Authentication may publish configuration and may be cancelled. Those changes
       // do not authorize reopening on another session, workspace or physical profile.
-      if (!owner.isCurrent() || current.sessionId !== context.sessionId || current.cwd !== context.cwd
+      try { owner.check(); } catch { return { note: result.note }; }
+      if (current.sessionId !== context.sessionId || current.cwd !== context.cwd
         || current.projectRoot !== context.projectRoot) return { note: result.note };
       const config = current.readConfiguration?.().config ?? current.runtimeConfig ?? readFreshConfiguration(current);
       const previous = new Set(choice.config.providerConnections.map(connection => connection.id));

@@ -161,6 +161,31 @@ it.each(['session', 'workspace'] as const)('does not reopen a model after the si
   expect(result).toEqual({ note: 'Authentication result retained' });
 });
 
+it('does not reopen after the original sign-in admission changes during authentication', async () => {
+  let blocked = false, release!: (value: { context: CommandContext; note: string }) => void;
+  const pending = new Promise<{ context: CommandContext; note: string }>(resolve => { release = resolve; });
+  const original: CommandContext = { ...context(), admission: () => blocked ? 'The session selection was cancelled.' : undefined };
+  const picker = modelSignInPicker(original, 'openai', () => pending, current => modelPicker(current));
+  await picker.load();
+  const started = picker.apply(['start']);
+  blocked = true;
+  release({ context: original, note: 'Authentication result retained' });
+  expect(await started).toEqual({ note: 'Authentication result retained' });
+});
+
+it('does not reopen after the original sign-in signal is cancelled during authentication', async () => {
+  const controller = new AbortController();
+  let release!: (value: { context: CommandContext; note: string }) => void;
+  const pending = new Promise<{ context: CommandContext; note: string }>(resolve => { release = resolve; });
+  const original: CommandContext = { ...context(), signal: controller.signal };
+  const picker = modelSignInPicker(original, 'openai', () => pending, current => modelPicker(current));
+  await picker.load();
+  const started = picker.apply(['start']);
+  controller.abort();
+  release({ context: original, note: 'Authentication result retained' });
+  expect(await started).toEqual({ note: 'Authentication result retained' });
+});
+
 it.each(['credential-missing', 'pending', 'error'] as const)('offers native sign-in for an existing %s builtin account connection without changing its old state', async state => {
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   const previous = { id: 'account-broken', provider: 'openai' as const, authType: 'account-auth' as const, model: 'gpt-5.4-mini',

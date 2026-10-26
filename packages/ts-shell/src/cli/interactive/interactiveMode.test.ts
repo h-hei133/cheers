@@ -337,7 +337,7 @@ describe("session wiring", () => {
     } finally { run.mockRestore(); mode.stop(); vi.unstubAllEnvs(); fs.rmSync(directory, { recursive: true, force: true }); }
   });
 
-  it.each(['success', 'failure', 'cancel'] as const)('returns a native model sign-in %s through the real host and retains its request-free draft', async outcome => {
+  it.each(['success', 'failure', 'cancel'] as const)('retains a native model sign-in %s through the real host without leaking its request-free draft', async outcome => {
     fs.mkdirSync('/tmp/cheers-test', { recursive: true }); const directory = fs.mkdtempSync('/tmp/cheers-test/model-auth-host-');
     const home = path.join(directory, 'home'), project = path.join(directory, 'project');
     fs.mkdirSync(home); fs.mkdirSync(project); vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
@@ -382,8 +382,13 @@ describe("session wiring", () => {
       }
       await vi.waitFor(() => expect(commands.current).toBeUndefined());
       await vi.waitFor(() => expect(host.busy).toBe(false));
-      await vi.waitFor(() => expect(frame()).toContain('▸ gpt-5.4-mini'));
-      expect(frame()).toContain(outcome === 'success' ? 'account-auth connected' : 'account-auth login failed');
+      if (outcome === 'cancel') {
+        expect(host.overlay.active).toBe(false);
+        expect(frame()).not.toContain('▸ gpt-5.4-mini');
+      } else {
+        await vi.waitFor(() => expect(frame()).toContain('▸ gpt-5.4-mini'));
+        expect(frame()).toContain(outcome === 'success' ? 'account-auth connected' : 'account-auth login failed');
+      }
       expect(host.view.transcript.all().some(block => 'text' in block && block.text.includes(
         outcome === 'success' ? 'pending -> connected' : 'pending -> error'))).toBe(true);
       const config = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;

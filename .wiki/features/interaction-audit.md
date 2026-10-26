@@ -704,3 +704,7 @@ review preview与dispatch原先各取一次Git snapshot，预览数值可能对�
 ADD-08确认deep-research preview的reservation消费只复核metadata，未执行预览已经捕获的原始来源、注入和附件guard；工作树之外的动态来源可在预览与`runtime.create`之间变化，导致显示估算与实际run输入漂移。现发布时保留detached request、图片摘要和完整`verifyContent`，提交先消费entry，再以command signal等待复验；请求不匹配、discard、过期、来源变更、配置/会话变化和取消明确拒绝，不静默创建fresh run，也不写state或ledger。CLI bridge传播父signal，standalone dispatch在session command owner内运行，pre-submission refusal恢复原始draft。
 
 13文件214项、七个有效反转/逐字节恢复及多轮独立只读review有局部证据；五静态门、责任上限0、TS build `901bcffeef12`、inputs `8d18923e65a4`、artifact `c2145971d843`和正式judge proven另绑定。末轮复核修正取消期间tombstone保留，最终无findings。未运行真实provider、全仓、exe、桌面或PTY；见[第五十九批](phase-20-addition.md#第五十九批研究预览的原始来源与one-use准入)。原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第六十批）
+
+ADD-02确认模型认证await后只调用`owner.isCurrent()`，因此原admission撤销或原signal取消而session/workspace身份不变时，仍可能返回model continuation并重开picker。现[模型认证 owner](../../packages/ts-shell/src/cli/interactive/picker/model/auth.ts)在sign-in返回后调用`owner.check()`，拒绝只保留安全note、不返回next；成功/失败认证仍沿原回返路径，真实host取消不重开。三文件137项、有效反转/逐字节恢复及独立只读review无findings有局部证据；五静态门、责任上限0、TS build `a3dd8c19d4b2`、inputs `af270b6ddc7b`、artifact `391db3bd812d`和正式judge proven另绑定。未运行真实provider、全仓、exe、桌面或PTY；见[第六十批](phase-20-addition.md#第六十批模型认证取消后的原始准入)。原Phase38/9、ADD独立且整体active。

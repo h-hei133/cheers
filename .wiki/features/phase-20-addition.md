@@ -1392,6 +1392,14 @@ review dispatch经`gitRequestMode`强制plan mode，因此[preview组装](../../
 
 五静态门/diff、责任上限0、TS build `901bcffeef12`（inputs `8d18923e65a4`、artifact `c2145971d843`）及签入validator正式judge `proven`、0 open/failed/gap通过。未运行真实provider、全仓、exe、桌面或PTY；测试使用真实attachment/session fixture和原research runtime，不证明真实provider、平台或用户原环境的完整来源成本。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第六十批：模型认证取消后的原始准入
+
+第六十批补ADD-02的认证回返边界。[模型认证 owner](../../packages/ts-shell/src/cli/interactive/picker/model/auth.ts)在await原生sign-in后原先只用`owner.isCurrent()`比较session、workspace与profile身份；当原admission已撤销或原signal已取消但身份未变时，仍会返回`next`并重开model picker。现改为先调用`owner.check()`重放原admission与取消信号，拒绝时只保留安全note、不返回continuation；成功认证仍沿原`back`路径回到精确model，原session/workspace身份检查保留。
+
+auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有效反转把`owner.check()`恢复为旧`owner.isCurrent()`后，auth admission、auth signal和key signal三项断言均失败；源码逐字节恢复后重验137项通过。真实host取消路径现断言overlay不重开且不出现model row，success/failure仍回返；独立只读review最终无findings。
+
+五静态门/diff、责任上限0、TS build `a3dd8c19d4b2`（inputs `af270b6ddc7b`、artifact `391db3bd812d`）及签入validator正式judge `proven`、0 open/failed/gap通过。未运行真实provider、全仓、exe、桌面或PTY；测试使用延迟sign-in、真实OverlayHost和隔离配置fixture，不证明真实认证服务或平台矩阵。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1426,6 +1434,7 @@ review dispatch经`gitRequestMode`强制plan mode，因此[preview组装](../../
 | 未配置或阻断relay模型详情错用官方能力 | 第三十四批确认缺resolution地址时回退canonical目录，导致同名模型32k误显示400k或已有能力丢失。现沿真实连接/所浏览目录地址共用精确元数据，补上限/图片/reasoning设置/档位/已声明价格，未知与地址歧义保真；78项/三反转/两模式实际隔离PTY有局部证据，完整能力与平台矩阵仍待验 |
 | 模型详情过期配置、退出后仍可操作与重开旧目录 | 第三十五批确认列表/详情旧地址进入新准入子面板、退出load复活动作，以及实际重开仍用旧accepted目录。现原捕获准入/取消复验、详情一次消费和退出retirement；重开仅通过原配置发布刷新catalog，保留普通设置并检查active模型约束。九文件136项、七反转、两模式实际Node隔离PTY有局部证据；真实认证与完整面板矩阵仍待验 |
 | 模型受当前reasoning档位阻断后没有面板恢复链 | 第三十六批确认configured目标详情只有Back；现Choose effort进入目标能力选择，原模型事务一次保存精确模型/档位，取消与失效不部分改当前偏好。六文件122项、五反转、普通/全屏实际Node小PTY有局部证据；缺凭据仍须配置，完整能力与平台验收保留 |
+| 模型认证取消后仍可重开 | 第六十批确认post-await只校验身份，原admission/取消信号失效时仍返回model continuation。现`owner.check()`重放准入，拒绝只保留note；成功/失败仍回返，取消不重开。三文件137项、有效反转及真实OverlayHost有局部证据；真实认证服务/平台仍待验 |
 
 ### 16.2 不成立的判断与仍未确认的原因
 
@@ -1494,4 +1503,4 @@ review dispatch经`gitRequestMode`强制plan mode，因此[preview组装](../../
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。

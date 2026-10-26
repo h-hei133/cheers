@@ -84,6 +84,20 @@ it('removes endpoint credentials before key submission and expires actions when 
   expect(signIn).not.toHaveBeenCalled(); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
 });
 
+it('does not reopen after the original key sign-in signal is cancelled during authentication', async () => {
+  const controller = new AbortController();
+  let release!: (value: { context: ReturnType<typeof context>; note: string }) => void;
+  const pending = new Promise<{ context: ReturnType<typeof context>; note: string }>(resolve => { release = resolve; });
+  const original = { ...context(), signal: controller.signal };
+  const signIn: ModelSignIn = () => pending;
+  const form = modelKeyPicker(original, 'openai', { model: 'relay-model', label: 'custom' }, signIn, current => modelPicker(current));
+  await form.load();
+  const started = form.input!.apply('synthetic-key');
+  controller.abort();
+  release({ context: original, note: 'Authentication result retained' });
+  expect(await started).toEqual({ note: 'Authentication result retained' });
+});
+
 it('does not fall back to a builtin credential endpoint when a relay has no usable HTTP address', async () => {
   writeCatalogCache([{ id: 'custom', runtime: 'openai', baseUrl: 'file:///secret', models: [{ id: 'relay-model' }] }]);
   const picker = modelPicker(context(), undefined, undefined, undefined, undefined, vi.fn());
