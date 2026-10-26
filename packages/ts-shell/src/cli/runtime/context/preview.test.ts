@@ -21,6 +21,12 @@ import { routeSlashCommand } from '../../../core/commands/slashRouter.js';
 import * as revisions from '../../../runtime/execution/read.js';
 import * as workspaceFiles from '../../../core/workspace/files.js';
 import { promptWithContext } from '../prompt.js';
+import { prepareContextInjection } from './injection.js';
+import { createProjectMemoryLocalStore } from '../../../memory/projectMemoryLocalStore.js';
+import { createProjectMemoryInjectionStateStore } from '../../../memory/projectMemoryInjectionState.js';
+import { createCompactLiveCheckpointStore } from '../../../context/compact/checkpoint/compactLiveCheckpoint.js';
+import { createCompactInjectionStateStore } from '../../../context/compact/injection/compactInjectionState.js';
+import type { ProjectMemoryRecord } from '../../../memory/projectMemoryStoreContract.js';
 
 let root: string;
 beforeEach(() => {
@@ -57,6 +63,30 @@ it('estimates an empty startup through the actual tool projection without provid
   expect(result.estimate.identity.endpointId).toMatch(/^[a-f0-9]{64}$/);
   expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
   expect(files.map(target => fs.readFileSync(target))).toEqual(before); expect(fs.existsSync(layout.stateLockPath)).toBe(false);
+});
+
+it('withdraws an actual runtime estimate after raw memory changes while retaining its pending generation and session bytes', async () => {
+  const { cwd, context, load, layout, gateway } = fixture();
+  const store = createProjectMemoryLocalStore({ ref: { mode: 'test-only', root: cwd } });
+  const record: ProjectMemoryRecord = { id: 'fact', version: 1, createdAt: '2026-10-26', candidateId: 'fact',
+    candidateKind: 'project-fact', retentionClass: 'project-scoped-candidate', approvedAt: '2026-10-26', approvedBySourceCommand: '/memory',
+    memoryText: 'Project uses strict validation.', evidence: ['preview:fixture'], source: 'system-derived', routeReferences: [], safety: 'safe', redactions: [] };
+  fs.writeFileSync(store.ref.recordsFile!, JSON.stringify(record) + '\n');
+  const states = createProjectMemoryInjectionStateStore();
+  const pending = states.markPending({ sessionScopeId: 'session:sess_preview', mode: 'recall', sourceCommand: '/memory use', query: 'validation', recordIds: ['fact'] });
+  const deps = { projectMemoryInjectionStateStore: states, compactCheckpointStore: createCompactLiveCheckpointStore(), compactInjectionStateStore: createCompactInjectionStateStore() };
+  context.preparePromptContext = (prompt, signal) => prepareContextInjection(context, store, prompt, signal, deps);
+  vi.spyOn(revisions, 'readRevision').mockReturnValue('stable');
+  const files = [layout.metadataPath, layout.statePath, layout.transcriptPath], before = files.map(file => fs.readFileSync(file));
+  const preview = await load('question'); preview.verify(); await preview.verifyContent(new AbortController().signal);
+  const injected = await context.preparePromptContext('question', new AbortController().signal);
+  expect(injected.prompt).toContain(record.memoryText);
+  fs.writeFileSync(store.ref.recordsFile!, fs.readFileSync(store.ref.recordsFile!, 'utf8').replace('strict', 'looser'));
+  expect(() => preview.verify()).not.toThrow();
+  await expect(preview.verifyContent(new AbortController().signal)).rejects.toThrow('bytes changed');
+  expect(states.get(pending.sessionScopeId)).toBe(pending);
+  expect(files.map(file => fs.readFileSync(file))).toEqual(before);
+  expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
 });
 
 it('includes all explicit skills and invalidates their manifests and target changes', async () => {

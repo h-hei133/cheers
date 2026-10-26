@@ -52,8 +52,16 @@ export interface ProjectMemoryLifecycleTombstone {
   readonly reason?: string;
 }
 
+export interface ProjectMemoryReadOptions {
+  readonly signal?: AbortSignal;
+  readonly maxBytes: number;
+  /** Actual raw bytes, observed before decoding or folding. */
+  readonly onSource?: (target: string, content?: Buffer) => void;
+}
+
 export interface ProjectMemoryListOptions {
   readonly includeInvalidated?: boolean;
+  readonly readOptions?: ProjectMemoryReadOptions;
 }
 
 export interface ProjectMemoryWriteRequest {
@@ -123,10 +131,10 @@ export interface ProjectMemoryStore {
   readonly ref: ProjectMemoryStoreRef;
   write(request: ProjectMemoryWriteRequest): Promise<ProjectMemoryWriteResult>;
   list(options?: ProjectMemoryListOptions): Promise<ProjectMemoryListResult>;
-  get(id: ProjectMemoryRecordId): Promise<ProjectMemoryRecord | undefined>;
+  get(id: ProjectMemoryRecordId, readOptions?: ProjectMemoryReadOptions): Promise<ProjectMemoryRecord | undefined>;
   invalidate?(request: ProjectMemoryInvalidateRequest): Promise<ProjectMemoryInvalidateResult>;
   delete?(request: ProjectMemoryDeleteRequest): Promise<ProjectMemoryDeleteResult>;
-  health(): Promise<ProjectMemoryStoreHealth>;
+  health(readOptions?: ProjectMemoryReadOptions): Promise<ProjectMemoryStoreHealth>;
 }
 
 export function projectMemoryStoreRefIsWritable(

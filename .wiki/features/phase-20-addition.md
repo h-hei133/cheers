@@ -937,6 +937,28 @@ ADD-09/11/12确认[提示词扫描](../../packages/ts-shell/src/core/prompts/tok
 
 下一步ADD-08研究预览须在原研究owner提取纯请求准备，覆盖最终入口提示词、具体工具schema、方法与附件、配置/模型身份、取消及来源新鲜度；预览不得调用create/arm、写研究状态或ledger、执行handler、启动child/provider。预览身份与实际提交的run绑定必须有明确重验/交接，不能伪造已armed任务。分开报告首个研究入口请求与随后每个研究child的独立上下文，禁止将入口估算称为全部研究总token或预算；control/save继续按独立准入，无法完整准备时保持unknown。此次仅完成源码定位，尚未实施或动态验收该研究preview路径。
 
+### 第三十批：待注入记忆的原始字节与可取消预览
+
+接续已推送`f8418fb93e35c1204fdec1fd92e8f1b45f331cbe`，本轮延迟实查其CI `40251165765`仍in_progress、headSha一致。上一轮代码边界修补和文档交付属于进展，整体目标继续active。
+
+ADD-08核查[原preview桥接](../../packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts)已有记忆recordsFile路径/元数据tracker及pending generation检查，普通删除/修改并非完全无保护；真实缺口是[记忆读取](../../packages/ts-shell/src/memory/memoryPersistence.ts)只返回解码/折叠数据，原始字节没有进入内容复验，preview准备时也使用同步无界body读取。因此不能将问题写成“所有记忆变动都不会失效”。新增fixture首轮缺evidence被原quality门正确拒绝，补真实evidence后3pass/1fail准确暴露缺少verifyContent，失败日志分别保留。
+
+现将实际未来回合准备移入[context/injection](../../packages/ts-shell/src/cli/runtime/context/injection.ts)，入口只委托原owner。预览经现[store合同](../../packages/ts-shell/src/memory/projectMemoryStoreContract.ts)的可选readOptions，把signal、512KiB单文件上限及onSource传至health、wake/recall候选、逐项生命周期读取；[local store](../../packages/ts-shell/src/memory/projectMemoryLocalStore.ts)沿同一decoder/fold返回，前后重验profile owner。读取复用verified-handle binary snapshot，真实raw Buffer在解码/BOM/非法UTF-8/JSON折叠之前进入现tracker，观察拒绝、超限、取消不变成部分成功。原常规命令/提交不带readOptions时继续既有读取合同，不改变普通保存/删除或实际注入预算。
+
+注入preview返回非消费isCurrent和异步verifyContent，后者由[完整runtime preview](../../packages/ts-shell/src/cli/runtime/context/preview.ts)及已有controller初次/周期核验调用。相等ID但被替换的session对象不能保留旧preview；未pending时不读取记忆正文，即便文件超512KiB，仍只保留原元数据保护。捕获原alias后、raw读取后和异步复验末尾均检查原身份，retarget/删除/invalidated/pending替换使旧值失效；没有调用accept、markConsumed、markInvalid或写store。
+
+只读参考A `packages/coding-agent/src/session/session-memory.ts`245–258按当前startup signal取消前代、只释放属于本代的slot，269–285在dispose前取消；采用signal身份和原owner边界，具体等待文件句柄settlement由Cheers现read/controller负责。该片段不提供本地JSONL raw摘要，未将其当作字节校验已存在的证明，也不引入另一memory backend。
+
+最终六文件73项通过：injection9、runtime preview20、memoryPersistence19、future-turn15、projection1、controller9。包括等长内容在固定元数据时bytes拒绝、真实delete/invalidate、同ID换session、原alias读取中retarget、缺失文件出现、BOM/非法UTF-8原始字节与幸存记录、observer拒绝/超限、已取消零acquisition，以及真实已open descriptor取消后一次close、无后续read且pending不消费。runtime完整estimate旧值异步撤回、session/transcript原字节及零MCP；三有效反转分别移除raw observer、runtime content检查、session对象身份，每次AssertionError/exit1，原源码逐字节恢复。
+
+单记录实际I/O计数：首次纯注入准备有health、候选、一次生命周期及初次内容复验共4次binary acquisition、peak1；20次同步isCurrent零body追加；一次内容复验再读1次。完整preview/controller仍可能追加复验，health/候选/每个pending record的重复读取尚未合并；512KiB是单次读取/追踪上限，不能称整个操作总I/O预算已完成，也不证明总发现成本或生产性能。无pending时body acquisition为0，有元数据I/O。上限超过时保持unknown/stale，不截断记录或虚构精确值。
+
+四静态门、最终TS构建通过：build`3815cb6d31fd53971ecf9ce83932647d620878895096e871a2df42e4f1cb036a`、inputs`331d444934f3bbff3566d41df47ce831aaa423e17b1d4bab7c6e6a0fa2d759d6`、artifact`dbd5f01ec2a0f20cc856f64bf081e1bf7db98042893858f6c6993e992b056c7f`。当前validator新目录解包judge实际exit0/proven，三义务satisfied；未并发运行验证、未全仓回归或20k真实PTY。
+
+普通/全屏实际Node小PTY均验证`/memory use validation`→numeric→外部修改撤旧→重估→超限撤旧→恢复有界来源重估→`/memory view`仍pending；preview期间transcript/config及memory原字节不写、零provider/无研究状态，SIGTERM143均settle。首轮以`/memory inspect`检查pending失败，是其现有另一事实存储入口；换实际view检查后通过，失败日志保留，不判为消费故障。隔离4.3k/4.6k是synthetic值，不能拆分用户真实1.7k/4.9k。
+
+归档`.omx/artifacts/phase20-addition-memory-preview/`。严格docs/diff、Git交付另绑定。完整面板/桌面/真实认证、研究driver完整preview、原生tokenizer、动态来源与累计物理I/O、生产冷热启动/真实上下文差额及cache/build来源仍待证。原Phase20保持38 complete / 9 partial，ADD独立，整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -953,6 +975,7 @@ ADD-09/11/12确认[提示词扫描](../../packages/ts-shell/src/core/prompts/tok
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。第二十五批修补搜索退出/焦点域/模型详情返回；第二十六批再补Model / Session两个真实owner入口及取消/保存/角色返回，六文件104项通过；第二十七批补普通choice/effort当前值焦点、七类编辑器保存重开与help退出夹具，五文件112项通过。第二十八批再补只读来源内容wheel、翻页/首尾、有界大值阅读及拒绝后返回，五文件118项和两模式隔离PTY通过；只读文本仍有4MiB上限。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
 | 代码示例误调用及合法关闭后漏skill | 原字符串查找将围栏正文误当关闭，或以不同长度反引号闭合；第二十九批改为独立关闭行与精确行内run，示例保持字面量，合法关闭后所有skill恢复解析。七文件151项、两有效反转和两模式隔离PTY有局部证据；实际研究driver完整数字preview仍待实现 |
+| 待注入记忆预览缺raw字节与可取消读取 | 原已有路径/元数据及generation保护；第三十批补原始字节追踪、有界async verified-handle读取及完整preview异步复验。六文件73项、三有效反转、两模式实际隔离PTY有局部证据。普通删除/invalidated原并非全无保护，当前仍未完成多记录总I/O优化或所有动态来源验收 |
 
 ### 16.2 不成立的判断与仍未确认的原因
 

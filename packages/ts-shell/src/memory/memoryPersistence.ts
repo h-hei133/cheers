@@ -1,11 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
+import { readBinarySnapshot } from '../runtime/execution/snapshot.js';
 import type {
   ProjectMemoryLifecycleTombstone,
   ProjectMemoryListOptions,
   ProjectMemoryRecord,
   ProjectMemoryRecordId,
   ProjectMemoryStoreRef,
+  ProjectMemoryReadOptions,
 } from "./projectMemoryStoreContract.js";
 import { projectMemoryStoreRefIsWritable } from "./projectMemoryStoreContract.js";
 import { PROJECT_MEMORY_KINDS, PROJECT_MEMORY_RETENTIONS, PROJECT_MEMORY_SOURCES } from "./projectMemoryCandidate.js";
@@ -45,6 +47,33 @@ export function readEntriesSync(ref: ProjectMemoryStoreRef): MemoryRead {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return result;
     return { ...result, readable: false, diagnostics: ["Memory store could not be read; changes are blocked."] };
   }
+  return decodeMemoryEntries(content, result);
+}
+
+/** Bounded preview acquisition retains the ordinary decoder and fold contract. */
+export async function readEntries(ref: ProjectMemoryStoreRef, options?: ProjectMemoryReadOptions): Promise<MemoryRead> {
+  if (!options) return readEntriesSync(ref);
+  options.signal?.throwIfAborted();
+  if (!Number.isSafeInteger(options.maxBytes) || options.maxBytes < 0 || options.maxBytes > 10 * 1024 * 1024) {
+    throw new Error('Memory preview read byte limit is invalid.');
+  }
+  const empty: MemoryRead = { entries: [], diagnostics: [], readable: true, appendPrefix: '' };
+  if (!projectMemoryStoreRefIsWritable(ref)) return { ...empty, readable: false };
+  const file = recordsFileFor(ref);
+  options.onSource?.(file);
+  let target: string;
+  try { target = fs.realpathSync(file); }
+  catch (error) {
+    if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return empty;
+    throw error;
+  }
+  const bytes = await readBinarySnapshot({ absolutePath: target, workspaceRoot: path.dirname(target), abortSignal: options.signal }, options.maxBytes);
+  options.signal?.throwIfAborted();
+  options.onSource?.(file, bytes);
+  return decodeMemoryEntries(bytes.toString('utf8'), empty);
+}
+
+function decodeMemoryEntries(content: string, result: MemoryRead): MemoryRead {
   for (const [index, line] of content.split(/\r?\n/).entries()) {
     if (!line.trim()) continue;
     try {

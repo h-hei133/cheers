@@ -160,6 +160,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const verifyContent = async (checkingSignal: AbortSignal) => {
     checkingSignal.throwIfAborted(); verify();
     await sources.verifyContent(checkingSignal);
+    await injected.verifyContent?.(checkingSignal);
     await verifyContextEntries(cwd, entries, sourceReaderForAsync(context, checkingSignal), checkingSignal);
     verify();
   };

@@ -9272,3 +9272,9 @@ ADD-09/11/12确认字符串查找提前关闭代码围栏、较长合法关闭�
 七文件151pass、两有效反转/字节恢复、四静态门、最终build1935ca8b0131/新解包正式judge proven三satisfied通过。两模式实际Node小PTY示例driver不调用、合法关闭后双skill估算恢复、配置/transcript不写、零message/provider，143退出均settle；实际研究driver数字preview仍不支持。首次build提前与反转重叠被输入变更检查拒绝，退出/恢复后重建通过，保留失败与操作偏差。隔离4.3k/6.4k不代表真实上下文拆分；归档phase20-addition-prompt-literals，docs/Git另绑定，上一批自身CI仍运行。原Phase38/9与ADD独立/active，完整面板/认证/性能/计量验收继续待证。
 
 产品交付c107c5d3已推送、本地/origin/远端精确一致且clean，自身CI40250943151/Watch40250943038初查运行。研究preview随后只读定位到create/arm新UUID后的入口提示词及runId绑定工具schema，单删拦截会低估；补充原研究owner纯准备/零写派发/最终身份交接和入口与child成本分开的验收方向，尚未实施该preview。文档补充另绑定delivery-followup.json，不升级整体完成状态。
+
+## [2026-10-26] fix | 记忆预览原始字节与可取消读取
+
+ADD-08原已有记忆元数据/generation保护，确认缺raw复验及同步无界preview读。context/injection委托原future-turn owner，经memory store可选readOptions以512KiB单文件上限/signal/raw observer复用verified-handle snapshot、同decoder/fold，runtime异步复验不消费pending；同ID session换对象拒绝，profile前后检查。未pending零body，普通命令/提交原读取保留。
+
+六文件73pass、三有效反转/字节恢复、四静态门/build3815cb6d31fd/新解包正式judge proven三satisfied通过；两模式实际Node小PTY记忆修改/超限撤旧、恢复数字、view仍pending，preview transcript/config/memory不写、零provider，退出143均settle。初轮fixture无evidence被quality正确拒绝、PTY inspect查错事实owner已分类，失败保留。单记录首次4次读/peak1、20同步检查零body、复验追加1，整体多记录I/O优化仍待做；隔离数值不代表真实差额。证据phase20-addition-memory-preview，docs/Git另绑定，上一批自身CI仍运行；原Phase38/9与ADD独立/active。

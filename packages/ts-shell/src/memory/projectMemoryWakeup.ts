@@ -1,6 +1,7 @@
 import type {
   ProjectMemoryRecord,
   ProjectMemoryStore,
+  ProjectMemoryReadOptions,
 } from "./projectMemoryStoreContract.js";
 import { compareMemoryRecordRecency } from "./projectMemoryRetrieval.js";
 import { memoryRecordIsInjectable } from "./memoryValidation.js";
@@ -26,8 +27,9 @@ const MAX_L1_RECORDS = 8;
 
 export async function buildProjectMemoryWakeupPreview(
   store: ProjectMemoryStore,
+  readOptions?: ProjectMemoryReadOptions,
 ): Promise<ProjectMemoryWakeupPreview> {
-  const list = await store.list();
+  const list = await store.list(readOptions ? { readOptions } : undefined);
   const records = list.records.filter(memoryRecordIsInjectable);
   const l0 = records
     .filter(isL0Record)

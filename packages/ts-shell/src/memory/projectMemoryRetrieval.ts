@@ -1,6 +1,7 @@
 import type {
   ProjectMemoryRecord,
   ProjectMemoryStore,
+  ProjectMemoryReadOptions,
 } from "./projectMemoryStoreContract.js";
 import type {
   ProjectMemoryCandidateKind,
@@ -44,9 +45,11 @@ const MAX_RESULT_LIMIT = 20;
 export async function retrieveProjectMemoryRecords(
   store: ProjectMemoryStore,
   request: ProjectMemoryRetrievalRequest = {},
+  readOptions?: ProjectMemoryReadOptions,
 ): Promise<ProjectMemoryRetrievalResult> {
   const list = await store.list({
     includeInvalidated: request.includeInvalidated === true,
+    readOptions,
   });
   const query = normalizeQuery(request.query);
   const filters = request.filters ?? {};

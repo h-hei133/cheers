@@ -16,6 +16,7 @@ import { retrieveProjectMemoryRecords } from "./projectMemoryRetrieval.js";
 import type {
   ProjectMemoryRecord,
   ProjectMemoryStore,
+  ProjectMemoryReadOptions,
 } from "./projectMemoryStoreContract.js";
 import { buildProjectMemoryWakeupPreview } from "./projectMemoryWakeup.js";
 import { memoryRecordIsInjectable } from "./memoryValidation.js";
@@ -35,6 +36,7 @@ export interface PlanProjectMemoryFutureTurnInjectionInput {
   /** Prepare context and dispositions without changing injection state. */
   readonly mode?: "prepare";
   readonly memoryStore?: ProjectMemoryStore;
+  readonly readOptions?: ProjectMemoryReadOptions;
   readonly injectionState: ProjectMemoryInjectionState;
   readonly markInjected?: (input: {
     readonly sessionScopeId: string;
@@ -70,7 +72,7 @@ export async function planProjectMemoryFutureTurnInjection(
   if (!input.memoryStore) {
     return invalid(input, "memory-store-missing", "Explicit local memory store is required.", baseEvidence);
   }
-  const health = await input.memoryStore.health();
+  const health = await input.memoryStore.health(input.readOptions);
   if (!(health.readable ?? health.writable)) {
     return invalid(input, "memory-store-not-writable", "Explicit local memory store is not writable.", [
       ...baseEvidence,
@@ -81,6 +83,7 @@ export async function planProjectMemoryFutureTurnInjection(
   const { candidate, selectedRecords } = await buildCurrentCandidate({
     memoryStore: input.memoryStore,
     state,
+    readOptions: input.readOptions,
   });
 
   if (candidate.recordIds.length === 0) {
@@ -96,7 +99,7 @@ export async function planProjectMemoryFutureTurnInjection(
     ]);
   }
 
-  const lifecycle = await resolvePendingRecordLifecycle(input.memoryStore, state.recordIds);
+  const lifecycle = await resolvePendingRecordLifecycle(input.memoryStore, state.recordIds, input.readOptions);
   const conflicts = detectProjectMemoryConflicts({ records: selectedRecords });
   const merge = planProjectMemoryInjectionMerge({
     injectionState: state,
@@ -241,12 +244,13 @@ function containsUnsafeContent(value: string): boolean {
 async function buildCurrentCandidate(input: {
   readonly memoryStore: ProjectMemoryStore;
   readonly state: ProjectMemoryInjectionState;
+  readonly readOptions?: ProjectMemoryReadOptions;
 }): Promise<{
   readonly candidate: ProjectMemoryFutureTurnCandidateContext;
   readonly selectedRecords: readonly ProjectMemoryRecord[];
 }> {
   if (input.state.mode === "wake") {
-    const wakeup = await buildProjectMemoryWakeupPreview(input.memoryStore);
+    const wakeup = await buildProjectMemoryWakeupPreview(input.memoryStore, input.readOptions);
     return {
       candidate: adaptProjectMemoryWakeupForFutureTurn({
         injectionId: input.state.memoryInjectionId ?? "project-memory-pending",
@@ -258,7 +262,7 @@ async function buildCurrentCandidate(input: {
   const retrieval = await retrieveProjectMemoryRecords(input.memoryStore, {
     query: input.state.query,
     maxResults: 5,
-  });
+  }, input.readOptions);
   return {
     candidate: adaptProjectMemoryRecallForFutureTurn({
       injectionId: input.state.memoryInjectionId ?? "project-memory-pending",
@@ -273,10 +277,12 @@ async function buildCurrentCandidate(input: {
 async function resolvePendingRecordLifecycle(
   memoryStore: ProjectMemoryStore,
   recordIds: readonly string[],
+  readOptions?: ProjectMemoryReadOptions,
 ): Promise<readonly ProjectMemoryPendingRecordLifecycle[]> {
   const result: ProjectMemoryPendingRecordLifecycle[] = [];
   for (const recordId of Array.from(new Set(recordIds))) {
-    const record = await memoryStore.get(recordId);
+    readOptions?.signal?.throwIfAborted();
+    const record = await memoryStore.get(recordId, readOptions);
     result.push({
       recordId,
       status: !record ? "deleted" : record.invalidatedAt ? "invalidated" : "active",

@@ -84,9 +84,7 @@ import { providerModelTransport } from '../../provider/request/transport.js';
 import { installRuleControlRuntime, takeForcedTool } from './ruleControls.js';
 import { contextEntryStillAuthorized, assertContextBounds } from '../../context/attachment/entry.js';
 import { foregroundTools, promptWithContext } from './prompt.js';
-import { buildPromptWithFutureTurnInjections } from '../../core/shell/sessionFutureTurnProjection.js';
-import { capturePromptSources } from '../../context/request/sources.js';
-import { recordsFileFor } from '../../memory/memoryPersistence.js';
+import { prepareContextInjection } from './context/injection.js';
 import { sourceReaderFor } from '../data/access.js';
 import { installUsageRuntime, usageResetApproval } from './usage.js';
 import { captureSummaryRole } from '../provider/summary.js';
@@ -245,17 +243,7 @@ export function createCliSessionRuntime(input: {
   const projectMemoryStore = createProjectMemoryLocalStore({
     ref: { mode: 'explicit-local', root: projectMemoryRootFor(input.runtimeContext.projectRoot) },
   });
-  input.runtimeContext.preparePromptContext = async (prompt, signal) => {
-    const sessionId = input.runtimeContext.session.id;
-    const sources = capturePromptSources(); sources.track(recordsFileFor(projectMemoryStore.ref));
-    signal.throwIfAborted();
-    const prepared = await buildPromptWithFutureTurnInjections({ deps: { projectMemoryStore }, sessionId, prompt });
-    signal.throwIfAborted(); sources.verify();
-    return { prompt: prepared.prompt, isCurrent: () => {
-      sources.verify();
-      return !signal.aborted && input.runtimeContext.session.id === sessionId && prepared.isCurrent();
-    } };
-  };
+  input.runtimeContext.preparePromptContext = (prompt, signal) => prepareContextInjection(input.runtimeContext, projectMemoryStore, prompt, signal);
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     admitPrompt: admitCollaborationPrompt.bind(undefined, input.runtimeContext),
     promptSettled: handoffSettlement(input.runtimeContext, settleCollaborationPrompt.bind(undefined, input.runtimeContext)),

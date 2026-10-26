@@ -437,3 +437,16 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 完整用户要求继续见[文末任务总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)：未配置模型可选、两个面板整体看齐、正文顶格与编辑箭头、首位完整slash和正文真实路径suggestion/Tab、同次全部明确skill及deep-research有限方法组合；正文功能命令不执行。代码示例内的driver保持字面量，实际研究driver完整数字preview仍待实现。隔离约4.3k/6.4k不替代用户真实数值拆分。本轮延迟实查`66fd7a4c`自身CI `40250056359`仍in_progress，Git另绑定，原Phase38/9与ADD独立/整体active。
 
 第二十九批实际交付`c107c5d3c57e20812dcb3012f7671d2c84fa0531`已推送且远端精确一致、工作区干净；自身CI `40250943151`与Watch `40250943038`首次实查仍运行，工件未读。研究数字preview仍未知的具体缺口已定位：真实提交先create/arm新UUID，再加入绑定runId的研究工具及入口提示词；普通组合preview没有这些请求输入。修补须沿研究owner纯准备并重验最终请求，不能单删拦截以生成偏小数字；此次只定位，尚未实施，详见addition第二十九批。
+
+### 文末当前结论（第三十批）
+
+ADD-08确认待注入记忆原已有recordsFile元数据与generation检查，普通删除/修改并非全无保护；本批真实缺口是raw字节未进入复验及preview同步无界正文读取。现沿原memory store可选readOptions、verified-handle snapshot及来源tracker，512KiB单文件有界/可取消原始字节读取与runtime异步内容核验，同ID换session也撤值，不消费pending。六文件73项、三有效反转、四静态门/最终build/正式judge proven三satisfied通过；两模式实际Node小PTY修改/超限撤旧→恢复数字→view仍pending，配置/记忆及preview transcript不写、零provider，143退出已settle。首轮inspect查错事实owner的探针失败保留。详见[第三十批](phase-20-addition.md#15-实施与验证证据)。
+
+| 分类 | 当前结论 |
+|---|---|
+| 确实存在、有局部修补 | 未配置model焦点、resume渐进自动焦点、输入留白/箭头、首帧与初始估算、面板完整操作不足、正文路径/多skill/有限方法及代码边界；本批补记忆raw字节和取消读取。局部证据不等于全部原现场验收 |
+| 确实仍需完善 | 完整settings/model字段/来源/scope/桌面/认证，完整研究preview、原生tokenizer、动态来源/累计物理I/O和生产启动/真实上下文差额。单记录注入首次4次读、周期1次追加仍非整体成本已优化 |
+| 不成立的判断 | model无按键监听、resume倒序反了、settings没分类、空配置没功能、每次start编译/入口用错、4.9k等于字符公式、工具数决定token数、当前只能加载一skill，以及原记忆所有变动全无失效保护 |
+| 尚未确认 | 原现场唯一按键根因、真实同模型/协议/规则/schema1.7k/4.9k、生产冷热收益、真实OAuth/API-key接受、历史cache writer与build lock来源。继续保留unknown |
+
+用户完整验收方向仍见[全文末尾任务](phase-20-addition.md#16-最新问题总和与必须完成的体验)：未配置具体模型可选、两个面板整体看齐、正文顶格/编辑箭头、首位完整slash/正文路径Tab、多skill实际生效及有限研究组合。隔离4.3k/4.6k不是用户真实成本证据。本轮延迟实查f8418fb9自身CI40251165765仍运行，本批Git另绑定；原Phase38/9与ADD独立且active。

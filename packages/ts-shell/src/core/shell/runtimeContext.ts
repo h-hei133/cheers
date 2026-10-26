@@ -91,6 +91,7 @@ export interface ShellRuntimeContext {
   /** Non-consuming future-turn preparation from the actual session runtime. */
   preparePromptContext?: (prompt: string, signal: AbortSignal) => Promise<{
     readonly prompt: string; readonly isCurrent: () => boolean;
+    readonly verifyContent?: (signal: AbortSignal) => Promise<void>;
   }>;
   contextAttachments?: readonly ContextEntry[];
   transientContextAttachments?: readonly ContextEntry[];

@@ -16,13 +16,14 @@ import {
   type ProjectMemoryInjectionStateStore,
 } from "../../memory/projectMemoryInjectionState.js";
 import { planProjectMemoryFutureTurnInjection } from "../../memory/projectMemoryFutureTurnInjection.js";
-import type { ProjectMemoryStore } from "../../memory/projectMemoryStoreContract.js";
+import type { ProjectMemoryStore, ProjectMemoryReadOptions } from "../../memory/projectMemoryStoreContract.js";
 
 export interface SessionFutureTurnProjectionDependencies {
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
   readonly projectMemoryInjectionStateStore?: ProjectMemoryInjectionStateStore;
   readonly projectMemoryStore?: ProjectMemoryStore;
+  readonly projectMemoryReadOptions?: ProjectMemoryReadOptions;
 }
 
 interface InjectionEffect {
@@ -142,6 +143,7 @@ async function buildPromptWithProjectMemoryInjection(input: {
   const plan = await planProjectMemoryFutureTurnInjection({
     mode: "prepare",
     memoryStore: input.deps.projectMemoryStore,
+    readOptions: input.deps.projectMemoryReadOptions,
     injectionState,
     markConsumed: injectionStateStore.markConsumed,
   });

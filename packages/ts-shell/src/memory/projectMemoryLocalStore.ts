@@ -17,6 +17,7 @@ import type {
   ProjectMemoryStore,
   ProjectMemoryStoreHealth,
   ProjectMemoryStoreRef,
+  ProjectMemoryReadOptions,
   ProjectMemoryWriteRequest,
   ProjectMemoryWriteResult,
 } from "./projectMemoryStoreContract.js";
@@ -30,6 +31,7 @@ import {
   foldProjectMemoryEntries,
   isMemoryRecord,
   readEntriesSync,
+  readEntries,
   recordsFileFor,
 } from "./memoryPersistence.js";
 
@@ -50,13 +52,12 @@ export function createProjectMemoryLocalStore(
     },
     async list(listOptions) {
       assertMemoryOwner(ref);
-      return readRecords(ref, listOptions);
+      const result = await readRecords(ref, listOptions); assertMemoryOwner(ref); return result;
     },
-    async get(id) {
+    async get(id, readOptions) {
       assertMemoryOwner(ref);
-      return (await readRecords(ref, { includeInvalidated: true })).records.find(
-        (record) => record.id === id,
-      );
+      const result = await readRecords(ref, { includeInvalidated: true, readOptions }); assertMemoryOwner(ref);
+      return result.records.find((record) => record.id === id);
     },
     async invalidate(request) {
       assertMemoryOwner(ref);
@@ -66,9 +67,9 @@ export function createProjectMemoryLocalStore(
       assertMemoryOwner(ref);
       return deleteRecord(ref, request);
     },
-    async health() {
+    async health(readOptions) {
       assertMemoryOwner(ref);
-      return storeHealth(ref);
+      const result = await storeHealth(ref, readOptions); assertMemoryOwner(ref); return result;
     },
   };
 }
@@ -316,11 +317,11 @@ function deleteRecord(
   }
 }
 
-function readRecords(
+async function readRecords(
   ref: ProjectMemoryStoreRef,
   options: ProjectMemoryListOptions = {},
-): ProjectMemoryListResult {
-  const snapshot = readEntriesSync(ref);
+): Promise<ProjectMemoryListResult> {
+  const snapshot = await readEntries(ref, options.readOptions);
   return {
     records: foldProjectMemoryEntries(snapshot.entries, options),
     diagnostics: snapshot.diagnostics,
@@ -335,7 +336,7 @@ function readRecords(
   };
 }
 
-function storeHealth(ref: ProjectMemoryStoreRef): ProjectMemoryStoreHealth {
+async function storeHealth(ref: ProjectMemoryStoreRef, readOptions?: ProjectMemoryReadOptions): Promise<ProjectMemoryStoreHealth> {
   if (!projectMemoryStoreRefIsWritable(ref)) {
     return {
       mode: ref.mode,
@@ -350,7 +351,7 @@ function storeHealth(ref: ProjectMemoryStoreRef): ProjectMemoryStoreHealth {
     };
   }
   const recordsFile = recordsFileFor(ref);
-  const snapshot = readEntriesSync(ref);
+  const snapshot = await readEntries(ref, readOptions);
   return {
     mode: ref.mode,
     ok: snapshot.readable && snapshot.diagnostics.length === 0,
