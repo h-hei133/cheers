@@ -622,3 +622,7 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 ### 文末当前问题判断（第四十三批）
 
 新增确认已存角色high在目录仍支持low/medium但禁用high时被chooser漏掉，default Enter落到auto并可覆盖原值。现保留active · unavailable只读焦点，Enter/直接旧值apply拒绝，用户明确移动到支持档位才写；三个自动角色host操作及普通/全屏实际Node小PTY均保留默认档位、兄弟角色和个人config。三文件67项与原源码有效反转/字节恢复、TS fresh和结构judge proven通过，见[第四十三批](phase-20-addition.md#第四十三批不可用已存角色档位的只读默认焦点)。零test invocation及启动前state基线误判分别分类，不修改产品政策或恢复合同迎合探针。完整模型/设置/认证/桌面及计量性能矩阵仍待验；第四十二批36971a16已远端确认，CI待后续实查。原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第四十四批）
+
+普通Thinking chooser新增七条host baseline失败确认退出旧apply/load、未load/多ID、准入内close及待定hook跨close/同实例重开没有边界。现原choice/浏览代次捕获并传原事务准入，等待动作互斥；显式新开可获最新值，旧动作不能写入或重开父级。保留写后关闭的确认通知，不把UI生命周期当持久结果。三文件35项、四有效反转/源码恢复、最终两模式Node小PTY取消/重开medium/明确low保存/重开读回、TS fresh与结构judge proven通过；roles/config保留、零请求。fullscreen未重绘hint超时为探针同步错误，根相对脚本路径/内联引号错误为未执行探针，均不改变产品政策。见[第四十四批](phase-20-addition.md#第四十四批普通档位面板的浏览代次与异步提交边界)。36971a16/156491b1的CI仍运行、各Watch成功，本批CI另绑定；完整交叉矩阵/真实认证/桌面与计量性能未验，原Phase38/9、ADD独立且整体active。

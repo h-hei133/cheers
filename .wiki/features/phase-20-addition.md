@@ -1242,6 +1242,20 @@ ADD-02继续检查“默认Enter不偷偷改当前值”。实际host回归确�
 
 第四十二批`36971a16`已提交/推送并远端readback，当前CI待后续检查；其CI不由本批本地检查替代。完整model/settings目标、角色、能力、来源、窗口/桌面与认证矩阵及研究/计量/启动剩余证据继续待验，原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第四十四批：普通档位面板的浏览代次与异步提交边界
+
+ADD-03沿[原Thinking effort chooser](../../packages/ts-shell/src/cli/interactive/picker/thinking.ts)补生命周期，未修改原模型事务/provider/auth。七条新增实际host baseline失败确认：Escape/close/replace后的旧apply仍可保存、load可复活、未load或多ID请求可执行、准入内close继续执行，以及PreModelSwitch hook等待跨close/重开后仍可写入。普通chooser既有“同一实例显式重开捕获最新值”合同，不能仅复制role的永久retired latch。
+
+现原chooser在onOpen/previewEnd/load推进浏览代次，每个操作捕获原choice与revision，准入前后复验本地生命及signal；将同一准入传入原runThinkingCommand/model事务，异步hook后和原write guard继续拒绝旧代次。等待中只接受一个动作，新显式open可捕获最新effort。构造子返回只在原操作仍有效时进行；原事务已经写入后PostModelSwitch关闭面板仍返回确认的写入通知，不因UI结束隐藏持久结果，也不重开父级。普通支持/不支持/unverified/歧义政策与现有可拒绝后再选择合同保持。
+
+目标代码检查后只读比较参考`model-hub.ts`565–575 disposed/清理及1253–1273 assignment pending/迟到结果拒绝；复用“显式关闭、等待动作互斥、迟到结果不复活”，本项目以generation区分同一实例重开并保留事务结果。[档位回归](../../packages/ts-shell/src/cli/interactive/picker/thinking.test.ts)15项与settings session14、lifecycle6串行三文件35项通过；覆盖实际host取消/替换、旧hook跨重开、pending重复、新开最新值、写后关闭通知和原settings返回。四有效反转分别移除退出退役、代次校验、pending门及确认写通知，均AssertionError/exit1、源码逐字节恢复。
+
+最终普通/全屏两个隔离实际Node小PTY验证medium焦点→取消无模型选择变化→重开medium→明确low保存→重开low读回，原roles和个人config字节不变，零message/provider请求，143退出close确认。首轮fullscreen取消后等待未重新绘制的input hint而超时，raw输出已恢复主状态栏；按实际partial repaint标记同步后通过。早期反转脚本在package目录使用根相对路径及临时内联脚本引号错误均为未执行探针，不构成产品失败；改用根目录文件脚本，不改产品迎合探针。旧测试临时目录同时移入规定的/tmp/cheers-test，最终build/PTY按该输入摘要重验。
+
+四静态门、责任上限0、TS build `e7f7390070e8fcfe4165c32db941d1880d7490d93973548042bd26b7490d9f1b`、inputs `087a79c321ac0fb9e7d8598f489f867911a93f39b9824c470ead8f19d110729d`、artifact `42dc030d96939d5e36e463365984c1706f2e1f0f672cd16751f10f9ec1d9eeef`及checkBuild fresh通过，当前正式包judge exit0/proven、三结构义务satisfied。审阅为主代理，没有独立审查；工件`.omx/artifacts/phase20-addition-thinking-lifetime/`归档baseline/四反转/source hash与最终PTY脚本收据，docs/Git/本批CI另绑定。没有exe构建、全仓本地、真实20k PTY或真实认证。
+
+延迟检查36971a16的CI40312626823及156491b1的CI40313929179仍in_progress，对应Watch40312627151/40313929393已success，不互相替代。完整model/settings字段/目标/角色/能力/来源/窗口/桌面/认证及研究/计量/启动剩余证据继续待验，原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1255,6 +1269,7 @@ ADD-02继续检查“默认Enter不偷偷改当前值”。实际host回归确�
 | 目录删除后焦点回首项且没有提示 | 第四十一批实际host/publication复现，现缺失焦点刷新按旧可见模型ID取幸存邻居，navigation清理旧ID并显示目录变化；生存手动身份与搜索失去匹配保留原语义，空占位不能启用。136项/三有效反转有证据，真实桌面/终端删除场景未验 |
 | 角色旧动作在退出后仍可保存，子面板取消后父级失效 | 第四十二批确认role/thinking没有永久退役与子入口准入、共享controller在Escape被取消、action wrapper丢owner。现退役/一次消费/原事务取消复验，显式返回转交父controller，wrapper保留不透明身份；152项/六有效反转及普通/全屏Node小PTY有局部证据。完整角色/认证/桌面矩阵未验 |
 | 角色已存档位不可用时默认Enter覆盖原值 | 第四十三批三个自动角色实际host复现缺失high回auto。现保留active · unavailable只读焦点，Enter及直接旧值apply不写，明确移动才保存支持值；三文件67项、有效反转及普通/全屏Node小PTY有局部证据，全部能力/桌面矩阵未验 |
+| 普通档位旧动作或待定hook跨关闭/重开仍可写入 | 第四十四批七条host baseline失败确认无浏览代次/退役/pending门。现每动作原choice/revision准入贯穿原事务，新开可捕获最新值，旧动作不能提交/重开父级，已确认写通知保留；35项/四有效反转及两模式Node小PTY有局部证据，完整矩阵未验 |
 | resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。已有局部修补证据 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |

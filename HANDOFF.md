@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Reopened Pickers Need Operation Generations And Durable Write Notices
+- **Symptom**: A dismissed thinking chooser still saves, or its old pending hook commits after the same picker instance reopens. Dropping every late outcome can also hide a write that completed before a post-switch hook closed the panel.
+- **Root Cause**: Mutable current-choice state is reused across browser lifetimes, and UI lifetime is mistaken for the persistence outcome.
+- **Rule**: Capture a browser generation and original admission per action; recheck them around admission callbacks and pass them into the existing transaction guard. Gate duplicate pending actions. New explicit opens may reacquire current values, but old generations cannot commit or reopen parents. Preserve the transaction's confirmed write/refusal notice even after the UI retires. Fullscreen partial repaint may retain the input hint without repainting it; synchronize returns on actual changed chrome and then verify the next action.
+
 ### Unavailable Saved Choices Must Retain Their Read-Only Focus
 - **Symptom**: A role effort saved as high opens on auto after its exact catalogue removes high support; default Enter can overwrite the accepted preference.
 - **Root Cause**: The supported-choice list omits the current value, so initialSelection cannot find it and the generic list falls back to the first row.

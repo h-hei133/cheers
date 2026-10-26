@@ -9388,3 +9388,11 @@ ADD-02三个自动角色实际host确认保存high后目录禁用high而仍支�
 串行三文件67项、原源码有效反转三个AssertionError/字节恢复、四静态门/责任上限0、TS build a9ffb9087e20/fresh、正式judge proven三satisfied通过。普通/全屏两个小型实际Node PTY用原owner建已存角色、session-id启动，默认Enter state字节不变、显式low保存/重开读回、零message/provider请求、143退出close确认。根目录调用包Vitest混入工件test副本零test及startup恢复前state基线误判分别保留/分类；快照改非执行txt，owning package验证，未改产品。HANDOFF补两陷阱，工件phase20-addition-role-focus；docs/Git/本批CI另绑定。
 
 第四十二批36971a16已提交/推送/远端readback，当前CI待后续实查；完整两面板能力/角色/来源/窗口/桌面/认证与研究/计量/性能剩余证据继续未验，未跑exe、全仓或真实20k PTY，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-26] fix | 普通档位浏览代次与异步提交边界
+
+ADD-03七条真实host baseline失败确认普通Thinking chooser退出旧apply/load、未load/多ID、准入内close和pending hook跨close/同实例重开仍可执行。现原owner在open/end/load推进generation，动作捕获choice/revision、准入前后和signal复验，原runThinkingCommand/model写锁guard共用准入；pending动作互斥，新开仍获最新值。旧动作不重开父级；写后PostModelSwitch关闭仍返回确认写通知，避免UI退役隐藏持久结果。比较参考disposed/pending/迟到拒绝，不改原事务/auth或能力政策。
+
+串行三文件35项、四有效反转/字节恢复、四静态门/责任上限0、TS build e7f7390070e8/fresh与正式judge proven三satisfied通过。最终普通/fullscreen两个Node小PTY medium取消/重开→明确low保存→重开low读回，roles/config保留、零message/provider请求、143退出close确认。fullscreen等待未重绘hint超时和早期脚本根相对路径/内联引号错误分别分类；旧测试scratch移入/tmp/cheers-test后重建及重测最终摘要。HANDOFF补代次/写通知陷阱，addition第四十四批/当前摘要与audit更新，工件phase20-addition-thinking-lifetime归档主代理非独立审阅/源码hash；docs/Git/本批CI另绑定。
+
+延迟查36971a16 CI40312626823及156491b1 CI40313929179仍in_progress，对应Watch40312627151/40313929393 success，不能替代CI。完整面板/真实认证/桌面与研究/计量/启动缺口继续未验，未跑exe、全仓或真实20k PTY，原Phase38/9、ADD独立且整体active。

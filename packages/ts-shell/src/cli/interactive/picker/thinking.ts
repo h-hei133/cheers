@@ -25,13 +25,19 @@ const LEVELS = ['auto', 'low', 'medium', 'high'] as const;
 export function thinkingPicker(context: CommandContext, back?: (notice?: string) => Picker): Picker {
   let choice: ReturnType<typeof captureModelChoice> | undefined;
   let initial: string | undefined;
+  let generation = 0, offered = false, retired = false;
+  let pending: number | undefined;
   return {
     title: 'Thinking effort',
     form: 'panel',
     get initialSelection() { return initial; },
+    onOpen() { generation++; offered = false; retired = false; pending = undefined; choice = undefined; },
+    previewEnd() { generation++; offered = false; retired = true; pending = undefined; },
     ...(back ? { back, footer: 'Enter saves for the current session · Esc returns to settings' } : {}),
     empty: 'No effort levels are available for the selected model.',
     async load(): Promise<readonly Option[]> {
+      if (retired) return [];
+      generation++; offered = false; pending = undefined;
       try { choice = captureModelChoice(context); } catch { choice = undefined; }
       const publication = context.readConfiguration?.();
       const config = choice?.config ?? publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
@@ -41,6 +47,7 @@ export function thinkingPicker(context: CommandContext, back?: (notice?: string)
       const current = captureThinkingPreference(context.projectRoot ?? context.cwd, target.thinkingEffort);
       initial = current.thinkingEffort ?? 'auto';
       const ambiguous = catalogProvider(catalog, provider, baseUrl).ambiguous;
+      offered = choice !== undefined;
       return LEVELS.map(level => {
         const effort = level === 'auto' ? null : level;
         const capability = effortCapability(catalog, provider, model, effort, baseUrl);
@@ -56,12 +63,24 @@ export function thinkingPicker(context: CommandContext, back?: (notice?: string)
       });
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
+      if (!offered || retired || !choice || context.signal?.aborted || pending !== undefined || ids.length !== 1) return undefined;
       const level = ids[0];
       if (!level || !(LEVELS as readonly string[]).includes(level)) return undefined;
-      const expired = choice?.admission();
+      const captured = choice, revision = generation;
+      const current = () => offered && !retired && generation === revision && !context.signal?.aborted;
+      const admission = () => {
+        if (!current()) return 'Thinking selection cancelled. Reopen the picker.';
+        const refusal = captured.admission();
+        return current() ? refusal : 'Thinking selection cancelled. Reopen the picker.';
+      };
+      const expired = admission();
+      if (!current()) return undefined;
       if (expired) return { note: expired, ...(back ? { next: back(expired) } : {}) };
-      const result = await runThinkingCommand([level === 'auto' ? 'off' : level], { ...context, ...(choice ? { admission: choice.admission } : {}) });
-      return result.kind === 'local' ? { note: result.output, ...(back ? { next: back(result.output) } : {}) } : undefined;
+      pending = revision;
+      try {
+        const result = await runThinkingCommand([level === 'auto' ? 'off' : level], { ...context, admission });
+        return result.kind === 'local' ? { note: result.output, ...(current() && back ? { next: back(result.output) } : {}) } : undefined;
+      } finally { if (pending === revision) pending = undefined; }
     },
   };
 }

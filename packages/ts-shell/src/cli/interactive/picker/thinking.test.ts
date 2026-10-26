@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../config/runtimeConfig.js';
@@ -12,13 +11,15 @@ import type { CommandContext } from '../../../core/commands/types.js';
 import { thinkingPicker } from './thinking.js';
 import { OverlayHost } from '../overlay.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
+import { defaultHookDispatcher } from '../../../core/hooks/hookDispatcher.js';
 
 let home: string;
 let manager: SessionManager;
 let sessionId: string;
 
 beforeEach(() => {
-  home = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-thinking-picker-'));
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  home = fs.mkdtempSync(path.join('/tmp/cheers-test', 'thinking-picker-'));
   vi.stubEnv('HOME', home);
   vi.stubEnv('USERPROFILE', home);
   vi.stubEnv('OPENAI_API_KEY', '');
@@ -152,4 +153,84 @@ it('reopens the same picker on its freshly accepted session effort', async () =>
   const overlay = new OverlayHost(() => {}); overlay.open(picker); await Promise.resolve(); await Promise.resolve();
   const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
   expect(apply.mock.calls[0]?.[1]).toEqual(['medium']); overlay.close();
+});
+
+it.each(['escape', 'close', 'replace'] as const)('retires thinking choices after actual host %s and does not revive them through a late load', async closing => {
+  const chosen = thinkingPicker(context()), host = new OverlayHost(() => {});
+  host.open(chosen); await Promise.resolve(); await Promise.resolve();
+  const config = fs.readFileSync(getUserRuntimeConfigPath());
+  try {
+    if (closing === 'escape') host.handleKey(parseKeyEvent('\x1b'), vi.fn());
+    else if (closing === 'close') host.close();
+    else host.open(thinkingPicker(context()));
+    expect(await chosen.apply(['low'])).toBeUndefined(); expect(await chosen.load()).toEqual([]);
+    expect(await chosen.apply(['medium'])).toBeUndefined(); expect(readSessionModel(sessionId)).toBeUndefined();
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+  } finally { host.close(); }
+});
+
+it('does not submit thinking choices before load or from a multi-choice request', async () => {
+  const chosen = thinkingPicker(context());
+  expect(await chosen.apply(['low'])).toBeUndefined(); await chosen.load();
+  expect(await chosen.apply(['low', 'medium'])).toBeUndefined(); expect(readSessionModel(sessionId)).toBeUndefined();
+});
+
+it('does not save when thinking admission closes the actual host', async () => {
+  const host = new OverlayHost(() => {});
+  const chosen = thinkingPicker({ ...context(), admission: () => { host.close(); return undefined; } });
+  host.open(chosen); await Promise.resolve(); await Promise.resolve();
+  expect(await chosen.apply(['low'])).toBeUndefined(); expect(readSessionModel(sessionId)).toBeUndefined();
+  expect(host.active).toBe(false);
+});
+
+it.each(['close', 'reopen'] as const)('refuses old thinking work after a pending hook crosses host %s', async closing => {
+  let unblock: () => void = () => {};
+  const pending = new Promise<void>(resolve => { unblock = resolve; });
+  let entered = false;
+  vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+    if (event.eventName === 'PreModelSwitch') { entered = true; await pending; }
+    return undefined;
+  });
+  const chosen = thinkingPicker(context()), host = new OverlayHost(() => {});
+  host.open(chosen); await Promise.resolve(); await Promise.resolve();
+  const work = chosen.apply(['low']); await vi.waitFor(() => expect(entered).toBe(true));
+  host.close(); if (closing === 'reopen') { host.open(chosen); await Promise.resolve(); await Promise.resolve(); }
+  try { unblock(); const outcome = await work; expect(outcome?.note).toContain('blocked');
+    expect(outcome?.next).toBeUndefined(); expect(readSessionModel(sessionId)).toBeUndefined(); }
+  finally { unblock(); host.close(); }
+});
+
+it('retains a confirmed thinking write notice if a post-switch hook closes its panel without reopening the parent', async () => {
+  const host = new OverlayHost(() => {}), back = vi.fn(() => thinkingPicker(context()));
+  vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+    if (event.eventName === 'PostModelSwitch') host.close();
+    return undefined;
+  });
+  const chosen = thinkingPicker(context(), back); host.open(chosen); await Promise.resolve(); await Promise.resolve();
+  const outcome = await chosen.apply(['low']);
+  expect(outcome?.note).toContain('Reasoning effort: low'); expect(outcome?.next).toBeUndefined();
+  expect(back).not.toHaveBeenCalled(); expect(readSessionModel(sessionId)?.thinkingEffort).toBe('low');
+  expect(host.active).toBe(false);
+});
+
+it('admits one thinking action while its hook is pending and allows a fresh explicit selection after reopening', async () => {
+  let unblock: () => void = () => {};
+  const pending = new Promise<void>(resolve => { unblock = resolve; }); let entered = false;
+  const dispatch = vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+    if (event.eventName === 'PreModelSwitch') { entered = true; await pending; }
+    return undefined;
+  });
+  const current: CommandContext = { ...context(), readConfiguration: () => ({
+    config: projectSessionModel(getRuntimeConfig(home), sessionId), catalog: loadCatalog() }) };
+  const chosen = thinkingPicker(current), host = new OverlayHost(() => {}); host.open(chosen); await Promise.resolve(); await Promise.resolve();
+  const work = chosen.apply(['low']); await vi.waitFor(() => expect(entered).toBe(true));
+  try {
+    const duplicate = chosen.apply(['medium']); await Promise.resolve(); unblock();
+    expect(await duplicate).toBeUndefined(); await work;
+    expect(dispatch.mock.calls.filter(([event]) => event.eventName === 'PreModelSwitch')).toHaveLength(1);
+    expect(readSessionModel(sessionId)?.thinkingEffort).toBe('low');
+    host.close(); host.open(chosen); await Promise.resolve(); await Promise.resolve();
+    expect(chosen.initialSelection).toBe('low'); await chosen.apply(['medium']);
+    expect(readSessionModel(sessionId)?.thinkingEffort).toBe('medium');
+  } finally { unblock(); host.close(); }
 });
