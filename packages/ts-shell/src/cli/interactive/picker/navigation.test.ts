@@ -8,12 +8,14 @@ import { modelPicker } from './model.js';
 import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
 import { parseMouseReport } from '../../../presentation/tui/input/mouse.js';
 import type { Option } from '../../../presentation/tui/chrome/options.js';
+import type { SettingsDraft } from '../settings.js';
 
 function settings() {
   const save = vi.fn(async () => ({ applied: true, note: 'saved' }));
-  return { save, openSettings: (scope: 'user' | 'project' = 'user') => ({ scope, save, definitions: CONFIG_SETTINGS,
+  const openSettings = (scope: 'user' | 'project' = 'user'): SettingsDraft => ({ scope, save, reopen: openSettings, definitions: CONFIG_SETTINGS,
     values: Object.fromEntries(CONFIG_SETTINGS.map(setting => [setting.key, { stored: undefined,
-      effective: setting.key === 'maxTurns' ? 10 : false, requested: false, source: 'default', requestedSource: 'default', restartRequired: false }])) }) };
+      effective: setting.key === 'maxTurns' ? 10 : false, requested: false, source: 'default', requestedSource: 'default', restartRequired: false }])) });
+  return { save, openSettings };
 }
 
 const settle = async () => { await Promise.resolve(); await Promise.resolve(); };

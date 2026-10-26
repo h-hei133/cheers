@@ -10,6 +10,10 @@ Enter a setting to inspect its effective value, stored override, source, save sc
 
 List and JSON object editors accept Shift+Enter or Ctrl+J to insert a newline at the cursor. Enter stages the complete value; Apply saves it. Esc leaves the editor and retains any value staged before that edit. Small windows keep the cursor's line visible as text wraps and scrolls.
 
+If another edit changes the same field in the same configuration file, the first Apply reports the conflict and retains your staged choice. An explicit second Apply can read that file again and retry, preserving unrelated fields and comments. If the session, workspace, profile or selected configuration source changed, return to the settings list and reopen the field before saving; retrying the old detail does not transfer its choice to the new destination.
+
+Change save scope opens a separate chooser. Esc keeps the original scope and staged choice. Confirming a readable scope discards the staged choice as the chooser indicates; it does not save it. If the chosen configuration is malformed or unreadable, the original scope and staged choice stay available with a failure notice. If a write reached disk but its runtime binding changed before application, the notice reports that it was saved and that application is unconfirmed.
+
 The initial panel saves to user configuration. `/settings set maxTurns 20` explicitly saves a user override; `/settings set maxTurns 20 --project` saves a project override. `/settings maxTurns` describes the field's registered type, scope and application timing; inspect the current value in the panel. Project settings follow the existing trust and field-scope rules; a field that the project may not own is refused. Never paste credentials into a general settings editor; use `/connect` for connections.
 
 Configuration files store explicit overrides. A small or empty file can inherit working defaults, user preferences and startup inputs. Inspect Source and Effective in the panel instead of filling the file with every default. Some values apply only to a compatible provider or to the next request; the description and application timing identify these cases.

@@ -49,7 +49,7 @@ it('moves one browsable model per wheel notch, stops at boundaries and requires 
 
 it('returns settings section focus to rows when wheeling content without staging or saving', async () => {
   const save = vi.fn(async () => ({ applied: true, note: 'saved' }));
-  const host = { openSettings: () => ({ scope: 'user' as const, save, definitions: CONFIG_SETTINGS,
+  const host = { openSettings: () => ({ scope: 'user' as const, save, reopen: () => undefined, definitions: CONFIG_SETTINGS,
     values: Object.fromEntries(CONFIG_SETTINGS.map(setting => [setting.key, { stored: undefined,
       effective: false, requested: false, source: 'default', requestedSource: 'default', restartRequired: false }])) }) };
   const overlay = new OverlayHost(() => {}); const apply = vi.fn();

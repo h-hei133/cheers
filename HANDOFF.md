@@ -346,3 +346,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: All settings saves reach disk but configuration publication rejects them, leaving requested/effective values unchanged.
 - **Root Cause**: The installed Vitest stringifies `vi.stubEnv(name, undefined)` into the environment value `undefined`; optional numeric inputs then fail configuration validation.
 - **Rule**: Register the original environment value with a temporary string, then delete the optional input explicitly and restore with `unstubAllEnvs`. Assert initial configuration validity/admission before exercising saves; classify fixture environment rejection separately from product focus or persistence failures.
+
+### Failed Draft Refresh Can Recapture A Different Save Owner
+- **Symptom**: A staged setting is refused after a session or workspace change, but a second Apply saves it; confirming an already-open scope chooser can do the same. A legacy user file stays writable after a preferred file appears.
+- **Root Cause**: Retrying through the ambient host captures a new binding and discards the draft's original ownership. Checking only project source selection leaves the user legacy/preferred selector unfenced.
+- **Rule**: Refresh retries and scope choices through the original draft, checking its binding, substrate, physical profile and selected user/project source before recapture, inside the existing write lock and before publication. Preserve explicit retry for same-source conflicts, retaining comments and siblings. Cancel or unreadable scope keeps pending and its original scope; a successful scope confirmation discards pending. Report a confirmed write separately from unconfirmed application after a binding change.

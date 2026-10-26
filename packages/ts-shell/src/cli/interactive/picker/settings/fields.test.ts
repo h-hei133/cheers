@@ -3,17 +3,20 @@ import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CONFIG_SETTINGS, formatSetting, settingValue, type SettingsScope } from '../../../../config/settings.js';
 import { getProjectConfigPath, getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt } from '../../../../config/runtimeConfig.js';
-import { createShellRuntimeContext } from '../../../../core/shell/runtimeContext.js';
+import { applyShellSubstrateTransition, createShellRuntimeContext } from '../../../../core/shell/runtimeContext.js';
 import { projectTrust } from '../../../../core/security/trust/store.js';
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { openSettings } from '../../settings.js';
-import { OverlayHost } from '../../overlay.js';
+import { OverlayHost, type PickerOutcome } from '../../overlay.js';
 import { settingsPicker } from '../settings.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
 import { themePreferences } from '../../../../presentation/theme/preview.js';
 import { selectTheme } from '../../../../presentation/theme/selection.js';
 import { sameValue } from '../../../../config/values.js';
+import { createProfileContext, withProfile } from '../../../../core/paths/profile/context.js';
+import * as configFiles from '../../../../config/runtimeConfig.js';
+import * as sessionFiles from '../../../../session/store/sessionFileStore.js';
 import { normalizeStatusItems, STATUS_ITEMS } from '../../../../presentation/tui/chrome/items.js';
 
 const choices: Readonly<Record<string, unknown>> = {
@@ -74,14 +77,16 @@ function surface(scope: SettingsScope) {
   const frame = () => stripAnsi(overlay.render(120, 40).join('\n'));
   const press = async (raw: string) => {
     let work: Promise<unknown> | undefined;
+    let result: PickerOutcome | undefined;
     overlay.handleKey(parseKeyEvent(raw), (picker, ids) => {
-      work = picker.apply(ids).then(outcome => { if (outcome?.next) overlay.open(outcome.next); });
+      work = picker.apply(ids).then(outcome => { result = outcome; if (outcome?.next) overlay.open(outcome.next); });
     });
     await work; await settle();
+    return result;
   };
   const choose = async (label: string) => {
     for (let attempt = 0; attempt < 30 && !frame().includes(`▸ ${label}`); attempt++) await press('\x1b[B');
-    expect(frame()).toContain(`▸ ${label}`); await press('\r');
+    expect(frame()).toContain(`▸ ${label}`); return press('\r');
   };
   const open = async (key: string) => {
     overlay.open(settingsPicker(host, scope)); await settle();
@@ -96,6 +101,184 @@ it('requires an explicit valid exercise for every real setting and every editabl
   expect(Object.keys(choices).sort()).toEqual(CONFIG_SETTINGS.map(setting => setting.key).sort());
   expect(cases).toHaveLength(73);
   expect(cases.filter(test => test.scope === 'project').map(test => test.key)).not.toContain('cacheWarming');
+});
+
+it.each(['session', 'workspace', 'workspace-return'] as const)('does not carry a failed staged project setting into another %s binding on retry', async change => {
+  const view = surface('project'); const before = fs.readFileSync(projectFile);
+  const nextRoot = path.join(scratch, 'next-project'); fs.mkdirSync(path.join(nextRoot, '.cheers'), { recursive: true });
+  const nextFile = getProjectConfigPath(nextRoot); fs.writeFileSync(nextFile, '{"maxTurns":7}');
+  const nextBefore = fs.readFileSync(nextFile);
+  try {
+    await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
+    if (change === 'session') applyShellSubstrateTransition(view.runtime, { session: { ...view.runtime.session, id: 'other-session' } });
+    else applyShellSubstrateTransition(view.runtime, { cwd: nextRoot, projectRoot: nextRoot, targetPathBase: nextRoot });
+    if (change === 'workspace-return') applyShellSubstrateTransition(view.runtime, { cwd: root, projectRoot: root, targetPathBase: root });
+    expect((await view.press('\r'))?.note).toContain('Reopen Settings');
+    expect(view.frame()).toContain('Pending: 42'); expect(view.frame()).toContain('Apply not confirmed');
+    await view.press('\r');
+    expect(fs.readFileSync(projectFile)).toEqual(before);
+    expect(fs.readFileSync(nextFile)).toEqual(nextBefore);
+    expect(view.frame()).toContain('Apply not confirmed');
+  } finally { view.overlay.close(); }
+});
+
+it.each(['user', 'project'] as const)('allows an explicit second Apply after a same-source %s conflict, retaining the draft and other fields', async scope => {
+  const view = surface(scope); const target = scope === 'user' ? userFile : projectFile;
+  const other = scope === 'user' ? projectFile : userFile; const otherBefore = fs.readFileSync(other);
+  try {
+    await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
+    const conflicting = '// changed externally\n{"schemaVersion":1,"maxTurns":17,"topP":0.6}';
+    fs.writeFileSync(target, conflicting);
+    expect((await view.press('\r'))?.note).toContain('conflict');
+    expect(fs.readFileSync(target, 'utf8')).toBe(conflicting); expect(view.frame()).toContain('Pending: 42');
+    expect((await view.press('\r'))?.note).toContain(`Saved to your ${scope}`);
+    expect(readRuntimeConfigEditAt(target).values).toMatchObject({ maxTurns: 42, topP: 0.6 });
+    expect(fs.readFileSync(target, 'utf8')).toContain('// changed externally'); expect(fs.readFileSync(other)).toEqual(otherBefore);
+    await view.press('\r'); expect(view.frame()).toContain('Stored: 42');
+  } finally { view.overlay.close(); }
+});
+
+it.each(['cancel', 'confirm'] as const)('keeps the scope chooser %s path explicit for a staged value with both source owners', async action => {
+  const view = surface('user'); const bytes = [userFile, projectFile].map(file => fs.readFileSync(file));
+  try {
+    await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
+    await view.choose('Change save scope');
+    if (action === 'cancel') {
+      await view.press('\x1b'); expect(view.frame()).toContain('save to user'); expect(view.frame()).toContain('Pending: 42');
+      await view.press('\r'); expect(readRuntimeConfigEditAt(userFile).values.maxTurns).toBe(42);
+      expect(fs.readFileSync(projectFile)).toEqual(bytes[1]);
+    } else {
+      await view.choose('Project configuration'); expect(view.frame()).toContain('save to project'); expect(view.frame()).not.toContain('Pending:');
+      expect([userFile, projectFile].map(file => fs.readFileSync(file))).toEqual(bytes);
+      await view.press('\r'); await view.press('\x15'); await view.press('24'); await view.press('\r'); await view.press('\r');
+      expect(readRuntimeConfigEditAt(projectFile).values.maxTurns).toBe(24); expect(fs.readFileSync(userFile)).toEqual(bytes[0]);
+    }
+  } finally { view.overlay.close(); }
+});
+
+it('does not recapture another binding by confirming a save-scope chooser opened before the transition', async () => {
+  const view = surface('user'); const bytes = [userFile, projectFile].map(file => fs.readFileSync(file));
+  try {
+    await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
+    await view.choose('Change save scope');
+    applyShellSubstrateTransition(view.runtime, { session: { ...view.runtime.session, id: 'other-session' } });
+    await view.choose('Project configuration');
+    expect(view.frame()).toContain('save to user'); expect(view.frame()).toContain('Pending: 42'); expect(view.frame()).toContain('Apply not confirmed');
+    await view.press('\r'); expect([userFile, projectFile].map(file => fs.readFileSync(file))).toEqual(bytes);
+  } finally { view.overlay.close(); }
+});
+
+it('keeps the original pending value and scope when a chosen scope document becomes unreadable', async () => {
+  const view = surface('user'); const before = fs.readFileSync(userFile);
+  try {
+    await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
+    await view.choose('Change save scope'); fs.writeFileSync(projectFile, '{broken');
+    await view.choose('Project configuration');
+    expect(view.frame()).toContain('save to user'); expect(view.frame()).toContain('Pending: 42'); expect(view.frame()).toContain('Apply not confirmed');
+    expect(fs.readFileSync(userFile)).toEqual(before); expect(fs.readFileSync(projectFile, 'utf8')).toBe('{broken');
+  } finally { view.overlay.close(); }
+});
+
+it('does not retry a pending project value into a preferred source that replaced its captured legacy source', async () => {
+  fs.rmSync(projectFile); const legacy = path.join(root, '.cheers.json'); fs.writeFileSync(legacy, '{"maxTurns":19}');
+  const view = surface('project');
+  try {
+    await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
+    fs.writeFileSync(projectFile, '{"maxTurns":21}');
+    expect((await view.press('\r'))?.note).toContain('source changed'); await view.press('\r');
+    expect(fs.readFileSync(legacy, 'utf8')).toBe('{"maxTurns":19}'); expect(fs.readFileSync(projectFile, 'utf8')).toBe('{"maxTurns":21}');
+    expect(view.frame()).toContain('Pending: 42'); expect(view.frame()).toContain('Apply not confirmed');
+  } finally { view.overlay.close(); }
+});
+
+it('does not write a captured legacy user source after a preferred user document appeared', async () => {
+  const preferred = userFile; const legacy = path.join(scratch, 'home', '.cheer', 'config.json');
+  fs.rmSync(preferred); fs.mkdirSync(path.dirname(legacy), { recursive: true }); fs.writeFileSync(legacy, '{"maxTurns":19}');
+  const view = surface('user');
+  try {
+    await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
+    fs.writeFileSync(preferred, '{"maxTurns":21}');
+    await view.press('\r'); await view.press('\r');
+    expect(fs.readFileSync(legacy, 'utf8')).toBe('{"maxTurns":19}'); expect(fs.readFileSync(preferred, 'utf8')).toBe('{"maxTurns":21}');
+    expect(view.frame()).toContain('Pending: 42'); expect(view.frame()).toContain('Apply not confirmed');
+  } finally { view.overlay.close(); }
+});
+
+it('does not reopen a project draft in another profile even when its workspace and selected project file are unchanged', async () => {
+  const home = path.dirname(path.dirname(userFile));
+  const first = createProfileContext({ name: 'first', homeDir: home, env: {} });
+  const second = createProfileContext({ name: 'second', homeDir: home, env: {} });
+  let captured: ReturnType<typeof openSettings> | undefined;
+  await withProfile(first, async () => {
+    const view = surface('project'); captured = view.host.openSettings('project'); view.overlay.close();
+  });
+  await withProfile(second, async () => {
+    expect(captured!.reopen()).toBeUndefined();
+  });
+});
+
+it('does not recapture a replaced physical profile directory for a project draft', async () => {
+  const home = path.dirname(path.dirname(userFile));
+  const profile = createProfileContext({ name: 'first', homeDir: home, env: {} });
+  let captured: ReturnType<typeof openSettings> | undefined;
+  await withProfile(profile, async () => {
+    const view = surface('project'); captured = view.host.openSettings('project'); view.overlay.close();
+  });
+  fs.renameSync(profile.root, profile.root + '-retired'); fs.mkdirSync(profile.root);
+  expect(captured!.reopen()).toBeUndefined();
+});
+
+it('rechecks a legacy user selector inside the real configuration write lock', async () => {
+  const preferred = userFile; const legacy = path.join(scratch, 'home', '.cheer', 'config.json');
+  fs.rmSync(preferred); fs.mkdirSync(path.dirname(legacy), { recursive: true }); fs.writeFileSync(legacy, '{"maxTurns":19}');
+  const view = surface('user'); const lock = sessionFiles.withFileLock;
+  try {
+    await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
+    vi.spyOn(sessionFiles, 'withFileLock').mockImplementation((file, action, options) => lock(file, () => {
+      fs.writeFileSync(preferred, '{"maxTurns":21}'); return action();
+    }, options));
+    expect((await view.press('\r'))?.note).toContain('conflict');
+    expect(fs.readFileSync(legacy, 'utf8')).toBe('{"maxTurns":19}'); expect(fs.readFileSync(preferred, 'utf8')).toBe('{"maxTurns":21}');
+    expect(view.frame()).toContain('Pending: 42');
+  } finally { view.overlay.close(); }
+});
+
+it('rechecks the original binding inside the real configuration write lock', async () => {
+  const view = surface('project'); const before = fs.readFileSync(projectFile); const lock = sessionFiles.withFileLock;
+  try {
+    await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
+    vi.spyOn(sessionFiles, 'withFileLock').mockImplementation((file, action, options) => lock(file, () => {
+      applyShellSubstrateTransition(view.runtime, { session: { ...view.runtime.session, id: 'other-session' } }); return action();
+    }, options));
+    expect((await view.press('\r'))?.note).toContain('conflict'); expect(fs.readFileSync(projectFile)).toEqual(before);
+    expect(view.frame()).toContain('Pending: 42');
+  } finally { view.overlay.close(); }
+});
+
+it('keeps persistence distinct from publication when the binding changes after the real write', async () => {
+  const view = surface('project'); const write = configFiles.writeRuntimeConfigFileAt; const userBefore = fs.readFileSync(userFile);
+  try {
+    await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
+    vi.spyOn(configFiles, 'writeRuntimeConfigFileAt').mockImplementation((file, patch, baseline, precondition) => {
+      const result = write(file, patch, baseline, precondition);
+      applyShellSubstrateTransition(view.runtime, { session: { ...view.runtime.session, id: 'other-session' } }); return result;
+    });
+    const result = await view.press('\r');
+    expect(result?.note).toContain('Saved to your project'); expect(result?.note).toContain('application is unconfirmed');
+    expect(view.frame()).toContain('Apply not confirmed'); expect(readRuntimeConfigEditAt(projectFile).values.maxTurns).toBe(42);
+    expect(fs.readFileSync(userFile)).toEqual(userBefore);
+  } finally { view.overlay.close(); }
+});
+
+it('rejects invalid number text through Enter, preserves an earlier pending value on editor Escape and saves only a later Apply', async () => {
+  const view = surface('user'); const before = fs.readFileSync(userFile);
+  try {
+    await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('0'); await view.press('\r');
+    expect(view.frame()).toContain('Invalid value'); expect(fs.readFileSync(userFile)).toEqual(before);
+    await view.press('\x15'); await view.press('42'); await view.press('\r'); await view.choose('Edit value');
+    await view.press('\x15'); await view.press('7'); await view.press('\x1b'); expect(view.frame()).toContain('Pending: 42');
+    expect(fs.readFileSync(userFile)).toEqual(before); await view.press('\r'); expect(readRuntimeConfigEditAt(userFile).values.maxTurns).toBe(42);
+  } finally { view.overlay.close(); }
 });
 
 it.each(cases)('navigates, cancels, saves, reopens and removes $key in $scope through real keys and owners', async ({ key, setting, scope }) => {

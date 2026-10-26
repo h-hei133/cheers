@@ -9342,3 +9342,15 @@ ADD-03按37项元数据补user37/project36共73条OverlayHost键盘链：搜索�
 延迟实查产品4abe6f11的CI40264741138/Watch40264741044、文档91f0d3d3的CI40265697710/Watch40265697734均success，未读完整日志/Watch工件，不转记本批。原Phase38/9、ADD独立且整体active。
 
 四静态门、strict docs/diff及317个链接/50标题/68行锚点检查通过，118条既有来源advisory保留。链接探针初轮把旧Markdown行锚点误作标题，修探针后通过，旧链接未改；Git交付另实际绑定。
+
+## [2026-10-26] fix | 设置失败重试与保存范围的原始归属
+
+ADD-03实际OverlayHost键盘确认session/project/A→B→A第一次Apply拒绝、第二次ambient host重捕获后却保存旧pending；已开scope确认同样存在。另确认user legacy→preferred selector无保护、损坏目标scope异常丢面板。现原SettingsDraft提供受限reopen，捕获binding/substrate/物理profile并检查user/project所选来源，重试和scope确认沿原draft，原write lock与发布前再复验。同源冲突可明确二次Apply，保留注释/兄弟字段/另一scope；取消/不可读scope保留原scope/pending，成功换scope撤销pending；写后换代显示已保存/应用未确认。
+
+最终七文件222项（fields98，保留73条基本字段/scope链并新增17生命周期场景）、三有效反转/逐字节恢复通过。移除显式profile检查仍绿色，因为trust/binding也拒绝，记录一无效反转，初轮停链及收据修正如实归档。普通/fullscreen×Top P同源冲突/user来源替换四条小型实际Node PTY通过，首次拒绝/明确二次0.8保存或两次拒绝/新开preferred0.6、零message/model变更/provider调用，143退出settle；早期两条试跑不重复计数。
+
+TS build ae02a58d6af6及当前新鲜度、四静态门、责任上限0、当前包正式judge proven三satisfied通过；未构建/验证exe或运行全仓/真实20k PTY。参考只比较子面板输入/取消/稳定ID恢复，staged多来源binding持久合同由原owner承担。更新addition第三十九批/当前清单、audit文末问题分类、settings指南及HANDOFF原draft陷阱。证据phase20-addition-settings-retry，docs/Git/本批CI按实际交付绑定。
+
+延迟实查上一批05ecc6c8的CI40268138916与Watch40268138889均success，未读完整日志/Watch工件，不转记本批。完整字段/来源/编辑器/窗口/桌面与model目标/能力/角色/真实认证、研究control/其他driver/child总成本、原生tokenizer/动态I/O、真实1.7k/4.9k分解、冷热/修补前启动收益和原model按键现场唯一原因继续待证；原Phase38/9和ADD独立/active。
+
+最终四静态门、strict docs/diff、324个链接/53标题/68行锚点、ADD-01…13完整性与恢复源码hash通过，118条既有来源advisory保留。自编final探针先用根dist、再把buildId当顶层返回字段，两次失败均为探针错误；按真实package dist和manifest合同修正后新鲜度通过，产品未改、未重跑已通过重验证。源码/脚本/hash及主代理非独立审阅收据已归档，owned scratch清理后交付。

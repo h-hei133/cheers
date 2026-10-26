@@ -65,7 +65,7 @@ it('moves the hover between sidebar and content, clears it over details and pres
 
 it('keeps settings section labels out of hover while ordinary nonclickable content can highlight without staging', async () => {
   const save = vi.fn(async () => ({ applied: true }));
-  const host = { openSettings: () => ({ scope: 'user' as const, save, definitions: CONFIG_SETTINGS,
+  const host = { openSettings: () => ({ scope: 'user' as const, save, reopen: () => undefined, definitions: CONFIG_SETTINGS,
     values: Object.fromEntries(CONFIG_SETTINGS.map(setting => [setting.key, { stored: undefined, effective: false,
       requested: false, source: 'default', requestedSource: 'default', restartRequired: false }])) }) };
   const overlay = new OverlayHost(() => {}); overlay.open(settingsPicker(host, 'user', 'Model')); await settle();

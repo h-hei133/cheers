@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CONFIG_SETTINGS, formatSetting } from '../../../config/settings.js';
+import type { SettingsDraft } from '../settings.js';
 import { settingsPicker, type SettingsHost } from './settings.js';
 import { OverlayHost, type Picker } from '../overlay.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
@@ -7,13 +8,14 @@ import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 
 function host() {
   const save = vi.fn(async () => ({ note: 'Saved to your user configuration. Effective for the next operation.', applied: true }));
-  return { save, openSettings: (scope: 'user' | 'project' = 'user') => ({ save, scope,
+  const openSettings = (scope: 'user' | 'project' = 'user'): SettingsDraft => ({ save, scope, reopen: openSettings,
     definitions: CONFIG_SETTINGS.filter(item => item.policy.sources.includes(scope)),
     values: Object.fromEntries(CONFIG_SETTINGS.map(item => [item.key, {
       effective: item.key === 'attentionOnIdle', requested: item.key === 'attentionOnIdle', stored: false,
       source: 'override', requestedSource: 'override', restartRequired: false,
     }])),
-  }) };
+  });
+  return { save, openSettings };
 }
 
 async function detail(h: SettingsHost = host(), key = 'attentionOnIdle') {

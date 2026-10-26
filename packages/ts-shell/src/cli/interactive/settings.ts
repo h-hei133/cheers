@@ -7,6 +7,8 @@ import { isOffline, OFFLINE_ENV } from '../../core/network/policy.js';
 import { readComposerShape, readDiagramMode, readStatusItems } from './tuiSettings.js';
 import { currentTheme } from '../../presentation/theme/theme.js';
 import { configTrustNotice } from '../../config/trust.js';
+import { configurationBinding } from '../../core/shell/configuration.js';
+import { assertCurrentProfile, currentProfile } from '../../core/paths/profile/context.js';
 
 export interface SettingValue {
   readonly effective: unknown;
@@ -21,6 +23,8 @@ export interface SettingsDraft {
   readonly scope: SettingsScope;
   readonly definitions: readonly SettingDefinition[];
   readonly values: Readonly<Record<string, SettingValue>>;
+  /** Refresh an edit baseline only within this draft's original binding and selected source. */
+  reopen(scope?: SettingsScope): SettingsDraft | undefined;
   save(key: string, value: unknown): Promise<SettingsSaveResult>;
 }
 
@@ -81,6 +85,19 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
   const file = scope === 'project' ? getProjectConfigPath(context.projectRoot) : getUserRuntimeConfigPath();
   const edit = readRuntimeConfigEditAt(file);
   const substrate = context.configuration.substrateRevision;
+  const binding = configurationBinding(context);
+  const profile = context.profile ?? currentProfile();
+  const ownerCurrent = (): boolean => {
+    try {
+      if (profile) assertCurrentProfile(profile);
+      else if (currentProfile()) return false;
+      return substrate === context.configuration.substrateRevision && sameValue(binding, configurationBinding(context));
+    } catch { return false; }
+  };
+  const sourceCurrent = (): boolean => {
+    try { return (scope === 'project' ? getProjectConfigPath(context.projectRoot) : getUserRuntimeConfigPath()) === file; }
+    catch { return false; }
+  };
   const definitions = CONFIG_SETTINGS.filter(setting => setting.policy.sensitivity === 'public' && setting.policy.sources.includes(scope));
   const values = Object.fromEntries(definitions.map(setting => {
     const actual = effective(context, setting); const requested = settingValue(context.configuration.current.requested, setting);
@@ -91,16 +108,19 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
   let consumed = false;
   return {
     scope, definitions, values,
+    reopen(selected = scope) {
+      if (!ownerCurrent() || !sourceCurrent()) return undefined;
+      return openSettings(context, onApplied, selected);
+    },
     async save(key, value) {
       const setting = settingDefinition(key);
       if (!setting || !definitions.includes(setting)) return unapplied('This setting is not editable in the selected scope.');
       const invalid = validateSetting(setting, value);
       if (invalid) return unapplied(invalid);
-      if (consumed || substrate !== context.configuration.substrateRevision) return unapplied('Settings changed or the session moved. Reopen Settings before saving.');
-      if (scope === 'project' && getProjectConfigPath(context.projectRoot) !== file) return unapplied('Project configuration source changed. Reopen Settings before saving.');
+      if (consumed || !ownerCurrent()) return unapplied('Settings changed or the session moved. Reopen Settings before saving.');
+      if (!sourceCurrent()) return unapplied(`${scope === 'project' ? 'Project' : 'User'} configuration source changed. Reopen Settings before saving.`);
       consumed = true;
-      const sourceCurrent = () => scope !== 'project' || getProjectConfigPath(context.projectRoot) === file;
-      try { writeRuntimeConfigFileAt(file, settingPatch(edit.values, setting, value), edit, sourceCurrent); }
+      try { writeRuntimeConfigFileAt(file, settingPatch(edit.values, setting, value), edit, () => ownerCurrent() && sourceCurrent()); }
       catch (error) {
         return unapplied(error instanceof ConfigWriteError ? `${error.message} Current settings were not refreshed.` : 'Settings save outcome is unverified. Current settings were not refreshed.');
       }
@@ -109,7 +129,7 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
         if (!sameValue(settingValue(readRuntimeConfigEditAt(edit.path).values, setting), value)) return unapplied(`The selected value is not confirmed in your ${scope} configuration. Current settings were not refreshed; reopen Settings.`);
       } catch { return unapplied(`The selected value could not be verified in your ${scope} configuration. Current settings were not refreshed; reopen Settings.`); }
       const saved = `Saved to your ${scope} configuration.`;
-      if (!sourceCurrent()) return unapplied(`${saved} Project configuration source changed; application is unconfirmed. Reopen Settings.`);
+      if (!ownerCurrent() || !sourceCurrent()) return unapplied(`${saved} Settings binding or source changed; application is unconfirmed. Reopen Settings.`);
       try {
         const result = refreshShellRuntimeConfig(context);
         if (result.status !== 'applied') return unapplied(`${saved} Configuration was not applied (${result.status}).${result.admissionBlocked ? ' New actions are blocked until a valid configuration is loaded.' : ''}`);

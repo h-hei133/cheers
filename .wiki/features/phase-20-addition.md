@@ -15,7 +15,7 @@ confidence: mixed
 
 本文汇总2026-10-25至26日常使用反馈、[逐项核查](interaction-audit.md)及用户最新更正，作为实施的需求与验收依据。第1至14节保留初次定位与需求基线；后续已授权实施的当前证据见第15节，文末第16节汇总问题与最终体验，不能把需求条目或局部验证当作全部验收通过。
 
-上一轮文档核对的产品HEAD为`4abe6f11af3bd7966796f29b996f5321b16b0140`，需求收口提交为`91f0d3d343d9ecb107c6792b5e9ee1d12df40157`，只读参考oh-my-pi仍为下述快照。该轮只定位与完善文档；第三十八批随后沿已授权实施范围补37项设置的73条scope操作链，并修补搜索结果焦点错误，证据见第15节。下文的“初次定位”均指修补前机制；不能将旧机制写成当前仍有同样故障。前次文档核对HEAD为`2a5cf9949cff57876adc20ebb8179040d7e00254`，其后第三十七批已修正启动测量和目录测试合同。
+上一轮文档核对的产品HEAD为`4abe6f11af3bd7966796f29b996f5321b16b0140`，需求收口提交为`91f0d3d343d9ecb107c6792b5e9ee1d12df40157`，只读参考oh-my-pi仍为下述快照。该轮只定位与完善文档；第三十八批随后补37项设置的73条scope操作链并修补搜索焦点，已交付为`05ecc6c8885f61d18e851a6a698597253f1165d7`。第三十九批继续修补失败Apply重试、保存范围确认和user来源换代，证据见第15节。下文的“初次定位”均指修补前机制；不能将旧机制写成当前仍有同样故障。前次文档核对HEAD为`2a5cf9949cff57876adc20ebb8179040d7e00254`，其后第三十七批已修正启动测量和目录测试合同。
 
 用户最新明确要求优先于旧裁决。本次不再询问是否恢复箭头、是否允许选中未配置模型、是否让settings/model向oh-my-pi看齐。原[Phase 20规划](phase-20-decisions.md)、[契约矩阵](phase-20-contract.md)和[交付状态](phase-20-status.md)仍保存原47项范围与历史证据；本文用ADD编号单独登记补充工作，既有任务映射表示复用关系，不修改它们的已验状态或补造完成证据。
 
@@ -122,6 +122,8 @@ Model / Session必须可从类别浏览及全局搜索找到；model/roles和当
 
 布尔/枚举子面板初次打开应聚焦真实effective值，而不是第一个choice；stored/requested与effective不同时保留来源差别，不能靠Enter默认覆盖。当前值无匹配时先聚焦Values and sources。暂存之后仍默认Apply，取消返回不保存；主题按accepted intent定位，尚不支持的当前thinking以只读焦点保留，Enter不替换为auto。重开按最新owner状态重新定位。
 
+失败Apply与保存范围子面板必须绑定进入时的session、workspace、profile、substrate及所选来源，不能通过第二次Apply或确认scope偷偷把旧暂存值带到新owner。同一来源的字段冲突先拒绝并保留暂存，用户明确第二次Apply可重新读取该来源后重试；另一scope、兄弟字段和JSONC注释须保留。来源选择从legacy变preferred、session/project切换（包括A→B→A）、profile换代时，旧详情继续拒绝，须返回设置列表重新打开字段。取消scope选择保留原scope和pending；成功确认范围按既有提示撤销pending；目标范围损坏或不可读时保留原scope/pending并报告失败，不丢面板。检查须贯穿草稿刷新、写锁内和发布前；若写入后身份变化，报告“已保存、应用未确认”，不将磁盘写入冒充新owner接受。第三十九批有下述代表性证据，完整字段×来源×窗口矩阵仍需补齐。
+
 列表与JSON对象编辑必须支持键盘直接构造多行，不能只靠粘贴才能输入“一项一行”。Shift+Enter或Ctrl+J在光标位置换行，普通Enter验证并暂存完整值，Apply另行保存；方向键属于子编辑器，Esc保留进入本次编辑前已有的暂存值。主界面与全屏表单按各自实际行预算绘制，极矮窗口优先保留光标所在编辑行，标题/说明可退化；超过编辑上限的原值必须明确拒绝，不能让Enter把未显示的原值覆盖成空值。该补充是完整编辑路径的实施细化，不能扩大为未配置模型可自动启用或认证表单允许多行秘密。
 
 验收选取每种编辑器至少一个字段，覆盖切分类→section→修改→Apply→重开读回及Discard撤回；还要验证无权限来源、窄屏导航、搜索清空、输入编辑器方向键和preview取消。
@@ -161,7 +163,7 @@ Model / Session必须可从类别浏览及全局搜索找到；model/roles和当
 
 当前`GROUP_ORDER`声明参考十类顺序，`SETTINGS_GROUPS`只显示有真实元数据的八类，Memory和Shell未显示；本轮所读`CONFIG_FIELDS`没有独立memory/shell可编辑字段。**缺这两个名字本身不是已确认故障，也不说明相关产品能力不存在。** ADD-03需继续核查相应原owner是否有适合从settings发现的真实设置或只读状态：有就委托入口并标明scope，没有就省略，不造空菜单或重复字段。今后新增真实字段时仍复用原schema/来源政策，不能另建面板配置体系。
 
-后续实施须以37项清单和原scope政策补齐字段、来源及保存读回矩阵：第三十八批已覆盖每项搜索发现→详情→暂存→取消→再暂存/Apply→effective/requested/stored读回→重开→移除→重开，以及七个跨来源政策场景。所属category/section导航有前述批次证据；仍须补来源冲突、无效值、取消/失效、编辑窗口及桌面组合，不能把这73条路径记为完整矩阵。已有第15节证据可复用，未覆盖组合写明未验，不重复全仓回归。
+后续实施须以37项清单和原scope政策补齐字段、来源及保存读回矩阵：第三十八批已覆盖每项搜索发现→详情→暂存→取消→再暂存/Apply→effective/requested/stored读回→重开→移除→重开，以及七个跨来源政策场景。第三十九批新增17项，覆盖代表性user/project同源冲突重试、scope取消/确认/不可读、session/workspace/profile失效、legacy/preferred换代、真实锁内复验、写入后应用未确认及无效数值取消恢复；这几类不再是完全无证据。所属category/section导航有前述批次证据；全部字段/编辑器与各来源冲突、无效值、失效、编辑窗口及桌面的交叉组合仍待验，不能把73条基本路径或17项新增场景记为完整矩阵。已有第15节证据可复用，未覆盖组合写明未验，不重复全仓回归。
 
 model当前已使用`disabled: true, focusable: true`允许具体未配置目标浏览，精确详情、配置返回、目录刷新和目标档位恢复也有逐批证据。ADD-01/02仍须完成单ready/全未配置、两个relay同名模型、角色/默认浏览、缺凭据/能力阻断/目录歧义/真实认证及键鼠窗口矩阵。参考的locked provider诊断与本项目“未配置具体模型也可选中”有明确差异，不能为了外观一致退回空模型内容区。新发现缺口先写可复现路径，再沿model、connect、会话模型及配置发布原owner修补。
 
@@ -1166,6 +1168,26 @@ TypeScript构建及checkBuild当前新鲜度通过：build `a3a165c2470bf61d034d
 
 ADD-03全部字段/scope基本操作链已有聚焦证据，来源冲突/无效值/失效、编辑窗口及真实桌面矩阵仍需补齐；model精确目标/能力/角色/真实认证，研究control/其他driver/child成本，原生tokenizer/动态来源累计I/O，真实1.7k/4.9k分解、冷缓存/修补前对照/真实项目启动收益继续未验。不运行全仓本地回归、并发重验证或真实20k消息PTY。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第三十九批：设置失败重试与保存范围的原始归属
+
+第三十八批`05ecc6c8885f61d18e851a6a698597253f1165d7`已提交/推送。本批延迟实查该SHA的CI [40268138916](https://github.com/h-hei133/cheers/actions/runs/40268138916)与Architecture Watch [40268138889](https://github.com/h-hei133/cheers/actions/runs/40268138889)，均completed/success；未读取完整日志或Watch工件，历史结果不转记本批源码或ADD整体验收。
+
+ADD-03沿[原设置草稿](../../packages/ts-shell/src/cli/interactive/settings.ts)和[原详情/保存范围面板](../../packages/ts-shell/src/cli/interactive/picker/settings.ts)补生命周期操作。真实OverlayHost键盘回归确认四类缺陷：session/project已变化时第一次Apply拒绝，第二次却用ambient host重新捕获新binding而保存旧pending，A→B→A同样存在；已打开scope子面板确认时也重新捕获新binding；user只检查字段基线，没有拒绝legacy来源被preferred替换；目标scope文件变为损坏JSON时异常使面板丢失。失败日志分别归档，不能将这些缺陷写成用户原model按键现场的唯一原因。
+
+修补在原草稿提供`reopen(scope?)`，捕获原configuration binding、substrate及物理profile，并对user/project均检查所选来源。失败重试和scope确认必须通过原草稿刷新；归属或来源变化则保留pending、原scope及失败状态，要求重新打开设置。普通同源字段冲突仍允许用户明确第二次Apply读取最新基线并只修改目标字段，不删除原冲突检测、不覆盖兄弟字段或另一scope。原write lock内再次检查归属/来源；写后复验发现换代时分别报告持久成功与应用未确认，不向新binding发布旧选择。scope取消保留pending，成功确认按原提示撤销pending，不可读目标保留原scope/pending并可重试。
+
+先读目标后定向比较同一参考快照的settings-list990–1088：子面板独占输入、undefined选择表示取消不改值、父层按稳定item ID恢复，恢复与子操作完成分开。本项目采用这些归属/取消/返回决定；staged Apply、user/project多来源及binding锁内检查是本项目自己的契约，不宣称参考已经提供相同持久事务。
+
+[字段操作测试](../../packages/ts-shell/src/cli/interactive/picker/settings/fields.test.ts)由81增至98项，新增17项包括session/workspace/A→B→A拒绝二次Apply、user/project同源冲突显式重试并保留注释/兄弟字段/另一scope、scope取消与确认、已开scope后的binding切换、不可读目标、user/project legacy→preferred、profile切换/物理目录替换、真实锁内变化、写后换代及无效数值Enter/旧pending取消恢复。沿实际host按键及原配置/保存owner；profile身份测试另直接检查草稿刷新，不冒充所有profile场景均走实际终端。最终七文件222项串行通过：fields98、interactive/settings44、picker/settings38、navigation15、wheel12、hover7、source8；反转恢复后fields98再通过，重复轮次不累加。
+
+三次有效反转：恢复retry host重捕获使3个断言失败，恢复scope host重捕获使1个失败，去掉user source检查使2个失败；全部源码逐字节恢复。picker/settings SHA256 `d2900c3f7fbe985f087e1aac2c9eae6227c48bf39d560b2d454744bf62a86728`，interactive/settings SHA256 `2a10e5839114521cc861a7fdadb5929599a269986b843cde64e936739a8c782a`。移除显式profile检查的第四次反转仍绿色，既有trust/binding检查也拒绝这些场景，故记录为**无效反转**，不作为显式profile检查必要性的证明。初轮脚本在此停链，修正收据分类后再串行运行后续检查；未将绿色反转伪装成有效。
+
+普通/fullscreen×同源冲突/来源替换共四条小型实际Node PTY通过。冲突场景逐字输入Top P、暂存0.8，外部写0.6；首次Apply保留0.6并报告未确认，第二次显式Apply保存0.8，重开Stored0.8。来源场景从隔离legacy user配置打开，preferred随后出现0.6；两次Apply都拒绝且两文件不写，返回列表新开读回preferred的Stored0.6。各场景零transcript message、session modelSelection不变、synthetic provider未调用；串行等待relay close及清理，143为SIGTERM退出。每样本45秒上限、UTF-8分段解码和2MiB输出上限，无20k历史压力。早期两条冲突试跑不累加为六条；终端证据只覆盖代表性Top P，不等于完整字段/桌面矩阵。
+
+四静态门、TypeScript build及当前checkBuild新鲜度通过：build `ae02a58d6af6d3e197999c298726f77a898b99985fdc5bc935d029f738337e25`、inputs `4a9a2eb8eab0304179e366b76e80492a9698a40f6e558ce4d5fe2fb7f34745f3`、artifact `da8f7e111fb9464f1182a168ce62da343327a44d3f8dea870fa14700dd00111c`。本批未构建或验证exe。责任上限报告0 findings；当前validator全新提取，archive SHA256 `6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985`，实际CLI judge exit0/proven、三项结构义务satisfied，属于架构证据。最终strict docs/diff、324本地链接/53标题/68行锚点及ADD-01…13完整性通过，118条既有来源advisory保留。复查探针先误读根dist、再误读checkBuild顶层buildId，均归类脚本错误；按真实package dist和manifest返回合同修正后新鲜度及全部恢复hash通过，没有重构建或改产品掩盖失败。工件归档`.omx/artifacts/phase20-addition-settings-retry/`，本批Git/CI按实际交付另绑定。
+
+settings基本73条链及以上代表性生命周期场景已有证据，全部来源/字段/编辑器/窗口/桌面组合仍需补齐。model精确目标/能力/角色/真实认证，研究control/其他driver/child及总成本，原生tokenizer/动态来源累计I/O，真实1.7k/4.9k组成、冷热与修补前启动对照、原现场model零交互唯一原因继续未确认。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1179,8 +1201,9 @@ ADD-03全部字段/scope基本操作链已有聚焦证据，来源冲突/无效�
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
-| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。第三十八批新增settings全部37项/user37-project36基本键盘操作链及七个跨来源政策场景。来源冲突/失效/窗口、model能力/角色/真实认证及桌面组合仍未完成；Memory/Shell缺名字本身不是故障，不能将局部绿色写成“整体已看齐” |
+| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。第三十八批新增settings全部37项/user37-project36基本键盘链及七个跨来源政策场景，第三十九批补17个代表性冲突/失效/取消/范围场景。完整字段×来源×编辑器×窗口/桌面及model能力/角色/真实认证矩阵仍未完成；Memory/Shell缺名字本身不是故障，不能将局部绿色写成“整体已看齐” |
 | 设置搜索新查询仍保留较弱匹配焦点 | 第三十八批确认typed/pasted `topP`排名第一但Enter打开Input shape。现新查询自动聚焦最强匹配，同查询手动选择保持，清空回原字段；178项聚焦、一有效反转及两模式实际Node PTY有证据。不是用户原model按键现场唯一原因的证明 |
+| 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
 | 代码示例误调用及合法关闭后漏skill | 原字符串查找将围栏正文误当关闭，或以不同长度反引号闭合；第二十九批改为独立关闭行与精确行内run，示例保持字面量，合法关闭后所有skill恢复解析。第三十三批再补实际研究新建入口数字preview，control/其他driver/child总成本仍待覆盖 |
 | 待注入记忆预览缺raw字节与可取消读取 | 原已有路径/元数据及generation保护；第三十批补原始字节追踪、有界async verified-handle读取及完整preview异步复验。六文件73项、三有效反转、两模式实际隔离PTY有局部证据。普通删除/invalidated原并非全无保护；第三十一批已补单次多记录共享读取，完整preview/controller累计I/O与所有动态来源验收仍未完成 |
@@ -1198,6 +1221,7 @@ ADD-03全部字段/scope基本操作链已有聚焦证据，来源冲突/无效�
 | “model压根没有上下键监听” | 源码有监听及导航；原来跳过disabled能导致无可见变化。不能用监听存在否认用户观察，也不能把“跳过未配置”当作用户意愿 |
 | “resume按时间排序反了” | 时间倒序机制存在，确定缺口在渐进自动焦点保留；修补焦点而非反转排序 |
 | “settings完全没有分类、稀疏配置说明字段没实现”“参考十类必须全部显示” | 当前八类/37项与两个会话入口来自真实元数据及原owner，默认继承和真实消费者存在。Memory/Shell未显示不单独证明缺陷；对应能力的发现入口仍需核查，不能添加假字段或把所有默认值写回 |
+| “失败后所有第二次Apply都应禁止”“取消scope必须清空暂存” | 同源字段冲突可以保留pending并由用户明确重试；取消scope按原合同保留pending。第三十九批拒绝的是归属/来源换代，成功scope确认才按提示撤销pending；不能以粗暴禁止重试掩盖原重捕获缺陷 |
 | “npm start每次编译，或用户入口用错” | 既有入口证据不支持。应改首帧时序并测实际耗时，不能把慢启动归咎于用户 |
 | “对话后4.9k就是字符÷3.5” | 对话后值有provider归一化输入用量来源；本地估算另有公式。两者需逐项对齐，不能混为同一公式结果 |
 | “工具数差不多，所以两个项目上下文必然相同” | 实际发送schema、规则、消息、协议与计数器决定成本，工具个数不足以推导token数 |
@@ -1211,7 +1235,7 @@ ADD-03全部字段/scope基本操作链已有聚焦证据，来源冲突/无效�
 | 范围 | 必须达成的完整体验 |
 |---|---|
 | model看齐 | Roles/All models/provider层次可辨；分类→搜索→未配置具体模型→详情→精确连接配置/适用登录→返回原模型→显式启用→重开读回。全部未配置仍能导航；同名relay按精确身份区分；取消/失败不虚报成功；键盘/点击/wheel/hover/窄屏/resize保持同一目标 |
-| settings看齐 | 真实主分类与section覆盖已有能力；跨分类搜索后回所属位置；布尔/枚举/数值/列表/对象等真实编辑器→Enter暂存→Apply保存或Discard/取消→重开读回。user/project scope、只读与显式来源、effective/stored、预览撤回及restart时点保真；窄屏先保留caret，不以标签换皮完成 |
+| settings看齐 | 真实主分类与section覆盖已有能力；跨分类搜索后回所属位置；布尔/枚举/数值/列表/对象等真实编辑器→Enter暂存→Apply保存或Discard/取消→重开读回。同源冲突明确重试，binding/profile/source换代拒绝旧pending；scope取消/不可读保留，成功换scope撤销pending。user/project、只读与显式来源、effective/stored、写后应用未确认、预览撤回及restart时点保真；窄屏先保留caret，不以标签换皮完成 |
 | 消息顶格与输入箭头 | 已提交用户正文无装饰性左空白，从第1列绘制并保留源缩进；普通编辑区恢复左侧箭头，正文在必要间隔后开始、续行对齐，不叠加旧padding。中文/emoji/长行/resize/选区/caret一致，复制只含原文；不恢复已删除黄条 |
 | 输入位置与路径新增 | 只有源文本第一行第一位置开放完整功能slash；正文`/home`给实际目录suggestion，上下选择或Tab接受并连续补全。只替换光标token，保留前后/多行/缩进；代码、URL、词内slash和转义不触发命令；迟到结果不覆盖新草稿 |
 | 多skill新增 | 首位、正文与后续行可发现skill，同一次输入的全部明确skill实际加载并进入同一任务，稳定去重、保留正文/附件；未知、失效、拒绝、超预算时报告并可重试，不能只运行第一个或递归执行skill正文slash。代码示例内不补全或调用，短/混合/嵌入关闭不结束围栏；合法较长关闭及CRLF后恢复真实skill，行内按完整相等反引号run配对 |
@@ -1244,11 +1268,11 @@ ADD-03全部字段/scope基本操作链已有聚焦证据，来源冲突/无效�
 
 ### 16.5 本轮需求收口与实施边界
 
-上一轮只更新文档，第三十八批沿已授权实施范围修补settings搜索焦点并补全部字段/scope基本操作链；保留ADD-01至13和原47项状态。执行时按以下清单补缺，每项沿原owner交付；已存在且有合格证据的路径复用既有结果，不重造系统。
+文档收口后，第三十八批沿已授权范围修补settings搜索焦点并补全部字段/scope基本链，第三十九批补失败重试、范围选择和来源归属；保留ADD-01至13和原47项状态。执行时按以下清单补缺，每项沿原owner交付；已存在且有合格证据的路径复用既有结果，不重造系统。
 
 | 用户要求 | 必须保留的实施方向 | 尚需补齐的证据 |
 |---|---|---|
-| 两面板整体看齐 | 先对照参考的分类/section、焦点域、搜索、详情、修改/配置、返回和窗口布局，再补具体缺口；功能内容来自本项目原owner | settings73条基本字段/scope链已通过，继续补来源冲突/失效/窗口/桌面；model精确目标/能力/角色/认证、两模式及键鼠完整操作仍待验 |
+| 两面板整体看齐 | 先对照参考的分类/section、焦点域、搜索、详情、修改/配置、返回和窗口布局，再补具体缺口；功能内容来自本项目原owner。settings重试与范围选择保留原binding/source，正常冲突可显式重试 | settings73条基本链及17个代表性生命周期场景已有证据，继续补字段/来源/编辑器/窗口/桌面的交叉矩阵；model精确目标/能力/角色/认证、两模式及键鼠完整操作仍待验 |
 | 未配置模型允许选中 | 上下键可移到具体未配置行，Enter查看详情/精确配置，配置接受后再显式启用；能力阻断走目标档位恢复 | 用户原环境事件链、全部未配置、配置成功/失败/取消、目录变化与同名relay；不能宣称表单打开就是认证成功 |
 | resume默认最新 | 自动阶段随最新可恢复候选更新，主动选择后按稳定ID保持；排序、current标记与默认焦点分别处理 | 分批旧→新、途中手选、scope/search换代、目标消失及Enter失效检查 |
 | 已提交正文顶格、输入箭头恢复 | 第1列正文仅去绘制留白，源缩进保留；编辑区箭头贴左、续行对齐正文，caret/复制用原源投影 | 中文/emoji/组合字符/换行/resize/选区及桌面IME、剪贴板；不恢复黄条或trim原文 |
@@ -1257,4 +1281,4 @@ ADD-03全部字段/scope基本操作链已有聚焦证据，来源冲突/无效�
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-上一轮修正旧HEAD与过时启动测量结论，补面板字段盘点、组合能力和验收清单；第三十八批按这份清单复现并修补settings搜索焦点，补全部字段/scope基本操作证据。未将其提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。

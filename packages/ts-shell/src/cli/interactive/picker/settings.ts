@@ -84,7 +84,15 @@ function scopePicker(host: SettingsHost, draft: SettingsDraft, setting: SettingD
     async apply(ids) {
       const scope = ids[0];
       if (ids.length !== 1 || (scope !== 'user' && scope !== 'project') || !setting.policy.sources.includes(scope)) return undefined;
-      return { next: settingDetail(host, host.openSettings(scope), setting) };
+      try {
+        const current = draft.reopen(scope);
+        if (current) return { next: settingDetail(host, current, setting) };
+        const note = 'Settings changed or the session moved. Reopen Settings before changing save scope.';
+        return { note, next: settingDetail(host, draft, setting, pending, note) };
+      } catch {
+        const note = 'Configuration could not be opened. The pending choice and save scope are retained; retry when it is readable.';
+        return { note, next: settingDetail(host, draft, setting, pending, note) };
+      }
     },
   };
 }
@@ -153,7 +161,14 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
       if (id === 'apply' && pending) {
         let current = draft;
         if (failure) {
-          try { current = host.openSettings(draft.scope); }
+          try {
+            const reopened = draft.reopen();
+            if (!reopened) {
+              const note = 'Settings changed or the session moved. Reopen Settings before saving.';
+              return { note, next: settingDetail(host, draft, setting, pending, note) };
+            }
+            current = reopened;
+          }
           catch {
             const note = 'Configuration could not be reopened. The pending choice is retained; retry when it is readable.';
             return { note, next: settingDetail(host, draft, setting, pending, note) };
