@@ -41,6 +41,54 @@ it("forwards a bare review without an empty focus argument", async () => {
   expect(result).toEqual({ kind: "local", output: "reviewed" });
 });
 
+it("carries composed prose, modifiers and skill instructions into the one native review request", async () => {
+  const gitCommand = vi.fn(async () => ({ kind: "prompt" as const, prompt: "prepared review",
+    promptMetadata: { source: "git-review" } }));
+  const input = "检查证据 /brainstorm /review /skill:review-b";
+  const result = await runReviewCommand([], {
+    ...gitCommandContext(root),
+    gitCommand,
+    composedPrompt: {
+      originalInput: input,
+      prose: "检查证据",
+      skills: [{ name: "review-b", identity: "cli:/fixture/SKILL.md:review-b", source: "cli",
+        digest: "fixture-digest", body: "Check counterexamples and report uncertainty." }],
+      modifiers: [{ name: "brainstorm", instruction: "Design exploration. Compare approaches." }],
+    },
+  });
+  const forwarded = gitCommand.mock.calls[0]?.[0];
+  expect(forwarded?.[0]).toBe("review");
+  expect(forwarded?.[1]).toContain('<skill name="review-b">');
+  expect(forwarded?.[1]).toContain("Check counterexamples and report uncertainty.");
+  expect(forwarded?.[1]).toContain('<method name="brainstorm">');
+  expect(forwarded?.[1]).toContain("Design exploration. Compare approaches.");
+  expect(forwarded?.[1]).toContain("检查证据");
+  expect(result).toMatchObject({ kind: "prompt", prompt: "prepared review", promptMetadata: { source: "git-review" } });
+});
+
+it("combines composed methods and skills with a real native Git review snapshot", async () => {
+  await fs.writeFile(path.join(root, "new.txt"), "untracked review evidence\n");
+  const skill = path.join(fixture.home, "review-method.md");
+  await fs.writeFile(skill, "---\nname: review-method\ndescription: Review method\n---\nCheck counterexamples and uncertainty.");
+  const input = "检查证据 /brainstorm /review /skill:review-method";
+  const result = await routeSlashCommand(input, {
+    ...gitCommandContext(root),
+    skillOptions: { skillPaths: [skill], noSkills: true },
+  });
+  if (result?.kind !== "prompt") throw new Error("Expected composed review prompt");
+  expect(result.prompt).toContain("Review only; do not edit, stage, commit, or push");
+  expect(result.prompt).toContain("?? new.txt");
+  expect(result.prompt).toContain("Check counterexamples and uncertainty.");
+  expect(result.prompt).toContain("Design exploration.");
+  expect(result.prompt).toContain("检查证据");
+  expect(result.promptMetadata).toMatchObject({
+    source: "git-review",
+    originalInput: input,
+    skills: [{ name: "review-method" }],
+    methods: [{ name: "brainstorm" }, { name: "review" }],
+  });
+});
+
 it("retains staged and unstaged changes even when they cancel in diff HEAD", async () => {
   const file = path.join(root, "tracked.txt");
   await fs.writeFile(file, "original\n");

@@ -84,6 +84,49 @@ it('combines two compatible pure modifiers without executing their handlers', as
   expect(commands.every(command => !command.execute.mock.calls.length)).toBe(true);
 });
 
+it('routes review as one driver carrying prose, modifiers and every selected skill', async () => {
+  const input = '检查证据 /brainstorm /review /skill:a';
+  const gitCommand = vi.fn(async (args: readonly string[]) => ({
+    kind: 'prompt' as const,
+    prompt: args[1] ?? '',
+    promptMetadata: { source: 'git-review' },
+  }));
+  const result = await routeSlashCommand(input, { cwd: root, skillOptions: { skillPaths, noSkills: true }, gitCommand });
+  expect(gitCommand).toHaveBeenCalledOnce();
+  const focus = gitCommand.mock.calls[0]?.[0]?.[1];
+  expect(focus).toContain('BODY a');
+  expect(focus).toContain('Design exploration.');
+  expect(focus).toContain('检查证据');
+  expect(result).toMatchObject({
+    kind: 'prompt',
+    prompt: expect.stringContaining('BODY a'),
+    promptMetadata: { source: 'git-review', originalInput: input, skills: [{ name: 'a' }] },
+  });
+});
+
+it.each(['audit', 'check'])('uses the review driver for the /%s alias in composed prose', async name => {
+  const input = `检查证据 /brainstorm /${name} /skill:a`;
+  const gitCommand = vi.fn(async () => ({ kind: 'prompt' as const, prompt: 'prepared review',
+    promptMetadata: { source: 'git-review' } }));
+  const result = await routeSlashCommand(input, { cwd: root, skillOptions: { skillPaths, noSkills: true }, gitCommand });
+  expect(gitCommand).toHaveBeenCalledOnce();
+  expect(result).toMatchObject({ kind: 'prompt', promptMetadata: { source: 'git-review', originalInput: input } });
+});
+
+it('refuses review when another workflow driver already owns the task', async () => {
+  const input = '问题 /deep-research /review /skill:a';
+  const gitCommand = vi.fn();
+  const researchCommand = vi.fn();
+  const result = await routeSlashCommand(input, { cwd: root, skillOptions: { skillPaths, noSkills: true }, gitCommand, researchCommand });
+  expect(result).toMatchObject({
+    kind: 'local',
+    retryDraft: input,
+    output: expect.stringContaining('Only one workflow driver can own a composed task'),
+  });
+  expect(gitCommand).not.toHaveBeenCalled();
+  expect(researchCommand).not.toHaveBeenCalled();
+});
+
 it('refuses an over-budget second method without truncating the first or dispatching', async () => {
   fs.appendFileSync(skillPaths[1]!, 'x'.repeat(65536));
   const input = '问题 /skill:a /skill:b';

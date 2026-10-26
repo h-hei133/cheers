@@ -9426,3 +9426,9 @@ slashCommandRegistry13项单进程通过；四静态门、责任上限0、TS bui
 ADD-03/13继续收口。settings新增Memory / Review与Shell / Diagnostics只读入口，分别插入`/memory status`、`/shell status`草稿；入口可搜索和分类导航，但零状态读取、零配置保存，也不复制原命令实现。分类存在由真实只读消费者支撑，不伪装成可编辑字段。
 
 真实OverlayHost分类/Enter/说明路径通过；settings39、fields98、session14、source8共159项最终单进程串行通过，移除capability rows后新增断言有效失败并恢复。settings指南/addition第四十九批/audit更新；四静态门、责任上限0、TS build d448a4c6a269及fresh、当前包judge proven、严格docs通过，Git/本批CI另绑定。未运行全仓、实际memory/shell输出、真实provider/沙箱、exe或桌面PTY，ADD整体继续active。
+
+## [2026-10-26] feat | review作为单一Git review driver
+
+ADD-12继续收口。review会读取真实Git snapshot并构造只读review prompt，因此不是纯modifier。现`/review`及audit/check别名声明为单一driver；正文组合时由原runtime消费共享问题、brainstorm指令与全部skill，再交给原Git workbench生成一份prompt。第二个driver在派发前拒绝，独立首位命令路径不变。
+
+真实Git fixture验证untracked证据、review只读约束、skill body、brainstorm与问题进入同一prompt；review runtime11、composition22、prose completion21共54项最终单进程通过。移除driver声明后正文组合、两个alias、双driver拒绝和prose候选共5项有效失败并恢复。HANDOFF/addition第五十批/audit更新；四静态门、责任上限0、TS build 686381afc994及fresh、当前包judge proven、严格docs通过，Git/本批CI另绑定。未运行真实provider、全仓、exe或桌面PTY，ADD整体继续active。

@@ -79,7 +79,7 @@ import { runWarmupLocalCommand } from "./warmupCommandRuntime.js";
 import { runExitCommand } from "./exitCommandRuntime.js";
 import { runClearCommand } from "./clearCommandRuntime.js";
 import { renameSyntax, deleteSyntax, runSessionManagementCommand } from './navigation/management.js';
-import { runReviewCommand, reviewSyntax } from "./reviewCommandRuntime.js";
+import { prepareReviewComposition, runReviewCommand, reviewSyntax } from "./reviewCommandRuntime.js";
 import { runReloadCommand } from "./reloadCommandRuntime.js";
 import { runThemeCommand, themeSyntax } from "./themeCommandRuntime.js";
 import { runSettingsCommand } from "./settingsCommandRuntime.js";
@@ -470,6 +470,7 @@ export function createCommandRegistry(
       group: "workflow",
       argumentMode: "raw",
       argumentHint: syntaxHint(reviewSyntax),
+      composition: { kind: "driver", prepare: prepareReviewComposition },
       execute: (args, context) => runReviewCommand(args, context),
     },
     {

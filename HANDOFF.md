@@ -406,3 +406,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A settings category is missing even though the product has a real status command, or adding it creates a fake editable field or eagerly performs owner I/O.
 - **Root Cause**: Settings rows and configuration fields were treated as the same kind of capability, conflating discoverability with writable schema ownership.
 - **Rule**: Expose a read-only capability as a searchable, categorized row that returns the canonical command draft and performs no owner read or write until submission. Do not create config keys merely to fill a reference category.
+
+### Snapshot-Producing Commands Are Drivers, Not Modifiers
+- **Symptom**: A review command in composed prose loses the user's question or skill instructions, or runs beside another workflow that also claims the task.
+- **Root Cause**: The command reads repository state and creates the final model prompt, so treating it as a pure text modifier bypasses evidence collection or permits two owners.
+- **Rule**: Declare state-reading prompt builders as one driver that consumes the shared prose, modifiers and skills into its native prompt. Keep its standalone route unchanged, share aliases, and reject a second driver before either handler runs.

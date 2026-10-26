@@ -86,3 +86,9 @@ it('offers only declared inline commands and retains a real same-name path', () 
   const settings = request('问题 /set')!;
   expect(catalogSuggestions(settings, []).some(item => item.value === '/settings')).toBe(false);
 });
+
+it('offers review in prose only after its driver composition declaration', () => {
+  const review = request('检查证据 /rev')!;
+  expect(catalogSuggestions(review, []).some(item => item.value === '/review')).toBe(true);
+  expect(catalogSuggestions(review, []).some(item => item.value === '/settings')).toBe(false);
+});

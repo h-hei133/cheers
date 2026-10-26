@@ -297,7 +297,7 @@ ADD-12在参考的正文skill限制上扩展，允许与skill搭配、以及多�
 | deep-research的新研究问题入口 | 后续实施必须支持与一个或多个skill搭配，位于首位或正文中均可识别；沿真实research owner运行 |
 | deep-research的status/dump/pause/resume/steer/reconcile及保存流程 | 不作为正文方法修饰执行；原独立控制/保存准入路径保留 |
 | brainstorm与明确可组合的提示词模板 | 当前brainstorm已声明modifier，模板仅在frontmatter为`composable: true`时声明modifier；准备沿原纯构造入口，不能把整handler任意串行执行 |
-| review等其他方法入口 | 作为扩展候选逐动作核查，尚未据本文示例获得组合资格；有明确声明和兼容语义后才开放 |
+| review | 已声明为单一driver：它读取真实Git snapshot并构造一份只读review prompt，可消费共享正文、brainstorm modifier及全部skill；不能与另一个driver同时拥有任务 |
 | settings/model/connect/login/logout、会话恢复/删除、权限、shell/git、队列/后台控制等 | 不进入正文组合候选，不因正文token改变全局/会话状态或执行功能动作 |
 | 第三方扩展/新命令 | 默认不组合；通过同一owner能力声明、解析与准入后才可加入，不能仅按summary关键词开放 |
 
@@ -322,7 +322,7 @@ ADD-12在参考的正文skill限制上扩展，允许与skill搭配、以及多�
 重点检查可验证证据和反例
 ```
 
-当前可按实际声明检查`问题正文 /brainstorm /evidence /skill:review-b`：`evidence`仅为隔离夹具中的提示词模板，必须有`composable: true`，不是内置命令承诺。[既有组合测试](../../packages/ts-shell/src/core/commands/composition.test.ts)覆盖brainstorm与该模板共同构造、零handler调用；本轮仅阅读，没有重跑。`问题正文 /brainstorm /review /skill:review-b`仍是review获明确准入后的扩展示例。不得把组合变成先启动一次brainstorm、再启动一次review、最后另开一次skill对话；若实际语义不能纯构造，应明确不准入，而不是默默降为普通文本。
+`问题正文 /brainstorm /evidence /skill:review-b`中的`evidence`仍仅为隔离夹具模板，必须有`composable: true`，不是内置命令承诺。[既有组合测试](../../packages/ts-shell/src/core/commands/composition.test.ts)覆盖brainstorm与该模板共同构造、零handler调用。`问题正文 /brainstorm /review /skill:review-b`现按review driver准入：一个真实Git review prompt消费共享问题、brainstorm指令和全部skill，不先启动多个独立任务；review与deep-research等第二个driver同时出现时必须在派发前拒绝。
 
 验收包含deep-research+两skill、正文研究入口、两个兼容modifier、control动作拒绝、功能命令正文不执行、同名path/command、alias兼容、参数冲突、两个driver拒绝、skill未知、权限拒绝、取消、排队和输入恢复。检查真实工作流绑定、指令payload、provider派发次数与原状态/写权限，不能只检查提示词含有命令名称。
 
@@ -437,7 +437,7 @@ ADD-02/03现有共享CatalogNavigation和导航绘制owner：宽屏分类栏/内
 |---|---|---|
 | ADD-10 | 本地实现验证通过 | 统一源位置token，完整功能菜单/命令参数只认offset=0；正文绝对/相对/home/Windows路径、引号目录连续Tab和局部替换复用现有path owner。裸slash只提供匹配skill名及已声明组合方法，路径优先，显式`/skill:`可搜描述。候选有path/skill/command类型和身份，保留现有异步snapshot与取消准入；真实Windows终端仍缺 |
 | ADD-11 | 本地实现验证通过 | 同提交加载全部明确skill，按稳定身份去重、记录源range及body digest；统一校验失败、配置变化、来源撤销、取消或预算超限则不部分提交，返回原草稿。保留原文缩进/换行及多行持久历史；忙碌输入等待同一提交边界，附件随排队/编辑/派发/取消恢复保留。真正交互路由检查两份body和一份图片，未请求真实provider |
-| ADD-12 | 本地实现验证通过，准入范围明确 | brainstorm纯方法与显式`composable: true`模板可组合；deep-research首位/正文/alias支持多skill，创建一个真实native research，持久化所选方法并将指令送入每个实际子阶段。research控制/save/help、功能命令混入、两个driver及非法参数在派发前拒绝；driver派发后异常不伪装零派发，意外shell-action不交给功能路由。review尚未声明组合，明确拒绝，不能宣称示例中的review组合已支持 |
+| ADD-12 | 本地实现验证通过，准入范围明确 | brainstorm纯方法与显式`composable: true`模板可组合；deep-research首位/正文/alias支持多skill，创建一个真实native research，持久化所选方法并将指令送入每个实际子阶段。review现声明为单一driver，消费共享正文、modifier与全部skill并生成一份真实Git review prompt；research控制/save/help、功能命令混入、两个driver及非法参数在派发前拒绝；driver派发后异常不伪装零派发，意外shell-action不交给功能路由 |
 | ADD-07/08/09/13 | 待实施/验证 | 提前首帧、启动估算、context目录口径与发现入口继续按第12节处理；不能从本批多skill绿色提升 |
 
 实际owner：`core/prompts/tokens.ts`扫描原文，`core/prompts/skills.ts`统一skill展开，`core/commands/composition/plan.ts`收集方法和声明参数，`core/commands/composition.ts`准备后单派发；模板进入同一registry，补全和提交复用同一组合声明。`research/brief`及`research/run/prompts.ts`保留真实request与子请求传播，未另造研究工作流。参考正文skill的名段前缀和路径后备；用户指定offset=0优先于参考忽略前导空白规则。参考快照只证明单skill parser，不能据此称其完整多skill注入已验证。
@@ -1296,6 +1296,14 @@ ADD-03/13继续收口。settings根目录新增Memory / Review与Shell / Diagnos
 
 此批不把只读入口当作memory/shell状态动态验收；实际命令输出、真实provider/沙箱、桌面和全仓仍未运行。四静态门、严格docs、TS build `d448a4c6a269`及fresh、当前包judge proven通过，Git/本批CI另实际绑定。
 
+### 第五十批：review作为单一Git review driver
+
+ADD-12继续收口。定向检查确认review不是纯modifier：它先读取真实Git snapshot，再构造一份只读review prompt。现把`/review`及其`audit`/`check`别名声明为单一driver；组合时`runReviewCommand`消费共享正文、brainstorm modifier和全部skill，将它们按既有安全边界并入同一份focus，再交给原Git workbench生成一次review prompt。没有新扫描器、第二套Git读取或独立模型派发。
+
+正文prose发现和提交解析共用该driver声明。review与deep-research等第二个driver同时出现时在派发前拒绝，两个handler均不调用；独立首位`/review`仍走原命令路径。真实Git fixture验证untracked路径、review只读约束、brainstorm指令、skill body和原问题进入同一prompt；组合测试另验证alias、prompt metadata及单次派发。
+
+最终三文件54项单进程通过：review runtime11、composition22、prose completion21。临时移除driver声明后正文组合、两个alias、双driver拒绝和prose候选共5项有效失败，源码恢复后重验通过。未运行真实provider、全仓、exe、桌面或20k PTY；四静态门、严格docs、TS build `686381afc994`及fresh、当前包judge proven通过，Git/本批CI另实际绑定。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1319,6 +1327,7 @@ ADD-03/13继续收口。settings根目录新增Memory / Review与Shell / Diagnos
 | 设置搜索新查询仍保留较弱匹配焦点 | 第三十八批确认typed/pasted `topP`排名第一但Enter打开Input shape。现新查询自动聚焦最强匹配，同查询手动选择保持，清空回原字段；178项聚焦、一有效反转及两模式实际Node PTY有证据。不是用户原model按键现场唯一原因的证明 |
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
+| review正文组合原先未准入 | 第五十批确认review会读取真实Git snapshot，不能当纯modifier。现声明为单一driver，消费共享正文、brainstorm和全部skill并生成一份review prompt；audit/check共用声明，第二个driver在派发前拒绝。54项、5项有效反转和真实Git fixture有局部证据，真实provider/桌面仍待验 |
 | 代码示例误调用及合法关闭后漏skill | 原字符串查找将围栏正文误当关闭，或以不同长度反引号闭合；第二十九批改为独立关闭行与精确行内run，示例保持字面量，合法关闭后所有skill恢复解析。第三十三批再补实际研究新建入口数字preview，control/其他driver/child总成本仍待覆盖 |
 | 待注入记忆预览缺raw字节与可取消读取 | 原已有路径/元数据及generation保护；第三十批补原始字节追踪、有界async verified-handle读取及完整preview异步复验。六文件73项、三有效反转、两模式实际隔离PTY有局部证据。普通删除/invalidated原并非全无保护；第三十一批已补单次多记录共享读取，完整preview/controller累计I/O与所有动态来源验收仍未完成 |
 | 一次记忆预览反复读取相同文件 | 第三十一批沿原store共享单次有界只读snapshot，health/候选/lifecycle共用，12pending的binary acquisition从15降2，复验仍追加1；75项/三反转/两模式PTY有局部证据。全preview/controller和动态来源总读取成本仍待验，不能扩成全请求两次读 |
@@ -1371,14 +1380,14 @@ ADD-03/13继续收口。settings根目录新增Memory / Review与Shell / Diagnos
 | `比较方案 /research-a`，接受skill候选后继续第二行选择另一skill | 可从短前缀发现skill，插入明确canonical调用；后续行仍能选择并共同生效 | ADD-10/11 |
 | `/deep-research --mode software --depth deep /skill:research-a /skill:review-b 比较两种架构` | 一个真实研究入口拥有预算/取消/持久状态，全部skill参与；不能降为只含名字的普通对话 | ADD-11/12 |
 | `比较架构 /deep-research /skill:research-a /skill:review-b` | 正文研究入口与首位研究入口得到一致准入；全部skill与问题传入同一研究任务 | ADD-12 |
-| `问题正文 /brainstorm /review /skill:review-b` | 仅在对应动作被明确声明可组合且语义兼容后开放；多个方法构造同一任务，不依次执行整套handler | ADD-12 |
+| `问题正文 /brainstorm /review /skill:review-b` | review作为单一driver读取真实Git snapshot，并在一份review prompt中消费共享问题、brainstorm指令和全部skill；不依次执行多个任务 | ADD-12 |
 | `问题正文 /brainstorm /evidence /skill:review-b` | brainstorm与真实`composable: true`模板的指令共同生效；evidence为自建/夹具模板，不承诺默认安装。模板未声明时明确拒绝组合，不能静默只运行brainstorm | ADD-12 |
 | `说明 /model /settings /resume`或正文研究control词 | 不出现可执行的正文功能命令候选，不切模型/配置/会话或执行控制；原功能命令仍可在首位独立使用 | ADD-10/12 |
 | URL、代码块、行内代码、转义slash与同名路径 | 保留字面内容，不误调用skill/命令；路径与skill冲突时按实际选中候选类型接受 | ADD-10/11/12 |
 | 第二个skill未知、失效或被拒绝；两个工作流driver冲突 | 明确报告并保留可重试草稿，准备阶段不先执行第一个再隐瞒剩余失败 | ADD-11/12 |
 | 查询后继续编辑、换根、取消或关闭 | 迟到补全/准备结果不能覆盖新草稿或执行旧目标；接受候选仍不自动读取文件正文或授权工具 | ADD-10/11/12 |
 
-组合命令以实际动作声明为准，不能用“prompt类型”或“看起来非功能性”自动放行。候选发现、直接键入、提交解析必须共用同一准入规则。用户点名的deep-research加多skill是必达要求；brainstorm与显式可组合模板已有声明和局部证据，review等扩展示例仍需核查，不能写成所有方法命令已支持。
+组合命令以实际动作声明为准，不能用“prompt类型”或“看起来非功能性”自动放行。候选发现、直接键入、提交解析必须共用同一准入规则。用户点名的deep-research加多skill是必达要求；brainstorm、显式可组合模板与review driver已有声明和局部证据，其他方法仍需逐项核查，不能写成所有方法命令已支持。
 
 ### 16.5 本轮需求收口与实施边界
 

@@ -566,7 +566,7 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 | 不成立的源码解释 | “model没有上下键监听”“resume排序反了”“settings完全没有分类” | 源码有相应导航、时间倒序和分类。排除这些笼统解释不等于否认用户观察；真正缺口在可聚焦性、自动焦点和完整操作链 |
 | 不成立的能力推断 | “少Memory/Shell两个分类就是故障”“稀疏配置表示字段没有实现” | 当前元数据没有这两个分类的独立可编辑字段；原schema、默认继承和消费者存在。第四十九批已提供只读命令入口，仍不能用假编辑字段补齐十个名称 |
 | 不成立的计量或启动推导 | “工具数相近就该同tokens”“1.7k/4.9k仅因字符公式”“npm start每次编译/用户入口用错” | 本地计数方式有差异，但工具schema、规则/历史/协议、provider/cache口径和实际输入集合须对齐；公式不足以独自解释真实差额。已有入口证据也不支持每次编译或用户误用 |
-| 不成立的当前功能判断 | “只会生效第一个skill”“所有prompt类slash都能组合”“所有方法命令已经支持组合” | 当前有两份及更多skill的逐批payload证据。组合由实际能力声明准入，brainstorm、deep-research入口及`composable: true`模板已有声明；review等示例不构成支持承诺 |
+| 不成立的当前功能判断 | “只会生效第一个skill”“所有prompt类slash都能组合”“所有方法命令已经支持组合” | 当前有两份及更多skill的逐批payload证据。组合由实际能力声明准入，brainstorm、review driver、deep-research入口及`composable: true`模板已有声明；其他方法仍不因名字或prompt类型自动获得资格 |
 | 仍未确认 | 原现场唯一按键根因、真实1.7k/4.9k组成、生产冷热收益、桌面输入与认证接受 | 缺证据就继续未确认，不能写成“不存在”或“已解决”；真实provider失败与产品路由故障仍分开 |
 
 用户最终要求已集中到[面板盘点与剩余验收](phase-20-addition.md#36-当前面板盘点与剩余验收范围)、[输入样例](phase-20-addition.md#164-用户输入样例与组合验收)和[本轮需求收口](phase-20-addition.md#165-本轮需求收口与实施边界)：两个面板整体参照oh-my-pi；未配置具体模型允许聚焦；resume默认最新且不抢手动焦点；已提交正文顶格、编辑箭头恢复；完整功能slash仅在源首位，正文路径suggestion/Tab；同一输入的多skill实际共同生效；多个兼容方法与一个研究入口组成一份任务。启动先显示真实TUI/loading，初始上下文按实际请求本地估算并与实测正确接续。
@@ -598,7 +598,7 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 | 确实存在，已有局部修补 | 首帧过晚、初始只读provider用量而出现问号、正文路径/Tab、多skill共同生效、有限slash组合及代码边界缺口。已沿真实TUI交接、请求本地估算、原补全/组合/研究owner推进；完整功能slash仅限源首位，正文开放路径、skill和明确准入方法，deep-research加多skill构造一份真实任务 |
 | 本批确定并修补 | settings失败重试/scope确认把旧pending带到新binding、user来源selector未保护、不可读scope丢面板。修补不禁止普通同源冲突重试，不将磁盘写入称为运行时已接受 |
 | 不成立的笼统解释 | “没有上下键监听”“resume排序反了”“settings无分类或稀疏配置说明无实现”“Memory/Shell菜单名缺失就一定是故障”“每次npm start都编译/用户入口用错”，当前源码与既有证据不支持；排除这些解释不否认用户观察 |
-| 不成立的计量或功能推导 | 工具数量相近不能推出token相同；对话后4.9k不能直接归因于本地字符公式。当前已有多skill实际payload证据，不再是只能加载首个；但prompt类型或“非功能性”标签不自动赋予组合资格，review等例子也不构成已支持承诺 |
+| 不成立的计量或功能推导 | 工具数量相近不能推出token相同；对话后4.9k不能直接归因于本地字符公式。当前已有多skill实际payload证据，不再是只能加载首个；但prompt类型或“非功能性”标签不自动赋予组合资格，未声明的其他方法仍不构成支持承诺 |
 | 仍未确认 | 用户原终端按键无交互的唯一原因、真实1.7k/4.9k分项差额、同条件冷热/修补前启动收益、真实桌面IME/剪贴板与认证接受。不能列为“不存在”或“已经解决”，不由合成PTY、结构judge或历史CI补造证据 |
 
 详细需求与验收仍集中在[phase-20-addition文末](phase-20-addition.md#16-最新问题总和与必须完成的体验)：未配置模型可选；两个面板整体看齐；已提交正文顶格、编辑箭头贴左且续行对齐；正文`/home` suggestion/Tab；首位与正文多skill真实共同生效；兼容modifier与deep-research入口组合为同一任务；启动先显示真实TUI/loading、上下文按实际请求本地估算再衔接实测。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
@@ -646,3 +646,7 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 ### 文末当前问题判断（第四十九批）
 
 settings根目录现补Memory / Review与Shell / Diagnostics两个只读入口，分别插入`/memory status`和`/shell status`草稿。入口可搜索、分类导航并说明真实owner，但不读取状态、不保存配置，也不是新增可编辑字段；实际输出仍需用户提交原命令。真实OverlayHost分类/Enter/零保存路径及settings39、fields98、session14、source8共159项通过，移除capability rows可触发有效失败并恢复。见[第四十九批](phase-20-addition.md#第四十九批memory与shell的只读owner入口)。四静态门、构建、judge和docs另绑定；完整面板及真实命令/桌面环境继续active。
+
+### 文末当前问题判断（第五十批）
+
+review被确认不是纯modifier：它读取真实Git snapshot并生成一份只读review prompt。现`/review`及audit/check别名声明为单一driver，正文组合时消费共享问题、brainstorm指令和全部skill，再由原Git workbench生成一次prompt；第二个driver在派发前拒绝，独立首位命令不变。真实Git fixture验证untracked证据、skill/modifier/prose进入同一review，review runtime/composition/prose三文件54项通过；移除driver声明后5项有效失败并恢复。见[第五十批](phase-20-addition.md#第五十批review作为单一git-review-driver)。未运行真实provider、全仓、exe或桌面PTY；ADD-12局部边界增强，整体及真实环境验收继续active。
