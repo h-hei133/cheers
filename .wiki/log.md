@@ -9326,3 +9326,9 @@ ADD-07原基准以后期模型名当firstFrame。现真实Loading编辑区/状�
 前两批CI40259916832/40261257582延迟确认failure，唯一旧configuration菜单断言本地复现。修fixture保留catalog scope和按授权重开发布合同测试，新增普通设置不隐式接受/原CLI目标/失败reload保真，三文件68pass；丢scope反转准入拒绝/恢复重验。首轮终端double未发inputReady与反转探针只认AssertionError分别分类，日志保留，未弱化产品。四静态门/docs/diff及当前打包judge proven三satisfied，证据phase20-addition-startup-measurement，Git当前CI另绑定；原Phase38/9与ADD独立/active，完整面板/认证/研究/计量及启动剩余缺口继续待验。
 
 最终checkBuild因新增测试进入输入摘要拒绝旧build；曾在失败后先做本地提交，未推送，现已串行补TS/exe build eb885e2d0902，TS artifact与120样本测量build相同。当前四形态×Node/exe各两样本共16次通过，required executable新鲜度通过。旧120样本仍绑定dc576660，当前仅小样本；两个manifest分别归档，临时目录清理后再交付。
+
+## [2026-10-26] docs | 面板完整清单与交互补充要求收口
+
+按用户最新要求只定位并完善文档，产品基线4abe6f11、参考快照未变。phase-20-addition校正旧HEAD与已过时首帧标记结论，补settings37项/八个真实分类、user37/project36政策及两个会话入口盘点；Memory/Shell缺菜单名不独立判缺陷，继续核查原owner发现入口。明确brainstorm、deep-research入口与显式composable模板的当前组合声明，review保留扩展示例；文末集中完整面板操作链、未配置可选、resume默认/手动焦点、正文顶格/箭头、路径Tab、多skill/有限slash、启动/计量验收。interaction-audit文末分已确认原问题/剩余任务/不成立解释/未确认原因，保留所有历史实施证据。
+
+本轮未改运行时代码、未跑产品测试/构建/PTY/基准/真实认证。延迟读取原HEAD自身CI40264741138仍运行，Architecture Watch40264741044已success；不等于ADD整体通过。313个本地链接、49个标题锚点、ADD-01…13/37项清单检查通过；首个内联链接探针双重转义误报0链接/缺ID，修探针并加非零断言后通过，未改文档掩盖失败。四静态门、strict docs和diff通过，118条既有引用advisory保留。原Phase38/9、ADD独立且active，Git交付按实际记录。

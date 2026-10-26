@@ -15,7 +15,7 @@ confidence: mixed
 
 本文汇总2026-10-25至26日常使用反馈、[逐项核查](interaction-audit.md)及用户最新更正，作为实施的需求与验收依据。第1至14节保留初次定位与需求基线；后续已授权实施的当前证据见第15节，文末第16节汇总问题与最终体验，不能把需求条目或局部验证当作全部验收通过。
 
-本轮按用户要求仅核对与补充文档，核对HEAD为`2a5cf9949cff57876adc20ebb8179040d7e00254`。下文的“初次定位”均指修补前机制；它们不能被当作这个HEAD仍有同样故障的证明。本轮没有重新运行产品测试、终端验证或真实provider对照，既有验证仍归属第15节对应批次。
+最新文档核对的产品HEAD为`4abe6f11af3bd7966796f29b996f5321b16b0140`，只读参考oh-my-pi仍为下述快照。本轮按用户要求定位与完善需求文档，没有修改运行时代码，也没有重跑产品测试、构建、终端、启动基准或真实provider对照。下文的“初次定位”均指修补前机制；既有实现与验证归属第15节对应批次，不能将旧机制写成当前仍有同样故障。前次文档核对HEAD为`2a5cf9949cff57876adc20ebb8179040d7e00254`，其后第三十七批已修正启动测量和目录测试合同。
 
 用户最新明确要求优先于旧裁决。本次不再询问是否恢复箭头、是否允许选中未配置模型、是否让settings/model向oh-my-pi看齐。原[Phase 20规划](phase-20-decisions.md)、[契约矩阵](phase-20-contract.md)和[交付状态](phase-20-status.md)仍保存原47项范围与历史证据；本文用ADD编号单独登记补充工作，既有任务映射表示复用关系，不修改它们的已验状态或补造完成证据。
 
@@ -144,6 +144,27 @@ Model / Session必须可从类别浏览及全局搜索找到；model/roles和当
 
 每条交付记录要有实际操作、焦点/目标身份、接受或持久状态、返回位置与未覆盖环境。普通TTY与fullscreen分别验证；桌面键盘、系统剪贴板、IME和真实认证仍单列缺口，不能由合成终端验证替代。
 
+### 3.6 当前面板盘点与剩余验收范围
+
+本轮静态核对[配置字段政策](../../packages/ts-shell/src/config/fields.ts)、[设置元数据](../../packages/ts-shell/src/config/settings.ts)、[设置草稿](../../packages/ts-shell/src/cli/interactive/settings.ts)及两个picker。当前settings元数据共37项：34个根字段、3个`tui`子字段；user scope可编辑37项，project scope按原政策排除个人选择`cacheWarming`后可编辑36项。Model / Session的两个入口由host能力另行提供，不能算作新增文件设置。这是源码清单，**不是本轮37项操作均验证通过**。
+
+| 当前可见分类 | 需逐项核对的现有设置/入口 | 验收重点 |
+|---|---|---|
+| Appearance | theme、tuiMode、tui.composerShape/statusItems/diagrams | 主题和输入预览撤回；立即生效与restart分别读回；状态项空值按默认合同 |
+| Model | maxTurns、temperature、topP、maxOutputTokens、allowedModels；Models and roles、Thinking effort | 数值范围/模型能力、限制交集、会话模型与文件scope分开；嵌套取消和保存返回原入口 |
+| Interaction | vimMode、attentionOnIdle、offline | 实际输入/通知/网络owner值；环境或启动覆盖存在时不能声称文件值已取代effective |
+| Context | contextWindow、reserveTokens、modelTokenBudgets、instructionBudgetBytes | 默认继承、对象完整编辑、模型预算和请求准入；本地计数与实测不同来源 |
+| Files | pathRules | 对象列表多行编辑、路径政策与约束累积；取消/拒绝不保存部分列表 |
+| Tools | allowedTools、disabledTools、hiddenToolPrefixes、denyRules、enableMcpTools、toolDiscovery | 空数组与unset区别、交集/合并/禁用政策、工具发现实际发送集合 |
+| Tasks | cacheWarming、agentMode、steeringMode、followUpMode、backgroundFollowUp | user/project适用性、默认模式与会话选择、后台请求实际应用时点 |
+| Providers | retryEnabled、retryMaxRetries、providerRetryMaxRetries、retryBaseDelayMs、retryMaxDelayMs、providerConnect/Headers/BodyTimeoutMs | 各重试层与超时对应真实消费者；连接/凭据仍走原connect owner |
+
+当前`GROUP_ORDER`声明参考十类顺序，`SETTINGS_GROUPS`只显示有真实元数据的八类，Memory和Shell未显示；本轮所读`CONFIG_FIELDS`没有独立memory/shell可编辑字段。**缺这两个名字本身不是已确认故障，也不说明相关产品能力不存在。** ADD-03需继续核查相应原owner是否有适合从settings发现的真实设置或只读状态：有就委托入口并标明scope，没有就省略，不造空菜单或重复字段。今后新增真实字段时仍复用原schema/来源政策，不能另建面板配置体系。
+
+后续实施须以37项清单和原scope政策补齐字段、来源及保存读回矩阵，而非继续随机挑一个绿色例子：每项覆盖所属category/section、搜索发现、effective/accepted/stored、编辑/移除、Apply/Discard及重开；每种来源合并政策和编辑器另覆盖代表性的冲突、无效值、取消与失效。已有第15节证据可复用，未覆盖组合写明未验，不重复全仓回归。
+
+model当前已使用`disabled: true, focusable: true`允许具体未配置目标浏览，精确详情、配置返回、目录刷新和目标档位恢复也有逐批证据。ADD-01/02仍须完成单ready/全未配置、两个relay同名模型、角色/默认浏览、缺凭据/能力阻断/目录歧义/真实认证及键鼠窗口矩阵。参考的locked provider诊断与本项目“未配置具体模型也可选中”有明确差异，不能为了外观一致退回空模型内容区。新发现缺口先写可复现路径，再沿model、connect、会话模型及配置发布原owner修补。
+
 ## 4. resume：渐进加载后的合理默认焦点
 
 ADD-04沿[当前会话首快照](../../packages/ts-shell/src/session/store/catalog/index.ts)、[listing](../../packages/ts-shell/src/cli/interactive/picker/session/listing.ts)与[overlay](../../packages/ts-shell/src/cli/interactive/overlay.ts)修补。初次定位时先发布current、历史逐批加入，OptionModel保留首次自动ID，因此今天的会话出现后仍选两天前那条。排序本身是置顶优先、更新时间倒序，不应通过反转排序修焦点。当前[session picker](../../packages/ts-shell/src/cli/interactive/picker/session.ts)已有最新候选defaultSelection，OptionModel以selectionTouched区分自动和手动选择，局部证据见第15节首批。
@@ -185,7 +206,7 @@ ADD-07按用户方向改善“空白终端等待”。初次定位时，[入口]
 
 分别测首次可见、输入接管、runtime-ready、首次请求准入与退出；同机器同fixture的冷/热Node/exe分别取样，首帧更快不能写成所有初始化更快。先用小会话验证加载时输入、取消和故障；性能验收沿现[START-03](phase-20-decisions.md)口径，不能用`--version`代替TUI首帧。
 
-本轮只读核对确认[现启动基准](../../scripts/bench-interactive.mjs)在regular/fullscreen仍以输出中的`openai`识别firstFrame；该标记指向后期模型状态，不能识别早期Loading编辑区。ADD-07必须先修正测量口径，区分早期首帧、完整runtime输入接管与ready，再做Node/exe取样。[进程计时](../../packages/ts-shell/src/observability/startupTiming.ts)的write callback表示流写入完成，不等于终端像素已呈现；父进程收到字节、进程内部写入及真实可见画面不得混算。本轮没有运行基准，冷/热收益继续未确认。
+前次文档核对时，[启动基准](../../scripts/bench-interactive.mjs)确实以`openai`误标firstFrame；第三十七批已修正。当前[观察owner](../../scripts/bench/observation.mjs)识别真实`❯ Loading · type a draft`与`Loading runtime`，另观察正式输入提示，记录runtime输入接管和正式写入；120个warm-uncontrolled空会话样本仍绑定该批测量build，最终新build另有16个pilot，不能混算。[进程计时](../../packages/ts-shell/src/observability/startupTiming.ts)的write callback表示流写入完成，不等于终端像素已呈现；父进程收到字节、进程内部写入及真实可见画面不得混算。本轮未重跑基准，冷缓存、修补前对照、真实项目/桌面与完整首请求收益继续未确认。
 
 ## 7. 上下文：启动估算、实测衔接与差额定位
 
@@ -273,7 +294,8 @@ ADD-12在参考的正文skill限制上扩展，允许与skill搭配、以及多�
 | 纯提示词模板/方法修饰 | 显式声明可组合且无准备阶段副作用的入口可加入；允许多个兼容项 |
 | deep-research的新研究问题入口 | 后续实施必须支持与一个或多个skill搭配，位于首位或正文中均可识别；沿真实research owner运行 |
 | deep-research的status/dump/pause/resume/steer/reconcile及保存流程 | 不作为正文方法修饰执行；原独立控制/保存准入路径保留 |
-| brainstorm、review等既有提示词入口 | 作为首批候选逐动作审计；提取纯提示词构造与必要只读准备后才能纳入，不把整handler任意串行执行 |
+| brainstorm与明确可组合的提示词模板 | 当前brainstorm已声明modifier，模板仅在frontmatter为`composable: true`时声明modifier；准备沿原纯构造入口，不能把整handler任意串行执行 |
+| review等其他方法入口 | 作为扩展候选逐动作核查，尚未据本文示例获得组合资格；有明确声明和兼容语义后才开放 |
 | settings/model/connect/login/logout、会话恢复/删除、权限、shell/git、队列/后台控制等 | 不进入正文组合候选，不因正文token改变全局/会话状态或执行功能动作 |
 | 第三方扩展/新命令 | 默认不组合；通过同一owner能力声明、解析与准入后才可加入，不能仅按summary关键词开放 |
 
@@ -298,7 +320,7 @@ ADD-12在参考的正文skill限制上扩展，允许与skill搭配、以及多�
 重点检查可验证证据和反例
 ```
 
-多个非skill提示词组合的示例，在相应动作进入白名单后验收：`问题正文 /brainstorm /review /skill:review-b`。不得把它变成先启动一次brainstorm、再启动一次review、最后另开一次skill对话；若该组合的实际语义不能纯构造，应明确不准入并提供可用替代，而不是默默降为普通文本。
+当前可按实际声明检查`问题正文 /brainstorm /evidence /skill:review-b`：`evidence`仅为隔离夹具中的提示词模板，必须有`composable: true`，不是内置命令承诺。[既有组合测试](../../packages/ts-shell/src/core/commands/composition.test.ts)覆盖brainstorm与该模板共同构造、零handler调用；本轮仅阅读，没有重跑。`问题正文 /brainstorm /review /skill:review-b`仍是review获明确准入后的扩展示例。不得把组合变成先启动一次brainstorm、再启动一次review、最后另开一次skill对话；若实际语义不能纯构造，应明确不准入，而不是默默降为普通文本。
 
 验收包含deep-research+两skill、正文研究入口、两个兼容modifier、control动作拒绝、功能命令正文不执行、同名path/command、alias兼容、参数冲突、两个driver拒绝、skill未知、权限拒绝、取消、排队和输入恢复。检查真实工作流绑定、指令payload、provider派发次数与原状态/写权限，不能只检查提示词含有命令名称。
 
@@ -1135,7 +1157,7 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，本批补preview异步/cancellable复验和实时准入，不能写成原来无内容校验。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
-| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、编辑多行、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进。第二十五批修补搜索退出/焦点域/模型详情返回；第二十六批再补Model / Session两个真实owner入口及取消/保存/角色返回，六文件104项通过；第二十七批补普通choice/effort当前值焦点、七类编辑器保存重开与help退出夹具，五文件112项通过。第二十八批再补只读来源内容wheel、翻页/首尾、有界大值阅读及拒绝后返回，五文件118项和两模式隔离PTY通过；只读文本仍有4MiB上限。全部字段/来源/scope/子编辑/桌面/真实认证组合尚未完成，不能将现有局部绿色写成“整体已看齐” |
+| settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。当前settings37项/八个真实分类及两个会话入口见第3.6节；Memory/Shell缺名字本身不是故障。全部字段/来源/scope/子编辑/能力/桌面/真实认证组合尚未完成，不能将第15节局部绿色写成“整体已看齐” |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；完整场景验收仍按下表，正文功能命令不能因此执行 |
 | 代码示例误调用及合法关闭后漏skill | 原字符串查找将围栏正文误当关闭，或以不同长度反引号闭合；第二十九批改为独立关闭行与精确行内run，示例保持字面量，合法关闭后所有skill恢复解析。第三十三批再补实际研究新建入口数字preview，control/其他driver/child总成本仍待覆盖 |
 | 待注入记忆预览缺raw字节与可取消读取 | 原已有路径/元数据及generation保护；第三十批补原始字节追踪、有界async verified-handle读取及完整preview异步复验。六文件73项、三有效反转、两模式实际隔离PTY有局部证据。普通删除/invalidated原并非全无保护；第三十一批已补单次多记录共享读取，完整preview/controller累计I/O与所有动态来源验收仍未完成 |
@@ -1152,7 +1174,7 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 |---|---|
 | “model压根没有上下键监听” | 源码有监听及导航；原来跳过disabled能导致无可见变化。不能用监听存在否认用户观察，也不能把“跳过未配置”当作用户意愿 |
 | “resume按时间排序反了” | 时间倒序机制存在，确定缺口在渐进自动焦点保留；修补焦点而非反转排序 |
-| “settings完全没有分类、稀疏配置说明字段没实现” | 既有分类、默认继承与真实消费者存在；需要改善整体导航和发现性，而不是制造空设置或把所有默认值写回 |
+| “settings完全没有分类、稀疏配置说明字段没实现”“参考十类必须全部显示” | 当前八类/37项与两个会话入口来自真实元数据及原owner，默认继承和真实消费者存在。Memory/Shell未显示不单独证明缺陷；对应能力的发现入口仍需核查，不能添加假字段或把所有默认值写回 |
 | “npm start每次编译，或用户入口用错” | 既有入口证据不支持。应改首帧时序并测实际耗时，不能把慢启动归咎于用户 |
 | “对话后4.9k就是字符÷3.5” | 对话后值有provider归一化输入用量来源；本地估算另有公式。两者需逐项对齐，不能混为同一公式结果 |
 | “工具数差不多，所以两个项目上下文必然相同” | 实际发送schema、规则、消息、协议与计数器决定成本，工具个数不足以推导token数 |
@@ -1189,11 +1211,27 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 | `/deep-research --mode software --depth deep /skill:research-a /skill:review-b 比较两种架构` | 一个真实研究入口拥有预算/取消/持久状态，全部skill参与；不能降为只含名字的普通对话 | ADD-11/12 |
 | `比较架构 /deep-research /skill:research-a /skill:review-b` | 正文研究入口与首位研究入口得到一致准入；全部skill与问题传入同一研究任务 | ADD-12 |
 | `问题正文 /brainstorm /review /skill:review-b` | 仅在对应动作被明确声明可组合且语义兼容后开放；多个方法构造同一任务，不依次执行整套handler | ADD-12 |
+| `问题正文 /brainstorm /evidence /skill:review-b` | brainstorm与真实`composable: true`模板的指令共同生效；evidence为自建/夹具模板，不承诺默认安装。模板未声明时明确拒绝组合，不能静默只运行brainstorm | ADD-12 |
 | `说明 /model /settings /resume`或正文研究control词 | 不出现可执行的正文功能命令候选，不切模型/配置/会话或执行控制；原功能命令仍可在首位独立使用 | ADD-10/12 |
 | URL、代码块、行内代码、转义slash与同名路径 | 保留字面内容，不误调用skill/命令；路径与skill冲突时按实际选中候选类型接受 | ADD-10/11/12 |
 | 第二个skill未知、失效或被拒绝；两个工作流driver冲突 | 明确报告并保留可重试草稿，准备阶段不先执行第一个再隐瞒剩余失败 | ADD-11/12 |
 | 查询后继续编辑、换根、取消或关闭 | 迟到补全/准备结果不能覆盖新草稿或执行旧目标；接受候选仍不自动读取文件正文或授权工具 | ADD-10/11/12 |
 
-组合命令以实际动作声明为准，不能用“prompt类型”或“看起来非功能性”自动放行。候选发现、直接键入、提交解析必须共用同一准入规则。用户点名的deep-research加多skill是必达要求；brainstorm/review属于需按实际动作核查的示例，不能将示例白名单误写成已经全部支持。
+组合命令以实际动作声明为准，不能用“prompt类型”或“看起来非功能性”自动放行。候选发现、直接键入、提交解析必须共用同一准入规则。用户点名的deep-research加多skill是必达要求；brainstorm与显式可组合模板已有声明和局部证据，review等扩展示例仍需核查，不能写成所有方法命令已支持。
 
-本轮新增的是文档澄清、面板交付清单、输入几何摘要与组合样例；另登记启动基准标记过时的确定测量缺口。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益仍待证据，不归类为“不存在”，也不提升ADD整体完成状态。
+### 16.5 本轮需求收口与实施边界
+
+本轮只更新文档，保留ADD-01至13和原47项状态。执行时按以下清单补缺，每项沿原owner交付；已存在且有合格证据的路径复用既有结果，不重造系统。
+
+| 用户要求 | 必须保留的实施方向 | 尚需补齐的证据 |
+|---|---|---|
+| 两面板整体看齐 | 先对照参考的分类/section、焦点域、搜索、详情、修改/配置、返回和窗口布局，再补具体缺口；功能内容来自本项目原owner | 第3.5/3.6节完整矩阵；settings全部真实字段与scope，model精确目标/能力/角色/认证，普通及全屏实际操作 |
+| 未配置模型允许选中 | 上下键可移到具体未配置行，Enter查看详情/精确配置，配置接受后再显式启用；能力阻断走目标档位恢复 | 用户原环境事件链、全部未配置、配置成功/失败/取消、目录变化与同名relay；不能宣称表单打开就是认证成功 |
+| resume默认最新 | 自动阶段随最新可恢复候选更新，主动选择后按稳定ID保持；排序、current标记与默认焦点分别处理 | 分批旧→新、途中手选、scope/search换代、目标消失及Enter失效检查 |
+| 已提交正文顶格、输入箭头恢复 | 第1列正文仅去绘制留白，源缩进保留；编辑区箭头贴左、续行对齐正文，caret/复制用原源投影 | 中文/emoji/组合字符/换行/resize/选区及桌面IME、剪贴板；不恢复黄条或trim原文 |
+| 首位slash、正文路径及Tab | 完整功能命令仅在源offset=0；其他位置按光标token提供路径、skill与准入方法；局部替换和目录连续补全 | `读取 /home`、后续行、词中光标、空格路径、同名候选、无候选、取消/换根与迟到结果 |
+| 一次多个skill | 全部明确调用统一解析、稳定去重、加载并进入同一实际prompt/研究任务，保留原问题/附件；不递归解析skill正文 | 至少两份实际body、未知第二项/拒绝/失效/超预算整次阻止与草稿恢复；代码/URL/转义保持字面量 |
+| 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
+| 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
+
+本轮修正了旧HEAD与过时启动测量结论，补充面板字段盘点、实际组合能力和剩余验收清单。没有发现需要本轮直接修改运行时代码的已复现新缺陷，也没有追加完成承诺。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
