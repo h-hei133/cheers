@@ -98,7 +98,9 @@ it('connects actual Settings input and confirmation to the accepted value and ne
   expect(fs.readFileSync(file, 'utf8')).toBe('{}');
   // Choosing the field and value only stages it; Apply is a separate action.
   terminal.input('attentionOnIdle'); terminal.input('\r');
-  await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('Choose true'));
+  await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('▸ Choose false'));
+  terminal.input('\x1b[A');
+  await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('▸ Choose true'));
   terminal.input('\r');
   await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('Pending: true'));
   expect(context.runtimeConfig.attentionOnIdle).toBe(false);

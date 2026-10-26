@@ -420,3 +420,5 @@ settings/model 对齐参考、resume 默认焦点、启动提前进入 TUI、首
 本批确认设置来源表单吞掉wheel，64KiB可编辑保护同时拒绝较大的只读三值来源，并阻止Enter返回。现只对绘制内容路由滚轮，复用共享Editor按4096单元/完整字素边界分页；PgUp/PgDn、Ctrl+Home/End与Enter/Esc回原详情保留暂存。只读总量上限4MiB，超限明确提示检查文件，编辑与密钥64KiB保护保留。五文件118项、三有效反转/字节恢复、四静态门/构建及正式judge proven三satisfied通过；普通/全屏实际Node隔离PTY验证大值编辑拒绝、来源wheel/翻页/首尾、两种返回及config原字节、零message/provider。详见[第二十八批](phase-20-addition.md#15-实施与验证证据)。
 
 本批未证明完整面板已看齐或极限大配置全部可在面板检查。未配置模型可选、输入顶格与箭头、正文路径、多skill及有限方法slash组合继续依[文末总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)验收；没有上下键监听、resume排序反了、每次编译、4.9k等于字符公式、工具数决定token数等解释仍不成立。现场唯一根因、真实token差额/启动收益/认证、cache-build来源继续未知。第二十七CI延迟检查仍in_progress，原Phase38/9与ADD独立、整体active。
+
+交付后的延迟实查：第二十七CI `40248313306`实际failure，999文件/10931pass/2fail/3skip；source与attention旧焦点夹具均默认Enter期待true。source已在`4967fe9c`修正，attention现用真实上键显式选true，本地基线13pass/1fail后两文件22pass；不修改当前值焦点产品合同。`4967fe9c`远端相同/工作区干净，CI `40249904982`仍in_progress；补充提交交付另绑定，不借历史Watch success替代测试。

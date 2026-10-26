@@ -9262,3 +9262,5 @@ ADD-03普通settings choice原默认首项、thinking默认auto，现按effectiv
 ADD-03确认form吞wheel、64KiB编辑保护拒绝只读三值来源且Enter无法返回。复用Editor按最多4096单元/完整字素源片段布局，内容命中wheel、PgUp/PgDn、Ctrl+Home/End及Enter/Esc保留暂存；只读总量4MiB并明确拒绝，编辑与masked64KiB仍保留。基线旧boolean期待按实际effective焦点显式选择true后验证覆盖。
 
 五文件118pass、三有效反转/字节恢复、四静态门/TS构建c27b7b21ca2e及新解包正式judge proven三satisfied通过。普通/全屏实际Node隔离PTY均通过大值拒绝→只读翻页/首尾/wheel→Enter/Esc保留pending，config原字节不变/零message-provider/modelSelection不写，143退出均settle。失败夹具日志保留。证据phase20-addition-settings-source；docs/Git另绑定，第二十七CI仍运行，完整面板/真实认证/计量性能等仍待验，原Phase38/9和ADD独立/active。
+
+交付后上一批CI完成红色10931pass/2fail/3skip，两失败为来源与提醒旧焦点夹具。来源本批已修，attention补真实上键选true并保留stage/Apply/下次通知断言，两文件22pass；不改变产品。上一批失败归档，当前CI仍运行，补充提交另绑定。基线未退出便启动后轮的短暂重叠已纠正并记录。
