@@ -13,7 +13,9 @@ confidence: mixed
 
 ## 1. 本文作用与优先关系
 
-本文汇总2026-10-25至26日常使用反馈、[逐项核查](interaction-audit.md)及用户最新更正，作为实施的需求与验收依据。第1至14节保留初次定位与需求基线；后续已授权实施的当前证据见第15节，不能把需求条目或局部验证当作全部验收通过。
+本文汇总2026-10-25至26日常使用反馈、[逐项核查](interaction-audit.md)及用户最新更正，作为实施的需求与验收依据。第1至14节保留初次定位与需求基线；后续已授权实施的当前证据见第15节，文末第16节汇总问题与最终体验，不能把需求条目或局部验证当作全部验收通过。
+
+本轮按用户要求仅核对与补充文档，核对HEAD为`2a5cf9949cff57876adc20ebb8179040d7e00254`。下文的“初次定位”均指修补前机制；它们不能被当作这个HEAD仍有同样故障的证明。本轮没有重新运行产品测试、终端验证或真实provider对照，既有验证仍归属第15节对应批次。
 
 用户最新明确要求优先于旧裁决。本次不再询问是否恢复箭头、是否允许选中未配置模型、是否让settings/model向oh-my-pi看齐。原[Phase 20规划](phase-20-decisions.md)、[契约矩阵](phase-20-contract.md)和[交付状态](phase-20-status.md)仍保存原47项范围与历史证据；本文用ADD编号单独登记补充工作，既有任务映射表示复用关系，不修改它们的已验状态或补造完成证据。
 
@@ -71,7 +73,7 @@ confidence: mixed
 
 ### 3.2 model：允许选中未配置模型
 
-当前[model picker](../../packages/ts-shell/src/cli/interactive/picker/model.ts#L71)把配置/凭据等准入失败映射成disabled；[OptionModel](../../packages/ts-shell/src/presentation/tui/chrome/options.ts#L78)禁止disabled成为current/focus，step也跳过它们。**这是源码事实；它与“只有一个模型可用时按键看起来毫无变化”相容，但不证明用户终端的事件确已进入这个分支。**
+初次定位时，[model picker](../../packages/ts-shell/src/cli/interactive/picker/model.ts)把配置/凭据等准入失败映射成disabled，[OptionModel](../../packages/ts-shell/src/presentation/tui/chrome/options.ts)禁止这些行成为current/focus，step也跳过它们。**这是修补前的源码事实；它与“只有一个模型可用时按键看起来毫无变化”相容，但不证明用户终端的事件确已进入这个分支。** 当前具体模型行已使用`disabled: true, focusable: true`表达“能浏览、不能直接启用”，OptionModel沿focusable导航；详情提供适用的连接配置或档位恢复。现有实现与局部验证见第15节，用户原环境的零可见交互仍需复验。
 
 ADD-01的目标行为：
 
@@ -88,7 +90,7 @@ ADD-01的目标行为：
 
 ### 3.3 model：分类、角色、预设与详情
 
-ADD-02须把目前平铺的provider→connection→model及角色预设组织成可导航层次。基础入口包括Roles、All models和provider分类；同一provider多个connection在内容区能辨认或下钻。预设沿现[预设owner](../../packages/ts-shell/src/core/commands/model/preset.ts)与[会话模型owner](../../packages/ts-shell/src/session/model/state.ts)处理，不新增另一套角色配置。
+ADD-02须把初次定位时平铺的provider→connection→model及角色预设组织成可导航层次。基础入口包括Roles、All models和provider分类；同一provider多个connection在内容区能辨认或下钻。预设沿现[预设owner](../../packages/ts-shell/src/core/commands/model/preset.ts)与[会话模型owner](../../packages/ts-shell/src/session/model/state.ts)处理，不新增另一套角色配置。分类已有实施证据，完整操作链仍按本节验收。
 
 默认打开时能定位当前模型，并清楚区分“当前活动”“键盘焦点”“尚未配置”。可用与未配置分类都可访问。两栏详情要跟随焦点，显示名称、精确连接、模型能力、reasoning约束及阻止启用的原因；模型类别tabs仅在目录有真实分类数据时提供，不根据名字臆测。目录刷新不抢手动焦点，目标失效时落到邻近可浏览项并说明状态。
 
@@ -98,7 +100,7 @@ ADD-02须把目前平铺的provider→connection→model及角色预设组织成
 
 ### 3.4 settings：主分类、section与真实编辑器
 
-ADD-03将现[七组加All](../../packages/ts-shell/src/cli/interactive/picker/settings.ts#L161)向参考的主分类/section层次组织，覆盖本项目已有设置而非仅改组名。建议映射：
+ADD-03将初次定位时的七组加All向参考的主分类/section层次组织，覆盖本项目已有设置而非仅改组名。当前[settings picker](../../packages/ts-shell/src/cli/interactive/picker/settings.ts)已声明下述十类，并加入Model / Session真实入口；这不代替全部字段、来源与编辑器的验收。分类映射：
 
 | 目标分类 | 本项目应归入的真实能力 |
 |---|---|
@@ -124,9 +126,27 @@ Model / Session必须可从类别浏览及全局搜索找到；model/roles和当
 
 验收选取每种编辑器至少一个字段，覆盖切分类→section→修改→Apply→重开读回及Discard撤回；还要验证无权限来源、窄屏导航、搜索清空、输入编辑器方向键和preview取消。
 
+### 3.5 面板看齐的交付清单
+
+“看齐oh-my-pi”是用户明确的整体要求。交付须按下面操作链检查参考的布局与交互决定，并说明本项目因真实能力、配置scope或首位slash规则作出的差异；不能将“已有同名分类”作为验收结论。
+
+| 检查项 | model必须达到 | settings必须达到 |
+|---|---|---|
+| 打开与定位 | 露出当前模型所在分类、具体行及活动标记；焦点与活动模型分开 | 露出当前类别、section、设置行及值；显示实际scope |
+| 分类与内容 | Roles、All models、provider及精确connection可辨；未配置provider和具体模型均可访问 | 主分类组织全部真实设置，section可导航；不添加无功能的参考专属字段 |
+| 键盘与搜索 | 上下可移到未配置模型，左右/Tab切焦点域，搜索后能回原分类及目标 | 分类、section、字段、子编辑器各有焦点；搜索定位到所属section，编辑键不被父面板抢走 |
+| 当前值与详情 | 当前目标的能力、连接和阻断原因准确；未知保持未知 | 当前effective值、stored覆盖、默认/来源与应用时点可查；默认Enter不偷偷改值 |
+| 配置或修改 | 未配置目标进入精确连接配置；成功返回原模型，显式确认后才启用；reasoning阻断走适用恢复 | 布尔、枚举、数值、文本、列表、对象均有完整编辑路径；Enter暂存，Apply保存，Discard撤回 |
+| 取消、失败与返回 | 详情→配置/登录→取消或失败→原详情/列表；不换目标，不虚报认证或启用 | 编辑/预览→取消→原字段；已暂存项按原合同保留，来源/scope不随子面板改变 |
+| 嵌套与重开 | settings→Model / Session→模型/角色/档位→返回同一scope、类别、入口并保留结果 | 从原保存owner读回实际值；需restart或应用未确认的结果仍明确，不只验证文件写入 |
+| 鼠标与窗口 | 点击、内容/侧栏滚轮、hover与键盘指向同一已绘制身份，窄屏/resize后目标仍可见 | 相同导航要求；长值与多行编辑优先保留caret，标题/footer按窗口预算退化 |
+| 刷新与生命周期 | 列表换代、连接变化或关闭后旧动作失效；重开使用最新接受目录 | 配置发布、搜索变化或关闭后迟到结果失效；普通设置不被目录刷新隐式重载 |
+
+每条交付记录要有实际操作、焦点/目标身份、接受或持久状态、返回位置与未覆盖环境。普通TTY与fullscreen分别验证；桌面键盘、系统剪贴板、IME和真实认证仍单列缺口，不能由合成终端验证替代。
+
 ## 4. resume：渐进加载后的合理默认焦点
 
-ADD-04沿[当前会话首快照](../../packages/ts-shell/src/session/store/catalog/index.ts#L117)、[listing](../../packages/ts-shell/src/cli/interactive/picker/session/listing.ts#L30)与[overlay](../../packages/ts-shell/src/cli/interactive/overlay.ts#L712)修补。当前机制先发布current，历史逐批加入；OptionModel保留首次自动ID，因此今天的会话出现后仍选两天前那条。排序本身是置顶优先、更新时间倒序，不应通过反转排序修焦点。
+ADD-04沿[当前会话首快照](../../packages/ts-shell/src/session/store/catalog/index.ts)、[listing](../../packages/ts-shell/src/cli/interactive/picker/session/listing.ts)与[overlay](../../packages/ts-shell/src/cli/interactive/overlay.ts)修补。初次定位时先发布current、历史逐批加入，OptionModel保留首次自动ID，因此今天的会话出现后仍选两天前那条。排序本身是置顶优先、更新时间倒序，不应通过反转排序修焦点。当前[session picker](../../packages/ts-shell/src/cli/interactive/picker/session.ts)已有最新候选defaultSelection，OptionModel以selectionTouched区分自动和手动选择，局部证据见第15节首批。
 
 目标规则：用户尚未主动选择时，随着有效候选到达，自动焦点更新为当前范围内最新可恢复会话；用户按上下键、点击或明确选择后，后续发现/刷新保留该ID。当前会话标记独立保留，不再压过默认最新期望。置顶影响列表排序，**建议不让旧置顶覆盖“默认最新”**；搜索范围、项目scope与目标可恢复性仍先过滤。Enter前重验目标身份与版本。
 
@@ -145,13 +165,13 @@ ADD-05处理已提交消息，ADD-06处理正在编辑的输入。这两处不�
 
 “顶格”去掉的是绘制引入的空白，**不删除用户原文的缩进、空行或正文空格**。编辑框有箭头时，正文自然在提示符之后；与已提交正文直接从第1列开始是两个可同时满足的几何要求。右侧留白独立决定，不能为改左侧而无条件移除两侧。
 
-现[renderUser](../../packages/ts-shell/src/presentation/tui/transcript/blocks.ts#L132)使用width−2折行并在正文前加空格；[composerFrame](../../packages/ts-shell/src/presentation/tui/composer/frame.ts#L29)将两侧padding共用一个值，[shapes](../../packages/ts-shell/src/presentation/tui/composer/shapes.ts#L18)清空普通gutter。修补须同步正文宽度、left/right padding、[contentColumn及cell映射](../../packages/ts-shell/src/presentation/tui/composer/row.ts#L44)、[transcript源投影](../../packages/ts-shell/src/presentation/tui/transcript/source.ts#L48)，恢复箭头优先沿原主题符号，避免硬编码只在一种字体有效的字符。
+初次定位时，[renderUser](../../packages/ts-shell/src/presentation/tui/transcript/blocks.ts)使用width−2折行并在正文前加空格；[composerFrame](../../packages/ts-shell/src/presentation/tui/composer/frame.ts)将两侧padding共用一个值，[shapes](../../packages/ts-shell/src/presentation/tui/composer/shapes.ts)清空普通gutter。修补须同步正文宽度、left/right padding、[contentColumn及cell映射](../../packages/ts-shell/src/presentation/tui/composer/row.ts)、[transcript源投影](../../packages/ts-shell/src/presentation/tui/transcript/source.ts)，恢复箭头优先沿原主题符号，避免硬编码只在一种字体有效的字符。当前已提交正文与编辑箭头的局部修补证据见第15节首批，不能将上述旧绘制行为当作当前状态。
 
 验收检查ANSI剥离后的实际列、折行及caret位置，覆盖中文/emoji/组合字符、多行缩进、长行、极窄屏、resize、IME尾、选区和应用内复制。复制只得到源文，不能包含箭头、框线、绘制padding或软折行；原文缩进保留。不得以trim用户内容实现顶格。
 
 ## 6. 启动：先绘制TUI，再完成加载
 
-ADD-07按用户方向改善“空白终端等待”。现[入口](../../packages/ts-shell/src/entrypoints/cli.tsx#L24)先加载cliProcessRunner，后者建立bootstrap/session runtime后才进入interactive loop；fullscreen的[startup surface](../../packages/ts-shell/src/cli/bootstrap/cliStartupSurface.ts#L43)不会提前打印intro。恢复提示延后至first-frame只是一部分任务后移，不能替代更早的TUI。
+ADD-07按用户方向改善“空白终端等待”。初次定位时，[入口](../../packages/ts-shell/src/entrypoints/cli.tsx)先加载cliProcessRunner，后者建立bootstrap/session runtime后才进入interactive loop；fullscreen的[startup surface](../../packages/ts-shell/src/cli/bootstrap/cliStartupSurface.ts)不会提前打印intro。当前合格TTY入口已先等待beginStartupSurface再加载重bootstrap图，交接证据见第15节第四、五批；生产启动收益仍须测量。
 
 参考A先beginStartupComposer，再加载网络bootstrap/命令图，最终用lease把同一Composer交给完整InteractiveMode。应采用这种时序原则，沿本项目已有TUI owner实现，避免临时启动画面与正式界面变成两个独立输入缓冲或终端控制器。
 
@@ -165,15 +185,19 @@ ADD-07按用户方向改善“空白终端等待”。现[入口](../../packages
 
 分别测首次可见、输入接管、runtime-ready、首次请求准入与退出；同机器同fixture的冷/热Node/exe分别取样，首帧更快不能写成所有初始化更快。先用小会话验证加载时输入、取消和故障；性能验收沿现[START-03](phase-20-decisions.md)口径，不能用`--version`代替TUI首帧。
 
+本轮只读核对确认[现启动基准](../../scripts/bench-interactive.mjs)在regular/fullscreen仍以输出中的`openai`识别firstFrame；该标记指向后期模型状态，不能识别早期Loading编辑区。ADD-07必须先修正测量口径，区分早期首帧、完整runtime输入接管与ready，再做Node/exe取样。[进程计时](../../packages/ts-shell/src/observability/startupTiming.ts)的write callback表示流写入完成，不等于终端像素已呈现；父进程收到字节、进程内部写入及真实可见画面不得混算。本轮没有运行基准，冷/热收益继续未确认。
+
 ## 7. 上下文：启动估算、实测衔接与差额定位
 
-ADD-08提供状态栏启动本地估算。现[sessionFacts](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts#L68)只读身份匹配的provider用量，无值就[显示问号](../../packages/ts-shell/src/presentation/tui/chrome/items.ts#L154)；对话后数字来自[归一化输入用量](../../packages/ts-shell/src/turn/session.ts#L304)，不是JSON字符÷3.5。参考A无provider anchor时仍用systemPrompt、当前tool roster、消息与pending本地计数，因此可以启动显示数值。
+ADD-08提供状态栏启动本地估算。初次定位时，[sessionFacts](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts)只读身份匹配的provider用量，无值就[显示问号](../../packages/ts-shell/src/presentation/tui/chrome/items.ts)；对话后数字来自[归一化输入用量](../../packages/ts-shell/src/turn/session.ts)，不是JSON字符÷3.5。当前已接live.promptContext本地估算，来源核验与实测衔接证据见第15节；无法准备有效请求时保留unknown。参考A无provider anchor时仍用systemPrompt、当前tool roster、消息与pending本地计数，因此可以启动显示数值。
 
 要求首次请求前根据**本次实际拟发送的内容**给出estimated值，不拿完整可发现工具目录充当发送schema。包含生效系统指令、项目规则/skills、当前消息历史、实际tool集合和能界定的协议开销；无法精确计算的部分说明局限，不把估算标成实测。provider返回后切换或校准measured，绑定session/model/endpoint/schema/system/history身份。切模型、恢复、换分支、加载工具或编辑指令使旧数值失效；无法证明当前值时仍允许unknown，不能为了消灭问号填0或旧缓存。
 
 约1.7k与4.9k的差额要单独取同模型/协议/规则/历史/实际schema的分项。工具数量、工具菜单是否丰富、源字节大小都不能直接推出token总数；缓存输入与provider归一化也需对齐。参考模型toolSchemasInContext=false时不计常驻工具schema是条件性分支，未验证用户具体模型走它。验收不设“必须也显示1.7k”的目标，而是同snapshot、可解释、estimated/measured/stale/unknown各态真实。
 
-ADD-09修[报告措辞](../../packages/ts-shell/src/core/commands/context/report.ts#L59)：`/context`将完整检查目录估算称作首请求“at least”没有建立下界。报告分别展示可发现目录估算、实际组装请求估算、最近provider总输入及分类源尺寸；源尺寸不能冒充精确分类tokens。两项可关联交付，但不能用修报告文字替代启动状态栏能力。
+对用户“公式是否不同”的问题，源码支持**计数方式有差异**：本项目[本地估算](../../packages/ts-shell/src/context/request/estimate.ts)标明characters/3.5；oh-my-pi的`packages/agent/src/tokenizer.ts`支持模型对应的native tokenizer，未知模型默认可用bytes/4，模式与环境覆盖会影响选择。对同一ASCII内容仅比较÷3.5和÷4约差14%，远不足以解释4.9k/1.7k约2.9倍；中文、emoji、模型tokenizer、协议与实际输入集合也不能套用这个ASCII比例。参考启动数值来自本地计数，本项目用户反馈中的对话后数值来自provider用量，两种来源须先对齐才可比较。详见[计数口径研究](28-context-display-and-startup-budget.md)。不能把问号原因与数字差额合并为一个已解决的公式问题。
+
+ADD-09修初次定位时的[报告措辞](../../packages/ts-shell/src/core/commands/context/report.ts)：当时`/context`将完整检查目录估算称作首请求“at least”，没有建立下界。当前报告已明确目录估算不是首请求估算或下界；报告分别展示可发现目录估算、实际组装请求估算、最近provider总输入及分类源尺寸，源尺寸不能冒充精确分类tokens。两项可关联交付，但不能用修报告文字替代启动状态栏能力。
 
 验收包括新空会话、恢复、缺usage、带cache用量、工具加载前后、换模型、辅助请求与前景请求、多步回合及stale回写。数值差额调查保留实际输入集合摘要和计数口径，不输出凭据；没有真实对照数据时保留差额未解释，不能归因已闭合。
 
@@ -183,7 +207,7 @@ ADD-10扩展现有[completionToken](../../packages/ts-shell/src/cli/interactive/
 
 ### 8.1 位置和歧义规则
 
-用户明确要求完整slash命令菜单限第一行第一个位置。建议按源文本offset=0执行这一规则；终端软折行不是源文本新行。已有提交处[trimStart](../../packages/ts-shell/src/cli/interactive/keymap.ts#L517)和补全处“前面没有token”不能直接作为判断依据，否则第二行或前置空格的slash会误入功能命令。参考A会忽略前导空白/空行，这一点与用户字面要求不同，实施应按本项目新要求而非机械复制。
+用户明确要求完整slash命令菜单限第一行第一个位置。按源文本offset=0执行这一规则；终端软折行不是源文本新行。初次定位时[提交处](../../packages/ts-shell/src/cli/interactive/keymap.ts)的trimStart和补全处“前面没有token”不能直接作为判断依据，否则第二行或前置空格的slash会误入功能命令。当前位置规则已有局部修补，仍按下面完整场景验收。参考A会忽略前导空白/空行，这一点与用户字面要求不同，实施应按本项目新要求而非机械复制。
 
 | 光标所处输入 | 候选与提交语义 |
 |---|---|
@@ -209,9 +233,9 @@ ADD-10扩展现有[completionToken](../../packages/ts-shell/src/cli/interactive/
 
 ## 9. 一次输入使用多个skill
 
-ADD-11同时实现候选与提交两端。当前[expandSkill](../../packages/ts-shell/src/core/prompts/expansion.ts#L114)只识别开头的一个`/skill:`，现[slashRouter](../../packages/ts-shell/src/core/commands/slashRouter.ts#L38)也只在开头解析它；把多个名字插进草稿并不等于它们都生效。
+ADD-11同时实现候选与提交两端。初次定位时，[expandSkill](../../packages/ts-shell/src/core/prompts/expansion.ts)与[slashRouter](../../packages/ts-shell/src/core/commands/slashRouter.ts)只处理开头的一个`/skill:`。当前expandSkill已委托[expandSkills](../../packages/ts-shell/src/core/prompts/skills.ts)收集、校验与去重全部明确调用，slashRouter已接组合准备；正文候选沿[prose completion](../../packages/ts-shell/src/cli/interactive/completion/prose.ts)区分skill、准入命令与路径。现有局部payload/工作流证据见第15节，把多个名字插进草稿本身仍不等于它们都生效。
 
-参考A的正文skill补全会限制为skill、插入canonical token并仅替换局部词。但当前快照的parseSkillInvocation只提取首个匹配，buildSkillCommandPrompt也只构造一个skill消息；本轮未证明剩余skill会通过另一条路径全部注入。用户观察支持“参考体验可用”的方向，**本项目验收必须比单个parse更完整，不能把参考的多skill注入当作已证事实。**
+参考A的正文skill补全会限制为skill、插入canonical token并仅替换局部词。但第14节记录的参考快照中parseSkillInvocation只提取首个匹配，buildSkillCommandPrompt也只构造一个skill消息；本轮未证明剩余skill会通过另一条路径全部注入。用户观察支持“参考体验可用”的方向，**本项目验收必须比单个parse更完整，不能把参考的多skill注入当作已证事实。**
 
 要求：
 
@@ -1111,9 +1135,33 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 |---|---|
 | model看齐 | Roles/All models/provider层次可辨；分类→搜索→未配置具体模型→详情→精确连接配置/适用登录→返回原模型→显式启用→重开读回。全部未配置仍能导航；同名relay按精确身份区分；取消/失败不虚报成功；键盘/点击/wheel/hover/窄屏/resize保持同一目标 |
 | settings看齐 | 真实主分类与section覆盖已有能力；跨分类搜索后回所属位置；布尔/枚举/数值/列表/对象等真实编辑器→Enter暂存→Apply保存或Discard/取消→重开读回。user/project scope、只读与显式来源、effective/stored、预览撤回及restart时点保真；窄屏先保留caret，不以标签换皮完成 |
+| 消息顶格与输入箭头 | 已提交用户正文无装饰性左空白，从第1列绘制并保留源缩进；普通编辑区恢复左侧箭头，正文在必要间隔后开始、续行对齐，不叠加旧padding。中文/emoji/长行/resize/选区/caret一致，复制只含原文；不恢复已删除黄条 |
 | 输入位置与路径新增 | 只有源文本第一行第一位置开放完整功能slash；正文`/home`给实际目录suggestion，上下选择或Tab接受并连续补全。只替换光标token，保留前后/多行/缩进；代码、URL、词内slash和转义不触发命令；迟到结果不覆盖新草稿 |
 | 多skill新增 | 首位、正文与后续行可发现skill，同一次输入的全部明确skill实际加载并进入同一任务，稳定去重、保留正文/附件；未知、失效、拒绝、超预算时报告并可重试，不能只运行第一个或递归执行skill正文slash。代码示例内不补全或调用，短/混合/嵌入关闭不结束围栏；合法较长关闭及CRLF后恢复真实skill，行内按完整相等反引号run配对 |
 | 有限slash组合改进 | 在参考正文skill限制上，允许显式声明的无副作用方法命令组合；deep-research研究入口必须可与两个及更多skill搭配，也支持兼容modifier组合成一个任务。一个工作流driver拥有预算/取消/持久状态；研究control/save按原独立准入，settings/model/connect/resume等功能命令不进入正文执行 |
 | 启动与上下文 | 先看到真实输入区/loading，再接管一次草稿，ready前零模型/工具派发；首请求本地估算来自实际有效规则/消息/tool schema及协议。实测返回后按身份衔接，来源变更撤值；分别测首帧和ready，并用同模型/协议/规则/schema拆分真实差额，不设必须等于1.7k的假目标 |
 
 以上任务继续沿ADD-01至13推进；完成证据以完整操作链、正确持久/应用状态、实际请求内容及相应环境测量为准。原47项Phase 20矩阵与补充任务状态分开，全文不以局部修补替代整体验收。
+
+### 16.4 用户输入样例与组合验收
+
+以下skill名仅为夹具示例，实际名字从当前skill目录选择。完整功能slash仅在源文本offset=0开放；第二源行、前导空格之后和正文中属于路径/skill/准入组合候选域。终端软折行不改变源位置。
+
+| 输入或操作 | 必须得到的行为 | 对应任务 |
+|---|---|---|
+| 首位输入`/mod` | 完整slash菜单可发现model，接受后走原独立命令路径 | ADD-10 |
+| `读取 /home`，在路径末尾按Tab | 给出实际文件/目录候选，补全当前token；目录可继续下一层，不吞掉`读取 `或后续正文 | ADD-10 |
+| 第二行输入`/home/wa`，或编辑正文中间路径 | 按当前光标和源范围补全路径，不因trimStart开放功能命令 | ADD-10 |
+| `比较方案 /skill:research-a /skill:review-b` | 两份skill真实指令进入一个任务，原问题保留；同skill重复只注入一次 | ADD-11 |
+| `比较方案 /research-a`，接受skill候选后继续第二行选择另一skill | 可从短前缀发现skill，插入明确canonical调用；后续行仍能选择并共同生效 | ADD-10/11 |
+| `/deep-research --mode software --depth deep /skill:research-a /skill:review-b 比较两种架构` | 一个真实研究入口拥有预算/取消/持久状态，全部skill参与；不能降为只含名字的普通对话 | ADD-11/12 |
+| `比较架构 /deep-research /skill:research-a /skill:review-b` | 正文研究入口与首位研究入口得到一致准入；全部skill与问题传入同一研究任务 | ADD-12 |
+| `问题正文 /brainstorm /review /skill:review-b` | 仅在对应动作被明确声明可组合且语义兼容后开放；多个方法构造同一任务，不依次执行整套handler | ADD-12 |
+| `说明 /model /settings /resume`或正文研究control词 | 不出现可执行的正文功能命令候选，不切模型/配置/会话或执行控制；原功能命令仍可在首位独立使用 | ADD-10/12 |
+| URL、代码块、行内代码、转义slash与同名路径 | 保留字面内容，不误调用skill/命令；路径与skill冲突时按实际选中候选类型接受 | ADD-10/11/12 |
+| 第二个skill未知、失效或被拒绝；两个工作流driver冲突 | 明确报告并保留可重试草稿，准备阶段不先执行第一个再隐瞒剩余失败 | ADD-11/12 |
+| 查询后继续编辑、换根、取消或关闭 | 迟到补全/准备结果不能覆盖新草稿或执行旧目标；接受候选仍不自动读取文件正文或授权工具 | ADD-10/11/12 |
+
+组合命令以实际动作声明为准，不能用“prompt类型”或“看起来非功能性”自动放行。候选发现、直接键入、提交解析必须共用同一准入规则。用户点名的deep-research加多skill是必达要求；brainstorm/review属于需按实际动作核查的示例，不能将示例白名单误写成已经全部支持。
+
+本轮新增的是文档澄清、面板交付清单、输入几何摘要与组合样例；另登记启动基准标记过时的确定测量缺口。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益仍待证据，不归类为“不存在”，也不提升ADD整体完成状态。

@@ -9312,3 +9312,9 @@ ADD-01/02确认旧详情地址进入新准入配置子面板、退出后load复�
 ## [2026-10-26] fix | 模型不兼容reasoning偏好的面板恢复
 
 ADD-01/02 configured目标因当前档位不兼容而详情只剩Back。现Choose effort按精确目标目录展示兼容/unknown与只读当前值，原setModelTarget一次保存模型+effort；Esc取消、失效与hook拒绝不部分改当前值，原角色/skillful及settings入口返回保留，模型专属context按原合同重算。五有效反转/字节恢复、六文件122项、四静态门/build848686070b9b/正式judge proven三satisfied，普通/全屏实际Node小PTY取消重开与精确relay+medium持久通过，config不写/零message-provider/143settle。新夹具标题/查询/原context合同及探针拼接错误保留分类，长动作已缩短。归档phase20-addition-model-effort，docs/Git/CI另绑定；完整面板/桌面/真实认证与能力矩阵、研究control/其他driver/child成本、计量/动态I/O/冷热启动与真实差额仍待验，原Phase38/9与ADD独立/active。
+
+## [2026-10-26] docs | 交互补充要求更正与完整验收清单
+
+按用户本轮要求只定位和更新文档，核对HEAD为2a5cf994。phase-20-addition明确未配置具体模型允许聚焦，补settings/model完整导航、详情、配置/编辑、取消返回、保存重开及键鼠窗口清单；文末补正文顶格/编辑箭头、正文路径Tab、多skill与有限slash组合样例。修正前部将初次定位行为写成当前行为的措辞，保留全部历史实现证据与ADD独立状态。interaction-audit文末按确定原问题、不成立判断、未确认原因汇总。
+
+定向源码比较确认本地计数方式不同，但不足以据此解释真实1.7k/4.9k；另确认启动基准仍用后期openai标记识别首帧，登记为ADD-07测量缺口，需修口径后再取样。未改运行时代码，未运行产品测试/构建/PTY/基准或真实认证。四个静态门、diff与strict docs检查通过，118条既有来源引用advisory保留；299个本地链接、46个Markdown标题和ADD-01…13完整性检查通过。首轮自编链接探针误解析历史日志正则/旧路径、将源码行锚点当Markdown标题，已限定日志新增行并识别行锚点后通过，未改历史日志掩盖失败。Git交付另按实际记录。
