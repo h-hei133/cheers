@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Prospective Model Effort Must Be Selected Before Its Atomic Switch
+- **Symptom**: A configured model blocked by the current reasoning preference offers only Back, or recovery changes the current model's effort before target selection succeeds.
+- **Root Cause**: Credential setup and capability recovery share a disabled-row presentation, while the ordinary thinking command edits the active target. Same-name canonical metadata also cannot decide a relay's supported levels.
+- **Rule**: Offer a prospective target effort chooser only for capability blocking, use the exact catalogue address, and commit model plus effort through the original model selection transaction. Preserve its hook/constraint/freshness guards and model-specific default reset. Cancel and dismissed loads must not mutate or revive actions; test actual host keys, settings returns and asynchronous hook refusal. Keep visible action names within the real list width.
+
 ### Reopening A Model Picker Must Refresh Its Accepted Catalogue
 - **Symptom**: An old model detail enters a new credential form with its stale endpoint, or rejects correctly but reopening still displays and recaptures that endpoint; exited details remain callable.
 - **Root Cause**: Target closures and child admission have different lifetimes. Capturing both an old accepted catalogue and fresh disk catalogue does not update the accepted publication. A later load can also revive a closed detail owner.

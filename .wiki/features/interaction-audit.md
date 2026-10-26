@@ -515,3 +515,11 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 | 未确认 | 原现场唯一按键根因、真实同模型/协议/规则/schema1.7k/4.9k、冷热收益、真实认证接受、历史cache writer/build lock来源，继续unknown |
 
 全部用户要求仍见[文末任务总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)，完整面板不能从局部修补宣布已看齐。前两批CI延迟确认success，本批Git/CI另绑定；原Phase38/9、ADD独立且整体active。
+
+### 文末当前结论（第三十六批）
+
+确实存在：已配置模型因当前reasoning档位不兼容而被阻断时，详情只有Back，缺从面板选择兼容档位并显式启用的操作链。现Choose effort按精确relay目录展示当前不支持值及兼容选项，通过原模型事务一次保存模型和档位；取消/失效/hook拒绝不部分修改当前effort。六文件122项、五有效反转、四静态门、构建、正式judge proven及普通/全屏实际Node小PTY通过。零message/provider，全局config不写，真实settings返回与notice有owner证据，见[第三十六批](phase-20-addition.md#15-实施与验证证据)。
+
+不成立：此类阻断一定是缺凭据、必须先修改当前模型的thinking、同名官方能力可代替relay、打开档位面板即已启用、取消后再load可以复活旧动作。原上下键监听缺失、resume排序反、工具数决定token数等解释仍不成立；用户原现场唯一原因及真实上下文差额仍未确认。
+
+仍需完善：完整settings/model字段/来源/scope/能力/类别/桌面/真实认证，研究control/其他driver/child成本，tokenizer/全部动态源累计I/O、冷热启动及真实同条件上下文拆分。全部明确用户体验继续见[文末任务总和](phase-20-addition.md#16-最新问题总和与必须完成的体验)，不从本批局部链宣布整体已看齐；原Phase38/9、ADD独立且active。

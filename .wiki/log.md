@@ -9308,3 +9308,7 @@ ADD-01/02未配置/pending/error relay缺resolution地址，原详情回退canon
 ADD-01/02确认旧详情地址进入新准入配置子面板、退出后load复活动作；原捕获准入与取消复验、一次消费/退出retirement现已补齐。实际普通PTY进一步检出重开仍读旧accepted目录；真实配置owner回归后，沿原refresh端口/catalog范围与ConfigState发布更新目录，保留普通accepted设置、重新验证active模型约束，取消/再变化/拒绝不构造子面板。
 
 最终九文件136pass、七有效反转/字节恢复、四静态门/buildaeb31a9888f8及新解包正式judge proven通过；普通/全屏实际Node小PTY旧详情拒绝→新地址重开→遮蔽key→取消返回，config/session model未写、零message/provider、143退出settle。全屏探针等待未变化提示的超时单独保留分类；前两批CI延迟确认success，本批交付另绑定。归档phase20-addition-model-admission；完整面板/桌面/真实认证、研究control/其他driver/child成本、tokenizer/动态I/O/冷热启动和真实差额仍待验，原Phase38/9与ADD独立/active。
+
+## [2026-10-26] fix | 模型不兼容reasoning偏好的面板恢复
+
+ADD-01/02 configured目标因当前档位不兼容而详情只剩Back。现Choose effort按精确目标目录展示兼容/unknown与只读当前值，原setModelTarget一次保存模型+effort；Esc取消、失效与hook拒绝不部分改当前值，原角色/skillful及settings入口返回保留，模型专属context按原合同重算。五有效反转/字节恢复、六文件122项、四静态门/build848686070b9b/正式judge proven三satisfied，普通/全屏实际Node小PTY取消重开与精确relay+medium持久通过，config不写/零message-provider/143settle。新夹具标题/查询/原context合同及探针拼接错误保留分类，长动作已缩短。归档phase20-addition-model-effort，docs/Git/CI另绑定；完整面板/桌面/真实认证与能力矩阵、研究control/其他driver/child成本、计量/动态I/O/冷热启动与真实差额仍待验，原Phase38/9与ADD独立/active。

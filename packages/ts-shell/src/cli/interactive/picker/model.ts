@@ -22,6 +22,7 @@ import { modelDetailsPicker } from './model/details.js';
 import { CatalogNavigation, type NavigationGroup } from './navigation.js';
 import { watchModels } from './model/watch.js';
 import { refreshModelCatalog } from './model/publication.js';
+import { modelEffortPicker } from './model/recovery.js';
 import { prepareModelRole, type AutomaticModelRole, type RoleResult } from '../../../core/commands/model/role.js';
 import { modelRoleEditor } from './model/role.js';
 import type { ThinkingPreference } from '../../../core/models/effort.js';
@@ -145,12 +146,19 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
                 return modelPicker(fresh, connectionId ? rowId(connectionId, provider.id, model.id) : id, navigation, refreshed,
                   result ? modelSignInStatus(result) : undefined, signIn, parent);
               };
-              inspections.set(id, () => modelDetailsPicker(model.id, details.get(id) ?? [],
+              const captured = choice;
+              const inspection: () => Picker = () => modelDetailsPicker(model.id, details.get(id) ?? [],
                 () => modelPicker(context, id, navigation, assigning, undefined, signIn, parent), draft,
                 account ? () => modelSignInPicker(context, provider.runtime, signIn, back) : undefined,
                 draft && signIn ? () => modelKeyPicker(context, provider.runtime,
                   { model: model.id, label: connection?.label ?? provider.id, baseUrl: safeEndpoint }, signIn, back) : undefined,
-                undefined, admitInspection));
+                undefined, admitInspection,
+                reason === 'reasoning effort unsupported' && captured ? () => modelEffortPicker({ target, current: thinkingEffort, catalog,
+                  baseUrl: modelAddress, lines: details.get(id) ?? [], admission: admitInspection, back: inspection,
+                  save: effort => setModelTarget({ ...target, thinkingEffort: effort }, { ...context, admission: admitInspection }, captured.baseline),
+                  done: result => parent ? parent(result) : modelPicker(context, id, navigation, assigning, result, signIn, parent),
+                }) : undefined);
+              inspections.set(id, inspection);
             }
             if (!reason && assigning && connection) {
               assignments.set(id, () => assigning.assign({ connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort: assignedEffort }));

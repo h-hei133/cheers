@@ -1053,6 +1053,20 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 
 归档`.omx/artifacts/phase20-addition-model-admission/`；docs/Git/当前CI另绑定。延迟检查确认前两批CI `40256984501`与`40258165621`均completed/success；Architecture Watch workflow也success，但其artifact未读取，不作为独立审查批准。本批未运行真实认证/provider，完整settings/model字段/来源/scope/能力/类别/桌面/真实认证、研究control/其他driver/child成本、tokenizer/动态来源累计I/O、冷热启动及真实1.7k/4.9k拆分仍未验。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
 
+### 第三十六批：不兼容reasoning偏好的模型选择恢复链
+
+接续已推送`8a03ac3efd8335aa054d57edd3a60fc53eb6dacc`，本批推进ADD-01/02具体模型详情到显式启用的完整链。已配置模型因当前reasoning档位不受支持而disabled时，原详情只有Back，不能从面板选择兼容档位并启用；三个真实配置owner新回归修补前全失败。不能把此情况当缺凭据再次配置连接，也不能先修改当前模型的thinking来绕开目标限制。
+
+[恢复子面板](../../packages/ts-shell/src/cli/interactive/picker/model/recovery.ts)接原精确SessionModelTarget、目录地址、捕获准入及原setModelTarget事务：用户选档位后一次提交目标模型和档位，普通Enter明确使用当前session。当前不支持档位仍作为只读焦点可见；其他unsupported档位禁用，auto按原null合同不发送显式effort，unknown保持unverified。原model详情新增短动作Choose effort，在普通宽度也完整可见；Esc回原详情不写，退出不可复活、有效动作一次消费，准入回调同步关闭host后不执行。原未配置/credential-missing目标仍走配置入口，不用档位恢复代替凭据。子面板exclusive/holdInput复用原host，执行原异步hook期间不派发新的前景输入。
+
+只读比较oh-my-pi `packages/tui/src/overlays/model-hub.ts`1276–1309、1320–1333、1404–1463：参考把模型与reasoning选择连成操作链、只按目标能力提供选项、保留受支持偏好并在结束后刷新。本项目采用这些决策，但在当前模型不兼容时先让用户选择再一次保存，不先持久化目标再开strip；保留现有null/low/medium/high、原精确连接/配置约束/hook/写锁准入，不引入参考独有档位。目标目录的同名relay能力必须优先，反转到canonical会使当前high错误变成可用。
+
+最终六文件122项单进程串行通过：recovery11、model43、admission11、settings/session14、metadata8、session selection35。真实owner覆盖精确relay与medium同时持久/发布、plain模型auto恢复、原角色和skillful保留、全局配置字节不变；model专属context override按原切换合同清除，以新模型重新解析。代码没有改这项原合同，早期新夹具误要求其跨模型保留已分类纠正。取消与真实host Esc、退出late load、一次使用、hook block、hook期间取消/竞争session选择、目录变化及准入回调关闭均拒绝部分写入；settings→Model/Session→详情→effort→保存后回原user/Model入口，真实footer含结果。早期设置夹具把真实带scope/category标题误当Settings和将notice误放status，已改验证实际owner，不判产品失败。
+
+五有效反转全部AssertionError/exit1后逐字节恢复：移除入口、丢弃精确目录地址、忽略用户选中effort、去掉退出retirement、去掉准入后生命周期检查。四静态门与最终生产代码构建通过，build`848686070b9b0c793df9299b1ce4ab83701939e62d5b3ce715af29c1b96b8feb`、inputs`5bfee7fd89cb856e9241b97d166b853bc610f5d0d9946e2f8f280224b9d69e94`、artifact`46f93a1458aa1d14dbce5d77aabaf5fda789aab28ca3f4f8840dd8f314f1f73f`。当前checked-in validator包新目录解包，正式judge实际exit0/proven、三结构义务satisfied。普通/全屏实际Node小PTY均验证high不支持仍可见→Esc取消无变化→重开→medium→精确relay与effort同时持久，config不写、零message/provider、两个143退出均settle。初始探针使用了/thinking只读标题而非实际保存输出、多词查询非相邻匹配、长动作被截断及一次脚本拼接语法错误均保留分类；动作缩短后实际流程通过，无20k真实PTY或全仓回归。
+
+归档`.omx/artifacts/phase20-addition-model-effort/`，docs/Git与延迟CI另绑定。本批无真实认证/provider或桌面平台验收；完整settings/model字段/来源/scope/类别/能力/真实认证、research control/其他driver/child成本、tokenizer/动态来源累计I/O、Node/exe冷热启动和真实1.7k/4.9k分解继续待验。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1075,6 +1089,7 @@ research_run和research_save提取原name/description/argsSchema投影；实际�
 | 组合研究把自身command owner误判为忙 | 实际终端Enter拒绝且真实ShellCommandRuntime路由回归可复现。第三十三批改为controller与signal双重身份匹配，自身可继续，其他命令与取消仍拒绝；不能只删除全部busy保护 |
 | 未配置或阻断relay模型详情错用官方能力 | 第三十四批确认缺resolution地址时回退canonical目录，导致同名模型32k误显示400k或已有能力丢失。现沿真实连接/所浏览目录地址共用精确元数据，补上限/图片/reasoning设置/档位/已声明价格，未知与地址歧义保真；78项/三反转/两模式实际隔离PTY有局部证据，完整能力与平台矩阵仍待验 |
 | 模型详情过期配置、退出后仍可操作与重开旧目录 | 第三十五批确认列表/详情旧地址进入新准入子面板、退出load复活动作，以及实际重开仍用旧accepted目录。现原捕获准入/取消复验、详情一次消费和退出retirement；重开仅通过原配置发布刷新catalog，保留普通设置并检查active模型约束。九文件136项、七反转、两模式实际Node隔离PTY有局部证据；真实认证与完整面板矩阵仍待验 |
+| 模型受当前reasoning档位阻断后没有面板恢复链 | 第三十六批确认configured目标详情只有Back；现Choose effort进入目标能力选择，原模型事务一次保存精确模型/档位，取消与失效不部分改当前偏好。六文件122项、五反转、普通/全屏实际Node小PTY有局部证据；缺凭据仍须配置，完整能力与平台验收保留 |
 
 ### 16.2 不成立的判断与仍未确认的原因
 
