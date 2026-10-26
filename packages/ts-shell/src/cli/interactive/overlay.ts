@@ -42,7 +42,11 @@ export interface PickerOutcome {
   readonly draft?: string;
 }
 
+/** Action wrappers carry the original browser's opaque lifecycle identity. */
+export const PICKER_OWNER = Symbol('picker owner');
+
 export interface Picker {
+  readonly [PICKER_OWNER]?: Picker;
   readonly navigation?: PickerNavigation;
   /** Start a fresh browsing lifecycle; mutation reloads do not call this. */
   onOpen?(): void;
@@ -116,6 +120,8 @@ export interface Picker {
   inspect?(id: string): Promise<PickerOutcome | undefined>;
   /** Capture an accepted choice before the host releases its browser signal. */
   previewAccept?(): void;
+  /** Transfer a nested browser's lifetime to its parent before cancelling its local preview. */
+  previewBack?(): void;
   /**
    * The selection changed but has not been applied. A picker whose subject is
    * visible on screen can show what the choice would look like here — nothing is
@@ -525,6 +531,7 @@ export class OverlayHost {
     if (this.input) {
       if (event.keyId === 'escape' && picker.back) {
         const back = picker.back;
+        picker.previewBack?.();
         this.close(); this.open(back());
       }
       else if (event.keyId === 'escape' || event.keyId === 'ctrl+c') this.close();
@@ -668,6 +675,7 @@ export class OverlayHost {
     // An explicit parent owns Escape before a nested catalogue changes its focus domain.
     if (event.keyId === 'escape' && !isApprovalPicker && picker.back) {
       const back = picker.back;
+      picker.previewBack?.();
       this.close(); this.open(back());
       return true;
     }

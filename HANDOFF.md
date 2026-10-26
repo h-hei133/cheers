@@ -7,6 +7,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Child Cancellation Must Retire Actions Without Cancelling Its Parent
+- **Symptom**: Role actions still save after a panel closes, or returning from a child with Escape leaves its parent unable to save. Disabled-row and input continuations can also lose cancellation tracking.
+- **Root Cause**: Local action admission survives host dismissal, while parent and child share a browser controller. Overlay action wrappers copy the picker and lose a WeakMap keyed only by the original object.
+- **Rule**: Retire local actions permanently on dismissal and after accepted use; recheck the original admission before constructing children and around writer guards. Transfer the shared controller on explicit parent return, abort it on root close or failed parent construction, and carry opaque owner identity through action wrappers. Test actual host Escape, inspection/input continuation, late callbacks and shutdown; use regular-output observation for regular panels rather than a fullscreen-only parser.
+
 ### Catalogue Refresh Fallback Must Observe The Actual Missing Focus
 - **Symptom**: Deleting the focused model jumps to the first row, leaves a deleted navigation ID, or announces removal when only a search match disappears.
 - **Root Cause**: Stable-ID retention has no owner-specific missing-ID fallback; navigation remembers IDs independently of the displayed filtered list. A default selection callback also runs when a surviving focus is present.

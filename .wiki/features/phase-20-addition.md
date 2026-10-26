@@ -1214,6 +1214,20 @@ ADD-02继续补目标消失路径。实际OverlayHost和watchModels目录publica
 
 延迟实查第四十批`f6582038`的CI `40305668414`仍in_progress、Watch `40305668560`completed/success，不借Watch称CI通过。完整model能力/角色/认证和两面板交叉矩阵、研究总成本、动态I/O/tokenizer、真实上下文差额及冷热启动继续待验；原47项38 complete / 9 partial保持，ADD独立且整体active。
 
+### 第四十二批：角色动作退役与子面板返回生命周期
+
+ADD-02/03沿[角色编辑器](../../packages/ts-shell/src/cli/interactive/picker/model/role.ts)、[角色档位](../../packages/ts-shell/src/cli/interactive/picker/model/thinking.ts)及[原事务](../../packages/ts-shell/src/core/commands/model/role.ts)补取消/失效边界。实际host回归确认Escape、close或替换后保留的旧回调仍可进入子面板或保存，随后load还会复活动作；Choose/Thinking子入口未复验原目录。现退出永久退役、有效动作只消费一次，子入口及档位保存使用原捕获准入并在回调后再检查本地生命周期，事务在准入前后和原write lock guard检查取消。角色更新保留默认模型、其他角色和原保存/应用未确认合同，没有新建角色存储或改provider/auth。
+
+新增取消检查也暴露[浏览器生命周期](../../packages/ts-shell/src/cli/interactive/picker/lifecycle.ts)的既有缺口：子面板Escape关闭时abort共享controller，重建父面板继承已取消signal；disabled inspection/input提交复制picker，WeakMap身份丢失，后续子面板不再受原controller跟踪。现[原overlay](../../packages/ts-shell/src/cli/interactive/overlay.ts)在显式返回前转交生命周期，退休本地preview而保留父controller；父构建失败、根关闭及shutdown仍取消。可枚举symbol携带不透明原owner，使现有action wrapper保留身份，原apply回调合同保持。没有第二套控制器或全局回调注册表。
+
+目标代码先检查，再只读对照参考`model-hub.ts`565–575的disposed/清理及1253–1273迟到assignment拒绝，另参照selector的显式onCancel/disposal。采用明确退出与迟到结果不复活的决定；共享父controller、角色持久及配置发布仍由本项目原owner承担。[角色回归](../../packages/ts-shell/src/cli/interactive/picker/model/role.test.ts)15项与[生命周期回归](../../packages/ts-shell/src/cli/interactive/picker/lifecycle.test.ts)6项覆盖真实按键、替换/关闭、目录失效、准入内关闭、事务取消、两种action wrapper、父构建失败和shutdown；与model43、settings session14、overlay74合并单进程串行152项通过。六个有效反转分别移除wrapper owner、role/thinking退役、父controller转交、子准入及准入后signal复验，均AssertionError/exit1，逐字节恢复hash一致。
+
+最终build的普通/全屏两个隔离实际Node小型PTY验证角色赋值浏览取消→重开→保存、档位取消→重开→low保存→返回读回→清除角色；默认fixture-ready保留，个人config字节不变、零message/provider请求，143退出及close确认。早期普通模式探针用fullscreen屏解析而超时，raw输出已有low；按实际输出观察修探针后通过，失败日志保留。新增input夹具漏validate的失败另归类夹具错误，没有改变产品输入合同。未运行真实20k PTY、全仓本地回归、exe构建或真实认证。
+
+四静态门、责任上限0、TS build `36f4f499d0fb44c70779bf5340a9e4635bea7af52dc39dceb70af2fe790e270d`、inputs `4630d73cb947484d40b3146c8c7a3f5ea3f65ea107059eaedef0a87aedf0bd37`、artifact `1f302fd8bd5e0c70eca659816b128c32758b50b97ec5898588e3a9e20c1ac8ce`及当前checkBuild fresh通过。当前包正式judge exit0/proven、三项结构义务satisfied，仅为架构证据；审阅为主代理、没有独立审查结论。工件`.omx/artifacts/phase20-addition-role-lifetime/`保留脚本、失败分类、反转/source hash与最终PTY收据，docs/Git/本批CI另绑定。
+
+延迟实查第四十批`f6582038`的CI40305668414/Watch40305668560、第四十一批`af282d5e`的CI40308877629/Watch40308877544均completed/success，未读完整日志/Watch工件，不能赋予本批CI结果。完整模型目标/角色/能力/真实认证/桌面及settings交叉矩阵、研究control/其他driver/child成本、原生tokenizer/动态来源累计I/O、真实1.7k/4.9k分解和冷热/修补前启动收益继续待验。原Phase20保持38 complete / 9 partial，ADD独立且整体active。
+
 ## 16. 最新问题总和与必须完成的体验
 
 本节是全文末尾的当前摘要；第2至13节保留详细要求，第15节记录逐批证据。确认一个机制存在、补齐一条路径、通过隔离测试与用户真实环境全部验收是不同结论。
@@ -1225,6 +1239,7 @@ ADD-02继续补目标消失路径。实际OverlayHost和watchModels目录publica
 | model上下键看起来无交互 | 原disabled跳过具体未配置模型是确定缺口；只有一行ready与该观察相容，原现场按键是否进入此分支仍未排他确认。必须允许未配置具体模型获得焦点、进入详情和配置，不能改回跳过它们；浏览、认证成功与显式启用分开。已有局部修补及真实host/隔离PTY证据，原环境仍需复验 |
 | 同协议relay分类错误标为可用 | 第四十批确认runtime级凭据聚合不能代表精确分类。现从分类自身已准入模型行派生状态和ready优先顺序；阻断模型仍可浏览，刷新保留手动身份。五文件84项、原源码有效反转及四条实际Node小型PTY有证据；完整模型/认证/桌面验收继续待证 |
 | 目录删除后焦点回首项且没有提示 | 第四十一批实际host/publication复现，现缺失焦点刷新按旧可见模型ID取幸存邻居，navigation清理旧ID并显示目录变化；生存手动身份与搜索失去匹配保留原语义，空占位不能启用。136项/三有效反转有证据，真实桌面/终端删除场景未验 |
+| 角色旧动作在退出后仍可保存，子面板取消后父级失效 | 第四十二批确认role/thinking没有永久退役与子入口准入、共享controller在Escape被取消、action wrapper丢owner。现退役/一次消费/原事务取消复验，显式返回转交父controller，wrapper保留不透明身份；152项/六有效反转及普通/全屏Node小PTY有局部证据。完整角色/认证/桌面矩阵未验 |
 | resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。已有局部修补证据 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |

@@ -20,6 +20,11 @@ export interface RoleResult { readonly output: string; readonly saved: boolean }
 /** Change one automatic consumer through the existing session selection transaction. */
 export function prepareModelRole(context: CommandContext, role: AutomaticModelRole) {
   const choice = captureModelChoice(context);
+  const admission = (): string | undefined => {
+    if (context.signal?.aborted) return 'Role editing cancelled. Reopen the model picker.';
+    const refusal = choice.admission();
+    return context.signal?.aborted ? 'Role editing cancelled. Reopen the model picker.' : refusal;
+  };
   const baseline = choice.baseline;
   const active = context.resolveConfigTarget?.(choice.config) ?? resolveProviderCredential({ runtimeConfig: choice.config });
   const tier = choice.config.providerConnections.find(connection => connection.id === active.credential?.connectionId)?.serviceTier
@@ -37,8 +42,8 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
       || path.resolve(baseline.projectRoot) !== path.resolve(context.projectRoot ?? context.cwd)) {
       return { saved: false, output: 'Role assignment requires a current session and a concrete default model.' };
     }
-    const admission = choice.admission();
-    if (admission) return { saved: false, output: admission };
+    const refusal = admission();
+    if (refusal) return { saved: false, output: refusal };
     if (baseline.selection && (!selectedModelMatches(choice.config, baseline.selection)
       || !sameValue(selectionRequest(context, choice.config, baseline.selection), active))) {
       return { saved: false, output: 'The saved default differs from the current request. Select the current model before editing roles.' };
@@ -50,7 +55,7 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
     else delete roles[role];
     const next = { ...selection, roles };
     try {
-      writeSessionModel(context.sessionId, next, baseline, () => !choice.admission());
+      writeSessionModel(context.sessionId, next, baseline, () => !admission());
       if (!sameValue(readSessionModel(context.sessionId), next)) {
         return { saved: false, output: 'Role assignment write outcome is unverified. Reopen the model panel.' };
       }
@@ -71,7 +76,7 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
   const levels = current && model?.reasoning !== false ? THINKING_LEVELS.filter(level =>
     effortCapability(choice.catalog, current.provider, current.model, level, resolution?.baseUrl) === 'supported') : [];
   const efforts: readonly ThinkingPreference[] = levels.length ? [null, ...levels] : [];
-  return { assign: commit, current, efforts, setEffort: (effort: ThinkingPreference): RoleResult => {
+  return { assign: commit, current, efforts, admission, setEffort: (effort: ThinkingPreference): RoleResult => {
     if (!current || !isThinkingPreference(effort) || !efforts.includes(effort)) {
       return { saved: false, output: 'This role has no available setting for that reasoning effort.' };
     }

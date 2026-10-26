@@ -29,4 +29,6 @@ Configuration files store explicit overrides. A small or empty file can inherit 
 | `/model` | Session model choice and supported automatic roles; retains the session model owner |
 | `/view` | Inspect or change user/developer output, including diagnostic and permission detail |
 
+In `/model`, choose an automatic role to assign its model, change its supported thinking effort or use the default model again. Esc cancels a child and returns to its parent; reopen the child to make a new choice. Role changes save to the current session and preserve the default model and other roles. If the captured catalogue or session changed, reopen the model panel before saving.
+
 The catalogue and settings panel expose supported entries. Their presence does not establish that every provider, desktop terminal or configuration scope has been tested. Current implementation evidence and remaining interaction work are recorded in [Phase 20 additions](../features/phase-20-addition.md#15-实施与验证证据).

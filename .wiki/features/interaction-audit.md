@@ -612,3 +612,9 @@ ADD-08研究entry现共用参数/全部方法投影、prospective run及完整�
 ### 文末当前问题判断（第四十一批）
 
 新增确认目录删除手动焦点后回首项、navigation保留旧ID且无提示。现实际host数据刷新仅在旧焦点失去浏览资格时调用model owner；确认离开完整目录后按旧可见精确ID选幸存邻居并提示，搜索失去匹配不能报删除，生存身份/手选继续保留，禁用空占位Enter拒绝。最终五文件136项、三个有效反转/恢复、TS构建fresh及结构judge proven通过；本批没有真实桌面/终端目录删除PTY或认证证据。见[第四十一批](phase-20-addition.md#第四十一批目录删除后的邻近模型焦点与状态)。完整追加体验及真实环境缺口保留，原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第四十二批）
+
+新增确认role/thinking在Escape、close或替换后仍接受旧动作、load复活，子入口未复验原目录；原事务未检查signal。现永久退役/一次消费，子入口与writer沿原准入检查取消和失效。实际跟踪链另确认子Escape取消父共享controller、disabled inspection和input action复制丢WeakMap身份；现显式返回转交父生命周期、本地preview退休，根关闭/构建失败/shutdown取消，action wrapper携带不透明owner。角色保存继续保留默认模型、其他角色和个人配置，见[第四十二批](phase-20-addition.md#第四十二批角色动作退役与子面板返回生命周期)。
+
+单进程串行五文件152项、六有效反转/字节恢复、最终TS fresh及结构judge proven通过。最终普通/全屏实际Node小型PTY覆盖赋值取消/重开保存、档位取消/重开low保存/返回读回及清除，零message/provider请求、个人config不变、143退出close确认。初轮regular屏解析超时及input夹具漏validate分别归类探针/夹具错误；没有真实认证、exe或桌面结论。延迟查f6582038及af282d5e自身CI/Watch均success，未读完整日志/Watch工件，本批CI另绑定。完整两个面板交叉矩阵及计量、性能、真实环境缺口保留，原Phase38/9、ADD独立且整体active。

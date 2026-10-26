@@ -9372,3 +9372,11 @@ ADD-02实际host/watchModels publication确认删去手动焦点后回首项、n
 最终五文件136项（focus12/category12/navigation16/options22/overlay74）、三有效反转/逐字节恢复、四静态门、责任上限0、TS build2cdda4030cbc/fresh、当前包judge proven通过。另有集成model43项通过。初轮夹具漏导航手动焦点及侧栏箭头误断言分别归档，不修改产品迎合夹具。只读参考stable selector/menu selectedKey保留，按本任务更强要求将缺失后的首项回退补为邻近回退与提示。
 
 addition第四十一批、audit与HANDOFF同步；工件phase20-addition-model-focus保存源码hash与主代理非独立审阅。未跑本批PTY/exe/全仓/20k真实终端；真实目录变更桌面/终端及完整模型/设置/认证矩阵仍待验。延迟查f6582038的CI40305668414仍in_progress，Watch40305668560success，不能互相替代。Git/本批CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-26] fix | 角色动作退役与子面板返回生命周期
+
+ADD-02/03实际host确认角色/档位退出旧动作仍可保存、load复活、子入口未复验原目录；现永久退役和一次消费，原事务准入前后/写锁guard检查signal，准入回调后再查本地生命周期。保留默认模型、其他角色和原保存/应用未确认合同。跟踪链另确认子Escape取消父共享controller、disabled inspection/input wrapper丢WeakMap身份；现显式返回转交父controller且退休本地preview，根关闭/父构建失败/shutdown取消，symbol保留原不透明owner，不改apply回调合同。只读参考退出/disposed与迟到assignment拒绝，未新造角色存储或改provider/auth。
+
+五文件152项、六有效反转/源码字节恢复、四静态门、责任上限0、TS build36f4f499d0fb及fresh、当前包judge proven三satisfied通过。最终普通/fullscreen两个隔离Node小PTY覆盖赋值取消→重开保存、档位取消→重开low保存→返回读回→清除；default fixture-ready与个人config保留、零message/provider请求、143退出close确认。早期regular使用fullscreen解析超时和input夹具漏validate分别保留/分类；未跑exe、全仓本地、真实20k PTY或真实认证。
+
+addition第四十二批/当前摘要、audit、settings指南和HANDOFF同步，工件phase20-addition-role-lifetime归档源码hash/脚本与主代理非独立审阅，docs/Git/本批CI另绑定。延迟实查f6582038的CI40305668414/Watch40305668560及af282d5e的CI40308877629/Watch40308877544均success，未读完整日志/Watch工件。完整面板目标/角色/能力/来源/桌面/认证、研究control/其他driver/child成本、tokenizer/动态I/O、真实上下文差额和冷热收益继续未验，原Phase38/9、ADD独立且整体active。
