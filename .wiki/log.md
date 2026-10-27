@@ -9831,3 +9831,14 @@ ADD-01/02/03双lane独立只读审阅发现普通根model遗漏accepted ownershi
 正式启动器预检拒绝旧build，因为输入指纹包含第102批改动的测试source；串行heap1536MiB重建为`fc8959959cad`，与上次artifact摘要相同，fresh验证后每个PTY进程heap768MiB、2MiB输出上限、45秒期限，无长历史或exe。失败探针的相对光标/启动备用屏幕/隐藏band/空会话清理/欢迎标题误匹配全部保留为夹具证据；最终按完整绘制行观察，不改产品断言。HANDOFF补测试source使build过期的陷阱，未改构建政策。
 
 五静态门及diff通过，118既有docs advisory保留；不重复Vitest或结构分析，无新反转构建或独立review，既有合同反转见第102批。工件归.omx/artifacts/phase20-addition-status-restart/并清理scratch。第101批CI success，第102批CI `40600853941`仍in_progress、Watch success，本批Git/CI另绑定。仅Linux PTY的project重启证据，不提供网络调用计数、真实provider、user来源重启、像素/桌面/Windows、全仓或20k历史验收，原Phase20矩阵未重跑，ADD整体active。
+
+
+## [2026-10-28] fix | 一步请求的预览schema与真实收尾投影对齐
+
+ADD-08/09隔离真实请求发现草稿~717而同请求组装估算568；preview按maxTurns>0，实际turn_start已先计第一步，maxTurns=1首请求已是省略schema并加入收尾指令的请求。现只修preview首步判断，继续复用原消息/身份/wire owner，不改provider/auth、默认预算或构建政策；参考采用provider context transform之后记录实际工具的决定。
+
+主代理heap768MiB单worker串行preview77+estimate2，共79项实际通过。四条新回归贯通真实turn计数和request serialization，对dynamic/full×一步/两步检查完整body、三类digest及数值；反转2失败/2控制通过、73未选，源码逐字节恢复及SHA核对后最终重验。夹具漏topP的四条3-token差额单独分类并修正，不作产品缺陷。五静态门、TS build688d5f73270c通过，118既有docs-source advisory保留，build heap1536MiB。
+
+修补前/后各一条接受的真实兼容端点auto请求，Linux regular PTY正式launcher、一步、无工具/MCP/预热/重试；只归档白名单元数据，不保留原文/地址/凭据，0600隔离配置finally删除、原配置保持、两场/exit退出0。最终草稿~568与实际组装568一致，provider输入462分开，2007bytes/2000UTF16及四wire分项相加一致，/context原报告口径通过。回合后的自动状态栏仍观察到stale，未证明measured/calibrated衔接；当前106tokens差额不解释历史4.9k/1.7k或确认auto后端。HANDOFF/当前摘要更新，工件归.omx/artifacts/phase20-addition-context-live/，无全仓/20k/exe/桌面/Windows或新独立review，原Phase20矩阵未动，ADD仍active。
+
+延迟核对第102批CI40600853941及Watch40600853895均success，第103批Watch40602411753 success、CI40602411771仍in_progress；本批Git/CI另绑定，不等待新CI。

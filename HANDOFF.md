@@ -683,3 +683,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A test-only commit passes focused validation, but the real launcher refuses the previous build as stale.
 - **Root Cause**: `buildInputDigest` fingerprints all TypeScript sources under `src`, including test files, even when those files are absent from the compiler's emitted input graph. A new build can therefore have a different input/build identity and the same artifact digest.
 - **Rule**: Check the verified build before native runtime probes. If test sources changed, rebuild serially under the memory limit when a fresh launcher is needed; preserve both identities and do not bypass freshness checks or misclassify preflight refusal as a product interaction failure. Test-only validation does not itself require a rebuild when no runtime launch follows.
+
+### First-Request Previews Must Include The Started Step
+- **Symptom**: With a one-step limit, the draft estimate includes tool schemas that the accepted request omits, and its schema identity cannot match that request.
+- **Root Cause**: The preview compared the limit with zero, while the turn owner increments its count on turn_start before dispatch. The first request of a one-step run is already the closing request, including its final-answer instruction.
+- **Rule**: Preview the actual first-step policy and reuse the existing closing-message projection. Compare complete serialized bodies, schema/system/history digests and local estimates through the real turn lifecycle at both one and two steps, including dynamic and full catalogues. Match sampling parameters in the fixture before classifying small numeric differences; retain provider aggregate usage as a separate measurement.

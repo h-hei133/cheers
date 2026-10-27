@@ -40,6 +40,11 @@ import { readPromptPreview } from '../../../session/context/preview.js';
 import { estimateWirePrompt } from '../../../context/request/wire.js';
 import { gitCommandFor, gitWorkbenchFor, installGitRuntime } from '../git.js';
 import { gitFixture, gitGate, stubGitEnvironment } from '../../../test-utils/git.js';
+import { createStepFunction } from '../../../turn/step.js';
+import { runTurn } from '../../../turn/session.js';
+import { getSessionUsage, resetSessionUsage } from '../../../observability/usageTelemetry.js';
+import type { HookDispatcher } from '../../../core/hooks/hookDispatcher.js';
+import { configuredOutputLimit } from '../../../provider/request/output.js';
 
 let root: string;
 let repositories: ReturnType<typeof gitFixture>[] = [];
@@ -1014,6 +1019,52 @@ it('uses the closing request schema identity when no tool steps are allowed', as
   Object.assign(context, { configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
   const result = await load('question'); result.verify();
   expect(result.estimate.identity.schemaDigest).toBe(requestIdentity({ tools: [] }).schemaDigest);
+});
+
+it.each((['dynamic', 'full'] as const).flatMap(toolDiscovery => [1, 2].map(maxTurns => ({ toolDiscovery, maxTurns }))))(
+  'matches the actual first request at the step boundary with $toolDiscovery tools and $maxTurns steps', async ({ toolDiscovery, maxTurns }) => {
+    const { cwd, context, session, manager, load, layout, gateway, target } = fixture();
+    const config = { ...context.configuration.current.config, maxTurns, toolDiscovery, allowedTools: ['read'] };
+    Object.assign(context, { runtimeConfig: config, configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
+    const files = [layout.metadataPath, layout.statePath, layout.transcriptPath], before = files.map(file => fs.readFileSync(file));
+    const prompt = 'Inspect the boundary 中文 🙂.';
+    const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+    const preview = await load(prompt); preview.verify();
+    const previewBody = JSON.parse(JSON.stringify(wire.mock.results.at(-1)!.value));
+    const prepared = await preparePromptRequest({ workspaceRoot: cwd, sessionId: session.id, runtimeConfig: config,
+      skillOptions: context.skillOptions, agentMode: 'build', featureTools: foregroundTools(context) });
+    const captured = await readPromptPreview(manager, session, cwd, prompt);
+    let body: Record<string, unknown> | undefined;
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'done' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 123, completion_tokens: 1 } }), { headers: { 'content-type': 'application/json' } });
+    });
+    const step = createStepFunction({ provider: { ...target, headers: {} }, workspaceRoot: cwd, sessionId: session.id,
+      systemPrompt: prepared.system.text, systemPromptSources: prepared.system.sources,
+      tools: toolSchemas(prepared.tools), toolSnapshot: () => toolSchemas(prepared.currentTools()),
+      catalog: context.configuration.current.catalog, temperature: config.temperature, topP: config.topP,
+      maxOutputTokens: configuredOutputLimit(config, endpoints.DEFAULT_ENDPOINT_KIND), fetchImpl });
+    try {
+      const run = runTurn({ sessionId: session.id, workspaceRoot: cwd, history: [], prompt, permissionScope: 'ask',
+        continuityContext: captured.continuityContextFor(prompt), goalObjective: captured.goalObjective,
+        step, tools: prepared.tools, maxSteps: maxTurns, onMessage: vi.fn(), signal: new AbortController().signal,
+        hooks: { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher });
+      for await (const _event of run.events) { /* Drain the real first-step lifecycle. */ }
+      expect(fetchImpl).toHaveBeenCalledOnce();
+      const usage = getSessionUsage(session.id);
+      expect(usage.turnsCount).toBe(1);
+      expect(body?.tools !== undefined).toBe(maxTurns > 1);
+      expect(JSON.stringify(body?.messages).includes('You have reached the limit of steps')).toBe(maxTurns === 1);
+      expect(preview.estimate.identity.schemaDigest).toBe(usage.lastPromptIdentity?.schemaDigest);
+      expect(preview.estimate.identity.systemDigest).toBe(usage.lastPromptIdentity?.systemDigest);
+      expect(preview.estimate.identity.historyDigest).toBe(usage.lastPromptIdentity?.historyDigest);
+      expect(body).toEqual(previewBody);
+      expect(preview.estimate.tokens).toBe(usage.requestContext?.localEstimate?.tokens);
+      expect(usage.requestContext?.promptTokens).toBe(123);
+      expect(files.map(file => fs.readFileSync(file))).toEqual(before);
+      expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
+    } finally { resetSessionUsage(session.id); }
 });
 
 it('refuses unavailable MCP without connection and invalidates revoked attachment access', async () => {

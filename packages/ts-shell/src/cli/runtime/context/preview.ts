@@ -145,7 +145,8 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const shape = resolveRequestShape(publication.catalog, resolution.provider, resolution.model, preference.thinkingEffort ?? undefined, base);
   const overhead = prepared.currentOverhead();
   const schemas = toolSchemas(prepared.currentTools());
-  const allowTools = config.maxTurns > 0;
+  // The turn owner counts the first step before dispatch; a one-step run is closing.
+  const allowTools = config.maxTurns > 1;
   const assembledIdentity = requestIdentity({ ...overhead, tools: allowTools ? schemas : [] });
   const configuredOutput = configuredOutputLimit(config, endpoint);
   const serviceTier = config.providerConnections?.find(item => item.id === resolution.credential?.connectionId)?.serviceTier
