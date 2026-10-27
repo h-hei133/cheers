@@ -32,7 +32,9 @@ function editorText(setting: SettingDefinition, value: unknown): string {
   if (editor === 'text' || editor === 'theme') return typeof value === 'string' ? value : String(value);
   if (editor === 'number') return String(value);
   if (editor === 'list' && Array.isArray(value)) {
-    return value.map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n');
+    const text = value.map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n');
+    const parsed = parseSettingInput(setting, text);
+    return parsed.ok && sameValue(parsed.value, value) ? text : formatSetting(value);
   }
   return formatSetting(value);
 }
@@ -42,7 +44,7 @@ function editorLabel(setting: SettingDefinition): string {
   if (editor === 'number') return `Number (${setting.schema.type}). Enter stages the value; Apply saves it.`;
   if (editor === 'list') return (setting.schema.items as { type?: string } | undefined)?.type === 'object'
     ? 'One JSON object per line. Enter stages the list; Apply saves it.'
-    : 'One item per line. Enter stages the list; Apply saves it.';
+    : 'JSON array or one item per line. Enter stages the list; Apply saves it.';
   if (editor === 'text' || editor === 'theme') return 'Text value. Enter stages the value; Apply saves it.';
   return `JSON ${setting.schema.type}. Enter stages the value; Apply saves it.`;
 }

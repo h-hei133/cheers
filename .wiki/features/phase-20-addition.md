@@ -1459,6 +1459,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。第三十八批新增settings全部37项/user37-project36基本键盘链及七个跨来源政策场景，第三十九批补17个代表性冲突/失效/取消/范围场景，第四十九批补Memory/Shell只读命令入口。完整字段×来源×编辑器×窗口/桌面及model能力/角色/真实认证矩阵仍未完成；只读入口不伪装可编辑字段，也不能将局部绿色写成“整体已看齐” |
 | 角色写入失败后丢失settings/model返回链 | 第八十批确认reset、具体模型和effort只在saved时返回父页面，Enter已释放面板，失败使生命周期结束；effort重建遇不可读state还会掩盖原写入结果。现回现有fresh parent，不可读时退回目录并保留原notice；60项执行通过、四组6/10/6/4有效反转及build有本地证据，真实文件系统故障与完整平台矩阵未验 |
 | 角色认证返回时读取失败吞掉连接保存结果 | 第八十一批确认API-key/account保存后的fresh role准备无异常边界，state不可读时丢失原认证notice和返回链。现沿原角色目录fallback，保留已保存/应用未确认事实，恢复后须显式重新选择才分配。107项执行通过、14项有效反转及build有本地证据；认证runner与故障受控，真实服务、磁盘故障和完整scope矩阵未验 |
+| 未改动的列表编辑会改变原值与工具可见集合 | 第八十二批确认逐行初始化与原parser的引号/JSON/换行/trim语义不往返，带引号的工具名可变为普通可见工具名。现先用原parser比较完整值，无法往返时沿已有JSON数组输入初始化；169项执行通过、24项有效反转及build有本地证据，普通逐行编辑保持，完整字段/来源/平台矩阵未验 |
 | 设置搜索新查询仍保留较弱匹配焦点 | 第三十八批确认typed/pasted `topP`排名第一但Enter打开Input shape。现新查询自动聚焦最强匹配，同查询手动选择保持，清空回原字段；178项聚焦、一有效反转及两模式实际Node PTY有证据。不是用户原model按键现场唯一原因的证明 |
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；第六十三批补非首位命令碰撞file引号、目录候选不触发命令模板查找、代码/转义/URL参数不请求path catalog及quoted Windows drive/UNC识别；第七十批补`/skill:`命名空间内真实路径与skill候选并存，quoted path与exact skill Enter/Tab分界保真。完整场景验收仍按下表，非skill同名template/path的裸提交歧义及正文功能命令执行边界不因此消失 |
@@ -1555,6 +1556,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第八十批补角色reset、具体模型及effort写入失败后的返回：沿现有fresh parent保留准确写入notice，state暂时不可读时退回现有目录。消费过的角色动作保持退休，重试须读取新基线并由用户再次选择；没有自动重试或修复状态文件。user/project与两模式host已有隔离证据，完整角色/来源/窗口和真实故障验收仍待补，ADD整体active。
 
 第八十一批补角色→未配置模型→API-key/account→返回中不可读state的边界：连接结果与角色事务各自保真，沿原角色目录保留结果；旧认证动作不重跑，恢复后只在新显式选择中分配目标角色。三个自动角色与两模式host已有局部证据，真实认证、磁盘故障和完整scope/平台矩阵继续待补，ADD整体active。
+
+第八十二批补列表编辑的原值保持：逐行文本须经同一parser还原为完全相同的数组，否则使用已支持的JSON数组初始化。user/project及两模式实际host证明未编辑的Enter→Apply、重开及取消保持存储值、工具可见集合、原scope和held草稿；不改变parser或校验规则，完整字段/来源/平台验收仍待补，ADD整体active。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -1781,3 +1784,17 @@ ADD-01/02/03继续检查角色浏览器的未配置模型。已有API-key/accoun
 主代理heap768MiB、单worker串行最终完成auth24、key9、role18、settings session28共79项；再过滤InteractiveMode执行28项通过、125项未选，包含新增8条及已有精确配置、masked key、native失败/取消和异常报告，共107项实际执行通过。独立反转认证返回guard后恰好14条新回归失败，按文件/名称确认auth6、host8，单元失败为预期read-failed。finally逐字节恢复，SHA-256 `360f8992c3850bde5ca3440cfa753fa2a6756e7eceec27a453f0ef26d7a905a9`，恢复后重跑上述全部最终聚焦检查；filtered-out不算通过。
 
 五静态门、diff、module facade 0与TS build `6bebbec2a005`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新，反转scratch清理。延迟读回`44e9ea4133f0c6679096b14f9cda412e845b2677`的Watch `40556518111`success、CI `40556517972`仍in_progress，不替代本批结果。未运行全仓、真实认证服务/PTY/provider请求/exe、桌面、真实磁盘故障或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。
+
+### 第八十二批：列表编辑器初始化的完整值往返
+
+ADD-03核对“打开编辑不能偷偷规范化未知或过时原值”的要求，确认[settings owner](../../packages/ts-shell/src/cli/interactive/picker/settings.ts)直接以换行拼接字符串项，而[已有parser](../../packages/ts-shell/src/config/settings.ts)还会去外层引号、解释JSON数组、拆分换行和trim每行。带字面引号的工具名未编辑就能变成普通工具名，数组样式单项和含换行项会变成多项，方括号前缀还会使合法原列表无法暂存。16条user/project特殊值回归先在旧实现复现；这是编辑表示不能还原存储值的问题，不能靠改变schema或规范化旧数据解决。
+
+现仅调整原`editorText`：逐行文本先交同一`parseSettingInput`，与完整原值相同时继续使用；失败或不同则用已有`formatSetting`生成JSON数组，原输入owner本就支持该格式。说明同步标明两种输入。普通逐行及对象列表编辑、验证、暂存、Apply、scope和保存owner继续复用。只读对照的text editor对数组使用JSON.stringify，并在schema为array时JSON.parse后验证数组形状；采用结构化表示保留数组身份的决定，同时保留本项目已要求的普通逐行输入，不引入新parser。
+
+[fields测试](../../packages/ts-shell/src/cli/interactive/picker/settings/fields.test.ts)新增user/project×九种列表共18条：双/单引号项、数组样式单项、内部换行、前后空白、方括号前缀、跨项引号、带引号模型selector和普通逐行控制。真实OverlayHost Enter→暂存→Apply→重开→再次Apply核对完整存储/accepted/effective、注释、兄弟字段与另一scope字节；工具字段同时调用实际prefilter，核对可见集合保持。普通控制明确断言仍以两行初始化。
+
+[InteractiveMode测试](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)新增regular/fullscreen×user/project×引号/换行八条，真实输入从settings搜索进入字段；project经实际scope确认，未修改文本而暂存/Apply、重开并取消，完整配置和工具可见集合不变，原scope/字段焦点及held多行草稿保持，零prompt派发/网络。初版夹具漏掉已存字段的`●`标记，且重开等待可能匹配历史title并早于保存owner结算，已按实际行标记、当前Edit action及busy结束校正；单元普通控制最初也误把成功后的根列表当作详情，已显式重开字段。此类失败记为夹具问题，未为它们改产品。
+
+主代理heap768MiB、单worker串行最终完成fields116、picker settings39、config settings6共161项，再过滤InteractiveMode执行8项通过、153项未选，共169项实际执行通过。独立反转初始化值比较分支，按名称/文件确认fields16、host8共24项预期失败，两个普通逐行控制仍通过。finally逐字节恢复，SHA-256 `4b41a6986d74684368eb70fdcc5a5aa02f5959a26767c400305090a9a3e80c65`，恢复后完成全部上述最终聚焦验证；filtered-out不算通过。
+
+五静态门、diff、module facade 0与TS build `b539b709a535`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新，临时反转与观察材料清理。延迟读回`44e9ea41`的CI `40556517972`已completed/success；`0a9f8584cb0b2d6ee9197faa75eda4ebcc923666`的Watch `40558903541`success、CI `40558903524`仍in_progress，不替代本批结果。未运行全仓、真实PTY/provider/exe、桌面或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。

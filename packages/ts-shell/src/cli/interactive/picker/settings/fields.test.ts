@@ -18,6 +18,7 @@ import { createProfileContext, withProfile } from '../../../../core/paths/profil
 import * as configFiles from '../../../../config/runtimeConfig.js';
 import * as sessionFiles from '../../../../session/store/sessionFileStore.js';
 import { normalizeStatusItems, STATUS_ITEMS } from '../../../../presentation/tui/chrome/items.js';
+import { filterVisibleToolNames } from '../../../../core/tools/prefilter.js';
 
 const choices: Readonly<Record<string, unknown>> = {
   attentionOnIdle: true, offline: true, maxTurns: 24, temperature: 0.2, topP: 0.8, maxOutputTokens: 2048,
@@ -280,6 +281,42 @@ it('rejects invalid number text through Enter, preserves an earlier pending valu
     expect(fs.readFileSync(userFile)).toEqual(before); await view.press('\r'); expect(readRuntimeConfigEditAt(userFile).values.maxTurns).toBe(42);
   } finally { view.overlay.close(); }
 });
+
+it.each((['user', 'project'] as const).flatMap(scope => [
+  { key: 'allowedTools', value: ['"read"'], name: 'double quotes' },
+  { key: 'allowedTools', value: ["'write'"], name: 'single quotes' },
+  { key: 'allowedTools', value: ['["read","write"]'], name: 'array-looking item' },
+  { key: 'allowedTools', value: ['read\nwrite'], name: 'embedded newline' },
+  { key: 'disabledTools', value: [' read '], name: 'surrounding whitespace' },
+  { key: 'hiddenToolPrefixes', value: ['[literal]'], name: 'leading bracket' },
+  { key: 'hiddenToolPrefixes', value: ["'first", "last'"], name: 'quotes across items' },
+  { key: 'allowedModels', value: ['"openai/fixture"'], name: 'quoted model selector' },
+  { key: 'allowedTools', value: ['read', 'write'], name: 'ordinary lines' },
+].map(test => ({ ...test, scope }))))(
+  'preserves $name in $key through untouched editor Enter and Apply in $scope scope', async ({ key, value, scope, name }) => {
+    const target = scope === 'user' ? userFile : projectFile, other = scope === 'user' ? projectFile : userFile;
+    fs.writeFileSync(target, `// preserved list\n${JSON.stringify({ schemaVersion: 1, [key]: value, topP: 0.7 })}`);
+    const bytes = fs.readFileSync(target), otherBytes = fs.readFileSync(other), view = surface(scope);
+    const before = view.host.openSettings(scope).values[key];
+    const tools = ['read', 'write', 'first', 'last', 'mcp__fixture__read'];
+    const visible = filterVisibleToolNames(tools, view.runtime.runtimeConfig);
+    const setting = CONFIG_SETTINGS.find(setting => setting.key === key)!;
+    try {
+      await view.open(key); const editor = await view.press('\r');
+      if (name === 'ordinary lines') expect(editor?.next?.input?.initial).toBe('read\nwrite');
+      await view.press('\r'); expect(view.frame()).toContain('Pending:'); expect(view.frame()).toContain('▸ Apply');
+      expect(fs.readFileSync(target)).toEqual(bytes);
+      await view.press('\r');
+      expect(settingValue(readRuntimeConfigEditAt(target).values, setting)).toEqual(value);
+      expect(readRuntimeConfigEditAt(target).values.topP).toBe(0.7);
+      expect(fs.readFileSync(target, 'utf8')).toContain('// preserved list'); expect(fs.readFileSync(other)).toEqual(otherBytes);
+      expect(view.host.openSettings(scope).values[key]).toEqual(before);
+      expect(filterVisibleToolNames(tools, view.runtime.runtimeConfig)).toEqual(visible);
+      await view.open(key); await view.press('\r'); await view.press('\r'); await view.press('\r');
+      expect(settingValue(readRuntimeConfigEditAt(target).values, setting)).toEqual(value);
+      expect(filterVisibleToolNames(tools, view.runtime.runtimeConfig)).toEqual(visible);
+    } finally { view.overlay.close(); }
+  });
 
 it.each(cases)('navigates, cancels, saves, reopens and removes $key in $scope through real keys and owners', async ({ key, setting, scope }) => {
   const value = choices[key]; const view = surface(scope);

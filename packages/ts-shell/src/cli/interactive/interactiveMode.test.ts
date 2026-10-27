@@ -55,7 +55,7 @@ import { Clipboard } from './clipboard.js';
 import * as promptRunner from './interactivePromptRunner.js';
 import { StartupSurface } from './startup.js';
 import { createShellRuntimeContext } from '../../core/shell/runtimeContext.js';
-import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
+import { getProjectConfigPath, getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
 import { writeCatalogCache } from '../../core/models/catalogStore.js';
 import { __setOpenAIProviderAuthLoginForTest } from '../../core/auth/providerAuthRuntime.js';
 import { ConfigWriteError } from '../../config/outcome.js';
@@ -70,6 +70,7 @@ import { promptTokens } from '../../core/prompts/tokens.js';
 import * as modelState from '../../session/model/state.js';
 import { SessionModelWriteError } from '../../session/model/outcome.js';
 import * as configurationCommands from '../../core/commands/configuration.js';
+import { filterVisibleToolNames } from '../../core/tools/prefilter.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
@@ -338,6 +339,61 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     } finally {
       mode.stop(); publication.mockRestore(); dispatch.mockRestore(); network.mockRestore(); __setOpenAIProviderAuthLoginForTest(undefined);
       vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  (['user', 'project'] as const).flatMap(scope =>
+    ['"read"', 'read\nwrite'].map(item => ({ kind, scope, item })))))(
+  'preserves a literal list through untouched Enter and Apply in the $kind $scope host ($item)', async ({ kind, scope, item }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/settings-list-host-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', tuiMode: kind, topP: 0.7, ...(scope === 'user' ? { allowedTools: [item] } : {}) },
+      readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    const project = getProjectConfigPath(root); fs.mkdirSync(path.dirname(project), { recursive: true });
+    fs.writeFileSync(project, `// project list\n${JSON.stringify({ schemaVersion: 1, topP: 0.6, ...(scope === 'project' ? { allowedTools: [item] } : {}) })}`);
+    const target = scope === 'user' ? getUserRuntimeConfigPath() : project, other = scope === 'user' ? project : getUserRuntimeConfigPath();
+    const bytes = fs.readFileSync(target), otherBytes = fs.readFileSync(other), before = readRuntimeConfigEditAt(target).values;
+    const manager = new SessionManager(), session = manager.createNew(root), { mode, terminal } = build();
+    const host = mode as unknown as { view: InteractiveView; busy: boolean; options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+      session, runtimeConfig: getRuntimeConfig(root) });
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const tools = ['read', 'write'], visible = filterVisibleToolNames(tools, context.runtimeConfig);
+    expect(visible).toEqual([]);
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    mode.start();
+    try {
+      terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
+      host.view.editor.setText('held list draft\nkept during settings');
+      terminal.input('allowedTools'); await vi.waitFor(() => expect(frame()).toContain(`▸ ${scope === 'user' ? '● ' : ''}Allowed tools`));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Edit value'));
+      if (scope === 'project') {
+        terminal.input('\x1b[B\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('Choose save scope'));
+        terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('save to project'));
+      }
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Edit Allowed tools'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Apply'));
+      expect(fs.readFileSync(target)).toEqual(bytes); expect(filterVisibleToolNames(tools, context.runtimeConfig)).toEqual(visible);
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain(`Settings — ${scope} configuration`));
+      await vi.waitFor(() => expect(host.busy).toBe(false));
+      expect(frame()).toContain('▸ ● Allowed tools'); expect(frame()).toContain(`Saved to your ${scope} configuration`);
+      expect(readRuntimeConfigEditAt(target).values).toEqual(before); expect(fs.readFileSync(other)).toEqual(otherBytes);
+      expect(context.runtimeConfig.allowedTools).toEqual([item]);
+      expect(filterVisibleToolNames(tools, context.runtimeConfig)).toEqual(visible);
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Edit value'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Edit Allowed tools'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Apply'));
+      terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain(`Settings — ${scope} configuration`));
+      expect(readRuntimeConfigEditAt(target).values).toEqual(before);
+      expect(host.view.editor.getText()).toBe('held list draft\nkept during settings');
+      expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+    } finally {
+      mode.stop(); dispatch.mockRestore(); network.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
     }
   });
 

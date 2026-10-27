@@ -9649,3 +9649,11 @@ ADD-01/02/03确认API-key/account保存后原返回callback立即准备新角色
 三个自动角色×两入口六条单元和regular/fullscreen×两入口×两类发布结果八条实际host回归先在旧实现失败。最终四文件79项及过滤host28项通过、125项未选，共107项执行通过；覆盖实际writer、只读返回、原认证note、旧动作不重跑、恢复后显式分配、held草稿及默认/兄弟role/连接配置保持。账号runner与状态故障受控，零prompt派发/网络，secret不入画面/历史/transcript。恢复state由fixture显式执行；初次host可选resolver误用已分类为夹具错误并用现有解析owner修正。有效反转触发auth6/host8共14项预期失败，源码逐字节恢复并核对SHA-256后完成最终重验。
 
 五静态门、diff、module facade 0与TS build `6bebbec2a005`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十一批/当前摘要更新、scratch清理。延迟检查`44e9ea4133f0c6679096b14f9cda412e845b2677`的Watch `40556518111`success、CI `40556517972`仍in_progress。未运行全仓、真实认证服务/PTY/provider请求/exe、桌面、真实磁盘故障或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 未改动列表编辑的完整值保持
+
+ADD-03确认settings字符串列表逐行初始化与已有parser的引号、JSON、换行和trim语义不往返，未改文本的Enter→Apply会改变原值，甚至把带字面引号的未知工具名变成可见工具名。现沿原editorText先解析比较完整值，不能往返时使用已支持的JSON数组表示；普通逐行输入及原schema/保存owner保持。只读参考以JSON表达并解析数组，采用其保留结构化身份的决定，保留本项目逐行输入要求。
+
+新增18条user/project owner场景及8条两模式/两scope实际host链。最终fields116、picker settings39、config settings6共161项，以及过滤host8项通过、153项未选，共169项执行通过，核对原存储/accepted/effective、注释/兄弟字段/另一scope、实际工具可见集合、重开取消和held草稿，零prompt派发/网络。初版夹具的根列表/详情混淆、存储标记遗漏和重开同步已按实际合同校正。有效反转触发fields16/host8共24项失败，两个普通逐行控制仍通过；源码逐字节恢复并核对SHA-256后完成最终验证。
+
+五静态门、diff、module facade 0与TS build `b539b709a535`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十二批/当前摘要更新、scratch清理。`44e9ea41`的CI `40556517972`已success；`0a9f8584cb0b2d6ee9197faa75eda4ebcc923666`的Watch `40558903541`success、CI `40558903524`仍in_progress。未运行全仓、真实PTY/provider/exe、桌面或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
