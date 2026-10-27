@@ -9641,3 +9641,11 @@ ADD-02/03确认role reset、effort和具体模型分配只在saved时返回父�
 最终settings session28、model role18、picker lifecycle6共52项，以及过滤实际host8项通过、137项未选，共60项执行通过。新增14条scope/outcome单元和8条regular/fullscreen链覆盖未写入、落盘unknown、effort写后不可读、fresh显式二次保存、原scope/focus和held草稿；默认/兄弟role及全局配置保持，零prompt派发/网络。不可读夹具恢复磁盘字节由测试显式完成，不记为产品恢复能力。四个独立反转触发6/10/6/4项预期失败，源码逐字节恢复及SHA-256核对后重跑全部上述聚焦检查；不把未选测试记为通过。
 
 五静态门、diff、module facade 0与TS build `6e4ec4816f6e`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十批/当前摘要更新、scratch清理。延迟读回`98313353`的CI `40550327157`/Watch `40550326742`success；最终验证后`db19104d7f16eb44454065b71eb4a4660deb2034`的CI `40552244493`已completed/success，Watch `40552244296`此前success，均不替代本批结果。未运行全仓、真实PTY/provider/exe、桌面、真实磁盘故障或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 角色认证返回的读取失败与保存结果隔离
+
+ADD-01/02/03确认API-key/account保存后原返回callback立即准备新角色事务，session state不可读时抛错，丢失原认证结果和settings/model链。现沿原owner保护fresh捕获，失败退对应角色目录并保留完整安全结果及优先的应用未确认notice；原认证准入/取消与仅保存连接边界保持，角色分配仍须新显式选择。只读参考将登录交给上层并保留角色hub，采用认证与角色动作分离的决定，没有另造持久化或复制其hub。
+
+三个自动角色×两入口六条单元和regular/fullscreen×两入口×两类发布结果八条实际host回归先在旧实现失败。最终四文件79项及过滤host28项通过、125项未选，共107项执行通过；覆盖实际writer、只读返回、原认证note、旧动作不重跑、恢复后显式分配、held草稿及默认/兄弟role/连接配置保持。账号runner与状态故障受控，零prompt派发/网络，secret不入画面/历史/transcript。恢复state由fixture显式执行；初次host可选resolver误用已分类为夹具错误并用现有解析owner修正。有效反转触发auth6/host8共14项预期失败，源码逐字节恢复并核对SHA-256后完成最终重验。
+
+五静态门、diff、module facade 0与TS build `6bebbec2a005`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十一批/当前摘要更新、scratch清理。延迟检查`44e9ea4133f0c6679096b14f9cda412e845b2677`的Watch `40556518111`success、CI `40556517972`仍in_progress。未运行全仓、真实认证服务/PTY/provider请求/exe、桌面、真实磁盘故障或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

@@ -69,6 +69,7 @@ import { scanCommandArgs } from '../../core/commands/arguments.js';
 import { promptTokens } from '../../core/prompts/tokens.js';
 import * as modelState from '../../session/model/state.js';
 import { SessionModelWriteError } from '../../session/model/outcome.js';
+import * as configurationCommands from '../../core/commands/configuration.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
@@ -253,6 +254,92 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  (['account', 'configure'] as const).flatMap(route =>
+    [false, true].map(unverified => ({ kind, route, unverified })))))(
+  'retains the role sign-in result after unreadable state through the $kind $route host (unverified: $unverified)', async ({ kind, route, unverified }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/role-auth-host-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'anthropic', tuiMode: kind, activeProviderConnectionId: 'default', providerConnections: [{
+      id: 'default', provider: 'anthropic', authType: 'api-key', apiKey: 'synthetic-default', model: 'default-model',
+      status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+    }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    writeCatalogCache([{ id: 'anthropic', models: [{ id: 'default-model', reasoning: true }] },
+      { id: 'openai', models: [{ id: 'gpt-5.4-mini', reasoning: true }] }]);
+    const manager = new SessionManager(), session = manager.createNew(root);
+    const target = { connectionId: 'default', provider: 'anthropic' as const, model: 'default-model', thinkingEffort: 'low' as const };
+    modelState.writeSessionModel(session.id, { connectionScope: 'session', ...target, thinkingEffort: 'high',
+      roles: { advisor: target, summary: target, subagent: target } }, modelState.readSessionModelEdit(session.id));
+    const original = readSessionModel(session.id)!, before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    const statePath = modelState.readSessionModelEdit(session.id).statePath, stateBytes = fs.readFileSync(statePath);
+    const { mode, terminal } = build();
+    const host = mode as unknown as { view: InteractiveView; busy: boolean;
+      options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+      session, runtimeConfig: getRuntimeConfig(root) });
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const publish = configurationCommands.configurationApplicationNotice;
+    const publication = vi.spyOn(configurationCommands, 'configurationApplicationNotice').mockImplementationOnce((...args) => {
+      const notice = publish(...args); fs.writeFileSync(statePath, '{unreadable');
+      return unverified ? 'Configuration application outcome is unverified.' : notice;
+    });
+    __setOpenAIProviderAuthLoginForTest(async () => ({ accessToken: 'synthetic-role-host-access', refreshToken: 'synthetic-role-host-refresh',
+      expiresAt: Date.now() + 3600000, authorizeUrl: 'https://auth.openai.com/authorize', callbackUrl: 'http://localhost:1455/auth/callback' }));
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    mode.start();
+    try {
+      terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
+      host.view.editor.setText('held role sign-in draft\nkept through failure');
+      terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('Advisor'); await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Choose model'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('gpt-5.4-mini'); await vi.waitFor(() => expect(frame()).toContain('▸ gpt-5.4-mini'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Account sign-in'));
+      terminal.input(route === 'account' ? '\x1b[B\r' : '\x1b[B\x1b[B\r');
+      await vi.waitFor(() => expect(frame()).toContain(route === 'account' ? 'Confirm account sign-in' : 'API key'));
+      if (route === 'account') terminal.input('\x1b[B\r');
+      else { terminal.input('synthetic-role-host-key'); await vi.waitFor(() => expect(frame()).toContain('••••')); terminal.input('\r'); }
+      await vi.waitFor(() => expect(publication).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(host.busy).toBe(false));
+      await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
+      if (unverified) expect(frame()).toContain('Configuration application outcome is unverified.');
+      const messages = JSON.stringify(host.view.transcript.all());
+      expect(messages).toContain(route === 'account' ? 'account-auth connected' : 'Connected provider openai.');
+      expect(messages).not.toContain('Session model read-failed'); expect(messages).not.toContain('synthetic-role-host-');
+      expect(fs.readFileSync(statePath, 'utf8')).toBe('{unreadable');
+      const saved = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values, configBytes = fs.readFileSync(getUserRuntimeConfigPath());
+      const connection = saved.providerConnections!.find(row => row.provider === 'openai')!;
+      expect(connection).toMatchObject({ status: 'connected', autoSelect: false });
+      if (route === 'configure') expect(connection.apiKey).toBe('synthetic-role-host-key');
+      expect(saved.provider).toBe(before.provider); expect(saved.activeProviderConnectionId).toBe(before.activeProviderConnectionId);
+      expect(saved.providerCredentials).toEqual(before.providerCredentials);
+      expect(saved.providerConnections!.find(row => row.id === 'default')).toEqual(before.providerConnections![0]);
+      fs.writeFileSync(statePath, stateBytes); expect(readSessionModel(session.id)).toEqual(original);
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Choose model'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('gpt-5.4-mini'); await vi.waitFor(() => expect(frame()).toContain('▸ gpt-5.4-mini'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
+      expect(readSessionModel(session.id)).toEqual({ ...original, roles: { ...original.roles,
+        advisor: { connectionId: connection.id, provider: 'openai', model: 'gpt-5.4-mini', thinkingEffort: 'low' } } });
+      terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('Settings — user configuration'));
+      expect(frame()).toContain('▸ Models and roles'); expect(frame()).toContain('advisor uses');
+      expect(host.view.editor.getText()).toBe('held role sign-in draft\nkept through failure');
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(configBytes);
+      expect(resolveProviderCredential({ runtimeConfig: context.runtimeConfig }).model).toBe('default-model');
+      expect(host.view.editor.getHistory()).not.toContain('synthetic-role-host-key');
+      expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+    } finally {
+      mode.stop(); publication.mockRestore(); dispatch.mockRestore(); network.mockRestore(); __setOpenAIProviderAuthLoginForTest(undefined);
+      vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 
 it('withdraws the prompt estimate when context selection changes', async () => {
   vi.useFakeTimers();

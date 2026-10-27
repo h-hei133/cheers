@@ -1458,6 +1458,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，预览补异步/cancellable复验和实时准入。第五十一批把preview模板发现收窄为候选精确探测，第五十三批再收窄正文补全与单命令查找，并补目录入口、优先级遮蔽和注册归属；第五十四批补首位真实路径/命令合并、command-first及文件引号防误路由；第五十七批让review standalone/composed预览复用真实Git snapshot与plan-mode prompt身份。同名模板/路径提交歧义和完整终端矩阵仍未消除。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。第三十八批新增settings全部37项/user37-project36基本键盘链及七个跨来源政策场景，第三十九批补17个代表性冲突/失效/取消/范围场景，第四十九批补Memory/Shell只读命令入口。完整字段×来源×编辑器×窗口/桌面及model能力/角色/真实认证矩阵仍未完成；只读入口不伪装可编辑字段，也不能将局部绿色写成“整体已看齐” |
 | 角色写入失败后丢失settings/model返回链 | 第八十批确认reset、具体模型和effort只在saved时返回父页面，Enter已释放面板，失败使生命周期结束；effort重建遇不可读state还会掩盖原写入结果。现回现有fresh parent，不可读时退回目录并保留原notice；60项执行通过、四组6/10/6/4有效反转及build有本地证据，真实文件系统故障与完整平台矩阵未验 |
+| 角色认证返回时读取失败吞掉连接保存结果 | 第八十一批确认API-key/account保存后的fresh role准备无异常边界，state不可读时丢失原认证notice和返回链。现沿原角色目录fallback，保留已保存/应用未确认事实，恢复后须显式重新选择才分配。107项执行通过、14项有效反转及build有本地证据；认证runner与故障受控，真实服务、磁盘故障和完整scope矩阵未验 |
 | 设置搜索新查询仍保留较弱匹配焦点 | 第三十八批确认typed/pasted `topP`排名第一但Enter打开Input shape。现新查询自动聚焦最强匹配，同查询手动选择保持，清空回原字段；178项聚焦、一有效反转及两模式实际Node PTY有证据。不是用户原model按键现场唯一原因的证明 |
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；第六十三批补非首位命令碰撞file引号、目录候选不触发命令模板查找、代码/转义/URL参数不请求path catalog及quoted Windows drive/UNC识别；第七十批补`/skill:`命名空间内真实路径与skill候选并存，quoted path与exact skill Enter/Tab分界保真。完整场景验收仍按下表，非skill同名template/path的裸提交歧义及正文功能命令执行边界不因此消失 |
@@ -1552,6 +1553,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第七十九批继续补既有`@`引用的字面量与文件名边界：代码围栏/行内代码不枚举文件，真实闭合后恢复；文件名内和开头的`@`可接受并重新解析为同一引用，raw双`@@`和邮箱仍保留原语义。测试目录枚举端口为mock，不是实际文件正文读取或授权证据；ADD整体仍active。
 
 第八十批补角色reset、具体模型及effort写入失败后的返回：沿现有fresh parent保留准确写入notice，state暂时不可读时退回现有目录。消费过的角色动作保持退休，重试须读取新基线并由用户再次选择；没有自动重试或修复状态文件。user/project与两模式host已有隔离证据，完整角色/来源/窗口和真实故障验收仍待补，ADD整体active。
+
+第八十一批补角色→未配置模型→API-key/account→返回中不可读state的边界：连接结果与角色事务各自保真，沿原角色目录保留结果；旧认证动作不重跑，恢复后只在新显式选择中分配目标角色。三个自动角色与两模式host已有局部证据，真实认证、磁盘故障和完整scope/平台矩阵继续待补，ADD整体active。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -1764,3 +1767,17 @@ ADD-02/03沿settings→Models and roles→Advisor检查出三处同类缺口：[
 主代理heap768MiB、单worker串行最终完成settings session28、model role18、picker lifecycle6共52项，随后过滤InteractiveMode执行8项通过、137项未选，共60项实际执行通过。四个独立反转分别恢复reset、effort、具体模型的成功限定返回及移除不可读父页面fallback，按文件与断言名称确认恰好6/10/6/4项失败；finally源码逐字节恢复，恢复后重跑上述全部聚焦验证。恢复SHA-256：role `bc386e764efb3c62979c0f6cd6ac31d1af6c005a2de61dd3f9ad7962d83b929c`，thinking `9db69e505f5bab8b89e6f730b92dcd41988325149e90fa2d1825cffc293a34cd`，model `fc578d0647f2d1fb113e87807775b3fb8bddede44a20316d9f43b3d153983ded`。filtered-out用例不算通过。
 
 五静态门、diff、module facade 0及TS build `6e4ec4816f6e`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新，临时反转材料清理。延迟读回`98313353`的CI `40550327157`及Watch `40550326742`success；本批最终验证后再读回`db19104d`的CI `40552244493`已completed/success，精确head为`db19104d7f16eb44454065b71eb4a4660deb2034`，Watch `40552244296`此前已success；均不替代本批CI。未运行全仓、真实PTY/provider/exe、桌面或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。
+
+### 第八十一批：角色认证结果与新事务读取失败的隔离
+
+ADD-01/02/03继续检查角色浏览器的未配置模型。已有API-key/account正常返回会重新捕获角色事务，并非一直复用认证前callback；但[model owner](../../packages/ts-shell/src/cli/interactive/picker/model.ts)在返回callback内立即`prepareModelRole`，没有处理该步骤读取失败。连接已经落盘后，session state若暂时不可读，结果会抛到通用host错误路径，原认证notice和settings/model返回链丢失。三个自动角色×两种认证入口六条单元，以及两模式×两入口×已应用/应用未确认八条实际host回归先在旧实现失败，属于产品返回边界缺口。
+
+现仅在原认证返回owner保护fresh角色事务捕获：成功仍回精确连接/模型浏览器；无法捕获时沿已有`assigning.back`退回对应角色目录，使用同一fresh context并保留原`modelSignInStatus`。完整认证note仍由原authentication owner返回，应用未确认提示继续置前。原身份/准入/取消检查、仅保存连接及后续显式启用边界保持。只读参考的hub把OAuth入口交给上层登录callback，原角色hub保留；其入口本身没有本项目这种立即重捕获session事务的步骤。采用认证与角色动作分离的决定，读取失败fallback由本项目现有目录承担，不将参考片段当作相同故障已解决的证据。
+
+[auth测试](../../packages/ts-shell/src/cli/interactive/picker/model/auth.test.ts)新增subagent/summary/advisor×account/key六条，实际connect writer以save-only模式保存，账号runner为受控fixture。写后破坏隔离session state，再核对原note、对应role焦点、只读模型行、原默认/镜像/连接与状态字节保持、旧认证动作不重跑。测试显式恢复原state字节后重新进入角色并选择，只有目标角色改为新连接/模型，default及另外两role保持；此恢复动作不是产品自动修复能力。
+
+[实际host测试](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)八条从`/settings`进入Advisor与未配置模型，走真实masked key或受控native account writer。原配置发布后注入不可读state，四条另注入应用未确认notice；回原role目录时保留完整安全认证transcript及适用notice。fixture恢复state后再显式选择，返回原user settings入口，held多行草稿保持、连接配置字节不再变化、默认请求目标与兄弟role保持，零prompt派发/网络且秘密不进入画面、transcript或历史。初次恢复后的host夹具误用未提供的可选`resolveConfigTarget`，分类为夹具错误，改为直接调用现有凭据解析owner后重验，没有因此改产品合同。
+
+主代理heap768MiB、单worker串行最终完成auth24、key9、role18、settings session28共79项；再过滤InteractiveMode执行28项通过、125项未选，包含新增8条及已有精确配置、masked key、native失败/取消和异常报告，共107项实际执行通过。独立反转认证返回guard后恰好14条新回归失败，按文件/名称确认auth6、host8，单元失败为预期read-failed。finally逐字节恢复，SHA-256 `360f8992c3850bde5ca3440cfa753fa2a6756e7eceec27a453f0ef26d7a905a9`，恢复后重跑上述全部最终聚焦检查；filtered-out不算通过。
+
+五静态门、diff、module facade 0与TS build `6bebbec2a005`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新，反转scratch清理。延迟读回`44e9ea4133f0c6679096b14f9cda412e845b2677`的Watch `40556518111`success、CI `40556517972`仍in_progress，不替代本批结果。未运行全仓、真实认证服务/PTY/provider请求/exe、桌面、真实磁盘故障或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。

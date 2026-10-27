@@ -7,7 +7,7 @@ import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, wr
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
 import { runConnectCommand, __setOpenAIAccountAuthRunnerForTest } from '../../../../core/commands/connectCommandRuntime.js';
-import { modelSignInPicker, modelSignInStatus, modelAccountSignIn } from './auth.js';
+import { modelSignInPicker, modelSignInStatus, modelAccountSignIn, type ModelSignIn } from './auth.js';
 import { BUILTIN_PROVIDERS } from '../../../../core/models/catalog.js';
 import type { CommandContext } from '../../../../core/commands/types.js';
 import { OverlayHost } from '../../overlay.js';
@@ -68,6 +68,65 @@ it.each(['subagent', 'summary', 'advisor'] as const)('continues %s assignment af
   expect(readSessionModel(sessionId)).toEqual({ ...original, roles: { ...original.roles,
     [role]: { connectionId: connection.id, provider: 'openai', model: 'gpt-5.4-mini', thinkingEffort: 'low' } } });
 });
+
+it.each((['subagent', 'summary', 'advisor'] as const).flatMap(role =>
+  (['account', 'configure'] as const).map(route => ({ role, route }))))(
+  'retains the $role $route result and a usable parent when session state becomes unreadable during sign-in', async ({ role, route }) => {
+    writeUserRuntimeConfigFile({ provider: 'anthropic', activeProviderConnectionId: 'default', providerConnections: [{
+      id: 'default', provider: 'anthropic', authType: 'api-key', apiKey: 'synthetic-default', model: 'default-model',
+      status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+    }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    const target = { connectionId: 'default', provider: 'anthropic' as const, model: 'default-model', thinkingEffort: 'low' as const };
+    writeSessionModel(sessionId, { connectionScope: 'session', ...target, thinkingEffort: 'high',
+      roles: { subagent: target, summary: target, advisor: target } }, readSessionModelEdit(sessionId));
+    writeCatalogCache([{ id: 'anthropic', models: [{ id: 'default-model', reasoning: true }] },
+      { id: 'openai', models: [{ id: 'gpt-5.4-mini', reasoning: true }] }]);
+    __setOpenAIAccountAuthRunnerForTest(async () => ({ accessToken: 'synthetic-role-access', refreshToken: 'synthetic-role-refresh',
+      expiresAt: Date.now() + 3600000, authorizeUrl: 'https://auth.openai.com/authorize', callbackUrl: 'http://localhost:1455/auth/callback' }));
+    const original = readSessionModel(sessionId)!, statePath = readSessionModelEdit(sessionId).statePath;
+    const stateBytes = fs.readFileSync(statePath), before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    let notice: string | undefined;
+    const authenticate: ModelSignIn = async (provider, key) => {
+      const args = key ? ['login', provider, `--api-key=${key.apiKey}`, `--model=${key.model}`, `--label=${key.label}`,
+        ...(key.baseUrl ? [`--base-url=${key.baseUrl}`] : [])] : ['login', provider, '--account'];
+      const result = await runConnectCommand(args, context(), undefined, { activate: false });
+      notice = result.output.split('\n').filter(line => !line.startsWith('Saved key:')).join('\n');
+      fs.writeFileSync(statePath, '{unreadable');
+      return { context: context(), note: notice };
+    };
+    const signIn = vi.fn(authenticate);
+    const models = modelPicker(context(), undefined, undefined, undefined, undefined, signIn); await models.load();
+    const actions = (await models.inspect!(`role:${role}`))!.next!; await actions.load();
+    const browse = (await actions.apply(['choose']))!.next!;
+    const missing = (await browse.load()).find(row => row.label === 'gpt-5.4-mini')!;
+    const details = (await browse.inspect!(missing.id))!.next!; await details.load();
+    const child = (await details.apply([route]))!.next!; await child.load();
+    const result = route === 'account' ? await child.apply(['start']) : await child.input!.apply('synthetic-role-key');
+    expect(result?.note).toBe(notice); expect(signIn).toHaveBeenCalledTimes(1);
+    const returned = result!.next!, rows = await returned.load();
+    expect(returned.initialSelection).toBe(`role:${role}`);
+    expect(returned.status!([], '')).toBe(modelSignInStatus(notice!));
+    const modelsAfterFailure = rows.filter(row => row.id.startsWith('model:'));
+    expect(modelsAfterFailure.length).toBeGreaterThan(0); expect(modelsAfterFailure.every(row => row.disabled)).toBe(true);
+    expect(fs.readFileSync(statePath, 'utf8')).toBe('{unreadable');
+    const saved = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    const connection = saved.providerConnections!.find(row => row.provider === 'openai')!;
+    expect(connection).toMatchObject({ status: 'connected', autoSelect: false });
+    expect(saved.activeProviderConnectionId).toBe(before.activeProviderConnectionId); expect(saved.provider).toBe(before.provider);
+    expect(saved.providerCredentials).toEqual(before.providerCredentials);
+    expect(saved.providerConnections!.find(row => row.id === 'default')).toEqual(before.providerConnections![0]);
+    expect(result?.note).not.toContain('synthetic-role-');
+    expect(route === 'account' ? await child.apply(['start']) : await child.input!.apply('synthetic-role-key')).toBeUndefined();
+    expect(signIn).toHaveBeenCalledTimes(1);
+    fs.writeFileSync(statePath, stateBytes);
+    const retry = (await returned.inspect!(`role:${role}`))!.next!; await retry.load();
+    const fresh = (await retry.apply(['choose']))!.next!; await fresh.load();
+    const assigned = await fresh.apply([id(connection.id, 'gpt-5.4-mini')]);
+    expect(assigned?.note).toContain(`${role} uses`);
+    expect(readSessionModel(sessionId)).toEqual({ ...original, roles: { ...original.roles,
+      [role]: { connectionId: connection.id, provider: 'openai', model: 'gpt-5.4-mini', thinkingEffort: 'low' } } });
+    expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values).toEqual(saved);
+  });
 
 it.each(['success', 'failure', 'cancel'] as const)('returns a native account %s to the precise model and refreshes real connection state', async outcome => {
   const baseline = readRuntimeConfigEditAt(getUserRuntimeConfigPath());

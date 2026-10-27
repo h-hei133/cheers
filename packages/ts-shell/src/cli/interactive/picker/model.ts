@@ -182,10 +182,15 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
                 ? connectionDraft(provider, model.id, endpoint, connection?.label ?? provider.id) : undefined;
               const account = signIn && canConfigure && modelAccountSignIn(provider, model.id, endpoint);
               const back = (fresh: CommandContext, result?: string, connectionId?: string, origin?: ModelDetailOrigin) => {
-                const refreshed = assigning ? { ...assigning, assign: prepareModelRole(fresh, assigning.role).assign,
-                  back: (note?: string) => assigning.back(note, fresh) } : undefined;
+                const status = result ? modelSignInStatus(result) : undefined;
+                let refreshed: RoleSelection | undefined;
+                if (assigning) {
+                  try { refreshed = { ...assigning, assign: prepareModelRole(fresh, assigning.role).assign,
+                    back: (note?: string) => assigning.back(note, fresh) }; }
+                  catch { return assigning.back(status ?? 'Role settings could not be read. Reopen the model panel.', fresh); }
+                }
                 return modelPicker(fresh, connectionId ? rowId(connectionId, provider.id, model.id) : id, navigation, refreshed,
-                  result ? modelSignInStatus(result) : undefined, signIn, parent, origin);
+                  status, signIn, parent, origin);
               };
               const childBack = (returnTo: (notice?: string) => Picker, origin?: ModelDetailOrigin) =>
                 (fresh: CommandContext, result?: string, connectionId?: string) =>
