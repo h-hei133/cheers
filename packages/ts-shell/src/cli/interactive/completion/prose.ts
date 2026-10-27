@@ -21,7 +21,7 @@ export function proseRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScope)
   if (!source || source.literal === 'code' || source.literal === 'escape' && !windows) return undefined;
   if (quoted && quotedBody === undefined) return undefined;
   const value = windows ? candidate : quote ? quotedBody! : scanCommandArgs(prefix, true)[0]?.value ?? '';
-  if (quoted && (!pathLike(value) || /^\/skill:/.test(value))) return undefined;
+  if (quoted && !pathLike(value)) return undefined;
   if (!pathLike(value)) return undefined;
   const pathExists = tokenFrom === 0 && value.length > 1 &&
     pathTargetExists(scope?.root ?? process.cwd(), value);
@@ -34,10 +34,10 @@ export function proseRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScope)
     listSlashInvocations(scope, {
       templates: { namePrefix: prefix.slice(1).toLowerCase() },
     }).some(item => item.invocation.startsWith(prefix)) && !pathExists) return undefined;
-  const kind = explicitSkill ? 'inline-skill' as const : !quoted && /^\/[A-Za-z0-9:._?-]*$/.test(value)
+  const kind = !quoted && /^\/[A-Za-z0-9:._?-]*$/.test(value)
     ? 'prose' as const : 'path' as const;
   return { kind, token: { from: tokenFrom, to: quote?.to ?? source.to, prefix, value, before: [] }, snapshot,
-    fixed: [] as Suggestion[], query: explicitSkill ? undefined : pathDirectory(value), scope };
+    fixed: [] as Suggestion[], query: pathDirectory(value), scope };
 }
 
 /** Bare prose requires a skill name segment prefix; paths never lose to fuzzy descriptions. */

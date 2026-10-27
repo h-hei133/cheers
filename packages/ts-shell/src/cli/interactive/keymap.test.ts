@@ -644,6 +644,31 @@ describe("completion interception", () => {
     expect(actions.submit).not.toHaveBeenCalled();
   });
 
+  it("submits an exact explicit skill on Enter even when a same-name path candidate is current", () => {
+    const { press, surface, actions } = build();
+    surface.editor.setText("/skill:review");
+    const snapshot = surface.editor.snapshot();
+    surface.suggestions.setItems([
+      completionEdit({ value: '"/skill:review"', label: "/skill:review", kind: "path" }, snapshot, 0, 13),
+    ]);
+    surface.setSuggesting(true);
+    press("\r");
+    expect(actions.submit).toHaveBeenCalledWith("/skill:review");
+  });
+
+  it("keeps Tab as the path gesture for an exact explicit skill collision", () => {
+    const { press, surface, actions } = build();
+    surface.editor.setText("/skill:review");
+    const snapshot = surface.editor.snapshot();
+    surface.suggestions.setItems([
+      completionEdit({ value: '"/skill:review"', label: "/skill:review", kind: "path" }, snapshot, 0, 13),
+    ]);
+    surface.setSuggesting(true);
+    press("\t");
+    expect(surface.editor.getText()).toBe('"/skill:review" ');
+    expect(actions.submit).not.toHaveBeenCalled();
+  });
+
   it("accepts the selection on enter once the user has navigated the list", () => {
     const { press, surface, actions } = build();
     surface.suggestions.setItems([

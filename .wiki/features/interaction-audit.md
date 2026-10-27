@@ -762,3 +762,9 @@ ADD-13确认`/statusline use`写入配置文件后没有发布当前会话的acc
 真实interactive router回归同时核对accepted configuration与读取当前配置的display路径；三文件60项串行通过，移除router display port后1项按预期失败并逐字节恢复。五静态门/diff、责任上限0、module facade0、Phase 20脚本38/9/0、strict docs及TS build `50fb30626897`（inputs `56d48d8ccac7`、artifact `5725771a1bcb`）另绑定。未运行全仓、PTY、真实provider、exe或桌面；见[第六十九批](phase-20-addition.md#第六十九批显示偏好命令的当前会话应用与持久化边界)。原Phase38/9、ADD独立且整体active。
 
 category23与session-provider28分别单进程串行通过；将行endpoint回退为只读取named-candidate resolution后，env/profile共2项按预期失败，源码逐字节恢复。独立review先发现inline source未断言及profile env未隔离，修复后delta review no findings。五静态门/diff、责任上限0、module facade0、Phase 20脚本38/9/0、TS build `a2508c6c2a64`（inputs `5350f916d60a`、artifact `cef810f8a754`）和fresh manifest 460/1882另绑定。见[第六十八批](phase-20-addition.md#第六十八批非当前ambient-provider行的有效端点投影)。未运行全仓、PTY、真实provider、exe或桌面，20k继续mock/切片；原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第七十批）
+
+ADD-10/11确认`/skill:`被当作只能承载skill的命名空间，导致真实absolute file `/skill:review`即使加引号也不进入path completion，raw前缀只加载skill；exact `/skill:review`在path候选存在时也可能被Enter接受为path。现`/skill:` token进入统一prose catalog，同时读取当前目录path与skill；quoted namespace值按同一`pathLike`规则作为path，accepted file加引号，skill候选保持canonical token。keymap把exact `/skill:<name>`作为command-first：Enter提交skill，Tab仍接受同名path，原`inline-skill`分支已删除。
+
+七文件190项串行通过；显式skill/path回归先失败2项，联合恢复exact skill query与keymap完整token判定后再次失败恰好2项，生产源码逐字节恢复。五静态门、责任上限0、module facade0、Phase 20脚本38/9/0、TS build `27dc4c67ec8e`（inputs `a303ef479cc2`、artifact `b937caa8d44b`）、fresh 460/1882及adapted judge proven另绑定。指定委派模型仍处cooldown，未记为review approval；见[第七十批](phase-20-addition.md#第七十批skill命名空间内的路径与显式skill分界)。未运行全仓、PTY、真实provider、exe、桌面或Windows，原Phase38/9、ADD独立且整体active。

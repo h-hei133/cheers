@@ -75,7 +75,6 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
     signal.throwIfAborted();
     const current = context();
     if (kind === 'path') return pathCatalog(current.cwd, query ?? '', false, signal);
-    if (kind === 'inline-skill') return (await skills.read(current, signal)).map(item => ({ ...item, value: `/skill:${item.value}`, label: `/skill:${item.label}` }));
     if (kind === 'prose') {
       const results = await Promise.allSettled([pathCatalog(current.cwd, query ?? '', false, signal), skills.read(current, signal)]);
       signal.throwIfAborted();
@@ -119,7 +118,7 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
   return Object.assign(load, {
     invalidate: () => { pending = undefined; },
     observe: (kind: CatalogKind, query: string | undefined, changed: () => void) => {
-      if (kind === "skill" || kind === 'inline-skill') return skills.observe(changed);
+      if (kind === "skill") return skills.observe(changed);
       if (kind === 'prose') {
         const close = skills.observe(changed);
         const directory = observeDirectory(resolveCatalogDirectory(context().cwd, query ?? '', false), changed);

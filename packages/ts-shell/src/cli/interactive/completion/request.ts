@@ -22,7 +22,7 @@ import { fileReferenceAt, fileSuggestions } from "../fileSuggestions.js";
 import { proseRequest, proseSuggestions } from './prose.js';
 import type { SlashCatalogScope } from '../../../entrypoints/slashCommandRegistry.js';
 
-export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant" | "connection" | "file" | "directory" | "reference" | "model" | "provider" | "workflow" | 'inline-skill' | 'prose' | 'path' | MemoryCatalogKind;
+export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant" | "connection" | "file" | "directory" | "reference" | "model" | "provider" | "workflow" | 'prose' | 'path' | MemoryCatalogKind;
 
 export function catalogRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScope) {
   const command = commandCatalogRequest(snapshot, scope);
@@ -89,7 +89,7 @@ function nonPathLiteral(value: string, token: ReturnType<typeof promptTokenAt>):
 }
 
 export function catalogSuggestions(request: NonNullable<ReturnType<typeof catalogRequest>>, items: readonly Suggestion[]) {
-  if (request.kind === 'inline-skill' || request.kind === 'prose' || request.kind === 'path') return proseSuggestions(request, items);
+  if (request.kind === 'prose' || request.kind === 'path') return proseSuggestions(request, items);
   if (request.kind === "reference") return fileSuggestions(request.snapshot.text, items.map(item => item.value), request.snapshot) ?? [];
   return matchSuggestions(request.token.value, [...request.fixed, ...items]).slice(0, 100).map(item => {
     const text = (item.value.startsWith("-") && !request.token.before.some(token => token.value === "--") ? "-- " : "") + quoteCompletion(item.value, request.token.prefix);

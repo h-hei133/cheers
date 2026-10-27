@@ -81,6 +81,24 @@ it('keeps a real /home path alongside a same-name skill without fuzzy descriptio
   expect(matches.map(item => item.edit?.text)).toEqual(['/home/', '/skill:home ']);
 });
 
+it('keeps real skill-namespaced paths distinct from explicit skill completions', () => {
+  const req = request('读取 /skill:rev|')!;
+  expect(req).toMatchObject({ kind: 'prose', query: '/' });
+  const matches = catalogSuggestions(req, [
+    { value: '/skill:review', label: '/skill:review', kind: 'path', identity: '/skill:review', detail: 'file' },
+    { value: '/skill:review', label: '/skill:review', kind: 'skill', detail: 'review sources' },
+  ]);
+  expect(matches.map(item => item.kind)).toEqual(['path', 'skill']);
+  expect(matches.map(item => item.edit?.text)).toEqual(['"/skill:review" ', '/skill:review ']);
+
+  const quoted = request('读取 "/skill:rev|"')!;
+  expect(quoted).toMatchObject({ kind: 'path', query: '/' });
+  const path = catalogSuggestions(quoted, [
+    { value: '/skill:review', label: '/skill:review', kind: 'path', identity: '/skill:review', detail: 'file' },
+  ])[0]!;
+  expect(path.edit?.text).toBe('"/skill:review" ');
+});
+
 it('reads only prefix-matching template bodies for ambiguous path completion', () => {
   const prompts = path.join(root, '.agents', 'prompts');
   fs.mkdirSync(prompts, { recursive: true });

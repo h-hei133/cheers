@@ -9556,3 +9556,9 @@ category23与session-provider28分别单进程串行通过。将行endpoint回�
 ADD-13确认`/statusline use`只写配置而未更新当前accepted display state，且旧输出错误承诺下一帧更新；`/theme`只改变当前进程却没有说明保存边界。现CommandContext增加host `applyDisplayConfig`，interactive route绑定既有`ConfigState.recordDisplay`；状态栏命令在写入后应用，缺失/异常时如实报告保存与应用范围。theme命令明确current session并指向`/settings Appearance`。
 
 三文件60项单进程串行通过：preferences17、theme6、interactive router37。真实router回归同时断言配置文件与accepted configuration；移除router display port后1项预期失败，源码逐字节恢复并核对SHA-256。五静态门/diff、责任上限0、module facade0、Phase 20 38 complete / 9 partial / 0 open、strict docs及TS build `50fb30626897`（inputs `56d48d8ccac7`、artifact `5725771a1bcb`）、fresh manifest 460/1882通过。未运行全仓、PTY、真实provider、exe或桌面；HANDOFF/addition第六十九批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-27] fix | `/skill:`命名空间内的路径与显式skill分界
+
+ADD-10/11确认`/skill:`被提前归入skill-only候选，quoted `/skill:` path被拒绝，raw `/skill:rev`无法同时展示同名absolute file；exact `/skill:review`也可能在path候选存在时被Enter接受为path。现prose catalog统一加载目录path与skill，quoted namespace值按同一pathLike规则作为path，accepted file加引号且skill候选保持canonical；keymap把exact `/skill:<name>`作为command-first，Enter提交skill、Tab接受path。无调用方的`inline-skill`分支已移除。
+
+七文件190项单进程串行通过：completion14、request30、paths18、prose34、controller14、skills2、keymap78。显式skill/path回归先失败2项；联合恢复skill path query与keymap完整token后再次恰好失败2项，源码逐字节恢复并核对SHA-256（prose `6efc7100f06c`、keymap `91c6b4e75c0e`）。五静态门/diff、责任上限0、module facade0、Phase 20 38/9/0、TS build `27dc4c67ec8e`（inputs `a303ef479cc2`、artifact `b937caa8d44b`）、fresh 460/1882及adapted judge proven/0 open-failed-gap通过。指定`global:deepseek-v4.1-flash-sg`仍处cooldown，未记为review approval；未运行全仓、PTY、真实provider、exe、桌面或Windows，HANDOFF/addition第七十批/audit更新，Git/CI另绑定。

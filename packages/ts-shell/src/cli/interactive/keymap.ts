@@ -487,7 +487,8 @@ function consumeSuggestionKey(event: ParsedKeyEvent, context: KeymapContext): bo
   // A whole command typed out submits, even if the list was navigated earlier:
   // accepting an old candidate here would execute something the user did not type.
   const complete = edit !== undefined && edit.from === 0 && written.startsWith("/") &&
-    getSlashInvocation(written.toLowerCase(), context.slashScope) !== undefined;
+    (getSlashInvocation(written.toLowerCase(), context.slashScope) !== undefined ||
+      /^\/skill:[^\s/\\]+$/.test(written));
   const accepts = action === "tui.input.tab" ||
     (action === "tui.input.submit" && !complete && (view.suggestions.chosen || incomplete));
   if (accepts) {
