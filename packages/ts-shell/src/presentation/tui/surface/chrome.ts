@@ -29,8 +29,9 @@ export function renderChrome(
   height: number,
 ): ChromeLayout {
   const busy = context.busy();
+  const inputRows = context.overlayInputActive?.() ? 1 : 0;
   const chromeCapacity = Math.max(1, height - MIN_TRANSCRIPT_ROWS);
-  const maxComposerRows = composerRowBudget(height);
+  const maxComposerRows = Math.min(composerRowBudget(height), Math.max(0, chromeCapacity - inputRows));
   const activityRows = renderActivity(context.activity(), context.now(), width);
   const composerLayout = layoutComposer(
     view.editor,
@@ -42,7 +43,7 @@ export function renderChrome(
   let remaining = chromeCapacity - composerRows.length;
   const hintStatus = context.hintStatus?.();
   const completionStatus = hintStatus?.completion;
-  const suggestionRows = view.suggestionsOpen ? view.suggestions.render(width, Math.max(0, remaining - Number(!!completionStatus))) : [];
+  const suggestionRows = view.suggestionsOpen ? view.suggestions.render(width, Math.max(0, remaining - inputRows - Number(!!completionStatus))) : [];
   remaining -= suggestionRows.length;
   // The search bar takes the hint row rather than adding one: an open search is
   // itself the hint, and the composer above it is where the user's text lives, so
@@ -60,9 +61,9 @@ export function renderChrome(
       },
       context.ambient(),
       width,
-    )).slice(0, remaining);
+    )).slice(0, Math.max(0, remaining - inputRows));
   remaining -= hints.length;
-  const overlayRows = context.overlayRows(width, height, Math.max(0, remaining - activityRows.length));
+  const overlayRows = context.overlayRows(width, height, Math.max(inputRows, remaining - activityRows.length));
   const statusRows = [...activityRows, ...overlayRows];
   const visibleStatus = remaining > 0 ? statusRows.slice(-remaining) : [];
   const droppedStatus = statusRows.length - visibleStatus.length;

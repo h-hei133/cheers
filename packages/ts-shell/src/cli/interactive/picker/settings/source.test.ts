@@ -1,12 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getRuntimeConfig, getUserRuntimeConfigPath, getProjectConfigPath, readUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserRuntimeConfigPath, getProjectConfigPath, readUserRuntimeConfigFile, readRuntimeConfigEditAt } from '../../../../config/runtimeConfig.js';
 import { createConfigInputs } from '../../../../config/inputs/selection.js';
 import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../../../../core/shell/runtimeContext.js';
 import { projectTrust } from '../../../../core/security/trust/store.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
+import { visibleWidth } from '../../../../presentation/tui/text/measure.js';
+import { CURSOR_MARKER, cursorTarget } from '../../../../presentation/tui/render/paint.js';
+import { InteractiveSurface } from '../../../../presentation/tui/surface/view.js';
 import { OverlayHost, type PickerOutcome } from '../../overlay.js';
 import { openSettings } from '../../settings.js';
 import { settingsPicker } from '../settings.js';
@@ -33,6 +36,15 @@ function panel(explicit = true, override = false) {
     runtimeConfig: getRuntimeConfig(root, overrides, inputs), runtimeConfigOverrides: overrides,
     session: { id: 'settings-sources', createdAt: 'now', updatedAt: 'now', status: 'active', turns: [] } });
   const overlay = new OverlayHost(() => {});
+  const view = new InteractiveSurface({
+    facts: () => ({ model: 'fixture', provider: 'openai' }), statusItems: () => ['model'],
+    activity: () => undefined, busy: () => false, queuedCount: () => 0, now: () => 0,
+    ambient: () => ({ openTodos: 0, peerSessions: 0 }), cancelArmed: () => false,
+    overlayFullScreen: () => overlay.fullScreen,
+    overlayInputActive: () => overlay.inputActive,
+    overlayRows: (width, height, available) => overlay.render(width, height, available), selection: () => undefined,
+  });
+  view.editor.setText('held prompt\nunchanged draft');
   const host = { openSettings: (scope?: 'user' | 'project') => openSettings(context, () => {}, scope) };
   let outcome: PickerOutcome | undefined;
   const settle = async () => { for (let index = 0; index < 4; index++) await Promise.resolve(); };
@@ -52,8 +64,10 @@ function panel(explicit = true, override = false) {
     }
     throw new Error(`Choice not reachable: ${label}`);
   };
-  const open = async (field = 'maxTurns') => { overlay.open(settingsPicker(host)); await settle(); await key(field); await key('\r'); };
-  return { context, overlay, render, key, choose, open };
+  const open = async (field = 'maxTurns', scope: 'user' | 'project' = 'user') => {
+    overlay.open(settingsPicker(host, scope)); await settle(); await key(field); await key('\r');
+  };
+  return { context, overlay, view, render, key, choose, open };
 }
 
 it.each([48, 100])('reads a long explicit origin at %i columns without editing or writing, and returns to the same staged value', async width => {
@@ -131,31 +145,64 @@ it('reads a large effective/accepted/stored value to the end with real settings 
   expect(h.context.runtimeConfig.disabledTools).toEqual(entries); h.overlay.close();
 });
 
-it.each([
-  { field: 'disabledTools', chunks: ['fixture.a', 'fixture.b', 'fixture.c'], value: ['fixture.a', 'fixture.b', 'fixture.c'] },
+it.each((['user', 'project'] as const).flatMap(scope => [
+  { scope, field: 'disabledTools', chunks: ['fixture.a', 'fixture.b', 'fixture.c'],
+    edit: ['\x1b[A', '\x05', '-edited'], value: ['fixture.a', 'fixture.b-edited', 'fixture.c'] },
   { field: 'modelTokenBudgets', chunks: ['{', '"openai/fixture": {"reserveTokens": 1000, "keepRecentTokens": 2000}', '}'],
-    value: { 'openai/fixture': { reserveTokens: 1000, keepRecentTokens: 2000 } } },
-])('types multiple lines for $field, stages without writing, cancels a second edit and saves only on Apply', async ({ field, chunks, value }) => {
-  const h = panel(false), original = fs.readFileSync(user), projectBytes = fs.readFileSync(project), inputBytes = fs.readFileSync(input);
-  await h.open(field); await h.choose('Edit value'); await h.key('\x15');
-  for (let index = 0; index < chunks.length; index++) {
-    await h.key(chunks[index]!);
-    if (index < chunks.length - 1) await h.key(index === 0 ? '\x1b[13;2u' : '\n');
-  }
-  expect(h.render()).toContain('Shift+Enter/Ctrl+J');
-  expect(fs.readFileSync(user)).toEqual(original);
-  await h.key('\r'); expect(h.render()).toContain('Pending:');
-  expect(fs.readFileSync(user)).toEqual(original);
-  await h.choose('Edit value'); await h.key('\n'); await h.key('discard-me');
-  await h.key('\x1b'); expect(h.render()).toContain('Pending:');
-  expect(fs.readFileSync(user)).toEqual(original);
-  expect((await h.choose('Apply'))?.note).toContain('Saved to your user configuration');
-  expect(readUserRuntimeConfigFile()[field as 'disabledTools' | 'modelTokenBudgets']).toEqual(value);
-  expect(fs.readFileSync(user, 'utf8')).toContain('/* retain */');
-  expect(fs.readFileSync(project)).toEqual(projectBytes); expect(fs.readFileSync(input)).toEqual(inputBytes);
-  await h.open(field); await h.choose('Edit value');
-  const shown = h.render(120);
-  expect(shown).not.toContain('discard-me');
-  expect(shown).toContain(field === 'disabledTools' ? 'fixture.c' : 'keepRecentTokens');
-  h.overlay.close();
+    scope, edit: ['\x01', '\x1b[A', '\x05', '\x1b[D', '\x7f', '1'],
+    value: { 'openai/fixture': { reserveTokens: 1000, keepRecentTokens: 2001 } } },
+]))('edits multiline $field in $scope across narrow/short resizes, cancels a second edit and saves only on Apply', async ({ scope, field, chunks, edit, value }) => {
+  projectTrust.setProjectTrust(root, 'session-only');
+  const h = panel(false), bytes = [user, project, input].map(file => fs.readFileSync(file));
+  const target = scope === 'user' ? user : project;
+  const paint = (columns: number, rows: number) => {
+    const frame = h.view.renderFrame({ columns, rows });
+    expect(frame.rows.length).toBeLessThanOrEqual(rows);
+    for (const row of frame.rows) expect(visibleWidth(row)).toBeLessThanOrEqual(columns);
+    const caret = cursorTarget(frame.rows, 0, rows);
+    expect(caret).not.toBeNull();
+    expect(caret!.column).toBeLessThan(columns);
+    expect(h.view.editor.getText()).toBe('held prompt\nunchanged draft');
+    return frame.rows;
+  };
+  try {
+    await h.open(field, scope); await h.choose('Edit value'); await h.key('\x15');
+    for (let index = 0; index < chunks.length; index++) {
+      await h.key(chunks[index]!);
+      if (index < chunks.length - 1) await h.key(index === 0 ? '\x1b[13;2u' : '\n');
+    }
+    expect(h.render()).toContain('Shift+Enter/Ctrl+J');
+    for (const columns of [8, 40, 8, 120]) {
+      for (const rows of [1, 2, 3, 4, 8, 24]) {
+        const shown = paint(columns, rows);
+        expect(shown.some(row => row.includes(`${chunks.at(-1)!.slice(-1)}${CURSOR_MARKER}`)), `${columns}x${rows}`).toBe(true);
+      }
+    }
+    for (const raw of edit) await h.key(raw);
+    expect([user, project, input].map(file => fs.readFileSync(file))).toEqual(bytes);
+    await h.key('\r'); expect(h.render()).toContain('Pending:');
+    expect([user, project, input].map(file => fs.readFileSync(file))).toEqual(bytes);
+    await h.choose('Edit value'); await h.key('\n'); await h.key('discard-me');
+    for (const columns of [8, 120]) paint(columns, 8);
+    await h.key('\x1b'); expect(h.render()).toContain('Pending:');
+    expect([user, project, input].map(file => fs.readFileSync(file))).toEqual(bytes);
+    expect((await h.choose('Apply'))?.note).toContain(`Saved to your ${scope} configuration`);
+    expect(readRuntimeConfigEditAt(target).values[field]).toEqual(value);
+    expect(h.context.runtimeConfig[field as 'disabledTools' | 'modelTokenBudgets']).toEqual(value);
+    expect(fs.readFileSync(user, 'utf8')).toContain('/* retain */');
+    expect(fs.readFileSync(scope === 'user' ? project : user)).toEqual(bytes[scope === 'user' ? 1 : 0]);
+    expect(fs.readFileSync(input)).toEqual(bytes[2]);
+    await h.open(field, scope); await h.choose('Edit value');
+    const shown = h.render(120);
+    expect(shown).not.toContain('discard-me');
+    expect(shown).toContain(field === 'disabledTools' ? 'fixture.b-edited' : '2001');
+    for (const columns of [8, 120]) paint(columns, 8);
+    await h.key('\x1b'); await h.choose('Values and sources');
+    expect(h.render(120)).toContain(`Save scope: ${scope}`);
+    expect(h.render(120)).toContain(field === 'disabledTools' ? 'fixture.b-edited' : '2001');
+    expect(h.overlay.fullScreen).toBe(true);
+    for (const columns of [8, 120]) for (const rows of [1, 4, 8, 24]) paint(columns, rows);
+    await h.key('\x1b'); expect(h.render()).toContain(`save to ${scope}`);
+    expect(readRuntimeConfigEditAt(target).values[field]).toEqual(value);
+  } finally { h.overlay.close(); }
 });

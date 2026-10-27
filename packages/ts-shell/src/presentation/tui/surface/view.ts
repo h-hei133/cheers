@@ -76,7 +76,7 @@ export class InteractiveSurface implements InteractiveView {
       this.context.imageProtocol ? { imageProtocol: this.context.imageProtocol() } : {},
       layout,
     );
-    this.lastComposerGeometry = layout === "document" ? undefined : {
+    this.lastComposerGeometry = layout === "document" || chrome.composerRows.length === 0 ? undefined : {
       top: transcriptRows.length + chrome.composerOffset,
       bottom: transcriptRows.length + chrome.composerOffset + chrome.composerRows.length - 1,
       rows: chrome.composerRows,

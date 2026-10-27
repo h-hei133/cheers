@@ -62,6 +62,8 @@ export interface ViewContext {
   cancelArmed(): boolean;
   /** True when an open picker or reader wants the whole screen. */
   overlayFullScreen(): boolean;
+  /** Reserve a visible edit row for the child that currently owns input. */
+  overlayInputActive?(): boolean;
   overlayPointerMotion?(): boolean;
   /** Render with actual space above the composer before querying full-screen form. */
   overlayRows(width: number, height: number, availableRows?: number): string[];

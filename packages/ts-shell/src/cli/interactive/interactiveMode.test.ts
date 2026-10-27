@@ -16,6 +16,7 @@ import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import { ManualScheduler, RecordingTerminal } from "../../test-utils/terminalDouble.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
+import { CURSOR_MARKER, cursorTarget } from '../../presentation/tui/render/paint.js';
 import type { OverlayHost, Picker } from "./overlay.js";
 import { pickerFor, type PickerHost } from "./picker/registry.js";
 import type { InteractiveView } from "../../presentation/tui/surface/contract.js";
@@ -114,6 +115,34 @@ function build(overrides: {
   });
   return { mode, renderer, readline, terminal, approval };
 }
+
+it.each([false, true])('retains the active form caret through the host at one-row sizes (masked: %s)', async masked => {
+  const { mode } = build();
+  const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView };
+  try {
+    host.view.editor.setText('held prompt\nunchanged draft');
+    host.overlay.open({ title: 'Edit value', form: 'panel', empty: '', load: async () => [], apply: async () => undefined,
+      input: { initial: masked ? 'a😀éz' : 'first\nlast!', label: 'Value', masked, multiline: !masked,
+        validate: () => undefined, apply: async () => undefined } });
+    await Promise.resolve(); await Promise.resolve();
+    for (const columns of [8, 40, 8]) {
+      for (const rows of [1, 2, 4, 8, 24]) {
+        for (const layout of ['document', 'viewport'] as const) {
+          const frame = host.view.renderFrame({ columns, rows }, layout);
+          expect(frame.rows.length).toBeLessThanOrEqual(rows);
+          expect(frame.fullScreen).not.toBe(true);
+          expect(frame.rows.some(row => row.includes(`${masked ? '••••' : 'last!'}${CURSOR_MARKER}`))).toBe(true);
+          expect(cursorTarget(frame.rows, 0, rows)).not.toBeNull();
+          expect(host.view.editor.getText()).toBe('held prompt\nunchanged draft');
+        }
+      }
+    }
+    host.overlay.close();
+    const restored = host.view.renderFrame({ columns: 80, rows: 24 });
+    expect(restored.rows.join('\n')).toContain(`unchanged draft${CURSOR_MARKER}`);
+    expect(host.view.composerGeometry()).toBeDefined();
+  } finally { mode.stop(); }
+});
 
 it('retains composed prose for the submission boundary instead of sending raw markers to a busy turn', () => {
   const { mode } = build();

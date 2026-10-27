@@ -124,7 +124,7 @@ Model / Session必须可从类别浏览及全局搜索找到；model/roles和当
 
 失败Apply与保存范围子面板必须绑定进入时的session、workspace、profile、substrate及所选来源，不能通过第二次Apply或确认scope偷偷把旧暂存值带到新owner。同一来源的字段冲突先拒绝并保留暂存，用户明确第二次Apply可重新读取该来源后重试；另一scope、兄弟字段和JSONC注释须保留。来源选择从legacy变preferred、session/project切换（包括A→B→A）、profile换代时，旧详情继续拒绝，须返回设置列表重新打开字段。取消scope选择保留原scope和pending；成功确认范围按既有提示撤销pending；目标范围损坏或不可读时保留原scope/pending并报告失败，不丢面板。检查须贯穿草稿刷新、写锁内和发布前；若写入后身份变化，报告“已保存、应用未确认”，不将磁盘写入冒充新owner接受。第三十九批有下述代表性证据，完整字段×来源×窗口矩阵仍需补齐。
 
-列表与JSON对象编辑必须支持键盘直接构造多行，不能只靠粘贴才能输入“一项一行”。Shift+Enter或Ctrl+J在光标位置换行，普通Enter验证并暂存完整值，Apply另行保存；方向键属于子编辑器，Esc保留进入本次编辑前已有的暂存值。主界面与全屏表单按各自实际行预算绘制，极矮窗口优先保留光标所在编辑行，标题/说明可退化；超过编辑上限的原值必须明确拒绝，不能让Enter把未显示的原值覆盖成空值。该补充是完整编辑路径的实施细化，不能扩大为未配置模型可自动启用或认证表单允许多行秘密。
+列表与JSON对象编辑必须支持键盘直接构造多行，不能只靠粘贴才能输入“一项一行”。Shift+Enter或Ctrl+J在光标位置换行，普通Enter验证并暂存完整值，Apply另行保存；方向键属于子编辑器，Esc保留进入本次编辑前已有的暂存值。主界面与全屏表单按各自实际行预算绘制，极矮窗口优先保留光标所在编辑行，标题/说明可退化；主界面必须在分配held composer、补全和提示之前为活动子表单保留至少一行，不能只保证独立InputForm内部的caret。超过编辑上限的原值必须明确拒绝，不能让Enter把未显示的原值覆盖成空值。该补充是完整编辑路径的实施细化，不能扩大为未配置模型可自动启用或认证表单允许多行秘密。
 
 验收选取每种编辑器至少一个字段，覆盖切分类→section→修改→Apply→重开读回及Discard撤回；还要验证无权限来源、窄屏导航、搜索清空、输入编辑器方向键和preview取消。
 
@@ -163,7 +163,7 @@ Model / Session必须可从类别浏览及全局搜索找到；model/roles和当
 
 初次实现时`GROUP_ORDER`声明参考十类顺序，`SETTINGS_GROUPS`只显示有真实元数据的八类，Memory和Shell未显示；所读`CONFIG_FIELDS`没有独立memory/shell可编辑字段。**缺这两个名字本身不是已确认故障，也不说明相关产品能力不存在。** 后续第四十九批已沿原`/memory status`与`/shell status`命令补只读发现入口：它们插入命令草稿，不伪装成可编辑字段，也不复制状态读取或保存owner。今后新增真实字段时仍复用原schema/来源政策，不能另建面板配置体系。
 
-后续实施须以37项清单和原scope政策补齐字段、来源及保存读回矩阵：第三十八批已覆盖每项搜索发现→详情→暂存→取消→再暂存/Apply→effective/requested/stored读回→重开→移除→重开，以及七个跨来源政策场景。第三十九批新增17项，覆盖代表性user/project同源冲突重试、scope取消/确认/不可读、session/workspace/profile失效、legacy/preferred换代、真实锁内复验、写入后应用未确认及无效数值取消恢复；这几类不再是完全无证据。所属category/section导航有前述批次证据；全部字段/编辑器与各来源冲突、无效值、失效、编辑窗口及桌面的交叉组合仍待验，不能把73条基本路径或17项新增场景记为完整矩阵。已有第15节证据可复用，未覆盖组合写明未验，不重复全仓回归。
+后续实施须以37项清单和原scope政策补齐字段、来源及保存读回矩阵：第三十八批已覆盖每项搜索发现→详情→暂存→取消→再暂存/Apply→effective/requested/stored读回→重开→移除→重开，以及七个跨来源政策场景。第三十九批新增17项，覆盖代表性user/project同源冲突重试、scope取消/确认/不可读、session/workspace/profile失效、legacy/preferred换代、真实锁内复验、写入后应用未确认及无效数值取消恢复；这几类不再是完全无证据。第七十三批补字符串列表/JSON对象×user/project的主界面缩放、光标编辑、暂存、取消二次编辑、Apply及来源读回，并验证1至4行窗口。所属category/section导航有前述批次证据；全部字段/编辑器与各来源冲突、无效值、失效、编辑窗口及桌面的交叉组合仍待验，不能把这些代表性路径记为完整矩阵。已有第15节证据可复用，未覆盖组合写明未验，不重复全仓回归。
 
 model当前已使用`disabled: true, focusable: true`允许具体未配置目标浏览，精确详情、配置返回、目录刷新和目标档位恢复也有逐批证据。ADD-01/02仍须完成单ready/全未配置、两个relay同名模型、角色/默认浏览、缺凭据/能力阻断/目录歧义/真实认证及键鼠窗口矩阵。参考的locked provider诊断与本项目“未配置具体模型也可选中”有明确差异，不能为了外观一致退回空模型内容区。新发现缺口先写可复现路径，再沿model、connect、会话模型及配置发布原owner修补。
 
@@ -1533,7 +1533,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
 ### 第六十四批：正文引号权威与context计量身份
 
@@ -1632,3 +1632,15 @@ ADD-01/02继续补根模型面板的错误与恢复状态。[model picker](../..
 主代理以单worker串行执行五个聚焦文件，73项通过：publication9、watch7、focus20、admission14、category23；新增回归覆盖revision读取失败、loader拒绝、同版本恢复、手动焦点、键盘inspection、零网络以及无配置/session写入。三组有效反转分别移除同版本恢复重试（2项失败）、根面板failure通知（3项失败）、只读入口守卫（3项失败）；每组两文件共16项，其余分别14/13/13项通过。两个源码逐字节恢复，SHA-256为`watch.ts` `64ed0264b3ad90d63a89d09532f2fb46ad67e2b1b5748b21b2fcbc407b3857a5`、`model.ts` `b9c3d35c322fa34a4b521a3a23e13d927dc086f89c46f4a6c016948d26e30940`，恢复后五文件73项再次通过。
 
 五静态门、module facade 0及最终TS build `cf4a6adbe6e9`通过，测试heap768MiB、build1536MiB。主代理只读审阅没有记作独立review。未运行全仓回归、真实PTY、provider、exe、桌面或20k历史压测；未重跑原Phase 20矩阵，未提升ADD整体状态。提交、推送及精确SHA的CI另绑定。
+
+### 第七十三批：设置编辑链的窗口预算与活动表单优先
+
+ADD-03的真实设置owner集成发现：8×1等极矮窗口中，主界面先给held composer分配全部行，设置表单不可见却继续接收输入。独立InputForm的caret切片已有保障，但不能证明主界面仍给它留有空间。现[OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts)提供当前表单状态，[InteractiveMode](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)沿既有view context投影；[chrome预算](../../packages/ts-shell/src/presentation/tui/surface/chrome.ts)在composer、补全、提示与activity之前保留一行。主草稿完整保留；无绘制行时不发布主输入框pointer geometry，关闭子表单后恢复。
+
+只读对照的编辑器在重排后按caret调整viewport，并把可见内容高度下限保留为一行；本项目采用同一决定，同时由自身surface分配实际剩余空间，不能照搬固定终端高度比例。没有新增设置、输入或保存owner。为遵守20函数名上限，将原拒绝原因表单绘制原样移至[overlay/denial](../../packages/ts-shell/src/cli/interactive/overlay/denial.ts)，host保留输入与审批结算；panel/modal两条原行为均有回归。
+
+[设置来源测试](../../packages/ts-shell/src/cli/interactive/picker/settings/source.test.ts)将既有两条user多行用例扩展为字符串列表/JSON对象×user/project四条真实操作链：Shift+Enter/Ctrl+J构造→8/40/8/120列与1/2/3/4/8/24行重排→方向键修改→Enter暂存→取消二次编辑→Apply→runtime/目标文件/重开值/只读来源读回。Apply前所有文件字节保持，另一个scope和显式input保持，JSONC注释保留。只读来源子表单也经过窄屏与一行窗口；真实InteractiveMode同时覆盖普通/掩码表单的document及viewport布局，surface覆盖activity/补全/提示并存。
+
+最终单worker串行通过四文件149项（source10、input21、surface43、overlay75），再单独过滤运行InteractiveMode两项通过、111项未选；合计151项执行通过，未运行整个InteractiveMode文件。新增设置四条先在旧预算上失败；移除活动表单保留行后，settings4、真实host2及surface2共8项按预期失败，源码逐字节恢复，chrome SHA-256为`150e566e74d7f79ad1f48b853481c679f660e1f35e60041227ee2943625e8076`。反转初次辅助断言误将旧Vitest JSON的filtered-out计数当作实际通过；改按失败名称/分组核验后确认上述8项，不把158个未选用例记为通过。
+
+五静态门、module facade 0、diff及TS build `679adfd7bb50`通过，测试heap768MiB、build1536MiB；此前`628e32af`的CI `40528401893`已completed/success，不能替代本批CI。未运行全仓回归、真实PTY、provider、exe、桌面或20k历史压测；未重跑原Phase 20矩阵，无独立review，完整字段/来源/窗口/桌面矩阵仍未验，ADD整体保持active。提交、推送及本批精确SHA的CI另绑定。

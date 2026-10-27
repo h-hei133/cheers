@@ -377,6 +377,7 @@ export class InteractiveMode {
           this.gesture.lastCancelAt !== undefined &&
           Date.now() - this.gesture.lastCancelAt < CANCEL_ARMED_MS,
         overlayFullScreen: () => this.pager.fullScreen || this.overlay.fullScreen,
+        overlayInputActive: () => !this.pager.active && this.overlay.inputActive,
         overlayPointerMotion: () => this.overlay.active && !this.pager.active,
         overlayRows: (width, height, availableRows) =>
           this.pager.active ? this.pager.render(width, height, availableRows) : this.overlay.render(width, height, availableRows),

@@ -9574,3 +9574,11 @@ ADD-01/02确认watcher只在await后检查owner关闭，旧revision结果或最�
 ADD-01/02确认根模型面板漏接watcher失败通知，旧行仍显示active/ready；版本读取恢复到同revision时也不会重载。现保留缓存与手动焦点，将行标为unverified、disabled/focusable，显示固定失败原因并拒绝旧选择/inspection；同revision恢复也重新核验，成功后恢复操作，稳定状态不重复加载。只读对照同样保留缓存并显示错误，本项目额外以accepted publication核验决定是否开放操作；不新增owner。
 
 五文件73项单worker串行通过：publication9、watch7、focus20、admission14、category23。三组反转分别触发2/3/3项预期失败，两个源码逐字节恢复并核对SHA-256，恢复后73项再次通过；真实OverlayHost覆盖手动焦点保持、disabled Enter的inspection拒绝及无配置/session写入，零网络。五静态门、module facade 0及最终TS build `cf4a6adbe6e9`通过，测试heap768MiB、build1536MiB。HANDOFF/addition第七十二批更新；未运行全仓、PTY、真实provider、exe、桌面或20k压测，未重跑原Phase 20矩阵，无独立review，Git/CI另绑定，ADD整体active。
+
+## [2026-10-27] fix | 极矮窗口保留活动设置表单
+
+ADD-03真实设置编辑链确认主composer先占完行预算，子表单虽不可见仍接收输入。现从OverlayHost向原surface投影活动表单，在其余chrome前保留一行；held draft不丢失，无绘制行时撤下主输入框pointer geometry。只读对照采用caret跟随viewport及至少一行内容的决定，本项目保留自己的实际行预算。既有拒绝原因绘制移至overlay/denial以满足20函数名上限，审批与提交仍归host。
+
+最终四文件149项单worker串行通过（source10、input21、surface43、overlay75），再过滤InteractiveMode两项通过、111项未选；共151项执行通过。字符串列表/JSON对象×user/project四条链覆盖1至4行及宽窄resize、键盘修改、Enter暂存、取消二次编辑、Apply与runtime/文件/来源读回；真实host验证普通/掩码输入的document/viewport及关闭后草稿恢复。撤掉保留行后8条目标回归预期失败并逐字节恢复，SHA-256核对一致；旧Vitest JSON对filtered-out计数的误导已分类并记录HANDOFF，不把未选用例记为通过。
+
+五静态门、module facade 0、diff及TS build `679adfd7bb50`通过，测试heap768MiB、build1536MiB。延迟核对前一提交`628e32af`的CI `40528401893`已success；本批Git/CI另绑定。HANDOFF及addition第七十三批更新；未运行全仓、真实PTY、provider、exe、桌面或20k压测，未重跑原Phase 20矩阵，无独立review，ADD整体active。

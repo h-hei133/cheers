@@ -831,12 +831,13 @@ describe("approval picker key routing", () => {
     expect(apply).toHaveBeenCalledWith(expect.anything(), ["allow-once"]);
   });
 
-  it("transitions to deny-reason sub-mode when onDeny is present and submits with reason", async () => {
+  it.each(['panel', 'modal'] as const)('renders the %s deny-reason sub-mode and submits with reason', async form => {
     const { overlay } = host();
     const apply = vi.fn();
     const onDeny = vi.fn();
     overlay.open({
       ...approvalPicker(),
+      form,
       onDeny,
     });
     await Promise.resolve();
@@ -846,6 +847,7 @@ describe("approval picker key routing", () => {
     const rows = overlay.render(60, 20);
     expect(rows.join("\n")).toContain("Explain why this was denied");
     for (const ch of "not safe") press(overlay, ch);
+    expect(stripAnsi(overlay.render(60, 20).join('\n'))).toContain('not safe');
     press(overlay, "\r", apply);
     expect(onDeny).toHaveBeenCalledWith("not safe");
     expect(overlay.active).toBe(false);

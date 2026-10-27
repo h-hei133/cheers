@@ -521,3 +521,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Cached model rows still look actionable after a revision or reload failure, and recovery to the same accepted revision never refreshes the owner.
 - **Root Cause**: The root browser omits the watcher's failure callback, and revision equality skips revalidation even after a failed read. Disabled Enter also hands off to inspection rather than suppressing the host callback.
 - **Rule**: Publish an explicit failure with cached rows disabled but focusable, mark their facts unverified and guard both selection and inspection. Retry after failed revision reads even if the recovered revision is unchanged; clear the failure only after successful revalidation. Preserve focus and test the actual Enter inspection handoff plus unchanged configuration/session bytes. Initial failed loads must not offer previously unconstructed children.
+
+### Active Forms Need A Row Before The Held Composer Takes The Budget
+- **Symptom**: A short terminal displays only the main prompt while keystrokes still edit an invisible settings child.
+- **Root Cause**: The form keeps its caret within its supplied budget, but the surface allocates that entire budget to the held composer, suggestions and hints first.
+- **Rule**: Project active child input from the real overlay host and reserve one row before allocating other chrome. Keep the held draft intact and remove its pointer geometry while it has no painted rows. Test the actual host and configuration owner through shrink/grow, cancellation, Apply and readback; an isolated InputForm render cannot prove this allocation.
+
+### Filtered Vitest JSON Totals Can Count Unselected Tests As Passed
+- **Symptom**: A filtered reversal reports eight expected failures but its JSON totals also claim 158 passes, even though only the eight selected cases ran.
+- **Root Cause**: The installed Vitest 0.34 JSON reporter counts filtered tests differently from the default reporter; numPassedTests is not an executed-case count under -t.
+- **Rule**: Match reversal failures by assertion name and expected failure groups. Use the default reporter's selected/skipped counts for execution claims, and never promote filtered-out tests to passing evidence.

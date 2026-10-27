@@ -13,6 +13,7 @@ import { truncateToWidth } from "../../presentation/tui/text/layout.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import { InputForm, type PickerInput } from './picker/input.js';
 import type { CommandReport } from '../../core/commands/report/contract.js';
+import { renderDenial } from './overlay/denial.js';
 
 /**
  * The active picker.
@@ -188,6 +189,8 @@ export class OverlayHost {
     return this.picker !== undefined;
   }
   get revision(): number { return this.generation; }
+  /** The child form owns input even when its chrome has no spare rows. */
+  get inputActive(): boolean { return this.input !== undefined; }
 
   /** Whether the open picker wants the whole screen. */
   get fullScreen(): boolean {
@@ -275,7 +278,7 @@ export class OverlayHost {
       return this.renderRename(width, height);
     }
     if (this.subMode === "deny-reason") {
-      return this.renderDenyReason(width, height);
+      return renderDenial({ modal: this.picker?.form === 'modal', title: this.picker?.title ?? '', draft: this.denyDraft }, width, height);
     }
     const empty = this.loading ? "loading…" : this.loadFailed ? picker.loadError ?? "Options could not be loaded."
       : this.searchFailed ? picker.searchError ?? "Search could not be completed."
@@ -483,38 +486,6 @@ export class OverlayHost {
     while (rows.length < height - 1) rows.push(modalBody("", inner));
     rows.push(defaultTheme.fg("border", `└${"─".repeat(inner)}┘`));
     return rows.slice(0, height);
-  }
-
-  private renderDenyReason(width: number, height: number): string[] {
-    const isModal = this.picker?.form === "modal";
-    if (isModal) {
-      const inner = Math.max(20, width - 2);
-      const title = defaultTheme.bold(defaultTheme.fg("warning", " Deny Permission "));
-      const fill = Math.max(0, inner - 19);
-      const rows: string[] = [
-        defaultTheme.fg("border", "┌") + title + defaultTheme.fg("border", `${"─".repeat(fill)}┐`),
-        modalBody("", inner),
-        modalBody(defaultTheme.bold("Explain why this was denied (optional):"), inner),
-        modalBody("", inner),
-        modalBody(`  > ${defaultTheme.fg("accent", this.denyDraft)}${CURSOR_MARKER}█`, inner),
-        modalBody("", inner),
-        modalBody(`  ${defaultTheme.fg("success", "[Enter] Submit")}    ${defaultTheme.fg("muted", "[Esc] Skip (no reason)")}`, inner),
-        modalBody("", inner),
-      ];
-      while (rows.length < height - 1) rows.push(modalBody("", inner));
-      rows.push(defaultTheme.fg("border", `└${"─".repeat(inner)}┘`));
-      return rows.slice(0, height);
-    }
-    const title = defaultTheme.bold(`  Permission Denied: ${this.picker?.title.replace(/^Permission:\s*/, "") ?? ""}`);
-    const prompt = defaultTheme.dim("  Explain why this was denied (optional, press Enter to skip):");
-    const input = `  > ${defaultTheme.fg("accent", this.denyDraft)}${CURSOR_MARKER}█`;
-    const hints = defaultTheme.dim("  [Enter] Submit reason    [Esc] Deny without reason");
-    return [
-      truncateToWidth(title, width),
-      truncateToWidth(prompt, width),
-      truncateToWidth(input, width),
-      truncateToWidth(hints, width),
-    ];
   }
 
   /** The accepted picker's owner remains valid until the host opens or closes another surface. */
