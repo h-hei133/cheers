@@ -185,8 +185,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
                 const status = result ? modelSignInStatus(result) : undefined;
                 let refreshed: RoleSelection | undefined;
                 if (assigning) {
-                  try { refreshed = { ...assigning, assign: prepareModelRole(fresh, assigning.role).assign,
-                    back: (note?: string) => assigning.back(note, fresh) }; }
+                  try { refreshed = refreshRoleSelection(fresh, assigning); }
                   catch { return assigning.back(status ?? 'Role settings could not be read. Reopen the model panel.', fresh); }
                 }
                 return modelPicker(fresh, connectionId ? rowId(connectionId, provider.id, model.id) : id, navigation, refreshed,
@@ -395,7 +394,14 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
     label, identity, read: () => detailRecords.get(id), revision: () => context.readConfiguration?.().revision,
     reload: async () => { await reloadDetailCatalogue(); },
     currentRows: () => navigation.origin,
-    back: (origin, detailNotice) => modelPicker(context, id, navigation, assigning, detailNotice, signIn, parent, origin),
+    back: (origin, detailNotice) => {
+      let refreshed = assigning;
+      if (assigning) {
+        try { refreshed = refreshRoleSelection(context, assigning); }
+        catch { return assigning.back(detailNotice ?? 'Role settings could not be read. Reopen the model panel.'); }
+      }
+      return modelPicker(context, id, navigation, refreshed, detailNotice, signIn, parent, origin);
+    },
     canReturn: () => {
       if (context.signal?.aborted) return false;
       const refusal = context.admission?.();
@@ -406,6 +412,12 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
     } : {}),
   });
   return picker;
+}
+
+function refreshRoleSelection(context: CommandContext, selection: RoleSelection): RoleSelection {
+  const edit = prepareModelRole(context, selection.role);
+  return { ...selection, assign: edit.assign, thinkingEffort: edit.current?.thinkingEffort ?? null,
+    back: (notice?: string, fresh = context) => selection.back(notice, fresh) };
 }
 
 function rowId(connection: string | undefined, provider: string, model: string): string {

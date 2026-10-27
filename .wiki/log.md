@@ -9713,3 +9713,11 @@ ADD-01/02/03确认refresh后的admit读取没有异常边界，已接受Enter会
 旧实现确认owner/publication11及两模式/两入口host4共15项失败。最终admission34、publication9、watch7及过滤host12共62项执行通过、175项host未选不算通过；三个有效反转15/4/2项预期失败，源码逐字节恢复及哈希核对后重验。实际host检查外部topP文件0.8保持、接受值仍0.7、原模型/父级/held草稿/session保持与零派发/fetch。两模式实际Node小型PTY串行通过拒绝自动返回、显式重试/取消、准确屏幕模式、文件/modelSelection保持、零message及退出0；一次Esc只回分类的首轮探针期待按实际导航修正，没有改产品代码。
 
 五静态门、diff、module facade 0及TS build `4ecf3161b638`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF、addition第八十九批/当前摘要更新，scratch清理。延迟读回`e5c01721`Watch `40576592407`success、CI `40576592505`仍in_progress，`5204ac40`CI `40574711764`亦in_progress。未运行全仓、真实provider/OAuth、exe、桌面、原生Windows、真实磁盘故障或20k历史，未重跑原Phase20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 角色详情返回重捕获分配事务与当前档位
+
+第八十九批已提交推送`5f6329b46612c02aeb7440de1b5cad9a1979cfc1`，远端main精确一致且clean。ADD-02/03三个自动角色×配置/会话变更与两模式host确认，详情拒绝返回的fresh列表仍持有旧assign/effort，新显式选择继续过期。现详情及认证返回共用原prepareModelRole重捕获事务与当前角色档位；失败沿角色目录保留原notice或安全读取失败提示。旧动作不复活，后台列表reload不自动换写入基线，默认/兄弟角色与原配置发布合同保留。
+
+旧实现确认publication6、host2共八项失败。另补拒绝/Back×准备抛错/state暂时不可读四条fallback；最终publication19、role18、auth24和过滤host14共75项执行通过，175项host未选不算通过。三组反转12/3/4项预期失败，源码逐字节恢复及SHA-256核对后重验。原八条认证host与四条普通拒绝host控制保持通过。导航期接受配置保持、显式保存后原发布owner重读文件，两时点分开断言；初轮三个单元把后者误期待为固定值属于夹具时点错误，没有改产品代码掩盖。
+
+五静态门、diff、module facade 0及TS build `33c2685c0eda`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF、addition第九十批/当前摘要更新，scratch清理。延迟读回`5204ac40`CI `40574711764`success，`e5c01721`CI `40576592505`及`5f6329b4`CI `40578160357`仍in_progress，两者Watch均success。未新增真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史验证，未运行全仓或原Phase20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

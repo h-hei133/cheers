@@ -347,6 +347,61 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     }
   });
 
+it.each(['regular', 'fullscreen'] as const)(
+  'renews a refused role browser transaction before an explicit assignment through the %s host', async kind => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/role-detail-retry-host-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', tuiMode: kind, topP: 0.7, activeProviderConnectionId: 'ready', providerConnections: [{
+      id: 'ready', provider: 'openai', authType: 'api-key', apiKey: 'synthetic-ready', model: 'shared',
+      baseUrl: 'https://ready.invalid/v1', status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+    }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    writeCatalogCache([{ id: 'openai', models: [{ id: 'shared', reasoning: true }, { id: 'other', reasoning: true }] },
+      { id: 'relay', runtime: 'openai', baseUrl: 'https://unconfigured.invalid/v1', models: [{ id: 'inspect-me' }] }]);
+    const manager = new SessionManager(), session = manager.createNew(root);
+    const target = { connectionId: 'ready', provider: 'openai' as const, model: 'shared', thinkingEffort: 'low' as const };
+    modelState.writeSessionModel(session.id, { ...target, thinkingEffort: 'high', roles: { advisor: target, summary: target, subagent: target } },
+      modelState.readSessionModelEdit(session.id));
+    const before = modelState.readSessionModelEdit(session.id), { mode, terminal } = build({ tuiMode: kind });
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+      session, runtimeConfig: getRuntimeConfig(root) });
+    const host = mode as unknown as { view: InteractiveView; options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    mode.start();
+    try {
+      expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+      terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
+      host.view.editor.setText('held role retry draft\nkept through admission');
+      terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('Advisor'); await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Choose model'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('inspect-me'); await vi.waitFor(() => expect(frame()).toContain('▸ inspect-me'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
+      const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath()); writeUserRuntimeConfigFile({ ...edit.value, topP: 0.8 }, edit);
+      const changed = fs.readFileSync(getUserRuntimeConfigPath());
+      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ inspect-me'));
+      expect(frame()).toContain('Model selection expired'); expect(modelState.readSessionModelEdit(session.id)).toEqual(before);
+      terminal.input('other'); await vi.waitFor(() => expect(frame()).toContain('▸ other'));
+      expect(context.runtimeConfig.topP).toBe(0.7);
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('advisor uses'));
+      await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
+      expect(readSessionModel(session.id)).toEqual({ ...before.selection!, roles: { ...before.selection!.roles,
+        advisor: { ...target, model: 'other' } } });
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(changed); expect(context.runtimeConfig.topP).toBe(0.8);
+      terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
+      expect(host.view.editor.getText()).toBe('held role retry draft\nkept through admission');
+      expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+    } finally {
+      mode.stop(); dispatch.mockRestore(); network.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
 it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   (['model', 'settings'] as const).map(entry => ({ kind, entry }))))(
   'retains model navigation after accepted detail refusal in the $kind $entry host', async ({ kind, entry }) => {

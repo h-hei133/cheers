@@ -5,11 +5,12 @@ import { loadCatalog, writeCatalogCache } from '../../../../core/models/catalogS
 import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../../../../core/shell/runtimeContext.js';
 import { configurationAdmission } from '../../../../core/shell/configuration.js';
 import { SessionManager } from '../../../../session/SessionManager.js';
-import { readSessionModelEdit } from '../../../../session/model/state.js';
+import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
 import { modelPicker } from '../model.js';
 import { OverlayHost } from '../../overlay.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
+import * as roleCommands from '../../../../core/commands/model/role.js';
 
 let root: string;
 const target = `model:${JSON.stringify([null, 'relay', 'shared'])}`;
@@ -62,6 +63,78 @@ it('reopens from a fresh accepted catalogue after stale rejection while ordinary
   expect(runtime.configuration.current).toBe(published);
   expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(readSessionModelEdit(runtime.session.id)).toEqual(selection);
 });
+
+it.each((['subagent', 'summary', 'advisor'] as const).flatMap(role =>
+  (['config', 'session'] as const).map(change => ({ role, change }))))(
+  'refreshes the $role assignment transaction after a detail refusal caused by $change changes', async ({ role, change }) => {
+    writeCatalogCache(loadCatalog().map(provider => provider.id === 'openai'
+      ? { ...provider, models: [...provider.models, { id: 'other', reasoning: true }] } : provider));
+    const { runtime, commands } = host();
+    const originalRole = { connectionId: 'main', provider: 'openai' as const, model: 'shared', thinkingEffort: 'high' as const };
+    writeSessionModel(runtime.session.id, { ...originalRole, roles: { subagent: originalRole, summary: originalRole, advisor: originalRole } },
+      readSessionModelEdit(runtime.session.id));
+    expect(refreshShellRuntimeConfig(runtime).status).toBe('applied');
+    const accepted = runtime.configuration.current, picker = modelPicker(commands, undefined, undefined, undefined, undefined, vi.fn());
+    await picker.load(); const editor = (await picker.inspect!(`role:${role}`))!.next!; await editor.load();
+    const browser = (await editor.apply(['choose']))!.next!; await browser.load();
+    const details = (await browser.inspect!(target))!.next!; await details.load();
+    if (change === 'config') {
+      const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath()); writeUserRuntimeConfigFile({ ...edit.value, maxTurns: 31 }, edit);
+    } else {
+      const state = readSessionModelEdit(runtime.session.id);
+      writeSessionModel(runtime.session.id, { ...state.selection!, roles: { ...state.selection!.roles,
+        [role]: { ...originalRole, thinkingEffort: 'low' } } }, state);
+    }
+    const before = readSessionModelEdit(runtime.session.id), config = fs.readFileSync(getUserRuntimeConfigPath());
+    const refused = (await details.apply(['configure']))!;
+    expect(refused.note).toContain('expired'); expect(refused.next?.initialSelection).toBe(target);
+    expect(readSessionModelEdit(runtime.session.id)).toEqual(before); expect(runtime.configuration.current).toBe(accepted);
+    const returned = refused.next!; const rows = await returned.load();
+    expect(runtime.configuration.current).toBe(accepted); expect(runtime.runtimeConfig.maxTurns).toBe(20);
+    expect(returned.title).toBe(`${role} model`); expect(rows.find(row => row.id === `model:["main","openai","other"]`)?.disabled).not.toBe(true);
+    const result = await returned.apply([`model:["main","openai","other"]`]);
+    expect(result?.note).toContain(`${role} uses`); expect(result?.next?.initialSelection).toBe(`role:${role}`);
+    expect(readSessionModel(runtime.session.id)).toEqual({ ...before.selection!, roles: { ...before.selection!.roles,
+      [role]: { ...before.selection!.roles![role]!, model: 'other' } } });
+    expect(runtime.runtimeConfig.maxTurns).toBe(change === 'config' ? 31 : 20);
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+    expect(await details.apply(['configure'])).toBeUndefined(); expect(await details.load()).toEqual([]);
+  });
+
+it.each((['refusal', 'back'] as const).flatMap(action =>
+  (['throw', 'unreadable'] as const).map(failure => ({ action, failure }))))(
+  'returns to the role catalogue after $action when fresh role preparation is $failure', async ({ action, failure }) => {
+    const { runtime, commands } = host();
+    const originalRole = { connectionId: 'main', provider: 'openai' as const, model: 'shared', thinkingEffort: 'low' as const };
+    writeSessionModel(runtime.session.id, { ...originalRole, thinkingEffort: 'high', roles: { advisor: originalRole, summary: originalRole } },
+      readSessionModelEdit(runtime.session.id));
+    expect(refreshShellRuntimeConfig(runtime).status).toBe('applied');
+    const state = readSessionModelEdit(runtime.session.id), bytes = fs.readFileSync(state.statePath);
+    const picker = modelPicker(commands); await picker.load();
+    const editor = (await picker.inspect!('role:advisor'))!.next!; await editor.load();
+    const browser = (await editor.apply(['choose']))!.next!; await browser.load();
+    const details = (await browser.inspect!(target))!.next!; await details.load();
+    if (action === 'refusal') {
+      const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath()); writeUserRuntimeConfigFile({ ...edit.value, maxTurns: 31 }, edit);
+    }
+    const config = fs.readFileSync(getUserRuntimeConfigPath()), prepare = roleCommands.prepareModelRole;
+    const read = vi.spyOn(roleCommands, 'prepareModelRole').mockImplementationOnce((...args) => {
+      if (failure === 'throw') throw new Error('private role preparation diagnostic');
+      fs.writeFileSync(state.statePath, '{unreadable'); return prepare(...args);
+    });
+    const result = (await details.apply([action === 'back' ? 'back' : 'configure']))!;
+    expect(read).toHaveBeenCalledTimes(1); expect(result.next?.initialSelection).toBe('role:advisor');
+    expect(result.next?.status?.()).toContain(action === 'refusal' ? 'expired' : 'Role settings could not be read');
+    expect(result.next?.status?.()).not.toContain('private role preparation diagnostic');
+    expect(await details.apply(['configure'])).toBeUndefined(); expect(await details.load()).toEqual([]);
+    expect(fs.readFileSync(state.statePath, 'utf8')).toBe(failure === 'unreadable' ? '{unreadable' : bytes.toString());
+    fs.writeFileSync(state.statePath, bytes);
+    const returned = result.next!; await returned.load();
+    const fresh = (await returned.inspect!('role:advisor'))!.next!; await fresh.load();
+    expect((await fresh.apply(['default']))?.note).toContain('advisor follows the default');
+    expect(readSessionModel(runtime.session.id)).toEqual({ ...state.selection!, roles: { summary: originalRole } });
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+  });
 
 it('retains the accepted catalogue and refuses child construction when new metadata violates active output constraints', async () => {
   const { runtime, commands } = host(); const accepted = runtime.configuration.current;
