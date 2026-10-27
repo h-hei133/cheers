@@ -653,3 +653,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Ordinary busy submissions retain images, but /queue add or its shorthand silently loses them; task text also loses trailing whitespace before composition.
 - **Root Cause**: SubmissionQueue already owns text plus attachments, while the command factory and queue adapter expose only text. The TUI control bridge trims the entire source before the existing literal-body parser sees it.
 - **Rule**: Carry optional PromptAttachments through the existing queue factory and adapter into the same pending item, retaining the text-only call shape. Extract controls from raw source without trimming task endings. Test actual Enter while a foreground turn is held, then drain or explicitly retry after unknown skills, budget refusal and interruption; check both skill bodies, image order, source metadata, one delivery and the existing pipe/text controls.
+
+### Queued Commands Can Reenter The Ordinary Router
+- **Symptom**: Direct queue controls keep images, but a queued queue command loses them when it runs or restores a refused composition.
+- **Root Cause**: The direct TUI control bridge forwards attachments, while the ordinary command router constructs the same queue factory without them. Later execution can reach that second entrypoint.
+- **Rule**: Forward the submission's existing attachments through every call into the queue owner. Test the ordinary router and actual Enter with a queued queue command, including missing-skill and budget refusals followed by explicit retry; require complete text, image order and one eventual dispatch.

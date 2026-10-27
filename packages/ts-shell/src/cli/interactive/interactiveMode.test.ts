@@ -992,8 +992,9 @@ it('delivers all composed instructions and images through the real interactive r
 });
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind => (['add ', ''] as const).flatMap(prefix =>
-  (['dispatch', 'missing', 'oversize', 'interrupt'] as const).map(ending => ({ kind, prefix, ending })))))(
-  'keeps queue $prefix images and composed source through $ending in the $kind Enter host', async ({ kind, prefix, ending }) => {
+  (['dispatch', 'missing', 'oversize', 'interrupt'] as const).flatMap(ending =>
+    (ending === 'interrupt' ? [false] : [false, true]).map(reroute => ({ kind, prefix, ending, reroute }))))))(
+  'keeps queue $prefix images and composed source through $ending with reroute=$reroute in the $kind Enter host', async ({ kind, prefix, ending, reroute }) => {
     fs.mkdirSync('/tmp/cheers-test', { recursive: true }); const root = fs.mkdtempSync('/tmp/cheers-test/queued-method-images-');
     vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
     const skillPaths = ['a', 'b'].map(name => {
@@ -1019,7 +1020,7 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind => (['add ', ''] as co
     const images = [{ type: 'image' as const, data: 'AA==', mimeType: 'image/png' },
       { type: 'image' as const, data: 'AQ==', mimeType: 'image/png' }];
     const markers = images.map(image => host.state.pastes.holdImage(image)).join(' ');
-    const draft = `/queue ${prefix}比较 ${markers} /skill:a\n/skill:b  `;
+    const draft = `/queue ${prefix}${reroute ? '/queue add ' : ''}比较 ${markers} /skill:a\n/skill:b  `;
     const source = '比较   /skill:a\n/skill:b  ';
     let foreground: Promise<void> | undefined;
     mode.start();
@@ -1028,7 +1029,7 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind => (['add ', ''] as co
       foreground = host.run('FOREGROUND'); await vi.waitFor(() => expect(dispatch).toHaveBeenCalledOnce());
       expect(host.busy).toBe(true); host.view.editor.setText(draft); terminal.input('\r');
       await vi.waitFor(() => expect(host.view.transcript.all().some(block => block.text?.includes('Queued '))).toBe(true));
-      expect(host.queue.control.entries()).toEqual([{ id: expect.any(String), lane: 'pending', text: source }]);
+      expect(host.queue.control.entries()).toEqual([{ id: expect.any(String), lane: 'pending', text: `${reroute ? '/queue add ' : ''}${source}` }]);
       expect(host.view.transcript.all().filter(block => block.kind === 'user').at(-1)).toMatchObject({ images });
       expect(host.view.editor.getText()).toBe(''); expect(dispatch).toHaveBeenCalledOnce();
       if (ending === 'missing') fs.unlinkSync(skillPaths[1]!);

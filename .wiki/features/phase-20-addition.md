@@ -1592,6 +1592,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 
 第九十五批补显式queue的多模态输入：add及简写入口把同一附件集合送入原SubmissionQueue，正文尾部空白不再被控制入口裁掉。两模式实际Enter覆盖忙碌排队、正常排空、第二skill未知/超预算及中断后的显式重试，全部body与图片只进入一个后续任务；派发端口为mock，未提升真实provider/平台或整体验收状态。
 
+第九十六批补队列任务再次进入普通命令路由的附件转交：直接queue入口已有图片保持，不代表排队的queue命令经普通router再次入队时也保持。两模式add/简写覆盖正常派发、第二skill未知/超预算后的完整草稿和图片恢复、显式重试，仍由原SubmissionQueue及统一组合准入消费；不扩大真实provider或平台验收结论。
+
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
 ### 第六十四批：正文引号权威与context计量身份
@@ -2019,3 +2021,15 @@ ADD-11/12核对排队→提交/恢复的真实操作链，确认普通[Submissio
 四项独立反转分别撤销queue factory附件、adapter附件、host转交及raw正文保持，产生3/3/16/16项精确预期失败，同次控制14/14/2/2项通过；后两组各217项未选，不计通过。每组finally逐字节恢复并核对SHA-256：queue owner259d6655711270d911d0159ab36e8309f0cd2fdb5e13f3a009325643d6740580、host cf84ee46f1eeecc3ad8dd06d52f4af1d5d6e1652378ff26ee90bdf266b7fe4e0。收据按逐assertionResults.status统计。
 
 五静态门、diff、module facade 0与TS build `aa06eaf988f1`通过，build heap1536MiB；118既有docs-source advisory保留。工件归.omx/artifacts/phase20-addition-queued-images/，HANDOFF已追加具体陷阱，Git/CI另绑定。延迟核对第九十三批CI40585215498已completed/success；第九十二批40582584417及第九十四批40586855260仍in_progress，不推断为停止或成功。未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，无独立review，原Phase20矩阵未重跑，ADD整体active。
+
+### 第九十六批：普通命令路由再次入队的图片保持
+
+第九十五批已提交推送`5695cd1e0cb2aaa002c724155bfcdbe5290c287d`，续接核对本地与tracking一致且clean。ADD-11/12继续检查排队→实际路由→组合提交，确认[普通路由](../../packages/ts-shell/src/cli/interactive/interactiveCommandRouter.ts)构造queueCommand时仍未转交input.attachments。`/queue add /queue add 比较 /skill:a /skill:b`等待前景结束后会经该入口再次入队；第九十五批覆盖的直接host快捷入口不能证明这条普通路由。旧实现新增两条router与两模式add/简写×正常/未知第二skill/超预算共十二条host场景均在图片保持断言失败，原十六条host控制通过，未选256项不计通过。
+
+目标检查后只读对照参考`packages/coding-agent/src/session/agent-session.ts`，快照`0838d2ab4407b74e870de07e1a6780a13c7d542c`：7990–8014将text/images一起交给排队owner，8970–9008的steer/followUp也携相同images，9276–9301一次发布完整user content。采用跨入口保持同一图片集合及一次任务的决定；本项目仍由原SubmissionQueue绑定session/root，组合准备推迟到实际派发，不复制参考的预展开或分lane策略。生产修补仅在原router调用中转交已有可选attachments，未新增队列、缓存或执行路径。
+
+[router回归](../../packages/ts-shell/src/cli/interactive/interactiveCommandRouter.test.ts)以实际queueCommand和SubmissionQueue检查add/简写的完整多行正文、图片顺序、一次性消费与尚未派发。[实际host](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)复用第九十五批操作链，补两种屏幕模式×两个入口×正常派发/第二skill缺失/超预算的再次入队；核对两份实际skill body、两张图片、原始source、一次后续任务，以及失败时零部分派发、原草稿/图片恢复和显式修复重试。原普通排队及中断控制保留；独立HOME/USERPROFILE/CHEERS_TEST_ROOT和小型真实文件目录，terminal为RecordingTerminal、prompt dispatch/fetch为mock，不是provider图片理解证据。
+
+主代理单worker、heap768MiB串行聚焦router39、runtime queue4、submission queue4、pipe9及过滤host30，共86项实际执行通过；host217项未选不计通过。有效反转仅撤销router附件转交，按文件/名称确认14项预期失败，16项控制通过、256项未选。finally逐字节恢复，源码SHA-256 `c3814fc552702b01a7c66387f060b47e334a06ba461c540cd5e37efaa1945745`，恢复后完成重验；测试夹具的类型标注调整后router39另行通过，未改行为断言。
+
+五静态门、diff、module facade 0及TS build `f60d926f601e`通过，build heap1536MiB，118既有docs-source advisory保留。工件归.omx/artifacts/phase20-addition-queue-routing/，HANDOFF与当前摘要更新，本批scratch清理。延迟核对第九十五批CI `40588730873`、第九十四批 `40586855260`及第九十二批 `40582584417`仍in_progress，三批Watch均success，第九十三批CI `40585215498`success；不等待或推断本批CI。未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，无独立review，原Phase20矩阵未重跑，ADD整体active。本批Git/CI另绑定。

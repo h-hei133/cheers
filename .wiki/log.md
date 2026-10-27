@@ -9763,3 +9763,11 @@ ADD-11/12确认SubmissionQueue已有附件合同，但queue控制factory/adapter
 旧实现owner3项附件失败、文本控制1项通过，新增两模式host16项在尾空白断言失败。四项独立反转3/3/16/16项预期失败、同次控制14/14/2/2项通过，host各217项未选，两个product源码逐字节恢复与哈希核对。恢复后主代理单worker串行聚焦35项通过、host217项未选不计通过；五静态门、diff、module facade 0及TS build `aa06eaf988f1`通过，测试heap768MiB、build1536MiB，118既有docs-source advisory保留；测试与脚本工件归.omx/artifacts/phase20-addition-queued-images/。新路径核查两份skill body、两张图片、完整source、失败零部分派发、未知第二项/超预算/中断后的显式重试与零fetch，provider派发端口为mock。
 
 HANDOFF与addition已更新。延迟核对第九十三批CI40585215498已success，第九十二批40582584417及第九十四批40586855260仍in_progress；不等待新CI，Git/精确SHA另绑定。未运行全仓、真实provider/PTY/exe/桌面/Windows或20k历史，ADD整体active。
+
+## [2026-10-28] fix | 普通命令路由再次入队保留图片
+
+续接确认第九十五批`5695cd1e0cb2aaa002c724155bfcdbe5290c287d`已推送且工作区clean。ADD-11/12发现直接queue控制桥虽已修补，排队的queue命令经普通router再次入队仍丢附件。现原router把同一attachments交给现有queueCommandFor，继续复用原SubmissionQueue、session/root绑定和派发时组合准入；参考采用text/images跨入口共同转交及一次任务的决定，未新建执行路径。
+
+旧实现确认router2与两模式add/简写×正常/未知第二skill/超预算的host12共14项图片断言失败，16项原控制通过。修补后串行聚焦router39、queue4+4、pipe9及过滤host30，共86项实际通过，host217项未选不计通过。撤销单行附件转交再次产生14项预期失败、16项控制通过、256项未选，源码逐字节恢复并核对SHA-256后重验；夹具类型标注调整后router39另行通过。两份body、两张图片、完整source、失败零部分派发、草稿恢复和显式重试有实际host到mock派发端口的证据。
+
+五静态门、diff、module facade 0和TS build `f60d926f601e`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF、addition第九十六批与当前摘要更新，工件归.omx/artifacts/phase20-addition-queue-routing/，本批scratch清理。延迟检查第九十二/九十四/九十五批CI仍in_progress，Watch均success，第九十三批CI已success；本批Git/精确SHA另绑定。未运行全仓、真实provider/PTY/exe/桌面/Windows/磁盘故障或20k历史，无独立review，原Phase20矩阵未重跑，ADD整体active。

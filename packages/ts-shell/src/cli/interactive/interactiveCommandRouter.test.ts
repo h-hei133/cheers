@@ -15,6 +15,9 @@ import type { CommandReport } from '../../core/commands/report/contract.js';
 import { reportText } from '../../core/commands/report/projection.js';
 import { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import { ShellCommandRuntime } from '../../core/shell/command.js';
+import { SubmissionQueue } from './inputQueue.js';
+import { attachSubmissionQueue } from '../runtime/inputQueue.js';
+import type { Session } from '../../session/schema/sessionRecord.js';
 
 function createHarness(root = "/tmp/project-alpha") {
   const lines: string[] = [];
@@ -69,6 +72,26 @@ function createHarness(root = "/tmp/project-alpha") {
 }
 
 describe("interactive command router", () => {
+  it.each(['add ', ''])('retains images when queue %s is routed into the pending submission owner', async prefix => {
+    const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
+    const root = fs.mkdtempSync(path.join(scratch, 'queued-route-images-'));
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const harness = createHarness(root), refused = vi.fn(), run = vi.fn();
+    const queue = new SubmissionQueue(() => (harness.input.runtimeContext as { session: Session }).session, refused);
+    const detach = attachSubmissionQueue(harness.input.sessionRuntime, queue, run, () => false);
+    const attachments = { images: [{ type: 'image' as const, data: 'AA==', mimeType: 'image/png' },
+      { type: 'image' as const, data: 'AQ==', mimeType: 'image/png' }] };
+    const text = '比较 /skill:a\n/skill:b  ';
+    try {
+      const result = await routeInteractiveCommand({ ...harness.input, prompt: `/queue ${prefix}${text}`, attachments });
+      expect(result.turnNumber).toBe(0); expect(harness.lines.join('\n')).toContain('Queued ');
+      expect(queue.control.entries()).toEqual([{ id: expect.any(String), lane: 'pending', text }]);
+      expect(queue.shift()).toBe(text); expect(queue.takeAttachments()).toEqual(attachments);
+      expect(queue.takeAttachments()).toBeUndefined(); expect(queue.shift()).toBeUndefined();
+      expect(run).not.toHaveBeenCalled(); expect(refused).not.toHaveBeenCalled();
+    } finally { detach(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
   it("applies a successful statusline save to the current display", async () => {
     const scratch = path.join(os.tmpdir(), "cheers-test"); fs.mkdirSync(scratch, { recursive: true });
     const root = fs.mkdtempSync(path.join(scratch, "statusline-route-"));

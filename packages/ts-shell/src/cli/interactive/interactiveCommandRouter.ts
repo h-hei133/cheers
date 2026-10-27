@@ -162,7 +162,7 @@ export async function routeInteractiveCommand(
     ruleControlsCommand: input.ruleControlsCommand ?? input.runtimeContext.ruleControlsCommand,
     forceTool: input.forceTool ?? input.runtimeContext.forceTool,
     goalCommand: goalCommandFor(input.runtimeContext, input.sessionManager),
-    queueCommand: queueCommandFor(input.runtimeContext, input.sessionRuntime),
+    queueCommand: queueCommandFor(input.runtimeContext, input.sessionRuntime, input.attachments),
     advisorCommand: advisorCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime, input.renderer),
     researchCommand: researchCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime, input.renderer),
     gitCommand: gitCommandFor(input.runtimeContext),
