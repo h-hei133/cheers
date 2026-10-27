@@ -20,6 +20,22 @@ describe("file references", () => {
       expect(fileReferenceAt("look at @src/co")).toEqual({ query: "src/co", start: 8 });
     });
 
+    it.each(["Let's inspect ", "Users' notes\n", "--author=O'Brien ", "'Twas ready "])(
+      'keeps prose apostrophes outside a later reference: %s', prefix => {
+        const text = prefix + '@src/mo';
+        expect(fileReferenceAt(text)).toEqual({ query: 'src/mo', start: prefix.length });
+        expect(couldBeFileReference(text)).toBe(true);
+      });
+
+    it.each(["@src/O'Brien", '@"src/O\'Brien"', "@'src/OBrien'", '@src/my\\ file'])(
+      'decodes only actual reference quote/escape spans: %s', reference => {
+        const prefix = "Let's inspect ";
+        const text = prefix + reference;
+        const query = reference === "@'src/OBrien'" ? 'src/OBrien'
+          : reference === '@src/my\\ file' ? 'src/my file' : "src/O'Brien";
+        expect(fileReferenceAt(text)).toEqual({ query, start: prefix.length });
+      });
+
     it("does not open inside a word", () => {
       // An email address, a decorator, a URL with credentials: offering a file
       // list over these is noise on ordinary text.
@@ -89,6 +105,27 @@ describe("file references", () => {
   });
 
   describe("suggestions for a draft", () => {
+    it.each([
+      ["Let's inspect @src/mo|stale  后文 /skill:follow 👩‍💻", 'src/model.ts'],
+      ["Users' notes\n@src/mo|stale  后文 /skill:follow 👩‍💻", 'src/model.ts'],
+      ["read @src/O|Brien's.ts  后文 /skill:follow 👩‍💻", "src/O'Brien.ts"],
+      ["Let's inspect @\"my f|stale\"  后文 /skill:follow 👩‍💻", 'my file.ts'],
+    ])('replaces only the source reference around prose or filename apostrophes: %s', (marked, file) => {
+      const cursor = marked.indexOf('|'), text = marked.replace('|', ''), from = text.indexOf('@');
+      const editor = new Editor(); editor.setText(text); editor.move('doc-start');
+      for (let count = 0; count < cursor; count++) editor.move('right');
+      const suffix = '  后文 /skill:follow 👩‍💻';
+      const candidate = fileSuggestions(text, [file], editor.snapshot())?.[0];
+      expect(candidate?.value).toBe('@' + file);
+      expect(candidate?.edit).toMatchObject({ from, to: text.indexOf(suffix) });
+      expect(editor.replace(candidate!.edit!)).toBe(true);
+      expect(editor.getText().slice(0, from)).toBe(text.slice(0, from));
+      expect(editor.getText().endsWith(suffix)).toBe(true);
+      const inserted = editor.getText().slice(from, -suffix.length);
+      expect(tokenizeCommandArgs(inserted)).toEqual(['@' + file]);
+      expect(fileReferenceAt(editor.getText(), editor.snapshot().cursor)).toEqual({ query: file, start: from });
+    });
+
     it.each([
       ['read @src/mail@20|  后文', 'src/mail@2026.ts'],
       ['read @mail@ex|  后文', 'mail@example.test'],

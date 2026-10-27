@@ -1976,6 +1976,51 @@ describe("session wiring", () => {
     } finally { mode.stop(); walk.mockRestore(); }
   });
 
+  it.each((['regular', 'fullscreen'] as const).flatMap(kind => [
+    { marked: "Let's inspect @src/mo|stale  后文 /skill:follow unchanged", file: 'src/model.ts' },
+    { marked: "read @src/O|Brien's.ts  后文 /skill:follow unchanged", file: "src/O'Brien.ts" },
+  ].map(scenario => ({ kind, ...scenario }))))(
+    'preserves prose and filename apostrophes through actual $kind reference Tab: $marked', async ({ kind, marked, file }) => {
+      fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+      const root = fs.mkdtempSync('/tmp/cheers-test/reference-apostrophe-');
+      vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+      fs.mkdirSync(path.join(root, 'src')); fs.writeFileSync(path.join(root, file), 'fixture');
+      const scheduler = new ManualScheduler();
+      const { mode, terminal } = build({ tuiMode: kind, scheduler }); terminal.columns = 120; terminal.rows = 24;
+      const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void;
+        options: { runtimeContext: ShellRuntimeContext } };
+      host.options.runtimeContext = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root,
+        targetPathBase: root, rootMode: 'direct', gitRoot: null,
+        gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+        session: host.options.runtimeContext.session, runtimeConfig: { ...getRuntimeConfig(root), tuiMode: kind } });
+      host.options.runtimeContext.skillOptions = { noSkills: true };
+      const submit = vi.spyOn(host, 'onSubmit').mockImplementation(() => {});
+      const walk = vi.spyOn(fileWalk, 'listWorkspaceFiles');
+      const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+      const cursor = marked.indexOf('|'), text = marked.replace('|', ''), from = text.indexOf('@');
+      const suffix = '  后文 /skill:follow unchanged';
+      mode.start();
+      try {
+        expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+        terminal.input(`\x1b[200~${text}\x1b[201~`);
+        terminal.input('\x1b[D'.repeat(text.length - cursor)); scheduler.flush();
+        expect(host.view.editor.snapshot().cursor).toBe(cursor);
+        await vi.waitFor(() => expect(host.view.suggestions.current()?.value).toBe('@' + file));
+        terminal.input('\t'); scheduler.flush();
+        const next = host.view.editor.getText();
+        expect(next.slice(0, from)).toBe(text.slice(0, from)); expect(next.endsWith(suffix)).toBe(true);
+        expect(scanCommandArgs(next.slice(from, -suffix.length)).map(token => token.value)).toEqual(['@' + file]);
+        expect(stripAnsi(terminal.drain())).toContain('后文 /skill:follow unchanged');
+        expect(promptTokens(next).find(token => token.raw === '/skill:follow')?.literal).toBeUndefined();
+        expect(walk).toHaveBeenCalledTimes(1);
+        expect(walk).toHaveBeenCalledWith(root, expect.objectContaining({ abortSignal: expect.any(AbortSignal) }));
+        expect(submit).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+      } finally {
+        mode.stop(); submit.mockRestore(); walk.mockRestore(); network.mockRestore(); vi.unstubAllEnvs();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
   it.each([
     ['regular', 'inline'], ['regular', 'fence'], ['fullscreen', 'inline'], ['fullscreen', 'fence'],
   ] as const)('keeps code references inert and resumes file completion in %s %s', async (kind, syntax) => {

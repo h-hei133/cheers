@@ -1467,6 +1467,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 转义目录名使连续Tab失败或隐藏后文skill | 第七十八批确认已插入引号内的转义源码被当成真实路径，裸反引号还会打开代码区。现复用参数扫描器解码，保留原始Windows分隔符并给反引号路径加引号；138项执行通过、三组有效反转与构建有本地证据。两模式host使用RecordingTerminal，Windows只做词法测试，真实终端与平台本批未验 |
 | 手动输入的未闭合单引号路径在空格处分裂 | 第八十四批确认leading单引号须先有close，路径后半段失去补全，内部skill/方法标记暴露给准备。现明确路径前缀沿原tokenizer保持open quote范围；142项执行通过、13项有效反转与build有本地证据，双引号/带前缀控制及闭合后的多skill保留，原生Windows与真实终端未验 |
 | 组合选项的引用值被误作普通正文 | 第八十五批确认`--mode="paper"`、depth和brief未进入研究参数，无效引用选项还会绕过校验。现保留未引用flag前缀，复用参数scanner解码后走原strict语法；未闭合选项在准备/建状态前阻止。完整引用、escape和code正文继续保留，预览/提交、durable options与两模式Enter有隔离证据 |
+| 正文或文件名中的apostrophe使文件引用失效或删除后文 | 第八十六批确认引用复用整段命令参数扫描，普通apostrophe被当成shell quote，目录请求和替换范围均出错。现从原prompt token取得引用范围，仅对引用自身的quote/escape解码；101项执行通过、18/1两组有效反转、两模式真实目录Tab及build有本地证据，真实PTY与完整平台矩阵未验 |
 | 代码示例中的文件引用仍扫描目录，含sigil文件名无法继续补全 | 第七十九批确认`@`后备分支未检查代码区，又把文件名内任意`@`当成重复sigil；前导`@`文件还可能插入为字面双`@@`。现复用源token排除代码、仅拒绝raw双sigil，并引用前导sigil文件名。94项执行通过及11/5/1有效反转有本地证据；实际host证明代码内零枚举、闭合后恢复，真实终端与平台本批未验 |
 | review正文组合原先未准入 | 第五十批确认review会读取真实Git snapshot，不能当纯modifier。现声明为单一driver，消费共享正文、brainstorm和全部skill并生成一份review prompt；audit/check共用声明，第二个driver在派发前拒绝。第五十七批补齐standalone/composed预览：复用同一review request与Git workbench，强制与dispatch一致的plan mode，并在内容复验时重查snapshot fingerprint；第五十八批再加入不持久化的one-use snapshot reservation、canonical binding、过期/变更拒绝和diff后fingerprint检查，不调用通用Git派发或写执行；第六十一批把失效标记扩为workbench级，并加入异步`reviewTake`/epoch；第六十二批再让提交期暂停controller自动失效，并把take保留到diff/最终检查完成。五文件234项、有效反转和真实Git fixture有局部证据，真实provider/桌面仍待验 |
 | 无flag组合方法静默吞掉dash正文 | 第五十二批确认option扫描未先检查方法是否声明flags，review与可组合模板会丢失`--keep-this`/`--counterexample`，而声明flags的方法仍需严格拒绝未知option。现只对非空flag声明解析，flagless正文完整进入共享prompt；91项、两个有效反转及独立review有局部证据，真实终端/平台仍未验 |
@@ -1567,6 +1568,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第八十四批补手动未闭合的单引号路径：明确路径起始保留跨空格的字面范围，内部skill/review/research不进入准备；实际Tab完成目录/子目录/含apostrophe文件，真实关闭后恢复多skill解析。两模式host与本地目录有证据，Windows仅词法覆盖，完整终端/平台验收仍待补，ADD整体active。
 
 第八十五批补组合选项的引用值：研究mode/depth/brief按原scanner解码并由已有语法校验，非法、重复和未闭合选项不创建研究或派发，原草稿可重试；值内slash/skill不再扫描。两模式Enter、实际研究状态读回及预览到同一run ID已有隔离证据，真实研究服务、PTY和完整平台验收继续待补，ADD整体active。
+
+第八十六批补文件引用的apostrophe边界：前文收缩词/所有格不再阻断后续`@`引用，文件名apostrophe不再扩大Tab替换范围。catalog与edit共用原prompt token，引用自身的quote/escape仍经已有scanner解码。两模式host使用真实隔离目录，保留后文与后续skill并只枚举一次；真实PTY与完整平台验收继续待补，ADD整体active。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -1849,3 +1852,17 @@ planner现区分未引用的dash前缀，解码已准入选项和值后仍交原
 主代理heap768MiB、单worker串行执行`rtk env NODE_OPTIONS=--max-old-space-size=768 VITEST_MAX_THREADS=1 VITEST_MIN_THREADS=1 npm exec --workspace packages/ts-shell -- vitest run src/core/commands/composition.test.ts src/research/run/composition.test.ts src/cli/runtime/context/preview.test.ts`，43+18+73共134项通过；host以`-t 'submits quoted research options'`执行4项通过、167项未选，共138项实际执行通过。恢复旧planner/prepare的反转按文件/名称确认25项失败（composition9、research6、preview6、host4），七个控制通过、273项未选；单独撤销prepare的未闭合quote拒绝触发composition1/preview1共2项失败，九个所选控制通过。finally逐字节恢复及SHA-256核对：plan `253cc1a9a58ce5f30cef624d08d965cfa3b5e1cd7bee1cfc5cf4cc3100451310`，prepare `95dee5565807afd77aca75006e6c25e47fc8c2613436d8e838f73c5b76f6a2a6`；恢复后重验受影响检查，未选测试不计为通过。
 
 五静态门、diff、module facade 0及最终TS build `bc773350564f`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新，反转scratch清理。延迟读回`b47218f0d4f185ab344af8c5565223c77ea3b851`的CI `40566634731`已success；`bf6bb90361b774fea7c65b7ff6825aa45d435fc0`的Watch `40568166653`success、CI `40568166550`仍in_progress，不替代本批结果。未运行全仓、真实PTY/provider/exe、桌面或20k历史，未重跑原Phase20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。
+
+### 第八十六批：文件引用的正文apostrophe与精确替换范围
+
+ADD-10确认[file references](../../packages/ts-shell/src/cli/interactive/fileSuggestions.ts)用命令参数scanner扫描整段正文。`Let's inspect @src/mo`与`Users' notes`后的引用因此被前文quote吞入；`read @src/O|Brien's.ts  后文`在caret处仍可产生候选，但Tab把后文也当成引用的一部分删除。旧实现运行新增回归，按名称确认fileSuggestions12、catalog references2、实际host4共18项失败，八个代码区/已有引用控制通过、202项未选；两条文件名host场景明确在后文保持断言失败。
+
+现以原`promptTokenAt`确定引用的from/to和raw prefix，保留代码区与raw双sigil拒绝，只有当前引用有quote/escape时才将隔离prefix交给原`scanCommandArgs`。普通文件名apostrophe直接保留。catalog request与候选edit共用同一个引用token，查询只取caret之前，替换仍覆盖完整源引用；没有新增分词器、目录扫描或编辑owner。
+
+只读对照pi快照`6c384aa30f619d7b28963f2bab24d8dacbe73cb6`的`packages/tui/src/autocomplete.ts`499–514：引用提取先区分quoted prefix，再取光标前末尾raw token，不把整段正文解释成命令参数。采用当前引用范围独立于前文shell quote状态的决定。本项目继续使用原prompt token以保留code、apostrophe与完整caret替换范围；参考将单引号列为delimiter，不能把它当作含apostrophe文件名完整支持的证据。
+
+新增测试覆盖四类前文apostrophe、raw/quoted/escaped引用解码、词中caret、中文与emoji后文及后续skill的字面范围。[实际host](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)的regular/fullscreen×前文/文件名四条场景，使用真实隔离目录和文件，从bracketed paste、方向键到Tab检查真实workspace walk一次、正确root/AbortSignal、完整前后文与后续skill，零prompt提交和fetch。终端是RecordingTerminal，不是原生PTY。
+
+本批续接前的验证已通过97项补全测试和四条host测试，共101项；续接时核对反转材料与源码快照一致后，未重复运行这组测试。额外撤销“仅literal引用解码”的反转触发一项raw apostrophe失败，三个quote/escape控制通过、35项未选。两源码均在finally逐字节恢复；续接重新确认SHA-256：fileSuggestions `b0078b174fcecd1a131ca51e5d7be6a78d4277de73900164a596694cce958f26`，request `763a91ac3208bdf96b36307467cf64cd1b229b038a535e61ee72cdc26d4577d9`。未选测试不计为通过。
+
+续接后五静态门、diff、module facade 0与TS build `8ef2d57d21c2`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF及当前摘要更新，本批反转scratch清理。本批尚未Git提交或推送，无对应CI；未运行全仓、真实PTY/provider/exe、桌面或原生Windows，未重跑原Phase 20矩阵，无独立review，ADD整体active。

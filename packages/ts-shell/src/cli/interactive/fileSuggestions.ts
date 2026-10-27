@@ -1,5 +1,6 @@
-import { completionToken, completionEdit, quoteCompletion } from "./completion.js";
+import { completionEdit, quoteCompletion } from "./completion.js";
 import { promptTokenAt } from '../../core/prompts/tokens.js';
+import { scanCommandArgs } from '../../core/commands/arguments.js';
 import type { DraftSnapshot } from "../../presentation/tui/editor/replacement.js";
 import type { Suggestion } from "../../presentation/tui/chrome/suggestions.js";
 
@@ -13,10 +14,18 @@ import type { Suggestion } from "../../presentation/tui/chrome/suggestions.js";
  * The same reasoning as the command draft rule, applied to the other sigil.
  */
 export function fileReferenceAt(draft: string, cursor = draft.length): { readonly query: string; readonly start: number } | null {
-  const token = completionToken(draft, cursor);
-  if (!token.prefix.startsWith("@") || token.prefix.startsWith("@@")) return null;
-  if (promptTokenAt(draft, cursor)?.literal === 'code') return null;
-  return { query: token.value.slice(1), start: token.from };
+  const token = fileReferenceToken(draft, cursor);
+  return token ? { query: token.value.slice(1), start: token.from } : null;
+}
+
+/** Prose owns the range; decode only an actual quote or escape in this reference. */
+export function fileReferenceToken(draft: string, cursor = draft.length) {
+  const source = promptTokenAt(draft, cursor);
+  if (!source || source.literal === 'code') return null;
+  const prefix = draft.slice(source.from, cursor);
+  if (!prefix.startsWith('@') || prefix.startsWith('@@')) return null;
+  const value = source.literal ? scanCommandArgs(prefix, true)[0]?.value ?? '' : prefix;
+  return { from: source.from, to: source.to, prefix, value, before: [] as const };
 }
 
 /**
@@ -33,12 +42,11 @@ export function couldBeFileReference(draft: string): boolean {
 
 /** Candidates for the file reference in `draft`, or nothing when there is none. */
 export function fileSuggestions(draft: string, files: readonly string[], snapshot: DraftSnapshot = { text: draft, cursor: draft.length, revision: 0 }): Suggestion[] | null {
-  const reference = fileReferenceAt(draft, snapshot.cursor);
-  if (!reference) return null;
-  const ranked = rankFiles(reference.query, files);
+  const token = fileReferenceToken(draft, snapshot.cursor);
+  if (!token) return null;
+  const ranked = rankFiles(token.value.slice(1), files);
   if (ranked.length === 0) return null;
   // Accepting replaces the reference, not the sentence it sits in.
-  const token = completionToken(draft, snapshot.cursor);
   return ranked.map(suggestion => completionEdit(suggestion, snapshot, token.from, token.to,
     quoteCompletion(suggestion.value.slice(1), suggestion.value.startsWith('@@') ? '@"' : token.prefix, "@")));
 }

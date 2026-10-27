@@ -9681,3 +9681,11 @@ ADD-11/12确认组合planner因token含quote而丢弃整个选项，mode/depth�
 最终composition43、native研究组合18、preview73共134项及过滤host4项通过、167项未选，共138项执行通过。三个入口×两种quote核对实际研究状态/child请求，预览绑定同一admitted run ID；regular/fullscreen从paste和Enter核对准确options、两skill、一次create/arm、非法时不建状态且原草稿返回。最终派发端口为mock，零研究执行/网络。初期无返回callback、固定null controller及构造后换屏幕模式均按夹具问题修正，实际alt-screen序列另有断言。有效反转触发25项及2项预期失败，按名称/文件核对，源码逐字节恢复及SHA-256确认后重验；未选测试不算通过。
 
 五静态门、diff、module facade 0与TS build `bc773350564f`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十五批/当前摘要更新、scratch清理。`b47218f0`的CI `40566634731`已success；`bf6bb903`的Watch `40568166653`success、CI `40568166550`仍in_progress，不替代本批。未运行全仓、真实PTY/provider/exe、桌面或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 文件引用的apostrophe与后文保持
+
+ADD-10确认文件引用复用整段命令参数scanner，前文普通apostrophe阻断catalog，文件名apostrophe扩大Tab替换范围并删除后文。现从原prompt token取得完整引用范围，只在引用自身有quote/escape时复用scanner解码，catalog与edit共用该token。只读参考采用当前raw引用独立于整段shell参数状态的决定，保留本项目code和apostrophe规则，没有新建解析或扫描owner。
+
+旧实现按文件/名称确认18项失败、八个控制通过，含两条实际Tab后文删除；额外解码反转一项失败、三个控制通过。续接前97项补全与四条两模式host共101项通过，真实隔离目录确认walk一次、正确root、完整前后文与后续skill，零prompt提交/网络；终端为RecordingTerminal。续接核对反转源码逐字节恢复及SHA-256一致，未重复已通过的测试。
+
+续接完成五静态门、diff、module facade 0和TS build `8ef2d57d21c2`，build heap1536MiB，保留118既有docs advisory；HANDOFF与addition第八十六批/当前摘要更新，本批scratch清理。尚未Git提交或推送，无本批CI；未运行全仓、真实PTY/provider/exe、桌面或原生Windows，未重跑原Phase 20矩阵，无独立review，ADD整体active。

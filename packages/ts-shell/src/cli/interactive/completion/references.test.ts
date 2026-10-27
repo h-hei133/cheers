@@ -41,6 +41,24 @@ it('loads references on demand, debounces edits and refreshes the menu without a
   h.controller.invalidate();
 });
 
+it.each(["Let's inspect ", "Users' notes\n"])(
+  'loads a reference independently of earlier prose apostrophes: %s', async prefix => {
+    const h = harness();
+    const text = prefix + '@src/mo stale suffix';
+    h.change(text, prefix.length + '@src/mo'.length);
+    const request = catalogRequest(h.draft());
+    expect(request).toMatchObject({ kind: 'reference', token: { from: prefix.length, to: prefix.length + '@src/mo'.length,
+      prefix: '@src/mo', value: '@src/mo' } });
+    expect(h.controller.update(h.draft())).toBe(true);
+    await vi.advanceTimersByTimeAsync(75);
+    expect(listWorkspaceFiles).toHaveBeenCalledTimes(1);
+    h.pending[0]!(['src/model.ts']); await vi.advanceTimersByTimeAsync(0);
+    expect(h.publish.mock.lastCall?.[0][0]).toMatchObject({ value: '@src/model.ts', edit: {
+      from: prefix.length, to: prefix.length + '@src/mo'.length, text: '@src/model.ts', snapshot: h.draft(),
+    } });
+    h.controller.invalidate();
+  });
+
 it.each(['example `literal @mo| tail`', '```text\n@mo|\n```'])(
   'does not enumerate code references and recovers after closing code: %s', async marked => {
     const h = harness();

@@ -18,7 +18,7 @@ import { getSlashInvocation } from "../../../entrypoints/slashCommandRegistry.js
 import { promptTokenAt } from "../../../core/prompts/tokens.js";
 import type { DraftSnapshot } from "../../../presentation/tui/editor/replacement.js";
 import { matchSuggestions, type Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
-import { fileReferenceAt, fileSuggestions } from "../fileSuggestions.js";
+import { fileReferenceToken, fileSuggestions } from "../fileSuggestions.js";
 import { proseRequest, proseSuggestions } from './prose.js';
 import type { SlashCatalogScope } from '../../../entrypoints/slashCommandRegistry.js';
 
@@ -29,8 +29,9 @@ export function catalogRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScop
   if (command) return command;
   const prose = proseRequest(snapshot, scope);
   if (prose) return prose;
-  if (!fileReferenceAt(snapshot.text, snapshot.cursor)) return undefined;
-  return { kind: "reference" as const, token: completionToken(snapshot.text, snapshot.cursor), snapshot,
+  const reference = fileReferenceToken(snapshot.text, snapshot.cursor);
+  if (!reference) return undefined;
+  return { kind: "reference" as const, token: reference, snapshot,
     fixed: [] as Suggestion[], query: undefined };
 }
 
