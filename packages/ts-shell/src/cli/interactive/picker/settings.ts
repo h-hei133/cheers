@@ -126,9 +126,10 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
   const accepted = setting.key === 'theme' ? host.themes?.selected() : draft.values[setting.key].effective;
   const currentChoice = setting.choices?.findIndex(value => sameValue(value, accepted)) ?? -1;
   let previewError = false;
+  let consumed = false;
   return {
     get title() { return `${setting.label}${preview ? ' preview' : ''} — save to ${draft.scope}${failure ? ' — Apply not confirmed' : ''}${previewError ? ' — Preview unavailable' : ''}`; },
-    form: 'panel', exclusive: true, holdInput: true, empty: '', filterable: false,
+    form: 'panel', exclusive: true, holdInput: true, acceptsOwnership: true, empty: '', filterable: false,
     back: () => settingsPicker(host, draft.scope, setting.group, setting.key),
     initialSelection: pending ? 'apply' : setting.choices ? currentChoice >= 0 ? `choice:${currentChoice}` : 'inspect' : 'edit',
     load: async () => [ ...(failure ? [{ id: 'failure', label: failure, disabled: true }] : []), ...detailOptions(draft, setting, pending, accepted) ],
@@ -142,13 +143,16 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
       },
       previewEnd: preview.end,
     } : {}),
-    async apply(ids): Promise<PickerOutcome | undefined> {
+    async apply(ids, stillOwned = () => true): Promise<PickerOutcome | undefined> {
+      if (consumed) return undefined;
+      if (!stillOwned()) { consumed = true; preview?.end(); return undefined; }
       const index = setting.choices?.findIndex((_, position) => ids[0] === `choice:${position}`) ?? -1;
       if (setting.key === 'theme' && preview && index >= 0 && ids.length === 1) {
         try { previewError = !preview.show(setting.choices![index]); }
         catch { previewError = true; }
       }
       preview?.end();
+      if (!stillOwned()) { consumed = true; return undefined; }
       if (ids.length !== 1) return undefined;
       if (index >= 0 && previewError) return {
         note: `${setting.key === 'theme' ? 'Theme' : 'Display'} preview is unavailable because the accepted setting changed. Review the current value before applying.`,
@@ -161,27 +165,28 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
       if (id === 'scope' && setting.policy.sources.includes('project')) return { next: scopePicker(host, draft, setting, pending) };
       if (id === 'back' || id === 'discard') return { next: settingsPicker(host, draft.scope, setting.group, setting.key) };
       if (id === 'apply' && pending) {
+        consumed = true;
         let current = draft;
         if (failure) {
+          let note: string | undefined;
           try {
             const reopened = draft.reopen();
-            if (!reopened) {
-              const note = 'Settings changed or the session moved. Reopen Settings before saving.';
-              return { note, next: settingDetail(host, draft, setting, pending, note) };
-            }
-            current = reopened;
+            if (reopened) current = reopened;
+            else note = 'Settings changed or the session moved. Reopen Settings before saving.';
           }
           catch {
-            const note = 'Configuration could not be reopened. The pending choice is retained; retry when it is readable.';
-            return { note, next: settingDetail(host, draft, setting, pending, note) };
+            note = 'Configuration could not be reopened. The pending choice is retained; retry when it is readable.';
           }
+          if (!stillOwned()) return note ? { note } : undefined;
+          if (note) return { note, next: settingDetail(host, draft, setting, pending, note) };
         }
         const result = await current.save(setting.key, pending.value);
+        const note = `${setting.label}: ${result.note}`;
+        if (!stillOwned()) return { note };
         return {
-          note: `${setting.label}: ${result.note}`,
-          ...(!result.applied
-            ? { next: settingDetail(host, current, setting, pending, result.note) }
-            : result.applied ? { next: settingsPicker(host, draft.scope, setting.group, setting.key, result.note) } : {}),
+          note,
+          next: result.applied ? settingsPicker(host, draft.scope, setting.group, setting.key, result.note)
+            : settingDetail(host, current, setting, pending, result.note),
         };
       }
       if (index >= 0) return { next: settingDetail(host, draft, setting, { value: setting.choices![index] }, failure) };

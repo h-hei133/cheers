@@ -1453,6 +1453,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 普通档位旧动作或待定hook跨关闭/重开仍可写入 | 第四十四批补浏览代次/退役/pending门；第九十四批确认实际Enter释放后仍缺accepted host归属，refusal及完成返回也未重验browser。现两种归属贯穿原thinking事务，拒绝/完成退休，显式重开才续期，已确认写通知保留；46项执行通过及六组有效反转有本地证据，完整矩阵未验 |
 | 普通ready模型与preset在宿主替换后仍切换 | 第九十七批独立审阅与实际host确认根model未转交accepted ownership，等待PreModelSwitch时重开settings仍会保存旧选择。现根动作代次与目录刷新分开，模型及preset沿原事务复验宿主，消费/取消后不能靠load续权；保存已确认时保留notice并复验原browser后才返回。115项聚焦执行、六组反转、TS构建及本修补的双lane复核有证据，完整平台/认证矩阵继续待验 |
 | 目标档位保存后仍返回失效workspace的父级 | 第九十八批动态确认PostModelSwitch撤销原workspace时host代次仍有效，recovery完成只验host会重开旧model/settings。现保留已确认写入notice，原browser明确获准且callback后host仍有效才构造父级；缺失/拒绝/抛错guard不返回。71项聚焦执行、两组有效反转、TS构建及双lane复核有证据，真实终端/认证/平台仍待验 |
+| 设置Apply在预览清理关闭宿主后仍保存 | 第一百批实际两模式确认theme预览end经refresh关闭/替换已接受宿主后仍写入。现详情接收accepted ownership，清理及重试reopen后复验，Apply先消费，保存完成保留原notice但不返回失效父级；迟到动作仍撤回原预览。125项聚焦执行、七组反转、TS构建及本修补双lane复核有证据，其他编辑器生命周期及完整平台矩阵未据此验收 |
 | resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。第四十六批另修跨时区/小数秒字符串排序，默认焦点按实际时刻选择；搜索/scope换代重置自动规则，手动渐进刷新仍保持。已有局部夹具证据，桌面平台与用户原环境现场仍待验 |
 | 认证快捷入口缺少参数发现 | 第四十七批确认`/login`、`/logout`只有委托执行而没有顶层提示/补全。现从原`connectSyntax`派生快捷语法：login提供provider与认证flag，logout发现保存连接，并排除不属于顶层语法的action alias；执行仍只走原认证owner。第四十八批再以registry合同锁定theme/statusline/connect/login/logout/view与settings元数据的owner可见性。73项、13项合同及两有效反转有局部证据，真实认证/桌面仍待验 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
@@ -1599,6 +1600,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第九十七批补普通ready模型及preset的接受后写入归属：已释放的根model动作在hook等待期间遇到关闭/替换必须阻止原事务提交，已确认保存的结果仍保真。目录刷新继续供详情使用，不复活已消费动作；显式重开才捕获新代次。第九十八批动态确认并修补目标档位恢复保存后遗漏原browser准入，保留写入结果但抑制失效父级，callback后再次复验host。独立双lane分别仅对各自修补完成复核，ADD整体仍active。
 
 第九十九批仅补模板/path提交的测试与证据：真实模板、明确选中的路径及首位exact Enter遵守现有语法，未动态复现新的产品缺陷，未改运行时代码。修正当前摘要笼统的“同名模板/路径未解决”表述为明确的Tab/Enter及字面路径规则；裸token不依文件存在性推断用户意图，完整桌面/原生终端/Windows矩阵继续待验。
+
+第一百批补设置Apply接受后的宿主归属：preview清理和retry reopen是同步callback边界，也必须先复验再进入原保存器。确认保存与refusal的notice继续保留，失效动作不构造旧父级；Apply单次消费，迟到且失效的主题动作仍结束原lease。只读双lane复核与聚焦证据限于这条操作链，不提升整个ADD状态。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -2077,3 +2080,18 @@ ADD-11/12核对排队→提交/恢复的真实操作链，确认普通[Submissio
 主代理heap768MiB、单worker串行最终prose70及过滤host10，共80项实际通过；host267项未选不计通过。独立撤销file冲突引号及完整命令Enter优先，分别确认2/2条预期失败、2/8条控制通过，66/267条未选。首轮file反转已产生正确失败，但收据名称匹配遗漏Vitest参数引号，保留旧收据后修正matcher重跑，未改产品/断言要求。各组finally逐字节恢复，SHA-256 prose `c148531b2aa34e641a6051c9f3dcbfc7f492acbab166339750f402c80d6b1e7a`、keymap `91c6b4e75c0e00be969b84eff92623b9e09ea2b1233ca65835a29bd6558a6ee3`，并与固定Git基线原字节一致；恢复后最终重验通过。
 
 五静态门与diff通过，118既有docs-source advisory保留；没有产品代码变更，不重复构建。两条gpt-6.1-sol只读lane最终APPROVE/CLEAR仅覆盖本批测试与语法表述，不授予全ADD验收。现有HANDOFF中按断言状态及行为匹配反转的规则继续适用，无新的产品陷阱条目。工件归.omx/artifacts/phase20-addition-template-path/，scratch归档清理。延迟核对第九十六批CI success；第九十七批 `40592404109`、第九十八批 `40593644060`及第九十二批 `40582584417`仍in_progress，第九十七/九十八批Watch `40592404024`/`40593643980`均success。本批Git/精确SHA另绑定，不等待新CI。未运行全仓、真实provider/OAuth/PTY/exe/桌面/原生Windows或20k历史，原Phase20矩阵未重跑，ADD整体active。
+
+
+### 第一百批：设置Apply的预览清理、重试与完成归属
+
+第九十九批`1c5e3f720812e39f16787e462e420859bdff9fec`已推送，续接前工作区clean。ADD-03动态核查[settingDetail](../../packages/ts-shell/src/cli/interactive/picker/settings.ts)：普通设置在原save的onApplied关闭宿主后，实际host已有revision门阻止返回，但owner仍构造旧next；theme的preview.end先经原follower.refresh关闭/替换已释放宿主时，旧Apply甚至继续写入。权威实际host基线两模式四条写入失败、八条控制通过。初始owner六条里一条把project保存误当成覆盖user生效，按既有user优先规则修正后四失败/两控制；不是产品优先级缺陷。初期三轮host夹具因加载时序、字符串choice引号及列表截断标签失败，均单独保留，不作产品证据。
+
+只读参考快照`0838d2ab4407b74e870de07e1a6780a13c7d542c`的settings-selector.ts1054–1068沿原settings及change callback同步处理，没有可直接照搬的异步完成政策；model-hub.ts1253–1275在原赋值callback上排除pending、失败重绘、disposed后不接收迟到UI完成。采用原writer、排除重复及退休后不导航的决定，本项目另保留持久结果notice，并用原accepted-host generation跨Enter release。未复制参考代码或增加另一套保存/生命周期系统。
+
+修补仅在详情owner：opt-in接收accepted ownership，动作前和preview清理后复验，Apply在reopen/save前消费；retry reopen返回、缺失或抛错后统一复验，失效不调用writer或构造旧retry页。保存完成保留原确认/refusal notice，host仍有效才构造next。原[openSettings](../../packages/ts-shell/src/cli/interactive/settings.ts)的scope、绑定、来源、锁内检查及publication未改；当前save内部没有await，因此本次无需扩充写入接口。独立code lane随后发现初版前置拒绝跳过原预览清理：迟到accepted theme动作在host已空时关闭不会结束lease，动态确认两条preview-state失败/十八条控制；现失效分支先消费再结束原lease，已消费动作直接返回。
+
+[owner回归](../../packages/ts-shell/src/cli/interactive/picker/settings/lifecycle.test.ts)二十条覆盖user/project保存后关闭/替换/正常返回、延迟accepted动作、pending重复、真实主题lease清理、原writer冲突拒绝及reopen三类结果中的关闭/替换；检查配置字节、publication与完整session model、实际effective及未触碰scope。[实际InteractiveMode](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)十二条走原/settings、真实暂存和Enter：theme清理在写入前撤权、attention保存在写入后撤权，以及两模式正常控制；检查原草稿、保存notice、replacement保留、session不变与零prompt/fetch。terminal为RecordingTerminal，非native PTY或真实provider。
+
+主代理heap768MiB、单worker、进程级串行最终执行lifecycle20、picker39、settings44、sources10及过滤host12，共125项通过；host277项未选不计通过。完整旧源码配现测试触发20项预期失败/39项控制；撤销accepted opt-in、preview后host检查、完成检查、reopen检查、Apply消费、迟到preview清理依次触发4/4/6/6/16/2项预期失败，控制8/8/14/14/4/18通过，前两组各277项未选。每组finally逐字节恢复并核对settings SHA-256 `07f051ee18d39c0204137485579e5c1137f2b37a7594fb3d718d2177afab1fba`，恢复后完成上述最终重验。
+
+五静态门、diff、module facade报告0及TS build `d52e3bda70f2`通过，build heap1536MiB，118既有docs-source advisory保留。两条原gpt-6.1-sol只读lane最终APPROVE/CLEAR仅覆盖本次Apply/cleanup/retry/completion，不授予其他表单、浏览准入或全ADD验收。HANDOFF与当前摘要更新，工件归.omx/artifacts/phase20-addition-settings-lifecycle/，scratch归档清理。延迟核对第九十七/九十八批CI `40592404109`/`40593644060`均success；第九十九批CI `40595036419`及第九十二批 `40582584417`仍in_progress，前者Watch `40595036390`success。本批Git/精确SHA另绑定，不等待新CI。未运行全仓、真实provider/OAuth、native PTY/exe、桌面、原生Windows、磁盘故障或20k历史，原Phase20矩阵未重跑，ADD整体active。

@@ -76,6 +76,73 @@ import { researchFor } from '../runtime/research.js';
 import { currentResearch, readResearch } from '../../research/run/store.js';
 import * as modelDetails from './picker/model/details.js';
 
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  (['theme', 'attentionOnIdle'] as const).flatMap(field =>
+    (['close', 'replace', 'keep'] as const).map(ending => ({ kind, field, ending })))))(
+  'fences settings Apply through the actual $kind host when $field refresh will $ending it', async ({ kind, field, ending }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/settings-apply-host-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', tuiMode: kind, theme: 'dark', attentionOnIdle: false, topP: 0.7 },
+      readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    selectTheme('dark', root);
+    const manager = new SessionManager(), session = manager.createNew(root), { mode, terminal } = build({ tuiMode: kind });
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: true },
+      session, runtimeConfig: getRuntimeConfig(root) });
+    const host = mode as unknown as { view: InteractiveView; overlay: OverlayHost; busy: boolean; theme: { refresh(): void };
+      options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const before = fs.readFileSync(getUserRuntimeConfigPath()), accepted = context.configuration.current;
+    const selection = JSON.stringify(modelState.readSessionModelEdit(session.id));
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    let refresh: ReturnType<typeof vi.spyOn> | undefined;
+    mode.start();
+    try {
+      expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+      terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
+      host.view.editor.setText('held settings draft\nkept through Apply');
+      terminal.input(field); await vi.waitFor(() => expect(frame()).toMatch(field === 'theme' ? /▸ (?:● )?Theme/ : /▸ (?:● )?Attention on/));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Choose'));
+      const label = field === 'theme' ? 'Choose "light"' : 'Choose true';
+      for (let index = 0; index < 40; index++) terminal.input('\x1b[A');
+      for (let index = 0; index < 40 && !frame().includes(`▸ ${label}`); index++) terminal.input('\x1b[B');
+      expect(frame()).toContain(`▸ ${label}`); terminal.input('\r');
+      await vi.waitFor(() => expect(frame()).toContain('▸ Apply'));
+      if (field === 'theme') expect(currentTheme()).toBe('light');
+      refresh = vi.spyOn(host.theme, 'refresh').mockImplementation(() => {
+        if (ending === 'close') host.overlay.close();
+        else if (ending === 'replace') host.overlay.open({ title: 'Replacement panel', form: 'panel', empty: 'Replacement remains current',
+          load: async () => [], apply: async () => undefined });
+      });
+      terminal.input('\r'); await vi.waitFor(() => expect(refresh).toHaveBeenCalled());
+      await vi.waitFor(() => expect(host.busy).toBe(false));
+      const cancelled = field === 'theme' && ending !== 'keep';
+      const notes = host.view.transcript.all().map(block => block.text).join('\n');
+      if (cancelled) {
+        expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+        expect(context.configuration.current).toBe(accepted); expect(currentTheme()).toBe('dark');
+        expect(notes).not.toContain('Saved to your user configuration.');
+      } else {
+        expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values[field]).toBe(field === 'theme' ? 'light' : true);
+        expect(notes).toContain('Saved to your user configuration.');
+        expect(context.runtimeConfig[field]).toBe(field === 'theme' ? 'light' : true);
+      }
+      expect(host.overlay.active).toBe(ending !== 'close');
+      if (ending === 'replace') expect(frame()).toContain('Replacement remains current');
+      if (ending === 'keep') await vi.waitFor(() => expect(frame()).toMatch(field === 'theme' ? /▸ (?:● )?Theme/ : /▸ (?:● )?Attention on/));
+      expect(context.runtimeConfig.topP).toBe(0.7);
+      expect(JSON.stringify(modelState.readSessionModelEdit(session.id))).toBe(selection);
+      expect(host.view.editor.getText()).toBe('held settings draft\nkept through Apply');
+      expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+    } finally {
+      refresh?.mockRestore(); mode.stop(); vi.restoreAllMocks(); vi.unstubAllEnvs();
+      selectTheme('dark'); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
 function build(overrides: {
   observeEvents?: () => () => void;
   exit?: (code?: number) => void;

@@ -9795,3 +9795,12 @@ ADD-01/02/03双lane独立只读审阅发现普通根model遗漏accepted ownershi
 主代理heap768MiB单worker串行最终prose70、过滤实际host10，共80项执行通过，host267项未选不计通过。owner的根file/directory候选受控注入，模板/skill为真实文件；两模式host实际枚举Linux`/tmp/`并读真实tmp.md，覆盖首位/正文Tab及path焦点上的exact Enter，检查一次派发、零fetch和配置/session保持。两个有效反转各2项预期失败、2/8项控制通过、66/267项未选，源码逐字节恢复并与固定Git基线一致后重验；首轮收据参数引号匹配错误已独立保留并修正，不改断言要求。fixture按精确kind/value选择，允许额外root候选。
 
 五静态门及diff通过，118既有docs advisory保留；无产品变更，不重复构建。双lane只读复核APPROVE/CLEAR仅覆盖本批测试/文档，工件归.omx/artifacts/phase20-addition-template-path/，scratch清理。第九十六批CI success，第九十七/九十八/九十二批仍in_progress，前两批Watch success；本批Git/CI另绑定。真实file根目录发现、native PTY/provider/桌面/Windows、全仓及20k历史未验，原Phase20矩阵未重跑，ADD整体active。
+
+
+## [2026-10-28] fix | 设置Apply在预览清理与宿主退役后的归属
+
+第一百批沿ADD-03修补原settingDetail：实际regular/fullscreen证明theme预览end的refresh关闭/替换已接受宿主后，旧Apply仍写入。详情现接收accepted ownership，preview清理和retry reopen各结果之后复验，Apply先消费，完成保留原writer确认/refusal但抑制失效next。迟到失效动作仍结束原theme lease；不改原scope/绑定/锁内writer/publication。
+
+主代理单进程串行、heap768MiB单worker最终125项执行通过，过滤host277项未选。七组有效反转依次20/4/4/6/6/16/2项预期失败，源码逐字节恢复并核对SHA后重验；初期project有效值和host加载/引号/截断夹具错误均保留、排除出产品基线。code lane指出初版拒绝跳过预览清理，动态确认2失败/18控制后修正，双lane最终APPROVE/CLEAR仅覆盖本修补。
+
+五静态门、diff、module facade报告0及TS build `d52e3bda70f2`通过，118既有docs advisory保留，build heap1536MiB。HANDOFF/当前摘要更新，工件归.omx/artifacts/phase20-addition-settings-lifecycle/并清理scratch。第九十七/九十八批CI success，第九十九/九十二批仍in_progress，前者Watch success；本批Git/CI另绑定。未验真实provider/native PTY/桌面/Windows、全仓或20k历史，原Phase20矩阵未重跑，ADD整体active。
