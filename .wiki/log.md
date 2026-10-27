@@ -9530,3 +9530,9 @@ ADD-08确认`/context`只传live schema/system，漏掉history与relay身份；c
 ADD-01/02确认resolved request target与行标签可漂移：CLI/env/profile把同一connection解析到另一model/provider/base URL时，行仍显示可激活，Enter释放picker后才由原事务拒绝。现picker逐行复用`exactTargetMatches`，mismatch行保持disabled/focusable并只进入详情；同名canonical/relay行均可浏览，canonical仅在无更具体endpoint目录时active，否则显示alias，精确relay项独占active。阻断current详情补精确上下文/上限/图片/reasoning/价格；详情返回删除目标按原分类幸存邻居回退并提示，搜索空态与空目录分开，watcher使用初次load的revision基线。
 
 17文件317项单进程通过：模型picker/分类/焦点/current/metadata/admission/publication/role/auth/key/recovery/watch、settings/session、navigation、pickers、interactive model与overlay。三组反转覆盖六个契约，分别产生2、1、6项失败（共9项），源码逐字节恢复；普通/全屏实际Node PTY覆盖all-missing上下键、详情返回、无匹配搜索、零model写入及143退出close。五静态门/diff、责任上限0、Phase 20 38 complete / 9 partial / 0 open、TS build 95ad9745fe4c（inputs 11a4b98a8004、artifact f0c767167db1）、manifest fresh 460/1882及正式judge proven通过。未运行真实provider、全仓、exe或桌面；架构WATCH保留详情快照、焦点notice清理、provider-slot exactness与非当前env/profile切换产品范围。HANDOFF/addition第六十五批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-27] fix | 模型详情刷新与宿主所有权
+
+ADD-01/02收口模型详情WATCH。详情现由revision-bound source读取当前catalogue record：首帧前、action前和异步边界后复核record identity、revision与inspection admission；同ID replacement/删除产生Back-only unavailable，reload失败明确提示无法刷新并移除action。打开详情沿原Picker订阅刷新事实与closure，搜索/分类origin贯穿刷新及嵌套account/key/effort的cancel/success返回；暂态notice仅在下个accepted revision清除。OverlayHost通过acceptance token拒绝host替换后的迟到publish/apply，普通picker不opt in。
+
+17文件426项单进程通过；九个独立契约反转均出现对应失败，源码逐字节恢复并核对SHA-256。普通/全屏实际Node PTY从外部替换catalogue，旧action被拒且零写入、重开读取replacement endpoint、masked key取消无泄露，保持零message/零provider及143 close；独立只读review最终no findings。五静态门/diff、责任上限0、module facade 0、Phase 20 38 complete / 9 partial / 0 open、TS build 3156e9912180（inputs 335af1c1d171、artifact 619abdf46909）、manifest fresh 460/1882及正式judge proven通过。未运行真实provider、全仓、exe、桌面、Windows或20k PTY；HANDOFF/addition第六十六批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。

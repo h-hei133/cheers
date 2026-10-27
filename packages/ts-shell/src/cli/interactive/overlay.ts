@@ -114,8 +114,10 @@ export interface Picker {
   load(signal?: AbortSignal): Promise<readonly Option[]>;
   /** Publish live options until the host releases the subscription on close. */
   subscribe?(publish: (options: readonly Option[]) => void): () => void;
+  /** Opt in to receiving the host ownership check throughout asynchronous application. */
+  readonly acceptsOwnership?: boolean;
   /** Apply the choice, reporting what to show or to draft next. */
-  apply(ids: readonly string[]): Promise<PickerOutcome | undefined>;
+  apply(ids: readonly string[], stillOwned?: () => boolean): Promise<PickerOutcome | undefined>;
   /** Browse a disabled-but-focusable row without authorizing its normal action. */
   inspect?(id: string): Promise<PickerOutcome | undefined>;
   /** Capture an accepted choice before the host releases its browser signal. */
@@ -172,6 +174,7 @@ export class OverlayHost {
   private renderedGeometry = '';
   private readonly chipRows = new Map<number, Array<{ readonly id: string; readonly from: number; readonly to: number }>>();
   private renderedWidth = 0;
+  private readonly acceptances = new WeakMap<Picker, () => boolean>();
 
   // In-TUI modal sub-modes for interactive delete confirmation and rename
   private subMode: "none" | "confirm-delete" | "rename" | "deny-reason" = "none";
@@ -512,6 +515,11 @@ export class OverlayHost {
       truncateToWidth(input, width),
       truncateToWidth(hints, width),
     ];
+  }
+
+  /** The accepted picker's owner remains valid until the host opens or closes another surface. */
+  acceptanceFor(picker: Picker): (() => boolean) | undefined {
+    return this.acceptances.get(picker);
   }
 
   /**
@@ -882,6 +890,8 @@ export class OverlayHost {
   }
 
   private accept(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void, directIds?: readonly string[]): void {
+    const acceptedGeneration = this.generation;
+    const stillOwned = (): boolean => this.generation === acceptedGeneration;
     if (directIds?.some(id => !this.model.visible.some(option => option.id === id && !option.disabled))) return;
     const current = this.model.current();
     if (directIds === undefined && !picker.multiple && current?.disabled) {
@@ -889,7 +899,9 @@ export class OverlayHost {
       const inspect = picker.inspect;
       this.release();
       this.onChange();
-      apply({ ...picker, previewAccept: undefined, apply: () => inspect(current.id) }, [current.id]);
+      const handed = { ...picker, previewAccept: undefined, apply: () => inspect(current.id) };
+      this.acceptances.set(handed, stillOwned);
+      try { apply(handed, [current.id]); } finally { this.acceptances.delete(handed); }
       return;
     }
     const ids = directIds ?? (picker.multiple ? this.model.chosenIds() : idsOf(this.model.current()));
@@ -899,7 +911,8 @@ export class OverlayHost {
     this.release();
     this.onChange();
     if (accepted) {
-      apply(picker, ids);
+      this.acceptances.set(picker, stillOwned);
+      try { apply(picker, ids); } finally { this.acceptances.delete(picker); }
     } else {
       picker.previewEnd?.();
     }

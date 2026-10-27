@@ -3,12 +3,19 @@ import { isFocusable, type Option } from '../../../../presentation/tui/chrome/op
 /** Refresh fallback uses the previous catalogue's neighbours, never model labels. */
 export class ModelFocus {
   notice?: string;
+  private noticeRevision?: number;
 
   reset(): void {
     this.notice = undefined;
+    this.noticeRevision = undefined;
   }
 
-  select(options: readonly Option[], previous: readonly Option[], focused: string): string | undefined {
+  settle(revision?: number): void {
+    if (this.notice !== undefined && revision !== undefined && this.noticeRevision !== undefined
+      && revision !== this.noticeRevision) this.reset();
+  }
+
+  select(options: readonly Option[], previous: readonly Option[], focused: string, revision?: number): string | undefined {
     if (!focused.startsWith('model:')) return undefined;
     const candidates = options.filter(row => row.id.startsWith('model:') && row.id !== 'model:current' && isFocusable(row));
     const available = new Set(candidates.map(row => row.id));
@@ -19,6 +26,7 @@ export class ModelFocus {
       ?? previous.slice(0, index).reverse().find(row => available.has(row.id))?.id
       ?? candidates[Math.min(Math.max(0, index), candidates.length - 1)]?.id;
     this.notice = 'Focused model left the catalogue. ' + (replacement ? 'Moved to a nearby model.' : 'No nearby models remain.');
+    this.noticeRevision = revision;
     return replacement;
   }
 }

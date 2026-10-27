@@ -18,7 +18,8 @@ import { setModelTarget } from "../../../core/commands/model/selection.js";
 import { captureThinkingPreference } from "../../../core/models/preference.js";
 import { sameValue } from "../../../config/values.js";
 import { connectionDraft, connectionEndpoint } from './connections.js';
-import { modelDetailsPicker } from './model/details.js';
+import { catalogueDetailSource, modelDetailsPicker, type ModelDetailAction, type ModelDetailRecord,
+  type ModelDetailOrigin, type ModelDetailSource } from './model/details.js';
 import { CatalogNavigation, type NavigationGroup } from './navigation.js';
 import { watchModels } from './model/watch.js';
 import { refreshModelCatalog } from './model/publication.js';
@@ -40,8 +41,10 @@ interface RoleSelection {
 
 /** Every actionable row retains its exact target and the inputs used to display it. */
 export function modelPicker(context: CommandContext, focus?: string, navigation = new CatalogNavigation(), assigning?: RoleSelection,
-  notice?: string, signIn?: ModelSignIn, parent?: (notice?: string) => Picker): Picker {
+  notice?: string, signIn?: ModelSignIn, parent?: (notice?: string) => Picker,
+  focusOrigin?: ModelDetailOrigin): Picker {
   const details = new Map<string, readonly string[]>();
+  const detailRecords = new Map<string, ModelDetailRecord>();
   const actions = new Map<string, () => Promise<string>>();
   const inspections = new Map<string, () => Picker>();
   const assignments = new Map<string, () => RoleResult>();
@@ -50,6 +53,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
   let observedRevision: number | undefined;
   let activeFocus = focus;
   let returnFocus = focus;
+  let focusFallback = focusOrigin;
   let inspectionAdmission: (() => string | undefined) | undefined;
   const picker: Picker = {
     title: assigning ? `${assigning.role} model` : "Model",
@@ -61,7 +65,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
     get initialSelection() { return activeFocus; },
     replacementSelection: (options, previous, focused) => {
       if (navigation.all.some(row => row.id === focused)) return undefined;
-      const replacement = focusState.select(options, previous, focused);
+      const replacement = focusState.select(options, previous, focused, observedRevision);
       if (replacement) navigation.focus(replacement);
       return replacement;
     },
@@ -70,7 +74,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
     footer: '↑↓ browse · Tab: navigation/content · ←→: parent/content · Enter: inspect or activate · Esc: back',
     async load(): Promise<readonly Option[]> {
       inspectionAdmission = undefined;
-      details.clear(); actions.clear(); inspections.clear(); assignments.clear();
+      details.clear(); detailRecords.clear(); actions.clear(); inspections.clear(); assignments.clear();
       refreshModelCatalog(context);
       let choice: ReturnType<typeof captureModelChoice> | undefined;
       try { choice = captureModelChoice(context); } catch { /* Read-only discovery still works without a saved session. */ }
@@ -144,9 +148,12 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               ...(reason ? { disabled: true, focusable: true } : {}) });
             const displayed = connection?.state === 'ready' && (resolution?.blocked || !resolution?.credential)
               ? { ...connection, state: 'credential-missing' as const, reason: 'This explicit connection needs its own credential.' } : connection;
-            details.set(id, [...modelDetails(provider, displayed, !connection ? resolution?.credential?.source : undefined),
+            const lines = [...modelDetails(provider, displayed, !connection ? resolution?.credential?.source : undefined),
               ...(!connection && (resolution?.baseUrl ?? provider.baseUrl) ? [`Endpoint: ${endpointLabel(resolution?.baseUrl ?? provider.baseUrl)}`] : []),
-              `Reasoning effort: ${assignedEffort ?? 'auto'}`, ...modelMetadataDetails(catalog, provider, model.id, modelAddress), ...(reason ? [reason] : [])]);
+              `Reasoning effort: ${assignedEffort ?? 'auto'}`, ...modelMetadataDetails(catalog, provider, model.id, modelAddress), ...(reason ? [reason] : [])];
+            details.set(id, lines);
+            const inspection = () => modelDetailsPicker(detailSourceFor(id, model.id, id));
+            const detailActions: ModelDetailAction[] = [];
             if (reason) {
               const endpoint = config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
               const safeEndpoint = connectionEndpoint(endpoint);
@@ -155,26 +162,36 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               const draft = canConfigure && (!endpoint || safeEndpoint) && (provider.id === provider.runtime || safeEndpoint)
                 ? connectionDraft(provider, model.id, endpoint, connection?.label ?? provider.id) : undefined;
               const account = signIn && canConfigure && modelAccountSignIn(provider, model.id, endpoint);
-              const back = (fresh: CommandContext, result?: string, connectionId?: string) => {
+              const back = (fresh: CommandContext, result?: string, connectionId?: string, origin?: ModelDetailOrigin) => {
                 const refreshed = assigning ? { ...assigning, assign: prepareModelRole(fresh, assigning.role).assign,
                   back: (note?: string) => assigning.back(note, fresh) } : undefined;
                 return modelPicker(fresh, connectionId ? rowId(connectionId, provider.id, model.id) : id, navigation, refreshed,
-                  result ? modelSignInStatus(result) : undefined, signIn, parent);
+                  result ? modelSignInStatus(result) : undefined, signIn, parent, origin);
               };
+              const childBack = (returnTo: (notice?: string) => Picker, origin?: ModelDetailOrigin) =>
+                (fresh: CommandContext, result?: string, connectionId?: string) =>
+                  result === undefined && connectionId === undefined ? returnTo() : back(fresh, result, connectionId, origin);
               const captured = choice;
-              const inspection: () => Picker = () => modelDetailsPicker(model.id, details.get(id) ?? [],
-                () => modelPicker(context, id, navigation, assigning, undefined, signIn, parent), draft,
-                account ? () => modelSignInPicker(context, provider.runtime, signIn, back) : undefined,
-                draft && signIn ? () => modelKeyPicker(context, provider.runtime,
-                  { model: model.id, label: connection?.label ?? provider.id, baseUrl: safeEndpoint }, signIn, back) : undefined,
-                undefined, admitInspection,
-                reason === 'reasoning effort unsupported' && captured ? () => modelEffortPicker({ target, current: thinkingEffort, catalog,
-                  baseUrl: modelAddress, lines: details.get(id) ?? [], admission: admitInspection, back: inspection,
+              if (reason === 'reasoning effort unsupported' && captured) {
+                detailActions.push({ id: 'effort', label: 'Choose effort', run: (returnTo, inspect) => ({ next: modelEffortPicker({
+                  target, current: thinkingEffort, catalog, baseUrl: modelAddress, lines, admission: admitInspection, back: inspect,
                   save: effort => setModelTarget({ ...target, thinkingEffort: effort }, { ...context, admission: admitInspection }, captured.baseline),
-                  done: result => parent ? parent(result) : modelPicker(context, id, navigation, assigning, result, signIn, parent),
-                }) : undefined);
+                  done: result => parent ? parent(result) : returnTo(result),
+                }) }) });
+              }
+              if (account && signIn) detailActions.push({ id: 'account', label: 'Account sign-in',
+                run: (returnTo, _inspect, origin) => ({ next: modelSignInPicker(context, provider.runtime, signIn, childBack(returnTo, origin)) }) });
+              if (draft && signIn) detailActions.push({ id: 'configure', label: 'Configure connection',
+                run: (returnTo, _inspect, origin) => ({ next: modelKeyPicker(context, provider.runtime,
+                  { model: model.id, label: connection?.label ?? provider.id, baseUrl: safeEndpoint }, signIn,
+                  childBack(returnTo, origin)) }) });
+              else if (draft) detailActions.push({ id: 'configure', label: 'Configure connection',
+                detail: 'Prepare a login command for this exact model.', run: () => ({ draft }) });
               inspections.set(id, inspection);
             }
+            detailRecords.set(id, { identity: id, view: {
+              label: model.id, lines, actions: detailActions, available: true, revision: observedRevision, admission: admitInspection,
+            } });
             if (!reason && assigning && connection) {
               assignments.set(id, () => assigning.assign({ connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort: assignedEffort }));
             } else if (!reason && choice) {
@@ -215,18 +232,19 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
           && targetId ? inspections.get(targetId) : undefined;
         rows.unshift({ id, label: currentModel, detail: [active.credential ? `${active.credential.source} credential` : 'Current request', currentProvider, currentConnection, endpoint].filter(Boolean).join(' · '),
           note, disabled: true, focusable: true });
-        details.set(id, [`Provider: ${currentProvider}`, `Model: ${currentModel}`, `Status: ${note}`, `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
+        const lines = [`Provider: ${currentProvider}`, `Model: ${currentModel}`, `Status: ${note}`, `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
           ...(currentConnection ? [`Selected connection: ${currentConnection}`] : []),
           ...(active.credential ? [`Credential source: ${active.credential.source}`] : []), ...(endpoint ? [`Endpoint: ${endpoint}`] : []),
           ...(active.blocked ? [`Request blocker: ${active.blocked}`] : []),
           ...(exactFacts ?? ['Model capabilities: unverified']),
-          'Remote availability: unverified']);
-        inspections.set(id, () => modelDetailsPicker(currentModel, details.get(id) ?? [],
-          () => modelPicker(context, id, navigation, assigning, undefined, signIn, parent), undefined, undefined, undefined,
-          recovery ? () => {
-            const refusal = choice?.admission() ?? context.admission?.();
-            return refusal ? { note: refusal } : { next: recovery() };
-          } : undefined, admitInspection));
+          'Remote availability: unverified'];
+        details.set(id, lines);
+        const identity = JSON.stringify([currentProvider, currentConnection ?? null, currentModel]);
+        detailRecords.set(id, { identity, view: {
+          label: currentModel, lines, actions: recovery ? [{ id: 'connection', label: 'Connection details',
+            run: () => ({ next: recovery() }) }] : [], available: true, revision: observedRevision, admission: admitInspection,
+        } });
+        inspections.set(id, () => modelDetailsPicker(detailSourceFor(id, currentModel, identity)));
       }
       if (context.sessionId && !assigning) {
         try {
@@ -293,20 +311,25 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         }
       }
       activeFocus = focus ?? rows.find(row => row.note === 'active')?.id;
-      const previousRows = navigation.project('');
+      const projected = navigation.project('');
+      const previousRows = focusFallback?.rows ?? projected;
+      const crossCategory = focusFallback?.crossCategory === true;
+      focusFallback = undefined;
       navigation.set(rows, groups, [...(assigning ? [] : [{ id: 'roles', label: 'Roles' }]), { id: 'all', label: 'All models' },
         ...ordered.map(provider => ({ id: provider.id, label: provider.label,
           note: readyCategories.has(provider.id) ? undefined : '○' }))]);
+      const fallbackOptions = crossCategory ? navigation.all : navigation.project('');
       if (returnFocus) {
         const requested = returnFocus;
         const update = navigation.point(requested, '');
         if (!update) {
-          const replacement = focusState.select(navigation.project(''), previousRows, requested);
+          const replacement = focusState.select(fallbackOptions, previousRows, requested, observedRevision);
           activeFocus = replacement;
           if (replacement) navigation.point(replacement, '');
         }
         returnFocus = undefined;
       }
+      focusState.settle(observedRevision);
       return rows;
     },
     detail: id => (id ? details.get(id) ?? [] : []),
@@ -328,6 +351,19 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       return { note, ...(parent ? { next: parent(note) } : {}) };
     },
   };
+  let detailReload: Promise<readonly Option[]> | undefined;
+  const reloadDetailCatalogue = (): Promise<readonly Option[]> => detailReload ??= picker.load().finally(() => {
+    detailReload = undefined;
+  });
+  const detailSourceFor = (id: string, label: string, identity: string): ModelDetailSource => catalogueDetailSource({
+    label, identity, read: () => detailRecords.get(id), revision: () => context.readConfiguration?.().revision,
+    reload: async () => { await reloadDetailCatalogue(); },
+    currentRows: () => navigation.origin,
+    back: (origin, detailNotice) => modelPicker(context, id, navigation, assigning, detailNotice, signIn, parent, origin),
+    ...(context.readConfiguration ? {
+      watch: (load, publish, observed, onFailure) => watchModels(context, load, publish, observed, onFailure),
+    } : {}),
+  });
   return picker;
 }
 

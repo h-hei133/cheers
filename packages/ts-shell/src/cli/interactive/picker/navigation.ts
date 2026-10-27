@@ -4,6 +4,7 @@ import { NavigationViewport } from '../../../presentation/tui/chrome/navigation.
 export interface NavigationItem { readonly id: string; readonly label: string; readonly note?: string }
 export interface NavigationGroup { readonly category: string; readonly section?: string }
 export interface NavigationUpdate { readonly options: readonly Option[]; readonly focus?: string; readonly query?: string }
+export interface NavigationOrigin { readonly rows: readonly Option[]; readonly crossCategory: boolean }
 export interface PickerNavigation {
   readonly viewport: NavigationViewport;
   readonly items: readonly NavigationItem[];
@@ -29,6 +30,8 @@ export class CatalogNavigation implements PickerNavigation {
   private section?: string;
   private searching = false;
   private searchDomain?: 'categories' | 'sections' | 'rows';
+  private projection: readonly Option[] = [];
+  private projectionQuery = '';
 
   constructor(category = 'all', private readonly sectionFocus = false,
     private readonly searchSelection = false) { this.category = category; }
@@ -37,6 +40,7 @@ export class CatalogNavigation implements PickerNavigation {
   get focused(): boolean { return this.domain === 'categories'; }
   get all(): readonly Option[] { return this.rows; }
   get preferred(): string | undefined { return this.domain === 'sections' ? this.section : this.rowFocus.get(this.category); }
+  get origin(): NavigationOrigin { return { rows: this.projection, crossCategory: Boolean(this.projectionQuery) }; }
   focus(id: string | undefined): void {
     if (this.searching || !id) return;
     if (id.startsWith('section:')) this.section = id;
@@ -57,12 +61,17 @@ export class CatalogNavigation implements PickerNavigation {
       this.searchDomain = undefined;
     }
     this.searching = Boolean(query);
+    this.projectionQuery = query;
     if (query) {
       this.domain = 'rows';
-      return this.rows.filter(row => `${row.label} ${row.detail ?? ''} ${row.note ?? ''} ${row.searchText ?? ''}`.toLowerCase().includes(query));
+      this.projection = this.rows.filter(row => `${row.label} ${row.detail ?? ''} ${row.note ?? ''} ${row.searchText ?? ''}`.toLowerCase().includes(query));
+      return this.projection;
     }
     const rows = this.rows.filter(row => this.category === 'all' || this.groups.get(row.id)?.category === this.category);
-    if (!this.sectionFocus) return rows;
+    if (!this.sectionFocus) {
+      this.projection = rows;
+      return this.projection;
+    }
     const result: Option[] = []; let previous: string | undefined;
     for (const row of rows) {
       const section = this.groups.get(row.id)?.section;
@@ -72,7 +81,8 @@ export class CatalogNavigation implements PickerNavigation {
       }
       result.push(this.domain === 'sections' ? { ...row, disabled: true, focusable: false } : row);
     }
-    return result;
+    this.projection = result;
+    return this.projection;
   }
 
   select(id: string): NavigationUpdate | undefined {

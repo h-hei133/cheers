@@ -633,7 +633,7 @@ export class InteractiveMode {
       this.tui.requestRender();
       return;
     }
-    if (this.overlay.handleKey(event, (picker, ids) => this.applyPicker(picker, ids))) {
+    if (this.overlay.handleKey(event, (picker, ids) => this.applyPicker(picker, ids, this.overlay.acceptanceFor(picker)))) {
       if (!this.overlay.active && !this.busy) {
         const next = this.queue.shift();
         if (next !== undefined) void this.run(next, this.queue.takeAttachments());
@@ -1138,7 +1138,7 @@ export class InteractiveMode {
   }
 
   /** Hand the choice to the picker that produced it and surface what it reports. */
-  private applyPicker(picker: Picker, ids: readonly string[]): void {
+  private applyPicker(picker: Picker, ids: readonly string[], stillOwned?: () => boolean): void {
     this.options.onUserIntent?.();
     const revision = this.overlay.revision;
     const persistReport = reportWriter(this.options.sessionManager, this.options.runtimeContext.session.id);
@@ -1148,8 +1148,8 @@ export class InteractiveMode {
       this.pickerPending = true;
       this.busy = true;
     }
-    void picker
-      .apply(ids)
+    const pending = stillOwned && picker.acceptsOwnership ? picker.apply(ids, stillOwned) : picker.apply(ids);
+    void pending
       .then((outcome) => {
         if (picker.isCurrent && (this.stopped || this.overlay.revision !== revision || !pickerIsCurrent(picker))) return;
         if (outcome?.note) {

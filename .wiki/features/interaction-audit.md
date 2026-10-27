@@ -738,3 +738,9 @@ ADD-08同时确认`/context`只把live identity的schema/system传给`measuredPr
 ADD-01/02新增确认三类可复现偏差：解析后的请求target可能与行标签不同，但行仍显示为可激活；从详情返回时被删除目标没有previous-visible fallback而静默回首项；同一connection在canonical与更具体relay目录中可同时显示active。现模型行先经原`exactTargetMatches`准入，mismatch行保持disabled并只进入详情；详情返回带原分类previous rows做邻近回退和notice；canonical/relay别名均可浏览，但只有精确目录项标active，canonical显示alias。阻断current详情补精确metadata，搜索空态与空目录分开，watcher以初次load的revision为基线。
 
 17文件317项、六个契约的三组反转（9项预期失败）及普通/全屏实际Node PTY有局部证据；五静态门、责任上限0、TS build `95ad9745fe4c`、inputs `11a4b98a8004`、artifact `f0c767167db1`、manifest fresh 460/1882和正式judge proven另绑定。架构复审为WATCH：详情仍是静态快照、焦点notice不会在后续成功刷新时自动清除、provider-slot exactness弱于named connection；非当前provider的env/profile切换仍是已记录的产品范围选择。见[第六十五批](phase-20-addition.md#第六十五批模型行目标准入详情返回与发布基线)。未运行真实provider、全仓、exe或桌面，原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第六十六批）
+
+ADD-01/02收口模型详情的目录换代边界。详情现绑定当前accepted revision与exact record identity，首帧前、action前及异步边界后都复核；同ID replacement与删除都进入Back-only unavailable，reload失败则明确提示无法刷新而不是伪装删除。搜索/分类origin贯穿刷新与嵌套account/key/effort返回，暂态notice在下一accepted revision清除，原transaction notice保留。`OverlayHost` acceptance token阻止详情在host被替换后继续publish/apply，普通picker路径不变。
+
+17文件426项、九个独立契约反转与源码逐字节恢复、独立只读review no findings，以及普通/全屏实际Node PTY有局部证据；PTY拒绝stale action、重开读取replacement endpoint、masked key取消无泄露，并保持零model写、零message、零provider调用和143 close。五静态门、责任上限0、module facade 0、Phase 20 38/9/0、TS build `3156e9912180`（inputs `335af1c1d171`、artifact `619abdf46909`）、manifest fresh 460/1882及正式judge proven另绑定。见[第六十六批](phase-20-addition.md#第六十六批模型详情刷新目录换代与宿主所有权)。未运行真实provider、全仓、exe、桌面、Windows或20k PTY，原Phase38/9、ADD独立且整体active。

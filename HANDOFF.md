@@ -42,6 +42,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Root Cause**: Protocol-level availability aggregates credentials for all of its connections; it cannot determine availability of an exact catalogue category.
 - **Rule**: Derive category readiness from its own admitted model rows and preserve stable order within each availability group. Keep blocked models browsable and preserve manual identity across refresh. Catalogue cache writes replace the supplied provider set; ambiguity fixtures must include both conflicting entries.
 
+### Model Details Need Host Ownership And Catalogue-Replacement Identity
+- **Symptom**: A detail action or late refresh can apply after its host was replaced, or a deleted/replaced model can remain actionably displayed; a failed reload can also be misreported as deletion.
+- **Root Cause**: Picker lifetime, asynchronous action completion and accepted-catalogue identity are separate lifetimes. Previous-visible rows describe focus order, not whether a target still exists after reload.
+- **Rule**: Bind details to the current accepted revision and exact record identity, pass a host ownership check through the accepted action, and recheck it after every asynchronous boundary before publishing or applying. Rebuild the view from the reloaded catalogue; use old visible rows only to choose a neighbour, the new catalogue to decide availability, and distinguish a confirmed removal from a refresh failure. Carry the original search/category return origin through nested children and clear transient focus notices only on a later accepted revision.
+
 ### Raw Baselines And Live Return Frames Need Exact Observation
 - **Symptom**: A source reversal fails to compile, or a terminal probe sends search text before a detail has returned to the model catalogue.
 - **Root Cause**: A filtered Git display is not raw source. Detail and catalogue frames share endpoint text; an Escape may also still be buffered when subsequent text arrives.

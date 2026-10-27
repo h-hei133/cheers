@@ -1533,7 +1533,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
 ### 第六十四批：正文引号权威与context计量身份
 
@@ -1556,3 +1556,17 @@ ADD-01/02继续收口模型行的可见状态与实际事务边界。[模型 pic
 最终17文件317项单进程串行通过：模型picker/分类/焦点/current/metadata/admission/publication/role/auth/key/recovery/watch、settings/session、navigation、pickers、interactive model与overlay。三组反转覆盖六个独立契约，分别触发2、1、6项预期失败（共9项），源码逐字节恢复并核对SHA-256：`model.ts` `7f233728e2c2`、`watch.ts` `2fbbd43c1c75`。普通/全屏两种实际Node PTY均完成all-missing搜索、上下键、详情返回、清空搜索后的`No matching models.`、零model写入及143退出close确认。
 
 五静态门/diff、责任上限0、Phase 20脚本38 complete / 9 partial / 0 open、TS build `95ad9745fe4c`（inputs `11a4b98a8004`、artifact `f0c767167db1`）及正式judge `proven`、0 open/failed/gap通过；manifest readback为fresh，460个compiler input与1882个immutable artifact匹配。未运行真实provider、全仓、exe或桌面；详情仍是打开时快照，provider-wide env/profile在非当前provider上是否应扩大为可切换目标仍需产品决定，真实目录跨进程删除和平台矩阵继续待证。
+
+### 第六十六批：模型详情刷新、目录换代与宿主所有权
+
+第六十六批收口第六十五批保留的模型详情WATCH。[model details](../../packages/ts-shell/src/cli/interactive/picker/model/details.ts)现由`ModelDetailSource`读取当前catalogue record，而不是持有打开时的行快照；每次详情打开先读取当前accepted revision，revision已变化时先reload再给首帧，已打开详情通过原`Picker.subscribe`刷新事实与action closure。执行action前再强制刷新accepted catalogue，核对record identity、revision和原inspection admission；同一row ID被删后由另一目标复用时会显示Back-only unavailable，不再执行旧closure。reload失败显示`model details could not be refreshed`并移除action，明确区别于confirmed removal。
+
+[model picker](../../packages/ts-shell/src/cli/interactive/picker/model.ts)在刷新前保留当时的搜索/分类origin，刷新后用新catalogue决定target availability，旧visible rows只决定删除目标的邻近回退顺序；跨分类搜索结果、多目标删除及同ID replacement均有覆盖。嵌套account、key和effort页面在cancel与success路径都携带origin返回，暂态焦点notice只在后续accepted revision清除，原transaction notice保留。
+
+[OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts)为opt-in详情action提供acceptance token；detail发布或异步action完成时会重查host generation，host被另一surface替换后不会继续publish、打开child或执行写操作。普通picker不opt in，原release/apply顺序保持不变。
+
+17文件426项单进程串行通过：model picker与model子目录、navigation、pickers、interactive model、overlay和InteractiveMode。九个独立契约分别覆盖live subscription、origin preservation、notice expiry、host ownership、exact identity、refresh failure、first-paint revision check、replacement availability和nested return；反转旧实现均触发对应断言失败，源码逐字节恢复并核对SHA-256：`overlay.ts` `f38f10903a1f`、`interactiveMode.ts` `49907cf4666c`、`model.ts` `e71ff1c01cd9`、`details.ts` `76b75c8f7b70`、`focus.ts` `819cd4003dbe`、`watch.ts` `ae5466174bfe`、`navigation.ts` `1090e92e3909`。
+
+普通/全屏两种实际Node PTY均从外部改写`models.json`：旧详情action被拒绝且零配置写入，重开读取replacement endpoint；随后进入masked key输入并取消，终端未出现测试secret，最终session model、配置和transcript保持不变，零message、零provider调用并以143完成close。独立只读review最终no findings。
+
+五静态门/diff、责任上限0、`analyze:module-facades` 0 findings、Phase 20脚本38 complete / 9 partial / 0 open、TS build `3156e9912180`（inputs `335af1c1d171`、artifact `619abdf46909`）及正式judge `proven`、0 open/failed/gap通过；manifest readback为fresh，460个compiler input与1882个immutable artifact匹配。未运行真实provider、全仓、exe、桌面、Windows或20k PTY；真实认证服务、跨平台终端和完整model操作矩阵仍未验证。原Phase 20保持38/9/0，ADD独立且整体active。

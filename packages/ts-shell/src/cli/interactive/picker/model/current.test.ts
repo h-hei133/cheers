@@ -106,14 +106,18 @@ it.each(['deleted', 'provider-changed', 'ambiguous', 'overridden', 'pool'] as co
   expect(await report.apply(['connection'])).toBeUndefined();
 });
 
-it('expires a current report before opening its captured connection after configuration changes', async () => {
+it('replaces a current report with unavailable details when another blocked connection reuses its row id', async () => {
   const picker = modelPicker(context()); await picker.load();
   const report = (await picker.inspect!('model:current'))!.next!; await report.load();
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
-  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'other' }, edit);
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'other',
+    providerConnections: edit.values.providerConnections!.map(row => row.id === 'other' ? { ...row, status: 'pending' } : row) }, edit);
   const original = fs.readFileSync(getUserRuntimeConfigPath());
-  const result = await report.apply(['connection']); expect(result?.note).toContain('expired');
-  expect(result?.next).toBeUndefined(); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+  expect((await modelPicker(context()).load()).find(row => row.id === 'model:current')?.detail).toContain('other');
+  const result = await report.apply(['connection']); const unavailable = result?.next!;
+  expect((await unavailable.load()).map(row => row.id)).toEqual(['back']);
+  expect(unavailable.detail!().join('\n')).toContain('no longer available in the accepted catalogue');
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
 });
 
 it('offers native login from an exact builtin current report and retains cancelled configuration bytes', async () => {
