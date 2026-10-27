@@ -9657,3 +9657,11 @@ ADD-03确认settings字符串列表逐行初始化与已有parser的引号、JSO
 新增18条user/project owner场景及8条两模式/两scope实际host链。最终fields116、picker settings39、config settings6共161项，以及过滤host8项通过、153项未选，共169项执行通过，核对原存储/accepted/effective、注释/兄弟字段/另一scope、实际工具可见集合、重开取消和held草稿，零prompt派发/网络。初版夹具的根列表/详情混淆、存储标记遗漏和重开同步已按实际合同校正。有效反转触发fields16/host8共24项失败，两个普通逐行控制仍通过；源码逐字节恢复并核对SHA-256后完成最终验证。
 
 五静态门、diff、module facade 0与TS build `b539b709a535`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十二批/当前摘要更新、scratch清理。`44e9ea41`的CI `40556517972`已success；`0a9f8584cb0b2d6ee9197faa75eda4ebcc923666`的Watch `40558903541`success、CI `40558903524`仍in_progress。未运行全仓、真实PTY/provider/exe、桌面或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 模型详情刷新失败的父页面与宿主归属
+
+ADD-01/02/03确认模型详情接受Enter后overlay已释放，目录复验异常只返回note会结束settings/model链；异常结算也跳过归属检查，关闭/替换后的迟到rejection仍产生结果。现沿原详情owner检查归属，退休已消费动作，通过既有父回调返回fresh目录并保留安全notice；恢复后须显式重开详情/配置。只读参考保留刷新错误与当前面板，采用其导航连续性决定，没有复制hub或另造导航。
+
+新增五条owner和四条两模式/两入口实际host链，先在旧实现复现；host夹具名称超过列宽的问题已单独修正。最终admission19、publication9、watch7及过滤host4共39项执行通过，161项host未选，核对原目标、notice、显式重试/取消/设置返回、held草稿、accepted publication与配置/会话保持，零prompt派发/网络。两次独立反转触发7/2项预期失败，其余所选2/7项通过；源码逐字节恢复并核对SHA-256后完成最终重验。
+
+五静态门、diff、module facade 0与TS build `67b2cfac97bc`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十三批/当前摘要更新、scratch清理。`29698cadf85fd3f93668d9a8557a6677fed5f6fa`的CI `40562201528`和Watch `40562201258`均success，`0a9f8584`的CI `40558903524`亦success。未运行全仓、真实PTY/provider/exe、桌面、真实磁盘故障或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

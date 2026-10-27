@@ -30,7 +30,7 @@ function detailSource(options: {
   readonly admission?: () => string | undefined;
   readonly refresh?: () => Promise<ModelDetailView>;
   readonly subscribe?: (publish: (view: ModelDetailView) => void) => () => void;
-  readonly back: () => Picker;
+  readonly back: (notice?: string) => Picker;
 }): ModelDetailSource {
   let current: ModelDetailView = { label: options.label ?? 'shared', lines: options.lines ?? [],
     actions: options.actions ?? [], available: true };
@@ -103,6 +103,52 @@ it('rechecks cancellation around inspection admission and does not create a stal
   const result = await details.apply(['configure']);
   expect(result?.note).toContain('cancelled'); expect(result?.next).toBeUndefined();
   expect((await picker.inspect!(target))?.note).toContain('cancelled');
+});
+
+it.each(['configure', 'account', 'connection'] as const)('returns to fresh models after the accepted %s detail refresh rejects', async action => {
+  const callback = vi.fn(() => ({ draft: '/connect login old' }));
+  const back = vi.fn((notice?: string) => modelPicker(context(), target, undefined, undefined, notice));
+  let refreshes = 0;
+  const initial: ModelDetailView = { label: 'shared', lines: ['original'], available: true,
+    actions: [{ id: action, label: action, run: callback }] };
+  const details = modelDetailsPicker(detailSource({ back, actions: initial.actions,
+    refresh: async () => { if (++refreshes > 1) throw new Error('private diagnostic'); return initial; } }));
+  const host = new OverlayHost(() => {}), before = fs.readFileSync(getUserRuntimeConfigPath()), state = readSessionModelEdit(sessionId);
+  host.open(details); await new Promise(resolve => setTimeout(resolve, 0));
+  let result: Awaited<ReturnType<typeof details.apply>>;
+  try {
+    host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+    host.handleKey(parseKeyEvent('\r'), (selected, ids) => {
+      void selected.apply(ids, host.acceptanceFor(selected)).then(outcome => { result = outcome; if (outcome?.next) host.open(outcome.next); });
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(result!.note).toBe('Model catalogue could not be refreshed. Reopen the model picker.');
+    expect(back).toHaveBeenCalledWith(result!.note); expect(host.active).toBe(true);
+    expect(result!.next?.initialSelection).toBe(target); expect(result!.next?.status?.()).toContain(result!.note);
+    expect(await details.apply([action])).toBeUndefined(); expect(await details.load()).toEqual([]);
+    expect(callback).not.toHaveBeenCalled();
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(state);
+  } finally { host.close(); }
+});
+
+it.each(['close', 'replace'] as const)('discards a rejected detail refresh after the accepted host is %s', async ending => {
+  let reject!: (error: Error) => void;
+  const pending = new Promise<ModelDetailView>((_resolve, fail) => { reject = fail; });
+  const callback = vi.fn(() => ({ draft: '/connect login old' })), back = vi.fn(() => modelPicker(context()));
+  const initial: ModelDetailView = { label: 'shared', lines: [], available: true,
+    actions: [{ id: 'configure', label: 'Configure connection', run: callback }] };
+  let refreshes = 0;
+  const details = modelDetailsPicker(detailSource({ back, actions: initial.actions,
+    refresh: () => ++refreshes === 1 ? Promise.resolve(initial) : pending }));
+  const host = new OverlayHost(() => {}); host.open(details); await new Promise(resolve => setTimeout(resolve, 0));
+  let accepted!: ReturnType<typeof details.apply>;
+  try {
+    host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+    host.handleKey(parseKeyEvent('\r'), (selected, ids) => { accepted = selected.apply(ids, host.acceptanceFor(selected)); });
+    if (ending === 'close') host.close(); else host.open(modelPicker(context()));
+    reject(new Error('private diagnostic'));
+    expect(await accepted).toBeUndefined(); expect(back).not.toHaveBeenCalled(); expect(callback).not.toHaveBeenCalled();
+  } finally { host.close(); }
 });
 
 it('does not execute a detail callback when its admission callback closes the actual host', async () => {

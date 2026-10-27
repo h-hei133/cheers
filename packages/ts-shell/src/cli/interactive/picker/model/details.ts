@@ -170,7 +170,12 @@ export function modelDetailsPicker(source: ModelDetailSource): Picker {
       if (!current.actions.some(action => action.id === id)) return undefined;
       let refreshed: ModelDetailView;
       try { refreshed = await source.refresh(); }
-      catch { return { note: 'Model catalogue could not be refreshed. Reopen the model picker.' }; }
+      catch {
+        if (!offered || retired || (stillOwned && !stillOwned())) return undefined;
+        offered = false; retired = true;
+        const note = 'Model catalogue could not be refreshed. Reopen the model picker.';
+        return { note, next: source.back(note) };
+      }
       if (!offered || retired || (stillOwned && !stillOwned())) return undefined;
       current = refreshed;
       const action = current.actions.find(candidate => candidate.id === id);

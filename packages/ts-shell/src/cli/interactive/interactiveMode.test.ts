@@ -343,6 +343,56 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   });
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  (['model', 'settings'] as const).map(entry => ({ kind, entry }))))(
+  'retains model navigation after accepted detail refresh failure in the $kind $entry host', async ({ kind, entry }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/model-detail-failure-host-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', tuiMode: kind, topP: 0.7, providerConnections: [] },
+      readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    writeCatalogCache([{ id: 'relay', runtime: 'openai', baseUrl: 'https://fixture.invalid/v1', models: [{ id: 'inspect-me' }] }]);
+    const manager = new SessionManager(), session = manager.createNew(root), { mode, terminal } = build();
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+      session, runtimeConfig: getRuntimeConfig(root) });
+    const host = mode as unknown as { view: InteractiveView; busy: boolean; options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const before = fs.readFileSync(getUserRuntimeConfigPath()), selection = modelState.readSessionModelEdit(session.id), accepted = context.configuration.current;
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    const read = vi.spyOn(context.configuration, 'current', 'get');
+    mode.start();
+    try {
+      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'settings' ? 'Settings' : 'All models'));
+      host.view.editor.setText('held model inspection draft\nkept through refresh failure');
+      if (entry === 'settings') {
+        terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
+        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      }
+      terminal.input('inspect-me'); await vi.waitFor(() => expect(frame()).toContain('▸ inspect-me'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
+      terminal.input('\x1b[B'); await vi.waitFor(() => expect(frame()).toContain('▸ Configure connection'));
+      read.mockImplementationOnce(() => { throw new Error('private refresh diagnostic'); });
+      terminal.input('\r');
+      await vi.waitFor(() => expect(frame()).toContain('All models'));
+      await vi.waitFor(() => expect(host.busy).toBe(false));
+      expect(frame()).toContain('Model catalogue could not be refreshed'); expect(frame()).toContain('▸ inspect-me');
+      expect(frame()).not.toContain('private refresh diagnostic'); expect(context.configuration.current).toBe(accepted);
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
+      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
+      terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('▸ inspect-me'));
+      terminal.input('\x1b');
+      if (entry === 'settings') await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(modelState.readSessionModelEdit(session.id)).toEqual(selection);
+      expect(host.view.editor.getText()).toBe('held model inspection draft\nkept through refresh failure');
+      expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+    } finally {
+      read.mockRestore(); mode.stop(); dispatch.mockRestore(); network.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   (['user', 'project'] as const).flatMap(scope =>
     ['"read"', 'read\nwrite'].map(item => ({ kind, scope, item })))))(
   'preserves a literal list through untouched Enter and Apply in the $kind $scope host ($item)', async ({ kind, scope, item }) => {
