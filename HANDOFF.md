@@ -531,3 +531,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A filtered reversal reports eight expected failures but its JSON totals also claim 158 passes, even though only the eight selected cases ran.
 - **Root Cause**: The installed Vitest 0.34 JSON reporter counts filtered tests differently from the default reporter; numPassedTests is not an executed-case count under -t.
 - **Rule**: Match reversal failures by assertion name and expected failure groups. Use the default reporter's selected/skipped counts for execution claims, and never promote filtered-out tests to passing evidence.
+
+### Focus Policy Reversals Must Separate Automatic Choice From Missing-Target Fallback
+- **Symptom**: Removing one default-selection callback breaks both untouched focus and the recovery of a missing manual target, obscuring which invariant a regression covers.
+- **Root Cause**: The same policy supplies the ongoing automatic preference and the fallback when a retained ID disappears.
+- **Rule**: Reverse the automatic-preference branch, manual-intent capture and missing-ID fallback separately. Keep a surviving older pinned row in the fixture so an accidental first-row fallback cannot pass as newest-session recovery.

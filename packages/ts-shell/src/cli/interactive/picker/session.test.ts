@@ -5,6 +5,7 @@ import { sessionChoices } from '../../../session/navigation/selection.js';
 import { summarizeSession } from '../../../session/store/catalog/projection.js';
 import { OverlayHost } from '../overlay.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
+import { parseMouseReport } from '../../../presentation/tui/input/mouse.js';
 import { sessionPicker } from './session.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 import { SessionCatalogPage } from '../../../session/store/catalog/query.js';
@@ -55,29 +56,67 @@ it('keeps current visible beyond forty while defaulting to the latest authorized
   expect(apply).toHaveBeenCalledWith(picker, ['recent-00']);
 });
 
-it.each([false, true])('follows newest progressive results unless the user touches selection (%s)', async touched => {
+it.each((['untouched', 'keyboard', 'click', 'wheel', 'hover'] as const).flatMap(gesture =>
+  (['available', 'missing', 'empty'] as const).map(retirement => ({ gesture, retirement }))))(
+  'follows progressive focus through $gesture and a $retirement selected session', async ({ gesture, retirement }) => {
   const older = session('current', '2026-10-24T00:00:00Z'); older.pinned = true;
   const latest = ['09', '11', '10'].map(hour => session(`today-${hour}`, `2026-10-26T${hour}:00:00Z`));
+  latest[0]!.pinned = true; // The fallback must prefer latest time over the first pinned row.
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
+  let retire!: () => void;
+  const retirementGate = new Promise<void>(resolve => { retire = resolve; });
   const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
   const records = new Map([older, ...latest].map(item => [item.id, item]));
-  const manager = { catalog: { async *list() {
-    yield { ...sessionChoices([summarizeSession(older, 'version')], context, 40), scanned: 1, unreadable: 0, limited: 0, status: 'scanning' };
+  const manager = { catalog: { async *list(_context: unknown, signal: AbortSignal) {
+    yield { ...sessionChoices([summarizeSession(older, 'first')], context, 40), scanned: 1, unreadable: 0, limited: 0, status: 'scanning' };
     await gate;
+    signal.throwIfAborted();
     for (let index = 0; index < latest.length; index++) yield {
       ...sessionChoices([older, ...latest.slice(0, index + 1)].map(item => summarizeSession(item, 'version')), context, 40),
-      scanned: index + 2, unreadable: 0, limited: 0, status: index === 2 ? 'complete' : 'scanning',
+      scanned: index + 2, unreadable: 0, limited: 0, status: 'scanning',
     };
+    await retirementGate;
+    signal.throwIfAborted();
+    yield { ...sessionChoices([...records.values()].map(item => summarizeSession(item, `final:${item.id}`)), context, 40),
+      scanned: 4, unreadable: 0, limited: 0, status: 'complete' };
   } }, getSession: (id: string) => records.get(id), files: { sizes: async () => new Map() } } as unknown as SessionManager;
-  const chosen = sessionPicker({ sessionManager: manager, context: () => context, resume: vi.fn() });
+  const resume = vi.fn(async () => undefined);
+  const chosen = sessionPicker({ sessionManager: manager, context: () => context, resume });
   const overlay = new OverlayHost(() => {}); overlay.open(chosen);
-  await vi.waitFor(() => expect(stripAnsi(overlay.render(100, 24).join('\n'))).toContain('Loading sessions: 1'));
-  if (touched) overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn()); // even a one-row wrap is explicit intent
-  release();
-  await vi.waitFor(() => expect(stripAnsi(overlay.render(100, 24).join('\n'))).toContain('today-11'));
-  const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
-  expect(apply).toHaveBeenCalledWith(chosen, [touched ? 'current' : 'today-11']);
+  const frame = () => stripAnsi(overlay.render(100, 24).join('\n'));
+  try {
+    await vi.waitFor(() => expect(frame()).toContain('Loading sessions: 1'));
+    if (gesture === 'keyboard') overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn()); // one-row wrap is explicit intent
+    if (['click', 'wheel', 'hover'].includes(gesture)) {
+      const rows = frame().split('\n');
+      const row = rows.findIndex(line => line.includes('▸ current'));
+      expect(row).toBeGreaterThanOrEqual(0);
+      const column = rows[row]!.indexOf('current');
+      const button = gesture === 'click' ? 0 : gesture === 'wheel' ? 65 : 35;
+      expect(overlay.handlePointer(parseMouseReport(`\x1b[<${button};${column + 1};${row + 1}M`)!, 0)).toBe(true);
+    }
+    overlay.render(40, 8); overlay.render(100, 24);
+    release();
+    await vi.waitFor(() => expect(frame()).toContain('Loading sessions: 4'));
+    const touched = ['keyboard', 'click', 'wheel'].includes(gesture);
+    expect(frame()).toContain(`▸ ${touched ? 'current' : 'today-11'}`);
+    expect(resume).not.toHaveBeenCalled();
+    if (retirement === 'missing') records.delete('current');
+    else if (retirement === 'empty') { older.turns = []; older.status = 'active'; }
+    retire();
+    await vi.waitFor(() => expect(frame()).not.toContain('Loading sessions:'));
+    const expected = touched && retirement === 'available' ? 'current' : 'today-11';
+    expect(frame()).toContain(`▸ ${expected}`);
+    if (retirement !== 'available') expect((await chosen.apply(['current']))?.note).toContain('not offered');
+    expect(resume).not.toHaveBeenCalled();
+    let pending: Promise<unknown> | undefined;
+    const apply = vi.fn((picker, ids) => { pending = picker.apply(ids); });
+    overlay.handleKey(parseKeyEvent('\r'), apply); await pending;
+    expect(apply).toHaveBeenCalledWith(chosen, [expected]);
+    expect(resume).toHaveBeenCalledOnce();
+    expect(resume).toHaveBeenCalledWith(expected, `final:${expected}`);
+  } finally { release(); retire(); overlay.close(); }
 });
 
 it.each([

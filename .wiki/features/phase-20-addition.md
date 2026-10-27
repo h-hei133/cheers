@@ -175,6 +175,8 @@ ADD-04沿[当前会话首快照](../../packages/ts-shell/src/session/store/catal
 
 以一条两天前current和三条今天记录的分批夹具验收：未碰按键，最后聚焦今天最新；加载中手选旧记录，最终仍保留手选；目标消失/不可恢复时落到合格候选；切scope/搜索按新的浏览生命周期重置自动规则；分页、partial和关闭后的迟到结果仍保真。参考pi的selectionTouched可作为对照，不复制整个scanner。
 
+第七十四批沿真实OverlayHost补齐未触碰/方向键/点击/滚轮/hover×记录仍可恢复/消失/变为空会话的15条渐进组合，并穿过窄屏resize与最终Enter→resume回调。hover和resize不锁定自动焦点，手动目标仍有效则保留，失效后选择最新可恢复候选而非剩余旧置顶；Enter传递最终summary版本。现有实现通过这些新增路径，没有据此改产品代码；这仍是受控catalogue与恢复端口证据，不是用户原环境或磁盘整会话恢复验收。
+
 ## 5. 输入几何：已提交消息顶格，编辑框恢复箭头
 
 ADD-05处理已提交消息，ADD-06处理正在编辑的输入。这两处不能用同一个“恢复左侧装饰”动作混在一起。
@@ -1533,7 +1535,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
 ### 第六十四批：正文引号权威与context计量身份
 
@@ -1644,3 +1646,20 @@ ADD-03的真实设置owner集成发现：8×1等极矮窗口中，主界面先�
 最终单worker串行通过四文件149项（source10、input21、surface43、overlay75），再单独过滤运行InteractiveMode两项通过、111项未选；合计151项执行通过，未运行整个InteractiveMode文件。新增设置四条先在旧预算上失败；移除活动表单保留行后，settings4、真实host2及surface2共8项按预期失败，源码逐字节恢复，chrome SHA-256为`150e566e74d7f79ad1f48b853481c679f660e1f35e60041227ee2943625e8076`。反转初次辅助断言误将旧Vitest JSON的filtered-out计数当作实际通过；改按失败名称/分组核验后确认上述8项，不把158个未选用例记为通过。
 
 五静态门、module facade 0、diff及TS build `679adfd7bb50`通过，测试heap768MiB、build1536MiB；此前`628e32af`的CI `40528401893`已completed/success，不能替代本批CI。未运行全仓回归、真实PTY、provider、exe、桌面或20k历史压测；未重跑原Phase 20矩阵，无独立review，完整字段/来源/窗口/桌面矩阵仍未验，ADD整体保持active。提交、推送及本批精确SHA的CI另绑定。
+
+### 第七十四批：resume渐进焦点、鼠标意图与失效回退的组合验收
+
+ADD-04已有默认最新、手选保留、搜索/scope重置及分页证据；本批扩展[session picker测试](../../packages/ts-shell/src/cli/interactive/picker/session.test.ts)的原渐进用例，补上指针意图和后续目标失效。四条小记录经原summary/eligibility投影、SessionListing、OptionModel与OverlayHost流转：先两天前current，再依次发现三条今天记录，最后重发记录仍可恢复、消失或变为空会话的快照。09点记录保留置顶，11点才是最新，因此第一行与正确默认/回退目标可区分。
+
+| 输入意图（均经过40×8再回100×24的resize） | 手选记录仍可恢复 | 记录消失或变为空会话 |
+|---|---|---|
+| 未触碰或只有hover | 自动跟随今天11点记录 | 继续选择最新可恢复记录 |
+| 方向键、点击或滚轮 | 保留原ID，最终Enter提交该手选目标 | 回退今天11点，不能回退到09点旧置顶 |
+
+指针走真实SGR mouse解码与已绘制行命中，点击和滚轮即使只在一条记录上仍算明确选择，hover不算激活。中途所有恢复调用均为零；失效的旧ID直接Apply拒绝，最终Enter调用原sessionPicker.apply，恰好一次把目标ID和最终summary版本交给既有resume端口。原“目标仍可恢复时保留手选并Enter”的场景保留，没有用失效分支替换掉它。实际磁盘恢复和平台输入由原owner/环境矩阵另验。
+
+只读对照保留selectionTouched与稳定会话身份；参考对scope/filter重置和当前会话定位的选择不直接搬用，本项目仍按本任务的最新时间、置顶排序与资格过滤规则决定默认与失效回退。现有产品实现满足新增场景，本批仅修改测试、HANDOFF与文档，没有新增运行时功能或第二套listing。
+
+最终主代理以heap768MiB、单worker串行执行session picker单文件，68项全部通过，包含上述15条；该文件的既有10,045条分页是mock catalogue单元路径，没有启动真实长历史二进制。三个定向反转分别关闭自动偏好、手动意图记录、失效ID的默认回退，在15条选择集中恰好触发6、9、6项对应失败；各次逐字节恢复，OptionModel SHA-256为`bfa4c418c7b6b81fa1059a3358437444abdbd7e5da22f1f5034ee8e3a962e9aa`，恢复后68项重验通过。首次整项移除defaultSelection同时反转自动与回退两条策略，已缩小到各消费分支分别核验，不将耦合失败当作独立证明。
+
+五静态门与diff通过，既有118条docs-source advisory保留。`6fd6a069`的Architecture Watch `40532987758`已success，CI `40532987731`延迟检查时仍in_progress，不替代本批结果。未运行构建、全仓回归、真实PTY、provider、exe、桌面或20k历史压测；没有重跑原Phase 20矩阵或取得独立review。ADD-04保留本地实现验证状态，ADD整体保持active，提交/推送和本批精确SHA的CI另绑定。

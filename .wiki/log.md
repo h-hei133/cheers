@@ -9582,3 +9582,11 @@ ADD-03真实设置编辑链确认主composer先占完行预算，子表单虽不
 最终四文件149项单worker串行通过（source10、input21、surface43、overlay75），再过滤InteractiveMode两项通过、111项未选；共151项执行通过。字符串列表/JSON对象×user/project四条链覆盖1至4行及宽窄resize、键盘修改、Enter暂存、取消二次编辑、Apply与runtime/文件/来源读回；真实host验证普通/掩码输入的document/viewport及关闭后草稿恢复。撤掉保留行后8条目标回归预期失败并逐字节恢复，SHA-256核对一致；旧Vitest JSON对filtered-out计数的误导已分类并记录HANDOFF，不把未选用例记为通过。
 
 五静态门、module facade 0、diff及TS build `679adfd7bb50`通过，测试heap768MiB、build1536MiB。延迟核对前一提交`628e32af`的CI `40528401893`已success；本批Git/CI另绑定。HANDOFF及addition第七十三批更新；未运行全仓、真实PTY、provider、exe、桌面或20k压测，未重跑原Phase 20矩阵，无独立review，ADD整体active。
+
+## [2026-10-27] test | resume渐进焦点与失效目标组合验收
+
+ADD-04将原两条渐进焦点用例扩展为未触碰/键盘/点击/滚轮/hover×仍可恢复/消失/空会话15条组合，保留原有效手选Enter路径，新增实际SGR解码、已绘制行命中、窄屏resize、失效ID拒绝及最终版本传给resume端口。剩余09点旧置顶与11点最新分开，使第一行回退无法冒充正确行为。现有产品实现通过，本批只改测试、HANDOFF与addition第七十四批，没有改运行时。
+
+主代理以768MiB heap、单worker串行运行session picker单文件，最终68项全部通过；三个分支反转分别产生6/9/6项预期失败，OptionModel逐字节恢复并核对SHA-256，恢复后68项重验。五静态门及diff通过；既有10,045记录分页只是mock catalogue单元测试，没有真实长历史进程。先整项移除共享defaultSelection会同时撤掉自动与fallback，已按消费分支拆开反转，相关guardrail写入HANDOFF。
+
+前一提交`6fd6a069`的Architecture Watch `40532987758`已success，CI `40532987731`延迟检查仍in_progress；本批Git/CI另绑定。未运行构建、全仓、真实PTY、provider、exe、桌面或20k压测，未重跑原Phase 20矩阵，无独立review；ADD-04本地验证状态保留，ADD整体active。
