@@ -15,6 +15,8 @@ export function watchModels<T>(context: CommandContext, load: () => Promise<T>, 
     pending = true;
     void load().then(rows => {
       if (!active) return;
+      const latest = context.readConfiguration!().revision;
+      if (!active || latest !== current) return;
       revision = current;
       publish(rows);
     }).catch(() => { if (active) onFailure?.(); })

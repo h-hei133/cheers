@@ -511,3 +511,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An absolute file named `/skill:review` cannot be completed even when quoted, while raw `/skill:rev` offers only installed skills; an exact skill token can also lose Enter to a same-name path candidate.
 - **Root Cause**: `/skill:` was treated as a skill-only namespace before the generic slash-looking path analysis ran, and keymap completeness recognized slash commands but not explicit skill invocations.
 - **Rule**: Load path and skill candidates together for `/skill:` tokens, retain quoted `/skill:` values as paths, and quote accepted files so they stay literal. Keep Enter command-first for an exact `/skill:<name>` token and Tab as the explicit path gesture. Test path and skill candidates, quoted completion, and both acceptance gestures.
+
+### Async Model Refreshes Must Revalidate Before Publishing
+- **Symptom**: An open model inspector briefly displays a superseded catalogue after its refresh finishes, or publishes rows while the accepted publication is unreadable.
+- **Root Cause**: The watcher captures a revision before awaiting its loader but checks only whether the owner is still open afterward.
+- **Rule**: Re-read the accepted revision immediately before publication and discard results whose revision changed. Treat a failed final read as a refresh failure, retain the prior observed revision for retry, and keep the pending slot until the old operation settles. Test deferred revision changes, unreadable final publication, recovery and actual inspector drawing.
