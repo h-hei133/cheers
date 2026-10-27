@@ -185,6 +185,62 @@ it.each((['PreModelSwitch', 'PostModelSwitch'] as const).flatMap(eventName =>
     } finally { overlay.close(); }
   });
 
+it.each(['workspace', 'abort', 'throw'] as const)(
+  'keeps a confirmed recovery write without returning after browser %s during PostModelSwitch', async ending => {
+    const { runtime, commands } = host(), controller = new AbortController(); let completed = false;
+    const { effort } = await recovery({ ...commands, signal: controller.signal, admission: () => {
+      if (completed && ending === 'throw') throw new Error('private browser diagnostic');
+      return commands.admission();
+    } });
+    const before = readSessionModel(runtime.session.id)!, config = fs.readFileSync(getUserRuntimeConfigPath());
+    vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+      if (event.eventName === 'PostModelSwitch') {
+        completed = true;
+        if (ending === 'workspace') runtime.workspaceIssue = 'Workspace is unavailable.';
+        if (ending === 'abort') controller.abort();
+      }
+      return undefined;
+    });
+    const overlay = new OverlayHost(() => {}); overlay.open(effort);
+    await new Promise(resolve => setTimeout(resolve, 0)); let pending!: ReturnType<typeof effort.apply>;
+    try {
+      overlay.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+      overlay.handleKey(parseKeyEvent('\r'), (selected, ids) => { pending = selected.apply(ids, overlay.acceptanceFor(selected)); });
+      const result = await pending;
+      expect(completed).toBe(true); expect(result?.note).toContain('Model switched to shared.');
+      expect(result?.next).toBeUndefined();
+      const { contextWindow: _window, ...controls } = before;
+      expect(readSessionModel(runtime.session.id)).toEqual({ ...controls, connectionId: 'relay', thinkingEffort: 'medium' });
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+      expect(await effort.apply(['medium'])).toBeUndefined(); expect(await effort.load()).toEqual([]);
+    } finally { overlay.close(); }
+  });
+
+it.each(['absent', 'refuse', 'throw'] as const)('keeps a saved recovery notice without a verified browser (%s guard)', async guard => {
+  const { commands } = host(), selection = prospective(commands);
+  selection.canReturn.mockImplementation(() => { if (guard === 'throw') throw new Error('private browser diagnostic'); return false; });
+  const { canReturn: _guard, ...unguarded } = selection;
+  const effort = modelEffortPicker(guard === 'absent' ? unguarded : selection); await effort.load();
+  expect(await effort.apply(['medium'])).toEqual({ note: 'Model switched to shared.' });
+  expect(selection.save).toHaveBeenCalledOnce(); expect(selection.done).not.toHaveBeenCalled(); expect(selection.back).not.toHaveBeenCalled();
+  expect(await effort.apply(['medium'])).toBeUndefined(); expect(await effort.load()).toEqual([]);
+});
+
+it.each(['close', 'replace'] as const)('keeps a saved recovery notice if browser return admission causes host %s', async ending => {
+  const { commands } = host(), selection = prospective(commands), overlay = new OverlayHost(() => {});
+  selection.canReturn.mockImplementation(() => { if (ending === 'close') overlay.close(); else overlay.open(modelPicker(commands)); return true; });
+  const effort = modelEffortPicker(selection); overlay.open(effort); await new Promise(resolve => setTimeout(resolve, 0));
+  let pending!: ReturnType<typeof effort.apply>;
+  try {
+    overlay.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+    overlay.handleKey(parseKeyEvent('\r'), (selected, ids) => { pending = selected.apply(ids, overlay.acceptanceFor(selected)); });
+    expect(await pending).toEqual({ note: 'Model switched to shared.' }); expect(selection.canReturn).toHaveBeenCalledOnce();
+    expect(selection.save).toHaveBeenCalledOnce(); expect(selection.done).not.toHaveBeenCalled(); expect(selection.back).not.toHaveBeenCalled();
+    expect(overlay.active).toBe(ending === 'replace');
+    expect(await effort.apply(['medium'])).toBeUndefined(); expect(await effort.load()).toEqual([]);
+  } finally { overlay.close(); }
+});
+
 it.each(['refuse', 'abort', 'throw'] as const)('retires refused recovery without returning when its original browser will %s', async ending => {
   const { runtime, commands } = host(), controller = new AbortController(); let armed = false, reads = 0;
   const { effort } = await recovery({ ...commands, signal: controller.signal, admission: () => {

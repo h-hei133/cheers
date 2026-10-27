@@ -56,8 +56,12 @@ export function modelEffortPicker(selection: EffortSelection): Picker {
       }
       offered = false; retired = true;
       const note = await selection.save(selected.effort, stillOwned);
+      let returning = false;
+      if (!stillOwned || stillOwned()) {
+        try { returning = selection.canReturn?.() === true; } catch { /* Keep the saved result without reopening an unverified browser. */ }
+      }
       // The transaction's result remains true even if its accepted host has since closed.
-      return { note, ...(!stillOwned || stillOwned() ? { next: selection.done(note) } : {}) };
+      return { note, ...(returning && (!stillOwned || stillOwned()) ? { next: selection.done(note) } : {}) };
     },
   };
 }

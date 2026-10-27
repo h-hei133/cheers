@@ -597,7 +597,9 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   ([{ entry: 'model', ending: 'refusal' }, { entry: 'settings', ending: 'refusal' },
-    { entry: 'settings', ending: 'close' }, { entry: 'settings', ending: 'replace' }] as const).map(path => ({ kind, ...path }))))(
+    { entry: 'settings', ending: 'close' }, { entry: 'settings', ending: 'replace' },
+    { entry: 'model', ending: 'post-workspace' }, { entry: 'settings', ending: 'post-workspace' },
+    { entry: 'model', ending: 'post-ready' }, { entry: 'settings', ending: 'post-ready' }] as const).map(path => ({ kind, ...path }))))(
   'retains effort recovery navigation after $ending in the $kind $entry host', async ({ kind, entry, ending }) => {
     fs.mkdirSync('/tmp/cheers-test', { recursive: true });
     const root = fs.mkdtempSync('/tmp/cheers-test/model-effort-refusal-');
@@ -636,6 +638,25 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       terminal.input('blocked-model'); await vi.waitFor(() => expect(frame()).toContain('▸ blocked-model'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
       terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ high'));
+      if (ending === 'post-workspace' || ending === 'post-ready') {
+        const hook = vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+          if (event.eventName === 'PostModelSwitch' && ending === 'post-workspace') context.workspaceIssue = 'Workspace is unavailable.';
+          return undefined;
+        });
+        switchHook = hook; terminal.input('\x1b[A\r');
+        await vi.waitFor(() => expect(hook).toHaveBeenCalledWith(expect.objectContaining({ eventName: 'PostModelSwitch' })));
+        await vi.waitFor(() => expect(host.view.transcript.all().map(block => block.text).join('\n')).toContain('Model switched to blocked-model.'));
+        if (ending === 'post-workspace') expect(host.overlay.active).toBe(false);
+        else await vi.waitFor(() => expect(frame()).toContain(entry === 'settings' ? '▸ Models and roles' : '▸ blocked-model'));
+        expect(readSessionModel(session.id)).toEqual({ ...target, connectionId: 'relay', model: 'blocked-model', thinkingEffort: 'medium' });
+        expect(resolveProviderCredential({ runtimeConfig: context.runtimeConfig })).toMatchObject({
+          model: 'blocked-model', thinkingEffort: 'medium', credential: { connectionId: 'relay' } });
+        expect(context.runtimeConfig.topP).toBe(0.7);
+        expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+        expect(host.view.editor.getText()).toBe('held effort recovery draft\nkept through refusal');
+        expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+        return;
+      }
       if (ending !== 'refusal') {
         const hook = vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
           if (event.eventName === 'PreModelSwitch') {

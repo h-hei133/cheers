@@ -9779,3 +9779,11 @@ ADD-01/02/03双lane独立只读审阅发现普通根model遗漏accepted ownershi
 最终主代理单worker串行activation23、model43、publication19及过滤host30共115项实际通过，host229项未选不计通过。六组反转35/12/19/2/5/5项预期失败、控制18/41/34/21/18/18项通过，源码逐字节恢复及SHA-256确认后重验。两条旧测试改为先拒绝已关闭/消费对象，再显式新开并保留原publication/stale preset合同；初期Escape层级、被覆盖frame观察与反转名称匹配均按夹具/收据问题修正，没有改产品掩盖。实际两模式Enter覆盖关闭/替换和挂起hook期间重开settings，完整配置/session/兄弟角色、held草稿和零派发/fetch分别核对。
 
 五静态门、diff、module facade 0及TS build `eb97f11d4f6a`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留。两条gpt-6.1-sol lane仅阅读/复核，本修补结论APPROVE/CLEAR；recovery保存后的browser WATCH尚待动态确认。HANDOFF与addition第九十七批/当前摘要更新，工件归.omx/artifacts/phase20-addition-model-activation/，scratch清理。延迟检查第九十四/九十五批CI success，第九十六/九十二批仍in_progress，Watch success；本批Git/精确SHA另绑定。未运行全仓、真实provider/PTY/exe/桌面/Windows/磁盘故障或20k历史，原Phase20矩阵未重跑，ADD整体active。
+
+## [2026-10-28] fix | 目标档位保存后重新准入原浏览返回
+
+第九十七批`69e2d484`已推送且远端读回一致。ADD-01/02/03动态确认原架构WATCH：PostModelSwitch撤销workspace而host代次仍有效时，recovery完成仍重开旧model/settings。现保持原writer notice，原browser明确获准且callback后host仍有效才构造父级，缺失/拒绝/抛错guard不返回；沿用原事务与参考disposed决定，未新建写入系统。双lane只读复核APPROVE/CLEAR仅覆盖本修补，整个ADD仍active。
+
+权威串行旧基线owner8+两模式两入口host4共12项失败、40项控制通过；最终recovery36、publication19、过滤host16共71项实际通过，host251项未选不计通过。两独立反转分别触发12/2项预期失败、40/34项控制通过，源码逐字节恢复与SHA-256核对后最终重验。实际host覆盖workspace失效及正常返回、confirmed notice、完整session/兄弟角色、配置字节、原请求目标、held草稿和零prompt/fetch。初轮字段投影断言按真实resolver修正；最初误启动的并发host立即中断，重叠证据废弃并重新串行运行，未隐藏为通过。
+
+五静态门、diff、module facade 0及TS build `02d3735f2386`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF及addition第九十八批/当前摘要更新，工件归.omx/artifacts/phase20-addition-recovery-return/，scratch清理。延迟检查第九十六批CI success，第九十七/九十二批仍in_progress，第九十七批Watch success；本批Git/精确SHA另绑定。未运行全仓、真实provider/PTY/exe/桌面/Windows/磁盘故障或20k历史，原Phase20矩阵未重跑，ADD整体active。
