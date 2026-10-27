@@ -396,6 +396,11 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
     reload: async () => { await reloadDetailCatalogue(); },
     currentRows: () => navigation.origin,
     back: (origin, detailNotice) => modelPicker(context, id, navigation, assigning, detailNotice, signIn, parent, origin),
+    canReturn: () => {
+      if (context.signal?.aborted) return false;
+      const refusal = context.admission?.();
+      return !context.signal?.aborted && !refusal;
+    },
     ...(context.readConfiguration ? {
       watch: (load, publish, observed, onFailure) => watchModels(context, load, publish, observed, onFailure),
     } : {}),

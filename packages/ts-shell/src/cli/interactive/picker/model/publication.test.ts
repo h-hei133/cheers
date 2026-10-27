@@ -37,13 +37,17 @@ function host() {
 
 it('reopens from a fresh accepted catalogue after stale rejection while ordinary settings remain pinned', async () => {
   const { runtime, commands } = host(); const initial = runtime.configuration.current;
-  const picker = modelPicker(commands); await picker.load(); const details = (await picker.inspect!(target))!.next!; await details.load();
+  const picker = modelPicker(commands, undefined, undefined, undefined, undefined, vi.fn());
+  await picker.load(); const details = (await picker.inspect!(target))!.next!; await details.load();
   catalogue('https://replacement.invalid/v1');
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   writeUserRuntimeConfigFile({ ...edit.value, maxTurns: 31 }, edit);
   const before = fs.readFileSync(getUserRuntimeConfigPath()), selection = readSessionModelEdit(runtime.session.id);
-  expect((await details.apply(['configure']))?.note).toContain('expired');
-  const reopened = modelPicker(commands, undefined, undefined, undefined, undefined, vi.fn());
+  const result = await details.apply(['configure']);
+  expect(result?.note).toContain('expired'); expect(result?.next?.initialSelection).toBe(target);
+  expect(result?.next?.status?.()).toContain(result!.note);
+  expect(await details.apply(['configure'])).toBeUndefined(); expect(await details.load()).toEqual([]);
+  const reopened = result!.next!;
   await reopened.load();
   expect(runtime.configuration.current.catalog.find(item => item.id === 'relay')?.baseUrl).toBe('https://replacement.invalid/v1');
   expect(runtime.configuration.current.revision).toBeGreaterThan(initial.revision);

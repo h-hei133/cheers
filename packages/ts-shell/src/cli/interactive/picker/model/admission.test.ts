@@ -28,6 +28,7 @@ function detailSource(options: {
   readonly lines?: readonly string[];
   readonly actions?: readonly ModelDetailAction[];
   readonly admission?: () => string | undefined;
+  readonly canReturn?: () => boolean;
   readonly refresh?: () => Promise<ModelDetailView>;
   readonly subscribe?: (publish: (view: ModelDetailView) => void) => () => void;
   readonly back: (notice?: string) => Picker;
@@ -47,6 +48,7 @@ function detailSource(options: {
       return current === view ? refusal : 'Model details changed. Review the refreshed model before continuing.';
     },
     back: options.back,
+    ...(options.canReturn ? { canReturn: options.canReturn } : {}),
     ...(options.subscribe ? { subscribe: options.subscribe } : {}),
   };
 }
@@ -58,20 +60,48 @@ it('refuses stale list inspection before constructing a configuration form for a
   expect(result?.note).toContain('expired'); expect(result?.next).toBeUndefined(); expect(signIn).not.toHaveBeenCalled();
 });
 
-it.each(['configure', 'account', 'connection'] as const)('rechecks a displayed detail before its %s callback and still permits return', async action => {
+it.each(['configure', 'account', 'connection'] as const)('returns fresh models after a displayed %s detail is refused without running its callback', async action => {
   let current = true;
   const back: Picker = { title: 'models', form: 'panel', empty: '', load: async () => [], apply: async () => undefined };
   const callback = vi.fn(() => ({ draft: '/connect login old' }));
   const actions = ['configure', 'account', 'connection'].map(id => ({
     id, label: id, run: callback,
   }));
-  const details = modelDetailsPicker(detailSource({ back: () => back, actions,
+  const details = modelDetailsPicker(detailSource({ back: () => back, actions, canReturn: () => true,
     admission: () => current ? undefined : 'Model selection expired. Reopen the model picker.' }));
   await details.load(); current = false;
   const result = await details.apply([action]);
-  expect(result?.note).toContain('expired'); expect(result?.next).toBeUndefined(); expect(result?.draft).toBeUndefined();
+  expect(result?.note).toContain('expired'); expect(result?.next).toBe(back); expect(result?.draft).toBeUndefined();
   expect(callback).not.toHaveBeenCalled();
-  expect((await details.apply(['back']))?.next).toBe(back);
+  current = true;
+  expect(await details.apply([action])).toBeUndefined(); expect(await details.apply(['back'])).toBeUndefined();
+  expect(await details.load()).toEqual([]); expect(callback).not.toHaveBeenCalled();
+});
+
+it.each(['close', 'replace'] as const)('suppresses a refused detail return when its return guard causes host %s', async ending => {
+  const host = new OverlayHost(() => {}), back = vi.fn(() => modelPicker(context())), callback = vi.fn();
+  const details = modelDetailsPicker(detailSource({ back, actions: [{ id: 'configure', label: 'Configure', run: callback }],
+    admission: () => 'Model selection expired. Reopen the model picker.',
+    canReturn: () => { if (ending === 'close') host.close(); else host.open(modelPicker(context())); return true; } }));
+  host.open(details); await new Promise(resolve => setTimeout(resolve, 0));
+  let pending!: ReturnType<typeof details.apply>;
+  try {
+    host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+    host.handleKey(parseKeyEvent('\r'), (selected, ids) => { pending = selected.apply(ids, host.acceptanceFor(selected)); });
+    expect(await pending).toBeUndefined(); expect(back).not.toHaveBeenCalled(); expect(callback).not.toHaveBeenCalled();
+    expect(await details.apply(['configure'])).toBeUndefined(); expect(await details.load()).toEqual([]);
+  } finally { host.close(); }
+});
+
+it('retains the original refusal and retires the detail when its return guard throws', async () => {
+  const back = vi.fn(() => modelPicker(context())), callback = vi.fn();
+  const details = modelDetailsPicker(detailSource({ back, actions: [{ id: 'configure', label: 'Configure', run: callback }],
+    admission: () => 'Model selection expired. Reopen the model picker.',
+    canReturn: () => { throw new Error('private return diagnostic'); } }));
+  await details.load();
+  expect(await details.apply(['configure'])).toEqual({ note: 'Model selection expired. Reopen the model picker.' });
+  expect(back).not.toHaveBeenCalled(); expect(callback).not.toHaveBeenCalled();
+  expect(await details.apply(['configure'])).toBeUndefined(); expect(await details.load()).toEqual([]);
 });
 
 it('rebuilds the actual relay key path from a changed catalogue before configuring', async () => {
@@ -102,7 +132,27 @@ it('rechecks cancellation around inspection admission and does not create a stal
   abortOnAdmission = true;
   const result = await details.apply(['configure']);
   expect(result?.note).toContain('cancelled'); expect(result?.next).toBeUndefined();
+  expect(await details.apply(['back'])).toBeUndefined(); expect(await details.load()).toEqual([]);
   expect((await picker.inspect!(target))?.note).toContain('cancelled');
+});
+
+it.each(['refuse', 'abort', 'throw'] as const)('does not return a refused detail if its original owner will %s on revalidation', async ending => {
+  const controller = new AbortController(); let armed = false, reads = 0;
+  const signIn = vi.fn();
+  const picker = modelPicker({ ...context(), signal: controller.signal, admission: () => {
+    if (!armed) return undefined;
+    if (++reads === 1) return 'The original selection expired.';
+    if (ending === 'abort') { controller.abort(); return undefined; }
+    if (ending === 'throw') throw new Error('private owner diagnostic');
+    return 'Workspace changed.';
+  } }, undefined, undefined, undefined, undefined, signIn);
+  await picker.load(); const details = (await picker.inspect!(target))!.next!; await details.load(); armed = true;
+  const before = fs.readFileSync(getUserRuntimeConfigPath()), state = readSessionModelEdit(sessionId);
+  const result = await details.apply(['configure']);
+  expect(result?.note).toContain('expired'); expect(result?.next).toBeUndefined(); expect(result?.draft).toBeUndefined();
+  expect(reads).toBe(2); expect(await details.apply(['configure'])).toBeUndefined(); expect(await details.load()).toEqual([]);
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(state);
+  expect(signIn).not.toHaveBeenCalled();
 });
 
 it.each(['configure', 'account', 'connection'] as const)('returns to fresh models after the accepted %s detail refresh rejects', async action => {

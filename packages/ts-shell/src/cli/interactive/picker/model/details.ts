@@ -34,6 +34,8 @@ export interface ModelDetailSource {
   initialize?(): Promise<ModelDetailView>;
   refresh(): Promise<ModelDetailView>;
   admit(view: ModelDetailView): string | undefined;
+  /** Returning after a refused choice requires the original browser owner. */
+  canReturn?(): boolean;
   back(notice?: string): Picker;
   origin?(): ModelDetailOrigin;
   subscribe?(publish: (view: ModelDetailView) => void): () => void;
@@ -47,6 +49,7 @@ interface CatalogueDetailSourceOptions {
   readonly reload: () => Promise<void>;
   readonly currentRows: () => ModelDetailOrigin;
   readonly back: (origin: ModelDetailOrigin, notice?: string) => Picker;
+  readonly canReturn?: () => boolean;
   readonly watch?: (load: () => Promise<ModelDetailView>, publish: (view: ModelDetailView) => void,
     observedRevision?: number, onFailure?: () => void) => () => void;
 }
@@ -98,6 +101,7 @@ export function catalogueDetailSource(options: CatalogueDetailSourceOptions): Mo
         ? 'Model details changed. Review the refreshed model before continuing.' : undefined;
     },
     back: (notice?: string) => options.back(previous, notice),
+    ...(options.canReturn ? { canReturn: options.canReturn } : {}),
     origin: () => previous,
     ...(options.watch ? {
       subscribe: (publish: (view: ModelDetailView) => void) => {
@@ -197,7 +201,13 @@ export function modelDetailsPicker(source: ModelDetailSource): Picker {
         return { note, next: source.back(note) };
       }
       if (!ownsAction(stillOwned)) return undefined;
-      if (refusal) return { note: refusal };
+      if (refusal) {
+        let returning = false;
+        try { returning = source.canReturn?.() === true; } catch { /* An unverified owner cannot reopen the browser. */ }
+        if (!ownsAction(stillOwned)) return undefined;
+        offered = false; retired = true;
+        return { note: refusal, ...(returning ? { next: source.back(refusal) } : {}) };
+      }
       offered = false; retired = true;
       return action.run(source.back, () => modelDetailsPicker(source), source.origin?.());
     },

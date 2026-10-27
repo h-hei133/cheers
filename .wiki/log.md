@@ -9705,3 +9705,11 @@ ADD-01/02/03确认refresh后的admit读取没有异常边界，已接受Enter会
 初始新增owner7/host4在旧实现确认11项失败，四个控制通过；初修暴露的四条直接重试失败按产品退休不足修补，另补动作开始前失效与三条旧refresh重试断言。最终admission28、publication9、watch7及过滤实际host8共52项执行通过，175项host未选不算通过；两模式/两入口注入实际accepted getter错误，核对原模型、safe notice、显式重试/取消、settings返回、held草稿、配置/会话保持和零派发/网络。原refresh控制夹具同步修正构造前模式与实际备用屏断言。三个独立反转触发9/2/9项预期失败，源码逐字节恢复及SHA-256确认后完成最终重验。
 
 五静态门、diff、module facade 0与TS build `025d00b2ff5c`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十八批/当前摘要更新，本批scratch清理。延迟检查`e2857e6f`的CI `40572639510`及Watch `40572639614`均success，`0982131e`的CI `40570812686`success；`5204ac40`的Watch `40574711942`success、CI `40574711764`仍in_progress。未运行全仓、真实磁盘故障/PTY/provider/exe、桌面或20k历史，未重跑原Phase20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 模型详情普通准入拒绝保留安全返回
+
+第八十八批已提交推送`e5c017217d64178f513916737627433d9b39d1f3`，续接确认本地/远端一致且clean。ADD-01/02/03通过真实隔离配置变化确认普通target准入拒绝只返回note，实际Enter释放overlay后丢settings/model链。现拒绝永久退休旧详情，由目录另验原browser signal/admission，有效时沿原父目录保留notice、具体模型焦点与settings入口；取消/身份失效/复验异常不重开，回调后再验宿主归属。只读参考采用失败保留导航与disposed检查的决定，保存、认证与配置接受owner继续复用。
+
+旧实现确认owner/publication11及两模式/两入口host4共15项失败。最终admission34、publication9、watch7及过滤host12共62项执行通过、175项host未选不算通过；三个有效反转15/4/2项预期失败，源码逐字节恢复及哈希核对后重验。实际host检查外部topP文件0.8保持、接受值仍0.7、原模型/父级/held草稿/session保持与零派发/fetch。两模式实际Node小型PTY串行通过拒绝自动返回、显式重试/取消、准确屏幕模式、文件/modelSelection保持、零message及退出0；一次Esc只回分类的首轮探针期待按实际导航修正，没有改产品代码。
+
+五静态门、diff、module facade 0及TS build `4ecf3161b638`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF、addition第八十九批/当前摘要更新，scratch清理。延迟读回`e5c01721`Watch `40576592407`success、CI `40576592505`仍in_progress，`5204ac40`CI `40574711764`亦in_progress。未运行全仓、真实provider/OAuth、exe、桌面、原生Windows、真实磁盘故障或20k历史，未重跑原Phase20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

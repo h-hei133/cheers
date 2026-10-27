@@ -1462,6 +1462,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 未改动的列表编辑会改变原值与工具可见集合 | 第八十二批确认逐行初始化与原parser的引号/JSON/换行/trim语义不往返，带引号的工具名可变为普通可见工具名。现先用原parser比较完整值，无法往返时沿已有JSON数组输入初始化；169项执行通过、24项有效反转及build有本地证据，普通逐行编辑保持，完整字段/来源/平台矩阵未验 |
 | 模型详情接受动作后的目录读取失败丢失返回链 | 第八十三批确认Enter已释放详情，刷新异常只返回note且跳过宿主归属检查。现失败时复验归属、退休已消费动作，沿原父目录保留安全提示；39项执行通过、7/2两组有效反转及build有本地证据。读取故障受控，真实磁盘/平台及完整认证矩阵未验 |
 | 模型详情最后准入读取异常、关闭后的拒绝结果与旧动作复活 | 第八十八批确认refresh成功后的admit无异常边界，拒绝先于归属复验返回；丢结果的guard也未永久退休旧详情。现最后准入异常沿原父目录返回，任一确认丢失归属永久退役，关闭/替换后不发布拒绝或异常结果；52项执行通过、9/2/9三组有效反转及build有本地证据，真实磁盘故障与平台矩阵未验 |
+| 模型详情普通准入拒绝关闭返回链 | 第八十九批用真实配置文件变化确认target拒绝只返回note，实际host已释放详情，settings/model链随之关闭。现拒绝消费旧动作，另验原浏览owner有效才回fresh目录，取消/身份失效/读取异常不自动重开；62项执行通过、15/4/2三组有效反转、build及两模式小型Node PTY有证据，完整来源/桌面矩阵未验 |
 | 设置搜索新查询仍保留较弱匹配焦点 | 第三十八批确认typed/pasted `topP`排名第一但Enter打开Input shape。现新查询自动聚焦最强匹配，同查询手动选择保持，清空回原字段；178项聚焦、一有效反转及两模式实际Node PTY有证据。不是用户原model按键现场唯一原因的证明 |
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；第六十三批补非首位命令碰撞file引号、目录候选不触发命令模板查找、代码/转义/URL参数不请求path catalog及quoted Windows drive/UNC识别；第七十批补`/skill:`命名空间内真实路径与skill候选并存，quoted path与exact skill Enter/Tab分界保真。完整场景验收仍按下表，非skill同名template/path的裸提交歧义及正文功能命令执行边界不因此消失 |
@@ -1576,6 +1577,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第八十七批补普通路径的apostrophe值保持：手动输入绝对、home、相对与父目录路径时，查询沿源token保留原文件名，接受后仍由原formatter加引号并连续Tab。两模式host与真实Node小型PTY已验证目录→子目录→文件，完整平台与真实provider验收继续待补，ADD整体active。
 
 第八十八批补模型详情最后准入读取异常及归属丢失后的永久退役：refresh成功不再掩盖随后的读取失败，仍有归属时回原目录并保留安全notice；关闭或替换后的拒绝/异常不发布，旧详情不能再读、返回或运行配置动作。两模式model/settings实际host已有隔离证据，真实故障与完整平台验收继续待补，ADD整体active。
+
+第八十九批继续补普通准入拒绝的导航：target过期与browser归属分开复验，有效时保留原notice和具体模型焦点，返回后须显式重开才能配置。取消、session/workspace/profile准入失效或归属复验抛错不重开，拒绝后的旧详情永久退休。普通设置仍按接受态固定，外部文件编辑不被导航隐式应用；实际host与两模式小型Node PTY已有证据，ADD整体active。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -1900,3 +1903,19 @@ ADD-01/02/03继续核对已接受详情动作的读取边界。[model details](.
 主代理heap768MiB、单worker串行执行`vitest run src/cli/interactive/picker/model/admission.test.ts src/cli/interactive/picker/model/publication.test.ts src/cli/interactive/picker/model/watch.test.ts`，28+9+7共44项通过；host以`-t 'retains model navigation after accepted detail (refresh|admission) failure'`执行8项通过、175项未选，共52项实际执行通过。独立撤销异常边界、拒绝前归属复验和永久退休，分别按文件/名称确认9、2、9项预期失败，同次控制11、18、11项通过，191项均未选。finally逐字节恢复并核对SHA-256 `dde41932a06487bba2032e3a6585569ca6ac035d7e2cf3e4ae480e2d716e9c28`，恢复后完成上述最终重验。未选不计通过。
 
 五静态门、diff、module facade 0及TS build `025d00b2ff5c`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF及当前摘要更新，本批反转scratch清理。延迟核对第八十六批`e2857e6f`的CI `40572639510`与Watch `40572639614`均success，第八十五批`0982131e`的CI `40570812686`亦success；第八十七批`5204ac404bbcb835873052c7231ca01b39955432`的Watch `40574711942`success、CI `40574711764`仍in_progress。以上不替代本批精确SHA的CI。读取故障为受控注入，终端为RecordingTerminal；未运行全仓、真实磁盘故障/PTY/provider/exe、桌面或20k历史，未重跑原Phase20矩阵，无独立review，ADD整体active。本批提交/推送与对应CI另绑定。
+
+### 第八十九批：模型详情普通拒绝后的安全父级返回
+
+第八十八批已提交并推送为`e5c017217d64178f513916737627433d9b39d1f3`，续接核对本地与远端精确一致且工作区clean。ADD-01/02/03继续沿[详情owner](../../packages/ts-shell/src/cli/interactive/picker/model/details.ts)检查普通准入拒绝：原控制只直接调用apply并允许随后Back，没有穿过已释放overlay的实际Enter。真实配置文件变化使target fingerprint过期，拒绝仅返回note，实际settings/model链因此关闭；旧对象还能再试。新增及加强owner/publication十一条与两模式/两入口host四条，在旧实现确认15项失败。
+
+只读参考快照`0838d2ab4407b74e870de07e1a6780a13c7d542c`的`packages/tui/src/overlays/model-hub.ts`1255–1275在同步/异步assignment返回false或拒绝时重绘原面板，并且异步结果检查disposed；604–634及1142–1162同样保留读取失败的可导航面板。采用失败后保留操作路径并尊重已退出生命周期的决定。本项目不复用其role/hub实现，也不将target失效视为browser归属失效的充分证据。
+
+[目录owner](../../packages/ts-shell/src/cli/interactive/picker/model.ts)现提供明确的返回检查，只复验原signal与context admission；详情在普通拒绝后调用它，检查回调之后再验accepted host，消费并永久退休旧动作。返回已获验证时沿原`source.back`构造fresh目录，保留原notice、具体模型焦点、原settings父级和目录origin；取消、原session/workspace/profile失效或检查抛错时只保留原拒绝，不重开旧链。缺少返回检查也不自动返回。返回不运行配置或认证动作，须用户明确再次打开；无新增保存owner、轮询、命令语法或provider/auth核心改动。
+
+[owner回归](../../packages/ts-shell/src/cli/interactive/picker/model/admission.test.ts)覆盖三个动作的拒绝返回、旧动作/迟到load、返回检查关闭/替换宿主、抛错保留原notice及真实modelPicker原owner拒绝/取消/抛错；[publication控制](../../packages/ts-shell/src/cli/interactive/picker/model/publication.test.ts)改用真实结果的next返回，核对新目录endpoint与普通设置保持接受态。[实际host](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)regular/fullscreen×model/settings四条直接修改隔离配置的topP文件，再通过真实Enter复现过期，检查原模型焦点、安全notice、显式重试/配置取消、settings返回、held草稿和session不变，外部文件字节保留、accepted topP仍为0.7，零prompt派发及fetch。终端为RecordingTerminal。
+
+主代理heap768MiB、单worker串行运行admission34、publication9、watch7及过滤host12，共62项实际执行通过，175项host未选不计通过。三项独立反转撤销拒绝continuation、原browser复验、返回callback后的host复验，分别按失败名称确认15/4/2项失败，所选控制7/6/7项通过、208/211/212项未选。finally逐字节恢复并核对SHA-256：details `9b9d7b36e05dafe0ef84255dd0283d1cca9994e7af5b2deb8a7e14c1233203d9`、model `7f3e5c65cf94691a13d006b52c2b98ec64f0aadc78a1b1d1446c6742ec3b8f91`；恢复后重验全部上述62项，未选不计通过。
+
+另以现有环境隔离owner与PTY relay运行实际Node launcher，regular/fullscreen两条新空会话串行通过：实际ready屏幕模式、精确relay详情、外部配置修改、拒绝自动回原模型、显式再开配置、取消回目录、分类焦点后退出面板、配置文件与modelSelection保持、零transcript message及正常退出0。首轮regular探针把内容焦点上的一次Esc误当关闭，实际只返回All models分类，按已绘制分类后再Esc修正探针；没有为此改产品代码。PTY不提供provider调用计数，零派发/网络证据来自host spies；未加载长历史或启动exe。
+
+五静态门、diff、module facade 0及TS build `4ecf3161b638`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新，本批scratch清理。延迟读回第八十八批Watch `40576592407`success、CI `40576592505`仍in_progress；第八十七批CI `40574711764`亦in_progress，不替代本批验证。未运行全仓、真实provider/OAuth、桌面、原生Windows、真实磁盘故障或20k历史，未重跑原Phase20矩阵，无独立review，ADD整体active。本批Git提交/推送与对应CI另绑定。
