@@ -1461,6 +1461,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；第六十三批补非首位命令碰撞file引号、目录候选不触发命令模板查找、代码/转义/URL参数不请求path catalog及quoted Windows drive/UNC识别；第七十批补`/skill:`命名空间内真实路径与skill候选并存，quoted path与exact skill Enter/Tab分界保真。完整场景验收仍按下表，非skill同名template/path的裸提交歧义及正文功能命令执行边界不因此消失 |
 | 转义目录名使连续Tab失败或隐藏后文skill | 第七十八批确认已插入引号内的转义源码被当成真实路径，裸反引号还会打开代码区。现复用参数扫描器解码，保留原始Windows分隔符并给反引号路径加引号；138项执行通过、三组有效反转与构建有本地证据。两模式host使用RecordingTerminal，Windows只做词法测试，真实终端与平台本批未验 |
+| 代码示例中的文件引用仍扫描目录，含sigil文件名无法继续补全 | 第七十九批确认`@`后备分支未检查代码区，又把文件名内任意`@`当成重复sigil；前导`@`文件还可能插入为字面双`@@`。现复用源token排除代码、仅拒绝raw双sigil，并引用前导sigil文件名。94项执行通过及11/5/1有效反转有本地证据；实际host证明代码内零枚举、闭合后恢复，真实终端与平台本批未验 |
 | review正文组合原先未准入 | 第五十批确认review会读取真实Git snapshot，不能当纯modifier。现声明为单一driver，消费共享正文、brainstorm和全部skill并生成一份review prompt；audit/check共用声明，第二个driver在派发前拒绝。第五十七批补齐standalone/composed预览：复用同一review request与Git workbench，强制与dispatch一致的plan mode，并在内容复验时重查snapshot fingerprint；第五十八批再加入不持久化的one-use snapshot reservation、canonical binding、过期/变更拒绝和diff后fingerprint检查，不调用通用Git派发或写执行；第六十一批把失效标记扩为workbench级，并加入异步`reviewTake`/epoch；第六十二批再让提交期暂停controller自动失效，并把take保留到diff/最终检查完成。五文件234项、有效反转和真实Git fixture有局部证据，真实provider/桌面仍待验 |
 | 无flag组合方法静默吞掉dash正文 | 第五十二批确认option扫描未先检查方法是否声明flags，review与可组合模板会丢失`--keep-this`/`--counterexample`，而声明flags的方法仍需严格拒绝未知option。现只对非空flag声明解析，flagless正文完整进入共享prompt；91项、两个有效反转及独立review有局部证据，真实终端/平台仍未验 |
 | 代码示例误调用及合法关闭后漏skill | 原字符串查找将围栏正文误当关闭，或以不同长度反引号闭合；第二十九批改为独立关闭行与精确行内run，示例保持字面量，合法关闭后所有skill恢复解析。第三十三批再补实际研究新建入口数字preview，control/其他driver/child总成本仍待覆盖 |
@@ -1546,6 +1547,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第七十六、七十七批继续补模型精确配置→返回→显式启用：保存不改默认请求目标，新slot不参与隐式回退；前导双横线与等号在表单字段中保持字面值。实际host、命名slot续期与各owner的隔离证据见对应批次，不替代真实认证服务、全部角色/来源/窗口和平台验收。
 
 第七十八批补路径插入→再次读取→目录/文件连续Tab的往返：引号、反斜杠与反引号目录不再破坏后续查询、词法边界或原文后缀。Windows原始输入与生成转义各有词法证据，不能提升为原生Windows文件系统或终端验收；ADD整体仍active。
+
+第七十九批继续补既有`@`引用的字面量与文件名边界：代码围栏/行内代码不枚举文件，真实闭合后恢复；文件名内和开头的`@`可接受并重新解析为同一引用，raw双`@@`和邮箱仍保留原语义。测试目录枚举端口为mock，不是实际文件正文读取或授权证据；ADD整体仍active。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -1730,3 +1733,17 @@ ADD-10/11沿实际路径插入→再次查询检查出确定缺口：[prose owne
 主代理heap768MiB、单worker串行完成五文件131项：prose52、request30、paths18、completion14、fileSuggestions17；再过滤InteractiveMode执行7项通过、126项未选，共138项实际执行通过。三个独立反转分别撤销非Windows引用解码、反引号引用和Windows原始输入保护，按断言名称/文件核对恰好16/4/4项失败；源码逐字节恢复后重跑上述全部聚焦检查。恢复SHA-256：prose `2d9c3a1c42591dd2c2c806a57d779c8ab7fe70814d25feab055098c763073d58`，completion `5e2e1dd1dd0c6fd3dc98c8821540782f614cfaf54e764502f93d760b80d5ec65`。不把filtered-out JSON总数算为执行通过。
 
 五静态门、diff、module facade 0与TS build `08c30d959db3`通过，build heap1536MiB，保留118条既有docs-source advisory；HANDOFF与当前摘要更新，反转scratch清理。延迟检查确认`217dae0a`的CI `40543737624`及`ecc99aae`的CI `40539857527`均success；`76093b0f`的Watch `40546189999`success、CI `40546189995`仍in_progress。更早`ab2bdde7`的CI `40536731834`实际failure，GitHub annotation明确hosted runner lost communication，停在脚本门、未进入build或产品测试；不记为产品测试失败，也不改记绿色。未运行真实PTY、provider、exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。
+
+### 第七十九批：文件引用的代码区与文件名sigil边界
+
+ADD-10继续检查已有`@`文件引用。[fileSuggestions owner](../../packages/ts-shell/src/cli/interactive/fileSuggestions.ts)原先只检查命令式空白token：行内代码或围栏中的`@src`会越过prose的代码区守卫，进入后备reference catalog并启动workspace walk；query内任何第二个`@`又被当成重复sigil，合法文件名失去补全。十一条新增源位置/引用/控制器回归先在旧实现失败，属于产品边界缺口。
+
+现复用`promptTokenAt`的代码区标记，在目录发现前拒绝引用；raw前缀双`@@`继续作为字面量，引用打开后文件名中的`@`保留。接受以`@`开头的文件名时沿原`quoteCompletion`加引号，避免插入为raw双sigil后失去引用身份。没有新tokenizer、文件扫描或正文读取owner。只读对照的`extractAtFilePrefix`按token边界识别sigil，把其余raw文本传给路径query；采用该边界决定，未照搬参考的Markdown wrapper剥离。本项目按已明确的代码字面量合同复用现有源token，参考前缀片段不作为代码区抑制已解决的证据。
+
+[文件引用测试](../../packages/ts-shell/src/cli/interactive/fileSuggestions.test.ts)补五种代码范围：闭合/未闭合行内代码、反引号/波浪围栏、不同长度围栏与带尾文伪关闭。五条文件名往返覆盖内部sigil、类似邮箱的文件名、quoted前导sigil、从未引用前缀接受前导sigil，以及空格加sigil；每条核对解码值、局部替换、后缀及接受后的同一reference query。原raw双sigil、普通邮箱、quoted路径及无匹配行为保留。[reference控制器测试](../../packages/ts-shell/src/cli/interactive/completion/references.test.ts)另验代码内不启动walk、不发布候选，真实闭合后一次枚举并恢复匹配。
+
+[实际host测试](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)覆盖regular/fullscreen×行内/围栏四条链，使用RecordingTerminal和mock workspace walk：bracketed paste进入未闭合代码→超过75ms debounce仍零枚举/无菜单→补真实关闭符与普通引用→一次绑定当前root的枚举→Tab接受含sigil的quoted文件名。完整草稿保留，零提交、零网络调用；不将mock目录端口或记录终端记为实际文件正文、PTY或平台验收。
+
+主代理heap768MiB、单worker串行完成四文件83项：fileSuggestions27、references12、request30、completion14；再过滤InteractiveMode执行11项通过、126项未选，共94项实际执行通过。三个独立反转分别移除代码区守卫、恢复query内任意sigil拒绝、移除前导sigil引用，按名称与文件核对恰好11/5/1项失败。源码逐字节恢复，SHA-256 `566f3320d94f3448db5a2c408804efaf527a2da44cc4d44241e8ba7accdf56d7`；恢复后重跑全部上述聚焦检查，不把未选用例记为通过。
+
+五静态门、diff、module facade 0及TS build `c68826cc3eee`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新、反转scratch清理。延迟读回`76093b0f`的CI `40546189995`success；`98313353`的Watch `40550326742`success、CI `40550327157`仍in_progress，不替代本批结果。未运行全仓、真实PTY/provider/exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。

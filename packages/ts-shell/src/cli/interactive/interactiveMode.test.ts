@@ -1644,6 +1644,45 @@ describe("session wiring", () => {
     } finally { mode.stop(); walk.mockRestore(); }
   });
 
+  it.each([
+    ['regular', 'inline'], ['regular', 'fence'], ['fullscreen', 'inline'], ['fullscreen', 'fence'],
+  ] as const)('keeps code references inert and resumes file completion in %s %s', async (kind, syntax) => {
+    vi.useFakeTimers();
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/reference-code-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const walk = vi.spyOn(fileWalk, 'listWorkspaceFiles').mockResolvedValue(['my @file.ts']);
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    const { mode, terminal } = build();
+    const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void;
+      options: { runtimeContext: ShellRuntimeContext } };
+    host.options.runtimeContext = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root,
+      targetPathBase: root, rootMode: 'direct', gitRoot: null,
+      gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+      session: host.options.runtimeContext.session, runtimeConfig: { ...getRuntimeConfig(root), tuiMode: kind } });
+    const submit = vi.spyOn(host, 'onSubmit').mockImplementation(() => {});
+    const initial = syntax === 'inline' ? 'example `literal @my' : '```text\n@my';
+    const close = syntax === 'inline' ? '` ' : '\n```\n';
+    mode.start();
+    try {
+      terminal.input(`\x1b[200~${initial}\x1b[201~`);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(host.view.editor.getText()).toBe(initial);
+      expect(walk).not.toHaveBeenCalled(); expect(host.view.suggestionsOpen).toBe(false);
+      terminal.input(`\x1b[200~${close}@my\x1b[201~`);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(host.view.suggestions.current()?.value).toBe('@my @file.ts');
+      expect(walk).toHaveBeenCalledTimes(1);
+      expect(walk).toHaveBeenCalledWith(root, expect.objectContaining({ abortSignal: expect.any(AbortSignal) }));
+      terminal.input('\t');
+      expect(host.view.editor.getText()).toBe(`${initial}${close}@"my @file.ts" `);
+      expect(submit).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+    } finally {
+      mode.stop(); submit.mockRestore(); walk.mockRestore(); network.mockRestore();
+      vi.useRealTimers(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     ['pick-quote"dir', 'pick-tick`dir'].map(name => ({ kind, name }))))(
     'continues escaped path Tab acceptance in $kind for $name', async ({ kind, name }) => {

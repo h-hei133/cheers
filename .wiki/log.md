@@ -9625,3 +9625,11 @@ ADD-10/11确认引号body被当成真实目录，转义字符没有还原；裸�
 十二条隔离文件系统与四条Windows词法回归先在旧实现失败。最终五文件131项及过滤实际InteractiveMode7项通过、126项未选，共138项执行通过；regular/fullscreen×引号/反引号四条host链覆盖paste、词中方向键、三次Tab、实际绘制、后文skill与零提交/网络。三个反转产生16/4/4项预期失败，源码逐字节恢复并核对SHA-256，恢复后重验全部聚焦检查。host初次括号错误属于fixture transform失败，修正后再记执行证据。
 
 五静态门、diff、module facade 0与TS build `08c30d959db3`通过，测试heap768MiB、build1536MiB；HANDOFF与addition第七十八批/当前摘要更新，scratch清理。`217dae0a`/`ecc99aae`的CI `40543737624`/`40539857527`success；`76093b0f`的Watch `40546189999`success、CI `40546189995`仍in_progress。更早`ab2bdde7`的CI `40536731834`为failure，annotation确认托管runner失联，尚未进入build或产品测试，不改记绿色。未运行全仓、真实PTY/provider/exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 文件引用的代码区与文件名边界
+
+ADD-10确认`@`后备catalog忽略代码区，代码示例仍启动workspace walk；query内任意第二个sigil又被拒绝，合法文件名失去补全。现复用源token在目录发现前拒绝代码，保留raw双`@@`和普通邮箱边界，允许内部sigil，并沿原formatter引用前导sigil文件名。只读对照采用token边界与后续raw query分离的决定，按本项目代码字面量合同保留更严格的源范围，不新增解析/扫描owner。
+
+十一条新增回归先在旧实现失败。最终四文件83项及过滤InteractiveMode11项通过、126项未选，共94项执行通过。regular/fullscreen×行内/围栏四条实际host链证明debounce后代码内零枚举、闭合后一次绑定root的枚举、Tab精确接受与零提交/网络；目录端口为mock，终端为RecordingTerminal。三个独立反转产生11/5/1项预期失败，源码逐字节恢复并核对SHA-256，恢复后全部聚焦检查重验。
+
+五静态门、diff、module facade 0与TS build `c68826cc3eee`通过，测试heap768MiB、build1536MiB；HANDOFF与addition第七十九批/当前摘要更新、scratch清理。`76093b0f`的CI `40546189995`success；`98313353`的Watch `40550326742`success、CI `40550327157`仍in_progress，不替代本批结果。未运行全仓、真实PTY/provider/exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

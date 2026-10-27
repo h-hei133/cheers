@@ -1,4 +1,5 @@
 import { completionToken, completionEdit, quoteCompletion } from "./completion.js";
+import { promptTokenAt } from '../../core/prompts/tokens.js';
 import type { DraftSnapshot } from "../../presentation/tui/editor/replacement.js";
 import type { Suggestion } from "../../presentation/tui/chrome/suggestions.js";
 
@@ -6,13 +7,15 @@ import type { Suggestion } from "../../presentation/tui/chrome/suggestions.js";
  * The file reference being typed, or nothing when the caret is not in one.
  *
  * `@` only opens a reference at the start of the draft or after whitespace. Any
- * other `@` is part of a word — an email address, a decorator, a URL with
- * credentials — and offering a file list there would be noise over ordinary text.
+ * word-adjacent `@` belongs to ordinary text such as an email address. Once a
+ * reference opens, further sigils belong to its filename; a raw doubled sigil
+ * and code spans remain literal.
  * The same reasoning as the command draft rule, applied to the other sigil.
  */
 export function fileReferenceAt(draft: string, cursor = draft.length): { readonly query: string; readonly start: number } | null {
   const token = completionToken(draft, cursor);
-  if (!token.prefix.startsWith("@") || token.value.slice(1).includes("@")) return null;
+  if (!token.prefix.startsWith("@") || token.prefix.startsWith("@@")) return null;
+  if (promptTokenAt(draft, cursor)?.literal === 'code') return null;
   return { query: token.value.slice(1), start: token.from };
 }
 
@@ -37,7 +40,7 @@ export function fileSuggestions(draft: string, files: readonly string[], snapsho
   // Accepting replaces the reference, not the sentence it sits in.
   const token = completionToken(draft, snapshot.cursor);
   return ranked.map(suggestion => completionEdit(suggestion, snapshot, token.from, token.to,
-    quoteCompletion(suggestion.value.slice(1), token.prefix, "@")));
+    quoteCompletion(suggestion.value.slice(1), suggestion.value.startsWith('@@') ? '@"' : token.prefix, "@")));
 }
 
 /**

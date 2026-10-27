@@ -1,5 +1,6 @@
 import { Editor } from "../../presentation/tui/editor.js";
 import { describe, expect, it } from "vitest";
+import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import {
   couldBeFileReference,
   fileReferenceAt,
@@ -30,6 +31,15 @@ describe("file references", () => {
       // of a word — the same rule that keeps an email address out.
       expect(fileReferenceAt("@@a")).toBeNull();
     });
+
+    it.each(['example `literal @src| tail`', '```text\n@src|\n```', '~~~text\n@src|\n~~~',
+      '````text\n``` trailing\n@src|\n````', 'example `unfinished @src|'])(
+      'keeps file-reference discovery outside code: %s', marked => {
+        const cursor = marked.indexOf('|'), text = marked.replace('|', '');
+        expect(fileReferenceAt(text, cursor)).toBeNull();
+        expect(fileSuggestions(text, files, { text, cursor, revision: 1 })).toBeNull();
+        expect(couldBeFileReference(text.slice(0, cursor))).toBe(false);
+      });
 
     it("closes once the reference is finished with a space", () => {
       expect(fileReferenceAt("see @src/core/model.ts and")).toBeNull();
@@ -79,6 +89,27 @@ describe("file references", () => {
   });
 
   describe("suggestions for a draft", () => {
+    it.each([
+      ['read @src/mail@20|  后文', 'src/mail@2026.ts'],
+      ['read @mail@ex|  后文', 'mail@example.test'],
+      ['read @no|  后文', '@notes.md'],
+      ['read @"@no|"  后文', '@notes.md'],
+      ['read @"my @fi|"  后文', 'my @file.md'],
+    ])('retains filename sigils through completion and reparsing: %s', (marked, file) => {
+      const cursor = marked.indexOf('|');
+      const editor = new Editor(); editor.setText(marked.replace('|', '')); editor.move('doc-start');
+      for (let count = 0; count < cursor; count++) editor.move('right');
+      const candidate = fileSuggestions(editor.getText(), [file], editor.snapshot())?.[0];
+      expect(candidate?.value).toBe('@' + file);
+      expect(editor.replace(candidate!.edit!)).toBe(true);
+      expect(editor.getText().startsWith('read ')).toBe(true);
+      expect(editor.getText().endsWith('  后文')).toBe(true);
+      const inserted = editor.getText().slice(5, -4);
+      expect(tokenizeCommandArgs(inserted)).toEqual(['@' + file]);
+      if (file.startsWith('@')) expect(inserted.startsWith('@"')).toBe(true);
+      expect(fileReferenceAt(editor.getText(), editor.snapshot().cursor)).toEqual({ query: file, start: 5 });
+    });
+
     it("completes a quoted file in the middle without duplicating quotes or dropping prose", async () => {
       const editor = new Editor();
       editor.setText('查看 @"my f"  后缀👩‍💻');

@@ -20,7 +20,7 @@ function harness() {
   const publish = vi.fn();
   const controller = new CatalogController({ identity: () => catalogIdentity(context), draft: () => draft, load, publish });
   return { controller, publish, pending, draft: () => draft,
-    change(text: string) { draft = { text, cursor: text.length, revision: draft.revision + 1 }; },
+    change(text: string, cursor = text.length) { draft = { text, cursor, revision: draft.revision + 1 }; },
     switch() { context = { ...context, projectRoot: "/other", session: { ...context.session, id: "two" } }; },
   };
 }
@@ -40,6 +40,23 @@ it('loads references on demand, debounces edits and refreshes the menu without a
   expect(listWorkspaceFiles).toHaveBeenCalledTimes(1);
   h.controller.invalidate();
 });
+
+it.each(['example `literal @mo| tail`', '```text\n@mo|\n```'])(
+  'does not enumerate code references and recovers after closing code: %s', async marked => {
+    const h = harness();
+    h.change(marked.replace('|', ''), marked.indexOf('|'));
+    expect(h.controller.update(h.draft())).toBe(false);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(listWorkspaceFiles).not.toHaveBeenCalled();
+    expect(h.publish).not.toHaveBeenCalled();
+    h.change(marked.replace('|', '') + '\n@mo');
+    expect(h.controller.update(h.draft())).toBe(true);
+    await vi.advanceTimersByTimeAsync(75);
+    expect(listWorkspaceFiles).toHaveBeenCalledTimes(1);
+    h.pending[0]!(['model@2026.ts']); await vi.advanceTimersByTimeAsync(0);
+    expect(h.publish.mock.lastCall?.[0][0]?.value).toBe('@model@2026.ts');
+    h.controller.invalidate();
+  });
 
 it('caches a successful empty reference listing without duplicate scans', async () => {
   const h = harness(); h.controller.update(h.draft()); await vi.advanceTimersByTimeAsync(75);
