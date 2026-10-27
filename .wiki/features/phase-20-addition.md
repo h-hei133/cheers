@@ -1551,7 +1551,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 
 | 用户要求 | 必须保留的实施方向 | 尚需补齐的证据 |
 |---|---|---|
-| 两面板整体看齐 | 先对照参考的分类/section、焦点域、搜索、详情、修改/配置、返回和窗口布局，再补具体缺口；功能内容来自本项目原owner。settings重试与范围选择保留原binding/source，正常冲突可显式重试 | settings73条基本链及17个代表性生命周期场景已有证据；第102批补状态栏两模式×user/project×Apply/Discard八条真实宿主链，区分暂存预览、存储与重启生效。继续补其余字段/来源/编辑器/窗口/桌面组合；model精确目标/能力/角色/认证、两模式及键鼠完整操作仍待验 |
+| 两面板整体看齐 | 先对照参考的分类/section、焦点域、搜索、详情、修改/配置、返回和窗口布局，再补具体缺口；功能内容来自本项目原owner。settings重试与范围选择保留原binding/source，正常冲突可显式重试 | settings73条基本链及17个代表性生命周期场景已有证据；第102批补状态栏两模式×user/project×Apply/Discard八条真实宿主链，第103批另补两模式project的真实PTY保存与新进程重启。暂存预览、存储与已安装显示分别核对。继续补其余字段/来源/编辑器/窗口/桌面组合；model精确目标/能力/角色/认证、两模式及键鼠完整操作仍待验 |
 | 未配置模型允许选中 | 上下键可移到具体未配置行，Enter查看详情/精确配置，配置接受后再显式启用；能力阻断走目标档位恢复 | 用户原环境事件链、全部未配置、配置成功/失败/取消、目录变化与同名relay；不能宣称表单打开就是认证成功 |
 | resume默认最新 | 自动阶段随最新可恢复候选更新，主动选择后按稳定ID保持；排序、current标记与默认焦点分别处理 | 分批旧→新、途中手选、scope/search换代、目标消失及Enter失效检查 |
 | 已提交正文顶格、输入箭头恢复 | 第1列正文仅去绘制留白，源缩进保留；编辑区箭头贴左、续行对齐正文，caret/复制用原源投影 | 中文/emoji/组合字符/换行/resize/选区及桌面IME、剪贴板；不恢复黄条或trim原文 |
@@ -1607,6 +1607,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第一百零一批补Escape父级返回中的同步callback撤权：清理、通知或parent构造改变host代次时，不覆盖新界面；准备转交但最终没有发布父级时，原previewBack返回的清理取消原controller。保留正常父级转交及delete/rename/denial/approval子模式优先级。两模式实际theme取消和返回后显式保存有聚焦证据，仍非整个ADD验收。
 
 第一百零二批仅补状态栏编辑的八条真实宿主交叉链：筛选不丢隐藏勾选项，Enter暂存后再次编辑并Escape保留原pending，Apply/Discard后同scope重开与存储读回。普通settings Apply沿既有restart政策保持installed/view；project保存改变requested与冷配置读回，user保存仍受project覆盖。没有复现新产品缺陷，不把冷读回当作进程重启，也不提升完整面板或ADD验收状态。
+
+第一百零三批补上述project保存路径的实际进程重启：两模式真实Node PTY分别预览→Discard→再暂存/Apply→退出0→新空会话启动，旧进程状态栏保持provider，新进程显示provider/directory并重开读到directory勾选。四条最终进程收据单列，不把第102批47条测试或先前部分探针累算；user来源重启、桌面与完整平台矩阵仍待验。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -2129,3 +2131,15 @@ ADD-11/12核对排队→提交/恢复的真实操作链，确认普通[Submissio
 主代理heap768MiB、单worker、进程级串行最终执行settings owner39及新增host8，共47项实际通过；host295项未选不计通过。四组有效反转分别撤销取消二次编辑时的pending保持、将chosenIds缩为过滤结果、遗漏status preview reset、将candidate tui直接安装，确认8/8/6/2项预期失败、39/39/41/45项控制通过，每组295项未选。各组finally逐字节恢复，四source与固定Git基线一致，SHA-256收据保留，恢复后上述最终重验通过。
 
 五静态门及最终文档drift/diff通过，118既有docs-source advisory保留；仅测试/文档变更，不重复build或module facade。工件归.omx/artifacts/phase20-addition-status-settings/，scratch归档清理。延迟观察第100批CI `40597440762`及Watch success；第101批CI `40598881157`仍in_progress、Watch `40598881187`success；第92批CI `40582584417`仍in_progress。本批Git/精确SHA另绑定，不等待新CI。RecordingTerminal与mock dispatch/fetch不证明native PTY、桌面、真实provider或实际重启；未运行全仓、exe、原生Windows、磁盘故障或20k历史，原Phase20矩阵未重跑，ADD整体active。
+
+### 第一百零三批：状态栏project保存后的真实PTY与新进程重启
+
+第一百零二批`9d0b7469667baf29884513e5ed62f87b38ad6bb9`已提交推送且远端一致、工作区clean。ADD-03继续补其明确未验的实际重启边界，不新增产品修补或重复同一host矩阵。使用既有[PTY relay](../../scripts/qa/relay.py)、[环境隔离](../../scripts/qa-pty-env.mjs)及[正式Node启动器](../../scripts/start.mjs)，主代理串行运行regular/fullscreen各编辑和重启两阶段，共四条最终进程收据；各进程heap768MiB，仅新空会话，无exe或长历史。
+
+隔离user状态项为model、project为provider。实际键盘进入/settings、搜索statusItems并明确选择project；在子编辑器筛到directory后Space预览、Enter暂存，显式Discard保持文件字节，关闭列表后观察实际状态栏恢复provider。再次编辑同样选择并Apply，核对project保存provider/directory及JSONC注释、user字节保持、restart notice和详情Accepted的restart required；关闭列表后旧进程状态栏仍为provider。随后/exit正常退出0，再启动新的产品进程和空会话，真实状态栏显示provider/directory，重开project编辑器的directory已勾选且不改文件。每阶段在退出前核对空会话模型选择保持、transcript message为0；这不是网络调用计数或真实provider证据。
+
+首次[构建预检](../../scripts/start-lib.mjs)在启动产品前拒绝旧build `91f42246bef9`：第102批仅改测试也会改变[输入指纹](../../scripts/build-identity.mjs)，因为它包含全部src TypeScript文件。按原构建门串行heap1536MiB重建为`fc8959959cadace60ac3b8db0acdefb5c76f72a7d4bbc91040fc6b8e0e042edf`，inputs `03860109a6c2e033bc93f6bfe38e79206ef031cebd019b716eb416240a1901a4`，artifact `62c6a5d555cf09168fcda80a53c1602487b564a0b8b59cc780783224ff513440`，与上一构建产物摘要相同；正式launcher重新验证fresh后运行。没有改构建政策或绕过freshness，HANDOFF补此可复用陷阱。
+
+失败探针保留并分类为观察器/夹具问题：普通模式相对光标定位不以绝对行的K终止；启动界面短暂使用备用屏幕后才交给regular，须检查正式prompt后的最后屏幕状态；全屏settings根列表遮住状态栏，不能拿之前绘制的band作为取消后读回；无消息空会话正常退出即清理，不能用旧session-id重启；provider子串还会命中欢迎标题，单纯多等重绘也无效，最终按完整已绘制行边界识别band。修正均在探针，未改产品或放宽持久/重启断言。普通模式的中间两条部分通过不累加到最终四条；不将这些失败写成产品缺陷。
+
+最终四条收据均通过并以/exit退出0，单进程输出约25–125KiB、有2MiB观察上限及45秒总期限；产品状态目录均清理。五静态门及diff通过，118既有docs-source advisory保留；无产品source变更，不重复Vitest、module facade或NormProof。第102批四组源码反转仍是restart/暂存合同的已有证据，本批未制作额外反转构建，也无独立review。工件归.omx/artifacts/phase20-addition-status-restart/，scratch归档清理。延迟核对第101批CI `40598881157`success，第102批CI `40600853941`仍in_progress、Watch `40600853895`success；本批Git/精确SHA另绑定，不等待新CI。只证明Linux PTY字节及project来源的新进程读回，未验user来源重启、像素/桌面/IME/原生Windows、真实provider、磁盘故障、全仓或20k历史；原Phase20矩阵未重跑，ADD整体active。

@@ -9822,3 +9822,12 @@ ADD-01/02/03双lane独立只读审阅发现普通根model遗漏accepted ownershi
 主代理heap768MiB单worker串行最终settings39及新host8，共47项实际通过，295项未选不计通过。四组有效反转确认8/8/6/2项预期失败、39/39/41/45控制通过，产品source逐字节恢复并与固定Git基线一致后重验。初两轮Space时序夹具八失败及同步后的两条错误即时生效预期单独保留，不作产品缺陷；现有HANDOFF已覆盖，无重复追加。两条gpt-6.1-sol只读lane最终APPROVE/CLEAR限于修正后测试与主张，code lane撤回早先错误预期认可。
 
 五静态门及最终文档drift/diff通过，118既有docs advisory保留；无产品变更，不重复build。当前摘要更新，工件归.omx/artifacts/phase20-addition-status-settings/并清理scratch。第100批CI/Watch success，第101批CI `40598881157`及第92批CI `40582584417`仍in_progress，第101批Watch success，本批Git/CI另绑定。未验native PTY/桌面/真实provider/实际重启/Windows、全仓或20k历史，原Phase20矩阵未重跑，ADD整体active。
+
+
+## [2026-10-28] docs | 状态栏project设置的实际PTY与重启证据
+
+第一百零三批补第102批未验的实际重启：regular/fullscreen各串行启动两个产品进程，真实/settings→project→directory预览→Enter暂存→Discard保持文件→再编辑Apply→退出0→新空会话启动。旧进程状态栏保持provider，新进程实际band及重开checkbox读到provider/directory；user字节、project注释和空会话模型选择保持，各阶段退出前transcript message为0。四条最终收据全部通过，先前部分通过不累算，没有产品代码变更或新缺陷。
+
+正式启动器预检拒绝旧build，因为输入指纹包含第102批改动的测试source；串行heap1536MiB重建为`fc8959959cad`，与上次artifact摘要相同，fresh验证后每个PTY进程heap768MiB、2MiB输出上限、45秒期限，无长历史或exe。失败探针的相对光标/启动备用屏幕/隐藏band/空会话清理/欢迎标题误匹配全部保留为夹具证据；最终按完整绘制行观察，不改产品断言。HANDOFF补测试source使build过期的陷阱，未改构建政策。
+
+五静态门及diff通过，118既有docs advisory保留；不重复Vitest或结构分析，无新反转构建或独立review，既有合同反转见第102批。工件归.omx/artifacts/phase20-addition-status-restart/并清理scratch。第101批CI success，第102批CI `40600853941`仍in_progress、Watch success，本批Git/CI另绑定。仅Linux PTY的project重启证据，不提供网络调用计数、真实provider、user来源重启、像素/桌面/Windows、全仓或20k历史验收，原Phase20矩阵未重跑，ADD整体active。
