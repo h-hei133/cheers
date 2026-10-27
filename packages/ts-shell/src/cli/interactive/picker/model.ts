@@ -32,6 +32,7 @@ import { modelAccountSignIn, modelSignInPicker, modelSignInStatus, type ModelSig
 import { modelKeyPicker } from './model/key.js';
 import { listedModelMetadata, modelMetadataDetails } from './model/metadata.js';
 import { ModelFocus } from './model/focus.js';
+import { modelBrowserOwned } from './model/owner.js';
 
 interface RoleSelection {
   readonly role: AutomaticModelRole;
@@ -402,11 +403,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       }
       return modelPicker(context, id, navigation, refreshed, detailNotice, signIn, parent, origin);
     },
-    canReturn: () => {
-      if (context.signal?.aborted) return false;
-      const refusal = context.admission?.();
-      return !context.signal?.aborted && !refusal;
-    },
+    canReturn: () => modelBrowserOwned(context),
     ...(context.readConfiguration ? {
       watch: (load, publish, observed, onFailure) => watchModels(context, load, publish, observed, onFailure),
     } : {}),

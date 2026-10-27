@@ -6,12 +6,18 @@ import type { SessionModelRole } from '../../../../session/model/contract.js';
 /** Edit the captured role, with no route through the default model's thinking command. */
 export function modelRoleThinkingPicker(current: SessionModelRole, efforts: readonly ThinkingPreference[],
   assign: (effort: ThinkingPreference) => RoleResult, back: (notice?: string) => Picker,
-  admission?: () => string | undefined): Picker {
+  admission?: () => string | undefined, canReturn?: () => boolean): Picker {
   let offered = false, retired = false;
+  const ownsAction = (stillOwned?: () => boolean): boolean => {
+    if (!offered || retired) return false;
+    if (stillOwned && !stillOwned()) { offered = false; retired = true; }
+    return offered && !retired;
+  };
   const active = current.thinkingEffort ?? null;
   const choices = efforts.includes(active) ? efforts : [...efforts, active];
   return {
     title: 'Role thinking effort', form: 'panel', filterable: false, empty: 'No reasoning settings are available.',
+    acceptsOwnership: true,
     initialSelection: current.thinkingEffort ?? 'auto', back,
     previewEnd: () => { offered = false; retired = true; },
     detail: () => [`${current.provider}/${current.model} · ${current.connectionId}`],
@@ -23,13 +29,19 @@ export function modelRoleThinkingPicker(current: SessionModelRole, efforts: read
         ...(effort === active ? { note: efforts.includes(effort) ? 'active' : 'active · unavailable' } : {}),
         ...(!efforts.includes(effort) ? { disabled: true, focusable: true } : {}) }));
     },
-    async apply(ids) {
-      if (!offered || retired || ids.length !== 1) return undefined;
+    async apply(ids, stillOwned) {
+      if (ids.length !== 1 || !ownsAction(stillOwned)) return undefined;
       const effort = efforts.find(value => (value ?? 'auto') === ids[0]);
       if (effort === undefined) return undefined;
       const refusal = admission?.();
-      if (refusal) return { note: refusal };
-      if (!offered || retired) return undefined;
+      if (!ownsAction(stillOwned)) return undefined;
+      if (refusal) {
+        let returning = false;
+        try { returning = canReturn?.() === true; } catch { /* Keep the refusal when the browser cannot be verified. */ }
+        if (!ownsAction(stillOwned)) return undefined;
+        offered = false; retired = true;
+        return { note: refusal, ...(returning ? { next: back(refusal) } : {}) };
+      }
       offered = false; retired = true;
       const result = assign(effort);
       return { note: result.output, next: back(result.output) };

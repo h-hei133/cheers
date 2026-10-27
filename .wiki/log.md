@@ -9721,3 +9721,11 @@ ADD-01/02/03确认refresh后的admit读取没有异常边界，已接受Enter会
 旧实现确认publication6、host2共八项失败。另补拒绝/Back×准备抛错/state暂时不可读四条fallback；最终publication19、role18、auth24和过滤host14共75项执行通过，175项host未选不算通过。三组反转12/3/4项预期失败，源码逐字节恢复及SHA-256核对后重验。原八条认证host与四条普通拒绝host控制保持通过。导航期接受配置保持、显式保存后原发布owner重读文件，两时点分开断言；初轮三个单元把后者误期待为固定值属于夹具时点错误，没有改产品代码掩盖。
 
 五静态门、diff、module facade 0及TS build `33c2685c0eda`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF、addition第九十批/当前摘要更新，scratch清理。延迟读回`5204ac40`CI `40574711764`success，`e5c01721`CI `40576592505`及`5f6329b4`CI `40578160357`仍in_progress，两者Watch均success。未新增真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史验证，未运行全仓或原Phase20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 角色准入拒绝保留导航并退休失去宿主的动作
+
+ADD-02/03角色菜单与档位页在Enter释放overlay后，准入拒绝只返回note且旧对象仍可重试；接受后的关闭/替换也不再触发previewEnd。现两owner接收原accepted generation，在动作开始、choice及return callback后复验，拒绝/失去归属永久退休。原browser仍有效才沿原父级保留notice，取消/归属变化/抛错不自动重开；详情与角色共用所属owner的原signal/admission检查，保存继续走原事务。参考采用失败保留导航及disposed后不接受结果的决定。
+
+旧实现确认owner24、两模式四入口host8共32项失败；writer探针初次缺少有效返回的两项修为受控RoleResult后，在原实现同24项均行为失败。最终role46、model43、admission34、publication19、过滤host14共156项执行通过，183项host未选不算通过。五项独立反转28/10/8/4/15项预期失败，源码逐字节恢复/哈希核对后重验。两条实际Node小型PTY串行通过settings角色与档位拒绝返回、显式模型/low保存、拒绝期selection保持、default/外部配置保持、零message、实际模式与退出0；网络计数证据来自host spies，未冒充真实provider。
+
+五静态门、diff、module facade 0与TS build `07790d1e5522`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF、addition第九十一批/当前摘要更新，scratch清理。延迟读回`e5c01721`CI `40576592505`success，`5f6329b4`CI `40578160357`与`3405c0b5`CI `40579335521`仍in_progress，两者Watch均success。未运行全仓、真实provider/OAuth、exe、桌面、原生Windows、磁盘故障或20k历史，原Phase20矩阵未重跑，无独立review，ADD整体active。本批Git/CI另绑定。
