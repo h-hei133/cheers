@@ -9599,3 +9599,12 @@ ADD-07/08组合路径确认textRevision误复用含光标的snapshot revision，
 最终四文件103项（editor59、replacement6、startup20、controller18）及过滤InteractiveMode11项通过、106项未选，共114项执行通过。regular/fullscreen×完整/跨交接paste四条链验证草稿保留、旧读取消与串行结算、迟到结果拒绝、placeholder展开全文、实际status显示、纯移动/resize保留及显式Enter一次提交。预览和派发端口为mock，不冒充token或provider验收。三个反转产生5/4/2项预期失败，buffer/host逐字节恢复并核对SHA-256；初期配置publication和cluster timer的fixture错误已分类，未弱化断言。
 
 五静态门、module facade 0、diff及TS build `9e463d050a78`通过，测试heap768MiB、build1536MiB。延迟读回`6fd6a069`的CI `40532987731`与Watch `40532987758`均success；`ab2bdde7`的Watch `40536731728`success、CI `40536731834`仍in_progress。HANDOFF及addition第七十五批更新；未运行全仓、真实PTY、provider、exe、桌面或20k压测，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+
+## [2026-10-28] fix | 模型连接保存与显式启用分离
+
+ADD-01/02/03实际settings→model→masked key→返回→显式启用链确认：普通login同时改写全局活动连接/provider镜像，仅保留这些字段仍会被凭据或logout隐式回退选中新slot。面板现沿原连接owner请求仅保存，新连接不参与自动选择，普通login和旧连接回退保留原合同；显式session/connection/账号池选择可用。native账号grant按精确slot/凭据/存储核验，非镜像保存不牺牲后续续期，普通激活仍要求镜像一致。
+
+恢复后六文件224项及过滤实际InteractiveMode13项通过、108项未选，共237项执行通过。覆盖两种终端模式×有/无既有连接、pending、取消/失败、明确选择后session持久化与返回、全局配置字节保持、logout、显式池和非镜像原生账号续期；认证使用本地callback和合成token，无真实provider请求。四个反转分别产生4/6/4/1项预期失败，四源码逐字节恢复并核对SHA-256。schema新增测试的嵌套诊断预期已按现有顶层字段合同修正，保留invalid/拒写/脱敏断言。
+
+五静态门、diff、module facade 0及TS build `d7aaee58ac2c`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory。HANDOFF与addition第七十六批/当前摘要更新；`ecc99aae`的Watch `40539857493`success、CI `40539857527`仍in_progress，`ab2bdde7`的CI `40536731834`仍in_progress。未运行全仓、真实认证服务、PTY、exe、桌面或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

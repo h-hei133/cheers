@@ -93,6 +93,8 @@ export interface ProviderConnectionConfig {
   readonly provider: RuntimeProvider;
   readonly authType: ProviderConnectionAuthType;
   readonly label?: string;
+  /** False requires an explicit connection selection; omitted preserves legacy fallback. */
+  readonly autoSelect?: boolean;
   readonly apiKey?: string;
   readonly baseUrl?: string;
   readonly model?: string;
@@ -782,6 +784,7 @@ function normalizeProviderConnections(
       provider: connection.provider,
       authType,
       ...(label ? { label } : {}),
+      ...(connection.autoSelect !== undefined ? { autoSelect: connection.autoSelect } : {}),
       ...(apiKey ? { apiKey } : {}),
       ...(baseUrl ? { baseUrl } : {}),
       ...(model ? { model } : {}),

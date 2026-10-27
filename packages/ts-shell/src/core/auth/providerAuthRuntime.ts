@@ -75,6 +75,7 @@ export async function runProviderAccountAuthLogin(input: {
   readonly workspaceRoot?: string;
   readonly signal?: AbortSignal;
   readonly onProgress?: (progress: import('./providerAuthContract.js').SignInProgress) => void;
+  readonly activate?: boolean;
 }): Promise<string> {
   input.signal?.throwIfAborted();
   const contract = resolveProviderAuthContract(input.provider);
@@ -92,6 +93,7 @@ export async function runProviderAccountAuthLogin(input: {
     id: connectionId,
     provider: input.provider,
     authType: "account-auth",
+    ...(input.activate === false ? { autoSelect: false } : {}),
     label:
       normalizeText(input.labelOverride) ?? `${input.providerLabel} account auth`,
     ...(resolveAccountAuthModel(input.provider, input.defaultModel)
@@ -129,6 +131,7 @@ export async function runProviderAccountAuthLogin(input: {
       callbackUrl: authResult.callbackUrl,
       pending,
       nativeResult: authResult,
+      activate: input.activate,
     });
     input.onPersisted?.();
 
@@ -139,7 +142,7 @@ export async function runProviderAccountAuthLogin(input: {
       "Connection type: account-auth",
       `Authorize URL: ${summary.authorizeUrl}`,
       `Callback URL: ${summary.callbackUrl}`,
-      `Default runtime provider switched to ${summary.provider}.`,
+      input.activate === false ? 'Connection saved. Select a model to enable it.' : `Default runtime provider switched to ${summary.provider}.`,
       `Stored at: ${summary.configPath}`,
       summary.refreshWarning,
     ].filter(Boolean).join("\n");
@@ -202,6 +205,7 @@ function persistConnectedAccountAuth(input: {
   readonly callbackUrl: string;
   readonly pending: PendingLogin;
   readonly nativeResult: ProviderAccountAuthResult;
+  readonly activate?: boolean;
 }): ProviderAccountAuthConnectionSummary & { readonly refreshWarning?: string } {
   const edit = readRuntimeConfigEditAt(input.pending.target);
   const latest = edit.values;
@@ -223,24 +227,26 @@ function persistConnectedAccountAuth(input: {
 
   const next: RuntimeConfigFile = {
     ...latest,
-    provider: input.provider,
-    activeProviderConnectionId: input.connectionId,
     providerConnections: nextConnections,
-    providerCredentials: {
-      ...(latest.providerCredentials ?? {}),
-      [input.provider]: {
-        // Account-auth should become the primary credential source after
-        // successful login. Keep endpoint/model metadata, but do not keep
-        // stale api-key fields that can force runtime back to api-key path.
-        ...withoutApiKey(latest.providerCredentials?.[input.provider] ?? {}),
-        model: resolveAccountAuthModel(
-          input.provider,
-          latest.providerCredentials?.[input.provider]?.model,
-        ),
-        accountAuth: toProviderAccountAuthConfig(input.provider, input.accountAuth),
-        ...(accountProtocol(input.accountAuth) ? { baseUrl: accountProtocol(input.accountAuth)!.baseUrl } : {}),
+    ...(input.activate !== false ? {
+      provider: input.provider,
+      activeProviderConnectionId: input.connectionId,
+      providerCredentials: {
+        ...(latest.providerCredentials ?? {}),
+        [input.provider]: {
+          // Account-auth should become the primary credential source after
+          // successful login. Keep endpoint/model metadata, but do not keep
+          // stale api-key fields that can force runtime back to api-key path.
+          ...withoutApiKey(latest.providerCredentials?.[input.provider] ?? {}),
+          model: resolveAccountAuthModel(
+            input.provider,
+            latest.providerCredentials?.[input.provider]?.model,
+          ),
+          accountAuth: toProviderAccountAuthConfig(input.provider, input.accountAuth),
+          ...(accountProtocol(input.accountAuth) ? { baseUrl: accountProtocol(input.accountAuth)!.baseUrl } : {}),
+        },
       },
-    },
+    } : {}),
   };
   const oauth = input.provider === 'openai' || input.provider === 'google'
     ? oauthConfigFor(input.provider, 'clientId' in input.accountAuth ? input.accountAuth.clientId : undefined,
@@ -262,7 +268,7 @@ function persistConnectedAccountAuth(input: {
   const confirmed = readRuntimeConfigEditAt(input.pending.target).values;
   const expected: RuntimeConfigFile = JSON.parse(JSON.stringify(next));
   if (path.resolve(getUserRuntimeConfigPath()) !== input.pending.source || fs.realpathSync(input.pending.source) !== input.pending.target
-    || confirmed.provider !== input.provider || confirmed.activeProviderConnectionId !== input.connectionId
+    || confirmed.provider !== expected.provider || confirmed.activeProviderConnectionId !== expected.activeProviderConnectionId
     || !sameValue(confirmed.providerConnections?.filter(item => item.id.trim() === input.connectionId), expected.providerConnections?.filter(item => item.id === input.connectionId))
     || !sameValue(confirmed.providerCredentials?.[input.provider], expected.providerCredentials?.[input.provider])) {
     throw new ConfigWriteError('verification-failed', 'persisted');
@@ -275,7 +281,8 @@ function persistConnectedAccountAuth(input: {
       const resolution = resolveProviderCredential({ runtimeConfig: { ...runtime, provider: input.provider,
         activeProviderConnectionId: input.connectionId, sessionConnection: { id: input.connectionId, provider: input.provider } }, env: {} });
       const captured = captureAccountEdit(input.pending.workspaceRoot, resolution);
-      if (!sameValue(resolution.credential?.accountAuth, input.accountAuth) || !captured.mirror
+      if (resolution.credential?.source !== 'connection' || resolution.credential.connectionId !== input.connectionId
+        || !sameValue(resolution.credential.accountAuth, input.accountAuth) || (input.activate !== false && !captured.mirror)
         || !grantRefreshLogin(enrollment, accountBinding(captured))) throw new Error('grant unavailable');
     } catch {
       refreshWarning = 'Access credentials were stored. Automatic renewal remains unverified; use an independent fresh profile for a new login.';

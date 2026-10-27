@@ -144,6 +144,27 @@ describe('configuration validation boundary', () => {
     expect(config.configDiagnostics).toEqual([]);
   });
 
+  it.each([false, true])('retains connection automatic selection policy (%s) across validated writes and runtime loading', autoSelect => {
+    writeUserRuntimeConfigFile({ providerConnections: [{ id: 'saved', provider: 'openai', authType: 'api-key', autoSelect,
+      apiKey: 'synthetic', createdAt: '2026-01-01', updatedAt: '2026-01-01' }] }, readRuntimeConfigEditAt(userPath));
+    expect(readUserRuntimeConfigFile().providerConnections?.[0]?.autoSelect).toBe(autoSelect);
+    const config = getRuntimeConfig(root);
+    expect(config.configValidation.valid).toBe(true);
+    expect(config.providerConnections[0]?.autoSelect).toBe(autoSelect);
+  });
+
+  it('rejects invalid connection selection policy without echoing its contents or writing', () => {
+    user({ model: 'retained' }); const before = fs.readFileSync(userPath);
+    expect(() => writeUserRuntimeConfigFile({ providerConnections: [{ id: 'saved', provider: 'openai',
+      autoSelect: 'private-invalid-policy' }] } as unknown as RuntimeConfigFile, readRuntimeConfigEditAt(userPath))).toThrow();
+    expect(fs.readFileSync(userPath)).toEqual(before);
+    user({ providerConnections: [{ id: 'saved', provider: 'openai', autoSelect: 'private-invalid-policy' }] });
+    const config = getRuntimeConfig(root);
+    expect(config.configValidation.valid).toBe(false);
+    expect(config.configDiagnostics.join(' ')).toContain('providerConnections');
+    expect(config.configDiagnostics.join(' ')).not.toContain('private-invalid-policy');
+  });
+
   it('validates TUI leaves with project precedence and legacy empty-list fallback', () => {
     user({ tui: { statusItems: ['cost'], diagrams: 'streaming' } });
     project({ tui: { statusItems: [], diagrams: 'off' } });

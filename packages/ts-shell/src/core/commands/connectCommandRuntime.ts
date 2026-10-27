@@ -76,6 +76,7 @@ export async function runConnectCommand(
   args: string[],
   context: CommandContext,
   baseline?: ConfigEdit<RuntimeConfigFile>,
+  options?: { readonly activate?: boolean },
 ): Promise<LocalCommandResult> {
   const parsed = parseConnectArgs(args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /connect arguments: ${parsed.reason}\n${syntaxHelp(connectSyntax)}` };
@@ -97,7 +98,7 @@ export async function runConnectCommand(
   const onPersisted = () => { persisted = true; };
   let output: string;
   if (action === 'login') {
-    const login = (signal?: AbortSignal) => addConnection(rest, onPersisted, context.cwd, { signal, onProgress: context.signInProgress });
+    const login = (signal?: AbortSignal) => addConnection(rest, onPersisted, context.cwd, { ...options, signal, onProgress: context.signInProgress });
     output = context.runCancellable ? await context.runCancellable(login) : await login(context.signal);
   }
   else if (action === "set") output = await addConnectionFromLegacyAuthSet(rest, onPersisted);
@@ -110,7 +111,7 @@ export async function runConnectCommand(
 }
 
 export async function addConnection(args: string[], onPersisted?: () => void, workspaceRoot?: string,
-  options?: { readonly signal?: AbortSignal; readonly onProgress?: CommandContext['signInProgress'] }): Promise<string> {
+  options?: { readonly activate?: boolean; readonly signal?: AbortSignal; readonly onProgress?: CommandContext['signInProgress'] }): Promise<string> {
   const syntax = parseConnectArgs(["login", ...args]);
   if (!syntax.ok) return `Invalid /connect arguments: ${syntax.reason}\n${syntaxHelp(connectSyntax)}`;
   const parsed = { positionals: syntax.args, flags: Object.fromEntries(syntax.flags) };
@@ -129,7 +130,7 @@ export async function addConnection(args: string[], onPersisted?: () => void, wo
   }
 
   if (parsed.flags.browser === true) {
-    return await runBrowserAssistedCaptureConnection(target, parsed.flags.label, onPersisted);
+    return await runBrowserAssistedCaptureConnection(target, parsed.flags.label, onPersisted, options);
   }
 
   const apiKey = parseFlagValue(parsed.flags["api-key"] ?? parsed.flags.key);
@@ -158,6 +159,7 @@ export async function addConnection(args: string[], onPersisted?: () => void, wo
     id: buildConnectionId(target.provider),
     provider: target.provider,
     authType: "api-key",
+    ...(options?.activate === false ? { autoSelect: false } : {}),
     ...(normalizeOptional(parseFlagValue(parsed.flags.label))
       ? { label: normalizeOptional(parseFlagValue(parsed.flags.label)) }
       : { label: target.label }),
@@ -175,18 +177,20 @@ export async function addConnection(args: string[], onPersisted?: () => void, wo
   const nextConnections = [connection, ...connections];
   const next: RuntimeConfigFile = {
     ...userConfig,
-    provider: target.provider,
-    activeProviderConnectionId: connection.id,
     providerConnections: nextConnections,
-    providerCredentials: {
-      ...(userConfig.providerCredentials ?? {}),
-      [target.provider]: {
-        ...(userConfig.providerCredentials?.[target.provider] ?? {}),
-        apiKey,
-        ...(baseUrl ? { baseUrl } : {}),
-        ...(model ? { model } : {}),
+    ...(options?.activate !== false ? {
+      provider: target.provider,
+      activeProviderConnectionId: connection.id,
+      providerCredentials: {
+        ...(userConfig.providerCredentials ?? {}),
+        [target.provider]: {
+          ...(userConfig.providerCredentials?.[target.provider] ?? {}),
+          apiKey,
+          ...(baseUrl ? { baseUrl } : {}),
+          ...(model ? { model } : {}),
+        },
       },
-    },
+    } : {}),
   };
   const configPath = writeUserRuntimeConfigFile(next, edit);
   onPersisted?.();
@@ -198,7 +202,7 @@ export async function addConnection(args: string[], onPersisted?: () => void, wo
     `Saved key: ${maskApiKey(apiKey)}`,
     ...(baseUrl ? [`Base URL: ${baseUrl}`] : []),
     ...(model ? [`Model: ${model}`] : []),
-    `Stored provider default: ${target.provider}.`,
+    options?.activate === false ? 'Connection saved. Select a model to enable it.' : `Stored provider default: ${target.provider}.`,
     `Stored at: ${configPath}`,
     "Use /connect status to inspect active connection details.",
   ].join("\n");
@@ -304,17 +308,18 @@ export function removeConnection(args: string[], onPersisted?: () => void, basel
   const nextConnections = connections.filter(
     (connection) => connection.id !== existing.id,
   );
+  const nextActive = nextConnections.find(connection => connection.autoSelect !== false);
   const next: RuntimeConfigFile = {
     ...userConfig,
     providerCredentials: withoutConnectionCredentials(userConfig.providerCredentials, existing, nextConnections),
     providerConnections: nextConnections,
     activeProviderConnectionId:
       userConfig.activeProviderConnectionId === existing.id
-        ? nextConnections[0]?.id
+        ? nextActive?.id
         : userConfig.activeProviderConnectionId,
     provider:
       userConfig.activeProviderConnectionId === existing.id
-        ? (nextConnections[0]?.provider ?? userConfig.provider)
+        ? (nextActive?.provider ?? userConfig.provider)
         : userConfig.provider,
   };
   const configPath = writeUserRuntimeConfigFile(next, edit);
@@ -333,6 +338,7 @@ export async function runBrowserAssistedCaptureConnection(
   target: ConnectPreset,
   labelFlag?: string | boolean,
   onPersisted?: () => void,
+  options?: { readonly activate?: boolean },
 ): Promise<string> {
   const now = new Date().toISOString();
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
@@ -346,6 +352,7 @@ export async function runBrowserAssistedCaptureConnection(
     id: connectionId,
     provider: target.provider,
     authType: "browser-assisted-capture",
+    ...(options?.activate === false ? { autoSelect: false } : {}),
     label: connectionLabel,
     ...(target.defaultBaseUrl ? { baseUrl: target.defaultBaseUrl } : {}),
     ...(target.defaultModel ? { model: target.defaultModel } : {}),
@@ -394,20 +401,22 @@ export async function runBrowserAssistedCaptureConnection(
     );
     const next: RuntimeConfigFile = {
       ...latest,
-      provider: target.provider,
-      activeProviderConnectionId: connectionId,
       providerConnections: nextConnections,
-      providerCredentials: {
-        ...(latest.providerCredentials ?? {}),
-        [target.provider]: {
-          ...(latest.providerCredentials?.[target.provider] ?? {}),
-          apiKey: browserResult.apiKey,
-          ...(activeConnection?.baseUrl
-            ? { baseUrl: activeConnection.baseUrl }
-            : {}),
-          ...(activeConnection?.model ? { model: activeConnection.model } : {}),
+      ...(options?.activate !== false ? {
+        provider: target.provider,
+        activeProviderConnectionId: connectionId,
+        providerCredentials: {
+          ...(latest.providerCredentials ?? {}),
+          [target.provider]: {
+            ...(latest.providerCredentials?.[target.provider] ?? {}),
+            apiKey: browserResult.apiKey,
+            ...(activeConnection?.baseUrl
+              ? { baseUrl: activeConnection.baseUrl }
+              : {}),
+            ...(activeConnection?.model ? { model: activeConnection.model } : {}),
+          },
         },
-      },
+      } : {}),
     };
     const configPath = writeUserRuntimeConfigFile(next, edit);
   onPersisted?.();
@@ -422,7 +431,7 @@ export async function runBrowserAssistedCaptureConnection(
         ? [`Base URL: ${activeConnection.baseUrl}`]
         : []),
       ...(activeConnection?.model ? [`Model: ${activeConnection.model}`] : []),
-      `Stored provider default: ${target.provider}.`,
+      options?.activate === false ? 'Connection saved. Select a model to enable it.' : `Stored provider default: ${target.provider}.`,
       `Stored at: ${configPath}`,
     ].join("\n");
   } catch (error) {
@@ -461,7 +470,7 @@ export async function runAccountAuthConnection(
   labelFlag?: string | boolean,
   onPersisted?: () => void,
   workspaceRoot?: string,
-  options?: { readonly signal?: AbortSignal; readonly onProgress?: CommandContext['signInProgress'] },
+  options?: { readonly activate?: boolean; readonly signal?: AbortSignal; readonly onProgress?: CommandContext['signInProgress'] },
 ): Promise<string> {
   return runProviderAccountAuthLogin({
     provider: target.provider,

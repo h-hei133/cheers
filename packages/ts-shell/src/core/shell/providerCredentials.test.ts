@@ -29,6 +29,29 @@ function createRuntimeConfig(): RuntimeConfig {
 }
 
 describe("provider credential resolution", () => {
+  it.each(['connected', 'pending', 'error'] as const)('excludes saved-only %s connections from implicit fallback', status => {
+    const config = createRuntimeConfig();
+    const saved = { id: 'saved', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'saved-key',
+      baseUrl: 'https://saved.invalid/v1', autoSelect: false, status, createdAt: '2026-01-01', updatedAt: '2026-01-02' };
+    const before = resolveProviderCredential({ runtimeConfig: config, env: {} });
+    expect(resolveProviderCredential({ runtimeConfig: { ...config, providerConnections: [saved] }, env: {} })).toEqual(before);
+    const legacy = { ...saved, id: 'legacy', autoSelect: undefined, status: 'connected' as const, apiKey: 'legacy-key' };
+    expect(resolveProviderCredential({ runtimeConfig: { ...config, providerConnections: [saved, legacy] }, env: {} }).credential)
+      .toMatchObject({ connectionId: 'legacy', apiKey: 'legacy-key' });
+  });
+
+  it.each(['active', 'session', 'pool'] as const)('permits explicit %s selection of a saved-only connection', selection => {
+    const connection = { id: 'saved', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'saved-key',
+      baseUrl: 'https://saved.invalid/v1', autoSelect: false, status: 'connected' as const, createdAt: '2026-01-01', updatedAt: '2026-01-02' };
+    const runtimeConfig = { ...createRuntimeConfig(), providerConnections: [connection],
+      ...(selection === 'pool' ? { accountPool: { openai: { connections: [connection.id] } } }
+        : { activeProviderConnectionId: connection.id }),
+      ...(selection === 'session' ? { sessionConnection: { id: connection.id, provider: 'openai' as const } } : {}),
+    };
+    expect(resolveProviderCredential({ runtimeConfig, env: {} }).credential)
+      .toMatchObject({ source: 'connection', connectionId: connection.id, apiKey: 'saved-key' });
+  });
+
   it.each(['api-key', 'account-auth'] as const)('fences a pending %s connection before CLI, env and legacy credential fallback', authType => {
     const result = resolveProviderCredential({
       runtimeConfig: {

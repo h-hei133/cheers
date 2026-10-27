@@ -41,6 +41,7 @@ export function connectionSchema(providers: readonly string[]): AnySchemaObject 
   return objectSchema({
     ...credentialSchema.properties,
     id: nameSchema, provider: enumSchema(providers), label: textSchema,
+    autoSelect: booleanSchema,
     // Missing authType/timestamps and browser-oauth are existing file formats.
     authType: enumSchema(['api-key', 'account-auth', 'browser-assisted-capture', 'browser-oauth']),
     status: enumSchema(['connected', 'pending', 'error']),

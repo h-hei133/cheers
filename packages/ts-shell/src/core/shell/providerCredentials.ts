@@ -385,7 +385,7 @@ function pickFallbackConnection(
   provider: RuntimeProvider,
 ): ProviderConnectionConfig | undefined {
   const sameProvider = connections.filter(
-    (connection) => connection.provider === provider,
+    (connection) => connection.provider === provider && connection.autoSelect !== false,
   );
   if (sameProvider.length === 0) {
     return undefined;

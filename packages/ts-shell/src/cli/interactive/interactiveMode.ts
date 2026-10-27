@@ -1283,7 +1283,7 @@ export class InteractiveMode {
           const args = key ? ['login', provider, '--api-key', key.apiKey, '--model', key.model, '--label', key.label,
             ...(key.baseUrl ? ['--base-url', key.baseUrl] : [])] : ['login', provider, '--account'];
           const result = await runConnectCommand(args, { ...commands,
-            signInProgress: value => renderSignInProgress(progress, value) });
+            signInProgress: value => renderSignInProgress(progress, value) }, undefined, { activate: false });
           note = key ? result.output.split('\n').filter(line => !line.startsWith('Saved key:')).join('\n') : result.output;
         } catch (error) {
           note = error instanceof ConfigWriteError ? error.message
