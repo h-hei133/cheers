@@ -308,6 +308,87 @@ it('preserves a bracketed paste split across startup adoption', () => {
   } finally { mode.stop(); startup.dispose(); }
 });
 
+it.each([
+  ['regular', false], ['regular', true], ['fullscreen', false], ['fullscreen', true],
+] as const)('estimates and submits the adopted draft in %s mode (split paste: %s)', async (kind, split) => {
+  vi.useFakeTimers();
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  const root = fs.mkdtempSync('/tmp/cheers-test/startup-context-');
+  vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('USERPROFILE', root);
+  const preview = (tokens: number) => ({
+    estimate: { tokens, source: 'estimated' as const, identity: { provider: 'openai', model: 'fixture' }, method: 'characters/3.5' as const },
+    verify: vi.fn(), verifyContent: vi.fn(async () => {}), suspend: vi.fn(), resume: vi.fn(), invalidate: vi.fn(), dispose: vi.fn(),
+  });
+  const old = preview(111), current = preview(222);
+  let finish!: (value: typeof old) => void;
+  const load = vi.spyOn(contextPreview, 'previewContext').mockResolvedValue(current)
+    .mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const route = vi.spyOn(commandRouter, 'routeInteractiveCommand').mockResolvedValue({ turnNumber: 1 });
+  const terminal = new RecordingTerminal(), scheduler = new ManualScheduler();
+  const start = vi.spyOn(terminal, 'start');
+  const startup = new StartupSurface(terminal, scheduler, vi.fn());
+  const pasted = Array.from({ length: 8 }, (_, index) => `line ${index} 中文 😀 ${'text '.repeat(8)}`).join('\n');
+  const prefix = 'retained\ninput ';
+  terminal.input('retained\rinput ');
+  terminal.input(`\x1b[200~${split ? pasted.slice(0, 30) : pasted + '\x1b[201~'}`);
+  const { mode } = build({ startup, scheduler });
+  const host = mode as unknown as { alternateScreen: boolean; busy: boolean; state: typeof startup.state;
+    view: InteractiveView; promptContext: ReturnType<typeof import('./context/controller.js').createContextController>;
+    options: { runtimeContext: ShellRuntimeContext } };
+  host.alternateScreen = kind === 'fullscreen';
+  const context = host.options.runtimeContext;
+  const frame = () => stripAnsi(host.view.renderFrame({ columns: terminal.columns, rows: terminal.rows }).rows.join('\n'));
+  try {
+    Object.assign(context, { cwd: root, projectRoot: root, session: { ...context.session, turns: [] } });
+    const binding = configurationBinding(context);
+    const config = context.configuration.current.config;
+    context.configuration.publish(context.configuration.begin(binding), { ...config,
+      tui: { ...config.tui, statusItems: ['context'] } }, binding);
+    expect(load).not.toHaveBeenCalled(); expect(route).not.toHaveBeenCalled();
+    mode.start(); scheduler.flush();
+    expect(host.state).toBe(startup.state); expect(start).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(150);
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(load.mock.calls[0]?.slice(3, 7)).toEqual([prefix + (split ? '' : pasted), undefined, 'build', 'ask']);
+    expect(host.promptContext.read()).toEqual({ source: 'unknown' });
+    expect(frame()).toContain('?/');
+
+    if (split) terminal.input(`${pasted.slice(30)}\x1b[201~`);
+    // A lone text cluster waits briefly for a combining continuation.
+    terminal.input('!'); await vi.advanceTimersByTimeAsync(10);
+    const submitted = prefix + pasted + '!';
+    expect(host.state.pastes.expand(host.view.editor.getText())).toBe(submitted);
+    expect(host.view.editor.getText().includes('[#1 pasted')).toBe(split);
+    expect(load.mock.calls[0]?.[7].aborted).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(load).toHaveBeenCalledTimes(1); expect(route).not.toHaveBeenCalled();
+    finish(old); await vi.advanceTimersByTimeAsync(0);
+    expect(old.invalidate).toHaveBeenCalledOnce(); expect(old.verify).not.toHaveBeenCalled();
+    expect(host.promptContext.read()).toEqual({ source: 'unknown' });
+    expect(frame()).toContain('?/'); expect(frame()).not.toContain('~111/');
+    await vi.advanceTimersByTimeAsync(650);
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(load.mock.calls[1]?.slice(3, 7)).toEqual([submitted, undefined, 'build', 'ask']);
+    expect(host.promptContext.read()).toEqual({ tokens: 222, source: 'estimated' });
+    expect(frame()).toContain('~222/');
+    terminal.input('\x1b[D'); terminal.columns = 80; terminal.rows = 16; terminal.resize(); scheduler.flush();
+    terminal.input('\x1b[C'); await vi.advanceTimersByTimeAsync(100);
+    expect(host.promptContext.read()).toEqual({ tokens: 222, source: 'estimated' });
+    expect(frame()).toContain('~222/'); expect(load).toHaveBeenCalledTimes(2);
+    expect(route).not.toHaveBeenCalled();
+
+    terminal.input('\r'); await vi.advanceTimersByTimeAsync(0); scheduler.flush();
+    expect(route).toHaveBeenCalledOnce(); expect(route.mock.calls[0]?.[0].prompt).toBe(submitted);
+    expect(host.view.editor.getText()).toBe(''); expect(host.busy).toBe(false);
+    mode.stop(); await vi.advanceTimersByTimeAsync(1000);
+    expect(load).toHaveBeenCalledTimes(2); expect(route).toHaveBeenCalledOnce();
+    expect(current.invalidate).toHaveBeenCalledOnce(); expect(terminal.stopped).toBe(true);
+  } finally {
+    mode.stop(); startup.dispose(); load.mockRestore(); route.mockRestore();
+    vi.unstubAllEnvs(); vi.useRealTimers(); fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 it.each([true, false])('records runtime adoption separately from its completed write (prepaint %s)', async prepaint => {
   const timing = vi.spyOn(startupTiming, 'time').mockImplementation(() => {});
   const terminal = new RecordingTerminal(), scheduler = new ManualScheduler();

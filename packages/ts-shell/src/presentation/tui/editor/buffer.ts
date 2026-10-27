@@ -22,6 +22,7 @@ export abstract class EditorBuffer {
   protected column = 0;
   protected scrollOffset = 0;
   protected revision = 0;
+  private contentRevision = 0;
   /**
    * The last thing that changed the text, for deciding whether the next change
    * continues it.
@@ -51,8 +52,8 @@ export abstract class EditorBuffer {
     return { text, cursor, revision: this.revision };
   }
 
-  /** Cheap freshness key for background observers; no text projection. */
-  get textRevision(): number { return this.revision; }
+  /** Cheap text freshness key; cursor motion keeps the current request valid. */
+  get textRevision(): number { return this.contentRevision; }
 
   replace(edit: DraftEdit): boolean {
     const next = replaceDraft(this.snapshot(), edit);
@@ -106,6 +107,7 @@ export abstract class EditorBuffer {
   insert(text: string): void {
     if (!text) return;
     this.revision += 1;
+    this.contentRevision += 1;
     this.adoptAsDraft();
     // A run of word characters is one undo step. Whitespace starts a new one, and
     // so does any non-word character, so the unit a user gets back is the word
@@ -213,6 +215,7 @@ export abstract class EditorBuffer {
 
   protected restore(snapshot: EditorSnapshot): void {
     this.revision += 1;
+    this.contentRevision += 1;
     this.lines = [...snapshot.lines];
     this.row = snapshot.row;
     this.column = snapshot.column;
@@ -222,6 +225,7 @@ export abstract class EditorBuffer {
 
   protected saveUndo(): void {
     this.revision += 1;
+    this.contentRevision += 1;
     this.edits.record({ lines: this.lines, row: this.row, column: this.column });
   }
 }

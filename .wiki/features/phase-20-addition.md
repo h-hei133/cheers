@@ -3,7 +3,7 @@ title: "Phase 20 日常交互补充要求与任务规划"
 category: article
 sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
-updated: 2026-10-27
+updated: 2026-10-28
 tags: [features, phase-20, additions, interaction, panels, completion]
 summary: "汇总用户最新要求：settings/model看齐oh-my-pi，允许选中未配置模型，resume默认焦点修补，消息顶格及箭头恢复，提前TUI首帧、上下文估算、路径补全、多skill与部分slash组合。逐项记录实现方向、边界与验收。"
 confidence: mixed
@@ -218,6 +218,8 @@ ADD-08提供状态栏启动本地估算。初次定位时，[sessionFacts](../..
 
 要求首次请求前根据**本次实际拟发送的内容**给出estimated值，不拿完整可发现工具目录充当发送schema。包含生效系统指令、项目规则/skills、当前消息历史、实际tool集合和能界定的协议开销；无法精确计算的部分说明局限，不把估算标成实测。provider返回后切换或校准measured，绑定session/model/endpoint/schema/system/history身份。切模型、恢复、换分支、加载工具或编辑指令使旧数值失效；无法证明当前值时仍允许unknown，不能为了消灭问号填0或旧缓存。
 
+第七十五批补启动交接后的草稿→估算→编辑→提交组合路径，并修复纯光标移动误使估算失效：[编辑器buffer](../../packages/ts-shell/src/presentation/tui/editor/buffer.ts)区分内容版本和含光标的range snapshot版本。纯移动/resize保留有效估算，真实编辑仍取消旧读取；跨交接粘贴的placeholder按实际全文估算与提交。此批mock预览和最终派发端口，不证明provider数值或生产启动性能。
+
 约1.7k与4.9k的差额要单独取同模型/协议/规则/历史/实际schema的分项。工具数量、工具菜单是否丰富、源字节大小都不能直接推出token总数；缓存输入与provider归一化也需对齐。参考模型toolSchemasInContext=false时不计常驻工具schema是条件性分支，未验证用户具体模型走它。验收不设“必须也显示1.7k”的目标，而是同snapshot、可解释、estimated/measured/stale/unknown各态真实。
 
 对用户“公式是否不同”的问题，源码支持**计数方式有差异**：本项目[本地估算](../../packages/ts-shell/src/context/request/estimate.ts)标明characters/3.5；oh-my-pi的`packages/agent/src/tokenizer.ts`支持模型对应的native tokenizer，未知模型默认可用bytes/4，模式与环境覆盖会影响选择。对同一ASCII内容仅比较÷3.5和÷4约差14%，远不足以解释4.9k/1.7k约2.9倍；中文、emoji、模型tokenizer、协议与实际输入集合也不能套用这个ASCII比例。参考启动数值来自本地计数，本项目用户反馈中的对话后数值来自provider用量，两种来源须先对齐才可比较。详见[计数口径研究](28-context-display-and-startup-budget.md)。不能把问号原因与数字差额合并为一个已解决的公式问题。
@@ -397,6 +399,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | oh-my-pi提交skill | packages/tui/src/prompt/skill-tokens.ts：8、28–34；packages/coding-agent/src/extensibility/skills.ts：639–668；src/modes/skill-command.ts：59–83 | 当前解析和构造各处理一个skill；未证明多token全注入，需本项目明确补全 |
 | oh-my-pi启动 | packages/coding-agent/src/cli.ts：522–555；src/modes/startup-composer.ts：69–99；src/main.ts：630–661 | 预绘制、后加载、同Composer移交；不代表初始化总耗时已对照 |
 | oh-my-pi上下文 | packages/coding-agent/src/session/session-stats.ts：367–389；packages/tui/src/status-line/context-usage.ts：237–281、364–377 | 无anchor本地估算、实际roster与条件schema计量；不证明用户具体1.7k的数值组成 |
+| oh-my-pi编辑器内容身份 | packages/tui/src/components/editor.ts：3234–3253、4698–4735 | 内容修改推进textRevision，纯光标移动不推进；本项目同时保留自己的cursor-sensitive range snapshot版本 |
 | pi会话选择 | packages/coding-agent/src/modes/interactive/components/session-selector.ts：363–394 | selectionTouched分界；本项目最新/置顶/可恢复性按新增规则决定 |
 
 这些证据是实现前定位和对照，不是动态复现或产品验收。需要补齐的运行证据已写入对应任务，不把未知变成缺陷不存在，也不把参考能力全部宣称已交付。
@@ -1535,6 +1538,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
+第七十五批补充启动草稿与估算owner的四条组合路径，修复光标移动误撤销估算；纯移动与resize不改变请求内容身份，真实编辑、历史及undo仍推进内容版本。预览/派发端口为mock，真实provider差额、冷热启动和桌面平台证据继续待补，ADD整体active。
+
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
 ### 第六十四批：正文引号权威与context计量身份
@@ -1663,3 +1668,14 @@ ADD-04已有默认最新、手选保留、搜索/scope重置及分页证据；�
 最终主代理以heap768MiB、单worker串行执行session picker单文件，68项全部通过，包含上述15条；该文件的既有10,045条分页是mock catalogue单元路径，没有启动真实长历史二进制。三个定向反转分别关闭自动偏好、手动意图记录、失效ID的默认回退，在15条选择集中恰好触发6、9、6项对应失败；各次逐字节恢复，OptionModel SHA-256为`bfa4c418c7b6b81fa1059a3358437444abdbd7e5da22f1f5034ee8e3a962e9aa`，恢复后68项重验通过。首次整项移除defaultSelection同时反转自动与回退两条策略，已缩小到各消费分支分别核验，不将耦合失败当作独立证明。
 
 五静态门与diff通过，既有118条docs-source advisory保留。`6fd6a069`的Architecture Watch `40532987758`已success，CI `40532987731`延迟检查时仍in_progress，不替代本批结果。未运行构建、全仓回归、真实PTY、provider、exe、桌面或20k历史压测；没有重跑原Phase 20矩阵或取得独立review。ADD-04保留本地实现验证状态，ADD整体保持active，提交/推送和本批精确SHA的CI另绑定。
+
+
+### 第七十五批：启动草稿、延迟估算与光标内容身份
+
+ADD-07/08沿真实StartupSurface→InteractiveMode→context controller→status surface补充regular/fullscreen×完整/跨交接paste四条组合，发现纯方向键移动会使已显示估算变unknown。原因是原textRevision直接返回含光标移动的snapshot revision。现[编辑器buffer](../../packages/ts-shell/src/presentation/tui/editor/buffer.ts)保留独立内容epoch，原通用revision继续拒绝光标移开再返回后的旧补全；没有在交互主文件加入新状态或每帧拼接/哈希全文。typing合并undo、换行/删改、kill/yank/yank-pop、undo/redo、range replacement、clear及history recall均验证内容版本推进。
+
+实现前只读对照确认参考编辑器将textRevision用于内容修改，moveCursor不推进；本项目采用这个决定，同时保留自身cursor-sensitive range snapshot合同。启动继续沿同一state/parser/TUI移交，加载期Enter保留换行。四条组合观察：runtime启动前零预览/派发、首估算读取保留草稿、编辑取消旧signal、旧promise未结算时不重叠读取、迟到结果invalidate且不显示、重读使用paste展开全文、界面显示~222、方向键/resize保持估算、显式Enter仅提交一次全文、stop撤销后续读取并释放terminal。预览结果111/222与最终路由是mock端口，只证明交互连线与生命周期，不冒充token算法或真实模型请求验证。
+
+主代理以heap768MiB、单worker串行验证：editor59、replacement6、startup20、controller18共103项，再过滤InteractiveMode执行11项通过、106项未选；最终共114项执行通过，没有运行整个InteractiveMode文件或全仓。三个独立反转分别恢复旧textRevision、移除交互draft身份、跳过paste展开，恰好触发5/4/2项预期失败；源码逐字节恢复并核对SHA-256：buffer `97281af20de517d151233be3a9d5ce0dfffc554f0fc7970eda437eab948add7c`，未修改的InteractiveMode `db83dbbcff5ee39e75752210189c060031f3a1745365711477d139a98c131284`。恢复后完成上述最终验证。初次夹具误用缺configValidation的runtimeConfig、随后未等待stdin的8ms cluster hold，均先分类为harness错误；修复夹具后才定位纯光标版本问题，没有放宽行为断言。
+
+五静态门、module facade 0、diff及TS build `9e463d050a78`通过，build heap1536MiB；文档更新后静态门重验通过。延迟读回`6fd6a069`的CI `40532987731`及Watch `40532987758`均success；`ab2bdde7`的Watch `40536731728`success、CI `40536731834`仍in_progress，不替代本批结果。HANDOFF记录内容/光标版本分离；未运行真实PTY、provider、exe、桌面或20k历史压测，未重跑原Phase 20矩阵，无独立review。真实1.7k/4.9k分项与冷热性能继续未证，ADD整体active，提交/推送及本批精确SHA的CI另绑定。

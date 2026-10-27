@@ -9590,3 +9590,12 @@ ADD-04将原两条渐进焦点用例扩展为未触碰/键盘/点击/滚轮/hove
 主代理以768MiB heap、单worker串行运行session picker单文件，最终68项全部通过；三个分支反转分别产生6/9/6项预期失败，OptionModel逐字节恢复并核对SHA-256，恢复后68项重验。五静态门及diff通过；既有10,045记录分页只是mock catalogue单元测试，没有真实长历史进程。先整项移除共享defaultSelection会同时撤掉自动与fallback，已按消费分支拆开反转，相关guardrail写入HANDOFF。
 
 前一提交`6fd6a069`的Architecture Watch `40532987758`已success，CI `40532987731`延迟检查仍in_progress；本批Git/CI另绑定。未运行构建、全仓、真实PTY、provider、exe、桌面或20k压测，未重跑原Phase 20矩阵，无独立review；ADD-04本地验证状态保留，ADD整体active。
+
+
+## [2026-10-28] fix | 光标移动保留上下文估算与启动草稿组合验证
+
+ADD-07/08组合路径确认textRevision误复用含光标的snapshot revision，方向键使有效估算变unknown。现编辑器buffer区分内容epoch，保留原cursor-sensitive补全snapshot；真实编辑、coalesced typing、undo/redo、历史及替换仍推进内容身份。只读对照采用内容修改与光标移动分离的决定，无新交互owner或每帧全文哈希。
+
+最终四文件103项（editor59、replacement6、startup20、controller18）及过滤InteractiveMode11项通过、106项未选，共114项执行通过。regular/fullscreen×完整/跨交接paste四条链验证草稿保留、旧读取消与串行结算、迟到结果拒绝、placeholder展开全文、实际status显示、纯移动/resize保留及显式Enter一次提交。预览和派发端口为mock，不冒充token或provider验收。三个反转产生5/4/2项预期失败，buffer/host逐字节恢复并核对SHA-256；初期配置publication和cluster timer的fixture错误已分类，未弱化断言。
+
+五静态门、module facade 0、diff及TS build `9e463d050a78`通过，测试heap768MiB、build1536MiB。延迟读回`6fd6a069`的CI `40532987731`与Watch `40532987758`均success；`ab2bdde7`的Watch `40536731728`success、CI `40536731834`仍in_progress。HANDOFF及addition第七十五批更新；未运行全仓、真实PTY、provider、exe、桌面或20k压测，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

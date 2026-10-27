@@ -75,6 +75,41 @@ describe("text entry", () => {
   });
 });
 
+describe("content freshness", () => {
+  it("retains content identity through cursor motion while retiring range snapshots", () => {
+    const editor = new Editor(); editor.setText('a😀 word\nsecond line');
+    const text = editor.getText(), content = editor.textRevision;
+    for (const move of ['left', 'right', 'word-left', 'word-right', 'line-start', 'line-end', 'doc-start', 'doc-end', 'up', 'down'] as const) {
+      const before = editor.snapshot(); editor.move(move);
+      expect(editor.getText()).toBe(text); expect(editor.textRevision).toBe(content);
+      expect(editor.snapshot().revision).toBeGreaterThan(before.revision);
+      expect(editor.replace({ snapshot: before, from: 0, to: 1, text: 'x' })).toBe(false);
+    }
+    editor.setCursorOffset(0); editor.render(4); editor.render(80); editor.focused = false;
+    expect(editor.textRevision).toBe(content); expect(editor.getText()).toBe(text);
+  });
+
+  it("advances content identity through edits, coalesced typing, history and undo", () => {
+    const editor = new Editor();
+    const change = (action: () => unknown, text: string) => {
+      const before = editor.textRevision; action();
+      expect(editor.getText()).toBe(text); expect(editor.textRevision).toBeGreaterThan(before);
+    };
+    change(() => editor.setText('a'), 'a');
+    change(() => editor.insert('b'), 'ab'); change(() => editor.insert('c'), 'abc');
+    editor.move('left'); change(() => editor.newline(), 'ab\nc');
+    change(() => editor.backspace(), 'abc'); change(() => editor.deleteForward(), 'ab');
+    change(() => editor.kill('line-start'), ''); change(() => editor.yank(), 'ab');
+    change(() => editor.undo(), ''); change(() => editor.redo(), 'ab');
+    change(() => editor.setDraftText('new'), 'new');
+    change(() => editor.replace({ snapshot: editor.snapshot(), from: 0, to: 3, text: 'fresh' }), 'fresh');
+    change(() => editor.clear(), ''); editor.pushHistory('past');
+    change(() => editor.recall(-1), 'past'); change(() => editor.recall(1), '');
+    change(() => editor.setText('cd'), 'cd'); change(() => editor.kill('line-start'), '');
+    change(() => editor.yank(), 'cd'); change(() => editor.yankPop(), 'ab');
+  });
+});
+
 describe("atomic tokens", () => {
   function editorWithTokens(): Editor {
     const editor = new Editor();

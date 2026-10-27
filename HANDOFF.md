@@ -536,3 +536,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Removing one default-selection callback breaks both untouched focus and the recovery of a missing manual target, obscuring which invariant a regression covers.
 - **Root Cause**: The same policy supplies the ongoing automatic preference and the fallback when a retained ID disappears.
 - **Rule**: Reverse the automatic-preference branch, manual-intent capture and missing-ID fallback separately. Keep a surviving older pinned row in the fixture so an accidental first-row fallback cannot pass as newest-session recovery.
+
+### Prompt Freshness Must Separate Content From Cursor Revisions
+- **Symptom**: Moving left then right makes a valid context estimate disappear or cancels its pending read even though the prospective request has not changed.
+- **Root Cause**: The editor's textRevision getter returns the general snapshot revision, which intentionally advances on cursor motion to reject stale completion replacements.
+- **Rule**: Keep a separate content epoch in the existing editor buffer and advance it for edits, coalesced typing, undo/redo and history replacement. Preserve the general snapshot revision and its cursor-sensitive replacement guard. Verify the actual startup-to-host path with delayed previews, expanded split pastes, cursor movement and resize; allow the stdin parser's combining-cluster hold to settle before asserting a lone typed character.
