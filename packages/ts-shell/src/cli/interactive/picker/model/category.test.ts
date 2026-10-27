@@ -1,9 +1,13 @@
 import fs from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
+import { getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile,
+  type RuntimeConfig } from '../../../../config/runtimeConfig.js';
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
+import { defaultHookDispatcher } from '../../../../core/hooks/hookDispatcher.js';
+import { resolveProviderCredential } from '../../../../core/shell/providerCredentials.js';
+import { setReviewedModelTarget } from '../../../../core/commands/model/selection.js';
 import { SessionManager } from '../../../../session/SessionManager.js';
-import { readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
+import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
 import { modelPicker } from '../model.js';
 import { OverlayHost, type PickerOutcome } from '../../overlay.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
@@ -76,6 +80,95 @@ it('does not label a named relay ready when only an environment fallback is pres
   const picker = modelPicker(commands()); const rows = await picker.load();
   expect(picker.navigation!.items.find(item => item.id === 'relay-missing')?.note).toBe('○');
   expect(rows.find(row => row.id === target('relay-missing', 'missing'))).toMatchObject({ disabled: true, focusable: true });
+});
+
+it('keeps environment credentials on the canonical provider and never borrows them for a relay endpoint', async () => {
+  vi.stubEnv('OPENAI_API_KEY', 'synthetic-environment');
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: undefined, providerConnections: [] }, edit);
+  writeCatalogCache([{ id: 'openai', runtime: 'openai', models: [{ id: 'shared' }] }, ...catalogue()]);
+  const picker = modelPicker(commands()); const rows = await picker.load();
+  const canonical = rows.find(row => row.id === target('openai'));
+  const relay = rows.find(row => row.id === target('relay-ready'));
+  expect(canonical?.disabled).not.toBe(true);
+  expect(relay).toMatchObject({ disabled: true, focusable: true });
+  expect(picker.detail!(target('relay-ready')).join('\n')).toContain('configure a connection');
+});
+
+it.each(['environment', 'profile'] as const)('keeps a non-current %s-backed provider disabled until an exact named connection exists', async source => {
+  if (source === 'environment') vi.stubEnv('ANTHROPIC_API_KEY', 'synthetic-anthropic');
+  else {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, providerCredentials: {
+      ...edit.values.providerCredentials,
+      anthropic: { apiKey: 'synthetic-anthropic', model: 'shared' },
+    } }, edit);
+  }
+  writeCatalogCache([{ id: 'openai', runtime: 'openai', models: [{ id: 'base' }] },
+    { id: 'anthropic', runtime: 'anthropic', models: [{ id: 'shared' }] }]);
+  const picker = modelPicker(commands()); const rows = await picker.load();
+  expect(rows.find(row => row.id === target('anthropic'))).toMatchObject({ disabled: true, focusable: true });
+  expect(picker.detail!(target('anthropic')).join('\n')).toContain('configure a connection');
+  expect(readSessionModel(sessionId)).toBeUndefined();
+});
+
+it.each([undefined, '', null, 42])('requires a valid reviewed resolution before applying a provider target: %j', async resolution => {
+  const before = readSessionModelEdit(sessionId);
+  expect(await setReviewedModelTarget({ connectionScope: 'provider', provider: 'anthropic', model: 'shared' }, commands(),
+    { resolution: resolution as string }))
+    .toContain('provider selection must come from the reviewed model picker');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+});
+
+it('expires a CLI-selected provider slot when its ambient credential changes after load', async () => {
+  vi.stubEnv('ANTHROPIC_API_KEY', 'synthetic-first');
+  writeCatalogCache([{ id: 'anthropic', runtime: 'anthropic', models: [{ id: 'shared' }] }]);
+  const command = { ...commands(),
+    resolveConfigTarget: (config: RuntimeConfig) => resolveProviderCredential({ runtimeConfig: config, cliProvider: 'anthropic' }) };
+  const picker = modelPicker(command); const rows = await picker.load();
+  expect(rows.find(row => row.id === target('anthropic'))?.disabled).not.toBe(true);
+  const before = fs.readFileSync(getUserRuntimeConfigPath());
+  vi.stubEnv('ANTHROPIC_API_KEY', 'synthetic-second');
+  const result = await picker.apply([target('anthropic')]);
+  expect(result?.note).toContain('selected credential or endpoint changed');
+  expect(result?.note).not.toContain('synthetic-');
+  expect(readSessionModel(sessionId)).toBeUndefined();
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+});
+
+it('expires a provider slot when only its resolved endpoint changes after load', async () => {
+  vi.stubEnv('ANTHROPIC_API_KEY', 'synthetic-stable');
+  vi.stubEnv('FIXTURE_PROVIDER_ENDPOINT', 'https://first.invalid/v1');
+  writeCatalogCache([{ id: 'anthropic', runtime: 'anthropic', models: [{ id: 'shared' }] }]);
+  const resolveConfigTarget = (config: RuntimeConfig) => {
+    const resolution = resolveProviderCredential({ runtimeConfig: config, cliProvider: 'anthropic' });
+    const baseUrl = process.env.FIXTURE_PROVIDER_ENDPOINT;
+    return resolution.credential ? { ...resolution, baseUrl, credential: { ...resolution.credential, baseUrl } } : resolution;
+  };
+  const picker = modelPicker({ ...commands(), resolveConfigTarget }); const rows = await picker.load();
+  expect(rows.find(row => row.id === target('anthropic'))?.disabled).not.toBe(true);
+  vi.stubEnv('FIXTURE_PROVIDER_ENDPOINT', 'https://second.invalid/v1');
+  expect((await picker.apply([target('anthropic')]))?.note).toContain('selected credential or endpoint changed');
+  expect(readSessionModel(sessionId)).toBeUndefined();
+});
+
+it('refuses a provider slot when its endpoint changes inside the switch hook', async () => {
+  vi.stubEnv('ANTHROPIC_API_KEY', 'synthetic-stable');
+  vi.stubEnv('FIXTURE_PROVIDER_ENDPOINT', 'https://first.invalid/v1');
+  writeCatalogCache([{ id: 'anthropic', runtime: 'anthropic', models: [{ id: 'shared' }] }]);
+  const resolveConfigTarget = (config: RuntimeConfig) => {
+    const resolution = resolveProviderCredential({ runtimeConfig: config, cliProvider: 'anthropic' });
+    const baseUrl = process.env.FIXTURE_PROVIDER_ENDPOINT;
+    return resolution.credential ? { ...resolution, baseUrl, credential: { ...resolution.credential, baseUrl } } : resolution;
+  };
+  const picker = modelPicker({ ...commands(), resolveConfigTarget }); await picker.load();
+  vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+    if (event.eventName === 'PreModelSwitch') vi.stubEnv('FIXTURE_PROVIDER_ENDPOINT', 'https://second.invalid/v1');
+    return undefined;
+  });
+  const result = await picker.apply([target('anthropic')]);
+  expect(result?.note).toContain('Session model conflict: this attempt did not write');
+  expect(readSessionModel(sessionId)).toBeUndefined();
 });
 
 it('keeps ambiguous exact-address categories unavailable even with a configured connection', async () => {

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { RuntimeConfig } from '../../../config/runtimeConfig.js';
 import { sameValue } from '../../../config/values.js';
 import type { SessionModelSelection, SessionModelTarget } from '../../../session/model/contract.js';
@@ -13,6 +14,24 @@ export function scopedModelTarget(target: SessionModelTarget): SessionModelSelec
 
 export function targetRequest(context: CommandContext, config: RuntimeConfig, target: SessionModelTarget) {
   return selectionRequest(context, config, scopedModelTarget(target));
+}
+
+/** The exact credential and endpoint a provider-slot picker row displayed. */
+export function targetResolutionIdentity(context: CommandContext, config: RuntimeConfig, target: SessionModelTarget): string {
+  const resolution = targetRequest(context, config, target);
+  const normalize = (baseUrl?: string): string | undefined => baseUrl?.trim().replace(/\/+$/, '') || undefined;
+  return createHash('sha256').update(JSON.stringify({
+    provider: resolution.provider,
+    model: resolution.model,
+    baseUrl: normalize(resolution.baseUrl),
+    blocked: resolution.blocked,
+    expectedEnvVarName: resolution.expectedEnvVarName,
+    selection: resolution.selection,
+    credential: resolution.credential ? {
+      ...resolution.credential,
+      baseUrl: normalize(resolution.credential.baseUrl),
+    } : undefined,
+  })).digest('hex');
 }
 
 /** Preference edits preserve legacy cascade semantics as well as explicit bindings. */

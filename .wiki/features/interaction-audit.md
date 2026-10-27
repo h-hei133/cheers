@@ -744,3 +744,9 @@ ADD-01/02新增确认三类可复现偏差：解析后的请求target可能与�
 ADD-01/02收口模型详情的目录换代边界。详情现绑定当前accepted revision与exact record identity，首帧前、action前及异步边界后都复核；同ID replacement与删除都进入Back-only unavailable，reload失败则明确提示无法刷新而不是伪装删除。搜索/分类origin贯穿刷新与嵌套account/key/effort返回，暂态notice在下一accepted revision清除，原transaction notice保留。`OverlayHost` acceptance token阻止详情在host被替换后继续publish/apply，普通picker路径不变。
 
 17文件426项、九个独立契约反转与源码逐字节恢复、独立只读review no findings，以及普通/全屏实际Node PTY有局部证据；PTY拒绝stale action、重开读取replacement endpoint、masked key取消无泄露，并保持零model写、零message、零provider调用和143 close。五静态门、责任上限0、module facade 0、Phase 20 38/9/0、TS build `3156e9912180`（inputs `335af1c1d171`、artifact `619abdf46909`）、manifest fresh 460/1882及正式judge proven另绑定。见[第六十六批](phase-20-addition.md#第六十六批模型详情刷新目录换代与宿主所有权)。未运行真实provider、全仓、exe、桌面、Windows或20k PTY，原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第六十七批）
+
+ADD-02确认provider-slot action原先只以“没有connectionId”判定provider credential等价；CLI provider不在config/connections时，其环境变化也不进入旧choice fingerprint，行显示后的新API key或normalized endpoint仍可被提交。现action捕获完整effective resolution的不持久化digest，reviewed入口要求64位hex token，非法/缺失token、credential变化与endpoint-only变化都在session写前拒绝；effort被排除以保留原恢复事务，hook后的漂移继续由完整target request比较拦截。旧positional调用保持兼容，provider target不能再绕过reviewed入口。
+
+非当前provider的ambient env/profile明确不提供跨provider激活，因为当前session contract没有可resume的凭据来源ID；此类行保持可浏览并进入named connection配置。五文件87项、三个独立反转/逐字节恢复及最终no-findings review有局部证据；import cycles、Node floor、facade0、diff、TS build `9283d98655a2`（inputs `d58b1fcf9114`、artifact `155f7d12d4be`）另绑定。见[第六十七批](phase-20-addition.md#第六十七批provider-slot有效凭据身份与环境范围)。WATCH保留switch-time-only exactness、配置读取到session写之间无跨进程文件锁；未运行全仓、PTY、真实provider、exe或桌面，20k仅mock/切片。原Phase38/9、ADD独立且整体active。

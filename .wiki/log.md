@@ -9536,3 +9536,9 @@ ADD-01/02确认resolved request target与行标签可漂移：CLI/env/profile把
 ADD-01/02收口模型详情WATCH。详情现由revision-bound source读取当前catalogue record：首帧前、action前和异步边界后复核record identity、revision与inspection admission；同ID replacement/删除产生Back-only unavailable，reload失败明确提示无法刷新并移除action。打开详情沿原Picker订阅刷新事实与closure，搜索/分类origin贯穿刷新及嵌套account/key/effort的cancel/success返回；暂态notice仅在下个accepted revision清除。OverlayHost通过acceptance token拒绝host替换后的迟到publish/apply，普通picker不opt in。
 
 17文件426项单进程通过；九个独立契约反转均出现对应失败，源码逐字节恢复并核对SHA-256。普通/全屏实际Node PTY从外部替换catalogue，旧action被拒且零写入、重开读取replacement endpoint、masked key取消无泄露，保持零message/零provider及143 close；独立只读review最终no findings。五静态门/diff、责任上限0、module facade 0、Phase 20 38 complete / 9 partial / 0 open、TS build 3156e9912180（inputs 335af1c1d171、artifact 619abdf46909）、manifest fresh 460/1882及正式judge proven通过。未运行真实provider、全仓、exe、桌面、Windows或20k PTY；HANDOFF/addition第六十六批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-27] fix | provider slot有效凭据与端点身份
+
+ADD-02确认provider slot只检查provider/model且无connectionId，未绑定凭据source、secret与endpoint；CLI provider不在配置/connections时，环境变化也可能绕过旧choice fingerprint。现每个action捕获effective resolution的不持久化digest，reviewed入口要求64位hex token，非法token、credential变化和endpoint-only变化均在session写前拒绝。effort不属于digest，原prospective effort恢复仍成功；hook后的漂移由既有完整target比较拦截。旧positional`setModelTarget`保持兼容，provider target不能绕过reviewed入口。
+
+非当前provider的ambient env/profile继续disabled并可进入named connection配置，因为provider-scoped session没有可resume的凭据来源身份。category23、provider28、recovery11、admission14、presetCommand11共五文件87项分别单进程串行通过；三个反转分别产生2/6/4项失败，源码逐字节恢复。独立review修正effort、falsey token与兼容入口问题后no findings。import cycles、Node floor、facade0、diff及TS build9283d98655a2（inputs d58b1fcf9114、artifact 155f7d12d4be）通过；未运行全仓、PTY、真实provider、exe或桌面，20k继续mock/切片。WATCH保留switch-time-only exactness与配置读/session写间无跨进程文件锁；HANDOFF/addition第六十七批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。

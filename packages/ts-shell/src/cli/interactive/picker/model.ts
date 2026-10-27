@@ -12,9 +12,9 @@ import { applyModelPreset, resolveModelPreset, wholePresetFailure } from "../../
 import { readProfilePresets } from "../../../core/commands/model/presetStore.js";
 import { readSessionModel } from "../../../session/model/state.js";
 import type { SessionModelRole, SessionModelTarget } from "../../../session/model/contract.js";
-import { exactTargetMatches, scopedModelTarget } from "../../../core/commands/model/target.js";
+import { exactTargetMatches, scopedModelTarget, targetResolutionIdentity } from "../../../core/commands/model/target.js";
 import { captureModelChoice } from "../../../core/commands/model/choice.js";
-import { setModelTarget } from "../../../core/commands/model/selection.js";
+import { setReviewedModelTarget } from "../../../core/commands/model/selection.js";
 import { captureThinkingPreference } from "../../../core/models/preference.js";
 import { sameValue } from "../../../config/values.js";
 import { connectionDraft, connectionEndpoint } from './connections.js';
@@ -173,9 +173,11 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
                   result === undefined && connectionId === undefined ? returnTo() : back(fresh, result, connectionId, origin);
               const captured = choice;
               if (reason === 'reasoning effort unsupported' && captured) {
+                const resolution = targetResolutionIdentity(context, config, target);
                 detailActions.push({ id: 'effort', label: 'Choose effort', run: (returnTo, inspect) => ({ next: modelEffortPicker({
                   target, current: thinkingEffort, catalog, baseUrl: modelAddress, lines, admission: admitInspection, back: inspect,
-                  save: effort => setModelTarget({ ...target, thinkingEffort: effort }, { ...context, admission: admitInspection }, captured.baseline),
+                  save: effort => setReviewedModelTarget({ ...target, thinkingEffort: effort }, { ...context, admission: admitInspection },
+                    { baseline: captured.baseline, resolution }),
                   done: result => parent ? parent(result) : returnTo(result),
                 }) }) });
               }
@@ -196,8 +198,9 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               assignments.set(id, () => assigning.assign({ connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort: assignedEffort }));
             } else if (!reason && choice) {
               const captured = choice;
-              actions.set(id, async () => captured.admission() ?? setModelTarget(target,
-                { ...context, admission: captured.admission }, captured.baseline));
+              const resolution = targetResolutionIdentity(context, config, target);
+              actions.set(id, async () => captured.admission() ?? setReviewedModelTarget(target,
+                { ...context, admission: captured.admission }, { baseline: captured.baseline, resolution }));
             }
           }
         }

@@ -1533,7 +1533,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
 ### 第六十四批：正文引号权威与context计量身份
 
@@ -1570,3 +1570,17 @@ ADD-01/02继续收口模型行的可见状态与实际事务边界。[模型 pic
 普通/全屏两种实际Node PTY均从外部改写`models.json`：旧详情action被拒绝且零配置写入，重开读取replacement endpoint；随后进入masked key输入并取消，终端未出现测试secret，最终session model、配置和transcript保持不变，零message、零provider调用并以143完成close。独立只读review最终no findings。
 
 五静态门/diff、责任上限0、`analyze:module-facades` 0 findings、Phase 20脚本38 complete / 9 partial / 0 open、TS build `3156e9912180`（inputs `335af1c1d171`、artifact `619abdf46909`）及正式judge `proven`、0 open/failed/gap通过；manifest readback为fresh，460个compiler input与1882个immutable artifact匹配。未运行真实provider、全仓、exe、桌面、Windows或20k PTY；真实认证服务、跨平台终端和完整model操作矩阵仍未验证。原Phase 20保持38/9/0，ADD独立且整体active。
+
+### 第六十七批：provider-slot有效凭据身份与环境范围
+
+第六十七批继续收口ADD-02的provider-level target。原[exact target owner](../../packages/ts-shell/src/core/commands/model/target.ts)对provider slot只要求provider/model相符且resolved credential没有`connectionId`，没有绑定凭据source、secret identity或normalized endpoint。模型面板在CLI provider不在配置文件/connections中时，也不会把该provider的API-key环境纳入原choice fingerprint；因此picker打开后若同一进程内环境凭据或provider-specific endpoint变化，action仍可能用新值提交。该场景不是外部shell对已运行进程的普通修改，但属于可构造的进程内生命周期与既有environment fixture路径。
+
+现[target resolution identity](../../packages/ts-shell/src/core/commands/model/target.ts)在行构造时生成不持久化的SHA-256 token，摘要输入包括provider、model、normalized base URL、blocked状态、expected env名、selection、auth mode、source、env name及完整api-key/account credential。token不显示、不写磁盘、不进入错误文本，也不会写入session。故意修改reasoning effort不改变credential/endpoint token，prospective effort仍由原事务一次提交。
+
+[selection owner](../../packages/ts-shell/src/core/commands/model/selection.ts)保留兼容的positional `setModelTarget`供既有preset/named调用，并新增picker使用的`setReviewedModelTarget`。provider target必须携带64位hex reviewed token；`undefined`、空串、null、非字符串和任意非digest值均在读取session前拒绝。apply开始时re-resolve并与显示token比较，switch hook之后的漂移继续由既有完整`targetRequest`比较与`beforeCommit`拒绝。直接调用旧入口的provider target不再绕过picker身份。
+
+跨provider的ambient env/profile选择明确保持out of scope：provider-scoped session只持久化provider/model/effort，没有稳定凭据ID，resume会重新服从当前ambient来源。因此非当前provider的env/profile行保持disabled/focusable并进入连接配置，跨provider激活继续要求named connection。该差异是产品合同，不是外观遗漏；若以后要求ambient跨provider resume，必须先扩展持久化身份与轮换合同。
+
+五个文件分别单进程串行87项通过：category23、provider28、recovery11、admission14、presetCommand11。三个有效反转分别为移除resolution比较（2项失败）、把effort纳入digest（6项恢复路径失败）和移除reviewed-token guard（4个非法token场景失败）；源码均逐字节恢复并通过SHA-256校验。独立只读review先提出effort误纳入、falsey token与兼容入口问题，修正后最终no findings。
+
+import cycles、Node floor、module facade0、diff check及TS build `9283d98655a2`（inputs `d58b1fcf9114`、artifact `155f7d12d4be`）通过，460 compiler input/1882 immutable artifact；strict docs在本文更新后单独重跑。保留WATCH：provider slot只保证switch-time身份，成功写入后ambient来源仍可轮换；最终配置读取到session lock写入之间也没有跨进程配置文件锁。未运行全仓测试、PTY、真实provider、exe或桌面；20k路径继续只用mock/切片，禁止真实长历史PTY。原Phase20保持38 complete / 9 partial / 0 open，ADD独立且整体active。

@@ -25,14 +25,38 @@ import { connectionIdentity, credentialIdentity } from './identity.js';
 import { invalidatePromptMeasurement } from '../../../observability/usageTelemetry.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
 import { captureThinkingPreference } from '../../models/preference.js';
-import { exactTargetMatches, targetRequest } from './target.js';
+import { exactTargetMatches, targetRequest, targetResolutionIdentity } from './target.js';
 
-interface ExactSelection { readonly target: SessionModelTarget; readonly baseline?: SessionModelEdit; readonly roles?: SessionModelPolicy }
+interface ExactSelection { readonly target: SessionModelTarget; readonly baseline?: SessionModelEdit; readonly roles?: SessionModelPolicy;
+  readonly resolution?: string }
+interface ReviewedTargetOptions { readonly baseline?: SessionModelEdit; readonly roles?: SessionModelPolicy; readonly resolution: string }
 
-/** Pickers and presets pass an exact address, never a label to parse again. */
-export async function setModelTarget(target: SessionModelTarget, context: CommandContext, baseline?: SessionModelEdit, roles?: SessionModelPolicy): Promise<string> {
-  try { return await selectModel([], context, false, target.thinkingEffort ?? null, { target, baseline, roles }); }
+/** Legacy callers pass an exact address; provider targets still require a reviewed picker snapshot. */
+export async function setModelTarget(target: SessionModelTarget, context: CommandContext, baseline?: SessionModelEdit,
+  roles?: SessionModelPolicy): Promise<string> {
+  return applyExactTarget(target, context, { baseline, roles });
+}
+
+/** Picker actions carry the full resolution shown at selection time. */
+export async function setReviewedModelTarget(target: SessionModelTarget, context: CommandContext,
+  options: ReviewedTargetOptions): Promise<string> {
+  return applyExactTarget(target, context, options);
+}
+
+async function applyExactTarget(target: SessionModelTarget, context: CommandContext,
+  options: Pick<ExactSelection, 'baseline' | 'roles' | 'resolution'>): Promise<string> {
+  if (target.connectionId === undefined && !validResolution(options.resolution)) {
+    return 'Model switch blocked: provider selection must come from the reviewed model picker.';
+  }
+  try {
+    return await selectModel([], context, false, target.thinkingEffort ?? null,
+      { target, baseline: options.baseline, roles: options.roles, resolution: options.resolution });
+  }
   catch { return 'Model selection outcome is unverified. Inspect saved session preferences before retrying.'; }
+}
+
+function validResolution(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 }
 
 export async function setModel(args: string[], context: CommandContext, global: boolean, requestedEffort?: ThinkingPreference): Promise<string> {
@@ -81,6 +105,9 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const catalog = loadCatalog();
   const scoped = exact?.target ?? (providerSlot ? { connectionScope: 'provider' as const, provider, model, thinkingEffort } : undefined);
   const request = scoped ? targetRequest(context, loaded, scoped) : undefined;
+  if (scoped && exact?.resolution !== undefined && targetResolutionIdentity(context, loaded, scoped) !== exact.resolution) {
+    return 'Model switch blocked: the selected credential or endpoint changed. Reopen the model picker.';
+  }
   if (scoped && !exactTargetMatches(context, loaded, scoped)) return 'Model switch blocked: the selected credential binding is unavailable or request overrides change its target.';
   if (providerSlot && (!actual.credential || actual.blocked || actual.credential.connectionId !== undefined
     || actual.baseUrl !== request?.baseUrl || !sameValue({ ...actual.credential, model: undefined }, { ...request?.credential, model: undefined }))) {
