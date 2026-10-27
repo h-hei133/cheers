@@ -732,3 +732,9 @@ ADD-10/11新增确认正文非首位file与slash命令同名时仍可能以裸�
 ADD-10/11确认正文引号从token前缀之后开始时，当前tokenizer只在token首字符识别quote；`focus="literal /review text"`会把中间的`/review`暴露成组合driver，`focus="literal /skill:a text"`也会错误注入skill。现`promptTokens`保存quote范围/闭合状态，并把整个含空白span保留为literal token；shell式单引号、首字符空白或Unicode、内部apostrophe、后续非字面调用以及解引用后的prefixed path都有正反覆盖。prose完成只替换quote范围，保留`path=`前缀和闭引号后的suffix；含apostrophe的路径改用双引号完成。
 
 ADD-08同时确认`/context`只把live identity的schema/system传给`measuredPromptContext`，漏掉history和relay地址，因此另一history或同协议relay的旧测量可能显示为当前值。现`/context`传递live `historyDigest`并从生效base URL派生`endpointId`；测量owner在记录含protocol/endpoint/history/relay身份但调用方无法提供时拒绝复用，compaction还从当前消息prefix派生history digest后才复用provider count。八文件180项单进程通过；五个独立契约恢复旧实现后触发19项预期失败，源码逐字节恢复。五静态门、责任上限0、Phase 20脚本38 complete / 9 partial / 0 open、TS build `530a74afb231`、inputs `557174e78290`、artifact `759b792ec77a`、manifest fresh 460/1882和正式judge proven另绑定。见[第六十四批](phase-20-addition.md#第六十四批正文引号权威与context计量身份)。未运行真实provider、全仓、exe、桌面或PTY；真实history/relay切换与用户原环境仍待验。
+
+### 文末当前问题判断（第六十五批）
+
+ADD-01/02新增确认三类可复现偏差：解析后的请求target可能与行标签不同，但行仍显示为可激活；从详情返回时被删除目标没有previous-visible fallback而静默回首项；同一connection在canonical与更具体relay目录中可同时显示active。现模型行先经原`exactTargetMatches`准入，mismatch行保持disabled并只进入详情；详情返回带原分类previous rows做邻近回退和notice；canonical/relay别名均可浏览，但只有精确目录项标active，canonical显示alias。阻断current详情补精确metadata，搜索空态与空目录分开，watcher以初次load的revision为基线。
+
+17文件317项、六个契约的三组反转（9项预期失败）及普通/全屏实际Node PTY有局部证据；五静态门、责任上限0、TS build `95ad9745fe4c`、inputs `11a4b98a8004`、artifact `f0c767167db1`、manifest fresh 460/1882和正式judge proven另绑定。架构复审为WATCH：详情仍是静态快照、焦点notice不会在后续成功刷新时自动清除、provider-slot exactness弱于named connection；非当前provider的env/profile切换仍是已记录的产品范围选择。见[第六十五批](phase-20-addition.md#第六十五批模型行目标准入详情返回与发布基线)。未运行真实provider、全仓、exe或桌面，原Phase38/9、ADD独立且整体active。

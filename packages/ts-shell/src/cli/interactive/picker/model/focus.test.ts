@@ -66,6 +66,35 @@ it.each([
   } finally { host.close(); }
 });
 
+it('returns from details to a surviving neighbour when the focused model was deleted', async () => {
+  const configured = getRuntimeConfig(root);
+  const config = { ...configured, activeProviderConnectionId: undefined,
+    providerConnections: configured.providerConnections.map(({ apiKey: _apiKey, ...connection }) => ({ ...connection, status: 'connected' as const })) };
+  let publication = { config, catalog: catalogue(), revision: 1 };
+  const picker = modelPicker({ cwd: root, projectRoot: root, sessionId, readConfiguration: () => publication }, id('beta'));
+  const before = fs.readFileSync(getUserRuntimeConfigPath()); const session = readSessionModelEdit(sessionId);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+  const host = new OverlayHost(() => {}); host.open(picker); await new Promise(resolve => setTimeout(resolve, 0));
+  const frame = () => host.render(120, 30).map(stripAnsi).join('\n');
+  const press = async (raw: string) => {
+    let pending: Promise<unknown> | undefined;
+    host.handleKey(parseKeyEvent(raw), (selected, ids) => {
+      pending = selected.apply(ids).then(outcome => { if (outcome?.next) host.open(outcome.next); });
+    });
+    await pending; await new Promise(resolve => setTimeout(resolve, 0));
+  };
+  try {
+    expect(frame()).toContain('▸ beta');
+    await press('\r'); expect(frame()).toContain('Configure connection');
+    publication = { ...publication, catalog: catalogue(['alpha', 'gamma']), revision: 2 };
+    await press('\x1b');
+    expect(frame()).toContain('▸ gamma');
+    expect(frame()).toContain('Focused model left the catalogue');
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(session);
+    expect(fetch).not.toHaveBeenCalled();
+  } finally { host.close(); }
+});
+
 it('preserves a surviving manual identity through a catalogue reorder without announcing removal', async () => {
   vi.useFakeTimers();
   let publication = { config: getRuntimeConfig(root), catalog: catalogue(), revision: 1 };
@@ -123,7 +152,7 @@ it('does not report removal when a refreshed search hides an identity still pres
       models: provider.models.map(model => ({ ...model, contextWindow: 64000 })) })), revision: 2 };
     writeCatalogCache(publication.catalog); await vi.advanceTimersByTimeAsync(500);
     const frame = host.render(120, 30).map(stripAnsi).join('\n');
-    expect(frame).toContain('No providers in the catalogue.'); expect(frame).not.toContain('left the catalogue');
+    expect(frame).toContain('No matching models.'); expect(frame).not.toContain('left the catalogue');
     host.handleKey(parseKeyEvent('\x1b'), vi.fn());
     expect(host.render(120, 30).map(stripAnsi).join('\n')).toContain('▸ delta');
   } finally { host.close(); }

@@ -43,6 +43,17 @@ it('orders the exact configured relay before unconfigured categories sharing its
   ]));
 });
 
+it('marks only the exact relay target active instead of its canonical alias', async () => {
+  writeCatalogCache([{ id: 'openai', runtime: 'openai', models: [{ id: 'shared' }] }, ...catalogue()]);
+  writeSessionModel(sessionId, { connectionScope: 'session', connectionId: 'ready', provider: 'openai', model: 'shared' },
+    readSessionModelEdit(sessionId));
+  const picker = modelPicker(commands()); const rows = await picker.load();
+  expect(rows.find(row => row.id === target('openai', 'ready'))).toMatchObject({ note: 'alias: Relay ready' });
+  expect(rows.filter(row => row.note === 'active')).toEqual([
+    expect.objectContaining({ id: target('relay-ready', 'ready'), label: 'shared' }),
+  ]);
+});
+
 it.each(['pending', 'error', 'credential-missing'] as const)('does not borrow another relay credential for a %s category', async state => {
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [...edit.values.providerConnections!, { id: 'missing',
@@ -128,7 +139,7 @@ it('reorders refreshed exact categories without moving manual focus and refuses 
     .toEqual([['relay-missing', undefined], ['relay-ready', '○'], ['relay-later', '○'], ['relay-extra', '○']]);
   expect(picker.navigation!.active).toBe('relay-ready');
   expect(picker.navigation!.preferred).toBe(target('relay-ready', 'ready'));
-  expect(picker.filterOptions!('').find(row => row.id === target('relay-ready', 'ready'))).toMatchObject({ disabled: true, focusable: true });
+  expect(picker.filterOptions!('', []).find(row => row.id === target('relay-ready', 'ready'))).toMatchObject({ disabled: true, focusable: true });
   expect(readSessionModelEdit(sessionId)).toEqual(before);
 });
 
@@ -157,7 +168,7 @@ it.each([false, true])('navigates exact relay categories, clears empty search an
     await press('\x1b[C'); expect(frame()).toContain('Endpoint: later.invalid/v1');
     await press('\r'); expect(frame()).toContain('Configure connection');
     await press('\x1b'); expect(frame()).toContain('▸ shared'); expect(frame()).toContain('Endpoint: later.invalid/v1');
-    host.handlePaste('no-such-model'); expect(frame()).toContain('No providers in the catalogue.');
+    host.handlePaste('no-such-model'); expect(frame()).toContain('No matching models.');
     await press('\x1b'); expect(frame()).toContain('▸ shared'); expect(frame()).toContain('Endpoint: later.invalid/v1');
     expect(frame(40, 18)).toContain('▸ shared');
     await press('\x1b[D'); await press('\x1b[A');

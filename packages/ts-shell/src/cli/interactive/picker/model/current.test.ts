@@ -23,7 +23,9 @@ beforeEach(() => {
       status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01' },
   ] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
   sessionId = new SessionManager().createNew(root).id;
-  writeCatalogCache([{ id: 'exact', runtime: 'openai', baseUrl: 'https://exact.invalid/v1', models: [{ id: 'shared' }] },
+  writeCatalogCache([{ id: 'exact', runtime: 'openai', baseUrl: 'https://exact.invalid/v1',
+    models: [{ id: 'shared', contextWindow: 48000, inputLimit: 40000, maxTokens: 8000, vision: false,
+      reasoning: true, cost: { promptPerMTok: 1, completionPerMTok: 2 } }] },
     { id: 'other', runtime: 'openai', baseUrl: 'https://other.invalid/v1', models: [{ id: 'shared' }] }]);
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
@@ -40,6 +42,9 @@ it.each(['pending', 'error', 'credential-missing'] as const)('opens the exact %s
   expect(picker.detail!('model:current')).toContain('Selected connection: broken');
   const report = (await picker.inspect!('model:current'))!.next!;
   expect((await report.load()).map(row => row.id)).toEqual(['back', 'connection']);
+  expect(report.detail!(undefined)).toContain('Context: 48000 tokens');
+  expect(report.detail!(undefined)).toContain('Images: unsupported');
+  expect(report.detail!(undefined)).toContain('Price per 1M tokens: input 1 · output 2');
   const exact = (await report.apply(['connection']))!.next!;
   expect((await exact.load()).map(row => row.id)).toEqual(['back', 'configure']);
   expect(exact.detail!()).toContain('Connection: broken'); expect(exact.detail!()).toContain('Endpoint: exact.invalid/v1');

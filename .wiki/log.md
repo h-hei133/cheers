@@ -9524,3 +9524,9 @@ ADD-10/11确认`promptTokens`只在token首字符识别quote；`focus="literal /
 ADD-08确认`/context`只传live schema/system，漏掉history与relay身份；compaction也未从当前消息prefix验history。现`/context`传递`historyDigest`并从生效base URL派生`endpointId`；测量owner在记录含protocol/endpoint/history/relay身份但调用方无法提供时拒绝复用；compaction从recorded message count派生prefix digest后才复用provider count。
 
 八文件180项单进程通过：tokens16、skills26、composition27、completion14、prose33、sessionFacts20、usageTelemetry25、compaction19。五个独立契约恢复旧实现后19项预期失败、161项通过，五源码逐字节恢复并核对SHA-256。`global:deepseek-v4.1-flash-sg`只读复审经精确模型重试及多轮修正后no findings/no additional focused test gap；残余为罕见shell拼接、uncommon leading elision与single-quoted内容内apostrophe。五静态门/diff、责任上限0、Phase 20 38 complete / 9 partial / 0 open、TS build 530a74afb231（inputs 557174e78290、artifact 759b792ec77a）、manifest fresh 460/1882及bundled judge proven/0 open-failed-gap通过。未运行真实provider、全仓、exe、桌面或PTY；HANDOFF/addition第六十四批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-27] fix | 模型行目标准入与详情返回
+
+ADD-01/02确认resolved request target与行标签可漂移：CLI/env/profile把同一connection解析到另一model/provider/base URL时，行仍显示可激活，Enter释放picker后才由原事务拒绝。现picker逐行复用`exactTargetMatches`，mismatch行保持disabled/focusable并只进入详情；同名canonical/relay行均可浏览，canonical仅在无更具体endpoint目录时active，否则显示alias，精确relay项独占active。阻断current详情补精确上下文/上限/图片/reasoning/价格；详情返回删除目标按原分类幸存邻居回退并提示，搜索空态与空目录分开，watcher使用初次load的revision基线。
+
+17文件317项单进程通过：模型picker/分类/焦点/current/metadata/admission/publication/role/auth/key/recovery/watch、settings/session、navigation、pickers、interactive model与overlay。三组反转覆盖六个契约，分别产生2、1、6项失败（共9项），源码逐字节恢复；普通/全屏实际Node PTY覆盖all-missing上下键、详情返回、无匹配搜索、零model写入及143退出close。五静态门/diff、责任上限0、Phase 20 38 complete / 9 partial / 0 open、TS build 95ad9745fe4c（inputs 11a4b98a8004、artifact f0c767167db1）、manifest fresh 460/1882及正式judge proven通过。未运行真实provider、全仓、exe或桌面；架构WATCH保留详情快照、焦点notice清理、provider-slot exactness与非当前env/profile切换产品范围。HANDOFF/addition第六十五批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。

@@ -2,9 +2,10 @@ import type { CommandContext } from '../../../../core/commands/types.js';
 import type { Option } from '../../../../presentation/tui/chrome/options.js';
 
 /** Refresh an open catalogue only after its accepted configuration publication changes. */
-export function watchModels(context: CommandContext, load: () => Promise<readonly Option[]>, publish: (rows: readonly Option[]) => void): () => void {
+export function watchModels(context: CommandContext, load: () => Promise<readonly Option[]>, publish: (rows: readonly Option[]) => void,
+  observedRevision?: number): () => void {
   if (!context.readConfiguration) return () => {};
-  let revision = context.readConfiguration().revision;
+  let revision = observedRevision ?? context.readConfiguration().revision;
   let active = true, pending = false;
   const timer = setInterval(() => {
     if (!active || pending) return;

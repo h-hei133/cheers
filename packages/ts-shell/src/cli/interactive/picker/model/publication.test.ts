@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
-import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
+import { loadCatalog, writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../../../../core/shell/runtimeContext.js';
 import { configurationAdmission } from '../../../../core/shell/configuration.js';
 import { SessionManager } from '../../../../session/SessionManager.js';
@@ -94,4 +94,20 @@ it('does not refresh an expired owner or one cancelled by its admission callback
   await expect(modelPicker({ ...commands, signal: controller.signal, admission: () => { controller.abort(); return undefined; },
     refreshRuntimeConfig: refresh }).load()).rejects.toThrow('cancelled');
   expect(refresh).not.toHaveBeenCalled();
+});
+
+it('does not miss a publication that changes between load and subscription', async () => {
+  vi.useFakeTimers();
+  try {
+    let publication = { config: getRuntimeConfig(root), catalog: loadCatalog(), revision: 1 };
+    const picker = modelPicker({ cwd: root, projectRoot: root, readConfiguration: () => publication });
+    await picker.load();
+    catalogue('https://replacement.invalid/v1');
+    publication = { ...publication, catalog: loadCatalog(), revision: 2 };
+    const publish = vi.fn(); const unsubscribe = picker.subscribe!(publish);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(publish).toHaveBeenCalledOnce();
+    expect(publish.mock.calls[0]![0].some(row => row.id === target)).toBe(true);
+    unsubscribe();
+  } finally { vi.useRealTimers(); }
 });

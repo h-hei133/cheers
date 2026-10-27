@@ -389,13 +389,22 @@ it.each(['deleted', 'provider-changed', 'error'])('blocks an explicit session ta
   expect(resolveProviderCredential({ runtimeConfig: projectSessionModel(getRuntimeConfig(home), sessionId), env: {} }).credential?.connectionId).toBe('a');
 });
 
-it.each(['model', 'baseUrl'])('refuses a request %s override that would send a different target', async field => {
+it.each(['model', 'baseUrl'])('blocks a request %s override before the row can leave the picker', async field => {
   const picker = modelPicker({ ...context(), resolveConfigTarget: config => {
     const result = resolveProviderCredential({ runtimeConfig: config, env: {} });
     return { ...result, [field]: field === 'model' ? 'other' : 'https://different.example.invalid/v1' };
   } });
-  await picker.load();
-  expect((await picker.apply([id()]))?.note).toContain('request overrides change its target');
+  const row = (await picker.load()).find(item => item.id === id());
+  expect(row).toMatchObject({ disabled: true, focusable: true, note: 'request target mismatch' });
+  const overlay = new OverlayHost(() => {}); overlay.open(picker);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  let pending: Promise<unknown> | undefined;
+  overlay.handleKey(parseKeyEvent('\r'), (selected, ids) => {
+    pending = selected.apply(ids).then(outcome => { if (outcome?.next) overlay.open(outcome.next); });
+  });
+  await pending; await new Promise(resolve => setTimeout(resolve, 0));
+  expect(overlay.active).toBe(true);
+  overlay.close();
   expect(readSessionModel(sessionId)).toBeUndefined();
 });
 
@@ -410,10 +419,10 @@ it('keeps the selected connection credential when an environment account is conf
   expect(override.blocked).toBe('connection-overridden'); expect(override.credential).toBeUndefined();
 });
 
-it('refuses a CLI credential override before persisting an exact connection choice', async () => {
+it('blocks a CLI credential override before persisting an exact connection choice', async () => {
   const picker = modelPicker({ ...context(), resolveConfigTarget: config => resolveProviderCredential({ runtimeConfig: config, cliApiKey: 'synthetic-other-account' }) });
-  await picker.load();
-  expect((await picker.apply([id()]))?.note).toContain('request overrides change its target');
+  const row = (await picker.load()).find(item => item.id === id());
+  expect(row).toMatchObject({ disabled: true, focusable: true, note: 'request target mismatch' });
   expect(readSessionModel(sessionId)).toBeUndefined();
 });
 
