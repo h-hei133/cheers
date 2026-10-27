@@ -20,7 +20,11 @@ export function proseRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScope)
   const windows = /^(?:[A-Za-z]:[\\/]|\\\\|\/\/)/.test(candidate);
   if (!source || source.literal === 'code' || source.literal === 'escape' && !windows) return undefined;
   if (quoted && quotedBody === undefined) return undefined;
-  const value = windows ? candidate : quote ? quotedBody! : scanCommandArgs(prefix, true)[0]?.value ?? '';
+  // Raw Windows separators remain literal. Our double-quoted insertions
+  // double the drive/UNC backslashes and must round-trip through the scanner.
+  const rawWindows = windows && (!quote || prefix.startsWith("'") ||
+    /^(?:[A-Za-z]:\\(?!\\)|\\{2}(?!\\))/.test(candidate));
+  const value = rawWindows ? candidate : scanCommandArgs(prefix, true)[0]?.value ?? '';
   if (quoted && !pathLike(value)) return undefined;
   if (!pathLike(value)) return undefined;
   const pathExists = tokenFrom === 0 && value.length > 1 &&

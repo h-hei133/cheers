@@ -9617,3 +9617,11 @@ ADD-01/02/03实际settings→model→masked key→返回→显式启用链确认
 regular/fullscreen×密钥/模型/标签/已知选项名八条新增回归先在旧实现失败，四条普通基线保留。最终四文件92项和过滤host21项通过、108项未选，共113项执行通过。保存及显式启用后读回精确值/endpoint/session目标，默认与镜像保持、无密钥历史或模型请求；有效反转触发四组各2条失败，源码逐字节恢复，SHA-256 `8ac7f87110adf03b29cc261b05c88aa05a01cdbee05e5effcf1ef4385afcb06b`。长模型名称的初期未截断画面预期已按实际列宽修正，完整身份断言保留。
 
 五静态门、diff、module facade 0及TS build `d1bff78338c5`通过，测试heap768MiB、build1536MiB；HANDOFF与addition第七十七批/当前摘要更新，反转材料清理。`217dae0a`的CI `40543737624`仍in_progress、Watch `40543737895`success，不替代本批结果。未运行全仓、真实认证服务、PTY、exe、桌面或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 转义路径的连续补全与后文保留
+
+ADD-10/11确认引号body被当成真实目录，转义字符没有还原；裸反引号目录还把后文skill吞入代码区。现复用原参数scanner读取路径，区分Windows原始分隔符与生成的双引号转义，反引号路径沿共享formatter加引号。保留原catalog、snapshot和替换owner。只读对照采用raw/quoted分离、目录不加空格及caret留在闭合引号内的决定，未将参考片段当作内部转义解码证据。
+
+十二条隔离文件系统与四条Windows词法回归先在旧实现失败。最终五文件131项及过滤实际InteractiveMode7项通过、126项未选，共138项执行通过；regular/fullscreen×引号/反引号四条host链覆盖paste、词中方向键、三次Tab、实际绘制、后文skill与零提交/网络。三个反转产生16/4/4项预期失败，源码逐字节恢复并核对SHA-256，恢复后重验全部聚焦检查。host初次括号错误属于fixture transform失败，修正后再记执行证据。
+
+五静态门、diff、module facade 0与TS build `08c30d959db3`通过，测试heap768MiB、build1536MiB；HANDOFF与addition第七十八批/当前摘要更新，scratch清理。`217dae0a`/`ecc99aae`的CI `40543737624`/`40539857527`success；`76093b0f`的Watch `40546189999`success、CI `40546189995`仍in_progress。更早`ab2bdde7`的CI `40536731834`为failure，annotation确认托管runner失联，尚未进入build或产品测试，不改记绿色。未运行全仓、真实PTY/provider/exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

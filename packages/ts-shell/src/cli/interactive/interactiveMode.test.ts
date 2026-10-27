@@ -65,6 +65,8 @@ import * as commandRouter from './interactiveCommandRouter.js';
 import { contextMessageHash } from '../../session/context/selection.js';
 import { readSessionModel } from '../../session/model/state.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
+import { scanCommandArgs } from '../../core/commands/arguments.js';
+import { promptTokens } from '../../core/prompts/tokens.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
@@ -1641,6 +1643,48 @@ describe("session wiring", () => {
       expect(walk).toHaveBeenCalledTimes(1);
     } finally { mode.stop(); walk.mockRestore(); }
   });
+
+  it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+    ['pick-quote"dir', 'pick-tick`dir'].map(name => ({ kind, name }))))(
+    'continues escaped path Tab acceptance in $kind for $name', async ({ kind, name }) => {
+      fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+      const root = fs.mkdtempSync('/tmp/cheers-test/path-tab-');
+      vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+      const directory = path.join(root, name), child = path.join(directory, 'child');
+      const file = path.join(child, 'report.txt');
+      fs.mkdirSync(child, { recursive: true }); fs.writeFileSync(file, 'fixture');
+      const { mode, terminal } = build();
+      const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void;
+        options: { runtimeContext: ShellRuntimeContext } };
+      host.options.runtimeContext = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root,
+        targetPathBase: root, rootMode: 'direct', gitRoot: null,
+        gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+        session: host.options.runtimeContext.session, runtimeConfig: { ...getRuntimeConfig(root), tuiMode: kind } });
+      const submit = vi.spyOn(host, 'onSubmit').mockImplementation(() => {});
+      const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+      const suffix = '\n后文 /skill:follow';
+      mode.start();
+      try {
+        terminal.input(`\x1b[200~阅读 ${root}/pickold${suffix}\x1b[201~`);
+        terminal.input('\x1b[D'.repeat(('old' + suffix).length));
+        for (const target of [directory + '/', child + '/', file]) {
+          await vi.waitFor(() => expect(host.view.suggestions.current()?.value).toBe(target));
+          terminal.input('\t');
+          const snapshot = host.view.editor.snapshot();
+          expect(snapshot.text.startsWith('阅读 ')).toBe(true);
+          expect(snapshot.text.endsWith(suffix)).toBe(true);
+          expect(scanCommandArgs(snapshot.text.slice(3, -suffix.length)).map(token => token.value)).toEqual([target]);
+          expect(promptTokens(snapshot.text).find(token => token.raw === '/skill:follow')?.literal).toBeUndefined();
+          expect(promptTokens(snapshot.text).some(token => token.raw === '/skill:follow')).toBe(true);
+          if (target !== file) expect(snapshot.text[snapshot.cursor]).toBe('"');
+          expect(stripAnsi(host.view.renderFrame({ columns: 100, rows: 24 }).rows.join('\n'))).toContain('后文 /skill:follow');
+        }
+        expect(submit).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+      } finally {
+        mode.stop(); submit.mockRestore(); network.mockRestore(); vi.unstubAllEnvs();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
 
   it.each(['escape', 'stop'])('cancels a pending reference walk on actual %s and ignores late results', async action => {
     let resolve!: (files: readonly string[]) => void;

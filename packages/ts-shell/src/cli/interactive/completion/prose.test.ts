@@ -10,6 +10,8 @@ import type { ShellRuntimeContext } from '../../../core/shell/runtimeContext.js'
 import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
 import { getSlashInvocation, registerSlashCommand } from '../../../entrypoints/slashCommandRegistry.js';
 import { routeSlashCommand } from '../../../core/commands/slashRouter.js';
+import { scanCommandArgs } from '../../../core/commands/arguments.js';
+import { promptTokens } from '../../../core/prompts/tokens.js';
 let root: string;
 let scope: { root: string; runtimeConfig: ReturnType<typeof getRuntimeConfig> };
 beforeEach(() => {
@@ -67,6 +69,64 @@ it('preserves prefix, suffix and newlines through consecutive quoted directory r
   const child = catalogSuggestions(childRequest, await load(childRequest.kind, new AbortController().signal, childRequest.query))[0]!;
   expect(replaceDraft(next, child.edit!)?.text).toBe(`阅读 "${root}/home space/child/"\n后文 👩‍💻`);
 });
+
+it.each(['pick-quote"dir', 'pick-back\\dir', 'pick-tick`dir', 'pick-组合 "\\`\'$dir'].flatMap(name =>
+  ['', '阅读 ', 'path="'].map(prefix => ({ name, prefix }))))(
+  'continues escaped directory replacements for $name after $prefix', async ({ name, prefix }) => {
+    const directory = path.join(root, name);
+    const child = path.join(directory, 'child "叶\\`$');
+    const file = path.join(child, 'report "\\`\'$.md');
+    fs.mkdirSync(child, { recursive: true });
+    fs.writeFileSync(file, 'fixture');
+    const embedded = prefix === 'path="';
+    const before = embedded ? 'path=' : prefix;
+    const suffix = `${embedded ? 'tail' : ''}\n后文 /skill:follow 👩‍💻`;
+    const initial = `${prefix}${root}/pick-|stale${embedded ? '"' : ''}${suffix}`;
+    const context = { cwd: root, projectRoot: root, session: { id: 'fixture' }, runtimeConfig: {},
+      skillOptions: { noSkills: true } } as ShellRuntimeContext;
+    const load = createCatalogLoader(() => context, {} as never, []);
+    let req = request(initial)!;
+    for (const target of [directory + '/', child + '/', file]) {
+      const items = catalogSuggestions(req, await load(req.kind, new AbortController().signal, req.query));
+      const item = items.find(candidate => candidate.value === target);
+      expect(item, `missing ${target}`).toBeDefined();
+      const next = replaceDraft(req.snapshot, item!.edit!)!;
+      expect(next.text.startsWith(before)).toBe(true);
+      expect(next.text.endsWith(suffix)).toBe(true);
+      const inserted = next.text.slice(before.length, -suffix.length);
+      expect(scanCommandArgs(inserted).map(token => token.value)).toEqual([target]);
+      expect(promptTokens(next.text).find(token => token.raw === '/skill:follow')).toMatchObject({ from: next.text.indexOf('/skill:follow') });
+      expect(promptTokens(next.text).find(token => token.raw === '/skill:follow')?.literal).toBeUndefined();
+      if (target === file) {
+        expect(next.cursor).toBe(before.length + inserted.length);
+      } else {
+        expect(next.text[next.cursor]).toBe('"');
+        req = catalogRequest(next, scope)!;
+        expect(req?.kind).toBe('path');
+        expect(req?.token.value).toBe(target);
+        expect(req?.query).toBe(target);
+      }
+    }
+  });
+
+it.each(['C:\\Users\\work space/', '\\\\server\\share\\work space/', 'C:/work `space/', '//server/share/work `space/'])(
+  'decodes generated quoted Windows paths without escape growth: %s', directory => {
+    let req = request('读取 "' + directory + '|"\n后文 /skill:follow')!;
+    for (const value of [directory, directory + 'child/', directory + 'child/report.txt']) {
+      const item = catalogSuggestions(req, [{ value, label: value, kind: 'path' }])[0]!;
+      expect(item).toBeDefined();
+      const next = replaceDraft(req.snapshot, item.edit!)!;
+      expect(scanCommandArgs(next.text.slice(3, next.text.indexOf('\n'))).map(token => token.value)).toEqual([value]);
+      expect(next.text.endsWith('\n后文 /skill:follow')).toBe(true);
+      if (value.endsWith('/')) {
+        req = catalogRequest(next, scope)!;
+        expect(req?.kind).toBe('path');
+        expect(req?.token.value).toBe(value);
+        expect(req?.query).toBe(value);
+        expect(next.text[next.cursor]).toBe('"');
+      }
+    }
+  });
 
 it('keeps a real /home path alongside a same-name skill without fuzzy description capture', () => {
   mockPathTarget('/home', 'directory');
@@ -254,6 +314,15 @@ it('recognizes quoted Windows drive and UNC paths in prose', () => {
   expect(request("读取 'C:/Users/wa|")).toMatchObject({ kind: 'path', token: { value: 'C:/Users/wa' } });
   expect(request('读取 "\\\\server\\share\\fo|')).toMatchObject({ kind: 'path' });
 });
+
+it.each(['C:\\Users\\$data\\`cache', '\\\\server\\share\\$data\\`cache'])(
+  'keeps separators before special characters in raw quoted Windows input: %s', value => {
+    for (const quote of ['"', "'"]) {
+      const req = request(`读取 ${quote}${value}|${quote}`);
+      expect(req?.kind).toBe('path');
+      expect(req?.token.value).toBe(value);
+    }
+  });
 
 it('completes a prefixed quoted path without replacing the prose prefix', () => {
   const req = request(`path="${root}/ho|me"tail suffix`)!;
