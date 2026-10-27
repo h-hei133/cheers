@@ -69,6 +69,31 @@ function createHarness(root = "/tmp/project-alpha") {
 }
 
 describe("interactive command router", () => {
+  it("applies a successful statusline save to the current display", async () => {
+    const scratch = path.join(os.tmpdir(), "cheers-test"); fs.mkdirSync(scratch, { recursive: true });
+    const root = fs.mkdtempSync(path.join(scratch, "statusline-route-"));
+    vi.stubEnv("HOME", root); vi.stubEnv("USERPROFILE", root);
+    const harness = createHarness(root);
+    const runtimeContext = harness.input.runtimeContext as unknown as {
+      configuration: ConfigState;
+      runtimeConfig: ReturnType<typeof getRuntimeConfig>;
+    };
+    Object.defineProperty(harness.input.runtimeContext, "runtimeConfig", {
+      configurable: true,
+      get: () => runtimeContext.configuration.current.config,
+    });
+    const runtime = new ShellSessionRuntime({ sessionManager: harness.input.sessionManager,
+      renderer: harness.input.renderer, runPrompt: () => { throw new Error("Unexpected provider call"); } });
+    try {
+      await routeInteractiveCommand({ ...harness.input, sessionRuntime: runtime, prompt: "/statusline use cost" });
+      expect(runtimeContext.configuration.current.config.tui?.statusItems).toEqual(["cost"]);
+      expect(runtimeContext.runtimeConfig.tui?.statusItems).toEqual(["cost"]);
+      expect(harness.lines.join("\n")).toContain("Applied to this session");
+    } finally {
+      vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it.each(['/context', '/tools', '/tools mcp__fixture__Read', '/debug tools'])('cancels %s discovery through the actual interactive command owner', async prompt => {
     const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
     const root = fs.mkdtempSync(path.join(scratch, 'context-route-'));

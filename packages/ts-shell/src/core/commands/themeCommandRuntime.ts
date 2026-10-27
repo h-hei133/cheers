@@ -71,7 +71,7 @@ export async function runThemeCommand(
   return {
     kind: "local",
     output: selectedTheme() === "auto"
-      ? `Theme set to \`auto\` (currently \`${currentTheme()}\`); following terminal appearance.`
-      : `Theme set to \`${currentTheme()}\`.`,
+      ? `Theme set to \`auto\` for this session (currently \`${currentTheme()}\`); following terminal appearance. Save a lasting choice in /settings Appearance.`
+      : `Theme set to \`${currentTheme()}\` for this session. Save a lasting choice in /settings Appearance.`,
   };
 }

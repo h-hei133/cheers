@@ -58,7 +58,10 @@ describe("the theme command", () => {
     const result = await runThemeCommand(["mine"], { cwd: workspace, themePaths: [file] });
 
     expect(result.kind).toBe("local");
-    if (result.kind === "local") expect(result.output).toContain("Theme set to `mine`");
+    if (result.kind === "local") {
+      expect(result.output).toContain("Theme set to `mine` for this session");
+      expect(result.output).toContain("/settings Appearance");
+    }
   });
 
   it("names what is available when the theme asked for is not there", async () => {

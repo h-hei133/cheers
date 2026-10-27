@@ -183,6 +183,8 @@ export interface CommandContext {
   readonly admission?: () => string | undefined
   /** Catalogue-only refresh retains ordinary accepted settings and rechecks model constraints. */
   readonly refreshRuntimeConfig?: (scope?: 'catalog') => import('../../config/application.js').ConfigReloadResult
+  /** Apply a display-only setting after its owning writer has persisted it. */
+  readonly applyDisplayConfig?: (applied: Pick<RuntimeConfig, 'tui' | 'tuiMode' | 'theme'>) => void
   /** Local transport/cursor/cache owners used by `/fresh`; transcript is never part of this port. */
   readonly freshState?: import('./fresh.js').FreshStateOwner
   /** Bootstrap-owned restart handoff; the command only requests it. */

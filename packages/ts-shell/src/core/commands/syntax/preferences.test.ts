@@ -15,7 +15,7 @@ import { statuslineCompletions } from "../statusline/syntax.js";
 import { CONFIG_SETTINGS } from '../../../config/settings.js';
 import { SessionManager } from '../../../session/SessionManager.js';
 import * as modelState from '../../../session/model/state.js';
-import { getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../config/runtimeConfig.js';
 
 let root: string;
 beforeEach(() => {
@@ -43,10 +43,24 @@ it("shares status item IDs and preserves comma lists, catalogue order and dedupl
   const result = await runStatuslineCommand(["use", "cost,model", "cost"], { cwd: root });
   const expected = STATUS_ITEMS.filter(item => ["cost", "model"].includes(item.id)).map(item => item.id);
   expect(result.output).toContain(`Status band set to: ${expected.join(", ")}`);
+  expect(result.output).toContain("fresh shell reads it from the start");
+  expect(result.output).not.toContain("updates on the next frame");
   expect(statuslineCompletions("use model,co")?.map(item => item.value)).toEqual(["model,context", "model,cost"]);
   expect(statuslineCompletions("use model ")?.some(item => item.value === "model")).toBe(false);
   expect(statuslineCompletions("use unknown ")).toBeNull();
   expect(statuslineCompletions("list ")).toBeNull();
+});
+
+it("does not claim live statusline application when display application fails", async () => {
+  const applied = vi.fn(() => { throw new Error("display unavailable"); });
+  const result = await runStatuslineCommand(["use", "model"], {
+    cwd: root,
+    runtimeConfig: getRuntimeConfig(root),
+    applyDisplayConfig: applied,
+  });
+  expect(applied).toHaveBeenCalledOnce();
+  expect(result.output).toContain("applying it to this session is unconfirmed");
+  expect(result.output).not.toContain("Applied to this session");
 });
 
 it("only describes implemented settings and refuses extra arguments", async () => {

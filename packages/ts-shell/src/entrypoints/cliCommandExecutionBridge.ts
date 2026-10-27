@@ -126,6 +126,7 @@ export interface BuildCliCommandExecutionInput {
   readonly recordAuxiliaryUsage?: CommandContext['recordAuxiliaryUsage'];
   readonly admission?: CommandContext['admission'];
   readonly refreshRuntimeConfig?: CommandContext['refreshRuntimeConfig'];
+  readonly applyDisplayConfig?: CommandContext['applyDisplayConfig'];
   readonly getToolPool?: CommandContext["getToolPool"];
 }
 
@@ -223,6 +224,7 @@ export async function buildCliCommandExecution(
     readConfiguration: input.readConfiguration,
     recordAuxiliaryUsage: input.recordAuxiliaryUsage,
     admission: input.admission,
+    applyDisplayConfig: input.applyDisplayConfig,
     workspaceRoots: input.workspaceRoots,
     getToolPool: input.getToolPool,
     compactCheckpointStore: input.compactCheckpointStore,

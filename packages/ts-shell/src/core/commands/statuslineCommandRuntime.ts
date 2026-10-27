@@ -36,6 +36,13 @@ export async function runStatuslineCommand(
   const wanted = new Set(requested);
   const items = VALID_IDS.filter((id) => wanted.has(id));
   const written = writeStatusItems(statusRoot(context), items);
+  let application: 'applied' | 'unavailable' | 'unverified' = context.applyDisplayConfig ? 'unverified' : 'unavailable';
+  if (context.applyDisplayConfig) {
+    try {
+      context.applyDisplayConfig({ tui: { ...context.runtimeConfig?.tui, statusItems: items } });
+      application = 'applied';
+    } catch { /* The durable write remains known; live application does not. */ }
+  }
 
   const where =
     written.scope === "project"
@@ -45,7 +52,12 @@ export async function runStatuslineCommand(
     kind: "local",
     output: [
       `Status band set to: ${items.join(", ")}.`,
-      `Saved to ${where}. The band updates on the next frame; a fresh shell shows it from the start.`,
+      `Saved to ${where}.`,
+      application === 'applied'
+        ? "Applied to this session; a fresh shell reads it from the start."
+        : application === 'unverified'
+        ? "The file was saved, but applying it to this session is unconfirmed."
+        : "This command context has no live status band; a fresh shell reads it from the start.",
     ].join("\n"),
   };
 }

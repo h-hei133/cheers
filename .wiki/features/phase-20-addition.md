@@ -1533,7 +1533,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
 ### 第六十四批：正文引号权威与context计量身份
 
@@ -1594,3 +1594,11 @@ import cycles、Node floor、module facade0、diff check及TS build `9283d98655a
 category env/profile两个分支分别使用不同ambient endpoint，并在测试setup清除真实`ANTHROPIC_API_KEY`，避免profile用例被宿主environment遮蔽；行内同时断言credential source，profile configure draft断言endpoint存在且合成key不存在。独立只读review先指出这两项测试隔离缺口，补齐后delta review为no findings。category23与session-provider28分别单进程串行通过；把行endpoint回退到仅named-candidate resolution后触发env/profile共2项预期失败，源码逐字节恢复并核对SHA-256。
 
 五静态门/diff、责任上限0、module facade0、Phase 20脚本38 complete / 9 partial / 0 open、strict docs及TS build `a2508c6c2a64`（inputs `5350f916d60a`、artifact `cef810f8a754`）通过，manifest readback为fresh且460 compiler input/1882 immutable artifact匹配。未重新运行前一批其余recovery/admission/preset文件，也未运行全仓、PTY、真实provider、exe或桌面；这些结果保持第六十七批的独立证据，不累加为本次重跑。原Phase 20保持38/9/0，ADD独立且整体active。
+
+### 第六十九批：显示偏好命令的当前会话应用与持久化边界
+
+第六十九批继续收口ADD-13的入口一致性。复核发现`/statusline use`已经把`tui.statusItems`写入配置文件，但命令只返回文本，没有把新值发布到当前会话的`ConfigState`；交互面板读取已接受的`configuration.current.config`，而该字段是restart应用项，普通配置刷新不会改写已安装显示值。因此旧输出“下一帧更新”与真实行为不符，用户会看到磁盘已改变但底栏不变。`/theme`也有同类文案缺口：命令只改变当前进程的主题，却只显示“Theme set”，没有说明持久化入口。
+
+现`CommandContext`新增可由host提供的`applyDisplayConfig`端口；交互路由把它绑定到既有[configuration owner](../../packages/ts-shell/src/config/state.ts)的`recordDisplay`，不另建主题/状态栏状态。`/statusline use`先完成原配置写入，再调用该端口；成功时明确报告“Applied to this session”，端口缺失时只报告已保存并说明新shell读取，端口异常时明确“写入已知、应用未确认”。[theme command](../../packages/ts-shell/src/core/commands/themeCommandRuntime.ts)则明确当前会话范围，并指向`/settings Appearance`保存长期选择。
+
+三文件单进程串行60项通过：`syntax/preferences`17、`themeCommandRuntime`6、`interactiveCommandRouter`37。新增真实路由回归断言磁盘与accepted configuration都变为`cost`；移除交互router的display port后该断言出现1项预期失败，源码逐字节恢复并通过SHA-256核对（`interactiveCommandRouter.ts` `be09893af02b`、`statuslineCommandRuntime.ts` `4d6acec8e0f0`）。五静态门/diff、责任上限0、module facade0、Phase 20脚本38 complete / 9 partial / 0 open及strict docs通过；TS build `50fb30626897`（inputs `56d48d8ccac7`、artifact `5725771a1bcb`）通过，manifest readback为fresh且460 compiler input/1882 immutable artifact匹配。未运行全仓、PTY、真实provider、exe或桌面；不将本轮命令路由证据外推到用户原始终端。

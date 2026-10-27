@@ -9550,3 +9550,9 @@ ADD-02补齐provider-slot follow-up的展示一致性。非当前canonical provi
 category23与session-provider28分别单进程串行通过。将行endpoint回退到仅named-candidate resolution后，env/profile共2项按预期失败，源码逐字节恢复。独立review先指出inline credential source未断言及profile用例可能被宿主`ANTHROPIC_API_KEY`遮蔽，修复后delta review no findings；测试setup现清空该key，并同时覆盖inline source/endpoint与profile draft无secret。
 
 五静态门/diff、责任上限0、module facade0、Phase 20 38 complete / 9 partial / 0 open、TS build `a2508c6c2a64`（inputs `5350f916d60a`、artifact `cef810f8a754`）、fresh manifest 460/1882及strict docs通过。未重跑前一批recovery/admission/preset，也未运行全仓、PTY、真实provider、exe或桌面；20k继续mock/切片。HANDOFF/addition第六十八批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-27] fix | 显示偏好命令的当前会话应用
+
+ADD-13确认`/statusline use`只写配置而未更新当前accepted display state，且旧输出错误承诺下一帧更新；`/theme`只改变当前进程却没有说明保存边界。现CommandContext增加host `applyDisplayConfig`，interactive route绑定既有`ConfigState.recordDisplay`；状态栏命令在写入后应用，缺失/异常时如实报告保存与应用范围。theme命令明确current session并指向`/settings Appearance`。
+
+三文件60项单进程串行通过：preferences17、theme6、interactive router37。真实router回归同时断言配置文件与accepted configuration；移除router display port后1项预期失败，源码逐字节恢复并核对SHA-256。五静态门/diff、责任上限0、module facade0、Phase 20 38 complete / 9 partial / 0 open、strict docs及TS build `50fb30626897`（inputs `56d48d8ccac7`、artifact `5725771a1bcb`）、fresh manifest 460/1882通过。未运行全仓、PTY、真实provider、exe或桌面；HANDOFF/addition第六十九批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。
