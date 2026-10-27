@@ -1466,6 +1466,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；第六十三批补非首位命令碰撞file引号、目录候选不触发命令模板查找、代码/转义/URL参数不请求path catalog及quoted Windows drive/UNC识别；第七十批补`/skill:`命名空间内真实路径与skill候选并存，quoted path与exact skill Enter/Tab分界保真。完整场景验收仍按下表，非skill同名template/path的裸提交歧义及正文功能命令执行边界不因此消失 |
 | 转义目录名使连续Tab失败或隐藏后文skill | 第七十八批确认已插入引号内的转义源码被当成真实路径，裸反引号还会打开代码区。现复用参数扫描器解码，保留原始Windows分隔符并给反引号路径加引号；138项执行通过、三组有效反转与构建有本地证据。两模式host使用RecordingTerminal，Windows只做词法测试，真实终端与平台本批未验 |
 | 手动输入的未闭合单引号路径在空格处分裂 | 第八十四批确认leading单引号须先有close，路径后半段失去补全，内部skill/方法标记暴露给准备。现明确路径前缀沿原tokenizer保持open quote范围；142项执行通过、13项有效反转与build有本地证据，双引号/带前缀控制及闭合后的多skill保留，原生Windows与真实终端未验 |
+| 组合选项的引用值被误作普通正文 | 第八十五批确认`--mode="paper"`、depth和brief未进入研究参数，无效引用选项还会绕过校验。现保留未引用flag前缀，复用参数scanner解码后走原strict语法；未闭合选项在准备/建状态前阻止。完整引用、escape和code正文继续保留，预览/提交、durable options与两模式Enter有隔离证据 |
 | 代码示例中的文件引用仍扫描目录，含sigil文件名无法继续补全 | 第七十九批确认`@`后备分支未检查代码区，又把文件名内任意`@`当成重复sigil；前导`@`文件还可能插入为字面双`@@`。现复用源token排除代码、仅拒绝raw双sigil，并引用前导sigil文件名。94项执行通过及11/5/1有效反转有本地证据；实际host证明代码内零枚举、闭合后恢复，真实终端与平台本批未验 |
 | review正文组合原先未准入 | 第五十批确认review会读取真实Git snapshot，不能当纯modifier。现声明为单一driver，消费共享正文、brainstorm和全部skill并生成一份review prompt；audit/check共用声明，第二个driver在派发前拒绝。第五十七批补齐standalone/composed预览：复用同一review request与Git workbench，强制与dispatch一致的plan mode，并在内容复验时重查snapshot fingerprint；第五十八批再加入不持久化的one-use snapshot reservation、canonical binding、过期/变更拒绝和diff后fingerprint检查，不调用通用Git派发或写执行；第六十一批把失效标记扩为workbench级，并加入异步`reviewTake`/epoch；第六十二批再让提交期暂停controller自动失效，并把take保留到diff/最终检查完成。五文件234项、有效反转和真实Git fixture有局部证据，真实provider/桌面仍待验 |
 | 无flag组合方法静默吞掉dash正文 | 第五十二批确认option扫描未先检查方法是否声明flags，review与可组合模板会丢失`--keep-this`/`--counterexample`，而声明flags的方法仍需严格拒绝未知option。现只对非空flag声明解析，flagless正文完整进入共享prompt；91项、两个有效反转及独立review有局部证据，真实终端/平台仍未验 |
@@ -1564,6 +1565,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第八十三批补模型详情已接受动作的刷新异常：失败只沿原父回调返回并展示安全notice，已消费详情退休；关闭或替换后的迟到rejection丢弃。两模式`/model`与`/settings`实际host覆盖fresh显式重试、取消、原入口与held草稿，配置/会话选择保持；真实故障和完整平台验收仍待补，ADD整体active。
 
 第八十四批补手动未闭合的单引号路径：明确路径起始保留跨空格的字面范围，内部skill/review/research不进入准备；实际Tab完成目录/子目录/含apostrophe文件，真实关闭后恢复多skill解析。两模式host与本地目录有证据，Windows仅词法覆盖，完整终端/平台验收仍待补，ADD整体active。
+
+第八十五批补组合选项的引用值：研究mode/depth/brief按原scanner解码并由已有语法校验，非法、重复和未闭合选项不创建研究或派发，原草稿可重试；值内slash/skill不再扫描。两模式Enter、实际研究状态读回及预览到同一run ID已有隔离证据，真实研究服务、PTY和完整平台验收继续待补，ADD整体active。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -1830,3 +1833,19 @@ ADD-10/11/12继续核对手动输入→候选→Tab→再次解析。原[prompt 
 主代理heap768MiB、单worker串行最终完成tokens22、skills26、composition30、prose58共136项；过滤InteractiveMode执行新增2条及既有转义路径4条，共6项通过、161项未选，总计142项实际执行通过。独立反转open-path quote判断，按文件/名称确认tokens6、prose2、composition3、host2共13项预期失败，四个控制仍通过，260项未选。finally逐字节恢复并核对SHA-256 `c3123204d36a349b88cb32d3b2c816efad4babe560c1e6360c81fa02a4e69be8`，恢复后重跑上述全部最终聚焦检查；filtered-out不算通过。
 
 五静态门、diff、module facade 0与TS build `47f715c0ca97`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新，临时反转材料清理。延迟读取`b47218f0d4f185ab344af8c5565223c77ea3b851`时Watch `40566634781`已success、CI `40566634731`仍in_progress，不替代本批结果。未运行全仓、真实PTY/provider/exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。
+
+### 第八十五批：组合选项的引用值与严格准入
+
+ADD-11/12确认[组合planner](../../packages/ts-shell/src/core/commands/composition/plan.ts)将所有含quote的token排除在选项lane之外。`问题 /deep-research --mode="paper" --depth='deep' --brief="brief with spaces.md" /skill:a /skill:b`因此创建quick/default研究，把选项原文留在question，briefPath缺失；unknown、duplicate与布尔选项的非法引用值也绕过原strict语法。真实router、native研究状态和preview→submission链均复现该产品缺口。
+
+只读对照快照`0838d2ab4407b74e870de07e1a6780a13c7d542c`的`packages/coding-agent/src/utils/command-args.ts`1–48将引用片段拼入单个解码value、不做变量展开，显式strict模式拒绝未闭合quote；默认模式不拒绝，不能宣称参考所有入口均严格。`src/modes/controllers/command-controller-shared.ts`43–64在解码后识别选项。本项目采用先解码再校验的决定，复用已有`scanCommandArgs`。组合输入还含普通正文，因此完整quote/escape/code token继续保留字面量；这与纯命令尾的解析范围不同，没有复制参考parser。
+
+planner现区分未引用的dash前缀，解码已准入选项和值后仍交原strict语法。未闭合选项形成准备错误，由[原prepare owner](../../packages/ts-shell/src/core/commands/composition/prepare.ts)在请求准备和研究状态创建前拒绝，沿既有retryDraft返回完整草稿。值中的`/review`、`/skill:missing`不重新扫描；flagless正文与独立命令parser保持原合同，没有新增研究或配置owner。
+
+[组合测试](../../packages/ts-shell/src/core/commands/composition.test.ts)新增两种quote的真实router参数/两skill验证、七种非法选项拒绝和四种完整quote/escape/code控制。[研究组合测试](../../packages/ts-shell/src/research/run/composition.test.ts)新增三个入口×两种quote六条，核对同一个native run、mode/depth/briefPath、durable readback及四个child stage的请求身份和两份真实skill body。[preview测试](../../packages/ts-shell/src/cli/runtime/context/preview.test.ts)补两种quote的同一prospective→admitted run ID、实际schema/system/token估算一致及零早期create/arm/run，另四条非法/未闭合值在注入准备前拒绝，session字节保持。
+
+[实际host测试](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)补regular/fullscreen×合法/非法四条，从bracketed paste和Enter走真实ShellSessionRuntime命令生命周期与native研究owner。合法只create/arm一次，完整options与两skill进入最终派发参数；非法不建状态/不派发，恢复原始含尾空格草稿。初期非法callback无返回、host固定null controller及构造后换tuiMode属夹具问题，分别改有效受控结果、实际runtime owner和构造前模式，并断言实际alternate-screen序列。最终provider派发端口为mock，研究执行和fetch均零调用；终端为RecordingTerminal，未读brief正文或启动真实研究服务。
+
+主代理heap768MiB、单worker串行执行`rtk env NODE_OPTIONS=--max-old-space-size=768 VITEST_MAX_THREADS=1 VITEST_MIN_THREADS=1 npm exec --workspace packages/ts-shell -- vitest run src/core/commands/composition.test.ts src/research/run/composition.test.ts src/cli/runtime/context/preview.test.ts`，43+18+73共134项通过；host以`-t 'submits quoted research options'`执行4项通过、167项未选，共138项实际执行通过。恢复旧planner/prepare的反转按文件/名称确认25项失败（composition9、research6、preview6、host4），七个控制通过、273项未选；单独撤销prepare的未闭合quote拒绝触发composition1/preview1共2项失败，九个所选控制通过。finally逐字节恢复及SHA-256核对：plan `253cc1a9a58ce5f30cef624d08d965cfa3b5e1cd7bee1cfc5cf4cc3100451310`，prepare `95dee5565807afd77aca75006e6c25e47fc8c2613436d8e838f73c5b76f6a2a6`；恢复后重验受影响检查，未选测试不计为通过。
+
+五静态门、diff、module facade 0及最终TS build `bc773350564f`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新，反转scratch清理。延迟读回`b47218f0d4f185ab344af8c5565223c77ea3b851`的CI `40566634731`已success；`bf6bb90361b774fea7c65b7ff6825aa45d435fc0`的Watch `40568166653`success、CI `40568166550`仍in_progress，不替代本批结果。未运行全仓、真实PTY/provider/exe、桌面或20k历史，未重跑原Phase20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。

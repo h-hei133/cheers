@@ -9673,3 +9673,11 @@ ADD-10/11/12确认token首位单引号必须先有close，手动输入带空格�
 新增六条词法、六条实际目录补全、三条router及两条两模式host场景；旧实现13项失败、四个兼容控制通过。最终tokens22、skills26、composition30、prose58共136项及过滤host6项通过、161项未选，共142项执行通过。覆盖目录/子目录/含apostrophe文件的Tab身份、内部标记零方法callback、关闭后两份真实skill body及原文保持，零host提交/网络；Windows仅词法证据。有效反转再次触发13项失败，四控制仍通过，源码逐字节恢复及SHA-256核对后完成最终重验。
 
 五静态门、diff、module facade 0与TS build `47f715c0ca97`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十四批/当前摘要更新、scratch清理。延迟读取`b47218f0d4f185ab344af8c5565223c77ea3b851`时Watch `40566634781`success、CI `40566634731`仍in_progress。未运行全仓、真实PTY/provider/exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 组合研究选项的引用值与严格准入
+
+ADD-11/12确认组合planner因token含quote而丢弃整个选项，mode/depth退默认、briefPath缺失，非法引用选项也越过校验。现保留未引用flag前缀，复用原scanner解码，再交原strict语法；未闭合选项在请求准备/建状态前阻止，值内slash/skill及完整引用/escape/code正文保持字面量。只读参考采用引用片段解码后识别选项的决定，没有新增parser或研究owner。
+
+最终composition43、native研究组合18、preview73共134项及过滤host4项通过、167项未选，共138项执行通过。三个入口×两种quote核对实际研究状态/child请求，预览绑定同一admitted run ID；regular/fullscreen从paste和Enter核对准确options、两skill、一次create/arm、非法时不建状态且原草稿返回。最终派发端口为mock，零研究执行/网络。初期无返回callback、固定null controller及构造后换屏幕模式均按夹具问题修正，实际alt-screen序列另有断言。有效反转触发25项及2项预期失败，按名称/文件核对，源码逐字节恢复及SHA-256确认后重验；未选测试不算通过。
+
+五静态门、diff、module facade 0与TS build `bc773350564f`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十五批/当前摘要更新、scratch清理。`b47218f0`的CI `40566634731`已success；`bf6bb903`的Watch `40568166653`success、CI `40568166550`仍in_progress，不替代本批。未运行全仓、真实PTY/provider/exe、桌面或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

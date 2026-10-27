@@ -673,6 +673,8 @@ it.each([
   '/deep-research --mode software question /skill:one /skill:two',
   'question /deep /skill:one /skill:two\nInspect counterexamples',
   '/research --save "Question with /home and quoted /model"',
+  'Compare papers /deep-research --mode="paper" --depth="deep" --brief="brief with spaces.md" /skill:one /skill:two',
+  "Compare papers /deep --mode='paper' --depth='deep' --brief='brief with spaces.md' /skill:one /skill:two",
 ])('previews and submits one exact native research entry without early state or network effects: %s', async input => {
   const { cwd, context, session, layout, load, manager, gateway } = fixture();
   const paths = ['one', 'two'].map(name => { const file = path.join(cwd, `${name}.md`); fs.writeFileSync(file, `---\nname: ${name}\ndescription: method\n---\nMETHOD ${name}`); return file; });
@@ -697,6 +699,10 @@ it.each([
     researchCommand, runCancellable: operation => host.commands.run(operation) });
   expect(result).toMatchObject({ kind: 'prompt', prompt: expectedPrompt, promptMetadata: { researchRunId: prospectiveId } });
   const admitted = runtime.selected(prospectiveId)!;
+  if (input.includes('--mode=')) {
+    expect(admitted.request).toMatchObject({ mode: 'paper', depth: 'deep', briefPath: 'brief with spaces.md' });
+    expect(admitted.request.question.trim()).toBe('Compare papers');
+  }
   expect(admitted.id).toBe(prospectiveId); expect(created).toHaveBeenCalledTimes(1); expect(arm).toHaveBeenCalledTimes(1);
   const descriptors = researchEntryDescriptors(admitted);
   const tools = descriptors.map(descriptor => ({ ...descriptor, execute: vi.fn(async () => ({ success: false })) }));
@@ -731,6 +737,19 @@ it('refuses a published research entry after attached source bytes change withou
   expect(create).not.toHaveBeenCalled();
   expect(fs.readFileSync(layout.statePath)).toEqual(before);
 });
+
+it.each(['--mode="unknown"', '--mode="paper" --mode software', '--brief="unfinished', '--brief "unfinished'])(
+  'rejects invalid quoted research previews without state or request preparation: %s', async option => {
+    const { context, layout, manager, load, gateway } = fixture();
+    const files = [layout.metadataPath, layout.statePath, layout.transcriptPath], before = files.map(file => fs.readFileSync(file));
+    const runtime = researchFor(context, manager, { renderLine: vi.fn() });
+    const create = vi.spyOn(runtime, 'create'), arm = vi.spyOn(runtime, 'arm'), execute = vi.spyOn(runtime, 'run');
+    const prepare = vi.fn(context.preparePromptContext!); context.preparePromptContext = prepare;
+    await expect(load(`Question /deep-research ${option}`)).rejects.toThrow();
+    expect(files.map(file => fs.readFileSync(file))).toEqual(before); expect(fs.existsSync(layout.stateLockPath)).toBe(false);
+    expect(create).not.toHaveBeenCalled(); expect(arm).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled();
+    expect(prepare).not.toHaveBeenCalled(); expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
+  });
 
 it('refuses an expired published research entry instead of starting a fresh run', async () => {
   const { cwd, context, session, layout, manager, load } = fixture();

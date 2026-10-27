@@ -71,6 +71,9 @@ import * as modelState from '../../session/model/state.js';
 import { SessionModelWriteError } from '../../session/model/outcome.js';
 import * as configurationCommands from '../../core/commands/configuration.js';
 import { filterVisibleToolNames } from '../../core/tools/prefilter.js';
+import { researchHarness, cleanupResearch } from '../../test-utils/research.js';
+import { researchFor } from '../runtime/research.js';
+import { currentResearch, readResearch } from '../../research/run/store.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
@@ -78,6 +81,7 @@ function build(overrides: {
   scheduler?: ManualScheduler;
   startup?: StartupSurface;
   onFirstFrame?: () => void;
+  tuiMode?: 'regular' | 'fullscreen';
 } = {}): {
   mode: InteractiveMode;
   renderer: StreamingRenderer;
@@ -95,7 +99,7 @@ function build(overrides: {
       projectRoot: "/workspace",
       session: { id: "sess_1" },
       gitContext: { branch: "main" },
-      runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64_000, configDiagnostics: [] },
+      runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64_000, configDiagnostics: [], tuiMode: overrides.tuiMode },
     } as unknown as ShellRuntimeContext),
     sessionRuntime: {
       commands: new ShellCommandRuntime(),
@@ -545,6 +549,57 @@ it('delivers all composed instructions and images through the real interactive r
     expect(dispatch).toHaveBeenCalledTimes(1); expect(host.lastPrompt).toBe(source);
   } finally { dispatch.mockRestore(); mode.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind => [true, false].map(valid => ({ kind, valid }))))(
+  'submits quoted research options through actual $kind Enter with valid=$valid', async ({ kind, valid }) => {
+    const setup = researchHarness();
+    const skillPaths = ['a', 'b'].map(name => {
+      const file = path.join(setup.root, name, 'SKILL.md'); fs.mkdirSync(path.dirname(file));
+      fs.writeFileSync(file, `---\nname: ${name}\ndescription: method\n---\nBODY ${name}`); return file;
+    });
+    const { mode, terminal, renderer } = build({ tuiMode: kind });
+    const host = mode as unknown as { view: InteractiveView; busy: boolean;
+      options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager; sessionRuntime: ShellSessionRuntime } };
+    const context = createShellRuntimeContext({ cwd: setup.root, originalCwd: setup.root, projectRoot: setup.root,
+      targetPathBase: setup.root, rootMode: 'direct', gitRoot: null,
+      gitContext: { insideGit: false, root: null, branch: null, isClean: null }, session: setup.session,
+      runtimeConfig: { ...getRuntimeConfig(setup.root), tuiMode: kind } });
+    context.skillOptions = { skillPaths, noSkills: true };
+    host.options.runtimeContext = context; host.options.sessionManager = setup.manager;
+    const provider = vi.fn();
+    host.options.sessionRuntime = new ShellSessionRuntime({ sessionManager: setup.manager, renderer, runPrompt: provider });
+    const runtime = researchFor(context, setup.manager, renderer);
+    const create = vi.spyOn(runtime, 'create'), arm = vi.spyOn(runtime, 'arm'), run = vi.spyOn(runtime, 'run');
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    const input = `比较论文 /deep-research --mode="${valid ? 'paper' : 'unknown'}" --depth='deep' --brief="brief /review.md" /skill:a /skill:b `;
+    const before = fs.readFileSync(readResearch(setup.manager, setup.session).bound.layout.statePath);
+    mode.start();
+    try {
+      expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+      terminal.input(`\x1b[200~${input}\x1b[201~`);
+      expect(host.view.editor.getText()).toBe(input);
+      terminal.input('\r');
+      if (valid) {
+        await vi.waitFor(() => expect(dispatch, host.view.transcript.all().map(block => block.text).join('\n')).toHaveBeenCalledOnce());
+        const admitted = currentResearch(readResearch(setup.manager, setup.session))!;
+        expect(admitted.request).toMatchObject({ mode: 'paper', depth: 'deep', briefPath: 'brief /review.md',
+          methods: { originalInput: input, skills: [{ name: 'a' }, { name: 'b' }] } });
+        expect(admitted.request.question.trim()).toBe('比较论文');
+        const sent = dispatch.mock.calls[0]![0];
+        expect(sent.promptMetadata).toMatchObject({ researchRunId: admitted.id, originalInput: input });
+        expect(sent.effectivePrompt).toContain('BODY a'); expect(sent.effectivePrompt).toContain('BODY b');
+        expect(create).toHaveBeenCalledOnce(); expect(arm).toHaveBeenCalledOnce();
+      } else {
+        await vi.waitFor(() => expect(host.view.transcript.all().map(block => block.text).join('\n')).toContain('Invalid research composition'));
+        expect(host.view.editor.getText()).toBe(input); expect(dispatch).not.toHaveBeenCalled();
+        expect(create).not.toHaveBeenCalled(); expect(arm).not.toHaveBeenCalled();
+        expect(fs.readFileSync(readResearch(setup.manager, setup.session).bound.layout.statePath)).toEqual(before);
+      }
+      await vi.waitFor(() => expect(host.busy).toBe(false));
+      expect(run).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled(); expect(provider).not.toHaveBeenCalled();
+    } finally { mode.stop(); cleanupResearch(); }
+  });
 
 it('restores queued composed images and text when the active turn is interrupted', async () => {
   const { mode } = build(); const host = mode as unknown as { busy: boolean; interrupt(): Promise<void>;

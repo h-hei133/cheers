@@ -64,6 +64,29 @@ it.each([
   expect(setup.researchCommand).not.toHaveBeenCalled(); expect(setup.runtime.current()).toBeUndefined();
 });
 
+it.each(['deep-research', 'research', 'deep'].flatMap(command => ["'", '"'].map(quote => ({ command, quote }))))(
+  'retains quoted options in one durable /$command run with $quote values', async ({ command, quote }) => {
+    const setup = fixture();
+    const brief = path.join(setup.root, 'brief /review /skill:literal.md');
+    const input = `比较论文\n/${command} --mode=${quote}paper${quote} --depth=${quote}deep${quote} --brief=${quote}${brief}${quote} /skill:research-a /skill:review-b`;
+    const result = await routeSlashCommand(input, setup.context);
+    expect(setup.researchCommand).toHaveBeenCalledOnce();
+    const admitted = setup.runtime.current()!;
+    expect(admitted.request).toMatchObject({ mode: 'paper', depth: 'deep', briefPath: brief, save: false,
+      methods: { originalInput: input, skills: [{ name: 'research-a' }, { name: 'review-b' }] } });
+    expect(admitted.request.question.trim()).toBe('比较论文');
+    const retained = currentResearch(readResearch(setup.manager, setup.session))!;
+    expect(retained.request).toEqual(admitted.request);
+    expect(result).toMatchObject({ kind: 'prompt', promptMetadata: { researchRunId: admitted.id, originalInput: input } });
+    for (const stage of ['brief', 'investigate', 'review', 'report'] as const) {
+      const prompt = researchPrompt(retained, stage);
+      expect(prompt).toContain('METHOD research-a'); expect(prompt).toContain('METHOD review-b');
+      const request = JSON.parse(prompt.split('Research input: ')[1]!).request;
+      expect(request).toMatchObject({ mode: 'paper', depth: 'deep', briefPath: brief });
+      expect(request.question.trim()).toBe('比较论文');
+    }
+  });
+
 it('includes every method in actual sequential child model requests while preserving native partial semantics', async () => {
   const setup = fixture();
   await routeSlashCommand('Versioned feature conditions /deep-research /skill:research-a /skill:review-b', setup.context);

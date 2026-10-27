@@ -5,6 +5,7 @@ import type { compositionPlan } from './plan.js';
 /** Prepare one task without invoking a command handler or admitting a workflow. */
 export function prepareComposition(input: string, plan: ReturnType<typeof compositionPlan>,
   skills: ReadonlyMap<string, Skill>, interactive = true) {
+  if (plan.error) return { error: plan.error };
   if (plan.disallowed.length) return { error: `${plan.disallowed.join(', ')} cannot be composed; use each separately or quote a literal reference.` };
   if (plan.methods.filter(method => method.invocation.composition?.kind === 'driver').length > 1) {
     return { error: 'Only one workflow driver can own a composed task.' };

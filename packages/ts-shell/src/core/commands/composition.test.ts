@@ -273,6 +273,40 @@ it('preserves literal option prose and permits absolute file values without cons
   expect(prepare).toHaveBeenLastCalledWith([], expect.stringContaining('"--literal"'));
 });
 
+it.each(["'", '"'])('decodes attached %s option values without rescanning their literal markers', async quote => {
+  const input = `问题 /deep-research --mode=${quote}paper${quote} --depth=${quote}deep${quote} --brief=${quote}/tmp/brief /review /skill:missing.md${quote} /skill:a /skill:b`;
+  const researchCommand = vi.fn(async () => ({ kind: 'prompt' as const, prompt: 'prepared research' }));
+  const gitCommand = vi.fn();
+  const result = await routeSlashCommand(input, { cwd: root, skillOptions: { skillPaths, noSkills: true }, researchCommand, gitCommand });
+  expect(result).toMatchObject({ kind: 'prompt', promptMetadata: { originalInput: input, skills: [{ name: 'a' }, { name: 'b' }] } });
+  expect(researchCommand).toHaveBeenCalledOnce();
+  const [args, context] = researchCommand.mock.calls[0]! as unknown as [string[], { composedPrompt: { prose: string } }];
+  expect(args.slice(0, -1)).toEqual(['--mode=paper', '--depth=deep', '--brief=/tmp/brief /review /skill:missing.md']);
+  expect(args.at(-1)).toBe(context.composedPrompt.prose);
+  expect(context.composedPrompt.prose.trim()).toBe('问题');
+  expect(gitCommand).not.toHaveBeenCalled();
+});
+
+it.each(['--mode="unknown"', "--depth='unknown'", '--unknown="literal"', '--save="true"',
+  '--mode="paper" --mode software', '--brief="unfinished', '--brief "unfinished'])(
+  'blocks invalid quoted composition options before dispatch: %s', async option => {
+    const input = `问题 /skill:a /deep-research ${option}`;
+    const researchCommand = vi.fn(async () => ({ kind: 'prompt' as const, prompt: 'unexpected research' }));
+    expect(await routeSlashCommand(input, { cwd: root, skillOptions: { skillPaths, noSkills: true }, researchCommand }))
+      .toMatchObject({ kind: 'local', retryDraft: input });
+    expect(researchCommand).not.toHaveBeenCalled();
+  });
+
+it.each(['"--mode=paper"', "'--mode=paper'", '--mode=`paper`', '\\--mode=paper'])(
+  'keeps fully literal option-looking prose out of declared flags: %s', async literal => {
+    const input = `问题 /deep-research ${literal} /skill:a`;
+    const researchCommand = vi.fn(async () => ({ kind: 'prompt' as const, prompt: 'prepared research' }));
+    await routeSlashCommand(input, { cwd: root, skillOptions: { skillPaths, noSkills: true }, researchCommand });
+    expect(researchCommand).toHaveBeenCalledOnce();
+    const [args] = researchCommand.mock.calls[0]! as unknown as [string[]];
+    expect(args).toHaveLength(1); expect(args[0]).toContain(literal);
+  });
+
 it('does not turn an unexpected driver shell action into an implicit functional action', async () => {
   const commands = [{ name: 'driver', kind: 'prompt', group: 'workflow', summary: 'driver', composition: {
     kind: 'driver', prepare: () => ({ args: ['question'] }) }, execute: async () => ({ kind: 'shell-action', action: 'exit-session' }) }] as never;
