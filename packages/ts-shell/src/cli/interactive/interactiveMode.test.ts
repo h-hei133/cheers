@@ -77,6 +77,99 @@ import { currentResearch, readResearch } from '../../research/run/store.js';
 import * as modelDetails from './picker/model/details.js';
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  (['user', 'project'] as const).flatMap(scope =>
+    (['apply', 'discard'] as const).map(action => ({ kind, scope, action })))))(
+  'retains status item staging through the actual $kind $scope settings editor and $action readback', async ({ kind, scope, action }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/status-settings-host-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', tuiMode: kind, topP: 0.7, tui: { statusItems: ['model'] } },
+      readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    const project = getProjectConfigPath(root); fs.mkdirSync(path.dirname(project), { recursive: true });
+    fs.writeFileSync(project, '{/* keep project comment */"tui":{"statusItems":["provider"]}}');
+    const manager = new SessionManager(), session = manager.createNew(root), { mode, terminal } = build({ tuiMode: kind });
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: true },
+      session, runtimeConfig: getRuntimeConfig(root) });
+    const host = mode as unknown as { view: InteractiveView & { context: { statusItems(): readonly string[] } }; overlay: OverlayHost;
+      options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const model = () => (host.overlay as unknown as { model: { current(): { id: string } | undefined;
+      visible: readonly { id: string }[]; isChosen(id: string): boolean } }).model;
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    const focus = async (id: string) => {
+      await vi.waitFor(() => expect(model().visible.some(row => row.id === id)).toBe(true));
+      for (let index = 0; index < model().visible.length; index++) {
+        if (model().current()?.id === id) return;
+        terminal.input('\x1b[B');
+      }
+      throw new Error(`Status setting row not reachable: ${id}`);
+    };
+    const choose = async (id: string) => { await focus(id); terminal.input('\r'); };
+    const originals = [getUserRuntimeConfigPath(), project].map(file => fs.readFileSync(file));
+    const accepted = context.configuration.current, selection = JSON.stringify(modelState.readSessionModelEdit(session.id));
+    const desired = ['provider', 'directory'];
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    mode.start();
+    try {
+      expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+      terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
+      host.view.editor.setText('held status settings draft\nkept through edit and return');
+      terminal.input('tui.statusItems'); await choose('tui.statusItems');
+      if (scope === 'project') { await choose('scope'); await choose('project'); }
+      await choose('edit'); await vi.waitFor(() => expect(frame()).toContain('Stage status items'));
+      const initial = scope === 'user' ? 'model' : 'provider';
+      await focus(initial); expect(model().isChosen(initial)).toBe(true); terminal.input(' ');
+      await vi.waitFor(() => expect(model().isChosen(initial), 'initial item toggled off').toBe(false));
+      for (const id of desired) {
+        await focus(id); expect(model().isChosen(id), `before choosing ${id}`).toBe(false); terminal.input(' ');
+        await vi.waitFor(() => expect(model().isChosen(id), `after choosing ${id}`).toBe(true));
+      }
+      expect(host.view.context.statusItems(), 'after selecting desired items').toEqual(desired);
+      terminal.input('Directory'); await vi.waitFor(() => expect(model().visible.map(row => row.id)).toEqual(['directory']));
+      expect(model().isChosen('provider')).toBe(true); terminal.input('\r');
+      await vi.waitFor(() => expect(frame()).toContain('▸ Apply')); expect(frame()).toContain('Pending:');
+      expect(host.view.context.statusItems(), 'after Enter stages filtered items').toEqual(desired);
+      await choose('edit'); await focus('directory'); terminal.input(' ');
+      await vi.waitFor(() => expect(host.view.context.statusItems()).toEqual(['provider'])); terminal.input('\x1b');
+      await vi.waitFor(() => expect(frame()).toContain('▸ Apply'));
+      expect(host.view.context.statusItems(), 'after Escape retains original pending items').toEqual(desired);
+      expect(context.configuration.current).toBe(accepted);
+      expect([getUserRuntimeConfigPath(), project].map(file => fs.readFileSync(file))).toEqual(originals);
+      await choose(action); await vi.waitFor(() => expect(frame()).toContain('Settings —'));
+      const stored = action === 'apply' ? desired : [initial];
+      const effective = ['provider'];
+      const requested = action === 'apply' && scope === 'project' ? desired : effective;
+      expect(host.view.context.statusItems()).toEqual(effective);
+      expect(context.runtimeConfig.tui?.statusItems).toEqual(effective);
+      expect(context.configuration.current.requested.tui?.statusItems).toEqual(requested);
+      expect(getRuntimeConfig(root).tui?.statusItems).toEqual(requested);
+      const files = [getUserRuntimeConfigPath(), project], target = scope === 'user' ? 0 : 1;
+      expect(readRuntimeConfigEditAt(files[target]).values.tui?.statusItems).toEqual(stored);
+      expect(fs.readFileSync(files[1 - target])).toEqual(originals[1 - target]);
+      if (action === 'discard') {
+        expect(fs.readFileSync(files[target])).toEqual(originals[target]); expect(context.configuration.current).toBe(accepted);
+      } else if (scope === 'project') expect(fs.readFileSync(project, 'utf8')).toContain('/* keep project comment */');
+      const notes = host.view.transcript.all().map(block => block.text).join('\n');
+      if (action === 'apply') {
+        expect(notes).toContain(`Saved to your ${scope} configuration.`);
+        if (scope === 'user') expect(notes).toContain('effective value differs');
+        else expect(notes).toContain('Restart required.');
+      } else expect(notes).not.toContain('Saved to your');
+      await choose('tui.statusItems'); await focus('edit');
+      if (action === 'apply' && scope === 'project') expect(frame()).toContain('restart required');
+      await choose('edit'); await focus(initial);
+      for (const id of ['model', 'provider', 'directory']) expect(model().isChosen(id)).toBe(stored.includes(id));
+      expect(host.view.context.statusItems()).toEqual(effective);
+      expect(context.runtimeConfig.topP).toBe(0.7);
+      expect(JSON.stringify(modelState.readSessionModelEdit(session.id))).toBe(selection);
+      expect(host.view.editor.getText()).toBe('held status settings draft\nkept through edit and return');
+      expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+    } finally { mode.stop(); vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   (['close', 'replace', 'keep'] as const).map(ending => ({ kind, ending }))))(
   'keeps the actual $kind settings Escape return subordinate to theme cleanup that will $ending its host', async ({ kind, ending }) => {
     fs.mkdirSync('/tmp/cheers-test', { recursive: true });

@@ -9813,3 +9813,12 @@ ADD-01/02/03双lane独立只读审阅发现普通根model遗漏accepted ownershi
 主代理heap768MiB单worker串行最终lifecycle35、overlay75、role46及实际host34，共190项执行通过，host261项未选。实际host新六条包含取消/正常返回后显式保存，另保留Apply和recovery控制；八组有效反转有十九/四条旧owner/host失败及2/8/5/18/17/1/2条独立边界失败，源码逐字节恢复并核对SHA后重验。五静态门、diff、module facade报告0及TS build `91f42246bef9`通过，118既有docs advisory保留，build heap1536MiB。
 
 两条gpt-6.1-sol只读lane最终APPROVE/CLEAR限于本修补；HANDOFF/当前摘要更新，工件归.omx/artifacts/phase20-addition-overlay-return/并清理scratch。第99批CI success，第100批CI `40597440762`在延迟观察时仍in_progress、Watch success，本批Git/CI另绑定。未验真实provider/native PTY/桌面/Windows、全仓或20k历史，原Phase20矩阵未重跑，ADD整体active。
+
+
+## [2026-10-28] test | 状态栏设置的暂存、来源与重启生效交叉验证
+
+第一百零二批沿ADD-03补regular/fullscreen×user/project×Apply/Discard八条实际host操作链：Space勾选、筛选保留隐藏选择、Enter暂存、二次编辑Escape恢复pending，保存/丢弃后同scope重开并核对配置/session/held草稿和零prompt/fetch。没有复现新产品缺陷，仅改测试/文档；statusItems沿既有restart合同保持installed/view，project Apply改变stored/requested/冷读回且提示重启，user Apply仍受project覆盖。冷读回不是实际重启，preview端口不是像素验证。
+
+主代理heap768MiB单worker串行最终settings39及新host8，共47项实际通过，295项未选不计通过。四组有效反转确认8/8/6/2项预期失败、39/39/41/45控制通过，产品source逐字节恢复并与固定Git基线一致后重验。初两轮Space时序夹具八失败及同步后的两条错误即时生效预期单独保留，不作产品缺陷；现有HANDOFF已覆盖，无重复追加。两条gpt-6.1-sol只读lane最终APPROVE/CLEAR限于修正后测试与主张，code lane撤回早先错误预期认可。
+
+五静态门及最终文档drift/diff通过，118既有docs advisory保留；无产品变更，不重复build。当前摘要更新，工件归.omx/artifacts/phase20-addition-status-settings/并清理scratch。第100批CI/Watch success，第101批CI `40598881157`及第92批CI `40582584417`仍in_progress，第101批Watch success，本批Git/CI另绑定。未验native PTY/桌面/真实provider/实际重启/Windows、全仓或20k历史，原Phase20矩阵未重跑，ADD整体active。

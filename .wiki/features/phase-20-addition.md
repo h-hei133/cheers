@@ -1551,7 +1551,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 
 | 用户要求 | 必须保留的实施方向 | 尚需补齐的证据 |
 |---|---|---|
-| 两面板整体看齐 | 先对照参考的分类/section、焦点域、搜索、详情、修改/配置、返回和窗口布局，再补具体缺口；功能内容来自本项目原owner。settings重试与范围选择保留原binding/source，正常冲突可显式重试 | settings73条基本链及17个代表性生命周期场景已有证据，继续补字段/来源/编辑器/窗口/桌面的交叉矩阵；model精确目标/能力/角色/认证、两模式及键鼠完整操作仍待验 |
+| 两面板整体看齐 | 先对照参考的分类/section、焦点域、搜索、详情、修改/配置、返回和窗口布局，再补具体缺口；功能内容来自本项目原owner。settings重试与范围选择保留原binding/source，正常冲突可显式重试 | settings73条基本链及17个代表性生命周期场景已有证据；第102批补状态栏两模式×user/project×Apply/Discard八条真实宿主链，区分暂存预览、存储与重启生效。继续补其余字段/来源/编辑器/窗口/桌面组合；model精确目标/能力/角色/认证、两模式及键鼠完整操作仍待验 |
 | 未配置模型允许选中 | 上下键可移到具体未配置行，Enter查看详情/精确配置，配置接受后再显式启用；能力阻断走目标档位恢复 | 用户原环境事件链、全部未配置、配置成功/失败/取消、目录变化与同名relay；不能宣称表单打开就是认证成功 |
 | resume默认最新 | 自动阶段随最新可恢复候选更新，主动选择后按稳定ID保持；排序、current标记与默认焦点分别处理 | 分批旧→新、途中手选、scope/search换代、目标消失及Enter失效检查 |
 | 已提交正文顶格、输入箭头恢复 | 第1列正文仅去绘制留白，源缩进保留；编辑区箭头贴左、续行对齐正文，caret/复制用原源投影 | 中文/emoji/组合字符/换行/resize/选区及桌面IME、剪贴板；不恢复黄条或trim原文 |
@@ -1605,6 +1605,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第一百批补设置Apply接受后的宿主归属：preview清理和retry reopen是同步callback边界，也必须先复验再进入原保存器。确认保存与refusal的notice继续保留，失效动作不构造旧父级；Apply单次消费，迟到且失效的主题动作仍结束原lease。只读双lane复核与聚焦证据限于这条操作链，不提升整个ADD状态。
 
 第一百零一批补Escape父级返回中的同步callback撤权：清理、通知或parent构造改变host代次时，不覆盖新界面；准备转交但最终没有发布父级时，原previewBack返回的清理取消原controller。保留正常父级转交及delete/rename/denial/approval子模式优先级。两模式实际theme取消和返回后显式保存有聚焦证据，仍非整个ADD验收。
+
+第一百零二批仅补状态栏编辑的八条真实宿主交叉链：筛选不丢隐藏勾选项，Enter暂存后再次编辑并Escape保留原pending，Apply/Discard后同scope重开与存储读回。普通settings Apply沿既有restart政策保持installed/view；project保存改变requested与冷配置读回，user保存仍受project覆盖。没有复现新产品缺陷，不把冷读回当作进程重启，也不提升完整面板或ADD验收状态。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -2113,3 +2115,17 @@ ADD-11/12核对排队→提交/恢复的真实操作链，确认普通[Submissio
 主代理heap768MiB、单worker、进程级串行最终执行lifecycle35、overlay75、role46及过滤host34，共190项通过；host261项未选不计通过。host范围同时保留第100批Apply十二条和effort recovery十六条控制。八组有效反转：完整旧实现在当前owner/overlay范围十九失败/九十一控制，旧host四失败/两控制/289未选；独立撤销prepare复验、close后复验、构造后复验、中止cleanup调用、finally abort、prepare异常abort及submode保护，依次2/8/5/18/17/1/2项预期失败、33/27/30/17/18/34/33控制通过。各组finally逐字节恢复两个source，SHA-256分别为overlay `b903ded02504b9cbacf9e4265b9f6258e3f1caafb7316d0c81fefb5eebfec63d`、lifecycle `01471993d8d0cab7fc914b87dda5b7dd5b0a7af97d177fa057c347430048985a`，恢复后完成上述最终重验。
 
 五静态门、diff、module facade报告0及TS build `91f42246bef9`通过，build heap1536MiB；118既有docs-source advisory保留。两条原gpt-6.1-sol只读lane最终APPROVE/CLEAR，仅覆盖Escape返回、同步callback与原controller清理，不授予全ADD验收。HANDOFF/当前摘要更新，工件归.omx/artifacts/phase20-addition-overlay-return/，scratch归档清理。延迟核对第99批CI `40595036419`success，第100批CI `40597440762`仍in_progress、Watch `40597440660`success；不等待新CI，本批提交/远端SHA另绑定。未运行全仓、真实provider/OAuth、native PTY/exe、桌面、原生Windows、磁盘故障或20k历史，原Phase20矩阵未重跑，ADD整体active。
+
+### 第一百零二批：状态栏暂存、来源与重启时点的真实宿主验证
+
+第一百零一批`4649643b61b7562aa3ed23ad69f70cc9021073b5`已提交推送，续接前工作区clean。ADD-03沿既有状态栏编辑器补regular/fullscreen×user/project×Apply/Discard八条[实际host回归](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)，没有修改产品实现或新增缺陷条目。目标源码先核对[字段生效政策](../../packages/ts-shell/src/config/fields.ts)和[接受态投影](../../packages/ts-shell/src/config/state.ts)：statusItems为restart，普通settings保存保持已安装显示值；不能沿用composerShape的即时生效预期。
+
+只读参考settings-selector.ts快照`0838d2ab4407b74e870de07e1a6780a13c7d542c`的1054–1068及1891–1904行沿原settings owner/change callback与同源状态栏preview。采用原owner与共享preview词汇的决定，本项目继续保留独立暂存/Apply、scope优先级和restart政策；未复制参考代码。测试使用隔离真实配置/session，以实际terminal.input的方向键、Space、Enter和Escape完成编辑；私有model仅观察焦点与checked，不直接调用apply或改状态。
+
+初始user为model、project为provider，目标暂存provider/directory。筛到Directory后隐藏provider仍选中；Enter暂存，再编辑移除Directory并Escape回到原pending。随后Apply或Discard、重开相同scope核对checkbox、文件字节/JSONC注释、accepted publication、完整session模型、held草稿及零prompt/fetch。preview观察实际view消费的statusItems端口。所有分支installed/runtime/view仍为provider；project Apply的stored/requested与新getRuntimeConfig读回为目标值且保留restart notice/detail；user Apply只改user存储，project覆盖仍有效并提示effective value differs；Discard保持原文件与publication。冷配置读回不等于实际进程重启。
+
+首两轮八失败来自StdinBuffer对单独可打印Space的短暂保留，修正为等待实际checked/preview变化；同步后六通过/两失败来自错误的project立即生效预期，按上述既有合同修正。收据全部保留，两类均不计产品缺陷；修正合同后的原实现八条通过。现有HANDOFF已覆盖输入hold及restart显示发布，不追加重复条目。两条原gpt-6.1-sol只读lane最终APPROVE/CLEAR限于修正后测试与主张，code lane明确撤回早先对错误即时生效预期的认可，未运行验证脚本。
+
+主代理heap768MiB、单worker、进程级串行最终执行settings owner39及新增host8，共47项实际通过；host295项未选不计通过。四组有效反转分别撤销取消二次编辑时的pending保持、将chosenIds缩为过滤结果、遗漏status preview reset、将candidate tui直接安装，确认8/8/6/2项预期失败、39/39/41/45项控制通过，每组295项未选。各组finally逐字节恢复，四source与固定Git基线一致，SHA-256收据保留，恢复后上述最终重验通过。
+
+五静态门及最终文档drift/diff通过，118既有docs-source advisory保留；仅测试/文档变更，不重复build或module facade。工件归.omx/artifacts/phase20-addition-status-settings/，scratch归档清理。延迟观察第100批CI `40597440762`及Watch success；第101批CI `40598881157`仍in_progress、Watch `40598881187`success；第92批CI `40582584417`仍in_progress。本批Git/精确SHA另绑定，不等待新CI。RecordingTerminal与mock dispatch/fetch不证明native PTY、桌面、真实provider或实际重启；未运行全仓、exe、原生Windows、磁盘故障或20k历史，原Phase20矩阵未重跑，ADD整体active。
