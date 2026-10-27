@@ -14,10 +14,12 @@ summary: "usage 只对产生它的模型/端点/schema/system 有效；完整请
 最近一次请求的 prompt tokens 只在同一身份下有效。telemetry 记录：
 
 ```ts
-{ provider, model, endpoint, schemaDigest, systemDigest }
+{ provider, model, endpoint, endpointId, schemaDigest, systemDigest, historyDigest }
 ```
 
-`schemaDigest` 是实际发送的工具声明摘要，`systemDigest` 是实际组装的 system 文本摘要。`measuredPromptContext` 在 provider/model 不同，或调用方提供的 endpoint/schema/system 摘要与记录不同时返回 `undefined`，不使用旧数字。`invalidatePromptMeasurement` 在模型切换时清除计量但保留请求证据；压缩、undo、会话导航继续走 `markContextUnknown`。
+`endpointId` 是实际目标地址的脱敏摘要；`schemaDigest` 是实际发送的工具声明摘要，`systemDigest` 是实际组装的 system 文本摘要，`historyDigest` 是有序、已选择消息内容的摘要。`measuredPromptContext` 在 provider/model、协议、目标地址、schema、system 或 history 身份不同时返回 `undefined`，不使用旧数字；如果记录包含某个可选身份字段而调用方无法提供同一字段，也不把该记录当作当前测量。
+
+`/context` 与状态栏都从同一实时 `promptIdentity` 传递 schema/system/history，并从当前生效的 provider 地址派生 `endpointId`。因此同 provider/model/协议的另一个 relay 不能复用旧测量。压缩查询使用 recorded `promptMessageCount` 从当前 messages 派生前缀 `historyDigest`；只有该前缀及其他请求身份全部匹配时才复用 provider count并追加后续消息估算。`invalidatePromptMeasurement` 在模型切换时清除计量但保留请求证据；undo、会话导航等真值变化继续走 `markContextUnknown`。
 
 `promptMessageCount` 是实际发送的 `messages` 长度。此前保存 `length + 1`，导致下一次测量跳过新 assistant 消息及其 tool-call 参数；现在只追加该请求之后新增的消息。
 
@@ -56,8 +58,8 @@ step 在构造请求后、发送前检查预算。失败返回带 `Context overf
 
 | 状态 | 条件 | 报告 |
 |---|---|---|
-| `measured` | 存在与当前 provider/model（及可用的 endpoint/schema/system 摘要）匹配的测量 | 显示 tokens 与窗口占比 |
-| `stale` | 有旧测量，但身份不匹配 | 明确说明属于另一模型/端点/schema，不显示为当前值 |
+| `measured` | 存在与当前 provider/model/endpoint/endpointId/schema/system/history 匹配的测量 | 显示 tokens 与窗口占比 |
+| `stale` | 有旧测量，但身份不匹配或无法证明 | 明确说明属于另一模型/端点/schema/history，不显示为当前值 |
 | `estimated` | 没有测量 | 给出当前工具 schema 的首请求下限估算，并说明会话 token 在发送前不估算 |
 | `unknown` | 无测量且无可信估算输入 | 只报告未知 |
 
@@ -67,4 +69,4 @@ step 在构造请求后、发送前检查预算。失败返回带 `Context overf
 
 - 首请求估算只覆盖当前工具 schema；system 文本与用户输入在发送前不作为 token 上界。
 - 未改变 `/context` 的工具池加载路径（它可能刷新扩展/MCP，但不发起 provider 请求）。
-- 已验证：measured/stale/unknown 事实、首请求估算行、状态栏不回退旧值、legacy 记录在失效前可用；未运行真实 provider。
+- 已验证：measured/stale/unknown 事实、首请求估算行、状态栏不回退旧值、legacy 记录在失效前可用，以及 history/relay 身份不匹配；未运行真实 provider。

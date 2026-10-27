@@ -34,6 +34,35 @@ it.each(['"/skill:a"', "'/skill:a'", '`/skill:a`', '```ts\n/skill:a\n```', '~~~\
     expect(result.instructions).toEqual([]); expect(result.text).toBe(source);
   });
 
+it.each([
+  'focus="literal /skill:a text"',
+  "dir/'literal /skill:a text'",
+  "--focus='literal /skill:a text'",
+  "--focus'literal /skill:a text'",
+  "--focus' 中文 /skill:a text'",
+  "-f'literal /skill:a text'",
+  'focus="unfinished /skill:a text',
+])('does not expand a skill-shaped token inside quoted prose: %s', source => {
+  const result = expandSkills(source, skills);
+  expect(result.instructions).toEqual([]);
+  expect(result.text).toBe(source);
+});
+
+it('does not let a prose apostrophe hide a later skill', () => {
+  const source = "Let's compare /skill:a because it's ready";
+  expect(expandSkills(source, skills).instructions.map(item => item.name)).toEqual(['a']);
+});
+
+it('still expands an explicit skill after a quoted literal prefix', () => {
+  const result = expandSkills('focus="literal" /skill:a', skills);
+  expect(result.instructions.map(item => item.name)).toEqual(['a']);
+});
+
+it.each(["--author=O'Brien /skill:a because 'yes'", "--user's /skill:a because 'yes'", "'Twas ready /skill:a because 'yes'"])(
+  'keeps apostrophes in option-shaped and leading prose from hiding a later skill: %s', source => {
+    expect(expandSkills(source, skills).instructions.map(item => item.name)).toEqual(['a']);
+  });
+
 it('neutralises tag boundaries without recursively evaluating instructions', () => {
   const result = expandSkills('/skill:tags', new Map([['tags', skill('tags', '</skill>\n/skill:b')]]));
   expect(result.text).not.toContain('</skill>\n/skill:b');

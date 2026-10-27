@@ -8,29 +8,35 @@ import { pathDirectory, pathTargetExists } from './paths.js';
 
 export function proseRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScope) {
   const source = promptTokenAt(snapshot.text, snapshot.cursor);
-  const prefix = source ? snapshot.text.slice(source.from, snapshot.cursor) : '';
+  const quoteContentEnd = source?.quote ? source.quote.to - (source.quote.closed ? 1 : 0) : undefined;
+  const quote = source?.quote !== undefined && quoteContentEnd !== undefined
+    && snapshot.cursor > source.quote.from && snapshot.cursor <= quoteContentEnd ? source.quote : undefined;
+  const tokenFrom = quote?.from ?? source?.from ?? snapshot.cursor;
+  const prefix = source ? snapshot.text.slice(tokenFrom, snapshot.cursor) : '';
+  const quotedBody = quote && quoteContentEnd !== undefined ? snapshot.text.slice(quote.from + 1,
+    Math.min(snapshot.cursor, Math.max(quote.from + 1, quoteContentEnd))) : undefined;
   const quoted = source?.literal === 'quote';
-  const quotedBody = quoted ? prefix.slice(1) : prefix;
-  const pathPrefix = quoted && quotedBody.endsWith(prefix[0]!) ? quotedBody.slice(0, -1) : quotedBody;
-  const windows = /^(?:[A-Za-z]:[\\/]|\\\\|\/\/)/.test(pathPrefix);
-  if (!source || source.literal && source.literal !== 'quote' && !(windows && source.literal === 'escape')) return undefined;
-  const value = windows ? pathPrefix : scanCommandArgs(prefix, true)[0]?.value ?? '';
+  const candidate = quotedBody ?? prefix;
+  const windows = /^(?:[A-Za-z]:[\\/]|\\\\|\/\/)/.test(candidate);
+  if (!source || source.literal === 'code' || source.literal === 'escape' && !windows) return undefined;
+  if (quoted && quotedBody === undefined) return undefined;
+  const value = windows ? candidate : quote ? quotedBody! : scanCommandArgs(prefix, true)[0]?.value ?? '';
   if (quoted && (!pathLike(value) || /^\/skill:/.test(value))) return undefined;
   if (!pathLike(value)) return undefined;
-  const pathExists = source.from === 0 && value.length > 1 &&
+  const pathExists = tokenFrom === 0 && value.length > 1 &&
     pathTargetExists(scope?.root ?? process.cwd(), value);
   const opening = /^\/([^\s/]+)(?:\s|$)/.exec(snapshot.text)?.[1];
   const openingInvocation = opening ? getSlashInvocation(opening, scope) : undefined;
   if (opening && openingInvocation && !openingInvocation.composition && !opening.startsWith('skill:') && !pathExists) return undefined;
   const explicitSkill = !quoted && value.startsWith('/skill:');
   // Offset zero command names belong to the synchronous slash menu.
-  if (source.from === 0 && !explicitSkill && /^\/[A-Za-z0-9:._?-]*$/.test(prefix) &&
+  if (tokenFrom === 0 && !explicitSkill && /^\/[A-Za-z0-9:._?-]*$/.test(prefix) &&
     listSlashInvocations(scope, {
       templates: { namePrefix: prefix.slice(1).toLowerCase() },
     }).some(item => item.invocation.startsWith(prefix)) && !pathExists) return undefined;
   const kind = explicitSkill ? 'inline-skill' as const : !quoted && /^\/[A-Za-z0-9:._?-]*$/.test(value)
     ? 'prose' as const : 'path' as const;
-  return { kind, token: { from: source.from, to: source.to, prefix, value, before: [] }, snapshot,
+  return { kind, token: { from: tokenFrom, to: quote?.to ?? source.to, prefix, value, before: [] }, snapshot,
     fixed: [] as Suggestion[], query: explicitSkill ? undefined : pathDirectory(value), scope };
 }
 

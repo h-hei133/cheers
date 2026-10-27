@@ -15,6 +15,7 @@ import { DEFAULT_ENDPOINT_KIND } from '../../provider/endpoints/index.js';
 import { catalogModel } from '../models/catalog.js';
 import { configuredOutputLimit } from '../../provider/request/output.js';
 import { endpointShape } from '../../provider/endpoints/index.js';
+import { captureUsageAttribution } from '../../observability/usage/identity.js';
 
 /**
  * /context — how much of the window the last request used.
@@ -103,17 +104,27 @@ async function inspectContext(context: CommandContext): Promise<LocalCommandResu
   const recorded = sessionId ? getSessionUsage(sessionId).lastPromptIdentity : undefined;
   const expectedSchemaDigest = context.promptIdentity?.schemaDigest;
   const expectedSystemDigest = context.promptIdentity?.systemDigest;
-  const hasExpectedIdentity = expectedSchemaDigest !== undefined && expectedSystemDigest !== undefined;
+  const expectedHistoryDigest = context.promptIdentity?.historyDigest;
+  const expectedEndpointId = active.model === undefined || activeBaseUrl === undefined ? undefined
+    : captureUsageAttribution({ provider: active.provider, model: active.model, baseUrl: activeBaseUrl }).endpointId;
+  const expectedIdentity = active.model === undefined ? undefined : {
+    provider: active.provider,
+    model: active.model,
+    ...(activeEndpoint !== undefined ? { endpoint: activeEndpoint } : {}),
+    ...(expectedEndpointId !== undefined ? { endpointId: expectedEndpointId } : {}),
+    ...(expectedSchemaDigest !== undefined ? { schemaDigest: expectedSchemaDigest } : {}),
+    ...(expectedSystemDigest !== undefined ? { systemDigest: expectedSystemDigest } : {}),
+    ...(expectedHistoryDigest !== undefined ? { historyDigest: expectedHistoryDigest } : {}),
+  };
+  const hasExpectedIdentity = expectedIdentity?.schemaDigest !== undefined && expectedIdentity.systemDigest !== undefined;
   // A complete stored identity is not evidence that it still describes the
   // current runtime. Only the live request identity can authorize it; otherwise
   // a reload that cleared the live identity would validate the record against
   // itself. Identity-free records remain the legacy compatibility path.
   const legacyMeasurement = recorded === undefined && context.promptIdentity === undefined;
 
-  const measured = sessionId && active.model && activeEndpoint && (hasExpectedIdentity || legacyMeasurement)
-    ? measuredPromptContext(sessionId, { provider: active.provider, model: active.model,
-      endpoint: activeEndpoint, ...(expectedSchemaDigest ? { schemaDigest: expectedSchemaDigest } : {}),
-      ...(expectedSystemDigest ? { systemDigest: expectedSystemDigest } : {}) },
+  const measured = sessionId && expectedIdentity && activeEndpoint && (hasExpectedIdentity || legacyMeasurement)
+    ? measuredPromptContext(sessionId, expectedIdentity,
       { requireExpectedIdentity: hasExpectedIdentity })
     : undefined;
   const measurement = measured ? 'measured' as const

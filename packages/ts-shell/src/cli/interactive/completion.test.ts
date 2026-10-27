@@ -37,4 +37,10 @@ describe("completion source ranges", () => {
       expect(tokenizeCommandArgs(quoteCompletion(value, prefix, "@"))).toEqual(["@" + value]);
     }
   });
+
+  it("switches apostrophe-containing values away from split single-quote segments", () => {
+    const quoted = quoteCompletion("dir/a'b.ts", "@'", "@");
+    expect(quoted).toBe('@"dir/a\'b.ts"');
+    expect(tokenizeCommandArgs(quoted)).toEqual(["@dir/a'b.ts"]);
+  });
 });

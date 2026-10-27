@@ -237,6 +237,14 @@ it('recognizes quoted Windows drive and UNC paths in prose', () => {
   expect(request('读取 "\\\\server\\share\\fo|')).toMatchObject({ kind: 'path' });
 });
 
+it('completes a prefixed quoted path without replacing the prose prefix', () => {
+  const req = request(`path="${root}/ho|me"tail suffix`)!;
+  expect(req).toMatchObject({ kind: 'path', token: { from: 5, value: `${root}/ho` } });
+  const item = catalogSuggestions(req, [{ value: `${root}/home space/`, label: 'home space',
+    kind: 'path', identity: `${root}/home space` }])[0]!;
+  expect(replaceDraft(req.snapshot, item.edit!)?.text).toBe(`path="${root}/home space/"tail suffix`);
+});
+
 it('does not request path catalogs for code, escape, or URL command arguments', () => {
   expect(request('/cd `/ho|`')).toBeUndefined();
   expect(request('/cd \\`/ho|\\`')).toBeUndefined();

@@ -99,6 +99,7 @@ export interface CommandContext {
   readonly promptIdentity?: {
     readonly schemaDigest?: string
     readonly systemDigest?: string
+    readonly historyDigest?: string
   }
   /** False for scripted invocations; omitted by callers without a CLI host. */
   readonly interactive?: boolean

@@ -258,6 +258,12 @@ export function measuredPromptContext(sessionId: string, expected: {
       : { tokens: telemetry.lastPromptTokens, messageCount: telemetry.lastPromptMessageCount };
   }
   if (identity.provider !== expected.provider || identity.model !== expected.model) return undefined;
+  // A recorded identity field is evidence of request-specific scope. If the
+  // caller cannot produce the same live field, it cannot prove the measurement
+  // still applies; a provider/model-only query is not sufficient.
+  if (identity.endpoint !== undefined && expected.endpoint === undefined) return undefined;
+  if (identity.historyDigest !== undefined && expected.historyDigest === undefined) return undefined;
+  if (identity.endpointId !== undefined && expected.endpointId === undefined) return undefined;
   // A complete recorded identity cannot be checked against a provider/model-only
   // query. Returning it here would let the status band present an old schema or
   // system prompt as the current request.

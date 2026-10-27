@@ -185,6 +185,28 @@ describe("status facts", () => {
     resetSessionUsage(id);
   });
 
+  it("drops a context report measurement from a different history or relay", async () => {
+    const id = "status-stale-context-identity";
+    resetSessionUsage(id);
+    const runtime = context(id);
+    const identity = { provider: "openai", model: "opus-5", endpoint: "openai-compatible",
+      schemaDigest: "a".repeat(64), systemDigest: "b".repeat(64), historyDigest: "c".repeat(64) };
+    const active = captureUsageAttribution({ provider: "openai", model: "opus-5", baseUrl: "https://api.openai.com/v1" });
+    const relay = captureUsageAttribution({ provider: "openai", model: "opus-5", baseUrl: "https://relay.invalid/v1" });
+    const reportFor = (historyDigest: string) => runContextCommand([], { cwd: runtime.projectRoot, sessionId: id,
+      runtimeConfig: runtime.runtimeConfig, readConfiguration: () => runtime.configuration.current,
+      getToolPool: async () => new Map(), promptIdentity: { schemaDigest: identity.schemaDigest,
+        systemDigest: identity.systemDigest, historyDigest } });
+
+    recordSessionUsage(id, { promptTokens: 9_000, promptMessageCount: 1, promptIdentity: identity, attribution: active });
+    expect((await reportFor(identity.historyDigest)).report?.facts.prompt).toMatchObject({ status: "measured", tokens: 9_000 });
+    expect((await reportFor("d".repeat(64))).report?.facts.prompt).toMatchObject({ status: "stale" });
+
+    recordSessionUsage(id, { promptTokens: 9_000, promptMessageCount: 1, promptIdentity: identity, attribution: relay });
+    expect((await reportFor(identity.historyDigest)).report?.facts.prompt).toMatchObject({ status: "stale" });
+    resetSessionUsage(id);
+  });
+
   it("keeps the status measurement only when the live request identity matches", () => {
     const id = "status-live-identity";
     resetSessionUsage(id);
@@ -200,13 +222,35 @@ describe("status facts", () => {
     resetSessionUsage(id);
   });
 
+  it("drops a status measurement from another history or relay", () => {
+    const id = "status-stale-history-relay";
+    resetSessionUsage(id);
+    const runtime = context(id);
+    const identity = { provider: "openai", model: "opus-5", endpoint: "openai-compatible",
+      schemaDigest: "a".repeat(64), systemDigest: "b".repeat(64), historyDigest: "c".repeat(64) };
+    const active = captureUsageAttribution({ provider: "openai", model: "opus-5", baseUrl: "https://api.openai.com/v1" });
+    const relay = captureUsageAttribution({ provider: "openai", model: "opus-5", baseUrl: "https://relay.invalid/v1" });
+    recordSessionUsage(id, { promptTokens: 9_000, promptMessageCount: 1, promptIdentity: identity, attribution: active });
+
+    runtime.promptIdentity = { schemaDigest: identity.schemaDigest, systemDigest: identity.systemDigest, historyDigest: "d".repeat(64) };
+    expect(readStatusFacts(runtime).contextUsed).toBeUndefined();
+    runtime.promptIdentity = { schemaDigest: identity.schemaDigest, systemDigest: identity.systemDigest,
+      historyDigest: identity.historyDigest };
+    expect(readStatusFacts(runtime).contextUsed).toBe(9_000);
+
+    recordSessionUsage(id, { promptTokens: 9_000, promptMessageCount: 1, promptIdentity: identity, attribution: relay });
+    expect(readStatusFacts(runtime).contextUsed).toBeUndefined();
+    resetSessionUsage(id);
+  });
+
   it("reports a retained dynamic request identity across a nested working directory", async () => {
     const id = "status-current-system";
     resetSessionUsage(id);
     const runtime = context(id);
     recordSessionUsage(id, { provider: "openai", model: "opus-5", promptTokens: 9_000, promptMessageCount: 1,
       promptIdentity: { provider: "openai", model: "opus-5", endpoint: "openai-compatible",
-        schemaDigest: "dynamic-request-schema", systemDigest: "request-system-prompt" } });
+        schemaDigest: "dynamic-request-schema", systemDigest: "request-system-prompt" },
+      attribution: captureUsageAttribution({ provider: "openai", model: "opus-5", baseUrl: "https://api.openai.com/v1" }) });
     const report = await runContextCommand([], { cwd: `${runtime.projectRoot}/nested`, projectRoot: runtime.projectRoot, sessionId: id,
       runtimeConfig: runtime.runtimeConfig, readConfiguration: () => runtime.configuration.current,
       getToolPool: async () => new Map(), promptIdentity: { schemaDigest: "dynamic-request-schema", systemDigest: "request-system-prompt" } });

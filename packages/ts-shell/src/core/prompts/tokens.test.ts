@@ -32,3 +32,36 @@ it('does not give a mid-line tilde run fence meaning or a quoted/escaped marker 
   const source = '正文 ~~~ /skill:a " /skill:fake " \\/skill:fake /skill:b';
   expect(promptTokens(source).filter(token => !token.literal).map(token => token.raw)).toEqual(['正文', '~~~', '/skill:a', '/skill:b']);
 });
+
+it.each(['"', "'"])('keeps a balanced %s quote literal when it starts after a token prefix', quote => {
+  const source = `focus=${quote}literal /review text${quote} /review`;
+  const tokens = promptTokens(source);
+  expect(tokens).toHaveLength(2);
+  expect(tokens[0]).toMatchObject({ raw: `focus=${quote}literal /review text${quote}`, literal: 'quote',
+    quote: { from: 6, closed: true } });
+  expect(tokens[1]).toMatchObject({ raw: '/review' });
+  expect(tokens[1]?.literal).toBeUndefined();
+});
+
+it('keeps apostrophes in prose from hiding later invocations', () => {
+  const source = "Let's compare Users' notes /review because it's ready";
+  expect(promptTokens(source).filter(token => !token.literal).map(token => token.raw)).toEqual([
+    "Let's", 'compare', "Users'", 'notes', '/review', 'because', "it's", 'ready',
+  ]);
+});
+
+it('keeps shell-style and unfinished quotes literal after arbitrary token prefixes', () => {
+  const source = `dir/'literal /skill:a text' --path'/tmp /review text' --focus' 中文 /review text' --focus'literal /review text' -f'literal /skill:a text' focus="unfinished /skill:b`;
+  const tokens = promptTokens(source);
+  expect(tokens).toHaveLength(6);
+  expect(tokens.map(token => token.literal)).toEqual(['quote', 'quote', 'quote', 'quote', 'quote', 'quote']);
+  expect(tokens.map(token => token.quote?.closed)).toEqual([true, true, true, true, true, false]);
+});
+
+it.each([
+  "--author=O'Brien /review because 'yes'",
+  "--user's /review because 'yes'",
+  "'Twas ready /review because 'yes'",
+])('keeps apostrophes on option-shaped or leading prose from hiding review: %s', source => {
+  expect(promptTokens(source).filter(token => !token.literal).map(token => token.raw)).toContain('/review');
+});

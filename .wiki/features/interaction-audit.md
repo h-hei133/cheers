@@ -726,3 +726,9 @@ ADD-08继续确认提交竞态：用户提交已发布的review preview后，bus
 ADD-10/11新增确认正文非首位file与slash命令同名时仍可能以裸路径接受，随后被组合解析当作命令；代码、转义slash和URL命令参数也可能请求路径目录。现非目录file只在非首位执行精确命令碰撞并加引号，directory不触发精确命令/模板读取；literal过滤在path catalog前生效，quoted Unix/相对/Windows drive/UNC路径共用同一谓词。`/home`测试不再读取宿主目录。
 
 三文件122项、四个有效反转/逐字节恢复及最终稳定只读review无findings有局部证据；非组合命令夹具的复审缺口已改为真实`/brainstorm`正反对照。五静态门、责任上限0、Phase 20脚本38 complete / 9 partial / 0 open、TS build `1e15b8d6239e`、inputs `cd0db660bc77`、artifact `94310bb1b156`、manifest fresh 460/1882和正式judge proven另绑定。非`scheme://` URI、Windows真实目录枚举、有界模板发现成本和用户原终端未验；见[第六十三批](phase-20-addition.md#第六十三批正文路径碰撞字面量与windows引号边界)。原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第六十四批）
+
+ADD-10/11确认正文引号从token前缀之后开始时，当前tokenizer只在token首字符识别quote；`focus="literal /review text"`会把中间的`/review`暴露成组合driver，`focus="literal /skill:a text"`也会错误注入skill。现`promptTokens`保存quote范围/闭合状态，并把整个含空白span保留为literal token；shell式单引号、首字符空白或Unicode、内部apostrophe、后续非字面调用以及解引用后的prefixed path都有正反覆盖。prose完成只替换quote范围，保留`path=`前缀和闭引号后的suffix；含apostrophe的路径改用双引号完成。
+
+ADD-08同时确认`/context`只把live identity的schema/system传给`measuredPromptContext`，漏掉history和relay地址，因此另一history或同协议relay的旧测量可能显示为当前值。现`/context`传递live `historyDigest`并从生效base URL派生`endpointId`；测量owner在记录含protocol/endpoint/history/relay身份但调用方无法提供时拒绝复用，compaction还从当前消息prefix派生history digest后才复用provider count。八文件180项单进程通过；五个独立契约恢复旧实现后触发19项预期失败，源码逐字节恢复。五静态门、责任上限0、Phase 20脚本38 complete / 9 partial / 0 open、TS build `530a74afb231`、inputs `557174e78290`、artifact `759b792ec77a`、manifest fresh 460/1882和正式judge proven另绑定。见[第六十四批](phase-20-addition.md#第六十四批正文引号权威与context计量身份)。未运行真实provider、全仓、exe、桌面或PTY；真实history/relay切换与用户原环境仍待验。

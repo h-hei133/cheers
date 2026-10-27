@@ -5,6 +5,42 @@ export interface PromptToken {
   readonly to: number;
   readonly raw: string;
   readonly literal?: 'quote' | 'code' | 'escape';
+  readonly quote?: { readonly from: number; readonly to: number; readonly closed: boolean };
+}
+
+function quoteSpanEnd(text: string, from: number, quote: string): number | undefined {
+  let index = from + 1;
+  while (index < text.length) {
+    if (text[index] === '\\' && quote === '"') {
+      index += Math.min(2, text.length - index);
+      continue;
+    }
+    if (text[index] === quote && (quote === '"' || !/[A-Za-z0-9_]/.test(text[index + 1] ?? ''))) return index + 1;
+    index++;
+  }
+  return undefined;
+}
+
+function competingSingleQuote(text: string, from: number, end: number): boolean {
+  for (let index = from + 1; index < end - 1; index++) {
+    if (text[index] === "'" && quoteSpanEnd(text, index, "'") === end) return true;
+  }
+  return false;
+}
+
+function quoteStartsSpan(text: string, index: number, from: number, quote: string, end: number | undefined): boolean {
+  const previous = text[index - 1];
+  if (quote === '"') return true;
+  if (index === from || previous === undefined) {
+    return end !== undefined
+      && !/^'(?:tis|twas|twere|twill|twould|em|cause|cos|til|bout|round|nother|\d{2}s)\b/i.test(text.slice(index));
+  }
+  if (!/[A-Za-z0-9_]/.test(previous)) return true;
+  // A word-adjacent apostrophe is normally a contraction or possessive. Treat
+  // it as shell-style concatenation only after a complete option name, with a
+  // real close that is not claimed by an inner apostrophe.
+  return /^--?[A-Za-z0-9][A-Za-z0-9-]*$/.test(text.slice(from, index))
+    && end !== undefined && !competingSingleQuote(text, index, end);
 }
 
 /** Scan only user source. Quoted prose and code never contribute invocations. */
@@ -14,6 +50,7 @@ export function promptTokens(text: string): PromptToken[] {
     if (/\s/.test(text[index]!)) { index++; continue; }
     const from = index;
     let literal: PromptToken['literal'];
+    let quote: PromptToken['quote'];
     while (index < text.length && !/\s/.test(text[index]!)) {
       const char = text[index]!;
       if (char === '\\') {
@@ -23,18 +60,17 @@ export function promptTokens(text: string): PromptToken[] {
         const end = promptCodeEnd(text, index);
         if (end !== undefined) { literal = 'code'; index = end; continue; }
       }
-      if (index === from && (char === '"' || char === "'")) {
-        literal = 'quote'; index++;
-        while (index < text.length && text[index] !== char) {
-          if (text[index] === '\\' && char === '"') index++;
-          index++;
-        }
-        if (index < text.length) index++;
+      const end = char === '"' || char === "'" ? quoteSpanEnd(text, index, char) : undefined;
+      if ((char === '"' || char === "'") && quoteStartsSpan(text, index, from, char, end)) {
+        literal ??= 'quote';
+        quote ??= { from: index, to: end ?? text.length, closed: end !== undefined };
+        index = end ?? text.length;
         continue;
       }
       index++;
     }
-    tokens.push({ from, to: index, raw: text.slice(from, index), ...(literal ? { literal } : {}) });
+    tokens.push({ from, to: index, raw: text.slice(from, index), ...(literal ? { literal } : {}),
+      ...(quote ? { quote } : {}) });
   }
   return tokens;
 }

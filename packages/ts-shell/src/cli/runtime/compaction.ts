@@ -6,12 +6,14 @@ import { catalogModel, catalogProvider, type CatalogProvider } from '../../core/
 import { resolveContextWindow, resolveTokenBudget } from '../../core/models/window.js';
 import { messageToText } from '../../model-adapters/multimodal.js';
 import { createComponentLogger } from '../../observability/structuredLogger.js';
-import { measuredPromptContext } from '../../observability/usageTelemetry.js';
+import { getSessionUsage, measuredPromptContext } from '../../observability/usageTelemetry.js';
 import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
 import { endpointShape, type EndpointKind } from '../../provider/endpoints/index.js';
 import { KEEP_RECENT_TOKENS, type CompactionPolicy, type SummarizeHistory, type SummarizeTurnPrefix } from '../../session/compaction.js';
 import { DEFAULT_RESERVE_TOKENS, estimateTokens } from '../../session/context.js';
+import { historyDigest } from '../../context/request/identity.js';
+import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import { prepareCompactionMessages, requestCompactionSummary, type CompactionChatMessage, type CompactionProvider as SummaryProvider } from '../../core/query/compaction/summarize.js';
 import { TURN_PREFIX_COMPACTION_PROMPT } from '../../core/query/compaction/summarizer.js';
 import { toChatMessages } from '../../turn/prompt.js';
@@ -171,8 +173,19 @@ export function buildCompactionWiring(input: {
       // since that request. Falls back to the estimate inside planCompaction
       // when no request has reported usage yet.
       measureContextTokens: (messages, identity) => {
+        const endpointId = captureUsageAttribution({ provider: provider.providerId, model: provider.model,
+          baseUrl: provider.baseUrl }).endpointId;
+        const usage = getSessionUsage(input.sessionId);
+        const recordedHistory = usage.lastPromptIdentity?.historyDigest;
+        const measuredMessageCount = usage.lastPromptMessageCount;
+        const historyIdentity = recordedHistory !== undefined
+          && Number.isSafeInteger(measuredMessageCount) && measuredMessageCount >= 0
+          && measuredMessageCount <= messages.length
+          ? { historyDigest: historyDigest(messages.slice(0, measuredMessageCount)) }
+          : {};
         const measured = measuredPromptContext(input.sessionId, { provider: provider.providerId, model: provider.model,
-          endpoint: provider.endpoint ?? 'openai-compatible', ...(identity ?? {}) }, { requireExpectedIdentity: true });
+          endpoint: provider.endpoint ?? 'openai-compatible', endpointId, ...(identity ?? {}), ...historyIdentity },
+          { requireExpectedIdentity: true });
         if (!measured) return undefined;
         return measured.tokens + estimateTokens(messages.slice(measured.messageCount));
       },

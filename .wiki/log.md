@@ -9516,3 +9516,11 @@ ADD-10/11确认正文非首位file与slash命令同名时仍可能以裸路径�
 prose completion32、completion controller14、keymap76共三文件122项单worker通过。四个有效反转分别移除非首位碰撞检查、关闭literal过滤、移除UNC谓词及恢复目录精确命令查找，均出现对应失败并逐字节恢复；最终源码hash一致。独立`cn:deepseek-v4.1-flash`只读复审指出初版碰撞夹具未使用真实可组合命令，改用`/brainstorm`后锁定未引号正文生成prompt、接受引号path保持字面量；稳定源码最终无findings。
 
 五静态门/diff、责任上限0、Phase 20 38 complete / 9 partial / 0 open、TS build 1e15b8d6239e（inputs cd0db660bc77、artifact 94310bb1b156）、manifest fresh 460 compiler input/1882 immutable artifact及正式judge proven/0 open-failed-gap通过。未运行真实provider、全仓、exe、桌面、PTY或Windows；非`scheme://` URI、Windows目录枚举、碰撞文件的有界模板发现成本和用户原终端继续待验。HANDOFF/addition第六十三批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-27] fix | 正文引号权威与 context 计量身份
+
+ADD-10/11确认`promptTokens`只在token首字符识别quote；`focus="literal /review text"`会暴露中间`/review`为组合driver，`path="..."`完成还会丢失前缀/后缀。现literal token保存quote范围与闭合状态；平衡双引号、闭合并有真实边界的单引号、option-attached引号和空/Unicode内容均可保留，contraction、possessive、`'Twas`与内部apostrophe不会吞掉后续真实调用。prose完成只替换活动quote范围并保留prefix/suffix，含apostrophe的路径改用双引号。
+
+ADD-08确认`/context`只传live schema/system，漏掉history与relay身份；compaction也未从当前消息prefix验history。现`/context`传递`historyDigest`并从生效base URL派生`endpointId`；测量owner在记录含protocol/endpoint/history/relay身份但调用方无法提供时拒绝复用；compaction从recorded message count派生prefix digest后才复用provider count。
+
+八文件180项单进程通过：tokens16、skills26、composition27、completion14、prose33、sessionFacts20、usageTelemetry25、compaction19。五个独立契约恢复旧实现后19项预期失败、161项通过，五源码逐字节恢复并核对SHA-256。`global:deepseek-v4.1-flash-sg`只读复审经精确模型重试及多轮修正后no findings/no additional focused test gap；残余为罕见shell拼接、uncommon leading elision与single-quoted内容内apostrophe。五静态门/diff、责任上限0、Phase 20 38 complete / 9 partial / 0 open、TS build 530a74afb231（inputs 557174e78290、artifact 759b792ec77a）、manifest fresh 460/1882及bundled judge proven/0 open-failed-gap通过。未运行真实provider、全仓、exe、桌面或PTY；HANDOFF/addition第六十四批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。

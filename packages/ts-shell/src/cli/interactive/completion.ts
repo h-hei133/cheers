@@ -21,7 +21,8 @@ export function completionEdit(candidate: Suggestion, snapshot: DraftSnapshot, f
 
 export function quoteCompletion(value: string, raw: string, sigil = ""): string {
   const body = raw.slice(sigil.length);
-  const quote = body.startsWith("'") ? "'" : body.startsWith('"') || /[\s"'\\]/.test(value) ? '"' : "";
+  const quote = body.startsWith("'") && !value.includes("'") ? "'"
+    : body.startsWith('"') || value.includes("'") || /[\s"\\]/.test(value) ? '"' : "";
   if (quote === "'") return sigil + "'" + value.replace(/'/g, "'\\''") + "'";
   if (quote === '"') return sigil + '"' + value.replace(/["\\$`]/g, "\\$&") + '"';
   return sigil + value;

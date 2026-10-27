@@ -16,6 +16,8 @@ import type { RequestSigner } from "../../provider/request/fetch.js";
 import { createCacheWarmingRunner } from "../../turn/cacheWarm.js";
 import { loadCatalog } from '../../core/models/catalogStore.js';
 import { getSessionUsage, recordSessionUsage, resetSessionUsage, totalTokens } from '../../observability/usageTelemetry.js';
+import { historyDigest } from '../../context/request/identity.js';
+import { captureUsageAttribution } from '../../observability/usage/identity.js';
 
 const fixture = vi.hoisted(() => ({
   deps: undefined as SessionRuntimeDependencies | undefined,
@@ -163,10 +165,36 @@ it("declines a compaction measurement without the complete prompt identity", () 
       provider: 'fixture', model: 'fixture-model', endpoint: 'test-signed-summary',
       schemaDigest: 'schema', systemDigest: 'system',
     },
+    attribution: captureUsageAttribution({ provider: 'fixture', model: 'fixture-model', baseUrl }),
   });
 
   expect(measure([], undefined)).toBeUndefined();
   expect(measure([], { schemaDigest: 'schema', systemDigest: 'system' })).toBe(100);
+});
+
+it('binds a compaction measurement to the measured history and relay', () => {
+  const deps = runtime(true);
+  deps.runPrompt('hello', new AbortController().signal);
+  const measure = fixture.compaction!.policy.measureContextTokens!;
+  const messages = [{ role: 'user' as const, content: 'old' }];
+  const identity = { provider: 'fixture', model: 'fixture-model', endpoint: 'test-signed-summary',
+    schemaDigest: 'schema', systemDigest: 'system', historyDigest: historyDigest(messages) };
+  recordSessionUsage('signed-summary', {
+    provider: 'fixture', model: 'fixture-model', promptTokens: 100, promptMessageCount: messages.length,
+    promptIdentity: identity, attribution: captureUsageAttribution({ provider: 'fixture', model: 'fixture-model', baseUrl }),
+  });
+  expect(measure(messages, { schemaDigest: 'schema', systemDigest: 'system' })).toBe(100);
+  expect(measure([...messages, { role: 'user', content: 'next' }],
+    { schemaDigest: 'schema', systemDigest: 'system' })).toBeGreaterThan(100);
+  expect(measure([{ ...messages[0]!, content: 'new' }], { schemaDigest: 'schema', systemDigest: 'system' }))
+    .toBeUndefined();
+
+  recordSessionUsage('signed-summary', {
+    provider: 'fixture', model: 'fixture-model', promptTokens: 100, promptMessageCount: messages.length,
+    promptIdentity: identity,
+    attribution: captureUsageAttribution({ provider: 'fixture', model: 'fixture-model', baseUrl: `${baseUrl}/other` }),
+  });
+  expect(measure(messages, { schemaDigest: 'schema', systemDigest: 'system' })).toBeUndefined();
 });
 
 it('uses one accepted catalogue per operation for requests and compaction after reload', () => {

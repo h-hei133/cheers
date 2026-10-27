@@ -104,6 +104,49 @@ it('routes review as one driver carrying prose, modifiers and every selected ski
   });
 });
 
+it('does not invoke a review marker inside a balanced quote, but does invoke the following review', async () => {
+  const input = 'focus="literal /review text" /review';
+  const gitCommand = vi.fn(async (args: readonly string[]) => ({
+    kind: 'prompt' as const,
+    prompt: args[1] ?? '',
+    promptMetadata: { source: 'git-review' },
+  }));
+  const result = await routeSlashCommand(input, { cwd: root, skillOptions: { skillPaths, noSkills: true }, gitCommand });
+  expect(gitCommand).toHaveBeenCalledOnce();
+  expect(gitCommand.mock.calls[0]?.[0]?.[1]).toContain('focus="literal /review text"');
+  expect(result).toMatchObject({
+    kind: 'prompt',
+    promptMetadata: { source: 'git-review', originalInput: input },
+  });
+});
+
+it("keeps an option-attached quote literal and an unfinished quote from dispatching review", async () => {
+  const gitCommand = vi.fn(async (args: readonly string[]) => ({
+    kind: 'prompt' as const,
+    prompt: args[1] ?? '',
+    promptMetadata: { source: 'git-review' },
+  }));
+  for (const quoted of ["--focus'literal /review text' /review", "--focus' 中文 /review text' /review",
+    "-f'literal /review text' /review"]) {
+    expect(await routeSlashCommand(quoted, { cwd: root, skillOptions: { skillPaths, noSkills: true }, gitCommand }))
+      .toMatchObject({ kind: 'prompt', promptMetadata: { source: 'git-review', originalInput: quoted } });
+  }
+  expect(gitCommand).toHaveBeenCalledTimes(3);
+
+  expect(await routeSlashCommand('focus="unfinished /review', { cwd: root,
+    skillOptions: { skillPaths, noSkills: true }, gitCommand })).toBeNull();
+  expect(gitCommand).toHaveBeenCalledTimes(3);
+});
+
+it('does not let prose apostrophes hide a review marker', async () => {
+  const input = "Let's compare /review because it's ready";
+  const gitCommand = vi.fn(async () => ({ kind: 'prompt' as const, prompt: 'reviewed',
+    promptMetadata: { source: 'git-review' } }));
+  const result = await routeSlashCommand(input, { cwd: root, skillOptions: { skillPaths, noSkills: true }, gitCommand });
+  expect(gitCommand).toHaveBeenCalledOnce();
+  expect(result).toMatchObject({ kind: 'prompt', promptMetadata: { source: 'git-review', originalInput: input } });
+});
+
 it('preserves dash-prefixed prose for a flagless review driver', async () => {
   const input = '检查证据 /review --keep-this /skill:a';
   const gitCommand = vi.fn(async (args: readonly string[]) => ({

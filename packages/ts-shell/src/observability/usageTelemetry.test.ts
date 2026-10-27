@@ -33,6 +33,7 @@ it('rejects changed or unverified history while preserving the recorded request 
   recordSessionUsage(SESSION, { promptTokens: 500, promptIdentity: identity, promptMessageCount: 2 });
   expect(measuredPromptContext(SESSION, identity)).toEqual({ tokens: 500, messageCount: 2 });
   expect(measuredPromptContext(SESSION, { ...identity, historyDigest: 'd'.repeat(64) })).toBeUndefined();
+  expect(measuredPromptContext(SESSION, { ...identity, historyDigest: undefined })).toBeUndefined();
   expect(getSessionUsage(SESSION).lastPromptTokens).toBe(500);
   recordSessionUsage(SESSION, { promptTokens: 600, promptIdentity: { ...identity, historyDigest: undefined } });
   expect(measuredPromptContext(SESSION, identity)).toBeUndefined();
@@ -46,6 +47,7 @@ it('binds prompt measurements to the actual relay without retaining its address'
   recordSessionUsage(SESSION, { model: 'm', provider: 'openai', promptTokens: 500, promptIdentity: identity, attribution });
   expect(getSessionUsage(SESSION).lastPromptIdentity).toEqual({ ...identity, endpointId: attribution.endpointId });
   expect(measuredPromptContext(SESSION, { ...identity, endpointId: attribution.endpointId })?.tokens).toBe(500);
+  expect(measuredPromptContext(SESSION, identity)).toBeUndefined();
   const other = captureUsageAttribution({ provider: 'openai', model: 'm', baseUrl: 'https://fixture.invalid/relay-two' });
   expect(measuredPromptContext(SESSION, { ...identity, endpointId: other.endpointId })).toBeUndefined();
 });
@@ -117,6 +119,7 @@ describe("bucketing", () => {
     expect(measuredPromptContext(SESSION, { ...identity, endpoint: 'anthropic' })).toBeUndefined();
     expect(measuredPromptContext(SESSION, { ...identity, schemaDigest: 'c'.repeat(64) })).toBeUndefined();
     expect(measuredPromptContext(SESSION, { ...identity, systemDigest: 'd'.repeat(64) })).toBeUndefined();
+    expect(measuredPromptContext(SESSION, { provider: 'openai', model: 'm' })).toBeUndefined();
     expect(measuredPromptContext(SESSION, { provider: 'openai', model: 'm', endpoint: 'openai-compatible',
       schemaDigest: identity.schemaDigest }, { requireExpectedIdentity: true })).toBeUndefined();
     expect(measuredPromptContext(SESSION, { provider: 'openai', model: 'm', endpoint: 'openai-compatible' })).toBeUndefined();
