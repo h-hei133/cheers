@@ -58,6 +58,24 @@ it.each([' /settings', '\n/model', '/home/fixture'])(
     expect(await routeSlashCommand(input, { cwd: root })).toBeNull();
   });
 
+it.each(['/review', '/deep-research', '/skill:missing'])(
+  'keeps %s inside an unfinished single-quoted path out of preparation and restores invocation after its close', async marker => {
+    const input = `读取 '/tmp/work space ${marker}`;
+    const gitCommand = vi.fn(async () => ({ kind: 'local' as const, output: 'unexpected review' }));
+    const researchCommand = vi.fn(async () => ({ kind: 'local' as const, output: 'unexpected research' }));
+    const context = { cwd: root, skillOptions: { skillPaths, noSkills: true }, gitCommand, researchCommand };
+    expect(await routeSlashCommand(input, context)).toBeNull();
+    expect(gitCommand).not.toHaveBeenCalled(); expect(researchCommand).not.toHaveBeenCalled();
+    const closed = `${input}' /skill:a /skill:b`;
+    const result = await routeSlashCommand(closed, context);
+    expect(result).toMatchObject({ kind: 'prompt', prompt: expect.stringContaining(input + "'"), promptMetadata: {
+      originalInput: closed, skills: [{ name: 'a' }, { name: 'b' }], methods: [],
+    } });
+    expect(result).toMatchObject({ prompt: expect.stringContaining('BODY a') });
+    expect(result).toMatchObject({ prompt: expect.stringContaining('BODY b') });
+    expect(gitCommand).not.toHaveBeenCalled(); expect(researchCommand).not.toHaveBeenCalled();
+  });
+
 it('cancels preparation without publishing partial instructions', async () => {
   const signal = new AbortController(); signal.abort();
   await expect(composePrompt('/skill:a', { cwd: root, signal: signal.signal, skillOptions: { skillPaths, noSkills: true } })).rejects.toThrow();

@@ -65,3 +65,16 @@ it.each([
 ])('keeps apostrophes on option-shaped or leading prose from hiding review: %s', source => {
   expect(promptTokens(source).filter(token => !token.literal).map(token => token.raw)).toContain('/review');
 });
+
+it.each(['/tmp/work space', '~/work space', './work space', '../work space', 'C:\\work space', '\\\\server\\work space'])(
+  'keeps an unfinished single-quoted path literal through whitespace and later markers: %s', value => {
+    const source = `读取 '${value} /skill:hidden /review`;
+    const tokens = promptTokens(source), quoted = tokens[1]!;
+    expect(tokens).toHaveLength(2);
+    expect(quoted).toMatchObject({ from: 3, to: source.length, literal: 'quote',
+      quote: { from: 3, to: source.length, closed: false } });
+    expect(promptTokenAt(source, source.indexOf('/skill:hidden') + 4)).toEqual(quoted);
+    expect(tokens.filter(token => !token.literal).map(token => token.raw)).toEqual(['读取']);
+    const closed = `${source}' /skill:real /review`;
+    expect(promptTokens(closed).filter(token => !token.literal).map(token => token.raw)).toEqual(['读取', '/skill:real', '/review']);
+  });

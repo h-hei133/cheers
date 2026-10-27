@@ -1465,6 +1465,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；第六十三批补非首位命令碰撞file引号、目录候选不触发命令模板查找、代码/转义/URL参数不请求path catalog及quoted Windows drive/UNC识别；第七十批补`/skill:`命名空间内真实路径与skill候选并存，quoted path与exact skill Enter/Tab分界保真。完整场景验收仍按下表，非skill同名template/path的裸提交歧义及正文功能命令执行边界不因此消失 |
 | 转义目录名使连续Tab失败或隐藏后文skill | 第七十八批确认已插入引号内的转义源码被当成真实路径，裸反引号还会打开代码区。现复用参数扫描器解码，保留原始Windows分隔符并给反引号路径加引号；138项执行通过、三组有效反转与构建有本地证据。两模式host使用RecordingTerminal，Windows只做词法测试，真实终端与平台本批未验 |
+| 手动输入的未闭合单引号路径在空格处分裂 | 第八十四批确认leading单引号须先有close，路径后半段失去补全，内部skill/方法标记暴露给准备。现明确路径前缀沿原tokenizer保持open quote范围；142项执行通过、13项有效反转与build有本地证据，双引号/带前缀控制及闭合后的多skill保留，原生Windows与真实终端未验 |
 | 代码示例中的文件引用仍扫描目录，含sigil文件名无法继续补全 | 第七十九批确认`@`后备分支未检查代码区，又把文件名内任意`@`当成重复sigil；前导`@`文件还可能插入为字面双`@@`。现复用源token排除代码、仅拒绝raw双sigil，并引用前导sigil文件名。94项执行通过及11/5/1有效反转有本地证据；实际host证明代码内零枚举、闭合后恢复，真实终端与平台本批未验 |
 | review正文组合原先未准入 | 第五十批确认review会读取真实Git snapshot，不能当纯modifier。现声明为单一driver，消费共享正文、brainstorm和全部skill并生成一份review prompt；audit/check共用声明，第二个driver在派发前拒绝。第五十七批补齐standalone/composed预览：复用同一review request与Git workbench，强制与dispatch一致的plan mode，并在内容复验时重查snapshot fingerprint；第五十八批再加入不持久化的one-use snapshot reservation、canonical binding、过期/变更拒绝和diff后fingerprint检查，不调用通用Git派发或写执行；第六十一批把失效标记扩为workbench级，并加入异步`reviewTake`/epoch；第六十二批再让提交期暂停controller自动失效，并把take保留到diff/最终检查完成。五文件234项、有效反转和真实Git fixture有局部证据，真实provider/桌面仍待验 |
 | 无flag组合方法静默吞掉dash正文 | 第五十二批确认option扫描未先检查方法是否声明flags，review与可组合模板会丢失`--keep-this`/`--counterexample`，而声明flags的方法仍需严格拒绝未知option。现只对非空flag声明解析，flagless正文完整进入共享prompt；91项、两个有效反转及独立review有局部证据，真实终端/平台仍未验 |
@@ -1561,6 +1562,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第八十二批补列表编辑的原值保持：逐行文本须经同一parser还原为完全相同的数组，否则使用已支持的JSON数组初始化。user/project及两模式实际host证明未编辑的Enter→Apply、重开及取消保持存储值、工具可见集合、原scope和held草稿；不改变parser或校验规则，完整字段/来源/平台验收仍待补，ADD整体active。
 
 第八十三批补模型详情已接受动作的刷新异常：失败只沿原父回调返回并展示安全notice，已消费详情退休；关闭或替换后的迟到rejection丢弃。两模式`/model`与`/settings`实际host覆盖fresh显式重试、取消、原入口与held草稿，配置/会话选择保持；真实故障和完整平台验收仍待补，ADD整体active。
+
+第八十四批补手动未闭合的单引号路径：明确路径起始保留跨空格的字面范围，内部skill/review/research不进入准备；实际Tab完成目录/子目录/含apostrophe文件，真实关闭后恢复多skill解析。两模式host与本地目录有证据，Windows仅词法覆盖，完整终端/平台验收仍待补，ADD整体active。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -1813,3 +1816,17 @@ ADD-01/02/03继续核对详情→配置→返回链。[详情owner](../../packag
 主代理heap768MiB、单worker串行最终完成admission19、publication9、watch7共35项，再过滤InteractiveMode执行4项通过、161项未选，共39项实际执行通过。两次独立反转分别移除父页返回和异常归属检查，按文件/名称确认7项（admission3/host4）和2项（admission2）预期失败，所选其余2/7项保持通过。finally逐字节恢复并核对SHA-256 `e4a5fe048f4317221f6d728b9ca6c14986c4ca4532ac81c6afa7cce87c0eaada`，恢复后重跑全部上述聚焦检查；filtered-out不算通过。
 
 五静态门、diff、module facade 0与TS build `67b2cfac97bc`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新，临时反转材料清理。延迟读回`29698cadf85fd3f93668d9a8557a6677fed5f6fa`的CI `40562201528`及Watch `40562201258`均completed/success；`0a9f8584`的CI `40558903524`亦success，不替代本批结果。未运行全仓、真实PTY/provider/exe、桌面、真实磁盘故障或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。
+
+### 第八十四批：未闭合单引号路径的完整字面范围
+
+ADD-10/11/12继续核对手动输入→候选→Tab→再次解析。原[prompt tokenizer](../../packages/ts-shell/src/core/prompts/tokens.ts)为避免将英文leading apostrophe视作quote，要求token首位单引号先有真实close。`读取 '/tmp/work space`因此在空格处分裂，光标处不再识别路径；后续`/skill:`、`/review`与`/deep-research`还会暴露给真实组合准备。六条词法、两条补全、三条路由和两条实际host回归在旧实现确认13项失败，四个双引号/带前缀控制仍通过。
+
+只读参考的autocomplete先找未闭合双引号prefix，再做空格分词；其这一路径只证明double-quote策略，没有假称其支持本批single-quote矩阵。本项目既有参数扫描与插入formatter已经支持单引号，因此仅沿原`quoteStartsSpan`承认明确absolute/home/relative/drive/UNC前缀的未闭合单引号。共享token保留完整quote范围，补全和提交共用该事实；ordinary apostrophe、已闭合quote、代码/escape规则继续保留，不新建路径parser或提交白名单。
+
+[tokens测试](../../packages/ts-shell/src/core/prompts/tokens.test.ts)新增六种路径前缀，核对完整source range、open状态、跨空格/内部标记的字面范围及真实关闭后的调用；[prose测试](../../packages/ts-shell/src/cli/interactive/completion/prose.test.ts)新增首位/正文/`path=`×单/双引号六条，沿实际目录loader完成目录→子目录，解码身份与caret保持。两条未闭合leading单引号场景是新增失败，其他四条是兼容控制。
+
+[组合测试](../../packages/ts-shell/src/core/commands/composition.test.ts)新增三条真实router链，未闭合路径内的review/research/未知skill不触发准备或方法callback，关闭后实际读取并注入两份skill body，原始输入、literal路径和methods空列表保持。[InteractiveMode测试](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)新增regular/fullscreen两条真实按键链，手动粘入未闭合单引号与空格后Tab，沿真实隔离目录完成子目录及含apostrophe文件，再验证后续skill token恢复；零提交/网络。终端为RecordingTerminal，drive/UNC是词法证据，未提升为原生Windows文件系统验收。
+
+主代理heap768MiB、单worker串行最终完成tokens22、skills26、composition30、prose58共136项；过滤InteractiveMode执行新增2条及既有转义路径4条，共6项通过、161项未选，总计142项实际执行通过。独立反转open-path quote判断，按文件/名称确认tokens6、prose2、composition3、host2共13项预期失败，四个控制仍通过，260项未选。finally逐字节恢复并核对SHA-256 `c3123204d36a349b88cb32d3b2c816efad4babe560c1e6360c81fa02a4e69be8`，恢复后重跑上述全部最终聚焦检查；filtered-out不算通过。
+
+五静态门、diff、module facade 0与TS build `47f715c0ca97`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新，临时反转材料清理。延迟读取`b47218f0d4f185ab344af8c5565223c77ea3b851`时Watch `40566634781`已success、CI `40566634731`仍in_progress，不替代本批结果。未运行全仓、真实PTY/provider/exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。

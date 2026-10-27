@@ -9665,3 +9665,11 @@ ADD-01/02/03确认模型详情接受Enter后overlay已释放，目录复验异�
 新增五条owner和四条两模式/两入口实际host链，先在旧实现复现；host夹具名称超过列宽的问题已单独修正。最终admission19、publication9、watch7及过滤host4共39项执行通过，161项host未选，核对原目标、notice、显式重试/取消/设置返回、held草稿、accepted publication与配置/会话保持，零prompt派发/网络。两次独立反转触发7/2项预期失败，其余所选2/7项通过；源码逐字节恢复并核对SHA-256后完成最终重验。
 
 五静态门、diff、module facade 0与TS build `67b2cfac97bc`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十三批/当前摘要更新、scratch清理。`29698cadf85fd3f93668d9a8557a6677fed5f6fa`的CI `40562201528`和Watch `40562201258`均success，`0a9f8584`的CI `40558903524`亦success。未运行全仓、真实PTY/provider/exe、桌面、真实磁盘故障或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 未闭合单引号路径的空格与调用边界
+
+ADD-10/11/12确认token首位单引号必须先有close，手动输入带空格路径时拆词，路径后半段失去补全，内部skill/review/research暴露给准备。现明确路径前缀沿原tokenizer保持open quote范围，补全和提交共用；英文apostrophe、双引号、已闭合路径及代码/escape策略保留。只读参考先识别未闭合双引号再分词，采用其范围所有权决定，按本项目已有单引号契约补齐，没有假称参考支持single-quote矩阵。
+
+新增六条词法、六条实际目录补全、三条router及两条两模式host场景；旧实现13项失败、四个兼容控制通过。最终tokens22、skills26、composition30、prose58共136项及过滤host6项通过、161项未选，共142项执行通过。覆盖目录/子目录/含apostrophe文件的Tab身份、内部标记零方法callback、关闭后两份真实skill body及原文保持，零host提交/网络；Windows仅词法证据。有效反转再次触发13项失败，四控制仍通过，源码逐字节恢复及SHA-256核对后完成最终重验。
+
+五静态门、diff、module facade 0与TS build `47f715c0ca97`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十四批/当前摘要更新、scratch清理。延迟读取`b47218f0d4f185ab344af8c5565223c77ea3b851`时Watch `40566634781`success、CI `40566634731`仍in_progress。未运行全仓、真实PTY/provider/exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

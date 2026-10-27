@@ -1960,6 +1960,44 @@ describe("session wiring", () => {
     }
   });
 
+  it.each(['regular', 'fullscreen'] as const)(
+    'continues a manually opened single-quoted path through actual %s Tab acceptance', async kind => {
+      fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+      const root = fs.mkdtempSync('/tmp/cheers-test/single-quote-path-host-');
+      vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+      const directory = path.join(root, 'work space'), child = path.join(directory, 'child'), file = path.join(child, "report's.md");
+      fs.mkdirSync(child, { recursive: true }); fs.writeFileSync(file, 'fixture');
+      const { mode, terminal } = build();
+      const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void;
+        options: { runtimeContext: ShellRuntimeContext } };
+      host.options.runtimeContext = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root,
+        targetPathBase: root, rootMode: 'direct', gitRoot: null,
+        gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+        session: host.options.runtimeContext.session, runtimeConfig: { ...getRuntimeConfig(root), tuiMode: kind } });
+      const submit = vi.spyOn(host, 'onSubmit').mockImplementation(() => {});
+      const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+      mode.start();
+      try {
+        terminal.input(`\x1b[200~读取 '${root}/work sp\x1b[201~`);
+        for (const target of [directory + '/', child + '/', file]) {
+          await vi.waitFor(() => expect(host.view.suggestions.current()?.value).toBe(target));
+          terminal.input('\t');
+          const snapshot = host.view.editor.snapshot();
+          expect(snapshot.text.startsWith('读取 ')).toBe(true);
+          expect(scanCommandArgs(snapshot.text.slice(3)).map(token => token.value)).toEqual([target]);
+          if (target !== file) expect(snapshot.text[snapshot.cursor]).toBe("'");
+          else expect(snapshot.text.endsWith(' ')).toBe(true);
+        }
+        terminal.input('\x1b[200~/skill:follow\x1b[201~');
+        const source = host.view.editor.getText();
+        expect(promptTokens(source).find(token => token.raw === '/skill:follow')).toMatchObject({ from: source.indexOf('/skill:follow') });
+        expect(promptTokens(source).find(token => token.raw === '/skill:follow')?.literal).toBeUndefined();
+        expect(submit).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+      } finally {
+        mode.stop(); submit.mockRestore(); network.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
   it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     ['pick-quote"dir', 'pick-tick`dir'].map(name => ({ kind, name }))))(
     'continues escaped path Tab acceptance in $kind for $name', async ({ kind, name }) => {

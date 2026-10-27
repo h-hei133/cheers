@@ -32,7 +32,9 @@ function quoteStartsSpan(text: string, index: number, from: number, quote: strin
   const previous = text[index - 1];
   if (quote === '"') return true;
   if (index === from || previous === undefined) {
-    return end !== undefined
+    // A path's opening quote keeps its whitespace literal while it is typed.
+    const openPath = /^(?:\/|~\/|\.\.?\/|[A-Za-z]:[\\/]|\\\\)/.test(text.slice(index + 1));
+    return (end !== undefined || openPath)
       && !/^'(?:tis|twas|twere|twill|twould|em|cause|cos|til|bout|round|nother|\d{2}s)\b/i.test(text.slice(index));
   }
   if (!/[A-Za-z0-9_]/.test(previous)) return true;

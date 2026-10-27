@@ -70,6 +70,28 @@ it('preserves prefix, suffix and newlines through consecutive quoted directory r
   expect(replaceDraft(next, child.edit!)?.text).toBe(`阅读 "${root}/home space/child/"\n后文 👩‍💻`);
 });
 
+it.each(['', '读取 ', 'path='].flatMap(prefix => ["'", '"'].map(quote => ({ prefix, quote }))))(
+  'completes an unfinished $quote path containing spaces after $prefix and continues through its directory', async ({ prefix, quote }) => {
+    const initial = `${prefix}${quote}${root}/home sp`;
+    const context = { cwd: root, projectRoot: root, session: { id: 'fixture' }, runtimeConfig: {},
+      skillOptions: { noSkills: true } } as ShellRuntimeContext;
+    const load = createCatalogLoader(() => context, {} as never, []);
+    const req = request(initial);
+    expect(req?.kind).toBe('path'); expect(req?.token.value).toBe(`${root}/home sp`);
+    const item = catalogSuggestions(req!, await load(req!.kind, new AbortController().signal, req!.query))[0]!;
+    const next = replaceDraft(req!.snapshot, item.edit!)!;
+    expect(next.text).toBe(`${prefix}${quote}${root}/home space/${quote}`);
+    expect(next.cursor).toBe(next.text.length - 1);
+    const nested = catalogRequest(next, scope)!;
+    expect(nested.query).toBe(`${root}/home space/`);
+    const child = catalogSuggestions(nested, await load(nested.kind, new AbortController().signal, nested.query))[0]!;
+    const accepted = replaceDraft(next, child.edit!)!;
+    expect(accepted.text).toBe(`${prefix}${quote}${root}/home space/child/${quote}`);
+    expect(scanCommandArgs(accepted.text.slice(prefix.length)).map(token => token.value)).toEqual([`${root}/home space/child/`]);
+    expect(promptTokens(`${accepted.text} /skill:real`).find(token => token.raw === '/skill:real')).toMatchObject({ raw: '/skill:real' });
+    expect(promptTokens(`${accepted.text} /skill:real`).find(token => token.raw === '/skill:real')?.literal).toBeUndefined();
+  });
+
 it.each(['pick-quote"dir', 'pick-back\\dir', 'pick-tick`dir', 'pick-组合 "\\`\'$dir'].flatMap(name =>
   ['', '阅读 ', 'path="'].map(prefix => ({ name, prefix }))))(
   'continues escaped directory replacements for $name after $prefix', async ({ name, prefix }) => {
