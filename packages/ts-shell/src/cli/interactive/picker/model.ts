@@ -199,8 +199,12 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               if (reason === 'reasoning effort unsupported' && captured) {
                 const resolution = targetResolutionIdentity(context, config, target);
                 detailActions.push({ id: 'effort', label: 'Choose effort', run: (returnTo, inspect) => ({ next: modelEffortPicker({
-                  target, current: thinkingEffort, catalog, baseUrl: modelAddress, lines, admission: admitInspection, back: inspect,
-                  save: effort => setReviewedModelTarget({ ...target, thinkingEffort: effort }, { ...context, admission: admitInspection },
+                  target, current: thinkingEffort, catalog, baseUrl: modelAddress, lines, admission: admitInspection,
+                  back: note => note === undefined ? inspect() : returnTo(note), canReturn: () => modelBrowserOwned(context),
+                  save: (effort, stillOwned) => setReviewedModelTarget({ ...target, thinkingEffort: effort }, { ...context, admission: () => {
+                    const refusal = admitInspection();
+                    return stillOwned && !stillOwned() ? 'Model selection cancelled. Reopen the model picker.' : refusal;
+                  } },
                     { baseline: captured.baseline, resolution }),
                   done: result => parent ? parent(result) : returnTo(result),
                 }) }) });

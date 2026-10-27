@@ -9737,3 +9737,11 @@ ADD-01/02/03确认详情refresh/admit异常catch直接返回父级，跳过普�
 旧实现确认owner10、两模式host4共14项失败，六条正常返回控制通过；最终admission44、publication19、watch7及过滤host16共86项执行通过，185项host未选不计通过。两个独立反转触发14/6项预期失败，各六条控制通过；源码逐字节恢复并核对SHA-256后最终重验。实际host通过原configuration admission检查workspaceIssue，核对不重开旧链、safe notice、held草稿、原配置/session保持和零派发/fetch；fixture恢复可用后显式重开并取消配置，不冒充自动恢复能力。
 
 五静态门、diff、module facade 0及TS build `1b57d1cebc47`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF、addition第九十二批/当前摘要更新，scratch清理。延迟读回`5f6329b4`CI `40578160357`success，`3405c0b5`CI `40579335521`及`6fadce8a`CI `40580717825`仍in_progress，对应Watch均success。未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，原Phase20矩阵未重跑，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 目标档位恢复的过期返回与宿主写入归属
+
+ADD-01/02/03确认目标effort过期只回note且旧动作未消费，实际Enter后丢settings/model链；accepted host在admission或hook期间关闭/替换仍可切模型。现沿原恢复picker检查accepted ownership与browser return，拒绝/丢失永久退休，获准才携notice回fresh目标目录；同一归属传入原模型事务，pre-hook关闭不写，post-hook关闭保留已确认结果而不重开旧父级。参考采用thinking沿原赋值回调、失败保留导航与disposed检查的决定，原能力、scope与writer合同保持。
+
+旧实现owner18、两模式/两入口host4共22项失败，四条正常保存控制通过。最终recovery28、model43、publication19及过滤host12共102项执行通过，197项host未选不计通过；五组有效反转13/5/4/6/4项失败，控制4/1/1/2/1项通过，源码逐字节恢复与哈希核对后完成最终重验。另四条实际host PreModelSwitch关闭/替换验证了accepted opt-in到writer的真实连接。第三组首轮冻结对象diff错误属于Vitest0.34报告器问题，单独保留为无效记录；完整序列化状态断言修正报告器路径，不改变产品冻结或状态保持要求。配置文件、导航期accepted状态、默认/兄弟角色、held草稿及零派发/fetch均分别检查；不冒充真实provider或原生PTY。
+
+五静态门、diff、module facade 0及TS build `c0237c461717`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF、addition第九十三批/当前摘要更新，scratch清理。延迟读回`3405c0b5`CI `40579335521`及`6fadce8a`CI `40580717825`success；`0effe82b`CI `40582584417`仍in_progress、Watch `40582584573`success。未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，原Phase20矩阵未重跑，无独立review，ADD整体active。本批Git/CI另绑定。

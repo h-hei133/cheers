@@ -1485,7 +1485,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 组合研究把自身command owner误判为忙 | 实际终端Enter拒绝且真实ShellCommandRuntime路由回归可复现。第三十三批改为controller与signal双重身份匹配，自身可继续，其他命令与取消仍拒绝；不能只删除全部busy保护 |
 | 未配置或阻断relay模型详情错用官方能力 | 第三十四批确认缺resolution地址时回退canonical目录，导致同名模型32k误显示400k或已有能力丢失。现沿真实连接/所浏览目录地址共用精确元数据，补上限/图片/reasoning设置/档位/已声明价格，未知与地址歧义保真；78项/三反转/两模式实际隔离PTY有局部证据，完整能力与平台矩阵仍待验 |
 | 模型详情过期配置、退出后仍可操作与重开旧目录 | 第三十五批确认列表/详情旧地址进入新准入子面板、退出load复活动作，以及实际重开仍用旧accepted目录。现原捕获准入/取消复验、详情一次消费和退出retirement；重开仅通过原配置发布刷新catalog，保留普通设置并检查active模型约束。九文件136项、七反转、两模式实际Node隔离PTY有局部证据；真实认证与完整面板矩阵仍待验 |
-| 模型受当前reasoning档位阻断后没有面板恢复链 | 第三十六批确认configured目标详情只有Back；现Choose effort进入目标能力选择，原模型事务一次保存精确模型/档位，取消与失效不部分改当前偏好。六文件122项、五反转、普通/全屏实际Node小PTY有局部证据；缺凭据仍须配置，完整能力与平台验收保留 |
+| 模型受当前reasoning档位阻断后没有面板恢复链 | 第三十六批补Choose effort与原模型事务的精确目标/档位一次保存。第九十三批再确认过期refusal丢导航及accepted host在hook期间关闭仍可切换；现复验原browser后回fresh目录，accepted ownership贯穿原writer，确认写入后的notice保留而旧父级不重开。102项执行通过、五组有效反转及build有本地证据，缺凭据仍须配置，完整能力/真实PTY/平台验收保留 |
 | 模型认证取消后仍可重开 | 第六十批确认post-await只校验身份，原admission/取消信号失效时仍返回model continuation。现`owner.check()`重放准入，拒绝只保留note；成功/失败仍回返，取消不重开。三文件137项、有效反转及真实OverlayHost有局部证据；真实认证服务/平台仍待验 |
 
 ### 16.2 不成立的判断与仍未确认的原因
@@ -1970,3 +1970,17 @@ ADD-01/02/03继续核对已接受详情动作的读取边界。[model details](.
 主代理heap768MiB、单worker串行执行`vitest run src/cli/interactive/picker/model/admission.test.ts src/cli/interactive/picker/model/publication.test.ts src/cli/interactive/picker/model/watch.test.ts --threads=false`，44+19+7共70项通过；实际host用`-t 'retains model navigation after accepted detail|does not reopen models after a detail'`执行16项通过、185项未选，共86项实际执行通过。独立撤销异常返回准入及返回检查后的host复验，分别按名称确认14/6项预期失败，各六条控制通过；finally逐字节恢复details源码，SHA-256 `d95ae071b8b43a0285c7d0a0523a547267066a52b88559dc8a23a0aa71c8eb0d`，恢复后完成上述最终重验。过滤未选项不计通过。
 
 五静态门、diff、module facade 0及TS build `1b57d1cebc47`通过，build heap1536MiB，118既有docs-source advisory保留；HANDOFF及当前摘要更新，本批scratch清理。延迟核对第八十九批CI `40578160357`success，第九十批CI `40579335521`与第九十一批CI `40580717825`仍in_progress，对应Watch `40579335559`及`40580717476`success。未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，原Phase20矩阵未重跑，无独立review，ADD整体active。本批Git/CI另绑定。
+
+### 第九十三批：目标档位恢复的过期返回与接受宿主写入边界
+
+第九十二批`0effe82b7af3e1657731861a70cecb1a9f28d4e8`已推送，续接核对main与tracking一致且clean。ADD-01/02/03继续检查[目标档位恢复](../../packages/ts-shell/src/cli/interactive/picker/model/recovery.ts)：过期准入仅返回note且未消费动作，实际Enter释放overlay后丢settings/model链；接受后的admission或切换hook关闭/替换host时，未接入的accepted ownership也不能保护旧动作。原实现按名称确认18条owner及四条两模式/两入口host共22项失败，四条正常保存控制通过。
+
+只读参考快照`0838d2ab4407b74e870de07e1a6780a13c7d542c`的`packages/tui/src/overlays/model-hub.ts`1625–1650将thinking变更交原onAssign及finishAssignment，1253–1275在失败后重绘并在异步完成后检查disposed。采用复用原写入owner、失败保留操作路径和退出后不接受迟到导航的决定。本项目继续遵守精确模型/档位、原浏览归属与事务写入准入，不复制参考scope或自动归一化策略；尚不支持的当前high仍为只读焦点，须明确移动后才保存。
+
+恢复picker现接入既有OverlayHost accepted generation，在动作开始、choice admission及browser-return admission后复验；拒绝或丢失归属永久退休，原browser未获准不重开，仍获准则通过原back携notice返回fresh目录并保留精确模型与settings父级。明确重试才捕获新选择。[模型目录owner](../../packages/ts-shell/src/cli/interactive/picker/model.ts)同时把accepted ownership送入原setReviewedModelTarget的admission，pre-hook后及锁内仍由原事务复验；写入前关闭/替换不切换。写入已确认后post-hook关闭时保留原安全结果，抑制旧父级构造，不将关闭解释为未写入。未改provider/auth、核心writer、脚本或构建合同。
+
+[recovery回归](../../packages/ts-shell/src/cli/interactive/picker/model/recovery.test.ts)覆盖目录/文件过期、原browser拒绝/取消/抛错、admission关闭/替换×成功/拒绝、返回检查关闭/替换、缺失/抛错guard、接受后延迟开始、实际Pre/PostModelSwitch hook及原配置/兄弟角色保持。[实际host](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)补regular/fullscreen×model/settings四条真实配置文件变更→拒绝回原目标→明确重开medium保存，以及两模式×pre-hook关闭/替换四条，证明InteractiveMode实际转交归属回调。它们分别检查原配置publication与文件、session selection、held草稿、准确屏幕模式及零prompt/fetch；post-hook确认写结果由owner场景证明，终端为RecordingTerminal。
+
+五项独立反转撤销拒绝返回、browser准入、accepted opt-in、原writer的归属guard及保存后的返回复验，最终分别按名称确认13/5/4/6/4项预期失败，所选控制4/1/1/2/1项通过。第三组首轮被Vitest0.34的冻结嵌套状态diff报告器中断，归为无效反转并保留日志；核对其递归clone遗漏forceWritable后，状态保持断言改为完整序列化值比较，未解冻产品对象或削弱保持合同，重新得到四条实际状态断言失败。finally逐字节恢复并核对SHA-256：recovery `264ab257c007651af60e8d8b0b0ee45c38532f403b3189237aeb436bfec08820`、model `696491bfc2587a9f487bb156c184d7191230a7000d19d10ed1fbc89086c96dce`。
+
+恢复后主代理heap768MiB、单worker串行执行`vitest run src/cli/interactive/picker/model/recovery.test.ts src/cli/interactive/picker/model.test.ts src/cli/interactive/picker/model/publication.test.ts --threads=false`，28+43+19共90项通过；host用`-t 'retains effort recovery|retains model navigation after accepted detail refusal'`执行12项通过、197项未选，共102项实际执行通过。五静态门、diff、module facade 0及TS build `c0237c461717`通过，build heap1536MiB，118既有docs-source advisory保留；HANDOFF与当前摘要更新，本批scratch清理。延迟读回第九十批CI `40579335521`、第九十一批CI `40580717825`均success；第九十二批CI `40582584417`仍in_progress、Watch `40582584573`success。本批未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，原Phase20矩阵未重跑，无独立review，ADD整体active。本批Git/CI另绑定。

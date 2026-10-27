@@ -47,7 +47,7 @@ import * as mcpRuntime from '../runtime/mcp.js';
 import { pluginPicker } from './picker/plugins.js';
 import type { ExtensionManager } from '../../extensions/view/model.js';
 import { ShellCommandRuntime } from '../../core/shell/command.js';
-import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
+import { HookDispatcher, defaultHookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import { installUsageRuntime } from '../runtime/usage.js';
 import type { ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
 import * as externalEditor from './externalEditor.js';
@@ -462,6 +462,87 @@ it.each(['regular', 'fullscreen'] as const)(
       expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
     } finally {
       mode.stop(); dispatch.mockRestore(); network.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  ([{ entry: 'model', ending: 'refusal' }, { entry: 'settings', ending: 'refusal' },
+    { entry: 'settings', ending: 'close' }, { entry: 'settings', ending: 'replace' }] as const).map(path => ({ kind, ...path }))))(
+  'retains effort recovery navigation after $ending in the $kind $entry host', async ({ kind, entry, ending }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/model-effort-refusal-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', tuiMode: kind, topP: 0.7, activeProviderConnectionId: 'main',
+      providerConnections: ['main', 'relay'].map(id => ({ id, provider: 'openai' as const, authType: 'api-key' as const,
+        apiKey: `synthetic-${id}`, model: id === 'main' ? 'default-model' : 'blocked-model', status: 'connected' as const,
+        ...(id === 'relay' ? { baseUrl: 'https://relay.invalid/v1' } : {}), createdAt: '2026-01-01', updatedAt: '2026-01-01' })) },
+      readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    writeCatalogCache([{ id: 'openai', models: [{ id: 'default-model', reasoning: true }] },
+      { id: 'relay', runtime: 'openai', baseUrl: 'https://relay.invalid/v1', models: [{ id: 'blocked-model', reasoning: true,
+        thinkingLevelMap: { high: null } }] }]);
+    const manager = new SessionManager(), session = manager.createNew(root), { mode, terminal } = build({ tuiMode: kind });
+    const target = { connectionScope: 'session' as const, connectionId: 'main', provider: 'openai' as const, model: 'default-model', thinkingEffort: 'high' as const,
+      roles: { advisor: { connectionId: 'main', provider: 'openai' as const, model: 'default-model', thinkingEffort: 'low' as const } } };
+    modelState.writeSessionModel(session.id, target, modelState.readSessionModelEdit(session.id));
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+      session, runtimeConfig: getRuntimeConfig(root) });
+    const host = mode as unknown as { view: InteractiveView; overlay: OverlayHost; busy: boolean; options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const selection = modelState.readSessionModelEdit(session.id), accepted = context.configuration.current, before = fs.readFileSync(getUserRuntimeConfigPath());
+    let switchHook: { mockRestore(): void } | undefined;
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    mode.start();
+    try {
+      expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'settings' ? 'Settings' : 'All models'));
+      host.view.editor.setText('held effort recovery draft\nkept through refusal');
+      if (entry === 'settings') {
+        terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
+        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      }
+      terminal.input('blocked-model'); await vi.waitFor(() => expect(frame()).toContain('▸ blocked-model'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
+      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ high'));
+      if (ending !== 'refusal') {
+        const hook = vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+          if (event.eventName === 'PreModelSwitch') {
+            if (ending === 'close') host.overlay.close();
+            else host.overlay.open({ title: 'Replacement panel', form: 'panel', empty: 'Replacement remains current',
+              load: async () => [], apply: async () => undefined });
+          }
+          return undefined;
+        });
+        switchHook = hook; terminal.input('\x1b[A\r');
+        await vi.waitFor(() => expect(hook).toHaveBeenCalledWith(expect.objectContaining({ eventName: 'PreModelSwitch' })));
+        await vi.waitFor(() => expect(host.busy).toBe(false));
+        expect(JSON.stringify(modelState.readSessionModelEdit(session.id))).toBe(JSON.stringify(selection));
+        expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+        expect(context.configuration.current).toBe(accepted); expect(host.overlay.active).toBe(ending === 'replace');
+        if (ending === 'replace') expect(frame()).toContain('Replacement remains current');
+        expect(host.view.editor.getText()).toBe('held effort recovery draft\nkept through refusal');
+        expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+        return;
+      }
+      const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath()); writeUserRuntimeConfigFile({ ...edit.value, topP: 0.8 }, edit);
+      const changed = fs.readFileSync(getUserRuntimeConfigPath());
+      terminal.input('\x1b[A\r');
+      await vi.waitFor(() => expect(frame()).toContain('▸ blocked-model')); expect(frame()).toContain('Model selection expired');
+      expect(modelState.readSessionModelEdit(session.id)).toEqual(selection); expect(context.configuration.current).toBe(accepted);
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(changed); expect(context.runtimeConfig.topP).toBe(0.7);
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
+      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('▸ high'));
+      terminal.input('\x1b[A\r'); await vi.waitFor(() => expect(frame()).toContain('Model switched to blocked-model'));
+      expect(readSessionModel(session.id)).toEqual({ ...target, connectionId: 'relay', model: 'blocked-model', thinkingEffort: 'medium' });
+      if (entry === 'settings') expect(frame()).toContain('▸ Models and roles');
+      else expect(frame()).toContain('▸ blocked-model');
+      expect(host.view.editor.getText()).toBe('held effort recovery draft\nkept through refusal');
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(changed); expect(context.runtimeConfig.topP).toBe(0.8);
+      expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+    } finally {
+      switchHook?.mockRestore(); mode.stop(); dispatch.mockRestore(); network.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
     }
   });
 

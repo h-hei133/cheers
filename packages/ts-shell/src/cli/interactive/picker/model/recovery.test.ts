@@ -53,6 +53,14 @@ async function recovery(commands: CommandContext) {
   return { picker, details, effort };
 }
 
+function prospective(commands: CommandContext) {
+  return { target: { connectionId: 'relay', provider: 'openai' as const, model: 'shared' }, current: 'high' as const,
+    catalog: commands.readConfiguration!().catalog, baseUrl: 'https://relay.invalid/v1', lines: [],
+    save: vi.fn(async () => 'Model switched to shared.'), admission: vi.fn((): string | undefined => undefined),
+    canReturn: vi.fn(() => true), back: vi.fn((_notice?: string) => modelPicker(commands)),
+    done: vi.fn((_notice: string) => modelPicker(commands)) };
+}
+
 it('selects the exact relay and compatible effort in one session transaction, retaining siblings and ordinary settings', async () => {
   const { runtime, commands } = host(); const original = readSessionModel(runtime.session.id)!;
   const before = fs.readFileSync(getUserRuntimeConfigPath()); const { effort } = await recovery(commands);
@@ -77,12 +85,120 @@ it('offers provider-decides recovery for a model with no reasoning parameter and
   expect(readSessionModel(runtime.session.id)).toMatchObject({ connectionId: 'relay', thinkingEffort: null });
 });
 
-it('expires the prospective selection after its exact catalogue changes without partially changing current effort', async () => {
+it.each(['catalogue', 'configuration'] as const)('returns an expired prospective selection after %s changes without partially changing current effort', async change => {
   const { runtime, commands } = host(); const { effort } = await recovery(commands);
-  const original = readSessionModel(runtime.session.id), before = fs.readFileSync(getUserRuntimeConfigPath());
-  catalogue(true);
-  expect((await effort.apply(['medium']))?.note).toContain('expired');
+  const original = readSessionModel(runtime.session.id);
+  if (change === 'catalogue') catalogue(true);
+  else {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.value, topP: 0.8 }, edit);
+  }
+  const before = fs.readFileSync(getUserRuntimeConfigPath()), result = await effort.apply(['medium']);
+  expect(result?.note).toContain('expired'); expect(result?.next?.initialSelection).toBe(target);
+  expect(result?.next?.status?.()).toContain(result!.note);
+  expect(await effort.apply(['medium'])).toBeUndefined(); expect(await effort.load()).toEqual([]);
   expect(readSessionModel(runtime.session.id)).toEqual(original); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+});
+
+it.each((['close', 'replace'] as const).flatMap(ending => [false, true].map(refuse => ({ ending, refuse }))))(
+  'retires an accepted recovery when admission causes host $ending (refuse: $refuse)', async ({ ending, refuse }) => {
+    const { commands } = host(), selection = prospective(commands), overlay = new OverlayHost(() => {});
+    selection.admission.mockImplementation(() => {
+      if (ending === 'close') overlay.close(); else overlay.open(modelPicker(commands));
+      return refuse ? 'Model selection expired.' : undefined;
+    });
+    const effort = modelEffortPicker(selection); overlay.open(effort); await new Promise(resolve => setTimeout(resolve, 0));
+    let pending!: ReturnType<typeof effort.apply>;
+    try {
+      overlay.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+      overlay.handleKey(parseKeyEvent('\r'), (selected, ids) => { pending = selected.apply(ids, overlay.acceptanceFor(selected)); });
+      expect(await pending).toBeUndefined(); expect(selection.save).not.toHaveBeenCalled();
+      expect(selection.canReturn).not.toHaveBeenCalled(); expect(selection.back).not.toHaveBeenCalled(); expect(selection.done).not.toHaveBeenCalled();
+      expect(await effort.apply(['medium'])).toBeUndefined(); expect(await effort.load()).toEqual([]);
+    } finally { overlay.close(); }
+  });
+
+it.each(['close', 'replace'] as const)('discards a recovery refusal if browser admission causes host %s', async ending => {
+  const { commands } = host(), selection = prospective(commands), overlay = new OverlayHost(() => {});
+  selection.admission.mockReturnValue('Model selection expired.');
+  selection.canReturn.mockImplementation(() => { if (ending === 'close') overlay.close(); else overlay.open(modelPicker(commands)); return true; });
+  const effort = modelEffortPicker(selection); overlay.open(effort); await new Promise(resolve => setTimeout(resolve, 0));
+  let pending!: ReturnType<typeof effort.apply>;
+  try {
+    overlay.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+    overlay.handleKey(parseKeyEvent('\r'), (selected, ids) => { pending = selected.apply(ids, overlay.acceptanceFor(selected)); });
+    expect(await pending).toBeUndefined(); expect(selection.canReturn).toHaveBeenCalledTimes(1);
+    expect(selection.save).not.toHaveBeenCalled(); expect(selection.back).not.toHaveBeenCalled(); expect(selection.done).not.toHaveBeenCalled();
+    expect(await effort.apply(['medium'])).toBeUndefined(); expect(await effort.load()).toEqual([]);
+  } finally { overlay.close(); }
+});
+
+it.each(['absent', 'throw'] as const)('keeps the recovery refusal retired without a verified browser (%s guard)', async guard => {
+  const { commands } = host(), selection = prospective(commands);
+  selection.admission.mockReturnValue('Model selection expired.');
+  selection.canReturn.mockImplementation(() => { throw new Error('private return diagnostic'); });
+  const { canReturn: _guard, ...unguarded } = selection;
+  const effort = modelEffortPicker(guard === 'absent' ? unguarded : selection); await effort.load();
+  expect(await effort.apply(['medium'])).toEqual({ note: 'Model selection expired.' });
+  expect(await effort.apply(['medium'])).toBeUndefined(); expect(await effort.load()).toEqual([]);
+  expect(selection.save).not.toHaveBeenCalled(); expect(selection.back).not.toHaveBeenCalled(); expect(selection.done).not.toHaveBeenCalled();
+});
+
+it('retires an accepted recovery that begins after the host closes', async () => {
+  const { commands } = host(), selection = prospective(commands), overlay = new OverlayHost(() => {});
+  const effort = modelEffortPicker(selection); overlay.open(effort); await new Promise(resolve => setTimeout(resolve, 0));
+  let accepted!: () => ReturnType<typeof effort.apply>;
+  try {
+    overlay.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+    overlay.handleKey(parseKeyEvent('\r'), (selected, ids) => {
+      const owned = overlay.acceptanceFor(selected); accepted = () => selected.apply(ids, owned);
+    });
+    overlay.close(); expect(await accepted()).toBeUndefined(); expect(await effort.load()).toEqual([]);
+    expect(await effort.apply(['medium'])).toBeUndefined(); expect(selection.admission).not.toHaveBeenCalled();
+    expect(selection.save).not.toHaveBeenCalled(); expect(selection.back).not.toHaveBeenCalled(); expect(selection.done).not.toHaveBeenCalled();
+  } finally { overlay.close(); }
+});
+
+it.each((['PreModelSwitch', 'PostModelSwitch'] as const).flatMap(eventName =>
+  (['close', 'replace'] as const).map(ending => ({ eventName, ending }))))(
+  'fences recovery writes and returns when $eventName causes host $ending', async ({ eventName, ending }) => {
+    const { runtime, commands } = host(), { effort } = await recovery(commands), overlay = new OverlayHost(() => {});
+    const original = readSessionModel(runtime.session.id), config = fs.readFileSync(getUserRuntimeConfigPath());
+    vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+      if (event.eventName === eventName) { if (ending === 'close') overlay.close(); else overlay.open(modelPicker(commands)); }
+      return undefined;
+    });
+    overlay.open(effort); await new Promise(resolve => setTimeout(resolve, 0));
+    let pending!: ReturnType<typeof effort.apply>;
+    try {
+      overlay.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+      overlay.handleKey(parseKeyEvent('\r'), (selected, ids) => { pending = selected.apply(ids, overlay.acceptanceFor(selected)); });
+      const result = await pending;
+      expect(result?.note).toContain(eventName === 'PreModelSwitch' ? 'blocked' : 'Model switched'); expect(result?.next).toBeUndefined();
+      if (eventName === 'PreModelSwitch') expect(readSessionModel(runtime.session.id)).toEqual(original);
+      else {
+        const { contextWindow: _window, ...controls } = original!;
+        expect(readSessionModel(runtime.session.id)).toEqual({ ...controls, connectionId: 'relay', thinkingEffort: 'medium' });
+      }
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+      expect(await effort.apply(['medium'])).toBeUndefined(); expect(await effort.load()).toEqual([]);
+    } finally { overlay.close(); }
+  });
+
+it.each(['refuse', 'abort', 'throw'] as const)('retires refused recovery without returning when its original browser will %s', async ending => {
+  const { runtime, commands } = host(), controller = new AbortController(); let armed = false, reads = 0;
+  const { effort } = await recovery({ ...commands, signal: controller.signal, admission: () => {
+    if (!armed) return commands.admission();
+    if (++reads === 1) return 'Old choice expired.';
+    if (ending === 'abort') { controller.abort(); return undefined; }
+    if (ending === 'throw') throw new Error('private owner diagnostic');
+    return 'Workspace changed.';
+  } });
+  const before = readSessionModelEdit(runtime.session.id); armed = true;
+  const result = await effort.apply(['medium']);
+  expect(result?.note).toContain('expired'); expect(result?.next).toBeUndefined(); expect(reads).toBe(2);
+  expect(await effort.apply(['medium'])).toBeUndefined(); expect(await effort.load()).toEqual([]);
+  expect(readSessionModelEdit(runtime.session.id)).toEqual(before);
 });
 
 it('returns from a real host effort picker without mutation and cannot revive its dismissed actions', async () => {
