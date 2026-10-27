@@ -9697,3 +9697,11 @@ ADD-10确认普通路径虽有正确源范围，二次命令参数解码仍把`O
 旧实现与有效反转均确认prose8/host4共12项失败，16个控制通过。最终prose66、request30、paths18及过滤host14共128项执行通过，未选165项不计通过；四条新增两模式absolute/home host和八条真实目录链核对完整query、词中替换、连续Tab、后续skill及零提交/网络。源码逐字节恢复并核对SHA-256后重验。两条实际Node小型PTY串行通过目录/子目录/文件接受、后文绘制、最终屏幕模式与退出0；每次新空会话、heap768MiB，没有长历史。探针的父Git root、早期备用屏、截断标签与空会话transcript假设按夹具问题修正，未为此改产品代码；PTY不宣称provider计数或存储验证。
 
 五静态门、diff、module facade 0与TS build `cc6397c0245e`通过，build heap1536MiB，保留118既有docs advisory；HANDOFF与addition第八十七批/当前摘要更新，本批scratch清理。上一批已提交推送`e2857e6f963331ebccf58ee2e2413a5de1fcb817`；延迟检查Watch `40572639614`success、CI `40572639510`仍in_progress，`0982131e`的CI `40570812686`仍in_progress，`bf6bb903`的CI `40568166550`success。未运行全仓、真实provider/exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 模型详情最终准入异常与旧动作永久退役
+
+ADD-01/02/03确认refresh后的admit读取没有异常边界，已接受Enter会丢失settings/model链；返回拒绝也先于最后归属检查，关闭/替换后仍发布结果。现沿原详情owner捕获准入读取异常，有效时回原fresh父目录并保留安全notice；观察到accepted host丢失则永久退役，旧动作不能通过直接重试或load复活。只读参考采用同步/异步读取失败保留导航的决定，没有引入第二套hub或保存owner。
+
+初始新增owner7/host4在旧实现确认11项失败，四个控制通过；初修暴露的四条直接重试失败按产品退休不足修补，另补动作开始前失效与三条旧refresh重试断言。最终admission28、publication9、watch7及过滤实际host8共52项执行通过，175项host未选不算通过；两模式/两入口注入实际accepted getter错误，核对原模型、safe notice、显式重试/取消、settings返回、held草稿、配置/会话保持和零派发/网络。原refresh控制夹具同步修正构造前模式与实际备用屏断言。三个独立反转触发9/2/9项预期失败，源码逐字节恢复及SHA-256确认后完成最终重验。
+
+五静态门、diff、module facade 0与TS build `025d00b2ff5c`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十八批/当前摘要更新，本批scratch清理。延迟检查`e2857e6f`的CI `40572639510`及Watch `40572639614`均success，`0982131e`的CI `40570812686`success；`5204ac40`的Watch `40574711942`success、CI `40574711764`仍in_progress。未运行全仓、真实磁盘故障/PTY/provider/exe、桌面或20k历史，未重跑原Phase20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

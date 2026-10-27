@@ -148,6 +148,71 @@ it.each(['close', 'replace'] as const)('discards a rejected detail refresh after
     if (ending === 'close') host.close(); else host.open(modelPicker(context()));
     reject(new Error('private diagnostic'));
     expect(await accepted).toBeUndefined(); expect(back).not.toHaveBeenCalled(); expect(callback).not.toHaveBeenCalled();
+    expect(await details.apply(['configure'])).toBeUndefined(); expect(await details.load()).toEqual([]);
+  } finally { host.close(); }
+});
+
+it.each(['configure', 'account', 'connection'] as const)(
+  'returns to fresh models when the accepted %s detail admission throws', async action => {
+    const callback = vi.fn(() => ({ draft: '/connect login old' }));
+    const back = vi.fn((notice?: string) => modelPicker(context(), target, undefined, undefined, notice));
+    const details = modelDetailsPicker(detailSource({ back,
+      actions: [{ id: action, label: action, run: callback }],
+      admission: () => { throw new Error('private admission diagnostic'); } }));
+    const host = new OverlayHost(() => {}), before = fs.readFileSync(getUserRuntimeConfigPath()), state = readSessionModelEdit(sessionId);
+    host.open(details); await new Promise(resolve => setTimeout(resolve, 0));
+    let accepted!: ReturnType<typeof details.apply>;
+    try {
+      host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+      host.handleKey(parseKeyEvent('\r'), (selected, ids) => { accepted = selected.apply(ids, host.acceptanceFor(selected)); });
+      const result = await accepted;
+      expect(result?.note).toBe('Model details could not be verified. Reopen the model picker.');
+      expect(back).toHaveBeenCalledWith(result!.note); expect(result!.next?.initialSelection).toBe(target);
+      expect(result!.next?.status?.()).toContain(result!.note);
+      host.open(result!.next!); await new Promise(resolve => setTimeout(resolve, 0));
+      expect(host.active).toBe(true); expect(await details.apply([action])).toBeUndefined();
+      expect(await details.load()).toEqual([]); expect(callback).not.toHaveBeenCalled();
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(state);
+    } finally { host.close(); }
+  });
+
+it.each((['close', 'replace'] as const).flatMap(ending =>
+  (['refuse', 'throw'] as const).map(outcome => ({ ending, outcome }))))(
+  'discards detail admission $outcome results after its accepted host is $ending', async ({ ending, outcome }) => {
+    const callback = vi.fn(() => ({ draft: '/connect login old' })), back = vi.fn(() => modelPicker(context()));
+    const host = new OverlayHost(() => {});
+    const details = modelDetailsPicker(detailSource({ back,
+      actions: [{ id: 'configure', label: 'Configure connection', run: callback }],
+      admission: () => {
+        if (ending === 'close') host.close(); else host.open(modelPicker(context()));
+        if (outcome === 'throw') throw new Error('private admission diagnostic');
+        return 'Model selection expired. Reopen the model picker.';
+      } }));
+    host.open(details); await new Promise(resolve => setTimeout(resolve, 0));
+    let accepted!: ReturnType<typeof details.apply>;
+    try {
+      host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+      host.handleKey(parseKeyEvent('\r'), (selected, ids) => { accepted = selected.apply(ids, host.acceptanceFor(selected)); });
+      expect(await accepted).toBeUndefined(); expect(back).not.toHaveBeenCalled(); expect(callback).not.toHaveBeenCalled();
+      expect(await details.apply(['configure'])).toBeUndefined();
+    } finally { host.close(); }
+  });
+
+it.each(['configure', 'back'] as const)('retires an already revoked detail acceptance before its %s action reads or returns', async action => {
+  const callback = vi.fn(() => ({ draft: '/connect login old' })), back = vi.fn(() => modelPicker(context()));
+  const source = detailSource({ back, actions: [{ id: 'configure', label: 'Configure connection', run: callback }] });
+  const refresh = vi.spyOn(source, 'refresh'), details = modelDetailsPicker(source), host = new OverlayHost(() => {});
+  host.open(details); await new Promise(resolve => setTimeout(resolve, 0));
+  let accepted!: () => ReturnType<typeof details.apply>;
+  try {
+    if (action === 'configure') host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+    host.handleKey(parseKeyEvent('\r'), (selected, ids) => {
+      const owned = host.acceptanceFor(selected); accepted = () => selected.apply(ids, owned);
+    });
+    host.close();
+    expect(await accepted()).toBeUndefined(); expect(refresh).toHaveBeenCalledTimes(1);
+    expect(await details.load()).toEqual([]); expect(await details.apply([action])).toBeUndefined();
+    expect(back).not.toHaveBeenCalled(); expect(callback).not.toHaveBeenCalled();
   } finally { host.close(); }
 });
 
@@ -181,6 +246,7 @@ it('suppresses a real accepted detail refresh that settles after its host is rep
   resolve({ label: 'shared', lines: ['replacement'], available: true,
     actions: [{ id: 'configure', label: 'Configure connection', run: child }] });
   expect(await pending).toBeUndefined();
+  expect(await details.apply(['configure'])).toBeUndefined(); expect(await details.load()).toEqual([]);
   expect(child).not.toHaveBeenCalled();
   host.close();
 });

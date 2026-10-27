@@ -134,6 +134,11 @@ export function modelDetailRefreshFailed(label: string, revision?: number): Mode
 /** The inspector refreshes through its catalogue owner; it never writes model state. */
 export function modelDetailsPicker(source: ModelDetailSource): Picker {
   let current = source.read(), offered = false, retired = false;
+  const ownsAction = (stillOwned?: () => boolean): boolean => {
+    if (!offered || retired) return false;
+    if (stillOwned && !stillOwned()) { offered = false; retired = true; }
+    return offered && !retired;
+  };
   const options = (view: ModelDetailView): readonly Option[] => [
     { id: 'back', label: 'Back to models' },
     ...(view.available ? view.actions : []),
@@ -161,7 +166,7 @@ export function modelDetailsPicker(source: ModelDetailSource): Picker {
       return options(current);
     },
     async apply(ids, stillOwned) {
-      if (!offered || retired || ids.length !== 1) return undefined;
+      if (ids.length !== 1 || !ownsAction(stillOwned)) return undefined;
       const id = ids[0]!;
       if (id === 'back') {
         offered = false; retired = true;
@@ -171,21 +176,28 @@ export function modelDetailsPicker(source: ModelDetailSource): Picker {
       let refreshed: ModelDetailView;
       try { refreshed = await source.refresh(); }
       catch {
-        if (!offered || retired || (stillOwned && !stillOwned())) return undefined;
+        if (!ownsAction(stillOwned)) return undefined;
         offered = false; retired = true;
         const note = 'Model catalogue could not be refreshed. Reopen the model picker.';
         return { note, next: source.back(note) };
       }
-      if (!offered || retired || (stillOwned && !stillOwned())) return undefined;
+      if (!ownsAction(stillOwned)) return undefined;
       current = refreshed;
       const action = current.actions.find(candidate => candidate.id === id);
       if (!current.available || !action) {
         offered = false; retired = true;
         return { next: modelDetailsPicker(source) };
       }
-      const refusal = source.admit(current);
+      let refusal: string | undefined;
+      try { refusal = source.admit(current); }
+      catch {
+        if (!ownsAction(stillOwned)) return undefined;
+        offered = false; retired = true;
+        const note = 'Model details could not be verified. Reopen the model picker.';
+        return { note, next: source.back(note) };
+      }
+      if (!ownsAction(stillOwned)) return undefined;
       if (refusal) return { note: refusal };
-      if (!offered || retired || (stillOwned && !stillOwned())) return undefined;
       offered = false; retired = true;
       return action.run(source.back, () => modelDetailsPicker(source), source.origin?.());
     },
