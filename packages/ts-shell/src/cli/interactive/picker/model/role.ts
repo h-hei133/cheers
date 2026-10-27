@@ -9,7 +9,9 @@ import type { ThinkingPreference } from '../../../../core/models/effort.js';
 export function modelRoleEditor(context: CommandContext, role: AutomaticModelRole,
   browse: (assign: (target: SessionModelRole) => RoleResult, effort: ThinkingPreference) => Picker,
   back: (notice?: string) => Picker, notice?: string): Picker {
-  const edit = prepareModelRole(context, role);
+  let edit: ReturnType<typeof prepareModelRole>;
+  try { edit = prepareModelRole(context, role); }
+  catch { return back(notice ?? 'Role settings could not be read. Reopen the model panel.'); }
   const picker = modelRolePicker(role, edit.current, edit.assign, () => browse(edit.assign, edit.current?.thinkingEffort ?? null), note => back(note ?? notice),
     edit.current && edit.efforts.length ? () => modelRoleThinkingPicker(edit.current!, edit.efforts, edit.setEffort,
       note => modelRoleEditor(context, role, browse, back, note), edit.admission) : undefined, edit.admission);
@@ -49,7 +51,7 @@ export function modelRolePicker(role: AutomaticModelRole, current: SessionModelR
       if (ids[0] === 'back') return { next: back() };
       if (ids[0] !== 'default') return undefined;
       const result = assign(undefined);
-      return { note: result.output, ...(result.saved ? { next: back(result.output) } : {}) };
+      return { note: result.output, next: back(result.output) };
     },
   };
 }

@@ -9633,3 +9633,11 @@ ADD-10确认`@`后备catalog忽略代码区，代码示例仍启动workspace wal
 十一条新增回归先在旧实现失败。最终四文件83项及过滤InteractiveMode11项通过、126项未选，共94项执行通过。regular/fullscreen×行内/围栏四条实际host链证明debounce后代码内零枚举、闭合后一次绑定root的枚举、Tab精确接受与零提交/网络；目录端口为mock，终端为RecordingTerminal。三个独立反转产生11/5/1项预期失败，源码逐字节恢复并核对SHA-256，恢复后全部聚焦检查重验。
 
 五静态门、diff、module facade 0与TS build `c68826cc3eee`通过，测试heap768MiB、build1536MiB；HANDOFF与addition第七十九批/当前摘要更新、scratch清理。`76093b0f`的CI `40546189995`success；`98313353`的Watch `40550326742`success、CI `40550327157`仍in_progress，不替代本批结果。未运行全仓、真实PTY/provider/exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 角色写入失败的父页面返回与结果保真
+
+ADD-02/03确认role reset、effort和具体模型分配只在saved时返回父页面；实际Enter先释放面板，失败便丢失settings/model链并退休owner。现沿原back重建fresh parent、保留精确writer notice。effort重建遇不可读state的四条新增回归也先复现失败，现回原模型目录并保留unknown写入结果；没有自动重试或状态修复。只读参考采用保存失败后保留可操作导航的决定，本项目仍使用原一次消费事务。
+
+最终settings session28、model role18、picker lifecycle6共52项，以及过滤实际host8项通过、137项未选，共60项执行通过。新增14条scope/outcome单元和8条regular/fullscreen链覆盖未写入、落盘unknown、effort写后不可读、fresh显式二次保存、原scope/focus和held草稿；默认/兄弟role及全局配置保持，零prompt派发/网络。不可读夹具恢复磁盘字节由测试显式完成，不记为产品恢复能力。四个独立反转触发6/10/6/4项预期失败，源码逐字节恢复及SHA-256核对后重跑全部上述聚焦检查；不把未选测试记为通过。
+
+五静态门、diff、module facade 0与TS build `6e4ec4816f6e`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory；HANDOFF与addition第八十批/当前摘要更新、scratch清理。延迟读回`98313353`的CI `40550327157`/Watch `40550326742`success；最终验证后`db19104d7f16eb44454065b71eb4a4660deb2034`的CI `40552244493`已completed/success，Watch `40552244296`此前success，均不替代本批结果。未运行全仓、真实PTY/provider/exe、桌面、真实磁盘故障或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

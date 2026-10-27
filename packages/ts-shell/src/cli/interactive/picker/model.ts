@@ -375,7 +375,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       const assignment = assignments.get(ids[0]);
       if (assignment && assigning) {
         const result = assignment();
-        return { note: result.output, ...(result.saved ? { next: assigning.back(result.output) } : {}) };
+        return { note: result.output, next: assigning.back(result.output) };
       }
       const action = actions.get(ids[0]);
       const note = action ? await action() : 'Model selection unavailable. Reopen the picker in an active session.';

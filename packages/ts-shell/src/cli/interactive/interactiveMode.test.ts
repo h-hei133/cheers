@@ -67,6 +67,8 @@ import { readSessionModel } from '../../session/model/state.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
 import { scanCommandArgs } from '../../core/commands/arguments.js';
 import { promptTokens } from '../../core/prompts/tokens.js';
+import * as modelState from '../../session/model/state.js';
+import { SessionModelWriteError } from '../../session/model/outcome.js';
 
 function build(overrides: {
   observeEvents?: () => () => void;
@@ -168,6 +170,88 @@ it('passes leading whitespace and second-line functional markers to prose dispat
     host.onSubmit(' \n/model'); expect(host.queue.shift()).toBe(' \n/model');
     host.onSubmit(' /queue clear'); expect(host.queue.shift()).toBe(' /queue clear');
   } finally { mode.stop(); }
+});
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  (['role', 'thinking', 'assignment'] as const).flatMap(surface =>
+    (surface === 'thinking' ? ['readable', 'unreadable'] as const : ['readable'] as const)
+      .map(state => ({ kind, surface, state })))))(
+  'returns an unverified role write through the actual $kind $surface host with $state state and permits a fresh explicit save', async ({ kind, surface, state }) => {
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  const root = fs.mkdtempSync('/tmp/cheers-test/role-write-host-');
+  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+  writeUserRuntimeConfigFile({ provider: 'openai', tuiMode: kind, activeProviderConnectionId: 'fixture', providerConnections: [{
+    id: 'fixture', provider: 'openai', authType: 'api-key', apiKey: 'synthetic-fixture', model: 'shared',
+    baseUrl: 'https://fixture.invalid/v1', status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+  }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'shared', reasoning: true }, { id: 'other', reasoning: true }] }]);
+  const manager = new SessionManager(), session = manager.createNew(root);
+  modelState.writeSessionModel(session.id, { connectionId: 'fixture', provider: 'openai', model: 'shared', thinkingEffort: 'high', roles: {
+    advisor: { connectionId: 'fixture', provider: 'openai', model: 'shared', thinkingEffort: 'high' },
+    summary: { connectionId: 'fixture', provider: 'openai', model: 'other', thinkingEffort: 'low' },
+  } }, modelState.readSessionModelEdit(session.id));
+  const baseline = readSessionModel(session.id)!, global = fs.readFileSync(getUserRuntimeConfigPath());
+  const { mode, terminal } = build();
+  const host = mode as unknown as { view: InteractiveView; options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+  host.options.runtimeContext = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+    rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+    session, runtimeConfig: getRuntimeConfig(root) }); host.options.sessionManager = manager;
+  const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+  const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+  const original = modelState.writeSessionModel, statePath = modelState.readSessionModelEdit(session.id).statePath;
+  let persisted: Buffer | undefined;
+  const writer = vi.spyOn(modelState, 'writeSessionModel').mockImplementationOnce((...args) => {
+    original(...args);
+    if (state === 'unreadable') {
+      persisted = fs.readFileSync(statePath); fs.writeFileSync(statePath, '{unreadable');
+    }
+    throw new SessionModelWriteError('verification-failed', 'unknown');
+  });
+  const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+  mode.start();
+  try {
+    terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
+    host.view.editor.setText('held draft\nkept through role editing');
+    terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
+    terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+    terminal.input('Advisor'); await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
+    terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('advisor model'));
+    if (surface === 'assignment') {
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('other'); await vi.waitFor(() => expect(frame()).toContain('▸ other'));
+      terminal.input('\r');
+    } else if (surface === 'thinking') {
+      terminal.input('\x1b[B\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('Role thinking effort'));
+      terminal.input('\x1b[A\x1b[A\r');
+    } else terminal.input('\x1b[B\r');
+    await vi.waitFor(() => expect(writer).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(frame()).toContain('unverified'));
+    expect(frame()).toContain(new SessionModelWriteError('verification-failed', 'unknown').message);
+    if (state === 'unreadable') {
+      await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
+      expect(fs.readFileSync(statePath, 'utf8')).toBe('{unreadable');
+      expect(writer).toHaveBeenCalledTimes(1); fs.writeFileSync(statePath, persisted!);
+    }
+    expect(readSessionModel(session.id)).toEqual({ ...baseline, roles: surface === 'role' ? { summary: baseline.roles!.summary }
+      : { ...baseline.roles, advisor: { ...baseline.roles!.advisor!, ...(surface === 'assignment' ? { model: 'other' } : { thinkingEffort: 'low' }) } } });
+    if (surface !== 'thinking' || state === 'unreadable') {
+      await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
+      terminal.input('\r');
+    } else expect(frame()).toContain('Reasoning effort: low');
+    await vi.waitFor(() => expect(frame()).toContain('▸ Choose model'));
+    terminal.input('\x1b[B\r');
+    await vi.waitFor(() => expect(writer).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
+    expect(readSessionModel(session.id)).toEqual({ ...baseline, roles: { summary: baseline.roles!.summary } });
+    terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('Settings — user configuration'));
+    expect(frame()).toContain('▸ Models and roles'); expect(frame()).toContain('advisor follows the default');
+    expect(host.view.editor.getText()).toBe('held draft\nkept through role editing');
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+    expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+  } finally {
+    mode.stop(); writer.mockRestore(); dispatch.mockRestore(); network.mockRestore();
+    vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 it('withdraws the prompt estimate when context selection changes', async () => {

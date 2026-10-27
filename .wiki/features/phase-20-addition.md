@@ -1457,6 +1457,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | TUI首帧过晚与基准误标 | 原入口先建立重runtime，原基准再将后期模型名当首帧。已采用早期真实composer/一次交接，第三十七批补实际Loading观察和runtime接管计时、close清理；同机Node/exe两模式各30个warm-uncontrolled空会话样本已归档。冷缓存、修补前对照、真实项目/桌面及完整首请求性能仍待验，不能写成已证明生产节省量 |
 | 初始上下文问号与估算新鲜度 | 首请求前原先只显示provider用量；已补实际请求本地估算及估算/实测身份衔接。规则、模板与普通skill/cold extension清单已补原始字节进入核验，warm extension沿现inventory摘要失效；附件原已严格UTF-8 digest重验，预览补异步/cancellable复验和实时准入。第五十一批把preview模板发现收窄为候选精确探测，第五十三批再收窄正文补全与单命令查找，并补目录入口、优先级遮蔽和注册归属；第五十四批补首位真实路径/命令合并、command-first及文件引号防误路由；第五十七批让review standalone/composed预览复用真实Git snapshot与plan-mode prompt身份。同名模板/路径提交歧义和完整终端矩阵仍未消除。其他动态来源完整覆盖、总读取成本、原生tokenizer及真实差额仍待验证，无法证明时保留unknown/stale |
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。第三十八批新增settings全部37项/user37-project36基本键盘链及七个跨来源政策场景，第三十九批补17个代表性冲突/失效/取消/范围场景，第四十九批补Memory/Shell只读命令入口。完整字段×来源×编辑器×窗口/桌面及model能力/角色/真实认证矩阵仍未完成；只读入口不伪装可编辑字段，也不能将局部绿色写成“整体已看齐” |
+| 角色写入失败后丢失settings/model返回链 | 第八十批确认reset、具体模型和effort只在saved时返回父页面，Enter已释放面板，失败使生命周期结束；effort重建遇不可读state还会掩盖原写入结果。现回现有fresh parent，不可读时退回目录并保留原notice；60项执行通过、四组6/10/6/4有效反转及build有本地证据，真实文件系统故障与完整平台矩阵未验 |
 | 设置搜索新查询仍保留较弱匹配焦点 | 第三十八批确认typed/pasted `topP`排名第一但Enter打开Input shape。现新查询自动聚焦最强匹配，同查询手动选择保持，清空回原字段；178项聚焦、一有效反转及两模式实际Node PTY有证据。不是用户原model按键现场唯一原因的证明 |
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；第六十三批补非首位命令碰撞file引号、目录候选不触发命令模板查找、代码/转义/URL参数不请求path catalog及quoted Windows drive/UNC识别；第七十批补`/skill:`命名空间内真实路径与skill候选并存，quoted path与exact skill Enter/Tab分界保真。完整场景验收仍按下表，非skill同名template/path的裸提交歧义及正文功能命令执行边界不因此消失 |
@@ -1549,6 +1550,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第七十八批补路径插入→再次读取→目录/文件连续Tab的往返：引号、反斜杠与反引号目录不再破坏后续查询、词法边界或原文后缀。Windows原始输入与生成转义各有词法证据，不能提升为原生Windows文件系统或终端验收；ADD整体仍active。
 
 第七十九批继续补既有`@`引用的字面量与文件名边界：代码围栏/行内代码不枚举文件，真实闭合后恢复；文件名内和开头的`@`可接受并重新解析为同一引用，raw双`@@`和邮箱仍保留原语义。测试目录枚举端口为mock，不是实际文件正文读取或授权证据；ADD整体仍active。
+
+第八十批补角色reset、具体模型及effort写入失败后的返回：沿现有fresh parent保留准确写入notice，state暂时不可读时退回现有目录。消费过的角色动作保持退休，重试须读取新基线并由用户再次选择；没有自动重试或修复状态文件。user/project与两模式host已有隔离证据，完整角色/来源/窗口和真实故障验收仍待补，ADD整体active。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -1747,3 +1750,17 @@ ADD-10继续检查已有`@`文件引用。[fileSuggestions owner](../../packages
 主代理heap768MiB、单worker串行完成四文件83项：fileSuggestions27、references12、request30、completion14；再过滤InteractiveMode执行11项通过、126项未选，共94项实际执行通过。三个独立反转分别移除代码区守卫、恢复query内任意sigil拒绝、移除前导sigil引用，按名称与文件核对恰好11/5/1项失败。源码逐字节恢复，SHA-256 `566f3320d94f3448db5a2c408804efaf527a2da44cc4d44241e8ba7accdf56d7`；恢复后重跑全部上述聚焦检查，不把未选用例记为通过。
 
 五静态门、diff、module facade 0及TS build `c68826cc3eee`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新、反转scratch清理。延迟读回`76093b0f`的CI `40546189995`success；`98313353`的Watch `40550326742`success、CI `40550327157`仍in_progress，不替代本批结果。未运行全仓、真实PTY/provider/exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。
+
+### 第八十批：角色写入失败的返回链与不可读父页面
+
+ADD-02/03沿settings→Models and roles→Advisor检查出三处同类缺口：[role reset](../../packages/ts-shell/src/cli/interactive/picker/model/role.ts)、[effort](../../packages/ts-shell/src/cli/interactive/picker/model/thinking.ts)及[具体模型分配](../../packages/ts-shell/src/cli/interactive/picker/model.ts)仅在`result.saved`时提供continuation。实际OverlayHost在apply之前释放面板，失败没有next使PickerLifecycles结束并abort原owner，因此诊断是释放面板后丢失返回链。现三处均沿现有back构造fresh parent、携带原writer输出；已经消费的角色/effort动作仍退休，后续保存须用户显式操作新事务。
+
+补查发现effort返回时立即prepare角色事务，若写入后state变为不可读，捕获基线会抛错，原unknown结果被后续read-failed替换。两scope单元和regular/fullscreen实际host四条回归先复现失败。现角色editor在无法准备事务时回已有模型目录，保留原notice；无原notice的入口只给受控读取失败提示。目录沿原只读发现和禁用选择合同工作，不产生写权限或自动修复。只读对照的角色保存回调在false/rejection后保留可用导航，只有成功执行成功回调；本项目采用该失败可操作决定，因现有事务一次消费而重建父owner，不复活旧callback。
+
+[settings session测试](../../packages/ts-shell/src/cli/interactive/picker/settings/session.test.ts)新增14条：user/project×reset、effort、具体模型×未写入/已落盘但unknown十二条，另两条effort写后state不可读。使用实际writer加受控失败和真实OverlayHost Enter/生命周期跟踪，核对准确notice、持久化状态、live continuation、退休callback、新基线第二次显式保存、原scope/focus及default/其他role/global配置保持。不可读夹具断言目录模型均禁用、没有第二次写入、损坏字节保持；由测试恢复已保存字节后再显式重试，不能当作产品自动修复证据。
+
+[InteractiveMode测试](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)新增regular/fullscreen×三类写入六条，加两模式effort不可读两条，共八条RecordingTerminal实际host链。经真实输入、settings/model/角色面板、unknown提示和显式二次保存回原settings，held多行草稿保持、原默认模型及summary角色不变、全局配置字节保持，零prompt派发和网络。真实会话存储与受控post-write错误用于保存事实，未注入真实provider或系统磁盘故障。
+
+主代理heap768MiB、单worker串行最终完成settings session28、model role18、picker lifecycle6共52项，随后过滤InteractiveMode执行8项通过、137项未选，共60项实际执行通过。四个独立反转分别恢复reset、effort、具体模型的成功限定返回及移除不可读父页面fallback，按文件与断言名称确认恰好6/10/6/4项失败；finally源码逐字节恢复，恢复后重跑上述全部聚焦验证。恢复SHA-256：role `bc386e764efb3c62979c0f6cd6ac31d1af6c005a2de61dd3f9ad7962d83b929c`，thinking `9db69e505f5bab8b89e6f730b92dcd41988325149e90fa2d1825cffc293a34cd`，model `fc578d0647f2d1fb113e87807775b3fb8bddede44a20316d9f43b3d153983ded`。filtered-out用例不算通过。
+
+五静态门、diff、module facade 0及TS build `6e4ec4816f6e`通过，build heap1536MiB，保留118既有docs-source advisory；HANDOFF与当前摘要更新，临时反转材料清理。延迟读回`98313353`的CI `40550327157`及Watch `40550326742`success；本批最终验证后再读回`db19104d`的CI `40552244493`已completed/success，精确head为`db19104d7f16eb44454065b71eb4a4660deb2034`，Watch `40552244296`此前已success；均不替代本批CI。未运行全仓、真实PTY/provider/exe、桌面或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。

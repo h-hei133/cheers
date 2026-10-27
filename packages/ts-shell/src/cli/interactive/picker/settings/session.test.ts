@@ -10,7 +10,10 @@ import { configurationAdmission } from '../../../../core/shell/configuration.js'
 import { resolveProviderCredential } from '../../../../core/shell/providerCredentials.js';
 import { openSettings } from '../../settings.js';
 import { pickerFor, type PickerHost } from '../registry.js';
-import { OverlayHost } from '../../overlay.js';
+import { OverlayHost, type Picker } from '../../overlay.js';
+import { PickerLifecycles } from '../lifecycle.js';
+import * as modelState from '../../../../session/model/state.js';
+import { SessionModelWriteError } from '../../../../session/model/outcome.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
 import type { CommandContext } from '../../../../core/commands/types.js';
@@ -30,11 +33,11 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { recursive: true, force: true }); });
 
-function host(signIn?: ModelSignIn) {
+function host(signIn?: ModelSignIn, signal?: AbortSignal) {
   const runtime = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, rootMode: 'direct', targetPathBase: root,
     gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: true }, runtimeConfig: getRuntimeConfig(root),
     session, resolveConfigTarget: config => resolveProviderCredential({ runtimeConfig: config, env: {} }) });
-  const commandContext: CommandContext = { cwd: root, projectRoot: root, sessionId, runtimeConfig: runtime.runtimeConfig,
+  const commandContext: CommandContext = { cwd: root, projectRoot: root, sessionId, runtimeConfig: runtime.runtimeConfig, signal,
     admission: configurationAdmission(runtime), readConfiguration: () => runtime.configuration.current,
     refreshRuntimeConfig: () => refreshShellRuntimeConfig(runtime), resolveConfigTarget: runtime.resolveConfigTarget };
   return { commandContext, openSettings: (scope?: 'user' | 'project') => openSettings(runtime, () => {}, scope),
@@ -97,6 +100,91 @@ it('assigns an advisor model through its owner and returns through the model cat
   expect(back.initialSelection).toBe('settings:model'); expect(back.title).toContain('Settings');
   expect(back.footer).toContain('advisor uses');
 });
+
+it.each((['user', 'project'] as const).flatMap(scope =>
+  (['role', 'thinking', 'assignment'] as const).flatMap(surface =>
+    (surface === 'thinking' ? ['unchanged', 'unknown', 'unreadable'] as const : ['unchanged', 'unknown'] as const)
+      .map(state => ({ scope, surface, state })))))(
+  'returns a failed $surface write in $scope scope with $state evidence to a fresh usable owner', async ({ scope, surface, state }) => {
+    writeSessionModel(sessionId, { connectionId: 'fixture', provider: 'openai', model: 'shared', thinkingEffort: 'high', roles: {
+      advisor: { connectionId: 'fixture', provider: 'openai', model: 'shared', thinkingEffort: 'high' },
+      summary: { connectionId: 'fixture', provider: 'openai', model: 'other', thinkingEffort: 'low' },
+    } }, readSessionModelEdit(sessionId));
+    const baseline = readSessionModel(sessionId)!, global = fs.readFileSync(getUserRuntimeConfigPath());
+    const lifetimes = new PickerLifecycles(), controller = lifetimes.begin(), h = host(undefined, controller.signal);
+    let settings = pickerFor('/settings', h)!; await settings.load();
+    if (scope === 'project') {
+      const field = (await settings.apply(['maxTurns']))!.next!; await field.load();
+      const scopes = (await field.apply(['scope']))!.next!; await scopes.load();
+      const projectField = (await scopes.apply(['project']))!.next!; await projectField.load();
+      settings = projectField.back!(); await settings.load();
+    }
+    const models = (await settings.apply(['settings:model']))!.next!; await models.load();
+    const role = (await models.inspect!('role:advisor'))!.next!; await role.load();
+    const child = surface === 'role' ? role : (await role.apply([surface === 'assignment' ? 'choose' : 'thinking']))!.next!;
+    const overlay = new OverlayHost(() => {});
+    overlay.open(lifetimes.track(child, controller, false)); await settle();
+    const original = modelState.writeSessionModel, statePath = readSessionModelEdit(sessionId).statePath;
+    let persisted: Buffer | undefined;
+    const writer = vi.spyOn(modelState, 'writeSessionModel').mockImplementationOnce((...args) => {
+      if (state !== 'unchanged') original(...args);
+      if (state === 'unreadable') {
+        persisted = fs.readFileSync(statePath); fs.writeFileSync(statePath, '{unreadable');
+      }
+      throw new SessionModelWriteError(state === 'unchanged' ? 'write-failed' : 'verification-failed', state === 'unchanged' ? state : 'unknown');
+    });
+    let pending: Promise<unknown> | undefined, outcome: Awaited<ReturnType<Picker['apply']>>;
+    const apply = (picker: Picker, ids: readonly string[]) => {
+      pending = picker.apply(ids).then(result => {
+        outcome = result;
+        const owner = lifetimes.controllerFor(picker);
+        if (result?.next && owner) overlay.open(lifetimes.track(result.next, owner, false));
+        lifetimes.finish(picker, result?.next ? owner : undefined);
+      });
+    };
+    try {
+      if (surface === 'assignment') overlay.handlePaste('other');
+      else for (let count = 0; count < (surface === 'role' ? 1 : 2); count++) overlay.handleKey(parseKeyEvent(surface === 'role' ? '\x1b[B' : '\x1b[A'), apply);
+      overlay.handleKey(parseKeyEvent('\r'), apply); await pending; await settle();
+      const failure = state === 'unchanged' ? 'this attempt did not write' : 'unverified';
+      expect(outcome?.note).toBe(new SessionModelWriteError(state === 'unchanged' ? 'write-failed' : 'verification-failed', state === 'unchanged' ? state : 'unknown').message);
+      expect(writer).toHaveBeenCalledTimes(1);
+      expect(outcome?.next).toBeDefined(); expect(overlay.active).toBe(true);
+      expect(controller.signal.aborted).toBe(false); expect(frame(overlay)).toContain(failure);
+      if (state === 'unreadable') {
+        expect(frame(overlay)).toContain('▸ Advisor');
+        const models = (await outcome!.next!.load()).filter(row => row.id.startsWith('model:'));
+        expect(models.length).toBeGreaterThan(0); expect(models.every(row => row.disabled)).toBe(true);
+        expect(fs.readFileSync(statePath, 'utf8')).toBe('{unreadable');
+        fs.writeFileSync(statePath, persisted!);
+      }
+      const after = readSessionModel(sessionId)!;
+      expect(after).toEqual(state === 'unchanged' ? baseline : { ...baseline, roles: surface === 'role'
+        ? { summary: baseline.roles!.summary }
+        : { ...baseline.roles, advisor: { ...baseline.roles!.advisor!, ...(surface === 'assignment' ? { model: 'other' } : { thinkingEffort: 'low' }) } } });
+      if (surface !== 'assignment') {
+        expect(await child.apply([surface === 'role' ? 'default' : 'low'])).toBeUndefined();
+        expect(await child.load()).toEqual([]);
+      }
+      expect(writer).toHaveBeenCalledTimes(1);
+      if (surface !== 'thinking' || state === 'unreadable') {
+        expect(frame(overlay)).toContain('▸ Advisor');
+        overlay.handleKey(parseKeyEvent('\r'), apply); await pending; await settle();
+      } else expect(frame(overlay)).toContain(`Reasoning effort: ${state === 'unknown' ? 'low' : 'high'}`);
+      expect(frame(overlay)).toContain('▸ Choose model');
+      overlay.handleKey(parseKeyEvent('\x1b[B'), apply); overlay.handleKey(parseKeyEvent('\r'), apply);
+      await pending; await settle();
+      expect(writer).toHaveBeenCalledTimes(2); expect(outcome?.note).toContain('advisor follows the default');
+      expect(readSessionModel(sessionId)).toEqual({ ...baseline, roles: { summary: baseline.roles!.summary } });
+      expect(controller.signal.aborted).toBe(false);
+      overlay.handleKey(parseKeyEvent('\x1b'), apply); await settle();
+      expect(frame(overlay)).toContain(`${scope} configuration`);
+      expect(frame(overlay)).toContain('▸ Models and roles');
+      expect(frame(overlay)).toContain('advisor follows the default');
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+      expect(h.runtime.resolveConfigTarget!(h.runtime.runtimeConfig).model).toBe('shared');
+    } finally { overlay.close(); lifetimes.abortAll(); }
+  });
 
 it('returns an expired thinking refusal to settings without changing the newer session choice', async () => {
   const settings = pickerFor('/settings', host())!; await settings.load(); const thinking = (await settings.apply(['settings:thinking']))!.next!;

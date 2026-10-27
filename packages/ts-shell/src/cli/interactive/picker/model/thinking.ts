@@ -32,7 +32,7 @@ export function modelRoleThinkingPicker(current: SessionModelRole, efforts: read
       if (!offered || retired) return undefined;
       offered = false; retired = true;
       const result = assign(effort);
-      return { note: result.output, ...(result.saved ? { next: back(result.output) } : {}) };
+      return { note: result.output, next: back(result.output) };
     },
   };
 }
