@@ -517,6 +517,66 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   });
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  (['refresh', 'admission'] as const).map(failure => ({ kind, failure }))))(
+  'does not reopen models after a detail $failure failure invalidates its browser in the $kind settings host', async ({ kind, failure }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/model-return-owner-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', tuiMode: kind, topP: 0.7, providerConnections: [] },
+      readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    writeCatalogCache([{ id: 'relay', runtime: 'openai', baseUrl: 'https://fixture.invalid/v1', models: [{ id: 'verify-me' }] }]);
+    const manager = new SessionManager(), session = manager.createNew(root), { mode, terminal } = build({ tuiMode: kind });
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+      session, runtimeConfig: getRuntimeConfig(root) });
+    const host = mode as unknown as { view: InteractiveView; overlay: OverlayHost; options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const before = fs.readFileSync(getUserRuntimeConfigPath()), selection = modelState.readSessionModelEdit(session.id), accepted = context.configuration.current;
+    const construct = modelDetails.catalogueDetailSource;
+    let armed = false;
+    const fail = () => { armed = false; context.workspaceIssue = 'Workspace is unavailable.'; throw new Error('private return diagnostic'); };
+    const source = vi.spyOn(modelDetails, 'catalogueDetailSource').mockImplementation(options => {
+      const original = construct(options);
+      return { ...original,
+        async refresh() { if (armed && failure === 'refresh') fail(); return original.refresh(); },
+        admit(view) { if (armed && failure === 'admission') fail(); return original.admit(view); },
+      };
+    });
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    mode.start();
+    try {
+      expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+      terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
+      host.view.editor.setText('held browser owner draft\nkept through failure');
+      terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('verify-me'); await vi.waitFor(() => expect(frame()).toContain('▸ verify-me'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
+      armed = true; terminal.input('\x1b[B\r');
+      await vi.waitFor(() => expect(frame()).toContain(failure === 'refresh' ? 'Model catalogue could not be refreshed' : 'Model details could not be verified'));
+      expect(host.overlay.active).toBe(false); expect(frame()).not.toContain('private return diagnostic');
+      expect(context.configuration.current).toBe(accepted); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+      expect(modelState.readSessionModelEdit(session.id)).toEqual(selection);
+      expect(host.view.editor.getText()).toBe('held browser owner draft\nkept through failure');
+      context.workspaceIssue = undefined;
+      host.view.editor.setText('/settings'); terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
+      terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('verify-me'); await vi.waitFor(() => expect(frame()).toContain('▸ verify-me'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Back to models'));
+      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
+      terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('▸ verify-me'));
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(modelState.readSessionModelEdit(session.id)).toEqual(selection);
+      expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+    } finally {
+      source.mockRestore(); mode.stop(); dispatch.mockRestore(); network.mockRestore();
+      vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   (['model', 'settings'] as const).map(entry => ({ kind, entry }))))(
   'retains model navigation after accepted detail admission failure in the $kind $entry host', async ({ kind, entry }) => {
     fs.mkdirSync('/tmp/cheers-test', { recursive: true });

@@ -1465,6 +1465,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 模型详情普通准入拒绝关闭返回链 | 第八十九批用真实配置文件变化确认target拒绝只返回note，实际host已释放详情，settings/model链随之关闭。现拒绝消费旧动作，另验原浏览owner有效才回fresh目录，取消/身份失效/读取异常不自动重开；62项执行通过、15/4/2三组有效反转、build及两模式小型Node PTY有证据，完整来源/桌面矩阵未验 |
 | 角色详情返回的列表更新而分配事务仍旧 | 第九十批三个自动角色×配置/会话变化与两模式host确认fresh目录仍复用旧assign/effort，显式重选继续过期。现详情及认证返回共用原角色owner重捕获事务和当前档位，失败沿角色目录保留原notice；75项执行通过、12/3/4三组有效反转及build有本地证据，未追加真实PTY或真实认证 |
 | 角色动作/档位准入拒绝关闭导航且接受后丢失宿主归属 | 第九十一批确认角色菜单和档位页的refusal只回note且未消费，Enter已释放的host也不再触发preview退休。现两owner接入accepted generation，准入及返回检查后再验归属，拒绝/归属丢失永久退休；156项执行通过、五组有效反转、build与两模式Node小PTY有证据，完整平台/来源/真实认证未验 |
+| 模型详情异常恢复绕过原浏览归属复验 | 第九十二批确认refresh/admit异常只验accepted host后直接构造父级，workspace已失效时仍会重开旧链。现异常与普通拒绝共用原详情owner的返回准入，检查前后复验宿主，未获准只保留安全结果并退休旧动作；86项执行通过、14/6两组有效反转及build有证据，故障受控，真实磁盘/桌面矩阵未验 |
 | 设置搜索新查询仍保留较弱匹配焦点 | 第三十八批确认typed/pasted `topP`排名第一但Enter打开Input shape。现新查询自动聚焦最强匹配，同查询手动选择保持，清空回原字段；178项聚焦、一有效反转及两模式实际Node PTY有证据。不是用户原model按键现场唯一原因的证明 |
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；第六十三批补非首位命令碰撞file引号、目录候选不触发命令模板查找、代码/转义/URL参数不请求path catalog及quoted Windows drive/UNC识别；第七十批补`/skill:`命名空间内真实路径与skill候选并存，quoted path与exact skill Enter/Tab分界保真。完整场景验收仍按下表，非skill同名template/path的裸提交歧义及正文功能命令执行边界不因此消失 |
@@ -1955,3 +1956,17 @@ ADD-01/02/03继续核对已接受详情动作的读取边界。[model details](.
 另以实际Node launcher、现有PTY relay与环境隔离owner串行运行regular/fullscreen两条新空会话：settings→Advisor菜单→外部topP变化→拒绝回原Advisor；显式重开并分配ready shared；再入角色档位→第二次文件变化→拒绝回角色菜单→显式保存low。检查两个拒绝期间selection不变、最终effort之外的default保持、外部配置字节保持、原settings返回、实际屏幕模式、零transcript message与退出0。每进程heap768MiB，无长历史或exe；PTY不提供网络调用计数，零派发/网络直接证据来自host spies，未用终端probe替代真实provider/桌面验收。
 
 五静态门、diff、module facade 0及TS build `07790d1e5522`通过，build heap1536MiB；118既有docs-source advisory保留。HANDOFF与当前摘要更新，本批scratch清理。延迟核对第八十八批CI `40576592505`已success；第八十九批CI `40578160357`与第九十批CI `40579335521`仍in_progress，Watch `40578160348`及`40579335559`均success，不替代本批精确SHA验证。未运行全仓、真实provider/OAuth、exe、桌面、原生Windows、真实磁盘故障或20k历史，未重跑原Phase20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+### 第九十二批：详情异常返回沿原浏览归属准入
+
+第九十一批`6fadce8abccc525e8fbfd6bad3ce2d5cf77481d1`已推送，续接核对本地/远端一致且clean。ADD-01/02/03继续核对[详情owner](../../packages/ts-shell/src/cli/interactive/picker/model/details.ts)：普通拒绝会调用原`source.canReturn`，refresh和最终admit的异常catch却直接调用`source.back`。原workspace已失效而accepted host仍存在时，实际Enter会重开旧settings/model链；返回检查自身关闭或替换host也没有相同的复验。十条owner及两模式×两失败边界四条实际host回归在旧实现确认14项失败，六条原正常异常返回控制通过。
+
+只读参考快照`0838d2ab4407b74e870de07e1a6780a13c7d542c`的`packages/tui/src/overlays/model-hub.ts`604–634、1142–1162将同步/异步读取错误保留在现有面板，1255–1275在异步失败完成时检查disposed后重绘。采用保留安全错误和导航、已退出页面不接受结果的决定。本项目还须遵守独立的session/workspace浏览准入，因此未获准时仅保留安全notice，不能因读取错误重开父级；不复制参考hub或新增导航/保存owner。
+
+详情本地的同一拒绝返回函数现在处理普通拒绝、refresh异常和admit异常。它在原browser检查前后复验accepted host，丢失归属则不发布；原browser准入缺失、拒绝或抛错时不构造父级，消费并永久退休旧详情；仍获准才沿原fresh父级返回。六条正常返回控制明确声明有效return guard，和实际model目录已提供的合同一致，保留原notice及具体模型焦点。
+
+[owner测试](../../packages/ts-shell/src/cli/interactive/picker/model/admission.test.ts)覆盖两类异常×缺少/拒绝/抛错guard，以及返回检查关闭/替换host、直接重试与迟到load。[实际host](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)regular/fullscreen从settings进入具体未配置模型，在refresh/admit故障时设置真实runtime的workspaceIssue，经原configuration admission拒绝旧browser；检查面板不重开、安全notice、原配置publication/文件/session保持、held草稿及零prompt/fetch。fixture清除workspaceIssue后须显式重新打开settings，再到原模型配置并取消；这不冒充产品自动恢复或真实磁盘故障。
+
+主代理heap768MiB、单worker串行执行`vitest run src/cli/interactive/picker/model/admission.test.ts src/cli/interactive/picker/model/publication.test.ts src/cli/interactive/picker/model/watch.test.ts --threads=false`，44+19+7共70项通过；实际host用`-t 'retains model navigation after accepted detail|does not reopen models after a detail'`执行16项通过、185项未选，共86项实际执行通过。独立撤销异常返回准入及返回检查后的host复验，分别按名称确认14/6项预期失败，各六条控制通过；finally逐字节恢复details源码，SHA-256 `d95ae071b8b43a0285c7d0a0523a547267066a52b88559dc8a23a0aa71c8eb0d`，恢复后完成上述最终重验。过滤未选项不计通过。
+
+五静态门、diff、module facade 0及TS build `1b57d1cebc47`通过，build heap1536MiB，118既有docs-source advisory保留；HANDOFF及当前摘要更新，本批scratch清理。延迟核对第八十九批CI `40578160357`success，第九十批CI `40579335521`与第九十一批CI `40580717825`仍in_progress，对应Watch `40579335559`及`40580717476`success。未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，原Phase20矩阵未重跑，无独立review，ADD整体active。本批Git/CI另绑定。

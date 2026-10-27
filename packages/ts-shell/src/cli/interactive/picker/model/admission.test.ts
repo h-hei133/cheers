@@ -161,7 +161,7 @@ it.each(['configure', 'account', 'connection'] as const)('returns to fresh model
   let refreshes = 0;
   const initial: ModelDetailView = { label: 'shared', lines: ['original'], available: true,
     actions: [{ id: action, label: action, run: callback }] };
-  const details = modelDetailsPicker(detailSource({ back, actions: initial.actions,
+  const details = modelDetailsPicker(detailSource({ back, actions: initial.actions, canReturn: () => true,
     refresh: async () => { if (++refreshes > 1) throw new Error('private diagnostic'); return initial; } }));
   const host = new OverlayHost(() => {}), before = fs.readFileSync(getUserRuntimeConfigPath()), state = readSessionModelEdit(sessionId);
   host.open(details); await new Promise(resolve => setTimeout(resolve, 0));
@@ -206,7 +206,7 @@ it.each(['configure', 'account', 'connection'] as const)(
   'returns to fresh models when the accepted %s detail admission throws', async action => {
     const callback = vi.fn(() => ({ draft: '/connect login old' }));
     const back = vi.fn((notice?: string) => modelPicker(context(), target, undefined, undefined, notice));
-    const details = modelDetailsPicker(detailSource({ back,
+    const details = modelDetailsPicker(detailSource({ back, canReturn: () => true,
       actions: [{ id: action, label: action, run: callback }],
       admission: () => { throw new Error('private admission diagnostic'); } }));
     const host = new OverlayHost(() => {}), before = fs.readFileSync(getUserRuntimeConfigPath()), state = readSessionModelEdit(sessionId);
@@ -223,6 +223,58 @@ it.each(['configure', 'account', 'connection'] as const)(
       expect(host.active).toBe(true); expect(await details.apply([action])).toBeUndefined();
       expect(await details.load()).toEqual([]); expect(callback).not.toHaveBeenCalled();
       expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(state);
+    } finally { host.close(); }
+  });
+
+it.each((['refresh', 'admission'] as const).flatMap(failure =>
+  (['absent', 'refuse', 'throw'] as const).map(guard => ({ failure, guard }))))(
+  'keeps a $failure failure retired without a verified browser return ($guard guard)', async ({ failure, guard }) => {
+    const callback = vi.fn(), back = vi.fn(() => modelPicker(context()));
+    const canReturn = guard === 'absent' ? undefined : vi.fn(() => {
+      if (guard === 'throw') throw new Error('private return diagnostic');
+      return false;
+    });
+    const initial: ModelDetailView = { label: 'shared', lines: [], available: true,
+      actions: [{ id: 'configure', label: 'Configure', run: callback }] };
+    let refreshes = 0;
+    const details = modelDetailsPicker(detailSource({ back, canReturn, actions: initial.actions,
+      refresh: async () => {
+        if (++refreshes > 1 && failure === 'refresh') throw new Error('private refresh diagnostic');
+        return initial;
+      },
+      admission: () => { throw new Error('private admission diagnostic'); } }));
+    await details.load();
+    const result = await details.apply(['configure']);
+    expect(result).toEqual({ note: failure === 'refresh' ? 'Model catalogue could not be refreshed. Reopen the model picker.'
+      : 'Model details could not be verified. Reopen the model picker.' });
+    if (canReturn) expect(canReturn).toHaveBeenCalledTimes(1);
+    expect(back).not.toHaveBeenCalled(); expect(callback).not.toHaveBeenCalled();
+    expect(await details.apply(['configure'])).toBeUndefined(); expect(await details.load()).toEqual([]);
+    expect(await details.apply(['back'])).toBeUndefined();
+  });
+
+it.each((['refresh', 'admission'] as const).flatMap(failure =>
+  (['close', 'replace'] as const).map(ending => ({ failure, ending }))))(
+  'discards a $failure failure if browser-return admission causes host $ending', async ({ failure, ending }) => {
+    const host = new OverlayHost(() => {}), callback = vi.fn(), back = vi.fn(() => modelPicker(context()));
+    const initial: ModelDetailView = { label: 'shared', lines: [], available: true,
+      actions: [{ id: 'configure', label: 'Configure', run: callback }] };
+    let refreshes = 0;
+    const canReturn = vi.fn(() => { if (ending === 'close') host.close(); else host.open(modelPicker(context())); return true; });
+    const details = modelDetailsPicker(detailSource({ back, canReturn, actions: initial.actions,
+      refresh: async () => {
+        if (++refreshes > 1 && failure === 'refresh') throw new Error('private refresh diagnostic');
+        return initial;
+      },
+      admission: () => { throw new Error('private admission diagnostic'); } }));
+    host.open(details); await new Promise(resolve => setTimeout(resolve, 0));
+    let accepted!: ReturnType<typeof details.apply>;
+    try {
+      host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+      host.handleKey(parseKeyEvent('\r'), (selected, ids) => { accepted = selected.apply(ids, host.acceptanceFor(selected)); });
+      expect(await accepted).toBeUndefined(); expect(canReturn).toHaveBeenCalledTimes(1);
+      expect(back).not.toHaveBeenCalled(); expect(callback).not.toHaveBeenCalled();
+      expect(await details.apply(['configure'])).toBeUndefined(); expect(await details.load()).toEqual([]);
     } finally { host.close(); }
   });
 

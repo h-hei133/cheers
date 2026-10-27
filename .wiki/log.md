@@ -9729,3 +9729,11 @@ ADD-02/03角色菜单与档位页在Enter释放overlay后，准入拒绝只返�
 旧实现确认owner24、两模式四入口host8共32项失败；writer探针初次缺少有效返回的两项修为受控RoleResult后，在原实现同24项均行为失败。最终role46、model43、admission34、publication19、过滤host14共156项执行通过，183项host未选不算通过。五项独立反转28/10/8/4/15项预期失败，源码逐字节恢复/哈希核对后重验。两条实际Node小型PTY串行通过settings角色与档位拒绝返回、显式模型/low保存、拒绝期selection保持、default/外部配置保持、零message、实际模式与退出0；网络计数证据来自host spies，未冒充真实provider。
 
 五静态门、diff、module facade 0与TS build `07790d1e5522`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF、addition第九十一批/当前摘要更新，scratch清理。延迟读回`e5c01721`CI `40576592505`success，`5f6329b4`CI `40578160357`与`3405c0b5`CI `40579335521`仍in_progress，两者Watch均success。未运行全仓、真实provider/OAuth、exe、桌面、原生Windows、磁盘故障或20k历史，原Phase20矩阵未重跑，无独立review，ADD整体active。本批Git/CI另绑定。
+
+## [2026-10-28] fix | 模型详情异常返回复验原浏览归属
+
+ADD-01/02/03确认详情refresh/admit异常catch直接返回父级，跳过普通拒绝的原browser准入；workspace失效而accepted host尚在时，真实Enter仍重开旧settings/model链。现三类失败共用详情本地返回函数，browser检查前后复验宿主，未获准只保留安全notice并退休旧动作，获准才沿原fresh父级返回。参考采用读取失败保留导航和disposed检查的决定，本项目额外保留原session/workspace准入，没有新建导航或保存系统。
+
+旧实现确认owner10、两模式host4共14项失败，六条正常返回控制通过；最终admission44、publication19、watch7及过滤host16共86项执行通过，185项host未选不计通过。两个独立反转触发14/6项预期失败，各六条控制通过；源码逐字节恢复并核对SHA-256后最终重验。实际host通过原configuration admission检查workspaceIssue，核对不重开旧链、safe notice、held草稿、原配置/session保持和零派发/fetch；fixture恢复可用后显式重开并取消配置，不冒充自动恢复能力。
+
+五静态门、diff、module facade 0及TS build `1b57d1cebc47`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF、addition第九十二批/当前摘要更新，scratch清理。延迟读回`5f6329b4`CI `40578160357`success，`3405c0b5`CI `40579335521`及`6fadce8a`CI `40580717825`仍in_progress，对应Watch均success。未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，原Phase20矩阵未重跑，无独立review，ADD整体active。本批Git/CI另绑定。

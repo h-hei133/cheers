@@ -34,7 +34,7 @@ export interface ModelDetailSource {
   initialize?(): Promise<ModelDetailView>;
   refresh(): Promise<ModelDetailView>;
   admit(view: ModelDetailView): string | undefined;
-  /** Returning after a refused choice requires the original browser owner. */
+  /** Returning after a failed choice requires the original browser owner. */
   canReturn?(): boolean;
   back(notice?: string): Picker;
   origin?(): ModelDetailOrigin;
@@ -143,6 +143,14 @@ export function modelDetailsPicker(source: ModelDetailSource): Picker {
     if (stillOwned && !stillOwned()) { offered = false; retired = true; }
     return offered && !retired;
   };
+  const refuse = (note: string, stillOwned?: () => boolean): PickerOutcome | undefined => {
+    if (!ownsAction(stillOwned)) return undefined;
+    let returning = false;
+    try { returning = source.canReturn?.() === true; } catch { /* An unverified owner cannot reopen the browser. */ }
+    if (!ownsAction(stillOwned)) return undefined;
+    offered = false; retired = true;
+    return { note, ...(returning ? { next: source.back(note) } : {}) };
+  };
   const options = (view: ModelDetailView): readonly Option[] => [
     { id: 'back', label: 'Back to models' },
     ...(view.available ? view.actions : []),
@@ -180,10 +188,7 @@ export function modelDetailsPicker(source: ModelDetailSource): Picker {
       let refreshed: ModelDetailView;
       try { refreshed = await source.refresh(); }
       catch {
-        if (!ownsAction(stillOwned)) return undefined;
-        offered = false; retired = true;
-        const note = 'Model catalogue could not be refreshed. Reopen the model picker.';
-        return { note, next: source.back(note) };
+        return refuse('Model catalogue could not be refreshed. Reopen the model picker.', stillOwned);
       }
       if (!ownsAction(stillOwned)) return undefined;
       current = refreshed;
@@ -195,19 +200,10 @@ export function modelDetailsPicker(source: ModelDetailSource): Picker {
       let refusal: string | undefined;
       try { refusal = source.admit(current); }
       catch {
-        if (!ownsAction(stillOwned)) return undefined;
-        offered = false; retired = true;
-        const note = 'Model details could not be verified. Reopen the model picker.';
-        return { note, next: source.back(note) };
+        return refuse('Model details could not be verified. Reopen the model picker.', stillOwned);
       }
       if (!ownsAction(stillOwned)) return undefined;
-      if (refusal) {
-        let returning = false;
-        try { returning = source.canReturn?.() === true; } catch { /* An unverified owner cannot reopen the browser. */ }
-        if (!ownsAction(stillOwned)) return undefined;
-        offered = false; retired = true;
-        return { note: refusal, ...(returning ? { next: source.back(refusal) } : {}) };
-      }
+      if (refusal) return refuse(refusal, stillOwned);
       offered = false; retired = true;
       return action.run(source.back, () => modelDetailsPicker(source), source.origin?.());
     },
