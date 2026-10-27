@@ -9754,3 +9754,12 @@ ADD-03确认Thinking effort的浏览代次未覆盖实际Enter释放后的host�
 原实现owner14项、实际host4项失败；修补后thinking36及过滤两模式host10共46项实际通过，209项未选不计通过。六组独立反转4/14/4/10/7/10项预期失败，控制6/22/32/26/29/26项通过，源码逐字节恢复并核对哈希；JSON收据按逐断言状态统计，避免Vitest0.34把未选计入passed。配置文件、完整session/兄弟角色、accepted publication、held草稿及零派发/fetch分别验证。
 
 五静态门、diff、module facade 0及TS build `6e18d285f49c`通过，恢复后46项最终重验通过，测试heap768MiB、build1536MiB，118既有docs-source advisory保留；工件归.omx/artifacts/phase20-addition-thinking-ownership/，HANDOFF与addition更新。延迟核对第九十二、九十三批CI仍in_progress，第九十三批Watch已success；本批Git/CI另绑定。真实PTY/provider/OAuth/exe/桌面/Windows/磁盘故障和全仓未验，不运行20k历史，ADD整体active。
+
+
+## [2026-10-28] fix | 显式队列保留组合正文与图片
+
+ADD-11/12确认SubmissionQueue已有附件合同，但queue控制factory/adapter与实际host只转text，图片丢失；控制入口的trim还裁掉literal任务尾部空白。现沿原queue owner可选转交PromptAttachments，文本调用形状保持；host保留raw正文并记录图片echo，仍由同一pending项编辑/派发/中断恢复，未新增执行或缓存系统。参考采用text/images同一任务保持，保留本项目session/root绑定和派发时统一skill准入。
+
+旧实现owner3项附件失败、文本控制1项通过，新增两模式host16项在尾空白断言失败。四项独立反转3/3/16/16项预期失败、同次控制14/14/2/2项通过，host各217项未选，两个product源码逐字节恢复与哈希核对。恢复后主代理单worker串行聚焦35项通过、host217项未选不计通过；五静态门、diff、module facade 0及TS build `aa06eaf988f1`通过，测试heap768MiB、build1536MiB，118既有docs-source advisory保留；测试与脚本工件归.omx/artifacts/phase20-addition-queued-images/。新路径核查两份skill body、两张图片、完整source、失败零部分派发、未知第二项/超预算/中断后的显式重试与零fetch，provider派发端口为mock。
+
+HANDOFF与addition已更新。延迟核对第九十三批CI40585215498已success，第九十二批40582584417及第九十四批40586855260仍in_progress；不等待新CI，Git/精确SHA另绑定。未运行全仓、真实provider/PTY/exe/桌面/Windows或20k历史，ADD整体active。

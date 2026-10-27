@@ -1469,6 +1469,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 设置搜索新查询仍保留较弱匹配焦点 | 第三十八批确认typed/pasted `topP`排名第一但Enter打开Input shape。现新查询自动聚焦最强匹配，同查询手动选择保持，清空回原字段；178项聚焦、一有效反转及两模式实际Node PTY有证据。不是用户原model按键现场唯一原因的证明 |
 | 设置失败重试/scope确认把旧暂存写到新归属，user来源换代或不可读范围处理不足 | 第三十九批确认ambient host重捕获绕过旧binding、user未检查legacy/preferred selector，以及损坏目标scope使面板丢失。现原draft受限reopen，同源冲突可明确第二次Apply；binding/profile/source变化须新开，scope取消或不可读保留pending和原scope，成功换scope撤销pending，写锁与发布前复验。222项、三有效/一无效反转及四小型实际Node PTY有局部证据，完整矩阵未验 |
 | 正文路径、多skill、有限slash组合原先缺口 | 原路径与skill路由偏向首位，多个名字不足以使多份skill生效。现沿原补全/解析/研究owner推进；第六十三批补非首位命令碰撞file引号、目录候选不触发命令模板查找、代码/转义/URL参数不请求path catalog及quoted Windows drive/UNC识别；第七十批补`/skill:`命名空间内真实路径与skill候选并存，quoted path与exact skill Enter/Tab分界保真。完整场景验收仍按下表，非skill同名template/path的裸提交歧义及正文功能命令执行边界不因此消失 |
+| 显式队列入口丢图片并裁掉任务尾部空白 | 第九十五批确认普通SubmissionQueue已有附件合同，但queue控制及adapter仅转文本，TUI还trim整个原输入。现原queue owner沿同一待提交项转交附件，控制入口保留literal正文及图片echo；两种Enter模式覆盖多skill、未知第二项、超预算和中断后重试，完整平台/真实provider仍未验 |
 | 转义目录名使连续Tab失败或隐藏后文skill | 第七十八批确认已插入引号内的转义源码被当成真实路径，裸反引号还会打开代码区。现复用参数扫描器解码，保留原始Windows分隔符并给反引号路径加引号；138项执行通过、三组有效反转与构建有本地证据。两模式host使用RecordingTerminal，Windows只做词法测试，真实终端与平台本批未验 |
 | 手动输入的未闭合单引号路径在空格处分裂 | 第八十四批确认leading单引号须先有close，路径后半段失去补全，内部skill/方法标记暴露给准备。现明确路径前缀沿原tokenizer保持open quote范围；142项执行通过、13项有效反转与build有本地证据，双引号/带前缀控制及闭合后的多skill保留，原生Windows与真实终端未验 |
 | 组合选项的引用值被误作普通正文 | 第八十五批确认`--mode="paper"`、depth和brief未进入研究参数，无效引用选项还会绕过校验。现保留未引用flag前缀，复用参数scanner解码后走原strict语法；未闭合选项在准备/建状态前阻止。完整引用、escape和code正文继续保留，预览/提交、durable options与两模式Enter有隔离证据 |
@@ -1588,6 +1589,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第九十一批补角色菜单及角色档位的拒绝返回与accepted宿主归属：有效浏览时沿原父级保留notice并要求重新选择，取消/归属失效不自动重开，旧动作及迟到load不复活。详情和角色共用原signal/admission检查，写入仍由原角色事务完成；两模式实际host与小型Node PTY有证据，ADD整体active。
 
 第九十四批补会话Thinking effort的接受后归属：原浏览代次与accepted host同时进入原模型事务，拒绝/完成返回另验browser，消费后的旧动作不复活。同一实例只有显式重开可获得新基线；写前关闭不保存，写后关闭保留确认结果。36项owner及两模式实际host10项有本地证据，完整平台/来源验收继续待补，ADD整体active。
+
+第九十五批补显式queue的多模态输入：add及简写入口把同一附件集合送入原SubmissionQueue，正文尾部空白不再被控制入口裁掉。两模式实际Enter覆盖忙碌排队、正常排空、第二skill未知/超预算及中断后的显式重试，全部body与图片只进入一个后续任务；派发端口为mock，未提升真实provider/平台或整体验收状态。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -2001,3 +2004,18 @@ ADD-03继续核对settings→Thinking effort→保存/返回。原[档位owner](
 六项独立反转：accepted opt-in、host guard、writer admission、browser return、动作消费和结果保留分别产生4/14/4/10/7/10项预期断言失败，同次控制6/22/32/26/29/26项通过，仅第一组另有209项未选。每次finally恢复原字节，SHA-256为1228880183677f16514f3849430360568f7f0272121fc5d5c575cea2c7329ded。反转自动分类初次以名称必须含thinking误拒一条原exact relay控制，修正为所属测试文件与精确失败名称核对；该组实际7项行为失败已读回，无产品修正。Vitest0.34 JSON顶层numPassedTests还包含未选项，收据一律逐assertionResults.status统计，不把215写成真实通过数。
 
 五静态门、diff、module facade 0及TS build `6e18d285f49c`通过；恢复后完成上述46项最终重验，测试heap768MiB、build1536MiB，118既有docs-source advisory保留。工件归.omx/artifacts/phase20-addition-thinking-ownership/，HANDOFF已补记录，Git/CI另绑定。延迟核对第九十二批CI40582584417及第九十三批CI40585215498仍in_progress，第九十三批Watch40585215777已success。未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，无独立review，原Phase20矩阵未重跑，ADD整体active。
+
+
+### 第九十五批：显式队列保留组合正文与图片附件
+
+ADD-11/12核对排队→提交/恢复的真实操作链，确认普通[SubmissionQueue](../../packages/ts-shell/src/cli/interactive/inputQueue.ts)已支持attachments，但[控制owner](../../packages/ts-shell/src/cli/runtime/inputQueue.ts)的factory及adapter只转text，[实际host](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)也未转交附件，导致`/queue add 比较 /skill:a /skill:b`或简写附带的图片丢失。host还在提取rawCommandArgs前trim整个输入，裁掉literal任务尾部空白。旧实现新增owner4项中3项在附件断言失败、文本控制1项通过；两模式实际host16项全部在尾空白保持断言失败，219项未选，不据此声称旧实现的后续路径已经通过。
+
+检查目标后，只读对照参考agent-session.ts 2136–2174、2237–2263、2302–2328，快照6c384aa30f619d7b28963f2bab24d8dacbe73cb6：队列与直接请求携带同一text/images；输入handler返回的图片随准备后的text传递；steer/followUp各自构造一份user content。采用同一正文和图片保持、一次任务的决定；本项目仍由原SubmissionQueue绑定session/root并延后skill展开到实际派发，保留多skill统一准入，未复制参考的预展开和分lane政策。
+
+现queueCommandFor及attachSubmissionQueue以可选PromptAttachments贯通同一push，原文本调用保持一个text参数。host控制入口转交附件、保留raw正文尾部空白并按原user block记录图片；list/cancel等控制仍操作已有pending项，不额外制造任务。不新建队列、第二份附件缓存或另一条执行路径；沿原editing/release/takeAttachments、真实组合路由和失败retryDraft继续消费与恢复。
+
+恢复后主代理heap768MiB、单worker串行执行runtime queue4、interactive queue4、pipe input9，以及过滤实际InteractiveMode18项（新增16与既有直接组合/中断控制2），共35项实际通过，217项host未选不计通过。两种screen×add/简写×正常排空/未知第二skill/超预算/中断覆盖真实Enter、两份body、两张图片、完整source metadata、单一后续派发、失败零部分派发、显式修复/重试和图片顺序；新host使用独立HOME/USERPROFILE/CHEERS_TEST_ROOT与真实小文件目录，prompt dispatch/fetch为mock。这是原host到派发端口的证据，不是provider图片理解或真实收费证据。
+
+四项独立反转分别撤销queue factory附件、adapter附件、host转交及raw正文保持，产生3/3/16/16项精确预期失败，同次控制14/14/2/2项通过；后两组各217项未选，不计通过。每组finally逐字节恢复并核对SHA-256：queue owner259d6655711270d911d0159ab36e8309f0cd2fdb5e13f3a009325643d6740580、host cf84ee46f1eeecc3ad8dd06d52f4af1d5d6e1652378ff26ee90bdf266b7fe4e0。收据按逐assertionResults.status统计。
+
+五静态门、diff、module facade 0与TS build `aa06eaf988f1`通过，build heap1536MiB；118既有docs-source advisory保留。工件归.omx/artifacts/phase20-addition-queued-images/，HANDOFF已追加具体陷阱，Git/CI另绑定。延迟核对第九十三批CI40585215498已completed/success；第九十二批40582584417及第九十四批40586855260仍in_progress，不推断为停止或成功。未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，无独立review，原Phase20矩阵未重跑，ADD整体active。

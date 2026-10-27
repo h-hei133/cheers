@@ -647,3 +647,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A filtered host run executes 10 tests, but Vitest0.34 JSON reports 215 passed, 4 failed and zero pending for a 219-test file.
 - **Root Cause**: The reporter's top-level pass total includes tests whose individual assertion status is skipped.
 - **Rule**: Derive executed passes, failures and unselected counts from assertionResults.status and cross-check the selected names. Keep skipped tests out of passing totals. Match reversal failures by the owning file and expected behavior, not by requiring an arbitrary word in every test name.
+
+
+### Queue Controls Must Carry The Same Attachments And Literal Task Body
+- **Symptom**: Ordinary busy submissions retain images, but /queue add or its shorthand silently loses them; task text also loses trailing whitespace before composition.
+- **Root Cause**: SubmissionQueue already owns text plus attachments, while the command factory and queue adapter expose only text. The TUI control bridge trims the entire source before the existing literal-body parser sees it.
+- **Rule**: Carry optional PromptAttachments through the existing queue factory and adapter into the same pending item, retaining the text-only call shape. Extract controls from raw source without trimming task endings. Test actual Enter while a foreground turn is held, then drain or explicitly retry after unknown skills, budget refusal and interruption; check both skill bodies, image order, source metadata, one delivery and the existing pipe/text controls.

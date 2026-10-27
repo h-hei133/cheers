@@ -1,5 +1,5 @@
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
-import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
+import type { PromptAttachments, ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import type { CommandContext } from '../../core/commands/types.js';
 import type { InputQueueControl } from '../../core/agent/queue.js';
 import { parsePlanningArgs, queueSyntax } from '../../core/commands/planning/syntax.js';
@@ -7,7 +7,7 @@ import { syntaxHelp } from '../../core/commands/syntax/projection.js';
 import { sanitizeExecutionReportText } from '../../runtime/execution/error.js';
 import { planningBody } from '../../core/commands/planning/source.js';
 
-interface QueueHost { readonly control: InputQueueControl; enqueue(text: string): string; drain(): void }
+interface QueueHost { readonly control: InputQueueControl; enqueue(text: string, attachments?: PromptAttachments): string; drain(): void }
 const hosts = new WeakMap<ShellSessionRuntime, QueueHost>();
 
 export function attachInputQueue(runtime: ShellSessionRuntime, host: QueueHost): () => void {
@@ -15,15 +15,16 @@ export function attachInputQueue(runtime: ShellSessionRuntime, host: QueueHost):
 }
 
 export function attachSubmissionQueue(runtime: ShellSessionRuntime,
-  queue: { readonly control: InputQueueControl; push(text: string): string; shift(): string | undefined },
+  queue: { readonly control: InputQueueControl; push(text: string, attachments?: PromptAttachments): string; shift(): string | undefined },
   run: (prompt: string) => Promise<unknown>, ready: () => boolean): () => void {
-  return attachInputQueue(runtime, { control: queue.control, enqueue: text => queue.push(text), drain: () => {
+  return attachInputQueue(runtime, { control: queue.control, enqueue: (text, attachments) => attachments ? queue.push(text, attachments) : queue.push(text), drain: () => {
     if (!ready()) return;
     const prompt = queue.shift(); if (prompt !== undefined) void run(prompt);
   } });
 }
 
-export function queueCommandFor(context: ShellRuntimeContext, runtime: ShellSessionRuntime): NonNullable<CommandContext['queueCommand']> {
+export function queueCommandFor(context: ShellRuntimeContext, runtime: ShellSessionRuntime,
+  attachments?: PromptAttachments): NonNullable<CommandContext['queueCommand']> {
   return async (args, commandContext) => {
     if (commandContext.sessionId !== context.session.id || commandContext.projectRoot !== context.projectRoot) {
       return { kind: 'local', output: 'Queue update refused: the current session changed.' };
@@ -38,7 +39,7 @@ export function queueCommandFor(context: ShellRuntimeContext, runtime: ShellSess
       `${index + 1}. ${entry.id} [${entry.lane}] ${sanitizeExecutionReportText(entry.text, 240)}`).join('\n')}` : 'No pending input.' };
     if (action === 'add') {
       const text = planningBody(commandContext.rawCommandArgs, parsed.action.name ? 1 : 0, parsed.args);
-      if (host) { const id = host.enqueue(text); host.drain(); return { kind: 'local', output: `Queued ${id}.` }; }
+      if (host) { const id = attachments ? host.enqueue(text, attachments) : host.enqueue(text); host.drain(); return { kind: 'local', output: `Queued ${id}.` }; }
       if (!runtime.getCurrentRunController()) return { kind: 'prompt', prompt: text, notice: 'Executing queued input through the ordinary prompt path.' };
       return { kind: 'local', output: 'Queue submission unavailable: this active host has no pending submission queue.' };
     }

@@ -991,6 +991,78 @@ it('delivers all composed instructions and images through the real interactive r
   } finally { dispatch.mockRestore(); mode.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+it.each((['regular', 'fullscreen'] as const).flatMap(kind => (['add ', ''] as const).flatMap(prefix =>
+  (['dispatch', 'missing', 'oversize', 'interrupt'] as const).map(ending => ({ kind, prefix, ending })))))(
+  'keeps queue $prefix images and composed source through $ending in the $kind Enter host', async ({ kind, prefix, ending }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true }); const root = fs.mkdtempSync('/tmp/cheers-test/queued-method-images-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const skillPaths = ['a', 'b'].map(name => {
+      const file = path.join(root, name, 'SKILL.md'); fs.mkdirSync(path.dirname(file));
+      fs.writeFileSync(file, `---\nname: ${name}\ndescription: method\n---\nBODY ${name}`); return file;
+    });
+    const second = fs.readFileSync(skillPaths[1]!), manager = new SessionManager(), session = manager.createNew(root);
+    const { mode, terminal } = build({ tuiMode: kind });
+    const host = mode as unknown as { run(text: string): Promise<void>; busy: boolean; interrupt(): Promise<void>;
+      queue: SubmissionQueue; view: InteractiveView; lastPrompt?: string; lastAttachments?: unknown;
+      state: { pastes: { holdImage(image: unknown): string; expand(text: string): string; imagesIn(text: string): readonly unknown[] } };
+      options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager; sessionRuntime: ShellSessionRuntime } };
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null }, session,
+      runtimeConfig: { ...getRuntimeConfig(root), tuiMode: kind } });
+    context.skillOptions = { skillPaths, noSkills: true };
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockImplementation(async input => {
+      if (input.effectivePrompt === 'FOREGROUND') await held;
+    });
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    const images = [{ type: 'image' as const, data: 'AA==', mimeType: 'image/png' },
+      { type: 'image' as const, data: 'AQ==', mimeType: 'image/png' }];
+    const markers = images.map(image => host.state.pastes.holdImage(image)).join(' ');
+    const draft = `/queue ${prefix}比较 ${markers} /skill:a\n/skill:b  `;
+    const source = '比较   /skill:a\n/skill:b  ';
+    let foreground: Promise<void> | undefined;
+    mode.start();
+    try {
+      expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+      foreground = host.run('FOREGROUND'); await vi.waitFor(() => expect(dispatch).toHaveBeenCalledOnce());
+      expect(host.busy).toBe(true); host.view.editor.setText(draft); terminal.input('\r');
+      await vi.waitFor(() => expect(host.view.transcript.all().some(block => block.text?.includes('Queued '))).toBe(true));
+      expect(host.queue.control.entries()).toEqual([{ id: expect.any(String), lane: 'pending', text: source }]);
+      expect(host.view.transcript.all().filter(block => block.kind === 'user').at(-1)).toMatchObject({ images });
+      expect(host.view.editor.getText()).toBe(''); expect(dispatch).toHaveBeenCalledOnce();
+      if (ending === 'missing') fs.unlinkSync(skillPaths[1]!);
+      if (ending === 'oversize') fs.appendFileSync(skillPaths[1]!, 'x'.repeat(65536));
+      if (ending === 'interrupt') {
+        host.options.sessionRuntime.cancelAndWait = vi.fn(async () => { release(); });
+        await host.interrupt();
+      } else release();
+      await foreground; await vi.waitFor(() => expect(host.busy).toBe(false));
+      let submitted = source;
+      if (ending !== 'dispatch') {
+        expect(dispatch).toHaveBeenCalledOnce();
+        const restored = host.view.editor.getText(); expect(restored.startsWith(source)).toBe(true);
+        expect(host.state.pastes.imagesIn(restored)).toEqual(images);
+        if (ending === 'missing' || ending === 'oversize') {
+          expect(host.view.transcript.all().some(block => block.text?.includes(ending === 'missing' ? 'Unknown skill: b' : 'input budget'))).toBe(true);
+          fs.writeFileSync(skillPaths[1]!, second);
+        }
+        submitted = host.state.pastes.expand(restored); terminal.input('\r');
+        await vi.waitFor(() => expect(host.busy).toBe(false));
+      }
+      expect(dispatch).toHaveBeenCalledTimes(2); const sent = dispatch.mock.calls[1]![0];
+      expect(sent).toMatchObject({ attachments: { images }, promptMetadata: {
+        originalInput: submitted, skills: [{ name: 'a' }, { name: 'b' }],
+      } });
+      expect(sent.effectivePrompt.match(/BODY a/g)).toHaveLength(1); expect(sent.effectivePrompt.match(/BODY b/g)).toHaveLength(1);
+      expect(host.lastPrompt).toBe(submitted); expect(host.lastAttachments).toEqual({ images });
+      expect(host.queue.length).toBe(0); expect(host.queue.takeAttachments()).toBeUndefined(); expect(network).not.toHaveBeenCalled();
+    } finally {
+      release(); await foreground; await vi.waitFor(() => expect(host.busy).toBe(false));
+      mode.stop(); dispatch.mockRestore(); network.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
 it.each((['regular', 'fullscreen'] as const).flatMap(kind => [true, false].map(valid => ({ kind, valid }))))(
   'submits quoted research options through actual $kind Enter with valid=$valid', async ({ kind, valid }) => {
     const setup = researchHarness();

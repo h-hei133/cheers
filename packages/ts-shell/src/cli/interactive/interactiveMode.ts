@@ -777,10 +777,11 @@ export class InteractiveMode {
     appendPromptHistory(this.options.runtimeContext.projectRoot, text);
     const controlSource = text.startsWith('/') ? text : '';
     if (isQueueControl(controlSource)) {
-      this.state.transcript.append(textBlock('user', text));
+      this.state.transcript.append(attachments?.images.length
+        ? { ...textBlock('user', text), images: attachments.images } : textBlock('user', text));
       const context = this.options.runtimeContext;
-      const rawCommandArgs = text.trim().replace(/^\/queue(?:\s|$)/i, '');
-      void queueCommandFor(context, this.options.sessionRuntime)(tokenizeCommandArgs(rawCommandArgs), {
+      const rawCommandArgs = text.replace(/^\/queue(?:\s|$)/i, '');
+      void queueCommandFor(context, this.options.sessionRuntime, attachments)(tokenizeCommandArgs(rawCommandArgs), {
         cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true, rawCommandArgs,
       }).then(result => {
         if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, '/queue'));
