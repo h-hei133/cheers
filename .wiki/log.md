@@ -9689,3 +9689,11 @@ ADD-10确认文件引用复用整段命令参数scanner，前文普通apostrophe
 旧实现按文件/名称确认18项失败、八个控制通过，含两条实际Tab后文删除；额外解码反转一项失败、三个控制通过。续接前97项补全与四条两模式host共101项通过，真实隔离目录确认walk一次、正确root、完整前后文与后续skill，零prompt提交/网络；终端为RecordingTerminal。续接核对反转源码逐字节恢复及SHA-256一致，未重复已通过的测试。
 
 续接完成五静态门、diff、module facade 0和TS build `8ef2d57d21c2`，build heap1536MiB，保留118既有docs advisory；HANDOFF与addition第八十六批/当前摘要更新，本批scratch清理。尚未Git提交或推送，无本批CI；未运行全仓、真实PTY/provider/exe、桌面或原生Windows，未重跑原Phase 20矩阵，无独立review，ADD整体active。
+
+## [2026-10-28] fix | 普通路径的apostrophe查询与连续Tab
+
+ADD-10确认普通路径虽有正确源范围，二次命令参数解码仍把`O'Brien`变成`OBrien`，真实目录失去候选。现plain路径保留源值，真正quote与raw Windows沿原政策，复用原目录、formatter及snapshot owner；只读参考采用raw prefix不统一shell解码的决定，其apostrophe delimiter差异明确保留。
+
+旧实现与有效反转均确认prose8/host4共12项失败，16个控制通过。最终prose66、request30、paths18及过滤host14共128项执行通过，未选165项不计通过；四条新增两模式absolute/home host和八条真实目录链核对完整query、词中替换、连续Tab、后续skill及零提交/网络。源码逐字节恢复并核对SHA-256后重验。两条实际Node小型PTY串行通过目录/子目录/文件接受、后文绘制、最终屏幕模式与退出0；每次新空会话、heap768MiB，没有长历史。探针的父Git root、早期备用屏、截断标签与空会话transcript假设按夹具问题修正，未为此改产品代码；PTY不宣称provider计数或存储验证。
+
+五静态门、diff、module facade 0与TS build `cc6397c0245e`通过，build heap1536MiB，保留118既有docs advisory；HANDOFF与addition第八十七批/当前摘要更新，本批scratch清理。上一批已提交推送`e2857e6f963331ebccf58ee2e2413a5de1fcb817`；延迟检查Watch `40572639614`success、CI `40572639510`仍in_progress，`0982131e`的CI `40570812686`仍in_progress，`bf6bb903`的CI `40568166550`success。未运行全仓、真实provider/exe、桌面、原生Windows或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。

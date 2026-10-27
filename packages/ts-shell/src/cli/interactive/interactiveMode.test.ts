@@ -2060,6 +2060,52 @@ describe("session wiring", () => {
     }
   });
 
+  it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+    ['absolute', 'home'].map(form => ({ kind, form }))))(
+    'completes raw apostrophe paths through actual $kind Tab in $form form', async ({ kind, form }) => {
+      fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+      const root = fs.mkdtempSync('/tmp/cheers-test/apostrophe-path-host-');
+      vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+      const child = path.join(root, "O'Brien", 'child space');
+      fs.mkdirSync(child, { recursive: true }); fs.writeFileSync(path.join(child, "report's.md"), 'fixture');
+      const base = form === 'absolute' ? root + '/' : '~/';
+      const scheduler = new ManualScheduler();
+      const { mode, terminal } = build({ tuiMode: kind, scheduler }); terminal.columns = 120; terminal.rows = 24;
+      const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void;
+        options: { runtimeContext: ShellRuntimeContext } };
+      host.options.runtimeContext = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root,
+        targetPathBase: root, rootMode: 'direct', gitRoot: null,
+        gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+        session: host.options.runtimeContext.session, runtimeConfig: { ...getRuntimeConfig(root), tuiMode: kind } });
+      host.options.runtimeContext.skillOptions = { noSkills: true };
+      const submit = vi.spyOn(host, 'onSubmit').mockImplementation(() => {});
+      const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+      const suffix = '\n后文 /skill:follow unchanged';
+      const text = `读取 ${base}O'Brstale${suffix}`, cursor = text.indexOf('stale');
+      mode.start();
+      try {
+        expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+        terminal.input(`\x1b[200~${text}\x1b[201~`);
+        terminal.input('\x1b[D'.repeat(text.length - cursor)); scheduler.flush();
+        expect(host.view.editor.snapshot().cursor).toBe(cursor);
+        for (const target of [base + "O'Brien/", base + "O'Brien/child space/", base + "O'Brien/child space/report's.md"]) {
+          await vi.waitFor(() => expect(host.view.suggestions.current()?.value).toBe(target));
+          terminal.input('\t'); scheduler.flush();
+          const snapshot = host.view.editor.snapshot();
+          expect(snapshot.text.startsWith('读取 ')).toBe(true); expect(snapshot.text.endsWith(suffix)).toBe(true);
+          expect(scanCommandArgs(snapshot.text.slice(3, -suffix.length)).map(token => token.value)).toEqual([target]);
+          expect(promptTokens(snapshot.text).find(token => token.raw === '/skill:follow')?.literal).toBeUndefined();
+          expect(promptTokens(snapshot.text).some(token => token.raw === '/skill:follow')).toBe(true);
+          if (target.endsWith('/')) expect(snapshot.text[snapshot.cursor]).toBe('"');
+        }
+        expect(stripAnsi(terminal.drain())).toContain('后文 /skill:follow unchanged');
+        expect(submit).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+      } finally {
+        mode.stop(); submit.mockRestore(); network.mockRestore(); vi.unstubAllEnvs();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
   it.each(['regular', 'fullscreen'] as const)(
     'continues a manually opened single-quoted path through actual %s Tab acceptance', async kind => {
       fs.mkdirSync('/tmp/cheers-test', { recursive: true });

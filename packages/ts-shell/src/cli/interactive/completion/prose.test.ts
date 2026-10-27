@@ -70,6 +70,36 @@ it('preserves prefix, suffix and newlines through consecutive quoted directory r
   expect(replaceDraft(next, child.edit!)?.text).toBe(`阅读 "${root}/home space/child/"\n后文 👩‍💻`);
 });
 
+it.each(['absolute', 'home', 'relative', 'parent'].flatMap(form =>
+  ['', '读取 '].map(prefix => ({ form, prefix }))))(
+  'preserves a raw filename apostrophe in $form paths after $prefix and continues Tab completion', async ({ form, prefix }) => {
+    const base = form === 'absolute' ? root + '/' : form === 'home' ? '~/'
+      : form === 'relative' ? './' : '../' + path.basename(root) + '/';
+    const child = path.join(root, "O'Brien", 'child space');
+    fs.mkdirSync(child, { recursive: true }); fs.writeFileSync(path.join(child, "report's.md"), 'fixture');
+    const suffix = '\n后文 /skill:follow 👩‍💻';
+    const context = { cwd: root, projectRoot: root, session: { id: 'fixture' }, runtimeConfig: {},
+      skillOptions: { noSkills: true } } as ShellRuntimeContext;
+    const load = createCatalogLoader(() => context, {} as never, []);
+    let req = request(`${prefix}${base}O'Br|stale${suffix}`)!;
+    expect(req?.token.value).toBe(base + "O'Br");
+    for (const target of [base + "O'Brien/", base + "O'Brien/child space/", base + "O'Brien/child space/report's.md"]) {
+      const items = catalogSuggestions(req, await load(req.kind, new AbortController().signal, req.query));
+      const item = items.find(candidate => candidate.value === target);
+      expect(item, `missing ${target}`).toBeDefined();
+      const next = replaceDraft(req.snapshot, item!.edit!)!;
+      expect(next.text.startsWith(prefix)).toBe(true); expect(next.text.endsWith(suffix)).toBe(true);
+      expect(scanCommandArgs(next.text.slice(prefix.length, -suffix.length)).map(token => token.value)).toEqual([target]);
+      expect(promptTokens(next.text).find(token => token.raw === '/skill:follow')?.literal).toBeUndefined();
+      expect(promptTokens(next.text).some(token => token.raw === '/skill:follow')).toBe(true);
+      if (target.endsWith('/')) {
+        expect(next.text[next.cursor]).toBe('"');
+        req = catalogRequest(next, scope)!;
+        expect(req?.token.value).toBe(target); expect(req?.query).toBe(target);
+      } else expect(next.cursor).toBe(next.text.length - suffix.length);
+    }
+  });
+
 it.each(['', '读取 ', 'path='].flatMap(prefix => ["'", '"'].map(quote => ({ prefix, quote }))))(
   'completes an unfinished $quote path containing spaces after $prefix and continues through its directory', async ({ prefix, quote }) => {
     const initial = `${prefix}${quote}${root}/home sp`;

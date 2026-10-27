@@ -24,7 +24,8 @@ export function proseRequest(snapshot: DraftSnapshot, scope?: SlashCatalogScope)
   // double the drive/UNC backslashes and must round-trip through the scanner.
   const rawWindows = windows && (!quote || prefix.startsWith("'") ||
     /^(?:[A-Za-z]:\\(?!\\)|\\{2}(?!\\))/.test(candidate));
-  const value = rawWindows ? candidate : scanCommandArgs(prefix, true)[0]?.value ?? '';
+  // Plain prose filenames keep apostrophes; only source quotes need decoding.
+  const value = rawWindows || !source.literal ? candidate : scanCommandArgs(prefix, true)[0]?.value ?? '';
   if (quoted && !pathLike(value)) return undefined;
   if (!pathLike(value)) return undefined;
   const pathExists = tokenFrom === 0 && value.length > 1 &&
