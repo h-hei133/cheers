@@ -1450,7 +1450,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 目录删除后焦点回首项且没有提示 | 第四十一批实际host/publication复现，现缺失焦点刷新按旧可见模型ID取幸存邻居，navigation清理旧ID并显示目录变化；生存手动身份与搜索失去匹配保留原语义，空占位不能启用。136项/三有效反转有证据，真实桌面/终端删除场景未验 |
 | 角色旧动作在退出后仍可保存，子面板取消后父级失效 | 第四十二批确认role/thinking没有永久退役与子入口准入、共享controller在Escape被取消、action wrapper丢owner。现退役/一次消费/原事务取消复验，显式返回转交父controller，wrapper保留不透明身份；152项/六有效反转及普通/全屏Node小PTY有局部证据。完整角色/认证/桌面矩阵未验 |
 | 角色已存档位不可用时默认Enter覆盖原值 | 第四十三批三个自动角色实际host复现缺失high回auto。现保留active · unavailable只读焦点，Enter及直接旧值apply不写，明确移动才保存支持值；三文件67项、有效反转及普通/全屏Node小PTY有局部证据，全部能力/桌面矩阵未验 |
-| 普通档位旧动作或待定hook跨关闭/重开仍可写入 | 第四十四批七条host baseline失败确认无浏览代次/退役/pending门。现每动作原choice/revision准入贯穿原事务，新开可捕获最新值，旧动作不能提交/重开父级，已确认写通知保留；35项/四有效反转及两模式Node小PTY有局部证据，完整矩阵未验 |
+| 普通档位旧动作或待定hook跨关闭/重开仍可写入 | 第四十四批补浏览代次/退役/pending门；第九十四批确认实际Enter释放后仍缺accepted host归属，refusal及完成返回也未重验browser。现两种归属贯穿原thinking事务，拒绝/完成退休，显式重开才续期，已确认写通知保留；46项执行通过及六组有效反转有本地证据，完整矩阵未验 |
 | resume先旧后三新仍选旧 | 渐进目录先发布current，首次自动ID被保留，排序本身未反。自动选择阶段跟随最新可恢复候选；一旦上下键/点击主动选择，后续刷新保留其ID，Enter重验身份。第四十六批另修跨时区/小数秒字符串排序，默认焦点按实际时刻选择；搜索/scope换代重置自动规则，手动渐进刷新仍保持。已有局部夹具证据，桌面平台与用户原环境现场仍待验 |
 | 认证快捷入口缺少参数发现 | 第四十七批确认`/login`、`/logout`只有委托执行而没有顶层提示/补全。现从原`connectSyntax`派生快捷语法：login提供provider与认证flag，logout发现保存连接，并排除不属于顶层语法的action alias；执行仍只走原认证owner。第四十八批再以registry合同锁定theme/statusline/connect/login/logout/view与settings元数据的owner可见性。73项、13项合同及两有效反转有局部证据，真实认证/桌面仍待验 |
 | 黄条删除后仍留白、编辑箭头缺失 | 绘制残余padding与普通gutter回退是确定缺口。已提交正文从第1列开始，编辑箭头贴左，续行对齐正文；保留用户源缩进、caret/选区/复制。已有局部修补证据，不能恢复黄色侧条冒充完成 |
@@ -1586,6 +1586,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 第九十批补角色详情返回的分配事务更新：fresh列表不再持有旧assign闭包和旧档位；返回时沿原prepareModelRole捕获当前状态，未完成新准备则回角色目录保留notice，恢复后须显式再开。三个自动角色的默认/兄弟保留与两模式settings嵌套显式重选有本地证据，原配置发布和写入结果合同保持，ADD整体active。
 
 第九十一批补角色菜单及角色档位的拒绝返回与accepted宿主归属：有效浏览时沿原父级保留notice并要求重新选择，取消/归属失效不自动重开，旧动作及迟到load不复活。详情和角色共用原signal/admission检查，写入仍由原角色事务完成；两模式实际host与小型Node PTY有证据，ADD整体active。
+
+第九十四批补会话Thinking effort的接受后归属：原浏览代次与accepted host同时进入原模型事务，拒绝/完成返回另验browser，消费后的旧动作不复活。同一实例只有显式重开可获得新基线；写前关闭不保存，写后关闭保留确认结果。36项owner及两模式实际host10项有本地证据，完整平台/来源验收继续待补，ADD整体active。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -1984,3 +1986,18 @@ ADD-01/02/03继续核对已接受详情动作的读取边界。[model details](.
 五项独立反转撤销拒绝返回、browser准入、accepted opt-in、原writer的归属guard及保存后的返回复验，最终分别按名称确认13/5/4/6/4项预期失败，所选控制4/1/1/2/1项通过。第三组首轮被Vitest0.34的冻结嵌套状态diff报告器中断，归为无效反转并保留日志；核对其递归clone遗漏forceWritable后，状态保持断言改为完整序列化值比较，未解冻产品对象或削弱保持合同，重新得到四条实际状态断言失败。finally逐字节恢复并核对SHA-256：recovery `264ab257c007651af60e8d8b0b0ee45c38532f403b3189237aeb436bfec08820`、model `696491bfc2587a9f487bb156c184d7191230a7000d19d10ed1fbc89086c96dce`。
 
 恢复后主代理heap768MiB、单worker串行执行`vitest run src/cli/interactive/picker/model/recovery.test.ts src/cli/interactive/picker/model.test.ts src/cli/interactive/picker/model/publication.test.ts --threads=false`，28+43+19共90项通过；host用`-t 'retains effort recovery|retains model navigation after accepted detail refusal'`执行12项通过、197项未选，共102项实际执行通过。五静态门、diff、module facade 0及TS build `c0237c461717`通过，build heap1536MiB，118既有docs-source advisory保留；HANDOFF与当前摘要更新，本批scratch清理。延迟读回第九十批CI `40579335521`、第九十一批CI `40580717825`均success；第九十二批CI `40582584417`仍in_progress、Watch `40582584573`success。本批未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，原Phase20矩阵未重跑，无独立review，ADD整体active。本批Git/CI另绑定。
+
+
+### 第九十四批：会话档位接受动作的宿主归属与安全返回
+
+ADD-03继续核对settings→Thinking effort→保存/返回。原[档位owner](../../packages/ts-shell/src/cli/interactive/picker/thinking.ts)已有浏览generation及原事务admission，但未声明acceptsOwnership；实际Enter先释放面板，后续close/replace不再触发其previewEnd。原实现新增owner29项中14项失败、15项控制通过；两模式实际InteractiveMode10项中4项PreModelSwitch关闭/替换仍写入，6项控制通过、209项未选。另确认refusal和正常完成都会直接构造旧parent，旧动作尚可重用；不能以先前direct apply的关闭测试代替接受后事件链。
+
+目标检查后只读对照参考model-hub.ts 1253–1275及1625–1650，快照0838d2ab4407b74e870de07e1a6780a13c7d542c：thinking沿原赋值callback，等待动作互斥，失败保持导航，异步完成复验disposed。采用这些决定，复用原runThinkingCommand/model事务及已有browser owner，不另建writer；本项目额外保留同一picker显式onOpen续期和已确认写入notice，不能以UI退役抹去持久结果。新增测试反转这些决定时须失败。
+
+现接受动作的host generation进入同一current/admission，执行前、choice callback后、原hook后及锁内均能拒绝失效动作。refusal及完成返回通过原browser admission，随后再验host；拒绝/throw/abort/关闭/替换不构造旧parent。拒绝、完成或丢失归属退休本次动作；只有显式onOpen可重新捕获当前值，旧异步generation不能退休新开。原不支持档位的直接调用仍被原writer拒绝；测试改为先确认旧动作失效，再显式重开选择受支持档位，不再依赖同一消费对象的隐式重试。
+
+主代理heap768MiB、单worker串行执行thinking36项及过滤实际host10项，共46项实际执行通过，209项未选不计通过。owner覆盖延迟开始、admission回调换host、写前/写后关闭、browser return拒绝/异常/取消、旧load不能复活和显式同实例重开；实际host覆盖外部配置变化→拒绝返回→新开low保存，以及Pre/PostModelSwitch×close/replace，检查完整session状态、兄弟角色、原配置文件、accepted publication、held草稿和零prompt/fetch。
+
+六项独立反转：accepted opt-in、host guard、writer admission、browser return、动作消费和结果保留分别产生4/14/4/10/7/10项预期断言失败，同次控制6/22/32/26/29/26项通过，仅第一组另有209项未选。每次finally恢复原字节，SHA-256为1228880183677f16514f3849430360568f7f0272121fc5d5c575cea2c7329ded。反转自动分类初次以名称必须含thinking误拒一条原exact relay控制，修正为所属测试文件与精确失败名称核对；该组实际7项行为失败已读回，无产品修正。Vitest0.34 JSON顶层numPassedTests还包含未选项，收据一律逐assertionResults.status统计，不把215写成真实通过数。
+
+五静态门、diff、module facade 0及TS build `6e18d285f49c`通过；恢复后完成上述46项最终重验，测试heap768MiB、build1536MiB，118既有docs-source advisory保留。工件归.omx/artifacts/phase20-addition-thinking-ownership/，HANDOFF已补记录，Git/CI另绑定。延迟核对第九十二批CI40582584417及第九十三批CI40585215498仍in_progress，第九十三批Watch40585215777已success。未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，无独立review，原Phase20矩阵未重跑，ADD整体active。

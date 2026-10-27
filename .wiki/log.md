@@ -9745,3 +9745,12 @@ ADD-01/02/03确认目标effort过期只回note且旧动作未消费，实际Ente
 旧实现owner18、两模式/两入口host4共22项失败，四条正常保存控制通过。最终recovery28、model43、publication19及过滤host12共102项执行通过，197项host未选不计通过；五组有效反转13/5/4/6/4项失败，控制4/1/1/2/1项通过，源码逐字节恢复与哈希核对后完成最终重验。另四条实际host PreModelSwitch关闭/替换验证了accepted opt-in到writer的真实连接。第三组首轮冻结对象diff错误属于Vitest0.34报告器问题，单独保留为无效记录；完整序列化状态断言修正报告器路径，不改变产品冻结或状态保持要求。配置文件、导航期accepted状态、默认/兄弟角色、held草稿及零派发/fetch均分别检查；不冒充真实provider或原生PTY。
 
 五静态门、diff、module facade 0及TS build `c0237c461717`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF、addition第九十三批/当前摘要更新，scratch清理。延迟读回`3405c0b5`CI `40579335521`及`6fadce8a`CI `40580717825`success；`0effe82b`CI `40582584417`仍in_progress、Watch `40582584573`success。未运行全仓、真实PTY/provider/OAuth/exe/桌面/原生Windows/磁盘故障或20k历史，原Phase20矩阵未重跑，无独立review，ADD整体active。本批Git/CI另绑定。
+
+
+## [2026-10-28] fix | 会话档位接受动作的宿主归属与安全返回
+
+ADD-03确认Thinking effort的浏览代次未覆盖实际Enter释放后的host，PreModelSwitch关闭/替换仍保存；refusal/完成也会直接构造旧设置父级，消费对象可重复使用。现accepted host归属进入原thinking/model事务，返回另验browser并再次核对host，拒绝/完成退休，显式onOpen续期；已确认写入notice仍保留。参考原赋值callback、pending与disposed决定，未新增写入系统。
+
+原实现owner14项、实际host4项失败；修补后thinking36及过滤两模式host10共46项实际通过，209项未选不计通过。六组独立反转4/14/4/10/7/10项预期失败，控制6/22/32/26/29/26项通过，源码逐字节恢复并核对哈希；JSON收据按逐断言状态统计，避免Vitest0.34把未选计入passed。配置文件、完整session/兄弟角色、accepted publication、held草稿及零派发/fetch分别验证。
+
+五静态门、diff、module facade 0及TS build `6e18d285f49c`通过，恢复后46项最终重验通过，测试heap768MiB、build1536MiB，118既有docs-source advisory保留；工件归.omx/artifacts/phase20-addition-thinking-ownership/，HANDOFF与addition更新。延迟核对第九十二、九十三批CI仍in_progress，第九十三批Watch已success；本批Git/CI另绑定。真实PTY/provider/OAuth/exe/桌面/Windows/磁盘故障和全仓未验，不运行20k历史，ADD整体active。

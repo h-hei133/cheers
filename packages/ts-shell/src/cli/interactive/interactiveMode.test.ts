@@ -466,6 +466,80 @@ it.each(['regular', 'fullscreen'] as const)(
   });
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  (['refusal', 'pre-close', 'pre-replace', 'post-close', 'post-replace'] as const).map(ending => ({ kind, ending }))))(
+  'retains session thinking truth after $ending in the $kind settings host', async ({ kind, ending }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/thinking-ownership-host-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', tuiMode: kind, topP: 0.7, activeProviderConnectionId: 'ready', providerConnections: [{
+      id: 'ready', provider: 'openai', authType: 'api-key', apiKey: 'synthetic-ready', model: 'shared',
+      status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+    }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    writeCatalogCache([{ id: 'openai', models: [{ id: 'shared', reasoning: true }] }]);
+    const manager = new SessionManager(), session = manager.createNew(root), { mode, terminal } = build({ tuiMode: kind });
+    const target = { connectionId: 'ready', provider: 'openai' as const, model: 'shared', thinkingEffort: 'high' as const,
+      roles: { advisor: { connectionId: 'ready', provider: 'openai' as const, model: 'shared', thinkingEffort: 'medium' as const } } };
+    modelState.writeSessionModel(session.id, target, modelState.readSessionModelEdit(session.id));
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+      session, runtimeConfig: getRuntimeConfig(root) });
+    const host = mode as unknown as { view: InteractiveView; overlay: OverlayHost; options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const selection = modelState.readSessionModelEdit(session.id), accepted = context.configuration.current, before = fs.readFileSync(getUserRuntimeConfigPath());
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    let switchHook: { mockRestore(): void } | undefined;
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    mode.start();
+    try {
+      expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+      terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
+      host.view.editor.setText('held session thinking draft\nkept through return');
+      terminal.input('Thinking effort'); await vi.waitFor(() => expect(frame()).toContain('▸ Thinking effort'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ high'));
+      if (ending === 'refusal') {
+        const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath()); writeUserRuntimeConfigFile({ ...edit.value, topP: 0.8 }, edit);
+        const changed = fs.readFileSync(getUserRuntimeConfigPath());
+        terminal.input('\x1b[A\x1b[A\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Thinking effort'));
+        expect(frame()).toContain('Model selection expired'); expect(modelState.readSessionModelEdit(session.id)).toEqual(selection);
+        expect(context.configuration.current).toBe(accepted); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(changed);
+        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ high'));
+        terminal.input('\x1b[A\x1b[A\r'); await vi.waitFor(() => expect(frame()).toContain('Reasoning effort: low'));
+        await vi.waitFor(() => expect(frame()).toContain('▸ Thinking effort'));
+        expect(readSessionModel(session.id)).toEqual({ ...target, thinkingEffort: 'low' });
+        expect(context.runtimeConfig.topP).toBe(0.8); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(changed);
+      } else {
+        const eventName = ending.startsWith('pre-') ? 'PreModelSwitch' : 'PostModelSwitch';
+        const hook = vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+          if (event.eventName === eventName) {
+            if (ending.endsWith('close')) host.overlay.close();
+            else host.overlay.open({ title: 'Replacement panel', form: 'panel', empty: 'Replacement remains current',
+              load: async () => [], apply: async () => undefined });
+          }
+          return undefined;
+        });
+        switchHook = hook; terminal.input('\x1b[A\x1b[A\r');
+        await vi.waitFor(() => expect(hook).toHaveBeenCalledWith(expect.objectContaining({ eventName })));
+        await vi.waitFor(() => expect(frame()).toMatch(/Reasoning effort: low|Model switch blocked:/));
+        if (eventName === 'PreModelSwitch') {
+          expect(JSON.stringify(modelState.readSessionModelEdit(session.id))).toBe(JSON.stringify(selection));
+          expect(context.configuration.current).toBe(accepted); expect(frame()).toContain('Model switch blocked');
+        } else {
+          expect(readSessionModel(session.id)).toEqual({ ...target, thinkingEffort: 'low' });
+          expect(frame()).toContain('Reasoning effort: low');
+        }
+        expect(host.overlay.active).toBe(ending.endsWith('replace'));
+        if (ending.endsWith('replace')) expect(frame()).toContain('Replacement remains current');
+        expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+      }
+      expect(host.view.editor.getText()).toBe('held session thinking draft\nkept through return');
+      expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+    } finally {
+      switchHook?.mockRestore(); mode.stop(); dispatch.mockRestore(); network.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   ([{ entry: 'model', ending: 'refusal' }, { entry: 'settings', ending: 'refusal' },
     { entry: 'settings', ending: 'close' }, { entry: 'settings', ending: 'replace' }] as const).map(path => ({ kind, ...path }))))(
   'retains effort recovery navigation after $ending in the $kind $entry host', async ({ kind, entry, ending }) => {

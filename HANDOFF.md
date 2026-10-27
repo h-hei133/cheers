@@ -636,3 +636,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A negative state assertion becomes a failed suite with a read-only nested property error instead of reporting the changed state.
 - **Root Cause**: Vitest 0.34's error formatter clones with forceWritable only at the top level; recursive cloning drops that option, and asymmetric-matcher replacement then assigns into frozen nested properties.
 - **Rule**: For JSON persistence snapshots, compare their complete serialized values when exercising expected failures. Keep production freezing intact and require the reversal to produce the intended behavioral assertion failures; preserve formatter failures separately rather than counting them as successful reversals.
+
+
+### A Reopenable Thinking Picker Still Needs Accepted Host Ownership
+- **Symptom**: Direct close tests pass, but actual Enter releases the thinking page before a hook closes its host, and the original writer still commits. Refused or completed actions can also reopen an obsolete settings parent.
+- **Root Cause**: Browser generations observe previewEnd/onOpen, while the released host requires the separate accepted-generation callback. A correct transaction admission is insufficient when it never receives that callback.
+- **Rule**: Opt the picker into accepted ownership and carry it through the original writer admission. Recheck browser admission and host ownership before returning; consume each finished/refused action while allowing only explicit onOpen to acquire a new baseline. Preserve the original writer notice after ownership loss. Test actual InteractiveMode Enter and pre/post hooks, alongside same-instance reopening and delayed accepted actions.
+
+### Filtered Vitest JSON Totals Can Count Unselected Tests As Passed
+- **Symptom**: A filtered host run executes 10 tests, but Vitest0.34 JSON reports 215 passed, 4 failed and zero pending for a 219-test file.
+- **Root Cause**: The reporter's top-level pass total includes tests whose individual assertion status is skipped.
+- **Rule**: Derive executed passes, failures and unselected counts from assertionResults.status and cross-check the selected names. Keep skipped tests out of passing totals. Match reversal failures by the owning file and expected behavior, not by requiring an arbitrary word in every test name.

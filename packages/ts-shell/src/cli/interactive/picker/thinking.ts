@@ -10,6 +10,7 @@ import { projectSessionModel } from '../../../session/model/projection.js';
 import type { CommandContext } from '../../../core/commands/types.js';
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import type { Picker, PickerOutcome } from '../overlay.js';
+import { modelBrowserOwned } from './model/owner.js';
 
 const LEVELS = ['auto', 'low', 'medium', 'high'] as const;
 
@@ -30,6 +31,7 @@ export function thinkingPicker(context: CommandContext, back?: (notice?: string)
   return {
     title: 'Thinking effort',
     form: 'panel',
+    acceptsOwnership: true,
     get initialSelection() { return initial; },
     onOpen() { generation++; offered = false; retired = false; pending = undefined; choice = undefined; },
     previewEnd() { generation++; offered = false; retired = true; pending = undefined; },
@@ -62,12 +64,16 @@ export function thinkingPicker(context: CommandContext, back?: (notice?: string)
         };
       });
     },
-    async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
+    async apply(ids: readonly string[], stillOwned?: () => boolean): Promise<PickerOutcome | undefined> {
       if (!offered || retired || !choice || context.signal?.aborted || pending !== undefined || ids.length !== 1) return undefined;
       const level = ids[0];
       if (!level || !(LEVELS as readonly string[]).includes(level)) return undefined;
       const captured = choice, revision = generation;
-      const current = () => offered && !retired && generation === revision && !context.signal?.aborted;
+      const current = () => {
+        if (!offered || retired || generation !== revision) return false;
+        if (context.signal?.aborted || (stillOwned && !stillOwned())) { offered = false; retired = true; }
+        return offered && !retired;
+      };
       const admission = () => {
         if (!current()) return 'Thinking selection cancelled. Reopen the picker.';
         const refusal = captured.admission();
@@ -75,11 +81,20 @@ export function thinkingPicker(context: CommandContext, back?: (notice?: string)
       };
       const expired = admission();
       if (!current()) return undefined;
-      if (expired) return { note: expired, ...(back ? { next: back(expired) } : {}) };
+      if (expired) {
+        const returning = back && modelBrowserOwned(context);
+        if (!current()) return undefined;
+        offered = false; retired = true;
+        return { note: expired, ...(returning ? { next: back(expired) } : {}) };
+      }
       pending = revision;
       try {
         const result = await runThinkingCommand([level === 'auto' ? 'off' : level], { ...context, admission });
-        return result.kind === 'local' ? { note: result.output, ...(current() && back ? { next: back(result.output) } : {}) } : undefined;
+        const returning = current() && back && modelBrowserOwned(context);
+        const owned = current();
+        if (generation === revision) { offered = false; retired = true; }
+        // A completed write keeps its result even if its accepted host has closed.
+        return result.kind === 'local' ? { note: result.output, ...(owned && returning ? { next: back(result.output) } : {}) } : undefined;
       } finally { if (pending === revision) pending = undefined; }
     },
   };

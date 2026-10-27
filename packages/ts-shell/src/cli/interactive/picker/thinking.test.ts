@@ -92,6 +92,8 @@ it('uses the exact relay capabilities and refuses an unsupported level even when
   expect(readSessionModel(sessionId)).toBeUndefined();
   expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
 
+  expect(await picker.apply(['low'])).toBeUndefined(); expect(await picker.load()).toEqual([]);
+  picker.onOpen?.(); await picker.load();
   expect((await picker.apply(['low']))?.note).toContain('Reasoning effort: low');
   expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'relay', model: 'shared', thinkingEffort: 'low' });
 });
@@ -229,8 +231,139 @@ it('admits one thinking action while its hook is pending and allows a fresh expl
     expect(await duplicate).toBeUndefined(); await work;
     expect(dispatch.mock.calls.filter(([event]) => event.eventName === 'PreModelSwitch')).toHaveLength(1);
     expect(readSessionModel(sessionId)?.thinkingEffort).toBe('low');
+    expect(await chosen.apply(['medium'])).toBeUndefined(); expect(await chosen.load()).toEqual([]);
     host.close(); host.open(chosen); await Promise.resolve(); await Promise.resolve();
     expect(chosen.initialSelection).toBe('low'); await chosen.apply(['medium']);
     expect(readSessionModel(sessionId)?.thinkingEffort).toBe('medium');
   } finally { unblock(); host.close(); }
 });
+
+it.each((['close', 'replace'] as const).flatMap(ending => [false, true].map(refuse => ({ ending, refuse }))))(
+  'retires accepted thinking when admission causes host $ending (refuse: $refuse)', async ({ ending, refuse }) => {
+    const host = new OverlayHost(() => {}), back = vi.fn(() => thinkingPicker(context()));
+    const admission = vi.fn(() => {
+      if (ending === 'close') host.close(); else host.open(thinkingPicker(context()));
+      return refuse ? 'Workspace unavailable.' : undefined;
+    });
+    const chosen = thinkingPicker({ ...context(), admission }, back);
+    host.open(chosen); await Promise.resolve(); await Promise.resolve();
+    const before = fs.readFileSync(getUserRuntimeConfigPath()); let pending!: ReturnType<typeof chosen.apply>;
+    try {
+      host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+      host.handleKey(parseKeyEvent('\r'), (selected, ids) => { pending = selected.apply(ids, host.acceptanceFor(selected)); });
+      expect(await pending).toBeUndefined(); expect(back).not.toHaveBeenCalled();
+      expect(await chosen.apply(['medium'])).toBeUndefined(); expect(await chosen.load()).toEqual([]);
+      expect(readSessionModel(sessionId)).toBeUndefined(); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+      expect(host.active).toBe(ending === 'replace');
+    } finally { host.close(); }
+  });
+
+it.each(['close', 'replace'] as const)('retires a delayed accepted thinking action after host %s', async ending => {
+  const host = new OverlayHost(() => {}), back = vi.fn(() => thinkingPicker(context())), chosen = thinkingPicker(context(), back);
+  host.open(chosen); await Promise.resolve(); await Promise.resolve();
+  let accepted!: () => ReturnType<typeof chosen.apply>;
+  try {
+    host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+    host.handleKey(parseKeyEvent('\r'), (selected, ids) => {
+      const stillOwned = host.acceptanceFor(selected); accepted = () => selected.apply(ids, stillOwned);
+    });
+    if (ending === 'close') host.close(); else host.open(thinkingPicker(context()));
+    expect(await accepted()).toBeUndefined(); expect(back).not.toHaveBeenCalled();
+    expect(await chosen.apply(['medium'])).toBeUndefined(); expect(await chosen.load()).toEqual([]);
+    expect(readSessionModel(sessionId)).toBeUndefined();
+  } finally { host.close(); }
+});
+
+it.each(['refuse', 'throw', 'abort', 'close', 'replace'] as const)(
+  'retains the confirmed thinking notice when return admission will %s', async ending => {
+    const host = new OverlayHost(() => {}), back = vi.fn(() => thinkingPicker(context())), controller = new AbortController();
+    let completed = false;
+    vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+      if (event.eventName === 'PostModelSwitch') completed = true;
+      return undefined;
+    });
+    const admission = vi.fn(() => {
+      if (!completed) return undefined;
+      if (ending === 'throw') throw new Error('synthetic return admission failure');
+      if (ending === 'abort') controller.abort();
+      if (ending === 'close') host.close();
+      if (ending === 'replace') host.open(thinkingPicker(context()));
+      return ending === 'refuse' ? 'Workspace unavailable.' : undefined;
+    });
+    const chosen = thinkingPicker({ ...context(), admission, signal: controller.signal }, back);
+    host.open(chosen); await Promise.resolve(); await Promise.resolve();
+    const before = fs.readFileSync(getUserRuntimeConfigPath()); let pending!: ReturnType<typeof chosen.apply>;
+    try {
+      host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+      host.handleKey(parseKeyEvent('\r'), (selected, ids) => { pending = selected.apply(ids, host.acceptanceFor(selected)); });
+      const result = await pending;
+      expect(result?.note).toContain('Reasoning effort: low'); expect(result?.next).toBeUndefined(); expect(back).not.toHaveBeenCalled();
+      expect(await chosen.apply(['medium'])).toBeUndefined(); expect(await chosen.load()).toEqual([]);
+      expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'relay', model: 'shared', thinkingEffort: 'low' });
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+    } finally { host.close(); }
+  });
+
+it.each(['refuse', 'throw', 'abort', 'close', 'replace'] as const)(
+  'does not return an expired thinking choice when browser admission will %s', async ending => {
+    const host = new OverlayHost(() => {}), back = vi.fn(() => thinkingPicker(context())), controller = new AbortController();
+    let checks = 0;
+    const admission = vi.fn(() => {
+      if (++checks === 1) return 'Workspace unavailable.';
+      if (ending === 'throw') throw new Error('synthetic admission failure');
+      if (ending === 'abort') controller.abort();
+      if (ending === 'close') host.close();
+      if (ending === 'replace') host.open(thinkingPicker(context()));
+      return ending === 'refuse' ? 'Workspace unavailable.' : undefined;
+    });
+    const chosen = thinkingPicker({ ...context(), admission, signal: controller.signal }, back);
+    host.open(chosen); await Promise.resolve(); await Promise.resolve();
+    let pending!: ReturnType<typeof chosen.apply>;
+    try {
+      host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+      host.handleKey(parseKeyEvent('\r'), (selected, ids) => { pending = selected.apply(ids, host.acceptanceFor(selected)); });
+      const result = await pending;
+      if (ending === 'refuse' || ending === 'throw') expect(result?.note).toContain('expired');
+      else expect(result).toBeUndefined();
+      expect(result?.next).toBeUndefined(); expect(back).not.toHaveBeenCalled(); expect(admission).toHaveBeenCalledTimes(2);
+      expect(await chosen.apply(['low'])).toBeUndefined(); expect(await chosen.load()).toEqual([]);
+      expect(readSessionModel(sessionId)).toBeUndefined();
+    } finally { host.close(); }
+  });
+
+it('returns a consumed thinking refusal to its admitted settings parent and requires a fresh explicit open', async () => {
+  const back = vi.fn((_notice?: string) => thinkingPicker(context())), chosen = thinkingPicker(context(), back);
+  await chosen.load(); writeConfig('custom-unlisted');
+  const before = fs.readFileSync(getUserRuntimeConfigPath()), result = await chosen.apply(['low']);
+  expect(result?.note).toContain('expired'); expect(back).toHaveBeenCalledWith(result!.note); expect(result?.next).toBeDefined();
+  expect(await chosen.apply(['low'])).toBeUndefined(); expect(await chosen.load()).toEqual([]);
+  expect(readSessionModel(sessionId)).toBeUndefined(); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+  const fresh = result!.next!; await fresh.load(); expect((await fresh.apply(['medium']))?.note).toContain('Reasoning effort: medium');
+  expect(readSessionModel(sessionId)).toMatchObject({ model: 'custom-unlisted', thinkingEffort: 'medium' });
+});
+
+it.each((['PreModelSwitch', 'PostModelSwitch'] as const).flatMap(hook =>
+  (['close', 'replace'] as const).map(ending => ({ hook, ending }))))(
+  'fences accepted thinking across $hook host $ending while preserving the writer result', async ({ hook, ending }) => {
+    const host = new OverlayHost(() => {}), back = vi.fn(() => thinkingPicker(context()));
+    const dispatch = vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+      if (event.eventName === hook) {
+        if (ending === 'close') host.close(); else host.open(thinkingPicker(context()));
+      }
+      return undefined;
+    });
+    const chosen = thinkingPicker(context(), back); host.open(chosen); await Promise.resolve(); await Promise.resolve();
+    const before = fs.readFileSync(getUserRuntimeConfigPath()); let pending!: ReturnType<typeof chosen.apply>;
+    try {
+      host.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+      host.handleKey(parseKeyEvent('\r'), (selected, ids) => { pending = selected.apply(ids, host.acceptanceFor(selected)); });
+      const result = await pending;
+      expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ eventName: hook }));
+      expect(result?.note).toContain(hook === 'PreModelSwitch' ? 'blocked' : 'Reasoning effort: low');
+      expect(result?.next).toBeUndefined(); expect(back).not.toHaveBeenCalled();
+      if (hook === 'PreModelSwitch') expect(readSessionModel(sessionId)).toBeUndefined();
+      else expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'relay', model: 'shared', thinkingEffort: 'low' });
+      expect(await chosen.apply(['medium'])).toBeUndefined(); expect(await chosen.load()).toEqual([]);
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(host.active).toBe(ending === 'replace');
+    } finally { host.close(); }
+  });
