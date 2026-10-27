@@ -20,7 +20,7 @@ const catalogue = () => ['missing', 'ready', 'later', 'extra'].map(name => ({ id
   runtime: 'openai' as const, baseUrl: address(name), models: [{ id: 'shared', contextWindow: 32000 }] }));
 beforeEach(() => {
   fs.mkdirSync('/tmp/cheers-test', { recursive: true }); root = fs.mkdtempSync('/tmp/cheers-test/model-category-');
-  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('OPENAI_API_KEY', '');
+  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('OPENAI_API_KEY', ''); vi.stubEnv('ANTHROPIC_API_KEY', '');
   writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'ready', providerConnections: [{ id: 'ready',
     provider: 'openai', authType: 'api-key', apiKey: 'synthetic-category', baseUrl: address('ready'), model: 'shared',
     status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01' }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
@@ -101,14 +101,28 @@ it.each(['environment', 'profile'] as const)('keeps a non-current %s-backed prov
     const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
     writeUserRuntimeConfigFile({ ...edit.values, providerCredentials: {
       ...edit.values.providerCredentials,
-      anthropic: { apiKey: 'synthetic-anthropic', model: 'shared' },
+      anthropic: { apiKey: 'synthetic-anthropic', baseUrl: 'https://profile-ambient.invalid/v1', model: 'shared' },
     } }, edit);
   }
   writeCatalogCache([{ id: 'openai', runtime: 'openai', models: [{ id: 'base' }] },
-    { id: 'anthropic', runtime: 'anthropic', models: [{ id: 'shared' }] }]);
+    { id: 'anthropic', runtime: 'anthropic', baseUrl: 'https://api.anthropic.invalid/v1', models: [{ id: 'shared' }] }]);
   const picker = modelPicker(commands()); const rows = await picker.load();
-  expect(rows.find(row => row.id === target('anthropic'))).toMatchObject({ disabled: true, focusable: true });
-  expect(picker.detail!(target('anthropic')).join('\n')).toContain('configure a connection');
+  const row = rows.find(row => row.id === target('anthropic'));
+  expect(row).toMatchObject({
+    disabled: true, focusable: true, note: 'named connection required',
+  });
+  expect(row?.detail).toContain(source === 'environment' ? 'api.anthropic.invalid/v1' : 'profile-ambient.invalid/v1');
+  expect(row?.detail).toContain(source === 'environment' ? 'env credential' : 'config credential');
+  expect(row?.detail).not.toContain('synthetic-anthropic');
+  expect(picker.detail!(target('anthropic')).join('\n')).toContain(`Credential source: ${source === 'environment' ? 'env' : 'config'}`);
+  expect(picker.detail!(target('anthropic')).join('\n')).toContain('named connection required');
+  if (source === 'profile') {
+    const details = (await picker.inspect!(target('anthropic')))!.next!;
+    expect((await details.load()).map(item => item.id)).toEqual(['back', 'configure']);
+    const outcome = await details.apply(['configure']);
+    expect(outcome?.draft).toContain('profile-ambient.invalid/v1');
+    expect(outcome?.draft).not.toContain('synthetic-anthropic');
+  }
   expect(readSessionModel(sessionId)).toBeUndefined();
 });
 

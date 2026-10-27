@@ -1584,3 +1584,13 @@ ADD-01/02继续收口模型行的可见状态与实际事务边界。[模型 pic
 五个文件分别单进程串行87项通过：category23、provider28、recovery11、admission14、presetCommand11。三个有效反转分别为移除resolution比较（2项失败）、把effort纳入digest（6项恢复路径失败）和移除reviewed-token guard（4个非法token场景失败）；源码均逐字节恢复并通过SHA-256校验。独立只读review先提出effort误纳入、falsey token与兼容入口问题，修正后最终no findings。
 
 import cycles、Node floor、module facade0、diff check及TS build `9283d98655a2`（inputs `d58b1fcf9114`、artifact `155f7d12d4be`）通过，460 compiler input/1882 immutable artifact；strict docs在本文更新后单独重跑。保留WATCH：provider slot只保证switch-time身份，成功写入后ambient来源仍可轮换；最终配置读取到session lock写入之间也没有跨进程配置文件锁。未运行全仓测试、PTY、真实provider、exe或桌面；20k路径继续只用mock/切片，禁止真实长历史PTY。原Phase20保持38 complete / 9 partial / 0 open，ADD独立且整体active。
+
+### 第六十八批：非当前ambient provider行的有效端点投影
+
+第六十八批收口第六十七批保留的展示一致性缺口。非当前provider的ambient env/profile行虽然已正确保持disabled/focusable并提示named connection required，但行摘要仍可能只显示canonical provider地址或遗漏ambient credential source；详情中的目录能力、模型地址及configure draft也没有统一使用同一份effective resolution。用户能浏览这类行，却可能看到与实际ambient来源不一致的endpoint，并据此准备连接草稿。
+
+现[model目录](../../packages/ts-shell/src/cli/interactive/picker/model.ts)只对符合`!connection && !providerSlot && provider.id === provider.runtime`的非当前canonical行构造ambient candidate。仅当resolved provider相符、未blocked且credential仍是无connectionId的ambient来源时，才把该resolution用于catalogue ambiguity、effort capability、模型metadata、行内credential source、详情Endpoint、account入口及configure草稿；行本身继续disabled/focusable，不把ambient来源伪装成可跨provider恢复的session身份。profile来源使用其已保存endpoint，env来源使用resolved/base catalogue endpoint，secret不进入行文本、详情或draft。
+
+category env/profile两个分支分别使用不同ambient endpoint，并在测试setup清除真实`ANTHROPIC_API_KEY`，避免profile用例被宿主environment遮蔽；行内同时断言credential source，profile configure draft断言endpoint存在且合成key不存在。独立只读review先指出这两项测试隔离缺口，补齐后delta review为no findings。category23与session-provider28分别单进程串行通过；把行endpoint回退到仅named-candidate resolution后触发env/profile共2项预期失败，源码逐字节恢复并核对SHA-256。
+
+五静态门/diff、责任上限0、module facade0、Phase 20脚本38 complete / 9 partial / 0 open、strict docs及TS build `a2508c6c2a64`（inputs `5350f916d60a`、artifact `cef810f8a754`）通过，manifest readback为fresh且460 compiler input/1882 immutable artifact匹配。未重新运行前一批其余recovery/admission/preset文件，也未运行全仓、PTY、真实provider、exe或桌面；这些结果保持第六十七批的独立证据，不累加为本次重跑。原Phase 20保持38/9/0，ADD独立且整体active。

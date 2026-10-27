@@ -750,3 +750,9 @@ ADD-01/02收口模型详情的目录换代边界。详情现绑定当前accepted
 ADD-02确认provider-slot action原先只以“没有connectionId”判定provider credential等价；CLI provider不在config/connections时，其环境变化也不进入旧choice fingerprint，行显示后的新API key或normalized endpoint仍可被提交。现action捕获完整effective resolution的不持久化digest，reviewed入口要求64位hex token，非法/缺失token、credential变化与endpoint-only变化都在session写前拒绝；effort被排除以保留原恢复事务，hook后的漂移继续由完整target request比较拦截。旧positional调用保持兼容，provider target不能再绕过reviewed入口。
 
 非当前provider的ambient env/profile明确不提供跨provider激活，因为当前session contract没有可resume的凭据来源ID；此类行保持可浏览并进入named connection配置。五文件87项、三个独立反转/逐字节恢复及最终no-findings review有局部证据；import cycles、Node floor、facade0、diff、TS build `9283d98655a2`（inputs `d58b1fcf9114`、artifact `155f7d12d4be`）另绑定。见[第六十七批](phase-20-addition.md#第六十七批provider-slot有效凭据身份与环境范围)。WATCH保留switch-time-only exactness、配置读取到session写之间无跨进程文件锁；未运行全仓、PTY、真实provider、exe或桌面，20k仅mock/切片。原Phase38/9、ADD独立且整体active。
+
+### 文末当前问题判断（第六十八批）
+
+ADD-02补齐非当前ambient provider行的展示一致性。此类env/profile行继续disabled/focusable并提示named connection required，但现在用同一ambient effective resolution驱动catalogue ambiguity、effort/metadata、行内credential source、详情endpoint、account入口和configure draft；profile保存endpoint会进入草稿，环境或endpoint变化继续不构成跨provider session凭据身份。测试显式隔离宿主Anthropic key，并同时核对行内source与endpoint，以及profile draft不含合成secret。
+
+category23与session-provider28分别单进程串行通过；将行endpoint回退为只读取named-candidate resolution后，env/profile共2项按预期失败，源码逐字节恢复。独立review先发现inline source未断言及profile env未隔离，修复后delta review no findings。五静态门/diff、责任上限0、module facade0、Phase 20脚本38/9/0、TS build `a2508c6c2a64`（inputs `5350f916d60a`、artifact `cef810f8a754`）和fresh manifest 460/1882另绑定。见[第六十八批](phase-20-addition.md#第六十八批非当前ambient-provider行的有效端点投影)。未运行全仓、PTY、真实provider、exe或桌面，20k继续mock/切片；原Phase38/9、ADD独立且整体active。

@@ -121,12 +121,20 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             const candidate = connection || providerSlot ? projectModelSelection(config, scopedModelTarget(target)) : undefined;
             const resolution = candidate ? !connection && context.resolveConfigTarget ? context.resolveConfigTarget(candidate)
               : resolveProviderCredential({ runtimeConfig: candidate }) : undefined;
+            const ambientCandidate = !connection && !providerSlot && provider.id === provider.runtime
+              ? projectModelSelection(config, scopedModelTarget(target)) : undefined;
+            const ambientResolution = ambientCandidate
+              ? context.resolveConfigTarget?.(ambientCandidate) ?? resolveProviderCredential({ runtimeConfig: ambientCandidate }) : undefined;
+            const namedConnectionRequired = Boolean(ambientResolution && !ambientResolution.blocked
+              && ambientResolution.provider === provider.runtime && ambientResolution.credential
+              && ambientResolution.credential.connectionId === undefined);
+            const effectiveResolution = resolution ?? (namedConnectionRequired ? ambientResolution : undefined);
             const exact = candidate ? exactTargetMatches(context, candidate, target) : false;
-            const ambiguous = catalogProvider(catalog, provider.runtime, resolution?.baseUrl).ambiguous;
-            const capability = effortCapability(catalog, provider.runtime, model.id, thinkingEffort, resolution?.baseUrl);
+            const ambiguous = catalogProvider(catalog, provider.runtime, effectiveResolution?.baseUrl).ambiguous;
+            const capability = effortCapability(catalog, provider.runtime, model.id, thinkingEffort, effectiveResolution?.baseUrl);
             const assignedEffort = assigning && capability !== 'supported' ? null : thinkingEffort;
             const unsupported = !assigning && capability === 'unsupported';
-            const modelAddress = resolution?.baseUrl
+            const modelAddress = effectiveResolution?.baseUrl
               ?? config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
             const alias = provider.id === provider.runtime ? catalog.find(candidate => candidate.runtime === provider.runtime
               && candidate.id !== provider.runtime && candidate.baseUrl !== undefined && modelAddress !== undefined
@@ -134,7 +142,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             const selected = Boolean(exact && !alias && !active.blocked && active.credential
               && connection?.connectionId === active.credential.connectionId && provider.runtime === active.provider && model.id === active.model
               && resolution?.baseUrl === active.baseUrl && sameValue(resolution?.credential, active.credential));
-            const reason = assigning && !connection ? 'role assignment requires a configured connection'
+            const reason = namedConnectionRequired ? 'named connection required'
+              : assigning && !connection ? 'role assignment requires a configured connection'
               : !connection && !providerSlot ? 'configure a connection' : connection && connection.state !== 'ready' ? availabilityLabel(connection.state)
               : resolution?.blocked || !resolution?.credential ? 'credential unavailable'
               : !exact ? 'request target mismatch'
@@ -142,20 +151,21 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               : unsupported ? 'reasoning effort unsupported' : !choice?.baseline ? 'active session required' : undefined;
             const metadata = listedModelMetadata(catalog, provider, model.id, modelAddress);
             rows.push({ id, label: model.id,
-              detail: [connection?.connectionId ?? (resolution?.credential ? `${resolution.credential.source} credential` : undefined), connection?.label, provider.label, connection?.endpoint ?? endpointLabel(resolution?.baseUrl),
+              detail: [connection?.connectionId ?? (effectiveResolution?.credential ? `${effectiveResolution.credential.source} credential` : undefined), connection?.label, provider.label, connection?.endpoint ?? endpointLabel(modelAddress),
                 metadata?.contextWindow ? `${Math.round(metadata.contextWindow / 1000)}k` : undefined].filter(Boolean).join(' · '),
               note: selected ? 'active' : reason ?? (alias ? `alias: ${alias.label}` : connection ? availabilityLabel(connection.state) : 'ready'),
               ...(reason ? { disabled: true, focusable: true } : {}) });
             const displayed = connection?.state === 'ready' && (resolution?.blocked || !resolution?.credential)
               ? { ...connection, state: 'credential-missing' as const, reason: 'This explicit connection needs its own credential.' } : connection;
-            const lines = [...modelDetails(provider, displayed, !connection ? resolution?.credential?.source : undefined),
-              ...(!connection && (resolution?.baseUrl ?? provider.baseUrl) ? [`Endpoint: ${endpointLabel(resolution?.baseUrl ?? provider.baseUrl)}`] : []),
+            const lines = [...modelDetails(provider, displayed, !connection ? effectiveResolution?.credential?.source : undefined),
+              ...(!connection && (effectiveResolution?.baseUrl ?? provider.baseUrl) ? [`Endpoint: ${endpointLabel(effectiveResolution?.baseUrl ?? provider.baseUrl)}`] : []),
               `Reasoning effort: ${assignedEffort ?? 'auto'}`, ...modelMetadataDetails(catalog, provider, model.id, modelAddress), ...(reason ? [reason] : [])];
             details.set(id, lines);
             const inspection = () => modelDetailsPicker(detailSourceFor(id, model.id, id));
             const detailActions: ModelDetailAction[] = [];
             if (reason) {
-              const endpoint = config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
+              const endpoint = config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl
+                ?? effectiveResolution?.baseUrl ?? provider.baseUrl;
               const safeEndpoint = connectionEndpoint(endpoint);
               const canConfigure = !connection && !providerSlot || reason === 'credential unavailable'
                 || Boolean(connection && ['credential-missing', 'pending', 'error'].includes(connection.state));

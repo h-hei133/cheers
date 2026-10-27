@@ -9542,3 +9542,11 @@ ADD-01/02收口模型详情WATCH。详情现由revision-bound source读取当前
 ADD-02确认provider slot只检查provider/model且无connectionId，未绑定凭据source、secret与endpoint；CLI provider不在配置/connections时，环境变化也可能绕过旧choice fingerprint。现每个action捕获effective resolution的不持久化digest，reviewed入口要求64位hex token，非法token、credential变化和endpoint-only变化均在session写前拒绝。effort不属于digest，原prospective effort恢复仍成功；hook后的漂移由既有完整target比较拦截。旧positional`setModelTarget`保持兼容，provider target不能绕过reviewed入口。
 
 非当前provider的ambient env/profile继续disabled并可进入named connection配置，因为provider-scoped session没有可resume的凭据来源身份。category23、provider28、recovery11、admission14、presetCommand11共五文件87项分别单进程串行通过；三个反转分别产生2/6/4项失败，源码逐字节恢复。独立review修正effort、falsey token与兼容入口问题后no findings。import cycles、Node floor、facade0、diff及TS build9283d98655a2（inputs d58b1fcf9114、artifact 155f7d12d4be）通过；未运行全仓、PTY、真实provider、exe或桌面，20k继续mock/切片。WATCH保留switch-time-only exactness与配置读/session写间无跨进程文件锁；HANDOFF/addition第六十七批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。
+
+## [2026-10-27] fix | 非当前 ambient provider 行的有效端点投影
+
+ADD-02补齐provider-slot follow-up的展示一致性。非当前canonical provider的ambient env/profile行仍disabled/focusable并显示named connection required，但现在只有resolved provider相符、未blocked且credential无connectionId时才把ambient resolution用于目录ambiguity、effort/metadata、行内source、详情endpoint、account入口和configure draft。profile endpoint进入草稿，env使用resolved/base catalogue endpoint；两者都不输出secret，也不把ambient来源提升为provider-scoped session可恢复身份。
+
+category23与session-provider28分别单进程串行通过。将行endpoint回退到仅named-candidate resolution后，env/profile共2项按预期失败，源码逐字节恢复。独立review先指出inline credential source未断言及profile用例可能被宿主`ANTHROPIC_API_KEY`遮蔽，修复后delta review no findings；测试setup现清空该key，并同时覆盖inline source/endpoint与profile draft无secret。
+
+五静态门/diff、责任上限0、module facade0、Phase 20 38 complete / 9 partial / 0 open、TS build `a2508c6c2a64`（inputs `5350f916d60a`、artifact `cef810f8a754`）、fresh manifest 460/1882及strict docs通过。未重跑前一批recovery/admission/preset，也未运行全仓、PTY、真实provider、exe或桌面；20k继续mock/切片。HANDOFF/addition第六十八批/audit更新，Git/CI另绑定，原Phase38/9、ADD独立且整体active。
