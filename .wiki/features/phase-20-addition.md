@@ -1533,7 +1533,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 部分slash共同参与任务 | brainstorm、显式可组合模板和deep-research入口沿统一能力声明；多个modifier加一个driver，不串行调用整套handler | 首位/正文research+两skill、两个兼容modifier、参数冲突、两个driver拒绝、control/save及功能命令不绕过原路径 |
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
-文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
+文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
 ### 第六十四批：正文引号权威与context计量身份
 
@@ -1622,3 +1622,13 @@ ADD-01/02继续补刷新生命周期。[模型watcher](../../packages/ts-shell/s
 主代理以`VITEST_MAX_THREADS=1 VITEST_MIN_THREADS=1`串行执行`vitest run src/cli/interactive/picker/model/watch.test.ts src/cli/interactive/picker/model/admission.test.ts src/cli/interactive/picker/model/focus.test.ts`，三文件40项通过。移除新增最终复验后，watcher六项中恰好三个新增契约失败，三个既有契约通过；源码逐字节恢复，SHA-256为`85bd0c85813f433a34f30a8acb45c40c815b3896d8b001a8ff5e5666fa9ddcca`，恢复后三文件40项再次通过。首次调用误用了当前Vitest不支持的`--maxWorkers`，属于CLI调用错误，未进入测试；改用已安装0.34.6支持的环境变量后才记录行为结果。
 
 五静态门、module facade 0及diff检查通过，TS build `f04099dfb42e`通过；测试heap限制768MiB，build限制1536MiB。没有运行全仓回归、真实PTY、provider、exe、桌面或20k历史压测，也没有把主代理审阅记为独立review。延迟回看前一提交`6e12dcb48bd617b1222393f37385fefccf4c8495`的CI `40461157659`与Architecture Watch `40461695485`均为completed/success，不作为本轮提交的CI证据。Git提交、推送及对应CI另绑定；本轮没有重跑原Phase 20任务矩阵，ADD整体保持active，真实认证与平台操作矩阵继续待证。
+
+### 第七十二批：模型刷新失败后的只读缓存与同版本恢复
+
+ADD-01/02继续补根模型面板的错误与恢复状态。[model picker](../../packages/ts-shell/src/cli/interactive/picker/model.ts)之前没有连接watcher的failure callback，accepted revision不可读或loader拒绝时，旧行仍显示active/ready；若版本读取恢复后仍等于原revision，[watcher](../../packages/ts-shell/src/cli/interactive/picker/model/watch.ts)还会直接跳过，无法重新核验。现失败通知发布明确状态，缓存行标为`unverified`、disabled/focusable，详情只显示失败原因；原选择与inspection入口均拒绝。版本读取失败会保留重试标记，同revision恢复也须重新加载，成功后解除只读，不在稳定正常状态下反复加载。
+
+只读模型选择器对照同样保留缓存并显示刷新错误；本项目的额外约束是无法核验accepted publication时不能继续使用旧写入口，因此缓存保持可浏览、不可启用。没有引入新的目录、配置或认证owner。只读行复用既有`isFocusable`判定，失败与恢复保留用户手动焦点；方向键仍能浏览。真实OverlayHost的disabled Enter沿既有inspection handoff返回只读拒绝，不能将host callback是否执行当作模型是否启用的证据；配置字节和session selection分别断言无写入。初始load拒绝后未曾构造的child仍不offer，既有三项契约未改预期。
+
+主代理以单worker串行执行五个聚焦文件，73项通过：publication9、watch7、focus20、admission14、category23；新增回归覆盖revision读取失败、loader拒绝、同版本恢复、手动焦点、键盘inspection、零网络以及无配置/session写入。三组有效反转分别移除同版本恢复重试（2项失败）、根面板failure通知（3项失败）、只读入口守卫（3项失败）；每组两文件共16项，其余分别14/13/13项通过。两个源码逐字节恢复，SHA-256为`watch.ts` `64ed0264b3ad90d63a89d09532f2fb46ad67e2b1b5748b21b2fcbc407b3857a5`、`model.ts` `b9c3d35c322fa34a4b521a3a23e13d927dc086f89c46f4a6c016948d26e30940`，恢复后五文件73项再次通过。
+
+五静态门、module facade 0及最终TS build `cf4a6adbe6e9`通过，测试heap768MiB、build1536MiB。主代理只读审阅没有记作独立review。未运行全仓回归、真实PTY、provider、exe、桌面或20k历史压测；未重跑原Phase 20矩阵，未提升ADD整体状态。提交、推送及精确SHA的CI另绑定。

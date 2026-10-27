@@ -516,3 +516,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An open model inspector briefly displays a superseded catalogue after its refresh finishes, or publishes rows while the accepted publication is unreadable.
 - **Root Cause**: The watcher captures a revision before awaiting its loader but checks only whether the owner is still open afterward.
 - **Rule**: Re-read the accepted revision immediately before publication and discard results whose revision changed. Treat a failed final read as a refresh failure, retain the prior observed revision for retry, and keep the pending slot until the old operation settles. Test deferred revision changes, unreadable final publication, recovery and actual inspector drawing.
+
+### Failed Model Refreshes Need Read-Only Cache And Same-Revision Recovery
+- **Symptom**: Cached model rows still look actionable after a revision or reload failure, and recovery to the same accepted revision never refreshes the owner.
+- **Root Cause**: The root browser omits the watcher's failure callback, and revision equality skips revalidation even after a failed read. Disabled Enter also hands off to inspection rather than suppressing the host callback.
+- **Rule**: Publish an explicit failure with cached rows disabled but focusable, mark their facts unverified and guard both selection and inspection. Retry after failed revision reads even if the recovered revision is unchanged; clear the failure only after successful revalidation. Preserve focus and test the actual Enter inspection handoff plus unchanged configuration/session bytes. Initial failed loads must not offer previously unconstructed children.

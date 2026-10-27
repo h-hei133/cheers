@@ -9568,3 +9568,9 @@ ADD-10/11确认`/skill:`被提前归入skill-only候选，quoted `/skill:` path�
 ADD-01/02确认watcher只在await后检查owner关闭，旧revision结果或最终publication不可读时仍可能发布。现发布前复核accepted revision，换代丢弃、不可读报告原failure，拒绝时不推进观察版本；保留旧promise结算前不启动下一读取的约束。只读对照采用await后生命周期检查及共享快照重读，本项目额外复核versioned publication，不新增owner。
 
 三文件40项以单worker串行通过：watch6、admission14、focus20；其中真实OverlayHost绘制证明旧详情不出现、下一次显示当前版本。移除新增守卫后恰好三项失败、三项通过，源码逐字节恢复并核对SHA-256，恢复后三文件40项再次通过。首次`--maxWorkers`调用不受已安装Vitest支持，未进入测试，按调用错误分类。五静态门、module facade 0、diff及TS build `f04099dfb42e`通过；测试heap768MiB、build1536MiB。延迟核对前一提交`6e12dcb4`的CI `40461157659`及Architecture Watch `40461695485`均completed/success；不代替本轮CI。HANDOFF及addition第七十一批更新；未运行全仓、PTY、真实provider、exe、桌面或20k压测，未重跑原Phase 20矩阵，无独立review，Git/CI另绑定，ADD整体active。
+
+## [2026-10-27] fix | 模型刷新失败的只读缓存与恢复
+
+ADD-01/02确认根模型面板漏接watcher失败通知，旧行仍显示active/ready；版本读取恢复到同revision时也不会重载。现保留缓存与手动焦点，将行标为unverified、disabled/focusable，显示固定失败原因并拒绝旧选择/inspection；同revision恢复也重新核验，成功后恢复操作，稳定状态不重复加载。只读对照同样保留缓存并显示错误，本项目额外以accepted publication核验决定是否开放操作；不新增owner。
+
+五文件73项单worker串行通过：publication9、watch7、focus20、admission14、category23。三组反转分别触发2/3/3项预期失败，两个源码逐字节恢复并核对SHA-256，恢复后73项再次通过；真实OverlayHost覆盖手动焦点保持、disabled Enter的inspection拒绝及无配置/session写入，零网络。五静态门、module facade 0及最终TS build `cf4a6adbe6e9`通过，测试heap768MiB、build1536MiB。HANDOFF/addition第七十二批更新；未运行全仓、PTY、真实provider、exe、桌面或20k压测，未重跑原Phase 20矩阵，无独立review，Git/CI另绑定，ADD整体active。

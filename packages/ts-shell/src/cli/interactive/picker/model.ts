@@ -7,6 +7,7 @@ import { effortCapability } from "../../../core/models/capability.js";
 import { resolveProviderCredential } from "../../../core/shell/providerCredentials.js";
 import type { CommandContext } from "../../../core/commands/types.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
+import { isFocusable } from "../../../presentation/tui/chrome/option.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
 import { applyModelPreset, resolveModelPreset, wholePresetFailure } from "../../../core/commands/model/preset.js";
 import { readProfilePresets } from "../../../core/commands/model/presetStore.js";
@@ -50,6 +51,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
   const assignments = new Map<string, () => RoleResult>();
   const focusState = new ModelFocus();
   let filtering = false;
+  let refreshFailed = false;
+  const refreshFailure = 'Model catalogue could not be refreshed; cached models are read-only.';
   let observedRevision: number | undefined;
   let activeFocus = focus;
   let returnFocus = focus;
@@ -58,7 +61,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
   const picker: Picker = {
     title: assigning ? `${assigning.role} model` : "Model",
     form: "panel",
-    get empty() { return filtering ? 'No matching models.' : 'No providers in the catalogue.'; },
+    get empty() { return refreshFailed ? refreshFailure : filtering ? 'No matching models.' : 'No providers in the catalogue.'; },
     navigation, fullScreen: true,
     ...(assigning ? { back: assigning.back } : parent ? { back: () => parent(notice) } : {}),
     onOpen() { returnFocus = focus; focusState.reset(); },
@@ -69,10 +72,16 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       if (replacement) navigation.focus(replacement);
       return replacement;
     },
-    status: () => [focusState.notice, notice].filter(Boolean).join(' ') || undefined,
-    filterOptions: query => { filtering = Boolean(query); return navigation.project(query); },
+    status: () => [refreshFailed ? refreshFailure : undefined, focusState.notice, notice].filter(Boolean).join(' ') || undefined,
+    filterOptions: query => {
+      filtering = Boolean(query);
+      const rows = navigation.project(query);
+      return refreshFailed ? rows.map(row => ({ ...row, disabled: true,
+        focusable: isFocusable(row), note: 'unverified' })) : rows;
+    },
     footer: '↑↓ browse · Tab: navigation/content · ←→: parent/content · Enter: inspect or activate · Esc: back',
     async load(): Promise<readonly Option[]> {
+      refreshFailed = true;
       inspectionAdmission = undefined;
       details.clear(); detailRecords.clear(); actions.clear(); inspections.clear(); assignments.clear();
       refreshModelCatalog(context);
@@ -343,17 +352,26 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         returnFocus = undefined;
       }
       focusState.settle(observedRevision);
+      refreshFailed = false;
       return rows;
     },
-    detail: id => (id ? details.get(id) ?? [] : []),
-    subscribe: publish => watchModels(context, () => picker.load(), publish, observedRevision),
+    detail: id => refreshFailed ? [refreshFailure] : (id ? details.get(id) ?? [] : []),
+    subscribe: publish => watchModels(context, () => picker.load(), rows => {
+      refreshFailed = false;
+      publish(rows);
+    }, observedRevision, () => {
+      refreshFailed = true;
+      publish(navigation.all);
+    }),
     async inspect(id) {
+      if (refreshFailed) return navigation.all.some(row => row.id === id) ? { note: refreshFailure } : undefined;
       const refusal = inspectionAdmission?.();
       if (refusal) return { note: refusal };
       const next = inspections.get(id)?.(); return next ? { next } : undefined;
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       if (!ids[0]) return undefined;
+      if (refreshFailed) return { note: refreshFailure };
       const assignment = assignments.get(ids[0]);
       if (assignment && assigning) {
         const result = assignment();

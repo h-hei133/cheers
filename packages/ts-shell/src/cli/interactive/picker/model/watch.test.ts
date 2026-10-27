@@ -57,6 +57,26 @@ it('publishes a failure when the accepted revision cannot be read', async () => 
   } finally { close(); vi.useRealTimers(); }
 });
 
+it('reloads after a failed revision read even when recovery returns the same accepted revision', async () => {
+  vi.useFakeTimers();
+  let readable = false;
+  const publish = vi.fn(), fail = vi.fn(), load = vi.fn(async () => ['revalidated']);
+  const context = { readConfiguration: () => {
+    if (!readable) throw new Error('publication unavailable');
+    return { revision: 1 };
+  } } as unknown as CommandContext;
+  const close = watchModels(context, load, publish, 1, fail);
+  try {
+    await vi.advanceTimersByTimeAsync(500);
+    expect(fail).toHaveBeenCalledOnce(); expect(load).not.toHaveBeenCalled();
+    readable = true;
+    await vi.advanceTimersByTimeAsync(500);
+    expect(load).toHaveBeenCalledOnce(); expect(publish).toHaveBeenCalledWith(['revalidated']);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(load).toHaveBeenCalledOnce(); expect(fail).toHaveBeenCalledOnce();
+  } finally { close(); vi.useRealTimers(); }
+});
+
 it('discards a superseded refresh and waits for it to drain before loading the current publication', async () => {
   vi.useFakeTimers();
   let revision = 1;

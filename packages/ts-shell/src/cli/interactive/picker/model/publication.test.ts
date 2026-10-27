@@ -7,6 +7,9 @@ import { configurationAdmission } from '../../../../core/shell/configuration.js'
 import { SessionManager } from '../../../../session/SessionManager.js';
 import { readSessionModelEdit } from '../../../../session/model/state.js';
 import { modelPicker } from '../model.js';
+import { OverlayHost } from '../../overlay.js';
+import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
+import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
 
 let root: string;
 const target = `model:${JSON.stringify([null, 'relay', 'shared'])}`;
@@ -110,4 +113,85 @@ it('does not miss a publication that changes between load and subscription', asy
     expect(publish.mock.calls[0]![0].some(row => row.id === target)).toBe(true);
     unsubscribe();
   } finally { vi.useRealTimers(); }
+});
+
+it.each(['revision', 'load'] as const)('makes cached models read-only after a %s refresh failure and restores them after revalidation', async failure => {
+  vi.useFakeTimers();
+  writeCatalogCache(loadCatalog().map(provider => provider.id === 'openai'
+    ? { ...provider, models: [...provider.models, { id: 'alternate', contextWindow: 128000, maxTokens: 16000 }] } : provider));
+  const { runtime, commands } = host();
+  let readable = true, publication = commands.readConfiguration();
+  const picker = modelPicker({ ...commands, readConfiguration: () => {
+    if (!readable) throw new Error('publication unavailable');
+    return publication;
+  } });
+  const overlay = new OverlayHost(() => {});
+  overlay.open(picker);
+  const frame = () => overlay.render(140, 32).map(stripAnsi).join('\n');
+  const ready = `model:${JSON.stringify(['main', 'openai', 'alternate'])}`;
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected network request'));
+  const before = fs.readFileSync(getUserRuntimeConfigPath()), selection = readSessionModelEdit(runtime.session.id);
+  try {
+    await vi.advanceTimersByTimeAsync(0);
+    expect(frame()).toContain('▸ shared');
+    overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+    expect(frame()).toContain('▸ alternate');
+    expect(picker.filterOptions!('', []).find(row => row.id === ready)?.disabled).not.toBe(true);
+    if (failure === 'revision') readable = false;
+    else {
+      publication = { ...publication, revision: publication.revision + 1 };
+      vi.spyOn(picker, 'load').mockRejectedValueOnce(new Error('synthetic reload failure'));
+    }
+    await vi.advanceTimersByTimeAsync(500);
+    expect(frame()).toContain('Model catalogue could not be refreshed');
+    expect(frame()).toContain('▸ alternate');
+    expect(picker.filterOptions!('', []).find(row => row.id === ready)).toMatchObject({ disabled: true, focusable: true, note: 'unverified' });
+    expect(picker.detail!(ready).join('\n')).toContain('read-only');
+    expect(await picker.apply([])).toBeUndefined();
+    expect((await picker.apply([ready]))?.note).toContain('could not be refreshed');
+    expect(await picker.inspect!(target)).toEqual({ note: expect.stringContaining('could not be refreshed') });
+    const activate = vi.fn();
+    overlay.handleKey(parseKeyEvent('\x1b[B'), activate);
+    overlay.handleKey(parseKeyEvent('\x1b[A'), activate);
+    expect(activate).not.toHaveBeenCalled(); expect(overlay.active).toBe(true);
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+    expect(readSessionModelEdit(runtime.session.id)).toEqual(selection);
+    readable = true;
+    await vi.advanceTimersByTimeAsync(500);
+    expect(frame()).not.toContain('could not be refreshed');
+    expect(frame()).toContain('▸ alternate');
+    expect(picker.filterOptions!('', []).find(row => row.id === ready)?.disabled).not.toBe(true);
+    expect((await picker.inspect!(target))?.next).toBeDefined();
+    overlay.handleKey(parseKeyEvent('\r'), activate);
+    expect(activate).toHaveBeenCalledWith(picker, [ready]);
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+    expect(readSessionModelEdit(runtime.session.id)).toEqual(selection);
+    expect(fetch).not.toHaveBeenCalled();
+  } finally { overlay.close(); vi.useRealTimers(); }
+});
+
+it('routes Enter on a cached model through inspection refusal without executing its old selection action', async () => {
+  vi.useFakeTimers();
+  const { runtime, commands } = host();
+  let readable = true;
+  const picker = modelPicker({ ...commands, readConfiguration: () => {
+    if (!readable) throw new Error('publication unavailable');
+    return commands.readConfiguration();
+  } });
+  const overlay = new OverlayHost(() => {});
+  overlay.open(picker);
+  const before = fs.readFileSync(getUserRuntimeConfigPath()), selection = readSessionModelEdit(runtime.session.id);
+  try {
+    await vi.advanceTimersByTimeAsync(0);
+    readable = false;
+    await vi.advanceTimersByTimeAsync(500);
+    const accepted = vi.fn();
+    overlay.handleKey(parseKeyEvent('\r'), accepted);
+    expect(accepted).toHaveBeenCalledOnce();
+    const [inspection, ids] = accepted.mock.calls[0]!;
+    expect(inspection).not.toBe(picker);
+    expect(await inspection.apply(ids)).toEqual({ note: expect.stringContaining('read-only') });
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+    expect(readSessionModelEdit(runtime.session.id)).toEqual(selection);
+  } finally { overlay.close(); vi.useRealTimers(); }
 });
