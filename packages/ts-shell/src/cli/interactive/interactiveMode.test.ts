@@ -2568,6 +2568,61 @@ describe("session wiring", () => {
   });
 
   it.each((['regular', 'fullscreen'] as const).flatMap(kind => [
+    { prefix: '', gesture: 'path-tab' }, { prefix: 'Inspect ', gesture: 'path-tab' },
+    { prefix: '', gesture: 'command-tab' }, { prefix: 'Inspect ', gesture: 'command-tab' },
+    { prefix: '', gesture: 'exact-enter' },
+  ].map(scenario => ({ kind, ...scenario }))))(
+    'keeps template and directory intent through actual $kind $gesture after "$prefix"', async ({ kind, prefix, gesture }) => {
+      fs.mkdirSync('/tmp/cheers-test', { recursive: true }); const root = fs.mkdtempSync('/tmp/cheers-test/template-path-host-');
+      vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+      const prompts = path.join(root, '.agents', 'prompts'); fs.mkdirSync(prompts, { recursive: true });
+      fs.writeFileSync(path.join(prompts, 'tmp.md'), '---\ncomposable: true\n---\nTEMPLATE INTENT: $@');
+      const scheduler = new ManualScheduler(), manager = new SessionManager(), session = manager.createNew(root);
+      const { mode, terminal } = build({ tuiMode: kind, scheduler });
+      const host = mode as unknown as { view: InteractiveView; lastPrompt?: string;
+        options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+      host.options.runtimeContext = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root,
+        targetPathBase: root, rootMode: 'direct', gitRoot: null,
+        gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+        session, runtimeConfig: { ...getRuntimeConfig(root), tuiMode: kind } });
+      host.options.runtimeContext.skillOptions = { noSkills: true }; host.options.sessionManager = manager;
+      const config = JSON.stringify(host.options.runtimeContext.configuration.current);
+      const selection = JSON.stringify(modelState.readSessionModelEdit(session.id));
+      const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+      const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+      mode.start();
+      try {
+        expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+        terminal.input(prefix + '/tmp'); scheduler.flush();
+        await vi.waitFor(() => expect(host.view.suggestions.length).toBeGreaterThanOrEqual(2));
+        const selected = gesture === 'command-tab' ? 'command' : 'path';
+        const value = selected === 'path' ? '/tmp/' : '/tmp';
+        for (let moves = 0; moves < host.view.suggestions.length; moves++) {
+          const current = host.view.suggestions.current();
+          if (current?.kind === selected && current.value === value) break;
+          terminal.input('\x1b[B');
+        }
+        expect(host.view.suggestions.current()).toMatchObject({ kind: selected, value });
+        let source = prefix + '/tmp';
+        if (gesture !== 'exact-enter') {
+          terminal.input('\t'); scheduler.flush();
+          expect(host.view.editor.getText()).toBe(prefix + (selected === 'path' ? '/tmp/' : '/tmp '));
+          expect(dispatch).not.toHaveBeenCalled();
+          terminal.input(' chosen'); scheduler.flush(); source = host.view.editor.getText();
+        }
+        terminal.input('\r'); await vi.waitFor(() => expect(dispatch).toHaveBeenCalledOnce());
+        const sent = dispatch.mock.calls[0]![0];
+        if (gesture === 'path-tab') expect(sent.effectivePrompt).toBe(source);
+        else expect(sent.effectivePrompt).toContain('TEMPLATE INTENT:');
+        expect(host.lastPrompt).toBe(source);
+        expect(JSON.stringify(host.options.runtimeContext.configuration.current)).toBe(config);
+        expect(JSON.stringify(modelState.readSessionModelEdit(session.id))).toBe(selection); expect(network).not.toHaveBeenCalled();
+      } finally {
+        mode.stop(); dispatch.mockRestore(); network.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+  it.each((['regular', 'fullscreen'] as const).flatMap(kind => [
     { marked: "Let's inspect @src/mo|stale  后文 /skill:follow unchanged", file: 'src/model.ts' },
     { marked: "read @src/O|Brien's.ts  后文 /skill:follow unchanged", file: "src/O'Brien.ts" },
   ].map(scenario => ({ kind, ...scenario }))))(

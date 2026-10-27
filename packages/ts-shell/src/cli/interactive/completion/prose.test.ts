@@ -324,6 +324,32 @@ it('quotes a command-colliding prose file at a nonzero source offset', async () 
   expect(await routeSlashCommand('问题 "/brainstorm"', { cwd: root })).toBeNull();
 });
 
+it.each((['file', 'directory'] as const).flatMap(kind => ['', '读取 '].map(prefix => ({ kind, prefix }))))(
+  'retains the selected $kind semantics beside a real same-name template after "$prefix"', async ({ kind, prefix }) => {
+    const directory = path.join(root, '.agents', 'prompts'); fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, 'fixture-evidence.md'), '---\ncomposable: true\n---\nTEMPLATE METHOD: $@');
+    const skill = path.join(root, 'control.md'); fs.writeFileSync(skill, '---\nname: control\ndescription: control\n---\nCONTROL SKILL');
+    const marker = '/fixture-evidence', value = marker + (kind === 'directory' ? '/' : '');
+    mockPathTarget(marker, kind);
+    const req = request(prefix + marker)!;
+    const matches = catalogSuggestions(req, [{ value, label: value, kind: 'path', identity: marker, detail: kind }]);
+    expect(matches.some(item => item.kind === 'command' && item.value === marker)).toBe(true);
+    const selected = matches.find(item => item.kind === 'path')!;
+    expect(selected.edit?.text).toBe(kind === 'file' ? '"/fixture-evidence" ' : '/fixture-evidence/');
+    const accepted = replaceDraft(req.snapshot, selected.edit!)!;
+    const context = { cwd: root, skillOptions: { noSkills: true, skillPaths: [skill] } };
+    expect(await routeSlashCommand(accepted.text, context)).toBeNull();
+    const source = accepted.text + ' /skill:control';
+    const result = await routeSlashCommand(source, context);
+    expect(result).toMatchObject({ kind: 'prompt', prompt: expect.stringContaining('CONTROL SKILL'), promptMetadata: {
+      originalInput: source, skills: [{ name: 'control' }], methods: [],
+    } });
+    if (result?.kind === 'prompt') {
+      expect(result.prompt).toContain(accepted.text.trimEnd()); expect(result.prompt).not.toContain('TEMPLATE METHOD:');
+    }
+    expect(await routeSlashCommand(prefix + marker, context)).toMatchObject({ kind: 'prompt', prompt: expect.stringContaining('TEMPLATE METHOD:') });
+  });
+
 it('quotes an isolated absolute file so first-position path acceptance remains a path', async () => {
   mockPathTarget('/fixture-solo', 'file');
   const req = request('/fixture-solo')!;

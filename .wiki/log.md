@@ -9787,3 +9787,11 @@ ADD-01/02/03双lane独立只读审阅发现普通根model遗漏accepted ownershi
 权威串行旧基线owner8+两模式两入口host4共12项失败、40项控制通过；最终recovery36、publication19、过滤host16共71项实际通过，host251项未选不计通过。两独立反转分别触发12/2项预期失败、40/34项控制通过，源码逐字节恢复与SHA-256核对后最终重验。实际host覆盖workspace失效及正常返回、confirmed notice、完整session/兄弟角色、配置字节、原请求目标、held草稿和零prompt/fetch。初轮字段投影断言按真实resolver修正；最初误启动的并发host立即中断，重叠证据废弃并重新串行运行，未隐藏为通过。
 
 五静态门、diff、module facade 0及TS build `02d3735f2386`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF及addition第九十八批/当前摘要更新，工件归.omx/artifacts/phase20-addition-recovery-return/，scratch清理。延迟检查第九十六批CI success，第九十七/九十二批仍in_progress，第九十七批Watch success；本批Git/精确SHA另绑定。未运行全仓、真实provider/PTY/exe/桌面/Windows/磁盘故障或20k历史，原Phase20矩阵未重跑，ADD整体active。
+
+## [2026-10-28] test | 明确同名模板与路径提交的现有语法证据
+
+第九十八批`35507ae8`已推送且远端一致。ADD-10/11/12动态核查旧摘要的同名非skill模板/path未验表述：现有运行时已通过候选类型、文件引号/目录尾斜杠、首位exact Enter command-first及Tab选择处理，无新产品缺陷。本批仅补真实模板与所选路径的回归、明确裸token按语法而非存在性猜意图；参考采用明确命令/路径手势，保留本项目严格源offset与snapshot/type。
+
+主代理heap768MiB单worker串行最终prose70、过滤实际host10，共80项执行通过，host267项未选不计通过。owner的根file/directory候选受控注入，模板/skill为真实文件；两模式host实际枚举Linux`/tmp/`并读真实tmp.md，覆盖首位/正文Tab及path焦点上的exact Enter，检查一次派发、零fetch和配置/session保持。两个有效反转各2项预期失败、2/8项控制通过、66/267项未选，源码逐字节恢复并与固定Git基线一致后重验；首轮收据参数引号匹配错误已独立保留并修正，不改断言要求。fixture按精确kind/value选择，允许额外root候选。
+
+五静态门及diff通过，118既有docs advisory保留；无产品变更，不重复构建。双lane只读复核APPROVE/CLEAR仅覆盖本批测试/文档，工件归.omx/artifacts/phase20-addition-template-path/，scratch清理。第九十六批CI success，第九十七/九十八/九十二批仍in_progress，前两批Watch success；本批Git/CI另绑定。真实file根目录发现、native PTY/provider/桌面/Windows、全仓及20k历史未验，原Phase20矩阵未重跑，ADD整体active。
