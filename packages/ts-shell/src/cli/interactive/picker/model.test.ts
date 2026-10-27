@@ -246,7 +246,11 @@ it('publishes role policy to the real runtime configuration and returns through 
   const parent = stripAnsi(overlay.render(110, 30).join('\n'));
   expect(parent).toContain('▸ Advisor'); expect(parent).not.toContain('Choose model');
   expect(readSessionModelEdit(sessionId)).toEqual(before); overlay.close();
-  expect((await browse.apply([id('b')]))?.note).toContain('advisor uses');
+  expect(await browse.apply([id('b')])).toBeUndefined(); expect(readSessionModelEdit(sessionId)).toEqual(before);
+  const reopened = modelPicker(commands); await reopened.load();
+  const renewedRole = (await reopened.inspect!('role:advisor'))!.next!; await renewedRole.load();
+  const fresh = (await renewedRole.apply(['choose']))!.next!; await fresh.load();
+  expect((await fresh.apply([id('b')]))?.note).toContain('advisor uses');
   expect(shell.runtimeConfig.sessionModelRoles?.advisor).toMatchObject({ connectionId: 'b', model: 'shared' });
   expect(resolveProviderCredential({ runtimeConfig: shell.runtimeConfig, env: {} }).credential?.connectionId).toBe('a');
 });
@@ -496,10 +500,11 @@ it('applies a named profile role in an empty session and rejects later preset re
   expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'b', model: 'other', thinkingEffort: 'high', connectionScope: 'session' });
   expect(projectSessionModel(getRuntimeConfig(home), sessionId).activeProviderConnectionId).toBe('b');
   expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
-  await picker.load();
+  await picker.load(); expect(await picker.apply(['preset:work:review'])).toBeUndefined();
+  const fresh = modelPicker(context()); await fresh.load();
   expect(saveProfileModelPreset('work', { default: roles.default }, context())).toContain('replaced');
   const before = readSessionModelEdit(sessionId);
-  expect((await picker.apply(['preset:work:review']))?.note).toContain('preset changed');
+  expect((await fresh.apply(['preset:work:review']))?.note).toContain('preset changed');
   expect(readSessionModelEdit(sessionId)).toEqual(before);
 });
 

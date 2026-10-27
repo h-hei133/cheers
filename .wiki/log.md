@@ -9771,3 +9771,11 @@ HANDOFF与addition已更新。延迟核对第九十三批CI40585215498已success
 旧实现确认router2与两模式add/简写×正常/未知第二skill/超预算的host12共14项图片断言失败，16项原控制通过。修补后串行聚焦router39、queue4+4、pipe9及过滤host30，共86项实际通过，host217项未选不计通过。撤销单行附件转交再次产生14项预期失败、16项控制通过、256项未选，源码逐字节恢复并核对SHA-256后重验；夹具类型标注调整后router39另行通过。两份body、两张图片、完整source、失败零部分派发、草稿恢复和显式重试有实际host到mock派发端口的证据。
 
 五静态门、diff、module facade 0和TS build `f60d926f601e`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留；HANDOFF、addition第九十六批与当前摘要更新，工件归.omx/artifacts/phase20-addition-queue-routing/，本批scratch清理。延迟检查第九十二/九十四/九十五批CI仍in_progress，Watch均success，第九十三批CI已success；本批Git/精确SHA另绑定。未运行全仓、真实provider/PTY/exe/桌面/Windows/磁盘故障或20k历史，无独立review，原Phase20矩阵未重跑，ADD整体active。
+
+## [2026-10-28] fix | 普通模型与preset接受后的写入归属
+
+ADD-01/02/03双lane独立只读审阅发现普通根model遗漏accepted ownership，用户在PreModelSwitch等待时重开settings仍保存旧选择。现model owner把动作代次/pending/退休与目录读取分开，ready及两类preset把宿主检查送入原事务，写前关闭阻止、写后确认notice保留，parent另验browser与host；显式重开才续权，详情refresh不受损。参考采用pending互斥、原赋值owner及disposed检查的决定，未改provider/auth核心或构建脚本。
+
+最终主代理单worker串行activation23、model43、publication19及过滤host30共115项实际通过，host229项未选不计通过。六组反转35/12/19/2/5/5项预期失败、控制18/41/34/21/18/18项通过，源码逐字节恢复及SHA-256确认后重验。两条旧测试改为先拒绝已关闭/消费对象，再显式新开并保留原publication/stale preset合同；初期Escape层级、被覆盖frame观察与反转名称匹配均按夹具/收据问题修正，没有改产品掩盖。实际两模式Enter覆盖关闭/替换和挂起hook期间重开settings，完整配置/session/兄弟角色、held草稿和零派发/fetch分别核对。
+
+五静态门、diff、module facade 0及TS build `eb97f11d4f6a`通过，测试heap768MiB、build1536MiB，118既有docs advisory保留。两条gpt-6.1-sol lane仅阅读/复核，本修补结论APPROVE/CLEAR；recovery保存后的browser WATCH尚待动态确认。HANDOFF与addition第九十七批/当前摘要更新，工件归.omx/artifacts/phase20-addition-model-activation/，scratch清理。延迟检查第九十四/九十五批CI success，第九十六/九十二批仍in_progress，Watch success；本批Git/精确SHA另绑定。未运行全仓、真实provider/PTY/exe/桌面/Windows/磁盘故障或20k历史，原Phase20矩阵未重跑，ADD整体active。

@@ -540,6 +540,62 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   });
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  (['model', 'settings'] as const).flatMap(entry =>
+    (['close', 'replace', 'reopen'] as const).map(ending => ({ kind, entry, ending })))))(
+  'fences ready model activation after hook $ending through the $kind $entry Enter host', async ({ kind, entry, ending }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true }); const root = fs.mkdtempSync('/tmp/cheers-test/ready-model-host-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', tuiMode: kind, topP: 0.7, activeProviderConnectionId: 'main',
+      providerConnections: [{ id: 'main', provider: 'openai', authType: 'api-key', apiKey: 'synthetic-ready', model: 'current-model',
+        status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01' }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    writeCatalogCache([{ id: 'openai', models: [{ id: 'current-model', reasoning: true }, { id: 'ready-model', reasoning: true }] }]);
+    const manager = new SessionManager(), session = manager.createNew(root), { mode, terminal } = build({ tuiMode: kind });
+    const target = { connectionId: 'main', provider: 'openai' as const, model: 'current-model', thinkingEffort: 'high' as const };
+    modelState.writeSessionModel(session.id, { ...target, roles: { advisor: target, summary: target } }, modelState.readSessionModelEdit(session.id));
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+      session, runtimeConfig: getRuntimeConfig(root) });
+    const host = mode as unknown as { view: InteractiveView; overlay: OverlayHost; options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const before = JSON.stringify(modelState.readSessionModelEdit(session.id)), accepted = context.configuration.current;
+    const config = fs.readFileSync(getUserRuntimeConfigPath()), dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
+    const hook = vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+      if (event.eventName === 'PreModelSwitch') {
+        if (ending === 'close') host.overlay.close();
+        else if (ending === 'reopen') await held;
+        else host.overlay.open({ title: 'Replacement panel', empty: 'Replacement remains current', load: async () => [], apply: async () => undefined });
+      }
+      return undefined;
+    });
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    mode.start();
+    try {
+      expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+      terminal.input(`/${entry}\r`); await vi.waitFor(() => expect(frame()).toContain(entry === 'model' ? 'All models' : 'Settings'));
+      host.view.editor.setText('held ready model draft\nkept through cancellation');
+      if (entry === 'settings') {
+        terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
+        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      }
+      terminal.input('ready-model'); await vi.waitFor(() => expect(frame()).toContain('▸ ready-model'));
+      terminal.input('\r'); await vi.waitFor(() => expect(hook).toHaveBeenCalledWith(expect.objectContaining({ eventName: 'PreModelSwitch' })));
+      if (ending === 'reopen') {
+        host.view.editor.setText('/settings'); terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
+        release();
+      }
+      await vi.waitFor(() => expect(host.view.transcript.all().map(block => block.text).join('\n')).toMatch(/Model switch blocked:|Model switched to ready-model/));
+      expect(JSON.stringify(modelState.readSessionModelEdit(session.id))).toBe(before);
+      expect(context.configuration.current).toBe(accepted); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+      expect(host.overlay.active).toBe(ending !== 'close'); if (ending === 'replace') expect(frame()).toContain('Replacement remains current');
+      if (ending === 'reopen') expect(frame()).toContain('Settings');
+      expect(host.view.editor.getText()).toBe(ending === 'reopen' ? '' : 'held ready model draft\nkept through cancellation');
+      expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+    } finally { release(); mode.stop(); hook.mockRestore(); dispatch.mockRestore(); network.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   ([{ entry: 'model', ending: 'refusal' }, { entry: 'settings', ending: 'refusal' },
     { entry: 'settings', ending: 'close' }, { entry: 'settings', ending: 'replace' }] as const).map(path => ({ kind, ...path }))))(
   'retains effort recovery navigation after $ending in the $kind $entry host', async ({ kind, entry, ending }) => {

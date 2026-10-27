@@ -32,7 +32,7 @@ import { modelAccountSignIn, modelSignInPicker, modelSignInStatus, type ModelSig
 import { modelKeyPicker } from './model/key.js';
 import { listedModelMetadata, modelMetadataDetails } from './model/metadata.js';
 import { ModelFocus } from './model/focus.js';
-import { modelBrowserOwned } from './model/owner.js';
+import { ModelActionOwner, modelActionAdmission, modelBrowserOwned } from './model/owner.js';
 
 interface RoleSelection {
   readonly role: AutomaticModelRole;
@@ -47,7 +47,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
   focusOrigin?: ModelDetailOrigin): Picker {
   const details = new Map<string, readonly string[]>();
   const detailRecords = new Map<string, ModelDetailRecord>();
-  const actions = new Map<string, () => Promise<string>>();
+  const actions = new Map<string, (stillOwned: () => boolean) => Promise<string>>();
   const inspections = new Map<string, () => Picker>();
   const assignments = new Map<string, () => RoleResult>();
   const focusState = new ModelFocus();
@@ -59,13 +59,16 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
   let returnFocus = focus;
   let focusFallback = focusOrigin;
   let inspectionAdmission: (() => string | undefined) | undefined;
+  const actionOwner = new ModelActionOwner();
   const picker: Picker = {
     title: assigning ? `${assigning.role} model` : "Model",
     form: "panel",
+    acceptsOwnership: true,
     get empty() { return refreshFailed ? refreshFailure : filtering ? 'No matching models.' : 'No providers in the catalogue.'; },
     navigation, fullScreen: true,
     ...(assigning ? { back: assigning.back } : parent ? { back: () => parent(notice) } : {}),
-    onOpen() { returnFocus = focus; focusState.reset(); },
+    onOpen() { actionOwner.open(); returnFocus = focus; focusState.reset(); },
+    previewEnd() { actionOwner.close(); },
     get initialSelection() { return activeFocus; },
     replacementSelection: (options, previous, focused) => {
       if (navigation.all.some(row => row.id === focused)) return undefined;
@@ -227,8 +230,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             } else if (!reason && choice) {
               const captured = choice;
               const resolution = targetResolutionIdentity(context, config, target);
-              actions.set(id, async () => captured.admission() ?? setReviewedModelTarget(target,
-                { ...context, admission: captured.admission }, { baseline: captured.baseline, resolution }));
+              actions.set(id, async stillOwned => modelActionAdmission(captured.admission, stillOwned) ?? setReviewedModelTarget(target,
+                { ...context, admission: () => modelActionAdmission(captured.admission, stillOwned) }, { baseline: captured.baseline, resolution }));
             }
           }
         }
@@ -314,8 +317,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               ...Object.entries(preset.roles).map(([role, target]) => `${role}: ${target.connectionId} · ${target.provider}/${target.model} · ${target.thinkingEffort ?? 'auto'}`)]);
             if (!failure && choice) {
               const captured = choice;
-              actions.set(allId, async () => {
-                const admission = () => captured.admission() ?? (sameValue(resolveModelPreset(context.sessionId, name), resolved)
+              actions.set(allId, async stillOwned => {
+                const admission = () => modelActionAdmission(captured.admission, stillOwned) ?? (sameValue(resolveModelPreset(context.sessionId, name), resolved)
                   ? undefined : 'Model preset changed. Reopen the model picker.');
                 return admission() ?? applyModelPreset(context.sessionId!, name, 'default', { ...context, admission }, true);
               });
@@ -329,8 +332,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
                 `Connection: ${target.connectionId}`, `Model: ${target.provider}/${target.model}`, `Reasoning effort: ${target.thinkingEffort ?? 'auto'}`]);
               if (choice) {
                 const captured = choice;
-                actions.set(id, async () => {
-                  const admission = () => captured.admission() ?? (sameValue(resolveModelPreset(context.sessionId, name), resolved)
+                actions.set(id, async stillOwned => {
+                  const admission = () => modelActionAdmission(captured.admission, stillOwned) ?? (sameValue(resolveModelPreset(context.sessionId, name), resolved)
                     ? undefined : 'Model preset changed. Reopen the model picker.');
                   return admission() ?? applyModelPreset(context.sessionId!, name, role, { ...context, admission });
                 });
@@ -378,17 +381,21 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       if (refusal) return { note: refusal };
       const next = inspections.get(id)?.(); return next ? { next } : undefined;
     },
-    async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
-      if (!ids[0]) return undefined;
+    async apply(ids: readonly string[], stillOwned?: () => boolean): Promise<PickerOutcome | undefined> {
+      if (ids.length !== 1 || !ids[0]) return undefined;
       if (refreshFailed) return { note: refreshFailure };
-      const assignment = assignments.get(ids[0]);
-      if (assignment && assigning) {
-        const result = assignment();
-        return { note: result.output, next: assigning.back(result.output) };
-      }
-      const action = actions.get(ids[0]);
-      const note = action ? await action() : 'Model selection unavailable. Reopen the picker in an active session.';
-      return { note, ...(parent ? { next: parent(note) } : {}) };
+      const owned = actionOwner.begin(context.signal, stillOwned);
+      if (!owned) return undefined;
+      try {
+        const assignment = assignments.get(ids[0]);
+        const action = actions.get(ids[0]);
+        const note = assignment && assigning ? assignment().output : action ? await action(owned)
+          : 'Model selection unavailable. Reopen the picker in an active session.';
+        const back = assignment && assigning ? assigning.back : parent;
+        const returning = back && owned() && modelBrowserOwned(context);
+        // The writer's confirmed outcome survives closure; the old parent does not.
+        return { note, ...(returning && owned() ? { next: back(note) } : {}) };
+      } finally { actionOwner.finish(owned); }
     },
   };
   let detailReload: Promise<readonly Option[]> | undefined;
