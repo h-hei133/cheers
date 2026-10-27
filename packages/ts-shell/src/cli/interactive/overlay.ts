@@ -123,8 +123,8 @@ export interface Picker {
   inspect?(id: string): Promise<PickerOutcome | undefined>;
   /** Capture an accepted choice before the host releases its browser signal. */
   previewAccept?(): void;
-  /** Transfer a nested browser's lifetime to its parent before cancelling its local preview. */
-  previewBack?(): void;
+  /** Prepare parent lifetime transfer; optional cleanup cancels an abandoned return. */
+  previewBack?(): void | (() => void);
   /**
    * The selection changed but has not been applied. A picker whose subject is
    * visible on screen can show what the choice would look like here — nothing is
@@ -506,14 +506,29 @@ export class OverlayHost {
       return true;
     }
     if (this.loading && ['enter', 'delete', 'ctrl+d', 'ctrl+r', 'ctrl+p'].includes(event.keyId)) return true;
+    const isApprovalPicker = !this.input && (
+      picker.title.startsWith("Permission:") ||
+      (this.model.visible.some((o) => o.id === "allow-once") &&
+        this.model.visible.some((o) => o.id === "deny")));
+    // Cleanup and parent construction can replace or close this host synchronously.
+    if (event.keyId === 'escape' && !isApprovalPicker && picker.back && (this.input || this.subMode === 'none')) {
+      const generation = this.generation;
+      const cancelReturn = picker.previewBack?.();
+      let returned = false;
+      try {
+        if (this.picker !== picker || this.generation !== generation) return true;
+        this.close();
+        if (this.picker || this.generation !== generation + 1) return true;
+        const parent = picker.back();
+        if (this.picker || this.generation !== generation + 1) return true;
+        this.open(parent);
+        returned = true;
+      } finally { if (!returned && typeof cancelReturn === 'function') cancelReturn(); }
+      return true;
+    }
     const focused = this.model.current()?.id;
     if (this.input) {
-      if (event.keyId === 'escape' && picker.back) {
-        const back = picker.back;
-        picker.previewBack?.();
-        this.close(); this.open(back());
-      }
-      else if (event.keyId === 'escape' || event.keyId === 'ctrl+c') this.close();
+      if (event.keyId === 'escape' || event.keyId === 'ctrl+c') this.close();
       else if (event.keyId === 'enter') {
         const value = this.input.value();
         if (value !== undefined) this.accept({ ...picker, apply: () => picker.input!.apply(value) }, apply, []);
@@ -613,11 +628,6 @@ export class OverlayHost {
     }
 
     // Normal navigation mode
-    const isApprovalPicker =
-      picker.title.startsWith("Permission:") ||
-      (this.model.visible.some((o) => o.id === "allow-once") &&
-        this.model.visible.some((o) => o.id === "deny"));
-
     if (isApprovalPicker) {
       const key = event.keyId.toLowerCase();
       const text = (event.text ?? "").toLowerCase();
@@ -651,13 +661,6 @@ export class OverlayHost {
       }
     }
 
-    // An explicit parent owns Escape before a nested catalogue changes its focus domain.
-    if (event.keyId === 'escape' && !isApprovalPicker && picker.back) {
-      const back = picker.back;
-      picker.previewBack?.();
-      this.close(); this.open(back());
-      return true;
-    }
     const navigation = !isApprovalPicker && !this.loading ? picker.navigation?.key(event.keyId, focused, this.model.filter.trim().toLowerCase()) : undefined;
     if (navigation) {
       this.optionRows.clear(); this.listRows.clear(); this.hovered = undefined; this.chipRows.clear();

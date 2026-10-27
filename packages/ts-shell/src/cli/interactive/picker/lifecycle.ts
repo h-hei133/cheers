@@ -29,7 +29,13 @@ export class PickerLifecycles {
       ...(picker.back ? {
         previewBack: { configurable: true, enumerable: true, value: () => {
           returning = true;
-          picker.previewBack?.();
+          try {
+            const cancelReturn = picker.previewBack?.();
+            return () => {
+              try { if (typeof cancelReturn === 'function') cancelReturn(); }
+              finally { this.abort(controller); }
+            };
+          } catch (error) { this.abort(controller); throw error; }
         } },
         back: { configurable: true, enumerable: true, value: () => {
           try { return this.track(picker.back!(), controller, false); }

@@ -77,6 +77,70 @@ import { currentResearch, readResearch } from '../../research/run/store.js';
 import * as modelDetails from './picker/model/details.js';
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  (['close', 'replace', 'keep'] as const).map(ending => ({ kind, ending }))))(
+  'keeps the actual $kind settings Escape return subordinate to theme cleanup that will $ending its host', async ({ kind, ending }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/settings-back-host-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', tuiMode: kind, theme: 'dark', attentionOnIdle: false, topP: 0.7 },
+      readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    selectTheme('dark', root);
+    const manager = new SessionManager(), session = manager.createNew(root), { mode, terminal } = build({ tuiMode: kind });
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: true },
+      session, runtimeConfig: getRuntimeConfig(root) });
+    const host = mode as unknown as { view: InteractiveView; overlay: OverlayHost; theme: { refresh(): void };
+      pickerLifecycles: { controllerFor(picker: Picker): AbortController | undefined };
+      options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const before = fs.readFileSync(getUserRuntimeConfigPath()), accepted = context.configuration.current;
+    const selection = JSON.stringify(modelState.readSessionModelEdit(session.id));
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    let refresh: ReturnType<typeof vi.spyOn> | undefined;
+    mode.start();
+    try {
+      expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
+      terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
+      host.view.editor.setText('held settings Escape draft\nkept through cleanup');
+      terminal.input('theme'); await vi.waitFor(() => expect(frame()).toMatch(/▸ (?:● )?Theme/));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Choose'));
+      for (let index = 0; index < 40; index++) terminal.input('\x1b[A');
+      for (let index = 0; index < 40 && !frame().includes('▸ Choose "light"'); index++) terminal.input('\x1b[B');
+      expect(frame()).toContain('▸ Choose "light"'); expect(currentTheme()).toBe('light');
+      const current = (host.overlay as unknown as { picker: Picker }).picker;
+      const owner = host.pickerLifecycles.controllerFor(current); expect(owner?.signal.aborted).toBe(false);
+      refresh = vi.spyOn(host.theme, 'refresh').mockImplementation(() => {
+        if (ending === 'close') host.overlay.close();
+        else if (ending === 'replace') host.overlay.open({ title: 'Replacement panel', form: 'panel', empty: 'Replacement remains current',
+          load: async () => [], apply: async () => undefined });
+      });
+      terminal.input('\x1b'); await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+      expect(host.overlay.active).toBe(ending !== 'close');
+      if (ending === 'replace') expect(frame()).toContain('Replacement remains current');
+      if (ending === 'keep') await vi.waitFor(() => expect(frame()).toMatch(/▸ (?:● )?Theme/));
+      expect(owner?.signal.aborted).toBe(ending !== 'keep');
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(context.configuration.current).toBe(accepted);
+      expect(currentTheme()).toBe('dark'); expect(context.runtimeConfig.theme).toBe('dark');
+      expect(JSON.stringify(modelState.readSessionModelEdit(session.id))).toBe(selection);
+      expect(host.view.editor.getText()).toBe('held settings Escape draft\nkept through cleanup');
+      expect(host.view.transcript.all().map(block => block.text).join('\n')).not.toContain('Saved to your user configuration.');
+      expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+      if (ending === 'keep') {
+        terminal.input('attentionOnIdle'); await vi.waitFor(() => expect(frame()).toMatch(/▸ (?:● )?Attention on/));
+        terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Choose false'));
+        terminal.input('\x1b[A\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Apply'));
+        terminal.input('\r'); await vi.waitFor(() => expect(context.runtimeConfig.attentionOnIdle).toBe(true));
+        expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.attentionOnIdle).toBe(true);
+      }
+    } finally {
+      refresh?.mockRestore(); mode.stop(); vi.restoreAllMocks(); vi.unstubAllEnvs();
+      selectTheme('dark'); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   (['theme', 'attentionOnIdle'] as const).flatMap(field =>
     (['close', 'replace', 'keep'] as const).map(ending => ({ kind, field, ending })))))(
   'fences settings Apply through the actual $kind host when $field refresh will $ending it', async ({ kind, field, ending }) => {

@@ -9804,3 +9804,12 @@ ADD-01/02/03双lane独立只读审阅发现普通根model遗漏accepted ownershi
 主代理单进程串行、heap768MiB单worker最终125项执行通过，过滤host277项未选。七组有效反转依次20/4/4/6/6/16/2项预期失败，源码逐字节恢复并核对SHA后重验；初期project有效值和host加载/引号/截断夹具错误均保留、排除出产品基线。code lane指出初版拒绝跳过预览清理，动态确认2失败/18控制后修正，双lane最终APPROVE/CLEAR仅覆盖本修补。
 
 五静态门、diff、module facade报告0及TS build `d52e3bda70f2`通过，118既有docs advisory保留，build heap1536MiB。HANDOFF/当前摘要更新，工件归.omx/artifacts/phase20-addition-settings-lifecycle/并清理scratch。第九十七/九十八批CI success，第九十九/九十二批仍in_progress，前者Watch success；本批Git/CI另绑定。未验真实provider/native PTY/桌面/Windows、全仓或20k历史，原Phase20矩阵未重跑，ADD整体active。
+
+
+## [2026-10-28] fix | Escape返回不再覆盖清理回调关闭或替换的宿主
+
+第一百零一批沿ADD-02/03确认实际两模式theme Escape会在preview cleanup关闭/替换后仍重开旧settings。原overlay现合并input/rows返回，在prepare、close清理/notify及parent构造后复验原generation；中止返回通过既有previewBack返回cleanup，取消原controller，正常parent继续可保存，replacement独立。delete/rename/denial/approval优先级保留；不增加导航或取消系统。
+
+主代理heap768MiB单worker串行最终lifecycle35、overlay75、role46及实际host34，共190项执行通过，host261项未选。实际host新六条包含取消/正常返回后显式保存，另保留Apply和recovery控制；八组有效反转有十九/四条旧owner/host失败及2/8/5/18/17/1/2条独立边界失败，源码逐字节恢复并核对SHA后重验。五静态门、diff、module facade报告0及TS build `91f42246bef9`通过，118既有docs advisory保留，build heap1536MiB。
+
+两条gpt-6.1-sol只读lane最终APPROVE/CLEAR限于本修补；HANDOFF/当前摘要更新，工件归.omx/artifacts/phase20-addition-overlay-return/并清理scratch。第99批CI success，第100批CI `40597440762`在延迟观察时仍in_progress、Watch success，本批Git/CI另绑定。未验真实provider/native PTY/桌面/Windows、全仓或20k历史，原Phase20矩阵未重跑，ADD整体active。
