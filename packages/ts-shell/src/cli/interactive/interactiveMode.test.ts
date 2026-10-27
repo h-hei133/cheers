@@ -423,8 +423,15 @@ it.each([true, false])('records runtime adoption separately from its completed w
 
 describe("session wiring", () => {
   it.each([
-    ['regular', true], ['fullscreen', true], ['regular', false], ['fullscreen', false],
-  ] as const)('configures a model from settings and activates it only on the next explicit selection in %s mode (existing: %s)', async (kind, existing) => {
+    ['regular', true, 'plain'], ['fullscreen', true, 'plain'], ['regular', false, 'plain'], ['fullscreen', false, 'plain'],
+    ['regular', true, 'key'], ['fullscreen', true, 'key'], ['regular', true, 'model'], ['fullscreen', true, 'model'],
+    ['regular', true, 'label'], ['fullscreen', true, 'label'],
+    ['regular', true, 'known-option'], ['fullscreen', true, 'known-option'],
+  ] as const)('configures a model from settings and activates it only on the next explicit selection in %s mode (existing: %s, value: %s)', async (kind, existing, variant) => {
+    const apiKey = variant === 'key' ? '--synthetic-private-key=value' : variant === 'known-option' ? '--account' : 'synthetic-new-key';
+    const model = variant === 'model' ? '--relay-model=opaque' : 'key-model';
+    const focused = `▸ ${model.slice(0, 10)}`;
+    const providerId = variant === 'label' ? '--account=label' : 'candidate';
     fs.mkdirSync('/tmp/cheers-test', { recursive: true });
     const directory = fs.mkdtempSync('/tmp/cheers-test/model-configure-select-');
     const home = path.join(directory, 'home'), project = path.join(directory, 'project');
@@ -438,7 +445,7 @@ describe("session wiring", () => {
     }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     writeCatalogCache([
       { id: 'existing', label: 'Existing', runtime: 'openai', baseUrl: 'https://existing.invalid/v1', models: [{ id: 'retained', reasoning: true }] },
-      { id: 'candidate', label: 'Candidate', runtime: 'openai', baseUrl: 'https://candidate.invalid/v1', models: [{ id: 'key-model', reasoning: true }] },
+      { id: providerId, label: 'Candidate', runtime: 'openai', baseUrl: 'https://candidate.invalid/v1', models: [{ id: model, reasoning: true }] },
     ]);
     const manager = new SessionManager(), session = manager.createNew(project);
     const { mode, terminal } = build();
@@ -458,16 +465,16 @@ describe("session wiring", () => {
       terminal.input('/settings\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
       terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
-      terminal.input('key-model'); await vi.waitFor(() => expect(frame()).toContain('▸ key-model'));
+      terminal.input(model); await vi.waitFor(() => expect(frame()).toContain(focused));
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Configure connection'));
       terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(frame()).toContain('API key'));
-      terminal.input('synthetic-new-key'); await vi.waitFor(() => expect(frame()).toContain('••••'));
-      expect(frame()).not.toContain('synthetic-new-key');
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ key-model'));
+      terminal.input(apiKey); await vi.waitFor(() => expect(frame()).toContain('••••'));
+      expect(frame()).not.toContain(apiKey);
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain(focused));
       await vi.waitFor(() => expect(host.busy).toBe(false));
       const saved = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
       const added = saved.providerConnections!.find(connection => connection.id !== 'existing')!;
-      expect(added).toMatchObject({ model: 'key-model', baseUrl: 'https://candidate.invalid/v1', status: 'connected', autoSelect: false });
+      expect(added).toMatchObject({ model, apiKey, label: providerId, baseUrl: 'https://candidate.invalid/v1', status: 'connected', autoSelect: false });
       expect(saved.activeProviderConnectionId).toBe(before.activeProviderConnectionId); expect(saved.provider).toBe(before.provider);
       expect(saved.providerCredentials).toEqual(before.providerCredentials);
       expect(saved.providerConnections!.filter(connection => connection.id !== added.id)).toEqual(before.providerConnections ?? []);
@@ -478,13 +485,13 @@ describe("session wiring", () => {
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('Settings'));
       await vi.waitFor(() => expect(host.busy).toBe(false));
       expect(frame()).toContain('▸ Models and roles'); expect(frame()).toContain('Model switched');
-      expect(readSessionModel(session.id)).toMatchObject({ connectionId: added.id, provider: 'openai', model: 'key-model' });
-      expect(target()).toMatchObject({ model: 'key-model', baseUrl: 'https://candidate.invalid/v1', credential: { connectionId: added.id } });
+      expect(readSessionModel(session.id)).toMatchObject({ connectionId: added.id, provider: 'openai', model });
+      expect(target()).toMatchObject({ model, baseUrl: 'https://candidate.invalid/v1', credential: { connectionId: added.id } });
       expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(configured);
-      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ key-model'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain(focused));
       expect(frame()).toContain('active');
-      expect(JSON.stringify(host.view.transcript.all())).not.toContain('synthetic-new-key');
-      expect(host.view.editor.getHistory()).not.toContain('synthetic-new-key');
+      expect(JSON.stringify(host.view.transcript.all())).not.toContain(apiKey);
+      expect(host.view.editor.getHistory()).not.toContain(apiKey);
       expect(manager.getSession(session.id)?.turns).toHaveLength(0);
       expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
     } finally {

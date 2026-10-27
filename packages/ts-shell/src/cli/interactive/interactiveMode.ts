@@ -1280,8 +1280,8 @@ export class InteractiveMode {
         const progress = transcriptLineRenderer(this.state.transcript, this.tui, 'Account sign-in');
         let note: string;
         try {
-          const args = key ? ['login', provider, '--api-key', key.apiKey, '--model', key.model, '--label', key.label,
-            ...(key.baseUrl ? ['--base-url', key.baseUrl] : [])] : ['login', provider, '--account'];
+          const args = key ? ['login', provider, `--api-key=${key.apiKey}`, `--model=${key.model}`, `--label=${key.label}`,
+            ...(key.baseUrl ? [`--base-url=${key.baseUrl}`] : [])] : ['login', provider, '--account'];
           const result = await runConnectCommand(args, { ...commands,
             signInProgress: value => renderSignInProgress(progress, value) }, undefined, { activate: false });
           note = key ? result.output.split('\n').filter(line => !line.startsWith('Saved key:')).join('\n') : result.output;

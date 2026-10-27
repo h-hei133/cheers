@@ -1445,6 +1445,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 |---|---|
 | model上下键看起来无交互 | 原disabled跳过具体未配置模型是确定缺口；只有一行ready与该观察相容，原现场按键是否进入此分支仍未排他确认。必须允许未配置具体模型获得焦点、进入详情和配置，不能改回跳过它们；浏览、认证成功与显式启用分开。已有局部修补及真实host/隔离PTY证据，原环境仍需复验 |
 | 模型面板保存连接提前切换请求目标 | 第七十六批确认面板复用普通login的默认激活写入；只保留默认字段仍会被凭据解析或logout的隐式回退选中。现沿原连接owner显式仅保存，新slot不参与自动选择，显式模型/session/连接/账号池选择仍有效；非镜像原生账号按精确slot核验并授予续期。237项执行通过、四组有效反转及TS构建有本地证据，真实认证服务、PTY和桌面平台本批未验 |
+| 带前导双横线的模型配置值无法保存 | 第七十七批确认host把表单密钥、模型ID与连接标签作为分开argv token，合法字面值被严格parser当成选项。现以原parser支持的字段绑定形式传递；保留直接命令的严格语法和脱敏诊断。两模式八条新增边界、113项执行通过及有效反转有证据，真实provider服务与平台本批未验 |
 | 同协议relay分类错误标为可用 | 第四十批确认runtime级凭据聚合不能代表精确分类。现从分类自身已准入模型行派生状态和ready优先顺序；阻断模型仍可浏览，刷新保留手动身份。五文件84项、原源码有效反转及四条实际Node小型PTY有证据；完整模型/认证/桌面验收继续待证 |
 | 目录删除后焦点回首项且没有提示 | 第四十一批实际host/publication复现，现缺失焦点刷新按旧可见模型ID取幸存邻居，navigation清理旧ID并显示目录变化；生存手动身份与搜索失去匹配保留原语义，空占位不能启用。136项/三有效反转有证据，真实桌面/终端删除场景未验 |
 | 角色旧动作在退出后仍可保存，子面板取消后父级失效 | 第四十二批确认role/thinking没有永久退役与子入口准入、共享controller在Escape被取消、action wrapper丢owner。现退役/一次消费/原事务取消复验，显式返回转交父controller，wrapper保留不透明身份；152项/六有效反转及普通/全屏Node小PTY有局部证据。完整角色/认证/桌面矩阵未验 |
@@ -1540,6 +1541,8 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 启动先显示TUI、初始上下文有数值 | 真实Loading编辑区和一次输入接管；首请求使用实际有效规则/消息/schema/协议做本地估算，实测按同身份接续 | 新鲜度完整来源、原生tokenizer、真实同模型/协议输入分项、冷热/修补前对照与首请求性能；缺依据仍保留unknown |
 
 第七十五批补充启动草稿与估算owner的四条组合路径，修复光标移动误撤销估算；纯移动与resize不改变请求内容身份，真实编辑、历史及undo仍推进内容版本。预览/派发端口为mock，真实provider差额、冷热启动和桌面平台证据继续待补，ADD整体active。
+
+第七十六、七十七批继续补模型精确配置→返回→显式启用：保存不改默认请求目标，新slot不参与隐式回退；前导双横线与等号在表单字段中保持字面值。实际host、命名slot续期与各owner的隔离证据见对应批次，不替代真实认证服务、全部角色/来源/窗口和平台验收。
 
 文档已修正旧HEAD与过时启动测量结论，并保留面板字段盘点、组合能力和完整验收清单；第三十八批修补搜索焦点并覆盖全部字段/scope基本链，第三十九批修补重试/scope确认与来源归属，第五十二批收口flagless组合正文与Memory/Shell分类测试合同，第五十三批收口正文补全的模板候选与命令归属边界，第五十五批收口上下文选择后的测量失效与有效条目身份，第五十六批补实际组装请求的本地估算事实，第五十七批补review standalone/composed的真实Git prompt预览，第五十八批补预览到dispatch的one-use Git snapshot reservation，第五十九批补研究预览原始来源复验与one-use准入，第六十批补模型认证取消后的原始准入，第六十一批补review失效标记与异步消费代次，第六十二批补提交期preview生命周期与review租约，第六十三批补正文路径碰撞、字面量与Windows引号边界，第六十四批补引号范围/前缀路径完成与context/compaction计量身份，第六十五批补模型行目标准入、详情返回与发布基线，第六十六批补模型详情实时刷新、目录换代与宿主所有权，第六十七批补provider-slot有效凭据/端点身份与ambient跨provider范围，第六十八批补非当前ambient provider行的有效端点投影，第六十九批补显示偏好命令向accepted display state的当前会话发布，第七十批补`/skill:`路径/skill双候选与Enter/Tab准入分界，第七十一批补模型异步刷新完成后的publication复验，第七十二批补根模型面板刷新失败的只读缓存与同版本恢复，第七十三批补活动设置表单的一行窗口预算及跨scope多行保存读回，第七十四批补resume渐进焦点、鼠标意图与失效回退的组合验收。未将局部证据提升为两个面板完整验收。原现场按键唯一根因、真实认证、同条件1.7k/4.9k分解和生产冷热收益继续待证，不归类为“不存在”，不提升ADD整体完成状态。
 
@@ -1697,3 +1700,16 @@ ADD-01/02/03沿真实设置→模型目录→遮罩凭据输入→返回→显�
 四组独立反转分别移除host仅保存选项、恢复隐式回退、恢复native grant的无条件镜像要求、恢复logout首项选择，恰好产生4/6/4/1项预期失败；按失败名称核验，不把Vitest JSON的filtered-out totals算作执行通过。源码逐字节恢复，SHA-256为host `1f5644292f6126581206797bff3ce2df7d9cae38a3125cb39a27c3fecda9426b`、credential `87c6efb0a9d410b59124ebb1e4ba8053372385906f3f4d281bc5fabc06c193c6`、account auth `4e723be791b5427cc2dfffe4d084d238b9b0efd1b830ed72a6c31664a0ed4535`、connect `1631da3663007da2a535a98f794048de95cc744adc61edd1c1b765a89170d9de`；恢复后完成上述最终验证。新增schema诊断断言曾误期待嵌套字段名，实际合同只报告所属providerConnections；先分类为测试预期错误，再保留拒写、invalid及无敏感值回显断言，不修改诊断实现。
 
 五静态门、diff及module facade 0通过，既有118条docs-source advisory保留；TS build `d7aaee58ac2c`通过，build heap1536MiB。HANDOFF记录两条隐式选择路径和非镜像续期边界。延迟读回`ecc99aae`的Watch `40539857493`为success、CI `40539857527`仍in_progress；`ab2bdde7`的Watch `40536731728`success、CI `40536731834`仍in_progress，不代替本批结果。未运行真实provider/OAuth服务、PTY、exe、桌面或20k历史压测，未重跑原Phase 20矩阵，无独立review，ADD整体保持active；提交/推送及本批精确SHA的CI另绑定。
+
+
+### 第七十七批：精确模型配置字段的字面值传递
+
+ADD-01/02/03继续沿settings→model→masked key→返回→显式启用检查精确目标。[InteractiveMode](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)此前将密钥、模型ID、连接标签作为分开的argv token传给连接owner。原表单允许的前导双横线字面值会被严格parser解释为选项，保存被拒绝；节点模型ID与连接标签来自已接受目录，同样不能在此边界改成命令语义。regular/fullscreen×密钥、模型、标签、已知选项名四组共8条新增实际host回归，在旧实现均因未保存连接失败，四条普通有/无连接基线仍通过。
+
+现沿原连接writer与严格parser传递`--api-key=值`、`--model=值`、`--label=值`及适用endpoint，保留带等号和前导双横线的完整字面值。没有增加第二套持久化、改变直接命令的语法，或改变上一批仅保存/显式启用合同。只读参考的认证prompt和凭据owner之间以结构化值传递，不重新按命令参数解释；本项目采用同一数据边界决定，并使用现有parser已支持的字段绑定，不迁移参考的认证结构。
+
+原[host测试](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)扩展为12条配置组合，保留原regular/fullscreen×有/无活动连接四条，再补`--synthetic-private-key=value`、`--relay-model=opaque`、`--account=label`及密钥字面值`--account`。各条均从实际输入解析、遮罩表单及连接owner保存，核对完整密钥/模型/标签与endpoint；保存后默认、旧连接、镜像、当前请求目标和session selection保持，下一次Enter才保存精确session目标，返回settings显示结果，重开显示active。配置文件在显式选择阶段字节不再变化；输入未进入画面、transcript或编辑历史，新增配置链零prompt派发、零provider请求。初次长模型名的画面同步误期待未截断标签，先分类为观察夹具错误，改为实际可见焦点前缀；完整保存与runtime模型身份仍逐字断言。
+
+主代理heap768MiB、单worker串行执行四个聚焦文件92项：connect54、connect syntax15、model key9、settings session14；再过滤InteractiveMode执行21项通过、108项未选，共113项实际执行通过。未运行整个host文件或全仓。将字段绑定反转回原分开参数后，12条配置选择集中恰好8条失败，按名称确认四组各2条，不把JSON filtered-out totals记为通过；源码逐字节恢复，host SHA-256 `8ac7f87110adf03b29cc261b05c88aa05a01cdbee05e5effcf1ef4385afcb06b`，恢复后完成上述最终验证。
+
+五静态门、diff、module facade 0与TS build `d1bff78338c5`通过，build heap1536MiB；保留118条既有docs-source advisory。HANDOFF与当前摘要更新，临时反转材料清理。延迟读回`217dae0a`：CI `40543737624`仍in_progress、Watch `40543737895`success；首次API读回EOF仅属状态观察失败，未将其当作CI终止或重启任务。未运行真实provider/OAuth服务、PTY、exe、桌面或20k历史压测，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批提交/推送及精确SHA的CI另绑定。

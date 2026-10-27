@@ -9608,3 +9608,12 @@ ADD-01/02/03实际settings→model→masked key→返回→显式启用链确认
 恢复后六文件224项及过滤实际InteractiveMode13项通过、108项未选，共237项执行通过。覆盖两种终端模式×有/无既有连接、pending、取消/失败、明确选择后session持久化与返回、全局配置字节保持、logout、显式池和非镜像原生账号续期；认证使用本地callback和合成token，无真实provider请求。四个反转分别产生4/6/4/1项预期失败，四源码逐字节恢复并核对SHA-256。schema新增测试的嵌套诊断预期已按现有顶层字段合同修正，保留invalid/拒写/脱敏断言。
 
 五静态门、diff、module facade 0及TS build `d7aaee58ac2c`通过，测试heap768MiB、build1536MiB，保留118既有docs advisory。HANDOFF与addition第七十六批/当前摘要更新；`ecc99aae`的Watch `40539857493`success、CI `40539857527`仍in_progress，`ab2bdde7`的CI `40536731834`仍in_progress。未运行全仓、真实认证服务、PTY、exe、桌面或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
+
+
+## [2026-10-28] fix | 模型配置字段保持字面值
+
+ADD-01/02/03实际settings→model→masked key→返回→显式启用链确认：host将结构化密钥、模型ID和标签拆成分开的argv，前导双横线被严格parser解释成选项，连接没有保存。现沿原writer以既有字段绑定语法传递完整值，不放宽直接命令语法，保留仅保存与后续显式启用。只读参考采用结构化凭据传递的决定，无新配置或认证owner。
+
+regular/fullscreen×密钥/模型/标签/已知选项名八条新增回归先在旧实现失败，四条普通基线保留。最终四文件92项和过滤host21项通过、108项未选，共113项执行通过。保存及显式启用后读回精确值/endpoint/session目标，默认与镜像保持、无密钥历史或模型请求；有效反转触发四组各2条失败，源码逐字节恢复，SHA-256 `8ac7f87110adf03b29cc261b05c88aa05a01cdbee05e5effcf1ef4385afcb06b`。长模型名称的初期未截断画面预期已按实际列宽修正，完整身份断言保留。
+
+五静态门、diff、module facade 0及TS build `d1bff78338c5`通过，测试heap768MiB、build1536MiB；HANDOFF与addition第七十七批/当前摘要更新，反转材料清理。`217dae0a`的CI `40543737624`仍in_progress、Watch `40543737895`success，不替代本批结果。未运行全仓、真实认证服务、PTY、exe、桌面或20k历史，未重跑原Phase 20矩阵，无独立review，ADD整体active。本批Git/CI另绑定。
