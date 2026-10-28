@@ -1463,6 +1463,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 一步配置的预览与实际收尾请求不一致 | 第一百零四批真实请求发现草稿~717而实际组装估算568；真实turn_start在派发前计入第一步，预览却按零步判断。现一步预览省略工具schema并沿原finalStepMessages加入收尾指令；dynamic/full×一步/两步的完整wire、三类digest与估算对照通过。最终Linux PTY草稿~568与同请求估算568一致，provider输入462独立显示；自动回合后状态栏仍观察到stale，未宣称实测衔接完成或历史差额闭合 |
 | 自动回合完成后状态栏被无数字preview占住 | 第一百零五批实际host确认请求完成后`promptContext`可先发布estimated，随后过期；旧状态投影只按对象存在性取live reading，`unknown/stale`即使没有token也会遮住同身份measured。现仅`estimated/calibrated`且带数值的live reading优先，无数字读数回退到身份匹配的provider实测；请求完成后identity失效或预算是真实unknown时仍保留对应状态。regular/fullscreen实际宿主路径已有证据，真实provider延迟与桌面平台未验 |
 | 外部目录刷新可持久化畸形模型上限 | 第一百零六批确认可变models.dev JSON的context/input/output未经同一整数准入即可写入缓存，且旧缓存读取不清理；负数或字符串可能进入compaction预算。现只接受正安全整数，refresh投影与catalog merge两个provider分支共用同一owner，新增provider及built-in patch的旧缓存均由回归覆盖；真实外部索引内容与端到端compaction平台仍未验 |
+| 刷新目录被错误显示为“yours” | 第一百零七批确认refresh cache与用户catalog复用同一merge，所有overlay都无条件标记`custom:true`，`/model`因此把公开索引刷新出的provider显示为用户自有。现merge显式区分user/refresh来源，只有用户文件保持`yours`；新增provider、built-in patch及同场用户overlay由surface回归覆盖。真实外部刷新内容和桌面渲染仍未验 |
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。第三十八批新增settings全部37项/user37-project36基本键盘链及七个跨来源政策场景，第三十九批补17个代表性冲突/失效/取消/范围场景，第四十九批补Memory/Shell只读命令入口。完整字段×来源×编辑器×窗口/桌面及model能力/角色/真实认证矩阵仍未完成；只读入口不伪装可编辑字段，也不能将局部绿色写成“整体已看齐” |
 | 角色写入失败后丢失settings/model返回链 | 第八十批确认reset、具体模型和effort只在saved时返回父页面，Enter已释放面板，失败使生命周期结束；effort重建遇不可读state还会掩盖原写入结果。现回现有fresh parent，不可读时退回目录并保留原notice；60项执行通过、四组6/10/6/4有效反转及build有本地证据，真实文件系统故障与完整平台矩阵未验 |
 | 角色认证返回时读取失败吞掉连接保存结果 | 第八十一批确认API-key/account保存后的fresh role准备无异常边界，state不可读时丢失原认证notice和返回链。现沿原角色目录fallback，保留已保存/应用未确认事实，恢复后须显式重新选择才分配。107项执行通过、14项有效反转及build有本地证据；认证runner与故障受控，真实服务、磁盘故障和完整scope矩阵未验 |
@@ -2180,3 +2181,11 @@ ADD-08沿[状态投影](../../packages/ts-shell/src/cli/interactive/sessionFacts
 新增[refresh回归](../../packages/ts-shell/src/core/models/catalogRefresh.test.ts)覆盖负值、小数、字符串、零、非安全整数、有效控制值，以及已写入磁盘的malformed新provider和built-in patch缓存。四个聚焦反转分别在raw context/input投影、cache sanitizer、predicate边界和built-in patch分支触发1项预期失败，其余未选不计通过；四source逐字节恢复并核对SHA-256 `5edeb144`/`639990c7`/`2e8e4035`/`56f050f6`后重验。
 
 首次生产回归执行在任何refresh测试隔离前覆盖了操作者`~/.cheers/models-cache.json`；实际mtime与`demo` fixture精确匹配，该单一test residue已删除。测试文件现于`beforeEach`隔离HOME/USERPROFILE/CHEERS_TEST_ROOT，最终27项执行后再次确认真实cache路径不存在。主代理heap768MiB、单worker串行执行catalogRefresh9及catalogShape18，共27项通过；五静态门、module facade0及TS build `41adc6e1c4ce`通过，118既有docs-source advisory保留，build heap1536MiB。独立只读review先指出旧缓存与test isolation缺口，修补后closure无remaining finding。本批未运行真实models.dev refresh、真实provider、PTY/exe、桌面/Windows或全仓，未重跑原Phase20矩阵；提交/推送/CI另绑定，ADD整体active。
+
+### 第一百零七批：刷新目录来源与“yours”标记
+
+[catalog merge](../../packages/ts-shell/src/core/models/catalog.ts)此前无论overlay来自refresh cache还是用户文件，都无条件写入`custom:true`；[catalog surface](../../packages/ts-shell/src/core/models/catalogSurface.ts)又把该字段渲染为`yours`。因此一次公开目录刷新会把built-in provider和新增provider都伪装成用户自有。现[加载owner](../../packages/ts-shell/src/core/models/catalogStore.ts)分别传入`origin:refresh/user`，merge以来源决定custom，输入patch中的同名字段不能覆盖；默认调用仍保持原用户overlay语义。
+
+[refresh/surface回归](../../packages/ts-shell/src/core/models/catalogRefresh.test.ts)在同一隔离环境中刷新新增provider与built-in patch，再写用户provider并直接渲染目录：前两者不得含`yours`，后者必须含`yours`。撤回origin判定后该测试1项失败、9项未选；四source逐字节恢复并核对SHA-256 `34cac2c0`/`2f9e6f0d`/`e7f53e23`/`b803a198`后重验。主代理heap768MiB、单worker串行执行四文件49项通过；五静态门、module facade0及TS build `a7837621f4e3`通过，118既有docs-source advisory保留，build heap1536MiB。
+
+本批只修正catalogue来源投影，没有改变真实provider、连接选择或认证行为；未运行真实models.dev refresh、真实provider、PTY/exe、桌面/Windows或全仓，未重跑原Phase20矩阵。提交/推送/CI另绑定，ADD整体active。

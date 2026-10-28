@@ -46,7 +46,7 @@ describe("the shipped catalog", () => {
         vision: true,
         compat: { supportsTemperature: true },
       }],
-    }], { preserveExplicitCapabilities: true });
+    }], { preserveExplicitCapabilities: true, origin: "refresh" });
     expect(resolveRequestShape(refreshed, "openai", "gpt-5.3-codex")).toMatchObject({
       reasoningEffort: true,
       vision: false,

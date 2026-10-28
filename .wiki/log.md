@@ -9860,3 +9860,9 @@ Provider审计确认旧F-01/02/03/05/06(Copilot)/07/08已实现，Anthropic OAut
 新增回归覆盖六类有效/无效值、磁盘旧新provider及built-in patch。四个聚焦反转分别触发1项预期失败，源码逐字节恢复并核对SHA-256`5edeb144`/`639990c7`/`2e8e4035`/`56f050f6`后重验。首次运行在隔离前写入操作者`~/.cheers/models-cache.json`，因内容与mtime精确对应测试`demo` fixture，已删除该单一residue；测试现逐例隔离HOME/USERPROFILE/CHEERS_TEST_ROOT，最终执行后确认真实路径未再写入。
 
 主代理heap768MiB、单worker串行catalogRefresh9+catalogShape18，共27项通过；五静态门、module facade0及TS build`41adc6e1c4ce`通过，118既有docs-source advisory保留，build heap1536MiB。独立只读review提出的旧缓存与test isolation问题已修，closure无remaining finding。commit/push/CI另绑定；未运行真实models.dev refresh、真实provider、PTY/exe、桌面/Windows、全仓或原Phase20矩阵，ADD整体active。
+
+## [2026-10-28] fix | 刷新目录来源与“yours”标记
+
+第一百零七批确认refresh cache与用户catalog复用同一merge后，所有overlay都被无条件标记`custom:true`，公开目录刷新出的新增provider和built-in patch在`/model`中错误显示为`yours`。现catalogStore显式传user/refresh来源，merge只让用户文件保持custom，patch内的同名字段不能覆盖来源判定，默认merge调用仍保持用户overlay语义。
+
+新增surface回归在同一隔离目录刷新新增provider与built-in patch、再写用户provider，验证前两者无`yours`且后者有`yours`。撤回来源判定后1项预期失败、9项未选；四source逐字节恢复并核对SHA-256`34cac2c0`/`2f9e6f0d`/`e7f53e23`/`b803a198`后重验。主代理heap768MiB、单worker串行四文件49项通过；五静态门、module facade0及TS build`a7837621f4e3`通过，118既有docs-source advisory保留，build heap1536MiB。commit/push/CI另绑定；未运行真实models.dev refresh、真实provider、PTY/exe、桌面/Windows、全仓或原Phase20矩阵，ADD整体active。

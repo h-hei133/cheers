@@ -708,3 +708,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A focused catalogue-refresh test replaces the operator's real `~/.cheers/models-cache.json` with a `demo` fixture.
 - **Root Cause**: `catalogCachePath()` resolves `HOME`/`USERPROFILE` at write time, and the test invoked `refreshCatalog` before stubbing either variable. The existing positive-value tests shared the same leak.
 - **Rule**: Isolate `HOME`, `USERPROFILE` and `CHEERS_TEST_ROOT` for every test that can refresh or load the catalogue, from `beforeEach` rather than after the first fixture. Assert the real cache path was not written when diagnosing prior residue. Admit model context/input/output limits through the shared positive-safe-integer rule at both refresh projection and catalogue merge, including old cache and built-in-patch branches.
+
+### Catalogue Provenance Must Travel Through The Merge Boundary
+- **Symptom**: After an explicit public-index refresh, providers from that cache are rendered as `yours` alongside entries the user actually added to `models.json`.
+- **Root Cause**: The generic provider merge treated every overlay as user-authored and wrote `custom:true`; cache and user layers called it identically.
+- **Rule**: Pass the overlay origin into the existing merge and derive `custom` from that source rather than from patch input. Keep the default user-origin behavior for direct callers, explicitly mark the refresh cache, and verify both added-provider and built-in-patch branches through the rendered surface.

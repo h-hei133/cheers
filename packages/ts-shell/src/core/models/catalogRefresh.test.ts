@@ -3,9 +3,10 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { refreshCatalog } from "./catalogRefresh.js";
-import { catalogCachePath, loadCatalog } from "./catalogStore.js";
+import { catalogCachePath, loadCatalog, userCatalogPath } from "./catalogStore.js";
 import { catalogModel } from "./catalog.js";
 import { resolveRequestShape } from "./requestShape.js";
+import { renderCatalog } from "./catalogSurface.js";
 
 /**
  * What a refresh keeps from the published index.
@@ -246,6 +247,42 @@ describe("refreshing the catalogue", () => {
     expect(model?.contextWindow).toBe(400_000);
     expect(model).not.toHaveProperty("inputLimit");
     expect(model).not.toHaveProperty("maxTokens");
+  });
+
+  it("marks only providers from the user catalogue as custom", async () => {
+    const document = {
+      demo: {
+        name: "Demo",
+        models: { fresh: { id: "fresh", limit: { context: 8_000 } } },
+      },
+      openai: {
+        name: "OpenAI",
+        models: { "cached-model": { id: "cached-model", limit: { context: 16_000 } } },
+      },
+    };
+    await withIndex(document, async (url) => {
+      expect((await refreshCatalog(url)).ok).toBe(true);
+      fs.writeFileSync(userCatalogPath(), JSON.stringify({
+        providers: {
+          mine: {
+            label: "Mine",
+            runtime: "openai-compatible",
+            auth: "api-key",
+            models: [{ id: "local" }],
+          },
+        },
+      }));
+      const catalog = loadCatalog();
+      const rendered = renderCatalog({
+        providers: catalog,
+        availability: { activeProvider: "openai", providers: [] },
+        configPath: userCatalogPath(),
+      });
+      const lineFor = (id: string) => rendered.split("\n").find(line => line.includes(`\`${id}\``));
+      expect(lineFor("demo")).not.toContain("yours");
+      expect(lineFor("openai")).not.toContain("yours");
+      expect(lineFor("mine")).toContain("yours");
+    });
   });
 
   it("fills missing built-in capabilities without overriding reviewed request constraints", async () => {

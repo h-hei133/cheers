@@ -586,9 +586,13 @@ export function catalogModel(
 export function mergeProviders(
   base: readonly CatalogProvider[],
   overlay: readonly Partial<CatalogProvider>[],
-  options: { readonly preserveExplicitCapabilities?: boolean } = {},
+  options: {
+    readonly preserveExplicitCapabilities?: boolean;
+    readonly origin?: "user" | "refresh";
+  } = {},
 ): CatalogProvider[] {
   const merged = base.map((provider) => ({ ...provider }));
+  const custom = options.origin !== "refresh";
   for (const patch of overlay) {
     if (!patch.id) continue;
     const models = patch.models?.map(sanitizeModelLimits);
@@ -606,7 +610,7 @@ export function mergeProviders(
         // failure would look like a bad key rather than a wrong shape.
         endpoint: patch.endpoint,
         models: models ?? [],
-        custom: true,
+        custom,
       });
       continue;
     }
@@ -619,7 +623,7 @@ export function mergeProviders(
       models: models
         ? mergeModelEntries([...existing.models, ...models], options.preserveExplicitCapabilities === true)
         : existing.models,
-      custom: true,
+      custom,
     };
   }
   return merged;
