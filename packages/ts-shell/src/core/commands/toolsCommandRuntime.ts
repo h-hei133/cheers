@@ -11,6 +11,7 @@ import { loadCatalog } from '../models/catalogStore.js';
 import { resolveProviderCredential } from '../shell/providerCredentials.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../auth/account/target.js';
 import { resolveRequestShape } from '../models/requestShape.js';
+import { catalogProvider } from '../models/catalog.js';
 import { DEFAULT_ENDPOINT_KIND } from '../../provider/endpoints/index.js';
 
 export const toolsSyntax = entitySyntax("tools");
@@ -61,8 +62,14 @@ async function inspectTools(wanted: string | undefined, context: CommandContext)
   return { kind: "local", output: reportText(report), report };
 }
 
-/** The active model's endpoint and whether it accepts tool declarations. */
-function activeTarget(context: CommandContext): { readonly endpoint: string; readonly toolCalling: boolean } {
+/**
+ * The active model's endpoint and whether it accepts tool declarations.
+ *
+ * An endpoint two entries claim has no single answer, and an unreadable
+ * catalogue is not evidence that tools are withheld; both report as unknown
+ * rather than asserting either reading.
+ */
+function activeTarget(context: CommandContext): { readonly endpoint: string; readonly toolCalling: boolean | 'unknown' } {
   try {
     const publication = context.readConfiguration?.();
     const config = publication?.config ?? context.runtimeConfig ?? getRuntimeConfig(context.projectRoot ?? context.cwd);
@@ -72,11 +79,11 @@ function activeTarget(context: CommandContext): { readonly endpoint: string; rea
     const baseUrl = providerCredentialBaseUrl(catalog, active);
     return {
       endpoint: providerCredentialEndpoint(catalog, active, baseUrl) ?? DEFAULT_ENDPOINT_KIND,
-      // An unreadable catalogue is not evidence that tools are withheld.
-      toolCalling: resolveRequestShape(catalog, active.provider, active.model, undefined, baseUrl).toolCalling,
+      toolCalling: catalogProvider(catalog, active.provider, baseUrl).ambiguous ? 'unknown'
+        : resolveRequestShape(catalog, active.provider, active.model, undefined, baseUrl).toolCalling,
     };
   } catch {
-    return { endpoint: DEFAULT_ENDPOINT_KIND, toolCalling: true };
+    return { endpoint: DEFAULT_ENDPOINT_KIND, toolCalling: 'unknown' };
   }
 }
 

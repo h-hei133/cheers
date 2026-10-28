@@ -9964,3 +9964,9 @@ GitHub Actions读回完整队列：`600ec86d`、`69056452`、`d7c62186`、`5e9bf
 上一批的director工具能力守卫直接读取`resolveRequestShape`，却未先检查端点歧义。`catalogProvider`在多于一个alias声明同一地址时返回`ambiguous`，此时`catalogModel`找不到唯一条目，形状回退为`DEFAULT_REQUEST_SHAPE`（toolCalling:true），守卫因此放行一个发送路径根本无法寻址的模型。现守卫先以与`createProviderStep`相同的措辞拒绝歧义，再判断工具能力；拒绝仍发生在创建任何cycle或live owner之前。
 
 [director回归](../../packages/ts-shell/src/cli/director/runtime.test.ts)另构造两个规范化后同址的alias，断言命令返回"multiple entries for this endpoint"且`liveDirectors`未注册。反转撤销该检查后用例失败（命令返回`Director on`），源码逐字节恢复并核对SHA-256`0a037ff7`后9项通过。四静态门与heap1536MiB TS build`e990dc0b12bf`通过。
+
+## [2026-10-29] fix | `/tools`在歧义端点报告unknown
+
+上一批让`/tools`声明"模型不接收工具"后，同族检查发现`activeTarget`在目录歧义时仍直接读形状。`catalogProvider`报ambiguous时`catalogModel`找不到唯一条目，形状回退为capable，报告会断言这些工具会到达一个发送路径都无法寻址的模型。现三态：`false`声明不接收、`'unknown'`（歧义或目录不可读）声明无法确定、`true`才表示确认接收；报告与`facts`分别呈现，不把不确定写成capable。
+
+[report回归](../../packages/ts-shell/src/core/commands/tools/report.test.ts)比较capable/no-tools/unknown三份报告。默认参数保持`true`，既有调用方语义不变。单文件14项通过；四静态门与heap1536MiB TS build`9562fe1eadd7`通过。

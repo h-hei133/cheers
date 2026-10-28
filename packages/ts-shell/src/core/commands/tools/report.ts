@@ -34,8 +34,10 @@ export function toolsReport(
    * model. A model the catalogue marks as taking none receives an empty schema,
    * so a report headed "what the model can actually do this turn" has to say so
    * rather than let the reader infer it from a list the model never sees.
+   * Absent keeps the historical reading — capable — because a caller that says
+   * nothing is not reporting a limitation.
    */
-  toolCalling = true,
+  toolCalling: boolean | 'unknown' = true,
 ): CommandReport {
   const safe = (value: string, maxLength = 4096): string => metadataText(value, projectRoot, maxLength);
   const tools = [...pool.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -57,7 +59,8 @@ export function toolsReport(
       { label: 'Wire bytes', minWidth: 8, align: 'right' },
       { label: 'What it does', minWidth: 24 }],
     lines: [
-      ...(!toolCalling ? [{ kind: 'text' as const, spans: [span('The active model does not accept tool declarations, so none of these tools reach it. Select a tool-capable model to use them.', 'warning')] }] : []),
+      ...(toolCalling === false ? [{ kind: 'text' as const, spans: [span('The active model does not accept tool declarations, so none of these tools reach it. Select a tool-capable model to use them.', 'warning')] }]
+        : toolCalling === 'unknown' ? [{ kind: 'text' as const, spans: [span('Whether the active model accepts tool declarations could not be determined from the catalogue.', 'warning')] }] : []),
       ...shownTools.map((tool): ReportLine => ({ kind: 'columns', cells: [
         [span(safe(tool.name, 240), 'code')], [span(toolPlanMode(tool.name, tool))],
         [span(measurements.get(tool.name)!.descriptionBytes, 'number')],

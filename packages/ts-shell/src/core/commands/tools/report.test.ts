@@ -57,9 +57,11 @@ it('says the active model receives none of the listed tools when it takes no dec
   const pool = new Map([['read', tool('read', 'Read a file', { type: 'object' })]]);
   const capable = toolsReport(pool, '/fixture', 'openai-compatible', true);
   const noTools = toolsReport(pool, '/fixture', 'openai-compatible', false);
+  const undecided = toolsReport(pool, '/fixture', 'openai-compatible', 'unknown');
 
   expect(reportText(capable)).not.toContain('does not accept tool declarations');
   expect(reportText(noTools)).toContain('does not accept tool declarations, so none of these tools reach it');
+  expect(reportText(undecided)).toContain('could not be determined from the catalogue');
   expect(noTools.facts).toMatchObject({ toolCalling: false, total: 1, shown: 1 });
   expect(capable.facts.toolCalling).toBe(true);
   // The catalogue itself is still reported: the reader learns what exists.
