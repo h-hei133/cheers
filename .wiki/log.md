@@ -9942,3 +9942,7 @@ closure阶段两组最终反转分别移除preview完整目标比较、移除ste
 ## [2026-10-29] review | 压缩投影的尺度与既有边界
 
 继续核查`proseToolHistory`的尺度语义：工具调用参数被内联进文本，而压缩路径不经`microcompactMessages`（主回合路径会裁剪工具输出）。`scheduleSegments`的`estimateTokens`已按`call.function.arguments.length`计量，因此超预算会被分段或不可分组单元拒绝，不会静默超出；单条超大调用导致整次压缩被拒是结构模式与文本投影共享的既有语义，不是本批引入的回归。本轮不改：它需要同时调整分段粒度与拒绝提示，属于独立设计决定，不在请求形状一致性范围内。本轮只读，未运行新测试。
+
+## [2026-10-29] review | 研究入口的工具能力边界
+
+继续同族核查`/deep-research`：它在arm时构造`kind:'prompt'`并把`research_run`工具名写进turn prompt，不校验主模型是否接受工具声明。与director不同，research不承诺"模式已启用即可执行"；它明确输出"ordinary model, tool and permission gates apply"，且run自带`deadlineAt`，到期由`runtime`转为`paused`并附`Research cancelled or deadline reached.`，不会永久悬挂，也不虚报完成。因此本轮不在此处加守卫：把"模型可能中途切换"这一真实情形排除在arm之外会误伤合法用法。记录为已知边界，不升级为缺陷。本轮只读。
