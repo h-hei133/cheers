@@ -220,6 +220,7 @@ export function createCliSessionRuntime(input: {
     assertAdmission(admission);
     const identity = credentialIdentityFor(target.provider, { connectionId: resolved.credential?.connectionId,
       accountAuth: renewed.accountAuth ?? target.accountAuth, apiKey: target.apiKey });
+    const shape = resolveRequestShape(catalog, target.provider, target.model, undefined, target.baseUrl);
     return { provider: {
       headers: providerAuthorization({
         apiKey: target.apiKey,
@@ -229,8 +230,8 @@ export function createCliSessionRuntime(input: {
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
-      shape: resolveRequestShape(catalog, target.provider, target.model, undefined, target.baseUrl),
-      supportsTemperature: resolveRequestShape(catalog, target.provider, target.model, undefined, target.baseUrl).supportsTemperature,
+      shape,
+      supportsTemperature: shape.supportsTemperature,
       ...(target.endpoint ? { endpoint: target.endpoint } : {}),
       ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
     } };
