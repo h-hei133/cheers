@@ -10,6 +10,7 @@ import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import { loadCatalog } from '../models/catalogStore.js';
 import { resolveProviderCredential } from '../shell/providerCredentials.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../auth/account/target.js';
+import { resolveRequestShape } from '../models/requestShape.js';
 import { DEFAULT_ENDPOINT_KIND } from '../../provider/endpoints/index.js';
 
 export const toolsSyntax = entitySyntax("tools");
@@ -54,13 +55,14 @@ async function inspectTools(wanted: string | undefined, context: CommandContext)
     return { kind: "local", output: reportText(report), report };
   }
 
-  const endpoint = resolveEndpoint(context);
+  const target = activeTarget(context);
   context.signal?.throwIfAborted();
-  const report = toolsReport(registry, context.cwd, endpoint);
+  const report = toolsReport(registry, context.cwd, target.endpoint, target.toolCalling);
   return { kind: "local", output: reportText(report), report };
 }
 
-function resolveEndpoint(context: CommandContext): string {
+/** The active model's endpoint and whether it accepts tool declarations. */
+function activeTarget(context: CommandContext): { readonly endpoint: string; readonly toolCalling: boolean } {
   try {
     const publication = context.readConfiguration?.();
     const config = publication?.config ?? context.runtimeConfig ?? getRuntimeConfig(context.projectRoot ?? context.cwd);
@@ -68,9 +70,13 @@ function resolveEndpoint(context: CommandContext): string {
     const active = context.resolveConfigTarget?.(config, context.sessionId)
       ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
     const baseUrl = providerCredentialBaseUrl(catalog, active);
-    return providerCredentialEndpoint(catalog, active, baseUrl) ?? DEFAULT_ENDPOINT_KIND;
+    return {
+      endpoint: providerCredentialEndpoint(catalog, active, baseUrl) ?? DEFAULT_ENDPOINT_KIND,
+      // An unreadable catalogue is not evidence that tools are withheld.
+      toolCalling: resolveRequestShape(catalog, active.provider, active.model, undefined, baseUrl).toolCalling,
+    };
   } catch {
-    return DEFAULT_ENDPOINT_KIND;
+    return { endpoint: DEFAULT_ENDPOINT_KIND, toolCalling: true };
   }
 }
 

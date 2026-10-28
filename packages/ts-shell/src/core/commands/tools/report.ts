@@ -27,6 +27,15 @@ export function toolsReport(
   pool: ReadonlyMap<string, ToolDefinition>,
   projectRoot = process.cwd(),
   endpoint = 'openai-compatible',
+  /**
+   * Whether the active model accepts tool declarations at all.
+   *
+   * The pool is what the session can offer, and the request is what reaches the
+   * model. A model the catalogue marks as taking none receives an empty schema,
+   * so a report headed "what the model can actually do this turn" has to say so
+   * rather than let the reader infer it from a list the model never sees.
+   */
+  toolCalling = true,
 ): CommandReport {
   const safe = (value: string, maxLength = 4096): string => metadataText(value, projectRoot, maxLength);
   const tools = [...pool.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -48,6 +57,7 @@ export function toolsReport(
       { label: 'Wire bytes', minWidth: 8, align: 'right' },
       { label: 'What it does', minWidth: 24 }],
     lines: [
+      ...(!toolCalling ? [{ kind: 'text' as const, spans: [span('The active model does not accept tool declarations, so none of these tools reach it. Select a tool-capable model to use them.', 'warning')] }] : []),
       ...shownTools.map((tool): ReportLine => ({ kind: 'columns', cells: [
         [span(safe(tool.name, 240), 'code')], [span(toolPlanMode(tool.name, tool))],
         [span(measurements.get(tool.name)!.descriptionBytes, 'number')],
@@ -66,7 +76,7 @@ export function toolsReport(
       { kind: 'text', spans: [span(PERMISSIONS, 'warning')] },
     ],
     facts: { count: tools.length, total: tools.length, shown: shownTools.length, omitted,
-      coverage: omitted > 0 ? 'partial' : 'complete',
+      coverage: omitted > 0 ? 'partial' : 'complete', toolCalling,
       tools: shownTools.map(tool => ({ name: safe(tool.name, 240),
         description: safe(tool.description, TOOL_FACT_DESCRIPTION_CHARS), planMode: toolPlanMode(tool.name, tool) })), permission: 'not-evaluated',
       // Static wire cost only; a token count requires the model's tokenizer.

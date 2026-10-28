@@ -9946,3 +9946,11 @@ closure阶段两组最终反转分别移除preview完整目标比较、移除ste
 ## [2026-10-29] review | 研究入口的工具能力边界
 
 继续同族核查`/deep-research`：它在arm时构造`kind:'prompt'`并把`research_run`工具名写进turn prompt，不校验主模型是否接受工具声明。与director不同，research不承诺"模式已启用即可执行"；它明确输出"ordinary model, tool and permission gates apply"，且run自带`deadlineAt`，到期由`runtime`转为`paused`并附`Research cancelled or deadline reached.`，不会永久悬挂，也不虚报完成。因此本轮不在此处加守卫：把"模型可能中途切换"这一真实情形排除在arm之外会误伤合法用法。记录为已知边界，不升级为缺陷。本轮只读。
+
+## [2026-10-29] fix | `/tools`报告标明模型是否接收工具
+
+同族检查的最后一处：[`/tools`](../../packages/ts-shell/src/core/commands/toolsCommandRuntime.ts)的文档写着"what the model can actually do this turn"，但报告从完整注册表列出工具，不随`toolCalling`变化。对目录声明`tool_call:false`的模型，用户会看到一屏它永远收不到的工具，而这正是本轮其它入口刚修掉的同一类误导。
+
+现`toolsReport`接受可选`toolCalling`，为false时在报告首行声明"该模型不接受工具声明，这些工具不会到达它"，并在`facts`中记录该标志；目录本身仍完整列出，因为读者仍需要知道会话提供了什么。目录不可读时保守返回`true`，不声称无法建立的限制。入口用一次解析同时取得endpoint与形状，避免重复读取配置。
+
+[report回归](../../packages/ts-shell/src/core/commands/tools/report.test.ts)比较capable与no-tools两份报告：前者无该警告，后者含精确措辞且`facts.toolCalling === false`、目录仍为1项。撤销该行后4个副本各1项预期失败（含`.tmp`历史探针副本，不计验收），源码逐字节恢复并核对SHA-256`e3087a3f`后单文件14项通过；五静态门与heap1536MiB TS build`f430c8f802c7`通过。

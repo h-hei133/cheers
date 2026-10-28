@@ -50,6 +50,22 @@ it.each(['file', 'fi\x1b[31mle'])('scrubs decoded file URL controls before redac
   }
 });
 
+it('says the active model receives none of the listed tools when it takes no declarations', () => {
+  // The list is the session's pool; the request is what reaches the model. A
+  // report headed "what the model can actually do this turn" must not leave the
+  // reader to infer that the pool travels.
+  const pool = new Map([['read', tool('read', 'Read a file', { type: 'object' })]]);
+  const capable = toolsReport(pool, '/fixture', 'openai-compatible', true);
+  const noTools = toolsReport(pool, '/fixture', 'openai-compatible', false);
+
+  expect(reportText(capable)).not.toContain('does not accept tool declarations');
+  expect(reportText(noTools)).toContain('does not accept tool declarations, so none of these tools reach it');
+  expect(noTools.facts).toMatchObject({ toolCalling: false, total: 1, shown: 1 });
+  expect(capable.facts.toolCalling).toBe(true);
+  // The catalogue itself is still reported: the reader learns what exists.
+  expect(noTools.facts.tools).toHaveLength(1);
+});
+
 it('reports static description and schema bytes without claiming a token count', () => {
   const report = toolsReport(new Map([
     ['a', tool('a', 'first', { type: 'object' })],
