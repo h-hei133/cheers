@@ -72,6 +72,8 @@ const fixture = (options: {
   readonly toolCalling?: boolean;
   readonly credential?: boolean;
   readonly endpoint?: 'openai-responses';
+  /** Two extra aliases claiming the same endpoint, so the address is ambiguous. */
+  readonly ambiguous?: boolean;
 } = {}) => {
   const cwd = options.git ? (() => {
     const repository = gitFixture(true); repositories.push(repository); stubGitEnvironment(repository.home); return repository.root;
@@ -87,10 +89,20 @@ const fixture = (options: {
       model: 'fixture', baseUrl: 'https://fixture.invalid/v1', source: 'config', envVarName: 'FIXTURE' } } : {}) };
   const context = { cwd, projectRoot: cwd, session, skillOptions: { noSkills: true }, runtimeConfig: config,
     resolveConfigTarget: () => target } as unknown as ShellRuntimeContext;
-  Object.assign(context, { configuration: new ConfigState(config, configurationBinding(context), [{ id: 'openai', name: 'Fixture', baseUrl: target.baseUrl,
-    ...(options.endpoint ? { endpoint: options.endpoint } : {}),
-    models: [{ id: 'fixture', name: 'Fixture', vision: false,
-      ...(options.toolCalling !== undefined ? { toolCalling: options.toolCalling } : {}) }] }]) });
+  const base = target.baseUrl.replace(/\/+$/, '');
+  const providers = [
+    { id: 'openai', name: 'Fixture', baseUrl: target.baseUrl,
+      ...(options.endpoint ? { endpoint: options.endpoint } : {}),
+      models: [{ id: 'fixture', name: 'Fixture', vision: false,
+        ...(options.toolCalling !== undefined ? { toolCalling: options.toolCalling } : {}) }] },
+    ...(options.ambiguous ? [
+      { id: 'alias-a', name: 'Alias A', runtime: 'openai' as const, baseUrl: `${base}/`,
+        models: [{ id: 'fixture', name: 'Fixture', vision: false }] },
+      { id: 'alias-b', name: 'Alias B', runtime: 'openai' as const, baseUrl: `${base}//`,
+        models: [{ id: 'fixture', name: 'Fixture', vision: false }] },
+    ] : []),
+  ];
+  Object.assign(context, { configuration: new ConfigState(config, configurationBinding(context), providers) });
   if (options.git) installGitRuntime(context, manager, new ShellSessionRuntime({} as never), () => gitGate(cwd));
   context.preparePromptContext = async (prompt, signal) => {
     const prepared = await buildPromptWithFutureTurnInjections({ deps: {}, sessionId: session.id, prompt });
@@ -1030,6 +1042,14 @@ it('keeps another local command busy and rejects cancelled owned research dispat
     await expect(researchCommand(['question'], { cwd, projectRoot: cwd, sessionId: session.id, signal })).rejects.toMatchObject({ name: 'AbortError' });
   });
   expect(fs.readFileSync(layout.statePath)).toEqual(before); expect(host.getCurrentRunController()).toBeNull();
+});
+
+it('refuses to preview an endpoint two catalogue entries claim', async () => {
+  // Dispatch refuses an ambiguous address, and the shape lookup would fall back
+  // to a capable default there. A preview that cannot be sent must say so rather
+  // than describe a request the run will never build.
+  const { context, load } = fixture({ ambiguous: true });
+  await expect(load('question')).rejects.toThrow('multiple entries for this endpoint');
 });
 
 it('uses the closing request schema identity when no tool steps are allowed', async () => {

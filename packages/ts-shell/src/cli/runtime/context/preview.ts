@@ -31,6 +31,7 @@ import {
   TOOL_HISTORY_UNSUPPORTED_MESSAGE,
 } from '../../../turn/messages.js';
 import { resolveRequestShape } from '../../../core/models/requestShape.js';
+import { catalogProvider } from '../../../core/models/catalog.js';
 import { captureUsageAttribution } from '../../../observability/usage/identity.js';
 import { estimateWirePrompt } from '../../../context/request/wire.js';
 import { createCommandRegistry } from '../../../core/commands/registry.js';
@@ -150,6 +151,13 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   }
   if (resolution.thinkingEffort === undefined) sources.track(projectStatePath(cwd));
   const preference = captureThinkingPreference(cwd, resolution.thinkingEffort);
+  // A preview that cannot be sent is not a preview. The dispatch path refuses an
+  // endpoint two catalogue entries claim, and an ambiguous address also makes
+  // the shape fall back to a capable default, so estimating here would describe
+  // a request the run will never build.
+  if (catalogProvider(publication.catalog, resolution.provider, base).ambiguous) {
+    throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before sending.');
+  }
   const shape = resolveRequestShape(publication.catalog, resolution.provider, resolution.model, preference.thinkingEffort ?? undefined, base);
   if (!shape.toolCalling && hasToolHistory(messages)) throw new Error(TOOL_HISTORY_UNSUPPORTED_MESSAGE);
   const schemas = shape.toolCalling ? toolSchemas(prepared.currentTools()) : [];

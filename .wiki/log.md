@@ -9970,3 +9970,9 @@ GitHub Actions读回完整队列：`600ec86d`、`69056452`、`d7c62186`、`5e9bf
 上一批让`/tools`声明"模型不接收工具"后，同族检查发现`activeTarget`在目录歧义时仍直接读形状。`catalogProvider`报ambiguous时`catalogModel`找不到唯一条目，形状回退为capable，报告会断言这些工具会到达一个发送路径都无法寻址的模型。现三态：`false`声明不接收、`'unknown'`（歧义或目录不可读）声明无法确定、`true`才表示确认接收；报告与`facts`分别呈现，不把不确定写成capable。
 
 [report回归](../../packages/ts-shell/src/core/commands/tools/report.test.ts)比较capable/no-tools/unknown三份报告。默认参数保持`true`，既有调用方语义不变。单文件14项通过；四静态门与heap1536MiB TS build`9562fe1eadd7`通过。
+
+## [2026-10-29] fix | 预览先拒绝歧义端点
+
+继续沿"歧义会让形状回退为capable"这一线索检查[context preview](../../packages/ts-shell/src/cli/runtime/context/preview.ts)。dispatch在`createStepFunction`内以`The model catalogue has multiple entries for this endpoint`拒绝歧义，但preview没有对应检查：它会在歧义时按capable形状生成工具schema、提示与估算，描述一个运行永远不会构建的请求，违反ADD-08要求的预览与派发一致。
+
+现preview在解析形状前以与dispatch相同的措辞拒绝歧义，拒绝发生在任何预览对象发布前。[preview回归](../../packages/ts-shell/src/cli/runtime/context/preview.test.ts)新增`ambiguous`夹具（两个规范化后同址的alias），断言加载直接抛错；反转撤销检查后该用例失败、其余86项保持通过，源码逐字节恢复并核对SHA-256`fd4921f9`后重验。四静态门与heap1536MiB TS build`f9ca6c656785`通过。
