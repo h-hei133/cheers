@@ -9938,3 +9938,7 @@ closure阶段两组最终反转分别移除preview完整目标比较、移除ste
 对ADD-10/11/12做了一轮定向复核，逐项验证文档声明而非复述实现，未发现需要修补的新缺陷：完整功能slash仅在源offset=0开放（[proseRequest](../../packages/ts-shell/src/cli/interactive/completion/prose.ts)的`tokenFrom===0`分支）；`pathLike`只接受绝对、home、相对、Windows drive与UNC前缀，裸文件名不进入候选域，与文档一致；多skill按`source:filePath:name`去重且未知skill整次返回`unknownSkill`，超预算在[prepareComposition](../../packages/ts-shell/src/core/commands/composition/prepare.ts)整次拒绝；围栏关闭要求独立成行且长度不小于开启标记，行内代码按精确run配对；`needsComposition`与`composePrompt`的前置条件逐字一致，`routeSlashCommand`与context preview也使用同一`!first || first.composition`判定，因此预览与派发不会就"是否组合"产生分歧；research入口把全部skill与modifier带入同一turn prompt；brainstorm组合要求非空共享正文。异步候选结果在编辑器层凭snapshot应用，非本模块职责。
 
 本轮只读复核未运行新的产品测试；相关结论建立在既有批次证据与当前源码之上。ADD整体active，矩阵不变。
+
+## [2026-10-29] review | 压缩投影的尺度与既有边界
+
+继续核查`proseToolHistory`的尺度语义：工具调用参数被内联进文本，而压缩路径不经`microcompactMessages`（主回合路径会裁剪工具输出）。`scheduleSegments`的`estimateTokens`已按`call.function.arguments.length`计量，因此超预算会被分段或不可分组单元拒绝，不会静默超出；单条超大调用导致整次压缩被拒是结构模式与文本投影共享的既有语义，不是本批引入的回归。本轮不改：它需要同时调整分段粒度与拒绝提示，属于独立设计决定，不在请求形状一致性范围内。本轮只读，未运行新测试。
