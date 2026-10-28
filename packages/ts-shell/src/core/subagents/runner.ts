@@ -156,9 +156,19 @@ export async function runSubagent(
      */
     readonly beforeToolCall?: ToolHooks["beforeToolCall"];
     readonly afterToolCall?: ToolHooks["afterToolCall"];
+    /**
+     * Whether the selected model accepts tool declarations.
+     *
+     * The instruction names the tools this run may use; the request decides
+     * whether any reach the model. When the catalogue says none do, naming a
+     * tool set would describe a capability the model cannot exercise. Absent
+     * means capable, which is what every delegated run assumed before.
+     */
+    readonly acceptsTools?: boolean;
   },
 ): Promise<SubagentRunResult> {
-  const available = [...host.tools.keys()];
+  const acceptsTools = host.acceptsTools !== false;
+  const available = acceptsTools ? [...host.tools.keys()] : [];
   const allowed = subagentTools(input.definition, available);
   const maxSteps = subagentMaxSteps(input.definition, host.defaultMaxSteps);
   if (input.signal?.aborted || admissionRefused(input)) {

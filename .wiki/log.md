@@ -9904,3 +9904,13 @@ closure阶段两组最终反转分别移除preview完整目标比较、移除ste
 验证：单元回归连接真实`requestCompactionSummary`，对有工具能力与`toolCalling:false`两种形状比较实际序列化body；接线回归直接调用`buildCompactionWiring`、以不带shape的provider与`openai-compatible`端点观察真实本地HTTP body。两处聚焦反转（撤销投影、撤销接线shape）分别触发1项预期失败，源码逐字节恢复并核对SHA-256`4cd965f6`（summarize）/`6b673493`（wiring）后重验。主代理heap768MiB、单线程串行5个受影响文件84项通过；五静态门、module facade0及heap1536MiB TS build`6a412b60c9d6`通过。
 
 同轮只读审计另确认两条同类不一致但本批未改：子代理指令按宿主工具池列出可用工具，而请求体按模型形状裁剪，声明无工具能力的委派模型会得到自相矛盾的指令；handoff/director连续性提示假定存在todo与worker工具。前者涉及委派能力模型，后者经核实会在宿主缺少`todo`时显式拒绝启动，不构成实际非法请求，故记入后续批次而非本批扩面。本批未运行真实provider、PTY/exe、桌面/Windows或20k历史，原Phase20矩阵未重跑，ADD整体active。
+
+## [2026-10-29] fix | 委派指令遵守目标模型的工具能力
+
+第一百一十一批留下的一条同类不一致在本批收口：[子代理runner](../../packages/ts-shell/src/core/subagents/runner.ts)按宿主工具池列出"Tools available to you"，而[turn step](../../packages/ts-shell/src/turn/step.ts)按`ResolvedRequestShape.toolCalling`裁剪实际工具schema。对一个目录声明`tool_call:false`的委派模型，同一次请求因此自相矛盾：请求体不声明任何工具、系统提示说"没有工具可用"，而子代理指令仍点名一组它无法调用的工具。
+
+修复沿原owner进行：`SubagentHost`新增可选`acceptsTools(model)`，`runSubagent`在目标不接受工具时既不列出工具清单，也不把工具交给循环，指令退回"You have no tools"。[delegatedSteps](../../packages/ts-shell/src/cli/provider/step.ts)用与step相同的目录地址解析目标形状并导出`acceptsTools`，运行时装配把该函数接到`subagentHost`。absent仍表示capable，保持既有委派行为。
+
+验证：runner回归新增一条用例，定义要求`read`但宿主声明`acceptsTools:false`，断言指令不含工具清单且`allowedTools`为空；provider接线回归把`review-model`声明为`toolCalling:false`，断言`delegatedSteps.acceptsTools`区分两个模型、真实HTTP子请求体无`tools`、正文不含工具清单而含"no tools"。三处聚焦反转（runner抑制、宿主传值、delegated解析）分别触发1项预期失败；源码逐字节恢复并核对SHA-256`c421ba68`（runner）、`cf698968`（turn subagent）、`a46b7231`（provider step）后重验。
+
+主代理heap1024MiB单线程逐个文件串行执行runner13、turn subagent22、provider step11、turn step96、invocation25、subagent5、boundary14，共186项通过；五静态门、module facade0及heap1536MiB TS build`13360ae8cc35`通过。handoff/director连续性提示同样假定`todo`与worker工具，但handoff的control在宿主缺少`todo`时已显式拒绝启动，不构成非法请求，本批不改。本批未运行真实provider委派、PTY/exe、桌面/Windows或20k历史，原Phase20矩阵未重跑，ADD整体active。

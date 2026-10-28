@@ -134,6 +134,33 @@ it('dispatches a subagent using the effort saved in the role panel while the mai
   expect(server.received.map(body => [body.model, body.reasoning_effort])).toEqual([['review-model', 'medium'], ['primary-model', 'low']]);
 });
 
+it('does not advertise tools to a delegated model the catalogue says takes none', async () => {
+  const setup = createAdvisorHarness(false, false);
+  const server = await wire(setup);
+  const providerCatalog = server.request.providerCatalog!.map(provider => ({ ...provider,
+    models: provider.models.map(model => model.id === 'review-model' ? { ...model, toolCalling: false } : model) }));
+  const request = { ...server.request, providerCatalog };
+  const tools = new Map([['task', createTaskToolDefinition()]]);
+  const delegated = delegatedSteps(request, tools, {});
+  expect(delegated.acceptsTools('openai/review-model')).toBe(false);
+  expect(delegated.acceptsTools('openai/primary-model')).toBe(true);
+
+  await createSubagentRunner({ step: createProviderStep(request, new Map(), {}), stepForModel: delegated, defaultMaxSteps: 1,
+    acceptsTools: model => delegated.acceptsTools(model) },
+  tools, { sessionId: setup.session.id, workspaceRoot: setup.root, agentMode: 'build', permissionScope: 'ask',
+    hooks: new HookDispatcher(), emit: () => {} })(
+    { definition: { name: 'review', description: 'Inspect', systemPrompt: 'Inspect the role evidence', source: 'builtin', tools: ['read'],
+        model: 'openai/review-model' },
+      prompt: 'Check role', workspace: setup.root,
+      observeTool: async () => undefined });
+
+  const child = server.received.find(body => body.model === 'review-model');
+  expect(child).toBeDefined();
+  expect(child!.tools).toBeUndefined();
+  expect(JSON.stringify(child)).not.toContain('Tools available to you');
+  expect(JSON.stringify(child)).toContain('You have no tools');
+});
+
 it('ordinary main task dispatch consumes fresh role prompt, model and effort on actual HTTP and the same ledger without changing main effort', async () => {
   const setup = createAdvisorHarness(false, false); writeGoal(setup.manager, setup.session, readGoalEdit(setup.manager, setup.session), { type: 'set', objective: 'Ordinary roles' });
   fs.mkdirSync(path.join(setup.root, '.agents'));

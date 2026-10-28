@@ -244,6 +244,27 @@ describe("running a subagent", () => {
     expect(result.allowedTools).toEqual([]);
     expect(result.text).toContain("You have no tools");
   });
+
+  it("names no tools when the selected model cannot receive tool declarations", async () => {
+    // The request withholds every schema for such a model, so an instruction
+    // listing tools would describe a capability the same request denies. The
+    // definition still asks for one; only the model's own limit suppresses it.
+    const seen: string[] = [];
+    const capture = async (messages: readonly AgentMessage[]): Promise<AssistantStep> => {
+      seen.push(String(messages[0]?.content ?? ""));
+      return { text: "done", toolCalls: [], stopReason: "stop" };
+    };
+
+    const result = await runSubagent(
+      { definition: { name: "Explore", description: "d", systemPrompt: "You explore.", tools: ["read"], source: "builtin" },
+        prompt: "go", workspace: "/work/here" },
+      { tools: new Map([["read", tool("read", () => {})]]), step: capture, ...HOST_BASE, acceptsTools: false },
+    );
+
+    expect(seen[0]).not.toContain("Tools available to you");
+    expect(seen[0]).toContain("You have no tools");
+    expect(result.allowedTools).toEqual([]);
+  });
 });
 
 

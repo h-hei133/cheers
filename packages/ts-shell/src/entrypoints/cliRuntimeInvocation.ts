@@ -427,6 +427,7 @@ async function startTurn(
       defaultMaxSteps: SUBAGENT_DEFAULT_STEPS,
       stepForModel: (model, admission, effort, workspace) => forModel(model, admission, effort, undefined, workspace),
       prepareModel: (model, admission, effort, workspace, publication) => forModel.prepare(model, admission, effort, workspace, publication),
+      acceptsTools: model => forModel.acceptsTools(model),
       retry: { enabled: request.runtimeConfig?.retryEnabled, maxRetries: request.runtimeConfig?.retryMaxRetries,
         baseDelayMs: request.runtimeConfig?.retryBaseDelayMs, maxDelayMs: request.runtimeConfig?.retryMaxDelayMs },
     },

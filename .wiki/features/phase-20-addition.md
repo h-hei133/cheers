@@ -2244,3 +2244,13 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 主代理heap768MiB、单线程串行执行5个受影响文件84项通过；`verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`analyze:module-facades`（ceiling20、reported0）及heap1536MiB TS build`6a412b60c9d6`通过。同轮只读审计另指出两条同类不一致，本批明确不改：子代理指令按宿主工具池列出工具而请求体按模型形状裁剪，涉及委派能力模型；handoff/director连续性提示假定`todo`与worker工具存在，但handoff的control在宿主缺少`todo`时已显式拒绝启动，不构成实际非法请求。两者记入后续批次。
 
 本批未运行真实provider、PTY/exe、桌面/原生Windows或20k历史，未重跑原Phase20矩阵（仍为35 complete / 12 partial / 0 open），ADD整体active。一次被`.tmp/workspace-boundary/`副本放大的用例如实保留为反转证据，不计为验收：该目录中的测试副本由既有探针遗留，验收使用显式文件路径。
+
+### 第一百一十二批：委派指令与目标模型工具能力的一致性
+
+第一百一十一批记录的两条遗留观察中，子代理指令这条经复核构成真实缺陷：[子代理runner](../../packages/ts-shell/src/core/subagents/runner.ts)用宿主工具池生成"Tools available to you"，而[turn step](../../packages/ts-shell/src/turn/step.ts)按同一`ResolvedRequestShape`裁剪实际schema。对目录声明`tool_call:false`的委派模型，一次请求同时包含三件互相矛盾的事实：请求体无`tools`、系统提示说没有工具、子代理指令点名一组无法调用的工具。
+
+修复保持在原owner：[SubagentHost](../../packages/ts-shell/src/turn/subagent.ts)新增可选`acceptsTools(model)`；`runSubagent`在目标不接受工具时既不列出清单也不把工具交给循环，指令退回既有的"You have no tools"分支。[delegatedSteps](../../packages/ts-shell/src/cli/provider/step.ts)以与step相同的目录地址解析目标形状并导出`acceptsTools`，[运行时装配](../../packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts)把该函数接到`subagentHost`。`acceptsTools`缺失仍表示capable，未声明能力的既有委派行为不变。
+
+[runner回归](../../packages/ts-shell/src/core/subagents/runner.test.ts)新增用例：定义要求`read`、宿主声明`acceptsTools:false`，断言指令不含工具清单且`allowedTools`为空。[provider接线回归](../../packages/ts-shell/src/cli/provider/step.test.ts)把`review-model`标为`toolCalling:false`，断言`delegatedSteps.acceptsTools`对两个模型分别返回false/true、真实HTTP子请求体无`tools`、正文不含工具清单且包含"no tools"。三处聚焦反转分别撤销runner抑制、宿主传值与delegated解析，各触发1项预期失败；源码逐字节恢复并核对SHA-256`c421ba68`（runner）、`cf698968`（turn subagent）、`a46b7231`（provider step）后重验。
+
+主代理heap1024MiB、单线程逐文件串行执行runner13、turn subagent22、provider step11、turn step96、invocation25、subagent5、boundary14，共186项通过；五静态门、module facade0及heap1536MiB TS build`13360ae8cc35`通过。handoff/director连续性提示同样假定`todo`与worker工具，但handoff的control在宿主缺少`todo`时显式拒绝启动，因此不构成实际非法请求，本批不改。未运行真实provider委派、PTY/exe、桌面/原生Windows或20k历史，原Phase20矩阵未重跑（35 complete / 12 partial / 0 open），ADD整体active。

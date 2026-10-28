@@ -13,6 +13,16 @@ export interface SubagentHost {
   readonly retry?: AgentLoopConfig['retry'];
   readonly defaultModel?: SessionModelRole;
   readonly modelRoles?: Readonly<Record<string, SessionModelRole | undefined>>;
+  /**
+   * Whether the target model accepts tool declarations at all.
+   *
+   * The instruction names the tools the subagent may use, and the request is
+   * what decides whether any reach the model. A model the catalogue marks as
+   * taking none would otherwise be told about tools it can never call. Absent
+   * means capable, which is what every delegating run assumed before the
+   * catalogue could say otherwise.
+   */
+  readonly acceptsTools?: (model: string | SessionModelRole | undefined) => boolean;
   readonly stepForModel?: (model: string | SessionModelRole, admission?: () => string | undefined, effort?: import('../core/models/effort.js').ThinkingPreference, workspace?: string) => StepFunction | Promise<StepFunction>;
   readonly prepareModel?: (model: string | SessionModelRole, admission?: () => string | undefined, effort?: import('../core/models/effort.js').ThinkingPreference, workspace?: string,
     publication?: SubagentPreparation['accountPublication']) => Promise<void>;
@@ -65,6 +75,7 @@ export function createSubagentRunner(
     const result = await runSubagent(input, {
       tools: new Map(adaptTools(tools, gate).map((tool) => [tool.name, tool])),
       step: (messages, signal, options) => step(messages, signal, {}, { ...options, agentMode }),
+      ...(host.acceptsTools ? { acceptsTools: host.acceptsTools(model) } : {}),
       beforeToolCall: hooks.beforeToolCall,
       afterToolCall: hooks.afterToolCall,
       defaultMaxSteps: host.defaultMaxSteps,

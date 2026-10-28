@@ -23,6 +23,7 @@ import type { SessionModelRole } from '../../session/model/contract.js';
 import { assertAdmission } from '../../core/network/admission.js';
 import { delegatedRenewal, type AccountRotation, type AccountPublication } from './renewal.js';
 import { sessionUsageSink } from '../../session/store/usage.js';
+import { resolveRequestShape } from '../../core/models/requestShape.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
 import { configuredOutputLimit } from '../../provider/request/output.js';
 import { providerRequestTarget } from './requestTarget.js';
@@ -142,7 +143,7 @@ export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<str
   const catalog = request.providerCatalog ?? loadCatalog();
   const select = (model: string | SessionModelRole, admission?: () => string | undefined, effort?: ThinkingPreference, providerScope?: 'current', workspace = request.workspaceRoot) => {
     if (request.providerMode === 'synthetic') {
-      if (!model && effort === undefined && syntheticDefault) return { step: syntheticDefault, prepare: async () => {} };
+      if (!model && effort === undefined && syntheticDefault) return { step: syntheticDefault, prepare: async () => {}, acceptsTools: true };
       throw new Error('Independent model review is unavailable in synthetic provider mode.');
     }
     const main = request.providerCredentialResolution;
@@ -169,9 +170,15 @@ export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<str
       }
     };
     const step: StepFunction = async (...args) => { args[1]?.throwIfAborted(); await prepare(); args[1]?.throwIfAborted(); return active(...args); };
-    return { step, prepare };
+    // The same catalogue address the step itself resolves, so a delegated
+    // instruction cannot claim tools the target model is declared not to take.
+    const address = providerCredentialBaseUrl(catalog, resolution);
+    const acceptsTools = resolveRequestShape(catalog, resolution.provider, resolution.model, undefined,
+      address ?? undefined).toolCalling;
+    return { step, prepare, acceptsTools };
   };
   return Object.assign((...args: Parameters<typeof select>): StepFunction => select(...args).step,
     { prepare: async (model: string | SessionModelRole, admission?: () => string | undefined, effort?: ThinkingPreference,
-      workspace?: string, publication?: AccountPublication): Promise<void> => { await select(model, admission, effort, undefined, workspace).prepare(publication); } });
+      workspace?: string, publication?: AccountPublication): Promise<void> => { await select(model, admission, effort, undefined, workspace).prepare(publication); },
+      acceptsTools: (model: string | SessionModelRole | undefined): boolean => select(model ?? '').acceptsTools });
 }
