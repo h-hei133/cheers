@@ -9926,3 +9926,9 @@ closure阶段两组最终反转分别移除preview完整目标比较、移除ste
 ## [2026-10-29] fix | 摘要重播身份包含有效请求形状
 
 第一百一十一批把请求形状接入摘要发送与预检，但fallback路径的`summaryIdentity`仍只哈希`provider`与`summaryLimits`。形状变化通常伴随模型变化（已包含在provider身份里），因此当前不产生可复现的重放错误；但它意味着"同一模型、形状不同"的两次捕获会得到相同身份，属于不完整绑定。现身份哈希改用含shape的`effectiveLimits`，与预检和发送读取同一对象。聚焦31项通过；本批未新增反转，因为该改动只收窄身份，不改变可观察的发送行为。
+
+## [2026-10-29] fix | 模型详情展示工具调用能力
+
+同轮检查发现[模型元数据详情](../../packages/ts-shell/src/cli/interactive/picker/model/metadata.ts)展示Images、Reasoning、Effort与价格，却不显示模型是否接受工具。上一批的`toolCalling`语义因此只存在于请求与守卫里，用户在选择模型时看不到"这个模型不能读、改、执行"这一事实。现详情新增`Tool calls: supported/unsupported/unverified`，undecided保持unverified，与请求读取同一字段。
+
+[metadata回归](../../packages/ts-shell/src/cli/interactive/picker/model/metadata.test.ts)新增显式`toolCalling:false`模型并断言unsupported，另在既有relay/unknown用例中断言unverified。撤销该行后3项预期失败；源码逐字节恢复并核对SHA-256`59e381ea`后重验，metadata9与picker43共52项通过。heap1536MiB TS build`b91820512360`后本批重建通过。未运行真实provider、PTY/exe、桌面或20k历史。

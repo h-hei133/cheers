@@ -20,6 +20,7 @@ beforeEach(() => {
       { id: 'shared', contextWindow: 32000, inputLimit: 24000, maxTokens: 4096, vision: false, reasoning: true,
         thinkingLevelMap: { high: null }, cost: { promptPerMTok: 0, completionPerMTok: 2, cacheReadPerMTok: 0 } },
       { id: 'unknown' },
+      { id: 'no-tools', toolCalling: false },
     ] },
   ]);
   sessionId = new SessionManager().createNew(root).id;
@@ -39,6 +40,7 @@ it('shows an unconfigured relay model using its exact metadata rather than the s
   expect(details).toContain('Input limit: 24000 tokens');
   expect(details).toContain('Max output: 4096 tokens');
   expect(details).toContain('Images: unsupported');
+  expect(details).toContain('Tool calls: unverified');
   expect(details).toContain('Reasoning settings: supported');
   expect(details).toContain('Effort levels: low supported · medium supported · high unsupported');
   expect(details).toContain('Price per 1M tokens: input 0 · output 2 · cache read 0');
@@ -48,8 +50,19 @@ it('keeps absent capabilities unverified and does not invent free pricing or a c
   const picker = modelPicker(context()); await picker.load();
   const details = picker.detail!(target('unknown'));
   expect(details).toContain('Images: unverified'); expect(details).toContain('Reasoning settings: unverified');
+  expect(details).toContain('Tool calls: unverified');
   expect(details).toContain('Effort levels: low unverified · medium unverified · high unverified');
   expect(details.join('\n')).not.toMatch(/Context:|Input limit:|Max output:|Price per/);
+});
+
+it('states that a model declaring no tool support is unsupported rather than unverified', async () => {
+  // The detail line is the only place the picker can say what the session will
+  // lose: a model marked tool_call:false receives no tool declarations, so the
+  // run cannot read, edit or act even though the row stays selectable.
+  const picker = modelPicker(context()); await picker.load();
+  const details = picker.detail!(target('no-tools'));
+  expect(details).toContain('Tool calls: unsupported');
+  expect(details).not.toContain('Tool calls: unverified');
 });
 
 it('retains a listed custom model declaration when its request address is not configured yet', async () => {

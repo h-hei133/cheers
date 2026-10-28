@@ -20,6 +20,10 @@ export function modelMetadataDetails(catalog: readonly CatalogProvider[], provid
     ...(metadata?.inputLimit ? [`Input limit: ${metadata.inputLimit} tokens`] : []),
     ...(metadata?.maxTokens ? [`Max output: ${metadata.maxTokens} tokens`] : []),
     `Images: ${metadata?.vision === true ? 'supported' : metadata?.vision === false ? 'unsupported' : 'unverified'}`,
+    // Undeclared means capable, the same reading every request uses. Saying so
+    // matters because a model that takes no tools changes what the session can
+    // do, not just how a request is shaped.
+    `Tool calls: ${metadata?.toolCalling === false ? 'unsupported' : metadata?.toolCalling === true ? 'supported' : 'unverified'}`,
     `Reasoning settings: ${reasoning}`,
     `Effort levels: ${levels.map(([level, status]) => `${level} ${status}`).join(' · ')}`,
     ...(metadata?.cost ? [`Price per 1M tokens: input ${metadata.cost.promptPerMTok} · output ${metadata.cost.completionPerMTok}`
