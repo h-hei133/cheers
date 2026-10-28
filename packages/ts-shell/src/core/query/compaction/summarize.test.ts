@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { prepareCompactionMessages, requestCompactionSummary } from "./summarize.js";
 import { parseFileFootprintXml } from "./fileFootprint.js";
+import { DEFAULT_REQUEST_SHAPE } from '../../models/requestShape.js';
 import { ModelAdmissionError } from '../../agent/request/model.js';
 import { SummaryAdmissionError } from '../../../session/compaction/contract.js';
 import { promptTokensFor } from '../../../context/request/budget.js';
@@ -125,6 +126,38 @@ describe("requestCompactionSummary", () => {
     });
     expect(checkpoint).not.toContain("<read-files>");
     expect(checkpoint).not.toContain("<modified-files>");
+  });
+
+  it("writes tool activity as prose for a model that takes no tool messages", async () => {
+    // A catalogue model with `tool_call: false` cannot parse `tool_calls` or a
+    // `tool` role at all. The checkpoint still has to record what ran, so the
+    // same conversation travels as text rather than as a shape the endpoint
+    // rejects. Capable models keep the structural form.
+    const bodies: string[] = [];
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      bodies.push(String(init?.body ?? ""));
+      return { ok: true, json: async () => ({ choices: [{ message: { content: "a summary" } }] }) } as unknown as Response;
+    }) as unknown as typeof fetch;
+    const conversation = [
+      { role: "user" as const, content: "read the file" },
+      { role: "assistant" as const, content: "", tool_calls: [{ id: "call-src-a", type: "function" as const,
+        function: { name: "read", arguments: JSON.stringify({ path: "src/a.ts" }) } }] },
+      { role: "tool" as const, tool_call_id: "call-src-a", content: "file contents" },
+    ];
+
+    await requestCompactionSummary({ provider: { baseUrl: "https://provider.test/v1", headers: {}, model: "m" },
+      fetchImpl, messages: conversation });
+    await requestCompactionSummary({ provider: { baseUrl: "https://provider.test/v1", headers: {}, model: "m",
+      shape: { ...DEFAULT_REQUEST_SHAPE, toolCalling: false } }, fetchImpl, messages: conversation });
+
+    const [capable, noTools] = bodies.map(body => JSON.parse(body) as { messages: Array<Record<string, unknown>> });
+    expect(capable!.messages.some(message => message.tool_calls !== undefined)).toBe(true);
+    expect(capable!.messages.some(message => message.role === "tool")).toBe(true);
+    expect(noTools!.messages.some(message => message.tool_calls !== undefined || message.role === "tool")).toBe(false);
+    const prose = JSON.stringify(noTools!.messages);
+    expect(prose).toContain("[tool call call-src-a] read");
+    expect(prose).toContain("[tool result call-src-a]");
+    expect(prose).toContain("file contents");
   });
 
   it("carries the temperature the protocol gates on, when the caller sets one", async () => {

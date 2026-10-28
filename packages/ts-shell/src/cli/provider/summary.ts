@@ -26,7 +26,7 @@ export function captureSummaryRole(input: {
   readonly workspaceRoot?: string;
   readonly admission?: Admission;
   readonly onCredentialPersisted?: () => void;
-}): { readonly identity: string; readonly limits: Pick<CompactionProvider, 'contextWindow' | 'inputLimit' | 'maxOutputTokens' | 'reserveTokens'>;
+}): { readonly identity: string; readonly limits: Pick<CompactionProvider, 'contextWindow' | 'inputLimit' | 'maxOutputTokens' | 'reserveTokens' | 'shape'>;
   readonly resolve: () => Promise<CompactionProvider> } | undefined {
   const role = input.config.sessionModelRoles?.summary;
   if (!role) return undefined;
@@ -68,7 +68,7 @@ export function captureSummaryRole(input: {
       shape, contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens,
     };
   };
-  return { identity, limits: { contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens }, resolve: () => {
+  return { identity, limits: { contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens, shape }, resolve: () => {
     assertAdmission(input.admission);
     // History and turn-prefix steps share one captured credential renewal.
     return pending ??= renew();

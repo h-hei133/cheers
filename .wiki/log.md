@@ -9894,3 +9894,13 @@ dispatch与preview现从同一resolved shape决定effective schemas、`allowTool
 closure阶段两组最终反转分别移除preview完整目标比较、移除step的wire-history/count/replay identity，均触发1项预期失败；未计skip为通过，源码逐字节恢复后preview SHA-256`1a1c6942`、step`81e52d01`。主代理heap768MiB、2 worker单进程串行18文件500项通过；`test:scripts`175项、五静态门、module facade0及diff通过。heap1536MiB fresh TS build`512adc9920fc`通过，inputs`075c3ed4a840`、artifact`19bde0f1847a`，fresh build后5个受影响compiled CLI文件7项通过。
 
 误启动的broad suite不计为验收：旧build下5文件/7项按freshness拒绝，另有1个worker OOM。前一HEAD`9f10edbe`CI`40628156612`及Watch`40628156518`均success；本批commit/push/CI另绑定。未运行真实provider/models.dev刷新、PTY/exe、桌面/Windows或20k历史，原Phase20矩阵未重跑且仍为35/12/0，ADD整体active。
+
+## [2026-10-29] fix | 摘要请求遵守模型工具形状
+
+第一百一十一批沿同一`ResolvedRequestShape`继续收口。上一批让主回合与preview按`toolCalling:false`裁剪工具，但压缩摘要请求仍原样转发`tool_calls`/`tool_call_id`：[摘要消息owner](../../packages/ts-shell/src/core/query/compaction/summarize.ts)的契约注释写着工具活动应以文本进入摘要，实现却把结构透传。结果是先在有工具能力的模型上跑过工具、再切到目录声明`tool_call:false`的模型后，主回合会以`TOOL_HISTORY_UNSUPPORTED_MESSAGE`拒绝，而`/compact`、`/back`的abandoned-turn摘要和阈值压缩仍把该模型无法解析的形状发到端点。
+
+现摘要消息构造按有效形状分流：有工具能力的模型保持原结构，使摘要器读到实际执行内容；`toolCalling:false`时同一对话以`[tool call <id>] name args`与`[tool result <id>]`文本投影，连续user语句合并，因为结构消失后原先由call/result配对支撑的独立轮次不再需要。纯文本预检与实际发送共用同一份投影，预算因此计入真实发送字节。接线侧[compaction wiring](../../packages/ts-shell/src/cli/runtime/compaction.ts)接受调用方已解析的shape（delegated/job路径原本只传provider，不带shape），缺失时从同一目录与地址解析；summary role的limits一并携带其自身shape。
+
+验证：单元回归连接真实`requestCompactionSummary`，对有工具能力与`toolCalling:false`两种形状比较实际序列化body；接线回归直接调用`buildCompactionWiring`、以不带shape的provider与`openai-compatible`端点观察真实本地HTTP body。两处聚焦反转（撤销投影、撤销接线shape）分别触发1项预期失败，源码逐字节恢复并核对SHA-256`4cd965f6`（summarize）/`6b673493`（wiring）后重验。主代理heap768MiB、单线程串行5个受影响文件84项通过；五静态门、module facade0及heap1536MiB TS build`6a412b60c9d6`通过。
+
+同轮只读审计另确认两条同类不一致但本批未改：子代理指令按宿主工具池列出可用工具，而请求体按模型形状裁剪，声明无工具能力的委派模型会得到自相矛盾的指令；handoff/director连续性提示假定存在todo与worker工具。前者涉及委派能力模型，后者经核实会在宿主缺少`todo`时显式拒绝启动，不构成实际非法请求，故记入后续批次而非本批扩面。本批未运行真实provider、PTY/exe、桌面/Windows或20k历史，原Phase20矩阵未重跑，ADD整体active。

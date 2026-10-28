@@ -2232,3 +2232,15 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 主代理以heap768MiB、2 worker单进程串行运行18个受影响文件500项全部通过；`test:scripts`175项、五静态门、module facade0及`git diff --check`通过，118既有docs-source advisory保留。heap1536MiB fresh TS build为`512adc9920fc1d5c977a38ce42e83f273415d1f063cc98c86fc3ca0793ab9c17`，inputs `075c3ed4a840d4636a493263f872441d8db72450354adce5b040dfc9a5674f1e`，artifact `19bde0f1847a1b3c17a8f51bd6693d39301e2cd3a850cacdc17b86098092b550`；fresh build后5个受影响compiled CLI文件7项通过。
 
 一次误用的broad suite不计为本批验收：旧build下5个compiled CLI文件/7项按freshness拒绝，另有1个worker OOM。前一HEAD`9f10edbe`CI`40628156612`及Watch`40628156518`均success；本批提交/推送/精确CI另绑定。未运行真实provider或真实models.dev刷新，也未取得PTY/exe、桌面/原生Windows、磁盘故障或20k历史证据；原Phase20矩阵未重跑，仍为35 complete / 12 partial / 0 open，ADD整体active。
+
+### 第一百一十一批：摘要请求与非工具模型的形状一致性
+
+第一百一十批让主回合与context preview从同一`ResolvedRequestShape`决定工具schema、系统提示、收尾消息与预算，显式`tool_call:false`模型不再收到工具形状。后续只读审计与主代理独立核查确认，第三条请求生产路径没有跟上：[压缩摘要消息owner](../../packages/ts-shell/src/core/query/compaction/summarize.ts)的`CompactionChatMessage`契约写着"工具调用以文本呈现"，而[压缩接线](../../packages/ts-shell/src/cli/runtime/compaction.ts)的`toCompactionMessages`把结构化`tool_calls`与`tool_call_id`原样转发。该形状只在有工具能力的模型上被端点接受；对目录声明无工具能力的模型，主回合会以`TOOL_HISTORY_UNSUPPORTED_MESSAGE`拒绝，而`/compact`、`/back`的abandoned-turn摘要与阈值压缩仍会把它发出去，且不带`tools`声明，形成自相矛盾的请求。
+
+修复沿原owner进行，不新增第二套投影：`prepareCompactionMessages`按`provider.shape.toolCalling === false`选择历史形态；有工具能力时保持结构，使摘要器读到实际执行内容；无工具能力时把同一对话写成`[tool call <id>] name args`与`[tool result <id>]`文本，合并连续user语句（结构消失后原先由call/result配对支撑的独立轮次不再必要）。纯文本预检与实际发送共用这份投影，预算因此计入真实发送字节。[compaction wiring](../../packages/ts-shell/src/cli/runtime/compaction.ts)的provider合同新增可选`shape`，delegated/job路径本来只传provider、不带shape，现由接线侧从同一目录与地址解析；summary role的limits携带其自身shape，预检与发送因此不会各说各话。
+
+[单元回归](../../packages/ts-shell/src/core/query/compaction/summarize.test.ts)连接真实`requestCompactionSummary`，对capable与`toolCalling:false`两种形状比较实际序列化body：前者保留`tool_calls`与`tool` role，后者两者均不出现且包含投影文本。[接线回归](../../packages/ts-shell/src/cli/runtime/compaction.test.ts)直接调用`buildCompactionWiring`，以不带shape的provider与`openai-compatible`端点观察真实本地HTTP body，断言`/chat/completions`路径与无工具结构。两处聚焦反转（撤销`proseToolHistory`选择、撤销接线shape传递）分别触发1项预期失败，其余用例保持通过；源码逐字节恢复并核对SHA-256`4cd965f6`（summarize）与`6b673493`（wiring）后重验。
+
+主代理heap768MiB、单线程串行执行5个受影响文件84项通过；`verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`analyze:module-facades`（ceiling20、reported0）及heap1536MiB TS build`6a412b60c9d6`通过。同轮只读审计另指出两条同类不一致，本批明确不改：子代理指令按宿主工具池列出工具而请求体按模型形状裁剪，涉及委派能力模型；handoff/director连续性提示假定`todo`与worker工具存在，但handoff的control在宿主缺少`todo`时已显式拒绝启动，不构成实际非法请求。两者记入后续批次。
+
+本批未运行真实provider、PTY/exe、桌面/原生Windows或20k历史，未重跑原Phase20矩阵（仍为35 complete / 12 partial / 0 open），ADD整体active。一次被`.tmp/workspace-boundary/`副本放大的用例如实保留为反转证据，不计为验收：该目录中的测试副本由既有探针遗留，验收使用显式文件路径。

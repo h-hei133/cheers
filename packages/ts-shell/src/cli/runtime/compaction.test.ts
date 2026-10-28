@@ -8,6 +8,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createCliSessionRuntime } from "./cliSessionRuntimeFactory.js";
+import { buildCompactionWiring } from "./compaction.js";
 import { runBtwCommand } from "../../core/commands/btwCommandRuntime.js";
 import { declareEndpoint, endpointShape } from "../../provider/endpoints/index.js";
 import type { SessionRuntimeDependencies } from "../../core/shell/sessionRuntime.js";
@@ -25,6 +26,8 @@ const fixture = vi.hoisted(() => ({
   invocation: undefined as CliRuntimeInvocationInput | undefined,
   configuration: undefined as ConfigState | undefined,
   resolution: {} as Record<string, unknown>,
+  toolCalling: undefined as boolean | undefined,
+  endpoint: "test-signed-summary",
   config: { providerConnectTimeoutMs: 1000, providerHeadersTimeoutMs: 1000, providerBodyTimeoutMs: 1000, offline: true },
 }));
 vi.mock("../../config/runtimeConfig.js", async importOriginal => ({ ...await importOriginal<typeof import('../../config/runtimeConfig.js')>(), getRuntimeConfig: () => fixture.config }));
@@ -33,8 +36,9 @@ vi.mock("./goal.js", () => ({ prepareGoalSession: () => undefined, goalObjective
 vi.mock('./goalScheduling.js', () => ({ installGoalScheduler: () => undefined }));
 vi.mock("../../core/shell/providerCredentials.js", () => ({ resolveProviderCredential: () => fixture.resolution }));
 vi.mock("../../core/models/catalogStore.js", () => ({ loadCatalog: () => [{
-  id: "fixture", endpoint: "test-signed-summary", models: [{ id: "fixture-model", contextWindow: 10000,
+  id: "fixture", endpoint: fixture.endpoint, models: [{ id: "fixture-model", contextWindow: 10000,
     promptCache: { short: 300 }, cost: { promptPerMTok: 10, cacheReadPerMTok: 1, completionPerMTok: 1 },
+    ...(fixture.toolCalling === undefined ? {} : { toolCalling: fixture.toolCalling }),
   }],
 }] }));
 vi.mock("../../turn/cacheWarm.js", () => ({ createCacheWarmingRunner: vi.fn(() => ({ stop: vi.fn() })) }));
@@ -71,6 +75,8 @@ beforeEach(async () => {
   signed = [];
   received = [];
   fixture.compaction = undefined;
+  fixture.toolCalling = undefined;
+  fixture.endpoint = "test-signed-summary";
   fixture.config.offline = true;
   vi.mocked(createCacheWarmingRunner).mockClear();
   declareEndpoint("test-signed-summary", {
@@ -153,6 +159,35 @@ it.each([true, false])("signs automatic history and prefix summaries (apiKey=%s)
   await fixture.compaction!.summarizeTurnPrefix!([], new AbortController().signal);
   expect(signed).toHaveLength(2);
   expect(received.map(request => request.signature)).toEqual(["signed-1", "signed-2"]);
+});
+
+it("writes the fallback summary's tool history as prose for a model that takes none", async () => {
+  // A delegated or job run passes a provider that names no request shape. The
+  // wiring site is what must resolve it, or the preflight and the send would
+  // disagree about whether tool messages may travel. The default protocol is
+  // used because it writes tool structure verbatim.
+  fixture.toolCalling = false;
+  const wiring = buildCompactionWiring({
+    provider: { headers: {}, baseUrl, model: "fixture-model", providerId: "fixture", endpoint: "openai-compatible" },
+    runtimeConfig: structuredClone({ ...fixture.config, configProvenance: {}, configValidation: { valid: true, securityBlocked: false },
+      configDiagnostics: [] }) as never,
+    sessionId: "signed-summary", catalog: loadCatalog(),
+  });
+  const messages = [
+    { role: "user" as const, content: "read the file" },
+    { role: "assistant" as const, content: "", tool_calls: [{ id: "call-1", type: "function" as const,
+      function: { name: "read", arguments: JSON.stringify({ path: "src/a.ts" }) } }] },
+    { role: "tool" as const, tool_call_id: "call-1", content: "file contents" },
+  ];
+  await wiring.summarize({ messages, signal: new AbortController().signal } as never);
+
+  const serialized = JSON.stringify(received[0]!.body);
+  expect(received[0]!.path).toBe("/chat/completions");
+  expect(serialized).not.toContain('"tool_calls"');
+  expect(serialized).not.toContain('"role":"tool"');
+  expect(serialized).toContain("[tool call call-1] read");
+  expect(serialized).toContain("[tool result call-1]");
+  expect(serialized).toContain("file contents");
 });
 
 it("declines a compaction measurement without the complete prompt identity", () => {

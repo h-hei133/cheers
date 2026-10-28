@@ -72,10 +72,10 @@ export interface CompactionProvider {
 /**
  * A message the summarizer sends.
  *
- * Text only: a summary request carries the conversation's prose, and a tool call
- * would arrive at the endpoint as a call with no result to pair it with, which
- * the stricter endpoint rejects outright. The tool calls a conversation contains
- * are represented in the text the summarizer is given instead.
+ * Tool activity stays structural for a model that accepts tool messages, so the
+ * summarizer reads what ran and what came back. A model the catalogue marks as
+ * taking none cannot receive that form at all, so the same activity is written
+ * out as text instead; see `proseToolHistory`.
  */
 export interface CompactionChatMessage {
   readonly tool_calls?: readonly import('../../../turn/prompt.js').ChatToolCall[];
@@ -145,7 +145,7 @@ export interface CompactionRequest {
 
 /** Pure preflight uses the same complete messages as the eventual summary send. */
 export function prepareCompactionMessages(request: Pick<CompactionRequest, 'messages' | 'previousSummary' | 'instructions' | 'prompt' | 'maxOutputTokens'> & {
-  readonly provider: Pick<CompactionProvider, 'contextWindow' | 'inputLimit' | 'maxOutputTokens' | 'reserveTokens'>;
+  readonly provider: Pick<CompactionProvider, 'contextWindow' | 'inputLimit' | 'maxOutputTokens' | 'reserveTokens' | 'shape'>;
 }): readonly CompactionChatMessage[] {
   const previousSummary = request.previousSummary?.trim();
   // Revising a checkpoint and summarizing from scratch are different questions,
@@ -155,9 +155,11 @@ export function prepareCompactionMessages(request: Pick<CompactionRequest, 'mess
   const prompt = request.instructions?.trim()
     ? `${base}\n\nThe user asked the summary to focus on: ${request.instructions.trim()}`
     : base;
+  const history = request.provider.shape?.toolCalling === false
+    ? proseToolHistory(request.messages) : request.messages;
   const messages = [
     ...(previousSummary ? [{ role: 'user' as const, content: `<previous-summary>\n${previousSummary}\n</previous-summary>` }] : []),
-    ...request.messages, { role: 'user' as const, content: prompt },
+    ...history, { role: 'user' as const, content: prompt },
   ];
   const maxOutputTokens = request.provider.maxOutputTokens ?? request.maxOutputTokens;
   if (request.provider.contextWindow !== undefined || request.provider.inputLimit !== undefined) {
@@ -167,6 +169,39 @@ export function prepareCompactionMessages(request: Pick<CompactionRequest, 'mess
     if (budget.ok === false && budget.reason !== 'unknown') throw new SummaryAdmissionError(`Summary request refused: ${budget.detail}`);
   }
   return messages;
+}
+
+/**
+ * The same conversation with tool activity written out as prose.
+ *
+ * A model the catalogue marks as taking no tool messages still has to read what
+ * ran and what came back, or the checkpoint loses the very work it condenses.
+ * Writing the call and its result as text is what the summary prompt already
+ * asks for, and it is the only form such a model accepts. Consecutive user
+ * statements are merged because the call/result pairing that justified separate
+ * turns no longer exists once the structure is gone.
+ */
+function proseToolHistory(messages: readonly CompactionChatMessage[]): CompactionChatMessage[] {
+  const projected: CompactionChatMessage[] = [];
+  const appendUser = (content: string): void => {
+    const previous = projected[projected.length - 1];
+    if (previous?.role === 'user') projected[projected.length - 1] = { role: 'user', content: [previous.content, content].filter(Boolean).join('\n\n') };
+    else projected.push({ role: 'user', content });
+  };
+  for (const message of messages) {
+    if (message.role === 'tool') {
+      appendUser(`[tool result${message.tool_call_id ? ` ${message.tool_call_id}` : ''}]\n${message.content ?? ''}`);
+      continue;
+    }
+    if (message.tool_calls?.length) {
+      const calls = message.tool_calls.map(call => `[tool call${call.id ? ` ${call.id}` : ''}] ${call.function.name} ${call.function.arguments}`);
+      projected.push({ role: 'assistant', content: [message.content, ...calls].filter(Boolean).join('\n') });
+      continue;
+    }
+    if (message.role === 'user') { appendUser(message.content ?? ''); continue; }
+    projected.push(message);
+  }
+  return projected;
 }
 
 /** The checkpoint message replacing `messages`, or nothing when the provider could not produce one. */

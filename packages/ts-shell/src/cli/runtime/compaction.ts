@@ -10,6 +10,7 @@ import { getSessionUsage, measuredPromptContext } from '../../observability/usag
 import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
 import { endpointShape, type EndpointKind } from '../../provider/endpoints/index.js';
+import { resolveRequestShape, type ResolvedRequestShape } from '../../core/models/requestShape.js';
 import { KEEP_RECENT_TOKENS, type CompactionPolicy, type SummarizeHistory, type SummarizeTurnPrefix } from '../../session/compaction.js';
 import { DEFAULT_RESERVE_TOKENS, estimateTokens } from '../../session/context.js';
 import { historyDigest } from '../../context/request/identity.js';
@@ -88,6 +89,8 @@ export function buildCompactionWiring(input: {
     readonly providerId: string;
     /** Which endpoint kind the summarizer must speak, when not the default. */
     readonly endpoint?: EndpointKind;
+    /** The shape the turn resolved for this model, when the caller already has it. */
+    readonly shape?: ResolvedRequestShape;
     readonly credentialId?: string;
     readonly credentialGeneration?: string;
   };
@@ -111,7 +114,7 @@ export function buildCompactionWiring(input: {
   const summaryRole = captureSummaryRole({ config: runtimeConfig, catalog: input.catalog, workspaceRoot: input.workspaceRoot,
     admission: input.admission, onCredentialPersisted: input.onCredentialPersisted });
   const send = async (request: Omit<Parameters<typeof requestCompactionSummary>[0], 'provider' | 'fetchImpl'>) => {
-    const summaryProvider = summaryRole ? await summaryRole.resolve() : { ...provider, ...summaryLimits };
+    const summaryProvider = summaryRole ? await summaryRole.resolve() : { ...provider, ...effectiveLimits };
     return requestCompactionSummary({ ...request, provider: summaryProvider,
       onUsage: usageFor({ provider: summaryProvider.providerId ?? '', model: summaryProvider.model,
         baseUrl: summaryProvider.baseUrl, rates: catalogModel(input.catalog, summaryProvider.providerId ?? '', summaryProvider.model, summaryProvider.baseUrl)?.cost }),
@@ -143,6 +146,13 @@ export function buildCompactionWiring(input: {
   }
   const summaryLimits = summaryRole?.limits ?? { contextWindow: resolvedWindow.window, inputLimit: mainModel?.inputLimit,
     maxOutputTokens: configuredOutputLimit(runtimeConfig, provider.endpoint), reserveTokens: runtimeConfig.reserveTokens };
+  // The fallback summarizer is the main model, so its request shape is the one
+  // the turn already resolved: the wiring site passes it on the provider. The
+  // preflight runs before that provider is resolved, so it needs the same shape
+  // or it would admit a tool-shaped message the send later rewrites.
+  const fallbackShape = summaryRole ? undefined
+    : input.provider.shape ?? resolveRequestShape(input.catalog, provider.providerId, provider.model, undefined, provider.baseUrl);
+  const effectiveLimits = fallbackShape ? { ...summaryLimits, shape: fallbackShape } : summaryLimits;
   return {
     policy: {
       summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([provider, summaryLimits])).digest('hex'),
@@ -192,12 +202,12 @@ export function buildCompactionWiring(input: {
     },
     summarize: Object.assign((request: Parameters<SummarizeHistory>[0]) => send(historyRequest(request)),
       { dispatchAware: true, preflight: (request: Parameters<SummarizeHistory>[0]) => {
-        prepareCompactionMessages({ ...historyRequest(request), provider: summaryLimits }); } }),
+        prepareCompactionMessages({ ...historyRequest(request), provider: effectiveLimits }); } }),
     // Asked a different question from the history summary: this is the opening
     // of a turn whose continuation is kept, so it explains the work that
     // follows rather than recapping what came before.
     summarizeTurnPrefix: Object.assign((messages: readonly AgentMessage[], signal?: AbortSignal, dispatch?: CompactionDispatch) => send(prefixRequest(messages, signal, dispatch)),
       { dispatchAware: true, preflight: (messages: readonly AgentMessage[], signal?: AbortSignal) => {
-        prepareCompactionMessages({ ...prefixRequest(messages, signal), provider: summaryLimits }); } }),
+        prepareCompactionMessages({ ...prefixRequest(messages, signal), provider: effectiveLimits }); } }),
   };
 }
