@@ -9980,3 +9980,9 @@ GitHub Actions读回完整队列：`600ec86d`、`69056452`、`d7c62186`、`5e9bf
 ## [2026-10-29] docs | 补齐report三态修补的源哈希
 
 `/tools`的两次修补各自记录当时的源哈希：`e3087a3f`（首次加入工具可达性声明）与三态unknown批次的后续状态。三态修补使该文件前进到`95089613`，与`summarize`4cd965f6、`runner`c421ba68、`director`0a037ff7、`preview`fd4921f9一样，均属各批当时状态；后续批次不回写旧哈希。
+
+## [2026-10-29] fix | 双进程并发夹具等待stdio关闭
+
+CI`40739686114`（`d33a0a1b`）唯一失败为`src/config/concurrency.test.ts`的`retains disjoint two-process writes`：收到的子进程输出是`ready\n`而缺少已写入的`saved\n`。该文件不在本轮任何改动范围内，根因是夹具用`exit`事件resolve：Node的`exit`可能先于stdout最后一块`data`到达，输出因此缺少尾部。现改用`close`（stdio全部关闭后触发）。
+
+连续5次单文件运行均3项通过。这是夹具竞态修复，不改变配置文件写入语义；产品代码未改。此前的全部生产修复CI仍为success，本批只补这一个间歇性夹具失败。

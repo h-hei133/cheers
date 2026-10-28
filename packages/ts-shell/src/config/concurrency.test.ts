@@ -33,7 +33,10 @@ function writer(file: string, patch: unknown) {
   });
   const done = new Promise<string>((resolve, reject) => {
     child.on('error', reject);
-    child.on('exit', code => code === 0 ? resolve(output) : reject(new Error(errors || `writer exit ${code}`)));
+    // `close` fires after the stdio streams finish, while `exit` can arrive
+    // before the last chunk has been delivered: resolving on exit sometimes
+    // returned 'ready\n' without the 'saved\n' the child had already written.
+    child.on('close', code => code === 0 ? resolve(output) : reject(new Error(errors || `writer exit ${code}`)));
   });
   // Attach a handler immediately; readiness may fail before the caller awaits exit.
   void done.catch(() => undefined);
