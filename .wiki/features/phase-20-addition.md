@@ -2262,3 +2262,5 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 现`on`在解析同一目录与地址后拒绝不具备工具能力的主模型，且在创建cycle或live owner之前返回。worker目标模型的选择、预算、审批与既有状态机不变。[director回归](../../packages/ts-shell/src/cli/director/runtime.test.ts)把`planner`标为`toolCalling:false`，断言命令返回明确拒绝且`liveDirectors`未注册；既有7项用例保持通过。反转撤销检查后该用例失败（命令返回`Director on`），源码逐字节恢复并核对SHA-256`cc2aa167`后重验。
 
 主代理heap1024MiB单线程执行director8项通过；五静态门、module facade0及heap1536MiB TS build`0252882b0d1a`通过。handoff的同类假设保持不改：其control在宿主缺少`todo`时已显式拒绝启动，不产生非法请求。未运行真实provider、PTY/exe、桌面/原生Windows或20k历史，原Phase20矩阵未重跑（35 complete / 12 partial / 0 open），ADD整体active。
+
+第一百一十一批记录的`6b673493`是当批反转与恢复时的wiring哈希；其后第一百一十一批的identity绑定与第一百一十四批的单次解析使该文件前进到`221f71fc`，历史证据不回溯改写。第一百一十二至一百一十三批同理只记录各自批次的源哈希。
