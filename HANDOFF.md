@@ -745,3 +745,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A subagent delegated to a catalogue model declaring `tool_call:false` receives an instruction listing tools, while the same request carries no tool schemas and a system prompt saying none are available.
 - **Root Cause**: The instruction was built from the host tool pool, which is the parent's set, while the request clips schemas from the resolved request shape. The two never met, so the same request told three different stories.
 - **Rule**: Give the subagent host an `acceptsTools(model)` predicate, resolve it through the same catalogue address the delegated step uses, and suppress both the tool list and the tools handed to the loop when it is false. Absent stays capable so existing delegations are unchanged. Prove the instruction, the wire body and the host wiring separately, and reverse each one; a test that only inspects the request body cannot see an instruction that contradicts it.
+
+### Tool-Enforced Modes Need A Tool-Capable Main Model
+
+- **Symptom**: `/director on` reports "Director on; main tools are restricted to reading and worker management" on a main model the catalogue marks `tool_call:false`, after which the restricted schema is empty and no worker can be managed.
+- **Root Cause**: The entry validated mode, goal state and handoff conflicts but never the main model's tool capability, even though the entire mode is enforced through injected tools.
+- **Rule**: When an entry point's behaviour exists only as tools, refuse it up front for a model declared unable to take tool declarations, and resolve the shape from the same catalogue address the request will use. Return the refusal before creating any live owner or durable cycle so a refused enablement leaves nothing to clean up.

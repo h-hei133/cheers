@@ -2254,3 +2254,11 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 [runner回归](../../packages/ts-shell/src/core/subagents/runner.test.ts)新增用例：定义要求`read`、宿主声明`acceptsTools:false`，断言指令不含工具清单且`allowedTools`为空。[provider接线回归](../../packages/ts-shell/src/cli/provider/step.test.ts)把`review-model`标为`toolCalling:false`，断言`delegatedSteps.acceptsTools`对两个模型分别返回false/true、真实HTTP子请求体无`tools`、正文不含工具清单且包含"no tools"。三处聚焦反转分别撤销runner抑制、宿主传值与delegated解析，各触发1项预期失败；源码逐字节恢复并核对SHA-256`c421ba68`（runner）、`cf698968`（turn subagent）、`a46b7231`（provider step）后重验。
 
 主代理heap1024MiB、单线程逐文件串行执行runner13、turn subagent22、provider step11、turn step96、invocation25、subagent5、boundary14，共186项通过；五静态门、module facade0及heap1536MiB TS build`13360ae8cc35`通过。handoff/director连续性提示同样假定`todo`与worker工具，但handoff的control在宿主缺少`todo`时显式拒绝启动，因此不构成实际非法请求，本批不改。未运行真实provider委派、PTY/exe、桌面/原生Windows或20k历史，原Phase20矩阵未重跑（35 complete / 12 partial / 0 open），ADD整体active。
+
+### 第一百一十三批：director入口的主模型工具能力校验
+
+第一百一十二批收口委派指令后，同一轮检查发现[director入口](../../packages/ts-shell/src/cli/director/command.ts)存在同族缺口。`/director on` 的语义是"主模型只能用读取与worker管理"，并把`workerEffects`/`workerObservations`作为feature tools注入；但入口不检查主模型是否接受工具声明。目录声明`tool_call:false`时，request shape会把这些工具全部裁掉，而director已经进入enabled并输出"Main tools are restricted to reading and worker management"——一个看不到任何工具的director。
+
+现`on`在解析同一目录与地址后拒绝不具备工具能力的主模型，且在创建cycle或live owner之前返回。worker目标模型的选择、预算、审批与既有状态机不变。[director回归](../../packages/ts-shell/src/cli/director/runtime.test.ts)把`planner`标为`toolCalling:false`，断言命令返回明确拒绝且`liveDirectors`未注册；既有7项用例保持通过。反转撤销检查后该用例失败（命令返回`Director on`），源码逐字节恢复并核对SHA-256`cc2aa167`后重验。
+
+主代理heap1024MiB单线程执行director8项通过；五静态门、module facade0及heap1536MiB TS build`0252882b0d1a`通过。handoff的同类假设保持不改：其control在宿主缺少`todo`时已显式拒绝启动，不产生非法请求。未运行真实provider、PTY/exe、桌面/原生Windows或20k历史，原Phase20矩阵未重跑（35 complete / 12 partial / 0 open），ADD整体active。

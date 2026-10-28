@@ -61,7 +61,9 @@ beforeEach(async () => {
     providerConnections: [{ id: 'fixture', provider: 'openai-compatible' as const, model: 'planner', apiKey: 'synthetic-fixture', baseUrl,
       authType: 'api-key' as const, status: 'connected' as const, thinkingEffort: null,
       createdAt: '2026-10-10T00:00:00Z', updatedAt: '2026-10-10T00:00:00Z' }], activeProviderConnectionId: 'fixture' };
-  context.configuration = new ConfigState(config, configurationBinding(context));
+  context.configuration = new ConfigState(config, configurationBinding(context),
+    [{ id: 'openai-compatible', label: 'fixture', runtime: 'openai-compatible', auth: 'api-key', baseUrl,
+      models: [{ id: 'planner', contextWindow: 32_000 }, { id: 'vendor/executor', contextWindow: 32_000 }] }]);
   Object.defineProperty(context, 'runtimeConfig', { get: () => context.configuration.current.config });
   runtime = { getCurrentRunController: () => null, getAgentMode: () => 'build', getPermissionScope: () => 'ask' } as unknown as ShellSessionRuntime;
   install();
@@ -121,6 +123,18 @@ it('uses the actual restricted main schema, independently approved worker effect
   expect(context.runtimeConfig).toBe(original); expect(await command('show ' + first.id)).toContain(childId); expect(approvals).toHaveLength(3);
   expect(await command('off')).toContain('cleanup settled'); expect(context.runtimeConfig).toBe(original);
 });
+it('refuses director mode on a main model the catalogue says takes no tools', async () => {
+  // Director mode is enforced through tools; a main model that cannot see any
+  // would be promised worker management the request withholds.
+  const current = context.configuration.current;
+  const catalog = current.catalog.map(provider => ({ ...provider,
+    models: provider.models.map(model => model.id === 'planner' ? { ...model, toolCalling: false } : model) }));
+  context.configuration = new ConfigState(current.config, current.binding, catalog);
+
+  expect(await command('on --model openai-compatible/vendor/executor')).toContain('requires a main model that accepts tool declarations');
+  expect(liveDirectors.get(context)).toBeUndefined();
+});
+
 it('denies a worker effect separately from delegation and preserves the original tool allowlist', async () => {
   approval = async name => name === 'write' ? 'deny' : 'allow-once'; let turn = 0;
   reply = (_body, response) => ++turn === 1 ? respond(response, [{ id: 'denied-effect', name: 'write', args: { path: 'denied.txt', content: 'denied' } }]) : respond(response);

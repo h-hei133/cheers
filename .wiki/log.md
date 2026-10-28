@@ -9914,3 +9914,11 @@ closure阶段两组最终反转分别移除preview完整目标比较、移除ste
 验证：runner回归新增一条用例，定义要求`read`但宿主声明`acceptsTools:false`，断言指令不含工具清单且`allowedTools`为空；provider接线回归把`review-model`声明为`toolCalling:false`，断言`delegatedSteps.acceptsTools`区分两个模型、真实HTTP子请求体无`tools`、正文不含工具清单而含"no tools"。三处聚焦反转（runner抑制、宿主传值、delegated解析）分别触发1项预期失败；源码逐字节恢复并核对SHA-256`c421ba68`（runner）、`cf698968`（turn subagent）、`a46b7231`（provider step）后重验。
 
 主代理heap1024MiB单线程逐个文件串行执行runner13、turn subagent22、provider step11、turn step96、invocation25、subagent5、boundary14，共186项通过；五静态门、module facade0及heap1536MiB TS build`13360ae8cc35`通过。handoff/director连续性提示同样假定`todo`与worker工具，但handoff的control在宿主缺少`todo`时已显式拒绝启动，不构成非法请求，本批不改。本批未运行真实provider委派、PTY/exe、桌面/Windows或20k历史，原Phase20矩阵未重跑，ADD整体active。
+
+## [2026-10-29] fix | director入口校验主模型工具能力
+
+第一百一十二批收口委派指令后，同族检查指向[director入口](../../packages/ts-shell/src/cli/director/command.ts)。`/director on` 把主模型限制为"读取加worker管理"，并注入`workerEffects`/`workerObservations`作为feature tools；但启用时从不检查主模型是否接受工具声明。目录声明`tool_call:false`时，[request shape](../../packages/ts-shell/src/core/models/requestShape.ts)会把这些工具全部裁掉，director却已进入enabled并宣称可管理worker——一个无法direct的director。
+
+现`on`在校验同一目录与地址后拒绝不具备工具能力的主模型，错误在创建任何cycle或live owner之前返回；worker目标模型的选择、预算与审批语义不变。[director回归](../../packages/ts-shell/src/cli/director/runtime.test.ts)把`planner`标为`toolCalling:false`，断言命令返回明确拒绝且`liveDirectors`没有注册。反转撤销该检查后用例失败（命令返回`Director on`），源码逐字节恢复并核对SHA-256`cc2aa167`后重验；其余7项director用例保持通过。
+
+主代理heap1024MiB单线程执行director8项通过；五静态门、module facade0及heap1536MiB TS build`0252882b0d1a`通过。handoff的同类假设保持不改：其control在宿主缺少`todo`时已显式拒绝启动。本批未运行真实provider、PTY/exe、桌面/Windows或20k历史，原Phase20矩阵未重跑，ADD整体active。

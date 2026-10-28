@@ -14,6 +14,8 @@ import { jobAdmission } from '../jobs/authority.js';
 import { agentProjection } from '../jobs/agent/projection.js';
 import { report } from '../jobs/projection.js';
 import { executionChoice, sourceChoice } from '../provider/selection.js';
+import { resolveRequestShape } from '../../core/models/requestShape.js';
+import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
 import { DirectorRuntime } from './lifetime.js';
 import { liveDirectors } from './state.js';
 import { workerEffects } from './effects.js';
@@ -52,6 +54,13 @@ export async function runDirectorCommand(host: JobsComposition, args: string[], 
       const original = host.agentRuntimeInput?.providerRuntimeBridge.resolveCredentialSnapshot();
       if (!original) throw new Error('The bound worker provider is unavailable.');
       const { config, catalog } = host.context.configuration.current; const source = sourceChoice(host.context.cwd, original);
+      // Director mode is enforcement through tools: reading plus worker
+      // management. A main model the catalogue says takes no tools cannot see
+      // any of them, so enabling it would promise a capability the request
+      // withholds. Refuse here rather than run a director that cannot direct.
+      const mainShape = resolveRequestShape(catalog, source.provider, source.model, undefined,
+        providerCredentialBaseUrl(catalog, source));
+      if (!mainShape.toolCalling) throw new Error('Director requires a main model that accepts tool declarations.');
       const model = parsed.flags.get('model'); const effort = parseEffortFlag(parsed.flags.get('effort'));
       const worker = executionChoice(typeof model === 'string' ? model : `${source.provider}/${source.model}`, effort, source, original, config, catalog);
       const directory = captureWorkspaceRoot(host.context.cwd, host.context.cwd, 'read');
