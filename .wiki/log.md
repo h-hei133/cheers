@@ -9932,3 +9932,9 @@ closure阶段两组最终反转分别移除preview完整目标比较、移除ste
 同轮检查发现[模型元数据详情](../../packages/ts-shell/src/cli/interactive/picker/model/metadata.ts)展示Images、Reasoning、Effort与价格，却不显示模型是否接受工具。上一批的`toolCalling`语义因此只存在于请求与守卫里，用户在选择模型时看不到"这个模型不能读、改、执行"这一事实。现详情新增`Tool calls: supported/unsupported/unverified`，undecided保持unverified，与请求读取同一字段。
 
 [metadata回归](../../packages/ts-shell/src/cli/interactive/picker/model/metadata.test.ts)新增显式`toolCalling:false`模型并断言unsupported，另在既有relay/unknown用例中断言unverified。撤销该行后3项预期失败；源码逐字节恢复并核对SHA-256`59e381ea`后重验，metadata9与picker43共52项通过。heap1536MiB TS build`b91820512360`后本批重建通过。未运行真实provider、PTY/exe、桌面或20k历史。
+
+## [2026-10-29] docs | 补全、多skill与命令组合的复核结论
+
+对ADD-10/11/12做了一轮定向复核，逐项验证文档声明而非复述实现，未发现需要修补的新缺陷：完整功能slash仅在源offset=0开放（[proseRequest](../../packages/ts-shell/src/cli/interactive/completion/prose.ts)的`tokenFrom===0`分支）；`pathLike`只接受绝对、home、相对、Windows drive与UNC前缀，裸文件名不进入候选域，与文档一致；多skill按`source:filePath:name`去重且未知skill整次返回`unknownSkill`，超预算在[prepareComposition](../../packages/ts-shell/src/core/commands/composition/prepare.ts)整次拒绝；围栏关闭要求独立成行且长度不小于开启标记，行内代码按精确run配对；`needsComposition`与`composePrompt`的前置条件逐字一致，`routeSlashCommand`与context preview也使用同一`!first || first.composition`判定，因此预览与派发不会就"是否组合"产生分歧；research入口把全部skill与modifier带入同一turn prompt；brainstorm组合要求非空共享正文。异步候选结果在编辑器层凭snapshot应用，非本模块职责。
+
+本轮只读复核未运行新的产品测试；相关结论建立在既有批次证据与当前源码之上。ADD整体active，矩阵不变。
