@@ -43,6 +43,14 @@ export interface CatalogModel {
    */
   readonly reasoning?: boolean;
   /**
+   * Whether this model supports tool declarations and tool-call history.
+   *
+   * Absent preserves the pre-catalogue behavior: tools were always available to
+   * a model nobody had described. `false` is only for a model that explicitly
+   * declares it cannot call tools.
+   */
+  readonly toolCalling?: boolean;
+  /**
    * What this model calls each reasoning level.
    *
    * Endpoints disagree about the names — one takes `low`, another `minimal`,
@@ -684,6 +692,7 @@ function mergeModelEntry(
     ...(preserveExplicitCapabilities
       ? {
           ...(existing.reasoning !== undefined ? { reasoning: existing.reasoning } : {}),
+          ...(existing.toolCalling !== undefined ? { toolCalling: existing.toolCalling } : {}),
           ...(existing.vision !== undefined ? { vision: existing.vision } : {}),
           ...(existing.maxTokens !== undefined ? { maxTokens: existing.maxTokens } : {}),
           ...(existing.serviceTiers !== undefined ? { serviceTiers: existing.serviceTiers } : {}),

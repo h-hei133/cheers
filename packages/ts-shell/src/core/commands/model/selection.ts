@@ -85,7 +85,8 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const connections = loaded.providerConnections;
   const projected = projectSessionModel(loaded, context.sessionId);
   const effective = context.readConfiguration?.().config ?? context.runtimeConfig ?? projected;
-  const actual = context.resolveConfigTarget?.(effective) ?? resolveProviderCredential({ runtimeConfig: effective });
+  const actual = context.resolveConfigTarget?.(effective, context.sessionId)
+    ?? resolveProviderCredential({ runtimeConfig: effective, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
   const providerSlot = exact ? exact.target.connectionId === undefined
     : !projected.activeProviderConnectionId && !actual.credential?.connectionId;
   const activeId = providerSlot ? undefined : exact?.target.connectionId ?? projected.activeProviderConnectionId;

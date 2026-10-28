@@ -96,7 +96,8 @@ function modelConfiguration(context: CommandContext) {
   const publication = context.readConfiguration?.();
   const config = publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
   return { config, catalog: publication?.catalog ?? loadCatalog(),
-    active: context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config }) };
+    active: context.resolveConfigTarget?.(config, context.sessionId)
+      ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) }) };
 }
 
 function renderCatalogView(context: CommandContext): string {

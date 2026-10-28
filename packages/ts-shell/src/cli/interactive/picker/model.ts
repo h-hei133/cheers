@@ -101,7 +101,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       observedRevision = publication?.revision;
       const config = choice?.config ?? publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
       const catalog = choice?.catalog ?? publication?.catalog ?? loadCatalog();
-      const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+      const active = context.resolveConfigTarget?.(config, context.sessionId)
+        ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
       const activeAddress = catalogBaseUrl(catalog, active.provider, active.baseUrl ?? active.credential?.baseUrl);
       const availability = availabilitySnapshot({ config, catalog });
       const thinkingEffort = assigning ? assigning.thinkingEffort
@@ -132,12 +133,13 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             const target: SessionModelTarget = connection ? { connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort }
               : { connectionScope: 'provider', provider: provider.runtime, model: model.id, thinkingEffort };
             const candidate = connection || providerSlot ? projectModelSelection(config, scopedModelTarget(target)) : undefined;
-            const resolution = candidate ? !connection && context.resolveConfigTarget ? context.resolveConfigTarget(candidate)
-              : resolveProviderCredential({ runtimeConfig: candidate }) : undefined;
+            const resolution = candidate ? !connection && context.resolveConfigTarget ? context.resolveConfigTarget(candidate, context.sessionId)
+              : resolveProviderCredential({ runtimeConfig: candidate, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) }) : undefined;
             const ambientCandidate = !connection && !providerSlot && provider.id === provider.runtime
               ? projectModelSelection(config, scopedModelTarget(target)) : undefined;
             const ambientResolution = ambientCandidate
-              ? context.resolveConfigTarget?.(ambientCandidate) ?? resolveProviderCredential({ runtimeConfig: ambientCandidate }) : undefined;
+              ? context.resolveConfigTarget?.(ambientCandidate, context.sessionId)
+                ?? resolveProviderCredential({ runtimeConfig: ambientCandidate, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) }) : undefined;
             const namedConnectionRequired = Boolean(ambientResolution && !ambientResolution.blocked
               && ambientResolution.provider === provider.runtime && ambientResolution.credential
               && ambientResolution.credential.connectionId === undefined);

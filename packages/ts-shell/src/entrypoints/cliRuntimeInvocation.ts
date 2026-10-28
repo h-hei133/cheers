@@ -60,6 +60,7 @@ import { scopedRuntimeConfig, assertScopedModel } from '../config/scope/projecti
 import { credentialBlockMessage } from '../core/shell/providerCredentials.js';
 import { scopeAdmission } from '../config/scope/admission.js';
 import { toolScopeBinding } from '../config/scope/tools.js';
+import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 
 type ProviderMode = "synthetic" | "real";
 
@@ -69,7 +70,7 @@ export interface CliRuntimeInvocationInput {
   readonly onCommandSettled?: ToolCatalogInput['onCommandSettled'];
   readonly thinkingPreference?: ReturnType<typeof captureThinkingPreference>;
   /** Receives the exact schema/system identity prepared for this run. */
-  readonly onPromptIdentity?: (identity: { readonly schemaDigest: string; readonly systemDigest: string; readonly historyDigest?: string }) => void;
+  readonly onPromptIdentity?: (identity: PromptIdentitySnapshot) => void;
   readonly background?: TurnOptions['background'];
   readonly featureTools?: readonly ToolDefinition[];
   /** One-use model tool restriction selected by `/force`; ordinary gates remain active. */
@@ -230,6 +231,7 @@ function deferUntilReady(
     const renewed = await renewStoredAccount({
       admission: request.admission,
       workspaceRoot: request.workspaceRoot,
+      sessionId: request.sessionId,
       resolution: request.providerCredentialResolution,
       fetchImpl: admittedFetch(providerFetch(request.runtimeConfig), request.admission),
     });

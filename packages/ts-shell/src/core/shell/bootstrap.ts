@@ -96,7 +96,7 @@ export function bootstrapShellRuntime(input: {
   launchCwd?: string;
   runtimeConfig: RuntimeConfig;
   runtimeConfigOverrides?: RuntimeConfigOverrides;
-  resolveConfigTarget?: (config: RuntimeConfig) => ProviderCredentialResolution;
+  resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution;
   /** How this run was asked to load skills; carried into the runtime context. */
   skillOptions?: {
     readonly skillPaths?: readonly string[];

@@ -58,7 +58,8 @@ export async function runBtwCommand(
   if (blocked) return { kind: "local", output: blocked };
   const publication = context.readConfiguration?.();
   const runtimeConfig = publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
-  const resolution = context.resolveConfigTarget?.(runtimeConfig) ?? resolveProviderCredential({ runtimeConfig });
+  const resolution = context.resolveConfigTarget?.(runtimeConfig, context.sessionId)
+    ?? resolveProviderCredential({ runtimeConfig, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
   const credential = resolution.credential;
   const catalog = publication?.catalog ?? loadCatalog();
   if (resolution.blocked) return { kind: 'local', output: `Side question refused: ${credentialBlockMessage(resolution.blocked)}` };

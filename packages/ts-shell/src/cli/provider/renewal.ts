@@ -13,7 +13,7 @@ import { providerFetchFromTimeouts, providerTimeoutsFrom } from '../../provider/
 export type { AccountRotation, AccountPublication } from '../../core/auth/account/contract.js';
 
 /** A turn shares at most 32 owned renewals. Tokens never become cache keys or public state. */
-export function delegatedRenewal(host: { readonly workspaceRoot: string; readonly runtimeConfig?: RuntimeConfig;
+export function delegatedRenewal(host: { readonly workspaceRoot: string; readonly sessionId?: string; readonly runtimeConfig?: RuntimeConfig;
   readonly onCredentialPersisted?: (rotation?: AccountRotation) => boolean | void }) {
   const entries = new Map<string, Promise<{ readonly fresh: ProviderCredentialResolution; readonly edit: AccountEdit; published: boolean }>>();
   return async (resolution: ProviderCredentialResolution, admission?: Admission, publication?: AccountPublication): Promise<ProviderCredentialResolution> => {
@@ -26,8 +26,8 @@ export function delegatedRenewal(host: { readonly workspaceRoot: string; readonl
     if (!pending) {
       if (entries.size >= 32) throw new Error('The turn account preparation limit was reached. Start a new turn.');
       pending = (async () => {
-        const edit = captureAccountEdit(host.workspaceRoot, resolution);
-        const renewed = await renewStoredAccount({ workspaceRoot: host.workspaceRoot, resolution, admission,
+        const edit = captureAccountEdit(host.workspaceRoot, resolution, host.sessionId);
+        const renewed = await renewStoredAccount({ workspaceRoot: host.workspaceRoot, sessionId: host.sessionId, resolution, admission,
           fetchImpl: admittedFetch(providerFetchFromTimeouts(providerTimeoutsFrom(host.runtimeConfig)), admission) });
         if (renewed.failure || !renewed.stored || !renewed.accountAuth) throw new Error(renewed.failure ?? 'Delegated account renewal was not verified.');
         const fresh = { ...resolution, credential: { ...resolution.credential!, accountAuth: renewed.accountAuth } };

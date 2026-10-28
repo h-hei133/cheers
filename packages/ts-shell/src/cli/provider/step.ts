@@ -8,7 +8,6 @@ import { buildSystemPrompt, systemPromptSnapshot, type SystemPromptContext } fro
 import { createStepFunction, type StepFunction } from '../../turn/step.js';
 import { loadCatalog } from '../../core/models/catalogStore.js';
 import { catalogProvider } from '../../core/models/catalog.js';
-import { accountAuthFor, providerAuthorization } from '../../provider/request/authorization.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
 import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
 import { endpointShape } from '../../provider/endpoints/index.js';
@@ -17,7 +16,6 @@ import { delegatedTarget } from './target.js';
 import { serviceTierCapability } from '../../core/models/serviceTier.js';
 import { assertScopedModel, scopedRuntimeConfig } from '../../config/scope/projection.js';
 import { credentialBlockMessage } from '../../core/shell/providerCredentials.js';
-import { credentialIdentityFor } from '../../core/auth/account/pool.js';
 import type { ToolDiscovery } from '../../core/tools/discovery/state.js';
 import { scopeAdmission } from '../../config/scope/admission.js';
 import { mergeConfigValue } from '../../config/merge.js';
@@ -26,8 +24,8 @@ import { assertAdmission } from '../../core/network/admission.js';
 import { delegatedRenewal, type AccountRotation, type AccountPublication } from './renewal.js';
 import { sessionUsageSink } from '../../session/store/usage.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
-import { accountReplayOwner } from '../../core/auth/account/replay.js';
 import { configuredOutputLimit } from '../../provider/request/output.js';
+import { providerRequestTarget } from './requestTarget.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -68,7 +66,13 @@ export function createProviderStep(
     throw new Error(`Configured service tier '${configuredTier}' is not verified for ${resolution.provider}/${resolution.model}.`);
   }
   const system = systemPromptSnapshot(request.agentMode, promptContext);
-  const identity = credentialIdentityFor(resolution.provider, resolution.credential);
+  const targetIdentity = providerRequestTarget({
+    workspaceRoot: request.workspaceRoot,
+    sessionId: request.sessionId,
+    resolution,
+    baseUrl: baseUrl ?? "",
+    ...(endpoint ? { endpoint } : {}),
+  });
   return createStepFunction({
     recordAuxiliaryUsage: sessionUsageSink(request.sessionId),
     requestPolicy: request.requestPolicy,
@@ -77,13 +81,10 @@ export function createProviderStep(
       // Built from the whole credential, not from its key alone. An account login
       // yields a token instead of a key, and formatting the header here from a
       // field it does not have is what sent an empty bearer.
-      headers: providerAuthorization({
-        apiKey: resolution.credential?.apiKey,
-        accountAuth: accountAuthFor(resolution.provider, resolution.credential ?? {}),
-        ...(endpoint ? { endpoint } : {}),
-      }).headers,
+      headers: targetIdentity.headers,
       baseUrl: baseUrl ?? "",
-      replayOwner: accountReplayOwner(request.workspaceRoot, resolution),
+      ...(targetIdentity.replayOwner ? { replayOwner: targetIdentity.replayOwner } : {}),
+      replayBinding: targetIdentity.replayBinding,
       model: resolution.model ?? resolution.credential?.model ?? "",
       // The catalog is keyed by provider id, so the request shape cannot be
       // resolved without it.
@@ -93,7 +94,9 @@ export function createProviderStep(
       // answers, and an endpoint is how they want to be asked.
       ...(endpoint ? { endpoint } : {}),
       ...(configuredTier ? { serviceTier: configuredTier } : {}),
-      ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
+      ...(targetIdentity.credentialId && targetIdentity.credentialGeneration
+        ? { credentialId: targetIdentity.credentialId, credentialGeneration: targetIdentity.credentialGeneration }
+        : {}),
     },
     // Without this the request is sent with the global fetch, which has no
     // deadline: a provider that accepts the connection and then never answers
@@ -108,7 +111,8 @@ export function createProviderStep(
     sessionId: request.sessionId,
     systemPrompt: system.text,
     systemPromptSources: system.sources,
-    systemPromptFor: (agentMode, toolNames) => buildSystemPrompt(agentMode, { ...promptContext, toolNames }),
+    systemPromptFor: (agentMode, toolNames, toolsAvailable = true) =>
+      buildSystemPrompt(agentMode ?? request.agentMode, { ...promptContext, toolNames }, toolsAvailable),
     thinkingEffort: request.thinkingEffort,
     thinkingEffortExplicit: request.thinkingEffortExplicit,
     tools: toolSchemas(tools),

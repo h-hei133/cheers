@@ -26,7 +26,8 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
     return context.signal?.aborted ? 'Role editing cancelled. Reopen the model picker.' : refusal;
   };
   const baseline = choice.baseline;
-  const active = context.resolveConfigTarget?.(choice.config) ?? resolveProviderCredential({ runtimeConfig: choice.config });
+  const active = context.resolveConfigTarget?.(choice.config, context.sessionId)
+    ?? resolveProviderCredential({ runtimeConfig: choice.config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
   const tier = choice.config.providerConnections.find(connection => connection.id === active.credential?.connectionId)?.serviceTier
     ?? choice.config.providerCredentials[active.provider]?.serviceTier;
   const selection: SessionModelSelection | undefined = baseline?.selection ?? (active.model && active.credential && !active.blocked

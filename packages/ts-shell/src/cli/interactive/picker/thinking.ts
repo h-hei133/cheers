@@ -44,7 +44,8 @@ export function thinkingPicker(context: CommandContext, back?: (notice?: string)
       const publication = context.readConfiguration?.();
       const config = choice?.config ?? publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
       const catalog = choice?.catalog ?? publication?.catalog ?? loadCatalog();
-      const target = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+      const target = context.resolveConfigTarget?.(config, context.sessionId)
+        ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
       const { provider, model, baseUrl } = target;
       const current = captureThinkingPreference(context.projectRoot ?? context.cwd, target.thinkingEffort);
       initial = current.thinkingEffort ?? 'auto';

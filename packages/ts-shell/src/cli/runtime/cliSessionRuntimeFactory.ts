@@ -207,6 +207,7 @@ export function createCliSessionRuntime(input: {
     if (!target) return {};
     const renewed = await renewStoredAccount({
       workspaceRoot: input.runtimeContext.projectRoot,
+      sessionId: input.runtimeContext.session.id,
       resolution: resolved,
       admission,
       fetchImpl: admittedFetch(providerFetchFromTimeouts(providerTimeoutsFrom(config)), admission),

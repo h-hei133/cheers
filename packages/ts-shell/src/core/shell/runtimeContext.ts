@@ -10,6 +10,7 @@ import { restoreSessionUsage } from '../../observability/usageTelemetry.js'
 import type { CommandContext } from '../commands/types.js'
 import type { ContextEntry } from '../../context/attachment/entry.js';
 import { currentProfile } from '../paths/profile/context.js';
+import type { PromptIdentitySnapshot } from '../../observability/usage/model.js';
 
 export interface ActiveSessionIdentity {
   readonly sessionId: string
@@ -32,7 +33,7 @@ export interface SessionResumeProvenance {
 export interface ShellRuntimeContext {
   readonly profile?: import('../paths/profile/context.js').ProfileContext;
   /** Identity of the request shape most recently prepared by this runtime. */
-  promptIdentity?: { readonly schemaDigest: string; readonly systemDigest: string; readonly historyDigest?: string };
+  promptIdentity?: PromptIdentitySnapshot;
   workspaceRevision?: number;
   workspaceIssue?: string;
   /** Durable workspace authority, supplied by the session store owner. */
@@ -57,7 +58,7 @@ export interface ShellRuntimeContext {
   readonly configuration: ConfigState
   /** Explicit launch flags must survive settings reloads and session switches. */
   readonly runtimeConfigOverrides?: RuntimeConfigOverrides
-  readonly resolveConfigTarget?: (config: RuntimeConfig) => ProviderCredentialResolution
+  readonly resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution
   /**
    * How this run was asked to load skills.
    *
@@ -127,7 +128,7 @@ export function createShellRuntimeContext(input: {
   rootBindingDiagnostics?: readonly RootBindingDiagnostic[]
   runtimeConfig: RuntimeConfig
   runtimeConfigOverrides?: RuntimeConfigOverrides
-  resolveConfigTarget?: (config: RuntimeConfig) => ProviderCredentialResolution
+  resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution
   skillOptions?: {
     readonly skillPaths?: readonly string[]
     readonly noSkills?: boolean

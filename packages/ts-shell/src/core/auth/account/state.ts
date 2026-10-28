@@ -22,6 +22,7 @@ interface Snapshot {
 
 export interface AccountEdit {
   readonly workspaceRoot: string;
+  readonly sessionId?: string;
   readonly snapshot: Snapshot;
   readonly resolution: ProviderCredentialResolution;
   readonly mirror: boolean;
@@ -32,7 +33,7 @@ function authority(source: string, target: string): boolean {
   catch { return false; }
 }
 
-function snapshot(workspaceRoot: string, selected: ProviderCredentialResolution): Snapshot {
+function snapshot(workspaceRoot: string, selected: ProviderCredentialResolution, sessionId?: string): Snapshot {
   const source = path.resolve(getUserRuntimeConfigPath());
   const edit = readRuntimeConfigEditAt(fs.realpathSync(source));
   const config = getRuntimeConfig(workspaceRoot);
@@ -46,7 +47,8 @@ function snapshot(workspaceRoot: string, selected: ProviderCredentialResolution)
     : selectedId ? { ...config, activeProviderConnectionId: selectedId,
     sessionConnection: { id: selectedId, provider: selected.provider } } : config;
   const resolution = resolveProviderCredential({ runtimeConfig: target,
-    cliProvider: selected.selection?.provider, cliBaseUrl: selected.selection?.baseUrl });
+    cliProvider: selected.selection?.provider, cliBaseUrl: selected.selection?.baseUrl,
+    ...(sessionId ? { pool: { sessionId } } : {}) });
   return { source, edit, config, resolution };
 }
 
@@ -76,9 +78,9 @@ export function sameAccountIdentity(before: AccountAuthConfig, after: AccountAut
 }
 
 /** Capture the actual source before spending its refresh token. */
-export function captureAccountEdit(workspaceRoot: string, resolution: ProviderCredentialResolution): AccountEdit {
+export function captureAccountEdit(workspaceRoot: string, resolution: ProviderCredentialResolution, sessionId?: string): AccountEdit {
   const root = identifyProject(workspaceRoot);
-  const current = snapshot(root, resolution);
+  const current = snapshot(root, resolution, sessionId);
   const credential = resolution.credential;
   const slot = accountAuthKey(resolution.provider);
   const selectedId = credential?.connectionId ?? normalizeConnectionId(current.config.activeProviderConnectionId);
@@ -90,7 +92,8 @@ export function captureAccountEdit(workspaceRoot: string, resolution: ProviderCr
   }
   const mirror = credential.source === 'connection'
     && sameValue(current.config.providerCredentials[resolution.provider]?.accountAuth?.[slot], credential.accountAuth);
-  return freezeDeep({ workspaceRoot: root, snapshot: current, resolution: structuredClone(resolution), mirror });
+  return freezeDeep({ workspaceRoot: root, ...(sessionId ? { sessionId } : {}), snapshot: current,
+    resolution: structuredClone(resolution), mirror });
 }
 
 function rotatedAuth(original: AccountAuthConfig | undefined, accountAuth: AccountAuthConfig): AccountAuthConfig {
@@ -130,7 +133,7 @@ export function readAccountRotation(edit: AccountEdit): AccountAuthConfig | unde
 }
 
 export function readAccountRotationReceipt(edit: AccountEdit): AccountRotation | undefined {
-  const current = snapshot(edit.workspaceRoot, edit.resolution);
+  const current = snapshot(edit.workspaceRoot, edit.resolution, edit.sessionId);
   const original = edit.resolution.credential?.accountAuth;
   const accountAuth = current.resolution.credential?.accountAuth;
   if (!current.edit.revision || !edit.snapshot.edit.revision || !original || !accountAuth || sameValue(original, accountAuth) || accountAuth.expiresAt <= Date.now()
@@ -149,7 +152,7 @@ export function persistAccountEdit(edit: AccountEdit, accountAuth: AccountAuthCo
   const original = resolution.credential?.accountAuth;
   if (!original || !sameAccountIdentity(original, accountAuth)) throw new ConfigWriteError('conflict', 'unchanged');
   const expected = { ...resolution, credential: { ...resolution.credential!, accountAuth } };
-  const current = snapshot(edit.workspaceRoot, resolution);
+  const current = snapshot(edit.workspaceRoot, resolution, edit.sessionId);
   if (current.source !== captured.source || current.edit.path !== captured.edit.path
     || (!sameValue(identity(current.resolution), identity(resolution)) && !sameValue(identity(current.resolution), identity(expected)))) {
     throw new ConfigWriteError('conflict', 'unchanged');
@@ -163,7 +166,7 @@ export function persistAccountEdit(edit: AccountEdit, accountAuth: AccountAuthCo
       && (alreadySaved || sameValue(selectors(locked, resolution.provider), selectors(captured.edit.values, resolution.provider)));
   });
   try {
-    const saved = snapshot(edit.workspaceRoot, resolution);
+    const saved = snapshot(edit.workspaceRoot, resolution, edit.sessionId);
     if (saved.source !== captured.source || saved.edit.path !== captured.edit.path
       || !sameValue(selectors(saved.edit.values, resolution.provider), selectors(desired, resolution.provider))
       || !sameValue(identity(saved.resolution), identity(expected))) throw new Error('mismatch');

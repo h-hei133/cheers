@@ -13,7 +13,8 @@ export function configurationOperation(context: Pick<ShellRuntimeContext, 'confi
   if (refused) throw new Error(refused);
   let config = scopedRuntimeConfig(publication.config, context.cwd);
   if (config !== publication.config) {
-    const target = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+    const target = context.resolveConfigTarget?.(config, context.session.id)
+      ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
     config = constrainRuntimeConfig(config, target, publication.catalog);
     if (!config.configValidation.valid) throw new Error('Configuration scope settings do not satisfy the selected model limits. Inspect Settings and reload a valid rule.');
   }

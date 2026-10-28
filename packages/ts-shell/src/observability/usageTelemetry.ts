@@ -245,6 +245,8 @@ export function measuredPromptContext(sessionId: string, expected: {
   readonly provider: string; readonly model: string; readonly endpoint?: string;
   readonly schemaDigest?: string; readonly systemDigest?: string;
   readonly historyDigest?: string;
+  readonly wireHistoryDigest?: string;
+  readonly replayBinding?: string;
   readonly endpointId?: string;
 }, options: { readonly requireExpectedIdentity?: boolean } = {}): { readonly tokens: number; readonly messageCount: number } | undefined {
   const telemetry = getSessionUsage(sessionId);
@@ -263,6 +265,8 @@ export function measuredPromptContext(sessionId: string, expected: {
   // still applies; a provider/model-only query is not sufficient.
   if (identity.endpoint !== undefined && expected.endpoint === undefined) return undefined;
   if (identity.historyDigest !== undefined && expected.historyDigest === undefined) return undefined;
+  if (identity.wireHistoryDigest !== undefined && expected.wireHistoryDigest === undefined) return undefined;
+  if (identity.replayBinding !== undefined && expected.replayBinding === undefined) return undefined;
   if (identity.endpointId !== undefined && expected.endpointId === undefined) return undefined;
   // A complete recorded identity cannot be checked against a provider/model-only
   // query. Returning it here would let the status band present an old schema or
@@ -280,8 +284,13 @@ export function measuredPromptContext(sessionId: string, expected: {
   if (expected.schemaDigest !== undefined && identity.schemaDigest !== undefined && identity.schemaDigest !== expected.schemaDigest) return undefined;
   if (expected.systemDigest !== undefined && identity.systemDigest !== undefined && identity.systemDigest !== expected.systemDigest) return undefined;
   if (expected.historyDigest !== undefined && identity.historyDigest !== expected.historyDigest) return undefined;
+  if (expected.wireHistoryDigest !== undefined && identity.wireHistoryDigest !== expected.wireHistoryDigest) return undefined;
+  if (expected.replayBinding !== undefined && identity.replayBinding !== expected.replayBinding) return undefined;
   if (expected.endpointId !== undefined && identity.endpointId !== expected.endpointId) return undefined;
-  return { tokens: telemetry.lastPromptTokens, messageCount: telemetry.lastPromptMessageCount };
+  if (identity.wireHistoryDigest !== undefined
+    && (!Number.isSafeInteger(identity.wireMessageCount) || (identity.wireMessageCount ?? -1) < 0)) return undefined;
+  return { tokens: telemetry.lastPromptTokens,
+    messageCount: identity.wireHistoryDigest === undefined ? telemetry.lastPromptMessageCount : identity.wireMessageCount! };
 }
 
 /** A model or schema change makes the live count stale without erasing request evidence. */

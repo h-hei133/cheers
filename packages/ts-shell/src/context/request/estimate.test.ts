@@ -32,3 +32,36 @@ it('does not add calibrated counts through tool compaction, reasoning or image t
   for (const message of variants) expect(estimatePrompt([...prefix, message], overhead, identity, usage(), 800))
     .toMatchObject({ source: 'estimated', tokens: 800 });
 });
+
+it('calibrates only an identical recorded wire request', () => {
+  const wireIdentity = {
+    ...identity,
+    historyDigest: historyDigest(prefix),
+    wireHistoryDigest: 'c'.repeat(64),
+    wireMessageCount: prefix.length,
+    replayBinding: 'f'.repeat(64),
+  };
+  const wireUsage = () => ({
+    ...getSessionUsage('estimate-fixture'),
+    lastPromptTokens: 500,
+    lastPromptMessageCount: prefix.length,
+    lastPromptIdentity: wireIdentity,
+  });
+
+  expect(estimatePrompt(prefix, overhead, wireIdentity, wireUsage(), 800))
+    .toMatchObject({ source: 'calibrated', tokens: 500 });
+  expect(estimatePrompt(prefix, overhead, {
+    ...wireIdentity,
+    wireHistoryDigest: 'd'.repeat(64),
+  }, wireUsage(), 800)).toMatchObject({ source: 'estimated', tokens: 800 });
+  expect(estimatePrompt(prefix, overhead, {
+    ...wireIdentity,
+    replayBinding: '0'.repeat(64),
+  }, wireUsage(), 800)).toMatchObject({ source: 'estimated', tokens: 800 });
+  expect(estimatePrompt([...prefix, { role: 'user', content: 'next' }], overhead, {
+    ...wireIdentity,
+    wireHistoryDigest: 'e'.repeat(64),
+    wireMessageCount: prefix.length + 1,
+  }, wireUsage(), 800))
+    .toMatchObject({ source: 'estimated', tokens: 800 });
+});

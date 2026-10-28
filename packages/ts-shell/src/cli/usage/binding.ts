@@ -28,7 +28,7 @@ export function bind(host: AccountUsageHost, requireFresh = true): Binding {
   if (current.resolution.provider !== 'openai' || account?.type !== 'openai-chatgpt-account'
     || !account.accountId || !/^[^\x00-\x20\x7f]{1,512}$/.test(account.accountId)) throw new AccountUsageError('unsupported');
   if (requireFresh && (!Number.isFinite(account.expiresAt) || account.expiresAt <= Date.now() + 60000)) throw new AccountUsageError('authentication');
-  captureAccountEdit(current.workspace, current.resolution);
+  captureAccountEdit(current.workspace, current.resolution, current.sessionId);
   const accountKey = hashContent(`openai\0${account.accountId}`);
   const credentialKey = hashContent(JSON.stringify({ provider: current.resolution.provider, baseUrl: current.resolution.baseUrl,
     source: current.resolution.credential!.source, connectionId: current.resolution.credential!.connectionId, account }));
@@ -39,5 +39,5 @@ export function checkBinding(host: AccountUsageHost, binding: Binding): void {
   if (current.workspace !== binding.workspace || current.sessionId !== binding.sessionId
     || !sameValue(current.resolution.credential, binding.resolution.credential) || current.resolution.provider !== binding.resolution.provider
     || current.resolution.baseUrl !== binding.resolution.baseUrl) throw new Error('Account selection changed; reopen /usage before continuing.');
-  captureAccountEdit(binding.workspace, binding.resolution);
+  captureAccountEdit(binding.workspace, binding.resolution, binding.sessionId);
 }

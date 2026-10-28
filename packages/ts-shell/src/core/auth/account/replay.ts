@@ -7,11 +7,12 @@ import { readLeases } from './lease/state.js';
 import { credentialDigest, refreshLineage } from './lineage.js';
 
 /** Only the existing native login/rotation grant may preserve replay across tokens. */
-export function accountReplayOwner(workspaceRoot: string, resolution: ProviderCredentialResolution): string | undefined {
+export function accountReplayOwner(workspaceRoot: string, resolution: ProviderCredentialResolution,
+  sessionId?: string): string | undefined {
   const account = resolution.credential?.accountAuth;
   if (account?.type !== 'openai-chatgpt-account' || !account.loginId?.trim() || !account.accountId?.trim()) return undefined;
   try {
-    const binding = accountBinding(captureAccountEdit(workspaceRoot, resolution));
+    const binding = accountBinding(captureAccountEdit(workspaceRoot, resolution, sessionId));
     const state = readLeases(captureLeaseStore(refreshLeasesPath()));
     const row = state.leases[refreshLineage({ provider: resolution.provider, refreshToken: account.refreshToken })];
     const grant = row?.grant;

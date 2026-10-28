@@ -30,6 +30,7 @@ import type { RuntimeConfig } from "../../config/runtimeConfig.js"
 import type { ToolDefinition } from "../../tools/types.js"
 import type { SidebarEventSink } from '../../presentation/sidebar/sidebarEventSink.js'
 import type { SidebarLiveEventStore } from '../../presentation/sidebar/sidebarLiveEventStore.js'
+import type { PromptIdentitySnapshot } from '../../observability/usage/model.js'
 
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
@@ -96,11 +97,7 @@ export interface CommandContext {
   /** Current configured pool, resolved on demand by the CLI host. */
   readonly getToolPool?: (signal?: AbortSignal) => Promise<ReadonlyMap<string, ToolDefinition>>
   /** Current effective prompt identity, when the host can prove it. */
-  readonly promptIdentity?: {
-    readonly schemaDigest?: string
-    readonly systemDigest?: string
-    readonly historyDigest?: string
-  }
+  readonly promptIdentity?: PromptIdentitySnapshot
   /** False for scripted invocations; omitted by callers without a CLI host. */
   readonly interactive?: boolean
   /**
@@ -177,7 +174,7 @@ export interface CommandContext {
    */
   readonly runtimeConfig?: RuntimeConfig
   /** Resolve the request provider using the host's explicit selection inputs. */
-  readonly resolveConfigTarget?: (config: RuntimeConfig) => ProviderCredentialResolution
+  readonly resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution
   /** Read the configuration and catalogue from one accepted publication. */
   readonly readConfiguration?: () => { readonly config: RuntimeConfig; readonly catalog: readonly CatalogProvider[]; readonly revision?: number; readonly binding?: import('../../config/state.js').ConfigBinding }
   readonly admission?: () => string | undefined

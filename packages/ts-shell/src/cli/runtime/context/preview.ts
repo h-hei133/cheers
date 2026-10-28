@@ -17,14 +17,19 @@ import { selectModelContext } from '../../../session/context/selection.js';
 import { openingMessage } from '../../../turn/opening.js';
 import { getSessionUsage } from '../../../observability/usageTelemetry.js';
 import { estimatePrompt } from '../../../context/request/estimate.js';
-import { requestIdentity } from '../../../context/request/identity.js';
+import { historyDigest, requestIdentity } from '../../../context/request/identity.js';
 import { capturePromptSources } from '../../../context/request/sources.js';
 import { assertContextBounds, contextEntryPathWithinRoot } from '../../../context/attachment/entry.js';
 import { verifyContextEntries } from '../../../context/attachment/verify.js';
 import { sourceAccessFor, sourceReaderForAsync } from '../../data/access.js';
 import type { PromptAttachments } from '../../../core/shell/sessionRuntime.js';
 import { resolveProviderCredential } from '../../../core/shell/providerCredentials.js';
-import { finalStepMessages, outgoingMessages } from '../../../turn/messages.js';
+import {
+  finalStepMessages,
+  hasToolHistory,
+  outgoingMessages,
+  TOOL_HISTORY_UNSUPPORTED_MESSAGE,
+} from '../../../turn/messages.js';
 import { resolveRequestShape } from '../../../core/models/requestShape.js';
 import { captureUsageAttribution } from '../../../observability/usage/identity.js';
 import { estimateWirePrompt } from '../../../context/request/wire.js';
@@ -44,6 +49,8 @@ import { researchEntryRequest, researchTurnPrompt } from '../../../research/run/
 import { researchPreviewTools } from '../../../research/run/tools.js';
 import { clearResearchPreview, prepareResearchPreview } from './research.js';
 import { clearReviewPreview, clearStaleReviewPreview, prepareReviewPreview } from './review.js';
+import { systemPromptSnapshot } from '../../../turn/prompt.js';
+import { providerRequestTarget } from '../../provider/requestTarget.js';
 
 /** A local estimate never connects MCP, accepts an injection or starts a driver. */
 export async function previewContext(context: ShellRuntimeContext, manager: SessionManager, gateway: CliMcpGateway,
@@ -128,7 +135,8 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     ...(snapshot ? { mcpGateway: { snapshot: async () => snapshot } } : {}),
     featureTools: features, admission, signal, onSource: sources.track,
     ...(forcedTool ? { forcedTool, allowedTools: [forcedTool] } : {}) });
-  const resolution = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+  const resolution = context.resolveConfigTarget?.(config, expected.id)
+    ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: expected.id } });
   if (!resolution?.model || resolution.blocked) throw new Error('Model request identity is unavailable.');
   const base = providerCredentialBaseUrl(publication.catalog, resolution);
   if (!base) throw new Error('Model request destination is unavailable.');
@@ -143,11 +151,15 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   if (resolution.thinkingEffort === undefined) sources.track(projectStatePath(cwd));
   const preference = captureThinkingPreference(cwd, resolution.thinkingEffort);
   const shape = resolveRequestShape(publication.catalog, resolution.provider, resolution.model, preference.thinkingEffort ?? undefined, base);
-  const overhead = prepared.currentOverhead();
-  const schemas = toolSchemas(prepared.currentTools());
+  if (!shape.toolCalling && hasToolHistory(messages)) throw new Error(TOOL_HISTORY_UNSUPPORTED_MESSAGE);
+  const schemas = shape.toolCalling ? toolSchemas(prepared.currentTools()) : [];
   // The turn owner counts the first step before dispatch; a one-step run is closing.
-  const allowTools = config.maxTurns > 1;
-  const assembledIdentity = requestIdentity({ ...overhead, tools: allowTools ? schemas : [] });
+  const allowTools = config.maxTurns > 1 && shape.toolCalling;
+  const systemPrompt = shape.toolCalling
+    ? prepared.system.text
+    : systemPromptSnapshot(review ? 'plan' : agentMode, prepared.promptContext, false).text;
+  const overhead = { systemPrompt, tools: allowTools ? schemas : [] };
+  const assembledIdentity = requestIdentity(overhead);
   const configuredOutput = configuredOutputLimit(config, endpoint);
   const serviceTier = config.providerConnections?.find(item => item.id === resolution.credential?.connectionId)?.serviceTier
     ?? config.providerCredentials?.[resolution.provider]?.serviceTier;
@@ -155,9 +167,20 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     throw new Error('Configured service tier is unavailable.');
   }
   const output = protocol.outputControl === 'provider' ? undefined : shape.maxOutputCeiling;
+  const wireMessages = finalStepMessages(
+    outgoingMessages(messages, shape.assistantAfterToolResult),
+    allowTools,
+    schemas.length > 0,
+  );
+  const wireHistoryDigest = historyDigest(wireMessages);
+  const targetIdentity = resolution.credential
+    ? providerRequestTarget({ workspaceRoot: cwd, sessionId: expected.id, resolution, baseUrl: base, endpoint })
+    : undefined;
+  const replayBinding = targetIdentity?.replayBinding
+    ?? requestReplayBinding({ provider: resolution.provider, endpoint, baseUrl: base });
   const body = endpointTurnBody(endpoint, { model: resolution.model, provider: resolution.provider,
-    replayBinding: requestReplayBinding({ provider: resolution.provider, endpoint, baseUrl: base }),
-    systemPrompt: overhead.systemPrompt ?? '', messages: finalStepMessages(outgoingMessages(messages, shape.assistantAfterToolResult), allowTools, schemas.length > 0),
+    replayBinding,
+    systemPrompt, messages: wireMessages,
     tools: schemas, allowTools, vision: shape.vision, temperature: config.temperature ?? 0.7,
     topP: config.topP, maxOutputTokens: configuredOutput ?? output, serviceTier,
     thinkingLevelName: shape.thinkingLevelName, thinkingBudgetTokens: shape.thinkingBudgetTokens,
@@ -167,7 +190,8 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   });
   const endpointId = captureUsageAttribution({ provider: resolution.provider, model: resolution.model, baseUrl: base }).endpointId;
   const estimate = estimatePrompt(messages, overhead, { provider: resolution.provider, model: resolution.model,
-    endpoint, endpointId, ...assembledIdentity }, getSessionUsage(expected.id), estimateWirePrompt(body, protocol.contextFields));
+    endpoint, endpointId, ...assembledIdentity, wireHistoryDigest, wireMessageCount: wireMessages.length, replayBinding },
+  getSessionUsage(expected.id), estimateWirePrompt(body, protocol.contextFields));
   let suspended = false;
   const verify = () => {
     try {
@@ -177,7 +201,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
         try { access(entry.path); } catch { throw new Error('Context preview is stale.'); }
       }
       if ([...skills.skills.values()].some(skill => skill.isCurrent?.() === false)) throw new Error('Skill catalogue changed.');
-      if (JSON.stringify(requestIdentity({ ...prepared.currentOverhead(), tools: allowTools ? toolSchemas(prepared.currentTools()) : [] })) !== JSON.stringify(assembledIdentity)
+      if (JSON.stringify(requestIdentity({ systemPrompt, tools: allowTools ? toolSchemas(prepared.currentTools()) : [] })) !== JSON.stringify(assembledIdentity)
         || JSON.stringify(toolSchemas(new Map(foregroundTools(context).map(tool => [tool.name, tool])))) !== featureIdentity) {
         throw new Error('Request tool schemas changed.');
       }
@@ -186,10 +210,18 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
         || JSON.stringify([context.contextAttachments, context.transientContextAttachments]) !== entryIdentity
         || catalogContributions(cwd, expected.id).some((entry, index) => entry !== contributions[index])
         || catalogContributions(cwd, expected.id).length !== contributions.length) throw new Error('Context preview is stale.');
-      const selected = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+      const selected = context.resolveConfigTarget?.(config, expected.id)
+        ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: expected.id } });
+      const selectedTarget = selected.credential
+        ? providerRequestTarget({ workspaceRoot: cwd, sessionId: expected.id, resolution: selected, baseUrl: base, endpoint })
+        : undefined;
       if (selected.blocked || selected.provider !== resolution.provider || selected.model !== resolution.model
         || selected.thinkingEffort !== resolution.thinkingEffort || providerCredentialBaseUrl(publication.catalog, selected) !== base
-        || (providerCredentialEndpoint(publication.catalog, selected, base) ?? DEFAULT_ENDPOINT_KIND) !== endpoint) {
+        || (providerCredentialEndpoint(publication.catalog, selected, base) ?? DEFAULT_ENDPOINT_KIND) !== endpoint
+        || selectedTarget?.replayBinding !== targetIdentity?.replayBinding
+        || selectedTarget?.credentialId !== targetIdentity?.credentialId
+        || selectedTarget?.credentialGeneration !== targetIdentity?.credentialGeneration
+        || selectedTarget?.replayOwner !== targetIdentity?.replayOwner) {
         throw new Error('Model request target changed.');
       }
       if (config.enableMcpTools && JSON.stringify(gateway.peekSnapshot?.()) !== JSON.stringify(snapshot)) throw new Error('MCP catalogue changed.');

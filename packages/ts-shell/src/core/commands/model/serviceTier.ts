@@ -19,7 +19,8 @@ import { selectedModelMatches, selectionRequest } from './target.js';
 export function effectiveServiceTier(context: CommandContext): string | undefined {
   const config = context.readConfiguration?.().config ?? context.runtimeConfig
     ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
-  const target = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+  const target = context.resolveConfigTarget?.(config, context.sessionId)
+    ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
   return config.providerConnections?.find(item => item.id === config.activeProviderConnectionId && item.provider === target.provider)?.serviceTier
     ?? config.providerCredentials?.[target.provider]?.serviceTier;
 }

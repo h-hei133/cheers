@@ -48,6 +48,7 @@ function failed(): StoredAccountRenewal {
 /** The native response is fingerprinted before storage; only exact verified storage grants its successor. */
 export async function renewStoredAccount(input: {
   readonly workspaceRoot: string;
+  readonly sessionId?: string;
   readonly resolution: ProviderCredentialResolution;
   readonly fetchImpl: typeof fetch;
   readonly admission?: Admission;
@@ -65,7 +66,7 @@ export async function renewStoredAccount(input: {
   try {
     assertAdmission(input.admission);
     const store = captureLeaseStore(refreshLeasesPath());
-    const edit = captureAccountEdit(input.workspaceRoot, input.resolution);
+    const edit = captureAccountEdit(input.workspaceRoot, input.resolution, input.sessionId);
     const lease = acquireRefreshLease({ provider: input.resolution.provider,
       credentialId: `${input.resolution.provider}:${input.resolution.credential?.connectionId ?? 'config'}`,
       refreshToken: original.refreshToken, ...('clientId' in original ? { clientId: original.clientId } : {}),

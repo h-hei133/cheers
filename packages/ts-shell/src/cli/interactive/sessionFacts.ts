@@ -30,7 +30,8 @@ export function shortenPath(target: string): string {
 /** Model identifier selected for requests by this host. */
 export function activeModelName(context: ShellRuntimeContext): string {
   const config = context.configuration.current.config;
-  const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+  const active = context.resolveConfigTarget?.(config, context.session.id)
+    ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
   return active.model ?? active.provider;
 }
 
@@ -55,7 +56,8 @@ export function readStatusFacts(
   live: LiveStatusFacts = {},
 ): StatusFacts {
   const { config, catalog } = context.configuration.current;
-  const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+  const active = context.resolveConfigTarget?.(config, context.session.id)
+    ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
   let activeBaseUrl = active.baseUrl;
   let activeEndpoint: string | undefined;
   try {
@@ -65,9 +67,10 @@ export function readStatusFacts(
     activeEndpoint = undefined;
   }
   const usage = getSessionUsage(context.session.id);
-  const measured = active.model && activeEndpoint ? measuredPromptContext(context.session.id, { provider: active.provider, model: active.model,
-    endpoint: activeEndpoint, ...(activeBaseUrl ? { endpointId: captureUsageAttribution({ provider: active.provider,
-      model: active.model, baseUrl: activeBaseUrl }).endpointId } : {}), ...(context.promptIdentity ?? {}) },
+  const measured = active.model && activeEndpoint ? measuredPromptContext(context.session.id, {
+    ...(context.promptIdentity ?? {}), provider: active.provider, model: active.model, endpoint: activeEndpoint,
+    ...(activeBaseUrl ? { endpointId: captureUsageAttribution({ provider: active.provider,
+      model: active.model, baseUrl: activeBaseUrl }).endpointId } : {}) },
     context.promptIdentity ? { requireExpectedIdentity: true } : {}) : undefined;
   // Summed across the models that answered, each at the rate published for the
   // provider that served it. A session that switched models — or providers — spent

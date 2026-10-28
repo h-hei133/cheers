@@ -77,16 +77,18 @@ export interface SystemPromptContext {
 export function buildSystemPrompt(
   agentMode: "plan" | "build" | undefined,
   context?: SystemPromptContext,
+  toolsAvailable = true,
 ): string {
-  return systemPromptSnapshot(agentMode, context).text;
+  return systemPromptSnapshot(agentMode, context, toolsAvailable).text;
 }
 
 /** Text and source sizes are assembled together, before endpoint escaping or wrapping. */
 export function systemPromptSnapshot(
   agentMode: 'plan' | 'build' | undefined,
   context?: SystemPromptContext,
+  toolsAvailable = true,
 ): { readonly text: string; readonly sources: readonly PromptSource[] } {
-  const sections = [
+  const sections = toolsAvailable ? [
     `You are an expert autonomous coding agent equipped with real tools (${context?.toolNames?.join(", ") ?? "none available"}).`,
     agentMode === "plan"
       ? "PLAN MODE ACTIVE: You have full access to inspect files, search symbols via LSP, run safe read-only commands (like git status, git diff) via bash, and explore websites via browser and web tools, but cannot modify files. Produce a structured execution plan based on real file contents."
@@ -98,6 +100,15 @@ export function systemPromptSnapshot(
     "3. For web searching: use `web_search` to retrieve online technical references.",
     "4. For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests/git).",
     "5. User Permission & Denial Feedback: When a tool execution is denied by the user, immediately respect the decision. If the user provided feedback or alternative instructions (e.g. changing filenames, using different arguments, or avoiding certain actions), you MUST strictly follow their feedback and not retry the rejected action.",
+  ] : [
+    "You are an expert autonomous coding agent. No tools are available for this turn.",
+    agentMode === "plan"
+      ? "PLAN MODE ACTIVE: Answer from the conversation and supplied context. You cannot inspect files, run commands, browse, or modify the workspace."
+      : "BUILD MODE ACTIVE: Answer from the conversation and supplied context. You cannot inspect files, run commands, browse, or modify the workspace.",
+    "CRITICAL ANSWER RULES:",
+    "1. Answer directly from the available conversation and context.",
+    "2. Do not claim to inspect, execute, browse, or modify anything.",
+    "3. If the task requires unavailable tools, state that limitation rather than inventing a result.",
   ]
 
   // Instructions come after the rules that describe how to work and before the

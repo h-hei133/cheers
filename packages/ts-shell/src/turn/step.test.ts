@@ -9,8 +9,11 @@ import { declareEndpoint } from "../provider/endpoints/index.js";
 import { crc32 } from "../provider/aws/eventStream.js";
 import { runAgentLoop } from "../core/agent/loop.js";
 import { sendSentRequest, type SentRequest } from "../provider/request/sentRequest.js";
-import { historyDigest } from '../context/request/identity.js';
+import { historyDigest, requestIdentity } from '../context/request/identity.js';
 import { BUILTIN_PROVIDERS } from '../core/models/catalog.js';
+import { buildSystemPrompt } from './prompt.js';
+import { estimateRequestTokens } from '../session/context.js';
+import { FINAL_STEP_MESSAGE, outgoingProjection } from './messages.js';
 
 /**
  * The step is the only place a provider is spoken to. What matters here is
@@ -66,6 +69,80 @@ describe("createStepFunction", () => {
     expect(identities).toHaveLength(2);
     expect(identities[0]!.systemDigest).toBe(identities[1]!.systemDigest);
     expect(identities[0]!.schemaDigest).not.toBe(identities[1]!.schemaDigest);
+  });
+
+  it("omits tool declarations and refuses tool history for a model that cannot call tools", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    let sent: SentRequest | undefined;
+    const step = createStepFunction({
+      ...request,
+      provider: { ...request.provider, provider: "fixture" },
+      catalog: [{ id: "fixture", models: [{ id: "m", toolCalling: false }] }],
+      tools: [{ type: "function", function: { name: "read", parameters: { type: "object" } } }],
+      systemPromptSources: [{ kind: "base", bytes: 8, codeUnits: 8 }],
+      systemPromptFor: (agentMode, toolNames, toolsAvailable = true) =>
+        buildSystemPrompt(agentMode, { toolNames }, toolsAvailable),
+      fetchImpl: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] });
+      },
+    });
+
+    expect(await step([{ role: "user", content: "hello" }], undefined, {}, {
+      allowTools: true,
+      onRequestSent: request => { sent = request; },
+    }))
+      .toMatchObject({ stopReason: "stop", text: "answer" });
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).not.toHaveProperty("tools");
+    expect(bodies[0]).not.toHaveProperty("tool_choice");
+    expect(bodies[0]?.messages).toEqual([{ role: "system", content: buildSystemPrompt(undefined, { toolNames: [] }, false) },
+      { role: "user", content: "hello" }]);
+    expect(JSON.stringify(bodies[0]?.messages)).not.toContain("You have reached the limit of steps");
+    expect(sent?.promptIdentity?.schemaDigest).toBe(requestIdentity({ tools: [] }).schemaDigest);
+    expect(sent?.context?.systemSources).toBeUndefined();
+
+    const history = [
+      { role: "user" as const, content: "read the file" },
+      { role: "assistant" as const, content: "", tool_calls: [{ id: "call-1", type: "function" as const,
+        function: { name: "read", arguments: "{}" } }] },
+      { role: "tool" as const, tool_call_id: "call-1", content: "contents" },
+    ];
+    const result = await step(history, undefined, {}, { allowTools: true });
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toContain("does not support tool history");
+    expect(bodies).toHaveLength(1);
+  });
+
+  it.each([undefined, true])("keeps the tool prompt for a model with tool calling %s", async (toolCalling) => {
+    let body: Record<string, unknown> | undefined;
+    let promptCalls = 0;
+    const step = createStepFunction({
+      ...request,
+      provider: { ...request.provider, provider: "fixture" },
+      catalog: [{ id: "fixture", models: [{
+        id: "m",
+        ...(toolCalling === undefined ? {} : { toolCalling }),
+      }] }],
+      systemPrompt: "stable tools prompt",
+      systemPromptFor: () => {
+        promptCalls += 1;
+        return "replacement prompt";
+      },
+      tools: [{ type: "function", function: { name: "read", parameters: { type: "object" } } }],
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step([{ role: "user", content: "hello" }], undefined, {}, { allowTools: true });
+
+    expect(body?.tools).toHaveLength(1);
+    expect(body?.tool_choice).toBe("auto");
+    expect(body?.messages).toEqual([{ role: "system", content: "stable tools prompt" },
+      { role: "user", content: "hello" }]);
+    expect(promptCalls).toBe(0);
   });
 
   it('observes the exact accepted serialization and drops static source claims for delegated prompts', async () => {
@@ -136,6 +213,110 @@ describe("createStepFunction", () => {
     expect(result.stopReason).toBe("error");
     expect(result.errorMessage).toMatch(/^Context overflow:/);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("budgets the closing request with withheld schemas and its synthetic instruction", async () => {
+    const id = "step-closing-budget";
+    resetSessionUsage(id);
+    const messages = [{ role: "user" as const, content: "hello" }];
+    const closingTokens = estimateRequestTokens(
+      [...messages, { role: "user", content: FINAL_STEP_MESSAGE }],
+      { systemPrompt: request.systemPrompt, tools: [] },
+    );
+    const fetchImpl = vi.fn(async () => jsonResponse({
+      choices: [{ message: { content: "answer" }, finish_reason: "stop" }],
+    }));
+    const create = (contextWindow: number) => createStepFunction({
+      ...request,
+      sessionId: id,
+      contextWindow,
+      maxOutputTokens: 1,
+      provider: { ...request.provider, provider: "fixture" },
+      catalog: [{ id: "fixture", models: [{ id: "m" }] }],
+      tools: [{
+        type: "function",
+        function: {
+          name: "read",
+          description: "x".repeat(40_000),
+          parameters: { type: "object" },
+        },
+      }],
+      fetchImpl,
+    });
+
+    try {
+      expect(await create(closingTokens + 1)(messages, undefined, {}, { allowTools: false }))
+        .toMatchObject({ stopReason: "stop", text: "answer" });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+      const blocked = await create(closingTokens)(messages, undefined, {}, { allowTools: false });
+      expect(blocked.stopReason).toBe("error");
+      expect(blocked.errorMessage).toMatch(/^Context overflow:/);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    } finally {
+      resetSessionUsage(id);
+    }
+  });
+
+  it("budgets the closing request from its microcompacted wire history", async () => {
+    const id = "step-wire-budget";
+    resetSessionUsage(id);
+    const messages = [
+      { role: "user" as const, content: "first" },
+      { role: "assistant" as const, content: "", tool_calls: [{ id: "call-1", type: "function" as const,
+        function: { name: "read", arguments: "{}" } }] },
+      { role: "tool" as const, tool_call_id: "call-1", content: "x".repeat(5_000) },
+      { role: "user" as const, content: "second" },
+      { role: "assistant" as const, content: "done" },
+      { role: "user" as const, content: "third" },
+      { role: "assistant" as const, content: "done" },
+      { role: "user" as const, content: "fourth" },
+      { role: "assistant" as const, content: "done" },
+      { role: "user" as const, content: "current" },
+    ];
+    const projection = outgoingProjection(messages, false);
+    expect(projection.sourceAligned).toBe(false);
+    expect(JSON.stringify(projection.messages)).toContain("Omitted");
+    const overhead = { systemPrompt: request.systemPrompt, tools: [] };
+    const wireMessages = [...projection.messages, { role: "user", content: FINAL_STEP_MESSAGE }]
+      .map(message => ({ ...message, content: message.content ?? "" }));
+    const wireTokens = estimateRequestTokens(wireMessages, overhead);
+    const rawTokens = estimateRequestTokens(
+      [...messages, { role: "user", content: FINAL_STEP_MESSAGE }],
+      overhead,
+    );
+    expect(rawTokens).toBeGreaterThan(wireTokens);
+    const bodies: Record<string, unknown>[] = [];
+    const step = createStepFunction({
+      ...request,
+      sessionId: id,
+      contextWindow: wireTokens + 1,
+      maxOutputTokens: 1,
+      provider: { ...request.provider, provider: "fixture" },
+      catalog: [{ id: "fixture", models: [{ id: "m" }] }],
+      tools: [{ type: "function", function: { name: "read", parameters: { type: "object" } } }],
+      fetchImpl: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return jsonResponse({
+          choices: [{ message: { content: "answer" }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 1, completion_tokens: 1 },
+        });
+      },
+    });
+
+    try {
+      expect(await step(messages, undefined, {}, { allowTools: false }))
+        .toMatchObject({ stopReason: "stop", text: "answer" });
+      expect(bodies).toHaveLength(1);
+      expect(JSON.stringify(bodies[0]?.messages)).toContain("Omitted");
+      const telemetry = getSessionUsage(id);
+      expect(telemetry.lastPromptMessageCount).toBe(messages.length);
+      expect(telemetry.lastPromptIdentity?.wireMessageCount).toBe(messages.length + 1);
+      expect(telemetry.lastPromptIdentity?.wireHistoryDigest).toMatch(/^[a-f0-9]{64}$/);
+      expect(telemetry.lastPromptIdentity?.replayBinding).toMatch(/^[a-f0-9]{64}$/);
+    } finally {
+      resetSessionUsage(id);
+    }
   });
 
   it("refuses a prompt over the model's independent input limit before sending", async () => {

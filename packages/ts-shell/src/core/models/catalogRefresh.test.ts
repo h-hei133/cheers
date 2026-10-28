@@ -128,6 +128,7 @@ describe("refreshing the catalogue", () => {
           multimodal: {
             id: "multimodal",
             reasoning: true,
+            tool_call: true,
             temperature: false,
             modalities: { input: ["text", "image"], output: ["text"] },
             limit: { context: 200_000, input: 190_000, output: 32_000 },
@@ -135,6 +136,7 @@ describe("refreshing the catalogue", () => {
           plain: {
             id: "plain",
             reasoning: false,
+            tool_call: false,
             temperature: true,
             modalities: { input: ["text"], output: ["text"] },
             limit: { context: 8_000, output: 2_000 },
@@ -154,6 +156,7 @@ describe("refreshing the catalogue", () => {
       expect(models.find((model) => model.id === "multimodal")).toMatchObject({
         vision: true,
         reasoning: true,
+        toolCalling: true,
         maxTokens: 32_000,
         inputLimit: 190_000,
         compat: { supportsTemperature: false },
@@ -161,11 +164,12 @@ describe("refreshing the catalogue", () => {
       expect(models.find((model) => model.id === "plain")).toMatchObject({
         vision: false,
         reasoning: false,
+        toolCalling: false,
         maxTokens: 2_000,
         compat: { supportsTemperature: true },
       });
       const legacy = models.find((model) => model.id === "legacy");
-      for (const field of ["vision", "reasoning", "maxTokens", "compat"]) {
+      for (const field of ["vision", "reasoning", "toolCalling", "maxTokens", "compat"]) {
         expect(legacy).not.toHaveProperty(field);
       }
     });

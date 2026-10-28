@@ -26,7 +26,8 @@ export function advisorFor(context: ShellRuntimeContext, store: SessionManager, 
       if (publication.admissionBlocked) throw new Error('Advisor configuration is unavailable.');
       const edit = readSessionModelEdit(context.session.id);
       const config = projectModelSelection(publication.config, edit.selection);
-      const main = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+      const main = context.resolveConfigTarget?.(config, context.session.id)
+        ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
       return resolveAdvisorSelection({ target, config, catalog: publication.catalog, main,
         revision: JSON.stringify([publication.revision, edit.revision]) });
     } });

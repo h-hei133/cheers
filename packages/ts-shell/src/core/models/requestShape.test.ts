@@ -109,6 +109,11 @@ describe("resolveRequestShape", () => {
     expect(resolveRequestShape(catalogWith({}), "vendor", "m", undefined).thinkingLevelName).toBeUndefined();
   });
 
+  it("keeps tool calling capable by default and honors an explicit refusal", () => {
+    expect(resolveRequestShape(catalogWith({}), "vendor", "m", undefined).toolCalling).toBe(true);
+    expect(resolveRequestShape(catalogWith({ toolCalling: false }), "vendor", "m", undefined).toolCalling).toBe(false);
+  });
+
   it("uses the model's own name for a level", () => {
     const shape = resolveRequestShape(
       catalogWith({ thinkingLevelMap: { high: "xhigh" } }),

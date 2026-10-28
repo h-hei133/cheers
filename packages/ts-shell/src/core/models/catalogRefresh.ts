@@ -39,6 +39,8 @@ interface IndexModel {
   readonly limit?: { readonly context?: number; readonly input?: number; readonly output?: number };
   /** Whether the model reasons and whether it accepts sampling temperature. */
   readonly reasoning?: boolean;
+  /** Whether the deployment supports tool declarations and tool-call history. */
+  readonly tool_call?: boolean;
   /** How the provider lets a caller control reasoning. */
   readonly reasoning_options?: readonly IndexReasoningOption[];
   readonly temperature?: boolean;
@@ -124,6 +126,7 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
         ...(inputLimit !== undefined ? { inputLimit } : {}),
         ...(maxTokens !== undefined ? { maxTokens } : {}),
         ...(typeof model?.reasoning === "boolean" ? { reasoning: model.reasoning } : {}),
+        ...(typeof model?.tool_call === "boolean" ? { toolCalling: model.tool_call } : {}),
         ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
         ...(vision !== undefined ? { vision } : {}),
         ...(compat ? { compat } : {}),

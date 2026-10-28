@@ -29,6 +29,7 @@ import type { DenyRule } from "../core/shell/approval/deny.js";
 import type { CacheWarmingRunner } from "./cacheWarm.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { getSessionUsage, recordRequestContext } from '../observability/usageTelemetry.js';
+import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 
 /**
  * One user turn, driven through the kernel.
@@ -78,7 +79,7 @@ export interface TurnOptions {
   /** Commit prepared prompt context after startup checks, immediately before kernel entry. */
   readonly onPromptAccepted?: () => void;
   /** Receives the exact prompt identity for each accepted foreground request. */
-  readonly onPromptIdentity?: (identity: { readonly schemaDigest: string; readonly systemDigest: string; readonly historyDigest?: string }) => void;
+  readonly onPromptIdentity?: (identity: PromptIdentitySnapshot) => void;
   /**
    * Images the user attached to this prompt.
    *

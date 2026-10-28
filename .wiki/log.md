@@ -9880,3 +9880,17 @@ refresh回归覆盖partial、budget+effort、empty、toggle、budget、special�
 第一百零九批迟到读回确认`23550c7d`CI`40625431536`与`803b9741`CI`40626395673`均failure，唯一失败为`test:scripts`完整declaration graph发现`catalog.ts -> limits.ts -> catalog.ts`。轻量`verify:import-cycles`报0，未捕获type-only back-edge；两个旧SHA不改记为绿色。
 
 limits现用本地structural generic，不再import catalog type，只读取并准入contextWindow/inputLimit/maxTokens后重建返回；catalog单向依赖保持，运行语义不变。主代理heap768MiB串行`test:scripts`175项通过，六文件75项及TS build`4da89e6e9976`通过，build heap1536MiB；limits SHA-256`2459d84e`。修复提交push/CI另绑定，未运行真实provider/models.dev刷新、PTY/exe、桌面/Windows、全仓或原Phase20矩阵，ADD整体active。
+
+## [2026-10-28] fix | 不支持工具的目录模型不再接收工具形状
+
+第一百一十批确认models.dev的`tool_call:boolean`在refresh中被丢弃，而dispatch始终向模型声明工具；显式`false`模型仍收到工具schema和工具型系统提示，带既有tool history时还可能发送其无法理解的形状。refresh现将boolean投影为`toolCalling`，absent保持capable，reviewed built-in和用户catalog优先级保持。
+
+dispatch与preview现从同一resolved shape决定effective schemas、`allowTools`、系统提示、收尾消息、schema/system/history digest与预算；非工具模型不声明工具、不使用工具提示、不追加仅因schema存在的收尾指令，并在发送前拒绝tool history。foreground无工具模型沿用host plan/build mode，closing预算排除未发送schema且计入实际合成指令。六组聚焦反转产生1/6/1/1/1/1项预期失败，preview反转保留77项控制通过；源码逐字节恢复并核对SHA-256`e7f587ee`/`166e186c`/`5150b622`/`8ffcd59e`/`35a8b3f8`后重验。
+
+独立只读复核另发现account-pool的preview/dispatch可能选择不同成员：resolver已支持session ID，dispatch bridge也传入，但bootstrap callback丢弃，pool affinity因此只在真实发送时生效。现resolver合同保留可选session ID，bootstrap、初始/刷新配置、scope、preview、status、`/usage`、model命令与picker、handoff、advisor、renewal及account-state capture均传捕获session，fallback pool也使用同一输入；`/usage`在检查/重置前会重新验证同一成员。两成员pool固定到非首项后，真实preview与provider step的完整本地HTTP body、replay binding及schema/system/history/wire-history身份逐项一致；bootstrap回归另锁回调传参。
+
+第二轮只读review确认三项closure均无remaining finding：sessionless resolution、preview目标复核不完整及prompt身份传播不完整。新的request-target owner让preview与dispatch共同捕获headers、replay binding/owner及credential ID/generation，preview revalidate会比较完整目标，因此同模型/端点下的pool fallback或credential backoff变化不会沿用旧预览；`PromptIdentitySnapshot`把完整请求身份传到SentRequest、turn、runtime、状态栏和`/context`。
+
+closure阶段两组最终反转分别移除preview完整目标比较、移除step的wire-history/count/replay identity，均触发1项预期失败；未计skip为通过，源码逐字节恢复后preview SHA-256`1a1c6942`、step`81e52d01`。主代理heap768MiB、2 worker单进程串行18文件500项通过；`test:scripts`175项、五静态门、module facade0及diff通过。heap1536MiB fresh TS build`512adc9920fc`通过，inputs`075c3ed4a840`、artifact`19bde0f1847a`，fresh build后5个受影响compiled CLI文件7项通过。
+
+误启动的broad suite不计为验收：旧build下5文件/7项按freshness拒绝，另有1个worker OOM。前一HEAD`9f10edbe`CI`40628156612`及Watch`40628156518`均success；本批commit/push/CI另绑定。未运行真实provider/models.dev刷新、PTY/exe、桌面/Windows或20k历史，原Phase20矩阵未重跑且仍为35/12/0，ADD整体active。

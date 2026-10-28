@@ -41,7 +41,8 @@ export function usageCommandFor(context: ShellRuntimeContext): NonNullable<Comma
       if (refusal || context.session.id !== sessionId || context.projectRoot !== workspace) throw new Error(refusal ?? 'Account session or workspace changed.');
     };
     const host = { current: () => ({ workspace: context.projectRoot, sessionId: context.session.id,
-      resolution: command.resolveConfigTarget?.(context.runtimeConfig) ?? resolveProviderCredential({ runtimeConfig: context.runtimeConfig }) }),
+      resolution: command.resolveConfigTarget?.(context.runtimeConfig, context.session.id)
+        ?? resolveProviderCredential({ runtimeConfig: context.runtimeConfig, pool: { sessionId: context.session.id } }) }),
     check, gate: (tool: string) => { const original = gate(tool); return { ...original, admission: () => { try { check(); return original.admission?.(); } catch { return 'Account request authority changed.'; } } }; },
     approveReset: installed!.approve ?? (async prompt => ({ promptId: prompt.id, decision: 'deny' as const, respondedAt: Date.now(), userComment: 'Explicit account confirmation is unavailable.' })) };
     if (!status) pending.add(context);

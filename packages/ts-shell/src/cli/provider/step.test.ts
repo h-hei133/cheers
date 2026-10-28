@@ -80,6 +80,32 @@ function ordinaryTurn(setup: ReturnType<typeof createAdvisorHarness>, server: Aw
   return { messages, finished: (async () => { for await (const _event of turn.events) { /* consume actual native turn */ } })() };
 }
 
+it('uses the host plan mode for a foreground model that cannot call tools', async () => {
+  const setup = createAdvisorHarness(false, false);
+  const server = await wire(setup);
+  const providerCatalog = server.request.providerCatalog!.map(provider => ({
+    ...provider,
+    models: provider.models.map(model => model.id === 'primary-model'
+      ? { ...model, toolCalling: false }
+      : model),
+  }));
+  const step = createProviderStep({
+    ...server.request,
+    agentMode: 'plan',
+    providerCatalog,
+  }, new Map(), {});
+
+  const result = await step([{ role: 'user', content: 'Plan without tools' }], setup.signal, {}, { allowTools: true });
+
+  expect(result).toMatchObject({ stopReason: 'stop', text: 'INDEPENDENT_ADVISOR_FINDING' });
+  expect(server.received).toHaveLength(1);
+  expect(server.received[0]?.tools).toBeUndefined();
+  const messages = server.received[0]?.messages as Array<{ readonly role: string; readonly content?: string }>;
+  expect(messages[0]?.content).toContain('PLAN MODE ACTIVE: Answer from the conversation');
+  expect(messages[0]?.content).not.toContain('BUILD MODE ACTIVE');
+  expect(messages[0]?.content).not.toContain('equipped with real tools');
+});
+
 it('dispatches a subagent using the effort saved in the role panel while the main request keeps its own setting', async () => {
   const setup = createAdvisorHarness(false, false); const server = await wire(setup);
   const connection = { id: 'role-wire', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'synthetic-role-wire',

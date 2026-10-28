@@ -65,7 +65,8 @@ async function inspectContext(context: CommandContext): Promise<LocalCommandResu
   // The same resolution the compaction engine performs, so the number reported
   // here is the number in force. Asking the credential resolver for the active
   // model is what makes this per-model rather than one global value.
-  const active = context.resolveConfigTarget?.(runtimeConfig) ?? resolveProviderCredential({ runtimeConfig });
+  const active = context.resolveConfigTarget?.(runtimeConfig, context.sessionId)
+    ?? resolveProviderCredential({ runtimeConfig, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
   const catalog = publication?.catalog ?? loadCatalog();
   let activeBaseUrl = active.baseUrl;
   let activeEndpoint: string | undefined;
@@ -105,6 +106,8 @@ async function inspectContext(context: CommandContext): Promise<LocalCommandResu
   const expectedSchemaDigest = context.promptIdentity?.schemaDigest;
   const expectedSystemDigest = context.promptIdentity?.systemDigest;
   const expectedHistoryDigest = context.promptIdentity?.historyDigest;
+  const expectedWireHistoryDigest = context.promptIdentity?.wireHistoryDigest;
+  const expectedReplayBinding = context.promptIdentity?.replayBinding;
   const expectedEndpointId = active.model === undefined || activeBaseUrl === undefined ? undefined
     : captureUsageAttribution({ provider: active.provider, model: active.model, baseUrl: activeBaseUrl }).endpointId;
   const expectedIdentity = active.model === undefined ? undefined : {
@@ -115,6 +118,8 @@ async function inspectContext(context: CommandContext): Promise<LocalCommandResu
     ...(expectedSchemaDigest !== undefined ? { schemaDigest: expectedSchemaDigest } : {}),
     ...(expectedSystemDigest !== undefined ? { systemDigest: expectedSystemDigest } : {}),
     ...(expectedHistoryDigest !== undefined ? { historyDigest: expectedHistoryDigest } : {}),
+    ...(expectedWireHistoryDigest !== undefined ? { wireHistoryDigest: expectedWireHistoryDigest } : {}),
+    ...(expectedReplayBinding !== undefined ? { replayBinding: expectedReplayBinding } : {}),
   };
   const hasExpectedIdentity = expectedIdentity?.schemaDigest !== undefined && expectedIdentity.systemDigest !== undefined;
   // A complete stored identity is not evidence that it still describes the

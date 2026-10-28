@@ -37,7 +37,8 @@ export function targetResolutionIdentity(context: CommandContext, config: Runtim
 /** Preference edits preserve legacy cascade semantics as well as explicit bindings. */
 export function selectionRequest(context: CommandContext, config: RuntimeConfig, selection: SessionModelSelection) {
   const candidate = projectModelSelection(config, selection);
-  return context.resolveConfigTarget?.(candidate) ?? resolveProviderCredential({ runtimeConfig: candidate });
+  return context.resolveConfigTarget?.(candidate, context.sessionId)
+    ?? resolveProviderCredential({ runtimeConfig: candidate, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
 }
 
 /** Named targets require their own credential. Provider targets use the accepted CLI/env/profile source. */
@@ -48,7 +49,8 @@ export function exactTargetMatches(context: CommandContext, config: RuntimeConfi
   const actual = targetRequest(context, config, target);
   if (actual.blocked || !actual.credential || actual.provider !== target.provider || actual.model !== target.model) return false;
   if (providerSlot) return actual.credential.connectionId === undefined;
-  const expected = resolveProviderCredential({ runtimeConfig: projectModelSelection(config, scopedModelTarget(target)) });
+  const expected = resolveProviderCredential({ runtimeConfig: projectModelSelection(config, scopedModelTarget(target)),
+    ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
   return actual.baseUrl === expected.baseUrl && sameValue(actual.credential, expected.credential);
 }
 

@@ -5,6 +5,12 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SessionManager } from "../../session/SessionManager.js";
 import { createSessionStoreLayout } from "../../session/store/sessionFileLayout.js";
 import {
+  getUserRuntimeConfigPath,
+  readRuntimeConfigEditAt,
+  writeUserRuntimeConfigFile,
+} from "../../config/runtimeConfig.js";
+import { selectPooledConnection } from "../../core/auth/account/pool.js";
+import {
   createCliBootstrapRuntimeContext,
   createCliRootContext,
 } from "./cliBootstrapContext.js";
@@ -61,6 +67,41 @@ it.each([0, 100, 1_000, 10_000])(
     expect(bootstrap.runtimeContext.session.projectRoot).toBe(workspace);
   },
 );
+
+it("resolves a pooled target with the bootstrapped session identity", () => {
+  const baseUrl = "https://fixture.invalid/v1";
+  const connection = (id: string) => ({
+    id, provider: "openai" as const, authType: "api-key" as const, apiKey: `synthetic-${id}`,
+    baseUrl, model: "fixture", status: "connected" as const,
+    createdAt: "2026-01-01", updatedAt: "2026-01-01",
+  });
+  writeUserRuntimeConfigFile({
+    provider: "openai",
+    providerConnections: [connection("first"), connection("second")],
+    accountPool: { openai: { connections: ["first", "second"] } },
+  }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+
+  const options = {};
+  const rootContext = createCliRootContext({ launchCwd: workspace, options });
+  const bootstrap = createCliBootstrapRuntimeContext({
+    launchCwd: workspace,
+    options,
+    rootContext,
+    writeError: vi.fn(),
+    exit: () => {
+      throw new Error("bootstrap unexpectedly exited");
+    },
+  });
+  const { session, resolveConfigTarget } = bootstrap.runtimeContext;
+  const config = bootstrap.runtimeContext.runtimeConfig;
+  expect(selectPooledConnection({
+    config, provider: "openai", connectionId: "second", sessionId: session.id,
+  })).toMatchObject({ connection: { id: "second" } });
+
+  expect(resolveConfigTarget?.(config, session.id)).toMatchObject({
+    credential: { connectionId: "second", apiKey: "synthetic-second" },
+  });
+});
 
 it("rejects a missing explicit config before bootstrap", () => {
   const missing = path.join(workspace, "missing.json");

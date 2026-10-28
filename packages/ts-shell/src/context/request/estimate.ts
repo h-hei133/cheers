@@ -18,10 +18,17 @@ export function estimatePrompt(messages: readonly AgentMessage[], overhead: Requ
   identity: PromptMeasurementIdentity, usage: SessionUsageTelemetry, projectedTokens?: number): PromptEstimate {
   const previous = usage.lastPromptIdentity;
   const count = usage.lastPromptMessageCount;
+  const comparedWireIdentity = previous?.wireHistoryDigest !== undefined || identity.wireHistoryDigest !== undefined;
+  const sameWireIdentity = previous?.wireHistoryDigest === identity.wireHistoryDigest
+    && previous?.wireMessageCount === identity.wireMessageCount;
+  const comparedReplayIdentity = previous?.replayBinding !== undefined || identity.replayBinding !== undefined;
+  const sameReplayIdentity = previous?.replayBinding === identity.replayBinding;
   const compatible = previous && previous.provider === identity.provider && previous.model === identity.model
     && previous.endpoint === identity.endpoint && previous.schemaDigest === identity.schemaDigest
     && identity.endpointId !== undefined && previous.endpointId === identity.endpointId
     && previous.systemDigest === identity.systemDigest && previous.historyDigest !== undefined
+    && (!comparedWireIdentity || sameWireIdentity)
+    && (!comparedReplayIdentity || sameReplayIdentity)
     && Number.isSafeInteger(count) && count >= 0 && count <= messages.length
     && previous.historyDigest === historyDigest(messages.slice(0, count))
     // Tool microcompaction and opaque multimodal/reasoning replay are not additive.

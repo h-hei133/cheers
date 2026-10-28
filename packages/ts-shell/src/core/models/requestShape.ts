@@ -39,6 +39,13 @@ export interface ResolvedRequestShape {
   readonly maxOutputCeiling?: number;
   /** Whether `reasoning_effort` may be sent at all. */
   readonly reasoningEffort: boolean;
+  /**
+   * Whether the model accepts tool declarations and prior tool-call history.
+   *
+   * Absent model metadata means capable, preserving what every request did
+   * before the catalogue could state otherwise.
+   */
+  readonly toolCalling: boolean;
   /** Whether a synthetic assistant turn bridges tool results and a user turn. */
   readonly assistantAfterToolResult: boolean;
   /**
@@ -101,6 +108,7 @@ export const DEFAULT_REQUEST_SHAPE: ResolvedRequestShape = {
   systemRole: "system",
   maxTokensField: "max_tokens",
   reasoningEffort: true,
+  toolCalling: true,
   // No, not yes: this is what an undeclared model gets, and sending an image to
   // a model that cannot read one fails the request rather than the image.
   vision: false,
@@ -154,6 +162,7 @@ export function resolveRequestShape(
     maxTokensField: compat.maxTokensField ?? DEFAULT_REQUEST_SHAPE.maxTokensField,
     ...(entry.maxTokens !== undefined ? { maxOutputCeiling: entry.maxTokens } : {}),
     reasoningEffort,
+    toolCalling: entry.toolCalling !== false,
     assistantAfterToolResult: compat.assistantAfterToolResult === true,
     allowEmptySignature: compat.allowEmptySignature === true,
     supportsTemperature: compat.supportsTemperature !== false,

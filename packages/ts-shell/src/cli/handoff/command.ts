@@ -39,7 +39,7 @@ export async function runHandoffCommand(context: ShellRuntimeContext, manager: S
     const publication = context.configuration.current;
     if (new DirectorStore(manager, context.session).read().cycles.some(row => !row.retired && row.phase !== 'disabled'))
       throw new Error('Disable the director preset before arming a model handoff.');
-    const resolution = context.resolveConfigTarget?.(publication.config);
+    const resolution = context.resolveConfigTarget?.(publication.config, context.session.id);
     if (!resolution) throw new Error('The active provider binding is unavailable.');
     const source = sourceChoice(context.cwd, resolution);
     const target = executionChoice(parsed.args[0]!, parseEffortFlag(parsed.flags.get('effort')), source, resolution, publication.config, publication.catalog);

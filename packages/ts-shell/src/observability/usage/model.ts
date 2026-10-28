@@ -49,7 +49,16 @@ export interface PromptMeasurementIdentity {
   readonly systemDigest?: string;
   /** Ordered, selected messages before endpoint projection, hashed. */
   readonly historyDigest?: string;
+  /** Ordered messages after compaction, bridging and closing policy, hashed. */
+  readonly wireHistoryDigest?: string;
+  /** How many projected messages carried this measurement. */
+  readonly wireMessageCount?: number;
+  /** Credential and account state that selected the provider replay shape. */
+  readonly replayBinding?: string;
 }
+
+/** Partial identity captured before a request is accepted. */
+export type PromptIdentitySnapshot = Partial<PromptMeasurementIdentity>;
 
 export interface SessionUsageTelemetry {
   readonly schemaVersion?: 2;
@@ -98,11 +107,12 @@ export interface SessionUsageTelemetry {
    */
   lastPromptTokens: number | undefined;
   /**
-   * How many messages that request carried.
+   * How many selected messages the context measurement is based on.
    *
    * The measured count only covers what was sent. Anything the conversation
    * gained afterwards is not in the provider's number, so the two have to be
    * added together before either can answer whether the next request fits.
+   * A projected request carries its exact wire count in `wireMessageCount`.
    */
   lastPromptMessageCount: number;
   /** What the measurement describes; a different model or schema makes it stale. */

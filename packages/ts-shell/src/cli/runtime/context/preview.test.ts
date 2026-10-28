@@ -1,13 +1,15 @@
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { previewContext } from './preview.js';
 import { projectSessionFileLayout } from '../../../session/store/sessionFileLayout.js';
 import { writeSessionRecord } from '../../../session/store/sessionStore.js';
 import type { Session } from '../../../session/schema/sessionRecord.js';
+import type { SessionMessage } from '../../../session/schema/sessionMessage.js';
 import type { SessionManager } from '../../../session/SessionManager.js';
 import type { ShellRuntimeContext } from '../../../core/shell/runtimeContext.js';
-import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
+import { getRuntimeConfig, type RuntimeConfig } from '../../../config/runtimeConfig.js';
 import { ConfigState } from '../../../config/state.js';
 import { configurationBinding } from '../../../core/shell/configuration.js';
 import { buildPromptWithFutureTurnInjections } from '../../../core/shell/sessionFutureTurnProjection.js';
@@ -46,6 +48,13 @@ import { getSessionUsage, resetSessionUsage } from '../../../observability/usage
 import type { HookDispatcher } from '../../../core/hooks/hookDispatcher.js';
 import { configuredOutputLimit } from '../../../provider/request/output.js';
 import type { ToolDefinition } from '../../../tools/types.js';
+import { buildSystemPrompt } from '../../../turn/prompt.js';
+import { providerRequestTarget } from '../../provider/requestTarget.js';
+import { createProviderStep } from '../../provider/step.js';
+import { resolveCliCredential } from '../../provider/cliProviderRuntimeBridge.js';
+import { credentialIdentityFor, selectPooledConnection } from '../../../core/auth/account/pool.js';
+import { noteCredentialRateLimit, resetCredentialBackoffForTests } from '../../../core/auth/account/backoff.js';
+import { captureThinkingPreference } from '../../../core/models/preference.js';
 
 let root: string;
 let repositories: ReturnType<typeof gitFixture>[] = [];
@@ -58,7 +67,12 @@ afterEach(() => {
   vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
   for (const repository of repositories) repository.cleanup();
 });
-const fixture = (options: { readonly git?: boolean } = {}) => {
+const fixture = (options: {
+  readonly git?: boolean;
+  readonly toolCalling?: boolean;
+  readonly credential?: boolean;
+  readonly endpoint?: 'openai-responses';
+} = {}) => {
   const cwd = options.git ? (() => {
     const repository = gitFixture(true); repositories.push(repository); stubGitEnvironment(repository.home); return repository.root;
   })() : path.join(root, 'workspace');
@@ -68,11 +82,15 @@ const fixture = (options: { readonly git?: boolean } = {}) => {
   const layout = projectSessionFileLayout({ sessionsDir: path.join(root, 'sessions'), sessionId: session.id }); writeSessionRecord({ session, layout });
   const manager = { getSessionDirPath: () => layout.sessionDir, getSession: () => session } as unknown as SessionManager;
   const config = { ...getRuntimeConfig(cwd), enableMcpTools: false, toolDiscovery: 'dynamic' as const };
-  const target = { provider: 'openai', model: 'fixture', baseUrl: 'https://fixture.invalid/v1', expectedEnvVarName: 'FIXTURE', thinkingEffort: null };
+  const target = { provider: 'openai', model: 'fixture', baseUrl: 'https://fixture.invalid/v1', expectedEnvVarName: 'FIXTURE', thinkingEffort: null,
+    ...(options.credential ? { credential: { provider: 'openai', authMode: 'api-key', apiKey: 'synthetic-preview-target',
+      model: 'fixture', baseUrl: 'https://fixture.invalid/v1', source: 'config', envVarName: 'FIXTURE' } } : {}) };
   const context = { cwd, projectRoot: cwd, session, skillOptions: { noSkills: true }, runtimeConfig: config,
     resolveConfigTarget: () => target } as unknown as ShellRuntimeContext;
   Object.assign(context, { configuration: new ConfigState(config, configurationBinding(context), [{ id: 'openai', name: 'Fixture', baseUrl: target.baseUrl,
-    models: [{ id: 'fixture', name: 'Fixture', vision: false }] }]) });
+    ...(options.endpoint ? { endpoint: options.endpoint } : {}),
+    models: [{ id: 'fixture', name: 'Fixture', vision: false,
+      ...(options.toolCalling !== undefined ? { toolCalling: options.toolCalling } : {}) }] }]) });
   if (options.git) installGitRuntime(context, manager, new ShellSessionRuntime({} as never), () => gitGate(cwd));
   context.preparePromptContext = async (prompt, signal) => {
     const prepared = await buildPromptWithFutureTurnInjections({ deps: {}, sessionId: session.id, prompt });
@@ -1022,25 +1040,208 @@ it('uses the closing request schema identity when no tool steps are allowed', as
   expect(result.estimate.identity.schemaDigest).toBe(requestIdentity({ tools: [] }).schemaDigest);
 });
 
-it.each((['dynamic', 'full'] as const).flatMap(toolDiscovery => [1, 2].map(maxTurns => ({ toolDiscovery, maxTurns }))))(
-  'matches preview and closing policy with $toolDiscovery tools and $maxTurns steps', async ({ toolDiscovery, maxTurns }) => {
-    const { cwd, context, session, manager, load, layout, gateway, target } = fixture();
+it('omits tool schemas for a model that cannot call tools', async () => {
+  const { context, load } = fixture({ toolCalling: false });
+  const config = { ...context.configuration.current.config, maxTurns: 2, toolDiscovery: 'dynamic' };
+  Object.assign(context, { runtimeConfig: config, configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
+  const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+  const result = await load('question'); result.verify();
+  const body = JSON.parse(JSON.stringify(wire.mock.results.at(-1)!.value));
+  expect(body.tools).toBeUndefined();
+  expect(body.tool_choice).toBeUndefined();
+  const messages = body.messages as Array<{ readonly role: string; readonly content?: string }>;
+  expect(messages[0]?.content).not.toContain('equipped with real tools');
+  expect(messages[0]?.content).not.toContain('`read`');
+  expect(JSON.stringify(messages)).not.toContain('You have reached the limit of steps');
+  expect(result.estimate.identity.schemaDigest).toBe(requestIdentity({ tools: [] }).schemaDigest);
+});
+
+it('uses the full provider replay identity for a Responses preview', async () => {
+  const { context, cwd, load } = fixture({ credential: true, endpoint: 'openai-responses' });
+  const result = await load('question');
+  const resolution = context.resolveConfigTarget!(context.runtimeConfig)!;
+  const expected = providerRequestTarget({
+    workspaceRoot: cwd,
+    resolution,
+    baseUrl: resolution.baseUrl!,
+    endpoint: 'openai-responses',
+  });
+
+  expect(result.estimate.identity.replayBinding).toBe(expected.replayBinding);
+  expect(result.estimate.identity.wireHistoryDigest).toMatch(/^[a-f0-9]{64}$/);
+  expect(result.estimate.identity.wireMessageCount).toBe(1);
+});
+
+it('keeps preview and dispatch on the session-affine account-pool member', async () => {
+  const { cwd, context, session, manager, load } = fixture();
+  const requests: Record<string, unknown>[] = [];
+  const server = http.createServer(async (request, response) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    requests.push(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({
+      choices: [{ message: { role: 'assistant', content: 'done' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 12, completion_tokens: 1, total_tokens: 13 },
+    }));
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Missing account-pool server address');
+    const baseUrl = `http://127.0.0.1:${address.port}/v1`;
+    const connection = (id: string) => ({
+      id, provider: 'openai' as const, authType: 'api-key' as const, apiKey: `synthetic-${id}`,
+      baseUrl, model: 'fixture', status: 'connected' as const,
+      createdAt: '2026-01-01', updatedAt: '2026-01-01',
+    });
+    const config: RuntimeConfig = {
+      ...context.runtimeConfig,
+      provider: 'openai',
+      activeProviderConnectionId: undefined,
+      providerConnections: [connection('first'), connection('second')],
+      accountPool: { openai: { connections: ['first', 'second'] } },
+      enableMcpTools: false,
+      toolDiscovery: 'dynamic',
+      maxOutputTokens: 32,
+      reserveTokens: 0,
+      retryEnabled: false,
+      retryMaxRetries: 0,
+      providerRetryMaxRetries: 0,
+      providerConnectTimeoutMs: 3_000,
+      providerHeadersTimeoutMs: 3_000,
+      providerBodyTimeoutMs: 3_000,
+    };
+    const catalog = context.configuration.current.catalog.map(provider => ({
+      ...provider,
+      baseUrl,
+      models: [{ id: 'fixture', name: 'Fixture', vision: false, contextWindow: 100_000, maxTokens: 32 }],
+    }));
+    const resolveTarget = vi.fn((candidate: RuntimeConfig, sessionId?: string) =>
+      resolveCliCredential(candidate, {}, {}, sessionId));
+    Object.assign(context, {
+      runtimeConfig: config,
+      resolveConfigTarget: resolveTarget,
+      configuration: new ConfigState(config, configurationBinding(context), catalog),
+    });
+    expect(selectPooledConnection({
+      config, provider: 'openai', connectionId: 'second', sessionId: session.id,
+    })).toMatchObject({ connection: { id: 'second' } });
+
+    const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+    const preview = await load('question');
+    preview.verify();
+    const previewBody = JSON.parse(JSON.stringify(wire.mock.results.at(-1)!.value));
+    expect(resolveTarget).toHaveBeenCalledWith(config, session.id);
+
+    const tools = foregroundTools(context);
+    const prepared = await preparePromptRequest({
+      workspaceRoot: cwd,
+      sessionId: session.id,
+      runtimeConfig: config,
+      skillOptions: context.skillOptions,
+      agentMode: 'build',
+      featureTools: tools,
+    });
+    const signal = new AbortController().signal;
+    const injected = await context.preparePromptContext!('question', signal);
+    const captured = await readPromptPreview(manager, session, cwd, 'question');
+    const resolution = resolveTarget(config, session.id);
+    expect(resolution.credential?.connectionId).toBe('second');
+    const step = createProviderStep({
+      providerMode: 'real',
+      providerCredentialResolution: resolution,
+      runtimeConfig: config,
+      providerCatalog: catalog,
+      agentMode: 'build',
+      workspaceRoot: cwd,
+      sessionId: session.id,
+      ...captureThinkingPreference(cwd, resolution.thinkingEffort),
+    }, prepared.currentTools(), prepared.promptContext);
+    let acceptedPromptIdentity: unknown;
+    const result = await step([openingMessage({
+      workspaceRoot: cwd,
+      workspaceRoots: session.workspaceRoots,
+      permissionScope: 'ask',
+      goalObjective: captured.goalObjective,
+      continuityContext: captured.continuityContextFor('question'),
+      prompt: injected.prompt,
+    })], signal, {}, { allowTools: true, onRequestSent: sent => { acceptedPromptIdentity = sent.promptIdentity; } });
+
+    expect(result.stopReason).toBe('stop');
+    expect(requests).toEqual([previewBody]);
+    const identity = getSessionUsage(session.id).lastPromptIdentity;
+    expect(identity).toMatchObject({
+      schemaDigest: preview.estimate.identity.schemaDigest,
+      systemDigest: preview.estimate.identity.systemDigest,
+      historyDigest: preview.estimate.identity.historyDigest,
+      wireHistoryDigest: preview.estimate.identity.wireHistoryDigest,
+      wireMessageCount: preview.estimate.identity.wireMessageCount,
+      replayBinding: preview.estimate.identity.replayBinding,
+    });
+    expect(acceptedPromptIdentity).toMatchObject({
+      provider: resolution.provider,
+      model: resolution.model,
+      schemaDigest: preview.estimate.identity.schemaDigest,
+      systemDigest: preview.estimate.identity.systemDigest,
+      historyDigest: preview.estimate.identity.historyDigest,
+      wireHistoryDigest: preview.estimate.identity.wireHistoryDigest,
+      wireMessageCount: preview.estimate.identity.wireMessageCount,
+      replayBinding: preview.estimate.identity.replayBinding,
+    });
+    const selectedCredential = credentialIdentityFor(resolution.provider, resolution.credential)!;
+    noteCredentialRateLimit(selectedCredential, 30_000);
+    expect(() => preview.verify()).toThrow('target changed');
+  } finally {
+    resetCredentialBackoffForTests();
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});
+
+it('rejects tool history for a model that cannot call tools before request construction', async () => {
+  const { layout, load, session } = fixture({ toolCalling: false });
+  const history: SessionMessage[] = [
+    { role: 'user', content: 'read the file', timestamp: '2026-10-26T00:00:00.000Z' },
+    { role: 'assistant', content: '', tool_calls: [{ id: 'read-1', type: 'function',
+      function: { name: 'read', arguments: '{"path":"boundary.txt"}' } }], timestamp: '2026-10-26T00:00:01.000Z' },
+    { role: 'tool', content: 'boundary contents', tool_call_id: 'read-1', timestamp: '2026-10-26T00:00:02.000Z' },
+  ];
+  session.turns.push(...history);
+  for (const message of history) appendTranscriptEvent(layout.transcriptPath, createMessageTranscriptEvent(message));
+  const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+
+  await expect(load('continue')).rejects.toThrow('does not support tool history');
+  expect(wire).not.toHaveBeenCalled();
+});
+
+const previewDispatchCases = [
+  ...(['dynamic', 'full'] as const).flatMap(toolDiscovery => [1, 2].flatMap(maxTurns => [
+    { capability: 'unknown', toolCalling: undefined, toolDiscovery, maxTurns, agentMode: 'build' as const },
+    { capability: 'no-tools', toolCalling: false, toolDiscovery, maxTurns, agentMode: 'build' as const },
+  ])),
+  { capability: 'no-tools-plan', toolCalling: false, toolDiscovery: 'dynamic' as const, maxTurns: 2, agentMode: 'plan' as const },
+];
+it.each(previewDispatchCases)(
+  'matches preview and closing policy for $capability capability with $toolDiscovery tools and $maxTurns steps',
+  async ({ toolCalling, toolDiscovery, maxTurns, agentMode }) => {
+    const { cwd, context, session, manager, load, layout, gateway, target } = fixture({ toolCalling });
     const config = { ...context.configuration.current.config, maxTurns, toolDiscovery, allowedTools: ['read'] };
     Object.assign(context, { runtimeConfig: config, configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
     const files = [layout.metadataPath, layout.statePath, layout.transcriptPath], before = files.map(file => fs.readFileSync(file));
     const prompt = 'Inspect the boundary 中文 🙂.';
     const wire = vi.spyOn(endpoints, 'endpointTurnBody');
-    const preview = await load(prompt); preview.verify();
+    const preview = await load(prompt, undefined, undefined, agentMode); preview.verify();
     const previewBody = JSON.parse(JSON.stringify(wire.mock.results.at(-1)!.value));
     const prepared = await preparePromptRequest({ workspaceRoot: cwd, sessionId: session.id, runtimeConfig: config,
-      skillOptions: context.skillOptions, agentMode: 'build', featureTools: foregroundTools(context) });
+      skillOptions: context.skillOptions, agentMode, featureTools: foregroundTools(context) });
     const captured = await readPromptPreview(manager, session, cwd, prompt);
     const bodies: Record<string, unknown>[] = [];
     let firstIdentity: ReturnType<typeof getSessionUsage>['lastPromptIdentity'];
     let firstContext: ReturnType<typeof getSessionUsage>['requestContext'];
     const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       bodies.push(JSON.parse(String(init?.body)));
-      const callsTool = maxTurns > 1 && bodies.length === 1;
+      const callsTool = toolCalling !== false && maxTurns > 1 && bodies.length === 1;
       return new Response(JSON.stringify({ choices: [{
         message: callsTool
           ? { content: '', tool_calls: [{ id: 'read-1', type: 'function',
@@ -1058,6 +1259,8 @@ it.each((['dynamic', 'full'] as const).flatMap(toolDiscovery => [1, 2].map(maxTu
     };
     const baseStep = createStepFunction({ provider: { ...target, headers: {} }, workspaceRoot: cwd, sessionId: session.id,
       systemPrompt: prepared.system.text, systemPromptSources: prepared.system.sources,
+      systemPromptFor: (requestAgentMode, toolNames, toolsAvailable = true) =>
+        buildSystemPrompt(requestAgentMode ?? agentMode, { ...prepared.promptContext, toolNames }, toolsAvailable),
       tools: toolSchemas(prepared.tools), toolSnapshot: () => toolSchemas(prepared.currentTools()),
       catalog: context.configuration.current.catalog, temperature: config.temperature, topP: config.topP,
       maxOutputTokens: configuredOutputLimit(config, endpoints.DEFAULT_ENDPOINT_KIND), fetchImpl });
@@ -1071,20 +1274,21 @@ it.each((['dynamic', 'full'] as const).flatMap(toolDiscovery => [1, 2].map(maxTu
       return result;
     };
     try {
-      const run = runTurn({ sessionId: session.id, workspaceRoot: cwd, history: [], prompt, permissionScope: 'ask',
+      const run = runTurn({ sessionId: session.id, workspaceRoot: cwd, history: [], prompt, agentMode, permissionScope: 'ask',
         continuityContext: captured.continuityContextFor(prompt), goalObjective: captured.goalObjective,
         step, tools: new Map([['read', readTool]]), maxSteps: maxTurns, onMessage: vi.fn(), signal: new AbortController().signal,
         hooks: { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher });
       for await (const _event of run.events) { /* Drain the real step lifecycle. */ }
-      expect(fetchImpl).toHaveBeenCalledTimes(maxTurns > 1 ? 2 : 1);
+      expect(fetchImpl).toHaveBeenCalledTimes(toolCalling !== false && maxTurns > 1 ? 2 : 1);
       const usage = getSessionUsage(session.id);
-      expect(usage.turnsCount).toBe(maxTurns > 1 ? 2 : 1);
+      expect(usage.turnsCount).toBe(toolCalling !== false && maxTurns > 1 ? 2 : 1);
       expect(bodies[0]).toEqual(previewBody);
-      expect(bodies[0]?.tools !== undefined).toBe(maxTurns > 1);
-      expect(JSON.stringify(bodies[0]?.messages).includes('You have reached the limit of steps')).toBe(maxTurns === 1);
+      expect(bodies[0]?.tools !== undefined).toBe(toolCalling !== false && maxTurns > 1);
+      expect(JSON.stringify(bodies[0]?.messages).includes('You have reached the limit of steps'))
+        .toBe(toolCalling !== false && maxTurns === 1);
       const closing = bodies.at(-1);
       expect(closing?.tools).toBeUndefined();
-      expect(JSON.stringify(closing?.messages).includes('You have reached the limit of steps')).toBe(true);
+      expect(JSON.stringify(closing?.messages).includes('You have reached the limit of steps')).toBe(toolCalling !== false);
       expect(preview.estimate.identity.schemaDigest).toBe(firstIdentity?.schemaDigest);
       expect(preview.estimate.identity.systemDigest).toBe(firstIdentity?.systemDigest);
       expect(preview.estimate.identity.historyDigest).toBe(firstIdentity?.historyDigest);

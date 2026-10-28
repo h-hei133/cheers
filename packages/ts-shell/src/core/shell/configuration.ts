@@ -25,7 +25,7 @@ interface ConfigurationContext {
   readonly cwd?: string;
   readonly session: { readonly id: string };
   readonly runtimeConfigOverrides?: RuntimeConfigOverrides;
-  readonly resolveConfigTarget?: (config: RuntimeConfig) => ConfigModelTarget;
+  readonly resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ConfigModelTarget;
   readonly themePaths?: readonly string[];
 }
 
@@ -49,7 +49,8 @@ export function initialConfiguration(context: Omit<ConfigurationContext, 'config
 
 function validateCandidate(config: RuntimeConfig, context: Pick<ConfigurationContext, 'session' | 'resolveConfigTarget'>, catalog: readonly CatalogProvider[]): RuntimeConfig {
   const candidate = projectSessionModel(config, context.session.id);
-  const target = context.resolveConfigTarget?.(candidate) ?? resolveProviderCredential({ runtimeConfig: candidate });
+  const target = context.resolveConfigTarget?.(candidate, context.session.id)
+    ?? resolveProviderCredential({ runtimeConfig: candidate, pool: { sessionId: context.session.id } });
   return constrainRuntimeConfig(candidate, target, catalog);
 }
 
@@ -93,7 +94,8 @@ export function refreshConfiguration(context: ConfigurationContext, scope?: 'cat
     const refusal = configurationAdmission(context)();
     if (refusal) return state.rejectCandidate(ticket, configurationBinding(context), [refusal], true);
     const accepted = state.current.requested;
-    const target = context.resolveConfigTarget?.(accepted) ?? resolveProviderCredential({ runtimeConfig: accepted });
+    const target = context.resolveConfigTarget?.(accepted, context.session.id)
+      ?? resolveProviderCredential({ runtimeConfig: accepted, pool: { sessionId: context.session.id } });
     return state.publish(ticket, constrainRuntimeConfig(accepted, target, catalog), configurationBinding(context), undefined, catalog);
   }
   let candidate: RuntimeConfig;

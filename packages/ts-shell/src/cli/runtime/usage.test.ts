@@ -11,6 +11,8 @@ import { readResetAttempts, updateResetAttempts } from '../usage/state.js';
 import { hashContent } from '../../core/workspace/files.js';
 import type { ToolGateOptions } from '../../turn/tools.js';
 import * as network from '../../core/network/connection.js';
+import { resolveCliCredential } from '../provider/cliProviderRuntimeBridge.js';
+import { selectPooledConnection } from '../../core/auth/account/pool.js';
 
 let scratch: string; let root: string; let home: string; let configPath: string;
 const accountId = 'synthetic-account';
@@ -24,22 +26,26 @@ function writeConfig(change: Partial<RuntimeConfigFile> = {}) {
 function harness(options: { decision?: 'allow-once' | 'allow-always' | 'deny'; mode?: 'plan' | 'build'; denied?: boolean; deniedTool?: string; onGate?: () => void; onApproval?: () => void; onEmit?: ToolGateOptions['emit']; missingApproval?: boolean } = {}) {
   const manager = new SessionManager(); const session = manager.createNew(root);
   const context = createShellRuntimeContext({ cwd: root, projectRoot: root, originalCwd: root, rootMode: 'direct', targetPathBase: root,
-    gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: true }, runtimeConfig: getRuntimeConfig(root), session });
+    gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: true }, runtimeConfig: getRuntimeConfig(root), session,
+    resolveConfigTarget: (config, sessionId) => resolveCliCredential(config, {}, {}, sessionId) });
   const approval = vi.fn(async prompt => { options.onApproval?.(); return { promptId: prompt.id, decision: options.decision ?? 'allow-once', respondedAt: Date.now() }; });
   const hooks = new HookDispatcher(); const emit = vi.fn((event: Parameters<ToolGateOptions['emit']>[0]) => options.onEmit?.(event));
   installUsageRuntime(context, () => { options.onGate?.(); return { workspaceRoot: root, sessionId: session.id, agentMode: options.mode ?? 'build', permissionScope: 'allow-all',
     hooks, denyRules: options.denied || options.deniedTool ? [{ tool: options.deniedTool ?? 'account_reset' }] : [], emit,
     escalationPromptHandler: async prompt => ({ promptId: prompt.id, decision: 'allow-always' as const, respondedAt: Date.now() }) }; },
     options.missingApproval ? undefined : usageResetApproval(context, manager, () => approval));
-  const command = { cwd: root, projectRoot: root, sessionId: session.id, interactive: true, usageCommand: usageCommandFor(context) };
+  const command = { cwd: root, projectRoot: root, sessionId: session.id, interactive: true,
+    resolveConfigTarget: context.resolveConfigTarget, usageCommand: usageCommandFor(context) };
   return { manager, session, context, command, approval, hooks, emit, run: (input: string) => routeSlashCommand(input, command) };
 }
-function protocol(options: { code?: string; usageReply?: unknown; creditReply?: unknown; creditStatus?: number; consumeThrows?: boolean; consume?: () => Promise<Response> } = {}) {
+function protocol(options: { code?: string; usageReply?: unknown; creditReply?: unknown; creditStatus?: number; consumeThrows?: boolean; consume?: () => Promise<Response>;
+  expected?: { readonly token: string; readonly accountId: string } } = {}) {
   const calls: { url: string; init: network.PublicRequest }[] = [];
+  const expected = options.expected ?? { token: 'SYNTHETIC_ACCOUNT_TOKEN', accountId };
   const request = vi.spyOn(network, 'requestPublic').mockImplementation(async (url, init, scope) => {
     scope.check(); calls.push({ url, init });
     expect(new URL(url).origin).toBe('https://chatgpt.com');
-    expect(init.headers).toMatchObject({ Authorization: 'Bearer SYNTHETIC_ACCOUNT_TOKEN', 'ChatGPT-Account-Id': accountId });
+    expect(init.headers).toMatchObject({ Authorization: `Bearer ${expected.token}`, 'ChatGPT-Account-Id': expected.accountId });
     if (url.endsWith('/consume')) {
       if (options.consume) return options.consume();
       if (options.consumeThrows) throw new Error('SYNTHETIC_PRIVATE_RESPONSE_BODY');
@@ -66,6 +72,33 @@ beforeEach(() => {
   vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', ''); vi.stubEnv('GIT_CEILING_DIRECTORIES', scratch); writeConfig();
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(scratch, { recursive: true, force: true }); });
+
+it('uses the session-affine account for usage inspection', async () => {
+  const firstToken = 'SYNTHETIC_ACCOUNT_TOKEN_FIRST';
+  const secondToken = 'SYNTHETIC_ACCOUNT_TOKEN_SECOND';
+  const poolConnection = (id: string, accountIdValue: string, token: string) => ({ id, provider: 'openai' as const,
+    authType: 'account-auth' as const, baseUrl: 'https://chatgpt.com/backend-api', status: 'connected' as const,
+    createdAt: '2026-01-01', updatedAt: '2026-01-01', accountAuth: { openai: {
+      type: 'openai-chatgpt-account' as const, accessToken: token, refreshToken: 'synthetic-refresh',
+      accountId: accountIdValue, expiresAt: Date.now() + 3_600_000,
+    } } });
+  writeConfig({
+    activeProviderConnectionId: undefined,
+    providerConnections: [poolConnection('first', 'account-first', firstToken),
+      poolConnection('second', 'account-second', secondToken)],
+    accountPool: { openai: { connections: ['first', 'second'] } },
+    providerCredentials: {},
+  });
+  const setup = harness();
+  expect(selectPooledConnection({
+    config: setup.context.runtimeConfig, provider: 'openai', connectionId: 'second', sessionId: setup.session.id,
+  })).toMatchObject({ connection: { id: 'second' } });
+  const remote = protocol({ code: 'reset', expected: { token: secondToken, accountId: 'account-second' } });
+  expect(await setup.run('/usage account')).toMatchObject({ kind: 'local', output: expect.stringContaining('primary: 25% used') });
+  const id = await prepare(setup);
+  expect(await setup.run(`/usage reset apply ${id}`)).toMatchObject({ kind: 'local', output: expect.stringContaining(': reset (reset)') });
+  expect(remote.posts()).toHaveLength(1);
+});
 
 it('refuses a configured foreign account address before any usage or reset HTTP', async () => {
   const value = JSON.parse(fs.readFileSync(configPath, 'utf8'));

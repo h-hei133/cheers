@@ -128,6 +128,32 @@ describe("bucketing", () => {
     expect(getSessionUsage(SESSION).lastPromptMessageCount).toBe(0);
   });
 
+  it("returns the projected message count only for the exact wire history that produced it", () => {
+    const identity = {
+      provider: 'openai',
+      model: 'm',
+      endpoint: 'openai-compatible',
+      schemaDigest: 'a'.repeat(64),
+      systemDigest: 'b'.repeat(64),
+      historyDigest: 'c'.repeat(64),
+      wireHistoryDigest: 'd'.repeat(64),
+      wireMessageCount: 4,
+      replayBinding: 'f'.repeat(64),
+    };
+    recordSessionUsage(SESSION, {
+      promptTokens: 500,
+      promptMessageCount: 9,
+      model: 'm',
+      provider: 'openai',
+      promptIdentity: identity,
+    });
+
+    expect(measuredPromptContext(SESSION, identity)).toEqual({ tokens: 500, messageCount: 4 });
+    expect(measuredPromptContext(SESSION, { ...identity, wireHistoryDigest: 'e'.repeat(64) })).toBeUndefined();
+    expect(measuredPromptContext(SESSION, { ...identity, wireHistoryDigest: undefined })).toBeUndefined();
+    expect(measuredPromptContext(SESSION, { ...identity, replayBinding: '0'.repeat(64) })).toBeUndefined();
+  });
+
   it("rejects incomplete recorded identities when the caller requires all fields", () => {
     const identity = { provider: 'openai', model: 'm', endpoint: 'openai-compatible', schemaDigest: 'a'.repeat(64), systemDigest: 'b'.repeat(64) };
     recordSessionUsage(SESSION, { promptTokens: 500, promptMessageCount: 3, model: 'm', provider: 'openai',

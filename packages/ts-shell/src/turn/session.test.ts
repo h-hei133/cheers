@@ -129,7 +129,9 @@ describe("runTurn", () => {
   });
 
   it('publishes the exact accepted wire prompt identity', async () => {
-    const identity = { schemaDigest: 'schema-wire', systemDigest: 'system-wire' };
+    const identity = { provider: 'fixture', model: 'm', endpoint: 'openai-compatible',
+      endpointId: 'endpoint-wire', schemaDigest: 'schema-wire', systemDigest: 'system-wire',
+      historyDigest: 'history-wire', wireHistoryDigest: 'wire-wire', wireMessageCount: 1, replayBinding: 'replay-wire' };
     const notified = vi.fn();
     const step: StepFunction = async (_messages, _signal, _listener, stepOptions) => {
       stepOptions.onRequestSent?.({ url: 'https://fixture.test', headers: {}, body: '{}', promptIdentity: identity });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import os from "node:os";
 import { activeModelName, readStatusFacts, shortenPath } from "./sessionFacts.js";
 import { recordSessionUsage, resetSessionUsage, markContextUnknown, getSessionUsage, restoreSessionUsage } from "../../observability/usageTelemetry.js";
@@ -10,6 +10,9 @@ import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import { withConfiguration } from "../../test-utils/configuration.js";
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import type { ProviderCredentialResolution } from '../../core/auth/credential.js';
+import { ConfigState } from '../../config/state.js';
+import { resolveCliCredential } from '../provider/cliProviderRuntimeBridge.js';
+import { selectPooledConnection } from '../../core/auth/account/pool.js';
 
 function context(sessionId: string, overrides: Partial<RuntimeConfig> = {}): ShellRuntimeContext {
   return withConfiguration({
@@ -24,6 +27,38 @@ function context(sessionId: string, overrides: Partial<RuntimeConfig> = {}): She
       ...overrides,
     },
   } as unknown as ShellRuntimeContext);
+}
+
+function pooledContext(sessionId: string): ShellRuntimeContext {
+  const root = '/workspace/app';
+  const baseUrl = 'https://pool.invalid/v1';
+  const connections = [
+    { id: 'first', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'synthetic-first',
+      baseUrl, model: 'first-model', status: 'connected' as const, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+    { id: 'second', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'synthetic-second',
+      baseUrl, model: 'second-model', status: 'connected' as const, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+  ];
+  const config = {
+    provider: 'openai' as const,
+    activeProviderConnectionId: undefined,
+    providerConnections: connections,
+    accountPool: { openai: { connections: ['first', 'second'] } },
+    providerCredentials: {},
+    contextWindow: 200_000,
+    agentMode: 'build' as const,
+    configValidation: { securityBlocked: false, valid: true },
+  };
+  const runtime = withConfiguration({
+    cwd: root, projectRoot: root, session: { id: sessionId }, gitContext: { branch: 'main' },
+    runtimeConfig: config as unknown as RuntimeConfig,
+    resolveConfigTarget: (candidate: RuntimeConfig, targetSessionId?: string) =>
+      resolveCliCredential(candidate, {}, {}, targetSessionId),
+  } as unknown as ShellRuntimeContext);
+  const catalog = [{ id: 'openai', label: 'Fixture', runtime: 'openai' as const, auth: 'api-key' as const, baseUrl,
+    models: [{ id: 'first-model' }, { id: 'second-model' }] }];
+  Object.assign(runtime, { runtimeConfig: config as unknown as RuntimeConfig,
+    configuration: new ConfigState(config as unknown as RuntimeConfig, runtime.configuration.current.binding, catalog) });
+  return runtime;
 }
 
 describe("path shortening", () => {
@@ -45,6 +80,27 @@ describe("model name", () => {
     const bare = context("s1", { providerCredentials: {} });
     expect(activeModelName(bare)).toBe("openai");
   });
+});
+
+it("uses the session-affine pool member for status and context reporting", async () => {
+  const runtime = pooledContext('pooled-status');
+  expect(selectPooledConnection({
+    config: runtime.runtimeConfig, provider: 'openai', connectionId: 'second', sessionId: runtime.session.id,
+  })).toMatchObject({ connection: { id: 'second' } });
+  expect(activeModelName(runtime)).toBe('second-model');
+  expect(readStatusFacts(runtime).model).toBe('second-model');
+  const resolveTarget = vi.fn(runtime.resolveConfigTarget!);
+  Object.assign(runtime, { resolveConfigTarget: resolveTarget });
+  const report = await runContextCommand([], {
+    cwd: runtime.projectRoot,
+    sessionId: runtime.session.id,
+    runtimeConfig: runtime.runtimeConfig,
+    readConfiguration: () => runtime.configuration.current,
+    resolveConfigTarget: runtime.resolveConfigTarget,
+    getToolPool: async () => new Map(),
+  });
+  expect(resolveTarget).toHaveBeenCalledWith(runtime.runtimeConfig, runtime.session.id);
+  expect(report.report?.facts.prompt).toMatchObject({ status: 'unknown' });
 });
 
 describe("status facts", () => {
@@ -124,6 +180,26 @@ describe("status facts", () => {
     expect(state.contextWindow).toBe(200_000);
     expect(state.costUsd).toBeGreaterThan(0);
     resetSessionUsage("used");
+  });
+
+  it("keeps a fresh measured request after the full wire identity is captured", async () => {
+    const id = 'status-full-identity';
+    resetSessionUsage(id);
+    const runtime = context(id);
+    const endpointId = captureUsageAttribution({ provider: 'openai', model: 'opus-5',
+      baseUrl: 'https://api.openai.com/v1' }).endpointId;
+    const identity = {
+      provider: 'openai', model: 'opus-5', endpoint: 'openai-compatible', endpointId,
+      schemaDigest: 'a'.repeat(64), systemDigest: 'b'.repeat(64), historyDigest: 'c'.repeat(64),
+      wireHistoryDigest: 'd'.repeat(64), wireMessageCount: 1, replayBinding: 'e'.repeat(64),
+    };
+    runtime.promptIdentity = identity;
+    recordSessionUsage(id, { promptTokens: 9_000, promptMessageCount: 1, promptIdentity: identity });
+    expect(readStatusFacts(runtime).contextUsed).toBe(9_000);
+    const report = await runContextCommand([], { cwd: runtime.projectRoot, sessionId: id, runtimeConfig: runtime.runtimeConfig,
+      readConfiguration: () => runtime.configuration.current, promptIdentity: identity, getToolPool: async () => new Map() });
+    expect(report.report?.facts.prompt).toMatchObject({ status: 'measured', tokens: 9_000 });
+    resetSessionUsage(id);
   });
 
   it("drops a measurement from a different endpoint identity", async () => {

@@ -65,7 +65,8 @@ function resolveEndpoint(context: CommandContext): string {
     const publication = context.readConfiguration?.();
     const config = publication?.config ?? context.runtimeConfig ?? getRuntimeConfig(context.projectRoot ?? context.cwd);
     const catalog = publication?.catalog ?? loadCatalog();
-    const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+    const active = context.resolveConfigTarget?.(config, context.sessionId)
+      ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
     const baseUrl = providerCredentialBaseUrl(catalog, active);
     return providerCredentialEndpoint(catalog, active, baseUrl) ?? DEFAULT_ENDPOINT_KIND;
   } catch {

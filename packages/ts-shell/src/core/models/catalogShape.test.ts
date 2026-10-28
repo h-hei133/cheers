@@ -95,6 +95,27 @@ describe("the shipped catalog", () => {
     });
   });
 
+  it("keeps reviewed tool-call support over refreshed metadata", () => {
+    const reviewed = [{
+      id: "vendor",
+      label: "Vendor",
+      runtime: "openai-compatible" as const,
+      auth: "api-key" as const,
+      models: [{ id: "no-tools", toolCalling: false }],
+    }];
+    const refreshed = mergeProviders(reviewed, [{
+      id: "vendor",
+      models: [{ id: "no-tools", toolCalling: true }],
+    }], { preserveExplicitCapabilities: true, origin: "refresh" });
+    expect(resolveRequestShape(refreshed, "vendor", "no-tools").toolCalling).toBe(false);
+
+    const user = mergeProviders(refreshed, [{
+      id: "vendor",
+      models: [{ id: "no-tools", toolCalling: true }],
+    }], { origin: "user" });
+    expect(resolveRequestShape(user, "vendor", "no-tools").toolCalling).toBe(true);
+  });
+
   it("stops sending a level to the model that refuses the field", () => {
     // `deepseek-reasoner` reasons by construction and rejects `reasoning_effort`.
     expect(shapeFor("deepseek", "deepseek-reasoner", "high").reasoningEffort).toBe(false);

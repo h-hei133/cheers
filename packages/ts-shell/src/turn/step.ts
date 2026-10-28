@@ -22,7 +22,12 @@ import { requestReplayBinding } from '../provider/request/replay.js';
 import type { SentRequest } from "../provider/request/sentRequest.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../provider/registry/provider.js";
 import { type ChatMessage } from "./prompt.js";
-import { outgoingMessages, finalStepMessages } from './messages.js';
+import {
+  outgoingProjection,
+  finalStepMessages,
+  hasToolHistory,
+  TOOL_HISTORY_UNSUPPORTED_MESSAGE,
+} from './messages.js';
 import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
 import { resolveRequestShape } from "../core/models/requestShape.js";
 import type { CatalogProvider } from "../core/models/catalog.js";
@@ -86,6 +91,8 @@ export interface ProviderTarget {
   readonly endpoint?: EndpointKind;
   /** Provider service tier selected by the session. */
   readonly serviceTier?: string;
+  /** Captured non-secret replay identity for the exact provider target. */
+  readonly replayBinding?: string;
 }
 
 /** What a step reports while it runs, before the assembled message exists. */
@@ -140,7 +147,11 @@ export interface StepRequest {
   readonly systemPrompt: string;
   readonly systemPromptSources?: readonly PromptSource[];
   /** Reuse the session's approved instructions with a delegated mode and tool set. */
-  readonly systemPromptFor?: (agentMode: "plan" | "build", toolNames: readonly string[]) => string;
+  readonly systemPromptFor?: (
+    agentMode: "plan" | "build" | undefined,
+    toolNames: readonly string[],
+    toolsAvailable?: boolean,
+  ) => string;
   readonly tools: readonly ToolSchema[];
   /** Read again for each step so tools loaded mid-run are declared next time. */
   readonly toolSnapshot?: () => readonly ToolSchema[];
@@ -239,22 +250,37 @@ export function createStepFunction(request: StepRequest): StepFunction {
     request.provider.model || request.provider.provider
       ? { ...(request.provider.provider ? { provider: request.provider.provider } : {}), model: request.provider.model }
       : undefined;
-  const replayBinding = requestReplayBinding(request.provider);
+  const replayBinding = request.provider.replayBinding ?? requestReplayBinding(request.provider);
   return async (messages, signal, listener, options): Promise<AssistantStep> => {
     const requestId = options.requestId ?? randomUUID();
     let requestAcceptedAt: number | undefined;
     let acceptedResponse = false;
+    const catalogAddress = request.provider.provider ? request.provider.baseUrl : undefined;
+    const toolCalling = resolveRequestShape(
+      request.catalog ?? [],
+      request.provider.provider ?? "",
+      request.provider.model,
+      undefined,
+      catalogAddress,
+    ).toolCalling;
+    const allowTools = options.allowTools && toolCalling;
     const allowed = options.allowedTools && new Set(options.allowedTools);
     const declared = request.toolSnapshot?.() ?? request.tools;
-    const tools = allowed ? declared.filter((tool) => allowed.has(tool.function.name)) : declared;
-    const systemPrompt = options.agentMode && request.systemPromptFor
-      ? request.systemPromptFor(options.agentMode, tools.map((tool) => tool.function.name))
+    const tools = toolCalling
+      ? allowed
+        ? declared.filter((tool) => allowed.has(tool.function.name))
+        : declared
+      : [];
+    const regeneratedPrompt = request.systemPromptFor !== undefined
+      && (options.agentMode !== undefined || !toolCalling);
+    const systemPrompt = regeneratedPrompt
+      ? request.systemPromptFor!(options.agentMode, tools.map((tool) => tool.function.name), toolCalling)
       : request.systemPrompt;
-    const overhead = { systemPrompt, tools };
     // The wire omits schemas when the closing step forbids tools. Hash what the
     // endpoint actually sends so a no-tools measurement cannot authorize a
     // later tool-enabled request with a stale prompt count.
-    const wireTools = options.allowTools ? tools : [];
+    const wireTools = allowTools ? tools : [];
+    const overhead = { systemPrompt, tools: wireTools };
     const schemaDigest = createHash('sha256').update(JSON.stringify(wireTools)).digest('hex');
     const systemDigest = createHash('sha256').update(systemPrompt).digest('hex');
     const messageDigest = historyDigest(messages);
@@ -266,7 +292,6 @@ export function createStepFunction(request: StepRequest): StepFunction {
     const stamp = (step: AssistantStep): AssistantStep => (origin ? { ...step, origin: step.origin ?? origin } : step);
     // Older direct adapters supplied only a model and URL. Without the runtime
     // provider identity, retain their unique-model catalogue lookup.
-    const catalogAddress = request.provider.provider ? request.provider.baseUrl : undefined;
     let streamAttempts = 0;
     for (;;) {
       const effort = effortAccepted ? captured.thinkingEffort ?? undefined : undefined;
@@ -275,6 +300,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
       }
       if (explicitEffort && effort && effortCapability(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, effort, catalogAddress) === 'unsupported') {
         return stamp(errorStep('The selected model does not support this reasoning effort. Select another level or use /thinking auto.'));
+      }
+      if (!toolCalling && hasToolHistory(messages)) {
+        return stamp(errorStep(TOOL_HISTORY_UNSUPPORTED_MESSAGE));
       }
       // Resolved per attempt rather than once, because the shape depends on the
       // level, and a refused `reasoning_effort` is answered by rebuilding the
@@ -294,10 +322,33 @@ export function createStepFunction(request: StepRequest): StepFunction {
       const modelEntry = catalogModel(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, catalogAddress);
       const usageAttribution = captureUsageAttribution({ provider: request.provider.provider ?? '', model: request.provider.model,
         baseUrl: request.provider.baseUrl, rates: modelEntry?.cost });
-      const measured = options.agentMode ? undefined : measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
+      const projection = outgoingProjection(messages, shape.assistantAfterToolResult);
+      const finalMessages = finalStepMessages(
+        projection.messages,
+        allowTools,
+        tools.length > 0,
+      );
+      const budgetMessages: readonly AgentMessage[] = finalMessages.map(message => ({
+        ...message,
+        content: message.content ?? '',
+      }));
+      const wireHistoryDigest = historyDigest(finalMessages);
+      const promptIdentity = {
+        provider: request.provider.provider ?? '',
+        model: request.provider.model,
+        endpoint,
+        endpointId: usageAttribution.endpointId,
+        schemaDigest,
+        systemDigest,
+        historyDigest: messageDigest,
+        wireHistoryDigest,
+        wireMessageCount: finalMessages.length,
+        replayBinding,
+      };
+      const measured = options.agentMode || !projection.sourceAligned ? undefined : measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
         model: request.provider.model, endpoint, schemaDigest, systemDigest,
-        endpointId: usageAttribution.endpointId, historyDigest: messageDigest });
-      const prompt = promptTokensFor({ messages, overhead, ...(measured ? { measured } : {}) });
+        endpointId: usageAttribution.endpointId, historyDigest: messageDigest, wireHistoryDigest, replayBinding });
+      const prompt = promptTokensFor({ messages: budgetMessages, overhead, ...(measured ? { measured } : {}) });
       const budget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
         inputLimit: modelEntry?.inputLimit,
         promptTokens: prompt.tokens, outputTokens: output ?? shape.maxOutputCeiling,
@@ -329,9 +380,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
           provider: request.provider.provider,
           model: request.provider.model,
           systemPrompt,
-          messages: outgoingMessages(messages, shape.assistantAfterToolResult),
+          messages: projection.messages,
           tools,
-          allowTools: options.allowTools,
+          allowTools,
           vision: shape.vision,
           temperature: request.temperature ?? 0.7,
           systemRole: shape.systemRole,
@@ -345,13 +396,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
           provider: request.provider.provider,
           replayBinding,
           systemPrompt,
-          messages: finalStepMessages(
-            outgoingMessages(messages, shape.assistantAfterToolResult),
-            options.allowTools,
-            tools.length > 0,
-          ),
+          messages: finalMessages,
           tools,
-          allowTools: options.allowTools,
+          allowTools,
           vision: shape.vision,
           temperature: request.temperature ?? 0.7,
           ...(request.topP != null ? { topP: request.topP } : {}),
@@ -450,10 +497,10 @@ export function createStepFunction(request: StepRequest): StepFunction {
             response = attemptResponse;
             responseAttempt = modelAttempt;
             options.onRequestSent?.({
-              promptIdentity: { schemaDigest, systemDigest, historyDigest: messageDigest },
+              promptIdentity,
               context: requestContext({ body, endpoint, fields: endpointShape(endpoint).contextFields,
                 provider: request.provider.provider ?? '', model: request.provider.model,
-                ...(!(options.agentMode && request.systemPromptFor) && request.systemPromptSources
+                ...(!regeneratedPrompt && request.systemPromptSources
                   ? { systemSources: request.systemPromptSources } : {}) }),
               endpoint,
               maxTokensField: shape.maxTokensField,
@@ -554,16 +601,14 @@ export function createStepFunction(request: StepRequest): StepFunction {
             // Recorded with the bucket, not looked up later: a provider switch must
             // not reprice tokens that were already spent at the old provider's rate.
             provider: request.provider.provider,
-            // The provider counted the prompt it was sent; the message count lets
-            // a later reader add whatever the conversation gained since. It is
-            // the array actually sent: an extra one would skip the assistant
-            // message and its tool arguments on the next measurement.
+            // The raw selected count preserves context-status calibration. The
+            // projection digest and its own count below bind budgets to the
+            // exact compacted, bridged and closing-step wire history.
             promptMessageCount: messages.length,
             // Use the effective schemas and system prompt, not the unfiltered
             // declarations: allowed tools and agent mode can change what was
             // actually sent, and a measurement from the wrong request is stale.
-            promptIdentity: { provider: request.provider.provider ?? '', model: request.provider.model, endpoint,
-              schemaDigest, systemDigest, historyDigest: messageDigest },
+            promptIdentity,
             purpose: options.requestPurpose ?? (options.agentMode ? 'subagent' : 'turn'),
           };
           if (options.agentMode && request.recordAuxiliaryUsage) request.recordAuxiliaryUsage(record);

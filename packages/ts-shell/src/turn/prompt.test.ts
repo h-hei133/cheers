@@ -90,4 +90,17 @@ describe("buildSystemPrompt", () => {
       prompt.indexOf("rule one"),
     );
   });
+
+  it("does not advertise tools when the model cannot call them", () => {
+    const prompt = buildSystemPrompt('build', {
+      toolNames: ['read', 'write'],
+      instructions: '<project_instructions>rule one</project_instructions>',
+    }, false);
+
+    expect(prompt).toContain('No tools are available');
+    expect(prompt).toContain('rule one');
+    expect(prompt).not.toContain('equipped with real tools');
+    expect(prompt).not.toContain('`read`');
+    expect(prompt).not.toContain('`web_search`');
+  });
 });

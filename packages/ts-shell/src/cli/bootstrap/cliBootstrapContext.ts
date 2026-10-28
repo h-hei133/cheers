@@ -114,7 +114,7 @@ export function createCliBootstrapRuntimeContext(
         launchCwd: input.launchCwd,
         runtimeConfig: input.rootContext.runtimeConfig,
         runtimeConfigOverrides: configOverrides(input.options),
-        resolveConfigTarget: config => resolveCliCredential(config, input.options),
+        resolveConfigTarget: (config, sessionId) => resolveCliCredential(config, input.options, process.env, sessionId),
         ...(input.options.skillPaths || input.options.noSkills
           ? {
               skillOptions: {

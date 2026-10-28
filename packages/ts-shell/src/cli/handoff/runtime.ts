@@ -65,7 +65,8 @@ export class HandoffRun {
     resources.cacheWarming?.stop();
     const { config, catalog } = this.context.configuration.current;
     const target = this.row.target;
-    const current = this.context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+    const current = this.context.resolveConfigTarget?.(config, this.context.session.id)
+      ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: this.context.session.id } });
     const window = resolveContextWindow({ catalog, provider: target.provider, model: target.model, baseUrl: current.baseUrl, configured: config.contextWindow }).window;
     const reserve = resolveTokenBudget(config.modelTokenBudgets, target.provider, target.model, 'reserveTokens', config.reserveTokens, DEFAULT_RESERVE_TOKENS);
     return { ...resources, cacheWarming: undefined, ...(resources.compaction ? { compaction: { ...resources.compaction,
