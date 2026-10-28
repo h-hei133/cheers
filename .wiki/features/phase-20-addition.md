@@ -2264,3 +2264,19 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 主代理heap1024MiB单线程执行director8项通过；五静态门、module facade0及heap1536MiB TS build`0252882b0d1a`通过。handoff的同类假设保持不改：其control在宿主缺少`todo`时已显式拒绝启动，不产生非法请求。未运行真实provider、PTY/exe、桌面/原生Windows或20k历史，原Phase20矩阵未重跑（35 complete / 12 partial / 0 open），ADD整体active。
 
 第一百一十一批记录的`6b673493`是当批反转与恢复时的wiring哈希；其后第一百一十一批的identity绑定与第一百一十四批的单次解析使该文件前进到`221f71fc`，历史证据不回溯改写。第一百一十二至一百一十三批同理只记录各自批次的源哈希。
+
+### 第一百一十四批：摘要重播身份与有效形状、单次解析
+
+第一百一十一批接入形状后，fallback 摘要的 `summaryIdentity` 仍只哈希 `provider` 与 `summaryLimits`。形状变化通常伴随模型变化（已含在 provider 身份里），因此当前没有可复现的重放缺陷；但"同一模型、形状不同"的两次捕获会得到相同身份，属于不完整绑定。现身份哈希改用含 shape 的 `effectiveLimits`，与预检和发送读取同一对象。
+
+同一文件里 `renewedProvider` 连续两次调用 `resolveRequestShape` 填两个相邻字段，现改为一次解析后复用，两个字段因此描述同一次解析结果。聚焦 31 项与 runtime 37 项通过；本批只收窄身份与消除重复解析，不改变可观察的发送行为，因此未制作反转。heap1536MiB TS build `b91820512360`/`42b75c032e36` 通过。
+
+### 第一百一十五批：模型详情的工具能力可见性与文档收口
+
+模型详情此前展示 Images、Reasoning、Effort 与价格，却不显示模型是否接受工具，用户在选择模型时看不到"这个模型不能读、改、执行"。[元数据详情](../../packages/ts-shell/src/cli/interactive/picker/model/metadata.ts)现新增 `Tool calls: supported/unsupported/unverified`，未声明保持 unverified，与请求读取同一字段。回归新增显式 `toolCalling:false` 模型并断言 unsupported，撤销该行后 3 项预期失败，源码恢复并核对 SHA-256 `59e381ea` 后重验；metadata 9 与 picker 43 共 52 项通过。
+
+同批更新第 16.3 节 model 验收行，使其包含工具能力可见性，避免文档描述落后于实现。另记录三项只读复核结论：补全/多 skill/命令组合未发现新缺陷；压缩投影的尺度边界由分段估算保证；研究入口不校验工具能力但明确声明"ordinary gates apply"且有 deadline，不构成非法请求。
+
+### 第一百一十六批：本轮全部生产代码提交的 CI 结论
+
+`fb602063` 之后共 11 个提交推送。GitHub Actions 读回：`600ec86d`、`69056452`、`d7c62186`、`5e9bfe75`、`f8f1b90a`、`4fa4731b`、`652fcd0a`、`34d98ea4`、`98b9eeea` 的 CI 均 success，即本轮全部生产代码改动通过 CI；`c6ad381e` 与 `9a3b0344` 为纯文档提交，结论另记。这不是真实 provider、PTY/exe、桌面/Windows 或 20k 历史的验收，原 Phase 20 矩阵未重跑，ADD 整体仍 active。
