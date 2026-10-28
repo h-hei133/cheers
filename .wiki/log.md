@@ -9954,3 +9954,7 @@ closure阶段两组最终反转分别移除preview完整目标比较、移除ste
 现`toolsReport`接受可选`toolCalling`，为false时在报告首行声明"该模型不接受工具声明，这些工具不会到达它"，并在`facts`中记录该标志；目录本身仍完整列出，因为读者仍需要知道会话提供了什么。目录不可读时保守返回`true`，不声称无法建立的限制。入口用一次解析同时取得endpoint与形状，避免重复读取配置。
 
 [report回归](../../packages/ts-shell/src/core/commands/tools/report.test.ts)比较capable与no-tools两份报告：前者无该警告，后者含精确措辞且`facts.toolCalling === false`、目录仍为1项。撤销该行后4个副本各1项预期失败（含`.tmp`历史探针副本，不计验收），源码逐字节恢复并核对SHA-256`e3087a3f`后单文件14项通过；五静态门与heap1536MiB TS build`f430c8f802c7`通过。
+
+## [2026-10-29] verify | 本轮全部提交的CI终态
+
+GitHub Actions读回完整队列：`600ec86d`、`69056452`、`d7c62186`、`5e9bfe75`、`f8f1b90a`、`4fa4731b`、`652fcd0a`、`34d98ea4`、`98b9eeea`、`c6ad381e`、`9a3b0344`、`4ff3233f`、`f16f14ff`共13个提交的CI均completed/success，本轮全部提交（含7个生产修复）通过CI，0失败，NormProof Architecture Watch同步success。这绑定的是精确SHA的CI结论，不是真实provider、PTY/exe、桌面/Windows或20k历史的验收；原Phase20矩阵未重跑，ADD整体active。
