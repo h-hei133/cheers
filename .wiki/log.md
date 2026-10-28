@@ -9986,3 +9986,9 @@ GitHub Actions读回完整队列：`600ec86d`、`69056452`、`d7c62186`、`5e9bf
 CI`40739686114`（`d33a0a1b`）唯一失败为`src/config/concurrency.test.ts`的`retains disjoint two-process writes`：收到的子进程输出是`ready\n`而缺少已写入的`saved\n`。该文件不在本轮任何改动范围内，根因是夹具用`exit`事件resolve：Node的`exit`可能先于stdout最后一块`data`到达，输出因此缺少尾部。现改用`close`（stdio全部关闭后触发）。
 
 连续5次单文件运行均3项通过。这是夹具竞态修复，不改变配置文件写入语义；产品代码未改。此前的全部生产修复CI仍为success，本批只补这一个间歇性夹具失败。
+
+## [2026-10-29] test | budget夹具同样等待stdio关闭
+
+顺着并发夹具的根因检查了其他读子进程stdout的测试：[budget回归](../../packages/ts-shell/src/planning/goal/budget.test.ts)也以`exit`事件解析`output`，存在同一竞态——`exit`可能早于最后一块stdout`data`。现改用`close`。`advisor`夹具只用exit判断退出码、不读stdout，无需改动。
+
+连续3次单文件运行均11项通过。夹具竞态修复，产品与预算语义未变。

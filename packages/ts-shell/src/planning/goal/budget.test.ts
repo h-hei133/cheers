@@ -129,7 +129,9 @@ catch (error) { console.log(error.code); }
         }
       });
       child.stderr.on('data', chunk => { errors += String(chunk); });
-      child.on('error', reject); child.on('exit', code => code === 0 && captured ? resolve(output.trim().slice('ready\n'.length)) : reject(new Error(`isolated child ${code}: ${errors || output}`)));
+      // `close` fires after the stdio streams finish; `exit` can arrive before
+      // the child's last stdout chunk, which would compare a truncated output.
+      child.on('error', reject); child.on('close', code => code === 0 && captured ? resolve(output.trim().slice('ready\n'.length)) : reject(new Error(`isolated child ${code}: ${errors || output}`)));
     });
     // Capture both policies before either writes, so the race exercises locked reservation, not optimistic reads.
     let results: string[];
