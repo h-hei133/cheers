@@ -155,7 +155,7 @@ export function buildCompactionWiring(input: {
   const effectiveLimits = fallbackShape ? { ...summaryLimits, shape: fallbackShape } : summaryLimits;
   return {
     policy: {
-      summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([provider, summaryLimits])).digest('hex'),
+      summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([provider, effectiveLimits])).digest('hex'),
       contextWindow: resolvedWindow.window,
       inputLimit: mainModel?.inputLimit,
       // Per-model budgets where the user set them, the global value otherwise.

@@ -9922,3 +9922,7 @@ closure阶段两组最终反转分别移除preview完整目标比较、移除ste
 现`on`在校验同一目录与地址后拒绝不具备工具能力的主模型，错误在创建任何cycle或live owner之前返回；worker目标模型的选择、预算与审批语义不变。[director回归](../../packages/ts-shell/src/cli/director/runtime.test.ts)把`planner`标为`toolCalling:false`，断言命令返回明确拒绝且`liveDirectors`没有注册。反转撤销该检查后用例失败（命令返回`Director on`），源码逐字节恢复并核对SHA-256`cc2aa167`后重验；其余7项director用例保持通过。
 
 主代理heap1024MiB单线程执行director8项通过；五静态门、module facade0及heap1536MiB TS build`0252882b0d1a`通过。handoff的同类假设保持不改：其control在宿主缺少`todo`时已显式拒绝启动。本批未运行真实provider、PTY/exe、桌面/Windows或20k历史，原Phase20矩阵未重跑，ADD整体active。
+
+## [2026-10-29] fix | 摘要重播身份包含有效请求形状
+
+第一百一十一批把请求形状接入摘要发送与预检，但fallback路径的`summaryIdentity`仍只哈希`provider`与`summaryLimits`。形状变化通常伴随模型变化（已包含在provider身份里），因此当前不产生可复现的重放错误；但它意味着"同一模型、形状不同"的两次捕获会得到相同身份，属于不完整绑定。现身份哈希改用含shape的`effectiveLimits`，与预检和发送读取同一对象。聚焦31项通过；本批未新增反转，因为该改动只收窄身份，不改变可观察的发送行为。
