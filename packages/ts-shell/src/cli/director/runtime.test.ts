@@ -135,6 +135,21 @@ it('refuses director mode on a main model the catalogue says takes no tools', as
   expect(liveDirectors.get(context)).toBeUndefined();
 });
 
+it('refuses director mode when two catalogue entries claim the main endpoint', async () => {
+  // With an ambiguous address the shape lookup falls back to a capable default,
+  // so a guard that only read `toolCalling` would pass a model the send path
+  // cannot address at all. The refusal must name the ambiguity instead.
+  const current = context.configuration.current;
+  const base = current.catalog[0]!.baseUrl!;
+  const catalog = [...current.catalog,
+    { ...current.catalog[0]!, id: 'duplicate-a', baseUrl: base.replace(/\/+$/, '') + '/' },
+    { ...current.catalog[0]!, id: 'duplicate-b', baseUrl: base.replace(/\/+$/, '') + '//' }];
+  context.configuration = new ConfigState(current.config, current.binding, catalog);
+
+  expect(await command('on --model openai-compatible/vendor/executor')).toContain('multiple entries for this endpoint');
+  expect(liveDirectors.get(context)).toBeUndefined();
+});
+
 it('denies a worker effect separately from delegation and preserves the original tool allowlist', async () => {
   approval = async name => name === 'write' ? 'deny' : 'allow-once'; let turn = 0;
   reply = (_body, response) => ++turn === 1 ? respond(response, [{ id: 'denied-effect', name: 'write', args: { path: 'denied.txt', content: 'denied' } }]) : respond(response);

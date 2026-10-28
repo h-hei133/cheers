@@ -15,6 +15,7 @@ import { agentProjection } from '../jobs/agent/projection.js';
 import { report } from '../jobs/projection.js';
 import { executionChoice, sourceChoice } from '../provider/selection.js';
 import { resolveRequestShape } from '../../core/models/requestShape.js';
+import { catalogProvider } from '../../core/models/catalog.js';
 import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
 import { DirectorRuntime } from './lifetime.js';
 import { liveDirectors } from './state.js';
@@ -58,8 +59,14 @@ export async function runDirectorCommand(host: JobsComposition, args: string[], 
       // management. A main model the catalogue says takes no tools cannot see
       // any of them, so enabling it would promise a capability the request
       // withholds. Refuse here rather than run a director that cannot direct.
-      const mainShape = resolveRequestShape(catalog, source.provider, source.model, undefined,
-        providerCredentialBaseUrl(catalog, source));
+      // An ambiguous endpoint is refused first: with two entries claiming the
+      // address the shape would fall back to "capable", and the guard would
+      // pass a model the send path cannot address at all.
+      const mainAddress = providerCredentialBaseUrl(catalog, source);
+      if (catalogProvider(catalog, source.provider, mainAddress).ambiguous) {
+        throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before enabling a director.');
+      }
+      const mainShape = resolveRequestShape(catalog, source.provider, source.model, undefined, mainAddress);
       if (!mainShape.toolCalling) throw new Error('Director requires a main model that accepts tool declarations.');
       const model = parsed.flags.get('model'); const effort = parseEffortFlag(parsed.flags.get('effort'));
       const worker = executionChoice(typeof model === 'string' ? model : `${source.provider}/${source.model}`, effort, source, original, config, catalog);

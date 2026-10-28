@@ -9958,3 +9958,9 @@ closure阶段两组最终反转分别移除preview完整目标比较、移除ste
 ## [2026-10-29] verify | 本轮全部提交的CI终态
 
 GitHub Actions读回完整队列：`600ec86d`、`69056452`、`d7c62186`、`5e9bfe75`、`f8f1b90a`、`4fa4731b`、`652fcd0a`、`34d98ea4`、`98b9eeea`、`c6ad381e`、`9a3b0344`、`4ff3233f`、`f16f14ff`共13个提交的CI均completed/success，本轮全部提交（含7个生产修复）通过CI，0失败，NormProof Architecture Watch同步success。这绑定的是精确SHA的CI结论，不是真实provider、PTY/exe、桌面/Windows或20k历史的验收；原Phase20矩阵未重跑，ADD整体active。
+
+## [2026-10-29] fix | director守卫先拒绝歧义端点
+
+上一批的director工具能力守卫直接读取`resolveRequestShape`，却未先检查端点歧义。`catalogProvider`在多于一个alias声明同一地址时返回`ambiguous`，此时`catalogModel`找不到唯一条目，形状回退为`DEFAULT_REQUEST_SHAPE`（toolCalling:true），守卫因此放行一个发送路径根本无法寻址的模型。现守卫先以与`createProviderStep`相同的措辞拒绝歧义，再判断工具能力；拒绝仍发生在创建任何cycle或live owner之前。
+
+[director回归](../../packages/ts-shell/src/cli/director/runtime.test.ts)另构造两个规范化后同址的alias，断言命令返回"multiple entries for this endpoint"且`liveDirectors`未注册。反转撤销该检查后用例失败（命令返回`Director on`），源码逐字节恢复并核对SHA-256`0a037ff7`后9项通过。四静态门与heap1536MiB TS build`e990dc0b12bf`通过。
