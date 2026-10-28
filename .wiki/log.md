@@ -9866,3 +9866,11 @@ Provider审计确认旧F-01/02/03/05/06(Copilot)/07/08已实现，Anthropic OAut
 第一百零七批确认refresh cache与用户catalog复用同一merge后，所有overlay都被无条件标记`custom:true`，公开目录刷新出的新增provider和built-in patch在`/model`中错误显示为`yours`。现catalogStore显式传user/refresh来源，merge只让用户文件保持custom，patch内的同名字段不能覆盖来源判定，默认merge调用仍保持用户overlay语义。
 
 新增surface回归在同一隔离目录刷新新增provider与built-in patch、再写用户provider，验证前两者无`yours`且后者有`yours`。撤回来源判定后1项预期失败、9项未选；四source逐字节恢复并核对SHA-256`34cac2c0`/`2f9e6f0d`/`e7f53e23`/`b803a198`后重验。主代理heap768MiB、单worker串行四文件49项通过；五静态门、module facade0及TS build`a7837621f4e3`通过，118既有docs-source advisory保留，build heap1536MiB。commit/push/CI另绑定；未运行真实models.dev refresh、真实provider、PTY/exe、桌面/Windows、全仓或原Phase20矩阵，ADD整体active。
+
+## [2026-10-28] fix | reasoning options与显式档位准入
+
+第一百零八批确认refresh完全丢弃models.dev`reasoning_options`，而`reasoning:true`又让legacy capability接受任意low/medium/high；只声明budget/toggle、只支持minimal/xhigh/max或只接受default/none的模型因此可能收到错误的`reasoning_effort`。现有效effort声明生成完整map，仅精确low/medium/high映射自身，其余显式null；特殊名不折叠，有效empty/toggle/budget声明禁用显式档位但保留auto，absent/malformed/非数组/未来未知type继续unprojected。
+
+refresh回归覆盖partial、budget+effort、empty、toggle、budget、special、absent、malformed、non-array及future结构，并核对partial medium拒绝、auto支持和budget-only无thinkingLevelName；catalog合同锁reviewed map优先。五个聚焦反转分别触发1项预期失败，三source逐字节恢复并核对SHA-256`ac4893a3`/`a00e6a09`/`99bd2c6f`后重验。review先发现budget-only over-claim，修补后closure无remaining finding，非数组/future测试缺口已补。
+
+主代理heap768MiB、单worker串行六文件75项通过；五静态门、module facade0及TS build`6eec90a17825`通过，118既有docs-source advisory保留，build heap1536MiB。commit/push/CI另绑定；未运行真实provider/models.dev刷新、PTY/exe、桌面/Windows、全仓或原Phase20矩阵，ADD整体active。

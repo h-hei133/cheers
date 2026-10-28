@@ -713,3 +713,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: After an explicit public-index refresh, providers from that cache are rendered as `yours` alongside entries the user actually added to `models.json`.
 - **Root Cause**: The generic provider merge treated every overlay as user-authored and wrote `custom:true`; cache and user layers called it identically.
 - **Rule**: Pass the overlay origin into the existing merge and derive `custom` from that source rather than from patch input. Keep the default user-origin behavior for direct callers, explicitly mark the refresh cache, and verify both added-provider and built-in-patch branches through the rendered surface.
+
+### Refreshed Reasoning Options Need Complete Capability Maps
+- **Symptom**: A model that publishes only budget/toggle reasoning, or effort names such as `minimal`/`xhigh`, still accepts low/medium/high in the picker and receives an invalid raw `reasoning_effort`.
+- **Root Cause**: Refresh kept only `reasoning:true`; capability treated that as blanket support for all project levels, while the wider models.dev vocabulary was discarded.
+- **Rule**: For valid effort options, emit all low/medium/high keys and map only exact names to themselves; explicit null means unsupported. Do not alias `minimal`, `xhigh`, `max`, `none`, or `default`. Valid empty/toggle/budget declarations disable named levels but keep automatic effort; absent or structurally unknown metadata stays unprojected. Preserve reviewed maps over refresh cache and keep fixed protocol budgets separate from named-effort projection.

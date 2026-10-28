@@ -1,4 +1,4 @@
-import type { CatalogProvider, CatalogModel, ModelCostRates } from "./catalog.js";
+import { THINKING_LEVELS, type CatalogProvider, type CatalogModel, type ModelCostRates } from "./catalog.js";
 import { writeCatalogCache } from "./catalogStore.js";
 import { positiveTokenLimit } from "./limits.js";
 
@@ -39,6 +39,8 @@ interface IndexModel {
   readonly limit?: { readonly context?: number; readonly input?: number; readonly output?: number };
   /** Whether the model reasons and whether it accepts sampling temperature. */
   readonly reasoning?: boolean;
+  /** How the provider lets a caller control reasoning. */
+  readonly reasoning_options?: readonly IndexReasoningOption[];
   readonly temperature?: boolean;
   /** Inputs the deployment accepts; image support is a request-shape capability. */
   readonly modalities?: {
@@ -58,6 +60,11 @@ interface IndexModel {
     readonly cache_read?: number;
     readonly cache_write?: number;
   };
+}
+
+interface IndexReasoningOption {
+  readonly type?: unknown;
+  readonly values?: readonly unknown[];
 }
 
 export async function refreshCatalog(indexUrl: string = DEFAULT_INDEX): Promise<RefreshResult> {
@@ -107,6 +114,7 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
       const vision = Array.isArray(model?.modalities?.input)
         ? model.modalities.input.includes("image")
         : undefined;
+      const thinkingLevelMap = projectThinkingLevelMap(model?.reasoning_options);
       const compat = typeof model?.temperature === "boolean"
         ? { supportsTemperature: model.temperature }
         : undefined;
@@ -116,6 +124,7 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
         ...(inputLimit !== undefined ? { inputLimit } : {}),
         ...(maxTokens !== undefined ? { maxTokens } : {}),
         ...(typeof model?.reasoning === "boolean" ? { reasoning: model.reasoning } : {}),
+        ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
         ...(vision !== undefined ? { vision } : {}),
         ...(compat ? { compat } : {}),
         ...(cost ? { cost } : {}),
@@ -162,4 +171,52 @@ function projectCost(cost: IndexModel["cost"]): ModelCostRates | undefined {
 /** A published rate, or nothing when the index did not state one. */
 function finite(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+/**
+ * Project only exact project-level effort names.
+ *
+ * Models.dev has a wider vocabulary. `minimal`, `xhigh`, and `max` are not
+ * interchangeable with this project's levels, while `none` disables reasoning
+ * and `default` is not the same as automatic. Guessing those names would turn a
+ * capability claim into a request the endpoint may reject.
+ *
+ * Valid options without an exact named level cannot authorize a raw project
+ * effort. Budget-only, toggle-only, and empty declarations therefore make all
+ * three explicit project levels unsupported while automatic effort remains
+ * available. Structurally unknown metadata stays unprojected for compatibility.
+ */
+function projectThinkingLevelMap(options: unknown): CatalogModel["thinkingLevelMap"] | undefined {
+  if (!Array.isArray(options)) return undefined;
+  const supported = new Set<string>();
+  let hasEffort = false;
+  let hasUnknown = false;
+  for (const raw of options) {
+    if (typeof raw !== "object" || raw === null) {
+      hasUnknown = true;
+      continue;
+    }
+    const option = raw as IndexReasoningOption;
+    if (option.type === "effort") {
+      if (!Array.isArray(option.values)) {
+        hasUnknown = true;
+        continue;
+      }
+      hasEffort = true;
+      for (const value of option.values) {
+        if (typeof value === "string") supported.add(value);
+      }
+    } else if (option.type !== "budget_tokens" && option.type !== "toggle") {
+      hasUnknown = true;
+    }
+  }
+  if (hasEffort) {
+    return Object.fromEntries(
+      THINKING_LEVELS.map(level => [level, supported.has(level) ? level : null]),
+    ) as NonNullable<CatalogModel["thinkingLevelMap"]>;
+  }
+  if (hasUnknown) return undefined;
+  return Object.fromEntries(
+    THINKING_LEVELS.map(level => [level, null]),
+  ) as NonNullable<CatalogModel["thinkingLevelMap"]>;
 }

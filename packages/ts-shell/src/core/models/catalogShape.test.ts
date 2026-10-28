@@ -69,6 +69,32 @@ describe("the shipped catalog", () => {
     });
   });
 
+  it("keeps reviewed thinking levels over refreshed metadata", () => {
+    const reviewed = [{
+      id: "vendor",
+      label: "Vendor",
+      runtime: "openai-compatible" as const,
+      auth: "api-key" as const,
+      models: [{
+        id: "reasoning",
+        reasoning: true,
+        thinkingLevelMap: { low: "brief", medium: null, high: "thorough" },
+      }],
+    }];
+    const refreshed = mergeProviders(reviewed, [{
+      id: "vendor",
+      models: [{
+        id: "reasoning",
+        thinkingLevelMap: { low: null, medium: "medium", high: null },
+      }],
+    }], { preserveExplicitCapabilities: true, origin: "refresh" });
+    expect(catalogModel(refreshed, "vendor", "reasoning")?.thinkingLevelMap).toEqual({
+      low: "brief",
+      medium: null,
+      high: "thorough",
+    });
+  });
+
   it("stops sending a level to the model that refuses the field", () => {
     // `deepseek-reasoner` reasons by construction and rejects `reasoning_effort`.
     expect(shapeFor("deepseek", "deepseek-reasoner", "high").reasoningEffort).toBe(false);

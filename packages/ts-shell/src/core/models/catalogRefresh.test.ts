@@ -5,6 +5,7 @@ import path from "node:path";
 import { refreshCatalog } from "./catalogRefresh.js";
 import { catalogCachePath, loadCatalog, userCatalogPath } from "./catalogStore.js";
 import { catalogModel } from "./catalog.js";
+import { effortCapability } from "./capability.js";
 import { resolveRequestShape } from "./requestShape.js";
 import { renderCatalog } from "./catalogSurface.js";
 
@@ -282,6 +283,63 @@ describe("refreshing the catalogue", () => {
       expect(lineFor("demo")).not.toContain("yours");
       expect(lineFor("openai")).not.toContain("yours");
       expect(lineFor("mine")).toContain("yours");
+    });
+  });
+
+  it("projects only exact declared reasoning effort levels", async () => {
+    const document = {
+      demo: {
+        name: "Demo",
+        models: {
+          partial: {
+            id: "partial",
+            reasoning: true,
+            reasoning_options: [
+              { type: "budget_tokens", max: 32_000 },
+              { type: "effort", values: ["low", "high"] },
+            ],
+          },
+          empty: { id: "empty", reasoning: true, reasoning_options: [] },
+          special: {
+            id: "special",
+            reasoning: true,
+            reasoning_options: [{ type: "effort", values: [null, "none", "minimal", "xhigh", "max", "default"] }],
+          },
+          toggle: { id: "toggle", reasoning: true, reasoning_options: [{ type: "toggle" }] },
+          budget: { id: "budget", reasoning: true, reasoning_options: [{ type: "budget_tokens", max: 32_000 }] },
+          absent: { id: "absent", reasoning: true },
+          malformed: { id: "malformed", reasoning: true, reasoning_options: [{ type: "effort" }] },
+          nonarray: { id: "nonarray", reasoning: true, reasoning_options: { type: "effort", values: ["low"] } },
+          future: { id: "future", reasoning: true, reasoning_options: [{ type: "future" }] },
+        },
+      },
+    };
+
+    await withIndex(document, async (url) => {
+      const result = await refreshCatalog(url);
+      expect(result.ok).toBe(true);
+      const models = readCache(result.cachePath!).demo?.models ?? [];
+      expect(models.find(model => model.id === "partial")?.thinkingLevelMap).toEqual({
+        low: "low",
+        medium: null,
+        high: "high",
+      });
+      const unsupported = { low: null, medium: null, high: null };
+      for (const id of ["empty", "special", "toggle", "budget"]) {
+        expect(models.find(model => model.id === id)?.thinkingLevelMap).toEqual(unsupported);
+      }
+      for (const id of ["absent", "malformed", "nonarray", "future"]) {
+        expect(models.find(model => model.id === id)).toBeDefined();
+        expect(models.find(model => model.id === id)).not.toHaveProperty("thinkingLevelMap");
+      }
+
+      const catalog = loadCatalog();
+      expect(effortCapability(catalog, "demo", "partial", "low")).toBe("supported");
+      expect(effortCapability(catalog, "demo", "partial", "medium")).toBe("unsupported");
+      expect(effortCapability(catalog, "demo", "partial", null)).toBe("supported");
+      expect(effortCapability(catalog, "demo", "budget", "low")).toBe("unsupported");
+      expect(resolveRequestShape(catalog, "demo", "partial", "low").thinkingLevelName).toBe("low");
+      expect(resolveRequestShape(catalog, "demo", "budget", "low").thinkingLevelName).toBeUndefined();
     });
   });
 
