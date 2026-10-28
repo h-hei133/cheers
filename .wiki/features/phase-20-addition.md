@@ -1465,6 +1465,7 @@ auth18、key9、InteractiveMode110共三文件137项单进程串行通过。有�
 | 外部目录刷新可持久化畸形模型上限 | 第一百零六批确认可变models.dev JSON的context/input/output未经同一整数准入即可写入缓存，且旧缓存读取不清理；负数或字符串可能进入compaction预算。现只接受正安全整数，refresh投影与catalog merge两个provider分支共用同一owner，新增provider及built-in patch的旧缓存均由回归覆盖；真实外部索引内容与端到端compaction平台仍未验 |
 | 刷新目录被错误显示为“yours” | 第一百零七批确认refresh cache与用户catalog复用同一merge，所有overlay都无条件标记`custom:true`，`/model`因此把公开索引刷新出的provider显示为用户自有。现merge显式区分user/refresh来源，只有用户文件保持`yours`；新增provider、built-in patch及同场用户overlay由surface回归覆盖。真实外部刷新内容和桌面渲染仍未验 |
 | 刷新目录丢失reasoning effort能力 | 第一百零八批确认`reasoning_options`被完全丢弃，`reasoning:true`又让任意显式low/medium/high看似受支持，可能向只接受budget/toggle或不同effort名的模型发送错误字段。现只精确投影声明的low/medium/high并补全不支持项，minimal/xhigh/max/none/default不猜测；有效空/budget/toggle选项禁用显式档位但保留auto，未知结构继续legacy unknown。真实provider协议矩阵仍待验 |
+| 模型上限helper引入声明依赖环 | 第一百零九批由CI`test:scripts`完整declaration graph发现`catalog.ts -> limits.ts -> catalog.ts`；轻量`verify:import-cycles`未捕获该type-only back-edge。现limits owner使用structurally typed generic，不再import catalog type，行为保持。迟到读回将`23550c7d`与`803b9741`CI标为failure，修复提交CI须另行验证 |
 | settings/model整体操作不足 | 分类/section/详情、配置与角色返回、来源长值、多行编辑、小窗口、pointer焦点、内容wheel、独立sidebar视口及hover均已有推进，来源阅读仍有4MiB上限。第三十八批新增settings全部37项/user37-project36基本键盘链及七个跨来源政策场景，第三十九批补17个代表性冲突/失效/取消/范围场景，第四十九批补Memory/Shell只读命令入口。完整字段×来源×编辑器×窗口/桌面及model能力/角色/真实认证矩阵仍未完成；只读入口不伪装可编辑字段，也不能将局部绿色写成“整体已看齐” |
 | 角色写入失败后丢失settings/model返回链 | 第八十批确认reset、具体模型和effort只在saved时返回父页面，Enter已释放面板，失败使生命周期结束；effort重建遇不可读state还会掩盖原写入结果。现回现有fresh parent，不可读时退回目录并保留原notice；60项执行通过、四组6/10/6/4有效反转及build有本地证据，真实文件系统故障与完整平台矩阵未验 |
 | 角色认证返回时读取失败吞掉连接保存结果 | 第八十一批确认API-key/account保存后的fresh role准备无异常边界，state不可读时丢失原认证notice和返回链。现沿原角色目录fallback，保留已保存/应用未确认事实，恢复后须显式重新选择才分配。107项执行通过、14项有效反转及build有本地证据；认证runner与故障受控，真实服务、磁盘故障和完整scope矩阵未验 |
@@ -2200,3 +2201,11 @@ ADD-08沿[状态投影](../../packages/ts-shell/src/cli/interactive/sessionFacts
 [refresh回归](../../packages/ts-shell/src/core/models/catalogRefresh.test.ts)覆盖partial exact、budget+effort、empty、toggle、budget、special、absent、malformed、non-array及future未知结构，并验证partial的medium显式拒绝、auto可用及budget-only无`thinkingLevelName`。[catalog合同](../../packages/ts-shell/src/core/models/catalogShape.test.ts)另锁reviewed完整thinking map不能被refresh metadata替换。五个聚焦反转分别在去掉投影、返回partial map、折叠special别名、恢复budget-only unknown及让refresh覆盖reviewed map时触发1项预期失败，其余未选不计通过；三source逐字节恢复并核对SHA-256 `ac4893a3`/`a00e6a09`/`99bd2c6f`后重验。
 
 独立只读review先指出budget-only仍可能over-claim显式档位；修补为完整null map并补capability断言后closure无remaining finding，非数组/未来type测试缺口已在最终回归补齐。主代理heap768MiB、单worker串行执行六文件75项通过；五静态门、module facade0及TS build `6eec90a17825`通过，118既有docs-source advisory保留，build heap1536MiB。本批未运行真实provider请求、真实models.dev刷新、PTY/exe、桌面/Windows或全仓，未重跑原Phase20矩阵；提交/推送/CI另绑定，ADD整体active。
+
+### 第一百零九批：模型上限helper的声明依赖环
+
+迟到读回GitHub CI `40625431536`与`40626395673`均为failure，唯一失败是`test:scripts`第70项完整repository declaration graph：`packages/ts-shell/src/core/models/catalog.ts -> limits.ts -> catalog.ts`。本地`verify:import-cycles`报runtime/type-only均为0，因此未发现[limits owner](../../packages/ts-shell/src/core/models/limits.ts)从[catalog](../../packages/ts-shell/src/core/models/catalog.ts)导入`CatalogModel`形成的declaration back-edge；`23550c7d`与`803b9741`不能改记为绿色。
+
+现limits以本地structural `ModelLimits`约束generic sanitizer，只读取contextWindow/inputLimit/maxTokens并把通过准入的字段重建回对象，不再import catalog type；catalog仍单向调用该helper，positive-safe-integer语义和旧缓存清理保持不变。主代理heap768MiB串行`test:scripts`175项全部通过，其中完整declaration graph明确通过；六个受影响文件75项、五静态门、module facade0及TS build `4da89e6e9976`通过，build heap1536MiB，118既有docs-source advisory保留。limits最终SHA-256为`2459d84e`，catalog与refresh保持`34cac2c0`/`ac4893a3`。
+
+本批只修复构建期依赖所有权，没有改变运行时能力或provider行为；未运行真实provider/models.dev刷新、PTY/exe、桌面/Windows或全仓。修复提交的push与精确SHA CI另绑定，ADD整体active。

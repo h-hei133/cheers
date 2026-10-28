@@ -1,4 +1,8 @@
-import type { CatalogModel } from './catalog.js';
+interface ModelLimits {
+  readonly contextWindow?: number;
+  readonly inputLimit?: number;
+  readonly maxTokens?: number;
+}
 
 /** A model limit the request and compaction owners can trust, or no declaration. */
 export function positiveTokenLimit(value: unknown): number | undefined {
@@ -6,18 +10,22 @@ export function positiveTokenLimit(value: unknown): number | undefined {
 }
 
 /** Remove malformed limits from any catalogue layer before they reach consumers. */
-export function sanitizeModelLimits(model: CatalogModel): CatalogModel {
-  const sanitized = { ...model };
-  const contextWindow = positiveTokenLimit(sanitized.contextWindow);
-  const inputLimit = positiveTokenLimit(sanitized.inputLimit);
-  const maxTokens = positiveTokenLimit(sanitized.maxTokens);
-  if (contextWindow === undefined) delete sanitized.contextWindow;
-  else sanitized.contextWindow = contextWindow;
-  if (inputLimit === undefined) delete sanitized.inputLimit;
-  else sanitized.inputLimit = inputLimit;
-  if (maxTokens === undefined) delete sanitized.maxTokens;
-  else sanitized.maxTokens = maxTokens;
-  return sanitized;
+export function sanitizeModelLimits<T extends ModelLimits>(model: T): T {
+  const {
+    contextWindow: _contextWindow,
+    inputLimit: _inputLimit,
+    maxTokens: _maxTokens,
+    ...rest
+  } = model;
+  const contextWindow = positiveTokenLimit(_contextWindow);
+  const inputLimit = positiveTokenLimit(_inputLimit);
+  const maxTokens = positiveTokenLimit(_maxTokens);
+  return {
+    ...rest,
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
+    ...(inputLimit !== undefined ? { inputLimit } : {}),
+    ...(maxTokens !== undefined ? { maxTokens } : {}),
+  } as T;
 }
 
 /** Model metadata is optional; an absent ceiling is not a proven limit. */

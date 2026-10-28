@@ -9874,3 +9874,9 @@ Provider审计确认旧F-01/02/03/05/06(Copilot)/07/08已实现，Anthropic OAut
 refresh回归覆盖partial、budget+effort、empty、toggle、budget、special、absent、malformed、non-array及future结构，并核对partial medium拒绝、auto支持和budget-only无thinkingLevelName；catalog合同锁reviewed map优先。五个聚焦反转分别触发1项预期失败，三source逐字节恢复并核对SHA-256`ac4893a3`/`a00e6a09`/`99bd2c6f`后重验。review先发现budget-only over-claim，修补后closure无remaining finding，非数组/future测试缺口已补。
 
 主代理heap768MiB、单worker串行六文件75项通过；五静态门、module facade0及TS build`6eec90a17825`通过，118既有docs-source advisory保留，build heap1536MiB。commit/push/CI另绑定；未运行真实provider/models.dev刷新、PTY/exe、桌面/Windows、全仓或原Phase20矩阵，ADD整体active。
+
+## [2026-10-28] fix | 模型上限helper的声明依赖环
+
+第一百零九批迟到读回确认`23550c7d`CI`40625431536`与`803b9741`CI`40626395673`均failure，唯一失败为`test:scripts`完整declaration graph发现`catalog.ts -> limits.ts -> catalog.ts`。轻量`verify:import-cycles`报0，未捕获type-only back-edge；两个旧SHA不改记为绿色。
+
+limits现用本地structural generic，不再import catalog type，只读取并准入contextWindow/inputLimit/maxTokens后重建返回；catalog单向依赖保持，运行语义不变。主代理heap768MiB串行`test:scripts`175项通过，六文件75项及TS build`4da89e6e9976`通过，build heap1536MiB；limits SHA-256`2459d84e`。修复提交push/CI另绑定，未运行真实provider/models.dev刷新、PTY/exe、桌面/Windows、全仓或原Phase20矩阵，ADD整体active。

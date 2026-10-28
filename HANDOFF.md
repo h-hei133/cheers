@@ -718,3 +718,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A model that publishes only budget/toggle reasoning, or effort names such as `minimal`/`xhigh`, still accepts low/medium/high in the picker and receives an invalid raw `reasoning_effort`.
 - **Root Cause**: Refresh kept only `reasoning:true`; capability treated that as blanket support for all project levels, while the wider models.dev vocabulary was discarded.
 - **Rule**: For valid effort options, emit all low/medium/high keys and map only exact names to themselves; explicit null means unsupported. Do not alias `minimal`, `xhigh`, `max`, `none`, or `default`. Valid empty/toggle/budget declarations disable named levels but keep automatic effort; absent or structurally unknown metadata stays unprojected. Preserve reviewed maps over refresh cache and keep fixed protocol budgets separate from named-effort projection.
+
+### Type-Only Declarations Still Form A CI Cycle
+- **Symptom**: `verify:import-cycles` reports zero cycles, but CI `test:scripts` fails on the complete repository declaration graph.
+- **Root Cause**: A low-level helper type-imported its higher-level owner while the owner runtime-imported the helper. The lightweight cycle gate did not include that declaration back-edge.
+- **Rule**: Keep shared leaf helpers structural: accept the few fields they read instead of type-importing the owner that calls them. Run `npm run test:scripts` before committing changes to cross-domain type imports; do not treat a green lightweight cycle gate as coverage of the full declaration graph.
