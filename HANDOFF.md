@@ -703,3 +703,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A newly discovered model has context and price but loses reasoning, image input, output ceiling or temperature rejection, causing invalid request shapes or unavailable capabilities.
 - **Root Cause**: The index projection kept only limits and price even though the upstream rows publish capability metadata.
 - **Rule**: Project only capabilities the index explicitly states, including false values, and leave absent fields absent. Merge refresh cache as a fill-missing capability layer so it cannot overwrite explicit reviewed built-in request constraints; keep the user's own catalog as the final ordinary overlay. Never infer capabilities from model names.
+
+### Catalogue Limit Tests Must Isolate User State Before The First Refresh
+- **Symptom**: A focused catalogue-refresh test replaces the operator's real `~/.cheers/models-cache.json` with a `demo` fixture.
+- **Root Cause**: `catalogCachePath()` resolves `HOME`/`USERPROFILE` at write time, and the test invoked `refreshCatalog` before stubbing either variable. The existing positive-value tests shared the same leak.
+- **Rule**: Isolate `HOME`, `USERPROFILE` and `CHEERS_TEST_ROOT` for every test that can refresh or load the catalogue, from `beforeEach` rather than after the first fixture. Assert the real cache path was not written when diagnosing prior residue. Admit model context/input/output limits through the shared positive-safe-integer rule at both refresh projection and catalogue merge, including old cache and built-in-patch branches.

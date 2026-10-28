@@ -1,3 +1,25 @@
+import type { CatalogModel } from './catalog.js';
+
+/** A model limit the request and compaction owners can trust, or no declaration. */
+export function positiveTokenLimit(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined;
+}
+
+/** Remove malformed limits from any catalogue layer before they reach consumers. */
+export function sanitizeModelLimits(model: CatalogModel): CatalogModel {
+  const sanitized = { ...model };
+  const contextWindow = positiveTokenLimit(sanitized.contextWindow);
+  const inputLimit = positiveTokenLimit(sanitized.inputLimit);
+  const maxTokens = positiveTokenLimit(sanitized.maxTokens);
+  if (contextWindow === undefined) delete sanitized.contextWindow;
+  else sanitized.contextWindow = contextWindow;
+  if (inputLimit === undefined) delete sanitized.inputLimit;
+  else sanitized.inputLimit = inputLimit;
+  if (maxTokens === undefined) delete sanitized.maxTokens;
+  else sanitized.maxTokens = maxTokens;
+  return sanitized;
+}
+
 /** Model metadata is optional; an absent ceiling is not a proven limit. */
 export function outputLimitFailure(output: number | undefined, ceiling?: number, window?: number): string | undefined {
   if (output === undefined) return undefined;

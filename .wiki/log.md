@@ -9852,3 +9852,11 @@ ADD-08实际host确认请求后preview可先estimated再过期，而无token的u
 Provider审计确认旧F-01/02/03/05/06(Copilot)/07/08已实现，Anthropic OAuth仍缺授权client/scopes，F-09不适用于当前JSON自描述协议；F-04确认`auto` reasoning仍不能发送temperature，现由OpenAI reasoning model shape关闭。Catalog refresh另投影models.dev的reasoning、temperature、image modality和output limit，缺失字段保持absent；refresh cache采用fill-missing capability policy，显式built-in约束不被覆盖，用户catalog仍最终优先。
 
 四个独立反转分别触发status3、temperature2、catalog1、cache precedence1项失败；源码逐字节恢复并核对SHA后重验。同一只读review closure确认M1 resolved且无新finding，残余为body级集成、无refresh producer的preserve分支及可变外部index。主代理heap768MiB、单worker串行6文件518项通过；五静态门、module facade0及TS build`0bceb22d3bf0`通过，118既有docs advisory保留。commit/push/CI另绑定；真实provider/OAuth、native PTY/桌面/Windows、历史差额及原Phase20矩阵未验，ADD整体active。
+
+## [2026-10-28] fix | 目录刷新上限准入与旧缓存收口
+
+第一百零六批确认可变models.dev目录的`limit.context`/`limit.input`未走`limit.output`已有的整数校验，负值、字符串和非安全整数可写入缓存；旧缓存读取也不清理，负input limit可经compaction unknown fallback折算成零可用输入。现共享模型上限owner只接受正安全整数，refresh投影及catalog merge的added-provider/built-in-patch两分支复用同一规则，malformed旧cache不会覆盖reviewed built-in context。
+
+新增回归覆盖六类有效/无效值、磁盘旧新provider及built-in patch。四个聚焦反转分别触发1项预期失败，源码逐字节恢复并核对SHA-256`5edeb144`/`639990c7`/`2e8e4035`/`56f050f6`后重验。首次运行在隔离前写入操作者`~/.cheers/models-cache.json`，因内容与mtime精确对应测试`demo` fixture，已删除该单一residue；测试现逐例隔离HOME/USERPROFILE/CHEERS_TEST_ROOT，最终执行后确认真实路径未再写入。
+
+主代理heap768MiB、单worker串行catalogRefresh9+catalogShape18，共27项通过；五静态门、module facade0及TS build`41adc6e1c4ce`通过，118既有docs-source advisory保留，build heap1536MiB。独立只读review提出的旧缓存与test isolation问题已修，closure无remaining finding。commit/push/CI另绑定；未运行真实models.dev refresh、真实provider、PTY/exe、桌面/Windows、全仓或原Phase20矩阵，ADD整体active。

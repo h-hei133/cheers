@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import http from "node:http";
 import fs from "node:fs";
+import path from "node:path";
 import { refreshCatalog } from "./catalogRefresh.js";
-import { loadCatalog } from "./catalogStore.js";
+import { catalogCachePath, loadCatalog } from "./catalogStore.js";
+import { catalogModel } from "./catalog.js";
 import { resolveRequestShape } from "./requestShape.js";
 
 /**
@@ -29,6 +31,22 @@ async function withIndex<T>(document: unknown, run: (url: string) => Promise<T>)
     server.close();
   }
 }
+
+let isolatedHome: string | undefined;
+
+beforeEach(() => {
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  isolatedHome = fs.mkdtempSync('/tmp/cheers-test/catalog-refresh-');
+  vi.stubEnv('HOME', isolatedHome);
+  vi.stubEnv('USERPROFILE', isolatedHome);
+  vi.stubEnv('CHEERS_TEST_ROOT', isolatedHome);
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  if (isolatedHome) fs.rmSync(isolatedHome, { recursive: true, force: true });
+  isolatedHome = undefined;
+});
 
 function readCache(path: string): Record<string, { models?: readonly Record<string, unknown>[] }> {
   const parsed = JSON.parse(fs.readFileSync(path, "utf8")) as {
@@ -151,10 +169,86 @@ describe("refreshing the catalogue", () => {
     });
   });
 
+  it("does not persist malformed published limits", () => {
+    const document = {
+      demo: {
+        name: "Demo",
+        models: {
+          negative: { id: "negative", limit: { context: -128_000, input: -120_000, output: -32_000 } },
+          fractional: { id: "fractional", limit: { context: 128_000.5, input: 120_000.5, output: 32_000.5 } },
+          textual: { id: "textual", limit: { context: "128000", input: "120000", output: "32000" } },
+          zero: { id: "zero", limit: { context: 0, input: 0, output: 0 } },
+          unsafe: { id: "unsafe", limit: { context: Number.MAX_SAFE_INTEGER + 1, input: Number.MAX_SAFE_INTEGER + 1, output: Number.MAX_SAFE_INTEGER + 1 } },
+          valid: { id: "valid", limit: { context: 128_000, input: 120_000, output: 32_000 } },
+        },
+      },
+    };
+
+    return withIndex(document, async (url) => {
+      const result = await refreshCatalog(url);
+      expect(result.ok).toBe(true);
+      const models = readCache(result.cachePath!).demo?.models ?? [];
+      for (const id of ["negative", "fractional", "textual", "zero", "unsafe"]) {
+        const model = models.find(candidate => candidate.id === id);
+        for (const field of ["contextWindow", "inputLimit", "maxTokens"]) {
+          expect(model).not.toHaveProperty(field);
+        }
+      }
+      expect(models.find(model => model.id === "valid")).toMatchObject({
+        contextWindow: 128_000,
+        inputLimit: 120_000,
+        maxTokens: 32_000,
+      });
+    });
+  });
+
+  it("drops malformed limits already present in a cache", () => {
+    const cachePath = catalogCachePath();
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    fs.writeFileSync(cachePath, JSON.stringify({
+      providers: {
+        demo: {
+          label: "Demo",
+          runtime: "openai-compatible",
+          auth: "api-key",
+          models: [{
+            id: "poisoned",
+            contextWindow: -1,
+            inputLimit: 0,
+            maxTokens: Number.MAX_SAFE_INTEGER + 1,
+          }],
+        },
+      },
+    }));
+    const model = catalogModel(loadCatalog(), "demo", "poisoned");
+    expect(model).toBeDefined();
+    for (const field of ["contextWindow", "inputLimit", "maxTokens"]) {
+      expect(model).not.toHaveProperty(field);
+    }
+  });
+
+  it("drops malformed limit patches to built-in models", () => {
+    const cachePath = catalogCachePath();
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    fs.writeFileSync(cachePath, JSON.stringify({
+      providers: {
+        openai: {
+          models: [{
+            id: "gpt-5.3",
+            contextWindow: -1,
+            inputLimit: -1,
+            maxTokens: -1,
+          }],
+        },
+      },
+    }));
+    const model = catalogModel(loadCatalog(), "openai", "gpt-5.3");
+    expect(model?.contextWindow).toBe(400_000);
+    expect(model).not.toHaveProperty("inputLimit");
+    expect(model).not.toHaveProperty("maxTokens");
+  });
+
   it("fills missing built-in capabilities without overriding reviewed request constraints", async () => {
-    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
-    const root = fs.mkdtempSync('/tmp/cheers-test/catalog-refresh-merge-');
-    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
     const document = {
       openai: {
         name: "OpenAI",
@@ -169,22 +263,17 @@ describe("refreshing the catalogue", () => {
         },
       },
     };
-    try {
-      await withIndex(document, async (url) => {
-        expect((await refreshCatalog(url)).ok).toBe(true);
-        const catalog = loadCatalog();
-        const shape = resolveRequestShape(catalog, "openai", "gpt-5.3-codex");
-        expect(shape).toMatchObject({
-          supportsTemperature: false,
-          vision: false,
-          reasoningEffort: true,
-          maxOutputCeiling: 128_000,
-        });
+    await withIndex(document, async (url) => {
+      expect((await refreshCatalog(url)).ok).toBe(true);
+      const catalog = loadCatalog();
+      const shape = resolveRequestShape(catalog, "openai", "gpt-5.3-codex");
+      expect(shape).toMatchObject({
+        supportsTemperature: false,
+        vision: false,
+        reasoningEffort: true,
+        maxOutputCeiling: 128_000,
       });
-    } finally {
-      vi.unstubAllEnvs();
-      fs.rmSync(root, { recursive: true, force: true });
-    }
+    });
   });
 
   it("reports a failure rather than writing an empty catalogue", async () => {

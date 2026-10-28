@@ -1,5 +1,6 @@
 import type { CatalogProvider, CatalogModel, ModelCostRates } from "./catalog.js";
 import { writeCatalogCache } from "./catalogStore.js";
+import { positiveTokenLimit } from "./limits.js";
 
 /**
  * Refreshing the catalogue from a public index.
@@ -99,9 +100,9 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
     for (const [modelId, model] of Object.entries(entry.models ?? {})) {
       const resolved = model?.id ?? modelId;
       if (!resolved) continue;
-      const context = model?.limit?.context;
-      const inputLimit = model?.limit?.input;
-      const maxTokens = positive(model?.limit?.output);
+      const context = positiveTokenLimit(model?.limit?.context);
+      const inputLimit = positiveTokenLimit(model?.limit?.input);
+      const maxTokens = positiveTokenLimit(model?.limit?.output);
       const cost = projectCost(model?.cost);
       const vision = Array.isArray(model?.modalities?.input)
         ? model.modalities.input.includes("image")
@@ -111,8 +112,8 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
         : undefined;
       models.push({
         id: resolved,
-        ...(context ? { contextWindow: context } : {}),
-        ...(inputLimit ? { inputLimit } : {}),
+        ...(context !== undefined ? { contextWindow: context } : {}),
+        ...(inputLimit !== undefined ? { inputLimit } : {}),
         ...(maxTokens !== undefined ? { maxTokens } : {}),
         ...(typeof model?.reasoning === "boolean" ? { reasoning: model.reasoning } : {}),
         ...(vision !== undefined ? { vision } : {}),
@@ -161,9 +162,4 @@ function projectCost(cost: IndexModel["cost"]): ModelCostRates | undefined {
 /** A published rate, or nothing when the index did not state one. */
 function finite(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
-}
-
-/** A positive integer limit, or nothing when the publisher did not state one. */
-function positive(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
 }

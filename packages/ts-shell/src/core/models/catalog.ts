@@ -1,5 +1,6 @@
 import type { RuntimeProvider } from "../../config/runtimeConfig.js";
 import type { EndpointKind } from "../../provider/endpoints/kinds.js";
+import { sanitizeModelLimits } from "./limits.js";
 
 /**
  * Provider and model catalogue.
@@ -590,6 +591,7 @@ export function mergeProviders(
   const merged = base.map((provider) => ({ ...provider }));
   for (const patch of overlay) {
     if (!patch.id) continue;
+    const models = patch.models?.map(sanitizeModelLimits);
     const index = merged.findIndex((provider) => provider.id === patch.id);
     if (index < 0) {
       merged.push({
@@ -603,7 +605,7 @@ export function mergeProviders(
         // protocol would otherwise be reached through the first one, and the
         // failure would look like a bad key rather than a wrong shape.
         endpoint: patch.endpoint,
-        models: patch.models ?? [],
+        models: models ?? [],
         custom: true,
       });
       continue;
@@ -614,8 +616,8 @@ export function mergeProviders(
       ...patch,
       // A user's models add to what ships rather than replacing it, so patching a
       // base URL does not quietly cost them the model list.
-      models: patch.models
-        ? mergeModelEntries([...existing.models, ...patch.models], options.preserveExplicitCapabilities === true)
+      models: models
+        ? mergeModelEntries([...existing.models, ...models], options.preserveExplicitCapabilities === true)
         : existing.models,
       custom: true,
     };
