@@ -10,6 +10,7 @@ import { crc32 } from "../provider/aws/eventStream.js";
 import { runAgentLoop } from "../core/agent/loop.js";
 import { sendSentRequest, type SentRequest } from "../provider/request/sentRequest.js";
 import { historyDigest } from '../context/request/identity.js';
+import { BUILTIN_PROVIDERS } from '../core/models/catalog.js';
 
 /**
  * The step is the only place a provider is spoken to. What matters here is
@@ -531,6 +532,25 @@ describe("createStepFunction", () => {
     expect(body.temperature).toBe(0.2);
     expect(body.top_p).toBe(0.9);
     expect(body.max_tokens).toBe(777);
+  });
+
+  it("omits temperature for a shipped reasoning model at automatic effort", async () => {
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      provider: { ...request.provider, provider: "openai", model: "gpt-5.3" },
+      catalog: BUILTIN_PROVIDERS,
+      thinkingEffort: null,
+      temperature: 0.2,
+      maxOutputTokens: 777,
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+    expect(body).not.toHaveProperty("temperature");
+    expect(body.max_completion_tokens).toBe(777);
   });
 
   it("recognizes overflow markers regardless of provider casing", () => {

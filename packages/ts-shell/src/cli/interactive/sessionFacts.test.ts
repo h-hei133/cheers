@@ -222,6 +222,34 @@ describe("status facts", () => {
     resetSessionUsage(id);
   });
 
+  it("falls back to a matching measurement when the live preview has no number", () => {
+    const id = "status-live-fallback";
+    resetSessionUsage(id);
+    const runtime = context(id);
+    const identity = { provider: "openai", model: "opus-5", endpoint: "openai-compatible",
+      schemaDigest: "a".repeat(64), systemDigest: "b".repeat(64), historyDigest: "c".repeat(64) };
+    runtime.promptIdentity = { schemaDigest: identity.schemaDigest, systemDigest: identity.systemDigest,
+      historyDigest: identity.historyDigest };
+    recordSessionUsage(id, { promptTokens: 9_000, promptMessageCount: 1, promptIdentity: identity,
+      attribution: captureUsageAttribution({ provider: "openai", model: "opus-5", baseUrl: "https://api.openai.com/v1" }) });
+
+    for (const source of ["unknown", "stale"] as const) {
+      expect(readStatusFacts(runtime, { promptContext: { source } })).toMatchObject({
+        contextUsed: 9_000,
+        contextSource: "measured",
+      });
+    }
+    expect(readStatusFacts(runtime, { promptContext: { tokens: 700, source: "estimated" } })).toMatchObject({
+      contextUsed: 700,
+      contextSource: "estimated",
+    });
+    expect(readStatusFacts(runtime, { promptContext: { tokens: 900, source: "calibrated" } })).toMatchObject({
+      contextUsed: 900,
+      contextSource: "calibrated",
+    });
+    resetSessionUsage(id);
+  });
+
   it("drops a status measurement from another history or relay", () => {
     const id = "status-stale-history-relay";
     resetSessionUsage(id);

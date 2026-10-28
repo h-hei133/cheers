@@ -688,3 +688,18 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: With a one-step limit, the draft estimate includes tool schemas that the accepted request omits, and its schema identity cannot match that request.
 - **Root Cause**: The preview compared the limit with zero, while the turn owner increments its count on turn_start before dispatch. The first request of a one-step run is already the closing request, including its final-answer instruction.
 - **Rule**: Preview the actual first-step policy and reuse the existing closing-message projection. Compare complete serialized bodies, schema/system/history digests and local estimates through the real turn lifecycle at both one and two steps, including dynamic and full catalogues. Match sampling parameters in the fixture before classifying small numeric differences; retain provider aggregate usage as a separate measurement.
+
+### Live Context Readings Without A Number Must Yield To Matching Measurements
+- **Symptom**: After an accepted request, the automatic status band remains `? stale` even though provider usage and a matching request identity are present.
+- **Root Cause**: The status projection treated the existence of a live `promptContext` object as sufficient precedence. `unknown` and `stale` readings carry no token value, so they replaced the measured fallback with `undefined`.
+- **Rule**: Let only `estimated` or `calibrated` live readings with a defined token value outrank a matching measurement. Fall back to measured usage for numberless unknown/stale readings, but preserve the no-measurement unknown/stale state rather than inventing a value. Verify the submission, busy/resume transition and actual status paint in both screen modes.
+
+### Automatic Reasoning Effort Still Excludes Sampling Temperature
+- **Symptom**: A shipped OpenAI reasoning model receives `temperature` when the user leaves thinking at automatic, even though reasoning remains active by provider default.
+- **Root Cause**: Temperature was omitted only for an explicit thinking level or an explicit `supportsTemperature:false`; the automatic path produced neither.
+- **Rule**: Declare sampling-temperature support off for shipped reasoning request shapes, not merely when a level is present. Test the resolved catalog shape and the actual serialized step body at automatic effort.
+
+### Catalogue Refresh Must Carry Executable Model Capabilities
+- **Symptom**: A newly discovered model has context and price but loses reasoning, image input, output ceiling or temperature rejection, causing invalid request shapes or unavailable capabilities.
+- **Root Cause**: The index projection kept only limits and price even though the upstream rows publish capability metadata.
+- **Rule**: Project only capabilities the index explicitly states, including false values, and leave absent fields absent. Merge refresh cache as a fill-missing capability layer so it cannot overwrite explicit reviewed built-in request constraints; keep the user's own catalog as the final ordinary overlay. Never infer capabilities from model names.

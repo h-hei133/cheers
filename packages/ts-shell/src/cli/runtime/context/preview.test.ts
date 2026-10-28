@@ -45,6 +45,7 @@ import { runTurn } from '../../../turn/session.js';
 import { getSessionUsage, resetSessionUsage } from '../../../observability/usageTelemetry.js';
 import type { HookDispatcher } from '../../../core/hooks/hookDispatcher.js';
 import { configuredOutputLimit } from '../../../provider/request/output.js';
+import type { ToolDefinition } from '../../../tools/types.js';
 
 let root: string;
 let repositories: ReturnType<typeof gitFixture>[] = [];
@@ -1022,7 +1023,7 @@ it('uses the closing request schema identity when no tool steps are allowed', as
 });
 
 it.each((['dynamic', 'full'] as const).flatMap(toolDiscovery => [1, 2].map(maxTurns => ({ toolDiscovery, maxTurns }))))(
-  'matches the actual first request at the step boundary with $toolDiscovery tools and $maxTurns steps', async ({ toolDiscovery, maxTurns }) => {
+  'matches preview and closing policy with $toolDiscovery tools and $maxTurns steps', async ({ toolDiscovery, maxTurns }) => {
     const { cwd, context, session, manager, load, layout, gateway, target } = fixture();
     const config = { ...context.configuration.current.config, maxTurns, toolDiscovery, allowedTools: ['read'] };
     Object.assign(context, { runtimeConfig: config, configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
@@ -1034,33 +1035,60 @@ it.each((['dynamic', 'full'] as const).flatMap(toolDiscovery => [1, 2].map(maxTu
     const prepared = await preparePromptRequest({ workspaceRoot: cwd, sessionId: session.id, runtimeConfig: config,
       skillOptions: context.skillOptions, agentMode: 'build', featureTools: foregroundTools(context) });
     const captured = await readPromptPreview(manager, session, cwd, prompt);
-    let body: Record<string, unknown> | undefined;
+    const bodies: Record<string, unknown>[] = [];
+    let firstIdentity: ReturnType<typeof getSessionUsage>['lastPromptIdentity'];
+    let firstContext: ReturnType<typeof getSessionUsage>['requestContext'];
     const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      body = JSON.parse(String(init?.body));
-      return new Response(JSON.stringify({ choices: [{ message: { content: 'done' }, finish_reason: 'stop' }],
+      bodies.push(JSON.parse(String(init?.body)));
+      const callsTool = maxTurns > 1 && bodies.length === 1;
+      return new Response(JSON.stringify({ choices: [{
+        message: callsTool
+          ? { content: '', tool_calls: [{ id: 'read-1', type: 'function',
+            function: { name: 'read', arguments: '{"path":"boundary.txt"}' } }] }
+          : { content: 'done' },
+        finish_reason: callsTool ? 'tool_calls' : 'stop',
+      }],
         usage: { prompt_tokens: 123, completion_tokens: 1 } }), { headers: { 'content-type': 'application/json' } });
     });
-    const step = createStepFunction({ provider: { ...target, headers: {} }, workspaceRoot: cwd, sessionId: session.id,
+    const readTool: ToolDefinition = {
+      name: 'read',
+      description: 'Read a fixture file.',
+      argsSchema: { type: 'object', properties: {} },
+      execute: async () => ({ success: true, output: 'boundary contents' }),
+    };
+    const baseStep = createStepFunction({ provider: { ...target, headers: {} }, workspaceRoot: cwd, sessionId: session.id,
       systemPrompt: prepared.system.text, systemPromptSources: prepared.system.sources,
       tools: toolSchemas(prepared.tools), toolSnapshot: () => toolSchemas(prepared.currentTools()),
       catalog: context.configuration.current.catalog, temperature: config.temperature, topP: config.topP,
       maxOutputTokens: configuredOutputLimit(config, endpoints.DEFAULT_ENDPOINT_KIND), fetchImpl });
+    const step: typeof baseStep = async (...args) => {
+      const result = await baseStep(...args);
+      if (firstIdentity === undefined) {
+        const first = getSessionUsage(session.id);
+        firstIdentity = first.lastPromptIdentity;
+        firstContext = first.requestContext;
+      }
+      return result;
+    };
     try {
       const run = runTurn({ sessionId: session.id, workspaceRoot: cwd, history: [], prompt, permissionScope: 'ask',
         continuityContext: captured.continuityContextFor(prompt), goalObjective: captured.goalObjective,
-        step, tools: prepared.tools, maxSteps: maxTurns, onMessage: vi.fn(), signal: new AbortController().signal,
+        step, tools: new Map([['read', readTool]]), maxSteps: maxTurns, onMessage: vi.fn(), signal: new AbortController().signal,
         hooks: { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher });
-      for await (const _event of run.events) { /* Drain the real first-step lifecycle. */ }
-      expect(fetchImpl).toHaveBeenCalledOnce();
+      for await (const _event of run.events) { /* Drain the real step lifecycle. */ }
+      expect(fetchImpl).toHaveBeenCalledTimes(maxTurns > 1 ? 2 : 1);
       const usage = getSessionUsage(session.id);
-      expect(usage.turnsCount).toBe(1);
-      expect(body?.tools !== undefined).toBe(maxTurns > 1);
-      expect(JSON.stringify(body?.messages).includes('You have reached the limit of steps')).toBe(maxTurns === 1);
-      expect(preview.estimate.identity.schemaDigest).toBe(usage.lastPromptIdentity?.schemaDigest);
-      expect(preview.estimate.identity.systemDigest).toBe(usage.lastPromptIdentity?.systemDigest);
-      expect(preview.estimate.identity.historyDigest).toBe(usage.lastPromptIdentity?.historyDigest);
-      expect(body).toEqual(previewBody);
-      expect(preview.estimate.tokens).toBe(usage.requestContext?.localEstimate?.tokens);
+      expect(usage.turnsCount).toBe(maxTurns > 1 ? 2 : 1);
+      expect(bodies[0]).toEqual(previewBody);
+      expect(bodies[0]?.tools !== undefined).toBe(maxTurns > 1);
+      expect(JSON.stringify(bodies[0]?.messages).includes('You have reached the limit of steps')).toBe(maxTurns === 1);
+      const closing = bodies.at(-1);
+      expect(closing?.tools).toBeUndefined();
+      expect(JSON.stringify(closing?.messages).includes('You have reached the limit of steps')).toBe(true);
+      expect(preview.estimate.identity.schemaDigest).toBe(firstIdentity?.schemaDigest);
+      expect(preview.estimate.identity.systemDigest).toBe(firstIdentity?.systemDigest);
+      expect(preview.estimate.identity.historyDigest).toBe(firstIdentity?.historyDigest);
+      expect(preview.estimate.tokens).toBe(firstContext?.localEstimate?.tokens);
       expect(usage.requestContext?.promptTokens).toBe(123);
       expect(files.map(file => fs.readFileSync(file))).toEqual(before);
       expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();

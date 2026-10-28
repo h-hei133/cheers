@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import http from "node:http";
 import fs from "node:fs";
 import { refreshCatalog } from "./catalogRefresh.js";
+import { loadCatalog } from "./catalogStore.js";
+import { resolveRequestShape } from "./requestShape.js";
 
 /**
  * What a refresh keeps from the published index.
@@ -96,6 +98,93 @@ describe("refreshing the catalogue", () => {
       const models = readCache(result.cachePath!).demo?.models ?? [];
       expect(models[0]?.cost).toEqual({ promptPerMTok: 1, completionPerMTok: 0, cacheReadPerMTok: 0.1 });
     });
+  });
+
+  it("keeps the capability metadata the index publishes", () => {
+    const document = {
+      demo: {
+        name: "Demo",
+        models: {
+          multimodal: {
+            id: "multimodal",
+            reasoning: true,
+            temperature: false,
+            modalities: { input: ["text", "image"], output: ["text"] },
+            limit: { context: 200_000, input: 190_000, output: 32_000 },
+          },
+          plain: {
+            id: "plain",
+            reasoning: false,
+            temperature: true,
+            modalities: { input: ["text"], output: ["text"] },
+            limit: { context: 8_000, output: 2_000 },
+          },
+          legacy: {
+            id: "legacy",
+            limit: { context: 4_000 },
+          },
+        },
+      },
+    };
+
+    return withIndex(document, async (url) => {
+      const result = await refreshCatalog(url);
+      expect(result.ok).toBe(true);
+      const models = readCache(result.cachePath!).demo?.models ?? [];
+      expect(models.find((model) => model.id === "multimodal")).toMatchObject({
+        vision: true,
+        reasoning: true,
+        maxTokens: 32_000,
+        inputLimit: 190_000,
+        compat: { supportsTemperature: false },
+      });
+      expect(models.find((model) => model.id === "plain")).toMatchObject({
+        vision: false,
+        reasoning: false,
+        maxTokens: 2_000,
+        compat: { supportsTemperature: true },
+      });
+      const legacy = models.find((model) => model.id === "legacy");
+      for (const field of ["vision", "reasoning", "maxTokens", "compat"]) {
+        expect(legacy).not.toHaveProperty(field);
+      }
+    });
+  });
+
+  it("fills missing built-in capabilities without overriding reviewed request constraints", async () => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/catalog-refresh-merge-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const document = {
+      openai: {
+        name: "OpenAI",
+        models: {
+          "gpt-5.3-codex": {
+            id: "gpt-5.3-codex",
+            reasoning: false,
+            temperature: true,
+            modalities: { input: ["text", "image"], output: ["text"] },
+            limit: { context: 500_000, output: 128_000 },
+          },
+        },
+      },
+    };
+    try {
+      await withIndex(document, async (url) => {
+        expect((await refreshCatalog(url)).ok).toBe(true);
+        const catalog = loadCatalog();
+        const shape = resolveRequestShape(catalog, "openai", "gpt-5.3-codex");
+        expect(shape).toMatchObject({
+          supportsTemperature: false,
+          vision: false,
+          reasoningEffort: true,
+          maxOutputCeiling: 128_000,
+        });
+      });
+    } finally {
+      vi.unstubAllEnvs();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("reports a failure rather than writing an empty catalogue", async () => {

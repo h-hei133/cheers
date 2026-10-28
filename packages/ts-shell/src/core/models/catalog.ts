@@ -209,6 +209,10 @@ const OPENAI_COMPATIBLE: RuntimeProvider = "openai-compatible";
 const REASONING_REQUEST_SHAPE: ModelRequestShape = {
   systemRole: "developer",
   maxTokensField: "max_completion_tokens",
+  // Reasoning models default to a non-none effort when the caller leaves the
+  // level at automatic, so sampling temperature is not a safe companion even
+  // when no explicit thinking level was requested.
+  supportsTemperature: false,
 };
 
 /** Providers that ship with the shell, in the order a chooser should offer them. */
@@ -287,10 +291,10 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     models: [
       // Five to ten minutes of inactivity, refreshed by each hit; the extended
       // tier runs to a day.
-      { id: "gpt-5.3", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
-      { id: "gpt-5.3-codex", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 } },
-      { id: "gpt-5.1-mini", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
-      { id: "o4-mini", contextWindow: 200_000, compat: REASONING_REQUEST_SHAPE, vision: true, serviceTiers: ['default', 'priority', 'fast', 'flex'] },
+      { id: "gpt-5.3", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
+      { id: "gpt-5.3-codex", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: false },
+      { id: "gpt-5.1-mini", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
+      { id: "o4-mini", contextWindow: 200_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, vision: true, serviceTiers: ['default', 'priority', 'fast', 'flex'] },
     ],
   },
   {
@@ -581,6 +585,7 @@ export function catalogModel(
 export function mergeProviders(
   base: readonly CatalogProvider[],
   overlay: readonly Partial<CatalogProvider>[],
+  options: { readonly preserveExplicitCapabilities?: boolean } = {},
 ): CatalogProvider[] {
   const merged = base.map((provider) => ({ ...provider }));
   for (const patch of overlay) {
@@ -609,7 +614,9 @@ export function mergeProviders(
       ...patch,
       // A user's models add to what ships rather than replacing it, so patching a
       // base URL does not quietly cost them the model list.
-      models: patch.models ? mergeModelEntries([...existing.models, ...patch.models]) : existing.models,
+      models: patch.models
+        ? mergeModelEntries([...existing.models, ...patch.models], options.preserveExplicitCapabilities === true)
+        : existing.models,
       custom: true,
     };
   }
@@ -633,7 +640,11 @@ export function mergeProviders(
  * patch that speaks about one flag inside `compat` is not also an instruction
  * to forget the others, and merging the field whole would read it as one.
  */
-function mergeModelEntry(existing: CatalogModel, patch: CatalogModel): CatalogModel {
+function mergeModelEntry(
+  existing: CatalogModel,
+  patch: CatalogModel,
+  preserveExplicitCapabilities: boolean,
+): CatalogModel {
   const merged = { ...existing, ...withoutUndefined(patch) };
   const baseCompat = existing.compat;
   const nextCompat = patch.compat;
@@ -643,17 +654,43 @@ function mergeModelEntry(existing: CatalogModel, patch: CatalogModel): CatalogMo
   const nextLevels = patch.thinkingLevelMap;
   return {
     ...merged,
-    ...(baseCompat && nextCompat ? { compat: { ...baseCompat, ...withoutUndefined(nextCompat) } } : {}),
-    ...(baseCache && nextCache ? { promptCache: { ...baseCache, ...withoutUndefined(nextCache) } } : {}),
-    ...(baseLevels && nextLevels ? { thinkingLevelMap: { ...baseLevels, ...withoutUndefined(nextLevels) } } : {}),
+    ...(baseCompat && nextCompat
+      ? {
+          compat: preserveExplicitCapabilities
+            ? { ...withoutUndefined(nextCompat), ...withoutUndefined(baseCompat) }
+            : { ...baseCompat, ...withoutUndefined(nextCompat) },
+        }
+      : {}),
+    ...(baseCache && nextCache
+      ? {
+          promptCache: preserveExplicitCapabilities
+            ? { ...withoutUndefined(nextCache), ...withoutUndefined(baseCache) }
+            : { ...baseCache, ...withoutUndefined(nextCache) },
+        }
+      : {}),
+    ...(baseLevels && nextLevels
+      ? {
+          thinkingLevelMap: preserveExplicitCapabilities
+            ? { ...withoutUndefined(nextLevels), ...withoutUndefined(baseLevels) }
+            : { ...baseLevels, ...withoutUndefined(nextLevels) },
+        }
+      : {}),
+    ...(preserveExplicitCapabilities
+      ? {
+          ...(existing.reasoning !== undefined ? { reasoning: existing.reasoning } : {}),
+          ...(existing.vision !== undefined ? { vision: existing.vision } : {}),
+          ...(existing.maxTokens !== undefined ? { maxTokens: existing.maxTokens } : {}),
+          ...(existing.serviceTiers !== undefined ? { serviceTiers: existing.serviceTiers } : {}),
+        }
+      : {}),
   };
 }
 
-function mergeModelEntries(models: readonly CatalogModel[]): CatalogModel[] {
+function mergeModelEntries(models: readonly CatalogModel[], preserveExplicitCapabilities: boolean): CatalogModel[] {
   const byId = new Map<string, CatalogModel>();
   for (const model of models) {
     const existing = byId.get(model.id);
-    byId.set(model.id, existing ? mergeModelEntry(existing, model) : model);
+    byId.set(model.id, existing ? mergeModelEntry(existing, model, preserveExplicitCapabilities) : model);
   }
   return [...byId.values()];
 }

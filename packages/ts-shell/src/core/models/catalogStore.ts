@@ -46,7 +46,9 @@ export function catalogCachePath(): string {
 export function loadCatalog(): readonly CatalogProvider[] {
   let providers = [...BUILTIN_PROVIDERS];
   const cached = readOverlay(catalogCachePath());
-  if (cached.length > 0) providers = mergeProviders(providers, cached);
+  if (cached.length > 0) {
+    providers = mergeProviders(providers, cached, { preserveExplicitCapabilities: true });
+  }
   const user = readOverlay(userCatalogPath());
   if (user.length > 0) providers = mergeProviders(providers, user);
   return providers;

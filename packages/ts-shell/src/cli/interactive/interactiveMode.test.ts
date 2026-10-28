@@ -75,6 +75,8 @@ import { researchHarness, cleanupResearch } from '../../test-utils/research.js';
 import { researchFor } from '../runtime/research.js';
 import { currentResearch, readResearch } from '../../research/run/store.js';
 import * as modelDetails from './picker/model/details.js';
+import { recordSessionUsage, resetSessionUsage } from '../../observability/usageTelemetry.js';
+import { captureUsageAttribution } from '../../observability/usage/identity.js';
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   (['user', 'project'] as const).flatMap(scope =>
@@ -1226,6 +1228,70 @@ it('withdraws the prompt estimate when context selection changes', async () => {
     vi.useRealTimers();
   }
 });
+
+it.each(['regular', 'fullscreen'] as const)(
+  'keeps the completed request measurement visible after the %s draft preview expires',
+  async tuiMode => {
+    vi.useFakeTimers();
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/status-measured-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const sessionId = `status-measured-${tuiMode}`;
+    resetSessionUsage(sessionId);
+    const preview = {
+      estimate: { tokens: 700, source: 'estimated' as const, identity: { provider: 'openai', model: 'fixture' },
+        method: 'characters/3.5' as const },
+      verify: vi.fn(), verifyContent: vi.fn(async () => {}),
+      suspend: vi.fn(), resume: vi.fn(), invalidate: vi.fn(), dispose: vi.fn(),
+    };
+    const load = vi.spyOn(contextPreview, 'previewContext').mockResolvedValue(preview);
+    const { mode, terminal } = build({ tuiMode });
+    const host = mode as unknown as {
+      busy: boolean;
+      promptContext: { read(): { tokens?: number; source: string } };
+      view: InteractiveView & { context: { facts(): { contextUsed?: number; contextSource?: string } } };
+      options: { runtimeContext: ShellRuntimeContext };
+    };
+    const context = withConfiguration({
+      cwd: root,
+      projectRoot: root,
+      session: { id: sessionId, turns: [] },
+      gitContext: { branch: 'main' },
+      runtimeConfig: { provider: 'openai', providerCredentials: { openai: { model: 'fixture' } },
+        contextWindow: 64_000, configDiagnostics: [], tuiMode, tui: { statusItems: ['context'] } },
+    } as unknown as ShellRuntimeContext);
+    host.options.runtimeContext = context;
+    const identity = { provider: 'openai', model: 'fixture', endpoint: 'openai-compatible',
+      schemaDigest: 'a'.repeat(64), systemDigest: 'b'.repeat(64), historyDigest: 'c'.repeat(64) };
+    const route = vi.spyOn(commandRouter, 'routeInteractiveCommand').mockImplementation(async () => {
+      context.promptIdentity = { schemaDigest: identity.schemaDigest, systemDigest: identity.systemDigest,
+        historyDigest: identity.historyDigest };
+      recordSessionUsage(sessionId, { promptTokens: 568, promptMessageCount: 1, promptIdentity: identity,
+        attribution: captureUsageAttribution({ provider: 'openai', model: 'fixture', baseUrl: 'https://api.openai.com/v1' }) });
+      return { turnNumber: 1 };
+    });
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    mode.start();
+    try {
+      terminal.input('measure\r');
+      await vi.waitFor(() => expect(route).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(host.busy).toBe(false));
+      await vi.advanceTimersByTimeAsync(500);
+      expect(load).toHaveBeenCalled();
+      expect(host.promptContext.read()).toEqual({ tokens: 700, source: 'estimated' });
+      expect(frame()).toContain('~700/');
+
+      vi.setSystemTime(Date.now() + 20_001);
+      expect(host.promptContext.read()).toEqual({ source: 'stale' });
+      expect(host.view.context.facts()).toMatchObject({ contextUsed: 568, contextSource: 'measured' });
+      expect(frame()).toContain('568/');
+      expect(frame()).not.toContain('? stale');
+    } finally {
+      mode.stop(); route.mockRestore(); load.mockRestore(); resetSessionUsage(sessionId);
+      vi.useRealTimers(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
 
 it('keeps a published preview reservation while a user submission is busy', async () => {
   vi.useFakeTimers();

@@ -35,7 +35,15 @@ interface IndexProvider {
 /** One model as the index describes it. */
 interface IndexModel {
   readonly id?: string;
-  readonly limit?: { readonly context?: number; readonly input?: number };
+  readonly limit?: { readonly context?: number; readonly input?: number; readonly output?: number };
+  /** Whether the model reasons and whether it accepts sampling temperature. */
+  readonly reasoning?: boolean;
+  readonly temperature?: boolean;
+  /** Inputs the deployment accepts; image support is a request-shape capability. */
+  readonly modalities?: {
+    readonly input?: readonly string[];
+    readonly output?: readonly string[];
+  };
   /**
    * What the publisher charges, per million tokens.
    *
@@ -78,9 +86,10 @@ export async function refreshCatalog(indexUrl: string = DEFAULT_INDEX): Promise<
  * Turn the index into provider patches.
  *
  * Only the fields we can act on are kept — id, label, models, key variable,
- * prices — and the request shape is left alone: the index describes providers,
- * not how this shell talks to them, and guessing that from a string would break
- * a connection that already works.
+ * prices and explicitly published model capabilities. The provider protocol is
+ * left alone: the index describes the model, not how this shell talks to the
+ * provider, and guessing that from a string would break a connection that
+ * already works.
  */
 function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProvider>[] {
   const providers: Partial<CatalogProvider>[] = [];
@@ -92,11 +101,22 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
       if (!resolved) continue;
       const context = model?.limit?.context;
       const inputLimit = model?.limit?.input;
+      const maxTokens = positive(model?.limit?.output);
       const cost = projectCost(model?.cost);
+      const vision = Array.isArray(model?.modalities?.input)
+        ? model.modalities.input.includes("image")
+        : undefined;
+      const compat = typeof model?.temperature === "boolean"
+        ? { supportsTemperature: model.temperature }
+        : undefined;
       models.push({
         id: resolved,
         ...(context ? { contextWindow: context } : {}),
         ...(inputLimit ? { inputLimit } : {}),
+        ...(maxTokens !== undefined ? { maxTokens } : {}),
+        ...(typeof model?.reasoning === "boolean" ? { reasoning: model.reasoning } : {}),
+        ...(vision !== undefined ? { vision } : {}),
+        ...(compat ? { compat } : {}),
         ...(cost ? { cost } : {}),
       });
     }
@@ -141,4 +161,9 @@ function projectCost(cost: IndexModel["cost"]): ModelCostRates | undefined {
 /** A published rate, or nothing when the index did not state one. */
 function finite(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+/** A positive integer limit, or nothing when the publisher did not state one. */
+function positive(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
 }

@@ -31,6 +31,44 @@ describe("the shipped catalog", () => {
     }
   });
 
+  it("does not send temperature to OpenAI reasoning models at automatic effort", () => {
+    for (const modelId of ["gpt-5.3", "gpt-5.3-codex", "gpt-5.1-mini", "o4-mini"]) {
+      expect(shapeFor("openai", modelId).supportsTemperature).toBe(false);
+    }
+  });
+
+  it("lets a user override capabilities a refreshed cache may not", () => {
+    const refreshed = mergeProviders(BUILTIN_PROVIDERS, [{
+      id: "openai",
+      models: [{
+        id: "gpt-5.3-codex",
+        reasoning: false,
+        vision: true,
+        compat: { supportsTemperature: true },
+      }],
+    }], { preserveExplicitCapabilities: true });
+    expect(resolveRequestShape(refreshed, "openai", "gpt-5.3-codex")).toMatchObject({
+      reasoningEffort: true,
+      vision: false,
+      supportsTemperature: false,
+    });
+
+    const user = mergeProviders(refreshed, [{
+      id: "openai",
+      models: [{
+        id: "gpt-5.3-codex",
+        reasoning: false,
+        vision: true,
+        compat: { supportsTemperature: true },
+      }],
+    }]);
+    expect(resolveRequestShape(user, "openai", "gpt-5.3-codex")).toMatchObject({
+      reasoningEffort: false,
+      vision: true,
+      supportsTemperature: true,
+    });
+  });
+
   it("stops sending a level to the model that refuses the field", () => {
     // `deepseek-reasoner` reasons by construction and rejects `reasoning_effort`.
     expect(shapeFor("deepseek", "deepseek-reasoner", "high").reasoningEffort).toBe(false);

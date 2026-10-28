@@ -9842,3 +9842,13 @@ ADD-08/09隔离真实请求发现草稿~717而同请求组装估算568；preview
 修补前/后各一条接受的真实兼容端点auto请求，Linux regular PTY正式launcher、一步、无工具/MCP/预热/重试；只归档白名单元数据，不保留原文/地址/凭据，0600隔离配置finally删除、原配置保持、两场/exit退出0。最终草稿~568与实际组装568一致，provider输入462分开，2007bytes/2000UTF16及四wire分项相加一致，/context原报告口径通过。回合后的自动状态栏仍观察到stale，未证明measured/calibrated衔接；当前106tokens差额不解释历史4.9k/1.7k或确认auto后端。HANDOFF/当前摘要更新，工件归.omx/artifacts/phase20-addition-context-live/，无全仓/20k/exe/桌面/Windows或新独立review，原Phase20矩阵未动，ADD仍active。
 
 延迟核对第102批CI40600853941及Watch40600853895均success，第103批Watch40602411753 success、CI40602411771仍in_progress；本批Git/CI另绑定，不等待新CI。
+
+## [2026-10-28] fix | 请求后实测回退与模型能力边界
+
+第一百零五批先修正第一百零四批的两步测试：首响应现返回一次受控read调用，证明dynamic/full预算为2时真实到达第二步；首个serialized body继续与preview一致，最终body无tools且含收尾指令，单步保持一次请求控制。撤回首步判断后2项预期失败、2项控制通过。
+
+ADD-08实际host确认请求后preview可先estimated再过期，而无token的unknown/stale对象会遮住同身份measured。状态投影现只在estimated/calibrated带数值时优先live reading，否则回退measured并保留真正的无实测unknown/stale。regular/fullscreen真实提交/resume/绘制由RecordingTerminal覆盖：~700过期后显示measured568且不再stale；route和provider用量仍为受控端口，不冒充真实provider。
+
+Provider审计确认旧F-01/02/03/05/06(Copilot)/07/08已实现，Anthropic OAuth仍缺授权client/scopes，F-09不适用于当前JSON自描述协议；F-04确认`auto` reasoning仍不能发送temperature，现由OpenAI reasoning model shape关闭。Catalog refresh另投影models.dev的reasoning、temperature、image modality和output limit，缺失字段保持absent；refresh cache采用fill-missing capability policy，显式built-in约束不被覆盖，用户catalog仍最终优先。
+
+四个独立反转分别触发status3、temperature2、catalog1、cache precedence1项失败；源码逐字节恢复并核对SHA后重验。同一只读review closure确认M1 resolved且无新finding，残余为body级集成、无refresh producer的preserve分支及可变外部index。主代理heap768MiB、单worker串行6文件518项通过；五静态门、module facade0及TS build`0bceb22d3bf0`通过，118既有docs advisory保留。commit/push/CI另绑定；真实provider/OAuth、native PTY/桌面/Windows、历史差额及原Phase20矩阵未验，ADD整体active。

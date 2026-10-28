@@ -78,6 +78,14 @@ export function readStatusFacts(
     resolveModelCost(catalog, provider, model),
   );
   const window = resolveContextWindow({ catalog, provider: active.provider, model: active.model, baseUrl: activeBaseUrl, configured: config.contextWindow });
+  const preview = live.promptContext;
+  // A live reading is useful only when it still carries a number. Missing or
+  // expired draft previews must not hide the provider-measured request that
+  // established the conversation's current footprint.
+  const contextFact = preview?.tokens !== undefined && (preview.source === 'estimated' || preview.source === 'calibrated')
+    ? { contextUsed: preview.tokens, contextSource: preview.source }
+    : measured ? { contextUsed: measured.tokens, contextSource: 'measured' as const }
+      : preview ? { contextSource: preview.source } : {};
   return {
     model: active.model ?? active.provider,
     provider: active.provider,
@@ -95,8 +103,7 @@ export function readStatusFacts(
     contextWindow: window.window,
     contextWindowSource: window.source,
     contextWarning: window.warning,
-    ...(live.promptContext ? { contextUsed: live.promptContext.tokens, contextSource: live.promptContext.source }
-      : measured ? { contextUsed: measured.tokens, contextSource: 'measured' as const } : {}),
+    ...contextFact,
     ...(totalTokens(usage) > 0 ? { sessionTokens: totalTokens(usage) } : {}),
     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),
     ...(cost > 0 || zeroCostSupported
