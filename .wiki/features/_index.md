@@ -21,7 +21,7 @@ confidence: high
 
 | 文档 | 当前内容与边界 |
 |---|---|
-| [Phase 20日常交互补充规划](phase-20-addition.md) | 2026-10-26面板整体看齐、未配置模型可选、resume焦点、消息顶格/箭头、启动/上下文、路径、多skill与部分slash组合；详细需求与13项待实施任务 |
+| [Phase 20日常交互补充规划](phase-20-addition.md) | 面板整体看齐、未配置模型可选、resume焦点、消息顶格/箭头、启动/上下文、路径、多skill与部分slash组合；第19节为2026-10-29第八轮（第二十四至三十项）的问题定位：跨目录写入被工具体硬拒、思考过程请求侧默认不索要、退出无界等待MCP、resume每次搜索全量重扫、SIGTERM不写terminated导致静默重入；含已排除假设与证据边界 |
 | [日常交互问题核查](interaction-audit.md) | 2026-10-25核查及26日更正：保留model按键观察与根因推测区别，记录新几何及补全方向；只交付调查 |
 | [23 输入几何](23-input-surface-geometry.md) | padding1、16正文行的目标；gutter/viewport与应用内复制边界 |
 | [24 Slash与参数](24-slash-completion-defects.md) | canonical/alias、选择状态、共享语法与真实4路径补全 |
