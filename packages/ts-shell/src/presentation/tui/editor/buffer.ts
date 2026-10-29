@@ -59,7 +59,7 @@ export abstract class EditorBuffer {
     const next = replaceDraft(this.snapshot(), edit);
     if (!next) return false;
     this.setDraftText(next.text);
-    const prefix = next.text.slice(0, next.cursor).split("\n");
+    const prefix = next.text.slice(0, next.cursor).replace(/\r\n?/g, "\n").split("\n");
     this.row = prefix.length - 1;
     this.column = prefix[this.row]!.length;
     return true;
@@ -91,7 +91,7 @@ export abstract class EditorBuffer {
   setText(text: string): void {
     this.saveUndo();
     this.lastAction = null;
-    this.lines = text.length > 0 ? text.split("\n") : [""];
+    this.lines = text.replace(/\r\n?/g, "\n").split("\n");
     this.row = this.lines.length - 1;
     this.column = this.lines[this.row]!.length;
     this.scrollOffset = 0;

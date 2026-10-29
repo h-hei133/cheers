@@ -2875,7 +2875,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 ### 19.2 第二十五：模型的思考过程打不开
 
-**结论修正（本轮最重要的发现）**：不是"渲染坏了"，而是**多数情况下根本没有思考可看**。渲染、折叠、`ctrl+t` 这条链是通的；缺的是上游——请求侧默认不索要推理，恢复侧不重建思考块。
+**后续协议复核修正**：渲染、折叠、`ctrl+t`链存在，恢复与流式点击缺口已由20.3/20.8修补。默认`auto`明确表示供应商决定档位，不能由未发送effort推导“多数情况下没有推理”；内部reasoning与公开summary也是不同事实。后续请求策略证据见20.10。
 
 **请求侧（决定性）**
 
@@ -2887,7 +2887,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | Google | `thinkingConfigFor(budgetTokens)` 在 `budgetTokens === undefined` 时返回 `undefined`，连 `includeThoughts` 一起不发 | `provider/endpoints/googleWire.ts:180-183` |
 | OpenAI 兼容 | `...(input.reasoningEffort && input.thinkingLevelName ? { reasoning_effort } : {})` | `provider/endpoints/openaiCompatible.ts:86-88` |
 
-`resolveRequestShape` 也只在 `level` 非空时才填 `thinkingLevelName`/`thinkingBudgetTokens`（`core/models/requestShape.ts:146-151`、`:170-171`）。所以在 Anthropic/Bedrock/Google 上，**出厂默认设置下供应商根本不产生推理**，也就没有 `reasoning.delta`，也就没有思考块可展开。对照 pi 的默认档位是 `medium`（`packages/coding-agent/src/core/defaults.ts:3`）。
+`resolveRequestShape` 也只在 `level` 非空时才填 `thinkingLevelName`/`thinkingBudgetTokens`（`core/models/requestShape.ts:146-151`、`:170-171`）。这些路径证明本项目不显式要求档位或budget，不能单凭源码断言供应商完全不产生推理。各协议/模型的默认行为与公开摘要支持须分别核对；本项目`auto`合同为provider decides，不把参考的`medium`产品默认直接覆盖现有用户偏好。
 
 **对用户当前环境的判断**：用户用的是 OpenAI 兼容 relay（`~/.cheers/config.json` 的 `bailucode.com` + `bailu-2.9-preview`）。这类 relay 通常**无论请求参数如何都会返回 `reasoning_content`**，而 `turn/completion.ts:169` 的 `REASONING_FIELDS` 确实解析它，所以用户应当**看得到**折叠行。那么"打不开"就落在下面第 3、4、5 条上，而不是请求侧。
 
@@ -2901,7 +2901,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **确定的五个缺口（按影响排序）**
 
-1. **请求侧默认不索要推理**（上文）。这决定 Anthropic/Bedrock/Google 上"从来没有思考"。
+1. **请求侧默认不发送显式推理档位**（上文）。是否产生及公开推理由实际协议/模型决定，旧“从来没有思考”结论已撤销。
 2. **OpenAI 官方模型走错端点，Responses 又只读摘要**。内置 `openai` provider 不声明 `endpoint`（`core/models/catalog.ts:288-308`），于是回落到 `openai-compatible`（`provider/endpoints/kinds.ts:216`）；`/chat/completions` 不返回推理。只有 ChatGPT 账号走 `openai-account-responses`（`core/auth/account/policy.ts:15-16`），而该读取器**只处理 `response.reasoning_summary_text.*`，完全忽略 `response.reasoning_text.delta`**（`provider/endpoints/responses/stream.ts:117-143`）。pi 两者都读。
 3. **恢复的会话里没有思考块。** `restoreConversation`（`cli/interactive/history.ts:36-109`）只建 `user`/`assistant`/`tool` 三种块，**从不读 `SessionMessage.reasoning`**——而该字段确实已落盘（`turn/step.ts:719-728`、`session/schema/sessionMessage.ts:60-86`、真实 transcript 抽查 8/70 条带 reasoning）。所以 `/resume`、切换会话、fork、rewind 之后，历史里一个思考块都不存在，"打不开"是必然的。
 4. **点击的按下与松开之间只要来一个增量，这次点击就被判过期并丢弃。** `pointer.ts:255-261` 在 `!transcriptSelectionCurrent()` 时 `clearSelection()` 后直接返回，`toggle()` 不再执行；而 `transcriptSelectionCurrent()`（`:307-313`）要求 `transcriptContentRevision === view.transcript.revision`，后者每个 delta 都推进。流式期间 delta 连续到达，落在这段极短窗口内的概率并不低——于是**模型正在思考时点那一行常常不展开**，恰恰是用户最想看的时刻。轮次结束后点击稳定有效。
@@ -2913,7 +2913,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **修复方向**
 
-1. 请求侧：在 `auto` 下也按协议请求"供应商默认档位的推理"（Anthropic 用最小 budget、Google 发 `includeThoughts: true`、OpenAI 兼容在目录声明 `reasoning: true` 时发 `reasoning_effort`），或把默认档位对齐 pi 的 `medium`。**这是"看不见思考"的根因，其他四条都只是"看得见却打不开"。**
+1. 请求侧：在 `auto` 下也按协议请求"供应商默认档位的推理"（Anthropic 用最小 budget、Google 发 `includeThoughts: true`、OpenAI 兼容在目录声明 `reasoning: true` 时发 `reasoning_effort`），或把默认档位对齐 pi 的 `medium`。这是原研究建议，后续保留auto/null并独立准入公开摘要；没有真实协议证据时不改全局档位。
 2. Responses 读取器补 `response.reasoning_text.delta`，并考虑让 OpenAI 推理模型默认走 Responses 端点。
 3. `restoreConversation` 把 `turn.reasoning.text` 还原为 `collapsed: true` 的已定稿思考块；`redacted` 时显示"provider withheld"而不显示正文。
 4. 点击展开不应被流式增量挡住：toggle 判定只依赖"行归属 + 块可折叠"，不依赖 selection 的 revision 新鲜度。
@@ -2992,16 +2992,16 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **仍然成立的候选（按可能性排序，均未证实）**
 
-- **`regular` 模式下主屏绘制器的原点靠假设而非观测**（最可能）。`transfer` 到 regular 时 `enterScreen()` **新建**一个 `MainScreenPainter`（`engine.ts:174-183`），其 `cursorRow`/`scrolled`/`visibleContent` 全部从 0 开始（`mainScreen.ts:57-62`）——它不知道终端在 `EXIT_ALT_SCREEN` 之后把光标放回了哪里。而它随后只用**相对移动**寻址（`mainScreen.ts:166-170` 的 `move` 是 `\x1b[NAB`/`\x1b[nA`），第一帧从 `move(writtenTotal)` 开始逐行 `ERASE_LINE + row + "\r\n"` 追加（`:173-186`）。所以整个对话块从"shell 提示符留下的光标位置"开始画；若提示符本来就在窗口靠下的位置，整块内容就会从低处开始并被推着滚动，composer 与光标随之错位。这能解释"光标在很下方"，且间歇性来自"提示符当时在哪一行"。
-- **首帧用替代尺寸合成**。`terminal.ts:143-152` 在 `process.stdout.rows/columns` 未定义时回落 80×24，而引擎只在尺寸 `<= 0` 时拒画（`engine.ts:358-359`），所以回落值一定会被用上。主屏模式下帧按 **document** 合成（`engine.ts:360`），`contentCapacity`/`overflow`/`newScrolled` 都由这个高度推出（`mainScreen.ts:130-141`），再转成真实的相对光标移动。WSL2/Windows Terminal 前几帧常常读不到 `rows`，此时按 24 行算出的位置与真实窗口不符；`resize` 事件到达后会强制重绘（`terminal.ts:180` → `engine.ts:401-404`），这解释了"输入之后就好了"。
+- **`regular`模式的相对原点是否漂移仍需几何证据**。MainScreenPainter的cursorRow=0是首次写入行的相对位置，不承诺物理屏幕第0行；shell光标在低处不能直接证明输入光标错位。后续20.9用具备CUD夹限与alternate cursor恢复的终端夹具，从顶部/中部/底部交接，均保持composer光标，无需据此新增DSR或原点重置。
+- **首帧用替代尺寸合成**。`terminal.ts:143-152` 在 `process.stdout.rows/columns` 未定义时回落 80×24，而引擎只在尺寸 `<= 0` 时拒画（`engine.ts:358-359`），所以回落值一定会被用上。主屏模式下帧按 **document** 合成（`engine.ts:360`），`contentCapacity`/`overflow`/`newScrolled` 都由这个高度推出（`mainScreen.ts:130-141`），再转成真实的相对光标移动。尚无用户现场证明WSL2/Windows Terminal前几帧实际缺失`rows`；若回落高度与真实窗口不符才可能有影响。`resize` 事件到达后会强制重绘（`terminal.ts:180` → `engine.ts:401-404`），这解释了"输入之后就好了"。
 - **`setText` 不归一化 CRLF**（一个窄但真实的隐患）。`EditorBuffer.insert` 会把 `\r\n?` 归一成 `\n`（`buffer.ts:118`），但 `setText`/`setDraftText` 只按 `\n` 切分（`:91-98`），于是每行尾部留下一个 `\r`。`setText` 正是历史回溯（`editor.ts:258/265/271`）与 `replaceExternalDraft`/`stashDraft`（`interactiveMode.ts:1442/1451`）走的路径；而 `\r` 在 `resolveCodePointWidth` 里宽度为 0，渲染层也不过滤控制字符（`render/paint.ts:51-60`）。结果是一个宽度算作 0、却会让终端真实回车的字符混进帧行——从 Windows/VS Code 粘贴的草稿或历史条目即可触发。
 - **transcript 填充行 + 窄窗口**：短历史被 `filler` 推到底部时 composer 之上会出现空行。这是**正常的底部对齐**，只是空行数随窗口高度变化；若用户把它读成异常，则不是缺陷。
 
 **为什么"输入内容后就能删掉空白行"**：按上面的排除，空草稿本就不该有布局偏移；而 Backspace 在行首会合并上一行（`editor/buffer.ts:144-163`），所以"能删掉"说明那些行是**草稿里真实存在的换行符**，不是布局空行。
 
-**需要并列考虑的一条**：`startup.ts:39` 在加载期把 `enter`/`ctrl+j`/`shift+enter` 一律插成 `'\n'`。若用户在"Loading"阶段按过 Enter，草稿里就会留下真实换行，接管后光标落在这些空行之后，而 Backspace 能逐个删掉它们。**这条与"主屏原点假设"是目前两个最能同时解释"光标在空白行之后"与"能删掉"的候选**，区别在于：前者那些行**可删**且删完就没有，后者那些行是**布局空行、删不掉**。用户下次只需试一下 Backspace——能删=草稿换行（加载期 Enter 或 CRLF 残留）；不能删=布局问题（主屏原点或首帧尺寸）。
+**需要并列考虑的一条**：`startup.ts:39` 在加载期把 `enter`/`ctrl+j`/`shift+enter` 一律插成 `'\n'`。若用户在"Loading"阶段按过 Enter，草稿里就会留下真实换行，接管后光标落在这些空行之后，而 Backspace 能逐个删掉它们。**这条与"主屏原点假设"是目前两个最能同时解释"光标在空白行之后"与"能删掉"的候选**，区别在于：加载期Enter形成的草稿行可删，布局行没有草稿owner、不能逐个Backspace删除。用户下次只需试一下 Backspace——能删=草稿换行（加载期 Enter 或 CRLF 残留）；不能删=布局问题（主屏原点或首帧尺寸）。
 
-**下一轮的做法**：三条夹具分别固定三个候选——(a) 加载期按 N 次 Enter 后接管，断言草稿文本与光标 offset；(b) 历史 + 空草稿的纯几何，断言 composer 首行紧贴最后一条历史行；(c) `tuiMode: "regular"` 下先让 shell 提示符停在窗口下半部再交接，断言首帧的绝对行号。另需一条单元用例锁住 `setText` 对 `\r\n` 的归一化。修复方向取决于结果：加载期 Enter 是用户输入、应保留但把光标放到末尾；主屏原点需要一次 DSR 观测或显式的原点重置；首帧尺寸应在 `rows` 未知时**推迟** document 合成而不是按 24 行假设。
+**下一轮的做法**：三条夹具分别固定三个候选——(a) 加载期按 N 次 Enter 后接管，断言草稿文本与光标 offset；(b) 历史 + 空草稿的纯几何，断言 composer 首行紧贴最后一条历史行；(c) `tuiMode: "regular"` 下先让 shell 提示符停在窗口下半部再交接，断言首帧的绝对行号。另需一条单元用例锁住 `setText` 对 `\r\n` 的归一化。修复方向取决于结果：加载期 Enter 是用户输入、应保留但把光标放到末尾；主屏原点和未知尺寸要先取得物理夹具或真实现场证据，不能直接新增DSR、原点重置或推迟首帧策略。
 
 **证据边界**：未在真实终端复现；上述为源码核实后的排除与候选，未做任何修复。需要用户确认两点：`tuiMode`（默认 fullscreen），以及进入后那些空白行是否**能被 Backspace 逐个删除**（能=草稿换行；不能=布局空行）。
 
@@ -3029,14 +3029,9 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **参考对照**：Claude Code 的 `/config` 是 `Settings` 面板的一个 tab，里面只有 `model`、`teammateDefaultModel` 这类**行为字段**，模型目录与切换在独立的 `/model` picker（`commands/model/model.tsx`）；pi 同理（`/settings` 是扁平设置菜单，`/model`、`/scoped-models`、`/thinking` 各自独立）。**没有一个参考项目把模型目录放进设置文件面板。**
 
-**修复方向**（复用现有 `SettingDefinition` 派生机制，不新建存储）
+**后续裁决修正**（20.11）：采样、limits、Context、Retries/Network仍是用户/项目配置字段；按“与模型有关”搬到模型目录不能改变其真正保存owner，也不是参考共同要求。pi设置入口实际提供transport、HTTP timeout、默认模型/档位等配置，原“没有参考在设置提供模型入口”的概括过强。保留SettingsDraft和现有嵌套返回合同，把两个当前会话跳转独立归入Session分类；Model只显示采样/限制文件字段，Session明确当前会话语义及来源scope。没有第二套库存、编辑器或持久化。裸/model继续管理目录/角色，/thinking继续通过原会话事务；不同入口共享owner不等于配置文件与会话状态重叠。
 
-1. 在 `settingNavigation`（`config/settings.ts:70-82`）增加 `domain: 'config' | 'model'`：`Request` 的 sampling/limits、`allowedModels`、`Context` 预算、`Retries`/`Network` 归 `model`；其余归 `config`。
-2. `settingsPicker` 只渲染 `domain === 'config'` 的行，**移除**两个跳转行（或保留为只读交叉引用）。
-3. `modelPicker` 增加一个 "Settings" 分类，用现有的 `settingDetail`/`SettingsDraft` 机制渲染 `domain === 'model'` 的字段——`SettingsHost.openSettings(scope)`（`picker/settings.ts:16`）已经存在，不需要第二条持久化路径。
-4. effort 收敛为一个 owner：`/thinking`，`/model` 的 "Choose effort" 继续委托它（现状已如此）。
-
-**证据边界**：这是产品结构判断，不是缺陷；未实现。
+**证据边界**：分类隔离是产品职责与发现性判断；后续聚焦操作链见20.11，不作真实终端或全部面板验收。
 
 ### 19.6 第二十九：resume 面板每个操作卡约 1 秒
 
@@ -3129,9 +3124,9 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 编号 | 判定 | 主要证据 | 实施优先级 |
 |---|---|---|---|
 | 24 | 确认：工具体硬拒绝，审批层不可达 | `registry.ts:322/426`、`turn/tools.ts:408`、参考实现对照 | P0（用户阻塞） |
-| 25 | 确认：请求侧默认不索要推理（Anthropic/Google/Bedrock 无思考可看）；恢复不重建思考块；流式中点击被丢；regular 模式提示不可点 | `preference.ts:6`、`anthropicMessages.ts:158`、`googleWire.ts:180-183`、`history.ts:36-109`、`pointer.ts:258-262` | P0（根因在请求侧） |
+| 25 | 确认：默认未发送显式档位；推理产生与公开内容须按协议分别核实。恢复缺块、流式点击与regular假提示已修，已知摘要准入见20.10 | `preference.ts:6`、`anthropicMessages.ts:158`、`googleWire.ts:180-183`、20.3/20.8/20.10 | P0（用户可见思考） |
 | 26 | 确认四条：`handleShellClose` 无异常围栏（锁超时即永久不退出）；MCP 关闭在 10 s 预算外；忙碌时 `/exit` 被排队；两个媒体定时器未 unref | `interactiveMode.ts:1509-1530`、`signalHandlers.ts:42-53`、`sessionFileStore.ts:135`、`interactiveLoop.ts:64-73`、`media/live.ts:85` | P0（阻塞退出） |
-| 27 | 未确认：三个候选被反证；最可能为 regular 主屏原点靠假设（`MainScreenPainter` 新建即从 0 行起）或首帧 80×24 回落；另有 `setText` 不归一化 CRLF 与加载期 Enter 两条 | `mainScreen.ts:57-62/166-186`、`terminal.ts:143-152`、`buffer.ts:91-98`、`startup.ts:39` | P1（先补三条夹具） |
+| 27 | 用户机制未确认：相对原点不是已证漂移，六组物理交接夹具保持caret；CRLF setter已修，加载期Enter保留为可删除草稿换行 | 19.4、20.9；`terminal.ts:143-152`、`startup.ts:39` | P1（缺真实现场） |
 | 28 | 确认：无 `/config`；模型行为字段在 settings、目录在 model，effort 三入口 | `settings.ts:78`、`picker/settings.ts:253-257`、`picker/model.ts:206` | P2（结构） |
 | 29 | 确认：搜索全量重扫（实测 0.87–1.03 s/次） | `listing.ts:69-73`、`catalog/index.ts:261-284` | P0（体验） |
 | 30 | 确认：SIGTERM/SIGHUP 不写 terminated，下次静默重入 | `bootstrap.ts:166/348-356`、`shutdown.ts:18-19` | P0（数据正确性） |
@@ -3177,10 +3172,10 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 反馈 | 当前状态 | 下一步 |
 |---|---|---|
 | 24 | 本地实现与聚焦验证 | 缺真实终端/用户目录审批现场与非Linux文件系统证据 |
-| 25 | raw Responses、历史恢复、streaming点击与有效键提示已实现；整体partial | 默认请求档位/endpoint逐协议验证；真实终端及用户环境复验 |
+| 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses摘要准入已实现；auto保留，整体partial | 其他模型/协议默认与公开内容、真实provider/账户及用户终端复验 |
 | 26 | 四条明确机制已修；本地验证 | 缺真实用户退出现场；MCP预算到期不能证明清理完成 |
-| 27 | 机制仍未确认 | 先用startup/CRLF/regular几何夹具区分，禁止按研究候选直接声称根因 |
-| 28 | 未实施 | settings/model职责与入口发现性整理 |
+| 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
+| 28 | 会话入口与配置字段分类隔离已实施；本地聚焦验证 | 缺真实用户终端与整体面板现场验收 |
 | 29 | 同次浏览索引复用已实现；聚焦与真实目录只读性能验证 | 缺真实终端按键/渲染与非Linux证据；ambient扫描本机约1ms，未确认是本次主因 |
 | 30 | 空闲fresh、信号关闭及真实恢复保护已实现；本地验证 | 缺真实用户signal/终端现场与非Linux证据；SIGKILL不执行清理钩子 |
 | 19.8 | 分桶恢复、真实加载与可见partial/unknown已实现；本地验证 | 原损坏记录及其生成原因未取得；无法恢复丢失的真实账单数值 |
@@ -3246,3 +3241,44 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 主代理768MiB、package-local、threads=false、显式文件&&串行最终通过120项：pointer39、blocks14、container18、view47、实际InteractiveMode regular/fullscreen各1。Host覆盖ctrl+t、混合状态、重复折叠、f2重绑及禁用；331项未选不计通过。六类反转命中mixed toggle1、truthful hint2、shortcut cache1、streaming click2、geometry guards2、Host wiring2，每次逐字节恢复后重跑上述120项通过。首轮view fixture未通过Transcript.update回调改变正文属setup错误，补实际mutation回调后通过，未修改产品适配。
 
 五静态门、完整声明图单一脚本、module facade0、diff通过；AST具名函数含对象属性：pointer14/click4/inputPreferences6/blocks12/container20/pane17/view20。TS build `b1cde057de0ae24a9dcdc9c918019424e30176c6fb30acdf8b9166d6f14eaa22`，inputs `4a923c96ab1bf5aad5b4699585b80360449e0e42a26f221a8e42e9e626799e8c`，重算460个compilerInputs一致；repo bundle NormProof proven/0open/0failed/0gap仅证collector结构。两个gpt-6.1-sol代理只读/编辑、未执行任何验证，主代理复核不作独立终局review。无PTY/exe、全套、20k终端、真实provider或非Linux验收；默认effort/endpoint仍待逐协议裁决，反馈25及ADD整体partial/active。提交、推送与CI以日志实际读回为准。
+
+
+### 20.9 草稿换行契约与启动物理坐标
+
+反馈27仍未取得用户现场根因。[editor buffer](../../packages/ts-shell/src/presentation/tui/editor/buffer.ts)修正已确认的setter/insert不一致：程序化setText与setDraftText、历史recall将CRLF/单独CR归一为LF，tabs和原history内容保留；replacement在接受原始source range后用同一转换映射caret prefix，避免setter缩短文本后caret越界。undo/redo、历史浏览与stashed draft合同保留。定向参考pi与oh-my-pi编辑器均在加载边界归一化，未在renderer删控制字节或改用户输入政策。
+
+[startup](../../packages/ts-shell/src/cli/interactive/startup.test.ts)固定加载期1/4次Enter在adopt(false)后保留为真实草稿换行，可逐次Backspace删除。[mainScreen夹具](../../packages/ts-shell/src/presentation/tui/render/mainScreen.test.ts)补CUD底部夹限、CUP/HVP、alternate保存/恢复与独立scrollback，从物理顶部/中部/底部×regular/fullscreen接管实际StartupSurface→InteractiveSurface，provider安装顺序与生产一致。六组均保持可见prompt的实际row/column、同一草稿、单一历史/提示，重复三帧无新增空行/scrollback。低处shell光标不是漂移证据，未改变painter/engine、未新增DSR/重置/推迟首帧。
+
+最终editor65/startup22/mainScreen28共115项串行通过；setter反转6项、caret映射反转2项有效失败，每次逐字节恢复后重验115项。buffer SHA256 `54987ec62c747d2dd3c7bbbabe827e8711b1c04cb7d2cf02a22c50ee6269cc42`。这补已确认的窄编辑器缺口与候选区分，不证明用户原环境的启动空行问题已解决；真实尺寸/按键现场和非Linux证据仍缺。结构/build/提交与CI以最终集成日志绑定。
+
+
+
+### 20.10 推理档位与公开摘要的独立准入
+
+反馈25请求切片修正19.2“auto即不思考”的判断。[官方推理指南](https://platform.openai.com/docs/guides/reasoning)本次实际读取确认：默认effort依模型而异，raw reasoning tokens不公开，summary需要显式opt-in，o4-mini支持detailed/auto。保留现有null/auto provider-decides，不把参考medium/high默认套入已有偏好或未知模型。其他协议/模型真实默认与公开内容仍未取得动态证据。
+
+[catalog](../../packages/ts-shell/src/core/models/catalog.ts)为有明确证据的内置o4-mini声明native Responses与summary能力；[protocol](../../packages/ts-shell/src/core/models/protocol.ts)只在canonical OpenAI、精确官方/v1、捕获模型及已声明协议下采用默认Responses。provider显式endpoint、relay精确alias、未知/legacy模型仍沿原选择，account issuer优先。[request shape](../../packages/ts-shell/src/core/models/requestShape.ts)将summary支持与effort分开，已知false拒绝，未知不自动添加；native能力不能借canonical fallback传播到其他地址，custom relay使用精确alias声明。ChatGPT account在精确issuer host、已解析account endpoint与已知summary能力时同样允许auto summary。
+
+[Responses body](../../packages/ts-shell/src/provider/endpoints/responses/body.ts)在summary:true且effort未设时只发`reasoning: {summary:'auto'}`，不伪造档位/budget；显式effort保持原合同，summary:false独立省略。turn/simple/preview/summary/compaction/side-question传同一解析shape和issuer endpoint。import白名单保留新compat字段，不包含凭据。[preview](../../packages/ts-shell/src/cli/runtime/context/preview.test.ts)用synthetic API-key/account SSE验证unset/null四组完整body与实际dispatch一致，账户仍省略provider-owned output限制。
+
+聚焦协议6文件76项、catalogShape20、serviceTier4/import13/compaction20、provider step11、preview91均串行通过（去重235项）；其后结构/匿名owner复核与factory责任拆分的最终证据另由日志绑定。五类反转有效命中route1、summary2、shape3、preview4、relay地址1，逐字节恢复后协议96及filtered preview4重新通过；初次summary反转选择`summary`未匹配`summaries`而零断言，改准确pattern后才计有效，不把zero-test exit0作证据。主代理发现catalog→protocol的type back-edge，完整声明图确实失败，要求叶结构输入修复；只读复核另指出匿名target的unique-model fallback不能授予新的native summary准入，补负向保护，不改旧模型能力fallback。
+
+最终修复后target6/model target5/requestShape24/turn protocol6重验41项；新增匿名owner两项使原235项增至237。匿名Responses relay在auto下不带新summary，旧unique-model形状标志保留；反转owner拒绝命中1项，逐字节恢复后protocol6重验通过。完整声明图再次通过，protocol以无import叶结构消除back-edge。原factory的凭据capture/renewal/publication移至[provider compaction](../../packages/ts-shell/src/cli/provider/compaction.ts)，缓存与renew后资源lifetime移至[resources](../../packages/ts-shell/src/cli/provider/resources.ts)；沿原publication/admission/source-entry、后台abort与handoff resources合同，无第二套运行路径。factory AST19名（另默认fallback匿名arrow即使保守计入也为20），compaction5/resources12/protocol2。原消费者compaction20/renewal12/summary17/cache6/handoff runtime11共66项串行通过，compaction20已计入原235，其余46项使本切片总去重283项。
+
+无live provider/账户、PTY/exe/full suite/20k终端；o4-mini以外的内置模型默认route/summary保持未知，不将合成请求体等同真实供应商支持。结构/build/Git及CI以最终日志实际读回为准，反馈25整体partial、ADD active。
+
+### 20.11 设置文件与当前会话入口分区
+
+反馈28按真实owner修正19.5建议：[settings](../../packages/ts-shell/src/cli/interactive/picker/settings.ts)保留采样、limits、Context、retry/network等全部真实用户/项目配置字段；Model只含文件字段，Models and roles/Thinking effort归独立Session分类。标题明确current session及from user/project configuration，详情说明settings scope不改会话选择或连接owner save scope。原裸/model、/thinking和nested child均委托现有会话事务；返回同Session入口、scope、焦点和写入notice，未建立domain文件panel或第二套配置存储。
+
+catalog成功load才授予offered ID，load前和失败时撤销；未提供的capability/字段不接受detail或apply，防止晚加callback或旧菜单ID执行不可见动作。typed value editor移入[settings/editor](../../packages/ts-shell/src/cli/interactive/picker/settings/editor.ts)，[contract](../../packages/ts-shell/src/cli/interactive/picker/settings/contract.ts)是叶类型，原SettingsHost路径继续re-export。来源、scope、preview、失败Apply、暂存与Discard沿原SettingsDraft，未因分区改存储。
+
+目标检查后参考pi settings的transport/HTTP timeout及默认模型/effort输入，以及oh-my-pi设置注册的分类元数据；它们不支持“模型有关的配置都搬走”的笼统结论。本项目保留原ADD-03/3.5嵌套返回合同，用导航隔离状态来源。
+
+最终settings picker43/session28、config settings7/runtime settings44/fields116共238项串行通过；实际Host regular/fullscreen×user/project4项通过，另thinking2项控制，331项未选不计。Session分区和offered准入反转各1项失败，逐字节恢复后owner71项重验。初轮新测试错误要求120列显示完整section（实际label budget截断）、并假定一次Esc关闭（真实rows→categories→close），按实际绘制/导航补精确断言，未改产品迁就测试。AST settings16/editor9/contract0；真实终端、平台与整体面板验收仍保留，build/结构/Git由最终日志实际绑定。
+
+最终交叉review发现setter归一化会改变原list plaintext的无损判定：合法`['prefix\rpart']`打开InputForm后变成两行，未编辑Enter即可改变列表。editorText改在相同newline投影后检查roundtrip，失败沿已有JSON fallback；新增实际OverlayHost/InputForm对lone CR与CRLF的未编辑Enter→staged Apply→精确原列表两项回归。picker最终45项通过，本owner/runtime去重增至240，Host4另计。反转newline投影命中lone CR1项，CRLF既有parser判定已拒绝plaintext；字节恢复后45项再次通过。首次集成build发现detail允许undefined而offered.has要求string，补空焦点分支及原准入用例断言后45项/TS build通过；这是类型遗漏，不改空焦点行为。
+
+最终集成五静态门、完整声明图单一用例、module facade0与diff通过（118旧docs-source advisory保留）。TS build `3c939881919f32b85a8da3824656d83d475a200d6e02dfd7522e0f500639dcb8`，inputs `e7698f8cfe402954cddbcc332ef43ccf3e756fa2ebf225c60252930fe3c3d36d`，重算460 compilerInputs与3545输入文件一致。新鲜度检查初次错用root dist路径，ENOENT属于诊断调用错误；改为实际package dist后通过，未改build行为。repo bundle NormProof proven/0open/0failed/0gap只证collector结构。三个gpt-6.1-sol代理仅阅读/编辑，全部验证由主代理单进程串行，无全套/PTY/exe/20k真实终端或live provider；原47项矩阵未重跑，ADD仍active。精确commit/push与CI另以日志读回绑定。
+
+staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重新构建并重算新鲜度：最终artifact `0277cf87c40560c30d96283908aa483419cb54e1da8f37f4aa96835ebfe5f646`，inputs `bc1adb529ef0e1554febbb9f2309b07dbf505a43b787fe27ada3988c353e5223`，460/3545一致。此前3c939为相同行为的前一构建；仅空白变化未重跑行为测试，最终staged diff通过。

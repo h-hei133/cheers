@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { serviceTierCapability } from './serviceTier.js';
+import { BUILTIN_PROVIDERS } from './catalog.js';
 import { withSessionServiceTier } from '../commands/model/serviceTier.js';
 
 describe('service tier capability', () => {
@@ -12,6 +13,14 @@ describe('service tier capability', () => {
 
   it('keeps absent model metadata unknown instead of inventing support', () => {
     expect(serviceTierCapability(catalog, 'openai', 'custom', 'priority')).toBe('unverified');
+  });
+
+  it('uses the admitted native model protocol for tier support', () => {
+    expect(serviceTierCapability(BUILTIN_PROVIDERS, 'openai', 'o4-mini', 'priority')).toBe('supported');
+    expect(serviceTierCapability(BUILTIN_PROVIDERS, 'openai', 'o4-mini', 'flex')).toBe('supported');
+    expect(serviceTierCapability(BUILTIN_PROVIDERS, 'openai', 'o4-mini', 'fast')).toBe('unsupported');
+    expect(serviceTierCapability(BUILTIN_PROVIDERS, 'openai', 'o4-mini', 'priority',
+      'https://chatgpt.com/backend-api', 'openai-account-responses')).toBe('unsupported');
   });
 
   it('removes a previously selected session tier when reset', () => {

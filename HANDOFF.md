@@ -850,3 +850,19 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Releasing a selection at the transcript edge starts another scroll interval or shifts a clicked target.
 - **Root Cause**: The edge branch accepts both drag and release before the release cleanup, so it returns after scheduling a new interval.
 - **Rule**: Apply edge autoscroll only to drag reports and stop the interval before release admission. Retain a timer assertion after edge release; observing only the first synchronous scroll misses the restart.
+
+
+### Newline Normalization Must Remap Replacement Carets
+- **Symptom**: Programmatic CRLF drafts retain carriage returns in rendered rows; normalizing the setter alone leaves replacement carets outside a normalized row.
+- **Root Cause**: Insert normalizes CRLF/lone CR but loaded text does not. A replacement then computes its caret from the unnormalized raw prefix after adopting shorter text.
+- **Rule**: Normalize loaded draft newlines at the editor boundary and map the accepted raw caret prefix through the same transform. Keep tabs, undo, recall and source offsets explicit; test both setter parity and replacement carets. A low physical shell cursor is not itself drift: verify actual prompt/caret correspondence with CUD clamp and alternate-screen cursor restoration before changing the painter.
+
+### Typed Settings Must Check Roundtrip After Editor Projection
+- **Symptom**: Opening a valid string-list value and pressing Enter without edits splits a lone-CR item into two values.
+- **Root Cause**: The settings editor tests plaintext roundtrip before the shared draft editor normalizes loaded newlines, so its initial-text representation changes after admission.
+- **Rule**: Choose plaintext or the existing JSON fallback after applying the exact editor newline projection. Keep actual InputForm load-to-Enter regressions and assert the original list reaches staged Apply unchanged.
+
+### Model Fallback Does Not Prove Provider Protocol Ownership
+- **Symptom**: An anonymous Responses relay gains automatic native summary controls merely because its model ID uniquely matches a built-in entry.
+- **Root Cause**: Existing unique-model shape fallback is reused as evidence for a new provider- and address-bound capability.
+- **Rule**: Preserve existing model fallback flags but require a resolved provider owner, captured address and admitted protocol before granting new summary support. Keep an anonymous explicit Responses relay negative at the actual turn boundary.

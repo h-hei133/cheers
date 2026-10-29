@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { requestSimpleCompletion } from "./completion.js";
 import { endpointShape } from "../endpoints/index.js";
 import { ModelAdmissionError } from '../../core/agent/request/model.js';
+import { BUILTIN_PROVIDERS } from '../../core/models/catalog.js';
+import { resolveRequestShape } from '../../core/models/requestShape.js';
 
 /**
  * The out-of-band request path.
@@ -30,6 +32,20 @@ function capturingFetch(): {
 }
 
 describe("an out-of-band completion", () => {
+  it('carries native summary-only shape through the simple request without inventing effort', async () => {
+    let body: Record<string, unknown> | undefined;
+    const answer = await requestSimpleCompletion({ provider: { headers: {}, providerId: 'openai',
+      baseUrl: 'https://api.openai.com/v1', model: 'o4-mini', endpoint: 'openai-responses',
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body));
+        return Response.json({ status: 'completed', output: [{ type: 'message', id: 'msg_1', role: 'assistant',
+          content: [{ type: 'output_text', text: 'answer' }] }] });
+      } }, shape: resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'o4-mini', undefined),
+      messages: [{ role: 'user', content: 'question' }], maxOutputTokens: 100,
+    });
+    expect(answer).toBe('answer'); expect(body?.reasoning).toEqual({ summary: 'auto' });
+    expect(body?.max_output_tokens).toBe(100);
+  });
   it.each(['content_filter', 'stop'])('reports billed usage before rejecting a %s answer or a budget breach', async finish_reason => {
     const onUsage = vi.fn();
     const settle = vi.fn(() => {

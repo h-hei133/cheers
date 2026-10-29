@@ -3,7 +3,7 @@ import type { ProviderCredentialResolution } from '../credential.js';
 import { accountProtocol, assertAccountAddress } from './policy.js';
 import { copilotEndpoint } from '../oauth/copilot/policy.js';
 
-type CredentialTarget = Pick<ProviderCredentialResolution, 'credential' | 'baseUrl'> & { readonly provider: string };
+type CredentialTarget = Pick<ProviderCredentialResolution, 'credential' | 'baseUrl' | 'model'> & { readonly provider: string };
 
 /** A model catalogue describes capabilities; it cannot relocate an account credential. */
 export function providerCredentialBaseUrl(catalog: readonly CatalogProvider[], resolution: CredentialTarget): string | undefined {
@@ -28,6 +28,7 @@ export function providerCredentialBaseUrl(catalog: readonly CatalogProvider[], r
 /** Account protocols come from the issuer; API keys keep catalogue selection. */
 export function providerCredentialEndpoint(catalog: readonly CatalogProvider[], resolution: CredentialTarget, baseUrl?: string): string | undefined {
   const account = resolution.credential?.accountAuth;
-  const selected = accountProtocol(account)?.endpoint ?? providerEndpoint(catalog, resolution.provider, baseUrl);
+  const selected = accountProtocol(account)?.endpoint ?? providerEndpoint(catalog, resolution.provider,
+    baseUrl ?? providerCredentialBaseUrl(catalog, resolution), resolution.model ?? resolution.credential?.model);
   return account?.type === 'subscription' ? copilotEndpoint(selected) : selected;
 }

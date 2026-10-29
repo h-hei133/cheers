@@ -77,7 +77,7 @@ export async function runBtwCommand(
   if (credential?.apiKey || accountAuth || endpointShape(endpoint).signer) {
     attempted = true;
     const model = resolution.model ?? credential?.model ?? "";
-    const shape = resolveRequestShape(catalog, resolution.provider, model, undefined, baseUrl);
+    const shape = resolveRequestShape(catalog, resolution.provider, model, undefined, baseUrl, endpoint);
     const attribution = captureUsageAttribution({ provider: resolution.provider, model, baseUrl: baseUrl ?? '',
       rates: catalogModel(catalog, resolution.provider, model, baseUrl)?.cost });
     const controller = new AbortController();

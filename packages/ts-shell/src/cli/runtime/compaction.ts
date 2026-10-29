@@ -151,7 +151,7 @@ export function buildCompactionWiring(input: {
   // preflight runs before that provider is resolved, so it needs the same shape
   // or it would admit a tool-shaped message the send later rewrites.
   const fallbackShape = summaryRole ? undefined
-    : input.provider.shape ?? resolveRequestShape(input.catalog, provider.providerId, provider.model, undefined, provider.baseUrl);
+    : input.provider.shape ?? resolveRequestShape(input.catalog, provider.providerId, provider.model, undefined, provider.baseUrl, provider.endpoint);
   const effectiveLimits = fallbackShape ? { ...summaryLimits, shape: fallbackShape } : summaryLimits;
   return {
     policy: {

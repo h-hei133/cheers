@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PROVIDERS, type CatalogProvider } from '../../models/catalog.js';
+import { BUILTIN_PROVIDERS, mergeProviders, providerEndpoint, type CatalogProvider } from '../../models/catalog.js';
 import type { ProviderCredentialResolution } from '../credential.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from './target.js';
 
@@ -39,5 +39,39 @@ describe('captured account endpoint', () => {
         expiresAt: 1, baseUrl: 'https://api.individual.githubcopilot.com' } } };
     expect(providerCredentialBaseUrl(foreign, resolution)).toBe('https://api.individual.githubcopilot.com');
     expect(() => providerCredentialBaseUrl(foreign, { ...resolution, baseUrl: 'https://foreign.invalid/v1' })).toThrow('account issuer');
+  });
+});
+
+describe('captured native OpenAI request protocol', () => {
+  const target = { provider: 'openai', model: 'o4-mini', baseUrl: 'https://api.openai.com/v1/' };
+
+  it('selects Responses only for the exact native address and a declared reasoning model', () => {
+    expect(providerCredentialEndpoint(BUILTIN_PROVIDERS, target)).toBe('openai-responses');
+    expect(providerEndpoint(BUILTIN_PROVIDERS, 'openai', target.baseUrl, target.model)).toBe('openai-responses');
+    for (const baseUrl of ['https://relay.invalid/v1', 'https://api.openai.com/v10', 'https://api.openai.com.evil.invalid/v1',
+      'http://api.openai.com/v1', 'https://api.openai.com/v1?proxy=1']) {
+      expect(providerCredentialEndpoint(BUILTIN_PROVIDERS, { ...target, baseUrl })).toBeUndefined();
+    }
+    for (const model of [undefined, 'unlisted', 'gpt-4o', 'gpt-5.3', 'gpt-5.3-codex', 'gpt-5.1-mini']) {
+      expect(providerCredentialEndpoint(BUILTIN_PROVIDERS, { ...target, model })).toBeUndefined();
+    }
+    const catalog = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'openai', models: [{ id: target.model, reasoning: false }] }]);
+    expect(providerCredentialEndpoint(catalog, target)).toBeUndefined();
+    const disabled = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'openai', models: [{ id: target.model,
+      compat: { endpoint: 'openai-compatible' } }] }]);
+    expect(providerCredentialEndpoint(disabled, target)).toBeUndefined();
+    const reasoningOnly = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'openai', models: [{ id: 'custom-reasoning', reasoning: true }] }]);
+    expect(providerCredentialEndpoint(reasoningOnly, { ...target, model: 'custom-reasoning' })).toBeUndefined();
+  });
+
+  it('preserves explicit protocols, exact relay ownership and account issuer authority', () => {
+    const explicit = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'openai', endpoint: 'openai-compatible' }]);
+    expect(providerCredentialEndpoint(explicit, target)).toBe('openai-compatible');
+    const relay = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'relay', runtime: 'openai', baseUrl: target.baseUrl,
+      models: [{ id: target.model, reasoning: true }] }]);
+    expect(providerCredentialEndpoint(relay, target)).toBeUndefined();
+    expect(providerCredentialEndpoint(explicit, { ...account(), model: target.model })).toBe('openai-account-responses');
+    const ambiguous = [...relay, { ...relay.at(-1)!, id: 'duplicate' }];
+    expect(providerCredentialEndpoint(ambiguous, target)).toBeUndefined();
   });
 });

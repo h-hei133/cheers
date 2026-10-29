@@ -10,8 +10,8 @@ const model = objectSchema({
   cost: objectSchema({ promptPerMTok: number, completionPerMTok: number, cacheReadPerMTok: number, cacheWritePerMTok: number }, ['promptPerMTok', 'completionPerMTok']),
   promptCache: objectSchema({ short: positiveSchema, long: positiveSchema }),
   thinkingLevelMap: objectSchema(Object.fromEntries(['low', 'medium', 'high'].map(key => [key, { type: ['string', 'null'] }]))),
-  compat: objectSchema({ systemRole: enumSchema(['system', 'developer']), maxTokensField: enumSchema(['max_tokens', 'max_completion_tokens']),
-    reasoningEffort: booleanSchema, assistantAfterToolResult: booleanSchema, allowEmptySignature: booleanSchema, supportsTemperature: booleanSchema }),
+  compat: objectSchema({ endpoint: nameSchema, systemRole: enumSchema(['system', 'developer']), maxTokensField: enumSchema(['max_tokens', 'max_completion_tokens']),
+    reasoningEffort: booleanSchema, reasoningSummary: booleanSchema, assistantAfterToolResult: booleanSchema, allowEmptySignature: booleanSchema, supportsTemperature: booleanSchema }),
 }, ['id']);
 const provider = objectSchema({ label: textSchema, runtime: enumSchema(RUNTIME_PROVIDERS), auth: enumSchema(['api-key', 'oauth', 'none']),
   baseUrl: nameSchema, endpoint: nameSchema, envVar: { type: 'string', pattern: '^[A-Za-z_][A-Za-z0-9_]*$' }, models: listSchema(model) });

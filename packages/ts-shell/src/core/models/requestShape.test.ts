@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CatalogProvider } from "./catalog.js";
+import { BUILTIN_PROVIDERS, mergeProviders, type CatalogProvider } from "./catalog.js";
 import { DEFAULT_REQUEST_SHAPE, resolveRequestShape } from "./requestShape.js";
 
 /**
@@ -23,6 +23,50 @@ function catalogWith(model: Record<string, unknown>): readonly CatalogProvider[]
 }
 
 describe("resolveRequestShape", () => {
+  it('requests native visible summaries without selecting an effort or a budget', () => {
+    const shape = resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'o4-mini', undefined, 'https://api.openai.com/v1/');
+    expect(shape.reasoningSummary).toBe(true);
+    expect(shape.thinkingLevelName).toBeUndefined(); expect(shape.thinkingBudgetTokens).toBeUndefined();
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'o4-mini', undefined, 'https://relay.invalid/v1').reasoningSummary).toBeUndefined();
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'o4-mini', undefined, 'https://relay.invalid/v1',
+      'openai-responses').reasoningSummary).toBeUndefined();
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'unlisted', undefined).reasoningSummary).toBeUndefined();
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'gpt-5.3', undefined).reasoningSummary).toBeUndefined();
+    const relay = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'relay', runtime: 'openai', baseUrl: 'https://api.openai.com/v1',
+      models: [{ id: 'o4-mini', reasoning: true }] }]);
+    expect(resolveRequestShape(relay, 'openai', 'o4-mini', undefined).reasoningSummary).toBeUndefined();
+  });
+
+  it('honors declared summary support separately from effort support and preserves refusal', () => {
+    expect(resolveRequestShape(catalogWith({ compat: { reasoningSummary: true, reasoningEffort: false } }),
+      'vendor', 'm', undefined, undefined, 'openai-responses').reasoningSummary).toBe(true);
+    const refused = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'openai', models: [{ id: 'o4-mini', compat: { reasoningSummary: false } }] }]);
+    expect(resolveRequestShape(refused, 'openai', 'o4-mini', 'high').reasoningSummary).toBe(false);
+    expect(resolveRequestShape(catalogWith({ reasoning: false, compat: { reasoningSummary: true } }),
+      'vendor', 'm', 'high').reasoningSummary).toBe(false);
+  });
+
+  it('does not admit native summaries from unique model fallback without a provider owner', () => {
+    const automatic = resolveRequestShape(BUILTIN_PROVIDERS, '', 'o4-mini', undefined, undefined, 'openai-responses');
+    expect(automatic.reasoningSummary).toBeUndefined();
+    const explicit = resolveRequestShape(BUILTIN_PROVIDERS, '', 'o4-mini', 'high', undefined, 'openai-responses');
+    expect(explicit.reasoningSummary).toBeUndefined();
+    expect(explicit.thinkingLevelName).toBe('high');
+    expect(explicit.maxTokensField).toBe('max_completion_tokens');
+  });
+
+  it('admits known account summaries only with the issuer-resolved endpoint and exact account host', () => {
+    const address = 'https://chatgpt.com/backend-api';
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'o4-mini', undefined, address,
+      'openai-account-responses').reasoningSummary).toBe(true);
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'o4-mini', undefined, address).reasoningSummary).toBeUndefined();
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'unlisted', undefined, address,
+      'openai-account-responses').reasoningSummary).toBeUndefined();
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'o4-mini', undefined, address,
+      'openai-compatible').reasoningSummary).toBeUndefined();
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'o4-mini', undefined, 'https://foreign.invalid',
+      'openai-account-responses').reasoningSummary).toBeUndefined();
+  });
   it("keeps what every request looked like before the catalog could answer", () => {
     const shape = resolveRequestShape(catalogWith({}), "vendor", "m", "high");
     expect(shape.systemRole).toBe("system");

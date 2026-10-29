@@ -24,6 +24,102 @@ async function detail(h: SettingsHost = host(), key = 'attentionOnIdle') {
 }
 
 describe('advanced settings picker', () => {
+  it('separates file preferences from current-session model and thinking entries without changing their owners', async () => {
+    const base = host();
+    const child = (back: (notice?: string) => Picker): Picker => ({
+      title: 'Session child', empty: '', back: () => back(), load: async () => [], apply: async () => undefined,
+    });
+    const h = { ...base, modelSettings: vi.fn(child), thinkingSettings: vi.fn(child) };
+    const model = settingsPicker(h, 'project', 'Model');
+    const all = await model.load();
+    const modelRows = model.filterOptions!('', all);
+    expect(modelRows.filter(row => !row.disabled).map(row => row.id).sort()).toEqual([
+      'allowedModels', 'maxOutputTokens', 'maxTurns', 'temperature', 'topP',
+    ]);
+    expect(modelRows.some(row => row.id.startsWith('settings:'))).toBe(false);
+    expect(all.some(row => row.id === 'providerConnectTimeoutMs')).toBe(true);
+    expect(all.some(row => row.id === 'instructionBudgetBytes')).toBe(true);
+    const sessions = model.chips!.select('Session')!;
+    const sessionRows = sessions.filterOptions!('', await sessions.load());
+    expect(sessionRows.map(row => row.id)).toEqual([
+      'section:Session / Current session', 'settings:model', 'settings:thinking',
+    ]);
+    expect(sessions.title).toBe('Settings — current session — from project configuration');
+    expect(sessions.detail!('settings:thinking').join(' ')).toContain('settings file scope does not change');
+    const thinking = (await sessions.apply(['settings:thinking']))!.next!;
+    const returned = thinking.back!();
+    expect(returned.chips?.active).toBe('Session');
+    expect(returned.initialSelection).toBe('settings:thinking');
+    expect(returned.title).toContain('project configuration');
+    expect(h.thinkingSettings).toHaveBeenCalledOnce();
+    expect(base.save).not.toHaveBeenCalled();
+  });
+
+  it('admits only IDs from a successfully loaded catalogue', async () => {
+    const h: SettingsHost = host();
+    const picker = settingsPicker(h);
+    expect(picker.detail!(undefined)).toEqual([]);
+    expect(await picker.apply(['settings:memory'])).toBeUndefined();
+    await picker.load();
+    expect(picker.chips?.items.some(item => item.id === 'Session')).toBe(false);
+    h.modelSettings = vi.fn(() => ({ title: 'Unexpected child', empty: '', load: async () => [], apply: async () => undefined }));
+    h.thinkingSettings = vi.fn(() => ({ title: 'Unexpected child', empty: '', load: async () => [], apply: async () => undefined }));
+    for (const id of ['settings:model', 'settings:thinking']) {
+      expect(picker.detail!(id)).toEqual([]);
+      expect(await picker.apply([id])).toBeUndefined();
+    }
+    expect(h.modelSettings).not.toHaveBeenCalled();
+    expect(h.thinkingSettings).not.toHaveBeenCalled();
+
+    const original = h.openSettings;
+    h.openSettings = scope => ({ ...original(scope), definitions: CONFIG_SETTINGS.filter(item => item.key !== 'temperature') });
+    const restricted = settingsPicker(h); await restricted.load();
+    expect(restricted.detail!('temperature')).toEqual([]);
+    expect(await restricted.apply(['temperature'])).toBeUndefined();
+    h.openSettings = () => { throw new Error('Synthetic unreadable configuration'); };
+    await expect(restricted.load()).rejects.toThrow('Synthetic unreadable configuration');
+    expect(restricted.detail!('settings:memory')).toEqual([]);
+    expect(await restricted.apply(['settings:memory'])).toBeUndefined();
+    expect(await restricted.apply(['maxTurns'])).toBeUndefined();
+  });
+
+  it.each(['user', 'project'] as const)('searches and returns session children through actual overlay keys while retaining %s file scope', async scope => {
+    const base = host();
+    const child = vi.fn((back: (notice?: string) => Picker): Picker => ({
+      title: 'Thinking child — current session', empty: '', back: () => back(), load: async () => [], apply: async () => undefined,
+    }));
+    const h = { ...base, thinkingSettings: child };
+    const picker = settingsPicker(h, scope, 'Model');
+    const overlay = new OverlayHost(() => {});
+    const frame = () => overlay.render(120, 32).map(stripAnsi).join('\n');
+    overlay.open(picker); await Promise.resolve(); await Promise.resolve();
+    overlay.handleKey(parseKeyEvent('\x1b[C'), vi.fn());
+    expect(frame()).toContain('Settings — current session');
+    expect(frame()).toContain('Session /');
+    expect(picker.chips?.active).toBe('Session');
+    expect(frame()).not.toContain('Maximum turns');
+    overlay.handlePaste('reasoning');
+    expect(frame()).toContain('▸ Thinking effort');
+    overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+    expect(picker.chips?.active).toBe('Session');
+    expect(frame()).toContain('▸ Thinking effort');
+    expect(frame()).toContain(`${scope} configuration`);
+    let pending: Promise<unknown> | undefined;
+    overlay.handleKey(parseKeyEvent('\r'), (selected, ids) => {
+      pending = selected.apply(ids).then(outcome => { if (outcome?.next) overlay.open(outcome.next); });
+    });
+    await pending; await Promise.resolve(); await Promise.resolve();
+    expect(frame()).toContain('Thinking child — current session');
+    overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
+    await Promise.resolve(); await Promise.resolve();
+    expect(frame()).toContain('Settings — current session');
+    expect(frame()).toContain(`${scope} configuration`);
+    expect(frame()).toContain('▸ Thinking effort');
+    expect(child).toHaveBeenCalledOnce();
+    expect(base.save).not.toHaveBeenCalled();
+    overlay.close();
+  });
+
   it('exposes memory and shell diagnostics as read-only drafts owned by their commands', async () => {
     const h = host();
     const picker = settingsPicker(h);
@@ -254,6 +350,29 @@ describe('advanced settings picker', () => {
     h.save.mockClear(); const remove = (await field.apply(['unset']))!.next!;
     expect(h.save).not.toHaveBeenCalled(); await remove.apply(['apply']); expect(h.save).toHaveBeenCalledWith('maxTurns', undefined);
   });
+  it.each(['prefix\rpart', 'prefix\r\npart'])(
+    'retains a list item containing loaded newlines through untouched form submission: %j', async item => {
+      const original = [item, 'unchanged'], base = host();
+      const h = { ...base, openSettings(scope?: 'user' | 'project') {
+        const draft = base.openSettings(scope);
+        return { ...draft, values: { ...draft.values,
+          hiddenToolPrefixes: { ...draft.values.hiddenToolPrefixes, effective: original, requested: original, stored: original },
+        } };
+      } };
+      const field = await detail(h, 'hiddenToolPrefixes');
+      const editor = (await field.apply(['edit']))!.next!;
+      expect(editor.input!.initial).toBe(formatSetting(original));
+      const overlay = new OverlayHost(() => {});
+      overlay.open(editor); await Promise.resolve(); await Promise.resolve();
+      let pending: ReturnType<Picker['apply']> | undefined;
+      overlay.handleKey(parseKeyEvent('\r'), (picker, ids) => { pending = picker.apply(ids); });
+      const staged = (await pending)!.next!;
+      overlay.close();
+      expect(base.save).not.toHaveBeenCalled();
+      await staged.apply(['apply']);
+      expect(base.save).toHaveBeenCalledWith('hiddenToolPrefixes', original);
+    },
+  );
   it('makes project targeting explicit and discards a pending value when scope changes', async () => {
     const h = host(); const field = await detail(h); const staged = (await field.apply(['choice:0']))!.next!;
     const scopes = (await staged.apply(['scope']))!.next!;

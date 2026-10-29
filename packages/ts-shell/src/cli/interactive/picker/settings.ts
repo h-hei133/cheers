@@ -1,82 +1,20 @@
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import { truncateToWidth } from '../../../presentation/tui/text/layout.js';
 import { matchRank } from '../../../presentation/tui/text/search.js';
-import { formatSetting, parseSettingInput, settingEditor, validateSetting, type SettingDefinition, type SettingsScope } from '../../../config/settings.js';
+import { formatSetting, type SettingDefinition, type SettingsScope } from '../../../config/settings.js';
 import type { Picker, PickerOutcome } from '../overlay.js';
 import type { SettingsDraft } from '../settings.js';
 import { CONFIG_SETTINGS } from '../../../config/settings.js';
-import { normalizeStatusItems } from '../../../presentation/tui/chrome/items.js';
-import { statusItemPicker } from './statusItems.js';
-import { settingPreview, type PreferenceHost } from './preview.js';
+import { settingPreview } from './preview.js';
 import { CatalogNavigation, type NavigationGroup } from './navigation.js';
 import { settingSources } from './settings/source.js';
+import { valueEditor } from './settings/editor.js';
+import type { SettingsHost, StagedValue } from './settings/contract.js';
 import { sameValue } from '../../../config/values.js';
 
-export interface SettingsHost extends PreferenceHost {
-  openSettings(scope?: SettingsScope): SettingsDraft;
-  modelSettings?(back: (notice?: string) => Picker): Picker;
-  thinkingSettings?(back: (notice?: string) => Picker): Picker;
-}
-interface StagedValue { readonly value: unknown }
+export type { SettingsHost } from './settings/contract.js';
 
 function compact(value: unknown): string { return truncateToWidth(formatSetting(value), 36); }
-
-function inputError(setting: SettingDefinition, text: string): string | undefined {
-  return parseSettingInput(setting, text).error;
-}
-
-/** The editor's starting text, in the shape that editor reads. */
-function editorText(setting: SettingDefinition, value: unknown): string {
-  const editor = settingEditor(setting);
-  if (value === undefined) return '';
-  if (editor === 'text' || editor === 'theme') return typeof value === 'string' ? value : String(value);
-  if (editor === 'number') return String(value);
-  if (editor === 'list' && Array.isArray(value)) {
-    const text = value.map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n');
-    const parsed = parseSettingInput(setting, text);
-    return parsed.ok && sameValue(parsed.value, value) ? text : formatSetting(value);
-  }
-  return formatSetting(value);
-}
-
-function editorLabel(setting: SettingDefinition): string {
-  const editor = settingEditor(setting);
-  if (editor === 'number') return `Number (${setting.schema.type}). Enter stages the value; Apply saves it.`;
-  if (editor === 'list') return (setting.schema.items as { type?: string } | undefined)?.type === 'object'
-    ? 'One JSON object per line. Enter stages the list; Apply saves it.'
-    : 'JSON array or one item per line. Enter stages the list; Apply saves it.';
-  if (editor === 'text' || editor === 'theme') return 'Text value. Enter stages the value; Apply saves it.';
-  return `JSON ${setting.schema.type}. Enter stages the value; Apply saves it.`;
-}
-
-function valueEditor(host: SettingsHost, draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue): Picker {
-  const current = draft.values[setting.key];
-  const value = pending ? pending.value : current.stored === undefined ? current.requested : current.stored;
-  if (setting.key === 'tui.statusItems') {
-    const preview = settingPreview(host, setting.key);
-    const picker = statusItemPicker({ current: normalizeStatusItems(value as readonly string[] | undefined), save: async () => undefined,
-      preview: items => { preview?.show(items); } });
-    return { ...picker, title: 'Stage status items — Enter reviews; empty uses defaults', exclusive: true, holdInput: true,
-      back: () => settingDetail(host, draft, setting, pending),
-      previewEnd: preview?.end,
-      apply: async ids => validateSetting(setting, ids) ? undefined : ({ next: settingDetail(host, draft, setting, { value: normalizeStatusItems(ids) }) }) };
-  }
-  return {
-    title: `Edit ${setting.label} — ${draft.scope}`, form: 'panel', exclusive: true, holdInput: true, empty: '',
-    back: () => settingDetail(host, draft, setting, pending),
-    load: async () => [], apply: async () => undefined,
-    input: {
-      initial: editorText(setting, value),
-      label: editorLabel(setting),
-      multiline: ['list', 'object'].includes(settingEditor(setting)),
-      validate: text => inputError(setting, text),
-      apply: async text => {
-        const parsed = parseSettingInput(setting, text);
-        return parsed.ok ? { next: settingDetail(host, draft, setting, { value: parsed.value }) } : undefined;
-      },
-    },
-  };
-}
 
 function scopePicker(host: SettingsHost, draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue): Picker {
   return {
@@ -160,7 +98,7 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
       };
       const id = ids[0];
       if (id === 'inspect') return { next: settingSources(draft, setting, () => settingDetail(host, draft, setting, pending, failure)) };
-      if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending) };
+      if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending, value => settingDetail(host, draft, setting, value)) };
       if (id === 'unset') return { next: settingDetail(host, draft, setting, { value: undefined }, failure) };
       if (id === 'scope' && setting.policy.sources.includes('project')) return { next: scopePicker(host, draft, setting, pending) };
       if (id === 'back' || id === 'discard') return { next: settingsPicker(host, draft.scope, setting.group, setting.key) };
@@ -195,7 +133,7 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
   };
 }
 
-const GROUP_ORDER = ['Appearance', 'Model', 'Interaction', 'Context', 'Memory', 'Files', 'Shell', 'Tools', 'Tasks', 'Providers'] as const;
+const GROUP_ORDER = ['Appearance', 'Model', 'Session', 'Interaction', 'Context', 'Memory', 'Files', 'Shell', 'Tools', 'Tasks', 'Providers'] as const;
 const CAPABILITY_ENTRIES = [
   {
     id: 'settings:memory', group: 'Memory', section: 'Memory / Review', label: 'Memory status', note: 'read-only',
@@ -216,19 +154,25 @@ const SETTINGS_GROUPS: readonly string[] = GROUP_ORDER.filter(group => CONFIG_SE
 /** Searchable grouped fields; selecting a row starts an explicit staged edit. */
 export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user', group?: string, selected?: string, notice?: string): Picker {
   let draft: SettingsDraft | undefined;
-  const active = group && SETTINGS_GROUPS.includes(group) ? group : 'all';
+  const categories = GROUP_ORDER.filter(name => SETTINGS_GROUPS.includes(name)
+    || (name === 'Session' && Boolean(host.modelSettings || host.thinkingSettings)));
+  const active = group && categories.includes(group as typeof categories[number]) ? group : 'all';
   const navigation = new CatalogNavigation(active, true, true);
   let searching = false;
   const groups = new Map<string, string>();
+  const offered = new Set<string>();
   return {
-    get title() { return `Settings — ${scope} configuration${searching ? ' — Search all groups' : navigation.active === 'all' ? '' : ` — ${navigation.active}`}`; },
+    get title() {
+      if (!searching && navigation.active === 'Session') return `Settings — current session — from ${scope} configuration`;
+      return `Settings — ${scope} configuration${searching ? ' — Search all groups' : navigation.active === 'all' ? '' : ` — ${navigation.active}`}`;
+    },
     form: 'panel', fullScreen: true, exclusive: true, holdInput: true, navigation,
     footer: [notice, '←→ categories · Tab: sections/rows/navigation · ↑↓ move · Enter: edit · Esc: back'].filter(Boolean).join(' '),
     ...(selected ? { initialSelection: selected } : {}),
     defaultSelection: options => searching ? options.find(option => !option.disabled)?.id : undefined,
     empty: 'Settings could not be loaded. Check your configuration and retry.',
     chips: {
-      items: [{ id: 'all', label: 'All' }, ...SETTINGS_GROUPS.map(name => ({ id: name, label: name }))],
+      items: [{ id: 'all', label: 'All' }, ...categories.map(name => ({ id: name, label: name }))],
       get active() { return searching ? 'all' : navigation.active; },
       select: id => settingsPicker(host, scope, id === 'all' ? undefined : id),
     },
@@ -239,8 +183,10 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
       return searchSettings(query, navigation.all, groups);
     },
     async load(): Promise<readonly Option[]> {
-      draft = host.openSettings(scope);
+      draft = undefined;
       groups.clear();
+      offered.clear();
+      draft = host.openSettings(scope);
       const positions = new Map<string, NavigationGroup>();
       const rows: Option[] = draft.definitions.map(setting => {
         groups.set(setting.key, setting.group);
@@ -253,8 +199,8 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
       for (const [id, label, available] of [['settings:model', 'Models and roles', host.modelSettings],
         ['settings:thinking', 'Thinking effort', host.thinkingSettings]] as const) {
         if (!available) continue;
-        groups.set(id, 'Model'); positions.set(id, { category: 'Model', section: 'Model / Session' });
-        rows.push({ id, label, note: 'current session', searchText: `Model Session ${id === 'settings:model' ? 'provider connection model roles /model' : 'reasoning thinking /thinking'}` });
+        groups.set(id, 'Session'); positions.set(id, { category: 'Session', section: 'Session / Current session' });
+        rows.push({ id, label, note: 'current session', searchText: `Session ${id === 'settings:model' ? 'provider connection model roles /model' : 'reasoning thinking /thinking'}` });
       }
       for (const entry of CAPABILITY_ENTRIES) {
         groups.set(entry.id, entry.group); positions.set(entry.id, { category: entry.group, section: entry.section });
@@ -262,12 +208,14 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
       }
       rows.sort((a, b) => GROUP_ORDER.indexOf(groups.get(a.id) as typeof GROUP_ORDER[number]) - GROUP_ORDER.indexOf(groups.get(b.id) as typeof GROUP_ORDER[number])
         || (positions.get(a.id)?.section ?? '').localeCompare(positions.get(b.id)?.section ?? ''));
-      navigation.set(rows, positions, [{ id: 'all', label: 'All' }, ...SETTINGS_GROUPS.map(id => ({ id, label: id }))]);
+      navigation.set(rows, positions, [{ id: 'all', label: 'All' }, ...categories.map(id => ({ id, label: id }))]);
+      for (const row of rows) offered.add(row.id);
       return rows;
     },
     detail: id => {
-      if (id === 'settings:model') return ['Browse models, configure connections and assign model roles.', 'Model and role choices apply to the current session and are saved for resume.', 'Connection configuration uses its own save scope; the settings file scope does not change it.'];
-      if (id === 'settings:thinking') return ['Choose reasoning effort for the current request model.', 'Changes apply to the current session and are saved for resume.', 'Supported levels follow the exact model and connection.'];
+      if (id === undefined || !offered.has(id)) return [];
+      if (id === 'settings:model') return ['Browse models, configure connections and assign model roles.', 'Model and role choices apply to the current session and are saved for resume.', 'The settings file scope does not change session choices or the connection owner\'s save scope.'];
+      if (id === 'settings:thinking') return ['Choose reasoning effort for the current request model.', 'Changes apply to the current session and are saved for resume; the settings file scope does not change them.', 'Supported levels follow the exact model and connection.'];
       const capability = CAPABILITY_ENTRIES.find(entry => entry.id === id);
       if (capability) return [capability.detail];
       const setting = draft?.definitions.find(item => item.key === id);
@@ -279,8 +227,8 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
         ...(value.projectTrustNotice ? [value.projectTrustNotice] : [])];
     },
     async apply(ids): Promise<PickerOutcome | undefined> {
-      if (!draft || ids.length !== 1) return undefined;
-      const back = (note?: string) => settingsPicker(host, scope, 'Model', ids[0], note);
+      if (!draft || ids.length !== 1 || !offered.has(ids[0])) return undefined;
+      const back = (note?: string) => settingsPicker(host, scope, 'Session', ids[0], note);
       if (ids[0] === 'settings:model' && host.modelSettings) return { next: host.modelSettings(back) };
       if (ids[0] === 'settings:thinking' && host.thinkingSettings) return { next: host.thinkingSettings(back) };
       const capability = CAPABILITY_ENTRIES.find(entry => entry.id === ids[0]);
@@ -298,6 +246,6 @@ function searchSettings(query: string, options: readonly Option[], groups: Reado
   const best = new Map<string, number>();
   for (const entry of ranked) best.set(entry.group, Math.max(best.get(entry.group) ?? 0, entry.rank));
   return ranked.sort((a, b) => (best.get(b.group)! - best.get(a.group)!) ||
-    SETTINGS_GROUPS.indexOf(a.group) - SETTINGS_GROUPS.indexOf(b.group) || b.rank - a.rank || a.order - b.order)
+    GROUP_ORDER.indexOf(a.group as typeof GROUP_ORDER[number]) - GROUP_ORDER.indexOf(b.group as typeof GROUP_ORDER[number]) || b.rank - a.rank || a.order - b.order)
     .map(entry => entry.option);
 }

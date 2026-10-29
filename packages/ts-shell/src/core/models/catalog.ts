@@ -1,6 +1,7 @@
 import type { RuntimeProvider } from "../../config/runtimeConfig.js";
 import type { EndpointKind } from "../../provider/endpoints/kinds.js";
 import { sanitizeModelLimits } from "./limits.js";
+import { nativeOpenAIReasoning } from './protocol.js';
 
 /**
  * Provider and model catalogue.
@@ -108,6 +109,8 @@ export interface CatalogModel {
 
 /** How one model wants a request shaped, when it differs from the default. */
 export interface ModelRequestShape {
+  /** Native OpenAI protocol admission at its official address; provider declarations take precedence. */
+  readonly endpoint?: EndpointKind;
   /**
    * Which role carries the system instruction.
    *
@@ -129,6 +132,8 @@ export interface ModelRequestShape {
    * not become a rejected request.
    */
   readonly reasoningEffort?: boolean;
+  /** True requests visible Responses summaries independently of effort; false omits them. */
+  readonly reasoningSummary?: boolean;
   /**
    * Whether a user message may follow tool results directly.
    *
@@ -303,7 +308,9 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
       { id: "gpt-5.3", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
       { id: "gpt-5.3-codex", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: false },
       { id: "gpt-5.1-mini", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
-      { id: "o4-mini", contextWindow: 200_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, vision: true, serviceTiers: ['default', 'priority', 'fast', 'flex'] },
+      { id: "o4-mini", contextWindow: 200_000, reasoning: true,
+        compat: { ...REASONING_REQUEST_SHAPE, endpoint: 'openai-responses', reasoningSummary: true },
+        vision: true, serviceTiers: ['default', 'priority', 'fast', 'flex'] },
     ],
   },
   {
@@ -521,20 +528,24 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
  * from the provider id: the id names who answers, and an endpoint is how they
  * want to be asked — the same company can offer both.
  *
- * The merged catalogue is read, not the built-in list, so a provider a user
- * added with its own endpoint is reached the way they declared it.
+ * The merged catalogue is read, so explicit protocols and exact relay ownership
+ * remain authoritative. An undeclared native OpenAI reasoning target uses
+ * Responses only with a captured model and its exact official address.
  */
 export function providerEndpoint(
   catalog: readonly CatalogProvider[],
   provider: string,
   baseUrl?: string,
+  model?: string,
 ): EndpointKind | undefined {
   // Passed through as declared, whatever it is. Mapping "anything that is not
   // this one kind" onto the default is what a closed union forced, and it read a
   // third protocol as the default shape — sending it a body its endpoint does not
   // accept, with nothing to say why. An unknown name now reaches `endpointShape`,
   // which names the kinds it does know.
-  return catalogProvider(catalog, provider, baseUrl).entry?.endpoint;
+  const entry = catalogProvider(catalog, provider, baseUrl).entry;
+  return entry?.endpoint ?? (nativeOpenAIReasoning(entry, catalogBaseUrl(catalog, provider, baseUrl), model)
+    ? 'openai-responses' : undefined);
 }
 
 /** Resolve the request address before selecting its catalogue metadata. */

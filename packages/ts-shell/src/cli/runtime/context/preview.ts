@@ -158,7 +158,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   if (catalogProvider(publication.catalog, resolution.provider, base).ambiguous) {
     throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before sending.');
   }
-  const shape = resolveRequestShape(publication.catalog, resolution.provider, resolution.model, preference.thinkingEffort ?? undefined, base);
+  const shape = resolveRequestShape(publication.catalog, resolution.provider, resolution.model, preference.thinkingEffort ?? undefined, base, endpoint);
   if (!shape.toolCalling && hasToolHistory(messages)) throw new Error(TOOL_HISTORY_UNSUPPORTED_MESSAGE);
   const schemas = shape.toolCalling ? toolSchemas(prepared.currentTools()) : [];
   // The turn owner counts the first step before dispatch; a one-step run is closing.
@@ -193,7 +193,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     topP: config.topP, maxOutputTokens: configuredOutput ?? output, serviceTier,
     thinkingLevelName: shape.thinkingLevelName, thinkingBudgetTokens: shape.thinkingBudgetTokens,
     allowEmptySignature: shape.allowEmptySignature, supportsTemperature: shape.supportsTemperature,
-    systemRole: shape.systemRole, reasoningEffort: shape.reasoningEffort,
+    systemRole: shape.systemRole, reasoningEffort: shape.reasoningEffort, reasoningSummary: shape.reasoningSummary,
     maxTokensField: shape.maxTokensField, assistantAfterToolResult: shape.assistantAfterToolResult,
   });
   const endpointId = captureUsageAttribution({ provider: resolution.provider, model: resolution.model, baseUrl: base }).endpointId;

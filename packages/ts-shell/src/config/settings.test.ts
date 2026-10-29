@@ -9,6 +9,19 @@ it('covers every public file field, expanding TUI leaves and excluding CLI-only 
   expect(new Set(CONFIG_SETTINGS.map(item => item.key)).size).toBe(CONFIG_SETTINGS.length);
 });
 
+it('keeps model request preferences in the file registry without declaring session selection fields', () => {
+  expect(CONFIG_SETTINGS.filter(item => item.group === 'Model').map(item => item.key).sort()).toEqual([
+    'allowedModels', 'maxOutputTokens', 'maxTurns', 'temperature', 'topP',
+  ]);
+  expect(CONFIG_SETTINGS.filter(item => item.group === 'Context').map(item => item.key)).toEqual(expect.arrayContaining([
+    'contextWindow', 'reserveTokens', 'modelTokenBudgets', 'instructionBudgetBytes',
+  ]));
+  expect(CONFIG_SETTINGS.filter(item => item.group === 'Providers').map(item => item.key)).toEqual(expect.arrayContaining([
+    'retryEnabled', 'providerRetryMaxRetries', 'providerConnectTimeoutMs',
+  ]));
+  expect(CONFIG_SETTINGS.some(item => item.group === 'Session' || item.key.startsWith('settings:'))).toBe(false);
+});
+
 it('uses the same advanced registry for command help without accepting a write command', async () => {
   expect((await runSettingsCommand(['maxOutputTokens'], {} as never)).output).toContain('Requested output token budget');
   expect((await runSettingsCommand(['tui.diagrams'], {} as never)).output).toContain('restart');

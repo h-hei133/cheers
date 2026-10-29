@@ -108,6 +108,59 @@ it.each(['regular', 'fullscreen'] as const)('shows admitted thinking shortcuts a
 });
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  (['user', 'project'] as const).map(scope => ({ kind, scope }))))(
+  'separates session choices from configuration fields in the actual $kind $scope settings host', async ({ kind, scope }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/settings-session-domain-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root); vi.stubEnv('OPENAI_API_KEY', '');
+    writeUserRuntimeConfigFile({ provider: 'openai', tuiMode: kind, topP: 0.7, providerConnections: [] },
+      readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    const project = getProjectConfigPath(root); fs.mkdirSync(path.dirname(project), { recursive: true });
+    fs.writeFileSync(project, '{"schemaVersion":1,"topP":0.6}');
+    writeCatalogCache([{ id: 'relay', runtime: 'openai', baseUrl: 'https://fixture.invalid/v1', models: [{ id: 'inspect-only' }] }]);
+    const manager = new SessionManager(), session = manager.createNew(root), { mode, terminal } = build({ tuiMode: kind });
+    const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+      rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+      session, runtimeConfig: getRuntimeConfig(root) });
+    const host = mode as unknown as { view: InteractiveView; overlay: OverlayHost; pickerHost(): PickerHost;
+      options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    host.options.runtimeContext = context; host.options.sessionManager = manager;
+    const userBytes = fs.readFileSync(getUserRuntimeConfigPath()), projectBytes = fs.readFileSync(project);
+    const before = modelState.readSessionModelEdit(session.id), accepted = context.configuration.current;
+    const dispatch = vi.spyOn(promptRunner, 'runInteractivePromptExecution').mockResolvedValue();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
+    mode.start();
+    try {
+      let settings = pickerFor('/settings', host.pickerHost())!; await settings.load();
+      if (scope === 'project') {
+        const field = (await settings.apply(['maxTurns']))!.next!; await field.load();
+        const scopes = (await field.apply(['scope']))!.next!; await scopes.load();
+        settings = (await scopes.apply(['project']))!.next!.back!(); await settings.load();
+      }
+      host.overlay.open(settings);
+      await vi.waitFor(() => expect(frame()).toContain(`Settings — ${scope} configuration`));
+      host.view.editor.setDraftText('held scope draft');
+      terminal.input('Models and roles'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
+      terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('All models'));
+      terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('▸ Models and roles'));
+      expect(frame()).toContain(`Settings — current session — from ${scope} configuration`);
+      expect(frame()).toContain('Session /');
+      expect(frame()).not.toContain('Top P');
+      terminal.input('\x1b');
+      await vi.waitFor(() => expect(frame()).toContain('▸ Session'));
+      terminal.input('\x1b');
+      await vi.waitFor(() => expect(host.overlay.active).toBe(false));
+      expect(host.view.editor.getText()).toBe('held scope draft');
+      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(userBytes); expect(fs.readFileSync(project)).toEqual(projectBytes);
+      expect(modelState.readSessionModelEdit(session.id)).toEqual(before); expect(context.configuration.current).toBe(accepted);
+      expect(dispatch).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled();
+    } finally {
+      mode.stop(); dispatch.mockRestore(); network.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   (['user', 'project'] as const).flatMap(scope =>
     (['apply', 'discard'] as const).map(action => ({ kind, scope, action })))))(
   'retains status item staging through the actual $kind $scope settings editor and $action readback', async ({ kind, scope, action }) => {

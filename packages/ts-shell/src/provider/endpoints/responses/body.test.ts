@@ -16,6 +16,15 @@ const output = [
 ];
 
 describe('Responses requests', () => {
+  it.each(['openai-responses', 'openai-account-responses'])('requests admitted %s summaries without selecting effort', endpoint => {
+    const body = endpointTurnBody(endpoint, { ...turn, reasoningSummary: true });
+    expect(body.reasoning).toEqual({ summary: 'auto' });
+    expect(body).not.toHaveProperty('reasoning.effort');
+    expect(endpointBody(endpoint, { ...turn, reasoningSummary: true }).reasoning).toEqual({ summary: 'auto' });
+    expect(endpointTurnBody(endpoint, turn)).not.toHaveProperty('reasoning');
+    expect(endpointTurnBody(endpoint, { ...turn, reasoningSummary: false, thinkingLevelName: 'high' }).reasoning).toEqual({ effort: 'high' });
+  });
+
   it('sends flat optional schemas, local history, inclusive output and supported reasoning controls', () => {
     const body = endpointTurnBody('openai-responses', { ...turn, thinkingLevelName: 'high', maxOutputTokens: 100, topP: 0.5, serviceTier: 'flex' });
     expect(endpointUrl('https://fixture.test/v1/', 'openai-responses', 'm')).toBe('https://fixture.test/v1/responses');

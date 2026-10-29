@@ -1,12 +1,12 @@
+import { createCompactionProviders, type ProviderRenewal } from '../provider/compaction.js';
+import { createProviderResources } from '../provider/resources.js';
+import { assertAdmission } from '../../core/network/admission.js';
+import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
+import { catalogModel } from '../../core/models/catalog.js';
+import { endpointShape } from '../../provider/endpoints/index.js';
+import { buildCompactionWiring, nativeCompactionAuthority, toCompactionMessages } from './compaction.js';
 import { profileScope } from '../../core/paths/profile/scope.js';
-import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import { configurationOperation } from '../../core/shell/scope.js';
-import { credentialIdentityFor } from '../../core/auth/account/pool.js';
-import { assertScopedModel } from '../../config/scope/projection.js';
-import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
-import { configurationAdmission } from "../../core/shell/configuration.js";
-import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
-import { admittedFetch, assertAdmission, type Admission } from "../../core/network/admission.js";
 import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
 import { messageToText } from "../../model-adapters/multimodal.js";
 import type { Interface as ReadlineInterface } from "node:readline";
@@ -57,29 +57,12 @@ import { advisorCheckpointFor } from './advisor.js';
 import { readGoalEdit } from '../../planning/goal/store.js';
 import type { GoalScheduler } from '../../planning/goal/run/scheduler.js';
 import { compactSessionHistory } from "../../core/shell/compaction.js";
-import { recordCompactionCheckpoint } from "../../context/compact/checkpoint/compactionCheckpoint.js";
 import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
-import { providerFetchForEndpoint, providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
-import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
-import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
 import { configuredOutputLimit } from '../../provider/request/output.js';
-import { catalogModel, catalogProvider } from "../../core/models/catalog.js";
 import { sessionUsageRecorder } from '../../session/store/usage.js';
-import { resolveRequestShape } from "../../core/models/requestShape.js";
-import { endpointShape, type EndpointKind } from "../../provider/endpoints/index.js";
 import { projectMemoryRootFor } from "../../memory/projectMemoryRoot.js";
-import { createCacheWarmingRunner, type CacheWarmingRunner } from "../../turn/cacheWarm.js";
-import { resolveCacheWarmingMode } from "../../core/models/cacheEconomics.js";
-import { cacheRefreshFor } from "./cache.js";
-import { allowsSelfInitiatedRequests } from "../../core/network/policy.js";
-import { renewStoredAccount } from "../../core/auth/account/renewal.js";
-import { markContextUnknown } from "../../observability/usageTelemetry.js";
-import { recordCount } from "../../observability/metrics.js";
-import type { CatalogProvider } from "../../core/models/catalog.js";
-import type { CompactionSetup } from "../../turn/session.js";
-import { buildCompactionWiring, nativeCompactionAuthority, toCompactionMessages, type CompactionProvider } from './compaction.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
 import { installRuleControlRuntime, takeForcedTool } from './ruleControls.js';
 import { contextEntryStillAuthorized, assertContextBounds } from '../../context/attachment/entry.js';
@@ -88,11 +71,6 @@ import { prepareContextInjection } from './context/injection.js';
 import { sourceReaderFor } from '../data/access.js';
 import { installUsageRuntime, usageResetApproval } from './usage.js';
 import { captureSummaryRole } from '../provider/summary.js';
-
-interface ProviderRenewal {
-  readonly provider?: CompactionProvider;
-  readonly failure?: string;
-}
 
 export function createCliSessionRuntime(input: {
   readonly sessionManager: SessionManager;
@@ -117,130 +95,8 @@ export function createCliSessionRuntime(input: {
 }): ShellSessionRuntime {
   prepareGoalSession(input.runtimeContext, input.sessionManager);
   const isStdinTty = input.isStdinTty ?? (() => Boolean(process.stdin.isTTY));
-  /**
-   * The runner the current run is using, so the next run can retire it.
-   *
-   * Held here rather than on the runner because it is the factory that knows a
-   * new run has begun.
-   */
-  let previousCacheWarming: CacheWarmingRunner | undefined;
-  let releaseCacheListener: (() => void) | undefined;
-  let cacheWarmingSessionId: string | undefined;
-  input.runtimeContext.freshState = {
-    admission: () => sessionRuntime.getCurrentRunController() !== null ? 'Wait for the current provider turn before resetting local state.' : undefined,
-    clearCache: async () => {
-      const sessionId = input.runtimeContext.session.id;
-      const owner = previousCacheWarming;
-      if (!owner || cacheWarmingSessionId !== sessionId) return 'unchanged';
-      const result = await owner.reset();
-      if (input.runtimeContext.session.id !== sessionId || owner !== previousCacheWarming) return 'unknown';
-      previousCacheWarming = undefined; cacheWarmingSessionId = undefined;
-      releaseCacheListener?.(); releaseCacheListener = undefined;
-      return result;
-    },
-  };
-
-  /**
-   * The provider both compaction paths summarize with, or nothing when none is
-   * configured.
-   *
-   * Authentication may be a static key, an account token, or an endpoint signer
-   * that resolves credentials at dispatch. A signer needs no key in this snapshot.
-   *
-   * The renewal runs on the explicit paths because they are request paths of their
-   * own: `/compact` and the abandoned-turn summary do not pass through the
-   * invocation path where the turn's own token is renewed, so an expired account
-   * token would be carried into a summarization request and come back as a provider
-   * refusal. The turn's own path has already renewed by the time it gets here.
-   */
-  const compactionTarget = (resolved: ProviderCredentialResolution, catalog: readonly CatalogProvider[]) => {
-    if (resolved.blocked) return undefined;
-    const baseUrl = providerCredentialBaseUrl(catalog, resolved);
-    if (catalogProvider(catalog, resolved.provider, baseUrl).ambiguous) return undefined;
-    const credential = resolved.credential;
-    const accountAuth = accountAuthFor(resolved.provider, credential ?? {});
-    if (!credential?.apiKey && !accountAuth && !endpointShape(providerCredentialEndpoint(catalog, resolved, baseUrl)).signer) return undefined;
-    const model = resolved.model ?? credential?.model;
-    if (!baseUrl || !model) return undefined;
-    return {
-      provider: resolved.provider,
-      apiKey: credential?.apiKey,
-      accountAuth,
-      endpoint: providerCredentialEndpoint(catalog, resolved, baseUrl),
-      baseUrl,
-      model,
-    };
-  };
-
-  /** The provider the turn's own compaction summarizes with. */
-  const compactionProvider = (resolved: ProviderCredentialResolution, catalog: readonly CatalogProvider[]): CompactionProvider | undefined => {
-    const target = compactionTarget(resolved, catalog);
-    if (!target) return undefined;
-    // Resolved from the catalogue the way the turn resolves it, so a model
-    // that rejects a temperature does not get one in its summary request
-    // either. The compaction body carries no temperature of its own; the flag
-    // is what the protocols gate on.
-    const shape = resolveRequestShape(catalog, target.provider, target.model, undefined, target.baseUrl);
-    const identity = credentialIdentityFor(target.provider, { connectionId: resolved.credential?.connectionId,
-      accountAuth: target.accountAuth, apiKey: target.apiKey });
-    return {
-      headers: providerAuthorization({
-        apiKey: target.apiKey,
-        accountAuth: target.accountAuth,
-        ...(target.endpoint ? { endpoint: target.endpoint } : {}),
-      }).headers,
-      baseUrl: target.baseUrl,
-      model: target.model,
-      providerId: target.provider,
-      ...(target.endpoint ? { endpoint: target.endpoint } : {}),
-      ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
-      supportsTemperature: shape.supportsTemperature,
-      shape,
-    };
-  };
-
-  /** The same, with an expiring account token replaced before the request is built. */
-  const renewedProvider = async (resolved: ProviderCredentialResolution, config: RuntimeConfig, admission: Admission, catalog: readonly CatalogProvider[], reportFailure = true): Promise<ProviderRenewal> => {
-    assertAdmission(admission);
-    assertScopedModel(config, resolved);
-    const target = compactionTarget(resolved, catalog);
-    if (!target) return {};
-    const renewed = await renewStoredAccount({
-      workspaceRoot: input.runtimeContext.projectRoot,
-      sessionId: input.runtimeContext.session.id,
-      resolution: resolved,
-      admission,
-      fetchImpl: admittedFetch(providerFetchFromTimeouts(providerTimeoutsFrom(config)), admission),
-    });
-    if (renewed.failure) {
-      if (reportFailure) input.renderer.renderLine(renewed.failure);
-      return { failure: renewed.failure };
-    }
-    if (renewed.stored) reportCredentialPublication();
-    assertAdmission(admission);
-    const identity = credentialIdentityFor(target.provider, { connectionId: resolved.credential?.connectionId,
-      accountAuth: renewed.accountAuth ?? target.accountAuth, apiKey: target.apiKey });
-    const shape = resolveRequestShape(catalog, target.provider, target.model, undefined, target.baseUrl);
-    return { provider: {
-      headers: providerAuthorization({
-        apiKey: target.apiKey,
-        accountAuth: renewed.accountAuth ?? target.accountAuth,
-        ...(target.endpoint ? { endpoint: target.endpoint } : {}),
-      }).headers,
-      baseUrl: target.baseUrl,
-      model: target.model,
-      providerId: target.provider,
-      shape,
-      supportsTemperature: shape.supportsTemperature,
-      ...(target.endpoint ? { endpoint: target.endpoint } : {}),
-      ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
-    } };
-  };
-  const reportCredentialPublication = () => {
-    const result = refreshShellRuntimeConfig(input.runtimeContext);
-    if (result.status !== 'applied') input.renderer.renderLine('Credential saved; configuration was not applied. Reload status: ' + result.status + '.');
-    return result.status === 'applied';
-  };
+  const providers = createCompactionProviders(input);
+  const providerResources = createProviderResources(input, providers);
   let goalScheduler: GoalScheduler | undefined;
   const projectMemoryStore = createProjectMemoryLocalStore({
     ref: { mode: 'explicit-local', root: projectMemoryRootFor(input.runtimeContext.projectRoot) },
@@ -271,8 +127,8 @@ export function createCliSessionRuntime(input: {
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
       const admission = operation.admission;
       const main = config.sessionModelRoles?.summary
-        ? Promise.resolve({ provider: compactionProvider(resolved, catalog) } as ProviderRenewal)
-        : renewedProvider(resolved, config, admission, catalog, false);
+        ? Promise.resolve({ provider: providers.provider(resolved, catalog) } as ProviderRenewal)
+        : providers.renew(resolved, config, admission, catalog, false);
       return main.then(({ provider, failure }) => {
         if (!provider) {
           return {
@@ -283,7 +139,7 @@ export function createCliSessionRuntime(input: {
         assertAdmission(admission);
         signal.throwIfAborted();
         const wiring = buildCompactionWiring({ provider, runtimeConfig: config, admission, sessionId, catalog, workspaceRoot,
-          onCredentialPersisted: reportCredentialPublication,
+          onCredentialPersisted: providers.publication,
           requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager) });
         return compactSessionHistory({
           store: input.sessionManager,
@@ -320,8 +176,8 @@ export function createCliSessionRuntime(input: {
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
       const admission = operation.admission;
       const role = captureSummaryRole({ config, catalog, workspaceRoot: input.runtimeContext.projectRoot, admission,
-        onCredentialPersisted: reportCredentialPublication });
-      const selected = role ? role.resolve().then(provider => ({ provider })) : renewedProvider(resolved, config, admission, catalog);
+        onCredentialPersisted: providers.publication });
+      const selected = role ? role.resolve().then(provider => ({ provider })) : providers.renew(resolved, config, admission, catalog);
       return selected.then(({ provider }) => {
         assertAdmission(admission);
         if (!provider) return undefined;
@@ -358,79 +214,12 @@ export function createCliSessionRuntime(input: {
       const research = researchRunFor(input.runtimeContext, input.sessionManager, input.renderer,
         goalPolicyFor(input.runtimeContext, input.sessionManager));
       const requestPolicy = director ? director.policy(research.requestPolicy) : handoff ? handoff.policy(research.requestPolicy) : research.requestPolicy;
-      // A runner left over from an earlier run in this session is still holding
-      // an idle timer, and it would refresh the same prefix the new runner is
-      // about to refresh — the same money spent twice. Only the current run
-      // keeps a window warm.
-      releaseCacheListener?.();
-      previousCacheWarming?.stop();
-      previousCacheWarming = undefined;
-      const prepareProviderResources = (resolved: ProviderCredentialResolution) => {
-        const activeProvider = compactionProvider(resolved, catalog);
-        // The prices and the cache window belong to the model, so they are read
-        // from the catalogue entry this run is talking to.
-        const warmingTarget = compactionTarget(resolved, catalog);
-        const warmingModel = warmingTarget
-          ? catalogModel(catalog, warmingTarget.provider, warmingTarget.model, warmingTarget.baseUrl)
-          : undefined;
-        // Automatic compaction needs a provider to write the checkpoint; without
-        // one the turn runs with the history it has and overflow reports itself.
-        // Built per run rather than per session: the model can change between
-        // runs, and the prices and window the decision rests on are properties of
-        // the model.
-        // A refresh is a request nobody asked for, so it answers to the same switch
-        // as every other one. Gated here rather than inside the runner: the runner
-        // decides whether a refresh is worth its price, and whether this session
-        // may make unasked requests at all is a different question with a different
-        // answer.
-        const mayRefreshOnItsOwn = allowsSelfInitiatedRequests({
-          configuredOffline: config.offline === true,
-        });
-        const cacheWarming = createCacheWarmingRunner({
-          mode: mayRefreshOnItsOwn
-            ? resolveCacheWarmingMode(config.cacheWarming)
-            : "off",
-          ...(warmingModel ? { cost: warmingModel.cost, promptCache: warmingModel.promptCache } : {}),
-          // Replays the request that went out. Rebuilding it here would produce a
-          // different prefix, and a different prefix is a cache miss at the full
-          // write price — the opposite of what a refresh is for.
-          ...cacheRefreshFor({ sessionId, runtimeConfig: config, admission,
-            requestPolicy,
-            ...(warmingTarget ? { baseUrl: warmingTarget.baseUrl, rates: warmingModel?.cost } : {}),
-            ...(activeProvider ? { provider: activeProvider } : {}),
-            ...(credentialIdentityFor(resolved.provider, resolved.credential) ? { credential: credentialIdentityFor(resolved.provider, resolved.credential)! } : {}),
-            renewHeaders: async () => (await renewedProvider(resolved, config, admission, catalog)).provider?.headers,
-            isCurrent: () => {
-              return !admission() && input.runtimeContext.configuration.current === publication &&
-                input.runtimeContext.session.id === sessionId &&
-                input.sessionManager.getSession(sessionId)?.turns.at(-1)?.id === sourceEntryId;
-            },
-          }),
-          onDecision: (_decision, stopReason) => { if (stopReason) input.renderer.renderLine(`Cache refresh stopped: ${stopReason}`); },
-        });
-        previousCacheWarming = cacheWarming;
-        cacheWarmingSessionId = sessionId;
-        const stopBackground = () => cacheWarming.stop();
-        backgroundSignal.addEventListener('abort', stopBackground, { once: true });
-        releaseCacheListener = () => backgroundSignal.removeEventListener('abort', stopBackground);
-        if (backgroundSignal.aborted) cacheWarming.stop();
-
-        const compaction: CompactionSetup | undefined = activeProvider
-          ? {
-              ...buildCompactionWiring({ provider: activeProvider, runtimeConfig: config, admission, sessionId, catalog, requestPolicy,
-                workspaceRoot: input.runtimeContext.projectRoot, onCredentialPersisted: reportCredentialPublication }),
-              authority: nativeCompactionAuthority({ sessionId, workspaceRoot: input.runtimeContext.projectRoot,
-                admission, publication, configuration: input.runtimeContext.configuration, store: input.sessionManager }),
-              onCompact: () => {
-                markContextUnknown(sessionId);
-                // Counted at the point a compaction actually happened, which is
-                // low frequency, so recording it inline is not a hot path.
-                recordCount("compaction.runs", 1, {});
-              },
-            }
-          : undefined;
-        return handoff ? handoff.resources({ compaction, cacheWarming }) : { compaction, cacheWarming };
-      };
+      const getSourceEntryId = () => sourceEntryId;
+      const prepareProviderResources = providerResources.startRun({
+        config, catalog, publication, backgroundSignal, sessionId, admission, requestPolicy,
+        getSourceEntryId,
+        ...(handoff ? { resources: handoff.resources.bind(handoff) } : {}),
+      });
       const escalationPromptHandler = createCliApprovalEscalationBridge({
         renderer: input.renderer,
         readline: input.getReadline,
@@ -516,7 +305,7 @@ export function createCliSessionRuntime(input: {
         },
         prepareProviderResources,
         admission,
-        onCredentialPersisted: reportCredentialPublication,
+        onCredentialPersisted: providers.publication,
         providerCredentialResolution: resolvedCredential,
         agentMode: gitRequestMode(allTurns.at(-1)) ?? sessionRuntime.getAgentMode(),
         providerRuntimeBridge: input.providerRuntimeBridge,
@@ -530,10 +319,11 @@ export function createCliSessionRuntime(input: {
             }
           : {}),
       });
-      return { ...run, sourceEntryId: () => sourceEntryId,
+      return { ...run, sourceEntryId: getSourceEntryId,
         settled: planningSettlement(input.sessionManager, sessionId, promptEntryId, sessionRuntime, config, input.renderer) };
     },
   });
+  providerResources.installFreshState(sessionRuntime);
   installRuleControlRuntime({ runtimeContext: input.runtimeContext, sessionManager: input.sessionManager, mcpGateway: input.mcpGateway,
     busy: () => sessionRuntime.getCurrentRunController() !== null });
   goalScheduler = installGoalScheduler(input.runtimeContext, input.sessionManager, sessionRuntime, message => input.renderer.renderLine(message));

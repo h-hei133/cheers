@@ -42,7 +42,8 @@ it('previews without writes, excludes live credentials and imports inactive nati
   write('config.json', JSON.stringify({ provider: 'openai', providerCredentials: { openai: { apiKey: 'synthetic-legacy', accountAuth: auth } },
     providerConnections: [{ id: 'same-id', provider: 'openai', authType: 'account-auth', status: 'connected', apiKey: 'synthetic-key', accountAuth: auth, model: 'test-model' }],
     activeProviderConnectionId: 'same-id', maxTurns: 17, unknown: { token: 'do-not-import' } }));
-  write('models.json', JSON.stringify({ providers: { openai: { models: [{ id: 'test-model', contextWindow: 8192, apiKey: 'do-not-import' }], accountAuth: auth } } }));
+  write('models.json', JSON.stringify({ providers: { openai: { models: [{ id: 'test-model', contextWindow: 8192,
+    compat: { reasoningSummary: false }, apiKey: 'do-not-import' }], accountAuth: auth } } }));
   write('skills/test/SKILL.md', '# Test definition\n'); write('skills/test/run.sh', 'do not copy');
   write('trust.json', '{"grants":["all"]}'); write('mcp-auth.json', '{"token":"synthetic-mcp"}');
   const document = { kind: 'session-history' as const, version: 1 as const, sourceId: 'original', title: 'Conversation', leafId: 'reply',
@@ -64,6 +65,7 @@ it('previews without writes, excludes live credentials and imports inactive nati
   expect(config.providerConnections[0]).toMatchObject({ id: 'same-id', status: 'pending', model: 'test-model' });
   for (const secret of ['synthetic-access', 'synthetic-refresh', 'synthetic-key', 'synthetic-legacy', 'do-not-import']) expect(configText).not.toContain(secret);
   expect(fs.readFileSync(path.join(target.root, 'models.json'), 'utf8')).not.toContain('do-not-import');
+  expect(JSON.parse(fs.readFileSync(path.join(target.root, 'models.json'), 'utf8')).providers.openai.models[0].compat.reasoningSummary).toBe(false);
   expect(fs.existsSync(path.join(target.root, 'trust.json'))).toBe(false);
   expect(fs.existsSync(path.join(target.root, 'mcp-auth.json'))).toBe(false);
   expect(fs.existsSync(path.join(target.root, 'skills/test/run.sh'))).toBe(false);

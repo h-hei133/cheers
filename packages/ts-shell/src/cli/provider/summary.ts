@@ -38,8 +38,8 @@ export function captureSummaryRole(input: {
   if (!model || effortCapability(input.catalog, role.provider, role.model, role.thinkingEffort ?? null, resolution.baseUrl) === 'unsupported') {
     throw new Error('The summary role model or reasoning effort is unavailable.');
   }
-  const shape = resolveRequestShape(input.catalog, role.provider, role.model, role.thinkingEffort ?? undefined, resolution.baseUrl);
   const endpoint = providerCredentialEndpoint(input.catalog, selected, resolution.baseUrl);
+  const shape = resolveRequestShape(input.catalog, role.provider, role.model, role.thinkingEffort ?? undefined, resolution.baseUrl, endpoint);
   const maxOutputTokens = configuredOutputLimit(input.config, endpoint)
     ?? (endpointShape(endpoint).outputControl === 'provider' ? undefined : shape.maxOutputCeiling);
   const reserveTokens = resolveTokenBudget(input.config.modelTokenBudgets, role.provider, role.model, 'reserveTokens', input.config.reserveTokens, 0);

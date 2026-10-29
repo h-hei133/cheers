@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MainScreenPainter, type MainScreenDevice } from "./mainScreen.js";
-import { CURSOR_MARKER } from "./paint.js";
+import { CURSOR_MARKER, cursorTarget } from "./paint.js";
+import { StartupSurface } from "../../../cli/interactive/startup.js";
+import { ManualScheduler, RecordingTerminal } from "../../../test-utils/terminalDouble.js";
+import { InteractiveSurface } from "../surface/view.js";
+import { stripAnsi } from "../text/ansi.js";
 
 /**
  * Painting to the terminal's own screen.
@@ -20,12 +24,17 @@ class Screen {
   private row = 0;
   private column = 0;
   private started = false;
+  private mainScreen: { readonly rows: string[]; readonly row: number; readonly column: number } | undefined;
 
   constructor(
     private columns = 40,
     private readonly height = 10,
     private readonly sync = true,
-  ) {}
+    initialRow = 0,
+  ) {
+    this.rows = Array.from({ length: height }, () => "");
+    this.row = Math.max(0, Math.min(height - 1, initialRow));
+  }
 
   write(data: string): void {
     for (let index = 0; index < data.length; index++) {
@@ -34,10 +43,12 @@ class Screen {
       if (hyperlink) { index += hyperlink[0].length - 1; continue; }
       // Private modes are written `\x1b[?...` and must be matched too, or their
       // bytes leak into the rows the assertions read.
-      const escape = /^\x1b\[[?]?(\d*)([A-Za-z])/.exec(rest);
+      const escape = /^\x1b\[([?=>]?)([\d;:]*)([@-~])/.exec(rest);
       if (escape) {
-        const final = escape[2]!;
-        if (!rest.startsWith("\x1b[?")) this.applySequence(Number(escape[1] || 1), final);
+        const parameters = escape[2]!.split(";").map(value => Number(value || 0));
+        const final = escape[3]!;
+        if (escape[1] === "?" && parameters.includes(1049)) this.alternate(final === "h");
+        else if (escape[1] === "") this.applySequence(parameters, final);
         index += escape[0].length - 1;
         continue;
       }
@@ -71,13 +82,39 @@ class Screen {
     return this.rows.filter((line) => line.trim() === text).length;
   }
 
-  private applySequence(count: number, final: string): void {
+  screenLines(): readonly string[] { return this.rows.map(line => line.trimEnd()); }
+
+  private alternate(enabled: boolean): void {
+    if (enabled && !this.mainScreen) {
+      this.started = true;
+      this.mainScreen = { rows: this.rows, row: this.row, column: this.column };
+      this.rows = Array.from({ length: this.height }, () => "");
+      this.row = 0; this.column = 0;
+    } else if (!enabled && this.mainScreen) {
+      this.rows = this.mainScreen.rows; this.row = this.mainScreen.row; this.column = this.mainScreen.column;
+      this.mainScreen = undefined;
+    }
+  }
+
+  private applySequence(parameters: readonly number[], final: string): void {
+    const count = Math.max(1, parameters[0] ?? 1);
     if (final === "A") this.row = Math.max(0, this.row - count);
-    else if (final === "B") this.row += count;
+    else if (final === "B") this.row = Math.min(this.height - 1, this.row + count);
     else if (final === "C") this.column = Math.min(this.columns - 1, this.column + count);
-    else if (final === "K") this.rows[this.row] = "";
-    else if (final === "J") for (let r = this.row; r < this.height; r++) this.rows[r] = "";
-    else if (final === "h" || final === "l") this.started = true;
+    else if (final === "D") this.column = Math.max(0, this.column - count);
+    else if (final === "H" || final === "f") {
+      this.row = Math.min(this.height - 1, Math.max(1, parameters[0] ?? 1) - 1);
+      this.column = Math.min(this.columns - 1, Math.max(1, parameters[1] ?? 1) - 1);
+    } else if (final === "K") {
+      const mode = parameters[0] ?? 0, line = this.rows[this.row] ?? "";
+      this.rows[this.row] = mode === 2 ? "" : mode === 1 ? " ".repeat(this.column + 1) + line.slice(this.column + 1) : line.slice(0, this.column);
+    } else if (final === "J") {
+      if (parameters[0] === 2 || parameters[0] === 3) this.rows.fill("");
+      else {
+        this.rows[this.row] = (this.rows[this.row] ?? "").slice(0, this.column);
+        for (let row = this.row + 1; row < this.height; row++) this.rows[row] = "";
+      }
+    }
     this.ensureRow();
   }
 
@@ -95,7 +132,7 @@ class Screen {
     if (this.row >= this.height) {
       // Scrolling is what moves a row out of the screen and into the history.
       const leaving = this.rows.shift() ?? "";
-      this.scrollback.push(leaving);
+      if (!this.mainScreen) this.scrollback.push(leaving);
       this.row = this.height - 1;
       this.rows[this.height - 1] = "";
     }
@@ -131,6 +168,94 @@ class Screen {
 
   get cursorScreenColumn(): number { return this.column; }
 }
+
+describe("physical terminal coordinates", () => {
+  it("clamps CUD at the bottom without scrolling and lets LF scroll", () => {
+    const screen = new Screen(40, 6, true, 4);
+    screen.write("\x1b[99B");
+    expect(screen.cursorScreenRow).toBe(5);
+    expect(screen.scrollback).toEqual([]);
+    expect(screen.screenLines()).toHaveLength(6);
+    screen.write("last\r\n");
+    expect(screen.cursorScreenRow).toBe(5);
+    expect(screen.scrollback).toHaveLength(1);
+    expect(screen.screenLines()[4]).toBe("last");
+  });
+
+  it("restores the main screen and cursor after alternate-screen CUP and scrolling", () => {
+    const screen = new Screen(40, 6, true, 4);
+    screen.write("shell> ");
+    const main = screen.screenLines();
+    screen.write("\x1b[?1049h\x1b[6;3Hloading\r\n\x1b[2;4H");
+    expect(screen.cursorScreenRow).toBe(1);
+    expect(screen.cursorScreenColumn).toBe(3);
+    expect(screen.scrollback).toEqual([]);
+    screen.write("\x1b[?1049l");
+    expect(screen.screenLines()).toEqual(main);
+    expect(screen.cursorScreenRow).toBe(4);
+    expect(screen.cursorScreenColumn).toBe(7);
+  });
+});
+
+describe("startup cursor geometry", () => {
+  it.each([
+    { origin: "top", row: 0, alternateScreen: false },
+    { origin: "middle", row: 8, alternateScreen: false },
+    { origin: "bottom", row: 15, alternateScreen: false },
+    { origin: "top", row: 0, alternateScreen: true },
+    { origin: "middle", row: 8, alternateScreen: true },
+    { origin: "bottom", row: 15, alternateScreen: true },
+  ])("keeps the adopted draft cursor on its physical prompt from $origin with alternateScreen=$alternateScreen", ({ row, alternateScreen }) => {
+    const terminal = new RecordingTerminal(), scheduler = new ManualScheduler();
+    terminal.columns = 60; terminal.rows = 16;
+    const screen = new Screen(terminal.columns, terminal.rows, true, row);
+    screen.write("shell> ");
+    vi.spyOn(terminal, "write").mockImplementation((data, onWritten) => {
+      terminal.writes.push(data); screen.write(data); onWritten?.();
+    });
+    const startup = new StartupSurface(terminal, scheduler, vi.fn());
+    try {
+      terminal.input("retained-draft"); startup.input.flush(); scheduler.flush();
+      const draft = startup.state.editor.snapshot();
+      expect(draft).toMatchObject({ text: "retained-draft", cursor: "retained-draft".length });
+      startup.state.transcript.append({ kind: "notice", text: "welcome-history", finalized: true });
+      const view = new InteractiveSurface({
+        facts: () => ({ model: "fixture-model", provider: "fixture-provider" }), statusItems: () => ["model"],
+        activity: () => undefined, busy: () => false, queuedCount: () => 0, now: () => 0,
+        ambient: () => ({ openTodos: 0, peerSessions: 0 }), cancelArmed: () => false,
+        overlayFullScreen: () => false, overlayRows: () => [], selection: () => undefined,
+      }, startup.state);
+      // Production installs the final provider before transferring the startup
+      // engine; the alternate screen then restores the original physical row.
+      startup.tui.setFrameProvider(view);
+      startup.adopt(alternateScreen); startup.tui.renderNow(); scheduler.flush();
+      const frame = view.renderFrame(terminal.getDimensions(), alternateScreen ? "viewport" : "document");
+      const caret = cursorTarget(frame.rows, 0, terminal.rows);
+      expect(caret).not.toBeNull();
+      const prompt = stripAnsi(frame.rows[caret!.row]!).replace(CURSOR_MARKER, "").trimEnd();
+      const physicalRow = screen.screenLines().findIndex(line => line === prompt);
+      expect(physicalRow).toBeGreaterThanOrEqual(0);
+      expect(screen.cursorScreenRow).toBe(physicalRow);
+      expect(screen.cursorScreenColumn).toBe(caret!.column);
+      expect(startup.state.editor.snapshot()).toEqual(draft);
+      expect(screen.countOnScreen(prompt)).toBe(1);
+      expect(screen.allLines().filter(line => line.includes("retained-draft"))).toHaveLength(1);
+      expect(screen.countInScrollback(prompt)).toBe(0);
+      expect(screen.allLines().filter(line => line === "welcome-history")).toHaveLength(1);
+      expect(screen.allLines().join("\n")).not.toContain("Loading");
+      const scrollback = [...screen.scrollback], lines = screen.allLines();
+      for (let render = 0; render < 3; render++) {
+        startup.tui.requestRender(); scheduler.flush();
+        expect(screen.cursorScreenRow).toBe(physicalRow);
+        expect(screen.cursorScreenColumn).toBe(caret!.column);
+        expect(screen.scrollback).toEqual(scrollback);
+        expect(screen.allLines()).toEqual(lines);
+        expect(screen.countOnScreen(prompt)).toBe(1);
+        expect(startup.state.editor.snapshot()).toEqual(draft);
+      }
+    } finally { startup.input.dispose(); startup.tui.stop(); startup.dispose(); }
+  });
+});
 
 describe("MainScreenPainter", () => {
   it("keeps the caret account through scrolling, appends, and external output", () => {

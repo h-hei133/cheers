@@ -307,14 +307,15 @@ export function createStepFunction(request: StepRequest): StepFunction {
       // Resolved per attempt rather than once, because the shape depends on the
       // level, and a refused `reasoning_effort` is answered by rebuilding the
       // request without it.
+      const endpoint = endpointFor(request);
       const shape = resolveRequestShape(
         request.catalog ?? [],
         request.provider.provider ?? "",
         request.provider.model,
         effortAccepted ? effort : undefined,
         catalogAddress,
+        endpoint,
       );
-      const endpoint = endpointFor(request);
       let protocol;
       try { protocol = endpointShape(endpoint); }
       catch (error) { return stamp(errorStep(error instanceof Error ? error.message : String(error))); }
@@ -415,6 +416,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             : {}),
           systemRole: shape.systemRole,
           reasoningEffort: shape.reasoningEffort,
+          reasoningSummary: shape.reasoningSummary,
           maxTokensField: shape.maxTokensField,
           assistantAfterToolResult: shape.assistantAfterToolResult,
           serviceTier: request.provider.serviceTier,

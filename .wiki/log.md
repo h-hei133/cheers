@@ -10078,3 +10078,19 @@ SessionListing将token和有界同version size cache转交Next，旧subscription
 恢复六类反转后120项实际通过：pointer39/blocks14/container18/view47/filtered Host2，331项未选不计。五静态门、完整声明图单一脚本、module facade0与AST≤20通过；build `b1cde057de0ae24a9dcdc9c918019424e30176c6fb30acdf8b9166d6f14eaa22`，inputs `4a923c96ab1bf5aad5b4699585b80360449e0e42a26f221a8e42e9e626799e8c`新鲜度一致；repo bundle judge proven/0open/0failed/0gap。无provider/auth/default/package行为变化，无PTY/exe/full suite/20k终端；默认effort/endpoint、27 startup与28职责仍待，原47项未重验、ADD active。保留CLAUDE.md，scratch清理后交付。
 
 延迟确认`7515c38347026935b21f4a1accba8f6811392d33`的[CI40897519775](https://github.com/h-hei133/cheers/actions/runs/40897519775)与[Watch40897519704](https://github.com/h-hei133/cheers/actions/runs/40897519704)均completed/success；以上不替代本批commit的CI。
+
+## [2026-10-30] fix | 草稿换行、独立摘要准入与Session设置分区
+
+当前main继续[addition20.9–20.11](features/phase-20-addition.md#209-草稿换行契约与启动物理坐标)。CRLF/lone CR在editor setter归一为LF，replacement映射同一caret prefix；保留tabs/history/undo。实际StartupSurface→InteractiveSurface六组顶部/中部/底部×regular/fullscreen保持prompt/caret及重复帧，无新增空行/scrollback。加载期Enter保持可删除草稿换行；用户原启动现象仍未解释，未改painter/engine或新增DSR/延迟。
+
+请求保留null/auto provider-decides，公开summary与effort独立。有官方证据的内置o4-mini在精确OpenAI官方/v1、捕获模型、未显式覆盖协议时采用Responses；已声明summary仅沿真实owner/地址/协议准入。account issuer权威、relay精确alias、未知/legacy原协议及显式effort兼容保留。匿名relay不能借unique-model fallback获得新summary。turn/simple/preview/summary/compaction/btw沿统一shape；profile import保留compat字段，不包含凭据。原factory凭据/renewal/publication与cache资源lifetime归cli/provider/compaction、resources，保留admission/publication/sourceEntry及handoff调整，原factory AST19（保守含匿名默认fallback为20），新owner5/12，protocol2。
+
+Settings保留全部真实文件字段，模型/effort会话跳转归Session分类，返回原user/project scope、焦点与notice，旧SettingsHost类型路径薄re-export。catalog成功load才授offered ID，失败/空焦点无动作。typed editor移至settings/editor；review发现CR字符串列表打开后可被newline投影改变，改在真实投影后判断plaintext无损性，否则用既有JSON fallback。实际InputForm未编辑Enter→Apply两项保留精确原列表。
+
+主代理每次显式一个package-local文件，768MiB/threads=false &&串行。本批去重644项：editor/startup/mainScreen115，provider283，settings owner/runtime240，Host Session4与thinking控制2。provider283为原235加匿名shape/turn2，再加提取消费者renewal12/summary17/cache6/handoff11；compaction20重验已计原235。最后settings45、protocol6在反转字节恢复后通过；setting undefined detail构建遗漏补分支后45重验。原20.9 setter6/caret2、20.10 route1/summary2/shape3/preview4/relay1、20.11 Session/offered各1反转均已命中恢复；最终匿名1与CR列表1反转有效。初次summary筛选零断言、初次manifest路径ENOENT分别是诊断选择/路径错误，纠正后的有效结果才计证据。无全套/PTY/exe/20k真实终端或live provider请求。
+
+五静态门、完整声明图单一脚本用例、module facade0、所有已改product owner AST≤20与diff通过，118旧docs advisory保留。曾发现catalog→protocol type back-edge，完整声明图确实失败；protocol改无import叶结构后通过。TS build `3c939881919f32b85a8da3824656d83d475a200d6e02dfd7522e0f500639dcb8`，inputs `e7698f8cfe402954cddbcc332ef43ccf3e756fa2ebf225c60252930fe3c3d36d`，460 compilerInputs/3545输入重新计算一致。repo bundle judge proven/0open/0failed/0gap只证collector结构。三个gpt-6.1-sol代理仅阅读/编辑，未执行验证；交叉review不作独立终局验收。HANDOFF追加newline/caret、typed list projection与anonymous protocol owner陷阱。原47项矩阵未重跑，真实provider/账户、用户启动现场与非Linux证据仍缺，ADD active。
+
+延迟读回上批`288e9fc5f47bfd86e179c4f0a0d0db568324a170`的[CI40903192541](https://github.com/h-hei133/cheers/actions/runs/40903192541)与[Watch40903192491](https://github.com/h-hei133/cheers/actions/runs/40903192491)均completed/success，headSha精确一致。本批commit/push/CI随后分别读回，前一SHA绿色不替代本批。保留原CLAUDE.md，scratch清理后提交。
+
+最终staged检查新protocol末尾多余空行，删除后重建：artifact `0277cf87c40560c30d96283908aa483419cb54e1da8f37f4aa96835ebfe5f646`，inputs `bc1adb529ef0e1554febbb9f2309b07dbf505a43b787fe27ada3988c353e5223`，460 compilerInputs/3545文件新鲜度一致。此前3c939为前一构建，行为不变；未因空白变化重跑测试。scratch已清理，最终staged diff通过。

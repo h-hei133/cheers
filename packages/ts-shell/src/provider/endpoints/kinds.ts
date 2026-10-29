@@ -128,7 +128,7 @@ export interface EndpointShape {
 
 /** A request with no tools, which is what a summarizer or a side question sends. */
 export interface SimpleRequest extends Partial<Pick<TurnRequest,
-  'systemRole' | 'maxTokensField' | 'reasoningEffort' | 'thinkingLevelName' | 'thinkingBudgetTokens' | 'allowEmptySignature'>> {
+  'systemRole' | 'maxTokensField' | 'reasoningEffort' | 'reasoningSummary' | 'thinkingLevelName' | 'thinkingBudgetTokens' | 'allowEmptySignature'>> {
   readonly model: string;
   readonly provider?: string;
   readonly replayBinding?: string;
@@ -199,6 +199,8 @@ export interface TurnRequest {
   readonly systemRole: "system" | "developer";
   /** Whether the level may be sent at all. */
   readonly reasoningEffort: boolean;
+  /** Known summary support may request display without selecting an effort. */
+  readonly reasoningSummary?: boolean;
   /** The field carrying the output ceiling. */
   readonly maxTokensField: "max_tokens" | "max_completion_tokens";
   /** Whether a synthetic assistant turn bridges tool results and a user turn. */

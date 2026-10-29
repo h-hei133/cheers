@@ -21,7 +21,8 @@
  */
 
 import type { CatalogModel, CatalogProvider, ThinkingLevel } from "./catalog.js";
-import { THINKING_LEVELS, catalogBaseUrl, catalogModel } from "./catalog.js";
+import { THINKING_LEVELS, catalogBaseUrl, catalogModel, catalogProvider, providerEndpoint } from "./catalog.js";
+import { summaryProtocol } from './protocol.js';
 
 /** What a request needs to know, with every choice already decided. */
 export interface ResolvedRequestShape {
@@ -39,6 +40,8 @@ export interface ResolvedRequestShape {
   readonly maxOutputCeiling?: number;
   /** Whether `reasoning_effort` may be sent at all. */
   readonly reasoningEffort: boolean;
+  /** Declared visible-summary support, independent of a selected reasoning effort. */
+  readonly reasoningSummary?: boolean;
   /**
    * Whether the model accepts tool declarations and prior tool-call history.
    *
@@ -137,6 +140,7 @@ export function resolveRequestShape(
   model: string | undefined,
   level: ThinkingLevel | undefined,
   baseUrl?: string,
+  endpoint?: string,
 ): ResolvedRequestShape {
   const entry = catalogModel(catalog, provider, model, catalogBaseUrl(catalog, provider, baseUrl));
   // A model nobody described still gets its level sent under its own name. That
@@ -156,12 +160,17 @@ export function resolveRequestShape(
   // so. Defaulting the other way would silently disable a setting that works for
   // every model the snapshot does not describe — which is all of them.
   const reasoningEffort = entry.reasoning !== false && compat.reasoningEffort !== false;
+  const wire = endpoint ?? providerEndpoint(catalog, provider, baseUrl, model);
+  const owner = catalogProvider(catalog, provider, baseUrl).entry;
+  const reasoningSummary = entry.reasoning === false || compat.reasoningSummary === false ? false
+    : compat.reasoningSummary === true && summaryProtocol(owner, catalogBaseUrl(catalog, provider, baseUrl), wire) ? true : undefined;
 
   return {
     systemRole: compat.systemRole ?? DEFAULT_REQUEST_SHAPE.systemRole,
     maxTokensField: compat.maxTokensField ?? DEFAULT_REQUEST_SHAPE.maxTokensField,
     ...(entry.maxTokens !== undefined ? { maxOutputCeiling: entry.maxTokens } : {}),
     reasoningEffort,
+    ...(reasoningSummary !== undefined ? { reasoningSummary } : {}),
     toolCalling: entry.toolCalling !== false,
     assistantAfterToolResult: compat.assistantAfterToolResult === true,
     allowEmptySignature: compat.allowEmptySignature === true,

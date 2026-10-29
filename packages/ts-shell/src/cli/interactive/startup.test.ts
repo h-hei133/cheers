@@ -26,6 +26,24 @@ it('paints and edits one draft without dispatching Enter before readiness', asyn
   } finally { surface.tui.stop(); surface.dispose(); }
 });
 
+it.each([1, 4])('preserves %i loading Enter presses as editable draft lines through regular adoption', async count => {
+  const terminal = new RecordingTerminal(), scheduler = new ManualScheduler(), exit = vi.fn();
+  const surface = new StartupSurface(terminal, scheduler, exit);
+  try {
+    terminal.input('\r'.repeat(count)); scheduler.flush();
+    await vi.waitFor(() => expect(surface.state.editor.getText()).toBe('\n'.repeat(count)));
+    const draft = surface.state.editor.snapshot();
+    expect(draft.cursor).toBe(count);
+    expect(surface.state.editor.render(40)).toHaveLength(count + 1);
+    expect(exit).not.toHaveBeenCalled();
+    surface.adopt(false);
+    expect(surface.state.editor.snapshot()).toEqual(draft);
+    for (let index = 0; index < count; index++) surface.state.editor.backspace();
+    expect(surface.state.editor.snapshot()).toMatchObject({ text: '', cursor: 0 });
+    expect(surface.state.editor.render(40)).toHaveLength(1);
+  } finally { surface.tui.stop(); surface.dispose(); }
+});
+
 it('refuses oversized paste as a whole and restores the terminal on startup cancellation', () => {
   const terminal = new RecordingTerminal(), scheduler = new ManualScheduler(), exit = vi.fn();
   const surface = new StartupSurface(terminal, scheduler, exit);

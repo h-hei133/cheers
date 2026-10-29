@@ -23,6 +23,38 @@ describe("text entry", () => {
     expect(shown(editor, 20)).toEqual(["a  b|"]);
   });
 
+  it.each(["setText", "setDraftText"] as const)("normalizes loaded newlines through %s while preserving tabs, caret and undo", method => {
+    const editor = new Editor();
+    editor.insert("before\tdraft"); editor.move("left");
+    const previous = editor.snapshot();
+    const source = "a\tb\r\nc\rd\r\n", normalized = "a\tb\nc\nd\n";
+    editor[method](source);
+    expect(editor.snapshot()).toMatchObject({ text: normalized, cursor: normalized.length });
+    expect(editor.snapshot().revision).toBeGreaterThan(previous.revision);
+    expect(shown(editor, 20)).toEqual(["a  b", "c", "d", "|"]);
+    const inserted = new Editor(); inserted.insert(source);
+    expect(editor.getText()).toBe(inserted.getText());
+    expect(editor.render(20)).toEqual(inserted.render(20));
+    expect(editor.undo()).toBe(true);
+    expect(editor.snapshot()).toMatchObject({ text: previous.text, cursor: previous.cursor });
+    expect(editor.redo()).toBe(true);
+    expect(editor.snapshot()).toMatchObject({ text: normalized, cursor: normalized.length });
+  });
+
+  it.each([
+    { cursorOffset: undefined, cursor: 6, rows: ["<a", "b", "c|>"] },
+    { cursorOffset: 3, cursor: 3, rows: ["<a", "|b", "c>"] },
+    { cursorOffset: 5, cursor: 5, rows: ["<a", "b", "|c>"] },
+  ])("maps replacement caret offset $cursorOffset through CRLF and lone CR", ({ cursorOffset, cursor, rows }) => {
+    const editor = new Editor(); editor.setText("<>"); editor.move("left");
+    const previous = editor.snapshot();
+    expect(editor.replace({ snapshot: previous, from: 1, to: 1, text: "a\r\nb\rc", cursorOffset })).toBe(true);
+    expect(editor.snapshot()).toMatchObject({ text: "<a\nb\nc>", cursor });
+    expect(shown(editor, 20)).toEqual(rows);
+    expect(editor.undo()).toBe(true);
+    expect(editor.snapshot()).toMatchObject({ text: previous.text, cursor: previous.cursor });
+  });
+
   it("moves and deletes across one tab source character and restores it on undo", () => {
     const editor = new Editor();
     editor.insert("a\tb");
@@ -600,6 +632,27 @@ describe("cutting back through a multi-line draft", () => {
 });
 
 describe("prompt recall", () => {
+  it("normalizes recalled entries while preserving browsing and the adopted draft", () => {
+    const editor = new Editor(), history = "first\r\nsecond\rtail";
+    editor.loadHistory([history]); editor.setDraftText("draft\r\n\tline");
+    expect(editor.recall(-1)).toBe(true);
+    expect(editor.browsingHistory).toBe(true);
+    expect(editor.snapshot()).toMatchObject({ text: "first\nsecond\ntail", cursor: "first\nsecond\ntail".length });
+    expect(shown(editor, 20)).toEqual(["first", "second", "tail|"]);
+    expect(editor.getHistory()).toEqual([history]);
+    expect(editor.recall(1)).toBe(true);
+    expect(editor.browsingHistory).toBe(false);
+    expect(editor.snapshot()).toMatchObject({ text: "draft\n\tline", cursor: "draft\n\tline".length });
+    expect(editor.recall(-1)).toBe(true);
+    editor.setDraftText("edited\r\n\tline\rtail");
+    expect(editor.browsingHistory).toBe(false);
+    expect(editor.recall(1)).toBe(false);
+    expect(editor.recall(-1)).toBe(true);
+    expect(editor.recall(1)).toBe(true);
+    expect(editor.snapshot()).toMatchObject({ text: "edited\n\tline\ntail", cursor: "edited\n\tline\ntail".length });
+    expect(editor.getHistory()).toEqual([history]);
+  });
+
   it("walks back through history and restores the stashed draft", () => {
     const editor = new Editor();
     editor.pushHistory("first");
