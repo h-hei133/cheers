@@ -1,0 +1,658 @@
+{
+  "mode": "regular",
+  "buildId": "bca358900c8273b0046b8f6826687157c1f0e1a6b8442a4d69c7a4c7af5c5260",
+  "inputsDigest": "278a28252e3c77cc04d3a081ae0fccea09cd935aef09cc3557416386fde231bc",
+  "fixtures": 48,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "checks": {
+    "basePagesCoverAllOnceExceptCurrent": true,
+    "noNextAfterLastPage": true,
+    "searchQueryCarriedToNext": true,
+    "searchPageClearReturnsNewest": true
+  },
+  "searchMs": [
+    {
+      "queryCharacters": 15,
+      "elapsed": 356
+    }
+  ],
+  "pages": [
+    {
+      "label": "base-first",
+      "fixtureIndexes": [
+        0,
+        47,
+        46,
+        45,
+        44,
+        43,
+        42,
+        41,
+        40,
+        39,
+        38,
+        37,
+        36,
+        35,
+        34,
+        33,
+        32,
+        31,
+        30,
+        29,
+        28,
+        27,
+        26,
+        25,
+        24,
+        23,
+        22,
+        21,
+        20,
+        19,
+        18,
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        10,
+        9
+      ],
+      "paintedFixtureIndexes": [
+        0,
+        47,
+        46,
+        45,
+        44,
+        43,
+        42,
+        41,
+        40,
+        39,
+        38,
+        37,
+        36,
+        35,
+        34,
+        33,
+        32,
+        31,
+        30,
+        29,
+        28,
+        27,
+        26,
+        25,
+        24,
+        23,
+        22,
+        21,
+        20,
+        19,
+        18,
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        10,
+        9
+      ],
+      "hasMore": true,
+      "currentOccurrences": 1
+    },
+    {
+      "label": "base-second",
+      "fixtureIndexes": [
+        8,
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1,
+        0
+      ],
+      "paintedFixtureIndexes": [
+        8,
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1,
+        0
+      ],
+      "hasMore": false,
+      "currentOccurrences": 1
+    },
+    {
+      "label": "search-first",
+      "fixtureIndexes": [
+        0,
+        47,
+        46,
+        45,
+        44,
+        43,
+        42,
+        41,
+        40,
+        39,
+        38,
+        37,
+        36,
+        35,
+        34,
+        33,
+        32,
+        31,
+        30,
+        29,
+        28,
+        27,
+        26,
+        25,
+        24,
+        23,
+        22,
+        21,
+        20,
+        19,
+        18,
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        10,
+        9
+      ],
+      "paintedFixtureIndexes": [
+        0,
+        47,
+        46,
+        45,
+        44,
+        43,
+        42,
+        41,
+        40,
+        39,
+        38,
+        37,
+        36,
+        35,
+        34,
+        33,
+        32,
+        31,
+        30,
+        29,
+        28,
+        27,
+        26,
+        25,
+        24,
+        23,
+        22,
+        21,
+        20,
+        19,
+        18,
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        10,
+        9
+      ],
+      "hasMore": true,
+      "currentOccurrences": 1
+    },
+    {
+      "label": "search-second",
+      "fixtureIndexes": [
+        8,
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1,
+        0
+      ],
+      "paintedFixtureIndexes": [
+        8,
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1,
+        0
+      ],
+      "hasMore": false,
+      "currentOccurrences": 1
+    },
+    {
+      "label": "cleared-search-page",
+      "fixtureIndexes": [
+        0,
+        47,
+        46,
+        45,
+        44,
+        43,
+        42,
+        41,
+        40,
+        39,
+        38,
+        37,
+        36,
+        35,
+        34,
+        33,
+        32,
+        31,
+        30,
+        29,
+        28,
+        27,
+        26,
+        25,
+        24,
+        23,
+        22,
+        21,
+        20,
+        19,
+        18,
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        10,
+        9
+      ],
+      "paintedFixtureIndexes": [
+        0,
+        47,
+        46,
+        45,
+        44,
+        43,
+        42,
+        41,
+        40,
+        39,
+        38,
+        37,
+        36,
+        35,
+        34,
+        33,
+        32,
+        31,
+        30,
+        29,
+        28,
+        27,
+        26,
+        25,
+        24,
+        23,
+        22,
+        21,
+        20,
+        19,
+        18,
+        17,
+        16,
+        15,
+        14,
+        13,
+        12,
+        11,
+        10,
+        9
+      ],
+      "hasMore": true,
+      "currentOccurrences": 1
+    }
+  ],
+  "pageMs": [
+    {
+      "queryCharacters": 0,
+      "elapsed": 153
+    },
+    {
+      "queryCharacters": 15,
+      "elapsed": 278
+    }
+  ],
+  "openMs": 1146,
+  "failure": "timeout-next",
+  "observation": {
+    "opens": 4,
+    "frames": [
+      {
+        "opens": 2,
+        "title": "Resume session",
+        "filter": "resume-fixture-",
+        "current": "action:more"
+      },
+      {
+        "opens": 3,
+        "title": "Resume session",
+        "filter": "resume-fixture-",
+        "current": "sess_948f3c2e41abe117_1793314374360"
+      },
+      {
+        "opens": 3,
+        "title": "Resume session",
+        "filter": "resume-fixture-",
+        "current": "sess_948f3c2e41abe117_1793314374360"
+      },
+      {
+        "opens": 3,
+        "title": "Resume session",
+        "filter": "",
+        "current": "sess_948f3c2e41abe117_1793314374360"
+      },
+      {
+        "opens": 3,
+        "title": "Resume session",
+        "filter": "",
+        "current": "sess_948f3c2e41abe117_1793314374360"
+      },
+      {
+        "opens": 3,
+        "title": "Resume session",
+        "filter": "",
+        "current": "action:more"
+      },
+      {
+        "opens": 4,
+        "title": "Resume session",
+        "filter": "resume-fixture-",
+        "current": "sess_948f3c2e41abe117_1793314374360"
+      },
+      {
+        "opens": 4,
+        "title": "Resume session",
+        "filter": "resume-fixture-",
+        "current": "sess_948f3c2e41abe117_1793314374360"
+      },
+      {
+        "opens": 4,
+        "title": "Resume session",
+        "filter": "resume-fixture-",
+        "current": "sess_948f3c2e41abe117_1793314374360"
+      },
+      {
+        "opens": 4,
+        "title": "Resume session",
+        "filter": "resume-fixture-",
+        "current": "sess_948f3c2e41abe117_1793314374360"
+      },
+      {
+        "opens": 4,
+        "title": "Resume session",
+        "filter": "resume-fixture-",
+        "current": "sess_948f3c2e41abe117_1793314374360"
+      },
+      {
+        "opens": 4,
+        "title": "Resume session",
+        "filter": "resume-fixture-",
+        "current": "sess_948f3c2e41abe117_1793314374360"
+      }
+    ],
+    "requests": 0,
+    "snapshot": {
+      "title": "Resume session",
+      "filter": "resume-fixture-",
+      "current": "sess_948f3c2e41abe117_1793314374360",
+      "loading": false,
+      "searching": false,
+      "failed": false,
+      "visible": [
+        {
+          "id": "sess_948f3c2e41abe117_1793314374360",
+          "label": "resume-fixture-00"
+        },
+        {
+          "id": "sess_735273a656f3a089_1793314376584",
+          "label": "resume-fixture-47"
+        },
+        {
+          "id": "sess_881b73e230745340_1793314376539",
+          "label": "resume-fixture-46"
+        },
+        {
+          "id": "sess_c0c78ad9999a73f7_1793314376493",
+          "label": "resume-fixture-45"
+        },
+        {
+          "id": "sess_9d048be56fa7b76e_1793314376448",
+          "label": "resume-fixture-44"
+        },
+        {
+          "id": "sess_83ca82720817187a_1793314376403",
+          "label": "resume-fixture-43"
+        },
+        {
+          "id": "sess_0ad67ae161aa4f7d_1793314376358",
+          "label": "resume-fixture-42"
+        },
+        {
+          "id": "sess_b23c275587d0ae76_1793314376312",
+          "label": "resume-fixture-41"
+        },
+        {
+          "id": "sess_4dfabdbee07a92b7_1793314376265",
+          "label": "resume-fixture-40"
+        },
+        {
+          "id": "sess_1d8d97aa2bff66fd_1793314376218",
+          "label": "resume-fixture-39"
+        },
+        {
+          "id": "sess_4a996cac4c829a11_1793314376171",
+          "label": "resume-fixture-38"
+        },
+        {
+          "id": "sess_198389fc2f661e22_1793314376126",
+          "label": "resume-fixture-37"
+        },
+        {
+          "id": "sess_430d614c872aaba2_1793314376079",
+          "label": "resume-fixture-36"
+        },
+        {
+          "id": "sess_9068b727255288c3_1793314376033",
+          "label": "resume-fixture-35"
+        },
+        {
+          "id": "sess_9db2fb5acd15fa6b_1793314375986",
+          "label": "resume-fixture-34"
+        },
+        {
+          "id": "sess_26b9c5841882aec2_1793314375941",
+          "label": "resume-fixture-33"
+        },
+        {
+          "id": "sess_ecdd09cd860c3941_1793314375897",
+          "label": "resume-fixture-32"
+        },
+        {
+          "id": "sess_66f8d51ec9f6413c_1793314375851",
+          "label": "resume-fixture-31"
+        },
+        {
+          "id": "sess_332209070242b0ae_1793314375805",
+          "label": "resume-fixture-30"
+        },
+        {
+          "id": "sess_43896d0aa104af96_1793314375757",
+          "label": "resume-fixture-29"
+        },
+        {
+          "id": "sess_3d97c0eb0758b0d6_1793314375710",
+          "label": "resume-fixture-28"
+        },
+        {
+          "id": "sess_2f014ced81af499b_1793314375663",
+          "label": "resume-fixture-27"
+        },
+        {
+          "id": "sess_9dbddb65afc2fcbe_1793314375619",
+          "label": "resume-fixture-26"
+        },
+        {
+          "id": "sess_dc4227bee084ddda_1793314375574",
+          "label": "resume-fixture-25"
+        },
+        {
+          "id": "sess_b43d87aa940edfd5_1793314375523",
+          "label": "resume-fixture-24"
+        },
+        {
+          "id": "sess_6266c983f8fcbab0_1793314375475",
+          "label": "resume-fixture-23"
+        },
+        {
+          "id": "sess_c6efb325d0cb9fe8_1793314375430",
+          "label": "resume-fixture-22"
+        },
+        {
+          "id": "sess_9f7c16cf2fa67db7_1793314375381",
+          "label": "resume-fixture-21"
+        },
+        {
+          "id": "sess_dbaa2435e9a0dcb9_1793314375335",
+          "label": "resume-fixture-20"
+        },
+        {
+          "id": "sess_a1ae021063c9a3ee_1793314375290",
+          "label": "resume-fixture-19"
+        },
+        {
+          "id": "sess_340128ae6ffde153_1793314375245",
+          "label": "resume-fixture-18"
+        },
+        {
+          "id": "sess_7c4a85fdd9db8069_1793314375201",
+          "label": "resume-fixture-17"
+        },
+        {
+          "id": "sess_723804c9f4b12a10_1793314375157",
+          "label": "resume-fixture-16"
+        },
+        {
+          "id": "sess_0d33e1e7b306dcb0_1793314375109",
+          "label": "resume-fixture-15"
+        },
+        {
+          "id": "sess_0b69f2eaa309d83b_1793314375056",
+          "label": "resume-fixture-14"
+        },
+        {
+          "id": "sess_3e8decbeda7f195e_1793314375009",
+          "label": "resume-fixture-13"
+        },
+        {
+          "id": "sess_9628aeda52b6cb29_1793314374962",
+          "label": "resume-fixture-12"
+        },
+        {
+          "id": "sess_0683aa907957f2ba_1793314374915",
+          "label": "resume-fixture-11"
+        },
+        {
+          "id": "sess_1d15f93a205e9d7a_1793314374869",
+          "label": "resume-fixture-10"
+        },
+        {
+          "id": "sess_1ce4426534d27adf_1793314374822",
+          "label": "resume-fixture-09"
+        },
+        {
+          "id": "action:more",
+          "label": "Next session page"
+        }
+      ],
+      "painted": [
+        "sess_948f3c2e41abe117_1793314374360",
+        "sess_735273a656f3a089_1793314376584",
+        "sess_881b73e230745340_1793314376539",
+        "sess_c0c78ad9999a73f7_1793314376493",
+        "sess_9d048be56fa7b76e_1793314376448",
+        "sess_83ca82720817187a_1793314376403",
+        "sess_0ad67ae161aa4f7d_1793314376358",
+        "sess_b23c275587d0ae76_1793314376312",
+        "sess_4dfabdbee07a92b7_1793314376265",
+        "sess_1d8d97aa2bff66fd_1793314376218",
+        "sess_4a996cac4c829a11_1793314376171",
+        "sess_198389fc2f661e22_1793314376126",
+        "sess_430d614c872aaba2_1793314376079",
+        "sess_9068b727255288c3_1793314376033",
+        "sess_9db2fb5acd15fa6b_1793314375986",
+        "sess_26b9c5841882aec2_1793314375941",
+        "sess_ecdd09cd860c3941_1793314375897",
+        "sess_66f8d51ec9f6413c_1793314375851",
+        "sess_332209070242b0ae_1793314375805",
+        "sess_43896d0aa104af96_1793314375757",
+        "sess_3d97c0eb0758b0d6_1793314375710",
+        "sess_2f014ced81af499b_1793314375663",
+        "sess_9dbddb65afc2fcbe_1793314375619",
+        "sess_dc4227bee084ddda_1793314375574",
+        "sess_b43d87aa940edfd5_1793314375523",
+        "sess_6266c983f8fcbab0_1793314375475",
+        "sess_c6efb325d0cb9fe8_1793314375430",
+        "sess_9f7c16cf2fa67db7_1793314375381",
+        "sess_dbaa2435e9a0dcb9_1793314375335",
+        "sess_a1ae021063c9a3ee_1793314375290",
+        "sess_340128ae6ffde153_1793314375245",
+        "sess_7c4a85fdd9db8069_1793314375201",
+        "sess_723804c9f4b12a10_1793314375157",
+        "sess_0d33e1e7b306dcb0_1793314375109",
+        "sess_0b69f2eaa309d83b_1793314375056",
+        "sess_3e8decbeda7f195e_1793314375009",
+        "sess_9628aeda52b6cb29_1793314374962",
+        "sess_0683aa907957f2ba_1793314374915",
+        "sess_1d15f93a205e9d7a_1793314374869",
+        "sess_1ce4426534d27adf_1793314374822",
+        "action:more"
+      ],
+      "rows": 46
+    }
+  },
+  "outputBytes": 48831,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true,
+  "peakRssKiB": 295288,
+  "elapsedSeconds": 19.77
+}

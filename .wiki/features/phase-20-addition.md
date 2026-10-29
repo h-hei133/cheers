@@ -3176,7 +3176,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 26 | 四条明确机制及MCP未开始调用的关闭拒绝已修；本地验证 | 缺真实用户退出现场；MCP预算到期不能证明清理完成 |
 | 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
 | 28 | 会话入口与配置字段分类隔离已实施；本地聚焦验证 | 缺真实用户终端与整体面板现场验收 |
-| 29 | 同次浏览索引复用已实现；聚焦与真实目录只读性能验证 | 缺真实终端按键/渲染与非Linux证据；ambient扫描本机约1ms，未确认是本次主因 |
+| 29 | 同次浏览索引复用与真实目录只读性能已验证；20.38/20.39补48小会话的实际CLI搜索/选择/分页，并修清空查询后重建回带旧查询 | 缺用户大目录终端性能与非Linux证据；小型PTY时间包含输入/去抖/观察开销，不能代替生产性能 |
 | 30 | 空闲fresh、信号关闭及真实恢复保护已实现；本地验证 | 缺真实用户signal/终端现场与非Linux证据；SIGKILL不执行清理钩子 |
 | 19.8 | 分桶恢复、真实加载与可见partial/unknown已实现；本地验证 | 原损坏记录及其生成原因未取得；无法恢复丢失的真实账单数值 |
 
@@ -3672,3 +3672,28 @@ build `bca358900c8273b0046b8f6826687157c1f0e1a6b8442a4d69c7a4c7af5c5260`，input
 首轮regular探针过早把16条渐进候选当成完整页，分页断言exit1、零请求；修改等待完整page action后，两模式才通过。此为probe setup失败，未据此改产品。正式工件[resume-cli](../../.omx/artifacts/phase20-addition-resume-cli/)保存脚本、无私有正文收据和失败分类；临时运行状态清理。仅文档/诊断工件变化，不重复build/Vitest；五静态门/diff、JS语法及JSON收据检查通过，118既有docs-source advisory保留。
 
 这是当前WSL PTY、小型真实磁盘布局、原CLI与writer操作证据，不替代2409项真实目录的终端性能、Windows/桌面/IME、外部目录变更或用户现场。没有独立review、live provider、exe/full suite/20k场景，原47项不升级、ADD和goal active。本批Git/精确CI另绑定。
+
+20.38已提交推送`0100057a97f6a0dad76f8a3825e31abe9faa4aa0`，远端main此前精确一致、仅原CLAUDE.md。延后核对[Watch40968345121](https://github.com/h-hei133/cheers/actions/runs/40968345121)completed/success、[CI40968345119](https://github.com/h-hei133/cheers/actions/runs/40968345119)in_progress，head一致；20.37 CI40967568515仍in_progress，20.36 CI40966166052已completed/success。
+
+### 20.39 resume清空搜索后翻页与切范围不带回旧查询
+
+继续20.38尚未操作Next的缺口，沿原CLI、overlay、SessionBrowser/actions和catalog page检查。定向只读比较codex resume_picker.rs:1598–1667：查询清空设为Idle、后续search token必须仍匹配；参考保留已加载列表及稳定选择。本项目同意清空查询撤回搜索语义与迟到结果准入，但原分页是替换页、不是累积列表，因此保留已有continued-base清空后的显式Reload newest session page，不能套用参考的累积行或稳定选择策略。既有session测试已覆盖query continuation和continued-base refresh；新增两条actual host回归验证清空后Next与scope重建，撤回对应决定会各失败一条。
+
+初始regular实际PTY已成功翻到base第二页、搜索第一页/第二页、清空回最新页，随后Next超时：画面filter重新成为已清空的`resume-fixture-`，并返回搜索首批40条，而非无查询的8条旧记录加current。此为产品行为漂移，零请求、19.77秒/295288KiB，失败收据保留，不能算完整通过。根因是browser.lastQuery清空后仍spread旧options.initialQuery，条件spread在undefined时没有覆盖旧值；scope重建同样继承旧seed。两条回归旧实现均失败，原[session actions](../../packages/ts-shell/src/cli/interactive/picker/session/actions.ts)翻页明确传live initialQuery（含undefined），[session picker](../../packages/ts-shell/src/cli/interactive/picker/session.ts)切scope显式清initialQuery，不新增目录、状态或执行owner。
+
+主代理单进程串行、package-local heap768MiB/threads=false，session.test.ts全部75项通过。单独撤回page与scope修复各1失败/1通过，73未选不计通过；finally字节恢复后两条再通过。五静态门/diff通过、118既有docs-source advisory保留。1536MiB build实际exit0后独立freshness为build `94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff`、inputs `b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193`，460 compilerInputs/3549文件一致。原产品命名callable AST前后session14/actions4，均未增加且低于20；无新产品import，无全仓graph/NormProof或无关重构。
+
+新构建下regular/fullscreen分别隔离home/profile/project，原SessionManager各48会话、每会话一条小user fixture。synthetic、offline、零工具/skills/指令、warming关闭，heap768MiB/45秒/2MiB边界，沿原Python120×60 relay。观察器调用原OverlayHost.open/render与TurnSink，记录host重开代数、实际绘制行IDs及状态，按键全部由真实PTY发送，没有调用model.focus或apply替代CLI动作。两模式均等待完整首批，Up聚焦已绘制Next、Enter翻页；搜索通用fixture query后再次Next仍保留查询；逐字退格清空、无查询Next到旧页；旧base上精确搜索/清空得到单独refresh，Enter重载最新页；再次搜索分页、清空、真实Tab切All projects保持无查询；精确搜索/Enter沿原resume writer，原selection文件读回目标，重开、Esc、Ctrl+D退出。
+
+| 新构建实际操作 | regular | fullscreen |
+|---|---|---|
+| 完整首批 | 1094ms | 1119ms |
+| 四次Next：base/search/base/search | 127 / 281 / 127 / 304ms | 154 / 253 / 127 / 304ms |
+| 四次搜索：通用/精确/通用/精确 | 329 / 177 / 356 / 179ms | 356 / 179 / 355 / 180ms |
+| 显式refresh / 精确resume | 762 / 248ms | 712 / 213ms |
+| Ctrl+D / termios读回 | 138ms、exit0、cooked恢复 | 137ms、exit0、cooked恢复 |
+| 峰值RSS / 总探针 | 298588KiB / 16.92s | 301976KiB / 16.65s |
+
+每次base首批40个、末批8个非current加单个current；页内无重复，非current跨页不重复，并集精确覆盖48个fixture。current跨页出现是原合同，不误判为重复故障。搜索两页与base对应行完全一致、末批不再提供Next；八个采样页面全部fixture ID均在原renderer的绘制行中出现。所有翻页/清空/refresh/scope过程中current selection仍为fixture0，只有最后精确resume切到fixture2，零message.started、配置字节不变；两次正常终端均读回ICANON/ECHO/ISIG。时间包括诊断、真实输入、去抖及磁盘读取，不能宣称2409项用户目录性能或无探针生产延迟。
+
+正式工件[resume-pages](../../.omx/artifacts/phase20-addition-resume-pages/)保存可复用脚本、原失败与两份有效收据、反转日志和build投影；final探针新增scope步骤，两模式实际重跑通过。HANDOFF追加seed覆盖陷阱，task scratch删除、原CLAUDE.md保留。没有真实provider、用户桌面/Windows/IME、外部目录变动、独立review或exe/full suite/20k证据；原47项状态不升级，ADD与Codex goal继续active。本批提交/推送及精确CI另绑定。

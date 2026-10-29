@@ -43,7 +43,7 @@ export function sessionActions(browser: SessionBrowser,
         browser.clearPage();
         try {
           return { next: reopen({ ...options, initialLimit: browser.limit, continuation: next,
-            ...(browser.lastQuery ? { initialQuery: browser.lastQuery } : {}) }, browse) };
+            initialQuery: browser.lastQuery }, browse) };
         } catch (error) {
           if (browse) options.sessionManager.catalog.retireBrowse(browse.token);
           throw error;

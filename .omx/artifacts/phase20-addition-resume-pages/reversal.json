@@ -1,0 +1,17 @@
+{
+  "variants": [
+    {
+      "variant": "page",
+      "exitCode": 1
+    },
+    {
+      "variant": "scope",
+      "exitCode": 1
+    }
+  ],
+  "restoredExitCode": 0,
+  "restoredSha256": {
+    "packages/ts-shell/src/cli/interactive/picker/session/actions.ts": "bf2aba1413ab5b79fe1f2d4905c80d4306901e53b209096a150d29fcfff5f767",
+    "packages/ts-shell/src/cli/interactive/picker/session.ts": "80d595099763eb44c74ec43683e66d6725a4d6472cac792f0c1c4ab124f64853"
+  }
+}

@@ -1000,3 +1000,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An AST inventory or old-code reversal differs from the committed source even though the working file is restored.
 - **Root Cause**: RTK can summarize git show output; that output is useful to read but is not a byte-exact source snapshot.
 - **Rule**: Use `rtk proxy git show` when capturing source for edits, hashes, AST checks or reversals. Validate replacement boundaries before mutation, preserve the original bytes in finally, and rerun any reversal based on filtered text.
+
+### Cleared Picker State Must Override Its Reconstruction Seed
+- **Symptom**: Clearing a continued session search restores the newest page, but Next or a project-scope change brings the old query back.
+- **Root Cause**: The browser clears its live query while immutable options retain initialQuery. A conditional spread omits the cleared value, allowing the reconstruction seed to survive.
+- **Rule**: Explicitly overwrite cleared state when rebuilding a picker. Page continuation carries the live query, including undefined; a fresh scope resets the initial query. Verify search continuation, clear, Next and scope change through the actual host and CLI, including the intentional current-session row on later pages.

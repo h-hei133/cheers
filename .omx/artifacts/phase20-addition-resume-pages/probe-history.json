@@ -1,0 +1,24 @@
+{
+  "baseline": {
+    "mode": "regular",
+    "status": "failed",
+    "failure": "timeout-next",
+    "classification": "product behavior drift",
+    "requests": 0,
+    "buildId": "bca358900c8273b0046b8f6826687157c1f0e1a6b8442a4d69c7a4c7af5c5260",
+    "lastFilter": "resume-fixture-",
+    "expectedFilter": "",
+    "pageAfterClearReturnedSearchFirst": true
+  },
+  "regressionBaseline": {
+    "selected": 2,
+    "failed": 2,
+    "unselected": 73
+  },
+  "correction": "Overwrite initialQuery on page reconstruction even when undefined; clear it on scope reconstruction.",
+  "finalProbeExpansion": "Added actual Tab scope check after the same clear-and-page sequence; both final modes passed.",
+  "fixturesPerMode": 48,
+  "messagesPerFixture": 1,
+  "realRequests": 0,
+  "rawOutputArchived": false
+}

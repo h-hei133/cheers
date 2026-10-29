@@ -1,0 +1,20 @@
+{
+  "buildId": "94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff",
+  "inputsDigest": "b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193",
+  "compilerInputs": 460,
+  "files": 3549,
+  "compilerMatch": true,
+  "digestMatch": true,
+  "callables": {
+    "packages/ts-shell/src/cli/interactive/picker/session.ts": {
+      "count": 14,
+      "previousCount": 14,
+      "sourceSha256": "80d595099763eb44c74ec43683e66d6725a4d6472cac792f0c1c4ab124f64853"
+    },
+    "packages/ts-shell/src/cli/interactive/picker/session/actions.ts": {
+      "count": 4,
+      "previousCount": 4,
+      "sourceSha256": "bf2aba1413ab5b79fe1f2d4905c80d4306901e53b209096a150d29fcfff5f767"
+    }
+  }
+}

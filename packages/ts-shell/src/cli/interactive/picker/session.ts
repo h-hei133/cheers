@@ -22,7 +22,7 @@ export function sessionPicker(options: SessionPickerOptions, browse?: SessionLis
       active: browser.allProjects ? 'all' : 'project',
       select: id => {
         browser.close();
-        return sessionPicker({ ...options, continuation: undefined, allProjects: id === 'all' });
+        return sessionPicker({ ...options, continuation: undefined, initialQuery: undefined, allProjects: id === 'all' });
       },
     },
     get empty() { return browser.empty; },

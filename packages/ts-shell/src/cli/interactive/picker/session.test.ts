@@ -527,6 +527,40 @@ it('restores base pagination copy after clearing a search', async () => {
   expect(restored.find(row => row.id === 'action:more')?.searchText).toBeUndefined();
 });
 
+it.each(['page', 'scope'] as const)('keeps a cleared continued search absent when opening another %s', async destination => {
+  const setup = fixture(Array.from({ length: 48 }, (_, index) => session(`common-${index.toString().padStart(2, '0')}`)));
+  setup.picker.onSearchChange!('common');
+  await setup.picker.search!('common');
+  const continued = (await setup.picker.apply(['action:more']))!.next!;
+  expect(continued.initialFilter).toBe('common');
+  const host = new OverlayHost(() => {});
+  vi.useFakeTimers();
+  try {
+    host.open(continued);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(stripAnsi(host.render(100, 24).join('\n'))).toContain('common-40');
+    for (let index = 0; index < 'common'.length; index++) host.handleKey(parseKeyEvent('\x7f'), vi.fn());
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stripAnsi(host.render(100, 24).join('\n'))).toContain('▸ common-00');
+    let reopened;
+    if (destination === 'page') {
+      host.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+      const apply = vi.fn(); host.handleKey(parseKeyEvent('\r'), apply);
+      expect(apply).toHaveBeenCalledWith(continued, ['action:more']);
+      reopened = (await continued.apply(['action:more']))!.next!;
+    } else {
+      reopened = continued.chips!.select('all')!;
+    }
+    expect(reopened.initialFilter).toBeUndefined();
+    host.open(reopened);
+    await vi.advanceTimersByTimeAsync(200);
+    const frame = stripAnsi(host.render(100, 24).join('\n'));
+    expect(frame).toContain(destination === 'page' ? 'common-40' : 'common-00');
+    if (destination === 'page') expect(frame).not.toContain('common-00');
+    expect(setup.resume).not.toHaveBeenCalled();
+  } finally { host.close(); vi.useRealTimers(); }
+});
+
 it('loads older sessions through an explicit page row', async () => {
   const entries = Array.from({ length: 45 }, (_, index) => session(`recent-${index.toString().padStart(2, '0')}`, new Date(Date.now() - index * 1000).toISOString()));
   const { picker } = fixture(entries);

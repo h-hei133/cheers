@@ -1,0 +1,25 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/session.test.ts  (75 tests | 1 failed | 73 skipped) 45ms
+   ❯ src/cli/interactive/picker/session.test.ts > keeps a cleared continued search absent when opening another page
+     → expected 'common' to be undefined
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/session.test.ts > keeps a cleared continued search absent when opening another page
+AssertionError: expected 'common' to be undefined
+ ❯ src/cli/interactive/picker/session.test.ts:554:36
+    552|       reopened = continued.chips!.select('all')!;
+    553|     }
+    554|     expect(reopened.initialFilter).toBeUndefined();
+       |                                    ^
+    555|     host.open(reopened);
+    556|     await vi.advanceTimersByTimeAsync(200);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 73 skipped (75)
+   Start at  06:56:35
+   Duration  1.24s (transform 671ms, setup 0ms, collect 970ms, tests 45ms, environment 0ms, prepare 55ms)

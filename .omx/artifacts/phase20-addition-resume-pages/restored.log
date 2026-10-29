@@ -1,0 +1,9 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/picker/session.test.ts  (75 tests | 73 skipped) 46ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 73 skipped (75)
+   Start at  06:56:38
+   Duration  1.25s (transform 661ms, setup 0ms, collect 962ms, tests 46ms, environment 0ms, prepare 56ms)
