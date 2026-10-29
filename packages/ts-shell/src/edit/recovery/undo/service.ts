@@ -61,16 +61,6 @@ export function operationsForTurn(context: CommandContext, turnId: string): read
   return [...scanOperations(undoScope(context))].filter(receipt => receipt.correlationId === turnId);
 }
 
-/** The turns this session recorded, newest first, each with its operation count. */
-export function turnsWithOperations(context: CommandContext): readonly { readonly turnId: string; readonly operations: number }[] {
-  const counts = new Map<string, number>();
-  for (const receipt of scanOperations(undoScope(context))) {
-    if (receipt.correlationId === undefined) continue;
-    counts.set(receipt.correlationId, (counts.get(receipt.correlationId) ?? 0) + 1);
-  }
-  return [...counts].map(([turnId, operations]) => ({ turnId, operations }));
-}
-
 export function undoHistory(context: CommandContext, operationId?: string): readonly OperationReceipt[] {
   const receipts: OperationReceipt[] = [];
   for (const receipt of scanOperations(undoScope(context))) {
