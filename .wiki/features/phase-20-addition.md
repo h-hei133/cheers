@@ -2932,18 +2932,18 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 ### 19.4 第二十七：进入时输入框光标跳到很多空白行
 
-**结论：这是 `fullscreen` 下"历史块先入 transcript、光标行按旧布局定位"的一个可复现几何竞态；具体触发条件未在用户原环境确认。**
+**结论：这是启动交接时"历史块先入 transcript、光标行按旧布局/旧光标位置定位"的几何竞态；`regular` 模式下有一条完整可复现的链路，`fullscreen` 下未找到同等证据。具体触发条件未在用户原环境确认。**
 
 **已确认的机制片段**
 
-1. `interactiveMode.start()`（`interactiveMode.ts:490`）在**第一帧之前**把欢迎块与会话历史 `append` 进 transcript（`:495` 的 `appendConversation`）。
+1. `interactiveMode.start()`（`interactiveMode.ts:477`）在**第一帧之前**把欢迎块与会话历史 `append` 进 transcript（`:495` 的 `appendConversation`）。
 2. `Editor.layout()`（`presentation/tui/editor.ts:281-319`）的 `scrollOffset` 是**编辑器实例上的持久字段**：`if (!options.preview) this.scrollOffset = scrollOffset`（`:317`）。它只在新文本或新宽度时重算，短文本分支还会把它重置为 0（`:303`）。
 3. 帧合成 `view.renderFrame`（`surface/view.ts:53-104`）先算 `chrome`（含 composer 行），再算 `transcriptRows`，最后把 composer 的屏幕位置算成 `transcriptRows.length + chrome.composerOffset`（`:79-83`）。
 4. `pane.render` 的 `filler`（`surface/pane.ts:98-99`）会把短对话**向下填充**到底部，填充行没有 owner（`blockIndexAt` 对 `within < 0` 返回 `undefined`，`viewport.ts:168-173`）。
 
 **最可能的组合**：启动表面（`cli/interactive/startup.ts:57`）**无条件**先以 alternate screen 启动并绘制一个 composer；随后 `InteractiveMode` 用 `startup.adopt()` 接管（`interactiveMode.ts:578`、`engine.ts:157-164`）。当目标模式是 `regular`（`tuiMode: "regular"`）时，`transfer` 会先 `leaveScreen()`（写 `\x1b[?1049l`）再 `enterScreen()` 建立 `MainScreenPainter`；`MainScreenPainter` 的 `viewportUnplaced` 路径（`render/mainScreen.ts:161-162, 269-274, 297`）在子进程/换屏之后**不按账本定位，而是从当前光标行开始写**。如果此前的 alt-screen 会话留下了光标位置，第一帧的 composer 就可能被画在历史行下方很远处——用户看到的就是"光标在若干空白行之后"。
 
-**为什么"输入内容后就能删掉空白行"**：编辑会推进 `contentRevision`，`Editor.layout` 重算行数并走 `maxRows` 分支（`editor.ts:302-318`），`scrollOffset` 被夹到 `[0, maxScroll]`；同时 `setText`/`insert` 会把 `scrollOffset` 归零（`buffer.ts:101-107`）。也就是说，**第一次真实编辑会纠正几何**，这与用户观察完全吻合。
+**为什么"输入内容后就能删掉空白行"**：编辑会推进 `contentRevision`，`Editor.layout` 重算行数并走 `maxRows` 分支（`editor.ts:302-318`），`scrollOffset` 被夹到 `[0, maxScroll]`；同时 `setText` 会把 `scrollOffset` 归零（`buffer.ts:97`）。也就是说，**第一次真实编辑会纠正几何**，这与用户观察完全吻合。
 
 **未确认**：用户实际使用的是 `fullscreen`（默认，`runtimeConfig.ts:438`）还是 `regular`；以及空白行是"transcript 填充行"还是"编辑器 scrollOffset 偏移"。两者在画面上都可能表现为光标下移。
 
@@ -3044,7 +3044,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 24 | 确认：工具体硬拒绝，审批层不可达 | `registry.ts:322/426`、`turn/tools.ts:408`、参考实现对照 | P0（用户阻塞） |
 | 25 | 确认：历史不恢复思考块；regular 模式提示不可点；单键无备选 | `history.ts:52-58`、`interactiveMode.ts:513`、`keybindings.ts:86` | P1 |
 | 26 | 确认：裸 `exit` 是提示词；MCP `close()` 无上限（最坏 30 s） | `registry.ts:436`、`interactiveLoop.ts:67`、`gateway.ts:188` | P0（阻塞退出） |
-| 27 | 高置信推断：启动几何竞态（`scrollOffset` 持久 + `viewportUnplaced`） | `editor.ts:281-319`、`mainScreen.ts:96-104` | P1（需用户确认模式） |
+| 27 | 高置信推断：启动几何竞态（`scrollOffset` 持久 + `viewportUnplaced`） | `editor.ts:281-319`、`mainScreen.ts:161-162` | P1（需用户确认模式） |
 | 28 | 确认：无 `/config`；模型行为字段在 settings、目录在 model，effort 三入口 | `settings.ts:78`、`picker/settings.ts:253-257`、`picker/model.ts:206` | P2（结构） |
 | 29 | 确认：搜索全量重扫（实测 0.87–1.03 s/次） | `listing.ts:69-73`、`catalog/index.ts:261-284` | P0（体验） |
 | 30 | 确认：SIGTERM/SIGHUP 不写 terminated，下次静默重入 | `bootstrap.ts:166/348-356`、`shutdown.ts:18-19` | P0（数据正确性） |
