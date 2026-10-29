@@ -169,7 +169,11 @@ export interface TurnRun extends TurnInput {
 }
 
 /** Tools whose calls must not interleave: each one changes what the next sees. */
-const SEQUENTIAL_TOOLS = new Set(["bash", "write", "edit", 'apply_patch', "task", "browser"]);
+// Tools whose calls must not overlap. `task` and `team` are here because each
+// one runs a subagent loop of its own: nothing counts how many of those are
+// live at once, so two calls in one step would double the model requests
+// without any budget noticing.
+const SEQUENTIAL_TOOLS = new Set(["bash", "write", "edit", 'apply_patch', "task", "team", "browser"]);
 
 /**
  * A request that follows a discovery result is the request whose extra schema

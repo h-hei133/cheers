@@ -2801,3 +2801,9 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 `team` 工具初版落到 `toolPolicy` 的默认分支，审批目标只有 `"team"` 两个字——用户被要求批准一件没有名字的事。现与 `task` 同列：目标取 `question`（截断 80 字符），缺失时用 `competing-hypothesis pass`。操作类型仍是 `execute`，仍需审批。
 
 验证：`toolPolicy.test.ts` 增至 36 项，新增"审批目标取问题文本而非工具名"。反转把 `team` 从该分支移除后，目标退回 `"team"`、该项预期失败；源码逐字节恢复并核对 SHA-256 `f0a5dd7b80d7` 后重验；静态门、module facade 0 与 TS build `2b6fec2211e1` 通过。
+
+### 第一百三十六批：`team` 加入串行工具集
+
+`team` 内部并行运行最多 3 个提案者，但同一回合里若模型同时发起两个 `team` 调用，峰值会到 6 个并发子代理循环。`SEQUENTIAL_TOOLS` 里已有 `task` 正是为此——没有任何地方统计同时存活的子代理循环数，一次 step 里的两个调用会让模型请求翻倍而预算察觉不到。`team` 现与 `task` 同列。
+
+验证：`turn/session.test.ts` 29 项通过；静态门、module facade 0 与 TS build 通过。该常量为模块私有，没有直接断言它的测试——此改动靠既有测试与代码注释维持，不宣称有反转证据。
