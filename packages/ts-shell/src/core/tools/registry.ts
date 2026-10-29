@@ -26,6 +26,7 @@ import { classifyMcpFailure, classifyUnknownMcpFailure, mcpFailureMetadata } fro
 import { createGlobToolDefinition } from './glob.js'
 import { createReadToolDefinition } from './read.js'
 import { createSkillToolDefinition, type SkillCatalog } from './skill.js'
+import { createTeamToolDefinition } from './teamTool.js'
 import { createGrepToolDefinition } from './grep.js'
 import { createWebFetchToolDefinition } from './webFetch.js'
 import { createWebSearchToolDefinition } from './webSearch.js'
@@ -576,6 +577,7 @@ export function createCoreToolRegistry(options?: {
         return runCommandTool(executionService, command, context, args.timeout)
       },
     },
+    createTeamToolDefinition(),
     createTaskOutputToolDefinition(),
     createTaskWaitToolDefinition(),
     createTaskStopToolDefinition(),
