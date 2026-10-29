@@ -96,6 +96,42 @@ it.each([
   }
 });
 
+it.each([
+  { stream: false, reasoning: '' }, { stream: true, reasoning: '' },
+  { stream: false, reasoning: 'Public reasoning' }, { stream: true, reasoning: 'Public reasoning' },
+])('reports an unanswered output limit without diagnosing context overflow: %j', async ({ stream, reasoning }) => {
+  const sessionId = `unanswered-length-${stream}-${Boolean(reasoning)}`;
+  const body = stream
+    ? `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: reasoning }, finish_reason: 'length' }] })}\n\ndata: [DONE]\n\n`
+    : JSON.stringify({ choices: [{ message: { content: '', reasoning_content: reasoning }, finish_reason: 'length' }] });
+  let calls = 0;
+  const step = createStepFunction({ provider: { provider: 'fixture', model: 'm', endpoint: 'openai-compatible',
+    baseUrl: 'https://fixture.invalid/v1', headers: {} }, sessionId, workspaceRoot: process.cwd(), systemPrompt: '', tools: [],
+    fetchImpl: async () => { calls++; return new Response(body, { headers: { 'content-type': stream ? 'text/event-stream' : 'application/json' } }); } });
+  const setup = options({ sessionId, step, maxSteps: 1, retry: { enabled: false } });
+  const transcript = new Transcript();
+  const sink = new TurnSink(transcript, () => {});
+  sink.begin(sessionId, 'question');
+  try {
+    const events: QueryEvent[] = [];
+    for await (const event of runTurn(setup).events) { events.push(event); sink.handleEvent(event); }
+    const completed = events.find(event => event.type === 'query.completed');
+    expect(completed).toMatchObject({ result: { status: 'stopped_error', terminalClassification: 'stopped',
+      stopReason: expect.stringContaining('output limit') } });
+    expect(JSON.stringify(completed)).not.toContain('/compact');
+    expect(JSON.stringify(completed)).not.toContain('context is probably full');
+    expect(JSON.stringify(completed)).toContain('length limit');
+    expect(JSON.stringify(completed)).toContain('/settings');
+    expect(events.some(event => event.type === 'query.failed')).toBe(false);
+    expect(calls).toBe(1);
+    expect(sink.lastTurnFailed).toBe(true);
+    expect(sink.retryTarget('question', sink.lastTurnFailed)).toBe('question');
+    expect(transcript.all().filter(block => block.text.includes('output limit'))).toHaveLength(1);
+    expect(restoreConversation(setup.persisted).blocks.filter(block => block.kind === 'thinking').map(block => block.text))
+      .toEqual(reasoning ? [reasoning] : []);
+  } finally { sink.end(); resetSessionUsage(sessionId); }
+});
+
 it('settles terminal reasoning tails before stop hooks finish in the actual response loop', async () => {
   const sessionId = 'responses-final-reasoning-clock';
   const reasoning = { id: 'rs_tail', type: 'reasoning', summary: [{ type: 'summary_text', text: 'Plan more' }] };

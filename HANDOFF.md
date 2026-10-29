@@ -975,3 +975,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Listing dist recursively emits millions of paths from retained historical builds instead of locating one runtime module.
 - **Root Cause**: Build artifacts are versioned under dist/builds; the current module does not live at dist/<module>, and a broad file search traverses every retained generation.
 - **Rule**: Read the current build-manifest.json, select dist/builds/<buildId>, and inspect only the required module. Use the manifest's input/artifact lists for targeted checks; never recursively enumerate the entire build history for source navigation.
+
+### A Length Stop Does Not Establish Context Overflow
+- **Symptom**: A tiny request exhausts its response allowance during reasoning, but its no-answer guidance says context is full and recommends compaction.
+- **Root Cause**: Output length stops and explicitly proven prompt overflow share an incorrect explanation even though they have different runtime evidence and remedies.
+- **Rule**: Preserve length as a stopped unanswered result and point to output-limit inspection. Reserve overflow classification and compaction recovery for the existing verified overflow evidence; test JSON/SSE with and without public reasoning through the actual result and display owners.

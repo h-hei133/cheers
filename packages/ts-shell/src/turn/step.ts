@@ -881,7 +881,7 @@ function failedStep(
  */
 export function emptyAnswerExplanation(finishReason: string | null | undefined, reasoningLength: number): string {
   if (finishReason === "length") {
-    return "The reply was cut off before any of it arrived — the context is probably full. Run `/compact` and ask again.";
+    return "The provider stopped at a length limit before an answer arrived. Check the output limit in `/settings` and ask again.";
   }
   if (REFUSAL.test(finishReason ?? "")) {
     return "The provider withheld the reply. Rephrasing the request usually gets past it.";

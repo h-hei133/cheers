@@ -3172,7 +3172,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 反馈 | 当前状态 | 下一步 |
 |---|---|---|
 | 24 | 本地实现与聚焦验证 | 缺真实终端/用户目录审批现场与非Linux文件系统证据 |
-| 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses/Google native摘要准入已实现；auto保留，整体partial | 其他模型/协议默认与公开内容、真实provider/账户及用户终端复验 |
+| 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses/Google native摘要准入已实现；20.33新增当前relay真实小请求的公开thinking/展开/恢复，auto保留，整体partial | 其他模型/协议默认与公开内容、真实账户及用户终端复验；单个relay请求不覆盖完整矩阵 |
 | 26 | 四条明确机制及MCP未开始调用的关闭拒绝已修；本地验证 | 缺真实用户退出现场；MCP预算到期不能证明清理完成 |
 | 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
 | 28 | 会话入口与配置字段分类隔离已实施；本地聚焦验证 | 缺真实用户终端与整体面板现场验收 |
@@ -3569,3 +3569,17 @@ HANDOFF补失败路径公开证据保留与验证终态权威分离，任务scra
 第一次验证脚本exit2表示正常回答验收不成立，不能隐去其截断/停止；公开thinking的显示、展开和恢复已通过。第二次exit0证明当前配置目标的小请求正常路径，usage是provider报告而非独立billing测量。两次均没有自动重试，第二次是主代理明确提高临时输出上限后的新请求；用户持久配置保持原值。第一轮usage投影改为原ProviderUsage的snake_case后，仅第二轮有上述计量证据。
 
 这不是用户真实终端Ctrl+T/鼠标/桌面/IME证据，也不是全部provider、账户、流失败或完整会话复入矩阵；不据此升级原Phase20的47项或宣告反馈25/ADD整体完成。没有本批产品代码改动，不重复build/Vitest；本任务scratch/profile清理，保留原CLAUDE.md。发现length说明仍把输出截断归因为context可能满，需沿原结果说明owner另行裁决，不把本次真实截断解释成provider故障。goal保持active，文档Git/精确CI另绑定。
+
+20.33文档已提交推送`e6d543ad9fa9a7dcaa236fcb213c6c5e393916f7`，远端main精确一致；五静态门/diff通过，118既有docs-source advisory保留。工作区仅原CLAUDE.md，本批对应CI尚未读回。
+
+### 20.34 无答案长度停止的准确说明
+
+20.33真实小输入、256输出上限请求已经达到length且没有答案，原[emptyAnswerExplanation](../../packages/ts-shell/src/turn/step.ts)却称context可能已满并指向compact。目标另有明确的overflow markers/前缀与恢复路径，不能把length当作已证明的输入溢出。新增四条兼容JSON/SSE×有/无公开reasoning的实际step→runTurn→sink→restore回归，旧说明全部在结果说明断言失败。
+
+定向只读对照pi openai-completions.ts:1556–1572将length保持独立；openai-responses-shared.ts:861–879将incomplete/max_output_tokens映射为length；openai-completions.ts:963–970明确reasoning与answer可共用max_tokens，推理耗尽会没有答案。采用保留停止原因与输出预算检查的决定，不据此新增reasoning预算字段，也不宣称所有兼容服务length的具体额度都已验证。
+
+产品只修改原说明为provider在长度限制处停止、去现有/settings检查输出上限后再请求；不声称具体预算确定、不再推荐无依据的compact。四条实际链路保持stopped_error/stopped、一次说明、retry目标、零query.failed、推理保存/恢复及单次请求；原明确context overflow与安全拒绝控制继续通过。
+
+主代理两显式文件138项串行通过：step97/session41。独立撤回说明的反转四条全部失败、37条未选不计通过；finally逐字节恢复step并核对SHA-256 `c5eb9dee4cf0592f828090cad2c17366532716cc03130279a4d37b970d4b71a2`，恢复后138再通过。五静态门/diff通过，无新product import/callable，不重复graph/NormProof。1536MiB build观察exit0后单独compilerInputs与digest核对一致：build `1bf1bbee4455594343e2fdc123ac1abedc72db761e31f22de24244a2a687907b`，inputs `5086aca3168877309143a0947153ae2d5116a119ae3fe77be1154f86edfa6c93`，460 compilerInputs/3549文件。
+
+HANDOFF补length与overflow的证据区别，task scratch清理、原CLAUDE.md保留。新说明未重发live请求，实环境证据仍绑定20.33旧build；无独立review、真实用户终端/账户/桌面/PTY/exe/full suite/20k会话，原47不升级、ADD及goal active。本批Git/精确CI另绑定。

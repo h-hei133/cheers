@@ -10276,3 +10276,11 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 反馈25沿[addition20.33](features/phase-20-addition.md#2033-配置中真实模型的公开thinking展开与恢复)运行两次串行真实请求。只读读取原配置/目录/档位与凭据，named profile隔离所有状态，实际createProviderStep/runTurn/sink/pane/SessionManager恢复链，零工具/项目内容/历史，禁用重试、45秒期限、heap768MiB。目标openai-compatible/bailu-2.9-preview、high：256临时输出上限时1301字符公开推理且length/stopped_error空答案；1024上限时715字符公开推理与3字符正确答案，completed/success，provider报告745/176/921 tokens、reasoning169。
 
 两次thinking均已冻结、可展开，原pane重绘分别多27/33行，显示与原会话恢复公开正文精确一致；耗时3211/1840ms，峰值RSS136924/136580KiB。第一轮脚本exit2不算正常回答通过，usage字段投影错误只有第二轮保留有效计数。没有打印响应正文或凭据，没有改用户配置/会话；scratch清理。没有用户终端键鼠/桌面、账户、其他provider或独立billing/review证据，原47项不升级、ADD与goal active。仅文档变化，不重复build/tests；长度说明的context归因另行核查，Git/精确CI另绑定。
+
+20.33文档已推送`e6d543ad9fa9a7dcaa236fcb213c6c5e393916f7`，远端main精确一致；五静态门/diff通过，118既有docs advisory保留，仅原CLAUDE.md。未读取其CI结果。
+
+## [2026-10-30] fix | 空答案length停止的准确说明
+
+沿[addition20.34](features/phase-20-addition.md#2034-无答案长度停止的准确说明)修真实小请求暴露的说明：length原指向context可能满/compact，目标明确overflow另有合同。定向对照参考length、incomplete/max_output_tokens及推理/答案共用输出额度，原说明改为provider在长度限制处停止、去/settings检查输出上限；没有新增预算或修改停止/溢出行为。
+
+四条实际JSON/SSE×有/无reasoning的step/turn/sink/restore旧说明全部失败；两显式文件step97/session41共138串行通过，反转旧说明四失败、finally逐字节恢复后138再通过。五静态门/diff，无新product import/callable；build `1bf1bbee4455594343e2fdc123ac1abedc72db761e31f22de24244a2a687907b`、inputs `5086aca3168877309143a0947153ae2d5116a119ae3fe77be1154f86edfa6c93`，460/3549在exit0后单独重算一致。HANDOFF与scratch清理；实环境证据仍绑定20.33旧build，新说明未重发live，无独立review/用户终端/账户/PTY/exe/full suite/20k；原47不升级、goal active，Git/精确CI另绑定。
