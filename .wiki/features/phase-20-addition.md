@@ -2953,26 +2953,33 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 ### 19.4 第二十七：进入时输入框光标跳到很多空白行
 
-**结论：这是启动交接时"历史块先入 transcript、光标行按旧布局/旧光标位置定位"的几何竞态；`regular` 模式下有一条完整可复现的链路，`fullscreen` 下未找到同等证据。具体触发条件未在用户原环境确认。**
+**结论：机制未确认。** 本轮找到的候选链路都有反证，因此只记录已排除项与需要补的证据，不给出"根因"。
 
-**已确认的机制片段**
+**已确认的几何事实**
 
 1. `interactiveMode.start()`（`interactiveMode.ts:477`）在**第一帧之前**把欢迎块与会话历史 `append` 进 transcript（`:495` 的 `appendConversation`）。
-2. `Editor.layout()`（`presentation/tui/editor.ts:281-319`）的 `scrollOffset` 是**编辑器实例上的持久字段**：`if (!options.preview) this.scrollOffset = scrollOffset`（`:317`）。它只在新文本或新宽度时重算，短文本分支还会把它重置为 0（`:303`）。
-3. 帧合成 `view.renderFrame`（`surface/view.ts:53-104`）先算 `chrome`（含 composer 行），再算 `transcriptRows`，最后把 composer 的屏幕位置算成 `transcriptRows.length + chrome.composerOffset`（`:79-83`）。
-4. `pane.render` 的 `filler`（`surface/pane.ts:98-99`）会把短对话**向下填充**到底部，填充行没有 owner（`blockIndexAt` 对 `within < 0` 返回 `undefined`，`viewport.ts:168-173`）。
+2. `view.renderFrame`（`surface/view.ts:53-104`）先算 chrome（含 composer 行），再算 `transcriptRows`，composer 的屏幕位置是 `transcriptRows.length + chrome.composerOffset`（`:79-83`）。
+3. `pane.render` 的 `filler`（`surface/pane.ts:98-99`）把短对话**向下填充**到底部；填充行没有 owner（`viewport.ts:168-173` 对 `within < 0` 返回 `undefined`）。
+4. 启动表面**无条件**先以 alternate screen 启动（`cli/interactive/startup.ts:57`），随后由 `startup.adopt()` 交给 `InteractiveMode`（`interactiveMode.ts:578`、`engine.ts:157-164`）。
 
-**最可能的组合**：启动表面（`cli/interactive/startup.ts:57`）**无条件**先以 alternate screen 启动并绘制一个 composer；随后 `InteractiveMode` 用 `startup.adopt()` 接管（`interactiveMode.ts:578`、`engine.ts:157-164`）。当目标模式是 `regular`（`tuiMode: "regular"`）时，`transfer` 会先 `leaveScreen()`（写 `\x1b[?1049l`）再 `enterScreen()` 建立 `MainScreenPainter`；`MainScreenPainter` 的 `viewportUnplaced` 路径（`render/mainScreen.ts:161-162, 269-274, 297`）在子进程/换屏之后**不按账本定位，而是从当前光标行开始写**。如果此前的 alt-screen 会话留下了光标位置，第一帧的 composer 就可能被画在历史行下方很远处——用户看到的就是"光标在若干空白行之后"。
+**已排除的假设（有代码反证）**
 
-**为什么"输入内容后就能删掉空白行"**：编辑会推进 `contentRevision`，`Editor.layout` 重算行数并走 `maxRows` 分支（`editor.ts:302-318`），`scrollOffset` 被夹到 `[0, maxScroll]`；同时 `setText` 会把 `scrollOffset` 归零（`buffer.ts:97`）。也就是说，**第一次真实编辑会纠正几何**，这与用户观察完全吻合。
+- **"`Editor.scrollOffset` 在空草稿下自己偏移"**：不成立。`editor.ts:302-305` 在 `rendered.length <= maxRows` 时把 `scrollOffset` 归零，空草稿只有一行；只有草稿真的超过行预算才会保留非零值，且随即被夹到 `[0, maxScroll]`（`:315-317`）。
+- **"`transfer` 走 `viewportUnplaced` 定位"**：不成立。`viewportUnplaced` 只由 `leaveForExternalOutput()` 置位（`mainScreen.ts:296`），而 `transfer` 走的是 `leaveScreen()` + `enterScreen()`，后者**新建**一个 `MainScreenPainter`（`engine.ts:160-163, 179-183`），新实例的 `scrolled`/`cursorRow`/`visibleContent` 全为 0，`viewportUnplaced` 为 false。所以模式切换不会进入"从当前光标行开始写"的分支。
+- **"reanchor 会重建位置"**：`reanchor` 只出现在 `mainScreen.ts:32` 的注释里，**没有实现**。
 
-**未确认**：用户实际使用的是 `fullscreen`（默认，`runtimeConfig.ts:438`）还是 `regular`；以及空白行是"transcript 填充行"还是"编辑器 scrollOffset 偏移"。两者在画面上都可能表现为光标下移。
+**仍然成立的候选（均未证实）**
 
-**一条被排除的假设**：`Editor.scrollOffset` 不会在"空草稿 + 小窗口"下自己产生偏移。`editor.ts:302-305` 的分支在 `rendered.length <= maxRows` 时把 `scrollOffset` 归零，而空草稿只有一行；只有当草稿行数真的超过行预算时才会保留非零偏移，且随后被夹到 `[0, maxScroll]`（`:315-317`）。所以"进入即偏移"不能由 `scrollOffset` 单独解释，必须有一个把内容或光标位置错置的上游步骤（`viewportUnplaced` 或 transcript 填充行）。下一轮应先补一条启动几何夹具，把这两个上游各自固定下来，再决定改哪里。
+- **transcript 填充行 + 窄窗口**：短历史被 `filler` 推到底部时，composer 之上会出现一片空行。若用户把"光标在很下方"理解为"光标跳到很多空白行之后"，这其实是**正常的底部对齐**，只是空行数量取决于窗口高度。
+- **`regular` 模式下的主屏追加**：`transfer` 到 regular 会先 `EXIT_ALT_SCREEN` 再新建主屏绘制器，第一帧把整个 document（欢迎 + 历史）追加进 scrollback；若终端在离开 alt screen 时把光标恢复到进入前的位置，追加的起点可能与用户预期不同。这条**未验证**。
 
-**修复方向**：先补一条启动几何夹具（给定历史 + 空草稿 + 一次模式切换，断言 composer 首行紧贴最后一条历史行），把"transcript 填充行"与"`viewportUnplaced` 首次定位"分别固定下来，再决定改哪一处。注意 `reanchor` 目前只出现在 `mainScreen.ts:32` 的注释里，**没有实现**——`viewportUnplaced` 之后没有任何重建位置的代码路径（`reanchor` 是文档承诺而非既有能力），所以不能把它当成现成的修复点。
+**为什么"输入内容后就能删掉空白行"**：按上面的排除，空草稿本就不该有布局偏移；而 Backspace 在行首会合并上一行（`editor/buffer.ts:144-163`），所以"能删掉"说明那些行是**草稿里真实存在的换行符**，不是布局空行。
 
-**证据边界**：未在真实终端复现；上述为源码链路推断，需要用户确认 `tuiMode` 与是否伴随 `--resume`。
+**最需要先查的一条**：`startup.ts:39` 在加载期把 `enter`/`ctrl+j`/`shift+enter` 一律插成 `'\n'`。若用户在"Loading"阶段按过 Enter（哪怕是习惯性按键），草稿里就会留下若干换行，接管后光标自然落在这些空行之后；而用户"输入内容后能删掉"正是编辑普通换行符的行为。**这条能同时解释"光标在空白行之后"与"能删掉"，且不需要任何布局缺陷。**
+
+**下一轮的做法**：先补一条启动夹具——加载期按 N 次 Enter 后接管，断言草稿文本与光标 offset；再补一条纯几何夹具——历史 + 空草稿，断言 composer 首行紧贴最后一条历史行。两条分别固定后，才能判断用户看到的是哪一种。修复方向取决于结果：若是加载期 Enter，应在接管时保留这些换行（它们是用户输入）但把光标放到末尾，并让提示行说明"Enter 换行"；若是几何问题，再改布局。
+
+**证据边界**：未在真实终端复现；上述为源码核实后的排除与候选，未做任何修复。需要用户确认两点：`tuiMode`（默认 fullscreen），以及进入后那些空白行是否**能被 Backspace 逐个删除**（能=草稿换行；不能=布局空行）。
 
 ### 19.5 第二十八：config 与 model 配置没有区分开
 
@@ -3067,7 +3074,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 24 | 确认：工具体硬拒绝，审批层不可达 | `registry.ts:322/426`、`turn/tools.ts:408`、参考实现对照 | P0（用户阻塞） |
 | 25 | 确认：请求侧默认不索要推理（Anthropic/Google/Bedrock 无思考可看）；恢复不重建思考块；流式中点击被丢；regular 模式提示不可点 | `preference.ts:6`、`anthropicMessages.ts:158`、`googleWire.ts:180-183`、`history.ts:36-109`、`pointer.ts:258-262` | P0（根因在请求侧） |
 | 26 | 确认：裸 `exit` 是提示词；MCP `close()` 无上限（最坏 30 s） | `registry.ts:436`、`interactiveLoop.ts:67`、`gateway.ts:188` | P0（阻塞退出） |
-| 27 | 高置信推断：启动几何竞态（`scrollOffset` 持久 + `viewportUnplaced`） | `editor.ts:281-319`、`mainScreen.ts:161-162` | P1（需用户确认模式） |
+| 27 | 未确认：三个候选均被反证或未证实；最可能为加载期 Enter 写入的草稿换行 | `startup.ts:39`、`editor.ts:302-305`、`mainScreen.ts:296` | P1（先补两条夹具） |
 | 28 | 确认：无 `/config`；模型行为字段在 settings、目录在 model，effort 三入口 | `settings.ts:78`、`picker/settings.ts:253-257`、`picker/model.ts:206` | P2（结构） |
 | 29 | 确认：搜索全量重扫（实测 0.87–1.03 s/次） | `listing.ts:69-73`、`catalog/index.ts:261-284` | P0（体验） |
 | 30 | 确认：SIGTERM/SIGHUP 不写 terminated，下次静默重入 | `bootstrap.ts:166/348-356`、`shutdown.ts:18-19` | P0（数据正确性） |
