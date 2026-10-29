@@ -3173,11 +3173,11 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 |---|---|---|
 | 24 | 本地实现与聚焦验证 | 缺真实终端/用户目录审批现场与非Linux文件系统证据 |
 | 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses/Google native摘要准入已实现；20.33新增当前relay真实小请求的公开thinking/展开/恢复，auto保留，整体partial | 其他模型/协议默认与公开内容、真实账户及用户终端复验；单个relay请求不覆盖完整矩阵 |
-| 26 | 四条明确机制、MCP未开始调用及表面/渲染失败围栏已修；20.36/20.40有小型真实CLI正常/空闲信号退出证据 | 缺真实用户故障退出与busy信号现场；MCP预算到期不能证明清理完成 |
+| 26 | 四条明确机制、MCP未开始调用及表面/渲染失败围栏已修；20.36/20.40有正常/空闲信号CLI，20.41有loopback忙碌流取消与恢复 | 缺真实用户故障设备/外部provider busy信号现场；MCP预算到期不能证明清理完成 |
 | 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
 | 28 | 会话入口与配置字段分类隔离已实施；本地聚焦验证 | 缺真实用户终端与整体面板现场验收 |
 | 29 | 同次浏览索引复用与真实目录只读性能已验证；20.38/20.39补48小会话的实际CLI搜索/选择/分页，并修清空查询后重建回带旧查询 | 缺用户大目录终端性能与非Linux证据；小型PTY时间包含输入/去抖/观察开销，不能代替生产性能 |
-| 30 | 空闲fresh、信号关闭及真实恢复保护已实现；20.40补regular/fullscreen×SIGTERM/SIGHUP实际CLI持久状态、普通fresh和显式resume | 缺用户终端关闭、busy信号、非Linux与不可捕获崩溃证据；SIGKILL不执行清理钩子 |
+| 30 | 空闲fresh、信号关闭及真实恢复保护已实现；20.40空闲/20.41 loopback busy均覆盖两模式×两信号CLI，恢复保留中断且不重发 | 缺用户终端关闭、外部provider busy、非Linux与不可捕获崩溃证据；SIGKILL不执行清理钩子 |
 | 19.8 | 分桶恢复、真实加载与可见partial/unknown已实现；本地验证 | 原损坏记录及其生成原因未取得；无法恢复丢失的真实账单数值 |
 
 只派gpt-6.1-sol只读/编辑代理；它们未运行任何test/build/验证。主代理在package目录每次一个文件、768MiB堆、threads=false，以`&&`串行验证。没有全套回归、没有PTY/exe、没有20k真实终端或真实provider请求。源码五静态门通过，118项旧docs advisory保留；完整声明图的单一focused脚本用例通过，module facade无超限。TypeScript build已通过，最终新鲜度和提交状态以开发日志中的实际读回为准。
@@ -3718,3 +3718,26 @@ build `94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff`、input
 四次信号退出各观察Terminal.restoreSync=1、stop=0；八次普通退出各stop=1、exit restore=0。信号成功恢复设备依赖原process exit钩子，不声称已经走完整InteractiveMode/TUI stop或每个render owner退休。Python在12次child结束后均读回ICANON/ECHO/ISIG恢复，CLI signal exit仍为143/129，不能把非零signal状态改称普通成功exit0。这里向仍正常连接的PTY注入SIGHUP，不是用户窗口实际断开/EIO，不证明故障设备或busy turn恢复。
 
 正式工件[signal-cli](../../.omx/artifacts/phase20-addition-signal-cli/)保存脚本、四组收据与边界，全部首轮通过，临时状态删除、原CLAUDE.md保留。仅文档/诊断工件变化，未重复build/Vitest/graph；脚本语法、JSON/12阶段断言与五静态门/diff检查通过，118既有docs-source advisory保留。没有真实provider、busy或pending写入、实际PTY断连、SIGKILL、Windows/桌面/IME、独立review、exe/full suite/20k证据；不升级原47项状态，ADD与Codex goal继续active。本批Git/精确CI另绑定。
+
+20.40已提交推送`52268e2a29f271b5655b65dfc4e5aa48291240cf`，远端main此前精确一致、仅原CLAUDE.md。延后核对[Watch40971222284](https://github.com/h-hei133/cheers/actions/runs/40971222284)completed/success、[CI40971222286](https://github.com/h-hei133/cheers/actions/runs/40971222286)in_progress，head一致；20.39 CI40970201073仍in_progress，不以旧CI成功替代这些新commit。
+
+### 20.41 忙碌流被信号取消后保留中断与已显示推理，恢复不重发
+
+继续20.40未覆盖busy的反馈26/30。目标先检查原signalSessionClose在isBusy时保留恢复、runner cancelGoalRunForShutdown→ShellSessionRuntime.cancelAndWait、bootstrap.hasUnfinishedBusiness和startup notices；同20.40参考信号cleanup先观察原生命周期，再处理终端。复用已有原provider step与流读取，不注入假query event或直接调用cancel；本批无产品改动。
+
+同20.39 build/inputs，各regular/fullscreen×SIGTERM/SIGHUP隔离一个home/profile/project与一条旧user fixture，原CLI显式打开、等真实prompt后输入一条小问题。本机HTTP server沿实际openai-compatible transport：GET `/v1/models`返回完整目录JSON，POST `/v1/chat/completions`只发39字符公开reasoning delta、无答案/终态，保持流直到客户端取消；不读取、记录或输出请求body/headers。CHEERS_PROVIDER_MODE=real仅选择实际HTTP路径，全部endpoint为loopback，零外部provider/真实凭据或账户请求。零工具/skills/指令、retry/warming关闭、输出256、maxTurns1、body10秒、heap768MiB、每CLI25秒/2MiB边界。
+
+等待原message.started=1、实际reasoning.delta=39及磁盘runPhase=turn-active/pending prompt身份，再向relay发信号，经原launcher转发给CLI。四组实际流连接均关闭、signal exit143/129，持久session为interrupted、runPhase仍turn-active/interruptedKind=turn，user prompt与已显示reasoning均保存；不把无答案/无终态升级成completed或terminated。随后普通重开不带session ID，原bootstrap恢复同ID，真实PTY显示Resumed session通知；原transcript恢复thinking digest与保存值相同，零新的message.started/POST，最后Ctrl+D exit0仍保留interrupted与原39字符。退出只是进程成功关闭，未将其解释成回合成功。
+
+| 实际busy/恢复路径 | signal退出 | 恢复后Ctrl+D | 峰值RSS / 两阶段探针 |
+|---|---|---|---|
+| regular/SIGTERM | 137ms、143 | 135ms、0 | 285812KiB / 12.24s |
+| regular/SIGHUP | 147ms、129 | 139ms、0 | 285392KiB / 12.31s |
+| fullscreen/SIGTERM | 135ms、143 | 136ms、0 | 284664KiB / 12.22s |
+| fullscreen/SIGHUP | 142ms、129 | 133ms、0 | 286196KiB / 12.23s |
+
+八次终端均读回ICANON/ECHO/ISIG；四次signal走exit restoreSync，四次普通恢复退出走physical stop，与20.40一致。每组最终GET readiness1/POST1，重开没有自动重发；四组共4个local completion/4个local readiness请求，不称真实provider验收。原config字节保持，current selection在busy和恢复阶段都为原fixture；全程没有答案、工具或writer，不能推断权限pending/未知写入、MCP拖延或真实服务端取消。
+
+首轮regular探针把GET与POST全算一次completion，并对readiness也返回悬挂SSE：尽管原message.started1/39字符delta已观察，HTTP总数2使等待永不满足，16.22秒/288588KiB exit1后finally发信号。此为harness/setup drift，不作产品失败或通过；改为按method/path区分完整readiness与held completion后四组重跑才全部通过，原失败收据保留。HANDOFF追加请求分桶陷阱。
+
+正式工件[signal-busy](../../.omx/artifacts/phase20-addition-signal-busy/)保存可复用脚本、初始失败/分类、四份有效收据；实际观察原start、TurnSink和Terminal方法，记录数量/状态/digest，未保存公开正文或请求内容。八次有效CLI严格串行且主代理观察结束后再执行下一项，task scratch/loopback sockets清理、原CLAUDE.md保留；脚本语法、JSON/八阶段断言与五静态门/diff通过，118旧advisory。仅文档/诊断工件，不重复build/Vitest/graph，无独立review、外部live、真实断连/EIO、SIGKILL/非Linux/桌面/IME或exe/full suite/20k；原47项不升级，ADD与goal继续active，提交/精确CI另绑定。

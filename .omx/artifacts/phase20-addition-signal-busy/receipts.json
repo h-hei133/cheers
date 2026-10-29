@@ -1,0 +1,402 @@
+[
+  {
+    "mode": "regular",
+    "signal": "SIGTERM",
+    "buildId": "94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff",
+    "inputsDigest": "b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193",
+    "fixtures": 1,
+    "messagesPerFixture": 1,
+    "providerMode": "local HTTP fixture",
+    "status": "passed",
+    "stages": [
+      {
+        "label": "busy-signal",
+        "status": "passed",
+        "recoveryBeforeSignal": {
+          "runPhase": "turn-active",
+          "pendingPromptMatches": true
+        },
+        "shutdown": {
+          "code": 143,
+          "signal": null
+        },
+        "exitMs": 137,
+        "observation": {
+          "requests": 1,
+          "reasoningCharacters": 39,
+          "physicalStops": 0,
+          "exitRestores": 1,
+          "session": {
+            "id": "sess_98ce31e2234ec8c5_1793315595533",
+            "turns": 1,
+            "userBlocks": 1,
+            "thinkingDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "durable": {
+          "status": "interrupted",
+          "runPhase": "turn-active",
+          "interruptedKind": "turn",
+          "promptRetained": true,
+          "reasoningCharacters": 39,
+          "reasoningDigest": "da5c7ce4200311102ee284620e2c99b26e9fa19b5b5e2937f192a4eb13347b47"
+        },
+        "outputBytes": 3107,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "label": "ordinary-recovery",
+        "status": "passed",
+        "recoveryNoticeVisible": true,
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 135,
+        "observation": {
+          "requests": 0,
+          "reasoningCharacters": 0,
+          "physicalStops": 1,
+          "exitRestores": 0,
+          "session": {
+            "id": "sess_98ce31e2234ec8c5_1793315595533",
+            "turns": 3,
+            "userBlocks": 2,
+            "thinkingDigest": "da5c7ce4200311102ee284620e2c99b26e9fa19b5b5e2937f192a4eb13347b47"
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "durable": {
+          "status": "interrupted",
+          "runPhase": "turn-active",
+          "interruptedKind": "turn",
+          "promptRetained": true,
+          "reasoningCharacters": 39,
+          "reasoningDigest": "da5c7ce4200311102ee284620e2c99b26e9fa19b5b5e2937f192a4eb13347b47"
+        },
+        "outputBytes": 4702,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      }
+    ],
+    "checks": {
+      "signalCancellationClosedTransport": true,
+      "recoveredSameInterruptedSession": true,
+      "reasoningSavedAndRestored": true,
+      "noAutomaticReplay": true,
+      "configUnchanged": true
+    },
+    "scratchRemoved": true,
+    "requests": 1,
+    "readinessRequests": 1,
+    "responseStreamClosed": true,
+    "peakRssKiB": 285812,
+    "elapsedSeconds": 12.24
+  },
+  {
+    "mode": "regular",
+    "signal": "SIGHUP",
+    "buildId": "94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff",
+    "inputsDigest": "b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193",
+    "fixtures": 1,
+    "messagesPerFixture": 1,
+    "providerMode": "local HTTP fixture",
+    "status": "passed",
+    "stages": [
+      {
+        "label": "busy-signal",
+        "status": "passed",
+        "recoveryBeforeSignal": {
+          "runPhase": "turn-active",
+          "pendingPromptMatches": true
+        },
+        "shutdown": {
+          "code": 129,
+          "signal": null
+        },
+        "exitMs": 147,
+        "observation": {
+          "requests": 1,
+          "reasoningCharacters": 39,
+          "physicalStops": 0,
+          "exitRestores": 1,
+          "session": {
+            "id": "sess_2748f42f51f7d6e7_1793315615804",
+            "turns": 1,
+            "userBlocks": 1,
+            "thinkingDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "durable": {
+          "status": "interrupted",
+          "runPhase": "turn-active",
+          "interruptedKind": "turn",
+          "promptRetained": true,
+          "reasoningCharacters": 39,
+          "reasoningDigest": "da5c7ce4200311102ee284620e2c99b26e9fa19b5b5e2937f192a4eb13347b47"
+        },
+        "outputBytes": 3107,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "label": "ordinary-recovery",
+        "status": "passed",
+        "recoveryNoticeVisible": true,
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 139,
+        "observation": {
+          "requests": 0,
+          "reasoningCharacters": 0,
+          "physicalStops": 1,
+          "exitRestores": 0,
+          "session": {
+            "id": "sess_2748f42f51f7d6e7_1793315615804",
+            "turns": 3,
+            "userBlocks": 2,
+            "thinkingDigest": "da5c7ce4200311102ee284620e2c99b26e9fa19b5b5e2937f192a4eb13347b47"
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "durable": {
+          "status": "interrupted",
+          "runPhase": "turn-active",
+          "interruptedKind": "turn",
+          "promptRetained": true,
+          "reasoningCharacters": 39,
+          "reasoningDigest": "da5c7ce4200311102ee284620e2c99b26e9fa19b5b5e2937f192a4eb13347b47"
+        },
+        "outputBytes": 4702,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      }
+    ],
+    "checks": {
+      "signalCancellationClosedTransport": true,
+      "recoveredSameInterruptedSession": true,
+      "reasoningSavedAndRestored": true,
+      "noAutomaticReplay": true,
+      "configUnchanged": true
+    },
+    "scratchRemoved": true,
+    "requests": 1,
+    "readinessRequests": 1,
+    "responseStreamClosed": true,
+    "peakRssKiB": 285392,
+    "elapsedSeconds": 12.31
+  },
+  {
+    "mode": "fullscreen",
+    "signal": "SIGTERM",
+    "buildId": "94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff",
+    "inputsDigest": "b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193",
+    "fixtures": 1,
+    "messagesPerFixture": 1,
+    "providerMode": "local HTTP fixture",
+    "status": "passed",
+    "stages": [
+      {
+        "label": "busy-signal",
+        "status": "passed",
+        "recoveryBeforeSignal": {
+          "runPhase": "turn-active",
+          "pendingPromptMatches": true
+        },
+        "shutdown": {
+          "code": 143,
+          "signal": null
+        },
+        "exitMs": 135,
+        "observation": {
+          "requests": 1,
+          "reasoningCharacters": 39,
+          "physicalStops": 0,
+          "exitRestores": 1,
+          "session": {
+            "id": "sess_4621965d15a65f4b_1793315635195",
+            "turns": 1,
+            "userBlocks": 1,
+            "thinkingDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "durable": {
+          "status": "interrupted",
+          "runPhase": "turn-active",
+          "interruptedKind": "turn",
+          "promptRetained": true,
+          "reasoningCharacters": 39,
+          "reasoningDigest": "da5c7ce4200311102ee284620e2c99b26e9fa19b5b5e2937f192a4eb13347b47"
+        },
+        "outputBytes": 4194,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "label": "ordinary-recovery",
+        "status": "passed",
+        "recoveryNoticeVisible": true,
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 136,
+        "observation": {
+          "requests": 0,
+          "reasoningCharacters": 0,
+          "physicalStops": 1,
+          "exitRestores": 0,
+          "session": {
+            "id": "sess_4621965d15a65f4b_1793315635195",
+            "turns": 3,
+            "userBlocks": 2,
+            "thinkingDigest": "da5c7ce4200311102ee284620e2c99b26e9fa19b5b5e2937f192a4eb13347b47"
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "durable": {
+          "status": "interrupted",
+          "runPhase": "turn-active",
+          "interruptedKind": "turn",
+          "promptRetained": true,
+          "reasoningCharacters": 39,
+          "reasoningDigest": "da5c7ce4200311102ee284620e2c99b26e9fa19b5b5e2937f192a4eb13347b47"
+        },
+        "outputBytes": 4934,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      }
+    ],
+    "checks": {
+      "signalCancellationClosedTransport": true,
+      "recoveredSameInterruptedSession": true,
+      "reasoningSavedAndRestored": true,
+      "noAutomaticReplay": true,
+      "configUnchanged": true
+    },
+    "scratchRemoved": true,
+    "requests": 1,
+    "readinessRequests": 1,
+    "responseStreamClosed": true,
+    "peakRssKiB": 284664,
+    "elapsedSeconds": 12.22
+  },
+  {
+    "mode": "fullscreen",
+    "signal": "SIGHUP",
+    "buildId": "94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff",
+    "inputsDigest": "b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193",
+    "fixtures": 1,
+    "messagesPerFixture": 1,
+    "providerMode": "local HTTP fixture",
+    "status": "passed",
+    "stages": [
+      {
+        "label": "busy-signal",
+        "status": "passed",
+        "recoveryBeforeSignal": {
+          "runPhase": "turn-active",
+          "pendingPromptMatches": true
+        },
+        "shutdown": {
+          "code": 129,
+          "signal": null
+        },
+        "exitMs": 142,
+        "observation": {
+          "requests": 1,
+          "reasoningCharacters": 39,
+          "physicalStops": 0,
+          "exitRestores": 1,
+          "session": {
+            "id": "sess_74545e7c85e13990_1793315671411",
+            "turns": 1,
+            "userBlocks": 1,
+            "thinkingDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "durable": {
+          "status": "interrupted",
+          "runPhase": "turn-active",
+          "interruptedKind": "turn",
+          "promptRetained": true,
+          "reasoningCharacters": 39,
+          "reasoningDigest": "da5c7ce4200311102ee284620e2c99b26e9fa19b5b5e2937f192a4eb13347b47"
+        },
+        "outputBytes": 4194,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "label": "ordinary-recovery",
+        "status": "passed",
+        "recoveryNoticeVisible": true,
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 133,
+        "observation": {
+          "requests": 0,
+          "reasoningCharacters": 0,
+          "physicalStops": 1,
+          "exitRestores": 0,
+          "session": {
+            "id": "sess_74545e7c85e13990_1793315671411",
+            "turns": 3,
+            "userBlocks": 2,
+            "thinkingDigest": "da5c7ce4200311102ee284620e2c99b26e9fa19b5b5e2937f192a4eb13347b47"
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "durable": {
+          "status": "interrupted",
+          "runPhase": "turn-active",
+          "interruptedKind": "turn",
+          "promptRetained": true,
+          "reasoningCharacters": 39,
+          "reasoningDigest": "da5c7ce4200311102ee284620e2c99b26e9fa19b5b5e2937f192a4eb13347b47"
+        },
+        "outputBytes": 4934,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      }
+    ],
+    "checks": {
+      "signalCancellationClosedTransport": true,
+      "recoveredSameInterruptedSession": true,
+      "reasoningSavedAndRestored": true,
+      "noAutomaticReplay": true,
+      "configUnchanged": true
+    },
+    "scratchRemoved": true,
+    "requests": 1,
+    "readinessRequests": 1,
+    "responseStreamClosed": true,
+    "peakRssKiB": 286196,
+    "elapsedSeconds": 12.23
+  }
+]

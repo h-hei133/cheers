@@ -10342,3 +10342,11 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 沿[addition20.40](features/phase-20-addition.md#2040-空闲信号关闭普通fresh与显式恢复的实际cli证据)补regular/fullscreen×SIGTERM/SIGHUP。每组一条小fixture，三阶段原Node CLI/PTY：显式会话→信号退出→磁盘terminated；普通启动→新ID/无旧history→Ctrl+D空会话删除；显式恢复→原ID/同一turn和user block/实际fixture绘制→Ctrl+D retained/terminated。synthetic零请求、隔离profile/home、heap768MiB/每CLI20秒/2MiB，12次严格串行首轮均过，配置原字节保持、current selection逐次读回。
 
 信号退出98–103ms、143/129，普通退出148–178ms、0，12次termios cooked恢复；四次signal走exit restoreSync一次、没有完整stop，八次普通走stop一次。峰值RSS286088–287176KiB，每组三阶段14.60–14.81秒。正式收据/脚本/边界保留、scratch清理；无产品变更，不重复build/Vitest，语法/JSON/五门/diff通过、118旧advisory。信号注入仍连接PTY，不代替busy/pending、实际断连/EIO、SIGKILL、非Linux、桌面/IME、live或独立review；原47不升级、goal active，Git/精确CI另绑定。
+
+20.40已推送`52268e2a29f271b5655b65dfc4e5aa48291240cf`，远端main此前一致。延后核对Watch40971222284 success，CI40971222286与20.39 CI40970201073仍in_progress，head一致。
+
+## [2026-10-30] verify | busy信号取消后中断恢复不重发
+
+沿[addition20.41](features/phase-20-addition.md#2041-忙碌流被信号取消后保留中断与已显示推理恢复不重发)补两模式×两信号原CLI/PTY与loopback实际HTTP。每组GET readiness JSON一次、POST一次只发39字符reasoning并保持流；等原message.started/delta及磁盘turn-active/prompt再发signal。四次signal135–147ms/143或129、流关闭、session interrupted；普通重开同ID、真实恢复通知、thinking保存/恢复digest一致、无自动第二POST，Ctrl+D133–139ms/0后仍interrupted。八次cooked flags恢复，峰值RSS284664–286196KiB，两阶段12.22–12.31秒。
+
+初始regular把readiness与completion混计且readiness悬挂，message1/delta39已观察但总HTTP2导致timeout exit1，保留并分类setup后修探针；四组有效重跑串行全部通过。仅文档/工件，无产品改动、外部live、工具/写入、独立review、实际PTY断连/EIO或非Linux；语法/JSON/五门/diff通过、118旧advisory，scratch与socket清理、HANDOFF追加分桶陷阱。当前loopback不能代替真实provider取消或未知写入，原47不升级、goal active，Git/CI另绑定。

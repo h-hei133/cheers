@@ -1,0 +1,39 @@
+{
+  "mode": "regular",
+  "signal": "SIGTERM",
+  "buildId": "94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff",
+  "inputsDigest": "b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "local HTTP fixture",
+  "status": "failed",
+  "stages": [
+    {
+      "label": "busy-signal",
+      "status": "failed",
+      "failure": "timeout-stream-reasoning",
+      "observation": {
+        "requests": 1,
+        "reasoningCharacters": 39,
+        "physicalStops": 0,
+        "exitRestores": 0,
+        "session": {
+          "id": "sess_1febba63b4c58161_1793315550854",
+          "turns": 1,
+          "userBlocks": 1,
+          "thinkingDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "outputBytes": 121968,
+      "outputLimitExceeded": false,
+      "deadlineExceeded": false
+    }
+  ],
+  "checks": {},
+  "failure": "timeout-stream-reasoning",
+  "scratchRemoved": true,
+  "requests": 2,
+  "responseStreamClosed": true,
+  "peakRssKiB": 288588,
+  "elapsedSeconds": 16.22
+}

@@ -1,0 +1,28 @@
+{
+  "initialRun": {
+    "mode": "regular",
+    "signal": "SIGTERM",
+    "status": "failed",
+    "failure": "timeout-stream-reasoning",
+    "classification": "harness/setup drift",
+    "allHttpRequests": 2,
+    "messageStarted": 1,
+    "reasoningCharacters": 39,
+    "deadlineBeforeIntendedSignal": true,
+    "finallySentSignal": true,
+    "peakRssKiB": 288588,
+    "elapsedSeconds": 16.22
+  },
+  "correction": "Return complete JSON to GET /v1/models and count it separately from held POST /v1/chat/completions.",
+  "finalRuns": 4,
+  "cliLaunches": 8,
+  "localCompletionRequests": 4,
+  "localReadinessRequests": 4,
+  "externalProviderRequests": 0,
+  "tools": 0,
+  "rawOutputArchived": false,
+  "deadPty": false,
+  "unverifiedWrites": false,
+  "response": "One public reasoning fragment, no answer or verified completion, hold until client cancellation.",
+  "note": "CHEERS_PROVIDER_MODE=real selects actual HTTP transport, but all requests use the isolated loopback fixture."
+}

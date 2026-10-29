@@ -1005,3 +1005,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Clearing a continued session search restores the newest page, but Next or a project-scope change brings the old query back.
 - **Root Cause**: The browser clears its live query while immutable options retain initialQuery. A conditional spread omits the cleared value, allowing the reconstruction seed to survive.
 - **Rule**: Explicitly overwrite cleared state when rebuilding a picker. Page continuation carries the live query, including undefined; a fresh scope resets the initial query. Verify search continuation, clear, Next and scope change through the actual host and CLI, including the intentional current-session row on later pages.
+
+### HTTP Probe Counts Must Separate Readiness From Model Turns
+- **Symptom**: A busy CLI probe receives the expected reasoning fragment but times out waiting for exactly one HTTP request.
+- **Root Cause**: The real provider route also calls GET /models for readiness. Treating every HTTP request as a completion makes the count assertion impossible and can hold the readiness response open.
+- **Rule**: Give readiness its own complete response and counter; hold only the intended completion stream. Observe the original message.started separately, retain setup failures, and count replay across the restart instead of equating all transport requests with model turns.
