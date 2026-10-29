@@ -220,6 +220,7 @@ export class TUI {
     if (!this.started || this.stopped) return run();
 
     this.scheduler.clearTimeout(this.frameTimer);
+    this.frameTimer = undefined;
     this.setMouseTracking(false);
     // The child owns the screen now and may clear it. Remembering image ids
     // across that would place pictures onto slots the child emptied.
@@ -279,6 +280,7 @@ export class TUI {
     this.stopped = true;
     this.started = false;
     this.scheduler.clearTimeout(this.frameTimer);
+    this.frameTimer = undefined;
     this.setMouseTracking(false);
     if (this.overlayScreen) {
       this.terminal.write(this.forgetTransmittedImages({ free: true }) + EXIT_ALT_SCREEN);
