@@ -10224,3 +10224,11 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 继续[addition20.27](features/phase-20-addition.md#2027-responses部分reasoning的可验证尾部)：原终态part允许已流prefix增长，但display的any-delta守卫丢所有余文；四项summary/raw reader与真实step→sink回归失败，另65通过。沿已核对官方done完整正文及参考item收尾投影，本项目只补可直接追加的同正文后缀。slot按真实发出顺序记shownReasoning，终态公开投影startsWith并增长才slice追加，Map part顺序不代表显示顺序。
 
 五显式文件201项串行通过，四类反转4/11/1/1失败、finally逐字节恢复后201再通过；交错part夹具加长终态第二part以观测错误追加。五静态门/diff通过，无新import/callable、不重复完整图/NormProof。build `643a2bafca77f650a22314da8a66341923cf3acaddf0f1bcba336f366762386f`，inputs `a8147821bee5b6b60e5c7642dfa3967aab05056ce6c3a7dbe4dacfd3bf1a754c`，460/3547在build exit0后单独重算一致。HANDOFF补实际发出顺序、task scratch清理；raw/summary重表示及不匹配正文的live全量替换仍未宣称完成。无独立review、live/真实账户终端、PTY/exe/full suite或20k会话，原47不升级、ADD active，Git/新精确CI另绑定。
+
+该批提交推送`b664f35231c557c04f40414d6b8c7bc2b9844b33`，远端main精确一致、仅原CLAUDE.md。[Watch40949567373](https://github.com/h-hei133/cheers/actions/runs/40949567373)延后success，[CI40949567238](https://github.com/h-hei133/cheers/actions/runs/40949567238)仍in_progress；[44f8d9fc CI40946387010](https://github.com/h-hei133/cheers/actions/runs/40946387010)现completed/success，精确head一致，3db82225 CI仍运行。
+
+## [2026-10-30] fix | 继续答案时结束新到thinking
+
+继续[addition20.28](features/phase-20-addition.md#2028-多次聚合delta后的thinking结束边界)：20.25单次聚合顺序修复后，多次聚合仍让第二thinking新建，而chunk复用assistant绕过openAssistant的结束调用。两次聚合的三field真实step→sink与owner回归四失败/85通过。对照每delta先thinking再text决定及实际sink复用边界，产品仅非空chunk先原settleThinking，保持同一答案累积与空tick不续钟。
+
+五显式文件232项串行通过，唯一调用撤去反转四失败、finally逐字节恢复后232再通过。五静态门/diff通过，无新import/callable、不重复graph/NormProof。build `c1fa3a0861b8b496dcdde6670e24383d5487a72750bd09b19cb7a18225a675dc`，inputs `ee672ceda08c4c0bd365387e3f42348c4c13b53f93ed93a01318bde3876b2d56`，460/3547在exit0后单独新鲜度一致。HANDOFF补答案复用陷阱、scratch清理；无独立review、live/真实账户/用户终端、PTY/exe/full suite或20k会话，原47不升级、ADD active，Git/精确新CI另绑定。

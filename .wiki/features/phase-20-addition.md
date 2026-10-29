@@ -3478,3 +3478,13 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 主代理五显式文件201项串行通过：stream59/consumer10/body19/account17/step96。summary/raw尾部各贯通当前thinking完整正文和finalized；额外交错part夹具确认实际回调顺序不能由Map中的part序列重建。四类反转关闭部分尾部、清空已显示前缀、去掉prefix校验、按part map重建分别4/11/1/1项失败，finally逐字节恢复后201项重验通过。交错fixture反转前补长终态第二part，让错误slice确实可观测，没有放宽产品合同。五静态门/diff通过；局部slot/前缀修复无新import/callable，未重复完整声明图或NormProof。1536MiB build确认exit0后单独新鲜度重算通过：build `643a2bafca77f650a22314da8a66341923cf3acaddf0f1bcba336f366762386f`，inputs `a8147821bee5b6b60e5c7642dfa3967aab05056ce6c3a7dbe4dacfd3bf1a754c`，460 compilerInputs/3547文件一致。
 
 HANDOFF记录实际发出顺序与校验part状态分开，任务scratch清理；无独立review、live provider/账户、真实终端、PTY/exe/full suite或20k会话，原47项不升级、ADD active。Git/精确新CI另绑定，既有success不延伸到本批。
+
+本批已提交推送`b664f35231c557c04f40414d6b8c7bc2b9844b33`，远端main精确一致、仅原CLAUDE.md。[Watch40949567373](https://github.com/h-hei133/cheers/actions/runs/40949567373)延后success，[CI40949567238](https://github.com/h-hei133/cheers/actions/runs/40949567238)仍in_progress。20.25的[44f8d9fc CI40946387010](https://github.com/h-hei133/cheers/actions/runs/40946387010)现completed/success，精确head一致；20.26 CI仍运行。
+
+### 20.28 多次聚合delta后的thinking结束边界
+
+继续20.25，第二个delta同时含reasoning与content时，[TurnSink](../../packages/ts-shell/src/cli/interactive/turnSink.ts)先新建thinking，但chunk复用原assistant，仅openAssistant里的settleThinking不会运行；第二thinking仍live、activity回thinking。三个公开字段的实际step→sink夹具扩为两次聚合delta，另新增owner回归保留同一answer并检查后续空tick不续钟：原实现四失败/85通过。目标检查后沿pi/oh-my-pi已定向读取的每delta先thinking后text决定，比较其block生命周期与本项目sink的assistant复用边界；采用每次答案增量结束当前thinking，不新建第二个答案或引入参考event体系。
+
+产品仅在chunk的非空text守卫后调用原settleThinking，保留openAssistant、prose/tool与终态收尾合同。当前thinking一旦结束，空think tick仍不新建块；答案正文只在原assistant累积。聚合thinking跨答案重复出现时仍依实际到达顺序保留独立块，未宣称重新排序整个会话。
+
+主代理五显式文件232项串行通过：completion37/endpoint38/step96/turnSink51/Responses consumer10。撤去唯一调用反转四项全部失败，finally逐字节恢复后232再通过。五静态门/diff通过，局部调用无新import/callable，不重复结构graph/NormProof。1536MiB build确认exit0后单独新鲜度通过：build `c1fa3a0861b8b496dcdde6670e24383d5487a72750bd09b19cb7a18225a675dc`，inputs `ee672ceda08c4c0bd365387e3f42348c4c13b53f93ed93a01318bde3876b2d56`，460 compilerInputs/3547文件一致。HANDOFF补答案复用边界、任务scratch清理；无独立review、live provider/账户/用户终端、PTY/exe/full suite或20k会话，原47项不升级、ADD active，Git/精确新CI另绑定。

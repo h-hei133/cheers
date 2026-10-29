@@ -409,6 +409,27 @@ describe("what a tool card says it is doing", () => {
 });
 
 describe("the activity row across a reasoning answer", () => {
+  it('settles resumed reasoning when the existing answer continues without splitting that answer', () => {
+    const { sink, transcript } = build();
+    sink.begin('turn', 'turn');
+    sink.think('First reasoning');
+    sink.chunk('Answer');
+    const assistant = transcript.all().find(block => block.kind === 'assistant');
+    sink.think('More reasoning');
+    const latest = transcript.last()!;
+    expect(latest.kind).toBe('thinking');
+    expect(latest.finalized).toBe(false);
+    sink.chunk(' continues');
+    expect(latest.finalized).toBe(true);
+    expect(sink.activity()?.label).toBe('working');
+    expect(transcript.all().filter(block => block.kind === 'assistant')).toEqual([assistant]);
+    expect(assistant?.text).toBe('Answer continues');
+    const elapsed = latest.elapsedMs;
+    sink.think();
+    expect(latest.elapsedMs).toBe(elapsed);
+    sink.end();
+  });
+
   it("stops reading thinking once the answer starts streaming", () => {
     const { sink } = build();
     sink.begin("turn", "turn");

@@ -19,7 +19,7 @@ it.each(['reasoning_content', 'reasoning', 'reasoning_text'] as const)(
     sink.begin('turn', 'turn');
     const events = [
       { choices: [{ delta: { [field]: 'Public reasoning', content: 'Answer' } }] },
-      { choices: [{ delta: { content: ' continues' }, finish_reason: 'stop' }] },
+      { choices: [{ delta: { [field]: ' continues', content: ' continues' }, finish_reason: 'stop' }] },
     ].map(event => `data: ${JSON.stringify(event)}\n\n`).join('') + 'data: [DONE]\n\n';
     const step = createStepFunction({ provider: { provider: 'fixture', model: 'm', baseUrl: 'https://fixture.invalid/v1',
       endpoint: 'openai-compatible', headers: {} }, workspaceRoot: process.cwd(), sessionId, systemPrompt: 'brief', tools: [],
@@ -28,10 +28,11 @@ it.each(['reasoning_content', 'reasoning', 'reasoning_text'] as const)(
       const result = await step([{ role: 'user', content: 'question' }], undefined,
         { onReasoning: delta => sink.handleEvent({ type: 'reasoning.delta', role: 'coder', delta }),
           onText: delta => sink.handleEvent({ type: 'message.delta', role: 'coder', delta }) }, { allowTools: false });
-      expect(result).toMatchObject({ text: 'Answer continues', reasoning: { text: 'Public reasoning' }, stopReason: 'stop' });
+      expect(result).toMatchObject({ text: 'Answer continues', reasoning: { text: 'Public reasoning continues' }, stopReason: 'stop' });
       expect(transcript.all().map(block => ({ kind: block.kind, text: block.text, finalized: block.finalized }))).toEqual([
         { kind: 'thinking', text: 'Public reasoning', finalized: true },
         { kind: 'assistant', text: 'Answer continues', finalized: false },
+        { kind: 'thinking', text: ' continues', finalized: true },
       ]);
       expect(sink.activity()?.label).toBe('working');
     } finally { sink.end(); resetSessionUsage(sessionId); }

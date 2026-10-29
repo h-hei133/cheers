@@ -936,3 +936,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A verified Responses terminal contains the rest of a public reasoning prefix, but the live thinking block retains only the prefix. Rebuilding shown text from per-part maps can also append an incorrect tail after interleaved parts.
 - **Root Cause**: A boolean already-streamed check drops every terminal suffix; per-part maps record validation state, not the order in which callbacks displayed text.
 - **Rule**: Record actual emitted reasoning per native output item. Append only the verified terminal projection's suffix when it starts with that exact emitted string; do not concatenate raw and summary alternatives or reconstruct display order from part maps. Preserve existing done/terminal rejection and native replay bytes.
+
+### Resuming An Answer Must Also Settle Newly Arrived Thinking
+- **Symptom**: Multiple aggregated SSE deltas each contain thinking and answer text; the second thinking row stays live after the answer continues.
+- **Root Cause**: Thinking settlement occurs only when the assistant block is first opened. Later answer deltas reuse that block and bypass settlement for a newly created thinking block.
+- **Rule**: Settle the current thinking block on every nonempty answer chunk, including chunks reusing an assistant. Preserve the existing single answer block and verify multiple combined deltas through the actual step-to-sink path; after settlement a no-text thinking tick must not restart its clock.

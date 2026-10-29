@@ -213,6 +213,7 @@ export class TurnSink implements RendererSink {
 
   chunk(text: string): void {
     if (!text) return;
+    this.settleThinking();
     const block = this.assistant ?? this.openAssistant();
     this.transcript.setText(block, block.text + text);
     this.onChange();
