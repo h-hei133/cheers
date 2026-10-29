@@ -970,3 +970,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Reasoning already shown disappears after reopening when the provider stream fails, ends early or is cancelled.
 - **Root Cause**: Failed/aborted step builders retain answer text but omit the public reasoning callback history; persistence cannot save evidence the step discarded.
 - **Rule**: Retain the current call's actual public reasoning callback text for failed/aborted results lacking native reasoning. Keep failure status, omit signature/replay authority, reject unknown terminal text, and reset observations on the next step. Test real EOF/error/cancellation plus persistence and restoration.
+
+### Immutable Build Navigation Must Use The Current Manifest
+- **Symptom**: Listing dist recursively emits millions of paths from retained historical builds instead of locating one runtime module.
+- **Root Cause**: Build artifacts are versioned under dist/builds; the current module does not live at dist/<module>, and a broad file search traverses every retained generation.
+- **Rule**: Read the current build-manifest.json, select dist/builds/<buildId>, and inspect only the required module. Use the manifest's input/artifact lists for targeted checks; never recursively enumerate the entire build history for source navigation.

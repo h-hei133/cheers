@@ -3546,3 +3546,26 @@ HANDOFF补推理证据与回答成功分开，任务scratch清理、原CLAUDE.md
 两显式文件134项串行通过：session37/step97，包含兼容EOF/reader error、Responses failed/EOF、真实取消、后续请求隔离、实际持久/恢复、一次请求且query.failed无query.completed、不含未验证终态正文/cipher/signature/replay binding；原partial answer仍保留。反转关闭stamp补文或移除实际delta累积均6失败，finally字节恢复后134再通过。五静态门/diff、AST step18通过，无新import/callable、不重复graph/NormProof。1536MiB build观察exit0后单独新鲜度一致：build `7f09032c8bbac12778139e6a2b0293d5690ba3067fecb6a1e897595a122dd8e0`，inputs `a32c8624a9e8b03ef465554bf116e46d4dff6500ce62c56b49d0a78fd5b69169`，460 compilerInputs/3549文件。
 
 HANDOFF补失败路径公开证据保留与验证终态权威分离，任务scratch清理，原CLAUDE.md保留。无独立review/live provider/账户/真实用户终端/PTY/exe/full suite/20k会话，原47项不升级、ADD/goal active，本批Git/精确CI另绑定。
+
+20.32已提交推送`cc74115ec5de8b391252b4096189577da8e6be11`，远端main精确一致、仅原CLAUDE.md。延后核对[Watch40957840554](https://github.com/h-hei133/cheers/actions/runs/40957840554)已completed/success，[CI40957840429](https://github.com/h-hei133/cheers/actions/runs/40957840429)仍in_progress。20.29[CI40954559846](https://github.com/h-hei133/cheers/actions/runs/40954559846)、20.30[CI40955431408](https://github.com/h-hei133/cheers/actions/runs/40955431408)均completed/success且head一致；20.31[CI40956596885](https://github.com/h-hei133/cheers/actions/runs/40956596885)仍in_progress，历史失败不改。
+
+### 20.33 配置中真实模型的公开thinking、展开与恢复
+
+在上述产品HEAD和已验证build `7f09032c8bbac12778139e6a2b0293d5690ba3067fecb6a1e897595a122dd8e0`上，反馈25新增两次串行真实provider请求。只读加载真实目录与legacy项目档位，使用原`createConfigInputs`/`getRuntimeConfig`读取用户配置、原`resolveCliCredential`解析凭据；运行状态由`.tmp/live-reasoning/`内named profile隔离。目标为`openai-compatible`、`bailucode.com`上的`bailu-2.9-preview`，实际档位high、explicit=false；没有改变用户配置、目录或真实会话状态，没有复制凭据到scratch文件。
+
+两次都通过实际`createProviderStep → runTurn → TurnSink`，只发同一小型算术问题，不加载项目指令/skill/历史、工具为空；使用原产品system prompt，内存中禁用重试并设45秒AbortController、10/30/30秒transport预算。调用原`TranscriptPane.toggleCollapsed('thinking')`检查展开并重绘，通过原SessionManager写入/读回及restoreConversation核对公开正文。structured日志持久化关闭，诊断只输出状态、计数与布尔值，不打印响应正文、headers或凭据。
+
+| 观测 | 第一次：验证输出上限256 | 第二次：验证输出上限1024 |
+|---|---|---|
+| 请求/耗时 | 1次，3211ms | 1次，1840ms |
+| step/turn | length；stopped_error/stopped；空答案 | stop；completed/success；3字符正确答案 |
+| 公开reasoning | 1301字符，71个delta | 715字符，46个delta |
+| thinking | 1块，已冻结；展开后多27行 | 1块，已冻结；展开后多33行 |
+| 显示/恢复 | 均与step公开正文精确一致 | 均与step公开正文精确一致 |
+| provider/auth/admission/取消 | 未报告failureClass或admissionFailure，未取消 | 未报告failureClass或admissionFailure，未取消 |
+| usage | 首轮探针字段投影错误，未保存可用计数 | provider报告input745/output176/total921，其中reasoning169 |
+| 峰值RSS | 136924KiB | 136580KiB |
+
+第一次验证脚本exit2表示正常回答验收不成立，不能隐去其截断/停止；公开thinking的显示、展开和恢复已通过。第二次exit0证明当前配置目标的小请求正常路径，usage是provider报告而非独立billing测量。两次均没有自动重试，第二次是主代理明确提高临时输出上限后的新请求；用户持久配置保持原值。第一轮usage投影改为原ProviderUsage的snake_case后，仅第二轮有上述计量证据。
+
+这不是用户真实终端Ctrl+T/鼠标/桌面/IME证据，也不是全部provider、账户、流失败或完整会话复入矩阵；不据此升级原Phase20的47项或宣告反馈25/ADD整体完成。没有本批产品代码改动，不重复build/Vitest；本任务scratch/profile清理，保留原CLAUDE.md。发现length说明仍把输出截断归因为context可能满，需沿原结果说明owner另行裁决，不把本次真实截断解释成provider故障。goal保持active，文档Git/精确CI另绑定。

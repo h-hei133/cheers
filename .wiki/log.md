@@ -10268,3 +10268,11 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 继续[addition20.32](features/phase-20-addition.md#2032-失败与取消后的已显示公开推理证据)：失败/EOF/取消路径只保留answer，实际公开reasoning显示后无法恢复。三个真实SSE/step/runTurn/history回归失败。对照参考catch保留thinking内容的决定，step单次调用记录实际公开回调，统一stamp仅为error/aborted且缺reasoning的结果补text；不接纳未知terminal、cipher或签名，无replay binding，后续请求隔离。
 
 两显式文件134串行通过，补文/累积反转均6失败、finally字节恢复后134再通过。五静态门/diff、AST step18，无新import/callable，不重复graph/NormProof。build `7f09032c8bbac12778139e6a2b0293d5690ba3067fecb6a1e897595a122dd8e0`，inputs `a32c8624a9e8b03ef465554bf116e46d4dff6500ce62c56b49d0a78fd5b69169`，460/3549在exit0后单独重算一致。HANDOFF补证据/权威边界、scratch清理，无独立review/live/真实终端/PTY/exe/full suite/20k，原47不升级、goal active，Git/新精确CI另绑定。
+
+20.32已推送`cc74115ec5de8b391252b4096189577da8e6be11`，远端main一致、仅原CLAUDE.md。延后核对Watch40957840554 success、CI40957840429仍in_progress；20.29 CI40954559846与20.30 CI40955431408均success、head一致，20.31 CI40956596885仍in_progress。
+
+## [2026-10-30] verify | 当前真实模型thinking展开与恢复
+
+反馈25沿[addition20.33](features/phase-20-addition.md#2033-配置中真实模型的公开thinking展开与恢复)运行两次串行真实请求。只读读取原配置/目录/档位与凭据，named profile隔离所有状态，实际createProviderStep/runTurn/sink/pane/SessionManager恢复链，零工具/项目内容/历史，禁用重试、45秒期限、heap768MiB。目标openai-compatible/bailu-2.9-preview、high：256临时输出上限时1301字符公开推理且length/stopped_error空答案；1024上限时715字符公开推理与3字符正确答案，completed/success，provider报告745/176/921 tokens、reasoning169。
+
+两次thinking均已冻结、可展开，原pane重绘分别多27/33行，显示与原会话恢复公开正文精确一致；耗时3211/1840ms，峰值RSS136924/136580KiB。第一轮脚本exit2不算正常回答通过，usage字段投影错误只有第二轮保留有效计数。没有打印响应正文或凭据，没有改用户配置/会话；scratch清理。没有用户终端键鼠/桌面、账户、其他provider或独立billing/review证据，原47项不升级、ADD与goal active。仅文档变化，不重复build/tests；长度说明的context归因另行核查，Git/精确CI另绑定。
