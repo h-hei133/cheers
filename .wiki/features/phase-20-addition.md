@@ -2924,32 +2924,54 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 ### 19.3 第二十六：`exit` 有时卡住
 
-**已确认：`exit` 不是一个命令词，是 `/exit`。而真正的退出链上有一个无上限的等待。**
+**已确认两条独立的挂起机制，都能解释"有时卡有时不卡"。** 另有第三类"看起来卡住"其实是被排队。
 
-**入口核实**：`core/commands/slashRouter.ts:21` 直接要求输入以 `/` 开头（`if (!input.startsWith('/') ...) return null`），所以 `registry.ts:436` 的 `exit` 命令（别名 `quit`、`q`）只有写成 `/exit` 才存在。裸输入 `exit` 会作为**普通提示词**发给模型——这本身就会让用户觉得"卡住"（模型在回答一个它被问到的词）。`ctrl+d`（`keybindings.ts:82`）在草稿为空时才退出。
+**入口核实**
 
-**退出链（`/exit` → `shutdown()`）**
+- `core/commands/slashRouter.ts:21` 要求输入以 `/` 开头，所以裸 `exit` **不是命令**，会被当普通提示词发给模型——用户若没打 `/`，看到的"卡住"是模型在回答这个词。
+- `/exit`（别名 `quit`、`q`，`registry.ts:436-443`）返回 `exit-session`（`exitCommandRuntime.ts:16`），由 `interactiveCommandRouter.ts:255-257` 转成 `exitRequested`。
+- 键：`ctrl+d` 仅草稿为空时退出（`keybindings.ts:81-82`、`keymap.ts:236-237`）；`ctrl+c` 两次（600 ms 内）退出（`keymap.ts:47`、`:347-372`）。两者直接调 `actions.exit()` → `shutdown()`（`interactiveMode.ts:692`）。
 
-1. `interactiveCommandRouter.ts:255` 把 `exit-session` 转成 `exitRequested`；`interactiveMode.ts:1105-1107` 调 `this.shutdown()`。
-2. `shutdown()`（`interactiveMode.ts:1509-1527`）：`stdin.dispose()` → `await this.terminal.drainInput()`（`drain.ts` 有 1000 ms 上限，**有界**）→ `this.stop()` → `handleShellClose(...)`。
-3. `handleShellClose`（`core/shell/signalHandlers.ts:28-54`）：`sessionRuntime.terminate()`（同步写盘）→ 打印 `--resume <id>` → `exit?.(0)`。
-4. `exit` 来自 `interactiveLoop.ts:62-70`：**`await initialMcpGateway.close?.()` 之后才 `terminate(code)`**。
+**机制一（已确认，最容易造成"永久卡住"）：`handleShellClose` 没有异常围栏**
 
-**卡住点**：`interactiveLoop.ts:67` 的 `initialMcpGateway.close()` 没有任何超时。它内部是 `gateway.ts:188` 的 `Promise.all([connectionManager.shutdown(), this.queue])`：
+`shutdown()`（`interactiveMode.ts:1509-1530`）依次执行：`stdin.dispose()` → `await drainInput()`（1000 ms 上限，**有界**）→ `stop()`（恢复终端）→ **`handleShellClose(...)`，无 try/catch**。
 
-- `this.queue` 是**串行队列**（`gateway.ts:194-199`）：一个尚未完成的 `snapshot()` 会让 `close()` 排在它后面。`snapshot` 的上限是 `MCP_CATALOG_TIMEOUT_MS = 30_000`（`catalogLimit.ts:3`），所以最坏情况退出要等 30 秒。
-- `connectionManager.shutdown()` → 每个 `CoreMcpClient.close()` → `finishClose()` 里 `await this.opening`（`client.ts:272`）。`opening` 是 `connect()` 的进行中 Promise，其超时同样是 30 秒（`client.ts:113` 传 `timeout: this.timeoutMs`）。
-- stdio 传输自身的 `close` 有 2 s + 2 s + SIGKILL 的兜底（SDK `stdio.js:143-176`），所以**stdio 不是主要卡点**；HTTP 传输（`mcp/http/transport.ts:37`）走 `requests.close()` + `super.close()`，没有额外上限。
+`handleShellClose`（`core/shell/signalHandlers.ts:28-54`）在 `input.exit?.(0)`（`:53`）之前同步执行 `sessionRuntime.terminate(sessionId)`（`:42`）→ `saveTerminated` → `handleSaveTerminated`（`session/agent/lifecycle.ts:85-90`）→ `saveSessionTerminated`（`session/lifecycle/sessionLifecycleStore.ts:150-175`），后者第一行就是 `callbacks.loadSession(sessionId)`，随后 `writeSessionMetadata`/`writeSessionState` 取**同步文件锁**。
 
-**为什么"有时卡有时不卡"**：卡住只在退出瞬间存在一个**尚未完成或正在重连**的 MCP 连接时发生。本仓库 `.cheers/mcp.json` 配置了 `code-index`（stdio，serena）与 `github`（HTTP）两个服务器；若退出时 serena 正在启动或 `tools/list` 尚未返回，`close()` 就会等它到 30 秒上限。若退出时两个连接都已稳定，退出是瞬时的。
+`withFileLock`（`session/store/sessionFileStore.ts:117-147`）用 `Atomics.wait` **阻塞主线程**，超时 1200 ms 后 `throw`（`:135`）；`loadSession` 对缺失/损坏的会话也会 `throw`（`session/store/sessionStore.ts:142-166`）。于是：
 
-**第二个隐患**：`shutdown()` 走的是 `handleShellClose`，而 `createCliShutdown` 的 `close()`（`cli/runtime/shutdown.ts:33-56`）会在 `process.exit` 之前**再执行一次** `mcpGateway.close()`（`cliProcessRunner.ts:216`）。两次 `close()` 靠 `this.closing ??=`（`gateway.ts:188`）合并，所以不会双倍等待；但这也说明**退出路径上有两个独立的 owner 都认为自己负责关 MCP**。
+- 另一个 `cheers` 进程正持有该会话的 state lock，或会话文件损坏 → `terminate()` 抛错 → `exit?.(0)` **永不执行**。
+- 四个调用点全是 fire-and-forget（`interactiveMode.ts:331`、`:460`、`:692`、`:1106`），拒绝被丢弃；`installCrashRecorder` 又明确让 `unhandledRejection` 继续运行（`observability/crashLog.ts` 注释）。结果：**终端已由 `stop()` 恢复，进程却还活着**——正是"卡住"的样子。
 
-**参考对照**：Claude Code 与 codex 的 MCP 关闭都在 shutdown 预算内（codex 的 `timeoutMs` 模式与本项目 `createCliShutdown` 的 `timeoutMs: 10_000` 一致），但本项目的 MCP `close()` **不在**那 10 秒预算内——`shutdown.exit()` 在 `interactiveLoop` 里先 await MCP，再进 `createCliShutdown`。
+间歇性的来源很清楚：取决于退出瞬间是否有别的进程持锁、或会话文件是否可读。
 
-**修复方向**：把 `interactiveLoop.ts:67` 的 MCP 关闭纳入有界预算（与 `createCliShutdown` 的 `timeoutMs` 同源），超时后打印"清理未确认"并**仍然退出**（当前 `handleShellClose` 已有"cleanup failed; exit was not verified"的措辞范式）；并让 `gateway.close()` 不再等待队列中尚未开始的 `snapshot`（关闭即拒绝新工作，队列里已排队的操作应被取消而不是等待）。
+**机制二（已确认）：MCP 关闭在 10 秒预算之外**
 
-**证据边界**：未在真实终端复现卡住；30 秒是代码上限推算，不是实测时长。裸 `exit` 是否真的被当作提示词发给模型，需用户确认当时的输入是否带 `/`。
+`exit` 回调（`interactiveLoop.ts:64-73`）先 `await input.initialMcpGateway.close?.()`，**无超时、无 abort**，之后才调 `terminate(code)`；而 `terminate` 指向的 `createCliShutdown.exit` 本身是有界的（`cli/runtime/shutdown.ts:41` 用 `timeoutMs ?? 10_000` 竞速）。
+
+`CoreMcpGateway.close()`（`core/mcp/gateway.ts:185-189`）是 `Promise.all([connectionManager.shutdown(), this.queue])`，而 `this.queue` 是串行 lane（`:191-200`）的尾部——一个正在跑的 `snapshot()`/`refresh()` 会让关闭排在它后面，上限 `MCP_CATALOG_TIMEOUT_MS = 30_000`（`catalogLimit.ts:3`）；`CoreMcpClient.finishClose` 还会 `await this.opening`（`client.ts:271-275`），连接中途再叠一个 30 秒。
+
+本仓库 `.cheers/mcp.json` 配了 `code-index`（stdio，serena）与 `github`（HTTP），所以这条在本机是**活跃风险**：退出时 serena 正在启动就会等。stdio 传输自身有 2 s + 2 s + SIGKILL 兜底（SDK `stdio.js:143-172`），HTTP 无额外上限。
+
+**机制三（已确认，不是挂起而是排队）：忙碌时 `/exit` 被排队**
+
+`onSubmit` 在 `busy` 时把 `/exit` 推入队列（`interactiveMode.ts:980-992`，`/` 开头的文本 `input` 为 `undefined`，走 `this.queue.push`），队列只在该轮结束后排空（`:1126`、`:1138`）。若该轮永不结束（挂起的 provider 请求、前台命令、占着 `busy` 的后台任务），`/exit` 就永远不执行。而 `ctrl+d`/双击 `ctrl+c` 直接走 `actions.exit()`，**不受忙碌限制**——这解释了"同一个词有时卡有时不卡"。
+
+**机制四（已确认，潜在）：两个媒体定时器没有 `unref`**
+
+`cli/media/live.ts:85` 的 100 ms `setInterval` 与 `cli/media/record.ts:49` 的 `setInterval` 都**没有 `.unref()`**，只在各自 `finish()`/`publish()` 里清除。若媒体设备关闭卡住，事件循环被永久钉住。其余定时器（`interactiveMode.ts:1025`、pointer、picker、context controller、ssh、security、terminal 键盘协商）都正确 unref 了。
+
+**参考对照**：`createCliShutdown` 的 10 秒总预算本身是对的（codex 同类），问题在于 MCP 关闭被放在了那个预算**之外**，以及 `handleShellClose` 的关键副作用没有失败处理。
+
+**修复方向**
+
+1. `shutdown()` 用 `try/finally` 包住 `handleShellClose`，保证 `exit` 一定被调用；`terminate` 失败时**仍然退出**，并打印"会话状态未能写入"（与既有 "cleanup failed; exit was not verified" 同范式）。这是最重要的一条：终端已经恢复却不退出，是四种机制里唯一会**永久**挂住的。
+2. 把 `interactiveLoop.ts:67` 的 MCP 关闭纳入同一有界预算，超时后打印未确认并退出。
+3. `gateway.close()` 不应等待队列中**尚未开始**的工作：关闭即拒绝新工作，已排队的操作取消而不是等待。
+4. `/exit` 在忙碌时应**直接执行**（或先取消当前轮），与 `ctrl+d` 语义一致，而不是排进队列。
+5. `media/live.ts:85` 与 `media/record.ts:49` 补 `.unref()`。
+
+**证据边界**：四条机制均为源码核实，未在真实终端复现。用户的卡住属于哪一条未确认；区分方法：若退出后终端已恢复但进程仍在（`ps` 可见），是机制一或四；若终端一直不恢复，是机制二。用户当时的输入是否带 `/` 也需确认。
 
 ### 19.4 第二十七：进入时输入框光标跳到很多空白行
 
@@ -2968,16 +2990,18 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 - **"`transfer` 走 `viewportUnplaced` 定位"**：不成立。`viewportUnplaced` 只由 `leaveForExternalOutput()` 置位（`mainScreen.ts:296`），而 `transfer` 走的是 `leaveScreen()` + `enterScreen()`，后者**新建**一个 `MainScreenPainter`（`engine.ts:160-163, 179-183`），新实例的 `scrolled`/`cursorRow`/`visibleContent` 全为 0，`viewportUnplaced` 为 false。所以模式切换不会进入"从当前光标行开始写"的分支。
 - **"reanchor 会重建位置"**：`reanchor` 只出现在 `mainScreen.ts:32` 的注释里，**没有实现**。
 
-**仍然成立的候选（均未证实）**
+**仍然成立的候选（按可能性排序，均未证实）**
 
-- **transcript 填充行 + 窄窗口**：短历史被 `filler` 推到底部时，composer 之上会出现一片空行。若用户把"光标在很下方"理解为"光标跳到很多空白行之后"，这其实是**正常的底部对齐**，只是空行数量取决于窗口高度。
-- **`regular` 模式下的主屏追加**：`transfer` 到 regular 会先 `EXIT_ALT_SCREEN` 再新建主屏绘制器，第一帧把整个 document（欢迎 + 历史）追加进 scrollback；若终端在离开 alt screen 时把光标恢复到进入前的位置，追加的起点可能与用户预期不同。这条**未验证**。
+- **`regular` 模式下主屏绘制器的原点靠假设而非观测**（最可能）。`transfer` 到 regular 时 `enterScreen()` **新建**一个 `MainScreenPainter`（`engine.ts:174-183`），其 `cursorRow`/`scrolled`/`visibleContent` 全部从 0 开始（`mainScreen.ts:57-62`）——它不知道终端在 `EXIT_ALT_SCREEN` 之后把光标放回了哪里。而它随后只用**相对移动**寻址（`mainScreen.ts:166-170` 的 `move` 是 `\x1b[NAB`/`\x1b[nA`），第一帧从 `move(writtenTotal)` 开始逐行 `ERASE_LINE + row + "\r\n"` 追加（`:173-186`）。所以整个对话块从"shell 提示符留下的光标位置"开始画；若提示符本来就在窗口靠下的位置，整块内容就会从低处开始并被推着滚动，composer 与光标随之错位。这能解释"光标在很下方"，且间歇性来自"提示符当时在哪一行"。
+- **首帧用替代尺寸合成**。`terminal.ts:143-152` 在 `process.stdout.rows/columns` 未定义时回落 80×24，而引擎只在尺寸 `<= 0` 时拒画（`engine.ts:358-359`），所以回落值一定会被用上。主屏模式下帧按 **document** 合成（`engine.ts:360`），`contentCapacity`/`overflow`/`newScrolled` 都由这个高度推出（`mainScreen.ts:130-141`），再转成真实的相对光标移动。WSL2/Windows Terminal 前几帧常常读不到 `rows`，此时按 24 行算出的位置与真实窗口不符；`resize` 事件到达后会强制重绘（`terminal.ts:180` → `engine.ts:401-404`），这解释了"输入之后就好了"。
+- **`setText` 不归一化 CRLF**（一个窄但真实的隐患）。`EditorBuffer.insert` 会把 `\r\n?` 归一成 `\n`（`buffer.ts:118`），但 `setText`/`setDraftText` 只按 `\n` 切分（`:91-98`），于是每行尾部留下一个 `\r`。`setText` 正是历史回溯（`editor.ts:258/265/271`）与 `replaceExternalDraft`/`stashDraft`（`interactiveMode.ts:1442/1451`）走的路径；而 `\r` 在 `resolveCodePointWidth` 里宽度为 0，渲染层也不过滤控制字符（`render/paint.ts:51-60`）。结果是一个宽度算作 0、却会让终端真实回车的字符混进帧行——从 Windows/VS Code 粘贴的草稿或历史条目即可触发。
+- **transcript 填充行 + 窄窗口**：短历史被 `filler` 推到底部时 composer 之上会出现空行。这是**正常的底部对齐**，只是空行数随窗口高度变化；若用户把它读成异常，则不是缺陷。
 
 **为什么"输入内容后就能删掉空白行"**：按上面的排除，空草稿本就不该有布局偏移；而 Backspace 在行首会合并上一行（`editor/buffer.ts:144-163`），所以"能删掉"说明那些行是**草稿里真实存在的换行符**，不是布局空行。
 
-**最需要先查的一条**：`startup.ts:39` 在加载期把 `enter`/`ctrl+j`/`shift+enter` 一律插成 `'\n'`。若用户在"Loading"阶段按过 Enter（哪怕是习惯性按键），草稿里就会留下若干换行，接管后光标自然落在这些空行之后；而用户"输入内容后能删掉"正是编辑普通换行符的行为。**这条能同时解释"光标在空白行之后"与"能删掉"，且不需要任何布局缺陷。**
+**需要并列考虑的一条**：`startup.ts:39` 在加载期把 `enter`/`ctrl+j`/`shift+enter` 一律插成 `'\n'`。若用户在"Loading"阶段按过 Enter，草稿里就会留下真实换行，接管后光标落在这些空行之后，而 Backspace 能逐个删掉它们。**这条与"主屏原点假设"是目前两个最能同时解释"光标在空白行之后"与"能删掉"的候选**，区别在于：前者那些行**可删**且删完就没有，后者那些行是**布局空行、删不掉**。用户下次只需试一下 Backspace——能删=草稿换行（加载期 Enter 或 CRLF 残留）；不能删=布局问题（主屏原点或首帧尺寸）。
 
-**下一轮的做法**：先补一条启动夹具——加载期按 N 次 Enter 后接管，断言草稿文本与光标 offset；再补一条纯几何夹具——历史 + 空草稿，断言 composer 首行紧贴最后一条历史行。两条分别固定后，才能判断用户看到的是哪一种。修复方向取决于结果：若是加载期 Enter，应在接管时保留这些换行（它们是用户输入）但把光标放到末尾，并让提示行说明"Enter 换行"；若是几何问题，再改布局。
+**下一轮的做法**：三条夹具分别固定三个候选——(a) 加载期按 N 次 Enter 后接管，断言草稿文本与光标 offset；(b) 历史 + 空草稿的纯几何，断言 composer 首行紧贴最后一条历史行；(c) `tuiMode: "regular"` 下先让 shell 提示符停在窗口下半部再交接，断言首帧的绝对行号。另需一条单元用例锁住 `setText` 对 `\r\n` 的归一化。修复方向取决于结果：加载期 Enter 是用户输入、应保留但把光标放到末尾；主屏原点需要一次 DSR 观测或显式的原点重置；首帧尺寸应在 `rows` 未知时**推迟** document 合成而不是按 24 行假设。
 
 **证据边界**：未在真实终端复现；上述为源码核实后的排除与候选，未做任何修复。需要用户确认两点：`tuiMode`（默认 fullscreen），以及进入后那些空白行是否**能被 Backspace 逐个删除**（能=草稿换行；不能=布局空行）。
 
@@ -3106,8 +3130,8 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 |---|---|---|---|
 | 24 | 确认：工具体硬拒绝，审批层不可达 | `registry.ts:322/426`、`turn/tools.ts:408`、参考实现对照 | P0（用户阻塞） |
 | 25 | 确认：请求侧默认不索要推理（Anthropic/Google/Bedrock 无思考可看）；恢复不重建思考块；流式中点击被丢；regular 模式提示不可点 | `preference.ts:6`、`anthropicMessages.ts:158`、`googleWire.ts:180-183`、`history.ts:36-109`、`pointer.ts:258-262` | P0（根因在请求侧） |
-| 26 | 确认：裸 `exit` 是提示词；MCP `close()` 无上限（最坏 30 s） | `registry.ts:436`、`interactiveLoop.ts:67`、`gateway.ts:188` | P0（阻塞退出） |
-| 27 | 未确认：三个候选均被反证或未证实；最可能为加载期 Enter 写入的草稿换行 | `startup.ts:39`、`editor.ts:302-305`、`mainScreen.ts:296` | P1（先补两条夹具） |
+| 26 | 确认四条：`handleShellClose` 无异常围栏（锁超时即永久不退出）；MCP 关闭在 10 s 预算外；忙碌时 `/exit` 被排队；两个媒体定时器未 unref | `interactiveMode.ts:1509-1530`、`signalHandlers.ts:42-53`、`sessionFileStore.ts:135`、`interactiveLoop.ts:64-73`、`media/live.ts:85` | P0（阻塞退出） |
+| 27 | 未确认：三个候选被反证；最可能为 regular 主屏原点靠假设（`MainScreenPainter` 新建即从 0 行起）或首帧 80×24 回落；另有 `setText` 不归一化 CRLF 与加载期 Enter 两条 | `mainScreen.ts:57-62/166-186`、`terminal.ts:143-152`、`buffer.ts:91-98`、`startup.ts:39` | P1（先补三条夹具） |
 | 28 | 确认：无 `/config`；模型行为字段在 settings、目录在 model，effort 三入口 | `settings.ts:78`、`picker/settings.ts:253-257`、`picker/model.ts:206` | P2（结构） |
 | 29 | 确认：搜索全量重扫（实测 0.87–1.03 s/次） | `listing.ts:69-73`、`catalog/index.ts:261-284` | P0（体验） |
 | 30 | 确认：SIGTERM/SIGHUP 不写 terminated，下次静默重入 | `bootstrap.ts:166/348-356`、`shutdown.ts:18-19` | P0（数据正确性） |
