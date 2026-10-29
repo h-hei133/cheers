@@ -3459,10 +3459,11 @@ describe("shell session runtime (W5)", () => {
     expect(calls).toEqual(["interrupted:sess_abort"]);
   });
 
-  it("terminates independently from prompt execution lifecycle", () => {
+  it("terminates confirmed idle state independently from prompt execution lifecycle", () => {
     const calls: string[] = [];
     const runtime = new ShellSessionRuntime({
       sessionManager: {
+        getRecoverySnapshot: () => ({ pendingLifecycle: { pendingTools: {}, pendingApprovals: {}, taskStates: {} } }),
         markRunStarted() {},
         persistUserPromptBarrier() {},
         markTurnActive() {},

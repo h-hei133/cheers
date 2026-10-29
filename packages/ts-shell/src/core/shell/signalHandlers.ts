@@ -40,19 +40,19 @@ export function handleShellClose(input: {
 }): void {
   const sessionId = input.runtimeContext.session.id;
   let exitCode = 0;
-  let persisted = false;
+  let closed = false;
   try {
     input.sessionRuntime.terminate(sessionId);
-    persisted = true;
+    closed = true;
     input.readline?.close();
-    // Only offer a resume id after its persisted close and retention check.
+    // Closing retains unfinished recovery evidence; offer only a retained id.
     const kept = input.sessionManager?.sessionExists(sessionId) ?? true;
     if (kept) input.renderer.renderLine(`\n  --resume ${sessionId}\n`);
     else input.renderer.renderLine("");
   } catch (error) {
     exitCode = 1;
     try {
-      input.renderer.renderLine(persisted
+      input.renderer.renderLine(closed
         ? "Session cleanup failed; process exit was not verified."
         : "Session state could not be saved; session close was not verified.");
     } catch { /* A disconnected terminal must still reach the exit hook. */ }

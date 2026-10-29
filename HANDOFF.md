@@ -891,3 +891,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A freshness check reads the previous manifest while a build is still running.
 - **Root Cause**: listCompilerFiles spawns TypeScript; a yielded session with output but no exit_code is still active. Starting enumeration at that point overlaps two heavy validation processes.
 - **Rule**: Poll the existing session until its exit_code is returned before launching any validation or freshness command. Read the final manifest only after build completion and repeat a premature check serially; a stale-read failure is not build evidence.
+
+### Ordinary Host Close Must Preserve Recovery Before Cancellation Settles
+- **Symptom**: Quitting during a request clears its pending prompt; later cancellation records interrupted status but automatic continuation is unavailable. An idle interrupted or state-only stopped outcome can also disappear on quit.
+- **Root Cause**: Shell termination calls the explicit prompt-clearing persistence primitive before the original resource join settles work. Transcript reconstruction recovers some pending tool/approval evidence, but does not restore the cleared prompt identity or every state-only outcome. A run can also remain pending after its controller is released while its settlement hook runs.
+- **Rule**: At the shell close boundary, retain durable state whenever the original run, command/controller or recovery snapshot indicates unfinished work; terminate only confirmed idle sessions. Keep explicit saveTerminated semantics and the original bounded cancellation join. Verify reopened recovery and actual bootstrap selection, plus pending settlement hooks, independently of raw state assertions.

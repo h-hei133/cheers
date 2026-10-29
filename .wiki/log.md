@@ -10140,3 +10140,13 @@ MCP修复已提交推送`60fb7545898b6a15669a583a954f72aeb4ce20e0`，远端main�
 继续[addition20.18](features/phase-20-addition.md#2018-精确coding型号的图片与独立token上限)，实际精确官方页再次确认image/400k context/272k input/128k output。仅内置条目纠正vision与两个缺失上限，原metadata/shape/budget/wire/preview消费，用户显式覆盖保留、refresh不改审阅能力/default输出配置。实际turn image完整传递，两类超限在fetch前拒绝；未配置详情显示精确容量与image支持，参考按声明能力转换而非名字猜测。
 
 六文件183项去重聚焦通过，三类字段反转各一项失败、逐字节恢复后44项重验通过；五静态门/diff通过。metadata-only不重跑结构graph/NormProof。TS build `3a4094f5fed192c24bb8442740f76d8fa037517343741db2c360eab19bb4b2e2`，inputs `2b37b35a4314d2da6dc23341dd9f443ee5f0bb67c54e12c7d545faa86d27cf74`，460/3545最终serial重算一致。曾在build pending时误启listCompilerFiles，短暂违反互斥并读旧manifest失败；两个完成后重新单进程检查通过，无OOM，不计失败为通过。HANDOFF补completion/session_id规则。无新增scratch、live/PTY/exe/full suite；原47项与ADD仍按证据partial/active，提交/精确CI另绑定。
+
+该批已提交推送`32960122eeedb8cb34374a6587603b2bfcd76a5d`，远端main当时精确一致、仅原CLAUDE.md未跟踪。[Watch40932465170](https://github.com/h-hei133/cheers/actions/runs/40932465170)success；延后[CI40932465421](https://github.com/h-hei133/cheers/actions/runs/40932465421)completed/failure，唯一advisor共享账户续期用例第二次请求缺席，实际1失败/12372通过/3跳过、1033文件通过/1失败/1跳过，静态/scripts/build success、NormProof skipped。保留失败证据，原因继续分类。
+
+## [2026-10-30] fix | 普通退出保留会话恢复证据
+
+继续[addition20.19](features/phase-20-addition.md#2019-普通退出保留未完成会话的恢复证据)：真实SessionManager+ShellSessionRuntime+handleShellClose复现普通close先saveTerminated、再原cancelAndWait，清pending prompt/source与state-only stopped证据，取消后仍无法autoResume。工具/审批的部分transcript证据可重建，未误称全部丢失。runtime原terminate现在先退休host，active run/command/controller或现有unfinished snapshot任一存在则保留durable状态，确认idle才原终止/空会话删除。显式saveTerminated primitive、原十秒join与安全失败合同保留；只读参考的stop→owner dispose及原abort/idle分界已对照，未复制吞abort错误。
+
+主代理七相关文件126项去重串行通过，真实重开recovery/eligibility/bootstrap同ID与idle新建覆盖；recovery判断反转四失败，active判断反转两失败，逐字节恢复后close12重验通过。signalHandlers仅局部变量命名整理后8项再验。五静态门、完整声明图单一脚本、AST runtime19/handler2/fixture8和diff通过；最终build `67a668ba12b8d9cddd00862e10d8675795230ce3b5ebd4d2c8961ec02aa36450`、inputs `002a881cb1bc74dfe4162c856d84d943892b9ac00a877d78e93ef3dade855a73`，460 compilerInputs/3546文件重新计算一致。此前d795为局部变量改名前构建，最终身份以上述为准。本地NormProof proven/0open/0failed/0gap仅collector。HANDOFF新增ordinary close与settlement hook陷阱，task scratch清理；无provider/live用户退出、PTY/exe/full suite或20k终端，原47项不升级，ADD active，Git/精确CI另绑定。
+
+延后确认[60fb7545 MCP CI40931209180](https://github.com/h-hei133/cheers/actions/runs/40931209180)completed/success，精确headSha相同。329601容量CI的advisor唯一失败继续核查，不以MCP或本地绿色替代。

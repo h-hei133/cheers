@@ -3360,3 +3360,19 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 主代理六文件183项去重聚焦通过：catalogShape21/catalogRefresh11/metadata10/turn protocol23/Responses body19/preview99；未选或重复不累加。三类逐字段反转分别撤去vision/inputLimit/maxTokens，各命中实际turn一项失败，每次逐字节恢复；恢复后turn23/catalog21重验44项。五静态门与diff通过；metadata-only不重复声明图/NormProof，本批未增加具名函数。TS build `3a4094f5fed192c24bb8442740f76d8fa037517343741db2c360eab19bb4b2e2`，inputs `2b37b35a4314d2da6dc23341dd9f443ee5f0bb67c54e12c7d545faa86d27cf74`，460/3545最终重新计算一致。
 
 验证纪律失误另记：build尚运行时提前启动listCompilerFiles新鲜度脚本，造成短暂两个heavy进程重叠并读到旧manifest而断言失败；两个进程结束后单进程重读最终manifest通过。没有将失败检查计为通过，也没有OOM；后续须以完成exit_code确认前进，不以已有输出认作命令已结束。无live OpenAI/account、PTY/exe或全仓，真实image识别与账户可用性未验；原47项不升级、ADD active。Git/CI另以精确SHA绑定。
+
+### 20.19 普通退出保留未完成会话的恢复证据
+
+继续反馈26/30的普通退出与恢复边界。[interactive shutdown](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)先停止输入/TUI，经[handleShellClose](../../packages/ts-shell/src/core/shell/signalHandlers.ts)调用runtime.terminate，再让原CLI资源owner取消并等待run。旧terminate无条件saveTerminated，先清pendingPrompt/source、runPhase/interrupted和terminal uncertainty；晚到saveInterrupted只能记录中断，不能恢复已经清掉的请求身份。SIGTERM/SIGHUP已有独立unfinished判断，但普通退出未经过该判断。
+
+本轮用真实SessionManager、ShellSessionRuntime和handleShellClose的小型隔离夹具复现：prompt/tool/approval三类active关闭后pendingPrompt均缺失，取消settle后autoResumeReady仍false；prompt-only的hasUnfinishedSessionWork立即false。tool/approval的pendingLifecycle能从transcript重建，未将此误称为全部证据丢失。闲置runtime上的已中断prompt同样失去自动继续；只存于state的stopped_not_proven结果也被清除。旧行为在八项初版用例中实际五项失败；后用soft断言同时观察真实recovery和settle后的结果，仍五项失败，完成根因分类后恢复普通强断言。
+
+目标检查后定向只读对照pi：interactive-mode.ts:4395–4433普通退出先stop TUI再runtimeHost.dispose、再resume提示/exit；agent-session-runtime.ts:404–410先shutdown extension与invalidate再session.dispose；agent-session.ts:1412–1434在原owner取消各类work，2503–2517的abort等待原idle。这些路径不另写“已完成/terminated”覆盖会话证据。本项目沿相同的host retirement与work ownership分界，保留原十秒资源清理总预算与失败可见性；不复制参考dispose吞掉abort错误的做法，也不引入第二套session关闭或恢复存储。
+
+[runtime.terminate](../../packages/ts-shell/src/core/shell/sessionRuntime.ts)仍退休shell state，但currentRun、原command/controller或现有hasUnfinishedSessionWork任一存在时保留持久会话。currentRun单独判断覆盖controller已释放、promptSettled仍未结束的时段。确认idle才调用原saveTerminated，完成对话正常关闭、空会话正常删除；显式SessionManager.saveTerminated继续是清pending source的原primitive。恢复读取失败沿既有安全消息及exit1，未清状态或发resume ID。原cancelAndWait、真实join、错误与预算不改；shell退休与durable interrupted/completed状态分别表达各自事实。
+
+[close回归](../../packages/ts-shell/src/core/shell/close.test.ts)最终十二项覆盖active三阶段、已中断prompt、state-only stopped、compact unverifiedFiles、active本地command、无controller但未settle的run、读取失败、idle完成/空会话与显式primitive。测试真实重开snapshot、describeSessionReentry和bootstrapShellRuntime：未完成状态采用同ID，完成状态新建；cleanup仍等待显式释放，失败经finally释放原Promise。无provider请求、真实进程退出或终端仿真。
+
+主代理768MiB、threads=false、显式七文件单进程串行126项去重通过：close12/sessionRuntime47/signalHandlers8/bootstrap28/shutdown11/branch8/work12。撤销recovery判断四项失败，撤销active判断两项失败；每次逐字节恢复，恢复后close12重验通过。五静态门、完整声明图单一用例、diff和AST责任计数通过：runtime19/signalHandlers2/close fixture8。本地NormProof proven/0open/0failed/0gap仅证collector范围。构建最终身份与Git/CI以日志读回绑定；无live provider/真实用户退出现场、PTY/exe、全仓或20k终端，原47项不升级，反馈26/30与ADD整体仍partial/active。
+
+延后CI读回：[60fb7545的MCP CI40931209180](https://github.com/h-hei133/cheers/actions/runs/40931209180)completed/success；[32960122容量CI40932465421](https://github.com/h-hei133/cheers/actions/runs/40932465421)completed/failure，实际1失败/12372通过/3跳过，1失败文件/1033通过/1跳过。唯一失败为advisor.test.ts的共享account续期后第二次请求缺席；静态/scripts/build步骤success，NormProof步骤skipped。具体原因继续核查，不将focused绿色升级为该CI通过，也不撤回容量官方证据。

@@ -35,6 +35,7 @@ import { ShellCommandRuntime } from "./command.js";
 import type { PermissionScope } from "../../cli/approval/permissionScope.js";
 import type { CompactionOutcome } from "./compaction.js";
 import type { TurnInput } from "../../turn/session.js";
+import { hasUnfinishedSessionWork } from "../../session/recovery/work.js";
 
 /**
  * What travels with a prompt beside its text.
@@ -453,6 +454,10 @@ export class ShellSessionRuntime {
 
   terminate(sessionId: string): void {
     this.stateMachine.terminate();
+    // The host closes before its bounded resource join cancels active work.
+    // Keep its prompt and uncertain outcomes until their owner settles them.
+    if (this.currentRun || this.getCurrentRunController()
+      || hasUnfinishedSessionWork(this.deps.sessionManager.getRecoverySnapshot(sessionId))) return;
     this.deps.sessionManager.saveTerminated(sessionId);
   }
 }
