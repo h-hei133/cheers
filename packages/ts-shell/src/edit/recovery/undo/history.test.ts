@@ -298,3 +298,28 @@ it('rechecks the opening admission before acquiring another receipt after a yiel
     expect(bytes()).toEqual(before);
   } finally { page.previewEnd?.(); }
 });
+
+it('names the turn each operation came from, when the writer recorded one', async () => {
+  // Two edits from one prompt share a correlation id. Undo is still per
+  // operation, but a reader has to be able to see which operations belong to
+  // the same turn before deciding which one to restore.
+  const scope = captureOperationScope({ sessionId: context.sessionId!, workspaceRoot: directory });
+  withOperationStore(scope, () => {
+    allocateOperation({ ...scope, schemaVersion: 1, operationId: 'turn-a', callId: 'call-1', correlationId: 'prompt-1',
+      revision: 1, status: 'committed', undo: 'none', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
+      files: [{ id: 'file', workspace: scope.workspace, path: 'note.txt', kind: 'update',
+        before: { state: 'exists', hash: hashContent('before') }, after: { state: 'exists', hash: hashContent('after') },
+        snapshot: { authorityId: 'turn-a', recordId: 'file' }, status: 'committed', undo: 'none' }] });
+  });
+
+  const result = await runUndoCommand(['status'], context);
+  expect(result.output).toContain('Turn: prompt-1');
+  expect((result.report!.facts.operations as { turn?: string }[])[0]?.turn).toBe('prompt-1');
+});
+
+it('says nothing about a turn when the writer recorded none', async () => {
+  seed(1);
+
+  const result = await runUndoCommand(['status'], context);
+  expect(result.output).not.toContain('Turn:');
+});

@@ -53,12 +53,17 @@ export function undoStatusReport(receipts: readonly OperationReceipt[], page?: U
   return createReport({ title: 'Saved file operations', lines: receipts.flatMap(receipt => [
     { kind: 'heading' as const, spans: [span(`${receipt.sequence}: ${receipt.operationId} · ${receipt.createdAt}`)] },
     text(`Write: ${receipt.status} · undo: ${receipt.undo}`),
+    // The prompt that caused the operation, when the writer recorded one. Two
+    // edits from one turn share it, which is the only visible grouping the
+    // ledger has — undo itself is still per operation.
+    ...(receipt.correlationId ? [text(`Turn: ${receipt.correlationId}`)] : []),
     ...receipt.files.map(file => text(`${JSON.stringify(path.join(file.workspace.path, file.path))}: write ${file.status}, undo ${file.undo}, compensation ${file.compensation ?? 'none'}`)),
   ]).concat(page ? [text(`Operations ${page.offset + 1}-${page.offset + receipts.length} of ${page.total}.`),
     text(page.nextCursor ? `Next results: /undo status --cursor=${page.nextCursor}` : 'End of saved operation results.')] : []),
   facts: { status: 'observation', count: receipts.length,
     ...(page ? { total: page.total, offset: page.offset, nextCursor: page.nextCursor ?? null } : {}),
-    operations: receipts.map(receipt => ({ operationId: receipt.operationId, status: receipt.status, undo: receipt.undo })) } });
+    operations: receipts.map(receipt => ({ operationId: receipt.operationId, status: receipt.status, undo: receipt.undo,
+      ...(receipt.correlationId ? { turn: receipt.correlationId } : {}) })) } });
 }
 
 function version(state: ContentVersion): string { return state.state === 'absent' ? 'absent' : `sha256 ${state.hash}${state.mode === undefined ? '' : ` · mode ${state.mode.toString(8)}`}`; }

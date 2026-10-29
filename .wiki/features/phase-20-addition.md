@@ -2339,9 +2339,13 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 2. 只有在需要覆盖 bash/非文本副作用时，才补一个 **turn 开始**的快照钩子，复用 `snapshotRoot`（`edit/recovery/root.ts:6-11`）与 ledger 目录，不新建根；非 git 工作区静默跳过（与 Codex 的 `NotAGitRepository` 行为一致）。
 3. **不复活**"快照写进对话历史"的协议语义：快照属于 edit/recovery ledger，对话历史只记 operation ID（现有 receipt 已是这个形状）。
 
+**本批已实施（第一百二十二批）**：`/undo status` 现在显示每个操作所属的 turn（`correlationId` 即 prompt entry id，writer 一直在记录，只是报告没有呈现）。同一轮的两个编辑共享它——这是账本里唯一可见的分组，**撤销本身仍是逐操作**。按 turn 批量撤销需要新的选择器、多 receipt 预览与顺序恢复的"部分成功"语义，是独立设计，本轮未做。
+
+**证据边界**：未新增工作区级快照，`/undo` 的单位仍是单个已提交操作。任何"按 turn 撤销"的实现都必须先有"未批准不写、批准后写入目标与批准目标一致、恢复不重放 unknown、部分失败如实报告"的反转证据。
+
 **本批已实施（第一百二十一批）**：新增 `taskWait` 工具。它不轮询、不 sleep：直接等 `BackgroundRunner.onEnded` 的完成事件，带 300 秒上限与可取消信号，超时或取消时明确回答"仍在运行"而不是假装结束。`bash` 描述同步引导"等待用 taskWait，不要在 bash 里 sleep"。**未实现**：把前台 `sleep` 在审批层硬拒（会误伤轮询脚本），以及修正 `27-background-execution.md` 的过期结论。
 
-**证据边界**：`taskWait` 的夹具使用受控的 `BackgroundRunner`，未在真实长任务上测过等待与取消；前台命令 60 秒自动提升的既有行为未改。任何实现都必须先有"未批准不写、批准后写入目标与批准目标一致、恢复不重放 unknown"的反转证据。
+**证据边界**：`taskWait` 的夹具使用受控的 `BackgroundRunner`，未在真实长任务上测过等待与取消；前台命令 60 秒自动提升的既有行为未改。
 
 
 ### 17.3 第十项（用户编号第二十）：Monitor 工具
@@ -2594,3 +2598,13 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 验证：`backgroundTools.test.ts` 新增 5 项——已结束直接返回、等待完成事件（断言调用确实阻塞在 runner 上）、超时报告仍在运行、取消后释放监听、未知 id 列出已知任务。反转把等待换成"读一次当前状态"后 2 项预期失败；源码逐字节恢复并核对 SHA-256 `490c6b9532b5` 后重验。`core/tools` 36 文件 424 项通过；五静态门与 module facade 0 通过。
 
 **边界**：夹具使用受控的 `BackgroundRunner`，未在真实长任务上测过等待与取消；前台 60 秒自动提升的既有行为未改；`27-background-execution.md` 的过期结论仍未修正。
+
+### 第一百二十二批：`/undo status` 显示 turn 归属
+
+账本里一直有 `correlationId`（writer 写入的 prompt entry id，即一轮对话的标识），但报告只显示 operation id 与时间戳。同一轮的多个编辑因此看起来毫无关联，用户在决定撤销哪一个之前无从判断它们属于同一次请求。
+
+现 `undoStatusReport` 在 receipt 带有 `correlationId` 时多显示一行 `Turn: <id>`，并写入 `facts.operations[].turn`。没有记录时不显示，不伪造归属。**撤销单位不变**：仍是单个已提交操作；按 turn 批量撤销需要新的选择器与"部分成功"语义，未做。
+
+验证：`history.test.ts` 新增两项——带 `correlationId` 的操作显示该行且出现在 facts 中，未带的不显示。撤销该行后第一项预期失败；源码逐字节恢复并核对 SHA-256 `03f6723aad9d` 后重验。`edit/recovery` 22 文件 199 项通过。
+
+**边界**：只是可见性改进，不改变任何恢复语义。
