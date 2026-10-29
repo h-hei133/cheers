@@ -98,6 +98,36 @@ describe("shell session runtime (W5)", () => {
     ]);
   });
 
+  it("still records a durable event when an observer throws", async () => {
+    // Observers run before the append now, so a rendering bug in the surface
+    // could otherwise swallow the event — including a terminal one, which
+    // would make the run look like it never ended.
+    const recorded: string[] = [];
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        persistUserPromptBarrier() {}, markTurnActive() {}, saveCompleted() {}, saveError() {},
+        appendQueryEvent(_id: string, event: { type: string }) { recorded.push(event.type); },
+      } as never,
+      renderer: { renderLine() {}, renderChunk() {} } as never,
+      runPrompt: async function* () {
+        yield { type: "tool.started" as const, toolName: "read", taskId: "task-1" };
+        yield {
+          type: "query.completed" as const,
+          result: {
+            status: "completed", terminalReason: "completed", terminalClassification: "success",
+            transcript: [], sharedContext: { sessionId: "sess_1", initialPrompt: "hello", notes: [], handoffs: [] },
+            finalOutput: "done:hello",
+          } as never,
+        };
+      },
+    });
+    runtime.observeEvents(() => { throw new Error("the surface failed to render"); });
+
+    await runtime.executePrompt("hello", "request");
+
+    expect(recorded).toEqual(["tool.started", "query.completed"]);
+  });
+
   it.each([false, true])("keeps runtime failure attribution explicit (run exists=%s)", async (runExists) => {
     const recorded: unknown[] = [];
     const runtime = new ShellSessionRuntime({

@@ -2807,3 +2807,9 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 `team` 内部并行运行最多 3 个提案者，但同一回合里若模型同时发起两个 `team` 调用，峰值会到 6 个并发子代理循环。`SEQUENTIAL_TOOLS` 里已有 `task` 正是为此——没有任何地方统计同时存活的子代理循环数，一次 step 里的两个调用会让模型请求翻倍而预算察觉不到。`team` 现与 `task` 同列。
 
 验证：`turn/session.test.ts` 29 项通过；静态门、module facade 0 与 TS build 通过。该常量为模块私有，没有直接断言它的测试——此改动靠既有测试与代码注释维持，不宣称有反转证据。
+
+### 第一百三十七批：观察者失败不得吞掉持久事件
+
+第一百一十八批把观察者移到持久化之前（卡顿修复的核心）。这引入一个回归：观察者抛错会让持久化被跳过。改动前持久化在前，渲染 bug 不影响落盘；改动后一个 surface 渲染异常就能让事件永久丢失——**包括 `query.completed` 这类终态事件**，整轮会看起来从未结束。
+
+现每个观察者单独 try/catch：显示失败不是持久失败。验证：`sessionRuntime.test.ts` 增至 47 项，新增"观察者抛错时仍记录持久事件"，断言 `recorded` 为 `["tool.started", "query.completed"]`。反转去掉 try/catch 后该项预期失败；源码逐字节恢复并核对 SHA-256 `d2e2bfd1f062` 后重验，两文件 52 项通过；静态门、module facade 0 与 TS build 通过。

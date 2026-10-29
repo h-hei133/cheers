@@ -296,8 +296,15 @@ export class ShellSessionRuntime {
         // screen could move — which on a long session is the difference between
         // text appearing as it arrives and appearing all at once when the turn
         // ends.
+        //
+        // An observer that throws must not cost the transcript an event. A
+        // rendering bug in the surface is exactly the kind of failure that
+        // happens mid-turn, and it must not be able to swallow a terminal
+        // event — the run would then look like it never ended.
         updateRuntimeEventDigest(eventDigest, event);
-        for (const observer of this.eventObservers) observer(event);
+        for (const observer of this.eventObservers) {
+          try { observer(event); } catch { /* A display failure is not a durable one. */ }
+        }
         if (isDurableQueryEvent(event)) {
           this.deps.sessionManager.appendQueryEvent(sessionId, event, sourceEntryId ? { entryId: sourceEntryId() } : undefined);
         }
