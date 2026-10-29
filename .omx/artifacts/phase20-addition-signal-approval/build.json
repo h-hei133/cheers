@@ -1,0 +1,20 @@
+{
+  "buildId": "06e0018d0b2128ca2f6cb1b45ec8b09bbd93862cc7d10cf6ad357642eae2993b",
+  "inputsDigest": "fd2dfb0fd4cef94fb20da0e7fe50c5e7c83d40e9bac31a65ac02b434626e8065",
+  "compilerInputs": 460,
+  "files": 3549,
+  "compilerMatch": true,
+  "digestMatch": true,
+  "callables": {
+    "packages/ts-shell/src/cli/interactive/picker/approval.ts": {
+      "count": 16,
+      "previousCount": 15,
+      "sourceSha256": "83e2ed1b13148de47ff2961323503672ed365d7634a6037c5f3b4a75c3fa3d33"
+    },
+    "packages/ts-shell/src/cli/interactive/interactiveMode.ts": {
+      "count": 123,
+      "previousCount": 123,
+      "sourceSha256": "c3908280bb2e2784a8ef2dd4f73a561078a3e8d9967033fb23ec0b765352f52b"
+    }
+  }
+}

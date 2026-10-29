@@ -1,0 +1,11 @@
+{
+  "classification": "product behavior drift",
+  "baselineBuildId": "94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff",
+  "cause": "The interactive approval Promise has no run cancellation binding; shutdown cancels the active run but waits on the unanswered prompt until the global budget expires",
+  "baselineExitCode": 1,
+  "baselineExitMs": 10071,
+  "originalRunEnds": 0,
+  "baselineToolResults": 0,
+  "repair": "Bind the current run AbortSignal to approval settlement; cancellation denies, retires ownership and prevents late group navigation; failed noncancelled dismissal rejects",
+  "reversalCorrection": "Initial whitespace-substring replacement retained one group guard and produced two rather than three failures. Scope reversal to chooseGroups callback section; final independent cases 4/2/3/1 failed and exact sources restored."
+}

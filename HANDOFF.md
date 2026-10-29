@@ -1015,3 +1015,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A second successful file edit appears to disagree with its native operation receipt.
 - **Root Cause**: readOperations scans descending sequence; selecting at(-1) compares the latest tool metadata against the oldest receipt.
 - **Rule**: Match the persisted tool operationId to the operation receipt, then validate committed status, exact target and readback. Never infer receipt identity from array position; retain and classify a probe indexing failure before rerunning.
+
+### An Unanswered Approval Must Follow Its Run Cancellation
+- **Symptom**: SIGTERM during a file approval waits for the full cleanup budget and exits with code 1 although the run controller was aborted.
+- **Root Cause**: The interactive approval Promise waits only for a picker answer; signal cleanup cancels the run without invoking complete surface stop, so the tool drain stays pending.
+- **Rule**: Bind the current run signal when publishing approval. Cancellation settles deny, retires the listener and suppresses late group navigation; a noncancelled dismissal failure rejects rather than authorizing or hanging. Verify actual pending CLI signal exit, zero writer receipts and interrupted recovery without automatic replay, separately from terminal restoration.

@@ -462,7 +462,8 @@ export class InteractiveMode {
     this.readline = this.questions.asReadline(() => { void this.shutdown(); });
     this.options.setReadline?.(this.readline);
     this.options.setInteractiveApprovalPrompt?.((prompt) => promptApproval(prompt,
-      { pager: this.pager, overlay: this.overlay, render: () => this.tui.requestRender() }));
+      { pager: this.pager, overlay: this.overlay, render: () => this.tui.requestRender() },
+      this.options.sessionRuntime.getCurrentRunController()?.signal));
     this.tui.setFrameProvider(recordingFrameProvider(options.runtimeContext, this.view));
     this.state.editor.placeholder = DEFAULT_PLACEHOLDER;
     // A chip token deletes whole: the caret sits at its end, and one Backspace

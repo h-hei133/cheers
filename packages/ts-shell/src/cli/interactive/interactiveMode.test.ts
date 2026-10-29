@@ -437,6 +437,26 @@ function build(overrides: {
   return { mode, renderer, readline, terminal, approval };
 }
 
+it.each(['regular', 'fullscreen'] as const)('binds unanswered approval to the current run cancellation in the actual %s host', async kind => {
+  const { mode, approval, terminal } = build({ tuiMode: kind }), controller = new AbortController();
+  const host = mode as unknown as { overlay: OverlayHost; options: { sessionRuntime: ShellSessionRuntime } };
+  host.options.sessionRuntime.getCurrentRunController = () => controller;
+  const request: EscalationPrompt = { id: 'fixture-cancelled-approval', title: 'Write approval', message: 'Write fixture',
+    context: { toolName: 'write', operation: 'write', target: '/outside/fixture.txt', explicitApproval: true },
+    options: [{ value: 'allow-once', label: 'Allow once' }, { value: 'deny', label: 'Deny' }],
+    defaultOption: 'deny', recommendedAction: 'deny', severity: 'medium' };
+  mode.start();
+  try {
+    const pending = approval.current!(request), observe = vi.fn(); void pending.then(observe);
+    await vi.waitFor(() => expect(host.overlay.active).toBe(true));
+    controller.abort(); await Promise.resolve();
+    expect(observe).toHaveBeenCalledWith({ decision: 'deny', reason: 'Operation cancelled before approval.' });
+    expect(host.overlay.active).toBe(false);
+    terminal.input('y');
+    expect(await pending).toMatchObject({ decision: 'deny' });
+  } finally { mode.stop(); }
+});
+
 it.each([false, true])('retains the active form caret through the host at one-row sizes (masked: %s)', async masked => {
   const { mode } = build();
   const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView };

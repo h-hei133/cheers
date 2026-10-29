@@ -3173,7 +3173,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 |---|---|---|
 | 24 | 本地实现与聚焦验证；20.42补两模式原CLI的拒绝/单次write/edit/重复询问与原操作收据读回 | 缺用户目录审批现场、实际provider产生的工具调用及非Linux文件系统证据 |
 | 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses/Google native摘要准入已实现；20.33新增当前relay真实小请求的公开thinking/展开/恢复，auto保留，整体partial | 其他模型/协议默认与公开内容、真实账户及用户终端复验；单个relay请求不覆盖完整矩阵 |
-| 26 | 四条明确机制、MCP未开始调用及表面/渲染失败围栏已修；20.36/20.40有正常/空闲信号CLI，20.41有loopback忙碌流取消与恢复 | 缺真实用户故障设备/外部provider busy信号现场；MCP预算到期不能证明清理完成 |
+| 26 | 四条明确机制、MCP未开始调用及表面/渲染失败围栏已修；20.36/20.40正常/空闲、20.41 loopback忙碌流与20.43审批pending信号CLI均有退出/恢复证据；20.43修补未答审批的取消等待 | 缺真实用户故障设备/外部provider busy信号现场；MCP预算到期不能证明清理完成 |
 | 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
 | 28 | 会话入口与配置字段分类隔离已实施；本地聚焦验证 | 缺真实用户终端与整体面板现场验收 |
 | 29 | 同次浏览索引复用与真实目录只读性能已验证；20.38/20.39补48小会话的实际CLI搜索/选择/分页，并修清空查询后重建回带旧查询 | 缺用户大目录终端性能与非Linux证据；小型PTY时间包含输入/去抖/观察开销，不能代替生产性能 |
@@ -3762,3 +3762,32 @@ build `94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff`、input
 首轮regular第三次edit后exact-operation失败：原store按sequence倒序返回，探针at(-1)取首个旧write收据。前两条已记录、第三条writer实际成功，不能把索引失败记成产品失败或完整通过。8.87秒/301408KiB exit1的原收据保留，改为按tool.metadata.operationId匹配后两模式四回合全部重跑通过；HANDOFF记录收据顺序陷阱。
 
 正式工件[file-cli](../../.omx/artifacts/phase20-addition-file-cli/)保存脚本、失败分类与两份有效收据/metrics。主代理严格串行，均观察exit0后执行下一项，task scratch/socket已清理、原CLAUDE.md保留；脚本语法、JSON/八回合断言、五静态门/diff通过，118既有docs advisory保留。仅文档/工件，不重复build/Vitest/graph。当前Linux隔离目录原CLI与loopback工具链不证明用户目录/实际模型工具选择、read/apply_patch完整CLI矩阵、审批pending的退出、非Linux/桌面/IME或独立review；原47不升级，ADD与goal继续active，本批提交/精确CI另绑定。
+
+20.42已提交推送`e95696b6e6274741d2eaf6f403ac6b60f7d9e79e`，远端main此前精确一致、仅原CLAUDE.md。延后核对[Watch40973267353](https://github.com/h-hei133/cheers/actions/runs/40973267353)completed/success、[CI40973267402](https://github.com/h-hei133/cheers/actions/runs/40973267402)in_progress；20.41 CI40972073289仍in_progress、20.40 CI40971222286已completed/success，全部headSha一致。
+
+### 20.43 未答复审批被取消后立即结束等待，保留中断恢复
+
+继续反馈24/26/30的审批pending退出缺口。先检查原shutdown→cancelGoalRunForShutdown→cancelAndWait，以及InteractiveMode安装的promptApproval。原回合controller会abort，但[审批owner](../../packages/ts-shell/src/cli/interactive/picker/approval.ts)的Promise只等面板答复/previewEnd，不接收signal；signal shutdown不执行完整surface stop，因此取消后仍在等待。原build的regular CLI停在原external write审批后发SIGTERM，10,071ms才预算超时exit1，原TurnSink ends0/results0、面板仍active；初始失败收据保留，15.65秒/266424KiB探针并非正常信号退出通过。
+
+定向只读参考codex bottom_pane/approval_overlay.rs:499–527/595–597：取消未完成的审批发Cancel/Deny，并消费该取消手势；tui.rs:304–338继续各项restore且保留first_error。采用取消必须结束等待、不能转成允许的决定，本项目仍使用原turn AbortSignal与现有deny状态，不加第二审批/退出系统；不称参考本身证明SIGTERM或本项目设备恢复。
+
+[宿主安装点](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)在每次审批读取当前run controller的signal，原promptApproval监听abort，拒绝未答复请求并关闭原overlay/preview；已取消请求不发布，答复/失败后移除监听，迟到chooseGroups与selected-subset回调不再重新导航。关闭异常不再悬挂Promise：已取消返回deny以释放回合，未取消则reject保留失败，不给write authority；初始面板发布失败也退休监听。取消路径的设备异常只证明等待结束与拒绝，不证明物理恢复。
+
+原基线八条新增回归全部失败。最终[审批所属文件](../../packages/ts-shell/src/cli/interactive/picker/approvalSelection.test.ts)12项、actual InteractiveMode过滤31项共43项通过，宿主322未选不计通过；覆盖approval/groups/refined三阶段、预先取消、迟到允许/分组、答复后listener退休、关闭/发布异常、两模式当前run信号绑定及原正常审批/exit行为。四独立反转撤回abort监听、宿主signal、迟到导航守卫、失败答复reject分别4/2/3/1失败；finally逐字节恢复后43重验通过。初次反转按空白substring误保留一条group守卫、实际2失败，分类并改为chooseGroups区段边界后重跑；后续startup try新增同缩进guard触发边界assert，零该案例测试且源码恢复，最终区段反转才有效，不用初次计数充当证据。
+
+五静态门/diff与1536MiB TS build通过，观察exit0后独立重算build `06e0018d0b2128ca2f6cb1b45ec8b09bbd93862cc7d10cf6ad357642eae2993b`/inputs `fd2dfb0fd4cef94fb20da0e7fe50c5e7c83d40e9bac31a65ac02b434626e8065`，460 compilerInputs/3549文件一致。AST审批16/原15；InteractiveMode123/原123是既有整体债务，本批不增加其具名callable，仅传原signal。无新import或结构移动，不重复graph/NormProof。
+
+最终build两模式×SIGTERM/SIGHUP各隔离home/profile/project/outside、一条小session fixture，loopback HTTP返回一个write call，等原overlay完整once/deny和规范目标、磁盘turn-active/prompt，再发signal。四组均结束原sink、tool.result.success=false、overlayActive=false，原writer无操作、目标不存在、兄弟不变、无grant/roots；signal后的session interrupted且runPhase=turn-active/interruptedKind=turn。审批被取消未发布approval.resolved，不能把absence解读为已批准。普通不带ID重开同一session，真实Resumed session通知、无审批面板/新message.started/POST，Ctrl+D后仍保留中断。
+
+| 最终原CLI路径 | 信号退出 | 恢复Ctrl+D | 峰值RSS / 两阶段探针 |
+|---|---|---|---|
+| regular/SIGTERM | 173ms、143 | 132ms、0 | 265560KiB / 18.18s |
+| regular/SIGHUP | 182ms、129 | 130ms、0 | 263256KiB / 18.20s |
+| fullscreen/SIGTERM | 175ms、143 | 135ms、0 | 261136KiB / 18.30s |
+| fullscreen/SIGHUP | 176ms、129 | 140ms、0 | 263092KiB / 18.19s |
+
+八次均读回ICANON/ECHO/ISIG；signal仍只走exit restoreSync，完整stop0，恢复Ctrl+D走stop1，不能由overlay退休推断全部TUI owner退休。每组最终仅1 local completion/1 readiness、恢复零重发，配置原字节保持；heap768MiB、每CLI25秒/2MiB，全部主代理进程级串行。初次修补build `95e29c61399e`的四组通过收据保存在pre-fence；异常答复围栏调整后全部按最终build重跑，最终表不复用旧build数值。
+
+同最终build再跑20.42原正常四回合×两模式，拒绝/once write/edit/再次询问、精确原committed receipt、零持久授权与正常Ctrl+D/cooked全部通过：各8 completion/4 readiness，RSS312228/299108KiB、各12.37秒，退出135/130ms。说明正常显式批准仍可写，取消仍不可写；未覆盖writer开始后的未知结果。
+
+正式工件[signal-approval](../../.omx/artifacts/phase20-addition-signal-approval/)保存原失败、分类、聚焦/反转/恢复、build新鲜度、最终八阶段与正常八回合收据；HANDOFF追加未答审批取消陷阱，task scratch与loopback sockets清理、原CLAUDE.md保留。工件语法/JSON断言、五门/diff均通过，118旧docs advisory保留；无独立review、真实用户/外部provider、read/patch全CLI组合、pending问答/MCP、实际断连/EIO、非Linux/桌面/IME、exe/full suite/20k。原47项不升级，ADD与goal继续active，提交/精确CI另绑定。

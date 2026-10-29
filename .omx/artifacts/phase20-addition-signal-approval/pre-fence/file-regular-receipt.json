@@ -1,0 +1,105 @@
+{
+  "mode": "regular",
+  "buildId": "95e29c61399e556adae727a6b64cbc7e1e34cc2c949ebfcf914ff908bb16611c",
+  "inputsDigest": "24544175280b933be25f44cb1b5bdcb2286e5e10ca6559a783660d8e606776a9",
+  "providerMode": "local HTTP fixture",
+  "status": "passed",
+  "attempts": [
+    {
+      "number": 1,
+      "scope": "ask",
+      "decision": "deny",
+      "pendingMs": 419,
+      "elapsedMs": 774,
+      "choices": [
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingUnchanged": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": false,
+      "fileState": "absent",
+      "operations": 0
+    },
+    {
+      "number": 2,
+      "scope": "accept-edits",
+      "decision": "allow-once",
+      "pendingMs": 518,
+      "elapsedMs": 797,
+      "choices": [
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingUnchanged": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": true,
+      "fileState": "exists",
+      "fileDigest": "84e4d68e2a90f324e15c135688d357c10a61116fb72975a9616eef1e3d49d567",
+      "operations": 1,
+      "nativeCommitStatus": "committed"
+    },
+    {
+      "number": 3,
+      "scope": "allow-all",
+      "decision": "allow-once",
+      "pendingMs": 597,
+      "elapsedMs": 927,
+      "choices": [
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingUnchanged": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": true,
+      "fileState": "exists",
+      "fileDigest": "ea853851c4ae0360ccce224ed10ea65b3bc5f7a70abeeb09247cc2295d079ca1",
+      "operations": 2,
+      "nativeCommitStatus": "committed"
+    },
+    {
+      "number": 4,
+      "scope": "allow-all",
+      "decision": "deny",
+      "pendingMs": 393,
+      "elapsedMs": 723,
+      "choices": [
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingUnchanged": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": false,
+      "fileState": "exists",
+      "fileDigest": "ea853851c4ae0360ccce224ed10ea65b3bc5f7a70abeeb09247cc2295d079ca1",
+      "operations": 2
+    }
+  ],
+  "checks": {
+    "denialNeverWrites": true,
+    "eachExternalCallRequiresAnswer": true,
+    "noPersistentGrantOrRoot": true,
+    "originalWriterCommittedExactlyTwice": true,
+    "siblingUnchanged": true,
+    "configUnchanged": true,
+    "cookedInputRestored": true
+  },
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 142,
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "requests": 8,
+  "readinessRequests": 4,
+  "outputBytes": 31103,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

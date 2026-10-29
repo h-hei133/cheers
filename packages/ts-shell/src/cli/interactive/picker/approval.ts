@@ -6,19 +6,35 @@ import { createReport, reportText, span } from '../../../core/commands/report/pr
 
 /** Approval owns its preview lifecycle as well as its choices. */
 export function promptApproval(prompt: EscalationPrompt, host: { readonly pager: Pick<Pager, 'open' | 'close'>;
-  readonly overlay: Pick<OverlayHost, 'open' | 'close'>; readonly render: () => void }): Promise<InteractiveApprovalResult> {
+  readonly overlay: Pick<OverlayHost, 'open' | 'close'>; readonly render: () => void }, signal?: AbortSignal): Promise<InteractiveApprovalResult> {
+  if (signal?.aborted) return Promise.resolve({ decision: 'deny', reason: 'Operation cancelled before approval.' });
   host.pager.close();
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     let settled = false;
     const settle = (result: InteractiveApprovalResult) => {
       if (settled) return; settled = true;
-      if (prompt.context?.preview) host.pager.close();
-      host.overlay.close(); resolve(result);
+      signal?.removeEventListener('abort', cancel);
+      try {
+        try { if (prompt.context?.preview) host.pager.close(); }
+        finally { host.overlay.close(); }
+      } catch (error) {
+        if (signal?.aborted) resolve({ decision: 'deny', reason: 'Operation cancelled before approval.' });
+        else reject(error);
+        return;
+      }
+      resolve(result);
+    };
+    const cancel = () => {
+      // A failed terminal cleanup must not strand the cancelled tool's drain.
+      // The denied answer carries no write authority even if dismissal fails.
+      settle({ decision: 'deny', reason: 'Operation cancelled before approval.' });
     };
     const chooseGroups = () => {
+      if (settled) return;
       host.overlay.close();
       host.pager.close();
       host.overlay.open(hunkPicker(prompt, selected => {
+        if (settled) return;
         const ids = selected.selected ?? [];
         if (!prompt.context.selectionPreview || ids.length === 0) {
           settle(selected);
@@ -53,10 +69,19 @@ export function promptApproval(prompt: EscalationPrompt, host: { readonly pager:
       }, settle));
       host.render();
     };
-    host.overlay.open(approvalPicker(prompt, settle, chooseGroups));
-    const preview = approvalPreview(prompt);
-    if (preview) host.pager.open(preview.title, reportText(preview), preview);
-    host.render();
+    signal?.addEventListener('abort', cancel, { once: true });
+    if (signal?.aborted) { cancel(); return; }
+    try {
+      host.overlay.open(approvalPicker(prompt, settle, chooseGroups));
+      if (settled) return;
+      const preview = approvalPreview(prompt);
+      if (preview) host.pager.open(preview.title, reportText(preview), preview);
+      host.render();
+    } catch (error) {
+      settled = true;
+      signal?.removeEventListener('abort', cancel);
+      reject(error);
+    }
   });
 }
 

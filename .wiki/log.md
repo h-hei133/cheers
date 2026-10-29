@@ -10358,3 +10358,13 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 沿[addition20.42](features/phase-20-addition.md#2042-跨目录文件单次审批的实际cli与原写入收据)补反馈24。两模式各一条小fixture、隔离home/profile/project/outside、原CLI/PTY与loopback HTTP；四回合ask拒绝write、Alt+P accept-edits单次write、Alt+P allow-all单次edit、allow-all再次拒绝write。原overlay每次只绘制once/deny、声明规范目标，a不能持久允许，pending无写入/result；获准两次原writer均committed且operationId精确匹配原单文件收据/bytes，最终两条操作、零grant/roots，兄弟文件与配置不变。
 
 首轮第三次edit的收据断言误取倒序列表末项，exit1/301408KiB/8.87秒保留为setup失败；按operationId匹配后两模式八回合全部重跑通过。有效每模式8 local completion/4 readiness、零外部请求，正常退出137/142ms、0与cooked恢复；峰值314916/315008KiB，12.44/12.55秒，四回合耗时含人为a等待，不作生产性能。build/inputs复用20.39，未改产品、不重复build/tests；脚本语法/JSON/五门/diff通过、118旧advisory，主代理严格串行、scratch清理、HANDOFF记录顺序陷阱。原CLI证据不替代真实模型/用户目录、read/patch CLI、pending退出、非Linux/桌面或独立review，原47不升级、goal active，Git/CI另绑定。
+
+20.42已推送`e95696b6e6274741d2eaf6f403ac6b60f7d9e79e`、远端main此前一致。延后核对Watch40973267353 success、CI40973267402和20.41 CI40972073289仍in_progress；20.40 CI40971222286 success，均head一致。
+
+## [2026-10-30] fix | 未答复审批取消后释放回合与信号退出
+
+沿[addition20.43](features/phase-20-addition.md#2043-未答复审批被取消后立即结束等待保留中断恢复)发现原approval Promise不听run signal，pending SIGTERM等10,071ms全局budget后exit1/原ends0。比较参考取消发Cancel/Deny与restore保留first_error，宿主只传当前controller.signal、审批owner取消deny/close并退休listener和迟到group导航；关闭异常已取消deny、未取消reject，发布失败退休listener，不授写权限。
+
+旧基线8新回归失败；最终approvalSelection12/过滤host31共43通过，322未选不计。四有效反转4/2/3/1失败、源码逐字节恢复后43再过；初次导航反转substring不精确实际2失败、后续边界assert未运行该案例，修区段边界后全部重跑，失败记录保留。五静态门/diff、1536MiB build exit0与独立新鲜度一致：build `06e0018d0b2128ca2f6cb1b45ec8b09bbd93862cc7d10cf6ad357642eae2993b`、inputs `fd2dfb0fd4cef94fb20da0e7fe50c5e7c83d40e9bac31a65ac02b434626e8065`，460/3549。AST审批16/15、原host123未增，保留整体债务，无新import/graph重跑。
+
+最终两模式×两信号8阶段CLI/PTY全过：审批完整绘制后signal173–182ms、143/129，原sink结束/false tool结果、overlay retired、零write/operation/grant/root，session interrupted；普通恢复同ID/真实notice、零重发，Ctrl+D130–140ms/0仍interrupted，八次cooked恢复。RSS261136–265560KiB/18.18–18.30秒，loopback各GET/POST1。初次修补build的收据另存pre-fence，最终均重跑；同最终build正常四审批×两模式也过，原writer两次committed、拒绝不写、各8 POST/4 GET，退出135/130ms、RSS312228/299108KiB各12.37秒。正式工件与HANDOFF、scratch清理、语法/JSON/五门/diff通过，118旧advisory；全程serial，无独立review/live用户/外部provider/非Linux/实际断连/未知写入/exe/full suite/20k。原47不升级、goal active，Git/CI另绑定。

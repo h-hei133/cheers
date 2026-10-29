@@ -1,0 +1,178 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/interactiveMode.test.ts  (353 tests | 2 failed | 351 skipped) 86ms
+   ❯ src/cli/interactive/interactiveMode.test.ts > binds unanswered approval to the current run cancellation in the actual regular host
+     → expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/interactiveMode.test.ts > binds unanswered approval to the current run cancellation in the actual fullscreen host
+     → expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts  (10 tests | 6 failed | 4 skipped) 10ms
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled approval approval without late authorization or navigation
+     → expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled groups approval without late authorization or navigation
+     → expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled refined approval without late authorization or navigation
+     → expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > does not publish a prompt for an already cancelled run
+     → expected undefined to deeply equal { decision: 'deny', …(1) }
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > retires cancellation after the user answers and leaves later surfaces alone
+     → expected "removeEventListener" to be called with arguments: [ 'abort', Any{ …(3) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > settles cancellation even when closing the approval surface throws
+     → expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > binds unanswered approval to the current run cancellation in the actual regular host
+ FAIL  src/cli/interactive/interactiveMode.test.ts > binds unanswered approval to the current run cancellation in the actual fullscreen host
+AssertionError: expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+ ❯ src/cli/interactive/interactiveMode.test.ts:453:21
+    451|     await vi.waitFor(() => expect(host.overlay.active).toBe(true));
+    452|     controller.abort(); await Promise.resolve();
+    453|     expect(observe).toHaveBeenCalledWith({ decision: 'deny', reason: '…
+       |                     ^
+    454|     expect(host.overlay.active).toBe(false);
+    455|     terminal.input('y');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled approval approval without late authorization or navigation
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled groups approval without late authorization or navigation
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled refined approval without late authorization or navigation
+AssertionError: expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts:107:19
+    105|   const active = opened.at(-1)!;
+    106|   controller.abort(); await Promise.resolve();
+    107|   expect(observe).toHaveBeenCalledWith({ decision: 'deny', reason: 'Op…
+       |                   ^
+    108|   const count = opened.length, previews = host.pager.open.mock.calls.l…
+    109|   await active.apply!(['allow-once']);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > does not publish a prompt for an already cancelled run
+AssertionError: expected undefined to deeply equal { decision: 'deny', …(1) }
+
+- Expected:
+Object {
+  "decision": "deny",
+  "reason": "Operation cancelled before approval.",
+}
+
++ Received:
+undefined
+
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts:122:18
+    120|   void promptApproval(prompt, host, controller.signal).then(value => {…
+    121|   await Promise.resolve();
+    122|   expect(answer).toEqual({ decision: 'deny', reason: 'Operation cancel…
+       |                  ^
+    123|   expect(host.overlay.open).not.toHaveBeenCalled(); expect(host.render…
+    124| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > retires cancellation after the user answers and leaves later surfaces alone
+AssertionError: expected "removeEventListener" to be called with arguments: [ 'abort', Any{ …(3) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts:134:18
+    132|   await opened[0]!.apply!(['allow-once']);
+    133|   expect(await pending).toMatchObject({ decision: 'allow-once' });
+    134|   expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+       |                  ^
+    135|   const calls = host.overlay.close.mock.calls.length;
+    136|   controller.abort(); expect(host.overlay.close).toHaveBeenCalledTimes…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > settles cancellation even when closing the approval surface throws
+AssertionError: expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts:146:19
+    144|   const pending = promptApproval(prompt, host, controller.signal), obs…
+    145|   expect(() => controller.abort()).not.toThrow(); await Promise.resolv…
+    146|   expect(observe).toHaveBeenCalledWith({ decision: 'deny', reason: 'Op…
+       |                   ^
+    147| });
+    148|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ Test Files  2 failed (2)
+      Tests  8 failed | 355 skipped (363)
+   Start at  07:31:31
+   Duration  16.66s (transform 9.84s, setup 0ms, collect 16.27s, tests 96ms, environment 0ms, prepare 58ms)

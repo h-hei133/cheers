@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { promptApproval } from './approval.js';
 import type { EscalationPrompt } from '../../../core/shell/approval/contract.js';
 import type { Picker } from '../overlay.js';
@@ -89,4 +89,77 @@ it('shows the exact selected-subset preview before final approval', async () => 
     selected: ['group-b'],
     selectionRevision: 'subset-revision',
   });
+});
+
+it.each(['approval', 'groups', 'refined'] as const)('settles cancelled %s approval without late authorization or navigation', async stage => {
+  const controller = new AbortController(), opened: Picker[] = [];
+  const host = { pager: { open: vi.fn(), close: vi.fn() },
+    overlay: { open: (picker: Picker) => { opened.push(picker); }, close: vi.fn() }, render: vi.fn() };
+  const revised = { ...prompt, context: { ...prompt.context, preview: 'Exact public fixture plan',
+    selectionPreview: () => ({ preview: 'Selected public fixture plan', revision: 'subset' }) } };
+  const pending = promptApproval(revised, host, controller.signal);
+  const observe = vi.fn(); void pending.then(observe);
+  if (stage !== 'approval') await opened[0]!.apply!(['choose-groups']);
+  const groups = stage !== 'approval' ? opened[1] : undefined;
+  if (stage === 'refined') await groups!.apply!(['group-b']);
+  const active = opened.at(-1)!;
+  controller.abort(); await Promise.resolve();
+  expect(observe).toHaveBeenCalledWith({ decision: 'deny', reason: 'Operation cancelled before approval.' });
+  const count = opened.length, previews = host.pager.open.mock.calls.length;
+  await active.apply!(['allow-once']);
+  await opened[0]!.apply!(['choose-groups']);
+  await groups?.apply?.(['group-a']);
+  expect(opened).toHaveLength(count); expect(host.pager.open).toHaveBeenCalledTimes(previews);
+  expect(await pending).toEqual({ decision: 'deny', reason: 'Operation cancelled before approval.' });
+});
+
+it('does not publish a prompt for an already cancelled run', async () => {
+  const controller = new AbortController(); controller.abort();
+  const host = { pager: { open: vi.fn(), close: vi.fn() }, overlay: { open: vi.fn(), close: vi.fn() }, render: vi.fn() };
+  let answer: unknown;
+  void promptApproval(prompt, host, controller.signal).then(value => { answer = value; });
+  await Promise.resolve();
+  expect(answer).toEqual({ decision: 'deny', reason: 'Operation cancelled before approval.' });
+  expect(host.overlay.open).not.toHaveBeenCalled(); expect(host.render).not.toHaveBeenCalled();
+});
+
+it('retires cancellation after the user answers and leaves later surfaces alone', async () => {
+  const controller = new AbortController(), opened: Picker[] = [];
+  const remove = vi.spyOn(controller.signal, 'removeEventListener');
+  const host = { pager: { open: vi.fn(), close: vi.fn() },
+    overlay: { open: (picker: Picker) => { opened.push(picker); }, close: vi.fn() }, render: vi.fn() };
+  const pending = promptApproval(prompt, host, controller.signal);
+  await opened[0]!.apply!(['allow-once']);
+  expect(await pending).toMatchObject({ decision: 'allow-once' });
+  expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+  const calls = host.overlay.close.mock.calls.length;
+  controller.abort(); expect(host.overlay.close).toHaveBeenCalledTimes(calls);
+});
+
+it('settles cancellation even when closing the approval surface throws', async () => {
+  const controller = new AbortController(), opened: Picker[] = [];
+  const host = { pager: { open: vi.fn(), close: vi.fn() },
+    overlay: { open: (picker: Picker) => { opened.push(picker); }, close: vi.fn(() => { throw new Error('controlled device failure'); }) },
+    render: vi.fn() };
+  const pending = promptApproval(prompt, host, controller.signal), observe = vi.fn(); void pending.then(observe);
+  expect(() => controller.abort()).not.toThrow(); await Promise.resolve();
+  expect(observe).toHaveBeenCalledWith({ decision: 'deny', reason: 'Operation cancelled before approval.' });
+});
+
+it('rejects an approval answer when closing its surface fails before cancellation', async () => {
+  const controller = new AbortController(), opened: Picker[] = [], failure = new Error('controlled device failure');
+  const host = { pager: { open: vi.fn(), close: vi.fn() },
+    overlay: { open: (picker: Picker) => { opened.push(picker); }, close: vi.fn(() => { throw failure; }) }, render: vi.fn() };
+  const pending = promptApproval(prompt, host, controller.signal);
+  const rejected = expect(pending).rejects.toBe(failure);
+  await opened[0]!.apply!(['allow-once']); await rejected;
+  controller.abort(); expect(host.overlay.close).toHaveBeenCalledOnce();
+});
+
+it('retires cancellation when publishing the approval fails', async () => {
+  const controller = new AbortController(), failure = new Error('controlled publication failure');
+  const host = { pager: { open: vi.fn(), close: vi.fn() },
+    overlay: { open: vi.fn(() => { throw failure; }), close: vi.fn() }, render: vi.fn() };
+  await expect(promptApproval(prompt, host, controller.signal)).rejects.toBe(failure);
+  controller.abort(); expect(host.overlay.close).not.toHaveBeenCalled();
 });

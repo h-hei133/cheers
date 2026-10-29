@@ -1,0 +1,87 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts  (12 tests | 4 failed | 8 skipped) 11ms
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled approval approval without late authorization or navigation
+     → expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled groups approval without late authorization or navigation
+     → expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled refined approval without late authorization or navigation
+     → expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > settles cancellation even when closing the approval surface throws
+     → expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled approval approval without late authorization or navigation
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled groups approval without late authorization or navigation
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled refined approval without late authorization or navigation
+AssertionError: expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts:107:19
+    105|   const active = opened.at(-1)!;
+    106|   controller.abort(); await Promise.resolve();
+    107|   expect(observe).toHaveBeenCalledWith({ decision: 'deny', reason: 'Op…
+       |                   ^
+    108|   const count = opened.length, previews = host.pager.open.mock.calls.l…
+    109|   await active.apply!(['allow-once']);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > settles cancellation even when closing the approval surface throws
+AssertionError: expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts:146:19
+    144|   const pending = promptApproval(prompt, host, controller.signal), obs…
+    145|   expect(() => controller.abort()).not.toThrow(); await Promise.resolv…
+    146|   expect(observe).toHaveBeenCalledWith({ decision: 'deny', reason: 'Op…
+       |                   ^
+    147| });
+    148|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 8 skipped (12)
+   Start at  07:40:52
+   Duration  320ms (transform 68ms, setup 0ms, collect 82ms, tests 11ms, environment 0ms, prepare 59ms)

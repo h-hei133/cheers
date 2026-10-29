@@ -1,0 +1,24 @@
+{
+  "cases": [
+    {
+      "case": "listener",
+      "exitCode": 1,
+      "expectedFailures": 4
+    },
+    {
+      "case": "binding",
+      "exitCode": 1,
+      "expectedFailures": 2
+    },
+    {
+      "case": "late-navigation",
+      "exitCode": 1,
+      "expectedFailures": 3
+    }
+  ],
+  "restored": true,
+  "sourceDigests": {
+    "packages/ts-shell/src/cli/interactive/picker/approval.ts": "43fd6c273bbc7167063b1a3b292af0068ac13647a6d8f229369aeabc516bc102",
+    "packages/ts-shell/src/cli/interactive/interactiveMode.ts": "c3908280bb2e2784a8ef2dd4f73a561078a3e8d9967033fb23ec0b765352f52b"
+  }
+}

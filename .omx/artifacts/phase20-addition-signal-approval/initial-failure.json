@@ -1,0 +1,61 @@
+{
+  "mode": "regular",
+  "signal": "SIGTERM",
+  "buildId": "94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff",
+  "inputsDigest": "b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "local HTTP fixture",
+  "status": "failed",
+  "stages": [
+    {
+      "label": "approval-signal",
+      "status": "failed",
+      "approvalPending": true,
+      "recoveryBeforeSignal": {
+        "runPhase": "turn-active",
+        "pendingPromptMatches": true
+      },
+      "shutdown": {
+        "code": 1,
+        "signal": null
+      },
+      "exitMs": 10071,
+      "failure": "Expected values to be strictly deep-equal:",
+      "observation": {
+        "requests": 1,
+        "starts": 1,
+        "ends": 0,
+        "approvals": [],
+        "results": [],
+        "scopes": [],
+        "physicalStops": 0,
+        "exitRestores": 1,
+        "sessionId": "sess_9aec9340b0da245c_1793316550668",
+        "snapshot": {
+          "title": "Permission: write (write)",
+          "current": "allow-once",
+          "loading": false,
+          "visible": [
+            "allow-once",
+            "deny"
+          ],
+          "targetDeclared": true,
+          "directoryDeclared": true,
+          "painted": [
+            "allow-once",
+            "deny"
+          ]
+        }
+      },
+      "outputBytes": 160857,
+      "outputLimitExceeded": false,
+      "deadlineExceeded": false
+    }
+  ],
+  "checks": {},
+  "failure": "Expected values to be strictly deep-equal:",
+  "scratchRemoved": true,
+  "requests": 1,
+  "readinessRequests": 1
+}

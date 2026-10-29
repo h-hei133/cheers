@@ -1,0 +1,49 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/interactiveMode.test.ts  (353 tests | 2 failed | 351 skipped) 96ms
+   ❯ src/cli/interactive/interactiveMode.test.ts > binds unanswered approval to the current run cancellation in the actual regular host
+     → expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/interactiveMode.test.ts > binds unanswered approval to the current run cancellation in the actual fullscreen host
+     → expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > binds unanswered approval to the current run cancellation in the actual regular host
+ FAIL  src/cli/interactive/interactiveMode.test.ts > binds unanswered approval to the current run cancellation in the actual fullscreen host
+AssertionError: expected "spy" to be called with arguments: [ { decision: 'deny', …(1) } ]
+
+Received:
+
+
+
+Number of calls: 0
+
+ ❯ src/cli/interactive/interactiveMode.test.ts:453:21
+    451|     await vi.waitFor(() => expect(host.overlay.active).toBe(true));
+    452|     controller.abort(); await Promise.resolve();
+    453|     expect(observe).toHaveBeenCalledWith({ decision: 'deny', reason: '…
+       |                     ^
+    454|     expect(host.overlay.active).toBe(false);
+    455|     terminal.input('y');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 351 skipped (353)
+   Start at  07:40:52
+   Duration  15.77s (transform 10.18s, setup 0ms, collect 15.41s, tests 96ms, environment 0ms, prepare 58ms)

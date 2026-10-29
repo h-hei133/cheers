@@ -1,0 +1,127 @@
+{
+  "mode": "regular",
+  "signal": "SIGHUP",
+  "buildId": "95e29c61399e556adae727a6b64cbc7e1e34cc2c949ebfcf914ff908bb16611c",
+  "inputsDigest": "24544175280b933be25f44cb1b5bdcb2286e5e10ca6559a783660d8e606776a9",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "local HTTP fixture",
+  "status": "passed",
+  "stages": [
+    {
+      "label": "approval-signal",
+      "status": "passed",
+      "approvalPending": true,
+      "recoveryBeforeSignal": {
+        "runPhase": "turn-active",
+        "pendingPromptMatches": true
+      },
+      "shutdown": {
+        "code": 129,
+        "signal": null
+      },
+      "exitMs": 176,
+      "observation": {
+        "requests": 1,
+        "starts": 1,
+        "ends": 1,
+        "approvals": [],
+        "results": [
+          {
+            "taskId": "fixture-pending-call",
+            "success": false
+          }
+        ],
+        "scopes": [],
+        "physicalStops": 0,
+        "exitRestores": 1,
+        "sessionId": "sess_ed81bd3cf9ded4c2_1793317048519",
+        "snapshot": {
+          "title": "Permission: write (write)",
+          "current": "allow-once",
+          "loading": false,
+          "visible": [
+            "allow-once",
+            "deny"
+          ],
+          "targetDeclared": true,
+          "directoryDeclared": true,
+          "painted": [
+            "allow-once",
+            "deny"
+          ]
+        },
+        "overlayActive": false
+      },
+      "device": {
+        "cookedFlagsRestored": true
+      },
+      "durable": {
+        "status": "interrupted",
+        "runPhase": "turn-active",
+        "interruptedKind": "turn",
+        "promptRetained": true,
+        "operations": 0,
+        "targetAbsent": true,
+        "noPersistentAuthority": true
+      },
+      "outputBytes": 4495,
+      "outputLimitExceeded": false,
+      "deadlineExceeded": false
+    },
+    {
+      "label": "ordinary-recovery",
+      "status": "passed",
+      "recoveryNoticeVisible": true,
+      "shutdown": {
+        "code": 0,
+        "signal": null
+      },
+      "exitMs": 131,
+      "observation": {
+        "requests": 0,
+        "starts": 0,
+        "ends": 0,
+        "approvals": [],
+        "results": [],
+        "scopes": [],
+        "physicalStops": 1,
+        "exitRestores": 0,
+        "snapshot": {
+          "loading": false,
+          "visible": [],
+          "targetDeclared": false,
+          "directoryDeclared": false,
+          "painted": []
+        },
+        "overlayActive": false,
+        "sessionId": "sess_ed81bd3cf9ded4c2_1793317048519"
+      },
+      "device": {
+        "cookedFlagsRestored": true
+      },
+      "durable": {
+        "status": "interrupted",
+        "runPhase": "turn-active",
+        "interruptedKind": "turn",
+        "promptRetained": true,
+        "operations": 0,
+        "targetAbsent": true,
+        "noPersistentAuthority": true
+      },
+      "outputBytes": 4832,
+      "outputLimitExceeded": false,
+      "deadlineExceeded": false
+    }
+  ],
+  "checks": {
+    "signalSettledUnansweredApproval": true,
+    "recoveredSameInterruptedSession": true,
+    "noWriteOperationOrPersistentAuthority": true,
+    "noAutomaticReplay": true,
+    "configUnchanged": true
+  },
+  "scratchRemoved": true,
+  "requests": 1,
+  "readinessRequests": 1
+}

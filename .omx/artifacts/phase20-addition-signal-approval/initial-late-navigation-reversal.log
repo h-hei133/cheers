@@ -1,0 +1,53 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts  (10 tests | 2 failed | 7 skipped) 14ms
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled groups approval without late authorization or navigation
+     → expected [ { …(10) }, { …(10) }, …(2) ] to have a length of 2 but got 4
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled refined approval without late authorization or navigation
+     → expected [ { …(10) }, { …(10) }, …(2) ] to have a length of 3 but got 4
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled groups approval without late authorization or navigation
+AssertionError: expected [ { …(10) }, { …(10) }, …(2) ] to have a length of 2 but got 4
+
+- Expected
++ Received
+
+- 2
++ 4
+
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts:112:18
+    110|   await opened[0]!.apply!(['choose-groups']);
+    111|   await groups?.apply?.(['group-a']);
+    112|   expect(opened).toHaveLength(count); expect(host.pager.open).toHaveBe…
+       |                  ^
+    113|   expect(await pending).toEqual({ decision: 'deny', reason: 'Operation…
+    114| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > settles cancelled refined approval without late authorization or navigation
+AssertionError: expected [ { …(10) }, { …(10) }, …(2) ] to have a length of 3 but got 4
+
+- Expected
++ Received
+
+- 3
++ 4
+
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts:112:18
+    110|   await opened[0]!.apply!(['choose-groups']);
+    111|   await groups?.apply?.(['group-a']);
+    112|   expect(opened).toHaveLength(count); expect(host.pager.open).toHaveBe…
+       |                  ^
+    113|   expect(await pending).toEqual({ decision: 'deny', reason: 'Operation…
+    114| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed | 7 skipped (10)
+   Start at  07:34:11
+   Duration  329ms (transform 70ms, setup 0ms, collect 84ms, tests 14ms, environment 0ms, prepare 61ms)

@@ -1,0 +1,25 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts  (12 tests | 1 failed | 11 skipped) 8ms
+   ❯ src/cli/interactive/picker/approvalSelection.test.ts > rejects an approval answer when closing its surface fails before cancellation
+     → promise resolved "{ decision: 'allow-once', …(1) }" instead of rejecting
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/approvalSelection.test.ts > rejects an approval answer when closing its surface fails before cancellation
+AssertionError: promise resolved "{ decision: 'allow-once', …(1) }" instead of rejecting
+ ❯ src/cli/interactive/picker/approvalSelection.test.ts:154:34
+    152|     overlay: { open: (picker: Picker) => { opened.push(picker); }, clo…
+    153|   const pending = promptApproval(prompt, host, controller.signal);
+    154|   const rejected = expect(pending).rejects.toBe(failure);
+       |                                  ^
+    155|   await opened[0]!.apply!(['allow-once']); await rejected;
+    156|   controller.abort(); expect(host.overlay.close).toHaveBeenCalledOnce(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 skipped (12)
+   Start at  07:41:09
+   Duration  316ms (transform 72ms, setup 0ms, collect 88ms, tests 8ms, environment 0ms, prepare 59ms)
