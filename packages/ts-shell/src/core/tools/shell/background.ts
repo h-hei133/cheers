@@ -5,6 +5,7 @@ import { ArtifactManager } from '../../session/artifactManager.js';
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../../../tools/types.js';
 import { approvedResult, deniedResult } from '../toolResultLifecycle.js';
 import { planCommandLaunch } from './launch.js';
+import type { BackgroundRunner, BackgroundTask } from '../../../workflow/jobs/local/model.js';
 import { TOOL_APPROVED_COMMAND_AUTHORITY } from './authority.js';
 
 /** Launch through the ordinary sandbox, returning a handle whose owner enforces its deadline. */
@@ -135,4 +136,103 @@ export function createTaskStopToolDefinition(): ToolDefinition {
       return approvedResult(`Stop requested for ${id}. Check taskOutput for the observed result.`)
     },
   }
+}
+
+/** Longest a single wait may block, matching the background deadline it watches. */
+const WAIT_MAX_MS = 300_000;
+/** How often a wait reports progress without a completion to report. */
+const WAIT_PROGRESS_MS = 15_000;
+
+/**
+ * Wait for a background command to finish, instead of polling for it.
+ *
+ * A model that needs a command's result had two options and both were wrong:
+ * `taskOutput` returns immediately whether or not anything has happened, so a
+ * caller had to guess how long to sleep first, and `bash sleep` spends the
+ * turn's own budget on the guess — and at sixty seconds the foreground command
+ * is promoted to the background anyway, so the sleep outlives the thing it was
+ * waiting for. This waits on the runner's own completion event, which fires
+ * once, and returns the task as it settled.
+ *
+ * The wait is bounded and cancellable. A background command is allowed to run
+ * past any single turn, so a wait that could not give up would make one slow
+ * command unkillable from the model's side; when the deadline passes the answer
+ * says the task is still running rather than pretending it finished.
+ */
+export function createTaskWaitToolDefinition(): ToolDefinition {
+  return {
+    name: 'taskWait',
+    description:
+      'Wait for a background command started with runInBackground to finish, then report its result. '
+      + 'Prefer this over polling taskOutput or sleeping in bash.',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        taskId: { type: 'string', description: 'The identifier the background command was started under.' },
+        timeoutSeconds: {
+          type: 'number',
+          description: `How long to wait before reporting it is still running (default and maximum ${WAIT_MAX_MS / 1000}).`,
+        },
+      },
+      required: ['taskId'],
+    },
+    async execute(args, context) {
+      const background = context.background ?? backgroundTasks;
+      const id = typeof args.taskId === 'string' ? args.taskId.trim() : '';
+      if (!id) return deniedResult('Error: taskWait needs a taskId.');
+      const requested = args.timeoutSeconds;
+      const timeoutMs = typeof requested === 'number' && Number.isFinite(requested)
+        ? Math.min(WAIT_MAX_MS, Math.max(1_000, Math.round(requested * 1000)))
+        : WAIT_MAX_MS;
+      const task = background.get(id);
+      if (!task) {
+        return deniedResult(`Error: no background command named '${id}'. Known: ${background.list().map(entry => entry.id).join(', ') || 'none'}.`);
+      }
+      // Already settled: the answer is the result, not a wait that returns at once.
+      if (task.state === 'exited' || task.state === 'killed' || task.state === 'unknown') return approvedResult(renderTask(task));
+
+      const settled = await waitForSettlement(background, id, timeoutMs, context.abortSignal);
+      if (settled === undefined) {
+        return approvedResult(`${id} is still running after ${Math.round(timeoutMs / 1000)}s.\n\n${renderTask(background.get(id) ?? task)}`);
+      }
+      return approvedResult(renderTask(settled));
+    },
+  };
+}
+
+/**
+ * Settle when `id` ends, the deadline passes, or the turn is cancelled.
+ *
+ * The listener is always released: a wait that timed out and left its listener
+ * attached would keep the runner calling into a tool call that no longer
+ * exists, and a cancelled wait must not keep the turn open.
+ */
+function waitForSettlement(
+  background: BackgroundRunner,
+  id: string,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<BackgroundTask | undefined> {
+  return new Promise(resolve => {
+    let done = false;
+    const finish = (task: BackgroundTask | undefined): void => {
+      if (done) return;
+      done = true;
+      clearTimeout(deadline);
+      clearInterval(progress);
+      release();
+      signal?.removeEventListener('abort', onAbort);
+      resolve(task);
+    };
+    const release = background.onEnded(ended => { if (ended.id === id) finish(ended); });
+    const onAbort = (): void => finish(undefined);
+    const deadline = setTimeout(() => finish(undefined), timeoutMs);
+    // Long waits should not look like a hang. Progress goes nowhere on its own;
+    // it exists so a cancelled wait still has a timer that notices the abort.
+    const progress = setInterval(() => {
+      if (signal?.aborted) finish(undefined);
+    }, WAIT_PROGRESS_MS);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) finish(undefined);
+  });
 }

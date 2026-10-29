@@ -104,3 +104,67 @@ describe("a background command and the sandbox", () => {
     expect(registry.get(task.id)?.output).toContain("LAUNCHER_WAS_USED");
   });
 });
+
+describe("waiting for a background command", () => {
+  it("returns at once when the command has already settled", async () => {
+    const settled = { id: 'task-1', command: 'true', cwd: '/tmp', pid: undefined, startedAt: 0, state: 'exited' as const, output: 'done' };
+    const background = {
+      get: (id: string) => (id === 'task-1' ? settled : undefined),
+      list: () => [settled],
+      onEnded: () => () => {},
+    };
+    const result = await tool('taskWait').execute({ taskId: 'task-1' },
+      { ...context, background } as unknown as ToolExecutionContext);
+
+    expect(result.output).toContain('task-1');
+    expect(result.output).toContain('done');
+  });
+
+  it("waits on the completion event instead of polling", async () => {
+    let settle: ((task: typeof running) => void) | undefined;
+    const running = { id: 'task-2', command: 'slow', cwd: '/tmp', pid: 1, startedAt: 0, state: 'running' as const, output: 'partial' };
+    const finished = { ...running, state: 'exited' as const, output: 'partial then done' };
+    const background = {
+      get: () => running,
+      list: () => [running],
+      onEnded: (listener: (task: typeof running) => void) => { settle = listener; return () => { settle = undefined; }; },
+    };
+    const pending = tool('taskWait').execute({ taskId: 'task-2' },
+      { ...context, background } as unknown as ToolExecutionContext);
+    // Nothing has happened yet: the call is blocked on the runner's event.
+    expect(settle).toBeDefined();
+    settle!(finished);
+
+    expect((await pending).output).toContain('partial then done');
+  });
+
+  it("reports a still-running command when the deadline passes", async () => {
+    const running = { id: 'task-3', command: 'slow', cwd: '/tmp', pid: 1, startedAt: 0, state: 'running' as const, output: '' };
+    const background = { get: () => running, list: () => [running], onEnded: () => () => {} };
+    const result = await tool('taskWait').execute({ taskId: 'task-3', timeoutSeconds: 1 },
+      { ...context, background } as unknown as ToolExecutionContext);
+
+    expect(result.output).toContain('still running');
+  });
+
+  it("gives up when the turn is cancelled, and releases its listener", async () => {
+    const running = { id: 'task-4', command: 'slow', cwd: '/tmp', pid: 1, startedAt: 0, state: 'running' as const, output: '' };
+    let released = false;
+    const background = { get: () => running, list: () => [running], onEnded: () => () => { released = true; } };
+    const controller = new AbortController();
+    const pending = tool('taskWait').execute({ taskId: 'task-4', timeoutSeconds: 300 },
+      { ...context, background, abortSignal: controller.signal } as unknown as ToolExecutionContext);
+    controller.abort();
+
+    expect((await pending).output).toContain('still running');
+    expect(released).toBe(true);
+  });
+
+  it("names the commands that do exist when the id is unknown", async () => {
+    const background = { get: () => undefined, list: () => [{ id: 'task-9' }], onEnded: () => () => {} };
+    const result = await tool('taskWait').execute({ taskId: 'nope' },
+      { ...context, background } as unknown as ToolExecutionContext);
+
+    expect(result.error).toContain('task-9');
+  });
+});

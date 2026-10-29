@@ -2339,7 +2339,9 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 2. 只有在需要覆盖 bash/非文本副作用时，才补一个 **turn 开始**的快照钩子，复用 `snapshotRoot`（`edit/recovery/root.ts:6-11`）与 ledger 目录，不新建根；非 git 工作区静默跳过（与 Codex 的 `NotAGitRepository` 行为一致）。
 3. **不复活**"快照写进对话历史"的协议语义：快照属于 edit/recovery ledger，对话历史只记 operation ID（现有 receipt 已是这个形状）。
 
-**证据边界**：本轮只做定位与参考对比，未实现。任何实现都必须先有"未批准不写、批准后写入目标与批准目标一致、恢复不重放 unknown"的反转证据。
+**本批已实施（第一百二十一批）**：新增 `taskWait` 工具。它不轮询、不 sleep：直接等 `BackgroundRunner.onEnded` 的完成事件，带 300 秒上限与可取消信号，超时或取消时明确回答"仍在运行"而不是假装结束。`bash` 描述同步引导"等待用 taskWait，不要在 bash 里 sleep"。**未实现**：把前台 `sleep` 在审批层硬拒（会误伤轮询脚本），以及修正 `27-background-execution.md` 的过期结论。
+
+**证据边界**：`taskWait` 的夹具使用受控的 `BackgroundRunner`，未在真实长任务上测过等待与取消；前台命令 60 秒自动提升的既有行为未改。任何实现都必须先有"未批准不写、批准后写入目标与批准目标一致、恢复不重放 unknown"的反转证据。
 
 
 ### 17.3 第十项（用户编号第二十）：Monitor 工具
@@ -2580,3 +2582,15 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 主代理以 heap1024MiB 单线程串行执行 7 文件 521 项通过；五静态门、module facade 0 及 heap1536MiB TS build `3c53260f3c65` 通过。
 
 **边界**：未实现"一键撤回润色"复用与 `alt+s` 备选键；非 raw 模式（`lineLoop.ts`）下的 IXON 吞键风险未经真机验证。
+
+### 第一百二十一批：`taskWait` 取代轮询与前台 sleep
+
+模型需要后台命令的结果时只有两条路，都不对：`taskOutput` 立即返回，调用方只能先猜一个 sleep 时长；而 `bash sleep` 花的是本回合自己的预算，且前台命令 60 秒就会被提升为后台任务，sleep 反而活得比它等待的东西更久。
+
+新增 `taskWait`（`core/tools/shell/background.ts`）：参数 `taskId` + 可选 `timeoutSeconds`（默认与上限 300 秒）。它**等待 `BackgroundRunner.onEnded` 的完成事件**，不轮询；超时或回合取消时返回"仍在运行"并附带当前状态，而不是假装结束。监听器在每条退出路径上都释放——超时后仍挂着的监听会让 runner 继续调用一个已不存在的工具调用，被取消的等待也不能把回合挂住。已结束的任务直接返回结果，不进入等待。
+
+`bash` 的工具描述同步改为引导 `taskWait`。
+
+验证：`backgroundTools.test.ts` 新增 5 项——已结束直接返回、等待完成事件（断言调用确实阻塞在 runner 上）、超时报告仍在运行、取消后释放监听、未知 id 列出已知任务。反转把等待换成"读一次当前状态"后 2 项预期失败；源码逐字节恢复并核对 SHA-256 `490c6b9532b5` 后重验。`core/tools` 36 文件 424 项通过；五静态门与 module facade 0 通过。
+
+**边界**：夹具使用受控的 `BackgroundRunner`，未在真实长任务上测过等待与取消；前台 60 秒自动提升的既有行为未改；`27-background-execution.md` 的过期结论仍未修正。

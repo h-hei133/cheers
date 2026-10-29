@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { verifyPathContainment } from '../security/pathJail.js'
 import { replaceInContent, replaceManyInContent } from './editEngine.js'
-import { startBackgroundCommand, createTaskOutputToolDefinition, createTaskStopToolDefinition } from './shell/background.js';
+import { startBackgroundCommand, createTaskOutputToolDefinition, createTaskStopToolDefinition, createTaskWaitToolDefinition } from './shell/background.js';
 import { planCommandLaunch } from './shell/launch.js';
 import { TOOL_APPROVED_COMMAND_AUTHORITY } from './shell/authority.js';
 import { withFileLock } from '../../runtime/execution/fileLock.js'
@@ -548,7 +548,7 @@ export function createCoreToolRegistry(options?: {
     createGrepToolDefinition(executionService),
     {
       name: 'bash',
-      description: 'Execute shell commands, including Git operations. Plan mode permits classified inspection commands such as git branch --show-current and git rev-parse --show-toplevel. Git status, diff, log, and show require approval because repository configuration can run helpers. Set runInBackground for a command that outlives this turn; read it back with taskOutput and end it with taskStop.',
+      description: 'Execute shell commands, including Git operations. Plan mode permits classified inspection commands such as git branch --show-current and git rev-parse --show-toplevel. Git status, diff, log, and show require approval because repository configuration can run helpers. Set runInBackground for a command that outlives this turn; wait for it with taskWait, read it with taskOutput, and end it with taskStop. To wait for something, use taskWait rather than sleeping in this tool.',
       argsSchema: {
         type: 'object',
         properties: {
@@ -577,6 +577,7 @@ export function createCoreToolRegistry(options?: {
       },
     },
     createTaskOutputToolDefinition(),
+    createTaskWaitToolDefinition(),
     createTaskStopToolDefinition(),
     createWebFetchToolDefinition(),
     createWebSearchToolDefinition(),
