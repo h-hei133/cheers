@@ -3466,3 +3466,15 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 主代理package-local五显式文件196项串行通过：stream56/consumer8/body19/account17/step96，覆盖done-only、纯terminal、两端点真实sink显示、多个item、empty delta、已流答案不重复、reduced account terminal、EOF/foreign/contradictory/malformed tool/failed不补发及cipher不显示。三个独立反转移除补发、移除已显示item守卫、移除有效completion守卫分别9/6/1项失败，每次finally逐字节恢复，恢复后196重验通过。五静态门/diff、完整声明图单一用例与AST stream4通过；1536MiB TS build完成exit0后单独新鲜度核验：build `d3fc77c496563398fe48395d87a977238b6907196363c2f8bced1a8a193b05bf`，inputs `5cac3c77d583651812cd1b1c9cb10e95fcbf8c38d8d01a3ac46358968444fdb8`，460 compilerInputs/3547文件重算一致。
 
 本批未重复本地NormProof judge，完整声明图是结构证据；无独立review、live provider/账户、真实终端、PTY/exe/full suite或20k会话。HANDOFF记录stream transport与显示事实分开，任务scratch清理。原47项不升级，反馈25与ADD整体仍partial/active，Git/精确新CI另绑定。
+
+本批已提交推送`3db82225087b54b0f82a2821e07dae0e70d6d0b0`，远端main精确一致、仅原CLAUDE.md。[Watch40948637008](https://github.com/h-hei133/cheers/actions/runs/40948637008)延后completed/success，[CI40948637046](https://github.com/h-hei133/cheers/actions/runs/40948637046)仍in_progress。20.24的[53bbd335 CI40945194907](https://github.com/h-hei133/cheers/actions/runs/40945194907)现completed/success，精确head一致；旧74f8bd2 failure保留。
+
+### 20.27 Responses部分reasoning的可验证尾部
+
+沿20.26明确留下的部分delta边界继续：原matches允许终态公开part保留已流prefix并增长，但“本item有任何delta便不补发”让当前thinking只显示前缀，存储正文完整。summary/raw各一reader与一实际step→TurnSink新增回归共四失败，另65通过。沿20.26已实际读取的官方done完整text及pi item收尾投影决定，本项目只处理可直接追加的同正文尾部，不采用参考的无条件全量替换。
+
+原slot增加本地shownReasoning，按reasoning fragment实际发出顺序累计，不持久化、不进入请求或public接口。终态完成原校验后，原outputProjection选出的公开正文必须startsWith该item实际已发字符串，且长度增加，才发slice后缀；未流item沿20.26原空前缀行为。raw/summary同时流出、多个part交错或正文表示变换导致不匹配时不追加，原最终存储/native replay不变；live显示与终态重表示的完整替换仍是独立剩余项。
+
+主代理五显式文件201项串行通过：stream59/consumer10/body19/account17/step96。summary/raw尾部各贯通当前thinking完整正文和finalized；额外交错part夹具确认实际回调顺序不能由Map中的part序列重建。四类反转关闭部分尾部、清空已显示前缀、去掉prefix校验、按part map重建分别4/11/1/1项失败，finally逐字节恢复后201项重验通过。交错fixture反转前补长终态第二part，让错误slice确实可观测，没有放宽产品合同。五静态门/diff通过；局部slot/前缀修复无新import/callable，未重复完整声明图或NormProof。1536MiB build确认exit0后单独新鲜度重算通过：build `643a2bafca77f650a22314da8a66341923cf3acaddf0f1bcba336f366762386f`，inputs `a8147821bee5b6b60e5c7642dfa3967aab05056ce6c3a7dbe4dacfd3bf1a754c`，460 compilerInputs/3547文件一致。
+
+HANDOFF记录实际发出顺序与校验part状态分开，任务scratch清理；无独立review、live provider/账户、真实终端、PTY/exe/full suite或20k会话，原47项不升级、ADD active。Git/精确新CI另绑定，既有success不延伸到本批。

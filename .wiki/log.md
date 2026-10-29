@@ -10216,3 +10216,11 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 五显式文件196项串行通过：stream56/consumer8/body19/account17/step96；含done-only、多个item、两端点sink、空delta、已流答案、reduced account terminal与非法终态拒绝。三类反转9/6/1失败，finally逐字节恢复后196再通过。五静态门/diff、完整声明图单一用例、AST stream4通过；build `d3fc77c496563398fe48395d87a977238b6907196363c2f8bced1a8a193b05bf`、inputs `5cac3c77d583651812cd1b1c9cb10e95fcbf8c38d8d01a3ac46358968444fdb8`，460/3547在build exit0后单独重算一致。
 
 未重跑本地NormProof judge，无独立review、live/真实账户终端、PTY/exe/full suite或20k会话；HANDOFF补stream/显示区别、task scratch清理。部分delta后的缺失尾部及raw/summary表示替换仍需独立裁决，未冒充该范围完成；原47项不升级、ADD active，Git/新精确CI另绑定。
+
+该批已提交推送`3db82225087b54b0f82a2821e07dae0e70d6d0b0`，远端main精确一致、仅原CLAUDE.md。[Watch40948637008](https://github.com/h-hei133/cheers/actions/runs/40948637008)延后success，[CI40948637046](https://github.com/h-hei133/cheers/actions/runs/40948637046)仍in_progress；[53bbd335 CI40945194907](https://github.com/h-hei133/cheers/actions/runs/40945194907)现completed/success，精确head一致，旧74f8bd2 failure不改。
+
+## [2026-10-30] fix | Responses公开thinking的可验证尾部
+
+继续[addition20.27](features/phase-20-addition.md#2027-responses部分reasoning的可验证尾部)：原终态part允许已流prefix增长，但display的any-delta守卫丢所有余文；四项summary/raw reader与真实step→sink回归失败，另65通过。沿已核对官方done完整正文及参考item收尾投影，本项目只补可直接追加的同正文后缀。slot按真实发出顺序记shownReasoning，终态公开投影startsWith并增长才slice追加，Map part顺序不代表显示顺序。
+
+五显式文件201项串行通过，四类反转4/11/1/1失败、finally逐字节恢复后201再通过；交错part夹具加长终态第二part以观测错误追加。五静态门/diff通过，无新import/callable、不重复完整图/NormProof。build `643a2bafca77f650a22314da8a66341923cf3acaddf0f1bcba336f366762386f`，inputs `a8147821bee5b6b60e5c7642dfa3967aab05056ce6c3a7dbe4dacfd3bf1a754c`，460/3547在build exit0后单独重算一致。HANDOFF补实际发出顺序、task scratch清理；raw/summary重表示及不匹配正文的live全量替换仍未宣称完成。无独立review、live/真实账户终端、PTY/exe/full suite或20k会话，原47不升级、ADD active，Git/新精确CI另绑定。

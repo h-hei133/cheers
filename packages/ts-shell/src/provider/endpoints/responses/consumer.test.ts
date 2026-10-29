@@ -70,6 +70,40 @@ it('delivers raw reasoning deltas and retains the same reasoning in the actual p
   expect(body.locked).toBe(false);
 });
 
+it.each(['summary', 'raw'] as const)('displays a validated %s tail once in the actual step-to-sink path', async channel => {
+  const reasoning = { id: 'rs_partial', type: 'reasoning', summary: [] };
+  const completed = { ...reasoning, ...(channel === 'summary'
+    ? { summary: [{ type: 'summary_text', text: 'Inspect the inputs.' }] }
+    : { content: [{ type: 'reasoning_text', text: 'Inspect the inputs.' }] }) };
+  const events = [
+    { type: 'response.output_item.added', output_index: 0, item: reasoning },
+    { type: channel === 'summary' ? 'response.reasoning_summary_text.delta' : 'response.reasoning_text.delta',
+      output_index: 0, item_id: reasoning.id, delta: 'Inspect ', ...(channel === 'summary' ? { summary_index: 0 } : { content_index: 0 }) },
+    { type: 'response.completed', response: { id: 'resp_partial', model: 'm', status: 'completed', output: [completed, item] } },
+  ];
+  const transcript = new Transcript();
+  const sink = new TurnSink(transcript, () => {});
+  const sessionId = `responses-partial-consumer-${channel}`;
+  const step = createStepFunction({ provider: { apiKey: 'synthetic', provider: 'fixture', ...provider },
+    workspaceRoot: process.cwd(), sessionId, systemPrompt: '', tools: [],
+    fetchImpl: async () => new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(''),
+      { headers: { 'content-type': 'text/event-stream' } }) });
+  sink.begin('turn', 'turn');
+  try {
+    const result = await step([{ role: 'user', content: 'q' }], undefined,
+      { onReasoning: delta => sink.handleEvent({ type: 'reasoning.delta', role: 'coder', delta }),
+        onText: delta => sink.handleEvent({ type: 'message.delta', role: 'coder', delta }) }, { allowTools: false });
+    expect(result.stopReason).toBe('stop');
+    expect(result.reasoning?.text).toBe('Inspect the inputs.');
+    expect(JSON.parse(result.reasoning!.signature!).output).toEqual([completed, item]);
+    expect(transcript.all().map(block => ({ kind: block.kind, text: block.text, finalized: block.finalized }))).toEqual([
+      { kind: 'thinking', text: 'Inspect the inputs.', finalized: true },
+      { kind: 'assistant', text: 'partial response', finalized: false },
+    ]);
+    expect(sink.activity()?.label).toBe('working');
+  } finally { sink.end(); resetSessionUsage(sessionId); }
+});
+
 it.each(['failed', 'incomplete', 'refusal'])('simple and compaction consumers reject %s text but record native usage', async status => {
   const completion = { status: status === 'refusal' ? 'completed' : status, model: 'm',
     output: status === 'refusal' ? [{ ...item, content: [{ type: 'refusal', refusal: 'withheld' }] }] : [item],

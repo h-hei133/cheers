@@ -931,3 +931,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A Responses SSE completion saves public reasoning from done/terminal snapshots, but the current turn has no thinking block.
 - **Root Cause**: The step suppresses whole-body reasoning callbacks for streamed responses, while the protocol reader only emits text deltas. A completed reasoning item can contain public text without any preceding reasoning delta.
 - **Rule**: After the existing terminal identity, item and actionable-output checks pass, publish public reasoning for each item that emitted no nonempty reasoning delta, before any remaining answer text. Reuse the native summary/raw projection, preserve opaque replay bytes, and verify reduced account terminals, no duplicate deltas, invalid terminals and the actual step-to-sink display separately.
+
+### Reasoning Tail Reconciliation Needs The Actual Emission Order
+- **Symptom**: A verified Responses terminal contains the rest of a public reasoning prefix, but the live thinking block retains only the prefix. Rebuilding shown text from per-part maps can also append an incorrect tail after interleaved parts.
+- **Root Cause**: A boolean already-streamed check drops every terminal suffix; per-part maps record validation state, not the order in which callbacks displayed text.
+- **Rule**: Record actual emitted reasoning per native output item. Append only the verified terminal projection's suffix when it starts with that exact emitted string; do not concatenate raw and summary alternatives or reconstruct display order from part maps. Preserve existing done/terminal rejection and native replay bytes.

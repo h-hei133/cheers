@@ -14,6 +14,7 @@ interface Slot {
   readonly textDone: Map<number, string>;
   readonly reasoningDone: Map<number, string>;
   readonly reasoningTextDone: Map<number, string>;
+  shownReasoning: string;
   done?: OutputItem;
 }
 
@@ -115,13 +116,15 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
         const text = completed.choices?.[0]?.message?.content ?? '';
         if (!text.startsWith(shown)) return assembled(responseFailure(shown, usage), shown);
         // Done snapshots can contain public reasoning without any text delta.
-        // Publish it only after terminal validation, once per unstreamed item.
+        // Publish it only after terminal validation, following each item's shown prefix.
         if (completed.choices?.[0]?.finish_reason !== 'error') for (const [index, item] of output.entries()) {
           if (item.type !== 'reasoning') continue;
           const slot = slots.get(index);
-          if (slot && [...slot.reasoning.values(), ...slot.reasoningText.values()].some(value => value.length > 0)) continue;
+          const shown = slot?.shownReasoning ?? '';
           const reasoning = outputProjection([item]).reasoning;
-          if (reasoning) yield { kind: 'reasoning', text: reasoning };
+          if (reasoning.startsWith(shown) && reasoning.length > shown.length) {
+            yield { kind: 'reasoning', text: reasoning.slice(shown.length) };
+          }
         }
         if (text.length > shown.length) yield { kind: 'text', text: text.slice(shown.length) };
         return assembled(completed, shown);
@@ -132,7 +135,7 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
         const item = event.item;
         if ([...slots.values()].some(slot => slot.item.id === item.id)) throw new Error('Response output item identity is repeated.');
         slots.set(index, { item, text: new Map(), reasoning: new Map(), reasoningText: new Map(),
-          textDone: new Map(), reasoningDone: new Map(), reasoningTextDone: new Map() });
+          textDone: new Map(), reasoningDone: new Map(), reasoningTextDone: new Map(), shownReasoning: '' });
       }
       if (event.type === 'response.output_item.done') {
         const index = position(event.output_index); const slot = slots.get(index); const output = responseOutput([event.item]);
@@ -168,6 +171,7 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
         }
         if (typeof event.delta !== 'string') throw new Error('Response delta has no text.');
         parts.set(index, (parts.get(index) ?? '') + event.delta);
+        if (reasoning) slot.shownReasoning += event.delta;
         if (!reasoning) shown += event.delta;
         yield { kind: reasoning ? 'reasoning' : 'text', text: event.delta };
       }

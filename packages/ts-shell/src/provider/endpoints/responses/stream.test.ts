@@ -119,6 +119,35 @@ describe('Responses terminal and SSE contract', () => {
       { kind: 'text', text: 'Hello 世界' }]);
   });
 
+  it.each(['summary', 'raw'] as const)('publishes only the validated %s tail after a partial delta', async channel => {
+    const start = { type: 'reasoning', id: 'rs_partial', summary: [] };
+    const completed = { ...start, ...(channel === 'summary'
+      ? { summary: [{ type: 'summary_text', text: 'Plan more' }] }
+      : { content: [{ type: 'reasoning_text', text: 'Plan more' }] }) };
+    const delta = { type: channel === 'summary' ? 'response.reasoning_summary_text.delta' : 'response.reasoning_text.delta',
+      output_index: 0, item_id: start.id, delta: 'Plan ', ...(channel === 'summary' ? { summary_index: 0 } : { content_index: 0 }) };
+    const { result, fragments } = await read([added(start as never), delta, terminal([completed, item])]);
+    expect(result.finishReason).toBe('stop');
+    expect(result.reasoning).toBe('Plan more');
+    expect(fragments).toEqual([{ kind: 'reasoning', text: 'Plan ' }, { kind: 'reasoning', text: 'more' },
+      { kind: 'text', text: 'Hello 世界' }]);
+    expect(JSON.parse(result.reasoningSignature!).output).toEqual([completed, item]);
+  });
+
+  it('keeps the actual reasoning delta order when deciding whether final text is appendable', async () => {
+    const reasoning = { type: 'reasoning', id: 'rs_parts', summary: [] };
+    const completed = { ...reasoning, summary: [{ type: 'summary_text', text: 'One first' }, { type: 'summary_text', text: 'Two more' }] };
+    const { result, fragments } = await read([added(reasoning as never),
+      { type: 'response.reasoning_summary_text.delta', output_index: 0, item_id: reasoning.id, summary_index: 0, delta: 'One ' },
+      { type: 'response.reasoning_summary_text.delta', output_index: 0, item_id: reasoning.id, summary_index: 1, delta: 'Two' },
+      { type: 'response.reasoning_summary_text.delta', output_index: 0, item_id: reasoning.id, summary_index: 0, delta: 'first' },
+      terminal([completed, item])]);
+    expect(result.finishReason).toBe('stop');
+    expect(result.reasoning).toBe('One first\nTwo more');
+    expect(fragments).toEqual([{ kind: 'reasoning', text: 'One ' }, { kind: 'reasoning', text: 'Two' },
+      { kind: 'reasoning', text: 'first' }, { kind: 'text', text: 'Hello 世界' }]);
+  });
+
   it('recovers public reasoning from sealed account items when response.done omits output', async () => {
     const reasoning = { type: 'reasoning', id: 'rs_account_final', summary: [{ type: 'summary_text', text: 'Account plan' }] };
     const { result, fragments } = await read([added({ ...reasoning, summary: [] } as never),
