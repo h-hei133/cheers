@@ -27,7 +27,6 @@ export interface StashedDraft {
 
 export class DraftStash {
   private held: StashedDraft | undefined;
-  private pinnedIds: readonly number[] = [];
 
   constructor(private readonly pastes: PasteStore) {}
 
@@ -44,8 +43,11 @@ export class DraftStash {
    */
   stash(draft: StashedDraft): boolean {
     if (!draft.text.trim() || this.held !== undefined) return false;
-    this.pinnedIds = this.pastes.idsIn(draft.text, true);
-    this.pastes.protector = id => this.pinnedIds.includes(id);
+    const ids = this.pastes.idsIn(draft.text, true);
+    // Captures the ids rather than reading through the stash: the predicate is
+    // installed for one draft, and a later stash must not change what it
+    // answers for the draft already set aside.
+    this.pastes.protector = id => ids.includes(id);
     this.held = draft;
     return true;
   }
@@ -59,8 +61,8 @@ export class DraftStash {
    */
   restore(): StashedDraft | undefined {
     const draft = this.held;
+    if (draft === undefined) return undefined;
     this.held = undefined;
-    this.pinnedIds = [];
     this.pastes.protector = undefined;
     return draft;
   }
