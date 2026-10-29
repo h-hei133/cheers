@@ -1,6 +1,5 @@
 import { createCliShutdown } from "../runtime/shutdown.js";
-import { hasUnfinishedSessionWork } from '../../session/recovery/work.js';
-import { getSessionUsage } from '../../observability/usageTelemetry.js';
+import { signalSessionClose } from '../runtime/lifecycle.js';
 import { cancelGoalRunForShutdown } from '../runtime/goalScheduling.js';
 import { closeCollaborationFor } from '../runtime/collaboration.js';
 import { closeSshFor } from '../runtime/ssh.js';
@@ -47,8 +46,7 @@ import {
 import {
   projectAndRenderCliStartupSurface,
 } from "./cliStartupSurface.js";
-import { createStartupRecoveryHint } from "./recoveryHint.js";
-import { createStartupNoticeRouter } from "./startupNotice.js";
+import { createCliStartupNotices } from './notices.js';
 import {
   runInteractiveLoop,
 } from "../interactive/interactiveLoop.js";
@@ -185,41 +183,13 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
   let isBusy: (() => boolean) | undefined;
   let requested: RestartRequest | SwitchTicket | undefined;
   const stopSurface = new AbortController();
-  const startupNotice = createStartupNoticeRouter({ renderer, logger });
-  const recoveryHint = createStartupRecoveryHint({
-    sessionManager,
-    preferredProjectRoot: runtimeContext.projectRoot,
-    currentSessionId: runtimeContext.session.id,
-    generation: () => JSON.stringify({
-      sessionId: runtimeContext.session.id,
-      sessionCreatedAt: runtimeContext.session.createdAt,
-      projectRoot: runtimeContext.projectRoot,
-      configRevision: runtimeContext.configuration.current.revision,
-    }),
-    publish: (hint) => {
-      if (hint.candidate && hint.summary) {
-        startupNotice.publish(
-          `- Recovery hint: /resume or --session-id ${hint.candidate.id} (${hint.summary.resumeDisposition})`,
-        );
-      } else if (hint.blocked) {
-        startupNotice.publish(
-          `- Recovery boundary: ${hint.blocked.detail.slice(0, 180)}${hint.blocked.detail.length > 180 ? "..." : ""}`,
-        );
-      }
-    },
-    logger,
-  });
+  const startup = createCliStartupNotices({ context: runtimeContext, sessionManager, renderer, logger,
+    lifecycleNotices: bootstrapRuntime.bootstrap.lifecycleNotices });
   const shutdown = createCliShutdown({
-    onSignal: () => {
-      const sessionId = runtimeContext.session.id;
-      // Termination clears pending work and terminal uncertainty. Preserve them
-      // when a signal interrupts a live turn or recovery remains unresolved.
-      if (isBusy?.() || hasUnfinishedSessionWork(sessionManager.getRecoverySnapshot(sessionId))) return;
-      sessionManager.saveTerminated(sessionId);
-    },
+    onSignal: signalSessionClose(runtimeContext, sessionManager, () => isBusy?.() ?? false),
     close: async () => {
       const results = await Promise.allSettled([
-        Promise.resolve().then(() => recoveryHint.cancel()),
+        Promise.resolve().then(startup.cancel),
         Promise.resolve().then(() => cancelRun?.()),
         closeMediaFor(runtimeContext), closeDirectorFor(runtimeContext), closeJobsFor(runtimeContext, Boolean(requested && 'kind' in requested)), closeSshFor(runtimeContext),
         closeCollaborationFor(runtimeContext), closeExtensionsFor(runtimeContext), closeTraceDashboard(), mcpGateway.close(),
@@ -286,17 +256,10 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       providerModeEnv: providerRuntimeBridge.providerModeEnv(),
     });
     time("startup surface prepared");
-    startupNotice.setFullScreenHost(startupSurface.fullScreenHost);
     const recoveryHintEligible = !options.sessionId && !options.printMode
       && !options.replayFile
       && stdinPromptCapture.nonInteractivePrompts.length === 0;
-    let firstFrameSeen = false;
-    const onFirstFrame = (): void => {
-      if (firstFrameSeen) return;
-      firstFrameSeen = true;
-      if (recoveryHintEligible) void recoveryHint.start();
-    };
-    const onUserIntent = (): void => recoveryHint.noteUserIntent();
+    startup.configure(startupSurface.fullScreenHost, recoveryHintEligible);
     logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
     // Started and not waited on, so the first frame is never behind a network
     // call. Only for an interactive session: a scripted run has nobody to read a
@@ -363,8 +326,8 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       },
       approvalTrustPolicy,
       stopRequested: () => requested !== undefined,
-      onFirstFrame,
-      onUserIntent,
+      onFirstFrame: startup.onFirstFrame,
+      onUserIntent: startup.onUserIntent,
     });
     if (handledPrintMode) {
       return requested;
@@ -381,18 +344,9 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       logger,
       approvalTrustPolicy,
       fallbackSessionId: recoveryCandidate?.id,
-      onFirstFrame,
-      onUserIntent,
-      setStartupNotice: writer => {
-        startupNotice.setTranscriptWriter(writer);
-        if (!writer) return;
-        if (startupSurface.fullScreenHost) for (const notice of bootstrapRuntime.bootstrap.lifecycleNotices) {
-          startupNotice.publish(notice);
-        }
-        if (getSessionUsage(runtimeContext.session.id).usageHealth) startupNotice.publish(
-          'Persisted usage is incomplete; recovered counts and cost estimates exclude unreadable records. Inspect /cost.',
-        );
-      },
+      onFirstFrame: startup.onFirstFrame,
+      onUserIntent: startup.onUserIntent,
+      setStartupNotice: startup.setTranscriptWriter,
       initialMcpGateway: mcpGateway,
       setReadline: (nextReadline) => {
         readline = nextReadline;

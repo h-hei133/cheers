@@ -830,3 +830,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A tolerant telemetry restore still cannot resume a session, or a surviving free bucket makes lost accounting appear to cost zero.
 - **Root Cause**: SessionStore strictly decodes usage before runtime activation. Bucket prices, aggregate completeness and write acknowledgement are separate facts; a writer callback can also mutate its input before a second decode.
 - **Rule**: Keep strict attribution admission, recover independently valid records at the file projection and runtime boundaries, retain durable health and history gaps, and show incomplete totals as partial/unknown. Capture immutable publication and acknowledgement copies before the writer; advance baseline only after write succeeds. Preserve verified baseline buckets when disk data is missing or invalid, while rejecting valid backwards counters. Current catalogue changes do not invalidate a key re-encoded from its own captured rates; a crash record alone cannot establish the original corruption cause.
+
+### Passing Facade Gates Can Miss Named Object Callbacks
+- **Symptom**: A runner passes facade and structural checks while exceeding the 20-name responsibility ceiling.
+- **Root Cause**: The collector omits callbacks bound to object property names; orchestration factories accumulate those names even with few top-level functions.
+- **Rule**: Count callable property assignments and methods with TypeScript AST when adding composition callbacks. Move coherent lifecycle or notice behavior to its owning domain and verify the original entrypoint; a green advisory collector does not waive the repository rule.

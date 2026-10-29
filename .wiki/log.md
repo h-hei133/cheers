@@ -10043,3 +10043,9 @@ usage恢复逐bucket/history严格校验、保留健康项，坏history加usage-
 八类反转各命中行为失败且字节恢复后重验：idle1、signal hook2、busy/pending/unknown保护3、真实store1、runtime恢复1、partial合计1、history-gap1、baseline2。反转诊断脚本两次因包装异常文本匹配过窄中断，finally均恢复源码，补准确匹配后重验；无超时/OOM/零测试。临时脚本已删除。五静态门与diff通过（118旧docs advisory），完整声明图单一脚本用例通过，module facade0，NormProof judge proven/0open/0failed/0gap仅证结构。TS build `235b6ac3dc39aaab2892ffada43a64723461065d088072eb25b101732a1bd7a7`通过并重新比较compilerInputs digest确认新鲜。无全套、PTY/exe、20k真实终端或真实provider验证，原47项矩阵未重跑。
 
 上一批已推送`ec1bcadb060e4b249af58a96bde2f9ee21569fe3`的[CI40882737918](https://github.com/h-hei133/cheers/actions/runs/40882737918)和[Architecture Watch40882737805](https://github.com/h-hei133/cheers/actions/runs/40882737805)已延后读取确认success。本批提交/推送状态须分别读回，CI按用户要求稍后检查；剩余25默认请求/点击、27根因区分、28设置结构、29索引复用及真实环境证据见addition20.4。保留未跟踪CLAUDE.md，HANDOFF新增idle与usage两条guardrail。
+
+## [2026-10-29] refactor | 启动通知与信号生命周期的责任边界
+
+上批`d5119e502aaa1ddcce42e5c510de25015cf66200`已提交推送且远端main读回同SHA。补充AST审查计入对象具名回调，发现runner26名超过20，而module facade/NormProof未报告；将启动notice组合移入cli/bootstrap/notices、signal保存策略移入cli/runtime/lifecycle，继续委托原startupNotice/recoveryHint，入口降至20名，新owner6/1。相关runner7、recoveryHint10、startupNotice4共21项串行通过，五静态门/diff与TS build `2b7844ba0068`通过。这是原行为的责任拆分，未新增provider或默认策略；无PTY/exe/full regression。HANDOFF提醒具名回调计数。
+
+反馈29只读分析已对照pi已加载对象搜索缓存：下一批应在catalog owner复用同一次browse完整summary索引，needle/page与source generation分开，查询取消不杀共享扫描，visible/current/sentinel/anchor继续版本复验；20k只用Mock/切片、64MiB物理预算不重置，partial跨query保留。不能用目录mtime代替核心文件身份；真实目录性能尚未测量，未实施搜索优化。
