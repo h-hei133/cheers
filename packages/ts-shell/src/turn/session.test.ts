@@ -21,6 +21,38 @@ import { Transcript } from '../presentation/tui/transcript/container.js';
 
 const quietHooks = { dispatch: async () => ({ decision: "allow" as const }) } as unknown as HookDispatcher;
 
+it.each(['compatible-eof', 'responses-failed', 'responses-eof'] as const)(
+  'preserves only already displayed public reasoning after %s without granting replay', async failure => {
+    const sessionId = `partial-thinking-${failure}`;
+    const endpoint = failure === 'compatible-eof' ? 'openai-compatible' : 'openai-responses';
+    const events = endpoint === 'openai-compatible'
+      ? [{ choices: [{ delta: { reasoning_content: 'Displayed prefix' } }] }]
+      : [{ type: 'response.output_item.added', output_index: 0, item: { id: 'rs_partial', type: 'reasoning', summary: [] } },
+        { type: 'response.reasoning_summary_text.delta', output_index: 0, item_id: 'rs_partial', summary_index: 0, delta: 'Displayed prefix' },
+        ...(failure === 'responses-failed' ? [{ type: 'response.failed', response: { id: 'resp_partial', status: 'failed', model: 'm',
+          output: [{ id: 'rs_partial', type: 'reasoning', summary: [{ type: 'summary_text', text: 'Unverified terminal text' }],
+            encrypted_content: 'synthetic-unverified-cipher' }] } }] : [])];
+    let calls = 0;
+    const step = createStepFunction({ provider: { provider: 'fixture', model: 'm', endpoint, baseUrl: 'https://fixture.invalid/v1', headers: {} },
+      sessionId, workspaceRoot: process.cwd(), systemPrompt: '', tools: [],
+      fetchImpl: async () => { calls++; return new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(''),
+        { headers: { 'content-type': 'text/event-stream' } }); } });
+    const setup = options({ sessionId, step });
+    try {
+      const emitted = await drain(runTurn(setup).events);
+      expect(setup.persisted.find(message => message.reasoning)).toMatchObject({ role: 'assistant', content: '',
+        reasoning: { text: 'Displayed prefix' }, origin: { provider: 'fixture', model: 'm' } });
+      expect(setup.persisted.find(message => message.reasoning)?.reasoning?.signature).toBeUndefined();
+      expect(setup.persisted.find(message => message.reasoning)?.origin?.replayBinding).toBeUndefined();
+      expect(restoreConversation(setup.persisted).blocks.filter(block => block.kind === 'thinking').map(block => block.text)).toEqual(['Displayed prefix']);
+      expect(emitted.some(event => event.type === 'query.failed')).toBe(true);
+      expect(emitted.some(event => event.type === 'query.completed')).toBe(false);
+      expect(calls).toBe(1);
+      expect(JSON.stringify(setup.persisted)).not.toContain('Unverified terminal text');
+      expect(JSON.stringify(setup.persisted)).not.toContain('synthetic-unverified-cipher');
+    } finally { resetSessionUsage(sessionId); }
+  });
+
 it('persists and restores actual reasoning-only output as an unanswered stopped result', async () => {
   const sessionId = 'reasoning-only-storage';
   const step = createStepFunction({ provider: { provider: 'fixture', model: 'm', endpoint: 'openai-compatible',

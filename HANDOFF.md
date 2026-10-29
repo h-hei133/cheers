@@ -964,3 +964,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Live public reasoning disappears after reopening, while a no-answer explanation is classified as success.
 - **Root Cause**: Message persistence filters only answer/tool content, and the result owner substitutes explanatory prose before treating the run as completed.
 - **Rule**: Preserve meaningful reasoning/signature/redaction evidence independently of answer presence. Classify empty or whitespace-only answers as stopped using existing result states, retain explicit step-limit precedence, and keep the explanation visible once while setting retry eligibility. Test the actual provider step through persistence and history restoration.
+
+
+### Failed Stream Public Text Must Survive Without Replay Authority
+- **Symptom**: Reasoning already shown disappears after reopening when the provider stream fails, ends early or is cancelled.
+- **Root Cause**: Failed/aborted step builders retain answer text but omit the public reasoning callback history; persistence cannot save evidence the step discarded.
+- **Rule**: Retain the current call's actual public reasoning callback text for failed/aborted results lacking native reasoning. Keep failure status, omit signature/replay authority, reject unknown terminal text, and reset observations on the next step. Test real EOF/error/cancellation plus persistence and restoration.

@@ -3533,3 +3533,16 @@ HANDOFF补模型输出与整turn结束的区别，任务scratch清理，保留�
 原conclude仍只发一次原解释并保存，sink将同文本已显示的解释计入stopped结果，设置失败可retry而不再新增重复notice；不同停止理由仍沿原通知路径。四显式文件120项串行通过：session34/projection8/history24/turnSink54，包含实际reasoning-only保存/恢复/停止、说明只一次、空白过滤、opaque/redacted保持且不显示、空/空白结果不成功、step limit和非空答案原空白保持。移除persist reasoning守卫、撤销未回答分类、移除重复通知守卫三反转2/3/1失败，finally字节恢复后120再通过。五静态门/diff通过，无新增product import/callable，既有ceiling保持；未重复graph/NormProof。1536MiB build观察exit0后单独新鲜度一致：build `cc3e3de8f256e86d5603bb7edcc72579fc6ebaf09d5d7c691c9fabce26de291c`，inputs `5b60dec32615383fcc91b09434bc85d87dfa4bb00251c7a40d8894a88fc02737`，460 compilerInputs/3549文件。
 
 HANDOFF补推理证据与回答成功分开，任务scratch清理、原CLAUDE.md保留。无独立review/live provider/账户/真实用户终端/PTY/exe/full suite/20k会话，原47项不升级、ADD/goal active，本批Git/精确CI另绑定。
+
+
+20.31已提交推送`5f98378fbe691cb08d7185c7a53e41fb509e0f9d`，远端main精确一致、仅原CLAUDE.md。[Watch40956596689](https://github.com/h-hei133/cheers/actions/runs/40956596689)延后completed/success，[CI40956596885](https://github.com/h-hei133/cheers/actions/runs/40956596885)仍in_progress；20.29/20.30 CI仍运行。
+
+### 20.32 失败与取消后的已显示公开推理证据
+
+继续反馈25的实际失败消息→恢复核查：兼容流EOF/reader error，以及Responses failed/EOF路径已显示公开reasoning，但readCompletion catch或responseFailure只保留答案，step失败结果不带reasoning；20.31persist无法保存未带出的证据。三个真实SSE→step→runTurn→restore回归初次全部失败，旧partial重试用例仅检查不重复请求，没有持久推理断言。
+
+定向读取pi openai-completions.ts:673–710，catch保留output.content中的thinking并设置error/aborted；目标已流文本与未知终态严格分开。采用保留实际公开回调正文的决定，不采用参考raw metadata错误报告或为未验证输出生成签名。[step](../../packages/ts-shell/src/turn/step.ts)在单次调用内记录onReasoning/onReasoningReplace实际文本，统一stamp只在error/aborted且原step无reasoning时补text；原origin保持无replayBinding，native签名与tool接纳不改变，成功消息的规范终态正文仍优先。缓存每次step新建，取消后下一请求不继承。
+
+两显式文件134项串行通过：session37/step97，包含兼容EOF/reader error、Responses failed/EOF、真实取消、后续请求隔离、实际持久/恢复、一次请求且query.failed无query.completed、不含未验证终态正文/cipher/signature/replay binding；原partial answer仍保留。反转关闭stamp补文或移除实际delta累积均6失败，finally字节恢复后134再通过。五静态门/diff、AST step18通过，无新import/callable、不重复graph/NormProof。1536MiB build观察exit0后单独新鲜度一致：build `7f09032c8bbac12778139e6a2b0293d5690ba3067fecb6a1e897595a122dd8e0`，inputs `a32c8624a9e8b03ef465554bf116e46d4dff6500ce62c56b49d0a78fd5b69169`，460 compilerInputs/3549文件。
+
+HANDOFF补失败路径公开证据保留与验证终态权威分离，任务scratch清理，原CLAUDE.md保留。无独立review/live provider/账户/真实用户终端/PTY/exe/full suite/20k会话，原47项不升级、ADD/goal active，本批Git/精确CI另绑定。

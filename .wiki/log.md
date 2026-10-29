@@ -10259,3 +10259,12 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 继续[addition20.31](features/phase-20-addition.md#2031-无答案推理的持久证据与停止结果)，真实reasoning-only消息被persist的content/tool过滤丢弃，conclude说明仍success。对照参考message_end完整assistant保存和thinking/answer独立内容，保留公开推理/signature/redacted原值，空白无证据仍过滤；conclude无答案沿原stopped_error，显式step limit优先，非空答案不trim。sink已有解释不重复notice但仍设置失败可retry。
 
 四显式文件120串行通过，persist/classification/duplicate反转2/3/1失败、finally字节恢复后120再通过。五静态门/diff，无新product import/callable。build `cc3e3de8f256e86d5603bb7edcc72579fc6ebaf09d5d7c691c9fabce26de291c`，inputs `5b60dec32615383fcc91b09434bc85d87dfa4bb00251c7a40d8894a88fc02737`，460/3549在exit0后单独重算一致。HANDOFF补证据/成功边界、scratch清理，无独立review/live/真实终端/PTY/exe/full suite/20k，原47不升级、goal active，Git/新精确CI另绑定。
+
+
+20.31已提交推送`5f98378fbe691cb08d7185c7a53e41fb509e0f9d`，远端main一致、仅原CLAUDE.md。[Watch40956596689](https://github.com/h-hei133/cheers/actions/runs/40956596689)延后success，[CI40956596885](https://github.com/h-hei133/cheers/actions/runs/40956596885)仍in_progress，20.29/20.30 CI仍运行。
+
+## [2026-10-30] fix | 保留失败流已显示公开推理
+
+继续[addition20.32](features/phase-20-addition.md#2032-失败与取消后的已显示公开推理证据)：失败/EOF/取消路径只保留answer，实际公开reasoning显示后无法恢复。三个真实SSE/step/runTurn/history回归失败。对照参考catch保留thinking内容的决定，step单次调用记录实际公开回调，统一stamp仅为error/aborted且缺reasoning的结果补text；不接纳未知terminal、cipher或签名，无replay binding，后续请求隔离。
+
+两显式文件134串行通过，补文/累积反转均6失败、finally字节恢复后134再通过。五静态门/diff、AST step18，无新import/callable，不重复graph/NormProof。build `7f09032c8bbac12778139e6a2b0293d5690ba3067fecb6a1e897595a122dd8e0`，inputs `a32c8624a9e8b03ef465554bf116e46d4dff6500ce62c56b49d0a78fd5b69169`，460/3549在exit0后单独重算一致。HANDOFF补证据/权威边界、scratch清理，无独立review/live/真实终端/PTY/exe/full suite/20k，原47不升级、goal active，Git/新精确CI另绑定。

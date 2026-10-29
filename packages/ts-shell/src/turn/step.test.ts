@@ -471,6 +471,28 @@ describe("createStepFunction", () => {
     expect(requests).toBe(1);
     expect(shown).toEqual(["already seen"]);
     expect(produced.at(-1)?.stopReason).toBe("error");
+    expect(produced.at(-1)?.reasoning).toEqual(channel === 'reasoning_content' ? { text: 'already seen' } : undefined);
+    expect(produced.at(-1)?.origin?.replayBinding).toBeUndefined();
+  });
+
+  it('keeps public reasoning on cancellation and does not carry it into the next request', async () => {
+    const controller = new AbortController();
+    let calls = 0;
+    const step = createStepFunction({ ...request, fetchImpl: async (_url, init) => {
+      if (calls++ > 0) return jsonResponse({ choices: [{ message: { content: 'Next answer' }, finish_reason: 'stop' }] });
+      return new Response(new ReadableStream<Uint8Array>({ start(stream) {
+        stream.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: 'Visible before cancel' } }] })}\n\n`));
+        init?.signal?.addEventListener('abort', () => stream.error(new Error('request aborted')), { once: true });
+      } }), { headers: { 'content-type': 'text/event-stream' } });
+    } });
+    const result = await step([], controller.signal, { onReasoning: () => controller.abort() }, { allowTools: false });
+    expect(result).toMatchObject({ text: '', stopReason: 'aborted', reasoning: { text: 'Visible before cancel' } });
+    expect(result.reasoning?.signature).toBeUndefined();
+    expect(result.origin?.replayBinding).toBeUndefined();
+    const next = await step([], undefined, {}, { allowTools: false });
+    expect(next).toMatchObject({ text: 'Next answer', stopReason: 'stop' });
+    expect(next.reasoning).toBeUndefined();
+    expect(calls).toBe(2);
   });
 
   it("does not replay an accepted response whose body ends before any event", async () => {

@@ -292,7 +292,14 @@ export function createStepFunction(request: StepRequest): StepFunction {
     // rather than threaded through each builder's signature. A `return` in
     // this body that forgets the stamp is invisible to the type, which is why
     // every exit goes through it.
-    const stamp = (step: AssistantStep): AssistantStep => (origin ? { ...step, origin: step.origin ?? origin } : step);
+    let shownReasoning = '';
+    const stamp = (step: AssistantStep): AssistantStep => {
+      // Failed reads have no verified native output, but public text already
+      // displayed still belongs in history. It receives no replay authority.
+      const recorded = !step.reasoning && shownReasoning && (step.stopReason === 'error' || step.stopReason === 'aborted')
+        ? { ...step, reasoning: { text: shownReasoning } } : step;
+      return origin ? { ...recorded, origin: recorded.origin ?? origin } : recorded;
+    };
     // Older direct adapters supplied only a model and URL. Without the runtime
     // provider identity, retain their unique-model catalogue lookup.
     let streamAttempts = 0;
@@ -453,10 +460,12 @@ export function createStepFunction(request: StepRequest): StepFunction {
           listener.onText?.(delta);
         },
         onReasoning: (delta) => {
+          shownReasoning += delta;
           shownAnything ||= delta.length > 0;
           listener.onReasoning?.(delta);
         },
         onReasoningReplace: (text) => {
+          shownReasoning = text;
           shownAnything ||= text.length > 0;
           listener.onReasoningReplace?.(text);
         },
