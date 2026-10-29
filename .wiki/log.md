@@ -10368,3 +10368,13 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 旧基线8新回归失败；最终approvalSelection12/过滤host31共43通过，322未选不计。四有效反转4/2/3/1失败、源码逐字节恢复后43再过；初次导航反转substring不精确实际2失败、后续边界assert未运行该案例，修区段边界后全部重跑，失败记录保留。五静态门/diff、1536MiB build exit0与独立新鲜度一致：build `06e0018d0b2128ca2f6cb1b45ec8b09bbd93862cc7d10cf6ad357642eae2993b`、inputs `fd2dfb0fd4cef94fb20da0e7fe50c5e7c83d40e9bac31a65ac02b434626e8065`，460/3549。AST审批16/15、原host123未增，保留整体债务，无新import/graph重跑。
 
 最终两模式×两信号8阶段CLI/PTY全过：审批完整绘制后signal173–182ms、143/129，原sink结束/false tool结果、overlay retired、零write/operation/grant/root，session interrupted；普通恢复同ID/真实notice、零重发，Ctrl+D130–140ms/0仍interrupted，八次cooked恢复。RSS261136–265560KiB/18.18–18.30秒，loopback各GET/POST1。初次修补build的收据另存pre-fence，最终均重跑；同最终build正常四审批×两模式也过，原writer两次committed、拒绝不写、各8 POST/4 GET，退出135/130ms、RSS312228/299108KiB各12.37秒。正式工件与HANDOFF、scratch清理、语法/JSON/五门/diff通过，118旧advisory；全程serial，无独立review/live用户/外部provider/非Linux/实际断连/未知写入/exe/full suite/20k。原47不升级、goal active，Git/CI另绑定。
+
+20.43已推送`181381302961263aa32fd858778508210ef75d44`、远端main此前一致。延后核对Watch40975396592 success、CI40975396578仍in_progress；20.42 CI40973267402和20.41 CI40972073289 success，全部head精确一致。
+
+## [2026-10-30] fix | 空草稿退出先于审批与预览按键消费
+
+沿[addition20.44](features/phase-20-addition.md#2044-空草稿的退出动作先于审批与预览按键归属)原CLI发现pending Ctrl+D被modal消费，12,001ms仍无exit/ends。参考parent quit与ShutdownFirst职责，宿主在pending input/pager/overlay前处理配置app.exit，仅composer空草稿才调原shutdown，非空继续保护。
+
+新增12条两模式×approval/groups/preview×默认/重绑定与两非空控制。初始fixture options方法/g快捷键/启动前binding被reload三类setup失败保留修正；有效early-exit反转12失败/2控制通过，finally字节恢复后相关过滤45项通过、322未选。一次基线handle未退出即启动后续验证链造成重叠，两者后观察exit1，无OOM观察；明确违反serial，不能称本批全程串行。此后反转/最终45/build/新鲜度/CLI逐进程串行完成。
+
+五门/diff、1536MiB build与独立freshness：build `b8f4c6b09e3d76997f67fc52532ac7da1a3f8ae20e664a10336c24fa584cf629`、inputs `6e2fff9d4f4a29c9afa08d9845e7a0b8beae5b8aa45a4268aab1b6305af8ea1a`、460/3549，host AST123未增。最终原CLI两模式pending Ctrl+D252/253ms/0、原stop1、overlay退休/零写收据/无grant与roots、磁盘interrupted；普通恢复同ID/notice/零重发、Ctrl+D135/132ms/0仍interrupted。四次cooked读回，RSS261120/264352KiB、18.26/18.46秒、各GET/POST1 loopback。surface先退休订阅，当前无tool.result不作授权或回合成功证据。工件/分类/HANDOFF、scratch清理、语法/JSON/五门/diff通过、118旧advisory，旧signal脚本原字节恢复；无独立review/live用户/外部provider/真实断连/非Linux/exe/full suite/20k。原47不升级、goal active，Git/CI另绑定。

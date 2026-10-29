@@ -1,0 +1,132 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/interactiveMode.test.ts  (367 tests | 12 failed | 353 skipped) 12386ms
+   ❯ src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'approval' ownership in the actual 'regular' host (rebound=false)
+     → expected "spy" to be called with arguments: [ +0 ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'approval' ownership in the actual 'regular' host (rebound=true)
+     → expected "spy" to be called with arguments: [ +0 ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'groups' ownership in the actual 'regular' host (rebound=false)
+     → host.overlay.options is not a function
+   ❯ src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'groups' ownership in the actual 'regular' host (rebound=true)
+     → host.overlay.options is not a function
+   ❯ src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'preview' ownership in the actual 'regular' host (rebound=false)
+     → expected "spy" to be called with arguments: [ +0 ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'preview' ownership in the actual 'regular' host (rebound=true)
+     → expected "spy" to be called with arguments: [ +0 ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'approval' ownership in the actual 'fullscreen' host (rebound=false)
+     → expected "spy" to be called with arguments: [ +0 ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'approval' ownership in the actual 'fullscreen' host (rebound=true)
+     → expected "spy" to be called with arguments: [ +0 ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'groups' ownership in the actual 'fullscreen' host (rebound=false)
+     → host.overlay.options is not a function
+   ❯ src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'groups' ownership in the actual 'fullscreen' host (rebound=true)
+     → host.overlay.options is not a function
+   ❯ src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'preview' ownership in the actual 'fullscreen' host (rebound=false)
+     → expected "spy" to be called with arguments: [ +0 ]
+
+Received:
+
+
+
+Number of calls: 0
+
+   ❯ src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'preview' ownership in the actual 'fullscreen' host (rebound=true)
+     → expected "spy" to be called with arguments: [ +0 ]
+
+Received:
+
+
+
+Number of calls: 0
+
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'approval' ownership in the actual 'regular' host (rebound=false)
+ FAIL  src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'approval' ownership in the actual 'regular' host (rebound=true)
+ FAIL  src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'preview' ownership in the actual 'regular' host (rebound=false)
+ FAIL  src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'preview' ownership in the actual 'regular' host (rebound=true)
+ FAIL  src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'approval' ownership in the actual 'fullscreen' host (rebound=false)
+ FAIL  src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'approval' ownership in the actual 'fullscreen' host (rebound=true)
+ FAIL  src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'preview' ownership in the actual 'fullscreen' host (rebound=false)
+ FAIL  src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'preview' ownership in the actual 'fullscreen' host (rebound=true)
+AssertionError: expected "spy" to be called with arguments: [ +0 ]
+
+Received:
+
+
+
+Number of calls: 0
+
+ ❯ src/cli/interactive/interactiveMode.test.ts:483:43
+    481|       if (stage === 'preview') expect(host.pager.active).toBe(true);
+    482|       terminal.input(rebound ? '\x1bOQ' : '\x04');
+    483|       await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(0));
+       |                                           ^
+    484|       expect(exit).toHaveBeenCalledOnce(); expect(terminal.stopped).to…
+    485|       expect(host.overlay.active).toBe(false); expect(host.pager.activ…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'groups' ownership in the actual 'regular' host (rebound=false)
+ FAIL  src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'groups' ownership in the actual 'regular' host (rebound=true)
+ FAIL  src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'groups' ownership in the actual 'fullscreen' host (rebound=false)
+ FAIL  src/cli/interactive/interactiveMode.test.ts > routes empty-draft exit before 'groups' ownership in the actual 'fullscreen' host (rebound=true)
+TypeError: host.overlay.options is not a function
+ ❯ src/cli/interactive/interactiveMode.test.ts:478:52
+    476|       await vi.waitFor(() => expect(host.overlay.active).toBe(true));
+    477|       if (stage === 'groups') {
+    478|         await vi.waitFor(() => expect(host.overlay.options().some(opti…
+       |                                                    ^
+    479|         terminal.input('g'); await vi.waitFor(() => expect(host.overla…
+    480|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+ Test Files  1 failed (1)
+      Tests  12 failed | 2 passed | 353 skipped (367)
+   Start at  07:48:54
+   Duration  28.04s (transform 10.15s, setup 0ms, collect 15.38s, tests 12.39s, environment 0ms, prepare 56ms)

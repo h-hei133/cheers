@@ -647,6 +647,11 @@ export class InteractiveMode {
   private onKey(event: Parameters<typeof routeKey>[0]): void {
     if (this.closing || this.stopped) return;
     this.options.onUserIntent?.();
+    if (this.preferences.keybindings.actionFor(event.keyId) === 'app.exit'
+      && this.state.editor.getText().length === 0) {
+      void this.shutdown();
+      return;
+    }
     if (this.pickerInputPending.has(this.overlay.revision) && !this.overlay.active) {
       const action = this.preferences.keybindings.actionFor(event.keyId);
       if (!this.options.sessionRuntime.commands?.current || (action !== 'app.interrupt' && action !== 'app.clear')) return;

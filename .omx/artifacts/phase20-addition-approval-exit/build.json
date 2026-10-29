@@ -1,0 +1,13 @@
+{
+  "buildId": "b8f4c6b09e3d76997f67fc52532ac7da1a3f8ae20e664a10336c24fa584cf629",
+  "inputsDigest": "6e2fff9d4f4a29c9afa08d9845e7a0b8beae5b8aa45a4268aab1b6305af8ea1a",
+  "compilerInputs": 460,
+  "files": 3549,
+  "compilerMatch": true,
+  "digestMatch": true,
+  "callables": {
+    "count": 123,
+    "previousCount": 123
+  },
+  "sourceSha256": "bc977f6c98bad5bbb0affcadf8dbbcf389afbfb3371af8acf00c9a73b679496a"
+}

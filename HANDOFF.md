@@ -1020,3 +1020,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: SIGTERM during a file approval waits for the full cleanup budget and exits with code 1 although the run controller was aborted.
 - **Root Cause**: The interactive approval Promise waits only for a picker answer; signal cleanup cancels the run without invoking complete surface stop, so the tool drain stays pending.
 - **Rule**: Bind the current run signal when publishing approval. Cancellation settles deny, retires the listener and suppresses late group navigation; a noncancelled dismissal failure rejects rather than authorizing or hanging. Verify actual pending CLI signal exit, zero writer receipts and interrupted recovery without automatic replay, separately from terminal restoration.
+
+### Modal Keyboard Ownership Must Not Hide Explicit Empty-Draft Exit
+- **Symptom**: Ctrl+D exits an idle CLI but is swallowed while approval or its preview is open.
+- **Root Cause**: Pager/overlay input runs before the app keymap and consumes the configured app.exit key; no shutdown or run cancellation begins.
+- **Rule**: Route the configured app.exit at the host before modal ownership when the original composer draft is empty. Keep nonempty draft protection and local cancel behavior. Test approval, group selection, preview and rebound exit keys through actual input, then verify CLI zero writes and interrupted recovery without replay.

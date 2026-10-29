@@ -3173,7 +3173,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 |---|---|---|
 | 24 | 本地实现与聚焦验证；20.42补两模式原CLI的拒绝/单次write/edit/重复询问与原操作收据读回 | 缺用户目录审批现场、实际provider产生的工具调用及非Linux文件系统证据 |
 | 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses/Google native摘要准入已实现；20.33新增当前relay真实小请求的公开thinking/展开/恢复，auto保留，整体partial | 其他模型/协议默认与公开内容、真实账户及用户终端复验；单个relay请求不覆盖完整矩阵 |
-| 26 | 四条明确机制、MCP未开始调用及表面/渲染失败围栏已修；20.36/20.40正常/空闲、20.41 loopback忙碌流与20.43审批pending信号CLI均有退出/恢复证据；20.43修补未答审批的取消等待 | 缺真实用户故障设备/外部provider busy信号现场；MCP预算到期不能证明清理完成 |
+| 26 | 四条明确机制、MCP未开始调用及表面/渲染失败围栏已修；20.36/20.40正常/空闲、20.41 loopback忙碌流、20.43审批pending信号与20.44审批Ctrl+D均有退出/恢复证据；20.43/44修补取消等待与modal吞退出动作 | 缺真实用户故障设备/外部provider busy信号现场；MCP预算到期不能证明清理完成 |
 | 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
 | 28 | 会话入口与配置字段分类隔离已实施；本地聚焦验证 | 缺真实用户终端与整体面板现场验收 |
 | 29 | 同次浏览索引复用与真实目录只读性能已验证；20.38/20.39补48小会话的实际CLI搜索/选择/分页，并修清空查询后重建回带旧查询 | 缺用户大目录终端性能与非Linux证据；小型PTY时间包含输入/去抖/观察开销，不能代替生产性能 |
@@ -3791,3 +3791,21 @@ build `94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff`、input
 同最终build再跑20.42原正常四回合×两模式，拒绝/once write/edit/再次询问、精确原committed receipt、零持久授权与正常Ctrl+D/cooked全部通过：各8 completion/4 readiness，RSS312228/299108KiB、各12.37秒，退出135/130ms。说明正常显式批准仍可写，取消仍不可写；未覆盖writer开始后的未知结果。
 
 正式工件[signal-approval](../../.omx/artifacts/phase20-addition-signal-approval/)保存原失败、分类、聚焦/反转/恢复、build新鲜度、最终八阶段与正常八回合收据；HANDOFF追加未答审批取消陷阱，task scratch与loopback sockets清理、原CLAUDE.md保留。工件语法/JSON断言、五门/diff均通过，118旧docs advisory保留；无独立review、真实用户/外部provider、read/patch全CLI组合、pending问答/MCP、实际断连/EIO、非Linux/桌面/IME、exe/full suite/20k。原47项不升级，ADD与goal继续active，提交/精确CI另绑定。
+
+20.43已提交推送`181381302961263aa32fd858778508210ef75d44`，远端main此前精确一致、仅原CLAUDE.md。延后核对[Watch40975396592](https://github.com/h-hei133/cheers/actions/runs/40975396592)completed/success、[CI40975396578](https://github.com/h-hei133/cheers/actions/runs/40975396578)in_progress；20.42 CI40973267402与20.41 CI40972073289已completed/success，全部head一致。
+
+### 20.44 空草稿的退出动作先于审批与预览按键归属
+
+继续反馈26，沿原CLI停在external write审批后发送Ctrl+D。20.43已让run取消结束审批等待，但此键在[宿主onKey](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)到keymap前被原pager/overlay消费；12,001ms观察后仍无exit、ends0/active审批，最后finally SIGTERM结束探针。原文件无写入，初始失败保留；该结果是退出动作不可达，不是20.43取消signal修补失败，也不是正常退出通过。
+
+目标keybindings app.exit明确为“Exit when the draft is empty”，原keymap也只检查原composer草稿，不受busy限制。定向参考codex bottom_pane/mod.rs:1–14将local view输入与parent quit分离，chatwidget.rs:1380–1387让明确quit走ShutdownFirst；同意退出是宿主生命周期，保留本项目空草稿单次退出合同，不照搬参考双击Ctrl+C/D或局部cancel策略。宿主在pending input/pager/overlay前解析现有keybindings，只在app.exit且原composer为空时调用原shutdown；非空草稿仍留在原面板。没有硬编码Ctrl+D、新退出系统或修改permission/writer行为。
+
+新增两模式×approval/groups/preview×默认/重绑定退出共12路径，另两模式非空草稿保护；全部通过实际terminal.input、原promptApproval/host.shutdown，关闭后deny，重绑定在原start重载配置后设置。初次夹具误用不存在的overlay.options、未实现g分组快捷键、启动前设置绑定被reload覆盖；保留各失败并改为原model可见行、Home/Enter与start后重绑定，不能把这几类setup失败记成产品回归。修补后相关过滤45项通过，322未选不计。有效反转只撤回early app.exit分支，12路径失败/2非空控制通过；finally源码逐字节恢复后45项再过，恢复SHA记录为`bc977f6c98bad5bbb0affcadf8dbbcf389afbfb3371af8acf00c9a73b679496a`。
+
+**本批验证纪律违规**：一次修正基线仍返回session_id时，主代理启动下一条静态门/聚焦链，导致两验证进程重叠。随后分别观察到前基线exit1和后聚焦exit1，没有观察OOM；不能宣称本批全程严格串行，也不以“无OOM”消除违规。停止重叠后，有效反转、最终恢复45项、build、新鲜度和两模式CLI均逐进程串行完成。后续工具handle未退出前不得启动任何验证。
+
+五门/diff、1536MiB TS build exit0后独立新鲜度一致：build `b8f4c6b09e3d76997f67fc52532ac7da1a3f8ae20e664a10336c24fa584cf629`/inputs `6e2fff9d4f4a29c9afa08d9845e7a0b8beae5b8aa45a4268aab1b6305af8ea1a`，460 compilerInputs/3549文件；AST host123/原123未增加，既有整体债务保留，无新import/结构移动，不重复graph/NormProof。
+
+最终两模式隔离home/profile/project/outside、一条小fixture、loopback GET/POST各1，原CLI启动后提交write fixture，等once/deny原实际绘制与规范目标、磁盘turn-active/prompt后Ctrl+D。regular/fullscreen分别252/253ms exit0；原stop1/restoreSync0、overlay退休、sink ends1，终端四次含恢复均ICANON/ECHO/ISIG读回。stop先退休事件订阅，所以当前收据没有tool.result/approval.resolved，不能推断允许或回合成功。磁盘均interrupted/runPhase=turn-active/interruptedKind=turn、目标不存在、operation/grant/roots均0、兄弟与config原字节保持。普通无ID重开同一session/实际Resumed session通知，零新POST/message.started/审批；Ctrl+D135/132ms exit0仍interrupted。
+
+regular RSS261120KiB/18.26秒、fullscreen264352KiB/18.46秒；heap768MiB/每CLI25秒/2MiB，仅小fixture与loopback实际transport，不使用真实账户。正式工件[approval-exit](../../.omx/artifacts/phase20-addition-approval-exit/)保存初始CLI/夹具失败、纪律违规分类、有效反转/恢复、新鲜度与两模式四阶段收据；旧20.43脚本恢复原字节。工件语法/JSON/五门/diff通过，118旧advisory保留，task scratch/socket清理、原CLAUDE.md保留，HANDOFF追加modal吞app.exit陷阱。无独立review、live用户/外部provider、writer已开始、真实断连/EIO、非Linux/桌面/IME、exe/full suite/20k；原47不升级、ADD与goal继续active，Git/精确CI另绑定。

@@ -457,6 +457,53 @@ it.each(['regular', 'fullscreen'] as const)('binds unanswered approval to the cu
   } finally { mode.stop(); }
 });
 
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  (['approval', 'groups', 'preview'] as const).flatMap(stage => [false, true].map(rebound => ({ kind, stage, rebound })))))(
+  'routes empty-draft exit before $stage ownership in the actual $kind host (rebound=$rebound)', async ({ kind, stage, rebound }) => {
+    const exit = vi.fn(), { mode, approval, terminal } = build({ tuiMode: kind, exit });
+    const host = mode as unknown as { overlay: OverlayHost & { model: { visible: readonly { id: string }[] } }; pager: Pager; view: InteractiveView;
+      preferences: { keybindings: Keybindings }; options: { sessionRuntime: ShellSessionRuntime } };
+    const controller = new AbortController(); host.options.sessionRuntime.getCurrentRunController = () => controller;
+    const request: EscalationPrompt = { id: 'fixture-exit-approval', title: 'Patch', message: 'Review fixture',
+      context: { toolName: 'apply_patch', operation: 'write', target: 'fixture.txt',
+        ...(stage === 'preview' ? { preview: 'Public exact fixture plan' } : {}),
+        ...(stage === 'groups' ? { selections: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] } : {}) },
+      options: [], defaultOption: 'deny', recommendedAction: 'deny', severity: 'medium' };
+    mode.start();
+    if (rebound) host.preferences.keybindings.setUserConfig({ 'app.exit': 'f2' });
+    try {
+      const pending = approval.current!(request);
+      await vi.waitFor(() => expect(host.overlay.active).toBe(true));
+      if (stage === 'groups') {
+        await vi.waitFor(() => expect(host.overlay.model.visible.some(option => option.id === 'choose-groups')).toBe(true));
+        terminal.input('\x1b[H\r'); await vi.waitFor(() => expect(host.overlay.model.visible.some(option => option.id === 'a')).toBe(true));
+      }
+      if (stage === 'preview') expect(host.pager.active).toBe(true);
+      terminal.input(rebound ? '\x1bOQ' : '\x04');
+      await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(0));
+      expect(exit).toHaveBeenCalledOnce(); expect(terminal.stopped).toBe(true);
+      expect(host.overlay.active).toBe(false); expect(host.pager.active).toBe(false);
+      expect(await pending).toMatchObject({ decision: 'deny' });
+    } finally { mode.stop(); }
+  });
+
+it.each(['regular', 'fullscreen'] as const)('preserves a nonempty draft when the exit key arrives during %s approval', async kind => {
+  const exit = vi.fn(), { mode, approval, terminal } = build({ tuiMode: kind, exit });
+  const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView };
+  mode.start();
+  try {
+    host.view.editor.setText('Held user draft');
+    const pending = approval.current!({ id: 'held-draft-approval', title: 'Write', message: 'Review fixture',
+      context: { toolName: 'write', operation: 'write', target: 'fixture.txt' }, options: [],
+      defaultOption: 'deny', recommendedAction: 'deny', severity: 'medium' });
+    await vi.waitFor(() => expect(host.overlay.active).toBe(true));
+    terminal.input('\x04'); await Promise.resolve();
+    expect(exit).not.toHaveBeenCalled(); expect(host.overlay.active).toBe(true);
+    expect(host.view.editor.getText()).toBe('Held user draft');
+    terminal.input('\x1b'); await expect(pending).resolves.toMatchObject({ decision: 'deny' });
+  } finally { mode.stop(); }
+});
+
 it.each([false, true])('retains the active form caret through the host at one-row sizes (masked: %s)', async masked => {
   const { mode } = build();
   const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView };

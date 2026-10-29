@@ -1,0 +1,14 @@
+{
+  "classification": "product behavior drift",
+  "cause": "Modal pager/overlay consume the configured app.exit before the host keymap can exit an empty draft",
+  "baselineWaitMs": 12001,
+  "baselineClosed": false,
+  "baselineWriterOperations": 0,
+  "repair": "Route the configured app.exit before modal/pending input ownership only when the original composer draft is empty",
+  "harnessFailures": [
+    "initial group inspection used a nonexistent options method",
+    "g has no choose-groups shortcut; use actual Home and Enter navigation",
+    "start reloads keybindings; apply rebound exit after start"
+  ],
+  "serialViolation": "A baseline session_id remained running when next static/focused chain was launched. Both later observed exit, no OOM observed; batch cannot claim strict serial execution. Reversal, restored check, build and CLI probes then ran serially."
+}
