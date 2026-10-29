@@ -63,7 +63,10 @@ export const KEY_ACTIONS: Record<string, KeybindingDefinition> = {
   "tui.input.submit": { defaultKeys: ["enter"], description: "Send the prompt" },
   "tui.input.tab": { defaultKeys: ["tab"], description: "Complete the highlighted candidate" },
   "tui.input.stash": {
-    defaultKeys: ["ctrl+s"],
+    // `alt+s` as well because `ctrl+s` is XOFF: a terminal that still has flow
+    // control enabled, or a multiplexer that forwards it, swallows the key
+    // before it ever arrives. The fallback is one key over, not a rebinding.
+    defaultKeys: ["ctrl+s", "alt+s"],
     description: "Set the draft aside, or take it back",
   },
   "tui.overlay.nextGroup": { defaultKeys: ["tab"], description: "Next picker group", scope: 'overlay' },

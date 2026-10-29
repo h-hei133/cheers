@@ -2409,7 +2409,9 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 - 被引用的粘贴条目在暂存期间受保护、恢复后释放，恢复出的草稿仍可提交。
 - 目录、重绑定表与指南三处同步。
 
-**未实现**方向 4 的 `alt+s` 备选键：`ctrl+s` 在 raw mode 下可用（`ctrl+q` 已绑定 follow-up 并有测试，说明流控未生效），但非 raw 的 line 模式下的 IXON 吞键风险未经真机验证。
+**已实施（第一百二十八批）**：`alt+s` 作为备选键。`ctrl+s` 是 XOFF，终端流控未关或多路复用器转发时会在到达前被吞掉；备选键必须真实可用而不只是出现在目录里。目录、重绑定表与指南三处同步，宿主级测试用真实 `\x1bs` 序列验证往返。
+
+**边界**：`ctrl+s` 在 raw mode 下可用（`ctrl+q` 已绑定 follow-up 并有测试，说明流控未生效），但非 raw 的 line 模式下的 IXON 吞键风险仍未在真机验证。
 
 **证据边界**：单槽是产品选择（对齐参考实现的 toggle 语义），未做多槽；IXON 在非 raw 模式下的吞键风险仍未经真机验证。
 
@@ -2688,3 +2690,11 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 验证：`toolPolicy.test.ts` 新增一项，用真实 symlink 指向工作区外，断言 accept-edits 下仍需升级。反转恢复词法判定后该用例预期失败（返回 `false`，即批准）；源码逐字节恢复并核对 SHA-256 `330b1feefe39` 后重验，35 项通过；静态门、module facade 0 与 TS build `8fad5ef03e22` 通过。
 
 **边界**：只统一判定源。"越界写改为需审批"仍未实施。
+
+### 第一百二十八批：`alt+s` 作为暂存备选键
+
+`ctrl+s` 是 XOFF。终端流控仍开着、或多路复用器把该键转发出去时，它根本到不了应用。目录里只列 `ctrl+s` 等于承诺了一个可能不存在的按键。
+
+现 `tui.input.stash` 同时绑定 `ctrl+s` 与 `alt+s`，目录与指南同步。宿主级测试用真实 `\x1bs` 序列走完整往返（暂存 → 恢复），反转撤销该绑定后预期失败；源码逐字节恢复并核对 SHA-256 `19fd5ba1018b`（keybindings）与 `9f2764d704a9`（keys）后重验，三文件 347 项通过；静态门、module facade 0 与 TS build `fd16f50737bd` 通过。
+
+**边界**：非 raw 的 line 模式（`lineLoop.ts`）下的 IXON 吞键风险仍未在真机验证；备选键解决的是"主键被吞"，不是"两个键都被吞"。

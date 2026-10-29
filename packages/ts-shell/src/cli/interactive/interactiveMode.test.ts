@@ -1565,6 +1565,22 @@ it.each(['regular', 'fullscreen'] as const)('stashes the draft and takes it back
   } finally { mode.stop(); }
 });
 
+it('stashes on the alternate chord too, for a terminal that eats the primary one', () => {
+  // ctrl+s is XOFF. A terminal with flow control still on, or a multiplexer
+  // that forwards it, never delivers the key; the fallback has to work on its
+  // own rather than only being advertised.
+  const { mode, terminal } = build();
+  const host = mode as unknown as { view: InteractiveView };
+  try {
+    mode.start();
+    terminal.input('kept');
+    terminal.input('\x1bs');                     // alt+s
+    expect(host.view.editor.getText()).toBe('');
+    terminal.input('\x1bs');
+    expect(host.view.editor.getText()).toBe('kept');
+  } finally { mode.stop(); }
+});
+
 it('does not consume the stash slot for an empty prompt', () => {
   const { mode, terminal } = build();
   const host = mode as unknown as { view: InteractiveView };
