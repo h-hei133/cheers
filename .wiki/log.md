@@ -10008,3 +10008,11 @@ CI`40739686114`（`d33a0a1b`）唯一失败为`src/config/concurrency.test.ts`�
 另从用户 `~/.cheers/crashes.json` 读到 2026-10-29 的真实 `unhandled-rejection: Invalid persisted session usage key`：`restoreSessionUsage`（`usageTelemetry.ts:355-364`）无错误边界，`decodeAttribution`（`identity.ts:63-70`）把算法演进当作数据损坏，崩溃记录器对 rejection 采取"记录后继续"，于是进程存活但该会话用量静默归零。已写入第19.8节与摘要表。
 
 本轮仍只做研究：未运行产品测试、未拉起 PTY/二进制；`verify:docs-drift:strict` 通过（rules 0 dangling，docs 118 既有 advisory）。文档另记入两条 HANDOFF 陷阱（"注释里的方法不等于实现"、"请求不问就不会有"）。
+
+## [2026-10-29] research | 第八轮收尾：退出挂起的确切机制与光标候选收敛
+
+第二十六项复核后从"一条慢路径"扩为四条，其中一条是**永久挂起**：`shutdown()`（`interactiveMode.ts:1509-1530`）对 `handleShellClose` 没有 try/catch，而后者在 `exit?.(0)` 之前同步执行 `terminate → saveTerminated → loadSession + 同步文件锁`（`signalHandlers.ts:42`、`sessionLifecycleStore.ts:150-175`、`sessionFileStore.ts:117-147`，锁超时 1200 ms 抛错）。四个调用点均为 fire-and-forget，拒绝被丢弃，而终端已由 `stop()` 恢复——进程不退出但屏幕看起来已结束。其余三条：MCP 关闭在 10 s 预算之外（`interactiveLoop.ts:64-73`、`gateway.ts:185-189`）、忙碌时 `/exit` 被排队而 `ctrl+d`/双击 `ctrl+c` 不受限（`interactiveMode.ts:980-992`）、`media/live.ts:85` 与 `media/record.ts:49` 的定时器未 unref。
+
+第二十七项收敛为四个候选并按可能性排序：regular 主屏绘制器新建即从 0 行起、只用相对移动寻址（`mainScreen.ts:57-62,166-186`）；首帧按 80×24 回落合成（`terminal.ts:143-152`、`engine.ts:358-360`）；`setText` 不归一化 CRLF（`buffer.ts:91-98` 对 `insert` 的 `:118`）；加载期 Enter 写入真实换行（`startup.ts:39`）。用户只需试 Backspace 即可二分：能删=草稿换行，不能删=布局问题。
+
+本轮仍只做研究：未运行产品测试、未拉起 PTY/二进制；`verify:docs-drift:strict` 通过。
