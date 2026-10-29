@@ -3648,3 +3648,27 @@ HANDOFF追加表面清理与session退出围栏区别，task scratch清理、原
 五静态门/diff通过，118既有docs-source advisory保留；无新产品import或命名callable。AST含constructor前后均23、不含constructor的原方法/箭头属性口径22，继承ceiling债务未消失，不称结构全合规。build观察exit0后独立重算compilerInputs与inputs digest一致：build `bca358900c8273b0046b8f6826687157c1f0e1a6b8442a4d69c7a4c7af5c5260`，inputs `278a28252e3c77cc04d3a081ae0fccea09cd935aef09cc3557416386fde231bc`，460 compilerInputs/3549文件。每个验证session均实际结束后才开始下一项；工件[render-retirement](../../.omx/artifacts/phase20-addition-render-retirement/)保留有效反转日志及build收据，HANDOFF记owner退休与RTK原文陷阱，task scratch清理。
 
 本批设备为RecordingTerminal、故障受控，不证明真实失败设备的恢复；20.36真实CLI/PTY正常退出证据仍绑定前一个build，本修补没有再发live请求或运行PTY/exe/full suite/20k。未取得独立review、用户桌面/IME/全部provider或账户证据，原47项不升级，ADD与goal active；Git/精确新CI另绑定。
+
+20.37已提交推送`5e2aa5253b143dcd6c555359518016e864178b2d`，远端main精确一致、仅原CLAUDE.md。延后读回[Watch40967568549](https://github.com/h-hei133/cheers/actions/runs/40967568549)completed/success，[CI40967568515](https://github.com/h-hei133/cheers/actions/runs/40967568515)in_progress，head一致；20.36 CI40966166052仍in_progress，旧成功不扩展到新commit。
+
+### 20.38 resume真实CLI的搜索、选择与重开
+
+反馈29与20.7补实际Node CLI→PTY→overlay操作证据。目标sessionPicker/browser/OptionModel与原selection/resume writer已检查，定向只读复读pi session-selector.ts:400–458的搜索/空态/可见选择绘制：查询交列表owner，画面围绕当前选择，空匹配明确提示。采用真实输入和实际绘制核对，不以直接catalog测量代替UI；本批无产品变更。
+
+build `bca358900c8273b0046b8f6826687157c1f0e1a6b8442a4d69c7a4c7af5c5260`，inputs `278a28252e3c77cc04d3a081ae0fccea09cd935aef09cc3557416386fde231bc`，regular/fullscreen分别独立home/profile/project，原SessionManager创建48个小会话，每会话仅一条fixture user消息、无工具/真实provider/私有历史。原配置采用synthetic，warming和启动网络关闭、heap768MiB、45秒总期限和2MiB输出限制。原Python relay为120×60，沿20.36termios读回；观察器调用原OverlayHost.render并只记录fixture焦点/筛选/加载与原message.started计数。
+
+两模式均等待startup prompt，输入`/resume`并等待完整页的Next session page入口；搜索精确fixture得到一项，退格放宽到十项、实际Down换焦点，逐字退格清空回首批；搜索无匹配后再次清空、重新搜索精确目标、Enter调用原runtime切换。原current selection文件读回目标fixture ID，重开/resume包含当前记录，Esc关闭后Ctrl+D exit0；配置字节不变，零请求，终端ICANON/ECHO/ISIG恢复。
+
+| 实际操作 | regular | fullscreen |
+|---|---|---|
+| 完整首批/分页入口绘制 | 1094ms | 1090ms |
+| 精确/无匹配/重查输入到绘制 | 178 / 178 / 175ms | 179 / 179 / 178ms |
+| 真实Enter至selection切换 | 95ms | 95ms |
+| Ctrl+D退出 | 134ms、exit0 | 137ms、exit0 |
+| 峰值RSS/总探针 | 297320KiB / 13.07s | 300476KiB / 13.15s |
+
+搜索时间包含真实逐键事件与既有去抖，不是catalog纯读取时间，不能与20.7约35ms直接比较或宣称大目录端到端加速。此轮检查分页入口已绘制，没有点击Next翻页；完整搜索索引在48项上检验，不拉起20,000条二进制。原使用过的session启动会更新时间，不能把其当前默认焦点当作旧pinned/latest渐进竞态的证明。
+
+首轮regular探针过早把16条渐进候选当成完整页，分页断言exit1、零请求；修改等待完整page action后，两模式才通过。此为probe setup失败，未据此改产品。正式工件[resume-cli](../../.omx/artifacts/phase20-addition-resume-cli/)保存脚本、无私有正文收据和失败分类；临时运行状态清理。仅文档/诊断工件变化，不重复build/Vitest；五静态门/diff、JS语法及JSON收据检查通过，118既有docs-source advisory保留。
+
+这是当前WSL PTY、小型真实磁盘布局、原CLI与writer操作证据，不替代2409项真实目录的终端性能、Windows/桌面/IME、外部目录变更或用户现场。没有独立review、live provider、exe/full suite/20k场景，原47项不升级、ADD和goal active。本批Git/精确CI另绑定。

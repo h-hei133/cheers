@@ -1,0 +1,100 @@
+[
+  {
+    "mode": "regular",
+    "buildId": "bca358900c8273b0046b8f6826687157c1f0e1a6b8442a4d69c7a4c7af5c5260",
+    "inputsDigest": "278a28252e3c77cc04d3a081ae0fccea09cd935aef09cc3557416386fde231bc",
+    "fixtures": 48,
+    "messagesPerFixture": 1,
+    "providerMode": "synthetic",
+    "status": "passed",
+    "checks": {
+      "pageActionVisible": true,
+      "arrowChangesFocus": true,
+      "confirmedNoMatch": true,
+      "exactSessionResumed": true,
+      "reopenIncludesCurrent": true,
+      "cookedInputRestored": true,
+      "zeroRequests": true,
+      "configUnchanged": true
+    },
+    "searchMs": [
+      {
+        "queryCharacters": 17,
+        "elapsed": 178
+      },
+      {
+        "queryCharacters": 24,
+        "elapsed": 178
+      },
+      {
+        "queryCharacters": 17,
+        "elapsed": 175
+      }
+    ],
+    "openMs": 1094,
+    "resumeMs": 95,
+    "shutdown": {
+      "code": 0,
+      "signal": null
+    },
+    "exitMs": 134,
+    "device": {
+      "cookedFlagsRestored": true
+    },
+    "outputBytes": 41967,
+    "outputLimitExceeded": false,
+    "deadlineExceeded": false,
+    "scratchRemoved": true,
+    "peakRssKiB": 297320,
+    "elapsedSeconds": 13.07
+  },
+  {
+    "mode": "fullscreen",
+    "buildId": "bca358900c8273b0046b8f6826687157c1f0e1a6b8442a4d69c7a4c7af5c5260",
+    "inputsDigest": "278a28252e3c77cc04d3a081ae0fccea09cd935aef09cc3557416386fde231bc",
+    "fixtures": 48,
+    "messagesPerFixture": 1,
+    "providerMode": "synthetic",
+    "status": "passed",
+    "checks": {
+      "pageActionVisible": true,
+      "arrowChangesFocus": true,
+      "confirmedNoMatch": true,
+      "exactSessionResumed": true,
+      "reopenIncludesCurrent": true,
+      "cookedInputRestored": true,
+      "zeroRequests": true,
+      "configUnchanged": true
+    },
+    "searchMs": [
+      {
+        "queryCharacters": 17,
+        "elapsed": 179
+      },
+      {
+        "queryCharacters": 24,
+        "elapsed": 179
+      },
+      {
+        "queryCharacters": 17,
+        "elapsed": 178
+      }
+    ],
+    "openMs": 1090,
+    "resumeMs": 95,
+    "shutdown": {
+      "code": 0,
+      "signal": null
+    },
+    "exitMs": 137,
+    "device": {
+      "cookedFlagsRestored": true
+    },
+    "outputBytes": 42012,
+    "outputLimitExceeded": false,
+    "deadlineExceeded": false,
+    "scratchRemoved": true,
+    "peakRssKiB": 300476,
+    "elapsedSeconds": 13.15
+  }
+]

@@ -10316,3 +10316,11 @@ engine59/signalHandlers9与过滤host26共94项串行通过；四类反转8/2/11
 初始三条失败、一条正常控制；最终engine65/mainScreen28与过滤host26共119项通过，host325未选不算通过。旧stop/first-error/overlay/painter四有效反转5/2/1/1失败、finally字节恢复后93再通过。首轮RTK过滤git show导致旧代码反转和AST不可信，改proxy原文与method边界后重跑；HANDOFF保留陷阱。五静态门/diff、1536MiB build通过，独立freshness为build `bca358900c8273b0046b8f6826687157c1f0e1a6b8442a4d69c7a4c7af5c5260`、inputs `278a28252e3c77cc04d3a081ae0fccea09cd935aef09cc3557416386fde231bc`，460/3549一致。AST含constructor23/23、原口径22，既有债务保留，无新import/callable。
 
 有效工件与scratch清理；验证全程serial，无独立review、live/PTY/exe/full suite/20k，真实PTY仍绑定20.36旧build，故障仅受控设备，不证明用户现场失败恢复。原47不升级、goal active，Git/精确CI另绑定。
+
+20.37已推送`5e2aa5253b143dcd6c555359518016e864178b2d`，远端main一致、仅原CLAUDE.md。延后核对Watch40967568549 success、CI40967568515与20.36 CI40966166052仍in_progress，head一致。
+
+## [2026-10-30] verify | resume实际CLI搜索与选择
+
+沿[addition20.38](features/phase-20-addition.md#2038-resume真实cli的搜索选择与重开)补feedback29真实Node CLI/PTY/overlay/writer。两模式分别48个原SessionManager会话、各一条小fixture，隔离home/profile、synthetic零请求，heap768MiB/45秒/2MiB。精确搜索、放宽十项、Down焦点、清空、无匹配、精确Enter切换、原selection文件读回、重开/Esc/Ctrl+D均通过；termios cooked flags和配置字节保持。
+
+regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输入去抖，selection95ms，退出134/137ms；峰值RSS297320/300476KiB。初次探针误把16项渐进画面当完整页exit1，改等Next入口后通过，不改产品；只核对分页入口，没有操作Next，不能称完整分页或用户大目录性能验收。正式工件/失败分类和scratch清理，五静态门/diff、工件语法/JSON收据通过，118旧advisory保留；无产品变更、不重复build/tests，无用户桌面/IME/Windows/live/exe/full suite/20k/独立review证据，原47不升级、goal active，Git/CI另绑定。

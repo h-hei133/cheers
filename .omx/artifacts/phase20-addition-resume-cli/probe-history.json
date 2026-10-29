@@ -1,0 +1,10 @@
+{
+  "initialProbe": "failed before searching because progressive frame with 16 candidates lacked final page action",
+  "initialExitCode": 1,
+  "initialPeakRssKiB": 282540,
+  "providerRequests": 0,
+  "correction": "wait until final Next session page action is published before checking the complete first page",
+  "testLimit": 48,
+  "messagesPerFixture": 1,
+  "rawOutputArchived": false
+}
