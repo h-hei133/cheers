@@ -985,3 +985,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Ctrl+D stops processing input, but a failed subscription release, transcript render or terminal write rejects shutdown before session persistence and the exit hook.
 - **Root Cause**: A persistence-only fence starts after an unfenced chain of surface cleanups; a failed rendering step can also bypass the physical terminal owner.
 - **Rule**: Attempt each original surface cleanup, retain failure, and independently attempt physical terminal stop. Carry any failure into the existing exit status, keep report errors fenced, and preserve embedded-call failure. Retire input at the closing state even if listener disposal fails; test actual buffered keys and controlled device failures without claiming successful physical restore.
+
+### PTY Repaints Do Not Always Contain the Beginning of a Block
+- **Symptom**: Thinking expands and the transcript changes correctly, but a PTY probe times out waiting for the first sentence on a repeated expansion or resumed screen.
+- **Root Cause**: Regular rendering can preserve earlier scrollback, and viewport rendering may show only the tail of a long block. A delta stream is not a fresh full-screen transcript.
+- **Rule**: Check the real key dispatch, collapsed state, source digest and rendered row change independently. For visible-body evidence, match a public-text fragment that can occur in the actual viewport; do not require the first sentence on every repaint. Read terminal cooked flags after normal exit to establish input restoration, and keep injected stop failures separate from that evidence.

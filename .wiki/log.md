@@ -10296,3 +10296,13 @@ engine59/signalHandlers9与过滤host26共94项串行通过；四类反转8/2/11
 提交前补stdin失败后paste/mouse退休，同一chunk草稿保持空且pointer零调用；撤回守卫2/1失败，regular本来不派mouse，首轮误预期已核对并重跑。恢复后host26再次通过。最后误在该测试session_id未结束时启动static/build链，验证发生重叠，两进程分别观察exit0、未观察OOM，不称本批全程严格串行；最终新鲜度在全部结束后单独核对，上述build为最终值。
 
 延后读回20.33文档CI40959758386已completed/success、精确head为e6d543ad9fa9a7dcaa236fcb213c6c5e393916f7；20.34 CI40960523986仍in_progress，Watch40960523975 success。
+
+20.35已推送`6a01c92e8f1a683b58b336b62848c3a1acb0d19c`，远端main一致；延后核对CI40963305689与Watch40963305563均completed/success、head一致，20.34 CI40960523986同样success，历史失败保留。
+
+## [2026-10-30] verify | 真实CLI推理按键与终端输入恢复
+
+沿[addition20.36](features/phase-20-addition.md#2036-真实cli的thinking键盘会话重开与终端输入恢复)补真实Node CLI→PTY→Ctrl+T→Ctrl+D→同会话重开链。原配置只读，隔离home/profile、零工具/指令/skills、显式high、输出1024、零重试、heap768MiB、65秒/2MiB边界。当前legacy请求地址与保存connection不同，预检失败后采用原provider-scope选择，不改用户目标或复制秘密。
+
+最后regular/fullscreen各一次真实请求，6725/6950ms、1011/1904字符公开推理、正确答案；当前与重开均三次真实Ctrl+T且正文digest一致，transcript17→43/53→17→43/53，实际PTY输出有公开正文片段。四次Ctrl+D exit0为138/131/126/133ms，Python读回ICANON/ECHO/ISIG和reset escapes；峰值RSS295940/292140KiB。重开无query事件，单请求零工具，原配置/目录字节不变、隔离会话terminated。
+
+总共四次串行真实请求，前两次产品回答正确但首行/viewport探针断言超时exit1，不掩盖失败；分类后最后两次才完整通过。usage投影漏缓存字段，已记录input是未缓存桶，不能称完整provider输入或独立billing；正式观察器补字段未重发。正式无秘密工件与HANDOFF保存陷阱，scratch清理；五静态门/diff、JS/Python语法、JSON/六组收据检查通过，118既有docs advisory保留。无产品改动，不重复build/tests，未运行exe/full suite/20k。当前WSL PTY证据不代替用户桌面/IME、流中鼠标、全部provider/账户或故障设备恢复，原47不升级、goal active，本批Git/CI另绑定。

@@ -1,0 +1,518 @@
+[
+  {
+    "mode": "regular",
+    "buildId": "c505ffd1811f4690029bf6fd025db469b17592203c21b691bf8c71d66ece19b6",
+    "inputsDigest": "95c59e5eae2252672f97805d8aa9fda5dda5b242469ebc021c91883a2aa899af",
+    "provider": "openai-compatible",
+    "endpointHost": "bailucode.com",
+    "model": "bailu-2.9-preview",
+    "effort": "high",
+    "explicit": true,
+    "maxOutputTokens": 1024,
+    "tools": [],
+    "retryEnabled": false,
+    "status": "passed",
+    "phases": [
+      {
+        "phase": "request",
+        "checks": {
+          "keyboardExpandCollapseExpand": true,
+          "actualPtyBody": true,
+          "storedDisplayMatch": true,
+          "restoreEscapes": true
+        },
+        "requestMs": 6725,
+        "reasoningCharacters": 1011,
+        "reasoningDigest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+        "answerCorrect": true,
+        "observation": {
+          "events": {
+            "query.started": 1,
+            "message.started": 1,
+            "reasoning.delta": 54,
+            "message.delta": 1,
+            "message.finished": 1,
+            "query.completed": 1
+          },
+          "toggles": [
+            {
+              "only": "thinking",
+              "changed": true,
+              "before": [
+                {
+                  "characters": 1011,
+                  "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+                  "collapsed": true,
+                  "finalized": true
+                }
+              ],
+              "after": [
+                {
+                  "characters": 1011,
+                  "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+                  "collapsed": false,
+                  "finalized": true
+                }
+              ],
+              "beforeRows": 17,
+              "afterRows": 43
+            },
+            {
+              "only": "thinking",
+              "changed": true,
+              "before": [
+                {
+                  "characters": 1011,
+                  "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+                  "collapsed": false,
+                  "finalized": true
+                }
+              ],
+              "after": [
+                {
+                  "characters": 1011,
+                  "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+                  "collapsed": true,
+                  "finalized": true
+                }
+              ],
+              "beforeRows": 43,
+              "afterRows": 17
+            },
+            {
+              "only": "thinking",
+              "changed": true,
+              "before": [
+                {
+                  "characters": 1011,
+                  "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+                  "collapsed": true,
+                  "finalized": true
+                }
+              ],
+              "after": [
+                {
+                  "characters": 1011,
+                  "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+                  "collapsed": false,
+                  "finalized": true
+                }
+              ],
+              "beforeRows": 17,
+              "afterRows": 43
+            }
+          ],
+          "ended": true,
+          "result": {
+            "status": "completed",
+            "terminalClassification": "success"
+          },
+          "blocks": [
+            {
+              "characters": 1011,
+              "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+              "collapsed": true,
+              "finalized": true
+            }
+          ],
+          "usage": [
+            {
+              "turns": 1,
+              "toolCalls": 0,
+              "request": {
+                "model": "bailu-2.9-preview",
+                "endpoint": "openai-compatible",
+                "bodyBytes": 1869,
+                "capturedAt": "2026-10-29T22:23:46.785Z"
+              },
+              "buckets": [
+                {
+                  "output": 222,
+                  "total": 1004,
+                  "requests": 1,
+                  "uncachedInput": 142
+                }
+              ]
+            }
+          ]
+        },
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 138,
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "status": "passed",
+        "outputBytes": 84925,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "phase": "resume",
+        "checks": {
+          "keyboardExpandCollapseExpand": true,
+          "actualPtyBody": true,
+          "storedDisplayMatch": true,
+          "restoreEscapes": true
+        },
+        "reasoningCharacters": 1011,
+        "reasoningDigest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+        "answerCorrect": true,
+        "observation": {
+          "events": {},
+          "toggles": [
+            {
+              "only": "thinking",
+              "changed": true,
+              "before": [
+                {
+                  "characters": 1011,
+                  "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+                  "collapsed": true,
+                  "finalized": true
+                }
+              ],
+              "after": [
+                {
+                  "characters": 1011,
+                  "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+                  "collapsed": false,
+                  "finalized": true
+                }
+              ],
+              "beforeRows": 17,
+              "afterRows": 43
+            },
+            {
+              "only": "thinking",
+              "changed": true,
+              "before": [
+                {
+                  "characters": 1011,
+                  "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+                  "collapsed": false,
+                  "finalized": true
+                }
+              ],
+              "after": [
+                {
+                  "characters": 1011,
+                  "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+                  "collapsed": true,
+                  "finalized": true
+                }
+              ],
+              "beforeRows": 43,
+              "afterRows": 17
+            },
+            {
+              "only": "thinking",
+              "changed": true,
+              "before": [
+                {
+                  "characters": 1011,
+                  "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+                  "collapsed": true,
+                  "finalized": true
+                }
+              ],
+              "after": [
+                {
+                  "characters": 1011,
+                  "digest": "eeb32bd4d2e829a71b52556a6fc3c9d6a4e3342506d3bc73522b3f5b5de8c41c",
+                  "collapsed": false,
+                  "finalized": true
+                }
+              ],
+              "beforeRows": 17,
+              "afterRows": 43
+            }
+          ],
+          "ended": false
+        },
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 131,
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "status": "passed",
+        "outputBytes": 8940,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      }
+    ],
+    "checks": {
+      "operatorFilesUnchanged": true,
+      "overrideUnchanged": true,
+      "noCredentialCopies": true,
+      "sessionTerminated": true
+    },
+    "scratchRemoved": true,
+    "peakRssKiB": 295940,
+    "elapsedSeconds": 17.26,
+    "usageLimit": "bucket input is uncached promptTokens; cache fields were not captured; no aggregate billing conclusion"
+  },
+  {
+    "mode": "fullscreen",
+    "buildId": "c505ffd1811f4690029bf6fd025db469b17592203c21b691bf8c71d66ece19b6",
+    "inputsDigest": "95c59e5eae2252672f97805d8aa9fda5dda5b242469ebc021c91883a2aa899af",
+    "provider": "openai-compatible",
+    "endpointHost": "bailucode.com",
+    "model": "bailu-2.9-preview",
+    "effort": "high",
+    "explicit": true,
+    "maxOutputTokens": 1024,
+    "tools": [],
+    "retryEnabled": false,
+    "status": "passed",
+    "phases": [
+      {
+        "phase": "request",
+        "checks": {
+          "keyboardExpandCollapseExpand": true,
+          "actualPtyBody": true,
+          "storedDisplayMatch": true,
+          "restoreEscapes": true
+        },
+        "requestMs": 6950,
+        "reasoningCharacters": 1904,
+        "reasoningDigest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+        "answerCorrect": true,
+        "observation": {
+          "events": {
+            "query.started": 1,
+            "message.started": 1,
+            "reasoning.delta": 105,
+            "message.delta": 1,
+            "message.finished": 1,
+            "query.completed": 1
+          },
+          "toggles": [
+            {
+              "only": "thinking",
+              "changed": true,
+              "before": [
+                {
+                  "characters": 1904,
+                  "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+                  "collapsed": true,
+                  "finalized": true
+                }
+              ],
+              "after": [
+                {
+                  "characters": 1904,
+                  "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+                  "collapsed": false,
+                  "finalized": true
+                }
+              ],
+              "beforeRows": 17,
+              "afterRows": 53
+            },
+            {
+              "only": "thinking",
+              "changed": true,
+              "before": [
+                {
+                  "characters": 1904,
+                  "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+                  "collapsed": false,
+                  "finalized": true
+                }
+              ],
+              "after": [
+                {
+                  "characters": 1904,
+                  "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+                  "collapsed": true,
+                  "finalized": true
+                }
+              ],
+              "beforeRows": 53,
+              "afterRows": 17
+            },
+            {
+              "only": "thinking",
+              "changed": true,
+              "before": [
+                {
+                  "characters": 1904,
+                  "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+                  "collapsed": true,
+                  "finalized": true
+                }
+              ],
+              "after": [
+                {
+                  "characters": 1904,
+                  "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+                  "collapsed": false,
+                  "finalized": true
+                }
+              ],
+              "beforeRows": 17,
+              "afterRows": 53
+            }
+          ],
+          "ended": true,
+          "result": {
+            "status": "completed",
+            "terminalClassification": "success"
+          },
+          "blocks": [
+            {
+              "characters": 1904,
+              "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+              "collapsed": true,
+              "finalized": true
+            }
+          ],
+          "usage": [
+            {
+              "turns": 1,
+              "toolCalls": 0,
+              "request": {
+                "model": "bailu-2.9-preview",
+                "endpoint": "openai-compatible",
+                "bodyBytes": 1869,
+                "capturedAt": "2026-10-29T22:24:28.675Z"
+              },
+              "buckets": [
+                {
+                  "output": 418,
+                  "total": 1201,
+                  "requests": 1,
+                  "uncachedInput": 143
+                }
+              ]
+            }
+          ]
+        },
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 126,
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "status": "passed",
+        "outputBytes": 22359,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "phase": "resume",
+        "checks": {
+          "keyboardExpandCollapseExpand": true,
+          "actualPtyBody": true,
+          "storedDisplayMatch": true,
+          "restoreEscapes": true
+        },
+        "reasoningCharacters": 1904,
+        "reasoningDigest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+        "answerCorrect": true,
+        "observation": {
+          "events": {},
+          "toggles": [
+            {
+              "only": "thinking",
+              "changed": true,
+              "before": [
+                {
+                  "characters": 1904,
+                  "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+                  "collapsed": true,
+                  "finalized": true
+                }
+              ],
+              "after": [
+                {
+                  "characters": 1904,
+                  "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+                  "collapsed": false,
+                  "finalized": true
+                }
+              ],
+              "beforeRows": 17,
+              "afterRows": 53
+            },
+            {
+              "only": "thinking",
+              "changed": true,
+              "before": [
+                {
+                  "characters": 1904,
+                  "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+                  "collapsed": false,
+                  "finalized": true
+                }
+              ],
+              "after": [
+                {
+                  "characters": 1904,
+                  "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+                  "collapsed": true,
+                  "finalized": true
+                }
+              ],
+              "beforeRows": 53,
+              "afterRows": 17
+            },
+            {
+              "only": "thinking",
+              "changed": true,
+              "before": [
+                {
+                  "characters": 1904,
+                  "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+                  "collapsed": true,
+                  "finalized": true
+                }
+              ],
+              "after": [
+                {
+                  "characters": 1904,
+                  "digest": "e94ec84653ec32b3e0a734e87236108bd0b997b5660ccf67e3030db70b44a04e",
+                  "collapsed": false,
+                  "finalized": true
+                }
+              ],
+              "beforeRows": 17,
+              "afterRows": 53
+            }
+          ],
+          "ended": false
+        },
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 133,
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "status": "passed",
+        "outputBytes": 11921,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      }
+    ],
+    "checks": {
+      "operatorFilesUnchanged": true,
+      "overrideUnchanged": true,
+      "noCredentialCopies": true,
+      "sessionTerminated": true
+    },
+    "scratchRemoved": true,
+    "peakRssKiB": 292140,
+    "elapsedSeconds": 17.46,
+    "usageLimit": "bucket input is uncached promptTokens; cache fields were not captured; no aggregate billing conclusion"
+  }
+]

@@ -3603,3 +3603,32 @@ HANDOFF追加表面清理与session退出围栏区别，task scratch清理、原
 提交前补查stdin解绑失败的paste/mouse入口，增加同一chunk的bracketed paste与鼠标按下/释放、草稿为空与pointer零处理断言；两个入口沿同一closing/stopped状态退休。分别撤回paste/mouse守卫实际2/1失败，regular模式本来不路由该mouse，不能把它算第二项失败；首轮误预期mouse两项、核对后重跑。逐字节恢复后host26再次通过，engine59/signalHandlers9此前已串行通过且无后续改动。最后host重验仍返回session_id时误启动静态门/build链，发生验证重叠；两者随后分别观察exit0，未观察OOM，但本批整体不能称全程严格串行。新鲜度在两进程结束后单独完成，最终build/inputs以上述最新值为准。
 
 延后读回20.33文档CI40959758386已completed/success、精确head为e6d543ad9fa9a7dcaa236fcb213c6c5e393916f7；20.34 CI40960523986仍in_progress，Watch40960523975 success。
+
+20.35已提交推送`6a01c92e8f1a683b58b336b62848c3a1acb0d19c`，远端main精确一致、仅原CLAUDE.md。延后核对[CI40963305689](https://github.com/h-hei133/cheers/actions/runs/40963305689)与[Watch40963305563](https://github.com/h-hei133/cheers/actions/runs/40963305563)均completed/success、head一致；20.34[CI40960523986](https://github.com/h-hei133/cheers/actions/runs/40960523986)同样completed/success，历史失败保留。
+
+### 20.36 真实CLI的thinking键盘、会话重开与终端输入恢复
+
+在20.35产品HEAD及其build `c505ffd1811f4690029bf6fd025db469b17592203c21b691bf8c71d66ece19b6`上补反馈25/26的CLI路径证据。使用原`scripts/start.mjs`启动已验证Node构建，Python PTY为120列×60行；每次等真实startup prompt后输入一个小型算术问题，等待实际query终态，再发送三次Ctrl+T、Ctrl+D，随后按同一session ID重开并重复按键/退出。未启动exe或大消息压力场景。
+
+只读引用原个人JSONC，不复制凭据；隔离HOME/USERPROFILE/测试根与named profile承接会话、目录和缓存。实际legacy请求目标为`openai-compatible`、`bailucode.com/openapi/v1`、`bailu-2.9-preview`，隔离会话采用原provider-scope模型选择并显式high。先前保存connection使用同host的`/v1`，预检不能把两者当成精确相同目标；两次预检失败均在请求前，探针修正选择方式，没有改用户连接。目录只复制该模型非秘密元数据，目录声明地址与请求不同，不以它证明该端点能力或价格。无项目指令、skills、历史或工具，重试和warming关闭，maxTurns=1、临时输出上限1024，transport为10/30/30秒；每CLI阶段65秒总期限、2MiB输出限制、heap768MiB。
+
+观察器仅在隔离进程包装原TurnSink和TranscriptPane方法并调用原实现，记录事件数量、行数、状态和SHA-256；Ctrl+T由真实PTY字节经过终端/解码/keymap调用原toggle，并非探针直接调用toggle。公开正文仅在内存中用于实际PTY输出片段匹配，不保存或打印正文、响应、headers、凭据；结构化日志持久化关闭。Python沿原relay增加退出后termios读回，验证ICANON/ECHO/ISIG三项，而不是只凭reset escape或exit0宣称原始输入恢复。
+
+| 有效最终运行 | regular | fullscreen |
+|---|---|---|
+| 真实请求/答案 | 1次、6725ms、正确3字符答案 | 1次、6950ms、正确3字符答案 |
+| 公开thinking | 1011字符、54 delta、已冻结 | 1904字符、105 delta、已冻结 |
+| 原transcript行数 | 17→43→17→43 | 17→53→17→53 |
+| 当前/重开Ctrl+T | 均展开→折叠→展开，同一正文digest | 均展开→折叠→展开，同一正文digest |
+| PTY绘制/恢复 | 展开输出含公开正文片段，持久与重开正文一致 | 展开输出含公开正文片段，持久与重开正文一致 |
+| Ctrl+D退出 | 当前138ms、重开131ms，均exit0 | 当前126ms、重开133ms，均exit0 |
+| 终端输入恢复 | 两次均读回cooked flags，reset escape齐备 | 两次均读回cooked flags，reset escape齐备 |
+| 峰值RSS/总探针时间 | 295940KiB / 17.26s | 292140KiB / 17.46s |
+
+两份有效收据均query.completed/success、单message.started、单usage请求、零tool调用；重开无query事件。用量探针最初只投影bucket.promptTokens，漏cacheRead/cacheWrite：regular未缓存输入142/output222/total1004，fullscreen143/418/1201；这些input不是完整输入量，不能据差额诊断产品计量错误或推断独立billing。正式观察器已补缓存字段供后续复验，但没有为该投影修正再发请求，当前证据按已记录范围保存。
+
+本批实际共四次串行真实请求，无自动重试：前两次产品均有正确答案，但探针分别等待第三次展开的正文首行、重开viewport中的首行而超时exit1。第一次3833字符/227 delta、20295ms；第二次3084字符/158 delta、31182ms，其当前CLI按键与137ms正常退出已经通过，重开片段断言未通过。分类后改为逐次检查真实toggle、source digest及重绘，并在首次展开匹配可见多词片段；最后两次才是上表完整通过，不能删除失败探针历史或把四次全部称为验收通过。
+
+正式工件[phase20-addition-live-cli](../../.omx/artifacts/phase20-addition-live-cli/)保存可复用PTY/观察器、无秘密收据与失败分类；task scratch清理。原配置/目录字节摘要一致，临时override不变，profile未生成凭据config副本，两次重开后的隔离会话均terminated。仅文档/诊断工件变化，无新产品代码或build/Vitest；主代理每次均等待进程实际exit后才开始下一验证。五静态门/diff通过，保留118条既有docs-source advisory；正式JS/Python语法、JSON与六组收据检查通过。正式脚本补缓存投影与显式单请求断言经过语法/收据静态核对，没有再次运行live；观测包装与termios读回增加诊断开销，上表时间不作为无探针生产性能基准。
+
+这是WSL Linux PTY、当前单API-key目标、正常结束后的键盘/恢复证据，不替代用户原桌面键鼠/IME、流中点击、全部provider/账户、真实设备故障或完整acceptance矩阵。20.35受控terminal.stop失败仍只证明尝试与exit1；本批正常设备成功不升级那些故障结果。没有独立review，原47项状态不升级，ADD与Codex goal继续active；本批文档Git/精确CI另绑定。

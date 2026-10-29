@@ -1,0 +1,31 @@
+{
+  "preflightFailures": [
+    "legacy selection has no explicit connection ID",
+    "same-host saved connection and legacy request have different path prefixes"
+  ],
+  "requestAttempts": 4,
+  "automaticRetries": 0,
+  "allObservedAnswersCorrect": true,
+  "discardedProbeAttempts": [
+    {
+      "reasoningCharacters": 3833,
+      "requestMs": 20295,
+      "failure": "third expansion prefix absent from terminal delta",
+      "exitCode": 1,
+      "peakRssKiB": 290368
+    },
+    {
+      "reasoningCharacters": 3084,
+      "requestMs": 31182,
+      "failure": "resumed expansion prefix outside displayed viewport",
+      "exitCode": 1,
+      "peakRssKiB": 293068,
+      "requestPhasePassed": true,
+      "requestExitMs": 137
+    }
+  ],
+  "correction": "assert state and repaint on every toggle; find any multiword public-body fragment in first expanded PTY output instead of requiring the first line on each redraw",
+  "operatorConfigWrites": 0,
+  "rawOutputArchived": false,
+  "credentialCopies": 0
+}
