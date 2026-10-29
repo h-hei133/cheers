@@ -203,6 +203,10 @@ export class TurnSink implements RendererSink {
 
   handleEvent(event: QueryEvent): void {
     switch (event.type) {
+      case "message.finished":
+        this.finalizeAssistant();
+        this.onChange();
+        return;
       case "message.started":
         this.finalizeAssistant();
         this.thinking.clear();

@@ -74,6 +74,7 @@ export class TurnProjection {
       }
       case "message_end": {
         const message = event.message;
+        if (message.role === "assistant") return [{ type: "message.finished", role: "coder" }];
         if (message.role !== "tool" || !message.tool_call_id) return [];
         const open = this.openCalls.get(message.tool_call_id);
         this.openCalls.delete(message.tool_call_id);

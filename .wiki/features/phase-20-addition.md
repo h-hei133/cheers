@@ -3507,3 +3507,16 @@ HANDOFF记录实际发出顺序与校验part状态分开，任务scratch清理�
 四类反转关闭替换、撤去消息边界、settle丢失owner、移除durability排除分别7/1/5/2失败，每次finally逐字节恢复。边界fixture进一步将正文断言放在事件计数前，反转直接得到Previous reasoning/Summary 1，丢失Summary 0，证明实际跨消息覆盖；恢复后305重验通过。五静态门/diff、完整声明图单一脚本用例通过；保守AST计数含constructor、对象回调：sink20/thinking5/stream4/step18/session18/request8/completion15/events1。1536MiB build确认exit0后单独新鲜度重算通过：build `de88fe907703d60e6b2c8791933f837bf4b17f64f4ebad282e1bed70e44f53b4`，inputs `97f94ad1e53d80b094fe83a1078d4b12978954ba38a376799cc5492629b4e423`，460 compilerInputs/3549文件一致。
 
 本批无独立review或本地NormProof judge，完整声明图提供实际解析/无环证据；无live provider/账户、真实用户终端、PTY/exe/full suite或20k会话。HANDOFF记录终态正文与显示归属边界，任务scratch清理，原CLAUDE.md和其他任务scratch保留；原47项不升级、反馈25实环境验收仍未闭合，ADD与Codex goal保持active。Git/本批精确CI另绑定，既有成功不延伸到新commit。
+
+
+20.29已提交推送`91759c28b216209258bab56875f1007eeca2dedb`，远端main精确一致、仅原CLAUDE.md。[Watch40954559655](https://github.com/h-hei133/cheers/actions/runs/40954559655)completed/success，[CI40954559846](https://github.com/h-hei133/cheers/actions/runs/40954559846)in_progress。延后核对20.27[CI40949567238](https://github.com/h-hei133/cheers/actions/runs/40949567238)及20.28[CI40950547705](https://github.com/h-hei133/cheers/actions/runs/40950547705)均completed/success、精确head一致。
+
+### 20.30 模型消息结束后冻结thinking与答案
+
+20.29完整显示后继续实际生命周期核查：Responses先流reasoning prefix再流完答案，终态仅补reasoning tail，thinking重新live却再无答案delta来settle。持住Stop hook的真实Response→step→runTurn→TurnSink回归初次失败：公开正文Plan more正确，但thinking.finalized=false，结束前空tick仍可计时。不能用sink.end最终finalizeAll掩盖等待hook期间的显示状态。
+
+定向读取pi openai-completions.ts:422–446，输出block结束明确发text_end/thinking_end。目标kernel已有assistant message_end，发生在step全部回调结束后，且失败/aborted同样有该事实；采用现有生命周期，不给各provider新增第二套结束条件。[projection](../../packages/ts-shell/src/turn/projection.ts)将assistant message_end映射为message.finished，[TurnSink](../../packages/ts-shell/src/cli/interactive/turnSink.ts)调用原finalizeAssistant并重绘，冻结当前thinking和答案；message.finished明确是临时显示事实、排除durable，没有升级query或write结果。user/tool原投影保持，后续query.failed仍记录失败。
+
+主代理四显式文件98项串行通过：session31/turnSink54/projection5/events8，包含实际Stop hook等待、空tick不续钟、assistant已结束、stop/error/aborted均投影结束、user不投影与失败仍可见。移除producer、consumer及durable排除三类反转4/2/1失败，finally字节恢复后98再通过。五静态门/diff通过；保守AST projection7/sink20/events1，无新import/callable，不重复graph/NormProof。1536MiB build观察exit0后单独新鲜度一致：build `0123730ff859e0378ef84ebc81d2cc14af9026b7ceb820421bb28df3ed8157b1`，inputs `8d6d8b5ab9bfb0f8810b9da02f83b7b27240f921bca0fb2bb2a529ddf900879c`，460 compilerInputs/3549文件。
+
+HANDOFF补模型输出与整turn结束的区别，任务scratch清理，保留原CLAUDE.md。无独立review/live provider/账户/真实用户终端/PTY/exe/full suite/20k会话，原47项不升级、ADD及goal active。Git/本批精确CI另绑定。

@@ -409,6 +409,23 @@ describe("what a tool card says it is doing", () => {
 });
 
 describe("the activity row across a reasoning answer", () => {
+  it('freezes a finished message before a later failure notice and preserves the failed outcome', () => {
+    const { sink, transcript } = build();
+    sink.begin('turn', 'turn');
+    sink.think('Partial reasoning');
+    const thinking = transcript.last()!;
+    sink.handleEvent({ type: 'message.finished', role: 'coder' });
+    expect(thinking.finalized).toBe(true);
+    const elapsed = thinking.elapsedMs;
+    sink.think();
+    expect(thinking.elapsedMs).toBe(elapsed);
+    expect(sink.lastTurnFailed).toBe(false);
+    sink.handleEvent({ type: 'query.failed', error: 'Provider failed' });
+    expect(sink.lastTurnFailed).toBe(true);
+    expect(transcript.last()?.text).toBe('Provider failed');
+    sink.end();
+  });
+
   it('replaces the same expanded reasoning after the answer and invalidates cached rows and selection revision', () => {
     const { sink, transcript, rows } = build();
     sink.begin('turn', 'turn');

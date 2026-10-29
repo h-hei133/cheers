@@ -10241,3 +10241,12 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 继续[addition20.29](features/phase-20-addition.md#2029-responses已验证公开正文的完整显示与消息归属)，Responses raw/summary和交错part/item的live拼接不同于最终公开投影。沿已核对官方done正文与参考item收尾决定，在原严格terminal/delta/sealed/actionable/answer前缀验证后比对整条实际发出正文，相同不重复、prefix只补尾部、其余完整替换。step传递reasoning.replace；turn/request在回调前发message.started，两新事件排除durable。thinking owner保留同消息块跨答案校正，Transcript原setText更新缓存/revision并保留展开选择；边界撤回引用，真实工具后新消息独立。session请求回调与usage/cache绑定移入request，原purpose导出兼容，保守AST全部不超过20。
 
 七显式文件305项串行通过，四类反转7/1/5/2失败、finally字节恢复；边界反转正文直接复现Summary 0被Summary 1覆盖，恢复后305再通过。五静态门/diff、完整声明图单一用例通过。build `de88fe907703d60e6b2c8791933f837bf4b17f64f4ebad282e1bed70e44f53b4`，inputs `97f94ad1e53d80b094fe83a1078d4b12978954ba38a376799cc5492629b4e423`，460/3549在exit0后单独重算一致。工具fixture缺function层导致零fetch已分类修正；HANDOFF补边界，task scratch清理。无独立review/live/真实账户或用户终端/PTY/exe/full suite/20k，本地NormProof未重复，原47不升级、ADD与goal active，Git/本批精确CI另绑定。
+
+
+20.29已提交推送`91759c28b216209258bab56875f1007eeca2dedb`，远端main一致、仅原CLAUDE.md。[Watch40954559655](https://github.com/h-hei133/cheers/actions/runs/40954559655)success，[CI40954559846](https://github.com/h-hei133/cheers/actions/runs/40954559846)in_progress。延后核对20.27[CI40949567238](https://github.com/h-hei133/cheers/actions/runs/40949567238)、20.28[CI40950547705](https://github.com/h-hei133/cheers/actions/runs/40950547705)均success、head一致。
+
+## [2026-10-30] fix | 模型消息结束即冻结输出
+
+继续[addition20.30](features/phase-20-addition.md#2030-模型消息结束后冻结thinking与答案)：终态reasoning tail晚于已流完答案时，原thinking仍live直到整turn收尾；真实Response/step/kernel/sink持住Stop hook回归失败。对照参考明确text/thinking结束事件，采用目标原assistant message_end映射临时message.finished，sink原finalizeAssistant冻结thinking和答案，两者不再等待hook，排除durable、不升级失败/写入结果。
+
+四显式文件98串行通过；producer/consumer/durability反转4/2/1失败、finally字节恢复后98再通过。五静态门/diff、AST projection7/sink20/events1通过，无新import/callable，不重复graph/NormProof。build `0123730ff859e0378ef84ebc81d2cc14af9026b7ceb820421bb28df3ed8157b1`，inputs `8d6d8b5ab9bfb0f8810b9da02f83b7b27240f921bca0fb2bb2a529ddf900879c`，460/3549在exit0后单独重算一致。HANDOFF补message/turn生命周期边界、scratch清理，无独立review/live/真实终端/PTY/exe/full suite/20k，原47不升级、goal active，Git/精确新CI另绑定。

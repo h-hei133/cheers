@@ -952,3 +952,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A process inventory includes credential-bearing service arguments, even when a wrapper truncates its output.
 - **Root Cause**: Requesting args exposes unrelated services' launch secrets; truncation is not redaction.
 - **Rule**: Observe verification processes using PID, parent PID, status and executable name only. Never request or print full process arguments when checking whether a yielded test or build is still running.
+
+
+### Model Output Ends Before Turn Settlement Hooks
+- **Symptom**: A terminal reasoning tail arrives after the last answer delta, leaving thinking live while Stop or other settlement hooks wait.
+- **Root Cause**: Answer increments settle thinking, but a late reasoning append can reopen it; whole-turn end is later than the model message's end.
+- **Rule**: Use the kernel's assistant message_end to freeze current display blocks immediately after all step callbacks. Keep that display event transient and independent of success, failure or write classification. Hold a Stop hook in the real loop regression so sink.end cannot hide the missing boundary.

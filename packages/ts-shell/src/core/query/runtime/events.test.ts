@@ -15,6 +15,7 @@ const STREAMING: readonly QueryEvent[] = [
   { type: "message.replace", role: "coder", text: "corrected" },
   { type: "reasoning.replace", role: "coder", text: "verified" },
   { type: "message.started", role: "coder" },
+  { type: "message.finished", role: "coder" },
 ];
 
 describe("durable query events", () => {

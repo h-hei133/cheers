@@ -1,5 +1,13 @@
 import { expect, it } from "vitest";
-import { concludeRun } from "./projection.js";
+import { concludeRun, TurnProjection } from "./projection.js";
+
+it.each(['stop', 'error', 'aborted'] as const)('closes assistant display on message_end without claiming %s success', stopReason => {
+  const projection = new TurnProjection();
+  const message = { role: 'assistant' as const, content: 'partial', stopReason };
+  expect(projection.project({ type: 'message_start', message })).toEqual([]);
+  expect(projection.project({ type: 'message_end', message })).toEqual([{ type: 'message.finished', role: 'coder' }]);
+  expect(projection.project({ type: 'message_end', message: { role: 'user', content: 'q' } })).toEqual([]);
+});
 
 it("does not report a completed turn after the newest tool failed", () => {
   const outcome = concludeRun([

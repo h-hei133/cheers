@@ -98,6 +98,8 @@ export type QueryEvent =
   | { readonly type: 'message.delta'; readonly role: AgentRole; readonly delta: string }
   /** Transient display boundary before callbacks from one model request. */
   | { readonly type: 'message.started'; readonly role: AgentRole }
+  /** The model message stopped producing output, including failed attempts. */
+  | { readonly type: 'message.finished'; readonly role: AgentRole }
   /**
    * What the model said while working the answer out. A separate channel because
    * it is not the answer: a reasoning model's working can run longer than its
@@ -139,4 +141,5 @@ export function isDurableQueryEvent(event: QueryEvent): boolean {
     && event.type !== 'message.replace'
     && event.type !== 'reasoning.replace'
     && event.type !== 'message.started'
+    && event.type !== 'message.finished'
 }

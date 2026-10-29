@@ -20,6 +20,49 @@ import { Transcript } from '../presentation/tui/transcript/container.js';
 
 const quietHooks = { dispatch: async () => ({ decision: "allow" as const }) } as unknown as HookDispatcher;
 
+it('settles terminal reasoning tails before stop hooks finish in the actual response loop', async () => {
+  const sessionId = 'responses-final-reasoning-clock';
+  const reasoning = { id: 'rs_tail', type: 'reasoning', summary: [{ type: 'summary_text', text: 'Plan more' }] };
+  const answer = { id: 'msg_tail', type: 'message', role: 'assistant', status: 'completed',
+    content: [{ type: 'output_text', text: 'Answer' }] };
+  const events = [
+    { type: 'response.output_item.added', output_index: 0, item: { ...reasoning, summary: [] } },
+    { type: 'response.reasoning_summary_text.delta', output_index: 0, item_id: reasoning.id, summary_index: 0, delta: 'Plan ' },
+    { type: 'response.output_item.added', output_index: 1, item: { ...answer, content: [] } },
+    { type: 'response.output_text.delta', output_index: 1, item_id: answer.id, content_index: 0, delta: 'Answer' },
+    { type: 'response.completed', response: { id: 'resp_tail', model: 'm', status: 'completed', output: [reasoning, answer] } },
+  ];
+  const step = createStepFunction({ provider: { provider: 'fixture', model: 'm', endpoint: 'openai-responses',
+    baseUrl: 'https://fixture.invalid/v1', headers: {} }, sessionId, workspaceRoot: process.cwd(), systemPrompt: '', tools: [],
+    fetchImpl: async () => new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(''),
+      { headers: { 'content-type': 'text/event-stream' } }) });
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const dispatch = vi.fn(async (event: { eventName: string }) => {
+    if (event.eventName === 'Stop') await held;
+    return { decision: 'allow' as const };
+  });
+  const transcript = new Transcript();
+  const sink = new TurnSink(transcript, () => {});
+  sink.begin('turn', 'turn');
+  const draining = (async () => {
+    for await (const event of runTurn(options({ sessionId, step, hooks: { dispatch } as unknown as HookDispatcher })).events) {
+      sink.handleEvent(event);
+    }
+  })();
+  try {
+    await vi.waitFor(() => expect(dispatch.mock.calls.some(([event]) => event.eventName === 'Stop')).toBe(true));
+    const thinking = transcript.all().find(block => block.kind === 'thinking')!;
+    expect(thinking.text).toBe('Plan more');
+    expect(thinking.finalized).toBe(true);
+    expect(sink.activity()?.label).toBe('working');
+    const elapsed = thinking.elapsedMs;
+    sink.think();
+    expect(thinking.elapsedMs).toBe(elapsed);
+    expect(transcript.all().find(block => block.kind === 'assistant')?.finalized).toBe(true);
+  } finally { release(); await draining; sink.end(); resetSessionUsage(sessionId); }
+});
+
 it('keeps verified reasoning in its own model message through the real tool loop and sink', async () => {
   const sessionId = 'responses-display-message-boundary';
   const outputs: Record<string, unknown>[][] = [];
