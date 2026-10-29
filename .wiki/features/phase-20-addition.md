@@ -2970,7 +2970,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **一条被排除的假设**：`Editor.scrollOffset` 不会在"空草稿 + 小窗口"下自己产生偏移。`editor.ts:302-305` 的分支在 `rendered.length <= maxRows` 时把 `scrollOffset` 归零，而空草稿只有一行；只有当草稿行数真的超过行预算时才会保留非零偏移，且随后被夹到 `[0, maxScroll]`（`:315-317`）。所以"进入即偏移"不能由 `scrollOffset` 单独解释，必须有一个把内容或光标位置错置的上游步骤（`viewportUnplaced` 或 transcript 填充行）。下一轮应先补一条启动几何夹具，把这两个上游各自固定下来，再决定改哪里。
 
-**修复方向**：把 `Editor.scrollOffset` 的生命周期绑到布局身份（文本 + 宽度 + 行预算），而不是实例字段；`MainScreenPainter` 在 `viewportUnplaced` 的第一帧应先用 `reanchor()` 重新建立位置，再绘制 composer；并补一条启动几何测试：给定历史 + 空草稿，composer 的首行必须紧贴最后一条历史行。
+**修复方向**：先补一条启动几何夹具（给定历史 + 空草稿 + 一次模式切换，断言 composer 首行紧贴最后一条历史行），把"transcript 填充行"与"`viewportUnplaced` 首次定位"分别固定下来，再决定改哪一处。注意 `reanchor` 目前只出现在 `mainScreen.ts:32` 的注释里，**没有实现**——`viewportUnplaced` 之后没有任何重建位置的代码路径（`reanchor` 是文档承诺而非既有能力），所以不能把它当成现成的修复点。
 
 **证据边界**：未在真实终端复现；上述为源码链路推断，需要用户确认 `tuiMode` 与是否伴随 `--resume`。
 
