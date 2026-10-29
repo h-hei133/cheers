@@ -10094,3 +10094,13 @@ Settings保留全部真实文件字段，模型/effort会话跳转归Session分�
 延迟读回上批`288e9fc5f47bfd86e179c4f0a0d0db568324a170`的[CI40903192541](https://github.com/h-hei133/cheers/actions/runs/40903192541)与[Watch40903192491](https://github.com/h-hei133/cheers/actions/runs/40903192491)均completed/success，headSha精确一致。本批commit/push/CI随后分别读回，前一SHA绿色不替代本批。保留原CLAUDE.md，scratch清理后提交。
 
 最终staged检查新protocol末尾多余空行，删除后重建：artifact `0277cf87c40560c30d96283908aa483419cb54e1da8f37f4aa96835ebfe5f646`，inputs `bc1adb529ef0e1554febbb9f2309b07dbf505a43b787fe27ada3988c353e5223`，460 compilerInputs/3545文件新鲜度一致。此前3c939为前一构建，行为不变；未因空白变化重跑测试。scratch已清理，最终staged diff通过。
+
+上述实现已提交推送`3531e3c17a7ca8f76ef9ffdbaef3858a14da34c6`，远端main精确同SHA；当时只剩原CLAUDE.md。[Watch40914893120](https://github.com/h-hei133/cheers/actions/runs/40914893120)completed/success；[CI40914893093](https://github.com/h-hei133/cheers/actions/runs/40914893093)延后读回仍in_progress，不计success。
+
+## [2026-10-30] fix | Google native摘要独立于自动thinking budget
+
+继续[addition20.12](features/phase-20-addition.md#2012-google原生公开thought-summary与动态budget)。实际官方GenerateContent字段与Vertex模型指南支持includeThoughts独立于budget；主thinking页面已转Interactions，未复制thinking_summaries。只为google-ai/vertex精确2.5Pro/Flash声明已知summary compat，默认effort不改；精确官方GenAI根/Vertex捕获resource+host/location限制canonical metadata，relay精确alias自行声明，匿名/Google compatible/account/未知模型不推断。Google wire与两native wrapper透传既有reasoningSummary；true无budget只发includeThoughts，false/unknown无budget省略，false显式budget保留budget并抑制摘要，unknown budget沿旧合同。refresh原逻辑不变。无summary的正常答案仍成功。
+
+主代理231项去重聚焦串行通过：shape31/catalog20/GenAI38/Vertex13/googleRequests10/turn protocol13/preview95/account5/auth target6。turn含八次native模型/auto组合但按两个用例计数，side/compaction形状与preview四组完整派发一致。两初次turn失败因新夹具忽略既有temperature0.7，补精确body后13通过。四类反转summary2/host1/Vertex1/preview透传2有效失败，全部字节恢复后shape31/body38/filtered preview4重验73通过，91未选不计；无timeout/zero-test/OOM。两个gpt-6.1-sol代理仅读/编辑无验证，交叉review不作独立终局验收。
+
+五静态门、完整声明图单一脚本、module facade0、AST≤20与diff通过；catalog8/protocol3/googleWire15/GenAI5/Vertex9。TS build `bf7cfd1f79433711a1caf7262ff94a1813eba154fc7915e859a7eac627dee35b`，inputs `f8ba10bb9699f271a18a1cd2ae7c49b962c5aeb2892e784483ed5b71efafc358`，460/3545重新计算一致；repo bundle judge proven/0open/0failed/0gap仅证collector。没有live Google/Vertex、真实signer/账户可用性或终端/full suite验证，2.5当前访问限制与能力证据分开；原47项未重验、ADD active。HANDOFF记公开摘要/budget/API合同区别，scratch清理后提交，Git/精确SHA CI另读回。

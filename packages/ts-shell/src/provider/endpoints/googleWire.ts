@@ -176,10 +176,13 @@ export function convertTools(
   ];
 }
 
-/** Where the thinking budget is stated, when a level was requested. */
-export function thinkingConfigFor(budgetTokens: number | undefined): Record<string, unknown> | undefined {
-  if (budgetTokens === undefined) return undefined;
-  return { thinkingConfig: { thinkingBudget: budgetTokens, includeThoughts: true } };
+/** Visible summaries can be requested while the provider retains its thinking budget. */
+export function thinkingConfigFor(budgetTokens: number | undefined, summary?: boolean): Record<string, unknown> | undefined {
+  if (budgetTokens === undefined && summary !== true) return undefined;
+  return { thinkingConfig: {
+    ...(budgetTokens !== undefined ? { thinkingBudget: budgetTokens } : {}),
+    includeThoughts: summary ?? true,
+  } };
 }
 
 /** A response's chunks, as the protocol frames them. */
@@ -435,6 +438,7 @@ export function googleBody(input: {
   readonly topP?: number;
   readonly maxOutputTokens?: number;
   readonly thinkingBudgetTokens?: number;
+  readonly reasoningSummary?: boolean;
 }): GoogleRequestBody {
   const tools = input.allowTools ? convertTools(input.tools) : undefined;
   return {
@@ -449,7 +453,7 @@ export function googleBody(input: {
       ...(input.supportsTemperature !== false && input.temperature !== undefined ? { temperature: input.temperature } : {}),
       ...(input.topP !== undefined ? { topP: input.topP } : {}),
       ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
-      ...(thinkingConfigFor(input.thinkingBudgetTokens) ?? {}),
+      ...(thinkingConfigFor(input.thinkingBudgetTokens, input.reasoningSummary) ?? {}),
     },
     ...(tools ? { tools } : {}),
     // Stated rather than left to the provider: the caller decides whether this

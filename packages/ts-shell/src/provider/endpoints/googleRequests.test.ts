@@ -3,6 +3,8 @@ import { requestSimpleCompletion } from "../request/completion.js";
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
 import { createStepFunction } from "../../turn/step.js";
 import { endpointUrl } from "./index.js";
+import { BUILTIN_PROVIDERS } from '../../core/models/catalog.js';
+import { resolveRequestShape } from '../../core/models/requestShape.js';
 
 const answer = { candidates: [{ content: { parts: [{ text: "paired answer" }] }, finishReason: "STOP" }] };
 // Return the wire format selected by the URL, so a caller using the wrong
@@ -79,4 +81,23 @@ describe.each([
       expect(url).toBe(`${baseUrl}${prefix}model%2Fwith%20%3Fquery:${stream ? "streamGenerateContent?alt=sse" : "generateContent"}`);
     }
   });
+});
+
+it.each([
+  ['google-ai', 'google-generative-ai', 'https://generativelanguage.googleapis.com'],
+  ['vertex', 'google-vertex', 'https://aiplatform.googleapis.com/v1/projects/synthetic/locations/global/publishers/google/models'],
+])('carries the same admitted summary shape through side questions and compaction for %s', async (providerId, endpoint, baseUrl) => {
+  const model = 'gemini-2.5-pro';
+  const shape = resolveRequestShape(BUILTIN_PROVIDERS, providerId, model, undefined, baseUrl, endpoint);
+  const provider = { providerId, endpoint, baseUrl, model, headers: {} };
+  const captured = transport();
+  const messages = [{ role: 'user' as const, content: 'hello' }];
+  expect(await requestSimpleCompletion({ provider: { ...provider, fetchImpl: captured.fetchImpl }, shape, messages })).toBe('paired answer');
+  expect(await requestCompactionSummary({ provider: { ...provider, shape }, messages, fetchImpl: captured.fetchImpl })).toContain('paired answer');
+  expect(captured.requests).toHaveLength(2);
+  for (const request of captured.requests) {
+    const body = JSON.parse(String(request.body));
+    expect(body.generationConfig.thinkingConfig).toEqual({ includeThoughts: true });
+    expect(body.tools).toBeUndefined();
+  }
 });

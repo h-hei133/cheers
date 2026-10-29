@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { endpointShape, endpointTurnBody, endpointUrl } from "./index.js";
+import { endpointBody, endpointShape, endpointTurnBody, endpointUrl } from "./index.js";
 import type { TurnRequest } from "./kinds.js";
 
 /**
@@ -76,6 +76,36 @@ describe("the URL and headers", () => {
 });
 
 describe("the request body", () => {
+  it.each(['google-generative-ai', 'google-vertex'])('requests %s summaries separately from the thinking budget', endpoint => {
+    for (const build of [endpointBody, endpointTurnBody]) {
+      const config = (summary: boolean | undefined, budget?: number) => build(endpoint, {
+        ...BASE, reasoningSummary: summary, ...(budget !== undefined ? { thinkingBudgetTokens: budget } : {}),
+      }).generationConfig as Record<string, unknown>;
+      expect(config(true).thinkingConfig).toEqual({ includeThoughts: true });
+      expect(config(false)).not.toHaveProperty('thinkingConfig');
+      expect(config(undefined)).not.toHaveProperty('thinkingConfig');
+      expect(config(true, 2_048).thinkingConfig).toEqual({ thinkingBudget: 2_048, includeThoughts: true });
+      expect(config(false, 2_048).thinkingConfig).toEqual({ thinkingBudget: 2_048, includeThoughts: false });
+      expect(config(undefined, 2_048).thinkingConfig).toEqual({ thinkingBudget: 2_048, includeThoughts: true });
+      expect(config(true)).not.toHaveProperty('thinkingConfig.thinkingBudget');
+      expect(config(true)).not.toHaveProperty('thinkingConfig.thinkingLevel');
+      expect(config(true)).not.toHaveProperty('thinkingConfig.thinking_summaries');
+      expect(config(true)).toHaveProperty('maxOutputTokens', BASE.maxOutputTokens);
+    }
+  });
+
+  it.each(['google-generative-ai', 'google-vertex'])('keeps %s refresh admission tied to the original budget and model', endpoint => {
+    const refresh = endpointShape(endpoint).refreshBody!;
+    for (const summary of [true, false, undefined]) {
+      const body = endpointTurnBody(endpoint, { ...BASE, reasoningSummary: summary });
+      expect(refresh(body, {})).toBeUndefined();
+      expect(refresh(body, { reasoning: false })).toEqual({ ...body,
+        generationConfig: { ...(body.generationConfig as Record<string, unknown>), maxOutputTokens: 1 } });
+      const budget = endpointTurnBody(endpoint, { ...BASE, reasoningSummary: summary, thinkingBudgetTokens: 2_048 });
+      expect(refresh(budget, { reasoning: false })).toBeUndefined();
+    }
+  });
+
   it("calls the assistant's role something else", () => {
     // Not cosmetic: this protocol has no `assistant` role, and a turn sent as one
     // is rejected.

@@ -270,8 +270,8 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     baseUrl: "https://generativelanguage.googleapis.com",
     envVar: "GEMINI_API_KEY",
     models: [
-      { id: "gemini-2.5-pro", contextWindow: 1_000_000, vision: true },
-      { id: "gemini-2.5-flash", contextWindow: 1_000_000, vision: true },
+      { id: "gemini-2.5-pro", contextWindow: 1_000_000, vision: true, compat: { reasoningSummary: true } },
+      { id: "gemini-2.5-flash", contextWindow: 1_000_000, vision: true, compat: { reasoningSummary: true } },
     ],
   },
   {
@@ -286,8 +286,8 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     // user is worse than nothing: it is copied into a command and sent. The
     // address is built from the environment when the connection is resolved.
     models: [
-      { id: "gemini-2.5-pro", contextWindow: 1_000_000, vision: true },
-      { id: "gemini-2.5-flash", contextWindow: 1_000_000, vision: true },
+      { id: "gemini-2.5-pro", contextWindow: 1_000_000, vision: true, compat: { reasoningSummary: true } },
+      { id: "gemini-2.5-flash", contextWindow: 1_000_000, vision: true, compat: { reasoningSummary: true } },
     ],
   },
   {

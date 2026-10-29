@@ -1140,6 +1140,43 @@ it.each([
   expect(files.map(file => fs.readFileSync(file))).toEqual(before);
 });
 
+it.each([
+  { provider: 'google-ai', endpoint: 'google-generative-ai', baseUrl: 'https://generativelanguage.googleapis.com', thinkingEffort: undefined },
+  { provider: 'google-ai', endpoint: 'google-generative-ai', baseUrl: 'https://generativelanguage.googleapis.com', thinkingEffort: null },
+  { provider: 'vertex', endpoint: 'google-vertex', baseUrl: 'https://aiplatform.googleapis.com/v1/projects/synthetic/locations/global/publishers/google/models', thinkingEffort: undefined },
+  { provider: 'vertex', endpoint: 'google-vertex', baseUrl: 'https://aiplatform.googleapis.com/v1/projects/synthetic/locations/global/publishers/google/models', thinkingEffort: null },
+] as const)('keeps automatic Google thought-summary preview identical to dispatch for $provider/$thinkingEffort', async target => {
+  const { context, cwd, session, load, layout } = fixture({ credential: true });
+  const model = 'gemini-2.5-pro';
+  const resolution = { provider: target.provider, model, baseUrl: target.baseUrl, thinkingEffort: target.thinkingEffort,
+    expectedEnvVarName: 'SYNTHETIC_GOOGLE', credential: { provider: target.provider, authMode: 'api-key' as const,
+      apiKey: 'synthetic-preview-target', model, baseUrl: target.baseUrl, source: 'config' as const, envVarName: 'SYNTHETIC_GOOGLE' } };
+  Object.assign(context, { resolveConfigTarget: () => resolution,
+    configuration: new ConfigState(context.runtimeConfig, configurationBinding(context), BUILTIN_PROVIDERS) });
+  const files = [layout.metadataPath, layout.statePath, layout.transcriptPath];
+  const before = files.map(file => fs.readFileSync(file));
+  const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+  const preview = await load('question'); preview.verify();
+  const [endpoint, input] = wire.mock.calls.at(-1)!;
+  const body = JSON.parse(JSON.stringify(wire.mock.results.at(-1)!.value));
+  expect(endpoint).toBe(target.endpoint);
+  expect(body.generationConfig.thinkingConfig).toEqual({ includeThoughts: true });
+  let dispatched: Record<string, unknown> | undefined;
+  const step = createStepFunction({ workspaceRoot: cwd, sessionId: session.id, catalog: BUILTIN_PROVIDERS,
+    ...captureThinkingPreference(cwd, target.thinkingEffort), provider: { provider: target.provider, model,
+      baseUrl: target.baseUrl, endpoint, replayBinding: input.replayBinding }, systemPrompt: input.systemPrompt, tools: input.tools,
+    temperature: input.temperature, topP: input.topP, maxOutputTokens: input.maxOutputTokens,
+    fetchImpl: async (_url, init) => {
+      dispatched = JSON.parse(String(init?.body));
+      const frame = { candidates: [{ content: { parts: [{ text: 'answer' }] }, finishReason: 'STOP' }] };
+      return new Response(`data: ${JSON.stringify(frame)}\n\n`, { headers: { 'content-type': 'text/event-stream' } });
+    },
+  });
+  expect((await step(input.messages, undefined, {}, { allowTools: input.allowTools })).text).toBe('answer');
+  expect(dispatched).toEqual(body);
+  expect(files.map(file => fs.readFileSync(file))).toEqual(before);
+});
+
 it('keeps preview and dispatch on the session-affine account-pool member', async () => {
   const { cwd, context, session, manager, load } = fixture();
   const requests: Record<string, unknown>[] = [];

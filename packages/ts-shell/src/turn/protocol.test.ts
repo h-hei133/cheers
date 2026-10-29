@@ -75,6 +75,59 @@ it('does not request native summaries for an anonymous Responses relay using uni
   expect(body).not.toHaveProperty('reasoning');
 });
 
+it.each([
+  { provider: 'google-ai', endpoint: 'google-generative-ai', baseUrl: 'https://generativelanguage.googleapis.com' },
+  { provider: 'vertex', endpoint: 'google-vertex', baseUrl: 'https://aiplatform.googleapis.com/v1/projects/synthetic/locations/global/publishers/google/models' },
+])('keeps automatic native Google summaries separate from an effort for $provider', async target => {
+  for (const model of ['gemini-2.5-pro', 'gemini-2.5-flash']) for (const thinkingEffort of [undefined, null] as const) {
+    let body: Record<string, unknown> | undefined;
+    const thought = 'Public thought summary';
+    const frame = { candidates: [{ content: { parts: [{ text: thought, thought: true }, { text: 'answer' }] }, finishReason: 'STOP' }] };
+    const step = createStepFunction({ workspaceRoot, sessionId: 'google-summary', systemPrompt: '', tools: [],
+      catalog: BUILTIN_PROVIDERS, thinkingEffort, provider: { ...target, model },
+      fetchImpl: async (url, init) => {
+        expect(String(url)).toContain(':streamGenerateContent?alt=sse');
+        body = JSON.parse(String(init?.body));
+        return new Response(`data: ${JSON.stringify(frame)}\n\n`, { headers: { 'content-type': 'text/event-stream' } });
+      },
+    });
+    const visible: string[] = [];
+    const result = await step([], undefined, { onReasoning: text => { visible.push(text); } }, { allowTools: false });
+    expect(body?.generationConfig).toEqual({ temperature: 0.7, thinkingConfig: { includeThoughts: true } });
+    expect(result.text).toBe('answer'); expect(result.reasoning?.text).toBe(thought);
+    expect(visible.join('')).toBe(thought);
+  }
+});
+
+it.each([
+  { provider: 'google-ai', model: 'gemini-2.5-pro', baseUrl: 'https://relay.invalid', endpoint: 'google-generative-ai' },
+  { provider: undefined, model: 'gemini-2.5-pro', baseUrl: 'https://relay.invalid', endpoint: 'google-generative-ai' },
+  { provider: 'google-ai', model: 'unlisted', baseUrl: 'https://generativelanguage.googleapis.com', endpoint: 'google-generative-ai' },
+  { provider: 'vertex', model: 'gemini-2.5-pro', baseUrl: 'https://relay.invalid/v1/projects/p/locations/global/publishers/google/models', endpoint: 'google-vertex' },
+])('does not grant native Google summaries to an unproven turn target %j', async target => {
+  let body: Record<string, unknown> | undefined;
+  const step = createStepFunction({ workspaceRoot, sessionId: 'unproven-google-summary', systemPrompt: '', tools: [],
+    catalog: BUILTIN_PROVIDERS, thinkingEffort: null, provider: target,
+    fetchImpl: async (_url, init) => {
+      body = JSON.parse(String(init?.body));
+      return Response.json({ candidates: [{ content: { parts: [{ text: 'answer' }] }, finishReason: 'STOP' }] });
+    },
+  });
+  expect((await step([], undefined, {}, { allowTools: false })).text).toBe('answer');
+  expect(body?.generationConfig).not.toHaveProperty('thinkingConfig');
+});
+
+it('accepts a native Google answer when an admitted summary is unavailable', async () => {
+  const step = createStepFunction({ workspaceRoot, sessionId: 'empty-google-summary', systemPrompt: '', tools: [],
+    catalog: BUILTIN_PROVIDERS, thinkingEffort: null, provider: { provider: 'google-ai', model: 'gemini-2.5-flash',
+      baseUrl: 'https://generativelanguage.googleapis.com', endpoint: 'google-generative-ai' },
+    fetchImpl: async () => Response.json({ candidates: [{ content: { parts: [{ text: 'answer' }] }, finishReason: 'STOP' }] }),
+  });
+  const result = await step([], undefined, {}, { allowTools: false });
+  expect(result.text).toBe('answer'); expect(result.stopReason).not.toBe('error');
+  expect(result.reasoning).toBeUndefined();
+});
+
 it('requests summary-only reasoning through the captured ChatGPT issuer route', async () => {
   const target = { provider: 'openai', model: 'o4-mini', credential: { provider: 'openai' as const,
     source: 'config' as const, envVarName: 'OPENAI_API_KEY', authMode: 'account-auth' as const,

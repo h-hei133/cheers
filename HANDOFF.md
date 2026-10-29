@@ -866,3 +866,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An anonymous Responses relay gains automatic native summary controls merely because its model ID uniquely matches a built-in entry.
 - **Root Cause**: Existing unique-model shape fallback is reused as evidence for a new provider- and address-bound capability.
 - **Rule**: Preserve existing model fallback flags but require a resolved provider owner, captured address and admitted protocol before granting new summary support. Keep an anonymous explicit Responses relay negative at the actual turn boundary.
+
+### Summary Opt-In Is Not A Thinking Budget Or A Different API
+- **Symptom**: Native Google requests under automatic effort may reason internally without returning public summaries, or a documentation update leads to Interactions fields being sent to GenerateContent.
+- **Root Cause**: Public `includeThoughts` is coupled to a selected budget; similarly named current documentation describes a different API's request contract.
+- **Rule**: Preserve provider-decided budget and request known supported summaries independently. Verify the actual endpoint's API schema and exact model support; do not infer visible text from encrypted signatures, summary opt-in or internal thought token counts. Bind native capability to the captured official owner/resource, and retain unknown/account/relay boundaries.

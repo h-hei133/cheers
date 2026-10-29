@@ -3172,7 +3172,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 反馈 | 当前状态 | 下一步 |
 |---|---|---|
 | 24 | 本地实现与聚焦验证 | 缺真实终端/用户目录审批现场与非Linux文件系统证据 |
-| 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses摘要准入已实现；auto保留，整体partial | 其他模型/协议默认与公开内容、真实provider/账户及用户终端复验 |
+| 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses/Google native摘要准入已实现；auto保留，整体partial | 其他模型/协议默认与公开内容、真实provider/账户及用户终端复验 |
 | 26 | 四条明确机制已修；本地验证 | 缺真实用户退出现场；MCP预算到期不能证明清理完成 |
 | 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
 | 28 | 会话入口与配置字段分类隔离已实施；本地聚焦验证 | 缺真实用户终端与整体面板现场验收 |
@@ -3282,3 +3282,17 @@ catalog成功load才授予offered ID，load前和失败时撤销；未提供的c
 最终集成五静态门、完整声明图单一用例、module facade0与diff通过（118旧docs-source advisory保留）。TS build `3c939881919f32b85a8da3824656d83d475a200d6e02dfd7522e0f500639dcb8`，inputs `e7698f8cfe402954cddbcc332ef43ccf3e756fa2ebf225c60252930fe3c3d36d`，重算460 compilerInputs与3545输入文件一致。新鲜度检查初次错用root dist路径，ENOENT属于诊断调用错误；改为实际package dist后通过，未改build行为。repo bundle NormProof proven/0open/0failed/0gap只证collector结构。三个gpt-6.1-sol代理仅阅读/编辑，全部验证由主代理单进程串行，无全套/PTY/exe/20k真实终端或live provider；原47项矩阵未重跑，ADD仍active。精确commit/push与CI另以日志读回绑定。
 
 staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重新构建并重算新鲜度：最终artifact `0277cf87c40560c30d96283908aa483419cb54e1da8f37f4aa96835ebfe5f646`，inputs `bc1adb529ef0e1554febbb9f2309b07dbf505a43b787fe27ada3988c353e5223`，460/3545一致。此前3c939为相同行为的前一构建；仅空白变化未重跑行为测试，最终staged diff通过。
+
+### 20.12 Google原生公开thought summary与动态budget
+
+继续反馈25的逐协议复核。[GenerateContent API](https://ai.google.dev/api/generate-content)实际读取：`includeThoughts`独立于`thinkingBudget`，只在可用时返回thoughts；[Vertex thinking指南](https://cloud.google.com/vertex-ai/generative-ai/docs/thinking)当前重定向至[模型指南](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/thinking)，其native JavaScript例子在`gemini-2.5-pro`只设置`thinkingConfig:{includeThoughts:true}`，不声明budget/level。2.5 Pro/Flash默认dynamic thinking、Pro不可关闭，公开summaries支持2.5及以后。[Pro](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-pro)与[Flash](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash)准确模型页确认thinking支持，同时当前访问限已活跃使用的用户；能力不等于本账户可用。[主thinking指南](https://ai.google.dev/gemini-api/docs/thinking)已转Interactions，其`thinking_summaries:'auto'`不能复制到本项目GenerateContent请求。
+
+目标检查后定向只读对照pi的`packages/ai/src/api/google-generative-ai.ts:398–405`及`google-vertex.ts:503–510`，二者先`includeThoughts:true`再按已有值加level/budget；oh-my-pi `packages/ai/src/providers/google-shared.ts:950–964`同样独立summary显示。参考的无effort禁用策略不替换本项目provider-decides auto。thought:true的公开正文与加密thoughtSignature分开，收到签名不补造正文。
+
+[catalog](../../packages/ts-shell/src/core/models/catalog.ts)仅为`google-ai`/`vertex`的精确`gemini-2.5-pro`、`gemini-2.5-flash`声明既有`compat.reasoningSummary:true`，不添加reasoning字段或改变effort选择。import-free [protocol](../../packages/ts-shell/src/core/models/protocol.ts)将canonical各owner限于自己endpoint与地址：google-ai精确HTTPS官方根；Vertex以捕获的project/location/publisher resource和对应global/region主机匹配，默认443允许，其他端口、userinfo、query/hash、伪后缀、location不一致与原始路径逃逸拒绝。custom relay沿精确alias及其显式能力准入，匿名不授予，Google compatible/account/未列模型保持未知。
+
+[googleWire](../../packages/ts-shell/src/provider/endpoints/googleWire.ts)复用reasoningSummary三态并由[GenAI](../../packages/ts-shell/src/provider/endpoints/googleGenAI.ts)/[Vertex](../../packages/ts-shell/src/provider/endpoints/googleVertex.ts)转发：true+无budget只发`includeThoughts:true`；false/unknown+无budget省略thinkingConfig；false+原显式budget保留budget并`includeThoughts:false`；unknown+原budget保留旧true合同。未发Interactions字段或伪造默认budget/level。refresh实现逐字未改，summary不改变原budget/model的有界准入。公开摘要缺席的正常答案仍可成功，不承诺请求即有正文。
+
+主代理package-local、显式每次一个文件、768MiB/threads=false &&串行共231项去重通过：requestShape31/catalogShape20/googleGenAI38/googleVertex13/googleRequests10/turn protocol13/preview95/googleAccount5/auth target6。实际turn覆盖两provider×两model×unset/null（八次synthetic请求在两个用例内，按用例数计13而非调用数）；负向relay/匿名/未知与无summary成功；simple/compaction同shape；preview四组完整body与实际dispatch逐值相同且session文件不写。初次turn新夹具未计既有默认temperature0.7，两项失败属fixture遗漏，补完整body精确断言后13通过。四类反转summary传播2、官方host1、Vertex资源1、GenAI preview透传2均有效失败且字节恢复；恢复后shape31/body38/filtered preview4重验73项，另91项未选不计新通过。没有timeout/OOM或zero-test反转。
+
+五静态门、完整声明图单一脚本、module facade0、diff与AST通过：catalog8/protocol3/googleWire15/GenAI5/Vertex9，均≤20。1536MiB TS build `bf7cfd1f79433711a1caf7262ff94a1813eba154fc7915e859a7eac627dee35b`，inputs `f8ba10bb9699f271a18a1cd2ae7c49b962c5aeb2892e784483ed5b71efafc358`，460 compilerInputs/3545文件重算一致；repo bundle judge proven/0open/0failed/0gap仅证collector结构。两个gpt-6.1-sol代理仅读/编辑，所有验证由主代理串行。无live Google/Vertex、真实token signer/账户可用性、PTY/exe或全套；原47项矩阵未重跑，feedback25 partial、ADD active。Git与CI另由日志精确绑定。

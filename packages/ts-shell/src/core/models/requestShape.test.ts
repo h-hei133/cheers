@@ -23,6 +23,77 @@ function catalogWith(model: Record<string, unknown>): readonly CatalogProvider[]
 }
 
 describe("resolveRequestShape", () => {
+  it.each(['gemini-2.5-pro', 'gemini-2.5-flash'])('admits native %s summaries without setting effort or budget', model => {
+    for (const [provider, address] of [
+      ['google-ai', 'https://generativelanguage.googleapis.com/'],
+      ['vertex', 'https://aiplatform.googleapis.com/v1/projects/synthetic-project/locations/global/publishers/google/models/'],
+      ['vertex', 'https://us-central1-aiplatform.googleapis.com/v1/projects/123456/locations/us-central1/publishers/google/models'],
+      ['vertex', 'https://europe-west4-aiplatform.googleapis.com:443/v1/projects/synthetic-project/locations/europe-west4/publishers/google/models'],
+    ] as const) {
+      const shape = resolveRequestShape(BUILTIN_PROVIDERS, provider, model, undefined, address);
+      expect(shape.reasoningSummary).toBe(true);
+      expect(shape.thinkingLevelName).toBeUndefined(); expect(shape.thinkingBudgetTokens).toBeUndefined();
+    }
+  });
+
+  it('does not infer native summary support for compatible, account, unknown or anonymous Google targets', () => {
+    for (const [provider, model, address, endpoint] of [
+      ['google', 'gemini-2.5-pro', undefined, undefined],
+      ['google-ai', 'gemini-3-pro', undefined, undefined],
+      ['google-ai', 'unknown', undefined, undefined],
+      ['google-ai', 'gemini-2.5-pro', 'https://generativelanguage.googleapis.com', 'google-account-generative-ai'],
+      ['', 'gemini-2.5-pro', undefined, 'google-generative-ai'],
+      ['openai', 'o4-mini', 'https://generativelanguage.googleapis.com', 'google-generative-ai'],
+      ['google-ai', 'gemini-2.5-pro', 'https://api.openai.com/v1', 'openai-responses'],
+    ] as const) {
+      expect(resolveRequestShape(BUILTIN_PROVIDERS, provider, model, undefined, address, endpoint).reasoningSummary).toBeUndefined();
+    }
+  });
+
+  it('keeps canonical Google summaries confined to the official native address', () => {
+    for (const address of ['https://relay.invalid', 'http://generativelanguage.googleapis.com',
+      'https://generativelanguage.googleapis.com.evil.invalid', 'https://generativelanguage.googleapis.com/v1beta',
+      'https://generativelanguage.googleapis.com?route=1', 'https://generativelanguage.googleapis.com/#section',
+      'https://synthetic@generativelanguage.googleapis.com', 'https://generativelanguage.googleapis.com:8443']) {
+      expect(resolveRequestShape(BUILTIN_PROVIDERS, 'google-ai', 'gemini-2.5-pro', undefined, address).reasoningSummary).toBeUndefined();
+    }
+  });
+
+  it('requires a captured Vertex resource whose hostname matches its location', () => {
+    const path = '/v1/projects/synthetic-project/locations/global/publishers/google/models';
+    for (const address of [undefined, 'not a URL', `http://aiplatform.googleapis.com${path}`,
+      `https://aiplatform.googleapis.com:8443${path}`, `https://aiplatform.googleapis.com.evil.invalid${path}`,
+      `https://synthetic@aiplatform.googleapis.com${path}`, `https://@aiplatform.googleapis.com${path}`,
+      `https://aiplatform.googleapis.com${path}?route=1`, `https://aiplatform.googleapis.com${path}#section`,
+      `https://aiplatform.googleapis.com${path}?`, `https://aiplatform.googleapis.com${path}#`,
+      `https://global-aiplatform.googleapis.com${path}`, `https://us-central1-aiplatform.googleapis.com${path}`,
+      `https://aiplatform.googleapis.com${path.replace('/global/', '/us-central1/')}`,
+      `https://aiplatform.googleapis.com${path.replace('/synthetic-project/', '//')}`,
+      `https://aiplatform.googleapis.com${path.replace('/global/', '//')}`,
+      `https://aiplatform.googleapis.com${path.replace('/google/', '/foreign/')}`,
+      `https://aiplatform.googleapis.com${path}/gemini-2.5-pro`,
+      `https://aiplatform.googleapis.com${path.replace('/synthetic-project/', '/synthetic%2Fproject/')}`,
+      `https://aiplatform.googleapis.com${path.replace('/synthetic-project/', '/synthetic/../synthetic-project/')}`]) {
+      expect(resolveRequestShape(BUILTIN_PROVIDERS, 'vertex', 'gemini-2.5-pro', undefined, address).reasoningSummary).toBeUndefined();
+    }
+  });
+
+  it.each([['google-ai', 'google-generative-ai'], ['vertex', 'google-vertex']] as const)(
+    'retains %s summary refusal and admits only the exact relay alias declarations', (provider, endpoint) => {
+    const address = 'https://relay.invalid/native';
+    const models = [{ id: 'gemini-2.5-pro' }];
+    const alias = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'relay', runtime: provider, baseUrl: address, endpoint, models }]);
+    expect(resolveRequestShape(alias, provider, 'gemini-2.5-pro', undefined, address).reasoningSummary).toBeUndefined();
+    const admitted = mergeProviders(alias, [{ id: 'relay', models: [{ id: models[0]!.id, compat: { reasoningSummary: true } }] }]);
+    expect(resolveRequestShape(admitted, provider, 'gemini-2.5-pro', undefined, address).reasoningSummary).toBe(true);
+    expect(resolveRequestShape(admitted, provider, 'gemini-2.5-pro', undefined, 'https://other.invalid/native').reasoningSummary).toBeUndefined();
+    const refused = mergeProviders(BUILTIN_PROVIDERS, [{ id: provider, models: [{ id: models[0]!.id, compat: { reasoningSummary: false } }] }]);
+    const shape = resolveRequestShape(refused, provider, 'gemini-2.5-pro', 'high');
+    expect(shape.reasoningSummary).toBe(false); expect(shape.thinkingBudgetTokens).toBe(16_384);
+    expect(resolveRequestShape([...admitted, { ...admitted.at(-1)!, id: 'duplicate' }],
+      provider, 'gemini-2.5-pro', undefined, address).reasoningSummary).toBeUndefined();
+  });
+
   it('requests native visible summaries without selecting an effort or a budget', () => {
     const shape = resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'o4-mini', undefined, 'https://api.openai.com/v1/');
     expect(shape.reasoningSummary).toBe(true);
