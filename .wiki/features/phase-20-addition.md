@@ -3067,7 +3067,40 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **证据边界**：未复现；上述为源码链路与 HANDOFF 既有记录的一致性推断。
 
-### 19.8 本轮结论摘要与实施顺序
+### 19.8 研究过程中新发现：损坏的用量键让恢复路径抛出未捕获拒绝
+
+这一项不在用户列表里，是在核查第二十五、第三十条时从 `~/.cheers/crashes.json` 读到的**真实记录**：
+
+```
+2026-10-29T05:30:55.648Z  unhandled-rejection  Invalid persisted session usage key
+```
+
+该文件共 5 条记录，4 条 `uncaught-exception`（含 `write EPIPE`）、1 条 `unhandled-rejection`，日期分布在 9/24–9/27 与 10/29。今天的这一条是本轮唯一能定位到具体代码的。
+
+**机制（已确认）**
+
+`decodeAttribution`（`observability/usage/identity.ts:63-70`）对 `namespace` 前缀的键做严格校验：只要键以 `namespace` 开头却不是 `legacyPrefix`，或 JSON 解出的值再编码后与键不一致，就 `throw new Error('Invalid persisted session usage key')`。
+
+调用链：
+
+- `restoreSessionUsage`（`observability/usageTelemetry.ts:355-364`）直接调用 `decodeUsageSnapshot(snapshot)`，**没有 try/catch**。
+- `decodeUsageSnapshot`（`observability/usage/snapshot.ts:19-40`）逐键调用 `decodeAttribution`（`:29`）。
+- `persistSessionUsage`（`usageTelemetry.ts:370-386`）同样无保护，且它在 `:384` 用 `!` 断言解码成功——若数据在两次解码之间被改写，这里会抛 TypeError 而不是给出可读错误。
+
+**为什么是 unhandled rejection**：`installCrashRecorder` 对 `unhandledRejection` 的策略是**记录后继续运行**（`observability/crashLog.ts` 的注释明确写了这一点），所以进程没死，会话也没丢——但**用量恢复静默失败**，该会话的 token 计数与成本从零开始。用户看到的是"数字不对"，而崩溃日志里只留一条记录。
+
+**为什么键会损坏**：`namespace` 前缀的键由 `attributedBucketKey` 生成（`identity.ts:58-61`），其输入包含 `ratesSnapshot(attribution.rates)`。当目录价格刷新、`models.dev` 缓存更新或用户改了 relay 定价时，**同一会话的旧键会与新算法算出的键不一致**；而 `decodeAttribution` 把这种"算法演进"当成"数据损坏"。
+
+**修复方向**：
+
+1. `restoreSessionUsage` 与 `persistSessionUsage` 对解码失败应**降级而非抛出**：丢弃该会话的用量快照并记一条可读警告（"persisted usage could not be decoded; counters restart"），而不是让拒绝逃逸到全局。
+2. `decodeUsageSnapshot` 对**单个坏键**应跳过并计数，而不是让整份快照失败——一个损坏的 bucket 不该抹掉其余 bucket。
+3. `decodeAttribution` 的严格校验保留（它是防篡改边界），但调用方必须把它当"可失败输入"，不是"必然成功"。
+4. 若确认是 `ratesSnapshot` 演进导致，应给键加版本位并保留对旧版本的解码能力，而不是让旧会话的键永久失效。
+
+**证据边界**：崩溃记录真实存在且时间与用户本轮反馈同日；但"是 `ratesSnapshot` 演进导致键不一致"是**推断**，未取到那条损坏的 state 文件原文（用户会话可能已被后续写入覆盖）。修复前应先加一条诊断：解码失败时记录键的前缀与长度，而不是记录键本身（键含 provider/model 摘要，不属机密但无必要外泄）。
+
+### 19.9 本轮结论摘要与实施顺序
 
 | 编号 | 判定 | 主要证据 | 实施优先级 |
 |---|---|---|---|
@@ -3078,10 +3111,11 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 28 | 确认：无 `/config`；模型行为字段在 settings、目录在 model，effort 三入口 | `settings.ts:78`、`picker/settings.ts:253-257`、`picker/model.ts:206` | P2（结构） |
 | 29 | 确认：搜索全量重扫（实测 0.87–1.03 s/次） | `listing.ts:69-73`、`catalog/index.ts:261-284` | P0（体验） |
 | 30 | 确认：SIGTERM/SIGHUP 不写 terminated，下次静默重入 | `bootstrap.ts:166/348-356`、`shutdown.ts:18-19` | P0（数据正确性） |
+| 新增 | 确认（真实崩溃日志）：损坏的用量键让恢复路径抛出未捕获拒绝，用量静默归零 | `crashes.json` 2026-10-29、`identity.ts:63-70`、`usageTelemetry.ts:355-364` | P1（数据正确性） |
 
 实施顺序建议：
 
-1. **30 与 26**——退出语义与重入判定，改动小、影响面清晰，且直接消除"旧会话界面"和"退出卡住"两类可复现的困扰。
+1. **30 与 26**——退出语义与重入判定，改动小、影响面清晰，且直接消除"旧会话界面"和"退出卡住"两类可复现的困扰。用量键解码失败（19.8）同属数据正确性且改动局部，可与本组一起做。
 2. **25 的请求侧与恢复侧**——"看不见思考"是用户能直接感知的能力缺失；其中 `restoreConversation` 补 thinking 块是纯增量，风险最低，应先做；请求侧默认档位涉及协议行为，需按供应商逐一验证后再动。
 3. **29**——resume 索引复用，纯性能、无行为变更。
 4. **24**——跨目录写入需要新的审批路径，改动面最大，必须与 19.1 的七条约束一起做，且要同时改写现有断言。
