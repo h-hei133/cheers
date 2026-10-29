@@ -26,7 +26,11 @@ export async function runUndoCommand(args: string[], context: CommandContext): P
   try {
     if (parsed.action.name === 'restore-turn') {
       const executeTurn = parsed.args[0]!;
-      const outcome = await restoreTurn({ context: () => context }, executeTurn, true, undoAccess(context));
+      // The confirmation gate above already returned unless `--execute` was
+      // given, so this reads the same flag rather than asserting a constant:
+      // the batch and the single-operation path then share one meaning of
+      // "confirmed".
+      const outcome = await restoreTurn({ context: () => context }, executeTurn, parsed.flags.has('execute'), undoAccess(context));
       return { ...local(turnRestoreReport(outcome, executeTurn)), state: outcome.complete
         ? { fileUndo: { operationId: `turn:${executeTurn}`, status: 'restored-verified',
           files: outcome.steps.flatMap(step => step.files.map(file => ({ ...file }))) } }
