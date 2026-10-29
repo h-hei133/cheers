@@ -10000,3 +10000,11 @@ CI`40739686114`（`d33a0a1b`）唯一失败为`src/config/concurrency.test.ts`�
 确认的机制：跨目录写入是工具体在审批后再次 `throw`（`core/tools/registry.ts:322/426`、`core/tools/read.ts:67`），审批层在 `turn/tools.ts:406-408` 就把越界异常转成 `blocked`，提示处理器不可达；三个参考项目都把"工作区外"实现为 `ask` 而非拒绝。思考过程可采集可渲染，但 `restoreConversation`（`cli/interactive/history.ts:52-58`）从不恢复 `turn.reasoning`，且 regular 模式下 `interactiveMode.ts:513` 不转发鼠标，使"click to expand"成为画出来点不了的提示。裸 `exit` 不是命令（需 `/exit`，`registry.ts:436`），退出链在 `interactiveLoop.ts:67` 无上限等待 MCP `close()`，最坏 30 秒。resume 卡顿实测：本机 2309 会话，每键全量重扫 874–1027 ms，缓存只缓存 summary 不缓存 stat。旧会话界面来自 `bootstrap.ts:166` + `hasUnfinishedBusiness`（`:348-356`）：`createCliShutdown` 的 SIGTERM/SIGHUP 路径（`shutdown.ts:18-19`）从不写 `terminated`，下次交互式启动静默重入。config/model 实际无 `/config`；重叠是模型行为字段在 settings、目录在 model、effort 三入口。
 
 未确认项：启动光标漂移的具体模式（`tuiMode` 与是否伴随 resume）需用户确认；退出卡住未在真实终端复现。本轮未运行产品测试、未拉起 PTY 或二进制，`verify:docs-drift:strict` 通过（rules 0 dangling，docs 118 既有 advisory）。
+
+## [2026-10-29] research | 第八轮补充：思考的真实缺口与一条真实崩溃
+
+对第19节的复核修正了两处结论。第二十五项原判为"渲染/展开损坏"，实际根因在**请求侧**：默认偏好 `null`（`core/models/preference.ts:6`），而 Anthropic（`anthropicMessages.ts:158`）、Google（`googleWire.ts:180-183`）、OpenAI 兼容（`openaiCompatible.ts:86-88`）都只在档位非空时才发推理参数，因此默认设置下供应商根本不产生推理。另有四条：内置 `openai` provider 未声明 endpoint 而回落 `/chat/completions`、Responses 读取器忽略 `response.reasoning_text.delta`、`restoreConversation` 不重建 thinking 块、流式期间按下与松开之间来一个增量即丢弃点击（`pointer.ts:255-261`）。第二十七项原判为几何竞态，复核发现 `transfer()` 会新建 `MainScreenPainter`（`engine.ts:160-183`），`viewportUnplaced` 不参与，且空草稿下 `scrollOffset` 必为 0；最可能改为加载期 Enter 写入的草稿换行（`startup.ts:39`），仍属未确认。
+
+另从用户 `~/.cheers/crashes.json` 读到 2026-10-29 的真实 `unhandled-rejection: Invalid persisted session usage key`：`restoreSessionUsage`（`usageTelemetry.ts:355-364`）无错误边界，`decodeAttribution`（`identity.ts:63-70`）把算法演进当作数据损坏，崩溃记录器对 rejection 采取"记录后继续"，于是进程存活但该会话用量静默归零。已写入第19.8节与摘要表。
+
+本轮仍只做研究：未运行产品测试、未拉起 PTY/二进制；`verify:docs-drift:strict` 通过（rules 0 dangling，docs 118 既有 advisory）。文档另记入两条 HANDOFF 陷阱（"注释里的方法不等于实现"、"请求不问就不会有"）。
