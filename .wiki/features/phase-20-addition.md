@@ -3348,3 +3348,15 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 [gateway回归](../../packages/ts-shell/src/core/mcp/gateway.test.ts)用受控active连接分别排入snapshot/refresh/tool/content/workspace sync。一个事件循环回合后，五种等待已收到安全closed拒绝，active尚未放行、close尚未完成、连接清理只启动一次、排队调用不做discovery；随后显式释放active，断言同一close完成且无后续连接。try/finally释放所有待观察Promise，避免失败污染后续测试。初次fixture的content discriminator与单microtask观察改为真实action及事件循环回合；最终反转在相同fixture下撤销close取消，五项均确实失败，不把初次夹具不足当作全部产品证据。
 
 主代理显式文件、768MiB、threads=false串行共79项去重通过：gateway28/shutdown11/content16/client8/CLI MCP16；后者使用真实隔离stdio mock server及原SIGTERM/SIGHUP/SIGINT、输出失败与父取消合同，没有真实远程认证。反转五项失败后gateway逐字节恢复并28项重验通过，未选23项不计反转通过。五静态门、完整声明图单一用例、diff和AST gateway20通过；1536MiB TS build `bd4f8fcb534b2ad568a74cce6128a580471dbf57208d91146975858735922a67`，inputs `cb5ecf626e39f52ab46a4085a10b057766cfcd512b54c319b4b2bae87b711386`，460/3545新鲜度重新计算一致。本地NormProof proven/0open/0failed/0gap只证collector；无PTY/exe、全仓、20k终端或真实用户退出现场，反馈26及ADD仍partial/active。Git/CI另以精确SHA绑定。
+
+### 20.18 精确coding型号的图片与独立token上限
+
+沿ADD-02精确模型详情与ADD-08/09请求预算复核。[官方精确型号页](https://developers.openai.com/api/docs/models/gpt-5.3-codex.md)再次实际读取确认text/image输入、400000总context、272000独立input及128000最大output。20.15路由批次刻意未调整vision；本批发现原catalog的vision:false与缺失上限导致图片被wire过滤、超过独立input的请求仍只检查总window。
+
+仅修[内置条目](../../packages/ts-shell/src/core/models/catalog.ts)：vision:true、inputLimit:272000、maxTokens:128000。现有exact metadata、request shape、budget、Responses body和preview直接消费，不添加新的能力解析或预算机制。默认用户maxOutputTokens不变，未声明输出时沿原catalog ceiling合同；用户显式model覆盖仍可修改上限/vision，refresh保留已审阅vision/output约束，其他型号不变。定向参考pi Responses共享message转换只接受model声明image能力且使用输出参数；官方精确页作为本型号数值依据，未根据名称模式或其他供应商同名条目推断。
+
+[详情](../../packages/ts-shell/src/cli/interactive/picker/model/metadata.test.ts)验证未配置具体型号仍可浏览并显示三种容量及image支持。[turn](../../packages/ts-shell/src/turn/protocol.test.ts)验证实际Responses input_image完整发送；一个有界960k字符message只用于估算超过272k但低于400k的独立input场景，拒绝发生于fetch前，不拉起PTY或构造20k会话。显式128001 output同样在fetch前拒绝。catalog shape与本地HTTP refresh夹具继续检查旧metadata不能覆盖已审阅能力、用户显式覆盖可以，未知image仍沿原不发送合同。
+
+主代理六文件183项去重聚焦通过：catalogShape21/catalogRefresh11/metadata10/turn protocol23/Responses body19/preview99；未选或重复不累加。三类逐字段反转分别撤去vision/inputLimit/maxTokens，各命中实际turn一项失败，每次逐字节恢复；恢复后turn23/catalog21重验44项。五静态门与diff通过；metadata-only不重复声明图/NormProof，本批未增加具名函数。TS build `3a4094f5fed192c24bb8442740f76d8fa037517343741db2c360eab19bb4b2e2`，inputs `2b37b35a4314d2da6dc23341dd9f443ee5f0bb67c54e12c7d545faa86d27cf74`，460/3545最终重新计算一致。
+
+验证纪律失误另记：build尚运行时提前启动listCompilerFiles新鲜度脚本，造成短暂两个heavy进程重叠并读到旧manifest而断言失败；两个进程结束后单进程重读最终manifest通过。没有将失败检查计为通过，也没有OOM；后续须以完成exit_code确认前进，不以已有输出认作命令已结束。无live OpenAI/account、PTY/exe或全仓，真实image识别与账户可用性未验；原47项不升级、ADD active。Git/CI另以精确SHA绑定。

@@ -356,7 +356,7 @@ describe("refreshing the catalogue", () => {
             id: "gpt-5.3-codex",
             reasoning: false,
             temperature: true,
-            modalities: { input: ["text", "image"], output: ["text"] },
+            modalities: { input: ["text"], output: ["text"] },
             limit: { context: 500_000, output: 128_000 },
           },
         },
@@ -368,7 +368,7 @@ describe("refreshing the catalogue", () => {
       const shape = resolveRequestShape(catalog, "openai", "gpt-5.3-codex");
       expect(shape).toMatchObject({
         supportsTemperature: false,
-        vision: false,
+        vision: true,
         reasoningEffort: true,
         maxOutputCeiling: 128_000,
       });

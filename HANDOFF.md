@@ -886,3 +886,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Closing MCP prevents new dispatch but queued caller Promises remain pending behind a stalled active request.
 - **Root Cause**: A closed check inside the serial lane runs only after the previous operation settles; dispatch refusal does not itself cancel the waiting caller.
 - **Rule**: Retire waiting callers before physical cleanup, remove each retirement callback when its operation starts, and retain active work in the original cleanup join. Test immediate queued refusal separately from actual close completion; never use a settled waiting caller as proof that an active tool or connection stopped.
+
+### Compiler Input Enumeration Is A Heavy Validation Process
+- **Symptom**: A freshness check reads the previous manifest while a build is still running.
+- **Root Cause**: listCompilerFiles spawns TypeScript; a yielded session with output but no exit_code is still active. Starting enumeration at that point overlaps two heavy validation processes.
+- **Rule**: Poll the existing session until its exit_code is returned before launching any validation or freshness command. Read the final manifest only after build completion and repeat a premature check serially; a stale-read failure is not build evidence.

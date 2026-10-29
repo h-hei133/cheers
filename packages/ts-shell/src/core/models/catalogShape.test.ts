@@ -43,13 +43,13 @@ describe("the shipped catalog", () => {
       models: [{
         id: "gpt-5.3-codex",
         reasoning: false,
-        vision: true,
+        vision: false,
         compat: { supportsTemperature: true },
       }],
     }], { preserveExplicitCapabilities: true, origin: "refresh" });
     expect(resolveRequestShape(refreshed, "openai", "gpt-5.3-codex")).toMatchObject({
       reasoningEffort: true,
-      vision: false,
+      vision: true,
       supportsTemperature: false,
     });
 
@@ -58,13 +58,13 @@ describe("the shipped catalog", () => {
       models: [{
         id: "gpt-5.3-codex",
         reasoning: false,
-        vision: true,
+        vision: false,
         compat: { supportsTemperature: true },
       }],
     }]);
     expect(resolveRequestShape(user, "openai", "gpt-5.3-codex")).toMatchObject({
       reasoningEffort: false,
-      vision: true,
+      vision: false,
       supportsTemperature: true,
     });
   });
@@ -178,9 +178,24 @@ describe("the shipped catalog", () => {
     // accepts images is not refused for looking unlike a pattern.
     expect(resolveRequestShape(BUILTIN_PROVIDERS, "anthropic", "claude-sonnet-4-5").vision).toBe(true);
     expect(resolveRequestShape(BUILTIN_PROVIDERS, "openai", "gpt-5.3").vision).toBe(true);
-    // And one that does not declare it stays false, which is a decision rather
-    // than an omission: this model is not sent images.
-    expect(resolveRequestShape(BUILTIN_PROVIDERS, "openai", "gpt-5.3-codex").vision).toBe(false);
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, "openai", "gpt-5.3-codex").vision).toBe(true);
+  });
+
+  it("declares independent input and output limits for the native coding model", () => {
+    expect(catalogModel(BUILTIN_PROVIDERS, 'openai', 'gpt-5.3-codex')).toMatchObject({
+      contextWindow: 400_000, inputLimit: 272_000, maxTokens: 128_000, vision: true,
+    });
+    expect(shapeFor('openai', 'gpt-5.3-codex').maxOutputCeiling).toBe(128_000);
+    const refreshed = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'openai', models: [{ id: 'gpt-5.3-codex',
+      maxTokens: 256_000, vision: false }] }], { preserveExplicitCapabilities: true, origin: 'refresh' });
+    expect(catalogModel(refreshed, 'openai', 'gpt-5.3-codex')).toMatchObject({
+      inputLimit: 272_000, maxTokens: 128_000, vision: true,
+    });
+    const user = mergeProviders(refreshed, [{ id: 'openai', models: [{ id: 'gpt-5.3-codex',
+      inputLimit: 200_000, maxTokens: 32_000, vision: false }] }]);
+    expect(catalogModel(user, 'openai', 'gpt-5.3-codex')).toMatchObject({
+      inputLimit: 200_000, maxTokens: 32_000, vision: false,
+    });
   });
 
   it("keeps a model's declared shape when a refresh patches it", () => {

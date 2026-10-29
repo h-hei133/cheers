@@ -306,9 +306,9 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
       // Five to ten minutes of inactivity, refreshed by each hit; the extended
       // tier runs to a day.
       { id: "gpt-5.3", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
-      { id: "gpt-5.3-codex", contextWindow: 400_000, reasoning: true,
+      { id: "gpt-5.3-codex", contextWindow: 400_000, inputLimit: 272_000, maxTokens: 128_000, reasoning: true,
         compat: { ...REASONING_REQUEST_SHAPE, endpoint: 'openai-responses' },
-        promptCache: { short: 600, long: 86_400 }, vision: false },
+        promptCache: { short: 600, long: 86_400 }, vision: true },
       { id: "gpt-5.1-mini", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
       { id: "o4-mini", contextWindow: 200_000, reasoning: true,
         compat: { ...REASONING_REQUEST_SHAPE, endpoint: 'openai-responses', reasoningSummary: true },

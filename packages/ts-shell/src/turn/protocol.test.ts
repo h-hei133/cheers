@@ -104,6 +104,41 @@ it.each(['low', 'medium', 'high'] as const)('sends explicit %s effort on the exa
   expect(body).not.toHaveProperty('reasoning_effort'); expect(body).not.toHaveProperty('temperature');
 });
 
+it('sends native coding model images through the declared Responses route', async () => {
+  const target = { provider: 'openai', model: 'gpt-5.3-codex', baseUrl: 'https://api.openai.com/v1' };
+  let body: Record<string, unknown> | undefined;
+  const step = createStepFunction({ workspaceRoot, sessionId: 'coding-image', systemPrompt: '', tools: [],
+    catalog: BUILTIN_PROVIDERS, provider: { ...target, endpoint: providerCredentialEndpoint(BUILTIN_PROVIDERS, target) },
+    maxOutputTokens: 100, fetchImpl: async (input, init) => {
+      expect(String(input)).toBe('https://api.openai.com/v1/responses'); body = JSON.parse(String(init?.body));
+      return Response.json({ status: 'completed', model: target.model, output: [{ type: 'message', id: 'msg_1', role: 'assistant',
+        content: [{ type: 'output_text', text: 'answer' }] }] });
+    },
+  });
+  expect((await step([{ role: 'user', content: [{ type: 'text', text: 'Inspect' },
+    { type: 'image', mimeType: 'image/png', data: 'AA==' }] }], undefined, {}, { allowTools: false })).text).toBe('answer');
+  expect(body?.input).toEqual([{ role: 'user', content: [{ type: 'input_text', text: 'Inspect' },
+    { type: 'input_image', image_url: 'data:image/png;base64,AA==', detail: 'auto' }] }]);
+  expect(body?.max_output_tokens).toBe(100);
+});
+
+it.each(['input', 'output'] as const)('refuses the native coding model %s ceiling before sending', async ceiling => {
+  const target = { provider: 'openai', model: 'gpt-5.3-codex', baseUrl: 'https://api.openai.com/v1' };
+  const fetchImpl = vi.fn(async () => Response.json({ status: 'completed', model: target.model, output: [{ type: 'message',
+    id: 'msg_1', role: 'assistant', content: [{ type: 'output_text', text: 'answer' }] }] }));
+  const step = createStepFunction({ workspaceRoot, sessionId: 'coding-limit', systemPrompt: '', tools: [],
+    catalog: BUILTIN_PROVIDERS, provider: { ...target, endpoint: providerCredentialEndpoint(BUILTIN_PROVIDERS, target) },
+    maxOutputTokens: ceiling === 'output' ? 128_001 : 100, fetchImpl,
+  });
+  // One bounded message isolates the independent input ceiling from the 400k window.
+  const result = await step([{ role: 'user', content: ceiling === 'input' ? 'x'.repeat(960_000) : 'question' }],
+    undefined, {}, { allowTools: false });
+  expect(result.stopReason).toBe('error');
+  expect(result.errorMessage).toMatch(ceiling === 'input' ? /^Context overflow: .*272000-token input limit/
+    : /^maxOutputTokens exceeds the selected model output limit\.$/);
+  expect(fetchImpl).not.toHaveBeenCalled();
+});
+
 it('carries a known summary refusal through the actual Responses turn', async () => {
   const catalog = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'openai', models: [{ id: 'o4-mini', compat: { reasoningSummary: false } }] }]);
   let body: Record<string, unknown> | undefined;

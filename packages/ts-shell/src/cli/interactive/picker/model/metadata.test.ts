@@ -55,6 +55,15 @@ it('keeps absent capabilities unverified and does not invent free pricing or a c
   expect(details.join('\n')).not.toMatch(/Context:|Input limit:|Max output:|Price per/);
 });
 
+it('shows the exact native coding model image support and independent token ceilings', async () => {
+  const picker = modelPicker(context()), rows = await picker.load();
+  const rowId = `model:${JSON.stringify([null, 'openai', 'gpt-5.3-codex'])}`;
+  expect(rows.find(row => row.id === rowId)).toMatchObject({ disabled: true, focusable: true });
+  expect(picker.detail!(rowId)).toEqual(expect.arrayContaining([
+    'Context: 400000 tokens', 'Input limit: 272000 tokens', 'Max output: 128000 tokens', 'Images: supported',
+  ]));
+});
+
 it('states that a model declaring no tool support is unsupported rather than unverified', async () => {
   // The detail line is the only place the picker can say what the session will
   // lose: a model marked tool_call:false receives no tool declarations, so the
