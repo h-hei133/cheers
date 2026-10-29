@@ -169,6 +169,16 @@ describe("folding a finished block", () => {
   });
 });
 
+it('refreshes cached thinking rows when the admitted keyboard shortcut changes or disappears', () => {
+  const transcript = new Transcript();
+  transcript.append({ kind: 'thinking', text: 'reasoning', finalized: true, collapsed: true });
+  expect(transcript.render(WIDTH, { thinkingShortcut: 'ctrl+t' }).rows.join('\n')).toContain('ctrl+t to expand');
+  const rebound = transcript.render(WIDTH, { thinkingShortcut: 'alt+t' }).rows.join('\n');
+  expect(rebound).toContain('alt+t to expand'); expect(rebound).not.toContain('ctrl+t');
+  const unbound = transcript.render(WIDTH).rows.join('\n');
+  expect(unbound).not.toContain('to expand'); expect(unbound).not.toContain('click');
+});
+
 describe("recoloring after a theme change", () => {
   it("re-renders a finalized block when the palette moved", () => {
     // Rows for a finalized block are memoised, and a theme is recolored in place,

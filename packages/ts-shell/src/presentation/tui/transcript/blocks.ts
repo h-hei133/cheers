@@ -75,6 +75,8 @@ export interface Block {
 export interface BlockRenderOptions {
   /** Inline-image protocol the terminal speaks, or nothing. */
   readonly imageProtocol?: ImageProtocol;
+  /** Effective admitted key label; absent when no keyboard action is bound. */
+  readonly thinkingShortcut?: string;
 }
 
 /**
@@ -101,7 +103,7 @@ export function renderBlock(
     case "user":
       return renderUser(block, width, options);
     case "thinking":
-      return renderThinking(block, width);
+      return renderThinking(block, width, options);
     case "tool":
       return renderTool(block, width);
     case "command":
@@ -167,11 +169,12 @@ function renderUser(block: Block, width: number, options: BlockRenderOptions = {
  * reasoning look like a turn that produced nothing. One row says it happened and
  * how long it took, and expanding shows it.
  */
-function renderThinking(block: Block, width: number): readonly string[] {
+function renderThinking(block: Block, width: number, options: BlockRenderOptions): readonly string[] {
   const seconds = block.elapsedMs ? ` ${(block.elapsedMs / 1000).toFixed(1)}s` : "";
   const head = `${GUTTER}${defaultTheme.dim(`● thought${seconds}`)}`;
   if (block.collapsed !== false) {
-    return [`${head} ${defaultTheme.dim("· click to expand")}`, ""];
+    const hint = options.thinkingShortcut ? ` ${defaultTheme.dim(`· ${options.thinkingShortcut} to expand`)}` : '';
+    return [`${head}${hint}`, ""];
   }
   const bodyWidth = Math.max(8, width - visibleWidth(BODY_INDENT));
   const rows = [head, ""];

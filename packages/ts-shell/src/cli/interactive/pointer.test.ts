@@ -5,6 +5,9 @@ import { Pointer } from "./pointer.js";
 import { parseMouseReport } from "../../presentation/tui/input/mouse.js";
 import type { InteractiveView } from "../../presentation/tui/surface/contract.js";
 import { SuggestionList } from "../../presentation/tui/chrome/suggestions.js";
+import { createViewState, type ViewContext } from '../../presentation/tui/surface/contract.js';
+import { InteractiveSurface } from '../../presentation/tui/surface/view.js';
+import type { Block } from '../../presentation/tui/transcript/blocks.js';
 
 function composerGeometry(text: string, top = 10, width = 40) {
   const editor = new Editor(); editor.setText(text);
@@ -44,9 +47,107 @@ function build(overrides: Partial<InteractiveView> = {}) {
   return { pointer, surface, copied, redraws: () => redrawn, rows };
 }
 
+function blockSurface(block: Block) {
+  const state = createViewState();
+  state.transcript.append(block);
+  const context: ViewContext = { facts: () => ({ model: 'test', provider: 'test' }), statusItems: () => [], activity: () => undefined,
+    busy: () => true, queuedCount: () => 0, now: () => 5000, ambient: () => ({ openTodos: 0, peerSessions: 0 }),
+    cancelArmed: () => false, overlayFullScreen: () => false, overlayRows: () => [], selection: () => undefined };
+  const view = new InteractiveSurface(context, state);
+  const copied: string[] = [];
+  let current: InteractiveView = view;
+  const pointer = new Pointer({ view: () => current, rows: () => current.contentRows(), copy: text => copied.push(text), redraw: vi.fn() });
+  view.renderFrame({ columns: 60, rows: 16 });
+  const row = Array.from({ length: 16 }, (_, index) => index).find(index => view.blockAtScreenRow(index) === block)!;
+  const event = { button: 0, shift: false, alt: false, ctrl: false, row, column: 2 };
+  return { view, pointer, copied, event, swap: (next: InteractiveView) => { current = next; } };
+}
+
+describe('pointer block clicks', () => {
+  it.each([false, true])('opens a live collapsed thinking prefix across a delta (repaint=%s)', repaint => {
+    const block: Block = { kind: 'thinking', text: 'initial reasoning', elapsedMs: 1000, collapsed: true, finalized: false };
+    const { view, pointer, copied, event } = blockSurface(block);
+    pointer.handle({ ...event, kind: 'press' });
+    view.transcript.update(block, current => { current.text += ' plus a new delta'; current.elapsedMs = 1001; });
+    if (repaint) view.renderFrame({ columns: 60, rows: 16 });
+    pointer.handle({ ...event, kind: 'release' });
+    expect(block.collapsed).toBe(false);
+    expect(copied).toEqual([]);
+    expect(pointer.selection).toBeUndefined();
+  });
+
+  it.each(['rewritten body', 'replaced block', 'changed collapse', 'changed metadata', 'different row',
+    'resize', 'invalidated layout', 'swapped view', 'scroll', 'drag away and back', 'changed painted row', 'painted elapsed change'] as const)
+  ('rejects a thinking click after %s', change => {
+    const block: Block = { kind: 'thinking', text: 'initial reasoning', collapsed: true, finalized: false };
+    const fixture = blockSurface(block);
+    const { view, pointer, copied, event } = fixture;
+    const collapse = vi.spyOn(view.transcript, 'setCollapsed');
+    pointer.handle({ ...event, kind: 'press' });
+    view.transcript.setText(block, `${block.text} plus a new delta`);
+    let release = event;
+    if (change === 'rewritten body') view.transcript.setText(block, 'replacement reasoning');
+    if (change === 'replaced block') { view.transcript.clear(); view.transcript.append({ ...block }); }
+    if (change === 'changed collapse') view.transcript.update(block, current => { current.collapsed = false; });
+    if (change === 'changed metadata') view.transcript.update(block, current => { current.title = 'different target'; });
+    if (change === 'different row') release = { ...event, row: event.row + 1 };
+    if (change === 'resize') view.renderFrame({ columns: 61, rows: 16 });
+    if (change === 'invalidated layout') view.invalidateLayout();
+    if (change === 'swapped view') fixture.swap(blockSurface(block).view);
+    if (change === 'scroll') vi.spyOn(view, 'selectionTop').mockReturnValue(view.selectionTop() + 1);
+    if (change === 'drag away and back') pointer.handle({ ...event, column: event.column + 1, kind: 'drag' });
+    if (change === 'changed painted row') vi.spyOn(view, 'contentRows').mockReturnValue(view.contentRows().map(() => 'changed row'));
+    if (change === 'painted elapsed change') {
+      view.transcript.update(block, current => { current.elapsedMs = 1000; });
+      view.renderFrame({ columns: 60, rows: 16 });
+    }
+    pointer.handle({ ...release, kind: 'release' });
+    expect(collapse).not.toHaveBeenCalled();
+    expect(copied).toEqual([]);
+  });
+
+  it.each(['tool', 'diff', 'expanded thinking'] as const)('keeps unchanged %s clicks working', kind => {
+    const block: Block = kind === 'expanded thinking'
+      ? { kind: 'thinking', text: 'reasoning', collapsed: false, finalized: true }
+      : { kind: 'tool', title: 'read', text: 'result', status: 'ok', collapsed: true, finalized: true,
+        ...(kind === 'diff' ? { diff: '--- a/file\n+++ b/file\n@@ -1 +1 @@\n-old\n+new' } : {}) };
+    const { pointer, copied, event } = blockSurface(block);
+    pointer.handle({ ...event, kind: 'press' });
+    pointer.handle({ ...event, kind: 'release' });
+    expect(block.collapsed).toBe(kind === 'expanded thinking');
+    expect(copied).toEqual([]);
+  });
+
+  it('keeps text selection and copy stale when a hidden thinking delta arrives', () => {
+    const block: Block = { kind: 'thinking', text: 'initial reasoning', collapsed: true, finalized: false };
+    const { view, pointer, copied, event } = blockSurface(block);
+    pointer.handle({ ...event, kind: 'press' });
+    pointer.handle({ ...event, column: event.column + 4, kind: 'drag' });
+    view.transcript.setText(block, `${block.text} plus a new delta`);
+    expect(pointer.selection).toBeUndefined();
+    expect(pointer.copySelection()).toBe(false);
+    pointer.handle({ ...event, kind: 'release' });
+    expect(block.collapsed).toBe(true);
+    expect(copied).toEqual([]);
+  });
+
+  it.each(['tool', 'expanded thinking'] as const)('rejects changed %s text during a click', kind => {
+    const block: Block = { kind: kind === 'tool' ? 'tool' : 'thinking', text: 'original', collapsed: kind === 'tool', finalized: false };
+    const { view, pointer, copied, event } = blockSurface(block);
+    const collapse = vi.spyOn(view.transcript, 'setCollapsed');
+    pointer.handle({ ...event, kind: 'press' });
+    view.transcript.setText(block, `${block.text} appended`);
+    view.renderFrame({ columns: 60, rows: 16 });
+    pointer.handle({ ...event, kind: 'release' });
+    expect(collapse).not.toHaveBeenCalled();
+    expect(copied).toEqual([]);
+  });
+});
+
 it('ignores uncaptured motion without clearing a drag, toggling a block or redrawing the transcript', () => {
   const { pointer, surface, redraws } = build();
   pointer.handle(parseMouseReport('\x1b[<0;3;1M')!);
+  vi.mocked(surface.blockAtScreenRow).mockClear();
   pointer.handle(parseMouseReport('\x1b[<32;8;3M')!);
   const selection = pointer.selection, before = redraws();
   pointer.handle(parseMouseReport('\x1b[<35;5;2M')!);
@@ -98,6 +199,7 @@ describe("pointer drag selection", () => {
     const copy = vi.fn();
     const pointer = new Pointer({ view: () => surface, rows: () => ["transcript"], copy, redraw: vi.fn(), capture: () => overlay });
     pointer.handle(parseMouseReport("\x1b[<0;3;1M")!);
+    vi.mocked(surface.blockAtScreenRow).mockClear();
     overlay = kind === "overlay";
     pointer.handle(parseMouseReport("\x1b[<32;3;6M")!);
     overlay = false;

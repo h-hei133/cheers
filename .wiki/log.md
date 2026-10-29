@@ -10067,3 +10067,14 @@ SessionListing将token和有界同version size cache转交Next，旧subscription
 最终review补source退休期间首current异步publication后token复验，新增1项反转命中、恢复后browse17/lifetime5共22项重验；原153项加新增1项=154项去重通过。最终TS build `5f78aa27a97ec7debc0b4778b8f2fbd52cef0d0813a44a9aa23f8e9eb2b2545c`与inputs `e2fddda35b004ac2858c6223f423be59033c84bf69d6726f6ad277f01dffba91`新鲜度通过，NormProof再次proven/0open/0failed/0gap。最终真实目录initial2817.8ms、query32.5/35.3ms、no-match2.7ms，I/O与c975测量一致；末heap12.6MiB非峰值。原c975构建仅为前一测量样本，不作最终artifact。
 
 最终staged diff检查发现新增contract末尾多余空行，修空白后重建；最终build `55f598d95261c57d81f335345f89bc80fbb306d499368cfb3b3343d752aab88a`、inputs `ca3d28d40dd16c828516d6fa2877968632f67ad5c9fc284782eaab1978371905`。此前5f78为相同行为测量样本；空白调整未改变测试行为，无新增测试重跑。staged检查补覆盖新增文件，提交前确认通过。
+
+本批实现已提交推送`7515c38347026935b21f4a1accba8f6811392d33`，远端main读回相同SHA；工作区只剩原有CLAUDE.md。该SHA的CI按用户要求延后检查，不用前一批绿色替代。继续反馈25交互边界，默认effort/endpoint仍未动。
+
+
+## [2026-10-29] fix | 流式thinking点击与有效按键提示
+
+反馈25交互沿[addition20.8](features/phase-20-addition.md#208-流式thinking点击与实际快捷键提示)实施：click owner绑定按下target/point/paint/geometry/top，仅live collapsed thinking允许隐藏prefix增长；拖动/改写/替换/resize/滚动仍拒绝，文本copy保留strict source revision。mixed thinking先展开隐藏项，再统一折叠。提示由实际admitted binding传到renderer与两层cache，支持重绑/禁用；regular主屏不再显示不可达click提示。edge autoscroll限drag，release停止timer。
+
+恢复六类反转后120项实际通过：pointer39/blocks14/container18/view47/filtered Host2，331项未选不计。五静态门、完整声明图单一脚本、module facade0与AST≤20通过；build `b1cde057de0ae24a9dcdc9c918019424e30176c6fb30acdf8b9166d6f14eaa22`，inputs `4a923c96ab1bf5aad5b4699585b80360449e0e42a26f221a8e42e9e626799e8c`新鲜度一致；repo bundle judge proven/0open/0failed/0gap。无provider/auth/default/package行为变化，无PTY/exe/full suite/20k终端；默认effort/endpoint、27 startup与28职责仍待，原47项未重验、ADD active。保留CLAUDE.md，scratch清理后交付。
+
+延迟确认`7515c38347026935b21f4a1accba8f6811392d33`的[CI40897519775](https://github.com/h-hei133/cheers/actions/runs/40897519775)与[Watch40897519704](https://github.com/h-hei133/cheers/actions/runs/40897519704)均completed/success；以上不替代本批commit的CI。

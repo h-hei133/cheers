@@ -419,6 +419,7 @@ export class InteractiveMode {
         // the renderer asks on every frame — a function per frame would re-run
         // the environment probe that never has a different answer.
         imageProtocol: () => this.imageProtocol,
+        thinkingShortcut: this.preferences.thinkingShortcut,
       },
       this.state,
     );

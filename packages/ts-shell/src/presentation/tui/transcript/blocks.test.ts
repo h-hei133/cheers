@@ -12,6 +12,24 @@ afterEach(() => defaultTheme.apply(getDefaultTheme(), originalColorMode));
 
 const WIDTH = 40;
 
+describe('thinking expansion hints', () => {
+  it('shows the admitted keyboard shortcut alongside elapsed thinking time', () => {
+    const block = { kind: 'thinking' as const, text: 'hidden reasoning', collapsed: true, finalized: true, elapsedMs: 1500 };
+    const rows = renderBlock(block, WIDTH, { thinkingShortcut: 'ctrl+t' }).map(stripAnsi);
+    expect(rows[0]).toBe('● thought 1.5s · ctrl+t to expand');
+    expect(rows.join('\n')).not.toContain('click');
+    expect(rows.join('\n')).not.toContain('hidden reasoning');
+  });
+
+  it('uses a rebound key and suppresses shortcut hints when none is admitted', () => {
+    const block = { kind: 'thinking' as const, text: 'hidden reasoning', collapsed: true, finalized: true };
+    expect(renderBlock(block, WIDTH, { thinkingShortcut: 'alt+t' }).map(stripAnsi).join('\n')).toContain('alt+t to expand');
+    expect(renderBlock(block, WIDTH).map(stripAnsi)).toEqual(['● thought', '']);
+    expect(renderBlock({ ...block, collapsed: false }, WIDTH, { thinkingShortcut: 'alt+t' }).map(stripAnsi).join('\n'))
+      .toContain('hidden reasoning');
+  });
+});
+
 describe("prompt echo", () => {
   it("paints the prompt as a full-width bubble", () => {
     // A shade that stops at the last character reads as a highlight, not as a

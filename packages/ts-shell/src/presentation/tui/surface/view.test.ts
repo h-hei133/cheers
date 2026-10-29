@@ -68,6 +68,39 @@ function surface(overrides: Partial<ViewContext> = {}): { view: InteractiveSurfa
 
 const SIZE = { columns: 60, rows: 16 };
 
+describe('painted pointer geometry', () => {
+  it('stays stable across hidden thinking deltas and records width-only resize and layout changes', () => {
+    const { view } = surface();
+    const thinking = view.transcript.append({ kind: 'thinking', text: 'initial', collapsed: true, finalized: false });
+    expect(view.pointerGeometry).toBeUndefined();
+    view.renderFrame(SIZE);
+    const first = view.pointerGeometry;
+    const sourceRevision = view.selectionRevision();
+    expect(first).toEqual({ width: 60, height: 16, layout: 'viewport' });
+    view.transcript.update(thinking, current => { current.text += ' streamed reasoning'; }); view.renderFrame(SIZE);
+    expect(view.selectionRevision()).toBeGreaterThan(sourceRevision);
+    expect(view.pointerGeometry).toEqual(first);
+    view.renderFrame({ ...SIZE, columns: 61 });
+    expect(view.pointerGeometry).toEqual({ ...first, width: 61 });
+    view.renderFrame({ ...SIZE, columns: 61 }, 'document');
+    expect(view.pointerGeometry).toEqual({ width: 61, height: 16, layout: 'document' });
+  });
+
+  it('expires on invalidation, unavailable frames and fullscreen overlays while scroll position stays separate', () => {
+    const { view, live } = surface();
+    for (let index = 0; index < 30; index++) view.transcript.append({ kind: 'notice', text: `line ${index}`, finalized: true });
+    view.renderFrame(SIZE); const first = view.pointerGeometry!; const top = view.selectionTop();
+    view.scroll(-2);
+    expect(view.selectionTop()).toBe(top - 2); expect(view.pointerGeometry).toBe(first);
+    view.invalidateLayout(); expect(view.pointerGeometry).toBeUndefined();
+    view.renderFrame(SIZE); expect(view.pointerGeometry).toBeDefined();
+    view.renderFrame({ columns: 0, rows: 16 }); expect(view.pointerGeometry).toBeUndefined();
+    view.renderFrame(SIZE); live.fullScreen = true;
+    view.renderFrame(SIZE); live.fullScreen = false;
+    expect(view.pointerGeometry).toBeUndefined();
+  });
+});
+
 function frame(view: InteractiveSurface, size = SIZE): string[] {
   return view.renderFrame(size).rows.map(stripAnsi);
 }
@@ -603,6 +636,33 @@ describe("collapsing from the keyboard", () => {
       ["tool", true],
       ["assistant", undefined],
     ]);
+  });
+
+  it('opens newly collapsed reasoning after older reasoning was expanded, then folds on repeated presses', () => {
+    const { view } = surface();
+    const older = view.transcript.append({ kind: 'thinking', text: 'older visible reasoning', finalized: true, collapsed: false });
+    const newest = view.transcript.append({ kind: 'thinking', text: 'new streamed reasoning', finalized: false, collapsed: true });
+    const tool = view.transcript.append({ kind: 'tool', text: 'tool output', finalized: true, collapsed: true });
+    expect(view.toggleCollapsed('thinking')).toBe(true);
+    expect([older.collapsed, newest.collapsed]).toEqual([false, false]);
+    expect(frame(view).join('\n')).toContain('new streamed reasoning');
+    expect(tool.collapsed).toBe(true);
+    view.toggleCollapsed('thinking');
+    expect([older.collapsed, newest.collapsed]).toEqual([true, true]);
+    view.toggleCollapsed('thinking');
+    expect([older.collapsed, newest.collapsed]).toEqual([false, false]);
+    expect(tool.collapsed).toBe(true);
+  });
+
+  it('renders the admitted keyboard hint in regular and fullscreen frames', () => {
+    const { view } = surface({ thinkingShortcut: () => 'alt+t' });
+    view.transcript.append({ kind: 'thinking', text: 'reasoning', finalized: true, collapsed: true });
+    for (const layout of ['document', 'viewport'] as const) {
+      const output = view.renderFrame(SIZE, layout).rows.map(stripAnsi).join('\n');
+      expect(output).toContain('alt+t to expand');
+      expect(output).not.toContain('ctrl+t');
+      expect(output).not.toContain('click to expand');
+    }
   });
 
   it("takes the second press back to where the first one started", () => {

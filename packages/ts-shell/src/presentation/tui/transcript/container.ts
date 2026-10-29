@@ -226,7 +226,8 @@ export class Transcript {
     if (!block.finalized) return sourceLinesFor(block, index, width, rows);
     const entry = this.cache.get(block)?.find(candidate => candidate.width === width
       && candidate.revision === defaultTheme.colorRevision
-      && candidate.options?.imageProtocol === options?.imageProtocol);
+      && candidate.options?.imageProtocol === options?.imageProtocol
+      && candidate.options?.thinkingShortcut === options?.thinkingShortcut);
     if (entry?.sources) return entry.sources;
     const sources = sourceLinesFor(block, index, width, rows);
     if (entry) entry.sources = sources;
@@ -246,11 +247,11 @@ export class Transcript {
     // renders differently after a theme change. Keying on width alone left the
     // scrollback in the old theme until a resize happened to invalidate it.
     const revision = defaultTheme.colorRevision;
-    const cacheKey = (entry: CacheEntry, candidateWidth: number): boolean =>
-      entry.width === candidateWidth &&
+    const hit = entries?.find(entry =>
+      entry.width === width &&
       entry.revision === revision &&
-      entry.options?.imageProtocol === options?.imageProtocol;
-    const hit = entries?.find((entry) => cacheKey(entry, width));
+      entry.options?.imageProtocol === options?.imageProtocol &&
+      entry.options?.thinkingShortcut === options?.thinkingShortcut);
     if (hit) {
       // The rows are the same at any index; the source lines name the position,
       // so an entry whose index moved is kept for its rows but loses them.

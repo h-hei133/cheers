@@ -3170,14 +3170,14 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 [Responses流](../../packages/ts-shell/src/provider/endpoints/responses/stream.ts)补raw `reasoning_text.delta/done`，content_index与summary_index独立，封口、身份、前缀和终态校验保留；[终态投影](../../packages/ts-shell/src/provider/endpoints/responses/output.ts)采用summary优先、raw content次之，每item只投影一种，opaque payload保持供应商原文供重放。对照参考的stream fallback后未采用：本项目replay要求reasoning与native output完全一致，不能伪造终态content。raw事件缺可验证终态content的relay继续error，不接纳工具或签名；raw与summary同时流出时实时仍分别显示，终态只存一种。
 
-[历史恢复](../../packages/ts-shell/src/cli/interactive/history.ts)在assistant正文与tool cards前重建finalized/collapsed thinking，空白跳过，withheld只有占位，签名不进入显示。参考pi按存储顺序恢复thinking；本项目保留自己的消息契约和60-block初始窗口。Responses两端点、实际provider step、transcript编解码/native replay和恢复顺序均有聚焦用例。默认档位、内置OpenAI endpoint、streaming点击与regular鼠标仍未修，不能据此宣称第25项整体完成。
+[历史恢复](../../packages/ts-shell/src/cli/interactive/history.ts)在assistant正文与tool cards前重建finalized/collapsed thinking，空白跳过，withheld只有占位，签名不进入显示。参考pi按存储顺序恢复thinking；本项目保留自己的消息契约和60-block初始窗口。Responses两端点、实际provider step、transcript编解码/native replay和恢复顺序均有聚焦用例。默认档位与内置OpenAI endpoint仍未修；streaming点击及regular可达提示随后在20.8补齐，不能据此宣称第25项整体完成。
 
 ### 20.4 当前剩余工作与证据边界
 
 | 反馈 | 当前状态 | 下一步 |
 |---|---|---|
 | 24 | 本地实现与聚焦验证 | 缺真实终端/用户目录审批现场与非Linux文件系统证据 |
-| 25 | raw Responses与历史恢复已实现；整体partial | 默认请求档位/endpoint逐协议验证；streaming点击身份与regular可达动作 |
+| 25 | raw Responses、历史恢复、streaming点击与有效键提示已实现；整体partial | 默认请求档位/endpoint逐协议验证；真实终端及用户环境复验 |
 | 26 | 四条明确机制已修；本地验证 | 缺真实用户退出现场；MCP预算到期不能证明清理完成 |
 | 27 | 机制仍未确认 | 先用startup/CRLF/regular几何夹具区分，禁止按研究候选直接声称根因 |
 | 28 | 未实施 | settings/model职责与入口发现性整理 |
@@ -3233,3 +3233,16 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 最终首current发布补异步后token复验：source在live recheck期间退休，第一次next也须拒绝，新增反转1项命中并恢复。browse17/lifetime5重验22项通过，其余上述文件此前通过未因窄改重跑，合计154项去重证据。最终build `5f78aa27a97e`新鲜度读回一致，同真实目录initial2817.8ms、两query32.5/35.3ms、no-match2.7ms，物理I/O与上表新版完全相同；末heap12.6MiB仍不作峰值证据。最终NormProof与静态门重验通过。
 
 最终staged diff检查发现新增contract末尾多余空行，修空白后重建；最终build `55f598d95261c57d81f335345f89bc80fbb306d499368cfb3b3343d752aab88a`、inputs `ca3d28d40dd16c828516d6fa2877968632f67ad5c9fc284782eaab1978371905`。此前5f78为相同行为测量样本；空白调整未改变测试行为，无新增测试重跑。staged检查补覆盖新增文件，提交前确认通过。
+
+
+### 20.8 流式thinking点击与实际快捷键提示
+
+反馈25的交互切片。新[click owner](../../packages/ts-shell/src/cli/interactive/click.ts)捕获按下时的view、block对象与快照、物理/内容坐标、绘制行、尺寸/layout及scrollTop；release逐项重验。仅live/collapsed thinking允许隐藏正文追加前缀和不改变绘制行的elapsed更新；改写、替换、metadata/collapse变化、拖动后返回、resize/invalidation、scroll、换view或绘制行变化均拒绝。tool/diff/已展开thinking仍要求正文与source新鲜。文本选择与复制保留原revision合同，pointer边缘自动滚动只接受drag，release先停止timer。
+
+[thinking批量操作](../../packages/ts-shell/src/presentation/tui/surface/pane.ts)先展开任何隐藏块，全部已开时才统一折叠，修正旧块已开/新块隐藏时第一次按键反而全部折叠。generic/tool保持原合同。[InputPreferences](../../packages/ts-shell/src/cli/interactive/inputPreferences.ts)从现有绑定与冲突判定取得有效key，通过实际Host→ViewContext→renderer传递；collapsed行显示ctrl+t或用户重绑键，无有效key则省略提示。regular主屏保留现有鼠标策略，键盘动作可达；不再显示无法点击的click提示。finalized rows与source cache均绑定shortcut，重绑不会留旧提示。[surface](../../packages/ts-shell/src/presentation/tui/surface/view.ts)以普通property保存最后绘制几何，空帧、全屏overlay和invalidateLayout清除，不增加超过20名的方法。
+
+目标检查后定向只读对照pi的streaming thinking MouseRegion、按下目标/位置记忆和有效键提示，以及oh-my-pi全局thinking可见性。采用统一揭示意图和目标身份，保留本项目release与copy的更严格边界；未复制参考的press即执行策略。
+
+主代理768MiB、package-local、threads=false、显式文件&&串行最终通过120项：pointer39、blocks14、container18、view47、实际InteractiveMode regular/fullscreen各1。Host覆盖ctrl+t、混合状态、重复折叠、f2重绑及禁用；331项未选不计通过。六类反转命中mixed toggle1、truthful hint2、shortcut cache1、streaming click2、geometry guards2、Host wiring2，每次逐字节恢复后重跑上述120项通过。首轮view fixture未通过Transcript.update回调改变正文属setup错误，补实际mutation回调后通过，未修改产品适配。
+
+五静态门、完整声明图单一脚本、module facade0、diff通过；AST具名函数含对象属性：pointer14/click4/inputPreferences6/blocks12/container20/pane17/view20。TS build `b1cde057de0ae24a9dcdc9c918019424e30176c6fb30acdf8b9166d6f14eaa22`，inputs `4a923c96ab1bf5aad5b4699585b80360449e0e42a26f221a8e42e9e626799e8c`，重算460个compilerInputs一致；repo bundle NormProof proven/0open/0failed/0gap仅证collector结构。两个gpt-6.1-sol代理只读/编辑、未执行任何验证，主代理复核不作独立终局review。无PTY/exe、全套、20k终端、真实provider或非Linux验收；默认effort/endpoint仍待逐协议裁决，反馈25及ADD整体partial/active。提交、推送与CI以日志实际读回为准。

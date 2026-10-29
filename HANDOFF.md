@@ -840,3 +840,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Every search key rescans the session directory; cancelling a search stops the next query, or closing the previous page invalidates its successor.
 - **Root Cause**: The query owns directory acquisition, although searches and pages need one bounded source snapshot. Host search-clear restores old rows synchronously and does not call load again.
 - **Rule**: Let the catalog own an opaque browse token and source controller, with a separate query controller for each wait. Transfer source ownership on admitted Next; retire it on final close, scope change or explicit refresh. Clear-search must arrange its own guarded page recheck. Preserve physical source quotas and incomplete counts across needles, check visible/current/lookahead/anchor identities, and never substitute directory mtime for core-file versions. Track the current host subscription so an old teardown cannot cancel its replacement or publish after release.
+
+### Hidden Streaming Text Has Different Authority From Copied Text
+- **Symptom**: A collapsed thinking row ignores clicks whenever a delta arrives between press and release; relaxing the transcript revision check also makes stale selections copyable.
+- **Root Cause**: Block activation and source selection share admission despite referring to different facts. Hidden append-only text can preserve a clicked target while changing the source behind a selection.
+- **Rule**: Keep copy revision checks strict. Admit a live collapsed-thinking prefix only after matching the pressed block object, metadata, row, point, painted text, frame dimensions and scroll position; retire the click on drag or layout invalidation. Advertise a key from the admitted binding instead of an unreachable mouse gesture.
+
+### Release Must Not Restart Edge Autoscroll
+- **Symptom**: Releasing a selection at the transcript edge starts another scroll interval or shifts a clicked target.
+- **Root Cause**: The edge branch accepts both drag and release before the release cleanup, so it returns after scheduling a new interval.
+- **Rule**: Apply edge autoscroll only to drag reports and stop the interval before release admission. Retain a timer assertion after edge release; observing only the first synchronous scroll misses the restart.

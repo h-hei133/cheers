@@ -3,7 +3,7 @@ import type { FrameLayout, TerminalFramePlan, ViewportSize } from "../render/fra
 import type { Block } from "../transcript/blocks.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import type { ScrollbarGeometry } from "../transcript/viewport.js";
-import { createViewState, type ChoiceRegions, type ComposerGeometry, type InteractiveView, type ViewContext, type ViewState } from "./contract.js";
+import { createViewState, type ChoiceRegions, type ComposerGeometry, type InteractiveView, type PointerGeometry, type ViewContext, type ViewState } from "./contract.js";
 import { TranscriptPane } from "./pane.js";
 import { renderChrome } from "./chrome.js";
 
@@ -27,6 +27,7 @@ export class InteractiveSurface implements InteractiveView {
   private readonly pane: TranscriptPane;
   private suggesting = false;
   private lastComposerGeometry: ComposerGeometry | undefined;
+  pointerGeometry: PointerGeometry | undefined;
 
   constructor(
     private readonly context: ViewContext,
@@ -51,6 +52,7 @@ export class InteractiveSurface implements InteractiveView {
   }
 
   renderFrame(dimensions: ViewportSize, layout: FrameLayout = "viewport"): TerminalFramePlan {
+    this.pointerGeometry = undefined;
     const width = Math.max(0, Math.floor(dimensions.columns));
     const height = Math.max(0, Math.floor(dimensions.rows));
     if (width === 0 || height === 0) {
@@ -73,7 +75,7 @@ export class InteractiveSurface implements InteractiveView {
       capacity,
       this.context.selection(),
       this.context.highlightSearchMatches,
-      this.context.imageProtocol ? { imageProtocol: this.context.imageProtocol() } : {},
+      { imageProtocol: this.context.imageProtocol?.(), thinkingShortcut: this.context.thinkingShortcut?.() },
       layout,
     );
     this.lastComposerGeometry = layout === "document" || chrome.composerRows.length === 0 ? undefined : {
@@ -95,6 +97,7 @@ export class InteractiveSurface implements InteractiveView {
         },
       } : {}),
     };
+    if (transcriptRows.length > 0) this.pointerGeometry = { width, height, layout };
     return {
       documentId: this.transcript.all(),
       rows: [...transcriptRows, ...chrome.rows],
@@ -180,6 +183,7 @@ export class InteractiveSurface implements InteractiveView {
 
   invalidateLayout(): void {
     this.lastComposerGeometry = undefined;
+    this.pointerGeometry = undefined;
     this.choiceRegions = {};
   }
 }

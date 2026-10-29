@@ -125,10 +125,10 @@ export class TranscriptPane {
       .filter((block) => block.collapsed !== undefined)
       .filter((block) => only === undefined || block.kind === only);
     if (collapsible.length === 0) return false;
-    // One decision for the whole set, taken from the first: pressing the key
-    // again must undo what it just did, which it cannot if some blocks were
-    // already in the target state and flip the other way.
-    const collapsed = !collapsible[0]!.collapsed;
+    // New reasoning arrives collapsed even after an older block was opened.
+    // Reveal any hidden reasoning first; the next press can fold the whole set.
+    const collapsed = only === 'thinking' ? !collapsible.some(block => block.collapsed)
+      : !collapsible[0]!.collapsed;
     for (const block of collapsible) this.transcript.setCollapsed(block, collapsed);
     return true;
   }

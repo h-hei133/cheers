@@ -77,6 +77,35 @@ import { currentResearch, readResearch } from '../../research/run/store.js';
 import * as modelDetails from './picker/model/details.js';
 import { recordSessionUsage, resetSessionUsage } from '../../observability/usageTelemetry.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
+import type { Keybindings } from './keybindings.js';
+
+it.each(['regular', 'fullscreen'] as const)('shows admitted thinking shortcuts and expands mixed streaming blocks in the actual %s host', kind => {
+  const { mode, terminal } = build({ tuiMode: kind });
+  const host = mode as unknown as { view: InteractiveView; preferences: { keybindings: Keybindings } };
+  mode.start();
+  try {
+    const older = host.view.transcript.append({ kind: 'thinking', text: 'Older private thought', collapsed: false, finalized: true });
+    const latest = host.view.transcript.append({ kind: 'thinking', text: 'New private thought', collapsed: true, finalized: false });
+    const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 30 }).rows.join('\n'));
+    expect(frame()).toContain('ctrl+t to expand');
+    expect(frame()).not.toContain('click to expand');
+    terminal.input('\x14');
+    expect(older.collapsed).toBe(false); expect(latest.collapsed).toBe(false);
+    expect(frame()).toContain('New private thought');
+    terminal.input('\x14');
+    expect(older.collapsed).toBe(true); expect(latest.collapsed).toBe(true);
+    host.preferences.keybindings.setUserConfig({ 'app.thinking.toggle': 'f2' });
+    expect(frame()).toContain('f2 to expand');
+    expect(frame()).not.toContain('ctrl+t to expand');
+    terminal.input('\x1bOQ');
+    expect(older.collapsed).toBe(false); expect(latest.collapsed).toBe(false);
+    terminal.input('\x1bOQ');
+    host.preferences.keybindings.setUserConfig({ 'app.thinking.toggle': [] });
+    expect(frame()).not.toContain('to expand');
+    terminal.input('\x14'); terminal.input('\x1bOQ');
+    expect(older.collapsed).toBe(true); expect(latest.collapsed).toBe(true);
+  } finally { mode.stop(); }
+});
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   (['user', 'project'] as const).flatMap(scope =>

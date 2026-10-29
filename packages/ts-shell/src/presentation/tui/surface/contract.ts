@@ -5,7 +5,7 @@ import { PasteStore } from "../pastes.js";
 import type { AmbientContext } from "../chrome/hints.js";
 import type { StatusFacts, StatusItemId } from "../chrome/items.js";
 import { SuggestionList } from "../chrome/suggestions.js";
-import type { TerminalFrameProvider } from "../render/frame.js";
+import type { FrameLayout, TerminalFrameProvider } from "../render/frame.js";
 import type { Block } from "../transcript/blocks.js";
 import { Transcript } from "../transcript/container.js";
 import type { TurnActivity } from "../transcript/live.js";
@@ -79,6 +79,8 @@ export interface ViewContext {
   searchBar?(): { readonly query: string; readonly matchCount: number; readonly currentNumber: number } | undefined;
   /** Inline-image protocol the terminal speaks, or nothing when it does not. */
   imageProtocol?(): ImageProtocol | undefined;
+  /** A key that currently dispatches the thinking expansion action. */
+  thinkingShortcut?(): string | undefined;
   /** Style the matches in one rendered row of the transcript. */
   highlightSearchMatches?(row: string, contentRow: number): string;
 }
@@ -219,6 +221,8 @@ export interface InteractiveView extends TerminalFrameProvider {
   selectionRevision?(): number;
   /** Current transcript scroll position for rejecting an externally moved drag. */
   selectionTop?(): number;
+  /** Last painted frame dimensions, independent of streamed source revisions. */
+  readonly pointerGeometry?: PointerGeometry;
   /** The block under screen row `row`, for a click that lands on the transcript. */
   blockAtScreenRow(row: number): Block | undefined;
   /**
@@ -246,6 +250,12 @@ export interface InteractiveView extends TerminalFrameProvider {
    * needs exactly that, or the user is told match 3 exists with no way to see it.
    */
   scrollToContentRow?(row: number): boolean;
+}
+
+export interface PointerGeometry {
+  readonly width: number;
+  readonly height: number;
+  readonly layout: FrameLayout;
 }
 
 export interface ComposerGeometry {
