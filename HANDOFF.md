@@ -776,3 +776,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A selection over the operation ledger returns nothing, and the command reports "no operation belongs to that turn" while the ledger plainly holds two.
 - **Root Cause**: `scanOperations` yields — it is a generator. Calling `.filter()` on it is a `TypeError`, and the command's `catch` turned that into a generic "could not be verified" report. The unit test that called the same helper looked like it passed because its own `.map()` threw first and the assertion was about a different line.
 - **Rule**: Spread a generator before using array methods on it, and make the first test assertion be the one that would fail if the value were the wrong kind. When a selection helper returns nothing, check whether it returned at all before checking what it selected.
+
+### Run A Focused Test From The Package Directory
+- **Symptom**: A single-file `vitest run src/.../pastes.test.ts` reports 167 files and 4349 tests, most of them from `.tmp/*/worktree` copies.
+- **Root Cause**: From the repository root, vitest's default include matches every `*.test.ts` it can reach, and `.tmp` holds historical worktree snapshots that each contain a full copy of the suite. The path argument narrows nothing because it is resolved as a filter over that larger set.
+- **Rule**: Run focused tests from `packages/ts-shell`, where the config and the source tree agree, and pass the file path relative to it. From the repository root use `npm run test:ts -- <path>` only when the whole suite is genuinely intended.
