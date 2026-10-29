@@ -347,6 +347,11 @@ export class TUI {
       this.scheduleFrame(BACKLOG_RETRY_MS);
       return;
     }
+    // A frame painted now satisfies whatever a pending timer was queued for.
+    // Leaving it armed would paint the same frame again a few milliseconds
+    // later — the caller asked for a frame, not for two.
+    this.scheduler.clearTimeout(this.frameTimer);
+    this.frameTimer = undefined;
     const startedAt = this.scheduler.now();
     const dimensions = this.terminal.getDimensions();
     if (dimensions.columns <= 0 || dimensions.rows <= 0) return;

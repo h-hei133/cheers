@@ -433,6 +433,37 @@ describe("steady-state repaint", () => {
     expect(provider.layouts).toHaveLength(1);
   });
 
+  it("does not paint twice when a frame is drawn with a timer still pending", () => {
+    // A direct paint satisfies whatever the pending timer was queued for.
+    // Leaving it armed painted the same frame again a few milliseconds later.
+    const terminal = new RecordingTerminal();
+    const timers: Array<{ id: number; run: () => void }> = [];
+    let nextId = 1;
+    const scheduler = {
+      setTimeout: (callback: () => void) => { const id = nextId++; timers.push({ id, run: callback }); return id; },
+      clearTimeout: (handle: unknown) => {
+        const at = timers.findIndex(entry => entry.id === handle);
+        if (at >= 0) timers.splice(at, 1);
+      },
+      setImmediate: (callback: () => void) => { callback(); return nextId++; },
+      now: () => 0,
+    };
+    const provider = new StubProvider();
+    const tui = new TUI(terminal, scheduler);
+    tui.setFrameProvider(provider);
+    tui.start();
+    timers.length = 0;
+    provider.layouts.length = 0;
+
+    tui.requestRender();            // queues a frame timer
+    expect(timers).toHaveLength(1);
+    tui.renderNow();                // paints immediately
+    expect(timers).toHaveLength(0);
+    while (timers.length) timers.shift()!.run();
+
+    expect(provider.layouts).toHaveLength(1);
+  });
+
   it("writes nothing but framing when the frame is identical", () => {
     const { tui, terminal, scheduler } = boot();
     tui.start();
