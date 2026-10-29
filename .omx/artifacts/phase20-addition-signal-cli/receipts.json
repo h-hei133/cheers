@@ -1,0 +1,458 @@
+[
+  {
+    "mode": "regular",
+    "signal": "SIGTERM",
+    "buildId": "94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff",
+    "inputsDigest": "b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193",
+    "fixtures": 1,
+    "messagesPerFixture": 1,
+    "providerMode": "synthetic",
+    "status": "passed",
+    "stages": [
+      {
+        "label": "signal-close",
+        "status": "passed",
+        "sessionMatchesFixture": true,
+        "turns": 1,
+        "userBlocks": 1,
+        "fixtureHistoryVisible": true,
+        "shutdown": {
+          "code": 143,
+          "signal": null
+        },
+        "exitMs": 103,
+        "observation": {
+          "requests": 0,
+          "physicalStops": 0,
+          "exitRestores": 1,
+          "session": {
+            "id": "sess_7c03f05b971821ca_1793315153930",
+            "turns": 1,
+            "userBlocks": 1
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "retained": true,
+        "durableStatus": "terminated",
+        "outputBytes": 1652,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "label": "fresh-reopen",
+        "status": "passed",
+        "sessionMatchesFixture": false,
+        "turns": 0,
+        "userBlocks": 0,
+        "fixtureHistoryVisible": false,
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 178,
+        "observation": {
+          "requests": 0,
+          "physicalStops": 1,
+          "exitRestores": 0,
+          "session": {
+            "id": "sess_f89272d00b48b51a_1793315159336",
+            "turns": 0,
+            "userBlocks": 0
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "retained": false,
+        "outputBytes": 4137,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "label": "explicit-resume",
+        "status": "passed",
+        "sessionMatchesFixture": true,
+        "turns": 1,
+        "userBlocks": 1,
+        "fixtureHistoryVisible": true,
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 156,
+        "observation": {
+          "requests": 0,
+          "physicalStops": 1,
+          "exitRestores": 0,
+          "session": {
+            "id": "sess_7c03f05b971821ca_1793315153930",
+            "turns": 1,
+            "userBlocks": 1
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "retained": true,
+        "durableStatus": "terminated",
+        "outputBytes": 1726,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      }
+    ],
+    "checks": {
+      "catchableSignalPersistsTerminated": true,
+      "ordinaryLaunchStartsFresh": true,
+      "explicitResumeRetainsHistory": true,
+      "configUnchanged": true,
+      "zeroRequests": true
+    },
+    "scratchRemoved": true,
+    "peakRssKiB": 286852,
+    "elapsedSeconds": 14.67
+  },
+  {
+    "mode": "regular",
+    "signal": "SIGHUP",
+    "buildId": "94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff",
+    "inputsDigest": "b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193",
+    "fixtures": 1,
+    "messagesPerFixture": 1,
+    "providerMode": "synthetic",
+    "status": "passed",
+    "stages": [
+      {
+        "label": "signal-close",
+        "status": "passed",
+        "sessionMatchesFixture": true,
+        "turns": 1,
+        "userBlocks": 1,
+        "fixtureHistoryVisible": true,
+        "shutdown": {
+          "code": 129,
+          "signal": null
+        },
+        "exitMs": 98,
+        "observation": {
+          "requests": 0,
+          "physicalStops": 0,
+          "exitRestores": 1,
+          "session": {
+            "id": "sess_b5642f7f99b19545_1793315183025",
+            "turns": 1,
+            "userBlocks": 1
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "retained": true,
+        "durableStatus": "terminated",
+        "outputBytes": 1652,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "label": "fresh-reopen",
+        "status": "passed",
+        "sessionMatchesFixture": false,
+        "turns": 0,
+        "userBlocks": 0,
+        "fixtureHistoryVisible": false,
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 177,
+        "observation": {
+          "requests": 0,
+          "physicalStops": 1,
+          "exitRestores": 0,
+          "session": {
+            "id": "sess_3dd8fbc94d220a91_1793315188325",
+            "turns": 0,
+            "userBlocks": 0
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "retained": false,
+        "outputBytes": 4254,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "label": "explicit-resume",
+        "status": "passed",
+        "sessionMatchesFixture": true,
+        "turns": 1,
+        "userBlocks": 1,
+        "fixtureHistoryVisible": true,
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 159,
+        "observation": {
+          "requests": 0,
+          "physicalStops": 1,
+          "exitRestores": 0,
+          "session": {
+            "id": "sess_b5642f7f99b19545_1793315183025",
+            "turns": 1,
+            "userBlocks": 1
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "retained": true,
+        "durableStatus": "terminated",
+        "outputBytes": 1726,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      }
+    ],
+    "checks": {
+      "catchableSignalPersistsTerminated": true,
+      "ordinaryLaunchStartsFresh": true,
+      "explicitResumeRetainsHistory": true,
+      "configUnchanged": true,
+      "zeroRequests": true
+    },
+    "scratchRemoved": true,
+    "peakRssKiB": 287176,
+    "elapsedSeconds": 14.6
+  },
+  {
+    "mode": "fullscreen",
+    "signal": "SIGTERM",
+    "buildId": "94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff",
+    "inputsDigest": "b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193",
+    "fixtures": 1,
+    "messagesPerFixture": 1,
+    "providerMode": "synthetic",
+    "status": "passed",
+    "stages": [
+      {
+        "label": "signal-close",
+        "status": "passed",
+        "sessionMatchesFixture": true,
+        "turns": 1,
+        "userBlocks": 1,
+        "fixtureHistoryVisible": true,
+        "shutdown": {
+          "code": 143,
+          "signal": null
+        },
+        "exitMs": 103,
+        "observation": {
+          "requests": 0,
+          "physicalStops": 0,
+          "exitRestores": 1,
+          "session": {
+            "id": "sess_d87e88121f9c8e8c_1793315210429",
+            "turns": 1,
+            "userBlocks": 1
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "retained": true,
+        "durableStatus": "terminated",
+        "outputBytes": 2178,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "label": "fresh-reopen",
+        "status": "passed",
+        "sessionMatchesFixture": false,
+        "turns": 0,
+        "userBlocks": 0,
+        "fixtureHistoryVisible": false,
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 172,
+        "observation": {
+          "requests": 0,
+          "physicalStops": 1,
+          "exitRestores": 0,
+          "session": {
+            "id": "sess_b67754afa7332e16_1793315215870",
+            "turns": 0,
+            "userBlocks": 0
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "retained": false,
+        "outputBytes": 3938,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "label": "explicit-resume",
+        "status": "passed",
+        "sessionMatchesFixture": true,
+        "turns": 1,
+        "userBlocks": 1,
+        "fixtureHistoryVisible": true,
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 148,
+        "observation": {
+          "requests": 0,
+          "physicalStops": 1,
+          "exitRestores": 0,
+          "session": {
+            "id": "sess_d87e88121f9c8e8c_1793315210429",
+            "turns": 1,
+            "userBlocks": 1
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "retained": true,
+        "durableStatus": "terminated",
+        "outputBytes": 2749,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      }
+    ],
+    "checks": {
+      "catchableSignalPersistsTerminated": true,
+      "ordinaryLaunchStartsFresh": true,
+      "explicitResumeRetainsHistory": true,
+      "configUnchanged": true,
+      "zeroRequests": true
+    },
+    "scratchRemoved": true,
+    "peakRssKiB": 286804,
+    "elapsedSeconds": 14.71
+  },
+  {
+    "mode": "fullscreen",
+    "signal": "SIGHUP",
+    "buildId": "94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff",
+    "inputsDigest": "b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193",
+    "fixtures": 1,
+    "messagesPerFixture": 1,
+    "providerMode": "synthetic",
+    "status": "passed",
+    "stages": [
+      {
+        "label": "signal-close",
+        "status": "passed",
+        "sessionMatchesFixture": true,
+        "turns": 1,
+        "userBlocks": 1,
+        "fixtureHistoryVisible": true,
+        "shutdown": {
+          "code": 129,
+          "signal": null
+        },
+        "exitMs": 103,
+        "observation": {
+          "requests": 0,
+          "physicalStops": 0,
+          "exitRestores": 1,
+          "session": {
+            "id": "sess_f3e3f00b389eeffc_1793315238093",
+            "turns": 1,
+            "userBlocks": 1
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "retained": true,
+        "durableStatus": "terminated",
+        "outputBytes": 2178,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "label": "fresh-reopen",
+        "status": "passed",
+        "sessionMatchesFixture": false,
+        "turns": 0,
+        "userBlocks": 0,
+        "fixtureHistoryVisible": false,
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 168,
+        "observation": {
+          "requests": 0,
+          "physicalStops": 1,
+          "exitRestores": 0,
+          "session": {
+            "id": "sess_31b2157e22ae1a95_1793315243650",
+            "turns": 0,
+            "userBlocks": 0
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "retained": false,
+        "outputBytes": 3938,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      },
+      {
+        "label": "explicit-resume",
+        "status": "passed",
+        "sessionMatchesFixture": true,
+        "turns": 1,
+        "userBlocks": 1,
+        "fixtureHistoryVisible": true,
+        "shutdown": {
+          "code": 0,
+          "signal": null
+        },
+        "exitMs": 160,
+        "observation": {
+          "requests": 0,
+          "physicalStops": 1,
+          "exitRestores": 0,
+          "session": {
+            "id": "sess_f3e3f00b389eeffc_1793315238093",
+            "turns": 1,
+            "userBlocks": 1
+          }
+        },
+        "device": {
+          "cookedFlagsRestored": true
+        },
+        "retained": true,
+        "durableStatus": "terminated",
+        "outputBytes": 2749,
+        "outputLimitExceeded": false,
+        "deadlineExceeded": false
+      }
+    ],
+    "checks": {
+      "catchableSignalPersistsTerminated": true,
+      "ordinaryLaunchStartsFresh": true,
+      "explicitResumeRetainsHistory": true,
+      "configUnchanged": true,
+      "zeroRequests": true
+    },
+    "scratchRemoved": true,
+    "peakRssKiB": 286088,
+    "elapsedSeconds": 14.81
+  }
+]

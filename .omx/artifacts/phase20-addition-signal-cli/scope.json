@@ -1,0 +1,27 @@
+{
+  "modes": [
+    "regular",
+    "fullscreen"
+  ],
+  "signals": [
+    "SIGTERM",
+    "SIGHUP"
+  ],
+  "stagesPerRun": [
+    "catchable idle signal",
+    "ordinary fresh launch",
+    "explicit same-session resume"
+  ],
+  "cliLaunches": 12,
+  "realRequests": 0,
+  "fixturesPerRun": 1,
+  "messagesPerFixture": 1,
+  "heapMiB": 768,
+  "stageDeadlineMs": 20000,
+  "outputCapBytes": 2097152,
+  "rawOutputArchived": false,
+  "deadPty": false,
+  "busyTurn": false,
+  "sigkill": false,
+  "productChanges": false
+}

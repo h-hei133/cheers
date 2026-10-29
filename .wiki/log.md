@@ -10334,3 +10334,11 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 旧build真实regular在clear→Next返回搜索首批，产品失败收据保留；两条actual host回归旧实现失败，修复后session75全过，page/scope各独立反转1失败，finally恢复后2项通过。五静态门/diff、build和独立freshness通过，build `94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff`、inputs `b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193`，460/3549一致；产品AST session14/actions4未增加。
 
 新build两模式各48小会话、45秒/2MiB/heap768MiB、真实CLI/PTY按键串行：base/search两页、clear后Next、continued-base显式refresh、真实Tab切scope、精确resume/selection读回、重开/Esc/Ctrl+D通过。页面覆盖48、仅current合法跨页重复、末页无Next，实际绘制ID与行一致；零请求、配置不变、cooked flags恢复，退出138/137ms，峰值RSS298588/301976KiB，探针16.92/16.65秒。正式收据/失败/反转/build工件和HANDOFF保留，scratch清理；当前小型WSL PTY不替代用户大目录/桌面/Windows/IME/外部变动或独立review，原47不升级、goal active，提交/CI另绑定。
+
+20.39已推送`cf397c69bc59d7bd564c0923bf981ebf050e679a`，远端main一致。延后核对Watch40970201142 success、CI40970201073 in_progress；20.38 CI40968345119与20.37 CI40967568515 success，均head一致。
+
+## [2026-10-30] verify | 空闲signal退出与fresh/resume实际CLI
+
+沿[addition20.40](features/phase-20-addition.md#2040-空闲信号关闭普通fresh与显式恢复的实际cli证据)补regular/fullscreen×SIGTERM/SIGHUP。每组一条小fixture，三阶段原Node CLI/PTY：显式会话→信号退出→磁盘terminated；普通启动→新ID/无旧history→Ctrl+D空会话删除；显式恢复→原ID/同一turn和user block/实际fixture绘制→Ctrl+D retained/terminated。synthetic零请求、隔离profile/home、heap768MiB/每CLI20秒/2MiB，12次严格串行首轮均过，配置原字节保持、current selection逐次读回。
+
+信号退出98–103ms、143/129，普通退出148–178ms、0，12次termios cooked恢复；四次signal走exit restoreSync一次、没有完整stop，八次普通走stop一次。峰值RSS286088–287176KiB，每组三阶段14.60–14.81秒。正式收据/脚本/边界保留、scratch清理；无产品变更，不重复build/Vitest，语法/JSON/五门/diff通过、118旧advisory。信号注入仍连接PTY，不代替busy/pending、实际断连/EIO、SIGKILL、非Linux、桌面/IME、live或独立review；原47不升级、goal active，Git/精确CI另绑定。

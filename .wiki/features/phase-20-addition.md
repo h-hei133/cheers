@@ -3173,11 +3173,11 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 |---|---|---|
 | 24 | 本地实现与聚焦验证 | 缺真实终端/用户目录审批现场与非Linux文件系统证据 |
 | 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses/Google native摘要准入已实现；20.33新增当前relay真实小请求的公开thinking/展开/恢复，auto保留，整体partial | 其他模型/协议默认与公开内容、真实账户及用户终端复验；单个relay请求不覆盖完整矩阵 |
-| 26 | 四条明确机制及MCP未开始调用的关闭拒绝已修；本地验证 | 缺真实用户退出现场；MCP预算到期不能证明清理完成 |
+| 26 | 四条明确机制、MCP未开始调用及表面/渲染失败围栏已修；20.36/20.40有小型真实CLI正常/空闲信号退出证据 | 缺真实用户故障退出与busy信号现场；MCP预算到期不能证明清理完成 |
 | 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
 | 28 | 会话入口与配置字段分类隔离已实施；本地聚焦验证 | 缺真实用户终端与整体面板现场验收 |
 | 29 | 同次浏览索引复用与真实目录只读性能已验证；20.38/20.39补48小会话的实际CLI搜索/选择/分页，并修清空查询后重建回带旧查询 | 缺用户大目录终端性能与非Linux证据；小型PTY时间包含输入/去抖/观察开销，不能代替生产性能 |
-| 30 | 空闲fresh、信号关闭及真实恢复保护已实现；本地验证 | 缺真实用户signal/终端现场与非Linux证据；SIGKILL不执行清理钩子 |
+| 30 | 空闲fresh、信号关闭及真实恢复保护已实现；20.40补regular/fullscreen×SIGTERM/SIGHUP实际CLI持久状态、普通fresh和显式resume | 缺用户终端关闭、busy信号、非Linux与不可捕获崩溃证据；SIGKILL不执行清理钩子 |
 | 19.8 | 分桶恢复、真实加载与可见partial/unknown已实现；本地验证 | 原损坏记录及其生成原因未取得；无法恢复丢失的真实账单数值 |
 
 只派gpt-6.1-sol只读/编辑代理；它们未运行任何test/build/验证。主代理在package目录每次一个文件、768MiB堆、threads=false，以`&&`串行验证。没有全套回归、没有PTY/exe、没有20k真实终端或真实provider请求。源码五静态门通过，118项旧docs advisory保留；完整声明图的单一focused脚本用例通过，module facade无超限。TypeScript build已通过，最终新鲜度和提交状态以开发日志中的实际读回为准。
@@ -3697,3 +3697,24 @@ build `bca358900c8273b0046b8f6826687157c1f0e1a6b8442a4d69c7a4c7af5c5260`，input
 每次base首批40个、末批8个非current加单个current；页内无重复，非current跨页不重复，并集精确覆盖48个fixture。current跨页出现是原合同，不误判为重复故障。搜索两页与base对应行完全一致、末批不再提供Next；八个采样页面全部fixture ID均在原renderer的绘制行中出现。所有翻页/清空/refresh/scope过程中current selection仍为fixture0，只有最后精确resume切到fixture2，零message.started、配置字节不变；两次正常终端均读回ICANON/ECHO/ISIG。时间包括诊断、真实输入、去抖及磁盘读取，不能宣称2409项用户目录性能或无探针生产延迟。
 
 正式工件[resume-pages](../../.omx/artifacts/phase20-addition-resume-pages/)保存可复用脚本、原失败与两份有效收据、反转日志和build投影；final探针新增scope步骤，两模式实际重跑通过。HANDOFF追加seed覆盖陷阱，task scratch删除、原CLAUDE.md保留。没有真实provider、用户桌面/Windows/IME、外部目录变动、独立review或exe/full suite/20k证据；原47项状态不升级，ADD与Codex goal继续active。本批提交/推送及精确CI另绑定。
+
+20.39已提交推送`cf397c69bc59d7bd564c0923bf981ebf050e679a`，远端main精确一致、仅原CLAUDE.md。延后核对[Watch40970201142](https://github.com/h-hei133/cheers/actions/runs/40970201142)completed/success、[CI40970201073](https://github.com/h-hei133/cheers/actions/runs/40970201073)in_progress，head一致；20.38 CI40968345119与20.37 CI40967568515已completed/success。Watch工作流成功不自动代表全部架构义务或Phase验收完成。
+
+### 20.40 空闲信号关闭、普通fresh与显式恢复的实际CLI证据
+
+反馈26/30沿原runner的signalSessionClose、createCliShutdown、bootstrap恢复判定与Terminal出口检查；此前20.5已实现idle saveTerminated、busy保留真实恢复证据，本批先补idle真实CLI路径。定向只读复读pi interactive-mode.ts:4392–4416：信号出口保留handler至cleanup完成，先资源退出后终端恢复，并与普通交互退出顺序区分。采用观察实际信号/普通两条路径的决定，本项目继续保留143/129和原10秒资源预算；不以参考exit0或完整ui.stop推断本项目相同执行序列，无新产品代码。
+
+build `94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff`、inputs `b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193`，与20.39已独立freshness一致。四组regular/fullscreen×SIGTERM/SIGHUP各独立home/profile/project，原SessionManager每组创建一条含单user消息的已完成fixture。每组沿原scripts/start.mjs、Python120×60 PTY串行启动三次：显式session启动并等真实prompt后向relay发信号，原relay→launcher→CLI转发；普通启动不传session ID，最后再显式传原ID。synthetic、offline、warming off、零tools/skills/指令、heap768MiB，每CLI20秒、2MiB边界，全部12次实际进程退出后才继续。
+
+观察器调用原InteractiveMode.start、Terminal.stop/restoreSync和TurnSink，记录session身份、turn/user block数量、实际退出restore调用与request数量；仅fixture正文用于内存PTY匹配，不输出或保存正文。四组首次均明确显示原fixture一条历史，SIGTERM/SIGHUP后原磁盘status=terminated且记录保留；普通重开每次为不同ID、零turn/零user block且PTY没有fixture历史，Ctrl+D后空会话按原合同删除；显式resume仍回原ID、一条turn/一条user block、实际PTY显示同fixture历史，正常退出仍retained/terminated。三阶段current selection均读回实际活动ID，配置原字节不变、零message.started。
+
+| 模式/信号 | 信号退出 | 普通fresh Ctrl+D | 显式resume Ctrl+D | 峰值RSS/三阶段探针 |
+|---|---|---|---|---|
+| regular/SIGTERM | 103ms、143 | 178ms、0 | 156ms、0 | 286852KiB / 14.67s |
+| regular/SIGHUP | 98ms、129 | 177ms、0 | 159ms、0 | 287176KiB / 14.60s |
+| fullscreen/SIGTERM | 103ms、143 | 172ms、0 | 148ms、0 | 286804KiB / 14.71s |
+| fullscreen/SIGHUP | 103ms、129 | 168ms、0 | 160ms、0 | 286088KiB / 14.81s |
+
+四次信号退出各观察Terminal.restoreSync=1、stop=0；八次普通退出各stop=1、exit restore=0。信号成功恢复设备依赖原process exit钩子，不声称已经走完整InteractiveMode/TUI stop或每个render owner退休。Python在12次child结束后均读回ICANON/ECHO/ISIG恢复，CLI signal exit仍为143/129，不能把非零signal状态改称普通成功exit0。这里向仍正常连接的PTY注入SIGHUP，不是用户窗口实际断开/EIO，不证明故障设备或busy turn恢复。
+
+正式工件[signal-cli](../../.omx/artifacts/phase20-addition-signal-cli/)保存脚本、四组收据与边界，全部首轮通过，临时状态删除、原CLAUDE.md保留。仅文档/诊断工件变化，未重复build/Vitest/graph；脚本语法、JSON/12阶段断言与五静态门/diff检查通过，118既有docs-source advisory保留。没有真实provider、busy或pending写入、实际PTY断连、SIGKILL、Windows/桌面/IME、独立review、exe/full suite/20k证据；不升级原47项状态，ADD与Codex goal继续active。本批Git/精确CI另绑定。
