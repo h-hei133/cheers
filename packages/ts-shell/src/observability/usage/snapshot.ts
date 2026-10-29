@@ -1,5 +1,5 @@
 import { isRecord } from "../../core/values/record.js";
-import { MAX_RECENT_REQUESTS, type ModelUsageBucket, type SessionUsageSnapshot, type UsageHistoryEntry } from "./model.js";
+import { MAX_RECENT_REQUESTS, type ModelUsageBucket, type SessionUsageSnapshot, type UsageHistoryEntry, type UsageHealth } from "./model.js";
 import { decodeAttribution, legacyBucketKey } from './identity.js';
 
 const bucketFields = ["promptTokens", "completionTokens", "totalTokens", "cacheReadTokens", "cacheWriteTokens", "turnsCount"] as const;
@@ -15,6 +15,44 @@ function text(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 16_384;
 }
 
+export function decodeUsageHealth(value: unknown): UsageHealth | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value) || value.status !== 'degraded' || typeof value.invalidSnapshot !== 'boolean'
+    || typeof value.rejectedBuckets !== 'number' || typeof value.rejectedHistoryEntries !== 'number'
+    || !Number.isSafeInteger(value.rejectedBuckets) || !Number.isSafeInteger(value.rejectedHistoryEntries)) {
+    throw new Error('Invalid persisted session usage health');
+  }
+  return { status: 'degraded', rejectedBuckets: count(value.rejectedBuckets),
+    rejectedHistoryEntries: count(value.rejectedHistoryEntries), invalidSnapshot: value.invalidSnapshot };
+}
+
+export function mergeUsageHealth(...values: (UsageHealth | undefined)[]): UsageHealth | undefined {
+  const present = values.filter((value): value is UsageHealth => value !== undefined);
+  if (!present.length) return undefined;
+  return { status: 'degraded', rejectedBuckets: Math.max(...present.map(value => value.rejectedBuckets)),
+    rejectedHistoryEntries: Math.max(...present.map(value => value.rejectedHistoryEntries)),
+    invalidSnapshot: present.some(value => value.invalidSnapshot) };
+}
+
+/** Publication callbacks receive one immutable, already validated value. */
+export function freezeUsageSnapshot(snapshot: SessionUsageSnapshot | undefined): void {
+  if (!snapshot) return;
+  for (const bucket of Object.values(snapshot.byModel)) Object.freeze(bucket);
+  for (const entry of snapshot.recentRequests) Object.freeze(entry);
+  Object.freeze(snapshot.byModel);
+  Object.freeze(snapshot.recentRequests);
+  if (snapshot.usageHealth) Object.freeze(snapshot.usageHealth);
+  Object.freeze(snapshot);
+}
+
+export function decodeUsageBucket(key: string, raw: unknown, attributed: boolean): ModelUsageBucket {
+  if (!isRecord(raw)) throw new Error('Invalid persisted session usage bucket');
+  const attribution = decodeAttribution(key, attributed ? raw.attribution : undefined);
+  const bucket = { ...(attribution ? { attribution } : {}) } as ModelUsageBucket;
+  for (const field of bucketFields) bucket[field] = count(raw[field]);
+  return bucket;
+}
+
 /** Copy and validate at the durable boundary; model keys remain opaque. */
 export function decodeUsageSnapshot(value: unknown): SessionUsageSnapshot | undefined {
   if (value === undefined) return undefined;
@@ -24,26 +62,26 @@ export function decodeUsageSnapshot(value: unknown): SessionUsageSnapshot | unde
   if (value.schemaVersion !== undefined && value.schemaVersion !== 2) throw new Error('Unsupported session usage schema');
   const byModel = Object.create(null) as Record<string, ModelUsageBucket>;
   for (const [storedKey, raw] of Object.entries(value.byModel)) {
-    if (!isRecord(raw)) throw new Error("Invalid persisted session usage bucket");
     const key = value.schemaVersion === 2 ? storedKey : legacyBucketKey(storedKey);
-    const attribution = decodeAttribution(key, value.schemaVersion === 2 ? raw.attribution : undefined);
-    const bucket = { ...(attribution ? { attribution } : {}) } as ModelUsageBucket;
-    for (const field of bucketFields) bucket[field] = count(raw[field]);
-    byModel[key] = bucket;
+    byModel[key] = decodeUsageBucket(key, raw, value.schemaVersion === 2);
   }
-  const recentRequests = history(value.recentRequests);
+  const recentRequests = decodeUsageHistory(value.recentRequests);
+  const usageHealth = decodeUsageHealth(value.usageHealth);
+  const lastBucketKey = value.schemaVersion === 2 ? value.lastBucketKey : legacyBucketKey(value.lastBucketKey);
+  if (lastBucketKey) decodeAttribution(lastBucketKey, byModel[lastBucketKey]?.attribution);
   return {
     schemaVersion: 2,
+    ...(usageHealth ? { usageHealth } : {}),
     byModel,
     turnsCount: count(value.turnsCount),
     toolCallsCount: count(value.toolCallsCount),
-    lastBucketKey: value.schemaVersion === 2 ? value.lastBucketKey : legacyBucketKey(value.lastBucketKey),
+    lastBucketKey,
     lastUpdated: count(value.lastUpdated),
     recentRequests,
   };
 }
 
-function history(value: unknown): UsageHistoryEntry[] {
+export function decodeUsageHistory(value: unknown): UsageHistoryEntry[] {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > MAX_RECENT_REQUESTS) {
     throw new Error("Invalid persisted session usage history");
@@ -161,5 +199,7 @@ export function mergeUsageDelta(
     merged.lastBucketKey = live.lastBucketKey;
   }
   merged.lastUpdated = Math.max(merged.lastUpdated, live.lastUpdated);
+  const usageHealth = mergeUsageHealth(merged.usageHealth, live.usageHealth, baseline?.usageHealth);
+  if (usageHealth) merged.usageHealth = usageHealth;
   return merged;
 }

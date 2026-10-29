@@ -10031,3 +10031,15 @@ Responses接通raw reasoning_text delta/done及终态content投影，summary优�
 八类有界反转命中：外部分类1、真实CLI显式答案2、thinking恢复1、raw流2、持久化失败exit1、忙时exit6、目录分页1、附带read denial2；全部逐字节恢复后重验。MCP恢复旧await反转55秒未终止，子进程结束并恢复，不计通过；当前7项正常入口用例重验通过。配置scope夹具首次未建立pathRules属于setup缺失，补实际规则后通过；不存在的directoryListing.test调用零测试，已用readImprovements19及完整approval25验证，不计产品失败。
 
 最终五静态门通过（118旧docs-source advisory保留），单一完整声明图脚本用例通过、module facade0，heap1536MiB TS build manifest ef6ff29f263a通过、diff --check通过。源码SHA-256前12位：workspace be4b051703e2、tools 9865a90d6475、interactiveLoop 59bae8f22ff4、interactiveMode 11333f3e687c、history 04fb4b2dc2ab、Responses stream 93298a7825da、signalHandlers 5cf440086dfd、CLI approval b2b7443fae14、directoryListing 7a9be4854f0e。以上是本地验证证据，推送与CI终态须分别读回；本批不等待CI。HANDOFF追加实际审批桥、目录祖先校验和推理终态/replay三条guardrail。ADD整体active，原47项矩阵未重跑；20.4列明后续工作。
+
+## [2026-10-29] fix | 空闲会话启动、信号关闭与损坏用量恢复
+
+当前main继续[addition20.5/20.6](features/phase-20-addition.md#205-空闲启动与信号关闭)。普通idle active不再静默重入，显式adopt/resume及真实pending/turn-active/interrupted/stopped/未验证写入保持恢复；读不出recovery时保留旧session并显示安全通知。SIGTERM/SIGHUP hook一次且纳入原10秒预算，仅确认idle写terminated；busy或未确认效果不清pending/terminal，普通close/restart/profile不执行此hook。恢复通知经过真实TTY startupNotice route。
+
+usage恢复逐bucket/history严格校验、保留健康项，坏history加usage-gap；SessionStore先于runtime的strict阻断同时修复。usageHealth持久化且经startup、status和cost显示partial/unknown；健康free分桶不代表损坏session总费用为0。可信baseline补回缺/坏bucket再加delta，合法倒退仍拒绝；writer快照冻结，save失败不ack且保留待写增量。第19.8节更正旧推断：当前目录刷新不改变旧记录自身captured rates的编码，原坏key原因未确认；崩溃记录本身不证明实际归零。
+
+主代理12个显式文件逐个768MiB/threads=false串行通过，共214项：cost26、sessionFacts24、band18、shutdown11、bootstrap28、recovery/work12、usage/recovery19、usage/persistence11、usage/attribution21、session/store/usage11、cliProcessRunner7、usageTelemetry26。CLI6项初次失败属于fixture先cleanup取消hint再等待hint，调整观察顺序后通过；后续telemetry命令曾被&&短路未跑，随后单独串行通过。新增测试含真实SessionManager resume→activate→record→save→resume与真实runner钩子接线。两个gpt-6.1-sol代理仅读/编辑，未执行任何验证。
+
+八类反转各命中行为失败且字节恢复后重验：idle1、signal hook2、busy/pending/unknown保护3、真实store1、runtime恢复1、partial合计1、history-gap1、baseline2。反转诊断脚本两次因包装异常文本匹配过窄中断，finally均恢复源码，补准确匹配后重验；无超时/OOM/零测试。临时脚本已删除。五静态门与diff通过（118旧docs advisory），完整声明图单一脚本用例通过，module facade0，NormProof judge proven/0open/0failed/0gap仅证结构。TS build `235b6ac3dc39aaab2892ffada43a64723461065d088072eb25b101732a1bd7a7`通过并重新比较compilerInputs digest确认新鲜。无全套、PTY/exe、20k真实终端或真实provider验证，原47项矩阵未重跑。
+
+上一批已推送`ec1bcadb060e4b249af58a96bde2f9ee21569fe3`的[CI40882737918](https://github.com/h-hei133/cheers/actions/runs/40882737918)和[Architecture Watch40882737805](https://github.com/h-hei133/cheers/actions/runs/40882737805)已延后读取确认success。本批提交/推送状态须分别读回，CI按用户要求稍后检查；剩余25默认请求/点击、27根因区分、28设置结构、29索引复用及真实环境证据见addition20.4。保留未跟踪CLAUDE.md，HANDOFF新增idle与usage两条guardrail。

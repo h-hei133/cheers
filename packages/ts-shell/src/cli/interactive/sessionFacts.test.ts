@@ -104,6 +104,29 @@ it("uses the session-affine pool member for status and context reporting", async
 });
 
 describe("status facts", () => {
+  it('marks retained accounting partial and never renders lost usage as a free session', () => {
+    const id = 'status-corrupt-usage'; resetSessionUsage(id);
+    try {
+      const runtime = context(id);
+      recordSessionUsage(id, { attribution: captureUsageAttribution({ provider: 'openai', model: 'opus-5',
+        baseUrl: 'https://priced.invalid', rates: { promptPerMTok: 1, completionPerMTok: 0 } }), promptTokens: 1_000_000 });
+      const snapshot = structuredClone(getSessionUsage(id));
+      snapshot.byModel['@usage:broken'] = {} as never;
+      resetSessionUsage(id); restoreSessionUsage(id, snapshot);
+      const retained = readStatusFacts(runtime);
+      expect(retained).toMatchObject({ costUsd: 1, costPartial: true, usageIncomplete: true });
+      expect(stripAnsi(renderStatusItem('session-tokens', retained)!)).toBe('1000k tok partial');
+      expect(stripAnsi(renderStatusItem('cost', retained)!)).toBe('est $1.0000 partial');
+      resetSessionUsage(id); restoreSessionUsage(id, { schemaVersion: 2, byModel: { '@usage:broken': {} },
+        turnsCount: 0, toolCallsCount: 0, lastBucketKey: '', lastUpdated: 0, recentRequests: [] });
+      const lost = readStatusFacts(runtime);
+      expect(lost.costUsd).toBeUndefined(); expect(lost.sessionTokens).toBeUndefined();
+      expect(stripAnsi(renderStatusItem('cost', lost)!)).toBe('cost unknown');
+      expect(stripAnsi(renderStatusItem('session-tokens', lost)!)).toBe('tokens unknown');
+      expect(stripAnsi(renderStatusItem('turns', lost)!)).toBe('turns unknown');
+    } finally { resetSessionUsage(id); }
+  });
+
   it('keeps estimates marked and stale numbers absent from the status band', () => {
     const runtime = context('status-local-preview');
     const estimated = readStatusFacts(runtime, { promptContext: { tokens: 1700, source: 'estimated' } });

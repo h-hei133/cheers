@@ -13,15 +13,20 @@ export function costReport(model: CostModel, projectRoot = process.cwd()) {
   const omittedBuckets = model.buckets.length - shownBuckets.length;
   const buckets = shownBuckets.map(bucket => projectBucket(bucket, projectRoot));
   const lines: ReportLine[] = [];
-  if (model.recordedTurns === 0 && model.buckets.length === 0) {
-    lines.push({ kind: 'text', spans: [span('No usage has been recorded in this session yet, so there is nothing to count.')] });
+  if (model.usageHealth) lines.push({ kind: 'text', spans: [span(
+    'Persisted usage is incomplete. Recovered counters and estimates are partial; unreadable usage is unknown.', 'warning')] });
+  if (model.buckets.length === 0 && (model.recordedTurns === 0 || model.usageHealth)) {
+    lines.push({ kind: 'text', spans: [span(model.usageHealth
+      ? 'Session usage and cost are unknown; no valid usage groups were recovered.'
+      : 'No usage has been recorded in this session yet, so there is nothing to count.')] });
   } else {
     lines.push({ kind: 'text', bullet: true, spans: model.buckets.length === 1
       ? [span('Model '), span(buckets[0]!.label, 'code'), span(` · ${model.recordedTurns} recorded request${model.recordedTurns === 1 ? '' : 's'}`)]
       : [span(model.modelCount, 'number'), span(` model${model.modelCount === 1 ? '' : 's'}${model.buckets.length !== model.modelCount ? ` · ${model.buckets.length} usage groups` : ''} · ${model.recordedTurns} recorded request${model.recordedTurns === 1 ? '' : 's'}`)] },
-    { kind: 'text', bullet: true, spans: [span(model.recordedTokens.toLocaleString(), 'number'), span(' tokens reported by the provider')] });
+    { kind: 'text', bullet: true, spans: [span(model.recordedTokens.toLocaleString(), 'number'), span(model.usageHealth
+      ? ' tokens in recovered provider records' : ' tokens reported by the provider')] });
     for (const bucket of buckets) lines.push(...bucketLines(bucket, model.buckets.length > 1));
-    if (model.buckets.length > 1) lines.push({ kind: 'text', spans: [span('Session total estimate: '),
+    if (model.buckets.length > 1 || model.usageHealth) lines.push({ kind: 'text', spans: [span(model.usageHealth ? 'Recovered usage estimate: ' : 'Session total estimate: '),
       span(money(model.estimate.usd), model.estimate.usd === null ? 'warning' : 'number')] });
     lines.push({ kind: 'space' }, { kind: 'text', spans: [span('Costs are estimates for recorded usage, not a provider bill.')] });
     if (model.buckets.some(bucket => bucket.rateBasis === 'captured')) lines.push({ kind: 'text', spans: [span('Captured rates belong to the destination at request time; later catalog changes do not reprice that usage.')] });
@@ -29,16 +34,17 @@ export function costReport(model: CostModel, projectRoot = process.cwd()) {
     if (model.buckets.some(bucket => bucket.rateSource === 'assumed')) lines.push({ kind: 'text', spans: [span(
       'Some rates are estimates at a fixed fallback that does not follow the model in use.', 'warning')] });
     if (model.estimate.coverage === 'partial') lines.push({ kind: 'text', spans: [span(
-      'Partial estimate: unpriced or unclassified tokens are excluded. Unknown costs are not zero.', 'warning')] });
+      'Partial estimate: unreadable usage and unpriced or unclassified tokens are excluded. Unknown costs are not zero.', 'warning')] });
     if (omittedBuckets > 0) lines.push({ kind: 'text', spans: [span(
-      `${omittedBuckets} usage groups omitted from model detail; session totals remain complete.`, 'muted')] });
+      `${omittedBuckets} usage groups omitted from model detail; ${model.usageHealth ? 'recovered' : 'session'} totals include all recorded groups.`, 'muted')] });
     lines.push(...cacheLines(model.cache));
   }
   return createReport({ title: 'Usage', columns: [{ label: 'Category', minWidth: 12 }, { label: 'Tokens', minWidth: 8, align: 'right' },
     { label: 'Rate / million', minWidth: 14, align: 'right' }, { label: 'Estimated USD', minWidth: 14, align: 'right' }], lines,
     facts: { recordedTurns: model.recordedTurns, recordedTokens: model.recordedTokens, estimate: model.estimate,
       totalModels: model.buckets.length, shownModels: buckets.length, omittedModels: omittedBuckets,
-      coverage: omittedBuckets > 0 ? 'partial' : 'complete',
+      ...(model.usageHealth ? { usageHealth: { ...model.usageHealth } } : {}),
+      coverage: omittedBuckets > 0 || model.usageHealth ? 'partial' : 'complete',
       models: buckets.map(bucket => ({ ...bucket, attribution: bucket.attribution ? {
         ...bucket.attribution, rates: bucket.attribution.rates ? { ...bucket.attribution.rates } : null,
       } : null })),

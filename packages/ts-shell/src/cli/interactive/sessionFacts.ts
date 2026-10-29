@@ -109,6 +109,7 @@ export function readStatusFacts(
     ...contextFact,
     ...(totalTokens(usage) > 0 ? { sessionTokens: totalTokens(usage) } : {}),
     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),
+    ...(usage.usageHealth ? { usageIncomplete: true } : {}),
     ...(cost > 0 || zeroCostSupported
       ? { costUsd: cost, costRates: usesAssumedRates ? 'assumed' : 'catalog', costPartial: partial } as const : {}),
   };

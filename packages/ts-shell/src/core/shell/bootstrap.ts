@@ -16,6 +16,7 @@ import {
 import { getWorkflowGitContext } from "../../workflow/gitContext.js";
 import path from "node:path";
 import { replayTodosFromMessages } from "../commands/todoCommandRuntime.js";
+import { hasUnfinishedSessionWork } from '../../session/recovery/work.js';
 
 export type ShellBootstrapPhase =
   | "fast-path-parse"
@@ -160,9 +161,13 @@ export function bootstrapShellRuntime(input: {
       // outcome was never established. That is recovery, and it is what anyone
       // expects after a crash. A session the user simply closed is left closed, and
       // only a one-shot run steps into it.
-      const unfinished =
-        currentSelection.ok &&
-        hasUnfinishedBusiness(input.sessionManager, currentSelection.session);
+      let unfinished = false;
+      if (currentSelection.ok && input.adoptCurrentSession !== true) {
+        try { unfinished = hasUnfinishedBusiness(input.sessionManager, currentSelection.session); }
+        catch {
+          emitLifecycleMessage('Current session recovery could not be verified; starting a fresh session. The saved session was retained.');
+        }
+      }
       if (currentSelection.ok && (input.adoptCurrentSession === true || unfinished)) {
         try {
           const resumed = input.sessionManager.resume(
@@ -341,16 +346,13 @@ export function bootstrapShellRuntime(input: {
 /**
  * Whether a session was left mid-work rather than closed.
  *
- * Any of: it never reached a terminal state, a prompt is still pending, or a write
- * was started and its outcome never established. Each is a reason the user would
- * expect to land back in it rather than somewhere new.
+ * Active metadata is also used by idle sessions. Only their actual recovery
+ * evidence distinguishes interrupted work from an ordinary previous sitting.
  */
 function hasUnfinishedBusiness(
   sessionManager: SessionManager,
   session: Session,
 ): boolean {
-  if (session.status !== "terminated" && session.status !== "completed") return true;
   if (session.pendingPrompt?.trim()) return true;
-  const summary = sessionManager.describeSessionReentry?.(session.id);
-  return summary?.durableStatus === "stopped" || summary?.runPhase === "turn-active";
+  return hasUnfinishedSessionWork(sessionManager.getRecoverySnapshot(session.id));
 }

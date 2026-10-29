@@ -328,7 +328,7 @@ describe('shell bootstrap', () => {
     expect(() => bootstrapShellRuntime({ ...input, requestedSessionId: unfinished.id })).toThrow('cannot also resume');
   });
 
-  it('resumes project current session by default when no --session-id is provided', () => {
+  it('starts fresh instead of adopting the ordinary idle active current session', () => {
     const sessionManager = new SessionManager()
     const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-current-'))
     const oldSession = sessionManager.createNew(projectRoot)
@@ -346,14 +346,65 @@ describe('shell bootstrap', () => {
       renderer: new StreamingRenderer(),
     })
 
-    expect(result.context.session.id).toBe(oldSession.id)
+    expect(result.context.session.id).not.toBe(oldSession.id)
     expect(result.context.session.id).not.toBe(newerSession.id)
+    expect(result.context.session.turns).toEqual([])
   })
+
+  it('adopts the selected idle session only for explicit current-session adoption', () => {
+    const sessionManager = new SessionManager();
+    const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-print-adopt-'));
+    const selected = sessionManager.createNew(projectRoot);
+    sessionManager.addTurn(selected.id, { role: 'user', content: 'kept conversation' });
+    const result = bootstrapShellRuntime({ cwd: projectRoot, runtimeConfig: getRuntimeConfig(projectRoot),
+      gitContext: getWorkflowGitContext(projectRoot), sessionManager, renderer: new StreamingRenderer(), adoptCurrentSession: true });
+    expect(result.context.session.id).toBe(selected.id);
+    expect(result.context.session.turns.map(turn => turn.content)).toEqual(['kept conversation']);
+  });
+
+  it('starts fresh with a safe notice when recovery cannot be read, while retaining the old session', () => {
+    const sessionManager = new SessionManager();
+    const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-unreadable-recovery-'));
+    const selected = sessionManager.createNew(projectRoot);
+    sessionManager.addTurn(selected.id, { role: 'user', content: 'retained saved history' });
+    const snapshot = vi.spyOn(sessionManager, 'getRecoverySnapshot').mockImplementation(() => { throw new Error('private fixture detail'); });
+    const result = bootstrapShellRuntime({ cwd: projectRoot, runtimeConfig: getRuntimeConfig(projectRoot),
+      gitContext: getWorkflowGitContext(projectRoot), sessionManager, renderer: new StreamingRenderer(), adoptCurrentSession: false,
+      emitLifecycleMessages: false });
+    expect(result.context.session.id).not.toBe(selected.id);
+    expect(sessionManager.getSession(selected.id)?.turns.map(turn => turn.content)).toEqual(['retained saved history']);
+    expect(result.lifecycleNotices).toContain('Current session recovery could not be verified; starting a fresh session. The saved session was retained.');
+    expect(result.lifecycleNotices.join(' ')).not.toContain('private fixture');
+    snapshot.mockRestore();
+  });
+
+  it.each(['prompt', 'turn', 'pending-tool', 'unknown-mutation'] as const)('retains actual %s recovery on an ordinary interactive launch', kind => {
+    const sessionManager = new SessionManager();
+    const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-recovery-'));
+    const selected = sessionManager.createNew(projectRoot);
+    if (kind === 'prompt') sessionManager.persistUserPromptBarrier(selected.id, 'finish pending prompt');
+    if (kind === 'turn') sessionManager.markTurnActive(selected.id);
+    if (kind === 'pending-tool') {
+      sessionManager.markRunStarted(selected.id, 'finish pending tool');
+      sessionManager.appendQueryEvent(selected.id, { type: 'tool.started', taskId: 'pending-write', toolName: 'write' });
+    }
+    if (kind === 'unknown-mutation') sessionManager.saveError(selected.id, 'Write outcome is unverified.',
+      { terminalClassification: 'stopped', terminalReason: 'stopped_not_proven' });
+    const before = sessionManager.getRecoverySnapshot(selected.id);
+    const result = bootstrapShellRuntime({ cwd: projectRoot, runtimeConfig: getRuntimeConfig(projectRoot),
+      gitContext: getWorkflowGitContext(projectRoot), sessionManager, renderer: new StreamingRenderer(), adoptCurrentSession: false,
+      emitLifecycleMessages: false });
+    expect(result.context.session.id).toBe(selected.id);
+    expect(result.lifecycleNotices).toContain(`Resumed session ${selected.id}`);
+    expect(sessionManager.getRecoverySnapshot(selected.id)).toMatchObject({ pendingPrompt: before.pendingPrompt,
+      terminalReason: before.terminalReason, pendingLifecycle: before.pendingLifecycle });
+  });
 
   it('falls back to fresh session when persisted current session cannot be resumed', () => {
     const sessionManager = new SessionManager()
     const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-stale-current-'))
     const current = sessionManager.createNew(projectRoot)
+    sessionManager.persistUserPromptBarrier(current.id, 'pending recoverable prompt')
     const originalResume = sessionManager.resume.bind(sessionManager)
     const resumeSpy = vi
       .spyOn(sessionManager, 'resume')
@@ -478,6 +529,7 @@ describe('shell bootstrap', () => {
       sessionManager,
       renderer,
       emitLifecycleMessages: false,
+      adoptCurrentSession: true,
     })
 
     expect(result.context.session.id).toBe(selected.id)

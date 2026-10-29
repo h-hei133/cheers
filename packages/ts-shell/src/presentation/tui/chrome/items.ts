@@ -41,6 +41,8 @@ export interface StatusFacts {
   readonly contextWindowSource?: WindowSource;
   readonly contextWarning?: string;
   readonly sessionTokens?: number;
+  /** Unreadable persisted usage makes retained counters a partial measurement. */
+  readonly usageIncomplete?: boolean;
   /** Estimate for recorded usage, never a claim of complete billing. */
   readonly costUsd?: number;
   readonly costRates?: 'catalog' | 'assumed';
@@ -134,11 +136,14 @@ export function renderStatusItem(id: StatusItemId, facts: StatusFacts): string |
     case "context":
       return renderContext(facts);
     case "session-tokens":
-      return facts.sessionTokens ? defaultTheme.dim(`${formatTokens(facts.sessionTokens)} tok`) : undefined;
+      return facts.sessionTokens ? defaultTheme.dim(`${formatTokens(facts.sessionTokens)} tok${facts.usageIncomplete ? ' partial' : ''}`)
+        : facts.usageIncomplete ? defaultTheme.fg('warning', 'tokens unknown') : undefined;
     case "cost":
-      return facts.costUsd !== undefined ? defaultTheme.dim(`est $${facts.costUsd.toFixed(4)}${facts.costPartial ? ' partial' : ''}${facts.costRates === 'assumed' ? ' assumed rates' : ''}`) : undefined;
+      return facts.costUsd !== undefined ? defaultTheme.dim(`est $${facts.costUsd.toFixed(4)}${facts.costPartial ? ' partial' : ''}${facts.costRates === 'assumed' ? ' assumed rates' : ''}`)
+        : facts.usageIncomplete ? defaultTheme.fg('warning', 'cost unknown') : undefined;
     case "turns":
-      return facts.turns ? defaultTheme.dim(`${facts.turns} turn${facts.turns === 1 ? "" : "s"}`) : undefined;
+      return facts.turns ? defaultTheme.dim(`${facts.turns} turn${facts.turns === 1 ? "" : "s"}${facts.usageIncomplete ? ' partial' : ''}`)
+        : facts.usageIncomplete ? defaultTheme.fg('warning', 'turns unknown') : undefined;
     case "todos":
       return facts.openTodos ? defaultTheme.fg("warning", `${facts.openTodos} todo`) : undefined;
     default:

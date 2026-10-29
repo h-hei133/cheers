@@ -80,6 +80,8 @@ import { createCliSessionRuntime } from "../runtime/cliSessionRuntimeFactory.js"
 import { captureCliStdinPrompts } from "../print/stdinPromptCapture.js";
 import { runCliPrintModeRouter } from "../print/printModeRouter.js";
 import { runCliProcess } from "./cliProcessRunner.js";
+import * as usage from '../../observability/usageTelemetry.js';
+import { createEmptyLifecycleIndex } from '../../core/tools/toolResultLifecycle.js';
 
 const projectRoot = "/tmp/cli-process-runner-project";
 
@@ -87,7 +89,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-it("routes a fullscreen recovery hint through the interactive transcript", async () => {
+it.each(['idle', 'busy', 'pending', 'unknown', 'unreadable', 'save-failed'] as const)("routes startup notices and preserves signal lifecycle for %s work", async state => {
   const renderer = new StreamingRenderer();
   const transcript: string[] = [];
   const runtimeContext = {
@@ -115,6 +117,13 @@ it("routes a fullscreen recovery hint through the interactive transcript", async
       candidate: { id: "sess_saved" },
       summary: { resumeDisposition: "fully-resumable" },
     })),
+    getRecoverySnapshot: vi.fn(() => {
+      if (state === 'unreadable') throw new Error('private fixture recovery failure');
+      return { pendingLifecycle: createEmptyLifecycleIndex(), runPhase: state === 'pending' ? 'turn-active' : 'idle',
+        terminalClassification: state === 'unknown' ? 'stopped' : undefined,
+        terminalReason: state === 'unknown' ? 'stopped_not_proven' : undefined };
+    }),
+    saveTerminated: vi.fn(() => { if (state === 'save-failed') throw new Error('private fixture persistence failure'); }),
   } as never;
   const mcpGateway = {
     close: vi.fn(),
@@ -136,7 +145,7 @@ it("routes a fullscreen recovery hint through the interactive transcript", async
     recoveryCandidate: null,
     recoveryCandidateSummary: null,
     runtimeContext,
-    bootstrap: { lifecycleNotices: [] },
+    bootstrap: { lifecycleNotices: ['Resumed session sess_current'] },
     mcpGateway,
   } as never);
   vi.mocked(projectAndRenderCliStartupSurface).mockResolvedValue({
@@ -155,21 +164,33 @@ it("routes a fullscreen recovery hint through the interactive transcript", async
     cliModePlan: { kind: "interactive" },
   } as never);
   vi.mocked(createCliSessionRuntime).mockReturnValue({
-    getCurrentRunController: () => null,
+    getCurrentRunController: () => state === 'busy' ? new AbortController() : null,
     terminate: vi.fn(),
     observeEvents: vi.fn(),
     getState: () => "idle",
     waitForIdle: vi.fn(async () => undefined),
   } as never);
   vi.mocked(createCliShutdown).mockReturnValue(shutdown as never);
+  const usageRead = vi.spyOn(usage, 'getSessionUsage').mockReturnValue({ usageHealth: { status: 'degraded',
+    rejectedBuckets: 1, rejectedHistoryEntries: 0, invalidSnapshot: false } } as never);
   vi.mocked(runInteractiveLoop).mockImplementation(async (input) => {
     input.setStartupNotice?.(line => transcript.push(line));
+    expect(transcript).toContain('Resumed session sess_current');
+    expect(transcript).toContain('Persisted usage is incomplete; recovered counts and cost estimates exclude unreadable records. Inspect /cost.');
     input.onFirstFrame?.();
     await vi.waitFor(() => {
       expect(transcript).toContain(
         "- Recovery hint: /resume or --session-id sess_saved (fully-resumable)",
       );
     });
+    const shutdownInput = vi.mocked(createCliShutdown).mock.calls[0]![0];
+    const hook = shutdownInput.onSignal!;
+    const before = (sessionManager as unknown as { saveTerminated: ReturnType<typeof vi.fn> }).saveTerminated;
+    await shutdownInput.close();
+    expect(before).not.toHaveBeenCalled(); // Ordinary cleanup is not a session close.
+    if (state === 'unreadable' || state === 'save-failed') expect(() => hook('SIGTERM')).toThrow('private fixture');
+    else hook('SIGTERM');
+    expect(before).toHaveBeenCalledTimes(state === 'idle' || state === 'save-failed' ? 1 : 0);
   });
 
   const stdout = new PassThrough();
@@ -194,6 +215,7 @@ it("routes a fullscreen recovery hint through the interactive transcript", async
       exit: ((code: number) => { throw new Error(`unexpected exit ${code}`); }) as never,
     });
   } finally {
+    usageRead.mockRestore();
     stdoutWrite.mockRestore();
     (stdin as unknown as PassThrough).destroy();
     stdout.destroy();

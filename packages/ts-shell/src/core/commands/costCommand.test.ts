@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCostCommand } from "./costCommandRuntime.js";
-import { recordSessionUsage, resetSessionUsage } from "../../observability/usageTelemetry.js";
+import { recordSessionUsage, resetSessionUsage, restoreSessionUsage } from "../../observability/usageTelemetry.js";
 import { writeCatalogCache } from "../models/catalogStore.js";
 import type { CommandContext } from "./types.js";
 import * as catalogStore from "../models/catalogStore.js";
@@ -51,6 +51,46 @@ afterEach(() => {
 });
 
 describe("runCostCommand", () => {
+  it('keeps recovered priced groups complete while marking session accounting partial', async () => {
+    const sessionId = 'cost-corrupt-group'; resetSessionUsage(sessionId);
+    try {
+      const attribution = captureUsageAttribution({ provider: 'fixture', model: 'meter',
+        baseUrl: 'https://priced.invalid', rates: { promptPerMTok: 1, completionPerMTok: 0 } });
+      recordSessionUsage(sessionId, { attribution, promptTokens: 1_000_000 });
+      const snapshot = structuredClone(getSessionUsage(sessionId));
+      snapshot.byModel['@usage:broken-secret-value'] = { ...Object.values(snapshot.byModel)[0]! };
+      resetSessionUsage(sessionId); restoreSessionUsage(sessionId, snapshot);
+      const result = await runCostCommand([], { cwd: workspace(), sessionId, readConfiguration: () => ({ catalog: [], config: {} as never }) });
+      expect(result.report?.facts).toMatchObject({ recordedTokens: 1_000_000, coverage: 'partial',
+        usageHealth: { status: 'degraded', rejectedBuckets: 1 }, estimate: { usd: 1, coverage: 'partial' },
+        models: [{ estimate: { usd: 1, coverage: 'complete' } }] });
+      expect(result.output).toContain('Persisted usage is incomplete');
+      expect(result.output).toContain('Recovered usage estimate: $1.0000');
+      expect(result.output).toContain('tokens in recovered provider records');
+      expect(result.output).not.toContain('broken-secret-value');
+    } finally { resetSessionUsage(sessionId); }
+  });
+
+  it('reports fully unreadable persisted accounting as unknown before and after another free request', async () => {
+    const sessionId = 'cost-corrupt-all'; resetSessionUsage(sessionId);
+    try {
+      restoreSessionUsage(sessionId, { schemaVersion: 2, byModel: { '@usage:broken': {} }, turnsCount: 1,
+        toolCallsCount: 0, lastBucketKey: '@usage:broken', lastUpdated: 1, recentRequests: [] });
+      const readConfiguration = () => ({ catalog: [], config: {} as never });
+      const result = await runCostCommand([], { cwd: workspace(), sessionId, readConfiguration });
+      expect(result.report?.facts).toMatchObject({ estimate: { usd: null, coverage: 'partial' }, coverage: 'partial' });
+      expect(result.output).toContain('Session usage and cost are unknown');
+      expect(result.output).not.toContain('nothing to count');
+      expect(result.output).not.toContain('$0.0000');
+      recordSessionUsage(sessionId, { attribution: captureUsageAttribution({ provider: 'fixture', model: 'free',
+        baseUrl: 'https://free.invalid', rates: { promptPerMTok: 0, completionPerMTok: 0 } }), promptTokens: 10 });
+      const next = await runCostCommand([], { cwd: workspace(), sessionId, readConfiguration });
+      expect(next.report?.facts).toMatchObject({ estimate: { usd: null, coverage: 'partial' },
+        models: [{ estimate: { usd: 0, coverage: 'complete' } }] });
+      expect(next.output).toContain('Recovered usage estimate: unknown');
+    } finally { resetSessionUsage(sessionId); }
+  });
+
   it('releases the actual cost reader without reacquiring or changing retained accounting', async () => {
     const cwd = workspace(), sessionId = 'cost-reader-lifetime'; resetSessionUsage(sessionId);
     recordSessionUsage(sessionId, { provider: 'fixture', model: 'reader', promptTokens: 100, completionTokens: 10 });

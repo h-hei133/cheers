@@ -9,14 +9,25 @@ export function createCliShutdown(input: {
   exit: (code: number) => void;
   writeError: (message: string) => void;
   handleInterrupt?: boolean;
+  /** Signal-only persistence; ordinary exits and restart/profile close never invoke it. */
+  onSignal?: (signal: 'SIGTERM' | 'SIGHUP') => void | Promise<void>;
   /** Total bound across resource owners; expiry never admits runtime reentry. */
   timeoutMs?: number;
 }): { close(): Promise<void>; exit(code?: number): void } {
   let exiting = false;
   let exitCode = 0;
   let closing: Promise<void> | undefined;
-  const onTerm = () => exit(143);
-  const onHangup = () => exit(129);
+  let signalClose: Promise<void> | undefined;
+  const signalExit = (signal: 'SIGTERM' | 'SIGHUP', code: number): void => {
+    if (exiting) return;
+    signalClose ??= Promise.resolve().then(() => input.onSignal?.(signal));
+    // close() may already be pending on a stuck owner; retain this failure for
+    // its bounded join without generating an unhandled rejection meanwhile.
+    void signalClose.catch(() => {});
+    exit(code);
+  };
+  const onTerm = () => signalExit('SIGTERM', 143);
+  const onHangup = () => signalExit('SIGHUP', 129);
   const onInterrupt = () => exit(130);
   const onStreamError = (error: NodeJS.ErrnoException): void => {
     if (!["EPIPE", "EIO", "ERR_STREAM_DESTROYED"].includes(error.code ?? "")) throw error;
@@ -33,10 +44,18 @@ export function createCliShutdown(input: {
   const drain = async (): Promise<void> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const cleanup = Promise.allSettled([
-        Promise.resolve().then(() => input.close()),
-        killAllTrackedProcesses(),
-      ]);
+      const cleanup = (async () => {
+        // Capture signal persistence before resource cancellation can change its
+        // recovery evidence. A signal arriving during close joins the same budget.
+        const signal = signalClose;
+        const results = await Promise.allSettled([
+          signal ?? Promise.resolve(),
+          Promise.resolve().then(() => input.close()),
+          killAllTrackedProcesses(),
+        ]);
+        if (!signal && signalClose) results.push(...await Promise.allSettled([signalClose]));
+        return results;
+      })();
       const results = await Promise.race([cleanup, new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error('Resource cleanup timed out; runtime reentry is blocked.')), input.timeoutMs ?? 10_000);
       })]);

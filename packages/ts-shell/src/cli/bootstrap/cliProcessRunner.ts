@@ -1,4 +1,6 @@
 import { createCliShutdown } from "../runtime/shutdown.js";
+import { hasUnfinishedSessionWork } from '../../session/recovery/work.js';
+import { getSessionUsage } from '../../observability/usageTelemetry.js';
 import { cancelGoalRunForShutdown } from '../runtime/goalScheduling.js';
 import { closeCollaborationFor } from '../runtime/collaboration.js';
 import { closeSshFor } from '../runtime/ssh.js';
@@ -208,6 +210,13 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
     logger,
   });
   const shutdown = createCliShutdown({
+    onSignal: () => {
+      const sessionId = runtimeContext.session.id;
+      // Termination clears pending work and terminal uncertainty. Preserve them
+      // when a signal interrupts a live turn or recovery remains unresolved.
+      if (isBusy?.() || hasUnfinishedSessionWork(sessionManager.getRecoverySnapshot(sessionId))) return;
+      sessionManager.saveTerminated(sessionId);
+    },
     close: async () => {
       const results = await Promise.allSettled([
         Promise.resolve().then(() => recoveryHint.cancel()),
@@ -374,7 +383,16 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       fallbackSessionId: recoveryCandidate?.id,
       onFirstFrame,
       onUserIntent,
-      setStartupNotice: startupNotice.setTranscriptWriter,
+      setStartupNotice: writer => {
+        startupNotice.setTranscriptWriter(writer);
+        if (!writer) return;
+        if (startupSurface.fullScreenHost) for (const notice of bootstrapRuntime.bootstrap.lifecycleNotices) {
+          startupNotice.publish(notice);
+        }
+        if (getSessionUsage(runtimeContext.session.id).usageHealth) startupNotice.publish(
+          'Persisted usage is incomplete; recovered counts and cost estimates exclude unreadable records. Inspect /cost.',
+        );
+      },
       initialMcpGateway: mcpGateway,
       setReadline: (nextReadline) => {
         readline = nextReadline;

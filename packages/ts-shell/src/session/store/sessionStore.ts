@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import { decodeWorkspaceRoots } from '../../core/workspace/model.js';
 import { selectSessionReports } from '../reports/projection.js';
-import { decodeUsageSnapshot } from "../../observability/usage/snapshot.js";
+import { recoverUsageSnapshot } from "../../observability/usage/recovery.js";
 import type { SessionMetadata } from "../schema/sessionMetadataCodec.js";
 import { projectSessionMetadata } from "../schema/sessionMetadataCodec.js";
 import type { Session } from "../schema/sessionRecord.js";
@@ -342,7 +342,7 @@ export function projectLoadedSession(input: {
     createdAt: metadata.createdAt,
     updatedAt: metadata.updatedAt,
     status: input.state.status,
-    usage: decodeUsageSnapshot(input.state.usage),
+    usage: recoverUsageSnapshot(input.state.usage),
     pendingPrompt: input.state.pendingPrompt,
     lastError: input.state.lastError,
     turns: input.turns,

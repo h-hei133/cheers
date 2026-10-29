@@ -12,7 +12,7 @@ export function costModel(telemetry: SessionUsageTelemetry, catalog: readonly Ca
     const identity = bucketIdentity(key, bucket);
     const published = bucketRates(key, bucket, rateFor);
     const rates: ModelCostRates | undefined = published ?? (bucket.attribution ? undefined : USAGE_RATES);
-    const estimate = estimateSessionCost({ ...telemetry, byModel: { [key]: bucket } }, rateFor);
+    const estimate = estimateSessionCost({ ...telemetry, usageHealth: undefined, byModel: { [key]: bucket } }, rateFor);
     const unpricedTokens = rates ? (rates.cacheReadPerMTok === undefined ? bucket.cacheReadTokens : 0)
       + (rates.cacheWritePerMTok === undefined ? bucket.cacheWriteTokens : 0) : bucket.totalTokens;
     const modelLabel = identity.provider ? `${identity.provider}/${identity.model}` : identity.model;
@@ -29,9 +29,10 @@ export function costModel(telemetry: SessionUsageTelemetry, catalog: readonly Ca
   });
   const estimate = estimateSessionCost(telemetry, rateFor);
   return { recordedTurns: telemetry.turnsCount, recordedTokens: totalTokens(telemetry), buckets,
+    ...(telemetry.usageHealth ? { usageHealth: { ...telemetry.usageHealth } } : {}),
     modelCount: new Set(buckets.map(bucket => JSON.stringify([bucket.provider, bucket.model]))).size,
     estimate: { usd: estimate.cost > 0 || estimate.zeroCostSupported ? estimate.cost : null,
-      coverage: buckets.every(bucket => bucket.estimate.coverage === 'complete') ? 'complete' as const : 'partial' as const,
+      coverage: !estimate.partial && buckets.every(bucket => bucket.estimate.coverage === 'complete') ? 'complete' as const : 'partial' as const,
       everyRatePublished: estimate.everyRatePublished },
     cache: { usage: summarizeCacheUsage(telemetry.recentRequests), waste: findCacheWaste(telemetry.recentRequests, (provider, model) => {
       const rates = rateFor(provider, model);

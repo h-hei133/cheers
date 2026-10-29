@@ -38,6 +38,15 @@ export interface ModelUsageBucket {
   turnsCount: number;
 }
 
+/** Missing accounting remains unknown after a successful write or a new request. */
+export interface UsageHealth {
+  readonly status: 'degraded';
+  /** Largest observed number of rejected records, not an invented token count. */
+  readonly rejectedBuckets: number;
+  readonly rejectedHistoryEntries: number;
+  readonly invalidSnapshot: boolean;
+}
+
 export interface PromptMeasurementIdentity {
   readonly provider: string;
   readonly model: string;
@@ -62,6 +71,7 @@ export type PromptIdentitySnapshot = Partial<PromptMeasurementIdentity>;
 
 export interface SessionUsageTelemetry {
   readonly schemaVersion?: 2;
+  usageHealth?: UsageHealth;
   /** Last accepted foreground request in this runtime, never persisted as cumulative usage. */
   requestContext?: RequestContext;
   /**
@@ -180,4 +190,4 @@ export interface UsageHistoryEntry {
 
 /** Durable cumulative counts plus the bounded request history used by attribution. */
 export type SessionUsageSnapshot = Pick<SessionUsageTelemetry,
-  "schemaVersion" | "byModel" | "turnsCount" | "toolCallsCount" | "lastBucketKey" | "lastUpdated" | "recentRequests">;
+  "schemaVersion" | "usageHealth" | "byModel" | "turnsCount" | "toolCallsCount" | "lastBucketKey" | "lastUpdated" | "recentRequests">;

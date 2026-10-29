@@ -10,7 +10,9 @@ export type { ModelCostRates };
 
 import { MAX_RECENT_REQUESTS, type ModelUsageBucket, type SessionUsageTelemetry,
   type UsageHistoryEntry, type SessionUsageSnapshot } from "./usage/model.js";
-import { decodeUsageSnapshot, mergeUsageDelta } from "./usage/snapshot.js";
+import { decodeUsageSnapshot, freezeUsageSnapshot, mergeUsageDelta, mergeUsageHealth } from "./usage/snapshot.js";
+import { preserveUsageBaseline, recoverUsageSnapshot } from './usage/recovery.js';
+import { createComponentLogger } from './structuredLogger.js';
 export { MAX_RECENT_REQUESTS };
 export type { ModelUsageBucket, SessionUsageTelemetry, UsageHistoryEntry, SessionUsageSnapshot } from "./usage/model.js";
 
@@ -92,8 +94,9 @@ export function estimateSessionCost(
   }
   // A total-only report supplies no category prices. Zero is supportable only
   // when actual recorded tokens have a complete allocation and published rates.
-  return { cost, everyRatePublished, fullyAllocated: allocated, usesAssumedRates, partial: unpriced || !allocated,
-    zeroCostSupported: cost === 0 && recorded > 0 && allocated && everyRatePublished };
+  return { cost, everyRatePublished: everyRatePublished && !telemetry.usageHealth,
+    fullyAllocated: allocated, usesAssumedRates, partial: unpriced || !allocated || Boolean(telemetry.usageHealth),
+    zeroCostSupported: cost === 0 && recorded > 0 && allocated && everyRatePublished && !telemetry.usageHealth };
 }
 
 
@@ -355,11 +358,14 @@ export function resetSessionUsage(sessionId: string): void {
 /** Restore once on activation. Never replace live, possibly unflushed usage. */
 export function restoreSessionUsage(sessionId: string, snapshot: unknown): void {
   if (currentUsage(sessionId)) return;
-  const restored = decodeUsageSnapshot(snapshot);
+  const restored = recoverUsageSnapshot(snapshot);
   if (!restored) return;
   const telemetry = Object.assign(emptyTelemetry(), restored);
   sessionTelemetries().set(sessionId, telemetry);
   persistedBaselines.set(telemetry, decodeUsageSnapshot(restored)!);
+  if (restored.usageHealth) createComponentLogger('session-usage').warn(
+    'Persisted session usage is incomplete; recovered counters are partial and missing costs are unknown.',
+    { ...restored.usageHealth });
 }
 
 /**
@@ -374,13 +380,25 @@ export function persistSessionUsage(
   scope = sessionTelemetries(),
 ): void {
   const live = currentUsage(sessionId, scope);
+  const baseline = live ? persistedBaselines.get(live) : undefined;
+  const restored = preserveUsageBaseline(recoverUsageSnapshot(current), baseline, current);
+  const previousHealth = live?.usageHealth;
+  if (live && restored?.usageHealth) live.usageHealth = mergeUsageHealth(live.usageHealth, restored.usageHealth);
   const snapshot = live
-    ? mergeUsageDelta(current, live, persistedBaselines.get(live))
-    : decodeUsageSnapshot(current);
+    ? mergeUsageDelta(restored, live, baseline)
+    : restored;
+  // Decode copies before publication; a writer must not alias the live counters
+  // or cause a second decode to fail after its write has already succeeded.
+  const adopted = live && snapshot ? decodeUsageSnapshot(snapshot) : undefined;
+  const nextBaseline = adopted ? decodeUsageSnapshot(adopted) : undefined;
+  freezeUsageSnapshot(snapshot);
+  if (snapshot?.usageHealth && JSON.stringify(previousHealth) !== JSON.stringify(snapshot.usageHealth)) createComponentLogger('session-usage').warn(
+    'Persisted session usage is incomplete; recovered counters are partial and missing costs are unknown.',
+    { ...snapshot.usageHealth });
   write(snapshot);
-  if (live && snapshot) {
+  if (live && adopted && nextBaseline) {
     // Keep the context gauge/history local even when another process added cost.
-    Object.assign(live, decodeUsageSnapshot(snapshot));
-    persistedBaselines.set(live, decodeUsageSnapshot(snapshot)!);
+    Object.assign(live, adopted);
+    persistedBaselines.set(live, nextBaseline);
   }
 }

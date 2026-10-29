@@ -17,6 +17,7 @@ import { readStateSnapshotSafely, withSessionStateLock, writeSessionState } from
 import { attributedBucketKey, captureUsageAttribution, legacyBucketKey } from '../../observability/usage/identity.js';
 import { costModel } from '../../core/commands/cost/model.js';
 import { createProfileContext, withProfile } from '../../core/paths/profile/context.js';
+import { SessionManager } from '../SessionManager.js';
 
 const ID = "sess_usage_roundtrip";
 let directory: string;
@@ -36,6 +37,32 @@ function activate(session: Session) {
 }
 
 describe("session usage persistence seams", () => {
+  it('resumes through the real manager with healthy accounting preserved beside a corrupted bucket', () => {
+    const layout = locateExistingSessionLayout(createSessionStoreLayout(), ID);
+    const session: Session = { id: ID, projectRoot: directory, createdAt: 'now', updatedAt: 'now', status: 'active', turns: [] };
+    writeSessionRecord({ session, layout });
+    const before = readStateSnapshotSafely(layout.statePath)!;
+    const bucket = { promptTokens: 100, completionTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0,
+      totalTokens: 120, turnsCount: 1 };
+    writeJsonFileAtomic(layout.statePath, { ...before, usage: { schemaVersion: 2,
+      byModel: { 'fixture/model': bucket, '@usage:invalid': bucket }, turnsCount: 2, toolCallsCount: 0,
+      lastBucketKey: '@usage:invalid', lastUpdated: 1, recentRequests: [] } });
+    const manager = new SessionManager();
+    const resumed = manager.resume(ID, directory);
+    expect(resumed.usage?.byModel['fixture/model']?.totalTokens).toBe(120);
+    expect(resumed.usage?.usageHealth?.rejectedBuckets).toBe(1);
+    activate(resumed);
+    expect(totalTokens(getSessionUsage(ID))).toBe(120);
+    expect(getSessionUsage(ID).usageHealth?.status).toBe('degraded');
+    recordSessionUsage(ID, { provider: 'fixture', model: 'model', promptTokens: 10 });
+    writeSessionUsage(ID, layout);
+    resetSessionUsage(ID);
+    activate(new SessionManager().resume(ID, directory));
+    expect(totalTokens(getSessionUsage(ID))).toBe(130);
+    expect(getSessionUsage(ID).usageHealth?.rejectedBuckets).toBe(1);
+    expect(getSessionUsage(ID).turnsCount).toBe(3);
+  });
+
   it('migrates legacy identity through real state writes and keeps captured prices on activation', () => {
     const layout = projectSessionFileLayout({ sessionsDir: directory, sessionId: ID });
     const session: Session = { id: ID, projectRoot: directory, createdAt: 'now', updatedAt: 'now', status: 'active', turns: [] };

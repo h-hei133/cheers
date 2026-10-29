@@ -3111,14 +3111,14 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 - `decodeUsageSnapshot`（`observability/usage/snapshot.ts:19-40`）逐键调用 `decodeAttribution`（`:29`）。
 - `persistSessionUsage`（`usageTelemetry.ts:370-386`）同样无保护，且它在 `:384` 用 `!` 断言解码成功——若数据在两次解码之间被改写，这里会抛 TypeError 而不是给出可读错误。
 
-**为什么是 unhandled rejection**：`installCrashRecorder` 对 `unhandledRejection` 的策略是**记录后继续运行**（`observability/crashLog.ts` 的注释明确写了这一点），所以进程没死，会话也没丢——但**用量恢复静默失败**，该会话的 token 计数与成本从零开始。用户看到的是"数字不对"，而崩溃日志里只留一条记录。
+**拒绝的证据边界**：`installCrashRecorder` 对 `unhandledRejection` 的策略是**记录后继续运行**（`observability/crashLog.ts`）。记录证明存在逃逸的解码错误，不能独自证明该次调用在恢复还是保存、后续是否继续记录、会话是否丢失或实际计数是否归零。第20.6节实施时另确认会话文件加载也会先严格解码usage，故恢复边界必须覆盖文件投影与运行时；本批未复现用户原始现场。
 
-**为什么键会损坏**：`namespace` 前缀的键由 `attributedBucketKey` 生成（`identity.ts:58-61`），其输入包含 `ratesSnapshot(attribution.rates)`。当目录价格刷新、`models.dev` 缓存更新或用户改了 relay 定价时，**同一会话的旧键会与新算法算出的键不一致**；而 `decodeAttribution` 把这种"算法演进"当成"数据损坏"。
+**键损坏原因尚未确认**：`attributedBucketKey`包含捕获的`attribution.rates`，`decodeAttribution`从该记录自身的价格重新编码，不查询当前目录。普通目录价格刷新不会使完整旧记录失效；metadata缺失、key/metadata不一致或历史编码算法变更均可能失败，但尚未拿到原损坏记录，不能把`ratesSnapshot`演进当作已确认根因。
 
 **修复方向**：
 
-1. `restoreSessionUsage` 与 `persistSessionUsage` 对解码失败应**降级而非抛出**：丢弃该会话的用量快照并记一条可读警告（"persisted usage could not be decoded; counters restart"），而不是让拒绝逃逸到全局。
-2. `decodeUsageSnapshot` 对**单个坏键**应跳过并计数，而不是让整份快照失败——一个损坏的 bucket 不该抹掉其余 bucket。
+1. 用量恢复与持久化对坏输入分桶降级，保留能验证的记录并显示partial/unknown，不能丢弃整份快照或静默重置为零。
+2. 严格`decodeUsageSnapshot`保留，恢复边界独立逐项验证并计数坏bucket/history；一个损坏bucket不抹掉其余bucket，丢失history应断开cache连续性。
 3. `decodeAttribution` 的严格校验保留（它是防篡改边界），但调用方必须把它当"可失败输入"，不是"必然成功"。
 4. 若确认是 `ratesSnapshot` 演进导致，应给键加版本位并保留对旧版本的解码能力，而不是让旧会话的键永久失效。
 
@@ -3164,7 +3164,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 [关闭处理](../../packages/ts-shell/src/core/shell/signalHandlers.ts)以finally调用exit：持久化或输出失败安全报告并退出1，未确认关闭不提供resume成功提示；无exit hook的嵌入调用保留异常。[交互入口](../../packages/ts-shell/src/cli/interactive/interactiveLoop.ts)删除预算外的重复MCP await，委托bootstrap已有的总10秒shutdown；无注入hook时同样复用既有shutdown。[host](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)通过原parser/registry识别无参数`/exit`、`/quit`、`/q`，忙碌或等待问题时直接复用退出路径，停止后不继续消费队列。live/record的观察interval均unref。
 
-参考pi的退出latch/先恢复终端及oh-my-pi的持久化失败可见；按本任务在首次失败时退出1，区别于参考的二次强退。同步会话锁仍可能阻塞约1.2秒，随后错误有出口；10秒预算到期证明退出路径有界，不证明MCP连接已实际关闭。SIGTERM/SIGHUP的terminated保存仍未实施，见20.4。
+参考pi的退出latch/先恢复终端及oh-my-pi的持久化失败可见；按本任务在首次失败时退出1，区别于参考的二次强退。同步会话锁仍可能阻塞约1.2秒，随后错误有出口；10秒预算到期证明退出路径有界，不证明MCP连接已实际关闭。后续SIGTERM/SIGHUP与重入修复见20.5。
 
 ### 20.3 推理流与恢复
 
@@ -3182,9 +3182,25 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 27 | 机制仍未确认 | 先用startup/CRLF/regular几何夹具区分，禁止按研究候选直接声称根因 |
 | 28 | 未实施 | settings/model职责与入口发现性整理 |
 | 29 | 未实施 | 同一次resume浏览索引复用、查询/刷新失效及真实目录性能比较 |
-| 30 | 未实施 | SIGTERM/SIGHUP关闭标记与重入判定 |
-| 19.8 | 未实施 | usage损坏分桶降级与可见未验证计量，不能静默归零 |
+| 30 | 空闲fresh、信号关闭及真实恢复保护已实现；本地验证 | 缺真实用户signal/终端现场与非Linux证据；SIGKILL不执行清理钩子 |
+| 19.8 | 分桶恢复、真实加载与可见partial/unknown已实现；本地验证 | 原损坏记录及其生成原因未取得；无法恢复丢失的真实账单数值 |
 
 只派gpt-6.1-sol只读/编辑代理；它们未运行任何test/build/验证。主代理在package目录每次一个文件、768MiB堆、threads=false，以`&&`串行验证。没有全套回归、没有PTY/exe、没有20k真实终端或真实provider请求。源码五静态门通过，118项旧docs advisory保留；完整声明图的单一focused脚本用例通过，module facade无超限。TypeScript build已通过，最终新鲜度和提交状态以开发日志中的实际读回为准。
 
 反转已命中跨目录分类、真实CLI显式回答、thinking恢复、raw Responses事件、close失败exit、忙时exit；每次源码逐字节恢复。目录分页和附带read denial另有定向反转。恢复后重新聚焦验证才计通过；反转中筛掉的其他用例不计通过。MCP旧预算外await的反转在55秒观察上限超时，进程终止并恢复源码，只记超时证据；其当前实现的正常用例已通过。新增配置scope夹具首次因未定义pathRules而未建立scope，补实际user规则后通过；不存在的directoryListing测试路径属于调用错误、零测试，不作产品失败或验收。
+
+### 20.5 空闲启动与信号关闭
+
+[恢复判定](../../packages/ts-shell/src/session/recovery/work.ts)复用原continuation evidence，只有pending prompt、active run phase、审批/工具未结、interrupted、stopped/未确认终态或unverifiedFiles保留自动重入。[bootstrap](../../packages/ts-shell/src/core/shell/bootstrap.ts)不再仅因`active`重入普通空闲会话；print显式adopt、指定session、fresh/profile合同保留。恢复读取失败创建fresh并保留旧记录，提供固定安全通知。对照pi的显式continue/resume与信号退出latch，采用显式意图区分和一次信号钩子，保留本项目真实中断自动恢复。
+
+[信号关闭](../../packages/ts-shell/src/cli/runtime/shutdown.ts)仅SIGTERM/SIGHUP执行onSignal一次，包含在既有10秒总预算中；普通close、restart/profile和普通exit不调用。真实[runner](../../packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts)在cancel资源前观察会话：确认idle才saveTerminated；busy或未确认恢复保持原pending/terminal证据，随后由原cancelAndWait收尾。失败或超时安全报告并exit1，不把清理未知写成成功。TTY宿主沿现有startupNotice route显示恢复与未确认通知，避免welcome画面静默采用旧history。SIGKILL/不可捕获崩溃不能执行hook，但idle metadata也不再自动采用；真实终端残留画面的次要机制未在本批复现。
+
+### 20.6 损坏用量恢复与可见未知
+
+[usage恢复](../../packages/ts-shell/src/observability/usage/recovery.ts)逐bucket/history保留严格解码通过的记录；strict attribution和snapshot不放宽。未知schema不解释，坏history置usage-gap断开cache连续性。usageHealth仅存degraded、坏bucket/history计数和invalidSnapshot，不存坏key/原异常；健康bucket保持原捕获价格。修复[SessionStore](../../packages/ts-shell/src/session/store/sessionStore.ts)先于runtime恢复的严格解码阻断，真实SessionManager resume→activate→record→save→resume可保留健康计量。
+
+[保存](../../packages/ts-shell/src/observability/usageTelemetry.ts)在坏/缺bucket时保留可信baseline并只追加delta，合法倒退计数仍拒绝；保存callback失败不推进baseline，待写增量与health保留。先严格复制待采用值，再冻结writer snapshot，避免callback改写后产生已保存但二次解码失败的歧义。参考pi逐坏行保留、oh-my-pi载入修复计数提示与write确认后推进；未采用其缺字段补零来表示本项目丢失账单。普通目录价格变化不破坏完整捕获attribution，第19.8节的算法演进根因已降为未确认。
+
+[cost](../../packages/ts-shell/src/core/commands/cost/model.ts)保留健康分桶完整/确实free的估价，但session合计始终partial；全损或仅恢复free记录时合计unknown。[报告](../../packages/ts-shell/src/core/commands/cost/report.ts)、[status](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts)与真实启动提示明确计量不完整，不显示无usage/确定零费用。新健康请求和成功保存不会消除先前丢失的计量证据。
+
+本批12个相关文件214项串行通过，另完整声明图单一脚本用例通过，五静态门/diff通过，module facade0。八类反转均失败并逐字节恢复后重验：idle启动1、signal hook2、pending保护3、真实store恢复1、telemetry降级1、partial合计1、history断点1、baseline保护2；筛掉的用例不计新通过。CLI夹具首次在先cleanup取消hint后等待hint而失败，改为先观察真实first-frame hint再cleanup，通过后未改产品来适配。反转诊断脚本两次仅因预期错误匹配过窄中断，源码finally恢复；补准确错误后重验通过。TS build manifest `235b6ac3dc39`，本地NormProof judge proven、0open/0failed/0gap，均为collector范围的结构证据。无全套回归、PTY/exe、20k终端或真实provider；提交与远端证据见日志。此前`ec1bcadb`的CI及Architecture Watch已确认success，本批推送后按用户要求稍后检查CI。
