@@ -89,6 +89,23 @@ describe("fanning out proposals", () => {
     expect(outcome.proposals.every(entry => entry.status === "cancelled")).toBe(true);
   });
 
+  it("does not hang when a proposer never settles", async () => {
+    // A run that never resolves would hold the pass open forever: the signal
+    // can stop the next proposer starting and mark one that throws, but it
+    // cannot interrupt a promise nobody rejects.
+    const controller = new AbortController();
+    const pending = fanOutProposals(requests, async request => {
+      if (request.id === "a") return await new Promise<string>(() => {});   // never settles
+      return "answered";
+    }, controller.signal);
+
+    controller.abort();
+    const outcome = await pending;
+
+    expect(outcome.proposals.find(entry => entry.id === "a")?.status).toBe("cancelled");
+    expect(outcome.complete).toBe(false);
+  });
+
   it("is complete only when every proposer answered", async () => {
     const all = await fanOutProposals(requests, async request => request.id);
     expect(all.complete).toBe(true);

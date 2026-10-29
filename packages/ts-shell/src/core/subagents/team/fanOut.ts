@@ -62,23 +62,44 @@ export async function fanOutProposals(
   run: (request: ProposalRequest, signal: AbortSignal | undefined) => Promise<string>,
   signal?: AbortSignal,
 ): Promise<FanOutOutcome> {
+  // Cancellation has to reach a run that is already inside `await`. A proposer
+  // that never settles would otherwise hold the whole pass open forever: the
+  // signal stops the next proposer from starting and marks one that throws, but
+  // it cannot interrupt a promise nobody rejects. So the abort settles the
+  // affected proposers here, and a later real result is discarded.
   const results = await Promise.all(requests.map(async (request): Promise<ProposalResult> => {
-    if (signal?.aborted) return { id: request.id, status: "cancelled", failure: "The run was cancelled before this proposal started." };
-    try {
-      const claim = (await run(request, signal)).trim();
-      // An empty answer is not a proposal. Reporting it as one would let a
-      // silent failure enter convergence as a claim nobody can refute.
-      return claim
-        ? { id: request.id, status: "proposed", claim }
-        : { id: request.id, status: "failed", failure: "The proposer returned nothing." };
-    } catch (error) {
-      return {
-        id: request.id,
-        status: signal?.aborted ? "cancelled" : "failed",
-        failure: error instanceof Error ? error.message : String(error),
+    if (signal?.aborted) return cancelled(request.id);
+    return new Promise<ProposalResult>(resolve => {
+      let settled = false;
+      const finish = (result: ProposalResult): void => {
+        if (settled) return;
+        settled = true;
+        signal?.removeEventListener("abort", onAbort);
+        resolve(result);
       };
-    }
+      const onAbort = (): void => finish(cancelled(request.id));
+      signal?.addEventListener("abort", onAbort, { once: true });
+      run(request, signal).then(
+        text => {
+          const claim = text.trim();
+          // An empty answer is not a proposal. Reporting it as one would let a
+          // silent failure enter convergence as a claim nobody can refute.
+          finish(claim
+            ? { id: request.id, status: "proposed", claim }
+            : { id: request.id, status: "failed", failure: "The proposer returned nothing." });
+        },
+        error => finish({
+          id: request.id,
+          status: signal?.aborted ? "cancelled" : "failed",
+          failure: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    });
   }));
   const proposed = results.filter(result => result.status === "proposed").length;
   return { proposals: results, proposed, complete: proposed === requests.length };
+}
+
+function cancelled(id: string): ProposalResult {
+  return { id, status: "cancelled", failure: "The run was cancelled before this proposal finished." };
 }

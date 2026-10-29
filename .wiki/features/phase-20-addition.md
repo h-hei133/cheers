@@ -2739,4 +2739,18 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 验证：`fanOut.test.ts` 7 项（同问题不同视角、真并发、单点失败不丢其余、空答案不算、取消语义、取消后不启动、完整性），`run.test.ts` 7 项（不展示自身提案、收敛、评审失败记录、提案缺失、单提案不跑交叉评审、limitation、证伪贯通）。三组反转各触发 1 项预期失败：串行执行、空答案算提案、允许自评审；源码逐字节恢复并核对 SHA-256 `52acefb7eafe`（fanOut）与 `893d77c31cd2`（run）后重验，3 文件 26 项通过；静态门、module facade 0 与 TS build `ed3eea96dc4e` 通过。
 
+**独立复核补强（第一百三十一批）**：初版 `fanOutProposals` 用 `Promise.all` 直接等待每个 `run`。某个提案者的 promise 永不 resolve 时整轮永久挂起——`signal` 只能阻止后续提案者启动、或把抛错的那个记为 cancelled，**无法中断一个没人 reject 的 promise**。现每个提案者包在可被 abort settle 的 promise 里，abort 时立即返回 cancelled 并丢弃迟到结果。
+
+复核另确认无问题的四点：新建文件路径不存在时 `verifyPathContainment` 会向上找最深存在祖先再拼回，结论正确；`confirmed=false` 时 `restoreOperation` 首行即返回 `denied`、不写任何字节；`scanOperations` 降序产出且 `filter` 保持顺序；`refutations` 的并发推入顺序不影响收敛（`converge` 按 proposalId 过滤，顺序只影响 reason 文本）。复核另指出 `command.ts` 恒传 `confirmed=true`，故该分支当前不可达——记为死参数，非缺陷。
+
 **边界**：未接入命令面与交互式批准流程，未运行真实多代理会话。
+
+### 第一百三十一批：中止必须能打断已在等待的提案
+
+独立复核指出 `fanOutProposals` 的真实缺陷：`Promise.all` 直接等待每个 `run`，某个提案者的 promise 永不 resolve 时整轮永久挂起。`signal` 原只能做两件事——阻止后续提案者启动、把**抛错**的那个记为 cancelled——但中断不了一个没人 reject 的 promise。
+
+现每个提案者包在一个可被 abort settle 的 promise 里：`abort` 到达时立即以 cancelled 结算，迟到结果被丢弃。这不会让底层请求停止（那是 provider 层的责任），但它保证编排层不会因为一个失联的提案者而永久等待。
+
+验证：`fanOut.test.ts` 增至 8 项，新增"提案者永不 settle 时 abort 能结束整轮"。反转把 abort 处理器改为空函数后，该用例**永久挂起**（20 秒超时被终止），恢复后 27 项通过；源码逐字节恢复并核对 SHA-256 `c8e8bab5f281` 后重验；静态门、module facade 0 与 TS build `55975874feba` 通过。
+
+复核另确认四点无问题（不存在路径的围栏判定、未确认不写、扫描顺序、并发推入顺序不影响收敛），并指出 `command.ts` 恒传 `confirmed=true` 使该分支不可达——记为死参数，未改。
