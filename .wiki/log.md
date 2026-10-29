@@ -9992,3 +9992,11 @@ CI`40739686114`（`d33a0a1b`）唯一失败为`src/config/concurrency.test.ts`�
 顺着并发夹具的根因检查了其他读子进程stdout的测试：[budget回归](../../packages/ts-shell/src/planning/goal/budget.test.ts)也以`exit`事件解析`output`，存在同一竞态——`exit`可能早于最后一块stdout`data`。现改用`close`。`advisor`夹具只用exit判断退出码、不读stdout，无需改动。
 
 连续3次单文件运行均11项通过。夹具竞态修复，产品与预算语义未变。
+
+## [2026-10-29] research | 第八轮反馈的问题定位与方案研究
+
+用户提出第二十四至第三十项问题，本轮只做定位与方案，不改产品代码。逐项结论与证据写入[补充规划第19节](features/phase-20-addition.md#19-第八轮用户反馈2026-10-29跨目录写入思考不可见退出卡住启动光标configmodelresume-卡顿旧会话界面)。
+
+确认的机制：跨目录写入是工具体在审批后再次 `throw`（`core/tools/registry.ts:322/426`、`core/tools/read.ts:67`），审批层在 `turn/tools.ts:406-408` 就把越界异常转成 `blocked`，提示处理器不可达；三个参考项目都把"工作区外"实现为 `ask` 而非拒绝。思考过程可采集可渲染，但 `restoreConversation`（`cli/interactive/history.ts:52-58`）从不恢复 `turn.reasoning`，且 regular 模式下 `interactiveMode.ts:513` 不转发鼠标，使"click to expand"成为画出来点不了的提示。裸 `exit` 不是命令（需 `/exit`，`registry.ts:436`），退出链在 `interactiveLoop.ts:67` 无上限等待 MCP `close()`，最坏 30 秒。resume 卡顿实测：本机 2309 会话，每键全量重扫 874–1027 ms，缓存只缓存 summary 不缓存 stat。旧会话界面来自 `bootstrap.ts:166` + `hasUnfinishedBusiness`（`:348-356`）：`createCliShutdown` 的 SIGTERM/SIGHUP 路径（`shutdown.ts:18-19`）从不写 `terminated`，下次交互式启动静默重入。config/model 实际无 `/config`；重叠是模型行为字段在 settings、目录在 model、effort 三入口。
+
+未确认项：启动光标漂移的具体模式（`tuiMode` 与是否伴随 resume）需用户确认；退出卡住未在真实终端复现。本轮未运行产品测试、未拉起 PTY 或二进制，`verify:docs-drift:strict` 通过（rules 0 dangling，docs 118 既有 advisory）。

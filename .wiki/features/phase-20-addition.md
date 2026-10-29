@@ -2530,7 +2530,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | `write` 工具执行体 | `core/tools/registry.ts:306-309` | **硬拒绝**（`throw`，不进入审批） | 决定性 |
 | `edit` 工具执行体 | `core/tools/registry.ts:410-413` | **硬拒绝** | 决定性 |
 | `apply_patch` 计划阶段 | `edit/patch/plan.ts:91-95` → `core/workspace/roots.ts:41` | **硬拒绝** | 决定性 |
-| 路径规范化 | `core/workspace/files.ts:16-54` | **硬拒绝**（任何组件是符号链接即拒绝） | 决定性 |
+| 路径规范化 | `core/workspace/files.ts:16-24` | **硬拒绝**（任何组件是符号链接即拒绝） | 决定性 |
 | 执行服务二次校验 | `runtime/execution/write.ts:20-30` | **硬拒绝**（冗余同向） | 决定性 |
 | 权限层 | `core/query/toolPolicy.ts:216-233` | 需审批，但越界在到达前已被工具层拒绝 | 实际不生效 |
 | sandbox | `sandbox/osSandbox.ts:266-267` | 默认 `off`，且只作用于 `bash` | 未生效 |
@@ -2825,3 +2825,230 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 `team` 初版用 `team-${role}` 作为子代理定义名，role 来自工具参数——模型选的文本。而 `delegationTools` 用这个名去匹配 `task` 的 deny 规则（`matchDenyRule(denyRules, 'task', name)`）。结果是一个精心构造的 perspective 可以绕开本应阻止委派的规则，或误触发为别的东西设的规则。
 
 现定义名固定为 `team-proposer`，role 只进 `systemPrompt`。验证：`teamTool.test.ts` 增至 14 项，新增"无论 perspective 是什么，每个提案者都拿到固定名字"；反转改回动态拼接后该项预期失败（收到 `team-task`、`team-review` 等）；源码逐字节恢复并核对 SHA-256 `cfa77ddbdfbe` 后重验；静态门、module facade 0 与 TS build `e056eeb81597` 通过。
+
+## 19. 第八轮用户反馈（2026-10-29）：跨目录写入、思考不可见、退出卡住、启动光标、config/model、resume 卡顿、旧会话界面
+
+本节只做**问题定位与方案研究**，不包含产品代码改动。编号沿用用户原序号（第二十四至第三十）。每条结论都区分三类证据：**已确认机制**（源码路径可复现）、**高置信推断**（链路完整但未在用户原环境复现）、**未确认**（不能用现有证据下结论）。本轮未运行任何产品测试，未拉起 PTY 或二进制；所有量化数字来自对真实 `~/.cheers/sessions`（2309 个会话目录、41 MiB）的只读文件系统测量。
+
+### 19.1 第二十四：跨目录写入被系统硬拒绝
+
+**用户的疑问值得单独回答**：拒绝不是来自注入的 `AGENTS.md`，也不是来自 `write`/`edit` 工具描述里的措辞。它来自工具执行体里的一次 `throw`。
+
+**已确认机制（决定性）**
+
+审批发生在工具体之前，但工具体在审批通过后**再检查一次**，而这次检查不接受任何批准结果：
+
+| 层 | 位置 | 行为 |
+|---|---|---|
+| `write` 工具体 | `core/tools/registry.ts:322-325` | `verifyPathContainment` 失败即 `throw outsideWorkspaceMessage(...)` |
+| `edit` 工具体 | `core/tools/registry.ts:426-429` | 同上 |
+| `read` 工具体 | `core/tools/read.ts:65-68` | 同上（**读也拒绝**，且同样不进入审批） |
+| `apply_patch` 计划 | `edit/patch/plan.ts:92` → `core/workspace/roots.ts:41` | 在 `prepare` 阶段抛错，**早于审批提示** |
+| 工作区绑定 | `core/workspace/tools.ts:16` → `roots.ts:32-42` | 目标不在主根、也不在已注册根内时抛 `Tool path is outside the registered workspace roots.` |
+| 审批层包装 | `turn/tools.ts:406-408` | 上一条抛错被 `catch` 转成 `{ blocked }`，**`escalationPromptHandler` 从未被调用**（`turn/tools.ts:461` 不可达） |
+
+`selectWorkspaceRoot`（`core/workspace/roots.ts:32-42`）只有两个返回路径：主根，或一个 `access === 'write'` 的已注册附加根。**没有第三条分支会去读审批决定**。所以即使审批层放行，工具体的 realpath 检查仍会以同一个根为准再次拒绝——用户看到的"批准了却什么都没发生"与"直接被系统拒绝"其实是同一条围栏的两种表现。
+
+`/workspace add <path> --write` 是唯一的持久化放行路径（`core/commands/workspace/command.ts:11`、`session/continuation/workspace.ts:57-94`、`core/workspace/roots.ts:18-29`），它把根写入会话、用 `dev:ino:birthtimeMs` 绑定身份、并入 sandbox 的 `allowWrite`。
+
+**对照：三个参考项目都不把"工作区外"当作绝对边界**
+
+- Claude Code：`utils/permissions/filesystem.ts` 的写判定最后一步是 **`ask`**（`:1395-1411`，`decisionReason.type === 'workingDir'`），并附 `addDirectories` 建议（`:1454-1463`）；读在工作区外同样降级为 `ask`（`:1179-1194`），并建议加 `Read` 规则（`:1427-1439`）。**没有任何一条路径把工作区外直接判 `deny`。**
+- Codex：`core/src/safety.rs:26-97` 对越界 patch 返回 `SafetyCheck::AskUser`；`core/src/tools/handlers/apply_patch.rs:236-275` 甚至**从 patch 自身的目标路径反推**需要临时授予的可写根。提示词模板 `sandbox_mode/workspace_write.md` 明写"Editing files in other directories requires approval"。
+- pi：写工具完全没有围栏（`core/tools/write.ts:65` 只做 `resolveToCwd`），README 明确"does not include a built-in permission system"。
+
+**结论**：本项目是四者中唯一把"工作区外"实现成绝对拒绝的。用户的直觉（"其他项目从没拒绝过"）与参考实现一致。
+
+**修复方向**（不放开相对路径逃逸，也不削弱符号链接防护）
+
+1. **让判定变全函数**：把 `selectWorkspaceRoot` 拆成 `resolveWorkspaceRoot(...) -> { root } | { outside }`，只为"不在任何根内"这一种情况返回 `outside`；只读根、身份变更、根重叠继续抛错（`turn/workspace.test.ts:48-59` 锁定的"只读根在提示前拒绝"必须保留）。
+2. **一次性的、不落盘的授权根**：`WorkspaceRoot` 增加 `origin: 'session' | 'approval'`；`approval` 只在内存中存活、只对本次 turn 有效，`decodeWorkspaceRoots`（`core/workspace/model.ts:13-31`）读取时拒绝该来源。这样 `/workspace add` 仍是唯一持久化放行方式。
+3. **审批目标必须是规范父目录**：用 `verifyPathContainment` 的 `resolvedPath` 的目录，而不是用户写法的字面串；批准后再用同一函数复验一次，符号链接在提示与写入之间被改写时拒绝——这正是 `toolPolicy.ts:223-228` 已经记录的"批准了却写不进去"隐患。
+4. **相对路径逃逸永不进入审批**：沿用 `writeTarget.ts:96-104` 的三分法——相对路径越界是笔误，直接拒绝；绝对路径越界才可升级。这是防止 `../../../.bashrc` 变成用户条件反射点"允许"的关键。
+5. **`apply_patch` 需要单独处理**：它在 `prepare` 阶段（审批前）就调用 `selectWorkspaceRoot`（`edit/patch/plan.ts:92`、`turn/preparation.ts:54`），所以要么让 plan 产出"这些文件在工作区外"的预览段并在预览里升级，要么把越界判定移出 plan。
+6. **读路径同样处理**：`read.ts:65-68` 应升级为审批，而不是拒绝；这与 Claude Code 的读语义一致。
+7. **保留执行层二次校验**（`runtime/execution/write.ts:20-30`、`core/workspace/files.ts:16-24`），只是让它们指向被批准的根。
+
+**会被改动的现有断言**：`core/tools/arguments.test.ts:99-123`（当前断言 `write`/`edit` 越界必 `reject` 且 `writeTextFile` 未被调用）是主要改动点；`core/security/pathJail.test.ts:22-80`、`core/query/toolPolicy.test.ts:85-104`、`turn/workspace.test.ts:44-67` 必须继续通过。
+
+**证据边界**：以上全部来自源码与参考实现对照，未在真实终端复现用户的拒绝现场，也未验证改动后的审批链路。
+
+### 19.2 第二十五：模型的思考过程打不开
+
+**结论：思考过程被采集、被渲染，但"打开"的交互在多数情况下不可达；同时它从不进入历史。**
+
+**链路分段核实**
+
+| 环节 | 状态 | 证据 |
+|---|---|---|
+| 供应商解析 | 可用 | `turn/completion.ts:169` `REASONING_FIELDS = ["reasoning_content","reasoning","reasoning_text"]`；Responses 端点在 `provider/endpoints/responses/body.ts:14` 请求 `summary: 'auto'` 并解析 `response.reasoning_summary_text.delta`（`responses/stream.ts:117-143`）；Anthropic 解析 `thinking_delta`（`anthropicMessages.ts:694`） |
+| 事件 | 可用 | `turn/session.ts:279` 把 `onReasoning` 推成 `reasoning.delta` |
+| 落盘 | 可用（作为消息字段） | 真实 transcript 中 `message` 事件带 `reasoning: { text }`（抽查 `sess_6cfd50aa…`：70 行中 8 条带 reasoning，最长 997 字符） |
+| 渲染 | 可用 | `cli/interactive/turnSink.ts:187-211` 建立 `kind:"thinking"` 块；`transcript/blocks.ts:170-188` 默认折叠为一行 `● thought 1.2s · click to expand` |
+| 展开（键盘） | **有条件可达** | `keybindings.ts:86` 绑定 `ctrl+t` → `keymap.ts:256` → `surface/pane.ts:122-134` |
+| 展开（鼠标） | **仅在特定模式** | `interactiveMode.ts:513` 只在 `alternateScreen || pager.active || overlay.fullScreen` 时把鼠标事件交给 pointer；`pointer.ts:353-357` 的 `toggle()` 要求 `block.collapsed !== undefined` |
+| 历史恢复 | **缺失** | `cli/interactive/history.ts:52-58` 只恢复 assistant 的 `content`，**从不读 `turn.reasoning`** |
+
+**确定的三个缺口**
+
+1. **恢复的会话里没有思考块。** `restoreConversation` 从不读取 `SessionMessage.reasoning`，所以 `/resume` 打开旧会话时，历史里根本不存在 `collapsed` 块。用户在旧会话里"打不开思考"是必然的，不是偶发。
+2. **`regular` 模式下鼠标不可达。** `interactiveMode.ts:513` 的条件让非全屏模式不接收鼠标报告，`engine.ts:369/373` 也只在 `alternateScreen || overlayScreen` 时开启鼠标跟踪。于是 `blocks.ts:174` 那行 "click to expand" 在 regular 模式下是一个**画出来但点不了的提示**——界面在承诺一个不存在的交互。
+3. **`ctrl+t` 是唯一键盘入口，且无第二绑定。** 与 `ctrl+s` 曾遇到的 XOFF 同类风险（HANDOFF 记录过），`ctrl+t` 在部分终端/多路复用器配置下也可能被吞；目录（`chrome/keys.ts:90`）与指南（`.wiki/guides/keybindings.md:92`）只列了这一个键。
+
+**参考对照**：Claude Code 的 `ctrl+o`（`keybindings/defaultBindings.ts:44` `app:toggleTranscript`）是**全局 transcript 视图切换**，不是逐块折叠；其 thinking 块在 verbose 下直接全文显示。本项目选了"逐块折叠 + 单键批量翻转"，语义更细，但因此更需要保证入口可达。
+
+**修复方向**：`restoreConversation` 增加 thinking 块（`collapsed: true`，文本取 `turn.reasoning.text`，`redacted` 时不显示正文而显示"provider withheld"）；`regular` 模式要么开启鼠标跟踪，要么不绘制 "click to expand"（二选一，不能继续画一个假提示）；为 `app.thinking.toggle` 增加备选键并同步目录与指南。
+
+**证据边界**：未在真实终端按键复现；`ctrl+t` 是否被用户终端吞掉未验证。
+
+### 19.3 第二十六：`exit` 有时卡住
+
+**已确认：`exit` 不是一个命令词，是 `/exit`。而真正的退出链上有一个无上限的等待。**
+
+**入口核实**：`registry.ts:436` 的 `exit` 命令（别名 `quit`、`q`）必须带前导 `/` 才会被 `slashRouter` 识别。裸输入 `exit` 会作为**普通提示词**发给模型——这本身就会让用户觉得"卡住"（模型在回答一个它被问到的词）。`ctrl+d`（`keybindings.ts:82`）在草稿为空时才退出。
+
+**退出链（`/exit` → `shutdown()`）**
+
+1. `interactiveCommandRouter.ts:255` 把 `exit-session` 转成 `exitRequested`；`interactiveMode.ts:1105-1107` 调 `this.shutdown()`。
+2. `shutdown()`（`interactiveMode.ts:1509-1527`）：`stdin.dispose()` → `await this.terminal.drainInput()`（`drain.ts` 有 1000 ms 上限，**有界**）→ `this.stop()` → `handleShellClose(...)`。
+3. `handleShellClose`（`core/shell/signalHandlers.ts:28-54`）：`sessionRuntime.terminate()`（同步写盘）→ 打印 `--resume <id>` → `exit?.(0)`。
+4. `exit` 来自 `interactiveLoop.ts:62-70`：**`await initialMcpGateway.close?.()` 之后才 `terminate(code)`**。
+
+**卡住点**：`interactiveLoop.ts:67` 的 `initialMcpGateway.close()` 没有任何超时。它内部是 `gateway.ts:188` 的 `Promise.all([connectionManager.shutdown(), this.queue])`：
+
+- `this.queue` 是**串行队列**（`gateway.ts:194-199`）：一个尚未完成的 `snapshot()` 会让 `close()` 排在它后面。`snapshot` 的上限是 `MCP_CATALOG_TIMEOUT_MS = 30_000`（`catalogLimit.ts:3`），所以最坏情况退出要等 30 秒。
+- `connectionManager.shutdown()` → 每个 `CoreMcpClient.close()` → `finishClose()` 里 `await this.opening`（`client.ts:272`）。`opening` 是 `connect()` 的进行中 Promise，其超时同样是 30 秒（`client.ts:113` 传 `timeout: this.timeoutMs`）。
+- stdio 传输自身的 `close` 有 2 s + 2 s + SIGKILL 的兜底（SDK `stdio.js:143-176`），所以**stdio 不是主要卡点**；HTTP 传输（`mcp/http/transport.ts:37`）走 `requests.close()` + `super.close()`，没有额外上限。
+
+**为什么"有时卡有时不卡"**：卡住只在退出瞬间存在一个**尚未完成或正在重连**的 MCP 连接时发生。本仓库 `.cheers/mcp.json` 配置了 `code-index`（stdio，serena）与 `github`（HTTP）两个服务器；若退出时 serena 正在启动或 `tools/list` 尚未返回，`close()` 就会等它到 30 秒上限。若退出时两个连接都已稳定，退出是瞬时的。
+
+**第二个隐患**：`shutdown()` 走的是 `handleShellClose`，而 `createCliShutdown` 的 `close()`（`cli/runtime/shutdown.ts:33-56`）会在 `process.exit` 之前**再执行一次** `mcpGateway.close()`（`cliProcessRunner.ts:216`）。两次 `close()` 靠 `this.closing ??=`（`gateway.ts:188`）合并，所以不会双倍等待；但这也说明**退出路径上有两个独立的 owner 都认为自己负责关 MCP**。
+
+**参考对照**：Claude Code 与 codex 的 MCP 关闭都在 shutdown 预算内（codex 的 `timeoutMs` 模式与本项目 `createCliShutdown` 的 `timeoutMs: 10_000` 一致），但本项目的 MCP `close()` **不在**那 10 秒预算内——`shutdown.exit()` 在 `interactiveLoop` 里先 await MCP，再进 `createCliShutdown`。
+
+**修复方向**：把 `interactiveLoop.ts:67` 的 MCP 关闭纳入有界预算（与 `createCliShutdown` 的 `timeoutMs` 同源），超时后打印"清理未确认"并**仍然退出**（当前 `handleShellClose` 已有"cleanup failed; exit was not verified"的措辞范式）；并让 `gateway.close()` 不再等待队列中尚未开始的 `snapshot`（关闭即拒绝新工作，队列里已排队的操作应被取消而不是等待）。
+
+**证据边界**：未在真实终端复现卡住；30 秒是代码上限推算，不是实测时长。裸 `exit` 是否真的被当作提示词发给模型，需用户确认当时的输入是否带 `/`。
+
+### 19.4 第二十七：进入时输入框光标跳到很多空白行
+
+**结论：这是 `fullscreen` 下"历史块先入 transcript、光标行按旧布局定位"的一个可复现几何竞态；具体触发条件未在用户原环境确认。**
+
+**已确认的机制片段**
+
+1. `interactiveMode.start()`（`interactiveMode.ts:490`）在**第一帧之前**把欢迎块与会话历史 `append` 进 transcript（`:495` 的 `appendConversation`）。
+2. `Editor.layout()`（`presentation/tui/editor.ts:281-319`）的 `scrollOffset` 是**编辑器实例上的持久字段**：`if (!options.preview) this.scrollOffset = scrollOffset`（`:317`）。它只在新文本或新宽度时重算，短文本分支还会把它重置为 0（`:303`）。
+3. 帧合成 `view.renderFrame`（`surface/view.ts:53-104`）先算 `chrome`（含 composer 行），再算 `transcriptRows`，最后把 composer 的屏幕位置算成 `transcriptRows.length + chrome.composerOffset`（`:79-83`）。
+4. `pane.render` 的 `filler`（`surface/pane.ts:98-99`）会把短对话**向下填充**到底部，填充行没有 owner（`blockIndexAt` 对 `within < 0` 返回 `undefined`，`viewport.ts:168-173`）。
+
+**最可能的组合**：启动表面（`cli/interactive/startup.ts:57`）**无条件**先以 alternate screen 启动并绘制一个 composer；随后 `InteractiveMode` 用 `startup.adopt()` 接管（`interactiveMode.ts:578`、`engine.ts:157-164`）。当目标模式是 `regular`（`tuiMode: "regular"`）时，`transfer` 会先 `leaveScreen()`（写 `\x1b[?1049l`）再 `enterScreen()` 建立 `MainScreenPainter`；`MainScreenPainter` 的 `viewportUnplaced` 路径（`render/mainScreen.ts:161-162, 269-274, 297`）在子进程/换屏之后**不按账本定位，而是从当前光标行开始写**。如果此前的 alt-screen 会话留下了光标位置，第一帧的 composer 就可能被画在历史行下方很远处——用户看到的就是"光标在若干空白行之后"。
+
+**为什么"输入内容后就能删掉空白行"**：编辑会推进 `contentRevision`，`Editor.layout` 重算行数并走 `maxRows` 分支（`editor.ts:302-318`），`scrollOffset` 被夹到 `[0, maxScroll]`；同时 `setText`/`insert` 会把 `scrollOffset` 归零（`buffer.ts:101-107`）。也就是说，**第一次真实编辑会纠正几何**，这与用户观察完全吻合。
+
+**未确认**：用户实际使用的是 `fullscreen`（默认，`runtimeConfig.ts:438`）还是 `regular`；以及空白行是"transcript 填充行"还是"编辑器 scrollOffset 偏移"。两者在画面上都可能表现为光标下移。
+
+**修复方向**：把 `Editor.scrollOffset` 的生命周期绑到布局身份（文本 + 宽度 + 行预算），而不是实例字段；`MainScreenPainter` 在 `viewportUnplaced` 的第一帧应先用 `reanchor()` 重新建立位置，再绘制 composer；并补一条启动几何测试：给定历史 + 空草稿，composer 的首行必须紧贴最后一条历史行。
+
+**证据边界**：未在真实终端复现；上述为源码链路推断，需要用户确认 `tuiMode` 与是否伴随 `--resume`。
+
+### 19.5 第二十八：config 与 model 配置没有区分开
+
+**先纠正一个事实：本项目没有 `/config` 命令。** 设置面板是 `/settings`（`registry.ts:513-523`，无别名），模型面板是 `/model`（`registry.ts:258-269`，别名 `models`、`switch`）。
+
+**实际的职责划分（已确认）**
+
+| 关注点 | `/settings` | `/model` |
+|---|---|---|
+| 模型/连接/凭据选择 | 只有两个跳转行 `settings:model`、`settings:thinking`（`picker/settings.ts:253-257, 284-285`） | 完整拥有（`picker/model.ts:114-240`） |
+| reasoning effort | 跳转到 `/thinking` | 详情里的 "Choose effort"（`model.ts:206-215`）**且** `/thinking` 独立存在 |
+| temperature / topP / maxOutputTokens | **是**（`config/settings.ts:22-25`，`settingNavigation` 把 `Request` 组映射到 `Model`） | 否 |
+| allowedModels（模型白名单） | **是**（`config/settings.ts:43`） | 否 |
+| contextWindow / reserveTokens / modelTokenBudgets | **是**（`config/settings.ts:26-28`，映射到 `Context`） | 否 |
+| retries / network timeouts | 是（`Providers` 组） | 否 |
+| roles / presets | 仅跳转 | 完整拥有 |
+| theme / vim / statusline / tools / tasks | 是 | 否 |
+
+**真正的重叠**只有两处，但都足以让用户觉得"没有分开"：
+
+1. **`/settings` 的 `Model` 分类里混着两类东西**：配置文件字段（sampling、limits、allowlist）和两个跳转行（模型/角色、thinking）。前者是"模型行为配置"，后者是"模型选择入口"。
+2. **effort 有三个入口**：`/settings → Thinking effort`、`/model → 详情 → Choose effort`、`/thinking` 命令本身。三处最终都落到同一个 session 事务（这是对的），但入口数量让"配置"与"选择"的边界消失。
+
+**参考对照**：Claude Code 的 `/config` 是 `Settings` 面板的一个 tab，里面只有 `model`、`teammateDefaultModel` 这类**行为字段**，模型目录与切换在独立的 `/model` picker（`commands/model/model.tsx`）；pi 同理（`/settings` 是扁平设置菜单，`/model`、`/scoped-models`、`/thinking` 各自独立）。**没有一个参考项目把模型目录放进设置文件面板。**
+
+**修复方向**（复用现有 `SettingDefinition` 派生机制，不新建存储）
+
+1. 在 `settingNavigation`（`config/settings.ts:70-82`）增加 `domain: 'config' | 'model'`：`Request` 的 sampling/limits、`allowedModels`、`Context` 预算、`Retries`/`Network` 归 `model`；其余归 `config`。
+2. `settingsPicker` 只渲染 `domain === 'config'` 的行，**移除**两个跳转行（或保留为只读交叉引用）。
+3. `modelPicker` 增加一个 "Settings" 分类，用现有的 `settingDetail`/`SettingsDraft` 机制渲染 `domain === 'model'` 的字段——`SettingsHost.openSettings(scope)`（`picker/settings.ts:16`）已经存在，不需要第二条持久化路径。
+4. effort 收敛为一个 owner：`/thinking`，`/model` 的 "Choose effort" 继续委托它（现状已如此）。
+
+**证据边界**：这是产品结构判断，不是缺陷；未实现。
+
+### 19.6 第二十九：resume 面板每个操作卡约 1 秒
+
+**已确认：卡顿来自"每次搜索都全量重扫会话目录"，叠加"每秒一次的同步文件系统扫描"。二者都在真实数据量下达到约 1 秒。**
+
+**量化（本机真实 `~/.cheers/sessions`：2309 个会话、41 MiB）**
+
+| 操作 | 实测 |
+|---|---|
+| `readdir` 全部会话目录 | 3.7 ms |
+| 每会话 `lstat` 三个核心文件（4 并发） | 354 ms |
+| 读取 metadata + state（1.4 MiB） | 504 ms |
+| 再读 transcript 并逐行 `JSON.parse`（5.5 MiB / 24 958 行） | 874 ms |
+| 缓存命中后的稳态 `lstat`（每会话约 12 次） | **1 027 ms** |
+| 单个大会话（1.84 MiB / 12 116 行）完整加载 | 读 14 ms + 解析 22 ms |
+
+**机制一：搜索每敲一个键就全量重扫。** `overlay.ts:955` 用 `picker.searchDebounceMs ?? 100` 调度；session picker 没有覆盖该值。`SessionListing.search`（`picker/session/listing.ts:57-83`）**把整个 catalog 迭代到最后一页**（`:69-73`），只为拿最后一个 snapshot；`SessionCatalog.list` 每次都会重新 `discoverSessions`（`catalog/discovery.ts:10-39`）并对每个 id 做 `locateCatalogFiles`（`catalog/files.ts:73-88`，目录 + 3 个文件各一次 `lstat`），`read()`（`catalog/index.ts:261-284`）又做**第二次** `locateCatalogFiles` 来确认版本没变。缓存只缓存 `SessionSummary`（`catalog/index.ts:48`），**不缓存 stat**。
+
+**机制二：每秒一次同步扫描跑在渲染路径上。** `renderChrome`（`surface/chrome.ts:62`）无条件调用 `context.ambient()`；`interactiveMode.ts:394` 把它接到 `readAmbientFacts`；`ambientFacts.ts:24` 的 `PEER_COUNT_TTL_MS = 1_000` 过期后会执行 `AgentRegistryScanner.scanAllReachableAgents()`（`core/messaging/agentRegistryScanner.ts:24-74`）——它是**同步**的：`readdirSync` + `SubagentLoader.loadAllSubagents()`，后者对每个 `.md` 走 `readTextFile` → `pathIdentity`（`core/workspace/files.ts:182-201`，**逐级 `lstat` 到 `/`**）。本机实测这条链在无 agent 文件时约 1 ms（`socketEntries: 0`），所以它不是本机 1 秒的主因；但它在有 agent 定义或多 socket 的机器上会成为尖峰，且**在 picker 打开时仍然执行**。
+
+**主因判定**：本机数据下，**机制一**足以单独造成约 1 秒/次（874–1027 ms），与用户描述吻合。机制二是放大器，不是主因。
+
+**参考对照**：Claude Code 的 resume 列表只做 `stat`，再按需 `enrichLogs` 读取有界前缀（`utils/sessionStorage.ts:3939-3956`、`screens/ResumeConversation.tsx:126-140`）；pi 用有界并发走目录并发布部分有序页（`session-manager.ts:941-976`），且**跨按键缓存小写化后的消息文本**（`session-selector-search.ts:44-57`）。本项目的 catalog 已有分页与预算，缺的是"索引复用"。
+
+**修复方向**：搜索改为在**已建立的 catalog 索引**上过滤（`SessionCatalogPage` 已按 needle 过滤，`catalog/query.ts:22-35`），不要每次重新 `discoverSessions`；把 `lstat` 结果与 `version` 一起缓存，用目录 mtime 做失效；`ambient()` 的 peer 计数移出渲染路径（或在 picker 打开时冻结）。
+
+**证据边界**：实测为本机只读文件系统测量，未运行产品代码；"约 1 秒"与用户主观描述吻合但未在同一进程内计时。
+
+### 19.7 第三十：打开 cheers 时显示了上一次 session 的界面
+
+**已确认：这是启动时的静默会话重入，不是终端残留画面。触发条件是上一次进程没有走 `shutdown()`（被 SIGTERM/SIGHUP/崩溃杀死）。**
+
+**机制（`core/shell/bootstrap.ts:130-190`）**
+
+- 交互式启动传 `adoptCurrentSession: false`（`cli/bootstrap/cliBootstrapContext.ts:137`）。
+- 但重入条件是 `adoptCurrentSession === true || unfinished`（`bootstrap.ts:166`）。
+- `hasUnfinishedBusiness`（`bootstrap.ts:348-356`）对**任何不是 `terminated`/`completed` 的状态都返回 true**；新会话以 `status: "active"` 创建（`session/store/sessionCreation.ts:72`），resume 也把状态设为 `active`（`session/recovery/sessionResume.ts:136`）。
+- `"terminated"` **只**由 `handleShellClose` → `sessionRuntime.terminate` → `saveTerminated` 写入（`core/shell/signalHandlers.ts:41-53`、`core/shell/sessionRuntime.ts:454-457`）。
+- **`createCliShutdown` 处理 SIGTERM/SIGHUP 时只调 `exit(143/129)`（`cli/runtime/shutdown.ts:18-19`），从不调用 `sessionRuntime.terminate`。** 崩溃路径同样不调。
+
+于是：终端窗口被关掉、进程被 `kill`、或崩溃之后，该会话的持久状态仍是 `active`；下一次交互式启动把它判定为"有未完成的事"，**静默 resume**。
+
+**为什么用户觉得"不是新会话"而不是"被恢复了"**：`emitLifecycleMessages: false`（`cliBootstrapContext.ts:134`）抑制了 `Resumed session <id>`（`bootstrap.ts:172`）；而这条通知只在 `showStartupSurface === true` 时打印（`cliStartupSurface.ts:79-96`），真实 TTY 的 fullscreen 宿主下该值为 false。窗口标题里虽然带 session id（`interactiveMode.ts:503-505`），但用户不会去比对。
+
+**这不是新缺陷**：HANDOFF 第 9 条"Fresh CLI Processes Can Reenter Existing Conversation History"（`HANDOFF.md:235-240`）记录的就是这段代码。
+
+**次要机制（仅在 `regular` 模式或 SIGKILL 后可达）**：启动表面**总是**先以 alternate screen 启动（`startup.ts:57`），`adopt()` 到 `regular` 时 `transfer` 会 `EXIT_ALT_SCREEN`（`engine.ts:160-163`），把终端恢复成上一个未正常退出的进程留下的屏幕。但用户配置里没有 `tuiMode`（默认 `fullscreen`），所以这条不是本机主因。
+
+**判定依据（供用户下次复现时区分）**：看欢迎块下方的状态行与窗口标题里的 session id；若与上次相同，是重入；若 id 是新的但画面旧，才是终端残留。另外 `crashes.json` 存在与否可区分崩溃与信号退出。
+
+**修复方向**：把"交互式启动不重入已关闭的会话"从"状态推断"改为"显式意图"——只有 `--continue`/`/resume` 或真实的 `pendingPrompt`/`turn-active` 才重入；`active` 但无 pending 工作且无 `runPhase` 的会话应视为已关闭。同时 `createCliShutdown` 在 SIGTERM/SIGHUP 路径应写入 `terminated`（或至少写入一个"进程非正常结束"标记），使下次启动能正确判定。若保留重入，则必须在 fullscreen 下也打印 `Resumed session <id>`。
+
+**证据边界**：未复现；上述为源码链路与 HANDOFF 既有记录的一致性推断。
+
+### 19.8 本轮结论摘要与实施顺序
+
+| 编号 | 判定 | 主要证据 | 实施优先级 |
+|---|---|---|---|
+| 24 | 确认：工具体硬拒绝，审批层不可达 | `registry.ts:322/426`、`turn/tools.ts:408`、参考实现对照 | P0（用户阻塞） |
+| 25 | 确认：历史不恢复思考块；regular 模式提示不可点；单键无备选 | `history.ts:52-58`、`interactiveMode.ts:513`、`keybindings.ts:86` | P1 |
+| 26 | 确认：裸 `exit` 是提示词；MCP `close()` 无上限（最坏 30 s） | `registry.ts:436`、`interactiveLoop.ts:67`、`gateway.ts:188` | P0（阻塞退出） |
+| 27 | 高置信推断：启动几何竞态（`scrollOffset` 持久 + `viewportUnplaced`） | `editor.ts:281-319`、`mainScreen.ts:96-104` | P1（需用户确认模式） |
+| 28 | 确认：无 `/config`；模型行为字段在 settings、目录在 model，effort 三入口 | `settings.ts:78`、`picker/settings.ts:253-257`、`picker/model.ts:206` | P2（结构） |
+| 29 | 确认：搜索全量重扫（实测 0.87–1.03 s/次） | `listing.ts:69-73`、`catalog/index.ts:261-284` | P0（体验） |
+| 30 | 确认：SIGTERM/SIGHUP 不写 terminated，下次静默重入 | `bootstrap.ts:166/348-356`、`shutdown.ts:18-19` | P0（数据正确性） |
+
+实施顺序建议：先做 30 与 26（退出语义与重入判定，改动小、影响面清晰），再做 29（resume 索引复用，纯性能、无行为变更），然后 24（跨目录写入需要新的审批路径，改动面最大，必须与 19.1 的六条约束一起做），最后 25、27、28。
+
+**本轮证据边界**：只做研究与文档；未运行产品测试、未拉起 PTY/二进制、未复现用户现场。19.6 的数字是只读文件系统测量，19.1/19.3/19.7 的结论来自源码链路与参考实现对照。所有"修复方向"均未实施，也未被验证。
