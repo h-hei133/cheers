@@ -3376,3 +3376,11 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 主代理768MiB、threads=false、显式七文件单进程串行126项去重通过：close12/sessionRuntime47/signalHandlers8/bootstrap28/shutdown11/branch8/work12。撤销recovery判断四项失败，撤销active判断两项失败；每次逐字节恢复，恢复后close12重验通过。五静态门、完整声明图单一用例、diff和AST责任计数通过：runtime19/signalHandlers2/close fixture8。本地NormProof proven/0open/0failed/0gap仅证collector范围。构建最终身份与Git/CI以日志读回绑定；无live provider/真实用户退出现场、PTY/exe、全仓或20k终端，原47项不升级，反馈26/30与ADD整体仍partial/active。
 
 延后CI读回：[60fb7545的MCP CI40931209180](https://github.com/h-hei133/cheers/actions/runs/40931209180)completed/success；[32960122容量CI40932465421](https://github.com/h-hei133/cheers/actions/runs/40932465421)completed/failure，实际1失败/12372通过/3跳过，1失败文件/1033通过/1跳过。唯一失败为advisor.test.ts的共享account续期后第二次请求缺席；静态/scripts/build步骤success，NormProof步骤skipped。具体原因继续核查，不将focused绿色升级为该CI通过，也不撤回容量官方证据。
+
+### 20.20 Advisor共享账户续期夹具与模型容量
+
+32960122的唯一CI失败在[advisor用例](../../packages/ts-shell/src/cli/runtime/advisor.test.ts)本地完整文件也稳定复现：36通过/1失败。定向诊断读取实际catalog为context32000、output128000、input272000，advisor状态error，只有主模型一次请求。夹具在共享账户测试中把gpt-5.3-codex重加到refresh cache并将window缩到32k、output设8192；原refresh规则保留已有已审阅maxTokens，因此20.18新增128k后形成输出比window还大的矛盾夹具。实际turn的requestBudget在fetch前拒绝，符合预算合同，不是续期第二次exchange、网络或凭据失败。
+
+只移除该测试的capacity cache改写及不必要的publication刷新，使用已经加载的真实内置型号，并检查context大于output。原续期一次、main/coding两次精确路径/合成凭据/型号及notes一项断言全部保留；account wire仍不发max_output_tokens。没有修改provider/auth、请求预算、刷新策略或默认输出，未以降低官方上限迁就测试。
+
+主代理完整advisor文件37项串行通过；旧夹具逐字节反转时同一共享账户项再次失败、其余36未选不计，恢复后单项通过。诊断输出只含public metadata、advisor状态及安全报告，临时诊断撤销。五静态门/diff与最终build新鲜度另由日志实际绑定；本批test-only不重跑结构NormProof。原失败CI保留，新提交CI另验，无live账户/真实认证或全仓执行，ADD仍active。

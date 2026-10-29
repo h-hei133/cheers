@@ -10150,3 +10150,11 @@ MCP修复已提交推送`60fb7545898b6a15669a583a954f72aeb4ce20e0`，远端main�
 主代理七相关文件126项去重串行通过，真实重开recovery/eligibility/bootstrap同ID与idle新建覆盖；recovery判断反转四失败，active判断反转两失败，逐字节恢复后close12重验通过。signalHandlers仅局部变量命名整理后8项再验。五静态门、完整声明图单一脚本、AST runtime19/handler2/fixture8和diff通过；最终build `67a668ba12b8d9cddd00862e10d8675795230ce3b5ebd4d2c8961ec02aa36450`、inputs `002a881cb1bc74dfe4162c856d84d943892b9ac00a877d78e93ef3dade855a73`，460 compilerInputs/3546文件重新计算一致。此前d795为局部变量改名前构建，最终身份以上述为准。本地NormProof proven/0open/0failed/0gap仅collector。HANDOFF新增ordinary close与settlement hook陷阱，task scratch清理；无provider/live用户退出、PTY/exe/full suite或20k终端，原47项不升级，ADD active，Git/精确CI另绑定。
 
 延后确认[60fb7545 MCP CI40931209180](https://github.com/h-hei133/cheers/actions/runs/40931209180)completed/success，精确headSha相同。329601容量CI的advisor唯一失败继续核查，不以MCP或本地绿色替代。
+
+本批退出修复已提交推送`ebf333b924f6ba4464768829a046ff8b859fc1dc`，远端main精确同SHA、仅原CLAUDE.md。[CI40936451972](https://github.com/h-hei133/cheers/actions/runs/40936451972)与[Watch40936452069](https://github.com/h-hei133/cheers/actions/runs/40936452069)启动时in_progress，按约定延后检查，未计通过。
+
+## [2026-10-30] test | Advisor续期夹具使用真实型号容量
+
+继续[addition20.20](features/phase-20-addition.md#2020-advisor共享账户续期夹具与模型容量)，329601唯一失败在本地完整advisor37项中同样36通过/1失败。诊断实际catalog context32k/output128k/input272k，advisor error、第二次请求未发送：refresh夹具缩小context，原preserveExplicitCapabilities保留新审阅128k output，原requestBudget正确拒绝矛盾容量。只删除该续期用例的cache改写/无必要refresh，使用已加载内置exact模型，并检查window大于output；原一次renew、两次精确account请求与note断言保留。provider/auth/预算/default/refresh策略未改。
+
+advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢复后单项通过、36未选不计新通过。五静态门/diff、1536MiB TS build及新鲜度通过：build `f67d21347098d354c8939157a39e3df0dc5a9269122c67904e5b807cf528bd0d`、inputs `b1f9a6ef856feaa942eb79098f477f39b2556d1e52e223bb78ed688c78f738b0`，460/3546一致。本批test-only未重跑结构NormProof。HANDOFF新增刷新夹具capacity陷阱，诊断撤销与scratch清理；无live/真实账户认证、PTY/exe或全套，原CI failure保留、ADD active，Git/精确新CI另绑定。

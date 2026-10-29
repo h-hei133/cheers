@@ -269,9 +269,10 @@ it.each(['settings', 'catalog', 'model', 'main-request'] as const)('does not acc
 
 it('uses the newly persisted main token for an advisor sharing the same account without a second exchange', async () => {
   const setup = await fixture('main'); setup.advisor.setEnabled(true);
-  writeCatalogCache(loadCatalog().map(provider => ({ ...provider,
-    models: [...provider.models, { id: 'gpt-5.3-codex', reasoning: true, contextWindow: 32000, maxTokens: 8192 }] })));
-  refreshConfiguration(setup.context);
+  // Use the installed model: a refresh cannot shrink its reviewed output ceiling.
+  const coding = setup.context.configuration.current.catalog.find(provider => provider.id === 'openai')!
+    .models.find(model => model.id === 'gpt-5.3-codex')!;
+  expect(coding.contextWindow).toBeGreaterThan(coding.maxTokens!);
   await runAdvisorCommand(['configure', 'a/gpt-5.3-codex'], setup.command, setup.advisor, false);
   await runAdvisorCommand(['on'], setup.command, setup.advisor, false);
   const renew = observeOAuthRenewal(freshAccount);
