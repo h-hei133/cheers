@@ -3583,3 +3583,23 @@ HANDOFF补失败路径公开证据保留与验证终态权威分离，任务scra
 主代理两显式文件138项串行通过：step97/session41。独立撤回说明的反转四条全部失败、37条未选不计通过；finally逐字节恢复step并核对SHA-256 `c5eb9dee4cf0592f828090cad2c17366532716cc03130279a4d37b970d4b71a2`，恢复后138再通过。五静态门/diff通过，无新product import/callable，不重复graph/NormProof。1536MiB build观察exit0后单独compilerInputs与digest核对一致：build `1bf1bbee4455594343e2fdc123ac1abedc72db761e31f22de24244a2a687907b`，inputs `5086aca3168877309143a0947153ae2d5116a119ae3fe77be1154f86edfa6c93`，460 compilerInputs/3549文件。
 
 HANDOFF补length与overflow的证据区别，task scratch清理、原CLAUDE.md保留。新说明未重发live请求，实环境证据仍绑定20.33旧build；无独立review、真实用户终端/账户/桌面/PTY/exe/full suite/20k会话，原47不升级、ADD及goal active。本批Git/精确CI另绑定。
+
+20.34已提交推送`9e4c4a2d3f5289f39f432e6dfc91bae9b49c42b6`，远端main精确一致、仅原CLAUDE.md。延后核对[Watch40960523975](https://github.com/h-hei133/cheers/actions/runs/40960523975)已success，[CI40960523986](https://github.com/h-hei133/cheers/actions/runs/40960523986)仍in_progress；20.33 Watch40959758635 success、CI40959758386仍in_progress。20.31[CI40956596885](https://github.com/h-hei133/cheers/actions/runs/40956596885)与20.32[CI40957840429](https://github.com/h-hei133/cheers/actions/runs/40957840429)均completed/success、head一致，历史失败保留。
+
+### 20.35 表面清理异常仍归还终端并执行退出
+
+继续反馈26实际退出边界。[InteractiveMode.shutdown](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)先stop再handleShellClose，stop内订阅释放、transcript渲染或TUI写入抛错时，session terminate和exit仍完全跳过；原保存失败围栏覆盖不到这里。regular/fullscreen×订阅/transcript/终端写入六条真实Ctrl+D host回归，旧实现全部拒绝并产生六个未处理拒绝，保留为产品失败证据，不称用户现场根因已确认。
+
+目标检查后定向只读对照pi tui.ts:1012–1022和terminal.ts:474–505：stop按序归还模式，但所读片段无异常继续围栏，不能据此称参考已解决。进一步读取codex tui.rs:305–335的restore_common：记录first_error，仍继续paste/raw/cursor恢复；lib.rs:600–617在资源关闭错误后仍执行terminal restore。采用各owner继续尝试、保留失败、终端恢复独立的决定，不复制Rust机制或新增第二套资源registry。
+
+stop保留原owner与顺序，以局部循环逐项尝试已有清理，清空三个release引用后调用、保留第一个实际异常；document渲染失败时仍调用原tui.stop。TUI在原stop的finally尝试物理terminal.stop，鼠标输出或timer cleanup失败不跳过设备归还。shutdown接纳stdin/stop异常，安全报告未完全验证的清理，将cleanupFailed传给原handleShellClose；会话成功保存也不能把退出码升级为0。无exit hook的嵌入调用在会话关闭后仍收到原清理异常。closing/stopped键、paste和mouse事件直接退休，即使stdin.dispose失败，同一个chunk的后续输入也不提交；没有新provider/auth、package script、build或MCP关闭系统。
+
+主代理package-local、heap768MiB、threads=false串行执行engine59/signalHandlers9完整所属检查及过滤host26，共94项实际通过；host325项未选不算通过。host覆盖两模式×subscription/transcript/terminal-write/terminal-stop/error-report/stdin十二条、嵌入失败两条及原busy exit、后续队列、drain、保存失败控制。物理stop失败只断言一次尝试与exit1，不假称设备已恢复；错误提示自身失败仍关闭会话并exit1，无原始错误正文。四类独立反转恢复旧stop、移除物理finally、移除失败退出码、移除stdin退休分别8/2/11/2失败；finally逐字节恢复后94再通过。第一轮反转脚本误预期4/11、实际6/9，按具体失败核对是error-report新增控制与renderer异常已有exit1分支；修正预期并补stdin场景后四类全部再次实际运行，不用错误计数冒充证明。
+
+恢复SHA-256：InteractiveMode `8c2b57c9ab5fce925854fe8079f439f82af98dca7c2f5421e8b41bb432ac0587`、engine `5eb07cad270555ac2418e469d660513a5ba4c2a7fe5b4e1195acd1aee4a0bc52`、signalHandlers `020bf839d7a5f21d3106534bcf4b66286335524c9d974e416bcdc537049ffc06`。五静态门/diff通过；无新product import或命名callable。保守AST命名方法/箭头属性计数相对HEAD保持InteractiveMode122/engine22/signalHandlers2；前两者继承的ceiling超限按原disposition追加明确defer，未宣称结构符合20上限、未为窄退出修复进行大拆分。未重复graph/NormProof。1536MiB build观察exit0后单独新鲜度一致：build `c505ffd1811f4690029bf6fd025db469b17592203c21b691bf8c71d66ece19b6`，inputs `95c59e5eae2252672f97805d8aa9fda5dda5b242469ebc021c91883a2aa899af`，460 compilerInputs/3549文件。
+
+HANDOFF追加表面清理与session退出围栏区别，task scratch清理、原CLAUDE.md保留。终端是RecordingTerminal、故障为受控注入，没有用户真实terminal、PTY/exe/full suite/20k、live provider或独立review证据；20.33 live仍绑定旧build。原47项不升级、ADD与goal active，本批Git/精确CI另绑定。
+
+提交前补查stdin解绑失败的paste/mouse入口，增加同一chunk的bracketed paste与鼠标按下/释放、草稿为空与pointer零处理断言；两个入口沿同一closing/stopped状态退休。分别撤回paste/mouse守卫实际2/1失败，regular模式本来不路由该mouse，不能把它算第二项失败；首轮误预期mouse两项、核对后重跑。逐字节恢复后host26再次通过，engine59/signalHandlers9此前已串行通过且无后续改动。最后host重验仍返回session_id时误启动静态门/build链，发生验证重叠；两者随后分别观察exit0，未观察OOM，但本批整体不能称全程严格串行。新鲜度在两进程结束后单独完成，最终build/inputs以上述最新值为准。
+
+延后读回20.33文档CI40959758386已completed/success、精确head为e6d543ad9fa9a7dcaa236fcb213c6c5e393916f7；20.34 CI40960523986仍in_progress，Watch40960523975 success。

@@ -10284,3 +10284,15 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 沿[addition20.34](features/phase-20-addition.md#2034-无答案长度停止的准确说明)修真实小请求暴露的说明：length原指向context可能满/compact，目标明确overflow另有合同。定向对照参考length、incomplete/max_output_tokens及推理/答案共用输出额度，原说明改为provider在长度限制处停止、去/settings检查输出上限；没有新增预算或修改停止/溢出行为。
 
 四条实际JSON/SSE×有/无reasoning的step/turn/sink/restore旧说明全部失败；两显式文件step97/session41共138串行通过，反转旧说明四失败、finally逐字节恢复后138再通过。五静态门/diff，无新product import/callable；build `1bf1bbee4455594343e2fdc123ac1abedc72db761e31f22de24244a2a687907b`、inputs `5086aca3168877309143a0947153ae2d5116a119ae3fe77be1154f86edfa6c93`，460/3549在exit0后单独重算一致。HANDOFF与scratch清理；实环境证据仍绑定20.33旧build，新说明未重发live，无独立review/用户终端/账户/PTY/exe/full suite/20k；原47不升级、goal active，Git/精确CI另绑定。
+
+20.34已推送`9e4c4a2d3f5289f39f432e6dfc91bae9b49c42b6`，远端main一致、仅原CLAUDE.md。Watch40960523975 success、CI40960523986仍in_progress；20.33 Watch40959758635 success、CI40959758386仍in_progress。延后核对20.31 CI40956596885及20.32 CI40957840429均success、head一致。
+
+## [2026-10-30] fix | 表面清理异常仍执行退出
+
+沿[addition20.35](features/phase-20-addition.md#2035-表面清理异常仍归还终端并执行退出)修feedback26的另一异常路径：stop在订阅/transcript/TUI写入失败时跳过会话close与exit。六条真实Ctrl+D两模式host旧实现拒绝并有未处理拒绝。参考terminal restore保留first_error但继续paste/raw/cursor的决定，目标stop逐项尝试原owner、TUI finally尝试物理stop、shutdown安全报告并传cleanupFailed给原close；保存成功仍exit1，嵌入调用保留原异常，stdin解绑失败也不再处理后续键。
+
+engine59/signalHandlers9与过滤host26共94项串行通过；四类反转8/2/11/2失败、finally逐字节恢复后94再通过，325未选host不算通过。首轮反转计数预期错误已核对并重跑，不隐去。五静态门/diff，无新product import/命名callable；AST122/22/2保持既有数量，继承ceiling超限追加disposition defer，不称结构全合规。build `c505ffd1811f4690029bf6fd025db469b17592203c21b691bf8c71d66ece19b6`、inputs `95c59e5eae2252672f97805d8aa9fda5dda5b242469ebc021c91883a2aa899af`，460/3549在exit0后单独新鲜度一致。HANDOFF和scratch清理；无真实用户终端/PTY/exe/full suite/20k/live或独立review，新实环境仍只20.33旧build，原47不升级、goal active，Git/精确CI另绑定。
+
+提交前补stdin失败后paste/mouse退休，同一chunk草稿保持空且pointer零调用；撤回守卫2/1失败，regular本来不派mouse，首轮误预期已核对并重跑。恢复后host26再次通过。最后误在该测试session_id未结束时启动static/build链，验证发生重叠，两进程分别观察exit0、未观察OOM，不称本批全程严格串行；最终新鲜度在全部结束后单独核对，上述build为最终值。
+
+延后读回20.33文档CI40959758386已completed/success、精确head为e6d543ad9fa9a7dcaa236fcb213c6c5e393916f7；20.34 CI40960523986仍in_progress，Watch40960523975 success。

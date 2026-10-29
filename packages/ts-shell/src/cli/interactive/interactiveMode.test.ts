@@ -3554,6 +3554,73 @@ describe("session wiring", () => {
     } finally { render.mockRestore(); mode.stop(); }
   });
 
+  it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+    (['subscription', 'transcript', 'terminal-write', 'terminal-stop', 'error-report', 'stdin'] as const).map(fault => ({ kind, fault }))
+  ))('continues failed $fault cleanup and exits the actual $kind host', async ({ kind, fault }) => {
+    const exit = vi.fn();
+    let armed = false;
+    const released = vi.fn(() => { if (armed && (fault === 'subscription' || fault === 'error-report')) throw new Error('PRIVATE_CLEANUP_DETAIL'); });
+    const { mode, terminal, renderer } = build({ exit, tuiMode: kind, observeEvents: () => released });
+    const host = mode as unknown as { shutdown(): Promise<void>; view: InteractiveView;
+      options: { sessionRuntime: ShellSessionRuntime }; clipboard: Clipboard; stdin: { dispose(): void }; pointer: { handle(report: unknown): void } };
+    const terminate = vi.spyOn(host.options.sessionRuntime, 'terminate');
+    const clipboard = vi.spyOn(host.clipboard, 'release');
+    const notices: string[] = [];
+    const renderLine = vi.spyOn(renderer, 'renderLine').mockImplementation(line => {
+      notices.push(line); if (fault === 'error-report') throw new Error('PRIVATE_REPORT_DETAIL');
+    });
+    mode.start();
+    const render = vi.spyOn(host.view.transcript, 'render');
+    const write = vi.spyOn(terminal, 'write');
+    const dispose = vi.spyOn(host.stdin, 'dispose');
+    if (fault === 'stdin') dispose.mockImplementation(() => { throw new Error('PRIVATE_CLEANUP_DETAIL'); });
+    if (fault === 'transcript') render.mockImplementationOnce(() => { throw new Error('PRIVATE_CLEANUP_DETAIL'); });
+    if (fault === 'terminal-write') write.mockImplementationOnce(() => { throw new Error('PRIVATE_CLEANUP_DETAIL'); });
+    const pending: Promise<void>[] = [];
+    const original = host.shutdown.bind(mode);
+    const shutdown = vi.spyOn(host, 'shutdown').mockImplementation(() => {
+      const operation = original(); pending.push(operation); void operation.catch(() => {}); return operation;
+    });
+    const stop = vi.spyOn(terminal, 'stop');
+    if (fault === 'terminal-stop') stop.mockImplementationOnce(() => { throw new Error('PRIVATE_CLEANUP_DETAIL'); });
+    armed = true;
+    const submit = vi.spyOn(host as unknown as { onSubmit(text: string): void }, 'onSubmit');
+    const pointer = vi.spyOn(host.pointer, 'handle');
+    try {
+      terminal.input('\x04should-not-submit\r\x1b[200~retired paste\x1b[201~\x1b[<0;1;1M\x1b[<0;1;1m');
+      await expect(pending[0]).resolves.toBeUndefined();
+      expect(stop).toHaveBeenCalledOnce();
+      expect(terminal.stopped).toBe(fault !== 'terminal-stop');
+      expect(clipboard).toHaveBeenCalledOnce();
+      expect(terminate).toHaveBeenCalledOnce();
+      expect(submit).not.toHaveBeenCalled();
+      expect(host.view.editor.getText()).toBe('');
+      expect(pointer).not.toHaveBeenCalled();
+      expect(exit.mock.calls).toEqual([[1]]);
+      expect(notices.some(line => line.includes('Interactive cleanup failed'))).toBe(true);
+      expect(notices.join('')).not.toContain('PRIVATE_CLEANUP_DETAIL');
+      terminal.input('\x04');
+      expect(exit).toHaveBeenCalledOnce();
+    } finally {
+      armed = false; render.mockRestore(); write.mockRestore(); stop.mockRestore(); shutdown.mockRestore(); dispose.mockRestore(); submit.mockRestore(); pointer.mockRestore();
+      terminal.stop(); mode.stop(); clipboard.mockRestore(); terminate.mockRestore(); renderLine.mockRestore();
+    }
+  });
+
+  it.each(['regular', 'fullscreen'] as const)('retains embedded cleanup failure after closing the actual %s host', async kind => {
+    const { mode, terminal } = build({ tuiMode: kind });
+    const host = mode as unknown as { shutdown(): Promise<void>; options: { sessionRuntime: ShellSessionRuntime } };
+    const terminate = vi.spyOn(host.options.sessionRuntime, 'terminate');
+    mode.start();
+    const failure = new Error('private terminal cleanup fixture');
+    const stop = vi.spyOn(terminal, 'stop').mockImplementationOnce(() => { throw failure; });
+    try {
+      await expect(host.shutdown()).rejects.toBe(failure);
+      expect(terminate).toHaveBeenCalledOnce();
+      expect(stop).toHaveBeenCalledOnce();
+    } finally { stop.mockRestore(); terminal.stop(); mode.stop(); terminate.mockRestore(); }
+  });
+
   it("installs a readline stand-in that can answer runtime questions", () => {
     // Runtime code asks through readline.question; without a working stand-in the
     // approval flow throws instead of prompting.

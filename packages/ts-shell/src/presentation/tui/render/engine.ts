@@ -276,15 +276,21 @@ export class TUI {
 
   stop(options?: TuiStopOptions): void {
     if (!this.started || this.stopped) return;
-    this.startup?.cancel();
     this.stopped = true;
     this.started = false;
-    this.scheduler.clearTimeout(this.frameTimer);
-    this.frameTimer = undefined;
-    this.setMouseTracking(false);
-    if (this.overlayScreen) {
-      this.terminal.write(this.forgetTransmittedImages({ free: true }) + EXIT_ALT_SCREEN);
-      this.overlayScreen = false;
+    try {
+      this.startup?.cancel();
+      this.scheduler.clearTimeout(this.frameTimer);
+      this.frameTimer = undefined;
+      this.setMouseTracking(false);
+      if (this.overlayScreen) {
+        this.terminal.write(this.forgetTransmittedImages({ free: true }) + EXIT_ALT_SCREEN);
+        this.overlayScreen = false;
+      }
+    } finally {
+      // Rendering and timer cleanup may fail before the device's unbuffered
+      // restore. The physical owner still gets its stop attempt.
+      this.terminal.stop();
     }
     // The driver restores every mode it may have set, unbuffered, and that
     // battery includes leaving the screen — which on most terminals also puts the
@@ -292,7 +298,6 @@ export class TUI {
     // first, and only then is the screen left (again, harmlessly) and the
     // document written under it: written before the battery, it would be
     // overprinted by whatever came next at the restored cursor.
-    this.terminal.stop();
     const width = Math.max(1, this.terminal.getDimensions().columns);
     if (this.mainScreen) {
       // There is no screen to give back — this never took one. The rows the

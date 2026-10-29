@@ -980,3 +980,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A tiny request exhausts its response allowance during reasoning, but its no-answer guidance says context is full and recommends compaction.
 - **Root Cause**: Output length stops and explicitly proven prompt overflow share an incorrect explanation even though they have different runtime evidence and remedies.
 - **Rule**: Preserve length as a stopped unanswered result and point to output-limit inspection. Reserve overflow classification and compaction recovery for the existing verified overflow evidence; test JSON/SSE with and without public reasoning through the actual result and display owners.
+
+### Surface Cleanup Needs Its Own Failure Fence Before Session Close
+- **Symptom**: Ctrl+D stops processing input, but a failed subscription release, transcript render or terminal write rejects shutdown before session persistence and the exit hook.
+- **Root Cause**: A persistence-only fence starts after an unfenced chain of surface cleanups; a failed rendering step can also bypass the physical terminal owner.
+- **Rule**: Attempt each original surface cleanup, retain failure, and independently attempt physical terminal stop. Carry any failure into the existing exit status, keep report errors fenced, and preserve embedded-call failure. Retire input at the closing state even if listener disposal fails; test actual buffered keys and controlled device failures without claiming successful physical restore.

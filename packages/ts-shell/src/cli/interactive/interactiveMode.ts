@@ -508,6 +508,7 @@ export class InteractiveMode {
     );
     this.stdin.onKey((event) => this.onKey(event));
     this.stdin.onMouse((report) => {
+      if (this.closing || this.stopped) return;
       if (report.kind !== 'move') {
         this.options.onUserIntent?.();
         this.vimSelection = undefined;
@@ -515,6 +516,7 @@ export class InteractiveMode {
       if (this.alternateScreen || this.pager.active || this.overlay.fullScreen) this.pointer.handle(report);
     });
     this.stdin.onPaste((text, issue) => {
+      if (this.closing || this.stopped) return;
       this.options.onUserIntent?.();
       if (issue) {
         resetVimState(this.state.editor);
@@ -607,37 +609,42 @@ export class InteractiveMode {
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;
-    this.promptContext.stop();
-    this.pickerLifecycles.abortAll();
-    this.options.setStartupNotice?.(undefined);
-    if (this.tick) clearInterval(this.tick);
-    this.tick = undefined;
-    this.pager.close();
-    this.overlay.close();
-    this.theme.stop();
-    this.catalogs.invalidate();
-    this.releaseEvents?.();
-    this.releaseEvents = undefined;
-    this.releaseGoalSubmission?.();
-    this.releaseGoalSubmission = undefined;
-    this.releaseInputQueue?.(); this.releaseInputQueue = undefined;
-    // The registry outlives this surface, so the subscription has to be given
-    // back or a later command would be announced to a session already gone.
-    this.stopWatchingBackground();
-    this.clipboard.release();
-    this.questions.abandon();
-    this.options.renderer.clearSink();
-    this.stdin.dispose();
-    // The conversation outlives the screen it was read on: rendered once more at
-    // the full width, it is left in the terminal where the user can scroll back
-    // to it and copy from it after the session is over.
-    const width = Math.max(1, this.terminal.getDimensions().columns);
-    this.tui.stop({ document: this.state.transcript.render(width).rows });
+    let failure: { cause: unknown } | undefined;
+    let document: readonly string[] | undefined;
+    // Each owner gets its cleanup attempt even when an earlier owner throws.
+    // Keep the first failure for the caller; releasing resources is not proof
+    // that every subscription or the final document was restored.
+    for (const cleanup of [
+      () => this.promptContext.stop(),
+      () => this.pickerLifecycles.abortAll(),
+      () => this.options.setStartupNotice?.(undefined),
+      () => { if (this.tick) clearInterval(this.tick); this.tick = undefined; },
+      () => this.pager.close(),
+      () => this.overlay.close(),
+      () => this.theme.stop(),
+      () => this.catalogs.invalidate(),
+      () => { const release = this.releaseEvents; this.releaseEvents = undefined; release?.(); },
+      () => { const release = this.releaseGoalSubmission; this.releaseGoalSubmission = undefined; release?.(); },
+      () => { const release = this.releaseInputQueue; this.releaseInputQueue = undefined; release?.(); },
+      () => this.stopWatchingBackground(),
+      () => this.clipboard.release(),
+      () => this.questions.abandon(),
+      () => this.options.renderer.clearSink(),
+      () => this.stdin.dispose(),
+      // Preserve the conversation in scrollback when rendering succeeds;
+      // document failure must still give the physical terminal back.
+      () => { document = this.state.transcript.render(Math.max(1, this.terminal.getDimensions().columns)).rows; },
+      () => this.tui.stop({ document }),
+    ]) {
+      try { cleanup(); } catch (cause) { failure ??= { cause }; }
+    }
+    if (failure) throw failure.cause;
   }
 
 
 
   private onKey(event: Parameters<typeof routeKey>[0]): void {
+    if (this.closing || this.stopped) return;
     this.options.onUserIntent?.();
     if (this.pickerInputPending.has(this.overlay.revision) && !this.overlay.active) {
       const action = this.preferences.keybindings.actionFor(event.keyId);
@@ -1530,19 +1537,26 @@ export class InteractiveMode {
     this.closing = true;
     // A single stdin chunk can contain the exit key and further complete keys,
     // paste or mouse events. Detach dispatch before yielding to the drain.
-    this.stdin.dispose();
+    let failure: { cause: unknown } | undefined;
+    try { this.stdin.dispose(); } catch (cause) { failure = { cause }; }
     try {
       if (this.terminal.drainInput) await this.terminal.drainInput();
     } catch {
       // A disconnected terminal must still reach synchronous cleanup.
     }
-    this.stop();
+    try { this.stop(); } catch (cause) { failure ??= { cause }; }
+    if (failure) {
+      try { this.options.renderer.renderLine('Interactive cleanup failed; terminal restoration was not fully verified.'); }
+      catch { /* A disconnected output stream must still reach session close. */ }
+    }
     handleShellClose({
       sessionRuntime: this.options.sessionRuntime,
       renderer: this.options.renderer,
       runtimeContext: this.options.runtimeContext,
       sessionManager: this.options.sessionManager,
+      cleanupFailed: Boolean(failure),
       exit: this.options.exit,
     });
+    if (failure && !this.options.exit) throw failure.cause;
   }
 }

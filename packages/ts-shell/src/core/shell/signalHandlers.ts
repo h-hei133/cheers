@@ -37,9 +37,11 @@ export function handleShellClose(input: {
   exit?: (code: number) => void;
   /** Used only to ask whether the session survived being closed. */
   sessionManager?: { sessionExists(sessionId: string): boolean };
+  /** A preceding surface cleanup failure must survive successful session persistence. */
+  cleanupFailed?: boolean;
 }): void {
   const sessionId = input.runtimeContext.session.id;
-  let exitCode = 0;
+  let exitCode = input.cleanupFailed ? 1 : 0;
   let closed = false;
   try {
     input.sessionRuntime.terminate(sessionId);

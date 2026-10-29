@@ -26,6 +26,15 @@ describe("shell signal handlers", () => {
     expect(events).toEqual(["terminated", "rendered"]);
   });
 
+  it('preserves a preceding surface failure after successful session persistence', () => {
+    const terminate = vi.fn();
+    const exit = vi.fn();
+    handleShellClose({ sessionRuntime: { terminate } as never, runtimeContext: { session: { id: 'saved' } } as never,
+      renderer: { renderLine: () => {} } as never, sessionManager: { sessionExists: () => false }, cleanupFailed: true, exit });
+    expect(terminate).toHaveBeenCalledOnce();
+    expect(exit.mock.calls).toEqual([[1]]);
+  });
+
   it("reports failed persistence safely and still exits unsuccessfully", () => {
     const failure = new Error("unreadable session with private fixture detail");
     const renderLine = vi.fn();

@@ -287,6 +287,22 @@ describe("taking the screen", () => {
     expect(written).toContain("\x1b[?1006l");
   });
 
+  it.each(['scheduler', 'mouse'] as const)('still restores the physical terminal when %s cleanup fails', fault => {
+    const { tui, terminal, scheduler } = boot();
+    tui.start(); scheduler.flush(); terminal.drain();
+    const failure = new Error('private cleanup fixture');
+    const clear = vi.spyOn(scheduler, 'clearTimeout');
+    const write = vi.spyOn(terminal, 'write');
+    const stop = vi.spyOn(terminal, 'stop');
+    if (fault === 'scheduler') clear.mockImplementationOnce(() => { throw failure; });
+    else write.mockImplementationOnce(() => { throw failure; });
+    expect(() => tui.stop()).toThrow(failure);
+    expect(stop).toHaveBeenCalledOnce();
+    expect(terminal.stopped).toBe(true);
+    tui.stop();
+    expect(stop).toHaveBeenCalledOnce();
+  });
+
   it("leaves the document under the restored screen, one row per line", () => {
     const { tui, terminal, scheduler } = boot();
     tui.start();
