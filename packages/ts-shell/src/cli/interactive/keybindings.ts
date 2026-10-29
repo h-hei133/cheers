@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { KEY_BINDINGS, type KeyBinding } from "../../presentation/tui/chrome/keys.js";
+import { KEY_BINDINGS, PASTE_GESTURE, type KeyBinding } from "../../presentation/tui/chrome/keys.js";
 import { resolveUserDataFile, userDataDirFor } from "../../core/paths/userHome.js";
 import { assertProfileStorage } from '../../core/paths/profile/context.js';
 
@@ -309,7 +309,7 @@ export class Keybindings {
         negotiatedKeys: keys.filter((key) => /^(ctrl\+shift\+|shift\+enter$|alt\+enter$)/.test(key)),
       };
     });
-    const gestures = KEY_BINDINGS.filter((row) => row.group === "pointer" || row.keys.includes("paste twice"));
+    const gestures = KEY_BINDINGS.filter((row) => row.group === "pointer" || row.keys.includes(PASTE_GESTURE));
     return [...actions, ...gestures.filter((row) => fullScreen || row.group !== "pointer")];
   }
 

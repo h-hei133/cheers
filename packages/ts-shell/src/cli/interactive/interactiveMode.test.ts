@@ -1525,6 +1525,43 @@ it('preserves a bracketed paste split across startup adoption', () => {
   } finally { mode.stop(); startup.dispose(); }
 });
 
+it.each(['regular', 'fullscreen'] as const)(
+  'expands the held block under the caret on a later paste in %s mode', kind => {
+    // The gesture is the caret, not a time window: the second paste arrives long
+    // after the first in wall-clock terms and carries unrelated text, and the
+    // block still opens because the caret was moved onto it.
+    const { mode, terminal } = build({ tuiMode: kind });
+    const host = mode as unknown as { view: InteractiveView; state: { pastes: import('../../presentation/tui/pastes.js').PasteStore } };
+    const long = Array.from({ length: 8 }, (_, index) => `line ${index} ${'text '.repeat(8)}`).join('\n');
+    try {
+      mode.start();
+      terminal.input(`\x1b[200~${long}\x1b[201~`);
+      const placeholder = host.view.editor.getText();
+      expect(placeholder).toMatch(/^\[#1 pasted /);
+      expect(host.state.pastes.expand(placeholder)).toBe(long);
+
+      // Move back onto the token, then paste something unrelated: the block
+      // opens in place and the clipboard text is deliberately not inserted.
+      terminal.input('\x1b[D\x1b[D');
+      terminal.input('\x1b[200~unrelated clipboard\x1b[201~');
+      expect(host.view.editor.getText()).toBe(long);
+    } finally { mode.stop(); }
+  });
+
+it('leaves the block alone when the caret sits just past it', () => {
+  // Inserting a token parks the caret after it. That must not arm the gesture,
+  // or the next unrelated paste would swallow the clipboard.
+  const { mode, terminal } = build();
+  const host = mode as unknown as { view: InteractiveView };
+  const long = Array.from({ length: 8 }, (_, index) => `line ${index} ${'text '.repeat(8)}`).join('\n');
+  try {
+    mode.start();
+    terminal.input(`\x1b[200~${long}\x1b[201~`);
+    terminal.input('\x1b[200~more text\x1b[201~');
+    expect(host.view.editor.getText()).toMatch(/^\[#1 pasted .*\]more text$/);
+  } finally { mode.stop(); }
+});
+
 it.each([
   ['regular', false], ['regular', true], ['fullscreen', false], ['fullscreen', true],
 ] as const)('estimates and submits the adopted draft in %s mode (split paste: %s)', async (kind, split) => {

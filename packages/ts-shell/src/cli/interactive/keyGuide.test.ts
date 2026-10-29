@@ -5,10 +5,10 @@ import { reportText } from "../../core/commands/report/projection.js";
 import { renderReport } from "../../presentation/tui/report/renderer.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import { KEY_ACTIONS, Keybindings } from "./keybindings.js";
-import { KEY_BINDINGS, keyReport } from "../../presentation/tui/chrome/keys.js";
+import { KEY_BINDINGS, PASTE_GESTURE, keyReport } from "../../presentation/tui/chrome/keys.js";
 
 it("keeps default keyboard chords in sync with the display catalogue", () => {
-  const advertised = KEY_BINDINGS.filter((row) => row.group !== "pointer" && !row.keys.includes("paste twice"));
+  const advertised = KEY_BINDINGS.filter((row) => row.group !== "pointer" && !row.keys.includes(PASTE_GESTURE));
   expect([...new Set(advertised.flatMap((row) => row.keys))].sort())
     .toEqual([...new Set(Object.values(KEY_ACTIONS).flatMap((action) => action.defaultKeys))].sort());
 });
@@ -63,7 +63,7 @@ it("keeps the documented action and gesture tables equal to the runtime catalogu
   const rows = Object.entries(KEY_ACTIONS).map(([id, action]) =>
     `| \`${id}\` | ${action.defaultKeys.map(key => `\`${key}\``).join(" / ")} | ${action.description} |`);
   expect(section("key-actions").split("\n").slice(2)).toEqual(rows);
-  const gestures = KEY_BINDINGS.filter(row => row.group === "pointer" || row.keys.includes("paste twice"))
+  const gestures = KEY_BINDINGS.filter(row => row.group === "pointer" || row.keys.includes(PASTE_GESTURE))
     .map(row => `| ${row.keys.map(key => `\`${key}\``).join(" / ")} | ${row.does} |`);
   expect(section("key-gestures").split("\n").slice(2)).toEqual(gestures);
   const index = fs.readFileSync(new URL("../../../../../.wiki/_index.md", import.meta.url), "utf8");

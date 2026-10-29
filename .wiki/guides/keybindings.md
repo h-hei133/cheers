@@ -124,7 +124,7 @@ The editor supports text selection by dragging; clicking to position its caret i
 <!-- key-gestures:start -->
 | Gesture | Does |
 | :--- | :--- |
-| `paste twice` | show a held paste in full, in the prompt |
+| `paste on a held block` | show that paste in full, in the prompt |
 | `wheel` | scroll the conversation |
 | `drag` | select and copy, without the layout |
 | `click` | open or close the block under the pointer |

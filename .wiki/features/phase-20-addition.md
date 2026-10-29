@@ -2280,3 +2280,188 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 ### 第一百一十六批：本轮全部生产代码提交的 CI 结论
 
 `fb602063` 之后共 11 个提交推送。GitHub Actions 读回：`600ec86d`、`69056452`、`d7c62186`、`5e9bfe75`、`f8f1b90a`、`4fa4731b`、`652fcd0a`、`34d98ea4`、`98b9eeea` 的 CI 均 success，即本轮全部生产代码改动通过 CI；`c6ad381e` 与 `9a3b0344` 为纯文档提交，结论另记。这不是真实 provider、PTY/exe、桌面/Windows 或 20k 历史的验收，原 Phase 20 矩阵未重跑，ADD 整体仍 active。
+
+## 17. 第七轮用户反馈（2026-10-29）：粘贴展开、快照、Monitor、草稿栈、Agent Teams、流式卡顿、跨目录写入
+
+本轮用户提出七项新问题与优化方向（编号沿用用户原序号：第十七、第十八、第二十、第二十一、第二十二、第二十三、第二十四）。本节记录逐项定位与真实机制，实施按第 18 节的顺序进行。用户未编号的第十九项在本轮未提出，故不登记。
+
+### 17.1 第七项（用户编号第十七）：长文本块改用"再次 Ctrl+V 展开"
+
+**用户要求**：原来"快速两次 Ctrl+V 展开长文本块"的时间窗手势不好用，改成"只要对长文本块再次使用 Ctrl+V 就展开"。
+
+**当前机制**（`presentation/tui/pastes.ts:110-126`）：
+
+- 首次粘贴超过阈值（`PASTE_PLACEHOLDER_THRESHOLD = 320` 字符或超过 6 行）时 `hold()` 保留原文并插入占位符 `[#N pasted …]`。
+- `expandOnRepeat(text, now)` 只在**同一文本**且距上次 `hold` 不超过 `DOUBLE_PASTE_MS = 1200` 毫秒时返回展开结果；否则按普通粘贴处理。
+- 调用点在 `cli/interactive/interactiveMode.ts:514`，位于 `stdin.onPaste` 回调内；编辑器与 `PasteStore` 之间没有"光标落在哪个占位符上"的概念。
+
+**确定的缺口**：
+
+1. 手势依赖时间窗而非"光标位置"。用户先粘贴、思考几秒再按 Ctrl+V，得到的是一份新的普通粘贴（因为 `now - last.at > 1200`），而不是展开。
+2. 手势依赖"同一文本"。第二次从剪贴板粘贴的内容只要有一个字节不同（例如用户复制了别的东西再回来），也不会展开。
+3. 编辑器已有 `atomicTokenStart`（`interactiveMode.ts:449-453`，正则 `/(?:⎘ #\d+|\[#\d+ [^\]]*\])$/`）能识别占位符作为原子 token，`EditorBuffer` 也已有光标行/列；但 `PasteStore` 没有暴露"在给定光标位置解析占位符 id"的接口，因此无法实现"光标在占位符上按 Ctrl+V 展开"。
+
+**修改方向**：在 `PasteStore` 上新增一个只读的"光标位置解析"能力（给定整段草稿与光标 offset，返回该位置覆盖的占位符 id、起止范围与原文），把 `expandOnRepeat` 的时间窗手势替换为"粘贴事件到达时，若光标位于本会话签发的长文本占位符内，则展开该占位符"；否则按既有 `holdIfLong` 处理。替换必须：
+
+- 只展开**本会话签发**且**仍持有原文**的占位符（复用既有 `issued` 与 `held` 判定，不能展开陌生 `[#42 …]` 文本）。
+- 图片占位符不因 Ctrl+V 展开（图片没有可展开的文本；保持既有 `holdImage` 语义）。
+- 展开后光标落在插入文本末尾，草稿其余部分不变；展开是一次真实编辑，进入 undo 栈。
+- 保留 `replaceLiteral` 的字面替换语义（`$&`、`$1` 等不能被当成替换模式）。
+- 键位提示 `chrome/keys.ts:57-61` 与 `.wiki/guides/keybindings.md` 的手势表同步改为新说法；`keyGuide.test.ts` 与文档同步测试必须一起更新。
+
+**证据边界**：这是产品交互变更，不是"修复参考项目的行为"。只读参考 pi 的 `grep -rni "paste.*placeholder\|PasteStore"` 为 0 命中，本项目该机制为自有实现；因此不宣称与参考一致。
+
+### 17.2 第八项（用户编号第十八）：快照功能
+
+**用户要求**：研究 Codex 的快照（snapshot）能力。
+
+**本项目现状**：已有三层名字含 "snapshot" 的东西，但**都不是工作区快照**：
+
+| 位置 | 实际语义 |
+|---|---|
+| `turn/checkpoint.ts:4-15` | turn 结束观察者接口（messages/step/willContinue/failed），唯一消费者是 advisor |
+| `session/recovery/` | 会话状态投影（pendingPrompt、runPhase、terminal），服务 resume/重入 |
+| `runtime/execution/snapshot.ts:9-30` | 有界二进制读取（附件/上传源），与回滚无关 |
+
+真正的文件回滚是 **edit/recovery 的写前 blob 快照 + operation receipt + `/undo`**，已相当完整：写前捕获（`edit/recovery/operation/write.ts:19-48`）、收据模型含逐文件 before/after hash（`operation/model.ts:34-47`）、预览/执行（`operation/preview.ts:26-89`、`operation/restore.ts:26`）、`/undo`（`undo/service.ts:34-95`）、锁内 stale-read 与 fsync/rename（`restorePrimitive.ts:50-110`、`edit/authority/commit.ts:40-61`）。纯消息回滚另有 `/back`（`session/navigation/revert.ts:23-94`），注释明确 "Files are untouched"。
+
+**缺口**：现有回滚单位是"单个已提交的文件操作"，不是 turn 或工作区。它不覆盖 bash 副作用、二进制文件、未跟踪文件、跨多个工具调用的整轮状态；也没有"回到 turn 开始前"的语义。`/undo` 的候选来自 operation ledger，不是 turn 边界。`.wiki/features/19-session-recovery-and-undo-ux.md:24` 已明确裁定 `/undo` 不按整轮回滚，这是**产品决策**而非缺陷。
+
+**参考实现**：
+
+- Codex（已移除）：用**临时 index + 分离 commit** 在用户仓库造"影子提交"，不更新任何 ref（`git-utils/src/ghost_commits.rs:339-395`：`GIT_INDEX_FILE` 临时 index、`write-tree`、`commit-tree`）；turn **开始时**创建并阻塞工具 gate 直到完成（历史版本 `core/src/tasks/ghost_snapshot.rs:22/88/111/151`）；回滚用 `git restore --source <commit> --worktree`，故意不加 `--staged` 以保留用户 index（`:467-497`）；回滚时删除快照后新增的 untracked、保留快照前已存在的（`:823` `remove_new_untracked`）；大文件/大目录有忽略阈值（`:28-47`，10 MiB / 200 项 / `node_modules` 等）。**现状是已整体删除**：`codex-rs/features/src/lib.rs:348,878-883` 标记 `Stage::Removed` 且默认关闭；`core/src/config/mod.rs:208-225` 仅保留配置解析兼容；`protocol/src/models.rs:3715-3729` 旧 item 反序列化为 `Other`；`thread/rollback` 与 `thread/revert` 现在只改对话历史，不回滚文件（`app-server-protocol/.../thread.rs:1225-1255`）。删除原因是把快照写进对话历史（`ResponseItem::GhostSnapshot`）长期背兼容包袱。
+- oh-my-pi：`checkpoint`/`rewind` 只是**上下文折叠**，文档明确不调用 git、不快照文件系统（`docs/tools/checkpoint.md:78`、`docs/tools/rewind.md:62,77-80`），默认关闭（`tools/settings.ts:745-754`）。
+- pi：**没有内建**快照；只有扩展示例用 `git stash create`/`apply`（`examples/extensions/git-checkpoint.ts:21-46`）。
+
+**修改方向**：**不新增 `/checkpoint`、`/snapshot` 或第二个 undo 栈**。本仓库已有"写前 blob + operation receipt + 预览/批准/核验"的完整安全链，缺的是分组粒度与创建时机：
+
+1. 把 turn 作为 operation 的分组键：在 `EditOperationIdentity`（`operation/model.ts:49-55`）增加 `turnId`/`turnOrdinal`，由 turn 开始处生成并透传；`/undo` 增加按 turn 选择的入口，把同一 turn 内所有 committed operation 视为一个撤销单元，复用既有预览/恢复逐文件执行，保留"跨文件非原子、unknown 不重放"的既有声明。不新增命令与存储。
+2. 只有在需要覆盖 bash/非文本副作用时，才补一个 **turn 开始**的快照钩子，复用 `snapshotRoot`（`edit/recovery/root.ts:6-11`）与 ledger 目录，不新建根；非 git 工作区静默跳过（与 Codex 的 `NotAGitRepository` 行为一致）。
+3. **不复活**"快照写进对话历史"的协议语义：快照属于 edit/recovery ledger，对话历史只记 operation ID（现有 receipt 已是这个形状）。
+
+**证据边界**：本轮只做定位与参考对比，未实现。任何实现都必须先有"未批准不写、批准后写入目标与批准目标一致、恢复不重放 unknown"的反转证据。
+
+
+### 17.3 第十项（用户编号第二十）：Monitor 工具
+
+待补充（研究进行中）。
+
+### 17.4 第十一项（用户编号第二十一）：草稿暂存栈与一键撤回润色
+
+待补充（研究进行中）。
+
+### 17.5 第十二项（用户编号第二十二）：平级 Agent Teams 与"竞争性假说互相证伪"
+
+**用户要求**：研究平级 Agent Teams（带点对点邮箱）及"竞争性假说互相证伪"范式。
+
+**本项目现状**：现有的是**父子委派 + 主从 worker + 单向 advisor + 跨进程房间**，没有进程内平级团队。
+
+| 现有能力 | 性质 | 证据 |
+|---|---|---|
+| `task` 子代理 | 严格父子委派，一次性返回 | `core/subagents/runner.ts:142-257`、`turn/subagent.ts:32-91`、`core/tools/taskTool.ts:16-140` |
+| 嵌套禁止 | 有意设计（"nothing counts the depth"） | `core/subagents/boundary.ts:17` `NEVER_GIVEN = new Set(["task"])` |
+| 同 turn 串行 | `SEQUENTIAL_TOOLS` 含 `task` | `turn/session.ts:172` |
+| director | 主代理 + 持久 worker，worker 之间不通信 | `cli/director/lifetime.ts:15-16`、`cli/director/workers.ts:15-43`；并发上限 2（`workflow/jobs/agent/journal.ts:19`） |
+| advisor | 单实例单向评审，note 需显式 apply | `advisor/runtime.ts:18-106`；digest/frontier/goal 防陈旧（`:74-75,93-97`） |
+| collaboration/ | 跨进程/跨用户房间（principal/ACL），不是 agent 团队 | `collaboration/contract/model.ts:18-28`、`collaboration/service/proposals.ts:15-58` |
+
+**平级邮箱曾经存在，已被删除**：`core/tools/messagingTools.ts`、`core/messaging/sessionSocketClient.ts`、`sessionSocketHost.ts`、`core/workflow/teamStore.ts` 在 `812d7f22` 删除（记录见 `.wiki/refactor/dead-code-tiers-2026-09-27.md:82-85`）。现仅剩扫描器与类型字面量：`core/messaging/types.ts:1` 的 `PeerAgentKind` 仍含 `"teammate"` 但无实现；生产消费者只有 peers 计数展示（`cli/interactive/ambientFacts.ts:14,36-45`）。
+
+**"竞争性假说证伪"目前只有单假说版本**：repair 假说单线程生成/拒绝（`repair/flow/hypothesis.ts:21-90`）；research 的 adversarial review 是单 draft、单 reviewer（`research/run/child.ts:16-38`）。但它已有最接近的证伪范式：四态 finding `counterevidence`/`condition-mismatch`/`insufficient`/`none-found`（`research/review/model.ts:3-15`），以及"引用必须来自本 review child 实际成功读取的源，否则降级为 insufficient"的强制绑定（`research/review/validation.ts:7-32`）。
+
+**参考实现**：
+
+- Codex：父子树 + 路径寻址的点对点消息（`spawn_agent`/`send_message`/`followup_task`/`wait_agent`/`list_agents`，`multi_agents_spec.rs:124-344`）；消息按 `AgentPath` 层级寻址（`protocol/src/agent_path.rs:59-72`、`core/src/agent/control.rs:445-528`）；投递分 `QueueOnly`/`TriggerTurn`（`multi_agents_v2/message_tool.rs:13-23,75-115`）；邮箱是每会话输入队列而非持久邮箱（`core/src/session/input_queue.rs:81,122-138`）；拓扑只存父子边（`agent-graph-store/src/store.rs:18-58`）。**没有平级团队/共享任务池**。
+- oh-my-pi：最接近平级邮箱。`AgentRegistry`（`registry/agent-registry.ts:27,125,389-393`）+ 进程内 `IrcBus`（`irc/bus.ts:31,98-103,164,344-347`，容量 100、send 永不阻塞、溢出丢最旧）；`irc/messaging.ts:17,46-120` 支持 `to === "all"` 广播；**明确区分父消息与同辈消息**（`session/irc-bridge.ts:29-33,46-58,100-140`，同辈消息单独开 wake turn，不污染父结果）；递归深度控制 `task/types.ts:300-306`。
+- pi：只有 durable 的通用原语（会话级输入队列 `durable/src/harness/inbox.ts:1-30`、任务图 `task-graph.ts:27-88`），子代理是扩展示例（`examples/extensions/subagent/index.ts:7-12`）。
+
+**修改方向**：**不新增 subagent runner，不复活 `teamStore`/`sessionSocketHost`/`messagingTools`**。新增一个进程内 team owner，复用现有底座：
+
+| 能力 | 复用点 |
+|---|---|
+| agent 执行 | `core/subagents/runner.ts:142` + `turn/subagent.ts:32`（已带父 gate/审批/预算） |
+| agent 持久身份 | `cli/jobs/agent/session.ts:26-57` + `workflow/jobs/agent/service.ts:13-90` |
+| 只读边界 | `core/subagents/capability.ts:11-27` `readOnlyDelegation` |
+| 提案状态机 | `collaboration/contract/model.ts:18-28` 的枚举（去掉 principal/ticket） |
+| 证据绑定 | `research/review/validation.ts:7-32` |
+| 防陈旧 | `advisor/runtime.ts:74-75,93-97` |
+
+三步最小机制：
+
+1. **多代理独立提案**：对同一问题并行调用 N 次 `runSubagent`（N ≤ 2，对齐现有并发上限；提高上限必须同步调整 `workflow/jobs/agent/journal.ts:19` 与 `workflow/jobs/store.ts:27`）。提案者拿相同输入但不同角色/提示，**互相不可见**以避免同化；输出结构化 `{ hypothesisId, claim, evidenceRefs, falsifiers }`。
+2. **交叉评审**：每个提案者只读评审其他提案（`readOnlyDelegation` + `agentMode: 'plan'`），复用四态 finding；强制证据绑定——引用必须来自本次实际成功读取的源，否则自动降级 `insufficient`；`none-found` 只能声明"本次有界评审未找到反证"，不得升级为"为真"。
+3. **收敛**：由一个**收敛 owner（不是 agent）**把"提案 × 评审矩阵"投影为 `survived`/`refuted`/`unresolved`：被至少一条带实际读取证据的 `counterevidence` 命中则 `refuted`；只有 `insufficient` 则 `unresolved`（不得当通过）；全部 `none-found` 才 `survived`，且报告必须携带相关性声明。收敛结果需显式用户批准才进入主上下文（照 advisor 的 apply 模式，不自动注入）。
+
+**明确不做**：不恢复跨进程 UDS + 文件锁任务池（跨进程场景已有 `collaboration/`，两套语义不混用）；不给 `runSubagent` 加"子代理再 spawn 子代理"；不新建第二套提案状态机。
+
+**证据边界**：本轮只做定位与参考对比，未实现；并发上限、成本与收敛质量均无实测证据。
+
+
+### 17.6 第十三项（用户编号第二十三）：对话时界面卡顿
+
+**用户现象**：与模型对话时界面卡顿；thought / thinking 后面的数字停住不动，然后整段输出突然一起出现；整轮结束前界面无法交互。
+
+**已确认的根因（高置信度）**：每个流式增量事件都同步走完整持久化链，而且**排在 UI 通知之前**。
+
+调用链（全部为同步 I/O）：
+
+1. `turn/session.ts:274-275` 把每个 provider 文本/推理增量推成 `message.delta` / `reasoning.delta` 事件。
+2. `core/shell/sessionRuntime.ts:289-294` 对每个事件**先**调用 `sessionManager.appendQueryEvent(...)`，**再**通知 `eventObservers`（也就是 `TurnSink`）。
+3. `session/agent/persistence.ts:22-41` 的 `handleAppendQueryEvent` 每次都：
+   - `store.readStateSnapshotSafely(statePath)`：整份状态 JSON 读取 + 解析；
+   - `handleGetTranscriptEvents(store, sessionId)`：**整份 transcript 读取 + 逐行 JSON 解析**（`session/transcript/read.ts:36`，无增量、无缓存）；
+   - `appendSessionQueryEvent` → `appendTranscriptEventToStore`：`fs.appendFileSync` 并**回读校验**（`session/transcript/sessionTranscript.ts:135-155`，含 `fstatSync`/`readSync`/`statSync`）；
+   - `applySessionQueryEventToState` → `withSessionStateLock`：文件锁（`sessionFileStore.ts:119-163`，重试时 `sleepBlocking` 用 `Atomics.wait` **同步阻塞主线程**，`sessionFileStore.ts:222-228`，锁超时 1200ms）；
+   - 状态快照构建 + `writeJsonFileAtomic`：临时文件写入 + `fsyncSync` + `renameSync`（`sessionFileStore.ts:185-215`）。
+
+**代价是 O(n²)**：会话越长，每来一个 token 都要把整份 transcript 重新读一遍再解析。用本机真实会话文件量化：`sess_1490bb947e4e3ebc_1790088117808/transcript.jsonl` 为 1.9 MiB / 12116 行，其中 3728 行是 `message.delta`。一次 3000 token 的回复意味着约 3000 次「读 1.9 MiB + 解析 12000 行 + 两次状态文件读写 + 一次文件锁」。
+
+**为什么表现为"数字卡住然后突然全部出现"**：事件循环被同步 I/O 占满，`requestRender` 的定时器（`render/engine.ts:315-328`，最小帧间隔 33ms）没有机会执行；`Atomics.wait` 期间连定时器都不推进。等 provider 流结束、同步链停止后，积压的事件一次性排空，UI 才第一次真正重绘。这也解释了"整轮结束前界面无法交互"——键盘事件同样排在事件循环里。
+
+**为什么 thought 数字不动**：`TurnSink.activity()`（`cli/interactive/turnSink.ts:157-168`）明确返回 `tokens: 0`（"不显示流式 token 计数"是既有设计），而 thinking 块的 `elapsedMs` 只在 `think()` 调用时更新（`turnSink.ts:201`）。真正的卡顿来自上面的事件循环阻塞，不是计数器逻辑本身；但两者叠加会让界面完全静止。
+
+**修改方向**：把流式增量从"持久化事件"中分离。持久化只需要**最终消息**与**生命周期/工具事件**；`message.delta` / `reasoning.delta` / `message.replace` 属于展示层增量，重放与恢复都不读取它们（已核实：`session/replay/builder.ts:450-458` 只读 `type === "message"`；`session/recovery/*` 不消费 delta；`session/export/collect.ts:35` 同样只读 `message`）。修复要点：
+
+- 在事件观察者之前先通知 UI（或至少在持久化前把展示事件交给 sink），保证渲染不被磁盘阻塞。
+- 增量事件不再进入 `appendQueryEvent` 的持久化路径；最终 `message` 记录仍由既有 `createMessageTranscriptEvent` 写入（`session/lifecycle/sessionPromptBarrier.ts:56`）。
+- 保留 `message.replace` 的纠错语义：它仍是展示事件，不能因为不落盘就丢掉。
+- 不得削弱崩溃恢复：恢复依赖 `message` 与生命周期事件，不依赖 delta。
+- 状态快照写入应只在真正改变状态的持久事件上发生，而不是每个 token。
+
+**证据边界**：以上结论来自源码链路与本机真实会话文件的量化，**未**在真实终端做阻塞时长测量；修复后的效果必须用聚焦的单元级夹具证明（事件顺序、持久化事件集合、恢复仍成立），不得用真实 20k 历史 PTY 压测（见第 13 节与项目红线）。
+
+### 17.7 第十四项（用户编号第二十四）：为什么限制在别的目录创建文件
+
+**用户疑问**：为什么有 policy 限制模型在其他目录下创建文件？是 AGENTS.md 注入的限制，还是 write/edit/apply_patch 工具提示词里的系统提示？
+
+**确认结论：限制来自工具/执行层的硬性路径围栏，不是提示词。**
+
+| 层 | 位置 | 性质 | 效果 |
+|---|---|---|---|
+| `write` 工具执行体 | `core/tools/registry.ts:306-309` | **硬拒绝**（`throw`，不进入审批） | 决定性 |
+| `edit` 工具执行体 | `core/tools/registry.ts:410-413` | **硬拒绝** | 决定性 |
+| `apply_patch` 计划阶段 | `edit/patch/plan.ts:91-95` → `core/workspace/roots.ts:41` | **硬拒绝** | 决定性 |
+| 路径规范化 | `core/workspace/files.ts:16-54` | **硬拒绝**（任何组件是符号链接即拒绝） | 决定性 |
+| 执行服务二次校验 | `runtime/execution/write.ts:20-30` | **硬拒绝**（冗余同向） | 决定性 |
+| 权限层 | `core/query/toolPolicy.ts:216-233` | 需审批，但越界在到达前已被工具层拒绝 | 实际不生效 |
+| sandbox | `sandbox/osSandbox.ts:266-267` | 默认 `off`，且只作用于 `bash` | 未生效 |
+| 工具描述措辞 | `registry.ts:285,291,361` | 仅提示（"in the workspace"） | 弱 |
+| 仓库 `AGENTS.md` | 本仓库 `AGENTS.md:15` | 仓库自定规则，仅影响本仓库会话 | 与产品机制无关 |
+
+**系统提示层面几乎没有限制措辞**：`turn/prompt.ts:91-112` 只有正向授权；`turn/prompt.ts:134-138` 的环境行是位置陈述；`turn/opening.ts:19-20` 反而列出附加根，方向相反。
+
+**参考项目策略对比**：
+
+- pi：写工具**完全没有围栏**（`core/tools/write.ts:65` 只做 `resolveToCwd`），`README.md:90` 明确"Pi does not include a built-in permission system"。
+- oh-my-pi：越界写**需审批**（`tools/approval.ts:44` 的 `always-ask` / `write` / `yolo`），另有"受限文件夹"黑名单强制每次询问（`approval.ts:569-588`）。
+- codex：沙箱决定物理可能，审批策略决定是否问（`codex-rs/core/src/safety.rs:26-97`）；`workspace-write` + `on-request` 下越界写是 `AskUser` 而非 `Reject`，且 `apply_patch` 会为越界目标申请临时写权限（`codex-rs/core/src/tools/handlers/apply_patch.rs:236-268`）。
+
+**修改方向**：把"是否在 workspace 内"的判定从工具执行体上移到审批层。越界时构造一次审批升级，批准后再用一个**显式授权的目标根**执行，而不是直接 `throw`。需要同时处理：
+
+- `core/workspace/roots.ts:32-42` 的 `selectWorkspaceRoot` 目前只认会话持久化的根，需要支持一次性授权根。
+- `core/query/toolPolicy.ts:216-218` 的 `isInside` 是纯词法判断，与工具层 realpath 判定不同源；应统一到 `verifyPathContainment`。
+- `core/security/writeTarget.ts:96-115` 已经有"相对越界=笔误必拒、绝对越界=需显式确认"的三分法，但它只服务 `/export`、`/report`；把这套策略下沉到工具层是最小改动。
+- 保留默认拒绝：未获批准的越界写仍必须失败，且失败信息要说明"需要显式授权"，不能伪装成"路径非法"。
+- 本仓库 `AGENTS.md` 的"参考仓库只读"规则保持不变；排查时必须区分"模型自己不愿写"与"工具拒绝写"。
+
+**证据边界**：本轮只做源码定位与参考对比，未修改写路径；任何放开都必须有"未批准仍拒绝"和"批准后可写、且写入目标与批准目标一致"的聚焦反转证据。

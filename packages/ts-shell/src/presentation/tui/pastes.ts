@@ -18,9 +18,6 @@ export const PASTE_PLACEHOLDER_THRESHOLD = 320;
 
 const PLACEHOLDER = /\[#(\d+) (?:pasted|image) [^\]]*\]/g;
 
-/** Window in which a second paste of the same text means "show it in full". */
-const DOUBLE_PASTE_MS = 1200;
-
 /**
  * How many entries the store keeps before the oldest are dropped.
  *
@@ -54,7 +51,6 @@ export class PasteStore {
   private readonly issued = new Map<number, Set<string>>();
   private heldBytes = 0;
   private nextId = 1;
-  private lastHeld: { readonly id: number; readonly text: string; readonly at: number } | undefined;
 
   constructor(
     private readonly maxHeld = MAX_HELD,
@@ -67,7 +63,7 @@ export class PasteStore {
   }
 
   /** Hold `text` and return the placeholder that stands for it. */
-  hold(text: string, now: number = Date.now()): string {
+  hold(text: string): string {
     const clean = normalizePaste(text);
     const bytes = Buffer.byteLength(clean, "utf8");
     if (bytes > MAX_HELD_ENTRY_BYTES) throw new RangeError("Pasted text exceeds the input limit.");
@@ -77,7 +73,6 @@ export class PasteStore {
     this.order.set(id, "text");
     this.heldBytes += bytes;
     this.evictOldest();
-    this.lastHeld = { id, text: clean, at: now };
     const placeholder = placeholderFor(id, clean);
     this.rememberPlaceholder(id, placeholder);
     return placeholder;
@@ -108,21 +103,38 @@ export class PasteStore {
   }
 
   /**
-   * A second paste of the same text, close behind the first, asking for it in full.
+   * The held paste the caret sits inside, as the range it occupies and its text.
    *
-   * Pressing paste twice is the gesture: the first press puts a placeholder in the
-   * draft, and the second says "no, show me". Returns the placeholder to replace and
-   * the text to replace it with, or nothing when this is an ordinary paste.
+   * The gesture is "paste again on the placeholder": the first paste leaves a
+   * short token in the draft, and a second paste while the caret is on that token
+   * means "show me what it stands for". That is a statement about where the caret
+   * is, not about how long ago the paste happened — a user who pastes, reads for a
+   * while, and comes back to the token is asking for the same thing as one who
+   * does it immediately, and a time window silently turned the second case into a
+   * second copy of the same text.
+   *
+   * The range is half-open and exclusive of `end` on purpose. Inserting a token
+   * leaves the caret immediately after it, so treating that position as "on the
+   * token" would make the very next unrelated paste expand the block and discard
+   * what the user had just copied. Moving into the token — which is what someone
+   * asking to see it does — is what arms the gesture.
+   *
+   * Only tokens this store issued and still holds qualify: `[#42 pasted …]` typed
+   * by hand, or a token whose payload was evicted, is ordinary draft text.
    */
-  expandOnRepeat(text: string, now: number = Date.now()): { readonly find: string; readonly text: string } | undefined {
-    const last = this.lastHeld;
-    if (!last || last.text !== normalizePaste(text) || now - last.at > DOUBLE_PASTE_MS) return undefined;
-    this.lastHeld = undefined;
-    this.held.delete(last.id);
-    this.heldBytes -= this.heldSizes.get(last.id) ?? 0;
-    this.heldSizes.delete(last.id);
-    this.order.delete(last.id);
-    return { find: placeholderFor(last.id, last.text), text: last.text };
+  expansionAt(draft: string, caret: number): { readonly start: number; readonly end: number; readonly text: string } | undefined {
+    if (!Number.isInteger(caret) || caret < 0 || caret > draft.length) return undefined;
+    for (const match of draft.matchAll(PLACEHOLDER)) {
+      const start = match.index;
+      const end = start + match[0].length;
+      if (caret < start || caret >= end) continue;
+      const id = Number(match[1]);
+      if (!this.issued.get(id)?.has(match[0])) return undefined;
+      const text = this.held.get(id);
+      if (text === undefined) return undefined;
+      return { start, end, text };
+    }
+    return undefined;
   }
 
   /** Replace what a placeholder stands for, keeping its identity. */
@@ -248,7 +260,6 @@ export class PasteStore {
     this.heldImageSizes.clear();
     this.order.clear();
     this.heldBytes = 0;
-    this.lastHeld = undefined;
   }
 
   private rememberPlaceholder(id: number, placeholder: string): void {

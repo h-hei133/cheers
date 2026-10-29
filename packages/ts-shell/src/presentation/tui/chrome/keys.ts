@@ -13,6 +13,15 @@ import { createReport, span } from "../../../core/commands/report/projection.js"
 
 export type KeyGroup = "moving" | "editing" | "sending" | "session" | "pointer";
 
+/**
+ * The paste gesture's key cell.
+ *
+ * Not a key id: the terminal sends the paste, so there is nothing to bind. The
+ * catalogue still has to name it, and three places ask "is this the paste row",
+ * so they ask this rather than repeating the phrase.
+ */
+export const PASTE_GESTURE = "paste on a held block";
+
 export interface KeyBinding {
   /** Key ids that trigger this, most idiomatic first. */
   readonly keys: readonly string[];
@@ -55,8 +64,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["ctrl+shift+z"], does: "redo the last undone edit", group: "editing", negotiated: true },
 
   {
-    keys: ["paste twice"],
-    does: "show a held paste in full, in the prompt",
+    keys: [PASTE_GESTURE],
+    does: "show that paste in full, in the prompt",
     group: "editing",
   },
   { keys: ["enter"], does: "send; while a turn runs, steer it before its next step", group: "sending" },

@@ -42,7 +42,6 @@ import type { RenderScheduler } from "../../presentation/tui/render/frame.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
-import { replaceLiteral } from "../../presentation/tui/pastes.js";
 import { goalCommandFor, isGoalControl } from '../runtime/goal.js';
 import { attachGoalSubmission, schedulerForRuntime } from '../runtime/goalScheduling.js';
 import { attachSubmissionQueue, isQueueControl, queueCommandFor } from '../runtime/inputQueue.js';
@@ -509,21 +508,18 @@ export class InteractiveMode {
       this.vimSelection = undefined;
       // A paste while the full-screen editor is up belongs to it, whole; a paste
       // into the prompt is held aside once it is long enough to bury the draft.
-      // Pasting the same thing twice in quick succession means "show it in full":
-      // the first press left a placeholder, and the second replaces it with the text.
-      const repeat = this.state.pastes.expandOnRepeat(text);
-      if (repeat) {
-        // The placeholder may have been deleted since the first paste; a replace
-        // would then silently drop the second paste. Re-insert in that case.
-        const draft = this.state.editor.getText();
-        // A string replacer would interpret $&, $1, $$ and ${...} inside the
-        // pasted code as substitution patterns and silently rewrite them away.
-        const replaced = replaceLiteral(draft, repeat.find, repeat.text);
-        if (replaced === draft) {
-          this.state.editor.insert(this.state.pastes.holdIfLong(text));
-        } else {
-          this.replaceExternalDraft(replaced);
-        }
+      //
+      // Pasting while the caret sits on a held block asks for that block in full:
+      // the gesture is where the caret is, not how recently the block was made.
+      // The pasted text is deliberately ignored — the user is pointing at the
+      // token, not offering new content, and a clipboard that changed since the
+      // first paste would otherwise silently insert a second block beside it.
+      const snapshot = this.state.editor.snapshot();
+      const expansion = this.state.pastes.expansionAt(snapshot.text, snapshot.cursor);
+      if (expansion) {
+        // A real edit through the editor, so Ctrl+Z takes it back and the caret
+        // lands after the text the block stood for.
+        this.state.editor.replace({ snapshot, from: expansion.start, to: expansion.end, text: expansion.text });
       } else {
         this.state.editor.insert(this.state.pastes.holdIfLong(text));
         this.syncSuggestions(false);

@@ -114,51 +114,103 @@ describe("held pastes", () => {
 });
 
 describe("asking for a paste in full", () => {
-  it("expands on a second paste of the same text", () => {
+  const caretIn = (draft: string, placeholder: string): number => draft.indexOf(placeholder) + 1;
+
+  it("expands the block the caret is on", () => {
     const store = new PasteStore();
-    const placeholder = store.hold(LONG, 1_000);
+    const placeholder = store.hold(LONG);
+    const draft = `fix ${placeholder} please`;
 
-    const repeat = store.expandOnRepeat(LONG, 1_200);
-
-    expect(repeat).toEqual({ find: placeholder, text: LONG });
+    expect(store.expansionAt(draft, caretIn(draft, placeholder))).toEqual({
+      start: 4,
+      end: 4 + placeholder.length,
+      text: LONG,
+    });
   });
 
-  it("treats a different paste as a new paste, not an expansion", () => {
+  it("addresses the block from its first character through its last", () => {
     const store = new PasteStore();
-    store.hold(LONG, 1_000);
+    const placeholder = store.hold(LONG);
+    const draft = `fix ${placeholder} please`;
+    const start = draft.indexOf(placeholder);
 
-    expect(store.expandOnRepeat(`${LONG}x`, 1_100)).toBeUndefined();
+    expect(store.expansionAt(draft, start)?.text).toBe(LONG);
+    expect(store.expansionAt(draft, start + placeholder.length - 1)?.text).toBe(LONG);
   });
 
-  it("does not expand once the window has passed", () => {
+  it("leaves the caret position just after a freshly inserted block unarmed", () => {
+    // Inserting the token leaves the caret after it. Treating that as "on the
+    // block" made the next unrelated paste expand it and throw away the clipboard.
     const store = new PasteStore();
-    store.hold(LONG, 1_000);
+    const placeholder = store.hold(LONG);
+    const draft = `fix ${placeholder} please`;
 
-    expect(store.expandOnRepeat(LONG, 9_000)).toBeUndefined();
+    expect(store.expansionAt(draft, draft.indexOf(placeholder) + placeholder.length)).toBeUndefined();
   });
 
-  it("expands only once, so a third paste inserts rather than expanding again", () => {
+  it("picks the block under the caret, not the first block in the draft", () => {
     const store = new PasteStore();
-    store.hold(LONG, 1_000);
-    store.expandOnRepeat(LONG, 1_100);
+    const first = store.hold("a".repeat(PASTE_PLACEHOLDER_THRESHOLD));
+    const second = store.hold("b".repeat(PASTE_PLACEHOLDER_THRESHOLD));
+    const draft = `${first} and ${second}`;
+    const secondStart = draft.indexOf(second);
 
-    expect(store.expandOnRepeat(LONG, 1_200)).toBeUndefined();
+    expect(store.expansionAt(draft, secondStart + 1)?.text).toBe("b".repeat(PASTE_PLACEHOLDER_THRESHOLD));
+    expect(store.expansionAt(draft, 1)?.text).toBe("a".repeat(PASTE_PLACEHOLDER_THRESHOLD));
+  });
+
+  it("does not expand when the caret is elsewhere in the draft", () => {
+    const store = new PasteStore();
+    const placeholder = store.hold(LONG);
+    const draft = `fix ${placeholder} please`;
+
+    expect(store.expansionAt(draft, 0)).toBeUndefined();
+    expect(store.expansionAt(draft, draft.length)).toBeUndefined();
+  });
+
+  it("does not depend on how long ago the paste happened", () => {
+    const store = new PasteStore();
+    const placeholder = store.hold(LONG);
+    // No clock is involved: the block stays expandable for as long as it is held.
+    expect(store.expansionAt(placeholder, 1)?.text).toBe(LONG);
+  });
+
+  it("ignores a bracketed token this store never issued", () => {
+    const store = new PasteStore();
+    store.hold(LONG);
+
+    expect(store.expansionAt("see [#7 pasted 1k chars]", 5)).toBeUndefined();
+    expect(store.expansionAt("see [#1 pasted note]", 5)).toBeUndefined();
+  });
+
+  it("ignores a block whose payload was released", () => {
+    const store = new PasteStore();
+    const placeholder = store.hold(LONG);
+    store.clear();
+
+    expect(store.expansionAt(placeholder, 1)).toBeUndefined();
+  });
+
+  it("does not expand an image block", () => {
+    const store = new PasteStore();
+    const placeholder = store.holdImage({ type: "image", data: "aGVsbG8=", mimeType: "image/png" });
+
+    expect(store.expansionAt(placeholder, 1)).toBeUndefined();
   });
 
   it("normalizes CRLF so a Windows paste expands to what the editor showed", () => {
     const store = new PasteStore();
     const raw = "line1\r\nline2\r\nline3";
-    const placeholder = store.hold(raw, 1_000);
-    const repeat = store.expandOnRepeat(raw, 1_100);
+    const placeholder = store.hold(raw);
 
-    expect(repeat).toEqual({ find: placeholder, text: "line1\nline2\nline3" });
+    expect(store.expansionAt(placeholder, 1)?.text).toBe("line1\nline2\nline3");
   });
 
-  it("retains tabs through held, repeated and updated pastes", () => {
+  it("retains tabs through held and updated pastes", () => {
     const store = new PasteStore();
-    const placeholder = store.hold("a\tb", 1_000);
+    const placeholder = store.hold("a\tb");
     expect(store.expand(placeholder)).toBe("a\tb");
-    expect(store.expandOnRepeat("a\tb", 1_100)).toEqual({ find: placeholder, text: "a\tb" });
+    expect(store.expansionAt(placeholder, 1)?.text).toBe("a\tb");
     const updated = store.update(2, "\tchanged  ");
     expect(store.expand(updated)).toBe("\tchanged  ");
   });
