@@ -160,6 +160,34 @@ describe("waiting for a background command", () => {
     expect(released).toBe(true);
   });
 
+  it("survives a runner that reports completion synchronously", async () => {
+    // onEnded may fire the listener before it returns the release function.
+    // Cleanup then runs while the timer handles are still unassigned; touching
+    // them there threw and the wait never settled.
+    const running = { id: 'task-5', command: 'fast', cwd: '/tmp', pid: 1, startedAt: 0, state: 'running' as const, output: '' };
+    const finished = { ...running, state: 'exited' as const, output: 'done at once' };
+    const background = {
+      get: () => running,
+      list: () => [running],
+      onEnded: (listener: (task: typeof running) => void) => { listener(finished); return () => {}; },
+    };
+
+    const result = await tool('taskWait').execute({ taskId: 'task-5' },
+      { ...context, background } as unknown as ToolExecutionContext);
+    expect(result.output).toContain('done at once');
+  });
+
+  it("settles when the turn was cancelled before the wait began", async () => {
+    const running = { id: 'task-6', command: 'slow', cwd: '/tmp', pid: 1, startedAt: 0, state: 'running' as const, output: '' };
+    const background = { get: () => running, list: () => [running], onEnded: () => () => {} };
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await tool('taskWait').execute({ taskId: 'task-6', timeoutSeconds: 300 },
+      { ...context, background, abortSignal: controller.signal } as unknown as ToolExecutionContext);
+    expect(result.output).toContain('still running');
+  });
+
   it("names the commands that do exist when the id is unknown", async () => {
     const background = { get: () => undefined, list: () => [{ id: 'task-9' }], onEnded: () => () => {} };
     const result = await tool('taskWait').execute({ taskId: 'nope' },

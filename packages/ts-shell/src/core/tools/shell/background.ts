@@ -215,21 +215,27 @@ function waitForSettlement(
 ): Promise<BackgroundTask | undefined> {
   return new Promise(resolve => {
     let done = false;
+    // Declared before anything can call `finish`: a runner that reports a
+    // completion synchronously from `onEnded`, or a signal that is already
+    // aborted, reaches the cleanup while these are still unassigned.
+    let release: () => void = () => {};
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    let progress: ReturnType<typeof setInterval> | undefined;
+    const onAbort = (): void => finish(undefined);
     const finish = (task: BackgroundTask | undefined): void => {
       if (done) return;
       done = true;
-      clearTimeout(deadline);
-      clearInterval(progress);
+      if (deadline !== undefined) clearTimeout(deadline);
+      if (progress !== undefined) clearInterval(progress);
       release();
       signal?.removeEventListener('abort', onAbort);
       resolve(task);
     };
-    const release = background.onEnded(ended => { if (ended.id === id) finish(ended); });
-    const onAbort = (): void => finish(undefined);
-    const deadline = setTimeout(() => finish(undefined), timeoutMs);
+    release = background.onEnded(ended => { if (ended.id === id) finish(ended); });
+    deadline = setTimeout(() => finish(undefined), timeoutMs);
     // Long waits should not look like a hang. Progress goes nowhere on its own;
     // it exists so a cancelled wait still has a timer that notices the abort.
-    const progress = setInterval(() => {
+    progress = setInterval(() => {
       if (signal?.aborted) finish(undefined);
     }, WAIT_PROGRESS_MS);
     signal?.addEventListener('abort', onAbort, { once: true });
