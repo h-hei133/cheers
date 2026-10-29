@@ -188,6 +188,24 @@ describe("waiting for a background command", () => {
     expect(result.output).toContain('still running');
   });
 
+  it("returns at once when the task ended before the listener was installed", async () => {
+    // onEnded only reports what happens after it is registered. A task that
+    // finished in the gap between `get` and that registration would otherwise
+    // sit until the deadline — five minutes of nothing for a finished command.
+    let reads = 0;
+    const running = { id: 'task-7', command: 'quick', cwd: '/tmp', pid: 1, startedAt: 0, state: 'running' as const, output: '' };
+    const finished = { ...running, state: 'exited' as const, output: 'already done' };
+    const background = {
+      get: () => (reads++ === 0 ? running : finished),
+      list: () => [running],
+      onEnded: () => () => {},
+    };
+
+    const result = await tool('taskWait').execute({ taskId: 'task-7', timeoutSeconds: 300 },
+      { ...context, background } as unknown as ToolExecutionContext);
+    expect(result.output).toContain('already done');
+  });
+
   it("names the commands that do exist when the id is unknown", async () => {
     const background = { get: () => undefined, list: () => [{ id: 'task-9' }], onEnded: () => () => {} };
     const result = await tool('taskWait').execute({ taskId: 'nope' },

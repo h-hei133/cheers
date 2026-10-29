@@ -240,5 +240,11 @@ function waitForSettlement(
     }, WAIT_PROGRESS_MS);
     signal?.addEventListener('abort', onAbort, { once: true });
     if (signal?.aborted) finish(undefined);
+    // The task can end between the caller's `get` and this listener being
+    // installed. `onEnded` only reports what happens after it is registered, so
+    // without this recheck that gap would leave the wait sitting until its
+    // deadline — five minutes of nothing for a command that already finished.
+    const current = background.get(id);
+    if (current && (current.state === 'exited' || current.state === 'killed' || current.state === 'unknown')) finish(current);
   });
 }
