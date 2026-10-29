@@ -2453,7 +2453,11 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **明确不做**：不恢复跨进程 UDS + 文件锁任务池（跨进程场景已有 `collaboration/`，两套语义不混用）；不给 `runSubagent` 加"子代理再 spawn 子代理"；不新建第二套提案状态机。
 
-**证据边界**：本轮只做定位与参考对比，未实现；并发上限、成本与收敛质量均无实测证据。
+**本批已实施（第一百二十四批）**：收敛规则已落地为纯函数 owner（`core/subagents/team/convergence.ts`），实现"多代理独立提案 → 交叉证伪 → 收敛"中最后一步的判定，并锁定了两条不对称规则：**无证据的证伪不算数**（引用必须来自评审者实际读过的源），**未被检查不等于存活**（只有 `none-found` 且带引用才算 survived）。结论必须携带"同模型不同上下文不等于独立确认"的声明。
+
+**未实施**：fan-out（并行调用 `runSubagent`）、cross-review 的提示词构造、以及把结果接入命令面与用户批准流程。这些依赖真实 provider 与并发预算，本轮不伪造证据。
+
+**证据边界**：只实现了判定规则本身，未运行真实多代理会话；并发上限、成本与收敛质量均无实测证据。
 
 
 ### 17.6 第十三项（用户编号第二十三）：对话时界面卡顿
@@ -2628,3 +2632,18 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 验证：宿主级 4 项（regular/fullscreen 往返、空槽、互换、编辑器未改动），加"取回原稿"与"互换"两项专项。两组反转各触发 1 项预期失败：去掉 `adoptDraft` 的保存、去掉互换分支；源码逐字节恢复并核对 SHA-256 `629fae556a27` 后重验。`interactiveMode` 与 `draftStash` 共 321 项通过；静态门与 module facade 0 通过，TS build `d52651ce6b16`。
 
 **边界**：只覆盖外部编辑器这一条润色路径；模型在对话中给出的改写建议不经过草稿槽。`alt+s` 备选键未做。
+
+### 第一百二十四批：竞争性假说的收敛规则
+
+"竞争性假说互相证伪"的产出不是两个回答并列，而是**哪些站得住、哪些被推翻、哪些没人能判定**。这一步是纯判定，不涉及 agent 调用，因此可以独立实现并直接测试——把它写进 runner 里则只能从整轮运行的结果反推规则。
+
+新增 [convergence.ts](../../packages/ts-shell/src/core/subagents/team/convergence.ts)。两条规则刻意不对称：
+
+1. **无证据的证伪不算数**。`counterevidence` 与 `condition-mismatch` 只有在引用至少一个评审者实际读过的源时才生效。意见不是证据，一个什么都没引用的评审者不能把提案踢出考虑范围。
+2. **未被检查不等于存活**。`survived` 要求至少有一条带引用的 `none-found`；没有评审、或只有无引用的结论，一律是 `unresolved`。只有 `insufficient` 也是 `unresolved`——查不动不等于没问题。
+
+结论对象强制携带 limitation："提案由同一模型的不同上下文评审，一致不等于独立确认，存活也不等于被证明，只是未被那些评审者读过的证据推翻。"
+
+验证：`convergence.test.ts` 10 项覆盖引用证伪、条件不匹配、无引用证伪不生效、`insufficient` 不算证伪、带引用 `none-found` 才 survived、无人评审为 unresolved、证伪优先于干净检查、孤儿 finding、limitation 措辞、排序。两组反转各触发 1 项与 2 项预期失败；源码逐字节恢复并核对 SHA-256 `d165fe7e9f6a` 后重验。静态门、module facade 0 与 TS build `906d8e46584c` 通过。
+
+**边界**：只有判定规则。fan-out、cross-review 提示词、命令面与用户批准流程均未实现，未运行真实多代理会话。
