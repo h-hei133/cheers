@@ -2553,7 +2553,13 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **已实施（第一百二十七批）**：`toolPolicy` 的 accept-edits 判定已统一到 `verifyPathContainment`。此前它用纯词法的 `path.relative` 判断"是否在工作区内"，与工具体执行的 realpath 判定不同源：一个通过 symlink 指向外部的路径在词法上是"内部"，权限层因此批准，而工具体随后拒绝——用户看到的是"批准了却写不进去"。现两处用同一个判定，并把"workspace 根本身"单独排除（`path: "."` 是目录，不是文件目标）。
 
-**仍未实施**：把越界写从"硬拒绝"改为"需审批"（对齐 oh-my-pi/codex 的 `AskUser` 语义）。这需要 `selectWorkspaceRoot` 支持一次性授权根、`runtime/execution/write.ts` 的 root 可注入，以及审批结果到执行目标的传递。属于安全边界变更，必须同时具备"未批准仍拒绝"、"批准后可写"、"写入目标与批准目标一致"三条反转证据；本轮只消除了判定不一致，未放开任何写权限。
+**关于"改为需审批"的判断（第一百三十二批复核）**：不做，理由是现有方案更安全且已完整。
+
+`/workspace add <path> --write` 不是提示，而是一条完整路径：它经用户显式调用、把根持久化到会话（`changeSessionWorkspaceRoots`）、用 `dev:ino:birthtimeMs` 绑定身份（根被替换即失效）、并入 sandbox 的 `allowWrite`、并让 `selectWorkspaceRoot` 在后续所有工具调用中选中它。之后模型可以直接写，无需每次重复批准。
+
+"每次越界写弹一次审批"会是一个**更弱**的模型：一次性授权没有身份绑定（同一个路径换了个 inode 也照样放行）、不进入会话状态（下次还要再批）、不参与 sandbox 规划，而且要在 `write`/`edit` 上新增 `prepare`、让 `selectWorkspaceRoot` 支持临时根、让执行服务的 root 可注入——三处安全边界改动，只为得到一个比现有机制更弱的等价物。
+
+因此本项的结论是：**限制合理，出路存在，缺的是被发现**。已做的三件事（拒绝信息点明命令、权限层与工具体判定统一、`/workspace add --write` 本身的既有完整性）覆盖了这个缺口。
 
 **证据边界**：本批只改了拒绝措辞，未放开任何写权限；越界写仍然失败。
 
