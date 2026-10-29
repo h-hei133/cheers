@@ -2875,31 +2875,52 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 ### 19.2 第二十五：模型的思考过程打不开
 
-**结论：思考过程被采集、被渲染，但"打开"的交互在多数情况下不可达；同时它从不进入历史。**
+**结论修正（本轮最重要的发现）**：不是"渲染坏了"，而是**多数情况下根本没有思考可看**。渲染、折叠、`ctrl+t` 这条链是通的；缺的是上游——请求侧默认不索要推理，恢复侧不重建思考块。
 
-**链路分段核实**
+**请求侧（决定性）**
 
-| 环节 | 状态 | 证据 |
+默认偏好是 `null`（"auto"）：`core/models/preference.ts:6` 取 `readProjectState(...).thinkingEffort ?? null`，`DEFAULT_CONFIG` 不含 thinking 档位。而各协议**只有在档位非空时才发推理参数**：
+
+| 协议 | 发送条件 | 位置 |
 |---|---|---|
-| 供应商解析 | 可用 | `turn/completion.ts:169` `REASONING_FIELDS = ["reasoning_content","reasoning","reasoning_text"]`；Responses 端点在 `provider/endpoints/responses/body.ts:14` 请求 `summary: 'auto'` 并解析 `response.reasoning_summary_text.delta`（`responses/stream.ts:117-143`）；Anthropic 解析 `thinking_delta`（`anthropicMessages.ts:694`） |
-| 事件 | 可用 | `turn/session.ts:279` 把 `onReasoning` 推成 `reasoning.delta` |
-| 落盘 | 可用（作为消息字段） | 真实 transcript 中 `message` 事件带 `reasoning: { text }`（抽查 `sess_6cfd50aa…`：70 行中 8 条带 reasoning，最长 997 字符） |
-| 渲染 | 可用 | `cli/interactive/turnSink.ts:187-211` 建立 `kind:"thinking"` 块；`transcript/blocks.ts:170-188` 默认折叠为一行 `● thought 1.2s · click to expand` |
-| 展开（键盘） | **有条件可达** | `keybindings.ts:86` 绑定 `ctrl+t` → `keymap.ts:256` → `surface/pane.ts:122-134` |
-| 展开（鼠标） | **仅在特定模式** | `interactiveMode.ts:513` 只在 `alternateScreen || pager.active || overlay.fullScreen` 时把鼠标事件交给 pointer；`pointer.ts:353-357` 的 `toggle()` 要求 `block.collapsed !== undefined` |
-| 历史恢复 | **缺失** | `cli/interactive/history.ts:52-58` 只恢复 assistant 的 `content`，**从不读 `turn.reasoning`** |
+| Anthropic | `if (input.thinkingLevelName !== undefined)` 才发 `thinking` | `provider/endpoints/anthropicMessages.ts:158` |
+| Google | `thinkingConfigFor(budgetTokens)` 在 `budgetTokens === undefined` 时返回 `undefined`，连 `includeThoughts` 一起不发 | `provider/endpoints/googleWire.ts:180-183` |
+| OpenAI 兼容 | `...(input.reasoningEffort && input.thinkingLevelName ? { reasoning_effort } : {})` | `provider/endpoints/openaiCompatible.ts:86-88` |
 
-**确定的三个缺口**
+`resolveRequestShape` 也只在 `level` 非空时才填 `thinkingLevelName`/`thinkingBudgetTokens`（`core/models/requestShape.ts:146-151`、`:170-171`）。所以在 Anthropic/Bedrock/Google 上，**出厂默认设置下供应商根本不产生推理**，也就没有 `reasoning.delta`，也就没有思考块可展开。对照 pi 的默认档位是 `medium`（`packages/coding-agent/src/core/defaults.ts:3`）。
 
-1. **恢复的会话里没有思考块。** `restoreConversation` 从不读取 `SessionMessage.reasoning`，所以 `/resume` 打开旧会话时，历史里根本不存在 `collapsed` 块。用户在旧会话里"打不开思考"是必然的，不是偶发。
-2. **`regular` 模式下鼠标不可达。** `interactiveMode.ts:513` 的条件让非全屏模式不接收鼠标报告，`engine.ts:369/373` 也只在 `alternateScreen || overlayScreen` 时开启鼠标跟踪。于是 `blocks.ts:174` 那行 "click to expand" 在 regular 模式下是一个**画出来但点不了的提示**——界面在承诺一个不存在的交互。
-3. **`ctrl+t` 是唯一键盘入口，且无第二绑定。** 与 `ctrl+s` 曾遇到的 XOFF 同类风险（HANDOFF 记录过），`ctrl+t` 在部分终端/多路复用器配置下也可能被吞；目录（`chrome/keys.ts:90`）与指南（`.wiki/guides/keybindings.md:92`）只列了这一个键。
+**对用户当前环境的判断**：用户用的是 OpenAI 兼容 relay（`~/.cheers/config.json` 的 `bailucode.com` + `bailu-2.9-preview`）。这类 relay 通常**无论请求参数如何都会返回 `reasoning_content`**，而 `turn/completion.ts:169` 的 `REASONING_FIELDS` 确实解析它，所以用户应当**看得到**折叠行。那么"打不开"就落在下面第 3、4、5 条上，而不是请求侧。
 
-**参考对照**：Claude Code 的 `ctrl+o`（`keybindings/defaultBindings.ts:44` `app:toggleTranscript`）是**全局 transcript 视图切换**，不是逐块折叠；其 thinking 块在 verbose 下直接全文显示。本项目选了"逐块折叠 + 单键批量翻转"，语义更细，但因此更需要保证入口可达。
+按用户描述（"没法打开查看"）最可能的两条：**在流式过程中点击**（第 4 条，此时点击被静默丢弃），或**处于 `regular` 模式**（第 5 条，鼠标根本不转发）。若是**恢复的旧会话**，则是第 3 条——那里连折叠行都不存在。三条都能解释"打不开"，但只有第 3 条能解释"连折叠行都没有"；用户下次复现时看有无 `● thought` 行即可二分。
 
-**修复方向**：`restoreConversation` 增加 thinking 块（`collapsed: true`，文本取 `turn.reasoning.text`，`redacted` 时不显示正文而显示"provider withheld"）；`regular` 模式要么开启鼠标跟踪，要么不绘制 "click to expand"（二选一，不能继续画一个假提示）；为 `app.thinking.toggle` 增加备选键并同步目录与指南。
+**解析与渲染（已确认可用）**
 
-**证据边界**：未在真实终端按键复现；`ctrl+t` 是否被用户终端吞掉未验证。
+- 事件：`turn/session.ts:279` → `reasoning.delta`；渲染：`cli/interactive/turnSink.ts:189-212` 建 `kind:"thinking"`、`collapsed:true`；`transcript/blocks.ts:170-187` 折叠行 `● thought Ns · click to expand`，展开正文用 `thinkingText` 主题令牌。
+- 折叠/展开缓存正确失效：`transcript/container.ts:130-132`（`setCollapsed` → `update` → `cache.delete`）。
+- 键盘入口真实存在且无冲突：`keybindings.ts:86` `ctrl+t` → `keymap.ts:255-258` → `surface/pane.ts:122-134`；`presentation/tui/input/keys.ts:214-230` 把 `0x14` 正确解成 `ctrl+t`。
+
+**确定的五个缺口（按影响排序）**
+
+1. **请求侧默认不索要推理**（上文）。这决定 Anthropic/Bedrock/Google 上"从来没有思考"。
+2. **OpenAI 官方模型走错端点，Responses 又只读摘要**。内置 `openai` provider 不声明 `endpoint`（`core/models/catalog.ts:288-308`），于是回落到 `openai-compatible`（`provider/endpoints/kinds.ts:216`）；`/chat/completions` 不返回推理。只有 ChatGPT 账号走 `openai-account-responses`（`core/auth/account/policy.ts:15-16`），而该读取器**只处理 `response.reasoning_summary_text.*`，完全忽略 `response.reasoning_text.delta`**（`provider/endpoints/responses/stream.ts:117-143`）。pi 两者都读。
+3. **恢复的会话里没有思考块。** `restoreConversation`（`cli/interactive/history.ts:36-109`）只建 `user`/`assistant`/`tool` 三种块，**从不读 `SessionMessage.reasoning`**——而该字段确实已落盘（`turn/step.ts:719-728`、`session/schema/sessionMessage.ts:60-86`、真实 transcript 抽查 8/70 条带 reasoning）。所以 `/resume`、切换会话、fork、rewind 之后，历史里一个思考块都不存在，"打不开"是必然的。
+4. **流式进行中点击会被丢弃。** `pointer.ts:258-262` 在 `!transcriptSelectionCurrent()` 时直接返回；该判定比较 `view.transcript.revision`，而每个 delta 都会推进 revision。于是**模型正在思考时点那一行不会展开**——恰恰是用户最想看的时刻。轮次结束后点击才有效。
+5. **`regular` 模式下鼠标不可达。** `interactiveMode.ts:513` 只在 `alternateScreen || pager.active || overlay.fullScreen` 时把鼠标交给 pointer，`engine.ts:369/373` 也只在同样条件开启鼠标跟踪。非全屏模式下 "click to expand" 是画出来点不了的提示（键盘 `ctrl+t` 仍可用）。
+
+**次要缺陷**：`pane.ts:128-132` 的批量翻转**只按最旧那个块决定目标状态**。若用户先展开了旧块，之后新块到达（新块恒为 `collapsed:true`），第一次按 `ctrl+t` 会把全部折叠，而不是展开新的那个——看起来像"按了没反应"。
+
+**参考对照**：Claude Code 的 `ctrl+o`（`keybindings/defaultBindings.ts:44`）是全局 transcript 视图切换，thinking 在 verbose 下直接全文显示，不存在逐块展开的可达性问题。
+
+**修复方向**
+
+1. 请求侧：在 `auto` 下也按协议请求"供应商默认档位的推理"（Anthropic 用最小 budget、Google 发 `includeThoughts: true`、OpenAI 兼容在目录声明 `reasoning: true` 时发 `reasoning_effort`），或把默认档位对齐 pi 的 `medium`。**这是"看不见思考"的根因，其他四条都只是"看得见却打不开"。**
+2. Responses 读取器补 `response.reasoning_text.delta`，并考虑让 OpenAI 推理模型默认走 Responses 端点。
+3. `restoreConversation` 把 `turn.reasoning.text` 还原为 `collapsed: true` 的已定稿思考块；`redacted` 时显示"provider withheld"而不显示正文。
+4. 点击展开不应被流式增量挡住：toggle 判定只依赖"行归属 + 块可折叠"，不依赖 selection 的 revision 新鲜度。
+5. `regular` 模式要么开启鼠标跟踪，要么不绘制 "click to expand"（二选一，不能继续画假提示）。
+6. `toggleCollapsed` 改以**最新**可折叠块决定目标状态，或让每块朝各自的反向翻转。
+
+**证据边界**：全部为源码核实，未在真实终端按键复现。"用户应当看得到折叠行"是基于 relay 通常返回 `reasoning_content` 的推断，未验证该 relay 的实际响应；用户是否在流式过程中点击也未确认。
 
 ### 19.3 第二十六：`exit` 有时卡住
 
@@ -2946,6 +2967,8 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 **为什么"输入内容后就能删掉空白行"**：编辑会推进 `contentRevision`，`Editor.layout` 重算行数并走 `maxRows` 分支（`editor.ts:302-318`），`scrollOffset` 被夹到 `[0, maxScroll]`；同时 `setText` 会把 `scrollOffset` 归零（`buffer.ts:97`）。也就是说，**第一次真实编辑会纠正几何**，这与用户观察完全吻合。
 
 **未确认**：用户实际使用的是 `fullscreen`（默认，`runtimeConfig.ts:438`）还是 `regular`；以及空白行是"transcript 填充行"还是"编辑器 scrollOffset 偏移"。两者在画面上都可能表现为光标下移。
+
+**一条被排除的假设**：`Editor.scrollOffset` 不会在"空草稿 + 小窗口"下自己产生偏移。`editor.ts:302-305` 的分支在 `rendered.length <= maxRows` 时把 `scrollOffset` 归零，而空草稿只有一行；只有当草稿行数真的超过行预算时才会保留非零偏移，且随后被夹到 `[0, maxScroll]`（`:315-317`）。所以"进入即偏移"不能由 `scrollOffset` 单独解释，必须有一个把内容或光标位置错置的上游步骤（`viewportUnplaced` 或 transcript 填充行）。下一轮应先补一条启动几何夹具，把这两个上游各自固定下来，再决定改哪里。
 
 **修复方向**：把 `Editor.scrollOffset` 的生命周期绑到布局身份（文本 + 宽度 + 行预算），而不是实例字段；`MainScreenPainter` 在 `viewportUnplaced` 的第一帧应先用 `reanchor()` 重新建立位置，再绘制 composer；并补一条启动几何测试：给定历史 + 空草稿，composer 的首行必须紧贴最后一条历史行。
 
@@ -3042,7 +3065,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 编号 | 判定 | 主要证据 | 实施优先级 |
 |---|---|---|---|
 | 24 | 确认：工具体硬拒绝，审批层不可达 | `registry.ts:322/426`、`turn/tools.ts:408`、参考实现对照 | P0（用户阻塞） |
-| 25 | 确认：历史不恢复思考块；regular 模式提示不可点；单键无备选 | `history.ts:52-58`、`interactiveMode.ts:513`、`keybindings.ts:86` | P1 |
+| 25 | 确认：请求侧默认不索要推理（Anthropic/Google/Bedrock 无思考可看）；恢复不重建思考块；流式中点击被丢；regular 模式提示不可点 | `preference.ts:6`、`anthropicMessages.ts:158`、`googleWire.ts:180-183`、`history.ts:36-109`、`pointer.ts:258-262` | P0（根因在请求侧） |
 | 26 | 确认：裸 `exit` 是提示词；MCP `close()` 无上限（最坏 30 s） | `registry.ts:436`、`interactiveLoop.ts:67`、`gateway.ts:188` | P0（阻塞退出） |
 | 27 | 高置信推断：启动几何竞态（`scrollOffset` 持久 + `viewportUnplaced`） | `editor.ts:281-319`、`mainScreen.ts:161-162` | P1（需用户确认模式） |
 | 28 | 确认：无 `/config`；模型行为字段在 settings、目录在 model，effort 三入口 | `settings.ts:78`、`picker/settings.ts:253-257`、`picker/model.ts:206` | P2（结构） |
