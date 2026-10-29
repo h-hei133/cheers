@@ -798,3 +798,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Users report that a model's reasoning cannot be viewed, and the investigation starts at the renderer.
 - **Root Cause**: The rendering, collapse state and toggle all worked; the request side sent no reasoning parameter at all, because the shipped default preference is null and every protocol gates its reasoning field on a non-null level. The provider therefore never emitted reasoning, so there was no block to expand.
 - **Rule**: When a capability appears missing, trace the request that would produce it before the code that would display it. A feature gated on an unset default is absent by default, not broken; state which default would have to change and which protocols honour it.
+
+### A Restored Terminal Is Not A Finished Process
+
+- **Symptom**: `/exit` sometimes leaves the shell looking normal but the process still alive; the user has to kill it.
+- **Root Cause**: The shutdown sequence restores the terminal (`stop()`) before calling `handleShellClose`, and that call has no exception fence. Its first action is a synchronous session write that takes a blocking file lock, so a lock timeout or an unreadable session throws before `exit()` is reached. Every caller invokes shutdown fire-and-forget, and the crash recorder deliberately lets rejections continue, so nothing reports it.
+- **Rule**: Any cleanup that restores user-visible state before the final exit must fence the steps after it and call exit in a `finally`. "The screen came back" is not evidence that the process is ending; check the process, not the paint.
