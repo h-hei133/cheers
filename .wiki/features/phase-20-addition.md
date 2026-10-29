@@ -2344,7 +2344,12 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 - `/undo status` 显示每个操作所属的 turn（`correlationId` 即 prompt entry id，writer 一直在记录，只是报告没有呈现）。
 - `/undo status --turn <id>` **按 turn 列出该轮的全部操作**，作为恢复前的审阅视图。选择是对既有账本的过滤，不是第二套账本；`undoStatusReport`、预览与恢复链路完全复用。
 
-**撤销单位仍是单个操作**：`/undo execute` 仍要求精确的 operation id + preview revision。批量恢复需要"部分成功"语义与逐条确认，本轮不做——一次失败的批量恢复会留下部分文件已改、部分未改，而现有契约明确声明"跨文件非原子"，不应在未设计好报告方式时扩大它。
+**批量恢复已实施（第一百二十九批）**：`/undo restore-turn <turn-id> --execute` 从新到旧恢复该轮的全部未完成操作。**不是单一事务**：每一步仍是原有的"预览 → 写意图 → 恢复 → 回读验证"链路，逐操作执行、各自加锁。两条规则：
+
+1. **顺序由账本决定，不由调用方选**：`restoreOperation` 只恢复最新的未完成操作（较旧的可能写在它之上），因此从新到旧走。
+2. **失败即停**：某一步未验证通过时，不再继续——继续会把更旧的内容写到该步留下的未知状态之上。报告逐条列出做了什么、跳过了什么、为什么停。
+
+`/undo execute` 仍是单操作路径，要求精确 id + revision，未变。
 
 **证据边界**：未新增工作区级快照，`/undo` 的单位仍是单个已提交操作。任何"按 turn 撤销"的实现都必须先有"未批准不写、批准后写入目标与批准目标一致、恢复不重放 unknown、部分失败如实报告"的反转证据。
 
@@ -2698,3 +2703,18 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 现 `tui.input.stash` 同时绑定 `ctrl+s` 与 `alt+s`，目录与指南同步。宿主级测试用真实 `\x1bs` 序列走完整往返（暂存 → 恢复），反转撤销该绑定后预期失败；源码逐字节恢复并核对 SHA-256 `19fd5ba1018b`（keybindings）与 `9f2764d704a9`（keys）后重验，三文件 347 项通过；静态门、module facade 0 与 TS build `fd16f50737bd` 通过。
 
 **边界**：非 raw 的 line 模式（`lineLoop.ts`）下的 IXON 吞键风险仍未在真机验证；备选键解决的是"主键被吞"，不是"两个键都被吞"。
+
+### 第一百二十九批：按 turn 批量恢复
+
+`/undo restore-turn <turn-id> --execute` 恢复该轮的全部未完成操作。它是**逐操作的串行执行**，不是单一事务——每一步复用原有的"预览 → 写意图 → 恢复 → 回读验证"，各自加锁、各自记录结果。
+
+两条规则决定了它的形状：
+
+1. **顺序由账本决定**。`restoreOperation` 只允许恢复最新的未完成操作，因为较旧的写入可能叠在它之上。因此批量从新到旧走，调用方不能指定顺序。
+2. **失败即停，并列出未尝试的操作**。某一步未验证通过时，继续会把更旧的内容写到该步留下的未知状态之上。报告逐条说明做了什么、跳过了什么、为什么停，且 `rollbackAtomicityClaim: false`。
+
+`complete` 只在全部操作都 `restored-verified` 时为真——不是"没有抛错"，因为部分成功才是最需要说清楚的结果。
+
+验证：`turnRestore.test.ts` 7 项覆盖顺序、未确认不写、空 turn、跨 turn 隔离、失败即停并列出剩余、预览不可信时不开始、运行中拒绝；`history.test.ts` 2 项覆盖命令面（走对路径、缺确认被拦）。两组反转各触发 1 项预期失败：失败后继续（`['newer','older']` vs `['newer']`）、改为旧到新；源码逐字节恢复并核对 SHA-256 `3d1a97555b98` 后重验，4 文件 49 项通过；静态门、module facade 0 与 TS build `67f982a1ee7c` 通过。
+
+**边界**：夹具用 stub 替换了 `previewOperation`/`restoreOperation`（真实逐文件恢复由 operation 测试覆盖），未在真实多文件 turn 上跑过端到端恢复；报告未接入交互式 picker。

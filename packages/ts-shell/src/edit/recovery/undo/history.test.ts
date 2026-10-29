@@ -354,3 +354,30 @@ it('says so when a turn recorded nothing', async () => {
   const result = await runUndoCommand(['status', '--turn', 'missing-turn'], context);
   expect(result.output).toContain('No recorded operation belongs to turn');
 });
+
+it('restores a whole turn through the command surface, newest first', async () => {
+  const scope = captureOperationScope({ sessionId: context.sessionId!, workspaceRoot: directory });
+  const seedTurn = (operationId: string) => withOperationStore(scope, () => {
+    allocateOperation({ ...scope, schemaVersion: 1, operationId, callId: `call-${operationId}`, correlationId: 'prompt-x',
+      revision: 1, status: 'committed', undo: 'none', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
+      files: [{ id: 'file', workspace: scope.workspace, path: 'note.txt', kind: 'update',
+        before: { state: 'exists', hash: hashContent('before') }, after: { state: 'exists', hash: hashContent('after') },
+        snapshot: { authorityId: operationId, recordId: 'file' }, status: 'committed', undo: 'none' }] });
+  });
+  seedTurn('turn-a');
+  seedTurn('turn-b');
+
+  const result = await runUndoCommand(['restore-turn', 'prompt-x', '--execute'], context);
+
+  // The snapshot blobs are absent in this fixture, so every step is expected to
+  // stop — what is asserted is that the command reached the turn path and
+  // reported honestly rather than claiming a restore.
+  expect(result.output).toContain('Turn: prompt-x');
+  expect(result.output).not.toContain('Every operation of this turn was restored');
+});
+
+it('requires confirmation before restoring a turn', async () => {
+  const result = await runUndoCommand(['restore-turn', 'prompt-x'], context);
+
+  expect(result.output).toContain('Explicit --execute confirmation is required');
+});

@@ -5,9 +5,10 @@ import { undoSyntax } from '../../../core/commands/undo/syntax.js';
 import { reportText } from '../../../core/commands/report/projection.js';
 import type { CommandReport } from '../../../core/commands/report/contract.js';
 import { contentHashPattern, safeRecoveryId } from '../record.js';
-import { executeUndo, operationsForTurn, prepareUndo, readUndoHistoryPage, undoHistory } from './service.js';
+import { executeUndo, operationsForTurn, prepareUndo, readUndoHistoryPage, undoAccess, undoHistory } from './service.js';
 import { validUndoHistoryCursor } from './history.js';
-import { undoNotice, undoPreviewReport, undoResultReport, undoStatusReport } from './report.js';
+import { turnRestoreReport, undoNotice, undoPreviewReport, undoResultReport, undoStatusReport } from './report.js';
+import { restoreTurn } from './turnRestore.js';
 
 export async function runUndoCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
   if (args[0] === '--hard' || args[0] === '--discard') return { kind: 'local', output:
@@ -18,9 +19,19 @@ export async function runUndoCommand(args: string[], context: CommandContext): P
     : parsed.flags.has('cursor') && !validUndoHistoryCursor(parsed.flags.get('cursor')) ? 'Invalid saved-results cursor.' : undefined;
   if (invalid || !parsed.ok) return { kind: 'local', output: `Invalid /undo arguments: ${invalid}\n${syntaxHelp(undoSyntax)}` };
   if (parsed.action.name === 'help') return { kind: 'local', output: syntaxHelp(undoSyntax) };
-  if (parsed.action.name === 'execute' && !parsed.flags.has('execute')) return local(undoNotice('Explicit --execute confirmation is required. Nothing was written.', 'permission-pending'));
+  if ((parsed.action.name === 'execute' || parsed.action.name === 'restore-turn') && !parsed.flags.has('execute')) {
+    return local(undoNotice('Explicit --execute confirmation is required. Nothing was written.', 'permission-pending'));
+  }
   let executionStarted = false;
   try {
+    if (parsed.action.name === 'restore-turn') {
+      const executeTurn = parsed.args[0]!;
+      const outcome = await restoreTurn({ context: () => context }, executeTurn, true, undoAccess(context));
+      return { ...local(turnRestoreReport(outcome, executeTurn)), state: outcome.complete
+        ? { fileUndo: { operationId: `turn:${executeTurn}`, status: 'restored-verified',
+          files: outcome.steps.flatMap(step => step.files.map(file => ({ ...file }))) } }
+        : undefined };
+    }
     if (parsed.action.name === 'status') {
       // Selecting by turn is a view over the same ledger: the operations it
       // lists are the ones the ordinary preview would restore, one at a time.

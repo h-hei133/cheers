@@ -6,6 +6,7 @@ import type { ContentVersion, OperationReceipt } from '../operation/model.js';
 import type { UndoPreview } from '../operation/preview.js';
 import type { UndoResult } from '../operation/restore.js';
 import type { UndoHistoryPage } from './history.js';
+import type { TurnRestoreOutcome } from './turnRestore.js';
 
 const DIFF_BYTES = 64 * 1024;
 const text = (value: string): ReportLine => ({ kind: 'text', spans: [span(value)] });
@@ -72,4 +73,36 @@ function differenceStart(current: string, before: string): number {
   let position = 0;
   while (position < Math.min(current.length, before.length) && current[position] === before[position]) position++;
   return Math.max(0, position - 128);
+}
+
+/**
+ * What a whole-turn restore did.
+ *
+ * The step list is the report. A batch is not one transaction, so a single
+ * "restored" line would be a claim about files nobody touched; each operation
+ * says what happened to it, and the operations that were never attempted are
+ * named rather than omitted.
+ */
+export function turnRestoreReport(outcome: TurnRestoreOutcome, turnId: string) {
+  const restored = outcome.steps.filter(step => step.status === 'restored-verified').length;
+  const lines: ReportLine[] = [
+    text(`Turn: ${turnId}`),
+    text(`Restored ${restored} of ${outcome.steps.length + outcome.skipped.length} recorded operation(s).`),
+    ...outcome.steps.flatMap(step => [
+      { kind: 'heading' as const, spans: [span(step.operationId)] },
+      text(`Status: ${step.status}`),
+      ...step.files.map(file => text(`${JSON.stringify(file.path)}: ${file.status}`)),
+    ]),
+    ...(outcome.skipped.length ? [text(`Not attempted: ${outcome.skipped.join(', ')}`)] : []),
+    ...(outcome.stoppedBecause ? [text(`Stopped: ${outcome.stoppedBecause}`)] : []),
+    text(outcome.complete
+      ? 'Every operation of this turn was restored and verified.'
+      : 'Some operations were not restored. Inspect the per-operation results before starting another restoration.'),
+    ...(outcome.steps.some(step => ['restored-verified', 'partial', 'unknown'].includes(step.status))
+      ? [text('Previous file reads may be stale; re-read affected files before editing.')] : []),
+  ];
+  return createReport({ title: outcome.complete ? 'Turn undo: restored' : 'Turn undo: incomplete', lines,
+    facts: { turnId, status: outcome.complete ? 'restored-verified' : 'partial', restored,
+      steps: outcome.steps.map(step => ({ operationId: step.operationId, status: step.status, files: step.files.map(file => ({ ...file })) })),
+      skipped: outcome.skipped, stoppedBecause: outcome.stoppedBecause ?? null, rollbackAtomicityClaim: false } });
 }

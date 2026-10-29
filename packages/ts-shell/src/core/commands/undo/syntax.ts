@@ -12,6 +12,9 @@ export const undoSyntax: CommandSyntax = {
     { name: 'execute', summary: 'restore the exact approved operation preview', parameters: [
       { name: 'operation-id', kind: 'text', required: true }, { name: 'preview-revision', kind: 'text', required: true },
     ], flags: [{ name: 'execute', kind: 'boolean', summary: 'explicitly confirm the selected restoration', suggest: false }] },
+    { name: 'restore-turn', summary: 'restore every outstanding operation one turn recorded, newest first',
+      parameters: [{ name: 'turn-id', kind: 'text', required: true }],
+      flags: [{ name: 'execute', kind: 'boolean', summary: 'explicitly confirm the restoration', suggest: false }] },
     { name: 'help', aliases: ['--help'], summary: 'show undo usage' },
   ],
   flags: [],
