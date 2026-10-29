@@ -5,7 +5,7 @@ import { undoSyntax } from '../../../core/commands/undo/syntax.js';
 import { reportText } from '../../../core/commands/report/projection.js';
 import type { CommandReport } from '../../../core/commands/report/contract.js';
 import { contentHashPattern, safeRecoveryId } from '../record.js';
-import { executeUndo, prepareUndo, readUndoHistoryPage, undoHistory } from './service.js';
+import { executeUndo, operationsForTurn, prepareUndo, readUndoHistoryPage, undoHistory } from './service.js';
 import { validUndoHistoryCursor } from './history.js';
 import { undoNotice, undoPreviewReport, undoResultReport, undoStatusReport } from './report.js';
 
@@ -22,6 +22,14 @@ export async function runUndoCommand(args: string[], context: CommandContext): P
   let executionStarted = false;
   try {
     if (parsed.action.name === 'status') {
+      // Selecting by turn is a view over the same ledger: the operations it
+      // lists are the ones the ordinary preview would restore, one at a time.
+      const turn = parsed.flags.get('turn');
+      if (typeof turn === 'string') {
+        const operations = operationsForTurn(context, turn);
+        return local(operations.length ? undoStatusReport(operations)
+          : undoNotice(`No recorded operation belongs to turn \`${turn}\`.`, 'empty'));
+      }
       if (parsed.args[0]) {
         const selected = undoHistory(context, parsed.args[0]);
         return local(selected.length ? undoStatusReport(selected) : undoNotice('No recorded operation was found in this session and workspace.', 'empty'));

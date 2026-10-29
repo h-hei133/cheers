@@ -771,3 +771,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A verification run covering eleven directories aborts with a V8 OOM stack trace instead of test results, after ten minutes.
 - **Root Cause**: The scope, not the changes. `--threads=false` serializes files but every file still loads into one process, and eleven directories is thousands of modules under a 1024 MiB cap. The earlier focused runs passed because each covered a handful of files.
 - **Rule**: Keep a single verification invocation to the files the change actually touches. Chain several small invocations with `&&` when more coverage is needed, and never treat a wider directory glob as a stronger version of a focused test. On this machine a broad run is also the path to the kernel OOM killer, which takes the session with it.
+
+### A Generator Is Not An Array
+- **Symptom**: A selection over the operation ledger returns nothing, and the command reports "no operation belongs to that turn" while the ledger plainly holds two.
+- **Root Cause**: `scanOperations` yields — it is a generator. Calling `.filter()` on it is a `TypeError`, and the command's `catch` turned that into a generic "could not be verified" report. The unit test that called the same helper looked like it passed because its own `.map()` threw first and the assertion was about a different line.
+- **Rule**: Spread a generator before using array methods on it, and make the first test assertion be the one that would fail if the value were the wrong kind. When a selection helper returns nothing, check whether it returned at all before checking what it selected.

@@ -43,6 +43,34 @@ export async function prepareUndo(context: CommandContext, signal?: AbortSignal)
     : 'This operation requires inspection. Its blocked or unknown results cannot be replayed automatically.' };
 }
 
+/**
+ * Every operation one turn recorded, newest first.
+ *
+ * A turn is the prompt that caused the edits: the writer stamps each receipt
+ * with that prompt's entry id, so two edits from one request share it. This is
+ * a selection over the existing ledger, not a second one — the receipts, their
+ * previews and their restorations are the same objects `/undo` already uses.
+ *
+ * A receipt without a correlation id belongs to no turn and is never selected;
+ * treating "unknown" as "the turn you meant" would restore something the user
+ * did not name.
+ */
+export function operationsForTurn(context: CommandContext, turnId: string): readonly OperationReceipt[] {
+  // `scanOperations` yields; spreading first is what makes the selection an
+  // array rather than a generator that has no `filter`.
+  return [...scanOperations(undoScope(context))].filter(receipt => receipt.correlationId === turnId);
+}
+
+/** The turns this session recorded, newest first, each with its operation count. */
+export function turnsWithOperations(context: CommandContext): readonly { readonly turnId: string; readonly operations: number }[] {
+  const counts = new Map<string, number>();
+  for (const receipt of scanOperations(undoScope(context))) {
+    if (receipt.correlationId === undefined) continue;
+    counts.set(receipt.correlationId, (counts.get(receipt.correlationId) ?? 0) + 1);
+  }
+  return [...counts].map(([turnId, operations]) => ({ turnId, operations }));
+}
+
 export function undoHistory(context: CommandContext, operationId?: string): readonly OperationReceipt[] {
   const receipts: OperationReceipt[] = [];
   for (const receipt of scanOperations(undoScope(context))) {

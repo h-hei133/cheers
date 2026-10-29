@@ -323,3 +323,34 @@ it('says nothing about a turn when the writer recorded none', async () => {
   const result = await runUndoCommand(['status'], context);
   expect(result.output).not.toContain('Turn:');
 });
+
+it('lists exactly the operations one turn recorded', async () => {
+  // Two prompts, three edits. Selecting by turn must not include the other
+  // turn's edit, and must not include receipts that recorded no turn at all.
+  const scope = captureOperationScope({ sessionId: context.sessionId!, workspaceRoot: directory });
+  const seedOne = (operationId: string, correlationId: string | undefined) => withOperationStore(scope, () => {
+    allocateOperation({ ...scope, schemaVersion: 1, operationId, callId: `call-${operationId}`,
+      ...(correlationId ? { correlationId } : {}), revision: 1, status: 'committed', undo: 'none',
+      createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
+      files: [{ id: 'file', workspace: scope.workspace, path: 'note.txt', kind: 'update',
+        before: { state: 'exists', hash: hashContent('before') }, after: { state: 'exists', hash: hashContent('after') },
+        snapshot: { authorityId: operationId, recordId: 'file' }, status: 'committed', undo: 'none' }] });
+  });
+  seedOne('turn-1-a', 'prompt-1');
+  seedOne('turn-1-b', 'prompt-1');
+  seedOne('turn-2-a', 'prompt-2');
+  seedOne('no-turn', undefined);
+
+  const listed = await runUndoCommand(['status', '--turn', 'prompt-1'], context);
+  expect(listed.output).toContain('turn-1-a');
+  expect(listed.output).toContain('turn-1-b');
+  expect(listed.output).not.toContain('turn-2-a');
+  expect(listed.output).not.toContain('no-turn');
+});
+
+it('says so when a turn recorded nothing', async () => {
+  seed(1);
+
+  const result = await runUndoCommand(['status', '--turn', 'missing-turn'], context);
+  expect(result.output).toContain('No recorded operation belongs to turn');
+});

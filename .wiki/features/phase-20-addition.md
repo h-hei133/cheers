@@ -2339,7 +2339,12 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 2. 只有在需要覆盖 bash/非文本副作用时，才补一个 **turn 开始**的快照钩子，复用 `snapshotRoot`（`edit/recovery/root.ts:6-11`）与 ledger 目录，不新建根；非 git 工作区静默跳过（与 Codex 的 `NotAGitRepository` 行为一致）。
 3. **不复活**"快照写进对话历史"的协议语义：快照属于 edit/recovery ledger，对话历史只记 operation ID（现有 receipt 已是这个形状）。
 
-**本批已实施（第一百二十二批）**：`/undo status` 现在显示每个操作所属的 turn（`correlationId` 即 prompt entry id，writer 一直在记录，只是报告没有呈现）。同一轮的两个编辑共享它——这是账本里唯一可见的分组，**撤销本身仍是逐操作**。按 turn 批量撤销需要新的选择器、多 receipt 预览与顺序恢复的"部分成功"语义，是独立设计，本轮未做。
+**本批已实施（第一百二十二批、第一百二十五批）**：
+
+- `/undo status` 显示每个操作所属的 turn（`correlationId` 即 prompt entry id，writer 一直在记录，只是报告没有呈现）。
+- `/undo status --turn <id>` **按 turn 列出该轮的全部操作**，作为恢复前的审阅视图。选择是对既有账本的过滤，不是第二套账本；`undoStatusReport`、预览与恢复链路完全复用。
+
+**撤销单位仍是单个操作**：`/undo execute` 仍要求精确的 operation id + preview revision。批量恢复需要"部分成功"语义与逐条确认，本轮不做——一次失败的批量恢复会留下部分文件已改、部分未改，而现有契约明确声明"跨文件非原子"，不应在未设计好报告方式时扩大它。
 
 **证据边界**：未新增工作区级快照，`/undo` 的单位仍是单个已提交操作。任何"按 turn 撤销"的实现都必须先有"未批准不写、批准后写入目标与批准目标一致、恢复不重放 unknown、部分失败如实报告"的反转证据。
 
@@ -2647,3 +2652,13 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 验证：`convergence.test.ts` 10 项覆盖引用证伪、条件不匹配、无引用证伪不生效、`insufficient` 不算证伪、带引用 `none-found` 才 survived、无人评审为 unresolved、证伪优先于干净检查、孤儿 finding、limitation 措辞、排序。两组反转各触发 1 项与 2 项预期失败；源码逐字节恢复并核对 SHA-256 `d165fe7e9f6a` 后重验。静态门、module facade 0 与 TS build `906d8e46584c` 通过。
 
 **边界**：只有判定规则。fan-out、cross-review 提示词、命令面与用户批准流程均未实现，未运行真实多代理会话。
+
+### 第一百二十五批：按 turn 审阅文件操作
+
+`/undo status --turn <id>` 列出某一轮记录的全部文件操作。选择是对既有账本的过滤（`operationsForTurn`），复用同一个 `undoStatusReport`，不新建存储或预览路径。没有 `correlationId` 的 receipt 不属于任何 turn，永远不会被选中——把"未知"当成"你要的那一轮"会恢复用户没有指定的东西。
+
+**撤销单位不变**：`/undo execute` 仍要求精确的 operation id 与 preview revision。批量恢复需要"部分成功"的报告语义，而现有契约明确声明跨文件非原子；在没设计好如何如实报告部分失败之前，不扩大这个单位。
+
+验证：`history.test.ts` 新增两项——四个操作分属两轮加一个无 turn，`--turn prompt-1` 只列出前两个且不泄漏另外两个；未知 turn 明确报告为空。反转去掉 turn 过滤后第一项预期失败；源码逐字节恢复并核对 SHA-256 `7a19d85d36f5` 后重验，21 项通过。
+
+**过程中发现并修复的真实缺陷**：`scanOperations` 是 generator，`.filter()` 在其上抛 `TypeError`，被命令的 `catch` 吞成"无法验证账本"。已改为先展开再过滤，并把这条陷阱写入 `HANDOFF.md`。
