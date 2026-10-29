@@ -95,6 +95,7 @@ import { couldBeFileReference } from "./fileSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { needsComposition } from '../../core/commands/composition.js';
 import { createCommandRegistry } from '../../core/commands/registry.js';
+import { parseCommandSource, resolveCommandInvocation } from '../../core/commands/invocation.js';
 import { catalogContributions } from '../../core/catalog/contributions.js';
 import { TurnSink } from "./turnSink.js";
 import { reportWriter, reportSaveNotice } from '../output/reports.js';
@@ -788,6 +789,18 @@ export class InteractiveMode {
     disposition?: "steer" | "followUp",
     attachments?: { readonly images: readonly ImageContent[] },
   ): void {
+    if (this.closing || this.stopped) return;
+    const invocation = parseCommandSource(text);
+    if (invocation && !invocation.argsText.trim() && resolveCommandInvocation(
+      [...createCommandRegistry(this.options.runtimeContext.cwd, this.options.runtimeContext.runtimeConfig).values()],
+      invocation.name,
+    )?.commandName === 'exit') {
+      // Explicit exit shares the key path, including while a turn or question
+      // is pending. It never becomes queued work or an answer to that question.
+      this.options.onUserIntent?.();
+      void this.shutdown();
+      return;
+    }
     this.toast = undefined;
     this.completionStatus = undefined;
     this.catalogs.invalidate();
@@ -1094,6 +1107,11 @@ export class InteractiveMode {
       this.options.renderer.clearSink();
       if (this.tick) clearInterval(this.tick);
       this.tick = undefined;
+      if (this.closing || this.stopped) {
+        this.sink.end();
+        this.busy = false;
+        return;
+      }
       // Long command output gets a view of its own: it is read once, and reading it
       // should not cost the conversation its place on screen.
       const output = this.sink.commandOutput;

@@ -10,8 +10,55 @@ import { ManualScheduler, RecordingTerminal } from "../../test-utils/terminalDou
 import { createStartupRecoveryHint } from "../bootstrap/recoveryHint.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import type { Session, SessionReentrySummary } from "../../session/SessionManager.js";
+import { createCliShutdown } from '../runtime/shutdown.js';
+import * as processTree from '../../core/shell/platform/processTree.js';
 
 describe("interactive loop", () => {
+  it.each(['regular', 'fullscreen'] as const)('hands MCP close to the single CLI shutdown budget on %s exit', async kind => {
+    const stdin = Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.ReadStream;
+    const stdout = Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.WriteStream;
+    const processEvents = new EventEmitter() as NodeJS.Process;
+    const terminal = new RecordingTerminal();
+    const kill = vi.spyOn(processTree, 'killAllTrackedProcesses').mockResolvedValue(undefined);
+    const close = vi.fn(() => new Promise<void>(() => {}));
+    const errors: string[] = [];
+    let finish!: (code: number) => void;
+    const exited = new Promise<number>(resolve => { finish = resolve; });
+    const shutdown = createCliShutdown({ process: processEvents, close,
+      exit: finish, writeError: message => errors.push(message), timeoutMs: 20 });
+    let readline: ReadlineInterface | null = null;
+    const loop = runInteractiveLoop({
+      stdin, stdout, process: processEvents, terminal, scheduler: new ManualScheduler(),
+      sessionManager: { sessionExists: () => false } as never,
+      renderer: new StreamingRenderer(),
+      runtimeContext: withConfiguration({ cwd: '/tmp/project-exit', projectRoot: '/tmp/project-exit',
+        session: { id: 'sess_exit' }, gitContext: { branch: 'main' },
+        runtimeConfig: { provider: 'openai', providerCredentials: {}, contextWindow: 64000, configDiagnostics: [], tuiMode: kind },
+      } as never),
+      sessionRuntime: { getAgentMode: () => 'build', getPermissionScope: () => 'ask',
+        getCurrentRunController: () => null, observeEvents: () => () => {}, terminate: () => {},
+      } as never,
+      logger: { error: () => {}, info: () => {}, warn: () => {} } as never,
+      approvalTrustPolicy: {} as never,
+      initialMcpGateway: { close } as never,
+      setReadline: value => { readline = value; },
+      setActiveNonInteractiveApprovalMode: () => {}, exit: shutdown.exit,
+    });
+    try {
+      await vi.waitFor(() => expect(readline).not.toBeNull());
+      readline!.close();
+      await loop;
+      expect(await exited).toBe(1);
+      expect(close).toHaveBeenCalledOnce();
+      expect(errors).toEqual(['Resource cleanup failed; process exit was not verified.']);
+      expect(terminal.stopped).toBe(true);
+    } finally {
+      kill.mockRestore();
+      (stdin as unknown as PassThrough).destroy();
+      (stdout as unknown as PassThrough).destroy();
+    }
+  });
+
   it("publishes a startup recovery hint through the host transcript", async () => {
     const stdin = Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.ReadStream;
     const stdout = Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.WriteStream;

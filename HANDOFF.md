@@ -804,3 +804,19 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: `/exit` sometimes leaves the shell looking normal but the process still alive; the user has to kill it.
 - **Root Cause**: The shutdown sequence restores the terminal (`stop()`) before calling `handleShellClose`, and that call has no exception fence. Its first action is a synchronous session write that takes a blocking file lock, so a lock timeout or an unreadable session throws before `exit()` is reached. Every caller invokes shutdown fire-and-forget, and the crash recorder deliberately lets rejections continue, so nothing reports it.
 - **Rule**: Any cleanup that restores user-visible state before the final exit must fence the steps after it and call exit in a `finally`. "The screen came back" is not evidence that the process is ending; check the process, not the paint.
+
+
+### External File Approval Must Reach The Actual Approval Host
+- **Symptom**: A file call appears to request approval in a gate test but the real CLI writes without presenting the question.
+- **Root Cause**: Session scopes, cached grants and inferred approval objects answer the escalation bridge before its interactive handler. Changing only the tool gate leaves that second authority path untouched.
+- **Rule**: Mark external file calls as requiring a fresh explicit answer through the shared prompt contract, bypass automatic answers and forbid persistent responses before the bridge saves anything. Bind temporary roots to the native argument object, tool and call ID; recheck the original alias, directory identity and session/configuration admission at effect boundaries. Test the real CLI bridge with cached grants and both permissive scopes, not only a mock prompt handler.
+
+### Directory Listings Recheck Their Ancestors Against The Selected Root
+- **Symptom**: An approved external directory looks empty, or root-relative denial fails to hide its child.
+- **Root Cause**: The directory walker checks every candidate and ancestor up to its selected root. A file-only ticket rejects those ancestors; using the directory's parent as the root also changes the relative spelling matched by deny rules.
+- **Rule**: Select an existing requested directory itself as the read root. Permit only its direct listing entries and the walk's root check, while retaining canonical containment and root-relative denial. Keep ordinary file tickets exact and use the existing directory walker rather than a second listing implementation.
+
+### Responses Reasoning Must Survive Terminal Projection Without Inventing Replay Data
+- **Symptom**: Raw reasoning deltas display while the persisted assistant message has no reasoning, or restored native replay fails its identity comparison.
+- **Root Cause**: The streaming reader and final output projection are separate consumers. Initial reasoning content is a growing prefix, while sealed native output is the replay authority.
+- **Rule**: Handle raw content indices independently of summary indices, check done snapshots and terminal content, and project summary or raw content once from the native output. Never append streamed text to an opaque provider payload to manufacture replay evidence. Restore finalized collapsed thinking before assistant text and tool cards, excluding signatures and withheld bodies.

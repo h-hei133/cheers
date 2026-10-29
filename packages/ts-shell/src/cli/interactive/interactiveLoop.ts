@@ -15,6 +15,7 @@ import { supportsFullScreenSurface } from "./surfaceCapability.js";
 import type { RenderScheduler } from "../../presentation/tui/render/frame.js";
 import type { TerminalDevice } from "../../presentation/tui/terminal.js";
 import { settleStartupInput, stopStartupSurface, takeStartupSurface } from './startup.js';
+import { createCliShutdown } from '../runtime/shutdown.js';
 
 /**
  * Interactive session entry point.
@@ -52,6 +53,7 @@ export interface InteractiveLoopInput {
   readonly setActiveNonInteractiveApprovalMode: (mode: ApprovalModeObject | undefined) => void;
   /** Theme paths this run was started with, so `/theme` can still select them. */
   readonly themePaths?: readonly string[];
+  /** Owns resource cleanup and its total budget before terminating the process. */
   readonly exit?: (code?: number) => void;
   readonly stopSignal?: AbortSignal;
 }
@@ -59,18 +61,19 @@ export interface InteractiveLoopInput {
 export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<void> {
   const stdin = input.stdin ?? process.stdin;
   const stdout = input.stdout ?? process.stdout;
-  const terminate = input.exit ?? ((code?: number) => process.exit(code));
   let exiting = false;
   const exit = (code = 0): void => {
     if (exiting) return;
     exiting = true;
-    void Promise.resolve().then(() => input.initialMcpGateway.close?.()).then(
-      () => terminate(code),
-      () => {
-        input.renderer.renderLine("MCP connection cleanup failed; process exit was not verified.");
-        terminate(1);
-      },
-    );
+    const terminate = input.exit ?? createCliShutdown({
+      process: input.process ?? process,
+      close: async () => { await input.initialMcpGateway.close?.(); },
+      exit: code => process.exit(code),
+      writeError: message => input.renderer.renderLine(message),
+    }).exit;
+    // Bootstrap already owns MCP alongside every other resource in its single
+    // bounded shutdown. Waiting here would put MCP outside that total budget.
+    terminate(code);
   };
 
   if (!supportsFullScreenSurface(stdin, stdout)) {

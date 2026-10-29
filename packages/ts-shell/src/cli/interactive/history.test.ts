@@ -54,6 +54,50 @@ describe("restoring a conversation", () => {
     ]);
   });
 
+  it('restores completed thinking before the assistant answer and its tool cards', () => {
+    const reasoning = { text: '  Inspect the inputs.\nThen read the file.  ', signature: 'opaque-signature' };
+    const assistant = { ...turn('assistant', 'I will inspect it.'), reasoning,
+      tool_calls: [{ id: 'call_thinking', type: 'function' as const, function: { name: 'read', arguments: '{"path":"a"}' } }] };
+    const result = { ...turn('tool', 'file body'), tool_call_id: 'call_thinking' };
+    const { blocks } = restoreConversation([turn('user', 'inspect'), assistant, result]);
+    expect(blocks.map(block => block.kind)).toEqual(['user', 'thinking', 'assistant', 'tool']);
+    expect(blocks[1]).toEqual({ kind: 'thinking', text: reasoning.text, collapsed: true, finalized: true });
+    expect(blocks[3]?.text).toBe('file body');
+    expect(assistant.reasoning).toEqual(reasoning);
+    expect(JSON.stringify(blocks)).not.toContain('opaque-signature');
+  });
+
+  it('restores reasoning-only turns and omits empty visible reasoning or reasoning on other roles', () => {
+    const { blocks } = restoreConversation([
+      { ...turn('user', 'question'), reasoning: { text: 'not assistant reasoning' } },
+      { ...turn('assistant', ''), reasoning: { text: 'Working through the question.' } },
+      { ...turn('assistant', 'answer'), reasoning: { text: ' \n\t', signature: 'opaque-empty' } },
+    ]);
+    expect(blocks.map(block => [block.kind, block.text])).toEqual([
+      ['user', 'question'], ['thinking', 'Working through the question.'], ['assistant', 'answer'],
+    ]);
+  });
+
+  it.each(['', 'withheld body'])('restores redacted reasoning as a placeholder without exposing %j or its signature', text => {
+    const { blocks } = restoreConversation([{ ...turn('assistant', 'answer'),
+      reasoning: { text, redacted: true, signature: 'opaque-redacted-payload' } }]);
+    expect(blocks[0]).toEqual({ kind: 'thinking', text: '(provider withheld)', collapsed: true, finalized: true });
+    expect(blocks[1]?.text).toBe('answer');
+    expect(JSON.stringify(blocks)).not.toContain('opaque-redacted-payload');
+    if (text) expect(JSON.stringify(blocks)).not.toContain(text);
+  });
+
+  it('retains thinking in the earlier source window when restored history is bounded', () => {
+    const turns = Array.from({ length: 31 }, (_, index) => ({ ...turn('assistant', `answer ${index}`), reasoning: { text: `reasoning ${index}` } }));
+    const restored = restoreConversation(turns);
+    expect(restored.blocks).toHaveLength(60); expect(restored.omitted).toBe(2);
+    expect(restored.earlier.map(block => [block.kind, block.text])).toEqual([
+      ['thinking', 'reasoning 0'], ['assistant', 'answer 0'],
+    ]);
+    expect(restored.blocks[0]?.text).toBe('reasoning 1');
+    expect(restored.earlier[0]).toMatchObject({ collapsed: true, finalized: true });
+  });
+
   it("leaves out system and tool turns, which are not the conversation", () => {
     expect(restoreConversation(CONVERSATION).blocks).toHaveLength(4);
   });
@@ -216,6 +260,16 @@ describe("restoring a conversation", () => {
 });
 
 describe("showing a session", () => {
+  it('rebuilds thinking once per stored turn when a session is shown repeatedly', () => {
+    const transcript = new Transcript();
+    const session = { id: 'thinking-shown', turns: [{ ...turn('assistant', 'answer'), reasoning: { text: 'Plan' } }] };
+    const target = { transcript, context: { session: { id: session.id } },
+      sessionManager: { getSession: () => session } } as never;
+    showConversation(target); showConversation(target);
+    expect(transcript.all().map(block => [block.kind, block.text])).toEqual([['thinking', 'Plan'], ['assistant', 'answer']]);
+    expect(transcript.all()[0]).toMatchObject({ collapsed: true, finalized: true });
+  });
+
   it("restores the checklist of the session being shown", () => {
     // Every path that puts a conversation on screen goes through here — opening
     // a session, `/resume`, the sessions panel, a fork, a rewind — so this is

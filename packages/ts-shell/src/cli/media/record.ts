@@ -50,6 +50,7 @@ export class RecordingOwner {
       if (this.admission()) this.stop('cancelled', 'authority-revoked');
       else if (Date.now() - started >= options.seconds * 1000) this.stop('truncated', 'duration-limit');
     }, 100);
+    this.timer.unref();
   }
   admission = (): string | undefined => {
     if (this.ended) return 'Recording is closed.';

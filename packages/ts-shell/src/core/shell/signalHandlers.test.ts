@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { handleShellClose, handleShellSigint } from "./signalHandlers.js";
 
 describe("shell signal handlers", () => {
@@ -24,6 +24,44 @@ describe("shell signal handlers", () => {
       sessionManager: { sessionExists: () => false },
     });
     expect(events).toEqual(["terminated", "rendered"]);
+  });
+
+  it("reports failed persistence safely and still exits unsuccessfully", () => {
+    const failure = new Error("unreadable session with private fixture detail");
+    const renderLine = vi.fn();
+    const sessionExists = vi.fn(() => true);
+    const exit = vi.fn();
+    expect(() => handleShellClose({
+      sessionRuntime: { terminate: () => { throw failure; } } as never,
+      runtimeContext: { session: { id: "saved" } } as never,
+      renderer: { renderLine } as never,
+      sessionManager: { sessionExists }, exit,
+    })).not.toThrow();
+    expect(exit.mock.calls).toEqual([[1]]);
+    expect(sessionExists).not.toHaveBeenCalled();
+    expect(renderLine.mock.calls).toEqual([["Session state could not be saved; session close was not verified."]]);
+  });
+
+  it.each(["retention", "renderer"])("still exits if %s fails after persistence", stage => {
+    const exit = vi.fn();
+    const renderLine = vi.fn(() => { if (stage === "renderer") throw new Error("disconnected"); });
+    expect(() => handleShellClose({
+      sessionRuntime: { terminate: () => {} } as never,
+      runtimeContext: { session: { id: "saved" } } as never,
+      renderer: { renderLine } as never,
+      sessionManager: { sessionExists: () => { if (stage === "retention") throw new Error("unreadable"); return true; } },
+      exit,
+    })).not.toThrow();
+    expect(exit.mock.calls).toEqual([[1]]);
+  });
+
+  it("retains persistence failure for embedded callers without an exit hook", () => {
+    const failure = new Error("write failed");
+    expect(() => handleShellClose({
+      sessionRuntime: { terminate: () => { throw failure; } } as never,
+      runtimeContext: { session: { id: "saved" } } as never,
+      renderer: { renderLine: () => {} } as never,
+    })).toThrow(failure);
   });
 
   it("requests interruption without prompting before the turn closes", () => {

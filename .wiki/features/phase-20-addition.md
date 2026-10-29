@@ -3,7 +3,7 @@ title: "Phase 20 日常交互补充要求与任务规划"
 category: article
 sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
-updated: 2026-10-28
+updated: 2026-10-29
 tags: [features, phase-20, additions, interaction, panels, completion]
 summary: "汇总用户最新要求：settings/model看齐oh-my-pi，允许选中未配置模型，resume默认焦点修补，消息顶格及箭头恢复，提前TUI首帧、上下文估算、路径补全、多skill与部分slash组合。逐项记录实现方向、边界与验收。"
 confidence: mixed
@@ -2828,7 +2828,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 ## 19. 第八轮用户反馈（2026-10-29）：跨目录写入、思考不可见、退出卡住、启动光标、config/model、resume 卡顿、旧会话界面
 
-本节只做**问题定位与方案研究**，不包含产品代码改动。编号沿用用户原序号（第二十四至第三十）；19.8 是研究过程中新发现的一项，不属用户列表。每条结论都区分三类证据：**已确认机制**（源码路径可复现）、**高置信推断**（链路完整但未在用户原环境复现）、**未确认**（不能用现有证据下结论）。本轮未运行任何产品测试，未拉起 PTY 或二进制；所有量化数字来自对真实 `~/.cheers/sessions`（2309 个会话目录、41 MiB）的只读文件系统测量。
+第19节保留研究轮次的**问题定位与方案研究**及当时证据；后续实施与当前剩余项见第20节，不能把下文旧机制当作仍未修复的当前源码。编号沿用用户原序号（第二十四至第三十）；19.8 是研究过程中新发现的一项，不属用户列表。每条结论都区分三类证据：**已确认机制**（源码路径可复现）、**高置信推断**（链路完整但未在用户原环境复现）、**未确认**（不能用现有证据下结论）。本轮未运行任何产品测试，未拉起 PTY 或二进制；所有量化数字来自对真实 `~/.cheers/sessions`（2309 个会话目录、41 MiB）的只读文件系统测量。
 
 ### 19.1 第二十四：跨目录写入被系统硬拒绝
 
@@ -3146,3 +3146,45 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 5. **27 与 28**——27 先补夹具确认机制再修；28 是结构整理，可以独立排期。
 
 **本轮证据边界**：只做研究与文档；未运行产品测试、未拉起 PTY/二进制、未复现用户现场。19.6 的数字是只读文件系统测量（`~/.cheers/sessions` 2309 个会话、41 MiB），19.8 的起点是用户自己的 `~/.cheers/crashes.json` 真实记录，其余各节的结论来自源码链路与参考实现对照。所有"修复方向"均未实施，也未被验证。第 19.4 节明确保留"机制未确认"，不得在下一轮被当作已定位缺陷直接开工。
+
+
+## 20. 第八轮实施进展（2026-10-29）
+
+本节覆盖第19节研究后的当前实施，不把局部通过升级为ADD整体完成。原Phase20的47项矩阵及需要真实环境的剩余项继续延期。本批先消除跨目录文件阻塞、退出异常与推理采集/恢复的明确缺口；第19.9节的建议顺序保留为研究历史。
+
+### 20.1 一次调用的跨目录文件审批
+
+[文件授权](../../packages/ts-shell/src/turn/workspace.ts)由现有turn gate拥有，复用[根选择](../../packages/ts-shell/src/core/workspace/roots.ts)、原[文件工具](../../packages/ts-shell/src/core/tools/registry.ts)、[补丁计划](../../packages/ts-shell/src/edit/patch/plan.ts)和记录/补偿writer。只有未注册的明确绝对目标进入审批；相对路径逃逸、注册只读根写入、根换代及注册根内的符号链接逃逸仍先拒绝。无需新增持久WorkspaceRoot来源：临时根只在WeakMap中绑定原始/准备后的参数对象、工具名及call ID，执行后退休，不写session roots，也不扩大命令sandbox。
+
+审批展示规范文件与目录，`explicitApproval`贯通真实[CLI审批桥](../../packages/ts-shell/src/entrypoints/cliApprovalModule.ts)，绕过会话scope、cached grant、prompt推导对象和headless policy的自动回答；界面只提供一次允许/拒绝，返回persistent答案会在保存grant前拒绝。批准后按原路径再次校验规范目标与目录身份，session/configuration admission继续保留。外部write/edit的原文读取遵守read deny；目录read只复用直接列表，分页提示保留绝对路径且下页重新审批。apply_patch可跨多个根准备完整预览，仍需精确选组和revision；源读取是既有预览preflight，先校验read/write/edit拒绝，未批准不执行writer。
+
+定向参考比较：本地Codex safety分离AskUser/Reject、patch只为未授权目标派生父根；本地Claude Code默认外部文件为ask；pi只解析cwd而无权限围栏。采用ask与临时目标身份，不采用pi的无围栏，也不把父目录临时根变成可任意访问其兄弟文件的授权。[完整调用回归](../../packages/ts-shell/src/turn/workspace/approval.test.ts)覆盖实际CLI bridge及原writer，共25项，包含目录分页、跨根patch、绝对alias、deny/headless/persistent答案、原文read denial、根/alias换代、scope身份、撤销和重放。
+
+### 20.2 退出有界与失败可见
+
+[关闭处理](../../packages/ts-shell/src/core/shell/signalHandlers.ts)以finally调用exit：持久化或输出失败安全报告并退出1，未确认关闭不提供resume成功提示；无exit hook的嵌入调用保留异常。[交互入口](../../packages/ts-shell/src/cli/interactive/interactiveLoop.ts)删除预算外的重复MCP await，委托bootstrap已有的总10秒shutdown；无注入hook时同样复用既有shutdown。[host](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)通过原parser/registry识别无参数`/exit`、`/quit`、`/q`，忙碌或等待问题时直接复用退出路径，停止后不继续消费队列。live/record的观察interval均unref。
+
+参考pi的退出latch/先恢复终端及oh-my-pi的持久化失败可见；按本任务在首次失败时退出1，区别于参考的二次强退。同步会话锁仍可能阻塞约1.2秒，随后错误有出口；10秒预算到期证明退出路径有界，不证明MCP连接已实际关闭。SIGTERM/SIGHUP的terminated保存仍未实施，见20.4。
+
+### 20.3 推理流与恢复
+
+[Responses流](../../packages/ts-shell/src/provider/endpoints/responses/stream.ts)补raw `reasoning_text.delta/done`，content_index与summary_index独立，封口、身份、前缀和终态校验保留；[终态投影](../../packages/ts-shell/src/provider/endpoints/responses/output.ts)采用summary优先、raw content次之，每item只投影一种，opaque payload保持供应商原文供重放。对照参考的stream fallback后未采用：本项目replay要求reasoning与native output完全一致，不能伪造终态content。raw事件缺可验证终态content的relay继续error，不接纳工具或签名；raw与summary同时流出时实时仍分别显示，终态只存一种。
+
+[历史恢复](../../packages/ts-shell/src/cli/interactive/history.ts)在assistant正文与tool cards前重建finalized/collapsed thinking，空白跳过，withheld只有占位，签名不进入显示。参考pi按存储顺序恢复thinking；本项目保留自己的消息契约和60-block初始窗口。Responses两端点、实际provider step、transcript编解码/native replay和恢复顺序均有聚焦用例。默认档位、内置OpenAI endpoint、streaming点击与regular鼠标仍未修，不能据此宣称第25项整体完成。
+
+### 20.4 当前剩余工作与证据边界
+
+| 反馈 | 当前状态 | 下一步 |
+|---|---|---|
+| 24 | 本地实现与聚焦验证 | 缺真实终端/用户目录审批现场与非Linux文件系统证据 |
+| 25 | raw Responses与历史恢复已实现；整体partial | 默认请求档位/endpoint逐协议验证；streaming点击身份与regular可达动作 |
+| 26 | 四条明确机制已修；本地验证 | 缺真实用户退出现场；MCP预算到期不能证明清理完成 |
+| 27 | 机制仍未确认 | 先用startup/CRLF/regular几何夹具区分，禁止按研究候选直接声称根因 |
+| 28 | 未实施 | settings/model职责与入口发现性整理 |
+| 29 | 未实施 | 同一次resume浏览索引复用、查询/刷新失效及真实目录性能比较 |
+| 30 | 未实施 | SIGTERM/SIGHUP关闭标记与重入判定 |
+| 19.8 | 未实施 | usage损坏分桶降级与可见未验证计量，不能静默归零 |
+
+只派gpt-6.1-sol只读/编辑代理；它们未运行任何test/build/验证。主代理在package目录每次一个文件、768MiB堆、threads=false，以`&&`串行验证。没有全套回归、没有PTY/exe、没有20k真实终端或真实provider请求。源码五静态门通过，118项旧docs advisory保留；完整声明图的单一focused脚本用例通过，module facade无超限。TypeScript build已通过，最终新鲜度和提交状态以开发日志中的实际读回为准。
+
+反转已命中跨目录分类、真实CLI显式回答、thinking恢复、raw Responses事件、close失败exit、忙时exit；每次源码逐字节恢复。目录分页和附带read denial另有定向反转。恢复后重新聚焦验证才计通过；反转中筛掉的其他用例不计通过。MCP旧预算外await的反转在55秒观察上限超时，进程终止并恢复源码，只记超时证据；其当前实现的正常用例已通过。新增配置scope夹具首次因未定义pathRules而未建立scope，补实际user规则后通过；不存在的directoryListing测试路径属于调用错误、零测试，不作产品失败或验收。

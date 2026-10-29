@@ -184,19 +184,20 @@ export function createCliEscalationPromptHandler(
     const evaluation = trustPolicy.evaluate(prompt, projectRoot);
     const isNonInteractive = rl === null && !promptInteractiveApproval;
     const requiresSelection = Boolean(prompt.context.selections?.length);
-    const cliNonInteractiveDecision = isNonInteractive && !requiresSelection
+    const requiresAnswer = requiresSelection || prompt.context.explicitApproval === true;
+    const cliNonInteractiveDecision = isNonInteractive && !requiresAnswer
       ? getNonInteractiveDecision?.()
       : undefined;
-    const approvalModeObject = requiresSelection ? undefined : getApprovalModeObject?.();
-    const hasAllowOnceCache = !requiresSelection && trustPolicy.hasAllowOnce(evaluation.cacheKey);
-    const hasAllowAlwaysGrant = !requiresSelection && Boolean(evaluation.matchedGrant);
+    const approvalModeObject = requiresAnswer ? undefined : getApprovalModeObject?.();
+    const hasAllowOnceCache = !requiresAnswer && trustPolicy.hasAllowOnce(evaluation.cacheKey);
+    const hasAllowAlwaysGrant = !requiresAnswer && Boolean(evaluation.matchedGrant);
     const hasCachedGrant = hasAllowOnceCache || hasAllowAlwaysGrant;
     // A session scope answers before anything is put to the user, and only in the
     // interactive channel: the non-interactive path has its own explicit policy,
     // and letting a display-level setting speak for it would hide which authority
     // actually decided.
-    const scope = requiresSelection ? "ask" : getPermissionScope?.() ?? "ask";
-    const scopeDecision = isNonInteractive || requiresSelection ? undefined : scopeAnswer(scope, prompt);
+    const scope = requiresAnswer ? "ask" : getPermissionScope?.() ?? "ask";
+    const scopeDecision = isNonInteractive || requiresAnswer ? undefined : scopeAnswer(scope, prompt);
     if (scopeDecision) {
       renderApprovalRequiredSurface(renderer, {
         prompt,
@@ -248,7 +249,7 @@ export function createCliEscalationPromptHandler(
       });
     }
 
-    if (!requiresSelection && isNonInteractive) {
+    if (!requiresAnswer && isNonInteractive) {
       const nonInteractiveDecisionPlan = resolveNonInteractiveApprovalDecision({
         cliDecision: cliNonInteractiveDecision,
         approvalModeObject,
@@ -359,7 +360,7 @@ export function createCliEscalationPromptHandler(
       });
     }
 
-    if (!requiresSelection && approvalModeObject) {
+    if (!requiresAnswer && approvalModeObject) {
       const interactiveDecisionPlan = resolveNonInteractiveApprovalDecision({
         approvalModeObject,
         hasAllowOnceCache,
@@ -446,7 +447,7 @@ export function createCliEscalationPromptHandler(
       }
     }
 
-    if (!requiresSelection && hasAllowOnceCache) {
+    if (!requiresAnswer && hasAllowOnceCache) {
       trustPolicy.consumeAllowOnce(evaluation.cacheKey);
       trustPolicy.recordLastHit({
         source: "allow-once-cache",
@@ -475,7 +476,7 @@ export function createCliEscalationPromptHandler(
         userComment: "CLI auto-approval from allow-once cache",
       });
     }
-    if (!requiresSelection && evaluation.matchedGrant) {
+    if (!requiresAnswer && evaluation.matchedGrant) {
       trustPolicy.recordLastHit({
         source: "allow-always-policy",
         projectRoot,
@@ -590,6 +591,11 @@ export function createCliEscalationPromptHandler(
       decision = "deny";
       decisionInputKey = "n";
       denialReason = "apply_patch requires an exact one-time group selection; allow-always is not available.";
+    }
+    if (prompt.context.explicitApproval && (decision === 'allow-always'
+      || !prompt.options.some(option => option.value === decision))) {
+      decision = 'deny'; decisionInputKey = 'n';
+      denialReason = 'This call requires one-time approval; no persistent grant was saved.';
     }
 
     if (!promptInteractiveApproval && decision === "allow-once") {

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { verifyPathContainment } from '../../core/security/pathJail.js';
 import { captureWorkspaceRoot, selectWorkspaceRoot } from '../../core/workspace/roots.js';
 import type { WorkspaceRoot } from '../../core/workspace/model.js';
 import { inspectWorkspaceFile, workspaceFilePath } from '../authority/state.js';
@@ -91,7 +92,9 @@ export function planPatch(input: string, context: {
     const absolute = path.resolve(scope.workspace.path, name);
     const root = selectWorkspaceRoot(scope.workspace.path, context.workspaceRoots ?? [], absolute, 'write');
     const workspace = captureWorkspaceRoot(root, root, 'write');
-    const relative = path.relative(root, absolute);
+    const lexical = path.relative(root, absolute);
+    const relative = lexical === '..' || lexical.startsWith(`..${path.sep}`) || path.isAbsolute(lexical)
+      ? path.relative(root, verifyPathContainment(absolute, root).resolvedPath) : lexical;
     const canonical = workspaceFilePath(root, relative);
     context.assertFileAccess?.(absolute);
     // Conservatively reject case/normalization aliases even on case-sensitive volumes.
@@ -268,7 +271,9 @@ export function planPatchSelection(input: string, context: {
     const absolute = path.resolve(base.scope.workspace.path, name);
     const root = selectWorkspaceRoot(base.scope.workspace.path, context.workspaceRoots ?? [], absolute, 'write');
     const workspace = captureWorkspaceRoot(root, root, 'write');
-    const relative = path.relative(root, absolute);
+    const lexical = path.relative(root, absolute);
+    const relative = lexical === '..' || lexical.startsWith(`..${path.sep}`) || path.isAbsolute(lexical)
+      ? path.relative(root, verifyPathContainment(absolute, root).resolvedPath) : lexical;
     const canonical = workspaceFilePath(root, relative);
     context.assertFileAccess?.(absolute);
     const key = canonical.normalize('NFC').toLowerCase();

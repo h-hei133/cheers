@@ -10016,3 +10016,18 @@ CI`40739686114`（`d33a0a1b`）唯一失败为`src/config/concurrency.test.ts`�
 第二十七项收敛为四个候选并按可能性排序：regular 主屏绘制器新建即从 0 行起、只用相对移动寻址（`mainScreen.ts:57-62,166-186`）；首帧按 80×24 回落合成（`terminal.ts:143-152`、`engine.ts:358-360`）；`setText` 不归一化 CRLF（`buffer.ts:91-98` 对 `insert` 的 `:118`）；加载期 Enter 写入真实换行（`startup.ts:39`）。用户只需试 Backspace 即可二分：能删=草稿换行，不能删=布局问题。
 
 本轮仍只做研究：未运行产品测试、未拉起 PTY/二进制；`verify:docs-drift:strict` 通过。
+
+
+## [2026-10-29] fix | 第八轮跨目录审批、退出与推理采集恢复
+
+按用户三条OOM红线继续第19节研究后的实施，当前分支main，保留原未跟踪CLAUDE.md。新增[turn文件授权](../packages/ts-shell/src/turn/workspace.ts)绑定原始/准备后参数、tool/call ID与规范目标，只对未注册绝对read/write/edit/apply_patch请求一次明确审批。相对逃逸、只读根、注册根内symlink逃逸、根/alias换代、session/configScope失效继续拒绝；临时根不落session、不扩command sandbox，patch沿原完整预览/精确选组/revision/记录writer。真实CLI bridge通过explicitApproval绕开scope/cache/prompt/headless自动授权，persistent答案保存前拒绝。目录分页保留绝对路径，附带原文读取保留read deny，两项由只读代理审查找到并修复。
+
+关闭链以finally确保持久化或输出失败仍exit1并报告固定安全错误；无参数/exit及quit/q复用原parser/registry立即关闭忙碌host，停止后不续队列。interactiveLoop直接委托bootstrap既有10秒总shutdown，删除预算外重复MCP await；live/record观察interval unref。SIGTERM/SIGHUP保存terminated尚未实施，不把本批升级成旧会话重入已修。
+
+Responses接通raw reasoning_text delta/done及终态content投影，summary优先保留一种；原始opaque payload不补造stream文字，raw缺可验证terminal content时error。history在assistant正文与tool前重建finalized/collapsed thinking，withheld只有占位、无签名。默认effort/endpoint、streaming点击/regular输入仍未修。参考决策及差异、逐项状态见[addition第20节](features/phase-20-addition.md#20-第八轮实施进展2026-10-29)。
+
+只使用两名gpt-6.1-sol代理进行读/编辑，代理未执行任何test/build/验证。主代理每次一个package-local测试文件，768MiB/threads=false，以&&串行；21个相关文件共658项去重复通过（含interactiveMode初次331项整文件，恢复后仅重验6个立即exit用例，筛掉325项不计新通过）。文件包括workspace/approval25、workspace9、patch/batch45、arguments18、pathJail16、toolPolicy36、signalHandlers8、interactiveLoop7、interactiveMode331、shutdown4、responses/stream45/body16/consumer6/account17、history24、session/reports/persistence5、approvalExecution6、turn/scope4、media/live9/record8、readImprovements19。没有全套回归、PTY/exe、20k真实终端或真实provider调用。
+
+八类有界反转命中：外部分类1、真实CLI显式答案2、thinking恢复1、raw流2、持久化失败exit1、忙时exit6、目录分页1、附带read denial2；全部逐字节恢复后重验。MCP恢复旧await反转55秒未终止，子进程结束并恢复，不计通过；当前7项正常入口用例重验通过。配置scope夹具首次未建立pathRules属于setup缺失，补实际规则后通过；不存在的directoryListing.test调用零测试，已用readImprovements19及完整approval25验证，不计产品失败。
+
+最终五静态门通过（118旧docs-source advisory保留），单一完整声明图脚本用例通过、module facade0，heap1536MiB TS build manifest ef6ff29f263a通过、diff --check通过。源码SHA-256前12位：workspace be4b051703e2、tools 9865a90d6475、interactiveLoop 59bae8f22ff4、interactiveMode 11333f3e687c、history 04fb4b2dc2ab、Responses stream 93298a7825da、signalHandlers 5cf440086dfd、CLI approval b2b7443fae14、directoryListing 7a9be4854f0e。以上是本地验证证据，推送与CI终态须分别读回；本批不等待CI。HANDOFF追加实际审批桥、目录祖先校验和推理终态/replay三条guardrail。ADD整体active，原47项矩阵未重跑；20.4列明后续工作。

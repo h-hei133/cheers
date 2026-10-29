@@ -8,10 +8,12 @@ interface Slot {
   readonly item: OutputItem;
   readonly text: Map<number, string>;
   readonly reasoning: Map<number, string>;
+  readonly reasoningText: Map<number, string>;
   args?: string;
   argsDone?: string;
   readonly textDone: Map<number, string>;
   readonly reasoningDone: Map<number, string>;
+  readonly reasoningTextDone: Map<number, string>;
   done?: OutputItem;
 }
 
@@ -22,8 +24,16 @@ function position(value: unknown): number {
 
 function matches(slot: Slot, item: OutputItem): boolean {
   if (slot.item.id !== item.id || slot.item.type !== item.type) return false;
-  for (const key of ['phase', 'namespace', 'content'] as const) {
-    if (slot.item[key] !== undefined && (key !== 'content' || item.type === 'reasoning') && !isDeepStrictEqual(slot.item[key], item[key])) return false;
+  for (const key of ['phase', 'namespace'] as const) {
+    if (slot.item[key] !== undefined && !isDeepStrictEqual(slot.item[key], item[key])) return false;
+  }
+  if (item.type === 'reasoning' && slot.item.content !== undefined) {
+    if (!Array.isArray(slot.item.content)) return false;
+    for (const [index, part] of slot.item.content.entries()) {
+      const next = (item.content as Record<string, unknown>[] | undefined)?.[index];
+      if (!isRecord(part) || part.type !== 'reasoning_text' || typeof part.text !== 'string'
+        || next?.type !== 'reasoning_text' || typeof next.text !== 'string' || !next.text.startsWith(part.text)) return false;
+    }
   }
   if (slot.done) {
     const { encrypted_content: previousEncrypted, ...previous } = slot.done;
@@ -42,8 +52,13 @@ function matches(slot: Slot, item: OutputItem): boolean {
     const part = (item.summary as Record<string, unknown>[] | undefined)?.[index];
     if (part?.type !== 'summary_text' || typeof part.text !== 'string' || !part.text.startsWith(text)) return false;
   }
+  for (const [index, text] of slot.reasoningText) {
+    const part = (item.content as Record<string, unknown>[] | undefined)?.[index];
+    if (part?.type !== 'reasoning_text' || typeof part.text !== 'string' || !part.text.startsWith(text)) return false;
+  }
   for (const [index, text] of slot.textDone) if ((item.content as { text: string }[] | undefined)?.[index]?.text !== text) return false;
   for (const [index, text] of slot.reasoningDone) if ((item.summary as { text: string }[] | undefined)?.[index]?.text !== text) return false;
+  for (const [index, text] of slot.reasoningTextDone) if ((item.content as { text: string }[] | undefined)?.[index]?.text !== text) return false;
   return true;
 }
 
@@ -107,7 +122,8 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
         if (!isRecord(event.item) || typeof event.item.id !== 'string' || slots.has(index)) throw new Error('Response output item is invalid or repeated.');
         const item = event.item;
         if ([...slots.values()].some(slot => slot.item.id === item.id)) throw new Error('Response output item identity is repeated.');
-        slots.set(index, { item, text: new Map(), reasoning: new Map(), textDone: new Map(), reasoningDone: new Map() });
+        slots.set(index, { item, text: new Map(), reasoning: new Map(), reasoningText: new Map(),
+          textDone: new Map(), reasoningDone: new Map(), reasoningTextDone: new Map() });
       }
       if (event.type === 'response.output_item.done') {
         const index = position(event.output_index); const slot = slots.get(index); const output = responseOutput([event.item]);
@@ -115,6 +131,7 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
         slot.done = output[0];
       }
       if (event.type === 'response.output_text.delta' || event.type === 'response.reasoning_summary_text.delta'
+        || event.type === 'response.reasoning_text.delta' || event.type === 'response.reasoning_text.done'
         || event.type === 'response.function_call_arguments.delta' || event.type === 'response.function_call_arguments.done'
         || event.type === 'response.output_text.done' || event.type === 'response.reasoning_summary_text.done') {
         const slot = slots.get(position(event.output_index));
@@ -128,10 +145,13 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
           if (slot.item.type !== 'function_call' || slot.argsDone !== undefined) throw new Error('Response tool delta changed a completed item.');
           slot.args = (slot.args ?? '') + event.delta; continue;
         }
-        const reasoning = event.type === 'response.reasoning_summary_text.delta' || event.type === 'response.reasoning_summary_text.done';
+        const summary = event.type === 'response.reasoning_summary_text.delta' || event.type === 'response.reasoning_summary_text.done';
+        const raw = event.type === 'response.reasoning_text.delta' || event.type === 'response.reasoning_text.done';
+        const reasoning = summary || raw;
         if (slot.item.type !== (reasoning ? 'reasoning' : 'message')) throw new Error('Response text delta has a different item type.');
-        const index = position(reasoning ? event.summary_index : event.content_index); const parts = reasoning ? slot.reasoning : slot.text;
-        const done = reasoning ? slot.reasoningDone : slot.textDone;
+        const index = position(summary ? event.summary_index : event.content_index);
+        const parts = summary ? slot.reasoning : raw ? slot.reasoningText : slot.text;
+        const done = summary ? slot.reasoningDone : raw ? slot.reasoningTextDone : slot.textDone;
         if (done.has(index)) throw new Error('Response text changed a completed part.');
         if (event.type.endsWith('.done')) {
           if (typeof event.text !== 'string' || (parts.has(index) && parts.get(index) !== event.text)) throw new Error('Response text contradicts its deltas.');

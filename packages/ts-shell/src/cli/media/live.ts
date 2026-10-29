@@ -83,6 +83,7 @@ export class LiveOwner {
       this.startup = setTimeout(() => { void this.fail('Voice startup timed out.'); }, 7000);
       this.lifetime = setTimeout(() => { void this.stop('duration-limit'); }, this.row.options.seconds * 1000);
       this.guard = setInterval(() => { if (!this.ending && this.admission()) void this.stop('authority-revoked'); }, 100);
+      this.guard.unref();
       return true;
     } catch (error) { await this.fail(error instanceof Error && error.message.startsWith('Model request admission') ? error.message : 'Voice startup failed before device capture.'); return false; }
   }

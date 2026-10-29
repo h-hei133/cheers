@@ -39,16 +39,26 @@ export function handleShellClose(input: {
   sessionManager?: { sessionExists(sessionId: string): boolean };
 }): void {
   const sessionId = input.runtimeContext.session.id;
-  input.sessionRuntime.terminate(sessionId);
-  if (input.readline?.close) {
-    input.readline.close();
+  let exitCode = 0;
+  let persisted = false;
+  try {
+    input.sessionRuntime.terminate(sessionId);
+    persisted = true;
+    input.readline?.close();
+    // Only offer a resume id after its persisted close and retention check.
+    const kept = input.sessionManager?.sessionExists(sessionId) ?? true;
+    if (kept) input.renderer.renderLine(`\n  --resume ${sessionId}\n`);
+    else input.renderer.renderLine("");
+  } catch (error) {
+    exitCode = 1;
+    try {
+      input.renderer.renderLine(persisted
+        ? "Session cleanup failed; process exit was not verified."
+        : "Session state could not be saved; session close was not verified.");
+    } catch { /* A disconnected terminal must still reach the exit hook. */ }
+    // Embedded callers retain the failure instead of silently continuing.
+    if (!input.exit) throw error;
+  } finally {
+    input.exit?.(exitCode);
   }
-  // One line, and only the line the user needs to come back — and only when there
-  // is something to come back to. A run that only listed commands has already had
-  // its session discarded, so offering a resume id would name a session that is
-  // gone.
-  const kept = input.sessionManager?.sessionExists(sessionId) ?? true;
-  if (kept) input.renderer.renderLine(`\n  --resume ${sessionId}\n`);
-  else input.renderer.renderLine("");
-  input.exit?.(0);
 }

@@ -32,6 +32,7 @@ import { EditOperationError } from '../edit/recovery/operation/write.js';
 import { createComponentLogger } from "../observability/structuredLogger.js";
 import type { ToolScopeBinding } from '../config/scope/tools.js';
 import { bindToolScope, forgetToolScope, toolScopePolicy } from './scope.js';
+import { authorizeFileAccess, bindFileAccess, captureFileAccess, fileAccessArguments, fileAccessOptions, fileAccessPrompt, forgetFileAccess, requireFileAccess } from './workspace.js';
 
 const traceLogger = createComponentLogger("tool-call");
 
@@ -126,6 +127,7 @@ export function adaptTools(
     prepareArguments: (args, signal) => {
       const prepared = prepareArguments(tool.name, args);
       validateToolArguments(tool.argsSchema, prepared);
+      captureFileAccess(tool.name, prepared, options);
       if (!tool.prepare) return prepared;
       const context = preparationContext(tool.name, options, signal, prepared);
       let refusal: 'blocked' | 'failed' = 'failed';
@@ -135,14 +137,16 @@ export function adaptTools(
         if (blocked) { refusal = 'blocked'; throw new Error(blocked); }
       };
       const refused = (error: unknown): never => {
+        forgetFileAccess(prepared);
         tool.onRefusal?.(prepared, context, signal?.aborted && error === signal.reason ? 'cancelled' : refusal);
         throw error;
       };
       try {
         verify();
         const result = prepareToolCall(tool, prepared, context, options, verify);
-        if (result instanceof Promise) return result.then(selected => { bindToolScope(prepared, selected, options); return selected; }).catch(refused);
+        if (result instanceof Promise) return result.then(selected => { bindToolScope(prepared, selected, options); bindFileAccess(prepared, selected); return selected; }).catch(refused);
         bindToolScope(prepared, result, options);
+        bindFileAccess(prepared, result);
         return result;
       } catch (error) { return refused(error); }
     },
@@ -179,7 +183,9 @@ async function executeTool(
     if (blocked) throw new Error(blocked);
     validateToolArguments(tool.argsSchema, args);
     toolScopePolicy(tool.name, args, options, preparedToolCall(args, options));
-    const binding = workspaceToolBinding(tool.name, args, options.workspaceRoot, options.workspaceRoots);
+    requireFileAccess(args, toolCallId);
+    const accessOptions = fileAccessOptions(tool.name, args, options);
+    const binding = workspaceToolBinding(tool.name, fileAccessArguments(tool.name, args), options.workspaceRoot, accessOptions.workspaceRoots);
     const selection = preparedSelection(args);
     const selectionRevision = preparedSelectionRevision(args);
     const preparation = consumeToolCall(args, options, tool, toolCallId);
@@ -188,7 +194,7 @@ async function executeTool(
       : tool.execute.bind(tool);
     const result = await execute(binding.args, {
       workspaceRoot: binding.root,
-      workspaceRoots: options.workspaceRoots,
+      workspaceRoots: accessOptions.workspaceRoots,
       artifactRoot: options.workspaceRoot,
       taskId: toolCallId,
       abortSignal: signal,
@@ -214,6 +220,7 @@ async function executeTool(
           return;
         }
         const actualArgs = { ...args, path: absolutePath, filePath: absolutePath };
+        const access = fileAccessOptions(tool.name, args, options, absolutePath);
         if (tool.name === 'browser') assertSourceAccess(absolutePath, options.workspaceRoot, options.workspaceRoots, options.permissionScope, denyRules);
         if (tool.name === 'lsp') {
           const fileArgs = { ...actualArgs, backend: 'scanner' };
@@ -226,10 +233,10 @@ async function executeTool(
           }
         }
         if (binding.scoped) {
-          const actual = workspaceToolBinding(tool.name, actualArgs, options.workspaceRoot, options.workspaceRoots);
+          const actual = workspaceToolBinding(tool.name, actualArgs, options.workspaceRoot, access.workspaceRoots);
           if (actual.root !== binding.root) throw new Error('The tool target changed workspace roots.');
         }
-        const decision = binding.scoped ? evaluateWorkspacePermission(tool.name, actualArgs, options)
+        const decision = binding.scoped ? evaluateWorkspacePermission(tool.name, actualArgs, options, undefined, access.workspaceRoots)
           : evaluateToolPermissionScope(tool.name, actualArgs, options.permissionScope, options.workspaceRoot, denyRules);
         if (decision.denied) throw new Error(decision.reason);
       },
@@ -256,7 +263,7 @@ async function executeTool(
     traceLogger.warn("tool call failed", { toolCallId, tool: tool.name, requestId: options.correlationId, error: error instanceof Error ? error.message : String(error) });
     return { output: [streamed ? boundText(streamed) : "", `Tool execution error: ${error instanceof Error ? error.message : String(error)}`].filter(Boolean).join("\n"), isError: true,
       ...(error instanceof EditOperationError ? { metadata: { operationId: error.operationId, status: error.status } } : {}) };
-  } finally { discardToolCall(args); }
+  } finally { discardToolCall(args); forgetFileAccess(args); }
 }
 
 /**
@@ -326,15 +333,17 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
         };
       }
       authorizeToolCall(args, options, call.name, call.id);
+      authorizeFileAccess(args, call.id);
       authorized = true;
       return undefined;
       } finally { if (!authorized) {
         try { toolFor(call.name)?.onRefusal?.(args, preparationContext(call.name, options), signal?.aborted ? 'cancelled' : refusal); }
-        finally { discardToolCall(args); forgetToolScope(args); }
+        finally { discardToolCall(args); forgetToolScope(args); forgetFileAccess(args); }
       } }
     },
     afterToolCall: async ({ call, args, result, isError }) => {
       discardToolCall(args);
+      forgetFileAccess(args);
       const approval = approvals.get(call.id);
       approvals.delete(call.id);
       let output = result.output;
@@ -401,9 +410,13 @@ async function askPermission(
   let evaluation: ReturnType<typeof evaluateToolPermissionScope>;
   let preparation: ToolPreparation | undefined;
   try {
+    captureFileAccess(toolName, args, options);
     if (toolName === 'lsp' && args.backend !== 'scanner') bindExecutionTarget(args, args.server, options.workspaceRoot);
     preparation = preparedToolCall(args, options);
     evaluation = preparation ? preparationPermission(toolName, preparation, options, args) : evaluateWorkspacePermission(toolName, args, options, tool);
+    const external = fileAccessPrompt(args);
+    if (external && !evaluation.denied) evaluation = { ...evaluation, requiresEscalation: true,
+      target: external, reason: `This call accesses files outside the registered workspace roots. One-time approval is required.\n${evaluation.reason}` };
   }
   catch (error) { return { blocked: error instanceof Error ? error.message : 'Workspace access could not be checked.' }; }
   // A refusal is an answer, not a question. Asking about it would offer the user
@@ -448,6 +461,10 @@ async function askPermission(
     ? evaluation.reason
     : "The permission scope allows this operation, but the exact patch groups still require explicit selection.";
   const prompt = buildToolEscalationPrompt(toolName, evaluation.operation, evaluation.target, promptReason);
+  if (fileAccessPrompt(args)) {
+    prompt.context.explicitApproval = true;
+    prompt.options = prompt.options.filter(option => option.value !== 'allow-always');
+  }
   if (preparation) {
     prompt.context.preview = preparation.preview; prompt.context.previewKind = preparation.previewKind;
     if (preparation.selections) prompt.context.selections = preparation.selections;
@@ -460,10 +477,12 @@ async function askPermission(
   }
   const response = await options.escalationPromptHandler(prompt);
   if (signal?.aborted) return { blocked: "Operation aborted" };
-  if (toolName === 'apply_patch' && response.decision === 'allow-always') {
+  if ((toolName === 'apply_patch' || fileAccessPrompt(args)) && response.decision === 'allow-always') {
     options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "denied" });
     return {
-      blocked: "Blocked: apply_patch requires an exact one-time selection; allow-always is not available for this tool.",
+      blocked: toolName === 'apply_patch'
+        ? "Blocked: apply_patch requires an exact one-time selection; allow-always is not available for this tool."
+        : "Blocked: external file access requires one-time approval; allow-always is not available.",
     };
   }
   if (response.decision === "deny") {
@@ -516,12 +535,20 @@ async function askPermission(
 }
 
 /** Denials apply to the requested spelling and to the selected root's relative paths. */
-function evaluateWorkspacePermission(toolName: string, args: Record<string, unknown>, options: ToolGateOptions, tool?: ToolDefinition) {
+function evaluateWorkspacePermission(toolName: string, args: Record<string, unknown>, options: ToolGateOptions, tool?: ToolDefinition,
+  roots?: readonly WorkspaceRoot[]) {
   const scoped = toolScopePolicy(toolName, args, options);
   const denyRules = [...options.denyRules ?? [], ...scoped.denyRules ?? []];
   const original = evaluateToolPermissionScope(toolName, args, options.permissionScope, options.workspaceRoot, denyRules, tool);
   if (original.denied) return original;
-  const binding = workspaceToolBinding(toolName, args, options.workspaceRoot, options.workspaceRoots);
+  const access = fileAccessOptions(toolName, args, options);
+  const binding = workspaceToolBinding(toolName, args, options.workspaceRoot, roots ?? access.workspaceRoots);
+  if (fileAccessPrompt(args) && (toolName === 'write' || toolName === 'edit')) {
+    for (const root of new Set([options.workspaceRoot, binding.root])) {
+      const read = evaluateToolPermissionScope('read', binding.args, options.permissionScope, root, denyRules);
+      if (read.denied) return read;
+    }
+  }
   return binding.root === options.workspaceRoot ? original
     : evaluateToolPermissionScope(toolName, binding.args, options.permissionScope, binding.root, denyRules, tool);
 }

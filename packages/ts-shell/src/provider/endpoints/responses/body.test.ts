@@ -58,6 +58,37 @@ describe('Responses requests', () => {
     expect((body.input as Record<string, unknown>[])[3]).toMatchObject({ type: 'function_call_output', call_id: 'call_1' });
   });
 
+  it('persists native raw reasoning and replays the unchanged provider output after transcript decode', () => {
+    const native = [{ ...output[0], content: [{ type: 'reasoning_text', text: 'Inspect raw inputs.' },
+      { type: 'reasoning_text', text: 'Then read the file.' }] }, ...output.slice(1)];
+    const completion = endpointShape('openai-responses').readBody({ status: 'completed', model: 'm', output: native });
+    const step = toStep(completion, {});
+    expect(step.reasoning?.text).toBe('Inspect raw inputs.\nThen read the file.');
+    const message = { role: 'assistant' as const, content: step.text, reasoning: step.reasoning,
+      origin: { provider: 'openai', model: 'm', replayBinding: turn.replayBinding },
+      tool_calls: step.toolCalls.map(call => ({ id: call.id, type: 'function' as const,
+        function: { name: call.name, arguments: JSON.stringify(call.args) } })), timestamp: '2026-10-29T00:00:00Z' };
+    const decoded = transcriptEventToSessionMessage(decodeTranscriptLine(JSON.stringify(createMessageTranscriptEvent(message))));
+    expect(decoded?.reasoning?.text).toBe(step.reasoning?.text);
+    const body = endpointTurnBody('openai-responses', { ...turn, messages: toChatMessages([decoded!]) });
+    expect((body.input as unknown[]).slice(0, 3)).toEqual(native);
+  });
+
+  it('chooses native summary over raw reasoning without concatenating two representations', () => {
+    const native = [{ ...output[0], summary: [{ type: 'summary_text', text: 'Summary' }],
+      content: [{ type: 'reasoning_text', text: 'Raw trace' }] }];
+    expect(endpointShape('openai-responses').readBody({ status: 'completed', model: 'm', output: native }).reasoning).toBe('Summary');
+  });
+
+  it.each([{ content: null }, { content: {} }, { content: [{ type: 'output_text', text: 'wrong type' }] },
+    { content: [{ type: 'reasoning_text', text: 1 }] }])('rejects malformed native reasoning content %j', ({ content }) => {
+    const completion = endpointShape('openai-responses').readBody({ status: 'completed', model: 'm',
+      output: [{ ...output[0], content }, ...output.slice(1)] });
+    expect(completion.choices?.[0]?.finish_reason).toBe('error');
+    expect(completion.choices?.[0]?.message?.tool_calls).toBeUndefined();
+    expect(completion.reasoningSignature).toBeUndefined();
+  });
+
   it.each(['model', 'provider', 'content', 'args', 'signature', 'binding', 'legacy'])('rebuilds foreign or changed %s history without opaque items', changed => {
     const completion = endpointShape('openai-responses').readBody({ status: 'completed', model: 'm', output });
     const messages = [{ role: 'assistant' as const, content: changed === 'content' ? 'changed' : 'Inspecting',

@@ -7,6 +7,7 @@ import { assertSourceAccess } from '../core/query/sourcePolicy.js';
 import { assertAgentSourceAccess } from '../core/subagents/source.js';
 import type { ToolScopeBinding } from '../config/scope/tools.js';
 import { toolScopePolicy } from './scope.js';
+import { fileAccessOptions } from './workspace.js';
 
 interface PreparationGate extends Pick<ToolExecutionContext, 'workspaceRoot' | 'workspaceRoots' | 'sessionId'> {
   readonly background?: ToolExecutionContext['background'];
@@ -18,7 +19,7 @@ interface PreparationGate extends Pick<ToolExecutionContext, 'workspaceRoot' | '
 
 /** Preflight and publication both enforce every path's grants and read/write denials. */
 export function preparationContext(toolName: string, options: PreparationGate, signal?: AbortSignal, args: Record<string, unknown> = {}): ToolExecutionContext {
-  return { workspaceRoot: options.workspaceRoot, artifactRoot: options.workspaceRoot, workspaceRoots: options.workspaceRoots,
+  return { workspaceRoot: options.workspaceRoot, artifactRoot: options.workspaceRoot, workspaceRoots: fileAccessOptions(toolName, args, options).workspaceRoots,
     abortSignal: signal,
     background: options.background,
     assertSourceAccess: absolute => { const blocked = options.admission?.(); if (blocked) throw new Error(blocked);
@@ -51,7 +52,7 @@ export function preparationPermission(toolName: string, preparation: ToolPrepara
 function targetPermission(toolName: string, target: ToolPreparation['targets'][number], options: PreparationGate, args: Record<string, unknown>) {
   const blocked = options.admission?.();
   if (blocked) throw new Error(blocked);
-  const root = selectWorkspaceRoot(options.workspaceRoot, options.workspaceRoots ?? [], target.path, 'write');
+  const root = selectWorkspaceRoot(options.workspaceRoot, fileAccessOptions(toolName, args, options, target.path).workspaceRoots ?? [], target.path, 'write');
   const scoped = toolScopePolicy(toolName, args, options, undefined, target.path);
   const denyRules = [...options.denyRules ?? [], ...scoped.denyRules ?? []];
   const evaluation = evaluateToolPermissionScope(toolName, target, options.permissionScope, root, denyRules);

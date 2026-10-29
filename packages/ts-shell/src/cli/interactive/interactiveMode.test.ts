@@ -3391,6 +3391,71 @@ describe("session wiring", () => {
     await vi.waitFor(() => expect(terminal.stopped).toBe(true));
   });
 
+  it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+    ['/exit', '/quit', '/q'].map(command => ({ kind, command }))
+  ))('executes $command immediately while the $kind host is busy with a question', async ({ kind, command }) => {
+    const exit = vi.fn();
+    const { mode, terminal, readline } = build({ exit, tuiMode: kind });
+    const host = mode as unknown as { busy: boolean; view: InteractiveView; queue: SubmissionQueue };
+    const answer = vi.fn();
+    mode.start();
+    try {
+      host.busy = true;
+      (readline.current as { question(query: string, callback: (answer: string) => void): void }).question('Continue?', answer);
+      host.view.editor.setText(command);
+      terminal.input('\r');
+      await vi.waitFor(() => expect(exit.mock.calls).toEqual([[0]]));
+      expect(terminal.stopped).toBe(true);
+      expect(host.queue.control.entries()).toEqual([]);
+      expect(answer.mock.calls).toEqual([['n']]);
+    } finally { mode.stop(); }
+  });
+
+  it.each(['exit', ' /exit', '/exit later', '/quit later', '/q/file'])('keeps %s outside the explicit immediate-exit lane', source => {
+    const exit = vi.fn(); const { mode } = build({ exit });
+    const host = mode as unknown as { busy: boolean; onSubmit(text: string): void; queue: SubmissionQueue };
+    host.busy = true;
+    try {
+      host.onSubmit(source);
+      expect(host.queue.shift()).toBe(source);
+      expect(exit).not.toHaveBeenCalled();
+    } finally { mode.stop(); }
+  });
+
+  it.each(['regular', 'fullscreen'] as const)('does not dispatch queued work after a late turn settles in the exiting %s host', async kind => {
+    const exit = vi.fn(); const { mode, terminal } = build({ exit, tuiMode: kind });
+    const host = mode as unknown as { run(text: string): Promise<void>; view: InteractiveView; queue: SubmissionQueue };
+    let release!: () => void;
+    const route = vi.spyOn(commandRouter, 'routeInteractiveCommand').mockImplementation(() => new Promise(resolve => {
+      release = () => resolve({ turnNumber: 1 });
+    }));
+    mode.start();
+    let active: Promise<void> | undefined;
+    try {
+      active = host.run('pending turn');
+      host.queue.push('/help');
+      host.view.editor.setText('/exit'); terminal.input('\r');
+      await vi.waitFor(() => expect(exit.mock.calls).toEqual([[0]]));
+      release(); await active;
+      expect(route).toHaveBeenCalledOnce();
+      expect(terminal.stopped).toBe(true);
+    } finally { release?.(); await active; route.mockRestore(); mode.stop(); }
+  });
+
+  it.each(['regular', 'fullscreen'] as const)('reports failed session persistence after restoring the %s terminal and still exits', async kind => {
+    const exit = vi.fn(); const { mode, terminal, renderer } = build({ exit, tuiMode: kind });
+    const host = mode as unknown as { view: InteractiveView; options: { sessionRuntime: ShellSessionRuntime } };
+    const rendered: { line: string; stopped: boolean }[] = [];
+    const render = vi.spyOn(renderer, 'renderLine').mockImplementation(line => { rendered.push({ line, stopped: terminal.stopped }); });
+    host.options.sessionRuntime.terminate = () => { throw new Error('private fixture persistence detail'); };
+    mode.start();
+    try {
+      host.view.editor.setText('/exit'); terminal.input('\r');
+      await vi.waitFor(() => expect(exit.mock.calls).toEqual([[1]]));
+      expect(rendered).toEqual([{ line: 'Session state could not be saved; session close was not verified.', stopped: true }]);
+    } finally { render.mockRestore(); mode.stop(); }
+  });
+
   it("installs a readline stand-in that can answer runtime questions", () => {
     // Runtime code asks through readline.question; without a working stand-in the
     // approval flow throws instead of prompting.

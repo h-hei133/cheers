@@ -50,6 +50,15 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
         blocks.push(textBlock("user", content));
       }
     } else if (turn.role === "assistant") {
+      const reasoning = turn.reasoning;
+      if (reasoning && (reasoning.redacted || reasoning.text.trim())) {
+        blocks.push({
+          kind: "thinking",
+          text: reasoning.redacted ? "(provider withheld)" : reasoning.text,
+          collapsed: true,
+          finalized: true,
+        });
+      }
       const content = messageToText(turn.content).trim();
       if (content) {
         blocks.push(textBlock("assistant", content));

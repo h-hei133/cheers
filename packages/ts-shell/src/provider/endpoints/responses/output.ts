@@ -23,6 +23,8 @@ export function responseOutput(value: unknown, actionable = false): readonly Out
     } else if (item.type === 'reasoning') {
       if (!Array.isArray(item.summary) || item.summary.some(part => !isRecord(part)
         || part.type !== 'summary_text' || typeof part.text !== 'string')
+        || (item.content !== undefined && (!Array.isArray(item.content) || item.content.some(part => !isRecord(part)
+          || part.type !== 'reasoning_text' || typeof part.text !== 'string')))
         || (item.encrypted_content !== undefined && item.encrypted_content !== null && typeof item.encrypted_content !== 'string')) return undefined;
     } else return undefined;
   }
@@ -39,7 +41,13 @@ export function outputProjection(output: readonly OutputItem[]): {
       if (part.type === 'output_text') text += part.text as string;
       else refused = true;
     }
-    if (item.type === 'reasoning') reasoning += (item.summary as { text: string }[]).map(part => part.text).join('\n');
+    if (item.type === 'reasoning') {
+      // Summary and raw content describe the same item; keep one display copy
+      // while leaving both native fields unchanged for opaque replay.
+      const summary = (item.summary as { text: string }[]).map(part => part.text).join('\n');
+      const content = (item.content as { text: string }[] | undefined)?.map(part => part.text).join('\n') ?? '';
+      reasoning += summary || content;
+    }
     if (item.type === 'function_call') calls.push({ id: item.call_id as string, type: 'function',
       function: { name: item.name as string, arguments: item.arguments as string } });
   }

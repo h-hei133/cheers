@@ -30,15 +30,25 @@ export function validateWorkspaceRoots(primary: string, roots: readonly Workspac
 
 /** Select one existing authority root; never widen a single-file writer's jail. */
 export function selectWorkspaceRoot(primary: string, roots: readonly WorkspaceRoot[], target: string, access: WorkspaceRoot['access']): string {
+  const root = resolveWorkspaceRoot(primary, roots, target, access);
+  if (root === undefined) throw new Error('Tool path is outside the registered workspace roots.');
+  return root;
+}
+
+/** Only an unregistered target is eligible for a separate approval. Invalid grants remain refusals. */
+export function resolveWorkspaceRoot(primary: string, roots: readonly WorkspaceRoot[], target: string, access: WorkspaceRoot['access']): string | undefined {
   const absolute = path.resolve(primary, target);
   if (verifyPathContainment(absolute, primary).allowed || verifyPathContainment(absolute, realpathSync(primary)).allowed) return primary;
+  if (contains(primary, absolute) || contains(realpathSync(primary), absolute)) throw new Error('Tool path escapes its workspace through a symbolic link.');
   for (const root of roots) {
-    if (!contains(root.path, absolute)) continue;
+    const checked = verifyPathContainment(absolute, root.path);
+    if (!contains(root.path, absolute) && !checked.allowed) continue;
     assertWorkspaceRoot(root);
     if (access === 'write' && root.access !== 'write') throw new Error('This additional workspace root is read-only.');
-    if (verifyPathContainment(absolute, root.path).allowed) return root.path;
+    if (checked.allowed) return root.path;
+    throw new Error('Tool path escapes its workspace through a symbolic link.');
   }
-  throw new Error('Tool path is outside the registered workspace roots.');
+  return undefined;
 }
 
 function contains(root: string, target: string): boolean {

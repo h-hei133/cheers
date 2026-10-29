@@ -133,6 +133,9 @@ export async function formatDirectoryListing(
  * carry for the next call to resolve to the same place.
  */
 function displayDirectoryPath(request: DirectoryListingRequest): string {
+  if (path.isAbsolute(request.displayPath)) {
+    return request.displayPath.endsWith(path.sep) ? request.displayPath : request.displayPath + path.sep;
+  }
   const relative = path.relative(request.workspaceRoot, request.absolutePath)
   const base =
     relative === '' ? '.' : relative.split(path.sep).join('/')
