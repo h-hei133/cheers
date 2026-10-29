@@ -2,7 +2,8 @@ import { expect, it } from 'vitest';
 import { createStepFunction, toStep } from '../../turn/step.js';
 import { resetSessionUsage } from '../../observability/usageTelemetry.js';
 import { createMessageTranscriptEvent, decodeTranscriptLine, transcriptEventToSessionMessage } from '../../session/sessionEventCodec.js';
-import { endpointShape } from './index.js';
+import { endpointBody, endpointShape, endpointTurnBody } from './index.js';
+import { toChatMessages } from '../../turn/prompt.js';
 
 it.each(['reasoning_content', 'reasoning', 'reasoning_text'] as const)(
   'retains and displays JSON %s when a compatible host ignores streaming', async field => {
@@ -104,5 +105,50 @@ it('displays actual SSE reasoning once while retaining the same final message', 
       onReasoning: text => shown.push(`thinking:${text}`), onText: text => shown.push(`text:${text}`),
     }, { allowTools: false })).toMatchObject({ text: 'Answer', stopReason: 'stop', reasoning: { text: 'Public reasoning' } });
     expect(shown).toEqual(['thinking:Public reasoning', 'text:Answer']);
+  } finally { resetSessionUsage(sessionId); }
+});
+
+it.each(['simple', 'turn'] as const)('projects protocol fields without internal reasoning or origin in %s requests', mode => {
+  const messages = toChatMessages([
+    { role: 'user', content: 'question' },
+    { role: 'assistant', content: 'Inspecting', reasoning: { text: 'Public reasoning', signature: 'OPAQUE_FIXTURE' },
+      origin: { provider: 'fixture', model: 'm', replayBinding: 'binding' },
+      tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'read', arguments: '{ "path": "a" }' } }] },
+    { role: 'tool', tool_call_id: 'call_1', content: 'Result' },
+  ]);
+  const before = JSON.stringify(messages);
+  const request = { model: 'm', systemPrompt: 'brief', messages };
+  const body = mode === 'simple' ? endpointBody('openai-compatible', request)
+    : endpointTurnBody('openai-compatible', { ...request, tools: [], allowTools: false, vision: false,
+      temperature: 0.2, systemRole: 'system', reasoningEffort: false, maxTokensField: 'max_tokens', assistantAfterToolResult: false });
+  expect(body.messages).toEqual([
+    { role: 'system', content: 'brief' }, { role: 'user', content: 'question' },
+    { role: 'assistant', content: 'Inspecting', tool_calls: [{ id: 'call_1', type: 'function',
+      function: { name: 'read', arguments: '{ "path": "a" }' } }] },
+    { role: 'tool', tool_call_id: 'call_1', content: 'Result' },
+  ]);
+  expect(JSON.stringify(messages)).toBe(before);
+  expect(messages[1]?.reasoning?.signature).toBe('OPAQUE_FIXTURE');
+});
+
+it('sends protocol history fields at the actual compatible request boundary', async () => {
+  const sessionId = 'compatible-history-fields';
+  let body: Record<string, unknown> | undefined;
+  const step = createStepFunction({ provider: { provider: 'fixture', model: 'm',
+    baseUrl: 'https://fixture.invalid/v1', endpoint: 'openai-compatible', headers: {} },
+    workspaceRoot: process.cwd(), sessionId, systemPrompt: 'brief', tools: [],
+    fetchImpl: async (_url, init) => {
+      body = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'Answer' }, finish_reason: 'stop' }] }),
+        { headers: { 'content-type': 'application/json' } });
+    },
+  });
+  try {
+    const result = await step([{ role: 'user', content: 'question' }, { role: 'assistant', content: 'Prior answer',
+      reasoning: { text: 'Public reasoning', signature: 'OPAQUE_FIXTURE' }, origin: { provider: 'fixture', model: 'm' } },
+    { role: 'user', content: 'continue' }], undefined, {}, { allowTools: false });
+    expect(result).toMatchObject({ text: 'Answer', stopReason: 'stop' });
+    expect(body?.messages).toEqual([{ role: 'system', content: 'brief' }, { role: 'user', content: 'question' },
+      { role: 'assistant', content: 'Prior answer' }, { role: 'user', content: 'continue' }]);
   } finally { resetSessionUsage(sessionId); }
 });

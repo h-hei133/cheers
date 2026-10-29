@@ -36,7 +36,7 @@ declareEndpoint("openai-compatible", {
     model: input.model,
     messages: [
       ...(input.systemPrompt ? [{ role: input.systemRole ?? 'system', content: input.systemPrompt }] : []),
-      ...input.messages,
+      ...input.messages.map(wireMessage),
     ],
     // Gated the same way the full request gates it. A caller that declares the
     // model rejects a temperature gets a request without one, whether or not the
@@ -116,12 +116,22 @@ function wireMessages(messages: readonly ChatMessage[], vision: boolean, bridge:
     if (message.role === "tool" && Array.isArray(message.content)) {
       const images = message.content.filter(block => block.type === "image");
       const text = messageToText(message.content, { placeholderForImages: !vision });
-      result.push({ ...message, content: text || (images.length ? "(see attached image)" : "") });
+      result.push({ ...wireMessage(message), content: text || (images.length ? "(see attached image)" : "") });
       if (vision && images.length) pending.push({ type: "text", text: `Image from tool result ${message.tool_call_id ?? "unknown"}:` }, ...images);
-    } else result.push({ ...message, content: wireContent(message.content, vision) });
+    } else result.push({ ...wireMessage(message), content: wireContent(message.content, vision) });
   }
   flush();
   return result;
+}
+
+/** Runtime provenance and signed replay belong to their own protocol codecs. */
+function wireMessage(message: ChatMessage): Record<string, unknown> {
+  return {
+    role: message.role,
+    content: message.content,
+    ...(message.role === 'assistant' && message.tool_calls ? { tool_calls: message.tool_calls } : {}),
+    ...(message.role === 'tool' && message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
+  };
 }
 
 /** Preserve explicit refusal even when the provider reports an ordinary stop. */

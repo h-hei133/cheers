@@ -10166,3 +10166,11 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 继续[addition20.21](features/phase-20-addition.md#2021-兼容服务json返回的公开thinking提取与显示)：兼容host忽略stream:true时，JSON message下公开reasoning未提取，非流式toStep也不发onReasoning。共用原字段优先级readReasoningText供delta/complete message，JSON selected choice提取、normalized优先，toStep未streamed且非redacted时在text前单次显示。已有signature/保存、reasoning-only unanswered与refusal错误合同保留；只读当前官方public字段与参考选择/分离决定，未迁移模型或推断tool replay。
 
 主代理四相关文件163项去重串行通过，包含真实Response请求→step→transcript、SSE一致性及reasoning:false仍显示已返回公开文本。四类反转5/6/2/1失败、逐字节恢复后163重验通过；初次refusal断言误期待kernel refusal，改回原error合同。五静态门、完整声明图单一脚本、AST completion15/step17/endpoint10/diff通过；build `62beb782eb1781adc7fb239f008f60b3816b265b742d15e9d71866045ca7a37c`、inputs `d43751b0d4535f94a3fdf63decce20321aca4c1b3be5e04161b74126a5afaead`，460/3547新鲜度重算一致，NormProof proven/0open/0failed/0gap仅collector。HANDOFF新增JSON提取/显示陷阱，scratch清理。无live provider/真实账户/终端、PTY/exe/full suite/20k，原47项不升级、ADD active，Git/精确CI另绑定。
+
+本批JSON修复已提交推送`be01f03ebbd34e606540c86ae0871effa20ea648`，远端main精确相同、仅原CLAUDE.md。[Watch40939033037](https://github.com/h-hei133/cheers/actions/runs/40939033037)completed/success，[CI40939033259](https://github.com/h-hei133/cheers/actions/runs/40939033259)初次读回in_progress；ebf333退出与6ff450 advisor两次CI延后当时仍in_progress，未计通过。
+
+## [2026-10-30] fix | 兼容消息明确投影wire字段
+
+继续[addition20.22](features/phase-20-addition.md#2022-兼容请求的消息协议字段投影)：实际compatible simple/turn body带内部origin及含opaque signature的结构化reasoning。adapter新增一个wireMessage复用，显式role/content/适用tool_calls/tool_call_id；不修改history、原media/vision/bridge流程或各native codec。官方schema与参考显式assistant构造已对照，公开reasoning_content工具回传仍需单独声明，未将内部对象当其合同。
+
+五相关文件232项去重串行通过，三新用例旧投影失败；simple/turn反转1/2失败，逐字节恢复后endpoint17重验。五静态门/diff、AST endpoint11、TS build与新鲜度通过：build `1f8dd8687959d0e09d5384bdf44587edb7ba7c9a6c32a8b98f80dccfccc4bc42`、inputs `a4de0160771458ad4fdce374cd17540dd6e6b744a82653ed115b11954de5d4a7`，460/3547一致。局部投影未重跑结构NormProof；初诊断从package index取未export函数失败，改为manifest build模块后取证。HANDOFF记内部message/wire边界，scratch清理；无live/真实账户/终端、PTY/exe/full suite/20k，原47项不升级、ADD active，Git/精确CI另绑定。

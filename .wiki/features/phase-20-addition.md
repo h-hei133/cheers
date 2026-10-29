@@ -3396,3 +3396,13 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 [实际请求回归](../../packages/ts-shell/src/provider/endpoints/openaiCompatible.test.ts)涵盖三种JSON字段、reasoning:false+无effort仍显示已返回正文、完整step→transcript编码/解码、first nonempty/单choice/不重复、normalized优先、五种无效字段、reasoning-only和SSE一致性。初版13项中5项确认提取缺口，另1项是fixture错误期待refusal kernel值；原kernel将wire refusal映射error，按已有合同修断言而未改产品错误行为。最终14项以真实Response和createStepFunction证明JSON/SSE thinking与text各一次。
 
 主代理四文件163项去重串行通过：endpoint14/completion34/step96/Responses body19。四类反转撤去JSON提取5失败、显示6失败、stream去重2失败、redacted保护1失败；各次逐字节恢复，最终163项重验通过。五静态门、完整声明图单一用例、diff与AST completion15/step17/endpoint10通过。1536MiB TS build `62beb782eb1781adc7fb239f008f60b3816b265b742d15e9d71866045ca7a37c`，inputs `d43751b0d4535f94a3fdf63decce20321aca4c1b3be5e04161b74126a5afaead`，460 compilerInputs/3547文件重新计算一致；NormProof proven/0open/0failed/0gap仅collector结构。HANDOFF记录JSON提取与显示分离，scratch清理；没有live供应商、真实账号/终端、PTY/exe/full suite或20k终端。默认effort、型号迁移、tool replay不变，原47项不升级，反馈25与ADD仍partial/active，Git/精确CI另绑定。
+
+### 20.22 兼容请求的消息协议字段投影
+
+继续核查20.16的回传边界，发现[compatible endpoint](../../packages/ts-shell/src/provider/endpoints/openaiCompatible.ts)在simple直接spread input.messages、turn spread内部ChatMessage，实际body带origin及结构化reasoning对象（含opaque signature）。该对象是本项目消息模型，不是供应商所要求的reasoning_content字符串。以最终不可变构建只读观察及真实createStepFunction夹具确认两路径均发送这些内部字段；未声称真实服务已拒绝或发生真实签名泄露。
+
+实际读取[官方Chat Completions schema](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create.md)的assistant/tool message声明：content、tool_calls及tool_call_id各有明确位置，没有内部origin或结构化reasoning合同。目标检查后沿20.21已定向对照的参考显式assistantMsg构造与compat-selected公开字段：采用明确protocol投影，不把任意内部message当wire。公开reasoning回传需求仍单独保留，不能用错误对象字段代替该声明，也不推断其他供应商的默认或型号迁移。
+
+新增一个本地wireMessage供simple及turn共用，只投影role/content和适用角色的tool_calls/tool_call_id。原tool image提取、连续result、vision fallback与bridge保持同一wireMessages流程；simple仅投影字段，原content表示保持。内部history未修改，reasoning文本/签名/origin仍留在transcript供各原生codec使用，工具ID/参数原字节保留。不新增第二套conversation normalization、模型规则或回放存储。
+
+三项新回归在旧投影下均失败，修复后五相关文件232项串行通过：endpoint17/simple12/media8/step96/preview99。包含真实fetch body、simple/turn与内部history不变、原多模态/预算/preview。分别反转simple投影1失败、turn投影2失败，逐字节恢复后endpoint17重验通过。五静态门/diff、AST endpoint11与1536MiB TS build通过；build `1f8dd8687959d0e09d5384bdf44587edb7ba7c9a6c32a8b98f80dccfccc4bc42`，inputs `a4de0160771458ad4fdce374cd17540dd6e6b744a82653ed115b11954de5d4a7`，460/3547新鲜度重算一致。局部adapter投影不重复结构NormProof；初次诊断错从package index取未export函数，改为manifest指定不可变build的endpoint模块后才取证，不作产品失败。HANDOFF记录wire投影边界，scratch清理；无live/真实账户/终端、PTY/exe/full suite/20k，原47项不升级，ADD active。公开reasoning tool回传仍待明确独立能力声明。

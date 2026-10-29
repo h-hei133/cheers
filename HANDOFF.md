@@ -906,3 +906,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A compatible host ignores stream:true and returns a normal JSON answer with reasoning_content, but the saved assistant message and thinking display omit it.
 - **Root Cause**: The stream reader extracts public reasoning fields while the JSON protocol reader leaves them nested under the chosen message. Final step projection also only emits text, assuming reasoning was already streamed.
 - **Rule**: Reuse the same public-field precedence for complete messages and deltas, retain normalized completion authority, and emit public reasoning once before text only when it was not streamed or withheld. Check actual JSON-to-step-to-transcript and SSE parity; a reasoning-only result remains unanswered, and field extraction alone does not establish the provider's replay wire contract.
+
+### Internal Message Objects Are Not Compatible Wire Messages
+- **Symptom**: Compatible requests include origin metadata and a structured reasoning object containing an opaque signature.
+- **Root Cause**: The adapter spreads internal ChatMessage objects into simple and turn bodies. Internal replay data has no automatic meaning in Chat Completions, whose supported public reasoning extensions use their own fields.
+- **Rule**: Explicitly project protocol message fields in the owning adapter, retain tool identity/content and keep internal history unchanged. Verify simple and actual turn bodies separately. Public reasoning replay requires its own declared wire contract; never use an internal object or opaque signature as a substitute.
