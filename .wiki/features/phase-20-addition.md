@@ -2536,7 +2536,9 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **本批已实施的部分（第一百一十九批）**：越界写的拒绝信息现在同时说明边界与出路——`write` 与 `edit` 的硬拒绝由 `outsideWorkspaceMessage` 生成，指出工作区根、并明确"用户可以运行 `/workspace add <path> --write` 后重试"。这不改变安全语义（仍是硬拒绝，不进入审批），但让模型与用户知道存在合法授权路径，而不是把限制读成任意规则。
 
-**未实施的部分**：把越界写从"硬拒绝"改为"需审批"（对齐 oh-my-pi/codex 的 `AskUser` 语义）需要 `selectWorkspaceRoot` 支持一次性授权根、`toolPolicy` 的 `isInside` 统一到 `verifyPathContainment`、以及 `runtime/execution/write.ts` 的 root 可注入。这属于安全边界变更，必须同时具备"未批准仍拒绝"、"批准后可写"、"写入目标与批准目标一致"三条反转证据；本轮未做，保留为后续任务。
+**已实施（第一百二十七批）**：`toolPolicy` 的 accept-edits 判定已统一到 `verifyPathContainment`。此前它用纯词法的 `path.relative` 判断"是否在工作区内"，与工具体执行的 realpath 判定不同源：一个通过 symlink 指向外部的路径在词法上是"内部"，权限层因此批准，而工具体随后拒绝——用户看到的是"批准了却写不进去"。现两处用同一个判定，并把"workspace 根本身"单独排除（`path: "."` 是目录，不是文件目标）。
+
+**仍未实施**：把越界写从"硬拒绝"改为"需审批"（对齐 oh-my-pi/codex 的 `AskUser` 语义）。这需要 `selectWorkspaceRoot` 支持一次性授权根、`runtime/execution/write.ts` 的 root 可注入，以及审批结果到执行目标的传递。属于安全边界变更，必须同时具备"未批准仍拒绝"、"批准后可写"、"写入目标与批准目标一致"三条反转证据；本轮只消除了判定不一致，未放开任何写权限。
 
 **证据边界**：本批只改了拒绝措辞，未放开任何写权限；越界写仍然失败。
 
@@ -2676,3 +2678,13 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 复核确认无问题的三点：`draftStash` 的 `held`/`protector` 始终成对设置、无其他写者；`--turn` 缺值会被 `parseFlags` 拒绝，不可达 `true` 分支；`strongest()` 排序稳定。另指出 `operationsForTurn` 展开全部 receipt 后过滤，峰值可能达百 MB 级——受既有读预算约束、非确定性缺陷，记为可改进项。
 
 验证：`convergence.test.ts` 增至 12 项（新增无证据反对、`insufficient` 不算反对两项），`interactiveMode.test.ts` 新增槽满提示一项。两组反转各触发 1 项预期失败；源码逐字节恢复并核对 SHA-256 `4b38f2340238`（interactiveMode）与 `f6744de3e0bd`（convergence）后重验，三文件 334 项通过；静态门、module facade 0 与 TS build `bf0a81fb0411` 通过。
+
+### 第一百二十七批：权限层与工具体用同一个围栏判定
+
+`toolPolicy` 的 accept-edits 分支用 `path.relative` 做词法判断，而 `write`/`edit` 的工具体用 `verifyPathContainment`（含 realpath）。两者在 symlink 上结论相反：词法说"在工作区内"，realpath 说"指向外部"。结果是权限层批准一个调用，工具体随后硬拒绝——用户看到"已批准"却什么都没发生。
+
+现 accept-edits 改用同一个 `verifyPathContainment`，并单独排除 workspace 根本身（`path: "."` 是目录，不是文件目标，写它是错误而非待批准的编辑）。**没有放开任何权限**：越界写仍是硬拒绝，只是判定源统一了。
+
+验证：`toolPolicy.test.ts` 新增一项，用真实 symlink 指向工作区外，断言 accept-edits 下仍需升级。反转恢复词法判定后该用例预期失败（返回 `false`，即批准）；源码逐字节恢复并核对 SHA-256 `330b1feefe39` 后重验，35 项通过；静态门、module facade 0 与 TS build `8fad5ef03e22` 通过。
+
+**边界**：只统一判定源。"越界写改为需审批"仍未实施。

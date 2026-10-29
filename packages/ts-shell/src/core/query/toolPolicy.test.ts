@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { evaluateToolPermissionScope, buildToolEscalationPrompt } from "./toolPolicy.js";
 
@@ -83,6 +86,23 @@ describe("toolPolicy", () => {
     const outsideResult = evaluateToolPermissionScope("write", { path: "/etc/passwd" }, "accept-edits", "/repo");
     expect(outsideResult.requiresEscalation).toBe(true);
   });
+  it("refuses a path that leaves the workspace through a symlink", () => {
+    // Lexical containment calls this inside the workspace; the realpath check
+    // the write itself runs calls it outside. Approving on the first answer
+    // would hand back an approval the write cannot use.
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-policy-'));
+    const inside = path.join(scratch, 'repo');
+    const outside = path.join(scratch, 'elsewhere');
+    fs.mkdirSync(inside, { recursive: true });
+    fs.mkdirSync(outside, { recursive: true });
+    fs.symlinkSync(outside, path.join(inside, 'escape'));
+    try {
+      const result = evaluateToolPermissionScope("write",
+        { path: path.join(inside, 'escape', 'file.txt') }, "accept-edits", inside);
+      expect(result.requiresEscalation).toBe(true);
+    } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+  });
+
   it("requires escalation when write or edit has missing, empty, or root path in accept-edits mode", () => {
     expect(evaluateToolPermissionScope("write", {}, "accept-edits", "/repo").requiresEscalation).toBe(true);
     expect(evaluateToolPermissionScope("write", { path: "" }, "accept-edits", "/repo").requiresEscalation).toBe(true);

@@ -6,6 +6,7 @@ import { matchDenyRule, type DenyRule } from "../shell/approval/deny.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import { filePolicyTargets } from "../tools/permissionContext.js";
 import { executionApprovalTarget } from '../../runtime/execution/binding.js';
+import { verifyPathContainment } from '../security/pathJail.js';
 import { nativeReadOnly } from '../tools/capability.js';
 
 export interface ToolPermissionEvaluation {
@@ -214,9 +215,17 @@ export function evaluateToolPermissionScope(
         };
       }
       const resolved = path.isAbsolute(target) ? target : path.resolve(workspaceRoot, target);
-      const rel = path.relative(workspaceRoot, resolved);
-      const isInside = rel.length > 0 && !rel.startsWith("..") && !path.isAbsolute(rel);
-      if (isInside) {
+      // The same containment test the tool body will run. A lexical check here
+      // disagreed with the realpath check there in both directions: a path that
+      // climbs out and comes back looks outside to `path.relative` but is inside
+      // the workspace, and a symlinked directory looks inside but writes out.
+      // Approving one answer and enforcing the other is how a call gets an
+      // approval it cannot use, or a refusal it was told would be allowed.
+      const containment = verifyPathContainment(resolved, workspaceRoot);
+      // The root itself is not a file target: `path: "."` names the directory,
+      // and a write there is a mistake rather than an edit to approve.
+      const isRoot = path.resolve(resolved) === path.resolve(workspaceRoot);
+      if (containment.allowed && !isRoot) {
         return {
           requiresEscalation: false,
           operation,
