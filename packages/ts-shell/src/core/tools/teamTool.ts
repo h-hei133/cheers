@@ -71,7 +71,9 @@ export function createTeamToolDefinition(): ToolDefinition {
         const result = await context.runSubagent!({
           definition: definition(role), capability, agentMode: 'plan', workspace: context.workspaceRoot,
           prompt, ...(shared ? { context: shared } : {}), signal,
-          ...(context.taskId ? { admission: () => undefined } : {}),
+          // No `admission` of our own: the host's runner already carries the
+          // session gate, and supplying a predicate that always answers
+          // "allowed" would replace that gate with a rubber stamp.
         });
         if (result.failed) throw new Error(result.failure ?? 'the proposer failed');
         return result.text;

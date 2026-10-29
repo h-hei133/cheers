@@ -100,6 +100,24 @@ describe("starting a team pass", () => {
     expect(result.output).toContain('Limitation:');
   });
 
+  it("does not hand the runner an admission that always allows", async () => {
+    // The host's runner already carries the session gate. Supplying a
+    // predicate that answers "allowed" unconditionally would replace it with a
+    // rubber stamp, which is worse than supplying none.
+    const calls: { admission?: unknown }[] = [];
+    const runSubagent = vi.fn(async (input: { admission?: unknown }) => {
+      calls.push({ admission: input.admission });
+      return { text: "a claim", failed: false };
+    });
+    await createTeamToolDefinition().execute(
+      { question: "why?", perspectives: ["a", "b"] },
+      context({ runSubagent, taskId: "task-1" } as unknown as Partial<ToolExecutionContext>),
+    );
+
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every(call => call.admission === undefined)).toBe(true);
+  });
+
   it("names a proposer that produced nothing", async () => {
     const runSubagent = vi.fn(async (input: { prompt: string }) => input.prompt.includes("CLAIM")
       ? { text: "", failed: false }
