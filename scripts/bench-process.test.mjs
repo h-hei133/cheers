@@ -15,7 +15,14 @@ function targetIdentity(pid) {
     const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
     const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
     return { state: fields[0], started: fields[19] };
-  } catch (error) { if (error.code === "ENOENT") return undefined; throw error; }
+  } catch (error) {
+    // The process being gone is the answer this asks for, not a failure of the
+    // question. `readFileSync` reports that as ENOENT when the directory entry
+    // is already removed and as ESRCH when the kernel reclaimed it between the
+    // open and the read; both mean the same thing here.
+    if (error.code === "ENOENT" || error.code === "ESRCH") return undefined;
+    throw error;
+  }
 }
 
 async function assertTargetStopped(pid, started) {

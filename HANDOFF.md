@@ -781,3 +781,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A single-file `vitest run src/.../pastes.test.ts` reports 167 files and 4349 tests, most of them from `.tmp/*/worktree` copies.
 - **Root Cause**: From the repository root, vitest's default include matches every `*.test.ts` it can reach, and `.tmp` holds historical worktree snapshots that each contain a full copy of the suite. The path argument narrows nothing because it is resolved as a filter over that larger set.
 - **Rule**: Run focused tests from `packages/ts-shell`, where the config and the source tree agree, and pass the file path relative to it. From the repository root use `npm run test:ts -- <path>` only when the whole suite is genuinely intended.
+
+### A Process That Vanished Answered The Question
+- **Symptom**: The Linux PTY termination test fails on CI with `ESRCH: no such process, read` while passing locally, and the stack points at reading `/proc/<pid>/stat`.
+- **Root Cause**: The helper treated only `ENOENT` as "the process is gone". When the kernel reclaims the entry between the directory lookup and the read, `readFileSync` reports `ESRCH` instead — the same fact, reported differently. The test asserts the target stopped, and then failed because it had.
+- **Rule**: In `/proc` probes, both `ENOENT` and `ESRCH` mean absence. Treat them alike, and say in the catch which question the error answers rather than which one it interrupts.
