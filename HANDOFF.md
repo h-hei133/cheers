@@ -786,3 +786,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: The Linux PTY termination test fails on CI with `ESRCH: no such process, read` while passing locally, and the stack points at reading `/proc/<pid>/stat`.
 - **Root Cause**: The helper treated only `ENOENT` as "the process is gone". When the kernel reclaims the entry between the directory lookup and the read, `readFileSync` reports `ESRCH` instead — the same fact, reported differently. The test asserts the target stopped, and then failed because it had.
 - **Rule**: In `/proc` probes, both `ENOENT` and `ESRCH` mean absence. Treat them alike, and say in the catch which question the error answers rather than which one it interrupts.
+
+### A Documented Method Is Not An Implemented One
+
+- **Symptom**: A diagnosis cites a helper that the module's own comment promises — `reanchor`, "which re-derives the position from what is on screen" — and the recommendation says to call it.
+- **Root Cause**: The comment describes an intended design; grep found the name only inside that comment. Reading the prose around a function is not the same as reading the code that implements it, and a recommendation built on the prose produces a fix that cannot compile.
+- **Rule**: Before citing any helper in a diagnosis, grep for its definition (`function name`, `const name =`, `name(`) and confirm a body exists. When a module's comment names a method that is absent, record the absence explicitly — the next round will otherwise assume it is available.
+
+### A Request That Never Asks Cannot Receive
+
+- **Symptom**: Users report that a model's reasoning cannot be viewed, and the investigation starts at the renderer.
+- **Root Cause**: The rendering, collapse state and toggle all worked; the request side sent no reasoning parameter at all, because the shipped default preference is null and every protocol gates its reasoning field on a non-null level. The provider therefore never emitted reasoning, so there was no block to expand.
+- **Rule**: When a capability appears missing, trace the request that would produce it before the code that would display it. A feature gated on an unset default is absent by default, not broken; state which default would have to change and which protocols honour it.
