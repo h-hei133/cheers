@@ -95,3 +95,29 @@ describe('tool argument boundary', () => {
     }
   })
 })
+
+describe('a write outside the workspace', () => {
+  it('names the boundary and the command that widens it', async () => {
+    // The refusal is a jail, not a question, so a bare "outside workspace"
+    // reads as an arbitrary restriction. The way through is a user command;
+    // the model can ask for it instead of retrying a call that cannot succeed.
+    const service = createDefaultExecutionService()
+    const write = vi.spyOn(service, 'writeTextFile').mockResolvedValue(undefined)
+    const tool = createCoreToolRegistry({ executionService: service }).get('write')!
+    const root = '/tmp/cheers-test/jail-root'
+
+    await expect(tool.execute({ path: '/tmp/cheers-test/elsewhere/file.txt', content: 'x' },
+      { workspaceRoot: root, taskId: 'outside' })).rejects.toThrow(/\/workspace add <path> --write/)
+    expect(write).not.toHaveBeenCalled()
+  })
+
+  it('refuses the same way for edit', async () => {
+    const service = createDefaultExecutionService()
+    const write = vi.spyOn(service, 'writeTextFile').mockResolvedValue(undefined)
+    const tool = createCoreToolRegistry({ executionService: service }).get('edit')!
+
+    await expect(tool.execute({ path: '/tmp/cheers-test/elsewhere/file.txt', content: 'x' },
+      { workspaceRoot: '/tmp/cheers-test/jail-root', taskId: 'outside-edit' })).rejects.toThrow(/\/workspace add <path> --write/)
+    expect(write).not.toHaveBeenCalled()
+  })
+})

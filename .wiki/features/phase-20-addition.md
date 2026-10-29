@@ -2344,11 +2344,54 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 ### 17.3 第十项（用户编号第二十）：Monitor 工具
 
-待补充（研究进行中）。
+**用户要求**：确认 Claude Code 的 Monitor 工具（封杀前台长 sleep）在本项目是否已有等价实现。
+
+**结论：没有等价工具。** 工具清单为 `bash`、`taskOutput`、`taskStop`、`web_fetch`、`web_search`、`lsp`、`ask`、`todo`、`task`、`browser`、`desktop`，可选 `skill` 与 MCP 转发（`core/tools/registry.ts:564-624`）；全仓 `monitor` 只命中 `observability/startupTiming.ts` 的 `monitorEventLoopDelay`，不是工具。唯一的 "wait" 是 `/director wait <id> [seconds≤30]`（`core/commands/director/syntax.ts:14-15`），只等 worker run。`taskOutput` 是轮询式读取（`core/tools/shell/background.ts:70-108`），不阻塞等待。
+
+**前台长 sleep 的现状**：默认 60 秒超时（`runtime/execution/commandTimeout.ts:18`）；交互式下未显式给 timeout 的命令会被 job owner 收养，60 秒到就**原地提升为后台任务并返回**（`registry.ts:116,137-174`），新用户输入也会提前提升（`interactiveMode.ts:966`）。显式 `timeout: 120` 则不可提升，会一直前台阻塞。后台独立上限 300 秒（`shell/background.ts:31-32`）。因此"封杀长 sleep"在本项目已经部分成立，缺的是**可等待、可取消、带进度**的一等工具。
+
+**参考实现**：
+
+- oh-my-pi：`WaitTool`（`packages/coding-agent/src/tools/wait.ts:24` `WAIT_MAX_MS = 30 * 60_000`，`:25` 进度 500ms）与 `yield` 工具。
+- codex：`exec_command` 的 `yield_time_ms`（默认 10s，`core/src/tools/handlers/unified_exec.rs:62-64`）与 `write_stdin`（默认 250ms，`:66-68`）——"前台先等一小段，未完成就返回会话句柄"。
+
+**修改方向**：新增 `wait` 工具，参数为 `taskId` + `timeoutMs`（上限对齐 30 分钟），内部用既有的 `BackgroundRunner.onEnded`/`whenPromoted` 阻塞，而不是 sleep 轮询；`abortSignal` 必须可取消。**不新增任务系统**：`BackgroundRunner` 已有 `list/get/stop/onEnded/whenPromoted`（`workflow/jobs/local/model.ts:25-61`），`registry.onEnded` 已按会话路由（`cli/runtime/jobs.ts:56-60`）。前台 `sleep` 不宜在审批层硬拒（会误伤轮询脚本），更合理的是在 `bash` 描述与系统提示中引导使用 `wait` 或 `runInBackground`。
+
+**顺带确认一处文档过期**：`.wiki/features/27-background-execution.md` §1.3（`:51`）写着"没有任何把慢速前景命令自动转为后台的代码"，与现状不符——`375e664e` 与 `dd43bcce`（均 2026-10-18）已实现原地提升；该文档 `updated: 2026-10-17`。其 §2.1 阈值模型与 §4 决策点仍可作设计参考。
+
+**证据边界**：本轮只做定位与参考对比，未实现。
+
 
 ### 17.4 第十一项（用户编号第二十一）：草稿暂存栈与一键撤回润色
 
-待补充（研究进行中）。
+**用户要求**：Claude Code 有 Ctrl+S 输入框草稿暂存栈（Prompt Stashing）与一键撤回润色。
+
+**结论：两者都没有。** 可重绑定的 action 表（`cli/interactive/keybindings.ts:30-89`）里没有任何 stash/draft 动作；`ctrl+s` 目前解析为 `ctrl+s`（`input/keys.ts:211-228`）但查不到 action，走 `applyTextKey` 后是**纯 no-op**（`keymap.ts:96-140,461-468`）。全仓无 chord（多键序列）支持——`normalizeKey` 只接受单键（`keybindings.ts:230-249`）。
+
+**现有的"类 stash"能力**（都是单槽、隐式）：
+
+- 历史回溯自带一格草稿：`editor.ts:57-79` 的 `draft` + `browsing` + `adoptAsDraft`，`recall()` 首次向上时暂存当前草稿（`:247-273`）。只有一格，且只在历史浏览期间存在。
+- 中断回填：`interactiveMode.ts:1360-1371` 把未投递的队列项与当前草稿拼回输入框。
+- `/retry` 与 F5：`turnSink.ts:70-78` 用 `lastPrompt` 重跑上一轮；`retryDraft` 把失败的斜杠命令原文塞回输入框（`interactiveMode.ts:1051-1054`）。这是"一键撤回"最接近的现有形态，但只针对失败/命令。
+
+**undo 的粒度**：`EditHistory` 双栈，容量 100 步（`editor/buffer.ts:44-46`）；快照只含 `{lines,row,column}`，**不含** PasteStore、选区与历史浏览状态。连续词字符合并为一步，`insert(text)` 整段算一步，一次长粘贴 = 1 步。**undo 不回滚 PasteStore**：撤销一次"展开粘贴"后，文本回不到占位符。
+
+**参考实现**：
+
+- Claude Code：`ctrl+s` → `chat:stash`（`keybindings/defaultBindings.ts:85`）；**单槽 toggle**（`components/PromptInput/PromptInput.tsx:1356-1383`：输入非空则存入并清空，输入为空且已有 stash 则恢复，含光标与粘贴内容映射）；提交时自动恢复（`screens/REPL.tsx:3344-3348`）；提示行 "Stashed (auto-restores after submit)"。其 undo 是环形快照 50 条 + 1000ms debounce，绑 `ctrl+_`（`useInputBuffer.ts:8-11,36-118`）。
+- codex：`chat.edit_queued_message`（默认 `alt+up`）把最近一条已排队消息弹回输入框（`tui/src/keymap.rs:1418`、`chatwidget/interaction.rs:113-126`），不是草稿栈。
+- pi：`app.message.dequeue`（`alt+up`）把所有排队消息合并回编辑器（`core/keybindings.ts:71-74`、`modes/interactive/interactive-mode.ts:4846-4866`）；`ctrl+s` 在 pi 与 oh-my-pi 都已被占用。
+
+**修改方向**：
+
+1. 新增 action `tui.input.stash`，默认 `ctrl+s`，语义**对齐 Claude Code 的单槽 toggle**而非栈：输入非空 → 暂存并清空；输入为空且栈非空 → 恢复。提示行走既有 transient hint 通道（`chrome/hints.ts:38-70`）。
+2. 暂存元素必须**感知 PasteStore**：`{text, cursor, pasteIds}`；暂存期间对被引用的 id 做保留，避免 `evictOldest`（`pastes.ts:94-108`）淘汰后恢复出失效占位符。恢复用 `editor.setDraftText` + `setCursorOffset`。
+3. "一键撤回润色"复用现有 `retryDraft` 通道（`core/commands/types.ts:198`、`interactiveMode.ts:1051-1054`）与 `replaceExternalDraft`（`:1375-1379`），把"润色前原文"作为一个 stash 槽，使 `/retry`、F5、Ctrl+S 共享同一条回填路径。
+4. **IXON 风险**：Cheers 在 `terminal.ts:294-308` 进 raw mode，仓库内没有自己的 termios/IXON 处理，且 `ctrl+q` 已被绑定为 follow-up 并有测试（`keymap.test.ts:237`），说明流控未生效；但非 raw 的 line 模式（`lineLoop.ts:78`）与部分 tmux 配置仍可能吞掉 `ctrl+s`，应同时提供 `alt+s` 作为备选。
+5. 新增 action 必须同步三处：`KEY_ACTIONS`、`KEY_BINDINGS` 与 `.wiki/guides/keybindings.md`——`keyGuide.test.ts:10-16,57-70` 会强制它们相等。
+
+**证据边界**：本轮只做定位与参考对比，未实现；单槽 vs 多槽是产品选择，建议先做单槽 toggle 并观察真实使用。
+
 
 ### 17.5 第十二项（用户编号第二十二）：平级 Agent Teams 与"竞争性假说互相证伪"
 
@@ -2464,7 +2507,11 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 - 保留默认拒绝：未获批准的越界写仍必须失败，且失败信息要说明"需要显式授权"，不能伪装成"路径非法"。
 - 本仓库 `AGENTS.md` 的"参考仓库只读"规则保持不变；排查时必须区分"模型自己不愿写"与"工具拒绝写"。
 
-**证据边界**：本轮只做源码定位与参考对比，未修改写路径；任何放开都必须有"未批准仍拒绝"和"批准后可写、且写入目标与批准目标一致"的聚焦反转证据。
+**本批已实施的部分（第一百一十九批）**：越界写的拒绝信息现在同时说明边界与出路——`write` 与 `edit` 的硬拒绝由 `outsideWorkspaceMessage` 生成，指出工作区根、并明确"用户可以运行 `/workspace add <path> --write` 后重试"。这不改变安全语义（仍是硬拒绝，不进入审批），但让模型与用户知道存在合法授权路径，而不是把限制读成任意规则。
+
+**未实施的部分**：把越界写从"硬拒绝"改为"需审批"（对齐 oh-my-pi/codex 的 `AskUser` 语义）需要 `selectWorkspaceRoot` 支持一次性授权根、`toolPolicy` 的 `isInside` 统一到 `verifyPathContainment`、以及 `runtime/execution/write.ts` 的 root 可注入。这属于安全边界变更，必须同时具备"未批准仍拒绝"、"批准后可写"、"写入目标与批准目标一致"三条反转证据；本轮未做，保留为后续任务。
+
+**证据边界**：本批只改了拒绝措辞，未放开任何写权限；越界写仍然失败。
 
 ## 18. 第七轮实施记录（2026-10-29）
 
@@ -2507,3 +2554,13 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 主代理以 heap1024MiB 单线程串行执行 62 个文件 868 项通过；五静态门、module facade 0（`turnSink` 一度因新增方法越过 20 上限，已通过合并回 `think()` 恢复为 0）及 heap1536MiB TS build `7d5eb8528248` 通过，118 条既有 docs-source advisory 保留。
 
 **证据边界**：以上是源码链路与本机真实会话文件的量化，加上确定性夹具；**未**在真实终端测量阻塞时长，也未验证真实 provider 下的体感改善。原始卡顿是否还有其它成因（例如 provider 侧缓冲、终端仿真器性能）不在本批证据内。
+
+### 第一百一十九批：越界写的拒绝信息说明出路
+
+`write` 与 `edit` 在目标解析到工作区之外时抛错，而错误正文只有 `Path '…' is outside workspace.`。这是一条**硬拒绝**（不进入审批），但措辞让人以为这是一条任意规则：既没说是哪条边界，也没说存在合法授权路径。`/workspace add <path> --write` 一直是可用的（`core/commands/workspace/syntax.ts:9-11`），只是模型与用户都无从得知。
+
+现两处拒绝共用 `outsideWorkspaceMessage`（`core/tools/registry.ts`），说明工作区根并点明该命令。安全语义完全不变：仍然硬拒绝、仍然不进入审批、仍然不写任何字节。
+
+验证：`arguments.test.ts` 新增两项，分别对 `write` 与 `edit` 断言拒绝信息包含该命令且执行服务从未被调用；撤销新措辞后两项均预期失败（返回旧的 `Path '…' is outside workspace.`），源码逐字节恢复并核对 SHA-256 `ab8651690367` 后重验。`core/tools` 36 文件 419 项通过。
+
+**边界**：本批只改措辞，未放开写权限；"越界写改为需审批"仍是未完成任务，理由见第 17.7 节。

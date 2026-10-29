@@ -60,6 +60,21 @@ const TOOL_APPROVED_WRITE_AUTHORITY: ExecutionAuthority = {
 }
 
 
+/**
+ * Why a write was refused, and how to allow it.
+ *
+ * The refusal is a jail, not a permission question: nothing the model can say
+ * changes it, and a bare "outside workspace" reads as an arbitrary restriction
+ * rather than a boundary with a way through. The way through is a command the
+ * user runs, so the message names it — the model can then ask for it instead of
+ * retrying a call that cannot succeed.
+ */
+function outsideWorkspaceMessage(reason: string | undefined, target: string, workspaceRoot: string): string {
+  const why = reason ?? `Target '${target}' is outside the workspace.`
+  return `${why} Writes are limited to the workspace (${workspaceRoot}) and the roots the user attaches. `
+    + `To allow this path, the user can run /workspace add <path> --write, then retry.`
+}
+
 function inferFailureKind(result: {
   status: 'completed' | 'failed' | 'timeout' | 'cancelled'
   failureKind?: ExecutionFailureKind
@@ -305,7 +320,7 @@ export function createCoreToolRegistry(options?: {
           const target = resolveToolTarget(args, 'path', context.workspaceRoot)
           const containment = verifyPathContainment(target, context.workspaceRoot)
           if (!containment.allowed) {
-            throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+            throw new Error(outsideWorkspaceMessage(containment.reason, target, context.workspaceRoot))
           }
           const content = args.content as string
           const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
@@ -409,7 +424,7 @@ export function createCoreToolRegistry(options?: {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
         const containment = verifyPathContainment(target, context.workspaceRoot)
         if (!containment.allowed) {
-          throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+          throw new Error(outsideWorkspaceMessage(containment.reason, target, context.workspaceRoot))
         }
 
         const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
