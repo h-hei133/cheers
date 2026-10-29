@@ -47,6 +47,63 @@ it('preserves custom relay protocol and automatic effort without new summary con
   expect(body).not.toHaveProperty('reasoning'); expect(body).not.toHaveProperty('reasoning_effort');
 });
 
+it.each([undefined, null] as const)('routes the exact native coding model through Responses with automatic effort %s', async thinkingEffort => {
+  const target = { provider: 'openai', model: 'gpt-5.3-codex', baseUrl: 'https://api.openai.com/v1' };
+  let url: string | undefined, body: Record<string, unknown> | undefined;
+  const step = createStepFunction({ workspaceRoot, sessionId: 'coding-protocol', systemPrompt: 'instructions', tools: [],
+    thinkingEffort, catalog: BUILTIN_PROVIDERS, provider: { ...target, endpoint: providerCredentialEndpoint(BUILTIN_PROVIDERS, target) },
+    maxOutputTokens: 100, fetchImpl: async (input, init) => {
+      url = String(input); body = JSON.parse(String(init?.body));
+      return Response.json({ status: 'completed', model: target.model, output: [{ type: 'message', id: 'msg_1',
+        role: 'assistant', phase: 'final_answer', content: [{ type: 'output_text', text: 'answer' }] }] });
+    },
+  });
+  expect((await step([], undefined, {}, { allowTools: false })).text).toBe('answer');
+  expect(url).toBe('https://api.openai.com/v1/responses');
+  expect(body).toMatchObject({ model: target.model, instructions: 'instructions', max_output_tokens: 100 });
+  expect(body).not.toHaveProperty('messages'); expect(body).not.toHaveProperty('reasoning');
+  expect(body).not.toHaveProperty('reasoning_effort'); expect(body).not.toHaveProperty('temperature');
+});
+
+it.each(['o4-mini', 'gpt-5.3-codex'])('keeps the declared native route for %s while refusing explicit reasoning settings', async model => {
+  const catalog = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'openai', models: [{ id: model, reasoning: false }] }]);
+  const target = { provider: 'openai', model, baseUrl: 'https://api.openai.com/v1' };
+  const fetchImpl = vi.fn(async (input, init) => {
+    expect(String(input)).toBe('https://api.openai.com/v1/responses');
+    expect(JSON.parse(String(init?.body))).not.toHaveProperty('reasoning');
+    return Response.json({ status: 'completed', model, output: [{ type: 'message', id: 'msg_1', role: 'assistant',
+      content: [{ type: 'output_text', text: 'answer' }] }] });
+  });
+  const provider = { ...target, endpoint: providerCredentialEndpoint(catalog, target) };
+  expect(provider.endpoint).toBe('openai-responses');
+  const input = { workspaceRoot, sessionId: 'refused-effort-route', systemPrompt: '', tools: [], catalog, provider, fetchImpl };
+  const automatic = createStepFunction({ ...input, thinkingEffort: null });
+  expect((await automatic([], undefined, {}, { allowTools: false })).text).toBe('answer');
+  const explicit = createStepFunction({ ...input, thinkingEffort: 'high' });
+  expect(await explicit([], undefined, {}, { allowTools: false })).toMatchObject({
+    text: '', toolCalls: [], stopReason: 'error',
+    errorMessage: 'The selected model does not support this reasoning effort. Select another level or use /thinking auto.',
+  });
+  expect(fetchImpl).toHaveBeenCalledOnce();
+});
+
+it.each(['low', 'medium', 'high'] as const)('sends explicit %s effort on the exact native coding model route', async thinkingEffort => {
+  const target = { provider: 'openai', model: 'gpt-5.3-codex', baseUrl: 'https://api.openai.com/v1' };
+  let body: Record<string, unknown> | undefined;
+  const step = createStepFunction({ workspaceRoot, sessionId: 'explicit-coding-protocol', systemPrompt: '', tools: [],
+    thinkingEffort, catalog: BUILTIN_PROVIDERS, provider: { ...target, endpoint: providerCredentialEndpoint(BUILTIN_PROVIDERS, target) },
+    fetchImpl: async (input, init) => {
+      expect(String(input)).toBe('https://api.openai.com/v1/responses');
+      body = JSON.parse(String(init?.body));
+      return Response.json({ status: 'completed', model: target.model, output: [{ type: 'message', id: 'msg_1', role: 'assistant',
+        content: [{ type: 'output_text', text: 'answer' }] }] });
+    },
+  });
+  expect((await step([], undefined, {}, { allowTools: false })).text).toBe('answer');
+  expect(body?.reasoning).toEqual({ effort: thinkingEffort, summary: 'auto' });
+  expect(body).not.toHaveProperty('reasoning_effort'); expect(body).not.toHaveProperty('temperature');
+});
+
 it('carries a known summary refusal through the actual Responses turn', async () => {
   const catalog = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'openai', models: [{ id: 'o4-mini', compat: { reasoningSummary: false } }] }]);
   let body: Record<string, unknown> | undefined;

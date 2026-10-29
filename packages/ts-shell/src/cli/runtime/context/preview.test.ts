@@ -1093,19 +1093,20 @@ it('uses the full provider replay identity for a Responses preview', async () =>
   expect(result.estimate.identity.wireMessageCount).toBe(1);
 });
 
-it.each([
+it.each(([
   { thinkingEffort: undefined, account: false }, { thinkingEffort: null, account: false },
   { thinkingEffort: undefined, account: true }, { thinkingEffort: null, account: true },
-] as const)('keeps summary-only preview and dispatch identical with automatic effort $thinkingEffort and account $account', async ({ thinkingEffort, account }) => {
+] as const).flatMap(scenario => ['o4-mini', 'gpt-5.3-codex'].map(model => ({ ...scenario, model }))))(
+  'keeps native $model preview and dispatch identical with automatic effort $thinkingEffort and account $account', async ({ thinkingEffort, account, model }) => {
   const { context, cwd, session, load, layout } = fixture({ credential: true });
   const baseUrl = account ? 'https://chatgpt.com/backend-api' : 'https://api.openai.com/v1';
-  const target = { provider: 'openai' as const, model: 'o4-mini', baseUrl,
+  const target = { provider: 'openai' as const, model, baseUrl,
     expectedEnvVarName: 'OPENAI_API_KEY', thinkingEffort, credential: account ? {
       provider: 'openai' as const, authMode: 'account-auth' as const, source: 'config' as const, envVarName: 'OPENAI_API_KEY',
       accountAuth: { type: 'openai-chatgpt-account' as const, accessToken: 'synthetic-preview-target', refreshToken: 'synthetic',
         expiresAt: 1, accountId: 'synthetic-account' },
     } : { provider: 'openai' as const, authMode: 'api-key' as const,
-      apiKey: 'synthetic-preview-target', model: 'o4-mini', baseUrl, source: 'config' as const, envVarName: 'OPENAI_API_KEY' } };
+      apiKey: 'synthetic-preview-target', model, baseUrl, source: 'config' as const, envVarName: 'OPENAI_API_KEY' } };
   Object.assign(context, { resolveConfigTarget: () => target,
     configuration: new ConfigState(context.runtimeConfig, configurationBinding(context), BUILTIN_PROVIDERS) });
   const files = [layout.metadataPath, layout.statePath, layout.transcriptPath];
@@ -1115,7 +1116,8 @@ it.each([
   const [endpoint, input] = wire.mock.calls.at(-1)!;
   const body = JSON.parse(JSON.stringify(wire.mock.results.at(-1)!.value));
   expect(endpoint).toBe(account ? 'openai-account-responses' : 'openai-responses');
-  expect(body.reasoning).toEqual({ summary: 'auto' });
+  if (model === 'o4-mini') expect(body.reasoning).toEqual({ summary: 'auto' });
+  else expect(body).not.toHaveProperty('reasoning');
   if (account) expect(body).not.toHaveProperty('max_output_tokens');
   let dispatched: Record<string, unknown> | undefined;
   const output = [{ type: 'message', id: 'msg_1', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: 'answer' }] }];

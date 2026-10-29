@@ -103,6 +103,7 @@ describe("resolveRequestShape", () => {
       'openai-responses').reasoningSummary).toBeUndefined();
     expect(resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'unlisted', undefined).reasoningSummary).toBeUndefined();
     expect(resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'gpt-5.3', undefined).reasoningSummary).toBeUndefined();
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, 'openai', 'gpt-5.3-codex', undefined).reasoningSummary).toBeUndefined();
     const relay = mergeProviders(BUILTIN_PROVIDERS, [{ id: 'relay', runtime: 'openai', baseUrl: 'https://api.openai.com/v1',
       models: [{ id: 'o4-mini', reasoning: true }] }]);
     expect(resolveRequestShape(relay, 'openai', 'o4-mini', undefined).reasoningSummary).toBeUndefined();

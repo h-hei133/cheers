@@ -876,3 +876,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An earlier stale picker-title assertion times out, then unrelated startup tests expire split pastes or make extra context-preview calls.
 - **Root Cause**: Installed Vitest 0.34 waitFor rejects on timeout without clearing its real polling interval. Every surviving callback advances the current fake clock before rechecking the old assertion; stopping the old overlay leaves that assertion permanently false.
 - **Rule**: Correct stale contracts first and verify affected later tests in the same file. Await the actual submission Promise when settlement is the invariant, keep teardown in finally, and do not rebaseline startup behavior from a contaminated run. A title-only reversal reproduced later preview failures; real-timer skill/completion failures still need their own evidence.
+
+### Effort Refusal Must Not Change A Declared Provider Protocol
+- **Symptom**: Overriding a native Responses model with reasoning:false sends automatic requests to unsupported Chat Completions.
+- **Root Cause**: The protocol guard reuses effort-setting admission even though the model still declares its endpoint; reasoning:false means explicit effort is unsupported, not that the endpoint changed.
+- **Rule**: Select protocol from the captured owner, address and explicit model endpoint independently of effort. Keep automatic requests on that route and assert explicit effort returns the existing errorStep before network; retain provider overrides, account issuer and relay boundaries.

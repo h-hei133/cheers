@@ -28,6 +28,7 @@ Last updated: 2026-10-17
 - [Phase 20 decisions and implementation plan](features/phase-20-decisions.md)
 - [Phase 20 interaction additions and acceptance criteria](features/phase-20-addition.md)
 - [Session CI failure classification and exact-model thinking defaults](features/phase-20-addition.md#2013-session返回断言与ci时序复核)
+- [Native coding-model protocol and retired reasoning aliases](features/phase-20-addition.md#2015-精确coding型号的原生协议与effort边界)
 - [Extension registry protocol and capability grants](features/extension-registry.md)
 - [Agent definitions, model routing and lifecycle](features/agent-definitions.md)
 - [SSH sessions, remote jobs and cancellation](features/ssh.md)

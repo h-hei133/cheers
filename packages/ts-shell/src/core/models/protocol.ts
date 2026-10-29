@@ -3,16 +3,15 @@ interface ProtocolOwner {
   readonly runtime: string;
   readonly models: readonly {
     readonly id: string;
-    readonly reasoning?: boolean;
     readonly compat?: { readonly endpoint?: string };
   }[];
 }
 
-/** Native defaults require an exact host and a positively declared model. */
-export function nativeOpenAIReasoning(entry: ProtocolOwner | undefined, address: string | undefined, model: string | undefined): boolean {
+/** Protocol ownership is independent of whether a model accepts effort settings. */
+export function nativeOpenAIResponses(entry: ProtocolOwner | undefined, address: string | undefined, model: string | undefined): boolean {
   return entry?.id === 'openai' && entry.runtime === 'openai'
     && address?.trim().replace(/\/+$/, '') === 'https://api.openai.com/v1'
-    && model !== undefined && entry.models.some(candidate => candidate.id === model && candidate.reasoning === true
+    && model !== undefined && entry.models.some(candidate => candidate.id === model
       && candidate.compat?.endpoint === 'openai-responses');
 }
 

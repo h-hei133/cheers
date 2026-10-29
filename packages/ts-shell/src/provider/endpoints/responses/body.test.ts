@@ -83,6 +83,20 @@ describe('Responses requests', () => {
     expect((body.input as unknown[]).slice(0, 3)).toEqual(native);
   });
 
+  it('preserves coding-model assistant phases through transcript storage and native replay', () => {
+    const model = 'gpt-5.3-codex';
+    const native = [{ ...output[1], id: 'preamble', phase: 'commentary' },
+      { ...output[1], id: 'answer', phase: 'final_answer', content: [{ type: 'output_text', text: 'Done.', annotations: [] }] }];
+    const step = toStep(endpointShape('openai-responses').readBody({ status: 'completed', model, output: native }), {});
+    const message = { role: 'assistant' as const, content: step.text, reasoning: step.reasoning,
+      origin: { provider: 'openai', model, replayBinding: turn.replayBinding }, timestamp: '2026-10-30T00:00:00Z' };
+    const decoded = transcriptEventToSessionMessage(decodeTranscriptLine(JSON.stringify(createMessageTranscriptEvent(message))));
+    const body = endpointTurnBody('openai-responses', { ...turn, model, messages: toChatMessages([decoded!,
+      { role: 'user', content: 'continue', timestamp: '2026-10-30T00:00:01Z' }]) });
+    expect((body.input as unknown[]).slice(0, 2)).toEqual(native);
+    expect((body.input as Record<string, unknown>[])[2]).not.toHaveProperty('phase');
+  });
+
   it('chooses native summary over raw reasoning without concatenating two representations', () => {
     const native = [{ ...output[0], summary: [{ type: 'summary_text', text: 'Summary' }],
       content: [{ type: 'reasoning_text', text: 'Raw trace' }] }];

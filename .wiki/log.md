@@ -10114,3 +10114,13 @@ Settings保留全部真实文件字段，模型/effort会话跳转归Session分�
 当前Vitest waitFor超时泄漏真实轮询，并在后续fake timers启用时推进虚拟时钟。仅旧标题反转16失败并带出2启动preview额外调用；字节恢复后20通过。受控1100ms队列延迟下新等待4通过、旧1秒等待反转4失败；诊断延迟撤销并字节恢复后队列/研究33通过。两个失败文件完整373项在Node24和真正Node20.3均串行通过；先前npx被工具代理为项目脚本而仍Node24，已更正证据，不计Node floor通过。Node20.3官方tar校验SHA256后绝对路径执行。重复聚焦不累加，技能/补全CI全部根因未确认，新SHA CI仍待实际读回。
 
 只读官方[Anthropic thinking](https://platform.claude.com/docs/en/build-with-claude/thinking.md)与精确内置型号复核见[addition20.14](features/phase-20-addition.md#2014-anthropic精确型号的自动思考边界)：三个型号省略thinking均off，Opus4.6可adaptive、Sonnet/Haiku4.5拒绝；启用后旧型号默认summary。保留auto省略及显式manual budget上限，不把参考的省略adaptive注释或新型号display规则套用。未改产品、无live Anthropic；自动开启待单独裁决。HANDOFF记录失败waiter跨测试推进fake clock。原47项矩阵不变、ADD active，scratch清理、最终静态门与本批Git/CI另绑定。
+
+Session测试修复已提交推送`9022efb85c5e7fc9dd2abedba9e849b6293225a9`，远端main当时精确一致，仅原CLAUDE.md未跟踪。[Watch40925143178](https://github.com/h-hei133/cheers/actions/runs/40925143178)completed/success；延后核实[CI40925143078](https://github.com/h-hei133/cheers/actions/runs/40925143078)仍在unit步骤in_progress，不计success。
+
+## [2026-10-30] fix | 精确coding型号的Responses路由与effort拒绝边界
+
+继续[addition20.15](features/phase-20-addition.md#2015-精确coding型号的原生协议与effort边界)，实际官方精确页确认gpt-5.3-codex支持Responses而不支持Chat；公告2027-04-01关闭，未替换型号。catalog声明native endpoint，协议按exact owner/runtime/HTTPS根/model声明选择，并与reasoning:false的显式档位拒绝分开。provider显式协议、relay精确alias和account issuer保持优先。auto不加reasoning，显式low/medium/high沿原Responses effort+summary:auto；summary能力仍未声明，未伪造默认或公开正文。已有opaque replay保存assistant phase，新增真实transcript序列化/解码到wire的回归，用户无phase。preview八组API-key/account×两型号×unset/null完整派发一致且会话文件不写。
+
+主代理聚焦六文件196项串行通过，反转endpoint声明2项失败、旧effort守卫2项失败；逐字节恢复后27项重验通过。新增两项拒绝预期原误写抛异常，按实际errorStep合同纠正，保留零新增HTTP断言。五静态门、完整声明图单一用例、AST catalog8/protocol3、diff通过；TS build `9c0367e15878317d8fc66f0e783a8cc522a0fb6f9efd3055a5d1ab3d644c9860`，inputs `6102c021dfdfa7eff95c6d70197c3db7927cd737495731a3a3e7fcf51c8bdad3`，460/3545新鲜度重算一致；本地NormProof proven/0open/0failed/0gap只证collector。无live OpenAI/account、PTY/exe或全仓；HANDOFF记录effort拒绝与协议分离，原47项未重验、ADD active，Git/CI另绑定。
+
+只读[addition20.16](features/phase-20-addition.md#2016-deepseek旧别名与当前思考合同的证据边界)确认官方两个旧别名在2026-07-24退役。当前flash/v4-pro公开reasoning_content与带tools时回传要求不能套给旧别名；已返回正文的读取/转发独立于effort设置。仅登记型号与回放缺口，未默默迁移catalog、无live DeepSeek或已捕获实际失败的声明。

@@ -3,7 +3,7 @@ title: "Phase 20 日常交互补充要求与任务规划"
 category: article
 sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
-updated: 2026-10-29
+updated: 2026-10-30
 tags: [features, phase-20, additions, interaction, panels, completion]
 summary: "汇总用户最新要求：settings/model看齐oh-my-pi，允许选中未配置模型，resume默认焦点修补，消息顶格及箭头恢复，提前TUI首帧、上下文估算、路径补全、多skill与部分slash组合。逐项记录实现方向、边界与验收。"
 confidence: mixed
@@ -3314,3 +3314,25 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 继续反馈25，只读核对当前内置`claude-opus-4-6`、`claude-sonnet-4-5`、`claude-haiku-4-5`与实际[request shape](../../packages/ts-shell/src/core/models/requestShape.ts)/[Messages adapter](../../packages/ts-shell/src/provider/endpoints/anthropicMessages.ts)。本次实际取得[官方thinking文档](https://platform.claude.com/docs/en/build-with-claude/thinking.md)：三个型号省略thinking均为off；只有Opus4.6接受adaptive，Sonnet/Haiku4.5的adaptive为400。Opus4.6与更早型号启用thinking后默认返回summarized内容，无需新的display opt-in。不能把新型号的默认开启/隐藏规则套到这些精确型号。
 
 现有显式low/medium/high继续发送manual enabled与budget，不发output_config.effort：请求预算2048/8192/16384受用户max_tokens减1024限制，默认4096下medium/high均3072；不足1024预算则沿现合同省略。auto/null仍省略thinking，不能以“显示summary”名义开启adaptive、发明budget或提高输出上限。定向参考的“4.6省略即adaptive”注释与官方精确型号表冲突，未机械复制；独立effort与thinking enablement分开。自动启用需要单独产品裁决，本轮不修改产品代码，也无live Anthropic证据。反馈25整体partial、原47项矩阵不变。
+
+### 20.15 精确coding型号的原生协议与effort边界
+
+继续反馈25，实际读取[精确gpt-5.3-codex模型页](https://developers.openai.com/api/docs/models/gpt-5.3-codex.md)：Responses受支持、Chat Completions不支持；effort支持low/medium/high/xhigh。[官方淘汰公告](https://developers.openai.com/api/docs/deprecations)列明2027-04-01关闭，deprecated不等于当前已不可访问。本轮保留精确型号，不替换为较新模型，也不调整vision或增加xhigh设置。gpt-5.3和gpt-5.1-mini精确页面404未能建立能力证据，不能仅凭404判定退役或套用其他型号合同。
+
+[catalog](../../packages/ts-shell/src/core/models/catalog.ts)仅为gpt-5.3-codex声明既有Responses endpoint；[protocol](../../packages/ts-shell/src/core/models/protocol.ts)的nativeOpenAIResponses要求精确canonical owner、runtime、官方HTTPS/v1地址和型号自己的声明。provider显式endpoint、精确relay alias与account issuer优先级保留。进一步复核确认reasoning:false的语义是拒绝显式档位，不能因此把已声明Responses的型号改回Chat；协议准入删除该耦合，未知型号和无声明仍不自动采用原生路由。实际turn覆盖o4-mini与coding型号：auto仍Responses且无reasoning，显式high返回原errorStep和精确提示，网络仅有之前auto的一次调用。
+
+[reasoning指南](https://developers.openai.com/api/docs/guides/reasoning.md)说明summary需要opt-in且支持依型号而异，未提供本精确型号自动摘要的独立证据，因此reasoningSummary继续未声明。unset/null的实际coding请求省略reasoning与reasoning_effort，输出上限和instructions走Responses；显式low/medium/high沿已有Responses合同发送effort及summary:auto，没有改默认档位或承诺摘要正文。这一继承行为已通过synthetic请求验证，真实账户支持与summary可见性仍缺live证据。
+
+[官方coding提示指南](https://developers.openai.com/cookbook/examples/gpt-5/codex_prompting_guide.md)要求assistant phase保存并原样回传，用户消息不得添加phase。定向参考pi的Responses effort/summary及opaque phase回放；未复制其为summary发明medium的行为。现有native output signature已保留phase，产品回放无需新增字段或第二套历史；新增[body回归](../../packages/ts-shell/src/provider/endpoints/responses/body.test.ts)贯穿toStep、实际transcript event序列化/解码、toChatMessages和endpoint body，验证commentary/final_answer原样回放以及用户无phase。[preview](../../packages/ts-shell/src/cli/runtime/context/preview.test.ts)覆盖o4-mini/coding×unset/null×API-key/account八组，完整body与实际派发相同，会话文件不写。
+
+主代理768MiB、package-local、threads=false单进程串行最终六文件196项通过：auth target7/catalogShape20/requestShape31/turn protocol20/Responses body19/preview99。初次新增两项误以为effort拒绝抛异常，实际合同是返回errorStep；补精确返回字段与零新增网络断言后通过，没有改变产品错误合同。撤去coding endpoint声明命中两个auto失败；恢复旧reasoning===true协议守卫命中两个reasoning:false失败，每次逐字节恢复；恢复后target7/turn20重验27项通过，不累加重复。无zero-test反转、timeout或OOM。
+
+五静态门、完整声明图单一用例、diff与含对象属性/方法的AST计数通过，catalog8/protocol3。1536MiB TS build `9c0367e15878317d8fc66f0e783a8cc522a0fb6f9efd3055a5d1ab3d644c9860`，inputs `6102c021dfdfa7eff95c6d70197c3db7927cd737495731a3a3e7fcf51c8bdad3`，460 compilerInputs/3545文件重新计算一致；本地NormProof proven/0open/0failed/0gap只证collector范围。无live OpenAI/account、PTY/exe、全仓或20k终端；原47项未重验、反馈25partial、ADD active。Git与精确SHA CI另绑定日志。
+
+### 20.16 DeepSeek旧别名与当前思考合同的证据边界
+
+只读复核[官方2026-04-24公告](https://api-docs.deepseek.com/news/news260424/#api-is-available-today)：内置deepseek-chat与deepseek-reasoner在2026-07-24 15:59 UTC后完全退役且不可访问。当前[thinking指南](https://api-docs.deepseek.com/guides/thinking_mode/)描述新的flash/v4-pro合同，返回reasoning_content且未要求summary opt-in；不能据此证明已退役别名接受显式reasoning_effort。catalog旧注释声称chat接受档位，但缺当前精确别名证据，本轮不扩展能力声明或默默替换用户型号。
+
+[completion读取](../../packages/ts-shell/src/turn/completion.ts)已经独立识别reasoning_content/reasoning/reasoning_text，[turn](../../packages/ts-shell/src/turn/step.ts)收到reasoning事件即转发，与effort和summary标志无关。reasoning:false只表达显式设置拒绝，不抑制已返回的thinking。未显示thinking不能仅由该标志推断供应商没有返回正文。
+
+未来型号迁移须另核对tool trajectory：当前官方要求带tools的请求回传既往reasoning_content，普通无tools对话可省略；通用兼容adapter的结构化reasoning对象不能未经比较就认作同一wire字段。本轮仅记录当前型号/回放证据缺口，无产品迁移或live DeepSeek，未宣称捕获旧别名的实际失败响应。反馈25与ADD仍partial/active。

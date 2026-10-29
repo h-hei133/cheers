@@ -1,7 +1,7 @@
 import type { RuntimeProvider } from "../../config/runtimeConfig.js";
 import type { EndpointKind } from "../../provider/endpoints/kinds.js";
 import { sanitizeModelLimits } from "./limits.js";
-import { nativeOpenAIReasoning } from './protocol.js';
+import { nativeOpenAIResponses } from './protocol.js';
 
 /**
  * Provider and model catalogue.
@@ -306,7 +306,9 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
       // Five to ten minutes of inactivity, refreshed by each hit; the extended
       // tier runs to a day.
       { id: "gpt-5.3", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
-      { id: "gpt-5.3-codex", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: false },
+      { id: "gpt-5.3-codex", contextWindow: 400_000, reasoning: true,
+        compat: { ...REASONING_REQUEST_SHAPE, endpoint: 'openai-responses' },
+        promptCache: { short: 600, long: 86_400 }, vision: false },
       { id: "gpt-5.1-mini", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
       { id: "o4-mini", contextWindow: 200_000, reasoning: true,
         compat: { ...REASONING_REQUEST_SHAPE, endpoint: 'openai-responses', reasoningSummary: true },
@@ -544,7 +546,7 @@ export function providerEndpoint(
   // accept, with nothing to say why. An unknown name now reaches `endpointShape`,
   // which names the kinds it does know.
   const entry = catalogProvider(catalog, provider, baseUrl).entry;
-  return entry?.endpoint ?? (nativeOpenAIReasoning(entry, catalogBaseUrl(catalog, provider, baseUrl), model)
+  return entry?.endpoint ?? (nativeOpenAIResponses(entry, catalogBaseUrl(catalog, provider, baseUrl), model)
     ? 'openai-responses' : undefined);
 }
 
