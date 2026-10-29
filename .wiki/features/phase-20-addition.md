@@ -2891,7 +2891,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **对用户当前环境的判断**：用户用的是 OpenAI 兼容 relay（`~/.cheers/config.json` 的 `bailucode.com` + `bailu-2.9-preview`）。这类 relay 通常**无论请求参数如何都会返回 `reasoning_content`**，而 `turn/completion.ts:169` 的 `REASONING_FIELDS` 确实解析它，所以用户应当**看得到**折叠行。那么"打不开"就落在下面第 3、4、5 条上，而不是请求侧。
 
-按用户描述（"没法打开查看"）最可能的两条：**在流式过程中点击**（第 4 条，此时点击被静默丢弃），或**处于 `regular` 模式**（第 5 条，鼠标根本不转发）。若是**恢复的旧会话**，则是第 3 条——那里连折叠行都不存在。三条都能解释"打不开"，但只有第 3 条能解释"连折叠行都没有"；用户下次复现时看有无 `● thought` 行即可二分。
+按用户描述（"没法打开查看"）最可能的两条：**在流式过程中点击**（第 4 条，按下与松开之间来一个增量即被静默丢弃），或**处于 `regular` 模式**（第 5 条，鼠标根本不转发）。若是**恢复的旧会话**，则是第 3 条——那里连折叠行都不存在。三条都能解释"打不开"，但只有第 3 条能解释"连折叠行都没有"；用户下次复现时看有无 `● thought` 行即可二分。
 
 **解析与渲染（已确认可用）**
 
@@ -2904,7 +2904,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 1. **请求侧默认不索要推理**（上文）。这决定 Anthropic/Bedrock/Google 上"从来没有思考"。
 2. **OpenAI 官方模型走错端点，Responses 又只读摘要**。内置 `openai` provider 不声明 `endpoint`（`core/models/catalog.ts:288-308`），于是回落到 `openai-compatible`（`provider/endpoints/kinds.ts:216`）；`/chat/completions` 不返回推理。只有 ChatGPT 账号走 `openai-account-responses`（`core/auth/account/policy.ts:15-16`），而该读取器**只处理 `response.reasoning_summary_text.*`，完全忽略 `response.reasoning_text.delta`**（`provider/endpoints/responses/stream.ts:117-143`）。pi 两者都读。
 3. **恢复的会话里没有思考块。** `restoreConversation`（`cli/interactive/history.ts:36-109`）只建 `user`/`assistant`/`tool` 三种块，**从不读 `SessionMessage.reasoning`**——而该字段确实已落盘（`turn/step.ts:719-728`、`session/schema/sessionMessage.ts:60-86`、真实 transcript 抽查 8/70 条带 reasoning）。所以 `/resume`、切换会话、fork、rewind 之后，历史里一个思考块都不存在，"打不开"是必然的。
-4. **流式进行中点击会被丢弃。** `pointer.ts:258-262` 在 `!transcriptSelectionCurrent()` 时直接返回；该判定比较 `view.transcript.revision`，而每个 delta 都会推进 revision。于是**模型正在思考时点那一行不会展开**——恰恰是用户最想看的时刻。轮次结束后点击才有效。
+4. **点击的按下与松开之间只要来一个增量，这次点击就被判过期并丢弃。** `pointer.ts:255-261` 在 `!transcriptSelectionCurrent()` 时 `clearSelection()` 后直接返回，`toggle()` 不再执行；而 `transcriptSelectionCurrent()`（`:307-313`）要求 `transcriptContentRevision === view.transcript.revision`，后者每个 delta 都推进。流式期间 delta 连续到达，落在这段极短窗口内的概率并不低——于是**模型正在思考时点那一行常常不展开**，恰恰是用户最想看的时刻。轮次结束后点击稳定有效。
 5. **`regular` 模式下鼠标不可达。** `interactiveMode.ts:513` 只在 `alternateScreen || pager.active || overlay.fullScreen` 时把鼠标交给 pointer，`engine.ts:369/373` 也只在同样条件开启鼠标跟踪。非全屏模式下 "click to expand" 是画出来点不了的提示（键盘 `ctrl+t` 仍可用）。
 
 **次要缺陷**：`pane.ts:128-132` 的批量翻转**只按最旧那个块决定目标状态**。若用户先展开了旧块，之后新块到达（新块恒为 `collapsed:true`），第一次按 `ctrl+t` 会把全部折叠，而不是展开新的那个——看起来像"按了没反应"。
