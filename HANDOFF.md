@@ -871,3 +871,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Native Google requests under automatic effort may reason internally without returning public summaries, or a documentation update leads to Interactions fields being sent to GenerateContent.
 - **Root Cause**: Public `includeThoughts` is coupled to a selected budget; similarly named current documentation describes a different API's request contract.
 - **Rule**: Preserve provider-decided budget and request known supported summaries independently. Verify the actual endpoint's API schema and exact model support; do not infer visible text from encrypted signatures, summary opt-in or internal thought token counts. Bind native capability to the captured official owner/resource, and retain unknown/account/relay boundaries.
+
+### Failed Waiters Can Advance A Later Test's Fake Clock
+- **Symptom**: An earlier stale picker-title assertion times out, then unrelated startup tests expire split pastes or make extra context-preview calls.
+- **Root Cause**: Installed Vitest 0.34 waitFor rejects on timeout without clearing its real polling interval. Every surviving callback advances the current fake clock before rechecking the old assertion; stopping the old overlay leaves that assertion permanently false.
+- **Rule**: Correct stale contracts first and verify affected later tests in the same file. Await the actual submission Promise when settlement is the invariant, keep teardown in finally, and do not rebaseline startup behavior from a contaminated run. A title-only reversal reproduced later preview failures; real-timer skill/completion failures still need their own evidence.

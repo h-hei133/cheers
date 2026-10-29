@@ -329,7 +329,8 @@ it('returns the real settings session entry with the exact selection outcome aft
   const details = (await models.inspect!(target))!.next!; await details.load();
   const effort = (await details.apply(['effort']))!.next!; await effort.load();
   const result = (await effort.apply(['medium']))!; await result.next!.load();
-  expect(result.next!.title).toBe('Settings — user configuration — Model'); expect(result.next!.initialSelection).toBe('settings:model');
+  expect(result.next!.title).toBe('Settings — current session — from user configuration');
+  expect(result.next!.chips?.active).toBe('Session'); expect(result.next!.initialSelection).toBe('settings:model');
   expect(result.next!.footer).toContain('Model switched to shared.');
   expect(readSessionModel(runtime.session.id)).toMatchObject({ connectionId: 'relay', thinkingEffort: 'medium' });
 });

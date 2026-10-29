@@ -10104,3 +10104,13 @@ Settings保留全部真实文件字段，模型/effort会话跳转归Session分�
 主代理231项去重聚焦串行通过：shape31/catalog20/GenAI38/Vertex13/googleRequests10/turn protocol13/preview95/account5/auth target6。turn含八次native模型/auto组合但按两个用例计数，side/compaction形状与preview四组完整派发一致。两初次turn失败因新夹具忽略既有temperature0.7，补精确body后13通过。四类反转summary2/host1/Vertex1/preview透传2有效失败，全部字节恢复后shape31/body38/filtered preview4重验73通过，91未选不计；无timeout/zero-test/OOM。两个gpt-6.1-sol代理仅读/编辑无验证，交叉review不作独立终局验收。
 
 五静态门、完整声明图单一脚本、module facade0、AST≤20与diff通过；catalog8/protocol3/googleWire15/GenAI5/Vertex9。TS build `bf7cfd1f79433711a1caf7262ff94a1813eba154fc7915e859a7eac627dee35b`，inputs `f8ba10bb9699f271a18a1cd2ae7c49b962c5aeb2892e784483ed5b71efafc358`，460/3545重新计算一致；repo bundle judge proven/0open/0failed/0gap仅证collector。没有live Google/Vertex、真实signer/账户可用性或终端/full suite验证，2.5当前访问限制与能力证据分开；原47项未重验、ADD active。HANDOFF记公开摘要/budget/API合同区别，scratch清理后提交，Git/精确SHA CI另读回。
+
+上述Google实现已提交推送`bdcb78d0f34391f5eb0f67628f75f94009ddd181`，远端main当时精确一致、仅原CLAUDE.md未跟踪。[Watch40919240153](https://github.com/h-hei133/cheers/actions/runs/40919240153)completed/success；[CI40919240078](https://github.com/h-hei133/cheers/actions/runs/40919240078)后来completed/failure，不记绿色。
+
+## [2026-10-30] test | Session返回合同与异步提交等待
+
+延后读回[3531 CI40914893093](https://github.com/h-hei133/cheers/actions/runs/40914893093)失败47/通过12279/跳过3；[bdcb CI40919240078](https://github.com/h-hei133/cheers/actions/runs/40919240078)失败54/通过12296/跳过3，两次均2失败文件/1032通过/1跳过。实际失败分类和处理见[addition20.13](features/phase-20-addition.md#2013-session返回断言与ci时序复核)：17项旧标题补精确current session/source scope和Session分类，原写入/notice/readback断言保留；队列和研究旁观真实run Promise、等待实际后续任务，清理经finally保证。生产调度、provider、权限与测试全局配置未改。
+
+当前Vitest waitFor超时泄漏真实轮询，并在后续fake timers启用时推进虚拟时钟。仅旧标题反转16失败并带出2启动preview额外调用；字节恢复后20通过。受控1100ms队列延迟下新等待4通过、旧1秒等待反转4失败；诊断延迟撤销并字节恢复后队列/研究33通过。两个失败文件完整373项在Node24和真正Node20.3均串行通过；先前npx被工具代理为项目脚本而仍Node24，已更正证据，不计Node floor通过。Node20.3官方tar校验SHA256后绝对路径执行。重复聚焦不累加，技能/补全CI全部根因未确认，新SHA CI仍待实际读回。
+
+只读官方[Anthropic thinking](https://platform.claude.com/docs/en/build-with-claude/thinking.md)与精确内置型号复核见[addition20.14](features/phase-20-addition.md#2014-anthropic精确型号的自动思考边界)：三个型号省略thinking均off，Opus4.6可adaptive、Sonnet/Haiku4.5拒绝；启用后旧型号默认summary。保留auto省略及显式manual budget上限，不把参考的省略adaptive注释或新型号display规则套用。未改产品、无live Anthropic；自动开启待单独裁决。HANDOFF记录失败waiter跨测试推进fake clock。原47项矩阵不变、ADD active，scratch清理、最终静态门与本批Git/CI另绑定。

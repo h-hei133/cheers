@@ -3296,3 +3296,21 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 主代理package-local、显式每次一个文件、768MiB/threads=false &&串行共231项去重通过：requestShape31/catalogShape20/googleGenAI38/googleVertex13/googleRequests10/turn protocol13/preview95/googleAccount5/auth target6。实际turn覆盖两provider×两model×unset/null（八次synthetic请求在两个用例内，按用例数计13而非调用数）；负向relay/匿名/未知与无summary成功；simple/compaction同shape；preview四组完整body与实际dispatch逐值相同且session文件不写。初次turn新夹具未计既有默认temperature0.7，两项失败属fixture遗漏，补完整body精确断言后13通过。四类反转summary传播2、官方host1、Vertex资源1、GenAI preview透传2均有效失败且字节恢复；恢复后shape31/body38/filtered preview4重验73项，另91项未选不计新通过。没有timeout/OOM或zero-test反转。
 
 五静态门、完整声明图单一脚本、module facade0、diff与AST通过：catalog8/protocol3/googleWire15/GenAI5/Vertex9，均≤20。1536MiB TS build `bf7cfd1f79433711a1caf7262ff94a1813eba154fc7915e859a7eac627dee35b`，inputs `f8ba10bb9699f271a18a1cd2ae7c49b962c5aeb2892e784483ed5b71efafc358`，460 compilerInputs/3545文件重算一致；repo bundle judge proven/0open/0failed/0gap仅证collector结构。两个gpt-6.1-sol代理仅读/编辑，所有验证由主代理串行。无live Google/Vertex、真实token signer/账户可用性、PTY/exe或全套；原47项矩阵未重跑，feedback25 partial、ADD active。Git与CI另由日志精确绑定。
+
+### 20.13 Session返回断言与CI时序复核
+
+延后读回确认两批CI失败：[3531e3c的CI40914893093](https://github.com/h-hei133/cheers/actions/runs/40914893093)为47失败/12279通过/3跳过，[bdcb78d的CI40919240078](https://github.com/h-hei133/cheers/actions/runs/40919240078)为54失败/12296通过/3跳过。两次均只有[interactiveMode测试](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)和[model recovery测试](../../packages/ts-shell/src/cli/interactive/picker/model/recovery.test.ts)失败；其他1032个文件通过，1个文件跳过。五静态门、scripts和build步骤通过不等于整次CI通过；两批Watch成功另计。
+
+3531的47项逐项归类为：17旧Session标题、17队列等待、3研究等待、4启动预览、2技能面板、4引用补全。bdcb重复同类，队列25项、引用3项，其余分类相同。17旧标题断言补为`Settings — current session — from user configuration`及Session分类，同时保留Models and roles焦点、unverified/sign-in通知、精确会话/配置读回、草稿和零网络断言。
+
+队列及研究已实际进入原提交路径，但`vi.waitFor`的默认1秒早于异步skill acquisition完成；整个测试的30秒预算不延长该等待。队列测试现旁观原run Promise，按实际追加的后续任务排空，包括嵌套queue与显式Enter重试，再断言busy=false和原text/images/skills/queue-empty合同；研究确认真实Enter只提交一次，等待同一Promise后检查原创建/派发或拒绝及文件不变。清理先stop，settlement拒绝也经finally恢复mock/env/fixture，没有更改生产调度、超时、权限或provider代码。
+
+进一步源码核查发现当前Vitest 0.34的waitFor超时只reject、不清真实setInterval；旧标题持续不匹配，mode.stop后旧overlay无行，轮询不能自行恢复。后续fake timers启用时，每个泄漏回调会先推进虚拟时钟50ms，影响startup paste/context计时。主代理有界反转只恢复旧标题：16项标题失败，并带出2项启动preview额外调用；逐字节恢复后20项通过。该反转确认一种启动连锁机制，不把真实定时器下的技能/补全失败全部归为同因，也未改依赖或全局测试配置。
+
+主代理768MiB、package-local、threads=false最终两个失败文件373项通过；先59项定向通过、再全文件373项通过用于分类，重复不累加。直接下载官方Node 20.3.0、核对官方SHA256后用绝对二进制再次跑同两个文件373项通过；先前npx命令被工具转为项目脚本、实际仍Node24，相关通过只算Node24证据。受控队列后续延迟1100ms时新等待4项通过，反转旧1秒等待4项失败；移除诊断延迟并字节恢复后队列/研究33项通过。临时证据和Node工具清理后交付。无全仓套件、PTY/exe、20k终端或live provider；新的精确SHA CI另读回，ADD仍active。
+
+### 20.14 Anthropic精确型号的自动思考边界
+
+继续反馈25，只读核对当前内置`claude-opus-4-6`、`claude-sonnet-4-5`、`claude-haiku-4-5`与实际[request shape](../../packages/ts-shell/src/core/models/requestShape.ts)/[Messages adapter](../../packages/ts-shell/src/provider/endpoints/anthropicMessages.ts)。本次实际取得[官方thinking文档](https://platform.claude.com/docs/en/build-with-claude/thinking.md)：三个型号省略thinking均为off；只有Opus4.6接受adaptive，Sonnet/Haiku4.5的adaptive为400。Opus4.6与更早型号启用thinking后默认返回summarized内容，无需新的display opt-in。不能把新型号的默认开启/隐藏规则套到这些精确型号。
+
+现有显式low/medium/high继续发送manual enabled与budget，不发output_config.effort：请求预算2048/8192/16384受用户max_tokens减1024限制，默认4096下medium/high均3072；不足1024预算则沿现合同省略。auto/null仍省略thinking，不能以“显示summary”名义开启adaptive、发明budget或提高输出上限。定向参考的“4.6省略即adaptive”注释与官方精确型号表冲突，未机械复制；独立effort与thinking enablement分开。自动启用需要单独产品裁决，本轮不修改产品代码，也无live Anthropic证据。反馈25整体partial、原47项矩阵不变。

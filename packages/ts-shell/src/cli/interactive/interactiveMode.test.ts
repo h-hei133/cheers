@@ -558,7 +558,8 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     await vi.waitFor(() => expect(writer).toHaveBeenCalledTimes(2));
     await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
     expect(readSessionModel(session.id)).toEqual({ ...baseline, roles: { summary: baseline.roles!.summary } });
-    terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('Settings — user configuration'));
+    terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('Settings — current session — from user configuration'));
+    expect(frame()).toContain('Session /');
     expect(frame()).toContain('▸ Models and roles'); expect(frame()).toContain('advisor follows the default');
     expect(host.view.editor.getText()).toBe('held draft\nkept through role editing');
     expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
@@ -642,7 +643,8 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       terminal.input('\r'); await vi.waitFor(() => expect(frame()).toContain('▸ Advisor'));
       expect(readSessionModel(session.id)).toEqual({ ...original, roles: { ...original.roles,
         advisor: { connectionId: connection.id, provider: 'openai', model: 'gpt-5.4-mini', thinkingEffort: 'low' } } });
-      terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('Settings — user configuration'));
+      terminal.input('\x1b'); await vi.waitFor(() => expect(frame()).toContain('Settings — current session — from user configuration'));
+      expect(frame()).toContain('Session /');
       expect(frame()).toContain('▸ Models and roles'); expect(frame()).toContain('advisor uses');
       expect(host.view.editor.getText()).toBe('held role sign-in draft\nkept through failure');
       expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(configBytes);
@@ -1471,6 +1473,11 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind => (['add ', ''] as co
     const markers = images.map(image => host.state.pastes.holdImage(image)).join(' ');
     const draft = `/queue ${prefix}${reroute ? '/queue add ' : ''}比较 ${markers} /skill:a\n/skill:b  `;
     const source = '比较   /skill:a\n/skill:b  ';
+    const running = vi.spyOn(host, 'run');
+    const settle = async () => {
+      // A settled turn may start its queued successor before returning.
+      for (let index = 0; index < running.mock.results.length; index++) await running.mock.results[index]!.value;
+    };
     let foreground: Promise<void> | undefined;
     mode.start();
     try {
@@ -1487,7 +1494,7 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind => (['add ', ''] as co
         host.options.sessionRuntime.cancelAndWait = vi.fn(async () => { release(); });
         await host.interrupt();
       } else release();
-      await foreground; await vi.waitFor(() => expect(host.busy).toBe(false));
+      await foreground; await settle(); expect(host.busy).toBe(false);
       let submitted = source;
       if (ending !== 'dispatch') {
         expect(dispatch).toHaveBeenCalledOnce();
@@ -1498,7 +1505,7 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind => (['add ', ''] as co
           fs.writeFileSync(skillPaths[1]!, second);
         }
         submitted = host.state.pastes.expand(restored); terminal.input('\r');
-        await vi.waitFor(() => expect(host.busy).toBe(false));
+        await settle(); expect(host.busy).toBe(false);
       }
       expect(dispatch).toHaveBeenCalledTimes(2); const sent = dispatch.mock.calls[1]![0];
       expect(sent).toMatchObject({ attachments: { images }, promptMetadata: {
@@ -1508,8 +1515,12 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind => (['add ', ''] as co
       expect(host.lastPrompt).toBe(submitted); expect(host.lastAttachments).toEqual({ images });
       expect(host.queue.length).toBe(0); expect(host.queue.takeAttachments()).toBeUndefined(); expect(network).not.toHaveBeenCalled();
     } finally {
-      release(); await foreground; await vi.waitFor(() => expect(host.busy).toBe(false));
-      mode.stop(); dispatch.mockRestore(); network.mockRestore(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+      release(); mode.stop();
+      try { await foreground; await settle(); }
+      finally {
+        running.mockRestore(); dispatch.mockRestore(); network.mockRestore(); vi.unstubAllEnvs();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
     }
   });
 
@@ -1521,7 +1532,7 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind => [true, false].map(v
       fs.writeFileSync(file, `---\nname: ${name}\ndescription: method\n---\nBODY ${name}`); return file;
     });
     const { mode, terminal, renderer } = build({ tuiMode: kind });
-    const host = mode as unknown as { view: InteractiveView; busy: boolean;
+    const host = mode as unknown as { view: InteractiveView; busy: boolean; run(text: string): Promise<void>;
       options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager; sessionRuntime: ShellSessionRuntime } };
     const context = createShellRuntimeContext({ cwd: setup.root, originalCwd: setup.root, projectRoot: setup.root,
       targetPathBase: setup.root, rootMode: 'direct', gitRoot: null,
@@ -1537,14 +1548,16 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind => [true, false].map(v
     const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
     const input = `比较论文 /deep-research --mode="${valid ? 'paper' : 'unknown'}" --depth='deep' --brief="brief /review.md" /skill:a /skill:b `;
     const before = fs.readFileSync(readResearch(setup.manager, setup.session).bound.layout.statePath);
+    const submitted = vi.spyOn(host, 'run');
     mode.start();
     try {
       expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
       terminal.input(`\x1b[200~${input}\x1b[201~`);
       expect(host.view.editor.getText()).toBe(input);
       terminal.input('\r');
+      expect(submitted).toHaveBeenCalledOnce(); await submitted.mock.results[0]!.value;
       if (valid) {
-        await vi.waitFor(() => expect(dispatch, host.view.transcript.all().map(block => block.text).join('\n')).toHaveBeenCalledOnce());
+        expect(dispatch, host.view.transcript.all().map(block => block.text).join('\n')).toHaveBeenCalledOnce();
         const admitted = currentResearch(readResearch(setup.manager, setup.session))!;
         expect(admitted.request).toMatchObject({ mode: 'paper', depth: 'deep', briefPath: 'brief /review.md',
           methods: { originalInput: input, skills: [{ name: 'a' }, { name: 'b' }] } });
@@ -1554,14 +1567,17 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind => [true, false].map(v
         expect(sent.effectivePrompt).toContain('BODY a'); expect(sent.effectivePrompt).toContain('BODY b');
         expect(create).toHaveBeenCalledOnce(); expect(arm).toHaveBeenCalledOnce();
       } else {
-        await vi.waitFor(() => expect(host.view.transcript.all().map(block => block.text).join('\n')).toContain('Invalid research composition'));
+        expect(host.view.transcript.all().map(block => block.text).join('\n')).toContain('Invalid research composition');
         expect(host.view.editor.getText()).toBe(input); expect(dispatch).not.toHaveBeenCalled();
         expect(create).not.toHaveBeenCalled(); expect(arm).not.toHaveBeenCalled();
         expect(fs.readFileSync(readResearch(setup.manager, setup.session).bound.layout.statePath)).toEqual(before);
       }
-      await vi.waitFor(() => expect(host.busy).toBe(false));
+      expect(host.busy).toBe(false);
       expect(run).not.toHaveBeenCalled(); expect(network).not.toHaveBeenCalled(); expect(provider).not.toHaveBeenCalled();
-    } finally { mode.stop(); cleanupResearch(); }
+    } finally {
+      mode.stop();
+      try { await submitted.mock.results[0]?.value; } finally { cleanupResearch(); }
+    }
   });
 
 it('restores queued composed images and text when the active turn is interrupted', async () => {
