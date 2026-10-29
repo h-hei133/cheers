@@ -766,3 +766,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: After pasting a long block, the next unrelated paste expands the block and silently discards the clipboard.
 - **Root Cause**: Expansion was addressed by "caret is on the block", and the range was closed at both ends. Inserting a token leaves the caret immediately after it, so that position armed the gesture for every following paste.
 - **Rule**: Address an atomic token with a half-open range and treat the position just past it as outside. Test the landing position explicitly — a test that only checks "caret inside expands" passes with the bug.
+
+### A Broad Suite Under A Tight Heap Is Not A Bigger Focused Test
+- **Symptom**: A verification run covering eleven directories aborts with a V8 OOM stack trace instead of test results, after ten minutes.
+- **Root Cause**: The scope, not the changes. `--threads=false` serializes files but every file still loads into one process, and eleven directories is thousands of modules under a 1024 MiB cap. The earlier focused runs passed because each covered a handful of files.
+- **Rule**: Keep a single verification invocation to the files the change actually touches. Chain several small invocations with `&&` when more coverage is needed, and never treat a wider directory glob as a stronger version of a focused test. On this machine a broad run is also the path to the kernel OOM killer, which takes the session with it.
