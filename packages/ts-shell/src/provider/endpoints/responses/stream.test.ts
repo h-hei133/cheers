@@ -72,7 +72,8 @@ describe('Responses terminal and SSE contract', () => {
       { type: 'response.reasoning_text.delta', output_index: 0, content_index: 0, item_id: 'rs_raw', delta: 'First' },
       terminal([completed])]);
     expect(result.finishReason).toBe('stop'); expect(result.reasoning).toBe('Summary');
-    expect(fragments.map(fragment => fragment.text)).toEqual(['Second', 'Summary', 'First']);
+    expect(fragments.map(fragment => fragment.text)).toEqual(['Second', 'Summary', 'First', 'Summary']);
+    expect(fragments.at(-1)).toEqual({ kind: 'reasoning.replace', text: 'Summary' });
     expect(JSON.parse(result.reasoningSignature!).output).toEqual([completed]);
   });
 
@@ -101,7 +102,7 @@ describe('Responses terminal and SSE contract', () => {
       ], '\n', true, true, kind);
       expect(result.finishReason).toBe('stop');
       expect(fragments).toEqual([
-        { kind: 'reasoning', text: 'Raw plan' }, { kind: 'reasoning', text: 'Summary plan' },
+        { kind: 'reasoning', text: 'Raw planSummary plan' },
         { kind: 'text', text: 'Hello 世界' },
       ]);
       expect(result.reasoning).toBe('Raw planSummary plan');
@@ -145,7 +146,8 @@ describe('Responses terminal and SSE contract', () => {
     expect(result.finishReason).toBe('stop');
     expect(result.reasoning).toBe('One first\nTwo more');
     expect(fragments).toEqual([{ kind: 'reasoning', text: 'One ' }, { kind: 'reasoning', text: 'Two' },
-      { kind: 'reasoning', text: 'first' }, { kind: 'text', text: 'Hello 世界' }]);
+      { kind: 'reasoning', text: 'first' }, { kind: 'reasoning.replace', text: 'One first\nTwo more' },
+      { kind: 'text', text: 'Hello 世界' }]);
   });
 
   it('recovers public reasoning from sealed account items when response.done omits output', async () => {
@@ -157,6 +159,60 @@ describe('Responses terminal and SSE contract', () => {
     ], '\n', true, true, 'openai-account-responses');
     expect(result.finishReason).toBe('stop');
     expect(fragments).toEqual([{ kind: 'reasoning', text: 'Account plan' }, { kind: 'text', text: 'Hello 世界' }]);
+    expect(JSON.parse(result.reasoningSignature!).output).toEqual([reasoning, item]);
+  });
+
+  it.each(['openai-responses', 'openai-account-responses'] as const)(
+    'reconciles %s reasoning across output items in canonical order without repeating streamed text', async kind => {
+      const first = { type: 'reasoning', id: 'rs_first', summary: [{ type: 'summary_text', text: 'First' }] };
+      const second = { type: 'reasoning', id: 'rs_second', summary: [{ type: 'summary_text', text: 'Second' }] };
+      const { result, fragments } = await read([added({ ...first, summary: [] } as never),
+        added({ ...second, summary: [] } as never, 1),
+        { type: 'response.reasoning_summary_text.delta', output_index: 1, item_id: second.id, summary_index: 0, delta: 'Second' },
+        { type: 'response.reasoning_summary_text.delta', output_index: 0, item_id: first.id, summary_index: 0, delta: 'First' },
+        terminal([first, second, item])], '\n', true, true, kind);
+      expect(result.reasoning).toBe('FirstSecond');
+      expect(fragments).toEqual([{ kind: 'reasoning', text: 'Second' }, { kind: 'reasoning', text: 'First' },
+        { kind: 'reasoning.replace', text: 'FirstSecond' }, { kind: 'text', text: 'Hello 世界' }]);
+      expect(JSON.parse(result.reasoningSignature!).output).toEqual([first, second, item]);
+    });
+
+  it.each(['eof', 'foreign', 'contradictory', 'malformed-tool', 'failed', 'error', 'answer-prefix'] as const)(
+    'does not replace streamed reasoning with a %s terminal projection', async fault => {
+      const start = { type: 'reasoning', id: 'rs_refused', summary: [] };
+      const reasoning = { ...start, summary: [{ type: 'summary_text', text: 'Final summary' }],
+        content: [{ type: 'reasoning_text', text: 'Streamed raw' }] };
+      const last = terminal([reasoning, item]);
+      const events: unknown[] = [{ type: 'response.created', response: { id: 'resp_1' } }, added(start as never),
+        { type: 'response.reasoning_text.delta', output_index: 0, item_id: start.id, content_index: 0, delta: 'Streamed raw' }];
+      if (fault === 'foreign') last.response.id = 'resp_other';
+      if (fault === 'contradictory') reasoning.content[0]!.text = 'Different raw';
+      if (fault === 'malformed-tool') last.response.output.push({ type: 'function_call', id: 'fc_bad',
+        call_id: 'bad', name: 'read', arguments: '[]', status: 'completed' });
+      if (fault === 'failed') { last.type = 'response.failed'; last.response.status = 'failed'; }
+      if (fault === 'answer-prefix') events.push(added(item, 1),
+        { type: 'response.output_text.delta', output_index: 1, item_id: item.id, content_index: 0, delta: 'Different answer' });
+      if (fault !== 'eof') events.push(fault === 'error' ? { type: 'error' } : last);
+      const { result, fragments } = await read(events);
+      expect(result.finishReason).toBe('error');
+      expect(result.reasoningSignature).toBeUndefined();
+      expect(fragments).toEqual([{ kind: 'reasoning', text: 'Streamed raw' },
+        ...(fault === 'answer-prefix' ? [{ kind: 'text', text: 'Different answer' }] : [])]);
+    });
+
+  it('replaces account reasoning from validated sealed items when the terminal omits output', async () => {
+    const start = { type: 'reasoning', id: 'rs_sealed', summary: [] };
+    const reasoning = { ...start, content: [{ type: 'reasoning_text', text: 'Raw' }],
+      summary: [{ type: 'summary_text', text: 'Summary' }], encrypted_content: 'synthetic-cipher' };
+    const { result, fragments } = await read([added(start as never),
+      { type: 'response.reasoning_text.delta', output_index: 0, item_id: start.id, content_index: 0, delta: 'Raw' },
+      { type: 'response.output_item.done', output_index: 0, item: reasoning }, added(item, 1),
+      { type: 'response.output_item.done', output_index: 1, item },
+      { type: 'response.done', response: { id: 'resp_1', status: 'completed', model: 'm' } },
+    ], '\n', true, true, 'openai-account-responses');
+    expect(result.finishReason).toBe('stop');
+    expect(fragments).toEqual([{ kind: 'reasoning', text: 'Raw' }, { kind: 'reasoning.replace', text: 'Summary' },
+      { kind: 'text', text: 'Hello 世界' }]);
     expect(JSON.parse(result.reasoningSignature!).output).toEqual([reasoning, item]);
   });
 

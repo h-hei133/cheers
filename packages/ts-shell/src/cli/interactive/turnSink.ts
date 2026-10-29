@@ -4,6 +4,7 @@ import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type { RendererSink } from "../../presentation/terminal/streaming.js";
 import { splitFencedDiff, type Block } from "../../presentation/tui/transcript/blocks.js";
 import { ToolCards } from "./toolCards.js";
+import { Thinking } from "./turn/thinking.js";
 import type { Transcript } from "../../presentation/tui/transcript/container.js";
 import type { TurnActivity } from "../../presentation/tui/transcript/live.js";
 
@@ -28,8 +29,7 @@ export class TurnSink implements RendererSink {
   private cancelling = false;
   private label = "working";
   private assistant: Block | undefined;
-  private thinking: Block | undefined;
-  private thinkingStartedAt = 0;
+  private readonly thinking: Thinking;
   private prose: Block | undefined;
   private readonly tools: ToolCards;
   private proseKind: "command" | "error" = "command";
@@ -41,13 +41,14 @@ export class TurnSink implements RendererSink {
     this.onChange = onChange;
     this.now = now;
     this.tools = new ToolCards(transcript, onChange, () => this.now());
+    this.thinking = new Thinking(transcript, () => this.now(), () => { this.label = "working"; });
   }
 
   /** Open a block that collects prose for one submitted input. */
   begin(kind: "command" | "turn", title: string): void {
     this.prose = undefined;
     this.assistant = undefined;
-    this.thinking = undefined;
+    this.thinking.clear();
     this.tools.clear();
     this.cancelling = false;
     this.failed = false;
@@ -103,7 +104,7 @@ export class TurnSink implements RendererSink {
       this.transcript.finalizeAll();
     }
     this.assistant = undefined;
-    this.thinking = undefined;
+    this.thinking.clear();
     this.prose = undefined;
     this.tools.clear();
     if (!discard) this.onChange();
@@ -187,33 +188,14 @@ export class TurnSink implements RendererSink {
    * nothing, and reasoning that runs longer than the answer should not bury it.
    */
   think(text = ""): void {
-    if (!text && !this.thinking) return;
-    if (!this.thinking) {
-      this.thinkingStartedAt = this.now();
-      this.thinking = this.transcript.append({
-        kind: "thinking",
-        text: "",
-        finalized: false,
-        collapsed: true,
-      });
-      this.label = "thinking";
-    }
-    // A reasoning stream is not continuous: the model can work silently for a
-    // long time between two deltas. Advancing the clock only when text arrives
-    // left the row frozen for exactly the stretch the user is waiting through,
-    // so the frame tick calls this with no text. A tick inside the tenth the row
-    // already shows changes nothing, and must not drop its cached rows.
-    const elapsed = this.now() - this.thinkingStartedAt;
-    if (Math.floor(elapsed / 100) !== Math.floor((this.thinking.elapsedMs ?? 0) / 100)) {
-      this.transcript.update(this.thinking, current => { current.elapsedMs = elapsed; });
-    }
-    if (text) this.transcript.setText(this.thinking, this.thinking.text + text);
+    if (!this.thinking.append(text)) return;
+    this.label = "thinking";
     this.onChange();
   }
 
   chunk(text: string): void {
     if (!text) return;
-    this.settleThinking();
+    this.thinking.settle();
     const block = this.assistant ?? this.openAssistant();
     this.transcript.setText(block, block.text + text);
     this.onChange();
@@ -221,6 +203,17 @@ export class TurnSink implements RendererSink {
 
   handleEvent(event: QueryEvent): void {
     switch (event.type) {
+      case "message.started":
+        this.finalizeAssistant();
+        this.thinking.clear();
+        this.prose = undefined;
+        this.label = "working";
+        this.onChange();
+        return;
+      case "reasoning.replace":
+        this.thinking.replace(event.text);
+        this.onChange();
+        return;
       case "message.delta":
         this.chunk(event.delta);
         return;
@@ -301,28 +294,14 @@ export class TurnSink implements RendererSink {
     // being shown as live and the activity row goes back to the turn's own label.
     // Streamed text arrives through this path and never through `openProse`, so
     // skipping this here left the row reading "thinking" for the whole answer.
-    this.settleThinking();
+    this.thinking.settle();
     this.assistant = this.transcript.append({ kind: "assistant", text: "", finalized: false });
     return this.assistant;
   }
 
-  /**
-   * Retire the live working block, if there is one.
-   *
-   * Both paths that begin the answer call this: prose written for a command, and
-   * text streamed from the model. They used to disagree, and only one of them put
-   * the label back.
-   */
-  private settleThinking(): void {
-    if (!this.thinking) return;
-    this.transcript.update(this.thinking, block => { block.finalized = true; });
-    this.thinking = undefined;
-    this.label = "working";
-  }
-
   private finalizeAssistant(): void {
     // Whatever the model was working through is settled once it starts answering.
-    this.settleThinking();
+    this.thinking.settle();
     if (!this.assistant) return;
     this.transcript.update(this.assistant, block => { block.finalized = true; });
     // `/copy` with no argument copies the last answer; without this it had

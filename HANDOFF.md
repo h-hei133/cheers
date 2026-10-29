@@ -941,3 +941,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Multiple aggregated SSE deltas each contain thinking and answer text; the second thinking row stays live after the answer continues.
 - **Root Cause**: Thinking settlement occurs only when the assistant block is first opened. Later answer deltas reuse that block and bypass settlement for a newly created thinking block.
 - **Rule**: Settle the current thinking block on every nonempty answer chunk, including chunks reusing an assistant. Preserve the existing single answer block and verify multiple combined deltas through the actual step-to-sink path; after settlement a no-text thinking tick must not restart its clock.
+
+
+### Verified Reasoning Needs Whole-Message Display Ownership
+- **Symptom**: Raw/summary or interleaved parts leave live thinking different from saved public text; replacing a later tool-following message can overwrite an earlier reasoning block.
+- **Root Cause**: Per-part validation state does not represent actual emission order, and settling a live clock discards or retains a block without an explicit model-message boundary. Kernel message_start occurs after the streaming step returns.
+- **Rule**: Compare the whole message's actual emitted text to the existing public projection only after terminal, item, tool and answer-prefix validation. Append a matching tail or replace through the revisioned Transcript writer; retain the same block after answer settlement, preserve its expansion, and retire its owner before the next step's callbacks. Keep display start/replacement events transient and test the real tool loop plus cache invalidation and failed-terminal refusal.
+
+### Process Checks Must Omit Command Arguments
+- **Symptom**: A process inventory includes credential-bearing service arguments, even when a wrapper truncates its output.
+- **Root Cause**: Requesting args exposes unrelated services' launch secrets; truncation is not redaction.
+- **Rule**: Observe verification processes using PID, parent PID, status and executable name only. Never request or print full process arguments when checking whether a yielded test or build is still running.

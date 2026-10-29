@@ -409,6 +409,46 @@ describe("what a tool card says it is doing", () => {
 });
 
 describe("the activity row across a reasoning answer", () => {
+  it('replaces the same expanded reasoning after the answer and invalidates cached rows and selection revision', () => {
+    const { sink, transcript, rows } = build();
+    sink.begin('turn', 'turn');
+    sink.handleEvent({ type: 'message.started', role: 'coder' });
+    sink.think('Intermediate raw');
+    const thinking = transcript.last()!;
+    transcript.setCollapsed(thinking, false);
+    sink.chunk('Answer');
+    expect(stripAnsi(rows())).toContain('Intermediate raw');
+    const revision = transcript.revision;
+    const elapsed = thinking.elapsedMs;
+    sink.handleEvent({ type: 'reasoning.replace', role: 'coder', text: 'Verified summary' });
+    expect(transcript.all().filter(block => block.kind === 'thinking')).toEqual([thinking]);
+    expect(thinking).toMatchObject({ text: 'Verified summary', collapsed: false, finalized: true, elapsedMs: elapsed });
+    expect(transcript.revision).toBeGreaterThan(revision);
+    expect(stripAnsi(rows())).toContain('Verified summary');
+    expect(stripAnsi(rows())).not.toContain('Intermediate raw');
+    sink.think();
+    expect(thinking.elapsedMs).toBe(elapsed);
+    expect(sink.activity()?.label).toBe('working');
+    sink.end();
+  });
+
+  it('retires message ownership even without tools and cannot replace previous reasoning with an empty new message', () => {
+    const { sink, transcript } = build();
+    sink.begin('turn', 'turn');
+    sink.handleEvent({ type: 'message.started', role: 'coder' });
+    sink.think('First');
+    sink.chunk('First answer');
+    sink.handleEvent({ type: 'message.started', role: 'coder' });
+    sink.handleEvent({ type: 'reasoning.replace', role: 'coder', text: '' });
+    expect(transcript.all().map(block => block.text)).toEqual(['First', 'First answer']);
+    sink.think('Second');
+    sink.chunk('Second answer');
+    sink.handleEvent({ type: 'reasoning.replace', role: 'coder', text: 'Second summary' });
+    expect(transcript.all().map(block => block.text)).toEqual(['First', 'First answer', 'Second summary', 'Second answer']);
+    expect(transcript.all()[1]?.finalized).toBe(true);
+    sink.end();
+  });
+
   it('settles resumed reasoning when the existing answer continues without splitting that answer', () => {
     const { sink, transcript } = build();
     sink.begin('turn', 'turn');
@@ -416,8 +456,9 @@ describe("the activity row across a reasoning answer", () => {
     sink.chunk('Answer');
     const assistant = transcript.all().find(block => block.kind === 'assistant');
     sink.think('More reasoning');
-    const latest = transcript.last()!;
-    expect(latest.kind).toBe('thinking');
+    const latest = transcript.all().find(block => block.kind === 'thinking')!;
+    expect(transcript.all().filter(block => block.kind === 'thinking')).toEqual([latest]);
+    expect(latest.text).toBe('First reasoningMore reasoning');
     expect(latest.finalized).toBe(false);
     sink.chunk(' continues');
     expect(latest.finalized).toBe(true);

@@ -30,9 +30,8 @@ it.each(['reasoning_content', 'reasoning', 'reasoning_text'] as const)(
           onText: delta => sink.handleEvent({ type: 'message.delta', role: 'coder', delta }) }, { allowTools: false });
       expect(result).toMatchObject({ text: 'Answer continues', reasoning: { text: 'Public reasoning continues' }, stopReason: 'stop' });
       expect(transcript.all().map(block => ({ kind: block.kind, text: block.text, finalized: block.finalized }))).toEqual([
-        { kind: 'thinking', text: 'Public reasoning', finalized: true },
+        { kind: 'thinking', text: 'Public reasoning continues', finalized: true },
         { kind: 'assistant', text: 'Answer continues', finalized: false },
-        { kind: 'thinking', text: ' continues', finalized: true },
       ]);
       expect(sink.activity()?.label).toBe('working');
     } finally { sink.end(); resetSessionUsage(sessionId); }

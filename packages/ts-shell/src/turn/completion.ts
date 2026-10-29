@@ -98,7 +98,9 @@ export interface StreamedCompletion {
 /** What kind of text a fragment is: the answer, or the working out. */
 export type StreamFragment =
   | { readonly kind: "text"; readonly text: string }
-  | { readonly kind: "reasoning"; readonly text: string };
+  | { readonly kind: "reasoning"; readonly text: string }
+  /** Verified public text for the whole model message, replacing its deltas. */
+  | { readonly kind: "reasoning.replace"; readonly text: string };
 
 /**
  * One entry of a `tool_calls` delta.

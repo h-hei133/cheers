@@ -96,12 +96,16 @@ export type QueryEvent =
     readonly output?: string;
   }
   | { readonly type: 'message.delta'; readonly role: AgentRole; readonly delta: string }
+  /** Transient display boundary before callbacks from one model request. */
+  | { readonly type: 'message.started'; readonly role: AgentRole }
   /**
    * What the model said while working the answer out. A separate channel because
    * it is not the answer: a reasoning model's working can run longer than its
    * conclusion, and merging the two buries the part that was asked for.
    */
   | { readonly type: 'reasoning.delta'; readonly role: AgentRole; readonly delta: string }
+  /** Replace this model message's reasoning with its validated public text. */
+  | { readonly type: 'reasoning.replace'; readonly role: AgentRole; readonly text: string }
   /**
    * Replace what has been streamed so far for this message. Sent only when the
    * assembled text differs from the concatenated deltas — which happens when tool
@@ -126,11 +130,13 @@ export type QueryEvent =
  * state snapshot write and a file lock, and there are thousands of deltas in one
  * answer.
  *
- * `message.replace` is excluded for the same reason: it corrects what is on
- * screen, and the corrected text is what the assistant message already holds.
+ * Display boundaries and replacements are excluded for the same reason: the
+ * assistant message already holds the final answer and public reasoning.
  */
 export function isDurableQueryEvent(event: QueryEvent): boolean {
   return event.type !== 'message.delta'
     && event.type !== 'reasoning.delta'
     && event.type !== 'message.replace'
+    && event.type !== 'reasoning.replace'
+    && event.type !== 'message.started'
 }

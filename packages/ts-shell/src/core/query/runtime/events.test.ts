@@ -13,6 +13,8 @@ const STREAMING: readonly QueryEvent[] = [
   { type: "message.delta", role: "coder", delta: "partial" },
   { type: "reasoning.delta", role: "coder", delta: "thinking" },
   { type: "message.replace", role: "coder", text: "corrected" },
+  { type: "reasoning.replace", role: "coder", text: "verified" },
+  { type: "message.started", role: "coder" },
 ];
 
 describe("durable query events", () => {

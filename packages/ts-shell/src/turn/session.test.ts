@@ -9,6 +9,8 @@ import type { StepFunction } from "./step.js";
 import { CONTEXT_OVERFLOW_PREFIX, createStepFunction } from "./step.js";
 import { getSessionUsage, markContextUnknown, persistSessionUsage, recordSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 import { requestContext } from '../context/request/projection.js';
+import { TurnSink } from '../cli/interactive/turnSink.js';
+import { Transcript } from '../presentation/tui/transcript/container.js';
 
 /**
  * The turn is where the kernel's lifecycle meets the shell's contract. These
@@ -17,6 +19,52 @@ import { requestContext } from '../context/request/projection.js';
  */
 
 const quietHooks = { dispatch: async () => ({ decision: "allow" as const }) } as unknown as HookDispatcher;
+
+it('keeps verified reasoning in its own model message through the real tool loop and sink', async () => {
+  const sessionId = 'responses-display-message-boundary';
+  const outputs: Record<string, unknown>[][] = [];
+  let calls = 0;
+  const step = createStepFunction({ provider: { provider: 'fixture', model: 'm', endpoint: 'openai-responses',
+    baseUrl: 'https://fixture.invalid/v1', headers: {} }, sessionId, workspaceRoot: process.cwd(), systemPrompt: '',
+    tools: [{ type: 'function', function: { name: 'read', description: 'read', parameters: { type: 'object', properties: {} } } }],
+    fetchImpl: async () => {
+      const index = calls++;
+      const reasoning = { id: `rs_${index}`, type: 'reasoning', summary: [{ type: 'summary_text', text: `Summary ${index}` }],
+        content: [{ type: 'reasoning_text', text: `Raw ${index}` }], encrypted_content: `synthetic-cipher-${index}` };
+      const result = index === 0 ? { id: 'fc_0', type: 'function_call', call_id: 'read_0', name: 'read', arguments: '{}', status: 'completed' }
+        : { id: 'msg_1', type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: 'Answer' }] };
+      const output = [reasoning, result]; outputs.push(output);
+      const events = [
+        { type: 'response.output_item.added', output_index: 0, item: { ...reasoning, summary: [], content: [] } },
+        { type: 'response.reasoning_text.delta', output_index: 0, item_id: reasoning.id, content_index: 0, delta: `Raw ${index}` },
+        { type: 'response.reasoning_summary_text.delta', output_index: 0, item_id: reasoning.id, summary_index: 0, delta: `Summary ${index}` },
+        { type: 'response.completed', response: { id: `resp_${index}`, model: 'm', status: 'completed', output } },
+      ];
+      return new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(''),
+        { headers: { 'content-type': 'text/event-stream' } });
+    } });
+  const transcript = new Transcript();
+  const previous = transcript.append({ kind: 'thinking', text: 'Previous reasoning', collapsed: false, finalized: true });
+  const sink = new TurnSink(transcript, () => {});
+  const setup = options({ sessionId, step, tools: new Map([['read', echoTool('read', 'read result')]]) });
+  const events: QueryEvent[] = [];
+  sink.begin('turn', 'turn');
+  try {
+    for await (const event of runTurn(setup).events) { events.push(event); sink.handleEvent(event); }
+    sink.end();
+    expect({ calls, failed: events.filter(event => event.type === 'query.failed') }).toEqual({ calls: 2, failed: [] });
+    expect(transcript.all().filter(block => block.kind === 'thinking').map(block => block.text)).toEqual([
+      'Previous reasoning', 'Summary 0', 'Summary 1',
+    ]);
+    expect(events.filter(event => event.type === 'message.started')).toHaveLength(2);
+    expect(previous.collapsed).toBe(false);
+    expect(transcript.all().map(block => block.kind)).toEqual(['thinking', 'thinking', 'tool', 'thinking', 'assistant']);
+    expect(JSON.stringify(transcript.all())).not.toContain('synthetic-cipher');
+    const assistants = setup.persisted.filter(message => message.role === 'assistant');
+    expect(assistants.map(message => message.reasoning?.text)).toEqual(['Summary 0', 'Summary 1']);
+    expect(assistants.map(message => JSON.parse(message.reasoning!.signature!).output)).toEqual(outputs);
+  } finally { sink.end(); resetSessionUsage(sessionId); }
+});
 
 it("carries registered MCP hints into the turn's plan gate", async () => {
   const execute = vi.fn(async () => ({ success: true, output: "found note" }));

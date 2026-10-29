@@ -2,7 +2,7 @@ import { isRecord } from '../../../core/values/record.js';
 import { isDeepStrictEqual } from 'node:util';
 import type { CompletedBody, StreamedCompletion, StreamFragment } from '../../../turn/completion.js';
 import { responseEvents } from './events.js';
-import { outputProjection, readResponse, responseFailure, responseOutput, responseUsage, type OutputItem } from './output.js';
+import { readResponse, responseFailure, responseOutput, responseUsage, type OutputItem } from './output.js';
 
 interface Slot {
   readonly item: OutputItem;
@@ -14,7 +14,6 @@ interface Slot {
   readonly textDone: Map<number, string>;
   readonly reasoningDone: Map<number, string>;
   readonly reasoningTextDone: Map<number, string>;
-  shownReasoning: string;
   done?: OutputItem;
 }
 
@@ -73,7 +72,8 @@ function assembled(body: CompletedBody, shown: string): StreamedCompletion {
 
 /** Only an explicit native terminal can complete a response; partial tools never execute. */
 export async function* readResponseStream(body: ReadableStream<Uint8Array>, account = false): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
-  const slots = new Map<number, Slot>(); let shown = ''; let responseId: string | undefined; let responseModel: string | undefined;
+  const slots = new Map<number, Slot>(); let shown = ''; let shownReasoning = '';
+  let responseId: string | undefined; let responseModel: string | undefined;
   try {
     for await (const event of responseEvents(body)) {
       if (event.type === 'response.created') {
@@ -115,16 +115,13 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
         const completed = readResponse(terminal, account);
         const text = completed.choices?.[0]?.message?.content ?? '';
         if (!text.startsWith(shown)) return assembled(responseFailure(shown, usage), shown);
-        // Done snapshots can contain public reasoning without any text delta.
-        // Publish it only after terminal validation, following each item's shown prefix.
-        if (completed.choices?.[0]?.finish_reason !== 'error') for (const [index, item] of output.entries()) {
-          if (item.type !== 'reasoning') continue;
-          const slot = slots.get(index);
-          const shown = slot?.shownReasoning ?? '';
-          const reasoning = outputProjection([item]).reasoning;
-          if (reasoning.startsWith(shown) && reasoning.length > shown.length) {
-            yield { kind: 'reasoning', text: reasoning.slice(shown.length) };
-          }
+        // Parts and raw/summary channels can interleave. Only this validated
+        // public projection can correct the whole message's actual emission order.
+        const reasoning = completed.reasoning ?? '';
+        if (completed.choices?.[0]?.finish_reason !== 'error' && reasoning !== shownReasoning) {
+          yield reasoning.startsWith(shownReasoning)
+            ? { kind: 'reasoning', text: reasoning.slice(shownReasoning.length) }
+            : { kind: 'reasoning.replace', text: reasoning };
         }
         if (text.length > shown.length) yield { kind: 'text', text: text.slice(shown.length) };
         return assembled(completed, shown);
@@ -135,7 +132,7 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
         const item = event.item;
         if ([...slots.values()].some(slot => slot.item.id === item.id)) throw new Error('Response output item identity is repeated.');
         slots.set(index, { item, text: new Map(), reasoning: new Map(), reasoningText: new Map(),
-          textDone: new Map(), reasoningDone: new Map(), reasoningTextDone: new Map(), shownReasoning: '' });
+          textDone: new Map(), reasoningDone: new Map(), reasoningTextDone: new Map() });
       }
       if (event.type === 'response.output_item.done') {
         const index = position(event.output_index); const slot = slots.get(index); const output = responseOutput([event.item]);
@@ -171,7 +168,7 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
         }
         if (typeof event.delta !== 'string') throw new Error('Response delta has no text.');
         parts.set(index, (parts.get(index) ?? '') + event.delta);
-        if (reasoning) slot.shownReasoning += event.delta;
+        if (reasoning) shownReasoning += event.delta;
         if (!reasoning) shown += event.delta;
         yield { kind: reasoning ? 'reasoning' : 'text', text: event.delta };
       }

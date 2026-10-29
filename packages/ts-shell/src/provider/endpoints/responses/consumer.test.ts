@@ -10,6 +10,48 @@ const item = { id: 'msg_1', type: 'message', role: 'assistant', status: 'complet
 const provider = { providerId: 'fixture', model: 'm', endpoint: 'openai-responses', baseUrl: 'https://fixture.test/v1', headers: {} };
 
 it.each(['openai-responses', 'openai-account-responses'] as const)(
+  'replaces the intermediate raw and summary display with verified %s public reasoning', async endpoint => {
+    const start = { type: 'reasoning', id: 'rs_combined', summary: [] };
+    const reasoning = { ...start, summary: [{ type: 'summary_text', text: 'Public summary' }],
+      content: [{ type: 'reasoning_text', text: 'Public raw' }], encrypted_content: 'synthetic-cipher' };
+    const events = [
+      { type: 'response.output_item.added', output_index: 0, item: start },
+      { type: 'response.reasoning_text.delta', output_index: 0, content_index: 0, item_id: start.id, delta: 'Public raw' },
+      { type: 'response.reasoning_summary_text.delta', output_index: 0, summary_index: 0, item_id: start.id, delta: 'Public summary' },
+      { type: 'response.output_item.added', output_index: 1, item: { ...item, content: [] } },
+      { type: 'response.output_text.delta', output_index: 1, content_index: 0, item_id: item.id, delta: 'partial response' },
+      { type: 'response.completed', response: { id: 'resp_combined', model: 'm', status: 'completed', output: [reasoning, item] } },
+    ];
+    const replacements: string[] = [];
+    const transcript = new Transcript();
+    const sink = new TurnSink(transcript, () => {});
+    sink.begin('turn', 'turn');
+    sink.handleEvent({ type: 'message.started', role: 'coder' });
+    const sessionId = `responses-combined-${endpoint}`;
+    const step = createStepFunction({ provider: { apiKey: 'synthetic', provider: 'fixture', ...provider, endpoint },
+      workspaceRoot: process.cwd(), sessionId, systemPrompt: '', tools: [],
+      fetchImpl: async () => new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(''),
+        { headers: { 'content-type': 'text/event-stream' } }) });
+    try {
+      const result = await step([{ role: 'user', content: 'q' }], undefined,
+        { onReasoning: text => sink.think(text), onText: text => sink.chunk(text),
+          onReasoningReplace: text => {
+            replacements.push(text);
+            sink.handleEvent({ type: 'reasoning.replace', role: 'coder', text });
+          } }, { allowTools: false });
+      expect(result.stopReason).toBe('stop'); expect(result.reasoning?.text).toBe('Public summary');
+      expect(replacements).toEqual(['Public summary']);
+      expect(transcript.all().map(block => ({ kind: block.kind, text: block.text }))).toEqual([
+        { kind: 'thinking', text: 'Public summary' }, { kind: 'assistant', text: 'partial response' },
+      ]);
+      expect(transcript.all()[0]?.finalized).toBe(true);
+      expect(sink.activity()?.label).toBe('working');
+      expect(JSON.stringify(transcript.all())).not.toContain('synthetic-cipher');
+      expect(JSON.parse(result.reasoning!.signature!).output).toEqual([reasoning, item]);
+    } finally { sink.end(); resetSessionUsage(sessionId); }
+  });
+
+it.each(['openai-responses', 'openai-account-responses'] as const)(
   'displays final-only public reasoning before the answer through the actual %s step and sink', async endpoint => {
     const reasoning = { id: 'rs_final', type: 'reasoning', summary: [{ type: 'summary_text', text: 'Inspect the inputs.' }],
       encrypted_content: 'synthetic-cipher' };

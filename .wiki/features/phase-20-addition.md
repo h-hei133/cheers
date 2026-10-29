@@ -3488,3 +3488,22 @@ HANDOFF记录实际发出顺序与校验part状态分开，任务scratch清理�
 产品仅在chunk的非空text守卫后调用原settleThinking，保留openAssistant、prose/tool与终态收尾合同。当前thinking一旦结束，空think tick仍不新建块；答案正文只在原assistant累积。聚合thinking跨答案重复出现时仍依实际到达顺序保留独立块，未宣称重新排序整个会话。
 
 主代理五显式文件232项串行通过：completion37/endpoint38/step96/turnSink51/Responses consumer10。撤去唯一调用反转四项全部失败，finally逐字节恢复后232再通过。五静态门/diff通过，局部调用无新import/callable，不重复结构graph/NormProof。1536MiB build确认exit0后单独新鲜度通过：build `c1fa3a0861b8b496dcdde6670e24383d5487a72750bd09b19cb7a18225a675dc`，inputs `ee672ceda08c4c0bd365387e3f42348c4c13b53f93ed93a01318bde3876b2d56`，460 compilerInputs/3547文件一致。HANDOFF补答案复用边界、任务scratch清理；无独立review、live provider/账户/用户终端、PTY/exe/full suite或20k会话，原47项不升级、ADD active，Git/精确新CI另绑定。
+
+
+20.28已提交推送`a634099effea837eebdd0a21cebe4b805958ab89`，远端main精确一致、仅原CLAUDE.md。[Watch40950547630](https://github.com/h-hei133/cheers/actions/runs/40950547630)completed/success，[CI40950547705](https://github.com/h-hei133/cheers/actions/runs/40950547705)延后仍in_progress；20.26的[CI40948637046](https://github.com/h-hei133/cheers/actions/runs/40948637046)现completed/success、精确head一致，20.27 CI仍运行。
+
+### 20.29 Responses已验证公开正文的完整显示与消息归属
+
+继续20.27明确留下的表示替换：raw与summary同时流出，或同一item的part、不同output item交错，原最终存储投影正确，但当前thinking保留到达顺序拼接的中间正文。两端点真实step新增替换回调回归初次失败；工具循环fixture另因tool schema缺少function层在网络前失败，安全query.failed确认后修正fixture，未据此改动产品请求合同。
+
+目标检查后沿20.26已核对官方done完整公开text与pi openai-responses-shared.ts:746–768的item收尾决定，采用已验证公开正文校正及明确输出归属；本项目继续先完成terminal identity、delta/done、sealed item、actionable tool及answer prefix验证，才允许显示修正。原reader改为记录整条模型消息实际发出的reasoning字符串，复用readResponse已有最终公开投影：相等不发送，可续写只发后缀，其余发送完整reasoning.replace fragment。移除旧slot级shownReasoning与重复投影；signature/native output保持原值，cipher不转成可见正文。
+
+[step](../../packages/ts-shell/src/turn/step.ts)传递onReasoningReplace，原shownAnything拒绝重复重试的守卫纳入非空替换。[turn/request](../../packages/ts-shell/src/turn/request.ts)在每次前台step回调前发message.started，并映射reasoning.replace；两事件仅用于显示，明确排除durable写入，完整assistant message仍是存储与恢复来源。真实kernel的message_start在step返回后才发，不能充当流前归属边界，也不能复用影响recovery的turn.started。
+
+[thinking owner](../../packages/ts-shell/src/cli/interactive/turn/thinking.ts)保留当前模型消息的同一Block引用：答案开始结束live计时，后续非空reasoning可复用，替换通过Transcript.setText使缓存和selection revision失效，保留用户展开/折叠选择；message.started先结束上一消息并撤回归属，工具后的新消息独立。20.28按到达顺序新增多个thinking的局部行为由本批单消息归属替代，答案仍只在该消息的同一assistant累计。session原具名回调超过20，顺势把本次涉及的请求回调、缓存请求和usage绑定移到请求owner，requestPurposeFor在原session路径薄re-export，原cache/context/identity测试继续验证移动前合同。
+
+主代理package-local七个显式文件305项串行通过：stream69/consumer12/session30/turnSink53/events7/compatible endpoint38/step96。包括summary/raw表示切换、交错part和多item、sealed account reduced terminal、无重复delta、EOF/foreign/contradictory/malformed tool/failed/error/answer-prefix不替换、真实read工具循环中两条summary与原展开历史互不污染、native输出保持、答案后同块替换、渲染缓存及selection revision、空tick不重启计时和durability排除。旧多item逐fragment断言改为消息完整投影，旧聚合独立thinking断言改为同消息复用，均保留最终正文和生命周期检查。
+
+四类反转关闭替换、撤去消息边界、settle丢失owner、移除durability排除分别7/1/5/2失败，每次finally逐字节恢复。边界fixture进一步将正文断言放在事件计数前，反转直接得到Previous reasoning/Summary 1，丢失Summary 0，证明实际跨消息覆盖；恢复后305重验通过。五静态门/diff、完整声明图单一脚本用例通过；保守AST计数含constructor、对象回调：sink20/thinking5/stream4/step18/session18/request8/completion15/events1。1536MiB build确认exit0后单独新鲜度重算通过：build `de88fe907703d60e6b2c8791933f837bf4b17f64f4ebad282e1bed70e44f53b4`，inputs `97f94ad1e53d80b094fe83a1078d4b12978954ba38a376799cc5492629b4e423`，460 compilerInputs/3549文件一致。
+
+本批无独立review或本地NormProof judge，完整声明图提供实际解析/无环证据；无live provider/账户、真实用户终端、PTY/exe/full suite或20k会话。HANDOFF记录终态正文与显示归属边界，任务scratch清理，原CLAUDE.md和其他任务scratch保留；原47项不升级、反馈25实环境验收仍未闭合，ADD与Codex goal保持active。Git/本批精确CI另绑定，既有成功不延伸到新commit。

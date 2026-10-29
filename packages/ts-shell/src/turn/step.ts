@@ -100,6 +100,8 @@ export interface ProviderTarget {
 export interface StepListener {
   readonly onText?: (delta: string) => void;
   readonly onReasoning?: (delta: string) => void;
+  /** The validated public reasoning differs from this message's deltas. */
+  readonly onReasoningReplace?: (text: string) => void;
   /** The assembled text differs from the streamed deltas. */
   readonly onReplace?: (text: string) => void;
 }
@@ -454,6 +456,10 @@ export function createStepFunction(request: StepRequest): StepFunction {
           shownAnything ||= delta.length > 0;
           listener.onReasoning?.(delta);
         },
+        onReasoningReplace: (text) => {
+          shownAnything ||= text.length > 0;
+          listener.onReasoningReplace?.(text);
+        },
         onReplace: (text) => {
           shown = text;
           shownAnything ||= text.length > 0;
@@ -701,6 +707,10 @@ async function readCompletion(
     }
     if (step.value.kind === "reasoning") {
       listener.onReasoning?.(step.value.text);
+      continue;
+    }
+    if (step.value.kind === "reasoning.replace") {
+      listener.onReasoningReplace?.(step.value.text);
       continue;
     }
     streamed += step.value.text;

@@ -10232,3 +10232,12 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 继续[addition20.28](features/phase-20-addition.md#2028-多次聚合delta后的thinking结束边界)：20.25单次聚合顺序修复后，多次聚合仍让第二thinking新建，而chunk复用assistant绕过openAssistant的结束调用。两次聚合的三field真实step→sink与owner回归四失败/85通过。对照每delta先thinking再text决定及实际sink复用边界，产品仅非空chunk先原settleThinking，保持同一答案累积与空tick不续钟。
 
 五显式文件232项串行通过，唯一调用撤去反转四失败、finally逐字节恢复后232再通过。五静态门/diff通过，无新import/callable、不重复graph/NormProof。build `c1fa3a0861b8b496dcdde6670e24383d5487a72750bd09b19cb7a18225a675dc`，inputs `ee672ceda08c4c0bd365387e3f42348c4c13b53f93ed93a01318bde3876b2d56`，460/3547在exit0后单独新鲜度一致。HANDOFF补答案复用陷阱、scratch清理；无独立review、live/真实账户/用户终端、PTY/exe/full suite或20k会话，原47不升级、ADD active，Git/精确新CI另绑定。
+
+
+20.28已提交推送`a634099effea837eebdd0a21cebe4b805958ab89`，远端main一致、仅原CLAUDE.md。[Watch40950547630](https://github.com/h-hei133/cheers/actions/runs/40950547630)success，[CI40950547705](https://github.com/h-hei133/cheers/actions/runs/40950547705)延后仍in_progress；20.26[CI40948637046](https://github.com/h-hei133/cheers/actions/runs/40948637046)现success、head核对一致，20.27 CI仍运行。
+
+## [2026-10-30] fix | 推理终态替换与单条模型消息显示归属
+
+继续[addition20.29](features/phase-20-addition.md#2029-responses已验证公开正文的完整显示与消息归属)，Responses raw/summary和交错part/item的live拼接不同于最终公开投影。沿已核对官方done正文与参考item收尾决定，在原严格terminal/delta/sealed/actionable/answer前缀验证后比对整条实际发出正文，相同不重复、prefix只补尾部、其余完整替换。step传递reasoning.replace；turn/request在回调前发message.started，两新事件排除durable。thinking owner保留同消息块跨答案校正，Transcript原setText更新缓存/revision并保留展开选择；边界撤回引用，真实工具后新消息独立。session请求回调与usage/cache绑定移入request，原purpose导出兼容，保守AST全部不超过20。
+
+七显式文件305项串行通过，四类反转7/1/5/2失败、finally字节恢复；边界反转正文直接复现Summary 0被Summary 1覆盖，恢复后305再通过。五静态门/diff、完整声明图单一用例通过。build `de88fe907703d60e6b2c8791933f837bf4b17f64f4ebad282e1bed70e44f53b4`，inputs `97f94ad1e53d80b094fe83a1078d4b12978954ba38a376799cc5492629b4e423`，460/3549在exit0后单独重算一致。工具fixture缺function层导致零fetch已分类修正；HANDOFF补边界，task scratch清理。无独立review/live/真实账户或用户终端/PTY/exe/full suite/20k，本地NormProof未重复，原47不升级、ADD与goal active，Git/本批精确CI另绑定。
