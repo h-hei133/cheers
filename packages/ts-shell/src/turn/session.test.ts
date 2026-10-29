@@ -10,6 +10,7 @@ import { CONTEXT_OVERFLOW_PREFIX, createStepFunction } from "./step.js";
 import { getSessionUsage, markContextUnknown, persistSessionUsage, recordSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 import { requestContext } from '../context/request/projection.js';
 import { TurnSink } from '../cli/interactive/turnSink.js';
+import { restoreConversation } from '../cli/interactive/history.js';
 import { Transcript } from '../presentation/tui/transcript/container.js';
 
 /**
@@ -19,6 +20,49 @@ import { Transcript } from '../presentation/tui/transcript/container.js';
  */
 
 const quietHooks = { dispatch: async () => ({ decision: "allow" as const }) } as unknown as HookDispatcher;
+
+it('persists and restores actual reasoning-only output as an unanswered stopped result', async () => {
+  const sessionId = 'reasoning-only-storage';
+  const step = createStepFunction({ provider: { provider: 'fixture', model: 'm', endpoint: 'openai-compatible',
+    baseUrl: 'https://fixture.invalid/v1', headers: {} }, sessionId, workspaceRoot: process.cwd(), systemPrompt: '', tools: [],
+    fetchImpl: async () => new Response(JSON.stringify({ choices: [{ message: { content: '', reasoning_content: 'Public reasoning' },
+      finish_reason: 'stop' }] }), { headers: { 'content-type': 'application/json' } }) });
+  const setup = options({ sessionId, step });
+  const transcript = new Transcript();
+  const sink = new TurnSink(transcript, () => {});
+  sink.begin('turn', 'turn');
+  try {
+    const events: QueryEvent[] = [];
+    for await (const event of runTurn(setup).events) { events.push(event); sink.handleEvent(event); }
+    expect(setup.persisted.filter(message => message.role === 'assistant' && message.reasoning)).toEqual([
+      expect.objectContaining({ content: '', reasoning: { text: 'Public reasoning' } }),
+    ]);
+    const restored = restoreConversation(setup.persisted);
+    expect(restored.blocks.filter(block => block.kind === 'thinking')).toEqual([
+      { kind: 'thinking', text: 'Public reasoning', collapsed: true, finalized: true },
+    ]);
+    expect(events.find(event => event.type === 'query.completed')).toMatchObject({ result: {
+      status: 'stopped_error', terminalClassification: 'stopped', stopReason: expect.stringContaining('never wrote an answer'),
+    } });
+    expect(events.some(event => event.type === 'query.failed')).toBe(false);
+    expect(sink.lastTurnFailed).toBe(true);
+    expect(transcript.all().filter(block => block.text.includes('never wrote an answer'))).toHaveLength(1);
+    expect(setup.persisted.filter(message => message.role === 'assistant' && message.content)).toHaveLength(1);
+  } finally { sink.end(); resetSessionUsage(sessionId); }
+});
+
+it.each([
+  { text: ' \n\t', keep: false },
+  { text: '', signature: 'synthetic-opaque', redacted: true, keep: true },
+])('keeps only meaningful reasoning evidence from otherwise empty messages: %j', async ({ keep, ...reasoning }) => {
+  const setup = options({ step: scripted([{ text: '', reasoning, toolCalls: [], stopReason: 'stop' }]) });
+  await drain(runTurn(setup).events);
+  expect(setup.persisted.filter(message => message.reasoning)).toHaveLength(keep ? 1 : 0);
+  if (keep) {
+    expect(setup.persisted.find(message => message.reasoning)?.reasoning).toEqual(reasoning);
+    expect(JSON.stringify(restoreConversation(setup.persisted).blocks)).not.toContain('synthetic-opaque');
+  }
+});
 
 it('settles terminal reasoning tails before stop hooks finish in the actual response loop', async () => {
   const sessionId = 'responses-final-reasoning-clock';

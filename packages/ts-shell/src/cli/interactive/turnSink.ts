@@ -259,12 +259,14 @@ export class TurnSink implements RendererSink {
         // A completed event can carry a refusal before any model message exists.
         // Keep stopped results visible and eligible for an explicit retry.
         if (event.result.status !== "completed" && !this.failed) {
+          const reason = event.result.stopReason || event.result.status;
+          const shown = this.assistant?.text === reason;
           this.finalizeAssistant();
           this.failed = true;
-          this.transcript.append({
+          if (!shown) this.transcript.append({
             kind: event.result.terminalClassification === "error" ? "error" : "notice",
             title: event.result.terminalClassification === "error" ? "error" : "stopped",
-            text: event.result.stopReason || event.result.status,
+            text: reason,
             finalized: true,
           });
           this.onChange();

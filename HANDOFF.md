@@ -958,3 +958,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A terminal reasoning tail arrives after the last answer delta, leaving thinking live while Stop or other settlement hooks wait.
 - **Root Cause**: Answer increments settle thinking, but a late reasoning append can reopen it; whole-turn end is later than the model message's end.
 - **Rule**: Use the kernel's assistant message_end to freeze current display blocks immediately after all step callbacks. Keep that display event transient and independent of success, failure or write classification. Hold a Stop hook in the real loop regression so sink.end cannot hide the missing boundary.
+
+
+### Reasoning Evidence Does Not Make An Unanswered Turn Successful
+- **Symptom**: Live public reasoning disappears after reopening, while a no-answer explanation is classified as success.
+- **Root Cause**: Message persistence filters only answer/tool content, and the result owner substitutes explanatory prose before treating the run as completed.
+- **Rule**: Preserve meaningful reasoning/signature/redaction evidence independently of answer presence. Classify empty or whitespace-only answers as stopped using existing result states, retain explicit step-limit precedence, and keep the explanation visible once while setting retry eligibility. Test the actual provider step through persistence and history restoration.

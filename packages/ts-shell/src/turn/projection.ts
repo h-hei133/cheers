@@ -152,8 +152,8 @@ export function concludeRun(messages: readonly AgentMessage[], prompt: string, s
   // no text to show, which reads the same as a silent one — so it is treated the
   // same way rather than reported as an empty answer.
   const lastText = messageToText(last?.content);
-  const explained = lastText === "";
-  const finalOutput = lastText || explainSilence(messages, last?.errorMessage);
+  const explained = lastText.trim() === "";
+  const finalOutput = explained ? explainSilence(messages, last?.errorMessage) : lastText;
   const refused = refusedToolCall(messages);
   if (refused) {
     return {
@@ -194,6 +194,7 @@ export function concludeRun(messages: readonly AgentMessage[], prompt: string, s
       },
     };
   }
+  const terminalReason = stepLimitReached ? 'stopped_max_turns' : explained ? 'stopped_error' : 'completed';
   return {
     kind: "completed",
     finalOutput,
@@ -201,10 +202,11 @@ export function concludeRun(messages: readonly AgentMessage[], prompt: string, s
     completed: {
       type: "query.completed",
       result: {
-        status: stepLimitReached ? 'stopped_max_turns' : 'completed',
-        terminalClassification: stepLimitReached ? 'stopped' : 'success',
-        terminalReason: stepLimitReached ? 'stopped_max_turns' : 'completed',
-        ...(stepLimitReached ? { stopReason: 'The turn reached its model step limit.' } : {}),
+        status: terminalReason,
+        terminalClassification: terminalReason === 'completed' ? 'success' : 'stopped',
+        terminalReason,
+        ...(stepLimitReached ? { stopReason: 'The turn reached its model step limit.' }
+          : explained ? { stopReason: finalOutput } : {}),
         transcript: [],
         sharedContext: { sessionId, initialPrompt: prompt, notes: [`steps: ${steps}`], handoffs: [] },
         finalOutput,

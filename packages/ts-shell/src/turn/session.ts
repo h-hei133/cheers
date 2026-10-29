@@ -465,7 +465,8 @@ export function runTurn(options: TurnOptions): TurnRun {
  * current model's once the model that wrote it is gone.
  */
 function persist(onMessage: (message: SessionMessage) => void, message: AgentMessage): void {
-  if (message.role === "assistant" && !message.content && !(message.tool_calls && message.tool_calls.length > 0)) return;
+  if (message.role === "assistant" && !message.content && !message.tool_calls?.length
+    && !message.reasoning?.text.trim() && !message.reasoning?.signature && !message.reasoning?.redacted) return;
   if (message.role === "system") return;
   const { stopReason: _stopReason, errorMessage: _errorMessage, ...stored } = message;
   onMessage(stored);

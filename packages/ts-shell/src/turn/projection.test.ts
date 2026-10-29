@@ -9,6 +9,20 @@ it.each(['stop', 'error', 'aborted'] as const)('closes assistant display on mess
   expect(projection.project({ type: 'message_end', message: { role: 'user', content: 'q' } })).toEqual([]);
 });
 
+it.each(['', ' \n\t'])('does not count an unanswered assistant as successful: %j', content => {
+  const outcome = concludeRun([{ role: 'assistant', content, errorMessage: 'No answer followed.', stopReason: 'stop' }],
+    'question', 'silent', 1);
+  expect(outcome).toMatchObject({ kind: 'completed', finalOutput: 'No answer followed.', explained: true,
+    completed: { result: { status: 'stopped_error', terminalClassification: 'stopped', stopReason: 'No answer followed.' } } });
+});
+
+it('preserves an explicit step limit and the whitespace of a nonempty answer', () => {
+  expect(concludeRun([{ role: 'assistant', content: '', stopReason: 'stop' }], 'q', 'limited', 1, true))
+    .toMatchObject({ completed: { result: { status: 'stopped_max_turns', terminalClassification: 'stopped' } } });
+  expect(concludeRun([{ role: 'assistant', content: '  Answer\n', stopReason: 'stop' }], 'q', 'answered', 1))
+    .toMatchObject({ finalOutput: '  Answer\n', explained: false, completed: { result: { status: 'completed' } } });
+});
+
 it("does not report a completed turn after the newest tool failed", () => {
   const outcome = concludeRun([
     { role: "user", content: "run the command" },

@@ -10250,3 +10250,12 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 继续[addition20.30](features/phase-20-addition.md#2030-模型消息结束后冻结thinking与答案)：终态reasoning tail晚于已流完答案时，原thinking仍live直到整turn收尾；真实Response/step/kernel/sink持住Stop hook回归失败。对照参考明确text/thinking结束事件，采用目标原assistant message_end映射临时message.finished，sink原finalizeAssistant冻结thinking和答案，两者不再等待hook，排除durable、不升级失败/写入结果。
 
 四显式文件98串行通过；producer/consumer/durability反转4/2/1失败、finally字节恢复后98再通过。五静态门/diff、AST projection7/sink20/events1通过，无新import/callable，不重复graph/NormProof。build `0123730ff859e0378ef84ebc81d2cc14af9026b7ceb820421bb28df3ed8157b1`，inputs `8d6d8b5ab9bfb0f8810b9da02f83b7b27240f921bca0fb2bb2a529ddf900879c`，460/3549在exit0后单独重算一致。HANDOFF补message/turn生命周期边界、scratch清理，无独立review/live/真实终端/PTY/exe/full suite/20k，原47不升级、goal active，Git/精确新CI另绑定。
+
+
+20.30已提交推送`6a28f575b848459e96439f6d5804a880c7dd3184`，远端main一致、仅原CLAUDE.md。[Watch40955431530](https://github.com/h-hei133/cheers/actions/runs/40955431530)延后success，[CI40955431408](https://github.com/h-hei133/cheers/actions/runs/40955431408)仍in_progress，20.29 CI仍运行。
+
+## [2026-10-30] fix | 无答案推理保留证据并报告停止
+
+继续[addition20.31](features/phase-20-addition.md#2031-无答案推理的持久证据与停止结果)，真实reasoning-only消息被persist的content/tool过滤丢弃，conclude说明仍success。对照参考message_end完整assistant保存和thinking/answer独立内容，保留公开推理/signature/redacted原值，空白无证据仍过滤；conclude无答案沿原stopped_error，显式step limit优先，非空答案不trim。sink已有解释不重复notice但仍设置失败可retry。
+
+四显式文件120串行通过，persist/classification/duplicate反转2/3/1失败、finally字节恢复后120再通过。五静态门/diff，无新product import/callable。build `cc3e3de8f256e86d5603bb7edcc72579fc6ebaf09d5d7c691c9fabce26de291c`，inputs `5b60dec32615383fcc91b09434bc85d87dfa4bb00251c7a40d8894a88fc02737`，460/3549在exit0后单独重算一致。HANDOFF补证据/成功边界、scratch清理，无独立review/live/真实终端/PTY/exe/full suite/20k，原47不升级、goal active，Git/新精确CI另绑定。

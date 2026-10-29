@@ -3520,3 +3520,16 @@ HANDOFF记录实际发出顺序与校验part状态分开，任务scratch清理�
 主代理四显式文件98项串行通过：session31/turnSink54/projection5/events8，包含实际Stop hook等待、空tick不续钟、assistant已结束、stop/error/aborted均投影结束、user不投影与失败仍可见。移除producer、consumer及durable排除三类反转4/2/1失败，finally字节恢复后98再通过。五静态门/diff通过；保守AST projection7/sink20/events1，无新import/callable，不重复graph/NormProof。1536MiB build观察exit0后单独新鲜度一致：build `0123730ff859e0378ef84ebc81d2cc14af9026b7ceb820421bb28df3ed8157b1`，inputs `8d6d8b5ab9bfb0f8810b9da02f83b7b27240f921bca0fb2bb2a529ddf900879c`，460 compilerInputs/3549文件。
 
 HANDOFF补模型输出与整turn结束的区别，任务scratch清理，保留原CLAUDE.md。无独立review/live provider/账户/真实用户终端/PTY/exe/full suite/20k会话，原47项不升级、ADD及goal active。Git/本批精确CI另绑定。
+
+
+20.30已提交推送`6a28f575b848459e96439f6d5804a880c7dd3184`，远端main精确一致、仅原CLAUDE.md。[Watch40955431530](https://github.com/h-hei133/cheers/actions/runs/40955431530)延后completed/success，[CI40955431408](https://github.com/h-hei133/cheers/actions/runs/40955431408)仍in_progress；20.29 CI仍运行。
+
+### 20.31 无答案推理的持久证据与停止结果
+
+继续实际消息写入→恢复边界核查：step已提供reasoning-only公开正文和原empty-answer说明，但[session](../../packages/ts-shell/src/turn/session.ts)的persist只看content/tool_calls，丢原推理；[concludeRun](../../packages/ts-shell/src/turn/projection.ts)把说明当作completed/success。真实兼容JSON→step→runTurn→restoreConversation回归与两种空/空白结果投影初次三失败，恢复owner本来已经支持reasoning-only，所以不是新增恢复系统。
+
+定向读取pi agent-session.ts:1147–1176，在message_end持久化完整assistant内容；openai-completions.ts:1280–1335把thinking与answer内容分别保存/构造。采用内容证据不依赖答案非空的决定，保留目标opaque与redacted投影，不复制参考字段编码或迁移策略。persist仅对content/tool_calls/public reasoning/signature/redacted均无有效内容的assistant丢弃；已有reasoning对象原值保留，空白公开正文不算证据。结果owner用trim判定无答案但不改非空正文，沿现有stopped_error/terminalClassification stopped表达未回答，显式step limit优先保持stopped_max_turns；没有改成provider失败或新成功状态。
+
+原conclude仍只发一次原解释并保存，sink将同文本已显示的解释计入stopped结果，设置失败可retry而不再新增重复notice；不同停止理由仍沿原通知路径。四显式文件120项串行通过：session34/projection8/history24/turnSink54，包含实际reasoning-only保存/恢复/停止、说明只一次、空白过滤、opaque/redacted保持且不显示、空/空白结果不成功、step limit和非空答案原空白保持。移除persist reasoning守卫、撤销未回答分类、移除重复通知守卫三反转2/3/1失败，finally字节恢复后120再通过。五静态门/diff通过，无新增product import/callable，既有ceiling保持；未重复graph/NormProof。1536MiB build观察exit0后单独新鲜度一致：build `cc3e3de8f256e86d5603bb7edcc72579fc6ebaf09d5d7c691c9fabce26de291c`，inputs `5b60dec32615383fcc91b09434bc85d87dfa4bb00251c7a40d8894a88fc02737`，460 compilerInputs/3549文件。
+
+HANDOFF补推理证据与回答成功分开，任务scratch清理、原CLAUDE.md保留。无独立review/live provider/账户/真实用户终端/PTY/exe/full suite/20k会话，原47项不升级、ADD/goal active，本批Git/精确CI另绑定。
