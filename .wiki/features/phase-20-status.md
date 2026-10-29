@@ -1185,3 +1185,19 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 测试后续独立code review APPROVE，无产品源码变化。改测后npm start freshness拒绝旧inputs，已按原合同重新串行静态五门/requirements/diff→TS/exe build→start help全部exit0；新build `d8eb0a2f0c7d28c28c1f729887e7880fe47f5ca8f0e758367b4b6f6711b62ff2`、inputs `3af36d77538a6d8bb5e34370c5ddb3572de1f9ea3453e1aa3ce975ee8b8af5b0`、artifact `80a3c28b5bd0b8a5e3b27cec994a16decb2f8da42cb4150d56b54377f91652dd`（与产品批次相同）、exe `6cf7cee7b8366da90acac58d40b18d7e362a622ab152cfed03fc4d764fb49b04`。测试/证据后续提交CI另绑定。
 
 MCP取消夹具修复独立code review APPROVE；最终静态五门/requirements/diff、双构建及start help串行exit0。build `1239efd9b49e96ad9b5b4d3a76ffdb6ca1e82a60ff31e0846fa2511e461c038a`、inputs `779a03f172228b25e9a2c9eff03dd40cee76dab5d04ecc7abc37e68cbf623a33`、artifact `80a3c28b5bd0b8a5e3b27cec994a16decb2f8da42cb4150d56b54377f91652dd`（产品字节保持）、exe `b0a98e2d2537710840126d67324a58b9d71f09a6d9d0f5f8232fdd2d40a456b5`；仅test/文档/护栏变化，新提交CI另绑定。
+
+## 2026-10-29 第七轮用户反馈（ADD 补充，独立于原 47 项矩阵）
+
+用户提出七项新问题与优化方向，逐项定位写入 [补充规划第 17 节](phase-20-addition.md)，实施证据写入第 18 节。本轮共 8 个提交，CI 全部 success（`90c0cd27`、`03ddd97b`、`b11c58fa`、`05e4e260`、`267ea875`、`2c2661a1`、`b6607ce6`、`08cd6110`）。
+
+| 用户编号 | 问题 | 本轮结论 |
+|---|---|---|
+| 第十七 | 长文本块展开手势 | **已实施**：改为"光标在块内时再次粘贴即展开"，不再依赖 1200ms 时间窗与文本相等；半开区间避免插入后位置误触发 |
+| 第十八 | Codex 快照 | **已研究未实施**：本项目有"单个已提交文件操作"级回滚（`/undo`）与消息级 `/back`，无工作区级快照；最小方案是把 turn 作为 operation 分组键，不新造 checkpoint |
+| 第二十 | Monitor 工具 | **已实施**：新增 `taskWait`，等 `BackgroundRunner.onEnded` 而非轮询/sleep；300 秒上限、可取消、超时如实报告 |
+| 第二十一 | Ctrl+S 草稿暂存 | **已实施**：单槽 toggle，光标随草稿保存，被引用粘贴在暂存期间受保护 |
+| 第二十二 | 平级 Agent Teams | **已研究未实施**：现有父子委派 + 主从 worker + 单向 advisor，无进程内平级团队；最小方案是复用 `runSubagent` + `AgentSessions` 新增 team owner，不复活已删除的跨进程任务池 |
+| 第二十三 | 对话卡顿 | **已修复五个根因**：每个 token 走完整持久化链（决定性）、sources 每帧重算、渲染定时器跨 tick 不合并、thought 秒数非时钟驱动、每帧两次扫盘 |
+| 第二十四 | 跨目录写入限制 | **已澄清并部分改进**：限制来自工具层硬拒绝（非提示词、非 AGENTS.md、sandbox 默认关闭）；拒绝信息现在说明 `/workspace add <path> --write`。改为"需审批"仍未实施 |
+
+原 47 项矩阵状态不变（38 complete / 9 partial / 0 open）；本表是独立补充，不提升 ADD 整体状态。
