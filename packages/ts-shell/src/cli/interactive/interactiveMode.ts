@@ -189,6 +189,13 @@ export class InteractiveMode {
     suspendTerminal: (run) => this.tui.suspend(run),
     workspaceRoot: () => this.options.runtimeContext.projectRoot,
     adoptDraft: (text) => {
+      // A rewrite from an external editor replaces the draft whole. Keep what it
+      // replaced so the original is one ctrl+s away instead of lost — an undo of
+      // an edit that never happened in this terminal cannot reach it.
+      const previous = this.state.editor.snapshot();
+      if (previous.text.trim() && previous.text !== text) {
+        this.stash.stash({ text: previous.text, cursor: previous.cursor });
+      }
       this.replaceExternalDraft(text);
     },
     redraw: () => this.tui.requestRender(),
@@ -1382,14 +1389,22 @@ export class InteractiveMode {
   /**
    * Set the draft aside, or take it back.
    *
-   * With text in the prompt the text is stashed and the prompt cleared; with an
-   * empty prompt the stashed draft returns, caret included. An empty prompt and
-   * an empty stash is a press with nothing to do, which says so rather than
-   * looking broken.
+   * Three cases, and the third is why the key is useful beyond a scratchpad:
+   *
+   * - Nothing stashed, text in the prompt: the text is stashed and the prompt
+   *   cleared.
+   * - A draft stashed, prompt empty: it comes back, caret included.
+   * - A draft stashed, text in the prompt: the two swap. This is what an
+   *   external rewrite leaves behind — the polished text in the prompt and the
+   *   original in the slot — so one press puts the original back, and pressing
+   *   again puts the rewrite back.
+   *
+   * A press with nothing in either place says so rather than looking broken.
    */
   private stashDraft(): void {
     const snapshot = this.state.editor.snapshot();
-    if (snapshot.text.trim()) {
+    const hasText = snapshot.text.trim().length > 0;
+    if (hasText && !this.stash.hasDraft) {
       if (!this.stash.stash({ text: snapshot.text, cursor: snapshot.cursor })) {
         this.toast = "A draft is already stashed; take it back before setting this one aside.";
         this.tui.requestRender();
@@ -1409,6 +1424,10 @@ export class InteractiveMode {
       this.tui.requestRender();
       return;
     }
+    // Swapping keeps the prompt's text rather than dropping it: the two drafts
+    // trade places, so the key is reversible without thinking about which one
+    // it will produce.
+    if (hasText) this.stash.stash({ text: snapshot.text, cursor: snapshot.cursor });
     resetVimState(this.state.editor);
     this.vimSelection = undefined;
     this.state.editor.setDraftText(restored.text);

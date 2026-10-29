@@ -3580,6 +3580,70 @@ it('resets pending Vim state when the real external-editor round trip adopts a d
   } finally { mode.stop(); }
 });
 
+it('keeps the pre-rewrite draft one key away after an external edit', () => {
+  // The editor is where a person goes to have the draft rewritten. What it
+  // replaces is not reachable by undo — that edit never happened in this
+  // terminal — so the original goes into the stash slot instead.
+  const scheduler = new ManualScheduler();
+  const { mode, terminal } = build({ scheduler });
+  const host = mode as unknown as { view: InteractiveView; preferences: { openExternalEditor(text: string): void } };
+  vi.spyOn(externalEditor, 'editExternally').mockReturnValue({ text: 'polished version' });
+  mode.start();
+  try {
+    terminal.input('original thought');
+    scheduler.flush();
+    host.preferences.openExternalEditor(host.view.editor.getText());
+    scheduler.flush();
+    expect(host.view.editor.getText()).toBe('polished version');
+
+    terminal.input('\x13');                       // ctrl+s: take the original back
+    expect(host.view.editor.getText()).toBe('original thought');
+  } finally { mode.stop(); }
+});
+
+it('swaps the prompt and the stash instead of refusing the second draft', () => {
+  // Two drafts, one key: the prompt's text and the stashed text trade places,
+  // so the key is reversible without remembering which one it will produce.
+  const scheduler = new ManualScheduler();
+  const { mode, terminal } = build({ scheduler });
+  const host = mode as unknown as { view: InteractiveView };
+  mode.start();
+  try {
+    terminal.input('first');
+    scheduler.flush();
+    terminal.input('\x13');
+    expect(host.view.editor.getText()).toBe('');
+
+    terminal.input('second');
+    scheduler.flush();
+    terminal.input('\x13');
+    expect(host.view.editor.getText()).toBe('first');
+    terminal.input('\x13');
+    expect(host.view.editor.getText()).toBe('second');
+  } finally { mode.stop(); }
+});
+
+it('leaves the stash empty when the editor changed nothing', () => {
+  // No rewrite means nothing was replaced, so there is no original to keep.
+  const scheduler = new ManualScheduler();
+  const { mode, terminal } = build({ scheduler });
+  const host = mode as unknown as { view: InteractiveView; preferences: { openExternalEditor(text: string): void } };
+  vi.spyOn(externalEditor, 'editExternally').mockReturnValue({ message: 'No changes.' });
+  mode.start();
+  try {
+    terminal.input('kept as written');
+    scheduler.flush();
+    host.preferences.openExternalEditor(host.view.editor.getText());
+    scheduler.flush();
+
+    // The first press stashes; the second brings it back unchanged.
+    terminal.input('\x13');
+    expect(host.view.editor.getText()).toBe('');
+    terminal.input('\x13');
+    expect(host.view.editor.getText()).toBe('kept as written');
+  } finally { mode.stop(); }
+});
+
 it('answers runtime questions through the text channel while Vim is in Normal mode', async () => {
   const scheduler = new ManualScheduler();
   const { mode, terminal, readline } = build({ scheduler });

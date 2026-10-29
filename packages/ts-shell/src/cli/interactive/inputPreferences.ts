@@ -22,7 +22,10 @@ export interface InputPreferencesHost {
   suspendTerminal<T>(run: () => T): T;
   /** The workspace root, for the editor's working directory. */
   workspaceRoot(): string;
-  /** Replace the draft with what the editor returned. */
+  /**
+   * Replace the draft with what the editor returned, keeping the text it
+   * replaced reachable so a rewrite can be taken back.
+   */
   adoptDraft(text: string): void;
   /** Repaint after the draft changed. */
   redraw(): void;
@@ -75,6 +78,10 @@ export class InputPreferences {
       suspendTerminal: (run) => this.host.suspendTerminal(run),
       cwd: this.host.workspaceRoot(),
     });
+    // A rewrite replaces the draft whole, and the editor is where a person goes
+    // to have a model or a tool rewrite it. Keeping the text it replaced is what
+    // makes "no, the original" a single press rather than an undo of an edit
+    // that was never made in this terminal.
     if (result.text !== undefined) this.host.adoptDraft(result.text);
     if (result.message !== undefined) this.host.report(result.message);
     this.host.redraw();
