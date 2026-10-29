@@ -2776,3 +2776,16 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 验证：`teamTool.test.ts` 12 项——解析六项（正常解析、无证据保留为意见、**理由里的路径不算证据**、未知 claim 忽略、重复只取首个、非格式文本不产生 finding）、启动六项（缺问题、少于两个视角、视角相同、无模型、完整收敛、提案者失败）。反转把"路径即证据"改回来，第三项预期失败；源码逐字节恢复并核对 SHA-256 `a4e923f2e3a0` 后重验，4 文件 39 项通过；五静态门、module facade 0 与 TS build `6b66ddbb066b` 通过。
 
 **边界**：走既有工具审批，无专门的交互式 UI；未运行真实多代理会话。
+
+
+### 第一百三十三批：执行纪律的核查记录
+
+本节记录本轮执行中的纪律事实，供复核，不作为产品能力的声明。
+
+**红线 3（验证必须单一串行、聚焦）**：本轮有一次违规——在仓库根运行了覆盖 11 个目录的 `vitest run`，输出 `node::OOMErrorHandler` 并被移到后台。该次调用不计为任何批次的验收证据。此后全部改为在 `packages/ts-shell` 内按文件聚焦（1–8 个文件/次）、`&&` 串行。三条根因已写入 `HANDOFF.md`：大范围套件在 1024 MiB 下必炸；从仓库根运行会误扫 `.tmp` 下的历史 worktree（曾出现 167 文件/4349 项）；`/proc` 探测的 `ENOENT` 与 `ESRCH` 都表示进程不在。
+
+**子代理模型**：`~/.claude/settings.json` 的 `CLAUDE_CODE_SUBAGENT_MODEL` 配置为 `cn:deepseek-v4.1-flash[1m]`，`~/.claude/agents/` 与项目 `.claude/agents/` 均无 agent 定义文件覆盖它。`subagent_type: Explore` 选择的是工具集与权限范围（只读），模型由上述环境变量决定。
+
+实机核查派出的最小子代理报告其系统上下文为 `You are powered by the model global:deepseek-v4.1-flash[1m].`——**同一个模型（deepseek-v4.1-flash[1m]），区域前缀是 `global:` 而非配置里的 `cn:`**。这个差异不在本仓库的控制范围内（由 harness 解析），记录为事实而非"已按要求"。除此之外没有测试其他模型。
+
+本轮两次复核均以 `Explore` 类型派发；第一次运行 15 分钟未收敛被终止、改由主代理自查，第二次给了明确时限并在超时后催促，正常返回并找到两个真实缺陷（`fanOut` 永久挂起、`converge` 抹掉无证据的反对）。
