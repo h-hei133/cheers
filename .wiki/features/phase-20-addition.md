@@ -2795,3 +2795,9 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 `team` 工具初版向 `runSubagent` 传了 `admission: () => undefined`——一个恒返回"允许"的谓词。宿主的 runner 本来就带着会话 gate；再传一个只能同意的谓词，不是加了一层检查，而是**替换**了原有的一层。现该字段省略，runner 保留它被构造时的权威。
 
 验证：`teamTool.test.ts` 增至 13 项，新增"不向 runner 传恒真准入"，断言每次调用收到的 `admission` 都是 `undefined`。反转把恒真谓词加回去后该项预期失败；源码逐字节恢复并核对 SHA-256 `1a97810ae013` 后重验；静态门、module facade 0 与 TS build `4920a6e44b88` 通过。
+
+### 第一百三十五批：`team` 的审批目标
+
+`team` 工具初版落到 `toolPolicy` 的默认分支，审批目标只有 `"team"` 两个字——用户被要求批准一件没有名字的事。现与 `task` 同列：目标取 `question`（截断 80 字符），缺失时用 `competing-hypothesis pass`。操作类型仍是 `execute`，仍需审批。
+
+验证：`toolPolicy.test.ts` 增至 36 项，新增"审批目标取问题文本而非工具名"。反转把 `team` 从该分支移除后，目标退回 `"team"`、该项预期失败；源码逐字节恢复并核对 SHA-256 `f0a5dd7b80d7` 后重验；静态门、module facade 0 与 TS build `2b6fec2211e1` 通过。

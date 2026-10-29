@@ -110,6 +110,17 @@ describe("toolPolicy", () => {
     expect(evaluateToolPermissionScope("edit", { path: "." }, "accept-edits", "/repo").requiresEscalation).toBe(true);
   });
 
+  it("names the question a team pass would ask, not the tool", () => {
+    // Approval shows the target. A bare "team" asks the user to allow
+    // something unnamed.
+    const withQuestion = evaluateToolPermissionScope("team", { question: "why is the build slow?" }, "ask");
+    expect(withQuestion.target).toBe("why is the build slow?");
+    expect(withQuestion.requiresEscalation).toBe(true);
+
+    const bare = evaluateToolPermissionScope("team", {}, "ask");
+    expect(bare.target).toBe("competing-hypothesis pass");
+  });
+
   it("derives clear target for task tool from description or prompt", () => {
     const withDesc = evaluateToolPermissionScope("task", { description: "Analyze performance" }, "ask");
     expect(withDesc.target).toBe("Analyze performance");

@@ -136,16 +136,21 @@ export function evaluateToolPermissionScope(
       operation = "execute";
       isReadOnly = false;
     }
-  } else if (toolName === "task") {
+  } else if (toolName === "task" || toolName === "team") {
     operation = "execute";
+    // The question is what the user is being asked to allow, so it is the
+    // target. Leaving it at the tool name would show a bare "team" and ask for
+    // approval of something unnamed.
     target =
       typeof safeArgs.description === "string" && safeArgs.description.trim()
         ? safeArgs.description.trim()
-        : typeof safeArgs.prompt === "string" && safeArgs.prompt.trim()
-          ? safeArgs.prompt.trim().slice(0, 80)
-          : typeof safeArgs.task === "string" && safeArgs.task.trim()
-            ? safeArgs.task.trim()
-            : "subagent task";
+        : typeof safeArgs.question === "string" && safeArgs.question.trim()
+          ? safeArgs.question.trim().slice(0, 80)
+          : typeof safeArgs.prompt === "string" && safeArgs.prompt.trim()
+            ? safeArgs.prompt.trim().slice(0, 80)
+            : typeof safeArgs.task === "string" && safeArgs.task.trim()
+              ? safeArgs.task.trim()
+              : toolName === "team" ? "competing-hypothesis pass" : "subagent task";
     isReadOnly = false;
   } else {
     operation = "execute";
