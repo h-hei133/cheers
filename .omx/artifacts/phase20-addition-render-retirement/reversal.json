@@ -1,0 +1,30 @@
+{
+  "receipts": [
+    {
+      "name": "prior-stop",
+      "exitCode": 1,
+      "failed": 5,
+      "valid": true
+    },
+    {
+      "name": "first-error",
+      "exitCode": 1,
+      "failed": 2,
+      "valid": true
+    },
+    {
+      "name": "overlay-retirement",
+      "exitCode": 1,
+      "failed": 1,
+      "valid": true
+    },
+    {
+      "name": "painter-retirement",
+      "exitCode": 1,
+      "failed": 1,
+      "valid": true
+    }
+  ],
+  "restored": true,
+  "sourceSha256": "1c2608199676952c020b53670abdd90349d153bd2f87058998d3488aff91ff90"
+}

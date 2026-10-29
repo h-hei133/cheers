@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/presentation/tui/render/engine.test.ts  (65 tests | 2 failed | 59 skipped) 15ms
+   ❯ src/presentation/tui/render/engine.test.ts > taking the screen > retires a borrowed screen and its images after scheduler stop failure
+     → expected error to have message: first private fixture
+   ❯ src/presentation/tui/render/engine.test.ts > taking the screen > retires a borrowed screen and its images after mouse stop failure
+     → expected error to have message: first private fixture
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed | 59 skipped (65)
+   Start at  06:37:29
+   Duration  478ms (transform 171ms, setup 0ms, collect 244ms, tests 15ms, environment 0ms, prepare 53ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/presentation/tui/render/engine.test.ts > taking the screen > retires a borrowed screen and its images after scheduler stop failure
+ FAIL  src/presentation/tui/render/engine.test.ts > taking the screen > retires a borrowed screen and its images after mouse stop failure
+AssertionError: expected error to have message: first private fixture
+
+- Expected
++ Received
+
+- first private fixture
++ later private fixture
+
+ ❯ src/presentation/tui/render/engine.test.ts:325:30
+    323|       });
+    324|     } else stop.mockImplementationOnce(() => { throw fault === 'termin…
+    325|     expect(() => tui.stop()).toThrow(first);
+       |                              ^
+    326|     expect(stop).toHaveBeenCalledOnce();
+    327|     const cleanup = terminal.drain();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯

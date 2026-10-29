@@ -303,6 +303,68 @@ describe("taking the screen", () => {
     expect(stop).toHaveBeenCalledOnce();
   });
 
+  it.each(['scheduler', 'mouse', 'terminal', 'overlay'] as const)('retires a borrowed screen and its images after %s stop failure', fault => {
+    const { tui, terminal, scheduler, provider } = boot();
+    tui.start({ useAlternateScreen: false });
+    provider.rows = ['history']; tui.renderNow(); terminal.drain();
+    provider.fullScreen = true;
+    provider.rows = ['image \x1b_Ga=T,f=100,q=2,c=10,i=23;QUJD\x1b\\'];
+    tui.renderNow(); expect(terminal.drain()).toContain('QUJD');
+    const first = new Error('first private fixture'), later = new Error('later private fixture');
+    const clear = vi.spyOn(scheduler, 'clearTimeout');
+    const write = vi.spyOn(terminal, 'write');
+    const stop = vi.spyOn(terminal, 'stop');
+    if (fault === 'scheduler') clear.mockImplementationOnce(() => { throw first; });
+    if (fault === 'mouse') write.mockImplementationOnce(() => { throw first; });
+    if (fault === 'overlay') {
+      write.mockImplementation((data, callback) => {
+        if (data.includes('\x1b[?1049l')) throw first;
+        terminal.writes.push(data); callback?.();
+      });
+    } else stop.mockImplementationOnce(() => { throw fault === 'terminal' ? first : later; });
+    expect(() => tui.stop()).toThrow(first);
+    expect(stop).toHaveBeenCalledOnce();
+    const cleanup = terminal.drain();
+    if (fault !== 'overlay') expect(cleanup).toContain('\x1b_Ga=d,d=A');
+    tui.stop(); expect(stop).toHaveBeenCalledOnce();
+    clear.mockRestore(); write.mockRestore(); stop.mockRestore();
+    tui.start({ useAlternateScreen: false }); terminal.drain();
+    tui.renderNow();
+    const restarted = terminal.drain();
+    expect(restarted).toContain('\x1b[?1049h');
+    expect(restarted).toContain('QUJD');
+    tui.stop();
+  });
+
+  it('retires the main painter when its cursor cleanup fails', () => {
+    const { tui, terminal, scheduler, provider } = boot();
+    tui.start({ useAlternateScreen: false }); scheduler.flush(); terminal.drain();
+    const failure = new Error('private cursor fixture');
+    const write = vi.spyOn(terminal, 'write').mockImplementationOnce(() => { throw failure; });
+    expect(() => tui.stop()).toThrow(failure);
+    expect(terminal.stopped).toBe(true);
+    write.mockRestore(); tui.start(); terminal.drain();
+    provider.rows = ['fresh alternate document']; tui.renderNow();
+    expect(provider.layouts.at(-1)).toBe('viewport');
+    expect(terminal.drain()).toContain('fresh alternate document');
+    tui.stop();
+  });
+
+  it('forgets images and leaves the document after physical stop fails', () => {
+    const { tui, terminal, scheduler, provider } = boot();
+    provider.rows = ['image \x1b_Ga=T,f=100,q=2,c=10,i=29;QUJD\x1b\\'];
+    tui.start(); scheduler.flush(); terminal.drain();
+    const failure = new Error('private stop fixture');
+    const stop = vi.spyOn(terminal, 'stop').mockImplementationOnce(() => { throw failure; });
+    expect(() => tui.stop({ document: ['retained answer'] })).toThrow(failure);
+    const written = terminal.drain();
+    expect(written).toContain('\x1b_Ga=d,d=A');
+    expect(written).toContain('retained answer');
+    stop.mockRestore(); tui.start(); terminal.drain(); tui.renderNow();
+    expect(terminal.drain()).toContain('QUJD');
+    tui.stop();
+  });
+
   it("leaves the document under the restored screen, one row per line", () => {
     const { tui, terminal, scheduler } = boot();
     tui.start();

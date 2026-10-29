@@ -990,3 +990,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Thinking expands and the transcript changes correctly, but a PTY probe times out waiting for the first sentence on a repeated expansion or resumed screen.
 - **Root Cause**: Regular rendering can preserve earlier scrollback, and viewport rendering may show only the tail of a long block. A delta stream is not a fresh full-screen transcript.
 - **Rule**: Check the real key dispatch, collapsed state, source digest and rendered row change independently. For visible-body evidence, match a public-text fragment that can occur in the actual viewport; do not require the first sentence on every repaint. Read terminal cooked flags after normal exit to establish input restoration, and keep injected stop failures separate from that evidence.
+
+### Physical Stop Does Not Retire Every Render Owner
+- **Symptom**: Multiple cleanup failures replace the first error, or restarting the same TUI after failed stop reuses a stale borrowed screen or transmitted image id.
+- **Root Cause**: A physical-stop finally skips subsequent image/document cleanup and can replace the original exception. Clearing painter or overlay references after a failing write leaves stopped ownership live.
+- **Rule**: Continue every original cleanup and retain the first thrown value. Withdraw startup, timer, painter and overlay ownership before their release calls; forget image ids even if device stop fails. Preserve main-screen scrollback images. Verify failed-stop restart through actual rendering rather than private flags alone.
+
+### Raw Source Comparisons Must Bypass RTK Filtering
+- **Symptom**: An AST inventory or old-code reversal differs from the committed source even though the working file is restored.
+- **Root Cause**: RTK can summarize git show output; that output is useful to read but is not a byte-exact source snapshot.
+- **Rule**: Use `rtk proxy git show` when capturing source for edits, hashes, AST checks or reversals. Validate replacement boundaries before mutation, preserve the original bytes in finally, and rerun any reversal based on filtered text.

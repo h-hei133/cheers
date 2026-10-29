@@ -278,45 +278,42 @@ export class TUI {
     if (!this.started || this.stopped) return;
     this.stopped = true;
     this.started = false;
-    try {
-      this.startup?.cancel();
-      this.scheduler.clearTimeout(this.frameTimer);
-      this.frameTimer = undefined;
-      this.setMouseTracking(false);
-      if (this.overlayScreen) {
-        this.terminal.write(this.forgetTransmittedImages({ free: true }) + EXIT_ALT_SCREEN);
-        this.overlayScreen = false;
-      }
-    } finally {
-      // Rendering and timer cleanup may fail before the device's unbuffered
-      // restore. The physical owner still gets its stop attempt.
-      this.terminal.stop();
-    }
     // The driver restores every mode it may have set, unbuffered, and that
     // battery includes leaving the screen — which on most terminals also puts the
     // cursor back where it was when the screen was taken. So the driver goes
     // first, and only then is the screen left (again, harmlessly) and the
     // document written under it: written before the battery, it would be
     // overprinted by whatever came next at the restored cursor.
-    const width = Math.max(1, this.terminal.getDimensions().columns);
-    if (this.mainScreen) {
-      // There is no screen to give back — this never took one. The rows the
-      // caller wanted left behind are already in the scrollback, having been
-      // appended as they were produced, so only the cursor has to be placed.
-      // The images in that scrollback are the user's to keep: deleting them
-      // would blank the pictures the conversation was left behind with.
-      this.forgetTransmittedImages({ free: false });
-      this.mainScreen.stop();
-      this.mainScreen = undefined;
-      return;
+    const mainScreen = this.mainScreen;
+    this.mainScreen = undefined;
+    let failure: { readonly cause: unknown } | undefined;
+    for (const release of [
+      () => { const startup = this.startup; this.startup = undefined; startup?.cancel(); },
+      () => { const timer = this.frameTimer; this.frameTimer = undefined; this.scheduler.clearTimeout(timer); },
+      () => this.setMouseTracking(false),
+      () => {
+        if (!this.overlayScreen) return;
+        this.overlayScreen = false;
+        this.terminal.write(this.forgetTransmittedImages({ free: true }) + EXIT_ALT_SCREEN);
+      },
+      () => this.terminal.stop(),
+      () => {
+        // Main-screen images belong to retained scrollback; alternate images
+        // are freed. Both paths forget their ids before a subsequent start.
+        const freed = this.forgetTransmittedImages({ free: !mainScreen });
+        if (freed) this.terminal.write(freed);
+      },
+      () => {
+        if (mainScreen) { mainScreen.stop(); return; }
+        const width = Math.max(1, this.terminal.getDimensions().columns);
+        const document = prepareRows(options?.document ?? [], width);
+        this.terminal.write(leaveScreen(document, this.terminal.capabilities.supportsDec2026Sync));
+      },
+    ]) {
+      try { release(); }
+      catch (cause) { failure ??= { cause }; }
     }
-    // Leaving the alternate screen takes its images with it, and the emulator
-    // keeps holding them until the process is told otherwise. Said before the
-    // screen goes, because the sequence belongs to the screen being left.
-    const freed = this.forgetTransmittedImages({ free: true });
-    if (freed) this.terminal.write(freed);
-    const document = prepareRows(options?.document ?? [], width);
-    this.terminal.write(leaveScreen(document, this.terminal.capabilities.supportsDec2026Sync));
+    if (failure) throw failure.cause;
   }
 
   requestRender(options?: RenderRequestOptions): void {

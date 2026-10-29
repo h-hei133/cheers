@@ -3632,3 +3632,19 @@ HANDOFF追加表面清理与session退出围栏区别，task scratch清理、原
 正式工件[phase20-addition-live-cli](../../.omx/artifacts/phase20-addition-live-cli/)保存可复用PTY/观察器、无秘密收据与失败分类；task scratch清理。原配置/目录字节摘要一致，临时override不变，profile未生成凭据config副本，两次重开后的隔离会话均terminated。仅文档/诊断工件变化，无新产品代码或build/Vitest；主代理每次均等待进程实际exit后才开始下一验证。五静态门/diff通过，保留118条既有docs-source advisory；正式JS/Python语法、JSON与六组收据检查通过。正式脚本补缓存投影与显式单请求断言经过语法/收据静态核对，没有再次运行live；观测包装与termios读回增加诊断开销，上表时间不作为无探针生产性能基准。
 
 这是WSL Linux PTY、当前单API-key目标、正常结束后的键盘/恢复证据，不替代用户原桌面键鼠/IME、流中点击、全部provider/账户、真实设备故障或完整acceptance矩阵。20.35受控terminal.stop失败仍只证明尝试与exit1；本批正常设备成功不升级那些故障结果。没有独立review，原47项状态不升级，ADD与Codex goal继续active；本批文档Git/精确CI另绑定。
+
+20.36已提交推送`8e80f9e01ef77e8cbd43b847f275dc37b5cc9c16`，远端main精确一致、仅原CLAUDE.md。[Watch40966165938](https://github.com/h-hei133/cheers/actions/runs/40966165938)completed/success，[CI40966166052](https://github.com/h-hei133/cheers/actions/runs/40966166052)延后核对仍in_progress，head一致。
+
+### 20.37 停止失败后退休渲染资源并保留原异常
+
+继续反馈26与20.35的实际stop边界：物理terminal.stop的finally能保证设备尝试，却会在自身抛错时覆盖最早的scheduler/mouse错误，并跳过后续图片、主屏painter和最终document清理。TUI已有同实例stop/start合同，停止前borrowed overlay的状态或图片id保留会使重启漏enter screen或把已失效图片当作可placement。新增四个初始owner回归三失败/一通过；borrowed screen仅terminal单故障已在物理stop前释放图片，所以该控制本来通过，不捏造失败。
+
+目标检查后定向复读pi tui.ts:1012–1022，其before/device/after顺序存在，但片段不提供异常继续；codex tui.rs:305–335保留first_error并继续paste/raw/cursor。采用原owner逐项释放、保留第一个异常及继续恢复的决定。本项目原[engine.stop](../../packages/ts-shell/src/presentation/tui/render/engine.ts)改为局部顺序release循环，不新增registry、执行路径或方法；startup/timer/painter/overlay引用在调用前退休。物理stop之后仍独立忘记图片id并尝试最终painter/document；main-screen图片保留用户scrollback，borrowed/alternate图片沿原free策略。任何失败仍throw首个值，上层20.35继续exit1，不能把最终document写入冒充物理设备恢复。
+
+[engine回归](../../packages/ts-shell/src/presentation/tui/render/engine.test.ts)覆盖scheduler/mouse先失败且device后失败、terminal单故障、borrowed overlay写入失败、main painter光标失败、alternate图片/document继续，以及原engine重新start后的真实viewport/enter screen/payload。六条新场景与既有owner测试，主代理heap768MiB、threads=false，engine65/mainScreen28共93项通过；实际host另按精确名称运行26项cleanup/busy退出/队列/late-input/persistence控制通过，325未选不算通过。初次host过滤误用drain/explicit exit等不匹配名称只选14项，随后读取真实名称重跑26，未以未选用例冒充通过。
+
+四组有效反转恢复完整旧stop、覆盖first error、把overlay退休放回写后、保留main painter引用，分别5/2/1/1断言失败，finally字节恢复后93项再通过。首轮旧stop反转错误使用会压缩输出的`rtk git show`，得6失败但不能算旧源码证据；AST检查也因此误报数量不一致。两者改为`rtk proxy git show`、核对method边界后完整重跑，上述5为有效旧实现计数，不隐藏无效轮。SHA-256 `1c2608199676952c020b53670abdd90349d153bd2f87058998d3488aff91ff90`恢复一致。
+
+五静态门/diff通过，118既有docs-source advisory保留；无新产品import或命名callable。AST含constructor前后均23、不含constructor的原方法/箭头属性口径22，继承ceiling债务未消失，不称结构全合规。build观察exit0后独立重算compilerInputs与inputs digest一致：build `bca358900c8273b0046b8f6826687157c1f0e1a6b8442a4d69c7a4c7af5c5260`，inputs `278a28252e3c77cc04d3a081ae0fccea09cd935aef09cc3557416386fde231bc`，460 compilerInputs/3549文件。每个验证session均实际结束后才开始下一项；工件[render-retirement](../../.omx/artifacts/phase20-addition-render-retirement/)保留有效反转日志及build收据，HANDOFF记owner退休与RTK原文陷阱，task scratch清理。
+
+本批设备为RecordingTerminal、故障受控，不证明真实失败设备的恢复；20.36真实CLI/PTY正常退出证据仍绑定前一个build，本修补没有再发live请求或运行PTY/exe/full suite/20k。未取得独立review、用户桌面/IME/全部provider或账户证据，原47项不升级，ADD与goal active；Git/精确新CI另绑定。

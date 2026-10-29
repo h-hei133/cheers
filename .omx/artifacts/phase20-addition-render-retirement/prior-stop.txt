@@ -1,0 +1,84 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/presentation/tui/render/engine.test.ts  (65 tests | 5 failed | 59 skipped) 17ms
+   ❯ src/presentation/tui/render/engine.test.ts > taking the screen > retires a borrowed screen and its images after scheduler stop failure
+     → expected error to have message: first private fixture
+   ❯ src/presentation/tui/render/engine.test.ts > taking the screen > retires a borrowed screen and its images after mouse stop failure
+     → expected error to have message: first private fixture
+   ❯ src/presentation/tui/render/engine.test.ts > taking the screen > retires a borrowed screen and its images after overlay stop failure
+     → expected '\u001b[?1002h\u001b[?1006h\u001b[?25l…' to include '\u001b[?1049h'
+   ❯ src/presentation/tui/render/engine.test.ts > taking the screen > retires the main painter when its cursor cleanup fails
+     → expected 'document' to be 'viewport' // Object.is equality
+   ❯ src/presentation/tui/render/engine.test.ts > taking the screen > forgets images and leaves the document after physical stop fails
+     → expected '\u001b[?1006l\u001b[?1002l' to include '\u001b_Ga=d,d=A'
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 1 passed | 59 skipped (65)
+   Start at  06:37:28
+   Duration  519ms (transform 178ms, setup 0ms, collect 259ms, tests 17ms, environment 0ms, prepare 60ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/presentation/tui/render/engine.test.ts > taking the screen > retires a borrowed screen and its images after scheduler stop failure
+ FAIL  src/presentation/tui/render/engine.test.ts > taking the screen > retires a borrowed screen and its images after mouse stop failure
+AssertionError: expected error to have message: first private fixture
+
+- Expected
++ Received
+
+- first private fixture
++ later private fixture
+
+ ❯ src/presentation/tui/render/engine.test.ts:325:30
+    323|       });
+    324|     } else stop.mockImplementationOnce(() => { throw fault === 'termin…
+    325|     expect(() => tui.stop()).toThrow(first);
+       |                              ^
+    326|     expect(stop).toHaveBeenCalledOnce();
+    327|     const cleanup = terminal.drain();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/presentation/tui/render/engine.test.ts > taking the screen > retires a borrowed screen and its images after overlay stop failure
+AssertionError: expected '\u001b[?1002h\u001b[?1006h\u001b[?25l…' to include '\u001b[?1049h'
+ ❯ src/presentation/tui/render/engine.test.ts:334:23
+    332|     tui.renderNow();
+    333|     const restarted = terminal.drain();
+    334|     expect(restarted).toContain('\x1b[?1049h');
+       |                       ^
+    335|     expect(restarted).toContain('QUJD');
+    336|     tui.stop();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/presentation/tui/render/engine.test.ts > taking the screen > retires the main painter when its cursor cleanup fails
+AssertionError: expected 'document' to be 'viewport' // Object.is equality
+
+- Expected
++ Received
+
+- viewport
++ document
+
+ ❯ src/presentation/tui/render/engine.test.ts:348:37
+    346|     write.mockRestore(); tui.start(); terminal.drain();
+    347|     provider.rows = ['fresh alternate document']; tui.renderNow();
+    348|     expect(provider.layouts.at(-1)).toBe('viewport');
+       |                                     ^
+    349|     expect(terminal.drain()).toContain('fresh alternate document');
+    350|     tui.stop();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/presentation/tui/render/engine.test.ts > taking the screen > forgets images and leaves the document after physical stop fails
+AssertionError: expected '\u001b[?1006l\u001b[?1002l' to include '\u001b_Ga=d,d=A'
+ ❯ src/presentation/tui/render/engine.test.ts:361:21
+    359|     expect(() => tui.stop({ document: ['retained answer'] })).toThrow(…
+    360|     const written = terminal.drain();
+    361|     expect(written).toContain('\x1b_Ga=d,d=A');
+       |                     ^
+    362|     expect(written).toContain('retained answer');
+    363|     stop.mockRestore(); tui.start(); terminal.drain(); tui.renderNow();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯

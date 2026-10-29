@@ -10306,3 +10306,13 @@ engine59/signalHandlers9与过滤host26共94项串行通过；四类反转8/2/11
 最后regular/fullscreen各一次真实请求，6725/6950ms、1011/1904字符公开推理、正确答案；当前与重开均三次真实Ctrl+T且正文digest一致，transcript17→43/53→17→43/53，实际PTY输出有公开正文片段。四次Ctrl+D exit0为138/131/126/133ms，Python读回ICANON/ECHO/ISIG和reset escapes；峰值RSS295940/292140KiB。重开无query事件，单请求零工具，原配置/目录字节不变、隔离会话terminated。
 
 总共四次串行真实请求，前两次产品回答正确但首行/viewport探针断言超时exit1，不掩盖失败；分类后最后两次才完整通过。usage投影漏缓存字段，已记录input是未缓存桶，不能称完整provider输入或独立billing；正式观察器补字段未重发。正式无秘密工件与HANDOFF保存陷阱，scratch清理；五静态门/diff、JS/Python语法、JSON/六组收据检查通过，118既有docs advisory保留。无产品改动，不重复build/tests，未运行exe/full suite/20k。当前WSL PTY证据不代替用户桌面/IME、流中鼠标、全部provider/账户或故障设备恢复，原47不升级、goal active，本批Git/CI另绑定。
+
+20.36已推送`8e80f9e01ef77e8cbd43b847f275dc37b5cc9c16`，远端main一致、仅原CLAUDE.md。延后核对Watch40966165938 success、CI40966166052仍in_progress，head一致。
+
+## [2026-10-30] fix | 渲染停止失败后仍退休资源
+
+沿[addition20.37](features/phase-20-addition.md#2037-停止失败后退休渲染资源并保留原异常)修20.35后续stop遗漏：物理finally覆盖first error、跳过image/document/painter清理。对照参考first_error继续restore的决定，原engine.stop顺序逐项尝试，调用前撤回owner引用，保留main scrollback图片，physical stop失败仍清图片id并尝试document；失败继续抛首个值，不假称设备恢复。
+
+初始三条失败、一条正常控制；最终engine65/mainScreen28与过滤host26共119项通过，host325未选不算通过。旧stop/first-error/overlay/painter四有效反转5/2/1/1失败、finally字节恢复后93再通过。首轮RTK过滤git show导致旧代码反转和AST不可信，改proxy原文与method边界后重跑；HANDOFF保留陷阱。五静态门/diff、1536MiB build通过，独立freshness为build `bca358900c8273b0046b8f6826687157c1f0e1a6b8442a4d69c7a4c7af5c5260`、inputs `278a28252e3c77cc04d3a081ae0fccea09cd935aef09cc3557416386fde231bc`，460/3549一致。AST含constructor23/23、原口径22，既有债务保留，无新import/callable。
+
+有效工件与scratch清理；验证全程serial，无独立review、live/PTY/exe/full suite/20k，真实PTY仍绑定20.36旧build，故障仅受控设备，不证明用户现场失败恢复。原47不升级、goal active，Git/精确CI另绑定。

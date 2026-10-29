@@ -1,0 +1,32 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/presentation/tui/render/engine.test.ts  (65 tests | 1 failed | 59 skipped) 15ms
+   ❯ src/presentation/tui/render/engine.test.ts > taking the screen > retires the main painter when its cursor cleanup fails
+     → expected 'document' to be 'viewport' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed | 59 skipped (65)
+   Start at  06:37:31
+   Duration  480ms (transform 173ms, setup 0ms, collect 240ms, tests 15ms, environment 0ms, prepare 61ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/presentation/tui/render/engine.test.ts > taking the screen > retires the main painter when its cursor cleanup fails
+AssertionError: expected 'document' to be 'viewport' // Object.is equality
+
+- Expected
++ Received
+
+- viewport
++ document
+
+ ❯ src/presentation/tui/render/engine.test.ts:348:37
+    346|     write.mockRestore(); tui.start(); terminal.drain();
+    347|     provider.rows = ['fresh alternate document']; tui.renderNow();
+    348|     expect(provider.layouts.at(-1)).toBe('viewport');
+       |                                     ^
+    349|     expect(terminal.drain()).toContain('fresh alternate document');
+    350|     tui.stop();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

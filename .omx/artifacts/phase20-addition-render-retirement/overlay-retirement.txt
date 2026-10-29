@@ -1,0 +1,25 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/presentation/tui/render/engine.test.ts  (65 tests | 1 failed | 59 skipped) 15ms
+   ❯ src/presentation/tui/render/engine.test.ts > taking the screen > retires a borrowed screen and its images after overlay stop failure
+     → expected '\u001b[?1002h\u001b[?1006h\u001b[?25l…' to include '\u001b[?1049h'
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed | 59 skipped (65)
+   Start at  06:37:30
+   Duration  494ms (transform 172ms, setup 0ms, collect 249ms, tests 15ms, environment 0ms, prepare 61ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/presentation/tui/render/engine.test.ts > taking the screen > retires a borrowed screen and its images after overlay stop failure
+AssertionError: expected '\u001b[?1002h\u001b[?1006h\u001b[?25l…' to include '\u001b[?1049h'
+ ❯ src/presentation/tui/render/engine.test.ts:334:23
+    332|     tui.renderNow();
+    333|     const restarted = terminal.drain();
+    334|     expect(restarted).toContain('\x1b[?1049h');
+       |                       ^
+    335|     expect(restarted).toContain('QUJD');
+    336|     tui.stop();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
