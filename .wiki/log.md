@@ -10206,3 +10206,13 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 夹具显示顺序从newest-first recent改用all，产品transcript不变。四显式文件221项聚焦通过，旧顺序反转六项全部失败、finally逐字节恢复后221再通过；AST completion15、五静态门/diff通过。TS build `ef6f1547fe429bf19ec53d5567aa542656102bde0496febbd3f5b08fbfc3f46d`、inputs `9939c7116176b085eda0e703cc87a15b454bd0e0b2b0d45693921e5ee86b64c9`，460/3547最终新鲜度一致。构建仍有session_id时误启动测试导致一次短暂重叠，两者最终exit0、未观察OOM，保留执行失误，不称整批严格串行；新鲜度单独执行，后续以exit_code为重检查互斥边界。
 
 局部顺序修复不重复结构NormProof，HANDOFF补聚合delta与recent/all规则，task scratch清理；无live relay/provider、真实终端、PTY/exe/full suite或20k会话，原47项不升级、ADD active，Git/精确CI另绑定。
+
+该批提交推送`44f8d9fc8d93531297f87a52bd5b697e7f95d29b`，远端main精确一致、仅原CLAUDE.md。[Watch40946386982](https://github.com/h-hei133/cheers/actions/runs/40946386982)延后success，[CI40946387010](https://github.com/h-hei133/cheers/actions/runs/40946387010)仍in_progress。20.23公开回传[3388b01 CI40944127824](https://github.com/h-hei133/cheers/actions/runs/40944127824)已completed/success，精确head一致；53bbd335 CI仍运行。
+
+## [2026-10-30] fix | Responses终态公开thinking当前显示
+
+继续[addition20.26](features/phase-20-addition.md#2026-responses终态公开reasoning的当前回合显示)：done/terminal-only reasoning原只保存，step把整个SSE视为已经显示，两端点实际Response→step→TurnSink无thinking。六失败/54通过确认本地显示缺口。OpenAI Docs实际取得官方summary/raw done schema，定向参考reasoning item收尾采用公开正文；保留本项目严格terminal/delta/sealed/tool校验。在原reader按item仅补发未有非空reasoning delta的公开正文，复用原summary/raw投影，再发剩余答案；cipher不显示、原signature字节保持。
+
+五显式文件196项串行通过：stream56/consumer8/body19/account17/step96；含done-only、多个item、两端点sink、空delta、已流答案、reduced account terminal与非法终态拒绝。三类反转9/6/1失败，finally逐字节恢复后196再通过。五静态门/diff、完整声明图单一用例、AST stream4通过；build `d3fc77c496563398fe48395d87a977238b6907196363c2f8bced1a8a193b05bf`、inputs `5cac3c77d583651812cd1b1c9cb10e95fcbf8c38d8d01a3ac46358968444fdb8`，460/3547在build exit0后单独重算一致。
+
+未重跑本地NormProof judge，无独立review、live/真实账户终端、PTY/exe/full suite或20k会话；HANDOFF补stream/显示区别、task scratch清理。部分delta后的缺失尾部及raw/summary表示替换仍需独立裁决，未冒充该范围完成；原47项不升级、ADD active，Git/新精确CI另绑定。

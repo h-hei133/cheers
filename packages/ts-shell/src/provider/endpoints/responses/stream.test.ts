@@ -76,15 +76,102 @@ describe('Responses terminal and SSE contract', () => {
     expect(JSON.parse(result.reasoningSignature!).output).toEqual([completed]);
   });
 
-  it('retains raw done text without a preceding delta and without inventing a streamed delta', async () => {
+  it('publishes validated raw done text once when no reasoning delta preceded it', async () => {
     const reasoning = { type: 'reasoning', id: 'rs_raw', summary: [] };
     const completed = { ...reasoning, content: [{ type: 'reasoning_text', text: 'Plan' }] };
     const { result, fragments } = await read([added(reasoning as never),
       { type: 'response.reasoning_text.done', output_index: 0, content_index: 0, item_id: 'rs_raw', text: 'Plan' },
       terminal([completed])]);
     expect(result.finishReason).toBe('stop'); expect(result.reasoning).toBe('Plan');
-    expect(fragments).toEqual([]);
+    expect(fragments).toEqual([{ kind: 'reasoning', text: 'Plan' }]);
   });
+
+  it.each(['openai-responses', 'openai-account-responses'] as const)(
+    'publishes previously unstreamed public items once after %s terminal validation', async kind => {
+      const raw = { type: 'reasoning', id: 'rs_final_raw', summary: [],
+        content: [{ type: 'reasoning_text', text: 'Raw plan' }] };
+      const summarized = { type: 'reasoning', id: 'rs_final_summary',
+        summary: [{ type: 'summary_text', text: 'Summary plan' }],
+        content: [{ type: 'reasoning_text', text: 'Alternate raw plan' }], encrypted_content: 'synthetic-cipher' };
+      const { result, fragments } = await read([
+        added({ ...raw, content: [] } as never),
+        { type: 'response.reasoning_text.done', output_index: 0, content_index: 0, item_id: raw.id, text: 'Raw plan' },
+        { type: 'response.output_item.done', output_index: 0, item: raw },
+        terminal([raw, summarized, item]),
+      ], '\n', true, true, kind);
+      expect(result.finishReason).toBe('stop');
+      expect(fragments).toEqual([
+        { kind: 'reasoning', text: 'Raw plan' }, { kind: 'reasoning', text: 'Summary plan' },
+        { kind: 'text', text: 'Hello 世界' },
+      ]);
+      expect(result.reasoning).toBe('Raw planSummary plan');
+      expect(JSON.parse(result.reasoningSignature!).output).toEqual([raw, summarized, item]);
+    });
+
+  it('does not suppress an unstreamed item because a different reasoning item emitted deltas', async () => {
+    const streamed = { type: 'reasoning', id: 'rs_streamed', summary: [{ type: 'summary_text', text: 'First' }] };
+    const final = { type: 'reasoning', id: 'rs_final', summary: [{ type: 'summary_text', text: 'Second' }] };
+    const { result, fragments } = await read([added({ ...streamed, summary: [] } as never),
+      { type: 'response.reasoning_summary_text.delta', output_index: 0, summary_index: 0, item_id: streamed.id, delta: 'First' },
+      terminal([streamed, final, item])]);
+    expect(result.finishReason).toBe('stop');
+    expect(fragments).toEqual([{ kind: 'reasoning', text: 'First' }, { kind: 'reasoning', text: 'Second' },
+      { kind: 'text', text: 'Hello 世界' }]);
+  });
+
+  it('recovers public reasoning from sealed account items when response.done omits output', async () => {
+    const reasoning = { type: 'reasoning', id: 'rs_account_final', summary: [{ type: 'summary_text', text: 'Account plan' }] };
+    const { result, fragments } = await read([added({ ...reasoning, summary: [] } as never),
+      { type: 'response.output_item.done', output_index: 0, item: reasoning }, added(item, 1),
+      { type: 'response.output_item.done', output_index: 1, item },
+      { type: 'response.done', response: { id: 'resp_1', status: 'completed', model: 'm', usage } },
+    ], '\n', true, true, 'openai-account-responses');
+    expect(result.finishReason).toBe('stop');
+    expect(fragments).toEqual([{ kind: 'reasoning', text: 'Account plan' }, { kind: 'text', text: 'Hello 世界' }]);
+    expect(JSON.parse(result.reasoningSignature!).output).toEqual([reasoning, item]);
+  });
+
+  it.each(['empty-delta', 'already-streamed-answer'] as const)('publishes final-only reasoning after %s without repeating answer text', async mode => {
+    const reasoning = { type: 'reasoning', id: 'rs_final', summary: [{ type: 'summary_text', text: 'Final plan' }] };
+    const events: unknown[] = [added({ ...reasoning, summary: [] } as never)];
+    if (mode === 'empty-delta') events.push({ type: 'response.reasoning_summary_text.delta', output_index: 0,
+      summary_index: 0, item_id: reasoning.id, delta: '' });
+    else events.push(added(item, 1), { type: 'response.output_text.delta', output_index: 1,
+      content_index: 0, item_id: item.id, delta: 'Hello 世界' });
+    const { result, fragments } = await read([...events, terminal([reasoning, item])]);
+    expect(result.finishReason).toBe('stop');
+    expect(fragments.filter(fragment => fragment.kind === 'reasoning' && fragment.text)).toEqual([{ kind: 'reasoning', text: 'Final plan' }]);
+    expect(fragments.filter(fragment => fragment.kind === 'text')).toEqual([{ kind: 'text', text: 'Hello 世界' }]);
+  });
+
+  it('does not reveal done-only reasoning before a verified terminal or decode an opaque cipher as text', async () => {
+    const reasoning = { type: 'reasoning', id: 'rs_unverified', summary: [{ type: 'summary_text', text: 'Unverified plan' }] };
+    const unverified = await read([added({ ...reasoning, summary: [] } as never),
+      { type: 'response.reasoning_summary_text.done', output_index: 0, summary_index: 0, item_id: reasoning.id, text: 'Unverified plan' },
+      { type: 'response.output_item.done', output_index: 0, item: reasoning }]);
+    expect(unverified.result.finishReason).toBe('error'); expect(unverified.fragments).toEqual([]);
+    const opaque = await read([terminal([{ ...reasoning, summary: [], encrypted_content: 'synthetic-cipher' }, item])]);
+    expect(opaque.result.finishReason).toBe('stop');
+    expect(opaque.fragments).toEqual([{ kind: 'text', text: 'Hello 世界' }]);
+  });
+
+  it.each(['foreign', 'contradictory', 'malformed-tool', 'failed'] as const)(
+    'does not publish final-only reasoning from a %s terminal', async fault => {
+      const reasoning = { type: 'reasoning', id: 'rs_final', summary: [],
+        content: [{ type: 'reasoning_text', text: 'Unverified plan' }] };
+      const last = terminal([reasoning, item]);
+      const events: unknown[] = [added({ ...reasoning, content: [] } as never)];
+      if (fault === 'foreign') last.response.id = 'resp_other';
+      if (fault === 'contradictory') events.push({ type: 'response.reasoning_text.done', output_index: 0,
+        content_index: 0, item_id: reasoning.id, text: 'Different plan' });
+      if (fault === 'malformed-tool') last.response.output.push({ type: 'function_call', id: 'fc_final',
+        call_id: 'call_final', name: 'read', arguments: '[]', status: 'completed' });
+      if (fault === 'failed') { last.type = 'response.failed'; last.response.status = 'failed'; }
+      const { result, fragments } = await read([{ type: 'response.created', response: { id: 'resp_1' } }, ...events, last]);
+      expect(result.finishReason).toBe('error'); expect(result.reasoningSignature).toBeUndefined();
+      expect(result.message.tool_calls).toBeUndefined();
+      expect(fragments.filter(fragment => fragment.kind === 'reasoning')).toEqual([]);
+    });
 
   it.each(['identity', 'index', 'type', 'done', 'late', 'missing-content', 'terminal'] as const)('rejects invalid raw reasoning %s without admitting native replay or tools', async fault => {
     const reasoning = { type: 'reasoning', id: 'rs_raw', summary: [] };

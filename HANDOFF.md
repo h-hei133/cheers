@@ -926,3 +926,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A proxy returns reasoning and answer text in one SSE delta; the thinking row stays live and activity returns to thinking while the answer continues.
 - **Root Cause**: The reader emits answer text first, so the sink opens its assistant block before the thinking block exists. Later answer deltas reuse that block and do not settle the newly created thinking row.
 - **Rule**: Emit the selected public reasoning fragment before content within each combined delta. Verify reader order and the actual step-to-sink block order/finalization together; `Transcript.recent` is newest first, while `all` is display order.
+
+### Stream Transport Does Not Prove Public Reasoning Was Displayed
+- **Symptom**: A Responses SSE completion saves public reasoning from done/terminal snapshots, but the current turn has no thinking block.
+- **Root Cause**: The step suppresses whole-body reasoning callbacks for streamed responses, while the protocol reader only emits text deltas. A completed reasoning item can contain public text without any preceding reasoning delta.
+- **Rule**: After the existing terminal identity, item and actionable-output checks pass, publish public reasoning for each item that emitted no nonempty reasoning delta, before any remaining answer text. Reuse the native summary/raw projection, preserve opaque replay bytes, and verify reduced account terminals, no duplicate deltas, invalid terminals and the actual step-to-sink display separately.

@@ -2,7 +2,7 @@ import { isRecord } from '../../../core/values/record.js';
 import { isDeepStrictEqual } from 'node:util';
 import type { CompletedBody, StreamedCompletion, StreamFragment } from '../../../turn/completion.js';
 import { responseEvents } from './events.js';
-import { readResponse, responseFailure, responseOutput, responseUsage, type OutputItem } from './output.js';
+import { outputProjection, readResponse, responseFailure, responseOutput, responseUsage, type OutputItem } from './output.js';
 
 interface Slot {
   readonly item: OutputItem;
@@ -114,6 +114,15 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
         const completed = readResponse(terminal, account);
         const text = completed.choices?.[0]?.message?.content ?? '';
         if (!text.startsWith(shown)) return assembled(responseFailure(shown, usage), shown);
+        // Done snapshots can contain public reasoning without any text delta.
+        // Publish it only after terminal validation, once per unstreamed item.
+        if (completed.choices?.[0]?.finish_reason !== 'error') for (const [index, item] of output.entries()) {
+          if (item.type !== 'reasoning') continue;
+          const slot = slots.get(index);
+          if (slot && [...slot.reasoning.values(), ...slot.reasoningText.values()].some(value => value.length > 0)) continue;
+          const reasoning = outputProjection([item]).reasoning;
+          if (reasoning) yield { kind: 'reasoning', text: reasoning };
+        }
         if (text.length > shown.length) yield { kind: 'text', text: text.slice(shown.length) };
         return assembled(completed, shown);
       }

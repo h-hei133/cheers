@@ -2,9 +2,46 @@ import { expect, it } from 'vitest';
 import { createStepFunction } from '../../../turn/step.js';
 import { requestSimpleCompletion } from '../../request/completion.js';
 import { requestCompactionSummary } from '../../../core/query/compaction/summarize.js';
+import { TurnSink } from '../../../cli/interactive/turnSink.js';
+import { Transcript } from '../../../presentation/tui/transcript/container.js';
+import { resetSessionUsage } from '../../../observability/usageTelemetry.js';
 
 const item = { id: 'msg_1', type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: 'partial response', annotations: [] }] };
 const provider = { providerId: 'fixture', model: 'm', endpoint: 'openai-responses', baseUrl: 'https://fixture.test/v1', headers: {} };
+
+it.each(['openai-responses', 'openai-account-responses'] as const)(
+  'displays final-only public reasoning before the answer through the actual %s step and sink', async endpoint => {
+    const reasoning = { id: 'rs_final', type: 'reasoning', summary: [{ type: 'summary_text', text: 'Inspect the inputs.' }],
+      encrypted_content: 'synthetic-cipher' };
+    const events = [
+      { type: 'response.output_item.added', output_index: 0, item: { ...reasoning, summary: [] } },
+      { type: 'response.reasoning_summary_text.done', output_index: 0, summary_index: 0, item_id: reasoning.id, text: 'Inspect the inputs.' },
+      { type: 'response.output_item.done', output_index: 0, item: reasoning },
+      { type: 'response.completed', response: { id: 'resp_final', model: 'm', status: 'completed', output: [reasoning, item] } },
+    ];
+    const transcript = new Transcript();
+    const sink = new TurnSink(transcript, () => {});
+    const sessionId = `responses-final-consumer-${endpoint}`;
+    sink.begin('turn', 'turn');
+    const step = createStepFunction({ provider: { apiKey: 'synthetic', provider: 'fixture', ...provider, endpoint },
+      workspaceRoot: process.cwd(), sessionId, systemPrompt: '', tools: [],
+      fetchImpl: async () => new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(''),
+        { headers: { 'content-type': 'text/event-stream' } }) });
+    try {
+      const result = await step([{ role: 'user', content: 'q' }], undefined,
+        { onReasoning: delta => sink.handleEvent({ type: 'reasoning.delta', role: 'coder', delta }),
+          onText: delta => sink.handleEvent({ type: 'message.delta', role: 'coder', delta }) }, { allowTools: false });
+      expect(result.stopReason).toBe('stop');
+      expect(result.reasoning?.text).toBe('Inspect the inputs.');
+      expect(JSON.parse(result.reasoning!.signature!).output).toEqual([reasoning, item]);
+      expect(transcript.all().map(block => ({ kind: block.kind, text: block.text, finalized: block.finalized }))).toEqual([
+        { kind: 'thinking', text: 'Inspect the inputs.', finalized: true },
+        { kind: 'assistant', text: 'partial response', finalized: false },
+      ]);
+      expect(sink.activity()?.label).toBe('working');
+      expect(JSON.stringify(transcript.all())).not.toContain('synthetic-cipher');
+    } finally { sink.end(); resetSessionUsage(sessionId); }
+  });
 
 it('delivers raw reasoning deltas and retains the same reasoning in the actual provider step', async () => {
   const reasoning = { id: 'rs_raw', type: 'reasoning', summary: [], content: [] };

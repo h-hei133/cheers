@@ -3452,3 +3452,17 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 新增reader检查三字段的fragment顺序与最终正文，实际请求回归检查thinking先于assistant、thinking已finalized、继续答案仍在同一assistant与activity working。初版TUI夹具误用Transcript.recent比较显示顺序；recent是最新在前，改用all读取实际显示顺序，未调整产品transcript语义。主代理所属package四个显式文件221项通过：completion37/endpoint38/step96/turnSink50。反转恢复content-before-reasoning后六项新回归全部失败，其余未选项不计新通过；finally逐字节恢复后221项再通过。AST completion15；五静态门/diff、1536MiB TS build与最终新鲜度核验通过：build `ef6f1547fe429bf19ec53d5567aa542656102bde0496febbd3f5b08fbfc3f46d`，inputs `9939c7116176b085eda0e703cc87a15b454bd0e0b2b0d45693921e5ee86b64c9`，460 compilerInputs/3547文件重算一致。
 
 本轮验证存在一次执行纪律失误：构建仍返回session_id时误启动了测试，短暂重叠，之后分别确认exit_code=0且新鲜度单独完成；未观察到OOM，但不能将本轮整体称为严格串行。后续以exit_code确认为启动下一项重检查的边界。局部顺序修复不重复结构NormProof；HANDOFF记录聚合delta与recent/all陷阱，任务scratch清理。无live relay/provider、真实终端、PTY/exe/full suite或20k会话，原47项不升级、反馈25与ADD仍partial/active；新Git/精确CI另绑定。
+
+本批已提交推送`44f8d9fc8d93531297f87a52bd5b697e7f95d29b`，远端main精确一致，仅原CLAUDE.md。[Watch40946386982](https://github.com/h-hei133/cheers/actions/runs/40946386982)延后completed/success，[CI40946387010](https://github.com/h-hei133/cheers/actions/runs/40946387010)仍in_progress。20.23公开回传的[CI40944127824](https://github.com/h-hei133/cheers/actions/runs/40944127824)现已completed/success、headSha核对一致；20.24 CI仍运行。
+
+### 20.26 Responses终态公开reasoning的当前回合显示
+
+继续反馈25，实际检查[Responses reader](../../packages/ts-shell/src/provider/endpoints/responses/stream.ts)与[step](../../packages/ts-shell/src/turn/step.ts)确认：done/终态有公开reasoning但没有reasoning delta时，原reader只保存正文，step因streamed已定义不发全量onReasoning，当前回合只有assistant，恢复后才有thinking。原raw done-only测试明确断言零fragment，覆盖存储但未覆盖当前显示。本轮实际Response→step→TurnSink两端点回归及reader场景初次六失败/54通过，证明本地缺口，未声称真实服务必然省略delta。
+
+使用OpenAI Docs核对[官方流式事件](https://developers.openai.com/api/reference/resources/responses/streaming-events.md#response.reasoning_summary_text.done)：summary/raw done的text是完整公开正文，并由item_id/output_index及各自part index定位。定向读取pi openai-responses-shared.ts:746–768，reasoning item收尾采用summary或raw正文并发布thinking_end。采用终态公开投影与每item不重复的决定；本项目保留更严格terminal identity、delta/done、sealed item与可执行tool检查，没有从未验证done或opaque cipher推造正文。
+
+原reader在readResponse和answer前缀验证后，按output_index找原slot，只为没有任何非空reasoning delta的item发一次reasoning fragment，复用原outputProjection的summary优先/raw次之，再发剩余答案。多个item分别判断；其他item流出正文不抑制本item，empty delta不构成已显示。账号服务的response.done省略output时继续只使用原连续sealed items。终态error不补发，opaque output和signature保持原始值。已流出的raw/summary合并显示合同保持；部分delta后的缺失尾部或表示切换不是本轮完成范围，仍需独立替换/去重裁决。
+
+主代理package-local五显式文件196项串行通过：stream56/consumer8/body19/account17/step96，覆盖done-only、纯terminal、两端点真实sink显示、多个item、empty delta、已流答案不重复、reduced account terminal、EOF/foreign/contradictory/malformed tool/failed不补发及cipher不显示。三个独立反转移除补发、移除已显示item守卫、移除有效completion守卫分别9/6/1项失败，每次finally逐字节恢复，恢复后196重验通过。五静态门/diff、完整声明图单一用例与AST stream4通过；1536MiB TS build完成exit0后单独新鲜度核验：build `d3fc77c496563398fe48395d87a977238b6907196363c2f8bced1a8a193b05bf`，inputs `5cac3c77d583651812cd1b1c9cb10e95fcbf8c38d8d01a3ac46358968444fdb8`，460 compilerInputs/3547文件重算一致。
+
+本批未重复本地NormProof judge，完整声明图是结构证据；无独立review、live provider/账户、真实终端、PTY/exe/full suite或20k会话。HANDOFF记录stream transport与显示事实分开，任务scratch清理。原47项不升级，反馈25与ADD整体仍partial/active，Git/精确新CI另绑定。
