@@ -21,7 +21,7 @@ confidence: high
 
 | 文档 | 当前内容与边界 |
 |---|---|
-| [Phase 20日常交互补充规划](phase-20-addition.md) | 面板、模型、输入与日常交互；第19节保留第八轮研究，第20节记录跨目录审批、有界退出、Responses推理恢复、空闲fresh/信号关闭与损坏usage的partial/unknown恢复。12文件214项串行及反转验证；真实环境证据与25/27/28/29剩余项保留，usage键生成原因未确认 |
+| [Phase 20日常交互补充规划](phase-20-addition.md) | 面板、模型、输入与日常交互；第19节保留第八轮研究，第20节记录审批、退出、推理、恢复与resume索引复用。20.7为8文件154项串行/反转与2409会话真实目录只读比较：重复搜索约2.1s→36ms，首次加载未证加速；真实终端/平台与25/27/28剩余项保留，usage键生成原因未确认 |
 | [日常交互问题核查](interaction-audit.md) | 2026-10-25核查及26日更正：保留model按键观察与根因推测区别，记录新几何及补全方向；只交付调查 |
 | [23 输入几何](23-input-surface-geometry.md) | padding1、16正文行的目标；gutter/viewport与应用内复制边界 |
 | [24 Slash与参数](24-slash-completion-defects.md) | canonical/alias、选择状态、共享语法与真实4路径补全 |

@@ -45,7 +45,7 @@ it('finds an older match behind ten thousand newer nonmatches through the actual
   expect(result.sessions.map(summary => summary.id)).toEqual(['saved-10000']);
 });
 
-it('validates the boundary before and after a later live scan and rejects a changed anchor', async () => {
+it('validates the boundary before and after a later live scan and expires the consumed cursor', async () => {
   const { catalog, read } = fixture(90);
   const first = await finish(catalog, { needle: '' });
   const after = first.continuation!;
@@ -55,8 +55,9 @@ it('validates the boundary before and after a later live scan and rejects a chan
   expect(second.sessions.at(-1)?.id).toBe('saved-00079');
   expect(read.mock.calls[0]?.[0]).toBe(after.boundary.id);
   expect(read.mock.calls.at(-1)?.[0]).toBe(after.boundary.id);
-  read.mockImplementation(async id => id === after.boundary.id ? undefined : second.sessions.find(summary => summary.id === id));
-  await expect(finish(catalog, { needle: '', after })).rejects.toThrow(/page changed/);
+  read.mockClear();
+  await expect(finish(catalog, { needle: '', after })).rejects.toThrow(/expired/);
+  expect(read).not.toHaveBeenCalled();
 });
 
 it('keeps first-page partial status across a clean continuation page', async () => {
@@ -118,4 +119,33 @@ it('bounds diagnostic samples while preserving the complete failure count', asyn
   expect(diagnostic).toHaveBeenCalledOnce();
   expect(diagnostic.mock.calls[0]?.[0].unreadableSessionIds).toHaveLength(CATALOG_LIMITS.diagnosticSamples);
   expect(JSON.stringify(result)).not.toContain('PRIVATE_SOURCE');
+});
+
+it('bounds the shared capture before filtering and keeps truncated cross-needle matches partial', async () => {
+  const { catalog } = fixture(CATALOG_LIMITS.attemptEntries + 1, summary => summary.id === 'saved-00001'
+    ? { ...summary, title: 'older needle' } : summary);
+  const browse = catalog.beginBrowse(context);
+  let first!: SessionCatalogSnapshot;
+  for await (const snapshot of catalog.list(context, undefined, 40, undefined, undefined, { browse, needle: 'not present' })) first = snapshot;
+  expect(first).toMatchObject({ status: 'partial', total: 0 });
+  vi.mocked(discoverSessions).mockClear();
+  let next!: SessionCatalogSnapshot;
+  for await (const snapshot of catalog.list(context, undefined, 40, undefined, undefined, { browse, needle: 'older needle' })) next = snapshot;
+  expect(next).toMatchObject({ status: 'partial', total: 1 });
+  expect(next.sessions.map(summary => summary.id)).toEqual(['saved-00001']);
+  expect(discoverSessions).not.toHaveBeenCalled();
+  const retained = catalog as unknown as { browses: { states: Map<string, { summaries: Map<string, SessionSummary> }> } };
+  expect(retained.browses.states.get(browse.id)!.summaries.size).toBeLessThanOrEqual(CATALOG_LIMITS.attemptEntries);
+  catalog.retireBrowse(browse);
+});
+
+it('refuses an unissued ordinary boundary without consuming the legitimate cursor', async () => {
+  const { catalog } = fixture(90);
+  const first = await finish(catalog, { needle: '' });
+  const after = first.continuation!;
+  await expect(finish(catalog, { needle: '', after: { ...after, boundary: { ...after.boundary, id: 'saved-00050',
+    version: 'v-saved-00050' } } })).rejects.toThrow(/expired/);
+  const second = await finish(catalog, { needle: '', after });
+  expect(second.sessions[0]?.id).toBe('saved-00040');
+  await expect(finish(catalog, { needle: '', after })).rejects.toThrow(/expired/);
 });

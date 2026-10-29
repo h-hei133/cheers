@@ -10049,3 +10049,21 @@ usage恢复逐bucket/history严格校验、保留健康项，坏history加usage-
 上批`d5119e502aaa1ddcce42e5c510de25015cf66200`已提交推送且远端main读回同SHA。补充AST审查计入对象具名回调，发现runner26名超过20，而module facade/NormProof未报告；将启动notice组合移入cli/bootstrap/notices、signal保存策略移入cli/runtime/lifecycle，继续委托原startupNotice/recoveryHint，入口降至20名，新owner6/1。相关runner7、recoveryHint10、startupNotice4共21项串行通过，五静态门/diff与TS build `2b7844ba0068`通过。这是原行为的责任拆分，未新增provider或默认策略；无PTY/exe/full regression。HANDOFF提醒具名回调计数。
 
 反馈29只读分析已对照pi已加载对象搜索缓存：下一批应在catalog owner复用同一次browse完整summary索引，needle/page与source generation分开，查询取消不杀共享扫描，visible/current/sentinel/anchor继续版本复验；20k只用Mock/切片、64MiB物理预算不重置，partial跨query保留。不能用目录mtime代替核心文件身份；真实目录性能尚未测量，未实施搜索优化。
+
+## [2026-10-29] perf | resume搜索复用同次浏览索引与真实目录比较
+
+反馈29沿[addition20.7](features/phase-20-addition.md#207-resume搜索的同次浏览索引与真实目录比较)实施。catalog拥有opaque browse token、20k summary与64MiB一次source quota；query cancel不杀共享scan，source退休排空workers/cursor。原SessionCatalogPage继续过滤/分页，visible/current/lookahead/anchor版本复验，新增源由显式重开纳入；partial、unreadable、limited与sourceLimited跨needle保留。continuation绑定最近实际发出的完整boundary，拒绝伪造同id退休与真实但未发出boundary、并发claim和旧页重放。首次current与历史渐进发布保留，scope/session换代拒绝。
+
+SessionListing将token和有界同version size cache转交Next，旧subscription/previewEnd只撤销旧wait；成功mutation由原host reload重新捕获。clear先撤销offered/versions显示只读，后台同source空needle复验成功再发布，失败partial/unknown且无动作；late clear/new search/host release代次分别保护。session入口装配薄层，browser/actions/projection/presentation归明确owner。只读对照pi的载入数组/文本缓存与bounded lifetime，不用目录mtime代替核心文件身份；ambient约1ms缺尖峰证据，本批未改。
+
+主代理package-local 768MiB/threads=false &&串行最终8文件154项通过：browse17/index26/list8/query13/projection2/listing10/lifetime5/session73。20,001 summary仅mock/slice单元，无真实长历史进程。初轮ordinary successor未更新authority导致old cursor可重放属产品失败已修；CLI rename漏Host reload及continued-base漏同browse token属fixture漂移，保留旧页拒绝并修完整链。12类反转reuse/query-cancel/source-retire/partial/version/boundary/transfer/clear-authority/quota各1、scope3、clear-generation1/首current发布退休1均命中，逐字节恢复后重验154。前三个初次不敏感用例分别补read非发生、无cursor独立scope、后续search清projection观察，最终有效反转才计证据。
+
+真实目录同脚本旧→新只读测量，均2409项、163match/40shown，old build2b7844ba0068/new c975a238225e。首次2677.6→2761.0ms（未证加速）；两次匹配搜索2163.0/2124.2→36.3/35.6ms；no-match2082.4→4.6ms。匹配每query stat20062→328，open5691→0、directory3→0、read8612662→0bytes；no-match全部0。initial open7227/directory3/read11868891bytes保持，stat20422→21382用于额外渐进/终页复验。末heap旧30.3/新12.3MiB只是heapUsed，不是peak/RSS；没有终端、provider或二进制。较早new样本匹配35.4/34.5ms，完整数表见20.7。
+
+五静态门、完整声明图单一脚本用例、module facade0与diff通过，118旧docs-source advisory保留。AST distinct callable names包含对象property/method：index14/browse10/continuation4/scan2/progress2/query7/session14/browser16/actions4/projection7/presentation3/listing16。1536MiB TS build `c975a238225eb1e32be89c6687ed3d9e7ca9914dac1b8909de7ddd32ff489286`通过，inputsDigest `0797511d5e1a26c985ac25fc1df1061ddc7f11ca56fad6d00101ecbef93e187f`重算一致。bare normproof未安装是调用环境问题，随后按CI repo bundle judge proven/0open/0failed/0gap。两个gpt-6.1-sol代理仅读/编辑无验证；交叉审阅不是独立终局review。HANDOFF追加source/query/host lifetime陷阱。保留CLAUDE.md，临时脚本清理后提交；原47项矩阵未重跑，ADD整体active。
+
+延迟读回`d5119e502aaa1ddcce42e5c510de25015cf66200`的[CI40887923740](https://github.com/h-hei133/cheers/actions/runs/40887923740)与[Watch40887923974](https://github.com/h-hei133/cheers/actions/runs/40887923974)success；`757bd803e3f40de55cd5ab9304ab8bd166694fca`的[Watch40890021956](https://github.com/h-hei133/cheers/actions/runs/40890021956)success，[CI40890021874](https://github.com/h-hei133/cheers/actions/runs/40890021874)延迟读回completed/success。以上不替代本批SHA的CI。提交/推送状态随后单独记录。
+
+最终review补source退休期间首current异步publication后token复验，新增1项反转命中、恢复后browse17/lifetime5共22项重验；原153项加新增1项=154项去重通过。最终TS build `5f78aa27a97ec7debc0b4778b8f2fbd52cef0d0813a44a9aa23f8e9eb2b2545c`与inputs `e2fddda35b004ac2858c6223f423be59033c84bf69d6726f6ad277f01dffba91`新鲜度通过，NormProof再次proven/0open/0failed/0gap。最终真实目录initial2817.8ms、query32.5/35.3ms、no-match2.7ms，I/O与c975测量一致；末heap12.6MiB非峰值。原c975构建仅为前一测量样本，不作最终artifact。
+
+最终staged diff检查发现新增contract末尾多余空行，修空白后重建；最终build `55f598d95261c57d81f335345f89bc80fbb306d499368cfb3b3343d752aab88a`、inputs `ca3d28d40dd16c828516d6fa2877968632f67ad5c9fc284782eaab1978371905`。此前5f78为相同行为测量样本；空白调整未改变测试行为，无新增测试重跑。staged检查补覆盖新增文件，提交前确认通过。

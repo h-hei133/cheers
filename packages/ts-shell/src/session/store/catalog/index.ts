@@ -2,7 +2,9 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { compareSessionChoices, sessionChoices, type SessionSelectionContext } from '../../navigation/selection.js';
 import type { SessionStoreLayout } from '../sessionFileLayout.js';
-import { discoverSessions } from './discovery.js';
+import { scanCatalog } from './scan.js';
+import { CatalogBrowses, waitForBrowse, type CatalogBrowseState } from './browse.js';
+import { CatalogContinuations } from './continuation.js';
 import {
   locateCatalogFiles,
   readCatalogFile,
@@ -13,6 +15,7 @@ import {
 import {
   CATALOG_LIMITS,
   type SessionCatalogBoundary,
+  type SessionCatalogBrowse,
   type SessionCatalogContinuation,
   type SessionCatalogQuery,
   type SessionCatalogSnapshot,
@@ -30,27 +33,22 @@ export interface SessionCatalogDiagnostic {
   readonly unreadableDirectories: readonly string[];
 }
 
-interface CatalogAttempt {
-  readonly key: string;
-  readonly total: number;
-  readonly entries: readonly SessionCatalogBoundary[];
-  readonly unreadable: number;
-  readonly limited: number;
-  readonly indexTruncated: boolean;
-  readonly readBudget: SessionCatalogReadBudget;
-  claimed: boolean;
-}
-
-const MAX_ATTEMPTS = 8;
-
 /** Bounded, process-local listing index; every use checks the actual core-file version. */
 export class SessionCatalog {
   private readonly cache = new Map<string, SessionSummary>();
-  private readonly attempts = new Map<string, CatalogAttempt>();
+  private readonly continuations = new CatalogContinuations();
+  private readonly browses: CatalogBrowses;
 
   constructor(private readonly layout: SessionStoreLayout,
     private readonly attemptBytes = CATALOG_LIMITS.attemptBytes) {
     if (!Number.isSafeInteger(attemptBytes) || attemptBytes < 1) throw new RangeError('Invalid session catalogue source limit.');
+    this.browses = new CatalogBrowses(layout, attemptBytes);
+  }
+
+  beginBrowse(context: SessionSelectionContext): SessionCatalogBrowse { return this.browses.begin(context); }
+
+  retireBrowse(token: SessionCatalogBrowse): void {
+    if (this.browses.retire(token)) this.continuations.retire(token.id);
   }
 
   resolve(reference: string, options: SessionReferenceQuery = {}): Promise<SessionReferenceResolution> {
@@ -64,8 +62,9 @@ export class SessionCatalog {
     query?: SessionCatalogQuery): AsyncGenerator<SessionCatalogSnapshot> {
     signal?.throwIfAborted();
     if (!Number.isInteger(limit) || limit < 1 || limit > 10_000) throw new RangeError('Invalid session listing limit.');
+    if (query?.browse) { yield* this.listBrowse(context, query, signal, limit, onSource, onUnreadable); return; }
     const after = query?.after;
-    const attempt = after ? this.readAttempt(after) : undefined;
+    const attempt = after ? this.continuations.claim(after) : undefined;
     // The quota spans pages; each read receives the current page's signal.
     // Retiring an earlier view must not cancel the next page's acquisition.
     const readBudget = attempt?.readBudget ?? sessionCatalogReadBudget(this.attemptBytes);
@@ -161,29 +160,17 @@ export class SessionCatalog {
           sourceLimited = true;
         }
         const page = selection!.snapshot(true);
-        if (page.continuation) attempt.claimed = false;
+        if (page.continuation) this.continuations.remember(page.continuation, attempt.entries, page.total,
+          unreadable, limited, selection!.indexTruncated, readBudget);
         this.remember(page.sessions);
         yield snapshot(sourceLimited || unreadable || limited || selection!.indexTruncated ? 'partial' : 'complete');
         return;
       }
       try {
-        for await (const page of discoverSessions(this.layout, signal, onSource)) {
+        for await (const page of scanCatalog(this.layout, context.sessionId, read, signal, onSource)) {
           if (page.unreadable > 0 && unreadableDirectories.size < CATALOG_LIMITS.diagnosticSamples) unreadableDirectories.add(page.directory);
           unreadable += page.unreadable;
-          const ids = page.ids.filter(id => id !== context.sessionId);
-          const loaded: SessionSummary[] = [];
-          let next = 0;
-          const worker = async (): Promise<void> => {
-            while (next < ids.length) {
-              signal?.throwIfAborted();
-              const summary = await read(ids[next++]!, page.directory);
-              if (summary) loaded.push(summary);
-            }
-          };
-          const settled = await Promise.allSettled(Array.from({ length: Math.min(CATALOG_LIMITS.concurrency, ids.length) }, worker));
-          signal?.throwIfAborted();
-          const failure = settled.find(result => result.status === 'rejected');
-          if (failure?.status === 'rejected') throw failure.reason;
+          const loaded = page.summaries;
           if (selection) for (const summary of loaded) selection.accept(summary);
           else recent = sessionChoices([...recent, ...loaded], context, limit).sessions;
           // Retain even an out-of-scope/empty current record solely for its explanation.
@@ -199,7 +186,7 @@ export class SessionCatalog {
       const final = snapshot(sourceLimited || unreadable || limited || selection?.indexTruncated ? 'partial' : 'complete');
       if (selection && final.continuation) {
         const entries = attempt?.entries ?? selection.matchedBoundaries().slice().sort(compareSessionChoices);
-        this.rememberAttempt(final.continuation, entries,
+        this.continuations.remember(final.continuation, entries,
           final.total ?? 0, unreadable, limited, selection.indexTruncated, readBudget);
       }
       yield final;
@@ -216,24 +203,94 @@ export class SessionCatalog {
     }
   }
 
-  private readAttempt(after: SessionCatalogContinuation): CatalogAttempt {
-    const attempt = this.attempts.get(after.attemptId);
-    if (!attempt || attempt.key !== attemptKey(after)) {
-      throw new Error('Session page expired. Reopen the session picker.');
+  private async *listBrowse(context: SessionSelectionContext, query: SessionCatalogQuery, signal: AbortSignal | undefined,
+    limit: number, onSource?: (target: string) => void,
+    onUnreadable?: (diagnostic: SessionCatalogDiagnostic) => void): AsyncGenerator<SessionCatalogSnapshot> {
+    const state = this.browses.get(query.browse!, context);
+    const after = query.after;
+    const selection = new SessionCatalogPage(context, limit, query, after?.attemptId ?? randomUUID());
+    const attempt = after ? this.continuations.claim(after) : undefined;
+    const read = this.read.bind(this);
+    this.browses.start(state, read, onSource);
+    await waitForBrowse(state, signal, state.ready);
+    this.browses.get(query.browse!, context);
+    const provisional = new SessionCatalogPage(context, limit, query);
+    const current = state.summaries.get(context.sessionId);
+    if (current) {
+      await this.validateBrowseSources([current], state, signal, onSource);
+      provisional.accept(current);
     }
-    if (attempt.claimed) throw new Error('Session page is already being read. Reopen the session picker.');
-    attempt.claimed = true;
-    this.attempts.delete(after.attemptId);
-    this.attempts.set(after.attemptId, attempt);
-    return attempt;
+    if (after) selection.assertBoundary(await this.read(after.boundary.id, signal, undefined, onSource, state.budget,
+      state.summaries.get(after.boundary.id)));
+    signal?.throwIfAborted();
+    this.browses.get(query.browse!, context);
+    yield browseSnapshot(provisional, state, 'scanning');
+    const accepted = new Set<string>();
+    const validated = new Set<SessionSummary>();
+    if (current) validated.add(current);
+    try {
+      while (!state.done) {
+        const revision = state.progress.revision;
+        for (const summary of state.summaries.values()) {
+          signal?.throwIfAborted();
+          if (!accepted.has(summary.id)) { accepted.add(summary.id); selection.accept(summary); }
+        }
+        await this.validateBrowseSources(selection.visibleSources(), state, signal, onSource, validated);
+        this.browses.get(query.browse!, context);
+        if (!state.done) yield browseSnapshot(selection, state, 'scanning');
+        if (!state.done && revision === state.progress.revision) {
+          await waitForBrowse(state, signal, Promise.race([state.build!, state.progress.changed]));
+        }
+      }
+      await waitForBrowse(state, signal);
+      this.browses.get(query.browse!, context);
+      for (const summary of state.summaries.values()) {
+        signal?.throwIfAborted();
+        if (!accepted.has(summary.id)) { accepted.add(summary.id); selection.accept(summary); }
+      }
+      if (after) selection.assertBoundary(await this.read(after.boundary.id, signal, undefined, onSource, state.budget,
+        state.summaries.get(after.boundary.id)));
+      await this.validateBrowseSources(selection.visibleSources(), state, signal, onSource);
+      if (after) selection.assertBoundary(await this.read(after.boundary.id, signal, undefined, onSource, state.budget,
+        state.summaries.get(after.boundary.id)));
+    } catch (error) {
+      signal?.throwIfAborted();
+      if (!(error instanceof SessionCatalogReadLimitError)) throw error;
+      state.sourceLimited = true;
+      // No row whose live identity was not checked may be offered as selectable.
+      yield { sessions: [], scanned: state.scanned, unreadable: state.unreadable, limited: state.limited,
+        status: 'partial', sourceLimited: true, hasMore: false, total: selection.snapshot(false).total };
+      return;
+    }
+    signal?.throwIfAborted();
+    this.browses.get(query.browse!, context);
+    const status = state.sourceLimited || state.indexTruncated || state.unreadable || state.limited ? 'partial' : 'complete';
+    const final = browseSnapshot(selection, state, status);
+    this.remember(final.sessions);
+    if (final.continuation) {
+      this.continuations.remember(final.continuation, attempt?.entries ?? selection.matchedBoundaries().slice().sort(compareSessionChoices),
+        final.total ?? 0, state.unreadable, state.limited, state.indexTruncated, state.budget);
+    }
+    if (state.unreadableIds.size || state.unreadableDirectories.size) {
+      try { onUnreadable?.({ unreadableSessionIds: [...state.unreadableIds], unreadableDirectories: [...state.unreadableDirectories] }); }
+      catch { /* Diagnostics are observational. */ }
+    }
+    yield final;
   }
 
-  private rememberAttempt(continuation: SessionCatalogContinuation,
-    entries: readonly SessionCatalogBoundary[], total: number, unreadable: number, limited: number,
-    indexTruncated: boolean, readBudget: SessionCatalogReadBudget): void {
-    this.attempts.set(continuation.attemptId, { key: attemptKey(continuation), entries, total,
-      unreadable, limited, indexTruncated, readBudget, claimed: false });
-    while (this.attempts.size > MAX_ATTEMPTS) this.attempts.delete(this.attempts.keys().next().value!);
+  private async validateBrowseSources(entries: readonly SessionSummary[], state: CatalogBrowseState,
+    signal?: AbortSignal, onSource?: (target: string) => void, validated?: Set<SessionSummary>): Promise<void> {
+    for (const expected of entries) {
+      if (validated?.has(expected)) continue;
+      signal?.throwIfAborted();
+      const actual = await this.read(expected.id, signal, undefined, onSource, state.budget, expected);
+      if (!actual || actual.id !== expected.id || actual.version !== expected.version
+        || compareSessionChoices(actual, expected) !== 0 || actual.projectRoot !== expected.projectRoot
+        || actual.reentry !== expected.reentry || actual.quality !== expected.quality) {
+        throw new Error('Session page changed while browsing. Reopen the session picker to refresh.');
+      }
+      validated?.add(expected);
+    }
   }
 
   private async readBatch(entries: readonly SessionCatalogBoundary[], signal?: AbortSignal,
@@ -259,11 +316,16 @@ export class SessionCatalog {
   }
 
   private async read(id: string, signal?: AbortSignal, directory?: string, onSource?: (target: string) => void,
-    readBudget?: SessionCatalogReadBudget): Promise<SessionSummary | undefined> {
+    readBudget?: SessionCatalogReadBudget, resident?: SessionSummary): Promise<SessionSummary | undefined> {
     const before = await locateCatalogFiles(this.layout, id, signal, onSource);
     if (!before) { this.cache.delete(id); return undefined; }
     if (directory && before.layout.sessionDir !== path.join(directory, id)) return undefined;
-    const cached = this.cache.get(id);
+    const cached = resident ?? this.cache.get(id);
+    // A captured browse is a snapshot, not permission to replace a changed row.
+    // Refuse before opening core files, including while four source reads run.
+    if (resident && resident.version !== before.version) {
+      throw new Error('Session page changed while browsing. Reopen the session picker to refresh.');
+    }
     let summary = cached?.version === before.version ? cached : undefined;
     if (!summary) {
       const metadata = await readCatalogFile(before.layout.metadataPath, before.stats[0], CATALOG_LIMITS.metadataBytes, signal, readBudget);
@@ -284,8 +346,12 @@ export class SessionCatalog {
   }
 }
 
-function attemptKey(value: Pick<SessionCatalogContinuation, 'sessionId' | 'projectRoot' | 'allProjects' | 'needle' | 'limit'>): string {
-  return JSON.stringify([value.sessionId, value.projectRoot, value.allProjects, value.needle, value.limit]);
+function browseSnapshot(selection: SessionCatalogPage, state: CatalogBrowseState,
+  status: SessionCatalogSnapshot['status']): SessionCatalogSnapshot {
+  const { continuation, ...page } = selection.snapshot(status !== 'scanning');
+  return { ...page, scanned: state.scanned, unreadable: state.unreadable, limited: state.limited, status,
+    ...(state.sourceLimited ? { sourceLimited: true, hasMore: false }
+      : continuation ? { continuation } : {}) };
 }
 
 function entriesAfter(entries: readonly SessionCatalogBoundary[], boundary: SessionCatalogBoundary): readonly SessionCatalogBoundary[] {

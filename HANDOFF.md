@@ -835,3 +835,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A runner passes facade and structural checks while exceeding the 20-name responsibility ceiling.
 - **Root Cause**: The collector omits callbacks bound to object property names; orchestration factories accumulate those names even with few top-level functions.
 - **Rule**: Count callable property assignments and methods with TypeScript AST when adding composition callbacks. Move coherent lifecycle or notice behavior to its owning domain and verify the original entrypoint; a green advisory collector does not waive the repository rule.
+
+### Shared Browse Sources Need Separate Query And Host Lifetimes
+- **Symptom**: Every search key rescans the session directory; cancelling a search stops the next query, or closing the previous page invalidates its successor.
+- **Root Cause**: The query owns directory acquisition, although searches and pages need one bounded source snapshot. Host search-clear restores old rows synchronously and does not call load again.
+- **Rule**: Let the catalog own an opaque browse token and source controller, with a separate query controller for each wait. Transfer source ownership on admitted Next; retire it on final close, scope change or explicit refresh. Clear-search must arrange its own guarded page recheck. Preserve physical source quotas and incomplete counts across needles, check visible/current/lookahead/anchor identities, and never substitute directory mtime for core-file versions. Track the current host subscription so an old teardown cannot cancel its replacement or publish after release.

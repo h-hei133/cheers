@@ -10,6 +10,7 @@ import { sessionPicker } from './session.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 import { SessionCatalogPage } from '../../../session/store/catalog/query.js';
 import type { SessionCatalogQuery } from '../../../session/store/catalog/model.js';
+import { SessionListing } from './session/listing.js';
 
 function session(id: string, updatedAt = '2026-10-07T00:00:00.000Z', projectRoot = '/workspace'): Session {
   return { id, projectRoot, title: id, updatedAt, createdAt: updatedAt, status: 'completed', turns: [{ role: 'user', content: 'saved conversation' }] };
@@ -28,7 +29,8 @@ function fixture(
   const records = new Map(sessions.map(item => [item.id, item]));
   const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
   const resume = vi.fn(async () => undefined); const remove = vi.fn(async () => undefined); const rename = vi.fn(async () => undefined);
-  const manager = { catalog: { async *list(listContext: typeof context = context, _signal?: AbortSignal, limit = 40,
+  const manager = { catalog: {
+      beginBrowse: vi.fn(() => ({ id: 'test-browse' })), retireBrowse: vi.fn(), async *list(listContext: typeof context = context, _signal?: AbortSignal, limit = 40,
     _source?: unknown, _diagnostic?: unknown, query?: SessionCatalogQuery) {
     const summaries = [...records.values()].map(record => summarizeSession(record, 'version'));
     const page = query ? new SessionCatalogPage(listContext, limit, query) : undefined;
@@ -68,7 +70,8 @@ it.each((['untouched', 'keyboard', 'click', 'wheel', 'hover'] as const).flatMap(
   const retirementGate = new Promise<void>(resolve => { retire = resolve; });
   const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
   const records = new Map([older, ...latest].map(item => [item.id, item]));
-  const manager = { catalog: { async *list(_context: unknown, signal: AbortSignal) {
+  const manager = { catalog: {
+      beginBrowse: vi.fn(() => ({ id: 'test-browse' })), retireBrowse: vi.fn(), async *list(_context: unknown, signal: AbortSignal) {
     yield { ...sessionChoices([summarizeSession(older, 'first')], context, 40), scanned: 1, unreadable: 0, limited: 0, status: 'scanning' };
     await gate;
     signal.throwIfAborted();
@@ -322,6 +325,9 @@ it('blocks current deletion while permitting explicit rename and normal complete
   expect(await setup.picker.onDelete?.('current')).toContain('current session cannot be deleted');
   expect(setup.remove).not.toHaveBeenCalled();
   await setup.picker.onRename?.('current', 'changed'); expect(setup.rename).toHaveBeenCalledWith('current', 'changed', 'version');
+  expect((await setup.picker.apply(['other']))?.note).toContain('not offered');
+  expect(setup.resume).not.toHaveBeenCalled();
+  await setup.picker.load(); // OverlayHost reloads after a confirmed metadata update.
   await setup.picker.apply(['other']); expect(setup.resume).toHaveBeenCalledWith('other', 'version');
   await setup.picker.load();
   await setup.picker.onDelete?.('other'); expect(setup.remove).toHaveBeenCalledWith('other', 'version');
@@ -338,7 +344,8 @@ it('sorts timestamp ties by ID regardless of input ordering', () => {
 });
 
 it('keeps load failure separate from a filtered-current explanation', async () => {
-  const picker = sessionPicker({ sessionManager: { catalog: { list: () => { throw new Error('PRIVATE_PATH'); } } } as unknown as SessionManager,
+  const picker = sessionPicker({ sessionManager: { catalog: {
+      beginBrowse: vi.fn(() => ({ id: 'test-browse' })), retireBrowse: vi.fn(), list: () => { throw new Error('PRIVATE_PATH'); } } } as unknown as SessionManager,
     context: () => ({ sessionId: 'current', projectRoot: '/workspace', busy: false }), resume: async () => undefined });
   const overlay = new OverlayHost(() => {}); overlay.open(picker);
   expect(overlay.render(100, 20).join('\n')).not.toContain('hidden by the filter');
@@ -603,14 +610,17 @@ it('refuses a changed catalogue anchor and keeps cancellation from retaining act
 it('does not resurrect a continued base page when its scan settles after query clear', async () => {
   const summaries = Array.from({ length: 90 }, (_, index) => summarizeSession(session(`recent-${index.toString().padStart(2, '0')}`), 'version'));
   const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
-  const first = new SessionCatalogPage(context, 40, { needle: '' });
+  const browse = { id: 'continued-browse' };
+  const first = new SessionCatalogPage(context, 40, { needle: '', browse });
   summaries.forEach(summary => first.accept(summary));
   let release!: () => void;
   let entered!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
   const pending = new Promise<void>(resolve => { entered = resolve; });
-  const manager = { catalog: { async *list(_context: typeof context, signal: AbortSignal, limit: number,
+  const manager = { catalog: {
+      beginBrowse: vi.fn(() => browse), retireBrowse: vi.fn(), async *list(_context: typeof context, signal: AbortSignal, limit: number,
     _source: unknown, _diagnostic: unknown, query: SessionCatalogQuery) {
+    expect(query.browse).toBe(browse);
     const page = new SessionCatalogPage(context, limit, query);
     summaries.forEach(summary => page.accept(summary));
     if (!query.needle) {
@@ -620,7 +630,8 @@ it('does not resurrect a continued base page when its scan settles after query c
     }
     yield { ...page.snapshot(true), scanned: 90, unreadable: 0, limited: 0, status: 'complete' };
   } }, files: { sizes: async () => new Map() } } as unknown as SessionManager;
-  const picker = sessionPicker({ sessionManager: manager, context: () => context, resume: vi.fn(), continuation: first.snapshot(true).continuation });
+  const picker = sessionPicker({ sessionManager: manager, context: () => context, resume: vi.fn(), continuation: first.snapshot(true).continuation },
+    { token: browse, context, sizes: new Map() });
   await picker.load();
   const publish = vi.fn(); const stop = picker.subscribe!(publish);
   await pending;
@@ -676,4 +687,102 @@ it('groups sessions by pin and recency with non-selectable headers', async () =>
   expect(rows.filter(row => row.disabled).map(row => row.label)).toEqual(['Pinned', 'Sessions', 'Today', 'Yesterday', 'Older']);
   expect(rows.filter(row => !row.disabled).map(row => row.id)).toEqual(['pinned', 'today', 'yesterday', 'old']);
   expect(rows.filter(row => row.disabled).every(row => row.id.startsWith('group:'))).toBe(true);
+});
+
+it('cancels a clear-search recheck when its host subscription releases, preserving transferred browse ownership', async () => {
+  const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
+  const snapshot = { sessions: [summarizeSession(session('current'), 'v')], scanned: 1, unreadable: 0, limited: 0,
+    status: 'complete' as const };
+  let calls = 0; let entered!: () => void; const pending = new Promise<void>(resolve => { entered = resolve; });
+  const cancelled = vi.fn(); const retireBrowse = vi.fn();
+  const manager = { catalog: { beginBrowse: () => ({ id: 'clear-owner' }), retireBrowse,
+    async *list(_context: unknown, signal: AbortSignal) {
+      if (++calls > 1) {
+        entered();
+        await new Promise<void>((_, reject) => signal.addEventListener('abort', () => { cancelled(); reject(signal.reason); }, { once: true }));
+      }
+      yield snapshot;
+    }
+  }, files: { sizes: async () => new Map() }, getSession: () => session('current') } as unknown as SessionManager;
+  const picker = sessionPicker({ sessionManager: manager, context: () => context, resume: vi.fn() });
+  await picker.load(); const publish = vi.fn(); const stop = picker.subscribe!(publish);
+  picker.onSearchChange?.('saved'); picker.onSearchClear?.();
+  await pending; stop();
+  await vi.waitFor(() => expect(cancelled).toHaveBeenCalledOnce());
+  expect(publish).not.toHaveBeenCalled(); expect(retireBrowse).not.toHaveBeenCalled();
+  picker.previewEnd?.(); expect(retireBrowse).toHaveBeenCalledOnce();
+});
+
+it('keeps a newer host subscription alive when an older teardown runs', async () => {
+  const setup = fixture(); const publish = vi.fn();
+  await setup.picker.load(); const old = setup.picker.subscribe!(publish);
+  await setup.picker.load(); const current = setup.picker.subscribe!(publish);
+  old();
+  setup.picker.onSearchChange?.('other'); setup.picker.onSearchClear?.();
+  await vi.waitFor(() => expect(publish).toHaveBeenCalled());
+  current(); setup.picker.previewEnd?.();
+});
+
+it('discards a clear-search page whose listing settled before host teardown but browser acceptance was pending', async () => {
+  const setup = fixture();
+  await setup.picker.load(); const publish = vi.fn(); const stop = setup.picker.subscribe!(publish);
+  let entered!: () => void; const pending = new Promise<void>(resolve => { entered = resolve; });
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  const load = vi.spyOn(SessionListing.prototype, 'load').mockImplementation(async () => {
+    entered(); await gate;
+    return { snapshot: { sessions: [summarizeSession(session('late'), 'late-v')], scanned: 1, unreadable: 0,
+      limited: 0, status: 'complete' }, sizes: new Map() };
+  });
+  try {
+    setup.picker.onSearchChange?.('saved'); setup.picker.onSearchClear?.();
+    await pending; release(); stop();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(publish).not.toHaveBeenCalled();
+    expect(setup.picker.detail?.('late')).toEqual([]);
+    expect((await setup.picker.apply(['late']))?.note).toContain('not offered');
+    expect(setup.resume).not.toHaveBeenCalled();
+  } finally { release(); load.mockRestore(); setup.picker.previewEnd?.(); }
+});
+
+it('revokes cached clear-search action authority until saved rows are revalidated and leaves failure read-only', async () => {
+  const setup = fixture(); await setup.picker.load();
+  let fail!: () => void; const gate = new Promise<never>((_, reject) => { fail = () => reject(new Error('Saved row changed')); });
+  const load = vi.spyOn(SessionListing.prototype, 'load').mockImplementation(() => gate);
+  const publish = vi.fn(); const stop = setup.picker.subscribe!(publish);
+  try {
+    setup.picker.onSearchChange?.('other');
+    const pending = setup.picker.onSearchClear!()!;
+    expect(pending.every(row => row.disabled)).toBe(true);
+    expect((await setup.picker.apply(['other']))?.note).toContain('not offered');
+    expect(setup.resume).not.toHaveBeenCalled();
+    fail(); await vi.waitFor(() => expect(publish).toHaveBeenCalled());
+    expect(publish.mock.lastCall![0].every((row: { disabled?: boolean }) => row.disabled)).toBe(true);
+    expect(setup.picker.status?.(publish.mock.lastCall![0])).toContain('stopped before completion');
+    expect((await setup.picker.apply(['other']))?.note).toContain('not offered');
+    expect(setup.resume).not.toHaveBeenCalled();
+  } finally { fail(); load.mockRestore(); stop(); setup.picker.previewEnd?.(); }
+});
+
+it('does not accept a late clear-search load after a newer search has acquired its result', async () => {
+  const setup = fixture(); await setup.picker.load();
+  let entered!: () => void; const pending = new Promise<void>(resolve => { entered = resolve; });
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  const load = vi.spyOn(SessionListing.prototype, 'load').mockImplementation(async () => {
+    entered(); await gate;
+    return { snapshot: { sessions: [summarizeSession(session('late'), 'late-v')], scanned: 1,
+      unreadable: 0, limited: 0, status: 'complete' }, sizes: new Map() };
+  });
+  const publish = vi.fn(); const stop = setup.picker.subscribe!(publish);
+  try {
+    setup.picker.onSearchChange?.('saved'); setup.picker.onSearchClear?.(); await pending;
+    setup.picker.onSearchChange?.('other'); await setup.picker.search!('other');
+    release(); await new Promise(resolve => setTimeout(resolve, 0));
+    expect(publish).not.toHaveBeenCalled();
+    expect(setup.picker.detail?.('late')).toEqual([]);
+    setup.picker.onSearchChange?.('other');
+    expect(setup.picker.detail?.('late')).toEqual([]);
+    expect((await setup.picker.apply(['late']))?.note).toContain('not offered');
+    await setup.picker.search!('other');
+    await setup.picker.apply(['other']); expect(setup.resume).toHaveBeenCalledWith('other', 'version');
+  } finally { release(); load.mockRestore(); stop(); setup.picker.previewEnd?.(); }
 });

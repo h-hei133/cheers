@@ -43,6 +43,7 @@ it('samples only the fixed visible page and matching current from ten thousand s
   const size = (id: string): SessionFileSize => ({ status: 'complete', bytes: id.length, sampledAt: '2026-01-01T00:00:00.000Z' });
   const manager = {
     catalog: {
+      beginBrowse: vi.fn(() => ({ id: 'test-browse' })), retireBrowse: vi.fn(),
       async *list(context: SessionSelectionContext, _signal: unknown, limit: number, _source: unknown, _diagnostic: unknown, query?: SessionCatalogQuery) {
         yield project(snapshot, context, limit, query);
       },
@@ -79,6 +80,7 @@ it('searches beyond the first page across the complete authorized snapshot', asy
   const sampled: string[][] = [];
   const manager = {
     catalog: {
+      beginBrowse: vi.fn(() => ({ id: 'test-browse' })), retireBrowse: vi.fn(),
       async *list(context: SessionSelectionContext, _signal?: AbortSignal, limit = 40, _source?: unknown, _diagnostic?: unknown, query?: SessionCatalogQuery) {
         limits.push(limit);
         yield project(snapshot, context, limit, query);
@@ -116,6 +118,7 @@ it('keeps the current match visible beyond the search page', async () => {
   };
   const manager = {
     catalog: {
+      beginBrowse: vi.fn(() => ({ id: 'test-browse' })), retireBrowse: vi.fn(),
       async *list(context: SessionSelectionContext, _signal: unknown, limit: number, _source: unknown, _diagnostic: unknown, query?: SessionCatalogQuery) {
         yield project(snapshot, context, limit, query);
       },
@@ -148,6 +151,7 @@ it('preserves partial search status instead of claiming the catalogue is complet
   };
   const manager = {
     catalog: {
+      beginBrowse: vi.fn(() => ({ id: 'test-browse' })), retireBrowse: vi.fn(),
       async *list(context: SessionSelectionContext, _signal: unknown, limit: number, _source: unknown, _diagnostic: unknown, query?: SessionCatalogQuery) {
         yield project(snapshot, context, limit, query);
       },
@@ -183,6 +187,7 @@ it('stops dispatching size batches after cancellation', async () => {
   });
   const manager = {
     catalog: {
+      beginBrowse: vi.fn(() => ({ id: 'test-browse' })), retireBrowse: vi.fn(),
       async *list(context: SessionSelectionContext, _signal: unknown, limit: number, _source: unknown, _diagnostic: unknown, query?: SessionCatalogQuery) {
         yield project(snapshot, context, limit, query);
       },
@@ -213,4 +218,72 @@ it('reports an attempt source-budget stop without implying a complete scan', () 
   const status = sessionListingStatus({ snapshot, sizes: new Map() });
   expect(status).toContain('source budget');
   expect(status).not.toContain('End of this session page range');
+});
+
+it('shares one browse across load, repeated needles, clearing and next-page ownership', async () => {
+  const context = { sessionId: 'session-00000', projectRoot: '/workspace', busy: false };
+  const snapshot: SessionCatalogSnapshot = { sessions: Array.from({ length: 45 }, (_, index) => summary(index)),
+    scanned: 45, unreadable: 0, limited: 0, status: 'complete' };
+  const token = { id: 'owned-browse' };
+  const beginBrowse = vi.fn(() => token); const retireBrowse = vi.fn();
+  const queries: SessionCatalogQuery[] = [];
+  const sizes = vi.fn(async (ids: readonly string[]) => new Map(ids.map(id => [id,
+    { status: 'complete' as const, bytes: 1, sampledAt: '2026-01-01T00:00:00Z' }])));
+  const manager = { catalog: { beginBrowse, retireBrowse,
+    async *list(scope: SessionSelectionContext, _signal: AbortSignal, limit: number, _source: unknown,
+      _diagnostic: unknown, query: SessionCatalogQuery) {
+      queries.push(query); yield project(snapshot, scope, limit, query);
+    } }, files: { sizes } } as unknown as Pick<SessionManager, 'catalog' | 'files'>;
+  const listing = new SessionListing(manager);
+  const base = await listing.load(context);
+  const unsubscribe = listing.subscribe(vi.fn());
+  await listing.search(context, 'Session');
+  await listing.search(context, 'session-00044');
+  await listing.search(context, '');
+  expect(beginBrowse).toHaveBeenCalledOnce();
+  expect(queries.every(query => query.browse === token)).toBe(true);
+  const transferred = listing.takeBrowse();
+  listing.close(); unsubscribe();
+  expect(retireBrowse).not.toHaveBeenCalled();
+  const next = new SessionListing(manager, transferred);
+  const second = await next.load(context, undefined, 40, base.snapshot.continuation);
+  expect(second.snapshot.sessions.map(session => session.id)).toContain('session-00000');
+  expect(beginBrowse).toHaveBeenCalledOnce();
+  expect(sizes.mock.calls.flatMap(([ids]) => ids)).toHaveLength(45);
+  next.close();
+  expect(retireBrowse).toHaveBeenCalledOnce();
+  expect(retireBrowse).toHaveBeenCalledWith(token);
+});
+
+it('cancels only the pending search wait and retires the shared source on final close', async () => {
+  const context = { sessionId: 'session-00000', projectRoot: '/workspace', busy: false };
+  let ready!: () => void; const entered = new Promise<void>(resolve => { ready = resolve; });
+  const beginBrowse = vi.fn(() => ({ id: 'live-browse' })); const retireBrowse = vi.fn();
+  const manager = { catalog: { beginBrowse, retireBrowse,
+    async *list(_scope: unknown, signal: AbortSignal) {
+      ready();
+      await new Promise<void>((_, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+      yield { sessions: [], scanned: 0, unreadable: 0, limited: 0, status: 'scanning' };
+    } }, files: { sizes: vi.fn() } } as unknown as Pick<SessionManager, 'catalog' | 'files'>;
+  const listing = new SessionListing(manager); const controller = new AbortController();
+  const pending = listing.search(context, 'missing', controller.signal);
+  const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  await entered; controller.abort(); await rejected;
+  expect(retireBrowse).not.toHaveBeenCalled();
+  listing.close(); expect(retireBrowse).toHaveBeenCalledOnce();
+});
+
+it('retires the previous source before a changed project or current identity can query', async () => {
+  let nextId = 0;
+  const beginBrowse = vi.fn(() => ({ id: `browse-${nextId++}` })); const retireBrowse = vi.fn();
+  const manager = { catalog: { beginBrowse, retireBrowse,
+    async *list() { yield { sessions: [], scanned: 0, unreadable: 0, limited: 0, status: 'complete' }; }
+  }, files: { sizes: async () => new Map() } } as unknown as Pick<SessionManager, 'catalog' | 'files'>;
+  const listing = new SessionListing(manager);
+  await listing.load({ sessionId: 'current', projectRoot: '/workspace', busy: false });
+  await listing.load({ sessionId: 'changed', projectRoot: '/other', busy: false });
+  expect(beginBrowse).toHaveBeenCalledTimes(2); expect(retireBrowse).toHaveBeenCalledOnce();
+  listing.close(); expect(retireBrowse).toHaveBeenCalledTimes(2);
 });

@@ -1,7 +1,8 @@
 import type { SessionManager } from '../../../../session/SessionManager.js';
 import type { SessionSelectionContext } from '../../../../session/navigation/selection.js';
-import { CATALOG_LIMITS, type SessionCatalogContinuation, type SessionCatalogSnapshot, type SessionSummary } from '../../../../session/store/catalog/model.js';
+import { CATALOG_LIMITS, type SessionCatalogBrowse, type SessionCatalogContinuation, type SessionCatalogSnapshot, type SessionSummary } from '../../../../session/store/catalog/model.js';
 import { SESSION_SIZE_BATCH, type SessionFileSize } from '../../../../session/store/files.js';
+import { normalizePathIdentity } from '../../../../session/continuation/roots.js';
 
 export interface SessionListingPage {
   readonly snapshot: SessionCatalogSnapshot;
@@ -16,16 +17,27 @@ interface ListingRequest {
   readonly iterator: AsyncGenerator<SessionCatalogSnapshot>;
   readonly release: () => void;
   readonly context: SessionSelectionContext;
-  versions: Map<string, string>;
   page?: SessionListingPage;
 }
 
-/** The picker subscription owns a single incremental store query and its cancellation. */
+interface CachedSize { readonly version: string; readonly size: SessionFileSize }
+
+/** Transferred only when the current picker admits its next page. */
+export interface SessionListingBrowse {
+  readonly token: SessionCatalogBrowse;
+  readonly context: SessionSelectionContext;
+  readonly sizes: Map<string, CachedSize>;
+}
+
+/** Owns a browse source; individual queries and subscriptions only own their waits. */
 export class SessionListing {
   private request?: ListingRequest;
   private searchController?: AbortController;
+  private browse?: SessionListingBrowse;
 
-  constructor(private readonly manager: Pick<SessionManager, 'catalog' | 'files'>) {}
+  constructor(private readonly manager: Pick<SessionManager, 'catalog' | 'files'>, browse?: SessionListingBrowse) {
+    this.browse = browse;
+  }
 
   async load(context: SessionSelectionContext, signal?: AbortSignal, limit = 40,
     after?: SessionCatalogContinuation): Promise<SessionListingPage> {
@@ -39,9 +51,9 @@ export class SessionListing {
     this.searchController?.abort();
     let iterator: AsyncGenerator<SessionCatalogSnapshot>;
     try { iterator = this.manager.catalog.list(context, controller.signal, Math.min(CATALOG_LIMITS.pageSize, limit), undefined, undefined,
-      { needle: '', ...(after ? { after } : {}) }); }
+      { needle: '', browse: this.source(context).token, ...(after ? { after } : {}) }); }
     catch (error) { controller.abort(); release(); throw error; }
-    const request: ListingRequest = { controller, iterator, release, context, versions: new Map() };
+    const request: ListingRequest = { controller, iterator, release, context };
     this.request = request;
     try {
       const first = await request.iterator.next();
@@ -53,12 +65,13 @@ export class SessionListing {
     }
   }
 
-  /** Scan the complete authorized catalogue, then page only the matching rows. */
+  /** Filter the shared authorized browse index, then sample only its visible matches. */
   async search(context: SessionSelectionContext, query: string, signal?: AbortSignal, limit = 40,
     after?: SessionCatalogContinuation): Promise<SessionListingPage> {
     signal?.throwIfAborted();
     const needle = query.trim().toLowerCase();
     if (!needle) return this.load(context, signal, limit);
+    const browse = this.source(context);
     this.searchController?.abort();
     const controller = new AbortController();
     this.searchController = controller;
@@ -67,13 +80,13 @@ export class SessionListing {
     let latest: SessionCatalogSnapshot | undefined;
     try {
       for await (const snapshot of this.manager.catalog.list(context, controller.signal, Math.min(CATALOG_LIMITS.pageSize, limit), undefined, undefined,
-        { needle, ...(after ? { after } : {}) })) {
+        { needle, browse: browse.token, ...(after ? { after } : {}) })) {
         controller.signal.throwIfAborted();
         latest = snapshot;
       }
       controller.signal.throwIfAborted();
       if (!latest) throw new Error('Session search did not produce a result.');
-      const sizes = await this.sampleSizes(latest.sessions, controller.signal);
+      const sizes = await this.sampleSizes(latest.sessions, controller.signal, browse);
       controller.signal.throwIfAborted();
       return { snapshot: latest, sizes, total: latest.total };
     } finally {
@@ -86,7 +99,10 @@ export class SessionListing {
     const request = this.request;
     if (!request) return () => {};
     void this.follow(request, publish);
-    return () => { if (this.request === request) this.close(); else this.stop(request); };
+    return () => {
+      this.stop(request);
+      if (this.request === request) this.request = undefined;
+    };
   }
 
   private async follow(request: ListingRequest, publish: (page: SessionListingPage) => void): Promise<void> {
@@ -106,29 +122,40 @@ export class SessionListing {
   private async project(request: ListingRequest, snapshot: SessionCatalogSnapshot): Promise<SessionListingPage> {
     const signal = request.controller.signal;
     signal.throwIfAborted();
-    const changed = snapshot.sessions.filter(session => request.versions.get(session.id) !== session.version);
-    const sampled = await this.sampleSizes(changed, signal);
+    const sizes = await this.sampleSizes(snapshot.sessions, signal, this.source(request.context));
     signal.throwIfAborted();
-    const sizes = new Map<string, SessionFileSize>();
-    for (const session of snapshot.sessions) {
-      const size = sampled.get(session.id) ?? request.page?.sizes.get(session.id);
-      if (size) sizes.set(session.id, size);
-    }
-    request.versions = new Map(snapshot.sessions.map(session => [session.id, session.version]));
     const page = { snapshot, sizes, total: snapshot.total };
     request.page = page;
     return page;
   }
 
-  private async sampleSizes(sessions: readonly SessionSummary[], signal?: AbortSignal): Promise<Map<string, SessionFileSize>> {
+  private async sampleSizes(sessions: readonly SessionSummary[], signal: AbortSignal | undefined,
+    browse: SessionListingBrowse): Promise<Map<string, SessionFileSize>> {
     const sampled = new Map<string, SessionFileSize>();
-    for (let offset = 0; offset < sessions.length; offset += SESSION_SIZE_BATCH) {
+    const changed = sessions.filter(session => browse.sizes.get(session.id)?.version !== session.version);
+    for (let offset = 0; offset < changed.length; offset += SESSION_SIZE_BATCH) {
       signal?.throwIfAborted();
-      const batch = sessions.slice(offset, offset + SESSION_SIZE_BATCH);
+      const batch = changed.slice(offset, offset + SESSION_SIZE_BATCH);
       const sizes = await this.manager.files.sizes(batch.map(session => session.id), signal);
-      for (const [id, size] of sizes) sampled.set(id, size);
+      signal?.throwIfAborted();
+      for (const session of batch) {
+        const size = sizes.get(session.id);
+        if (!size) continue;
+        browse.sizes.delete(session.id);
+        browse.sizes.set(session.id, { version: session.version, size });
+        while (browse.sizes.size > CATALOG_LIMITS.cacheEntries) browse.sizes.delete(browse.sizes.keys().next().value!);
+      }
+    }
+    for (const session of sessions) {
+      const cached = browse.sizes.get(session.id);
+      if (cached?.version === session.version) sampled.set(session.id, cached.size);
     }
     return sampled;
+  }
+
+  private source(context: SessionSelectionContext): SessionListingBrowse {
+    if (this.browse && !sameContext(this.browse.context, context)) this.close();
+    return this.browse ??= { token: this.manager.catalog.beginBrowse(context), context: { ...context }, sizes: new Map() };
   }
 
   private stop(request: ListingRequest): void {
@@ -138,12 +165,36 @@ export class SessionListing {
     void request.iterator.return(undefined).catch(() => {});
   }
 
-  close(): void {
+  cancelQueries(): void {
     if (this.request) this.stop(this.request);
     this.request = undefined;
     this.searchController?.abort();
     this.searchController = undefined;
   }
+
+  cancelSearch(): void {
+    this.searchController?.abort();
+    this.searchController = undefined;
+  }
+
+  takeBrowse(): SessionListingBrowse | undefined {
+    this.cancelQueries();
+    const browse = this.browse;
+    this.browse = undefined;
+    return browse;
+  }
+
+  close(): void {
+    this.cancelQueries();
+    if (this.browse) this.manager.catalog.retireBrowse(this.browse.token);
+    this.browse = undefined;
+  }
+}
+
+function sameContext(expected: SessionSelectionContext, current: SessionSelectionContext): boolean {
+  return expected.sessionId === current.sessionId
+    && normalizePathIdentity(expected.projectRoot) === normalizePathIdentity(current.projectRoot)
+    && (expected.allProjects === true) === (current.allProjects === true);
 }
 
 export function sessionListingStatus(page: SessionListingPage): string | undefined {

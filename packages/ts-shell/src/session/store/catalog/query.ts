@@ -26,7 +26,8 @@ export class SessionCatalogPage {
     if (limit > CATALOG_LIMITS.pageSize) throw new RangeError('Invalid session query page size.');
     const after = query.after;
     if (after && (after.sessionId !== context.sessionId || after.projectRoot !== normalizePathIdentity(context.projectRoot)
-      || after.allProjects !== (context.allProjects === true) || after.needle !== this.needle || after.limit !== limit)) {
+      || after.allProjects !== (context.allProjects === true) || after.needle !== this.needle || after.limit !== limit
+      || after.browseId !== query.browse?.id)) {
       throw new Error('Session page no longer matches this search or project. Reopen the session picker.');
     }
   }
@@ -70,6 +71,7 @@ export class SessionCatalogPage {
       ...(currentUnavailable ? { currentUnavailable } : {}),
       ...(final && hasMore && last ? { continuation: {
         attemptId: this.attemptId,
+        ...(this.query.browse ? { browseId: this.query.browse.id } : {}),
         sessionId: this.context.sessionId, projectRoot: normalizePathIdentity(this.context.projectRoot) ?? '',
         allProjects: this.context.allProjects === true, needle: this.needle, limit: this.limit,
         boundary: { id: last.id, version: last.version, pinned: last.pinned, updatedAt: last.updatedAt },
@@ -88,6 +90,12 @@ export class SessionCatalogPage {
 
   matchedBoundaries(): readonly SessionCatalogBoundary[] {
     return this.matched;
+  }
+
+  /** Include the lookahead row in live validation before issuing a cursor. */
+  visibleSources(): readonly SessionSummary[] {
+    return this.current && !this.recent.some(summary => summary.id === this.current!.id)
+      ? [...this.recent, this.current] : this.recent;
   }
 
   get indexTruncated(): boolean {

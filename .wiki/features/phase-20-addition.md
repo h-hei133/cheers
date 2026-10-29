@@ -3040,7 +3040,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 ### 19.6 第二十九：resume 面板每个操作卡约 1 秒
 
-**已确认：卡顿来自"每次搜索都全量重扫会话目录"，叠加"每秒一次的同步文件系统扫描"。二者都在真实数据量下达到约 1 秒。**
+**已确认：每次搜索都全量重扫会话目录，足以解释本机约 1 秒的停顿。渲染路径另有每秒一次的同步扫描，但本机约 1 ms，未证明它是本次主因。**
 
 **量化（本机真实 `~/.cheers/sessions`：2309 个会话、41 MiB）**
 
@@ -3061,7 +3061,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **参考对照**：Claude Code 的 resume 列表只做 `stat`，再按需 `enrichLogs` 读取有界前缀（`utils/sessionStorage.ts:3939-3956`、`screens/ResumeConversation.tsx:126-140`）；pi 用有界并发走目录并发布部分有序页（`session-manager.ts:941-976`），且**跨按键缓存小写化后的消息文本**（`session-selector-search.ts:44-57`）。本项目的 catalog 已有分页与预算，缺的是"索引复用"。
 
-**修复方向**：搜索改为在**已建立的 catalog 索引**上过滤（`SessionCatalogPage` 已按 needle 过滤，`catalog/query.ts:22-35`），不要每次重新 `discoverSessions`；把 `lstat` 结果与 `version` 一起缓存，用目录 mtime 做失效；`ambient()` 的 peer 计数移出渲染路径（或在 picker 打开时冻结）。
+**修复方向（实施前修订）**：在catalog owner复用同一次浏览中已读取的完整summary索引，沿原`SessionCatalogPage`过滤和分页；查询取消只撤销本次等待，浏览关闭或显式刷新撤销共享扫描。核心文件可在目录mtime不变时改写，不能用目录mtime替代身份复验；visible/current/lookahead/anchor继续核对核心文件版本。新增记录由显式重开纳入，partial与原读取预算跨查询保留。ambient扫描缺本次尖峰证据，暂不扩展为无依据的运行时修改。
 
 **证据边界**：实测为本机只读文件系统测量，未运行产品代码；"约 1 秒"与用户主观描述吻合但未在同一进程内计时。
 
@@ -3135,7 +3135,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 28 | 确认：无 `/config`；模型行为字段在 settings、目录在 model，effort 三入口 | `settings.ts:78`、`picker/settings.ts:253-257`、`picker/model.ts:206` | P2（结构） |
 | 29 | 确认：搜索全量重扫（实测 0.87–1.03 s/次） | `listing.ts:69-73`、`catalog/index.ts:261-284` | P0（体验） |
 | 30 | 确认：SIGTERM/SIGHUP 不写 terminated，下次静默重入 | `bootstrap.ts:166/348-356`、`shutdown.ts:18-19` | P0（数据正确性） |
-| 新增 | 确认（真实崩溃日志）：损坏的用量键让恢复路径抛出未捕获拒绝，用量静默归零 | `crashes.json` 2026-10-29、`identity.ts:63-70`、`usageTelemetry.ts:355-364` | P1（数据正确性） |
+| 新增 | 确认严格usage解码错误逃逸；原坏key生成原因及真实计量损失仍未确认 | `crashes.json` 2026-10-29、strict解码路径；当前恢复与未知合计见20.6 | P1（数据正确性） |
 
 实施顺序建议：
 
@@ -3181,7 +3181,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 26 | 四条明确机制已修；本地验证 | 缺真实用户退出现场；MCP预算到期不能证明清理完成 |
 | 27 | 机制仍未确认 | 先用startup/CRLF/regular几何夹具区分，禁止按研究候选直接声称根因 |
 | 28 | 未实施 | settings/model职责与入口发现性整理 |
-| 29 | 未实施 | 同一次resume浏览索引复用、查询/刷新失效及真实目录性能比较 |
+| 29 | 同次浏览索引复用已实现；聚焦与真实目录只读性能验证 | 缺真实终端按键/渲染与非Linux证据；ambient扫描本机约1ms，未确认是本次主因 |
 | 30 | 空闲fresh、信号关闭及真实恢复保护已实现；本地验证 | 缺真实用户signal/终端现场与非Linux证据；SIGKILL不执行清理钩子 |
 | 19.8 | 分桶恢复、真实加载与可见partial/unknown已实现；本地验证 | 原损坏记录及其生成原因未取得；无法恢复丢失的真实账单数值 |
 
@@ -3206,3 +3206,30 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 本批12个相关文件214项串行通过，另完整声明图单一脚本用例通过，五静态门/diff通过，module facade0。八类反转均失败并逐字节恢复后重验：idle启动1、signal hook2、pending保护3、真实store恢复1、telemetry降级1、partial合计1、history断点1、baseline保护2；筛掉的用例不计新通过。CLI夹具首次在先cleanup取消hint后等待hint而失败，改为先观察真实first-frame hint再cleanup，通过后未改产品来适配。反转诊断脚本两次仅因预期错误匹配过窄中断，源码finally恢复；补准确错误后重验通过。TS build manifest `235b6ac3dc39`，本地NormProof judge proven、0open/0failed/0gap，均为collector范围的结构证据。无全套回归、PTY/exe、20k终端或真实provider；提交与远端证据见日志。此前`ec1bcadb`的CI及Architecture Watch已确认success，本批推送后按用户要求稍后检查CI。
 
 后续AST复核发现runner含对象具名回调共有26名，facade/NormProof的collector未报告。启动通知组合移入[notices](../../packages/ts-shell/src/cli/bootstrap/notices.ts)，信号生命周期移入[lifecycle](../../packages/ts-shell/src/cli/runtime/lifecycle.ts)，保留原router与recovery owner；AST实数runner20、notices6、lifecycle1。原runner7、recoveryHint10、startupNotice4串行21项通过，五静态门与TS build `2b7844ba0068`通过。此前214项为行为实现批次证据，最终构建以此补充分域后的版本为准。
+
+### 20.7 resume搜索的同次浏览索引与真实目录比较
+
+[catalog browse](../../packages/ts-shell/src/session/store/catalog/browse.ts)拥有一次只读扫描、最多20,000个summary与原64MiB物理读取预算；第一次query启动有界四worker，首次当前会话与历史渐进发布保留。搜索只取消本次wait，关闭/刷新/scope切换退休source并排空已派发读取。新needle按完整已捕获summary过滤，沿原[SessionCatalogPage](../../packages/ts-shell/src/session/store/catalog/query.ts)分页；不复扫目录，不用目录mtime猜核心文件身份。每次query/页面复验visible/current/lookahead及前后anchor，换代先拒绝而不额外打开core文件；同一query中已验证的渐进行可复用，末页再次复验。新增/原来不匹配记录的外部变化由明确重开纳入；这是浏览快照范围，不是全目录实时监控。
+
+[continuation](../../packages/ts-shell/src/session/store/catalog/continuation.ts)仍是单一分页authority，现在绑定最近实际发出的id/version/pinned/updatedAt，拒绝换成真实但未发出的boundary、并发claim及旧页重放。伪造同id browse对象不能使用或退休合法源/游标。[SessionListing](../../packages/ts-shell/src/cli/interactive/picker/session/listing.ts)把token与有界512项同version size cache转交Next；旧subscription与previewEnd只关闭旧wait，不退休已转交源。清空搜索先撤销旧行offered/versions、显示只读加载行，再由宿主订阅发布同source的空needle复验；失败保持只读partial，迟到clear不能覆盖新search或已释放host。pin/rename/delete成功后由原host reload重新捕获源。session入口保留装配，browser/actions/projection/presentation各归其责任。
+
+只读对照pi对已载入会话数组过滤与对象文本缓存，并保留其bounded workers/owner cancellation；本项目继续保留更严格的scope、核心文件版本、预算与操作准入。没有改provider/auth/default/package脚本。ambient peer同步扫描仍未改：本机约1ms缺尖峰证据，不能把研究里的放大器猜测当作已证根因。
+
+主代理以768MiB堆、threads=false、package-local显式文件和`&&`串行最终通过8文件154项：browse17、index26、list8、query13、projection2、listing10、lifetime5、session73。20,001条边界只用mock discovery/read的summary单元，不拉起真实历史二进制。初轮普通续页旧cursor仍可重放属于产品缺陷，补successor authority后重验；rename测试遗漏真实host reload、continued-base fixture遗漏同browse token属于setup漂移，补操作链且保留旧页拒绝。12类反转命中reuse1、query取消1、source退休1、partial1、version1、issued boundary1、Next转交1、clear authority1、source quota1、scope3、clear generation1、首current发布时source退休1；每次逐字节恢复后再完成154项。初次source退休反转只检查close不检查read、scope反转被分页guard提前挡住、late-clear反转被search projection遮住，均补独立可观察断言后才计反转通过，不改变产品来迁就测试。
+
+真实`/home/wang`会话布局只读测量直接导入两份不可变TS构建的catalog/files/listing，不启动CLI、PTY、provider或exe，不打印会话正文/ID。同一脚本按旧版→新版串行，均检查2409项，163个匹配/显示40行与无匹配结果一致：
+
+| 操作 | 旧构建`2b7844ba0068` | 新构建`c975a238225e` | 旧→新物理I/O |
+|---|---:|---:|---|
+| 首次完整加载 | 2677.6ms | 2761.0ms | stat 20422→21382；open7227、directory3、read11868891bytes相同 |
+| 搜索5字符 | 2163.0ms | 36.3ms | stat20062→328；open5691→0、directory3→0、read8612662→0bytes |
+| 搜索4字符 | 2124.2ms | 35.6ms | stat20062→328；open5691→0、directory3→0、read8612662→0bytes |
+| 无匹配34字符 | 2082.4ms | 4.6ms | stat19662→0；open5691→0、directory3→0、read8612662→0bytes |
+
+旧版先前样本2589.1ms/2130.3ms/2088.6ms/2080.0ms，新版先前样本2888.0ms/35.4ms/34.5ms/2.1ms。匹配搜索约60倍提升；首次加载未证明加速，新版多960次stat用于渐进与最终可见身份复验。进程末heap旧30.3MiB/新12.3MiB只是采样时heapUsed，不是总峰值或RSS。数据量、缓存顺序和文件系统不同会改变时延；以上不能替代真实终端按键/渲染矩阵。
+
+五静态门、完整声明图单一focused脚本、module facade0、diff通过；AST具名函数（含对象属性/方法）catalog index14/browse10/continuation4/scan2/progress2/query7，CLI session14/browser16/actions4/projection7/presentation3/listing16，均≤20。1536MiB TS build `5f78aa27a97ec7debc0b4778b8f2fbd52cef0d0813a44a9aa23f8e9eb2b2545c`，inputsDigest `e2fddda35b004ac2858c6223f423be59033c84bf69d6726f6ad277f01dffba91`，重新计算compilerInputs一致。裸normproof命令未安装，随后按CI使用repo bundle执行judge，proven/0open/0failed/0gap仅证collector范围结构。两个gpt-6.1-sol代理只读/编辑、未执行任何验证；交叉审阅不记独立终局review。没有全套、PTY/exe、真实provider或20k终端；原47项矩阵未重跑，ADD整体active。提交/推送/精确SHA的CI另绑定日志。
+
+最终首current发布补异步后token复验：source在live recheck期间退休，第一次next也须拒绝，新增反转1项命中并恢复。browse17/lifetime5重验22项通过，其余上述文件此前通过未因窄改重跑，合计154项去重证据。最终build `5f78aa27a97e`新鲜度读回一致，同真实目录initial2817.8ms、两query32.5/35.3ms、no-match2.7ms，物理I/O与上表新版完全相同；末heap12.6MiB仍不作峰值证据。最终NormProof与静态门重验通过。
+
+最终staged diff检查发现新增contract末尾多余空行，修空白后重建；最终build `55f598d95261c57d81f335345f89bc80fbb306d499368cfb3b3343d752aab88a`、inputs `ca3d28d40dd16c828516d6fa2877968632f67ad5c9fc284782eaab1978371905`。此前5f78为相同行为测量样本；空白调整未改变测试行为，无新增测试重跑。staged检查补覆盖新增文件，提交前确认通过。

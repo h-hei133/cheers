@@ -92,20 +92,26 @@ function observeSources(beforeOpen?: (target: string) => Promise<void>) {
 }
 
 it('hands a real catalogue to the next picker after closing the previous listing', async () => {
-  const { picker } = fixture();
+  const { picker, catalog } = fixture();
+  const begin = vi.spyOn(catalog, 'beginBrowse');
+  const retire = vi.spyOn(catalog, 'retireBrowse');
   const previous = new AbortController();
   try {
     await finish(picker, previous.signal);
     const outcome = await picker.apply(['action:more']);
     expect(outcome?.next).toBeDefined();
     previous.abort(new Error('Previous overlay released'));
+    picker.previewEnd?.();
+    expect(retire).not.toHaveBeenCalled();
     const next = outcome!.next!;
     try {
       await expect(finish(next, new AbortController().signal)).resolves.toEqual(expect.arrayContaining([
         expect.objectContaining({ id: 'saved-a' }), expect.objectContaining({ id: 'action:more' }),
       ]));
       expect(next.detail?.('saved-a')).toBeDefined();
+      expect(begin).toHaveBeenCalledOnce();
     } finally { next.previewEnd?.(); }
+    expect(retire).toHaveBeenCalledOnce();
   } finally { picker.previewEnd?.(); }
 });
 
@@ -114,7 +120,8 @@ it.each([32, 128 * 1024])('bounds real paging acquisition and retention across r
   const counts = observeSources();
   const retained = catalog as unknown as {
     cache: ReadonlyMap<string, unknown>;
-    attempts: ReadonlyMap<string, { readonly entries: readonly unknown[] }>;
+    continuations: { readonly attempts: ReadonlyMap<string, { readonly entries: readonly unknown[] }> };
+    browses: { readonly states: ReadonlyMap<string, { readonly summaries: ReadonlyMap<string, unknown> }> };
   };
   for (let browse = 0; browse < 10; browse++) {
     let picker = createPicker();
@@ -140,8 +147,9 @@ it.each([32, 128 * 1024])('bounds real paging acquisition and retention across r
       }
       expect([...visited].sort()).toEqual(['current', 'saved-a', 'saved-b', 'saved-c']);
       expect(retained.cache.size).toBe(4);
-      expect(retained.attempts.size).toBeLessThanOrEqual(8);
-      expect([...retained.attempts.values()].reduce((sum, attempt) => sum + attempt.entries.length, 0)).toBeLessThanOrEqual(32);
+      expect(retained.continuations.attempts.size).toBeLessThanOrEqual(8);
+      expect([...retained.continuations.attempts.values()].reduce((sum, attempt) => sum + attempt.entries.length, 0)).toBeLessThanOrEqual(32);
+      expect(retained.browses.states.size).toBe(0);
     } finally { picker.previewEnd?.(); }
   }
   expect(counts.opened).toBe(12);
@@ -149,7 +157,7 @@ it.each([32, 128 * 1024])('bounds real paging acquisition and retention across r
   expect(counts.peak).toBeLessThanOrEqual(CATALOG_LIMITS.concurrency);
   expect(counts.chunk).toBeLessThanOrEqual(CATALOG_LIMITS.readChunkBytes);
   expect(sizes.mock.calls.every(([ids]) => ids.length <= 2)).toBe(true);
-  expect(sizes.mock.results.length).toBeGreaterThan(40);
+  expect(sizes.mock.results).toHaveLength(40); // Four visible identities sampled once per browse.
   for (const result of sizes.mock.results) {
     expect(result.type).toBe('return');
     const sampled = await result.value;
@@ -189,4 +197,42 @@ it('drains real in-flight acquisition on close without reading or publishing the
     release(); unsubscribe?.(); picker.previewEnd?.();
     await vi.waitFor(() => expect(counts.active).toBe(0));
   }
+});
+
+it('reuses one real scan for cancelled searches, clear and matching pages', async () => {
+  const { picker, catalog, sizes, sourceBytes } = fixture();
+  const begin = vi.spyOn(catalog, 'beginBrowse'); const retire = vi.spyOn(catalog, 'retireBrowse');
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  const counts = observeSources(async target => {
+    if (path.basename(path.dirname(target)) !== 'current') await gate;
+  });
+  const publish = vi.fn(); let unsubscribe: (() => void) | undefined;
+  try {
+    await picker.load(); unsubscribe = picker.subscribe!(publish);
+    await vi.waitFor(() => expect(counts.active).toBe(3));
+    const controller = new AbortController(); picker.onSearchChange?.('saved');
+    const pending = picker.search!('saved', controller.signal);
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort(); await rejected;
+    expect(retire).not.toHaveBeenCalled();
+    release();
+    picker.onSearchChange?.('saved'); const matches = await picker.search!('saved');
+    expect(matches.some(row => row.id === 'action:more')).toBe(true);
+    picker.onSearchChange?.('saved-b');
+    expect(await picker.search!('saved-b')).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'saved-b' })]));
+    picker.onSearchClear?.();
+    await vi.waitFor(() => expect(publish.mock.lastCall?.[0]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'current' }), expect.objectContaining({ id: 'action:more' }),
+    ])));
+    picker.onSearchChange?.('saved'); await picker.search!('saved');
+    const next = (await picker.apply(['action:more']))!.next!;
+    unsubscribe(); picker.previewEnd?.();
+    expect(retire).not.toHaveBeenCalled();
+    try { expect(await next.search!('saved')).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'saved-b' })])); }
+    finally { next.previewEnd?.(); }
+    expect(begin).toHaveBeenCalledOnce(); expect(retire).toHaveBeenCalledOnce();
+    expect(counts.directories).toBe(1); expect(counts.directoriesClosed).toBe(1);
+    expect(counts.bytes).toBe(sourceBytes); expect(counts.closed).toBe(counts.opened);
+    expect(sizes.mock.calls.flatMap(([ids]) => ids).sort()).toEqual(['current', 'saved-a', 'saved-b']);
+  } finally { release(); unsubscribe?.(); picker.previewEnd?.(); }
 });

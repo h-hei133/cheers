@@ -40,13 +40,18 @@ export interface SessionCatalogSnapshot {
 export interface SessionCatalogQuery {
   readonly needle: string;
   readonly after?: SessionCatalogContinuation;
+  readonly browse?: SessionCatalogBrowse;
 }
+
+/** Only the catalogue that issued this token may use it. No session data leaves the owner. */
+export interface SessionCatalogBrowse { readonly id: string }
 
 export type SessionCatalogBoundary = Pick<SessionSummary, 'id' | 'version' | 'pinned' | 'updatedAt'>;
 
 /** A process-local browse attempt with a live version check for every offered row. */
 export interface SessionCatalogContinuation {
   readonly attemptId: string;
+  readonly browseId?: string;
   readonly sessionId: string;
   readonly projectRoot: string;
   readonly allProjects: boolean;
