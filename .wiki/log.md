@@ -10350,3 +10350,11 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 沿[addition20.41](features/phase-20-addition.md#2041-忙碌流被信号取消后保留中断与已显示推理恢复不重发)补两模式×两信号原CLI/PTY与loopback实际HTTP。每组GET readiness JSON一次、POST一次只发39字符reasoning并保持流；等原message.started/delta及磁盘turn-active/prompt再发signal。四次signal135–147ms/143或129、流关闭、session interrupted；普通重开同ID、真实恢复通知、thinking保存/恢复digest一致、无自动第二POST，Ctrl+D133–139ms/0后仍interrupted。八次cooked flags恢复，峰值RSS284664–286196KiB，两阶段12.22–12.31秒。
 
 初始regular把readiness与completion混计且readiness悬挂，message1/delta39已观察但总HTTP2导致timeout exit1，保留并分类setup后修探针；四组有效重跑串行全部通过。仅文档/工件，无产品改动、外部live、工具/写入、独立review、实际PTY断连/EIO或非Linux；语法/JSON/五门/diff通过、118旧advisory，scratch与socket清理、HANDOFF追加分桶陷阱。当前loopback不能代替真实provider取消或未知写入，原47不升级、goal active，Git/CI另绑定。
+
+20.41已推送`d1cfebbe3a47a090aba63a53cf3436b3a21b1517`，远端main此前一致。延后核对Watch40972073105 success、CI40972073289与20.40 CI40971222286仍in_progress；20.39 CI40970201073 success，均head精确一致。
+
+## [2026-10-30] verify | 跨目录文件单次审批的原CLI链路
+
+沿[addition20.42](features/phase-20-addition.md#2042-跨目录文件单次审批的实际cli与原写入收据)补反馈24。两模式各一条小fixture、隔离home/profile/project/outside、原CLI/PTY与loopback HTTP；四回合ask拒绝write、Alt+P accept-edits单次write、Alt+P allow-all单次edit、allow-all再次拒绝write。原overlay每次只绘制once/deny、声明规范目标，a不能持久允许，pending无写入/result；获准两次原writer均committed且operationId精确匹配原单文件收据/bytes，最终两条操作、零grant/roots，兄弟文件与配置不变。
+
+首轮第三次edit的收据断言误取倒序列表末项，exit1/301408KiB/8.87秒保留为setup失败；按operationId匹配后两模式八回合全部重跑通过。有效每模式8 local completion/4 readiness、零外部请求，正常退出137/142ms、0与cooked恢复；峰值314916/315008KiB，12.44/12.55秒，四回合耗时含人为a等待，不作生产性能。build/inputs复用20.39，未改产品、不重复build/tests；脚本语法/JSON/五门/diff通过、118旧advisory，主代理严格串行、scratch清理、HANDOFF记录顺序陷阱。原CLI证据不替代真实模型/用户目录、read/patch CLI、pending退出、非Linux/桌面或独立review，原47不升级、goal active，Git/CI另绑定。

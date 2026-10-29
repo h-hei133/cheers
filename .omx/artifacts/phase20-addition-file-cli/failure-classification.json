@@ -1,0 +1,8 @@
+{
+  "classification": "harness/setup drift",
+  "failure": "exact-operation",
+  "cause": "readOperations returns descending sequence; at(-1) selects the oldest receipt after the second commit",
+  "repair": "Match the persisted tool operationId against readOperations instead of assuming its array order",
+  "productChanged": false,
+  "rerun": "regular and fullscreen each passed all four decisions"
+}

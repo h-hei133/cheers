@@ -1010,3 +1010,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A busy CLI probe receives the expected reasoning fragment but times out waiting for exactly one HTTP request.
 - **Root Cause**: The real provider route also calls GET /models for readiness. Treating every HTTP request as a completion makes the count assertion impossible and can hold the readiness response open.
 - **Rule**: Give readiness its own complete response and counter; hold only the intended completion stream. Observe the original message.started separately, retain setup failures, and count replay across the restart instead of equating all transport requests with model turns.
+
+### Operation History Is Returned Newest First
+- **Symptom**: A second successful file edit appears to disagree with its native operation receipt.
+- **Root Cause**: readOperations scans descending sequence; selecting at(-1) compares the latest tool metadata against the oldest receipt.
+- **Rule**: Match the persisted tool operationId to the operation receipt, then validate committed status, exact target and readback. Never infer receipt identity from array position; retain and classify a probe indexing failure before rerunning.

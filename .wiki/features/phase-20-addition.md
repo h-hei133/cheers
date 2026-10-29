@@ -3171,7 +3171,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 | 反馈 | 当前状态 | 下一步 |
 |---|---|---|
-| 24 | 本地实现与聚焦验证 | 缺真实终端/用户目录审批现场与非Linux文件系统证据 |
+| 24 | 本地实现与聚焦验证；20.42补两模式原CLI的拒绝/单次write/edit/重复询问与原操作收据读回 | 缺用户目录审批现场、实际provider产生的工具调用及非Linux文件系统证据 |
 | 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses/Google native摘要准入已实现；20.33新增当前relay真实小请求的公开thinking/展开/恢复，auto保留，整体partial | 其他模型/协议默认与公开内容、真实账户及用户终端复验；单个relay请求不覆盖完整矩阵 |
 | 26 | 四条明确机制、MCP未开始调用及表面/渲染失败围栏已修；20.36/20.40有正常/空闲信号CLI，20.41有loopback忙碌流取消与恢复 | 缺真实用户故障设备/外部provider busy信号现场；MCP预算到期不能证明清理完成 |
 | 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
@@ -3741,3 +3741,24 @@ build `94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff`、input
 首轮regular探针把GET与POST全算一次completion，并对readiness也返回悬挂SSE：尽管原message.started1/39字符delta已观察，HTTP总数2使等待永不满足，16.22秒/288588KiB exit1后finally发信号。此为harness/setup drift，不作产品失败或通过；改为按method/path区分完整readiness与held completion后四组重跑才全部通过，原失败收据保留。HANDOFF追加请求分桶陷阱。
 
 正式工件[signal-busy](../../.omx/artifacts/phase20-addition-signal-busy/)保存可复用脚本、初始失败/分类、四份有效收据；实际观察原start、TurnSink和Terminal方法，记录数量/状态/digest，未保存公开正文或请求内容。八次有效CLI严格串行且主代理观察结束后再执行下一项，task scratch/loopback sockets清理、原CLAUDE.md保留；脚本语法、JSON/八阶段断言与五静态门/diff通过，118旧advisory。仅文档/诊断工件，不重复build/Vitest/graph，无独立review、外部live、真实断连/EIO、SIGKILL/非Linux/桌面/IME或exe/full suite/20k；原47项不升级，ADD与goal继续active，提交/精确CI另绑定。
+
+20.41已提交推送`d1cfebbe3a47a090aba63a53cf3436b3a21b1517`，远端main此前精确一致。延后核对[Watch40972073105](https://github.com/h-hei133/cheers/actions/runs/40972073105)completed/success、[CI40972073289](https://github.com/h-hei133/cheers/actions/runs/40972073289)in_progress；20.40 CI40971222286仍in_progress，20.39 CI40970201073已completed/success，全部headSha精确一致。
+
+### 20.42 跨目录文件单次审批的实际CLI与原写入收据
+
+继续反馈24/20.1的真实CLI链路缺口，先读原turn/workspace、tools escalation、CLI approval bridge与writer/operation store。定向复核只读参考codex safety.rs:20–97：AskUser与Reject是独立结果，越界文件在策略允许询问时进入AskUser，Never等策略可拒绝；不沿用19.1“所有参考始终询问”的过度概括。本项目保留相对路径逃逸、只读根与身份变更拒绝，原显式单次授权不扩为持久目录授权。仅新增诊断工件与记录，没有改产品。
+
+同20.39 build `94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff`/inputs `b1e103aa74a8b86da2e8243b69d2440ad5ada34d129853e5ff7f72c81400a193`，regular/fullscreen分别隔离home/profile/project和同级outside目录，原SessionManager仅一条小fixture。原Node CLI经PTY启动，loopback实际HTTP每回合先返回一个write/edit tool_call，再返回固定完成；零外部provider请求，不读取或记录请求body/headers。allowedTools仅write/edit、maxTurns2、输出256、retry/warming/skills/MCP关闭，heap768MiB、45秒/2MiB边界。
+
+每模式实际输入四回合：ask下外部write→Esc拒绝；真实Alt+P切accept-edits→write→y单次允许；再切allow-all→edit→y；allow-all下再次write→Esc拒绝。每次原overlay都只提供且实际绘制allow-once/deny，详情声明规范目标与父目录；答复前发送a均保持pending，无tool.result或文件变化。批准后两次原writer均metadata.status=committed，通过其operationId匹配原readOperations的精确单文件committed收据与实际bytes；拒绝保持目标不存在或编辑后的digest，最终正好两条操作。兄弟文件保持、原ApprovalTrustPolicy无grant、session.workspaceRoots为空、config字节不变。
+
+| 原CLI路径 | 四回合总请求 | 四回合各自含审批耗时 | Ctrl+D退出 | 峰值RSS / 探针 |
+|---|---|---|---|---|
+| regular | 8 local completion / 4 readiness | 723/797/927/724ms | 137ms、0 | 314916KiB / 12.44s |
+| fullscreen | 8 local completion / 4 readiness | 776/799/929/752ms | 142ms、0 | 315008KiB / 12.55s |
+
+耗时包含人为150ms的a等待、输入、模型fixture与观察间隔，不用作生产性能。两次正常退出均读回ICANON/ECHO/ISIG；没有直接调用picker apply或writer，观察器包装后仍调用原InteractiveMode/OverlayHost/TurnSink方法，记录状态/计数/digest和fixture身份。
+
+首轮regular第三次edit后exact-operation失败：原store按sequence倒序返回，探针at(-1)取首个旧write收据。前两条已记录、第三条writer实际成功，不能把索引失败记成产品失败或完整通过。8.87秒/301408KiB exit1的原收据保留，改为按tool.metadata.operationId匹配后两模式四回合全部重跑通过；HANDOFF记录收据顺序陷阱。
+
+正式工件[file-cli](../../.omx/artifacts/phase20-addition-file-cli/)保存脚本、失败分类与两份有效收据/metrics。主代理严格串行，均观察exit0后执行下一项，task scratch/socket已清理、原CLAUDE.md保留；脚本语法、JSON/八回合断言、五静态门/diff通过，118既有docs advisory保留。仅文档/工件，不重复build/Vitest/graph。当前Linux隔离目录原CLI与loopback工具链不证明用户目录/实际模型工具选择、read/apply_patch完整CLI矩阵、审批pending的退出、非Linux/桌面/IME或独立review；原47不升级，ADD与goal继续active，本批提交/精确CI另绑定。
