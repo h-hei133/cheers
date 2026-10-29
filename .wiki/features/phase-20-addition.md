@@ -2789,3 +2789,9 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 实机核查派出的最小子代理报告其系统上下文为 `You are powered by the model global:deepseek-v4.1-flash[1m].`——**同一个模型（deepseek-v4.1-flash[1m]），区域前缀是 `global:` 而非配置里的 `cn:`**。这个差异不在本仓库的控制范围内（由 harness 解析），记录为事实而非"已按要求"。除此之外没有测试其他模型。
 
 本轮两次复核均以 `Explore` 类型派发；第一次运行 15 分钟未收敛被终止、改由主代理自查，第二次给了明确时限并在超时后催促，正常返回并找到两个真实缺陷（`fanOut` 永久挂起、`converge` 抹掉无证据的反对）。
+
+### 第一百三十四批：`team` 工具的准入橡皮章
+
+`team` 工具初版向 `runSubagent` 传了 `admission: () => undefined`——一个恒返回"允许"的谓词。宿主的 runner 本来就带着会话 gate；再传一个只能同意的谓词，不是加了一层检查，而是**替换**了原有的一层。现该字段省略，runner 保留它被构造时的权威。
+
+验证：`teamTool.test.ts` 增至 13 项，新增"不向 runner 传恒真准入"，断言每次调用收到的 `admission` 都是 `undefined`。反转把恒真谓词加回去后该项预期失败；源码逐字节恢复并核对 SHA-256 `1a97810ae013` 后重验；静态门、module facade 0 与 TS build `4920a6e44b88` 通过。
