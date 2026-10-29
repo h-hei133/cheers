@@ -3623,6 +3623,32 @@ it('swaps the prompt and the stash instead of refusing the second draft', () => 
   } finally { mode.stop(); }
 });
 
+it('says when a rewrite cannot be kept because the slot is full', () => {
+  // The slot holds one draft. When a rewrite replaces a second one, the
+  // original is only in the undo stack — and saying so is the difference
+  // between "your original is one key away" and "your original is gone".
+  const scheduler = new ManualScheduler();
+  const { mode, terminal } = build({ scheduler });
+  const host = mode as unknown as { view: InteractiveView; toast?: string;
+    preferences: { openExternalEditor(text: string): void } };
+  vi.spyOn(externalEditor, 'editExternally').mockReturnValue({ text: 'rewritten' });
+  mode.start();
+  try {
+    terminal.input('stashed draft');
+    scheduler.flush();
+    terminal.input('\x13');                       // stash it
+    expect(host.view.editor.getText()).toBe('');
+
+    terminal.input('second draft');
+    scheduler.flush();
+    host.preferences.openExternalEditor(host.view.editor.getText());
+    scheduler.flush();
+
+    expect(host.view.editor.getText()).toBe('rewritten');
+    expect(host.toast).toContain('only reachable with ctrl+z');
+  } finally { mode.stop(); }
+});
+
 it('leaves the stash empty when the editor changed nothing', () => {
   // No rewrite means nothing was replaced, so there is no original to keep.
   const scheduler = new ManualScheduler();

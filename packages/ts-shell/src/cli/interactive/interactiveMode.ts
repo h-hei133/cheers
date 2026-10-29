@@ -192,9 +192,18 @@ export class InteractiveMode {
       // A rewrite from an external editor replaces the draft whole. Keep what it
       // replaced so the original is one ctrl+s away instead of lost — an undo of
       // an edit that never happened in this terminal cannot reach it.
+      //
+      // When a draft is already stashed the slot is full, and the rewrite wins
+      // the prompt. Saying so is the difference between "your original is in the
+      // slot you set aside" and "your original is gone": the two drafts are not
+      // interchangeable, and silently dropping one is the failure this whole
+      // mechanism exists to prevent.
       const previous = this.state.editor.snapshot();
       if (previous.text.trim() && previous.text !== text) {
-        this.stash.stash({ text: previous.text, cursor: previous.cursor });
+        const kept = this.stash.stash({ text: previous.text, cursor: previous.cursor });
+        this.toast = kept
+          ? "Draft rewritten · ctrl+s brings the original back"
+          : "Draft rewritten · the slot already held a draft, so this original is only reachable with ctrl+z";
       }
       this.replaceExternalDraft(text);
     },

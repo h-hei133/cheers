@@ -109,8 +109,24 @@ export function converge(proposals: readonly Proposal[], refutations: readonly R
     }
     // A reviewer that read sources and found nothing against it is the only
     // thing that can produce "survived"; a review that never ran cannot.
+    //
+    // An unbacked objection still has to be visible. It cannot refute — an
+    // opinion is not evidence — but reporting "nothing found against it" while
+    // a reviewer said otherwise hides a disagreement the user should see, and
+    // is the one way this function could quietly upgrade a contested proposal.
     const checked = backed.filter(refutation => refutation.kind === "none-found");
     if (checked.length > 0) {
+      const unbacked = about.filter(refutation => refutation.evidence.length === 0
+        && (refutation.kind === "counterevidence" || refutation.kind === "condition-mismatch"));
+      if (unbacked.length > 0) {
+        return {
+          proposalId: proposal.id,
+          verdict: "unresolved",
+          reason: "A reviewer cited sources and found nothing against this, but another objected without citing anything. "
+            + "The objection cannot refute it and is not evidence; it is reported rather than dropped.",
+          decisive: [],
+        };
+      }
       return {
         proposalId: proposal.id,
         verdict: "survived",

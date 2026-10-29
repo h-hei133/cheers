@@ -65,6 +65,30 @@ describe("converging proposals", () => {
     expect(result.outcomes.find(entry => entry.proposalId === "a")?.verdict).toBe("survived");
   });
 
+  it("reports an unbacked objection instead of claiming nothing was found", () => {
+    // The objection cannot refute — an opinion is not evidence — but a clean
+    // check from one reviewer must not erase a disagreement another raised.
+    const result = converge(PROPOSALS, [
+      refutation({ proposalId: "a", reviewerId: "one", kind: "counterevidence", reason: "I doubt it.", evidence: [] }),
+      refutation({ proposalId: "a", reviewerId: "two", kind: "none-found", evidence: ["s1"] }),
+    ]);
+
+    const outcome = result.outcomes.find(entry => entry.proposalId === "a")!;
+    expect(outcome.verdict).toBe("unresolved");
+    expect(outcome.reason).toContain("another objected without citing anything");
+  });
+
+  it("still says survived when the only other findings were inconclusive", () => {
+    // `insufficient` is not an objection: a reviewer that could not check
+    // something has not disagreed with anyone.
+    const result = converge(PROPOSALS, [
+      refutation({ proposalId: "a", reviewerId: "one", kind: "insufficient", reason: "Could not check." }),
+      refutation({ proposalId: "a", reviewerId: "two", kind: "none-found", evidence: ["s1"] }),
+    ]);
+
+    expect(result.outcomes.find(entry => entry.proposalId === "a")?.verdict).toBe("survived");
+  });
+
   it("leaves a proposal nobody reviewed unresolved", () => {
     const result = converge(PROPOSALS, []);
 

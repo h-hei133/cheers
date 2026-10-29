@@ -2460,6 +2460,8 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **本批已实施（第一百二十四批）**：收敛规则已落地为纯函数 owner（`core/subagents/team/convergence.ts`），实现"多代理独立提案 → 交叉证伪 → 收敛"中最后一步的判定，并锁定了两条不对称规则：**无证据的证伪不算数**（引用必须来自评审者实际读过的源），**未被检查不等于存活**（只有 `none-found` 且带引用才算 survived）。结论必须携带"同模型不同上下文不等于独立确认"的声明。
 
+**独立复核补强（第一百二十六批）**：初版在"一个评审者带证据说没找到问题、另一个不带证据表示反对"时判为 `survived` 并给出"没有发现反证"的理由，把反对意见整个丢掉。现改为 `unresolved` 并说明"有人反对但没有引用任何东西"——无证据的意见不能证伪，但也不能当作不存在。`insufficient` 不算反对（查不动不等于不同意）。
+
 **未实施**：fan-out（并行调用 `runSubagent`）、cross-review 的提示词构造、以及把结果接入命令面与用户批准流程。这些依赖真实 provider 与并发预算，本轮不伪造证据。
 
 **证据边界**：只实现了判定规则本身，未运行真实多代理会话；并发上限、成本与收敛质量均无实测证据。
@@ -2636,7 +2638,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 验证：宿主级 4 项（regular/fullscreen 往返、空槽、互换、编辑器未改动），加"取回原稿"与"互换"两项专项。两组反转各触发 1 项预期失败：去掉 `adoptDraft` 的保存、去掉互换分支；源码逐字节恢复并核对 SHA-256 `629fae556a27` 后重验。`interactiveMode` 与 `draftStash` 共 321 项通过；静态门与 module facade 0 通过，TS build `d52651ce6b16`。
 
-**边界**：只覆盖外部编辑器这一条润色路径；模型在对话中给出的改写建议不经过草稿槽。`alt+s` 备选键未做。
+**边界**：只覆盖外部编辑器这一条润色路径；模型在对话中给出的改写建议不经过草稿槽。`alt+s` 备选键未做。槽已占用时，第二次改写覆盖的原稿只能靠 `ctrl+z` 找回，界面会明确说出来而不是静默丢弃。
 
 ### 第一百二十四批：竞争性假说的收敛规则
 
@@ -2662,3 +2664,15 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 验证：`history.test.ts` 新增两项——四个操作分属两轮加一个无 turn，`--turn prompt-1` 只列出前两个且不泄漏另外两个；未知 turn 明确报告为空。反转去掉 turn 过滤后第一项预期失败；源码逐字节恢复并核对 SHA-256 `7a19d85d36f5` 后重验，21 项通过。
 
 **过程中发现并修复的真实缺陷**：`scanOperations` 是 generator，`.filter()` 在其上抛 `TypeError`，被命令的 `catch` 吞成"无法验证账本"。已改为先展开再过滤，并把这条陷阱写入 `HANDOFF.md`。
+
+### 第一百二十六批：独立复核发现的两处静默丢失
+
+独立只读复核针对最近三批改动提出两条真实缺陷，均已修复。
+
+**一、外部改写覆盖原稿时静默丢失**（`interactiveMode.ts` 的 `adoptDraft`）。槽里已有一份草稿时，第二次外部改写覆盖的原稿既进不了槽，也没有任何提示——与"保留被替换文本"的承诺相反。现在两种情况都给出提示：进槽时说明 `ctrl+s` 可取回，槽满时说明原稿只在 `ctrl+z` 栈里。原稿并未真正丢失（`setDraftText` 会 `saveUndo`），但用户必须知道它在哪。
+
+**二、干净检查抹掉了无证据的反对**（`convergence.ts`）。一个评审者带证据报 `none-found`、另一个不带证据报 `counterevidence` 时，初版判 `survived` 且理由写"没有发现反证"，把反对整个丢弃。现改为 `unresolved` 并说明有人反对但未引用任何东西。无证据的意见不能证伪（这是原有规则），但也不能被当作不存在（这是补上的规则）。`insufficient` 仍不算反对。
+
+复核确认无问题的三点：`draftStash` 的 `held`/`protector` 始终成对设置、无其他写者；`--turn` 缺值会被 `parseFlags` 拒绝，不可达 `true` 分支；`strongest()` 排序稳定。另指出 `operationsForTurn` 展开全部 receipt 后过滤，峰值可能达百 MB 级——受既有读预算约束、非确定性缺陷，记为可改进项。
+
+验证：`convergence.test.ts` 增至 12 项（新增无证据反对、`insufficient` 不算反对两项），`interactiveMode.test.ts` 新增槽满提示一项。两组反转各触发 1 项预期失败；源码逐字节恢复并核对 SHA-256 `4b38f2340238`（interactiveMode）与 `f6744de3e0bd`（convergence）后重验，三文件 334 项通过；静态门、module facade 0 与 TS build `bf0a81fb0411` 通过。
