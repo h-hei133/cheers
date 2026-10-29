@@ -85,6 +85,50 @@ describe("core MCP gateway (W3)", () => {
     await first;
   });
 
+  it.each(['snapshot', 'refresh', 'invokeTool', 'content', 'syncWorkspace'] as const)(
+    'rejects queued %s on close before the active request settles', async operation => {
+      fs.writeFileSync(path.join(workspaceRoot, '.cheers.mcp.json'), JSON.stringify({ mcpServers: {
+        held: { transport: 'stdio', command: 'never-spawn' },
+      } }));
+      let release!: () => void, started!: () => void;
+      const held = new Promise<void>(resolve => { release = resolve; });
+      const entered = new Promise<void>(resolve => { started = resolve; });
+      const connect = vi.spyOn(CoreMcpClient.prototype, 'connect').mockImplementation(async function () {
+        started(); await held;
+        return { type: 'connected', name: this.name, config: this.config };
+      });
+      const list = vi.spyOn(CoreMcpClient.prototype, 'listTools').mockResolvedValue([]);
+      const dispose = vi.spyOn(CoreMcpClient.prototype, 'close').mockResolvedValue();
+      const gateway = new CoreMcpGateway(workspaceRoot); gateways.push(gateway);
+      const active = gateway.snapshot();
+      await entered;
+      const pending = operation === 'snapshot' ? gateway.snapshot()
+        : operation === 'refresh' ? gateway.refresh()
+          : operation === 'invokeTool' ? gateway.invokeTool('held', 'never-dispatch', {})
+            : operation === 'content' ? gateway.content('held', { action: 'resources' })
+              : gateway.syncWorkspace();
+      let settled = false, failure: unknown, closed = false;
+      const observed = pending.then(() => { settled = true; }, error => { settled = true; failure = error; });
+      const closing = gateway.close();
+      expect(gateway.close()).toBe(closing);
+      const closeObserved = closing.then(() => { closed = true; });
+      await new Promise<void>(resolve => setImmediate(resolve));
+      try {
+        expect(settled).toBe(true);
+        expect(failure).toMatchObject({ message: 'MCP gateway is closed' });
+        expect(closed).toBe(false);
+        expect(connect).toHaveBeenCalledOnce(); expect(list).not.toHaveBeenCalled();
+        expect(dispose).toHaveBeenCalledOnce();
+        await expect(gateway.snapshot()).rejects.toThrow('MCP gateway is closed');
+      } finally {
+        release();
+        await Promise.allSettled([active, observed, closeObserved]);
+      }
+      expect(closed).toBe(true);
+      expect(connect).toHaveBeenCalledOnce(); expect(list).toHaveBeenCalledOnce();
+    },
+  );
+
   it.each(['queue', 'connection'])('rechecks admission after the %s boundary before further MCP effects', async stage => {
     let blocked = false;
     const admission = () => blocked ? 'configuration revoked' : undefined;

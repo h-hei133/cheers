@@ -881,3 +881,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Overriding a native Responses model with reasoning:false sends automatic requests to unsupported Chat Completions.
 - **Root Cause**: The protocol guard reuses effort-setting admission even though the model still declares its endpoint; reasoning:false means explicit effort is unsupported, not that the endpoint changed.
 - **Rule**: Select protocol from the captured owner, address and explicit model endpoint independently of effort. Keep automatic requests on that route and assert explicit effort returns the existing errorStep before network; retain provider overrides, account issuer and relay boundaries.
+
+### Closed Queue Admission Must Also Settle Waiting Callers
+- **Symptom**: Closing MCP prevents new dispatch but queued caller Promises remain pending behind a stalled active request.
+- **Root Cause**: A closed check inside the serial lane runs only after the previous operation settles; dispatch refusal does not itself cancel the waiting caller.
+- **Rule**: Retire waiting callers before physical cleanup, remove each retirement callback when its operation starts, and retain active work in the original cleanup join. Test immediate queued refusal separately from actual close completion; never use a settled waiting caller as proof that an active tool or connection stopped.

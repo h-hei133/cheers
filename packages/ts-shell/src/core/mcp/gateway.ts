@@ -33,6 +33,7 @@ export class CoreMcpGateway {
   private workspaceRoot: string;
   private readonly connectionManager: CoreMcpConnectionManager;
   private queue: Promise<unknown> = Promise.resolve();
+  private readonly pending = new Set<() => void>();
   private closed = false;
   private closing?: Promise<void>;
   private readonly contentLifetime = new McpContentLifetime();
@@ -184,6 +185,7 @@ export class CoreMcpGateway {
 
   close(): Promise<void> {
     this.closed = true;
+    for (const cancel of this.pending) cancel();
     this.contentLifetime.cancel();
     return this.closing ??= Promise.all([this.connectionManager.shutdown(), this.queue]).then(() => {});
   }
@@ -191,22 +193,27 @@ export class CoreMcpGateway {
   private run<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     if (this.closed) return Promise.reject(new Error("MCP gateway is closed"));
     if (signal?.aborted) return Promise.reject(signal.reason);
-    const queued = this.queue.then(() => {
-      if (this.closed) throw new Error("MCP gateway is closed");
-      signal?.throwIfAborted();
-      return operation();
-    });
-    this.queue = queued.catch(() => {});
-    if (!signal) return queued;
     return new Promise<T>((resolve, reject) => {
-      const abort = (): void => reject(signal.reason);
-      const finish = (): void => signal.removeEventListener("abort", abort);
-      signal.addEventListener("abort", abort, { once: true });
-      if (signal.aborted) {
+      const abort = (): void => {
         finish();
-        reject(signal.reason);
-        return;
-      }
+        reject(signal?.aborted ? signal.reason : new Error("MCP gateway is closed"));
+      };
+      const finish = (): void => {
+        this.pending.delete(abort);
+        signal?.removeEventListener("abort", abort);
+      };
+      this.pending.add(abort);
+      const queued = this.queue.then(() => {
+        // Close retires only waiting callers. The active operation remains part
+        // of the physical cleanup join and cannot dispatch queued successors.
+        this.pending.delete(abort);
+        if (this.closed) throw new Error("MCP gateway is closed");
+        signal?.throwIfAborted();
+        return operation();
+      });
+      this.queue = queued.catch(() => {});
+      signal?.addEventListener("abort", abort, { once: true });
+      if (signal?.aborted) abort();
       queued.then(
         value => { finish(); resolve(value); },
         error => { finish(); reject(error); },

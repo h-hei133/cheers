@@ -10124,3 +10124,11 @@ Session测试修复已提交推送`9022efb85c5e7fc9dd2abedba9e849b6293225a9`，�
 主代理聚焦六文件196项串行通过，反转endpoint声明2项失败、旧effort守卫2项失败；逐字节恢复后27项重验通过。新增两项拒绝预期原误写抛异常，按实际errorStep合同纠正，保留零新增HTTP断言。五静态门、完整声明图单一用例、AST catalog8/protocol3、diff通过；TS build `9c0367e15878317d8fc66f0e783a8cc522a0fb6f9efd3055a5d1ab3d644c9860`，inputs `6102c021dfdfa7eff95c6d70197c3db7927cd737495731a3a3e7fcf51c8bdad3`，460/3545新鲜度重算一致；本地NormProof proven/0open/0failed/0gap只证collector。无live OpenAI/account、PTY/exe或全仓；HANDOFF记录effort拒绝与协议分离，原47项未重验、ADD active，Git/CI另绑定。
 
 只读[addition20.16](features/phase-20-addition.md#2016-deepseek旧别名与当前思考合同的证据边界)确认官方两个旧别名在2026-07-24退役。当前flash/v4-pro公开reasoning_content与带tools时回传要求不能套给旧别名；已返回正文的读取/转发独立于effort设置。仅登记型号与回放缺口，未默默迁移catalog、无live DeepSeek或已捕获实际失败的声明。
+
+coding路由已提交推送`6e29dae1984b2c2b23380d115ebfc09adc3d2e2a`，远端main精确一致，工作区仅原CLAUDE.md；[Watch40929290162](https://github.com/h-hei133/cheers/actions/runs/40929290162)success，[CI40929290086](https://github.com/h-hei133/cheers/actions/runs/40929290086)延后仍in_progress。之前Session修复[9022 CI40925143078](https://github.com/h-hei133/cheers/actions/runs/40925143078)已completed/success，实际1034文件/12350项通过、1文件/3项跳过，全部静态/scripts/build/NormProof步骤success；仅绑定9022，不延伸到新提交。
+
+## [2026-10-30] fix | MCP关闭即时拒绝未开始调用
+
+继续[addition20.17](features/phase-20-addition.md#2017-mcp关闭时立即拒绝未开始的调用)。gateway原closed检查阻止迟到派发却不能提前settle队列Promise；现原lane登记待开始reject回调，开始即退休，close先拒绝等待、再原content/connection cleanup。active仍参加真实close join、重复close同Promise、失败与十秒预算不改。定向参考先撤销pending/handshake，保留本项目不可重开的owner和错误可见，未另建queue或重连系统。
+
+主代理五文件79项去重串行通过，覆盖五queued操作、parent取消和真实隔离MCP stdio子进程/信号/输出失败。取消反转五项失败、字节恢复后gateway28重验通过；新fixture的content action和事件循环观察按实际合同纠正，最终反转才记证据。五静态门、完整声明图单一用例、diff和AST gateway20通过。TS build `bd4f8fcb534b2ad568a74cce6128a580471dbf57208d91146975858735922a67`，inputs `cb5ecf626e39f52ab46a4085a10b057766cfcd512b54c319b4b2bae87b711386`，460/3545重算一致；本地NormProof proven/0open/0failed/0gap仅collector。HANDOFF记队列拒绝与active停止分开，无新增scratch、无全仓/PTY/exe/live远程provider或用户退出现场；原47项未重验，ADD active，Git/精确CI另绑定。

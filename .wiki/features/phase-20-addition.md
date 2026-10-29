@@ -3173,7 +3173,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 |---|---|---|
 | 24 | 本地实现与聚焦验证 | 缺真实终端/用户目录审批现场与非Linux文件系统证据 |
 | 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses/Google native摘要准入已实现；auto保留，整体partial | 其他模型/协议默认与公开内容、真实provider/账户及用户终端复验 |
-| 26 | 四条明确机制已修；本地验证 | 缺真实用户退出现场；MCP预算到期不能证明清理完成 |
+| 26 | 四条明确机制及MCP未开始调用的关闭拒绝已修；本地验证 | 缺真实用户退出现场；MCP预算到期不能证明清理完成 |
 | 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
 | 28 | 会话入口与配置字段分类隔离已实施；本地聚焦验证 | 缺真实用户终端与整体面板现场验收 |
 | 29 | 同次浏览索引复用已实现；聚焦与真实目录只读性能验证 | 缺真实终端按键/渲染与非Linux证据；ambient扫描本机约1ms，未确认是本次主因 |
@@ -3336,3 +3336,15 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 [completion读取](../../packages/ts-shell/src/turn/completion.ts)已经独立识别reasoning_content/reasoning/reasoning_text，[turn](../../packages/ts-shell/src/turn/step.ts)收到reasoning事件即转发，与effort和summary标志无关。reasoning:false只表达显式设置拒绝，不抑制已返回的thinking。未显示thinking不能仅由该标志推断供应商没有返回正文。
 
 未来型号迁移须另核对tool trajectory：当前官方要求带tools的请求回传既往reasoning_content，普通无tools对话可省略；通用兼容adapter的结构化reasoning对象不能未经比较就认作同一wire字段。本轮仅记录当前型号/回放证据缺口，无产品迁移或live DeepSeek，未宣称捕获旧别名的实际失败响应。反馈25与ADD仍partial/active。
+
+### 20.17 MCP关闭时立即拒绝未开始的调用
+
+继续反馈26，复核[gateway](../../packages/ts-shell/src/core/mcp/gateway.ts)发现：原closed guard已阻止排队操作启动，但其Promise仍等待前方active操作结束才收到拒绝。CLI十秒总预算继续保护实际退出，不能据此认为队列调用已及时取消。
+
+定向参考oh-my-pi MCP manager的disconnectAll先撤销handshake、清退休pending并用epoch阻止晚返回；pi的signal shutdown保留handler直到终端恢复。本轮采用“先退休未开始工作”的决定，保留本项目不可重开的gateway、原串行lane、真实connection manager取消与CLI有界清理。未复制可重连epoch系统，也未采用参考吞掉全部dispose错误的做法。
+
+原run在同一lane上登记未开始调用的reject回调，开始操作时撤销该登记，parent abort或完成时移除listener。close先设closed并拒绝所有等待调用，再沿原content取消和connection shutdown，仍等待active/lane真正结束；重复close返回同一Promise。没有把active tool执行或真实连接关闭未知升级为成功，未调整十秒预算、provider、权限或恢复证据。
+
+[gateway回归](../../packages/ts-shell/src/core/mcp/gateway.test.ts)用受控active连接分别排入snapshot/refresh/tool/content/workspace sync。一个事件循环回合后，五种等待已收到安全closed拒绝，active尚未放行、close尚未完成、连接清理只启动一次、排队调用不做discovery；随后显式释放active，断言同一close完成且无后续连接。try/finally释放所有待观察Promise，避免失败污染后续测试。初次fixture的content discriminator与单microtask观察改为真实action及事件循环回合；最终反转在相同fixture下撤销close取消，五项均确实失败，不把初次夹具不足当作全部产品证据。
+
+主代理显式文件、768MiB、threads=false串行共79项去重通过：gateway28/shutdown11/content16/client8/CLI MCP16；后者使用真实隔离stdio mock server及原SIGTERM/SIGHUP/SIGINT、输出失败与父取消合同，没有真实远程认证。反转五项失败后gateway逐字节恢复并28项重验通过，未选23项不计反转通过。五静态门、完整声明图单一用例、diff和AST gateway20通过；1536MiB TS build `bd4f8fcb534b2ad568a74cce6128a580471dbf57208d91146975858735922a67`，inputs `cb5ecf626e39f52ab46a4085a10b057766cfcd512b54c319b4b2bae87b711386`，460/3545新鲜度重新计算一致。本地NormProof proven/0open/0failed/0gap只证collector；无PTY/exe、全仓、20k终端或真实用户退出现场，反馈26及ADD仍partial/active。Git/CI另以精确SHA绑定。
