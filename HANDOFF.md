@@ -916,3 +916,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A compatible tool trajectory drops required public reasoning, a saved request binding prevents its context preview, or an oversized reasoning replay passes a budget that only counts answer text.
 - **Root Cause**: Receive support does not declare the outbound field; an ownership digest was treated as an opaque payload, and the legacy message estimate does not count reasoning.
 - **Rule**: Declare the public replay field on the exact model/address, bind received text to the original provider/model/request identity, and project only unsigned, non-withheld text. Never encode field names in signatures or synthesize missing reasoning. Preview opacity depends on the actual signature/withheld payload; check the declared replay's actual wire size before sending, including when tools are disabled for the closing request.
+
+### Cancellation Assertions Need A Publication Boundary
+- **Symptom**: A close-during-acquisition test passes locally but CI reports one published current-session row.
+- **Root Cause**: The catalogue legally publishes its current-session progress while other file reads wait. Polling an active-handle count can race that publication, and a final all-time zero-publish assertion also rejects events before close.
+- **Rule**: Synchronize on actual acquisition and initial publication, record the publication count immediately before closing, then require no increase after draining. Keep the zero additional bytes, closed handles/directory and retired details checks; do not suppress legitimate live progress to stabilize a cancellation fixture.

@@ -10186,3 +10186,13 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 五静态门/diff、完整声明图单一用例和AST ceiling通过：catalog8/shape2/kinds8/adapter11/step17/preview8。build `e74f7ef6c2424f9299efb0da32479172a2e4ed2f60a91c45aa2c3a0979ffdd66`，inputs `b1babcf0d168f24306850df37e50a9bb44a9112d038466e491544e5b3a63e4f6`，460/3547新鲜度一致；NormProof proven/0open/0failed/0gap仅collector。HANDOFF/index更新，task scratch清理；无live、真实账户/终端、PTY/exe/full suite/20k，原47项不升级、ADD active，Git/精确新CI另绑定。
 
 延后精确读回[6ff4508 CI40937374700](https://github.com/h-hei133/cheers/actions/runs/40937374700)、[be01f03 CI40939033259](https://github.com/h-hei133/cheers/actions/runs/40939033259)均completed/success。退出[ebf333b CI40936451972](https://github.com/h-hei133/cheers/actions/runs/40936451972)completed/failure，停scripts gate、未build/产品测试；job/check-run `123668145319` annotation为hosted runner lost communication，failed log为空，归类runner通信失败且保留failure，不修改为绿色或产品断言失败。
+
+公开回传已提交推送`3388b01cfad4688aab4bf41a9c98193c80b91114`，远端main精确一致，仅原CLAUDE.md；[Watch40944128024](https://github.com/h-hei133/cheers/actions/runs/40944128024)success，[CI40944127824](https://github.com/h-hei133/cheers/actions/runs/40944127824)启动时in_progress。
+
+## [2026-10-30] test | 会话关闭前后发布边界
+
+继续[addition20.24](features/phase-20-addition.md#2024-会话关闭回归的发布边界与ci分类)。74f8bd2的CI40940297696精确completed/failure，1失败/12401通过/3跳过；唯一session lifetime close断言收到合法current进度，静态/scripts/build均success、NormProof skipped。原lifetime完整5项本地通过，但等待真实publication与acquisition后旧zero断言稳定一失败，确认观察范围混合关闭前后。参考active controller的partial publication与退休守卫已定向对照。
+
+只修测试：实际事件同步、关闭前合法current但无saved row、记录发布count，drain后count/bytes不增加且handles/directory全关、detail退休、重开正常。生产取消/目录逻辑不变。package-local三个显式文件88项串行通过：session73/lifetime5/listing10；首次不存在browser.test只选择两实际文件15项，不计三文件证据。五静态门/diff与build通过，HANDOFF记观察边界，test-only不重复结构NormProof；无scratch、live/PTY/exe/full suite/20k，原47与ADD active，Git/新精确CI另绑定。
+
+最终build `7684ef96c4fd009560fa22231aed9e72aec1e6d4e406d90f8deee72e9cb18f82`，inputs `48721bbe95e106f8056d0734a245299c0145a87a9bf6c4a55d57e79b046e21d5`，460 compilerInputs/3547文件重新计算一致。

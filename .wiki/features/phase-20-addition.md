@@ -3428,3 +3428,15 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 五静态门、diff、完整声明图单一用例通过；AST具名callable catalog8/shape2/kinds8/adapter11/step17/preview8。1536MiB串行TS build `e74f7ef6c2424f9299efb0da32479172a2e4ed2f60a91c45aa2c3a0979ffdd66`，inputs `b1babcf0d168f24306850df37e50a9bb44a9112d038466e491544e5b3a63e4f6`，460 compilerInputs/3547文件重算一致。NormProof proven/0open/0failed/0gap仅collector结构。HANDOFF记录public ownership/测量边界，任务scratch清理。无live relay/provider、真实账户/终端或独立review，原47项不升级，反馈25与ADD整体partial/active；Git/新提交精确CI另绑定。
 
 延后确认[6ff4508 CI40937374700](https://github.com/h-hei133/cheers/actions/runs/40937374700)与[be01f03 CI40939033259](https://github.com/h-hei133/cheers/actions/runs/40939033259)completed/success，各headSha一致。普通退出[ebf333b CI40936451972](https://github.com/h-hei133/cheers/actions/runs/40936451972)completed/failure，停在scripts gate，build与产品测试未开始；check-run `123668145319` annotation明确“hosted runner lost communication with the server”，failed logs为空。归类runner通信失败，保留整次failure，不记产品测试失败或绿色；该提交Watch成功另计。
+
+本批公开回传已提交推送`3388b01cfad4688aab4bf41a9c98193c80b91114`，远端main精确一致、仅原CLAUDE.md。[Watch40944128024](https://github.com/h-hei133/cheers/actions/runs/40944128024)completed/success，[CI40944127824](https://github.com/h-hei133/cheers/actions/runs/40944127824)启动读回in_progress；该CI不由本地302项或Watch替代。
+
+### 20.24 会话关闭回归的发布边界与CI分类
+
+延后[74f8bd2 CI40940297696](https://github.com/h-hei133/cheers/actions/runs/40940297696)为completed/failure，精确head核对；1失败/12401通过/3跳过，1035文件通过/1失败/1跳过。静态/scripts/build均success、NormProof步骤skipped。唯一失败为[session lifetime测试](../../packages/ts-shell/src/cli/interactive/picker/session/lifetime.test.ts)的drains real in-flight acquisition，最终zero-publish断言收到一次current row，其他product/advisor/JSON投影测试通过。原失败状态保留。
+
+本地原完整lifetime五项通过，不能据此称CI已修。目标源码[listing](../../packages/ts-shell/src/cli/interactive/picker/session/listing.ts)和[catalog](../../packages/ts-shell/src/session/store/catalog/index.ts)在非current文件open受阻时合法发布current progress；原测试只等active=3，再close，all-time zero-publish会随调度时序计入关闭前的发布。只改同步方式、等待实际acquisition和current publication后，旧最终断言稳定复现同一one-call失败。定向pi session-selector.ts:943–990也允许active controller发布partialSessions，只在controller退休后拒绝；采用合法live progress与retired outcome分开，不抑制生产目录发布。
+
+测试现在由真实open事件确认三个文件句柄待处理，由订阅事件确认current进度且未发布saved rows，close前记录发布数；drain后要求次数不增加、bytes不增加、handles/directory全部关闭、旧detail为空，重开继续完整分页。原production cancellation、目录预算和返回链未修改，不依赖延长timeout或轮询迟早命中来稳定夹具。真实事件同步+旧zero断言的反转一失败，修正后所属package三个显式文件88项串行通过：session73/lifetime5/listing10。首次验证传入不存在browser.test路径时Vitest只选择另两个实际文件15项，未据此称三文件通过，随后用真实session.test完成88项。
+
+五静态门/diff与1536MiB串行build通过，最终build与460/3547新鲜度由日志精确绑定；test-only未重跑结构NormProof。HANDOFF新增关闭前/后发布边界；无新scratch、live provider/PTY/exe、全仓或20k会话，原47项不升级、ADD active。新的Git/CI另绑定，旧runner与测试失败不改成绿色。

@@ -170,22 +170,35 @@ it('drains real in-flight acquisition on close without reading or publishing the
   const { picker, createPicker } = fixture();
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
+  let started!: () => void;
+  const acquisitionStarted = new Promise<void>(resolve => { started = resolve; });
   const counts = observeSources(async target => {
-    if (path.basename(path.dirname(target)) !== 'current') await gate;
+    if (path.basename(path.dirname(target)) !== 'current') {
+      if (counts.active === 3) started();
+      await gate;
+    }
   });
-  const publish = vi.fn();
+  let published!: () => void;
+  const initialPublished = new Promise<void>(resolve => { published = resolve; });
+  const publish = vi.fn((rows: readonly Option[]) => {
+    if (rows.some(row => row.id === 'current')) published();
+  });
   let unsubscribe: (() => void) | undefined;
   try {
     await picker.load();
     const initialBytes = counts.bytes;
     unsubscribe = picker.subscribe!(publish);
-    await vi.waitFor(() => expect(counts.active).toBe(3));
+    await Promise.all([acquisitionStarted, initialPublished]);
+    expect(counts.active).toBe(3);
+    expect(publish).toHaveBeenCalled();
+    expect(publish.mock.calls.every(([rows]) => !rows.some(row => row.id.startsWith('saved-')))).toBe(true);
+    const publishedBeforeClose = publish.mock.calls.length;
     picker.previewEnd?.();
     release();
     await vi.waitFor(() => expect({ active: counts.active, directoriesClosed: counts.directoriesClosed }).toEqual({ active: 0, directoriesClosed: 1 }));
     expect(counts.bytes).toBe(initialBytes);
     expect(counts.closed).toBe(counts.opened);
-    expect(publish).not.toHaveBeenCalled();
+    expect(publish).toHaveBeenCalledTimes(publishedBeforeClose);
     expect(picker.detail?.('current')).toEqual([]);
     const reopened = createPicker();
     try { expect(await finish(reopened)).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'action:more' })])); }
