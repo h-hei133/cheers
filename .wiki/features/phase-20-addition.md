@@ -2905,7 +2905,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **已确认：`exit` 不是一个命令词，是 `/exit`。而真正的退出链上有一个无上限的等待。**
 
-**入口核实**：`registry.ts:436` 的 `exit` 命令（别名 `quit`、`q`）必须带前导 `/` 才会被 `slashRouter` 识别。裸输入 `exit` 会作为**普通提示词**发给模型——这本身就会让用户觉得"卡住"（模型在回答一个它被问到的词）。`ctrl+d`（`keybindings.ts:82`）在草稿为空时才退出。
+**入口核实**：`core/commands/slashRouter.ts:21` 直接要求输入以 `/` 开头（`if (!input.startsWith('/') ...) return null`），所以 `registry.ts:436` 的 `exit` 命令（别名 `quit`、`q`）只有写成 `/exit` 才存在。裸输入 `exit` 会作为**普通提示词**发给模型——这本身就会让用户觉得"卡住"（模型在回答一个它被问到的词）。`ctrl+d`（`keybindings.ts:82`）在草稿为空时才退出。
 
 **退出链（`/exit` → `shutdown()`）**
 
