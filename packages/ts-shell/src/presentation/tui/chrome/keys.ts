@@ -79,6 +79,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   },
   { keys: ["ctrl+q"], does: "queue the draft to run after the current turn", group: "sending" },
   { keys: ["tab"], does: "complete a command name", group: "sending" },
+  { keys: ["ctrl+s"], does: "set the draft aside, or take it back", group: "sending" },
   {
     keys: ["escape"],
     does: "interrupt a run, dismiss a chooser; twice on an empty prompt goes back",

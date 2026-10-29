@@ -62,6 +62,10 @@ export const KEY_ACTIONS: Record<string, KeybindingDefinition> = {
   },
   "tui.input.submit": { defaultKeys: ["enter"], description: "Send the prompt" },
   "tui.input.tab": { defaultKeys: ["tab"], description: "Complete the highlighted candidate" },
+  "tui.input.stash": {
+    defaultKeys: ["ctrl+s"],
+    description: "Set the draft aside, or take it back",
+  },
   "tui.overlay.nextGroup": { defaultKeys: ["tab"], description: "Next picker group", scope: 'overlay' },
   "tui.overlay.previousGroup": { defaultKeys: ["shift+tab"], description: "Previous picker group", scope: 'overlay' },
   "tui.altScreen.top": { defaultKeys: ["ctrl+home"], description: "Go to the oldest rows, or the start of the draft" },

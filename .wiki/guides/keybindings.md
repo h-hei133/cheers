@@ -77,6 +77,7 @@ In Settings, typing searches all groups, including when a group is selected. Fie
 | `tui.input.newLine` | `shift+enter` / `alt+enter` / `ctrl+j` | Insert a new line instead of sending |
 | `tui.input.submit` | `enter` | Send the prompt |
 | `tui.input.tab` | `tab` | Complete the highlighted candidate |
+| `tui.input.stash` | `ctrl+s` | Set the draft aside, or take it back |
 | `tui.overlay.nextGroup` | `tab` | Next picker group |
 | `tui.overlay.previousGroup` | `shift+tab` | Previous picker group |
 | `tui.altScreen.top` | `ctrl+home` | Go to the oldest rows, or the start of the draft |

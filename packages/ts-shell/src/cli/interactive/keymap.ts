@@ -215,6 +215,11 @@ function runAction(action: string, event: ParsedKeyEvent, context: KeymapContext
       actions.syncSuggestions(true);
       actions.redraw();
       return "redrawn";
+    case "tui.input.stash":
+      // The host owns the slot, so the keymap only says the gesture happened;
+      // whether it stashes or restores depends on what the prompt holds.
+      actions.stashDraft?.();
+      return "redrawn";
     case "tui.altScreen.top":
       return handleEdge(context, "start");
     case "tui.altScreen.bottom":

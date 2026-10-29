@@ -2390,7 +2390,9 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 4. **IXON 风险**：Cheers 在 `terminal.ts:294-308` 进 raw mode，仓库内没有自己的 termios/IXON 处理，且 `ctrl+q` 已被绑定为 follow-up 并有测试（`keymap.test.ts:237`），说明流控未生效；但非 raw 的 line 模式（`lineLoop.ts:78`）与部分 tmux 配置仍可能吞掉 `ctrl+s`，应同时提供 `alt+s` 作为备选。
 5. 新增 action 必须同步三处：`KEY_ACTIONS`、`KEY_BINDINGS` 与 `.wiki/guides/keybindings.md`——`keyGuide.test.ts:10-16,57-70` 会强制它们相等。
 
-**证据边界**：本轮只做定位与参考对比，未实现；单槽 vs 多槽是产品选择，建议先做单槽 toggle 并观察真实使用。
+**本批已实施（第一百二十批）**：按上述方向 1/2/5 落地——`ctrl+s` 绑定 `tui.input.stash`，单槽 toggle 语义（有文本则暂存并清空，空则恢复），暂存的草稿保留光标位置；被引用的粘贴条目在暂存期间受保护、恢复后释放，因此恢复出来的草稿仍可提交。目录、重绑定表与指南三处同步。**未实现**方向 3（一键撤回润色复用 retryDraft）与方向 4 的 `alt+s` 备选键，保留为后续任务。
+
+**证据边界**：单槽是产品选择（对齐参考实现的 toggle 语义），未做多槽；IXON 在非 raw 模式下的吞键风险仍未经真机验证。
 
 
 ### 17.5 第十二项（用户编号第二十二）：平级 Agent Teams 与"竞争性假说互相证伪"
@@ -2564,3 +2566,17 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 验证：`arguments.test.ts` 新增两项，分别对 `write` 与 `edit` 断言拒绝信息包含该命令且执行服务从未被调用；撤销新措辞后两项均预期失败（返回旧的 `Path '…' is outside workspace.`），源码逐字节恢复并核对 SHA-256 `ab8651690367` 后重验。`core/tools` 36 文件 419 项通过。
 
 **边界**：本批只改措辞，未放开写权限；"越界写改为需审批"仍是未完成任务，理由见第 17.7 节。
+
+### 第一百二十批：草稿暂存（Ctrl+S）
+
+`ctrl+s` 此前解析成 `ctrl+s` 但没有任何 action 认领，是纯 no-op。现绑定 `tui.input.stash`：输入框有文本则暂存并清空，输入框为空且槽里有草稿则恢复，恢复时光标回到原位置。**单槽而非栈**——第二次按键必须有一个确定含义，多槽需要第二个手势和用户记住隐藏了几份草稿。
+
+新增 [DraftStash](../../packages/ts-shell/src/presentation/tui/editor/draftStash.ts) 持有唯一槽位。关键约束：暂存期间被草稿引用的粘贴条目不能过期。`PasteStore` 的淘汰是按年龄的，一份恢复出来却无法提交的草稿，其失败要到提交时才暴露，远晚于原因。因此 `PasteStore` 新增可选的 `protector` 判定，由 DraftStash 在暂存时安装、恢复时撤下；保护逻辑留在 owner 里，`PasteStore` 只多一个谓词字段。
+
+`idsIn` 增加 `images` 参数：展开文本只要文本条目，而暂存的草稿要保住提交所需的全部条目，图片也是其中之一。
+
+验证：[draftStash.test.ts](../../packages/ts-shell/src/presentation/tui/editor/draftStash.test.ts) 8 项覆盖往返、空草稿不占槽、第二份被拒、粘贴跨淘汰存活、恢复后释放、protector 生命周期；宿主级 3 项覆盖 regular/fullscreen 真实按键往返与空槽行为。反转撤销保护安装后，"keeps the pastes the draft names alive" 1 项预期失败；源码逐字节恢复并核对 SHA-256 `28a92d563330` 后重验。
+
+主代理以 heap1024MiB 单线程串行执行 7 文件 521 项通过；五静态门、module facade 0 及 heap1536MiB TS build `3c53260f3c65` 通过。
+
+**边界**：未实现"一键撤回润色"复用与 `alt+s` 备选键；非 raw 模式（`lineLoop.ts`）下的 IXON 吞键风险未经真机验证。

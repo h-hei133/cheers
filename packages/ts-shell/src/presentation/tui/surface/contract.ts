@@ -168,6 +168,15 @@ export interface ViewActions {
    * unclaimed rather than bind it to nothing.
    */
   attachClipboardImage?(): void;
+  /**
+   * Set the current draft aside, or take a stashed one back.
+   *
+   * One action for both directions because it is one key: with the prompt empty
+   * it restores, with text in it the text is stashed. Optional for the same
+   * reason as the others — a surface that owns no draft store must leave the key
+   * unclaimed rather than bind it to nothing.
+   */
+  stashDraft?(): void;
 }
 
 /**

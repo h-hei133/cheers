@@ -45,6 +45,7 @@ import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { goalCommandFor, isGoalControl } from '../runtime/goal.js';
 import { attachGoalSubmission, schedulerForRuntime } from '../runtime/goalScheduling.js';
 import { attachSubmissionQueue, isQueueControl, queueCommandFor } from '../runtime/inputQueue.js';
+import { DraftStash } from '../../presentation/tui/editor/draftStash.js';
 import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
 import { usageCommandFor } from '../runtime/usage.js';
@@ -166,6 +167,8 @@ export class InteractiveMode {
   private readonly view: InteractiveSurface;
   /** The transcript, draft, pastes, and completions the surface projects. */
   private readonly state: ViewState;
+  /** The one draft set aside, while the prompt holds something else. */
+  private readonly stash: DraftStash;
   private readonly stdin: StdinBuffer;
   private readonly sink: TurnSink;
   private readonly questions: QuestionBridge;
@@ -314,6 +317,7 @@ export class InteractiveMode {
     // runner may settle during construction; completion notices must have a
     // valid storage target even in that narrow window.
     this.state = options.startup?.state ?? createViewState();
+    this.stash = new DraftStash(this.state.pastes);
     excludeRecordingInput(options.runtimeContext, () => this.stopped || Boolean(this.state.editor.getText() || this.questions.question() || this.overlay.active || this.pager.active || this.search.active));
     // Completion is a scoped local notice. Output does not become new user intent
     // or silently dispatch a model request; taskOutput exposes the retained facts.
@@ -714,6 +718,7 @@ export class InteractiveMode {
         toggleCollapsed: (only) => this.view.toggleCollapsed(only),
         openExternalEditor: () => this.preferences.openExternalEditor(this.state.editor.getText()),
         attachClipboardImage: () => void this.preferences.attachClipboardImage(),
+        stashDraft: () => this.stashDraft(),
       },
     });
   }
@@ -1374,6 +1379,44 @@ export class InteractiveMode {
   }
 
   /** Programmatic replacements start a fresh Vim mode and undo-safe draft. */
+  /**
+   * Set the draft aside, or take it back.
+   *
+   * With text in the prompt the text is stashed and the prompt cleared; with an
+   * empty prompt the stashed draft returns, caret included. An empty prompt and
+   * an empty stash is a press with nothing to do, which says so rather than
+   * looking broken.
+   */
+  private stashDraft(): void {
+    const snapshot = this.state.editor.snapshot();
+    if (snapshot.text.trim()) {
+      if (!this.stash.stash({ text: snapshot.text, cursor: snapshot.cursor })) {
+        this.toast = "A draft is already stashed; take it back before setting this one aside.";
+        this.tui.requestRender();
+        return;
+      }
+      resetVimState(this.state.editor);
+      this.vimSelection = undefined;
+      this.state.editor.clear();
+      this.syncSuggestions(false);
+      this.toast = "Draft stashed · ctrl+s takes it back";
+      this.tui.requestRender();
+      return;
+    }
+    const restored = this.stash.restore();
+    if (!restored) {
+      this.toast = "No stashed draft.";
+      this.tui.requestRender();
+      return;
+    }
+    resetVimState(this.state.editor);
+    this.vimSelection = undefined;
+    this.state.editor.setDraftText(restored.text);
+    this.state.editor.setCursorOffset(restored.cursor);
+    this.syncSuggestions(false);
+    this.tui.requestRender();
+  }
+
   private replaceExternalDraft(text: string): void {
     resetVimState(this.state.editor);
     this.vimSelection = undefined;

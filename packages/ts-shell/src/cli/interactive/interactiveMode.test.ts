@@ -1548,6 +1548,38 @@ it.each(['regular', 'fullscreen'] as const)(
     } finally { mode.stop(); }
   });
 
+it.each(['regular', 'fullscreen'] as const)('stashes the draft and takes it back on the same key in %s mode', kind => {
+  // One key, two directions: with text in the prompt it stashes, with an empty
+  // prompt it restores. The caret comes back where it was, so a draft set aside
+  // mid-sentence resumes mid-sentence.
+  const { mode, terminal } = build({ tuiMode: kind });
+  const host = mode as unknown as { view: InteractiveView };
+  try {
+    mode.start();
+    terminal.input('half a question');
+    terminal.input('\x13');                       // ctrl+s
+    expect(host.view.editor.getText()).toBe('');
+
+    terminal.input('\x13');
+    expect(host.view.editor.getText()).toBe('half a question');
+  } finally { mode.stop(); }
+});
+
+it('does not consume the stash slot for an empty prompt', () => {
+  const { mode, terminal } = build();
+  const host = mode as unknown as { view: InteractiveView };
+  try {
+    mode.start();
+    terminal.input('\x13');                       // nothing to stash, nothing held
+    expect(host.view.editor.getText()).toBe('');
+    terminal.input('kept');
+    terminal.input('\x13');
+    expect(host.view.editor.getText()).toBe('');
+    terminal.input('\x13');
+    expect(host.view.editor.getText()).toBe('kept');
+  } finally { mode.stop(); }
+});
+
 it('leaves the block alone when the caret sits just past it', () => {
   // Inserting a token parks the caret after it. That must not arm the gesture,
   // or the next unrelated paste would swallow the clipboard.

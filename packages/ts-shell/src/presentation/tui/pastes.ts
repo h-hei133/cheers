@@ -57,6 +57,15 @@ export class PasteStore {
     private readonly maxHeldBytes = MAX_HELD_BYTES,
   ) {}
 
+  /**
+   * Whether an entry must survive eviction.
+   *
+   * Set by whoever holds a draft that is not in the prompt — a stashed one —
+   * because only that owner knows which placeholders its draft still names.
+   * Absent means every entry is evictable.
+   */
+  protector: ((id: number) => boolean) | undefined;
+
   /** Whether `text` is long enough to be worth holding aside. */
   static shouldHold(text: string): boolean {
     return text.length >= PASTE_PLACEHOLDER_THRESHOLD || text.split("\n").length > 6;
@@ -88,7 +97,13 @@ export class PasteStore {
    */
   private evictOldest(): void {
     while (this.order.size > this.maxHeld || this.heldBytes > this.maxHeldBytes) {
-      const [id, kind] = this.order.entries().next().value!;
+      // A draft that was set aside names the placeholders it was written with,
+      // and its entries must survive until it comes back — otherwise restoring
+      // it reports a paste that is no longer available and the text is gone.
+      // When only protected entries remain there is nothing left to drop.
+      const candidate = [...this.order.entries()].find(([id]) => !this.protector?.(id));
+      if (candidate === undefined) return;
+      const [id, kind] = candidate;
       this.order.delete(id);
       if (kind === "text") {
         this.held.delete(id);
@@ -158,12 +173,23 @@ export class PasteStore {
     return this.held.get(id);
   }
 
-  /** The placeholder ids present in `draft`, in the order they appear. */
-  idsIn(draft: string): number[] {
+  /**
+   * The placeholder ids `draft` names, in the order they appear.
+   *
+   * `images` decides whether image placeholders count: a caller expanding text
+   * wants only the text pastes, while a stashed draft has to keep alive
+   * everything its submission would need, and an image is one of those.
+   *
+   * `protect` keeps those entries from being evicted, or releases them. Pinning
+   * is counted, because two stashed drafts can name the same paste and
+   * restoring one must not release what the other still needs.
+   */
+  idsIn(draft: string, images = false): number[] {
     const ids: number[] = [];
     for (const match of draft.matchAll(PLACEHOLDER)) {
       const id = Number(match[1]);
-      if (this.held.has(id) && this.issued.get(id)?.has(match[0])) ids.push(id);
+      if (!this.issued.get(id)?.has(match[0])) continue;
+      if (this.held.has(id) || (images && this.heldImages.has(id))) ids.push(id);
     }
     return ids;
   }
