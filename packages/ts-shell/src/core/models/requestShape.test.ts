@@ -23,6 +23,46 @@ function catalogWith(model: Record<string, unknown>): readonly CatalogProvider[]
 }
 
 describe("resolveRequestShape", () => {
+  it.each(['reasoning_content', 'reasoning', 'reasoning_text'] as const)(
+    'admits declared public %s replay only from the exact compatible model owner', field => {
+      const address = 'https://relay.invalid/v1';
+      const catalog = mergeProviders([], [{ id: 'relay', runtime: 'openai', baseUrl: address,
+        models: [{ id: 'm', compat: { reasoningReplayField: field } }] }]);
+      expect(resolveRequestShape(catalog, 'openai', 'm', undefined, `${address}/`).reasoningReplayField).toBe(field);
+      for (const [provider, model, baseUrl, endpoint] of [
+        ['', 'm', address, 'openai-compatible'], ['openai', 'other', address, 'openai-compatible'],
+        ['openai', 'm', 'https://other.invalid/v1', 'openai-compatible'],
+        ['openai', 'm', address, 'openai-responses'], ['openai', 'm', address, 'anthropic-messages'],
+      ] as const) {
+        expect(resolveRequestShape(catalog, provider, model, undefined, baseUrl, endpoint).reasoningReplayField).toBeUndefined();
+      }
+      expect(resolveRequestShape([...catalog, { ...catalog[0]!, id: 'duplicate' }],
+        'openai', 'm', undefined, address).reasoningReplayField).toBeUndefined();
+      expect(resolveRequestShape(catalog, 'relay', 'm', undefined, address).reasoningReplayField).toBe(field);
+      expect(resolveRequestShape(catalog, 'relay', 'm', undefined, 'https://other.invalid/v1').reasoningReplayField).toBeUndefined();
+    });
+
+  it('does not infer public replay or accept arbitrary catalogue field names', () => {
+    for (const value of [undefined, false, true, 'signature', 'reasoning_details', '__proto__', {}]) {
+      const catalog = [{ ...catalogWith({ compat: { reasoningReplayField: value } })[0]!, baseUrl: 'https://relay.invalid/v1' }];
+      expect(resolveRequestShape(catalog, 'vendor', 'm', undefined, 'https://relay.invalid/v1').reasoningReplayField).toBeUndefined();
+    }
+    expect(resolveRequestShape(catalogWith({ compat: { reasoningReplayField: 'reasoning_content' } }),
+      'vendor', 'm', undefined).reasoningReplayField).toBeUndefined();
+  });
+
+  it('preserves reviewed public replay on refresh and permits explicit user changes', () => {
+    const catalog = mergeProviders([], [{ id: 'relay', runtime: 'openai', baseUrl: 'https://relay.invalid/v1',
+      models: [{ id: 'm', compat: { reasoningReplayField: 'reasoning_content' } }] }]);
+    const patch = [{ id: 'relay', models: [{ id: 'm', compat: { reasoningReplayField: 'reasoning_text' as const } }] }];
+    expect(resolveRequestShape(mergeProviders(catalog, patch, { preserveExplicitCapabilities: true }),
+      'openai', 'm', undefined, 'https://relay.invalid/v1').reasoningReplayField).toBe('reasoning_content');
+    expect(resolveRequestShape(mergeProviders(catalog, patch),
+      'openai', 'm', undefined, 'https://relay.invalid/v1').reasoningReplayField).toBe('reasoning_text');
+    const refused = mergeProviders(catalog, [{ id: 'relay', models: [{ id: 'm', compat: { reasoningReplayField: false } }] }]);
+    expect(resolveRequestShape(refused, 'openai', 'm', undefined, 'https://relay.invalid/v1').reasoningReplayField).toBeUndefined();
+  });
+
   it.each(['gemini-2.5-pro', 'gemini-2.5-flash'])('admits native %s summaries without setting effort or budget', model => {
     for (const [provider, address] of [
       ['google-ai', 'https://generativelanguage.googleapis.com/'],

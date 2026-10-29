@@ -3406,3 +3406,25 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 新增一个本地wireMessage供simple及turn共用，只投影role/content和适用角色的tool_calls/tool_call_id。原tool image提取、连续result、vision fallback与bridge保持同一wireMessages流程；simple仅投影字段，原content表示保持。内部history未修改，reasoning文本/签名/origin仍留在transcript供各原生codec使用，工具ID/参数原字节保留。不新增第二套conversation normalization、模型规则或回放存储。
 
 三项新回归在旧投影下均失败，修复后五相关文件232项串行通过：endpoint17/simple12/media8/step96/preview99。包含真实fetch body、simple/turn与内部history不变、原多模态/预算/preview。分别反转simple投影1失败、turn投影2失败，逐字节恢复后endpoint17重验通过。五静态门/diff、AST endpoint11与1536MiB TS build通过；build `1f8dd8687959d0e09d5384bdf44587edb7ba7c9a6c32a8b98f80dccfccc4bc42`，inputs `a4de0160771458ad4fdce374cd17540dd6e6b744a82653ed115b11954de5d4a7`，460/3547新鲜度重算一致。局部adapter投影不重复结构NormProof；初次诊断错从package index取未export函数，改为manifest指定不可变build的endpoint模块后才取证，不作产品失败。HANDOFF记录wire投影边界，scratch清理；无live/真实账户/终端、PTY/exe/full suite/20k，原47项不升级，ADD active。公开reasoning tool回传仍待明确独立能力声明。
+
+该投影批次已提交推送`74f8bd2e852229eb645e7156a4b3814d517de49a`，远端main精确一致、仅原CLAUDE.md。[Watch40940297634](https://github.com/h-hei133/cheers/actions/runs/40940297634)completed/success，[CI40940297696](https://github.com/h-hei133/cheers/actions/runs/40940297696)延后仍in_progress。20.23进一步落实显式回传能力；本文的历史待裁决表述保留为该批次边界。
+
+### 20.23 兼容协议公开reasoning的声明回传与输入预算
+
+反馈25继续沿收到公开reasoning→持久消息→tool结果→下一次请求检查。20.22修正内部字段污染后，兼容codec没有公开回传字段；接收的三种字段只能显示与存储。新增回归的初次基线为9失败/59通过：三种wire投影、JSON/SSE接收绑定及目录准入/刷新四项均失败。该批是新能力缺口，不声称用户relay已经拒绝或真实服务已经验证。
+
+采用20.21/20.22已实际读取的官方Chat Completions schema及DeepSeek当前thinking guide：公开reasoning_content是独立正文，部分tool轨迹需要回传。定向再读pi openai-completions.ts:1280–1390的显式assistant构造和已识别字段回传，以及oh-my-pi openai-completions.ts:2580–2668的compat-selected字段、tool与缓存回传选择。采用显式字段/正文分离，拒绝把本项目已有opaque signature改成字段名；不按模型/provider名称猜字段、不补造缺失正文、不引入参考结构。参考允许部分跨API正文回传，本项目本批限定原provider/model/request绑定，跨目标迁移另行裁决。
+
+[catalog](../../packages/ts-shell/src/core/models/catalog.ts)增加`compat.reasoningReplayField`，只接受reasoning_content/reasoning/reasoning_text或false。原[request shape](../../packages/ts-shell/src/core/models/requestShape.ts)要求精确owner、模型和已声明地址一致，兼容或共享Chat Completions codec准入，未知/匿名/歧义/换地址/其他协议不准入。refresh保留已审阅声明、用户显式修改或false可撤销，原merge owner不变。没有为任何内置型号增加声明，没有迁移旧DeepSeek别名。
+
+[turn](../../packages/ts-shell/src/turn/step.ts)将已收到且公开、无signature的reasoning绑定原requestReplayBinding，再沿既有origin/transcript存储；不新增reasoning字段或存储系统。[compatible adapter](../../packages/ts-shell/src/provider/endpoints/openaiCompatible.ts)只在声明字段、unsigned/non-redacted正文与原provider/model/binding全部一致时写字符串，simple与turn共享投影，tool IDs/参数字节与history不变。目标目录可声明不同于接收字段的回传字段；接收字段本身不构成回传授权。无tools的simple及closing请求仍保留合法历史正文，未带绑定的旧历史省略，不补空值。凭据旋转通过原binding拒绝旧正文，不把public声明赋给opaqueReplay。
+
+预览三条新增回归首次全部在[preview](../../packages/ts-shell/src/cli/runtime/context/preview.ts)的“任意replayBinding就是opaque”检查失败。现opacity依据实际signature/withheld数据，绑定public text不再拒估算；原opaque保存回归仍通过。声明字段从同一shape贯通preview，估算实际投影并与dispatch完整body比较。进一步发现旧message预算只计answer/tool、不计reasoning；仅在声明回传时以现有estimateWirePrompt复核实际payload与input/window/output/reserve，超限在fetch前走原overflow失败合同，未修改未声明目标的预算行为。
+
+主代理768MiB、threads=false、package-local六个显式文件最终302项去重通过：endpoint35/requestShape36/preview102/step96/simple12/catalogShape21。覆盖JSON/SSE→transcript解码→第二次实际tool请求、三种配置字段、exact owner与未知/歧义/其他协议、refresh/user false、unsigned/空signature/withheld/旧历史、旋转凭据、closing无tools，以及40k字符public正文超过10k窗口的本地拒绝；不是20k会话或PTY。preview三种字段核对同一body/估算、会话文件字节不变。
+
+七类独立反转分别撤去adapter正文、provider/model/binding守卫、turn传参、received绑定、字段白名单、public preview测量与wire预算，按实际失败名称确认5/7/2/2/2/3/1项失败，各次finally逐字节恢复。字段白名单反转初先只预期一失败，实际另命中user false撤销；分类后按两项重验，并未降低断言。源码恢复后完成302项，预算反转再恢复后endpoint35重验。一次重验误从repo root启动，发现三份既有临时source副本共140项；不计其重复发现结果，随后所属package endpoint35单文件重跑通过，不删除其他任务副本。
+
+五静态门、diff、完整声明图单一用例通过；AST具名callable catalog8/shape2/kinds8/adapter11/step17/preview8。1536MiB串行TS build `e74f7ef6c2424f9299efb0da32479172a2e4ed2f60a91c45aa2c3a0979ffdd66`，inputs `b1babcf0d168f24306850df37e50a9bb44a9112d038466e491544e5b3a63e4f6`，460 compilerInputs/3547文件重算一致。NormProof proven/0open/0failed/0gap仅collector结构。HANDOFF记录public ownership/测量边界，任务scratch清理。无live relay/provider、真实账户/终端或独立review，原47项不升级，反馈25与ADD整体partial/active；Git/新提交精确CI另绑定。
+
+延后确认[6ff4508 CI40937374700](https://github.com/h-hei133/cheers/actions/runs/40937374700)与[be01f03 CI40939033259](https://github.com/h-hei133/cheers/actions/runs/40939033259)completed/success，各headSha一致。普通退出[ebf333b CI40936451972](https://github.com/h-hei133/cheers/actions/runs/40936451972)completed/failure，停在scripts gate，build与产品测试未开始；check-run `123668145319` annotation明确“hosted runner lost communication with the server”，failed logs为空。归类runner通信失败，保留整次failure，不记产品测试失败或绿色；该提交Watch成功另计。

@@ -8,7 +8,7 @@ import {
 import { readCompletionStream, readReasoningText, type CompletedBody } from "../../turn/completion.js";
 import type { ChatMessage } from "../../turn/prompt.js";
 import { copilotRequestHeaders } from "./copilotHeaders.js";
-import { declareEndpoint } from "./kinds.js";
+import { declareEndpoint, type SimpleRequest } from "./kinds.js";
 
 /**
  * The default wire shape.
@@ -36,7 +36,7 @@ declareEndpoint("openai-compatible", {
     model: input.model,
     messages: [
       ...(input.systemPrompt ? [{ role: input.systemRole ?? 'system', content: input.systemPrompt }] : []),
-      ...input.messages.map(wireMessage),
+      ...input.messages.map(message => wireMessage(message, input)),
     ],
     // Gated the same way the full request gates it. A caller that declares the
     // model rejects a temperature gets a request without one, whether or not the
@@ -62,7 +62,7 @@ declareEndpoint("openai-compatible", {
       // A bare string, or an array of parts when the message carries images.
       // The bridging and the compaction the caller already did are its business,
       // not the protocol's; what is left here is how this wire writes a message.
-      ...wireMessages(input.messages, input.vision, input.assistantAfterToolResult),
+      ...wireMessages(input.messages, input.vision, input.assistantAfterToolResult, input),
     ],
     // Omitted rather than sent with `tool_choice: "none"`, which is what the
     // other protocol already did. Both ways stop the call, but keeping the
@@ -102,7 +102,7 @@ declareEndpoint("openai-compatible", {
 });
 
 /** Tool responses remain contiguous; this protocol accepts images in user turns. */
-function wireMessages(messages: readonly ChatMessage[], vision: boolean, bridge: boolean): Record<string, unknown>[] {
+function wireMessages(messages: readonly ChatMessage[], vision: boolean, bridge: boolean, input: SimpleRequest): Record<string, unknown>[] {
   const result: Record<string, unknown>[] = [];
   let pending: MultimodalContentBlock[] = [];
   const flush = (): void => {
@@ -116,21 +116,28 @@ function wireMessages(messages: readonly ChatMessage[], vision: boolean, bridge:
     if (message.role === "tool" && Array.isArray(message.content)) {
       const images = message.content.filter(block => block.type === "image");
       const text = messageToText(message.content, { placeholderForImages: !vision });
-      result.push({ ...wireMessage(message), content: text || (images.length ? "(see attached image)" : "") });
+      result.push({ ...wireMessage(message, input), content: text || (images.length ? "(see attached image)" : "") });
       if (vision && images.length) pending.push({ type: "text", text: `Image from tool result ${message.tool_call_id ?? "unknown"}:` }, ...images);
-    } else result.push({ ...wireMessage(message), content: wireContent(message.content, vision) });
+    } else result.push({ ...wireMessage(message, input), content: wireContent(message.content, vision) });
   }
   flush();
   return result;
 }
 
-/** Runtime provenance and signed replay belong to their own protocol codecs. */
-function wireMessage(message: ChatMessage): Record<string, unknown> {
+/** Public text uses its declared field; provenance and signed replay stay internal. */
+function wireMessage(message: ChatMessage, input: SimpleRequest): Record<string, unknown> {
+  const field = input.reasoningReplayField;
+  const publicReplay = field && ['reasoning_content', 'reasoning', 'reasoning_text'].includes(field)
+    && message.role === 'assistant' && message.reasoning?.text && !message.reasoning.redacted
+    && message.reasoning.signature === undefined && input.provider && input.replayBinding
+    && message.origin?.provider === input.provider && message.origin.model === input.model
+    && message.origin.replayBinding === input.replayBinding;
   return {
     role: message.role,
     content: message.content,
     ...(message.role === 'assistant' && message.tool_calls ? { tool_calls: message.tool_calls } : {}),
     ...(message.role === 'tool' && message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
+    ...(publicReplay ? { [field]: message.reasoning!.text } : {}),
   };
 }
 

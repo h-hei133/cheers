@@ -911,3 +911,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Compatible requests include origin metadata and a structured reasoning object containing an opaque signature.
 - **Root Cause**: The adapter spreads internal ChatMessage objects into simple and turn bodies. Internal replay data has no automatic meaning in Chat Completions, whose supported public reasoning extensions use their own fields.
 - **Rule**: Explicitly project protocol message fields in the owning adapter, retain tool identity/content and keep internal history unchanged. Verify simple and actual turn bodies separately. Public reasoning replay requires its own declared wire contract; never use an internal object or opaque signature as a substitute.
+
+### Public Reasoning Replay Also Needs Ownership And Input Accounting
+- **Symptom**: A compatible tool trajectory drops required public reasoning, a saved request binding prevents its context preview, or an oversized reasoning replay passes a budget that only counts answer text.
+- **Root Cause**: Receive support does not declare the outbound field; an ownership digest was treated as an opaque payload, and the legacy message estimate does not count reasoning.
+- **Rule**: Declare the public replay field on the exact model/address, bind received text to the original provider/model/request identity, and project only unsigned, non-withheld text. Never encode field names in signatures or synthesize missing reasoning. Preview opacity depends on the actual signature/withheld payload; check the declared replay's actual wire size before sending, including when tools are disabled for the closing request.

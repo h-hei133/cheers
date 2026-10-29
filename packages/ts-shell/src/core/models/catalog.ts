@@ -134,6 +134,8 @@ export interface ModelRequestShape {
   readonly reasoningEffort?: boolean;
   /** True requests visible Responses summaries independently of effort; false omits them. */
   readonly reasoningSummary?: boolean;
+  /** Explicit public-text replay extension at this catalogue address; never a signed payload. */
+  readonly reasoningReplayField?: 'reasoning_content' | 'reasoning' | 'reasoning_text' | false;
   /**
    * Whether a user message may follow tool results directly.
    *

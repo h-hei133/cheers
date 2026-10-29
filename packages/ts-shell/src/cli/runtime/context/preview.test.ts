@@ -1306,6 +1306,45 @@ it('keeps preview and dispatch on the session-affine account-pool member', async
   }
 });
 
+it.each(['reasoning_content', 'reasoning', 'reasoning_text'] as const)(
+  'keeps declared public %s replay identical in preview and dispatch', async field => {
+  const { context, cwd, session, layout, load } = fixture({ credential: true });
+  const config = { ...context.runtimeConfig, maxTurns: 2, allowedTools: ['read'], reserveTokens: 0 };
+  const catalog = context.configuration.current.catalog.map(provider => ({ ...provider,
+    models: provider.models.map(model => ({ ...model, compat: { ...model.compat, reasoningReplayField: field } })) }));
+  Object.assign(context, { runtimeConfig: config, configuration: new ConfigState(config, configurationBinding(context), catalog) });
+  const resolution = context.resolveConfigTarget!(config)!;
+  const target = providerRequestTarget({ workspaceRoot: cwd, sessionId: session.id, resolution,
+    baseUrl: resolution.baseUrl!, endpoint: 'openai-compatible' });
+  const history: SessionMessage[] = [{ role: 'user', content: 'question', timestamp: '2026-10-30T00:00:00Z' },
+    { role: 'assistant', content: 'Inspecting', reasoning: { text: ' Public reasoning ' },
+      origin: { provider: resolution.provider, model: resolution.model!, replayBinding: target.replayBinding },
+      tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'read', arguments: '{}' } }], timestamp: '2026-10-30T00:00:01Z' },
+    { role: 'tool', content: 'Result', tool_call_id: 'call_1', timestamp: '2026-10-30T00:00:02Z' }];
+  session.turns.push(...history);
+  for (const message of history) appendTranscriptEvent(layout.transcriptPath, createMessageTranscriptEvent(message));
+  const files = [layout.metadataPath, layout.statePath, layout.transcriptPath], before = files.map(file => fs.readFileSync(file));
+  const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+  const preview = await load('continue'); preview.verify();
+  const [endpoint, input] = wire.mock.calls.at(-1)!;
+  const body = JSON.parse(JSON.stringify(wire.mock.results.at(-1)!.value));
+  expect(body.messages[2][field]).toBe(' Public reasoning ');
+  expect(preview.estimate.tokens).toBe(estimateWirePrompt(body, endpoints.endpointShape(endpoint).contextFields));
+  let dispatched: Record<string, unknown> | undefined;
+  const step = createStepFunction({ workspaceRoot: cwd, sessionId: session.id, catalog,
+    provider: { provider: resolution.provider, model: input.model, baseUrl: resolution.baseUrl!, endpoint, replayBinding: target.replayBinding },
+    systemPrompt: input.systemPrompt, tools: input.tools, temperature: input.temperature, topP: input.topP,
+    maxOutputTokens: input.maxOutputTokens, thinkingEffort: null,
+    fetchImpl: async (_url, init) => {
+      dispatched = JSON.parse(String(init?.body)); return Response.json({ choices: [{ message: { content: 'Answer' }, finish_reason: 'stop' }] });
+    } });
+  try {
+    expect((await step(input.messages, undefined, {}, { allowTools: input.allowTools })).text).toBe('Answer');
+    expect(dispatched).toEqual(body);
+    expect(files.map(file => fs.readFileSync(file))).toEqual(before);
+  } finally { resetSessionUsage(session.id); preview.dispose?.(); }
+});
+
 it('rejects tool history for a model that cannot call tools before request construction', async () => {
   const { layout, load, session } = fixture({ toolCalling: false });
   const history: SessionMessage[] = [

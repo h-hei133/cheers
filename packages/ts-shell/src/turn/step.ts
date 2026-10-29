@@ -33,6 +33,7 @@ import { resolveRequestShape } from "../core/models/requestShape.js";
 import type { CatalogProvider } from "../core/models/catalog.js";
 import type { PromptSource } from '../context/request/model.js';
 import { requestContext } from '../context/request/projection.js';
+import { estimateWirePrompt } from '../context/request/wire.js';
 import { historyDigest } from '../context/request/identity.js';
 import {
   REFUSAL,
@@ -417,10 +418,18 @@ export function createStepFunction(request: StepRequest): StepFunction {
           systemRole: shape.systemRole,
           reasoningEffort: shape.reasoningEffort,
           reasoningSummary: shape.reasoningSummary,
+          reasoningReplayField: shape.reasoningReplayField,
           maxTokensField: shape.maxTokensField,
           assistantAfterToolResult: shape.assistantAfterToolResult,
           serviceTier: request.provider.serviceTier,
         });
+        // Public replay adds input outside the legacy answer/tool estimate.
+        if (shape.reasoningReplayField) {
+          const replayBudget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
+            inputLimit: modelEntry?.inputLimit, promptTokens: estimateWirePrompt(payload, protocol.contextFields),
+            outputTokens: output ?? shape.maxOutputCeiling, reserveTokens: request.reserveTokens, measured: false });
+          if (!replayBudget.ok && replayBudget.reason !== 'unknown') return stamp(errorStep(`${CONTEXT_OVERFLOW_PREFIX}${replayBudget.detail}`));
+        }
       } catch (error) {
         // The only throw from this call is an undeclared kind, and it names both
         // the kind and the ones that exist. Reported as the reason the step
@@ -620,7 +629,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
         } else if (!options.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
         responseAttempt?.settle(usage);
         const decoded = toStep(completion, watched);
-        const completed = completion.reasoningSignature && protocol.opaqueReplay && origin
+        const ownsReplay = completion.reasoningSignature && protocol.opaqueReplay
+          || shape.reasoningReplayField && completion.reasoning && !completion.reasoningSignature && !completion.reasoningRedacted;
+        const completed = ownsReplay && origin
           ? { ...decoded, origin: { ...origin, replayBinding } } : decoded;
         return stamp(shownAnything && completed.stopReason === "error"
           ? { ...completed, retriesExhausted: true }

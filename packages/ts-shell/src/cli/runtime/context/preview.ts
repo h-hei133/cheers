@@ -146,7 +146,8 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const messages = [...selectModelContext(session.session), openingMessage({ workspaceRoot: cwd,
     workspaceRoots: expected.workspaceRoots, permissionScope, goalObjective: session.goalObjective, continuityContext: session.continuityContextFor(effectivePrompt),
     prompt: promptWithContext(injected.prompt, entries), attachments })];
-  if (messages.some(message => message.origin?.replayBinding || message.reasoning?.signature || message.reasoning?.redacted)) {
+  // Ownership also binds public text; only opaque payloads prevent local measurement.
+  if (messages.some(message => message.reasoning?.signature || message.reasoning?.redacted)) {
     throw new Error('Opaque replay has no complete local token estimate.');
   }
   if (resolution.thinkingEffort === undefined) sources.track(projectStatePath(cwd));
@@ -194,6 +195,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     thinkingLevelName: shape.thinkingLevelName, thinkingBudgetTokens: shape.thinkingBudgetTokens,
     allowEmptySignature: shape.allowEmptySignature, supportsTemperature: shape.supportsTemperature,
     systemRole: shape.systemRole, reasoningEffort: shape.reasoningEffort, reasoningSummary: shape.reasoningSummary,
+    reasoningReplayField: shape.reasoningReplayField,
     maxTokensField: shape.maxTokensField, assistantAfterToolResult: shape.assistantAfterToolResult,
   });
   const endpointId = captureUsageAttribution({ provider: resolution.provider, model: resolution.model, baseUrl: base }).endpointId;

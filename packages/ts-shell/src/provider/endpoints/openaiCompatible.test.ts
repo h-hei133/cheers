@@ -4,6 +4,127 @@ import { resetSessionUsage } from '../../observability/usageTelemetry.js';
 import { createMessageTranscriptEvent, decodeTranscriptLine, transcriptEventToSessionMessage } from '../../session/sessionEventCodec.js';
 import { endpointBody, endpointShape, endpointTurnBody } from './index.js';
 import { toChatMessages } from '../../turn/prompt.js';
+import { requestReplayBinding } from '../request/replay.js';
+import { requestSimpleCompletion } from '../request/completion.js';
+import { resolveRequestShape } from '../../core/models/requestShape.js';
+
+it.each([false, true])('budgets the actual public replay text before sending (declared=%s)', async declared => {
+  const sessionId = `public-replay-budget-${declared}`;
+  const target = { provider: 'fixture', model: 'm', baseUrl: 'https://fixture.invalid/v1', endpoint: 'openai-compatible', headers: {} };
+  let calls = 0;
+  const step = createStepFunction({ provider: target, workspaceRoot: process.cwd(), sessionId, systemPrompt: 'brief',
+    maxOutputTokens: 100, reserveTokens: 0, tools: [], catalog: [{ id: 'fixture', runtime: 'openai', baseUrl: target.baseUrl,
+      models: [{ id: 'm', contextWindow: 10_000, maxTokens: 100,
+        ...(declared ? { compat: { reasoningReplayField: 'reasoning_content' as const } } : {}) }] }],
+    fetchImpl: async () => { calls++; return Response.json({ choices: [{ message: { content: 'Answer' }, finish_reason: 'stop' }] }); } });
+  try {
+    const result = await step([{ role: 'assistant', content: 'Prior answer', reasoning: { text: 'a'.repeat(40_000) },
+      origin: { provider: target.provider, model: target.model, replayBinding: requestReplayBinding(target) } },
+    { role: 'user', content: 'continue' }], undefined, {}, { allowTools: false });
+    if (declared) {
+      expect(result.stopReason).toBe('error'); expect(result.errorMessage).toContain('does not fit'); expect(calls).toBe(0);
+    } else { expect(result.text).toBe('Answer'); expect(calls).toBe(1); }
+  } finally { resetSessionUsage(sessionId); }
+});
+
+it.each(['reasoning_content', 'reasoning', 'reasoning_text'] as const)(
+  'replays declared public %s with exact request ownership in simple and turn bodies', field => {
+    const binding = 'a'.repeat(64);
+    const messages = toChatMessages([{ role: 'assistant', content: 'Inspecting', reasoning: { text: ' Public\nreasoning ' },
+      origin: { provider: 'fixture', model: 'm', replayBinding: binding },
+      tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'read', arguments: '{ "path": "a" }' } }] },
+    { role: 'tool', tool_call_id: 'call_1', content: 'Result' }]);
+    const before = JSON.stringify(messages);
+    const request = { provider: 'fixture', model: 'm', replayBinding: binding, reasoningReplayField: field, messages, systemPrompt: 'brief' };
+    const simple = endpointBody('openai-compatible', request);
+    const turn = endpointTurnBody('openai-compatible', { ...request, tools: [], allowTools: false, vision: false,
+      temperature: 0.2, systemRole: 'system', reasoningEffort: false, maxTokensField: 'max_tokens', assistantAfterToolResult: false });
+    expect(simple.messages).toEqual(turn.messages);
+    expect((turn.messages as Record<string, unknown>[])[1]).toEqual({ role: 'assistant', content: 'Inspecting',
+      [field]: ' Public\nreasoning ', tool_calls: messages[0]?.tool_calls });
+    expect(JSON.stringify(messages)).toBe(before);
+    expect((turn.messages as Record<string, unknown>[])[2]).toEqual({ role: 'tool', tool_call_id: 'call_1', content: 'Result' });
+  });
+
+it.each([
+  'undeclared', 'invalid field', 'different provider', 'different model', 'different binding', 'missing origin',
+  'missing binding', 'signature', 'empty signature', 'redacted', 'empty',
+])('omits incompatible public replay: %s', mismatch => {
+  const binding = 'a'.repeat(64);
+  const message = { role: 'assistant' as const, content: 'Answer', reasoning: { text: 'Public',
+    ...(mismatch === 'signature' ? { signature: 'OPAQUE_FIXTURE' } : {}),
+    ...(mismatch === 'empty signature' ? { signature: '' } : {}),
+    ...(mismatch === 'redacted' ? { redacted: true } : {}), ...(mismatch === 'empty' ? { text: '' } : {}) },
+    ...(mismatch === 'missing origin' ? {} : { origin: { provider: mismatch === 'different provider' ? 'other' : 'fixture',
+      model: mismatch === 'different model' ? 'other' : 'm',
+      ...(mismatch === 'missing binding' ? {} : { replayBinding: mismatch === 'different binding' ? 'b'.repeat(64) : binding }) } }) };
+  const body = endpointBody('openai-compatible', { provider: 'fixture', model: 'm', replayBinding: binding,
+    ...(mismatch === 'undeclared' ? {} : { reasoningReplayField: mismatch === 'invalid field' ? 'signature' as never : 'reasoning_content' }),
+    messages: [message] });
+  expect(body.messages).toEqual([{ role: 'assistant', content: 'Answer' }]);
+  expect(JSON.stringify(body)).not.toContain('OPAQUE_FIXTURE');
+});
+
+it.each(['json', 'sse'] as const)('round-trips public reasoning through transcript into the next %s tool request', async mode => {
+  const sessionId = `public-replay-${mode}`;
+  const target = { provider: 'fixture', model: 'm', baseUrl: 'https://fixture.invalid/v1',
+    endpoint: 'openai-compatible', headers: {} };
+  const catalog = [{ id: 'fixture', runtime: 'openai', baseUrl: target.baseUrl,
+    models: [{ id: 'm', compat: { reasoningReplayField: 'reasoning_content' as const } }] }];
+  const calls = [{ id: 'call_1', type: 'function', function: { name: 'read', arguments: '{ "path": "a" }' } }];
+  const requests: Record<string, unknown>[] = [];
+  const step = createStepFunction({ provider: target, catalog, workspaceRoot: process.cwd(), sessionId, systemPrompt: 'brief',
+    tools: [{ type: 'function', function: { name: 'read', description: 'Read a file', parameters: { type: 'object', properties: { path: { type: 'string' } } } } }],
+    fetchImpl: async (_url, init) => {
+      requests.push(JSON.parse(String(init?.body)));
+      if (mode === 'sse' && requests.length === 1) {
+        const events = [
+          { choices: [{ delta: { reasoning_text: 'Public reasoning' } }] },
+          { choices: [{ delta: { content: 'Inspecting', tool_calls: calls.map(call => ({ ...call, index: 0 })) }, finish_reason: 'tool_calls' }] },
+        ];
+        return new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('') + 'data: [DONE]\n\n',
+          { headers: { 'content-type': 'text/event-stream' } });
+      }
+      return Response.json({ choices: [{ message: requests.length === 1
+        ? { content: 'Inspecting', reasoning_text: 'Public reasoning', tool_calls: calls }
+        : { content: 'Answer' }, finish_reason: requests.length === 1 ? 'tool_calls' : 'stop' }] });
+    } });
+  try {
+    const first = await step([{ role: 'user', content: 'question' }], undefined, {}, { allowTools: true });
+    expect(first.origin?.replayBinding).toBe(requestReplayBinding(target));
+    expect(first.reasoning).toEqual({ text: 'Public reasoning' });
+    const restored = transcriptEventToSessionMessage(decodeTranscriptLine(JSON.stringify(createMessageTranscriptEvent({
+      role: 'assistant', content: first.text, reasoning: first.reasoning, origin: first.origin, tool_calls: calls,
+      timestamp: '2026-10-30T00:00:00Z',
+    }))))!;
+    const history = toChatMessages([{ role: 'user', content: 'question' }, restored,
+      { role: 'tool', tool_call_id: 'call_1', content: 'Result' }]);
+    expect((await step(history, undefined, {}, { allowTools: true })).text).toBe('Answer');
+    expect((requests[1]?.messages as Record<string, unknown>[])[2]).toEqual({ role: 'assistant', content: 'Inspecting',
+      tool_calls: calls, reasoning_content: 'Public reasoning' });
+    expect(requests[1]?.tools).toHaveLength(1);
+    expect(JSON.stringify(requests[1])).not.toContain('replayBinding');
+    const closingBody = endpointTurnBody(target.endpoint, { provider: target.provider, model: target.model,
+      replayBinding: first.origin?.replayBinding, reasoningReplayField: 'reasoning_content', messages: history,
+      systemPrompt: 'brief', tools: [], allowTools: false, vision: false, temperature: 0.2,
+      systemRole: 'system', reasoningEffort: false, maxTokensField: 'max_tokens', assistantAfterToolResult: false });
+    expect((closingBody.messages as Record<string, unknown>[])[2]?.reasoning_content).toBe('Public reasoning');
+    expect(closingBody.tools).toBeUndefined();
+    let simpleBody: Record<string, unknown> | undefined;
+    expect(await requestSimpleCompletion({ provider: { ...target, providerId: target.provider, fetchImpl: async (_url, init) => {
+      simpleBody = JSON.parse(String(init?.body)); return Response.json({ choices: [{ message: { content: 'Summary' } }] });
+    } }, shape: resolveRequestShape(catalog, target.provider, target.model, undefined, target.baseUrl), messages: history })).toBe('Summary');
+    expect((simpleBody?.messages as Record<string, unknown>[])[1]).toEqual((requests[1]?.messages as Record<string, unknown>[])[2]);
+    const changed = createStepFunction({ provider: { ...target, headers: { Authorization: 'Bearer synthetic-rotated' } },
+      catalog, workspaceRoot: process.cwd(), sessionId, systemPrompt: 'brief', tools: [],
+      fetchImpl: async (_url, init) => {
+        const messages = JSON.parse(String(init?.body)).messages;
+        expect(messages[2]).toEqual({ role: 'assistant', content: 'Inspecting', tool_calls: calls });
+        return Response.json({ choices: [{ message: { content: 'Changed target' }, finish_reason: 'stop' }] });
+      } });
+    expect((await changed(history, undefined, {}, { allowTools: false })).text).toBe('Changed target');
+  } finally { resetSessionUsage(sessionId); }
+});
 
 it.each(['reasoning_content', 'reasoning', 'reasoning_text'] as const)(
   'retains and displays JSON %s when a compatible host ignores streaming', async field => {

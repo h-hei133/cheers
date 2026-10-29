@@ -20,7 +20,7 @@
  * which one is running.
  */
 
-import type { CatalogModel, CatalogProvider, ThinkingLevel } from "./catalog.js";
+import type { CatalogModel, CatalogProvider, ModelRequestShape, ThinkingLevel } from "./catalog.js";
 import { THINKING_LEVELS, catalogBaseUrl, catalogModel, catalogProvider, providerEndpoint } from "./catalog.js";
 import { summaryProtocol } from './protocol.js';
 
@@ -42,6 +42,8 @@ export interface ResolvedRequestShape {
   readonly reasoningEffort: boolean;
   /** Declared visible-summary support, independent of a selected reasoning effort. */
   readonly reasoningSummary?: boolean;
+  /** Exact compatible protocol field for public reasoning replay; absent disables it. */
+  readonly reasoningReplayField?: Exclude<ModelRequestShape['reasoningReplayField'], false>;
   /**
    * Whether the model accepts tool declarations and prior tool-call history.
    *
@@ -164,6 +166,14 @@ export function resolveRequestShape(
   const owner = catalogProvider(catalog, provider, baseUrl).entry;
   const reasoningSummary = entry.reasoning === false || compat.reasoningSummary === false ? false
     : compat.reasoningSummary === true && summaryProtocol(owner, catalogBaseUrl(catalog, provider, baseUrl), wire) ? true : undefined;
+  const address = catalogBaseUrl(catalog, provider, baseUrl);
+  const reasoningReplayField = provider && address && owner?.baseUrl
+    && owner.baseUrl.replace(/\/+$/, '') === address.replace(/\/+$/, '')
+    && owner.models.some(candidate => candidate === entry)
+    && (wire === undefined || wire === 'openai-compatible' || wire === 'copilot-chat-completions')
+    && typeof compat.reasoningReplayField === 'string'
+    && ['reasoning_content', 'reasoning', 'reasoning_text'].includes(compat.reasoningReplayField)
+    ? compat.reasoningReplayField : undefined;
 
   return {
     systemRole: compat.systemRole ?? DEFAULT_REQUEST_SHAPE.systemRole,
@@ -171,6 +181,7 @@ export function resolveRequestShape(
     ...(entry.maxTokens !== undefined ? { maxOutputCeiling: entry.maxTokens } : {}),
     reasoningEffort,
     ...(reasoningSummary !== undefined ? { reasoningSummary } : {}),
+    ...(reasoningReplayField !== undefined ? { reasoningReplayField } : {}),
     toolCalling: entry.toolCalling !== false,
     assistantAfterToolResult: compat.assistantAfterToolResult === true,
     allowEmptySignature: compat.allowEmptySignature === true,

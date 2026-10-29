@@ -10174,3 +10174,15 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 继续[addition20.22](features/phase-20-addition.md#2022-兼容请求的消息协议字段投影)：实际compatible simple/turn body带内部origin及含opaque signature的结构化reasoning。adapter新增一个wireMessage复用，显式role/content/适用tool_calls/tool_call_id；不修改history、原media/vision/bridge流程或各native codec。官方schema与参考显式assistant构造已对照，公开reasoning_content工具回传仍需单独声明，未将内部对象当其合同。
 
 五相关文件232项去重串行通过，三新用例旧投影失败；simple/turn反转1/2失败，逐字节恢复后endpoint17重验。五静态门/diff、AST endpoint11、TS build与新鲜度通过：build `1f8dd8687959d0e09d5384bdf44587edb7ba7c9a6c32a8b98f80dccfccc4bc42`、inputs `a4de0160771458ad4fdce374cd17540dd6e6b744a82653ed115b11954de5d4a7`，460/3547一致。局部投影未重跑结构NormProof；初诊断从package index取未export函数失败，改为manifest build模块后取证。HANDOFF记内部message/wire边界，scratch清理；无live/真实账户/终端、PTY/exe/full suite/20k，原47项不升级、ADD active，Git/精确CI另绑定。
+
+该投影已提交推送`74f8bd2e852229eb645e7156a4b3814d517de49a`，远端main精确相同、仅原CLAUDE.md。[Watch40940297634](https://github.com/h-hei133/cheers/actions/runs/40940297634)success，[CI40940297696](https://github.com/h-hei133/cheers/actions/runs/40940297696)延后仍in_progress。
+
+## [2026-10-30] fix | 声明公开reasoning回传与实际输入预算
+
+继续[addition20.23](features/phase-20-addition.md#2023-兼容协议公开reasoning的声明回传与输入预算)，目录compat显式声明三种公开字段或false，原shape要求exact model/address owner，未知/匿名/歧义/其他协议不准入；refresh保留审阅、user显式修改可撤销。已收到公开unsigned正文通过原origin/requestBinding存储，simple/turn codec只按同provider/model/binding回传，不把signature改成字段名、不补造缺失正文、不猜型号或自动启用内置模型。参考显式assistant/compat字段决定已对照。
+
+新增preview回归暴露binding误归opaque，改按真实signature/withheld检查并贯通同shape；原opaque拒估算保留。旧budget漏计reasoning，声明回传时按实际wire body复核input/window/output/reserve，超限fetch前拒绝。六显式文件302项去重串行通过，含JSON/SSE→transcript→下一次tool、三field preview/dispatch、凭据旋转、closing无tools及40k public正文的边界。七类反转5/7/2/2/2/3/1失败、每次finally逐字节恢复；字段白名单实际额外命中false撤销，分类后重验。误从root重验发现三份旧scratch副本，重复140不计，随后package-local endpoint35重验通过。
+
+五静态门/diff、完整声明图单一用例和AST ceiling通过：catalog8/shape2/kinds8/adapter11/step17/preview8。build `e74f7ef6c2424f9299efb0da32479172a2e4ed2f60a91c45aa2c3a0979ffdd66`，inputs `b1babcf0d168f24306850df37e50a9bb44a9112d038466e491544e5b3a63e4f6`，460/3547新鲜度一致；NormProof proven/0open/0failed/0gap仅collector。HANDOFF/index更新，task scratch清理；无live、真实账户/终端、PTY/exe/full suite/20k，原47项不升级、ADD active，Git/精确新CI另绑定。
+
+延后精确读回[6ff4508 CI40937374700](https://github.com/h-hei133/cheers/actions/runs/40937374700)、[be01f03 CI40939033259](https://github.com/h-hei133/cheers/actions/runs/40939033259)均completed/success。退出[ebf333b CI40936451972](https://github.com/h-hei133/cheers/actions/runs/40936451972)completed/failure，停scripts gate、未build/产品测试；job/check-run `123668145319` annotation为hosted runner lost communication，failed log为空，归类runner通信失败且保留failure，不修改为绿色或产品断言失败。
