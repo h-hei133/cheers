@@ -58,8 +58,12 @@ export function createTeamToolDefinition(): ToolDefinition {
       if (!context.runSubagent) return deniedResult('Error: no model is available to this session, so the team was not started.');
 
       const shared = typeof args.context === 'string' && args.context.trim() ? args.context.trim() : undefined;
+      // The name is fixed, not derived from the role: it is what a `task` deny
+      // rule matches against, and the role is text the model chose. A name built
+      // from it would let a crafted perspective dodge a rule meant to stop
+      // delegation, or trip one meant for something else.
       const definition = (role: string): SubagentDefinition => ({
-        name: `team-${role}`,
+        name: 'team-proposer',
         description: `Competing-hypothesis proposer (${role})`,
         systemPrompt: `You are one of several independent agents answering the same question. Your angle: ${role}. `
           + 'State the single strongest explanation you can defend. Do not survey alternatives; another agent is covering those.',

@@ -100,6 +100,23 @@ describe("starting a team pass", () => {
     expect(result.output).toContain('Limitation:');
   });
 
+  it("gives every proposer a fixed name, whatever the perspective says", async () => {
+    // The definition name is what a task deny rule matches against. Building it
+    // from the perspective — text the model chose — would let a crafted role
+    // dodge a rule meant to stop delegation.
+    const names: string[] = [];
+    const runSubagent = vi.fn(async (input: { definition: { name: string } }) => {
+      names.push(input.definition.name);
+      return { text: "a claim", failed: false };
+    });
+    await createTeamToolDefinition().execute(
+      { question: "why?", perspectives: ["task", "review"] },
+      context({ runSubagent } as unknown as Partial<ToolExecutionContext>),
+    );
+
+    expect(new Set(names)).toEqual(new Set(["team-proposer"]));
+  });
+
   it("does not hand the runner an admission that always allows", async () => {
     // The host's runner already carries the session gate. Supplying a
     // predicate that answers "allowed" unconditionally would replace it with a

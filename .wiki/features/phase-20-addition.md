@@ -2819,3 +2819,9 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 `taskWait` 先 `get(id)` 判断是否已结束，再注册 `onEnded`。任务若在这两步之间结束，`onEnded` 只报告注册之后发生的事，监听永远等不到——只能靠 300 秒超时兜底，对一个早已完成的命令白等五分钟。
 
 现注册监听后立刻复查一次状态。验证：`backgroundTools.test.ts` 增至 11 项，新增"任务在监听安装前已结束"，夹具让第一次 `get` 返回 running、第二次返回 exited。反转去掉复查后该用例**挂起 300 秒被终止**，正是缺陷本身；源码逐字节恢复并核对 SHA-256 `41257b792f7c` 后重验；静态门、module facade 0 与 TS build 通过。
+
+### 第一百三十九批：`team` 的定义名不得由模型文本拼成
+
+`team` 初版用 `team-${role}` 作为子代理定义名，role 来自工具参数——模型选的文本。而 `delegationTools` 用这个名去匹配 `task` 的 deny 规则（`matchDenyRule(denyRules, 'task', name)`）。结果是一个精心构造的 perspective 可以绕开本应阻止委派的规则，或误触发为别的东西设的规则。
+
+现定义名固定为 `team-proposer`，role 只进 `systemPrompt`。验证：`teamTool.test.ts` 增至 14 项，新增"无论 perspective 是什么，每个提案者都拿到固定名字"；反转改回动态拼接后该项预期失败（收到 `team-task`、`team-review` 等）；源码逐字节恢复并核对 SHA-256 `cfa77ddbdfbe` 后重验；静态门、module facade 0 与 TS build `e056eeb81597` 通过。
