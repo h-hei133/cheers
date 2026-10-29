@@ -10196,3 +10196,13 @@ advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢�
 只修测试：实际事件同步、关闭前合法current但无saved row、记录发布count，drain后count/bytes不增加且handles/directory全关、detail退休、重开正常。生产取消/目录逻辑不变。package-local三个显式文件88项串行通过：session73/lifetime5/listing10；首次不存在browser.test只选择两实际文件15项，不计三文件证据。五静态门/diff与build通过，HANDOFF记观察边界，test-only不重复结构NormProof；无scratch、live/PTY/exe/full suite/20k，原47与ADD active，Git/新精确CI另绑定。
 
 最终build `7684ef96c4fd009560fa22231aed9e72aec1e6d4e406d90f8deee72e9cb18f82`，inputs `48721bbe95e106f8056d0734a245299c0145a87a9bf6c4a55d57e79b046e21d5`，460 compilerInputs/3547文件重新计算一致。
+
+该测试修复已提交推送`53bbd335b2ae8169a527db4842866fbe29eda4e0`，远端main精确一致、仅原CLAUDE.md。[Watch40945194797](https://github.com/h-hei133/cheers/actions/runs/40945194797)success，[CI40945194907](https://github.com/h-hei133/cheers/actions/runs/40945194907)延后仍in_progress；3388b01的CI40944127824亦仍运行，未计通过。
+
+## [2026-10-30] fix | 聚合SSE先显示thinking再显示答案
+
+继续[addition20.25](features/phase-20-addition.md#2025-聚合sse-delta中的thinking与答案顺序)：compatible reader同delta先content后reasoning，使实际step→TurnSink先建assistant、后建thinking未结束，继续答案复用assistant且activity错误回thinking。定向参考两实现均按thinking先于content，采用原reader移动提取顺序，未新增sink状态机；三字段共六项reader/真实Response→step→TUI新回归在原顺序失败，原69通过。
+
+夹具显示顺序从newest-first recent改用all，产品transcript不变。四显式文件221项聚焦通过，旧顺序反转六项全部失败、finally逐字节恢复后221再通过；AST completion15、五静态门/diff通过。TS build `ef6f1547fe429bf19ec53d5567aa542656102bde0496febbd3f5b08fbfc3f46d`、inputs `9939c7116176b085eda0e703cc87a15b454bd0e0b2b0d45693921e5ee86b64c9`，460/3547最终新鲜度一致。构建仍有session_id时误启动测试导致一次短暂重叠，两者最终exit0、未观察OOM，保留执行失误，不称整批严格串行；新鲜度单独执行，后续以exit_code为重检查互斥边界。
+
+局部顺序修复不重复结构NormProof，HANDOFF补聚合delta与recent/all规则，task scratch清理；无live relay/provider、真实终端、PTY/exe/full suite或20k会话，原47项不升级、ADD active，Git/精确CI另绑定。

@@ -7,6 +7,35 @@ import { toChatMessages } from '../../turn/prompt.js';
 import { requestReplayBinding } from '../request/replay.js';
 import { requestSimpleCompletion } from '../request/completion.js';
 import { resolveRequestShape } from '../../core/models/requestShape.js';
+import { TurnSink } from '../../cli/interactive/turnSink.js';
+import { Transcript } from '../../presentation/tui/transcript/container.js';
+
+it.each(['reasoning_content', 'reasoning', 'reasoning_text'] as const)(
+  'settles %s before the answer in the actual aggregated SSE-to-TUI path', async field => {
+    const sessionId = `aggregated-thinking-${field}`;
+    const transcript = new Transcript();
+    let clock = 0;
+    const sink = new TurnSink(transcript, () => {}, () => clock += 100);
+    sink.begin('turn', 'turn');
+    const events = [
+      { choices: [{ delta: { [field]: 'Public reasoning', content: 'Answer' } }] },
+      { choices: [{ delta: { content: ' continues' }, finish_reason: 'stop' }] },
+    ].map(event => `data: ${JSON.stringify(event)}\n\n`).join('') + 'data: [DONE]\n\n';
+    const step = createStepFunction({ provider: { provider: 'fixture', model: 'm', baseUrl: 'https://fixture.invalid/v1',
+      endpoint: 'openai-compatible', headers: {} }, workspaceRoot: process.cwd(), sessionId, systemPrompt: 'brief', tools: [],
+      fetchImpl: async () => new Response(events, { headers: { 'content-type': 'text/event-stream' } }) });
+    try {
+      const result = await step([{ role: 'user', content: 'question' }], undefined,
+        { onReasoning: delta => sink.handleEvent({ type: 'reasoning.delta', role: 'coder', delta }),
+          onText: delta => sink.handleEvent({ type: 'message.delta', role: 'coder', delta }) }, { allowTools: false });
+      expect(result).toMatchObject({ text: 'Answer continues', reasoning: { text: 'Public reasoning' }, stopReason: 'stop' });
+      expect(transcript.all().map(block => ({ kind: block.kind, text: block.text, finalized: block.finalized }))).toEqual([
+        { kind: 'thinking', text: 'Public reasoning', finalized: true },
+        { kind: 'assistant', text: 'Answer continues', finalized: false },
+      ]);
+      expect(sink.activity()?.label).toBe('working');
+    } finally { sink.end(); resetSessionUsage(sessionId); }
+  });
 
 it.each([false, true])('budgets the actual public replay text before sending (declared=%s)', async declared => {
   const sessionId = `public-replay-budget-${declared}`;

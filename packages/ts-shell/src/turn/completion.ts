@@ -341,19 +341,18 @@ function absorb(
   }
 
   const fragments: StreamFragment[] = [];
+  // Aggregating proxies can put both channels in one delta; reasoning precedes the answer.
+  const thinking = readReasoningText(delta);
+  if (thinking) {
+    state.reasoning += thinking;
+    fragments.push({ kind: "reasoning", text: thinking });
+  }
   if (typeof delta.content === "string" && delta.content.length > 0) {
     const text = visibleText(state, delta.content);
     if (text) {
       state.content += text;
       fragments.push({ kind: "text", text });
     }
-  }
-  // A reasoning model can put its entire visible output here and leave
-  // `content` empty. Dropping it meant the turn produced nothing at all.
-  const thinking = readReasoningText(delta);
-  if (thinking) {
-    state.reasoning += thinking;
-    fragments.push({ kind: "reasoning", text: thinking });
   }
   // The content is complete, but a host that reports usage in its own event
   // sends that event after this one, so the caller may still read a little more.

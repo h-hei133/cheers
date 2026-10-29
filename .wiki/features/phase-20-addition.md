@@ -3440,3 +3440,15 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 测试现在由真实open事件确认三个文件句柄待处理，由订阅事件确认current进度且未发布saved rows，close前记录发布数；drain后要求次数不增加、bytes不增加、handles/directory全部关闭、旧detail为空，重开继续完整分页。原production cancellation、目录预算和返回链未修改，不依赖延长timeout或轮询迟早命中来稳定夹具。真实事件同步+旧zero断言的反转一失败，修正后所属package三个显式文件88项串行通过：session73/lifetime5/listing10。首次验证传入不存在browser.test路径时Vitest只选择另两个实际文件15项，未据此称三文件通过，随后用真实session.test完成88项。
 
 五静态门/diff与1536MiB串行build通过，最终build与460/3547新鲜度由日志精确绑定；test-only未重跑结构NormProof。HANDOFF新增关闭前/后发布边界；无新scratch、live provider/PTY/exe、全仓或20k会话，原47项不升级、ADD active。新的Git/CI另绑定，旧runner与测试失败不改成绿色。
+
+本批测试修复已提交推送`53bbd335b2ae8169a527db4842866fbe29eda4e0`，远端main精确一致，仅原CLAUDE.md。[Watch40945194797](https://github.com/h-hei133/cheers/actions/runs/40945194797)completed/success，[CI40945194907](https://github.com/h-hei133/cheers/actions/runs/40945194907)延后读回仍in_progress；20.23的CI40944127824同样仍在运行，不计通过。
+
+### 20.25 聚合SSE delta中的thinking与答案顺序
+
+反馈25沿实际stream→step→TurnSink继续验证。[completion reader](../../packages/ts-shell/src/turn/completion.ts)在同一个delta含公开reasoning与content时先发答案，再发thinking；代理聚合两通道会让assistant先建块，后建thinking仍live，后续答案复用assistant而不结束thinking，activity回到thinking。不是字段提取或effort缺口。三个公开字段的reader与真实Response→createStepFunction→TurnSink共六项新增回归在原顺序下失败，原69项通过。
+
+目标检查后定向读取pi packages/ai/src/api/openai-completions.ts:578–640，其注释明确代理聚合场景，先处理reasoning再处理content；oh-my-pi packages/ai/src/providers/openai-completions.ts:1457–1515同样thinking在前。本批采用这一顺序，在原reader仅移动现有公开reasoning提取/fragment发送到content之前，不新增sink状态机或协议转换；字段优先级、tool累积、terminal/usage和marker合同保持原逻辑。
+
+新增reader检查三字段的fragment顺序与最终正文，实际请求回归检查thinking先于assistant、thinking已finalized、继续答案仍在同一assistant与activity working。初版TUI夹具误用Transcript.recent比较显示顺序；recent是最新在前，改用all读取实际显示顺序，未调整产品transcript语义。主代理所属package四个显式文件221项通过：completion37/endpoint38/step96/turnSink50。反转恢复content-before-reasoning后六项新回归全部失败，其余未选项不计新通过；finally逐字节恢复后221项再通过。AST completion15；五静态门/diff、1536MiB TS build与最终新鲜度核验通过：build `ef6f1547fe429bf19ec53d5567aa542656102bde0496febbd3f5b08fbfc3f46d`，inputs `9939c7116176b085eda0e703cc87a15b454bd0e0b2b0d45693921e5ee86b64c9`，460 compilerInputs/3547文件重算一致。
+
+本轮验证存在一次执行纪律失误：构建仍返回session_id时误启动了测试，短暂重叠，之后分别确认exit_code=0且新鲜度单独完成；未观察到OOM，但不能将本轮整体称为严格串行。后续以exit_code确认为启动下一项重检查的边界。局部顺序修复不重复结构NormProof；HANDOFF记录聚合delta与recent/all陷阱，任务scratch清理。无live relay/provider、真实终端、PTY/exe/full suite或20k会话，原47项不升级、反馈25与ADD仍partial/active；新Git/精确CI另绑定。

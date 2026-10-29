@@ -921,3 +921,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A close-during-acquisition test passes locally but CI reports one published current-session row.
 - **Root Cause**: The catalogue legally publishes its current-session progress while other file reads wait. Polling an active-handle count can race that publication, and a final all-time zero-publish assertion also rejects events before close.
 - **Rule**: Synchronize on actual acquisition and initial publication, record the publication count immediately before closing, then require no increase after draining. Keep the zero additional bytes, closed handles/directory and retired details checks; do not suppress legitimate live progress to stabilize a cancellation fixture.
+
+### Aggregated Reasoning Must Precede Its Answer Delta
+- **Symptom**: A proxy returns reasoning and answer text in one SSE delta; the thinking row stays live and activity returns to thinking while the answer continues.
+- **Root Cause**: The reader emits answer text first, so the sink opens its assistant block before the thinking block exists. Later answer deltas reuse that block and do not settle the newly created thinking row.
+- **Rule**: Emit the selected public reasoning fragment before content within each combined delta. Verify reader order and the actual step-to-sink block order/finalization together; `Transcript.recent` is newest first, while `all` is display order.

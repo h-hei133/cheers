@@ -36,6 +36,23 @@ async function collect(stream: ReadableStream<Uint8Array>): Promise<{
 }
 
 describe("reading a streamed completion", () => {
+  it.each(['reasoning_content', 'reasoning', 'reasoning_text'] as const)(
+    'yields public %s before answer text when a proxy aggregates them in one delta', async field => {
+      const fragments: unknown[] = [];
+      const iterator = readCompletionStream(streamOf(chunk({ content: 'Answer', [field]: 'Public reasoning' },
+        { finish_reason: 'stop' }), 'data: [DONE]\n\n'));
+      for (;;) {
+        const item = await iterator.next();
+        if (item.done) {
+          expect(item.value.message.content).toBe('Answer');
+          expect(item.value.reasoning).toBe('Public reasoning');
+          break;
+        }
+        fragments.push(item.value);
+      }
+      expect(fragments).toEqual([{ kind: 'reasoning', text: 'Public reasoning' }, { kind: 'text', text: 'Answer' }]);
+    });
+
   it("yields each fragment as it arrives and assembles the whole", async () => {
     const { deltas, result } = await collect(
       streamOf(chunk({ content: "Hel" }), chunk({ content: "lo" }), "data: [DONE]\n\n"),
