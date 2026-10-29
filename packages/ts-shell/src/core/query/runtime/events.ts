@@ -113,3 +113,24 @@ export type QueryEvent =
   | { readonly type: 'lifecycle.error'; readonly error: string }
   | { readonly type: 'query.completed'; readonly result: OrchestrationResult }
   | { readonly type: 'query.failed'; readonly error: string; readonly admissionFailure?: import('../../agent/request/model.js').ModelAdmissionError['code'] }
+
+/**
+ * Whether this event belongs in the durable transcript.
+ *
+ * Streaming increments do not. A delta is a fragment of an answer whose whole
+ * form is already recorded — the assistant message itself is written by the
+ * message barrier — so persisting it adds nothing a reader can use: replay
+ * rebuilds history from `message` events, recovery reads lifecycle and terminal
+ * events, and export reads `message` events. Keeping them out is not an
+ * optimization detail: every persisted event costs a full transcript read, a
+ * state snapshot write and a file lock, and there are thousands of deltas in one
+ * answer.
+ *
+ * `message.replace` is excluded for the same reason: it corrects what is on
+ * screen, and the corrected text is what the assistant message already holds.
+ */
+export function isDurableQueryEvent(event: QueryEvent): boolean {
+  return event.type !== 'message.delta'
+    && event.type !== 'reasoning.delta'
+    && event.type !== 'message.replace'
+}

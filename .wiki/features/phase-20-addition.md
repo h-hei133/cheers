@@ -2465,3 +2465,45 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 - 本仓库 `AGENTS.md` 的"参考仓库只读"规则保持不变；排查时必须区分"模型自己不愿写"与"工具拒绝写"。
 
 **证据边界**：本轮只做源码定位与参考对比，未修改写路径；任何放开都必须有"未批准仍拒绝"和"批准后可写、且写入目标与批准目标一致"的聚焦反转证据。
+
+## 18. 第七轮实施记录（2026-10-29）
+
+### 第一百一十七批：长文本块按光标展开
+
+`PasteStore.expandOnRepeat` 的时间窗手势（同文本 + 1200ms）已被 `expansionAt(draft, caret)` 取代：粘贴事件到达时，若光标位于本会话签发且仍持有原文的占位符**内部**，则就地展开该块，粘贴文本被丢弃——用户指的是这个 token，不是在提供新内容。范围是半开区间：插入占位符后光标正好停在末尾，把那个位置也算"在块上"会让下一次无关粘贴吞掉剪贴板。
+
+`interactiveMode.ts` 的 onPaste 改用 `editor.replace` 走真实编辑，因此 Ctrl+Z 可撤销且光标落在展开文本末尾。手势目录（`chrome/keys.ts` 的 `PASTE_GESTURE`）、重绑定表与 `keybindings.md` 同步更新。
+
+验证：`pastes.test.ts` 35 项、宿主级 3 项（regular/fullscreen 真实 bracketed paste）、`keyGuide/keybindings/editor/keymap` 203 项通过。三组反转各触发预期失败：块选择改为"首个匹配"（1 项）、去掉 `issued` 校验（1 项）、把末尾边界也算作块内（2 项，含宿主级）。源码逐字节恢复并核对 SHA-256 `2f22c25b5d80` 后重验。提交 `90c0cd27` 已推送。
+
+### 第一百一十八批：流式卡顿的五个根因
+
+用户报告"对话时界面卡顿、thought 数字停住、整段输出突然出现、整轮结束前无法交互"。只读分析定位到五个可独立验证的机制，全部修复：
+
+**根因一（决定性）：每个 token 都在 UI 通知之前走完整持久化。** `core/shell/sessionRuntime.ts` 的事件循环先调 `appendQueryEvent` 再通知观察者；`session/agent/persistence.ts:22-41` 对每个事件读取整份 state、**读取并逐行解析整份 transcript**（`transcript/read.ts:36`）、`appendFileSync` 后回读校验（`sessionTranscript.ts:135-155`）、再取文件锁（`sessionFileStore.ts:119-163`，重试时 `Atomics.wait` **同步阻塞主线程**）、最后 `fsync` + `rename` 写回 state。代价是 O(n²)：本机真实会话 `transcript.jsonl` 为 1.9 MiB / 12116 行，其中 3728 行是 `message.delta`。
+
+修复：新增 `isDurableQueryEvent`（`core/query/runtime/events.ts`），`message.delta`/`reasoning.delta`/`message.replace` 不再落盘；事件循环改为**先通知观察者、再持久化**。重放、恢复与导出都不读取这三类事件（`session/replay/builder.ts:450-458` 与 `session/export/collect.ts:35` 只读 `message`），最终助手消息仍由既有的 `createMessageTranscriptEvent` 写入，因此恢复能力不变。
+
+**根因二：`sourceLinesFor` 每帧对每个已 finalize 块重跑 Markdown/diff 布局。** `container.ts` 只缓存了 `rowsFor` 的行，sources 层完全无缓存；一帧 30 次、每次遍历整段历史。
+
+修复：sources 与 rows 共用同一 `CacheEntry`，按 width/revision/imageProtocol 命中，并以 `blockIndex` 保证编号正确。
+
+**根因三：渲染定时器不取消也不合并。** `engine.ts` 的 `requestRender` 只在同一 tick 内用 `renderQueued` 合并；跨 tick 的请求会排第二个 frame timer 而不取消第一个，两个都触发，各自组装整屏——延迟因此完全失去节流作用。
+
+修复：新增 `scheduleFrame`，永远只保留一个待执行 timer。
+
+**根因四：thought 秒数不是时钟驱动的。** `elapsedMs` 只在收到 reasoning delta 时写入；模型静默思考期间数字定格。而 activity 行的 spinner 由 100ms tick 驱动，两者表现不一致。
+
+修复：`TurnSink.think()` 接受空文本作为 tick，`interactiveMode` 的 100ms 定时器调用它；同一十分之一秒内不重算，避免无谓地丢弃缓存行。
+
+**根因五：每帧两次同步扫盘。** `readAmbientFacts` 在 `renderChrome` 与 `facts` 里各调一次，每次都 `scanAllReachableAgents()`——递归遍历子代理目录并读取每个定义文件。
+
+修复：peer 计数按 session 做 1 秒 TTL 缓存。
+
+验证：新增 `core/query/runtime/events.test.ts`（8 项，锁定三类流式事件不落盘、其余落盘）；`sessionRuntime.test.ts` 新增"观察者先于持久化"的顺序断言并更新既有的 `observed === recorded` 契约；`container.test.ts` 新增 sources 复用断言；`engine.test.ts` 新增跨 tick 单帧断言；`turnSink.test.ts` 新增思考时钟断言；`ambientFacts.test.ts` 新增扫盘次数断言。
+
+五组反转全部有效触发预期失败：谓词恒真（4 项）、持久化移到观察者之前（1 项）、去掉 sources 缓存（1 项）、去掉 timer 取消（1 项，经两次修正测试才真正命中）、禁用思考 tick（1 项）、去掉 peer TTL（1 项）。全部源码逐字节恢复并核对 SHA-256（`92116e693c6d` sessionRuntime / `df8e9c309656` events / `012bb1d0ae63` container / `d4c6510f49b0` engine / `1857d8bfd4a2` turnSink / `32a7b171025b` ambientFacts）。
+
+主代理以 heap1024MiB 单线程串行执行 62 个文件 868 项通过；五静态门、module facade 0（`turnSink` 一度因新增方法越过 20 上限，已通过合并回 `think()` 恢复为 0）及 heap1536MiB TS build `7d5eb8528248` 通过，118 条既有 docs-source advisory 保留。
+
+**证据边界**：以上是源码链路与本机真实会话文件的量化，加上确定性夹具；**未**在真实终端测量阻塞时长，也未验证真实 provider 下的体感改善。原始卡顿是否还有其它成因（例如 provider 侧缓冲、终端仿真器性能）不在本批证据内。

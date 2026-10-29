@@ -81,6 +81,21 @@ describe("re-rendering", () => {
 
     expect(transcript.last()?.finalized).toBe(true);
   });
+
+  it("keeps a finished block's source lines instead of re-deriving them every frame", () => {
+    // Deriving them re-runs the Markdown layout per block per frame, which on a
+    // long conversation is the cost that makes streaming look stalled.
+    const transcript = new Transcript();
+    transcript.append({ kind: "assistant", text: "first answer", finalized: true });
+    transcript.finalizeAll();
+
+    const first = transcript.render(80);
+    const second = transcript.render(80);
+
+    expect(second.sources).toEqual(first.sources);
+    // Same objects, not merely equal ones: a rebuild would allocate new lines.
+    expect(second.sources[0]).toBe(first.sources[0]);
+  });
 });
 
 describe("the newest blocks", () => {

@@ -1001,7 +1001,13 @@ export class InteractiveMode {
     // The elapsed time is computed at paint time, and paints are driven by events.
     // Between two events there are none, so without a clock of its own the timer
     // sits at whatever it read when the turn began.
-    this.tick ??= setInterval(() => this.tui.requestRender(), ACTIVITY_TICK_MS);
+    this.tick ??= setInterval(() => {
+      // The reasoning row carries its own clock, and it only moves when asked:
+      // a long silent stretch between two deltas is exactly when the user is
+      // waiting for it, so the tick advances it as well as repainting.
+      this.sink.think();
+      this.tui.requestRender();
+    }, ACTIVITY_TICK_MS);
     this.tick.unref?.();
     let exiting = false;
     let retrying: string | undefined;

@@ -186,8 +186,8 @@ export class TurnSink implements RendererSink {
    * a turn that produced only reasoning should not look like a turn that produced
    * nothing, and reasoning that runs longer than the answer should not bury it.
    */
-  think(text: string): void {
-    if (!text) return;
+  think(text = ""): void {
+    if (!text && !this.thinking) return;
     if (!this.thinking) {
       this.thinkingStartedAt = this.now();
       this.thinking = this.transcript.append({
@@ -198,8 +198,16 @@ export class TurnSink implements RendererSink {
       });
       this.label = "thinking";
     }
-    this.thinking.elapsedMs = this.now() - this.thinkingStartedAt;
-    this.transcript.setText(this.thinking, this.thinking.text + text);
+    // A reasoning stream is not continuous: the model can work silently for a
+    // long time between two deltas. Advancing the clock only when text arrives
+    // left the row frozen for exactly the stretch the user is waiting through,
+    // so the frame tick calls this with no text. A tick inside the tenth the row
+    // already shows changes nothing, and must not drop its cached rows.
+    const elapsed = this.now() - this.thinkingStartedAt;
+    if (Math.floor(elapsed / 100) !== Math.floor((this.thinking.elapsedMs ?? 0) / 100)) {
+      this.transcript.update(this.thinking, current => { current.elapsedMs = elapsed; });
+    }
+    if (text) this.transcript.setText(this.thinking, this.thinking.text + text);
     this.onChange();
   }
 

@@ -13,11 +13,23 @@ import type { AmbientContext } from "../../presentation/tui/chrome/hints.js";
 
 const scanner = new AgentRegistryScanner();
 
+/**
+ * How long a peer count is trusted before the registry is walked again.
+ *
+ * The row under the prompt is repainted on every frame — 30 times a second while
+ * an answer streams — and the registry behind this count is a recursive
+ * directory walk that reads every subagent definition. A count that is a second
+ * old is indistinguishable to a reader; a walk per frame is not free.
+ */
+const PEER_COUNT_TTL_MS = 1_000;
+
+let peerCount: { readonly sessionId: string; readonly at: number; readonly count: number } | undefined;
+
 /** Current ambient state, recomputed per frame from live stores. */
 export function readAmbientFacts(sessionId: string, background?: BackgroundRunner): AmbientContext {
   return {
     openTodos: getSessionTodos(sessionId).filter((todo) => todo.status !== "done" && todo.status !== "dropped").length,
-    peerSessions: countPeerSessions(sessionId),
+    peerSessions: countPeerSessions(sessionId, Date.now()),
     runningCommands: runningCommandCount(background),
   };
 }
@@ -32,15 +44,19 @@ function runningCommandCount(background?: BackgroundRunner): AmbientContext['run
   }
 }
 
-/** Other live sessions reachable for cross-session messaging. */
-function countPeerSessions(sessionId: string): number {
+/** Other live sessions reachable for cross-session messaging, at most once a second. */
+function countPeerSessions(sessionId: string, now: number): number {
+  if (peerCount?.sessionId === sessionId && now - peerCount.at < PEER_COUNT_TTL_MS) return peerCount.count;
+  let count: number;
   try {
-    return scanner
+    count = scanner
       .scanAllReachableAgents()
       .filter((agent) => agent.kind === "local_session" && agent.id !== sessionId).length;
   } catch {
     // The registry lives on the filesystem; an unreadable socket directory is
     // not worth failing a frame over.
-    return 0;
+    count = 0;
   }
+  peerCount = { sessionId, at: now, count };
+  return count;
 }

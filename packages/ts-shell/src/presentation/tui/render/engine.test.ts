@@ -394,6 +394,45 @@ describe("steady-state repaint", () => {
     expect(written).not.toContain("three");
   });
 
+  it("keeps one pending frame when a request lands after the immediate ran", () => {
+    // Every streamed token asks for a frame. The immediate-coalescing only folds
+    // requests made in one tick: a request arriving in the next tick — which is
+    // what a provider chunk does — queues its own immediate, and that immediate
+    // used to schedule a second frame timer without cancelling the first. Both
+    // then fired, each composing the whole screen, so the delay was not a
+    // throttle at all.
+    const terminal = new RecordingTerminal();
+    const immediates: Array<() => void> = [];
+    const timers: Array<{ id: number; run: () => void }> = [];
+    let nextId = 1;
+    const scheduler = {
+      setTimeout: (callback: () => void) => { const id = nextId++; timers.push({ id, run: callback }); return id; },
+      clearTimeout: (handle: unknown) => {
+        const at = timers.findIndex(entry => entry.id === handle);
+        if (at >= 0) timers.splice(at, 1);
+      },
+      setImmediate: (callback: () => void) => { immediates.push(callback); return nextId++; },
+      now: () => 0,
+    };
+    const provider = new StubProvider();
+    const tui = new TUI(terminal, scheduler);
+    tui.setFrameProvider(provider);
+    tui.start();
+    while (immediates.length) immediates.shift()!();
+    timers.length = 0;
+    provider.layouts.length = 0;
+
+    tui.requestRender();
+    immediates.shift()!();            // first request schedules its frame timer
+    expect(timers).toHaveLength(1);
+    tui.requestRender();              // next tick, before that frame is painted
+    immediates.shift()!();
+    expect(timers).toHaveLength(1);   // still one pending frame, not two
+    while (timers.length) timers.shift()!.run();
+
+    expect(provider.layouts).toHaveLength(1);
+  });
+
   it("writes nothing but framing when the frame is identical", () => {
     const { tui, terminal, scheduler } = boot();
     tui.start();

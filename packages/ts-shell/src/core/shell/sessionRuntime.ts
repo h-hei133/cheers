@@ -9,6 +9,7 @@ import type { CompactInjectionStateStore } from "../../context/compact/injection
 import type { ProjectMemoryInjectionStateStore } from "../../memory/projectMemoryInjectionState.js";
 import type { ProjectMemoryStore } from "../../memory/projectMemoryStoreContract.js";
 import type { QueryEvent } from "../query/runtime/events.js";
+import { isDurableQueryEvent } from "../query/runtime/events.js";
 import type { QueryRuntimeStateSeed } from "../query/runtime/state.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import {
@@ -289,9 +290,17 @@ export class ShellSessionRuntime {
           enteredQueryPhase = true;
           this.deps.sessionManager.markTurnActive(sessionId);
         }
-        this.deps.sessionManager.appendQueryEvent(sessionId, event, sourceEntryId ? { entryId: sourceEntryId() } : undefined);
+        // Observers run first. A delta is a display increment, and putting the
+        // durable append in front of it meant every token paid for a full
+        // transcript read, a state snapshot write and a file lock before the
+        // screen could move — which on a long session is the difference between
+        // text appearing as it arrives and appearing all at once when the turn
+        // ends.
         updateRuntimeEventDigest(eventDigest, event);
         for (const observer of this.eventObservers) observer(event);
+        if (isDurableQueryEvent(event)) {
+          this.deps.sessionManager.appendQueryEvent(sessionId, event, sourceEntryId ? { entryId: sourceEntryId() } : undefined);
+        }
         if (!structuredOutput) {
           const renderResult = renderSessionQueryEventSurface({
             renderer: this.deps.renderer,

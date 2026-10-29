@@ -22,6 +22,16 @@ interface CacheEntry {
   /** The palette revision the rows were rendered with. */
   readonly revision: number;
   readonly rows: readonly string[];
+  /**
+   * The block's position in the transcript, which its source lines carry.
+   *
+   * A block's index is stable while it is in the transcript — blocks are only
+   * ever appended or cleared wholesale — so it is recorded rather than
+   * re-keyed, and checked so a reused entry cannot serve stale lines.
+   */
+  blockIndex: number;
+  /** Derived from `rows` and the same key; computed on first use. */
+  sources?: readonly (SourceLine | undefined)[];
 }
 
 /**
@@ -168,7 +178,7 @@ export class Transcript {
   /** Rows the whole transcript occupies at `width`. */
   rowCount(width: number): number {
     let total = 0;
-    for (const block of this.blocks) total += this.rowsFor(block, width).length;
+    for (let index = 0; index < this.blocks.length; index++) total += this.rowsFor(this.blocks[index]!, index, width).length;
     return total;
   }
 
@@ -187,8 +197,8 @@ export class Transcript {
     const sources: (SourceLine | undefined)[] = [];
     for (let index = 0; index < this.blocks.length; index++) {
       const block = this.blocks[index]!;
-      const blockRows = this.rowsFor(block, width, options);
-      const blockSources = sourceLinesFor(block, index, width, blockRows);
+      const blockRows = this.rowsFor(block, index, width, options);
+      const blockSources = this.sourcesFor(block, index, width, blockRows, options);
       for (let row = 0; row < blockRows.length; row++) {
         rows.push(blockRows[row]!);
         owners.push(index);
@@ -198,8 +208,38 @@ export class Transcript {
     return { rows, owners, sources };
   }
 
-  /** Rendered rows for one block, memoised while the block cannot change. */
-  private rowsFor(block: Block, width: number, options?: BlockRenderOptions): readonly string[] {
+  /**
+   * Source lines for one block, memoised alongside its rows.
+   *
+   * Deriving them re-runs the Markdown layout and, for a diff, searches every
+   * row offset for the frame — per block, per frame. A finished block cannot
+   * change, so the answer is cached with the rows it was computed against. The
+   * block index is part of the key because it is written into every line.
+   */
+  private sourcesFor(
+    block: Block,
+    index: number,
+    width: number,
+    rows: readonly string[],
+    options?: BlockRenderOptions,
+  ): readonly (SourceLine | undefined)[] {
+    if (!block.finalized) return sourceLinesFor(block, index, width, rows);
+    const entry = this.cache.get(block)?.find(candidate => candidate.width === width
+      && candidate.revision === defaultTheme.colorRevision
+      && candidate.options?.imageProtocol === options?.imageProtocol);
+    if (entry?.sources) return entry.sources;
+    const sources = sourceLinesFor(block, index, width, rows);
+    if (entry) entry.sources = sources;
+    return sources;
+  }
+
+  /**
+   * Rendered rows for one block, memoised while the block cannot change.
+   *
+   * The entry also carries the block's current index so the source cache built
+   * beside it can be keyed by the same facts.
+   */
+  private rowsFor(block: Block, index: number, width: number, options?: BlockRenderOptions): readonly string[] {
     if (!block.finalized) return renderBlock(block, width, options);
     const entries = this.cache.get(block);
     // The palette is recolored in place, so the same block at the same width
@@ -211,13 +251,21 @@ export class Transcript {
       entry.revision === revision &&
       entry.options?.imageProtocol === options?.imageProtocol;
     const hit = entries?.find((entry) => cacheKey(entry, width));
-    if (hit) return hit.rows;
+    if (hit) {
+      // The rows are the same at any index; the source lines name the position,
+      // so an entry whose index moved is kept for its rows but loses them.
+      if (hit.blockIndex !== index) {
+        hit.blockIndex = index;
+        hit.sources = undefined;
+      }
+      return hit.rows;
+    }
 
     const rows = renderBlock(block, width, options);
     // An entry from a superseded palette is worth nothing, so those go first
     // and the width list stays bounded.
     const kept = (entries ?? []).filter((entry) => entry.revision === revision);
-    kept.unshift({ width, revision, rows, options });
+    kept.unshift({ width, revision, rows, options, blockIndex: index });
     this.cache.set(block, kept.slice(0, MAX_CACHED_WIDTHS));
     return rows;
   }

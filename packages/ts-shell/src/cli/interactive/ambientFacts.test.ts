@@ -29,3 +29,26 @@ it('reports a known zero only when no runner is configured or a read succeeds wi
   expect(readAmbientFacts('session').runningCommands).toBe(0);
   expect(readAmbientFacts('session', { list: () => [] } as unknown as BackgroundRunner).runningCommands).toBe(0);
 });
+
+it('does not walk the agent registry once per frame', () => {
+  // The row under the prompt is repainted on every frame, and the registry
+  // behind the peer count is a recursive directory walk that reads every
+  // subagent definition. A count a second old is indistinguishable to a reader.
+  const scan = vi.spyOn(AgentRegistryScanner.prototype, 'scanAllReachableAgents').mockReturnValue([]);
+  const now = vi.spyOn(Date, 'now');
+
+  now.mockReturnValue(1_000);
+  readAmbientFacts('frame-1');
+  readAmbientFacts('frame-1');
+  readAmbientFacts('frame-1');
+  expect(scan).toHaveBeenCalledTimes(1);
+
+  // A different session is a different question and must not reuse the answer.
+  readAmbientFacts('frame-2');
+  expect(scan).toHaveBeenCalledTimes(2);
+
+  // Once the window has passed the count is refreshed from the live registry.
+  now.mockReturnValue(3_000);
+  readAmbientFacts('frame-2');
+  expect(scan).toHaveBeenCalledTimes(3);
+});

@@ -430,6 +430,32 @@ describe("the activity row across a reasoning answer", () => {
     const thinking = transcript.recent(10).find((block) => block.kind === "thinking");
     expect(thinking?.finalized).toBe(true);
   });
+
+  it("keeps the reasoning clock moving between deltas", () => {
+    // A reasoning stream is not continuous: the model can work silently for a
+    // long time. Recomputing the elapsed time only when text arrived left the
+    // row frozen for exactly the stretch the user is waiting through.
+    const { sink, transcript, rows } = build();
+    sink.begin("turn", "turn");
+    sink.handleEvent({ type: "reasoning.delta", role: "coder", delta: "working it out" } as QueryEvent);
+    const before = transcript.recent(10).find((block) => block.kind === "thinking")?.elapsedMs;
+
+    // The clock advances by 100ms per read; three ticks is a visible change.
+    sink.think();
+    sink.think();
+    sink.think();
+
+    const after = transcript.recent(10).find((block) => block.kind === "thinking")?.elapsedMs;
+    expect(after).toBeGreaterThan(before ?? 0);
+    expect(stripAnsi(rows())).toContain(`thought ${((after ?? 0) / 1000).toFixed(1)}s`);
+  });
+
+  it("does nothing to the reasoning row when no reasoning is live", () => {
+    const { sink } = build();
+    sink.begin("turn", "turn");
+
+    expect(() => sink.think()).not.toThrow();
+  });
 });
 
 describe("a tool card when its call settles", () => {

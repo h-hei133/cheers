@@ -48,9 +48,54 @@ describe("shell session runtime (W5)", () => {
       }
     });
     await expect(runtime.executePrompt("cancelled", "request")).rejects.toThrow("without a terminal event");
-    expect(observed).toEqual(recorded);
+    // A streamed increment reaches the observer but is not written to the
+    // transcript: the assistant message is what a reader reconstructs from, and
+    // paying a full transcript read per token is what made the screen stall.
+    // The cancellation that closes the run is still durable.
+    expect(recorded).toEqual(observed.filter(event => (event as { type?: string }).type !== "message.delta"));
+    expect(recorded).toHaveLength(1);
+    expect((recorded[0] as { type: string }).type).toBe("lifecycle.cancelled");
     expect(observed.at(-1)).toEqual({ type: "lifecycle.cancelled", reason: "AbortSignal triggered during shell session runtime" });
     expect(observed).toHaveLength(enteredTurn ? 2 : 1);
+  });
+
+  it("hands a durable event to observers before writing it to the transcript", async () => {
+    // The ordering is the fix, not a detail of it. A durable append reads the
+    // whole transcript and rewrites the state snapshot; putting it in front of
+    // the observer made the screen wait on disk for every event, and on a long
+    // session that is what turned streaming into one dump at the end.
+    const order: string[] = [];
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        persistUserPromptBarrier() {}, markTurnActive() {}, saveCompleted() {}, saveError() {},
+        appendQueryEvent(_id: string, event: { type: string }) { order.push(`durable:${event.type}`); },
+      } as never,
+      renderer: { renderLine() {}, renderChunk() {} } as never,
+      runPrompt: async function* () {
+        yield { type: "tool.started" as const, toolName: "read", taskId: "task-1" };
+        yield { type: "message.delta" as const, role: "coder" as const, delta: "partial" };
+        yield {
+          type: "query.completed" as const,
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: { sessionId: "sess_1", initialPrompt: "hello", notes: [], handoffs: [] },
+            finalOutput: "done:hello",
+          } as never,
+        };
+      },
+    });
+    runtime.observeEvents(event => { order.push(`observer:${event.type}`); });
+
+    await runtime.executePrompt("hello", "request");
+
+    expect(order).toEqual([
+      "observer:tool.started", "durable:tool.started",
+      "observer:message.delta",
+      "observer:query.completed", "durable:query.completed",
+    ]);
   });
 
   it.each([false, true])("keeps runtime failure attribution explicit (run exists=%s)", async (runExists) => {
