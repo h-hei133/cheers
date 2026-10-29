@@ -3384,3 +3384,15 @@ staged diff补覆盖新文件时发现protocol末尾多余空行，删除后重�
 只移除该测试的capacity cache改写及不必要的publication刷新，使用已经加载的真实内置型号，并检查context大于output。原续期一次、main/coding两次精确路径/合成凭据/型号及notes一项断言全部保留；account wire仍不发max_output_tokens。没有修改provider/auth、请求预算、刷新策略或默认输出，未以降低官方上限迁就测试。
 
 主代理完整advisor文件37项串行通过；旧夹具逐字节反转时同一共享账户项再次失败、其余36未选不计，恢复后单项通过。诊断输出只含public metadata、advisor状态及安全报告，临时诊断撤销。五静态门/diff与最终build新鲜度另由日志实际绑定；本批test-only不重跑结构NormProof。原失败CI保留，新提交CI另验，无live账户/真实认证或全仓执行，ADD仍active。
+
+### 20.21 兼容服务JSON返回的公开thinking提取与显示
+
+反馈25另一个可独立验证的缺口：[completion stream](../../packages/ts-shell/src/turn/completion.ts)已读取reasoning_content/reasoning/reasoning_text，但[兼容JSON reader](../../packages/ts-shell/src/provider/endpoints/openaiCompatible.ts)直接保留choices，没有将selected message的字段提到共同CompletedBody.reasoning。服务忽略stream:true并返回application/json时，[toStep](../../packages/ts-shell/src/turn/step.ts)只能得到答案；即使completion已经normalized reasoning，也没有非流式onReasoning回调。两条缺口分别影响持久消息与实时显示，与effort选项无关。
+
+实际再次读取[供应商thinking指南](https://api-docs.deepseek.com/guides/thinking_mode/)确认公开reasoning_content与content同级；该页当前型号与tools回传合同仍不替换20.16的旧别名裁决。本轮只处理已收到公开正文。定向比较pi openai-completions.ts:578–600按三种字段优先选择并防重复，以及1280–1390保留thinking的独立消息位置；oh-my-pi openai-completions.ts:1457以后同样选择公开字段，其2580–2668按显式compat处理回传。采用公开字段选择/答案分离与已streamed不重复显示，不复制signature里编码字段名、fallback伪造或新型号启用。工具reasoning回传仍单独待裁决。
+
+原reader的reasoningDelta改名为readReasoningText并允许unknown complete message，现有delta和JSON共用同一first-nonempty选择；没有第二份字段白名单。JSON只取choices[0]的message，并优先保留已有normalized string reasoning；原refusal映射及未知字段不变。toStep在streamed未定义且公开reasoning非空、非redacted时先onReasoning再text。streamed/withheld不重播，最终reasoning/signature与持久化沿原合同；reasoning-only仍带原empty-answer错误，不因thinking存在宣称回答完成。
+
+[实际请求回归](../../packages/ts-shell/src/provider/endpoints/openaiCompatible.test.ts)涵盖三种JSON字段、reasoning:false+无effort仍显示已返回正文、完整step→transcript编码/解码、first nonempty/单choice/不重复、normalized优先、五种无效字段、reasoning-only和SSE一致性。初版13项中5项确认提取缺口，另1项是fixture错误期待refusal kernel值；原kernel将wire refusal映射error，按已有合同修断言而未改产品错误行为。最终14项以真实Response和createStepFunction证明JSON/SSE thinking与text各一次。
+
+主代理四文件163项去重串行通过：endpoint14/completion34/step96/Responses body19。四类反转撤去JSON提取5失败、显示6失败、stream去重2失败、redacted保护1失败；各次逐字节恢复，最终163项重验通过。五静态门、完整声明图单一用例、diff与AST completion15/step17/endpoint10通过。1536MiB TS build `62beb782eb1781adc7fb239f008f60b3816b265b742d15e9d71866045ca7a37c`，inputs `d43751b0d4535f94a3fdf63decce20321aca4c1b3be5e04161b74126a5afaead`，460 compilerInputs/3547文件重新计算一致；NormProof proven/0open/0failed/0gap仅collector结构。HANDOFF记录JSON提取与显示分离，scratch清理；没有live供应商、真实账号/终端、PTY/exe/full suite或20k终端。默认effort、型号迁移、tool replay不变，原47项不升级，反馈25与ADD仍partial/active，Git/精确CI另绑定。

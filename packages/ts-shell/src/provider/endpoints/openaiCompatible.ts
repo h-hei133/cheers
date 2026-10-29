@@ -5,7 +5,7 @@ import {
   type MultimodalContentBlock,
   messageToText,
 } from "../../model-adapters/multimodal.js";
-import { readCompletionStream, type CompletedBody } from "../../turn/completion.js";
+import { readCompletionStream, readReasoningText, type CompletedBody } from "../../turn/completion.js";
 import type { ChatMessage } from "../../turn/prompt.js";
 import { copilotRequestHeaders } from "./copilotHeaders.js";
 import { declareEndpoint } from "./kinds.js";
@@ -128,8 +128,10 @@ function wireMessages(messages: readonly ChatMessage[], vision: boolean, bridge:
 function readBody(body: unknown): CompletedBody {
   const result = (body ?? {}) as CompletedBody;
   if (!Array.isArray(result.choices)) return result;
+  const reasoning = typeof result.reasoning === 'string' ? result.reasoning : readReasoningText(result.choices[0]?.message);
   return {
     ...result,
+    ...(reasoning !== undefined ? { reasoning } : {}),
     choices: result.choices.map((choice) => {
       const refusal = (choice?.message as { refusal?: unknown } | undefined)?.refusal;
       return typeof refusal === "string" && refusal.trim()

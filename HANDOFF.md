@@ -901,3 +901,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An account renewal test sends its main request but no delegated request after a built-in model gains an output limit.
 - **Root Cause**: The fixture shrinks context through the refresh cache while refresh deliberately retains the reviewed output ceiling. The resulting output greater than context is rejected before network, independently of credential renewal.
 - **Rule**: Use the installed exact model in protocol/account tests, or an explicit coherent user overlay when custom capacities are the subject. Inspect the loaded metadata and existing budget refusal before diagnosing missing requests as authentication or publication regressions; preserve the network and renewal assertions.
+
+### JSON Reasoning Needs Both Protocol Extraction And One Display Callback
+- **Symptom**: A compatible host ignores stream:true and returns a normal JSON answer with reasoning_content, but the saved assistant message and thinking display omit it.
+- **Root Cause**: The stream reader extracts public reasoning fields while the JSON protocol reader leaves them nested under the chosen message. Final step projection also only emits text, assuming reasoning was already streamed.
+- **Rule**: Reuse the same public-field precedence for complete messages and deltas, retain normalized completion authority, and emit public reasoning once before text only when it was not streamed or withheld. Check actual JSON-to-step-to-transcript and SSE parity; a reasoning-only result remains unanswered, and field extraction alone does not establish the provider's replay wire contract.

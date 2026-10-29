@@ -350,7 +350,7 @@ function absorb(
   }
   // A reasoning model can put its entire visible output here and leave
   // `content` empty. Dropping it meant the turn produced nothing at all.
-  const thinking = reasoningDelta(delta as unknown as Record<string, unknown>);
+  const thinking = readReasoningText(delta);
   if (thinking) {
     state.reasoning += thinking;
     fragments.push({ kind: "reasoning", text: thinking });
@@ -483,10 +483,11 @@ function heldPartial(text: string): string {
   return tail.length > MAX_HELD ? "" : tail;
 }
 
-/** Reasoning in this delta, whichever field the provider chose to put it in. */
-function reasoningDelta(delta: Record<string, unknown>): string | undefined {
+/** Public reasoning in a delta or complete message, using the same precedence. */
+export function readReasoningText(message: unknown): string | undefined {
+  if (!message || typeof message !== 'object' || Array.isArray(message)) return undefined;
   for (const field of REASONING_FIELDS) {
-    const value = delta[field];
+    const value = (message as Record<string, unknown>)[field];
     if (typeof value === "string" && value.length > 0) return value;
   }
   return undefined;

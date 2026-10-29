@@ -10158,3 +10158,11 @@ MCP修复已提交推送`60fb7545898b6a15669a583a954f72aeb4ce20e0`，远端main�
 继续[addition20.20](features/phase-20-addition.md#2020-advisor共享账户续期夹具与模型容量)，329601唯一失败在本地完整advisor37项中同样36通过/1失败。诊断实际catalog context32k/output128k/input272k，advisor error、第二次请求未发送：refresh夹具缩小context，原preserveExplicitCapabilities保留新审阅128k output，原requestBudget正确拒绝矛盾容量。只删除该续期用例的cache改写/无必要refresh，使用已加载内置exact模型，并检查window大于output；原一次renew、两次精确account请求与note断言保留。provider/auth/预算/default/refresh策略未改。
 
 advisor完整37项串行通过，旧夹具反转同一项失败，逐字节恢复后单项通过、36未选不计新通过。五静态门/diff、1536MiB TS build及新鲜度通过：build `f67d21347098d354c8939157a39e3df0dc5a9269122c67904e5b807cf528bd0d`、inputs `b1f9a6ef856feaa942eb79098f477f39b2556d1e52e223bb78ed688c78f738b0`，460/3546一致。本批test-only未重跑结构NormProof。HANDOFF新增刷新夹具capacity陷阱，诊断撤销与scratch清理；无live/真实账户认证、PTY/exe或全套，原CI failure保留、ADD active，Git/精确新CI另绑定。
+
+该测试修复已提交推送`6ff4508021da667d7773f7f7ea2e65685bece193`，远端main精确一致、仅原CLAUDE.md。[CI40937374700](https://github.com/h-hei133/cheers/actions/runs/40937374700)与[Watch40937374817](https://github.com/h-hei133/cheers/actions/runs/40937374817)启动时in_progress，延后核查。
+
+## [2026-10-30] fix | 兼容JSON公开thinking提取与单次显示
+
+继续[addition20.21](features/phase-20-addition.md#2021-兼容服务json返回的公开thinking提取与显示)：兼容host忽略stream:true时，JSON message下公开reasoning未提取，非流式toStep也不发onReasoning。共用原字段优先级readReasoningText供delta/complete message，JSON selected choice提取、normalized优先，toStep未streamed且非redacted时在text前单次显示。已有signature/保存、reasoning-only unanswered与refusal错误合同保留；只读当前官方public字段与参考选择/分离决定，未迁移模型或推断tool replay。
+
+主代理四相关文件163项去重串行通过，包含真实Response请求→step→transcript、SSE一致性及reasoning:false仍显示已返回公开文本。四类反转5/6/2/1失败、逐字节恢复后163重验通过；初次refusal断言误期待kernel refusal，改回原error合同。五静态门、完整声明图单一脚本、AST completion15/step17/endpoint10/diff通过；build `62beb782eb1781adc7fb239f008f60b3816b265b742d15e9d71866045ca7a37c`、inputs `d43751b0d4535f94a3fdf63decce20321aca4c1b3be5e04161b74126a5afaead`，460/3547新鲜度重算一致，NormProof proven/0open/0failed/0gap仅collector。HANDOFF新增JSON提取/显示陷阱，scratch清理。无live provider/真实账户/终端、PTY/exe/full suite/20k，原47项不升级、ADD active，Git/精确CI另绑定。

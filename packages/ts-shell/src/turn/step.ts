@@ -709,6 +709,9 @@ export function toStep(completion: CompletionShape, listener: StepListener): Ass
   const { text, calls } = choice?.finish_reason === 'length'
     ? { text: message.content ?? '', calls: message.tool_calls ?? [] }
     : liftInlineCalls(message.content ?? "", message.tool_calls ?? []);
+  if (completion.streamed === undefined && completion.reasoning && !completion.reasoningRedacted) {
+    listener.onReasoning?.(completion.reasoning);
+  }
   if (text) {
     if (completion.streamed === undefined) listener.onText?.(text);
     else if (text !== completion.streamed) listener.onReplace?.(text);
