@@ -1188,7 +1188,7 @@ MCP取消夹具修复独立code review APPROVE；最终静态五门/requirements
 
 ## 2026-10-29 第七轮用户反馈（ADD 补充，独立于原 47 项矩阵）
 
-用户提出七项新问题与优化方向，逐项定位写入 [补充规划第 17 节](phase-20-addition.md)，实施证据写入第 18 节。本轮共 24 个提交，此前 12 个的 CI 全部 success（`90c0cd27`、`03ddd97b`、`b11c58fa`、`05e4e260`、`267ea875`、`2c2661a1`、`b6607ce6`、`08cd6110`、`d47f5db2`、`6c5bd7dc`、`2df4844f`、`a52dc72e`），`1354f0c4` 亦 success。
+用户提出七项新问题与优化方向，逐项定位写入 [补充规划第 17 节](phase-20-addition.md)，实施证据写入第 18 节。本轮共 30 个提交，此前 12 个的 CI 全部 success（`90c0cd27`、`03ddd97b`、`b11c58fa`、`05e4e260`、`267ea875`、`2c2661a1`、`b6607ce6`、`08cd6110`、`d47f5db2`、`6c5bd7dc`、`2df4844f`、`a52dc72e`），`1354f0c4` 亦 success。
 
 | 用户编号 | 问题 | 本轮结论 |
 |---|---|---|
@@ -1196,8 +1196,8 @@ MCP取消夹具修复独立code review APPROVE；最终静态五门/requirements
 | 第十八 | Codex 快照 | **已实施**：无工作区级快照（与 Codex 影子提交不同），但 `/undo status --turn <id>` 可按轮审阅、`/undo restore-turn <id> --execute` 可按轮恢复。逐操作串行、失败即停、列出未尝试项，明确声明非原子 |
 | 第二十 | Monitor 工具 | **已实施**：新增 `taskWait`，等 `BackgroundRunner.onEnded` 而非轮询/sleep；300 秒上限、可取消、超时如实报告 |
 | 第二十一 | Ctrl+S 草稿暂存 | **已实施**：单槽 toggle + 互换语义，光标随草稿保存，被引用粘贴在暂存期间受保护；外部编辑器改写后原稿自动入槽，一次按键取回（"一键撤回润色"）；`ctrl+s` 与 `alt+s` 双绑定 |
-| 第二十二 | 平级 Agent Teams | **已实施核心链路**：`fanOut.ts` 并行独立提案、`run.ts` 交叉评审编排（提案者永不评审自己）、`convergence.ts` 收敛判定。命令面与交互式批准未接入 |
+| 第二十二 | 平级 Agent Teams | **已实施**：`team` 工具接入——`fanOut.ts` 并行独立提案、`run.ts` 交叉评审（提案者永不评审自己、评审者只读）、`convergence.ts` 收敛判定（无证据的证伪不算数、未被检查不等于存活）。走既有工具审批 |
 | 第二十三 | 对话卡顿 | **已修复五个根因**：每个 token 走完整持久化链（决定性）、sources 每帧重算、渲染定时器跨 tick 不合并、thought 秒数非时钟驱动、每帧两次扫盘 |
-| 第二十四 | 跨目录写入限制 | **已澄清并部分改进**：限制来自工具层硬拒绝（非提示词、非 AGENTS.md、sandbox 默认关闭）；拒绝信息说明 `/workspace add <path> --write`；权限层与工具体的围栏判定已统一（symlink 不再"批准了却写不进"）。改为"需审批"仍未实施 |
+| 第二十四 | 跨目录写入限制 | **已澄清并裁决**：限制来自工具层硬拒绝（非提示词、非 AGENTS.md、sandbox 默认关闭）；拒绝信息说明 `/workspace add <path> --write`；权限层与工具体的围栏判定已统一。"改为每次审批"经复核判定不做——现有根机制（会话持久化 + 身份绑定 + sandbox 集成）比一次性授权更安全，理由见补充规划 17.7 |
 
 原 47 项矩阵状态不变（38 complete / 9 partial / 0 open）；本表是独立补充，不提升 ADD 整体状态。
