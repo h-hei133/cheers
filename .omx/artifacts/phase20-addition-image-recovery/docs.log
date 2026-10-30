@@ -1,0 +1,4 @@
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=25 docs_refs=456 docs_dangling=0 docs_source_dangling=118
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 118 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on

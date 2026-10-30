@@ -1,0 +1,158 @@
+{
+  "mode": "fullscreen",
+  "buildId": "d4297fc1e1cd6053249f47cb8afbb896d1654fdacef71d1638cead1669e053c0",
+  "inputsDigest": "a8e6aba8fe59b75f8a3533c898053adb727ce845057ea765e933aa410e975471",
+  "provider": "loopback HTTP fixture",
+  "savedMessages": 1,
+  "phases": [
+    {
+      "label": "interrupted submission",
+      "shutdown": {
+        "code": 0,
+        "signal": null
+      },
+      "device": {
+        "cookedFlagsRestored": true
+      }
+    },
+    {
+      "label": "restart and recovery",
+      "shutdown": {
+        "code": 0,
+        "signal": null
+      },
+      "device": {
+        "cookedFlagsRestored": true
+      }
+    }
+  ],
+  "status": "passed",
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 60,
+    "outputBytes": 2097152
+  },
+  "stages": [
+    {
+      "action": "real bracketed paste and alt+s stash",
+      "imageHostInjections": 1,
+      "pressureIssuances": 1100,
+      "pressureSource": "tiny payload injection into actual PasteStore",
+      "pressure": {
+        "signatures": 1024,
+        "payloads": 128,
+        "payloadBytes": 4122
+      },
+      "noPostWhileStashed": true,
+      "noticePainted": true
+    },
+    {
+      "action": "real alt+s restore",
+      "exactDraftAndCaret": true,
+      "textRetained": true,
+      "imageRetained": true,
+      "interiorExpansion": true,
+      "unresolved": 0
+    },
+    {
+      "action": "real Enter then Ctrl+C during HTTP wait",
+      "wire": {
+        "textMatches": true,
+        "imageMatches": true,
+        "noLiteralTokens": true,
+        "imageBlocks": 1,
+        "recoveryPromptMatches": true
+      },
+      "savedUser": {
+        "exactTextAndImageBlocks": true,
+        "userMessages": 2
+      },
+      "interrupted": true
+    },
+    {
+      "action": "new CLI process executes real /continue with original image history",
+      "priorImageReplayed": true,
+      "wire": {
+        "textMatches": true,
+        "imageMatches": true,
+        "noLiteralTokens": true,
+        "imageBlocks": 1,
+        "recoveryPromptMatches": true
+      },
+      "exactPriorContent": true,
+      "finalUserMessages": 2,
+      "duplicateUserPrompts": 0,
+      "finalStatus": "completed",
+      "noImageOrPressureInjection": true,
+      "responsePainted": true
+    }
+  ],
+  "wireShape": [
+    {
+      "role": "system",
+      "array": false,
+      "length": 1366,
+      "kinds": [],
+      "containsPublicText": false,
+      "containsPublicImage": false
+    },
+    {
+      "role": "user",
+      "array": false,
+      "length": 28,
+      "kinds": [],
+      "containsPublicText": false,
+      "containsPublicImage": false
+    },
+    {
+      "role": "user",
+      "array": true,
+      "length": 2,
+      "kinds": [
+        "text",
+        "image_url"
+      ],
+      "containsPublicText": true,
+      "containsPublicImage": true
+    },
+    {
+      "role": "user",
+      "array": false,
+      "length": 1543,
+      "kinds": [],
+      "containsPublicText": true,
+      "containsPublicImage": false
+    }
+  ],
+  "cancelMs": 50,
+  "wire": [
+    {
+      "textMatches": true,
+      "imageMatches": true,
+      "noLiteralTokens": true,
+      "imageBlocks": 1,
+      "recoveryPromptMatches": true
+    },
+    {
+      "textMatches": true,
+      "imageMatches": true,
+      "noLiteralTokens": true,
+      "imageBlocks": 1,
+      "recoveryPromptMatches": true
+    }
+  ],
+  "savedUser": {
+    "exactTextAndImageBlocks": true,
+    "userMessages": 2
+  },
+  "configurationUnchanged": true,
+  "projectUnchanged": true,
+  "requests": 2,
+  "readinessRequests": 2,
+  "rejectedRequests": 0,
+  "configuredProviderLoopback": true,
+  "outputBytes": 18010,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

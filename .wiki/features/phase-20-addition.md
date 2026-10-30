@@ -4555,3 +4555,12 @@ HANDOFF补载荷/签名生命周期及vision/persistence分界，CLAUDE.md保留
 两探针失败保留：SessionManager在withProfile外构造绑定错profile、历史正文误要求当前请求environment前缀。仅修fixture owner/比较合同，未改产品或弱化精确image/文本/单次历史断言。旧21.27的saved image false作为历史证据保留；此后新增图片可跨所测完成会话进程重放，旧已丢图片不可恢复，image-only自动续跑、compaction/branch与任意图片预算体验未新增验收。中断会话读盘验证不冒充自动中断派发验证。
 
 HANDOFF更新、CLAUDE.md保留。延后一次CI读回8061bd92 CI41056737057/Watch41056737048均completed/success，bc121e28 Watch41062973311 success、CI41062973370仍in_progress且heads一致；本批Git/未来CI另绑定。无full local suite/并行heavy/本助手subagent/20k真实终端/exe/真实provider/独立代理review/NormProof judge，原47与ADD整体仍partial、goal active。
+
+
+### 21.29 图片中断后的实际continue与零重复消息
+
+补齐21.28明确未验的自动中断派发：读目标[resume owner](../../packages/ts-shell/src/core/shell/recovery.ts)、[continue bridge](../../packages/ts-shell/src/core/shell/continueShellActionRuntime.ts)和[model history](../../packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts)，确认附件由原multimodal历史带入、恢复提示另建。因此缺少bridge.attachments本身不证明丢图，无新产品缺陷证据，不添加第二次图片转发或store。
+
+原NodeCLI regular/fullscreen各1保存fixture消息、isolated home/profile/project、declared-vision loopback、heap768MiB/总60秒/累计2MiB。首次真实paste/alt+s/Enter、原host PNG/tiny store1100压力；第一POST精确text/image，服务器保持待回。真实Ctrl+C直到turn end及HTTP response close，分别51/50ms小夹具观测，原session interrupted且存完整block，未知请求用量不伪造清零。Ctrl+D退出后新CLI重开同ID、无attachment/pressure注入，真实/continue第二POST携原image_url一次、精确历史text及原recovery指令。回复实际绘制、session completed/pendingPrompt清理，最终仅两user含原fixture，零重复prompt。两模式各两个exit0/cooked、config/models/project不变、scratch清理。[正式工件](../../.omx/artifacts/phase20-addition-image-recovery/README.md)保存结构布尔、计数及当前fresh build `d4297fc1e1cd6053249f47cb8afbb896d1654fdacef71d1638cead1669e053c0`、inputs `a8e6aba8fe59b75f8a3533c898053adb727ce845057ea765e933aa410e975471`。
+
+两个syntax、两模式probe主代理串行首轮通过；无产品源码改动而不重跑build/unit/源码反转。此为文字加小图在HTTP等待取消后的原continue路径，非image-only、mid-tool/compaction/branch、大图、未知billing、clipboard或其他平台验收。延后一次bc121e28 CI41062973370/Watch41062973311均success，165940b3 Watch41065163449 success、CI41065163338仍in_progress、head一致；本批Git/未来CI另绑定。CLAUDE.md保留，无full local suite/并行heavy/本助手subagent/20k终端/exe/真实provider/独立review/NormProof judge；原47/ADD整体partial、goal active。

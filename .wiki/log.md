@@ -10649,3 +10649,10 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 9项去重聚焦、四反转1/2/2/2 AssertionError与finally字节恢复、五门/build/freshness全部主代理串行通过；128未选不计、118旧docs advisory保留，四owner无新增callable，旧facade保守29超限如实记录。真实CLI两模式各首次paste/alt+s/Enter发精确text/image并存一次，退出后新进程重开同ID、无attachment/pressure注入，真实followup HTTP再次携原图一次；最终三个user与原blocks正确，四次exit0/cooked，config/models/project不变、heap768MiB/总60秒/累计2MiB、scratch清理。初期mock terminal、profile构造、历史environment framing失败均保留与分类。
 
 正式工件/HANDOFF更新、CLAUDE.md保留；完成会话跨进程重放已测，中断读盘不冒充自动dispatch，旧丢图片/image-only/compaction/branch/大图/平台验收不升级。8061bd92 CI/Watch均success，bc121e28 Watch41062973311 success、CI41062973370延后读回仍in_progress。本批Git/未来CI另绑定，原47与ADD仍partial、goal active。
+
+
+### 2026-10-30：图片HTTP等待中断后的跨进程continue
+
+[addition21.29](features/phase-20-addition.md#2129-图片中断后的实际continue与零重复消息)在当前image persistence build补自动中断派发证据。两CLI模式首个text/image POST保持待回，真实Ctrl+C51/50ms小夹具观测后response close/session interrupted/block完整。新进程重开同ID、零附件/压力注入、真实/continue第二POST携原image_url一次与原恢复提示，完成回复绘制、pending清理，最终两user含fixture/无重复消息；四exit0/cooked、config/models/project不变、scratch删除，heap768MiB/总60秒/累计2MiB。
+
+目标原history已承担图片续跑，未发现需修改bridge的缺陷，所以只加正式probe/收据/文档，不重跑unit/build/源码反转。syntax与两probe主代理串行首轮通过；此为文字加小图HTTP等待取消场景，其他图片/恢复/平台/费用验收仍partial。bc121e28 CI/Watch均success，165940b3 Watch41065163449 success、CI41065163338延后读回仍in_progress；本批Git/CI另绑定，CLAUDE.md保留、goal active。
