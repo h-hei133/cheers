@@ -10471,3 +10471,12 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 原NodeCLI两模式实际discovery+每turn load、未读引用unresolved、native行2-2收据绑定refuted、两held review Ctrl+C102/127ms结束；exit156/150ms、0/cooked，23POST/3GET各，文件/config不变。正式工件保留权限与per-turn load/setup及newline/prefix fixture分类、scratch清理、CLAUDE.md保留，无本助手subagent/heavy并发/全套/exe/20k。17.5并发上限/覆盖收敛/结构化提案/专门apply批准仍未完成，原47不升级、goal active。
 
 延后CI：20.51 CI40986394168 success；20.50 CI40986098392同五editor fixture failure已由20.51修。20.52 CI40987047192 in_progress、Watch40987047203 success，本批Git/未来CI另绑定。
+
+
+## [2026-10-30] fix | 两人team入口与交叉评审完整覆盖
+
+[addition20.54](features/phase-20-addition.md#2054-团队两人上限与完整交叉评审覆盖)落实17.5 N≤2，tool文案/schema/admission同步拒绝第三视角。原run补requested peer缺失finding为insufficient、convergence拒绝用单个clean check覆盖failed/漏答/insufficient/failed proposer；已绑定反证仍refuted。旧insufficient+clean survivor测试按裁决改unresolved、不删场景。
+
+基线6失败/47通过，六文件75通过；原三owner独立反转1/3/5失败并精确恢复后75重跑。五门/build/freshness460/3554、callables7/1/5/8/2、118旧advisory。原CLI两模式未读→实际native receipt绑定→三视角零dispatch拒绝→held cross-review Ctrl+C102/101ms，exit143/185ms/0/cooked，26POST/4GET各、文件/config保持与scratch清理。正式工件/HANDOFF/CLAUDE.md保留；结构化提案与专门apply批准仍待续，原47不升级、goal active。
+
+20.53已推送8e4e6fd1b3865fc657dee87644912296c75ec009；延后20.52 CI40987047192 success，20.53 CI40989150210 in_progress/Watch40989150206 success。本批Git/未来CI另绑定。

@@ -23,13 +23,13 @@ import type { SubagentDefinition } from '../subagents/types.js';
  */
 
 /** How many proposers one pass may run, and why that number. */
-const MAX_PROPOSERS = 3;
+const MAX_PROPOSERS = 2;
 
 export function createTeamToolDefinition(): ToolDefinition {
   return {
     name: 'team',
     description:
-      'Ask up to three independent agents the same question, have each try to refute the others, and report what survived. '
+      'Ask two independent agents the same question, have each try to refute the others, and report what survived. '
       + 'Use it when a question has competing explanations worth testing against each other, not for work that has one answer.',
     argsSchema: {
       type: 'object',

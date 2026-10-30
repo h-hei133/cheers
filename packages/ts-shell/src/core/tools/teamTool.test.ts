@@ -256,3 +256,14 @@ it("does not fall back to narration when the final answer is explicitly empty", 
   });
   expect(result.output).toContain("Proposed 0 of 2");
 });
+
+
+it("caps team at two proposers before dispatch and advertises the same schema", async () => {
+  const runSubagent = vi.fn();
+  const tool = createTeamToolDefinition();
+  expect(tool.description).toContain('two');
+  expect(tool.argsSchema).toMatchObject({ properties: { perspectives: { maxItems: 2 } } });
+  const result = await tool.execute({ question: 'why?', perspectives: ['a', 'b', 'c'] }, { workspaceRoot: '/repo', taskId: 'capacity', runSubagent });
+  expect(result.error).toContain('at most 2');
+  expect(runSubagent).not.toHaveBeenCalled();
+});

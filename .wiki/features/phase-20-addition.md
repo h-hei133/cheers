@@ -3977,3 +3977,16 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 正式[工件](../../.omx/artifacts/phase20-addition-team-review/)与HANDOFF已留，task scratch清理、原CLAUDE.md保留；无本助手subagent/heavy并发/full suite/exe/20k/独立review。原三提案上限与N≤2裁决不符、部分review收敛标准、结构化hypothesis/falsifiers及专门apply-to-context批准尚待后续，不称17.5完整完成，原47不升级、goal active。本批Git/未来CI另绑定。
 
 延后观察20.51 `189374283093ce678469451da1f70f5185ed00be` CI40986394168已success，故editor fixture修补现有CI证据；20.50 CI40986098392 failure为同五fixture（已由20.51修补）。20.52 `0960d010a20f16a06e24bfe900b737a0895eb1d7` CI40987047192仍in_progress、Watch40987047203 success；待跑完不可报通过。
+
+
+### 20.54 团队两人上限与完整交叉评审覆盖
+
+沿17.5裁决继续：原team tool maxItems/执行允许3，与N≤2不符；一个带证据的none-found可覆盖其他review failed/漏答/insufficient甚至proposer缺席。原[tool](../../packages/ts-shell/src/core/tools/teamTool.ts)把description/schema/admission同步为2（三个视角在dispatch前拒绝）。原[run](../../packages/ts-shell/src/core/subagents/team/run.ts)按requested peer×reviewable proposal补缺失finding为insufficient，原[convergence](../../packages/ts-shell/src/core/subagents/team/convergence.ts)只在所有peer有backed clean check才survived；insufficient/未引用none-found与peer遗漏都unresolved。已绑定counterevidence/condition mismatch仍优先refuted，不用缺失评审抹除观察到的反证。既有纯函数"insufficient+clean peer仍survived"测试为旧裁决冲突，改精确unresolved并保留场景。
+
+先读AgentJournal和JobStore，确认分别为agent/remote backend上限2，不冒充全进程总量锁；本批只落实本前台pass≤2，不新worker pool或改jobs容量。对照reference parallel.ts input-order、取消不再调度、保留完成结果，复用20.53既有结算即可；reference同类调度存在但当前两人入口无必要复制该worker pool，Node20.3边界保持。
+
+基线三文件6失败/47通过；最终六文件75通过，原tool/run/convergence分别独立反转1/3/5失败（后者双文件），finally bytes恢复后75重跑。五门/build/独立freshness通过，118旧docs advisory；build `8a5cec06060687eaee5e213e0f7937aa7a80ecab54d1646f3dff7b5f10923bb9`、inputs `a3110da22245e72ab5a93fc67b0963ef31ae8742c9cbede8e6334a2a16fc199a`，460/3554、五owner7/1/5/8/2。原NodeCLI/PTY/loopback两模式每turn discovery load→未读引用unresolved→native selected line2-2绑定refuted→三个视角拒绝且零新增proposer请求→两held review Ctrl+C102/101ms结束；exit143/185ms、0/cooked、每模式26POST/4GET，文件/config保持、scratch清理。覆盖缺失组合由unit矩阵证明，CLI用真实两人入口，因此不冒充三人生产质量或全局并发测量。
+
+[正式工件](../../.omx/artifacts/phase20-addition-team-coverage/)及HANDOFF留证，原CLAUDE.md保留，无本助手subagent/heavy并发/exe/full suite/20k/真实生产provider/非Linux/独立review。结构化hypothesis/evidenceRefs/falsifiers和专门context-adoption批准仍待续，不称17.5或原47完成，goal active。本批Git/未来CI另绑定。
+
+20.53已推送`8e4e6fd1b3865fc657dee87644912296c75ec009`（69测试/双模式CLI证据）。延后精确CI：20.52 `0960d010` CI40987047192已success；20.53 CI40989150210仍in_progress、Watch40989150206 success；20.51 CI40986394168 success，本批不把未完成CI当通过。

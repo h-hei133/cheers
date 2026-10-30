@@ -1071,3 +1071,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A team reports a refutation from an invented path, or waits forever after Ctrl+C in cross-review; intermediate narration can also become the retained claim.
 - **Root Cause**: Parsing evidence strings is mistaken for observed source acquisition, and only the proposal pass has abort settlement. Discovery tool loading also lasts one turn, not every later turn.
 - **Rule**: Issue per-review receipts through the existing native read observer, bind every citation to that reviewer and selected content, and downgrade unbound findings. Prefer explicit finalText, including an empty final answer. Settle cancellation at the review boundary, remove listeners immediately, observe late rejection and discard late publication; this does not prove external work terminated. CLI fixtures must load a discovered tool in each turn and fence HTTP assertion failures before cleanup.
+
+
+### Clean Peer Findings Do Not Cover Missing Reviews
+- **Symptom**: A team reports survived when one reviewer has a clean check but another failed, omitted the claim or could not inspect it; public tool arity exceeds the intended concurrency budget.
+- **Root Cause**: Convergence sees only returned findings, so omitted expected peers disappear. Any backed none-found is treated as sufficient coverage.
+- **Rule**: Project each requested proposal/peer assignment at the original run owner, retain missing findings as insufficient, and require every peer's backed clean check before survived. A backed contradiction still refutes despite missing peers. Keep tool schema, admission and advertised limit aligned; per-backend job limits do not prove a universal runtime semaphore.

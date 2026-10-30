@@ -57,7 +57,14 @@ export async function runTeam(input: TeamRunInput): Promise<TeamRun> {
     const others = reviewable.filter(candidate => candidate.id !== proposal.id);
     return others.length ? reviewProposal(input, proposal.id, others) : undefined;
   }));
-  const refutations = reviews.flatMap(review => review?.findings ?? []);
+  const observed = reviews.flatMap(review => review?.findings ?? []);
+  // Every requested peer must provide a backed check for a survivor. A failed
+  // proposer or omitted finding leaves the same gap as an inconclusive review.
+  const refutations: Refutation[] = reviewable.flatMap(proposal => input.requests
+    .filter(request => request.id !== proposal.id)
+    .map(request => observed.find(finding => finding.proposalId === proposal.id && finding.reviewerId === request.id)
+      ?? { proposalId: proposal.id, reviewerId: request.id, kind: "insufficient" as const, evidence: [],
+        reason: "The required peer review supplied no finding for this proposal." }));
   const failedReviews = reviews.flatMap(review => review?.failure ? [review.failure] : []);
   const convergence = converge(reviewable, refutations);
 

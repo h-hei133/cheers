@@ -78,15 +78,15 @@ describe("converging proposals", () => {
     expect(outcome.reason).toContain("another objected without citing anything");
   });
 
-  it("still says survived when the only other findings were inconclusive", () => {
-    // `insufficient` is not an objection: a reviewer that could not check
-    // something has not disagreed with anyone.
+  it("keeps the proposal unresolved when another review was inconclusive", () => {
+    // An inconclusive check leaves review coverage incomplete even when a peer
+    // returned a clean bounded check.
     const result = converge(PROPOSALS, [
       refutation({ proposalId: "a", reviewerId: "one", kind: "insufficient", reason: "Could not check." }),
       refutation({ proposalId: "a", reviewerId: "two", kind: "none-found", evidence: ["s1"] }),
     ]);
 
-    expect(result.outcomes.find(entry => entry.proposalId === "a")?.verdict).toBe("survived");
+    expect(result.outcomes.find(entry => entry.proposalId === "a")?.verdict).toBe("unresolved");
   });
 
   it("leaves a proposal nobody reviewed unresolved", () => {

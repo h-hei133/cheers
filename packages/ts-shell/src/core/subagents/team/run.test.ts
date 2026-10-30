@@ -183,3 +183,29 @@ it("rejects self review and forged reviewer identity at the orchestration bounda
   expect(result.convergence.outcomes.every(entry => entry.verdict === "unresolved")).toBe(true);
   expect(result.failedReviews).toHaveLength(3);
 });
+
+
+it.each(['failed-review', 'missing-finding', 'insufficient', 'failed-proposer'])(
+  'keeps a clean check unresolved when peer coverage has %s', async scenario => {
+    const result = await runTeam(input({
+      propose: async request => { if (scenario === 'failed-proposer' && request.id === 'c') throw Error('no proposal'); return request.id; },
+      review: async ({ reviewerId, proposals }) => {
+        if (reviewerId === 'c' && scenario === 'failed-review') throw Error('no review');
+        return proposals.flatMap(proposal => reviewerId === 'c' && scenario === 'missing-finding' ? [] : [{
+          reviewerId, proposalId: proposal.id, kind: reviewerId === 'c' && scenario === 'insufficient' ? 'insufficient' as const : 'none-found' as const,
+          reason: 'bounded check', evidence: ['receipt'],
+        }]);
+      },
+    }));
+    expect(result.convergence.outcomes.find(entry => entry.proposalId === 'a')?.verdict).toBe('unresolved');
+    expect(result.convergence.outcomes.find(entry => entry.proposalId === 'a')?.reason).toContain('review');
+  });
+
+it('retains a backed refutation even when another required peer never reviews', async () => {
+  const result = await runTeam(input({ review: async ({ reviewerId }) => {
+    if (reviewerId === 'c') throw Error('no review');
+    return reviewerId === 'b' ? [{ proposalId: 'a', reviewerId, kind: 'counterevidence', reason: 'Observed contradiction.', evidence: ['receipt'] }] : [];
+  } }));
+  expect(result.convergence.outcomes.find(entry => entry.proposalId === 'a')?.verdict).toBe('refuted');
+  expect(result.limitation).toContain('incomplete');
+});

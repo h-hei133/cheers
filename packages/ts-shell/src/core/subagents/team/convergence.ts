@@ -116,6 +116,13 @@ export function converge(proposals: readonly Proposal[], refutations: readonly R
     // is the one way this function could quietly upgrade a contested proposal.
     const checked = backed.filter(refutation => refutation.kind === "none-found");
     if (checked.length > 0) {
+      if (about.some(refutation => refutation.kind === "insufficient"
+        || refutation.kind === "none-found" && refutation.evidence.length === 0)) {
+        return {
+          proposalId: proposal.id, verdict: "unresolved", decisive: [],
+          reason: "A peer found no counterevidence, but another required review did not establish a backed finding. Review coverage is incomplete.",
+        };
+      }
       const unbacked = about.filter(refutation => refutation.evidence.length === 0
         && (refutation.kind === "counterevidence" || refutation.kind === "condition-mismatch"));
       if (unbacked.length > 0) {
