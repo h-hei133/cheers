@@ -71,3 +71,9 @@ Before this batch the first three agreed with each other and the fourth did not,
 A probe mistake is kept on record: the first version passed an empty access object, so `assertOperationFile` could not find the attached root among the grants and the preview reported `snapshot-or-workspace-unavailable`. That is the check doing its job — undo will not restore through a root the session does not currently hold — not a product defect.
 
 `patch-readonly-probe.mjs` covers the other side: a patch targeting a read-only attached root is refused during preparation ("This additional workspace root is read-only.") and no file is created.
+
+## Revoking the grant also revokes restore
+
+`revoked-probe.mjs` writes through an attached root, removes the grant with `/workspace remove`, then tries to restore the old operation: the preview reports `canRestore: false` with `snapshot-or-workspace-unavailable`, the restore is `blocked`, and the file keeps the written bytes.
+
+That is the intended shape. The grant is a live authority the session holds, not a permanent permission captured when the write happened, so undo cannot write back through a root the user has since detached.
