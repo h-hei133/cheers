@@ -1,0 +1,33 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/arguments.test.ts  (26 tests | 1 failed | 25 skipped) 86ms
+   ❯ src/core/tools/arguments.test.ts > a write through an attached root keeps the session ledger > records the operation under the session root, not the attached one
+     → expected true to be false // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 25 skipped (26)
+   Start at  02:22:32
+   Duration  4.04s (transform 2.83s, setup 0ms, collect 3.72s, tests 86ms, environment 0ms, prepare 52ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/arguments.test.ts > a write through an attached root keeps the session ledger > records the operation under the session root, not the attached one
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/core/tools/arguments.test.ts:284:79
+    282|     // The ledger root is derived from the operation identity; the att…
+    283|     // must not acquire one of its own.
+    284|     expect(fs.existsSync(path.join(attached, '.sisyphus', 'edit-snapsh…
+       |                                                                               ^
+    285|   })
+    286| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

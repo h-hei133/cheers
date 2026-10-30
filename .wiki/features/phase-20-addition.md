@@ -4739,3 +4739,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 21.39–21.41修复了write/edit/read/glob/grep的围栏，但复查发现[workspaceToolBinding](../../packages/ts-shell/src/core/workspace/tools.ts)——**权限层**用于决定批准哪个根并重写参数的函数——一直没有测试。它本来就用`selectWorkspaceRoot`并读取`roots`，因此修复前存在「权限层批准附加根、工具体层拒绝」的不一致，正是21.38观察到的「批准了却写不进去」的另一半。
 
 新增[四个用例](../../packages/ts-shell/src/core/workspace/tools.test.ts)锁定契约：附加根被选中且参数重写为该根下的绝对目标；主根内路径保留调用者拼写；只读附加根对write拒绝而对read放行；未注册路径拒绝且非文件工具仍绑主根。4项通过；五静态门与TS build通过，118旧docs advisory保留。build `91aa1e1d8bb4`。原47/ADD整体partial、goal active。
+
+
+### 21.47 附加根写入的撤销账本仍归属会话
+
+21.39把editIdentity绑到解析出的根，使receipt与operation scope一致；本批发现这带来一个默认profile下的真实副作用：`storageRoot(scope)`在无命名profile时回退到`scope.workspace.path`，于是附加根写入的账本落在**附加根**下的`.sisyphus/edit-snapshots`，而`/undo`从会话主根读取——写入成功却看不到撤销记录。探针实测：默认profile下`primaryLedgerExists:false`、`attachedLedgerExists:true`。
+
+现editIdentity的workspaceRoot改回`artifactRoot ?? workspaceRoot`（会话主根），而写入目标仍用解析根：账本随会话、写入随授权。修复后同一探针为`primaryLedgerExists:true`、`attachedLedgerExists:false`，写入仍成功。21.39当时观察到的`Edit operation receipt is invalid.`实为探针缺`taskId`导致`callId`为空，与账本归属无关——此判断错误已在本批纠正。
+
+验证：`arguments`26（新例用真实execution service断言附加根下不产生账本）、`workspace/tools`4、`workspace/approval`25、`fileAccess`3、`workspace`9，共**67项**通过；六反转（write/read/glob/grep退回只查主根、以read解析write授权、账本跟随目标根）全部命中且finally字节恢复；五静态门、TS build/freshness、端到端探针（拒绝→授权→写入→目录替换失效）通过。build `a3fd86238923`。原47/ADD整体partial、goal active。

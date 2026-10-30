@@ -1280,3 +1280,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A hand-written PTY wrapper reports `exit-timeout` for a command that exits immediately.
 - **Root Cause**: The wrapper relayed the child's output but never forwarded the parent's stdin, so the typed `/exit` never reached the process.
 - **Rule**: Use the shared relay helper for PTY probes rather than writing a new one. Also resolve every dynamic value (a loopback port, a temp path) before writing config that references it: a config written first produces a misleading `Invalid URL` and the turn never dispatches, which reads like a product failure.
+
+### A Write Target Root And The Undo Ledger Are Different Owners
+
+- **Symptom**: A write through an attached workspace root succeeds, but `/undo` does not list it; a `.sisyphus/edit-snapshots` directory appears under the attached root.
+- **Root Cause**: The edit operation identity decides where the ledger lives. With the default profile (no named profile) the store falls back to the operation scope's workspace, so binding the identity to the write target moved the ledger there while undo reads the session's root.
+- **Rule**: Carry the resolved root into containment, the execution service, and the write itself, but keep `editIdentity.workspaceRoot` on the session's primary root. Test with the default profile, not only a named one, and assert that no ledger directory appears under the attached root. Do not diagnose `Edit operation receipt is invalid.` as a ledger-contract problem before checking that the caller supplied `taskId` — an empty `callId` produces the same message.

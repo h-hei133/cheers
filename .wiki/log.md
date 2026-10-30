@@ -10748,3 +10748,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：文件工具根选择的测试覆盖
 
 [addition21.46](features/phase-20-addition.md#2146-文件工具根选择的测试覆盖)发现workspaceToolBinding（权限层选根与参数重写）从无测试，它本就用selectWorkspaceRoot，故修复前是「权限层批准、工具体层拒绝」的不一致来源。新增四用例锁定：附加根选中且参数重写、主根内保留拼写、只读根write拒read允、未注册拒绝且非文件工具绑主根。4项通过、五门/TS build通过。build 91aa1e1d。原47/ADD整体partial、goal active。
+
+### 2026-10-31：附加根写入的撤销账本仍归属会话
+
+[addition21.47](features/phase-20-addition.md#2147-附加根写入的撤销账本仍归属会话)发现21.39的副作用：默认profile下storageRoot回退到scope.workspace.path，附加根写入的账本落在附加根、`/undo`看不到。现editIdentity改回会话主根、写入仍用解析根。探针从primaryLedgerExists:false/attached:true变为true/false且写入仍成功。21.39的`Edit operation receipt is invalid.`实为探针缺taskId，本批纠正。67项聚焦、六反转命中、五门/TS build/端到端通过。build a3fd8623。原47/ADD整体partial、goal active。

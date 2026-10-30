@@ -258,3 +258,29 @@ describe('an attached root is searchable', () => {
     expect(String(result.output ?? '')).toContain('needle')
   })
 })
+
+describe('a write through an attached root keeps the session ledger', () => {
+  const root = (name: string): string => fs.mkdtempSync(path.join('/tmp/cheers-test/', name))
+
+  it('records the operation under the session root, not the attached one', async () => {
+    // Undo reads the ledger the session owns. A write whose ledger moved to the
+    // attached root would succeed and then be invisible to /undo.
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true })
+    const primary = root('ledger-primary-')
+    const attached = root('ledger-attached-')
+    // A real execution service, because the ledger is written by the operation
+    // store rather than by the mocked write call.
+    const tool = createCoreToolRegistry({}).get('write')!
+    const target = path.join(attached, 'note.txt')
+
+    await expect(tool.execute({ path: target, content: 'x' }, {
+      workspaceRoot: primary, taskId: 'ledger-attached',
+      workspaceRoots: [captureWorkspaceRoot(attached, attached, 'write')],
+      sessionId: 'sess_ledger',
+    })).resolves.toBeDefined()
+    expect(fs.existsSync(target)).toBe(true)
+    // The ledger root is derived from the operation identity; the attached root
+    // must not acquire one of its own.
+    expect(fs.existsSync(path.join(attached, '.sisyphus', 'edit-snapshots'))).toBe(false)
+  })
+})

@@ -352,7 +352,7 @@ export function createCoreToolRegistry(options?: {
           }
           const written = await executionService.writeTextFile({
             operationKind: 'file.write',
-            ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: root, callId: context.taskId, correlationId: context.correlationId } } : {}),
+            ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: context.artifactRoot ?? context.workspaceRoot, callId: context.taskId, correlationId: context.correlationId } } : {}),
             assertFileAccess: context.assertFileAccess,
             abortSignal: context.abortSignal,
             absolutePath: target,
@@ -536,7 +536,7 @@ export function createCoreToolRegistry(options?: {
 
         const written = await executionService.writeTextFile({
           operationKind: 'file.write',
-            ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: root, callId: context.taskId, correlationId: context.correlationId } } : {}),
+            ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: context.artifactRoot ?? context.workspaceRoot, callId: context.taskId, correlationId: context.correlationId } } : {}),
           assertFileAccess: context.assertFileAccess,
           abortSignal: context.abortSignal,
           absolutePath: target,

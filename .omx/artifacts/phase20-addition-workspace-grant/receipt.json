@@ -1,6 +1,6 @@
 {
-  "buildId": "96a6043df384a05279f4b6944d2ba9c04c6f0892110ea329d30eff83361ba368",
-  "inputsDigest": "1615471a421914223b98423c4482ffef2880b0a98e93a47bfd4b5cc7d35198f7",
+  "buildId": "a3fd8623892342a338e3b9c863f01374bd636ce583a28694c712a87991b50dd3",
+  "inputsDigest": "b4fbd424b73f9aad901427a042e4f31674cf7af9b566de13085093031f293572",
   "status": "passed",
   "refusedBeforeGrant": {
     "ok": false,
@@ -13,7 +13,7 @@
     "note": "Additional workspace root saved. File access uses its declared mode; executable project resources still come from the primary root.",
     "roots": [
       {
-        "path": "/home/wang/projects/cheers/.tmp/workspace-grant/run-4xgtT5/outside",
+        "path": "/home/wang/projects/cheers/.tmp/workspace-grant/run-F0kRXC/outside",
         "access": "write"
       }
     ]

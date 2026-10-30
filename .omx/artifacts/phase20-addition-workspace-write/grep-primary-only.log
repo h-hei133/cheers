@@ -1,14 +1,14 @@
 
  RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
 
- ❯ src/core/tools/arguments.test.ts  (25 tests | 1 failed | 24 skipped) 12ms
+ ❯ src/core/tools/arguments.test.ts  (26 tests | 1 failed | 25 skipped) 12ms
    ❯ src/core/tools/arguments.test.ts > an attached root is searchable > finds content under an attached root with grep
      → expected { success: false, …(2) } to match object { success: true }
 
  Test Files  1 failed (1)
-      Tests  1 failed | 24 skipped (25)
-   Start at  01:54:29
-   Duration  3.83s (transform 2.70s, setup 0ms, collect 3.59s, tests 12ms, environment 0ms, prepare 53ms)
+      Tests  1 failed | 25 skipped (26)
+   Start at  02:22:27
+   Duration  4.02s (transform 2.84s, setup 0ms, collect 3.78s, tests 12ms, environment 0ms, prepare 55ms)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
