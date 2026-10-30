@@ -1,0 +1,53 @@
+{
+  "mode": "regular",
+  "buildId": "e2930dba7c8af5c2ce9a7ae62770da5573bfeaa5485c38b406ce9216dbc1b47f",
+  "inputsDigest": "e2bd5e51ebe097036feaf680dd0ffb219c2f3a5c5eb302c0a9a533badcce0d38",
+  "savedMessages": 1,
+  "status": "failed",
+  "stages": [
+    {
+      "action": "conflicted stash primary",
+      "advertised": "alt+k",
+      "originalRestored": true,
+      "noticePainted": true
+    },
+    {
+      "action": "external editor with empty slot",
+      "advertised": "alt+k",
+      "originalRestored": true,
+      "noticePainted": true
+    },
+    {
+      "action": "external editor with occupied slot",
+      "advertised": "alt+z",
+      "originalRestored": true,
+      "olderSlotRetained": true,
+      "noticePainted": true
+    },
+    {
+      "action": "unbound stash then actual reload",
+      "originalRetainedAndRestored": true,
+      "noDefaultKeyAdvertised": true,
+      "noticePainted": true
+    }
+  ],
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 45,
+    "outputBytes": 2097152
+  },
+  "failure": "closed-draft-unbound second",
+  "observation": {
+    "ends": 3,
+    "reloads": 4,
+    "renders": 26,
+    "sessionId": "sess_6d174a62133bbe84_1793356712674",
+    "draft": "",
+    "stashKey": "alt+k"
+  },
+  "requests": 0,
+  "outputBytes": 32278,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

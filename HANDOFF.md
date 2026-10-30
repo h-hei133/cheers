@@ -1181,3 +1181,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A CLI probe completes native investigation and fresh review but fails because it expects two source records, or because it hashes a trimmed quote.
 - **Root Cause**: Research source identity is content-addressed from locator/hash/excerpts, so identical re-reads refresh the same record. The native read hash binds selected text, including its terminal newline; retained excerpts may normalize that text for citation.
 - **Rule**: Prove fresh acquisition with distinct child/request identities, actual native receipt delivery and current-review attribution, rather than source count. Check the declared hash scope against the original selected bytes and validate the quote separately. A completed child with no reads can still have a failed review and a partial run.
+
+### Recovery Hints Must Follow Effective Keys And Settled Input
+- **Symptom**: A stash/rewrite notice advertises a key that was rebound or lost a conflict. A new external-editor test also restores a draft missing its final character.
+- **Root Cause**: Notices hardcode default keys; the fixture invokes a programmatic editor callback before StdinBuffer emits its pending final grapheme.
+- **Rule**: Resolve advertised actions against current conflict winners and explicitly report an unbound action. In host tests flush the existing input scheduler before invoking external callbacks, then verify actual restoration with exact text. CLI drivers should clear only nonempty drafts; repeated Ctrl+C on an empty prompt can legitimately exit.

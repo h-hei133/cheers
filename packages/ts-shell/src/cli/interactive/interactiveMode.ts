@@ -191,7 +191,7 @@ export class InteractiveMode {
     workspaceRoot: () => this.options.runtimeContext.projectRoot,
     adoptDraft: (text) => {
       // A rewrite from an external editor replaces the draft whole. Keep what it
-      // replaced so the original is one ctrl+s away instead of lost — an undo of
+      // replaced so the original is one stash shortcut away instead of lost — an undo of
       // an edit that never happened in this terminal cannot reach it.
       //
       // When a draft is already stashed the slot is full, and the rewrite wins
@@ -202,9 +202,11 @@ export class InteractiveMode {
       const previous = this.state.editor.snapshot();
       if (previous.text.trim() && previous.text !== text) {
         const kept = this.stash.stash({ text: previous.text, cursor: previous.cursor });
+        const key = this.preferences.shortcut(kept ? 'tui.input.stash' : 'tui.editor.undo');
         this.toast = kept
-          ? "Draft rewritten · ctrl+s brings the original back"
-          : "Draft rewritten · the slot already held a draft, so this original is only reachable with ctrl+z";
+          ? key ? `Draft rewritten · ${key} brings the original back` : 'Draft rewritten · original stashed (shortcut unbound)'
+          : key ? `Draft rewritten · the slot already held a draft, so this original is only reachable with ${key}`
+            : 'Draft rewritten · the slot already held a draft; undo shortcut is unbound';
       }
       this.replaceExternalDraft(text);
     },
@@ -1466,7 +1468,8 @@ export class InteractiveMode {
       this.vimSelection = undefined;
       this.state.editor.clear();
       this.syncSuggestions(false);
-      this.toast = "Draft stashed · ctrl+s takes it back";
+      const key = this.preferences.shortcut('tui.input.stash');
+      this.toast = key ? `Draft stashed · ${key} takes it back` : 'Draft stashed (shortcut unbound)';
       this.tui.requestRender();
       return;
     }

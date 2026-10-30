@@ -1838,6 +1838,21 @@ it.each(['regular', 'fullscreen'] as const)('stashes the draft and takes it back
   } finally { mode.stop(); }
 });
 
+it.each((['regular', 'fullscreen'] as const).flatMap(kind => ['remapped', 'conflicted'].map(binding => ({ kind, binding }))))(
+  'advertises the effective draft shortcut after $binding stash bindings in $kind', ({ kind, binding }) => {
+    const { mode, terminal } = build({ tuiMode: kind });
+    const host = mode as unknown as { view: InteractiveView; toast?: string; preferences: { keybindings: Keybindings } };
+    mode.start();
+    try {
+      host.preferences.keybindings.setUserConfig(binding === 'remapped' ? { 'tui.input.stash': ['alt+k'] }
+        : { 'tui.input.stash': ['alt+j', 'alt+k'], 'app.retry': ['alt+j'] });
+      terminal.input('retained original'); terminal.input('\x1bk');
+      expect(host.view.editor.getText()).toBe('');
+      expect(host.toast).toBe('Draft stashed · alt+k takes it back');
+      terminal.input('\x1bk'); expect(host.view.editor.getText()).toBe('retained original');
+    } finally { mode.stop(); }
+  });
+
 it('stashes on the alternate chord too, for a terminal that eats the primary one', () => {
   // ctrl+s is XOFF. A terminal with flow control still on, or a multiplexer
   // that forwards it, never delivers the key; the fallback has to work on its
@@ -4056,6 +4071,32 @@ it('resets pending Vim state when the real external-editor round trip adopts a d
     terminal.input('x');
     scheduler.flush();
     expect(host.view.editor.getText()).toBe('fresh draftx');
+  } finally { mode.stop(); }
+});
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind => [
+  'remapped stash', 'unbound stash', 'conflicted stash', 'remapped undo', 'unbound undo', 'conflicted undo',
+].map(binding => ({ kind, binding }))))('uses the effective draft shortcut for external rewrites with $binding in $kind', ({ kind, binding }) => {
+  const scheduler = new ManualScheduler(), { mode, terminal } = build({ tuiMode: kind, scheduler });
+  const host = mode as unknown as { view: InteractiveView; toast?: string;
+    preferences: { keybindings: Keybindings; openExternalEditor(text: string): void } };
+  const occupied = binding.endsWith('undo'), unbound = binding.startsWith('unbound') || binding === 'conflicted stash';
+  const action = occupied ? 'tui.editor.undo' : 'tui.input.stash', key = occupied ? 'alt+z' : 'alt+k';
+  const keys = unbound ? binding.startsWith('conflicted') ? ['alt+j'] : [] : binding.startsWith('conflicted') ? ['alt+j', key] : [key];
+  vi.spyOn(externalEditor, 'editExternally').mockReturnValue({ text: 'rewritten draft' });
+  mode.start();
+  try {
+    host.preferences.keybindings.setUserConfig({ [action]: keys, ...(binding.startsWith('conflicted') ? { 'app.retry': ['alt+j'] } : {}) });
+    if (occupied) { terminal.input('older stashed draft'); terminal.input('\x13'); scheduler.flush(); }
+    terminal.input('original draft'); scheduler.flush(); host.preferences.openExternalEditor(host.view.editor.getText()); scheduler.flush();
+    expect(host.view.editor.getText()).toBe('rewritten draft');
+    expect(host.toast).toBe(occupied
+      ? unbound ? 'Draft rewritten · the slot already held a draft; undo shortcut is unbound'
+        : `Draft rewritten · the slot already held a draft, so this original is only reachable with ${key}`
+      : unbound ? 'Draft rewritten · original stashed (shortcut unbound)' : `Draft rewritten · ${key} brings the original back`);
+    if (unbound) host.preferences.keybindings.setUserConfig({ [action]: [key] });
+    terminal.input(occupied ? '\x1bz' : '\x1bk'); scheduler.flush(); expect(host.view.editor.getText()).toBe('original draft');
+    if (occupied) { terminal.input('\x13'); expect(host.view.editor.getText()).toBe('older stashed draft'); }
   } finally { mode.stop(); }
 });
 

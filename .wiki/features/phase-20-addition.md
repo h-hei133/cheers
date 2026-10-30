@@ -4480,3 +4480,15 @@ publication首轮只换方向仍失败，诊断看到完整内置条目后改为
 主代理严格串行：五静态门、两个脚本syntax与两模式原CLI通过，118旧docs advisory保留。复用已验freshness的build `7499028c41a4b125f9d40e17b29501c009d3db8a8783211cd7130ed93892a7f1`、inputs `336820d5bccff83c07312cede18a15fa093f35a8f1a389105cfad52633622578`；无产品源码变化，未重跑unit/build或修改源码做反转。两份初期probe失败收据保留：错把相同来源复读当两record、对原selected-text哈希先trim；修正为实际child/request/receipt/当前review归属和保留末尾换行的哈希，未改产品或放宽fresh read断言。详见[正式工件](../../.omx/artifacts/phase20-addition-research-wire/README.md)与HANDOFF。
 
 一次延后读回：316e4de7的CI41035961101/Watch41035960972均completed/success；ed4820cb的CI41039139794仍in_progress、Watch41039139814 completed/success且head一致；本批Git/未来CI另绑定。原CLAUDE.md保留，无full suite/并行heavy/本助手subagent/20k真实终端/exe、独立review或NormProof judge。此为确定性loopback的实际请求契约，非生成式模型研究质量、真实provider费用/可用性、deep/paper/mixed/save/recovery/平台验收；ADD-11/12与原47/ADD整体不升级，goal active。
+
+### 21.23 草稿暂存与外部编辑撤回提示使用实际绑定
+
+继续17.4的真实可用快捷键要求。默认键与alt+s已存在，但[host](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)的stash/rewrite三条提示仍写死ctrl+s/ctrl+z；用户重绑定或冲突后，实际动作和恢复提示不一致。现于原[InputPreferences](../../packages/ts-shell/src/cli/interactive/inputPreferences.ts)复用thinkingShortcut的有效键查找，选首个仍派发到对应action的键；thinking callback委托同方法。host只在提示生成时读取它，无可用键明确写shortcut unbound。stash槽、互换、undo、外部编辑执行和路由保持原owner，不增第二份草稿或绑定表。
+
+目标先读后定向只读比较参考PromptInput.tsx:819–823的action-aware hint与ConfigurableShortcutHint/useShortcutDisplay：同意按实际action读取，未复制其迁移fallback；本项目始终有accepted binding owner，显式unbound不能退回默认键。新宿主回归和反转分别验证动态提示、冲突过滤及无默认回退。
+
+主代理串行：旧实现16新增全失败；最终**26项去重**聚焦通过，374未选不计，三反转分别16/6/4断言失败并finally字节恢复；恢复26项再过、五静态门与TS build/freshness通过，118旧docs advisory保留。保守AST含constructor和命名property callback，InputPreferences7→8、既有host123→123；未解决host责任上限。build `e2930dba7c8af5c2ce9a7ae62770da5573bfeaa5485c38b406ce9216dbc1b47f`，inputs `e2bd5e51ebe097036feaf680dd0ffb219c2f3a5c5eb302c0a9a533badcce0d38`，见[正式工件](../../.omx/artifacts/phase20-addition-draft-shortcuts/README.md)。
+
+原NodeCLI regular/fullscreen各1保存会话×1消息、45秒/2MiB/heap768MiB限制，真实alt+k stash/恢复、外部editor进程、alt+z undo、保留旧槽、unbound提示与三次实际/reload均通过，每条notice既观察state也等待实际terminal输出。零HTTP请求、config/project不变（只有probe主动改fixture keybindings）、Ctrl+D exit0/cooked恢复，scratch清理。第一次host fixture未flush最后grapheme，第一次CLI又对空草稿连续Ctrl+C触发原退出；两类失败日志保留，均只修fixture，不改产品手势或放宽原文恢复。
+
+ed4820cb的CI41039139794/Watch41039139814延后读回均completed/success；上一证据提交ff084423的CI41040907065仍in_progress、Watch41040907311 success且head一致，不重复轮询。本批Git/未来CI另绑定，原CLAUDE.md保留。无full suite/并行heavy/本助手subagent/20k真实终端/exe、真实provider/独立review/NormProof judge；非raw流控、用户桌面与非Linux未验收，原47/ADD整体不升级、goal active。

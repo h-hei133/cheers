@@ -44,9 +44,12 @@ export class InputPreferences {
     return this.bindings;
   }
 
-  /** The advertised shortcut must dispatch after user bindings and conflicts. */
-  readonly thinkingShortcut = (): string | undefined => this.bindings.keysFor('app.thinking.toggle')
-    .find(key => this.bindings.actionFor(key) === 'app.thinking.toggle');
+  /** Advertise only a shortcut that still dispatches after binding conflicts. */
+  shortcut(actionId: string): string | undefined {
+    return this.bindings.keysFor(actionId).find(key => this.bindings.actionFor(key) === actionId);
+  }
+
+  readonly thinkingShortcut = (): string | undefined => this.shortcut('app.thinking.toggle');
 
   /**
    * Re-read everything on disk.

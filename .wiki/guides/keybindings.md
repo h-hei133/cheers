@@ -43,6 +43,9 @@ Use distinct keys to avoid ambiguity. Malformed JSON falls back to defaults. Unk
 a string or list of strings are reported and ignored. Unusable chords are reported and dropped; if none remain, that
 action becomes unbound rather than falling back to its defaults.
 
+Draft stash and external-editor notices show a shortcut that still works after conflict resolution. If none is bound,
+the notice says so. Update `keybindings.json` and run `/reload` to make a recovery shortcut available again.
+
 Group navigation applies only while a grouped picker owns input, so its Tab binding does not conflict with editor
 completion. Enter, Escape, Ctrl+C, Up/Down, Space, Backspace, Delete, Ctrl+D, Ctrl+P and Ctrl+R remain reserved for picker
 confirmation, cancellation, navigation and editing. Assigning a group action to one of these keys reports the problem

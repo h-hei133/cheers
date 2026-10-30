@@ -1,0 +1,11 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/interactiveMode.test.ts -t draft shortcut|stash|pre-rewrite|rewrite cannot|thinking.*shortcut
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/interactiveMode.test.ts  (400 tests | 374 skipped) 644ms
+
+ Test Files  1 passed (1)
+      Tests  26 passed | 374 skipped (400)
+   Start at  18:34:00
+   Duration  13.59s (transform 9.92s, setup 0ms, collect 12.69s, tests 644ms, environment 0ms, prepare 64ms)

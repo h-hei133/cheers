@@ -1,0 +1,15 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/interactiveMode.test.ts -t draft shortcut|stash|pre-rewrite|rewrite cannot|thinking.*shortcut
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/interactiveMode.test.ts  (400 tests | 374 skipped) 614ms
+
+ Test Files  1 passed (1)
+      Tests  26 passed | 374 skipped (400)
+   Start at  18:37:21
+   Duration  13.67s (transform 9.92s, setup 0ms, collect 12.79s, tests 614ms, environment 0ms, prepare 59ms)
+
+npm notice run @cheers/ts-shell@0.1.0 build
+npm notice run node ../../scripts/build-cli.mjs
+Wrote build manifest e2930dba7c8a for @cheers/ts-shell@0.1.0

@@ -10601,3 +10601,11 @@ resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不�
 主代理串行五门、syntax与两CLI通过，118旧advisory保留；复用fresh build，源码不变而不重跑unit/build。两次probe错误分别为content-addressed复读应刷新同source、selected-text哈希保留末尾换行；失败收据保留，未改产品，HANDOFF补guardrail。每模式heap768MiB/60秒/2MiB/30POST上限，实际22POST，config/project不变、exit0/cooked、scratch清理。确定性fixture不代表真实研究质量/provider/平台验收，原47与ADD不升级、goal active。
 
 316e4de7 CI41035961101/Watch41035960972延后读回均completed/success；ed4820cb CI41039139794仍in_progress、Watch41039139814 success且head一致，不重复轮询。正式工件保留，本批提交/推送/未来CI另绑定，CLAUDE.md不改。
+
+## [2026-10-30] fix | 草稿恢复提示读取有效快捷键
+
+[addition21.23](features/phase-20-addition.md#2123-草稿暂存与外部编辑撤回提示使用实际绑定)补17.4重绑定后的提示：InputPreferences复用原thinking有效键查询，host的stash/外部rewrite按实际冲突赢家显示，unbound明确提示而不借默认键。沿原单槽/互换/undo/editor，不增草稿或绑定机制。
+
+主代理串行16新增基线失败、最终26项去重通过，三反转16/6/4断言失败且bytes恢复，恢复26项、五门/build/freshness通过；118旧advisory保留，保守含constructor的owner计数7→8/host123不增长。两模式原CLI各1保存会话×1消息，真实alt+k/alt+z、外部编辑进程、unbound及/reload原稿恢复，提示实际绘制、零请求、文件不变、exit0/cooked。fixture未flush末grapheme和空草稿双Ctrl+C两类失败保留，未改产品来适配；scratch清理、HANDOFF/指南更新。
+
+ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI41040907065仍in_progress、Watch41040907311 success且head一致，本批Git/未来CI另绑定。CLAUDE.md不改，无full suite/20k/exe/真实provider/独立review，非raw流控与桌面/其他平台未验收，原47与ADD整体不升级、goal active。

@@ -1,0 +1,141 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/interactiveMode.test.ts  (400 tests | 16 failed | 384 skipped) 482ms
+   ❯ src/cli/interactive/interactiveMode.test.ts > advertises the effective draft shortcut after 'remapped' stash bindings in 'regular'
+     → expected 'Draft stashed · ctrl+s takes it back' to be 'Draft stashed · alt+k takes it back' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > advertises the effective draft shortcut after 'conflicted' stash bindings in 'regular'
+     → expected 'Draft stashed · ctrl+s takes it back' to be 'Draft stashed · alt+k takes it back' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > advertises the effective draft shortcut after 'remapped' stash bindings in 'fullscreen'
+     → expected 'Draft stashed · ctrl+s takes it back' to be 'Draft stashed · alt+k takes it back' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > advertises the effective draft shortcut after 'conflicted' stash bindings in 'fullscreen'
+     → expected 'Draft stashed · ctrl+s takes it back' to be 'Draft stashed · alt+k takes it back' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'remapped stash' in 'regular'
+     → expected 'Draft rewritten · ctrl+s brings the o…' to be 'Draft rewritten · alt+k brings the or…' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'unbound stash' in 'regular'
+     → expected 'Draft rewritten · ctrl+s brings the o…' to be 'Draft rewritten · original stashed (s…' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'conflicted stash' in 'regular'
+     → expected 'Draft rewritten · ctrl+s brings the o…' to be 'Draft rewritten · original stashed (s…' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'remapped undo' in 'regular'
+     → expected 'Draft rewritten · the slot already he…' to be 'Draft rewritten · the slot already he…' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'unbound undo' in 'regular'
+     → expected 'Draft rewritten · the slot already he…' to be 'Draft rewritten · the slot already he…' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'conflicted undo' in 'regular'
+     → expected 'Draft rewritten · the slot already he…' to be 'Draft rewritten · the slot already he…' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'remapped stash' in 'fullscreen'
+     → expected 'Draft rewritten · ctrl+s brings the o…' to be 'Draft rewritten · alt+k brings the or…' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'unbound stash' in 'fullscreen'
+     → expected 'Draft rewritten · ctrl+s brings the o…' to be 'Draft rewritten · original stashed (s…' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'conflicted stash' in 'fullscreen'
+     → expected 'Draft rewritten · ctrl+s brings the o…' to be 'Draft rewritten · original stashed (s…' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'remapped undo' in 'fullscreen'
+     → expected 'Draft rewritten · the slot already he…' to be 'Draft rewritten · the slot already he…' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'unbound undo' in 'fullscreen'
+     → expected 'Draft rewritten · the slot already he…' to be 'Draft rewritten · the slot already he…' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'conflicted undo' in 'fullscreen'
+     → expected 'Draft rewritten · the slot already he…' to be 'Draft rewritten · the slot already he…' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  16 failed | 384 skipped (400)
+   Start at  18:36:07
+   Duration  13.55s (transform 9.90s, setup 0ms, collect 12.79s, tests 482ms, environment 0ms, prepare 63ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/interactiveMode.test.ts -t draft shortcut
+⎯⎯⎯⎯⎯⎯ Failed Tests 16 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > advertises the effective draft shortcut after 'remapped' stash bindings in 'regular'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > advertises the effective draft shortcut after 'conflicted' stash bindings in 'regular'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > advertises the effective draft shortcut after 'remapped' stash bindings in 'fullscreen'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > advertises the effective draft shortcut after 'conflicted' stash bindings in 'fullscreen'
+AssertionError: expected 'Draft stashed · ctrl+s takes it back' to be 'Draft stashed · alt+k takes it back' // Object.is equality
+
+- Expected
++ Received
+
+- Draft stashed · alt+k takes it back
++ Draft stashed · ctrl+s takes it back
+
+ ❯ src/cli/interactive/interactiveMode.test.ts:1851:26
+    1849|       terminal.input('retained original'); terminal.input('\x1bk');
+    1850|       expect(host.view.editor.getText()).toBe('');
+    1851|       expect(host.toast).toBe('Draft stashed · alt+k takes it back');
+       |                          ^
+    1852|       terminal.input('\x1bk'); expect(host.view.editor.getText()).toBe…
+    1853|     } finally { mode.stop(); }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/16]⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'remapped stash' in 'regular'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'remapped stash' in 'fullscreen'
+AssertionError: expected 'Draft rewritten · ctrl+s brings the o…' to be 'Draft rewritten · alt+k brings the or…' // Object.is equality
+
+- Expected
++ Received
+
+- Draft rewritten · alt+k brings the original back
++ Draft rewritten · ctrl+s brings the original back
+
+ ❯ src/cli/interactive/interactiveMode.test.ts:4093:24
+    4091|     terminal.input('original draft'); scheduler.flush(); host.preferen…
+    4092|     expect(host.view.editor.getText()).toBe('rewritten draft');
+    4093|     expect(host.toast).toBe(occupied
+       |                        ^
+    4094|       ? unbound ? 'Draft rewritten · the slot already held a draft; un…
+    4095|         : `Draft rewritten · the slot already held a draft, so this or…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/16]⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'unbound stash' in 'regular'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'conflicted stash' in 'regular'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'unbound stash' in 'fullscreen'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'conflicted stash' in 'fullscreen'
+AssertionError: expected 'Draft rewritten · ctrl+s brings the o…' to be 'Draft rewritten · original stashed (s…' // Object.is equality
+
+- Expected
++ Received
+
+- Draft rewritten · original stashed (shortcut unbound)
++ Draft rewritten · ctrl+s brings the original back
+
+ ❯ src/cli/interactive/interactiveMode.test.ts:4093:24
+    4091|     terminal.input('original draft'); scheduler.flush(); host.preferen…
+    4092|     expect(host.view.editor.getText()).toBe('rewritten draft');
+    4093|     expect(host.toast).toBe(occupied
+       |                        ^
+    4094|       ? unbound ? 'Draft rewritten · the slot already held a draft; un…
+    4095|         : `Draft rewritten · the slot already held a draft, so this or…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/16]⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'remapped undo' in 'regular'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'unbound undo' in 'regular'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'conflicted undo' in 'regular'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'remapped undo' in 'fullscreen'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'unbound undo' in 'fullscreen'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > uses the effective draft shortcut for external rewrites with 'conflicted undo' in 'fullscreen'
+AssertionError: expected 'Draft rewritten · the slot already he…' to be 'Draft rewritten · the slot already he…' // Object.is equality
+
+- Expected
++ Received
+
+- Draft rewritten · the slot already held a draft, so this original is only reachable with alt+z
++ Draft rewritten · the slot already held a draft, so this original is only reachable with ctrl+z
+
+ ❯ src/cli/interactive/interactiveMode.test.ts:4093:24
+    4091|     terminal.input('original draft'); scheduler.flush(); host.preferen…
+    4092|     expect(host.view.editor.getText()).toBe('rewritten draft');
+    4093|     expect(host.toast).toBe(occupied
+       |                        ^
+    4094|       ? unbound ? 'Draft rewritten · the slot already held a draft; un…
+    4095|         : `Draft rewritten · the slot already held a draft, so this or…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/16]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/interactiveMode.test.ts -t 'draft shortcut'

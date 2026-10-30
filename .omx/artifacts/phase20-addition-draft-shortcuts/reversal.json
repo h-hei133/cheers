@@ -1,0 +1,23 @@
+{
+  "cases": [
+    {
+      "name": "hardcoded-notices",
+      "exit": 1,
+      "tests": "16 failed | 384 skipped (400)",
+      "sourceSha256": "b4cd96d7b4e4917ef89c90ebd4430ac08338cb4e4245e5f0d8ccd7dbd6241112"
+    },
+    {
+      "name": "conflict-filter",
+      "exit": 1,
+      "tests": "6 failed | 394 skipped (400)",
+      "sourceSha256": "31a3aa6c1733eb8e98782accc252b1a794977a17bed04505ab49d39dc32f4822"
+    },
+    {
+      "name": "unbound-fallback",
+      "exit": 1,
+      "tests": "4 failed | 396 skipped (400)",
+      "sourceSha256": "31a3aa6c1733eb8e98782accc252b1a794977a17bed04505ab49d39dc32f4822"
+    }
+  ],
+  "restored": true
+}
