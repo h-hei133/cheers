@@ -10446,3 +10446,10 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 最终6文件76通过，undo原三owner反转6失败、usage反转3失败，字节恢复；五门/build/freshness460/3550、build e23a79095b8f、inputs89102ec6a461，118旧advisory。两模式真实edit两操作→未确认零写→partial保留外部a且恢复b→通知落盘/下一HTTP→complete newest-first→完整通知下一HTTP全部通过；每模式7POST/3GET，退出167/166ms、0/cookedflags。正式工件保留pager/observer setup与usage阻塞分类，不削弱断言；scratch清理、原CLAUDE.md，无subagent/heavy并发/exe/full suite/20k，原47不升级、goal active。
 
 20.49已推送ef4d078d43f2923a02e6d60efe1166ec339633d2，延后CI40983398554仍in_progress/Watch40983398564 success；20.48 CI40981106387 failure，五externalEditor fixture试图执行CI不存在的rtk，12548 passed/3 skipped，gates/build成功。此后单独修补fixture，不冒充CI通过；本批Git/精确CI另绑定。
+
+
+## [2026-10-30] test | 外部编辑器newline夹具的CI可移植性
+
+[addition20.51](features/phase-20-addition.md#2051-外部编辑器回归不依赖开发命令包装器)修20.48 CI五失败：fixture把本机rtk当EDITOR，CI没有该wrapper。空PATH有效baseline五失败，改quoted process.execPath/script、含空格目录后21通过；只反转command五失败、字节恢复后21重跑。产品/editor/build/CI未改，不重复build或PTY；五门/diff、正式工件与HANDOFF、scratch清理，118旧advisory，原47不升级、goal active。
+
+20.50已推送1ab0cc6f1c4145ebbcb343eaa3a7ae3631f856f0，原undo及usage修补76聚焦测试与两模式CLI证据已绑定；本批未即时轮询其CI，Git/精确CI另记录。

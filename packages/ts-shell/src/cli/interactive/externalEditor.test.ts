@@ -123,16 +123,17 @@ describe("external editor", () => {
       const terminal = tracker();
       const temporaryRoot = path.resolve('../../.tmp');
       fs.mkdirSync(temporaryRoot, { recursive: true });
-      const directory = fs.mkdtempSync(path.join(temporaryRoot, 'external-editor-'));
+      const directory = fs.mkdtempSync(path.join(temporaryRoot, 'external editor-'));
       const editor = path.join(directory, 'edit.mjs');
       try {
         fs.writeFileSync(editor, `import fs from 'node:fs'; fs.writeFileSync(process.argv[2], ${JSON.stringify(saved)});`);
+        vi.stubEnv('PATH', '');
         const result = editExternally({ text: original, suspendTerminal: terminal.suspendTerminal,
-          env: { EDITOR: `rtk proxy node ${editor}` } });
+          env: { EDITOR: `"${process.execPath}" "${editor}"` } });
         expect(result.text).toBe(expected);
         if (expected === undefined) expect(result.message).toContain('No changes');
         expect(terminal.depth()).toBe(0);
-      } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+      } finally { vi.unstubAllEnvs(); fs.rmSync(directory, { recursive: true, force: true }); }
     });
 
     it("reports an unchanged save instead of rewriting the draft", () => {

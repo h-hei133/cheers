@@ -1,0 +1,95 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/externalEditor.test.ts  (21 tests | 5 failed | 16 skipped) 28ms
+   ❯ src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'CRLF save' without adding an empty draft line
+     → expected undefined to be 'edited' // Object.is equality
+   ❯ src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'bare CR save' without adding an empty draft line
+     → expected undefined to be 'edited' // Object.is equality
+   ❯ src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'extra blank line' without adding an empty draft line
+     → expected undefined to be 'edited\n' // Object.is equality
+   ❯ src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'mixed line endings and tab' without adding an empty draft line
+     → expected undefined to be 'first\n\tsecond\nthird' // Object.is equality
+   ❯ src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'only line ending changed' without adding an empty draft line
+     → expected 'Could not run `rtk proxy node /home/w…' to include 'No changes'
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'CRLF save' without adding an empty draft line
+ FAIL  src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'bare CR save' without adding an empty draft line
+AssertionError: expected undefined to be 'edited' // Object.is equality
+
+- Expected: 
+"edited"
+
++ Received: 
+undefined
+
+ ❯ src/cli/interactive/externalEditor.test.ts:133:29
+    131|         const result = editExternally({ text: original, suspendTermina…
+    132|           env: { EDITOR: `rtk proxy node ${editor}` } });
+    133|         expect(result.text).toBe(expected);
+       |                             ^
+    134|         if (expected === undefined) expect(result.message).toContain('…
+    135|         expect(terminal.depth()).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'extra blank line' without adding an empty draft line
+AssertionError: expected undefined to be 'edited\n' // Object.is equality
+
+- Expected: 
+"edited
+"
+
++ Received: 
+undefined
+
+ ❯ src/cli/interactive/externalEditor.test.ts:133:29
+    131|         const result = editExternally({ text: original, suspendTermina…
+    132|           env: { EDITOR: `rtk proxy node ${editor}` } });
+    133|         expect(result.text).toBe(expected);
+       |                             ^
+    134|         if (expected === undefined) expect(result.message).toContain('…
+    135|         expect(terminal.depth()).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'mixed line endings and tab' without adding an empty draft line
+AssertionError: expected undefined to be 'first\n\tsecond\nthird' // Object.is equality
+
+- Expected: 
+"first
+	second
+third"
+
++ Received: 
+undefined
+
+ ❯ src/cli/interactive/externalEditor.test.ts:133:29
+    131|         const result = editExternally({ text: original, suspendTermina…
+    132|           env: { EDITOR: `rtk proxy node ${editor}` } });
+    133|         expect(result.text).toBe(expected);
+       |                             ^
+    134|         if (expected === undefined) expect(result.message).toContain('…
+    135|         expect(terminal.depth()).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'only line ending changed' without adding an empty draft line
+AssertionError: expected 'Could not run `rtk proxy node /home/w…' to include 'No changes'
+ ❯ src/cli/interactive/externalEditor.test.ts:134:60
+    132|           env: { EDITOR: `rtk proxy node ${editor}` } });
+    133|         expect(result.text).toBe(expected);
+    134|         if (expected === undefined) expect(result.message).toContain('…
+       |                                                            ^
+    135|         expect(terminal.depth()).toBe(0);
+    136|       } finally { vi.unstubAllEnvs(); fs.rmSync(directory, { recursive…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 16 skipped (21)
+   Start at  09:30:26
+   Duration  304ms (transform 42ms, setup 0ms, collect 51ms, tests 28ms, environment 0ms, prepare 53ms)
+

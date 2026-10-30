@@ -3940,3 +3940,12 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 正式[工件](../../.omx/artifacts/phase20-addition-turn-restore/)保留报告被pager消费、错误observer方法、partial-metadata失败及usage抛错来源；修正的是harness同步与产品usage缺陷，未削弱通知断言。源正文只用public fixture，不保存真实provider响应/凭据。全程heavy serial、无subagent/exe/full suite/20k；scratch归档清理，原CLAUDE.md保留。未验真实provider选择、非Linux/桌面、跨多文件故障矩阵、独立review或工作区整体快照；原47/ADD整体不升级，goal active。
 
 20.49已推送`ef4d078d43f2923a02e6d60efe1166ec339633d2`；本轮延后精确观察CI40983398554 in_progress、Watch40983398564 success。20.48 CI40981106387现failure，Build/gates成功但externalEditor.test.ts五新增fixture失败，12548 passed/3 skipped；错误显示fixture尝试运行CI不存在的rtk，后续单独分类修补，不将其称产品CRLF验证失败或CI通过。20.47及此前成功记录不变；本批Git/CI另绑定。
+
+
+### 20.51 外部编辑器回归不依赖开发命令包装器
+
+20.48 CI40981106387的五个newline fixture失败来自`EDITOR: rtk proxy node ...`：CI未安装本机开发wrapper。产品normalize修补的真实CLI两模式证据仍有效，但此前不能称CI通过。20.50已提交推送`1ab0cc6f1c4145ebbcb343eaa3a7ae3631f856f0`，本批继续独立修补测试，不等待其CI。
+
+仅改[externalEditor.test.ts](../../packages/ts-shell/src/cli/interactive/externalEditor.test.ts)：fixture用已运行的`process.execPath`绝对路径及quoted script路径，目录故意含空格；只在这五个case内设空PATH、finally恢复，证明编辑器不依赖rtk或PATH中node。调用仍走原splitEditorCommand/spawnSync/readback，未mock writer或改产品/editor/build/CI配置。shell command纪律属于开发调用，不能成为产品或测试运行时的安装前提。
+
+空PATH的有效baseline五失败/16未选，修补后原owner21通过。独立只反转EDITOR command再次五失败，finally精确恢复SHA256 `e8d0eec3197c675e70df5cf6450b7c7713a92f184bdbad61236f65bb1aadb426`后21重跑。五静态门与diff通过、118旧docs advisory保留；产品未变不重复build/PTY，全程serial。正式[工件](../../.omx/artifacts/phase20-addition-editor-fixture/)保存分类与反转；原CLAUDE.md保留、无新scratch残留/真实provider/非Linux/独立review，原47不升级、goal active。本批Git与未来CI另绑定。

@@ -1,0 +1,10 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/externalEditor.test.ts  (21 tests) 521ms
+
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+   Start at  09:30:08
+   Duration  794ms (transform 42ms, setup 0ms, collect 48ms, tests 521ms, environment 0ms, prepare 57ms)
+

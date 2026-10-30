@@ -1053,3 +1053,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A newer operation restores before an older one is blocked, but the batch omits the next-request notice or a reporting failure claims no restoration began.
 - **Root Cause**: Publication is gated on whole-batch completion, execution is not marked before batch writes, and later context acquisition throws away accumulated results.
 - **Rule**: Publish actual partial/unknown changes through the existing context owner; retain verified prior steps and skipped operations when later scope checks fail. Capture known execution state before report construction. Revocation after rename but before readback remains unknown even when observed bytes match the requested restoration.
+
+
+### Development Wrappers Are Not Test Runtime Dependencies
+- **Symptom**: Line-ending editor fixtures pass locally but all five fail in CI with Could not run rtk proxy node.
+- **Root Cause**: A developer shell-command convention was embedded into EDITOR, which the product spawns directly. CI does not install that wrapper.
+- **Rule**: Use quoted process.execPath and a quoted fixture script path for Node-backed editor fixtures. Exercise empty PATH and paths containing spaces, then restore environment in finally. Keep development command wrappers outside product and test subprocess configuration.
