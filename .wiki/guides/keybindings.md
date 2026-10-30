@@ -120,7 +120,11 @@ In a picker or completion list, a left click selects the displayed row. Press En
 multi-select pickers still use Space to toggle and Enter to apply. Clicks do not apply settings or approve actions.
 
 An open picker owns pointer input, so it cannot drag or collapse the transcript underneath it.
-The editor supports text selection by dragging; clicking to position its caret is not supported.
+In the input, a single left click positions the caret; dragging selects and copies text.
+Double click selects a word and triple click selects a line. Borders and status rows do not position the caret.
+Pasting again within 1200 ms of inserting a held text block expands it directly from its end.
+An intervening text edit (including undo) ends that gesture. Pasting inside a held text block always expands it;
+image blocks do not expand.
 
 <!-- key-gestures:start -->
 | Gesture | Does |
@@ -128,7 +132,7 @@ The editor supports text selection by dragging; clicking to position its caret i
 | `paste on a held block` | show that paste in full, in the prompt |
 | `wheel` | scroll the conversation |
 | `drag` | select and copy, without the layout |
-| `click` | open or close the block under the pointer |
+| `click` | position the input caret or open or close a conversation block |
 | `shift+drag` | hand the drag to the terminal instead |
 <!-- key-gestures:end -->
 

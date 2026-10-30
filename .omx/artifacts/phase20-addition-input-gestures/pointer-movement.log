@@ -1,0 +1,38 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/pointer.test.ts  (70 tests | 2 failed | 58 skipped) 18ms
+   ❯ src/cli/interactive/pointer.test.ts > pointer composer caret clicks > does not request a caret move for drag away and back
+     → expected 3 to be undefined
+   ❯ src/cli/interactive/pointer.test.ts > pointer composer caret clicks > does not request a caret move for move away and back
+     → expected 3 to be undefined
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 10 passed | 58 skipped (70)
+   Start at  16:14:21
+   Duration  1.00s (transform 546ms, setup 0ms, collect 758ms, tests 18ms, environment 0ms, prepare 53ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/pointer.test.ts -t does not request a caret move
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/pointer.test.ts > pointer composer caret clicks > does not request a caret move for drag away and back
+ FAIL  src/cli/interactive/pointer.test.ts > pointer composer caret clicks > does not request a caret move for move away and back
+AssertionError: expected 3 to be undefined
+ ❯ src/cli/interactive/pointer.test.ts:513:61
+    511|       if (change === "clear") pointer.clearSelection();
+    512|       if (change === "copy") pointer.copySelection();
+    513|       expect(pointer.handle({ ...point, kind: "release" })).toBeUndefi…
+       |                                                             ^
+    514|     });
+    515|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/pointer.test.ts -t 'does not request a caret move'

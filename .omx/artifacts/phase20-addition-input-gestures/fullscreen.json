@@ -1,0 +1,46 @@
+{
+  "mode": "fullscreen",
+  "buildId": "e30fee9b2190193441b0f69215310220045526ee43dc1349097bb7be883f670b",
+  "inputsDigest": "499f2356143bf0a5fb68a49b55e5a9b569d946c1734d9e33d3f107ac47710fb3",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "passed",
+  "checks": {
+    "immediateRepeat": true,
+    "undoInvalidates": true,
+    "expiredKeepsClipboard": true,
+    "editInvalidates": true,
+    "staleResizeRejected": true,
+    "cookedInputRestored": true,
+    "zeroRequests": true,
+    "filesUnchanged": true
+  },
+  "widths": [
+    {
+      "width": 40,
+      "mappedWideCell": true,
+      "nativeMouseRetained": false,
+      "drag": true
+    },
+    {
+      "width": 80,
+      "mappedWideCell": true,
+      "nativeMouseRetained": false,
+      "drag": true
+    },
+    {
+      "width": 120,
+      "mappedWideCell": true,
+      "nativeMouseRetained": false,
+      "drag": true
+    }
+  ],
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 133,
+  "outputBytes": 19684,
+  "scratchRemoved": true
+}

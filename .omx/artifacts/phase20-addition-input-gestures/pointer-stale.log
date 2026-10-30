@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/pointer.test.ts  (70 tests | 1 failed | 65 skipped) 16ms
+   ❯ src/cli/interactive/pointer.test.ts > pointer composer caret clicks > rejects stale painted coordinates after resize
+     → expected 3 to be undefined
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed | 65 skipped (70)
+   Start at  16:14:22
+   Duration  922ms (transform 497ms, setup 0ms, collect 681ms, tests 16ms, environment 0ms, prepare 56ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/pointer.test.ts -t stale painted coordinates
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/pointer.test.ts > pointer composer caret clicks > rejects stale painted coordinates after resize
+AssertionError: expected 3 to be undefined
+ ❯ src/cli/interactive/pointer.test.ts:534:59
+    532|       current = new InteractiveSurface(context, state); current.render…
+    533|     }
+    534|     expect(pointer.handle({ ...point, kind: "release" })).toBeUndefine…
+       |                                                           ^
+    535|     expect(copied).not.toHaveBeenCalled();
+    536|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/pointer.test.ts -t 'stale painted coordinates'

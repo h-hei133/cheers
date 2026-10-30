@@ -1,0 +1,30 @@
+{
+  "cases": [
+    {
+      "name": "paste-expiry",
+      "exit": 1,
+      "sourceSha256": "9dd6ce7effcc91c4d66c151178fe7623d5f78d905c69b3ce8bd607b4d59ac23e"
+    },
+    {
+      "name": "paste-revision",
+      "exit": 1,
+      "sourceSha256": "9dd6ce7effcc91c4d66c151178fe7623d5f78d905c69b3ce8bd607b4d59ac23e"
+    },
+    {
+      "name": "host-insertion",
+      "exit": 1,
+      "sourceSha256": "e357569ac42d9d4d6cfa234bb569615faae6c578c6456849377d62cd8d8be9b6"
+    },
+    {
+      "name": "pointer-movement",
+      "exit": 1,
+      "sourceSha256": "432dcb5e23feeabe7f4912008a6b9a7dc4f92db887f5f2ebefd65a7a5870cee1"
+    },
+    {
+      "name": "pointer-stale",
+      "exit": 1,
+      "sourceSha256": "432dcb5e23feeabe7f4912008a6b9a7dc4f92db887f5f2ebefd65a7a5870cee1"
+    }
+  ],
+  "restored": true
+}

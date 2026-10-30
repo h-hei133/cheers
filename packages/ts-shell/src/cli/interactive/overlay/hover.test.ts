@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { OverlayHost, type Picker } from '../overlay.js';
 import { CatalogNavigation } from '../picker/navigation.js';
 import { modelPicker } from '../picker/model.js';
-import { settingsPicker } from '../picker/settings.js';
+import { settingsPicker, type SettingsHost } from '../picker/settings.js';
 import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
 import { CONFIG_SETTINGS } from '../../../config/settings.js';
 import { defaultTheme } from '../../../presentation/theme/theme.js';
@@ -20,8 +20,8 @@ beforeEach(() => {
 afterEach(() => restoreTheme());
 const move = (overlay: OverlayHost, row: number, column: number, top = 0) =>
   overlay.handlePointer(parseMouseReport(`\x1b[<35;${column + 1};${top + row + 1}M`)!, top);
-const point = (rows: readonly string[], text: string, pane?: 'sidebar' | 'content') => {
-  const row = rows.findIndex(line => (pane === 'sidebar' ? stripAnsi(line).split('│')[0]
+const point = (rows: readonly string[], text: string, pane?: 'sidebar' | 'content' | 'list') => {
+  const row = rows.findIndex(line => (pane === 'sidebar' || pane === 'list' ? stripAnsi(line).split('│')[0]
     : pane === 'content' ? stripAnsi(line).split('│')[1] : stripAnsi(line))?.includes(text));
   expect(row).toBeGreaterThanOrEqual(0);
   return { row, column: stripAnsi(rows[row]!).indexOf(text) };
@@ -65,14 +65,14 @@ it('moves the hover between sidebar and content, clears it over details and pres
 
 it('keeps settings section labels out of hover while ordinary nonclickable content can highlight without staging', async () => {
   const save = vi.fn(async () => ({ applied: true }));
-  const host = { openSettings: () => ({ scope: 'user' as const, save, reopen: () => undefined, definitions: CONFIG_SETTINGS,
+  const host: SettingsHost = { openSettings: () => ({ scope: 'user', file: '/fixture/config.json', save, reopen: () => undefined, definitions: CONFIG_SETTINGS,
     values: Object.fromEntries(CONFIG_SETTINGS.map(setting => [setting.key, { stored: undefined, effective: false,
       requested: false, source: 'default', requestedSource: 'default', restartRequired: false }])) }) };
   const overlay = new OverlayHost(() => {}); overlay.open(settingsPicker(host, 'user', 'Model')); await settle();
   overlay.handleKey(parseKeyEvent('\t'), vi.fn());
-  let rows = overlay.render(120, 30), field = point(rows, 'Maximum turns', 'content');
+  let rows = overlay.render(120, 30), field = point(rows, 'Maximum turns', 'list');
   move(overlay, field.row, field.column); hovered(overlay.render(120, 30), field.row);
-  const section = point(rows, 'Model / Limits', 'content'); move(overlay, section.row, section.column);
+  const section = point(rows, 'Model / Limits', 'list'); move(overlay, section.row, section.column);
   expect(overlay.render(120, 30).join('\n')).not.toContain(defaultTheme.bgOpen('statusBandBg'));
   expect(save).not.toHaveBeenCalled(); overlay.close();
 });

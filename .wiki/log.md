@@ -10549,3 +10549,12 @@ resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不�
 十文件219项、四反转/bytes恢复、五门/build严格串行通过；118旧advisory保留。两模式原CLI各1会话×1消息，坏目录notice→probe修正隔离文件→重开清除，实际user/project来源页路径核对，user/project配置未写、零请求、exit0/cooked。全屏probe初次Esc手势冲突收据保留，dismiss间隔超过600ms后通过；未为此改产品键盘行为。catalog owner/helper分别13/2 callable，既有model/settings picker46/23未增长但未解决上限问题；非独立review或全量验收。
 
 工件/HANDOFF/指南更新，真实用户文件不改。31本地实现与小型CLI通过，继续32/35/36/37；33大目录体验和原47/ADD整体仍未升级，goal active。上一批06138788的CI41015773762/Watch41015773723均completed/success且head一致，本批Git/未来CI另绑定。
+
+
+## [2026-10-30] fix | 重复粘贴展开与全屏输入单击定位
+
+[addition21.17](features/phase-20-addition.md#2117-第三十六三十七实施重复粘贴展开与全屏点击定位)在原PasteStore绑定最新实际插入token的末尾、时间与单调textRevision，1200ms内重复粘贴展开，编辑/撤销/过期不复活，内部位置继续不限时、图片排除、展开一次可撤销。Pointer复用原sourceBoundary，仅同格未移动左键且原视图/painted几何有效时返回offset，host沿既有回调移动caret并同步Vim/补全；宽字、组合/emoji、折行/行尾、拖拽/双三击、边框和modal/regular所有权有回归。
+
+主代理串行九文件295项、13条宿主筛选与另19条publication补验，合计327项；五反转/bytes恢复、五静态门、TS build及两模式原NodeCLI通过。小fixture每模式1会话×1消息，40/80/120列物理resize、真实SGR点击插入/drag与旧release拒绝、重复粘贴/过期/编辑删回/撤销失效，零请求、文件不变、exit0/cooked。完整builtin目录使publication旧单步邻项假设失效，修为有界键盘遍历+精确ID；settings间接测试改用navigation、当前列表列/退出路径和完整typed draft。历史CI26d3a53c的8失败与fda6a665的9失败收据保留，当前局部修复通过不改变历史SHA verdict；本批远端CI另绑定。
+
+正式工件保留probe初期geometry/event同步错误与publication只改方向的失败日志，最终收据绑定新build；HANDOFF记录指针事件同步和内容行内chrome边界。pastes20、projection3、pointer16、keys3，既有host122未增长但责任债未解决。未做全套本地回归/20k/独立review/真实桌面或其他平台验收；第36/37本地实现验证通过，33大目录体验、原47和ADD整体不升级，goal active。

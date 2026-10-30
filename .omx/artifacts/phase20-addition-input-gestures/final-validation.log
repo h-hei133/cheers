@@ -1,0 +1,104 @@
+scc-gate root=packages/ts-shell/src files=3010
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=53 read=53 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=25 docs_refs=456 docs_dangling=0 docs_source_dangling=118
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 118 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/presentation/tui/pastes.test.ts src/cli/interactive/pointer.test.ts src/presentation/tui/composer/geometry.test.ts src/presentation/tui/editor.test.ts src/cli/interactive/keyGuide.test.ts src/cli/interactive/settings.test.ts src/cli/interactive/picker/model/recovery.test.ts src/cli/interactive/overlay/wheel.test.ts src/cli/interactive/overlay/hover.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/pointer.test.ts  (70 tests) 59ms
+ ✓ src/presentation/tui/pastes.test.ts  (47 tests) 31ms
+ ✓ src/cli/interactive/picker/model/recovery.test.ts  (36 tests) 1584ms
+ ✓ src/cli/interactive/settings.test.ts  (44 tests) 803ms
+ ✓ src/presentation/tui/composer/geometry.test.ts  (8 tests) 168ms
+ ✓ src/cli/interactive/overlay/wheel.test.ts  (12 tests) 115ms
+ ✓ src/cli/interactive/overlay/hover.test.ts  (7 tests) 80ms
+ ✓ src/presentation/tui/editor.test.ts  (65 tests) 33ms
+ ✓ src/cli/interactive/keyGuide.test.ts  (6 tests) 22ms
+
+ Test Files  9 passed (9)
+      Tests  295 passed (295)
+   Start at  16:15:06
+   Duration  14.64s (transform 5.69s, setup 0ms, collect 10.17s, tests 2.90s, environment 1ms, prepare 383ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/interactiveMode.test.ts -t held block under the caret|expired block|immediate repeat paste|undone fresh paste|composer caret click|separates session choices
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/interactiveMode.test.ts  (384 tests | 371 skipped) 1154ms
+
+ Test Files  1 passed (1)
+      Tests  13 passed | 371 skipped (384)
+   Start at  16:15:22
+   Duration  14.20s (transform 9.99s, setup 0ms, collect 12.81s, tests 1.15s, environment 0ms, prepare 58ms)
+
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+Wrote build manifest 0bcc3018d469 for @cheers/ts-shell@0.1.0
+{"counts":[{"file":"presentation/tui/pastes.ts","count":20,"baseline":19},{"file":"presentation/tui/composer/projection.ts","count":3,"baseline":3},{"file":"cli/interactive/pointer.ts","count":16,"baseline":16},{"file":"cli/interactive/interactiveMode.ts","count":122,"baseline":122},{"file":"presentation/tui/chrome/keys.ts","count":3,"baseline":3}],"build":{"ok":true,"entry":"/home/wang/projects/cheers/packages/ts-shell/dist/builds/0bcc3018d46909dfaaf966ac84c61e4bcf0c3c2a5e862c01d7260cfc9c84d87c/entrypoints/cli.js","buildId":"0bcc3018d46909dfaaf966ac84c61e4bcf0c3c2a5e862c01d7260cfc9c84d87c","inputsDigest":"4f4612e1e62a27c4c127127c018035e5bc1d2b150050adbfeffb7e2b50ed735a","artifactDigest":"78c3de281285bd04cbc34e368a0f292d0d66e787278dc78b6d06bec988c29452","version":"0.1.0"}}
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/model/publication.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/model/publication.test.ts  (19 tests | 2 failed) 1234ms
+   ❯ src/cli/interactive/picker/model/publication.test.ts > makes cached models read-only after a revision refresh failure and restores them after revalidation
+     → expected '  Browse                │  Model     …' to include '▸ alternate'
+   ❯ src/cli/interactive/picker/model/publication.test.ts > makes cached models read-only after a load refresh failure and restores them after revalidation
+     → expected '  Browse                │  Model     …' to include '▸ alternate'
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/model/publication.test.ts > makes cached models read-only after a revision refresh failure and restores them after revalidation
+ FAIL  src/cli/interactive/picker/model/publication.test.ts > makes cached models read-only after a load refresh failure and restores them after revalidation
+AssertionError: expected '  Browse                │  Model     …' to include '▸ alternate'
+ ❯ src/cli/interactive/picker/model/publication.test.ts:216:21
+    214|     // Alphabetical order puts alternate before the initially selected…
+    215|     overlay.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+    216|     expect(frame()).toContain('▸ alternate');
+       |                     ^
+    217|     expect(picker.filterOptions!('', []).find(row => row.id === ready)…
+    218|     if (failure === 'revision') readable = false;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 17 passed (19)
+   Start at  16:22:15
+   Duration  4.08s (transform 1.97s, setup 1ms, collect 2.59s, tests 1.23s, environment 0ms, prepare 58ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/picker/model/publication.test.ts
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/model/publication.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/picker/model/publication.test.ts  (19 tests) 1280ms
+
+ Test Files  1 passed (1)
+      Tests  19 passed (19)
+   Start at  16:25:38
+   Duration  4.07s (transform 1.91s, setup 0ms, collect 2.53s, tests 1.28s, environment 0ms, prepare 57ms)
+
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+Wrote build manifest e30fee9b2190 for @cheers/ts-shell@0.1.0
+{"counts":[{"file":"presentation/tui/pastes.ts","count":20,"baseline":19},{"file":"presentation/tui/composer/projection.ts","count":3,"baseline":3},{"file":"cli/interactive/pointer.ts","count":16,"baseline":16},{"file":"cli/interactive/interactiveMode.ts","count":122,"baseline":122},{"file":"presentation/tui/chrome/keys.ts","count":3,"baseline":3}],"build":{"ok":true,"entry":"/home/wang/projects/cheers/packages/ts-shell/dist/builds/e30fee9b2190193441b0f69215310220045526ee43dc1349097bb7be883f670b/entrypoints/cli.js","buildId":"e30fee9b2190193441b0f69215310220045526ee43dc1349097bb7be883f670b","inputsDigest":"499f2356143bf0a5fb68a49b55e5a9b569d946c1734d9e33d3f107ac47710fb3","artifactDigest":"78c3de281285bd04cbc34e368a0f292d0d66e787278dc78b6d06bec988c29452","version":"0.1.0"}}
+{"mode":"regular","buildId":"e30fee9b2190193441b0f69215310220045526ee43dc1349097bb7be883f670b","inputsDigest":"499f2356143bf0a5fb68a49b55e5a9b569d946c1734d9e33d3f107ac47710fb3","fixtures":1,"messagesPerFixture":1,"providerMode":"synthetic","status":"passed","checks":{"immediateRepeat":true,"undoInvalidates":true,"expiredKeepsClipboard":true,"editInvalidates":true,"cookedInputRestored":true,"zeroRequests":true,"filesUnchanged":true},"widths":[{"width":40,"mappedWideCell":false,"nativeMouseRetained":true,"drag":false},{"width":80,"mappedWideCell":false,"nativeMouseRetained":true,"drag":false},{"width":120,"mappedWideCell":false,"nativeMouseRetained":true,"drag":false}],"shutdown":{"code":0,"signal":null},"exitMs":132,"outputBytes":21867,"scratchRemoved":true}
+{"mode":"fullscreen","buildId":"e30fee9b2190193441b0f69215310220045526ee43dc1349097bb7be883f670b","inputsDigest":"499f2356143bf0a5fb68a49b55e5a9b569d946c1734d9e33d3f107ac47710fb3","fixtures":1,"messagesPerFixture":1,"providerMode":"synthetic","status":"passed","checks":{"immediateRepeat":true,"undoInvalidates":true,"expiredKeepsClipboard":true,"editInvalidates":true,"staleResizeRejected":true,"cookedInputRestored":true,"zeroRequests":true,"filesUnchanged":true},"widths":[{"width":40,"mappedWideCell":true,"nativeMouseRetained":false,"drag":true},{"width":80,"mappedWideCell":true,"nativeMouseRetained":false,"drag":true},{"width":120,"mappedWideCell":true,"nativeMouseRetained":false,"drag":true}],"shutdown":{"code":0,"signal":null},"exitMs":133,"outputBytes":19684,"scratchRemoved":true}

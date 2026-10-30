@@ -1,0 +1,30 @@
+{
+  "mode": "regular",
+  "buildId": "0bcc3018d46909dfaaf966ac84c61e4bcf0c3c2a5e862c01d7260cfc9c84d87c",
+  "inputsDigest": "4f4612e1e62a27c4c127127c018035e5bc1d2b150050adbfeffb7e2b50ed735a",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "checks": {
+    "immediateRepeat": true,
+    "undoInvalidates": true,
+    "expiredKeepsClipboard": true,
+    "editInvalidates": true
+  },
+  "widths": [],
+  "failure": "assertion",
+  "observation": {
+    "requests": 0,
+    "renders": 22,
+    "pointers": [],
+    "snapshot": {
+      "text": "abc 中😀é long text abc 中😀é long text abc 中😀é long text \nnext row",
+      "cursor": 69,
+      "revision": 22,
+      "width": 40
+    }
+  },
+  "outputBytes": 16125,
+  "scratchRemoved": true
+}

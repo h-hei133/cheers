@@ -1,0 +1,47 @@
+[
+  {
+    "run": 41020546837,
+    "sha": "26d3a53c0214410ddd28202a934bd724f294a9dd",
+    "conclusion": "failure",
+    "excerpts": [
+      " FAIL  src/cli/interactive/interactiveMode.test.ts > separates session choices from configuration fields in the actual 'regular' 'user' settings host",
+      " FAIL  src/cli/interactive/interactiveMode.test.ts > separates session choices from configuration fields in the actual 'regular' 'project' settings host",
+      " FAIL  src/cli/interactive/interactiveMode.test.ts > separates session choices from configuration fields in the actual 'fullscreen' 'user' settings host",
+      " FAIL  src/cli/interactive/interactiveMode.test.ts > separates session choices from configuration fields in the actual 'fullscreen' 'project' settings host",
+      "AssertionError: expected '\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\\u2026' to include '\u25b8 Session'",
+      " FAIL  src/cli/interactive/settings.test.ts > exposes applicable settings categories and sections and marks stored values",
+      " Test Files  5 failed | 1038 passed | 1 skipped (1044)",
+      "AssertionError: expected undefined to deeply equal [ 'all', 'Appearance', 'Model', \u2026(8) ]",
+      "      Tests  8 failed | 12687 passed | 3 skipped (12698)",
+      " FAIL  src/cli/interactive/overlay/hover.test.ts > keeps settings section labels out of hover while ordinary nonclickable content can highlight without staging",
+      "AssertionError: expected -1 to be greater than or equal to 0",
+      " FAIL  src/cli/interactive/overlay/wheel.test.ts > returns settings section focus to rows when wheeling content without staging or saving",
+      "AssertionError: expected -1 to be greater than or equal to 0",
+      " FAIL  src/cli/interactive/picker/model/recovery.test.ts > returns the real settings session entry with the exact selection outcome after effort recovery",
+      "AssertionError: expected undefined to be 'Session' // Object.is equality"
+    ]
+  },
+  {
+    "run": 41022696879,
+    "sha": "fda6a665242127244f3011c4547649bc903af523",
+    "conclusion": "failure",
+    "excerpts": [
+      " FAIL  src/cli/interactive/interactiveMode.test.ts > separates session choices from configuration fields in the actual 'regular' 'user' settings host",
+      " FAIL  src/cli/interactive/interactiveMode.test.ts > separates session choices from configuration fields in the actual 'regular' 'project' settings host",
+      " FAIL  src/cli/interactive/interactiveMode.test.ts > separates session choices from configuration fields in the actual 'fullscreen' 'user' settings host",
+      " FAIL  src/cli/interactive/interactiveMode.test.ts > separates session choices from configuration fields in the actual 'fullscreen' 'project' settings host",
+      "AssertionError: expected '\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\\u2026' to include '\u25b8 Session'",
+      " FAIL  src/cli/interactive/settings.test.ts > exposes applicable settings categories and sections and marks stored values",
+      "AssertionError: expected undefined to deeply equal [ 'all', 'Appearance', 'Model', \u2026(8) ]",
+      " FAIL  src/cli/interactive/overlay/hover.test.ts > keeps settings section labels out of hover while ordinary nonclickable content can highlight without staging",
+      "AssertionError: expected -1 to be greater than or equal to 0",
+      " FAIL  src/cli/interactive/picker/model/publication.test.ts > makes cached models read-only after a revision refresh failure and restores them after revalidation",
+      " FAIL  src/cli/interactive/picker/model/publication.test.ts > makes cached models read-only after a load refresh failure and restores them after revalidation",
+      "AssertionError: expected '  Browse                \u2502  Model     \u2026' to include '\u25b8 alternate'",
+      " FAIL  src/cli/interactive/picker/model/recovery.test.ts > returns the real settings session entry with the exact selection outcome after effort recovery",
+      "AssertionError: expected undefined to be 'Session' // Object.is equality",
+      " Test Files  5 failed | 1038 passed | 1 skipped (1044)",
+      "      Tests  9 failed | 12692 passed | 3 skipped (12704)"
+    ]
+  }
+]

@@ -1,0 +1,509 @@
+{
+  "mode": "fullscreen",
+  "buildId": "0bcc3018d46909dfaaf966ac84c61e4bcf0c3c2a5e862c01d7260cfc9c84d87c",
+  "inputsDigest": "4f4612e1e62a27c4c127127c018035e5bc1d2b150050adbfeffb7e2b50ed735a",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "checks": {
+    "immediateRepeat": true,
+    "undoInvalidates": true,
+    "expiredKeepsClipboard": true,
+    "editInvalidates": true
+  },
+  "widths": [
+    {
+      "width": 40,
+      "mappedWideCell": true,
+      "nativeMouseRetained": false,
+      "drag": true
+    }
+  ],
+  "failure": "assertion",
+  "assertion": "drag never positions caret",
+  "observation": {
+    "requests": 0,
+    "renders": 27,
+    "pointers": [
+      {
+        "kind": "press"
+      },
+      {
+        "kind": "release",
+        "offset": 4
+      },
+      {
+        "kind": "press"
+      },
+      {
+        "kind": "drag"
+      },
+      {
+        "kind": "release"
+      },
+      {
+        "kind": "press"
+      },
+      {
+        "kind": "release",
+        "offset": 4
+      },
+      {
+        "kind": "press"
+      },
+      {
+        "kind": "drag"
+      },
+      {
+        "kind": "release"
+      }
+    ],
+    "snapshot": {
+      "text": "abc 中😀é long text abc 中😀é long text abc 中😀é long text \nnext row",
+      "cursor": 4,
+      "revision": 25,
+      "width": 80,
+      "geometry": {
+        "top": 27,
+        "bottom": 31,
+        "rows": [
+          "────────────────────────────────────────────────────────── ~681/64k assumed 1% ─",
+          "❯ abc \u001b_c\u0007中😀é long text abc 中😀é long text abc 中😀é long text                   ",
+          "  next row                                                                      ",
+          "────────────────────────────────────────────────────────────────────────────────",
+          "fixture ▏ build ▏ ask"
+        ],
+        "layout": {
+          "shape": "default",
+          "source": "abc 中😀é long text abc 中😀é long text abc 中😀é long text \nnext row",
+          "sourceRevision": 25,
+          "viewportStart": 0,
+          "width": 80,
+          "rows": [
+            {
+              "kind": "decoration",
+              "screenRow": 0,
+              "rendered": "────────────────────────────────────────────────────────── ~681/64k assumed 1% ─"
+            },
+            {
+              "kind": "content",
+              "screenRow": 1,
+              "rendered": "❯ abc \u001b_c\u0007中😀é long text abc 中😀é long text abc 中😀é long text                   ",
+              "contentColumn": 2,
+              "contentCells": 77,
+              "cells": [
+                {
+                  "columnStart": 2,
+                  "columnEnd": 3,
+                  "sourceStart": 0,
+                  "sourceEnd": 1
+                },
+                {
+                  "columnStart": 3,
+                  "columnEnd": 4,
+                  "sourceStart": 1,
+                  "sourceEnd": 2
+                },
+                {
+                  "columnStart": 4,
+                  "columnEnd": 5,
+                  "sourceStart": 2,
+                  "sourceEnd": 3
+                },
+                {
+                  "columnStart": 5,
+                  "columnEnd": 6,
+                  "sourceStart": 3,
+                  "sourceEnd": 4
+                },
+                {
+                  "columnStart": 6,
+                  "columnEnd": 8,
+                  "sourceStart": 4,
+                  "sourceEnd": 5
+                },
+                {
+                  "columnStart": 8,
+                  "columnEnd": 10,
+                  "sourceStart": 5,
+                  "sourceEnd": 7
+                },
+                {
+                  "columnStart": 10,
+                  "columnEnd": 11,
+                  "sourceStart": 7,
+                  "sourceEnd": 9
+                },
+                {
+                  "columnStart": 11,
+                  "columnEnd": 12,
+                  "sourceStart": 9,
+                  "sourceEnd": 10
+                },
+                {
+                  "columnStart": 12,
+                  "columnEnd": 13,
+                  "sourceStart": 10,
+                  "sourceEnd": 11
+                },
+                {
+                  "columnStart": 13,
+                  "columnEnd": 14,
+                  "sourceStart": 11,
+                  "sourceEnd": 12
+                },
+                {
+                  "columnStart": 14,
+                  "columnEnd": 15,
+                  "sourceStart": 12,
+                  "sourceEnd": 13
+                },
+                {
+                  "columnStart": 15,
+                  "columnEnd": 16,
+                  "sourceStart": 13,
+                  "sourceEnd": 14
+                },
+                {
+                  "columnStart": 16,
+                  "columnEnd": 17,
+                  "sourceStart": 14,
+                  "sourceEnd": 15
+                },
+                {
+                  "columnStart": 17,
+                  "columnEnd": 18,
+                  "sourceStart": 15,
+                  "sourceEnd": 16
+                },
+                {
+                  "columnStart": 18,
+                  "columnEnd": 19,
+                  "sourceStart": 16,
+                  "sourceEnd": 17
+                },
+                {
+                  "columnStart": 19,
+                  "columnEnd": 20,
+                  "sourceStart": 17,
+                  "sourceEnd": 18
+                },
+                {
+                  "columnStart": 20,
+                  "columnEnd": 21,
+                  "sourceStart": 18,
+                  "sourceEnd": 19
+                },
+                {
+                  "columnStart": 21,
+                  "columnEnd": 22,
+                  "sourceStart": 19,
+                  "sourceEnd": 20
+                },
+                {
+                  "columnStart": 22,
+                  "columnEnd": 23,
+                  "sourceStart": 20,
+                  "sourceEnd": 21
+                },
+                {
+                  "columnStart": 23,
+                  "columnEnd": 24,
+                  "sourceStart": 21,
+                  "sourceEnd": 22
+                },
+                {
+                  "columnStart": 24,
+                  "columnEnd": 25,
+                  "sourceStart": 22,
+                  "sourceEnd": 23
+                },
+                {
+                  "columnStart": 25,
+                  "columnEnd": 26,
+                  "sourceStart": 23,
+                  "sourceEnd": 24
+                },
+                {
+                  "columnStart": 26,
+                  "columnEnd": 28,
+                  "sourceStart": 24,
+                  "sourceEnd": 25
+                },
+                {
+                  "columnStart": 28,
+                  "columnEnd": 30,
+                  "sourceStart": 25,
+                  "sourceEnd": 27
+                },
+                {
+                  "columnStart": 30,
+                  "columnEnd": 31,
+                  "sourceStart": 27,
+                  "sourceEnd": 29
+                },
+                {
+                  "columnStart": 31,
+                  "columnEnd": 32,
+                  "sourceStart": 29,
+                  "sourceEnd": 30
+                },
+                {
+                  "columnStart": 32,
+                  "columnEnd": 33,
+                  "sourceStart": 30,
+                  "sourceEnd": 31
+                },
+                {
+                  "columnStart": 33,
+                  "columnEnd": 34,
+                  "sourceStart": 31,
+                  "sourceEnd": 32
+                },
+                {
+                  "columnStart": 34,
+                  "columnEnd": 35,
+                  "sourceStart": 32,
+                  "sourceEnd": 33
+                },
+                {
+                  "columnStart": 35,
+                  "columnEnd": 36,
+                  "sourceStart": 33,
+                  "sourceEnd": 34
+                },
+                {
+                  "columnStart": 36,
+                  "columnEnd": 37,
+                  "sourceStart": 34,
+                  "sourceEnd": 35
+                },
+                {
+                  "columnStart": 37,
+                  "columnEnd": 38,
+                  "sourceStart": 35,
+                  "sourceEnd": 36
+                },
+                {
+                  "columnStart": 38,
+                  "columnEnd": 39,
+                  "sourceStart": 36,
+                  "sourceEnd": 37
+                },
+                {
+                  "columnStart": 39,
+                  "columnEnd": 40,
+                  "sourceStart": 37,
+                  "sourceEnd": 38
+                },
+                {
+                  "columnStart": 40,
+                  "columnEnd": 41,
+                  "sourceStart": 38,
+                  "sourceEnd": 39
+                },
+                {
+                  "columnStart": 41,
+                  "columnEnd": 42,
+                  "sourceStart": 39,
+                  "sourceEnd": 40
+                },
+                {
+                  "columnStart": 42,
+                  "columnEnd": 43,
+                  "sourceStart": 40,
+                  "sourceEnd": 41
+                },
+                {
+                  "columnStart": 43,
+                  "columnEnd": 44,
+                  "sourceStart": 41,
+                  "sourceEnd": 42
+                },
+                {
+                  "columnStart": 44,
+                  "columnEnd": 45,
+                  "sourceStart": 42,
+                  "sourceEnd": 43
+                },
+                {
+                  "columnStart": 45,
+                  "columnEnd": 46,
+                  "sourceStart": 43,
+                  "sourceEnd": 44
+                },
+                {
+                  "columnStart": 46,
+                  "columnEnd": 48,
+                  "sourceStart": 44,
+                  "sourceEnd": 45
+                },
+                {
+                  "columnStart": 48,
+                  "columnEnd": 50,
+                  "sourceStart": 45,
+                  "sourceEnd": 47
+                },
+                {
+                  "columnStart": 50,
+                  "columnEnd": 51,
+                  "sourceStart": 47,
+                  "sourceEnd": 49
+                },
+                {
+                  "columnStart": 51,
+                  "columnEnd": 52,
+                  "sourceStart": 49,
+                  "sourceEnd": 50
+                },
+                {
+                  "columnStart": 52,
+                  "columnEnd": 53,
+                  "sourceStart": 50,
+                  "sourceEnd": 51
+                },
+                {
+                  "columnStart": 53,
+                  "columnEnd": 54,
+                  "sourceStart": 51,
+                  "sourceEnd": 52
+                },
+                {
+                  "columnStart": 54,
+                  "columnEnd": 55,
+                  "sourceStart": 52,
+                  "sourceEnd": 53
+                },
+                {
+                  "columnStart": 55,
+                  "columnEnd": 56,
+                  "sourceStart": 53,
+                  "sourceEnd": 54
+                },
+                {
+                  "columnStart": 56,
+                  "columnEnd": 57,
+                  "sourceStart": 54,
+                  "sourceEnd": 55
+                },
+                {
+                  "columnStart": 57,
+                  "columnEnd": 58,
+                  "sourceStart": 55,
+                  "sourceEnd": 56
+                },
+                {
+                  "columnStart": 58,
+                  "columnEnd": 59,
+                  "sourceStart": 56,
+                  "sourceEnd": 57
+                },
+                {
+                  "columnStart": 59,
+                  "columnEnd": 60,
+                  "sourceStart": 57,
+                  "sourceEnd": 58
+                },
+                {
+                  "columnStart": 60,
+                  "columnEnd": 61,
+                  "sourceStart": 58,
+                  "sourceEnd": 59
+                },
+                {
+                  "columnStart": 61,
+                  "columnEnd": 62,
+                  "sourceStart": 59,
+                  "sourceEnd": 60
+                }
+              ],
+              "sourceStart": 0,
+              "sourceEnd": 60,
+              "breakAfter": "logical",
+              "cursorOverflow": 0,
+              "imeSafeCursorTail": false,
+              "scrollbarThumb": false
+            },
+            {
+              "kind": "content",
+              "screenRow": 2,
+              "rendered": "  next row                                                                      ",
+              "contentColumn": 2,
+              "contentCells": 77,
+              "cells": [
+                {
+                  "columnStart": 2,
+                  "columnEnd": 3,
+                  "sourceStart": 61,
+                  "sourceEnd": 62
+                },
+                {
+                  "columnStart": 3,
+                  "columnEnd": 4,
+                  "sourceStart": 62,
+                  "sourceEnd": 63
+                },
+                {
+                  "columnStart": 4,
+                  "columnEnd": 5,
+                  "sourceStart": 63,
+                  "sourceEnd": 64
+                },
+                {
+                  "columnStart": 5,
+                  "columnEnd": 6,
+                  "sourceStart": 64,
+                  "sourceEnd": 65
+                },
+                {
+                  "columnStart": 6,
+                  "columnEnd": 7,
+                  "sourceStart": 65,
+                  "sourceEnd": 66
+                },
+                {
+                  "columnStart": 7,
+                  "columnEnd": 8,
+                  "sourceStart": 66,
+                  "sourceEnd": 67
+                },
+                {
+                  "columnStart": 8,
+                  "columnEnd": 9,
+                  "sourceStart": 67,
+                  "sourceEnd": 68
+                },
+                {
+                  "columnStart": 9,
+                  "columnEnd": 10,
+                  "sourceStart": 68,
+                  "sourceEnd": 69
+                }
+              ],
+              "sourceStart": 61,
+              "sourceEnd": 69,
+              "breakAfter": "none",
+              "cursorOverflow": 0,
+              "imeSafeCursorTail": false,
+              "scrollbarThumb": false
+            },
+            {
+              "kind": "decoration",
+              "screenRow": 3,
+              "rendered": "────────────────────────────────────────────────────────────────────────────────"
+            },
+            {
+              "kind": "decoration",
+              "screenRow": 4,
+              "rendered": "fixture ▏ build ▏ ask"
+            }
+          ],
+          "height": 5
+        }
+      }
+    }
+  },
+  "outputBytes": 11468,
+  "scratchRemoved": true
+}

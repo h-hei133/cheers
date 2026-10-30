@@ -450,3 +450,105 @@ describe("pointer composer drag selection", () => {
     expect(pointer.composerSelection).toBeUndefined();
   });
 });
+
+describe("pointer composer caret clicks", () => {
+  const event = { button: 0, shift: false, alt: false, ctrl: false };
+
+  it.each([
+    ["abc", 0, 0], ["abc", 1, 1], ["abc", 30, 3], ["", 0, 0],
+    ["中x", 0, 0], ["中x", 1, 0], ["中x", 2, 1],
+    ["e\u0301x", 1, 2], ["😀x", 1, 0], ["😀x", 2, 2],
+    ["👩‍💻x", 1, 0], ["👩‍💻x", 2, 5],
+  ] as const)("maps %j cell %s to source offset %s", (text, cell, offset) => {
+    const geometry = composerGeometry(text);
+    const row = geometry.layout.rows.find(row => row.kind === "content")!;
+    if (row.kind !== "content") throw Error("content row");
+    const { pointer, copied } = build({ composerGeometry: () => geometry });
+    const point = { row: geometry.top + row.screenRow, column: row.contentColumn + cell };
+    expect(pointer.handle({ ...event, ...point, kind: "press" })).toBeUndefined();
+    expect(pointer.handle({ ...event, ...point, kind: "release" })).toBe(offset);
+    expect(pointer.handle({ ...event, ...point, kind: "release" })).toBeUndefined();
+    expect(copied).toEqual([]);
+  });
+
+  it("maps wrapped rows, logical newlines and row padding", () => {
+    const text = "abcdefghijklmnopqrstuvwx\nnext", geometry = composerGeometry(text, 10, 16);
+    const { pointer } = build({ composerGeometry: () => geometry });
+    const rows = geometry.layout.rows.filter(row => row.kind === "content");
+    expect(rows.length).toBeGreaterThan(2);
+    for (const row of rows) {
+      const point = { row: geometry.top + row.screenRow, column: row.contentColumn };
+      pointer.clearSelection();
+      pointer.handle({ ...event, ...point, kind: "press" });
+      expect(pointer.handle({ ...event, ...point, kind: "release" })).toBe(row.sourceStart);
+      if (row === rows.at(-1)) {
+        pointer.clearSelection();
+        const tail = { ...point, column: row.contentColumn + row.contentCells - 1 };
+        pointer.handle({ ...event, ...tail, kind: "press" });
+        expect(pointer.handle({ ...event, ...tail, kind: "release" })).toBe(text.length);
+      }
+    }
+  });
+
+  it.each(["drag away and back", "move away and back", "different release", "shift", "alt", "ctrl", "right", "decoration", "left border", "right border", "clear", "copy"])(
+    "does not request a caret move for %s", change => {
+      const geometry = composerGeometry("first word");
+      const row = geometry.layout.rows.find(row => row.kind === "content")!;
+      const { pointer } = build({ composerGeometry: () => geometry });
+      let point = { ...event, row: geometry.top + row.screenRow, column: 5 };
+      if (change === "decoration") point = { ...point, row: geometry.top };
+      if (change === "left border") point.column = 0;
+      if (change === "right border") point.column = geometry.layout.width - 1;
+      if (change === "shift") point.shift = true;
+      if (change === "alt") point.alt = true;
+      if (change === "ctrl") point.ctrl = true;
+      if (change === "right") point.button = 2;
+      pointer.handle({ ...point, kind: "press" });
+      if (change === "drag away and back" || change === "move away and back") {
+        pointer.handle({ ...point, column: point.column + 1, kind: change === "drag away and back" ? "drag" : "move" });
+      }
+      if (change === "different release") point.column += 1;
+      if (change === "clear") pointer.clearSelection();
+      if (change === "copy") pointer.copySelection();
+      expect(pointer.handle({ ...point, kind: "release" })).toBeUndefined();
+    });
+
+  it.each(["text", "revision", "resize", "invalidate", "swap"])("rejects stale painted coordinates after %s", change => {
+    const state = createViewState(); state.editor.setText("original text");
+    const context: ViewContext = { facts: () => ({ model: "test", provider: "test" }), statusItems: () => [], activity: () => undefined,
+      busy: () => false, queuedCount: () => 0, now: () => 0, ambient: () => ({ openTodos: 0, peerSessions: 0 }),
+      cancelArmed: () => false, overlayFullScreen: () => false, overlayRows: () => [], selection: () => undefined };
+    const view = new InteractiveSurface(context, state); let current: InteractiveView = view;
+    const copied = vi.fn(), pointer = new Pointer({ view: () => current, rows: () => [], copy: copied, redraw: vi.fn() });
+    view.renderFrame({ columns: 40, rows: 24 });
+    const geometry = view.composerGeometry()!, row = geometry.layout.rows.find(row => row.kind === "content")!;
+    const point = { ...event, row: geometry.top + row.screenRow, column: 5 };
+    pointer.handle({ ...point, kind: "press" });
+    if (change === "text") state.editor.insert("!");
+    if (change === "revision") { state.editor.insert("!"); state.editor.undo(); }
+    if (change === "resize") view.renderFrame({ columns: 39, rows: 24 });
+    if (change === "invalidate") view.invalidateLayout();
+    if (change === "swap") {
+      current = new InteractiveSurface(context, state); current.renderFrame({ columns: 40, rows: 24 });
+    }
+    expect(pointer.handle({ ...point, kind: "release" })).toBeUndefined();
+    expect(copied).not.toHaveBeenCalled();
+  });
+
+  it("leaves double and triple click word/line selection with its existing owner", () => {
+    const geometry = composerGeometry("first word"), { pointer, copied } = build({ composerGeometry: () => geometry });
+    const row = geometry.layout.rows.find(row => row.kind === "content")!;
+    const point = { ...event, row: geometry.top + row.screenRow, column: 5 };
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
+    try {
+      pointer.handle({ ...point, kind: "press" });
+      expect(pointer.handle({ ...point, kind: "release" })).toBeDefined();
+      for (const now of [1100, 1200]) {
+        clock.mockReturnValue(now);
+        pointer.handle({ ...point, kind: "press" });
+        expect(pointer.handle({ ...point, kind: "release" })).toBeUndefined();
+      }
+      expect(copied).toEqual(["first", "first word"]);
+    } finally { clock.mockRestore(); }
+  });
+});

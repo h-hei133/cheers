@@ -15,6 +15,8 @@ import type { ImageContent } from "../../model-adapters/multimodal.js";
 
 /** Length past which a paste is held aside rather than shown in full. */
 export const PASTE_PLACEHOLDER_THRESHOLD = 320;
+/** A repeat paste just after the newly inserted token opens that token. */
+export const REPEAT_PASTE_MS = 1200;
 
 const PLACEHOLDER = /\[#(\d+) (?:pasted|image) [^\]]*\]/g;
 
@@ -51,6 +53,7 @@ export class PasteStore {
   private readonly issued = new Map<number, Set<string>>();
   private heldBytes = 0;
   private nextId = 1;
+  private fresh: { readonly placeholder: string; readonly at: number; end?: number; revision?: number } | undefined;
 
   constructor(
     private readonly maxHeld = MAX_HELD,
@@ -73,6 +76,7 @@ export class PasteStore {
 
   /** Hold `text` and return the placeholder that stands for it. */
   hold(text: string): string {
+    this.fresh = undefined;
     const clean = normalizePaste(text);
     const bytes = Buffer.byteLength(clean, "utf8");
     if (bytes > MAX_HELD_ENTRY_BYTES) throw new RangeError("Pasted text exceeds the input limit.");
@@ -84,7 +88,19 @@ export class PasteStore {
     this.evictOldest();
     const placeholder = placeholderFor(id, clean);
     this.rememberPlaceholder(id, placeholder);
+    this.fresh = { placeholder, at: Date.now() };
     return placeholder;
+  }
+
+  /** Bind the latest token to its actual insertion and text revision. */
+  arm(draft: string, caret: number, revision: number): void {
+    const fresh = this.fresh;
+    if (!fresh || draft.slice(caret - fresh.placeholder.length, caret) !== fresh.placeholder) {
+      this.fresh = undefined;
+      return;
+    }
+    fresh.end = caret;
+    fresh.revision = revision;
   }
 
   /**
@@ -120,33 +136,28 @@ export class PasteStore {
   /**
    * The held paste the caret sits inside, as the range it occupies and its text.
    *
-   * The gesture is "paste again on the placeholder": the first paste leaves a
-   * short token in the draft, and a second paste while the caret is on that token
-   * means "show me what it stands for". That is a statement about where the caret
-   * is, not about how long ago the paste happened — a user who pastes, reads for a
-   * while, and comes back to the token is asking for the same thing as one who
-   * does it immediately, and a time window silently turned the second case into a
-   * second copy of the same text.
-   *
-   * The range is half-open and exclusive of `end` on purpose. Inserting a token
-   * leaves the caret immediately after it, so treating that position as "on the
-   * token" would make the very next unrelated paste expand the block and discard
-   * what the user had just copied. Moving into the token — which is what someone
-   * asking to see it does — is what arms the gesture.
+   * Inside a token the gesture has no time limit. At its end, only the latest
+   * actual insertion qualifies, briefly and before any text edit. Text revisions
+   * also reject an edit followed by undo, even when the draft looks identical.
    *
    * Only tokens this store issued and still holds qualify: `[#42 pasted …]` typed
    * by hand, or a token whose payload was evicted, is ordinary draft text.
    */
-  expansionAt(draft: string, caret: number): { readonly start: number; readonly end: number; readonly text: string } | undefined {
+  expansionAt(draft: string, caret: number, revision?: number): { readonly start: number; readonly end: number; readonly text: string } | undefined {
     if (!Number.isInteger(caret) || caret < 0 || caret > draft.length) return undefined;
+    const fresh = this.fresh;
+    const age = fresh ? Date.now() - fresh.at : Infinity;
+    if (fresh && (revision !== fresh.revision || age < 0 || age > REPEAT_PASTE_MS)) this.fresh = undefined;
     for (const match of draft.matchAll(PLACEHOLDER)) {
       const start = match.index;
       const end = start + match[0].length;
-      if (caret < start || caret >= end) continue;
+      const repeat = revision !== undefined && this.fresh?.end === end && this.fresh.placeholder === match[0];
+      if (caret < start || caret > end || (caret === end && !repeat)) continue;
       const id = Number(match[1]);
       if (!this.issued.get(id)?.has(match[0])) return undefined;
       const text = this.held.get(id);
       if (text === undefined) return undefined;
+      this.fresh = undefined;
       return { start, end, text };
     }
     return undefined;
@@ -154,6 +165,7 @@ export class PasteStore {
 
   /** Replace what a placeholder stands for, keeping its identity. */
   update(id: number, text: string): string {
+    this.fresh = undefined;
     const clean = normalizePaste(text);
     const bytes = Buffer.byteLength(clean, "utf8");
     if (bytes > MAX_HELD_ENTRY_BYTES) throw new RangeError("Pasted text exceeds the input limit.");
@@ -237,6 +249,7 @@ export class PasteStore {
 
   /** Hold `text` when it is long enough to bury a draft, else return it as-is. */
   holdIfLong(text: string): string {
+    this.fresh = undefined;
     return PasteStore.shouldHold(text) ? this.hold(text) : text;
   }
 
@@ -248,6 +261,7 @@ export class PasteStore {
    * separately and never becomes part of the sentence.
    */
   holdImage(image: ImageContent): string {
+    this.fresh = undefined;
     const bytes = Buffer.byteLength(image.data, "utf8");
     if (bytes > MAX_HELD_ENTRY_BYTES) throw new RangeError("Attached image exceeds the input limit.");
     const id = this.nextId++;
@@ -280,6 +294,7 @@ export class PasteStore {
 
   /** Forget everything; a submitted or discarded draft holds nothing. */
   clear(): void {
+    this.fresh = undefined;
     this.held.clear();
     this.heldSizes.clear();
     this.heldImages.clear();

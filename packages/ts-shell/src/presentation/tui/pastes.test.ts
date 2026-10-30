@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { PasteStore, PASTE_PLACEHOLDER_THRESHOLD, replaceLiteral } from "./pastes.js";
+import { describe, expect, it, vi } from "vitest";
+import { PasteStore, PASTE_PLACEHOLDER_THRESHOLD, REPEAT_PASTE_MS, replaceLiteral } from "./pastes.js";
 
 const LONG = "x".repeat(PASTE_PLACEHOLDER_THRESHOLD);
 
@@ -138,15 +138,49 @@ describe("asking for a paste in full", () => {
     expect(store.expansionAt(draft, start + placeholder.length - 1)?.text).toBe(LONG);
   });
 
-  it("leaves the caret position just after a freshly inserted block unarmed", () => {
-    // Inserting the token leaves the caret after it. Treating that as "on the
-    // block" made the next unrelated paste expand it and throw away the clipboard.
+  it("requires an actual insertion revision to expand just after a block", () => {
     const store = new PasteStore();
     const placeholder = store.hold(LONG);
     const draft = `fix ${placeholder} please`;
 
     expect(store.expansionAt(draft, draft.indexOf(placeholder) + placeholder.length)).toBeUndefined();
   });
+
+  it.each([0, REPEAT_PASTE_MS, REPEAT_PASTE_MS + 1, -1])("bounds fresh end expansion at age %s", age => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(10000);
+    try {
+      const store = new PasteStore(), placeholder = store.hold(LONG);
+      const draft = `fix ${placeholder} please`, end = 4 + placeholder.length;
+      store.arm(draft, end, 7);
+      clock.mockReturnValue(10000 + age);
+      expect(store.expansionAt(draft, end, 7)?.text).toBe(age >= 0 && age <= REPEAT_PASTE_MS ? LONG : undefined);
+      // Interior expansion never expires, including after the end gesture was consumed.
+      expect(store.expansionAt(draft, 5, 8)?.text).toBe(LONG);
+    } finally { clock.mockRestore(); }
+  });
+
+  it("binds the end gesture to one insertion position and consumes it once", () => {
+    const store = new PasteStore(), token = store.hold(LONG), draft = `${token} ${token}`;
+    store.arm(draft, token.length, 3);
+    expect(store.expansionAt(draft, draft.length, 3)).toBeUndefined();
+    expect(store.expansionAt(draft, token.length, 3)?.text).toBe(LONG);
+    expect(store.expansionAt(draft, token.length, 3)).toBeUndefined();
+  });
+
+  it.each(["edit", "short paste", "new block", "update", "image", "clear", "failed insertion"])(
+    "invalidates the fresh end after %s", change => {
+      const store = new PasteStore(), token = store.hold(LONG);
+      store.arm(token, token.length, 3);
+      if (change === "edit") {
+        expect(store.expansionAt(token, token.length, 4)).toBeUndefined();
+      } else if (change === "short paste") store.holdIfLong("next");
+      else if (change === "new block") store.hold(LONG);
+      else if (change === "update") store.update(1, "edited");
+      else if (change === "image") store.holdImage({ type: "image", data: "aGVsbG8=", mimeType: "image/png" });
+      else if (change === "clear") store.clear();
+      else store.arm("other text", 0, 3);
+      expect(store.expansionAt(token, token.length, 3)).toBeUndefined();
+    });
 
   it("picks the block under the caret, not the first block in the draft", () => {
     const store = new PasteStore();

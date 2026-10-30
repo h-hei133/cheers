@@ -4208,6 +4208,8 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 
 **证据边界**：机制与测试来自源码；未实现、未验证 1200 ms 窗口在真实按键节奏下的手感，也未验证"粘贴→输入→再粘贴"是否会被误判（按方案 4 不会）。
 
+**后续实施**：第36项已在21.17实现并完成本地聚焦与小型CLI验证；上文机制与建议为实施前研究快照。
+
 ### 21.7 第三十七：点击输入框任意位置移动光标
 
 **已确认机制**
@@ -4234,6 +4236,8 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 6. 该动作不写配置、不触发提交、不改变选区语义；点击后照常 `requestRender`。
 
 **证据边界**：机制来自源码；未实现、未在真实终端验证点击精度（宽字符、折行、缩放后重排、点击行尾之后的夹取），也未验证与双击选词的手感冲突。
+
+**后续实施**：第37项已在21.17实现并完成本地聚焦与小型CLI验证；上文机制与建议为实施前研究快照。
 
 ### 21.8 研究过程中新发现（不在用户列表内）
 
@@ -4386,3 +4390,22 @@ provider保持原有“至少一个精确model行可用”的就绪裁决，先�
 CLI每模式1会话×1消息，isolated home/profile/project、synthetic offline、heap768MiB/45秒，物理resize40/80/120列：provider组序、当前模型置顶、Not ready标题/键盘跳过、未配置模型真实检查与返回、全目录跨provider模型/搜索字母序均通过。完整built-in目录保留，非只塞四个fixture。前探针误以为自定义provider相邻、并期待窄列未截断的Configure connection，保留失败收据后改用真实next provider/可见prefix/精确action id；未改产品来迁就夹具。user/project config及models字节不变、请求0、exit0/cooked flags，退出130/138ms仅为小夹具观测。
 
 build `02517cf6aedf162c04ac06a13af6cdddbf144202f4b18b3a8f31b3e167b52d65`，inputs `fc9a56afaba143945a564cf526162ac72b4b207cdc9a6197f1f65b5f12cbd27c`，两CLI及[正式工件](../../.omx/artifacts/phase20-addition-model-order/README.md)绑定。named-callable navigation12→13、renderer6不变、order1，model picker既有46未增长，append disposition而不称全owner达标。无独立代理review/NormProof judge/真实provider/其他平台/exe/full suite/20k；scratch清理，原CLAUDE.md保留。第35项本地实现与小型CLI通过；36/37继续，33的大目录真实体验仍partial，原47及ADD整体不升级，goal active。
+
+
+### 21.17 第三十六／三十七实施：重复粘贴展开与全屏点击定位
+
+[PasteStore](../../packages/ts-shell/src/presentation/tui/pastes.ts)只保留一个最新文本token的fresh记录；hold后由实际插入路径绑定精确末尾与editor.textRevision。1200ms内在同一末尾重复粘贴即展开原payload；内部位置继续不限时展开，图片不展开。过期、负时间差、其他token/位置、任何编辑或撤销/重做、短粘贴、图片、update/clear均不能复活末尾手势。展开仍经原editor.replace，一次Ctrl+Z恢复token，下一次无关粘贴保留剪贴板。没有第二份payload栈。
+
+21.6建议的每个编辑回调disarm调整为既有单调textRevision：目标源码已证实saveUndo、insert和restore更新该值，普通caret移动不变；它能拒绝“编辑后撤销到相同文本”，不依赖内容比较，也无需给所有编辑路径增加hook。host真实输入回归与原Node CLI都验证该反例。局部参考研究仍成立：参考没有重复粘贴展开手势，本项沿用目标的issued身份/held载荷/原编辑器路径，不声称借用了参考实现。
+
+[Pointer](../../packages/ts-shell/src/cli/interactive/pointer.ts)对未修饰左键记录同格候选，指针一旦离开原格即失效，拖回也不定位；release只在原视图、原painted source/revision/宽度/viewport/行几何仍有效、且原DragSelection没有处理选区时返回source offset。[host](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)复用既有mouse callback应用setCursorOffset、reset Vim与补全同步；offset0明确可用。复用[composer sourceBoundary](../../packages/ts-shell/src/presentation/tui/composer/projection.ts)的UTF16字素映射，宽字第二格落到字素起点，行末文本区空白夹到行尾；content区域以外的gutter/边框/scrollbar与装饰行拒绝。双击词、三击行、拖拽复制及picker/reader优先级沿原owner，regular主屏保留终端鼠标。
+
+定向只读核对pi tui-alt-screen.ts:925–944与editor.ts:638–694，同意“原格释放且从未移开”才产生click；复用本项目现有映射与选择器，不引入第二套几何。单元覆盖中日韩宽字、组合音标、emoji/ZWJ、空草稿、软折行/换行、尾部空白、修饰键/右键、边框、重复release、drag/move离开再回来、text/undo/resize/失效layout/换view，以及双/三击。真实host走SGR解码验证caret、补全重同步、regular拒绝和picker/reader接管。
+
+主代理严格串行：五静态门、九聚焦文件295项、host筛选13项（另371项按筛选未运行）、TS build与owner审计通过；118旧docs advisory保留。五独立反转分别移除时限、文本修订、host插入绑定、指针离格失效与stale geometry拒绝，全部AssertionError并finally逐字节恢复。named-callable为pastes19→20、projection3/pointer16/keys3不变、既有host122不变；没有据此解决host责任上限。未运行本地全套、15-suite batch、20k真实终端、exe、NormProof judge或独立代理review。
+
+回查历史CI：26d3a53c的41020546837 failure（12687 passed/8 failed/3 skipped），fda6a665的41022696879也failure（12692 passed/9 failed/3 skipped），详见[CI收据](../../.omx/artifacts/phase20-addition-input-gestures/prior-ci.json)。本批将间接settings断言改用唯一navigation来源、移除旧侧栏Esc、hover坐标改为当前列表列，并补typed SettingsHost.file；不是恢复重复chips或旧导航。settings/model recovery/wheel/hover四文件99项与四个实际scope/mode宿主用例均在上述组合中通过。后一次CI另有两项publication旧邻项假设：完整built-in ready目录中alternate与shared间还有其他模型，不能仅把Down换成Up；修为有界逐项键盘移动并断言精确ID，19项补验通过并另记于最终日志。原read-only/恢复/不写入断言保留。历史失败SHA不会因此变绿；Watch41020546679/41022696885先前读回success，不能代替代码CI。
+
+原Node CLI两模式各1保存会话×1消息，isolated home/profile/project、synthetic offline、heap768MiB、45秒/2MiB限额。两模式实际重复粘贴、展开撤销后再粘贴、超时后保留剪贴板、输入并删回后失效均通过；物理PTY依次40/80/120列，全屏点击宽字第二格后插入准确、拖回不定位，press后resize的旧release拒绝；regular同坐标SGR不会到pointer。user/project config及models字节不变、请求0、exit0/cooked flags，退出132/133ms仅为小夹具观测。
+
+publication首轮只换方向仍失败，诊断看到完整内置条目后改为精确目标的有界键盘遍历；未修改model排序或刷新产品代码。首轮probe误把regular document视作具有composer鼠标几何；全屏第二轮又在caret已到目标时提前完成等待，将尚未处理的新click混入后续drag收据。失败收据均保留，分别改为regular直接验证无pointer调用、全屏同时等待实际新增mouse events与caret。产品未为探针改动。最终build `e30fee9b2190193441b0f69215310220045526ee43dc1349097bb7be883f670b`，inputs `499f2356143bf0a5fb68a49b55e5a9b569d946c1734d9e33d3f107ac47710fb3`，与[正式工件](../../.omx/artifacts/phase20-addition-input-gestures/README.md)绑定。第36/37项本地实现和小型CLI验证通过；真实桌面手感/其他平台未验收，33用户大目录体验仍partial，原47与ADD整体不升级，goal active。本批提交/推送及未来CI另绑定。

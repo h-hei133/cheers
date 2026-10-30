@@ -211,7 +211,11 @@ it.each(['revision', 'load'] as const)('makes cached models read-only after a %s
   try {
     await vi.advanceTimersByTimeAsync(0);
     expect(frame()).toContain('▸ shared');
-    overlay.handleKey(parseKeyEvent('\x1b[B'), vi.fn());
+    // Built-in ready models remain between alternate and the active shared.
+    for (let step = 0; step < overlay.model.visible.length && overlay.model.current()?.id !== ready; step++) {
+      overlay.handleKey(parseKeyEvent('\x1b[A'), vi.fn());
+    }
+    expect(overlay.model.current()?.id).toBe(ready);
     expect(frame()).toContain('▸ alternate');
     expect(picker.filterOptions!('', []).find(row => row.id === ready)?.disabled).not.toBe(true);
     if (failure === 'revision') readable = false;

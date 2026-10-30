@@ -463,15 +463,17 @@ it('exposes applicable settings categories and sections and marks stored values'
   const host = { openSettings: () => openSettings(context, vi.fn()) };
   const all = settingsPicker(host);
   const allItems = await all.load();
-  expect(all.chips?.items.map(item => item.id)).toEqual([
+  expect(all.navigation?.placement).toBe('top');
+  expect(all.navigation?.items.map(item => item.id)).toEqual([
     'all', 'Appearance', 'Model', 'Interaction', 'Context', 'Memory',
     'Files', 'Shell', 'Tools', 'Tasks', 'Providers',
   ]);
-  expect(all.chips?.active).toBe('all');
+  expect(all.navigation?.active).toBe('all');
   expect(allItems.find(item => item.id === 'offline')?.label.startsWith('● ')).toBe(true);
-  const session = all.chips!.select('Interaction')!;
-  const list = new OptionModel(session.filterOptions);
-  list.setOptions(await session.load());
+  const selected = all.navigation!.select('Interaction')!;
+  expect(all.navigation?.active).toBe('Interaction');
+  const list = new OptionModel(all.filterOptions);
+  list.setOptions(selected.options);
   const sessionItems = list.visible;
   expect(sessionItems.length).toBeGreaterThan(0);
   expect(sessionItems.filter(item => item.disabled).every(item => item.label.startsWith('Interaction /'))).toBe(true);

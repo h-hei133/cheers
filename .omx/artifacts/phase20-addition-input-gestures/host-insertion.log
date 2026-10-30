@@ -1,0 +1,58 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/interactiveMode.test.ts  (384 tests | 2 failed | 382 skipped) 101ms
+   ❯ src/cli/interactive/interactiveMode.test.ts > expands an immediate repeat paste as one undoable edit in regular mode
+     → expected { …(3) } to match object { …(2) }
+   ❯ src/cli/interactive/interactiveMode.test.ts > expands an immediate repeat paste as one undoable edit in fullscreen mode
+     → expected { …(3) } to match object { …(2) }
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 382 skipped (384)
+   Start at  16:14:07
+   Duration  13.22s (transform 10.00s, setup 0ms, collect 12.86s, tests 101ms, environment 0ms, prepare 59ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/interactiveMode.test.ts -t immediate repeat paste
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > expands an immediate repeat paste as one undoable edit in regular mode
+ FAIL  src/cli/interactive/interactiveMode.test.ts > expands an immediate repeat paste as one undoable edit in fullscreen mode
+AssertionError: expected { …(3) } to match object { …(2) }
+
+- Expected
++ Received
+
+  Object {
+-   "cursor": 80,
+-   "text": "long text
+- long text
+- long text
+- long text
+- long text
+- long text
+- long text
+- long text
+- ",
++   "cursor": 48,
++   "revision": 4,
++   "text": "[#1 pasted 80 chars, 9 lines]different clipboard",
+  }
+
+ ❯ src/cli/interactive/interactiveMode.test.ts:1895:41
+    1893|     const placeholder = host.view.editor.getText();
+    1894|     terminal.input('\x1b[200~different clipboard\x1b[201~');
+    1895|     expect(host.view.editor.snapshot()).toMatchObject({ text: long, cu…
+       |                                         ^
+    1896|     terminal.input('\x1a');
+    1897|     expect(host.view.editor.getText()).toBe(placeholder);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/interactiveMode.test.ts -t 'immediate repeat paste'

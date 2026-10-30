@@ -1140,3 +1140,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A settings detail crashes in a wheel test after a required draft fact is added, despite focused picker tests passing.
 - **Root Cause**: An indirect fake omitted SettingsDraft.file; transpiled tests exercised it only when rendering the detail. UI layout changes can also move the tested list column.
 - **Rule**: Type settings hosts, populate the captured draft contract in each fixture, and run the interaction tests that actually render its details. Derive wheel coordinates from the painted list pane; do not make product code synthesize missing ownership facts to accommodate an incomplete test fixture.
+
+### Pointer Probes Must Observe New Events Even When The Caret Already Matches
+- **Symptom**: A later resize iteration falsely reports that a drag positioned the caret, although its recorded drag events return no offset.
+- **Root Cause**: Waiting only for the expected caret accepts a value left by the preceding iteration. The next click is still queued and its release then falls inside the drag's observation window. Regular document rendering also deliberately has no composer mouse geometry.
+- **Rule**: Synchronize each click on both newly handled mouse events and the expected caret before starting another gesture. Verify regular-mode native ownership by absence of pointer calls; derive fullscreen coordinates from its current painted composer geometry.
+
+### A Content Row Includes Chrome Outside Its Text Cells
+- **Symptom**: A composer click mapped by row kind alone also positions the caret through its side border, gutter or scrollbar.
+- **Root Cause**: Content rows carry source cells and surrounding shape glyphs together; the source-boundary mapper correctly clamps padding but does not decide pointer admission.
+- **Rule**: Admit caret clicks only inside the contentColumn/contentCells interval of a content row. Keep row-end blank text cells usable, and let selection retain its separate mapping and ownership.

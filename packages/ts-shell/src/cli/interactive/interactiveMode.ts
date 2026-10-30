@@ -514,7 +514,14 @@ export class InteractiveMode {
         this.options.onUserIntent?.();
         this.vimSelection = undefined;
       }
-      if (this.alternateScreen || this.pager.active || this.overlay.fullScreen) this.pointer.handle(report);
+      if (this.alternateScreen || this.pager.active || this.overlay.fullScreen) {
+        const offset = this.pointer.handle(report);
+        if (offset !== undefined && this.state.editor.setCursorOffset(offset)) {
+          resetVimState(this.state.editor);
+          this.syncSuggestions(false);
+          this.tui.requestRender();
+        }
+      }
     });
     this.stdin.onPaste((text, issue) => {
       if (this.closing || this.stopped) return;
@@ -534,19 +541,21 @@ export class InteractiveMode {
       // A paste while the full-screen editor is up belongs to it, whole; a paste
       // into the prompt is held aside once it is long enough to bury the draft.
       //
-      // Pasting while the caret sits on a held block asks for that block in full:
-      // the gesture is where the caret is, not how recently the block was made.
+      // Pasting on a held block asks for it in full. An immediate repeat just
+      // after its fresh, unedited token also qualifies.
       // The pasted text is deliberately ignored — the user is pointing at the
       // token, not offering new content, and a clipboard that changed since the
       // first paste would otherwise silently insert a second block beside it.
       const snapshot = this.state.editor.snapshot();
-      const expansion = this.state.pastes.expansionAt(snapshot.text, snapshot.cursor);
+      const expansion = this.state.pastes.expansionAt(snapshot.text, snapshot.cursor, this.state.editor.textRevision);
       if (expansion) {
         // A real edit through the editor, so Ctrl+Z takes it back and the caret
         // lands after the text the block stood for.
         this.state.editor.replace({ snapshot, from: expansion.start, to: expansion.end, text: expansion.text });
       } else {
         this.state.editor.insert(this.state.pastes.holdIfLong(text));
+        const inserted = this.state.editor.snapshot();
+        this.state.pastes.arm(inserted.text, inserted.cursor, this.state.editor.textRevision);
         this.syncSuggestions(false);
       }
       this.tui.requestRender();

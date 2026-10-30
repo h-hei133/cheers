@@ -101,7 +101,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   // normal screen the wheel and the drag belong to the terminal.
   { keys: ["wheel"], does: "scroll the conversation", group: "pointer" },
   { keys: ["drag"], does: "select and copy, without the layout", group: "pointer" },
-  { keys: ["click"], does: "open or close the block under the pointer", group: "pointer" },
+  { keys: ["click"], does: "position the input caret or open or close a conversation block", group: "pointer" },
   { keys: ["shift+drag"], does: "hand the drag to the terminal instead", group: "pointer" },
 ];
 

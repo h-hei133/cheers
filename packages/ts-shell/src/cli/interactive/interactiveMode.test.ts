@@ -205,8 +205,6 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
       expect(frame()).toContain('Session /');
       expect(frame()).not.toContain('Top P');
       terminal.input('\x1b');
-      await vi.waitFor(() => expect(frame()).toContain('▸ Session'));
-      terminal.input('\x1b');
       await vi.waitFor(() => expect(host.overlay.active).toBe(false));
       expect(host.view.editor.getText()).toBe('held scope draft');
       expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(userBytes); expect(fs.readFileSync(project)).toEqual(projectBytes);
@@ -1871,17 +1869,75 @@ it('does not consume the stash slot for an empty prompt', () => {
   } finally { mode.stop(); }
 });
 
-it('leaves the block alone when the caret sits just past it', () => {
-  // Inserting a token parks the caret after it. That must not arm the gesture,
-  // or the next unrelated paste would swallow the clipboard.
+it('leaves an expired block alone when the caret sits just past it', () => {
   const { mode, terminal } = build();
   const host = mode as unknown as { view: InteractiveView };
   const long = Array.from({ length: 8 }, (_, index) => `line ${index} ${'text '.repeat(8)}`).join('\n');
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(10000);
   try {
     mode.start();
     terminal.input(`\x1b[200~${long}\x1b[201~`);
+    clock.mockReturnValue(11201);
     terminal.input('\x1b[200~more text\x1b[201~');
     expect(host.view.editor.getText()).toMatch(/^\[#1 pasted .*\]more text$/);
+  } finally { mode.stop(); clock.mockRestore(); }
+});
+
+it.each(['regular', 'fullscreen'] as const)('expands an immediate repeat paste as one undoable edit in %s mode', kind => {
+  const { mode, terminal } = build({ tuiMode: kind });
+  const host = mode as unknown as { view: InteractiveView };
+  const long = 'long text\n'.repeat(8);
+  try {
+    mode.start();
+    terminal.input(`\x1b[200~${long}\x1b[201~`);
+    const placeholder = host.view.editor.getText();
+    terminal.input('\x1b[200~different clipboard\x1b[201~');
+    expect(host.view.editor.snapshot()).toMatchObject({ text: long, cursor: long.length });
+    terminal.input('\x1a');
+    expect(host.view.editor.getText()).toBe(placeholder);
+    terminal.input('\x1b[200~next\x1b[201~');
+    expect(host.view.editor.getText()).toBe(placeholder + 'next');
+  } finally { mode.stop(); }
+});
+
+it.each(['regular', 'fullscreen'] as const)('rejects edited and undone fresh paste gestures in %s mode', async kind => {
+  const { mode, terminal } = build({ tuiMode: kind });
+  const host = mode as unknown as { view: InteractiveView };
+  try {
+    mode.start(); terminal.input(`\x1b[200~${'long text\n'.repeat(8)}\x1b[201~`);
+    const placeholder = host.view.editor.getText();
+    terminal.input('!'); await vi.waitFor(() => expect(host.view.editor.getText()).toBe(placeholder + '!'));
+    terminal.input('\x1a'); expect(host.view.editor.getText()).toBe(placeholder);
+    terminal.input('\x1b[200~next\x1b[201~');
+    expect(host.view.editor.getText()).toBe(placeholder + 'next');
+  } finally { mode.stop(); }
+});
+
+it.each(['regular', 'fullscreen'] as const)('routes a composer caret click through actual SGR input in %s mode', kind => {
+  const { mode, terminal } = build({ tuiMode: kind });
+  const host = mode as unknown as { view: InteractiveView; overlay: OverlayHost; pager: Pager; syncSuggestions(force: boolean): void };
+  try {
+    mode.start(); host.view.editor.setDraftText('a中😀e\u0301z');
+    host.view.renderFrame({ columns: 80, rows: 24 });
+    const geometry = host.view.composerGeometry()!, row = geometry.layout.rows.find(row => row.kind === 'content')!;
+    if (row.kind !== 'content') throw Error('content');
+    const resync = vi.spyOn(host, 'syncSuggestions');
+    const click = () => {
+      const position = `${row.contentColumn + 3};${geometry.top + row.screenRow + 1}`;
+      terminal.input(`\x1b[<0;${position}M\x1b[<0;${position}m`);
+    };
+    click();
+    expect(host.view.editor.snapshot().cursor).toBe(kind === 'fullscreen' ? 1 : 7);
+    expect(host.view.editor.getText()).toBe('a中😀e\u0301z');
+    expect(resync).toHaveBeenCalledTimes(kind === 'fullscreen' ? 1 : 0);
+    // A full-screen picker or reader owns the same coordinates.
+    host.view.editor.setCursorOffset(7);
+    host.overlay.open({ title: 'Covered', fullScreen: true, empty: '', load: async () => [], apply: async () => undefined });
+    click(); expect(host.view.editor.snapshot().cursor).toBe(7);
+    host.overlay.close();
+    host.pager.open('Reader', 'line\n'.repeat(100));
+    host.view.renderFrame({ columns: 80, rows: 24 });
+    click(); expect(host.view.editor.snapshot().cursor).toBe(7);
   } finally { mode.stop(); }
 });
 

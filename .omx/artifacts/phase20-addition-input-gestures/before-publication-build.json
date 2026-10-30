@@ -1,0 +1,8 @@
+{
+  "ok": true,
+  "entry": "/home/wang/projects/cheers/packages/ts-shell/dist/builds/0bcc3018d46909dfaaf966ac84c61e4bcf0c3c2a5e862c01d7260cfc9c84d87c/entrypoints/cli.js",
+  "buildId": "0bcc3018d46909dfaaf966ac84c61e4bcf0c3c2a5e862c01d7260cfc9c84d87c",
+  "inputsDigest": "4f4612e1e62a27c4c127127c018035e5bc1d2b150050adbfeffb7e2b50ed735a",
+  "artifactDigest": "78c3de281285bd04cbc34e368a0f292d0d66e787278dc78b6d06bec988c29452",
+  "version": "0.1.0"
+}

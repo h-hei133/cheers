@@ -4,7 +4,7 @@ import type { ComposerLayout, ComposerLayoutRow, SourceSelection } from "./contr
 type ContentRow = Extract<ComposerLayoutRow, { readonly kind: "content" }>;
 
 /** Resolve a screen endpoint to a boundary of an entire source grapheme. */
-function sourceBoundary(layout: ComposerLayout, point: SelectionPoint, edge: "start" | "end"): number {
+export function sourceBoundary(layout: ComposerLayout, point: SelectionPoint, edge: "start" | "end"): number {
   const content = layout.rows.filter((row): row is ContentRow => row.kind === "content");
   const first = content[0];
   const last = content[content.length - 1];

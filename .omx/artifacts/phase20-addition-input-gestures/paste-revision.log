@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/presentation/tui/pastes.test.ts  (47 tests | 1 failed | 40 skipped) 9ms
+   ❯ src/presentation/tui/pastes.test.ts > asking for a paste in full > invalidates the fresh end after edit
+     → expected { start: +0, end: 21, …(1) } to be undefined
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed | 40 skipped (47)
+   Start at  16:14:06
+   Duration  306ms (transform 55ms, setup 0ms, collect 56ms, tests 9ms, environment 0ms, prepare 60ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/presentation/tui/pastes.test.ts -t invalidates the fresh end after
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/presentation/tui/pastes.test.ts > asking for a paste in full > invalidates the fresh end after edit
+AssertionError: expected { start: +0, end: 21, …(1) } to be undefined
+ ❯ src/presentation/tui/pastes.test.ts:175:59
+    173|       store.arm(token, token.length, 3);
+    174|       if (change === "edit") {
+    175|         expect(store.expansionAt(token, token.length, 4)).toBeUndefine…
+       |                                                           ^
+    176|       } else if (change === "short paste") store.holdIfLong("next");
+    177|       else if (change === "new block") store.hold(LONG);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/presentation/tui/pastes.test.ts -t 'invalidates the fresh end after'
