@@ -10804,3 +10804,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：重叠根不再重复列出同一符号
 
 [addition21.59](features/phase-20-addition.md#2159-重叠根不再重复列出同一符号)子代理review超时后自行完成六项审查：NUL不绕过围栏、receipt分层正确、投影逃逸回退绝对、撤销无缓存、新会话不继承。发现真实缺陷：decodeWorkspaceRoots不查父子重叠，手改state可致双重遍历重复符号；targetFiles改Set去重。57项聚焦、四反转命中、五门/TS build通过。build a5505182。原47/ADD整体partial、goal active。
+
+### 2026-10-31：只读附加根在sandbox两个平台上都被保护
+
+[addition21.60](features/phase-20-addition.md#2160-只读附加根在sandbox两个平台上都被保护)bwrap用--ro-bind、seatbelt在allow之后deny，两者都保证--read根在bash中不可写。子代理模型确认不可用（工具仅支持sonnet/opus/haiku/fable），按用户指令自行完成。未改产品代码。build a5505182。原47/ADD整体partial、goal active。

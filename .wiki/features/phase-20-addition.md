@@ -4861,3 +4861,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 发现一处真实缺陷：`validateWorkspaceRoots`在写入时禁止父子重叠，但`decodeWorkspaceRoots`只查重复路径、**不查父子重叠**——手改state文件可造出`/a`与`/a/b`，`scanRoots`会双重遍历，符号在答案中重复。现`targetFiles`改为`Set`去重。
 
 验证：`lsp`13（新例断言匹配行为1行）、`language`44，共**57项**通过；四反转（扫描只留主根、文档符号只留主根、符号路径恒绝对、无去重）全部命中且finally字节恢复；五静态门、TS build/freshness通过。build `a55051824792`。原47/ADD整体partial、goal active。
+
+
+### 21.60 只读附加根在sandbox两个平台上都被保护
+
+`workspaceSandboxPolicy`把附加根按access分流：全部进`allowRead`、只有write根进`allowWrite`，只读根另列`readOnlyRoots`。`osSandbox`对两平台分别落实：bwrap用`--ro-bind`（独立挂载，不可写）；seatbelt在`allow file-write*`之后追加`deny file-write*`（顺序正确，deny覆盖allow）。两者都保证`/workspace add --read`的目录在`bash`中不可写。
+
+子代理模型确认：Agent工具仅支持sonnet/opus/haiku/fable，用户指定的`cn:deepseek-v4.1-flash[1m]`不可用；按用户指令「如果发现子代理模型不可使用，那就自行完成任务」自行完成。此前一次只读review子代理运行1小时无结论后停止，未运行任何测试或构建。
+
+未改产品代码。build `a55051824792`。原47/ADD整体partial、goal active。
