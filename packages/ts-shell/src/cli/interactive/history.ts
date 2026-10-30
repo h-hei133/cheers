@@ -1,4 +1,4 @@
-import { messageToText } from "../../model-adapters/multimodal.js";
+import { imagesOf, messageToText } from "../../model-adapters/multimodal.js";
 import { replayTodosFromMessages } from "../../core/commands/todoCommandRuntime.js";
 import { splitFencedDiff, textBlock, type Block } from "../../presentation/tui/transcript/blocks.js";
 import { summarize } from "./toolCards.js";
@@ -46,8 +46,12 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
         continue;
       }
       const content = typeof turn.metadata?.originalInput === 'string' ? turn.metadata.originalInput : messageToText(turn.content);
-      if (content.trim()) {
-        blocks.push(textBlock("user", content));
+      // The picture is part of what was said. Projecting only the text loses it
+      // from the restored conversation even though the stored message still
+      // holds it, and a message that was only a picture would read as nothing.
+      const images = imagesOf(turn.content);
+      if (content.trim() || images.length > 0) {
+        blocks.push(images.length > 0 ? { ...textBlock("user", content), images } : textBlock("user", content));
       }
     } else if (turn.role === "assistant") {
       const reasoning = turn.reasoning;

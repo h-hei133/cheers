@@ -26,6 +26,14 @@ export function messageHasContent(content: string | readonly MultimodalContentBl
     block.type === "text" ? block.text.trim().length > 0 : block.data.length > 0));
 }
 
+/** The pictures a message carries, in the order they were attached. */
+export function imagesOf(
+  content: string | readonly MultimodalContentBlock[] | null | undefined,
+): readonly ImageContent[] {
+  if (!Array.isArray(content)) return [];
+  return content.filter((block): block is ImageContent => block.type === "image");
+}
+
 const IMAGE_EXTENSION_MAP: Record<string, string> = {
   ".png": "image/png",
   ".jpg": "image/jpeg",

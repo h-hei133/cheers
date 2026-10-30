@@ -1,0 +1,35 @@
+{
+  "baselineCommit": "4b27b4ad",
+  "owners": [
+    {
+      "file": "cli/interactive/history.ts",
+      "baseline": 5,
+      "count": 5,
+      "names": [
+        "restoreConversation",
+        "showConversation",
+        "appendConversation",
+        "startFreshSession",
+        "groupReports"
+      ]
+    },
+    {
+      "file": "model-adapters/multimodal.ts",
+      "baseline": 7,
+      "count": 8,
+      "names": [
+        "messageHasContent",
+        "imagesOf",
+        "isImageFilePath",
+        "getImageMimeType",
+        "toAnthropicImageBlock",
+        "toOpenAIImageUrlBlock",
+        "formatNonVisionFallback",
+        "messageToText"
+      ]
+    }
+  ],
+  "buildId": "9a6624d48f82120506879633d1b9f11bfbf09265b1d032251c63269a53184bf1",
+  "inputsDigest": "dabe8d4d43d22f8680b430db8927a1a6f570803b5812e9a398157f33ee9f507d",
+  "freshness": true
+}

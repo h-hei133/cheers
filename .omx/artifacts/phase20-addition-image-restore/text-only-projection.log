@@ -1,0 +1,95 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/history.test.ts  (27 tests | 3 failed | 24 skipped) 12ms
+   ❯ src/cli/interactive/history.test.ts > restoring a conversation > restores the pictures a stored prompt carried, beside its text
+     → expected { kind: 'user', …(3) } to match object { kind: 'user', …(2) }
+   ❯ src/cli/interactive/history.test.ts > restoring a conversation > restores a prompt that was only a picture, which has no text to show
+     → expected [] to have a length of 1 but got +0
+   ❯ src/cli/interactive/history.test.ts > restoring a conversation > keeps restored pictures out of the editor history, which recalls words
+     → expected undefined to match object { kind: 'user', images: [ { …(3) } ] }
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 24 skipped (27)
+   Start at  00:28:20
+   Duration  1.55s (transform 884ms, setup 0ms, collect 1.30s, tests 12ms, environment 0ms, prepare 57ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/history.test.ts > restoring a conversation > restores the pictures a stored prompt carried, beside its text
+AssertionError: expected { kind: 'user', …(3) } to match object { kind: 'user', …(2) }
+
+- Expected
++ Received
+
+  Object {
+-   "images": Array [
+-     Object {
+-       "data": "QUJD",
+-       "mimeType": "image/png",
+-       "type": "image",
+-     },
+-   ],
++   "finalized": true,
+    "kind": "user",
+    "text": "what is this?",
++   "title": undefined,
+  }
+
+ ❯ src/cli/interactive/history.test.ts:52:23
+     50|     ] }]);
+     51|     expect(blocks).toHaveLength(1);
+     52|     expect(blocks[0]).toMatchObject({ kind: 'user', text: 'what is thi…
+       |                       ^
+     53|   });
+     54| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/cli/interactive/history.test.ts > restoring a conversation > restores a prompt that was only a picture, which has no text to show
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/cli/interactive/history.test.ts:58:20
+     56|     const picture = { type: 'image' as const, data: 'QUJD', mimeType: …
+     57|     const { blocks } = restoreConversation([{ ...turn('user', ''), con…
+     58|     expect(blocks).toHaveLength(1);
+       |                    ^
+     59|     expect(blocks[0]).toMatchObject({ kind: 'user', text: '', images: …
+     60|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/cli/interactive/history.test.ts > restoring a conversation > keeps restored pictures out of the editor history, which recalls words
+AssertionError: expected undefined to match object { kind: 'user', images: [ { …(3) } ] }
+
+- Expected: 
+Object {
+  "images": Array [
+    Object {
+      "data": "QUJD",
+      "mimeType": "image/png",
+      "type": "image",
+    },
+  ],
+  "kind": "user",
+}
+
++ Received: 
+undefined
+
+ ❯ src/cli/interactive/history.test.ts:67:31
+     65|     appendConversation({ transcript, editor: { loadHistory: (saved) =>…
+     66|       { id: 'picture-history', turns: [{ ...turn('user', ''), content:…
+     67|     expect(transcript.last()).toMatchObject({ kind: 'user', images: [p…
+       |                               ^
+     68|     expect(entries).toEqual([]);
+     69|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

@@ -10674,3 +10674,11 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 四baseline失败/一控制、三反转各3/3/1失败及bytes恢复；最终48聚焦通过/四旧大边界未选，五门/TS build/freshness通过。两小型实际CLI/back→Enter保留原image一次/两user无重复/后续branch与原transcript prefix，重开Esc状态不变、零fetch、config不变、exit0/cooked、scratch清理。HANDOFF及正式工件记录原history与新composer附件分界，无平台/provider验收升级。
 
 89843761 CI/Watch均success，138c2c42 Watch41073636819 success、CI41073636746延后读回仍in_progress。本批commit/push/未来CI分开，CLAUDE.md保留，原47/ADD仍partial、goal active。
+
+### 2026-10-31：重开会话恢复历史中的图片
+
+[addition21.32](features/phase-20-addition.md#2132-重开会话恢复历史中的图片)接续21.28的持久化修补：图片已保存且跨进程保留，但重开会话不可见。缺口在`restoreConversation`——user轮次只投影文字（丢弃图片），且文字为空时不建块，纯图片问题整条消失。现multimodal owner新增`imagesOf`（与`messageHasContent`/`messageToText`共用content union），user轮次按“有文字或有图片”准入并携带保存图片；复用既有`Block.images`渲染，无第二附件/重放路径。
+
+先读目标后定向只读对照本机pi的interactive-mode.ts：其restore的`getUserMessageText`只过滤text块、文字为空不渲染，是同样文字投影，明确不当作解法，未复制代码。三独立反转（文字投影、图片需文字、imagesOf返回空）分别3/1/2 AssertionError且finally bytes恢复；恢复后history27+multimodal26=53项通过，加rewind共84项。五门/TS build/freshness主代理串行通过，118旧docs advisory保留，owner callable 5→5与7→8。
+
+原CLI regular/fullscreen各1保存会话（文字/文字+图片/纯图片三user加后续回答），两模式恢复三个user块、图片数精确0/1/1、无图形协议终端实际绘制image attachment、composer零图片/零draft/零fetch，保存消息与transcript prefix逐字节不变，两exit0/cooked、config/project不变、scratch删除。此为新历史显示，非附件派发；图形协议内联、大图、compaction/branch、clipboard与平台未验收，原47/ADD整体partial、goal active。

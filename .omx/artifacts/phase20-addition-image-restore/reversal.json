@@ -1,0 +1,23 @@
+{
+  "cases": [
+    {
+      "name": "text-only-projection",
+      "exit": 1,
+      "tests": "3 failed | 24 skipped (27)",
+      "originalSha256": "cb4c9fb844de238f8859bd465312ff55d3ea37746db647c60f137eaf5cd3ea65"
+    },
+    {
+      "name": "picture-text-required",
+      "exit": 1,
+      "tests": "1 failed | 26 skipped (27)",
+      "originalSha256": "cb4c9fb844de238f8859bd465312ff55d3ea37746db647c60f137eaf5cd3ea65"
+    },
+    {
+      "name": "no-image-projection",
+      "exit": 1,
+      "tests": "1 failed | 6 passed | 19 skipped (26)",
+      "originalSha256": "a064203214a858541140d149e986879965c69c32d32d1139070ce248866e9b41"
+    }
+  ],
+  "restored": true
+}

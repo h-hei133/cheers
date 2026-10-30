@@ -42,6 +42,32 @@ describe("restoring a conversation", () => {
     appendConversation({ transcript, editor: { loadHistory } }, { id: 'original', turns: [message] } as never);
     expect(transcript.last()?.text).toBe(source);
   });
+
+  it('restores the pictures a stored prompt carried, beside its text', () => {
+    const picture = { type: 'image' as const, data: 'QUJD', mimeType: 'image/png' };
+    const { blocks } = restoreConversation([{ ...turn('user', ''), content: [
+      { type: 'text', text: 'what is this?' }, picture,
+    ] }]);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ kind: 'user', text: 'what is this?', images: [picture] });
+  });
+
+  it('restores a prompt that was only a picture, which has no text to show', () => {
+    const picture = { type: 'image' as const, data: 'QUJD', mimeType: 'image/png' };
+    const { blocks } = restoreConversation([{ ...turn('user', ''), content: [picture] }]);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ kind: 'user', text: '', images: [picture] });
+  });
+
+  it('keeps restored pictures out of the editor history, which recalls words', () => {
+    const picture = { type: 'image' as const, data: 'QUJD', mimeType: 'image/png' };
+    const transcript = new Transcript(); const entries: string[] = [];
+    appendConversation({ transcript, editor: { loadHistory: (saved) => entries.push(...saved) } },
+      { id: 'picture-history', turns: [{ ...turn('user', ''), content: [picture] }] } as never);
+    expect(transcript.last()).toMatchObject({ kind: 'user', images: [picture] });
+    expect(entries).toEqual([]);
+  });
+
   it("rebuilds what was said, in order", () => {
     const { blocks } = restoreConversation(CONVERSATION);
 

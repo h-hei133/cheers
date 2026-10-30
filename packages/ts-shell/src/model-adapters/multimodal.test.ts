@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  imagesOf,
   messageHasContent,
   messageToText,
   toAnthropicImageBlock,
@@ -14,6 +15,18 @@ describe("multimodal content admission", () => {
   it.each(["real text", [{ type: "text", text: "real text" }], [{ type: "image", data: "aGVsbG8=", mimeType: "image/png" }],
     [{ type: "text", text: " " }, { type: "image", data: "aGVsbG8=", mimeType: "image/png" }]] as const)(
     "admits text or image content %j", content => { expect(messageHasContent(content)).toBe(true); });
+});
+
+describe("pictures carried by a message", () => {
+  const picture: ImageContent = { type: "image", data: "aGVsbG8=", mimeType: "image/png" };
+
+  it("returns images in attachment order and leaves text out", () => {
+    const second: ImageContent = { type: "image", data: "d29ybGQ=", mimeType: "image/jpeg" };
+    expect(imagesOf([{ type: "text", text: "two pictures" }, picture, second])).toEqual([picture, second]);
+  });
+
+  it.each([undefined, null, "", "plain text", [{ type: "text", text: "no picture" }], []] as const)(
+    "has nothing to return for %j", content => { expect(imagesOf(content)).toEqual([]); });
 });
 
 /**

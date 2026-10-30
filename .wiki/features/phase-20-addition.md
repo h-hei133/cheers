@@ -4590,3 +4590,16 @@ HANDOFF补text/content与empty-string证据陷阱，日志归档。分支丢弃/
 原Node CLI regular/fullscreen各三微小保存消息（文字/空text图片/后续回答）、isolated home/profile/Git project、无凭据synthetic且fetch观察拒绝、heap768MiB/45秒/2MiB。真实/back实际绘制Image message、Enter经原导航writer，fresh read确认图片活动叶且exact block一次，最终两user无重复、原transcript prefix及后续answer仍在树。重开Esc状态bytes不变、零fetch尝试、config/project不变、两exit0/cooked、scratch删除。composer未注入图片，原history保留图片；不冒充重新附图的新普通回合/模型派发/平台clipboard验收。
 
 HANDOFF补question admission/display文本分界；无full local suite/并行heavy/本助手subagent/20k真实终端/exe/真实provider/独立代理review/NormProof judge。延后一次89843761 CI41066606262/Watch41066606364均success，138c2c42 Watch41073636819 success、CI41073636746仍in_progress且head一致；本批Git/CI另绑定，CLAUDE.md保留，原47/ADD整体partial、goal active。
+
+
+### 21.32 重开会话恢复历史中的图片
+
+接续21.28的持久化修补：图片已写入保存的user消息并跨进程保留，但重开会话仍看不到。缺口在[history projection](../../packages/ts-shell/src/cli/interactive/history.ts)的`restoreConversation`——它把每个user轮次投影成`messageToText`（按设计丢弃图片），且只在文字投影非空时建块，纯图片问题整条消失。现原[multimodal owner](../../packages/ts-shell/src/model-adapters/multimodal.ts)新增`imagesOf`，与既有`messageHasContent`/`messageToText`共用同一content union；user轮次按“有文字或有图片”准入，块携带保存的图片。原composed source（`metadata.originalInput`）、60块窗口、earlier copy source、编辑器历史规则保持不变——历史仍只收有文字的prompt。渲染复用既有`Block.images`能力（live echo本来就这样传），无第二附件/重放路径、无新store或schema。
+
+先读目标再定向只读对照本机pi的interactive-mode.ts：其restore用`getUserMessageText`只过滤text块，文字为空则整条不渲染，是同样的文字投影，明确不当作已解决问题；live渲染也只显示文字。沿本项目原渲染能力修补，未复制参考代码。[正式工件](../../.omx/artifacts/phase20-addition-image-restore/README.md)存三独立反转（文字投影、图片需文字、`imagesOf`返回空），分别3/1/2 AssertionError且finally bytes恢复；恢复后history 27项+multimodal 26项=53项通过，加rewind共84项。
+
+五门/TS build/freshness主代理串行通过，118旧docs advisory保留；owner named callable为5→5与7→8，均低于20。build `9a6624d48f82120506879633d1b9f11bfbf09265b1d032251c63269a53184bf1`、inputs `dabe8d4d43d22f8680b430db8927a1a6f570803b5812e9a398157f33ee9f507d`。
+
+原Node CLI regular/fullscreen各1保存会话（文字/文字+图片/纯图片三user加后续回答）、isolated home/profile/Git project、无凭据synthetic且fetch拒绝、heap768MiB/45秒/2MiB。两模式启动即恢复三个user块，图片数量精确为0/1/1，无图形协议终端实际绘制`image attachment: image/png`，composer零图片、零draft、零fetch；fresh read确认三条保存消息与transcript prefix逐字节不变，两exit0/cooked、config/project不变、scratch删除。
+
+此为历史显示恢复，不是新附件路径：不注入composer、不派发请求。图形协议内联绘制、大图、compaction/branch超出prefix的投影、clipboard与其他平台未验收。无full local suite/并行heavy/本助手subagent/20k真实终端/exe/真实provider/独立review/NormProof judge；原47/ADD整体partial、goal active。

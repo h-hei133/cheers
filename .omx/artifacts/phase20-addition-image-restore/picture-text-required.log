@@ -1,0 +1,33 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/history.test.ts  (27 tests | 1 failed | 26 skipped) 8ms
+   ❯ src/cli/interactive/history.test.ts > restoring a conversation > restores a prompt that was only a picture, which has no text to show
+     → expected [] to have a length of 1 but got +0
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 skipped (27)
+   Start at  00:28:22
+   Duration  1.43s (transform 823ms, setup 0ms, collect 1.19s, tests 8ms, environment 0ms, prepare 56ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/history.test.ts > restoring a conversation > restores a prompt that was only a picture, which has no text to show
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/cli/interactive/history.test.ts:58:20
+     56|     const picture = { type: 'image' as const, data: 'QUJD', mimeType: …
+     57|     const { blocks } = restoreConversation([{ ...turn('user', ''), con…
+     58|     expect(blocks).toHaveLength(1);
+       |                    ^
+     59|     expect(blocks[0]).toMatchObject({ kind: 'user', text: '', images: …
+     60|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

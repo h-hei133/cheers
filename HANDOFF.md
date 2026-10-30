@@ -1226,3 +1226,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A saved image-only user question is visible in the tree but missing from `/back`; duplicate image question identities are also skipped before validation.
 - **Root Cause**: Both question source paths treated nonblank text projection as the candidate admission rule, and row summaries had no label for admitted empty prose.
 - **Rule**: Use actual content admission in both synchronous and asynchronous sources, retain original empty text separately from its visible image label, and run the same identity/version/limit controls for image questions. Verify the original branch writer keeps the image and later branch without adding a user prompt; a visible label must never become submitted text or proof of new composer attachments.
+
+### Restored Prompt Projection Must Keep Pictures Beside Text
+
+- **Symptom**: A saved prompt shows its words after reopening a session, but the picture it carried is gone; a prompt that was only a picture produces no transcript block at all.
+- **Root Cause**: Durable prompt storage already writes the text/image content union, while the transcript restore path projected each user turn through `messageToText` (which drops images by design) and then admitted the block only on non-blank text.
+- **Rule**: When rebuilding a stored user turn for display, derive pictures from the same content union (`imagesOf`) and admit on text *or* pictures; pass them through the existing `Block.images` renderer instead of a second attachment path. Keep editor history word-only — recalling a draft does not recall a picture. A restore fixture must include a prose turn, a prose+image turn and an image-only turn, and assert the drawn fallback label on a terminal without a graphics protocol.
