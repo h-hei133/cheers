@@ -10712,3 +10712,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：启动草稿交接与光标位置实测
 
 [addition21.37](features/phase-20-addition.md#2137-启动草稿交接与光标位置实测)在加载期输入三行草稿后由真实runtime接管：两模式草稿精确28字符、光标在末尾、五次退格精确删除5字符；全屏原始帧三行正确绘制且光标在第58行第12列，无空白行。第27项「跳到大片空白行」在该场景不可复现，但缺用户原始终端/尺寸/按键上下文，原机制仍未确认而非证伪。两个探针失败（占位符就绪断言、不存在的lastComposerGeometry调用）保留为harness问题。未改产品代码；原47/ADD整体partial、goal active。
+
+### 2026-10-31：附加workspace根未到达文件writer（第24项真实缺陷）
+
+[addition21.38](features/phase-20-addition.md#2138-附加workspace根未到达文件writer第24项真实缺陷)推翻旧裁决：真实构建下越界写被拒（消息正确），`/workspace add --write`成功保存根，但**同一写入仍被拒**且再次提示运行刚运行过的命令。根因是write/edit围栏只查主根、从不读`context.workspaceRoots`；会话级`resolveWorkspaceRoot`已完整但未被调用。改走它后围栏通过，但edit恢复账本从操作scope派生位置、要求落在profile内，绑到附加根会移动账本导致`Edit operation receipt is invalid.`——需契约改动，已回退，产品代码无变化。第24项属真实缺陷而非提示词问题。边界：合成会话、仅Linux、未覆盖apply_patch/bash路径。原47/ADD整体partial、goal active。

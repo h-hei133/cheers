@@ -1262,3 +1262,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A startup probe that waits for "Ask anything, or / for commands" times out even though the runtime is fully ready.
 - **Root Cause**: The placeholder is drawn only while the draft is empty. A probe that types during loading has a non-empty draft, so the placeholder never appears.
 - **Rule**: Observe readiness for a pre-filled draft through settled render counts and the adopted editor snapshot, not the placeholder text. Also do not call view methods from an observer without checking the surface contract — an unknown method throws inside `renderFrame` and the process exits with "Fatal error", which looks like a product crash but is probe code.
+
+### An Attached Workspace Root Does Not Reach write/edit
+
+- **Symptom**: After `/workspace add <path> --write` reports success, writing to that path is still refused, and the refusal repeats the grant command the user just ran.
+- **Root Cause**: `core/tools/registry.ts` fences write and edit with `verifyPathContainment(target, context.workspaceRoot)` — the primary root only — and never reads `context.workspaceRoots`. The session resolver `resolveWorkspaceRoot` already implements the full rule but these writers do not call it.
+- **Rule**: Do not claim the grant path is complete just because the root is stored with identity and access mode. Routing the writers through `resolveWorkspaceRoot` is necessary but not sufficient: the edit-recovery ledger derives its location from the operation scope's workspace and requires it to sit inside the profile, so binding the operation identity to an attached root makes the committed receipt unreadable (`Edit operation receipt is invalid.`). A correct fix keeps the snapshot ledger bound to the session/profile while allowing a different write target root; treat that as a contract change and test a real write end to end, not just the containment call.

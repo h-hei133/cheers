@@ -4648,3 +4648,18 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 第27项此前一直保持「机制未确认」。本批在**加载期**输入三行草稿后让真实runtime接管同一个editor，两模式各一轮原CLI（隔离home/profile/Git project、无凭据synthetic且fetch拒绝、heap768MiB、40秒上界）：交接后草稿精确为`line one\nline two\nline three`（28字符）、光标28（末尾）；五次退格后为23字符且内容正是原文本前23字符。全屏原始帧显示三行绘制为`❯ line one`/`  line two`/`  line thre…`，光标落在第58行第12列（第三行末尾），上下均无空白行。
 
 结论：本build在「加载期多行草稿」这一场景下，交接保留草稿与光标、退格删除真实字符，用户所述「跳到大片空白行且无法删除」**不可复现**；但不复现用户原始终端、窗口尺寸与该次按键上下文，故原机制仍属**未确认**而非已证伪。两个探针失败保留为harness问题而非产品缺陷：就绪断言等待了非空草稿会正确抑制的占位符；observer调用了不存在的`lastComposerGeometry`导致致命错误。未改产品代码。[正式工件](../../.omx/artifacts/phase20-addition-startup-draft/README.md)。build `5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473`、inputs `4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806`。原47/ADD整体partial、goal active。
+
+
+### 21.38 附加workspace根未到达文件writer（第24项真实缺陷）
+
+第17.7/第一百三十二批的裁决认为「限制合理、出路存在（`/workspace add <path> --write`）、缺的只是被发现」。本批用真实构建做端到端验证，结论**对该裁决不利**：
+
+1. 越界写被拒，消息含`/workspace add`与`--write`，未创建文件——正确。
+2. `/workspace add <outside> --write`成功：根以`access:"write"`和`dev:ino:birthtimeMs`身份保存——正确。
+3. **同一写入仍被拒**，且消息再次让用户运行刚运行过的命令。
+
+根因：[write/edit](../../packages/ts-shell/src/core/tools/registry.ts)的围栏是`verifyPathContainment(target, context.workspaceRoot)`，只看主根，**从不读`context.workspaceRoots`**。会话级[resolveWorkspaceRoot](../../packages/ts-shell/src/core/workspace/roots.ts)已完整实现规则（仅注册根、write需write访问、每次复验目录身份），但这两个writer不调用它；因此附加根只影响sandbox写入允许和已使用`selectWorkspaceRoot`的路径。
+
+尝试与回退：把write/edit改走`resolveWorkspaceRoot`后围栏通过，但写入随即报`Edit operation receipt is invalid.`。[edit恢复store](../../packages/ts-shell/src/edit/recovery/operation/store.ts)从操作scope的workspace派生账本位置（`storageRoot(scope) = profile.root ?? scope.workspace.path`），`assertProfileStorage`要求该位置在profile内；把操作身份绑到附加根会移动账本，提交写入的receipt无法在同一scope下读回。要让授权真正生效，需要**快照账本继续绑定会话/profile，而写入目标是另一个根**——这是edit恢复store的契约改动，不是围栏的一行修改。该改动已回退，本批产品代码无变化。
+
+因此第24项的正确结论是：授权机制作为「带身份与访问模式的已保存根」是完整的，但**文件writer不读取它**，且edit账本无法记录目标根非主根的写入。这与用户「别的目录建文件被系统拒绝」的报告一致，属真实缺陷而非提示词问题。证据边界：合成会话、单次真实写入、仅Linux；未覆盖apply_patch、bash sandbox写入路径与多根并发。[正式工件](../../.omx/artifacts/phase20-addition-workspace-grant/README.md)。build `5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473`、inputs `4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806`。原47/ADD整体partial、goal active。
