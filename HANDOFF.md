@@ -1155,3 +1155,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Typing three draft characters triggers many synchronous current-transcript reads even with no active Git commit intent and no provider requests.
 - **Root Cause**: Dynamic foreground tool discovery calls the commit-intent owner repeatedly, and its current-session supplier loaded full history before checking the local armed state.
 - **Rule**: Reject an absent host intent before acquiring its authoritative prompt. When armed, retain current session/cwd/source/intent revalidation; do not replace durable authority with a convenient cached draft. Attribute actual read calls by owner in small CLI probes, and report remaining startup reads separately.
+
+### Category Hit Spans Must Retain Their Presentation Domain
+- **Symptom**: Top settings tabs do not highlight on hover; treating every category hit as a chip then removes existing model sidebar hover or highlights an identically named content option.
+- **Root Cause**: The chip hit map also carries sidebar categories, while content and categories may share an ID. A hit ID alone cannot choose the correct renderer.
+- **Rule**: Preserve painted list/sidebar classification before falling back to chip spans. Keep chip hover separate from content hover, and give the active tab's style priority. Verify actual styled row changes: a theme may use the same background color for selection and hover.
+
+### Capture The Outgoing Row Before Pointer Category Selection
+- **Symptom**: Returning from a field editor, clicking another category and navigating back loses the original field despite keyboard-only category changes retaining it.
+- **Root Cause**: A recreated navigation owner receives the field as initialSelection, but its per-category row memory is not populated until an explicit focus capture. Keyboard category handling captures the outgoing row; the pointer path used select directly.
+- **Rule**: Capture the current row through the existing navigation focus contract before selecting a painted category. Preserve its search guard, and verify both top and side navigation with an explicit initial row that differs from the first option.

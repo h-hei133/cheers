@@ -1,0 +1,44 @@
+scc-gate root=packages/ts-shell/src files=3011
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=53 read=53 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=25 docs_refs=456 docs_dangling=0 docs_source_dangling=118
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 118 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/overlay/hover.test.ts src/cli/interactive/overlay.test.ts src/cli/interactive/picker/navigation.test.ts src/presentation/tui/chrome/chips.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/overlay/hover.test.ts  (16 tests) 136ms
+ ✓ src/cli/interactive/picker/navigation.test.ts  (22 tests) 345ms
+ ✓ src/cli/interactive/overlay.test.ts  (77 tests) 273ms
+ ✓ src/presentation/tui/chrome/chips.test.ts  (3 tests) 5ms
+
+ Test Files  4 passed (4)
+      Tests  118 passed (118)
+   Start at  17:11:01
+   Duration  3.22s (transform 70ms, setup 0ms, collect 1.82s, tests 759ms, environment 0ms, prepare 154ms)
+
+{"reversed":4,"restored":true}
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/overlay/hover.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/overlay/hover.test.ts  (16 tests) 164ms
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  17:11:13
+   Duration  1.80s (transform 1.03s, setup 0ms, collect 1.41s, tests 164ms, environment 0ms, prepare 51ms)
+
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+Wrote build manifest fd78750d7592 for @cheers/ts-shell@0.1.0
+{"counts":[{"file":"cli/interactive/overlay.ts","count":30,"baseline":30},{"file":"presentation/tui/chrome/chips.ts","count":4,"baseline":4}],"build":{"ok":true,"entry":"/home/wang/projects/cheers/packages/ts-shell/dist/builds/fd78750d75921f43170a72cf28f52ad0bf196f76028016e414c0ba623a842b34/entrypoints/cli.js","buildId":"fd78750d75921f43170a72cf28f52ad0bf196f76028016e414c0ba623a842b34","inputsDigest":"f8188435fc5f8ae9d6fe1f3a27445e492c68c2d47f7fd0d51a33b181f5197044","artifactDigest":"8133554df4e8410324dcf60de38465342e11fd4de881021f64a3ca5285f55726","version":"0.1.0"}}

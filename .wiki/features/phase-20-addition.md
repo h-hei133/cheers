@@ -4422,3 +4422,17 @@ publication首轮只换方向仍失败，诊断看到完整内置条目后改为
 主代理单进程串行五静态门、intent/native operation两文件32项、runtime preview筛选4项（另99项未运行）通过；两反转分别恢复急切读取与移除armed来源/ID拒绝，均失败并finally逐字节恢复。前者命中测试特意抛出的history acquisition错误，不写成AssertionError；后者命中身份断言。恢复后intent8项与实际foreground投影1项再通过，随后TS build、owner AST审计及两模式CLI。intent named callable5→5，无新增超限。build `0edc912eddca92511a12ff9d3b0a27fb46943988fa462266ff204061bb411be7`，inputs `0632b42b62113c7e481b33b122d724cb88680e1400c11a45fb7a605db1edeb57`，与[正式工件](../../.omx/artifacts/phase20-addition-idle-tools/README.md)绑定。
 
 没有本地全套/并行heavy/子代理/20k真实终端、exe、独立review、NormProof judge或真实provider/其他平台验收；scratch清理、原CLAUDE.md保留。第33项减少一条已确认的残余同步开销，用户大目录实际体验仍partial，原47与ADD整体不升级，goal active。延后读回b30801aa的CI41026961526仍in_progress、Watch41026961630 completed/success且head一致；不等待/重复轮询，本批提交/推送与未来CI单独绑定。
+
+### 21.19 顶部分类悬停与鼠标切类后的原字段恢复
+
+继续核对第3.1节鼠标与连续性要求，确认21.15顶部分类只登记点击span，motion只查listRows，故settings分类无法悬停高亮。[OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts)复用原chipRows，在原列表/侧栏命中之后补chip命中；独立标记chip hover，避免同ID内容行误高亮。[chipStrip](../../packages/ts-shell/src/presentation/tui/chrome/chips.ts)沿原主题绘制非活动分类的悬停，活动样式优先；悬停不改变分类、字段、预览或保存。原搜索/resize/来源替换/短frame与未绘制origin、modified motion、loading准入继续有效。
+
+小型原CLI进一步复现：从Theme详情返回，鼠标点Model，再用Left回Appearance，焦点丢到Input shape。键盘切类会捕获当前行，而鼠标直接select；现于原pointer分类入口先调用navigation.focus捕获当前字段，再select，保留原search guard，不增状态或另一套导航。top/side回归都用非首项initialSelection，确认返回与Enter保持原行。
+
+定向只读对照`settings-selector.ts:1242–1272`与`tab-bar.ts:248–255,337–353`：采用已绘制命中、悬停独立于选择、活动样式优先。该参考的鼠标与键盘共用tab-change回调（`:661–670`），但切类重建列表（`:1808–1817`）；本项目保留自身更强的逐类字段记忆合同，仅补齐两种入口的一致捕获，不照搬重建。回归与四反转覆盖路由、绘制、分类/内容同ID隔离及返回焦点。
+
+主代理严格串行：初始新增悬停6失败/既有7通过，追加鼠标返回2失败；最终四文件**118项去重测试**、五静态门、四反转（分别3/3/2/2失败，finally逐字节恢复）、恢复后hover16项与TS build通过。118旧docs advisory保留；保守named-callable overlay30→30、chips4→4，既有overlay上限债保留并append disposition，不称全部owner达标。最终build `fd78750d75921f43170a72cf28f52ad0bf196f76028016e414c0ba623a842b34`，inputs `f8188435fc5f8ae9d6fe1f3a27445e492c68c2d47f7fd0d51a33b181f5197044`。
+
+原Node CLI regular/fullscreen各1保存会话×1消息，物理40/80/120列resize、真实SGR motion、原字段Enter/取消、鼠标切类与键盘返回、model侧栏悬停和退出逐项验证；配置与models字节不变、请求0、exit0且cooked flags恢复。探针旧收据保留：首轮未取得完整observer；修原子收据和显式颜色后，不能把同色selectedBg/statusBandBg算作多处hover，改为实际行样式hash差与独立hover身份；随后真实暴露的字段丢失已修，未放松返回断言。首次产品修补误将共用chipRows里的侧栏分类也归为chip，既有回归检出后修为列表/侧栏优先；详见[正式工件](../../.omx/artifacts/phase20-addition-tab-hover/README.md)与HANDOFF。
+
+延后一次读回确认`93efa0a0`的CI41028824744/Watch41028824745及`b30801aa`的CI41026961526/Watch41026961630均completed/success且head一致；本批自己的提交、推送与未来CI另绑定。不运行全套/20k真实终端/exe/真实provider/独立review或NormProof judge；用户桌面手感、其他平台和第33项大目录体验仍未验收，原47与ADD整体不升级，goal active。

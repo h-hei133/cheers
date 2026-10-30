@@ -171,7 +171,7 @@ export class OverlayHost {
   private searchFailed = false;
   private readonly optionRows = new Map<number, { readonly id: string; readonly from: number; readonly to: number }>();
   private readonly listRows = new Map<number, Array<{ readonly from: number; readonly to: number; readonly id: string; readonly sidebar?: boolean }>>();
-  private hovered?: { readonly id: string; readonly sidebar?: boolean };
+  private hovered?: { readonly id: string; readonly sidebar?: boolean; readonly chip?: boolean };
   private renderedGeometry = '';
   private readonly chipRows = new Map<number, Array<{ readonly id: string; readonly from: number; readonly to: number }>>();
   private renderedWidth = 0;
@@ -299,7 +299,8 @@ export class OverlayHost {
       ? { items: picker.navigation.items, active: this.model.filter ? 'all' : picker.navigation.active }
       : !picker.navigation ? picker.chips : undefined;
     const chipChrome = {
-      ...(chips ? { chips: chipStrip(chips.items, chips.active, picker.form === 'modal' ? Math.max(0, width - 4) : width) } : {}),
+      ...(chips ? { chips: chipStrip(chips.items, chips.active, picker.form === 'modal' ? Math.max(0, width - 4) : width,
+        this.hovered?.chip ? this.hovered.id : undefined) } : {}),
       ...(groupKeys.length ? { groupHint: `${groupKeys.join('/')} group` } : {}),
       onChipRow: (row: number, id: string, from: number, to: number) => {
         const spans = this.chipRows.get(row) ?? [];
@@ -313,7 +314,7 @@ export class OverlayHost {
         this.model,
         {
           title: picker.title,
-          hovered: this.hovered?.sidebar ? undefined : this.hovered?.id,
+          hovered: this.hovered?.sidebar || this.hovered?.chip ? undefined : this.hovered?.id,
           empty,
           ...(state ? { state } : {}),
           detailRows: picker.detailRows ?? 2,
@@ -344,7 +345,7 @@ export class OverlayHost {
       this.model,
       {
         title: picker.title,
-        hovered: this.hovered?.sidebar ? undefined : this.hovered?.id,
+        hovered: this.hovered?.sidebar || this.hovered?.chip ? undefined : this.hovered?.id,
         empty,
         ...(state ? { state } : {}),
         multiple: picker.multiple === true,
@@ -365,10 +366,13 @@ export class OverlayHost {
   handlePointer(report: MouseReport, top?: number): boolean {
     if (!this.picker) return false;
     if (report.kind === 'move') {
-      const target = top === undefined || this.input || this.actionPending || this.loading || this.subMode !== 'none'
+      const chip = top === undefined ? undefined : this.chipRows.get(report.row - top)
+        ?.find(span => report.column >= span.from && report.column < span.to);
+      const target: typeof this.hovered = top === undefined || this.input || this.actionPending || this.loading || this.subMode !== 'none'
         || report.shift || report.alt || report.ctrl ? undefined : this.listRows.get(report.row - top)
-          ?.find(span => report.column >= span.from && report.column < span.to && !span.id.startsWith('section:'));
-      if (target?.id !== this.hovered?.id || target?.sidebar !== this.hovered?.sidebar) {
+          ?.find(span => report.column >= span.from && report.column < span.to && !span.id.startsWith('section:'))
+          ?? (chip ? { id: chip.id, chip: true } : undefined);
+      if (target?.id !== this.hovered?.id || target?.sidebar !== this.hovered?.sidebar || target?.chip !== this.hovered?.chip) {
         this.hovered = target; this.onChange();
       }
       return true;
@@ -406,6 +410,7 @@ export class OverlayHost {
         report.column >= 0 && report.column < this.renderedWidth) {
       const chip = this.chipRows.get(report.row - top)?.find(span => report.column >= span.from && report.column < span.to);
       if (chip) {
+        this.picker.navigation?.focus(this.model.current()?.id);
         const update = this.picker.navigation?.select(chip.id);
         if (update) {
           this.optionRows.clear(); this.listRows.clear(); this.hovered = undefined; this.chipRows.clear();

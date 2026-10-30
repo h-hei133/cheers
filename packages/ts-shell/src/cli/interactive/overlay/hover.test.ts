@@ -42,6 +42,107 @@ it.each(['panel', 'modal'] as const)('paints a separate hover band in %s without
   expect(apply).toHaveBeenCalledWith(picker, ['a']); overlay.close();
 });
 
+it.each([40, 80, 120])('highlights a painted settings tab at %s columns without switching category or changing Enter', async width => {
+  const save = vi.fn(async () => ({ applied: true })), preview = vi.fn();
+  const host: SettingsHost = { openSettings: () => ({ scope: 'user', file: '/fixture/config.json', save, reopen: () => undefined,
+    definitions: CONFIG_SETTINGS, values: Object.fromEntries(CONFIG_SETTINGS.map(setting => [setting.key,
+      { stored: undefined, effective: false, requested: false, source: 'default', requestedSource: 'default', restartRequired: false }])) }) };
+  const redraw = vi.fn(), overlay = new OverlayHost(redraw);
+  const picker = { ...settingsPicker(host, 'user', 'Appearance', 'theme'), previewChange: preview };
+  overlay.open(picker); await settle(); let rows = overlay.render(width, 30);
+  const tab = point(rows, ' Model '), before = rows.map(stripAnsi);
+  redraw.mockClear(); preview.mockClear(); move(overlay, tab.row, tab.column + 1, 7);
+  expect(redraw).toHaveBeenCalledOnce();
+  rows = overlay.render(width, 30); hovered(rows, tab.row);
+  expect(rows.filter(line => line.includes(defaultTheme.bgOpen('statusBandBg')))).toHaveLength(1);
+  expect(rows.map(stripAnsi)).toEqual(before);
+  expect(picker.navigation?.active).toBe('Appearance');
+  move(overlay, tab.row, tab.column + 1, 7); expect(redraw).toHaveBeenCalledOnce();
+  expect(preview).not.toHaveBeenCalled(); expect(save).not.toHaveBeenCalled();
+  const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(apply).toHaveBeenCalledWith(picker, ['theme']); overlay.close();
+});
+
+it.each(['panel', 'modal'] as const)('keeps %s chip hover separate from an identically named option and from activation', async form => {
+  const select = vi.fn(), preview = vi.fn(), apply = vi.fn(), overlay = new OverlayHost(() => {});
+  const picker: Picker = { title: 'Candidates', form, empty: '', apply, previewChange: preview,
+    chips: { items: [{ id: 'a', label: 'First group' }, { id: 'b', label: 'Second group' }], active: 'a', select },
+    load: async () => [{ id: 'a', label: 'alpha' }, { id: 'b', label: 'beta' }] };
+  overlay.open(picker); await settle(); let rows = overlay.render(100, 20);
+  const tab = point(rows, 'Second group'); preview.mockClear();
+  move(overlay, tab.row, tab.column); rows = overlay.render(100, 20);
+  hovered(rows, tab.row);
+  expect(rows.filter(line => line.includes(defaultTheme.bgOpen('statusBandBg')))).toHaveLength(1);
+  const option = point(rows, 'beta'); move(overlay, option.row, option.column);
+  rows = overlay.render(100, 20); hovered(rows, option.row);
+  expect(rows[tab.row]).not.toContain(defaultTheme.bgOpen('statusBandBg'));
+  const active = point(rows, 'First group'); move(overlay, active.row, active.column);
+  expect(overlay.render(100, 20).join('\n')).not.toContain(defaultTheme.bgOpen('statusBandBg'));
+  expect(select).not.toHaveBeenCalled(); expect(preview).not.toHaveBeenCalled();
+  overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(apply).toHaveBeenCalledWith(picker, ['a']); overlay.close();
+});
+
+it('retires tab hover and hit targets on search, resize and replacement before the next frame', async () => {
+  const overlay = new OverlayHost(() => {}), select = vi.fn();
+  const picker: Picker = { title: 'Candidates', form: 'panel', empty: '', apply: async () => undefined,
+    chips: { items: [{ id: 'a', label: 'First group' }, { id: 'b', label: 'Second group' }], active: 'a', select },
+    load: async () => [{ id: 'a', label: 'alpha' }] };
+  overlay.open(picker); await settle(); let rows = overlay.render(100, 20), tab = point(rows, 'Second group');
+  move(overlay, tab.row, tab.column); hovered(overlay.render(100, 20), tab.row);
+  move(overlay, tab.row, tab.column + 'Second group'.length + 2);
+  expect(overlay.render(100, 20).join('\n')).not.toContain(defaultTheme.bgOpen('statusBandBg'));
+  move(overlay, tab.row, tab.column); overlay.handlePaste('alpha'); move(overlay, tab.row, tab.column);
+  expect(overlay.render(100, 20).join('\n')).not.toContain(defaultTheme.bgOpen('statusBandBg'));
+  rows = overlay.render(100, 20); tab = point(rows, 'Second group'); move(overlay, tab.row, tab.column);
+  expect(overlay.render(40, 20).join('\n')).not.toContain(defaultTheme.bgOpen('statusBandBg'));
+  rows = overlay.render(100, 20); tab = point(rows, 'Second group'); move(overlay, tab.row, tab.column);
+  expect(overlay.render(100, 3).join('\n')).not.toContain(defaultTheme.bgOpen('statusBandBg'));
+  move(overlay, tab.row, tab.column);
+  expect(overlay.render(100, 3).join('\n')).not.toContain(defaultTheme.bgOpen('statusBandBg'));
+  rows = overlay.render(100, 20); tab = point(rows, 'Second group'); move(overlay, tab.row, tab.column);
+  overlay.open({ ...picker, chips: undefined }); move(overlay, tab.row, tab.column); await settle();
+  expect(overlay.render(100, 20).join('\n')).not.toContain(defaultTheme.bgOpen('statusBandBg'));
+  expect(select).not.toHaveBeenCalled(); overlay.close();
+});
+
+it('requires an unmodified tab motion with a painted origin and a finished load', async () => {
+  const redraw = vi.fn(), overlay = new OverlayHost(redraw);
+  let finish!: (rows: readonly { id: string; label: string }[]) => void;
+  overlay.open({ title: 'Candidates', form: 'panel', empty: '', apply: async () => undefined,
+    chips: { items: [{ id: 'a', label: 'First group' }, { id: 'b', label: 'Second group' }], active: 'a', select: vi.fn() },
+    load: () => new Promise(resolve => { finish = resolve; }) });
+  let rows = overlay.render(100, 20), tab = point(rows, 'Second group'); redraw.mockClear();
+  move(overlay, tab.row, tab.column); expect(redraw).not.toHaveBeenCalled();
+  finish([{ id: 'a', label: 'alpha' }]); await settle();
+  rows = overlay.render(100, 20); tab = point(rows, 'Second group'); redraw.mockClear();
+  for (const code of [35, 39, 43, 51]) {
+    overlay.handlePointer(parseMouseReport(`\x1b[<${code};${tab.column + 1};${tab.row + 1}M`)!, code === 35 ? undefined : 0);
+    expect(overlay.render(100, 20).join('\n')).not.toContain(defaultTheme.bgOpen('statusBandBg'));
+  }
+  expect(redraw).not.toHaveBeenCalled();
+  move(overlay, tab.row, tab.column); hovered(overlay.render(100, 20), tab.row); overlay.close();
+});
+
+it.each(['top', 'side'] as const)('retains the current row when clicking away and back through %s navigation', async placement => {
+  const navigation = new CatalogNavigation('first', false, false, placement), overlay = new OverlayHost(() => {});
+  navigation.set([{ id: 'a', label: 'alpha' }, { id: 'b', label: 'beta' }, { id: 'c', label: 'gamma' }],
+    new Map([['a', { category: 'first' }], ['b', { category: 'first' }], ['c', { category: 'second' }]]),
+    [{ id: 'first', label: 'First category' }, { id: 'second', label: 'Second category' }]);
+  const picker: Picker = { title: 'Candidates', form: 'panel', empty: '', navigation, initialSelection: 'b',
+    load: async () => navigation.project(''), apply: async () => undefined };
+  overlay.open(picker); await settle();
+  for (const label of ['Second category', 'First category']) {
+    const p = point(overlay.render(120, 20), label);
+    overlay.handlePointer(parseMouseReport(`\x1b[<0;${p.column + 1};${p.row + 1}M`)!, 0);
+  }
+  expect(navigation.active).toBe('first');
+  const apply = vi.fn();
+  if (placement === 'side') overlay.handleKey(parseKeyEvent('\r'), apply);
+  overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(apply).toHaveBeenCalledWith(picker, ['b']); overlay.close();
+});
+
 it('moves the hover between sidebar and content, clears it over details and preserves the exact model selection', async () => {
   const config = { ...getRuntimeConfig('/tmp/cheers-test'), providerConnections: [], activeProviderConnectionId: undefined };
   const catalog = [{ id: 'fixture', label: 'Fixture provider', runtime: 'openai' as const, auth: 'api-key' as const,

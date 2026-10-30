@@ -1,0 +1,86 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/overlay/hover.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/overlay/hover.test.ts  (13 tests | 6 failed) 127ms
+   ❯ src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 40 columns without switching category or changing Enter
+     → expected "spy" to be called once, but got 0 times
+   ❯ src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 80 columns without switching category or changing Enter
+     → expected "spy" to be called once, but got 0 times
+   ❯ src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 120 columns without switching category or changing Enter
+     → expected "spy" to be called once, but got 0 times
+   ❯ src/cli/interactive/overlay/hover.test.ts > keeps panel chip hover separate from an identically named option and from activation
+     → expected '\u001b[1m[First group]\u001b[22m\u001…' to include '\u001b[41m'
+   ❯ src/cli/interactive/overlay/hover.test.ts > keeps modal chip hover separate from an identically named option and from activation
+     → expected '\u001b[97m│\u001b[39m \u001b[1m[First…' to include '\u001b[41m'
+   ❯ src/cli/interactive/overlay/hover.test.ts > retires tab hover and hit targets on search, resize and replacement before the next frame
+     → expected '\u001b[1m[First group]\u001b[22m\u001…' to include '\u001b[41m'
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 40 columns without switching category or changing Enter
+ FAIL  src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 80 columns without switching category or changing Enter
+ FAIL  src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 120 columns without switching category or changing Enter
+AssertionError: expected "spy" to be called once, but got 0 times
+ ❯ src/cli/interactive/overlay/hover.test.ts:55:18
+     53|   const tab = point(rows, ' Model '), before = rows.map(stripAnsi);
+     54|   redraw.mockClear(); preview.mockClear(); move(overlay, tab.row, tab.…
+     55|   expect(redraw).toHaveBeenCalledOnce();
+       |                  ^
+     56|   rows = overlay.render(width, 30); hovered(rows, tab.row);
+     57|   expect(rows.filter(line => line.includes(defaultTheme.bgOpen('status…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/cli/interactive/overlay/hover.test.ts > keeps panel chip hover separate from an identically named option and from activation
+AssertionError: expected '\u001b[1m[First group]\u001b[22m\u001…' to include '\u001b[41m'
+ ❯ hovered src/cli/interactive/overlay/hover.test.ts:29:77
+     27|   return { row, column: stripAnsi(rows[row]!).indexOf(text) };
+     28| };
+     29| const hovered = (rows: readonly string[], row: number) => expect(rows[…
+       |                                                                             ^
+     30|
+     31| it.each(['panel', 'modal'] as const)('paints a separate hover band in …
+ ❯ src/cli/interactive/overlay/hover.test.ts:74:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/cli/interactive/overlay/hover.test.ts > keeps modal chip hover separate from an identically named option and from activation
+AssertionError: expected '\u001b[97m│\u001b[39m \u001b[1m[First…' to include '\u001b[41m'
+ ❯ hovered src/cli/interactive/overlay/hover.test.ts:29:77
+     27|   return { row, column: stripAnsi(rows[row]!).indexOf(text) };
+     28| };
+     29| const hovered = (rows: readonly string[], row: number) => expect(rows[…
+       |                                                                             ^
+     30|
+     31| it.each(['panel', 'modal'] as const)('paints a separate hover band in …
+ ❯ src/cli/interactive/overlay/hover.test.ts:74:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/cli/interactive/overlay/hover.test.ts > retires tab hover and hit targets on search, resize and replacement before the next frame
+AssertionError: expected '\u001b[1m[First group]\u001b[22m\u001…' to include '\u001b[41m'
+ ❯ hovered src/cli/interactive/overlay/hover.test.ts:29:77
+     27|   return { row, column: stripAnsi(rows[row]!).indexOf(text) };
+     28| };
+     29| const hovered = (rows: readonly string[], row: number) => expect(rows[…
+       |                                                                             ^
+     30|
+     31| it.each(['panel', 'modal'] as const)('paints a separate hover band in …
+ ❯ src/cli/interactive/overlay/hover.test.ts:92:39
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 7 passed (13)
+   Start at  16:57:11
+   Duration  2.21s (transform 1.33s, setup 0ms, collect 1.83s, tests 127ms, environment 0ms, prepare 56ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/overlay/hover.test.ts

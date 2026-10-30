@@ -1,0 +1,41 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/overlay/hover.test.ts  (16 tests | 3 failed | 13 skipped) 23ms
+   ❯ src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 40 columns without switching category or changing Enter
+     → expected "spy" to be called once, but got 0 times
+   ❯ src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 80 columns without switching category or changing Enter
+     → expected "spy" to be called once, but got 0 times
+   ❯ src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 120 columns without switching category or changing Enter
+     → expected "spy" to be called once, but got 0 times
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 13 skipped (16)
+   Start at  17:11:05
+   Duration  1.64s (transform 1.04s, setup 0ms, collect 1.41s, tests 23ms, environment 0ms, prepare 49ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/overlay/hover.test.ts -t highlights a painted settings tab
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 40 columns without switching category or changing Enter
+ FAIL  src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 80 columns without switching category or changing Enter
+ FAIL  src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 120 columns without switching category or changing Enter
+AssertionError: expected "spy" to be called once, but got 0 times
+ ❯ src/cli/interactive/overlay/hover.test.ts:55:18
+     53|   const tab = point(rows, ' Model '), before = rows.map(stripAnsi);
+     54|   redraw.mockClear(); preview.mockClear(); move(overlay, tab.row, tab.…
+     55|   expect(redraw).toHaveBeenCalledOnce();
+       |                  ^
+     56|   rows = overlay.render(width, 30); hovered(rows, tab.row);
+     57|   expect(rows.filter(line => line.includes(defaultTheme.bgOpen('status…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/overlay/hover.test.ts -t 'highlights a painted settings tab'

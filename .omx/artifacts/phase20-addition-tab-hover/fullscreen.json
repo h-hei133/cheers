@@ -1,0 +1,57 @@
+{
+  "mode": "fullscreen",
+  "buildId": "fd78750d75921f43170a72cf28f52ad0bf196f76028016e414c0ba623a842b34",
+  "inputsDigest": "f8188435fc5f8ae9d6fe1f3a27445e492c68c2d47f7fd0d51a33b181f5197044",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "passed",
+  "checks": {
+    "modelSidebarHover": true,
+    "settingsWidths": true,
+    "cookedInputRestored": true,
+    "zeroRequests": true,
+    "configUnchanged": true,
+    "projectConfigUnchanged": true,
+    "modelsUnchanged": true
+  },
+  "widths": [
+    {
+      "width": 40,
+      "hoverOnlyOnTab": true,
+      "unchangedTextAndField": true,
+      "sameCellMotionHandled": true,
+      "leaveClears": true,
+      "activeStyleWins": true,
+      "enterOriginalField": true,
+      "clickAndKeyboardReturn": true
+    },
+    {
+      "width": 80,
+      "hoverOnlyOnTab": true,
+      "unchangedTextAndField": true,
+      "sameCellMotionHandled": true,
+      "leaveClears": true,
+      "activeStyleWins": true,
+      "enterOriginalField": true,
+      "clickAndKeyboardReturn": true
+    },
+    {
+      "width": 120,
+      "hoverOnlyOnTab": true,
+      "unchangedTextAndField": true,
+      "sameCellMotionHandled": true,
+      "leaveClears": true,
+      "activeStyleWins": true,
+      "enterOriginalField": true,
+      "clickAndKeyboardReturn": true
+    }
+  ],
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 131,
+  "outputBytes": 65858,
+  "scratchRemoved": true
+}

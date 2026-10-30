@@ -1,0 +1,50 @@
+[
+  {
+    "file": "cli/interactive/overlay.ts",
+    "count": 30,
+    "baseline": 30,
+    "names": [
+      "active",
+      "revision",
+      "inputActive",
+      "fullScreen",
+      "open",
+      "close",
+      "release",
+      "render",
+      "onChipRow",
+      "onOptionRow",
+      "onListRow",
+      "onItem",
+      "onOptionRow",
+      "onListRow",
+      "handlePointer",
+      "handlePaste",
+      "renderConfirmDelete",
+      "renderRename",
+      "acceptanceFor",
+      "handleKey",
+      "apply",
+      "reload",
+      "mutate",
+      "accept",
+      "stillOwned",
+      "apply",
+      "changeFilter",
+      "scheduleSearch",
+      "cancelSearch",
+      "idsOf"
+    ]
+  },
+  {
+    "file": "presentation/tui/chrome/chips.ts",
+    "count": 4,
+    "baseline": 4,
+    "names": [
+      "chipStrip",
+      "total",
+      "renderChips",
+      "total"
+    ]
+  }
+]

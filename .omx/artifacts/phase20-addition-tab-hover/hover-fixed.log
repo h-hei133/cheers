@@ -1,0 +1,11 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/overlay/hover.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/overlay/hover.test.ts  (13 tests) 132ms
+
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+   Start at  16:58:44
+   Duration  2.20s (transform 1.33s, setup 0ms, collect 1.81s, tests 132ms, environment 0ms, prepare 58ms)

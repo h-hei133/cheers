@@ -1,0 +1,68 @@
+{
+  "mode": "regular",
+  "buildId": "351bfdd5f073cb7a8c85c42f83771771186ef728d28e38e9da6cb75e92f103ac",
+  "inputsDigest": "5ff7dc3ea9d7e05a7d38c1eebb9b79159a200ac318a40bdccf587908b4c39c6e",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "checks": {},
+  "widths": [],
+  "failure": "timeout-model-hover-40",
+  "errorType": "Error",
+  "observation": {
+    "requests": 0,
+    "renders": 13,
+    "mouse": [
+      {
+        "kind": "move",
+        "row": 1,
+        "column": 13,
+        "top": 0
+      }
+    ],
+    "snapshot": {
+      "width": 40,
+      "height": 60,
+      "category": "Appearance",
+      "placement": "top",
+      "title": "Settings — user configuration — Appearance",
+      "current": "theme",
+      "loading": false,
+      "filter": "",
+      "hovered": {
+        "id": "Model",
+        "chip": true
+      },
+      "chips": [
+        {
+          "row": 1,
+          "id": "Appearance",
+          "from": 1,
+          "to": 13
+        },
+        {
+          "row": 1,
+          "id": "Model",
+          "from": 13,
+          "to": 20
+        },
+        {
+          "row": 1,
+          "id": "Session",
+          "from": 20,
+          "to": 29
+        }
+      ],
+      "bandAvailable": true,
+      "hoverRows": [
+        1,
+        10
+      ],
+      "text": "  Settings — user configuration — Appea…\n…[Appearance] Model  Session           …\n    Appearance / Co…                    \n    Input shape              \"default\"  \n    Appearance / Di…                    \n    ● Terminal mode          \"regular\"  \n    Diagrams               \"streaming\"  \n    Appearance / St…                    \n    Status items    [\"model\",\"agent-m…  \n    Appearance / Th…                    \n  ▸ Theme                       \"dark\"  \n  Preview\n  Theme name, including custom themes a…\n  Appearance / Theme\n  Field: theme\n  Effective: \"dark\"\n  Stored: unset\n  Source: default\n  Save file: /home/wang/projects/cheers…\n  Application: immediate\n  ←→ categories · Tab: sections/rows \n  · ↑↓ move · Enter: edit · Esc: back"
+    },
+    "origin": 0
+  },
+  "outputBytes": 16576,
+  "scratchRemoved": true
+}

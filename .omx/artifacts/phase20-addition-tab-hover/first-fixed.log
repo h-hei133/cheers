@@ -1,0 +1,2263 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/overlay/hover.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/overlay/hover.test.ts  (13 tests | 5 failed) 163ms
+   ❯ src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 40 columns without switching category or changing Enter
+     → expected "spy" to be called with arguments: [ { …(14) }, [ 'theme' ] ]
+
+Received:
+
+  1st spy call:
+
+  Array [
+    Object {
+      "apply": [Function apply],
+      "defaultSelection": [Function defaultSelection],
+      "detail": [Function detail],
+      "empty": "Settings could not be loaded. Check your configuration and retry.",
+      "exclusive": true,
+      "filterOptions": [Function filterOptions],
+      "footer": "←→ categories · Tab: sections/rows · ↑↓ move · Enter: edit · Esc: back",
+      "form": "panel",
+      "fullScreen": true,
+      "holdInput": true,
+      "load": [Function load],
+      "navigation": CatalogNavigation {
+        "categories": Array [
+          Object {
+            "id": "all",
+            "label": "All",
+          },
+          Object {
+            "id": "Appearance",
+            "label": "Appearance",
+          },
+          Object {
+            "id": "Model",
+            "label": "Model",
+          },
+          Object {
+            "id": "Interaction",
+            "label": "Interaction",
+          },
+          Object {
+            "id": "Context",
+            "label": "Context",
+          },
+          Object {
+            "id": "Memory",
+            "label": "Memory",
+          },
+          Object {
+            "id": "Files",
+            "label": "Files",
+          },
+          Object {
+            "id": "Shell",
+            "label": "Shell",
+          },
+          Object {
+            "id": "Tools",
+            "label": "Tools",
+          },
+          Object {
+            "id": "Tasks",
+            "label": "Tasks",
+          },
+          Object {
+            "id": "Providers",
+            "label": "Providers",
+          },
+        ],
+        "category": "Appearance",
+        "domain": "rows",
+        "groups": Map {
+          "theme" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Theme",
+          },
+          "tuiMode" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Display",
+          },
+          "tui.composerShape" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Composer",
+          },
+          "tui.statusItems" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Status line",
+          },
+          "tui.diagrams" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Display",
+          },
+          "contextWindow" => Object {
+            "category": "Context",
+            "section": "Context / Budgets",
+          },
+          "reserveTokens" => Object {
+            "category": "Context",
+            "section": "Context / Budgets",
+          },
+          "modelTokenBudgets" => Object {
+            "category": "Context",
+            "section": "Context / Budgets",
+          },
+          "instructionBudgetBytes" => Object {
+            "category": "Context",
+            "section": "Context / Instructions",
+          },
+          "pathRules" => Object {
+            "category": "Files",
+            "section": "Files / Path policies",
+          },
+          "attentionOnIdle" => Object {
+            "category": "Interaction",
+            "section": "Interaction / Notifications",
+          },
+          "offline" => Object {
+            "category": "Interaction",
+            "section": "Interaction / Requests",
+          },
+          "vimMode" => Object {
+            "category": "Interaction",
+            "section": "Interaction / Input",
+          },
+          "maxTurns" => Object {
+            "category": "Model",
+            "section": "Model / Limits",
+          },
+          "temperature" => Object {
+            "category": "Model",
+            "section": "Model / Sampling",
+          },
+          "topP" => Object {
+            "category": "Model",
+            "section": "Model / Sampling",
+          },
+          "maxOutputTokens" => Object {
+            "category": "Model",
+            "section": "Model / Limits",
+          },
+          "allowedModels" => Object {
+            "category": "Model",
+            "section": "Model / Limits",
+          },
+          "retryEnabled" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "retryMaxRetries" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "providerRetryMaxRetries" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "retryBaseDelayMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "retryMaxDelayMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "providerConnectTimeoutMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Timeouts",
+          },
+          "providerHeadersTimeoutMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Timeouts",
+          },
+          "providerBodyTimeoutMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Timeouts",
+          },
+          "cacheWarming" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Background requests",
+          },
+          "agentMode" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "steeringMode" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "followUpMode" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "backgroundFollowUp" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "allowedTools" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "disabledTools" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "hiddenToolPrefixes" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "denyRules" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "enableMcpTools" => Object {
+            "category": "Tools",
+            "section": "Tools / Discovery",
+          },
+          "toolDiscovery" => Object {
+            "category": "Tools",
+            "section": "Tools / Discovery",
+          },
+          "settings:memory" => Object {
+            "category": "Memory",
+            "section": "Memory / Review",
+          },
+          "settings:shell" => Object {
+            "category": "Shell",
+            "section": "Shell / Diagnostics",
+          },
+        },
+        "placement": "top",
+        "projection": Array [
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Composer",
+            "label": "Appearance / Composer",
+          },
+          Object {
+            "id": "tui.composerShape",
+            "label": "Input shape",
+            "note": "false",
+            "searchText": "Appearance Composer tui.composerShape Input appearance; project leaves take precedence. Unset uses default",
+          },
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Display",
+            "label": "Appearance / Display",
+          },
+          Object {
+            "id": "tuiMode",
+            "label": "Terminal mode",
+            "note": "false",
+            "searchText": "Appearance Display tuiMode Regular or fullscreen; changes require restart",
+          },
+          Object {
+            "id": "tui.diagrams",
+            "label": "Diagrams",
+            "note": "false",
+            "searchText": "Appearance Display tui.diagrams Diagram presentation; project leaves take precedence",
+          },
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Status line",
+            "label": "Appearance / Status line",
+          },
+          Object {
+            "id": "tui.statusItems",
+            "label": "Status items",
+            "note": "false",
+            "searchText": "Appearance Status line tui.statusItems Supported status item names; project leaves take precedence. Empty uses the default band",
+          },
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Theme",
+            "label": "Appearance / Theme",
+          },
+          Object {
+            "id": "theme",
+            "label": "Theme",
+            "note": "false",
+            "searchText": "Appearance Theme theme Theme name, including custom themes and auto",
+          },
+        ],
+        "projectionQuery": "",
+        "rowFocus": Map {
+          "Appearance" => "tui.composerShape",
+        },
+        "rows": Array [
+          Object {
+            "id": "tui.composerShape",
+            "label": "Input shape",
+            "note": "false",
+            "searchText": "Appearance Composer tui.composerShape Input appearance; project leaves take precedence. Unset uses default",
+          },
+          Object {
+            "id": "tuiMode",
+            "label": "Terminal mode",
+            "note": "false",
+            "searchText": "Appearance Display tuiMode Regular or fullscreen; changes require restart",
+          },
+          Object {
+            "id": "tui.diagrams",
+            "label": "Diagrams",
+            "note": "false",
+            "searchText": "Appearance Display tui.diagrams Diagram presentation; project leaves take precedence",
+          },
+          Object {
+            "id": "tui.statusItems",
+            "label": "Status items",
+            "note": "false",
+            "searchText": "Appearance Status line tui.statusItems Supported status item names; project leaves take precedence. Empty uses the default band",
+          },
+          Object {
+            "id": "theme",
+            "label": "Theme",
+            "note": "false",
+            "searchText": "Appearance Theme theme Theme name, including custom themes and auto",
+          },
+          Object {
+            "id": "maxTurns",
+            "label": "Maximum turns",
+            "note": "false",
+            "searchText": "Model Limits maxTurns Maximum turns in an operation",
+          },
+          Object {
+            "id": "maxOutputTokens",
+            "label": "Output token limit",
+            "note": "false",
+            "searchText": "Model Limits maxOutputTokens Requested output token budget; model limits still apply",
+          },
+          Object {
+            "id": "allowedModels",
+            "label": "Allowed models",
+            "note": "false",
+            "searchText": "Model Limits allowedModels JSON list of provider/model identifiers; intersects other restrictions. Empty permits no model requests; unset adds no allowlist",
+          },
+          Object {
+            "id": "temperature",
+            "label": "Temperature",
+            "note": "false",
+            "searchText": "Model Sampling temperature Sampling temperature; support depends on the selected model",
+          },
+          Object {
+            "id": "topP",
+            "label": "Top P",
+            "note": "false",
+            "searchText": "Model Sampling topP Sampling probability threshold from 0 to 1",
+          },
+          Object {
+            "id": "vimMode",
+            "label": "Vim mode",
+            "note": "false",
+            "searchText": "Interaction Input vimMode Normal/Insert/Visual/Visual-Line/Replace editing in the prompt; starts in Insert",
+          },
+          Object {
+            "id": "attentionOnIdle",
+            "label": "Attention on idle",
+            "note": "false",
+            "searchText": "Interaction Notifications attentionOnIdle Bell and notification sequence after long operations; desktop display depends on the terminal",
+          },
+          Object {
+            "id": "offline",
+            "label": "Offline",
+            "note": "false",
+            "searchText": "Interaction Requests offline Skip self-initiated requests; prompts and requested tools remain available",
+          },
+          Object {
+            "id": "contextWindow",
+            "label": "Context window",
+            "note": "false",
+            "searchText": "Context Budgets contextWindow Override model window resolution; unset to use the model catalogue",
+          },
+          Object {
+            "id": "reserveTokens",
+            "label": "Reserved tokens",
+            "note": "false",
+            "searchText": "Context Budgets reserveTokens Tokens reserved outside the usable input budget",
+          },
+          Object {
+            "id": "modelTokenBudgets",
+            "label": "Model token budgets",
+            "note": "false",
+            "searchText": "Context Budgets modelTokenBudgets JSON object mapping provider/model identifiers to reserveTokens and keepRecentTokens",
+          },
+          Object {
+            "id": "instructionBudgetBytes",
+            "label": "Instruction bytes",
+            "note": "false",
+            "searchText": "Context Instructions instructionBudgetBytes Project instruction byte budget; 0 disables loading",
+          },
+          Object {
+            "id": "settings:memory",
+            "label": "Memory status",
+            "note": "read-only",
+            "searchText": "Memory status health candidates facts recall review /memory",
+          },
+          Object {
+            "id": "pathRules",
+            "label": "Path rules",
+            "note": "false",
+            "searchText": "Files Path policies pathRules JSON list of {path, settings} rules; only registered operation fields apply, and safety restrictions accumulate",
+          },
+          Object {
+            "id": "settings:shell",
+            "label": "Shell diagnostics",
+            "note": "read-only",
+            "searchText": "Shell diagnostics backend execution sandbox /shell",
+          },
+          Object {
+            "id": "allowedTools",
+            "label": "Allowed tools",
+            "note": "false",
+            "searchText": "Tools Access allowedTools JSON list; intersects other restrictions. Empty permits no tools; unset adds no allowlist",
+          },
+          Object {
+            "id": "disabledTools",
+            "label": "Disabled tools",
+            "note": "false",
+            "searchText": "Tools Access disabledTools JSON list; combines with other disabled tool lists",
+          },
+          Object {
+            "id": "hiddenToolPrefixes",
+            "label": "Hidden tool prefixes",
+            "note": "false",
+            "searchText": "Tools Access hiddenToolPrefixes JSON list; combines with other hidden prefixes",
+          },
+          Object {
+            "id": "denyRules",
+            "label": "Deny rules",
+            "note": "false",
+            "searchText": "Tools Access denyRules JSON list of tool/pattern constraints; combines with other deny rules",
+          },
+          Object {
+            "id": "enableMcpTools",
+            "label": "Enable MCP tools",
+            "note": "false",
+            "searchText": "Tools Discovery enableMcpTools Any configured false disables MCP tools; approvals still apply",
+          },
+          Object {
+            "id": "toolDiscovery",
+            "label": "Tool discovery",
+            "note": "false",
+            "searchText": "Tools Discovery toolDiscovery dynamic starts with pinned tools and loads the rest on request; full sends every schema",
+          },
+          Object {
+            "id": "cacheWarming",
+            "label": "Cache warming",
+            "note": "false",
+            "searchText": "Tasks Background requests cacheWarming Idle warming can incur charges without a new prompt",
+          },
+          Object {
+            "id": "agentMode",
+            "label": "Default agent mode",
+            "note": "false",
+            "searchText": "Tasks Delivery agentMode Initial mode preference; explicit session mode selection takes precedence",
+          },
+          Object {
+            "id": "steeringMode",
+            "label": "Steering delivery",
+            "note": "false",
+            "searchText": "Tasks Delivery steeringMode Deliver queued steering messages one at a time or together",
+          },
+          Object {
+            "id": "followUpMode",
+            "label": "Follow-up delivery",
+            "note": "false",
+            "searchText": "Tasks Delivery followUpMode Deliver queued follow-up messages one at a time or together",
+          },
+          Object {
+            "id": "backgroundFollowUp",
+            "label": "Background follow-up",
+            "note": "false",
+            "searchText": "Tasks Delivery backgroundFollowUp Send a finished background task as a model follow-up; off means a local notice only",
+          },
+          Object {
+            "id": "retryEnabled",
+            "label": "Enable turn retries",
+            "note": "false",
+            "searchText": "Providers Retries retryEnabled Retry eligible failed model calls",
+          },
+          Object {
+            "id": "retryMaxRetries",
+            "label": "Turn retry count",
+            "note": "false",
+            "searchText": "Providers Retries retryMaxRetries Maximum retries at the turn layer",
+          },
+          Object {
+            "id": "providerRetryMaxRetries",
+            "label": "Provider retry count",
+            "note": "false",
+            "searchText": "Providers Retries providerRetryMaxRetries Maximum retries at the provider layer",
+          },
+          Object {
+            "id": "retryBaseDelayMs",
+            "label": "Base delay in ms",
+            "note": "false",
+            "searchText": "Providers Retries retryBaseDelayMs Initial retry delay in milliseconds",
+          },
+          Object {
+            "id": "retryMaxDelayMs",
+            "label": "Maximum delay in ms",
+            "note": "false",
+            "searchText": "Providers Retries retryMaxDelayMs Maximum retry delay in milliseconds",
+          },
+          Object {
+            "id": "providerConnectTimeoutMs",
+            "label": "Connect timeout in ms",
+            "note": "false",
+            "searchText": "Providers Timeouts providerConnectTimeoutMs Connection establishment timeout",
+          },
+          Object {
+            "id": "providerHeadersTimeoutMs",
+            "label": "Headers timeout in ms",
+            "note": "false",
+            "searchText": "Providers Timeouts providerHeadersTimeoutMs Response header wait timeout",
+          },
+          Object {
+            "id": "providerBodyTimeoutMs",
+            "label": "Body timeout in ms",
+            "note": "false",
+            "searchText": "Providers Timeouts providerBodyTimeoutMs Response body wait timeout",
+          },
+        ],
+        "searchDomain": undefined,
+        "searchSelection": true,
+        "searching": false,
+        "section": undefined,
+        "sectionFocus": true,
+        "viewport": NavigationViewport {
+          "active": undefined,
+          "capacity": 0,
+          "focused": false,
+          "items": Array [],
+          "narrow": false,
+          "offset": 0,
+        },
+      },
+      "previewChange": [Function spy],
+      "title": "Settings — user configuration — Appearance",
+    },
+    Array [
+-     "theme",
++     "tui.composerShape",
+    ],
+  ]
+
+
+Number of calls: 1
+
+   ❯ src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 80 columns without switching category or changing Enter
+     → expected "spy" to be called with arguments: [ { …(14) }, [ 'theme' ] ]
+
+Received:
+
+  1st spy call:
+
+  Array [
+    Object {
+      "apply": [Function apply],
+      "defaultSelection": [Function defaultSelection],
+      "detail": [Function detail],
+      "empty": "Settings could not be loaded. Check your configuration and retry.",
+      "exclusive": true,
+      "filterOptions": [Function filterOptions],
+      "footer": "←→ categories · Tab: sections/rows · ↑↓ move · Enter: edit · Esc: back",
+      "form": "panel",
+      "fullScreen": true,
+      "holdInput": true,
+      "load": [Function load],
+      "navigation": CatalogNavigation {
+        "categories": Array [
+          Object {
+            "id": "all",
+            "label": "All",
+          },
+          Object {
+            "id": "Appearance",
+            "label": "Appearance",
+          },
+          Object {
+            "id": "Model",
+            "label": "Model",
+          },
+          Object {
+            "id": "Interaction",
+            "label": "Interaction",
+          },
+          Object {
+            "id": "Context",
+            "label": "Context",
+          },
+          Object {
+            "id": "Memory",
+            "label": "Memory",
+          },
+          Object {
+            "id": "Files",
+            "label": "Files",
+          },
+          Object {
+            "id": "Shell",
+            "label": "Shell",
+          },
+          Object {
+            "id": "Tools",
+            "label": "Tools",
+          },
+          Object {
+            "id": "Tasks",
+            "label": "Tasks",
+          },
+          Object {
+            "id": "Providers",
+            "label": "Providers",
+          },
+        ],
+        "category": "Appearance",
+        "domain": "rows",
+        "groups": Map {
+          "theme" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Theme",
+          },
+          "tuiMode" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Display",
+          },
+          "tui.composerShape" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Composer",
+          },
+          "tui.statusItems" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Status line",
+          },
+          "tui.diagrams" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Display",
+          },
+          "contextWindow" => Object {
+            "category": "Context",
+            "section": "Context / Budgets",
+          },
+          "reserveTokens" => Object {
+            "category": "Context",
+            "section": "Context / Budgets",
+          },
+          "modelTokenBudgets" => Object {
+            "category": "Context",
+            "section": "Context / Budgets",
+          },
+          "instructionBudgetBytes" => Object {
+            "category": "Context",
+            "section": "Context / Instructions",
+          },
+          "pathRules" => Object {
+            "category": "Files",
+            "section": "Files / Path policies",
+          },
+          "attentionOnIdle" => Object {
+            "category": "Interaction",
+            "section": "Interaction / Notifications",
+          },
+          "offline" => Object {
+            "category": "Interaction",
+            "section": "Interaction / Requests",
+          },
+          "vimMode" => Object {
+            "category": "Interaction",
+            "section": "Interaction / Input",
+          },
+          "maxTurns" => Object {
+            "category": "Model",
+            "section": "Model / Limits",
+          },
+          "temperature" => Object {
+            "category": "Model",
+            "section": "Model / Sampling",
+          },
+          "topP" => Object {
+            "category": "Model",
+            "section": "Model / Sampling",
+          },
+          "maxOutputTokens" => Object {
+            "category": "Model",
+            "section": "Model / Limits",
+          },
+          "allowedModels" => Object {
+            "category": "Model",
+            "section": "Model / Limits",
+          },
+          "retryEnabled" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "retryMaxRetries" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "providerRetryMaxRetries" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "retryBaseDelayMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "retryMaxDelayMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "providerConnectTimeoutMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Timeouts",
+          },
+          "providerHeadersTimeoutMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Timeouts",
+          },
+          "providerBodyTimeoutMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Timeouts",
+          },
+          "cacheWarming" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Background requests",
+          },
+          "agentMode" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "steeringMode" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "followUpMode" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "backgroundFollowUp" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "allowedTools" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "disabledTools" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "hiddenToolPrefixes" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "denyRules" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "enableMcpTools" => Object {
+            "category": "Tools",
+            "section": "Tools / Discovery",
+          },
+          "toolDiscovery" => Object {
+            "category": "Tools",
+            "section": "Tools / Discovery",
+          },
+          "settings:memory" => Object {
+            "category": "Memory",
+            "section": "Memory / Review",
+          },
+          "settings:shell" => Object {
+            "category": "Shell",
+            "section": "Shell / Diagnostics",
+          },
+        },
+        "placement": "top",
+        "projection": Array [
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Composer",
+            "label": "Appearance / Composer",
+          },
+          Object {
+            "id": "tui.composerShape",
+            "label": "Input shape",
+            "note": "false",
+            "searchText": "Appearance Composer tui.composerShape Input appearance; project leaves take precedence. Unset uses default",
+          },
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Display",
+            "label": "Appearance / Display",
+          },
+          Object {
+            "id": "tuiMode",
+            "label": "Terminal mode",
+            "note": "false",
+            "searchText": "Appearance Display tuiMode Regular or fullscreen; changes require restart",
+          },
+          Object {
+            "id": "tui.diagrams",
+            "label": "Diagrams",
+            "note": "false",
+            "searchText": "Appearance Display tui.diagrams Diagram presentation; project leaves take precedence",
+          },
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Status line",
+            "label": "Appearance / Status line",
+          },
+          Object {
+            "id": "tui.statusItems",
+            "label": "Status items",
+            "note": "false",
+            "searchText": "Appearance Status line tui.statusItems Supported status item names; project leaves take precedence. Empty uses the default band",
+          },
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Theme",
+            "label": "Appearance / Theme",
+          },
+          Object {
+            "id": "theme",
+            "label": "Theme",
+            "note": "false",
+            "searchText": "Appearance Theme theme Theme name, including custom themes and auto",
+          },
+        ],
+        "projectionQuery": "",
+        "rowFocus": Map {
+          "Appearance" => "tui.composerShape",
+        },
+        "rows": Array [
+          Object {
+            "id": "tui.composerShape",
+            "label": "Input shape",
+            "note": "false",
+            "searchText": "Appearance Composer tui.composerShape Input appearance; project leaves take precedence. Unset uses default",
+          },
+          Object {
+            "id": "tuiMode",
+            "label": "Terminal mode",
+            "note": "false",
+            "searchText": "Appearance Display tuiMode Regular or fullscreen; changes require restart",
+          },
+          Object {
+            "id": "tui.diagrams",
+            "label": "Diagrams",
+            "note": "false",
+            "searchText": "Appearance Display tui.diagrams Diagram presentation; project leaves take precedence",
+          },
+          Object {
+            "id": "tui.statusItems",
+            "label": "Status items",
+            "note": "false",
+            "searchText": "Appearance Status line tui.statusItems Supported status item names; project leaves take precedence. Empty uses the default band",
+          },
+          Object {
+            "id": "theme",
+            "label": "Theme",
+            "note": "false",
+            "searchText": "Appearance Theme theme Theme name, including custom themes and auto",
+          },
+          Object {
+            "id": "maxTurns",
+            "label": "Maximum turns",
+            "note": "false",
+            "searchText": "Model Limits maxTurns Maximum turns in an operation",
+          },
+          Object {
+            "id": "maxOutputTokens",
+            "label": "Output token limit",
+            "note": "false",
+            "searchText": "Model Limits maxOutputTokens Requested output token budget; model limits still apply",
+          },
+          Object {
+            "id": "allowedModels",
+            "label": "Allowed models",
+            "note": "false",
+            "searchText": "Model Limits allowedModels JSON list of provider/model identifiers; intersects other restrictions. Empty permits no model requests; unset adds no allowlist",
+          },
+          Object {
+            "id": "temperature",
+            "label": "Temperature",
+            "note": "false",
+            "searchText": "Model Sampling temperature Sampling temperature; support depends on the selected model",
+          },
+          Object {
+            "id": "topP",
+            "label": "Top P",
+            "note": "false",
+            "searchText": "Model Sampling topP Sampling probability threshold from 0 to 1",
+          },
+          Object {
+            "id": "vimMode",
+            "label": "Vim mode",
+            "note": "false",
+            "searchText": "Interaction Input vimMode Normal/Insert/Visual/Visual-Line/Replace editing in the prompt; starts in Insert",
+          },
+          Object {
+            "id": "attentionOnIdle",
+            "label": "Attention on idle",
+            "note": "false",
+            "searchText": "Interaction Notifications attentionOnIdle Bell and notification sequence after long operations; desktop display depends on the terminal",
+          },
+          Object {
+            "id": "offline",
+            "label": "Offline",
+            "note": "false",
+            "searchText": "Interaction Requests offline Skip self-initiated requests; prompts and requested tools remain available",
+          },
+          Object {
+            "id": "contextWindow",
+            "label": "Context window",
+            "note": "false",
+            "searchText": "Context Budgets contextWindow Override model window resolution; unset to use the model catalogue",
+          },
+          Object {
+            "id": "reserveTokens",
+            "label": "Reserved tokens",
+            "note": "false",
+            "searchText": "Context Budgets reserveTokens Tokens reserved outside the usable input budget",
+          },
+          Object {
+            "id": "modelTokenBudgets",
+            "label": "Model token budgets",
+            "note": "false",
+            "searchText": "Context Budgets modelTokenBudgets JSON object mapping provider/model identifiers to reserveTokens and keepRecentTokens",
+          },
+          Object {
+            "id": "instructionBudgetBytes",
+            "label": "Instruction bytes",
+            "note": "false",
+            "searchText": "Context Instructions instructionBudgetBytes Project instruction byte budget; 0 disables loading",
+          },
+          Object {
+            "id": "settings:memory",
+            "label": "Memory status",
+            "note": "read-only",
+            "searchText": "Memory status health candidates facts recall review /memory",
+          },
+          Object {
+            "id": "pathRules",
+            "label": "Path rules",
+            "note": "false",
+            "searchText": "Files Path policies pathRules JSON list of {path, settings} rules; only registered operation fields apply, and safety restrictions accumulate",
+          },
+          Object {
+            "id": "settings:shell",
+            "label": "Shell diagnostics",
+            "note": "read-only",
+            "searchText": "Shell diagnostics backend execution sandbox /shell",
+          },
+          Object {
+            "id": "allowedTools",
+            "label": "Allowed tools",
+            "note": "false",
+            "searchText": "Tools Access allowedTools JSON list; intersects other restrictions. Empty permits no tools; unset adds no allowlist",
+          },
+          Object {
+            "id": "disabledTools",
+            "label": "Disabled tools",
+            "note": "false",
+            "searchText": "Tools Access disabledTools JSON list; combines with other disabled tool lists",
+          },
+          Object {
+            "id": "hiddenToolPrefixes",
+            "label": "Hidden tool prefixes",
+            "note": "false",
+            "searchText": "Tools Access hiddenToolPrefixes JSON list; combines with other hidden prefixes",
+          },
+          Object {
+            "id": "denyRules",
+            "label": "Deny rules",
+            "note": "false",
+            "searchText": "Tools Access denyRules JSON list of tool/pattern constraints; combines with other deny rules",
+          },
+          Object {
+            "id": "enableMcpTools",
+            "label": "Enable MCP tools",
+            "note": "false",
+            "searchText": "Tools Discovery enableMcpTools Any configured false disables MCP tools; approvals still apply",
+          },
+          Object {
+            "id": "toolDiscovery",
+            "label": "Tool discovery",
+            "note": "false",
+            "searchText": "Tools Discovery toolDiscovery dynamic starts with pinned tools and loads the rest on request; full sends every schema",
+          },
+          Object {
+            "id": "cacheWarming",
+            "label": "Cache warming",
+            "note": "false",
+            "searchText": "Tasks Background requests cacheWarming Idle warming can incur charges without a new prompt",
+          },
+          Object {
+            "id": "agentMode",
+            "label": "Default agent mode",
+            "note": "false",
+            "searchText": "Tasks Delivery agentMode Initial mode preference; explicit session mode selection takes precedence",
+          },
+          Object {
+            "id": "steeringMode",
+            "label": "Steering delivery",
+            "note": "false",
+            "searchText": "Tasks Delivery steeringMode Deliver queued steering messages one at a time or together",
+          },
+          Object {
+            "id": "followUpMode",
+            "label": "Follow-up delivery",
+            "note": "false",
+            "searchText": "Tasks Delivery followUpMode Deliver queued follow-up messages one at a time or together",
+          },
+          Object {
+            "id": "backgroundFollowUp",
+            "label": "Background follow-up",
+            "note": "false",
+            "searchText": "Tasks Delivery backgroundFollowUp Send a finished background task as a model follow-up; off means a local notice only",
+          },
+          Object {
+            "id": "retryEnabled",
+            "label": "Enable turn retries",
+            "note": "false",
+            "searchText": "Providers Retries retryEnabled Retry eligible failed model calls",
+          },
+          Object {
+            "id": "retryMaxRetries",
+            "label": "Turn retry count",
+            "note": "false",
+            "searchText": "Providers Retries retryMaxRetries Maximum retries at the turn layer",
+          },
+          Object {
+            "id": "providerRetryMaxRetries",
+            "label": "Provider retry count",
+            "note": "false",
+            "searchText": "Providers Retries providerRetryMaxRetries Maximum retries at the provider layer",
+          },
+          Object {
+            "id": "retryBaseDelayMs",
+            "label": "Base delay in ms",
+            "note": "false",
+            "searchText": "Providers Retries retryBaseDelayMs Initial retry delay in milliseconds",
+          },
+          Object {
+            "id": "retryMaxDelayMs",
+            "label": "Maximum delay in ms",
+            "note": "false",
+            "searchText": "Providers Retries retryMaxDelayMs Maximum retry delay in milliseconds",
+          },
+          Object {
+            "id": "providerConnectTimeoutMs",
+            "label": "Connect timeout in ms",
+            "note": "false",
+            "searchText": "Providers Timeouts providerConnectTimeoutMs Connection establishment timeout",
+          },
+          Object {
+            "id": "providerHeadersTimeoutMs",
+            "label": "Headers timeout in ms",
+            "note": "false",
+            "searchText": "Providers Timeouts providerHeadersTimeoutMs Response header wait timeout",
+          },
+          Object {
+            "id": "providerBodyTimeoutMs",
+            "label": "Body timeout in ms",
+            "note": "false",
+            "searchText": "Providers Timeouts providerBodyTimeoutMs Response body wait timeout",
+          },
+        ],
+        "searchDomain": undefined,
+        "searchSelection": true,
+        "searching": false,
+        "section": undefined,
+        "sectionFocus": true,
+        "viewport": NavigationViewport {
+          "active": undefined,
+          "capacity": 0,
+          "focused": false,
+          "items": Array [],
+          "narrow": false,
+          "offset": 0,
+        },
+      },
+      "previewChange": [Function spy],
+      "title": "Settings — user configuration — Appearance",
+    },
+    Array [
+-     "theme",
++     "tui.composerShape",
+    ],
+  ]
+
+
+Number of calls: 1
+
+   ❯ src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 120 columns without switching category or changing Enter
+     → expected "spy" to be called with arguments: [ { …(14) }, [ 'theme' ] ]
+
+Received:
+
+  1st spy call:
+
+  Array [
+    Object {
+      "apply": [Function apply],
+      "defaultSelection": [Function defaultSelection],
+      "detail": [Function detail],
+      "empty": "Settings could not be loaded. Check your configuration and retry.",
+      "exclusive": true,
+      "filterOptions": [Function filterOptions],
+      "footer": "←→ categories · Tab: sections/rows · ↑↓ move · Enter: edit · Esc: back",
+      "form": "panel",
+      "fullScreen": true,
+      "holdInput": true,
+      "load": [Function load],
+      "navigation": CatalogNavigation {
+        "categories": Array [
+          Object {
+            "id": "all",
+            "label": "All",
+          },
+          Object {
+            "id": "Appearance",
+            "label": "Appearance",
+          },
+          Object {
+            "id": "Model",
+            "label": "Model",
+          },
+          Object {
+            "id": "Interaction",
+            "label": "Interaction",
+          },
+          Object {
+            "id": "Context",
+            "label": "Context",
+          },
+          Object {
+            "id": "Memory",
+            "label": "Memory",
+          },
+          Object {
+            "id": "Files",
+            "label": "Files",
+          },
+          Object {
+            "id": "Shell",
+            "label": "Shell",
+          },
+          Object {
+            "id": "Tools",
+            "label": "Tools",
+          },
+          Object {
+            "id": "Tasks",
+            "label": "Tasks",
+          },
+          Object {
+            "id": "Providers",
+            "label": "Providers",
+          },
+        ],
+        "category": "Appearance",
+        "domain": "rows",
+        "groups": Map {
+          "theme" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Theme",
+          },
+          "tuiMode" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Display",
+          },
+          "tui.composerShape" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Composer",
+          },
+          "tui.statusItems" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Status line",
+          },
+          "tui.diagrams" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Display",
+          },
+          "contextWindow" => Object {
+            "category": "Context",
+            "section": "Context / Budgets",
+          },
+          "reserveTokens" => Object {
+            "category": "Context",
+            "section": "Context / Budgets",
+          },
+          "modelTokenBudgets" => Object {
+            "category": "Context",
+            "section": "Context / Budgets",
+          },
+          "instructionBudgetBytes" => Object {
+            "category": "Context",
+            "section": "Context / Instructions",
+          },
+          "pathRules" => Object {
+            "category": "Files",
+            "section": "Files / Path policies",
+          },
+          "attentionOnIdle" => Object {
+            "category": "Interaction",
+            "section": "Interaction / Notifications",
+          },
+          "offline" => Object {
+            "category": "Interaction",
+            "section": "Interaction / Requests",
+          },
+          "vimMode" => Object {
+            "category": "Interaction",
+            "section": "Interaction / Input",
+          },
+          "maxTurns" => Object {
+            "category": "Model",
+            "section": "Model / Limits",
+          },
+          "temperature" => Object {
+            "category": "Model",
+            "section": "Model / Sampling",
+          },
+          "topP" => Object {
+            "category": "Model",
+            "section": "Model / Sampling",
+          },
+          "maxOutputTokens" => Object {
+            "category": "Model",
+            "section": "Model / Limits",
+          },
+          "allowedModels" => Object {
+            "category": "Model",
+            "section": "Model / Limits",
+          },
+          "retryEnabled" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "retryMaxRetries" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "providerRetryMaxRetries" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "retryBaseDelayMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "retryMaxDelayMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "providerConnectTimeoutMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Timeouts",
+          },
+          "providerHeadersTimeoutMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Timeouts",
+          },
+          "providerBodyTimeoutMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Timeouts",
+          },
+          "cacheWarming" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Background requests",
+          },
+          "agentMode" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "steeringMode" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "followUpMode" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "backgroundFollowUp" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "allowedTools" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "disabledTools" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "hiddenToolPrefixes" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "denyRules" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "enableMcpTools" => Object {
+            "category": "Tools",
+            "section": "Tools / Discovery",
+          },
+          "toolDiscovery" => Object {
+            "category": "Tools",
+            "section": "Tools / Discovery",
+          },
+          "settings:memory" => Object {
+            "category": "Memory",
+            "section": "Memory / Review",
+          },
+          "settings:shell" => Object {
+            "category": "Shell",
+            "section": "Shell / Diagnostics",
+          },
+        },
+        "placement": "top",
+        "projection": Array [
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Composer",
+            "label": "Appearance / Composer",
+          },
+          Object {
+            "id": "tui.composerShape",
+            "label": "Input shape",
+            "note": "false",
+            "searchText": "Appearance Composer tui.composerShape Input appearance; project leaves take precedence. Unset uses default",
+          },
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Display",
+            "label": "Appearance / Display",
+          },
+          Object {
+            "id": "tuiMode",
+            "label": "Terminal mode",
+            "note": "false",
+            "searchText": "Appearance Display tuiMode Regular or fullscreen; changes require restart",
+          },
+          Object {
+            "id": "tui.diagrams",
+            "label": "Diagrams",
+            "note": "false",
+            "searchText": "Appearance Display tui.diagrams Diagram presentation; project leaves take precedence",
+          },
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Status line",
+            "label": "Appearance / Status line",
+          },
+          Object {
+            "id": "tui.statusItems",
+            "label": "Status items",
+            "note": "false",
+            "searchText": "Appearance Status line tui.statusItems Supported status item names; project leaves take precedence. Empty uses the default band",
+          },
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Theme",
+            "label": "Appearance / Theme",
+          },
+          Object {
+            "id": "theme",
+            "label": "Theme",
+            "note": "false",
+            "searchText": "Appearance Theme theme Theme name, including custom themes and auto",
+          },
+        ],
+        "projectionQuery": "",
+        "rowFocus": Map {
+          "Appearance" => "tui.composerShape",
+        },
+        "rows": Array [
+          Object {
+            "id": "tui.composerShape",
+            "label": "Input shape",
+            "note": "false",
+            "searchText": "Appearance Composer tui.composerShape Input appearance; project leaves take precedence. Unset uses default",
+          },
+          Object {
+            "id": "tuiMode",
+            "label": "Terminal mode",
+            "note": "false",
+            "searchText": "Appearance Display tuiMode Regular or fullscreen; changes require restart",
+          },
+          Object {
+            "id": "tui.diagrams",
+            "label": "Diagrams",
+            "note": "false",
+            "searchText": "Appearance Display tui.diagrams Diagram presentation; project leaves take precedence",
+          },
+          Object {
+            "id": "tui.statusItems",
+            "label": "Status items",
+            "note": "false",
+            "searchText": "Appearance Status line tui.statusItems Supported status item names; project leaves take precedence. Empty uses the default band",
+          },
+          Object {
+            "id": "theme",
+            "label": "Theme",
+            "note": "false",
+            "searchText": "Appearance Theme theme Theme name, including custom themes and auto",
+          },
+          Object {
+            "id": "maxTurns",
+            "label": "Maximum turns",
+            "note": "false",
+            "searchText": "Model Limits maxTurns Maximum turns in an operation",
+          },
+          Object {
+            "id": "maxOutputTokens",
+            "label": "Output token limit",
+            "note": "false",
+            "searchText": "Model Limits maxOutputTokens Requested output token budget; model limits still apply",
+          },
+          Object {
+            "id": "allowedModels",
+            "label": "Allowed models",
+            "note": "false",
+            "searchText": "Model Limits allowedModels JSON list of provider/model identifiers; intersects other restrictions. Empty permits no model requests; unset adds no allowlist",
+          },
+          Object {
+            "id": "temperature",
+            "label": "Temperature",
+            "note": "false",
+            "searchText": "Model Sampling temperature Sampling temperature; support depends on the selected model",
+          },
+          Object {
+            "id": "topP",
+            "label": "Top P",
+            "note": "false",
+            "searchText": "Model Sampling topP Sampling probability threshold from 0 to 1",
+          },
+          Object {
+            "id": "vimMode",
+            "label": "Vim mode",
+            "note": "false",
+            "searchText": "Interaction Input vimMode Normal/Insert/Visual/Visual-Line/Replace editing in the prompt; starts in Insert",
+          },
+          Object {
+            "id": "attentionOnIdle",
+            "label": "Attention on idle",
+            "note": "false",
+            "searchText": "Interaction Notifications attentionOnIdle Bell and notification sequence after long operations; desktop display depends on the terminal",
+          },
+          Object {
+            "id": "offline",
+            "label": "Offline",
+            "note": "false",
+            "searchText": "Interaction Requests offline Skip self-initiated requests; prompts and requested tools remain available",
+          },
+          Object {
+            "id": "contextWindow",
+            "label": "Context window",
+            "note": "false",
+            "searchText": "Context Budgets contextWindow Override model window resolution; unset to use the model catalogue",
+          },
+          Object {
+            "id": "reserveTokens",
+            "label": "Reserved tokens",
+            "note": "false",
+            "searchText": "Context Budgets reserveTokens Tokens reserved outside the usable input budget",
+          },
+          Object {
+            "id": "modelTokenBudgets",
+            "label": "Model token budgets",
+            "note": "false",
+            "searchText": "Context Budgets modelTokenBudgets JSON object mapping provider/model identifiers to reserveTokens and keepRecentTokens",
+          },
+          Object {
+            "id": "instructionBudgetBytes",
+            "label": "Instruction bytes",
+            "note": "false",
+            "searchText": "Context Instructions instructionBudgetBytes Project instruction byte budget; 0 disables loading",
+          },
+          Object {
+            "id": "settings:memory",
+            "label": "Memory status",
+            "note": "read-only",
+            "searchText": "Memory status health candidates facts recall review /memory",
+          },
+          Object {
+            "id": "pathRules",
+            "label": "Path rules",
+            "note": "false",
+            "searchText": "Files Path policies pathRules JSON list of {path, settings} rules; only registered operation fields apply, and safety restrictions accumulate",
+          },
+          Object {
+            "id": "settings:shell",
+            "label": "Shell diagnostics",
+            "note": "read-only",
+            "searchText": "Shell diagnostics backend execution sandbox /shell",
+          },
+          Object {
+            "id": "allowedTools",
+            "label": "Allowed tools",
+            "note": "false",
+            "searchText": "Tools Access allowedTools JSON list; intersects other restrictions. Empty permits no tools; unset adds no allowlist",
+          },
+          Object {
+            "id": "disabledTools",
+            "label": "Disabled tools",
+            "note": "false",
+            "searchText": "Tools Access disabledTools JSON list; combines with other disabled tool lists",
+          },
+          Object {
+            "id": "hiddenToolPrefixes",
+            "label": "Hidden tool prefixes",
+            "note": "false",
+            "searchText": "Tools Access hiddenToolPrefixes JSON list; combines with other hidden prefixes",
+          },
+          Object {
+            "id": "denyRules",
+            "label": "Deny rules",
+            "note": "false",
+            "searchText": "Tools Access denyRules JSON list of tool/pattern constraints; combines with other deny rules",
+          },
+          Object {
+            "id": "enableMcpTools",
+            "label": "Enable MCP tools",
+            "note": "false",
+            "searchText": "Tools Discovery enableMcpTools Any configured false disables MCP tools; approvals still apply",
+          },
+          Object {
+            "id": "toolDiscovery",
+            "label": "Tool discovery",
+            "note": "false",
+            "searchText": "Tools Discovery toolDiscovery dynamic starts with pinned tools and loads the rest on request; full sends every schema",
+          },
+          Object {
+            "id": "cacheWarming",
+            "label": "Cache warming",
+            "note": "false",
+            "searchText": "Tasks Background requests cacheWarming Idle warming can incur charges without a new prompt",
+          },
+          Object {
+            "id": "agentMode",
+            "label": "Default agent mode",
+            "note": "false",
+            "searchText": "Tasks Delivery agentMode Initial mode preference; explicit session mode selection takes precedence",
+          },
+          Object {
+            "id": "steeringMode",
+            "label": "Steering delivery",
+            "note": "false",
+            "searchText": "Tasks Delivery steeringMode Deliver queued steering messages one at a time or together",
+          },
+          Object {
+            "id": "followUpMode",
+            "label": "Follow-up delivery",
+            "note": "false",
+            "searchText": "Tasks Delivery followUpMode Deliver queued follow-up messages one at a time or together",
+          },
+          Object {
+            "id": "backgroundFollowUp",
+            "label": "Background follow-up",
+            "note": "false",
+            "searchText": "Tasks Delivery backgroundFollowUp Send a finished background task as a model follow-up; off means a local notice only",
+          },
+          Object {
+            "id": "retryEnabled",
+            "label": "Enable turn retries",
+            "note": "false",
+            "searchText": "Providers Retries retryEnabled Retry eligible failed model calls",
+          },
+          Object {
+            "id": "retryMaxRetries",
+            "label": "Turn retry count",
+            "note": "false",
+            "searchText": "Providers Retries retryMaxRetries Maximum retries at the turn layer",
+          },
+          Object {
+            "id": "providerRetryMaxRetries",
+            "label": "Provider retry count",
+            "note": "false",
+            "searchText": "Providers Retries providerRetryMaxRetries Maximum retries at the provider layer",
+          },
+          Object {
+            "id": "retryBaseDelayMs",
+            "label": "Base delay in ms",
+            "note": "false",
+            "searchText": "Providers Retries retryBaseDelayMs Initial retry delay in milliseconds",
+          },
+          Object {
+            "id": "retryMaxDelayMs",
+            "label": "Maximum delay in ms",
+            "note": "false",
+            "searchText": "Providers Retries retryMaxDelayMs Maximum retry delay in milliseconds",
+          },
+          Object {
+            "id": "providerConnectTimeoutMs",
+            "label": "Connect timeout in ms",
+            "note": "false",
+            "searchText": "Providers Timeouts providerConnectTimeoutMs Connection establishment timeout",
+          },
+          Object {
+            "id": "providerHeadersTimeoutMs",
+            "label": "Headers timeout in ms",
+            "note": "false",
+            "searchText": "Providers Timeouts providerHeadersTimeoutMs Response header wait timeout",
+          },
+          Object {
+            "id": "providerBodyTimeoutMs",
+            "label": "Body timeout in ms",
+            "note": "false",
+            "searchText": "Providers Timeouts providerBodyTimeoutMs Response body wait timeout",
+          },
+        ],
+        "searchDomain": undefined,
+        "searchSelection": true,
+        "searching": false,
+        "section": undefined,
+        "sectionFocus": true,
+        "viewport": NavigationViewport {
+          "active": undefined,
+          "capacity": 0,
+          "focused": false,
+          "items": Array [],
+          "narrow": false,
+          "offset": 0,
+        },
+      },
+      "previewChange": [Function spy],
+      "title": "Settings — user configuration — Appearance",
+    },
+    Array [
+-     "theme",
++     "tui.composerShape",
+    ],
+  ]
+
+
+Number of calls: 1
+
+   ❯ src/cli/interactive/overlay/hover.test.ts > moves the hover between sidebar and content, clears it over details and preserves the exact model selection
+     → expected '  Fixture provider ○    \u001b[97m│\u…' to include '\u001b[41m'
+   ❯ src/cli/interactive/overlay/hover.test.ts > does not reveal a sidebar hover on a hidden narrow content page or with modified motion
+     → expected '  Other                              …' to include '\u001b[41m'
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 40 columns without switching category or changing Enter
+ FAIL  src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 80 columns without switching category or changing Enter
+ FAIL  src/cli/interactive/overlay/hover.test.ts > highlights a painted settings tab at 120 columns without switching category or changing Enter
+AssertionError: expected "spy" to be called with arguments: [ { …(14) }, [ 'theme' ] ]
+
+Received:
+
+  1st spy call:
+
+  Array [
+    Object {
+      "apply": [Function apply],
+      "defaultSelection": [Function defaultSelection],
+      "detail": [Function detail],
+      "empty": "Settings could not be loaded. Check your configuration and retry.",
+      "exclusive": true,
+      "filterOptions": [Function filterOptions],
+      "footer": "←→ categories · Tab: sections/rows · ↑↓ move · Enter: edit · Esc: back",
+      "form": "panel",
+      "fullScreen": true,
+      "holdInput": true,
+      "load": [Function load],
+      "navigation": CatalogNavigation {
+        "categories": Array [
+          Object {
+            "id": "all",
+            "label": "All",
+          },
+          Object {
+            "id": "Appearance",
+            "label": "Appearance",
+          },
+          Object {
+            "id": "Model",
+            "label": "Model",
+          },
+          Object {
+            "id": "Interaction",
+            "label": "Interaction",
+          },
+          Object {
+            "id": "Context",
+            "label": "Context",
+          },
+          Object {
+            "id": "Memory",
+            "label": "Memory",
+          },
+          Object {
+            "id": "Files",
+            "label": "Files",
+          },
+          Object {
+            "id": "Shell",
+            "label": "Shell",
+          },
+          Object {
+            "id": "Tools",
+            "label": "Tools",
+          },
+          Object {
+            "id": "Tasks",
+            "label": "Tasks",
+          },
+          Object {
+            "id": "Providers",
+            "label": "Providers",
+          },
+        ],
+        "category": "Appearance",
+        "domain": "rows",
+        "groups": Map {
+          "theme" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Theme",
+          },
+          "tuiMode" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Display",
+          },
+          "tui.composerShape" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Composer",
+          },
+          "tui.statusItems" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Status line",
+          },
+          "tui.diagrams" => Object {
+            "category": "Appearance",
+            "section": "Appearance / Display",
+          },
+          "contextWindow" => Object {
+            "category": "Context",
+            "section": "Context / Budgets",
+          },
+          "reserveTokens" => Object {
+            "category": "Context",
+            "section": "Context / Budgets",
+          },
+          "modelTokenBudgets" => Object {
+            "category": "Context",
+            "section": "Context / Budgets",
+          },
+          "instructionBudgetBytes" => Object {
+            "category": "Context",
+            "section": "Context / Instructions",
+          },
+          "pathRules" => Object {
+            "category": "Files",
+            "section": "Files / Path policies",
+          },
+          "attentionOnIdle" => Object {
+            "category": "Interaction",
+            "section": "Interaction / Notifications",
+          },
+          "offline" => Object {
+            "category": "Interaction",
+            "section": "Interaction / Requests",
+          },
+          "vimMode" => Object {
+            "category": "Interaction",
+            "section": "Interaction / Input",
+          },
+          "maxTurns" => Object {
+            "category": "Model",
+            "section": "Model / Limits",
+          },
+          "temperature" => Object {
+            "category": "Model",
+            "section": "Model / Sampling",
+          },
+          "topP" => Object {
+            "category": "Model",
+            "section": "Model / Sampling",
+          },
+          "maxOutputTokens" => Object {
+            "category": "Model",
+            "section": "Model / Limits",
+          },
+          "allowedModels" => Object {
+            "category": "Model",
+            "section": "Model / Limits",
+          },
+          "retryEnabled" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "retryMaxRetries" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "providerRetryMaxRetries" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "retryBaseDelayMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "retryMaxDelayMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Retries",
+          },
+          "providerConnectTimeoutMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Timeouts",
+          },
+          "providerHeadersTimeoutMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Timeouts",
+          },
+          "providerBodyTimeoutMs" => Object {
+            "category": "Providers",
+            "section": "Providers / Timeouts",
+          },
+          "cacheWarming" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Background requests",
+          },
+          "agentMode" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "steeringMode" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "followUpMode" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "backgroundFollowUp" => Object {
+            "category": "Tasks",
+            "section": "Tasks / Delivery",
+          },
+          "allowedTools" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "disabledTools" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "hiddenToolPrefixes" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "denyRules" => Object {
+            "category": "Tools",
+            "section": "Tools / Access",
+          },
+          "enableMcpTools" => Object {
+            "category": "Tools",
+            "section": "Tools / Discovery",
+          },
+          "toolDiscovery" => Object {
+            "category": "Tools",
+            "section": "Tools / Discovery",
+          },
+          "settings:memory" => Object {
+            "category": "Memory",
+            "section": "Memory / Review",
+          },
+          "settings:shell" => Object {
+            "category": "Shell",
+            "section": "Shell / Diagnostics",
+          },
+        },
+        "placement": "top",
+        "projection": Array [
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Composer",
+            "label": "Appearance / Composer",
+          },
+          Object {
+            "id": "tui.composerShape",
+            "label": "Input shape",
+            "note": "false",
+            "searchText": "Appearance Composer tui.composerShape Input appearance; project leaves take precedence. Unset uses default",
+          },
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Display",
+            "label": "Appearance / Display",
+          },
+          Object {
+            "id": "tuiMode",
+            "label": "Terminal mode",
+            "note": "false",
+            "searchText": "Appearance Display tuiMode Regular or fullscreen; changes require restart",
+          },
+          Object {
+            "id": "tui.diagrams",
+            "label": "Diagrams",
+            "note": "false",
+            "searchText": "Appearance Display tui.diagrams Diagram presentation; project leaves take precedence",
+          },
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Status line",
+            "label": "Appearance / Status line",
+          },
+          Object {
+            "id": "tui.statusItems",
+            "label": "Status items",
+            "note": "false",
+            "searchText": "Appearance Status line tui.statusItems Supported status item names; project leaves take precedence. Empty uses the default band",
+          },
+          Object {
+            "disabled": true,
+            "focusable": false,
+            "id": "section:Appearance / Theme",
+            "label": "Appearance / Theme",
+          },
+          Object {
+            "id": "theme",
+            "label": "Theme",
+            "note": "false",
+            "searchText": "Appearance Theme theme Theme name, including custom themes and auto",
+          },
+        ],
+        "projectionQuery": "",
+        "rowFocus": Map {
+          "Appearance" => "tui.composerShape",
+        },
+        "rows": Array [
+          Object {
+            "id": "tui.composerShape",
+            "label": "Input shape",
+            "note": "false",
+            "searchText": "Appearance Composer tui.composerShape Input appearance; project leaves take precedence. Unset uses default",
+          },
+          Object {
+            "id": "tuiMode",
+            "label": "Terminal mode",
+            "note": "false",
+            "searchText": "Appearance Display tuiMode Regular or fullscreen; changes require restart",
+          },
+          Object {
+            "id": "tui.diagrams",
+            "label": "Diagrams",
+            "note": "false",
+            "searchText": "Appearance Display tui.diagrams Diagram presentation; project leaves take precedence",
+          },
+          Object {
+            "id": "tui.statusItems",
+            "label": "Status items",
+            "note": "false",
+            "searchText": "Appearance Status line tui.statusItems Supported status item names; project leaves take precedence. Empty uses the default band",
+          },
+          Object {
+            "id": "theme",
+            "label": "Theme",
+            "note": "false",
+            "searchText": "Appearance Theme theme Theme name, including custom themes and auto",
+          },
+          Object {
+            "id": "maxTurns",
+            "label": "Maximum turns",
+            "note": "false",
+            "searchText": "Model Limits maxTurns Maximum turns in an operation",
+          },
+          Object {
+            "id": "maxOutputTokens",
+            "label": "Output token limit",
+            "note": "false",
+            "searchText": "Model Limits maxOutputTokens Requested output token budget; model limits still apply",
+          },
+          Object {
+            "id": "allowedModels",
+            "label": "Allowed models",
+            "note": "false",
+            "searchText": "Model Limits allowedModels JSON list of provider/model identifiers; intersects other restrictions. Empty permits no model requests; unset adds no allowlist",
+          },
+          Object {
+            "id": "temperature",
+            "label": "Temperature",
+            "note": "false",
+            "searchText": "Model Sampling temperature Sampling temperature; support depends on the selected model",
+          },
+          Object {
+            "id": "topP",
+            "label": "Top P",
+            "note": "false",
+            "searchText": "Model Sampling topP Sampling probability threshold from 0 to 1",
+          },
+          Object {
+            "id": "vimMode",
+            "label": "Vim mode",
+            "note": "false",
+            "searchText": "Interaction Input vimMode Normal/Insert/Visual/Visual-Line/Replace editing in the prompt; starts in Insert",
+          },
+          Object {
+            "id": "attentionOnIdle",
+            "label": "Attention on idle",
+            "note": "false",
+            "searchText": "Interaction Notifications attentionOnIdle Bell and notification sequence after long operations; desktop display depends on the terminal",
+          },
+          Object {
+            "id": "offline",
+            "label": "Offline",
+            "note": "false",
+            "searchText": "Interaction Requests offline Skip self-initiated requests; prompts and requested tools remain available",
+          },
+          Object {
+            "id": "contextWindow",
+            "label": "Context window",
+            "note": "false",
+            "searchText": "Context Budgets contextWindow Override model window resolution; unset to use the model catalogue",
+          },
+          Object {
+            "id": "reserveTokens",
+            "label": "Reserved tokens",
+            "note": "false",
+            "searchText": "Context Budgets reserveTokens Tokens reserved outside the usable input budget",
+          },
+          Object {
+            "id": "modelTokenBudgets",
+            "label": "Model token budgets",
+            "note": "false",
+            "searchText": "Context Budgets modelTokenBudgets JSON object mapping provider/model identifiers to reserveTokens and keepRecentTokens",
+          },
+          Object {
+            "id": "instructionBudgetBytes",
+            "label": "Instruction bytes",
+            "note": "false",
+            "searchText": "Context Instructions instructionBudgetBytes Project instruction byte budget; 0 disables loading",
+          },
+          Object {
+            "id": "settings:memory",
+            "label": "Memory status",
+            "note": "read-only",
+            "searchText": "Memory status health candidates facts recall review /memory",
+          },
+          Object {
+            "id": "pathRules",
+            "label": "Path rules",
+            "note": "false",
+            "searchText": "Files Path policies pathRules JSON list of {path, settings} rules; only registered operation fields apply, and safety restrictions accumulate",
+          },
+          Object {
+            "id": "settings:shell",
+            "label": "Shell diagnostics",
+            "note": "read-only",
+            "searchText": "Shell diagnostics backend execution sandbox /shell",
+          },
+          Object {
+            "id": "allowedTools",
+            "label": "Allowed tools",
+            "note": "false",
+            "searchText": "Tools Access allowedTools JSON list; intersects other restrictions. Empty permits no tools; unset adds no allowlist",
+          },
+          Object {
+            "id": "disabledTools",
+            "label": "Disabled tools",
+            "note": "false",
+            "searchText": "Tools Access disabledTools JSON list; combines with other disabled tool lists",
+          },
+          Object {
+            "id": "hiddenToolPrefixes",
+            "label": "Hidden tool prefixes",
+            "note": "false",
+            "searchText": "Tools Access hiddenToolPrefixes JSON list; combines with other hidden prefixes",
+          },
+          Object {
+            "id": "denyRules",
+            "label": "Deny rules",
+            "note": "false",
+            "searchText": "Tools Access denyRules JSON list of tool/pattern constraints; combines with other deny rules",
+          },
+          Object {
+            "id": "enableMcpTools",
+            "label": "Enable MCP tools",
+            "note": "false",
+            "searchText": "Tools Discovery enableMcpTools Any configured false disables MCP tools; approvals still apply",
+          },
+          Object {
+            "id": "toolDiscovery",
+            "label": "Tool discovery",
+            "note": "false",
+            "searchText": "Tools Discovery toolDiscovery dynamic starts with pinned tools and loads the rest on request; full sends every schema",
+          },
+          Object {
+            "id": "cacheWarming",
+            "label": "Cache warming",
+            "note": "false",
+            "searchText": "Tasks Background requests cacheWarming Idle warming can incur charges without a new prompt",
+          },
+          Object {
+            "id": "agentMode",
+            "label": "Default agent mode",
+            "note": "false",
+            "searchText": "Tasks Delivery agentMode Initial mode preference; explicit session mode selection takes precedence",
+          },
+          Object {
+            "id": "steeringMode",
+            "label": "Steering delivery",
+            "note": "false",
+            "searchText": "Tasks Delivery steeringMode Deliver queued steering messages one at a time or together",
+          },
+          Object {
+            "id": "followUpMode",
+            "label": "Follow-up delivery",
+            "note": "false",
+            "searchText": "Tasks Delivery followUpMode Deliver queued follow-up messages one at a time or together",
+          },
+          Object {
+            "id": "backgroundFollowUp",
+            "label": "Background follow-up",
+            "note": "false",
+            "searchText": "Tasks Delivery backgroundFollowUp Send a finished background task as a model follow-up; off means a local notice only",
+          },
+          Object {
+            "id": "retryEnabled",
+            "label": "Enable turn retries",
+            "note": "false",
+            "searchText": "Providers Retries retryEnabled Retry eligible failed model calls",
+          },
+          Object {
+            "id": "retryMaxRetries",
+            "label": "Turn retry count",
+            "note": "false",
+            "searchText": "Providers Retries retryMaxRetries Maximum retries at the turn layer",
+          },
+          Object {
+            "id": "providerRetryMaxRetries",
+            "label": "Provider retry count",
+            "note": "false",
+            "searchText": "Providers Retries providerRetryMaxRetries Maximum retries at the provider layer",
+          },
+          Object {
+            "id": "retryBaseDelayMs",
+            "label": "Base delay in ms",
+            "note": "false",
+            "searchText": "Providers Retries retryBaseDelayMs Initial retry delay in milliseconds",
+          },
+          Object {
+            "id": "retryMaxDelayMs",
+            "label": "Maximum delay in ms",
+            "note": "false",
+            "searchText": "Providers Retries retryMaxDelayMs Maximum retry delay in milliseconds",
+          },
+          Object {
+            "id": "providerConnectTimeoutMs",
+            "label": "Connect timeout in ms",
+            "note": "false",
+            "searchText": "Providers Timeouts providerConnectTimeoutMs Connection establishment timeout",
+          },
+          Object {
+            "id": "providerHeadersTimeoutMs",
+            "label": "Headers timeout in ms",
+            "note": "false",
+            "searchText": "Providers Timeouts providerHeadersTimeoutMs Response header wait timeout",
+          },
+          Object {
+            "id": "providerBodyTimeoutMs",
+            "label": "Body timeout in ms",
+            "note": "false",
+            "searchText": "Providers Timeouts providerBodyTimeoutMs Response body wait timeout",
+          },
+        ],
+        "searchDomain": undefined,
+        "searchSelection": true,
+        "searching": false,
+        "section": undefined,
+        "sectionFocus": true,
+        "viewport": NavigationViewport {
+          "active": undefined,
+          "capacity": 0,
+          "focused": false,
+          "items": Array [],
+          "narrow": false,
+          "offset": 0,
+        },
+      },
+      "previewChange": [Function spy],
+      "title": "Settings — user configuration — Appearance",
+    },
+    Array [
+-     "theme",
++     "tui.composerShape",
+    ],
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/cli/interactive/overlay/hover.test.ts:63:17
+     61|   expect(preview).not.toHaveBeenCalled(); expect(save).not.toHaveBeenC…
+     62|   const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
+     63|   expect(apply).toHaveBeenCalledWith(picker, ['theme']); overlay.close…
+       |                 ^
+     64| });
+     65|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/cli/interactive/overlay/hover.test.ts > moves the hover between sidebar and content, clears it over details and preserves the exact model selection
+AssertionError: expected '  Fixture provider ○    \u001b[97m│\u…' to include '\u001b[41m'
+ ❯ hovered src/cli/interactive/overlay/hover.test.ts:29:77
+     27|   return { row, column: stripAnsi(rows[row]!).indexOf(text) };
+     28| };
+     29| const hovered = (rows: readonly string[], row: number) => expect(rows[…
+       |                                                                             ^
+     30|
+     31| it.each(['panel', 'modal'] as const)('paints a separate hover band in …
+ ❯ src/cli/interactive/overlay/hover.test.ts:116:81
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/cli/interactive/overlay/hover.test.ts > does not reveal a sidebar hover on a hidden narrow content page or with modified motion
+AssertionError: expected '  Other                              …' to include '\u001b[41m'
+ ❯ hovered src/cli/interactive/overlay/hover.test.ts:29:77
+     27|   return { row, column: stripAnsi(rows[row]!).indexOf(text) };
+     28| };
+     29| const hovered = (rows: readonly string[], row: number) => expect(rows[…
+       |                                                                             ^
+     30|
+     31| it.each(['panel', 'modal'] as const)('paints a separate hover band in …
+ ❯ src/cli/interactive/overlay/hover.test.ts:172:35
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 8 passed (13)
+   Start at  16:57:51
+   Duration  2.18s (transform 1.30s, setup 0ms, collect 1.76s, tests 163ms, environment 0ms, prepare 60ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/overlay/hover.test.ts

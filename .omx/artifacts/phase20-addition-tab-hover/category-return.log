@@ -1,0 +1,427 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/overlay/hover.test.ts  (16 tests | 2 failed | 14 skipped) 17ms
+   ❯ src/cli/interactive/overlay/hover.test.ts > retains the current row when clicking away and back through top navigation
+     → expected "spy" to be called with arguments: [ { title: 'Candidates', …(6) }, …(1) ]
+
+Received:
+
+  1st spy call:
+
+  Array [
+    Object {
+      "apply": [Function apply],
+      "empty": "",
+      "form": "panel",
+      "initialSelection": "b",
+      "load": [Function load],
+      "navigation": CatalogNavigation {
+        "categories": Array [
+          Object {
+            "id": "first",
+            "label": "First category",
+          },
+          Object {
+            "id": "second",
+            "label": "Second category",
+          },
+        ],
+        "category": "first",
+        "domain": "rows",
+        "groups": Map {
+          "a" => Object {
+            "category": "first",
+          },
+          "b" => Object {
+            "category": "first",
+          },
+          "c" => Object {
+            "category": "second",
+          },
+        },
+        "placement": "top",
+        "projection": Array [
+          Object {
+            "id": "a",
+            "label": "alpha",
+          },
+          Object {
+            "id": "b",
+            "label": "beta",
+          },
+        ],
+        "projectionQuery": "",
+        "rowFocus": Map {
+          "first" => "a",
+        },
+        "rows": Array [
+          Object {
+            "id": "a",
+            "label": "alpha",
+          },
+          Object {
+            "id": "b",
+            "label": "beta",
+          },
+          Object {
+            "id": "c",
+            "label": "gamma",
+          },
+        ],
+        "searchDomain": undefined,
+        "searchSelection": false,
+        "searching": false,
+        "section": undefined,
+        "sectionFocus": false,
+        "viewport": NavigationViewport {
+          "active": undefined,
+          "capacity": 0,
+          "focused": false,
+          "items": Array [],
+          "narrow": false,
+          "offset": 0,
+        },
+      },
+      "title": "Candidates",
+    },
+    Array [
+-     "b",
++     "a",
+    ],
+  ]
+
+
+Number of calls: 1
+
+   ❯ src/cli/interactive/overlay/hover.test.ts > retains the current row when clicking away and back through side navigation
+     → expected "spy" to be called with arguments: [ { title: 'Candidates', …(6) }, …(1) ]
+
+Received:
+
+  1st spy call:
+
+  Array [
+    Object {
+      "apply": [Function apply],
+      "empty": "",
+      "form": "panel",
+      "initialSelection": "b",
+      "load": [Function load],
+      "navigation": CatalogNavigation {
+        "categories": Array [
+          Object {
+            "id": "first",
+            "label": "First category",
+          },
+          Object {
+            "id": "second",
+            "label": "Second category",
+          },
+        ],
+        "category": "first",
+        "domain": "rows",
+        "groups": Map {
+          "a" => Object {
+            "category": "first",
+          },
+          "b" => Object {
+            "category": "first",
+          },
+          "c" => Object {
+            "category": "second",
+          },
+        },
+        "placement": "side",
+        "projection": Array [
+          Object {
+            "id": "a",
+            "label": "alpha",
+          },
+          Object {
+            "id": "b",
+            "label": "beta",
+          },
+        ],
+        "projectionQuery": "",
+        "rowFocus": Map {
+          "first" => "a",
+        },
+        "rows": Array [
+          Object {
+            "id": "a",
+            "label": "alpha",
+          },
+          Object {
+            "id": "b",
+            "label": "beta",
+          },
+          Object {
+            "id": "c",
+            "label": "gamma",
+          },
+        ],
+        "searchDomain": undefined,
+        "searchSelection": false,
+        "searching": false,
+        "section": undefined,
+        "sectionFocus": false,
+        "viewport": NavigationViewport {
+          "active": undefined,
+          "capacity": 12,
+          "focused": true,
+          "items": Array [
+            Object {
+              "id": "first",
+              "label": "First category",
+            },
+            Object {
+              "id": "second",
+              "label": "Second category",
+            },
+          ],
+          "narrow": false,
+          "offset": 0,
+        },
+      },
+      "title": "Candidates",
+    },
+    Array [
+-     "b",
++     "a",
+    ],
+  ]
+
+
+Number of calls: 1
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 14 skipped (16)
+   Start at  17:11:11
+   Duration  1.62s (transform 1.03s, setup 0ms, collect 1.40s, tests 17ms, environment 0ms, prepare 51ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/overlay/hover.test.ts -t retains the current row when clicking
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/overlay/hover.test.ts > retains the current row when clicking away and back through top navigation
+AssertionError: expected "spy" to be called with arguments: [ { title: 'Candidates', …(6) }, …(1) ]
+
+Received:
+
+  1st spy call:
+
+  Array [
+    Object {
+      "apply": [Function apply],
+      "empty": "",
+      "form": "panel",
+      "initialSelection": "b",
+      "load": [Function load],
+      "navigation": CatalogNavigation {
+        "categories": Array [
+          Object {
+            "id": "first",
+            "label": "First category",
+          },
+          Object {
+            "id": "second",
+            "label": "Second category",
+          },
+        ],
+        "category": "first",
+        "domain": "rows",
+        "groups": Map {
+          "a" => Object {
+            "category": "first",
+          },
+          "b" => Object {
+            "category": "first",
+          },
+          "c" => Object {
+            "category": "second",
+          },
+        },
+        "placement": "top",
+        "projection": Array [
+          Object {
+            "id": "a",
+            "label": "alpha",
+          },
+          Object {
+            "id": "b",
+            "label": "beta",
+          },
+        ],
+        "projectionQuery": "",
+        "rowFocus": Map {
+          "first" => "a",
+        },
+        "rows": Array [
+          Object {
+            "id": "a",
+            "label": "alpha",
+          },
+          Object {
+            "id": "b",
+            "label": "beta",
+          },
+          Object {
+            "id": "c",
+            "label": "gamma",
+          },
+        ],
+        "searchDomain": undefined,
+        "searchSelection": false,
+        "searching": false,
+        "section": undefined,
+        "sectionFocus": false,
+        "viewport": NavigationViewport {
+          "active": undefined,
+          "capacity": 0,
+          "focused": false,
+          "items": Array [],
+          "narrow": false,
+          "offset": 0,
+        },
+      },
+      "title": "Candidates",
+    },
+    Array [
+-     "b",
++     "a",
+    ],
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/cli/interactive/overlay/hover.test.ts:143:17
+    141|   if (placement === 'side') overlay.handleKey(parseKeyEvent('\r'), app…
+    142|   overlay.handleKey(parseKeyEvent('\r'), apply);
+    143|   expect(apply).toHaveBeenCalledWith(picker, ['b']); overlay.close();
+       |                 ^
+    144| });
+    145|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/cli/interactive/overlay/hover.test.ts > retains the current row when clicking away and back through side navigation
+AssertionError: expected "spy" to be called with arguments: [ { title: 'Candidates', …(6) }, …(1) ]
+
+Received:
+
+  1st spy call:
+
+  Array [
+    Object {
+      "apply": [Function apply],
+      "empty": "",
+      "form": "panel",
+      "initialSelection": "b",
+      "load": [Function load],
+      "navigation": CatalogNavigation {
+        "categories": Array [
+          Object {
+            "id": "first",
+            "label": "First category",
+          },
+          Object {
+            "id": "second",
+            "label": "Second category",
+          },
+        ],
+        "category": "first",
+        "domain": "rows",
+        "groups": Map {
+          "a" => Object {
+            "category": "first",
+          },
+          "b" => Object {
+            "category": "first",
+          },
+          "c" => Object {
+            "category": "second",
+          },
+        },
+        "placement": "side",
+        "projection": Array [
+          Object {
+            "id": "a",
+            "label": "alpha",
+          },
+          Object {
+            "id": "b",
+            "label": "beta",
+          },
+        ],
+        "projectionQuery": "",
+        "rowFocus": Map {
+          "first" => "a",
+        },
+        "rows": Array [
+          Object {
+            "id": "a",
+            "label": "alpha",
+          },
+          Object {
+            "id": "b",
+            "label": "beta",
+          },
+          Object {
+            "id": "c",
+            "label": "gamma",
+          },
+        ],
+        "searchDomain": undefined,
+        "searchSelection": false,
+        "searching": false,
+        "section": undefined,
+        "sectionFocus": false,
+        "viewport": NavigationViewport {
+          "active": undefined,
+          "capacity": 12,
+          "focused": true,
+          "items": Array [
+            Object {
+              "id": "first",
+              "label": "First category",
+            },
+            Object {
+              "id": "second",
+              "label": "Second category",
+            },
+          ],
+          "narrow": false,
+          "offset": 0,
+        },
+      },
+      "title": "Candidates",
+    },
+    Array [
+-     "b",
++     "a",
+    ],
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/cli/interactive/overlay/hover.test.ts:143:17
+    141|   if (placement === 'side') overlay.handleKey(parseKeyEvent('\r'), app…
+    142|   overlay.handleKey(parseKeyEvent('\r'), apply);
+    143|   expect(apply).toHaveBeenCalledWith(picker, ['b']); overlay.close();
+       |                 ^
+    144| });
+    145|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/overlay/hover.test.ts -t 'retains the current row when clicking'

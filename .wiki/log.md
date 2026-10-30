@@ -10567,3 +10567,11 @@ resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不�
 主代理串行五门、32项Git测试和4条preview筛选通过，两反转/bytes恢复，恢复后8+1聚焦、TS build/owner审计和两模式原NodeCLI通过。每模式1保存会话×1消息、三个真实草稿字符，before/fixed均21次discovery，其内部同步transcript读21→0，全程23→2，剩余启动读取单列；文件不变、零请求、exit0/cooked。不是大目录实测或全局零读取。intent callable5不变，正式收据/HANDOFF保留，scratch清理。
 
 第33项用户大目录体验仍partial，原47/ADD整体不升级、goal active。上一批b30801aa CI41026961526延后读回仍in_progress，Watch41026961630 success且head一致；本批Git/未来CI另绑定，未做full suite/20k/独立review/真实provider与其他平台。
+
+## [2026-10-30] fix | 分类悬停与鼠标切类返回原字段
+
+[addition21.19](features/phase-20-addition.md#2119-顶部分类悬停与鼠标切类后的原字段恢复)补settings顶部分类motion：复用原chipRows、保留list/sidebar命中优先，chip/content同ID高亮隔离、活动样式优先，不切分类或预览保存。原CLI进一步复现Theme详情返回后点Model再Left丢到首字段；原pointer入口先用navigation.focus捕获当前行再select，保留search guard，top/side返回均保留原ID。
+
+新增悬停6失败/既有7通过、鼠标返回2失败；最终四文件118项去重聚焦、四反转3/3/2/2失败与bytes恢复、恢复hover16、五静态门/TS build/freshness通过，118旧advisory保留。原NodeCLI两模式各1保存会话×1消息，40/80/120列实际SGR悬停、Enter/cancel、点击/键盘往返、model侧栏及exit0/cooked通过，文件不变/请求0。探针收据保留缺observer、同色background识别错误及真实丢字段失败；最终用原子收据、样式行hash差与独立hover身份，不放松字段返回断言。overlay30/chips4均不增长，既有overlay责任债append disposition。
+
+正式工件/HANDOFF保留、scratch清理、原CLAUDE.md不改；无full suite/20k真实终端/exe/真实provider/独立review或NormProof judge。延后读回93efa0a0 CI41028824744/Watch41028824745及b30801aa CI41026961526/Watch41026961630均completed/success且head一致；本批Git/未来CI另绑定。用户桌面/其他平台及33大目录体验仍未验收，原47/ADD整体不升级、goal active。

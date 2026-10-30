@@ -1,0 +1,129 @@
+{
+  "mode": "regular",
+  "buildId": "351bfdd5f073cb7a8c85c42f83771771186ef728d28e38e9da6cb75e92f103ac",
+  "inputsDigest": "5ff7dc3ea9d7e05a7d38c1eebb9b79159a200ac318a40bdccf587908b4c39c6e",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "checks": {},
+  "widths": [],
+  "failure": "timeout-keyboard-return-40",
+  "errorType": "Error",
+  "observation": {
+    "requests": 0,
+    "renders": 21,
+    "mouse": [
+      {
+        "kind": "move",
+        "row": 1,
+        "column": 13,
+        "top": 0
+      },
+      {
+        "kind": "move",
+        "row": 1,
+        "column": 13,
+        "top": 0
+      },
+      {
+        "kind": "move",
+        "row": 0,
+        "column": 0,
+        "top": 0
+      },
+      {
+        "kind": "move",
+        "row": 1,
+        "column": 1,
+        "top": 0
+      },
+      {
+        "kind": "move",
+        "row": 1,
+        "column": 13,
+        "top": 0
+      },
+      {
+        "kind": "move",
+        "row": 1,
+        "column": 13,
+        "top": 0
+      },
+      {
+        "kind": "press",
+        "row": 1,
+        "column": 13,
+        "top": 0
+      },
+      {
+        "kind": "release",
+        "row": 1,
+        "column": 1,
+        "top": 0
+      }
+    ],
+    "snapshot": {
+      "width": 40,
+      "height": 60,
+      "category": "Appearance",
+      "placement": "top",
+      "title": "Settings — user configuration — Appearance",
+      "current": "tui.composerShape",
+      "loading": false,
+      "filter": "",
+      "chips": [
+        {
+          "row": 1,
+          "id": "Appearance",
+          "from": 1,
+          "to": 13
+        },
+        {
+          "row": 1,
+          "id": "Model",
+          "from": 13,
+          "to": 20
+        },
+        {
+          "row": 1,
+          "id": "Session",
+          "from": 20,
+          "to": 29
+        }
+      ],
+      "bandAvailable": true,
+      "bandRows": [
+        3
+      ],
+      "rowHashes": [
+        "517a5da801d541b85365b54cacc20ffd1b30aca7fb801115ffef89d00d9024ba",
+        "9e13bb0ab9f0a2ea639161a9fa61a18173e98bf70e351c54391e8a46530b92d8",
+        "b18ac3f88be6b678b62936cf6ed18d31109895cbaef68621701830f1ce98c87e",
+        "0c7089cab7819fad9329c4bb543d23f78f6323a73c139ac565e1aa6c4feb0a5e",
+        "af67bb91102071a6fdb80b3028dcfadc0d70363847c441846e09013b24fb1922",
+        "9f22f640d6f51bfeaf210c560469d9bffd3827657fe6b5b5aa1b7a431be177ae",
+        "4b764bd2bccd9ce73f50ed5173542277c9c4911fc03abe000e76ca1585279e37",
+        "23860741e32a219901c8abe59f6462f3c3ff0bb5225355a5af8cfdc509ef4e73",
+        "a22ad7b2497c2c3c38887ea45005b39a50f55b56b0365af34ff1699bf36a5056",
+        "97dbf841f2ada68b5c5a612383d9c950b5863a6c559c4539e82b7a78f17e17fb",
+        "7472e684793fb08f95e5aaf2b2ab7fc8ed1f4676cb02636b27153f02cbb6a47c",
+        "2a726d37b8fd8bdd7b135ed10e5119c45079d9470ca515775a434eb8ee9d8644",
+        "2f9c664da0d120806606defdf96ae1650f43ad7a58f183cdec2f6392e57c50dd",
+        "4aed33f1b394618f3a85b805d501b09a4f9ebc8ff488bb2d3a96ff3e98a6876c",
+        "1b6715eb6c00815542778d95b0f91c2f4b4d98e099fedf4a12b767e29e46f455",
+        "d5172e19eb71e387f9109fe3ce3dcd118b3f9e2bba75ba43645ffc8963d7653c",
+        "2fd2e2388502d8637758b6f50ab34b6ac27f5c640caa9c3690e0dbdde8dafadc",
+        "1dc8b12da74d1a89981c6c566a4faaaa75114d0164a81d8289220ae0311565a2",
+        "795181ba7dd61a62d94facab0b664c35c9a22dc9c76c3fbfee5b35c9529d3c69",
+        "cdc066bcb16447d794dc00eca218bf2fb6788f870842849102e714b05cd1bf9b",
+        "e79df69615df9ea09a59602734613fc456b36b7facf5a63ce1204ed17957abec",
+        "98b9bfcf3609b1fd6e5dc5fdfbc9827488ceb95510d89004e4443761283af70c"
+      ],
+      "text": "  Settings — user configuration — Appea…\n…[Appearance] Model  Session           …\n    Appearance / Co…                    \n  ▸ Input shape              \"default\"  \n    Appearance / Di…                    \n    ● Terminal mode          \"regular\"  \n    Diagrams               \"streaming\"  \n    Appearance / St…                    \n    Status items    [\"model\",\"agent-m…  \n    Appearance / Th…                    \n    Theme                       \"dark\"  \n  Preview\n  Input appearance; project leaves take…\n  Appearance / Composer\n  Field: tui.composerShape\n  Effective: \"default\"\n  Stored: unset\n  Source: default\n  Save file: /home/wang/projects/cheers…\n  Application: immediate\n  ←→ categories · Tab: sections/rows \n  · ↑↓ move · Enter: edit · Esc: back"
+    },
+    "origin": 0
+  },
+  "outputBytes": 23694,
+  "scratchRemoved": true
+}

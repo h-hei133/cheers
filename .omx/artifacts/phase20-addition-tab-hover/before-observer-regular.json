@@ -1,0 +1,15 @@
+{
+  "mode": "regular",
+  "buildId": "351bfdd5f073cb7a8c85c42f83771771186ef728d28e38e9da6cb75e92f103ac",
+  "inputsDigest": "5ff7dc3ea9d7e05a7d38c1eebb9b79159a200ac318a40bdccf587908b4c39c6e",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "checks": {},
+  "widths": [],
+  "failure": "assertion",
+  "observation": {},
+  "outputBytes": 14400,
+  "scratchRemoved": true
+}

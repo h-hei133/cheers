@@ -1,0 +1,127 @@
+{
+  "baselineHead": "93efa0a0d45c2e34a2572946f4ae304ac8478098",
+  "uniqueFocusedTests": 118,
+  "files": 4,
+  "staticGates": 5,
+  "existingDocsAdvisories": 118,
+  "reversals": 4,
+  "byteExactRestore": true,
+  "buildId": "fd78750d75921f43170a72cf28f52ad0bf196f76028016e414c0ba623a842b34",
+  "inputsDigest": "f8188435fc5f8ae9d6fe1f3a27445e492c68c2d47f7fd0d51a33b181f5197044",
+  "cli": [
+    {
+      "mode": "regular",
+      "status": "passed",
+      "exitMs": 136,
+      "shutdown": {
+        "code": 0,
+        "signal": null
+      },
+      "checks": {
+        "modelSidebarHover": true,
+        "settingsWidths": true,
+        "cookedInputRestored": true,
+        "zeroRequests": true,
+        "configUnchanged": true,
+        "projectConfigUnchanged": true,
+        "modelsUnchanged": true
+      },
+      "widths": [
+        {
+          "width": 40,
+          "hoverOnlyOnTab": true,
+          "unchangedTextAndField": true,
+          "sameCellMotionHandled": true,
+          "leaveClears": true,
+          "activeStyleWins": true,
+          "enterOriginalField": true,
+          "clickAndKeyboardReturn": true
+        },
+        {
+          "width": 80,
+          "hoverOnlyOnTab": true,
+          "unchangedTextAndField": true,
+          "sameCellMotionHandled": true,
+          "leaveClears": true,
+          "activeStyleWins": true,
+          "enterOriginalField": true,
+          "clickAndKeyboardReturn": true
+        },
+        {
+          "width": 120,
+          "hoverOnlyOnTab": true,
+          "unchangedTextAndField": true,
+          "sameCellMotionHandled": true,
+          "leaveClears": true,
+          "activeStyleWins": true,
+          "enterOriginalField": true,
+          "clickAndKeyboardReturn": true
+        }
+      ],
+      "scratchRemoved": true
+    },
+    {
+      "mode": "fullscreen",
+      "status": "passed",
+      "exitMs": 131,
+      "shutdown": {
+        "code": 0,
+        "signal": null
+      },
+      "checks": {
+        "modelSidebarHover": true,
+        "settingsWidths": true,
+        "cookedInputRestored": true,
+        "zeroRequests": true,
+        "configUnchanged": true,
+        "projectConfigUnchanged": true,
+        "modelsUnchanged": true
+      },
+      "widths": [
+        {
+          "width": 40,
+          "hoverOnlyOnTab": true,
+          "unchangedTextAndField": true,
+          "sameCellMotionHandled": true,
+          "leaveClears": true,
+          "activeStyleWins": true,
+          "enterOriginalField": true,
+          "clickAndKeyboardReturn": true
+        },
+        {
+          "width": 80,
+          "hoverOnlyOnTab": true,
+          "unchangedTextAndField": true,
+          "sameCellMotionHandled": true,
+          "leaveClears": true,
+          "activeStyleWins": true,
+          "enterOriginalField": true,
+          "clickAndKeyboardReturn": true
+        },
+        {
+          "width": 120,
+          "hoverOnlyOnTab": true,
+          "unchangedTextAndField": true,
+          "sameCellMotionHandled": true,
+          "leaveClears": true,
+          "activeStyleWins": true,
+          "enterOriginalField": true,
+          "clickAndKeyboardReturn": true
+        }
+      ],
+      "scratchRemoved": true
+    }
+  ],
+  "notRun": [
+    "full-suite",
+    "large-history-pty",
+    "executable",
+    "real-provider",
+    "independent-review",
+    "normproof-judge",
+    "physical-desktop",
+    "other-platforms"
+  ],
+  "phaseAcceptance": "unchanged-partial",
+  "goal": "active"
+}

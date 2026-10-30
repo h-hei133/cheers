@@ -24,11 +24,12 @@ export interface ChipStrip {
 }
 
 /** The chip row plus where each visible chip landed. */
-export function chipStrip(chips: readonly Chip[], activeId: string | undefined, width: number): ChipStrip {
+export function chipStrip(chips: readonly Chip[], activeId: string | undefined, width: number, hoveredId?: string): ChipStrip {
   if (width <= 0 || chips.length === 0) return { text: "", spans: [] };
   const rendered = chips.map(chip => {
     const text = chip.count === undefined ? chip.label : `${chip.label} ${chip.count}`;
-    return chip.id === activeId ? defaultTheme.bold(`[${text}]`) : defaultTheme.dim(` ${text} `);
+    return chip.id === activeId ? defaultTheme.bold(`[${text}]`)
+      : chip.id === hoveredId ? defaultTheme.bg('statusBandBg', ` ${text} `) : defaultTheme.dim(` ${text} `);
   });
   const active = Math.max(0, chips.findIndex(chip => chip.id === activeId));
   let start = 0;

@@ -1,0 +1,14 @@
+{"reversed":3,"restored":true}
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/overlay/hover.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/overlay/hover.test.ts  (14 tests) 152ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  17:02:15
+   Duration  2.13s (transform 1.27s, setup 0ms, collect 1.73s, tests 152ms, environment 0ms, prepare 55ms)
+
+{"counts":[{"file":"cli/interactive/overlay.ts","count":30,"baseline":30},{"file":"presentation/tui/chrome/chips.ts","count":4,"baseline":4}],"build":{"ok":true,"entry":"/home/wang/projects/cheers/packages/ts-shell/dist/builds/351bfdd5f073cb7a8c85c42f83771771186ef728d28e38e9da6cb75e92f103ac/entrypoints/cli.js","buildId":"351bfdd5f073cb7a8c85c42f83771771186ef728d28e38e9da6cb75e92f103ac","inputsDigest":"5ff7dc3ea9d7e05a7d38c1eebb9b79159a200ac318a40bdccf587908b4c39c6e","artifactDigest":"28796a158a5adce35499b7e00eae6d930f1c62c779bf1432432839f76a7dc59a","version":"0.1.0"}}

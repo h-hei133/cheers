@@ -1,0 +1,21 @@
+# Category hover and return focus
+
+This slice closes two concrete gaps in addition §3.1/§21.15: settings top categories had clickable spans but no motion highlight, and pointer category changes could lose a field restored as initialSelection. It does not complete the whole addition or the original Phase 20 matrix.
+
+Product owners are OverlayHost's existing pointer/render paths, CatalogNavigation's existing focus/select contract and chipStrip's existing theme renderer. No new navigation store, import or host callable is introduced. List/sidebar hits retain priority because chipRows also contains sidebar categories. Chip hover has a separate identity from content hover, and active-tab styling wins.
+
+Read-only comparison after inspecting the target: settings-selector.ts:1242–1272 and tab-bar.ts:248–255,337–353 in the local terminal reference use painted hit zones, separate hover and selection, and active-style priority. The reference shares a tab-change callback between keyboard and mouse (:661–670) but recreates its settings list (:1808–1817). The target retains its stronger per-category row memory and captures the outgoing field through its existing focus contract before pointer selection.
+
+Validation was performed only by the main agent, with one verification process at a time:
+
+- `baseline.log`: six new hover failures, seven existing passes. `focus-baseline.log`: two pointer-return failures with 14 excluded tests.
+- `final-integrated.log`: five static gates; hover16 + overlay77 + navigation22 + chips3 = **118 unique tests**; four reversals; restored hover16; TypeScript build; fresh-build and callable audit. Restoration runs are not counted again.
+- `reversal.mjs`, `reversal.json`, `tab-routing.log`, `tab-paint.log`, `tab-identity.log`, `category-return.log`: independently remove routing, painting, hover namespace and outgoing-row capture; 3/3/2/2 assertion failures respectively. Every source is restored byte-exact in finally.
+- `module-counts.json`: conservative callable counts overlay30→30 and chips4→4. The inherited overlay ceiling violation remains recorded; no architecture-judge verdict is claimed.
+- `build.json`: final build `fd78750d75921f43170a72cf28f52ad0bf196f76028016e414c0ba623a842b34`, inputs `f8188435fc5f8ae9d6fe1f3a27445e492c68c2d47f7fd0d51a33b181f5197044`.
+- `regular.json`, `fullscreen.json`: original Node CLI, each with one saved session containing one message; isolated home/profile/project; synthetic offline configuration, 768 MiB heap, 45 s / 2 MiB caps. Actual SGR motion, unchanged field/category/text, repeated motion, leaving the strip, active-style priority, Enter/cancel, pointer category switch and keyboard return, original model sidebar hover, resize40/80/120 and clean exit are observed. Config/model bytes remain unchanged, requests0, exit0 and cooked flags restored. The existing settings-navigation relay is reused.
+- `prior-ci.json`: delayed read of CI/Watch for 93efa0a0 and b30801aa; all four completed/success with matching heads. These runs do not validate this new commit.
+
+Intermediate receipts are retained. `first-fixed.log` caught a real implementation regression from treating shared sidebar hits as chips, plus a fixture's unsupported assumption that Theme was the initial first field; the fixture now explicitly selects Theme. `before-observer-regular.json` has no complete observer readback. The observer now publishes atomically and the probe explicitly enables color. `before-band-identity-regular.json` shows selection and hover share a background in the default theme, so the final probe compares styled-row hashes and independent hover identity. `before-category-focus-regular.json` then reproduces the actual outgoing-field loss on the earlier hover-only build; a new product regression and the existing CLI assertion verify the repair. Earlier logs/receipts are not evidence for the final build.
+
+No full suite, concurrent heavy execution, delegated verification, executable, large-history PTY, real provider, independent review, NormProof judge, physical desktop or other-platform acceptance was run. The 118 existing docs advisories remain. Scratch directories are removed; CLAUDE.md is preserved. Commit/push and this commit's CI are separate evidence.

@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "name": "tab-routing",
+      "exit": 1,
+      "sourceSha256": "8b453b871524946ab861d2385d5078911482c7dd8b9831aabee63900e5060db0"
+    },
+    {
+      "name": "tab-paint",
+      "exit": 1,
+      "sourceSha256": "6954c1abb45c2b1c6d29d895c5640755fdd374491b0158e28978e97f2fb24999"
+    },
+    {
+      "name": "tab-identity",
+      "exit": 1,
+      "sourceSha256": "8b453b871524946ab861d2385d5078911482c7dd8b9831aabee63900e5060db0"
+    },
+    {
+      "name": "category-return",
+      "exit": 1,
+      "sourceSha256": "8b453b871524946ab861d2385d5078911482c7dd8b9831aabee63900e5060db0"
+    }
+  ],
+  "restored": true
+}
