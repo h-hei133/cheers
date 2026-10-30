@@ -80,3 +80,19 @@ it('does not hand a fork the tool call its source never finished', () => {
   // The source keeps its own unfinished call.
   expect(Object.keys(manager.getRecoverySnapshot(session.id).pendingLifecycle.pendingTools)).toEqual(['call-open']);
 })
+
+it('does not hand a fork an approval whose tool never started', () => {
+  // Approval is asked before the tool starts, so a pending approval has no
+  // tool.started of its own. Seeding only from tool.started left it in the fork.
+  const manager = new SessionManager();
+  const session = manager.createNew(process.cwd());
+  manager.persistUserPromptBarrier(session.id, 'Patch the file', undefined);
+  manager.appendQueryEvent(session.id, { type: 'approval.requested', toolName: 'apply_patch', taskId: 'call-approval' });
+  manager.saveInterrupted(session.id, 'turn');
+
+  const forked = manager.fork(session.id, process.cwd(), {});
+  const forkedSnapshot = manager.getRecoverySnapshot(forked.id);
+  expect(Object.keys(forkedSnapshot.pendingLifecycle.pendingApprovals)).toEqual([]);
+  expect(hasUnfinishedSessionWork(forkedSnapshot)).toBe(false);
+  expect(Object.keys(manager.getRecoverySnapshot(session.id).pendingLifecycle.pendingApprovals)).toEqual(['call-approval']);
+})

@@ -4946,3 +4946,14 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 检查`appendSessionTurn`的写入顺序：先append transcript、再`writeMetadata`、再`writeState`。transcript失败时metadata不会写，因此不会出现「metadata有而transcript没有」。反向部分成功（transcript成功、metadata失败）时，读取侧`projectSessionRecordSnapshot`的`turns`由`projectBranchMessages(events, ...)`从**transcript**投影，而非从metadata的turns数组——transcript是权威，metadata是索引。因此部分成功降级为「索引缺一条、记录完整」，恢复仍看到完整历史。
 
 21.67的并发探针（41轮完整、state可解析）与此一致。未改产品代码。build `dbe6dc1eb2a1`。原47/ADD整体partial、goal active。
+
+
+### 21.69 fork不再继承未开始的审批（子代理review F1）
+
+21.64只处理了`tool.started`，但**审批在工具启动之前询问**（`core/agent/tools.ts:177`的`tool_execution_start`在`:208`的`beforeToolCall`之后）。因此一个`approval.requested`可能没有对应的`tool.started`，`unfinishedToolCallIds`从不把它列入未完成集合，fork仍复制该审批。探针确认：修复前fork得到`pendingApprovals:["call-approval"]`、`hasUnfinishedSessionWork:true`。
+
+现`unfinishedToolCallIds`同时从`approval.requested`播种、并以`approval.resolved`结算。修复后fork的两个pending集合均为空、`hasUnfinishedSessionWork:false`，源会话保留其审批。
+
+子代理review另报F2（图片提示在`sessionHasReentrySurface`/`scoreSessionReentrySummary`/`hasPendingPromptHere`仍按`pendingPrompt?.trim()`判定）。逐项探针核实**均已兜底**：`sessionHasReentrySurface`由`sessionHasConversation`先行返回true（图片消息即对话）；`hasPendingPromptHere`由`autoResumeReady`兜底；`bootstrap.hasUnfinishedBusiness`第二条件`hasUnfinishedSessionWork`覆盖。故F2降级为潜在不一致，非当前错误结果。
+
+验证：`create`5（新例断言fork无pending审批、源保留）、`work`13、`recovery`24，共**42项**通过；一反转（只从tool.started播种）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `69a1ba79a49e`。原47/ADD整体partial、goal active。

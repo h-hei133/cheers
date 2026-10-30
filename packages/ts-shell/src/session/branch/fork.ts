@@ -16,8 +16,12 @@ function unfinishedToolCallIds(events: readonly TranscriptEvent[]): ReadonlySet<
   for (const event of events) {
     if (event.type !== 'query-event') continue;
     const inner = event.event;
-    if (inner.type === 'tool.started') started.add(inner.taskId);
-    else if (inner.type === 'tool.result' || inner.type === 'tool.settled') settled.add(inner.taskId);
+    // An approval is asked before the tool starts, so a call can be pending with
+    // no `tool.started` of its own. Seeding only from `tool.started` left that
+    // approval in the fork, which then reported work it never began.
+    if (inner.type === 'tool.started' || inner.type === 'approval.requested') started.add(inner.taskId);
+    else if (inner.type === 'tool.result' || inner.type === 'tool.settled'
+      || inner.type === 'approval.resolved') settled.add(inner.taskId);
   }
   return new Set([...started].filter(id => !settled.has(id)));
 }

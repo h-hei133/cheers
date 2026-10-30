@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/branch/create.test.ts  (5 tests | 1 failed | 4 skipped) 60ms
+   ❯ src/session/branch/create.test.ts > does not hand a fork an approval whose tool never started
+     → expected [ 'call-approval' ] to deeply equal []
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  06:09:40
+   Duration  1.40s (transform 886ms, setup 0ms, collect 1.09s, tests 60ms, environment 0ms, prepare 60ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/branch/create.test.ts > does not hand a fork an approval whose tool never started
+AssertionError: expected [ 'call-approval' ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   "call-approval",
++ ]
+
+ ❯ src/session/branch/create.test.ts:95:73
+     93|   const forked = manager.fork(session.id, process.cwd(), {});
+     94|   const forkedSnapshot = manager.getRecoverySnapshot(forked.id);
+     95|   expect(Object.keys(forkedSnapshot.pendingLifecycle.pendingApprovals)…
+       |                                                                         ^
+     96|   expect(hasUnfinishedSessionWork(forkedSnapshot)).toBe(false);
+     97|   expect(Object.keys(manager.getRecoverySnapshot(session.id).pendingLi…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
