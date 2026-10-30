@@ -1286,3 +1286,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A write through an attached workspace root succeeds, but `/undo` does not list it; a `.sisyphus/edit-snapshots` directory appears under the attached root.
 - **Root Cause**: The edit operation identity decides where the ledger lives. With the default profile (no named profile) the store falls back to the operation scope's workspace, so binding the identity to the write target moved the ledger there while undo reads the session's root.
 - **Rule**: Carry the resolved root into containment, the execution service, and the write itself, but keep `editIdentity.workspaceRoot` on the session's primary root. Test with the default profile, not only a named one, and assert that no ledger directory appears under the attached root. Do not diagnose `Edit operation receipt is invalid.` as a ledger-contract problem before checking that the caller supplied `taskId` — an empty `callId` produces the same message.
+
+### A Search Result Must Be A Path The Next Tool Can Open
+
+- **Symptom**: `glob` under an attached root returns `found.ts`, and `read` on that exact string fails with ENOENT.
+- **Root Cause**: The listing reports paths relative to the root it walked. Once a search can walk an attached root, that relative path is resolved against the primary root by every later tool, naming a file that does not exist there.
+- **Rule**: When the search root is not the primary root, report absolute paths; keep the primary root's relative spelling unchanged. Compare against the primary root, not against the resolved root — those are equal under an attached grant, so the check silently passes. Test the round trip (search, then read the reported path), not just that the search found something.

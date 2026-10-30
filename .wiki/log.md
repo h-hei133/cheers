@@ -10752,3 +10752,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：附加根写入的撤销账本仍归属会话
 
 [addition21.47](features/phase-20-addition.md#2147-附加根写入的撤销账本仍归属会话)发现21.39的副作用：默认profile下storageRoot回退到scope.workspace.path，附加根写入的账本落在附加根、`/undo`看不到。现editIdentity改回会话主根、写入仍用解析根。探针从primaryLedgerExists:false/attached:true变为true/false且写入仍成功。21.39的`Edit operation receipt is invalid.`实为探针缺taskId，本批纠正。67项聚焦、六反转命中、五门/TS build/端到端通过。build a3fd8623。原47/ADD整体partial、goal active。
+
+### 2026-10-31：附加根下的搜索结果为可用路径
+
+[addition21.48](features/phase-20-addition.md#2148-附加根下的搜索结果为可用路径)发现21.41的副作用：glob/grep返回相对解析根的路径，后续read/edit按主根解析导致ENOENT，搜索结果不可用。现搜索根非主根时返回绝对路径，主根下拼写不变。27项arguments（新例断言绝对路径）、78项聚焦、七反转命中、五门/TS build/往返探针通过。build f78027db。原47/ADD整体partial、goal active。

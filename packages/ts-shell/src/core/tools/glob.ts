@@ -6,6 +6,7 @@
  * notice and that is more than a registry entry should hold.
  */
 
+import path from 'node:path'
 import { approvedResult } from './toolResultLifecycle.js'
 import { matchesGlob } from './globMatch.js'
 import { truncateHead } from './truncation.js'
@@ -83,7 +84,12 @@ export function createGlobToolDefinition(
         reportSafeTarget: searchRoot,
       })
       context.abortSignal?.throwIfAborted()
-      const filtered = files.filter((file) => matchesGlob(file, pattern))
+      // The listing reports paths relative to the root it walked. When that root
+      // is not the primary one, a relative path would be resolved against the
+      // primary root by every later tool, so the result would name files that do
+      // not exist there. Absolute paths keep the reported result usable.
+      const project = (file: string): string => searchRoot === context.workspaceRoot ? file : path.join(searchRoot, file)
+      const filtered = files.filter((file) => matchesGlob(file, pattern)).map(project)
       if (filtered.length === 0) {
         return approvedResult('No files matched the pattern.')
       }

@@ -194,7 +194,9 @@ export function createGrepToolDefinition(
             const line = lines[i];
             if (regex.test(line)) {
               const safeLine = truncateLineWidth(line, 500);
-              results.push(`${relPath}:${i + 1}: ${safeLine}`);
+              // Same rule as glob: a path relative to an attached root would be
+              // resolved against the primary root by every later tool.
+              results.push(`${searchRoot === context.workspaceRoot ? relPath : path.join(searchRoot, relPath)}:${i + 1}: ${safeLine}`);
               totalMatches++;
               if (totalMatches >= limit) {
                 break;

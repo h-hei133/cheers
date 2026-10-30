@@ -242,6 +242,24 @@ describe('an attached root is searchable', () => {
     expect(String(result.output ?? '')).toContain('found.ts')
   })
 
+  it('reports paths a later tool can use, not paths relative to the attached root', async () => {
+    // A relative path would be resolved against the primary root by every later
+    // tool, naming a file that does not exist there.
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true })
+    const primary = root('roundtrip-primary-')
+    const attached = root('roundtrip-attached-')
+    fs.writeFileSync(path.join(attached, 'found.ts'), 'export const x = 1\n')
+    const service = createDefaultExecutionService()
+    const tools = createCoreToolRegistry({ executionService: service })
+    const context = { workspaceRoot: primary, taskId: 'roundtrip',
+      workspaceRoots: [captureWorkspaceRoot(attached, attached, 'read')] }
+    const globbed = await tools.get('glob')!.execute({ pattern: '*.ts', path: attached }, context)
+    const reported = String(globbed.output ?? '').trim().split('\n').filter(Boolean)
+    expect(reported).toHaveLength(1)
+    expect(path.isAbsolute(reported[0]!)).toBe(true)
+    expect(reported[0]).toBe(path.join(realpathSync(attached), 'found.ts'))
+  })
+
   it('finds content under an attached root with grep', async () => {
     fs.mkdirSync('/tmp/cheers-test', { recursive: true })
     const primary = root('grep-primary-')

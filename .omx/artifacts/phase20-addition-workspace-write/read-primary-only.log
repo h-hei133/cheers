@@ -1,19 +1,19 @@
 
  RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
 
- ❯ src/core/tools/arguments.test.ts  (26 tests | 1 failed | 25 skipped) 9ms
+ ❯ src/core/tools/arguments.test.ts  (27 tests | 1 failed | 26 skipped) 8ms
    ❯ src/core/tools/arguments.test.ts > an attached root is readable whatever its access mode > reads a file through a read-only attached root
-     → Path '/tmp/cheers-test/read-attached-tyBwT0/note.txt' symlink resolves outside workspace root.
+     → Path '/tmp/cheers-test/read-attached-1Snpdq/note.txt' symlink resolves outside workspace root.
 
  Test Files  1 failed (1)
-      Tests  1 failed | 25 skipped (26)
-   Start at  02:22:18
-   Duration  4.02s (transform 2.83s, setup 0ms, collect 3.78s, tests 9ms, environment 0ms, prepare 56ms)
+      Tests  1 failed | 26 skipped (27)
+   Start at  02:28:59
+   Duration  3.99s (transform 2.82s, setup 0ms, collect 3.75s, tests 8ms, environment 0ms, prepare 54ms)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  src/core/tools/arguments.test.ts > an attached root is readable whatever its access mode > reads a file through a read-only attached root
-Error: Path '/tmp/cheers-test/read-attached-tyBwT0/note.txt' symlink resolves outside workspace root.
+Error: Path '/tmp/cheers-test/read-attached-1Snpdq/note.txt' symlink resolves outside workspace root.
  ❯ Object.execute src/core/tools/read.ts:72:17
      70|         const containment = verifyPathContainment(target, root)
      71|         if (!containment.allowed) {

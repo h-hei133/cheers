@@ -4752,3 +4752,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 补充端到端证据：`undo-probe.mjs`在默认profile下经附加根把`before`写成`after`，随后用会话主根的scope读取操作列表——可见**一条**操作，且其文件记录的`workspace`指向附加根。首次探针在未await的`withProfile`回调里调用工具，写入未执行、计数为0，该错误保留记录。
 
 补充跨层一致性证据：`layers-probe.mjs`对同一附加根询问所有可能允许或拒绝写入的层（默认profile）——`workspaceToolBinding`的写授权解析到附加根、只读授权报`This additional workspace root is read-only.`；`workspaceSandboxPolicy`把该根放进`allowWrite`、只读根进`readOnlyRoots`；工具围栏写入成功；撤销账本可见一条。修复前前两层与工具体层不一致，正是授权看起来失效的原因。
+
+
+### 21.48 附加根下的搜索结果为可用路径
+
+21.41让glob/grep以解析根作为结果投影基准，但暴露一个副作用：结果仍是**相对该根**的路径（如`found.ts`），而后续工具（read/edit）按主根解析它，得到ENOENT。探针实测：glob在附加根下返回`found.ts`，read该路径失败。这是本轮改动引入的真实缺陷——搜索结果不可用。
+
+现两者在搜索根**不是主根**时返回绝对路径；主根下保持原有相对拼写不变。修复后同一探针返回附加根下的绝对路径，`read`可直接打开。
+
+验证：`arguments`27（新例断言附加根结果必须是绝对路径且等于该根下的真实目标）、`glob`19、`grep`3、`grepPaths`12、`grepRipgrep`18，共**78项**通过；七反转（write/read/glob/grep退回只查主根、以read解析write授权、账本跟随目标根、glob返回相对路径）全部命中且finally字节恢复；五静态门、TS build/freshness、往返探针通过。build `f78027dbf35d`。原47/ADD整体partial、goal active。

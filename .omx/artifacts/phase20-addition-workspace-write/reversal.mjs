@@ -45,6 +45,11 @@ const cases = [
     before: `editIdentity: { sessionId: context.sessionId, workspaceRoot: context.artifactRoot ?? context.workspaceRoot, callId: context.taskId, correlationId: context.correlationId }`,
     after: `editIdentity: { sessionId: context.sessionId, workspaceRoot: root, callId: context.taskId, correlationId: context.correlationId }`,
     filter: 'keeps the session ledger' },
+  { name: 'glob-relative-paths', file: 'packages/ts-shell/src/core/tools/glob.ts',
+    before: `      const project = (file: string): string => searchRoot === context.workspaceRoot ? file : path.join(searchRoot, file)
+      const filtered = files.filter((file) => matchesGlob(file, pattern)).map(project)`,
+    after: `      const filtered = files.filter((file) => matchesGlob(file, pattern))`,
+    filter: 'reports paths a later tool can use' },
   { name: 'no-access-check',
     before: `            ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'write') ?? context.workspaceRoot`,
     after: `            ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'read') ?? context.workspaceRoot`,

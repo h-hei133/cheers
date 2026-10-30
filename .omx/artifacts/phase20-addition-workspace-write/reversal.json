@@ -3,37 +3,43 @@
     {
       "name": "primary-root-only-write",
       "exit": 1,
-      "tests": "1 failed | 25 skipped (26)",
+      "tests": "1 failed | 26 skipped (27)",
       "originalSha256": "44f952875c8600c32222a6035bda8637a66be473dd1a65a5e48304ffd08b9a2d"
     },
     {
       "name": "read-primary-only",
       "exit": 1,
-      "tests": "1 failed | 25 skipped (26)",
+      "tests": "1 failed | 26 skipped (27)",
       "originalSha256": "57c4bb3e5fbdfd17fd3419310d65d7844c3f50ce06ee9457519712538c257d72"
     },
     {
       "name": "glob-primary-only",
       "exit": 1,
-      "tests": "1 failed | 25 skipped (26)",
-      "originalSha256": "21a16f069e55cbfcd159cfaf7effe9eaa8e93489dd01a8db4d00265bc555beac"
+      "tests": "1 failed | 26 skipped (27)",
+      "originalSha256": "47ad30721b7cf5720b6bdd2e8e43bb6952ccc36c72d151d4a52e11965a961e6e"
     },
     {
       "name": "grep-primary-only",
       "exit": 1,
-      "tests": "1 failed | 25 skipped (26)",
-      "originalSha256": "d8bf8e453f54cb661fc3683a656d149a05210252ec2f43df5f266b0041e86f7c"
+      "tests": "1 failed | 26 skipped (27)",
+      "originalSha256": "999fbfd9e036a47f03559381ee1f803e158af29f225691aa6d2ee82828b1b82e"
     },
     {
       "name": "ledger-follows-target",
       "exit": 1,
-      "tests": "1 failed | 25 skipped (26)",
+      "tests": "1 failed | 26 skipped (27)",
       "originalSha256": "44f952875c8600c32222a6035bda8637a66be473dd1a65a5e48304ffd08b9a2d"
+    },
+    {
+      "name": "glob-relative-paths",
+      "exit": 1,
+      "tests": "1 failed | 26 skipped (27)",
+      "originalSha256": "47ad30721b7cf5720b6bdd2e8e43bb6952ccc36c72d151d4a52e11965a961e6e"
     },
     {
       "name": "no-access-check",
       "exit": 1,
-      "tests": "1 failed | 1 passed | 24 skipped (26)",
+      "tests": "1 failed | 1 passed | 25 skipped (27)",
       "originalSha256": "44f952875c8600c32222a6035bda8637a66be473dd1a65a5e48304ffd08b9a2d"
     }
   ],
