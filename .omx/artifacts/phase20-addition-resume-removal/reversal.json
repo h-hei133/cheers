@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "name": "delete-hint",
+      "exit": 1,
+      "sourceSha256": "d3a2ea108d9a88a96dba06ae51ad7966db6fec32667ea13c2c47e45452bfb244"
+    },
+    {
+      "name": "retire-source",
+      "exit": 1,
+      "sourceSha256": "03f6aa835fb2067bd8ff14deca60c1fd461b6d9f57767da236a13bab701b6ead"
+    },
+    {
+      "name": "page-object",
+      "exit": 1,
+      "sourceSha256": "03f6aa835fb2067bd8ff14deca60c1fd461b6d9f57767da236a13bab701b6ead"
+    },
+    {
+      "name": "detached-query",
+      "exit": 1,
+      "sourceSha256": "a64bebd8ddc9d45faa16b4fa770e697ea4c4329dcac7d417a7dfc64bcac4e030"
+    }
+  ],
+  "restored": true
+}

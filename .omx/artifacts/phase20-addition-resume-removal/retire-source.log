@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/session/lifetime.test.ts  (8 tests | 1 failed | 7 skipped) 117ms
+   ❯ src/cli/interactive/picker/session/lifetime.test.ts > deletes through the actual overlay and reloads/searches the original browse without rediscovery
+     → expected "beginBrowse" to be called once, but got 2 times
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  13:34:54
+   Duration  1.07s (transform 601ms, setup 0ms, collect 740ms, tests 117ms, environment 0ms, prepare 56ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/session/lifetime.test.ts -t deletes through the actual overlay
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/session/lifetime.test.ts > deletes through the actual overlay and reloads/searches the original browse without rediscovery
+AssertionError: expected "beginBrowse" to be called once, but got 2 times
+ ❯ src/cli/interactive/picker/session/lifetime.test.ts:84:54
+     82|     await vi.waitFor(() => { expect(visible().some(row => row.id === o…
+     83|       expect(picker.status?.(visible()) ?? '').not.toContain('Loading'…
+     84|     expect(overlay.active).toBe(true); expect(begin).toHaveBeenCalledO…
+       |                                                      ^
+     85|     expect(counts.directories).toBe(directories); expect(counts.bytes)…
+     86|     const rows = await picker.search!('Conversation', new AbortControl…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/picker/session/lifetime.test.ts -t 'deletes through the actual overlay'

@@ -1,0 +1,28 @@
+{
+  "buildId": "cda852ed59e152495c94ca91882ce2c8472be1af0036bd7c7c7fef2de2e2bd24",
+  "inputsDigest": "4e200e15e7aa4d616b060f64ee88d2c1f2e885565dc22a0cf7ca6091f398b6f5",
+  "compilerInputs": 460,
+  "checkBuild": true,
+  "callables": {
+    "cli/interactive/picker/session/actions.ts": {
+      "count": 4,
+      "sourceSha256": "03f6aa835fb2067bd8ff14deca60c1fd461b6d9f57767da236a13bab701b6ead"
+    },
+    "cli/interactive/picker/session/browser.ts": {
+      "count": 18,
+      "sourceSha256": "4036a148db032a76450bbdcdfdb850d5f688fd8cd40956d8cd10ec9c15e73f70"
+    },
+    "cli/interactive/picker/session/listing.ts": {
+      "count": 19,
+      "sourceSha256": "a101285d5eb0023ab0404c6dbe248a88a7c77440d6d16743212194e362ad8322"
+    },
+    "session/store/catalog/browse.ts": {
+      "count": 11,
+      "sourceSha256": "cd0f58ddee0601b91a87e44aecba7fd1b9e3a3c8770936b09d2f6d87eee35a6d"
+    },
+    "session/store/catalog/index.ts": {
+      "count": 19,
+      "sourceSha256": "a64bebd8ddc9d45faa16b4fa770e697ea4c4329dcac7d417a7dfc64bcac4e030"
+    }
+  }
+}

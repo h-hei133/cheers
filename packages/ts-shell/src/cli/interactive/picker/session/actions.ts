@@ -16,10 +16,20 @@ export function sessionActions(browser: SessionBrowser,
   const update = async (id: string, action: 'delete' | 'rename' | 'pin', title?: string): Promise<string | undefined> => {
     const block = blocked(id, action);
     if (block) return block;
-    const version = browser.active()?.versions.get(id);
+    const projection = browser.active();
+    const lifetime = browser.lifetime;
+    const version = projection?.versions.get(id);
     const note = action === 'delete' ? await options.delete!(id, version)
       : action === 'rename' ? await options.rename!(id, title!, version) : await options.pin!(id, version);
-    if (!note) browser.close();
+    if (!note && browser.lifetime === lifetime && sameSessionContext(browser.expected, options.context())) {
+      if (action === 'delete') {
+        const summary = projection?.summaries.get(id);
+        if (summary) {
+          try { browser.forget(summary); }
+          catch { browser.close(); return 'Session deleted. Reopen /resume to refresh the saved sessions.'; }
+        }
+      } else browser.close();
+    }
     return note;
   };
   return {

@@ -1,0 +1,29 @@
+{
+  "mode": "regular",
+  "buildId": "cda852ed59e152495c94ca91882ce2c8472be1af0036bd7c7c7fef2de2e2bd24",
+  "inputsDigest": "4e200e15e7aa4d616b060f64ee88d2c1f2e885565dc22a0cf7ca6091f398b6f5",
+  "fixtures": 8,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "passed",
+  "checks": {
+    "retainedSourceAcrossTwoDeletions": true,
+    "noRemovedRowsAfterSearchClear": true,
+    "survivorsUnchanged": true,
+    "retiredOnClose": true,
+    "cookedInputRestored": true,
+    "zeroRequests": true,
+    "configUnchanged": true
+  },
+  "deletionMs": [
+    195,
+    278
+  ],
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 126,
+  "outputBytes": 37877,
+  "scratchRemoved": true
+}

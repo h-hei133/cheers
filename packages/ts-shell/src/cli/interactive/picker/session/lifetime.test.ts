@@ -5,6 +5,8 @@ import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { SessionManager } from '../../../../session/SessionManager.js';
 import type { Session } from '../../../../session/schema/sessionRecord.js';
+import { OverlayHost } from '../../overlay.js';
+import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
 import { projectSessionMetadata } from '../../../../session/schema/sessionMetadataCodec.js';
 import { buildSessionStateSnapshot } from '../../../../session/schema/sessionStateSnapshot.js';
 import { createMessageTranscriptEvent, createTranscriptHeader } from '../../../../session/sessionEventCodec.js';
@@ -15,6 +17,8 @@ import { createSessionStoreLayout, projectSessionFileLayout } from '../../../../
 import type { Option } from '../../../../presentation/tui/chrome/options.js';
 import type { Picker } from '../../overlay.js';
 import { sessionPicker } from '../session.js';
+import { SessionBrowser } from './browser.js';
+import { sessionActions } from './actions.js';
 
 vi.mock('node:fs/promises', async () => {
   const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
@@ -46,15 +50,81 @@ function fixture(contentBytes = 0) {
   const catalog = new SessionCatalog(layout);
   const files = new SessionFiles(layout);
   const sizes = vi.spyOn(files, 'sizes');
-  const manager = { catalog, files } as unknown as SessionManager;
+  const manager = { catalog, files, getSession: (id: string) => ({ id, projectRoot: '/workspace', status: 'completed',
+    turns: [{ role: 'user', content: `Conversation ${id}` }] }) } as unknown as SessionManager;
   const createPicker = () => sessionPicker({ sessionManager: manager, context: () => ({ sessionId: 'current', projectRoot: '/workspace', busy: false }),
     initialLimit: 1, resume: vi.fn(async () => undefined) });
   const sourceBytes = fs.readdirSync(layout.sessionsDir).reduce((sum, id) => {
     const saved = projectSessionFileLayout({ sessionsDir: layout.sessionsDir, sessionId: id });
     return sum + [saved.metadataPath, saved.statePath, saved.transcriptPath].reduce((bytes, file) => bytes + fs.statSync(file).size, 0);
   }, 0);
-  return { picker: createPicker(), createPicker, catalog, sizes, sourceBytes };
+  return { picker: createPicker(), createPicker, catalog, sizes, sourceBytes, manager, layout };
 }
+
+it('deletes through the actual overlay and reloads/searches the original browse without rediscovery', async () => {
+  const { catalog, manager, layout } = fixture();
+  const counts = observeSources(), begin = vi.spyOn(catalog, 'beginBrowse'), retire = vi.spyOn(catalog, 'retireBrowse');
+  const remove = vi.fn(async (id: string) => { fs.rmSync(path.join(layout.sessionsDir, id), { recursive: true }); return undefined; });
+  const picker = sessionPicker({ sessionManager: manager, context: () => ({ sessionId: 'current', projectRoot: '/workspace', busy: false }),
+    resume: vi.fn(), initialLimit: 2, delete: remove });
+  const overlay = new OverlayHost(() => {});
+  const visible = () => (overlay as unknown as { model: { visible: readonly Option[] } }).model.visible;
+  overlay.open(picker);
+  try {
+    await vi.waitFor(() => expect(visible().some(row => row.id === 'action:more')).toBe(true));
+    const initialBytes = counts.bytes, directories = counts.directories;
+    const offered = visible().find(row => row.id.startsWith('saved-'))!;
+    overlay.handleKey(parseKeyEvent('\x1b[B'), () => {});
+    const model = (overlay as unknown as { model: { focus(id: string): void } }).model;
+    model.focus(offered.id);
+    overlay.handleKey(parseKeyEvent('\x1b[3~'), () => {}); overlay.handleKey(parseKeyEvent('\r'), () => {});
+    await vi.waitFor(() => expect(remove).toHaveBeenCalledWith(offered.id, expect.any(String)));
+    await vi.waitFor(() => { expect(visible().some(row => row.id === offered.id)).toBe(false);
+      expect(picker.status?.(visible()) ?? '').not.toContain('Loading'); });
+    expect(overlay.active).toBe(true); expect(begin).toHaveBeenCalledOnce(); expect(retire).not.toHaveBeenCalled();
+    expect(counts.directories).toBe(directories); expect(counts.bytes).toBe(initialBytes);
+    const rows = await picker.search!('Conversation', new AbortController().signal);
+    expect(rows.some(row => row.id === offered.id)).toBe(false);
+    expect(counts.directories).toBe(directories); expect(counts.bytes).toBe(initialBytes);
+    const next = (await picker.apply(['action:more']))?.next;
+    expect(next).toBeDefined();
+    overlay.open(next!);
+    await vi.waitFor(() => expect(visible().some(row => row.id.startsWith('saved-'))).toBe(true));
+    expect(visible().some(row => row.id === offered.id)).toBe(false);
+    expect(begin).toHaveBeenCalledOnce(); expect(retire).not.toHaveBeenCalled();
+    expect(counts.directories).toBe(directories); expect(counts.bytes).toBe(initialBytes);
+  } finally { overlay.close(); }
+  expect(retire).toHaveBeenCalledOnce(); expect(counts.active).toBe(0); expect(counts.closed).toBe(counts.opened);
+});
+
+it.each([false, true])('binds a pending deletion to its browse lifetime, including a page refresh: reopened=%s', async reopened => {
+  const { catalog, manager, layout } = fixture();
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const browser = new SessionBrowser({ sessionManager: manager,
+    context: () => ({ sessionId: 'current', projectRoot: '/workspace', busy: false }), resume: vi.fn(),
+    delete: async id => { await gate; fs.rmSync(path.join(layout.sessionsDir, id), { recursive: true }); return undefined; } });
+  browser.open();
+  const finishPage = async () => {
+    await browser.load();
+    await new Promise<void>(resolve => { browser.subscribe(rows => {
+      if (browser.status(rows)?.includes('End of this session page range')) resolve();
+    }); });
+  };
+  try {
+    await finishPage();
+    const forgotten = vi.spyOn(catalog, 'forgetBrowse');
+    const pending = sessionActions(browser, () => { throw new Error('Unexpected page handoff'); }).onDelete!('saved-a');
+    if (reopened) browser.open();
+    await finishPage();
+    release(); await pending;
+    expect(forgotten.mock.calls.length).toBe(reopened ? 0 : 1);
+    if (!reopened) {
+      await finishPage();
+      expect(browser.active()?.offered.has('saved-a')).toBe(false);
+    }
+  } finally { release(); browser.close(); }
+});
 
 async function finish(picker: Picker, signal?: AbortSignal): Promise<readonly Option[]> {
   await picker.load(signal);

@@ -287,7 +287,7 @@ export class OverlayHost {
       : this.loadFailed || this.searchFailed ? "error" : undefined;
     const actionHints = (
       picker.onDelete || picker.onRename || picker.onPin
-        ? `${picker.onDelete ? "^D delete" : ""}  ${picker.onRename ? "^R rename" : ""}  ${picker.onPin ? "^P pin" : ""}`.trim()
+        ? `${picker.onDelete ? "Del delete" : ""}  ${picker.onRename ? "^R rename" : ""}  ${picker.onPin ? "^P pin" : ""}`.trim()
         : undefined);
     const pickerStatus = !this.loading && !this.loadFailed ? picker.status?.(this.model.visible, this.model.filter) : undefined;
     const searchStatus = this.searching ? 'Searching…' : this.searchFailed ? picker.searchError ?? 'Search could not be completed.' : undefined;

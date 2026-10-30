@@ -10,7 +10,7 @@ import type { Session } from '../../schema/sessionRecord.js';
 import { createSessionStoreLayout, projectSessionFileLayout } from '../sessionFileLayout.js';
 import { SessionCatalog } from './index.js';
 import type { SessionCatalogBrowse, SessionCatalogContinuation, SessionCatalogSnapshot } from './model.js';
-import type { CatalogRead } from './browse.js';
+import { CatalogBrowses, type CatalogRead } from './browse.js';
 
 vi.mock('node:fs/promises', async () => {
   const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
@@ -53,6 +53,52 @@ async function finish(catalog: SessionCatalog, context: ReturnType<typeof fixtur
   for await (const page of catalog.list(context, signal, limit, undefined, undefined, { browse, needle, after })) pages.push(page);
   return { pages, last: pages.at(-1)! };
 }
+
+it('forgets a confirmed removed row without rediscovery, source reads or a fresh quota', async () => {
+  const { catalog, context, browse, layout } = fixture();
+  seed(layout, 'current', { updatedAt: '2020-01-01T00:00:00.000Z' }); const removed = seed(layout, 'one'); seed(layout, 'two'); seed(layout, 'three');
+  const first = await finish(catalog, context, browse, '', undefined, undefined, 1);
+  const summary = first.last.sessions.find(item => item.id === 'one')!;
+  const retained = catalog as unknown as { browses: CatalogBrowses; cache: Map<string, unknown> };
+  const state = retained.browses.get(browse, context), budget = state.budget;
+  const remaining = budget.remaining();
+  expect(() => catalog.forgetBrowse({ ...browse }, context, summary)).toThrow(/expired/);
+  expect(() => catalog.forgetBrowse(browse, { ...context, projectRoot: '/elsewhere' }, summary)).toThrow(/expired/);
+  expect(() => catalog.forgetBrowse(browse, context, { ...summary, version: 'forged' })).toThrow(/changed/);
+  fs.rmSync(removed.sessionDir, { recursive: true });
+  catalog.forgetBrowse(browse, context, summary);
+  expect(retained.browses.get(browse, context)).toBe(state); expect(state.budget).toBe(budget);
+  expect(budget.remaining()).toBe(remaining);
+  expect(state.summaries.has('one')).toBe(false); expect(state.forgotten.has('one')).toBe(true);
+  expect(retained.cache.has('one')).toBe(false);
+  await expect(finish(catalog, context, browse, '', first.last.continuation, undefined, 1)).rejects.toThrow(/expired/);
+  seed(layout, 'one', { title: 'Recreated saved session' });
+  vi.mocked(io.open).mockClear(); vi.mocked(io.opendir).mockClear();
+  const later = await finish(catalog, context, browse);
+  expect(later.last.sessions.map(item => item.id)).not.toContain('one');
+  expect(later.last.total).toBe(3); expect(later.last.status).toBe('complete');
+  expect(io.open).not.toHaveBeenCalled(); expect(io.opendir).not.toHaveBeenCalled();
+  catalog.retireBrowse(browse);
+  const refreshed = catalog.beginBrowse(context);
+  expect((await finish(catalog, context, refreshed, 'Recreated')).last.sessions.map(item => item.id)).toEqual(['one']);
+  catalog.retireBrowse(refreshed);
+});
+
+it('invalidates a detached query that retained a removed row, and preserves partial provenance', async () => {
+  const { catalog, context, browse, layout } = fixture();
+  seed(layout, 'current'); const removed = seed(layout, 'one'); seed(layout, 'two');
+  const first = await finish(catalog, context, browse);
+  const query = catalog.list(context, undefined, 40, undefined, undefined, { browse, needle: '' });
+  await query.next();
+  const state = (catalog as unknown as { browses: CatalogBrowses }).browses.get(browse, context);
+  state.unreadable = 1; state.limited = 1; state.sourceLimited = true;
+  fs.rmSync(removed.sessionDir, { recursive: true });
+  catalog.forgetBrowse(browse, context, first.last.sessions.find(item => item.id === 'one')!);
+  await expect(query.next()).rejects.toThrow(/changed|expired/);
+  const later = await finish(catalog, context, browse, 'two');
+  expect(later.last).toMatchObject({ status: 'partial', unreadable: 1, limited: 1, sourceLimited: true });
+  catalog.retireBrowse(browse);
+});
 
 it('captures all summaries once and filters new needles without opening source files or rediscovering', async () => {
   const { catalog, context, browse, layout } = fixture();

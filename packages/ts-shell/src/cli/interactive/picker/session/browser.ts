@@ -1,7 +1,7 @@
 import type { Option } from '../../../../presentation/tui/chrome/options.js';
 import type { SessionSelectionContext } from '../../../../session/navigation/selection.js';
 import { normalizePathIdentity } from '../../../../session/continuation/roots.js';
-import { CATALOG_LIMITS } from '../../../../session/store/catalog/model.js';
+import { CATALOG_LIMITS, type SessionSummary } from '../../../../session/store/catalog/model.js';
 import type { SessionPickerOptions } from './contract.js';
 import { SessionListing, type SessionListingBrowse, type SessionListingPage } from './listing.js';
 import { pendingSessionPage, projectSessionPage, type SessionProjection } from './projection.js';
@@ -16,6 +16,7 @@ export class SessionBrowser {
   continuation: SessionPickerOptions['continuation'];
   lastQuery?: string;
   refreshOffered = false;
+  lifetime = 0;
   private base?: SessionProjection;
   private searched?: SessionProjection;
   private activeSource: 'base' | 'search' = 'base';
@@ -170,7 +171,19 @@ export class SessionBrowser {
     this.publish = undefined;
   }
 
+  /** Mutation reload starts a new page query on the existing source and live filter. */
+  forget(expected: SessionSummary): void {
+    this.listing.forget(expected);
+    this.clearPage();
+    this.continuation = undefined;
+    this.continuedBase = false;
+    this.refreshOffered = false;
+    this.searchPending = Boolean(this.lastQuery);
+    this.searchComplete = false;
+  }
+
   close(): void {
+    this.lifetime++;
     this.clearPage();
     this.continuation = undefined;
     this.continuedBase = false;

@@ -10517,3 +10517,11 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 新三例原基线全失败，三文件484聚焦测试单worker/2GiB通过；接线与notice各独立反转2/1失败并bytes恢复。只读 `gpt-6.1-sol` 评审指出组合signal不能证明原host释放，追加原host signal断言后新三例重跑通过；无剩余本批finding。五门/build与两消息原NodeCLI/PTY两模式均通过：双击→cancel→草稿保护→显式选择旧问题→新manager读回，config不变、exit0/cookedflags。最终build/退出收据见正式工件；源码注释整理后刷新构建绑定。不跑exe/20k/full suite/真实provider，scratch清理、原CLAUDE.md保留；原47与ADD不升级，goal active。
 
 resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不退还与管理快照身份边界，33尚未实现。研究b79a301a CI41001708699/Watch41001708696、20.55 CI40991170478/Watch40991170435、20.54 CI40989805757/Watch40989805764、20.53 CI40989150210/Watch40989150206已completed/success且head一致。本批Git/未来CI另绑定。
+
+## [2026-10-30] fix | resume删除后保留原浏览索引与查询边界
+
+[addition21.11](features/phase-20-addition.md#2111-第三十三实施之一删除后复用原浏览索引)接续已有实现，确认删除后复用同browse/预算，清summary/size缓存、旧continuation和查询revision，tombstone不退还条目额度；原writer与三文件版本检查保留。补pending删除期间刷新projection的lifetime准入，关闭重开不受旧结果影响。参考只定向复读pi已加载列表删项决定，不采用其后整scope重扫。
+
+四文件179项、四独立反转/bytes恢复、五门及TS build串行通过；118旧advisory保留，五个主要owner callable≤19。原Node CLI两模式各8会话/每条一消息，真实Delete/Enter连续删两项含搜索后清空，begin1/forget2/close前retire0、close后1，剩余非current三文件与config不变、零请求、exit0/cooked。195/278与193/275ms只为小夹具，非用户大目录性能。初次Ctrl+D在原空草稿策略下正常退出、零删除，失败收据保留；modal提示改Del，未新增session panel页脚。
+
+工件/HANDOFF更新，scratch清理、原CLAUDE.md保留。33的三次整读/扫描解析/ambient优化和大目录实测仍待续，31/32/35/36/37继续；原47与ADD不升级，goal active。上批49e3d16e CI41005821166/Watch41005821171已completed/success且head一致；本批Git/未来CI另绑定。

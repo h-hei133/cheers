@@ -184,6 +184,14 @@ export class SessionListing {
     return browse;
   }
 
+  forget(expected: SessionSummary): void {
+    const browse = this.browse;
+    if (!browse) throw new Error('Session browse expired. Reopen the session picker.');
+    this.cancelQueries();
+    this.manager.catalog.forgetBrowse(browse.token, browse.context, expected);
+    browse.sizes.delete(expected.id);
+  }
+
   close(): void {
     this.cancelQueries();
     if (this.browse) this.manager.catalog.retireBrowse(this.browse.token);

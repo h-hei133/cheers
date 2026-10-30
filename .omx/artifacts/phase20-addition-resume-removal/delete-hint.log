@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/overlay.test.ts  (77 tests | 1 failed | 76 skipped) 16ms
+   ❯ src/cli/interactive/overlay.test.ts > lifecycle > cancels loads and ignores a stale reload when the same picker is reopened
+     → expected '┌ Pick (2) ──────────────────────────…' to include 'Del delete'
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 76 skipped (77)
+   Start at  13:34:53
+   Duration  663ms (transform 341ms, setup 0ms, collect 422ms, tests 16ms, environment 0ms, prepare 52ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/overlay.test.ts -t cancels loads and ignores a stale reload
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/overlay.test.ts > lifecycle > cancels loads and ignores a stale reload when the same picker is reopened
+AssertionError: expected '┌ Pick (2) ──────────────────────────…' to include 'Del delete'
+ ❯ src/cli/interactive/overlay.test.ts:384:59
+    382|     } });
+    383|     overlay.open(menu); loads[0]!(options); await new Promise(resolve …
+    384|     expect(stripAnsi(overlay.render(100, 20).join('\n'))).toContain('D…
+       |                                                           ^
+    385|     press(overlay, '\x1b[3~'); press(overlay, '\r'); await new Promise…
+    386|     expect(loads).toHaveLength(2); expect(signals[0]!.aborted).toBe(tr…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/overlay.test.ts -t 'cancels loads and ignores a stale reload'

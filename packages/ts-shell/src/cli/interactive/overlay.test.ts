@@ -377,11 +377,12 @@ describe("lifecycle", () => {
   });
   it('cancels loads and ignores a stale reload when the same picker is reopened', async () => {
     const { overlay } = host(); const loads: ((items: readonly Option[]) => void)[] = []; const signals: AbortSignal[] = [];
-    const menu = picker({ onDelete: async () => undefined, load: signal => {
+    const menu = picker({ form: 'modal', onDelete: async () => undefined, load: signal => {
       signals.push(signal!); return new Promise(resolve => loads.push(resolve));
     } });
     overlay.open(menu); loads[0]!(options); await new Promise(resolve => setTimeout(resolve, 0));
-    press(overlay, '\x04'); press(overlay, '\r'); await new Promise(resolve => setTimeout(resolve, 0));
+    expect(stripAnsi(overlay.render(100, 20).join('\n'))).toContain('Del delete');
+    press(overlay, '\x1b[3~'); press(overlay, '\r'); await new Promise(resolve => setTimeout(resolve, 0));
     expect(loads).toHaveLength(2); expect(signals[0]!.aborted).toBe(true);
     overlay.close(); expect(signals[1]!.aborted).toBe(true);
     overlay.open(menu); loads[2]!([{ id: 'new', label: 'fresh item' }]); await new Promise(resolve => setTimeout(resolve, 0));

@@ -1,0 +1,55 @@
+{
+  "mode": "regular",
+  "buildId": "6155343bde7513b6358c730e6d5d514fb7fc85f639904c5ab5b29cce5bb620cd",
+  "inputsDigest": "e82427186e6889ab663a259a6aef0974320a7b7dff0bd3d4ef5592c51c750054",
+  "fixtures": 8,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "checks": {},
+  "deletionMs": [],
+  "failure": "closed-delete-confirmation",
+  "assertion": "closed-delete-confirmation",
+  "observation": {
+    "begins": 1,
+    "retires": 1,
+    "removals": 0,
+    "requests": 0,
+    "renders": 11,
+    "snapshot": {
+      "title": "Resume session",
+      "filter": "",
+      "current": "sess_4684f37ebd6b813b_1793338230220",
+      "loading": false,
+      "searching": false,
+      "pending": false,
+      "failed": false,
+      "status": "End of this session page range. Reopen to refresh saved sessions.",
+      "ids": [
+        "sess_c2d8cfbbd4f6ff3b_1793338230160",
+        "sess_0667092fbad2ea1e_1793338230496",
+        "sess_3ef47d44e35b3b1d_1793338230449",
+        "sess_f4b9625874be03f2_1793338230404",
+        "sess_3419c3ebe6fc78dd_1793338230361",
+        "sess_25b36b398e02f820_1793338230315",
+        "sess_d51dd56f89c71f08_1793338230268",
+        "sess_4684f37ebd6b813b_1793338230220"
+      ],
+      "painted": [
+        "group:pinned:false",
+        "group:false:Today",
+        "sess_c2d8cfbbd4f6ff3b_1793338230160",
+        "sess_0667092fbad2ea1e_1793338230496",
+        "sess_3ef47d44e35b3b1d_1793338230449",
+        "sess_f4b9625874be03f2_1793338230404",
+        "sess_3419c3ebe6fc78dd_1793338230361",
+        "sess_25b36b398e02f820_1793338230315",
+        "sess_d51dd56f89c71f08_1793338230268",
+        "sess_4684f37ebd6b813b_1793338230220"
+      ],
+      "rows": 14
+    }
+  },
+  "outputBytes": 11630,
+  "scratchRemoved": true
+}

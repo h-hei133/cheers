@@ -1100,3 +1100,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Closing a picker aborts its source signal, and a test calls that proof that the host lifetime released.
 - **Root Cause**: The source uses a combination of the host signal and the overlay load signal. Either input aborts the combination; the overlay can mask a surviving host controller.
 - **Rule**: Capture the original host signal separately and assert its release directly, alongside the combined source signal. An unavailable factory result must release its original controller too. Keep keyboard-to-panel assertions through the actual registry.
+
+### Pending Mutations Belong To A Browse Lifetime, Not One Page Object
+- **Symptom**: A confirmed deletion skips removing its cached row after a progressive page refresh, or its late result changes a reopened browser.
+- **Root Cause**: Page projections change within the same browser lifetime; object equality cannot distinguish a harmless refresh from host retirement.
+- **Rule**: Capture the original browse lifetime before awaiting the mutation. Allow its page projections to refresh, retire admission on close/reopen, and bind removal to the original catalog summary. Invalidate old query and continuation authority without refunding acquisition budgets. Exercise page replacement and reopen separately.
+
+### Delete Must Have A Key That Reaches The Actual Host
+- **Symptom**: A direct overlay Ctrl+D test deletes, while the real CLI exits with no deletion.
+- **Root Cause**: Empty-draft app.exit runs before modal ownership; the generic overlay shortcut is not proof of host reachability.
+- **Rule**: Advertise and exercise the existing Delete key for deletion; preserve explicit global exit behavior. Distinguish modal action hints from panel footers and verify real confirmation, directory absence and source retention through CLI input.

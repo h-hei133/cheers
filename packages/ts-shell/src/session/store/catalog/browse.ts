@@ -13,6 +13,7 @@ export interface CatalogBrowseState {
   readonly controller: AbortController;
   readonly budget: SessionCatalogReadBudget;
   readonly summaries: Map<string, SessionSummary>;
+  readonly forgotten: Set<string>;
   readonly unreadableIds: Set<string>;
   readonly unreadableDirectories: Set<string>;
   readonly ready: Promise<void>;
@@ -24,6 +25,7 @@ export interface CatalogBrowseState {
   sourceLimited: boolean;
   indexTruncated: boolean;
   done: boolean;
+  mutationRevision: number;
   build?: Promise<void>;
 }
 
@@ -46,8 +48,8 @@ export class CatalogBrowses {
     let publishCurrent!: () => void;
     const ready = new Promise<void>(resolve => { publishCurrent = resolve; });
     this.states.set(token.id, { token, context: { ...context }, controller: new AbortController(),
-      budget: sessionCatalogReadBudget(this.limit), summaries: new Map(), unreadableIds: new Set(), unreadableDirectories: new Set(),
-      ready, publishCurrent, progress: new CatalogProgress(), scanned: 0, unreadable: 0, limited: 0, sourceLimited: false, indexTruncated: false, done: false });
+      budget: sessionCatalogReadBudget(this.limit), summaries: new Map(), forgotten: new Set(), unreadableIds: new Set(), unreadableDirectories: new Set(),
+      ready, publishCurrent, progress: new CatalogProgress(), scanned: 0, unreadable: 0, limited: 0, sourceLimited: false, indexTruncated: false, done: false, mutationRevision: 0 });
     return token;
   }
 
@@ -70,6 +72,16 @@ export class CatalogBrowses {
     return true;
   }
 
+  /** Retains the source and its consumed budget after a confirmed deletion. */
+  forget(token: SessionCatalogBrowse, context: SessionSelectionContext, expected: SessionSummary): void {
+    const state = this.get(token, context);
+    if (state.summaries.get(expected.id) !== expected) throw new Error('Session browse selection changed. Reopen the session picker.');
+    state.summaries.delete(expected.id);
+    state.forgotten.add(expected.id);
+    state.mutationRevision++;
+    state.progress.publish();
+  }
+
   start(state: CatalogBrowseState, read: CatalogRead, onSource?: (target: string) => void): void {
     if (state.build) return;
     state.build = captureBrowse(this.layout, state, read, onSource);
@@ -86,8 +98,8 @@ async function captureBrowse(layout: SessionStoreLayout, state: CatalogBrowseSta
     try { onSource?.(target); } catch { /* A detached query observer does not own source acquisition. */ }
   };
   const acquire = async (id: string, directory?: string): Promise<SessionSummary | undefined> => {
-    if (state.summaries.has(id)) return undefined;
-    if (state.summaries.size + pending >= CATALOG_LIMITS.attemptEntries) {
+    if (state.summaries.has(id) || state.forgotten.has(id)) return undefined;
+    if (state.summaries.size + state.forgotten.size + pending >= CATALOG_LIMITS.attemptEntries) {
       state.indexTruncated = true;
       throw new SessionCatalogReadLimitError('Session catalogue entry limit reached.');
     }
@@ -95,6 +107,7 @@ async function captureBrowse(layout: SessionStoreLayout, state: CatalogBrowseSta
     try {
       const summary = await read(id, signal, directory, observe, state.budget);
       signal.throwIfAborted();
+      if (state.forgotten.has(id)) return undefined;
       if (summary) {
         state.summaries.set(id, summary); state.scanned++;
         if (summary.quality === 'limited') state.limited++;
@@ -102,6 +115,7 @@ async function captureBrowse(layout: SessionStoreLayout, state: CatalogBrowseSta
       return summary;
     } catch (error) {
       signal.throwIfAborted();
+      if (state.forgotten.has(id)) return undefined;
       if (error instanceof SessionCatalogReadLimitError) throw error;
       state.unreadable++;
       if (id !== state.context.sessionId && state.unreadableIds.size < CATALOG_LIMITS.diagnosticSamples) state.unreadableIds.add(id);

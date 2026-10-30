@@ -51,6 +51,13 @@ export class SessionCatalog {
     if (this.browses.retire(token)) this.continuations.retire(token.id);
   }
 
+  /** Called with the original offered summary only after deletion was confirmed. */
+  forgetBrowse(token: SessionCatalogBrowse, context: SessionSelectionContext, expected: SessionSummary): void {
+    this.browses.forget(token, context, expected);
+    this.cache.delete(expected.id);
+    this.continuations.retire(token.id);
+  }
+
   resolve(reference: string, options: SessionReferenceQuery = {}): Promise<SessionReferenceResolution> {
     const budget = sessionCatalogReadBudget(this.attemptBytes, options.signal);
     return resolveCatalogReference(this.layout, (id, signal, directory) => this.read(id, signal, directory, undefined, budget), reference, options);
@@ -207,13 +214,21 @@ export class SessionCatalog {
     limit: number, onSource?: (target: string) => void,
     onUnreadable?: (diagnostic: SessionCatalogDiagnostic) => void): AsyncGenerator<SessionCatalogSnapshot> {
     const state = this.browses.get(query.browse!, context);
+    const mutationRevision = state.mutationRevision;
+    const assertCurrent = (): void => {
+      this.browses.get(query.browse!, context);
+      if (state.mutationRevision !== mutationRevision) throw new Error('Session browse changed. Reload its current page.');
+    };
     const after = query.after;
     const selection = new SessionCatalogPage(context, limit, query, after?.attemptId ?? randomUUID());
     const attempt = after ? this.continuations.claim(after) : undefined;
-    const read = this.read.bind(this);
+    const read: typeof this.read = async (...args) => {
+      try { return await this.read(...args); }
+      finally { if (state.forgotten.has(args[0])) this.cache.delete(args[0]); }
+    };
     this.browses.start(state, read, onSource);
     await waitForBrowse(state, signal, state.ready);
-    this.browses.get(query.browse!, context);
+    assertCurrent();
     const provisional = new SessionCatalogPage(context, limit, query);
     const current = state.summaries.get(context.sessionId);
     if (current) {
@@ -223,7 +238,7 @@ export class SessionCatalog {
     if (after) selection.assertBoundary(await this.read(after.boundary.id, signal, undefined, onSource, state.budget,
       state.summaries.get(after.boundary.id)));
     signal?.throwIfAborted();
-    this.browses.get(query.browse!, context);
+    assertCurrent();
     yield browseSnapshot(provisional, state, 'scanning');
     const accepted = new Set<string>();
     const validated = new Set<SessionSummary>();
@@ -236,14 +251,14 @@ export class SessionCatalog {
           if (!accepted.has(summary.id)) { accepted.add(summary.id); selection.accept(summary); }
         }
         await this.validateBrowseSources(selection.visibleSources(), state, signal, onSource, validated);
-        this.browses.get(query.browse!, context);
+        assertCurrent();
         if (!state.done) yield browseSnapshot(selection, state, 'scanning');
         if (!state.done && revision === state.progress.revision) {
           await waitForBrowse(state, signal, Promise.race([state.build!, state.progress.changed]));
         }
       }
       await waitForBrowse(state, signal);
-      this.browses.get(query.browse!, context);
+      assertCurrent();
       for (const summary of state.summaries.values()) {
         signal?.throwIfAborted();
         if (!accepted.has(summary.id)) { accepted.add(summary.id); selection.accept(summary); }
@@ -255,6 +270,7 @@ export class SessionCatalog {
         state.summaries.get(after.boundary.id)));
     } catch (error) {
       signal?.throwIfAborted();
+      assertCurrent();
       if (!(error instanceof SessionCatalogReadLimitError)) throw error;
       state.sourceLimited = true;
       // No row whose live identity was not checked may be offered as selectable.
@@ -263,7 +279,7 @@ export class SessionCatalog {
       return;
     }
     signal?.throwIfAborted();
-    this.browses.get(query.browse!, context);
+    assertCurrent();
     const status = state.sourceLimited || state.indexTruncated || state.unreadable || state.limited ? 'partial' : 'complete';
     const final = browseSnapshot(selection, state, status);
     this.remember(final.sessions);

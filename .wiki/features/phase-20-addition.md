@@ -4282,3 +4282,23 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 只读评审为33补充具体陷阱：同token更新须废止旧查询/已消费continuation、保护在途扫描不复活删项，tombstone参与条目上限且物理字节预算不可退还；管理快照必须保留metadata/state和全三文件版本，不用 `turns: []` 伪造完整Session。复用索引减少的是物理I/O，内存summaries重投影仍遍历索引；该方案尚未实现或验证。
 
 延后CI观察：研究提交 `b79a301a937f86e1524f23458bad5d1313421033` 的CI41001708699/Watch41001708696均success；20.55 `e74d87f7d083f6117d011e8b2d7f32412b5b2372` CI40991170478/Watch40991170435、20.54 `3bc969461f3e8bd757f1e87546f0ab479ad0ab95` CI40989805757/Watch40989805764、20.53 `8e4e6fd1b3865fc657dee87644912296c75ec009` CI40989150210/Watch40989150206均completed/success且head一致。本批提交、推送和未来CI另绑定，旧CI不替代本批CI。
+
+### 21.11 第三十三实施之一：删除后复用原浏览索引
+
+接续工作区已有实现，完成21.3建议1。确认删除后，原[actions](../../packages/ts-shell/src/cli/interactive/picker/session/actions.ts)不再关闭整个browser，而由原listing/catalog移除所选summary与size缓存，废止旧continuation和查询revision，清掉页面投影后沿原overlay.reload重新查询。同一个browse token、已用字节预算及partial来源保留；tombstone计入条目上限，捕获路径在异步读取后也检查删项。重建同名ID要显式重开才可见。当前会话保护、真实删除owner及版本复验保持原契约，没有第二套索引或管理writer。
+
+目标检查后定向复读pi的session-selector.ts:837–853：同意确认删除后先移除已加载项；不采用随后整个scope重扫，因为本项目已有同生命周期catalog与预算。21.3此前的另一参考比较作为已记录设计依据，不冒充本批重新读过该快照。新回归在恢复整源关闭时失败，检查实际目录打开、读取字节及token数量，而非只看列表不含删项。内存重新投影仍遍历summaries，不能称总时间复杂度降成O(当前页)。
+
+集成发现页对象比较的竞态：等待删除时原浏览可发布新projection，`active() === projection`会漏掉删项；改为捕获browser lifetime，刷新仍属于原浏览，关闭/重开则退休原lifetime。两条pending-delete回归验证刷新后清理与重开后不改新browse；选中summary仍须是catalog持有的原对象，不能用伪造版本或其他context代替。
+
+初始宿主夹具错误等待End而首批实际有Next，后续又把只有两项的搜索当作可分页；均为测试设置错误，修为真实完整页/有下一页的查询，未放松源读取或身份断言。最终单worker、1536MiB heap的四文件179项通过，覆盖catalog browse、session lifetime、session picker及overlay。四项独立反转分别撤回保留source、浏览lifetime、旧query失效与Del提示，均发生断言失败；finally逐字节恢复后179项重跑通过。五静态门及2048MiB TS build通过，118条既有docs-source advisory保留。五个主要owner的保守named-callable计数分别4/18/19/11/19，未超过20。
+
+第一次真实CLI用Ctrl+D尝试删除，原空草稿app.exit先退出，零删除/零模型请求；该失败保留为baseline，不能记为删除成功。原overlay还支持Delete，最终探针使用真实Delete→确认Enter。modal的删除动作提示由`^D delete`改为`Del delete`，经实际modal绘制及Delete触发reload回归验证；session panel本身没有绘制这段modal actionHints，不据此声称新增了panel页脚。保留原空草稿全局退出政策。
+
+最终regular/fullscreen均为隔离home/profile/project的原Node CLI和120×60 PTY，每模式仅8个会话、每会话一条小user消息，synthetic/offline、零tools/skills/上下文文件、warming关闭，heap768MiB/45秒/2MiB输出上限。实际按键连续删除两项，第二项在精确搜索中删除，随后清空搜索仍不出现删项；同一token共begin1/forget2/retire0，Esc后才retire1。新SessionManager读回删除目录缺失，未改变当前选择，其余五个非current会话的三文件原字节不变，配置不变、零message.started、exit0及ICANON/ECHO/ISIG读回恢复。
+
+regular两次删除195/278ms、退出126ms；fullscreen193/275ms、退出125ms。时间含输入、确认、重查与绘制，只证明小夹具链路；不代表2307会话用户目录或桌面终端延迟。最终build `cda852ed59e152495c94ca91882ce2c8472be1af0036bd7c7c7fef2de2e2bd24`、inputs `4e200e15e7aa4d616b060f64ee88d2c1f2e885565dc22a0cf7ca6091f398b6f5`，两模式均经checkBuild绑定。正式[工件](../../.omx/artifacts/phase20-addition-resume-removal/)保存脚本、反转、初次失败与最终收据；scratch清理，原CLAUDE.md保留。
+
+**尚未完成**：21.3建议2的管理快照/三次整读、建议3的扫描解析让出主线程、建议4的ambient读取优化及用户大目录实测；第33项仍partial，31/32/35/36/37继续按顺序实施。没有真实provider/外部平台/独立代理审核/exe/full suite/20k证据；原47项与ADD整体状态不升级，goal active。本批未派发子代理，所有验证严格逐进程串行。
+
+延后精确检查上批 `49e3d16ed1188fbc77b1fa5b80d894936ba3ed10`：CI41005821166和Watch41005821171均completed/success。本批Git/推送及未来CI另绑定，不沿用旧CI作本批证据。
