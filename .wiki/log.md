@@ -10700,3 +10700,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：本轮图片修复的CI结论
 
 延后读回：`4fa2cd53`（历史图片恢复）、`4fefcbd0`（工具结果图片）、`7675617f`（退出基线文档）的CI与NormProof均completed/success且head一致。`97b56211`（纯图片空白行）NormProof success、CI当时仍in_progress，另绑定。绿色CI不替代真实provider/桌面/图形协议验收，原47/ADD整体仍partial、goal active。
+
+### 2026-10-31：图片修复批次CI全绿
+
+`97b56211`（纯图片空白行）CI与NormProof均completed/success且head一致。至此本轮四个提交`4fa2cd53`/`4fefcbd0`/`97b56211`/`7675617f`全部CI+Watch双绿；`48873abc`为纯文档归档，Watch success、CI当时in_progress另绑定。绿色CI不替代真实provider/桌面/图形协议验收，原47/ADD整体仍partial、goal active。
