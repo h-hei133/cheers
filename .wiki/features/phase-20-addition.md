@@ -4843,3 +4843,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 第25项此前覆盖了「完成后恢复」，本批补「中断」：持久化user提示、写一条content为空但带reasoning的assistant消息、标记interrupted，再用`restoreConversation`读回——得到`user`+`thinking`（精确文本、`collapsed:true`），序列化结果不含签名。压缩路径不涉及reasoning（被压缩消息整体移出，是既定设计）。resume的当前会话标记含`currentUnavailable`分支，逻辑完整。
 
 证据边界：这是投影而非真实推理模型被中断的现场；从未持久化的推理（provider扣留、或进程在写消息前死亡）无法恢复，本批不作此声明。[工件](../../.omx/artifacts/phase20-addition-thinking-recovery/README.md)。build `059b7423ab15`。未改产品代码。原47/ADD整体partial、goal active。
+
+
+### 21.58 /context的compactAt阈值与实际压缩触发同源
+
+第25项相邻的最后一个未审面。`/context`的`compactAt`来自`requestBudget`的`softLimit`（`Math.min(floor(window×0.9), availableInput)`，`fraction`默认0.9且仅在(0,1)内才接受）；实际压缩的`shouldCompact`用`Math.min(floor(contextWindow×0.9), availableInput)`且额外要求`tokens + reserve <= inputLimit`。`compactAt`的else分支显式处理该条件（`Math.min(floor(window×0.9), inputLimit - reserve)`），两者语义对齐，不存在「报告阈值与实际触发不一致」。
+
+未改产品代码。build `059b7423ab15`。原47/ADD整体partial、goal active。
+
+补充：`/workspace add`后新会话**不继承**附加根（`createNew`不带该字段），正确——授权属于会话。state快照的`current?.workspaceRoots ?? session.workspaceRoots`是正确合并（空数组不回退、undefined才回退）。`/workspace remove`后`runtimeContext.session`被替换为新session，后续工具从该字段读取，撤销立即生效。

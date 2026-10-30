@@ -10792,3 +10792,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：中断会话的思考块保留
 
 [addition21.57](features/phase-20-addition.md#2157-中断会话的思考块保留)补第25项的中断分支：中断消息的reasoning经restoreConversation读回为collapsed thinking块、精确文本、无签名。压缩不涉及reasoning是既定设计。边界：投影证据而非真实推理模型中断现场。未改产品代码。build 059b7423。原47/ADD整体partial、goal active。
+
+### 2026-10-31：/context的compactAt阈值与实际压缩触发同源
+
+[addition21.58](features/phase-20-addition.md#2158-context的compactat阈值与实际压缩触发同源)核对requestBudget.softLimit与shouldCompact：同为floor(window×0.9)并与availableInput/inputLimit-reserve取小，语义对齐。未改产品代码。build 059b7423。原47/ADD整体partial、goal active。
