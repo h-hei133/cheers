@@ -1,0 +1,9 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/interactiveMode.test.ts  (373 tests | 368 skipped) 163ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed | 368 skipped (373)
+   Start at  08:35:29
+   Duration  15.65s (transform 9.96s, setup 0ms, collect 15.22s, tests 163ms, environment 0ms, prepare 55ms)

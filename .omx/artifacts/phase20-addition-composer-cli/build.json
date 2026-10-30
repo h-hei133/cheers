@@ -1,0 +1,15 @@
+{
+  "buildId": "39fd3f6d79f34cb1143ddfa12ab559272ac29cc218ec3eb45cb0b78763ff7175",
+  "inputsDigest": "8867735c26bc057eee902d1f98672f0a48ca999a9543ad71b6786cf5531b882d",
+  "compilerInputs": 460,
+  "files": 3549,
+  "compilerMatch": true,
+  "digestMatch": true,
+  "callables": {
+    "packages/ts-shell/src/cli/interactive/externalEditor.ts": {
+      "count": 3,
+      "previousCount": 3,
+      "sourceSha256": "f070b73e1cd3fcea851d4a3b340a63dd24b77d7b3a17b3850ff972847702e52f"
+    }
+  }
+}

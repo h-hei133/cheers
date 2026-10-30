@@ -1,0 +1,13 @@
+{
+  "library": "pyte",
+  "version": "0.8.2",
+  "checks": {
+    "cup": true,
+    "cudBottomClamp": true,
+    "alternateCursorRestore": true,
+    "privateQueriesAccepted": true,
+    "resizeBounds": true
+  },
+  "coordinateSource": "bounded ANSI parser of actual PTY output; initial row 28 is a parser seed, not a desktop cursor measurement",
+  "desktopPixelsVerified": false
+}

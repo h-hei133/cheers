@@ -3174,7 +3174,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 | 24 | 本地实现与聚焦验证；20.42补两模式原CLI的拒绝/单次write/edit/重复询问，20.45补跨目录patch分组与原操作收据并修真实选项过滤/g/4派发，20.46补文件selector与目录分页的实际CLI单次read | 缺用户目录审批现场、实际provider产生的工具调用及非Linux文件系统证据 |
 | 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses/Google native摘要准入已实现；20.33新增当前relay真实小请求的公开thinking/展开/恢复，auto保留，整体partial | 其他模型/协议默认与公开内容、真实账户及用户终端复验；单个relay请求不覆盖完整矩阵 |
 | 26 | 四条明确机制、MCP未开始调用及表面/渲染失败围栏已修；20.36/20.40正常/空闲、20.41 loopback忙碌流、20.43审批pending信号与20.44审批Ctrl+D均有退出/恢复证据；20.43/44修补取消等待与modal吞退出动作 | 缺真实用户故障设备/外部provider busy信号现场；MCP预算到期不能证明清理完成 |
-| 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
+| 27 | CRLF编辑器契约与20.48外部编辑器末尾CRLF返回已修；startup/坐标夹具及两模式实际CLI粘贴、stash、resize、外部编辑器有证据，现场机制仍未确认 | 缺真实用户尺寸/按键/桌面终端现场；PTY解析坐标不代替物理像素验收，不把相对原点当成已证漂移 |
 | 28 | 会话入口与配置字段分类隔离已实施；本地聚焦验证 | 缺真实用户终端与整体面板现场验收 |
 | 29 | 同次浏览索引复用与真实目录只读性能已验证；20.38/20.39补48小会话的实际CLI搜索/选择/分页，并修清空查询后重建回带旧查询 | 缺用户大目录终端性能与非Linux证据；小型PTY时间包含输入/去抖/观察开销，不能代替生产性能 |
 | 30 | 空闲fresh、信号关闭及真实恢复保护已实现；20.40空闲/20.41 loopback busy均覆盖两模式×两信号CLI，恢复保留中断且不重发 | 缺用户终端关闭、外部provider busy、非Linux与不可捕获崩溃证据；SIGKILL不执行清理钩子 |
@@ -3874,3 +3874,26 @@ regular RSS261120KiB/18.26秒、fullscreen264352KiB/18.46秒；heap768MiB/每CLI
 | fullscreen | 776 / 722ms | 145ms、0 | 263712KiB / 10.76s |
 
 时间含人工150ms等待与copy/fixture/观察，不当作生产延迟。当前build/inputs同20.45，产品未改不重复build/Vitest；正式脚本语法/JSON/收据、五静态门/diff检查后task scratch清理，原CLAUDE.md保留、主代理逐进程serial。原observer只记录选定fs open/opendir，不证明metadata/kernel I/O为零；未验policy撤销、reader已开始后的替换、用户目录/外部provider、其他平台/桌面/IME/完整媒体与独立review，无exe/full suite/20k。原47及ADD整体不升级，goal active，Git/精确CI另绑定。
+
+
+20.47已推送`433077c52d2a91c79dbb51672dd483b78d93175a`，远端main此前精确一致、仅原CLAUDE.md。延后核对Watch40979466580 completed/success、CI40979466560仍in_progress；20.46 CI40979108158及20.45 CI40978485363仍in_progress，head均精确一致。没有借Watch成功称完整CI或原47验收通过。
+
+
+### 20.48 外部编辑器末尾CRLF不再生成额外空白草稿行
+
+继续反馈27与ADD-05/06，先检查原buffer setter、paste/store、stash、frame/painter及[外部编辑器返回](../../packages/ts-shell/src/cli/interactive/externalEditor.ts)。当前setter已归一CRLF，真实CLI短paste与stash/resize可以通过；但普通外部编辑器保存final CRLF时，return先仅删LF留下CR，setter再转换为LF，三行草稿变四行末尾空白。原CLI regular在13个阶段通过后，external-crlf-edit等待精确三行失败，19.28秒/303192KiB；原收据保留。该新缺口属于返回顺序，不据此宣称已定位用户启动空白行。
+
+定向对照只读pi `modes/interactive/external-editor.ts`、oh-my-pi `utils/external-editor.ts`均仅replace final LF，编辑器加载边界分别normalize CRLF/bare CR；它们没有证明该返回组合的CRLF合同正确，本项目不复制同一缺陷。保留target已有逻辑换行投影、一次末尾换行移除与无变更不adopt：返回先归一，再比较input同投影，最后删除一次logical newline；额外blank line及Tab保留，文件原文不被改写。Codex external editor读取原文，未把其全文保留规则换成本项目的editor-added newline政策。
+
+五条原editExternally subprocess回归在旧实现全失败：CRLF、bare CR、额外blank、mixed+Tab及只有line endings改变；最后一条应No changes以免覆盖已有末尾换行。修补后owner21与过滤actual host5共26通过、368未选不算通过；独立恢复旧return五失败，finally字节恢复后21+5最终重跑。最初静态门在package cwd找不到root script，属于invocation失败，root串行重跑五门/diff通过，118旧advisory保留。最终build heap1536MiB exit0；独立freshness build `39fd3f6d79f34cb1143ddfa12ab559272ac29cc218ec3eb45cb0b78763ff7175`、inputs `8867735c26bc057eee902d1f98672f0a48ca999a9543ad71b6786cf5531b882d`，460/3549一致，owner AST3/3、无新product import/callable，source SHA256 `f070b73e1cd3fcea851d4a3b340a63dd24b77d7b3a17b3850ff972847702e52f`。
+
+[composer-cli工件](../../.omx/artifacts/phase20-addition-composer-cli/)用原Node CLI/PTY、两模式各一条小saved session，synthetic零请求、只public fixture、heap768MiB/45秒/2MiB。实际输入17阶段：empty→CRLF/bare-CR/Tab/中文/emoji paste→Alt+S stash/restore→120×60缩42×20→Left两次/stash/restore caret→回120×60→clear→九行held paste再paste于token内展开→clear→original→Ctrl+G真实Python editor写三行末尾CRLF→Alt+S取原稿/取改写→clear/Ctrl+D。原editor子进程原稿digest匹配且stdin是cooked TTY，临时文件清空，整个链零model turn/config改变。
+
+PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原application chrome与cursor marker对应的解析row/column，未写新产品几何或第二输入状态。parser需适配private device-status query与alternate cursor restore；初始两次startup失败，第二次诊断TypeError private keyword，CLI未交互/零请求，分别保留。修parser后CUP/CUD底部夹限/alternate恢复/private queries/resize bounds五检查通过。initial row28只为parser seed，未把低处起始写成真实桌面光标测量；screen resize无全终端scrollback reflow模型，结果称PTY解析坐标，不称物理像素匹配。
+
+| 模式 | 最终CLI阶段 | external CRLF后逻辑行/caret | Ctrl+D exit | 峰值RSS / 探针 |
+|---|---|---|---|---|
+| regular | 17全过 | 3行/66、解析cursor row13 col20 | 167ms、0 | 303352KiB / 13.41s |
+| fullscreen | 17全过 | 3行/66、解析cursor row56 col20 | 168ms、0 | 303444KiB / 13.26s |
+
+最终34阶段chrome/解析caret与source digest均匹配，tabs保留、无CR、placeholder展开不重复，终端两次normal exit ICANON/ECHO/ISIG恢复。旧build的pre-editor/pre-trailing-newline成功收据另保留，不能代替含final CRLF的失败和新build最终证据。时间含人为150ms/观察/小fixture，不作为生产性能。正式工件保存失败分类、baseline/反转/恢复、build/parser/final receipts；不归档raw显示/原会话/provider正文，syntax/JSON/收据/五门/diff后清理task scratch。HANDOFF追加先normalize再trim陷阱。全程主代理heavy serial、原CLAUDE.md保留；无独立review/用户桌面与启动空白现场/Windows/IME/缺尺寸/全部editor失败或live submit，未跑exe/full suite/20k。原47和ADD整体不升级，goal active，Git/精确CI另绑定。

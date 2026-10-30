@@ -1,0 +1,105 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/externalEditor.test.ts  (21 tests | 5 failed | 16 skipped) 257ms
+   ❯ src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'CRLF save' without adding an empty draft line
+     → expected 'edited\r' to be 'edited' // Object.is equality
+   ❯ src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'bare CR save' without adding an empty draft line
+     → expected 'edited\r' to be 'edited' // Object.is equality
+   ❯ src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'extra blank line' without adding an empty draft line
+     → expected 'edited\r\n\r' to be 'edited\n' // Object.is equality
+   ❯ src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'mixed line endings and tab' without adding an empty draft line
+     → expected 'first\r\n\tsecond\rthird\r' to be 'first\n\tsecond\nthird' // Object.is equality
+   ❯ src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'only line ending changed' without adding an empty draft line
+     → expected 'original\r' to be undefined // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'CRLF save' without adding an empty draft line
+ FAIL  src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'bare CR save' without adding an empty draft line
+AssertionError: expected 'edited\r' to be 'edited' // Object.is equality
+
+- Expected
++ Received
+
+- edited
++ edited
+
+ ❯ src/cli/interactive/externalEditor.test.ts:132:29
+    130|         const result = editExternally({ text: original, suspendTermina…
+    131|           env: { EDITOR: `rtk proxy node ${editor}` } });
+    132|         expect(result.text).toBe(expected);
+       |                             ^
+    133|         if (expected === undefined) expect(result.message).toContain('…
+    134|         expect(terminal.depth()).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'extra blank line' without adding an empty draft line
+AssertionError: expected 'edited\r\n\r' to be 'edited\n' // Object.is equality
+
+- Expected
++ Received
+
+- edited
+-
++ edited
++
+
+ ❯ src/cli/interactive/externalEditor.test.ts:132:29
+    130|         const result = editExternally({ text: original, suspendTermina…
+    131|           env: { EDITOR: `rtk proxy node ${editor}` } });
+    132|         expect(result.text).toBe(expected);
+       |                             ^
+    133|         if (expected === undefined) expect(result.message).toContain('…
+    134|         expect(terminal.depth()).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'mixed line endings and tab' without adding an empty draft line
+AssertionError: expected 'first\r\n\tsecond\rthird\r' to be 'first\n\tsecond\nthird' // Object.is equality
+
+- Expected
++ Received
+
+- first
+- 	second
+- third
++ first
++ 	second
+third
+
+ ❯ src/cli/interactive/externalEditor.test.ts:132:29
+    130|         const result = editExternally({ text: original, suspendTermina…
+    131|           env: { EDITOR: `rtk proxy node ${editor}` } });
+    132|         expect(result.text).toBe(expected);
+       |                             ^
+    133|         if (expected === undefined) expect(result.message).toContain('…
+    134|         expect(terminal.depth()).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/cli/interactive/externalEditor.test.ts > external editor > running it > handles the logical newline in a 'only line ending changed' without adding an empty draft line
+AssertionError: expected 'original\r' to be undefined // Object.is equality
+
+- Expected:
+undefined
+
++ Received:
+"original
+"
+
+ ❯ src/cli/interactive/externalEditor.test.ts:132:29
+    130|         const result = editExternally({ text: original, suspendTermina…
+    131|           env: { EDITOR: `rtk proxy node ${editor}` } });
+    132|         expect(result.text).toBe(expected);
+       |                             ^
+    133|         if (expected === undefined) expect(result.message).toContain('…
+    134|         expect(terminal.depth()).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 16 skipped (21)
+   Start at  08:35:18
+   Duration  519ms (transform 42ms, setup 0ms, collect 47ms, tests 257ms, environment 0ms, prepare 54ms)

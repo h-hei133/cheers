@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { editExternally, resolveEditor, splitEditorCommand } from "./externalEditor.js";
 
@@ -110,6 +111,28 @@ describe("external editor", () => {
       });
 
       expect(result.text?.endsWith("\n")).toBe(false);
+    });
+
+    it.each([
+      { name: 'CRLF save', original: 'original', saved: 'edited\r\n', expected: 'edited' },
+      { name: 'bare CR save', original: 'original', saved: 'edited\r', expected: 'edited' },
+      { name: 'extra blank line', original: 'original', saved: 'edited\r\n\r\n', expected: 'edited\n' },
+      { name: 'mixed line endings and tab', original: 'original', saved: 'first\r\n\tsecond\rthird\r\n', expected: 'first\n\tsecond\nthird' },
+      { name: 'only line ending changed', original: 'original\n', saved: 'original\r\n', expected: undefined },
+    ])('handles the logical newline in a $name without adding an empty draft line', ({ original, saved, expected }) => {
+      const terminal = tracker();
+      const temporaryRoot = path.resolve('../../.tmp');
+      fs.mkdirSync(temporaryRoot, { recursive: true });
+      const directory = fs.mkdtempSync(path.join(temporaryRoot, 'external-editor-'));
+      const editor = path.join(directory, 'edit.mjs');
+      try {
+        fs.writeFileSync(editor, `import fs from 'node:fs'; fs.writeFileSync(process.argv[2], ${JSON.stringify(saved)});`);
+        const result = editExternally({ text: original, suspendTerminal: terminal.suspendTerminal,
+          env: { EDITOR: `rtk proxy node ${editor}` } });
+        expect(result.text).toBe(expected);
+        if (expected === undefined) expect(result.message).toContain('No changes');
+        expect(terminal.depth()).toBe(0);
+      } finally { fs.rmSync(directory, { recursive: true, force: true }); }
     });
 
     it("reports an unchanged save instead of rewriting the draft", () => {

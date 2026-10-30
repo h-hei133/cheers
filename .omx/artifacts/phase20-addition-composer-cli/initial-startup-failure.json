@@ -1,0 +1,27 @@
+{
+  "mode": "regular",
+  "buildId": "78e425be03020696bcd40a6e0a576a32f300de62f62a36f7d9298030a10bce8d",
+  "inputsDigest": "d64d3f37b2ea1b6e4305be80647d8c96bdf9e18c0860cdac8efd7f91bd6befdc",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "steps": [],
+  "checks": {},
+  "failure": "closed-startup",
+  "outputBytes": 1195,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true,
+  "observedSource": {},
+  "screenSummary": {
+    "columns": 120,
+    "rows": 60,
+    "cursor": {
+      "row": 28,
+      "column": 0
+    },
+    "sequence": 0,
+    "outputBytes": 63
+  }
+}

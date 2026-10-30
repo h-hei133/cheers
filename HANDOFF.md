@@ -1031,3 +1031,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A real patch approval loses Choose groups while empty-option unit fixtures pass; the advertised g/4 keys also do nothing.
 - **Root Cause**: Navigation IDs are filtered as approval decisions, and their displayed shortcuts have no original action dispatch.
 - **Rule**: Admit navigation using its actual decision prerequisite and retain its offered ID through decision filtering. Direct apply and shortcuts must respect the same offered/enabled action contract. Cover populated original runtime prompts through both hosts, selected preview and explicit final approval; denial-only and absent actions cannot bypass admission. Synchronize pager returns on a fresh panel title and completed load before reading its options.
+
+
+### Normalize External Editor Line Endings Before Removing Its Final Newline
+- **Symptom**: An external editor saving a final CRLF returns a draft with one extra empty line; an LF-only fixture passes.
+- **Root Cause**: Removing final LF leaves CR, which the downstream editor setter turns back into a logical newline.
+- **Rule**: Normalize CRLF and bare CR before unchanged comparison and final logical-newline removal at the external-editor return boundary. Preserve extra blank lines, tabs and accepted unchanged text. Verify a real saved final CRLF through CLI adoption and original-draft recovery, and distinguish bounded PTY parser coordinates from desktop cursor or pixel measurements.

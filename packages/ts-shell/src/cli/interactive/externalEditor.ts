@@ -148,8 +148,9 @@ export function editExternally(input: {
     }
     // An editor that saves the file unchanged should not count as an edit: the
     // surface would report a change and rewrite the draft with identical text.
-    if (edited === input.text) return { message: "No changes." };
-    return { text: edited.replace(/\n$/, "") };
+    const normalized = edited.replace(/\r\n?/g, "\n");
+    if (normalized === input.text.replace(/\r\n?/g, "\n")) return { message: "No changes." };
+    return { text: normalized.replace(/\n$/, "") };
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }

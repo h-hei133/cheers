@@ -10414,3 +10414,15 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 沿[addition20.47](features/phase-20-addition.md#2047-已批准读取仍拒绝审批期间的目录身份替换)核对原workspace identity owner与既有write回归，补原read CLI。两模式各等完整审批，将external目录rename/copy为同路径同内容新dev/ino后y；用户approved但tool false/changed identity，无记录fixture read open/enumeration。下一native call重新审批后精确第二行/provenance digest才成功，两事实区分。
 
 四回合首轮通过，各4 completion/2 readiness、零外部请求/operation/grant/roots，old/new源与config字节保持，Ctrl+D148/145ms/0和cooked恢复，RSS267376/263712KiB、10.77/10.76秒。正式script/receipt/metrics、syntax/JSON/五门/diff及scratch清理，全程serial；产品未改复用20.45 build、不重复build/tests、118旧advisory。未验policy撤销/reader-started替换/live用户/外部provider/非Linux/桌面/独立review，未跑exe/full suite/20k，原47不升级、goal active，本批Git/精确CI另绑定。
+
+
+20.47已推送`433077c52d2a91c79dbb51672dd483b78d93175a`，远端main此前精确一致、仅原CLAUDE.md。延后核对Watch40979466580 completed/success、CI40979466560仍in_progress；20.46 CI40979108158及20.45 CI40978485363仍in_progress，head均精确一致。没有借Watch成功称完整CI或原47验收通过。
+
+
+## [2026-10-30] fix | 外部编辑器CRLF末尾空白与实际CLI草稿几何
+
+沿[addition20.48](features/phase-20-addition.md#2048-外部编辑器末尾crlf不再生成额外空白草稿行)发现Ctrl+G返回仅删LF、残CR经setter变LF，多一空行。参考utility同样LF-only且加载边界normalize，不复制；目标return先normalize/比较unchanged，再删一次logical newline，Tab与额外blank保留。五新增subprocess旧实现全失败，修补后owner21/过滤host5共26通过，368未选不算通过；独立反转五失败、finally精确恢复后26重跑。root gate误在package cwd失败已分类，最终五门/diff通过、118旧advisory。build exit0/freshness `39fd3f6d79f34cb1143ddfa12ab559272ac29cc218ec3eb45cb0b78763ff7175`、inputs `8867735c26bc057eee902d1f98672f0a48ca999a9543ad71b6786cf5531b882d`、460/3549，owner3/3无新增import/callable。
+
+两模式原CLI/PTY各17阶段paste/stash/42×20 resize/caret/120×60/held expansion/真实外部editor final CRLF/取原稿与改写全部通过、零model request/config变化。editor cooked TTY/原稿digest和tmp清理，final草稿3行caret66，Ctrl+D167/168ms/0与cooked flags恢复，RSS303352/303444KiB、13.41/13.26秒。旧final CRLF失败实际4行，初始private pyte query两失败与narrow旧build passes均保留分类。应用frame与实际PTY的pyte解析chrome/caret匹配、parser五检查通过；坐标不是桌面像素，initial row seed与reflow限制明确。
+
+正式工件/回归/反转/build/parser/收据与HANDOFF、scratch清理，syntax/JSON/五门/diff；全程heavy serial、不跑exe/full suite/20k/外部live，无独立review/用户现场/Windows/IME/缺尺寸验收，原CLAUDE.md保留、原47/ADD不升级、goal active，Git/精确CI另绑定。

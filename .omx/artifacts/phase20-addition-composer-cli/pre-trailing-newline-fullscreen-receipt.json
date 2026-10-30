@@ -1,0 +1,356 @@
+{
+  "mode": "fullscreen",
+  "buildId": "78e425be03020696bcd40a6e0a576a32f300de62f62a36f7d9298030a10bce8d",
+  "inputsDigest": "d64d3f37b2ea1b6e4305be80647d8c96bdf9e18c0860cdac8efd7f91bd6befdc",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "passed",
+  "steps": [
+    {
+      "label": "empty-start",
+      "elapsedMs": 152,
+      "sourceDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "cursor": 0,
+      "lines": 1,
+      "placeholders": 0,
+      "containsTab": false,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 57,
+        "column": 2
+      }
+    },
+    {
+      "label": "crlf-paste",
+      "elapsedMs": 228,
+      "sourceDigest": "8322847dcf90d20457c274e9bae273be7702305ba7ff6637198bc4d339383a26",
+      "cursor": 61,
+      "lines": 3,
+      "placeholders": 0,
+      "containsTab": true,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 57,
+        "column": 19
+      }
+    },
+    {
+      "label": "stash",
+      "elapsedMs": 277,
+      "sourceDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "cursor": 0,
+      "lines": 1,
+      "placeholders": 0,
+      "containsTab": false,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 56,
+        "column": 2
+      }
+    },
+    {
+      "label": "restore",
+      "elapsedMs": 254,
+      "sourceDigest": "8322847dcf90d20457c274e9bae273be7702305ba7ff6637198bc4d339383a26",
+      "cursor": 61,
+      "lines": 3,
+      "placeholders": 0,
+      "containsTab": true,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 56,
+        "column": 19
+      }
+    },
+    {
+      "label": "narrow",
+      "elapsedMs": 151,
+      "sourceDigest": "8322847dcf90d20457c274e9bae273be7702305ba7ff6637198bc4d339383a26",
+      "cursor": 61,
+      "lines": 3,
+      "placeholders": 0,
+      "containsTab": true,
+      "dimensions": {
+        "columns": 42,
+        "rows": 20
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 16,
+        "column": 19
+      }
+    },
+    {
+      "label": "move-left",
+      "elapsedMs": 202,
+      "sourceDigest": "8322847dcf90d20457c274e9bae273be7702305ba7ff6637198bc4d339383a26",
+      "cursor": 59,
+      "lines": 3,
+      "placeholders": 0,
+      "containsTab": true,
+      "dimensions": {
+        "columns": 42,
+        "rows": 20
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 16,
+        "column": 17
+      }
+    },
+    {
+      "label": "stash-caret",
+      "elapsedMs": 202,
+      "sourceDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "cursor": 0,
+      "lines": 1,
+      "placeholders": 0,
+      "containsTab": false,
+      "dimensions": {
+        "columns": 42,
+        "rows": 20
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 16,
+        "column": 2
+      }
+    },
+    {
+      "label": "restore-caret",
+      "elapsedMs": 252,
+      "sourceDigest": "8322847dcf90d20457c274e9bae273be7702305ba7ff6637198bc4d339383a26",
+      "cursor": 59,
+      "lines": 3,
+      "placeholders": 0,
+      "containsTab": true,
+      "dimensions": {
+        "columns": 42,
+        "rows": 20
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 16,
+        "column": 17
+      }
+    },
+    {
+      "label": "wide",
+      "elapsedMs": 151,
+      "sourceDigest": "8322847dcf90d20457c274e9bae273be7702305ba7ff6637198bc4d339383a26",
+      "cursor": 59,
+      "lines": 3,
+      "placeholders": 0,
+      "containsTab": true,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 56,
+        "column": 17
+      }
+    },
+    {
+      "label": "clear",
+      "elapsedMs": 202,
+      "sourceDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "cursor": 0,
+      "lines": 1,
+      "placeholders": 0,
+      "containsTab": false,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 56,
+        "column": 2
+      }
+    },
+    {
+      "label": "expand-placeholder",
+      "elapsedMs": 201,
+      "sourceDigest": "3f13df77f6f05957c20cabcd6096f3aa50dbd9d7ab61ab9e05ecba947b1b0c6f",
+      "cursor": 584,
+      "lines": 9,
+      "placeholders": 0,
+      "containsTab": false,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 56,
+        "column": 66
+      }
+    },
+    {
+      "label": "final-clear",
+      "elapsedMs": 203,
+      "sourceDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "cursor": 0,
+      "lines": 1,
+      "placeholders": 0,
+      "containsTab": false,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 56,
+        "column": 2
+      }
+    },
+    {
+      "label": "before-editor",
+      "elapsedMs": 201,
+      "sourceDigest": "e9f87a6ceda45ce2c204987e60b0c66020a00da813e4d2df39c09a9e05ad9cd6",
+      "cursor": 21,
+      "lines": 1,
+      "placeholders": 0,
+      "containsTab": false,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 57,
+        "column": 23
+      }
+    },
+    {
+      "label": "external-crlf-edit",
+      "elapsedMs": 304,
+      "sourceDigest": "7c075ec06476faf377326e030307cdd950d662b0139fd8bf14bd77c9b154ed8b",
+      "cursor": 66,
+      "lines": 3,
+      "placeholders": 0,
+      "containsTab": true,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 56,
+        "column": 20
+      }
+    },
+    {
+      "label": "take-original",
+      "elapsedMs": 202,
+      "sourceDigest": "e9f87a6ceda45ce2c204987e60b0c66020a00da813e4d2df39c09a9e05ad9cd6",
+      "cursor": 21,
+      "lines": 1,
+      "placeholders": 0,
+      "containsTab": false,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 56,
+        "column": 23
+      }
+    },
+    {
+      "label": "take-edited",
+      "elapsedMs": 227,
+      "sourceDigest": "7c075ec06476faf377326e030307cdd950d662b0139fd8bf14bd77c9b154ed8b",
+      "cursor": 66,
+      "lines": 3,
+      "placeholders": 0,
+      "containsTab": true,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 56,
+        "column": 20
+      }
+    },
+    {
+      "label": "clear-edited",
+      "elapsedMs": 252,
+      "sourceDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "cursor": 0,
+      "lines": 1,
+      "placeholders": 0,
+      "containsTab": false,
+      "dimensions": {
+        "columns": 120,
+        "rows": 60
+      },
+      "chromeMatches": true,
+      "physicalCaretMatches": true,
+      "physicalCursor": {
+        "row": 56,
+        "column": 2
+      }
+    }
+  ],
+  "checks": {
+    "externalEditorNormalizesCrAndKeepsOriginal": true,
+    "externalEditorCookedHandoff": true,
+    "externalEditorTempRemoved": true,
+    "normalizedPasteAndStash": true,
+    "cursorStableAcrossResize": true,
+    "heldPasteExpandedWithoutDuplicate": true,
+    "zeroModelRequests": true,
+    "configUnchanged": true
+  },
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 165,
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "outputBytes": 23498,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

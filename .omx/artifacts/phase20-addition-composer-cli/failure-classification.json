@@ -1,0 +1,44 @@
+{
+  "setup": [
+    {
+      "case": "two first startup attempts",
+      "class": "harness/setup drift",
+      "cause": "Installed pyte report_device_status rejects the private query keyword.",
+      "repair": "Parse private queries without synthesizing a reply; preserve alternate cursor state.",
+      "evidence": [
+        "initial-startup-failure.json",
+        "classified-startup-failure.json"
+      ]
+    },
+    {
+      "case": "static gates first invoked in package cwd",
+      "class": "invocation drift",
+      "cause": "Static scripts belong to repository root.",
+      "repair": "Rerun root gates serially; package-local focused tests separately.",
+      "finalGatesPassed": true
+    }
+  ],
+  "product": [
+    {
+      "case": "external editor final CRLF",
+      "class": "product behavior drift",
+      "cause": "LF-only stripping leaves CR; setter normalization creates a new empty draft line.",
+      "evidence": "initial-final-crlf-failure.json",
+      "stepsPassedBeforeFailure": 13,
+      "observedLines": 4,
+      "expectedLines": 3,
+      "repair": "Normalize logical newlines before unchanged comparison and one-final-newline removal."
+    }
+  ],
+  "final": {
+    "focusedOwnerPassed": 21,
+    "filteredHostPassed": 5,
+    "unselectedHostCases": 368,
+    "independentReversalFailures": 5,
+    "sourceRestored": true,
+    "buildExitCode": 0,
+    "cliModesPassed": 2,
+    "stagesPerMode": 17,
+    "externalRequests": 0
+  }
+}
