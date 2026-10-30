@@ -10,7 +10,8 @@ import { approvedResult } from './toolResultLifecycle.js'
 import { matchesGlob } from './globMatch.js'
 import { truncateHead } from './truncation.js'
 import { ArtifactManager } from '../session/artifactManager.js'
-import { resolveWorkspaceToolTarget } from './permissionContext.js'
+import { resolveToolTarget, resolveWorkspaceToolTarget } from './permissionContext.js'
+import { resolveWorkspaceRoot } from '../workspace/roots.js'
 import type { ToolDefinition } from '../../tools/types.js'
 import type { ExecutionAuthority, ExecutionService } from '../../runtime/execution/service.js'
 
@@ -62,17 +63,24 @@ export function createGlobToolDefinition(
       // silently searching for a name the caller did not ask for. The matcher
       // understands `./` on its own, so there is nothing to strip.
       const pattern = (typeof args.pattern === 'string' ? args.pattern.trim() : '') || '*'
-      const searchRoot = resolveWorkspaceToolTarget({ path: typeof args.path === 'string' ? args.path : '.' }, 'path', context.workspaceRoot)
+      const searchPath = typeof args.path === 'string' ? args.path : '.'
+      // An attached root may be searched too. The listing reports paths relative
+      // to the root it walked, so the resolved root is also the jail.
+      const requestedTarget = resolveToolTarget({ path: searchPath }, 'path', context.workspaceRoot)
+      const root = context.workspaceRoots?.length
+        ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, requestedTarget, 'read') ?? context.workspaceRoot
+        : context.workspaceRoot
+      const searchRoot = resolveWorkspaceToolTarget({ path: searchPath }, 'path', root)
       const files = await executionService.listFilesRecursive({
         operationKind: 'file.list',
         assertFileAccess: context.assertFileAccess,
         abortSignal: context.abortSignal,
         absoluteRoot: searchRoot,
-        workspaceRoot: context.workspaceRoot,
+        workspaceRoot: root,
         authority: TOOL_APPROVED_READ_AUTHORITY,
         caller: 'core-tool:glob',
         reason: 'List approved workspace files for glob matching.',
-        reportSafeTarget: context.workspaceRoot,
+        reportSafeTarget: searchRoot,
       })
       context.abortSignal?.throwIfAborted()
       const filtered = files.filter((file) => matchesGlob(file, pattern))

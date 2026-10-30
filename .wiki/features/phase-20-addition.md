@@ -4687,3 +4687,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 `glob`/`grep`的`path`是搜索起点、涉及结果路径投影，本批未改并保留为已知边界。
 
 验证（主代理串行）：`arguments`23（两新例：只读附加根可读、未注册目录仍拒）、`readBudget`7、`readCleanup`16、`readFreshness`6、`fileAccess`3、`workspace`9、`workspace/approval`25，共**89项**通过；三反转（write退回只查主根、read退回只查主根、以read解析write授权）均命中预期断言且finally逐字节恢复；五静态门、TS build/freshness通过，118旧docs advisory保留。build `eb5cc365d7fb`。边界：glob/grep搜索起点、bash sandbox写入、真实provider与桌面平台未覆盖。原47/ADD整体partial、goal active。
+
+
+### 21.41 附加workspace根接入glob与grep
+
+21.40保留的边界已收口：`glob`/`grep`同样只围栏主根。现两者都先以`resolveToolTarget`取绝对目标（纯路径拼接，不提前施加主根边界），再由`resolveWorkspaceRoot`以`read`模式选出根，并把该根作为搜索起点与结果投影基准：glob的`listFilesRecursive`、grep的ripgrep与回退walk两条路径、以及每个文件的`readTextFile`都使用同一根。结果路径语义不变（相对被搜索的根）。
+
+首轮实现用`resolveWorkspaceToolTarget`取目标，它在主根外直接抛`Tool path resolves outside the workspace boundary.`，导致附加根用例失败；改为`resolveToolTarget`后正确。
+
+验证（主代理串行）：`arguments`25（两新例：附加根glob命中、附加根grep命中）、`glob`19、`grep`3、`grepPaths`12、`grepRipgrep`18、`grepStream`14、`fileAccess`3，共**94项**通过；五反转（write/read/glob/grep退回只查主根、以read解析write授权）均命中预期断言且finally逐字节恢复；五静态门、TS build/freshness通过，118旧docs advisory保留。build `c1302abc9ff4`。边界：bash写入仍由sandbox治理；真实provider工具调用、桌面平台与多根并发未覆盖。原47/ADD整体partial、goal active。

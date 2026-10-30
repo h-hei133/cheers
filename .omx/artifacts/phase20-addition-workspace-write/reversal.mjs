@@ -29,6 +29,18 @@ const cases = [
           : context.workspaceRoot`,
     after: `        const root = context.workspaceRoot`,
     filter: 'reads a file through a read-only attached root' },
+  { name: 'glob-primary-only', file: 'packages/ts-shell/src/core/tools/glob.ts',
+    before: `      const root = context.workspaceRoots?.length
+        ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, requestedTarget, 'read') ?? context.workspaceRoot
+        : context.workspaceRoot`,
+    after: `      const root = context.workspaceRoot`,
+    filter: 'finds files under an attached root' },
+  { name: 'grep-primary-only', file: 'packages/ts-shell/src/core/tools/grep.ts',
+    before: `        searchRoot = context.workspaceRoots?.length
+          ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, requestedTarget, 'read') ?? context.workspaceRoot
+          : context.workspaceRoot;`,
+    after: `        searchRoot = context.workspaceRoot;`,
+    filter: 'finds content under an attached root' },
   { name: 'no-access-check',
     before: `            ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'write') ?? context.workspaceRoot`,
     after: `            ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'read') ?? context.workspaceRoot`,

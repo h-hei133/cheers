@@ -8,7 +8,8 @@ import type { ExecutionAuthority, ExecutionService } from "../../runtime/executi
 import { truncateLineWidth, truncateHead } from "./truncation.js";
 import { ArtifactManager } from "../session/artifactManager.js";
 import { matchesGlob } from "./globMatch.js";
-import { resolveWorkspaceToolTarget } from './permissionContext.js';
+import { resolveToolTarget, resolveWorkspaceToolTarget } from './permissionContext.js'
+import { resolveWorkspaceRoot } from '../workspace/roots.js';
 import {
   MAX_SEARCHED_FILE_BYTES,
   formatRipgrepMatch,
@@ -67,10 +68,18 @@ export function createGrepToolDefinition(
 
       if (context.abortSignal?.aborted) return deniedResult('Search stopped: cancelled.');
       let searchSubPath: string;
+      let searchRoot = context.workspaceRoot;
       try {
-        const target = resolveWorkspaceToolTarget({ path: typeof args.path === 'string' && args.path !== '' ? args.path : '.' }, 'path', context.workspaceRoot);
+        const searchPath = typeof args.path === 'string' && args.path !== '' ? args.path : '.';
+        // An attached root may be searched too. Matches are reported relative to
+        // the root that was searched, so that same root is the jail.
+        const requestedTarget = resolveToolTarget({ path: searchPath }, 'path', context.workspaceRoot);
+        searchRoot = context.workspaceRoots?.length
+          ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, requestedTarget, 'read') ?? context.workspaceRoot
+          : context.workspaceRoot;
+        const target = resolveWorkspaceToolTarget({ path: searchPath }, 'path', searchRoot);
         context.assertFileAccess?.(target);
-        searchSubPath = path.relative(realpathSync(context.workspaceRoot), target).split(path.sep).join('/');
+        searchSubPath = path.relative(realpathSync(searchRoot), target).split(path.sep).join('/');
         const stat = await fs.stat(target);
         if (!stat.isFile() && !stat.isDirectory()) return deniedResult('Search target must be a file or directory.');
       } catch {
@@ -97,7 +106,7 @@ export function createGrepToolDefinition(
         ...(globFilter ? { glob: globFilter } : {}),
         ignoreCase,
         limit,
-        workspaceRoot: context.workspaceRoot,
+        workspaceRoot: searchRoot,
         abortSignal: context.abortSignal,
       });
       if (viaRipgrep.ok) {
@@ -139,12 +148,12 @@ export function createGrepToolDefinition(
         operationKind: "file.list",
         assertFileAccess: context.assertFileAccess,
         abortSignal: context.abortSignal,
-        absoluteRoot: context.workspaceRoot,
-        workspaceRoot: context.workspaceRoot,
+        absoluteRoot: searchRoot,
+        workspaceRoot: searchRoot,
         authority: TOOL_APPROVED_READ_AUTHORITY,
         caller: "core-tool:grep",
         reason: "List approved workspace files for content grep.",
-        reportSafeTarget: context.workspaceRoot,
+        reportSafeTarget: searchRoot,
       });
 
       if (context.abortSignal?.aborted) return deniedResult("Search stopped: cancelled.");
@@ -166,14 +175,14 @@ export function createGrepToolDefinition(
         if (totalMatches >= limit) {
           break;
         }
-        const fullPath = path.resolve(context.workspaceRoot, relPath);
+        const fullPath = path.resolve(searchRoot, relPath);
         try {
           const stat = await fs.stat(fullPath);
           if (!stat.isFile() || stat.size > MAX_SEARCHED_FILE_BYTES) {
             continue;
           }
           const content = await executionService.readTextFile({
-            operationKind: 'file.read', absolutePath: fullPath, workspaceRoot: context.workspaceRoot,
+            operationKind: 'file.read', absolutePath: fullPath, workspaceRoot: searchRoot,
             authority: TOOL_APPROVED_READ_AUTHORITY, caller: 'core-tool:grep',
             reason: 'Read an approved search candidate.', reportSafeTarget: fullPath,
             assertFileAccess: context.assertFileAccess, abortSignal: context.abortSignal,

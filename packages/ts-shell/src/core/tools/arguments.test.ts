@@ -222,3 +222,39 @@ describe('an attached root is readable whatever its access mode', () => {
     })).rejects.toThrow(/outside workspace/)
   })
 })
+
+describe('an attached root is searchable', () => {
+  const root = (name: string): string => fs.mkdtempSync(path.join('/tmp/cheers-test/', name))
+
+  it('finds files under an attached root with glob', async () => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true })
+    const primary = root('glob-primary-')
+    const attached = root('glob-attached-')
+    fs.writeFileSync(path.join(attached, 'found.ts'), 'export const x = 1\n')
+    const service = createDefaultExecutionService()
+    const tool = createCoreToolRegistry({ executionService: service }).get('glob')!
+
+    const result = await tool.execute({ pattern: '*.ts', path: attached }, {
+      workspaceRoot: primary, taskId: 'glob-attached',
+      workspaceRoots: [captureWorkspaceRoot(attached, attached, 'read')],
+    })
+    expect(result).toMatchObject({ success: true })
+    expect(String(result.output ?? '')).toContain('found.ts')
+  })
+
+  it('finds content under an attached root with grep', async () => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true })
+    const primary = root('grep-primary-')
+    const attached = root('grep-attached-')
+    fs.writeFileSync(path.join(attached, 'note.txt'), 'attached needle here\n')
+    const service = createDefaultExecutionService()
+    const tool = createCoreToolRegistry({ executionService: service }).get('grep')!
+
+    const result = await tool.execute({ pattern: 'needle', path: attached }, {
+      workspaceRoot: primary, taskId: 'grep-attached',
+      workspaceRoots: [captureWorkspaceRoot(attached, attached, 'read')],
+    })
+    expect(result).toMatchObject({ success: true })
+    expect(String(result.output ?? '')).toContain('needle')
+  })
+})

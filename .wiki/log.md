@@ -10724,3 +10724,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：附加workspace根同样接入read
 
 [addition21.40](features/phase-20-addition.md#2140-附加workspace根同样接入read)复查同类工具：read围栏同样只查主根，授权后连读取都不行。现read复用`resolveWorkspaceRoot`以read模式解析（只读可读不可写、未注册仍拒），目录列表与文件读取都传解析根。glob/grep的搜索起点涉及结果路径投影，未改并记为边界。89项聚焦、三反转命中且bytes恢复、五门/TS build/freshness通过。build eb5cc365。原47/ADD整体partial、goal active。
+
+### 2026-10-31：附加workspace根接入glob与grep
+
+[addition21.41](features/phase-20-addition.md#2141-附加workspace根接入glob与grep)收口21.40边界：glob/grep同样只围栏主根。现两者先`resolveToolTarget`取绝对目标、再由`resolveWorkspaceRoot`以read模式选根，该根同时作为搜索起点与结果投影基准（ripgrep与回退walk两条路径、每文件读取均用同一根）。首轮用`resolveWorkspaceToolTarget`取目标会提前抛边界错误，改`resolveToolTarget`后通过。94项聚焦、五反转命中且bytes恢复、五门/TS build/freshness通过。build c1302abc。原47/ADD整体partial、goal active。
