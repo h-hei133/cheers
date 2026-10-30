@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { verifyPathContainment } from '../security/pathJail.js'
+import { resolveWorkspaceRoot } from '../workspace/roots.js'
 import { replaceInContent, replaceManyInContent } from './editEngine.js'
 import { startBackgroundCommand, createTaskOutputToolDefinition, createTaskStopToolDefinition, createTaskWaitToolDefinition } from './shell/background.js';
 import { planCommandLaunch } from './shell/launch.js';
@@ -319,12 +320,18 @@ export function createCoreToolRegistry(options?: {
         validateToolArguments(this.argsSchema, args)
         return withFileLock(resolveToolTarget(args, 'path', context.workspaceRoot), async () => {
           const target = resolveToolTarget(args, 'path', context.workspaceRoot)
-          const containment = verifyPathContainment(target, context.workspaceRoot)
+          // No attached roots means the primary root is the only authority, and the
+          // lexical fence below already describes that refusal without touching
+          // the filesystem.
+          const root = context.workspaceRoots?.length
+            ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'write') ?? context.workspaceRoot
+            : context.workspaceRoot
+          const containment = verifyPathContainment(target, root)
           if (!containment.allowed) {
-            throw new Error(outsideWorkspaceMessage(containment.reason, target, context.workspaceRoot))
+            throw new Error(outsideWorkspaceMessage(containment.reason, target, root))
           }
           const content = args.content as string
-          const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
+          const relPath = path.relative(root, containment.resolvedPath)
           let original = ''
           let originalUnreadable = false
           try {
@@ -333,7 +340,7 @@ export function createCoreToolRegistry(options?: {
               assertFileAccess: context.assertFileAccess,
               abortSignal: context.abortSignal,
               absolutePath: containment.resolvedPath,
-              workspaceRoot: context.workspaceRoot,
+              workspaceRoot: root,
               authority: TOOL_APPROVED_READ_AUTHORITY,
               caller: 'core-tool:write',
               reason: 'Read original content for diff.',
@@ -345,12 +352,12 @@ export function createCoreToolRegistry(options?: {
           }
           const written = await executionService.writeTextFile({
             operationKind: 'file.write',
-            ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: context.artifactRoot ?? context.workspaceRoot, callId: context.taskId, correlationId: context.correlationId } } : {}),
+            ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: root, callId: context.taskId, correlationId: context.correlationId } } : {}),
             assertFileAccess: context.assertFileAccess,
             abortSignal: context.abortSignal,
             absolutePath: target,
             content,
-            workspaceRoot: context.workspaceRoot,
+            workspaceRoot: root,
             authority: TOOL_APPROVED_WRITE_AUTHORITY,
             caller: 'core-tool:write',
             reason: 'Write an approved workspace file target.',
@@ -423,12 +430,18 @@ export function createCoreToolRegistry(options?: {
         validateToolArguments(this.argsSchema, args)
         return withFileLock(resolveToolTarget(args, 'path', context.workspaceRoot), async () => {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
-        const containment = verifyPathContainment(target, context.workspaceRoot)
+        // No attached roots means the primary root is the only authority, and the
+          // lexical fence below already describes that refusal without touching
+          // the filesystem.
+          const root = context.workspaceRoots?.length
+            ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'write') ?? context.workspaceRoot
+            : context.workspaceRoot
+        const containment = verifyPathContainment(target, root)
         if (!containment.allowed) {
-          throw new Error(outsideWorkspaceMessage(containment.reason, target, context.workspaceRoot))
+          throw new Error(outsideWorkspaceMessage(containment.reason, target, root))
         }
 
-        const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
+        const relPath = path.relative(root, containment.resolvedPath)
         let original = ''
         let originalUnreadable = false
         let finalContent = ''
@@ -440,7 +453,7 @@ export function createCoreToolRegistry(options?: {
             assertFileAccess: context.assertFileAccess,
             abortSignal: context.abortSignal,
             absolutePath: containment.resolvedPath,
-            workspaceRoot: context.workspaceRoot,
+            workspaceRoot: root,
             authority: TOOL_APPROVED_READ_AUTHORITY,
             caller: 'core-tool:edit',
             reason: 'Read original content for targeted replacements.',
@@ -470,7 +483,7 @@ export function createCoreToolRegistry(options?: {
             assertFileAccess: context.assertFileAccess,
             abortSignal: context.abortSignal,
             absolutePath: containment.resolvedPath,
-            workspaceRoot: context.workspaceRoot,
+            workspaceRoot: root,
             authority: TOOL_APPROVED_READ_AUTHORITY,
             caller: 'core-tool:edit',
             reason: 'Read original content for resilient replacement.',
@@ -505,7 +518,7 @@ export function createCoreToolRegistry(options?: {
               assertFileAccess: context.assertFileAccess,
               abortSignal: context.abortSignal,
               absolutePath: containment.resolvedPath,
-              workspaceRoot: context.workspaceRoot,
+              workspaceRoot: root,
               authority: TOOL_APPROVED_READ_AUTHORITY,
               caller: 'core-tool:edit',
               reason: 'Read original content for diff.',
@@ -523,13 +536,13 @@ export function createCoreToolRegistry(options?: {
 
         const written = await executionService.writeTextFile({
           operationKind: 'file.write',
-            ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: context.artifactRoot ?? context.workspaceRoot, callId: context.taskId, correlationId: context.correlationId } } : {}),
+            ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: root, callId: context.taskId, correlationId: context.correlationId } } : {}),
           assertFileAccess: context.assertFileAccess,
           abortSignal: context.abortSignal,
           absolutePath: target,
           content: finalContent,
           expectedContent,
-          workspaceRoot: context.workspaceRoot,
+          workspaceRoot: root,
           authority: TOOL_APPROVED_WRITE_AUTHORITY,
           caller: 'core-tool:edit',
           reason: 'Replace an approved workspace file target.',

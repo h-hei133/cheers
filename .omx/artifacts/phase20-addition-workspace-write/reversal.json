@@ -1,0 +1,17 @@
+{
+  "cases": [
+    {
+      "name": "primary-root-only-write",
+      "exit": 1,
+      "tests": "1 failed | 20 skipped (21)",
+      "originalSha256": "17d70282acd672ea8a2abac34257e253d28b36d46f6dbc11ac476ac1c6b1bd64"
+    },
+    {
+      "name": "no-access-check",
+      "exit": 1,
+      "tests": "1 failed | 20 skipped (21)",
+      "originalSha256": "17d70282acd672ea8a2abac34257e253d28b36d46f6dbc11ac476ac1c6b1bd64"
+    }
+  ],
+  "restored": true
+}

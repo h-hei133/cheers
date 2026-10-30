@@ -4663,3 +4663,18 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 尝试与回退：把write/edit改走`resolveWorkspaceRoot`后围栏通过，但写入随即报`Edit operation receipt is invalid.`。[edit恢复store](../../packages/ts-shell/src/edit/recovery/operation/store.ts)从操作scope的workspace派生账本位置（`storageRoot(scope) = profile.root ?? scope.workspace.path`），`assertProfileStorage`要求该位置在profile内；把操作身份绑到附加根会移动账本，提交写入的receipt无法在同一scope下读回。要让授权真正生效，需要**快照账本继续绑定会话/profile，而写入目标是另一个根**——这是edit恢复store的契约改动，不是围栏的一行修改。该改动已回退，本批产品代码无变化。
 
 因此第24项的正确结论是：授权机制作为「带身份与访问模式的已保存根」是完整的，但**文件writer不读取它**，且edit账本无法记录目标根非主根的写入。这与用户「别的目录建文件被系统拒绝」的报告一致，属真实缺陷而非提示词问题。证据边界：合成会话、单次真实写入、仅Linux；未覆盖apply_patch、bash sandbox写入路径与多根并发。[正式工件](../../.omx/artifacts/phase20-addition-workspace-grant/README.md)。build `5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473`、inputs `4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806`。原47/ADD整体partial、goal active。
+
+
+### 21.39 附加workspace根接入write/edit（第24项修复）
+
+接21.38确认的缺陷，本批完成修复而非仅记录。[write/edit](../../packages/ts-shell/src/core/tools/registry.ts)现在先问既有会话解析器哪个根适用，而不是只围栏主根：
+
+- 会话**无**附加根时仍用主根并保持词法拒绝，不触碰文件系统——因此主根不存在时错误信息与之前一致（首轮实现无条件调用resolver导致`jail-root`用例报ENOENT，已修正）。
+- 有附加根时由`resolveWorkspaceRoot`决定：仅注册根、write需write访问、每次复验目录身份。
+- 解析出的根同时进入execution service的`workspaceRoot`与edit operation identity，使receipt的workspace与operation scope一致。21.38观察到的`Edit operation receipt is invalid.`实际来自这两处不一致（operation identity仍绑主根），**不是账本契约问题**；诊断过程中另发现探针缺`taskId`会让`callId`为空、同样触发该错误。
+
+未新增jail/resolver/grant机制，会话解析器本就拥有全部规则。[正式工件](../../.omx/artifacts/phase20-addition-workspace-write/README.md)。
+
+验证（主代理串行）：`arguments`21（三新例：附加根写入成功且service收到附加根、只读附加根被拒、目录被替换后按身份拒绝）、`workspace`9、`fileAccess`3、`workspace/approval`25，共**59项**通过；两反转（退回只查主根、以read访问解析）均命中预期断言且finally逐字节恢复；五静态门、TS build/freshness通过，118旧docs advisory保留。端到端探针：授权前拒绝且不建文件→`/workspace add --write`保存→同一写入成功且内容精确→替换目录后旧授权再次拒绝。build `96a6043df384a05279f4b6944d2ba9c04c6f0892110ea329d30eff83361ba368`、inputs `1615471a421914223b98423c4482ffef2880b0a98e93a47bfd4b5cc7d35198f7`。
+
+边界：`apply_patch`未改动（另有跨根计划路径）；`bash`写入仍由sandbox治理；只读附加根的读取路径不变。未覆盖真实provider工具调用、桌面平台与多根并发。原47/ADD整体partial、goal active。

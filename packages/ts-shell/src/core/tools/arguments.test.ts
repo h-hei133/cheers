@@ -1,4 +1,8 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { realpathSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
+import { captureWorkspaceRoot } from '../workspace/roots.js'
 import { validateToolArguments } from './arguments.js'
 import { createCoreToolRegistry } from './registry.js'
 import { createDefaultExecutionService } from '../../runtime/execution/service.js'
@@ -118,6 +122,68 @@ describe('a write outside the workspace', () => {
 
     await expect(tool.execute({ path: '/tmp/cheers-test/elsewhere/file.txt', content: 'x' },
       { workspaceRoot: '/tmp/cheers-test/jail-root', taskId: 'outside-edit' })).rejects.toThrow(/\/workspace add <path> --write/)
+    expect(write).not.toHaveBeenCalled()
+  })
+})
+
+describe('an attached workspace root widens the file tools', () => {
+  /** A real directory, because the resolver checks directory identity. */
+  const root = (name: string): string => {
+    const target = fs.mkdtempSync(path.join('/tmp/cheers-test/', name))
+    return target
+  }
+
+  it('writes through an attached root that grants write access', async () => {
+    // The grant command stores a root with identity and access; a writer that
+    // only checked the primary root made that command look like it did nothing.
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true })
+    const primary = root('attach-primary-')
+    const attached = root('attach-outside-')
+    const service = createDefaultExecutionService()
+    const write = vi.spyOn(service, 'writeTextFile').mockResolvedValue(undefined)
+    const tool = createCoreToolRegistry({ executionService: service }).get('write')!
+    const target = path.join(attached, 'note.txt')
+
+    await expect(tool.execute({ path: target, content: 'x' }, {
+      workspaceRoot: primary, taskId: 'attached-write',
+      workspaceRoots: [captureWorkspaceRoot(attached, attached, 'write')],
+    })).resolves.toBeDefined()
+    expect(write).toHaveBeenCalledOnce()
+    expect(write.mock.calls[0]![0]).toMatchObject({ workspaceRoot: realpathSync(attached), absolutePath: target })
+  })
+
+  it('still refuses a read-only attached root for a write', async () => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true })
+    const primary = root('readonly-primary-')
+    const attached = root('readonly-outside-')
+    const service = createDefaultExecutionService()
+    const write = vi.spyOn(service, 'writeTextFile').mockResolvedValue(undefined)
+    const tool = createCoreToolRegistry({ executionService: service }).get('write')!
+
+    await expect(tool.execute({ path: path.join(attached, 'note.txt'), content: 'x' }, {
+      workspaceRoot: primary, taskId: 'readonly-attached',
+      workspaceRoots: [captureWorkspaceRoot(attached, attached, 'read')],
+    })).rejects.toThrow('This additional workspace root is read-only.')
+    expect(write).not.toHaveBeenCalled()
+  })
+
+  it('refuses an attached root whose directory identity changed', async () => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true })
+    const primary = root('stale-primary-')
+    const attached = root('stale-outside-')
+    const granted = captureWorkspaceRoot(attached, attached, 'write')
+    // Replace the directory with a different one: the inode necessarily changes,
+    // so this does not depend on birthtime resolution.
+    const replacement = root('stale-replacement-')
+    fs.rmSync(attached, { recursive: true, force: true })
+    fs.renameSync(replacement, attached)
+    const service = createDefaultExecutionService()
+    const write = vi.spyOn(service, 'writeTextFile').mockResolvedValue(undefined)
+    const tool = createCoreToolRegistry({ executionService: service }).get('write')!
+
+    await expect(tool.execute({ path: path.join(attached, 'note.txt'), content: 'x' }, {
+      workspaceRoot: primary, taskId: 'stale-attached', workspaceRoots: [granted],
+    })).rejects.toThrow(/changed identity/)
     expect(write).not.toHaveBeenCalled()
   })
 })

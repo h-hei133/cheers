@@ -1,7 +1,7 @@
 {
-  "buildId": "086e671a3335eb59f035bd5a3752c98d2ac4497fc57b2a11a27287b6edbcc390",
-  "inputsDigest": "cc02e2fd94bbd3906d44928ac04ff672004113ebe3912e7022544bd64bad227e",
-  "status": "failed",
+  "buildId": "96a6043df384a05279f4b6944d2ba9c04c6f0892110ea329d30eff83361ba368",
+  "inputsDigest": "1615471a421914223b98423c4482ffef2880b0a98e93a47bfd4b5cc7d35198f7",
+  "status": "passed",
   "refusedBeforeGrant": {
     "ok": false,
     "mentionsGrant": true,
@@ -13,16 +13,19 @@
     "note": "Additional workspace root saved. File access uses its declared mode; executable project resources still come from the primary root.",
     "roots": [
       {
-        "path": "/home/wang/projects/cheers/.tmp/workspace-grant/run-IVLxmC/outside",
+        "path": "/home/wang/projects/cheers/.tmp/workspace-grant/run-4xgtT5/outside",
         "access": "write"
       }
     ]
   },
   "allowedAfterGrant": {
-    "ok": false,
-    "output": "Edit operation receipt is invalid.",
-    "fileCreated": false
+    "ok": true,
+    "output": "Wrote note.txt (original unreadable, no diff)",
+    "fileCreated": true,
+    "content": "first"
   },
-  "failure": "write must succeed after the grant",
+  "afterDirectoryReplace": {
+    "ok": false
+  },
   "scratchRemoved": true
 }

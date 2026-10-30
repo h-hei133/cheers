@@ -10716,3 +10716,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：附加workspace根未到达文件writer（第24项真实缺陷）
 
 [addition21.38](features/phase-20-addition.md#2138-附加workspace根未到达文件writer第24项真实缺陷)推翻旧裁决：真实构建下越界写被拒（消息正确），`/workspace add --write`成功保存根，但**同一写入仍被拒**且再次提示运行刚运行过的命令。根因是write/edit围栏只查主根、从不读`context.workspaceRoots`；会话级`resolveWorkspaceRoot`已完整但未被调用。改走它后围栏通过，但edit恢复账本从操作scope派生位置、要求落在profile内，绑到附加根会移动账本导致`Edit operation receipt is invalid.`——需契约改动，已回退，产品代码无变化。第24项属真实缺陷而非提示词问题。边界：合成会话、仅Linux、未覆盖apply_patch/bash路径。原47/ADD整体partial、goal active。
+
+### 2026-10-31：附加workspace根接入write/edit（第24项修复）
+
+[addition21.39](features/phase-20-addition.md#2139-附加workspace根接入writeedit第24项修复)接21.38完成修复：write/edit先问既有`resolveWorkspaceRoot`哪个根适用；无附加根时保持原词法拒绝（不碰文件系统，主根不存在时错误不变），有附加根时按注册/访问/身份规则解析，并把解析根同时送入execution service与edit identity。21.38的`Edit operation receipt is invalid.`实际是两处根不一致所致，非账本契约问题；另发现探针缺taskId会触发同一错误。59项聚焦、两反转命中且bytes恢复、五门/TS build/freshness通过、端到端探针四步全过。build 96a6043d。边界：apply_patch与bash路径未改，未覆盖真实provider/桌面/并发；原47/ADD整体partial、goal active。

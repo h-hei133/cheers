@@ -38,7 +38,7 @@ try {
   const { createCoreToolRegistry } = await load('core/tools/registry.js');
   const makeContext = session => ({
     workspaceRoot: project, workspaceRoots: session.workspaceRoots, sessionId: session.id,
-    abortSignal: undefined, cwd: project,
+    taskId: `probe-${Date.now().toString(36)}`, abortSignal: undefined, cwd: project,
   });
   // The profile must be active while the tool runs: the edit ledger derives its
   // storage root from the current profile, exactly as a real turn does.
@@ -50,7 +50,8 @@ try {
     try {
       const result = await write.execute({ path: target, content }, makeContext(session));
       return { ok: !result.isError, output: result.output ?? '' };
-    } catch (error) { return { ok: false, output: error instanceof Error ? error.message : String(error) }; }
+    } catch (error) { return { ok: false, output: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? (error.stack ?? '').split('\n').slice(0, 8).join(' | ') : '' }; }
   });
 
   const targetFile = path.join(outside, 'note.txt');
