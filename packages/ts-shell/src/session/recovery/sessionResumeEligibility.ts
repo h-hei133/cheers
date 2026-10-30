@@ -1,4 +1,4 @@
-import { messageToText } from "../../model-adapters/multimodal.js";
+import { messageHasContent, messageToText } from "../../model-adapters/multimodal.js";
 import {
   findLastQueryCompletionEvent,
 } from "../sessionContinuityModule.js";
@@ -68,7 +68,8 @@ export function evaluateSessionResumeEligibility(input: {
     snapshot.lastLifecycleEvent?.event === "run-interrupted";
   const hasPendingPrompt =
     typeof snapshot.pendingPrompt === "string" &&
-    snapshot.pendingPrompt.trim().length > 0;
+    (snapshot.pendingPrompt.trim().length > 0 || messageToText(snapshot.lastUserMessage?.content) === snapshot.pendingPrompt
+      && messageHasContent(snapshot.lastUserMessage?.content));
   const hasPendingLifecycle =
     Object.keys(snapshot.pendingLifecycle.pendingApprovals).length > 0 ||
     Object.keys(snapshot.pendingLifecycle.pendingTools).length > 0;
@@ -169,8 +170,8 @@ export function hasSessionResumeContextEvidence(
   snapshot: RecoverySnapshot,
 ): boolean {
   const hasLastMessages =
-    Boolean(messageToText(snapshot.lastUserMessage?.content).trim()) ||
-    Boolean(messageToText(snapshot.lastAssistantMessage?.content).trim());
+    messageHasContent(snapshot.lastUserMessage?.content) ||
+    messageHasContent(snapshot.lastAssistantMessage?.content);
   const hasCompletedTurn =
     findLastQueryCompletionEvent(snapshot.transcriptEvents) !== undefined;
   const hasRepairEvidence =

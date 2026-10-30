@@ -1,0 +1,47 @@
+{
+  "cases": [
+    {
+      "name": "text-only-content",
+      "exit": 1,
+      "tests": "2 failed | 9 passed | 8 skipped (19)",
+      "file": "model-adapters/multimodal.ts",
+      "originalSha256": "92c2bd8b745bbf309e2987f34bb1bd1f4fdaf4688340e706c365ff520e99d125"
+    },
+    {
+      "name": "missing-image-admission",
+      "exit": 1,
+      "tests": "2 failed | 15 skipped (17)",
+      "file": "session/recovery/scope.ts",
+      "originalSha256": "93dffe75843e2275842036f4f89c78739e680083ab508ac95fb48862c4c04f07"
+    },
+    {
+      "name": "text-only-eligibility",
+      "exit": 1,
+      "tests": "1 failed | 1 passed | 3 skipped (5)",
+      "file": "session/recovery/sessionResumeEligibility.ts",
+      "originalSha256": "100eb37168ce15ffb0b3b1d9b47b61c7cec255b9a035256069f2f5eb48e4516b"
+    },
+    {
+      "name": "truthy-pending",
+      "exit": 1,
+      "tests": "1 failed | 1 passed | 4 skipped (6)",
+      "file": "core/shell/recovery.ts",
+      "originalSha256": "70de179ded17691a3a62dab1d0ab37d5a7a65cd40739f4c2bb648fc862517822"
+    },
+    {
+      "name": "text-only-effective",
+      "exit": 1,
+      "tests": "2 failed | 4 skipped (6)",
+      "file": "core/shell/recovery.ts",
+      "originalSha256": "70de179ded17691a3a62dab1d0ab37d5a7a65cd40739f4c2bb648fc862517822"
+    },
+    {
+      "name": "text-only-conversation",
+      "exit": 1,
+      "tests": "1 failed | 84 skipped (85)",
+      "file": "session/presentation/sessionReentrySurface.ts",
+      "originalSha256": "1510868120f345a05302ed34e8ce3b9cb7bbbed4fbe0de62d013db435021c703"
+    }
+  ],
+  "restored": true
+}

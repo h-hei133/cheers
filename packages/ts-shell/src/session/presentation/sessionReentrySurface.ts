@@ -1,4 +1,4 @@
-import { messageToText } from "../../model-adapters/multimodal.js";
+import { messageHasContent, messageToText } from "../../model-adapters/multimodal.js";
 import type {
   TerminalClassification,
   TerminalReason,
@@ -99,7 +99,7 @@ export function projectSessionReentrySummary(input: {
 /** Whether a session holds a real exchange rather than only command bookkeeping. */
 export function sessionHasConversation(session: Session): boolean {
   return session.turns.some(
-    (turn) => (turn.role === "user" || turn.role === "assistant") && messageToText(turn.content).trim().length > 0,
+    (turn) => (turn.role === "user" || turn.role === "assistant") && messageHasContent(turn.content),
   );
 }
 

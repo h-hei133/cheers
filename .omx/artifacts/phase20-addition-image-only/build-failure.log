@@ -1,0 +1,5 @@
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+packages/ts-shell/src/session/recovery/scope.ts(59,96): error TS2339: Property 'content' does not exist on type 'TranscriptEvent'.
+  Property 'content' does not exist on type 'ReportTranscriptEntry'.
+Build failed: TypeScript build failed with exit 2.

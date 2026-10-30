@@ -1,0 +1,32 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/SessionManager.test.ts  (85 tests | 1 failed | 84 skipped) 51ms
+   ❯ src/session/SessionManager.test.ts > SessionManager > retains an image-only conversation when discarding empty sessions
+     → expected true to be false // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 84 skipped (85)
+   Start at  22:01:36
+   Duration  1.49s (transform 1.01s, setup 0ms, collect 1.21s, tests 51ms, environment 0ms, prepare 57ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/SessionManager.test.ts > SessionManager > retains an image-only conversation when discarding empty sessions
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/session/SessionManager.test.ts:51:48
+     49|     manager.persistUserPromptBarrier(session.id, "", undefined, [{ typ…
+     50|     manager.saveInterrupted(session.id);
+     51|     expect(manager.discardIfEmpty(session.id)).toBe(false);
+       |                                                ^
+     52|     expect(manager.sessionExists(session.id)).toBe(true);
+     53|     expect(manager.describeSessionReentry(session.id).hasConversation)…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

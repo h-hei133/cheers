@@ -281,7 +281,7 @@ export async function resumeShellSession(input: {
   const canAutoResume = resumeEligibility?.autoResumeReady === true;
   if (
     canAutoResume &&
-    (pendingPrompt || recoverySnapshot.runPhase === "turn-active")
+    (pendingPrompt !== undefined || recoverySnapshot.runPhase === "turn-active")
   ) {
     const continuitySnapshot =
       typeof input.sessionManager.buildContinuitySnapshot === "function"
@@ -301,7 +301,7 @@ export async function resumeShellSession(input: {
     }
     const effectivePrompt =
       pendingPrompt ?? guardedRuntimeSeed.config.initialPrompt;
-    if (effectivePrompt?.trim()) {
+    if (effectivePrompt !== undefined) {
       if (
         continuitySnapshot?.lastStagedRepairStepCount &&
         continuitySnapshot.lastStagedRepairStepCount > 1
@@ -672,7 +672,7 @@ function hasPendingPromptHere(input: {
     const summary = input.sessionManager.describeSessionReentry(
       input.runtimeContext.session.id,
     );
-    return Boolean(summary?.pendingPrompt?.trim());
+    return Boolean(summary?.pendingPrompt?.trim()) || summary?.autoResumeReady === true;
   } catch {
     return false;
   }

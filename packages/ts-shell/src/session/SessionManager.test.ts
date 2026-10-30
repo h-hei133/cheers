@@ -44,6 +44,15 @@ describe("SessionManager", () => {
     expect(loaded.pendingPrompt).toBe(status === "completed" ? undefined : prompt);
   });
 
+  it("retains an image-only conversation when discarding empty sessions", () => {
+    const manager = new SessionManager(), session = manager.createNew();
+    manager.persistUserPromptBarrier(session.id, "", undefined, [{ type: "image", data: "aGVsbG8=", mimeType: "image/png" }]);
+    manager.saveInterrupted(session.id);
+    expect(manager.discardIfEmpty(session.id)).toBe(false);
+    expect(manager.sessionExists(session.id)).toBe(true);
+    expect(manager.describeSessionReentry(session.id).hasConversation).toBe(true);
+  });
+
   it("restores an interrupted session and preserves pending prompt metadata", () => {
     const manager = new SessionManager();
     const session = manager.createNew();

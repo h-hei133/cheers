@@ -1,0 +1,26 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/recovery/branch.test.ts  (17 tests | 1 failed | 8 skipped) 289ms
+   ❯ src/session/recovery/branch.test.ts > selected branch recovery > refuses image-only recovery after legacy-source
+     → expected '' to be undefined
+ ✓ src/model-adapters/multimodal.test.ts  (19 tests | 8 skipped) 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/recovery/branch.test.ts > selected branch recovery > refuses image-only recovery after legacy-source
+AssertionError: expected '' to be undefined
+ ❯ src/session/recovery/branch.test.ts:65:68
+     63|     }
+     64|     const reopened = new SessionManager();
+     65|     expect(reopened.getRecoverySnapshot(session.id).pendingPrompt).toB…
+       |                                                                    ^
+     66|     expect(reopened.describeSessionReentry(session.id).autoResumeReady…
+     67|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 19 passed | 16 skipped (36)
+   Start at  21:58:55
+   Duration  1.79s (transform 874ms, setup 0ms, collect 1.10s, tests 292ms, environment 0ms, prepare 102ms)

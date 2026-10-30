@@ -20,6 +20,12 @@ export interface TextContent {
 
 export type MultimodalContentBlock = TextContent | ImageContent;
 
+/** Content admission includes pictures even when their text projection is empty. */
+export function messageHasContent(content: string | readonly MultimodalContentBlock[] | null | undefined): boolean {
+  return typeof content === "string" ? content.trim().length > 0 : Boolean(content?.some(block =>
+    block.type === "text" ? block.text.trim().length > 0 : block.data.length > 0));
+}
+
 const IMAGE_EXTENSION_MAP: Record<string, string> = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
@@ -94,9 +100,9 @@ export function formatNonVisionFallback(image: ImageContent): string {
  * a token estimate. Those readers should not each learn what a content block is,
  * so they call this and get what they had before images existed.
  *
- * A message that is only an image yields the empty string by default, because
- * every one of those readers already treats empty content as "nothing to say",
- * and a placeholder would put a line in a title where the author wrote a picture.
+ * A message that is only an image yields the empty string by default, because a
+ * placeholder would put a line in a title where the author wrote a picture.
+ * Readers deciding whether content exists use `messageHasContent` instead.
  * A reader that is *showing* the message to a person passes
  * `placeholderForImages`, because there the alternative is that the picture
  * vanishes without a trace.

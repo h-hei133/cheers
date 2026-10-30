@@ -1,0 +1,307 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/recovery/branch.test.ts  (11 tests | 2 failed | 8 skipped) 121ms
+   ❯ src/session/recovery/branch.test.ts > selected branch recovery > keeps a source-bound image-only pending prompt "" across close and branch changes
+     → expected { pendingPrompt: undefined, …(13) } to match object { pendingPrompt: '', …(2) }
+   ❯ src/session/recovery/branch.test.ts > selected branch recovery > keeps a source-bound image-only pending prompt "  \n" across close and branch changes
+     → expected { pendingPrompt: undefined, …(13) } to match object { pendingPrompt: '  \n', …(2) }
+ ❯ src/core/shell/continueShellActionRuntime.test.ts  (6 tests | 2 failed | 4 skipped) 233ms
+   ❯ src/core/shell/continueShellActionRuntime.test.ts > runResumeLikeShellAction > executes image-only interrupted recovery for pending text ""
+     → expected [] to have a length of 1 but got +0
+   ❯ src/core/shell/continueShellActionRuntime.test.ts > runResumeLikeShellAction > executes image-only interrupted recovery for pending text "  \n"
+     → expected [] to have a length of 1 but got +0
+ ❯ src/session/SessionManager.test.ts  (85 tests | 1 failed | 84 skipped) 45ms
+   ❯ src/session/SessionManager.test.ts > SessionManager > retains an image-only conversation when discarding empty sessions
+     → expected true to be false // Object.is equality
+ ❯ src/session/recovery/sessionResumeEligibility.test.ts  (5 tests | 1 failed | 3 skipped) 6ms
+   ❯ src/session/recovery/sessionResumeEligibility.test.ts > session resume eligibility > admits image-only pending recovery only with matching content (image=true)
+     → expected false to be true // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/SessionManager.test.ts > SessionManager > retains an image-only conversation when discarding empty sessions
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/session/SessionManager.test.ts:51:48
+     49|     manager.persistUserPromptBarrier(session.id, "", undefined, [{ typ…
+     50|     manager.saveInterrupted(session.id);
+     51|     expect(manager.discardIfEmpty(session.id)).toBe(false);
+       |                                                ^
+     52|     expect(manager.sessionExists(session.id)).toBe(true);
+     53|     expect(manager.describeSessionReentry(session.id).hasConversation)…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/core/shell/continueShellActionRuntime.test.ts > runResumeLikeShellAction > executes image-only interrupted recovery for pending text ""
+ FAIL  src/core/shell/continueShellActionRuntime.test.ts > runResumeLikeShellAction > executes image-only interrupted recovery for pending text "  \n"
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/core/shell/continueShellActionRuntime.test.ts:74:21
+     72|         renderer: { renderLine() {} } as never, switchRuntimeSessionPr…
+     73|         executeResolvedPromptTurn: async input => { turns.push(input);…
+     74|       expect(turns).toHaveLength(1);
+       |                     ^
+     75|       expect(turns[0]).toMatchObject({ turnOrigin: "resumed" });
+     76|       expect(turns[0]!.effectivePrompt).toContain("Continue the interr…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/session/recovery/branch.test.ts > selected branch recovery > keeps a source-bound image-only pending prompt "" across close and branch changes
+AssertionError: expected { pendingPrompt: undefined, …(13) } to match object { pendingPrompt: '', …(2) }
+
+- Expected
++ Received
+
+  Object {
+-   "interruptedKind": "prompt",
++   "durableStatus": undefined,
++   "interruptedKind": undefined,
++   "lastAssistantMessage": undefined,
++   "lastContinuationReason": undefined,
++   "lastError": undefined,
++   "lastLifecycleEvent": Object {
++     "detail": "",
++     "event": "run-interrupted",
++     "id": "evt_4e6096a7",
++     "timestamp": "2026-10-30T13:57:01.690Z",
++     "type": "lifecycle",
++   },
+    "lastUserMessage": Object {
+      "content": Array [
+        Object {
+          "text": "",
+          "type": "text",
+        },
+        Object {
+          "data": "aGVsbG8=",
+          "mimeType": "image/png",
+          "type": "image",
+        },
+      ],
+      "id": "turn_49e95b60",
++     "role": "user",
++     "timestamp": "2026-10-30T13:57:01.682Z",
++     "type": "message",
+    },
+-   "pendingPrompt": "",
++   "pendingLifecycle": Object {
++     "pendingApprovals": Object {},
++     "pendingTools": Object {},
++     "taskStates": Object {},
++   },
++   "pendingPrompt": undefined,
++   "repairSummary": Object {
++     "ignoredDuplicateTurnStarts": 0,
++     "ignoredRoleMismatchedTurnCompletions": 0,
++     "ignoredUnpairedTurnCompletions": 0,
++     "insertedPromptMessage": false,
++     "insertedQueryStarted": false,
++     "insertedRunInterrupted": false,
++     "strippedInterruptedTerminalEvents": 0,
++   },
++   "runPhase": undefined,
++   "terminalClassification": undefined,
++   "terminalReason": undefined,
++   "transcriptEvents": Array [
++     Object {
++       "content": "base",
++       "id": "turn_0d403e69",
++       "role": "user",
++       "timestamp": "2026-10-30T13:57:01.674Z",
++       "type": "message",
++     },
++     Object {
++       "detail": "",
++       "event": "run-started",
++       "id": "evt_df372999",
++       "sourceEntryId": "turn_49e95b60",
++       "timestamp": "2026-10-30T13:57:01.682Z",
++       "type": "lifecycle",
++     },
++     Object {
++       "content": Array [
++         Object {
++           "text": "",
++           "type": "text",
++         },
++         Object {
++           "data": "aGVsbG8=",
++           "mimeType": "image/png",
++           "type": "image",
++         },
++       ],
++       "id": "turn_49e95b60",
++       "role": "user",
++       "timestamp": "2026-10-30T13:57:01.682Z",
++       "type": "message",
++     },
++     Object {
++       "detail": "",
++       "event": "run-interrupted",
++       "id": "evt_4e6096a7",
++       "timestamp": "2026-10-30T13:57:01.690Z",
++       "type": "lifecycle",
++     },
++   ],
+  }
+
+ ❯ src/session/recovery/branch.test.ts:28:54
+     26|     manager.saveInterrupted(session.id, "prompt");
+     27|     const reopened = new SessionManager();
+     28|     expect(reopened.getRecoverySnapshot(session.id)).toMatchObject({ p…
+       |                                                      ^
+     29|       lastUserMessage: { id: pending, content: [{ type: "text", text: …
+     30|     expect(reopened.describeSessionReentry(session.id).autoResumeReady…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/session/recovery/branch.test.ts > selected branch recovery > keeps a source-bound image-only pending prompt "  \n" across close and branch changes
+AssertionError: expected { pendingPrompt: undefined, …(13) } to match object { pendingPrompt: '  \n', …(2) }
+
+- Expected
++ Received
+
+  Object {
+-   "interruptedKind": "prompt",
++   "durableStatus": undefined,
++   "interruptedKind": undefined,
++   "lastAssistantMessage": undefined,
++   "lastContinuationReason": undefined,
++   "lastError": undefined,
++   "lastLifecycleEvent": Object {
++     "detail": "
++ ",
++     "event": "run-interrupted",
++     "id": "evt_5cd3de39",
++     "timestamp": "2026-10-30T13:57:01.736Z",
++     "type": "lifecycle",
++   },
+    "lastUserMessage": Object {
+      "content": Array [
+        Object {
+          "text": "
+  ",
+          "type": "text",
+        },
+        Object {
+          "data": "aGVsbG8=",
+          "mimeType": "image/png",
+          "type": "image",
+        },
+      ],
+      "id": "turn_48810250",
++     "role": "user",
++     "timestamp": "2026-10-30T13:57:01.730Z",
++     "type": "message",
+    },
+-   "pendingPrompt": "
++   "pendingLifecycle": Object {
++     "pendingApprovals": Object {},
++     "pendingTools": Object {},
++     "taskStates": Object {},
++   },
++   "pendingPrompt": undefined,
++   "repairSummary": Object {
++     "ignoredDuplicateTurnStarts": 0,
++     "ignoredRoleMismatchedTurnCompletions": 0,
++     "ignoredUnpairedTurnCompletions": 0,
++     "insertedPromptMessage": false,
++     "insertedQueryStarted": false,
++     "insertedRunInterrupted": false,
++     "strippedInterruptedTerminalEvents": 0,
++   },
++   "runPhase": undefined,
++   "terminalClassification": undefined,
++   "terminalReason": undefined,
++   "transcriptEvents": Array [
++     Object {
++       "content": "base",
++       "id": "turn_16d9420b",
++       "role": "user",
++       "timestamp": "2026-10-30T13:57:01.722Z",
++       "type": "message",
++     },
++     Object {
++       "detail": "
++ ",
++       "event": "run-started",
++       "id": "evt_41df378a",
++       "sourceEntryId": "turn_48810250",
++       "timestamp": "2026-10-30T13:57:01.730Z",
++       "type": "lifecycle",
++     },
++     Object {
++       "content": Array [
++         Object {
++           "text": "
++ ",
++           "type": "text",
++         },
++         Object {
++           "data": "aGVsbG8=",
++           "mimeType": "image/png",
++           "type": "image",
++         },
++       ],
++       "id": "turn_48810250",
++       "role": "user",
++       "timestamp": "2026-10-30T13:57:01.730Z",
++       "type": "message",
++     },
++     Object {
++       "detail": "
+  ",
++       "event": "run-interrupted",
++       "id": "evt_5cd3de39",
++       "timestamp": "2026-10-30T13:57:01.736Z",
++       "type": "lifecycle",
++     },
++   ],
+  }
+
+ ❯ src/session/recovery/branch.test.ts:28:54
+     26|     manager.saveInterrupted(session.id, "prompt");
+     27|     const reopened = new SessionManager();
+     28|     expect(reopened.getRecoverySnapshot(session.id)).toMatchObject({ p…
+       |                                                      ^
+     29|       lastUserMessage: { id: pending, content: [{ type: "text", text: …
+     30|     expect(reopened.describeSessionReentry(session.id).autoResumeReady…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  src/session/recovery/sessionResumeEligibility.test.ts > session resume eligibility > admits image-only pending recovery only with matching content (image=true)
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/session/recovery/sessionResumeEligibility.test.ts:15:36
+     13|       loadRecoverySnapshot: () => snapshot({ pendingPrompt: "", runPha…
+     14|         lastUserMessage: { role: "user", content: image ? [{ type: "im…
+     15|     expect(result.autoResumeReady).toBe(image);
+       |                                    ^
+     16|   });
+     17|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ Test Files  4 failed (4)
+      Tests  6 failed | 2 passed | 99 skipped (107)
+   Start at  21:57:00
+   Duration  3.46s (transform 648ms, setup 0ms, collect 2.32s, tests 405ms, environment 1ms, prepare 192ms)

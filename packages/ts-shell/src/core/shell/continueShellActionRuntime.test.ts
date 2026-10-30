@@ -61,6 +61,41 @@ function withFakeHome<T>(prefix: string, run: () => Promise<T>): Promise<T> {
 }
 
 describe("runResumeLikeShellAction", () => {
+  it.each([
+    ["continue-session", ""], ["continue-session", "  \n"],
+    ["resume-session", ""], ["resume-session", "  \n"],
+  ] as const)("executes image-only interrupted recovery via %s for pending text %j", async (action, prompt) =>
+    withFakeHome("cheers-image-only-recovery-", async () => {
+      const manager = new SessionManager(), session = manager.createNew();
+      manager.persistUserPromptBarrier(session.id, prompt, undefined, [{ type: "image", data: "aGVsbG8=", mimeType: "image/png" }]);
+      manager.saveInterrupted(session.id, "prompt");
+      const turns: ResumeLikePromptTurnInput[] = [];
+      await runResumeLikeShellAction({ slashResult: { kind: "shell-action", action, sessionId: session.id },
+        source: "interactive", printMode: false, sessionManager: manager, runtimeContext: createRuntimeContext(session),
+        renderer: { renderLine() {} } as never, switchRuntimeSessionProjectContext: () => undefined, renderSessionCommandMap: () => undefined,
+        executeResolvedPromptTurn: async input => { turns.push(input); } });
+      expect(turns).toHaveLength(1);
+      expect(turns[0]).toMatchObject({ turnOrigin: "resumed" });
+      expect(turns[0]!.effectivePrompt).toContain("Continue the interrupted task using the recovery evidence below.");
+      expect(turns[0]!.runtimeSeed?.config.initialPrompt).toBe(prompt);
+      expect(manager.getSession(session.id)!.turns).toHaveLength(1);
+    }));
+
+  it("keeps empty text-only current sessions out of automatic resume", async () =>
+    withFakeHome("cheers-empty-resume-", async () => {
+      const manager = new SessionManager(), session = manager.createNew();
+      manager.persistUserPromptBarrier(session.id, "", undefined, []);
+      manager.saveInterrupted(session.id, "prompt");
+      const turns: ResumeLikePromptTurnInput[] = [], lines: string[] = [];
+      await runResumeLikeShellAction({ slashResult: { kind: "shell-action", action: "resume-session", sessionId: session.id },
+        source: "interactive", printMode: false, sessionManager: manager, runtimeContext: createRuntimeContext(session),
+        renderer: { renderLine(line: string) { lines.push(line); } } as never,
+        switchRuntimeSessionProjectContext: () => undefined, renderSessionCommandMap: () => undefined,
+        executeResolvedPromptTurn: async input => { turns.push(input); } });
+      expect(turns).toHaveLength(0);
+      expect(lines.join("\n")).toContain("Already in session");
+    }));
+
   it("executes returned auto-resume payload with runtime seed and continuity state", async () =>
     withFakeHome("cheers-resume-action-", async () => {
       const manager = new SessionManager();

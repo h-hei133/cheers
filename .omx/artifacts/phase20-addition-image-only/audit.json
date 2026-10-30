@@ -1,0 +1,74 @@
+{
+  "baselineCommit": "89843761e990abd674173160f1537fcb2f63ccff",
+  "owners": [
+    {
+      "file": "model-adapters/multimodal.ts",
+      "baseline": 6,
+      "count": 7,
+      "names": [
+        "messageHasContent",
+        "isImageFilePath",
+        "getImageMimeType",
+        "toAnthropicImageBlock",
+        "toOpenAIImageUrlBlock",
+        "formatNonVisionFallback",
+        "messageToText"
+      ]
+    },
+    {
+      "file": "session/recovery/scope.ts",
+      "baseline": 5,
+      "count": 5,
+      "names": [
+        "selectRecoveryScope",
+        "readPendingPrompt",
+        "recoveryPendingRunStart",
+        "recoveryTaskMemory",
+        "selectedRecoveryTerminal"
+      ]
+    },
+    {
+      "file": "session/recovery/sessionResumeEligibility.ts",
+      "baseline": 2,
+      "count": 2,
+      "names": [
+        "evaluateSessionResumeEligibility",
+        "hasSessionResumeContextEvidence"
+      ]
+    },
+    {
+      "file": "session/presentation/sessionReentrySurface.ts",
+      "baseline": 4,
+      "count": 4,
+      "names": [
+        "projectSessionReentrySummary",
+        "sessionHasConversation",
+        "sessionHasReentrySurface",
+        "scoreSessionReentrySummary"
+      ]
+    },
+    {
+      "file": "core/shell/recovery.ts",
+      "baseline": 13,
+      "count": 13,
+      "names": [
+        "resolveSessionReference",
+        "isFailedResume",
+        "guardRuntimeSeedForRecovery",
+        "resumeShellSession",
+        "validateSelection",
+        "buildInterruptedContinuationPrompt",
+        "formatActionResultSeedEvidenceLine",
+        "deriveInterruptionReason",
+        "deriveContinuationNextAction",
+        "renderResumedContextSummary",
+        "renderResumeDispositionLabel",
+        "truncate",
+        "hasPendingPromptHere"
+      ]
+    }
+  ],
+  "buildId": "5caca84d38898e55a5ebd784ced415c03ca65f3768b21f420645603dcc214685",
+  "inputsDigest": "3b971877ccb02869f21071038e57458f4f8254b21d11dced6eedb50e282b1f1f",
+  "freshness": true
+}

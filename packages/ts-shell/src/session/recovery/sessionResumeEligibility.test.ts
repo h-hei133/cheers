@@ -8,6 +8,13 @@ import type { RecoveryTrustBoundaryBlock } from "./recoveryTrustBoundary.js";
 import type { Session } from "../schema/sessionRecord.js";
 
 describe("session resume eligibility", () => {
+  it.each([true, false])("admits image-only pending recovery only with matching content (image=%s)", image => {
+    const result = evaluateSessionResumeEligibility({ session: session({ status: "interrupted" }), createBlock,
+      loadRecoverySnapshot: () => snapshot({ pendingPrompt: "", runPhase: "prompt-persisted", interruptedKind: "prompt",
+        lastUserMessage: { role: "user", content: image ? [{ type: "image", data: "aGVsbG8=", mimeType: "image/png" }] : "" } }) });
+    expect(result.autoResumeReady).toBe(image);
+  });
+
   it("keeps stopped durable status non-resumable", () => {
     const result = evaluateSessionResumeEligibility({
       session: session({ status: "error" }),

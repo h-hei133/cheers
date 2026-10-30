@@ -1,0 +1,12 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/core/shell/continueShellActionRuntime.test.ts  (6 tests | 4 skipped) 213ms
+ ✓ src/session/recovery/branch.test.ts  (11 tests | 8 skipped) 126ms
+ ✓ src/session/SessionManager.test.ts  (85 tests | 84 skipped) 37ms
+ ✓ src/session/recovery/sessionResumeEligibility.test.ts  (5 tests | 3 skipped) 2ms
+
+ Test Files  4 passed (4)
+      Tests  8 passed | 99 skipped (107)
+   Start at  21:57:57
+   Duration  3.32s (transform 637ms, setup 0ms, collect 2.25s, tests 378ms, environment 0ms, prepare 172ms)

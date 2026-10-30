@@ -1,0 +1,11 @@
+{
+  "observedAt": "2026-10-30T14:09:00Z",
+  "runs": [
+    { "headSha": "165940b36995545fbe94abf95bb90b8a458e037c", "databaseId": 41065163338, "name": "CI", "status": "completed", "conclusion": "success" },
+    { "headSha": "165940b36995545fbe94abf95bb90b8a458e037c", "databaseId": 41065163449, "name": "NormProof Architecture Watch", "status": "completed", "conclusion": "success" },
+    { "headSha": "89843761e990abd674173160f1537fcb2f63ccff", "databaseId": 41066606364, "name": "NormProof Architecture Watch", "status": "completed", "conclusion": "success" },
+    { "headSha": "89843761e990abd674173160f1537fcb2f63ccff", "databaseId": 41066606262, "name": "CI", "status": "in_progress", "conclusion": "" }
+  ],
+  "source": "one delayed gh run list readback",
+  "observedAtPrecision": "minute approximation"
+}

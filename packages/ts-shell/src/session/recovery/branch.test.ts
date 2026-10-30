@@ -16,6 +16,56 @@ describe("selected branch recovery", () => {
     if (home) fs.rmSync(home, { recursive: true, force: true });
   });
 
+  it.each(["", "  \n"])("keeps a source-bound image-only pending prompt %j across close and branch changes", async prompt => {
+    const manager = new SessionManager(), session = manager.createNew();
+    manager.addTurn(session.id, { role: "user", content: "base" });
+    const base = manager.getSession(session.id)!.turns.at(-1)!.id!;
+    const image = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+    manager.persistUserPromptBarrier(session.id, prompt, undefined, [image]);
+    const pending = manager.getSession(session.id)!.turns.at(-1)!.id!;
+    manager.saveInterrupted(session.id, "prompt");
+    const reopened = new SessionManager();
+    expect(reopened.getRecoverySnapshot(session.id)).toMatchObject({ pendingPrompt: prompt, interruptedKind: "prompt",
+      lastUserMessage: { id: pending, content: [{ type: "text", text: prompt }, image] } });
+    expect(reopened.describeSessionReentry(session.id).autoResumeReady).toBe(true);
+    await reopened.revertTo(session.id, base);
+    expect(reopened.getRecoverySnapshot(session.id).pendingPrompt).toBeUndefined();
+    expect(JSON.stringify(reopened.getReplayPlan(session.id).replayMessages)).not.toContain(image.data);
+    await reopened.revertTo(session.id, pending);
+    expect(new SessionManager().getRecoverySnapshot(session.id).pendingPrompt).toBe(prompt);
+  });
+
+  it("does not turn an empty text-only prompt into image recovery", () => {
+    const manager = new SessionManager(), session = manager.createNew();
+    manager.persistUserPromptBarrier(session.id, "", undefined, []);
+    manager.saveInterrupted(session.id);
+    expect(manager.getRecoverySnapshot(session.id).pendingPrompt).toBeUndefined();
+    expect(manager.describeSessionReentry(session.id).autoResumeReady).toBe(false);
+  });
+
+  it.each(["missing", "duplicate", "empty-image", "changed-text", "changed-role", "legacy-source"])("refuses image-only recovery after %s", kind => {
+    const manager = new SessionManager(), session = manager.createNew();
+    manager.persistUserPromptBarrier(session.id, "", undefined, [{ type: "image", data: "aGVsbG8=", mimeType: "image/png" }]);
+    const pending = manager.getSession(session.id)!.turns.at(-1)!.id!;
+    manager.saveInterrupted(session.id);
+    const directory = manager.getSessionDirPath(session.id), transcriptPath = path.join(directory, "transcript.jsonl");
+    const events = fs.readFileSync(transcriptPath, "utf8").trimEnd().split("\n").map(line => JSON.parse(line));
+    const message = events.find(event => event.type === "message" && event.id === pending)!;
+    if (kind === "missing") events.splice(events.indexOf(message), 1);
+    if (kind === "duplicate") events.push(message);
+    if (kind === "empty-image") message.content[1].data = "";
+    if (kind === "changed-text") message.content[0].text = "other request";
+    if (kind === "changed-role") message.role = "assistant";
+    fs.writeFileSync(transcriptPath, events.map(event => JSON.stringify(event)).join("\n") + "\n");
+    if (kind === "legacy-source") {
+      const statePath = path.join(directory, "state.json"), state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+      delete state.pendingPromptEntryId; fs.writeFileSync(statePath, JSON.stringify(state));
+    }
+    const reopened = new SessionManager();
+    expect(reopened.getRecoverySnapshot(session.id).pendingPrompt).toBeUndefined();
+    expect(reopened.describeSessionReentry(session.id).autoResumeReady).toBe(false);
+  });
+
   it("does not automatically resume an interrupted prompt discarded by a branch switch", async () => {
     const manager = new SessionManager();
     const session = manager.createNew();

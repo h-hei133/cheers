@@ -1,0 +1,7 @@
+{
+  "name": "current-session-text-only-pending",
+  "exit": 1,
+  "tests": "2 failed | 3 passed | 4 skipped (9)",
+  "originalSha256": "3283e27dc9c6918e9c9125146b371994bb7d0b3647320389b780f6a0f7c40e74",
+  "restored": true
+}

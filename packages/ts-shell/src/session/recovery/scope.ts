@@ -1,4 +1,4 @@
-import { messageToText } from "../../model-adapters/multimodal.js";
+import { messageHasContent, messageToText } from "../../model-adapters/multimodal.js";
 import { isRecord } from "../../core/values/record.js";
 import { continuityBranchScope, selectBranchResultMemory } from "../continuation/branch.js";
 import type { Session } from "../schema/sessionRecord.js";
@@ -17,8 +17,9 @@ export function selectRecoveryScope(input: {
   const memory = selectBranchResultMemory(input.state.workingMemory, input.state.thread, input.transcriptEvents);
   const legacyState = scope.allowGlobalFallback && memory === input.state.workingMemory;
   const source = input.state.pendingPromptEntryId;
+  const legacyPrompt = input.state.pendingPrompt ?? input.session.pendingPrompt;
   const pendingPrompt = source === undefined && legacyState
-    ? input.state.pendingPrompt ?? input.session.pendingPrompt
+    ? legacyPrompt?.trim() ? legacyPrompt : undefined
     : readPendingPrompt(input.state, input.transcriptEvents, scope.admitsEntry);
   const allowInterruptionRepair = source === undefined ? legacyState : pendingPrompt !== undefined;
   const transcriptEvents = input.transcriptEvents.filter(event => {
@@ -46,13 +47,19 @@ function readPendingPrompt(
   events: readonly TranscriptEvent[],
   admitsEntry: (entryId: unknown) => boolean,
 ): string | undefined {
-  if (!admitsEntry(state.pendingPromptEntryId) || typeof state.pendingPrompt !== "string" || !state.pendingPrompt.trim()) return undefined;
+  if (!admitsEntry(state.pendingPromptEntryId) || typeof state.pendingPrompt !== "string") return undefined;
   const entry = state.thread?.entries.find(candidate => candidate.id === state.pendingPromptEntryId);
   if (entry?.kind !== "turn-message" || entry.role !== "user") return undefined;
   const selected = state.thread ? sessionThreadPath(state.thread).path : [];
   if ([...selected].reverse().find(candidate => candidate.role === "user")?.id !== entry.id) return undefined;
-  const messages = events.filter(event => event.type === "message" && event.id === state.pendingPromptEntryId);
-  if (messages.length > 1 || messages.some(event => event.type !== "message" || event.role !== "user" || messageToText(event.content) !== state.pendingPrompt)) return undefined;
+  const messages = events.filter(
+    (event): event is Extract<TranscriptEvent, { type: "message" }> =>
+      event.type === "message" && event.id === state.pendingPromptEntryId,
+  );
+  if (messages.length > 1 || messages.some(event => event.role !== "user" || messageToText(event.content) !== state.pendingPrompt)) return undefined;
+  // Empty text is recoverable only through the exact retained image message;
+  // legacy missing-text repair cannot manufacture an absent picture.
+  if (!state.pendingPrompt.trim() && (messages.length !== 1 || !messageHasContent(messages[0]!.content))) return undefined;
   return state.pendingPrompt;
 }
 

@@ -10656,3 +10656,12 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 [addition21.29](features/phase-20-addition.md#2129-图片中断后的实际continue与零重复消息)在当前image persistence build补自动中断派发证据。两CLI模式首个text/image POST保持待回，真实Ctrl+C51/50ms小夹具观测后response close/session interrupted/block完整。新进程重开同ID、零附件/压力注入、真实/continue第二POST携原image_url一次与原恢复提示，完成回复绘制、pending清理，最终两user含fixture/无重复消息；四exit0/cooked、config/models/project不变、scratch删除，heap768MiB/总60秒/累计2MiB。
 
 目标原history已承担图片续跑，未发现需修改bridge的缺陷，所以只加正式probe/收据/文档，不重跑unit/build/源码反转。syntax与两probe主代理串行首轮通过；此为文字加小图HTTP等待取消场景，其他图片/恢复/平台/费用验收仍partial。bc121e28 CI/Watch均success，165940b3 Watch41065163449 success、CI41065163338延后读回仍in_progress；本批Git/CI另绑定，CLAUDE.md保留、goal active。
+
+
+### 2026-10-30：纯图片中断恢复与内容准入
+
+[addition21.30](features/phase-20-addition.md#2130-纯图片中断任务保留原恢复准入)修补纯图片保存后退出变terminated、/continue无POST的实际基线。复用原multimodal内容、branch scope、eligibility/conversation及shell恢复owner；空文字只准入当前分支最新user/source唯一且角色/文本一致的保留图片，缺失/重复/空image/改role-text/legacy缺source拒绝，无新replay系统。提交前发现当前会话/resume文字truthiness遗漏，新增两失败/三控制基线并复用autoResumeReady修补，空文字控制保持拒绝。
+
+最终54项聚焦通过、81未选，七反转有效且源码恢复；五门/TS build/freshness串行通过，初次TS2339/filter type predicate及preflight拒绝分类保留。原CLI两模式真实alt+v/alt+s/Enter/Ctrl+C等待取消后新进程/continue或/resume <当前ID>，第二POST精确原image一次、最终两user无重复、completed/pending清理、八个最终exit0/cooked、config不变、scratch清理。平台clipboard注入边界/空字符串恒真证据排除/实际branch与未知billing限制记入正式工件和HANDOFF，原47/ADD整体仍partial。
+
+165940b3 CI41065163338与Watch均success；89843761 Watch41066606364 success、CI41066606262延后读回仍in_progress。本批commit/push/未来CI分别绑定，CLAUDE.md保留、goal active。

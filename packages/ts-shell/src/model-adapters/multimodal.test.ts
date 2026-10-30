@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  messageHasContent,
   messageToText,
   toAnthropicImageBlock,
   toOpenAIImageUrlBlock,
   type ImageContent,
   type MultimodalContentBlock,
 } from "./multimodal.js";
+
+describe("multimodal content admission", () => {
+  it.each([undefined, null, "", "  \n", [], [{ type: "text", text: " " }], [{ type: "image", data: "", mimeType: "image/png" }]] as const)(
+    "refuses empty content %j", content => { expect(messageHasContent(content)).toBe(false); });
+  it.each(["real text", [{ type: "text", text: "real text" }], [{ type: "image", data: "aGVsbG8=", mimeType: "image/png" }],
+    [{ type: "text", text: " " }, { type: "image", data: "aGVsbG8=", mimeType: "image/png" }]] as const)(
+    "admits text or image content %j", content => { expect(messageHasContent(content)).toBe(true); });
+});
 
 /**
  * Messages that carry an image.
@@ -41,9 +50,8 @@ describe("reading a message as text", () => {
   });
 
   it("says nothing for a message that is only an image", () => {
-    // Every text reader already treats empty content as "nothing to say", and a
-    // placeholder here would put a line in a session title where the author sent
-    // a picture.
+    // A placeholder here would put a line in a session title where the author
+    // sent a picture. Content admission keeps its separate image check.
     expect(messageToText([IMAGE])).toBe("");
   });
 
