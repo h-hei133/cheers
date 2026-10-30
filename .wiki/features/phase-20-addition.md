@@ -4836,3 +4836,10 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 第29项用户报告「每个操作卡约1秒」。本批测两个用户真正等待的时刻：真实Node CLI、隔离home/profile/Git project、synthetic、heap768MiB、每会话一条消息。**200会话**：面板标题123ms、首个可选行347ms；**800会话**：标题134ms、首行370ms。目录扩大4倍，首行只增加23ms。
 
 结论：该范围内打开面板不随目录规模线性增长——面板先绘制标题、行随扫描逐步填充，打开不等完整扫描。这印证了此前批次的渐进发布设计。但**未复现1秒卡顿**，也未覆盖用户自己的目录、磁盘、终端与按键时序；删除/搜索/翻页是各自独立测量的操作。两轮均为每会话一条消息的合成目录，大transcript目录每会话读取更多，未覆盖。[正式工件](../../.omx/artifacts/phase20-addition-resume-latency/README.md)。build `059b7423ab15`、inputs `ead9d186ab6030878407d95123092d3ddfef3e4f36ab1d9b010f50cb52fc35df`。未改产品代码。原47/ADD整体partial、goal active。
+
+
+### 21.57 中断会话的思考块保留
+
+第25项此前覆盖了「完成后恢复」，本批补「中断」：持久化user提示、写一条content为空但带reasoning的assistant消息、标记interrupted，再用`restoreConversation`读回——得到`user`+`thinking`（精确文本、`collapsed:true`），序列化结果不含签名。压缩路径不涉及reasoning（被压缩消息整体移出，是既定设计）。resume的当前会话标记含`currentUnavailable`分支，逻辑完整。
+
+证据边界：这是投影而非真实推理模型被中断的现场；从未持久化的推理（provider扣留、或进程在写消息前死亡）无法恢复，本批不作此声明。[工件](../../.omx/artifacts/phase20-addition-thinking-recovery/README.md)。build `059b7423ab15`。未改产品代码。原47/ADD整体partial、goal active。

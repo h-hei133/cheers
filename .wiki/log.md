@@ -10788,3 +10788,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：resume面板首帧与首个可选行的实测延迟
 
 [addition21.56](features/phase-20-addition.md#2156-resume面板首帧与首个可选行的实测延迟)200会话标题123ms/首行347ms，800会话134ms/370ms，4倍目录首行只增23ms，证明打开不等完整扫描；未复现用户1秒卡顿，未覆盖真实目录/磁盘/终端。未改产品代码。build 059b7423。原47/ADD整体partial、goal active。
+
+### 2026-10-31：中断会话的思考块保留
+
+[addition21.57](features/phase-20-addition.md#2157-中断会话的思考块保留)补第25项的中断分支：中断消息的reasoning经restoreConversation读回为collapsed thinking块、精确文本、无签名。压缩不涉及reasoning是既定设计。边界：投影证据而非真实推理模型中断现场。未改产品代码。build 059b7423。原47/ADD整体partial、goal active。
