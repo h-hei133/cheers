@@ -1,0 +1,33 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/presentation/tui/transcript/blocks.test.ts  (17 tests | 1 failed | 16 skipped) 9ms
+   ❯ src/presentation/tui/transcript/blocks.test.ts > image attachments in the prompt echo > draws no blank board above a prompt that was only a picture
+     → expected 2 to be 1 // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 16 skipped (17)
+   Start at  00:51:07
+   Duration  710ms (transform 330ms, setup 0ms, collect 461ms, tests 9ms, environment 0ms, prepare 54ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/presentation/tui/transcript/blocks.test.ts > image attachments in the prompt echo > draws no blank board above a prompt that was only a picture
+AssertionError: expected 2 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ src/presentation/tui/transcript/blocks.test.ts:154:71
+    152|     // One row for the picture and the block separator; an empty promp…
+    153|     // words, and a full-width blank board would read as a stray gap.
+    154|     expect(rows.filter((row) => stripAnsi(row).trim() === "").length).…
+       |                                                                       ^
+    155|     expect(rows[0]).toContain("image attachment: image/png");
+    156|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

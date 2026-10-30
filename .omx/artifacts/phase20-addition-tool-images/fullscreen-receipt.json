@@ -3,8 +3,8 @@
   "status": "passed",
   "savedMessages": 4,
   "provider": "synthetic without credentials; fetch rejects all calls",
-  "buildId": "ddc46156fc822d780417971f073e352002cc6ed628568cbdce2f0ff0fc6d83e6",
-  "inputsDigest": "fe5f0a974365a8049320ad2437f1bb53c64a08f26ad84afae6f2f1c0a85acdf5",
+  "buildId": "5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473",
+  "inputsDigest": "4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806",
   "limits": {
     "heapMiB": 768,
     "wallSeconds": 45,
@@ -35,6 +35,6 @@
   "outputBytes": 3141,
   "outputLimitExceeded": false,
   "deadlineExceeded": false,
-  "transcriptBaselineSha256": "a7c2ec580d47d303efd02296f6d38dc49ea502b4b7d84780134efc0ae4304855",
+  "transcriptBaselineSha256": "42bda21be5a3deaa99dab12e48fdc5e271fafc94675f53f53dcc813e9a34ae44",
   "scratchRemoved": true
 }

@@ -1,0 +1,7 @@
+{
+  "name": "blank-board",
+  "exit": 1,
+  "tests": "1 failed | 16 skipped (17)",
+  "originalSha256": "98d0ec1a534084858a659c7acf86d430309ba3f391f59d662f3fe137144aea09",
+  "restored": true
+}

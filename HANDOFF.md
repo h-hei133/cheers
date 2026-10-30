@@ -1238,3 +1238,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A browser screenshot's prose says it was captured, but no picture appears on the tool card, and reopening the session shows the same text-only card.
 - **Root Cause**: The tool result message stores the text/image union, but the projection to `tool.result` only carried `messageToText`, and the card renderer drew only words — so the display lost what the model actually received.
 - **Rule**: Carry tool-result pictures on the display event (`tool.result.images`) and draw them in both folded and expanded card states, but strip them in the durable codec: the same bytes already live on the tool result message, and persisting them twice doubles the encoded payload in the transcript. Restore history cards from the stored message, not from the persisted event. A probe must assert the picture appears once on screen and exactly one copy exists in the transcript bytes.
+
+### An Empty Prompt Still Wraps To One Blank Board
+
+- **Symptom**: A prompt that was only a picture shows a full-width empty bubble row above the picture.
+- **Root Cause**: The user-block renderer wraps the source text before drawing; `wrapToWidth("")` returns one empty line, so an empty prompt still produced a padded board.
+- **Rule**: When a prompt has pictures and no text, skip the word rows rather than drawing an empty board; keep the text path untouched so line counts, source projection and copy semantics are unchanged. Assert the picture row is the first row and only the block separator is blank.

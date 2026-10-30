@@ -4618,3 +4618,8 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 原Node CLI regular/fullscreen各1保存会话（提问/assistant调用browser/含PNG的tool结果/后续回答）、isolated home/profile/Git project、无凭据synthetic且fetch拒绝、heap768MiB/45秒/2MiB。两模式恢复tool卡片精确文字与一张图、无图形协议终端实际绘制`image result: image/png`，transcript prefix逐字节不变且图片载荷恰好一份，零fetch、零draft，两exit0/cooked、config/project不变、scratch删除。
 
 边界：这是已保存工具结果的显示；未覆盖真实浏览器会话中实时截图到达、真实图形协议内联绘制、超出既有单结果媒体预算的图片、clipboard与其他平台。无full local suite/并行heavy/本助手subagent/20k真实终端/exe/真实provider/独立review/NormProof judge；原47/ADD整体partial、goal active。
+
+
+### 21.34 纯图片提示不再绘制空白气泡行
+
+21.32恢复图片后，`renderUser`对空文字仍先`wrapToWidth("")`出一行，导致纯图片问题在图片上方多一条全宽空白气泡，读起来像错误留白。现只有文字为空且有图片时才省略该行；有文字时行数、源投影与复制语义完全不变。反转（恢复空字符串行）使新增断言失败且finally bytes恢复；blocks/container/source 56项通过，五门与TS build串行通过，118旧docs advisory保留。build `5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473`、inputs `4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806`。两模式原CLI重跑：三user块图片数0/1/1、无协议终端绘制label、零fetch、exit0/cooked，纯图片轮次的空白行不再出现。图形协议内联、桌面平台未验收；原47/ADD整体partial、goal active。

@@ -136,7 +136,10 @@ function renderUser(block: Block, width: number, options: BlockRenderOptions = {
   const sourceLines = block.text.split("\n");
   if (block.text.endsWith('\n')) sourceLines.pop();
   const wrapped = sourceLines.flatMap((line) => wrapToWidth(line, bodyWidth));
-  const rows = wrapped.map((line) => {
+  // A prompt that was only a picture has no words to draw. Painting the empty
+  // string would still produce one full-width blank board above the picture,
+  // which reads as a stray gap rather than as a message.
+  const rows = (block.text === "" && (block.images?.length ?? 0) > 0 ? [] : wrapped).map((line) => {
     const padded = padToWidth(defaultTheme.fg("userMessageText", line), width);
     return `${defaultTheme.bg("userMessageBg", padded)}\x1b[0m`;
   });

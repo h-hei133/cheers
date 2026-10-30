@@ -10688,3 +10688,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 [addition21.33](features/phase-20-addition.md#2133-工具结果保留图片并在卡片显示)续21.32：截图工具返回PNG且已存入tool消息、模型可收到，但`tool.result`投影只送文字、卡片与历史只画文字。现事件新增仅显示`images`，持久化前剔除（字节已在消息中，避免transcript重复编码载荷）；卡片经原revisioned update携带图片，折叠/展开都绘制，图形协议内联、否则命名行；历史从保存消息取图。`Block.images`改为可写。无第二store/事件/replay路径。
 
 定向只读对照本机pi tool-execution.ts（从result.content过滤image并保留在两种外壳中），未复制代码。五独立反转全部AssertionError且finally bytes恢复；八文件168项通过，五门/TS build/freshness串行通过，118旧docs advisory保留，owner callable 13/19/12→13/5/7/13→14。两模式真实CLI恢复tool卡片精确文字+一张图、无协议终端绘制image result、transcript恰好一份图片载荷、零fetch、exit0/cooked、config/project不变、scratch删除。实时截图、图形协议内联、超预算图片与平台未验收；原47/ADD整体partial、goal active。
+
+### 2026-10-31：纯图片提示不再绘制空白气泡行
+
+[addition21.34](features/phase-20-addition.md#2134-纯图片提示不再绘制空白气泡行)续21.32/21.33：`renderUser`对空文字仍wrap出一行全宽气泡，纯图片问题上方出现像错误留白的空行。现仅“无文字且有图片”时省略该行，有文字路径不变。反转使新断言失败并恢复bytes；blocks/container/source 56项、五门、TS build通过，118 advisory保留。两模式原CLI重跑图片数0/1/1、label绘制、零fetch、exit0/cooked。图形协议内联与平台未验收，原47/ADD整体partial、goal active。

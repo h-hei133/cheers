@@ -146,6 +146,14 @@ describe("image attachments in the prompt echo", () => {
     // terminal that cannot draw it.
     expect(rows.some((row) => row.includes("image/png"))).toBe(true);
   });
+
+  it("draws no blank board above a prompt that was only a picture", () => {
+    const rows = renderBlock({ ...textBlock("user", ""), images: [IMG] }, WIDTH, { imageProtocol: undefined });
+    // One row for the picture and the block separator; an empty prompt has no
+    // words, and a full-width blank board would read as a stray gap.
+    expect(rows.filter((row) => stripAnsi(row).trim() === "").length).toBe(1);
+    expect(rows[0]).toContain("image attachment: image/png");
+  });
 });
 
 describe("pictures a tool returned", () => {
