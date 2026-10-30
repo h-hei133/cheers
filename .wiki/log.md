@@ -10812,3 +10812,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：压缩的失败与拒绝路径审查
 
 [addition21.61](features/phase-20-addition.md#2161-压缩的失败与拒绝路径审查)四条拒绝与三条失败各有精确提示、区分决策与故障，would-not-shrink防越压越大。发现shouldCompact用>而requestBudget用>=的1-token边界差异，未修改（敏感行为、收益低于风险）。未改产品代码。build a5505182。原47/ADD整体partial、goal active。
+
+### 2026-10-31：纯图片提示的续跑证据不再依赖运行阶段
+
+[addition21.62](features/phase-20-addition.md#2162-纯图片提示的续跑证据不再依赖运行阶段)发现hasContinuationEvidence仍要求非空文字，纯图片提示只靠runPhase保住证据（巧合而非规则）。现与sessionResumeEligibility读同一条件。63项聚焦、一反转命中、五门/TS build通过。build f9996ca4。原47/ADD整体partial、goal active。

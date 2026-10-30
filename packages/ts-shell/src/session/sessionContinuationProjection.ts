@@ -1,4 +1,5 @@
 import type { RecoverySnapshot } from "./recovery/sessionRecoverySnapshot.js";
+import { messageHasContent, messageToText } from "../model-adapters/multimodal.js";
 
 const unsafeContinuationEvidencePattern =
   /(raw-dom|raw DOM|<html|<\/|authorization|api[_-]?key|token|secret|cookie|cheers-real|BEGIN [A-Z ]*PRIVATE KEY|raw-file|file-dump)/i;
@@ -76,9 +77,15 @@ export function selectContinuationEvidenceForSnapshot(
 }
 
 export function hasContinuationEvidence(snapshot: RecoverySnapshot): boolean {
+  // A prompt can be a picture with no words. Requiring non-blank text would
+  // drop that continuation evidence, and only the run phase would keep it
+  // alive — a coincidence, not a rule. The eligibility owner already admits
+  // this shape, so both read the same condition.
   const hasPendingPrompt =
     typeof snapshot.pendingPrompt === "string" &&
-    snapshot.pendingPrompt.trim().length > 0;
+    (snapshot.pendingPrompt.trim().length > 0 ||
+      (messageToText(snapshot.lastUserMessage?.content) === snapshot.pendingPrompt &&
+        messageHasContent(snapshot.lastUserMessage?.content)));
   const hasActiveRunPhase =
     snapshot.runPhase === "prompt-persisted" ||
     snapshot.runPhase === "turn-active";

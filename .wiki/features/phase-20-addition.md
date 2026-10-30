@@ -4879,3 +4879,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 发现一处**边界约定不一致**但未修改：`shouldCompact`用`tokens > window - reserve`（严格大于），而`requestBudget`的`soft`用`promptTokens >= softLimit`（大于等于）——恰好等于阈值时两者判断不同，差1 token。两者都是合理的边界约定，改动会触及压缩触发这一敏感行为，收益低于风险，故只记录不改。
 
 未改产品代码。build `a55051824792`。原47/ADD整体partial、goal active。
+
+
+### 21.62 纯图片提示的续跑证据不再依赖运行阶段
+
+21.30修好了`sessionResumeEligibility`的空文字准入，但复查发现`hasContinuationEvidence`（决定`hasUnfinishedSessionWork`、进而决定关闭时是否保留恢复证据）仍要求`pendingPrompt.trim().length > 0`。纯图片提示的`pendingPrompt`是空字符串，因此该判定为假——**只靠`runPhase`仍为`prompt-persisted`/`turn-active`才保住证据**，这是巧合而非规则：一旦运行阶段回落或新增阶段值，纯图片会话就会丢失续跑证据。
+
+现两处读同一条件（空文字时要求最新user消息的文本投影等于pendingPrompt且有实际内容），与eligibility owner一致。探针确认纯图片中断会话`continuationEvidence:true`、`unfinishedWork:true`。
+
+验证：`work`13（新例断言纯图片保留、空文字无图片不保留）、`scope`21、`sessionResumeEligibility`5、`recovery`24，共**63项**通过；一反转（退回纯文字判定）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `f9996ca41a80`。原47/ADD整体partial、goal active。

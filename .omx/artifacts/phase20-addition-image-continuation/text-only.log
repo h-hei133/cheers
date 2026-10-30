@@ -1,0 +1,33 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/recovery/work.test.ts  (13 tests | 1 failed | 12 skipped) 7ms
+   ❯ src/session/recovery/work.test.ts > keeps continuation evidence for a prompt that was only a picture
+     → expected false to be true // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 12 skipped (13)
+   Start at  04:43:54
+   Duration  292ms (transform 47ms, setup 0ms, collect 46ms, tests 7ms, environment 0ms, prepare 59ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/recovery/work.test.ts > keeps continuation evidence for a prompt that was only a picture
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/session/recovery/work.test.ts:31:46
+     29|   const snapshot = { pendingLifecycle: createEmptyLifecycleIndex(), pe…
+     30|     runPhase: 'idle', lastUserMessage: { role: 'user' as const, conten…
+     31|   expect(hasUnfinishedSessionWork(snapshot)).toBe(true);
+       |                                              ^
+     32|   // Empty text with no picture is still nothing to continue.
+     33|   expect(hasUnfinishedSessionWork({ ...snapshot,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

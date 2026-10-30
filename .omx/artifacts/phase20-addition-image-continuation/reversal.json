@@ -1,0 +1,7 @@
+{
+  "name": "text-only-pending",
+  "exit": 1,
+  "tests": "1 failed | 12 skipped (13)",
+  "originalSha256": "05b0d44dac96730253e99be121369146b01ec1279b1cf99b74e2063c8146a9b1",
+  "restored": true
+}

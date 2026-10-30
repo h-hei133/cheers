@@ -1316,3 +1316,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: The same symbol appears twice in a workspace symbol answer, or a file appears twice in a listing.
 - **Root Cause**: `validateWorkspaceRoots` forbids overlapping roots when they are written, but `decodeWorkspaceRoots` only rejects exact duplicates. A hand-edited state file can name `/a` and `/a/b`, and a scan that walks every root then visits the same files twice.
 - **Rule**: Deduplicate the collected target files rather than trusting the roots to be disjoint. A reader of persisted state must not assume a writer's invariant that it does not itself enforce.
+
+### Two Owners Of "Is There A Pending Prompt" Must Agree
+
+- **Symptom**: A session whose only prompt was a picture keeps its recovery evidence only while the run phase happens to still be `prompt-persisted` or `turn-active`; if that phase settles, the evidence disappears.
+- **Root Cause**: `sessionResumeEligibility` was taught that an empty-text prompt with an image is content, but `hasContinuationEvidence` — which decides whether closing the session preserves recovery evidence — still required non-blank text. Two functions answered the same question differently, and one answer was masked by an unrelated field.
+- **Rule**: When a condition gains a new admitted shape, find every owner that asks the same question and change them together. Test the shape directly rather than through a state that happens to mask the missing branch.

@@ -21,3 +21,15 @@ it.each([{}, { runPhase: 'idle' }, { durableStatus: 'success', terminalClassific
   'does not turn ordinary idle or completed evidence into automatic recovery %#', evidence => {
     expect(hasUnfinishedSessionWork({ pendingLifecycle: createEmptyLifecycleIndex(), ...evidence } as RecoverySnapshot)).toBe(false);
   });
+
+it('keeps continuation evidence for a prompt that was only a picture', () => {
+  // The run phase alone would keep this alive, which is a coincidence: the
+  // evidence rule itself must admit an empty-text prompt with an image.
+  const picture = { type: 'image' as const, data: 'QUJD', mimeType: 'image/png' };
+  const snapshot = { pendingLifecycle: createEmptyLifecycleIndex(), pendingPrompt: '',
+    runPhase: 'idle', lastUserMessage: { role: 'user' as const, content: [picture] } } as RecoverySnapshot;
+  expect(hasUnfinishedSessionWork(snapshot)).toBe(true);
+  // Empty text with no picture is still nothing to continue.
+  expect(hasUnfinishedSessionWork({ ...snapshot,
+    lastUserMessage: { role: 'user' as const, content: [{ type: 'text' as const, text: '' }] } } as RecoverySnapshot)).toBe(false);
+});
