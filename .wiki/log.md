@@ -10736,3 +10736,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：请求飞行中的退出有界性
 
 [addition21.43](features/phase-20-addition.md#2143-请求飞行中的退出有界性)补忙碌退出：loopback应答readiness后挂起chat completions，原CLI在busy时`/exit`，两模式193/207ms、exit0、cooked恢复，服务器确认收到两请求。挂起请求不持有进程。两个探针错误（PTY包装未转发stdin、端口未定先写配置）如实保留。边界：普通chat completion，未覆盖工具循环/审批/待答问题。build c1302abc。原47/ADD整体partial、goal active。
+
+### 2026-10-31：窄终端下折行草稿与光标位置
+
+[addition21.44](features/phase-20-addition.md#2144-窄终端下折行草稿与光标位置)40列PTY下长行正确折行两行、续行对齐、无空白行、光标在折行内；`abcdef`三次退格精确变`abc`且帧重绘；退出干净。首轮两个探针错误（行间`\r`被当作提交、对长折行做粗糙变化断言）如实保留。第27项症状仍不可复现而非证伪，缺真实终端/IME/resize。build c1302abc。原47/ADD整体partial、goal active。

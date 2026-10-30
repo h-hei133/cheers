@@ -4714,3 +4714,14 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 两个探针错误如实保留：手写PTY包装未转发stdin导致`/exit`根本没到达（假「exit-timeout」）；配置在loopback端口确定前写入导致CLI报`Invalid URL`且从未派发。均非产品故障。
 
 证据边界：本地服务器、普通chat completion；未覆盖工具循环中的provider停顿、等待审批、待答问题等其他忙碌形态。[正式工件](../../.omx/artifacts/phase20-addition-exit-busy/README.md)。build `c1302abc9ff4873abf20da961b7a991bd7c70319ca181fef499e84f66bfc7268`、inputs `6e696319aff2a2fc9b1fff597b439fccc3b5a07c863b050c2a0e31816939814e`。原47/ADD整体partial、goal active。
+
+
+### 21.44 窄终端下折行草稿与光标位置
+
+第27项在120列下不可复现，本批收窄到**40列**（可配置尺寸的PTY relay，40×40），在runtime已接管输入后输入长行。结果：软折行为两行（`❯ alpha bravo charlie delta echo` / `foxtrot golf hotel india juliet`），续行对齐首行、上下无空白行，光标在折行内；`abcdef`三次退格后精确变为`abc`，帧实际重绘；退出干净、cooked恢复。
+
+首轮误判为「退格无变化」的两个探针错误如实保留：**行间用`\r`**——加载面提示「Enter adds a line」，但runtime接管后Enter是提交，五行变成五个提交turn（`Synthetic reply: one`等）而非一份五行草稿；**对长折行做粗糙的「文本是否变化」断言**——删除发生在第二视觉行尾部、重绘帧几乎相同，短行`abcdef`→`abc`才清楚显示行为。
+
+结论：窄终端下草稿、折行与光标都在composer内，无空白行，删除真实字符。用户所述症状**仍不可复现**而非证伪——缺真实终端、字体/IME、resize与物理像素坐标。[正式工件](../../.omx/artifacts/phase20-addition-startup-narrow/README.md)。build `c1302abc9ff4873abf20da961b7a991bd7c70319ca181fef499e84f66bfc7268`、inputs `6e696319aff2a2fc9b1fff597b439fccc3b5a07c863b050c2a0e31816939814e`。原47/ADD整体partial、goal active。
+
+补充：全屏模式下探针首次发送`/exit`时草稿仍有`abc`，该行成为`abc/exit`并被当作正文提交（`Synthetic reply: abc/exit`）——斜杠命令仅在源起始处成立，这是正确行为。清空草稿后两模式均exit0。
