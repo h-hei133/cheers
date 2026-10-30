@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { parseRefutations } from "./teamTool.js";
 import { createTeamToolDefinition } from "./teamTool.js";
+import { createHash } from "node:crypto";
+import type { SubagentRunInput } from "../subagents/runner.js";
 import type { ToolExecutionContext } from "../../tools/types.js";
 
 /**
@@ -84,7 +86,7 @@ describe("starting a team pass", () => {
     expect(result.error).toContain('no model is available');
   });
 
-  it("reports what survived when every proposer answers", async () => {
+  it("keeps an invented citation unresolved", async () => {
     const runSubagent = vi.fn(async (input: { prompt: string }) => ({
       text: input.prompt.includes("CLAIM")
         ? "CLAIM p1 counterevidence The profile disagrees. evidence: src/profile.ts"
@@ -96,7 +98,7 @@ describe("starting a team pass", () => {
       context({ runSubagent } as unknown as Partial<ToolExecutionContext>),
     );
 
-    expect(result.output).toContain('p1: refuted');
+    expect(result.output).toContain('p1: unresolved');
     expect(result.output).toContain('Limitation:');
   });
 
@@ -146,4 +148,111 @@ describe("starting a team pass", () => {
 
     expect(result.output).toContain('Proposed 0 of 2');
   });
+});
+
+
+function observedRead(input: SubagentRunInput, overrides: Record<string, unknown> = {}) {
+  const text = "cache misses: 0\n";
+  return input.observeTool?.({
+    call: { id: "read-1", name: "read", args: { path: "src/profile.ts" } },
+    args: { path: "src/profile.ts" }, assistantMessage: { role: "assistant", content: "reading" },
+    isError: false,
+    result: { output: text, isError: false, metadata: {
+      read: { text, startLine: 4, endLine: 4, bytesRead: text.length },
+      provenance: { locator: "src/profile.ts", contentHash: createHash("sha256").update(text).digest("hex"),
+        hashScope: "selected-text", parser: "utf8", location: "lines" },
+    } }, ...overrides,
+  });
+}
+
+it.each(["counterevidence", "none-found"])("does not accept an unread %s citation", async kind => {
+  const tool = createTeamToolDefinition();
+  const result = await tool.execute({ question: "why?", perspectives: ["a", "b"] }, {
+    workspaceRoot: "/repo", taskId: "unread",
+    runSubagent: async input => ({ text: input.prompt.includes("CLAIM")
+      ? `CLAIM p1 ${kind} I checked. evidence: src/profile.ts` : "a claim", failed: false, steps: 1, allowedTools: [] }),
+  });
+  expect(result.output).toContain("p1: unresolved");
+});
+
+it("binds a finding to its current review receipt and asks for that exact format", async () => {
+  let receipt = "";
+  const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
+    workspaceRoot: "/repo", taskId: "bound",
+    runSubagent: async input => {
+      if (!input.prompt.includes("CLAIM")) return { text: "a claim", failed: false, steps: 1, allowedTools: [] };
+      expect(input.prompt).toContain("evidence:");
+      expect(input.prompt).toContain("receipt");
+      const observation = await observedRead(input);
+      expect(observation?.suffix).toContain("lines 4-4");
+      receipt = /receipt: (\S+)/.exec(observation?.suffix ?? "")?.[1] ?? "";
+      expect(receipt).not.toBe("");
+      return { text: `CLAIM p1 counterevidence The profile disagrees. evidence: ${receipt}`, failed: false, steps: 2, allowedTools: ["read"] };
+    },
+  });
+  expect(result.output).toContain("p1: refuted");
+  expect(result.metadata).toMatchObject({ evidence: expect.arrayContaining([expect.objectContaining({ id: receipt,
+    locator: "src/profile.ts", start: 4, end: 4, location: "lines" })]) });
+});
+
+it.each(["failed", "directory", "empty", "wrong-hash"])("does not issue a receipt for a %s read", async scenario => {
+  const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
+    workspaceRoot: "/repo", taskId: scenario,
+    runSubagent: async input => {
+      if (!input.prompt.includes("CLAIM")) return { text: "a claim", failed: false, steps: 1, allowedTools: [] };
+      const observation = await observedRead(input, scenario === "failed" ? { isError: true } : {
+        result: { output: "a file", isError: false, metadata: scenario === "directory" ? {} : {
+          read: { text: scenario === "empty" ? " " : "different", startLine: 4, endLine: 4 },
+          provenance: { locator: "src/profile.ts", contentHash: "0".repeat(64), parser: "utf8", location: "lines", hashScope: "selected-text" },
+        } },
+      });
+      expect(observation?.suffix).toBeUndefined();
+      return { text: "CLAIM p1 none-found All fine. evidence: src/profile.ts", failed: false, steps: 2, allowedTools: ["read"] };
+    },
+  });
+  expect(result.output).toContain("p1: unresolved");
+});
+
+it("cannot borrow the other reviewer's receipt or a proposer citation", async () => {
+  let stolen = "src/profile.ts";
+  const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
+    workspaceRoot: "/repo", taskId: "isolation",
+    runSubagent: async input => {
+      if (!input.prompt.includes("CLAIM")) {
+        await observedRead(input);
+        return { text: "a claim evidence: src/profile.ts", failed: false, steps: 1, allowedTools: [] };
+      }
+      if (input.prompt.includes("[p2]")) {
+        const observed = await observedRead(input);
+        stolen = /receipt: (\S+)/.exec(observed?.suffix ?? "")?.[1] ?? stolen;
+        return { text: "CLAIM p2 insufficient Could not check.", failed: false, steps: 2, allowedTools: ["read"] };
+      }
+      await new Promise(resolve => setTimeout(resolve, 0));
+      return { text: `CLAIM p1 counterevidence Borrowed. evidence: ${stolen}`, failed: false, steps: 1, allowedTools: [] };
+    },
+  });
+  expect(result.output).toContain("p1: unresolved");
+});
+
+it("uses final answers instead of intermediate proposal and review narration", async () => {
+  const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
+    workspaceRoot: "/repo", taskId: "final",
+    runSubagent: async input => {
+      if (!input.prompt.includes("CLAIM")) return { text: "intermediate\n\nfinal claim", finalText: "final claim", failed: false, steps: 2, allowedTools: [] };
+      expect(input.prompt).not.toContain("intermediate");
+      const observed = await observedRead(input);
+      const id = /receipt: (\S+)/.exec(observed?.suffix ?? "")?.[1];
+      return { text: `CLAIM p1 counterevidence Intermediate. evidence: ${id}`, finalText: "CLAIM p1 insufficient Cannot conclude.",
+        failed: false, steps: 2, allowedTools: ["read"] };
+    },
+  });
+  expect(result.output).toContain("p1: unresolved");
+  expect(result.metadata).toMatchObject({ proposals: [expect.objectContaining({ claim: "final claim" }), expect.objectContaining({ claim: "final claim" })] });
+});
+
+it("does not fall back to narration when the final answer is explicitly empty", async () => {
+  const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
+    workspaceRoot: "/repo", taskId: "empty-final", runSubagent: async () => ({ text: "I am looking", finalText: "", failed: false, steps: 1, allowedTools: [] }),
+  });
+  expect(result.output).toContain("Proposed 0 of 2");
 });

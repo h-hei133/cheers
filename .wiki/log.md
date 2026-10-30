@@ -10462,3 +10462,12 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 原CLI两模式blocked外部a/b零恢复且无通知→partial仅b恢复保留a→complete newest-first→两通知下一HTTP全部通过；7POST/3GET，退出177/160ms、0/cooked，正式工件/scratch清理、CLAUDE.md保留。unknown故障只有实际writer单元证据，不冒充CLI故障注入；无subagent/重验证并发/exe/full suite/20k或独立review，原47不升级、goal active。
 
 20.51已推送189374283093ce678469451da1f70f5185ed00be；延后CI40986394168/20.50 CI40986098392仍in_progress、对应Watchsuccess。20.49 CI40983398554现failure，同五editor fixture缺rtk、12552 passed/3 skipped，20.51已修但未来CI未确认。本批Git/精确CI另记录。
+
+
+## [2026-10-30] fix | 团队评审实际读取证据与取消边界
+
+[addition20.53](features/phase-20-addition.md#2053-团队评审绑定实际读取证据并响应取消)修任意路径当证据、prompt字段缺失、aggregated narration与cross-review取消挂住。复用原observeTool签发当前review的selected-content收据、无效引用insufficient；原run保留完成结果、取消释放监听和丢弃迟到结果，拒绝self/异review身份。六文件69通过、两原owner独立反转11/4失败且精确恢复，五门/build/freshness460/3554、四owner7/1/5/8 callables、118旧advisory。
+
+原NodeCLI两模式实际discovery+每turn load、未读引用unresolved、native行2-2收据绑定refuted、两held review Ctrl+C102/127ms结束；exit156/150ms、0/cooked，23POST/3GET各，文件/config不变。正式工件保留权限与per-turn load/setup及newline/prefix fixture分类、scratch清理、CLAUDE.md保留，无本助手subagent/heavy并发/全套/exe/20k。17.5并发上限/覆盖收敛/结构化提案/专门apply批准仍未完成，原47不升级、goal active。
+
+延后CI：20.51 CI40986394168 success；20.50 CI40986098392同五editor fixture failure已由20.51修。20.52 CI40987047192 in_progress、Watch40987047203 success，本批Git/未来CI另绑定。

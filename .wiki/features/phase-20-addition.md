@@ -3962,3 +3962,18 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 正式[工件](../../.omx/artifacts/phase20-addition-restore-status/)保存baseline/reversal/build/CLI和收据，task scratch归档清理；原CLAUDE.md保留。全程heavy serial、无subagent/exe/full suite/20k；未验production provider/非Linux/desktop/独立review/整体workspace snapshot，原47/ADD不升级、goal active。
 
 20.51已推送`189374283093ce678469451da1f70f5185ed00be`。延后精确观察：其CI40986394168、20.50 CI40986098392均in_progress，Watch40986394211/40986098348均success。20.49 CI40983398554已failure，五externalEditor fixture依赖缺少rtk、12552 passed/3 skipped，和20.48同因，20.51修补已在远端；仍不把待跑完CI视为通过。本批Git/CI另绑定。
+
+
+### 20.53 团队评审绑定实际读取证据并响应取消
+
+复核17.5原实现发现三项可运行缺陷：`evidence:`后任意路径被收敛视为实际读取，review prompt未要求该字段，review bare await可在取消后永远等待；另用aggregated text令中间叙述进入提案/评审。原[team tool](../../packages/ts-shell/src/core/tools/teamTool.ts)现在优先finalText（缺失才兼容text，显式空final不回退），透过既有runner.observeTool接入本域[evidence](../../packages/ts-shell/src/core/subagents/team/evidence.ts)。成功native read签发本次review专属收据，带原locator、selected-text SHA256及行段/PDF source hash及所选页；空白、目录、failed、hash不符、非read工具和其他review收据都不成立，任一引用无效降为insufficient，原finding reason保留。prompt明确`CLAIM <id> <kind> <reason> evidence: <receipt IDs>`及有界none-found；metadata保留finding与receipt供追溯，无额外证据store/runner/邮箱或provider更改。
+
+原[run](../../packages/ts-shell/src/core/subagents/team/run.ts)将cross-review结算交给本域[review](../../packages/ts-shell/src/core/subagents/team/review.ts)：取消前check、监听abort、立即释放listener、完成结果按原顺序保留、迟到finding/rejection不再发布；拒绝self/非分配proposal/异review身份/duplicate。底层signal与父gate、plan/readOnly预算、固定definition name保持。wrapper结束不被表述为任意外部进程已终止。
+
+基线15失败/20通过；新增原createSubagentRunner+registry/read父权限集成：实际selector行2-2、成功证伪/none-found、invented/mixed/proposer-only/denied、12KiB read截断后receipt仍可见。首次五fixture失败分类为原page不带末尾newline与deny pattern为prefix而非glob，修fixture不改原read/policy。最终六文件69通过，原tool与run独立反转11/4失败、finally精确bytes恢复后69重跑；五门/build/独立freshness通过，118旧docs advisory，build `ed23b909325a6fad20eb4e0f015184b0f4b753e3a19643944acffd34ac84ffcd`、inputs `0c083de6ba2af3e8a1eb9ec3fd05d5e6dad028375e10f3acf83ad27b2d99bf4b`，460/3554、四owner callables7/1/5/8。对照既有research强制当前child成功读取绑定；参考pi actual child abort/finally和oh-my-pi untilAborted native Promise结算，保持Node20.3普通Promise、wrapper结算即释放listener，未复制参考新版Promise.withResolvers；目标引用绑定强于本次参考所见，无同类reference结论冒认。
+
+实际原NodeCLI+PTY+loopback两模式：tool_search→本turn tool_load→team未读invented unresolved；下turn重新load→两个review实际read指定行→HTTP收到receipt→原session metadata行段/hash/reviewer绑定→refuted；第三turn两个review HTTP hold，Ctrl+C102/127ms结束、无续发前台请求，exit156/150ms且0/cooked flags。每模式23POST/3GET、6proposer请求、8review请求（含read后续step），文件与config不变。保留首次审批pending/setup及误以为tool_load跨turn的fixture失败，修有界探针异常后cleanup，不修改产品discovery/pinning。该结果是隔离synthetic HTTP实际路由证据，不当生产模型质量/成本/平台或PDF真实团队评估。
+
+正式[工件](../../.omx/artifacts/phase20-addition-team-review/)与HANDOFF已留，task scratch清理、原CLAUDE.md保留；无本助手subagent/heavy并发/full suite/exe/20k/独立review。原三提案上限与N≤2裁决不符、部分review收敛标准、结构化hypothesis/falsifiers及专门apply-to-context批准尚待后续，不称17.5完整完成，原47不升级、goal active。本批Git/未来CI另绑定。
+
+延后观察20.51 `189374283093ce678469451da1f70f5185ed00be` CI40986394168已success，故editor fixture修补现有CI证据；20.50 CI40986098392 failure为同五fixture（已由20.51修补）。20.52 `0960d010a20f16a06e24bfe900b737a0895eb1d7` CI40987047192仍in_progress、Watch40987047203 success；待跑完不可报通过。

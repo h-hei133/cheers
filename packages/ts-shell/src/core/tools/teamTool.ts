@@ -1,6 +1,8 @@
 import type { ToolDefinition, ToolExecutionResult } from '../../tools/types.js';
 import { readOnlyDelegation } from '../subagents/capability.js';
 import { runTeam } from '../subagents/team/run.js';
+import { reviewEvidence, type ReadReceipt } from '../subagents/team/evidence.js';
+import type { SubagentRunInput } from '../subagents/runner.js';
 import type { Refutation } from '../subagents/team/convergence.js';
 import { approvedResult, deniedResult } from './toolResultLifecycle.js';
 import type { SubagentDefinition } from '../subagents/types.js';
@@ -71,18 +73,20 @@ export function createTeamToolDefinition(): ToolDefinition {
       });
       const capability = readOnlyDelegation({ tools: ['read', 'glob', 'grep'], network: false, maxSteps: 12 });
 
-      const run = async (prompt: string, role: string, signal: AbortSignal | undefined): Promise<string> => {
+      const run = async (prompt: string, role: string, signal: AbortSignal | undefined, observeTool?: SubagentRunInput['observeTool']): Promise<string> => {
         const result = await context.runSubagent!({
           definition: definition(role), capability, agentMode: 'plan', workspace: context.workspaceRoot,
-          prompt, ...(shared ? { context: shared } : {}), signal,
+          prompt, ...(shared ? { context: shared } : {}), signal, observeTool,
           // No `admission` of our own: the host's runner already carries the
           // session gate, and supplying a predicate that always answers
           // "allowed" would replace that gate with a rubber stamp.
         });
         if (result.failed) throw new Error(result.failure ?? 'the proposer failed');
-        return result.text;
+        return result.finalText ?? result.text;
       };
 
+      const evidence: ReadReceipt[] = [];
+      const findings: Refutation[] = [];
       const outcome = await runTeam({
         requests: perspectives.map((perspective, index) => ({
           id: `p${index + 1}`,
@@ -95,12 +99,21 @@ export function createTeamToolDefinition(): ToolDefinition {
           // The reviewer sees the other claims and nothing else — not its own,
           // and not a summary of what the pass expects.
           const listed = proposals.map(proposal => `[${proposal.id}] ${proposal.claim}`).join('\n\n');
-          const text = await run(
-            `Another agent's claims are below. Try to refute them using what you can read. `
-            + `For each claim reply exactly one line: "CLAIM <id> <counterevidence|condition-mismatch|insufficient|none-found> <reason>". `
-            + `Cite a file path when you used one; a refutation without a source is recorded but cannot refute.\n\n${listed}`,
-            `reviewer for ${reviewerId}`, signal);
-          return parseRefutations(text, reviewerId, proposals.map(proposal => proposal.id));
+          const reads = reviewEvidence(reviewerId, signal);
+          try {
+            const text = await run(
+              `Another agent's claims are below. Try to refute them using what you can read. `
+              + `For each claim reply exactly one line: "CLAIM <id> <counterevidence|condition-mismatch|insufficient|none-found> <reason> evidence: <receipt IDs>". `
+              + `Use only receipt IDs returned by successful read calls in this review; separate IDs with commas. `
+              + `A file path is not a receipt. If you cannot check, use insufficient with no evidence. `
+              + `none-found means only that this bounded review found no counterevidence in the returned content.\n\n${listed}`,
+              `reviewer for ${reviewerId}`, signal, reads.observe);
+            if (signal?.aborted) return [];
+            const bound = reads.bind(parseRefutations(text, reviewerId, proposals.map(proposal => proposal.id)));
+            evidence.push(...reads.snapshot());
+            findings.push(...bound);
+            return bound;
+          } finally { reads.retire(); }
         },
       });
 
@@ -114,6 +127,7 @@ export function createTeamToolDefinition(): ToolDefinition {
         proposals: outcome.proposals.map(result => ({ id: result.id, status: result.status, claim: result.claim ?? null })),
         outcomes: outcome.convergence.outcomes.map(entry => ({ proposalId: entry.proposalId, verdict: entry.verdict })),
         failedReviews: outcome.failedReviews,
+        findings, evidence,
       });
     },
   };
@@ -129,8 +143,8 @@ export function createTeamToolDefinition(): ToolDefinition {
  *
  * Evidence must be stated, not inferred. A path that merely appears inside the
  * reason is prose — a reviewer can write any path it likes — so the format asks
- * for it explicitly after `evidence:` and everything else stays an opinion,
- * which convergence will not let refute.
+ * for receipt IDs explicitly after `evidence:`. This parser extracts claims;
+ * the per-review native receipt owner validates them before convergence.
  */
 export function parseRefutations(text: string, reviewerId: string, proposalIds: readonly string[]): readonly Refutation[] {
   const known = new Set(proposalIds);

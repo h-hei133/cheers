@@ -1065,3 +1065,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A turn report says partial when the ledger and next-request notice say unknown, or when no restoration was attempted.
 - **Root Cause**: The report derives status from complete alone while the command derives it from per-step file outcomes.
 - **Rule**: Derive batch status once in the turn owner and reuse it for report and context notice. Preserve unverified writes as unknown, actual incomplete changes as partial, and zero-restore refusal as blocked/denied. Verify the original writer's post-rename readback failure separately from the CLI's zero-write blocked path.
+
+
+### Review Citations Need Native Per-Review Read Identity
+- **Symptom**: A team reports a refutation from an invented path, or waits forever after Ctrl+C in cross-review; intermediate narration can also become the retained claim.
+- **Root Cause**: Parsing evidence strings is mistaken for observed source acquisition, and only the proposal pass has abort settlement. Discovery tool loading also lasts one turn, not every later turn.
+- **Rule**: Issue per-review receipts through the existing native read observer, bind every citation to that reviewer and selected content, and downgrade unbound findings. Prefer explicit finalText, including an empty final answer. Settle cancellation at the review boundary, remove listeners immediately, observe late rejection and discard late publication; this does not prove external work terminated. CLI fixtures must load a discovered tool in each turn and fence HTTP assertion failures before cleanup.

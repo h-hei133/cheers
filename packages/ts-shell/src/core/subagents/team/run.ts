@@ -12,6 +12,7 @@
  * source guaranteed to agree, and that alone is enough to report "survived".
  */
 
+import { reviewProposal, type ReviewRequest } from "./review.js";
 import { converge, type Convergence, type Proposal, type Refutation } from "./convergence.js";
 import { fanOutProposals, type ProposalRequest, type ProposalResult } from "./fanOut.js";
 
@@ -37,11 +38,7 @@ export interface TeamRunInput {
    * It is given only the other proposers' claims — never its own — and returns
    * findings in the shape `convergence.ts` reads.
    */
-  readonly review: (input: {
-    readonly reviewerId: string;
-    readonly proposals: readonly Proposal[];
-    readonly signal: AbortSignal | undefined;
-  }) => Promise<readonly Refutation[]>;
+  readonly review: (input: ReviewRequest) => Promise<readonly Refutation[]>;
 }
 
 /**
@@ -56,29 +53,22 @@ export async function runTeam(input: TeamRunInput): Promise<TeamRun> {
   const reviewable: Proposal[] = outcome.proposals.flatMap(result =>
     result.status === "proposed" && result.claim !== undefined ? [{ id: result.id, claim: result.claim }] : []);
 
-  const refutations: Refutation[] = [];
-  const failedReviews: { reviewerId: string; reason: string }[] = [];
-  await Promise.all(reviewable.map(async proposal => {
+  const reviews = await Promise.all(reviewable.map(proposal => {
     const others = reviewable.filter(candidate => candidate.id !== proposal.id);
-    // One proposer and nothing to compare it against is not a team; there is
-    // no cross-review to run, and pretending otherwise would add a reviewer
-    // that can only agree with itself.
-    if (others.length === 0) return;
-    try {
-      refutations.push(...await input.review({ reviewerId: proposal.id, proposals: others, signal: input.signal }));
-    } catch (error) {
-      failedReviews.push({ reviewerId: proposal.id, reason: error instanceof Error ? error.message : String(error) });
-    }
+    return others.length ? reviewProposal(input, proposal.id, others) : undefined;
   }));
+  const refutations = reviews.flatMap(review => review?.findings ?? []);
+  const failedReviews = reviews.flatMap(review => review?.failure ? [review.failure] : []);
+  const convergence = converge(reviewable, refutations);
 
   return {
     proposals: outcome.proposals,
-    convergence: converge(reviewable, refutations),
+    convergence,
     reviewable,
     failedReviews,
     limitation: outcome.complete && failedReviews.length === 0
-      ? converge(reviewable, []).limitation
-      : `${converge(reviewable, []).limitation} `
+      ? convergence.limitation
+      : `${convergence.limitation} `
         + `This run is incomplete: ${outcome.proposals.length - outcome.proposed} proposer(s) produced nothing`
         + `${failedReviews.length ? ` and ${failedReviews.length} reviewer(s) did not finish` : ""}.`,
   };

@@ -119,3 +119,67 @@ describe("running a team pass", () => {
     expect(result.convergence.outcomes.find(entry => entry.proposalId === "a")?.reason).toContain("Only true for incremental builds");
   });
 });
+
+
+it("settles held reviews on cancellation, keeps completed findings and discards late results", async () => {
+  const controller = new AbortController();
+  let release!: (findings: readonly Refutation[]) => void;
+  let ready!: () => void;
+  const started = new Promise<void>(resolve => { ready = resolve; });
+  const remove = vi.spyOn(controller.signal, "removeEventListener");
+  const pending = runTeam(input({ signal: controller.signal,
+    review: async ({ reviewerId }) => {
+      if (reviewerId === "b") return [{ proposalId: "a", reviewerId: "b", kind: "counterevidence", reason: "Observed.", evidence: ["receipt"] }];
+      if (reviewerId === "c") return [];
+      return await new Promise<readonly Refutation[]>(resolve => { release = resolve; ready(); });
+    },
+  }));
+  await started;
+  await new Promise(resolve => setTimeout(resolve, 0));
+  controller.abort();
+  const result = await Promise.race([pending, new Promise<undefined>(resolve => setTimeout(resolve, 100))]);
+  expect(result, "cancellation must settle a noncooperative reviewer").toBeDefined();
+  expect(result?.convergence.outcomes.find(entry => entry.proposalId === "a")?.verdict).toBe("refuted");
+  expect(result?.failedReviews).toEqual([{ reviewerId: "a", reason: "The run was cancelled before this review finished." }]);
+  expect(result?.limitation).toContain("1 reviewer(s) did not finish");
+  const before = JSON.stringify(result);
+  release([{ proposalId: "b", reviewerId: "a", kind: "counterevidence", reason: "Late.", evidence: ["receipt"] }]);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(JSON.stringify(result)).toBe(before);
+  expect(remove.mock.calls.filter(call => call[0] === "abort")).toHaveLength(6);
+});
+
+it("does not dispatch another reviewer once cancellation occurs", async () => {
+  const controller = new AbortController();
+  const seen: string[] = [];
+  const result = await runTeam(input({ signal: controller.signal,
+    review: async ({ reviewerId }) => { seen.push(reviewerId); controller.abort(); return []; },
+  }));
+  expect(seen).toEqual(["a"]);
+  expect(result.failedReviews.map(entry => entry.reviewerId)).toEqual(["a", "b", "c"]);
+});
+
+it("observes late reviewer rejection after cancellation", async () => {
+  const controller = new AbortController();
+  let reject!: (error: Error) => void;
+  let ready!: () => void;
+  const started = new Promise<void>(resolve => { ready = resolve; });
+  const pending = runTeam(input({ requests: requests.slice(0, 2), signal: controller.signal,
+    review: async ({ reviewerId }) => reviewerId === "a"
+      ? await new Promise<readonly Refutation[]>((_resolve, fail) => { reject = fail; ready(); }) : [],
+  }));
+  await started;
+  controller.abort();
+  const result = await Promise.race([pending, new Promise<undefined>(resolve => setTimeout(resolve, 100))]);
+  expect(result).toBeDefined();
+  reject(new Error("late provider rejection"));
+  await new Promise(resolve => setTimeout(resolve, 0));
+});
+
+it("rejects self review and forged reviewer identity at the orchestration boundary", async () => {
+  const result = await runTeam(input({ review: async ({ reviewerId }) => [
+    { proposalId: reviewerId, reviewerId: "forged", kind: "none-found", reason: "Agreed with myself.", evidence: ["receipt"] },
+  ] }));
+  expect(result.convergence.outcomes.every(entry => entry.verdict === "unresolved")).toBe(true);
+  expect(result.failedReviews).toHaveLength(3);
+});
