@@ -10732,3 +10732,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：apply_patch附加根端到端确认
 
 [addition21.42](features/phase-20-addition.md#2142-applypatch附加根的端到端确认)补端到端证据：两阶段探针授权前报outside registered roots且不建文件，授权后同一补丁committed、内容精确。apply_patch无需改动。边界：合成会话、单文件、仅Linux；原47/ADD整体partial、goal active。
+
+### 2026-10-31：请求飞行中的退出有界性
+
+[addition21.43](features/phase-20-addition.md#2143-请求飞行中的退出有界性)补忙碌退出：loopback应答readiness后挂起chat completions，原CLI在busy时`/exit`，两模式193/207ms、exit0、cooked恢复，服务器确认收到两请求。挂起请求不持有进程。两个探针错误（PTY包装未转发stdin、端口未定先写配置）如实保留。边界：普通chat completion，未覆盖工具循环/审批/待答问题。build c1302abc。原47/ADD整体partial、goal active。

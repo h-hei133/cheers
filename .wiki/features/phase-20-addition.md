@@ -4703,3 +4703,14 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 21.41后第24项的工具面已覆盖write/edit/read/glob/grep。`apply_patch`静态上一直使用`selectWorkspaceRoot`并读取`workspaceRoots`，本批补端到端证据：两阶段探针（`prepare`→选定group→`execute`）在授权前报`Tool path is outside the registered workspace roots`且不建文件；`/workspace add --write`后同一补丁`committed`，附加根下文件内容精确为补丁正文。故`apply_patch`无需改动。
 
 证据边界：合成会话、单文件补丁、仅Linux；未覆盖跨根多文件补丁、真实provider工具调用与桌面平台。build `c1302abc9ff4`。原47/ADD整体partial、goal active。
+
+
+### 21.43 请求飞行中的退出有界性
+
+21.35只测了空闲退出，本批补上「忙碌中退出」——这正是用户「有时卡住」若由未完成请求持有进程所会呈现的形状。loopback服务器应答readiness（`GET /v1/models`）使CLI能开始真实turn，然后接受`POST /v1/chat/completions`且永不响应；原CLI提交问题、观察到busy后执行`/exit`。
+
+两模式结果一致：busy成立、服务器确实收到两个请求、退出**193/207ms**、exit0、cooked恢复。挂起的对话请求不会持有进程。
+
+两个探针错误如实保留：手写PTY包装未转发stdin导致`/exit`根本没到达（假「exit-timeout」）；配置在loopback端口确定前写入导致CLI报`Invalid URL`且从未派发。均非产品故障。
+
+证据边界：本地服务器、普通chat completion；未覆盖工具循环中的provider停顿、等待审批、待答问题等其他忙碌形态。[正式工件](../../.omx/artifacts/phase20-addition-exit-busy/README.md)。build `c1302abc9ff4873abf20da961b7a991bd7c70319ca181fef499e84f66bfc7268`、inputs `6e696319aff2a2fc9b1fff597b439fccc3b5a07c863b050c2a0e31816939814e`。原47/ADD整体partial、goal active。

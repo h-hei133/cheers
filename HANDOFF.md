@@ -1274,3 +1274,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: After fixing the fence to consult attached roots, the write still failed with `Edit operation receipt is invalid.`
 - **Root Cause**: Two roots must agree, not one. The fence and the execution service must use the resolved root, and the edit operation identity must use the same root so the receipt's workspace matches the operation scope. A probe that omits `taskId` also produces this error, because `callId` is then empty and the receipt is rejected.
 - **Rule**: When routing a writer through `resolveWorkspaceRoot`, carry the resolved root into every consumer of that write — containment, execution-service `workspaceRoot`, and `editIdentity.workspaceRoot`. Keep the no-attached-roots path on the primary root and lexical-only refusal: calling the resolver unconditionally makes a nonexistent primary root throw `ENOENT` instead of the boundary message. Test the refusal, the granted write, the read-only attached root, and a replaced directory identity.
+
+### A Probe Must Not Substitute For The Terminal Relay
+
+- **Symptom**: A hand-written PTY wrapper reports `exit-timeout` for a command that exits immediately.
+- **Root Cause**: The wrapper relayed the child's output but never forwarded the parent's stdin, so the typed `/exit` never reached the process.
+- **Rule**: Use the shared relay helper for PTY probes rather than writing a new one. Also resolve every dynamic value (a loopback port, a temp path) before writing config that references it: a config written first produces a misleading `Invalid URL` and the turn never dispatches, which reads like a product failure.
