@@ -4678,3 +4678,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 验证（主代理串行）：`arguments`21（三新例：附加根写入成功且service收到附加根、只读附加根被拒、目录被替换后按身份拒绝）、`workspace`9、`fileAccess`3、`workspace/approval`25，共**59项**通过；两反转（退回只查主根、以read访问解析）均命中预期断言且finally逐字节恢复；五静态门、TS build/freshness通过，118旧docs advisory保留。端到端探针：授权前拒绝且不建文件→`/workspace add --write`保存→同一写入成功且内容精确→替换目录后旧授权再次拒绝。build `96a6043df384a05279f4b6944d2ba9c04c6f0892110ea329d30eff83361ba368`、inputs `1615471a421914223b98423c4482ffef2880b0a98e93a47bfd4b5cc7d35198f7`。
 
 边界：`apply_patch`未改动（另有跨根计划路径）；`bash`写入仍由sandbox治理；只读附加根的读取路径不变。未覆盖真实provider工具调用、桌面平台与多根并发。原47/ADD整体partial、goal active。
+
+
+### 21.40 附加workspace根同样接入read
+
+21.39修好write/edit后复查同类工具：[read](../../packages/ts-shell/src/core/tools/read.ts)的围栏同样只查主根（`verifyPathContainment(target, context.workspaceRoot)`），因此用户用`/workspace add --write`授权后**连读取都做不到**。现read复用同一`resolveWorkspaceRoot`，以`'read'`访问模式解析：只读授权可读、不可写；未注册目录仍拒绝；目录列表与文件读取都把解析出的根传给execution service。无附加根时保持原词法路径，不触碰文件系统。
+
+`glob`/`grep`的`path`是搜索起点、涉及结果路径投影，本批未改并保留为已知边界。
+
+验证（主代理串行）：`arguments`23（两新例：只读附加根可读、未注册目录仍拒）、`readBudget`7、`readCleanup`16、`readFreshness`6、`fileAccess`3、`workspace`9、`workspace/approval`25，共**89项**通过；三反转（write退回只查主根、read退回只查主根、以read解析write授权）均命中预期断言且finally逐字节恢复；五静态门、TS build/freshness通过，118旧docs advisory保留。build `eb5cc365d7fb`。边界：glob/grep搜索起点、bash sandbox写入、真实provider与桌面平台未覆盖。原47/ADD整体partial、goal active。

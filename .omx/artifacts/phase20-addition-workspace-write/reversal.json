@@ -3,13 +3,19 @@
     {
       "name": "primary-root-only-write",
       "exit": 1,
-      "tests": "1 failed | 20 skipped (21)",
+      "tests": "1 failed | 22 skipped (23)",
       "originalSha256": "17d70282acd672ea8a2abac34257e253d28b36d46f6dbc11ac476ac1c6b1bd64"
+    },
+    {
+      "name": "read-primary-only",
+      "exit": 1,
+      "tests": "1 failed | 22 skipped (23)",
+      "originalSha256": "57c4bb3e5fbdfd17fd3419310d65d7844c3f50ce06ee9457519712538c257d72"
     },
     {
       "name": "no-access-check",
       "exit": 1,
-      "tests": "1 failed | 20 skipped (21)",
+      "tests": "1 failed | 1 passed | 21 skipped (23)",
       "originalSha256": "17d70282acd672ea8a2abac34257e253d28b36d46f6dbc11ac476ac1c6b1bd64"
     }
   ],

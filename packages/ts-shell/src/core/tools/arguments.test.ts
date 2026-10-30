@@ -187,3 +187,38 @@ describe('an attached workspace root widens the file tools', () => {
     expect(write).not.toHaveBeenCalled()
   })
 })
+
+describe('an attached root is readable whatever its access mode', () => {
+  const root = (name: string): string => fs.mkdtempSync(path.join('/tmp/cheers-test/', name))
+
+  it('reads a file through a read-only attached root', async () => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true })
+    const primary = root('read-primary-')
+    const attached = root('read-attached-')
+    fs.writeFileSync(path.join(attached, 'note.txt'), 'attached body\n')
+    const service = createDefaultExecutionService()
+    const tool = createCoreToolRegistry({ executionService: service }).get('read')!
+
+    const result = await tool.execute({ path: path.join(attached, 'note.txt') }, {
+      workspaceRoot: primary, taskId: 'read-attached',
+      workspaceRoots: [captureWorkspaceRoot(attached, attached, 'read')],
+    })
+    expect(result).toMatchObject({ success: true })
+    expect(String(result.output ?? '')).toContain('attached body')
+  })
+
+  it('refuses to read through an unregistered directory', async () => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true })
+    const primary = root('unreg-primary-')
+    const attached = root('unreg-attached-')
+    const other = root('unreg-other-')
+    fs.writeFileSync(path.join(other, 'secret.txt'), 'not mine\n')
+    const service = createDefaultExecutionService()
+    const tool = createCoreToolRegistry({ executionService: service }).get('read')!
+
+    await expect(tool.execute({ path: path.join(other, 'secret.txt') }, {
+      workspaceRoot: primary, taskId: 'read-unregistered',
+      workspaceRoots: [captureWorkspaceRoot(attached, attached, 'read')],
+    })).rejects.toThrow(/outside workspace/)
+  })
+})

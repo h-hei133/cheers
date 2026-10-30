@@ -10720,3 +10720,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：附加workspace根接入write/edit（第24项修复）
 
 [addition21.39](features/phase-20-addition.md#2139-附加workspace根接入writeedit第24项修复)接21.38完成修复：write/edit先问既有`resolveWorkspaceRoot`哪个根适用；无附加根时保持原词法拒绝（不碰文件系统，主根不存在时错误不变），有附加根时按注册/访问/身份规则解析，并把解析根同时送入execution service与edit identity。21.38的`Edit operation receipt is invalid.`实际是两处根不一致所致，非账本契约问题；另发现探针缺taskId会触发同一错误。59项聚焦、两反转命中且bytes恢复、五门/TS build/freshness通过、端到端探针四步全过。build 96a6043d。边界：apply_patch与bash路径未改，未覆盖真实provider/桌面/并发；原47/ADD整体partial、goal active。
+
+### 2026-10-31：附加workspace根同样接入read
+
+[addition21.40](features/phase-20-addition.md#2140-附加workspace根同样接入read)复查同类工具：read围栏同样只查主根，授权后连读取都不行。现read复用`resolveWorkspaceRoot`以read模式解析（只读可读不可写、未注册仍拒），目录列表与文件读取都传解析根。glob/grep的搜索起点涉及结果路径投影，未改并记为边界。89项聚焦、三反转命中且bytes恢复、五门/TS build/freshness通过。build eb5cc365。原47/ADD整体partial、goal active。

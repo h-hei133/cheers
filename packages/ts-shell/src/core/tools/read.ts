@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { verifyPathContainment } from '../security/pathJail.js'
+import { resolveWorkspaceRoot } from '../workspace/roots.js'
 import { isImageFilePath } from '../../model-adapters/multimodal.js'
 import { ArtifactManager } from '../session/artifactManager.js'
 import { parsePathSelector } from './selectorParser.js'
@@ -62,7 +63,13 @@ export function createReadToolDefinition(executionService: ExecutionService): To
         }
       } else {
         target = resolveToolTarget({ path: selector.cleanPath }, 'path', context.workspaceRoot)
-        const containment = verifyPathContainment(target, context.workspaceRoot)
+        // A session can hold additional roots the user attached. Reading is
+        // allowed through a registered root whatever its access mode — a
+        // read-only grant means "may be read, not written".
+        const root = context.workspaceRoots?.length
+          ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'read') ?? context.workspaceRoot
+          : context.workspaceRoot
+        const containment = verifyPathContainment(target, root)
         if (!containment.allowed) {
           throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
         }
@@ -76,7 +83,7 @@ export function createReadToolDefinition(executionService: ExecutionService): To
             assertFileAccess: context.assertFileAccess,
             abortSignal: context.abortSignal,
             absolutePath: containment.resolvedPath,
-            workspaceRoot: context.workspaceRoot,
+            workspaceRoot: root,
             artifactRoot: context.artifactRoot,
             displayPath: selector.cleanPath,
             sessionId: context.sessionId,
@@ -93,7 +100,7 @@ export function createReadToolDefinition(executionService: ExecutionService): To
           assertFileAccess: context.assertFileAccess,
           abortSignal: context.abortSignal,
           absolutePath: containment.resolvedPath,
-          workspaceRoot: context.workspaceRoot,
+          workspaceRoot: root,
           authority: AUTHORITY,
           caller: 'core-tool:read',
           reason: 'Read an approved workspace file target.',

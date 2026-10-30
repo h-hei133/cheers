@@ -5,8 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
 const root = process.cwd(), archive = path.join(root, '.omx/artifacts/phase20-addition-workspace-write');
-const file = path.join(root, 'packages/ts-shell/src/core/tools/registry.ts');
-const original = fs.readFileSync(file);
+const defaultFile = path.join(root, 'packages/ts-shell/src/core/tools/registry.ts');
 const cases = [
   { name: 'primary-root-only-write',
     before: `          const root = context.workspaceRoots?.length
@@ -24,6 +23,12 @@ const cases = [
           }
           const content = args.content as string`,
     filter: 'writes through an attached root' },
+  { name: 'read-primary-only', file: 'packages/ts-shell/src/core/tools/read.ts',
+    before: `        const root = context.workspaceRoots?.length
+          ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'read') ?? context.workspaceRoot
+          : context.workspaceRoot`,
+    after: `        const root = context.workspaceRoot`,
+    filter: 'reads a file through a read-only attached root' },
   { name: 'no-access-check',
     before: `            ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'write') ?? context.workspaceRoot`,
     after: `            ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'read') ?? context.workspaceRoot`,
@@ -31,6 +36,8 @@ const cases = [
 ];
 const receipts = [];
 for (const item of cases) {
+  const file = item.file ? path.join(root, item.file) : defaultFile;
+  const original = fs.readFileSync(file);
   try {
     const replaced = original.toString().replace(item.before, item.after);
     assert.notEqual(replaced, original.toString(), 'reversal must change source: ' + item.name);
