@@ -1,0 +1,63 @@
+{
+  "product": [
+    {
+      "case": "populated decision options",
+      "class": "product behavior drift",
+      "evidence": "baseline.log",
+      "cause": "Decision filtering removed the synthetic choose-groups navigation action.",
+      "repair": "Retain group navigation only when allow-once is permitted."
+    },
+    {
+      "case": "advertised g and 4 shortcuts",
+      "class": "product behavior drift",
+      "evidence": "shortcuts-reversal.log",
+      "cause": "Approval input had no group action dispatch.",
+      "repair": "Dispatch choose-groups through original offered-option validation."
+    }
+  ],
+  "setup": [
+    {
+      "case": "host Enter fixture",
+      "class": "harness/setup drift",
+      "evidence": "after-options.log",
+      "failures": 2,
+      "cause": "Home is not handled by the overlay; the initial deny focus remained.",
+      "repair": "Use actual two Up events then Enter; no product Home binding added."
+    },
+    {
+      "case": "first regular CLI probe",
+      "class": "harness/setup drift",
+      "evidence": "initial-failure.json",
+      "exitCode": 1,
+      "cause": "Pager close was observed before a fresh Permission screen; the snapshot still described the group panel.",
+      "repair": "Wait for inactive pager, Permission title and completed load before asserting final approval options."
+    }
+  ],
+  "build": {
+    "case": "first build while inputs changed",
+    "class": "input freshness refusal",
+    "result": "failed before publication",
+    "cause": "Final deny-only protection was edited during compilation.",
+    "rawLogAvailable": false,
+    "notCountedAsPassed": true,
+    "finalRerun": {
+      "exitCode": 0,
+      "evidence": "build.json",
+      "source": "Continuation summary and final independent freshness receipt"
+    }
+  },
+  "final": {
+    "focusedPassed": 141,
+    "unselectedHostCases": 322,
+    "pickerPassed": 13,
+    "overlayPassed": 77,
+    "hostPassed": 51,
+    "productSourceRestored": true,
+    "cliModes": [
+      "regular",
+      "fullscreen"
+    ],
+    "cliRoundsPerMode": 4,
+    "externalRequests": 0
+  }
+}

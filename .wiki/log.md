@@ -10378,3 +10378,17 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 新增12条两模式×approval/groups/preview×默认/重绑定与两非空控制。初始fixture options方法/g快捷键/启动前binding被reload三类setup失败保留修正；有效early-exit反转12失败/2控制通过，finally字节恢复后相关过滤45项通过、322未选。一次基线handle未退出即启动后续验证链造成重叠，两者后观察exit1，无OOM观察；明确违反serial，不能称本批全程串行。此后反转/最终45/build/新鲜度/CLI逐进程串行完成。
 
 五门/diff、1536MiB build与独立freshness：build `b8f4c6b09e3d76997f67fc52532ac7da1a3f8ae20e664a10336c24fa584cf629`、inputs `6e2fff9d4f4a29c9afa08d9845e7a0b8beae5b8aa45a4268aab1b6305af8ea1a`、460/3549，host AST123未增。最终原CLI两模式pending Ctrl+D252/253ms/0、原stop1、overlay退休/零写收据/无grant与roots、磁盘interrupted；普通恢复同ID/notice/零重发、Ctrl+D135/132ms/0仍interrupted。四次cooked读回，RSS261120/264352KiB、18.26/18.46秒、各GET/POST1 loopback。surface先退休订阅，当前无tool.result不作授权或回合成功证据。工件/分类/HANDOFF、scratch清理、语法/JSON/五门/diff通过、118旧advisory，旧signal脚本原字节恢复；无独立review/live用户/外部provider/真实断连/非Linux/exe/full suite/20k。原47不升级、goal active，Git/CI另绑定。
+
+
+20.44已推送`b27a44ec35655872125ca8eeb92dc62eb19d1474`，远端main此前一致。延后精确核对Watch40976279333 completed/success、CI40976279272仍in_progress；20.43 CI40975396578已completed/success，head均一致。此前20.44验证重叠记录保留。
+
+
+## [2026-10-30] fix | 跨目录patch分组入口与原CLI单次审批
+
+沿[addition20.45](features/phase-20-addition.md#2045-跨目录patch分组审批可达与实际cli单次写入)修反馈24实际审批：非空decision options过滤choose-groups，g/4只有声明无派发。参考提供shortcut后派发action的决定，目标分组入口与直接apply须allow-once准入，按键经过原offered-option校验，保留选后preview与明确最终revision批准。
+
+原prompt builder×两模式×三入口六host回归及deny-only/无组快捷键控制，最终picker13/overlay77/过滤host51共141串行通过，322未选不算通过。过滤/shortcut反转六/四失败，finally精确恢复后141重跑通过。Home+Enter两失败为fixture不匹配，改实际Up；首轮build输入变化拒绝发布不计通过，最终稳定源码1536MiB build exit0与独立freshness通过：build `78e425be03020696bcd40a6e0a576a32f300de62f62a36f7d9298030a10bce8d`、inputs `d64d3f37b2ea1b6e4305be80647d8c96bdf9e18c0860cdac8efd7f91bd6befdc`，460/3549。AST16/31/123前后未增、既有债务保留；五门/diff与118旧advisory。
+
+原CLI/PTY/loopback两模式各g/4/Enter选第二外部目录分组、Esc拒绝四回合全部通过。完整/选后preview无写入，a持续pending，y后原writer exact operationId、selected/skipped/revision及bytes匹配，第一未选目标一直缺席，最终三committed、零grant/roots/config变化。各8 completion/4 readiness、零外部请求，退出131/138ms/0与cooked flags恢复，RSS303956/315208KiB、13.45/8.25秒。首轮regular读取旧group快照exit1保留，改等fresh Permission后重跑；时序含人为等待不作生产性能。
+
+正式工件/分类/HANDOFF与task scratch清理，syntax/JSON/收据/digest/五门/diff检查；全程heavy serial，原CLAUDE.md保留。无独立review/live用户/外部模型/read CLI/started writer故障/非Linux/桌面/exe/full suite/20k，原47不升级、goal active，本批Git/精确CI另绑定。

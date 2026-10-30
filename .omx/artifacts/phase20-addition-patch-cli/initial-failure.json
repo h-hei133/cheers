@@ -1,0 +1,57 @@
+{
+  "mode": "regular",
+  "buildId": "78e425be03020696bcd40a6e0a576a32f300de62f62a36f7d9298030a10bce8d",
+  "inputsDigest": "d64d3f37b2ea1b6e4305be80647d8c96bdf9e18c0860cdac8efd7f91bd6befdc",
+  "providerMode": "local HTTP fixture",
+  "status": "failed",
+  "attempts": [],
+  "checks": {},
+  "failure": "selected-once-options",
+  "observation": {
+    "requests": 1,
+    "starts": 1,
+    "ends": 0,
+    "approvals": [],
+    "results": [],
+    "scopes": [],
+    "sessionId": "sess_98540087529d77f9_1793318641428",
+    "snapshot": {
+      "title": "Apply which groups?",
+      "current": "84b3842c3caf",
+      "loading": false,
+      "visible": [
+        "84b3842c3caf",
+        "f6d3172dbd8c"
+      ],
+      "targetDeclared": false,
+      "directoryDeclared": true,
+      "painted": [
+        "84b3842c3caf",
+        "f6d3172dbd8c"
+      ],
+      "groups": [
+        {
+          "id": "84b3842c3caf",
+          "first": true,
+          "second": false
+        },
+        {
+          "id": "f6d3172dbd8c",
+          "first": false,
+          "second": true
+        }
+      ]
+    },
+    "pager": {
+      "active": false,
+      "firstDeclared": false,
+      "secondDeclared": false
+    }
+  },
+  "requests": 1,
+  "readinessRequests": 1,
+  "outputBytes": 18841,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

@@ -78,6 +78,38 @@ import * as modelDetails from './picker/model/details.js';
 import { recordSessionUsage, resetSessionUsage } from '../../observability/usageTelemetry.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import type { Keybindings } from './keybindings.js';
+import { buildToolEscalationPrompt } from '../../core/query/toolPolicy.js';
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind => ['g', '4', 'enter'].map(key => ({ kind, key }))))(
+  'selects exact patch groups from a populated runtime approval in the actual $kind host with $key', async ({ kind, key }) => {
+    const { mode, approval, terminal } = build({ tuiMode: kind });
+    const host = mode as unknown as { overlay: OverlayHost & { model: { visible: readonly { id: string; note?: string }[] } };
+      pager: Pager; view: InteractiveView };
+    const request = buildToolEscalationPrompt('apply_patch', 'write', '/outside/a.txt, /outside/b.txt', 'Exact one-time selection');
+    request.options = request.options.filter(option => option.value !== 'allow-always');
+    request.context = { ...request.context, explicitApproval: true, preview: 'Full public fixture plan',
+      selections: [{ id: 'group-a', label: 'Update A', files: ['/outside/a.txt'] },
+        { id: 'group-b', label: 'Update B', files: ['/outside/b.txt'] }],
+      selectionRevision: 'full', selectionPreview: ids => ({ preview: 'Only public fixture B', revision: ids.join(',') }) };
+    mode.start();
+    try {
+      const pending = approval.current!(request), observe = vi.fn(); void pending.then(observe);
+      expect(host.pager.active).toBe(true); terminal.input('\x1b');
+      await vi.waitFor(() => expect(host.pager.active).toBe(false));
+      await vi.waitFor(() => expect(host.overlay.model.visible.map(option => option.id)).toEqual(['choose-groups', 'allow-once', 'deny']));
+      expect(observe).not.toHaveBeenCalled();
+      terminal.input(key === 'enter' ? '\x1b[A\x1b[A\r' : key);
+      await vi.waitFor(() => expect(host.overlay.model.visible.map(option => option.id)).toEqual(['group-a', 'group-b']));
+      expect(observe).not.toHaveBeenCalled();
+      terminal.input(' \r');
+      await vi.waitFor(() => expect(host.pager.active).toBe(true));
+      expect(host.pager.text).toContain('Only public fixture B');
+      expect(observe).not.toHaveBeenCalled();
+      terminal.input('\x1b'); await vi.waitFor(() => expect(host.pager.active).toBe(false));
+      terminal.input('y');
+      await expect(pending).resolves.toEqual({ decision: 'allow-once', selected: ['group-b'], selectionRevision: 'group-b' });
+    } finally { mode.stop(); }
+  });
 
 it.each(['regular', 'fullscreen'] as const)('shows admitted thinking shortcuts and expands mixed streaming blocks in the actual %s host', kind => {
   const { mode, terminal } = build({ tuiMode: kind });

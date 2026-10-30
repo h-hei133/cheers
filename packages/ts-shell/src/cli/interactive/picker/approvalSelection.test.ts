@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { promptApproval } from './approval.js';
+import { approvalPicker, promptApproval } from './approval.js';
 import type { EscalationPrompt } from '../../../core/shell/approval/contract.js';
 import type { Picker } from '../overlay.js';
 
@@ -162,4 +162,12 @@ it('retires cancellation when publishing the approval fails', async () => {
     overlay: { open: vi.fn(() => { throw failure; }), close: vi.fn() }, render: vi.fn() };
   await expect(promptApproval(prompt, host, controller.signal)).rejects.toBe(failure);
   controller.abort(); expect(host.overlay.close).not.toHaveBeenCalled();
+});
+
+it('cannot choose patch groups when the prompt offers only denial', async () => {
+  const settle = vi.fn(), choose = vi.fn();
+  const picker = approvalPicker({ ...prompt, options: [{ value: 'deny', label: 'Deny', description: 'Refuse this request' }] }, settle, choose);
+  expect((await picker.load()).map(row => row.id)).toEqual(['deny']);
+  await picker.apply!(['choose-groups']);
+  expect(choose).not.toHaveBeenCalled(); expect(settle).toHaveBeenCalledWith({ decision: 'deny' });
 });

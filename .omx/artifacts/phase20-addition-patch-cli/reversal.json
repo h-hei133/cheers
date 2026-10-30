@@ -1,0 +1,19 @@
+{
+  "cases": [
+    {
+      "case": "choice",
+      "exitCode": 1,
+      "expectedFailures": 6
+    },
+    {
+      "case": "shortcuts",
+      "exitCode": 1,
+      "expectedFailures": 4
+    }
+  ],
+  "restored": true,
+  "digests": {
+    "packages/ts-shell/src/cli/interactive/picker/approval.ts": "68e4847f68e788f45146a0b7cd54c5009e939c5b809d3f47e0c91b305a2c3670",
+    "packages/ts-shell/src/cli/interactive/overlay.ts": "d35ecaf5ce8a3a918777669ce35bbb2310b6e2eb26be9d961c00d7e39e82374a"
+  }
+}

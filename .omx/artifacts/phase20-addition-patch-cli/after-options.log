@@ -1,0 +1,40 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/interactiveMode.test.ts  (373 tests | 2 failed | 367 skipped) 2928ms
+   ❯ src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'regular' host with 'enter'
+     → expected [ 'choose-groups', 'allow-once', …(1) ] to deeply equal [ 'group-a', 'group-b' ]
+   ❯ src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'fullscreen' host with 'enter'
+     → expected [ 'choose-groups', 'allow-once', …(1) ] to deeply equal [ 'group-a', 'group-b' ]
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'regular' host with 'enter'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'fullscreen' host with 'enter'
+AssertionError: expected [ 'choose-groups', 'allow-once', …(1) ] to deeply equal [ 'group-a', 'group-b' ]
+
+- Expected
++ Received
+
+  Array [
+-   "group-a",
+-   "group-b",
++   "choose-groups",
++   "allow-once",
++   "deny",
+  ]
+
+ ❯ src/cli/interactive/interactiveMode.test.ts:102:90
+    100|       expect(observe).not.toHaveBeenCalled();
+    101|       terminal.input(key === 'enter' ? '\x1b[H\r' : key);
+    102|       await vi.waitFor(() => expect(host.overlay.model.visible.map(opt…
+       |                                                                                          ^
+    103|       expect(observe).not.toHaveBeenCalled();
+    104|       terminal.input(' \r');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed | 367 skipped (373)
+   Start at  07:57:59
+   Duration  18.66s (transform 10.27s, setup 1ms, collect 15.47s, tests 2.93s, environment 0ms, prepare 55ms)

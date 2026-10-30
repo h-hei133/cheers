@@ -1,0 +1,50 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/interactiveMode.test.ts  (373 tests | 6 failed | 367 skipped) 6472ms
+   ❯ src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'regular' host with 'g'
+     → expected [ 'allow-once', 'deny' ] to deeply equal [ 'choose-groups', 'allow-once', …(1) ]
+   ❯ src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'regular' host with '4'
+     → expected [ 'allow-once', 'deny' ] to deeply equal [ 'choose-groups', 'allow-once', …(1) ]
+   ❯ src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'regular' host with 'enter'
+     → expected [ 'allow-once', 'deny' ] to deeply equal [ 'choose-groups', 'allow-once', …(1) ]
+   ❯ src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'fullscreen' host with 'g'
+     → expected [ 'allow-once', 'deny' ] to deeply equal [ 'choose-groups', 'allow-once', …(1) ]
+   ❯ src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'fullscreen' host with '4'
+     → expected [ 'allow-once', 'deny' ] to deeply equal [ 'choose-groups', 'allow-once', …(1) ]
+   ❯ src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'fullscreen' host with 'enter'
+     → expected [ 'allow-once', 'deny' ] to deeply equal [ 'choose-groups', 'allow-once', …(1) ]
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'regular' host with 'g'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'regular' host with '4'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'regular' host with 'enter'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'fullscreen' host with 'g'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'fullscreen' host with '4'
+ FAIL  src/cli/interactive/interactiveMode.test.ts > selects exact patch groups from a populated runtime approval in the actual 'fullscreen' host with 'enter'
+AssertionError: expected [ 'allow-once', 'deny' ] to deeply equal [ 'choose-groups', 'allow-once', …(1) ]
+
+- Expected
++ Received
+
+  Array [
+-   "choose-groups",
+    "allow-once",
+    "deny",
+  ]
+
+ ❯ src/cli/interactive/interactiveMode.test.ts:99:90
+     97|       expect(host.pager.active).toBe(true); terminal.input('\x1b');
+     98|       await vi.waitFor(() => expect(host.pager.active).toBe(false));
+     99|       await vi.waitFor(() => expect(host.overlay.model.visible.map(opt…
+       |                                                                                          ^
+    100|       expect(observe).not.toHaveBeenCalled();
+    101|       terminal.input(key === 'enter' ? '\x1b[H\r' : key);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 367 skipped (373)
+   Start at  07:57:08
+   Duration  22.06s (transform 10.00s, setup 0ms, collect 15.32s, tests 6.47s, environment 0ms, prepare 55ms)

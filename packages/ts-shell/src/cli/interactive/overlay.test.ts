@@ -950,6 +950,15 @@ describe("approval picker key routing", () => {
     expect(overlay.active).toBe(false);
   });
 
+  it.each(['g', '4'])('ignores the group shortcut %s when the approval offers no selection', key => {
+    const { overlay } = host(), apply = vi.fn();
+    overlay.open(approvalPicker());
+    return Promise.resolve().then(() => Promise.resolve()).then(() => {
+      press(overlay, key, apply);
+      expect(apply).not.toHaveBeenCalled(); expect(overlay.active).toBe(true);
+    });
+  });
+
   it("dismisses approval picker on escape and triggers previewEnd", async () => {
     const { overlay } = host();
     const apply = vi.fn();

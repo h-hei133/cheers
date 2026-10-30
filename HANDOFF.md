@@ -1025,3 +1025,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Ctrl+D exits an idle CLI but is swallowed while approval or its preview is open.
 - **Root Cause**: Pager/overlay input runs before the app keymap and consumes the configured app.exit key; no shutdown or run cancellation begins.
 - **Rule**: Route the configured app.exit at the host before modal ownership when the original composer draft is empty. Keep nonempty draft protection and local cancel behavior. Test approval, group selection, preview and rebound exit keys through actual input, then verify CLI zero writes and interrupted recovery without replay.
+
+
+### Decision Option Lists Must Preserve Offered Navigation Actions
+- **Symptom**: A real patch approval loses Choose groups while empty-option unit fixtures pass; the advertised g/4 keys also do nothing.
+- **Root Cause**: Navigation IDs are filtered as approval decisions, and their displayed shortcuts have no original action dispatch.
+- **Rule**: Admit navigation using its actual decision prerequisite and retain its offered ID through decision filtering. Direct apply and shortcuts must respect the same offered/enabled action contract. Cover populated original runtime prompts through both hosts, selected preview and explicit final approval; denial-only and absent actions cannot bypass admission. Synchronize pager returns on a fresh panel title and completed load before reading its options.

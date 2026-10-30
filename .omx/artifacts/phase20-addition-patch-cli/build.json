@@ -1,0 +1,25 @@
+{
+  "buildId": "78e425be03020696bcd40a6e0a576a32f300de62f62a36f7d9298030a10bce8d",
+  "inputsDigest": "d64d3f37b2ea1b6e4305be80647d8c96bdf9e18c0860cdac8efd7f91bd6befdc",
+  "compilerInputs": 460,
+  "files": 3549,
+  "compilerMatch": true,
+  "digestMatch": true,
+  "callables": {
+    "packages/ts-shell/src/cli/interactive/picker/approval.ts": {
+      "count": 16,
+      "previousCount": 16,
+      "sourceSha256": "68e4847f68e788f45146a0b7cd54c5009e939c5b809d3f47e0c91b305a2c3670"
+    },
+    "packages/ts-shell/src/cli/interactive/overlay.ts": {
+      "count": 31,
+      "previousCount": 31,
+      "sourceSha256": "d35ecaf5ce8a3a918777669ce35bbb2310b6e2eb26be9d961c00d7e39e82374a"
+    },
+    "packages/ts-shell/src/cli/interactive/interactiveMode.ts": {
+      "count": 123,
+      "previousCount": 123,
+      "sourceSha256": "bc977f6c98bad5bbb0affcadf8dbbcf389afbfb3371af8acf00c9a73b679496a"
+    }
+  }
+}

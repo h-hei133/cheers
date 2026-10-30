@@ -1,0 +1,9 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/overlay.test.ts  (77 tests) 299ms
+
+ Test Files  1 passed (1)
+      Tests  77 passed (77)
+   Start at  08:03:09
+   Duration  1.14s (transform 417ms, setup 0ms, collect 606ms, tests 299ms, environment 0ms, prepare 57ms)

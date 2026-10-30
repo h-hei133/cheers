@@ -1,0 +1,9 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/picker/approvalSelection.test.ts  (13 tests) 17ms
+
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+   Start at  08:03:08
+   Duration  344ms (transform 76ms, setup 0ms, collect 90ms, tests 17ms, environment 0ms, prepare 66ms)

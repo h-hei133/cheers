@@ -3171,7 +3171,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 | 反馈 | 当前状态 | 下一步 |
 |---|---|---|
-| 24 | 本地实现与聚焦验证；20.42补两模式原CLI的拒绝/单次write/edit/重复询问与原操作收据读回 | 缺用户目录审批现场、实际provider产生的工具调用及非Linux文件系统证据 |
+| 24 | 本地实现与聚焦验证；20.42补两模式原CLI的拒绝/单次write/edit/重复询问，20.45补跨目录patch分组选中→预览→单次审批→原操作收据读回，并修真实选项过滤与g/4派发 | 缺用户目录审批现场、实际provider产生的工具调用、read CLI及非Linux文件系统证据 |
 | 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses/Google native摘要准入已实现；20.33新增当前relay真实小请求的公开thinking/展开/恢复，auto保留，整体partial | 其他模型/协议默认与公开内容、真实账户及用户终端复验；单个relay请求不覆盖完整矩阵 |
 | 26 | 四条明确机制、MCP未开始调用及表面/渲染失败围栏已修；20.36/20.40正常/空闲、20.41 loopback忙碌流、20.43审批pending信号与20.44审批Ctrl+D均有退出/恢复证据；20.43/44修补取消等待与modal吞退出动作 | 缺真实用户故障设备/外部provider busy信号现场；MCP预算到期不能证明清理完成 |
 | 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
@@ -3809,3 +3809,28 @@ build `94b7abf7d7634fe723daacb5c93113acefbec94adb26df6dbeb29f1df03028ff`、input
 最终两模式隔离home/profile/project/outside、一条小fixture、loopback GET/POST各1，原CLI启动后提交write fixture，等once/deny原实际绘制与规范目标、磁盘turn-active/prompt后Ctrl+D。regular/fullscreen分别252/253ms exit0；原stop1/restoreSync0、overlay退休、sink ends1，终端四次含恢复均ICANON/ECHO/ISIG读回。stop先退休事件订阅，所以当前收据没有tool.result/approval.resolved，不能推断允许或回合成功。磁盘均interrupted/runPhase=turn-active/interruptedKind=turn、目标不存在、operation/grant/roots均0、兄弟与config原字节保持。普通无ID重开同一session/实际Resumed session通知，零新POST/message.started/审批；Ctrl+D135/132ms exit0仍interrupted。
 
 regular RSS261120KiB/18.26秒、fullscreen264352KiB/18.46秒；heap768MiB/每CLI25秒/2MiB，仅小fixture与loopback实际transport，不使用真实账户。正式工件[approval-exit](../../.omx/artifacts/phase20-addition-approval-exit/)保存初始CLI/夹具失败、纪律违规分类、有效反转/恢复、新鲜度与两模式四阶段收据；旧20.43脚本恢复原字节。工件语法/JSON/五门/diff通过，118旧advisory保留，task scratch/socket清理、原CLAUDE.md保留，HANDOFF追加modal吞app.exit陷阱。无独立review、live用户/外部provider、writer已开始、真实断连/EIO、非Linux/桌面/IME、exe/full suite/20k；原47不升级、ADD与goal继续active，Git/精确CI另绑定。
+
+
+20.44已推送`b27a44ec35655872125ca8eeb92dc62eb19d1474`，远端main此前一致。延后精确核对Watch40976279333 completed/success、CI40976279272仍in_progress；20.43 CI40975396578已completed/success，head均一致。此前20.44验证重叠记录保留。
+
+
+### 20.45 跨目录patch分组审批可达与实际CLI单次写入
+
+继续反馈24/20.1，先检查原[approval picker](../../packages/ts-shell/src/cli/interactive/picker/approval.ts)、[overlay输入](../../packages/ts-shell/src/cli/interactive/overlay.ts)及原prompt builder。真实工具prompt有非空once/deny选项，原picker把导航ID `choose-groups`也按decision白名单过滤；既有空options夹具掩盖了缺陷。界面虽声明`4 / g`，overlay也没有相应派发。修补只保留准许allow-once时的分组入口，直接apply也守同一准入；按键通过原accept检查提供且可用的ID后派发，不增加授权决策或写入路径。
+
+定向对照只读参考codex `tui/src/bottom_pane/approval_overlay.rs:537–574`及`shortcut_triggers_selection`：先匹配提供的shortcut再派发原action。本项目同意提供选项校验，保留自己的多组选择→选后preview→明确最终revision批准合同；参考没有同一独立patch分组流程，不称完全等价。猜测的oh-my-pi patch确认路径不存在，没有引用为证据。
+
+新增原buildToolEscalationPrompt非空选项×regular/fullscreen×g/4/两Up+Enter六条真实host回归，完整preview及选后preview期间均未settle，最终恰为group-b/revision group-b；补deny-only不可选组与无组选项快捷键不能settle。最终主代理串行picker13、overlay77、过滤host51，共141通过，322未选host不算通过。决策过滤独立反转六失败、快捷键反转四失败/两Enter控制通过，finally逐字节恢复后141项最终重跑通过。最初Home+Enter夹具两失败而g/4通过，分类为overlay不支持Home，改用实际Up不改产品Home合同。
+
+五静态门/diff通过，118旧docs-source advisory保留。首轮build期间继续编辑deny-only准入导致input changed，原构建拒绝发布并保留旧产物；该轮失败不计通过，原输出未归档。最终稳定源码重跑1536MiB build exit0后独立freshness一致：build `78e425be03020696bcd40a6e0a576a32f300de62f62a36f7d9298030a10bce8d`、inputs `d64d3f37b2ea1b6e4305be80647d8c96bdf9e18c0860cdac8efd7f91bd6befdc`，460 compilerInputs/3549 input files。AST含constructor为approval16/16、overlay31/31、host123/123，无新产品import或callable；既有overlay/host ceiling债务保留。
+
+最终原Node CLI→PTY→loopback HTTP两模式各四回合：g、4、方向键Enter选组与Esc拒绝。每组一条小saved session、隔离home/profile/project、两个外部目录，只有apply_patch、maxTurns2/output256、关闭retry/warming/skills/MCP、heap768MiB/45秒/2MiB。完整preview声明两个目录且无write/result；返回审批实际绘制choose-groups/once/deny，a保持pending且无持久批准。前三回合进入原groups、Space取消第一组、Enter后preview只声明第二目录；关闭后等待新的Permission面板，最后y批准。原writer仅提交第二文件、operationId与原readOperations精确匹配，selected/skipped IDs及preview revision一致，未选第一文件一直不存在。第四回合拒绝两个目标都不写，最终仅三条committed操作，零grant/roots，兄弟文件/config字节保持。
+
+| 模式 | local completion / readiness | g / 4 / Enter / deny回合 | Ctrl+D exit | 峰值RSS / 探针 |
+|---|---|---|---|---|
+| regular | 8 / 4 | 1181 / 1107 / 1133 / 824ms | 131ms、0 | 303956KiB / 13.45s |
+| fullscreen | 8 / 4 | 1159 / 1131 / 1159 / 825ms | 138ms、0 | 315208KiB / 8.25s |
+
+两次正常退出cooked flags恢复、零外部请求。时间含人为150ms持久键等待/夹具/观察，不能当生产性能。第一regular探针在选后pager.close立即读到旧group面板，selected-once-options断言exit1/零settled attempts，264864KiB/6.79s；保留失败收据，分类为observer同步，改等fresh Permission title与load结束后两模式全部重跑通过。
+
+正式[patch-cli工件](../../.omx/artifacts/phase20-addition-patch-cli/)归档最终收据/metrics、baseline/有效反转/恢复log、build freshness与四类失败分类；反转源码保留为不可发现测试的文本快照。工件语法/JSON/收据与源码digest、五门/diff检查后清理task scratch，原CLAUDE.md保留。HANDOFF记录真实decision选项不应过滤导航ID及shortcut必须通过原提供选项派发。此批heavy verification严格逐进程串行；无独立review、live用户/外部模型、read CLI、writer已开始的失败恢复、非Linux/桌面/IME、exe/full suite/20k。原47不升级、ADD/goal继续active；本批Git与精确CI另绑定。

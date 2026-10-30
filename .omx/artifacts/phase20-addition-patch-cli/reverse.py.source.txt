@@ -1,0 +1,30 @@
+from pathlib import Path
+import subprocess, json, hashlib
+root=Path.cwd(); scratch=root/'.tmp/approval-groups'
+picker=root/'packages/ts-shell/src/cli/interactive/picker/approval.ts'
+overlay=root/'packages/ts-shell/src/cli/interactive/overlay.ts'
+original={p:p.read_bytes() for p in (picker,overlay)}
+cases=[('choice',picker,"(option.id === 'choose-groups' || permitted(option.id as ApprovalDecision))",'permitted(option.id as ApprovalDecision)',6),
+ ('shortcuts',overlay,"""      if (key === 'g' || key === '4' || text === 'g' || text === '4') {
+        this.accept(picker, apply, ['choose-groups']);
+        return true;
+      }
+""",'',4)]
+records=[]
+try:
+ for name,file,before,after,failures in cases:
+  source=original[file].decode(); assert source.count(before)==1
+  file.write_text(source.replace(before,after))
+  try:
+   result=subprocess.run(['rtk','proxy','env','NODE_OPTIONS=--max-old-space-size=768','node','node_modules/vitest/vitest.mjs',
+    'run','src/cli/interactive/interactiveMode.test.ts','--threads=false','-t','selects exact patch groups from a populated'],
+    cwd=root/'packages/ts-shell',text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+   (scratch/(name+'-reversal.log')).write_text(result.stdout)
+   records.append({'case':name,'exitCode':result.returncode,'expectedFailures':failures})
+   assert result.returncode==1 and f'{failures} failed' in result.stdout
+  finally: file.write_bytes(original[file])
+finally:
+ for file,content in original.items():file.write_bytes(content)
+ (scratch/'reversal.json').write_text(json.dumps({'cases':records,'restored':all(f.read_bytes()==v for f,v in original.items()),
+  'digests':{str(f.relative_to(root)):hashlib.sha256(v).hexdigest() for f,v in original.items()}},indent=2)+'\n')
+print(json.dumps(records))

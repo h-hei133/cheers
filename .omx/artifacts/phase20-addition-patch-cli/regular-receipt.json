@@ -1,0 +1,126 @@
+{
+  "mode": "regular",
+  "buildId": "78e425be03020696bcd40a6e0a576a32f300de62f62a36f7d9298030a10bce8d",
+  "inputsDigest": "d64d3f37b2ea1b6e4305be80647d8c96bdf9e18c0860cdac8efd7f91bd6befdc",
+  "providerMode": "local HTTP fixture",
+  "status": "passed",
+  "attempts": [
+    {
+      "number": 1,
+      "key": "g",
+      "decision": "allow-once",
+      "pendingMs": 749,
+      "elapsedMs": 1181,
+      "choices": [
+        "choose-groups",
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingUnchanged": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": true,
+      "fileState": "exists",
+      "fileDigest": "60680fd2c73c7da94e64b15d42e2f68b30539bbcb578fa8018c9069c36b81252",
+      "operations": 1,
+      "nativeCommitStatus": "committed",
+      "unselectedAbsent": true,
+      "selectedGroups": 1,
+      "skippedGroups": 1,
+      "selectedPreviewBeforeApproval": true
+    },
+    {
+      "number": 2,
+      "key": "4",
+      "decision": "allow-once",
+      "pendingMs": 725,
+      "elapsedMs": 1107,
+      "choices": [
+        "choose-groups",
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingUnchanged": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": true,
+      "fileState": "exists",
+      "fileDigest": "60680fd2c73c7da94e64b15d42e2f68b30539bbcb578fa8018c9069c36b81252",
+      "operations": 2,
+      "nativeCommitStatus": "committed",
+      "unselectedAbsent": true,
+      "selectedGroups": 1,
+      "skippedGroups": 1,
+      "selectedPreviewBeforeApproval": true
+    },
+    {
+      "number": 3,
+      "key": "enter",
+      "decision": "allow-once",
+      "pendingMs": 752,
+      "elapsedMs": 1133,
+      "choices": [
+        "choose-groups",
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingUnchanged": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": true,
+      "fileState": "exists",
+      "fileDigest": "60680fd2c73c7da94e64b15d42e2f68b30539bbcb578fa8018c9069c36b81252",
+      "operations": 3,
+      "nativeCommitStatus": "committed",
+      "unselectedAbsent": true,
+      "selectedGroups": 1,
+      "skippedGroups": 1,
+      "selectedPreviewBeforeApproval": true
+    },
+    {
+      "number": 4,
+      "key": "deny",
+      "decision": "deny",
+      "pendingMs": 393,
+      "elapsedMs": 824,
+      "choices": [
+        "choose-groups",
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingUnchanged": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": false,
+      "fileState": "absent",
+      "operations": 3,
+      "unselectedAbsent": true,
+      "selectedGroups": 0,
+      "skippedGroups": 0,
+      "selectedPreviewBeforeApproval": false
+    }
+  ],
+  "checks": {
+    "denialNeverWrites": true,
+    "eachExternalCallRequiresAnswer": true,
+    "noPersistentGrantOrRoot": true,
+    "originalWriterCommittedSelectedGroupsOnly": true,
+    "siblingUnchanged": true,
+    "configUnchanged": true,
+    "cookedInputRestored": true
+  },
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 131,
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "requests": 8,
+  "readinessRequests": 4,
+  "outputBytes": 77322,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

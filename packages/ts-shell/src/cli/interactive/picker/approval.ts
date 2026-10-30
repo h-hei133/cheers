@@ -120,7 +120,7 @@ export function approvalPicker(
   const operation = prompt.context?.operation ? ` (${prompt.context.operation})` : "";
   const target = prompt.context?.target ? ` on '${prompt.context.target}'` : "";
   const permitted = (choice: ApprovalDecision) => !prompt.options.length || prompt.options.some(option => option.value === choice);
-  const selectable = Boolean(onChooseGroups && (prompt.context?.selections?.length ?? 0) > 1);
+  const selectable = Boolean(onChooseGroups && permitted('allow-once') && (prompt.context?.selections?.length ?? 0) > 1);
   return {
     title: `Permission: ${toolName}${operation}`,
     form: "panel",
@@ -149,10 +149,10 @@ export function approvalPicker(
         detail: "Block this action and return failure to model",
         note: "3 / n / d / esc",
       },
-    ].filter(option => permitted(option.id as ApprovalDecision)
+    ].filter(option => (option.id === 'choose-groups' || permitted(option.id as ApprovalDecision))
       && (persistentAllowed || option.id !== 'allow-always')),
     apply: async (ids): Promise<undefined> => {
-      if (ids[0] === 'choose-groups' && onChooseGroups) { onChooseGroups(); return undefined; }
+      if (ids[0] === 'choose-groups' && selectable && onChooseGroups) { onChooseGroups(); return undefined; }
       const choice = ids[0] as ApprovalDecision | undefined;
       const decision = choice && permitted(choice) ? choice : "deny";
       const selected = decision !== "deny" && prompt.context?.selections?.length

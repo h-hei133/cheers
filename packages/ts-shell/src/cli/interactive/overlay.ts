@@ -631,6 +631,10 @@ export class OverlayHost {
     if (isApprovalPicker) {
       const key = event.keyId.toLowerCase();
       const text = (event.text ?? "").toLowerCase();
+      if (key === 'g' || key === '4' || text === 'g' || text === '4') {
+        this.accept(picker, apply, ['choose-groups']);
+        return true;
+      }
       if (key === "y" || key === "1" || text === "1" || text === "y") {
         this.accept(picker, apply, ["allow-once"]);
         return true;
