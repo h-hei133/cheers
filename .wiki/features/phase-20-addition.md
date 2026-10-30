@@ -4813,3 +4813,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现两者共用一条规则：结果若在主根内则重定基到主根（搜索`src`报告`src/a.ts`），在主根外（附加根或已绝对）则报告绝对路径。glob与grep（含ripgrep路径）三条输出路径统一。修复后三种调用方式都返回`src/a.ts`且`read`可解析，附加根仍返回绝对路径。
 
 验证：`arguments`29（新例断言子目录搜索的glob与grep都返回`src/a.ts`）、`glob`19、`grep`3、`grepPaths`12、`grepRipgrep`18，共**81项**通过；七反转全部命中且finally字节恢复（旧的glob相对路径用例因源码变化已更新）；五静态门、TS build/freshness通过。build `0b0556f21575`。原47/ADD整体partial、goal active。
+
+
+### 21.54 lsp符号路径与glob/grep同一规则
+
+21.53统一glob/grep的路径规则后，本批发现`lsp`的`workspaceSymbol`仍输出**绝对路径**，而同一会话内glob/grep输出相对主根的路径——两种约定并存，用户读到一个搜索结果后无法直接喂给下一个命令。
+
+现scanner的definitions/references/workspaceSymbol三处渲染共用`reportedSymbolPath`：主根内重定基（`src/a.ts`），主根外（附加根）保持绝对。探针确认主根内为`src/a.ts`、附加根为绝对路径。
+
+验证：`lsp`12（新例断言主根内为`` `public.ts:1` ``、附加根为绝对路径）、`language`44、`arguments`29，共**85项**通过；三反转（扫描只留主根、文档符号只留主根、符号路径恒绝对）全部命中且finally字节恢复；五静态门、TS build/freshness通过。build `059b7423ab15`。原47/ADD整体partial、goal active。

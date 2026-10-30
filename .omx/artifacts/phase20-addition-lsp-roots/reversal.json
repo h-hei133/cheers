@@ -4,13 +4,19 @@
       "name": "scan-primary-only",
       "exit": 1,
       "tests": "1 failed | 11 skipped (12)",
-      "originalSha256": "4689181643e6d38c5345480fefb8ee222d1218e081ec745f2696123df79994c0"
+      "originalSha256": "1f16fe2e82d4c4343850f0d7410391380a6934c4495bc7d87c58111d5d5dda2e"
+    },
+    {
+      "name": "symbol-absolute-paths",
+      "exit": 1,
+      "tests": "1 failed | 11 skipped (12)",
+      "originalSha256": "1f16fe2e82d4c4343850f0d7410391380a6934c4495bc7d87c58111d5d5dda2e"
     },
     {
       "name": "document-symbol-primary-only",
       "exit": 1,
       "tests": "1 failed | 11 skipped (12)",
-      "originalSha256": "4689181643e6d38c5345480fefb8ee222d1218e081ec745f2696123df79994c0"
+      "originalSha256": "1f16fe2e82d4c4343850f0d7410391380a6934c4495bc7d87c58111d5d5dda2e"
     }
   ],
   "restored": true

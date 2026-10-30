@@ -191,6 +191,11 @@ describe('an attached workspace root is part of the search space', () => {
 
     const primaryResult = await tool.execute({ backend: 'scanner', operation: 'workspaceSymbol', symbol: 'primaryNeedle' }, context);
     expect(String(primaryResult.output)).toMatch(/Workspace Symbol Matches[^\n]*1 found/);
+    // Spelled the way glob and grep spell it: relative inside the primary root,
+    // absolute outside it. Two conventions for one session would make a search
+    // result unusable in the next command.
+    expect(String(primaryResult.output)).toContain('`public.ts:1`');
+    expect(String(attachedResult.output)).toContain(`${path.join(attached, 'lib.ts')}:1`);
 
     // documentSymbol must read the file under the root that owns it, rather
     // than resolving the path against the primary root and failing silently.

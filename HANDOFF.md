@@ -1304,3 +1304,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: `glob`/`grep` with `path: 'src'` report `a.ts`, and `read` on that string fails; the same tools without `path` report a usable `root.ts`.
 - **Root Cause**: The listing reports paths relative to the root it walked, and the searcher walked the subdirectory. A later tool resolves relative paths against the primary root, so a subdirectory-relative result names a file that does not exist there.
 - **Rule**: Rebase every reported path onto the primary root when it lies inside it (`src/a.ts`), and report it absolutely when it does not. Apply one rule to every search path — glob, the grep walk, and the ripgrep branch — rather than fixing them one at a time.
+
+### One Session Must Not Have Two Path Conventions
+
+- **Symptom**: `glob`/`grep` report `src/a.ts` while `lsp` reports the absolute path for the same file, so a result from one tool has to be translated before another accepts it.
+- **Root Cause**: Each search surface grew its own projection while being fixed for attached roots, and only some were rebased onto the primary root.
+- **Rule**: Keep one projection rule for every surface that reports a path — rebase inside the primary root, absolute outside it — and assert the spelling, not just that the file is reachable. When fixing a path projection, enumerate every surface that reports paths rather than the one that was reported.

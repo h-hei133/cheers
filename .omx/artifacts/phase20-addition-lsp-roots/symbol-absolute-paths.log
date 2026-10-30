@@ -1,0 +1,26 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/lsp.test.ts  (12 tests | 1 failed | 11 skipped) 44ms
+   ❯ src/core/tools/lsp.test.ts > an attached workspace root is part of the search space > finds symbols in an attached root and keeps the primary root working
+     → expected '# Workspace Symbol Matches for `prima…' to include '`public.ts:1`'
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 skipped (12)
+   Start at  02:59:11
+   Duration  3.16s (transform 2.22s, setup 0ms, collect 2.89s, tests 44ms, environment 0ms, prepare 54ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/lsp.test.ts > an attached workspace root is part of the search space > finds symbols in an attached root and keeps the primary root working
+AssertionError: expected '# Workspace Symbol Matches for `prima…' to include '`public.ts:1`'
+ ❯ src/core/tools/lsp.test.ts:197:42
+    195|     // absolute outside it. Two conventions for one session would make…
+    196|     // result unusable in the next command.
+    197|     expect(String(primaryResult.output)).toContain('`public.ts:1`');
+       |                                          ^
+    198|     expect(String(attachedResult.output)).toContain(`${path.join(attac…
+    199| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

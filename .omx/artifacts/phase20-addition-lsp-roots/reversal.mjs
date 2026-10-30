@@ -11,6 +11,16 @@ const cases = [
     before: `        const scanRoots = [context.workspaceRoot, ...(context.workspaceRoots ?? []).map(root => root.path)];`,
     after: `        const scanRoots = [context.workspaceRoot];`,
     filter: 'part of the search space' },
+  { name: 'symbol-absolute-paths',
+    before: `function reportedSymbolPath(file: string, primary: string): string {
+  const relative = path.relative(primary, file);
+  return relative === '' || relative === '..' || relative.startsWith(\`..\${path.sep}\`) || path.isAbsolute(relative)
+    ? file : relative.split(path.sep).join('/');
+}`,
+    after: `function reportedSymbolPath(file: string, _primary: string): string {
+  return file;
+}`,
+    filter: 'part of the search space' },
   { name: 'document-symbol-primary-only',
     before: `          const fileRoot = selectWorkspaceRoot(context.workspaceRoot, context.workspaceRoots ?? [],
             path.isAbsolute(filePath) ? filePath : path.resolve(context.workspaceRoot, filePath), 'read');`,

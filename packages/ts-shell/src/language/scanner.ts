@@ -22,6 +22,20 @@ import { selectWorkspaceRoot } from "../core/workspace/roots.js";
  * position would invite callers to expect the precision of a real language
  * server while getting a text scan.
  */
+/**
+ * A reported symbol path, spelled the way the file tools spell theirs.
+ *
+ * Inside the primary root a relative path resolves for every later tool, so the
+ * result is rebased onto that root; outside it, only the absolute path does.
+ * Keeping this identical to glob and grep is what lets a person read a search
+ * result and pass it to `read` without translating between two conventions.
+ */
+function reportedSymbolPath(file: string, primary: string): string {
+  const relative = path.relative(primary, file);
+  return relative === '' || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
+    ? file : relative.split(path.sep).join('/');
+}
+
 export function createScannerToolDefinition(
   executionService: ExecutionService,
 ): ToolDefinition {
@@ -167,20 +181,20 @@ export function createScannerToolDefinition(
         if (op === "definition") {
           return approvedResult(
             matches.filter((match) => match.isDefinition).length > 0
-              ? `# Definitions for \`${query}\`\n\n${matches.filter((match) => match.isDefinition).map((match) => `- \`${match.file}:${match.line}\`: \`${match.text}\``).join("\n")}`
+              ? `# Definitions for \`${query}\`\n\n${matches.filter((match) => match.isDefinition).map((match) => `- \`${reportedSymbolPath(match.file, context.workspaceRoot)}:${match.line}\`: \`${match.text}\``).join("\n")}`
               : `No definition found for symbol \`${query}\`.`,
           );
         }
         if (op === "references") {
           return approvedResult(
             matches.length > 0
-              ? `# References to \`${query}\` (${matches.length} found)\n\n${matches.slice(0, 50).map((match) => `- \`${match.file}:${match.line}\`: ${match.text}`).join("\n")}`
+              ? `# References to \`${query}\` (${matches.length} found)\n\n${matches.slice(0, 50).map((match) => `- \`${reportedSymbolPath(match.file, context.workspaceRoot)}:${match.line}\`: ${match.text}`).join("\n")}`
               : `No references found for symbol \`${query}\`.`,
           );
         }
         return approvedResult(
           matches.length > 0
-            ? `# Workspace Symbol Matches for \`${query}\` (${matches.length} found)\n\n${matches.slice(0, 30).map((match) => `- \`${match.file}:${match.line}\`: ${match.text}`).join("\n")}`
+            ? `# Workspace Symbol Matches for \`${query}\` (${matches.length} found)\n\n${matches.slice(0, 30).map((match) => `- \`${reportedSymbolPath(match.file, context.workspaceRoot)}:${match.line}\`: ${match.text}`).join("\n")}`
             : `No workspace symbols matched query \`${query}\`.`,
         );
       }
