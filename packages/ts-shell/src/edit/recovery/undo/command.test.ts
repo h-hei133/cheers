@@ -81,7 +81,21 @@ it('publishes an unknown write when access retires before readback verification'
   expect(readOperation(newer, newer.operationId).undo).toBe('unknown');
   expect(readOperation(older, older.operationId).undo).toBe('none');
   expect(result.state?.fileUndo).toMatchObject({ status: 'unknown' });
+  expect(result.report!.facts.status).toBe('unknown');
+  expect(result.output).toContain('file writes may have occurred');
   expect(result.output).not.toContain('No restoration was started');
+});
+
+it('reports a blocked turn with no restoration when its newest file changed externally', async () => {
+  const receipt = await edit('a.txt', 'new-a\n');
+  fs.writeFileSync(path.join(root, 'a.txt'), 'external-a\n');
+  const result = await runUndoCommand(['restore-turn', 'prompt-batch', '--execute'], context);
+  expect(result.report!.facts.status).toBe('blocked');
+  expect(result.state).toBeUndefined();
+  expect(result.report!.facts.steps).toEqual([]);
+  expect(result.output).toContain('No operation was restored');
+  expect(fs.readFileSync(path.join(root, 'a.txt'), 'utf8')).toBe('external-a\n');
+  expect(readOperation(receipt, receipt.operationId).undo).toBe('none');
 });
 
 it('refuses unconfirmed restoration before reading or writing any snapshots', async () => {

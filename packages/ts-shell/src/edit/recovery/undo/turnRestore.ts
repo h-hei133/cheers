@@ -56,6 +56,14 @@ export interface TurnRestoreHost {
   publish?(result: UndoResult, receipt: OperationReceipt): void;
 }
 
+/** Aggregate file evidence without flattening refused or unverified writes. */
+export function turnRestoreStatus(outcome: TurnRestoreOutcome): UndoResult['status'] {
+  if (outcome.complete) return 'restored-verified';
+  if (outcome.steps.some(step => step.status === 'unknown')) return 'unknown';
+  if (outcome.steps.some(step => step.status === 'restored-verified' || step.status === 'partial')) return 'partial';
+  return outcome.steps.some(step => step.status === 'denied') ? 'denied' : 'blocked';
+}
+
 /**
  * Restore every outstanding operation of `turnId`, newest first.
  *

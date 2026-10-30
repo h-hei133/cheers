@@ -6,7 +6,7 @@ import type { ContentVersion, OperationReceipt } from '../operation/model.js';
 import type { UndoPreview } from '../operation/preview.js';
 import type { UndoResult } from '../operation/restore.js';
 import type { UndoHistoryPage } from './history.js';
-import type { TurnRestoreOutcome } from './turnRestore.js';
+import { turnRestoreStatus, type TurnRestoreOutcome } from './turnRestore.js';
 
 const DIFF_BYTES = 64 * 1024;
 const text = (value: string): ReportLine => ({ kind: 'text', spans: [span(value)] });
@@ -84,6 +84,7 @@ function differenceStart(current: string, before: string): number {
  * named rather than omitted.
  */
 export function turnRestoreReport(outcome: TurnRestoreOutcome, turnId: string) {
+  const status = turnRestoreStatus(outcome);
   const restored = outcome.steps.filter(step => step.status === 'restored-verified').length;
   const lines: ReportLine[] = [
     text(`Turn: ${turnId}`),
@@ -96,14 +97,17 @@ export function turnRestoreReport(outcome: TurnRestoreOutcome, turnId: string) {
     ]),
     ...(outcome.skipped.length ? [text(`Not attempted: ${outcome.skipped.join(', ')}`)] : []),
     ...(outcome.stoppedBecause ? [text(`Stopped: ${outcome.stoppedBecause}`)] : []),
-    text(outcome.complete
+    text(status === 'restored-verified'
       ? 'Every operation of this turn was restored and verified.'
-      : 'Some operations were not restored. Inspect the per-operation results before starting another restoration.'),
+      : status === 'unknown' ? 'Some file results could not be verified; file writes may have occurred. Inspect /undo status before retrying.'
+      : status === 'partial' ? 'Some operations were not restored. Inspect the per-operation results before starting another restoration.'
+      : status === 'denied' ? 'Restoration was not approved. No operation was restored.'
+      : 'No operation was restored. Inspect the blockers before retrying.'),
     ...(outcome.steps.some(step => ['restored-verified', 'partial', 'unknown'].includes(step.status))
       ? [text('Previous file reads may be stale; re-read affected files before editing.')] : []),
   ];
   return createReport({ title: outcome.complete ? 'Turn undo: restored' : 'Turn undo: incomplete', lines,
-    facts: { turnId, status: outcome.complete ? 'restored-verified' : 'partial', restored,
+    facts: { turnId, status, restored,
       steps: outcome.steps.map(step => ({ operationId: step.operationId, status: step.status, files: step.files.map(file => ({ ...file })) })),
       skipped: outcome.skipped, stoppedBecause: outcome.stoppedBecause ?? null, rollbackAtomicityClaim: false } });
 }

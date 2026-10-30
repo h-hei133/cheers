@@ -1,0 +1,54 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/edit/recovery/undo/command.test.ts  (7 tests | 2 failed) 1010ms
+   ❯ src/edit/recovery/undo/command.test.ts > publishes an unknown write when access retires before readback verification
+     → expected 'partial' to be 'unknown' // Object.is equality
+   ❯ src/edit/recovery/undo/command.test.ts > reports a blocked turn with no restoration when its newest file changed externally
+     → expected 'partial' to be 'blocked' // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/edit/recovery/undo/command.test.ts > publishes an unknown write when access retires before readback verification
+AssertionError: expected 'partial' to be 'unknown' // Object.is equality
+
+- Expected
++ Received
+
+- unknown
++ partial
+
+ ❯ src/edit/recovery/undo/command.test.ts:84:39
+     82|   expect(readOperation(older, older.operationId).undo).toBe('none');
+     83|   expect(result.state?.fileUndo).toMatchObject({ status: 'unknown' });
+     84|   expect(result.report!.facts.status).toBe('unknown');
+       |                                       ^
+     85|   expect(result.output).toContain('file writes may have occurred');
+     86|   expect(result.output).not.toContain('No restoration was started');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/edit/recovery/undo/command.test.ts > reports a blocked turn with no restoration when its newest file changed externally
+AssertionError: expected 'partial' to be 'blocked' // Object.is equality
+
+- Expected
++ Received
+
+- blocked
++ partial
+
+ ❯ src/edit/recovery/undo/command.test.ts:93:39
+     91|   fs.writeFileSync(path.join(root, 'a.txt'), 'external-a\n');
+     92|   const result = await runUndoCommand(['restore-turn', 'prompt-batch',…
+     93|   expect(result.report!.facts.status).toBe('blocked');
+       |                                       ^
+     94|   expect(result.state).toBeUndefined();
+     95|   expect(result.report!.facts.steps).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 5 passed (7)
+   Start at  09:34:18
+   Duration  1.98s (transform 527ms, setup 0ms, collect 740ms, tests 1.01s, environment 0ms, prepare 55ms)
+

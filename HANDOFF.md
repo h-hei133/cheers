@@ -1059,3 +1059,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Line-ending editor fixtures pass locally but all five fail in CI with Could not run rtk proxy node.
 - **Root Cause**: A developer shell-command convention was embedded into EDITOR, which the product spawns directly. CI does not install that wrapper.
 - **Rule**: Use quoted process.execPath and a quoted fixture script path for Node-backed editor fixtures. Exercise empty PATH and paths containing spaces, then restore environment in finally. Keep development command wrappers outside product and test subprocess configuration.
+
+
+### Batch Reports Must Use The Same File Evidence As Context Notices
+- **Symptom**: A turn report says partial when the ledger and next-request notice say unknown, or when no restoration was attempted.
+- **Root Cause**: The report derives status from complete alone while the command derives it from per-step file outcomes.
+- **Rule**: Derive batch status once in the turn owner and reuse it for report and context notice. Preserve unverified writes as unknown, actual incomplete changes as partial, and zero-restore refusal as blocked/denied. Verify the original writer's post-rename readback failure separately from the CLI's zero-write blocked path.

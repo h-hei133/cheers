@@ -1,0 +1,12 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/edit/recovery/undo/command.test.ts  (7 tests) 1017ms
+ ✓ src/edit/recovery/undo/service.test.ts  (16 tests) 1945ms
+ ✓ src/edit/recovery/undo/turnRestore.test.ts  (8 tests) 281ms
+
+ Test Files  3 passed (3)
+      Tests  31 passed (31)
+   Start at  09:35:10
+   Duration  12.97s (transform 5.42s, setup 0ms, collect 9.43s, tests 3.24s, environment 0ms, prepare 54ms)
+

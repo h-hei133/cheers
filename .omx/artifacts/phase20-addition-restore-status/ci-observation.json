@@ -1,0 +1,29 @@
+{
+  "observedAt": "2026-10-30",
+  "runs": [
+    {
+      "head": "189374283093ce678469451da1f70f5185ed00be",
+      "ci": 40986394168,
+      "status": "in_progress",
+      "watch": 40986394211,
+      "watchConclusion": "success"
+    },
+    {
+      "head": "1ab0cc6f1c4145ebbcb343eaa3a7ae3631f856f0",
+      "ci": 40986098392,
+      "status": "in_progress",
+      "watch": 40986098348,
+      "watchConclusion": "success"
+    },
+    {
+      "head": "ef4d078d43f2923a02e6d60efe1166ec339633d2",
+      "ci": 40983398554,
+      "conclusion": "failure",
+      "failedFile": "src/cli/interactive/externalEditor.test.ts",
+      "failedTests": 5,
+      "passedTests": 12552,
+      "skippedTests": 3,
+      "classification": "same missing rtk editor fixture as 20.48; repaired in 20.51"
+    }
+  ]
+}

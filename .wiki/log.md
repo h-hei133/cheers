@@ -10453,3 +10453,12 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 [addition20.51](features/phase-20-addition.md#2051-外部编辑器回归不依赖开发命令包装器)修20.48 CI五失败：fixture把本机rtk当EDITOR，CI没有该wrapper。空PATH有效baseline五失败，改quoted process.execPath/script、含空格目录后21通过；只反转command五失败、字节恢复后21重跑。产品/editor/build/CI未改，不重复build或PTY；五门/diff、正式工件与HANDOFF、scratch清理，118旧advisory，原47不升级、goal active。
 
 20.50已推送1ab0cc6f1c4145ebbcb343eaa3a7ae3631f856f0，原undo及usage修补76聚焦测试与两模式CLI证据已绑定；本批未即时轮询其CI，Git/精确CI另记录。
+
+
+## [2026-10-30] fix | 整轮恢复报告的unknown与blocked
+
+[addition20.52](features/phase-20-addition.md#2052-整轮恢复报告区分未知写入与零写阻止)修非complete报告恒partial。原turn owner统一状态给command/report，unknown明确可能写入、blocked零restore，writer/权限/顺序保持。真实writer两baseline失败，原report反转两失败/字节恢复，三文件31重跑通过；五门/build/freshness460/3550、build d230293ba013、inputs38e7a234c675，turn owner1→2 callables、118旧advisory。
+
+原CLI两模式blocked外部a/b零恢复且无通知→partial仅b恢复保留a→complete newest-first→两通知下一HTTP全部通过；7POST/3GET，退出177/160ms、0/cooked，正式工件/scratch清理、CLAUDE.md保留。unknown故障只有实际writer单元证据，不冒充CLI故障注入；无subagent/重验证并发/exe/full suite/20k或独立review，原47不升级、goal active。
+
+20.51已推送189374283093ce678469451da1f70f5185ed00be；延后CI40986394168/20.50 CI40986098392仍in_progress、对应Watchsuccess。20.49 CI40983398554现failure，同五editor fixture缺rtk、12552 passed/3 skipped，20.51已修但未来CI未确认。本批Git/精确CI另记录。

@@ -1,0 +1,35 @@
+{
+  "buildId": "d230293ba0136f9333b0b9ae2cbe2888df958bbe742457c5d7a5eea780eb5b7f",
+  "inputsDigest": "38e7a234c675456715ac40de07845047e52c7b7470890ca1a727c28e8cc0fbda",
+  "compilerInputs": 460,
+  "files": 3550,
+  "compilerMatch": true,
+  "digestMatch": true,
+  "callables": {
+    "packages/ts-shell/src/edit/recovery/undo/turnRestore.ts": {
+      "count": 2,
+      "previousCount": 1,
+      "sourceSha256": "ecf82748961c6485cb49f5fa6ccc8e0f8e524c8bfd780d5e7d0e8d5ef0fc3cb1"
+    },
+    "packages/ts-shell/src/edit/recovery/undo/report.ts": {
+      "count": 8,
+      "previousCount": 8,
+      "sourceSha256": "3c1725bf2dbfe32c19ce1889025ac47c6c9afa7c02fc5fd2bfca8d619b4a7f9b"
+    },
+    "packages/ts-shell/src/edit/recovery/undo/command.ts": {
+      "count": 4,
+      "previousCount": 4,
+      "sourceSha256": "59ddc237cbc9d6044fc3ee89b2e836376534e0235507953bee197200699ad733"
+    },
+    "packages/ts-shell/src/edit/recovery/undo/service.ts": {
+      "count": 10,
+      "previousCount": 10,
+      "sourceSha256": "8fa2c1aab73ad173580e30fa8b9f1cebc1c861162a234e42ffb3b6f12145aa29"
+    },
+    "packages/ts-shell/src/observability/usageTelemetry.ts": {
+      "count": 16,
+      "previousCount": 16,
+      "sourceSha256": "b80b2049b4c6a4857c548ce0ac3c9d43a8fb518d1cab6a25188d7bb696c129c2"
+    }
+  }
+}

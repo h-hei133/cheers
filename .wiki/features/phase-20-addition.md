@@ -3949,3 +3949,16 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 仅改[externalEditor.test.ts](../../packages/ts-shell/src/cli/interactive/externalEditor.test.ts)：fixture用已运行的`process.execPath`绝对路径及quoted script路径，目录故意含空格；只在这五个case内设空PATH、finally恢复，证明编辑器不依赖rtk或PATH中node。调用仍走原splitEditorCommand/spawnSync/readback，未mock writer或改产品/editor/build/CI配置。shell command纪律属于开发调用，不能成为产品或测试运行时的安装前提。
 
 空PATH的有效baseline五失败/16未选，修补后原owner21通过。独立只反转EDITOR command再次五失败，finally精确恢复SHA256 `e8d0eec3197c675e70df5cf6450b7c7713a92f184bdbad61236f65bb1aadb426`后21重跑。五静态门与diff通过、118旧docs advisory保留；产品未变不重复build/PTY，全程serial。正式[工件](../../.omx/artifacts/phase20-addition-editor-fixture/)保存分类与反转；原CLAUDE.md保留、无新scratch残留/真实provider/非Linux/独立review，原47不升级、goal active。本批Git与未来CI另绑定。
+
+
+### 20.52 整轮恢复报告区分未知写入与零写阻止
+
+沿20.50实际writer测试发现[report](../../packages/ts-shell/src/edit/recovery/undo/report.ts)把所有非complete结果固定为partial：撤权落在rename后/readback前时原账本与state为unknown、报告却partial；最新文件外部变化导致零restore时也partial。原[turnRestore](../../packages/ts-shell/src/edit/recovery/undo/turnRestore.ts)增加turnRestoreStatus作为本域统一判定，原[command](../../packages/ts-shell/src/edit/recovery/undo/command.ts)和report复用。完整verified、unknown、已改变的partial、denied、blocked分别保留；unknown正文明确可能写入、检查账本，blocked说明本次没有operation restored。未改变恢复顺序、writer、权限、snapshot或发布时机。
+
+真实writer基线两失败/五通过；新增零写blocked case并加强既有rename后撤权unknown断言。三文件31通过，独立只恢复原report再次两失败/五通过，finally字节恢复后31重跑。五门/build/独立freshness通过，build `d230293ba0136f9333b0b9ae2cbe2888df958bbe742457c5d7a5eea780eb5b7f`、inputs `38e7a234c675456715ac40de07845047e52c7b7470890ca1a727c28e8cc0fbda`，460/3550；turnRestore callable1→2，其余不增且≤20，118旧docs advisory。对照20.50已读的逐操作恢复与会话上下文/账单身份决定，保留本项目较强partial/unknown，不新造reference式workspace rewind。
+
+原NodeCLI/PTY/loopback两模式各在两真实edit后先外部改a/b：--execute报告blocked、零账本restore、无fileUndo通知、外部bytes不变。再恢复b的已记录post-edit bytes，partial恢复b而保留外部a，第二轮complete恢复，通知落盘/下一请求断言全部通过。regular blocked254/partial634/complete909/exit177ms；fullscreen255/609/938/160ms，均exit0/cooked flags、7POST/3GET、config不变、local undo零model请求。unknown由原writer单元撤权场景证明，CLI未注入该故障；计时含fixture，不当生产性能。
+
+正式[工件](../../.omx/artifacts/phase20-addition-restore-status/)保存baseline/reversal/build/CLI和收据，task scratch归档清理；原CLAUDE.md保留。全程heavy serial、无subagent/exe/full suite/20k；未验production provider/非Linux/desktop/独立review/整体workspace snapshot，原47/ADD不升级、goal active。
+
+20.51已推送`189374283093ce678469451da1f70f5185ed00be`。延后精确观察：其CI40986394168、20.50 CI40986098392均in_progress，Watch40986394211/40986098348均success。20.49 CI40983398554已failure，五externalEditor fixture依赖缺少rtk、12552 passed/3 skipped，和20.48同因，20.51修补已在远端；仍不把待跑完CI视为通过。本批Git/CI另绑定。

@@ -8,7 +8,7 @@ import { contentHashPattern, safeRecoveryId } from '../record.js';
 import { executeUndo, operationsForTurn, prepareUndo, readUndoHistoryPage, undoAccess, undoHistory } from './service.js';
 import { validUndoHistoryCursor } from './history.js';
 import { turnRestoreReport, undoNotice, undoPreviewReport, undoResultReport, undoStatusReport } from './report.js';
-import { restoreTurn } from './turnRestore.js';
+import { restoreTurn, turnRestoreStatus } from './turnRestore.js';
 
 export async function runUndoCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
   if (args[0] === '--hard' || args[0] === '--discard') return { kind: 'local', output:
@@ -33,9 +33,10 @@ export async function runUndoCommand(args: string[], context: CommandContext): P
       // "confirmed".
       executionStarted = true;
       const outcome = await restoreTurn({ context: () => context }, executeTurn, parsed.flags.has('execute'), undoAccess(context));
-      const changed = outcome.steps.some(step => ['restored-verified', 'partial', 'unknown'].includes(step.status));
+      const status = turnRestoreStatus(outcome);
+      const changed = ['restored-verified', 'partial', 'unknown'].includes(status);
       executionState = changed ? { fileUndo: { operationId: `turn:${executeTurn}`,
-        status: outcome.complete ? 'restored-verified' : outcome.steps.some(step => step.status === 'unknown') ? 'unknown' : 'partial',
+        status,
         files: outcome.steps.flatMap(step => step.files.map(file => ({ ...file }))) } } : undefined;
       return { ...local(turnRestoreReport(outcome, executeTurn)), state: executionState,
         ...(changed ? { stateFailureWarning: 'File results remain in the operation receipt; the model context update could not be confirmed.' } : {}) };

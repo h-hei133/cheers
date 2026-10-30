@@ -1,0 +1,59 @@
+{
+  "mode": "fullscreen",
+  "buildId": "d230293ba0136f9333b0b9ae2cbe2888df958bbe742457c5d7a5eea780eb5b7f",
+  "inputsDigest": "38e7a234c675456715ac40de07845047e52c7b7470890ca1a727c28e8cc0fbda",
+  "provider": "loopback HTTP fixture",
+  "status": "passed",
+  "stages": [
+    {
+      "action": "unconfirmed batch",
+      "elapsedMs": 153,
+      "writes": 0,
+      "modelRequests": 0
+    },
+    {
+      "action": "blocked batch",
+      "elapsedMs": 255,
+      "writes": 0,
+      "noModelNotice": true
+    },
+    {
+      "action": "real partial batch",
+      "elapsedMs": 609,
+      "newerRestored": true,
+      "olderChangedPreserved": true,
+      "persistedModelNotice": true,
+      "reportDigest": "8a5154ead6898224fe5e49448f85675879920b7bc6e622ee7f85ad19661738a0"
+    },
+    {
+      "action": "real complete batch",
+      "elapsedMs": 938,
+      "bothRestored": true,
+      "newestFirst": true,
+      "persistedModelNotice": true
+    }
+  ],
+  "checks": {
+    "noWriteWithoutConfirmation": true,
+    "partialDoesNotOverwriteExternal": true,
+    "completeRestoresBoth": true,
+    "partialNoticeReachedNextRequest": true,
+    "completeNoticeReachedNextRequest": true,
+    "localUndoDoesNotRequestModel": true,
+    "configUnchanged": true
+  },
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 160,
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "requests": 7,
+  "readinessRequests": 3,
+  "outputBytes": 46699,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}
