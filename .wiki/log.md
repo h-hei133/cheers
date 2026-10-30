@@ -10848,3 +10848,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：fork不再继承未开始的审批（子代理review F1）
 
 [addition21.69](features/phase-20-addition.md#2169-fork不再继承未开始的审批子代理review-f1)子代理review找到：审批在工具启动前询问，故approval.requested可无对应tool.started，21.64的过滤漏掉它。现同时从approval.requested播种、以approval.resolved结算。42项聚焦、一反转到命中、五门/TS build通过。F2经探针核实均有兜底，降级为潜在不一致。build 69a1ba79。原47/ADD整体partial、goal active。
+
+### 2026-10-31：近期批次的CI结论
+
+延后读回：`14d2da3b`（并发写入证据）、`5e09ce94`（transcript权威性）、`ef4c120e`（子代理模型纠正）三个提交的CI与NormProof均completed/success且head一致；`9da50c94`（fork审批修复）Watch success、CI当时in_progress另绑定。绿色CI不替代真实provider/桌面/图形协议验收，原47/ADD整体仍partial、goal active。
