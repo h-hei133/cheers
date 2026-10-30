@@ -1150,3 +1150,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A composer click mapped by row kind alone also positions the caret through its side border, gutter or scrollbar.
 - **Root Cause**: Content rows carry source cells and surrounding shape glyphs together; the source-boundary mapper correctly clamps padding but does not decide pointer admission.
 - **Rule**: Admit caret clicks only inside the contentColumn/contentCells interval of a content row. Keep row-end blank text cells usable, and let selection retain its separate mapping and ownership.
+
+### An Inactive Tool Must Not Acquire Session History Just To Return Empty
+- **Symptom**: Typing three draft characters triggers many synchronous current-transcript reads even with no active Git commit intent and no provider requests.
+- **Root Cause**: Dynamic foreground tool discovery calls the commit-intent owner repeatedly, and its current-session supplier loaded full history before checking the local armed state.
+- **Rule**: Reject an absent host intent before acquiring its authoritative prompt. When armed, retain current session/cwd/source/intent revalidation; do not replace durable authority with a convenient cached draft. Attribute actual read calls by owner in small CLI probes, and report remaining startup reads separately.

@@ -4409,3 +4409,16 @@ build `02517cf6aedf162c04ac06a13af6cdddbf144202f4b18b3a8f31b3e167b52d65`，input
 原Node CLI两模式各1保存会话×1消息，isolated home/profile/project、synthetic offline、heap768MiB、45秒/2MiB限额。两模式实际重复粘贴、展开撤销后再粘贴、超时后保留剪贴板、输入并删回后失效均通过；物理PTY依次40/80/120列，全屏点击宽字第二格后插入准确、拖回不定位，press后resize的旧release拒绝；regular同坐标SGR不会到pointer。user/project config及models字节不变、请求0、exit0/cooked flags，退出132/133ms仅为小夹具观测。
 
 publication首轮只换方向仍失败，诊断看到完整内置条目后改为精确目标的有界键盘遍历；未修改model排序或刷新产品代码。首轮probe误把regular document视作具有composer鼠标几何；全屏第二轮又在caret已到目标时提前完成等待，将尚未处理的新click混入后续drag收据。失败收据均保留，分别改为regular直接验证无pointer调用、全屏同时等待实际新增mouse events与caret。产品未为探针改动。最终build `e30fee9b2190193441b0f69215310220045526ee43dc1349097bb7be883f670b`，inputs `499f2356143bf0a5fb68a49b55e5a9b569d946c1734d9e33d3f107ac47710fb3`，与[正式工件](../../.omx/artifacts/phase20-addition-input-gestures/README.md)绑定。第36/37项本地实现和小型CLI验证通过；真实桌面手感/其他平台未验收，33用户大目录体验仍partial，原47与ADD整体不升级，goal active。本批提交/推送及未来CI另绑定。
+
+
+### 21.18 第三十三残余开销：未准备的Git工具清单不再读取会话全文
+
+21.13实际CLI归因曾发现当前会话的Git工具投影同步读取，未误记为删除目标的读取。本批沿[foregroundTools](../../packages/ts-shell/src/cli/runtime/prompt.ts)→[Git runtime](../../packages/ts-shell/src/cli/runtime/git.ts)→[commit intent](../../packages/ts-shell/src/workflow/git/operation/intent.ts)定位：tools先调用current supplier，后检查armed；supplier通过manager.getSession读取当前完整transcript，因此输入估算/工具清单即使没有原生提交意图也重复读全文。
+
+修补仅调整原意图owner的顺序：无armed立即返回空Git工具列表；已有armed仍获取原权威prompt，继续校验session/cwd/user role/source/exact intent ID。未使用缓存draft代替持久来源，未新增工具库存、索引或prompt缓存，未改变Git审批、准备计划和write/readback边界。定向只读对照pi agent-session.ts:1518–1541：普通工具发现从已激活工具状态投影，不为清单重载session history；参考没有本项目host-armed提交合同，未借用其机制或放松本项目权威校验。
+
+先采集修补前后同一小型原NodeCLI：regular/fullscreen各1保存会话×1消息，实际输入三个字符并等待预览；两模式修补前均21次tool discovery/21次其内部同步transcript读，全程共23次。修补后仍均21次discovery，该owner内同步读0，全程剩余2次启动读取。不是全进程零读取，也不是用户大目录延迟/heap实测；21.3扫描/删除的既有预算和复验保持原样。synthetic offline、heap768MiB、45秒/2MiB限额；user/project config和models字节不变，零请求，exit0/cooked，退出145/139ms仅小夹具观测。
+
+主代理单进程串行五静态门、intent/native operation两文件32项、runtime preview筛选4项（另99项未运行）通过；两反转分别恢复急切读取与移除armed来源/ID拒绝，均失败并finally逐字节恢复。前者命中测试特意抛出的history acquisition错误，不写成AssertionError；后者命中身份断言。恢复后intent8项与实际foreground投影1项再通过，随后TS build、owner AST审计及两模式CLI。intent named callable5→5，无新增超限。build `0edc912eddca92511a12ff9d3b0a27fb46943988fa462266ff204061bb411be7`，inputs `0632b42b62113c7e481b33b122d724cb88680e1400c11a45fb7a605db1edeb57`，与[正式工件](../../.omx/artifacts/phase20-addition-idle-tools/README.md)绑定。
+
+没有本地全套/并行heavy/子代理/20k真实终端、exe、独立review、NormProof judge或真实provider/其他平台验收；scratch清理、原CLAUDE.md保留。第33项减少一条已确认的残余同步开销，用户大目录实际体验仍partial，原47与ADD整体不升级，goal active。延后读回b30801aa的CI41026961526仍in_progress、Watch41026961630 completed/success且head一致；不等待/重复轮询，本批提交/推送与未来CI单独绑定。

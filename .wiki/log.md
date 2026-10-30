@@ -10558,3 +10558,12 @@ resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不�
 主代理串行九文件295项、13条宿主筛选与另19条publication补验，合计327项；五反转/bytes恢复、五静态门、TS build及两模式原NodeCLI通过。小fixture每模式1会话×1消息，40/80/120列物理resize、真实SGR点击插入/drag与旧release拒绝、重复粘贴/过期/编辑删回/撤销失效，零请求、文件不变、exit0/cooked。完整builtin目录使publication旧单步邻项假设失效，修为有界键盘遍历+精确ID；settings间接测试改用navigation、当前列表列/退出路径和完整typed draft。历史CI26d3a53c的8失败与fda6a665的9失败收据保留，当前局部修复通过不改变历史SHA verdict；本批远端CI另绑定。
 
 正式工件保留probe初期geometry/event同步错误与publication只改方向的失败日志，最终收据绑定新build；HANDOFF记录指针事件同步和内容行内chrome边界。pastes20、projection3、pointer16、keys3，既有host122未增长但责任债未解决。未做全套本地回归/20k/独立review/真实桌面或其他平台验收；第36/37本地实现验证通过，33大目录体验、原47和ADD整体不升级，goal active。
+
+
+## [2026-10-30] perf | 未准备的Git工具发现跳过会话全文读取
+
+[addition21.18](features/phase-20-addition.md#2118-第三十三残余开销未准备的git工具清单不再读取会话全文)沿真实CLI归因残余current-session同步读：GitCommitIntent先获取完整当前prompt后才看armed。仅在原owner提前拒绝不存在的host intent，已有intent继续原权威session/cwd/role/source/ID校验；不改审批、write或缓存结构。
+
+主代理串行五门、32项Git测试和4条preview筛选通过，两反转/bytes恢复，恢复后8+1聚焦、TS build/owner审计和两模式原NodeCLI通过。每模式1保存会话×1消息、三个真实草稿字符，before/fixed均21次discovery，其内部同步transcript读21→0，全程23→2，剩余启动读取单列；文件不变、零请求、exit0/cooked。不是大目录实测或全局零读取。intent callable5不变，正式收据/HANDOFF保留，scratch清理。
+
+第33项用户大目录体验仍partial，原47/ADD整体不升级、goal active。上一批b30801aa CI41026961526延后读回仍in_progress，Watch41026961630 success且head一致；本批Git/未来CI另绑定，未做full suite/20k/独立review/真实provider与其他平台。

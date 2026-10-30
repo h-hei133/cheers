@@ -1,0 +1,31 @@
+{
+  "initial": {
+    "staticGates": [
+      "verify:import-cycles",
+      "check:config-consumers",
+      "check:declarations",
+      "check:node-floor",
+      "verify:docs-drift:strict"
+    ],
+    "staticPassed": true,
+    "docsSourceAdvisories": 118,
+    "unitFiles": [
+      "src/workflow/git/operation/intent.test.ts",
+      "src/workflow/git/operation/operation.test.ts"
+    ],
+    "unitPassed": 32,
+    "previewFile": "src/cli/runtime/context/preview.test.ts",
+    "previewFilter": "idle foreground tools|composed .* prompt through the native Git owner",
+    "previewPassed": 4,
+    "previewExcluded": 99
+  },
+  "restored": {
+    "intentPassed": 8,
+    "idlePreviewPassed": 1,
+    "previewExcluded": 102,
+    "log": "final-validation.log"
+  },
+  "uniqueFocusedTestsPassed": 36,
+  "serialMainAgentOnly": true,
+  "fullSuiteRun": false
+}

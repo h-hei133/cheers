@@ -1,0 +1,14 @@
+[
+  {
+    "file": "workflow/git/operation/intent.ts",
+    "count": 5,
+    "baseline": 5,
+    "names": [
+      "arm",
+      "tools",
+      "onRefusal",
+      "prepare",
+      "execute"
+    ]
+  }
+]

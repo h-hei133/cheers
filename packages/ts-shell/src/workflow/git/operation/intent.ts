@@ -18,8 +18,11 @@ export class GitCommitIntent {
     this.armed = { id, sessionId: current.id, cwd: current.cwd, snapshot, index }; return id;
   }
   tools(git: NativeGit): readonly ToolDefinition[] {
-    const capture = this.armed; const current = this.current();
-    if (!capture || capture.sessionId !== current.id || capture.cwd !== current.cwd
+    const capture = this.armed;
+    // Tool discovery also runs while typing. An unarmed intent needs no history.
+    if (!capture) return [];
+    const current = this.current();
+    if (capture.sessionId !== current.id || capture.cwd !== current.cwd
       || current.prompt?.role !== 'user' || current.prompt.metadata?.source !== 'git-commit' || current.prompt.metadata.gitCommitId !== capture.id) return [];
     return [{ name: 'git_commit', description: 'Commit only the exact host-armed staged index. Cannot stage, amend, merge or push. Ordinary exact command approval and snapshot validation are required.',
       argsSchema: { type: 'object', additionalProperties: false, required: ['commitId', 'message'], properties: { commitId: { const: capture.id }, message: { type: 'string', minLength: 1, maxLength: 64000 } } },

@@ -1,0 +1,26 @@
+{
+  "mode": "fullscreen",
+  "buildId": "0edc912eddca92511a12ff9d3b0a27fb46943988fa462266ff204061bb411be7",
+  "inputsDigest": "0632b42b62113c7e481b33b122d724cb88680e1400c11a45fb7a605db1edeb57",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "passed",
+  "checks": {
+    "toolCalls": 21,
+    "toolTranscriptReads": 0,
+    "totalSyncTranscriptReads": 2,
+    "cookedInputRestored": true,
+    "zeroRequests": true,
+    "filesUnchanged": true
+  },
+  "widths": [],
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 139,
+  "outputBytes": 3990,
+  "scratchRemoved": true,
+  "expected": "fixed"
+}

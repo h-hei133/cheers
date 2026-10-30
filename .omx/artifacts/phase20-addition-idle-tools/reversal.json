@@ -1,0 +1,15 @@
+{
+  "cases": [
+    {
+      "name": "idle-history",
+      "exit": 1,
+      "sourceSha256": "647aa0186d39d3751a6a7ba68f5dade9a67fccf41f33b8e49299334b4d0f4495"
+    },
+    {
+      "name": "armed-origin",
+      "exit": 1,
+      "sourceSha256": "647aa0186d39d3751a6a7ba68f5dade9a67fccf41f33b8e49299334b4d0f4495"
+    }
+  ],
+  "restored": true
+}

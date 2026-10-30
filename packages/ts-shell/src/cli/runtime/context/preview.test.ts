@@ -126,6 +126,13 @@ it('estimates an empty startup through the actual tool projection without provid
   expect(files.map(target => fs.readFileSync(target))).toEqual(before); expect(fs.existsSync(layout.stateLockPath)).toBe(false);
 });
 
+it('projects idle foreground tools without loading the Git session history', () => {
+  const { context, manager } = fixture({ git: true });
+  const getSession = vi.spyOn(manager, 'getSession').mockImplementation(() => { throw new Error('No history read for an unarmed commit.'); });
+  for (let index = 0; index < 10; index++) expect(foregroundTools(context).some(tool => tool.name === 'git_commit')).toBe(false);
+  expect(getSession).not.toHaveBeenCalled();
+});
+
 it('withdraws an actual runtime estimate after raw memory changes while retaining its pending generation and session bytes', async () => {
   const { cwd, context, load, layout, gateway } = fixture();
   const store = createProjectMemoryLocalStore({ ref: { mode: 'test-only', root: cwd } });

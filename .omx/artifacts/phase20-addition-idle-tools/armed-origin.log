@@ -1,0 +1,71 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/workflow/git/operation/intent.test.ts  (8 tests | 2 failed | 2 skipped) 16ms
+   ❯ src/workflow/git/operation/intent.test.ts > commit intent tool discovery > still acquires the authoritative prompt and rejects a changed source when armed
+     → expected [ { name: 'git_commit', …(5) } ] to deeply equal []
+   ❯ src/workflow/git/operation/intent.test.ts > commit intent tool discovery > still acquires the authoritative prompt and rejects a changed intent when armed
+     → expected [ { name: 'git_commit', …(5) } ] to deeply equal []
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed | 2 skipped (8)
+   Start at  16:42:03
+   Duration  1.17s (transform 736ms, setup 0ms, collect 912ms, tests 16ms, environment 0ms, prepare 58ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/workflow/git/operation/intent.test.ts -t authoritative prompt
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/workflow/git/operation/intent.test.ts > commit intent tool discovery > still acquires the authoritative prompt and rejects a changed source when armed
+ FAIL  src/workflow/git/operation/intent.test.ts > commit intent tool discovery > still acquires the authoritative prompt and rejects a changed intent when armed
+AssertionError: expected [ { name: 'git_commit', …(5) } ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   Object {
++     "argsSchema": Object {
++       "additionalProperties": false,
++       "properties": Object {
++         "commitId": Object {
++           "const": "8ed72f54-a4bb-4285-868e-6f54e63ced1b",
++         },
++         "message": Object {
++           "maxLength": 64000,
++           "minLength": 1,
++           "type": "string",
++         },
++       },
++       "required": Array [
++         "commitId",
++         "message",
++       ],
++       "type": "object",
++     },
++     "description": "Commit only the exact host-armed staged index. Cannot stage, amend, merge or push. Ordinary exact command approval and snapshot validation are required.",
++     "execute": [Function execute],
++     "name": "git_commit",
++     "onRefusal": [Function onRefusal],
++     "prepare": [Function prepare],
++   },
++ ]
+
+ ❯ src/workflow/git/operation/intent.test.ts:36:33
+     34|           metadata: { source: change === 'source' ? 'ordinary-input' :…
+     35|             gitCommitId: change === 'intent' ? 'other-intent' : id } }…
+     36|       expect(intent.tools(git)).toEqual([]);
+       |                                 ^
+     37|       expect(current).toHaveBeenCalledOnce(); expect(runCommand).not.t…
+     38|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/workflow/git/operation/intent.test.ts -t 'authoritative prompt'

@@ -1,0 +1,31 @@
+{"reversed":2,"restored":true}
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/workflow/git/operation/intent.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/workflow/git/operation/intent.test.ts  (8 tests) 13ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  16:42:05
+   Duration  1.18s (transform 748ms, setup 0ms, collect 933ms, tests 13ms, environment 0ms, prepare 53ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/runtime/context/preview.test.ts -t idle foreground tools
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/runtime/context/preview.test.ts  (103 tests | 102 skipped) 88ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 102 skipped (103)
+   Start at  16:42:07
+   Duration  10.44s (transform 7.77s, setup 0ms, collect 10.09s, tests 88ms, environment 0ms, prepare 58ms)
+
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+Wrote build manifest 0edc912eddca for @cheers/ts-shell@0.1.0
+{"counts":[{"file":"workflow/git/operation/intent.ts","count":5,"baseline":5}],"build":{"ok":true,"entry":"/home/wang/projects/cheers/packages/ts-shell/dist/builds/0edc912eddca92511a12ff9d3b0a27fb46943988fa462266ff204061bb411be7/entrypoints/cli.js","buildId":"0edc912eddca92511a12ff9d3b0a27fb46943988fa462266ff204061bb411be7","inputsDigest":"0632b42b62113c7e481b33b122d724cb88680e1400c11a45fb7a605db1edeb57","artifactDigest":"d0ead95133ddcdabb904a1981522cb2fef05c898cdd063c52ca8dda1c17575aa","version":"0.1.0"}}
+{"mode":"regular","buildId":"0edc912eddca92511a12ff9d3b0a27fb46943988fa462266ff204061bb411be7","inputsDigest":"0632b42b62113c7e481b33b122d724cb88680e1400c11a45fb7a605db1edeb57","fixtures":1,"messagesPerFixture":1,"providerMode":"synthetic","status":"passed","checks":{"toolCalls":21,"toolTranscriptReads":0,"totalSyncTranscriptReads":2,"cookedInputRestored":true,"zeroRequests":true,"filesUnchanged":true},"widths":[],"shutdown":{"code":0,"signal":null},"exitMs":145,"outputBytes":5903,"scratchRemoved":true,"expected":"fixed"}
+{"mode":"fullscreen","buildId":"0edc912eddca92511a12ff9d3b0a27fb46943988fa462266ff204061bb411be7","inputsDigest":"0632b42b62113c7e481b33b122d724cb88680e1400c11a45fb7a605db1edeb57","fixtures":1,"messagesPerFixture":1,"providerMode":"synthetic","status":"passed","checks":{"toolCalls":21,"toolTranscriptReads":0,"totalSyncTranscriptReads":2,"cookedInputRestored":true,"zeroRequests":true,"filesUnchanged":true},"widths":[],"shutdown":{"code":0,"signal":null},"exitMs":139,"outputBytes":3990,"scratchRemoved":true,"expected":"fixed"}
