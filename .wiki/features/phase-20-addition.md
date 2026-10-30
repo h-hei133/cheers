@@ -4911,3 +4911,13 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现fork丢弃未完成的工具事件（`tool.started`无对应`tool.result`/`tool.settled`），保留描述对话的消息历史。探针：修复前`forkedPendingTools:["call-open"]`/`forkedUnfinished:true`，修复后`[]`/`false`，源会话仍为`true`。
 
 验证：`create`4（新例断言fork无pending、源保留）、`work`13、`recovery`24，共**41项**通过；一反转（保留pending事件）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `dbe6dc1eb2a1`。原47/ADD整体partial、goal active。
+
+
+### 21.65 导航与fork对进行中工作的行为验证
+
+21.64后检查两个交互点：
+
+- **`/back` 越过未完成调用**：回到该调用**之前**的点会清空`pendingTools`、`hasUnfinishedSessionWork`变为false；回到该调用**之后**的点则保留，因为那次调用属于仍在视图中的分支。`recovery/scope.ts`一直按`sourceEntryId`过滤query-event，索引从用户所在分支重建——行为正确。
+- **fork与undo**：fork的`undoHistory`为空、源会话仍列出自己的操作，新方向无法撤销它没做过的写入。
+
+首轮探针把「回到调用之后仍保留pending」误读为缺陷，据此写下的transcript投影改动已回退。这是本系列第二次因探针设计错误而差点引入多余改动。[工件](../../.omx/artifacts/phase20-addition-navigation-pending/README.md)。build `dbe6dc1eb2a1`。未改产品代码。原47/ADD整体partial、goal active。

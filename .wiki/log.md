@@ -10824,3 +10824,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：fork不再继承源会话未完成的工具调用
 
 [addition21.64](features/phase-20-addition.md#2164-fork不再继承源会话未完成的工具调用)发现forkTranscriptEvents复制全部事件而pendingLifecycle完全从transcript重建，导致fork继承源会话的未完成工具调用、被当作可恢复工作。现丢弃未完成工具事件、保留消息历史。41项聚焦、一反转命中、五门/TS build通过。build dbe6dc1e。原47/ADD整体partial、goal active。
+
+### 2026-10-31：导航与fork对进行中工作的行为验证
+
+[addition21.65](features/phase-20-addition.md#2165-导航与fork对进行中工作的行为验证)/back越过未完成调用时清空pending、回到其后则保留（属于当前分支），scope.ts的分支过滤一直正确；fork的undo与源隔离。首轮探针误读，多余改动已回退。未改产品代码。build dbe6dc1e。原47/ADD整体partial、goal active。
