@@ -10808,3 +10808,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：只读附加根在sandbox两个平台上都被保护
 
 [addition21.60](features/phase-20-addition.md#2160-只读附加根在sandbox两个平台上都被保护)bwrap用--ro-bind、seatbelt在allow之后deny，两者都保证--read根在bash中不可写。子代理模型确认不可用（工具仅支持sonnet/opus/haiku/fable），按用户指令自行完成。未改产品代码。build a5505182。原47/ADD整体partial、goal active。
+
+### 2026-10-31：压缩的失败与拒绝路径审查
+
+[addition21.61](features/phase-20-addition.md#2161-压缩的失败与拒绝路径审查)四条拒绝与三条失败各有精确提示、区分决策与故障，would-not-shrink防越压越大。发现shouldCompact用>而requestBudget用>=的1-token边界差异，未修改（敏感行为、收益低于风险）。未改产品代码。build a5505182。原47/ADD整体partial、goal active。

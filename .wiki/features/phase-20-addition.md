@@ -4870,3 +4870,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 子代理模型确认：Agent工具仅支持sonnet/opus/haiku/fable，用户指定的`cn:deepseek-v4.1-flash[1m]`不可用；按用户指令「如果发现子代理模型不可使用，那就自行完成任务」自行完成。此前一次只读review子代理运行1小时无结论后停止，未运行任何测试或构建。
 
 未改产品代码。build `a55051824792`。原47/ADD整体partial、goal active。
+
+
+### 21.61 压缩的失败与拒绝路径审查
+
+审查`session/compaction.ts`与`core/shell/compaction.ts`：四条拒绝原因（`fits-budget`/`below-threshold`/`no-legal-cut`/`would-not-shrink`）与三条失败（hook拒绝、无摘要、step-unknown）各有精确且互不混淆的用户提示，明确区分「决策」与「故障」。`would-not-shrink`（`after >= before`）防止上下文越压越大。取消与`CompactionStepUnknown`在生成前后各复验一次。
+
+发现一处**边界约定不一致**但未修改：`shouldCompact`用`tokens > window - reserve`（严格大于），而`requestBudget`的`soft`用`promptTokens >= softLimit`（大于等于）——恰好等于阈值时两者判断不同，差1 token。两者都是合理的边界约定，改动会触及压缩触发这一敏感行为，收益低于风险，故只记录不改。
+
+未改产品代码。build `a55051824792`。原47/ADD整体partial、goal active。
