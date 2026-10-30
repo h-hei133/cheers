@@ -4725,3 +4725,10 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 结论：窄终端下草稿、折行与光标都在composer内，无空白行，删除真实字符。用户所述症状**仍不可复现**而非证伪——缺真实终端、字体/IME、resize与物理像素坐标。[正式工件](../../.omx/artifacts/phase20-addition-startup-narrow/README.md)。build `c1302abc9ff4873abf20da961b7a991bd7c70319ca181fef499e84f66bfc7268`、inputs `6e696319aff2a2fc9b1fff597b439fccc3b5a07c863b050c2a0e31816939814e`。原47/ADD整体partial、goal active。
 
 补充：全屏模式下探针首次发送`/exit`时草稿仍有`abc`，该行成为`abc/exit`并被当作正文提交（`Synthetic reply: abc/exit`）——斜杠命令仅在源起始处成立，这是正确行为。清空草稿后两模式均exit0。
+
+
+### 21.45 纯图片会话的/copy提示不再谎称空
+
+图片可进入历史（21.32/21.33）后暴露一个小缺陷：`/copy`只收录有文字的块，因此一个只含图片的会话会显示「Nothing in the transcript to copy yet.」——但transcript并不空，只是没有可放进剪贴板的文字。现[copy source](../../packages/ts-shell/src/cli/interactive/picker/copy/source.ts)在跳过无文字块时单独计数带图片的块，[picker](../../packages/ts-shell/src/cli/interactive/picker/copy.ts)据此选择文案：「The transcript holds only pictures; there is no text to copy.」；真正空的会话保留原措辞。剪贴板仍只取`block.text`，图片载荷不会进入复制内容。
+
+验证：`copy`13（新例同时断言两种措辞）、`history`28，共**41项**通过；反转（恒用空措辞）命中断言且finally字节恢复；五静态门、TS build/freshness通过，118旧docs advisory保留。build `7edae23d3d72`。原47/ADD整体partial、goal active。

@@ -10740,3 +10740,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：窄终端下折行草稿与光标位置
 
 [addition21.44](features/phase-20-addition.md#2144-窄终端下折行草稿与光标位置)40列PTY下长行正确折行两行、续行对齐、无空白行、光标在折行内；`abcdef`三次退格精确变`abc`且帧重绘；退出干净。首轮两个探针错误（行间`\r`被当作提交、对长折行做粗糙变化断言）如实保留。第27项症状仍不可复现而非证伪，缺真实终端/IME/resize。build c1302abc。原47/ADD整体partial、goal active。
+
+### 2026-10-31：纯图片会话的/copy提示不再谎称空
+
+[addition21.45](features/phase-20-addition.md#2145-纯图片会话的copy提示不再谎称空)copy source跳过无文字块时单独计数带图片块，picker据此提示「只含图片、没有可复制文字」，真正空的会话保留原措辞；剪贴板仍只取block.text。41项聚焦、一反转到命中且bytes恢复、五门/TS build通过。build 7edae23d。原47/ADD整体partial、goal active。

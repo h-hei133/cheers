@@ -1,0 +1,11 @@
+{
+  "cases": [
+    {
+      "name": "always-empty-wording",
+      "exit": 1,
+      "tests": "1 failed | 12 skipped (13)",
+      "originalSha256": "ee5e9e46d64562752e649def97cbdfcff6d55ed1c05f53072145273051171161"
+    }
+  ],
+  "restored": true
+}

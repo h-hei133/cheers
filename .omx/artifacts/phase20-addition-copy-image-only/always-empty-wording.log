@@ -1,0 +1,33 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/copy.test.ts  (13 tests | 1 failed | 12 skipped) 9ms
+   ❯ src/cli/interactive/picker/copy.test.ts > says a picture-only transcript has no text rather than calling it empty
+     → expected 'Nothing in the transcript to copy yet.' to be 'The transcript holds only pictures; t…' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 12 skipped (13)
+   Start at  02:12:56
+   Duration  969ms (transform 544ms, setup 0ms, collect 716ms, tests 9ms, environment 0ms, prepare 59ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/copy.test.ts > says a picture-only transcript has no text rather than calling it empty
+AssertionError: expected 'Nothing in the transcript to copy yet.' to be 'The transcript holds only pictures; t…' // Object.is equality
+
+- Expected
++ Received
+
+- The transcript holds only pictures; there is no text to copy.
++ Nothing in the transcript to copy yet.
+
+ ❯ src/cli/interactive/picker/copy.test.ts:274:24
+    272|   const picker = copyPicker(transcript, { cwd: '/workspace' } as Comma…
+    273|   await picker.load();
+    274|   expect(picker.empty).toBe('The transcript holds only pictures; there…
+       |                        ^
+    275|   // A genuinely empty transcript keeps the original wording.
+    276|   const blank = copyPicker(new Transcript(), { cwd: '/workspace' } as …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

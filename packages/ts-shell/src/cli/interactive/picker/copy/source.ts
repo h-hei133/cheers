@@ -12,6 +12,13 @@ export interface CopyEntry {
 /** One source snapshot and one matching-reference cache shared by its pages. */
 export class CopySource {
   private readonly entries: CopyEntry[] = [];
+  /**
+   * Blocks that carry a picture but no words.
+   *
+   * They are not copyable — a clipboard takes text — but a transcript holding
+   * only these is not empty, and saying so would be wrong.
+   */
+  private imageOnly = 0;
   private readonly search: readonly string[];
   private needle = '';
   private matches: readonly CopyEntry[] = this.entries;
@@ -27,10 +34,16 @@ export class CopySource {
         throw new Error('Transcript exceeds copy browsing limits. No source was selected.');
       }
       if (block.text.trim()) this.entries.push({ id: '', label, text: block.text });
+      else if (block.images?.length) this.imageOnly += 1;
     }
     this.entries.reverse();
     for (let index = 0; index < this.entries.length; index++) this.entries[index] = { ...this.entries[index]!, id: String(index) };
     this.search = this.entries.map(entry => `${entry.label} ${entry.text}`.toLowerCase());
+  }
+
+  /** Whether the transcript held content that simply has no text to copy. */
+  get hasImageOnlyBlocks(): boolean {
+    return this.imageOnly > 0;
   }
 
   page(query: string, offset: number, size: number): { readonly entries: readonly CopyEntry[]; readonly total: number } {

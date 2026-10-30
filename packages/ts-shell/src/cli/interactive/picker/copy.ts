@@ -69,7 +69,13 @@ function copyPage(transcript: Transcript, context: CommandContext, source: CopyS
     title: "Copy block",
     form: "panel",
     initialFilter: query,
-    empty: "Nothing in the transcript to copy yet.",
+    // A transcript of pictures alone has nothing to put on a clipboard, but it
+    // is not empty; saying it is would be a false statement about the session.
+    get empty(): string {
+      return source?.hasImageOnlyBlocks
+        ? "The transcript holds only pictures; there is no text to copy."
+        : "Nothing in the transcript to copy yet.";
+    },
     loadError: 'Copy sources are unavailable, changed, or beyond browsing limits. No source was selected.',
     status: () => `Source revision ${revision}; blocks ${total === 0 ? '0' : `${offset + 1}-${offset + offered.length}`} of ${total}${offset + pageSize < total ? '; more available' : '; end of blocks'}`,
     filterOptions: project,

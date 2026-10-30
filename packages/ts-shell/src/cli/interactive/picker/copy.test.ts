@@ -265,3 +265,15 @@ it('clamps caller page sizes and ignores invalid offsets', async () => {
   const signal = AbortSignal.abort();
   await expect(copyPicker(transcript, { cwd: '/workspace' }).load(signal)).rejects.toThrow();
 });
+
+it('says a picture-only transcript has no text rather than calling it empty', async () => {
+  const transcript = new Transcript();
+  transcript.append({ ...textBlock('user', ''), images: [{ type: 'image', data: 'QUJD', mimeType: 'image/png' }] });
+  const picker = copyPicker(transcript, { cwd: '/workspace' } as CommandContext);
+  await picker.load();
+  expect(picker.empty).toBe('The transcript holds only pictures; there is no text to copy.');
+  // A genuinely empty transcript keeps the original wording.
+  const blank = copyPicker(new Transcript(), { cwd: '/workspace' } as CommandContext);
+  await blank.load();
+  expect(blank.empty).toBe('Nothing in the transcript to copy yet.');
+});
