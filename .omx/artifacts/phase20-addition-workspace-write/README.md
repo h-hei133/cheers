@@ -77,3 +77,7 @@ A probe mistake is kept on record: the first version passed an empty access obje
 `revoked-probe.mjs` writes through an attached root, removes the grant with `/workspace remove`, then tries to restore the old operation: the preview reports `canRestore: false` with `snapshot-or-workspace-unavailable`, the restore is `blocked`, and the file keeps the written bytes.
 
 That is the intended shape. The grant is a live authority the session holds, not a permanent permission captured when the write happened, so undo cannot write back through a root the user has since detached.
+
+## Replacing the directory also stops restore
+
+`identity-probe.mjs` writes through an attached root, replaces the directory with a different one at the same path, then previews the old operation: `canRestore: false`, the restore is `blocked`, and the new directory stays empty. The recorded `dev:ino:birthtimeMs` identity is what makes this work — a path alone would have written the old bytes into an unrelated directory.

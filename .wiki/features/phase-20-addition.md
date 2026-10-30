@@ -4774,3 +4774,5 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 补充撤销与只读证据：`restore-probe.mjs`经附加根把`before`写成`after`，预览`canRestore:true`、恢复`restored-verified`、文件回到`before`。首轮探针传空access对象，`assertOperationFile`找不到授权根而报`snapshot-or-workspace-unavailable`——这是检查在正常工作（撤销不会穿过会话当前未持有的根），非产品缺陷。`patch-readonly-probe.mjs`覆盖另一侧：只读附加根上的补丁在prepare阶段被拒且不创建文件。
 
 补充撤销边界证据：`revoked-probe.mjs`经附加根写入后用`/workspace remove`撤销授权，再尝试恢复旧操作——预览`canRestore:false`、blocker为`snapshot-or-workspace-unavailable`、恢复`blocked`、文件保持写入后的字节。授权是会话当前持有的活权限而非写入时捕获的永久许可，因此撤销后undo不能穿过已分离的根写回。
+
+补充身份边界证据：`identity-probe.mjs`经附加根写入后把该目录替换为同路径的不同目录，再预览旧操作——`canRestore:false`、恢复`blocked`、新目录保持为空。起作用的是记录的`dev:ino:birthtimeMs`身份；仅有路径会把旧字节写进无关目录。
