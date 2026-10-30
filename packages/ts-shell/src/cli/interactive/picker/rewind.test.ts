@@ -6,6 +6,22 @@ import { rewindPicker } from './rewind.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 
 describe("back selectors", () => {
+  it("offers an image-only question visibly through the actual overlay", async () => {
+    const rewind = vi.fn(async () => ({ draft: "" }));
+    const picker = rewindPicker({ turns: [{ id: "picture", role: "user", content: [
+      { type: "image", data: "aGVsbG8=", mimeType: "image/png" },
+    ] }], rewind });
+    const overlay = new OverlayHost(() => {});
+    overlay.open(picker);
+    await vi.waitFor(() => expect(strip(overlay)).toContain("Image message"));
+    const selected = vi.fn();
+    overlay.handleKey(parseKeyEvent("\r"), selected);
+    expect(selected).toHaveBeenCalledWith(picker, ["picture"]);
+    expect(await picker.apply(["picture"])).toEqual({ draft: "" });
+    expect(rewind).toHaveBeenCalledWith({ entryId: "picture", prompt: "", dropped: 0 });
+    overlay.close();
+  });
+
   it.each(['cancel', 'stale'])('withholds pending back rows after original %s authority expires', async kind => {
     const original = new AbortController(), browser = new AbortController(); let stale = false, release!: () => void;
     let acquisitionSignal: AbortSignal | undefined;

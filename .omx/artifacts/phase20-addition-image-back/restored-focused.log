@@ -1,0 +1,12 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/picker/rewind.test.ts  (31 tests) 491ms
+ ✓ src/cli/interactive/picker/rewind/source.test.ts  (11 tests | 3 skipped) 15ms
+ ✓ src/cli/interactive/picker/rewind/lifetime.test.ts  (3 tests) 1150ms
+ ✓ src/cli/interactive/picker/rewind/boundary.test.ts  (7 tests | 1 skipped) 79ms
+
+ Test Files  4 passed (4)
+      Tests  48 passed | 4 skipped (52)
+   Start at  22:54:33
+   Duration  12.64s (transform 560ms, setup 0ms, collect 10.13s, tests 1.74s, environment 0ms, prepare 187ms)

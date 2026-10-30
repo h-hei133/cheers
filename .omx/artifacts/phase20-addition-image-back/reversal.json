@@ -1,0 +1,23 @@
+{
+  "cases": [
+    {
+      "name": "sync-text-only",
+      "exit": 1,
+      "tests": "3 failed | 8 skipped (11)",
+      "originalSha256": "0ee88e48e0b3bc4f70aa30c05422deb997f14d31916b3a594b4eee59603b25dd"
+    },
+    {
+      "name": "async-text-only",
+      "exit": 1,
+      "tests": "3 failed | 8 skipped (11)",
+      "originalSha256": "0ee88e48e0b3bc4f70aa30c05422deb997f14d31916b3a594b4eee59603b25dd"
+    },
+    {
+      "name": "blank-image-label",
+      "exit": 1,
+      "tests": "1 failed | 30 skipped (31)",
+      "originalSha256": "76b7e80c003bdaa1e0cc6b1bb1ec6ec0188c874b8a9bc57c7043df7afcf687b4"
+    }
+  ],
+  "restored": true
+}

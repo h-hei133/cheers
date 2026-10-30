@@ -1,0 +1,25 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/rewind.test.ts  (31 tests | 1 failed | 30 skipped) 1013ms
+   ❯ src/cli/interactive/picker/rewind.test.ts > back selectors > offers an image-only question visibly through the actual overlay
+     → expected '  Ask again from                     …' to include 'Image message'
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 30 skipped (31)
+   Start at  22:54:23
+   Duration  9.51s (transform 6.36s, setup 0ms, collect 8.27s, tests 1.01s, environment 0ms, prepare 51ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/rewind.test.ts > back selectors > offers an image-only question visibly through the actual overlay
+AssertionError: expected '  Ask again from                     …' to include 'Image message'
+ ❯ src/cli/interactive/picker/rewind.test.ts:16:51
+     14|     const overlay = new OverlayHost(() => {});
+     15|     overlay.open(picker);
+     16|     await vi.waitFor(() => expect(strip(overlay)).toContain("Image mes…
+       |                                                   ^
+     17|     const selected = vi.fn();
+     18|     overlay.handleKey(parseKeyEvent("\r"), selected);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

@@ -1,0 +1,40 @@
+{
+  "mode": "fullscreen",
+  "status": "passed",
+  "savedMessages": 3,
+  "provider": "synthetic without credentials; fetch rejects all calls",
+  "buildId": "a0c8252603f0d5a787d1686cdec4d65f17b18df765c8e67afda1200c240fe72c",
+  "inputsDigest": "afcf8f280cb56a9a5f9c05b2e1cba2c013f46081630cb8289f5053cdc07f654f",
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 45,
+    "outputBytes": 2097152
+  },
+  "imageQuestionOffered": true,
+  "navigation": {
+    "originalImageRetained": true,
+    "userMessages": 2,
+    "duplicateUserPrompts": 0,
+    "activePictureVerified": true,
+    "laterBranchRetained": true,
+    "originalTranscriptPrefixUnchanged": true
+  },
+  "cancelledReopenUnchanged": true,
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "configurationUnchanged": true,
+  "projectUnchanged": true,
+  "sourceTextProjectionEmpty": true,
+  "noComposerImageInjection": true,
+  "networkAttempts": 0,
+  "outputBytes": 8374,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "transcriptBaselineSha256": "3b18559ddeaa1715ff8ac48af704d1d94d2368f2b6e49f8589eac41d15b9bc8a",
+  "scratchRemoved": true
+}

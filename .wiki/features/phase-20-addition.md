@@ -4577,3 +4577,16 @@ HANDOFF更新、CLAUDE.md保留。延后一次CI读回8061bd92 CI41056737057/Wat
 原Node CLI regular/fullscreen各1保存fixture消息、isolated home/profile/project、vision loopback、heap768MiB/总60秒/累计2MiB。真实alt+v经原attachment host注入公开PNG（非系统clipboard采集），alt+s暂存/恢复跨1100 tiny store发行，Enter首POST仅一image，Ctrl+C取消HTTP等待continue51/52ms、resume52/51ms小夹具观测并保留interrupted。Ctrl+D后新CLI同ID、零附件/压力注入，真实/continue与/resume <当前ID>四组第二POST携原图片恰好一次/精确空text/原恢复指令；回复绘制、completed/pending清理、最终仅两user含fixture、无重复prompt。八个最终exit0/cooked、config/models/project不变、scratch清理。基线旧action标签误写bracketed paste及containsPublicText对空字符串的恒真判断明确排除，最终改真实alt+v标签并删除恒真字段，精确saved blocks与wire比较保留。
 
 HANDOFF补text/content与empty-string证据陷阱，日志归档。分支丢弃/重选为unit证据，非真实branch CLI；无full local suite/并行heavy/本助手subagent/20k真实终端/exe/真实provider/平台clipboard/大图compaction或checkpoint/独立代理review/NormProof judge/未知billing结算。延后一次读回165940b3 CI41065163338/Watch41065163449均success，89843761 Watch41066606364 success、CI41066606262仍in_progress且head一致；本批Git/CI另绑定，CLAUDE.md保留，原47及ADD整体partial，goal active。
+
+
+### 21.31 back列表保留纯图片问题与原分支内容
+
+接续21.30，检查[question source](../../packages/ts-shell/src/cli/interactive/picker/rewind/source.ts)的同步/异步路径都在messageToText后要求非空白，导致已保存纯图片不进入/back且重复图片ID不触发identity拒绝。原[navigation](../../packages/ts-shell/src/cli/runtime/navigation.ts)已接受空user text、保留活动图片和后续树，因此不加第二图片转发。现两source复用messageHasContent，空文字+真实data准入，空文字/空image仍拒绝；[row summary](../../packages/ts-shell/src/cli/interactive/picker/rewind.ts)显示Image message，原prompt仍精确空text，不把标签存入草稿。保留25页、共享query/source、ID/version、parts/textunits、取消与一次消费边界。
+
+先检查目标，再定向只读参考快照`f09d01b85e0384647fcab6779d35ab9dabe04be3`的tree-selector.ts:370–372按role包括user、agent-session.ts:4173–4177将user导航与editor text分开。其fork source4242–4255仍排除空text，明确不当作已解决此问题。沿本项目原保留user叶语义及更严content/identity/version护栏，未复制代码。[正式工件](../../.omx/artifacts/phase20-addition-image-back/README.md)存原四AssertionError/一空image控制、三独立反转分别同步/异步text-only与空标签，各3/3/1 AssertionError且finally bytes恢复。
+
+最终四文件**48项去重通过**（picker31/source8/boundary6/lifetime3），四旧大边界未选不计；含literal/dropped/empty-data、exact-ID/ordinal、query续页、source version、取消/关闭及实际保存会话readBackSource→picker→原navigateSession writer，原图片一次/后续回答保留/草稿空text。五门/TS build/freshness串行通过，118旧docs advisory保留；两个产品owner named callable不增且低于20。build `a0c8252603f0d5a787d1686cdec4d65f17b18df765c8e67afda1200c240fe72c`、inputs `afcf8f280cb56a9a5f9c05b2e1cba2c013f46081630cb8289f5053cdc07f654f`。
+
+原Node CLI regular/fullscreen各三微小保存消息（文字/空text图片/后续回答）、isolated home/profile/Git project、无凭据synthetic且fetch观察拒绝、heap768MiB/45秒/2MiB。真实/back实际绘制Image message、Enter经原导航writer，fresh read确认图片活动叶且exact block一次，最终两user无重复、原transcript prefix及后续answer仍在树。重开Esc状态bytes不变、零fetch尝试、config/project不变、两exit0/cooked、scratch删除。composer未注入图片，原history保留图片；不冒充重新附图的新普通回合/模型派发/平台clipboard验收。
+
+HANDOFF补question admission/display文本分界；无full local suite/并行heavy/本助手subagent/20k真实终端/exe/真实provider/独立代理review/NormProof judge。延后一次89843761 CI41066606262/Watch41066606364均success，138c2c42 Watch41073636819 success、CI41073636746仍in_progress且head一致；本批Git/CI另绑定，CLAUDE.md保留，原47/ADD整体partial、goal active。

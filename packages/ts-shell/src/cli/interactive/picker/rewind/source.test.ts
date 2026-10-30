@@ -4,6 +4,35 @@ import { REWIND_LIMITS, RewindSource, rewindPoints } from './source.js';
 
 afterEach(() => vi.restoreAllMocks());
 
+it.each(["", "  \n"])("retains a real image question with text %j in synchronous and asynchronous sources", async prompt => {
+  const turns = [
+    { id: "text", role: "user" as const, content: "earlier question" },
+    { id: "image", role: "user" as const, content: [{ type: "text" as const, text: prompt },
+      { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" }] },
+    { role: "assistant" as const, content: "later answer" },
+  ];
+  const expected = [{ entryId: "image", prompt, dropped: 1 }, { entryId: "text", prompt: "earlier question", dropped: 2 }];
+  expect(rewindPoints(turns)).toEqual(expected);
+  const source = await RewindSource.create(turns, undefined, "saved-version");
+  expect(source.page("", 0, 25).entries).toEqual(expected.map(point => ({ ...point, version: "saved-version" })));
+  expect(source.selection("1")?.point.entryId).toBe("image");
+  expect(source.page("image", 0, 25).entries).toHaveLength(1);
+});
+
+it("refuses ambiguous image question identities in both source paths", async () => {
+  const question = { id: "same", role: "user" as const,
+    content: [{ type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" }] };
+  expect(() => rewindPoints([question, question])).toThrow("ambiguous");
+  await expect(RewindSource.create([question, question])).rejects.toThrow("ambiguous");
+});
+
+it("keeps empty text and empty image data out of both question sources", async () => {
+  const turns = [{ id: "text", role: "user" as const, content: "  \n" },
+    { id: "image", role: "user" as const, content: [{ type: "image" as const, data: "", mimeType: "image/png" }] }];
+  expect(rewindPoints(turns)).toEqual([]);
+  expect((await RewindSource.create(turns)).page("", 0, 25)).toEqual({ entries: [], total: 0 });
+});
+
 it('admits the exact question boundary and refuses the next point', () => {
   const turns = Array.from({ length: REWIND_LIMITS.questions }, (_, index) => ({ id: String(index), role: 'user' as const, content: 'question' }));
   expect(rewindPoints(turns)).toHaveLength(REWIND_LIMITS.questions);

@@ -1,0 +1,46 @@
+{
+  "baselineCommit": "138c2c42452e046b7d5335fcd2ce427049dcb017",
+  "owners": [
+    {
+      "file": "cli/interactive/picker/rewind.ts",
+      "baseline": 16,
+      "count": 16,
+      "names": [
+        "rewindPicker",
+        "admission",
+        "ensureSource",
+        "isWrappedTurns",
+        "questionPage",
+        "release",
+        "position",
+        "project",
+        "isCurrent",
+        "initialSelection",
+        "resolvedFilter",
+        "status",
+        "load",
+        "apply",
+        "describeCost",
+        "summarise"
+      ]
+    },
+    {
+      "file": "cli/interactive/picker/rewind/source.ts",
+      "baseline": 8,
+      "count": 8,
+      "names": [
+        "rewindPoints",
+        "rewindPointsAsync",
+        "create",
+        "selection",
+        "indexOf",
+        "page",
+        "matchesFor",
+        "yieldForAbort"
+      ]
+    }
+  ],
+  "buildId": "a0c8252603f0d5a787d1686cdec4d65f17b18df765c8e67afda1200c240fe72c",
+  "inputsDigest": "afcf8f280cb56a9a5f9c05b2e1cba2c013f46081630cb8289f5053cdc07f654f",
+  "freshness": true
+}

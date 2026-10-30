@@ -1,4 +1,4 @@
-import { messageToText } from '../../../../model-adapters/multimodal.js';
+import { messageHasContent, messageToText } from '../../../../model-adapters/multimodal.js';
 import { isSessionContextMessage, type SessionMessage } from '../../../../session/schema/sessionMessage.js';
 
 /** Source admission bounds references and text units, not the runtime's heap. */
@@ -38,7 +38,7 @@ export function rewindPoints(turns: readonly SessionMessage[], signal?: AbortSig
       }
       if (units > REWIND_LIMITS.textUnits) throw new Error('Conversation exceeds back browsing limits.');
       const prompt = messageToText(turn.content);
-      if (prompt.trim()) {
+      if (messageHasContent(turn.content)) {
         if (identities.has(turn.id)) throw new Error('Conversation question identity is ambiguous.');
         identities.add(turn.id);
         if (points.length >= REWIND_LIMITS.questions) throw new Error('Conversation exceeds back browsing limits.');
@@ -75,7 +75,7 @@ async function rewindPointsAsync(turns: readonly SessionMessage[], signal?: Abor
       }
       if (units > REWIND_LIMITS.textUnits) throw new Error('Conversation exceeds back browsing limits.');
       const prompt = messageToText(turn.content);
-      if (prompt.trim()) {
+      if (messageHasContent(turn.content)) {
         if (identities.has(turn.id)) throw new Error('Conversation question identity is ambiguous.');
         identities.add(turn.id);
         if (points.length >= REWIND_LIMITS.questions) throw new Error('Conversation exceeds back browsing limits.');

@@ -249,5 +249,5 @@ function summarise(prompt: string): string {
     if (line) return line.length > SUMMARY_LENGTH ? `${line.slice(0, SUMMARY_LENGTH - 1)}…` : line;
     start = end + 1;
   }
-  return '';
+  return 'Image message';
 }

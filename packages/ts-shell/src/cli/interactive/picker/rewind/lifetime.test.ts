@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../../../session/SessionManager.js';
 import { createSessionStoreLayout, locateExistingSessionLayout } from '../../../../session/store/sessionFileLayout.js';
-import { readBackSource } from '../../../runtime/navigation.js';
+import { navigateSession, readBackSource } from '../../../runtime/navigation.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
 import { visibleWidth } from '../../../../presentation/tui/text/measure.js';
@@ -34,6 +34,32 @@ function saved(units: number) {
   const before = targets.map(target => fs.readFileSync(target));
   return { context, targets, before, bytes: before.reduce((sum, value) => sum + value.length, 0) };
 }
+
+it('navigates a saved image question through the original branch owner without duplicating it', async () => {
+  const fixture = saved(32), manager = new SessionManager(), id = fixture.context.session.id;
+  const image = { type: 'image' as const, data: 'aGVsbG8=', mimeType: 'image/png' };
+  manager.persistUserPromptBarrier(id, '', undefined, [image]);
+  const question = manager.getSession(id)!.turns.at(-1)!;
+  manager.addTurn(id, { role: 'assistant', content: 'Later image answer' });
+  manager.saveCompleted(id);
+  fixture.context.session = manager.getSession(id)!;
+  const original = fs.readFileSync(fixture.targets[2]!, 'utf8');
+  const picker = rewindPicker({ readTurns: signal => readBackSource(fixture.context, signal), rewind: async point => {
+    const result = await navigateSession({ runtimeContext: fixture.context as never, sessionManager: manager,
+      sessionRuntime: { getState: () => 'idle', summarizeAbandonedTurns: async () => undefined } as never }, point.entryId, point.version);
+    return { note: result.output, ...(result.draft !== undefined ? { draft: result.draft } : {}) };
+  } });
+  const rows = await picker.load();
+  expect(rows[0]).toMatchObject({ id: question.id, label: 'Image message' });
+  const outcome = await picker.apply([question.id!]);
+  expect(outcome?.draft).toBe('');
+  expect(outcome?.note).toContain('Files are unchanged');
+  const reopened = new SessionManager().getSession(id)!;
+  expect(reopened.turns.at(-1)?.content).toEqual([{ type: 'text', text: '' }, image]);
+  expect(reopened.turns.filter(turn => turn.id === question.id)).toHaveLength(1);
+  expect(fs.readFileSync(fixture.targets[2]!, 'utf8').startsWith(original)).toBe(true);
+  expect(fs.readFileSync(fixture.targets[2]!, 'utf8')).toContain('Later image answer');
+});
 
 it.each([32, 128 * 1024])('bounds saved back acquisition, shared pages and repeated host lifetime (%i source units)', async units => {
   const fixture = saved(units), rewind = vi.fn();

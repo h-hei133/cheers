@@ -1,0 +1,66 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/rewind/source.test.ts  (11 tests | 3 failed | 8 skipped) 12ms
+   ❯ src/cli/interactive/picker/rewind/source.test.ts > retains a real image question with text "" in synchronous and asynchronous sources
+     → expected [ { entryId: 'text', …(2) } ] to deeply equal [ { entryId: 'image', …(2) }, …(1) ]
+   ❯ src/cli/interactive/picker/rewind/source.test.ts > retains a real image question with text "  \n" in synchronous and asynchronous sources
+     → expected [ { entryId: 'text', …(2) } ] to deeply equal [ { entryId: 'image', …(2) }, …(1) ]
+   ❯ src/cli/interactive/picker/rewind/source.test.ts > refuses ambiguous image question identities in both source paths
+     → expected [Function] to throw an error
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 8 skipped (11)
+   Start at  22:54:21
+   Duration  339ms (transform 73ms, setup 0ms, collect 75ms, tests 12ms, environment 0ms, prepare 62ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/rewind/source.test.ts > retains a real image question with text "" in synchronous and asynchronous sources
+ FAIL  src/cli/interactive/picker/rewind/source.test.ts > retains a real image question with text "  \n" in synchronous and asynchronous sources
+AssertionError: expected [ { entryId: 'text', …(2) } ] to deeply equal [ { entryId: 'image', …(2) }, …(1) ]
+
+- Expected
++ Received
+
+  Array [
+    Object {
+-     "dropped": 1,
+-     "entryId": "image",
+-     "prompt": "",
+-   },
+-   Object {
+      "dropped": 2,
+      "entryId": "text",
+      "prompt": "earlier question",
+    },
+  ]
+
+ ❯ src/cli/interactive/picker/rewind/source.test.ts:15:31
+     13|   ];
+     14|   const expected = [{ entryId: "image", prompt, dropped: 1 }, { entryI…
+     15|   expect(rewindPoints(turns)).toEqual(expected);
+       |                               ^
+     16|   const source = await RewindSource.create(turns, undefined, "saved-ve…
+     17|   expect(source.page("", 0, 25).entries).toEqual(expected.map(point =>…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/cli/interactive/picker/rewind/source.test.ts > refuses ambiguous image question identities in both source paths
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ src/cli/interactive/picker/rewind/source.test.ts:25:52
+     23|   const question = { id: "same", role: "user" as const,
+     24|     content: [{ type: "image" as const, data: "aGVsbG8=", mimeType: "i…
+     25|   expect(() => rewindPoints([question, question])).toThrow("ambiguous"…
+       |                                                    ^
+     26|   await expect(RewindSource.create([question, question])).rejects.toTh…
+     27| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯

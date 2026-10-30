@@ -10665,3 +10665,12 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 最终54项聚焦通过、81未选，七反转有效且源码恢复；五门/TS build/freshness串行通过，初次TS2339/filter type predicate及preflight拒绝分类保留。原CLI两模式真实alt+v/alt+s/Enter/Ctrl+C等待取消后新进程/continue或/resume <当前ID>，第二POST精确原image一次、最终两user无重复、completed/pending清理、八个最终exit0/cooked、config不变、scratch清理。平台clipboard注入边界/空字符串恒真证据排除/实际branch与未知billing限制记入正式工件和HANDOFF，原47/ADD整体仍partial。
 
 165940b3 CI41065163338与Watch均success；89843761 Watch41066606364 success、CI41066606262延后读回仍in_progress。本批commit/push/未来CI分别绑定，CLAUDE.md保留、goal active。
+
+
+### 2026-10-30：back保留纯图片问题与原导航
+
+[addition21.31](features/phase-20-addition.md#2131-back列表保留纯图片问题与原分支内容)修补同步/异步question source按文字过滤图片、跳过图片ID验证的缺口。复用原messageHasContent与row summary；显示Image message但原prompt保留空text，原navigation负责图片/后续树，无新attachment replay。
+
+四baseline失败/一控制、三反转各3/3/1失败及bytes恢复；最终48聚焦通过/四旧大边界未选，五门/TS build/freshness通过。两小型实际CLI/back→Enter保留原image一次/两user无重复/后续branch与原transcript prefix，重开Esc状态不变、零fetch、config不变、exit0/cooked、scratch清理。HANDOFF及正式工件记录原history与新composer附件分界，无平台/provider验收升级。
+
+89843761 CI/Watch均success，138c2c42 Watch41073636819 success、CI41073636746延后读回仍in_progress。本批commit/push/未来CI分开，CLAUDE.md保留，原47/ADD仍partial、goal active。
