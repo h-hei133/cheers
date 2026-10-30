@@ -6,6 +6,7 @@ import { SessionManager } from '../SessionManager.js';
 import { SessionStoreAccess } from '../store/sessionStoreAccess.js';
 import { readSessionNavigation } from '../query/navigation.js';
 import { SessionForkError } from './create.js';
+import { hasUnfinishedSessionWork } from '../recovery/work.js';
 
 let root: string;
 beforeEach(() => {
@@ -62,3 +63,20 @@ it('rejects an obsolete fork source version before creating any session', () => 
   expect(manager.getTranscriptEvents(source.id)).toEqual(events);
   expect(manager.getCurrentSessionForProject(root)?.id).toBe(source.id);
 });
+
+it('does not hand a fork the tool call its source never finished', () => {
+  // The recovery read model rebuilds pending tools from the transcript. A fork
+  // that copied an unanswered tool.started would look like it owed that call.
+  const manager = new SessionManager();
+  const session = manager.createNew(process.cwd());
+  manager.persistUserPromptBarrier(session.id, 'Write a file', undefined);
+  manager.appendQueryEvent(session.id, { type: 'tool.started', toolName: 'write', taskId: 'call-open' });
+  manager.saveInterrupted(session.id, 'turn');
+
+  const forked = manager.fork(session.id, process.cwd(), {});
+  const forkedSnapshot = manager.getRecoverySnapshot(forked.id);
+  expect(Object.keys(forkedSnapshot.pendingLifecycle.pendingTools)).toEqual([]);
+  expect(hasUnfinishedSessionWork(forkedSnapshot)).toBe(false);
+  // The source keeps its own unfinished call.
+  expect(Object.keys(manager.getRecoverySnapshot(session.id).pendingLifecycle.pendingTools)).toEqual(['call-open']);
+})

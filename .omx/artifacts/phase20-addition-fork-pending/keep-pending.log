@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/branch/create.test.ts  (4 tests | 1 failed | 3 skipped) 55ms
+   ❯ src/session/branch/create.test.ts > does not hand a fork the tool call its source never finished
+     → expected [ 'call-open' ] to deeply equal []
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  04:48:13
+   Duration  1.37s (transform 886ms, setup 0ms, collect 1.08s, tests 55ms, environment 0ms, prepare 57ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/branch/create.test.ts > does not hand a fork the tool call its source never finished
+AssertionError: expected [ 'call-open' ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   "call-open",
++ ]
+
+ ❯ src/session/branch/create.test.ts:78:69
+     76|   const forked = manager.fork(session.id, process.cwd(), {});
+     77|   const forkedSnapshot = manager.getRecoverySnapshot(forked.id);
+     78|   expect(Object.keys(forkedSnapshot.pendingLifecycle.pendingTools)).to…
+       |                                                                     ^
+     79|   expect(hasUnfinishedSessionWork(forkedSnapshot)).toBe(false);
+     80|   // The source keeps its own unfinished call.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

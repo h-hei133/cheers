@@ -1322,3 +1322,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A session whose only prompt was a picture keeps its recovery evidence only while the run phase happens to still be `prompt-persisted` or `turn-active`; if that phase settles, the evidence disappears.
 - **Root Cause**: `sessionResumeEligibility` was taught that an empty-text prompt with an image is content, but `hasContinuationEvidence` — which decides whether closing the session preserves recovery evidence — still required non-blank text. Two functions answered the same question differently, and one answer was masked by an unrelated field.
 - **Rule**: When a condition gains a new admitted shape, find every owner that asks the same question and change them together. Test the shape directly rather than through a state that happens to mask the missing branch.
+
+### A Fork Must Not Inherit Work In Flight
+
+- **Symptom**: After forking a session whose last tool call never returned, the new session reports unfinished work and an active run.
+- **Root Cause**: The recovery read model rebuilds `pendingLifecycle` from the transcript alone, ignoring the state snapshot. Copying the source transcript verbatim therefore recreated a pending call that belonged to the source session.
+- **Rule**: When a derived index is rebuilt from persisted events, copying those events copies the index. Decide explicitly what the copy should owe: a fork starts a new direction and owes nothing, so drop events that would recreate an unsettled call while keeping the message history. Test the fork's own snapshot, not just that the copy succeeded.

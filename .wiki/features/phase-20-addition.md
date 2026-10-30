@@ -4902,3 +4902,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 最后一处**未修改**：它是非交互式会话列表的显示降级，不丢数据；交互式`/resume`面板本就只显示`session.status`（`interrupted`等）而不显示pending，两条路径状态字段足够。`SessionReentrySummary`没有「是否含图片」字段，添加它需要改投影契约，收益低于风险。
 
 未改产品代码。build `f9996ca41a80`。原47/ADD整体partial、goal active。
+
+
+### 21.64 fork不再继承源会话未完成的工具调用
+
+审查`/fork`与进行中工具的交互，发现真实缺陷：`forkTranscriptEvents`复制全部transcript事件，而`sessionRecoverySnapshot`的`pendingLifecycle`**完全由`deriveLifecycleIndexFromTranscript`从transcript重建**（忽略state里的值）。源会话有一个`tool.started`无对应结果时，fork出的新会话因此继承`pendingTools:["call-open"]`、`hasUnfinishedSessionWork`为真、状态`active`——用户fork出新方向，新会话却看起来欠着**属于源会话**的那次调用，可能被当作可恢复的未完成工作。
+
+现fork丢弃未完成的工具事件（`tool.started`无对应`tool.result`/`tool.settled`），保留描述对话的消息历史。探针：修复前`forkedPendingTools:["call-open"]`/`forkedUnfinished:true`，修复后`[]`/`false`，源会话仍为`true`。
+
+验证：`create`4（新例断言fork无pending、源保留）、`work`13、`recovery`24，共**41项**通过；一反转（保留pending事件）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `dbe6dc1eb2a1`。原47/ADD整体partial、goal active。

@@ -10820,3 +10820,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：「提示是否有内容」的其余判定点排查
 
 [addition21.63](features/phase-20-addition.md#2163-提示是否有内容的其余判定点排查)四处判定：continuation已修、eligibility与scope 21.30已含图片准入、sessionsPanel仅显示降级（未改，交互式面板本就只显示status）。未改产品代码。build f9996ca4。原47/ADD整体partial、goal active。
+
+### 2026-10-31：fork不再继承源会话未完成的工具调用
+
+[addition21.64](features/phase-20-addition.md#2164-fork不再继承源会话未完成的工具调用)发现forkTranscriptEvents复制全部事件而pendingLifecycle完全从transcript重建，导致fork继承源会话的未完成工具调用、被当作可恢复工作。现丢弃未完成工具事件、保留消息历史。41项聚焦、一反转命中、五门/TS build通过。build dbe6dc1e。原47/ADD整体partial、goal active。
