@@ -1,0 +1,35 @@
+scc-gate root=packages/ts-shell/src files=3009
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=53 read=53 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=25 docs_refs=456 docs_dangling=0 docs_source_dangling=118
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 118 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/navigation.test.ts src/cli/interactive/picker/settings.test.ts src/cli/interactive/picker/help.test.ts src/cli/interactive/keyGuide.test.ts src/cli/interactive/overlay.test.ts src/presentation/tui/chrome/navigation.test.ts src/presentation/tui/chrome/chips.test.ts src/presentation/tui/chrome/panel.test.ts src/core/commands/syntax/preferences.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/picker/help.test.ts  (13 tests) 3147ms
+ ✓ src/cli/interactive/picker/navigation.test.ts  (22 tests) 327ms
+ ✓ src/cli/interactive/overlay.test.ts  (77 tests) 282ms
+ ✓ src/core/commands/syntax/preferences.test.ts  (17 tests) 138ms
+ ✓ src/cli/interactive/picker/settings.test.ts  (47 tests) 76ms
+ ✓ src/presentation/tui/chrome/panel.test.ts  (14 tests) 54ms
+ ✓ src/cli/interactive/keyGuide.test.ts  (6 tests) 18ms
+ ✓ src/presentation/tui/chrome/navigation.test.ts  (3 tests) 9ms
+ ✓ src/presentation/tui/chrome/chips.test.ts  (3 tests) 5ms
+
+ Test Files  9 passed (9)
+      Tests  202 passed (202)
+   Start at  15:24:35
+   Duration  16.28s (transform 1.01s, setup 0ms, collect 10.65s, tests 4.06s, environment 1ms, prepare 376ms)
+
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+Wrote build manifest 79fede2f1bec for @cheers/ts-shell@0.1.0

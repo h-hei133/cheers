@@ -37,6 +37,7 @@ describe("command guide", () => {
       overlay.open(picker); await new Promise(resolve => setTimeout(resolve, 0));
       expect(picker.navigation!.active).toBe('all');
       expect(picker.detail?.('/theme').join('\n')).toContain('settings Appearance');
+      expect(picker.detail?.('/settings').join('\n')).toContain('←→ categories, Tab sections/rows');
     } finally { remove(); overlay.close(); }
   });
 

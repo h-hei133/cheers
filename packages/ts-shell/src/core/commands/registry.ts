@@ -515,7 +515,7 @@ export function createCommandRegistry(
       supportsNonInteractive: true,
       availability: "available",
       enabled: true,
-      summary: "browse or save settings; inspect effective values, sources and save scope",
+      summary: "browse or save settings; ←→ categories, Tab sections/rows; inspect values, sources and save scope",
       group: "workspace",
       argumentHint: syntaxHint(settingsSyntax),
       getArgumentCompletions: (prefix) => syntaxCompletions(settingsSyntax, prefix),

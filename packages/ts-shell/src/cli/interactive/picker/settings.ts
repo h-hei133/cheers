@@ -1,6 +1,6 @@
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import { truncateToWidth } from '../../../presentation/tui/text/layout.js';
-import { matchRank } from '../../../presentation/tui/text/search.js';
+import { searchSettings } from './settings/search.js';
 import { formatSetting, type SettingDefinition, type SettingsScope } from '../../../config/settings.js';
 import type { Picker, PickerOutcome } from '../overlay.js';
 import type { SettingsDraft } from '../settings.js';
@@ -158,7 +158,7 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
   const categories = GROUP_ORDER.filter(name => SETTINGS_GROUPS.includes(name)
     || (name === 'Session' && Boolean(host.modelSettings || host.thinkingSettings)));
   const active = group && categories.includes(group as typeof categories[number]) ? group : 'all';
-  const navigation = new CatalogNavigation(active, true, true);
+  const navigation = new CatalogNavigation(active, true, true, 'top');
   let searching = false;
   const groups = new Map<string, string>();
   const offered = new Set<string>();
@@ -168,20 +168,15 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
       return `Settings — ${scope} configuration${searching ? ' — Search all groups' : navigation.active === 'all' ? '' : ` — ${navigation.active}`}`;
     },
     form: 'panel', fullScreen: true, exclusive: true, holdInput: true, navigation,
-    footer: [notice, '←→ categories · Tab: sections/rows/navigation · ↑↓ move · Enter: edit · Esc: back'].filter(Boolean).join(' '),
+    footer: [notice, '←→ categories · Tab: sections/rows · ↑↓ move · Enter: edit · Esc: back'].filter(Boolean).join(' '),
     ...(selected ? { initialSelection: selected } : {}),
     defaultSelection: options => searching ? options.find(option => !option.disabled)?.id : undefined,
     empty: 'Settings could not be loaded. Check your configuration and retry.',
-    chips: {
-      items: [{ id: 'all', label: 'All' }, ...categories.map(name => ({ id: name, label: name }))],
-      get active() { return searching ? 'all' : navigation.active; },
-      select: id => settingsPicker(host, scope, id === 'all' ? undefined : id),
-    },
     filterOptions(query, options) {
       searching = query.length > 0;
       navigation.project(query);
       if (!searching) return navigation.project('');
-      return searchSettings(query, navigation.all, groups);
+      return searchSettings(query, navigation.all, groups, GROUP_ORDER);
     },
     async load(): Promise<readonly Option[]> {
       draft = undefined;
@@ -240,15 +235,4 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
       return setting ? { next: settingDetail(host, draft, setting) } : undefined;
     },
   };
-}
-
-function searchSettings(query: string, options: readonly Option[], groups: ReadonlyMap<string, string>): readonly Option[] {
-  const ranked = options.map((option, order) => ({ option, order, group: groups.get(option.id) ?? '',
-    rank: Math.max(matchRank(query, option.id), matchRank(query, option.label, `${option.detail ?? ''} ${option.note ?? ''} ${option.searchText ?? ''}`)),
-  })).filter(entry => entry.rank > 0);
-  const best = new Map<string, number>();
-  for (const entry of ranked) best.set(entry.group, Math.max(best.get(entry.group) ?? 0, entry.rank));
-  return ranked.sort((a, b) => (best.get(b.group)! - best.get(a.group)!) ||
-    GROUP_ORDER.indexOf(a.group as typeof GROUP_ORDER[number]) - GROUP_ORDER.indexOf(b.group as typeof GROUP_ORDER[number]) || b.rank - a.rank || a.order - b.order)
-    .map(entry => entry.option);
 }

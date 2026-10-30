@@ -1,0 +1,48 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/navigation.test.ts  (22 tests | 3 failed | 19 skipped) 94ms
+   ❯ src/cli/interactive/picker/navigation.test.ts > keeps every top category visible and moves vertically within its active domain at 40 columns
+     → expected true to be false // Object.is equality
+   ❯ src/cli/interactive/picker/navigation.test.ts > keeps every top category visible and moves vertically within its active domain at 80 columns
+     → expected true to be false // Object.is equality
+   ❯ src/cli/interactive/picker/navigation.test.ts > keeps every top category visible and moves vertically within its active domain at 120 columns
+     → expected true to be false // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 19 skipped (22)
+   Start at  15:25:45
+   Duration  2.12s (transform 1.31s, setup 0ms, collect 1.77s, tests 94ms, environment 0ms, prepare 55ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/navigation.test.ts -t keeps every top category visible
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/navigation.test.ts > keeps every top category visible and moves vertically within its active domain at 40 columns
+ FAIL  src/cli/interactive/picker/navigation.test.ts > keeps every top category visible and moves vertically within its active domain at 80 columns
+ FAIL  src/cli/interactive/picker/navigation.test.ts > keeps every top category visible and moves vertically within its active domain at 120 columns
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/cli/interactive/picker/navigation.test.ts:257:45
+    255|   overlay.handleKey(parseKeyEvent('\t'), apply);
+    256|   overlay.handleKey(parseKeyEvent('\t'), apply);
+    257|   expect(modelSettings.navigation?.focused).toBe(false);
+       |                                             ^
+    258|   expect(view(overlay, width)).toContain(`▸ ${CONFIG_SETTINGS.find(set…
+    259|   overlay.handleKey(parseKeyEvent('\x1b[Z'), apply);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/picker/navigation.test.ts -t 'keeps every top category visible'

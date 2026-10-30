@@ -6,6 +6,7 @@ export interface NavigationGroup { readonly category: string; readonly section?:
 export interface NavigationUpdate { readonly options: readonly Option[]; readonly focus?: string; readonly query?: string }
 export interface NavigationOrigin { readonly rows: readonly Option[]; readonly crossCategory: boolean }
 export interface PickerNavigation {
+  readonly placement?: 'side' | 'top';
   readonly viewport: NavigationViewport;
   readonly items: readonly NavigationItem[];
   readonly active: string;
@@ -34,7 +35,7 @@ export class CatalogNavigation implements PickerNavigation {
   private projectionQuery = '';
 
   constructor(category = 'all', private readonly sectionFocus = false,
-    private readonly searchSelection = false) { this.category = category; }
+    private readonly searchSelection = false, readonly placement: 'side' | 'top' = 'side') { this.category = category; }
   get items(): readonly NavigationItem[] { return this.categories; }
   get active(): string { return this.category; }
   get focused(): boolean { return this.domain === 'categories'; }
@@ -89,7 +90,7 @@ export class CatalogNavigation implements PickerNavigation {
     if (!this.categories.some(item => item.id === id)) return undefined;
     this.category = id;
     this.searching = false; this.searchDomain = undefined;
-    this.domain = 'categories';
+    this.domain = this.placement === 'top' ? 'rows' : 'categories';
     this.viewport.reveal();
     return { options: this.project(''), focus: this.rowFocus.get(id), query: '' };
   }
@@ -132,11 +133,13 @@ export class CatalogNavigation implements PickerNavigation {
     if (query && !['left', 'right', 'tab', 'shift+tab'].includes(key)) return undefined;
     if (query) { this.searching = false; this.searchDomain = undefined; }
     if (key === 'tab' || key === 'shift+tab') {
-      const domains: readonly ('categories' | 'sections' | 'rows')[] = this.sectionFocus ? ['categories', 'rows', 'sections'] : ['categories', 'rows'];
+      const domains: readonly ('categories' | 'sections' | 'rows')[] = this.placement === 'top'
+        ? this.sectionFocus ? ['rows', 'sections'] : ['rows']
+        : this.sectionFocus ? ['categories', 'rows', 'sections'] : ['categories', 'rows'];
       const index = domains.indexOf(this.domain);
       this.domain = domains[(index + (key === 'tab' ? 1 : -1) + domains.length) % domains.length];
     } else if (key === 'left' || key === 'right') {
-      if (this.sectionFocus) {
+      if (this.placement === 'top' || this.sectionFocus) {
         const index = this.categories.findIndex(item => item.id === this.category);
         this.category = this.categories[(index + (key === 'right' ? 1 : -1) + this.categories.length) % this.categories.length]?.id ?? this.category;
       } else this.domain = key === 'left' ? 'categories' : 'rows';
@@ -154,11 +157,13 @@ export class CatalogNavigation implements PickerNavigation {
         const next = rows[index + 1]; if (next) this.rowFocus.set(this.category, next.id);
       }
       this.domain = 'rows';
-    } else if (key === 'escape' && this.domain !== 'categories') this.domain = 'categories';
+    } else if (key === 'escape' && this.domain !== (this.placement === 'top' ? 'rows' : 'categories')) {
+      this.domain = this.placement === 'top' ? 'rows' : 'categories';
+    }
     else return undefined;
     if (this.domain === 'categories') this.viewport.reveal();
     const options = this.project('');
     return { options, query: '', focus: this.domain === 'sections'
-      ? this.section ?? options.find(row => row.id.startsWith('section:'))?.id : this.rowFocus.get(this.category) };
+      ? options.find(row => row.id === this.section)?.id ?? options.find(row => row.id.startsWith('section:'))?.id : this.rowFocus.get(this.category) };
   }
 }

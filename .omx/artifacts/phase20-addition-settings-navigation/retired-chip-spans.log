@@ -1,0 +1,59 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/navigation.test.ts  (22 tests | 1 failed | 21 skipped) 14ms
+   ❯ src/cli/interactive/picker/navigation.test.ts > retires top category hit spans when search changes its chip window and repaints All
+     → expected "select" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st select call:
+
+    Array [
+      "Interaction",
+    ]
+
+
+Number of calls: 1
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 skipped (22)
+   Start at  15:25:48
+   Duration  1.97s (transform 1.27s, setup 0ms, collect 1.72s, tests 14ms, environment 0ms, prepare 55ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/navigation.test.ts -t retires top category hit spans
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/navigation.test.ts > retires top category hit spans when search changes its chip window and repaints All
+AssertionError: expected "select" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st select call:
+
+    Array [
+      "Interaction",
+    ]
+
+
+Number of calls: 1
+
+ ❯ src/cli/interactive/picker/navigation.test.ts:206:22
+    204|   overlay.handlePaste('maxTurns');
+    205|   overlay.handlePointer(parseMouseReport(`\x1b[<0;${column + 1};2M`)!,…
+    206|   expect(select).not.toHaveBeenCalled();
+       |                      ^
+    207|   const filtered = overlay.render(40, 30).map(stripAnsi);
+    208|   expect(filtered[1]).toContain('[All]'); expect(filtered.join('\n')).…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/picker/navigation.test.ts -t 'retires top category hit spans'

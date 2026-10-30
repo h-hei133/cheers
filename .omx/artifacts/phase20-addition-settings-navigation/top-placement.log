@@ -1,0 +1,48 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/navigation.test.ts  (22 tests | 3 failed | 19 skipped) 12ms
+   ❯ src/cli/interactive/picker/navigation.test.ts > clicks top categories and settings rows across resize at 40 columns without applying a value
+     → expected 'side' to be 'top' // Object.is equality
+   ❯ src/cli/interactive/picker/navigation.test.ts > clicks top categories and settings rows across resize at 80 columns without applying a value
+     → expected 'side' to be 'top' // Object.is equality
+   ❯ src/cli/interactive/picker/navigation.test.ts > clicks top categories and settings rows across resize at 120 columns without applying a value
+     → expected 'side' to be 'top' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 19 skipped (22)
+   Start at  15:25:42
+   Duration  2.06s (transform 1.32s, setup 0ms, collect 1.79s, tests 12ms, environment 0ms, prepare 63ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/navigation.test.ts -t clicks top categories and settings rows
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/navigation.test.ts > clicks top categories and settings rows across resize at 40 columns without applying a value
+ FAIL  src/cli/interactive/picker/navigation.test.ts > clicks top categories and settings rows across resize at 80 columns without applying a value
+ FAIL  src/cli/interactive/picker/navigation.test.ts > clicks top categories and settings rows across resize at 120 columns without applying a value
+AssertionError: expected 'side' to be 'top' // Object.is equality
+
+- Expected
++ Received
+
+- top
++ side
+
+ ❯ src/cli/interactive/picker/navigation.test.ts:115:40
+    113|   };
+    114|   overlay.open(picker); await settle();
+    115|   expect(picker.navigation?.placement).toBe('top'); expect(picker.chip…
+       |                                        ^
+    116|   click('Model', true);
+    117|   for (const size of [40, 80, 120]) {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/picker/navigation.test.ts -t 'clicks top categories and settings rows'

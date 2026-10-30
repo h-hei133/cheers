@@ -4358,3 +4358,16 @@ regular两次删除195/278ms、退出126ms；fullscreen193/275ms、退出125ms�
 [正式工件](../../.omx/artifacts/phase20-addition-catalog-ownership/README.md)与HANDOFF保留。named-callable比较：catalog store6→13、publication helper1→2，其余不增长；保守计数下model/settings picker已有46/23仍保留，**本批没有解决这两处既有责任上限问题，不能称所有owner都达标**。实际用户models文件未编辑；其他平台、真实provider、exe/full suite/20k和独立代理review未验证。第31项本地实现与小型CLI通过；32/35/36/37继续，第33项大目录体验仍partial，原47与ADD整体不升级，goal active。
 
 延后一次读回：`0613878865e19f6e9a656d1191a6d8bdb6f7f7d7` 的CI41015773762/Watch41015773723均completed/success且head一致；本批提交/推送与未来CI另绑定，不借用上一批绿色。
+
+
+### 21.15 第三十二实施：settings 顶部分类与方向一致的导航
+
+settings 显式采用 `navigation.placement = top`，由原 `chipStrip` 绘制唯一分类来源；移除以前被navigation抑制的重复chips。内容继续原panel，两列分别为列表/详情，不再有第三列分类侧栏。40/80/120列均让活动分类保持可见；默认side保留给model与help。左右键切分类，Tab/Shift+Tab仅在条目与分节标题间切换，上下键在当前域移动；标题Enter进入其首字段，标题Esc回条目，条目Esc关闭，搜索Esc保留所选结果及所属分类。搜索变化同步清空chip命中，拒绝使用重绘前的旧分类窗口。footer、`/help`的settings描述、直接settings说明及两份指南同步。
+
+此前已定向只读对照终端参考的settings-selector.ts:1940–1960与tab-bar.ts:205–226：采用横向分类/左右键、Tab标题/条目决策，继续目标原有chip窗口与命中登记；不复制另一套renderer。放回side与恢复三域Tab的独立反转均使回归失败。搜索排序原样移入已有settings子目录，显式接受原category order，避免重复排序表；主settings picker保守named-callable计数23→20、新search1、navigation12不变。overlay30与命令registry121为本批未增长的既有超限，append disposition，不称全部owner达标。
+
+主代理串行完成五静态门、九聚焦文件202项与TS build；四独立反转（placement/Tab域/旧chip命中/model side默认）均AssertionError且finally逐字节恢复，补足Tab双向循环断言后的恢复navigation22项再通过。初次6处测试失败来自详情列重复label误作列表坐标、80列标签截断及错误的下一字段假设，修夹具后以实际Enter字段ID维持更严格验证，未放松写入或身份断言。118旧docs advisory保留，无并行heavy/子代理验证/全套本地回归/20k真实终端。测试断言变更后首个CLI尝试被freshness拒绝，随后重build，未把旧build视为当前代码证据。
+
+原Node CLI在regular/fullscreen均各1会话×1消息，物理PTY依次resize40/80/120列：顶部活动分类、Tab标题→下一节→Enter字段→实际详情→Esc原字段、左右分类往返保留字段、搜索All与Esc所选归属均通过；再打开model，Tab仍到原侧栏。配置user/project及models文件字节不变、请求0、exit0/cooked flags，退出136/142ms仅为小fixture观测。鼠标实际绘制区域、短frame及旧命中拒绝由单元宿主覆盖；未采集真实桌面鼠标/键盘或其他平台体验。最终build `6a98f52461a8e7443de16bc14fb88b92395048201c67b39d0678a5c0855fb0de`，inputs `40eb551ecc21d86b841a49d4e2567490c43a062e7a5666f0a9c1c336c9fc9967`，收据与[正式工件](../../.omx/artifacts/phase20-addition-settings-navigation/README.md)绑定。scratch已清理，原CLAUDE.md保留。
+
+延后一次读回上批`94a4737978808146d33d169ee0be48e8065cda51`：CI41018354924仍in_progress、Watch41018354865 completed/success，head均一致；不等待或重复轮询。本批未运行独立代理review/真实provider/exe/full suite/20k，自己的Git/推送与未来CI另绑定。第32项本地实现与小型CLI通过；35及36/37继续，第33项用户大目录体验仍partial，原47与ADD整体不升级，goal active。

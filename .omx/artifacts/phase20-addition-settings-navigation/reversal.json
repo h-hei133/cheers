@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "name": "top-placement",
+      "exit": 1,
+      "sourceSha256": "4dce58d7d3863d08b302c30085b67df411392202f293d2e63df091e445c72d3e"
+    },
+    {
+      "name": "top-tab-domains",
+      "exit": 1,
+      "sourceSha256": "f97f253d7239c9b269f4b6961e98f2ec6f7bfcd99ae14959574da98caeb8623c"
+    },
+    {
+      "name": "retired-chip-spans",
+      "exit": 1,
+      "sourceSha256": "779013c5eee245eef680eeefbc04821b5435faa4c3250a8ad097078cea2fa61d"
+    },
+    {
+      "name": "side-default",
+      "exit": 1,
+      "sourceSha256": "f97f253d7239c9b269f4b6961e98f2ec6f7bfcd99ae14959574da98caeb8623c"
+    }
+  ],
+  "restored": true
+}

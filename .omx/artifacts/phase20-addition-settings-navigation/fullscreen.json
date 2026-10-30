@@ -1,0 +1,51 @@
+{
+  "mode": "fullscreen",
+  "buildId": "6a98f52461a8e7443de16bc14fb88b92395048201c67b39d0678a5c0855fb0de",
+  "inputsDigest": "40eb551ecc21d86b841a49d4e2567490c43a062e7a5666f0a9c1c336c9fc9967",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "passed",
+  "checks": {
+    "modelStillSide": true,
+    "settingsWidths": true,
+    "cookedInputRestored": true,
+    "zeroRequests": true,
+    "configUnchanged": true,
+    "projectConfigUnchanged": true,
+    "modelsUnchanged": true
+  },
+  "widths": [
+    {
+      "width": 40,
+      "top": true,
+      "noSidebar": true,
+      "noCategoryFocus": true,
+      "searchAll": true,
+      "keyboardAndReturn": true
+    },
+    {
+      "width": 80,
+      "top": true,
+      "noSidebar": true,
+      "noCategoryFocus": true,
+      "searchAll": true,
+      "keyboardAndReturn": true
+    },
+    {
+      "width": 120,
+      "top": true,
+      "noSidebar": true,
+      "noCategoryFocus": true,
+      "searchAll": true,
+      "keyboardAndReturn": true
+    }
+  ],
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 142,
+  "outputBytes": 64720,
+  "scratchRemoved": true
+}

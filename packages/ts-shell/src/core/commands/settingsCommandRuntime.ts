@@ -20,6 +20,7 @@ export async function runSettingsCommand(args: string[], context: CommandContext
   ].join('\n') };
   return { kind: 'local', output: [
     '### Settings', '', 'Open /settings in an interactive session. Type to search by field, group or description.',
+    'Use Left/Right for top categories, Tab for sections/rows, and Up/Down to move.',
     'Choose a field and save scope, stage a value, then choose Apply. Credentials stay in /connect.', '',
     '| Group | Setting | What it does |', '| :--- | :--- | :--- |',
     ...CONFIG_SETTINGS.map(item => `| ${item.group} | ${item.key} | ${item.description} |`), '',

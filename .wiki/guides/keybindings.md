@@ -48,7 +48,7 @@ completion. Enter, Escape, Ctrl+C, Up/Down, Space, Backspace, Delete, Ctrl+D, Ct
 confirmation, cancellation, navigation and editing. Assigning a group action to one of these keys reports the problem
 and drops that binding; any other keys in the same entry remain available.
 
-In Settings, typing searches all groups, including when a group is selected. Field keys and labels support literal and fuzzy matching; results stay grouped, with the best-matching group first. Clearing the query returns to the previous group. Back from a field's detail returns to its group with that field selected. Searching and navigating do not save a value.
+In Settings, Left/Right changes the top category; Tab or Shift+Tab toggles rows and section headings, and Up/Down moves within them. Enter on a heading enters its first field. Esc returns from headings to rows, then closes the panel. Typing searches all groups, including when a group is selected. Field keys and labels support literal and fuzzy matching; results stay grouped, with the best-matching group first. Clearing the query returns to the previous group. Back from a field's detail returns to its group with that field selected. Searching and navigating do not save a value.
 
 ## Default actions
 

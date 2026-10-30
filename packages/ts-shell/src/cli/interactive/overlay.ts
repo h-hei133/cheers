@@ -295,8 +295,11 @@ export class OverlayHost {
       ([searchStatus, pickerStatus].filter(Boolean).join(' ') || undefined);
     const groupKeys = picker.chips && !picker.navigation ? ['tui.overlay.previousGroup', 'tui.overlay.nextGroup'].flatMap(id =>
       this.bindings.keysFor(id).filter(key => this.bindings.actionFor(key, 'overlay') === id)) : [];
+    const chips = picker.navigation?.placement === 'top'
+      ? { items: picker.navigation.items, active: this.model.filter ? 'all' : picker.navigation.active }
+      : !picker.navigation ? picker.chips : undefined;
     const chipChrome = {
-      ...(picker.chips && !picker.navigation ? { chips: chipStrip(picker.chips.items, picker.chips.active, picker.form === 'modal' ? Math.max(0, width - 4) : width) } : {}),
+      ...(chips ? { chips: chipStrip(chips.items, chips.active, picker.form === 'modal' ? Math.max(0, width - 4) : width) } : {}),
       ...(groupKeys.length ? { groupHint: `${groupKeys.join('/')} group` } : {}),
       onChipRow: (row: number, id: string, from: number, to: number) => {
         const spans = this.chipRows.get(row) ?? [];
@@ -328,7 +331,7 @@ export class OverlayHost {
       picker.title.startsWith("Permission:") ||
       (this.model.visible.some((o) => o.id === "allow-once") &&
         this.model.visible.some((o) => o.id === "deny"));
-    const renderer = picker.navigation ? (model: OptionModel, chrome: Parameters<typeof renderPanel>[1], width: number, height: number) =>
+    const renderer = picker.navigation && picker.navigation.placement !== 'top' ? (model: OptionModel, chrome: Parameters<typeof renderPanel>[1], width: number, height: number) =>
       renderNavigation(model, chrome, { ...picker.navigation!,
         items: picker.navigation!.items, active: picker.navigation!.active, focused: picker.navigation!.focused,
         viewport: picker.navigation!.viewport,
@@ -897,6 +900,7 @@ export class OverlayHost {
   }
   private changeFilter(change: () => void): void {
     this.optionRows.clear(); this.listRows.clear(); this.hovered = undefined;
+    this.chipRows.clear();
     this.picker?.navigation?.focus(this.model.current()?.id);
     this.model.setOptions(this.baseOptions);
     change();

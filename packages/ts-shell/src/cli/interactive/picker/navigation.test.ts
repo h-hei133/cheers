@@ -10,6 +10,7 @@ import { parseMouseReport } from '../../../presentation/tui/input/mouse.js';
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import type { SettingsDraft } from '../settings.js';
 import { CatalogNavigation } from './navigation.js';
+import { visibleWidth } from '../../../presentation/tui/text/measure.js';
 
 function settings() {
   const save = vi.fn(async () => ({ applied: true, note: 'saved' }));
@@ -34,7 +35,7 @@ it('drops removed row identities from every category while retaining surviving f
   navigation.select('all'); expect(navigation.preferred).toBeUndefined();
 });
 
-it('navigates category/section/row domains, edits a real number, discards and reopens the exact field', async () => {
+it('navigates top categories and section/row domains, edits a real number, discards and reopens the exact field', async () => {
   const h = settings(); const overlay = new OverlayHost(() => {});
   const press = async (key: string) => {
     let pending: Promise<unknown> | undefined;
@@ -44,7 +45,7 @@ it('navigates category/section/row domains, edits a real number, discards and re
     await pending; await settle();
   };
   overlay.open(settingsPicker(h, 'project', 'Appearance')); await settle();
-  expect(view(overlay)).toContain('Browse'); expect(view(overlay)).toContain('Appearance / Composer');
+  expect(view(overlay)).toContain('[Appearance]'); expect(view(overlay)).toContain('Appearance / Composer');
   await press('\x1b[C'); // Model category
   expect(view(overlay)).toContain('Model / Limits');
   await press('\t'); // section domain
@@ -69,7 +70,6 @@ it('navigates category/section/row domains, edits a real number, discards and re
   // Enter selects Apply by default; Discard is reached via two Down keys.
   await press('\x1b[B'); await press('\x1b[B'); await press('\r');
   expect(view(overlay)).toContain('▸ Maximum turns'); expect(h.save).not.toHaveBeenCalled();
-  await press('\x1b'); expect(view(overlay, 40)).toContain('Browse');
   await press('\x1b'); expect(overlay.active).toBe(false);
 });
 
@@ -100,31 +100,34 @@ it('browses an unavailable provider through navigation then returns from inspect
   overlay.close();
 });
 
-it('moves category and settings row focus to the clicked pane across resize without applying a value', async () => {
+it.each([40, 80, 120])('clicks top categories and settings rows across resize at %i columns without applying a value', async width => {
   const h = settings(); const overlay = new OverlayHost(() => {}); const apply = vi.fn();
-  const click = (label: string, pane: 'navigation' | 'content', width = 120) => {
-    const frame = overlay.render(width, 30).map(stripAnsi);
-    const row = frame.findIndex(text => pane === 'navigation' ? text.split('│')[0]?.includes(label) : text.split('│')[1]?.includes(label));
-    expect(row).toBeGreaterThanOrEqual(0);
-    const column = frame[row]!.indexOf(label);
+  const picker = settingsPicker(h, 'project', 'Appearance');
+  const click = (label: string, category = false, size = width) => {
+    const frame = overlay.render(size, 30).map(stripAnsi);
+    const row = category ? 1 : frame.findIndex(text => text.split('│')[0]?.includes(label));
+    const column = (category ? frame[row]! : frame[row]!.split('│')[0]!).indexOf(label);
     expect(column).toBeGreaterThanOrEqual(0);
     overlay.handlePointer(parseMouseReport(`\x1b[<0;${column + 1};${row + 1}M`)!, 0);
+    return { row, column };
   };
-  overlay.open(settingsPicker(h, 'project', 'Appearance')); await settle();
-  click('Model', 'navigation');
-  expect(view(overlay)).toContain('▸ Model');
-  expect(view(overlay, 40)).toContain('▸ Model'); expect(view(overlay, 40)).not.toContain('Maximum turns');
+  overlay.open(picker); await settle();
+  expect(picker.navigation?.placement).toBe('top'); expect(picker.chips).toBeUndefined();
+  click('Model', true);
+  for (const size of [40, 80, 120]) {
+    const frame = overlay.render(size, 30).map(stripAnsi);
+    expect(frame[1]).toContain('[Model]'); expect(frame.join('\n')).toContain('Maximum turns');
+    expect(frame.join('\n')).not.toContain('Browse'); expect(frame.join('\n')).not.toContain('shift+tab/tab group');
+  }
+  expect(picker.navigation?.focused).toBe(false);
+  const select = vi.spyOn(picker.navigation!, 'select');
+  const old = click('Maximum turns');
+  overlay.handlePointer(parseMouseReport(`\x1b[<0;${old.column + 1};2M`)!, 0); // Retired category hit map.
+  expect(select).not.toHaveBeenCalled();
+  expect(view(overlay, width)).toContain('▸ Maximum turns');
   overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
-  expect(view(overlay, 40)).toContain('▸ Interaction');
-  overlay.handleKey(parseKeyEvent('\x1b[A'), apply);
-  const beforeClick = overlay.render(120, 30).map(stripAnsi);
-  const categoryRow = beforeClick.findIndex(text => text.split('│')[0]?.includes('Context'));
-  click('Maximum turns', 'content');
-  overlay.handlePointer(parseMouseReport(`\x1b[<0;3;${categoryRow + 1}M`)!, 0); // Retired frame, before repaint.
-  expect(view(overlay)).toContain('▸ Maximum turns'); expect(view(overlay, 40)).not.toContain('Browse');
-  overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
-  expect(view(overlay)).toContain('▸ Output token');
-  expect(view(overlay)).toContain('• Model'); expect(apply).not.toHaveBeenCalled(); expect(h.save).not.toHaveBeenCalled();
+  expect(view(overlay, width)).toContain('▸ Output token');
+  expect(picker.navigation?.active).toBe('Model'); expect(apply).not.toHaveBeenCalled(); expect(h.save).not.toHaveBeenCalled();
   overlay.handleKey(parseKeyEvent('\r'), apply);
   expect(apply).toHaveBeenCalledWith(expect.anything(), ['maxOutputTokens']); overlay.close();
 });
@@ -166,12 +169,11 @@ it('clicks an unconfigured model from category focus then opens its exact inspec
   overlay.close();
 });
 
-it('does not expose sidebar hit targets outside an extremely short painted frame', async () => {
+it('does not expose top category hit targets outside an extremely short painted frame', async () => {
   const h = settings(); const overlay = new OverlayHost(() => {}); const picker = settingsPicker(h, 'user', 'Model');
   overlay.open(picker); await settle(); const apply = vi.fn();
   const select = vi.spyOn(picker.navigation!, 'select');
-  overlay.handleKey(parseKeyEvent('\t'), apply); overlay.handleKey(parseKeyEvent('\t'), apply); // categories
-  for (const width of [40, 120]) for (const height of [0, 1, 2]) {
+  for (const width of [40, 80, 120]) for (const height of [0, 1, 2]) {
     const frame = overlay.render(width, height);
     expect(frame.length).toBeLessThanOrEqual(height);
     overlay.handlePointer(parseMouseReport('\x1b[<0;3;2M')!, 0);
@@ -185,7 +187,7 @@ it('preserves an uppercase settings search after clicking its result', async () 
   const h = settings(); const overlay = new OverlayHost(() => {}); const apply = vi.fn();
   overlay.open(settingsPicker(h)); await settle(); overlay.handlePaste('MAX');
   const frame = overlay.render(120, 30).map(stripAnsi);
-  const row = frame.findIndex(text => text.split('│')[1]?.includes('Output token'));
+  const row = frame.findIndex(text => text.includes('Output token'));
   const column = frame[row]!.indexOf('Output token');
   overlay.handlePointer(parseMouseReport(`\x1b[<0;${column + 1};${row + 1}M`)!, 0);
   const selected = view(overlay); expect(selected).toContain('MAX'); expect(selected).toContain('▸ Output token');
@@ -193,21 +195,72 @@ it('preserves an uppercase settings search after clicking its result', async () 
   expect(apply).toHaveBeenCalledWith(expect.anything(), ['maxOutputTokens']); expect(h.save).not.toHaveBeenCalled(); overlay.close();
 });
 
-it.each(['categories', 'sections'] as const)('restores the settings %s focus after clearing an empty-result search', async domain => {
+it('retires top category hit spans when search changes its chip window and repaints All', async () => {
   const h = settings(); const overlay = new OverlayHost(() => {}); const apply = vi.fn();
   const picker = settingsPicker(h, 'user', 'Model'); overlay.open(picker); await settle();
-  overlay.handleKey(parseKeyEvent('\t'), apply); // sections
-  overlay.handleKey(parseKeyEvent('\x1b[B'), apply); // Sampling
-  if (domain === 'categories') overlay.handleKey(parseKeyEvent('\t'), apply);
-  expect(view(overlay)).toContain(domain === 'sections' ? '▸ Model / Sampling' : '▸ Model');
+  const frame = overlay.render(40, 30).map(stripAnsi);
+  const column = frame[1]!.indexOf('Interaction'); expect(column).toBeGreaterThanOrEqual(0);
+  const select = vi.spyOn(picker.navigation!, 'select');
+  overlay.handlePaste('maxTurns');
+  overlay.handlePointer(parseMouseReport(`\x1b[<0;${column + 1};2M`)!, 0);
+  expect(select).not.toHaveBeenCalled();
+  const filtered = overlay.render(40, 30).map(stripAnsi);
+  expect(filtered[1]).toContain('[All]'); expect(filtered.join('\n')).toContain('▸ Maximum turns');
+  overlay.handleKey(parseKeyEvent('\x1b'), apply);
+  expect(view(overlay, 40)).toContain('[Model]'); expect(picker.navigation?.active).toBe('Model');
+  expect(h.save).not.toHaveBeenCalled(); expect(apply).not.toHaveBeenCalled(); overlay.close();
+});
+
+it.each(['rows', 'sections'] as const)('restores the settings %s focus after clearing an empty-result search', async domain => {
+  const h = settings(); const overlay = new OverlayHost(() => {}); const apply = vi.fn();
+  const picker = settingsPicker(h, 'user', 'Model'); overlay.open(picker); await settle();
+  if (domain === 'sections') overlay.handleKey(parseKeyEvent('\t'), apply);
+  overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+  const expected = domain === 'sections' ? '▸ Model / Sampling' : '▸ Output token';
+  expect(view(overlay)).toContain(expected);
   overlay.handlePaste('no-such-setting');
-  expect(view(overlay)).not.toContain('▸ Model / Sampling');
+  expect(view(overlay)).not.toContain(expected);
   for (const character of 'no-such-setting') overlay.handleKey(parseKeyEvent('\x7f'), apply);
-  expect(picker.navigation?.focused).toBe(domain === 'categories');
-  expect(view(overlay, 40)).toContain(domain === 'sections' ? '▸ Model / Sampling' : 'Browse');
+  expect(picker.navigation?.focused).toBe(false);
+  expect(view(overlay, 40)).toContain(expected);
   overlay.handleKey(parseKeyEvent(domain === 'sections' ? '\r' : '\x1b[B'), apply);
-  expect(view(overlay)).toContain(domain === 'sections' ? '▸ Temperature' : '▸ Interaction');
-  expect(apply).not.toHaveBeenCalled(); expect(h.save).not.toHaveBeenCalled(); overlay.close();
+  expect(view(overlay)).toContain(`▸ ${CONFIG_SETTINGS.find(setting => setting.key === (domain === 'sections' ? 'temperature' : 'allowedModels'))!.label}`);
+  overlay.handleKey(parseKeyEvent('\r'), apply);
+  expect(apply).toHaveBeenCalledWith(picker, [domain === 'sections' ? 'temperature' : 'allowedModels']);
+  expect(h.save).not.toHaveBeenCalled(); overlay.close();
+});
+
+it.each([40, 80, 120])('keeps every top category visible and moves vertically within its active domain at %i columns', async width => {
+  const h = settings(); const picker = settingsPicker(h); const overlay = new OverlayHost(() => {}); const apply = vi.fn();
+  overlay.open(picker); await settle();
+  const navigation = picker.navigation!;
+  for (const category of navigation.items) {
+    const frame = overlay.render(width, 30).map(stripAnsi);
+    expect(frame[1]).toContain(`[${category.label}]`);
+    expect(frame.every(row => visibleWidth(row) <= width)).toBe(true);
+    expect(navigation.focused).toBe(false);
+    overlay.handleKey(parseKeyEvent('\x1b[C'), apply);
+  }
+  expect(navigation.active).toBe('all');
+  overlay.handleKey(parseKeyEvent('\x1b[D'), apply);
+  expect(navigation.active).toBe(navigation.items.at(-1)?.id);
+  overlay.close(); const modelSettings = settingsPicker(h, 'user', 'Model'); overlay.open(modelSettings); await settle();
+  overlay.handleKey(parseKeyEvent('\t'), apply);
+  overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+  expect(view(overlay, width)).toContain('▸ Model / Sam');
+  overlay.handleKey(parseKeyEvent('\x1b[C'), apply);
+  expect(view(overlay, width)).toContain('▸ Interaction /');
+  overlay.handleKey(parseKeyEvent('\x1b[Z'), apply);
+  expect(view(overlay, width)).toContain(`▸ ${CONFIG_SETTINGS.find(setting => setting.key === 'vimMode')!.label}`);
+  overlay.handleKey(parseKeyEvent('\t'), apply);
+  overlay.handleKey(parseKeyEvent('\t'), apply);
+  expect(modelSettings.navigation?.focused).toBe(false);
+  expect(view(overlay, width)).toContain(`▸ ${CONFIG_SETTINGS.find(setting => setting.key === 'vimMode')!.label}`);
+  overlay.handleKey(parseKeyEvent('\x1b[Z'), apply);
+  overlay.handleKey(parseKeyEvent('\x1b'), apply);
+  expect(overlay.active).toBe(true); expect(view(overlay, width)).toContain(`▸ ${CONFIG_SETTINGS.find(setting => setting.key === 'vimMode')!.label}`);
+  overlay.handleKey(parseKeyEvent('\x1b'), apply);
+  expect(overlay.active).toBe(false); expect(apply).not.toHaveBeenCalled(); expect(h.save).not.toHaveBeenCalled();
 });
 
 it('leaves settings search at the selected result without closing or applying it', async () => {

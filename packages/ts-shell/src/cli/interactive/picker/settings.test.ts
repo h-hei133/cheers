@@ -51,8 +51,9 @@ describe('advanced settings picker', () => {
     expect(modelRows.some(row => row.id.startsWith('settings:'))).toBe(false);
     expect(all.some(row => row.id === 'providerConnectTimeoutMs')).toBe(true);
     expect(all.some(row => row.id === 'instructionBudgetBytes')).toBe(true);
-    const sessions = model.chips!.select('Session')!;
-    const sessionRows = sessions.filterOptions!('', await sessions.load());
+    model.navigation!.select('Session');
+    const sessions = model;
+    const sessionRows = sessions.filterOptions!('', all);
     expect(sessionRows.map(row => row.id)).toEqual([
       'section:Session / Current session', 'settings:model', 'settings:thinking',
     ]);
@@ -60,7 +61,7 @@ describe('advanced settings picker', () => {
     expect(sessions.detail!('settings:thinking').join(' ')).toContain('settings file scope does not change');
     const thinking = (await sessions.apply(['settings:thinking']))!.next!;
     const returned = thinking.back!();
-    expect(returned.chips?.active).toBe('Session');
+    expect(returned.navigation?.active).toBe('Session');
     expect(returned.initialSelection).toBe('settings:thinking');
     expect(returned.title).toContain('project configuration');
     expect(h.thinkingSettings).toHaveBeenCalledOnce();
@@ -73,7 +74,7 @@ describe('advanced settings picker', () => {
     expect(picker.detail!(undefined)).toEqual([]);
     expect(await picker.apply(['settings:memory'])).toBeUndefined();
     await picker.load();
-    expect(picker.chips?.items.some(item => item.id === 'Session')).toBe(false);
+    expect(picker.navigation?.items.some(item => item.id === 'Session')).toBe(false);
     h.modelSettings = vi.fn(() => ({ title: 'Unexpected child', empty: '', load: async () => [], apply: async () => undefined }));
     h.thinkingSettings = vi.fn(() => ({ title: 'Unexpected child', empty: '', load: async () => [], apply: async () => undefined }));
     for (const id of ['settings:model', 'settings:thinking']) {
@@ -108,12 +109,12 @@ describe('advanced settings picker', () => {
     overlay.handleKey(parseKeyEvent('\x1b[C'), vi.fn());
     expect(frame()).toContain('Settings — current session');
     expect(frame()).toContain('Session /');
-    expect(picker.chips?.active).toBe('Session');
+    expect(picker.navigation?.active).toBe('Session');
     expect(frame()).not.toContain('Maximum turns');
     overlay.handlePaste('reasoning');
     expect(frame()).toContain('▸ Thinking effort');
     overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
-    expect(picker.chips?.active).toBe('Session');
+    expect(picker.navigation?.active).toBe('Session');
     expect(frame()).toContain('▸ Thinking effort');
     expect(frame()).toContain(`${scope} configuration`);
     let pending: Promise<unknown> | undefined;
@@ -136,7 +137,7 @@ describe('advanced settings picker', () => {
     const h = host();
     const picker = settingsPicker(h);
     const rows = await picker.load();
-    expect(picker.chips?.items.map(item => item.id)).toEqual(expect.arrayContaining(['Memory', 'Shell']));
+    expect(picker.navigation?.items.map(item => item.id)).toEqual(expect.arrayContaining(['Memory', 'Shell']));
     expect(rows.find(row => row.id === 'settings:memory')).toMatchObject({ label: 'Memory status', note: 'read-only' });
     expect(rows.find(row => row.id === 'settings:shell')).toMatchObject({ label: 'Shell diagnostics', note: 'read-only' });
     expect(picker.filterOptions!('memory', rows)[0]?.id).toBe('settings:memory');
@@ -213,13 +214,13 @@ describe('advanced settings picker', () => {
     const fuzzy = picker.filterOptions!('mxtrns', options);
     expect(fuzzy[0]?.id).toBe('maxTurns');
     expect(picker.title).toContain('Search all groups');
-    expect(picker.chips?.active).toBe('all');
+    expect(picker.navigation?.active).toBe('Interaction'); // Search retains its return category.
     expect(picker.filterOptions!('maxturns', options)[0]?.id).toBe('maxTurns');
     expect(picker.filterOptions!('no-such-setting', options)).toEqual([]);
     const restored = picker.filterOptions!('', options);
     expect(restored.length).toBeGreaterThan(0);
     expect(restored.some(option => option.id === 'section:Interaction / Input')).toBe(true);
-    expect(picker.chips?.active).toBe('Interaction');
+    expect(picker.navigation?.active).toBe('Interaction');
     expect(picker.title).toContain(' — Interaction');
     expect(h.save).not.toHaveBeenCalled();
   });
@@ -258,7 +259,7 @@ describe('advanced settings picker', () => {
     const h = host(); const picker = settingsPicker(h, 'user', 'Interaction'); await picker.load();
     const detail = (await picker.apply(['maxTurns']))!.next!;
     const back = (await detail.apply(['back']))!.next!;
-    expect(back.chips?.active).toBe('Model');
+    expect(back.navigation?.active).toBe('Model');
     expect(back.initialSelection).toBe('maxTurns');
     const overlay = new OverlayHost(() => {}); overlay.open(back);
     await Promise.resolve(); await Promise.resolve();

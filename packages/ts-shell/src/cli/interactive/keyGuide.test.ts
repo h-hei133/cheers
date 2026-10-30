@@ -68,6 +68,7 @@ it("keeps the documented action and gesture tables equal to the runtime catalogu
   expect(section("key-gestures").split("\n").slice(2)).toEqual(gestures);
   const index = fs.readFileSync(new URL("../../../../../.wiki/_index.md", import.meta.url), "utf8");
   expect(index).toContain("(guides/keybindings.md)");
+  expect(guideDocument).toContain('Left/Right changes the top category; Tab or Shift+Tab toggles rows and section headings');
 });
 
 it("shows the documented rebinding example in the effective hotkey command", async () => {
