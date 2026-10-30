@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
-import { reviewEvidence } from './evidence.js';
+import { readEvidence } from './evidence.js';
 import type { AfterToolCallContext } from '../../agent/tools.js';
 
 function observation(overrides: Partial<AfterToolCallContext> = {}): AfterToolCallContext {
@@ -13,7 +13,7 @@ function observation(overrides: Partial<AfterToolCallContext> = {}): AfterToolCa
 }
 
 it('retires read authority and returns detached receipt snapshots', async () => {
-  const reads = reviewEvidence('r');
+  const reads = readEvidence('r', 'review');
   await reads.observe(observation());
   const snapshot = reads.snapshot();
   (snapshot[0] as { locator: string }).locator = 'tampered';
@@ -25,18 +25,18 @@ it('retires read authority and returns detached receipt snapshots', async () => 
 
 it('refuses new receipts when the original review signal is cancelled', async () => {
   const controller = new AbortController();
-  const reads = reviewEvidence('r', controller.signal);
+  const reads = readEvidence('r', 'review', controller.signal);
   controller.abort();
   expect(await reads.observe(observation())).toBeUndefined();
   expect(reads.snapshot()).toEqual([]);
 });
 
 it.each(['grep', 'glob'])('does not certify a %s result as a native file content read', async name => {
-  expect(await reviewEvidence('r').observe(observation({ call: { id: 'call', name, args: {} } }))).toBeUndefined();
+  expect(await readEvidence('r', 'review').observe(observation({ call: { id: 'call', name, args: {} } }))).toBeUndefined();
 });
 
 it('rejects a mismatched native locator and invalid line range', async () => {
-  const reads = reviewEvidence('r');
+  const reads = readEvidence('r', 'review');
   expect(await reads.observe(observation({ args: { path: 'other.txt' } }))).toBeUndefined();
   const context = observation();
   (context.result.metadata!.read as { endLine: number }).endLine = 0;
@@ -44,7 +44,7 @@ it('rejects a mismatched native locator and invalid line range', async () => {
 });
 
 it.each(['text', 'no-text'])('certifies only actually extracted PDF %s', async status => {
-  const reads = reviewEvidence('r');
+  const reads = readEvidence('r', 'review');
   const result = await reads.observe(observation({ args: { path: 'doc.pdf' }, result: { output: 'PDF extraction', isError: false,
     metadata: { provenance: { locator: 'doc.pdf', parser: 'poppler', location: 'pages' },
       media: { kind: 'pdf', sourceHash: 'a'.repeat(64), startPage: 2, endPage: 2,

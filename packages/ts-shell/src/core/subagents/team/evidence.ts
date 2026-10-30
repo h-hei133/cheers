@@ -5,7 +5,8 @@ import type { Refutation } from './convergence.js';
 /** A native read receipt identifies only the selected content, never the whole file. */
 export interface ReadReceipt {
   readonly id: string;
-  readonly reviewerId: string;
+  readonly agentId: string;
+  readonly stage: 'propose' | 'review';
   readonly locator: string;
   readonly contentHash: string;
   readonly location: 'lines' | 'pages';
@@ -13,8 +14,8 @@ export interface ReadReceipt {
   readonly end: number;
 }
 
-/** Ephemeral per-review receipts, issued before the model can cite the result. */
-export function reviewEvidence(reviewerId: string, signal?: AbortSignal) {
+/** Ephemeral per-agent receipts, issued before the model can cite the result. */
+export function readEvidence(agentId: string, stage: ReadReceipt['stage'], signal?: AbortSignal) {
   const prefix = randomUUID();
   const receipts: ReadReceipt[] = [];
   let retired = false;
@@ -23,13 +24,13 @@ export function reviewEvidence(reviewerId: string, signal?: AbortSignal) {
       if (retired || signal?.aborted || context.call.name !== 'read' || context.isError || context.result.isError) return undefined;
       const source = nativeSource(context);
       if (!source) return undefined;
-      const receipt: ReadReceipt = { ...source, reviewerId, id: `${prefix}:${receipts.length + 1}` };
+      const receipt: ReadReceipt = { ...source, agentId, stage, id: `${prefix}:${receipts.length + 1}` };
       receipts.push(receipt);
       return { suffix: `Read receipt: ${receipt.id} (${JSON.stringify(receipt.locator)}, ${receipt.location} ${receipt.start}-${receipt.end}). `
         + 'This receipt covers only the returned content. Cite its ID after evidence: when checking a claim.' };
     },
     bind: (findings: readonly Refutation[]): readonly Refutation[] => findings.map(finding => {
-      const valid = finding.reviewerId === reviewerId && finding.evidence.length > 0
+      const valid = stage === 'review' && finding.reviewerId === agentId && finding.evidence.length > 0
         && finding.evidence.every(id => receipts.some(receipt => receipt.id === id));
       return valid ? { ...finding, evidence: [...new Set(finding.evidence)] } : {
         ...finding, kind: 'insufficient', evidence: [],
@@ -41,7 +42,7 @@ export function reviewEvidence(reviewerId: string, signal?: AbortSignal) {
   };
 }
 
-function nativeSource(context: AfterToolCallContext): Omit<ReadReceipt, 'id' | 'reviewerId'> | undefined {
+function nativeSource(context: AfterToolCallContext): Omit<ReadReceipt, 'id' | 'agentId' | 'stage'> | undefined {
   const metadata = context.result.metadata;
   const provenance = record(metadata?.provenance);
   const locator = provenance?.locator;

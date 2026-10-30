@@ -3990,3 +3990,16 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 [正式工件](../../.omx/artifacts/phase20-addition-team-coverage/)及HANDOFF留证，原CLAUDE.md保留，无本助手subagent/heavy并发/exe/full suite/20k/真实生产provider/非Linux/独立review。结构化hypothesis/evidenceRefs/falsifiers和专门context-adoption批准仍待续，不称17.5或原47完成，goal active。本批Git/未来CI另绑定。
 
 20.53已推送`8e4e6fd1b3865fc657dee87644912296c75ec009`（69测试/双模式CLI证据）。延后精确CI：20.52 `0960d010` CI40987047192已success；20.53 CI40989150210仍in_progress、Watch40989150206 success；20.51 CI40986394168 success，本批不把未完成CI当通过。
+
+
+### 20.55 结构化竞争假说及提案读取身份
+
+继续17.5的`{hypothesisId, claim, evidenceRefs, falsifiers}`：原tool将完整text当claim，无法区分格式错误/无证伪条件/伪引用。新增本域[proposal](../../packages/ts-shell/src/core/subagents/team/proposal.ts)以exact JSON验证id/claim≤4096bytes、refs≤12、falsifiers1–8且各≤1024bytes、总≤16KiB，拒绝未声明字段与未被该proposer读取的收据；空refs保留为未验证支持，不伪造源。原[fanOut](../../packages/ts-shell/src/core/subagents/team/fanOut.ts)/[run](../../packages/ts-shell/src/core/subagents/team/run.ts)携带typed hypothesis，单人失败保留另一有效提案；没有复活提案store/runner/provider schema或额外retry。
+
+原[evidence](../../packages/ts-shell/src/core/subagents/team/evidence.ts)更名readEvidence（无兼容重复函数），proposal/review共用本域原observer，metadata带agentId/stage、每次随机receipt ID，阶段之间不共享引用权。原[tool](../../packages/ts-shell/src/core/tools/teamTool.ts)给review只发送其他hypothesis/falsifiers和其引用receipt的locator/selected range/hash作为查阅线索，强调proposal source并非review实际证据；复读后只能引用本review收据。成功proposer原生读取及finalText解析已跑真实runner/read，原同模型声明/权限/预算/两人上限/缺失覆盖规则保持。
+
+新增基线8失败，另同步dispatch throw一失败/8通过：原fanOut仅处理Promise rejection，同步throw能拒绝整批；现在原owner同步/异步同fence、释放listener并丢迟到结果。首次focused82通过/1失败为并发receipt顺序fixture，改按身份包含断言保留所有收据。最终八文件98通过；原tool独立反转8失败、只撤同步dispatch fence反转1失败，finally bytes恢复后98重跑；五门/build/独立freshness通过，118旧docs advisory；build `482f7dd97a7a9ce0ce9a5a674c7211a67f3840b0d04abf078a54e9798e3f13c2`、inputs `d45d786a0d46ac1576a0b9290011e7b5a441a776707528aaedb0828318d8e3dc`，460/3557、product callables7/1/5/8/2/5/4。对照reference strict output缺字段/不合法必须非success，与pi例子的进程JSON事件采集区分；本项目复用既有research exact-stage JSON/receipt思路但core不反向import research，不新增yield/provider机制。
+
+实际原NodeCLI+PTY+loopback两模式：无ref合法结构提案+invented review unresolved；proposer/read+review/read实际指定行2-2，四收据阶段隔离、falsifiers保留、reviewerID绑定新receipt且进入真实HTTP/原session metadata→refuted；一个p1错误id失败但p2保留、零新增review；第三视角零新增proposer拒绝；两held review Ctrl+C102/103ms结束，exit144/143ms/0/cooked、每模式33POST/5GET，文件/config保持，task scratch清理。原tool和调用fence均有反转证据；不当生产模型质量/成本/平台验证。
+
+[正式工件](../../.omx/artifacts/phase20-addition-team-proposals/)及HANDOFF留存，原CLAUDE.md保留；无本助手subagent/heavy并发/full suite/exe/20k/真实provider或独立review，原47不升级、goal active。专门用户显式批准才采用结论至主上下文尚未实施，仍沿原tool result发布，不称17.5完成。本批Git/未来CI另绑定；20.54已推送`3bc969461f3e8bd757f1e87546f0ab479ad0ab95`，本次两次GitHub API读均EOF，没有新CI结论，不把网络错误判成测试失败或CI成功。

@@ -1,7 +1,8 @@
 import type { ToolDefinition, ToolExecutionResult } from '../../tools/types.js';
 import { readOnlyDelegation } from '../subagents/capability.js';
+import { parseProposal, proposalPrompt } from '../subagents/team/proposal.js';
 import { runTeam } from '../subagents/team/run.js';
-import { reviewEvidence, type ReadReceipt } from '../subagents/team/evidence.js';
+import { readEvidence, type ReadReceipt } from '../subagents/team/evidence.js';
 import type { SubagentRunInput } from '../subagents/runner.js';
 import type { Refutation } from '../subagents/team/convergence.js';
 import { approvedResult, deniedResult } from './toolResultLifecycle.js';
@@ -94,16 +95,28 @@ export function createTeamToolDefinition(): ToolDefinition {
           perspective: perspective.trim(),
         })),
         signal: context.abortSignal,
-        propose: (request, signal) => run(request.prompt, request.perspective, signal),
+        propose: async (request, signal) => {
+          const reads = readEvidence(request.id, 'propose', signal);
+          try {
+            const text = await run(proposalPrompt(request.prompt, request.id), request.perspective, signal, reads.observe);
+            signal?.throwIfAborted();
+            const receipts = reads.snapshot();
+            const proposal = parseProposal(text, request.id, receipts.map(receipt => receipt.id));
+            evidence.push(...receipts);
+            return proposal;
+          } finally { reads.retire(); }
+        },
         review: async ({ reviewerId, proposals, signal }) => {
           // The reviewer sees the other claims and nothing else — not its own,
           // and not a summary of what the pass expects.
-          const listed = proposals.map(proposal => `[${proposal.id}] ${proposal.claim}`).join('\n\n');
-          const reads = reviewEvidence(reviewerId, signal);
+          const listed = proposals.map(proposal => `[${proposal.id}] ${JSON.stringify({ ...proposal,
+            sources: evidence.filter(receipt => receipt.stage === 'propose' && receipt.agentId === proposal.id && proposal.evidenceRefs.includes(receipt.id)) })}`).join('\n\n');
+          const reads = readEvidence(reviewerId, 'review', signal);
           try {
             const text = await run(
               `Another agent's claims are below. Try to refute them using what you can read. `
               + `For each claim reply exactly one line: "CLAIM <id> <counterevidence|condition-mismatch|insufficient|none-found> <reason> evidence: <receipt IDs>". `
+              + `Inspect the claim and its falsifiers; proposed sources are leads, not evidence read by you. `
               + `Use only receipt IDs returned by successful read calls in this review; separate IDs with commas. `
               + `A file path is not a receipt. If you cannot check, use insufficient with no evidence. `
               + `none-found means only that this bounded review found no counterevidence in the returned content.\n\n${listed}`,
@@ -124,7 +137,7 @@ export function createTeamToolDefinition(): ToolDefinition {
         `Limitation: ${outcome.limitation}`,
       ];
       return approvedResult(lines.join('\n'), {
-        proposals: outcome.proposals.map(result => ({ id: result.id, status: result.status, claim: result.claim ?? null })),
+        proposals: outcome.proposals.map(result => ({ id: result.id, status: result.status, claim: result.claim ?? null, evidenceRefs: result.evidenceRefs ?? [], falsifiers: result.falsifiers ?? [] })),
         outcomes: outcome.convergence.outcomes.map(entry => ({ proposalId: entry.proposalId, verdict: entry.verdict })),
         failedReviews: outcome.failedReviews,
         findings, evidence,

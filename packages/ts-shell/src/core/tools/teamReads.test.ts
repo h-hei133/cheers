@@ -24,7 +24,7 @@ it.each(['counterevidence', 'none-found', 'invented', 'denied', 'proposer-only',
       const shouldRead = review ? scenario !== 'proposer-only' : scenario === 'proposer-only';
       if (!tools.length && shouldRead) return { text: 'intermediate narration', stopReason: 'stop',
         toolCalls: [{ id: 'native-read', name: 'read', args: { path: 'profile.txt:2-2' } }] };
-      if (!review) return { text: 'final claim', stopReason: 'stop', toolCalls: [] };
+      if (!review) return { text: JSON.stringify({ hypothesisId: /hypothesis ID is (p[12])/.exec(String(messages[1]?.content))?.[1], claim: 'final claim', evidenceRefs: [], falsifiers: ['Observed contradiction.'] }), stopReason: 'stop', toolCalls: [] };
       const output = String(tools[0]?.content ?? '');
       seen.push(output);
       const receipt = /receipt: (\S+)/.exec(output)?.[1];
@@ -47,7 +47,7 @@ it.each(['counterevidence', 'none-found', 'invented', 'denied', 'proposer-only',
       expect(seen.every(output => output.includes('Read receipt:') && output.includes('lines 2-2'))).toBe(true);
       expect(result.metadata).toMatchObject({ evidence: [expect.objectContaining({ locator: 'profile.txt:2-2', start: 2, end: 2,
         contentHash: createHash('sha256').update('cache misses: 0').digest('hex') }), expect.any(Object)] });
-    } else expect(result.metadata?.evidence).toEqual([]);
+    } else expect((result.metadata?.evidence as { stage: string }[]).filter(entry => entry.stage === 'review')).toEqual([]);
     expect(result.output).toContain('not independent confirmation');
     expect(await fs.readFile(path.join(root, 'profile.txt'), 'utf8')).toBe('header\ncache misses: 0\nfooter\n');
   });
@@ -56,7 +56,7 @@ it('keeps a read receipt visible when the original tool output exceeds the model
   await fs.writeFile(path.join(root, 'profile.txt'), 'a'.repeat(12000) + '\n');
   const registry = createCoreToolRegistry();
   const run = createSubagentRunner({ defaultMaxSteps: 3, step: async (messages: readonly AgentMessage[]) => {
-    if (!String(messages[1]?.content).includes('CLAIM')) return { text: 'claim', stopReason: 'stop', toolCalls: [] };
+    if (!String(messages[1]?.content).includes('CLAIM')) return { text: JSON.stringify({ hypothesisId: /hypothesis ID is (p[12])/.exec(String(messages[1]?.content))?.[1], claim: 'claim', evidenceRefs: [], falsifiers: ['Observed contradiction.'] }), stopReason: 'stop', toolCalls: [] };
     const tool = messages.find(message => message.role === 'tool');
     if (!tool) return { text: 'read', stopReason: 'stop', toolCalls: [{ id: 'read', name: 'read', args: { path: 'profile.txt' } }] };
     const receipt = /receipt: (\S+)/.exec(String(tool.content))?.[1];

@@ -17,10 +17,12 @@ const requests: readonly ProposalRequest[] = [
   { id: "c", prompt: "Why is the build slow?", perspective: "compare history" },
 ];
 
+function proposal(id: string, claim: string) { return { id, claim, evidenceRefs: [], falsifiers: ['Observed contradiction.'] }; }
+
 function input(overrides: Partial<TeamRunInput> = {}): TeamRunInput {
   return {
     requests,
-    propose: async request => `claim-${request.id}`,
+    propose: async request => proposal(request.id, `claim-${request.id}`),
     review: async () => [],
     ...overrides,
   };
@@ -75,7 +77,7 @@ describe("running a team pass", () => {
     const result = await runTeam(input({
       propose: async request => {
         if (request.id === "b") throw new Error("timeout");
-        return `claim-${request.id}`;
+        return proposal(request.id, `claim-${request.id}`);
       },
     }));
 
@@ -188,7 +190,7 @@ it("rejects self review and forged reviewer identity at the orchestration bounda
 it.each(['failed-review', 'missing-finding', 'insufficient', 'failed-proposer'])(
   'keeps a clean check unresolved when peer coverage has %s', async scenario => {
     const result = await runTeam(input({
-      propose: async request => { if (scenario === 'failed-proposer' && request.id === 'c') throw Error('no proposal'); return request.id; },
+      propose: async request => { if (scenario === 'failed-proposer' && request.id === 'c') throw Error('no proposal'); return proposal(request.id, request.id); },
       review: async ({ reviewerId, proposals }) => {
         if (reviewerId === 'c' && scenario === 'failed-review') throw Error('no review');
         return proposals.flatMap(proposal => reviewerId === 'c' && scenario === 'missing-finding' ? [] : [{

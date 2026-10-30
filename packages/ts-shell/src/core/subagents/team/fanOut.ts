@@ -18,6 +18,8 @@
  * than an honest gap.
  */
 
+import type { Proposal } from './proposal.js';
+
 export interface ProposalRequest {
   /** Identity the reviewer will cite; stable across the run. */
   readonly id: string;
@@ -32,6 +34,8 @@ export interface ProposalResult {
   readonly status: "proposed" | "failed" | "cancelled";
   /** The claim, when one was produced. */
   readonly claim?: string;
+  readonly evidenceRefs?: readonly string[];
+  readonly falsifiers?: readonly string[];
   /** Why it produced nothing, in the terms a user reads. */
   readonly failure?: string;
 }
@@ -59,7 +63,7 @@ export interface FanOutOutcome {
  */
 export async function fanOutProposals(
   requests: readonly ProposalRequest[],
-  run: (request: ProposalRequest, signal: AbortSignal | undefined) => Promise<string>,
+  run: (request: ProposalRequest, signal: AbortSignal | undefined) => Promise<Proposal>,
   signal?: AbortSignal,
 ): Promise<FanOutOutcome> {
   // Cancellation has to reach a run that is already inside `await`. A proposer
@@ -79,21 +83,21 @@ export async function fanOutProposals(
       };
       const onAbort = (): void => finish(cancelled(request.id));
       signal?.addEventListener("abort", onAbort, { once: true });
-      run(request, signal).then(
-        text => {
-          const claim = text.trim();
-          // An empty answer is not a proposal. Reporting it as one would let a
-          // silent failure enter convergence as a claim nobody can refute.
+      const failed = (error: unknown): void => finish({
+        id: request.id, status: signal?.aborted ? 'cancelled' : 'failed',
+        failure: error instanceof Error ? error.message : String(error),
+      });
+      if (signal?.aborted) { onAbort(); return; }
+      try {
+        void run(request, signal).then(proposal => {
+          if (settled) return;
+          const claim = proposal.claim.trim();
           finish(claim
-            ? { id: request.id, status: "proposed", claim }
+            ? { id: request.id, status: "proposed", claim, evidenceRefs: [...proposal.evidenceRefs], falsifiers: [...proposal.falsifiers] }
             : { id: request.id, status: "failed", failure: "The proposer returned nothing." });
-        },
-        error => finish({
-          id: request.id,
-          status: signal?.aborted ? "cancelled" : "failed",
-          failure: error instanceof Error ? error.message : String(error),
-        }),
-      );
+        }, failed).catch(failed);
+      } catch (error) { failed(error); }
+
     });
   }));
   const proposed = results.filter(result => result.status === "proposed").length;

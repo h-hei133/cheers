@@ -31,7 +31,7 @@ export interface TeamRunInput {
   readonly requests: readonly ProposalRequest[];
   readonly signal?: AbortSignal;
   /** Run one proposer. The host owns the model, tools and permission gate. */
-  readonly propose: (request: ProposalRequest, signal: AbortSignal | undefined) => Promise<string>;
+  readonly propose: (request: ProposalRequest, signal: AbortSignal | undefined) => Promise<Proposal>;
   /**
    * Run one reviewer against the proposals it may refute.
    *
@@ -51,7 +51,7 @@ export interface TeamRunInput {
 export async function runTeam(input: TeamRunInput): Promise<TeamRun> {
   const outcome = await fanOutProposals(input.requests, input.propose, input.signal);
   const reviewable: Proposal[] = outcome.proposals.flatMap(result =>
-    result.status === "proposed" && result.claim !== undefined ? [{ id: result.id, claim: result.claim }] : []);
+    result.status === "proposed" && result.claim !== undefined ? [{ id: result.id, claim: result.claim, evidenceRefs: result.evidenceRefs ?? [], falsifiers: result.falsifiers ?? [] }] : []);
 
   const reviews = await Promise.all(reviewable.map(proposal => {
     const others = reviewable.filter(candidate => candidate.id !== proposal.id);

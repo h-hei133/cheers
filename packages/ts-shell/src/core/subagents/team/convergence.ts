@@ -44,10 +44,8 @@ export interface Refutation {
   readonly evidence: readonly string[];
 }
 
-export interface Proposal {
-  readonly id: string;
-  readonly claim: string;
-}
+export type { Proposal } from './proposal.js';
+import type { Proposal } from './proposal.js';
 
 export type ProposalVerdict =
   /** At least one refutation with evidence against it. */
@@ -89,10 +87,10 @@ const LIMITATION =
  *
  * A proposal is refuted when any reviewer produced counter-evidence or a
  * condition mismatch and cited at least one source. It is unresolved when the
- * only findings were unbacked or inconclusive. It survived when at least one
- * reviewer actually checked it and none refuted it.
+ * only findings were unbacked or inconclusive. It survives only when every
+ * required peer supplied a backed clean check; the run projects missing peers.
  */
-export function converge(proposals: readonly Proposal[], refutations: readonly Refutation[]): Convergence {
+export function converge(proposals: readonly Pick<Proposal, 'id' | 'claim'>[], refutations: readonly Refutation[]): Convergence {
   const known = new Set(proposals.map(proposal => proposal.id));
   const orphaned = refutations.filter(refutation => !known.has(refutation.proposalId));
   const outcomes = proposals.map((proposal): ProposalOutcome => {

@@ -9,7 +9,7 @@ import { converge, strongest, type Proposal, type Refutation } from "./convergen
  * to keep both halves of that from drifting.
  */
 
-const PROPOSALS: readonly Proposal[] = [
+const PROPOSALS: readonly Pick<Proposal, 'id' | 'claim'>[] = [
   { id: "a", claim: "The cache is the bottleneck." },
   { id: "b", claim: "The index is the bottleneck." },
 ];

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fanOutProposals, type ProposalRequest } from "./fanOut.js";
+import { fanOutProposals as fanOut, type ProposalRequest } from "./fanOut.js";
 
 /**
  * Independent proposals, run together.
@@ -8,6 +8,9 @@ import { fanOutProposals, type ProposalRequest } from "./fanOut.js";
  * else, and a failure is reported per proposer rather than dissolving the
  * batch or entering convergence as an empty claim.
  */
+
+const fanOutProposals = (requests: readonly ProposalRequest[], run: (request: ProposalRequest, signal: AbortSignal | undefined) => Promise<string>, signal?: AbortSignal) =>
+  fanOut(requests, async (request, signal) => ({ id: request.id, claim: await run(request, signal), evidenceRefs: [], falsifiers: ['Observed contradiction.'] }), signal);
 
 const requests: readonly ProposalRequest[] = [
   { id: "a", prompt: "Why is the build slow?", perspective: "profile first" },
@@ -117,4 +120,14 @@ describe("fanning out proposals", () => {
     });
     expect(one.complete).toBe(false);
   });
+});
+
+
+it('keeps a completed proposal when another proposer throws before returning its promise', async () => {
+  const result = await fanOut(requests, request => {
+    if (request.id === 'b') throw new Error('Dispatch refused.');
+    return Promise.resolve({ id: request.id, claim: 'observed', evidenceRefs: [], falsifiers: ['contradiction'] });
+  });
+  expect(result.proposals[0]).toMatchObject({ status: 'proposed', claim: 'observed' });
+  expect(result.proposals[1]).toMatchObject({ status: 'failed', failure: 'Dispatch refused.' });
 });

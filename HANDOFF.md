@@ -1077,3 +1077,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A team reports survived when one reviewer has a clean check but another failed, omitted the claim or could not inspect it; public tool arity exceeds the intended concurrency budget.
 - **Root Cause**: Convergence sees only returned findings, so omitted expected peers disappear. Any backed none-found is treated as sufficient coverage.
 - **Rule**: Project each requested proposal/peer assignment at the original run owner, retain missing findings as insufficient, and require every peer's backed clean check before survived. A backed contradiction still refutes despite missing peers. Keep tool schema, admission and advertised limit aligned; per-backend job limits do not prove a universal runtime semaphore.
+
+
+### Structured Hypotheses Need Validation Before Fan-Out Retention
+- **Symptom**: A JSON response is stored as an opaque claim, falsifiers vanish, or one synchronous dispatch error discards another proposer's valid answer.
+- **Root Cause**: Proposal transport is free text and only Promise rejection is fenced; source identity is also easy to confuse between proposal and review stages.
+- **Rule**: Validate exact bounded hypothesis identity/claim/references/falsifiers at the team owner before retention, bind proposal refs to its own read receipts and preserve empty refs as unverified support. Send other hypotheses' source locators as review leads, require fresh review reads for findings, and catch synchronous invocation plus asynchronous settlement per proposer. Receipt order follows completion; compare IDs, not array positions.

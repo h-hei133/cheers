@@ -5,6 +5,11 @@ import { createHash } from "node:crypto";
 import type { SubagentRunInput } from "../subagents/runner.js";
 import type { ToolExecutionContext } from "../../tools/types.js";
 
+function hypothesis(input: { prompt?: string }, claim = 'a claim'): string {
+  return JSON.stringify({ hypothesisId: /hypothesis ID is (p[12])/.exec(input.prompt ?? '')?.[1], claim,
+    evidenceRefs: [], falsifiers: ['Observed contradiction.'] });
+}
+
 /**
  * The tool's two jobs: parse a reviewer's reply without inventing findings,
  * and refuse to start a pass it cannot run.
@@ -90,7 +95,7 @@ describe("starting a team pass", () => {
     const runSubagent = vi.fn(async (input: { prompt: string }) => ({
       text: input.prompt.includes("CLAIM")
         ? "CLAIM p1 counterevidence The profile disagrees. evidence: src/profile.ts"
-        : "the cache is the bottleneck",
+        : hypothesis(input, "the cache is the bottleneck"),
       failed: false,
     }));
     const result = await createTeamToolDefinition().execute(
@@ -107,9 +112,9 @@ describe("starting a team pass", () => {
     // from the perspective — text the model chose — would let a crafted role
     // dodge a rule meant to stop delegation.
     const names: string[] = [];
-    const runSubagent = vi.fn(async (input: { definition: { name: string } }) => {
+    const runSubagent = vi.fn(async (input: { definition: { name: string }; prompt: string }) => {
       names.push(input.definition.name);
-      return { text: "a claim", failed: false };
+      return { text: hypothesis(input), failed: false };
     });
     await createTeamToolDefinition().execute(
       { question: "why?", perspectives: ["task", "review"] },
@@ -124,9 +129,9 @@ describe("starting a team pass", () => {
     // predicate that answers "allowed" unconditionally would replace it with a
     // rubber stamp, which is worse than supplying none.
     const calls: { admission?: unknown }[] = [];
-    const runSubagent = vi.fn(async (input: { admission?: unknown }) => {
+    const runSubagent = vi.fn(async (input: { admission?: unknown; prompt: string }) => {
       calls.push({ admission: input.admission });
-      return { text: "a claim", failed: false };
+      return { text: hypothesis(input), failed: false };
     });
     await createTeamToolDefinition().execute(
       { question: "why?", perspectives: ["a", "b"] },
@@ -170,7 +175,7 @@ it.each(["counterevidence", "none-found"])("does not accept an unread %s citatio
   const result = await tool.execute({ question: "why?", perspectives: ["a", "b"] }, {
     workspaceRoot: "/repo", taskId: "unread",
     runSubagent: async input => ({ text: input.prompt.includes("CLAIM")
-      ? `CLAIM p1 ${kind} I checked. evidence: src/profile.ts` : "a claim", failed: false, steps: 1, allowedTools: [] }),
+      ? `CLAIM p1 ${kind} I checked. evidence: src/profile.ts` : hypothesis(input), failed: false, steps: 1, allowedTools: [] }),
   });
   expect(result.output).toContain("p1: unresolved");
 });
@@ -180,7 +185,7 @@ it("binds a finding to its current review receipt and asks for that exact format
   const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
     workspaceRoot: "/repo", taskId: "bound",
     runSubagent: async input => {
-      if (!input.prompt.includes("CLAIM")) return { text: "a claim", failed: false, steps: 1, allowedTools: [] };
+      if (!input.prompt.includes("CLAIM")) return { text: hypothesis(input), failed: false, steps: 1, allowedTools: [] };
       expect(input.prompt).toContain("evidence:");
       expect(input.prompt).toContain("receipt");
       const observation = await observedRead(input);
@@ -199,7 +204,7 @@ it.each(["failed", "directory", "empty", "wrong-hash"])("does not issue a receip
   const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
     workspaceRoot: "/repo", taskId: scenario,
     runSubagent: async input => {
-      if (!input.prompt.includes("CLAIM")) return { text: "a claim", failed: false, steps: 1, allowedTools: [] };
+      if (!input.prompt.includes("CLAIM")) return { text: hypothesis(input), failed: false, steps: 1, allowedTools: [] };
       const observation = await observedRead(input, scenario === "failed" ? { isError: true } : {
         result: { output: "a file", isError: false, metadata: scenario === "directory" ? {} : {
           read: { text: scenario === "empty" ? " " : "different", startLine: 4, endLine: 4 },
@@ -219,8 +224,7 @@ it("cannot borrow the other reviewer's receipt or a proposer citation", async ()
     workspaceRoot: "/repo", taskId: "isolation",
     runSubagent: async input => {
       if (!input.prompt.includes("CLAIM")) {
-        await observedRead(input);
-        return { text: "a claim evidence: src/profile.ts", failed: false, steps: 1, allowedTools: [] };
+        return { text: hypothesis(input), failed: false, steps: 1, allowedTools: [] };
       }
       if (input.prompt.includes("[p2]")) {
         const observed = await observedRead(input);
@@ -238,7 +242,7 @@ it("uses final answers instead of intermediate proposal and review narration", a
   const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
     workspaceRoot: "/repo", taskId: "final",
     runSubagent: async input => {
-      if (!input.prompt.includes("CLAIM")) return { text: "intermediate\n\nfinal claim", finalText: "final claim", failed: false, steps: 2, allowedTools: [] };
+      if (!input.prompt.includes("CLAIM")) return { text: "intermediate\n\n" + hypothesis(input, "final claim"), finalText: hypothesis(input, "final claim"), failed: false, steps: 2, allowedTools: [] };
       expect(input.prompt).not.toContain("intermediate");
       const observed = await observedRead(input);
       const id = /receipt: (\S+)/.exec(observed?.suffix ?? "")?.[1];

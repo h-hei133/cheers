@@ -10480,3 +10480,12 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 基线6失败/47通过，六文件75通过；原三owner独立反转1/3/5失败并精确恢复后75重跑。五门/build/freshness460/3554、callables7/1/5/8/2、118旧advisory。原CLI两模式未读→实际native receipt绑定→三视角零dispatch拒绝→held cross-review Ctrl+C102/101ms，exit143/185ms/0/cooked，26POST/4GET各、文件/config保持与scratch清理。正式工件/HANDOFF/CLAUDE.md保留；结构化提案与专门apply批准仍待续，原47不升级、goal active。
 
 20.53已推送8e4e6fd1b3865fc657dee87644912296c75ec009；延后20.52 CI40987047192 success，20.53 CI40989150210 in_progress/Watch40989150206 success。本批Git/未来CI另绑定。
+
+
+## [2026-10-30] fix | 竞争假说结构与提案来源身份
+
+[addition20.55](features/phase-20-addition.md#2055-结构化竞争假说及提案读取身份)落实exact bounded hypothesisId/claim/evidenceRefs/falsifiers，proposer自有实际read收据绑定，错误结构/id/refs单人失败保留另一提案；原fanOut/run携带结构，review收到other falsifiers/source locator线索但须自己实际复读。复用原evidence owner为agentId/stage，不新store/runner/provider。另原同步dispatch throw不再丢整批。
+
+基线8失败、dispatch1失败；八文件98通过，原tool与dispatch fence独立反转8/1失败、bytes恢复后98重跑；五门/build/freshness460/3557、callables≤8、118旧advisory。原CLI两模式四实际read receipts阶段绑定/falsifiers持久化、无证据unresolved、错误id保留peer零review、三视角拒绝、held review取消102/103ms、exit144/143ms/0/cooked、33POST/5GET，文件/config保持/scratch清理。正式工件/HANDOFF/CLAUDE.md保留；专门上下文采用批准仍待续，原47不升级、goal active。
+
+20.54已推送3bc969461f3e8bd757f1e87546f0ab479ad0ab95；两GitHub API查询EOF无新CI结论。本批Git/未来CI另绑定。
