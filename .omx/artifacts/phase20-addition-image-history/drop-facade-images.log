@@ -1,0 +1,95 @@
+
+ RUN  v0.34.6 <repo>/packages/ts-shell
+
+ ❯ src/session/SessionManager.test.ts  (84 tests | 2 failed | 82 skipped) 73ms
+   ❯ src/session/SessionManager.test.ts > SessionManager > loads persisted image prompt blocks after completed
+     → expected { id: 'turn_c17d971b', …(6) } to match object { role: 'user', …(2) }
+   ❯ src/session/SessionManager.test.ts > SessionManager > loads persisted image prompt blocks after interrupted
+     → expected { id: 'turn_2ed654f3', …(6) } to match object { role: 'user', …(2) }
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 82 skipped (84)
+   Start at  21:33:28
+   Duration  1.27s (transform 812ms, setup 0ms, collect 981ms, tests 73ms, environment 0ms, prepare 51ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/SessionManager.test.ts > SessionManager > loads persisted image prompt blocks after completed
+AssertionError: expected { id: 'turn_c17d971b', …(6) } to match object { role: 'user', …(2) }
+
+- Expected
++ Received
+
+  Object {
+-   "content": Array [
+-     Object {
+-       "text": "  retained question
++   "content": "  retained question
+  ",
+-       "type": "text",
+-     },
+-     Object {
+-       "data": "aGVsbG8=",
+-       "mimeType": "image/png",
+-       "type": "image",
+-     },
+-   ],
++   "id": "turn_c17d971b",
+    "metadata": Object {
+      "originalInput": "public original",
+    },
+    "role": "user",
++   "timestamp": "2026-10-30T13:33:29.790Z",
++   "tool_call_id": undefined,
++   "tool_calls": undefined,
+  }
+
+ ❯ src/session/SessionManager.test.ts:41:29
+     39|     const loaded = new SessionManager().getSession(session.id);
+     40|     expect(loaded.turns).toHaveLength(1);
+     41|     expect(loaded.turns[0]).toMatchObject({ role: "user", content: [{ …
+       |                             ^
+     42|       metadata: { originalInput: "public original" } });
+     43|     expect(toChatMessages(loaded.turns)).toEqual([{ role: "user", cont…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/session/SessionManager.test.ts > SessionManager > loads persisted image prompt blocks after interrupted
+AssertionError: expected { id: 'turn_2ed654f3', …(6) } to match object { role: 'user', …(2) }
+
+- Expected
++ Received
+
+  Object {
+-   "content": Array [
+-     Object {
+-       "text": "  retained question
++   "content": "  retained question
+  ",
+-       "type": "text",
+-     },
+-     Object {
+-       "data": "aGVsbG8=",
+-       "mimeType": "image/png",
+-       "type": "image",
+-     },
+-   ],
++   "id": "turn_2ed654f3",
+    "metadata": Object {
+      "originalInput": "public original",
+    },
+    "role": "user",
++   "timestamp": "2026-10-30T13:33:29.830Z",
++   "tool_call_id": undefined,
++   "tool_calls": undefined,
+  }
+
+ ❯ src/session/SessionManager.test.ts:41:29
+     39|     const loaded = new SessionManager().getSession(session.id);
+     40|     expect(loaded.turns).toHaveLength(1);
+     41|     expect(loaded.turns[0]).toMatchObject({ role: "user", content: [{ …
+       |                             ^
+     42|       metadata: { originalInput: "public original" } });
+     43|     expect(toChatMessages(loaded.turns)).toEqual([{ role: "user", cont…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯

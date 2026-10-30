@@ -256,7 +256,11 @@ export class ShellSessionRuntime {
 
       if (!options?.runtimeSeed) {
         await this.deps.admitPrompt?.(prompt, options?.promptMetadata, signal);
-        this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt, options?.promptMetadata);
+        if (options?.attachments?.images.length) {
+          this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt, options.promptMetadata, options.attachments.images);
+        } else {
+          this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt, options?.promptMetadata);
+        }
       }
 
       let sawTerminalEvent = false;

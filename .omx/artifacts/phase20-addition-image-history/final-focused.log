@@ -1,0 +1,30 @@
+
+ RUN  v0.34.6 <repo>/packages/ts-shell
+
+ ❯ src/core/shell/sessionRuntime.test.ts  (49 tests | 2 failed | 46 skipped) 8ms
+   ❯ src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=false)
+     → this.deps.sessionManager.saveError is not a function
+   ❯ src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=true)
+     → this.deps.sessionManager.saveError is not a function
+ ✓ src/session/SessionManager.test.ts  (84 tests | 82 skipped) 64ms
+ ✓ src/session/lifecycle/sessionPromptBarrier.test.ts  (4 tests) 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=false)
+ FAIL  src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=true)
+TypeError: this.deps.sessionManager.saveError is not a function
+ ❯ ShellSessionRuntime.drivePrompt src/core/shell/sessionRuntime.ts:398:34
+    396|           error: errorSave.error,
+    397|         }, { entryId: sourceEntryId?.() });
+    398|         this.deps.sessionManager.saveError(
+       |                                  ^
+    399|           sessionId,
+    400|           errorSave.error,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 7 passed | 128 skipped (137)
+   Start at  21:30:38
+   Duration  2.14s (transform 433ms, setup 0ms, collect 1.58s, tests 76ms, environment 0ms, prepare 123ms)

@@ -1,0 +1,102 @@
+{
+  "owners": [
+    {
+      "file": "core/shell/sessionRuntime.ts",
+      "baseline": 19,
+      "count": 19,
+      "names": [
+        "observeEvents",
+        "getState",
+        "getCurrentRunController",
+        "input",
+        "waitForIdle",
+        "cancelAndWait",
+        "getViewMode",
+        "setViewMode",
+        "getAgentMode",
+        "setAgentMode",
+        "getPermissionScope",
+        "setPermissionScope",
+        "executePrompt",
+        "trackRun",
+        "drivePrompt",
+        "cancelCurrentRun",
+        "compactHistory",
+        "summarizeAbandonedTurns",
+        "terminate"
+      ]
+    },
+    {
+      "file": "session/agent/lifecycle.ts",
+      "baseline": 15,
+      "count": 15,
+      "names": [
+        "handleMarkRunStarted",
+        "handlePersistUserPromptBarrier",
+        "appendTranscriptEvent",
+        "writeSessionMetadata",
+        "writeSessionState",
+        "handleMarkTurnActive",
+        "handleMarkRecoveryReentry",
+        "handleSaveInterrupted",
+        "handleSaveCompleted",
+        "handleSaveError",
+        "handleSaveTerminated",
+        "handleAddTurn",
+        "append",
+        "writeMetadata",
+        "writeState"
+      ]
+    },
+    {
+      "file": "session/lifecycle/sessionLifecycleWrites.ts",
+      "baseline": 29,
+      "count": 29,
+      "names": [
+        "createSessionLifecycleCallbacks",
+        "loadSession",
+        "appendTranscriptEvent",
+        "writeSessionMetadata",
+        "writeSessionState",
+        "now",
+        "appendTranscriptEvent",
+        "applyQueryEventToState",
+        "addTurn",
+        "captureReportWriter",
+        "recordApprovalAuditDecision",
+        "withStateLock",
+        "readCurrentSnapshot",
+        "buildSnapshot",
+        "writeSnapshot",
+        "markRunStarted",
+        "persistUserPromptBarrier",
+        "markTurnActive",
+        "markRecoveryReentry",
+        "saveInterrupted",
+        "saveCompleted",
+        "saveError",
+        "saveTerminated",
+        "discardIfEmpty",
+        "reconcilePendingLifecycle",
+        "applyQueryEventToState",
+        "appendQueryEvent",
+        "readPendingLifecycle",
+        "appendQueryEvent"
+      ]
+    },
+    {
+      "file": "session/lifecycle/sessionPromptBarrier.ts",
+      "baseline": 1,
+      "count": 1,
+      "names": [
+        "persistSessionUserPromptBarrier"
+      ]
+    }
+  ],
+  "baselineCeilingViolationsRetained": [
+    "session/lifecycle/sessionLifecycleWrites.ts"
+  ],
+  "buildId": "d4297fc1e1cd6053249f47cb8afbb896d1654fdacef71d1638cead1669e053c0",
+  "inputsDigest": "a8e6aba8fe59b75f8a3533c898053adb727ce845057ea765e933aa410e975471",
+  "freshness": true
+}

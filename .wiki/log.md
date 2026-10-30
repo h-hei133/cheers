@@ -10640,3 +10640,12 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 68项去重聚焦、三反转3/1/1失败及源码bytes恢复、五门/build/freshness主代理串行通过；393未选不计、118旧docs advisory保留、owner20→20。原CLI两模式各1保存消息，真实paste/alt+s/Enter，原host注入公开PNG、实际store注入1100微小压力，签名1024/载荷128/4122bytes；draft/caret、text/image/内部展开及实际一次HTTP payload正确，exit0/cooked、config/models/project不变。此为loopback请求/本次恢复证据，非clipboard采集或真实provider。
 
 探针未声明vision、metadata放错owner、saved-image要求均留失败收据。另发现string prompt barrier只保存文字：最终savedUser.imageMatches false明确保留，图片持久化/replay另列后续修复，不能从当前HTTP成功推断。正式工件/HANDOFF更新、scratch清理、CLAUDE.md保留；8061bd92 Watch41056737048 success，CI41056737057延后读回仍in_progress。本批提交/推送/未来CI另绑定，真实目录/桌面/平台与原47/ADD仍partial、goal active。
+
+
+### 2026-10-30：原用户消息屏障保存图片并跨CLI进程重放
+
+[addition21.28](features/phase-20-addition.md#2128-图片提交进入原用户消息屏障并跨进程重放)修复21.27独立发现的图片历史缺失：runtime/facade/handler传optional images，原barrier使用已支持text/image content并复制image record，原pendingPrompt/text metadata/先存顺序保留。复用现transcript/toChatMessages，无新schema/store/provider/恢复引擎；目标先读后只读参考完整message保存决定。
+
+9项去重聚焦、四反转1/2/2/2 AssertionError与finally字节恢复、五门/build/freshness全部主代理串行通过；128未选不计、118旧docs advisory保留，四owner无新增callable，旧facade保守29超限如实记录。真实CLI两模式各首次paste/alt+s/Enter发精确text/image并存一次，退出后新进程重开同ID、无attachment/pressure注入，真实followup HTTP再次携原图一次；最终三个user与原blocks正确，四次exit0/cooked，config/models/project不变、heap768MiB/总60秒/累计2MiB、scratch清理。初期mock terminal、profile构造、历史environment framing失败均保留与分类。
+
+正式工件/HANDOFF更新、CLAUDE.md保留；完成会话跨进程重放已测，中断读盘不冒充自动dispatch，旧丢图片/image-only/compaction/branch/大图/平台验收不升级。8061bd92 CI/Watch均success，bc121e28 Watch41062973311 success、CI41062973370延后读回仍in_progress。本批Git/未来CI另绑定，原47与ADD仍partial、goal active。

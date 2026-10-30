@@ -1,0 +1,9 @@
+
+ RUN  v0.34.6 <repo>/packages/ts-shell
+
+ ✓ src/core/shell/sessionRuntime.test.ts  (49 tests | 47 skipped) 6ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 47 skipped (49)
+   Start at  21:31:48
+   Duration  1.63s (transform 1.15s, setup 0ms, collect 1.40s, tests 6ms, environment 0ms, prepare 54ms)

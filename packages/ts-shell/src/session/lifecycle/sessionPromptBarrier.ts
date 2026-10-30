@@ -2,6 +2,7 @@ import {
   createEmptyLifecycleIndex,
 } from "../../core/tools/toolResultLifecycle.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
+import type { ImageContent } from "../../model-adapters/multimodal.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionStateSnapshotOverrides } from "../schema/sessionStateSnapshot.js";
 import {
@@ -17,6 +18,7 @@ export function persistSessionUserPromptBarrier(input: {
   readonly prompt: string;
   readonly timestamp: string;
   readonly metadata?: Record<string, unknown>;
+  readonly images?: readonly ImageContent[];
   readonly appendTranscriptEvent: (event: TranscriptEvent) => void;
   readonly writeSessionMetadata: (session: Session) => void;
   readonly writeSessionState: (
@@ -26,7 +28,7 @@ export function persistSessionUserPromptBarrier(input: {
 }): void {
   const nextMessage: SessionMessage & { timestamp: string } = {
     role: "user",
-    content: input.prompt,
+    content: input.images?.length ? [{ type: "text", text: input.prompt }, ...input.images.map(image => ({ ...image }))] : input.prompt,
     timestamp: input.timestamp,
     ...(input.metadata ? { metadata: input.metadata } : {}),
     // Named here so the thread entry and the transcript line agree, as in

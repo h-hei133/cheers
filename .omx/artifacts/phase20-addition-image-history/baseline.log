@@ -1,0 +1,193 @@
+
+ RUN  v0.34.6 <repo>/packages/ts-shell
+
+ ❯ src/session/SessionManager.test.ts  (84 tests | 2 failed | 82 skipped) 87ms
+   ❯ src/session/SessionManager.test.ts > SessionManager > loads persisted image prompt blocks after completed
+     → expected { id: 'turn_fefec866', …(6) } to match object { role: 'user', …(2) }
+   ❯ src/session/SessionManager.test.ts > SessionManager > loads persisted image prompt blocks after interrupted
+     → expected { id: 'turn_e195cce9', …(6) } to match object { role: 'user', …(2) }
+ ❯ src/core/shell/sessionRuntime.test.ts  (49 tests | 2 failed | 47 skipped) 6ms
+   ❯ src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=false)
+     → this.deps.sessionManager.appendQueryEvent is not a function
+   ❯ src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=true)
+     → this.deps.sessionManager.appendQueryEvent is not a function
+ ❯ src/session/lifecycle/sessionPromptBarrier.test.ts  (4 tests | 2 failed | 1 skipped) 10ms
+   ❯ src/session/lifecycle/sessionPromptBarrier.test.ts > sessionPromptBarrier > preserves image prompt content at the durable barrier (empty text=false)
+     → expected { role: 'user', …(4) } to match object { role: 'user', …(2) }
+   ❯ src/session/lifecycle/sessionPromptBarrier.test.ts > sessionPromptBarrier > preserves image prompt content at the durable barrier (empty text=true)
+     → expected { role: 'user', content: '', …(3) } to match object { role: 'user', …(2) }
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/SessionManager.test.ts > SessionManager > loads persisted image prompt blocks after completed
+AssertionError: expected { id: 'turn_fefec866', …(6) } to match object { role: 'user', …(2) }
+
+- Expected
++ Received
+
+  Object {
+-   "content": Array [
+-     Object {
+-       "text": "  retained question
++   "content": "  retained question
+  ",
+-       "type": "text",
+-     },
+-     Object {
+-       "data": "aGVsbG8=",
+-       "mimeType": "image/png",
+-       "type": "image",
+-     },
+-   ],
++   "id": "turn_fefec866",
+    "metadata": Object {
+      "originalInput": "public original",
+    },
+    "role": "user",
++   "timestamp": "2026-10-30T13:28:35.765Z",
++   "tool_call_id": undefined,
++   "tool_calls": undefined,
+  }
+
+ ❯ src/session/SessionManager.test.ts:41:29
+     39|     const loaded = new SessionManager().getSession(session.id);
+     40|     expect(loaded.turns).toHaveLength(1);
+     41|     expect(loaded.turns[0]).toMatchObject({ role: "user", content: [{ …
+       |                             ^
+     42|       metadata: { originalInput: "public original" } });
+     43|     expect(toChatMessages(loaded.turns)).toEqual([{ role: "user", cont…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/session/SessionManager.test.ts > SessionManager > loads persisted image prompt blocks after interrupted
+AssertionError: expected { id: 'turn_e195cce9', …(6) } to match object { role: 'user', …(2) }
+
+- Expected
++ Received
+
+  Object {
+-   "content": Array [
+-     Object {
+-       "text": "  retained question
++   "content": "  retained question
+  ",
+-       "type": "text",
+-     },
+-     Object {
+-       "data": "aGVsbG8=",
+-       "mimeType": "image/png",
+-       "type": "image",
+-     },
+-   ],
++   "id": "turn_e195cce9",
+    "metadata": Object {
+      "originalInput": "public original",
+    },
+    "role": "user",
++   "timestamp": "2026-10-30T13:28:35.811Z",
++   "tool_call_id": undefined,
++   "tool_calls": undefined,
+  }
+
+ ❯ src/session/SessionManager.test.ts:41:29
+     39|     const loaded = new SessionManager().getSession(session.id);
+     40|     expect(loaded.turns).toHaveLength(1);
+     41|     expect(loaded.turns[0]).toMatchObject({ role: "user", content: [{ …
+       |                             ^
+     42|       metadata: { originalInput: "public original" } });
+     43|     expect(toChatMessages(loaded.turns)).toEqual([{ role: "user", cont…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=false)
+ FAIL  src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=true)
+TypeError: this.deps.sessionManager.appendQueryEvent is not a function
+ ❯ ShellSessionRuntime.drivePrompt src/core/shell/sessionRuntime.ts:390:34
+    388|           lastContinuationReason: terminalState.lastContinuationReason,
+    389|         });
+    390|         this.deps.sessionManager.appendQueryEvent(sessionId, {
+       |                                  ^
+    391|           type: "lifecycle.error",
+    392|           error: errorSave.error,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/session/lifecycle/sessionPromptBarrier.test.ts > sessionPromptBarrier > preserves image prompt content at the durable barrier (empty text=false)
+AssertionError: expected { role: 'user', …(4) } to match object { role: 'user', …(2) }
+
+- Expected
++ Received
+
+  Object {
+-   "content": Array [
+-     Object {
+-       "text": "  public image question
++   "content": "  public image question
+  ",
+-       "type": "text",
+-     },
+-     Object {
+-       "data": "aGVsbG8=",
+-       "mimeType": "image/png",
+-       "type": "image",
+-     },
+-   ],
++   "id": "turn_6212573e",
+    "metadata": Object {
+      "originalInput": "public input",
+    },
+    "role": "user",
++   "timestamp": "2026-10-30T00:00:04.000Z",
+  }
+
+ ❯ src/session/lifecycle/sessionPromptBarrier.test.ts:18:30
+     16|       writeSessionMetadata: () => undefined, writeSessionState: (_sess…
+     17|     const content = [{ type: "text", text: prompt }, image];
+     18|     expect(session.turns[0]).toMatchObject({ role: "user", content, me…
+       |                              ^
+     19|     expect(transcript[1]).toMatchObject({ type: "message", content, id…
+     20|     expect(states[0]?.pendingPromptEntryId).toBe(session.turns[0]!.id);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  src/session/lifecycle/sessionPromptBarrier.test.ts > sessionPromptBarrier > preserves image prompt content at the durable barrier (empty text=true)
+AssertionError: expected { role: 'user', content: '', …(3) } to match object { role: 'user', …(2) }
+
+- Expected
++ Received
+
+  Object {
+-   "content": Array [
+-     Object {
+-       "text": "",
+-       "type": "text",
+-     },
+-     Object {
+-       "data": "aGVsbG8=",
+-       "mimeType": "image/png",
+-       "type": "image",
+-     },
+-   ],
++   "content": "",
++   "id": "turn_5e076d4a",
+    "metadata": Object {
+      "originalInput": "public input",
+    },
+    "role": "user",
++   "timestamp": "2026-10-30T00:00:04.000Z",
+  }
+
+ ❯ src/session/lifecycle/sessionPromptBarrier.test.ts:18:30
+     16|       writeSessionMetadata: () => undefined, writeSessionState: (_sess…
+     17|     const content = [{ type: "text", text: prompt }, image];
+     18|     expect(session.turns[0]).toMatchObject({ role: "user", content, me…
+       |                              ^
+     19|     expect(transcript[1]).toMatchObject({ type: "message", content, id…
+     20|     expect(states[0]?.pendingPromptEntryId).toBe(session.turns[0]!.id);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ Test Files  3 failed (3)
+      Tests  6 failed | 1 passed | 130 skipped (137)
+   Start at  21:28:34
+   Duration  2.45s (transform 477ms, setup 0ms, collect 1.78s, tests 103ms, environment 0ms, prepare 155ms)

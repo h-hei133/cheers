@@ -1,0 +1,33 @@
+{
+  "cases": [
+    {
+      "name": "drop-runtime-images",
+      "exit": 1,
+      "tests": "1 failed | 1 passed | 47 skipped (49)",
+      "file": "packages/ts-shell/src/core/shell/sessionRuntime.ts",
+      "originalSha256": "44494c1442e806920eb87d78db8e9332ee1722706e503348cd32674f6be66e62"
+    },
+    {
+      "name": "drop-facade-images",
+      "exit": 1,
+      "tests": "2 failed | 82 skipped (84)",
+      "file": "packages/ts-shell/src/session/lifecycle/sessionLifecycleWrites.ts",
+      "originalSha256": "e604f189a5c3f19dccb5193407a0c5f79a662feeead6678d8e20f6433eb4e41f"
+    },
+    {
+      "name": "flatten-barrier-content",
+      "exit": 1,
+      "tests": "2 failed | 2 skipped (4)",
+      "file": "packages/ts-shell/src/session/lifecycle/sessionPromptBarrier.ts",
+      "originalSha256": "b0d473301cd5be624c20fefcc5edfdf1bf754f777949b6d26d40d9a94fdcb881"
+    },
+    {
+      "name": "share-mutable-image",
+      "exit": 1,
+      "tests": "2 failed | 2 skipped (4)",
+      "file": "packages/ts-shell/src/session/lifecycle/sessionPromptBarrier.ts",
+      "originalSha256": "b0d473301cd5be624c20fefcc5edfdf1bf754f777949b6d26d40d9a94fdcb881"
+    }
+  ],
+  "restored": true
+}

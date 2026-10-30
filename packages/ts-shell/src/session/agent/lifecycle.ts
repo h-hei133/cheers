@@ -1,4 +1,5 @@
 import type { SessionMessage } from "../schema/sessionMessage.js";
+import type { ImageContent } from "../../model-adapters/multimodal.js";
 import type { TerminalPersistence } from "../schema/sessionStateSnapshot.js";
 import type { QueryRuntimeRecoveryBoundary } from "../../core/query/runtime/state.js";
 import {
@@ -29,6 +30,7 @@ export function handlePersistUserPromptBarrier(
   sessionId: string,
   prompt: string,
   metadata?: Record<string, unknown>,
+  images?: readonly ImageContent[],
 ): void {
   const session = callbacks.loadSession(sessionId);
   const timestamp = callbacks.now();
@@ -37,6 +39,7 @@ export function handlePersistUserPromptBarrier(
     prompt,
     timestamp,
     metadata,
+    images,
     appendTranscriptEvent: (event) => callbacks.appendTranscriptEvent(sessionId, event),
     writeSessionMetadata: (next) => callbacks.writeSessionMetadata(next),
     writeSessionState: (next, overrides) => callbacks.writeSessionState(next, overrides),

@@ -16,6 +16,23 @@ import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalSt
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
 describe("shell session runtime (W5)", () => {
+  it.each([false, true])("passes submitted images to the original prompt barrier before dispatch (attachments=%s)", async attached => {
+    const image = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+    const calls: unknown[][] = [], dispatches: unknown[][] = [], metadata = { originalInput: "public original" };
+    const runtime = new ShellSessionRuntime({ sessionManager: {
+      persistUserPromptBarrier(...args: unknown[]) { calls.push(args); }, saveCompleted() {}, appendQueryEvent() {}, markTurnActive() {},
+      saveError(_session: string, error: string) { throw Error(error); },
+    } as never, renderer: { renderLine() {}, renderChunk() {} } as never,
+      runPrompt: async function* (prompt, _signal, _seed, _continuity, attachments) {
+        dispatches.push([calls.length, prompt, attachments?.images]);
+        yield { type: "query.completed", result: { status: "completed", terminalReason: "completed", terminalClassification: "success",
+          transcript: [], sharedContext: { sessionId: "sess_image", initialPrompt: prompt, notes: [], handoffs: [] }, finalOutput: "done" } };
+      } });
+    await runtime.executePrompt("sess_image", "  image question\n", { promptMetadata: metadata,
+      ...(attached ? { attachments: { images: [image] } } : {}) });
+    expect(calls).toEqual([attached ? ["sess_image", "  image question\n", metadata, [image]] : ["sess_image", "  image question\n", metadata]]);
+    expect(dispatches).toEqual([[1, "  image question\n", attached ? [image] : undefined]]);
+  });
   it('uses the configured agent default until the user explicitly chooses a mode', () => {
     let configured: 'plan' | 'build' = 'plan';
     const runtime = new ShellSessionRuntime({ configuredAgentMode: () => configured } as never);

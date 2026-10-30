@@ -6,6 +6,7 @@ import { createLongSessionContinuityFixture } from "../test-utils/longSessionCon
 import { SessionManager } from "./SessionManager.js";
 import { SessionStoreAccess } from "./store/sessionStoreAccess.js";
 import { forgetSessionTodos, getSessionTodos, setSessionTodos } from "../core/commands/todoCommandRuntime.js";
+import { toChatMessages } from "../turn/prompt.js";
 
 describe("SessionManager", () => {
   const originalUserProfile = process.env.USERPROFILE;
@@ -28,6 +29,19 @@ describe("SessionManager", () => {
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
     fs.rmSync(fakeHome, { recursive: true, force: true });
+  });
+
+  it.each(["completed", "interrupted"] as const)("loads persisted image prompt blocks after %s", status => {
+    const manager = new SessionManager(), session = manager.createNew();
+    const prompt = "  retained question\n", image = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+    manager.persistUserPromptBarrier(session.id, prompt, { originalInput: "public original" }, [image]);
+    if (status === "completed") manager.saveCompleted(session.id); else manager.saveInterrupted(session.id);
+    const loaded = new SessionManager().getSession(session.id);
+    expect(loaded.turns).toHaveLength(1);
+    expect(loaded.turns[0]).toMatchObject({ role: "user", content: [{ type: "text", text: prompt }, image],
+      metadata: { originalInput: "public original" } });
+    expect(toChatMessages(loaded.turns)).toEqual([{ role: "user", content: [{ type: "text", text: prompt }, image] }]);
+    expect(loaded.pendingPrompt).toBe(status === "completed" ? undefined : prompt);
   });
 
   it("restores an interrupted session and preserves pending prompt metadata", () => {

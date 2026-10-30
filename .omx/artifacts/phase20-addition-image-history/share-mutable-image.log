@@ -1,0 +1,74 @@
+
+ RUN  v0.34.6 <repo>/packages/ts-shell
+
+ ❯ src/session/lifecycle/sessionPromptBarrier.test.ts  (4 tests | 2 failed | 2 skipped) 9ms
+   ❯ src/session/lifecycle/sessionPromptBarrier.test.ts > sessionPromptBarrier > preserves image prompt content at the durable barrier (empty text=false)
+     → expected [ { type: 'text', …(1) }, …(1) ] to deeply equal [ { type: 'text', …(1) }, …(1) ]
+   ❯ src/session/lifecycle/sessionPromptBarrier.test.ts > sessionPromptBarrier > preserves image prompt content at the durable barrier (empty text=true)
+     → expected [ { type: 'text', text: '' }, …(1) ] to deeply equal [ { type: 'text', text: '' }, …(1) ]
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 skipped (4)
+   Start at  21:33:30
+   Duration  286ms (transform 64ms, setup 0ms, collect 69ms, tests 9ms, environment 0ms, prepare 50ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/lifecycle/sessionPromptBarrier.test.ts > sessionPromptBarrier > preserves image prompt content at the durable barrier (empty text=false)
+AssertionError: expected [ { type: 'text', …(1) }, …(1) ] to deeply equal [ { type: 'text', …(1) }, …(1) ]
+
+- Expected
++ Received
+
+  Array [
+    Object {
+      "text": "  public image question
+  ",
+      "type": "text",
+    },
+    Object {
+-     "data": "aGVsbG8=",
++     "data": "later-mutated",
+      "mimeType": "image/png",
+      "type": "image",
+    },
+  ]
+
+ ❯ src/session/lifecycle/sessionPromptBarrier.test.ts:23:39
+     21|     expect(session.pendingPrompt).toBe(prompt);
+     22|     image.data = "later-mutated";
+     23|     expect(session.turns[0]!.content).toEqual([{ type: "text", text: p…
+       |                                       ^
+     24|   });
+     25|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/session/lifecycle/sessionPromptBarrier.test.ts > sessionPromptBarrier > preserves image prompt content at the durable barrier (empty text=true)
+AssertionError: expected [ { type: 'text', text: '' }, …(1) ] to deeply equal [ { type: 'text', text: '' }, …(1) ]
+
+- Expected
++ Received
+
+  Array [
+    Object {
+      "text": "",
+      "type": "text",
+    },
+    Object {
+-     "data": "aGVsbG8=",
++     "data": "later-mutated",
+      "mimeType": "image/png",
+      "type": "image",
+    },
+  ]
+
+ ❯ src/session/lifecycle/sessionPromptBarrier.test.ts:23:39
+     21|     expect(session.pendingPrompt).toBe(prompt);
+     22|     image.data = "later-mutated";
+     23|     expect(session.turns[0]!.content).toEqual([{ type: "text", text: p…
+       |                                       ^
+     24|   });
+     25|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯

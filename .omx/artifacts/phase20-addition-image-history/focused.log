@@ -1,0 +1,30 @@
+
+ RUN  v0.34.6 <repo>/packages/ts-shell
+
+ ✓ src/session/SessionManager.test.ts  (84 tests | 82 skipped) 69ms
+ ✓ src/session/lifecycle/sessionPromptBarrier.test.ts  (4 tests) 4ms
+ ❯ src/core/shell/sessionRuntime.test.ts  (49 tests | 2 failed | 46 skipped) 8ms
+   ❯ src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=false)
+     → this.deps.sessionManager.appendQueryEvent is not a function
+   ❯ src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=true)
+     → this.deps.sessionManager.appendQueryEvent is not a function
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=false)
+ FAIL  src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=true)
+TypeError: this.deps.sessionManager.appendQueryEvent is not a function
+ ❯ ShellSessionRuntime.drivePrompt src/core/shell/sessionRuntime.ts:394:34
+    392|           lastContinuationReason: terminalState.lastContinuationReason,
+    393|         });
+    394|         this.deps.sessionManager.appendQueryEvent(sessionId, {
+       |                                  ^
+    395|           type: "lifecycle.error",
+    396|           error: errorSave.error,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 7 passed | 128 skipped (137)
+   Start at  21:29:28
+   Duration  2.21s (transform 459ms, setup 0ms, collect 1.62s, tests 81ms, environment 0ms, prepare 127ms)

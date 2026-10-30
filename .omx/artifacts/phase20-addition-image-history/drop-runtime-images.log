@@ -1,0 +1,47 @@
+
+ RUN  v0.34.6 <repo>/packages/ts-shell
+
+ ❯ src/core/shell/sessionRuntime.test.ts  (49 tests | 1 failed | 47 skipped) 15ms
+   ❯ src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=true)
+     → expected [ [ 'sess_image', …(2) ] ] to deeply equal [ [ 'sess_image', …(3) ] ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 47 skipped (49)
+   Start at  21:33:26
+   Duration  1.64s (transform 1.14s, setup 0ms, collect 1.38s, tests 15ms, environment 0ms, prepare 57ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > passes submitted images to the original prompt barrier before dispatch (attachments=true)
+AssertionError: expected [ [ 'sess_image', …(2) ] ] to deeply equal [ [ 'sess_image', …(3) ] ]
+
+- Expected
++ Received
+
+  Array [
+    Array [
+      "sess_image",
+      "  image question
+  ",
+      Object {
+        "originalInput": "public original",
+      },
+-     Array [
+-       Object {
+-         "data": "aGVsbG8=",
+-         "mimeType": "image/png",
+-         "type": "image",
+-       },
+-     ],
+    ],
+  ]
+
+ ❯ src/core/shell/sessionRuntime.test.ts:33:19
+     31|     await runtime.executePrompt("sess_image", "  image question\n", { …
+     32|       ...(attached ? { attachments: { images: [image] } } : {}) });
+     33|     expect(calls).toEqual([attached ? ["sess_image", "  image question…
+       |                   ^
+     34|     expect(dispatches).toEqual([[1, "  image question\n", attached ? […
+     35|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

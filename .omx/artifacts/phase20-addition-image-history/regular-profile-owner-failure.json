@@ -1,0 +1,133 @@
+{
+  "mode": "regular",
+  "buildId": "d4297fc1e1cd6053249f47cb8afbb896d1654fdacef71d1638cead1669e053c0",
+  "inputsDigest": "a8e6aba8fe59b75f8a3533c898053adb727ce845057ea765e933aa410e975471",
+  "provider": "loopback HTTP fixture",
+  "savedMessages": 1,
+  "phases": [
+    {
+      "label": "initial submission",
+      "shutdown": {
+        "code": 0,
+        "signal": null
+      },
+      "device": {
+        "cookedFlagsRestored": true
+      }
+    }
+  ],
+  "status": "failed",
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 60,
+    "outputBytes": 2097152
+  },
+  "stages": [
+    {
+      "action": "real bracketed paste and alt+s stash",
+      "imageHostInjections": 1,
+      "pressureIssuances": 1100,
+      "pressureSource": "tiny payload injection into actual PasteStore",
+      "pressure": {
+        "signatures": 1024,
+        "payloads": 128,
+        "payloadBytes": 4122
+      },
+      "noPostWhileStashed": true,
+      "noticePainted": true
+    },
+    {
+      "action": "real alt+s restore",
+      "exactDraftAndCaret": true,
+      "textRetained": true,
+      "imageRetained": true,
+      "interiorExpansion": true,
+      "unresolved": 0
+    },
+    {
+      "action": "real Enter submission",
+      "wire": {
+        "textMatches": true,
+        "imageMatches": true,
+        "noLiteralTokens": true,
+        "imageBlocks": 1,
+        "followupMatches": true
+      },
+      "savedUser": {
+        "exactTextAndImageBlocks": true,
+        "userMessages": 2
+      },
+      "responsePainted": true
+    }
+  ],
+  "wireShape": [
+    {
+      "role": "system",
+      "array": false,
+      "length": 1366,
+      "kinds": [],
+      "containsPublicText": false,
+      "containsPublicImage": false
+    },
+    {
+      "role": "user",
+      "array": false,
+      "length": 28,
+      "kinds": [],
+      "containsPublicText": false,
+      "containsPublicImage": false
+    },
+    {
+      "role": "user",
+      "array": true,
+      "length": 2,
+      "kinds": [
+        "text",
+        "image_url"
+      ],
+      "containsPublicText": true,
+      "containsPublicImage": true
+    }
+  ],
+  "wire": [
+    {
+      "textMatches": true,
+      "imageMatches": true,
+      "noLiteralTokens": true,
+      "imageBlocks": 1,
+      "followupMatches": true
+    }
+  ],
+  "savedUser": {
+    "exactTextAndImageBlocks": true,
+    "userMessages": 2
+  },
+  "failure": "Cannot read properties of undefined (reading 'turns')",
+  "observation": {
+    "ends": 1,
+    "renders": 5,
+    "imageHostInjections": 1,
+    "pressureIssuances": 1100,
+    "sessionId": "sess_83e8429d476bcc0f_1793367264219",
+    "draftLength": 0,
+    "draftHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cursor": 0,
+    "expandedTextMatches": false,
+    "imageMatches": false,
+    "unresolved": 0,
+    "insideExpansionMatches": false,
+    "pressure": {
+      "signatures": 1024,
+      "payloads": 128,
+      "payloadBytes": 4122
+    }
+  },
+  "requests": 1,
+  "readinessRequests": 1,
+  "rejectedRequests": 0,
+  "configuredProviderLoopback": true,
+  "outputBytes": 6859,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

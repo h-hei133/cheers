@@ -4542,3 +4542,16 @@ HANDOFF补共享guard消费者与retire观察边界。延后读回`cccc44662a66b
 失败收据保留：早期未在models.json声明vision触发原nonvision fallback；错在credentials中写models的夹具派发前失败；已修正metadata owner后实际HTTP通过。随后保存图片断言揭示独立既有缺口：[sessionRuntime](../../packages/ts-shell/src/core/shell/sessionRuntime.ts)调用[string prompt barrier](../../packages/ts-shell/src/session/lifecycle/sessionPromptBarrier.ts)只存文字。最终receipt明确savedUser.textMatches true/imageMatches false，本批不声称图片跨会话replay已修复，该缺口另列后续owner修复。初期释放保护的测试也误要求已淘汰签名仍在unresolved中，现分别验证载荷释放/后续签名过期，原日志保留。
 
 HANDOFF补载荷/签名生命周期及vision/persistence分界，CLAUDE.md保留。延后一次读回8061bd92 Watch41056737048 completed/success，CI41056737057仍in_progress、head匹配，无重复轮询，本批Git/未来CI另绑定。无full local suite/并行heavy/本助手subagent/20k真实终端/exe/真实provider/独立代理review/NormProof judge；真实用户目录、桌面clipboard、其他平台及原47/ADD整体仍partial，goal active。
+
+
+### 21.28 图片提交进入原用户消息屏障并跨进程重放
+
+接续21.27实际HTTP成功但保存图片缺失的证据，目标[schema](../../packages/ts-shell/src/session/schema/sessionMessage.ts)已支持text/image union，[toChatMessages](../../packages/ts-shell/src/turn/prompt.ts)已保留block，缺失点为原[shell runtime](../../packages/ts-shell/src/core/shell/sessionRuntime.ts)未向[lifecycle facade](../../packages/ts-shell/src/session/lifecycle/sessionLifecycleWrites.ts)传图片，[handler](../../packages/ts-shell/src/session/agent/lifecycle.ts)与[prompt barrier](../../packages/ts-shell/src/session/lifecycle/sessionPromptBarrier.ts)只接字符串。现四段传递optional images，barrier保存原text加image block并拷贝image record，防后续调用方变更；无图片仍string。pendingPrompt/metadata/原空白/事件顺序/sourceEntryId及派发前屏障不变，无新schema/map/replay/provider政策。
+
+目标先读后定向只读比较参考快照`f09d01b85e0384647fcab6779d35ab9dabe04be3`的agent-session.ts:1969–1978构造text/images、1163–1181保存实际message。采用“持久化完整内容”，保留本项目先存屏障且不把environment prompt存进历史，未复制参考代码。初期baseline四个内容断言失败/empty-image控制通过，另两runtime fixture因缺terminal hooks抛TypeError不计产品证据；补齐真实terminal completion、manager callbacks且断言放runtime外后有效反转定位转发。最终**9项去重**聚焦通过，128未选不计，覆盖barrier4、manager完成/中断读盘2、runtime转发与text/seeded-reentry3。四反转撤回runtime/facade图片、flatten content、共享可变record，分别1/2/2/2 AssertionError，finally bytes恢复；恢复九项/五门/TS build/freshness串行通过，118旧docs advisory保留。AST runtime19/handler15/facade29/barrier1均不增，旧facade保守count超20如实保留。[正式工件](../../.omx/artifacts/phase20-addition-image-history/README.md)绑定build `d4297fc1e1cd6053249f47cb8afbb896d1654fdacef71d1638cead1669e053c0`、inputs `a8e6aba8fe59b75f8a3533c898053adb727ce845057ea765e933aa410e975471`。
+
+实际Node CLI regular/fullscreen各1保存fixture消息、isolated home/profile/project、declared-vision loopback、heap768MiB/总60秒/累计2MiB。首次真实paste/alt+s/Enter沿原host公开PNG及1100 tiny store压力，实际POST一次并保存精确text/image user仅一次；退出后新CLI进程重开同ID，零image host/pressure注入，真实followup第二POST携原image_url精确一次和原历史text、新请求正文，响应实际绘制。 fresh disk最终三个user、原block不变；两模式各两个进程exit0/cooked、config/models/project不变、scratch清理。
+
+两探针失败保留：SessionManager在withProfile外构造绑定错profile、历史正文误要求当前请求environment前缀。仅修fixture owner/比较合同，未改产品或弱化精确image/文本/单次历史断言。旧21.27的saved image false作为历史证据保留；此后新增图片可跨所测完成会话进程重放，旧已丢图片不可恢复，image-only自动续跑、compaction/branch与任意图片预算体验未新增验收。中断会话读盘验证不冒充自动中断派发验证。
+
+HANDOFF更新、CLAUDE.md保留。延后一次CI读回8061bd92 CI41056737057/Watch41056737048均completed/success，bc121e28 Watch41062973311 success、CI41062973370仍in_progress且heads一致；本批Git/未来CI另绑定。无full local suite/并行heavy/本助手subagent/20k真实终端/exe/真实provider/独立代理review/NormProof judge，原47与ADD整体仍partial、goal active。

@@ -20,6 +20,7 @@ import type { ApprovalAuditMemoryState } from "../sessionContinuityTypes.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
+import type { ImageContent } from "../../model-adapters/multimodal.js";
 import type {
   SessionStateSnapshot,
   SessionStateSnapshotOverrides,
@@ -137,12 +138,13 @@ export abstract class SessionLifecycleWrites extends SessionCompactionWrites {
     handleMarkRunStarted(this.createSessionLifecycleCallbacks(), sessionId, prompt);
   }
 
-  persistUserPromptBarrier(sessionId: string, prompt: string, metadata?: Record<string, unknown>): void {
+  persistUserPromptBarrier(sessionId: string, prompt: string, metadata?: Record<string, unknown>, images?: readonly ImageContent[]): void {
     handlePersistUserPromptBarrier(
       this.createSessionLifecycleCallbacks(),
       sessionId,
       prompt,
       metadata,
+      images,
     );
   }
 
