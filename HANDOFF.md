@@ -1310,3 +1310,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: `glob`/`grep` report `src/a.ts` while `lsp` reports the absolute path for the same file, so a result from one tool has to be translated before another accepts it.
 - **Root Cause**: Each search surface grew its own projection while being fixed for attached roots, and only some were rebased onto the primary root.
 - **Rule**: Keep one projection rule for every surface that reports a path — rebase inside the primary root, absolute outside it — and assert the spelling, not just that the file is reachable. When fixing a path projection, enumerate every surface that reports paths rather than the one that was reported.
+
+### A Repeated Root Doubles Every Search Result
+
+- **Symptom**: The same symbol appears twice in a workspace symbol answer, or a file appears twice in a listing.
+- **Root Cause**: `validateWorkspaceRoots` forbids overlapping roots when they are written, but `decodeWorkspaceRoots` only rejects exact duplicates. A hand-edited state file can name `/a` and `/a/b`, and a scan that walks every root then visits the same files twice.
+- **Rule**: Deduplicate the collected target files rather than trusting the roots to be disjoint. A reader of persisted state must not assume a writer's invariant that it does not itself enforce.

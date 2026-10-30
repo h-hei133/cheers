@@ -205,3 +205,20 @@ describe('an attached workspace root is part of the search space', () => {
     expect(String(document.output)).toContain('Function: `attachedNeedle`');
   });
 })
+
+describe('overlapping roots do not duplicate results', () => {
+  it('lists a symbol once when a root repeats the primary root', async () => {
+    // A hand-edited state file can name the same directory twice; the walk would
+    // otherwise report every file twice and the answer would repeat each symbol.
+    const workspaceRoot = workspaceWith({ 'lib.ts': 'export function onceNeedle() { return 1; }' });
+    const service = createDefaultExecutionService();
+    const tool = createLspToolDefinition(service);
+    const context = { workspaceRoot, taskId: 'dup-scan',
+      workspaceRoots: [captureWorkspaceRoot(workspaceRoot, workspaceRoot, 'read')] };
+
+    const result = await tool.execute({ backend: 'scanner', operation: 'workspaceSymbol', symbol: 'onceNeedle' }, context);
+    // Count match rows, not every occurrence: the heading quotes the query.
+    const rows = String(result.output).split('\n').filter(line => line.startsWith('- `'));
+    expect(rows).toHaveLength(1);
+  });
+})

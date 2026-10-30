@@ -4852,3 +4852,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 未改产品代码。build `059b7423ab15`。原47/ADD整体partial、goal active。
 
 补充：`/workspace add`后新会话**不继承**附加根（`createNew`不带该字段），正确——授权属于会话。state快照的`current?.workspaceRoots ?? session.workspaceRoots`是正确合并（空数组不回退、undefined才回退）。`/workspace remove`后`runtimeContext.session`被替换为新session，后续工具从该字段读取，撤销立即生效。
+
+
+### 21.59 重叠根不再重复列出同一符号
+
+子代理review超时停止后，本批自行完成六项定向审查。结论：`\0`与控制字符不绕过围栏（`path.resolve`按普通字符处理，`relative`仍正确判越界）；receipt顶层workspace与scope一致而`files[].workspace`可为附加根，是正确分层；路径投影对`..`逃逸条目回退绝对路径；撤销后无缓存；新会话不继承根。
+
+发现一处真实缺陷：`validateWorkspaceRoots`在写入时禁止父子重叠，但`decodeWorkspaceRoots`只查重复路径、**不查父子重叠**——手改state文件可造出`/a`与`/a/b`，`scanRoots`会双重遍历，符号在答案中重复。现`targetFiles`改为`Set`去重。
+
+验证：`lsp`13（新例断言匹配行为1行）、`language`44，共**57项**通过；四反转（扫描只留主根、文档符号只留主根、符号路径恒绝对、无去重）全部命中且finally字节恢复；五静态门、TS build/freshness通过。build `a55051824792`。原47/ADD整体partial、goal active。

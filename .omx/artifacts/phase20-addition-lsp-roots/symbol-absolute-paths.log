@@ -1,14 +1,14 @@
 
  RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
 
- ❯ src/core/tools/lsp.test.ts  (12 tests | 1 failed | 11 skipped) 44ms
+ ❯ src/core/tools/lsp.test.ts  (13 tests | 1 failed | 12 skipped) 44ms
    ❯ src/core/tools/lsp.test.ts > an attached workspace root is part of the search space > finds symbols in an attached root and keeps the primary root working
      → expected '# Workspace Symbol Matches for `prima…' to include '`public.ts:1`'
 
  Test Files  1 failed (1)
-      Tests  1 failed | 11 skipped (12)
-   Start at  02:59:11
-   Duration  3.16s (transform 2.22s, setup 0ms, collect 2.89s, tests 44ms, environment 0ms, prepare 54ms)
+      Tests  1 failed | 12 skipped (13)
+   Start at  04:38:44
+   Duration  3.23s (transform 2.32s, setup 0ms, collect 2.95s, tests 44ms, environment 0ms, prepare 62ms)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 

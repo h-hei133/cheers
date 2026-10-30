@@ -3,20 +3,26 @@
     {
       "name": "scan-primary-only",
       "exit": 1,
-      "tests": "1 failed | 11 skipped (12)",
-      "originalSha256": "1f16fe2e82d4c4343850f0d7410391380a6934c4495bc7d87c58111d5d5dda2e"
+      "tests": "1 failed | 12 skipped (13)",
+      "originalSha256": "3fd2debbabce9c7a5d6c52878b68f81b046cc38ac56654ab8911f69f129a7e20"
     },
     {
       "name": "symbol-absolute-paths",
       "exit": 1,
-      "tests": "1 failed | 11 skipped (12)",
-      "originalSha256": "1f16fe2e82d4c4343850f0d7410391380a6934c4495bc7d87c58111d5d5dda2e"
+      "tests": "1 failed | 12 skipped (13)",
+      "originalSha256": "3fd2debbabce9c7a5d6c52878b68f81b046cc38ac56654ab8911f69f129a7e20"
+    },
+    {
+      "name": "no-dedup",
+      "exit": 1,
+      "tests": "1 failed | 12 skipped (13)",
+      "originalSha256": "3fd2debbabce9c7a5d6c52878b68f81b046cc38ac56654ab8911f69f129a7e20"
     },
     {
       "name": "document-symbol-primary-only",
       "exit": 1,
-      "tests": "1 failed | 11 skipped (12)",
-      "originalSha256": "1f16fe2e82d4c4343850f0d7410391380a6934c4495bc7d87c58111d5d5dda2e"
+      "tests": "1 failed | 12 skipped (13)",
+      "originalSha256": "3fd2debbabce9c7a5d6c52878b68f81b046cc38ac56654ab8911f69f129a7e20"
     }
   ],
   "restored": true

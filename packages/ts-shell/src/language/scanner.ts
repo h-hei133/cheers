@@ -122,7 +122,10 @@ export function createScannerToolDefinition(
         // they are part of this session's workspace, and a symbol that lives in
         // one is no less real for being outside the primary directory.
         const scanRoots = [context.workspaceRoot, ...(context.workspaceRoots ?? []).map(root => root.path)];
-        const targetFiles: string[] = [];
+        // Two roots can describe the same directory when a saved state was edited
+        // by hand; the walk would then report every file twice and the answer
+        // would list each symbol twice.
+        const targetFiles = new Set<string>();
         for (const scanRoot of scanRoots) {
           const listed = await executionService.listFilesRecursive({
             operationKind: "file.list",
@@ -141,7 +144,7 @@ export function createScannerToolDefinition(
             // but a caller-supplied entry can already be absolute. Joining an
             // absolute path onto the root would fabricate a path inside it and
             // skip the containment check the reader performs.
-            targetFiles.push(path.isAbsolute(file) ? file : path.join(scanRoot, file));
+            targetFiles.add(path.isAbsolute(file) ? file : path.join(scanRoot, file));
           }
         }
         const matches: Array<{ file: string; line: number; text: string; isDefinition: boolean }> = [];

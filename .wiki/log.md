@@ -10796,3 +10796,11 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：/context的compactAt阈值与实际压缩触发同源
 
 [addition21.58](features/phase-20-addition.md#2158-context的compactat阈值与实际压缩触发同源)核对requestBudget.softLimit与shouldCompact：同为floor(window×0.9)并与availableInput/inputLimit-reserve取小，语义对齐。未改产品代码。build 059b7423。原47/ADD整体partial、goal active。
+
+### 2026-10-31：workspace多根修复批次的CI结论
+
+延后读回：`0b768249`（lsp路径约定）、`18ef34f7`（路径面清单）、`10f38ad5`（resume延迟测量）、`2f4b655c`（中断思考证据）、`b691b6f6`（context阈值核对）五个提交的CI与NormProof均completed/success且head一致。更早的`c3bd1079`（子目录重定基）、`92efdca5`（grep两条路径）、`ced00ed5`（账本归属）、`c5dfec8d`（lsp附加根）等亦已在此前读回。绿色CI不替代真实provider/桌面/图形协议验收，原47/ADD整体仍partial、goal active。
+
+### 2026-10-31：重叠根不再重复列出同一符号
+
+[addition21.59](features/phase-20-addition.md#2159-重叠根不再重复列出同一符号)子代理review超时后自行完成六项审查：NUL不绕过围栏、receipt分层正确、投影逃逸回退绝对、撤销无缓存、新会话不继承。发现真实缺陷：decodeWorkspaceRoots不查父子重叠，手改state可致双重遍历重复符号；targetFiles改Set去重。57项聚焦、四反转命中、五门/TS build通过。build a5505182。原47/ADD整体partial、goal active。

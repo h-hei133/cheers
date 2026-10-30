@@ -21,6 +21,10 @@ const cases = [
   return file;
 }`,
     filter: 'part of the search space' },
+  { name: 'no-dedup',
+    before: `        const targetFiles = new Set<string>();`,
+    after: `        const targetFiles = { set: new Set<string>(), add(v: string) { this.set.add(v); }, [Symbol.iterator]() { return [...this.set, ...this.set][Symbol.iterator](); } } as unknown as Set<string>;`,
+    filter: 'lists a symbol once' },
   { name: 'document-symbol-primary-only',
     before: `          const fileRoot = selectWorkspaceRoot(context.workspaceRoot, context.workspaceRoots ?? [],
             path.isAbsolute(filePath) ? filePath : path.resolve(context.workspaceRoot, filePath), 'read');`,

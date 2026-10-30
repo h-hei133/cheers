@@ -1,0 +1,33 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/lsp.test.ts  (13 tests | 1 failed | 12 skipped) 31ms
+   ❯ src/core/tools/lsp.test.ts > overlapping roots do not duplicate results > lists a symbol once when a root repeats the primary root
+     → expected [ …(2) ] to have a length of 1 but got 2
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 12 skipped (13)
+   Start at  04:38:47
+   Duration  3.27s (transform 2.29s, setup 0ms, collect 3.00s, tests 31ms, environment 0ms, prepare 52ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/lsp.test.ts > overlapping roots do not duplicate results > lists a symbol once when a root repeats the primary root
+AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ src/core/tools/lsp.test.ts:222:18
+    220|     // Count match rows, not every occurrence: the heading quotes the …
+    221|     const rows = String(result.output).split('\n').filter(line => line…
+    222|     expect(rows).toHaveLength(1);
+       |                  ^
+    223|   });
+    224| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
