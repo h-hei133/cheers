@@ -3171,7 +3171,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 | 反馈 | 当前状态 | 下一步 |
 |---|---|---|
-| 24 | 本地实现与聚焦验证；20.42补两模式原CLI的拒绝/单次write/edit/重复询问，20.45补跨目录patch分组选中→预览→单次审批→原操作收据读回，并修真实选项过滤与g/4派发 | 缺用户目录审批现场、实际provider产生的工具调用、read CLI及非Linux文件系统证据 |
+| 24 | 本地实现与聚焦验证；20.42补两模式原CLI的拒绝/单次write/edit/重复询问，20.45补跨目录patch分组与原操作收据并修真实选项过滤/g/4派发，20.46补文件selector与目录分页的实际CLI单次read | 缺用户目录审批现场、实际provider产生的工具调用及非Linux文件系统证据 |
 | 25 | raw Responses、历史恢复、streaming点击/有效键提示及有证据的Responses/Google native摘要准入已实现；20.33新增当前relay真实小请求的公开thinking/展开/恢复，auto保留，整体partial | 其他模型/协议默认与公开内容、真实账户及用户终端复验；单个relay请求不覆盖完整矩阵 |
 | 26 | 四条明确机制、MCP未开始调用及表面/渲染失败围栏已修；20.36/20.40正常/空闲、20.41 loopback忙碌流、20.43审批pending信号与20.44审批Ctrl+D均有退出/恢复证据；20.43/44修补取消等待与modal吞退出动作 | 缺真实用户故障设备/外部provider busy信号现场；MCP预算到期不能证明清理完成 |
 | 27 | CRLF编辑器契约已修；startup/物理坐标夹具通过，现场机制仍未确认 | 缺真实用户尺寸/按键/终端现场；不把相对原点当成已证漂移 |
@@ -3834,3 +3834,24 @@ regular RSS261120KiB/18.26秒、fullscreen264352KiB/18.46秒；heap768MiB/每CLI
 两次正常退出cooked flags恢复、零外部请求。时间含人为150ms持久键等待/夹具/观察，不能当生产性能。第一regular探针在选后pager.close立即读到旧group面板，selected-once-options断言exit1/零settled attempts，264864KiB/6.79s；保留失败收据，分类为observer同步，改等fresh Permission title与load结束后两模式全部重跑通过。
 
 正式[patch-cli工件](../../.omx/artifacts/phase20-addition-patch-cli/)归档最终收据/metrics、baseline/有效反转/恢复log、build freshness与四类失败分类；反转源码保留为不可发现测试的文本快照。工件语法/JSON/收据与源码digest、五门/diff检查后清理task scratch，原CLAUDE.md保留。HANDOFF记录真实decision选项不应过滤导航ID及shortcut必须通过原提供选项派发。此批heavy verification严格逐进程串行；无独立review、live用户/外部模型、read CLI、writer已开始的失败恢复、非Linux/桌面/IME、exe/full suite/20k。原47不升级、ADD/goal继续active；本批Git与精确CI另绑定。
+
+
+20.45已推送`a072ecb199d93e33d3aca70cc5d0c1e84148b713`，远端main一致、仅原CLAUDE.md。延后精确核对Watch40978485261 completed/success、CI40978485363仍in_progress；20.44 CI40976279272已completed/success，head均一致。Watch成功不改变既有ceiling债务或原47验收。
+
+
+### 20.46 外部文件切片与目录分页的实际CLI读取审批
+
+补20.4反馈24的read CLI证据。先检查原[turn文件授权](../../packages/ts-shell/src/turn/workspace.ts)、[CLI approval](../../packages/ts-shell/src/entrypoints/cliApprovalModule.ts)、[read工具](../../packages/ts-shell/src/core/tools/read.ts)和[目录列表](../../packages/ts-shell/src/core/tools/directoryListing.ts)：selector去除只用于规范目标捕获，执行保留slice；explicitApproval每call独立，scope/cache不替用户回答，目录direct listing及下页绝对路径仍进入新调用审批。
+
+定向对照只读pi read.ts:125–131的resolveReadPathAsync→access和oh-my-pi read.ts:1026–1048的selectorless授权目标/目录自身授权：同意授权目标与实际执行目标一致、目录只列本层；本项目不采用可复用folder grant，仍每次明确once，literal-colon解析差异未在此次探针比较。Codex safety是patch政策，不把它当read审批的等价依据。没有发现需新增产品修补的缺陷，不改产品。
+
+复用正式小型CLI观察器框架，新增[read-cli工件](../../.omx/artifacts/phase20-addition-read-cli/)：两模式各一条小saved session、隔离home/profile/project/outside。原Node CLI→PTY→loopback HTTP、只允许read，maxTurns2/output256、关闭MCP/skills/retry/warming、heap768MiB/45秒/2MiB。每模式六回合依次ask拒绝原文件、Alt+P accept-edits批准`:2-2`、Alt+P allow-all批准同目录兄弟`:2-2`、allow-all再次拒绝原文件、批准目录offset1/limit2及offset3/limit2。原approval每次实际绘制once/deny与目标目录，a保持pending不能持久回答。
+
+观察器仅转发原fs.promises.open/opendir并记录fixture目录下边界；未答复与拒绝时没有记录read handle或enumeration，结果也未提前发布，不把stat/metadata检查或所有kernel I/O说成零。获准文件各恰一次打开其原精确目标，返回只有第二行，首尾与其他文件正文不出现，original read.startLine/endLine及provenance.contentHash匹配。目录两页分别为nested/saved与sibling/z-final直接条目，nested正文不读取/显示，原绝对目录offset3 continuation正确，第二次重新审批，末页无Next；目录每调用观察两个directory handle，没有child body open。
+
+| 模式 | completion / readiness | 六回合elapsed ms | Ctrl+D exit | 峰值RSS / 探针 |
+|---|---|---|---|---|
+| regular | 12 / 6 | 801 / 695 / 697 / 672 / 877 / 797 | 180ms、0 | 328036KiB / 13.85s |
+| fullscreen | 12 / 6 | 802 / 696 / 722 / 750 / 794 / 800 | 154ms、0 | 313196KiB / 13.98s |
+
+十二回合首轮全部通过、零外部请求；零writer operation/grant/roots、源文件/兄弟/config原字节保持，两次正常退出cooked flags恢复。时间含人工150ms持久键等待与fixture/观察，不能当生产read性能。仅记录status/count/digest，不保存原会话或HTTP正文。当前build与inputs同20.45，source未改不重复build/Vitest，工件语法/JSON/收据与五静态门/diff检查后归档清理scratch。无独立review、live用户/外部provider工具选择、pending时目录身份替换/撤销、完整read媒体/非Linux/桌面/IME、exe/full suite/20k；原47不升级、goal active，本批Git/精确CI另绑定。

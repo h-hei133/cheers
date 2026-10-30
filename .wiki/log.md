@@ -10392,3 +10392,15 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 原CLI/PTY/loopback两模式各g/4/Enter选第二外部目录分组、Esc拒绝四回合全部通过。完整/选后preview无写入，a持续pending，y后原writer exact operationId、selected/skipped/revision及bytes匹配，第一未选目标一直缺席，最终三committed、零grant/roots/config变化。各8 completion/4 readiness、零外部请求，退出131/138ms/0与cooked flags恢复，RSS303956/315208KiB、13.45/8.25秒。首轮regular读取旧group快照exit1保留，改等fresh Permission后重跑；时序含人为等待不作生产性能。
 
 正式工件/分类/HANDOFF与task scratch清理，syntax/JSON/收据/digest/五门/diff检查；全程heavy serial，原CLAUDE.md保留。无独立review/live用户/外部模型/read CLI/started writer故障/非Linux/桌面/exe/full suite/20k，原47不升级、goal active，本批Git/精确CI另绑定。
+
+
+20.45已推送`a072ecb199d93e33d3aca70cc5d0c1e84148b713`，远端main一致、仅原CLAUDE.md。延后精确核对Watch40978485261 completed/success、CI40978485363仍in_progress；20.44 CI40976279272已completed/success，head均一致。Watch成功不改变既有ceiling债务或原47验收。
+
+
+## [2026-10-30] verify | 外部read原CLI切片与目录分页
+
+沿[addition20.46](features/phase-20-addition.md#2046-外部文件切片与目录分页的实际cli读取审批)补反馈24最后read CLI缺口。检查原授权/approval/read与directory owner，对照参考授权目标与执行目标一致、目录自身direct listing，保留每call once，不改产品。
+
+两模式原CLI/PTY/loopback各六回合：ask拒绝、accept-edits批准原文件第二行、allow-all批准兄弟第二行、再次拒绝原文件、目录两页分别批准。每次once/deny实际绘制、a保持pending，未答复/拒绝没有记录原fs.promises fixture read open或enumeration，获准文件精确目标一次open/slice/provenance digest匹配，目录direct entries/绝对offset3与重新询问正确，无递归child body open。十二回合首轮通过，各12 completion/6 readiness、零外部请求、operation/grant/roots均0，源/config原字节保持；Ctrl+D180/154ms/0与cooked flags恢复，RSS328036/313196KiB、13.85/13.98秒。观察器不证明metadata或kernel I/O为零，人工等待不当生产性能。
+
+正式脚本/收据/metrics归档与scratch清理，syntax/JSON/收据/五门/diff检查、118旧advisory；复用20.45 build，产品未改不重复build/tests，全程serial。无独立review/live用户/外部provider选择/身份更换/非Linux/媒体矩阵/桌面/exe/full suite/20k，原47不升级、goal active，Git/精确CI另绑定。

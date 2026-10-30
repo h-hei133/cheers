@@ -1,0 +1,162 @@
+{
+  "mode": "regular",
+  "buildId": "78e425be03020696bcd40a6e0a576a32f300de62f62a36f7d9298030a10bce8d",
+  "inputsDigest": "d64d3f37b2ea1b6e4305be80647d8c96bdf9e18c0860cdac8efd7f91bd6befdc",
+  "providerMode": "local HTTP fixture",
+  "status": "passed",
+  "attempts": [
+    {
+      "number": 1,
+      "scope": "ask",
+      "kind": "file",
+      "decision": "deny",
+      "pendingMs": 419,
+      "elapsedMs": 801,
+      "choices": [
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingNoReadHandle": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": false,
+      "readOpened": false,
+      "outputDigest": "2e38dac38c61c3905b9c94bfc60181a3ec564e18483c6508a3bbc595c5587e37",
+      "operations": 0,
+      "sourceBytesUnchanged": true
+    },
+    {
+      "number": 2,
+      "scope": "accept-edits",
+      "kind": "file",
+      "decision": "allow-once",
+      "pendingMs": 415,
+      "elapsedMs": 695,
+      "choices": [
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingNoReadHandle": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": true,
+      "readOpened": true,
+      "openedCount": 1,
+      "exactSlice": true,
+      "outputDigest": "a666652c05665ff52c12c55f22f741895891030f6952b6a4d2c5f8163d2730b2",
+      "operations": 0,
+      "sourceBytesUnchanged": true
+    },
+    {
+      "number": 3,
+      "scope": "allow-all",
+      "kind": "file",
+      "decision": "allow-once",
+      "pendingMs": 417,
+      "elapsedMs": 697,
+      "choices": [
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingNoReadHandle": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": true,
+      "readOpened": true,
+      "openedCount": 1,
+      "exactSlice": true,
+      "outputDigest": "3618751df7119fec7f63a01f945a08dd9605bcce3b638d24127c5a2888d1676f",
+      "operations": 0,
+      "sourceBytesUnchanged": true
+    },
+    {
+      "number": 4,
+      "scope": "allow-all",
+      "kind": "file",
+      "decision": "deny",
+      "pendingMs": 392,
+      "elapsedMs": 672,
+      "choices": [
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingNoReadHandle": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": false,
+      "readOpened": false,
+      "outputDigest": "2e38dac38c61c3905b9c94bfc60181a3ec564e18483c6508a3bbc595c5587e37",
+      "operations": 0,
+      "sourceBytesUnchanged": true
+    },
+    {
+      "number": 5,
+      "scope": "allow-all",
+      "kind": "directory",
+      "decision": "allow-once",
+      "pendingMs": 595,
+      "elapsedMs": 877,
+      "choices": [
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingNoReadHandle": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": true,
+      "readOpened": true,
+      "openedCount": 2,
+      "exactDirectoryPage": true,
+      "absoluteContinuation": true,
+      "outputDigest": "9196557d581921abd1183de4ce57a2e8904445ee8c323700244d7fd622909c88",
+      "operations": 0,
+      "sourceBytesUnchanged": true
+    },
+    {
+      "number": 6,
+      "scope": "allow-all",
+      "kind": "directory",
+      "decision": "allow-once",
+      "pendingMs": 517,
+      "elapsedMs": 797,
+      "choices": [
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingNoReadHandle": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": true,
+      "readOpened": true,
+      "openedCount": 2,
+      "exactDirectoryPage": true,
+      "outputDigest": "bc4b7b07ec6c12edd344a24f289f52bc8d89d23d6ccbe9076f9337c202f68674",
+      "operations": 0,
+      "sourceBytesUnchanged": true
+    }
+  ],
+  "checks": {
+    "denialNeverOpensRead": true,
+    "eachExternalCallRequiresAnswer": true,
+    "noPersistentGrantOrRoot": true,
+    "exactFileSliceAndDirectoryPages": true,
+    "zeroWriterOperations": true,
+    "sourceBytesUnchanged": true,
+    "configUnchanged": true,
+    "cookedInputRestored": true
+  },
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 180,
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "requests": 12,
+  "readinessRequests": 6,
+  "outputBytes": 50902,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}
