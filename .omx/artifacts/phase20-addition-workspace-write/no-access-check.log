@@ -1,14 +1,14 @@
 
  RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
 
- ❯ src/core/tools/arguments.test.ts  (28 tests | 1 failed | 26 skipped) 27ms
+ ❯ src/core/tools/arguments.test.ts  (29 tests | 1 failed | 27 skipped) 32ms
    ❯ src/core/tools/arguments.test.ts > an attached workspace root widens the file tools > still refuses a read-only attached root for a write
      → promise resolved "{ success: true, …(2) }" instead of rejecting
 
  Test Files  1 failed (1)
-      Tests  1 failed | 1 passed | 26 skipped (28)
-   Start at  02:46:45
-   Duration  4.21s (transform 2.92s, setup 0ms, collect 3.95s, tests 27ms, environment 0ms, prepare 51ms)
+      Tests  1 failed | 1 passed | 27 skipped (29)
+   Start at  02:55:54
+   Duration  3.89s (transform 2.71s, setup 0ms, collect 3.63s, tests 32ms, environment 0ms, prepare 54ms)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 

@@ -10772,3 +10772,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：相邻面的只读审查（无缺陷）
 
 [addition21.52](features/phase-20-addition.md#2152-相邻面的只读审查无缺陷)检查/undo restore-turn、/restore、fork、会话切换四项：根归属与授权传递均正确，未改代码。记录负面结果与修复同等重要。build 15052712。原47/ADD整体partial、goal active。
+
+### 2026-10-31：子目录搜索的结果重定基到主根
+
+[addition21.53](features/phase-20-addition.md#2153-子目录搜索的结果重定基到主根)发现glob/grep在主根内子目录仍以searchRoot为基准：搜索src报告a.ts而后续工具按主根解析。现结果在主根内则重定基（src/a.ts）、在外则绝对路径，glob与grep三条输出路径统一。29项arguments、81项聚焦、七反转命中、五门/TS build通过。build 0b0556f2。原47/ADD整体partial、goal active。

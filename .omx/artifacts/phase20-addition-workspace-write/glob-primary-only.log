@@ -1,14 +1,14 @@
 
  RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
 
- ❯ src/core/tools/arguments.test.ts  (28 tests | 1 failed | 27 skipped) 9ms
+ ❯ src/core/tools/arguments.test.ts  (29 tests | 1 failed | 28 skipped) 9ms
    ❯ src/core/tools/arguments.test.ts > an attached root is searchable > finds files under an attached root with glob
      → Tool path resolves outside the workspace boundary.
 
  Test Files  1 failed (1)
-      Tests  1 failed | 27 skipped (28)
-   Start at  02:46:21
-   Duration  4.18s (transform 2.92s, setup 0ms, collect 3.94s, tests 9ms, environment 0ms, prepare 60ms)
+      Tests  1 failed | 28 skipped (29)
+   Start at  02:55:37
+   Duration  3.86s (transform 2.69s, setup 0ms, collect 3.63s, tests 9ms, environment 0ms, prepare 55ms)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 

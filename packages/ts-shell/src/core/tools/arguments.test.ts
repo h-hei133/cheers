@@ -260,6 +260,22 @@ describe('an attached root is searchable', () => {
     expect(reported[0]).toBe(path.join(realpathSync(attached), 'found.ts'))
   })
 
+  it('rebases a subdirectory search onto the primary root', async () => {
+    // Searching `src` used to report `a.ts`, which every later tool resolves
+    // against the primary root — a file that does not exist there.
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true })
+    const primary = root('rebase-primary-')
+    fs.mkdirSync(path.join(primary, 'src'))
+    fs.writeFileSync(path.join(primary, 'src', 'a.ts'), 'export function rebaseNeedle() { return 1 }\n')
+    const service = createDefaultExecutionService()
+    const tools = createCoreToolRegistry({ executionService: service })
+    const context = { workspaceRoot: primary, taskId: 'rebase' }
+    const globbed = await tools.get('glob')!.execute({ pattern: '*.ts', path: 'src' }, context)
+    expect(String(globbed.output ?? '').trim().split('\n')[0]).toBe('src/a.ts')
+    const grepped = await tools.get('grep')!.execute({ pattern: 'rebaseNeedle', path: 'src' }, context)
+    expect(String(grepped.output ?? '').trim().split('\n')[0]?.split(':')[0]).toBe('src/a.ts')
+  })
+
   it('reports grep paths a later tool can use, on both search paths', async () => {
     // The ripgrep path and the in-process walk both report paths relative to
     // what they searched; under an attached root that must be absolute.

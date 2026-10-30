@@ -1,14 +1,14 @@
 
  RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
 
- ❯ src/core/tools/arguments.test.ts  (28 tests | 1 failed | 27 skipped) 10ms
+ ❯ src/core/tools/arguments.test.ts  (29 tests | 1 failed | 28 skipped) 12ms
    ❯ src/core/tools/arguments.test.ts > an attached root is searchable > finds content under an attached root with grep
      → expected { success: false, …(2) } to match object { success: true }
 
  Test Files  1 failed (1)
-      Tests  1 failed | 27 skipped (28)
-   Start at  02:46:26
-   Duration  4.16s (transform 2.97s, setup 0ms, collect 3.92s, tests 10ms, environment 0ms, prepare 54ms)
+      Tests  1 failed | 28 skipped (29)
+   Start at  02:55:41
+   Duration  3.90s (transform 2.73s, setup 0ms, collect 3.65s, tests 12ms, environment 0ms, prepare 54ms)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -25,13 +25,13 @@ AssertionError: expected { success: false, …(2) } to match object { success: t
 +   "success": false,
   }
 
- ❯ src/core/tools/arguments.test.ts:292:20
-    290|       workspaceRoots: [captureWorkspaceRoot(attached, attached, 'read'…
-    291|     })
-    292|     expect(result).toMatchObject({ success: true })
+ ❯ src/core/tools/arguments.test.ts:308:20
+    306|       workspaceRoots: [captureWorkspaceRoot(attached, attached, 'read'…
+    307|     })
+    308|     expect(result).toMatchObject({ success: true })
        |                    ^
-    293|     expect(String(result.output ?? '')).toContain('needle')
-    294|   })
+    309|     expect(String(result.output ?? '')).toContain('needle')
+    310|   })
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

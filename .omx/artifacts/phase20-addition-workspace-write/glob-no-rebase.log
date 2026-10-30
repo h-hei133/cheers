@@ -1,0 +1,33 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/arguments.test.ts  (29 tests | 1 failed | 28 skipped) 18ms
+   ❯ src/core/tools/arguments.test.ts > an attached root is searchable > rebases a subdirectory search onto the primary root
+     → expected 'a.ts' to be 'src/a.ts' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 28 skipped (29)
+   Start at  02:55:50
+   Duration  3.98s (transform 2.80s, setup 0ms, collect 3.74s, tests 18ms, environment 0ms, prepare 53ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/arguments.test.ts > an attached root is searchable > rebases a subdirectory search onto the primary root
+AssertionError: expected 'a.ts' to be 'src/a.ts' // Object.is equality
+
+- Expected
++ Received
+
+- src/a.ts
++ a.ts
+
+ ❯ src/core/tools/arguments.test.ts:274:64
+    272|     const context = { workspaceRoot: primary, taskId: 'rebase' }
+    273|     const globbed = await tools.get('glob')!.execute({ pattern: '*.ts'…
+    274|     expect(String(globbed.output ?? '').trim().split('\n')[0]).toBe('s…
+       |                                                                ^
+    275|     const grepped = await tools.get('grep')!.execute({ pattern: 'rebas…
+    276|     expect(String(grepped.output ?? '').trim().split('\n')[0]?.split('…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

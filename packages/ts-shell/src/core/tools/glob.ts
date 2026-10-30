@@ -84,11 +84,17 @@ export function createGlobToolDefinition(
         reportSafeTarget: searchRoot,
       })
       context.abortSignal?.throwIfAborted()
-      // The listing reports paths relative to the root it walked. When that root
-      // is not the primary one, a relative path would be resolved against the
-      // primary root by every later tool, so the result would name files that do
-      // not exist there. Absolute paths keep the reported result usable.
-      const project = (file: string): string => searchRoot === context.workspaceRoot ? file : path.join(searchRoot, file)
+      // The listing reports paths relative to the root it walked. A later tool
+      // resolves a relative path against the primary root, so a result is only
+      // usable if it is relative to that root. Inside the primary root the path
+      // is rebased onto it (a search of `src` reports `src/a.ts`, not `a.ts`);
+      // outside it, the absolute path is the only spelling that resolves.
+      const project = (file: string): string => {
+        const absolute = path.join(searchRoot, file)
+        const relative = path.relative(context.workspaceRoot, absolute)
+        return relative === '' || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
+          ? absolute : relative.split(path.sep).join('/')
+      }
       const filtered = files.filter((file) => matchesGlob(file, pattern)).map(project)
       if (filtered.length === 0) {
         return approvedResult('No files matched the pattern.')

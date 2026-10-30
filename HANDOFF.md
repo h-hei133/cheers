@@ -1298,3 +1298,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A test asserting `output.toContain(symbol)` passes even when the search found nothing.
 - **Root Cause**: The empty-result message quotes the query (`No workspace symbols matched query \`X\``), so the symbol name appears in the failure text too.
 - **Rule**: Assert the match format (`N found`, the reported path) rather than the symbol name. Also check the fixture actually produces symbols: this parser reports functions and classes, not a bare `export const`, so a const fixture yields an empty parse and makes the assertion vacuous.
+
+### A Search Result Is Relative To Whatever The Searcher Used
+
+- **Symptom**: `glob`/`grep` with `path: 'src'` report `a.ts`, and `read` on that string fails; the same tools without `path` report a usable `root.ts`.
+- **Root Cause**: The listing reports paths relative to the root it walked, and the searcher walked the subdirectory. A later tool resolves relative paths against the primary root, so a subdirectory-relative result names a file that does not exist there.
+- **Rule**: Rebase every reported path onto the primary root when it lies inside it (`src/a.ts`), and report it absolutely when it does not. Apply one rule to every search path — glob, the grep walk, and the ripgrep branch — rather than fixing them one at a time.

@@ -113,10 +113,9 @@ export function createGrepToolDefinition(
         // Ripgrep reports paths relative to the root it ran in. Under an
         // attached root that relative path would be resolved against the
         // primary root by every later tool, so it is made absolute here too.
-        const absolute = (match: { readonly path: string }) => searchRoot === context.workspaceRoot || path.isAbsolute(match.path)
-          ? match.path : path.join(searchRoot, match.path);
         return await reportGrepMatches(
-          viaRipgrep.matches.map((match) => formatRipgrepMatch({ ...match, path: absolute(match) }, 500)),
+          viaRipgrep.matches.map((match) => formatRipgrepMatch({ ...match,
+            path: reportPath(match.path, searchRoot, context.workspaceRoot) }, 500)),
           context.artifactRoot ?? context.workspaceRoot, context.sessionId,
         );
       }
@@ -203,9 +202,7 @@ export function createGrepToolDefinition(
               // resolved against the primary root by every later tool. An entry
               // that is already absolute must not be joined onto the root again,
               // which would fabricate a different path inside it.
-              const reported = searchRoot === context.workspaceRoot ? relPath
-                : path.isAbsolute(relPath) ? relPath : path.join(searchRoot, relPath);
-              results.push(`${reported}:${i + 1}: ${safeLine}`);
+              results.push(`${reportPath(relPath, searchRoot, context.workspaceRoot)}:${i + 1}: ${safeLine}`);
               totalMatches++;
               if (totalMatches >= limit) {
                 break;
@@ -234,6 +231,21 @@ export function createGrepToolDefinition(
  * per path would leak the fallback into the transcript and make the tool's
  * output depend on what happened to be installed.
  */
+/**
+ * A reported path is only usable if a later tool can resolve it.
+ *
+ * Relative paths are resolved against the primary root, so a result is rebased
+ * onto that root when it lies inside it (`src/a.ts` for a search of `src`), and
+ * reported absolutely when it does not — an attached root, or an entry that
+ * arrived already absolute.
+ */
+function reportPath(file: string, searchRoot: string, primary: string): string {
+  const absolute = path.isAbsolute(file) ? file : path.join(searchRoot, file);
+  const relative = path.relative(primary, absolute);
+  return relative === '' || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
+    ? absolute : relative.split(path.sep).join('/');
+}
+
 async function reportGrepMatches(
   matches: readonly string[],
   workspaceRoot: string,

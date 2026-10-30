@@ -4804,3 +4804,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 - **会话切换**：`switchActiveSession`调用方把`cwd`设为新`projectRoot`，工具主根不会陈旧；授权读自会话而非进程，切会话即切授权。
 
 记录负面结果与修复同等重要：它表明这些路径是被检查过的，而非假设。[工件](../../.omx/artifacts/phase20-addition-workspace-write/README.md)。build `15052712085a`。原47/ADD整体partial、goal active。
+
+
+### 21.53 子目录搜索的结果重定基到主根
+
+21.50修完附加根路径后，本批发现同一函数在**主根内子目录**场景仍不正确：`glob`/`grep`以`searchRoot`为基准，搜索`src`时报告`a.ts`，而后续工具按主根解析它——文件不存在。修复前实测`path:'src'`返回`a.ts`（不可用），省略`path`返回`root.ts`（可用），同一工具输出格式随参数变化。
+
+现两者共用一条规则：结果若在主根内则重定基到主根（搜索`src`报告`src/a.ts`），在主根外（附加根或已绝对）则报告绝对路径。glob与grep（含ripgrep路径）三条输出路径统一。修复后三种调用方式都返回`src/a.ts`且`read`可解析，附加根仍返回绝对路径。
+
+验证：`arguments`29（新例断言子目录搜索的glob与grep都返回`src/a.ts`）、`glob`19、`grep`3、`grepPaths`12、`grepRipgrep`18，共**81项**通过；七反转全部命中且finally字节恢复（旧的glob相对路径用例因源码变化已更新）；五静态门、TS build/freshness通过。build `0b0556f21575`。原47/ADD整体partial、goal active。

@@ -1,14 +1,14 @@
 
  RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
 
- ❯ src/core/tools/arguments.test.ts  (28 tests | 1 failed | 27 skipped) 22ms
+ ❯ src/core/tools/arguments.test.ts  (29 tests | 1 failed | 28 skipped) 19ms
    ❯ src/core/tools/arguments.test.ts > an attached workspace root widens the file tools > writes through an attached root that grants write access
      → promise rejected "Error: Path '/tmp/cheers-test/attach-outs…" instead of resolving
 
  Test Files  1 failed (1)
-      Tests  1 failed | 27 skipped (28)
-   Start at  02:46:11
-   Duration  4.44s (transform 3.06s, setup 0ms, collect 4.19s, tests 22ms, environment 0ms, prepare 56ms)
+      Tests  1 failed | 28 skipped (29)
+   Start at  02:55:28
+   Duration  4.15s (transform 2.96s, setup 0ms, collect 3.88s, tests 19ms, environment 0ms, prepare 52ms)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
