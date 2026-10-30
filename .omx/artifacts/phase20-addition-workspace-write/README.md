@@ -81,3 +81,9 @@ That is the intended shape. The grant is a live authority the session holds, not
 ## Replacing the directory also stops restore
 
 `identity-probe.mjs` writes through an attached root, replaces the directory with a different one at the same path, then previews the old operation: `canRestore: false`, the restore is `blocked`, and the new directory stays empty. The recorded `dev:ino:birthtimeMs` identity is what makes this work — a path alone would have written the old bytes into an unrelated directory.
+
+## The undo command surface and directory listings
+
+`undo-command-probe.mjs` checks the command surface, not just the store: `undoHistory` returns the attached-root operation with its file entry naming that root, `operationsForTurn` finds it by the turn it belonged to, and an unrelated turn id matches nothing. A probe mistake is kept: the first run passed `taskId` but no `correlationId`, so the turn filter correctly found nothing — the filter reads the recorded correlation, not the call id.
+
+`dirlist-probe.mjs` lists a directory under an attached root with a small page size and follows the continuation hint: the hint names the attached directory as an absolute path with its trailing separator, and the next page reads the same directory.

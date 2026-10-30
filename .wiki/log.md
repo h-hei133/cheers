@@ -10764,3 +10764,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：grep的两条搜索路径都返回可用结果
 
 [addition21.50](features/phase-20-addition.md#2150-grep的两条搜索路径都返回可用结果)复查发现ripgrep路径也返回相对路径，回退路径遇绝对条目会path.join伪造根内路径。现两条路径在搜索根非主根时输出绝对路径、绝对条目不再拼接。28项arguments、80项聚焦、八反转命中、五门/TS build/端到端探针通过。build 15052712。原47/ADD整体partial、goal active。
+
+### 2026-10-31：/undo命令面与目录续页在附加根下正确
+
+[addition21.51](features/phase-20-addition.md#2151-undo命令面与目录续页在附加根下正确)审查/undo完整链：undoScope用会话主根、undoAccess传workspaceRoots，与21.47账本归属一致。探针确认history可见且指向附加根、按turn命中、无关turn为零；首次探针缺correlationId导致turn过滤零（正确行为）。目录续页hint为绝对路径且下一页同目录。均无需修改。build 15052712。原47/ADD整体partial、goal active。

@@ -4783,3 +4783,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 21.48只修了glob与grep回退路径的相对路径问题；本批复查发现**ripgrep路径**同样返回相对`searchRoot`的路径，且回退路径在`listFilesRecursive`返回绝对条目时会`path.join`伪造根内路径（与21.49在lsp处修过的同一类错误）。现两条路径都：搜索根非主根时输出绝对路径，已是绝对路径的条目不再次拼接。端到端探针：附加根下grep结果首行路径为绝对且`read`可直接打开（`readOk:true`）。
 
 验证：`arguments`28（新例断言grep结果绝对且等于该根下真实目标）、`glob`19、`grep`3、`grepPaths`12、`grepRipgrep`18，共**80项**通过；八反转（write/read/glob/grep扫描/ripgrep路径退回主根、以read解析write授权、账本跟随目标根、glob相对路径）全部命中且finally字节恢复；五静态门、TS build/freshness通过。build `15052712085a`。原47/ADD整体partial、goal active。
+
+
+### 21.51 /undo命令面与目录续页在附加根下正确
+
+审查`/undo`完整链路：`undoScope`用`context.projectRoot ?? context.cwd`（会话主根），`undoAccess`传`context.workspaceRoots`——与21.47的账本归属一致。端到端探针：附加根写入后`undoHistory`返回该操作且文件指向附加根、`operationsForTurn`按turn命中、无关turn为零。首次探针只传`taskId`未传`correlationId`，turn过滤正确返回零——过滤读的是记录的correlation而非call id。
+
+目录续页探针：附加根下小分页列出目录，hint给出该目录的绝对路径（带尾分隔符），下一页读到同一目录。两处均无需修改。
+
+边界：合成会话、单文件、仅Linux。build `15052712085a`。原47/ADD整体partial、goal active。
