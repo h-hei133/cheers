@@ -10784,3 +10784,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：报告路径的面清单与最后两项确认
 
 [addition21.55](features/phase-20-addition.md#2155-报告路径的面清单与最后两项确认)补齐八处报告路径接口的清单：前五处搜索/列表结果统一「主根内重定基、主根外绝对」，后三处陈述具体文件事实用绝对路径。browser upload与web_fetch确认正确。build 059b7423。原47/ADD整体partial、goal active。
+
+### 2026-10-31：resume面板首帧与首个可选行的实测延迟
+
+[addition21.56](features/phase-20-addition.md#2156-resume面板首帧与首个可选行的实测延迟)200会话标题123ms/首行347ms，800会话134ms/370ms，4倍目录首行只增23ms，证明打开不等完整扫描；未复现用户1秒卡顿，未覆盖真实目录/磁盘/终端。未改产品代码。build 059b7423。原47/ADD整体partial、goal active。

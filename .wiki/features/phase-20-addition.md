@@ -4829,3 +4829,10 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 21.53/21.54后补齐清单：**会报告路径的接口**共八处。前五处（glob、grep回退、grep ripgrep、lsp三渲染点、read目录列表）是「人会把结果喂给下一条命令」的搜索/列表结果，统一遵循一条规则：主根内重定基、主根外绝对。后三处（undo状态报告、browser上传预览、`/context`）陈述的是某个具体文件的事实或尺寸，绝对路径即事实本身。
 
 `browser` upload已确认正确：`selectWorkspaceRoot`解析根、`verifyPathContainment`复验、绑定`dev:ino:size:mtimeNs:ctimeNs`身份，预览同时显示源路径与读取根。`web_fetch`只接受URL、不触本地路径。[清单工件](../../.omx/artifacts/phase20-addition-workspace-write/PATH-SURFACES.md)。build `059b7423ab15`。原47/ADD整体partial、goal active。
+
+
+### 21.56 resume面板首帧与首个可选行的实测延迟
+
+第29项用户报告「每个操作卡约1秒」。本批测两个用户真正等待的时刻：真实Node CLI、隔离home/profile/Git project、synthetic、heap768MiB、每会话一条消息。**200会话**：面板标题123ms、首个可选行347ms；**800会话**：标题134ms、首行370ms。目录扩大4倍，首行只增加23ms。
+
+结论：该范围内打开面板不随目录规模线性增长——面板先绘制标题、行随扫描逐步填充，打开不等完整扫描。这印证了此前批次的渐进发布设计。但**未复现1秒卡顿**，也未覆盖用户自己的目录、磁盘、终端与按键时序；删除/搜索/翻页是各自独立测量的操作。两轮均为每会话一条消息的合成目录，大transcript目录每会话读取更多，未覆盖。[正式工件](../../.omx/artifacts/phase20-addition-resume-latency/README.md)。build `059b7423ab15`、inputs `ead9d186ab6030878407d95123092d3ddfef3e4f36ab1d9b010f50cb52fc35df`。未改产品代码。原47/ADD整体partial、goal active。

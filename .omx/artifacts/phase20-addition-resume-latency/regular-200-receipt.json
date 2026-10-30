@@ -1,0 +1,22 @@
+{
+  "mode": "regular",
+  "sessions": 200,
+  "status": "passed",
+  "buildId": "059b7423ab1538b501aa154091dbfbd3ad8e6bb1c15e77a558fdf8761504f5a2",
+  "inputsDigest": "ead9d186ab6030878407d95123092d3ddfef3e4f36ab1d9b010f50cb52fc35df",
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 60,
+    "outputBytes": 2097152
+  },
+  "firstSelectableRowMs": 347,
+  "firstRowMs": 123,
+  "opened": true,
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "outputBytes": 10636,
+  "outputLimitExceeded": false,
+  "scratchRemoved": true
+}
