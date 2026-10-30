@@ -1,0 +1,26 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/transcript/sessionQueryEventPersistence.test.ts  (3 tests | 1 failed | 2 skipped) 7ms
+   ❯ src/session/transcript/sessionQueryEventPersistence.test.ts > session query event persistence > keeps a tool result's display-only pictures out of the transcript
+     → expected '[{"type":"query-event","id":"qevt_9d5…' to not include 'QUJD'
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 skipped (3)
+   Start at  00:47:12
+   Duration  326ms (transform 79ms, setup 0ms, collect 88ms, tests 7ms, environment 0ms, prepare 54ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/transcript/sessionQueryEventPersistence.test.ts > session query event persistence > keeps a tool result's display-only pictures out of the transcript
+AssertionError: expected '[{"type":"query-event","id":"qevt_9d5…' to not include 'QUJD'
+ ❯ src/session/transcript/sessionQueryEventPersistence.test.ts:25:42
+     23|     expect(appended).toHaveLength(1);
+     24|     expect(appended[0]).toMatchObject({ event: { type: "tool.result", …
+     25|     expect(JSON.stringify(appended)).not.toContain("QUJD");
+       |                                          ^
+     26|     expect(JSON.stringify(appended)).not.toContain('"images"');
+     27|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

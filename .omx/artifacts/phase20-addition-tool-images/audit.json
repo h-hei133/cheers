@@ -1,0 +1,45 @@
+{
+  "baselineCommit": "4fa2cd53",
+  "owners": [
+    {
+      "file": "cli/interactive/toolCards.ts",
+      "baseline": 13,
+      "count": 13,
+      "overCeiling": false
+    },
+    {
+      "file": "cli/interactive/turnSink.ts",
+      "baseline": 19,
+      "count": 19,
+      "overCeiling": false
+    },
+    {
+      "file": "presentation/tui/transcript/blocks.ts",
+      "baseline": 12,
+      "count": 13,
+      "overCeiling": false
+    },
+    {
+      "file": "cli/interactive/history.ts",
+      "baseline": 5,
+      "count": 5,
+      "overCeiling": false
+    },
+    {
+      "file": "turn/projection.ts",
+      "baseline": 7,
+      "count": 7,
+      "overCeiling": false
+    },
+    {
+      "file": "session/sessionEventCodec.ts",
+      "baseline": 13,
+      "count": 14,
+      "overCeiling": false
+    }
+  ],
+  "overCeiling": [],
+  "buildId": "ddc46156fc822d780417971f073e352002cc6ed628568cbdce2f0ff0fc6d83e6",
+  "inputsDigest": "fe5f0a974365a8049320ad2437f1bb53c64a08f26ad84afae6f2f1c0a85acdf5",
+  "freshness": true
+}

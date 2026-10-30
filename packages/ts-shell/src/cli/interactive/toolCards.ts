@@ -1,5 +1,6 @@
 import { splitFencedDiff, type Block } from "../../presentation/tui/transcript/blocks.js";
 import type { Transcript } from "../../presentation/tui/transcript/container.js";
+import type { ImageContent } from "../../model-adapters/multimodal.js";
 
 /**
  * The live cards for tool calls in flight.
@@ -125,8 +126,12 @@ export class ToolCards {
    * that shows only a tick cannot be checked against what the model said the tool
    * returned, and a card that shows everything buries the answer. A failed call
    * opens by default — its output is the reason it failed.
+   *
+   * Pictures travel beside the words for the same reason: a screenshot's prose
+   * says it was taken, and the picture is what was taken.
    */
-  finish(taskId: string, success: boolean, failureReason?: string, output?: string): void {
+  finish(taskId: string, success: boolean, failureReason?: string, output?: string,
+    images?: readonly ImageContent[]): void {
     const block = this.cards.get(taskId);
     if (!block) return;
     const pending = this.outputBuffer.get(taskId);
@@ -143,6 +148,7 @@ export class ToolCards {
       current.failureReason = success ? undefined : failureReason;
       current.collapsed = success;
       current.finalized = true;
+      if (images?.length) current.images = images;
     });
     this.cards.delete(taskId);
     this.onChange();

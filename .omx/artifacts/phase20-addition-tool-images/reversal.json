@@ -1,0 +1,35 @@
+{
+  "cases": [
+    {
+      "name": "projection-drops-images",
+      "exit": 1,
+      "tests": "1 failed | 8 skipped (9)",
+      "originalSha256": "700aaf299c5a5b4b503620b8efdb78af9fb1a5023c59bd376386f3090d870a06"
+    },
+    {
+      "name": "durable-keeps-display-images",
+      "exit": 1,
+      "tests": "1 failed | 2 skipped (3)",
+      "originalSha256": "4e19b17ecf72728c0cf6121db020ed5ffd1897a1b5780ddc7182220d4dd001ca"
+    },
+    {
+      "name": "cards-drop-images",
+      "exit": 1,
+      "tests": "1 failed | 13 skipped (14)",
+      "originalSha256": "14c2150fe19cbf460579eba780cf3f2cd25b314610301da6bf40bf2b2e824c80"
+    },
+    {
+      "name": "renderer-hides-tool-images",
+      "exit": 1,
+      "tests": "1 failed | 15 skipped (16)",
+      "originalSha256": "37519b2345938192340885b0201f05a8038109fcf47bce425844a0bf906cd3c9"
+    },
+    {
+      "name": "history-drops-tool-images",
+      "exit": 1,
+      "tests": "1 failed | 27 skipped (28)",
+      "originalSha256": "2544e4ed28f6ae048d23c5108e34d3a063d0ceadb2337b91b7be73be7528be17"
+    }
+  ],
+  "restored": true
+}

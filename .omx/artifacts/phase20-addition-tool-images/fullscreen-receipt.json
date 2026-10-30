@@ -1,0 +1,40 @@
+{
+  "mode": "fullscreen",
+  "status": "passed",
+  "savedMessages": 4,
+  "provider": "synthetic without credentials; fetch rejects all calls",
+  "buildId": "ddc46156fc822d780417971f073e352002cc6ed628568cbdce2f0ff0fc6d83e6",
+  "inputsDigest": "fe5f0a974365a8049320ad2437f1bb53c64a08f26ad84afae6f2f1c0a85acdf5",
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 45,
+    "outputBytes": 2097152
+  },
+  "restoredToolCard": {
+    "title": "browser",
+    "text": "Viewport screenshot captured.",
+    "images": 1
+  },
+  "toolImageDrawnAsLabel": true,
+  "history": {
+    "toolCardImageCount": 1,
+    "transcriptPrefixUnchanged": true,
+    "singleStoredImageCopy": true,
+    "zeroNetworkAttempts": true
+  },
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "configurationUnchanged": true,
+  "projectUnchanged": true,
+  "networkAttempts": 0,
+  "outputBytes": 3141,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "transcriptBaselineSha256": "a7c2ec580d47d303efd02296f6d38dc49ea502b4b7d84780134efc0ae4304855",
+  "scratchRemoved": true
+}

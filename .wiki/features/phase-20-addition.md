@@ -4603,3 +4603,18 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 原Node CLI regular/fullscreen各1保存会话（文字/文字+图片/纯图片三user加后续回答）、isolated home/profile/Git project、无凭据synthetic且fetch拒绝、heap768MiB/45秒/2MiB。两模式启动即恢复三个user块，图片数量精确为0/1/1，无图形协议终端实际绘制`image attachment: image/png`，composer零图片、零draft、零fetch；fresh read确认三条保存消息与transcript prefix逐字节不变，两exit0/cooked、config/project不变、scratch删除。
 
 此为历史显示恢复，不是新附件路径：不注入composer、不派发请求。图形协议内联绘制、大图、compaction/branch超出prefix的投影、clipboard与其他平台未验收。无full local suite/并行heavy/本助手subagent/20k真实终端/exe/真实provider/独立review/NormProof judge；原47/ADD整体partial、goal active。
+
+
+### 21.33 工具结果保留图片并在卡片显示
+
+接续21.32对user轮次图片的恢复，发现同一类缺口在tool结果：[浏览器截图工具](../../packages/ts-shell/src/browser/tool/features.ts)把PNG随结果返回，[工具结果消息](../../packages/ts-shell/src/core/agent/tools.ts)已保存text/image union，模型能收到，但[投影](../../packages/ts-shell/src/turn/projection.ts)只把`messageToText`送进`tool.result`，[卡片渲染](../../packages/ts-shell/src/presentation/tui/transcript/blocks.ts)只画文字，历史恢复同样只有文字。
+
+现`tool.result`新增**仅显示**的`images`；持久化前由[session codec](../../packages/ts-shell/src/session/sessionEventCodec.ts)剔除，因为同样的字节已存在tool消息里，重复落盘会让编码载荷在transcript中出现两次（探针断言恰好一份）。原transcript的revisioned update路径承载卡片图片，`Block.images`因此改为可写；折叠与展开都绘制——图形协议用inline sequence，否则显示`image result: <mime>`一行。历史恢复从保存的tool消息取图，重开与live一致。无第二附件store、事件类型或replay路径。
+
+先读目标后定向只读对照本机pi的tool-execution.ts：它从`result.content`过滤`type === "image"`，按终端能力渲染并保留在折叠/展开外壳中——同一条“对已存消息的显示决定”，未复制代码。[正式工件](../../.omx/artifacts/phase20-addition-tool-images/README.md)存五独立反转（投影丢弃、持久化保留显示字段、卡片丢弃、渲染器隐藏、历史丢弃），全部AssertionError且finally bytes恢复。
+
+聚焦八文件**168项**通过（projection9/persistence3/toolCards14/blocks16/history28/turnSink54/container18/multimodal26）；五门/TS build/freshness主代理串行通过，118旧docs advisory保留；owner callable为13/19/12→13/5/7/13→14，均低于20。build `ddc46156fc822d780417971f073e352002cc6ed628568cbdce2f0ff0fc6d83e6`、inputs `fe5f0a974365a8049320ad2437f1bb53c64a08f26ad84afae6f2f1c0a85acdf5`。
+
+原Node CLI regular/fullscreen各1保存会话（提问/assistant调用browser/含PNG的tool结果/后续回答）、isolated home/profile/Git project、无凭据synthetic且fetch拒绝、heap768MiB/45秒/2MiB。两模式恢复tool卡片精确文字与一张图、无图形协议终端实际绘制`image result: image/png`，transcript prefix逐字节不变且图片载荷恰好一份，零fetch、零draft，两exit0/cooked、config/project不变、scratch删除。
+
+边界：这是已保存工具结果的显示；未覆盖真实浏览器会话中实时截图到达、真实图形协议内联绘制、超出既有单结果媒体预算的图片、clipboard与其他平台。无full local suite/并行heavy/本助手subagent/20k真实终端/exe/真实provider/独立review/NormProof judge；原47/ADD整体partial、goal active。

@@ -147,3 +147,27 @@ describe("image attachments in the prompt echo", () => {
     expect(rows.some((row) => row.includes("image/png"))).toBe(true);
   });
 });
+
+describe("pictures a tool returned", () => {
+  const IMG = { type: "image" as const, data: "QUJD", mimeType: "image/png" };
+
+  it("draws a screenshot result even while the card is folded", () => {
+    // The picture is the result; folding the card's prose away must not hide it.
+    const rows = renderBlock(
+      { kind: "tool", title: "browser", text: "captured", status: "ok", collapsed: true, finalized: true, images: [IMG] },
+      WIDTH,
+      { imageProtocol: "kitty" },
+    );
+    expect(rows.filter((row) => row.includes("\x1b_G")).length).toBe(1);
+  });
+
+  it("names the picture on a terminal that cannot draw it", () => {
+    const rows = renderBlock(
+      { kind: "tool", title: "browser", text: "", status: "ok", collapsed: false, finalized: true, images: [IMG] },
+      WIDTH,
+      { imageProtocol: undefined },
+    );
+    expect(rows.some((row) => row.includes("\x1b_G"))).toBe(false);
+    expect(rows.some((row) => row.includes("image result: image/png"))).toBe(true);
+  });
+});

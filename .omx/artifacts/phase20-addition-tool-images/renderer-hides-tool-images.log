@@ -1,0 +1,33 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/presentation/tui/transcript/blocks.test.ts  (16 tests | 1 failed | 15 skipped) 9ms
+   ❯ src/presentation/tui/transcript/blocks.test.ts > pictures a tool returned > draws a screenshot result even while the card is folded
+     → expected +0 to be 1 // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 15 skipped (16)
+   Start at  00:47:14
+   Duration  705ms (transform 324ms, setup 0ms, collect 452ms, tests 9ms, environment 0ms, prepare 57ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/presentation/tui/transcript/blocks.test.ts > pictures a tool returned > draws a screenshot result even while the card is folded
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/presentation/tui/transcript/blocks.test.ts:161:65
+    159|       { imageProtocol: "kitty" },
+    160|     );
+    161|     expect(rows.filter((row) => row.includes("\x1b_G")).length).toBe(1…
+       |                                                                 ^
+    162|   });
+    163| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

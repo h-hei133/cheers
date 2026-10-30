@@ -68,6 +68,22 @@ describe("restoring a conversation", () => {
     expect(entries).toEqual([]);
   });
 
+  it("restores a tool result's pictures beside its output", () => {
+    const picture = { type: 'image' as const, data: 'QUJD', mimeType: 'image/png' };
+    const turns: SessionMessage[] = [
+      turn('user', 'take a screenshot'),
+      { role: 'assistant', content: 'Capturing.', tool_calls: [{ id: 'call_shot', type: 'function' as const,
+        function: { name: 'browser', arguments: '{"action":"screenshot"}' } }] },
+      { role: 'tool', tool_call_id: 'call_shot', content: [
+        { type: 'text', text: 'Viewport screenshot captured.' }, picture,
+      ] },
+    ];
+    const { blocks } = restoreConversation(turns);
+    const card = blocks.find(block => block.kind === 'tool')!;
+    expect(card).toMatchObject({ title: 'browser', status: 'ok', images: [picture] });
+    expect(card.text).toBe('Viewport screenshot captured.');
+  });
+
   it("rebuilds what was said, in order", () => {
     const { blocks } = restoreConversation(CONVERSATION);
 

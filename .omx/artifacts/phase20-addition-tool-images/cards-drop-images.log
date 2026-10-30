@@ -1,0 +1,48 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/toolCards.test.ts  (14 tests | 1 failed | 13 skipped) 8ms
+   ❯ src/cli/interactive/toolCards.test.ts > tool bodies and state > keeps a tool's pictures on the card that reports its result
+     → expected { Object (kind, title, ...) } to match object { status: 'ok', collapsed: true, …(1) }
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Start at  00:47:13
+   Duration  714ms (transform 342ms, setup 0ms, collect 471ms, tests 8ms, environment 0ms, prepare 57ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/toolCards.test.ts > tool bodies and state > keeps a tool's pictures on the card that reports its result
+AssertionError: expected { Object (kind, title, ...) } to match object { status: 'ok', collapsed: true, …(1) }
+
+- Expected
++ Received
+
+  Object {
+    "collapsed": true,
+-   "images": Array [
+-     Object {
+-       "data": "QUJD",
+-       "mimeType": "image/png",
+-       "type": "image",
+-     },
+-   ],
++   "failureReason": undefined,
++   "finalized": true,
++   "kind": "tool",
++   "previewTruncated": false,
+    "status": "ok",
++   "text": "captured",
++   "title": "browser",
+  }
+
+ ❯ src/cli/interactive/toolCards.test.ts:73:18
+     71|     const picture = { type: "image" as const, data: "QUJD", mimeType: …
+     72|     cards.finish("shot", true, undefined, "captured", [picture]);
+     73|     expect(card).toMatchObject({ status: "ok", collapsed: true, images…
+       |                  ^
+     74|     // A result without pictures must not invent one from an earlier c…
+     75|     cards.start("browser", "plain");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

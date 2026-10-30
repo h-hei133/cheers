@@ -1,6 +1,7 @@
 import type { CommandReport } from '../../core/commands/report/contract.js';
 import { recordLastAssistantResponse } from "../../core/commands/copyCommandRuntime.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
+import type { ImageContent } from "../../model-adapters/multimodal.js";
 import type { RendererSink } from "../../presentation/terminal/streaming.js";
 import { splitFencedDiff, type Block } from "../../presentation/tui/transcript/blocks.js";
 import { ToolCards } from "./toolCards.js";
@@ -245,7 +246,7 @@ export class TurnSink implements RendererSink {
         this.tools.settle(event.taskId, event.success);
         return;
       case "tool.result":
-        this.closeTool(event.taskId, event.success, event.failureReason, event.output);
+        this.closeTool(event.taskId, event.success, event.failureReason, event.output, event.images);
         return;
       case "query.retrying":
         this.label = `retrying (attempt ${event.attempt})`;
@@ -322,11 +323,12 @@ export class TurnSink implements RendererSink {
     success: boolean,
     failureReason?: string,
     output?: string,
+    images?: readonly ImageContent[],
   ): void {
     // Whatever has not been flushed belongs before the result, which carries the
     // whole output anyway; flushing first keeps the card's order honest.
     this.tools.flush();
-    this.tools.finish(taskId, success, failureReason, output);
+    this.tools.finish(taskId, success, failureReason, output, images);
     this.label = "working";
     this.onChange();
   }

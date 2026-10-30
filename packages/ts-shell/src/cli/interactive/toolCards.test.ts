@@ -63,6 +63,21 @@ describe("tool bodies and state", () => {
     expect(next.text).toBe("");
   });
 
+  it("keeps a tool's pictures on the card that reports its result", () => {
+    const transcript = new Transcript();
+    const cards = new ToolCards(transcript, () => {}, () => 0);
+    cards.start("browser", "shot");
+    const card = transcript.last()!;
+    const picture = { type: "image" as const, data: "QUJD", mimeType: "image/png" };
+    cards.finish("shot", true, undefined, "captured", [picture]);
+    expect(card).toMatchObject({ status: "ok", collapsed: true, images: [picture] });
+    // A result without pictures must not invent one from an earlier card.
+    cards.start("browser", "plain");
+    const plain = transcript.last()!;
+    cards.finish("plain", true, undefined, "nothing captured");
+    expect(plain.images).toBeUndefined();
+  });
+
   it("keeps approval out of the body and replaces preview with one canonical final", () => {
     const { cards, block, transcript } = setup();
     cards.approval("one", "awaiting");

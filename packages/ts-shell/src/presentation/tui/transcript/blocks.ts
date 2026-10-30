@@ -56,7 +56,7 @@ export interface Block {
    * terminal speaks a graphics protocol, named in text when it does not — the
    * placeholder token alone says a picture travelled, not what it is.
    */
-  readonly images?: readonly ImageContent[];
+  images?: readonly ImageContent[];
   /**
    * Self-rendering override, for blocks whose presentation depends on the frame
    * width in a way plain re-wrapping cannot reproduce — an elided path, say.
@@ -105,7 +105,7 @@ export function renderBlock(
     case "thinking":
       return renderThinking(block, width, options);
     case "tool":
-      return renderTool(block, width);
+      return renderTool(block, width, options);
     case "command":
       return renderLabelled(block, defaultTheme.fg("accent", "⌘"), width);
     case "error":
@@ -206,7 +206,7 @@ function wrapAll(text: string, width: number): string[] {
  * answer off the screen, and a card showing nothing at all cannot be checked
  * against what the model claimed the tool said.
  */
-function renderTool(block: Block, width: number): readonly string[] {
+function renderTool(block: Block, width: number, options: BlockRenderOptions = {}): readonly string[] {
   const status = block.status ?? "running";
   const glyph = status === "ok" ? defaultTheme.fg("success", STATUS_GLYPH.ok)
     : status === "failed" ? defaultTheme.fg("error", STATUS_GLYPH.failed)
@@ -232,6 +232,9 @@ function renderTool(block: Block, width: number): readonly string[] {
       const lines = body.split("\n").length;
       rows.push(`${GUTTER}${defaultTheme.dim(`  ↳ ${lines} ${lines === 1 ? "line" : "lines"} · click to expand`)}`);
     }
+    // The picture is the result, not detail behind a fold: a screenshot card
+    // that only says one was taken cannot be checked against the page it shows.
+    rows.push(...toolImageRows(block, width, options));
     rows.push("");
     return rows;
   }
@@ -276,7 +279,32 @@ function renderTool(block: Block, width: number): readonly string[] {
   }
 
   rows.push(defaultTheme.fg("border", `╰${"─".repeat(inner)}╯`));
+  rows.push(...toolImageRows(block, width, options));
   rows.push("");
+  return rows;
+}
+
+/**
+ * A tool result's pictures, drawn below its header.
+ *
+ * Same two paths as a prompt echo: the terminal's graphics protocol when it
+ * speaks one, and a named row when it does not — a card that silently omitted
+ * the picture would look like the tool returned nothing.
+ */
+function toolImageRows(block: Block, width: number, options: BlockRenderOptions): readonly string[] {
+  const rows: string[] = [];
+  for (const image of block.images ?? []) {
+    if (options.imageProtocol) {
+      const sequence = inlineImageSequence(options.imageProtocol, image.data, {
+        columns: Math.max(4, Math.min(width, 48)),
+        imageId: imageIdForData(image.data),
+      });
+      rows.push(`${GUTTER}${sequence}`);
+    } else {
+      const label = `${image.mimeType}, ${Math.round((image.data.length * 3) / 4 / 1024)} KB`;
+      rows.push(`${GUTTER}${defaultTheme.dim(`image result: ${label}`)}`);
+    }
+  }
   return rows;
 }
 /** Cells left on the header row for the detail, after the status and the name. */

@@ -55,3 +55,18 @@ it("does not let an older failure override a newer successful tool", () => {
     completed: { result: { terminalClassification: "success" } },
   });
 });
+
+it("carries a tool result's pictures to its card, and only when there are some", () => {
+  const projection = new TurnProjection();
+  const picture = { type: "image" as const, data: "QUJD", mimeType: "image/png" };
+  projection.project({ type: "tool_execution_start", toolCallId: "shot", toolName: "browser", args: {} });
+  const [withPicture] = projection.project({ type: "message_end", message: { role: "tool", tool_call_id: "shot",
+    content: [{ type: "text", text: "captured" }, picture] } });
+  expect(withPicture).toMatchObject({ type: "tool.result", output: "captured", images: [picture] });
+
+  projection.project({ type: "tool_execution_start", toolCallId: "plain", toolName: "bash", args: {} });
+  const [withoutPicture] = projection.project({ type: "message_end", message: { role: "tool", tool_call_id: "plain",
+    content: "done" } });
+  expect(withoutPicture).toMatchObject({ type: "tool.result", output: "done" });
+  expect((withoutPicture as { images?: unknown }).images).toBeUndefined();
+});

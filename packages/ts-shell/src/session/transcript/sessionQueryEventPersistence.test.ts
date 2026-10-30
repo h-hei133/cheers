@@ -6,6 +6,26 @@ import {
 } from "./sessionQueryEventPersistence.js";
 
 describe("session query event persistence", () => {
+  it("keeps a tool result's display-only pictures out of the transcript", () => {
+    // The bytes are already on the tool result message; writing them here as
+    // well would double the encoded payload in the durable transcript.
+    const picture = { type: "image" as const, data: "QUJD", mimeType: "image/png" };
+    const appended: Extract<unknown, { type: "query-event" }>[] = [];
+
+    appendSessionQueryEvent({
+      event: { type: "tool.result", toolName: "browser", taskId: "shot", success: true, output: "captured", images: [picture] },
+      timestamp: "2026-05-28T00:00:00.000Z",
+      transcriptEvents: [],
+      appendTranscriptEvent: (transcriptEvent) => appended.push(transcriptEvent as never),
+      applyQueryEventToState: () => {},
+    });
+
+    expect(appended).toHaveLength(1);
+    expect(appended[0]).toMatchObject({ event: { type: "tool.result", taskId: "shot", output: "captured" } });
+    expect(JSON.stringify(appended)).not.toContain("QUJD");
+    expect(JSON.stringify(appended)).not.toContain('"images"');
+  });
+
   it("does not append identical direct resolution events twice", () => {
     const event: QueryEvent = {
       type: "tool.result",

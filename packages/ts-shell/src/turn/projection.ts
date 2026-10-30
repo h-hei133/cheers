@@ -1,4 +1,4 @@
-import { messageToText } from "../model-adapters/multimodal.js";
+import { imagesOf, messageToText } from "../model-adapters/multimodal.js";
 import { isRecord } from "../core/values/record.js";
 import type { AgentLifecycleEvent } from "../core/agent/events.js";
 import type { AgentMessage } from "../core/agent/state.js";
@@ -80,6 +80,7 @@ export class TurnProjection {
         this.openCalls.delete(message.tool_call_id);
         const isError = open?.isError ?? false;
         const output = messageToText(message.content);
+        const images = imagesOf(message.content);
         return [
           {
             type: "tool.result",
@@ -90,6 +91,8 @@ export class TurnProjection {
             // The whole output, bounded: a card the user can open is only worth
             // opening if what the tool actually printed is behind it.
             output: output.slice(0, CARD_OUTPUT_LIMIT),
+            // A screenshot's words say it was captured; the picture is the result.
+            ...(images.length > 0 ? { images } : {}),
           },
         ];
       }

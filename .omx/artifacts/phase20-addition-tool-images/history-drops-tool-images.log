@@ -1,0 +1,47 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/history.test.ts  (28 tests | 1 failed | 27 skipped) 10ms
+   ❯ src/cli/interactive/history.test.ts > restoring a conversation > restores a tool result's pictures beside its output
+     → expected { Object (kind, title, ...) } to match object { Object (title, status, ...) }
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 27 skipped (28)
+   Start at  00:47:15
+   Duration  1.51s (transform 855ms, setup 0ms, collect 1.27s, tests 10ms, environment 0ms, prepare 53ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/history.test.ts > restoring a conversation > restores a tool result's pictures beside its output
+AssertionError: expected { Object (kind, title, ...) } to match object { Object (title, status, ...) }
+
+- Expected
++ Received
+
+  Object {
+-   "images": Array [
+-     Object {
+-       "data": "QUJD",
+-       "mimeType": "image/png",
+-       "type": "image",
+-     },
+-   ],
++   "collapsed": true,
++   "detail": "screenshot",
++   "finalized": true,
++   "kind": "tool",
+    "status": "ok",
++   "text": "Viewport screenshot captured.",
+    "title": "browser",
+  }
+
+ ❯ src/cli/interactive/history.test.ts:83:18
+     81|     const { blocks } = restoreConversation(turns);
+     82|     const card = blocks.find(block => block.kind === 'tool')!;
+     83|     expect(card).toMatchObject({ title: 'browser', status: 'ok', image…
+       |                  ^
+     84|     expect(card.text).toBe('Viewport screenshot captured.');
+     85|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

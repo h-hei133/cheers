@@ -244,9 +244,23 @@ export function createQueryTranscriptEvent(input: {
     type: "query-event",
     id: createTranscriptEntryId("qevt"),
     ...(input.sourceEntryId !== undefined ? { sourceEntryId: input.sourceEntryId } : {}),
-    event: input.event,
+    event: durableQueryEvent(input.event),
     timestamp: input.timestamp,
   };
+}
+
+/**
+ * The event as it goes to disk.
+ *
+ * A tool result's pictures are carried for the card that shows the result; the
+ * same bytes are already stored on the tool result message, which is what replay
+ * and the model read. Writing them here as well would put the encoded payload in
+ * the transcript twice, so the durable copy drops the display-only field.
+ */
+function durableQueryEvent(event: QueryEvent): QueryEvent {
+  if (event.type !== 'tool.result' || event.images === undefined) return event;
+  const { images: _displayOnly, ...rest } = event;
+  return rest;
 }
 
 export function encodeTranscriptEvent(event: TranscriptEvent): string {

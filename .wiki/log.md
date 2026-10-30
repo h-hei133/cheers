@@ -10682,3 +10682,9 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 先读目标后定向只读对照本机pi的interactive-mode.ts：其restore的`getUserMessageText`只过滤text块、文字为空不渲染，是同样文字投影，明确不当作解法，未复制代码。三独立反转（文字投影、图片需文字、imagesOf返回空）分别3/1/2 AssertionError且finally bytes恢复；恢复后history27+multimodal26=53项通过，加rewind共84项。五门/TS build/freshness主代理串行通过，118旧docs advisory保留，owner callable 5→5与7→8。
 
 原CLI regular/fullscreen各1保存会话（文字/文字+图片/纯图片三user加后续回答），两模式恢复三个user块、图片数精确0/1/1、无图形协议终端实际绘制image attachment、composer零图片/零draft/零fetch，保存消息与transcript prefix逐字节不变，两exit0/cooked、config/project不变、scratch删除。此为新历史显示，非附件派发；图形协议内联、大图、compaction/branch、clipboard与平台未验收，原47/ADD整体partial、goal active。
+
+### 2026-10-31：工具结果保留图片并在卡片显示
+
+[addition21.33](features/phase-20-addition.md#2133-工具结果保留图片并在卡片显示)续21.32：截图工具返回PNG且已存入tool消息、模型可收到，但`tool.result`投影只送文字、卡片与历史只画文字。现事件新增仅显示`images`，持久化前剔除（字节已在消息中，避免transcript重复编码载荷）；卡片经原revisioned update携带图片，折叠/展开都绘制，图形协议内联、否则命名行；历史从保存消息取图。`Block.images`改为可写。无第二store/事件/replay路径。
+
+定向只读对照本机pi tool-execution.ts（从result.content过滤image并保留在两种外壳中），未复制代码。五独立反转全部AssertionError且finally bytes恢复；八文件168项通过，五门/TS build/freshness串行通过，118旧docs advisory保留，owner callable 13/19/12→13/5/7/13→14。两模式真实CLI恢复tool卡片精确文字+一张图、无协议终端绘制image result、transcript恰好一份图片载荷、零fetch、exit0/cooked、config/project不变、scratch删除。实时截图、图形协议内联、超预算图片与平台未验收；原47/ADD整体partial、goal active。

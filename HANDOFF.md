@@ -1232,3 +1232,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A saved prompt shows its words after reopening a session, but the picture it carried is gone; a prompt that was only a picture produces no transcript block at all.
 - **Root Cause**: Durable prompt storage already writes the text/image content union, while the transcript restore path projected each user turn through `messageToText` (which drops images by design) and then admitted the block only on non-blank text.
 - **Rule**: When rebuilding a stored user turn for display, derive pictures from the same content union (`imagesOf`) and admit on text *or* pictures; pass them through the existing `Block.images` renderer instead of a second attachment path. Keep editor history word-only — recalling a draft does not recall a picture. A restore fixture must include a prose turn, a prose+image turn and an image-only turn, and assert the drawn fallback label on a terminal without a graphics protocol.
+
+### Tool Result Pictures Are Display-Only In The Event Stream
+
+- **Symptom**: A browser screenshot's prose says it was captured, but no picture appears on the tool card, and reopening the session shows the same text-only card.
+- **Root Cause**: The tool result message stores the text/image union, but the projection to `tool.result` only carried `messageToText`, and the card renderer drew only words — so the display lost what the model actually received.
+- **Rule**: Carry tool-result pictures on the display event (`tool.result.images`) and draw them in both folded and expanded card states, but strip them in the durable codec: the same bytes already live on the tool result message, and persisting them twice doubles the encoded payload in the transcript. Restore history cards from the stored message, not from the persisted event. A probe must assert the picture appears once on screen and exactly one copy exists in the transcript bytes.

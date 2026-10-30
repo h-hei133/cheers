@@ -94,6 +94,16 @@ export type QueryEvent =
     readonly coveredFiles?: readonly string[];
     /** What the tool printed, bounded, so its card can be opened and read. */
     readonly output?: string;
+    /**
+     * Pictures the tool produced, for the card that shows its result.
+     *
+     * Display-only: the same bytes are already stored on the tool result message,
+     * which is what replay and the model read. Persisting them here would write
+     * the encoded payload into the transcript twice, so the durable copy strips
+     * this field and a reader that needs the pictures for history takes them from
+     * the message instead.
+     */
+    readonly images?: readonly import('../../../model-adapters/multimodal.js').ImageContent[];
   }
   | { readonly type: 'message.delta'; readonly role: AgentRole; readonly delta: string }
   /** Transient display boundary before callbacks from one model request. */

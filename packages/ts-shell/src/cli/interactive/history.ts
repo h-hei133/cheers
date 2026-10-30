@@ -98,6 +98,10 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
           // These blocks are being composed, not yet in a transcript, so no
           // cache holds their rows; the direct write is the correct form here.
           toolBlock.text = body;
+          // A screenshot's result is the picture; the message already holds it,
+          // so the restored card shows what the live card showed.
+          const images = imagesOf(turn.content);
+          if (images.length > 0) toolBlock.images = images;
           splitFencedDiff(toolBlock);
           if (/^(\(Operation cancelled|Blocked\b|Tool execution error:|Tool '[^']+' is not available|Error\b)/i.test(body)) {
             toolBlock.status = "failed";

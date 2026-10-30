@@ -1,0 +1,45 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/turn/projection.test.ts  (9 tests | 1 failed | 8 skipped) 9ms
+   ❯ src/turn/projection.test.ts > carries a tool result's pictures to its card, and only when there are some
+     → expected { type: 'tool.result', …(4) } to match object { type: 'tool.result', …(2) }
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 skipped (9)
+   Start at  00:47:10
+   Duration  1.48s (transform 851ms, setup 0ms, collect 1.22s, tests 9ms, environment 0ms, prepare 60ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/projection.test.ts > carries a tool result's pictures to its card, and only when there are some
+AssertionError: expected { type: 'tool.result', …(4) } to match object { type: 'tool.result', …(2) }
+
+- Expected
++ Received
+
+  Object {
+-   "images": Array [
+-     Object {
+-       "data": "QUJD",
+-       "mimeType": "image/png",
+-       "type": "image",
+-     },
+-   ],
+    "output": "captured",
++   "success": true,
++   "taskId": "shot",
++   "toolName": "browser",
+    "type": "tool.result",
+  }
+
+ ❯ src/turn/projection.test.ts:65:23
+     63|   const [withPicture] = projection.project({ type: "message_end", mess…
+     64|     content: [{ type: "text", text: "captured" }, picture] } });
+     65|   expect(withPicture).toMatchObject({ type: "tool.result", output: "ca…
+       |                       ^
+     66| 
+     67|   projection.project({ type: "tool_execution_start", toolCallId: "plai…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
