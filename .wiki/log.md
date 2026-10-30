@@ -10832,3 +10832,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：压缩不改变会话结构，未完成调用仍属活动分支
 
 [addition21.66](features/phase-20-addition-compaction-pending.md)检查/compact与进行中工具：压缩只减消息、transcript append-only、thread保留entries，未完成调用仍在活动分支，恢复索引保留它是正确语义。未改产品代码。build dbe6dc1e。原47/ADD整体partial、goal active。
+
+### 2026-10-31：并发写入同一会话不丢失
+
+[addition21.67](features/phase-20-addition.md#2167-并发写入同一会话不丢失)两进程各追加20轮：exit0、41轮、各自20轮都在、state.json可解析、transcript 42行。锁串行化与原子写有效。边界：同机两写者、仅Linux、未覆盖中途被杀/网络FS/多写者。未改产品代码。build dbe6dc1e。原47/ADD整体partial、goal active。

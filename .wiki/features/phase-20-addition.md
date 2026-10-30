@@ -4930,3 +4930,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 判定为**正确行为**而非缺陷：那次调用确实未被答复，发起它的分支仍在视图中；恢复时用户会被告知会话中断且有pending调用。若反而移除该entry，索引就与用户所在分支不一致。`applyCompaction`只返回新的messages数组，不改transcript或thread，这是分层正确的表现。
 
 未改产品代码。[工件](../../.omx/artifacts/phase20-addition-compaction-pending/README.md)。build `dbe6dc1eb2a1`。原47/ADD整体partial、goal active。
+
+
+### 21.67 并发写入同一会话不丢失
+
+两个独立Node进程各向同一保存会话追加20轮，彼此无协调。结果：两个进程exit0；最终41轮（base+20+20），各自20轮都在、互不丢失；`state.json`仍可解析；`transcript.jsonl`42行（header+41轮）。会话状态锁串行化追加、原子状态写保持快照可读——撕裂或交错写入会表现为丢轮或状态文件不可解析，两者均未出现。
+
+边界：同机两写者、每轮一次追加、仅Linux；未覆盖写入中途被杀、锁语义更弱的网络文件系统、或两个以上写者；也未覆盖两写者编辑**同一轮**（会话writer是append-only，该形态不存在）。
+
+未改产品代码。[工件](../../.omx/artifacts/phase20-addition-concurrent-writes/README.md)。build `dbe6dc1eb2a1`。原47/ADD整体partial、goal active。
