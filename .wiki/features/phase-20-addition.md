@@ -4792,3 +4792,15 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 目录续页探针：附加根下小分页列出目录，hint给出该目录的绝对路径（带尾分隔符），下一页读到同一目录。两处均无需修改。
 
 边界：合成会话、单文件、仅Linux。build `15052712085a`。原47/ADD整体partial、goal active。
+
+
+### 21.52 相邻面的只读审查（无缺陷）
+
+按「同类缺陷完整排查」继续检查未审查面，四项均正确、未改代码：
+
+- **`/undo restore-turn`**：传`undoAccess(context)`（含`workspaceRoots`），`undoScope`用`projectRoot`——与账本写入根一致。
+- **`/restore`**：独立面，按显式`--record`/`--authority-id`读快照、拒绝猜测；其写访问经`selectWorkspaceRoot`并读`workspaceRoots`，命名后可用附加根。
+- **fork**：仅在项目根未变时继承`workspaceRoots`；跨项目fork丢弃它们，正确——授权属于原项目。
+- **会话切换**：`switchActiveSession`调用方把`cwd`设为新`projectRoot`，工具主根不会陈旧；授权读自会话而非进程，切会话即切授权。
+
+记录负面结果与修复同等重要：它表明这些路径是被检查过的，而非假设。[工件](../../.omx/artifacts/phase20-addition-workspace-write/README.md)。build `15052712085a`。原47/ADD整体partial、goal active。

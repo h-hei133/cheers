@@ -87,3 +87,14 @@ That is the intended shape. The grant is a live authority the session holds, not
 `undo-command-probe.mjs` checks the command surface, not just the store: `undoHistory` returns the attached-root operation with its file entry naming that root, `operationsForTurn` finds it by the turn it belonged to, and an unrelated turn id matches nothing. A probe mistake is kept: the first run passed `taskId` but no `correlationId`, so the turn filter correctly found nothing — the filter reads the recorded correlation, not the call id.
 
 `dirlist-probe.mjs` lists a directory under an attached root with a small page size and follows the continuation hint: the hint names the attached directory as an absolute path with its trailing separator, and the next page reads the same directory.
+
+## Adjacent surfaces reviewed without a defect
+
+These were checked and found correct; no code changed for them.
+
+- **`/undo` restore-turn**: passes `undoAccess(context)`, which carries `workspaceRoots`, and `undoScope` uses `projectRoot` — the same root the ledger is written under.
+- **`/restore`**: a separate surface that reads edit snapshots by explicit `--record`/`--authority-id`, refusing to guess. Its write access goes through `selectWorkspaceRoot` with `workspaceRoots`, so an attached root is usable once named.
+- **Fork**: inherits `workspaceRoots` from the source session only when the project root is unchanged; a fork into another project drops them, which is correct because the grants belong to the original project.
+- **Session switch**: `switchActiveSession` callers set `cwd` to the new `projectRoot`, so the runtime `cwd` used as the tools' primary root cannot go stale. Grants are read from the session, not the process, so switching sessions switches grants.
+
+Recording a negative result matters as much as a fix: it says these paths were inspected rather than assumed.
