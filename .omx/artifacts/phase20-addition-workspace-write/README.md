@@ -49,3 +49,17 @@ Focused command from the package directory:
 ```bash
 rtk env NODE_OPTIONS=--max-old-space-size=2048 VITEST_MAX_THREADS=1 VITEST_MIN_THREADS=1 ./node_modules/.bin/vitest run src/core/tools/arguments.test.ts src/turn/workspace.test.ts src/turn/fileAccess.test.ts src/turn/workspace/approval.test.ts
 ```
+
+## All four layers agree
+
+`layers-probe.mjs` asks every layer that can allow or refuse a write about the same attached root, under the default profile:
+
+| Layer | Result |
+|---|---|
+| `workspaceToolBinding`, write grant | resolves to the attached root |
+| `workspaceToolBinding`, read-only grant | refuses with "This additional workspace root is read-only." |
+| `workspaceSandboxPolicy` | the root is in `allowWrite`, and a read-only grant appears in `readOnlyRoots` |
+| tool fence | the write succeeds |
+| undo ledger | one operation is visible to the session |
+
+Before this batch the first three agreed with each other and the fourth did not, which is what made the grant look broken: policy approved a write the writer then refused. They now share one answer.

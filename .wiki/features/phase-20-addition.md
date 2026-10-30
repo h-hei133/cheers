@@ -4750,3 +4750,5 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 验证：`arguments`26（新例用真实execution service断言附加根下不产生账本）、`workspace/tools`4、`workspace/approval`25、`fileAccess`3、`workspace`9，共**67项**通过；六反转（write/read/glob/grep退回只查主根、以read解析write授权、账本跟随目标根）全部命中且finally字节恢复；五静态门、TS build/freshness、端到端探针（拒绝→授权→写入→目录替换失效）通过。build `a3fd86238923`。原47/ADD整体partial、goal active。
 
 补充端到端证据：`undo-probe.mjs`在默认profile下经附加根把`before`写成`after`，随后用会话主根的scope读取操作列表——可见**一条**操作，且其文件记录的`workspace`指向附加根。首次探针在未await的`withProfile`回调里调用工具，写入未执行、计数为0，该错误保留记录。
+
+补充跨层一致性证据：`layers-probe.mjs`对同一附加根询问所有可能允许或拒绝写入的层（默认profile）——`workspaceToolBinding`的写授权解析到附加根、只读授权报`This additional workspace root is read-only.`；`workspaceSandboxPolicy`把该根放进`allowWrite`、只读根进`readOnlyRoots`；工具围栏写入成功；撤销账本可见一条。修复前前两层与工具体层不一致，正是授权看起来失效的原因。
