@@ -3,43 +3,49 @@
     {
       "name": "primary-root-only-write",
       "exit": 1,
-      "tests": "1 failed | 26 skipped (27)",
+      "tests": "1 failed | 27 skipped (28)",
       "originalSha256": "44f952875c8600c32222a6035bda8637a66be473dd1a65a5e48304ffd08b9a2d"
     },
     {
       "name": "read-primary-only",
       "exit": 1,
-      "tests": "1 failed | 26 skipped (27)",
+      "tests": "1 failed | 27 skipped (28)",
       "originalSha256": "57c4bb3e5fbdfd17fd3419310d65d7844c3f50ce06ee9457519712538c257d72"
     },
     {
       "name": "glob-primary-only",
       "exit": 1,
-      "tests": "1 failed | 26 skipped (27)",
+      "tests": "1 failed | 27 skipped (28)",
       "originalSha256": "47ad30721b7cf5720b6bdd2e8e43bb6952ccc36c72d151d4a52e11965a961e6e"
     },
     {
       "name": "grep-primary-only",
       "exit": 1,
-      "tests": "1 failed | 26 skipped (27)",
-      "originalSha256": "999fbfd9e036a47f03559381ee1f803e158af29f225691aa6d2ee82828b1b82e"
+      "tests": "1 failed | 27 skipped (28)",
+      "originalSha256": "af4f36c0c88657040f3bd914700954d5df3b7a462d4e0d3886c3159a6b25bb89"
     },
     {
       "name": "ledger-follows-target",
       "exit": 1,
-      "tests": "1 failed | 26 skipped (27)",
+      "tests": "1 failed | 27 skipped (28)",
       "originalSha256": "44f952875c8600c32222a6035bda8637a66be473dd1a65a5e48304ffd08b9a2d"
     },
     {
       "name": "glob-relative-paths",
       "exit": 1,
-      "tests": "1 failed | 26 skipped (27)",
+      "tests": "1 failed | 27 skipped (28)",
       "originalSha256": "47ad30721b7cf5720b6bdd2e8e43bb6952ccc36c72d151d4a52e11965a961e6e"
+    },
+    {
+      "name": "grep-relative-paths",
+      "exit": 1,
+      "tests": "1 failed | 27 skipped (28)",
+      "originalSha256": "af4f36c0c88657040f3bd914700954d5df3b7a462d4e0d3886c3159a6b25bb89"
     },
     {
       "name": "no-access-check",
       "exit": 1,
-      "tests": "1 failed | 1 passed | 25 skipped (27)",
+      "tests": "1 failed | 1 passed | 26 skipped (28)",
       "originalSha256": "44f952875c8600c32222a6035bda8637a66be473dd1a65a5e48304ffd08b9a2d"
     }
   ],

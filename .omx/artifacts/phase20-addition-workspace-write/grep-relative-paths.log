@@ -1,0 +1,33 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/arguments.test.ts  (28 tests | 1 failed | 27 skipped) 78ms
+   ❯ src/core/tools/arguments.test.ts > an attached root is searchable > reports grep paths a later tool can use, on both search paths
+     → expected false to be true // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 27 skipped (28)
+   Start at  02:46:40
+   Duration  4.28s (transform 2.96s, setup 0ms, collect 3.96s, tests 78ms, environment 0ms, prepare 60ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/arguments.test.ts > an attached root is searchable > reports grep paths a later tool can use, on both search paths
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/core/tools/arguments.test.ts:276:39
+    274|     const result = await tools.get('grep')!.execute({ pattern: 'roundt…
+    275|     const reported = String(result.output ?? '').trim().split('\n')[0]…
+    276|     expect(path.isAbsolute(reported)).toBe(true)
+       |                                       ^
+    277|     expect(reported).toBe(path.join(realpathSync(attached), 'lib.ts'))
+    278|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

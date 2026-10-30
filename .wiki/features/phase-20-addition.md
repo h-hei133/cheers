@@ -4776,3 +4776,10 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 补充撤销边界证据：`revoked-probe.mjs`经附加根写入后用`/workspace remove`撤销授权，再尝试恢复旧操作——预览`canRestore:false`、blocker为`snapshot-or-workspace-unavailable`、恢复`blocked`、文件保持写入后的字节。授权是会话当前持有的活权限而非写入时捕获的永久许可，因此撤销后undo不能穿过已分离的根写回。
 
 补充身份边界证据：`identity-probe.mjs`经附加根写入后把该目录替换为同路径的不同目录，再预览旧操作——`canRestore:false`、恢复`blocked`、新目录保持为空。起作用的是记录的`dev:ino:birthtimeMs`身份；仅有路径会把旧字节写进无关目录。
+
+
+### 21.50 grep的两条搜索路径都返回可用结果
+
+21.48只修了glob与grep回退路径的相对路径问题；本批复查发现**ripgrep路径**同样返回相对`searchRoot`的路径，且回退路径在`listFilesRecursive`返回绝对条目时会`path.join`伪造根内路径（与21.49在lsp处修过的同一类错误）。现两条路径都：搜索根非主根时输出绝对路径，已是绝对路径的条目不再次拼接。端到端探针：附加根下grep结果首行路径为绝对且`read`可直接打开（`readOk:true`）。
+
+验证：`arguments`28（新例断言grep结果绝对且等于该根下真实目标）、`glob`19、`grep`3、`grepPaths`12、`grepRipgrep`18，共**80项**通过；八反转（write/read/glob/grep扫描/ripgrep路径退回主根、以read解析write授权、账本跟随目标根、glob相对路径）全部命中且finally字节恢复；五静态门、TS build/freshness通过。build `15052712085a`。原47/ADD整体partial、goal active。

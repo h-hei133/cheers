@@ -110,8 +110,13 @@ export function createGrepToolDefinition(
         abortSignal: context.abortSignal,
       });
       if (viaRipgrep.ok) {
+        // Ripgrep reports paths relative to the root it ran in. Under an
+        // attached root that relative path would be resolved against the
+        // primary root by every later tool, so it is made absolute here too.
+        const absolute = (match: { readonly path: string }) => searchRoot === context.workspaceRoot || path.isAbsolute(match.path)
+          ? match.path : path.join(searchRoot, match.path);
         return await reportGrepMatches(
-          viaRipgrep.matches.map((match) => formatRipgrepMatch(match, 500)),
+          viaRipgrep.matches.map((match) => formatRipgrepMatch({ ...match, path: absolute(match) }, 500)),
           context.artifactRoot ?? context.workspaceRoot, context.sessionId,
         );
       }
@@ -195,8 +200,12 @@ export function createGrepToolDefinition(
             if (regex.test(line)) {
               const safeLine = truncateLineWidth(line, 500);
               // Same rule as glob: a path relative to an attached root would be
-              // resolved against the primary root by every later tool.
-              results.push(`${searchRoot === context.workspaceRoot ? relPath : path.join(searchRoot, relPath)}:${i + 1}: ${safeLine}`);
+              // resolved against the primary root by every later tool. An entry
+              // that is already absolute must not be joined onto the root again,
+              // which would fabricate a different path inside it.
+              const reported = searchRoot === context.workspaceRoot ? relPath
+                : path.isAbsolute(relPath) ? relPath : path.join(searchRoot, relPath);
+              results.push(`${reported}:${i + 1}: ${safeLine}`);
               totalMatches++;
               if (totalMatches >= limit) {
                 break;

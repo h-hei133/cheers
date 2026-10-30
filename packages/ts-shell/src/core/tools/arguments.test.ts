@@ -260,6 +260,23 @@ describe('an attached root is searchable', () => {
     expect(reported[0]).toBe(path.join(realpathSync(attached), 'found.ts'))
   })
 
+  it('reports grep paths a later tool can use, on both search paths', async () => {
+    // The ripgrep path and the in-process walk both report paths relative to
+    // what they searched; under an attached root that must be absolute.
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true })
+    const primary = root('grep-roundtrip-primary-')
+    const attached = root('grep-roundtrip-attached-')
+    fs.writeFileSync(path.join(attached, 'lib.ts'), 'export function roundtripNeedle() { return 1 }\n')
+    const service = createDefaultExecutionService()
+    const tools = createCoreToolRegistry({ executionService: service })
+    const context = { workspaceRoot: primary, taskId: 'grep-roundtrip',
+      workspaceRoots: [captureWorkspaceRoot(attached, attached, 'read')] }
+    const result = await tools.get('grep')!.execute({ pattern: 'roundtripNeedle', path: attached }, context)
+    const reported = String(result.output ?? '').trim().split('\n')[0]?.split(':')[0] ?? ''
+    expect(path.isAbsolute(reported)).toBe(true)
+    expect(reported).toBe(path.join(realpathSync(attached), 'lib.ts'))
+  })
+
   it('finds content under an attached root with grep', async () => {
     fs.mkdirSync('/tmp/cheers-test', { recursive: true })
     const primary = root('grep-primary-')

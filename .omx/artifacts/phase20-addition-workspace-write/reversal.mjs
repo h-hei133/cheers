@@ -50,6 +50,11 @@ const cases = [
       const filtered = files.filter((file) => matchesGlob(file, pattern)).map(project)`,
     after: `      const filtered = files.filter((file) => matchesGlob(file, pattern))`,
     filter: 'reports paths a later tool can use' },
+  { name: 'grep-relative-paths', file: 'packages/ts-shell/src/core/tools/grep.ts',
+    before: `        const absolute = (match: { readonly path: string }) => searchRoot === context.workspaceRoot || path.isAbsolute(match.path)
+          ? match.path : path.join(searchRoot, match.path);`,
+    after: `        const absolute = (match: { readonly path: string }) => match.path;`,
+    filter: 'reports grep paths a later tool can use' },
   { name: 'no-access-check',
     before: `            ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'write') ?? context.workspaceRoot`,
     after: `            ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'read') ?? context.workspaceRoot`,

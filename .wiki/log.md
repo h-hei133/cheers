@@ -10760,3 +10760,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：lsp扫描与文档符号覆盖附加根
 
 [addition21.49](features/phase-20-addition.md#2149-lsp扫描与文档符号覆盖附加根)发现scanner完全不读workspaceRoots：附加根下符号搜索找不到、文档符号返回空。现扫描根为主根+附加根、documentSymbol前置校验按归属根、readSource按归属根读取。首轮无条件join绝对路径破坏符号链接逃逸测试，改为只拼接相对路径。56项聚焦、两反转命中、五门/TS build通过。首轮夹具用export const导致假阳性，已改函数声明并断言匹配格式。build cf51133a。原47/ADD整体partial、goal active。
+
+### 2026-10-31：grep的两条搜索路径都返回可用结果
+
+[addition21.50](features/phase-20-addition.md#2150-grep的两条搜索路径都返回可用结果)复查发现ripgrep路径也返回相对路径，回退路径遇绝对条目会path.join伪造根内路径。现两条路径在搜索根非主根时输出绝对路径、绝对条目不再拼接。28项arguments、80项聚焦、八反转命中、五门/TS build/端到端探针通过。build 15052712。原47/ADD整体partial、goal active。
