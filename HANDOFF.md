@@ -1256,3 +1256,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: `/exit` occasionally appears to hang.
 - **Root Cause**: The only remaining blocking wait on the close path is `withFileLock`'s synchronous retry loop (`STATE_LOCK_TIMEOUT_MS = 1200`) while another live process holds the session state lock. A probe without a competing holder cannot see it.
 - **Rule**: Measure this with a real second process holding the lock and real metadata, not a mock. Observed: a hold shorter than the bound is waited out and the close succeeds with `--resume`; a longer hold fails at ~1.35 s with exit code 1 and the fixed "session close was not verified" line, and no resume hint is offered. A direct write under the same hold either waits and succeeds or fails at ~1.2 s without persisting that turn. Treat "hangs" reports as contention evidence, not proof of an unbounded wait, and do not raise the timeout expecting the wait to disappear.
+
+### A Non-Empty Startup Draft Suppresses The Composer Placeholder
+
+- **Symptom**: A startup probe that waits for "Ask anything, or / for commands" times out even though the runtime is fully ready.
+- **Root Cause**: The placeholder is drawn only while the draft is empty. A probe that types during loading has a non-empty draft, so the placeholder never appears.
+- **Rule**: Observe readiness for a pre-filled draft through settled render counts and the adopted editor snapshot, not the placeholder text. Also do not call view methods from an observer without checking the surface contract — an unknown method throws inside `renderFrame` and the process exits with "Fatal error", which looks like a product crash but is probe code.

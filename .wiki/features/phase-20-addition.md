@@ -4641,3 +4641,10 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 直接经产品自身session owner的写入测量给出同一边界：持锁900ms时等待922ms后成功；持锁2500ms时1208ms超时失败且该turn未落盘（`finalMessages`缺该条），释放后重试24ms成功。因此「有时卡住」与**并发写入者**一致，不是无界等待：进程在锁上界停止并如实报告关闭未确认，失败是可见的而非静默。1.35秒是真实用户可感知延迟，但有界且真实；本批未改产品代码，因为改变上界只是换取另一个上界而非消除等待。
 
 证据边界：合成/离线会话、单个本地竞争进程、仅Linux；未覆盖跨主机持有者、持锁中途死亡（stale takeover）、真实用户终端或多进程并发竞争。[正式工件](../../.omx/artifacts/phase20-addition-lock-contention/README.md)。build `5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473`、inputs `4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806`。原47/ADD整体partial、goal active。
+
+
+### 21.37 启动草稿交接与光标位置实测
+
+第27项此前一直保持「机制未确认」。本批在**加载期**输入三行草稿后让真实runtime接管同一个editor，两模式各一轮原CLI（隔离home/profile/Git project、无凭据synthetic且fetch拒绝、heap768MiB、40秒上界）：交接后草稿精确为`line one\nline two\nline three`（28字符）、光标28（末尾）；五次退格后为23字符且内容正是原文本前23字符。全屏原始帧显示三行绘制为`❯ line one`/`  line two`/`  line thre…`，光标落在第58行第12列（第三行末尾），上下均无空白行。
+
+结论：本build在「加载期多行草稿」这一场景下，交接保留草稿与光标、退格删除真实字符，用户所述「跳到大片空白行且无法删除」**不可复现**；但不复现用户原始终端、窗口尺寸与该次按键上下文，故原机制仍属**未确认**而非已证伪。两个探针失败保留为harness问题而非产品缺陷：就绪断言等待了非空草稿会正确抑制的占位符；observer调用了不存在的`lastComposerGeometry`导致致命错误。未改产品代码。[正式工件](../../.omx/artifacts/phase20-addition-startup-draft/README.md)。build `5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473`、inputs `4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806`。原47/ADD整体partial、goal active。

@@ -1,0 +1,29 @@
+{
+  "mode": "fullscreen",
+  "status": "passed",
+  "buildId": "5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473",
+  "inputsDigest": "4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806",
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 40,
+    "outputBytes": 1048576
+  },
+  "draftAfterAdoption": {
+    "text": "line one\nline two\nline three",
+    "cursor": 28,
+    "length": 28
+  },
+  "afterBackspaces": {
+    "text": "line one\nline two\nline ",
+    "cursor": 23,
+    "length": 23
+  },
+  "shutdown": {
+    "code": null,
+    "signal": "unknown"
+  },
+  "outputTail": "line one\r\nline two\r\nline three\u001b[?2004h\u001b[?u\u001b[c\u001b[?2031h\u001b[?996n\u001b]11;?\u001b\\\u001b[?1049h\u001b[?1002h\u001b[?1006h\u001b[?25l\u001b[?7l\u001b[1;1H\u001b[J\u001b[1;1H\u001b[K\u001b[2;1H\u001b[K\u001b[3;1H\u001b[K\u001b[4;1H\u001b[K\u001b[5;1H\u001b[K\u001b[6;1H\u001b[K\u001b[7;1H\u001b[K\u001b[8;1H\u001b[K\u001b[9;1H\u001b[K\u001b[10;1H\u001b[K\u001b[11;1H\u001b[K\u001b[12;1H\u001b[K\u001b[13;1H\u001b[K\u001b[14;1H\u001b[K\u001b[15;1H\u001b[K\u001b[16;1H\u001b[K\u001b[17;1H\u001b[K\u001b[18;1H\u001b[K\u001b[19;1H\u001b[K\u001b[20;1H\u001b[K\u001b[21;1H\u001b[K\u001b[22;1H\u001b[K\u001b[23;1H\u001b[K\u001b[24;1H\u001b[K\u001b[25;1H\u001b[K\u001b[26;1H\u001b[K\u001b[27;1H\u001b[K\u001b[28;1H\u001b[K\u001b[29;1H\u001b[K\u001b[30;1H\u001b[K\u001b[31;1H\u001b[K\u001b[32;1H\u001b[K\u001b[33;1H\u001b[K\u001b[34;1H\u001b[K\u001b[35;1H\u001b[K\u001b[36;1H\u001b[K\u001b[37;1H\u001b[K\u001b[38;1H\u001b[K\u001b[39;1H\u001b[K\u001b[40;1H\u001b[K\u001b[41;1H\u001b[K\u001b[42;1H\u001b[K\u001b[43;1H\u001b[K\u001b[44;1H\u001b[K\u001b[45;1H\u001b[K\u001b[46;1H\u001b[K\u001b[47;1H\u001b[K\u001b[48;1H\u001b[K\u001b[49;1H\u001b[K\u001b[50;1H\u001b[K\u001b[51;1H\u001b[K\u001b[52;1H\u001b[K\u001b[53;1H\u001b[K\u001b[54;1H\u001b[K\u001b[55;1H\u001b[K\u001b[56;1H────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b]8;;\u0007\u001b[K\u001b[57;1H❯ Loading · type a draft                                                                                                \u001b[0m\u001b]8;;\u0007\u001b[K\u001b[58;1H────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b]8;;\u0007\u001b[K\u001b[59;1H<scratch>/project\u001b[0m\u001b]8;;\u0007\u001b[K\u001b[60;1HLoading runtime · Enter adds a line · Esc exits\u001b[0m\u001b]8;;\u0007\u001b[K\u001b[57;3H\u001b[?25h\u001b[?7h\u001b]0;cheers — project — sess_db0ebf8ccf1a88cd_1793381356882\u0007\u001b[?25l\u001b[?7l\u001b[1;1H\u001b[J\u001b[1;1H\u001b[K\u001b[2;1H\u001b[K\u001b[3;1H\u001b[K\u001b[4;1H\u001b[K\u001b[5;1H\u001b[K\u001b[6;1H\u001b[K\u001b[7;1H\u001b[K\u001b[8;1H\u001b[K\u001b[9;1H\u001b[K\u001b[10;1H\u001b[K\u001b[11;1H\u001b[K\u001b[12;1H\u001b[K\u001b[13;1H\u001b[K\u001b[14;1H\u001b[K\u001b[15;1H\u001b[K\u001b[16;1H\u001b[K\u001b[17;1H\u001b[K\u001b[18;1H\u001b[K\u001b[19;1H\u001b[K\u001b[20;1H\u001b[K\u001b[21;1H\u001b[K\u001b[22;1H\u001b[K\u001b[23;1H\u001b[K\u001b[24;1H\u001b[K\u001b[25;1H\u001b[K\u001b[26;1H\u001b[K\u001b[27;1H\u001b[K\u001b[28;1H\u001b[K\u001b[29;1H\u001b[K\u001b[30;1H\u001b[K\u001b[31;1H\u001b[K\u001b[32;1H\u001b[K\u001b[33;1H\u001b[K\u001b[34;1H\u001b[K\u001b[35;1H\u001b[K\u001b[36;1H\u001b[K\u001b[37;1H\u001b[K\u001b[38;1H\u001b[K\u001b[39;1H\u001b[K\u001b[40;1H\u001b[K\u001b[41;1H\u001b[K\u001b[42;1H\u001b[K\u001b[43;1H\u001b[K\u001b[44;1H\u001b[K\u001b[45;1H\u001b[K\u001b[46;1H\u001b[K\u001b[47;1H\u001b[K\u001b[48;1H\u001b[K\u001b[49;1H\u001b[K\u001b[50;1H\u001b[1mCheers\u001b[22m  openai\u001b[0m\u001b]8;;\u0007\u001b[K\u001b[51;1H<scratch>/project\u001b[0m\u001b]8;;\u0007\u001b[K\u001b[52;1H\u001b[K\u001b[53;1HWarning: Config user (unknown): unknown-field; value ignored.\u001b[0m\u001b]8;;\u0007\u001b[K\u001b[54;1H\u001b[K\u001b[55;1H──────────────────────────────────────────────────────────────────────────────────────────────────────── ?/64k assumed ─\u001b[0m\u001b]8;;\u0007\u001b[K\u001b[56;1H❯ line one                                                                                                              \u001b[0m\u001b]8;;\u0007\u001b[K\u001b[57;1H  line two                                                                                                              \u001b[0m\u001b]8;;\u0007\u001b[K\u001b[58;1H  line thre                                                                                                             \u001b[0m\u001b]8;;\u0007\u001b[K\u001b[59;1H────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b]8;;\u0007\u001b[K\u001b[60;1Hopenai ▏ build ▏ ask ▏ <scratch>/project\u001b[0m\u001b]8;;\u0007\u001b[K\u001b[58;12H\u001b[?25h\u001b[?7h\u001b[?25l\u001b[?7l\u001b[58;1H  line three                                                                                                            \u001b[0m\u001b]8;;\u0007\u001b[K\u001b[58;13H\u001b[?25h\u001b[?7h\u001b[?25l\u001b[?7l\u001b[58;13H\u001b[?25h\u001b[?7h\u001b[?25l\u001b[?7l\u001b[58;13H\u001b[?25h\u001b[?7h\u001b[?25l\u001b[?7l\u001b[58;1H  line                                                                                                                  \u001b[0m\u001b]8;;\u0007\u001b[K\u001b[58;8H\u001b[?25h\u001b[?7h\u001b[?25l\u001b[?7l\u001b[58;8H\u001b[?25h\u001b[?7h\u001b[?25l\u001b[?7l\u001b[58;8H\u001b[?25h\u001b[?7h\u001b[?2031l\u001b[?1049l\u001b[?2026l\u001b[?7h\u001b[?1l\u001b>\u001b[?2004l\u001b[?1006l\u001b[?1003l\u001b[?1002l\u001b[?1000l\u001b[?25h\u001b[0m",
+  "outputBytes": 4346,
+  "outputLimitExceeded": false,
+  "scratchRemoved": true
+}

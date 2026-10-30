@@ -1,0 +1,28 @@
+{
+  "mode": "regular",
+  "status": "passed",
+  "buildId": "5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473",
+  "inputsDigest": "4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806",
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 40,
+    "outputBytes": 1048576
+  },
+  "draftAfterAdoption": {
+    "text": "line one\nline two\nline three",
+    "cursor": 28,
+    "length": 28
+  },
+  "afterBackspaces": {
+    "text": "line one\nline two\nline ",
+    "cursor": 23,
+    "length": 23
+  },
+  "shutdown": {
+    "code": null,
+    "signal": "unknown"
+  },
+  "outputBytes": 11080,
+  "outputLimitExceeded": false,
+  "scratchRemoved": true
+}

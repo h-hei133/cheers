@@ -10708,3 +10708,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：会话锁竞争下的退出有界性实测
 
 [addition21.36](features/phase-20-addition.md#2136-会话锁竞争下的退出有界性与失败可见)补21.35未实测的阻塞点：另一存活本地进程真实持锁后，两模式×600/2500ms四组原CLI。短持锁673/677ms、exit0、打印--resume、terminated、cooked恢复；长持锁1346/1342ms、exit1、实际绘制"Session state could not be saved; session close was not verified."、无resume、cooked恢复。直接写入测量同界：900ms等待922ms成功，2500ms在1208ms超时且turn未落盘，释放后24ms成功。结论：偶发卡顿与并发写入者一致，退出有界且失败可见；未改产品代码。边界：单本地进程、仅Linux、无跨主机/stale takeover/真实终端。build 5bf1f1e9，原47/ADD整体partial、goal active。
+
+### 2026-10-31：启动草稿交接与光标位置实测
+
+[addition21.37](features/phase-20-addition.md#2137-启动草稿交接与光标位置实测)在加载期输入三行草稿后由真实runtime接管：两模式草稿精确28字符、光标在末尾、五次退格精确删除5字符；全屏原始帧三行正确绘制且光标在第58行第12列，无空白行。第27项「跳到大片空白行」在该场景不可复现，但缺用户原始终端/尺寸/按键上下文，原机制仍未确认而非证伪。两个探针失败（占位符就绪断言、不存在的lastComposerGeometry调用）保留为harness问题。未改产品代码；原47/ADD整体partial、goal active。
