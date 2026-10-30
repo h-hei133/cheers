@@ -21,9 +21,17 @@ No new jail, resolver, or grant mechanism was added; the session resolver alread
 
 Build `96a6043df384a05279f4b6944d2ba9c04c6f0892110ea329d30eff83361ba368`, inputs `1615471a421914223b98423c4482ffef2880b0a98e93a47bfd4b5cc7d35198f7`.
 
+## The other file tools
+
+The same batch extended the fix to the rest of the file tools, because they fenced on the primary root too:
+
+- `read` resolves through the session resolver with read access: a read-only grant may be read but not written, an unregistered directory is still refused.
+- `glob` and `grep` use the resolved root as the search origin and as the base for reported paths, across both the ripgrep path and the in-process fallback walk.
+- `apply_patch` needed no change. It already called `selectWorkspaceRoot` and read `workspaceRoots`. The two-phase probe (`patch-probe.mjs`) confirms it end to end: refused before the grant with "Tool path is outside the registered workspace roots", and after the grant it commits the file at the attached path with the exact content.
+
 ## Boundaries
 
-Synthetic session, single write, Linux. `apply_patch` was not changed — it has its own multi-root plan path. `bash` writes remain governed by the sandbox, not this fence. Read-only attached roots still allow reads through the same resolver, unchanged. Not covered: real provider tool calls, desktop platforms, concurrent multi-root writes.
+Synthetic session, single write, Linux. `bash` writes remain governed by the sandbox, not this fence. Read-only attached roots still allow reads through the same resolver, unchanged. Not covered: real provider tool calls, desktop platforms, concurrent multi-root writes.
 
 ```bash
 rtk node .omx/artifacts/phase20-addition-workspace-write/reversal.mjs

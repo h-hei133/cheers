@@ -1,0 +1,37 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/arguments.test.ts  (25 tests | 1 failed | 24 skipped) 12ms
+   ❯ src/core/tools/arguments.test.ts > an attached root is searchable > finds content under an attached root with grep
+     → expected { success: false, …(2) } to match object { success: true }
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 24 skipped (25)
+   Start at  01:54:29
+   Duration  3.83s (transform 2.70s, setup 0ms, collect 3.59s, tests 12ms, environment 0ms, prepare 53ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/arguments.test.ts > an attached root is searchable > finds content under an attached root with grep
+AssertionError: expected { success: false, …(2) } to match object { success: true }
+
+- Expected
++ Received
+
+  Object {
+-   "success": true,
++   "error": "Search path is unavailable, denied, or outside the workspace.",
++   "metadata": undefined,
++   "success": false,
+  }
+
+ ❯ src/core/tools/arguments.test.ts:257:20
+    255|       workspaceRoots: [captureWorkspaceRoot(attached, attached, 'read'…
+    256|     })
+    257|     expect(result).toMatchObject({ success: true })
+       |                    ^
+    258|     expect(String(result.output ?? '')).toContain('needle')
+    259|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

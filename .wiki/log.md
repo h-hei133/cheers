@@ -10728,3 +10728,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：附加workspace根接入glob与grep
 
 [addition21.41](features/phase-20-addition.md#2141-附加workspace根接入glob与grep)收口21.40边界：glob/grep同样只围栏主根。现两者先`resolveToolTarget`取绝对目标、再由`resolveWorkspaceRoot`以read模式选根，该根同时作为搜索起点与结果投影基准（ripgrep与回退walk两条路径、每文件读取均用同一根）。首轮用`resolveWorkspaceToolTarget`取目标会提前抛边界错误，改`resolveToolTarget`后通过。94项聚焦、五反转命中且bytes恢复、五门/TS build/freshness通过。build c1302abc。原47/ADD整体partial、goal active。
+
+### 2026-10-31：apply_patch附加根端到端确认
+
+[addition21.42](features/phase-20-addition.md#2142-applypatch附加根的端到端确认)补端到端证据：两阶段探针授权前报outside registered roots且不建文件，授权后同一补丁committed、内容精确。apply_patch无需改动。边界：合成会话、单文件、仅Linux；原47/ADD整体partial、goal active。

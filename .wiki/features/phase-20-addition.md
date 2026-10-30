@@ -4696,3 +4696,10 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 首轮实现用`resolveWorkspaceToolTarget`取目标，它在主根外直接抛`Tool path resolves outside the workspace boundary.`，导致附加根用例失败；改为`resolveToolTarget`后正确。
 
 验证（主代理串行）：`arguments`25（两新例：附加根glob命中、附加根grep命中）、`glob`19、`grep`3、`grepPaths`12、`grepRipgrep`18、`grepStream`14、`fileAccess`3，共**94项**通过；五反转（write/read/glob/grep退回只查主根、以read解析write授权）均命中预期断言且finally逐字节恢复；五静态门、TS build/freshness通过，118旧docs advisory保留。build `c1302abc9ff4`。边界：bash写入仍由sandbox治理；真实provider工具调用、桌面平台与多根并发未覆盖。原47/ADD整体partial、goal active。
+
+
+### 21.42 apply_patch附加根的端到端确认
+
+21.41后第24项的工具面已覆盖write/edit/read/glob/grep。`apply_patch`静态上一直使用`selectWorkspaceRoot`并读取`workspaceRoots`，本批补端到端证据：两阶段探针（`prepare`→选定group→`execute`）在授权前报`Tool path is outside the registered workspace roots`且不建文件；`/workspace add --write`后同一补丁`committed`，附加根下文件内容精确为补丁正文。故`apply_patch`无需改动。
+
+证据边界：合成会话、单文件补丁、仅Linux；未覆盖跨根多文件补丁、真实provider工具调用与桌面平台。build `c1302abc9ff4`。原47/ADD整体partial、goal active。

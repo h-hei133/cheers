@@ -1,0 +1,28 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/arguments.test.ts  (25 tests | 1 failed | 24 skipped) 9ms
+   ❯ src/core/tools/arguments.test.ts > an attached root is searchable > finds files under an attached root with glob
+     → Tool path resolves outside the workspace boundary.
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 24 skipped (25)
+   Start at  01:54:24
+   Duration  3.99s (transform 2.83s, setup 0ms, collect 3.75s, tests 9ms, environment 0ms, prepare 57ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/arguments.test.ts > an attached root is searchable > finds files under an attached root with glob
+Error: Tool path resolves outside the workspace boundary.
+ ❯ Module.resolveWorkspaceToolTarget src/core/tools/permissionContext.ts:25:35
+     23|   const target = resolveToolTarget(args, key, workspaceRoot)
+     24|   const containment = verifyPathContainment(target, workspaceRoot)
+     25|   if (!containment.allowed) throw new Error('Tool path resolves outsid…
+       |                                   ^
+     26|   return containment.resolvedPath
+     27| }
+ ❯ Object.execute src/core/tools/glob.ts:71:26
+ ❯ src/core/tools/arguments.test.ts:237:31
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
