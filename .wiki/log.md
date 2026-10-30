@@ -10836,3 +10836,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：并发写入同一会话不丢失
 
 [addition21.67](features/phase-20-addition.md#2167-并发写入同一会话不丢失)两进程各追加20轮：exit0、41轮、各自20轮都在、state.json可解析、transcript 42行。锁串行化与原子写有效。边界：同机两写者、仅Linux、未覆盖中途被杀/网络FS/多写者。未改产品代码。build dbe6dc1e。原47/ADD整体partial、goal active。
+
+### 2026-10-31：transcript是会话内容的权威来源
+
+[addition21.68](features/phase-20-addition.md#2168-transcript是会话内容的权威来源)appendSessionTurn先写transcript再写metadata/state；读取侧turns由transcript投影，transcript是权威、metadata是索引，部分成功降级为索引缺一条而记录完整。未改产品代码。build dbe6dc1e。原47/ADD整体partial、goal active。

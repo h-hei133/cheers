@@ -4939,3 +4939,10 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 边界：同机两写者、每轮一次追加、仅Linux；未覆盖写入中途被杀、锁语义更弱的网络文件系统、或两个以上写者；也未覆盖两写者编辑**同一轮**（会话writer是append-only，该形态不存在）。
 
 未改产品代码。[工件](../../.omx/artifacts/phase20-addition-concurrent-writes/README.md)。build `dbe6dc1eb2a1`。原47/ADD整体partial、goal active。
+
+
+### 21.68 transcript是会话内容的权威来源
+
+检查`appendSessionTurn`的写入顺序：先append transcript、再`writeMetadata`、再`writeState`。transcript失败时metadata不会写，因此不会出现「metadata有而transcript没有」。反向部分成功（transcript成功、metadata失败）时，读取侧`projectSessionRecordSnapshot`的`turns`由`projectBranchMessages(events, ...)`从**transcript**投影，而非从metadata的turns数组——transcript是权威，metadata是索引。因此部分成功降级为「索引缺一条、记录完整」，恢复仍看到完整历史。
+
+21.67的并发探针（41轮完整、state可解析）与此一致。未改产品代码。build `dbe6dc1eb2a1`。原47/ADD整体partial、goal active。
