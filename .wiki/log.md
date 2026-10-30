@@ -10593,3 +10593,11 @@ resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不�
 新增基线8失败/3控制通过，最终四文件42项去重、四反转1/3/1/2失败与bytes恢复、恢复15项、五门/build/freshness串行通过，118旧advisory保留，owner callable11→12≤20。两模式原NodeCLI各1保存会话×1消息、loopback HTTP，原60秒窗口实测约60123/60125ms，原PID保留、adopt1/promotion1/重新launch0、单durable job；随后真实超时、Ctrl+C、0/5秒等待文字与事件、同任务release完成均通过，三wait listener释放，配置不变、exit0/cooked。100秒/2MiB/768MiB限额，非生产长任务或平台验收。
 
 探针的缺省journal数组、ready计时起点及异步paint同步三类失败保留，均只修fixture；正式工件/HANDOFF/后台研究文档更新，scratch清理、CLAUDE.md不改。19ee578c CI41032575806/Watch41032575779均success；316e4de7 CI41035961101仍in_progress、Watch41035960972 success且head匹配，不重复轮询，本批Git/未来CI另绑定。原47与ADD不升级，goal active。
+
+## [2026-10-30] test | 多skill原生研究实际HTTP链验证
+
+[addition21.22](features/phase-20-addition.md#2122-add-1112多skill进入原生研究实际http请求)确认现有entry/stage/runner组合已注入全部method，无新增产品修补。两模式原NodeCLI各1保存会话×1消息，loopback实际HTTP：未知第二skill零POST/零run、原草稿/state保真；首位入口12POST含八native children/两次读取，run/review completed；正文入口10POST含八children、零读取，review failed/run partial。逐请求两正文各一次、exact runId/schema、原换行及metadata、账本settled、三report fragments和实际绘制均通过。
+
+主代理串行五门、syntax与两CLI通过，118旧advisory保留；复用fresh build，源码不变而不重跑unit/build。两次probe错误分别为content-addressed复读应刷新同source、selected-text哈希保留末尾换行；失败收据保留，未改产品，HANDOFF补guardrail。每模式heap768MiB/60秒/2MiB/30POST上限，实际22POST，config/project不变、exit0/cooked、scratch清理。确定性fixture不代表真实研究质量/provider/平台验收，原47与ADD不升级、goal active。
+
+316e4de7 CI41035961101/Watch41035960972延后读回均completed/success；ed4820cb CI41039139794仍in_progress、Watch41039139814 success且head一致，不重复轮询。正式工件保留，本批提交/推送/未来CI另绑定，CLAUDE.md不改。

@@ -1,0 +1,309 @@
+{
+  "mode": "regular",
+  "buildId": "7499028c41a4b125f9d40e17b29501c009d3db8a8783211cd7130ed93892a7f1",
+  "inputsDigest": "336820d5bccff83c07312cede18a15fa093f35a8f1a389105cfad52633622578",
+  "provider": "loopback HTTP fixture; real adapter path",
+  "savedMessages": 1,
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 60,
+    "outputBytes": 2097152,
+    "requests": 30
+  },
+  "status": "failed",
+  "cases": [
+    {
+      "name": "unknown second skill",
+      "exactDraftRestored": true,
+      "stateUnchanged": true,
+      "providerRequests": 0,
+      "researchRuns": 0
+    }
+  ],
+  "failure": "Expected values to be strictly equal:",
+  "observation": {
+    "ends": 2,
+    "tools": [
+      {
+        "name": "research_run",
+        "success": true
+      }
+    ],
+    "restoredDrafts": [
+      "/deep-research --mode software /skill:one /skill:missing Versioned feature conditions"
+    ],
+    "sessionId": "sess_9a4b5fe77f3cf0e1_1793355628649",
+    "scope": "allow-all"
+  },
+  "nativeRuns": [
+    {
+      "id": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "status": "completed",
+      "stage": "report",
+      "children": [
+        {
+          "id": "80aa28c1-c790-4790-bdfe-b9ad3354694c",
+          "stage": "brief",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:20:32.155Z",
+          "status": "completed",
+          "requestIds": [
+            "473f4c8c-f01c-4dbc-b1b4-b4e47570e87c"
+          ],
+          "sourceIds": [],
+          "endedAt": "2026-10-30T10:20:32.285Z"
+        },
+        {
+          "id": "3524ec7d-c8e0-479a-861c-41469cf2e3a6",
+          "stage": "investigate",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:20:32.301Z",
+          "status": "completed",
+          "requestIds": [
+            "43a7c16c-5daa-4e76-8a75-384fa8a147e9",
+            "23b5ed64-b08f-4dde-8d4d-e4de3d853fab"
+          ],
+          "sourceIds": [
+            "s-3a8525c0dc95b26ea287"
+          ],
+          "endedAt": "2026-10-30T10:20:32.617Z"
+        },
+        {
+          "id": "c3619698-fa24-4470-9ed5-38b6d2eb564a",
+          "stage": "gaps",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:20:32.635Z",
+          "status": "completed",
+          "requestIds": [
+            "b333ed3e-00e8-4ecf-8448-c31f26122b51"
+          ],
+          "sourceIds": [],
+          "endedAt": "2026-10-30T10:20:32.758Z"
+        },
+        {
+          "id": "f25fe5e6-a977-4a27-97ff-62341715a47b",
+          "stage": "draft",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:20:32.771Z",
+          "status": "completed",
+          "requestIds": [
+            "c504684c-5752-43be-ba60-8a33eedf06e0"
+          ],
+          "sourceIds": [],
+          "endedAt": "2026-10-30T10:20:32.891Z"
+        },
+        {
+          "id": "6a590904-d209-444d-9d81-b285eb49ba8c",
+          "stage": "review",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:20:32.902Z",
+          "status": "completed",
+          "requestIds": [
+            "fc93ce78-f0c4-41ce-8ebd-e7e1a16aad5a",
+            "6c17398f-f2b9-4748-abae-1f307ba7eed1"
+          ],
+          "sourceIds": [
+            "s-3a8525c0dc95b26ea287"
+          ],
+          "endedAt": "2026-10-30T10:20:33.210Z"
+        },
+        {
+          "id": "537cece2-7da7-4af7-910c-81799637dba8",
+          "stage": "report",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:20:33.225Z",
+          "status": "completed",
+          "requestIds": [
+            "2b487c95-12e7-4299-8a0e-ae6817d01cc8"
+          ],
+          "sourceIds": [],
+          "endedAt": "2026-10-30T10:20:33.354Z"
+        },
+        {
+          "id": "aef7c47a-340c-4f55-95fd-cfd762c491ef",
+          "stage": "report",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:20:33.373Z",
+          "status": "completed",
+          "requestIds": [
+            "1d0fe223-e052-40f4-8f60-eb179e1e5790"
+          ],
+          "sourceIds": [],
+          "endedAt": "2026-10-30T10:20:33.497Z"
+        },
+        {
+          "id": "a4fc05cc-1c0b-4556-961f-78dfed529e32",
+          "stage": "report",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:20:33.511Z",
+          "status": "completed",
+          "requestIds": [
+            "2536c89d-e082-4135-a0fb-79c129783681"
+          ],
+          "sourceIds": [],
+          "endedAt": "2026-10-30T10:20:33.634Z"
+        }
+      ]
+    }
+  ],
+  "requests": 12,
+  "readinessRequests": 1,
+  "wire": [
+    {
+      "request": 1,
+      "case": "first-position with evidence",
+      "stage": "root",
+      "runId": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "nativeTool": true
+    },
+    {
+      "request": 2,
+      "case": "first-position with evidence",
+      "stage": "brief",
+      "runId": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 3
+    },
+    {
+      "request": 3,
+      "case": "first-position with evidence",
+      "stage": "investigate",
+      "runId": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": true,
+      "toolCount": 3
+    },
+    {
+      "request": 4,
+      "case": "first-position with evidence",
+      "stage": "investigate",
+      "runId": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": true,
+      "nativeRead": false,
+      "toolCount": 3
+    },
+    {
+      "request": 5,
+      "case": "first-position with evidence",
+      "stage": "gaps",
+      "runId": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 6,
+      "case": "first-position with evidence",
+      "stage": "draft",
+      "runId": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 7,
+      "case": "first-position with evidence",
+      "stage": "review",
+      "runId": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": true,
+      "toolCount": 3
+    },
+    {
+      "request": 8,
+      "case": "first-position with evidence",
+      "stage": "review",
+      "runId": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": true,
+      "nativeRead": false,
+      "toolCount": 3
+    },
+    {
+      "request": 9,
+      "case": "first-position with evidence",
+      "stage": "report",
+      "runId": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 10,
+      "case": "first-position with evidence",
+      "stage": "report",
+      "runId": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 11,
+      "case": "first-position with evidence",
+      "stage": "report",
+      "runId": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 12,
+      "case": "first-position with evidence",
+      "stage": "root",
+      "runId": "87eb5af9-cb03-40a1-b0f3-dfed06fd2e35",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "nativeTool": true
+    }
+  ],
+  "outputBytes": 7246,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

@@ -451,3 +451,9 @@ W8 合成模型与实际原生 CLI 验证运行时契约，不代表上述真实
 具体 owner、命令、来源/review/save/recovery 行为见 §2、§6–§7、§13–§16。最终 Node 20.3 构建与35文件392项、结果契约149项、8有效反转/恢复后25项、五项静态 gates/43 scripts/NormProof 0 blocking、Node/executable两入口两模式共171次合成请求通过；源码82项冻结稳定。独立审查修复与最终批准、精确提交和远端结果统一记录于[Phase 19 §8.122](phase-19-decisions.md)。
 
 合成模型按 schema 驱动真实 CLI、工具/PDF、审批/writer、shared ledger 与重启边界，因此是运行时契约证据；不是生成式模型真实研究质量、混合域真实样本或跨平台证明。公共API快照只支持该次服务事实。真实质量与跨平台证据仍归最终QA，完整Phase19继续。
+
+### 17.6 多skill组合的实际请求证据（2026-10-30）
+
+[Phase20 addition §21.22](phase-20-addition.md#2122-add-1112多skill进入原生研究实际http请求)在原NodeCLI regular/fullscreen中验证两份skill正文进入根entry及全部原生child HTTP请求，精确绑定同一runId，保留原始输入/换行。未知第二skill在创建run和派发前拒绝；实际读取得到completed的有界报告，无读取仍保持failed review/partial run。相同内容的调查与复核两次读取刷新同一source ID，以各自child/request/receipt及当前review归属证明fresh acquisition，不按来源条数宣称独立确认。
+
+本批未修改产品源码，确定性loopback只证明请求/工具/状态合同。真实模型质量、外部provider、deep/paper/mixed/save/recovery及平台验收不由这份证据覆盖，原任务状态不升级。

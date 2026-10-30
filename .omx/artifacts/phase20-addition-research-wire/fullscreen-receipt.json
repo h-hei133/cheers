@@ -1,0 +1,464 @@
+{
+  "mode": "fullscreen",
+  "buildId": "7499028c41a4b125f9d40e17b29501c009d3db8a8783211cd7130ed93892a7f1",
+  "inputsDigest": "336820d5bccff83c07312cede18a15fa093f35a8f1a389105cfad52633622578",
+  "provider": "loopback HTTP fixture; real adapter path",
+  "savedMessages": 1,
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 60,
+    "outputBytes": 2097152,
+    "requests": 30
+  },
+  "status": "passed",
+  "cases": [
+    {
+      "name": "unknown second skill",
+      "exactDraftRestored": true,
+      "stateUnchanged": true,
+      "providerRequests": 0,
+      "researchRuns": 0
+    },
+    {
+      "name": "first-position with evidence",
+      "reads": true,
+      "rootRequests": 2,
+      "childRequests": 10,
+      "actualReads": 2,
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "originalInputPreserved": true,
+      "durableSkillBodies": true,
+      "nativeStatus": "completed",
+      "review": "completed",
+      "sameModelCorrelation": "same-model-independent-context",
+      "requests": 12,
+      "children": [
+        {
+          "stage": "brief",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        },
+        {
+          "stage": "investigate",
+          "status": "completed",
+          "requestIds": 2,
+          "sourceIds": 1
+        },
+        {
+          "stage": "gaps",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        },
+        {
+          "stage": "draft",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        },
+        {
+          "stage": "review",
+          "status": "completed",
+          "requestIds": 2,
+          "sourceIds": 1
+        },
+        {
+          "stage": "report",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        },
+        {
+          "stage": "report",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        },
+        {
+          "stage": "report",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        }
+      ],
+      "sources": 1,
+      "claims": 1,
+      "fragments": 3,
+      "parentMetadataBound": true,
+      "ledgerScopePresent": true,
+      "ledgerNextSequence": 13,
+      "ledgerPending": 0,
+      "nativeResultPainted": true,
+      "save": "not-requested"
+    },
+    {
+      "name": "body entry without evidence",
+      "reads": false,
+      "rootRequests": 2,
+      "childRequests": 8,
+      "actualReads": 0,
+      "runId": "9ced8ab3-68c4-4753-80b4-ff35b3599671",
+      "originalInputPreserved": true,
+      "durableSkillBodies": true,
+      "nativeStatus": "partial",
+      "review": "failed",
+      "sameModelCorrelation": "same-model-independent-context",
+      "requests": 10,
+      "children": [
+        {
+          "stage": "brief",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        },
+        {
+          "stage": "investigate",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        },
+        {
+          "stage": "gaps",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        },
+        {
+          "stage": "draft",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        },
+        {
+          "stage": "review",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        },
+        {
+          "stage": "report",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        },
+        {
+          "stage": "report",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        },
+        {
+          "stage": "report",
+          "status": "completed",
+          "requestIds": 1,
+          "sourceIds": 0
+        }
+      ],
+      "sources": 0,
+      "claims": 0,
+      "fragments": 3,
+      "parentMetadataBound": true,
+      "ledgerScopePresent": true,
+      "ledgerNextSequence": 11,
+      "ledgerPending": 0,
+      "nativeResultPainted": true,
+      "save": "not-requested"
+    }
+  ],
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "configurationUnchanged": true,
+  "projectUnchanged": true,
+  "requests": 22,
+  "readinessRequests": 2,
+  "wire": [
+    {
+      "request": 1,
+      "case": "first-position with evidence",
+      "stage": "root",
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "nativeTool": true
+    },
+    {
+      "request": 2,
+      "case": "first-position with evidence",
+      "stage": "brief",
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 3
+    },
+    {
+      "request": 3,
+      "case": "first-position with evidence",
+      "stage": "investigate",
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": true,
+      "toolCount": 3
+    },
+    {
+      "request": 4,
+      "case": "first-position with evidence",
+      "stage": "investigate",
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": true,
+      "nativeRead": false,
+      "toolCount": 3
+    },
+    {
+      "request": 5,
+      "case": "first-position with evidence",
+      "stage": "gaps",
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 6,
+      "case": "first-position with evidence",
+      "stage": "draft",
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 7,
+      "case": "first-position with evidence",
+      "stage": "review",
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": true,
+      "toolCount": 3
+    },
+    {
+      "request": 8,
+      "case": "first-position with evidence",
+      "stage": "review",
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": true,
+      "nativeRead": false,
+      "toolCount": 3
+    },
+    {
+      "request": 9,
+      "case": "first-position with evidence",
+      "stage": "report",
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 10,
+      "case": "first-position with evidence",
+      "stage": "report",
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 11,
+      "case": "first-position with evidence",
+      "stage": "report",
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 12,
+      "case": "first-position with evidence",
+      "stage": "root",
+      "runId": "bfc1a675-a104-4cde-8023-c1507f9053d9",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "nativeTool": true
+    },
+    {
+      "request": 13,
+      "case": "body entry without evidence",
+      "stage": "root",
+      "runId": "9ced8ab3-68c4-4753-80b4-ff35b3599671",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "nativeTool": true
+    },
+    {
+      "request": 14,
+      "case": "body entry without evidence",
+      "stage": "brief",
+      "runId": "9ced8ab3-68c4-4753-80b4-ff35b3599671",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 3
+    },
+    {
+      "request": 15,
+      "case": "body entry without evidence",
+      "stage": "investigate",
+      "runId": "9ced8ab3-68c4-4753-80b4-ff35b3599671",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 3
+    },
+    {
+      "request": 16,
+      "case": "body entry without evidence",
+      "stage": "gaps",
+      "runId": "9ced8ab3-68c4-4753-80b4-ff35b3599671",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 17,
+      "case": "body entry without evidence",
+      "stage": "draft",
+      "runId": "9ced8ab3-68c4-4753-80b4-ff35b3599671",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 18,
+      "case": "body entry without evidence",
+      "stage": "review",
+      "runId": "9ced8ab3-68c4-4753-80b4-ff35b3599671",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 3
+    },
+    {
+      "request": 19,
+      "case": "body entry without evidence",
+      "stage": "report",
+      "runId": "9ced8ab3-68c4-4753-80b4-ff35b3599671",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 20,
+      "case": "body entry without evidence",
+      "stage": "report",
+      "runId": "9ced8ab3-68c4-4753-80b4-ff35b3599671",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 21,
+      "case": "body entry without evidence",
+      "stage": "report",
+      "runId": "9ced8ab3-68c4-4753-80b4-ff35b3599671",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 22,
+      "case": "body entry without evidence",
+      "stage": "root",
+      "runId": "9ced8ab3-68c4-4753-80b4-ff35b3599671",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "nativeTool": true
+    }
+  ],
+  "outputBytes": 25134,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

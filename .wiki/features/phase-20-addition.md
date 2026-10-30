@@ -4468,3 +4468,15 @@ publication首轮只换方向仍失败，诊断看到完整内置条目后改为
 三次探针失败均留收据：首次把未创建账本的可选local当现有数组；第二次从child ready算前台窗口，漏掉shell/child启动，改为原adopt/promote的同进程单调边界；第三次已见0/5秒event但未等异步绘制帧，改为同时等待实际terminal text。未为这些fixture问题修改产品或放宽同PID/单次提升/60秒结果/实际绘制断言。scratch已清理、CLAUDE.md保留，无本地full suite/并行heavy/本助手subagent/20k终端/exe、真实provider、独立review或NormProof judge。
 
 延后一次读回：19ee578c的CI41032575806/Watch41032575779均completed/success且head匹配；316e4de7的CI41035961101仍in_progress，Watch41035960972 completed/success。无重复watch，本批提交/推送/未来CI另绑定。17.3本地等待与原60秒提升路径取得证据，真实生产任务/设备、非Linux、33大目录体验及原47/ADD整体仍未验收，goal active。
+
+### 21.22 ADD-11/12多skill进入原生研究实际HTTP请求
+
+继续第9/10节真实payload验收。目标[entry](../../packages/ts-shell/src/research/run/entry.ts)、[stage prompt](../../packages/ts-shell/src/research/run/prompts.ts)与[runner组合测试](../../packages/ts-shell/src/research/run/composition.test.ts)已实现全部method正文的持久化和每阶段注入，本批未发现新的产品缺陷，因此不添加重复注入或新runner。先读目标，再定向只读对照pi agent-session.ts:2150–2154,2228–2255的派发前skill展开与显式location；参考仅处理首位单skill且未知名称原文透传，本项目按addition保留正文/多skill及派发前明确拒绝的更强合同，未复制实现。
+
+补充原NodeCLI→实际loopback HTTP adapter→research_run→原生顺序children→主请求继续的证据，弥补旧research-preview只有run持久化、没有children的范围。regular/fullscreen各1保存会话×1消息、两份公开skill，首先提交未知第二skill：精确原草稿恢复、state内容不变、零POST/零run。随后首位研究入口带两skill实际调用native read，12次POST中根2/child10，八children按brief/investigate/gaps/draft/review/report×3完成；调查/复核各一次实际读取，保留一份content-addressed来源、一个bound claim和三report fragments，run/review均completed。正文研究入口带两skill且有原始换行，另10次POST中根2/child8，零reads/sources/claims，review failed、run partial；成功返回的review child未被当作核验成功。
+
+每个实际根entry和child prompt均检查两份准确正文各一次；根工具schema精确绑定本次runId，所有child输入同ID；durable methods与user metadata保留原始输入/换行和两份正文。每个child请求ID存在且去重计数吻合，不提供shell/write/nested task/research权限；账本scope存在、推进且无pending，最终两种native状态均实际绘制。不请求save，project/config不变，Ctrl+D exit0/cooked恢复。heap768MiB、每模式60秒/2MiB/30POST上限，实际每模式22POST+2readiness GET，scratch清理。
+
+主代理严格串行：五静态门、两个脚本syntax与两模式原CLI通过，118旧docs advisory保留。复用已验freshness的build `7499028c41a4b125f9d40e17b29501c009d3db8a8783211cd7130ed93892a7f1`、inputs `336820d5bccff83c07312cede18a15fa093f35a8f1a389105cfad52633622578`；无产品源码变化，未重跑unit/build或修改源码做反转。两份初期probe失败收据保留：错把相同来源复读当两record、对原selected-text哈希先trim；修正为实际child/request/receipt/当前review归属和保留末尾换行的哈希，未改产品或放宽fresh read断言。详见[正式工件](../../.omx/artifacts/phase20-addition-research-wire/README.md)与HANDOFF。
+
+一次延后读回：316e4de7的CI41035961101/Watch41035960972均completed/success；ed4820cb的CI41039139794仍in_progress、Watch41039139814 completed/success且head一致；本批Git/未来CI另绑定。原CLAUDE.md保留，无full suite/并行heavy/本助手subagent/20k真实终端/exe、独立review或NormProof judge。此为确定性loopback的实际请求契约，非生成式模型研究质量、真实provider费用/可用性、deep/paper/mixed/save/recovery/平台验收；ADD-11/12与原47/ADD整体不升级，goal active。

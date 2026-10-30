@@ -1,0 +1,37 @@
+{
+  "observedAt": "2026-10-30T10:23:19.993Z",
+  "runs": [
+    {
+      "conclusion": "",
+      "databaseId": 41039139794,
+      "headSha": "ed4820cbb214c29686cd5d9b7bb2144df8a0f3e0",
+      "name": "CI",
+      "status": "in_progress",
+      "url": "https://github.com/h-hei133/cheers/actions/runs/41039139794"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41039139814,
+      "headSha": "ed4820cbb214c29686cd5d9b7bb2144df8a0f3e0",
+      "name": "NormProof Architecture Watch",
+      "status": "completed",
+      "url": "https://github.com/h-hei133/cheers/actions/runs/41039139814"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41035960972,
+      "headSha": "316e4de78c32f68afba7b55e6bc8cc8f6512264e",
+      "name": "NormProof Architecture Watch",
+      "status": "completed",
+      "url": "https://github.com/h-hei133/cheers/actions/runs/41035960972"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41035961101,
+      "headSha": "316e4de78c32f68afba7b55e6bc8cc8f6512264e",
+      "name": "CI",
+      "status": "completed",
+      "url": "https://github.com/h-hei133/cheers/actions/runs/41035961101"
+    }
+  ]
+}

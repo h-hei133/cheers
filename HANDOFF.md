@@ -1176,3 +1176,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A progress clock survives cancellation or completion, or an already completed task creates a new interval after its cleanup has run. A throwing progress observer can also strand the real wait.
 - **Root Cause**: Display updates are installed separately from the completion subscription and deadline, including after the post-subscription completion recheck has settled.
 - **Rule**: Recheck completion and cancellation before installing progress, retire its interval in the same settlement owner, and allow a synchronous first update to cancel safely. Disable a failing observer without changing the actual task result. A progress tick must not poll the task, replay its output, imply that it is running, or extend its deadline; elapsed wait time and task completion are separate facts.
+
+### Fresh Research Reads Can Refresh One Source Identity
+- **Symptom**: A CLI probe completes native investigation and fresh review but fails because it expects two source records, or because it hashes a trimmed quote.
+- **Root Cause**: Research source identity is content-addressed from locator/hash/excerpts, so identical re-reads refresh the same record. The native read hash binds selected text, including its terminal newline; retained excerpts may normalize that text for citation.
+- **Rule**: Prove fresh acquisition with distinct child/request identities, actual native receipt delivery and current-review attribution, rather than source count. Check the declared hash scope against the original selected bytes and validate the quote separately. A completed child with no reads can still have a failed review and a partial run.

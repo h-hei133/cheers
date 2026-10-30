@@ -1,0 +1,314 @@
+{
+  "mode": "regular",
+  "buildId": "7499028c41a4b125f9d40e17b29501c009d3db8a8783211cd7130ed93892a7f1",
+  "inputsDigest": "336820d5bccff83c07312cede18a15fa093f35a8f1a389105cfad52633622578",
+  "provider": "loopback HTTP fixture; real adapter path",
+  "savedMessages": 1,
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 60,
+    "outputBytes": 2097152,
+    "requests": 30
+  },
+  "status": "failed",
+  "cases": [
+    {
+      "name": "unknown second skill",
+      "exactDraftRestored": true,
+      "stateUnchanged": true,
+      "providerRequests": 0,
+      "researchRuns": 0
+    }
+  ],
+  "failure": "The expression evaluated to a falsy value:",
+  "assertion": {
+    "actual": false,
+    "expected": true,
+    "location": "at file:///home/wang/projects/cheers/.omx/artifacts/phase20-addition-research-wire/pty.mjs:173:25"
+  },
+  "observation": {
+    "ends": 2,
+    "tools": [
+      {
+        "name": "research_run",
+        "success": true
+      }
+    ],
+    "restoredDrafts": [
+      "/deep-research --mode software /skill:one /skill:missing Versioned feature conditions"
+    ],
+    "sessionId": "sess_f5855614a5f34296_1793355685263",
+    "scope": "allow-all"
+  },
+  "nativeRuns": [
+    {
+      "id": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "status": "completed",
+      "stage": "report",
+      "children": [
+        {
+          "id": "227e1f08-97f8-4467-9a65-8035e9d9a5c1",
+          "stage": "brief",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:21:28.950Z",
+          "status": "completed",
+          "requestIds": [
+            "a97da8ce-3469-4478-8118-c2a9ea8eba49"
+          ],
+          "sourceIds": [],
+          "endedAt": "2026-10-30T10:21:29.085Z"
+        },
+        {
+          "id": "c2209889-7a72-4c46-aea5-2cd2eccbbc85",
+          "stage": "investigate",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:21:29.103Z",
+          "status": "completed",
+          "requestIds": [
+            "a6da981e-40ea-4046-9607-812e8f49e777",
+            "b910707f-63bb-41ad-a2f9-afbc0c4f0dd2"
+          ],
+          "sourceIds": [
+            "s-3a8525c0dc95b26ea287"
+          ],
+          "endedAt": "2026-10-30T10:21:29.417Z"
+        },
+        {
+          "id": "bc0a588c-a80d-47a2-9410-1fd2c926d9aa",
+          "stage": "gaps",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:21:29.435Z",
+          "status": "completed",
+          "requestIds": [
+            "53b0d595-46a4-4f7d-b25b-4cb8006714e9"
+          ],
+          "sourceIds": [],
+          "endedAt": "2026-10-30T10:21:29.564Z"
+        },
+        {
+          "id": "40e3fba1-a6b7-4ba2-875c-466e40340910",
+          "stage": "draft",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:21:29.579Z",
+          "status": "completed",
+          "requestIds": [
+            "b085fb23-ab7f-4037-aeb1-d151597ba5bb"
+          ],
+          "sourceIds": [],
+          "endedAt": "2026-10-30T10:21:29.699Z"
+        },
+        {
+          "id": "f9a30662-73f1-481f-8589-970985e1d43b",
+          "stage": "review",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:21:29.711Z",
+          "status": "completed",
+          "requestIds": [
+            "a354c399-f242-4305-b9ba-4f9b9a6b0df5",
+            "6cd09b00-0822-44ac-b08e-4c378fc04d5b"
+          ],
+          "sourceIds": [
+            "s-3a8525c0dc95b26ea287"
+          ],
+          "endedAt": "2026-10-30T10:21:30.017Z"
+        },
+        {
+          "id": "a39bfb2a-a58e-48be-bcac-8c77a414bc22",
+          "stage": "report",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:21:30.035Z",
+          "status": "completed",
+          "requestIds": [
+            "e4c3d5fd-c9d0-4045-846c-1e57e5845f8c"
+          ],
+          "sourceIds": [],
+          "endedAt": "2026-10-30T10:21:30.163Z"
+        },
+        {
+          "id": "f178c5cc-3683-415e-84e9-3386bc20d979",
+          "stage": "report",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:21:30.179Z",
+          "status": "completed",
+          "requestIds": [
+            "fe959c9d-dc47-4987-8aaf-9fcf7d2fe6fd"
+          ],
+          "sourceIds": [],
+          "endedAt": "2026-10-30T10:21:30.306Z"
+        },
+        {
+          "id": "727fb34f-4ae6-40e9-adba-2e63a47f22bf",
+          "stage": "report",
+          "briefRevision": 1,
+          "startedAt": "2026-10-30T10:21:30.317Z",
+          "status": "completed",
+          "requestIds": [
+            "06005e4e-2e70-4544-8f82-7a688657a883"
+          ],
+          "sourceIds": [],
+          "endedAt": "2026-10-30T10:21:30.449Z"
+        }
+      ]
+    }
+  ],
+  "requests": 12,
+  "readinessRequests": 1,
+  "wire": [
+    {
+      "request": 1,
+      "case": "first-position with evidence",
+      "stage": "root",
+      "runId": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "nativeTool": true
+    },
+    {
+      "request": 2,
+      "case": "first-position with evidence",
+      "stage": "brief",
+      "runId": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 3
+    },
+    {
+      "request": 3,
+      "case": "first-position with evidence",
+      "stage": "investigate",
+      "runId": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": true,
+      "toolCount": 3
+    },
+    {
+      "request": 4,
+      "case": "first-position with evidence",
+      "stage": "investigate",
+      "runId": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": true,
+      "nativeRead": false,
+      "toolCount": 3
+    },
+    {
+      "request": 5,
+      "case": "first-position with evidence",
+      "stage": "gaps",
+      "runId": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 6,
+      "case": "first-position with evidence",
+      "stage": "draft",
+      "runId": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 7,
+      "case": "first-position with evidence",
+      "stage": "review",
+      "runId": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": true,
+      "toolCount": 3
+    },
+    {
+      "request": 8,
+      "case": "first-position with evidence",
+      "stage": "review",
+      "runId": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": true,
+      "nativeRead": false,
+      "toolCount": 3
+    },
+    {
+      "request": 9,
+      "case": "first-position with evidence",
+      "stage": "report",
+      "runId": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 10,
+      "case": "first-position with evidence",
+      "stage": "report",
+      "runId": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 11,
+      "case": "first-position with evidence",
+      "stage": "report",
+      "runId": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "receipt": false,
+      "nativeRead": false,
+      "toolCount": 0
+    },
+    {
+      "request": 12,
+      "case": "first-position with evidence",
+      "stage": "root",
+      "runId": "0722c99e-99fd-4542-8795-ef648b12c373",
+      "methods": [
+        "one",
+        "two"
+      ],
+      "nativeTool": true
+    }
+  ],
+  "outputBytes": 7246,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}
