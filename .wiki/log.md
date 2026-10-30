@@ -10744,3 +10744,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：纯图片会话的/copy提示不再谎称空
 
 [addition21.45](features/phase-20-addition.md#2145-纯图片会话的copy提示不再谎称空)copy source跳过无文字块时单独计数带图片块，picker据此提示「只含图片、没有可复制文字」，真正空的会话保留原措辞；剪贴板仍只取block.text。41项聚焦、一反转到命中且bytes恢复、五门/TS build通过。build 7edae23d。原47/ADD整体partial、goal active。
+
+### 2026-10-31：文件工具根选择的测试覆盖
+
+[addition21.46](features/phase-20-addition.md#2146-文件工具根选择的测试覆盖)发现workspaceToolBinding（权限层选根与参数重写）从无测试，它本就用selectWorkspaceRoot，故修复前是「权限层批准、工具体层拒绝」的不一致来源。新增四用例锁定：附加根选中且参数重写、主根内保留拼写、只读根write拒read允、未注册拒绝且非文件工具绑主根。4项通过、五门/TS build通过。build 91aa1e1d。原47/ADD整体partial、goal active。

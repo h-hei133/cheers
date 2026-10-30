@@ -4732,3 +4732,10 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 图片可进入历史（21.32/21.33）后暴露一个小缺陷：`/copy`只收录有文字的块，因此一个只含图片的会话会显示「Nothing in the transcript to copy yet.」——但transcript并不空，只是没有可放进剪贴板的文字。现[copy source](../../packages/ts-shell/src/cli/interactive/picker/copy/source.ts)在跳过无文字块时单独计数带图片的块，[picker](../../packages/ts-shell/src/cli/interactive/picker/copy.ts)据此选择文案：「The transcript holds only pictures; there is no text to copy.」；真正空的会话保留原措辞。剪贴板仍只取`block.text`，图片载荷不会进入复制内容。
 
 验证：`copy`13（新例同时断言两种措辞）、`history`28，共**41项**通过；反转（恒用空措辞）命中断言且finally字节恢复；五静态门、TS build/freshness通过，118旧docs advisory保留。build `7edae23d3d72`。原47/ADD整体partial、goal active。
+
+
+### 21.46 文件工具根选择的测试覆盖
+
+21.39–21.41修复了write/edit/read/glob/grep的围栏，但复查发现[workspaceToolBinding](../../packages/ts-shell/src/core/workspace/tools.ts)——**权限层**用于决定批准哪个根并重写参数的函数——一直没有测试。它本来就用`selectWorkspaceRoot`并读取`roots`，因此修复前存在「权限层批准附加根、工具体层拒绝」的不一致，正是21.38观察到的「批准了却写不进去」的另一半。
+
+新增[四个用例](../../packages/ts-shell/src/core/workspace/tools.test.ts)锁定契约：附加根被选中且参数重写为该根下的绝对目标；主根内路径保留调用者拼写；只读附加根对write拒绝而对read放行；未注册路径拒绝且非文件工具仍绑主根。4项通过；五静态门与TS build通过，118旧docs advisory保留。build `91aa1e1d8bb4`。原47/ADD整体partial、goal active。
