@@ -10489,3 +10489,23 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 基线8失败、dispatch1失败；八文件98通过，原tool与dispatch fence独立反转8/1失败、bytes恢复后98重跑；五门/build/freshness460/3557、callables≤8、118旧advisory。原CLI两模式四实际read receipts阶段绑定/falsifiers持久化、无证据unresolved、错误id保留peer零review、三视角拒绝、held review取消102/103ms、exit144/143ms/0/cooked、33POST/5GET，文件/config保持/scratch清理。正式工件/HANDOFF/CLAUDE.md保留；专门上下文采用批准仍待续，原47不升级、goal active。
 
 20.54已推送3bc969461f3e8bd757f1e87546f0ab479ad0ab95；两GitHub API查询EOF无新CI结论。本批Git/未来CI另绑定。
+
+## [2026-10-30] research | 配置文件归属、面板导航、resume 延迟、双击 Esc 回归与三项输入手势
+
+用户提出第三十一至第三十七项问题，本轮只做定位与方案，未改产品代码、未运行测试/构建/PTY/provider/20k，唯一数据采集是对 `~/.cheers/sessions`（2307 个目录、41 MiB）的只读脚本。结论写入[补充规划第21节](features/phase-20-addition.md#21-第九轮用户反馈2026-10-30配置文件与模型目录settings-导航resume-卡顿双击-escmodel-排序双击粘贴与点击定位)。
+
+第三十一：`config.json`（user + project，`/connect`、`/settings`、`/model use --global` 写）与 `models.json`（**仅 user**，只有 `/model config` 创建）确为三个 owner；界面只写 scope 不写文件名（`settings.ts:45`、`settings/source.ts:12-16`、`model.ts:437-442`）。本机 `models.json` 实际含**两个**顶层 `providers`，后者生效、前者被 JSON 静默丢弃；`readOverlay` 对解析失败也静默返回空（`catalogStore.ts:99-119`）。参考 pi/oh-my-pi 目录文件同样无项目作用域，故作用域不是缺陷，缺陷是归属不可见与失败不可见。
+
+第三十二：settings 同时声明 `navigation` 与 `chips`，overlay 仅在 `!navigation` 时画 chips（`overlay.ts:296-299`），因此顶部条从不出现；左右键在 `sectionFocus` 下切的是竖排分类（`picker/navigation.ts:138-142`）。参考 oh-my-pi 为顶部 `TabBar` + 左右切 tab（`settings-defs.ts:20-32`、`settings-selector.ts:1947-1951`、`components/tab-bar.ts:210-220`），tab 内另有左侧 section 栏（`components/settings-list.ts:820-826,914-930`）。建议给 picker 契约加 `placement`，默认 `side` 以保住 model 面板。
+
+第三十三：只读测量一次完整扫描约 1.62 s（lstat 905 ms、读 654 ms、parse 32 ms）。打开时首帧只等当前会话（`catalog/index.ts:215`、`browse.ts:112-113`），但后台全量扫描的 `decodeSessionSummary` 同步 parse（`catalog/projection.ts:29-56`）会切碎主线程；删除含三次整会话同步读（`actions.ts:14`、`management.ts:47-51,79`）且成功后 `browser.close()`（`actions.ts:22`）销毁浏览索引，触发整目录重扫。建议先做"删除不退休索引"与"三次读合一"。
+
+第三十四：**确认为回归**。双击判定完好（`keymap.ts:310-340`，600 ms），但接线 `openPicker("back")`（`interactiveMode.ts:739`）与 `pickerFor` 的 `/` 守卫（`picker/registry.ts:185`，由 `3841998d` 于 2026-10-26 加入）冲突，`openPicker` 静默 abort（`:1187-1191`）。`keymap.test.ts` 只断言 action、`picker/rewind.test.ts` 只测带斜杠入口，缺口正好吞掉这次回归。参考 oh-my-pi 语义一致（空编辑器、500 ms、草稿重置计时、autocomplete/vim 先消费），无需改语义。
+
+第三十五：已就绪置前但组内保持目录顺序（`picker/model.ts:244-246`），未就绪只有 `○`（`:354-356`）。参考 oh-my-pi 为未解锁置底 + 分隔 + provider 字母序（`model-hub.ts:744-748,772-778`、`hub-frame.ts:248-250`）；用户要求首字母序，优先按用户。
+
+第三十六：`expansionAt` 只接受严格内部位置（`pastes.ts:140-152`），块后一格被有意排除并有测试（`pastes.test.ts:141-147`）。四个参考项目均无此手势，属自有实现；建议加"刚粘贴块"短期状态，保留块内任意时刻可展开。
+
+第三十七：输入框点击只做选择、从不移动光标（`pointer.ts:216-233,262`）；映射数据（`composer/contract.ts:11-16`、`row.ts:35-62`）与 `setCursorOffset`（`editor/buffer.ts:77-87`）均已存在。参考 pi 与 Claude Code 已实现（同格 press+release 合成 click → 列偏移 → 设光标），codex/oh-my-pi 未实现。建议复用 `sourceBoundary` 并只在 fullscreen 生效。
+
+同时记录研究新发现：`models.json` 解析失败与重复键静默、`openPicker` 静默失败、删除后索引重建、以及"action 被调用 ≠ 面板真的打开"的测试缺口。建议顺序：34 → 33 → 31 → 32 → 35 → 36+37。参考项目仅只读对照，未复制实现；原 47 项与 ADD 状态不变。

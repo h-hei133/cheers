@@ -1083,3 +1083,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A JSON response is stored as an opaque claim, falsifiers vanish, or one synchronous dispatch error discards another proposer's valid answer.
 - **Root Cause**: Proposal transport is free text and only Promise rejection is fenced; source identity is also easy to confuse between proposal and review stages.
 - **Rule**: Validate exact bounded hypothesis identity/claim/references/falsifiers at the team owner before retention, bind proposal refs to its own read receipts and preserve empty refs as unverified support. Send other hypotheses' source locators as review leads, require fresh review reads for findings, and catch synchronous invocation plus asynchronous settlement per proposer. Receipt order follows completion; compare IDs, not array positions.
+
+
+### Picker Factories Guard On The Command Prefix, So Callers Must Pass It
+- **Symptom**: Double Escape silently does nothing: the keymap calls the rewind action, the action is invoked, and no panel appears. The regression survived a month while both the keymap test and the picker test were green.
+- **Root Cause**: `pickerFor` gained an early `if (!command.startsWith('/')) return undefined;` guard, while the host kept calling `openPicker("back")` without the slash. `openPicker` treats an undefined picker as "nothing to open" and aborts the lifecycle without reporting, so the gesture fails silently.
+- **Rule**: Treat the picker factory's accepted input as a command line and pass the leading slash at every call site; do not normalize the string inside the factory, because the slash is what separates a command invocation from arbitrary text. When a picker cannot be constructed, report it instead of returning silently, so a wiring mistake is visible to the user. Test gestures through the real host (key press → overlay opened) rather than only asserting that the action callback was called, and test the factory with the exact string the host passes.
+
+
+### A Session Browse Index Must Survive A Mutation
+- **Symptom**: Deleting one session in the resume picker costs about a second, and the list appears to reload from scratch afterwards.
+- **Root Cause**: The delete action closes the browser on success, which retires the shared catalog browse token. The overlay then reloads the picker, which begins a brand new browse and rescans every session directory; only the small bounded summary cache survives. The same path also reads and parses the target session's full transcript three times synchronously (selection block, preparation, locked apply).
+- **Rule**: A mutation inside one picker lifetime should invalidate the affected entry, not the whole acquisition source: forget the removed id, keep the token, and let the next query re-verify its page boundary. Keep the identity checks; reuse the catalog summary for fields the summary already projects instead of loading the full session. Read the full transcript only where the user is about to see conversation content.

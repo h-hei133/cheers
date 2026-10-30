@@ -4003,3 +4003,266 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 实际原NodeCLI+PTY+loopback两模式：无ref合法结构提案+invented review unresolved；proposer/read+review/read实际指定行2-2，四收据阶段隔离、falsifiers保留、reviewerID绑定新receipt且进入真实HTTP/原session metadata→refuted；一个p1错误id失败但p2保留、零新增review；第三视角零新增proposer拒绝；两held review Ctrl+C102/103ms结束，exit144/143ms/0/cooked、每模式33POST/5GET，文件/config保持，task scratch清理。原tool和调用fence均有反转证据；不当生产模型质量/成本/平台验证。
 
 [正式工件](../../.omx/artifacts/phase20-addition-team-proposals/)及HANDOFF留存，原CLAUDE.md保留；无本助手subagent/heavy并发/full suite/exe/20k/真实provider或独立review，原47不升级、goal active。专门用户显式批准才采用结论至主上下文尚未实施，仍沿原tool result发布，不称17.5完成。本批Git/未来CI另绑定；20.54已推送`3bc969461f3e8bd757f1e87546f0ab479ad0ab95`，本次两次GitHub API读均EOF，没有新CI结论，不把网络错误判成测试失败或CI成功。
+
+## 21. 第九轮用户反馈（2026-10-30）：配置文件与模型目录、settings 导航、resume 卡顿、双击 Esc、model 排序、双击粘贴与点击定位
+
+本轮用户提出第三十一至第三十七项问题与优化方向。本节只做定位、机制核实与方案研究，**未修改任何产品代码**；实施与验证另记。编号沿用用户原序号。
+
+证据分三类：**已确认机制**（源码可复现，含提交历史）、**只读测量**（本机文件系统或只读脚本，不是产品运行）、**未确认**（现有证据不足）。本轮唯一的一次数据采集是对 `~/.cheers/sessions`（2307 个会话目录）的只读 `node` 脚本，未启动产品、PTY、provider 或任何构建/测试命令。
+
+### 21.1 第三十一：config.json 与 models.json 没有区分开
+
+**用户所指已确认**：`config.json`（运行配置）与 `models.json`（模型目录）是两个文件、两个 owner，但界面与文档都没有把它们说清楚。
+
+**已确认的三个 owner**
+
+| 文件 | 内容 | 写入者 |
+|---|---|---|
+| `config.json`（user；项目另有 `.cheers/config.json`） | `provider`、`providerConnections`、`providerCredentials`、采样/上限、`allowedModels`、`modelTokenBudgets`、retries/network、TUI 字段 | `/connect`（`connectCommandRuntime.ts:195,278,325,364,421,452` 六处 `writeUserRuntimeConfigFile`）、`/settings` 的 `save`（`cli/interactive/settings.ts:115-140`）、`/model use --global` |
+| `models.json`（**仅 user 作用域**） | provider 目录条目：`baseUrl`、`envVar`、`models[].contextWindow`、`compat` 等 | 只有 `/model config` 会创建它（`catalogStore.ts:78-96`），此后靠用户手改 |
+| `models-cache.json` | `/model refresh` 写入的目录缓存，永不由用户编辑 | `catalogRefresh.ts:86` |
+
+**本机真实状态（只读，未打印任何密钥）**：`~/.cheers/config.json` 只有 `provider`、`providerCredentials`、`tui`、`providerConnections`（1 条 `openai-compatible` 连接，带 `baseUrl`/`model`）；`~/.cheers/models.json` 里有 BaiLu 目录条目（`baseUrl` + `contextWindow: 1000000`）。也就是说，**同一个模型的服务地址同时存在于两个文件**：连接里一份、目录里一份，而两者由不同写入者维护。这正是"没有区分开"的实质。
+
+**界面为什么说不清**
+
+1. `/settings` 的 `Stored:` 只写 `${draft.scope} file`（`picker/settings.ts:45`），来源页只写 `Save scope:`（`picker/settings/source.ts:12-16`），**从不显示文件名或路径**。用户看到"user file"无法知道是 `config.json`。
+2. `/model` 面板的详情里没有任何文件归属行（`picker/model.ts:437-442` 只有 Provider/Connection/Endpoint/Availability），只有 `/model config` 的命令输出会打印 `models.json` 路径（`modelCommandRuntime.ts:56-63`）。
+3. `models.json` 是 **user-only**（`catalogStore.ts:22,33-35` 走 `resolveUserDataFile`），而 `config.json` 有 user 与 project 两个作用域。这个不对称在面板里完全没有说明，用户会合理地以为两者都能按项目配置。
+
+**研究过程中发现的真实缺陷（不在用户列表内）**
+
+- **目录解析失败完全静默**。`readOverlay`（`catalogStore.ts:99-116`）在 `readFileSync` 失败、`JSON.parse` 失败或 `providers` 非对象时一律返回 `[]`，不记录、不提示。用户手改 `models.json` 写错一个逗号，结果是"自定义模型全部消失"，界面与命令都不说原因。注释写明这是有意"降级而非拒绝启动"，方向正确，但**没有可见性**。
+- **重复顶层键静默丢弃**。本机 `models.json` 实际包含**两个**顶层 `"providers"`（第一个是 `ensureUserCatalog` 写入的 `my-proxy` 示例，第二个是用户追加的 BaiLu）。`JSON.parse` 对重复键取最后一个，第一个块被无声丢弃；文件仍然是"合法 JSON"，所以任何解析错误提示都抓不到它。这是 `ensureUserCatalog` 的示例块与用户粘贴习惯共同造成的真实陷阱。
+- 由此推论：**`/model config` 的"示例文件"形态本身有风险**。它写入一个 `providers` 对象供用户照着改，而用户更常见的动作是把另一个 `{"providers": …}` 整块粘到文件末尾。
+
+**参考对照**（只读）
+
+- pi：`models.json`、`settings.json`、`auth.json` 三文件同目录、各自单一职责（`packages/coding-agent/src/config.ts:618-632`），目录文件同样只有 user 作用域。
+- oh-my-pi：`models.yml` 与 `settings.yml`/`config.yml` 分开，`models.yml` 只放 provider 目录（`docs/models.md` 的 "Config file location" 与 "What controls model behavior"），同样是 agent 目录级、无项目作用域；`models.json` 只作为旧格式迁移来源。
+- 结论：**"目录文件没有项目作用域"不是缺陷**，参考项目一致；真正的缺陷是界面不说明归属、解析失败静默、重复键静默。
+
+**建议方案**
+
+1. 每个展示"值"的地方标出 owner 文件，而不是只写 scope：`/settings` 的 `Stored:` 与来源页补 `config.json`（或 `.cheers/config.json`）；`/model` 详情补一行 `Catalogue: models.json`；`/model config` 保留现有路径输出。
+2. `/settings` 的 `Model` 分组与 `/model` 面板各加一行只读说明，写清"行为字段在 config.json，模型目录在 models.json，连接在 config.json"，避免用户在两处找同一件事。
+3. `readOverlay` 改为返回 `{ providers, error? }`，由 `/model`、`/model list` 与 model 面板把 `error` 显示为一行 notice（例如"models.json 无法解析；当前只使用内置目录"）。保持"降级而不拒绝启动"的既有政策，只增加可见性。
+4. 加载时对原文做一次**仅顶层**的重复键扫描（深度 1 内统计 `"key"`），发现重复时给出警告，不改写文件、不自动修复。范围要小：只针对 `models.json` 的顶层 `providers`，不做通用 JSON lint。
+5. 不改 `models.json` 的作用域语义，也不新增项目级目录文件；文档补一张"关注点 → 文件 → 作用域 → 写入者"的对照表。
+6. `/model config` 的示例保持单 `providers` 键；可把示例 provider 的 `id` 改成更明显的占位名，降低用户另起一个 `providers` 块的概率。
+
+**证据边界**：文件内容与重复键为本机只读读取；"用户因为重复键丢过条目"是推断（文件现状只能证明重复键存在且后块生效）；未运行产品、未复现用户视角的"模型消失"现场。
+
+### 21.2 第三十二：settings 面板的左侧导航应改成顶部导航
+
+**用户要求**：现在左侧是竖排导航，却用左右键上下移动；应放到顶部作为导航栏，左右键控制左右移动。
+
+**已确认机制**
+
+1. settings 面板同时声明了 `navigation`（`picker/settings.ts:160` `new CatalogNavigation(active, true, true)`）与 `chips`（`picker/settings.ts:174-178`，`All` + 各分类）。
+2. **但 overlay 只在没有 navigation 时绘制 chips**：`picker.chips && !picker.navigation`（`overlay.ts:296-299`）。settings 两者都有，所以 chips 永远不画。
+3. 于是绘制走 `renderNavigation`（`overlay.ts:331-343` → `chrome/navigation.ts:53-79`），左侧一列 `Browse` + 分类（`navigation.ts:62-68`），内容在右。
+4. 左右键在 `sectionFocus` 为真时**切换分类**（`picker/navigation.ts:138-142`），而分类是竖排的——这就是"左右键上下移动"的直接来源。上下键在同一分支里只在 `domain === 'categories'` 时切分类（`:144-147`），否则移动行。
+5. Tab 在 categories/rows/sections 三个域之间轮换（`:135-137`）；footer 目前写的是 `←→ categories · Tab: sections/rows/navigation · ↑↓ move`（`picker/settings.ts:170`），与竖排布局并不矛盾，但读起来像横向导航。
+
+**参考对照**
+
+- oh-my-pi：`SETTING_TABS` 顶部 tab 条（`packages/tui/src/overlays/settings-defs.ts:20-32`），由 `TabBar` 渲染（`settings-selector.ts:657-660`）；**左右键始终交给 tab 条**（`settings-selector.ts:1942-1952` → `tab-bar.ts:210-220`）。tab 内部另有**左侧 section 栏**（`settings-list.ts:920-996`，≥2 sections 且无过滤时启用；窄屏退化为内联标题 `:927`），上下键跨 section 连续移动（`:1028-1037`）。
+- pi：扁平 `SettingsList`，无 tab、无 section 栏（`packages/coding-agent/src/modes/interactive/components/settings-selector.ts:468-479`）。
+- 结论：**顶部 tab 条 + 左右键切 tab** 是参考项目的共同形态；oh-my-pi 在 tab 内部仍保留左侧 section 栏，与本项目"分类 + section"两级结构最接近。
+
+**建议方案**
+
+1. 在 picker 契约上增加一个**导航位置**选项（例如 `navigation.placement: 'side' | 'top'`），而不是复制第二套渲染：`top` 时由 `chipStrip`（`presentation/tui/chrome/chips.ts:32-58`）绘制分类，内容区占满宽度；`side` 保留现有 `renderNavigation`。
+2. overlay 的 chips 抑制条件改为"navigation 为 `side` 时才抑制"，`top` 时同时绘制 chips 并登记 chip 命中（现有 `chipRows` 与点击路径 `overlay.ts:400-418` 可复用）。
+3. 左右键在 `top` 下**只切分类**（复用 `CatalogNavigation.select`），上下键只移行；Tab 在 rows 与 sections 之间切换；不再需要"categories 域"。窄屏（<72 列）保留现有退化路径；是否把窄屏也改成横向滚动需在实施时按实际宽度确认，本轮不预设。
+4. footer 与 `/help` 的按键说明同步；`keyGuide` 相关测试一并更新。
+5. model 面板**不跟着改**（用户只针对 settings），但它复用同一个 `CatalogNavigation`；`placement` 默认值必须保持 `side`，避免顺手改掉 model 面板的既有验收。
+
+**证据边界**：机制全部来自源码；未在真实终端复现用户的按键感受，也未验证 chips 在 37 项设置、8 个分类下的横向宽度是否够用（需要实施后按 40/80/120 列各测一次）。
+
+### 21.3 第三十三：resume 面板打开与删除仍有约 1 秒延迟
+
+**结论：打开与删除是两个不同的主因，都不是渲染问题。**
+
+**只读测量（本机 2307 个会话目录、41 MiB，未启动产品）**
+
+| 阶段 | 耗时 |
+|---|---:|
+| `readdir` 全部会话目录 | 2–16 ms |
+| 每会话 3 次 `lstat`（全量） | 905 ms |
+| 读取 transcript（全量，3.7 MiB） | 654 ms |
+| 逐行 `JSON.parse`（22 876 行） | 32 ms |
+| **合计（一次完整目录扫描）** | **约 1.62 s** |
+| 单个最大会话（1.87 MiB / 12 116 行）同步读取+解析 | 13 ms + 13 ms |
+
+即：**一次完整扫描 ≈ 1.6 s**，其中 `lstat` 占一半以上。20.7 已把"搜索"从全量重扫降到约 35 ms（复用同一次浏览的 summary 索引），但**打开与删除仍会触发完整扫描**。
+
+**打开（已确认机制）**
+
+1. `openPicker` → `pickerFor` → `sessionPicker` → `SessionBrowser.load`（`picker/session/browser.ts:110-120`）→ `SessionListing.load`（`listing.ts:42-58`）→ `catalog.list(..., { browse })`。
+2. 首帧确实不等全量扫描：`listBrowse` 先 `await waitForBrowse(state, signal, state.ready)`（`catalog/index.ts:215`），`ready` 只等**当前会话**读完（`browse.ts:112-113`）。所以首帧应该很快。
+3. 但 `captureBrowse`（`browse.ts:81-127`）随后在后台完整扫描：`scanCatalog` → `discoverSessions` 遍历全部目录（`scan.ts:12-32`、`discovery.ts:12-44`），4 并发、每批 16 个，**每个会话的 transcript 都被完整读取**，再由 `decodeSessionSummary` **同步** `JSON.parse` 元数据/状态并 `parseTranscript` 逐行解析（`catalog/projection.ts:29-55`）。解析是同步的，主线程因此被切成大量短阻塞；2307 个会话累计约 1.6 s 的扫描全部落在渲染线程上。
+4. 每批扫描都会 `publish` → `follow` 重新投影（`listing.ts:108-118`），并对当前可见的至多 40 行执行 `validateBrowseSources`（`catalog/index.ts:281-294`，每行再 4 次 `lstat`）与 `sampleSizes`（`listing.ts:132-154`）。扫描期间这些复验持续叠加在事件循环上。
+5. 另外每帧还会调用 `context.ambient()`（`surface/chrome.ts:62`），其 peer 计数 TTL 到期后执行**同步** `readdirSync` + subagent 目录遍历（`cli/interactive/ambientFacts.ts:24-26,48-62`）。picker 打开时 hint 行被 overlay 覆盖，这次扫描纯属浪费。
+
+**删除（已确认机制，成本更高）**
+
+1. `overlay.mutate` → `sessionActions.update`（`picker/session/actions.ts:10-23`）。
+2. `blocked()` 调 `manager.getSession(id)`（`actions.ts:14` → `sessionReadSurface.ts:88-95`），后者走 `loadSessionRecord` → `readSessionRecordSnapshot`，**无 limits**（`sessionStore.ts:147-158`），读取并解析整份 transcript。这是第 1 次完整同步读。
+3. `prepareSessionManagement`（`session/lifecycle/management.ts:27-61`）：`catalog.resolve` 后再 `readSessionFileVersion` + **第二次** `readSessionRecordSnapshot`（`:47-51`）。第 2 次完整同步读。
+4. `applySessionManagement`（`:64-127`）在 `withSessionStateLock` 内再复验版本、**第三次** `readSessionRecordSnapshot`（`:79`），然后 `fs.rmSync(dir, { recursive: true })`（`sessionStore.ts:107-115`）。锁本身用 `Atomics.wait` 阻塞重试，上限 1200 ms（`sessionFileStore.ts:119-139,222-228`）。第 3 次完整同步读 + 删除 + 锁释放。
+5. **成功后 `update()` 调 `browser.close()`**（`actions.ts:22`）→ `listing.close()` → `catalog.retireBrowse`（`browse.ts:64-71`），**整个浏览索引被销毁**；随后 `mutate` 的 `reload()`（`overlay.ts:856-861`）创建新 token（`listing.ts:156-159`），**重新完整扫描 2307 个会话**。只有 `SessionCatalog.cache` 的 512 条 summary 存活（`catalog/index.ts:38,202`、`model.ts:80`），其余约 1800 个会话要重读重解析。
+
+所以"删除卡 1 秒"由两段构成：三段同步整会话读（含 transcript）+ 删除后的整目录重扫。
+
+**参考对照**
+
+- oh-my-pi：宿主把会话数组预先交给选择器（`session-selector.ts:588`），删除成功后**原地 `splice` 并从内存重排**（`:822-831`），不重新扫描目录；`loadAllSessions` 的全量列表也缓存（`:1435-1436`）。
+- pi：删除后先就地 `filter` 掉该条（`session-selector.ts:841-845`），随后仍调 `refreshSessionsAfterMutation()` **重读整个 scope**（`:1018-1023`）；但它的逐条读取是 `readline` + `createReadStream` 的**异步流式**解析（`core/session-manager.ts:799-826,941-975`），并发受 `MAX_CONCURRENT_SESSION_INFO_LOADS` 限制。也就是说 pi 同样重扫，但扫描不阻塞事件循环。
+- 结论：**"删除后不重建索引"只有 oh-my-pi 做到**；pi 与我们的差别不在是否重扫，而在扫描是否同步阻塞。两者都支持本节的建议 1 与建议 3。
+
+**建议方案**（按收益排序，均不新增第二套索引）
+
+1. **删除不再退休浏览索引**。在 `CatalogBrowses` 增加 `forget(token, id)`：从 `summaries` 删除该 id、让下一次查询重新校验页边界；`SessionBrowser` 删除成功后只刷新当前页（复用已有 token），`browser.close()` 只在真正关闭面板时调用。这是收益最大的一项：把 O(全目录) 降到 O(当前页)。
+2. **删除路径的三次整会话读合并为一次元数据+状态读**。`sessionSelectionBlock` 需要的 `projectRoot`/`status`/`reentry` 已由 catalog summary 计算（`catalog/projection.ts:20-25` 的 `reentry` 就是 `sessionHasReentrySurface` 的结果），`blocked()` 可以直接用 summary，不必 `getSession`。管理预览/应用只需要 metadata + state，不需要 transcript；在 session store 增加一个"管理快照"读取（复用 `readSessionMetadataRecord` + `readStateSnapshotRequired` + 版本复验），替换后两次 `readSessionRecordSnapshot`。
+3. **扫描期让出主线程**。`decodeSessionSummary` 内的 transcript 解析改用已存在的异步解析（`session/transcript/read.ts:255` `parseTranscriptAsync`），或在每批之间显式 `await` 一次。目标不是更快，而是不阻塞渲染。
+4. **picker 打开时不跑 ambient peer 扫描**。`readAmbientFacts` 在 overlay 打开时返回缓存值；peer 计数是提示行信息，picker 覆盖提示行时无人阅读。
+5. 保持现有预算与身份复验（20.7 的 visible/current/lookahead 复验不能因为性能回退）。
+
+**证据边界**：测量为本机只读脚本，不是产品运行；"约 1 秒"与用户主观描述吻合但未在同一进程内计时。删除的三次整读与删除后重扫由源码确认；哪一段在用户机器上占主导未单独计时。
+
+### 21.4 第三十四：双击 Esc 失效（已定位为回归）
+
+**结论：双击 Esc 的判定逻辑完好，但打开面板的接线在 2026-10-26 的提交里被破坏，之后一直静默失败。**
+
+**已确认机制**
+
+1. keymap 的双击逻辑完整：空草稿、600 ms 窗口、第二次 Esc 调 `actions.openRewind()`（`keymap.ts:310-340`，常量 `DOUBLE_ESCAPE_MS = 600` 在 `:44`）。有测试（`keymap.test.ts:827-838`）覆盖"第二次 Esc 调用 openRewind"。
+2. 接线是 `openRewind: () => this.openPicker("back")`（`interactiveMode.ts:739`）。
+3. 而 `pickerFor` 现在**要求命令以 `/` 开头**：`if (!command.startsWith('/')) return undefined;`（`picker/registry.ts:185`）。于是 `pickerFor("back")` 返回 `undefined`，`openPicker` 走 `if (!picker) { this.pickerLifecycles.abort(controller); return; }`（`interactiveMode.ts:1187-1191`）**静默返回**。
+4. 该 `/` 守卫由提交 `3841998d`（2026-10-26，"compose skills and methods in one prompt"）加入；而 `openPicker("back")` 由更早的 `5f558351`（2026-09-23）引入，当时没有守卫，所以当时可用。**这是一次真实的跨提交回归**，不是用户记错。
+5. 测试为什么没发现：`keymap.test.ts` 只断言 action 被调用（`:835`），从未经过真实 host 的 `openPicker`；`picker/rewind.test.ts` 直接调 `pickerFor('/back')`（`:44,74,169`），带斜杠。两者之间正好是缺口。
+
+**参考对照（oh-my-pi）**
+
+- 第二次 Esc 的行为在 host controller：空编辑器、500 ms 窗口（`input-controller.ts:665`）；非空草稿会**重置计时**并阻止触发（`:656-658`）；autocomplete 与 vim 在编辑器层先消费第一次 Esc（`custom-editor.ts:1790-1798`）；动作可配置 `doubleEscapeAction: rewind | tree | none`，默认 `rewind`（`modes/settings.ts:921-928`）。
+- 它还记录了一条运维教训：触发后必须只做**视口重绘**，不能用全量 `resetDisplay()`，否则长会话下选择器"打开但看不见"，双击 Esc 读起来像没反应（`input-controller.ts:676-681`）。本项目当前用 `openPicker` + 常规 `requestRender`，不存在该问题。
+- 我们的语义与参考一致（空草稿、双击窗口、草稿保护、suggestion 先关、busy 先中断），差别只是窗口 600 ms 且不可配置。**不需要改语义，只需要修接线。**
+
+**建议方案**
+
+1. 最小修复：`openRewind: () => this.openPicker("/back")`。同时把 `openPicker` 的入参语义写清（它接受一条带 `/` 的命令行），避免下一次同样的误用。
+2. **不要静默失败**：`openPicker` 在 `pickerFor` 返回 `undefined` 时追加一条 notice（例如"无法打开返回面板；请使用 /back"），而不是只 abort lifecycle。这与 evidence-and-truthfulness 的"不得把未发生的事表现成发生过"一致。
+3. 补一条**经过真实 host** 的测试：双击 Esc → `overlay` 真的打开 `/back` 选择器（可参考 `interactiveMode.test.ts` 现有的 picker 打开断言方式），而不是只断言 action 被调用。
+4. 可选的发现性改进：空草稿时提示行或 `/help` 明确写出"Esc Esc 返回"；`/back` 已在命令表里（`slashCommandRegistry.ts:80-92`），这是当前唯一的发现路径。
+5. 是否把窗口做成可配置，参考项目有、我们没有；本轮不建议新增配置项，先恢复功能。
+
+**证据边界**：回归由提交历史与源码确认；未在真实终端复现按键。用户描述的"只剩下 undo"与机制一致：`/undo` 是文件恢复（`picker/undo.ts`），与 `/back` 的对话返回是两件事，二者从未合并。
+
+### 21.5 第三十五：model 面板未配置项应置底并按首字母排序
+
+**已确认机制**
+
+1. 分类（provider 侧栏）当前按"是否有可用行"排序：`ordered.sort((l, r) => Number(!ready.has(l)) - Number(!ready.has(r)))`（`picker/model.ts:244`）。**已就绪在前、未就绪在后**，但**组内保持目录顺序**（`BUILTIN_PROVIDERS` 顺序：anthropic、bedrock、google-ai、vertex、openai、google、deepseek…，`core/models/catalog.ts:235-524`），不是字母序。
+2. 模型行同样只按就绪分组：`rows.sort(...)`（`model.ts:245-246`），**组内保持目录顺序**（例如 `gpt-5.3`、`gpt-5.3-codex`、`gpt-5.1-mini`、`o4-mini`），不是字母序。
+3. 当前活动模型若不在目录里会 `rows.unshift` 一条 `model:current`（`model.ts:269`），位置固定最前，不参与排序。
+4. 未就绪分类只用 `note: '○'` 标记（`model.ts:354-356`），没有分组标题或分隔。
+
+**参考对照（oh-my-pi）**
+
+- 行排序 `sortModelItems`（`packages/tui/src/overlays/model-browser.ts:346-403`）：角色优先 → MRU → **provider `localeCompare`** → priority → 版本号降序 → `-latest`/日期 → 字母序兜底。即 provider 是字母序，模型不是纯字母序。
+- `/models` hub 的侧栏：已解锁 provider 按字母序，然后一条分隔，再是**锁定的 provider**（`model-hub.ts:744-748,772-778`，`hub-frame.ts:248-250` 画分隔线），锁定项置灰、标题写 "`X · not configured`"（`:2548-2550`），选中后只显示说明与登录方式（`:2723-2727`）。
+- 结论：**"未配置置底 + 分隔 + 已配置按字母序"正是参考做法**；但参考的模型行是版本/新近度排序，与用户要求的"首字母排序"不同。这里**用户要求优先**。
+
+**建议方案**
+
+1. 分类排序：先按就绪分组（保留），组内按 `label`（无 label 用 `id`）`localeCompare`；`Roles`、`All models` 固定在 provider 之前。
+2. 模型行排序：组内按模型 `id` `localeCompare`；`model:current` 仍置顶；`roles` 分类内的角色行保持既有固定顺序（default/subagent/summary/advisor），不参与字母序。
+3. 未就绪 provider 增加一条不可聚焦的分隔标题（例如 `Not configured`），沿用现有 `note` 与 disabled 行能力；若渲染层不支持标题行，则至少在分类 label 上加统一前缀，避免只有 `○` 一个符号。
+4. 排序必须在 `navigation.set` 之前完成（`model.ts:354`），保证侧栏、内容、搜索投影三者顺序一致；搜索投影（`filterOptions` → `navigation.project`）会保留传入顺序，不能只排 `rows` 不排分类。
+5. 既有测试 `orders configured providers before unavailable catalogue entries`（`picker/model.test.ts:433-437`）只断言第一条，排序改动后仍需通过；新增"组内字母序"与"未配置在末尾"的断言。
+
+**证据边界**：机制来自源码；内置 provider 共 23 个（`catalog.ts:237-524`），用户目录另有 1 个自定义条目；未在真实面板里核对最终顺序，也未验证 40 列窄屏下分隔标题的可用性。
+
+### 21.6 第三十六：双击 Ctrl+V 应能直接展开刚粘贴的长文本块
+
+**用户要求**：现在必须把光标移进占位符内再按 Ctrl+V 才展开；希望"粘贴后立刻再按一次 Ctrl+V"（光标就在块后一格）也能展开。
+
+**已确认机制**
+
+1. `PasteStore.expansionAt(draft, caret)` 只接受**严格位于占位符内部**的位置：`if (caret < start || caret >= end) continue;`（`presentation/tui/pastes.ts:140-154`）。
+2. 插入占位符后光标停在 `end`，所以紧接着的第二次粘贴**不会**展开；这是 17.1 之后**有意**的设计，并有测试固定（`pastes.test.ts:141-147`，注释写明"否则下一次无关粘贴会展开旧块并丢掉剪贴板"）。
+3. 展开路径本身完整：`interactiveMode.ts:543-548` 用 `editor.replace` 做一次真实编辑（可撤销），展开后光标落在插入文本末尾。
+4. 图片占位符永不展开（`pastes.ts:150-152` 只查 `held`，不查 `heldImages`）。
+
+**参考对照**：oh-my-pi、pi、codex、Claude Code **都没有**"再粘贴一次展开"的手势；四者都只在提交时展开占位符（oh-my-pi `editor.ts:3279-3293,3343,3960`；pi `editor.ts:1100-1113,1376`；codex `chat_composer.rs:2517-2518,2993`；Claude Code `handlePromptSubmit.ts:216`、`promptEditor.ts:148`）。因此这是本项目自有手势，**没有可直接复用的参考实现**，只能沿用我们自己的占位符身份与编辑路径。
+
+**建议方案（保留既有保护，只放宽"刚粘贴的那一块"）**
+
+1. `hold()` 时记录一个**刚粘贴**状态：`{ id, placeholder, at }`。`expansionAt` 增加可选参数 `{ now, freshMs }`；`caret === end` 只在以下条件全部成立时展开：该占位符就是 `fresh` 记录的那一块、草稿中该位置仍是同一 token、`now - fresh.at <= freshMs`。
+2. 严格内部位置的行为**保持不变**（任意时刻都可展开），这样"移进块内再粘贴"仍然有效；`pastes.test.ts:141-147` 的用例改成"超过窗口后不展开"，保留反例。
+3. 窗口建议复用旧的 1200 ms 量级（原 `DOUBLE_PASTE_MS`），并改名以反映新语义（例如 `REPEAT_PASTE_MS`）。窗口只影响"块后一格"这一种位置，不影响块内。
+4. 任何一次编辑（插入/删除）后 `fresh` 失效即可；最简单可靠的做法是在 host 的每次编辑器变更后调用 `pastes.disarm()`，而不是猜草稿修订号。
+5. 图片仍不展开；展开仍是一次可撤销编辑；不新增第二个粘贴栈。
+
+**证据边界**：机制与测试来自源码；未实现、未验证 1200 ms 窗口在真实按键节奏下的手感，也未验证"粘贴→输入→再粘贴"是否会被误判（按方案 4 不会）。
+
+### 21.7 第三十七：点击输入框任意位置移动光标
+
+**已确认机制**
+
+1. 输入框的点击目前只用于**拖拽选择**：press 进入 `dragTarget = "composer"`（`cli/interactive/pointer.ts:216-233`），release 时若没有选区则直接返回（`:262` 的 `if (report.kind === "release") { … return; }`）。**没有任何路径移动光标。**
+2. 映射所需的数据已经存在：`ComposerGeometry.layout.rows[].cells` 每个 cell 带 `columnStart/columnEnd/sourceStart/sourceEnd`（`presentation/tui/composer/contract.ts:11-16`、`row.ts:35-62` 的 `contentRow`），`selectionFromPoints`/`sourceBoundary` 已能把屏幕坐标解析到源码边界（`composer/projection.ts:7-33`）。
+3. 编辑器已有 `setCursorOffset(offset)`（`presentation/tui/editor/buffer.ts:77-87`）：拒绝非字素边界、越界，并重置纵向列偏好。**不需要新写坐标换算。**
+4. 鼠标只在 alternate screen、pager 或全屏 overlay 时交给 pointer（`interactiveMode.ts:511-517`），引擎也只在同样条件开启鼠标跟踪（`render/engine.ts:371-375`）。regular 模式不接管鼠标，保留终端自身的选择与 scrollback。
+
+**参考对照**
+
+- pi：**已实现**。press/drag/release 留给选区，渲染器只在"按下与松开落在同一格"时合成 `click`（`packages/tui/src/tui-alt-screen.ts:936-940,1365`），随后按可视行映射 + 字素宽度求列偏移（`editor.ts:638-694`），最后 `setCursorCol`。拖动永远不移动光标。
+- Claude Code：**已实现**（POC）。左键释放且未拖动时触发 `onClick`，用 `measuredText.getOffsetFromPosition` 求偏移后 `setCursorOffset`（`components/PromptInput/PromptInput.tsx:1993-2010`）；同样只在 alternate screen 生效。
+- codex：**没有**（鼠标事件被显式丢弃）。
+- oh-my-pi：**没有**光标定位（鼠标只用于卡片/链接/焦点）。
+
+**建议方案**
+
+1. 在 pointer 的 composer 分支记录 press 的格子与源码偏移；release 时若**指针没有离开该格**且没有产生选区，则调用一次新的视图动作把光标移到该偏移（`editor.setCursorOffset`）。拖动仍然只做选择与复制。
+2. 坐标到源码一律复用 `sourceBoundary(layout, point, "start")`（`composer/projection.ts:7-25`）：它已处理宽字符、折行与"点到行尾之后"的夹取，与现有选区高亮使用同一套映射，不会出现两套几何。
+3. 只对 `kind === "content"` 的行生效；点击上边框、footer、滚动条等装饰行不移动光标。
+4. 单击移动光标、双击选词、三击选行：现有 `DragSelection` 已经实现双击/三击的词/行粒度（`clickSelect.ts:25-60`、`selection.ts:110-160`），第一次点击顺带定位光标是符合直觉的副作用，不需要额外抑制。
+5. 只在 fullscreen 生效，与参考一致；regular 模式保持"鼠标归终端"，避免夺走 scrollback。
+6. 该动作不写配置、不触发提交、不改变选区语义；点击后照常 `requestRender`。
+
+**证据边界**：机制来自源码；未实现、未在真实终端验证点击精度（宽字符、折行、缩放后重排、点击行尾之后的夹取），也未验证与双击选词的手感冲突。
+
+### 21.8 研究过程中新发现（不在用户列表内）
+
+1. **`models.json` 解析失败静默**（21.1）：写错一个逗号会让自定义模型整体消失，界面不说明。
+2. **`models.json` 重复顶层键静默丢弃**（21.1）：本机文件实际命中；`ensureUserCatalog` 的示例块与用户粘贴习惯共同造成。
+3. **双击 Esc 静默失败**（21.4）：`pickerFor` 的 `/` 守卫与 `openPicker("back")` 的调用约定不一致，`openPicker` 失败时不报告。
+4. **删除会话后浏览索引被销毁**（21.3）：`actions.ts:22` 的 `browser.close()` 让一次删除触发整目录重扫，这与 20.7"同次浏览复用索引"的目标相反。
+5. **测试缺口**：`keymap.test.ts` 只验证 action 被调用、`picker/rewind.test.ts` 只验证带斜杠的入口，两者之间没有"双击 Esc 真的打开面板"的测试；这是回归能存活一个多月的原因。
+
+### 21.9 本轮结论摘要与建议实施顺序
+
+| 编号 | 判定 | 主要证据 | 优先级 |
+|---|---|---|---|
+| 31 | 确认：三个文件三个 owner，界面只写 scope 不写文件；解析失败与重复键均静默 | `settings.ts:45`、`source.ts:12-16`、`model.ts:437-442`、`catalogStore.ts:22,99-116`；本机 `models.json` 双 `providers` | P1 |
+| 32 | 确认：settings 同时声明 navigation 与 chips，chips 被 `!navigation` 抑制；左右键切的是竖排分类 | `overlay.ts:296-299`、`chrome/navigation.ts:53-79`、`picker/navigation.ts:138-142` | P1 |
+| 33 | 确认：一次完整扫描约 1.6 s；删除含三次整会话同步读 + 删除后整目录重扫 | 本机只读测量；`catalog/index.ts:215,281-294`、`management.ts:27-117`、`actions.ts:22`、`store.ts:147-158` | P0（用户可感知） |
+| 34 | 确认：双击 Esc 逻辑完好，`openPicker("back")` 与 `pickerFor` 的 `/` 守卫冲突，静默失败；回归自 `3841998d` | `interactiveMode.ts:739,1187-1191`、`picker/registry.ts:185`、提交历史 | P0（功能丢失） |
+| 35 | 确认：已就绪置前但组内不排序；未就绪只有 `○`，无分隔 | `picker/model.ts:243-246,354-356`、`catalog.ts:235-524` | P2 |
+| 36 | 确认：`expansionAt` 只接受严格内部位置；"块后一格"被有意排除 | `pastes.ts:140-153`、`pastes.test.ts:141-147`、`interactiveMode.ts:543-548` | P2 |
+| 37 | 确认：输入框点击只做选择，从不移动光标；映射数据与 `setCursorOffset` 均已存在 | `pointer.ts:216-233,262`、`composer/contract.ts:11-16`、`projection.ts:7-33`、`buffer.ts:77-87` | P2 |
+| 新增 | 见 21.8：静默失败三处（models.json 解析、重复键、openPicker）、删除后重扫、测试缺口 | 同上 | 随对应项 |
+
+建议顺序：
+
+1. **34**（双击 Esc）——最小改动、功能已丢失、有明确的回归提交与测试缺口，先修接线并补真实 host 测试。
+2. **33**（resume）——用户直接可感知；先做"删除不退休索引"与"三次整读合一"，再考虑扫描期让出主线程。
+3. **31**（文件归属）——纯展示与诊断，不改语义；与 33 的删除路径改动可以分开提交。
+4. **32**（settings 顶部导航）——涉及 picker 契约新增 `placement`，改动面比看起来大，必须同时保住 model 面板的既有行为。
+5. **35**（model 排序）——纯排序与分组标题，风险低。
+6. **36 与 37**（输入手势）——两者都在输入路径上，建议同一批做、同一批验证，避免两次改动同一段 pointer/粘贴代码。
+
+**本轮证据边界**：只做研究与文档；未修改产品代码，未运行测试、构建、PTY、真实 provider 或 20k 压测。21.3 的数字来自本机只读脚本（2307 个会话、41 MiB），不是产品进程内计时。21.4 的回归由源码与提交历史确认，未在终端复现按键。参考项目均为只读对照，未复制其实现。原 Phase 20 的 47 项矩阵与 ADD 整体状态不变。
