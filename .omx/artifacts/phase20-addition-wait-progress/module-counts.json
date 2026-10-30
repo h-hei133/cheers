@@ -1,0 +1,21 @@
+[
+  {
+    "file": "core/tools/shell/background.ts",
+    "count": 12,
+    "baseline": 11,
+    "names": [
+      "startBackgroundCommand",
+      "createTaskOutputToolDefinition",
+      "execute",
+      "createTaskStopToolDefinition",
+      "execute",
+      "createTaskWaitToolDefinition",
+      "execute",
+      "waitForSettlement",
+      "release",
+      "onAbort",
+      "finish",
+      "report"
+    ]
+  }
+]

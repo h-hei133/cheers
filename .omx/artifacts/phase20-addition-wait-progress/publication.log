@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/taskWait.test.ts  (11 tests | 1 failed | 10 skipped) 10ms
+   ❯ src/core/tools/taskWait.test.ts > shows bounded wait time while retaining event-driven completion and the original task state
+     → expected "spy" to be called 1 times, but got 0 times
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 10 skipped (11)
+   Start at  17:58:33
+   Duration  843ms (transform 470ms, setup 0ms, collect 589ms, tests 10ms, environment 0ms, prepare 58ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/taskWait.test.ts -t shows bounded wait time
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/taskWait.test.ts > shows bounded wait time while retaining event-driven completion and the original task state
+AssertionError: expected "spy" to be called 1 times, but got 0 times
+ ❯ src/core/tools/taskWait.test.ts:32:22
+     30|   const pending = createTaskWaitToolDefinition().execute({ taskId: f.t…
+     31|     .then(result => { finished = true; return result; });
+     32|   expect(f.onOutput).toHaveBeenCalledTimes(1);
+       |                      ^
+     33|   expect(f.onOutput).toHaveBeenLastCalledWith('Waiting for task comple…
+     34|   await vi.advanceTimersByTimeAsync(10_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/core/tools/taskWait.test.ts -t 'shows bounded wait time'

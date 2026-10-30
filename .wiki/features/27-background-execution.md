@@ -23,7 +23,7 @@ confidence: high
 
 - `runInBackground: boolean` —— 立即返回，命令跨回合继续。
 - `taskOutput(taskId, all?)` —— 读输出与状态。
-- `taskWait(taskId, timeoutSeconds?)` —— 等完成事件，默认与上限300秒，取消或超时只结束等待，按当前观察报告状态。
+- `taskWait(taskId, timeoutSeconds?)` —— 等完成事件，默认与上限300秒；工具卡片立即及每5秒显示已等待时长，取消或超时只结束等待，按当前观察报告状态。时钟不表示任务完成比例，也不轮询任务状态。
 - `taskStop(taskId)` —— 按**进程组**发信号停止。
 
 实现 `startBackgroundCommand`（[shell/background.ts:13-66](../../packages/ts-shell/src/core/tools/shell/background.ts#L13)）复用普通沙箱路径，因此后台命令**同样受沙箱与审批约束**：
@@ -55,7 +55,7 @@ export const MAX_COMMAND_TIMEOUT_MS = 2_147_483_647;              // 第 20 行
 
 未进入提升路径的前景结果在超时后保留`status: 'timeout'`与部分输出，投影截尾为1500行/50KB并可写artifact（[registry](../../packages/ts-shell/src/core/tools/registry.ts)）。提升只释放前景等待，native总期限仍由原handle持有。清理是否成功必须看`terminationFailed`等观察，不能把请求停止当作整个进程树已被杀死。
 
-后台完成自动通知当前交互面：`watchJobsFor`的会话绑定listener交给`InteractiveMode`，写notice并重绘；**notice不成为新用户意图，不静默发起模型请求**。模型主动等待用`taskWait`，它现与`taskOutput/taskStop`同属初始发现清单。20.49两模式分别观察1秒超时、Ctrl+C取消、同任务至少16秒等待后实际完成，三次wait监听全部释放，原进程在取消后仍活跃、全程一次dispatch。小进程等待证据不代表生产长任务或自动follow-up验收。
+后台完成自动通知当前交互面：`watchJobsFor`的会话绑定listener交给`InteractiveMode`，写notice并重绘；**notice不成为新用户意图，不静默发起模型请求**。模型主动等待用`taskWait`，它现与`taskOutput/taskStop`同属初始发现清单。20.49两模式分别观察1秒超时、Ctrl+C取消、同任务至少16秒等待后实际完成，三次wait监听全部释放，原进程在取消后仍活跃、全程一次dispatch。小进程等待证据不代表生产长任务或自动follow-up验收。 后续addition21.21补原60秒窗口的两模式CLI：同一PID收养后自动提升一次、账本仅一项，随后超时/取消/再等待与0/5秒可见更新、实际完成均通过；仍不代表生产长时或跨平台验收。
 
 ## 2. oh-my-pi 的自动转后台
 

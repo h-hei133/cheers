@@ -1,0 +1,48 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/taskWait.test.ts  (11 tests | 3 failed | 8 skipped) 14ms
+   ❯ src/core/tools/taskWait.test.ts > retires every progress timer on cancel
+     → expected 1 to be +0 // Object.is equality
+   ❯ src/core/tools/taskWait.test.ts > retires every progress timer on timeout
+     → expected 1 to be +0 // Object.is equality
+   ❯ src/core/tools/taskWait.test.ts > retires every progress timer on settled
+     → expected 1 to be +0 // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 8 skipped (11)
+   Start at  17:58:34
+   Duration  845ms (transform 475ms, setup 1ms, collect 585ms, tests 14ms, environment 0ms, prepare 55ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/taskWait.test.ts -t retires every progress timer
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/taskWait.test.ts > retires every progress timer on cancel
+ FAIL  src/core/tools/taskWait.test.ts > retires every progress timer on timeout
+ FAIL  src/core/tools/taskWait.test.ts > retires every progress timer on settled
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/core/tools/taskWait.test.ts:58:30
+     56|   expect(result.output).toContain(ending === 'cancel' ? 'Wait cancelle…
+     57|   expect(f.release).toHaveBeenCalledTimes(1); expect(f.stop).not.toHav…
+     58|   expect(vi.getTimerCount()).toBe(0);
+       |                              ^
+     59|   await vi.advanceTimersByTimeAsync(60_000); expect(f.onOutput).toHave…
+     60| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/core/tools/taskWait.test.ts -t 'retires every progress timer'

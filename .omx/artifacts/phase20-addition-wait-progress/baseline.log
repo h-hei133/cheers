@@ -1,0 +1,105 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/taskWait.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/taskWait.test.ts  (11 tests | 8 failed) 30024ms
+   ❯ src/core/tools/taskWait.test.ts > shows bounded wait time while retaining event-driven completion and the original task state
+     → expected "spy" to be called 1 times, but got 0 times
+   ❯ src/core/tools/taskWait.test.ts > retires every progress timer on cancel
+     → expected "spy" to be called 2 times, but got 0 times
+   ❯ src/core/tools/taskWait.test.ts > retires every progress timer on timeout
+     → expected "spy" to be called 2 times, but got 0 times
+   ❯ src/core/tools/taskWait.test.ts > retires every progress timer on settled
+     → expected "spy" to be called 2 times, but got 0 times
+   ❯ src/core/tools/taskWait.test.ts > cleans up when the initial progress callback cancels the wait synchronously
+     → Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   ❯ src/core/tools/taskWait.test.ts > keeps waiting on the task if progress observer call 1 fails
+     → expected "spy" to be called 1 times, but got 0 times
+   ❯ src/core/tools/taskWait.test.ts > keeps waiting on the task if progress observer call 2 fails
+     → expected "spy" to be called 2 times, but got 0 times
+   ❯ src/core/tools/taskWait.test.ts > bounds progress to the clamped five-minute wait instead of extending the task deadline
+     → expected 0 to be greater than 1
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/taskWait.test.ts > shows bounded wait time while retaining event-driven completion and the original task state
+AssertionError: expected "spy" to be called 1 times, but got 0 times
+ ❯ src/core/tools/taskWait.test.ts:32:22
+     30|   const pending = createTaskWaitToolDefinition().execute({ taskId: f.t…
+     31|     .then(result => { finished = true; return result; });
+     32|   expect(f.onOutput).toHaveBeenCalledTimes(1);
+       |                      ^
+     33|   expect(f.onOutput).toHaveBeenLastCalledWith('Waiting for task comple…
+     34|   await vi.advanceTimersByTimeAsync(10_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  src/core/tools/taskWait.test.ts > retires every progress timer on cancel
+ FAIL  src/core/tools/taskWait.test.ts > retires every progress timer on timeout
+ FAIL  src/core/tools/taskWait.test.ts > retires every progress timer on settled
+AssertionError: expected "spy" to be called 2 times, but got 0 times
+ ❯ src/core/tools/taskWait.test.ts:51:22
+     49|   const pending = createTaskWaitToolDefinition().execute({ taskId: f.t…
+     50|   await vi.advanceTimersByTimeAsync(5000);
+     51|   expect(f.onOutput).toHaveBeenCalledTimes(2);
+       |                      ^
+     52|   if (ending === 'cancel') f.controller.abort();
+     53|   else if (ending === 'timeout') await vi.advanceTimersByTimeAsync(700…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/core/tools/taskWait.test.ts > cleans up when the initial progress callback cancels the wait synchronously
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  src/core/tools/taskWait.test.ts > keeps waiting on the task if progress observer call 1 fails
+AssertionError: expected "spy" to be called 1 times, but got 0 times
+ ❯ src/core/tools/taskWait.test.ts:101:22
+     99|   const pending = createTaskWaitToolDefinition().execute({ taskId: f.t…
+    100|   await vi.advanceTimersByTimeAsync(15_000);
+    101|   expect(f.onOutput).toHaveBeenCalledTimes(failedCall);
+       |                      ^
+    102|   expect(f.release).not.toHaveBeenCalled(); expect(f.get).toHaveBeenCa…
+    103|   f.settle(); const result = await pending;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  src/core/tools/taskWait.test.ts > keeps waiting on the task if progress observer call 2 fails
+AssertionError: expected "spy" to be called 2 times, but got 0 times
+ ❯ src/core/tools/taskWait.test.ts:101:22
+     99|   const pending = createTaskWaitToolDefinition().execute({ taskId: f.t…
+    100|   await vi.advanceTimersByTimeAsync(15_000);
+    101|   expect(f.onOutput).toHaveBeenCalledTimes(failedCall);
+       |                      ^
+    102|   expect(f.release).not.toHaveBeenCalled(); expect(f.get).toHaveBeenCa…
+    103|   f.settle(); const result = await pending;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  src/core/tools/taskWait.test.ts > bounds progress to the clamped five-minute wait instead of extending the task deadline
+AssertionError: expected 0 to be greater than 1
+ ❯ src/core/tools/taskWait.test.ts:113:40
+    111|   await vi.advanceTimersByTimeAsync(300_000); const result = await pen…
+    112|   expect(f.onOutput.mock.calls.length).toBeLessThanOrEqual(61);
+    113|   expect(f.onOutput.mock.calls.length).toBeGreaterThan(1);
+       |                                        ^
+    114|   expect(result.output).toContain('Wait limit reached after 300s');
+    115|   expect(f.stop).not.toHaveBeenCalled(); expect(f.get).toHaveBeenCalle…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 3 passed (11)
+   Start at  17:54:45
+   Duration  30.83s (transform 454ms, setup 0ms, collect 559ms, tests 30.02s, environment 0ms, prepare 57ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/core/tools/taskWait.test.ts

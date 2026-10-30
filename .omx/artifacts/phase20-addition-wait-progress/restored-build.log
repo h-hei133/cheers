@@ -1,0 +1,18 @@
+{"reversed":4,"restored":true}
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/taskWait.test.ts src/core/tools/shell/promotion.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/core/tools/taskWait.test.ts  (11 tests) 13ms
+ ✓ src/core/tools/shell/promotion.test.ts  (4 tests) 1409ms
+
+ Test Files  2 passed (2)
+      Tests  15 passed (15)
+   Start at  17:58:38
+   Duration  5.70s (transform 2.59s, setup 0ms, collect 3.90s, tests 1.42s, environment 0ms, prepare 95ms)
+
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+Wrote build manifest 7499028c41a4 for @cheers/ts-shell@0.1.0
+{"counts":[{"file":"core/tools/shell/background.ts","count":12,"baseline":11}],"build":{"ok":true,"entry":"/home/wang/projects/cheers/packages/ts-shell/dist/builds/7499028c41a4b125f9d40e17b29501c009d3db8a8783211cd7130ed93892a7f1/entrypoints/cli.js","buildId":"7499028c41a4b125f9d40e17b29501c009d3db8a8783211cd7130ed93892a7f1","inputsDigest":"336820d5bccff83c07312cede18a15fa093f35a8f1a389105cfad52633622578","artifactDigest":"e523b1eedd1c1ce4d5eccd36118f7f77faeff6c51d2f8c9d6b911abd59ccda89","version":"0.1.0"}}

@@ -165,7 +165,7 @@ export function createTaskWaitToolDefinition(): ToolDefinition {
     name: 'taskWait',
     description:
       'Wait for a background command started with runInBackground to finish, then report its result. '
-      + 'Prefer this over polling taskOutput or sleeping in bash.',
+      + 'Shows elapsed wait time while waiting. Prefer this over polling taskOutput or sleeping in bash.',
     argsSchema: {
       type: 'object',
       properties: {
@@ -192,7 +192,7 @@ export function createTaskWaitToolDefinition(): ToolDefinition {
       // Already settled: the answer is the result, not a wait that returns at once.
       if (task.state === 'exited' || task.state === 'killed' || task.state === 'unknown') return approvedResult(renderTask(task));
 
-      const outcome = await waitForSettlement(background, id, timeoutMs, context.abortSignal);
+      const outcome = await waitForSettlement(background, id, timeoutMs, context.abortSignal, context.onOutput);
       if (outcome.kind === 'settled') return approvedResult(renderTask(outcome.task));
       const notice = outcome.kind === 'cancelled'
         ? 'Wait cancelled; no stop was requested.'
@@ -215,19 +215,23 @@ function waitForSettlement(
   id: string,
   timeoutMs: number,
   signal: AbortSignal | undefined,
+  onOutput: ToolExecutionContext['onOutput'],
 ): Promise<WaitOutcome> {
   return new Promise(resolve => {
     let done = false;
+    const startedAt = Date.now();
     // Declared before anything can call `finish`: a runner that reports a
     // completion synchronously from `onEnded`, or a signal that is already
     // aborted, reaches the cleanup while these are still unassigned.
     let release: () => void = () => {};
     let deadline: ReturnType<typeof setTimeout> | undefined;
+    let progress: ReturnType<typeof setInterval> | undefined;
     const onAbort = (): void => finish({ kind: 'cancelled' });
     const finish = (outcome: WaitOutcome): void => {
       if (done) return;
       done = true;
       if (deadline !== undefined) clearTimeout(deadline);
+      if (progress !== undefined) clearInterval(progress);
       release();
       signal?.removeEventListener('abort', onAbort);
       resolve(outcome);
@@ -244,6 +248,24 @@ function waitForSettlement(
     // without this recheck that gap would leave the wait sitting until its
     // deadline — five minutes of nothing for a command that already finished.
     const current = background.get(id);
-    if (current && (current.state === 'exited' || current.state === 'killed' || current.state === 'unknown')) finish({ kind: 'settled', task: current });
+    if (current && (current.state === 'exited' || current.state === 'killed' || current.state === 'unknown')) {
+      finish({ kind: 'settled', task: current }); return;
+    }
+    if (onOutput) {
+      // This clock describes the wait, never the command's progress or state.
+      // No task reads, output replay or completion polling happen on the tick.
+      const report = (): void => {
+        if (done || signal?.aborted) return;
+        const elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+        try { onOutput(`Waiting for task completion: ${elapsed}s elapsed (wait limit ${timeoutMs / 1000}s).\n`); }
+        catch {
+          // A display observer cannot cancel or strand the actual task wait.
+          if (progress !== undefined) clearInterval(progress);
+          progress = undefined;
+        }
+      };
+      progress = setInterval(report, 5000);
+      report();
+    }
   });
 }

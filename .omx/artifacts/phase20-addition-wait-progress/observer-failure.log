@@ -1,0 +1,49 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/taskWait.test.ts  (11 tests | 2 failed | 9 skipped) 11ms
+   ❯ src/core/tools/taskWait.test.ts > keeps waiting on the task if progress observer call 1 fails
+     → expected "spy" to be called 1 times, but got 4 times
+   ❯ src/core/tools/taskWait.test.ts > keeps waiting on the task if progress observer call 2 fails
+     → expected "spy" to be called 2 times, but got 4 times
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 9 skipped (11)
+   Start at  17:58:37
+   Duration  787ms (transform 445ms, setup 0ms, collect 547ms, tests 11ms, environment 0ms, prepare 53ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/taskWait.test.ts -t keeps waiting on the task if progress observer
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/taskWait.test.ts > keeps waiting on the task if progress observer call 1 fails
+AssertionError: expected "spy" to be called 1 times, but got 4 times
+ ❯ src/core/tools/taskWait.test.ts:103:22
+    101|   const pending = createTaskWaitToolDefinition().execute({ taskId: f.t…
+    102|   await vi.advanceTimersByTimeAsync(15_000);
+    103|   expect(f.onOutput).toHaveBeenCalledTimes(failedCall);
+       |                      ^
+    104|   expect(f.release).not.toHaveBeenCalled(); expect(f.get).toHaveBeenCa…
+    105|   f.settle(); const result = await pending;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/core/tools/taskWait.test.ts > keeps waiting on the task if progress observer call 2 fails
+AssertionError: expected "spy" to be called 2 times, but got 4 times
+ ❯ src/core/tools/taskWait.test.ts:103:22
+    101|   const pending = createTaskWaitToolDefinition().execute({ taskId: f.t…
+    102|   await vi.advanceTimersByTimeAsync(15_000);
+    103|   expect(f.onOutput).toHaveBeenCalledTimes(failedCall);
+       |                      ^
+    104|   expect(f.release).not.toHaveBeenCalled(); expect(f.get).toHaveBeenCa…
+    105|   f.settle(); const result = await pending;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/core/tools/taskWait.test.ts -t 'keeps waiting on the task if progress observer'

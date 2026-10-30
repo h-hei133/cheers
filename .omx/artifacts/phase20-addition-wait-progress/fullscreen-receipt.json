@@ -1,0 +1,68 @@
+{
+  "mode": "fullscreen",
+  "buildId": "7499028c41a4b125f9d40e17b29501c009d3db8a8783211cd7130ed93892a7f1",
+  "inputsDigest": "336820d5bccff83c07312cede18a15fa093f35a8f1a389105cfad52633622578",
+  "provider": "loopback HTTP fixture",
+  "status": "passed",
+  "stages": [
+    {
+      "action": "actual 60-second automatic promotion",
+      "foregroundMs": 60124.966505,
+      "elapsedMs": 62137,
+      "originalPidRetained": true,
+      "oneAdoption": true,
+      "backgroundLaunches": 0,
+      "journaledOnce": true,
+      "unshortenedWindow": true
+    },
+    {
+      "action": "wait limit",
+      "elapsedMs": 62152,
+      "taskStillRunning": true,
+      "waitListenerReleased": true
+    },
+    {
+      "action": "Ctrl+C wait cancellation",
+      "elapsedMs": 886,
+      "cancelMs": 108,
+      "sameOriginalProcessActive": true,
+      "waitListenerReleased": true,
+      "noExtraModelRequest": true
+    },
+    {
+      "action": "same-task completion event",
+      "elapsedMs": 5840,
+      "releaseToTurnMs": 496,
+      "waitedForActualProcess": true,
+      "elapsedWaitUpdates": [
+        0,
+        5
+      ],
+      "exitCode": 0,
+      "oneDispatch": true,
+      "outputDigest": "215f2a6f66ba0d7d37b86ebed8ad508ec346b6aa67883b21da5b70d58423f052"
+    }
+  ],
+  "checks": {
+    "timeoutKeepsTask": true,
+    "cancellationKeepsOriginalProcess": true,
+    "resumedWaitNoRespawn": true,
+    "allWaitListenersReleased": true,
+    "completionOutputPersisted": true,
+    "configUnchanged": true
+  },
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 175,
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "requests": 6,
+  "readinessRequests": 3,
+  "outputBytes": 80979,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

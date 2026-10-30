@@ -1,0 +1,73 @@
+{
+  "mode": "regular",
+  "buildId": "7499028c41a4b125f9d40e17b29501c009d3db8a8783211cd7130ed93892a7f1",
+  "inputsDigest": "336820d5bccff83c07312cede18a15fa093f35a8f1a389105cfad52633622578",
+  "provider": "loopback HTTP fixture",
+  "status": "failed",
+  "stages": [],
+  "checks": {},
+  "failure": "real unshortened foreground window",
+  "observation": {
+    "adoptions": 1,
+    "launches": 0,
+    "promotions": [
+      {
+        "id": "bb6bf7c6-685e-40dc-8ded-23b6b1511cb2",
+        "outcome": "promoted",
+        "at": 1793354519484
+      }
+    ],
+    "progress": [
+      {
+        "id": "fixture-1-2",
+        "elapsed": 0,
+        "at": 1793354519638
+      }
+    ],
+    "jobs": [
+      {
+        "id": "bb6bf7c6-685e-40dc-8ded-23b6b1511cb2",
+        "state": "running",
+        "pid": 74149
+      }
+    ],
+    "subscriptions": 2,
+    "releases": 1,
+    "active": 1,
+    "starts": [
+      {
+        "name": "bash",
+        "id": "fixture-1-1"
+      },
+      {
+        "name": "taskWait",
+        "id": "fixture-1-2"
+      }
+    ],
+    "results": [
+      {
+        "name": "bash",
+        "success": true,
+        "cancelled": false,
+        "timeout": false,
+        "finished": false
+      },
+      {
+        "name": "taskWait",
+        "success": true,
+        "cancelled": false,
+        "timeout": true,
+        "finished": false
+      }
+    ],
+    "ends": 1,
+    "sessionId": "sess_fcae09ac6e8d3edd_1793354459710",
+    "scope": "allow-all"
+  },
+  "requests": 3,
+  "readinessRequests": 1,
+  "outputBytes": 707389,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

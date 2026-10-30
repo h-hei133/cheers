@@ -1,0 +1,131 @@
+{
+  "mode": "regular",
+  "buildId": "7499028c41a4b125f9d40e17b29501c009d3db8a8783211cd7130ed93892a7f1",
+  "inputsDigest": "336820d5bccff83c07312cede18a15fa093f35a8f1a389105cfad52633622578",
+  "provider": "loopback HTTP fixture",
+  "status": "failed",
+  "stages": [
+    {
+      "action": "actual 60-second automatic promotion",
+      "foregroundMs": 60127.626699,
+      "elapsedMs": 62111,
+      "originalPidRetained": true,
+      "oneAdoption": true,
+      "backgroundLaunches": 0,
+      "journaledOnce": true,
+      "unshortenedWindow": true
+    },
+    {
+      "action": "wait limit",
+      "elapsedMs": 62127,
+      "taskStillRunning": true,
+      "waitListenerReleased": true
+    },
+    {
+      "action": "Ctrl+C wait cancellation",
+      "elapsedMs": 912,
+      "cancelMs": 133,
+      "sameOriginalProcessActive": true,
+      "waitListenerReleased": true,
+      "noExtraModelRequest": true
+    }
+  ],
+  "checks": {},
+  "failure": "The expression evaluated to a falsy value:",
+  "observation": {
+    "adoptions": 1,
+    "launches": 0,
+    "promotions": [
+      {
+        "id": "18301f90-4189-4d27-967f-0a3aafc7b08d",
+        "outcome": "promoted",
+        "at": 1793354726035,
+        "promotedNs": "26877148413849"
+      }
+    ],
+    "progress": [
+      {
+        "id": "fixture-1-2",
+        "elapsed": 0,
+        "at": 1793354726171
+      },
+      {
+        "id": "fixture-2-1",
+        "elapsed": 0,
+        "at": 1793354727605
+      },
+      {
+        "id": "fixture-3-1",
+        "elapsed": 0,
+        "at": 1793354728509
+      },
+      {
+        "id": "fixture-3-1",
+        "elapsed": 5,
+        "at": 1793354733510
+      }
+    ],
+    "jobs": [
+      {
+        "id": "18301f90-4189-4d27-967f-0a3aafc7b08d",
+        "state": "running",
+        "pid": 74550,
+        "startedAt": 1793354665907,
+        "adoptedNs": "26817020787150"
+      }
+    ],
+    "subscriptions": 4,
+    "releases": 2,
+    "active": 2,
+    "starts": [
+      {
+        "name": "bash",
+        "id": "fixture-1-1"
+      },
+      {
+        "name": "taskWait",
+        "id": "fixture-1-2"
+      },
+      {
+        "name": "taskWait",
+        "id": "fixture-2-1"
+      },
+      {
+        "name": "taskWait",
+        "id": "fixture-3-1"
+      }
+    ],
+    "results": [
+      {
+        "name": "bash",
+        "success": true,
+        "cancelled": false,
+        "timeout": false,
+        "finished": false
+      },
+      {
+        "name": "taskWait",
+        "success": true,
+        "cancelled": false,
+        "timeout": true,
+        "finished": false
+      },
+      {
+        "name": "taskWait",
+        "success": true,
+        "cancelled": true,
+        "timeout": false,
+        "finished": false
+      }
+    ],
+    "ends": 2,
+    "sessionId": "sess_dd49034cc54977c7_1793354662017",
+    "scope": "allow-all"
+  },
+  "requests": 5,
+  "readinessRequests": 3,
+  "outputBytes": 779513,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

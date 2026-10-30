@@ -2362,7 +2362,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **用户要求**：确认 Claude Code 的 Monitor 工具（封杀前台长 sleep）在本项目是否已有等价实现。
 
-**当前实施更新（20.49）**：已存在并初始可达的`taskWait`等完成事件，取消/超时不请求stop，原CLI真实进程路径已有小规模证据。原文“没有等价工具”是实施前结论。未在审批层硬拒sleep，未新增周期进度回调；初版15秒interval只查abort，未显示进度，现已移除。[后台研究现状](27-background-execution.md)的无自动提升结论同步更正。
+**当前实施更新（20.49、21.21）**：已存在并初始可达的`taskWait`等完成事件，取消/超时不请求stop，原CLI真实进程路径已有小规模证据。原文“没有等价工具”是实施前结论。21.21沿既有tool.output卡片补立即及每5秒的等待时长，不把时钟当任务完成比例；结束、取消、超时和observer失败均退休该显示时钟，不轮询任务。未在审批层硬拒sleep；初版只查abort但不显示进度的15秒interval仍保持移除。[后台研究现状](27-background-execution.md)的无自动提升结论同步更正。
 
 **结论：没有等价工具。** 工具清单为 `bash`、`taskOutput`、`taskStop`、`web_fetch`、`web_search`、`lsp`、`ask`、`todo`、`task`、`browser`、`desktop`，可选 `skill` 与 MCP 转发（`core/tools/registry.ts:564-624`）；全仓 `monitor` 只命中 `observability/startupTiming.ts` 的 `monitorEventLoopDelay`，不是工具。唯一的 "wait" 是 `/director wait <id> [seconds≤30]`（`core/commands/director/syntax.ts:14-15`），只等 worker run。`taskOutput` 是轮询式读取（`core/tools/shell/background.ts:70-108`），不阻塞等待。
 
@@ -4451,3 +4451,20 @@ publication首轮只换方向仍失败，诊断看到完整内置条目后改为
 原Node CLI regular/fullscreen各1保存会话×1消息，isolated home/profile/project、loopback HTTP、heap768MiB、45秒/2MiB限额；实际tool_search/tool_load、两提案/交叉review和native selected read全链路。allow-all下仍等待采用，完整预览期间无新请求且当前报告未持久化；真实输入1拒绝后下一主模型payload与保存会话不含本轮报告，输入2才含对应claim/falsifiers/四条line2收据与digest。每轮独立公开marker排除旧已采用历史的干扰。pending Ctrl+C两模式均观察406ms结束（含300ms静默检查），无后续主模型请求；pending Ctrl+D退出251/238ms，未采用、问题settled、exit0/cooked恢复。配置和fixture文件字节不变，scratch清理；时延只为小夹具观测，非生产性能结论。
 
 原CLAUDE.md保留；无全套/并行heavy/本助手subagent/exe/20k真实终端、真实provider、独立review或NormProof judge。延后读取19ee578c CI时GitHub API EOF，保留失败收据、无CI结论，不混同产品失败或成功；本批提交/推送/未来CI另绑定。17.5的本地报告采用路径已覆盖，模型成本/收敛质量、真实桌面/其他平台与33大目录体验仍未验收，原47与ADD整体不升级，goal active。
+
+
+### 21.21 后台等待显示时长与真实六十秒自动提升
+
+继续17.3的“可等待、可取消、带进度”与20.49尚缺的真实60秒提升证据。原[taskWait](../../packages/ts-shell/src/core/tools/shell/background.ts)只等完成事件，等待卡片正文为空；现复用ToolExecutionContext.onOutput→既有tool.output→原ToolCards，订阅并复验完成/取消后立即显示等待0秒，此后每5秒显示已等待时长与等待上限。时钟不表示任务完成比例、原任务年龄或running状态，不读取任务、不重复输出命令/内容，也不决定完成；等待原300秒上限及任务自身期限不变。现有tool.output持久语义保留，最多约60条有界更新，不称零I/O。
+
+显示计时与原settlement同生命周期：完成、超时、取消全部clear interval，预先取消、已完成及注册间隙完成不安装；初次回调同步取消也正确清理。observer抛错只关闭后续显示，实际wait仍由原完成事件返回结果，不把callback异常当任务结果。没有新增任务系统、runner、store、provider/权限机制或event类型。原成功/取消/超时最终文本由实际task快照投影，替换等待预览。
+
+先读目标的wait/卡片/事件持久与原promotion owner，再定向只读对照oh-my-pi tools/wait.ts:24–25,220–249：只在有update callback时安装时钟、finally随等待资源释放。保留本项目单任务/300秒/Node floor；选5秒有界文字更新，不复制参考500ms快照读取、消息/服务协调、30分钟上限或Promise.withResolvers。
+
+主代理严格串行：旧实现新增11项中8失败/3控制通过，包含一次夹具等不存在callback的30秒timeout，现改先断言首次publication再await，使缺失直接失败；原日志保留。三文件38项与原foreground promotion4项共**42项去重测试**通过，五静态门、TS build/freshness/AST通过，118旧docs advisory保留；原background测试的Node子进程deprecation warning保留，未为其改运行时。四反转独立撤回首次显示、interval释放、完成复验return、observer失败释放，分别1/3/1/2项断言失败，finally字节恢复；恢复15项不重复计数。owner named-callable11→12≤20。build `7499028c41a4b125f9d40e17b29501c009d3db8a8783211cd7130ed93892a7f1`，inputs `336820d5bccff83c07312cede18a15fa093f35a8f1a389105cfad52633622578`，详见[正式工件](../../.omx/artifacts/phase20-addition-wait-progress/README.md)。
+
+原Node CLI regular/fullscreen各1保存会话×1消息，isolated home/profile/project、loopback HTTP、heap768MiB、100秒/2MiB限额。实际foreground bash未指定timeout，原owner只adopt一次，最初无durable job；原60秒窗口未缩短，CLI同进程单调观测分别60123/60125ms后promotion一次，保留原PID/start identity，0个background重新launch，账本仅1项且结果明确after60 seconds。随后真实1秒wait超时保留运行；Ctrl+C取消分别107/108ms，原进程仍活跃且无额外模型请求；重新等待同一任务，事件和终端文字均观察0/5秒，release后原事件完成、exit0、输出持久化，三次wait listener全部释放，host原notice listener保留。配置字节不变、无重复dispatch，Ctrl+D退出181/175ms且cooked flags恢复；上述时间仅小夹具观测，不是生产长任务/平台性能结论。
+
+三次探针失败均留收据：首次把未创建账本的可选local当现有数组；第二次从child ready算前台窗口，漏掉shell/child启动，改为原adopt/promote的同进程单调边界；第三次已见0/5秒event但未等异步绘制帧，改为同时等待实际terminal text。未为这些fixture问题修改产品或放宽同PID/单次提升/60秒结果/实际绘制断言。scratch已清理、CLAUDE.md保留，无本地full suite/并行heavy/本助手subagent/20k终端/exe、真实provider、独立review或NormProof judge。
+
+延后一次读回：19ee578c的CI41032575806/Watch41032575779均completed/success且head匹配；316e4de7的CI41035961101仍in_progress，Watch41035960972 completed/success。无重复watch，本批提交/推送/未来CI另绑定。17.3本地等待与原60秒提升路径取得证据，真实生产任务/设备、非Linux、33大目录体验及原47/ADD整体仍未验收，goal active。

@@ -1,0 +1,31 @@
+{
+  "baseline": {
+    "newFailed": 8,
+    "controlsPassed": 3,
+    "includesOneMissingCallbackTimeout": true
+  },
+  "focusedUniqueTests": 42,
+  "focusedFiles": 4,
+  "reversalCases": 4,
+  "reversalFailedTests": [
+    1,
+    3,
+    1,
+    2
+  ],
+  "exactRestoration": true,
+  "restoredTests": 15,
+  "staticGates": "passed",
+  "docsAdvisories": 118,
+  "build": "passed",
+  "cliModes": [
+    "regular",
+    "fullscreen"
+  ],
+  "savedMessagesPerMode": 1,
+  "realForegroundWindowSeconds": 60,
+  "provider": "loopback synthetic HTTP",
+  "realProvider": "not-run",
+  "fullSuite": "not-run",
+  "goal": "active"
+}

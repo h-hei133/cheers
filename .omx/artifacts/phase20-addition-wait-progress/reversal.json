@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "name": "publication",
+      "exit": 1,
+      "sourceSha256": "c5f67e684c10dbd5233c74dbdbf717390a93da59a7c65153a215788689c160a1"
+    },
+    {
+      "name": "progress-cleanup",
+      "exit": 1,
+      "sourceSha256": "c5f67e684c10dbd5233c74dbdbf717390a93da59a7c65153a215788689c160a1"
+    },
+    {
+      "name": "completion-recheck",
+      "exit": 1,
+      "sourceSha256": "c5f67e684c10dbd5233c74dbdbf717390a93da59a7c65153a215788689c160a1"
+    },
+    {
+      "name": "observer-failure",
+      "exit": 1,
+      "sourceSha256": "c5f67e684c10dbd5233c74dbdbf717390a93da59a7c65153a215788689c160a1"
+    }
+  ],
+  "restored": true
+}

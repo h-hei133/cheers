@@ -10584,3 +10584,12 @@ resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不�
 旧实现14新增失败；最终六文件82项、四反转1/5/1/1失败与bytes恢复、恢复25项、五静态门/build/freshness串行通过，118旧advisory保留，三个owner callable7/7/17均≤20。两模式原NodeCLI各1会话×1消息、loopback HTTP实际discover/load/native read/review；pending无请求，拒绝后会话/下一payload无本轮报告，明确采用保留四条读取证据，Ctrl+C无继续请求，pending Ctrl+D exit0/cooked、文件不变。逐轮marker排除已采用历史干扰，正式工件/HANDOFF更新，scratch清理、CLAUDE.md不改。
 
 上一提交19ee578c延后CI查询遇GitHub API EOF，无新CI结论；本批Git/未来CI另绑定。17.5真实模型成本/质量、33大目录体验及其他平台仍未验收，原47与ADD不升级，goal active。
+
+
+## [2026-10-30] feat | 后台等待时长与六十秒提升验证
+
+[addition21.21](features/phase-20-addition.md#2121-后台等待显示时长与真实六十秒自动提升)补17.3的等待进度：复用原tool.output卡片立即/每5秒显示已等待时长；不轮询任务、不复读命令输出或宣称完成比例。完成/取消/超时同owner清理计时，预先完成/取消不安装；observer失败关闭显示但保留实际wait及结果。原任务期限与300秒wait上限保留，无第二套任务/runner/provider机制。
+
+新增基线8失败/3控制通过，最终四文件42项去重、四反转1/3/1/2失败与bytes恢复、恢复15项、五门/build/freshness串行通过，118旧advisory保留，owner callable11→12≤20。两模式原NodeCLI各1保存会话×1消息、loopback HTTP，原60秒窗口实测约60123/60125ms，原PID保留、adopt1/promotion1/重新launch0、单durable job；随后真实超时、Ctrl+C、0/5秒等待文字与事件、同任务release完成均通过，三wait listener释放，配置不变、exit0/cooked。100秒/2MiB/768MiB限额，非生产长任务或平台验收。
+
+探针的缺省journal数组、ready计时起点及异步paint同步三类失败保留，均只修fixture；正式工件/HANDOFF/后台研究文档更新，scratch清理、CLAUDE.md不改。19ee578c CI41032575806/Watch41032575779均success；316e4de7 CI41035961101仍in_progress、Watch41035960972 success且head匹配，不重复轮询，本批Git/未来CI另绑定。原47与ADD不升级，goal active。
