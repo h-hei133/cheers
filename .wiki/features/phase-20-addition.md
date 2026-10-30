@@ -4515,3 +4515,17 @@ ed4820cb的CI41039139794/Watch41039139814延后读回均completed/success；上�
 两模式均完整扫描2,307条、matched 2,307、unreadable 0、无source budget限制；首帧时只完成current session并仍处于scanning。扫描中方向键仍能改变焦点。搜索唯一合成标题后删除目标，确认原browse继续使用；第二次打开后于扫描中Escape，catalog browse controller实际aborted且没有迟到page发布。两次均零request、exit0、恢复cooked flags，profile scratch清理、config不变。
 
 探针observer写入receipt并参与计时；合成fixture只有6.3 MB且不是用户当前41 MiB目录，不能据此宣称用户目录、cold/warm磁盘、总heap/physical I/O、平台或release性能已验收。完整扫描约13.0–13.4秒而交互期间仍可用，作为后续实环境对照线索，不触发仅凭此fixture的runtime改动；第33项、原47项与ADD整体仍partial。正式脚本、regular/fullscreen receipt与两次已修正的harness-only失败见[工件](../../.omx/artifacts/phase20-addition-large-directory/README.md)；HANDOFF记录observer receipt owner约束。
+
+### 21.26 第三十三：目录列表合并重复的profile祖先检查
+
+沿21.25继续检查真实catalog热路径，发现[files](../../packages/ts-shell/src/session/store/catalog/files.ts)定位一条会话时，对session目录及metadata/transcript/state/lock共五个路径分别运行profile身份与完整祖先walk；每个目标还经原profilePath再次复验身份。锁文件本次未读，三个数据文件随后原本已有lstat与打开handle前后version检查。现私有目录定位只检查共同session目录；列表沿原三文件lstat、O_NOFOLLOW、handle version、预算和read后的目录/三文件version继续。公开direct-reference入口仍补原四leaf准入，避免改变不用读取正文即可解析确切ID的合同；未修改全局profile/sandbox/writer政策。
+
+先检查目标，再定向只读参考快照`f09d01b85e0384647fcab6779d35ab9dabe04be3`的session-manager异步逐行读取段799–826。采用其有界并发/取消决定，保留目标额外的profile/三文件版本边界；该参考无相同多文件profile布局，不照搬其缓存或弱化身份检查。[正式工件](../../.omx/artifacts/phase20-addition-catalog-boundary/README.md)记录差异、计数与限制。
+
+新12例原实现11通过/1失败，证明重复leaf检查；调用方复核后追加direct-reference三数据文件/锁的链接拒绝与列表不读锁，最终三文件66项通过。五独立反转（恢复重复walk、删共同目录准入、允链接core file、删profile边界、删reference leaf准入）均AssertionError并bytes恢复，恢复17项及原reference消费者6项再次通过。早期单独删entry guard的反转仍绿，因为目录guard独立保留profile身份；保留并明确不计有效证据。五静态门、TS build/freshness串行通过，118旧docs advisory保留；owner named-callable 7→8，未引入其他系统。
+
+同SHA256的256会话×1短消息fixture前后，真实同步lstat/stat/realpath总调用207,302→60,422（减少70.85%），完整扫描1,658→729ms、返回ID一致、文件bytes不变。before用保留旧build明确标为snapshot，after绑定fresh build；单次合成计时、cache未控制，不等于真实用户目录收益。最终build `2ff779a8212489ba2b45aee2d278659ee59d25e7e092fc1a8179704035006859`，inputs `9fd68f6d4c015be87db09d076a960f291716a53846bcbb78a0f0b638fc602e83`。
+
+最终原Node CLI两模式各2,307会话×1消息、6,303,012 bytes、heap768MiB/90秒/2MiB/offline无凭据。regular/fullscreen首帧176/164ms、全扫6,862/6,866ms、扫描中按键72/51ms、搜索168/168ms、确认删除151/151ms；complete2307/unreadable0/sourceLimited false、原browse保留、重开Escape controller aborted且无迟到页、config不变、零请求、exit0/cooked、scratch清理。与21.25的13秒属不同轮次/近似fixture，不能称受控CLI性能配对。初次fullscreen只等面板清空，前一retire收据迟到混入新计数；改为等待真实retire后重开，失败收据保留，未为此改产品。
+
+HANDOFF补共享guard消费者与retire观察边界。延后读回`cccc44662a66b988cd9d948907de79fe42057b4d` CI41050906091/Watch41050906089均completed/success且head一致；本批Git/未来CI另绑定。无full local suite/20k真实终端/exe/独立代理review/NormProof judge/真实provider/其他平台；CLAUDE.md保留，真实41MiB用户目录与桌面体验、原47及ADD整体仍partial，goal active。

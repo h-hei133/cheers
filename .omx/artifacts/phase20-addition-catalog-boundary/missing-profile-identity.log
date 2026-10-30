@@ -1,0 +1,9 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/session/store/catalog/files.test.ts  (12 tests | 11 skipped) 10ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 11 skipped (12)
+   Start at  20:18:18
+   Duration  305ms (transform 74ms, setup 0ms, collect 87ms, tests 10ms, environment 0ms, prepare 50ms)

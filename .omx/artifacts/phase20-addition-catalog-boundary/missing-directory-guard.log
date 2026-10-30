@@ -1,0 +1,46 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/store/catalog/files.test.ts  (17 tests | 2 failed | 15 skipped) 18ms
+   ❯ src/session/store/catalog/files.test.ts > refuses a linked session directory before inspecting its files
+     → expected [Function] to throw error matching /symbolic links/ but got 'Session directory is unavailable.'
+   ❯ src/session/store/catalog/files.test.ts > refuses a linked ancestor directory before inspecting its files
+     → promise resolved "{ layout: { …(5) }, …(3) }" instead of rejecting
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 15 skipped (17)
+   Start at  20:27:58
+   Duration  318ms (transform 75ms, setup 1ms, collect 88ms, tests 18ms, environment 0ms, prepare 52ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/store/catalog/files.test.ts > refuses a linked session directory before inspecting its files
+AssertionError: expected [Function] to throw error matching /symbolic links/ but got 'Session directory is unavailable.'
+
+- Expected:
+/symbolic links/
+
++ Received:
+"Session directory is unavailable."
+
+ ❯ src/session/store/catalog/files.test.ts:84:3
+     82|   fs.renameSync(target, `${target}-retired`);
+     83|   fs.symlinkSync(`${target}-retired`, target, 'dir');
+     84|   await expect(locateCatalogFiles(store, 'saved')).rejects.toThrow(/sy…
+       |   ^
+     85|   expect(io.lstat).not.toHaveBeenCalled();
+     86|   expect(io.open).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/session/store/catalog/files.test.ts > refuses a linked ancestor directory before inspecting its files
+AssertionError: promise resolved "{ layout: { …(5) }, …(3) }" instead of rejecting
+ ❯ src/session/store/catalog/files.test.ts:84:50
+     82|   fs.renameSync(target, `${target}-retired`);
+     83|   fs.symlinkSync(`${target}-retired`, target, 'dir');
+     84|   await expect(locateCatalogFiles(store, 'saved')).rejects.toThrow(/sy…
+       |                                                  ^
+     85|   expect(io.lstat).not.toHaveBeenCalled();
+     86|   expect(io.open).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯

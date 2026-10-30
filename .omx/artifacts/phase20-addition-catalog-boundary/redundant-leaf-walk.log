@@ -1,0 +1,38 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/store/catalog/files.test.ts  (17 tests | 1 failed | 16 skipped) 14ms
+   ❯ src/session/store/catalog/files.test.ts > checks the shared profile directory once per location and stats every core file
+     → expected [ undefined, …(5) ] to deeply equal [ undefined, …(1) ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 16 skipped (17)
+   Start at  20:27:57
+   Duration  333ms (transform 79ms, setup 0ms, collect 90ms, tests 14ms, environment 0ms, prepare 59ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/store/catalog/files.test.ts > checks the shared profile directory once per location and stats every core file
+AssertionError: expected [ undefined, …(5) ] to deeply equal [ undefined, …(1) ]
+
+- Expected
++ Received
+
+  Array [
+    undefined,
+    "/tmp/cheers-test/catalog-boundary-N7Fu1H/.cheers/profiles/catalog/sessions/saved",
++   "/tmp/cheers-test/catalog-boundary-N7Fu1H/.cheers/profiles/catalog/sessions/saved/metadata.json",
++   "/tmp/cheers-test/catalog-boundary-N7Fu1H/.cheers/profiles/catalog/sessions/saved/transcript.jsonl",
++   "/tmp/cheers-test/catalog-boundary-N7Fu1H/.cheers/profiles/catalog/sessions/saved/state.json",
++   "/tmp/cheers-test/catalog-boundary-N7Fu1H/.cheers/profiles/catalog/sessions/saved/state.lock",
+  ]
+
+ ❯ src/session/store/catalog/files.test.ts:42:49
+     40|   expect(found?.layout).toEqual(files);
+     41|   expect(found?.stats.map(stat => stat.size)).toEqual([6, 6, 6]);
+     42|   expect(guard.mock.calls.map(call => call[1])).toEqual([undefined, fi…
+       |                                                 ^
+     43|   expect(vi.mocked(io.lstat).mock.calls.map(call => call[0])).toEqual([
+     44|     files.sessionDir, files.metadataPath, files.statePath, files.trans…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

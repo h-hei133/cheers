@@ -1,0 +1,25 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/store/catalog/files.test.ts  (17 tests | 1 failed | 16 skipped) 10ms
+   ❯ src/session/store/catalog/files.test.ts > refuses a replaced profile even when its path has been recreated
+     → promise resolved "undefined" instead of rejecting
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 16 skipped (17)
+   Start at  20:27:59
+   Duration  306ms (transform 75ms, setup 0ms, collect 87ms, tests 10ms, environment 0ms, prepare 51ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/store/catalog/files.test.ts > refuses a replaced profile even when its path has been recreated
+AssertionError: promise resolved "undefined" instead of rejecting
+ ❯ src/session/store/catalog/files.test.ts:93:50
+     91|   fs.renameSync(profile.root, `${profile.root}-retired`);
+     92|   fs.mkdirSync(profile.root);
+     93|   await expect(locateCatalogFiles(store, 'saved')).rejects.toThrow(/ch…
+       |                                                  ^
+     94|   expect(io.lstat).not.toHaveBeenCalled();
+     95|   expect(io.open).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

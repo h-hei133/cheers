@@ -1,0 +1,34 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/store/catalog/files.test.ts  (17 tests | 4 failed | 13 skipped) 22ms
+   ❯ src/session/store/catalog/files.test.ts > preserves direct-reference admission for a linked metadataPath
+     → promise resolved "{ layout: { …(5) }, …(1) }" instead of rejecting
+   ❯ src/session/store/catalog/files.test.ts > preserves direct-reference admission for a linked statePath
+     → promise resolved "{ layout: { …(5) }, …(1) }" instead of rejecting
+   ❯ src/session/store/catalog/files.test.ts > preserves direct-reference admission for a linked transcriptPath
+     → promise resolved "{ layout: { …(5) }, …(1) }" instead of rejecting
+   ❯ src/session/store/catalog/files.test.ts > preserves direct-reference admission for a linked stateLockPath
+     → promise resolved "{ layout: { …(5) }, …(1) }" instead of rejecting
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 13 skipped (17)
+   Start at  20:28:00
+   Duration  317ms (transform 76ms, setup 0ms, collect 88ms, tests 22ms, environment 0ms, prepare 50ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/store/catalog/files.test.ts > preserves direct-reference admission for a linked metadataPath
+ FAIL  src/session/store/catalog/files.test.ts > preserves direct-reference admission for a linked statePath
+ FAIL  src/session/store/catalog/files.test.ts > preserves direct-reference admission for a linked transcriptPath
+ FAIL  src/session/store/catalog/files.test.ts > preserves direct-reference admission for a linked stateLockPath
+AssertionError: promise resolved "{ layout: { …(5) }, …(1) }" instead of rejecting
+ ❯ src/session/store/catalog/files.test.ts:65:56
+     63|     if (fs.existsSync(files[key])) fs.unlinkSync(files[key]);
+     64|     fs.symlinkSync(foreign, files[key]);
+     65|     await expect(locateCatalogDirectory(store, 'saved')).rejects.toThr…
+       |                                                        ^
+     66|     expect(io.open).not.toHaveBeenCalled();
+     67|   },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯

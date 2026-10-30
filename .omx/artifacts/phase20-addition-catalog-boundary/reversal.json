@@ -1,0 +1,31 @@
+{
+  "checks": [
+    {
+      "case": "redundant-leaf-walk",
+      "exitCode": 1,
+      "assertionFailure": true
+    },
+    {
+      "case": "missing-directory-guard",
+      "exitCode": 1,
+      "assertionFailure": true
+    },
+    {
+      "case": "linked-core-admission",
+      "exitCode": 1,
+      "assertionFailure": true
+    },
+    {
+      "case": "missing-profile-boundary",
+      "exitCode": 1,
+      "assertionFailure": true
+    },
+    {
+      "case": "missing-reference-leaf-admission",
+      "exitCode": 1,
+      "assertionFailure": true
+    }
+  ],
+  "restored": true,
+  "sha256": "98bb969936968e871a67ab73dadabc986c98a31a7b37a8b9d87bbd668bccbf5e"
+}

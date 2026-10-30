@@ -1196,3 +1196,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A CLI probe exits before its startup prompt because its observer module cannot load a named receipt export.
 - **Root Cause**: A wrapper observer imports and installs another observer but does not re-export that observer's bindings.
 - **Rule**: Import shared receipt state directly from the module that owns it; treat wrapper modules as side-effect imports. Smoke-import the observer before launching a bounded PTY child, and keep import failures separate from product startup failures.
+
+### Shared Directory Checks Need Each Caller's Acquisition Contract
+- **Symptom**: A named-profile catalogue performs hundreds of thousands of synchronous ancestor checks for a few hundred small sessions; removing leaf checks from its shared locator can also change direct-reference admission.
+- **Root Cause**: Every fixed leaf repeats the same profile and ancestor walk, including an unused lock. Listing then independently stats and verifies the opened files, while a direct reference can return after directory location alone.
+- **Rule**: Consolidate common ancestor checks only on paths that subsequently validate every acquired file. Keep direct-reference leaf admission, source ordering, profile identity and final versions. Count real filesystem calls against an identical bounded fixture and exercise links/replacements, not just the number of guard calls.
+
+### A Cleared Panel Can Precede Its Browse Retirement Receipt
+- **Symptom**: A close/reopen probe fails its cancellation count even though both original browse controllers eventually abort.
+- **Root Cause**: Overlay chrome clears before its asynchronous close action publishes the retirement receipt; reopening too early captures the preceding retirement in the new run's counter delta.
+- **Rule**: Synchronize reopening on the actual original browse retirement, then compare the new owner's abort receipt and late-publication boundary separately. A blank panel alone is not proof of released acquisition ownership.

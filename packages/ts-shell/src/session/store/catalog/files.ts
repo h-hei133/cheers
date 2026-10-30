@@ -45,6 +45,19 @@ export function sessionCatalogReadBudget(limit: number, signal?: AbortSignal): S
 
 /** Physical identity remains usable even when the saved content needs recovery. */
 export async function locateCatalogDirectory(store: SessionStoreLayout, id: string, signal?: AbortSignal, onSource?: (target: string) => void): Promise<CatalogDirectory | undefined> {
+  const found = await locateDirectory(store, id, signal, onSource);
+  if (found) {
+    // Direct references do not subsequently inspect core files. Preserve their
+    // existing leaf admission, including the lock, outside the listing hot path.
+    const { layout } = found;
+    for (const target of [layout.metadataPath, layout.transcriptPath, layout.statePath, layout.stateLockPath]) {
+      assertSessionStoreProfile(store, target);
+    }
+  }
+  return found;
+}
+
+async function locateDirectory(store: SessionStoreLayout, id: string, signal?: AbortSignal, onSource?: (target: string) => void): Promise<CatalogDirectory | undefined> {
   assertSessionStoreProfile(store);
   signal?.throwIfAborted();
   if (validateSessionId(id) !== id || id === '.' || id === '..') throw new Error('Invalid session identity.');
@@ -52,7 +65,10 @@ export async function locateCatalogDirectory(store: SessionStoreLayout, id: stri
     signal?.throwIfAborted();
     onSource?.(sessionsDir);
     const layout = projectSessionFileLayout({ sessionsDir, sessionId: id });
-    for (const target of Object.values(layout)) assertSessionStoreProfile(store, target);
+    // Core files have fixed leaf names under this checked directory. Their
+    // lstat and opened-handle checks reject links/replacements at acquisition.
+    // Rewalking every leaf also checks the unused lock and repeats all ancestors.
+    assertSessionStoreProfile(store, layout.sessionDir);
     onSource?.(layout.sessionDir);
     let directory: Stats;
     try { directory = await lstat(layout.sessionDir); }
@@ -69,7 +85,7 @@ export async function locateCatalogDirectory(store: SessionStoreLayout, id: stri
 }
 
 export async function locateCatalogFiles(store: SessionStoreLayout, id: string, signal?: AbortSignal, onSource?: (target: string) => void): Promise<CatalogFiles | undefined> {
-  const found = await locateCatalogDirectory(store, id, signal, onSource);
+  const found = await locateDirectory(store, id, signal, onSource);
   if (!found) return undefined;
   const { layout, directory } = found;
   const stats: Stats[] = [];

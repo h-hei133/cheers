@@ -1,0 +1,31 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/store/catalog/files.test.ts  (17 tests | 3 failed | 14 skipped) 26ms
+   ❯ src/session/store/catalog/files.test.ts > refuses a linked metadataPath without opening it
+     → promise resolved "{ layout: { …(5) }, …(3) }" instead of rejecting
+   ❯ src/session/store/catalog/files.test.ts > refuses a linked statePath without opening it
+     → promise resolved "{ layout: { …(5) }, …(3) }" instead of rejecting
+   ❯ src/session/store/catalog/files.test.ts > refuses a linked transcriptPath without opening it
+     → promise resolved "{ layout: { …(5) }, …(3) }" instead of rejecting
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 14 skipped (17)
+   Start at  20:27:58
+   Duration  320ms (transform 76ms, setup 0ms, collect 87ms, tests 26ms, environment 0ms, prepare 51ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/store/catalog/files.test.ts > refuses a linked metadataPath without opening it
+ FAIL  src/session/store/catalog/files.test.ts > refuses a linked statePath without opening it
+ FAIL  src/session/store/catalog/files.test.ts > refuses a linked transcriptPath without opening it
+AssertionError: promise resolved "{ layout: { …(5) }, …(3) }" instead of rejecting
+ ❯ src/session/store/catalog/files.test.ts:54:50
+     52|   fs.unlinkSync(files[key]);
+     53|   fs.symlinkSync(foreign, files[key]);
+     54|   await expect(locateCatalogFiles(store, 'saved')).rejects.toThrow(/un…
+       |                                                  ^
+     55|   expect(io.open).not.toHaveBeenCalled();
+     56| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯

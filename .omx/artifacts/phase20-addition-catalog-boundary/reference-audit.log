@@ -1,0 +1,11 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/session/store/catalog/index.test.ts  (26 tests | 20 skipped) 308ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed | 20 skipped (26)
+   Start at  20:30:32
+   Duration  982ms (transform 375ms, setup 0ms, collect 451ms, tests 308ms, environment 0ms, prepare 55ms)
+
+{"counts":[{"file":"session/store/catalog/files.ts","count":8,"baseline":7}],"build":{"ok":true,"entry":"/home/wang/projects/cheers/packages/ts-shell/dist/builds/2ff779a8212489ba2b45aee2d278659ee59d25e7e092fc1a8179704035006859/entrypoints/cli.js","buildId":"2ff779a8212489ba2b45aee2d278659ee59d25e7e092fc1a8179704035006859","inputsDigest":"9fd68f6d4c015be87db09d076a960f291716a53846bcbb78a0f0b638fc602e83","artifactDigest":"6570ddefd5025b2e2e4dbb5c78777e42e544691111f98e91801cabae583c71df","version":"0.1.0"}}

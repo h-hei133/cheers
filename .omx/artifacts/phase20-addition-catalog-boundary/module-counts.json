@@ -1,0 +1,17 @@
+[
+  {
+    "file": "session/store/catalog/files.ts",
+    "count": 8,
+    "baseline": 7,
+    "names": [
+      "sessionCatalogReadBudget",
+      "check",
+      "admit",
+      "remaining",
+      "locateCatalogDirectory",
+      "locateDirectory",
+      "locateCatalogFiles",
+      "readCatalogFile"
+    ]
+  }
+]

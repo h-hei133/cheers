@@ -1,0 +1,80 @@
+[
+  {
+    "file": "baseline-gates.log",
+    "rawSha256": "e0b98c425a8a3158fc07ed52c4c1fabd2d4f61777acfad26911cfca95ed00eb6",
+    "normalizedSha256": "e0b98c425a8a3158fc07ed52c4c1fabd2d4f61777acfad26911cfca95ed00eb6",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  },
+  {
+    "file": "baseline-test.log",
+    "rawSha256": "c4932c1343992ee59932033a17d0a30f08aed4fe3a9e0a320f5c228614cb594c",
+    "normalizedSha256": "163c80cff227f4042e5c2fa26edc3e7cbf6edb7154c79c90b380d436b6e5c3cc",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  },
+  {
+    "file": "final-build-cli.log",
+    "rawSha256": "de26d40eddb9f9979bab67b9914f7adac4daa9ec506c3be618a7418dc8a19800",
+    "normalizedSha256": "de26d40eddb9f9979bab67b9914f7adac4daa9ec506c3be618a7418dc8a19800",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  },
+  {
+    "file": "final-gates.log",
+    "rawSha256": "e0b98c425a8a3158fc07ed52c4c1fabd2d4f61777acfad26911cfca95ed00eb6",
+    "normalizedSha256": "e0b98c425a8a3158fc07ed52c4c1fabd2d4f61777acfad26911cfca95ed00eb6",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  },
+  {
+    "file": "focused-final.log",
+    "rawSha256": "94ae44f9b2993c19506e8d57d87823d99251ef4e3a2d8d9eef323b8f41304405",
+    "normalizedSha256": "9900ed8c9877a8c4824ec3b61a739ab0868718279a13db7d57ae0c74d6b68ebb",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  },
+  {
+    "file": "focused-initial.log",
+    "rawSha256": "5a28bbbb6e5f8e08b57a060f607773754314ce32b78c16127d2a52c50e3c6dea",
+    "normalizedSha256": "391e760f375737ac113e8b79a51cc3270dabf146bbf9e4f4cd543c58b028db58",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  },
+  {
+    "file": "linked-core-admission.log",
+    "rawSha256": "5b518716205ea7666e42a7d739c378d12b9720c1c7748f302421b239cfca2f2d",
+    "normalizedSha256": "4c70602c83388b48d0025686849fcfe4c212ffacd15196c755f6f61a4ff5d6bd",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  },
+  {
+    "file": "missing-directory-guard.log",
+    "rawSha256": "d8d383e8ac6c0dcab2e7aebd108a761523c4fc95bfcbb09d656ad53175226e64",
+    "normalizedSha256": "56c5f9ffb962355177901d03da8984889332e67f6bf8a3b7c083d0dc6582b135",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  },
+  {
+    "file": "missing-profile-boundary.log",
+    "rawSha256": "bb0d1df207d935f13bc8792f9c0974d9bc503b58a133484c903804b0f6202103",
+    "normalizedSha256": "41cc3a6e8808a830fe6d706d74606c77c7ecaad58fb86eceb9a72c1d0ba59512",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  },
+  {
+    "file": "missing-profile-identity.log",
+    "rawSha256": "052e36b2f72bc255abf4b00fabcbac3599a6bf068fff3491ae1fe79b228d4f68",
+    "normalizedSha256": "2beed6a089d52a79c09dcbe8734bb682f7cae744653406931e4ce675fbc46d57",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  },
+  {
+    "file": "missing-reference-leaf-admission.log",
+    "rawSha256": "8f3dde47ea60f87b55e47888131440575be3d47f87ff709224548c4b94d30e2a",
+    "normalizedSha256": "d0cca2e3b2187372b9522a5ef93c15ed85492614f97220f8cf64037cad3764f2",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  },
+  {
+    "file": "redundant-leaf-walk.log",
+    "rawSha256": "97de71fad0a862c4d9d2f18b9d29d8505fab075a2947a208c651b2617aa86f9a",
+    "normalizedSha256": "780afcdd84e45734d4a053cb9ced4b55893618cfe88ddb04ddb172b3e29f8194",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  },
+  {
+    "file": "reference-audit.log",
+    "rawSha256": "2e41d556dfcfcb98bda6665b3cff75349b180a3e58139f77ed4c165524146cc3",
+    "normalizedSha256": "2e41d556dfcfcb98bda6665b3cff75349b180a3e58139f77ed4c165524146cc3",
+    "normalization": "trailing whitespace and terminal blank lines only"
+  }
+]

@@ -1,0 +1,1330 @@
+{
+  "mode": "fullscreen",
+  "fixtureCount": 2307,
+  "messagesPerFixture": 1,
+  "syntheticContentPaddingChars": 1400,
+  "fixtureSourceBytes": 6303012,
+  "fixtureSetupMs": 1250,
+  "buildId": "c84cc13506d62849080e19856e644bf3f7698eabcc55879270a35e9a8f44a56f",
+  "inputsDigest": "c5bfbe55500d6b88eb151552608bd02ff074129afaf09321a9ba207621d44874",
+  "providerMode": "offline-no-credential",
+  "status": "failed",
+  "checks": {
+    "firstFramePrecedesCompleteScan": true,
+    "completeCatalog": true,
+    "interactionDuringScan": true,
+    "uniqueSearchResult": true,
+    "sameBrowseAfterDelete": true,
+    "targetDeleted": true,
+    "configUnchanged": true,
+    "catalogBrowseAbortedOnClose": false,
+    "noCatalogPagesAfterCancel": true,
+    "cookedInputRestored": true,
+    "zeroRequests": true,
+    "scratchRemoved": true
+  },
+  "interactionMs": [
+    72
+  ],
+  "deletionMs": [
+    152
+  ],
+  "firstFrameMs": 175,
+  "firstProgress": {
+    "scanned": 1,
+    "unreadable": 0,
+    "status": "scanning",
+    "total": 1,
+    "hasMore": false,
+    "sourceLimited": false
+  },
+  "scanFromOpenMs": 6975,
+  "scanAfterFirstFrameMs": 6800,
+  "catalogFinal": {
+    "scanned": 2307,
+    "unreadable": 0,
+    "status": "complete",
+    "total": 2307,
+    "hasMore": true,
+    "sourceLimited": false
+  },
+  "catalogSnapshotCount": 145,
+  "searchMs": 167,
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 138,
+  "failure": "assertion",
+  "assertion": "checks",
+  "observation": {
+    "begins": 2,
+    "retires": 2,
+    "removals": 1,
+    "requests": 0,
+    "renders": 87,
+    "syncTranscriptReads": 2,
+    "expectedSyncTranscriptReadsPerDeletion": 0,
+    "syncTranscriptReadsBySession": {
+      "sess_980e2feec90ce08f_1793363018798": 2
+    },
+    "transcriptReadSites": [
+      {
+        "id": "sess_980e2feec90ce08f_1793363018798",
+        "site": [
+          "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+          "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+          "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+          "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+          "    at Object.loadSession (file://<build>/session/SessionManager.js:47:57)",
+          "    at tryResumeSession (file://<build>/session/recovery/sessionResume.js:32:35)"
+        ]
+      },
+      {
+        "id": "sess_980e2feec90ce08f_1793363018798",
+        "site": [
+          "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+          "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+          "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+          "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+          "    at SessionManager.updateSessionWorkspaceBinding (file://<build>/session/SessionManager.js:130:41)",
+          "    at bootstrapShellRuntime (file://<build>/core/shell/bootstrap.js:173:30)"
+        ]
+      }
+    ],
+    "peerScans": 2,
+    "panelPeerScans": 1,
+    "catalogSnapshots": [
+      {
+        "scanned": 1,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1,
+        "hasMore": false,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1,
+        "hasMore": false,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 33,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 17,
+        "hasMore": false,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 70,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 41,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 105,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 81,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 125,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 113,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 141,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 129,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 145,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 145,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 165,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 161,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 177,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 177,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 193,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 193,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 213,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 209,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 225,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 225,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 241,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 241,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 257,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 257,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 273,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 273,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 289,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 289,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 309,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 305,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 321,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 321,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 337,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 337,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 353,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 353,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 369,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 369,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 385,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 385,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 401,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 401,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 421,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 417,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 433,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 433,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 449,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 449,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 465,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 465,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 481,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 481,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 497,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 497,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 513,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 513,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 529,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 529,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 545,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 545,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 561,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 561,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 577,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 577,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 593,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 593,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 609,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 609,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 625,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 625,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 641,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 641,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 657,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 657,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 673,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 673,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 689,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 689,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 705,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 705,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 721,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 721,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 737,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 737,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 753,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 753,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 769,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 769,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 785,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 785,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 801,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 801,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 817,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 817,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 833,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 833,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 849,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 849,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 865,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 865,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 881,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 881,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 897,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 897,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 913,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 913,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 929,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 929,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 945,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 945,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 961,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 961,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 977,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 977,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 993,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 993,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1009,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1009,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1025,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1025,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1041,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1041,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1057,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1057,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1073,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1073,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1089,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1089,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1105,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1105,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1121,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1121,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1137,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1137,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1153,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1153,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1169,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1169,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1185,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1185,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1201,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1201,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1217,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1217,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1233,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1233,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1249,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1249,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1265,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1265,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1281,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1281,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1297,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1297,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1313,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1313,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1329,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1329,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1345,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1345,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1361,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1361,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1377,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1377,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1393,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1393,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1409,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1409,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1425,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1425,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1441,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1441,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1457,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1457,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1473,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1473,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1489,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1489,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1505,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1505,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1521,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1521,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1537,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1537,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1553,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1553,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1569,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1569,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1585,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1585,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1601,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1601,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1617,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1617,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1633,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1633,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1649,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1649,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1665,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1665,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1681,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1681,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1697,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1697,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1713,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1713,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1728,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1728,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1744,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1744,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1760,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1760,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1776,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1776,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1792,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1792,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1808,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1808,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1824,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1824,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1840,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1840,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1856,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1856,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1872,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1872,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1888,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1888,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1904,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1904,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1920,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1920,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1936,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1936,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1952,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1952,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1968,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1968,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1984,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1984,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2000,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2000,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2016,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2016,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2032,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2032,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2048,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2048,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2064,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2064,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2080,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2080,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2096,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2096,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2112,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2112,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2128,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2128,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2144,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2144,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2160,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2160,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2176,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2176,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2192,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2192,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2208,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2208,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2224,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2224,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2240,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2240,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2256,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2256,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2272,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2272,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2288,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2288,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2304,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2304,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2307,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 2307,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2307,
+        "unreadable": 0,
+        "status": "complete",
+        "total": 2307,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2307,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 0,
+        "hasMore": false,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2307,
+        "unreadable": 0,
+        "status": "complete",
+        "total": 1,
+        "hasMore": false,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2307,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1,
+        "hasMore": false,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 2307,
+        "unreadable": 0,
+        "status": "complete",
+        "total": 2306,
+        "hasMore": true,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1,
+        "hasMore": false,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 1,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 1,
+        "hasMore": false,
+        "sourceLimited": false
+      },
+      {
+        "scanned": 35,
+        "unreadable": 0,
+        "status": "scanning",
+        "total": 17,
+        "hasMore": false,
+        "sourceLimited": false
+      }
+    ],
+    "cancelledBrowses": 2,
+    "snapshot": {
+      "filter": "",
+      "loading": false,
+      "searching": false,
+      "pending": false,
+      "subMode": "none",
+      "failed": false,
+      "ids": [],
+      "painted": [],
+      "rows": 0
+    }
+  },
+  "outputBytes": 269872,
+  "scratchRemoved": true
+}

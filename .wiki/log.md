@@ -10623,3 +10623,11 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 [addition21.25](features/phase-20-addition.md#2125-第三十三2307会话合成cli目录探针)记录Node CLI regular/fullscreen各一轮、隔离2,307 session/6,323,775 bytes/每条一条合成消息。首帧197/197ms，全目录扫描13,046/13,429ms；扫描中方向键72/51ms，唯一搜索177/179ms，确认删除149/154ms。两模式目录均complete 2,307、unreadable0、无source budget限制；第二次打开后Escape期间browse controller aborted、无迟到目录页，文件/profile清理、config不变、零请求、exit0/cooked。
 
 该合成目录小于21.3观测的41MiB用户目录，计时含observer写receipt，不证明真实用户目录、cold/warm磁盘、heap/physical I/O或跨平台性能；目录全扫约13.0–13.4秒而交互仍可用，作为后续现场对照线索，原47与ADD整体不升级。正式脚本/收据在`.omx/artifacts/phase20-addition-large-directory/`，HANDOFF补observer receipt owner guardrail。首轮全writer夹具85,522ms、次轮复制夹具1,172ms，均因observer import错误启动前退出；修正后regular/fullscreen两轮通过。无产品源码改动。
+
+## [2026-10-30] perf | 目录列表合并重复profile祖先检查
+
+[addition21.26](features/phase-20-addition.md#2126-第三十三目录列表合并重复的profile祖先检查)在原catalog files owner只复验共同目录；三个数据文件保留原lstat、O_NOFOLLOW/handle前后版本、预算及读取后目录/三文件复验。公开direct-reference保留四leaf准入含锁，未改变全局profile/writer。只读参考有界异步读取决定，未复制代码或新增索引。
+
+三文件66项、五有效反转/bytes恢复、恢复17项及原reference六项、五门/build/freshness全部主代理串行通过；118旧docs advisory保留，owner callable7→8。相同256会话fixture真实sync调用207302→60422（-70.85%）、scan1658→729ms，仅单次合成/cache未控；最终两CLI各2307会话×1消息扫描6862/6866ms，首帧176/164ms，按键/搜索/删除/重开取消通过，config不变、零请求、exit0/cooked、heap768MiB。早期无效反转与fullscreen观察到chrome清空但未retire的fixture失败均保留，未冒充产品故障。
+
+正式工件/HANDOFF更新、scratch清理、CLAUDE.md保留；真实用户目录/平台/heap与physical I/O未验，原47与ADD不升级、goal active。上一批cccc4466 CI41050906091/Watch41050906089均completed/success且head一致，本批提交/推送与未来CI另绑定，无full local suite/20k/exe/独立review或真实provider。

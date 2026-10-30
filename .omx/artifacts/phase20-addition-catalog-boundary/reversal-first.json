@@ -1,0 +1,32 @@
+{
+  "checks": [
+    {
+      "case": "redundant-leaf-walk",
+      "exitCode": 1,
+      "assertionFailure": true
+    },
+    {
+      "case": "missing-directory-guard",
+      "exitCode": 1,
+      "assertionFailure": true
+    },
+    {
+      "case": "linked-core-admission",
+      "exitCode": 1,
+      "assertionFailure": true
+    },
+    {
+      "case": "missing-profile-identity",
+      "exitCode": 0,
+      "assertionFailure": false,
+      "classification": "Ineffective reversal: the directory guard independently rechecks profile identity."
+    },
+    {
+      "case": "missing-profile-boundary",
+      "exitCode": 1,
+      "assertionFailure": true
+    }
+  ],
+  "restored": true,
+  "sha256": "1d11aecce5289ccee0ecd67e8d8b9961f40336e9b98f94f00b0242c494d9ec2f"
+}
