@@ -1,0 +1,81 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/backgroundTools.test.ts  (14 tests | 5 failed | 3 skipped) 1020ms
+   ❯ src/core/tools/backgroundTools.test.ts > waiting for a background command > gives up when the turn is cancelled, and releases its listener
+     → expected 'task-4 is still running after 300s.\n…' to include 'Wait cancelled'
+   ❯ src/core/tools/backgroundTools.test.ts > waiting for a background command > survives a runner that reports completion synchronously
+     → expected "spy" to be called 1 times, but got 0 times
+   ❯ src/core/tools/backgroundTools.test.ts > waiting for a background command > settles when the turn was cancelled before the wait began
+     → expected 'task-6 is still running after 300s.\n…' to include 'Wait cancelled'
+   ❯ src/core/tools/backgroundTools.test.ts > waiting for a background command > reports the observed paused state when the wait expires
+     → expected 'task-paused is still running after 1s…' to include 'Wait limit reached after 1s'
+   ❯ src/core/tools/backgroundTools.test.ts > waiting for a background command > does not invent a running state when the task disappears during the wait
+     → expected 'task-lost is still running after 300s…' to include 'Wait cancelled'
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/backgroundTools.test.ts > waiting for a background command > gives up when the turn is cancelled, and releases its listener
+AssertionError: expected 'task-4 is still running after 300s.\n…' to include 'Wait cancelled'
+ ❯ src/core/tools/backgroundTools.test.ts:164:27
+    162|
+    163|     const result = await pending;
+    164|     expect(result.output).toContain('Wait cancelled');
+       |                           ^
+    165|     expect(result.output).toContain('still running');
+    166|     expect(result.output).not.toContain('after 300s');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/core/tools/backgroundTools.test.ts > waiting for a background command > survives a runner that reports completion synchronously
+AssertionError: expected "spy" to be called 1 times, but got 0 times
+ ❯ src/core/tools/backgroundTools.test.ts:187:21
+    185|       { ...context, background } as unknown as ToolExecutionContext);
+    186|     expect(result.output).toContain('done at once');
+    187|     expect(release).toHaveBeenCalledTimes(1);
+       |                     ^
+    188|     expect(vi.getTimerCount()).toBe(0);
+    189|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/core/tools/backgroundTools.test.ts > waiting for a background command > settles when the turn was cancelled before the wait began
+AssertionError: expected 'task-6 is still running after 300s.\n…' to include 'Wait cancelled'
+ ❯ src/core/tools/backgroundTools.test.ts:200:27
+    198|       { ...context, background, abortSignal: controller.signal } as un…
+    199|     expect(result.output).toContain('still running');
+    200|     expect(result.output).toContain('Wait cancelled');
+       |                           ^
+    201|     expect(result.output).not.toContain('after 300s');
+    202|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/core/tools/backgroundTools.test.ts > waiting for a background command > reports the observed paused state when the wait expires
+AssertionError: expected 'task-paused is still running after 1s…' to include 'Wait limit reached after 1s'
+ ❯ src/core/tools/backgroundTools.test.ts:213:27
+    211|     await vi.advanceTimersByTimeAsync(1000);
+    212|     const result = await pending;
+    213|     expect(result.output).toContain('Wait limit reached after 1s');
+       |                           ^
+    214|     expect(result.output).toContain('paused; no command dispatched');
+    215|     expect(result.output).not.toContain('still running');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/core/tools/backgroundTools.test.ts > waiting for a background command > does not invent a running state when the task disappears during the wait
+AssertionError: expected 'task-lost is still running after 300s…' to include 'Wait cancelled'
+ ❯ src/core/tools/backgroundTools.test.ts:231:27
+    229|     controller.abort();
+    230|     const result = await pending;
+    231|     expect(result.output).toContain('Wait cancelled');
+       |                           ^
+    232|     expect(result.output).toContain('current task state is unavailable…
+    233|     expect(result.output).not.toContain('still running');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 6 passed | 3 skipped (14)
+   Start at  08:44:12
+   Duration  5.96s (transform 2.94s, setup 0ms, collect 4.69s, tests 1.02s, environment 0ms, prepare 54ms)

@@ -1,0 +1,54 @@
+{
+  "mode": "regular",
+  "buildId": "c46e70f091c5c38fda60eff345a059c6d5f99db25b65bcfaf64102ed0bd5489d",
+  "inputsDigest": "8b6274c16cee5ef31ce8cece2ef94057394f09aa1f05beedce9fbcff87a1737b",
+  "provider": "loopback HTTP fixture",
+  "status": "passed",
+  "stages": [
+    {
+      "action": "wait limit",
+      "elapsedMs": 2047,
+      "taskStillRunning": true,
+      "waitListenerReleased": true
+    },
+    {
+      "action": "Ctrl+C wait cancellation",
+      "elapsedMs": 862,
+      "cancelMs": 109,
+      "sameOriginalProcessActive": true,
+      "waitListenerReleased": true,
+      "noExtraModelRequest": true
+    },
+    {
+      "action": "same-task completion event",
+      "elapsedMs": 2034,
+      "releaseToTurnMs": 275,
+      "waitedForActualProcess": true,
+      "exitCode": 0,
+      "oneDispatch": true,
+      "outputDigest": "8087a6264c059577919236ed7abb52d5191e859d75840b7881754645543bd362"
+    }
+  ],
+  "checks": {
+    "timeoutKeepsTask": true,
+    "cancellationKeepsOriginalProcess": true,
+    "resumedWaitNoRespawn": true,
+    "allWaitListenersReleased": true,
+    "completionOutputPersisted": true,
+    "configUnchanged": true
+  },
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 167,
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "requests": 6,
+  "readinessRequests": 3,
+  "outputBytes": 45709,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

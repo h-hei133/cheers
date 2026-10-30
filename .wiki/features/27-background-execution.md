@@ -3,15 +3,15 @@ title: "后台执行：显式开关与参考的自动转后台"
 category: article
 sources: [repo-audit-2026-10-15, packages/ts-shell/src/core/tools/registry.ts, packages/ts-shell/src/core/tools/shell/background.ts, packages/ts-shell/src/runtime/execution/commandTimeout.ts, packages/ts-shell/src/workflow/jobs/local/*, oh-my-pi/packages/coding-agent/src/async/auto-background.ts, oh-my-pi/packages/coding-agent/src/tools/bash.ts, oh-my-pi/packages/coding-agent/src/exec/settings.ts, oh-my-pi/packages/coding-agent/src/async/job-manager.ts, 05-tools-and-execution-safety.md]
 created: 2026-10-15
-updated: 2026-10-17
+updated: 2026-10-30
 tags: [features, tools, execution, background, gap-analysis]
-summary: "Cheers 已有显式后台命令、会话与根目录绑定、持久记录、完成通知与关闭清理；缺口是现有进程的自动提升及可选模型结果跟进。omp 的 foreground 占位/提升握手值得比较，但等待阈值不能延长原截止时间，完成通知也不能自动升级为新用户意图。"
+summary: "Cheers 已有显式后台命令、同进程自动提升、taskWait、会话与根目录绑定、持久记录、完成通知与关闭清理。等待取消不请求停止任务；默认完成通知不创建新模型请求。完整长时、跨平台与可选模型跟进证据仍有边界。"
 confidence: high
 ---
 
 # 后台执行：显式开关与参考的自动转后台
 
-源码基线 `0d30d589`；参考快照 oh-my-pi `c2cb79e4`。2026-10-17 仅源码复核与研究修订，没有新 PTY、进程或 provider 实验。oh-my-pi 当前 HEAD 为 `eb74cf84`；本文用 `git show c2cb79e4:<path>` 回核关键参考行为。
+历史研究源码基线 `0d30d589`；§2/§3.1 的参考快照 oh-my-pi `c2cb79e4` 保留为当时比较，不表示当前 HEAD。2026-10-30 更新目标现状：[addition20.49](phase-20-addition.md#2049-taskwait真实cli可达取消与同步完成清理)补充两模式原CLI与真实小后台进程的等待/取消/完成证据；未复跑60秒自动提升或真实provider矩阵。
 
 > **证据更正**：本轮一个子代理报告前景默认超时为 120,000 ms、上限 300,000 ms。**实测源码与此不符**——真实值为 60,000 ms 与 2,147,483,647 ms（见 §1.2）。下文以源码为准。
 
@@ -19,10 +19,11 @@ confidence: high
 
 ### 1.1 能力已存在
 
-`bash` 工具暴露三个协作入口（[registry.ts:484-516](../../packages/ts-shell/src/core/tools/registry.ts#L484)）：
+`bash` 工具及[后台工具](../../packages/ts-shell/src/core/tools/shell/background.ts)暴露四个协作入口：
 
 - `runInBackground: boolean` —— 立即返回，命令跨回合继续。
 - `taskOutput(taskId, all?)` —— 读输出与状态。
+- `taskWait(taskId, timeoutSeconds?)` —— 等完成事件，默认与上限300秒，取消或超时只结束等待，按当前观察报告状态。
 - `taskStop(taskId)` —— 按**进程组**发信号停止。
 
 实现 `startBackgroundCommand`（[shell/background.ts:13-66](../../packages/ts-shell/src/core/tools/shell/background.ts#L13)）复用普通沙箱路径，因此后台命令**同样受沙箱与审批约束**：
@@ -48,13 +49,13 @@ export const MAX_COMMAND_TIMEOUT_MS = 2_147_483_647;              // 第 20 行
 
 后台路径另有独立上限：会话所有的后台任务默认 300,000 ms，接受 1–300 秒（[background.ts:30-31](../../packages/ts-shell/src/core/tools/shell/background.ts#L30)）；未绑定的旧调用者拒绝显式超时。
 
-### 1.3 无自动提升
+### 1.3 同进程自动提升与等待
 
-全文检索确认：**没有任何把慢速前景命令自动转为后台的代码**。模型必须主动设置 `runInBackground`。
+旧版“没有自动提升”结论已过期。`375e664e`与`dd43bcce`已实现交互式未显式timeout的同进程收养/提升：[registry](../../packages/ts-shell/src/core/tools/registry.ts)在dispatch前给native handle 300秒总期限，前景默认等60秒；普通新输入可提前提升，明确取消仍交给原handle，显式timeout保持前景路径。`adopt/promote/whenPromoted`复用[local registry](../../packages/ts-shell/src/workflow/jobs/local/registry.ts)，不启动第二个命令。
 
-前景结果在超时后保留 `status: 'timeout'` 与已捕获部分输出，投影截尾为 1500 行 / 50 KB 并可写 artifact（[registry.ts:110-135](../../packages/ts-shell/src/core/tools/registry.ts#L110)）。但清理是否成功必须看原执行 owner 的 `terminationFailed` 等证据，不能把「请求停止」等同已杀死整个进程树。
+未进入提升路径的前景结果在超时后保留`status: 'timeout'`与部分输出，投影截尾为1500行/50KB并可写artifact（[registry](../../packages/ts-shell/src/core/tools/registry.ts)）。提升只释放前景等待，native总期限仍由原handle持有。清理是否成功必须看`terminationFailed`等观察，不能把请求停止当作整个进程树已被杀死。
 
-后台完成已自动通知当前交互面：`watchJobsFor` 的会话绑定 listener 交给 `InteractiveMode`，后者写入 notice 并请求重绘（[interactiveMode.ts:265-271](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts#L265)）。注释明确规定 **notice 不成为新用户意图，不静默发起模型请求**。因此缺的是自动提升和可选模型 follow-up，不是完全缺少自动交付或 owner。
+后台完成自动通知当前交互面：`watchJobsFor`的会话绑定listener交给`InteractiveMode`，写notice并重绘；**notice不成为新用户意图，不静默发起模型请求**。模型主动等待用`taskWait`，它现与`taskOutput/taskStop`同属初始发现清单。20.49两模式分别观察1秒超时、Ctrl+C取消、同任务至少16秒等待后实际完成，三次wait监听全部释放，原进程在取消后仍活跃、全程一次dispatch。小进程等待证据不代表生产长任务或自动follow-up验收。
 
 ## 2. oh-my-pi 的自动转后台
 
@@ -150,12 +151,12 @@ export const ASYNC_PREVIEW_TAIL_CHARS = 1_000;
 
 | 维度 | Cheers | oh-my-pi | 取证 |
 |---|---|---|---|
-| 结果交付 | UI 完成 notice；模型详情经 `taskOutput` | 结算后可作为 follow-up 投递 | §1.3/§3.1 |
+| 结果交付 | UI完成notice；模型详情经`taskOutput`或事件式`taskWait` | 结算后可作为 follow-up 投递 | §1.3/§3.1 |
 | 交付所有权 | session/root identity 绑定与当前 host 检查 | owner-routed，回到发起会话 | §3.1/§3.2 |
 | 会话切换后的旧结果 | 旧 host 关闭，旧 listener 不投当前会话 | generation 不匹配即丢弃排队条目 | §3.1/§3.2 |
 | 体积策略 | 前景 1500 行 / 50 KB 投影；后台 live sink 64 KiB 与 journal/artifact owner | 12,000 字符溢出 + 4,000 预览（尾 1,000） | §3.2 |
 
-**判定**：Cheers 具备显式启动、读取、停止、沙箱、持久记录和有归属的 UI 完成通知。自动提升是确切缺口；完整进程生命周期、容量与所有宿主交付尚未动态验收，不能概称后台能力已全部完成。
+**判定**：Cheers具备显式启动、读取、等待、停止、同进程提升、沙箱、持久记录和有归属的UI通知。20.49补充原CLI真实小进程的wait超时/取消/完成；完整长时生命周期、容量、所有宿主与可选模型follow-up仍未动态验收。
 
 ## 4. 待定决策点
 
@@ -171,7 +172,7 @@ export const ASYNC_PREVIEW_TAIL_CHARS = 1_000;
 
 ## 5. 未验证项
 
-- 未实测 Cheers 后台任务在会话结束后的存活与清理行为。
+- 20.49实测同CLI跨turn与取消wait后仍存活、最后完成并正常退出；未覆盖进程退出时仍运行的长任务、完整平台或daemon存活合同。
 - 源码复核：`TaskRegistry` 的 legacy 完成历史保留最近 100 项，live sink 为 64 KiB；这不等于运行任务数或 durable journal 的全局容量上限（[registry.ts:47-48,112-119](../../packages/ts-shell/src/workflow/jobs/local/registry.ts#L47)）。容量仍需端到端审计。
 - 未验证 omp 的「自动投递」在无 TUI 客户端时的行为。
 - 未测自动转后台对模型 token 预算的实际影响。

@@ -1,0 +1,12 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+(node:46813) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/core/tools/backgroundTools.test.ts  (14 tests) 1668ms
+ ✓ src/core/tools/discovery/state.test.ts  (10 tests) 9ms
+
+ Test Files  2 passed (2)
+      Tests  24 passed (24)
+   Start at  08:55:03
+   Duration  8.42s (transform 66ms, setup 0ms, collect 6.42s, tests 1.68s, environment 0ms, prepare 66ms)

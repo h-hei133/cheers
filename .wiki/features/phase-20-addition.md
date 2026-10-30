@@ -2353,14 +2353,16 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **证据边界**：未新增工作区级快照，`/undo` 的单位仍是单个已提交操作。任何"按 turn 撤销"的实现都必须先有"未批准不写、批准后写入目标与批准目标一致、恢复不重放 unknown、部分失败如实报告"的反转证据。
 
-**本批已实施（第一百二十一批）**：新增 `taskWait` 工具。它不轮询、不 sleep：直接等 `BackgroundRunner.onEnded` 的完成事件，带 300 秒上限与可取消信号，超时或取消时明确回答"仍在运行"而不是假装结束。`bash` 描述同步引导"等待用 taskWait，不要在 bash 里 sleep"。**未实现**：把前台 `sleep` 在审批层硬拒（会误伤轮询脚本），以及修正 `27-background-execution.md` 的过期结论。
+**本批已实施（第一百二十一批，20.49补充）**：新增`taskWait`工具，不轮询、不sleep，等`BackgroundRunner.onEnded`，300秒上限与取消信号。20.49修正取消误报完整timeout、同步完成清理与初始discovery可达，超时/取消按当前观察报告，不虚构运行或结束；`bash`描述引导它，`27-background-execution.md`过期结论已更正。未在审批层硬拒前台sleep，避免误伤轮询脚本。
 
-**证据边界**：`taskWait` 的夹具使用受控的 `BackgroundRunner`，未在真实长任务上测过等待与取消；前台命令 60 秒自动提升的既有行为未改。
+**证据边界**：初版仅受控runner。20.49新增原CLI regular/fullscreen真实小进程：1秒wait超时、Ctrl+C取消后原进程仍活跃、同任务至少16秒等待后完成，三次wait监听释放。未覆盖生产长时任务、60秒自动提升或完整平台矩阵。
 
 
 ### 17.3 第十项（用户编号第二十）：Monitor 工具
 
 **用户要求**：确认 Claude Code 的 Monitor 工具（封杀前台长 sleep）在本项目是否已有等价实现。
+
+**当前实施更新（20.49）**：已存在并初始可达的`taskWait`等完成事件，取消/超时不请求stop，原CLI真实进程路径已有小规模证据。原文“没有等价工具”是实施前结论。未在审批层硬拒sleep，未新增周期进度回调；初版15秒interval只查abort，未显示进度，现已移除。[后台研究现状](27-background-execution.md)的无自动提升结论同步更正。
 
 **结论：没有等价工具。** 工具清单为 `bash`、`taskOutput`、`taskStop`、`web_fetch`、`web_search`、`lsp`、`ask`、`todo`、`task`、`browser`、`desktop`，可选 `skill` 与 MCP 转发（`core/tools/registry.ts:564-624`）；全仓 `monitor` 只命中 `observability/startupTiming.ts` 的 `monitorEventLoopDelay`，不是工具。唯一的 "wait" 是 `/director wait <id> [seconds≤30]`（`core/commands/director/syntax.ts:14-15`），只等 worker run。`taskOutput` 是轮询式读取（`core/tools/shell/background.ts:70-108`），不阻塞等待。
 
@@ -2643,7 +2645,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 验证：`backgroundTools.test.ts` 新增 5 项——已结束直接返回、等待完成事件（断言调用确实阻塞在 runner 上）、超时报告仍在运行、取消后释放监听、未知 id 列出已知任务。反转把等待换成"读一次当前状态"后 2 项预期失败；源码逐字节恢复并核对 SHA-256 `490c6b9532b5` 后重验。`core/tools` 36 文件 424 项通过；五静态门与 module facade 0 通过。
 
-**边界**：夹具使用受控的 `BackgroundRunner`，未在真实长任务上测过等待与取消；前台 60 秒自动提升的既有行为未改；`27-background-execution.md` 的过期结论仍未修正。
+**初版边界**：此批仅受控runner，未测真实等待；后续20.49已补两模式CLI真实小进程的16秒wait、取消、同任务完成，并修正后台研究现状。生产长时与60秒自动提升仍未在20.49复验。
 
 ### 第一百二十二批：`/undo status` 显示 turn 归属
 
@@ -3897,3 +3899,25 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 | fullscreen | 17全过 | 3行/66、解析cursor row56 col20 | 168ms、0 | 303444KiB / 13.26s |
 
 最终34阶段chrome/解析caret与source digest均匹配，tabs保留、无CR、placeholder展开不重复，终端两次normal exit ICANON/ECHO/ISIG恢复。旧build的pre-editor/pre-trailing-newline成功收据另保留，不能代替含final CRLF的失败和新build最终证据。时间含人为150ms/观察/小fixture，不作为生产性能。正式工件保存失败分类、baseline/反转/恢复、build/parser/final receipts；不归档raw显示/原会话/provider正文，syntax/JSON/收据/五门/diff后清理task scratch。HANDOFF追加先normalize再trim陷阱。全程主代理heavy serial、原CLAUDE.md保留；无独立review/用户桌面与启动空白现场/Windows/IME/缺尺寸/全部editor失败或live submit，未跑exe/full suite/20k。原47和ADD整体不升级，goal active，Git/精确CI另绑定。
+
+
+### 20.49 taskWait真实CLI可达、取消与同步完成清理
+
+接续17.3/18.121/18.138，先读target后台tool、discovery、local registry/journal、turn与actual input：core registry中已注册taskWait，但初始discovery仅pin taskOutput/taskStop，bash描述推荐它而真实CLI实际返回“Tool taskWait not found”。原CLI一次background dispatch后taskWait不订阅且失败，诊断repeat确认原持久tool正文为该固定拒绝，不属于provider/network故障。初始注册测试绕过discovery，故此前通过不能证明用户路径可达。
+
+另发现两个原wait问题：取消与timeout都返回undefined，取消后错误声称“after 300s”，paused或已消失任务仍声称running；onEnded同步回调先finish，registration返回release后仍安装deadline/interval且不再cleanup，留下listener与五分钟timer。15秒interval只检查abort，无进度输出。只读对照oh-my-pi当前wait owner明确essential、wake区分abort/timeout、finally清timer/listener、仅存在onUpdate时创建progress；本项目同意初始可达和资源释放，保留300秒单任务上限、原runner与Node20.3 Promise，不复制全局消息/服务等待或Promise.withResolvers。取消wait仅取消等待，任务停止仍是原taskStop合同。
+
+修补在原owner：[background](../../packages/ts-shell/src/core/tools/shell/background.ts)返回settled/cancelled/timeout，超时或取消只说明未请求stop并读当前snapshot，不借旧task虚构state；同步settlement先释放registration返回的capability，再决定是否安装timer/abort listener；移除无progress作用的interval，保留注册后状态复查。[discovery](../../packages/ts-shell/src/core/tools/discovery/state.ts)将taskWait与taskOutput/taskStop同pin，原generation/权限检查不变。
+
+原两文件24项通过；5条wait行为在原实现失败、初始registry/discovery合同1条失败。独立分别恢复原source，wait5失败/6通过/3未选、discovery1失败/9未选，finally字节恢复后24重跑通过。最终措辞进一步改为“no stop was requested”，避免假定其他owner没有停止进程；最终24再跑与build均exit0。五静态门/diff通过、118旧docs-source advisory保留。独立freshness build `5a930c87bbb11a9a2a2ed681b90f235e2027178cb323a4057f28abff72757b6b`、inputs `f313e9e018d73df96038db471c08e459d7361b140bd30227db29976278a4b2cf`、460/3549一致；owner callable11/11及16/16，无新增product import/function，source digests见[工件](../../.omx/artifacts/phase20-addition-background-wait/)。
+
+原Node CLI/PTY两模式每次一条小saved session、一条真实Node后台进程，loopback HTTP选择原bash/taskWait；真实Alt+P两次取得isolated allow-all。1秒wait limit返回后journal仍running，Ctrl+C取消wait后Linux start identity确认同一个原进程仍非zombie，再对同job等待至少16秒后由fixture release结束原进程，完成事件给exit0与持久output。三次wait listener全部释放，常规host notice listener保留；job journal全程一个dispatch、取消后无额外model request，完成原输出digest匹配。
+
+| 模式 | wait1整轮 / cancel2 | wait3保持 / release到turn | normal Ctrl+D |
+|---|---|---|---|
+| regular | 2176ms / 109ms | 至少16000ms / 300ms | 172ms、exit0 |
+| fullscreen | 2076ms / 132ms | 至少16000ms / 274ms | 162ms、exit0 |
+
+每模式6 completion/3 readiness请求、零real-provider credential、config不变，最终ICANON/ECHO/ISIG恢复；2MiB/45秒上限未触发。fixture child用小文件poll控制结束，product taskWait仍只等completion event；observer同步写小收据影响timings，不作生产性能。保留unsupported CLI flag带来startup prompt的setup失败、原tool-missing两失败和不同build的1.5秒short成功收据，不能代替最终16秒等待。全部任务scratch在归档后清理，原CLAUDE.md保留；未用subagent、不跑exe/full suite/20k、不声称物理terminal像素、未测生产分钟级任务/60秒提升/真实provider选tool/全部清理与容量/独立review。更正27-background-execution无自动提升与17.3实施前结论，HANDOFF追加discovery及同步registration陷阱；原47/ADD整体不升级，goal active。
+
+20.48已提交推送`ec8a44aab6884e9f1e496e049f5263fb4e54a7bc`。本轮延后精确head观察：CI40981106387仍in_progress、Watch40981106301 completed/success；20.47 `433077c52d2a91c79dbb51672dd483b78d93175a` CI40979466560/Watch40979466580均success；20.46 `5b0c9dcbf02194307624c134cec88118c868ad09` CI40979108158/Watch40979108188均success；20.45 `a072ecb199d93e33d3aca70cc5d0c1e84148b713` CI40978485363/Watch40978485261均success。Watch workflow成功不证明完整架构或Phase验收。

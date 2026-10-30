@@ -1037,3 +1037,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An external editor saving a final CRLF returns a draft with one extra empty line; an LF-only fixture passes.
 - **Root Cause**: Removing final LF leaves CR, which the downstream editor setter turns back into a logical newline.
 - **Rule**: Normalize CRLF and bare CR before unchanged comparison and final logical-newline removal at the external-editor return boundary. Preserve extra blank lines, tabs and accepted unchanged text. Verify a real saved final CRLF through CLI adoption and original-draft recovery, and distinguish bounded PTY parser coordinates from desktop cursor or pixel measurements.
+
+### Advertised Tools Need Discovery And Wait Cleanup Coverage
+- **Symptom**: The core registry contains taskWait but the actual CLI reports it missing; a synchronous completion returns while leaving its listener and five-minute timer alive. Cancellation also reports the full requested timeout as elapsed.
+- **Root Cause**: Registry tests bypass the initial discovery snapshot. A completion callback can run before registration returns its release function, and timeout/cancellation share an undefined outcome.
+- **Rule**: Verify advertised collaborators through the original discovery snapshot and CLI. After synchronous subscription settlement, release the returned capability before installing timers or abort listeners. Keep cancellation, timeout and observed task state distinct; never infer process termination from stopping a wait. Abort events already provide wakeup, so a periodic abort check is not progress reporting.

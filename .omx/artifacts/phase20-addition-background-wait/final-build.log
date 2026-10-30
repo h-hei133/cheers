@@ -1,0 +1,6 @@
+npm notice run cheers@0.1.0 build
+npm notice run npm run build:ts
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+Wrote build manifest 5a930c87bbb1 for @cheers/ts-shell@0.1.0
+{"buildId":"5a930c87bbb11a9a2a2ed681b90f235e2027178cb323a4057f28abff72757b6b","inputsDigest":"f313e9e018d73df96038db471c08e459d7361b140bd30227db29976278a4b2cf","compilerInputs":460,"files":3549,"compilerMatch":true,"digestMatch":true,"callables":{"packages/ts-shell/src/core/tools/shell/background.ts":{"count":11,"previousCount":11,"sourceSha256":"c72b1513c3abf9b8000986b91e5a26716c86b065e6a740d9f0810e4d62b32baf"},"packages/ts-shell/src/core/tools/discovery/state.ts":{"count":16,"previousCount":16,"sourceSha256":"fa196f5b0cebf3ce6170ec0aba76adb92ca86734ada9cf14273d492b777de857"}}}

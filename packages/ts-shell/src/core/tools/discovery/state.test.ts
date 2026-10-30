@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import type { ToolDefinition } from '../../../tools/types.js';
 import { createToolDiscovery, DISCOVERY_LOAD_TOOL, DISCOVERY_SEARCH_TOOL, PINNED_TOOL_NAMES } from './state.js';
 import { discoveryTools } from './tools.js';
+import { createCoreToolRegistry } from '../registry.js';
 
 function tool(name: string, description = `${name} tool`): ToolDefinition {
   return { name, description, argsSchema: { type: 'object', properties: {} }, execute: async () => ({ success: true, output: 'ok' }) };
@@ -21,6 +22,22 @@ it('starts from pinned tools plus the discovery entry points', () => {
   const value = discovery();
   expect([...value.snapshot().keys()]).toEqual([...PINNED_TOOL_NAMES.filter(name => catalog().has(name)), DISCOVERY_SEARCH_TOOL, DISCOVERY_LOAD_TOOL]);
   expect(value.snapshot().has('browser')).toBe(false);
+});
+
+it('offers the background wait advertised by bash in the initial request', async () => {
+  const value = createToolDiscovery({ catalog: createCoreToolRegistry() });
+  const tools = value.snapshot();
+  expect(tools.get('bash')!.description).toContain('taskWait');
+  expect(tools.has('taskWait')).toBe(true);
+  expect(tools.get('taskWait')!.argsSchema.required).toEqual(['taskId']);
+  // Being offered never bypasses the ordinary owner or task identity checks.
+  const result = await tools.get('taskWait')!.execute({ taskId: 'missing' }, {
+    workspaceRoot: process.cwd(), taskId: 'call', background: {
+      get: () => undefined, list: () => [], onEnded: () => () => {},
+    },
+  } as never);
+  expect(result.success).toBe(false);
+  expect(result.error).toContain('no background command');
 });
 
 it('searches names and descriptions without returning schemas', () => {

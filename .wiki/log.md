@@ -10426,3 +10426,14 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 两模式原CLI/PTY各17阶段paste/stash/42×20 resize/caret/120×60/held expansion/真实外部editor final CRLF/取原稿与改写全部通过、零model request/config变化。editor cooked TTY/原稿digest和tmp清理，final草稿3行caret66，Ctrl+D167/168ms/0与cooked flags恢复，RSS303352/303444KiB、13.41/13.26秒。旧final CRLF失败实际4行，初始private pyte query两失败与narrow旧build passes均保留分类。应用frame与实际PTY的pyte解析chrome/caret匹配、parser五检查通过；坐标不是桌面像素，initial row seed与reflow限制明确。
 
 正式工件/回归/反转/build/parser/收据与HANDOFF、scratch清理，syntax/JSON/五门/diff；全程heavy serial、不跑exe/full suite/20k/外部live，无独立review/用户现场/Windows/IME/缺尺寸验收，原CLAUDE.md保留、原47/ADD不升级、goal active，Git/精确CI另绑定。
+
+
+## [2026-10-30] fix | taskWait初始可达、取消与真实进程等待
+
+[addition20.49](features/phase-20-addition.md#2049-taskwait真实cli可达取消与同步完成清理)真实CLI发现bash推荐taskWait而discovery遗漏，工具实际not found。原wait取消误报after300s、paused/消失误报running、同步registration完成遗留timer/listener；对照reference essential与独立wake/finally cleanup，原owner改settled/cancelled/timeout与当前state、同步释放后不再安装timer、去掉无progress的abort interval，discovery同pin taskOutput/taskStop。原权限/runner/Node floor保留。
+
+两文件24通过，独立原wait五失败与原discovery一失败，finally字节恢复后24重跑，最终no stop was requested措辞后24/build/freshness重验。五门/diff通过、118旧advisory；build `5a930c87bbb11a9a2a2ed681b90f235e2027178cb323a4057f28abff72757b6b`、inputs `f313e9e018d73df96038db471c08e459d7361b140bd30227db29976278a4b2cf`、460/3549；owner11/11、16/16。
+
+两模式原NodeCLI/PTY真实小child一次dispatch：wait1超时仍running→Ctrl+C109/132ms结束wait、原pid/start identity仍活跃→同job wait至少16秒、release后300/274ms收到完成/持久output/exit0，三wait监听释放。每模式6completion/3readiness，Ctrl+D172/162ms、0/cookedflags恢复，config不变。setup unsupported flag、tool-missing failures、旧short successes单列保留；2MiB/45秒上限、孤立state全部清理，正式工件/HANDOFF/27现状同步。未测production分钟级/60秒提升/真provider/完整平台或capacity/独立review，原47/ADD不升级、goal active。
+
+20.48已推送`ec8a44aab6884e9f1e496e049f5263fb4e54a7bc`，本轮延后exact CI40981106387仍in_progress/Watch40981106301 success；20.47 CI40979466560现success，20.46 CI40979108158、20.45 CI40978485363 success，三Watch均success且head一致。不将Watch成功替代完整验收；本批Git/精确CI另绑定。

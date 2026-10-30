@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -106,6 +106,10 @@ describe("a background command and the sandbox", () => {
 });
 
 describe("waiting for a background command", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("returns at once when the command has already settled", async () => {
     const settled = { id: 'task-1', command: 'true', cwd: '/tmp', pid: undefined, startedAt: 0, state: 'exited' as const, output: 'done' };
     const background = {
@@ -156,25 +160,32 @@ describe("waiting for a background command", () => {
       { ...context, background, abortSignal: controller.signal } as unknown as ToolExecutionContext);
     controller.abort();
 
-    expect((await pending).output).toContain('still running');
+    const result = await pending;
+    expect(result.output).toContain('Wait cancelled');
+    expect(result.output).toContain('still running');
+    expect(result.output).not.toContain('after 300s');
     expect(released).toBe(true);
   });
 
   it("survives a runner that reports completion synchronously", async () => {
+    vi.useFakeTimers();
     // onEnded may fire the listener before it returns the release function.
     // Cleanup then runs while the timer handles are still unassigned; touching
     // them there threw and the wait never settled.
     const running = { id: 'task-5', command: 'fast', cwd: '/tmp', pid: 1, startedAt: 0, state: 'running' as const, output: '' };
     const finished = { ...running, state: 'exited' as const, output: 'done at once' };
+    const release = vi.fn();
     const background = {
       get: () => running,
       list: () => [running],
-      onEnded: (listener: (task: typeof running) => void) => { listener(finished); return () => {}; },
+      onEnded: (listener: (task: typeof running) => void) => { listener(finished); return release; },
     };
 
     const result = await tool('taskWait').execute({ taskId: 'task-5' },
       { ...context, background } as unknown as ToolExecutionContext);
     expect(result.output).toContain('done at once');
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("settles when the turn was cancelled before the wait began", async () => {
@@ -186,6 +197,58 @@ describe("waiting for a background command", () => {
     const result = await tool('taskWait').execute({ taskId: 'task-6', timeoutSeconds: 300 },
       { ...context, background, abortSignal: controller.signal } as unknown as ToolExecutionContext);
     expect(result.output).toContain('still running');
+    expect(result.output).toContain('Wait cancelled');
+    expect(result.output).not.toContain('after 300s');
+  });
+
+  it("reports the observed paused state when the wait expires", async () => {
+    vi.useFakeTimers();
+    const paused = { id: 'task-paused', command: 'slow', cwd: '/tmp', pid: undefined, startedAt: 0, state: 'paused' as const, output: '' };
+    const release = vi.fn();
+    const background = { get: () => paused, list: () => [paused], onEnded: () => release };
+    const pending = tool('taskWait').execute({ taskId: paused.id, timeoutSeconds: 1 },
+      { ...context, background } as unknown as ToolExecutionContext);
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await pending;
+    expect(result.output).toContain('Wait limit reached after 1s');
+    expect(result.output).toContain('paused; no command dispatched');
+    expect(result.output).not.toContain('still running');
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does not invent a running state when the task disappears during the wait", async () => {
+    vi.useFakeTimers();
+    const running = { id: 'task-lost', command: 'slow', cwd: '/tmp', pid: 1, startedAt: 0, state: 'running' as const, output: '' };
+    let current: typeof running | undefined = running;
+    const background = { get: () => current, list: () => [], onEnded: () => () => {} };
+    const controller = new AbortController();
+    const pending = tool('taskWait').execute({ taskId: running.id },
+      { ...context, background, abortSignal: controller.signal } as unknown as ToolExecutionContext);
+    current = undefined;
+    controller.abort();
+    const result = await pending;
+    expect(result.output).toContain('Wait cancelled');
+    expect(result.output).toContain('current task state is unavailable');
+    expect(result.output).not.toContain('still running');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("ignores other completions and cleans up only when the selected task ends", async () => {
+    vi.useFakeTimers();
+    const running = { id: 'task-selected', command: 'slow', cwd: '/tmp', pid: 1, startedAt: 0, state: 'running' as const, output: '' };
+    const finished = { ...running, state: 'exited' as const, exitCode: 0, output: 'selected done' };
+    const release = vi.fn();
+    let notify!: (task: typeof finished) => void;
+    const background = { get: () => running, list: () => [running], onEnded: (listener: typeof notify) => { notify = listener; return release; } };
+    const pending = tool('taskWait').execute({ taskId: running.id },
+      { ...context, background } as unknown as ToolExecutionContext);
+    notify({ ...finished, id: 'task-other' });
+    expect(release).not.toHaveBeenCalled();
+    notify(finished);
+    expect((await pending).output).toContain('selected done');
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("returns at once when the task ended before the listener was installed", async () => {

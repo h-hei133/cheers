@@ -140,8 +140,9 @@ export function createTaskStopToolDefinition(): ToolDefinition {
 
 /** Longest a single wait may block, matching the background deadline it watches. */
 const WAIT_MAX_MS = 300_000;
-/** How often a wait reports progress without a completion to report. */
-const WAIT_PROGRESS_MS = 15_000;
+type WaitOutcome =
+  | { readonly kind: 'settled'; readonly task: BackgroundTask }
+  | { readonly kind: 'cancelled' | 'timeout' };
 
 /**
  * Wait for a background command to finish, instead of polling for it.
@@ -157,7 +158,7 @@ const WAIT_PROGRESS_MS = 15_000;
  * The wait is bounded and cancellable. A background command is allowed to run
  * past any single turn, so a wait that could not give up would make one slow
  * command unkillable from the model's side; when the deadline passes the answer
- * says the task is still running rather than pretending it finished.
+ * reports the current task state rather than pretending it finished.
  */
 export function createTaskWaitToolDefinition(): ToolDefinition {
   return {
@@ -171,7 +172,7 @@ export function createTaskWaitToolDefinition(): ToolDefinition {
         taskId: { type: 'string', description: 'The identifier the background command was started under.' },
         timeoutSeconds: {
           type: 'number',
-          description: `How long to wait before reporting it is still running (default and maximum ${WAIT_MAX_MS / 1000}).`,
+          description: `How long to wait before reporting the current task state (default and maximum ${WAIT_MAX_MS / 1000}).`,
         },
       },
       required: ['taskId'],
@@ -191,11 +192,13 @@ export function createTaskWaitToolDefinition(): ToolDefinition {
       // Already settled: the answer is the result, not a wait that returns at once.
       if (task.state === 'exited' || task.state === 'killed' || task.state === 'unknown') return approvedResult(renderTask(task));
 
-      const settled = await waitForSettlement(background, id, timeoutMs, context.abortSignal);
-      if (settled === undefined) {
-        return approvedResult(`${id} is still running after ${Math.round(timeoutMs / 1000)}s.\n\n${renderTask(background.get(id) ?? task)}`);
-      }
-      return approvedResult(renderTask(settled));
+      const outcome = await waitForSettlement(background, id, timeoutMs, context.abortSignal);
+      if (outcome.kind === 'settled') return approvedResult(renderTask(outcome.task));
+      const notice = outcome.kind === 'cancelled'
+        ? 'Wait cancelled; no stop was requested.'
+        : `Wait limit reached after ${Math.round(timeoutMs / 1000)}s; no stop was requested.`;
+      const current = background.get(id);
+      return approvedResult(`${notice}\n\n${current ? renderTask(current) : `${id}: current task state is unavailable.`}`);
     },
   };
 }
@@ -212,7 +215,7 @@ function waitForSettlement(
   id: string,
   timeoutMs: number,
   signal: AbortSignal | undefined,
-): Promise<BackgroundTask | undefined> {
+): Promise<WaitOutcome> {
   return new Promise(resolve => {
     let done = false;
     // Declared before anything can call `finish`: a runner that reports a
@@ -220,31 +223,27 @@ function waitForSettlement(
     // aborted, reaches the cleanup while these are still unassigned.
     let release: () => void = () => {};
     let deadline: ReturnType<typeof setTimeout> | undefined;
-    let progress: ReturnType<typeof setInterval> | undefined;
-    const onAbort = (): void => finish(undefined);
-    const finish = (task: BackgroundTask | undefined): void => {
+    const onAbort = (): void => finish({ kind: 'cancelled' });
+    const finish = (outcome: WaitOutcome): void => {
       if (done) return;
       done = true;
       if (deadline !== undefined) clearTimeout(deadline);
-      if (progress !== undefined) clearInterval(progress);
       release();
       signal?.removeEventListener('abort', onAbort);
-      resolve(task);
+      resolve(outcome);
     };
-    release = background.onEnded(ended => { if (ended.id === id) finish(ended); });
-    deadline = setTimeout(() => finish(undefined), timeoutMs);
-    // Long waits should not look like a hang. Progress goes nowhere on its own;
-    // it exists so a cancelled wait still has a timer that notices the abort.
-    progress = setInterval(() => {
-      if (signal?.aborted) finish(undefined);
-    }, WAIT_PROGRESS_MS);
+    release = background.onEnded(ended => { if (ended.id === id) finish({ kind: 'settled', task: ended }); });
+    // A synchronous completion ran cleanup before registration returned its
+    // release capability. Retire it now and create no timers or abort listener.
+    if (done) { release(); return; }
+    deadline = setTimeout(() => finish({ kind: 'timeout' }), timeoutMs);
     signal?.addEventListener('abort', onAbort, { once: true });
-    if (signal?.aborted) finish(undefined);
+    if (signal?.aborted) { onAbort(); return; }
     // The task can end between the caller's `get` and this listener being
     // installed. `onEnded` only reports what happens after it is registered, so
     // without this recheck that gap would leave the wait sitting until its
     // deadline — five minutes of nothing for a command that already finished.
     const current = background.get(id);
-    if (current && (current.state === 'exited' || current.state === 'killed' || current.state === 'unknown')) finish(current);
+    if (current && (current.state === 'exited' || current.state === 'killed' || current.state === 'unknown')) finish({ kind: 'settled', task: current });
   });
 }

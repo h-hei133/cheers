@@ -1,0 +1,32 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/discovery/state.test.ts  (10 tests | 1 failed | 9 skipped) 9ms
+   ❯ src/core/tools/discovery/state.test.ts > offers the background wait advertised by bash in the initial request
+     → expected false to be true // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/discovery/state.test.ts > offers the background wait advertised by bash in the initial request
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/core/tools/discovery/state.test.ts:31:33
+     29|   const tools = value.snapshot();
+     30|   expect(tools.get('bash')!.description).toContain('taskWait');
+     31|   expect(tools.has('taskWait')).toBe(true);
+       |                                 ^
+     32|   expect(tools.get('taskWait')!.argsSchema.required).toEqual(['taskId'…
+     33|   // Being offered never bypasses the ordinary owner or task identity …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 skipped (10)
+   Start at  08:52:04
+   Duration  4.62s (transform 2.74s, setup 0ms, collect 4.35s, tests 9ms, environment 0ms, prepare 54ms)

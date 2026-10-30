@@ -1,0 +1,17 @@
+{
+  "restored": true,
+  "cases": [
+    {
+      "owner": "packages/ts-shell/src/core/tools/shell/background.ts",
+      "exitCode": 1,
+      "oldDigest": "41257b792f7c776a1d9fefe22811d1cd7ab3c52c0113bf3e35fea71e2f1e7031",
+      "restoredDigest": "d4719daf9a01a8eb38cd27fe7b466141b0b2775ed7b23356455f6897333fe2db"
+    },
+    {
+      "owner": "packages/ts-shell/src/core/tools/discovery/state.ts",
+      "exitCode": 1,
+      "oldDigest": "7ef942723df94c9e580a7a025dd31ded0ec904f9fc8b4c3984e63dd073abbcb4",
+      "restoredDigest": "fa196f5b0cebf3ce6170ec0aba76adb92ca86734ada9cf14273d492b777de857"
+    }
+  ]
+}

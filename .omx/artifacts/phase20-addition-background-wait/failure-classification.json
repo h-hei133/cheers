@@ -1,0 +1,26 @@
+{
+  "baseline": {
+    "wait": "Five assertion failures: cancellation wording, synchronous release, pre-cancelled wording, paused-state timeout and missing-state cancellation.",
+    "discovery": "One assertion failure: initial core discovery omits the wait advertised by bash."
+  },
+  "cli": [
+    {
+      "file": "startup-failed.log",
+      "class": "harness/setup drift",
+      "reason": "Unsupported permission-scope flag leaves its value as a positional initial prompt; startup closes before interactive probe. One completion and one readiness request, zero job dispatches.",
+      "repair": "Remove unsupported flag, select the real permission scope through Alt+P twice."
+    },
+    {
+      "file": "first-wait-failed.log",
+      "class": "product behavior defect",
+      "reason": "Real background task started, but taskWait never subscribed and failed; initial receipt did not retain refusal text."
+    },
+    {
+      "file": "tool-missing-failed.log",
+      "class": "product behavior defect",
+      "reason": "Diagnostic repeat confirms Tool taskWait not found from initial discovery, not a runner or provider failure.",
+      "repair": "Pin taskWait alongside taskOutput and taskStop, preserve ordinary discovery generation and permission guards."
+    }
+  ],
+  "limits": "Final evidence uses loopback HTTP and one small real process per mode. Prior short successes have separate receipts and build IDs."
+}
