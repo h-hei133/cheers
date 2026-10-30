@@ -1,0 +1,22 @@
+{
+  "classification": "harness-only; neither receipt is a product verdict",
+  "failures": [
+    {
+      "fixtureSetupMs": 85522,
+      "failure": "closed-startup",
+      "processExit": 1,
+      "scratchRemoved": true,
+      "stage": "full SessionManager fixture creation",
+      "cause": "fixture creation took 85.5 seconds; child then closed before startup because of the observer import"
+    },
+    {
+      "fixtureSetupMs": 1172,
+      "failure": "closed-startup",
+      "processExit": 1,
+      "scratchRemoved": true,
+      "stage": "observer module initialization",
+      "cause": "observer wrapper imported a named receipt export from a module that did not export it",
+      "correction": "imported receipt and save directly from their shared owner; import check passed"
+    }
+  ]
+}

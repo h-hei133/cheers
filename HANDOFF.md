@@ -1191,3 +1191,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A live research probe reports a suspected network failure even though its structured query error has no recognized cause, then fails because an unresolved request remains in the ledger.
 - **Root Cause**: A regular-expression classifier scans the whole terminal, including the echoed user's word network; the fixture also treats zero pending entries as mandatory when complete remote usage is absent.
 - **Rule**: Classify only actual error event fields into safe enums, discard raw error text and keep unclassified outcomes unclassified. Preserve dispatched unknown ledger entries and their budget consequences; an empty reference set or zero settled token totals proves no citation quality or zero billing. A failed probe alone does not establish model unavailability or authorize a fallback model.
+
+### Probe Observers Must Import Their Receipt Owner
+- **Symptom**: A CLI probe exits before its startup prompt because its observer module cannot load a named receipt export.
+- **Root Cause**: A wrapper observer imports and installs another observer but does not re-export that observer's bindings.
+- **Rule**: Import shared receipt state directly from the module that owns it; treat wrapper modules as side-effect imports. Smoke-import the observer before launching a bounded PTY child, and keep import failures separate from product startup failures.

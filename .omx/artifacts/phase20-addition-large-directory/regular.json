@@ -1,0 +1,60 @@
+{
+  "mode": "regular",
+  "fixtureCount": 2307,
+  "messagesPerFixture": 1,
+  "syntheticContentPaddingChars": 1400,
+  "fixtureSourceBytes": 6323775,
+  "fixtureSetupMs": 1167,
+  "buildId": "e2930dba7c8af5c2ce9a7ae62770da5573bfeaa5485c38b406ce9216dbc1b47f",
+  "inputsDigest": "e2bd5e51ebe097036feaf680dd0ffb219c2f3a5c5eb302c0a9a533badcce0d38",
+  "providerMode": "offline-no-credential",
+  "status": "passed",
+  "checks": {
+    "firstFramePrecedesCompleteScan": true,
+    "completeCatalog": true,
+    "interactionDuringScan": true,
+    "uniqueSearchResult": true,
+    "sameBrowseAfterDelete": true,
+    "targetDeleted": true,
+    "configUnchanged": true,
+    "catalogBrowseAbortedOnClose": true,
+    "noCatalogPagesAfterCancel": true,
+    "cookedInputRestored": true,
+    "zeroRequests": true,
+    "scratchRemoved": true
+  },
+  "interactionMs": [
+    72
+  ],
+  "deletionMs": [
+    149
+  ],
+  "firstFrameMs": 197,
+  "firstProgress": {
+    "scanned": 1,
+    "unreadable": 0,
+    "status": "scanning",
+    "total": 1,
+    "hasMore": false,
+    "sourceLimited": false
+  },
+  "scanFromOpenMs": 13046,
+  "scanAfterFirstFrameMs": 12849,
+  "catalogFinal": {
+    "scanned": 2307,
+    "unreadable": 0,
+    "status": "complete",
+    "total": 2307,
+    "hasMore": true,
+    "sourceLimited": false
+  },
+  "catalogSnapshotCount": 145,
+  "searchMs": 177,
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 139,
+  "outputBytes": 282503,
+  "scratchRemoved": true
+}

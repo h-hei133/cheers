@@ -4502,3 +4502,16 @@ ed4820cb的CI41039139794/Watch41039139814延后读回均completed/success；上�
 首轮失败收据原样保留但排除诊断：对整段终端搜network会命中回显的用户输入，且探针错误要求未知结果必须清零。最终仅分类真实错误event字段，原文丢弃；保持未分类、记录未知账本，completed仍要求settled。空引用上的every=true不算引用验证。两次CLI均exit0/cooked恢复，原config及公开文件字节不变；0700 scratch内0600凭据fixture已删除，原始模型/终端/错误文本不存档，收据写入前扫描原key/endpoint。详见[正式工件](../../.omx/artifacts/phase20-addition-research-live/README.md)，HANDOFF补回显误诊guardrail。仅证据脚本/文档变更，无确认产品缺陷而不修改运行时。
 
 主代理syntax与两次CLI严格串行，两次probe命令均exit1（live未验证），复用fresh build `e2930dba7c8af5c2ce9a7ae62770da5573bfeaa5485c38b406ce9216dbc1b47f`、inputs `e2bd5e51ebe097036feaf680dd0ffb219c2f3a5c5eb302c0a9a533badcce0d38`；无unit/build重跑、源码反转、full suite/并行heavy/本助手subagent/20k真实终端/exe/独立review/NormProof judge。一次延后读回ff084423 CI41040907065/Watch41040907311均completed/success，22e2a1fb Watch41042919272 completed/success、CI41042919220仍in_progress且head一致。当前提交/推送/未来CI另绑定，CLAUDE.md保留，原47与ADD整体不升级、goal active。
+
+### 21.25 第三十三：2,307会话合成CLI目录探针
+
+为补充21.3的只读用户目录测量及21.13/21.18的小目录CLI结果，使用当前Node CLI在隔离home/project/profile中生成2,307个session目录、每条一条约1.4K重复ASCII填充的合成用户消息。session文件共6,323,775 bytes，明显小于21.3观测的41 MiB用户目录。一个会话由生产`SessionManager` writer创建，其余仅复制有效metadata/state/transcript结构并更新ID、标题和时间，不读真实用户会话。regular/fullscreen各单独串行运行，768 MiB heap、90秒deadline、2 MiB terminal输出上限；只保存计数、状态和耗时，不保存终端正文。
+
+| 模式 | 首帧 | 全目录扫描完成 | 扫描中的按键响应 | 唯一标题搜索 | 确认删除 |
+|---|---:|---:|---:|---:|---:|
+| regular | 197 ms | 13,046 ms | 72 ms | 177 ms | 149 ms |
+| fullscreen | 197 ms | 13,429 ms | 51 ms | 179 ms | 154 ms |
+
+两模式均完整扫描2,307条、matched 2,307、unreadable 0、无source budget限制；首帧时只完成current session并仍处于scanning。扫描中方向键仍能改变焦点。搜索唯一合成标题后删除目标，确认原browse继续使用；第二次打开后于扫描中Escape，catalog browse controller实际aborted且没有迟到page发布。两次均零request、exit0、恢复cooked flags，profile scratch清理、config不变。
+
+探针observer写入receipt并参与计时；合成fixture只有6.3 MB且不是用户当前41 MiB目录，不能据此宣称用户目录、cold/warm磁盘、总heap/physical I/O、平台或release性能已验收。完整扫描约13.0–13.4秒而交互期间仍可用，作为后续实环境对照线索，不触发仅凭此fixture的runtime改动；第33项、原47项与ADD整体仍partial。正式脚本、regular/fullscreen receipt与两次已修正的harness-only失败见[工件](../../.omx/artifacts/phase20-addition-large-directory/README.md)；HANDOFF记录observer receipt owner约束。

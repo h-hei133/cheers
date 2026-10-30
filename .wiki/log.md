@@ -10617,3 +10617,9 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 账本保留1派发后未知结果符合原合同，零已结算用量不等于零费用。首轮错误用整段终端network正则、又强求清账，失败收据保留且排除诊断；最终改为真实错误event字段的安全enum并保持未知结果，HANDOFF补guardrail。原config/fixture bytes不变、exit0/cooked恢复、凭据fixture删除且收据secret scan通过。无产品源码变化，不重复unit/build或制造修补；syntax/CLI主代理串行，probe exit1如实保留，复用fresh build。
 
 一次延后读回ff084423 CI41040907065/Watch41040907311均completed/success；22e2a1fb Watch41042919272 success、CI41042919220仍in_progress且head一致。当前Git/未来CI另绑定，CLAUDE.md保留；无full suite/20k/exe/本助手subagent/独立review/NormProof judge，原47/ADD不升级，goal active。
+
+## [2026-10-30] test | 2,307会话合成CLI目录探针
+
+[addition21.25](features/phase-20-addition.md#2125-第三十三2307会话合成cli目录探针)记录Node CLI regular/fullscreen各一轮、隔离2,307 session/6,323,775 bytes/每条一条合成消息。首帧197/197ms，全目录扫描13,046/13,429ms；扫描中方向键72/51ms，唯一搜索177/179ms，确认删除149/154ms。两模式目录均complete 2,307、unreadable0、无source budget限制；第二次打开后Escape期间browse controller aborted、无迟到目录页，文件/profile清理、config不变、零请求、exit0/cooked。
+
+该合成目录小于21.3观测的41MiB用户目录，计时含observer写receipt，不证明真实用户目录、cold/warm磁盘、heap/physical I/O或跨平台性能；目录全扫约13.0–13.4秒而交互仍可用，作为后续现场对照线索，原47与ADD整体不升级。正式脚本/收据在`.omx/artifacts/phase20-addition-large-directory/`，HANDOFF补observer receipt owner guardrail。首轮全writer夹具85,522ms、次轮复制夹具1,172ms，均因observer import错误启动前退出；修正后regular/fullscreen两轮通过。无产品源码改动。
