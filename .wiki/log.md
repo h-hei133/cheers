@@ -10404,3 +10404,13 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 两模式原CLI/PTY/loopback各六回合：ask拒绝、accept-edits批准原文件第二行、allow-all批准兄弟第二行、再次拒绝原文件、目录两页分别批准。每次once/deny实际绘制、a保持pending，未答复/拒绝没有记录原fs.promises fixture read open或enumeration，获准文件精确目标一次open/slice/provenance digest匹配，目录direct entries/绝对offset3与重新询问正确，无递归child body open。十二回合首轮通过，各12 completion/6 readiness、零外部请求、operation/grant/roots均0，源/config原字节保持；Ctrl+D180/154ms/0与cooked flags恢复，RSS328036/313196KiB、13.85/13.98秒。观察器不证明metadata或kernel I/O为零，人工等待不当生产性能。
 
 正式脚本/收据/metrics归档与scratch清理，syntax/JSON/收据/五门/diff检查、118旧advisory；复用20.45 build，产品未改不重复build/tests，全程serial。无独立review/live用户/外部provider选择/身份更换/非Linux/媒体矩阵/桌面/exe/full suite/20k，原47不升级、goal active，Git/精确CI另绑定。
+
+
+20.46已推送`5b0c9dcbf02194307624c134cec88118c868ad09`，远端main一致、仅原CLAUDE.md。延后核对Watch40979108188 completed/success、CI40979108158仍in_progress；20.45 CI40978485363仍in_progress，head精确一致，不等待或反复轮询。
+
+
+## [2026-10-30] verify | 审批期间目录换代后的read拒绝与新审批
+
+沿[addition20.47](features/phase-20-addition.md#2047-已批准读取仍拒绝审批期间的目录身份替换)核对原workspace identity owner与既有write回归，补原read CLI。两模式各等完整审批，将external目录rename/copy为同路径同内容新dev/ino后y；用户approved但tool false/changed identity，无记录fixture read open/enumeration。下一native call重新审批后精确第二行/provenance digest才成功，两事实区分。
+
+四回合首轮通过，各4 completion/2 readiness、零外部请求/operation/grant/roots，old/new源与config字节保持，Ctrl+D148/145ms/0和cooked恢复，RSS267376/263712KiB、10.77/10.76秒。正式script/receipt/metrics、syntax/JSON/五门/diff及scratch清理，全程serial；产品未改复用20.45 build、不重复build/tests、118旧advisory。未验policy撤销/reader-started替换/live用户/外部provider/非Linux/桌面/独立review，未跑exe/full suite/20k，原47不升级、goal active，本批Git/精确CI另绑定。

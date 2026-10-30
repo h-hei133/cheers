@@ -3855,3 +3855,22 @@ regular RSS261120KiB/18.26秒、fullscreen264352KiB/18.46秒；heap768MiB/每CLI
 | fullscreen | 12 / 6 | 802 / 696 / 722 / 750 / 794 / 800 | 154ms、0 | 313196KiB / 13.98s |
 
 十二回合首轮全部通过、零外部请求；零writer operation/grant/roots、源文件/兄弟/config原字节保持，两次正常退出cooked flags恢复。时间含人工150ms持久键等待与fixture/观察，不能当生产read性能。仅记录status/count/digest，不保存原会话或HTTP正文。当前build与inputs同20.45，source未改不重复build/Vitest，工件语法/JSON/收据与五静态门/diff检查后归档清理scratch。无独立review、live用户/外部provider工具选择、pending时目录身份替换/撤销、完整read媒体/非Linux/桌面/IME、exe/full suite/20k；原47不升级、goal active，本批Git/精确CI另绑定。
+
+
+20.46已推送`5b0c9dcbf02194307624c134cec88118c868ad09`，远端main一致、仅原CLAUDE.md。延后核对Watch40979108188 completed/success、CI40979108158仍in_progress；20.45 CI40978485363仍in_progress，head精确一致，不等待或反复轮询。
+
+
+### 20.47 已批准读取仍拒绝审批期间的目录身份替换
+
+继续20.46的pending身份边界，目标原[workspace access](../../packages/ts-shell/src/turn/workspace.ts)在执行前调用[assertWorkspaceRoot](../../packages/ts-shell/src/core/workspace/roots.ts)，既有approval.test.ts已有write的parent identity回归；真实read CLI尚未取得。沿20.46授权目标与执行目标一致的参考决定，保留原目录身份复验，无产品改动。
+
+正式[read-identity工件](../../.omx/artifacts/phase20-addition-read-identity/)用原CLI/PTY/loopback与相同小fixture/budgets：两模式各两回合，等once/deny实际完整绘制、a无效/pending无read后，将outside rename为old，再复制小fixture为同路径新目录，assert dev/ino不同而内容完全相同。用户y之后原approval.resolved是approved，tool.result却false，原tool内容明确changed identity；没有记录fixture文件handle或目录enumeration，原与新目录源字节均不变。两事实分别保留，不能因用户批准写成工具读取成功。
+
+第二回合同一路径重新捕获/显示原审批，再y才exact slice成功，一次打开精确target、原read范围与provenance digest一致。两组四回合首轮通过，operation/grant/workspaceRoots均0、config原字节保持，正常Ctrl+D与cooked flags恢复。每模式4 completion/2 readiness、零外部请求。
+
+| 模式 | 旧身份批准后失败 / 新审批成功 | Ctrl+D exit | 峰值RSS / 探针 |
+|---|---|---|---|
+| regular | 783 / 719ms | 148ms、0 | 267376KiB / 10.77s |
+| fullscreen | 776 / 722ms | 145ms、0 | 263712KiB / 10.76s |
+
+时间含人工150ms等待与copy/fixture/观察，不当作生产延迟。当前build/inputs同20.45，产品未改不重复build/Vitest；正式脚本语法/JSON/收据、五静态门/diff检查后task scratch清理，原CLAUDE.md保留、主代理逐进程serial。原observer只记录选定fs open/opendir，不证明metadata/kernel I/O为零；未验policy撤销、reader已开始后的替换、用户目录/外部provider、其他平台/桌面/IME/完整媒体与独立review，无exe/full suite/20k。原47及ADD整体不升级，goal active，Git/精确CI另绑定。

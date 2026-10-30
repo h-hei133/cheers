@@ -1,0 +1,80 @@
+{
+  "mode": "fullscreen",
+  "buildId": "78e425be03020696bcd40a6e0a576a32f300de62f62a36f7d9298030a10bce8d",
+  "inputsDigest": "d64d3f37b2ea1b6e4305be80647d8c96bdf9e18c0860cdac8efd7f91bd6befdc",
+  "providerMode": "local HTTP fixture",
+  "status": "passed",
+  "attempts": [
+    {
+      "number": 1,
+      "scope": "ask",
+      "kind": "file",
+      "decision": "allow-once",
+      "directoryReplaced": true,
+      "identityRefused": true,
+      "pendingMs": 396,
+      "elapsedMs": 776,
+      "choices": [
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingNoReadHandle": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": false,
+      "readOpened": false,
+      "outputDigest": "695f9ed89885a0b60d82a4e700f0c7bb6bb09bc8cdc106147d530654fdd5a7c3",
+      "operations": 0,
+      "sourceBytesUnchanged": true
+    },
+    {
+      "number": 2,
+      "scope": "ask",
+      "kind": "file",
+      "decision": "allow-once",
+      "directoryReplaced": false,
+      "identityRefused": false,
+      "pendingMs": 416,
+      "elapsedMs": 722,
+      "choices": [
+        "allow-once",
+        "deny"
+      ],
+      "canonicalTargetDeclared": true,
+      "pendingNoReadHandle": true,
+      "persistentKeyIgnored": true,
+      "toolSuccess": true,
+      "readOpened": true,
+      "openedCount": 1,
+      "exactSlice": true,
+      "outputDigest": "a666652c05665ff52c12c55f22f741895891030f6952b6a4d2c5f8163d2730b2",
+      "operations": 0,
+      "sourceBytesUnchanged": true
+    }
+  ],
+  "checks": {
+    "approvedStaleIdentityNeverOpensRead": true,
+    "freshReapprovalReadsReplacement": true,
+    "eachExternalCallRequiresAnswer": true,
+    "noPersistentGrantOrRoot": true,
+    "exactFileSlice": true,
+    "zeroWriterOperations": true,
+    "sourceBytesUnchanged": true,
+    "configUnchanged": true,
+    "cookedInputRestored": true
+  },
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 145,
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "requests": 4,
+  "readinessRequests": 2,
+  "outputBytes": 20913,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}
