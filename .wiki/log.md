@@ -10828,3 +10828,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：导航与fork对进行中工作的行为验证
 
 [addition21.65](features/phase-20-addition.md#2165-导航与fork对进行中工作的行为验证)/back越过未完成调用时清空pending、回到其后则保留（属于当前分支），scope.ts的分支过滤一直正确；fork的undo与源隔离。首轮探针误读，多余改动已回退。未改产品代码。build dbe6dc1e。原47/ADD整体partial、goal active。
+
+### 2026-10-31：压缩不改变会话结构，未完成调用仍属活动分支
+
+[addition21.66](features/phase-20-addition-compaction-pending.md)检查/compact与进行中工具：压缩只减消息、transcript append-only、thread保留entries，未完成调用仍在活动分支，恢复索引保留它是正确语义。未改产品代码。build dbe6dc1e。原47/ADD整体partial、goal active。

@@ -4921,3 +4921,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 - **fork与undo**：fork的`undoHistory`为空、源会话仍列出自己的操作，新方向无法撤销它没做过的写入。
 
 首轮探针把「回到调用之后仍保留pending」误读为缺陷，据此写下的transcript投影改动已回退。这是本系列第二次因探针设计错误而差点引入多余改动。[工件](../../.omx/artifacts/phase20-addition-navigation-pending/README.md)。build `dbe6dc1eb2a1`。未改产品代码。原47/ADD整体partial、goal active。
+
+
+### 21.66 压缩不改变会话结构，未完成调用仍属活动分支
+
+检查`/compact`与进行中工具的交互。压缩只减少发送给模型的消息：transcript是append-only、thread保留全部entries、`state.thread`原样带过。因此压缩前未完成的工具调用在压缩后仍在活动分支上，恢复索引仍指向它。
+
+判定为**正确行为**而非缺陷：那次调用确实未被答复，发起它的分支仍在视图中；恢复时用户会被告知会话中断且有pending调用。若反而移除该entry，索引就与用户所在分支不一致。`applyCompaction`只返回新的messages数组，不改transcript或thread，这是分层正确的表现。
+
+未改产品代码。[工件](../../.omx/artifacts/phase20-addition-compaction-pending/README.md)。build `dbe6dc1eb2a1`。原47/ADD整体partial、goal active。
