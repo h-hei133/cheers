@@ -4492,3 +4492,13 @@ publication首轮只换方向仍失败，诊断看到完整内置条目后改为
 原NodeCLI regular/fullscreen各1保存会话×1消息、45秒/2MiB/heap768MiB限制，真实alt+k stash/恢复、外部editor进程、alt+z undo、保留旧槽、unbound提示与三次实际/reload均通过，每条notice既观察state也等待实际terminal输出。零HTTP请求、config/project不变（只有probe主动改fixture keybindings）、Ctrl+D exit0/cooked恢复，scratch清理。第一次host fixture未flush最后grapheme，第一次CLI又对空草稿连续Ctrl+C触发原退出；两类失败日志保留，均只修fixture，不改产品手势或放宽原文恢复。
 
 ed4820cb的CI41039139794/Watch41039139814延后读回均completed/success；上一证据提交ff084423的CI41040907065仍in_progress、Watch41040907311 success且head一致，不重复轮询。本批Git/未来CI另绑定，原CLAUDE.md保留。无full suite/并行heavy/本助手subagent/20k真实终端/exe、真实provider/独立review/NormProof judge；非raw流控、用户桌面与非Linux未验收，原47/ADD整体不升级、goal active。
+
+### 21.24 多skill真实研究的有界请求尝试与未知结果
+
+接续21.22确定性HTTP链，使用已配置openai-compatible的正常adapter和原Node CLI regular，显式请求gpt-6.1-terra，尝试真实模型读取两份相互矛盾的公开本地资料并使用两份skill。release限定v2/Linux/FEATURE_X=1、排除Windows；mirror无版本却声称默认全平台启用。隔离Git project/home/profile、1保存消息，只准read/glob/grep/research_run，关闭MCP/warming/重试、offline，heap768MiB、360秒/2MiB/根4步、原quick五分钟期限。1536输出上限仅请求值，后端型号与远端执行未确认。
+
+两次尝试分别5/6秒结束在ready/brief，零native child/child request/read/source/claim/report fragment，review未运行，不能作为研究完成或质量证据。最终结构化query.failed只得到unclassified-live-or-runtime；没有证据认定Terra不可用、网络或认证故障，也未改用Sol。账本各保留1派发后未知结果；第二次确认0未派发项，已结算input/output为0不等于零tokens或零费用。目标[ledger](../../packages/ts-shell/src/core/agent/request/ledger.ts)与[research policy](../../packages/ts-shell/src/research/run/policy.test.ts)原合同要求保留不完整用量及显式reconcile，不应为探针清账或新增runner。
+
+首轮失败收据原样保留但排除诊断：对整段终端搜network会命中回显的用户输入，且探针错误要求未知结果必须清零。最终仅分类真实错误event字段，原文丢弃；保持未分类、记录未知账本，completed仍要求settled。空引用上的every=true不算引用验证。两次CLI均exit0/cooked恢复，原config及公开文件字节不变；0700 scratch内0600凭据fixture已删除，原始模型/终端/错误文本不存档，收据写入前扫描原key/endpoint。详见[正式工件](../../.omx/artifacts/phase20-addition-research-live/README.md)，HANDOFF补回显误诊guardrail。仅证据脚本/文档变更，无确认产品缺陷而不修改运行时。
+
+主代理syntax与两次CLI严格串行，两次probe命令均exit1（live未验证），复用fresh build `e2930dba7c8af5c2ce9a7ae62770da5573bfeaa5485c38b406ce9216dbc1b47f`、inputs `e2bd5e51ebe097036feaf680dd0ffb219c2f3a5c5eb302c0a9a533badcce0d38`；无unit/build重跑、源码反转、full suite/并行heavy/本助手subagent/20k真实终端/exe/独立review/NormProof judge。一次延后读回ff084423 CI41040907065/Watch41040907311均completed/success，22e2a1fb Watch41042919272 completed/success、CI41042919220仍in_progress且head一致。当前提交/推送/未来CI另绑定，CLAUDE.md保留，原47与ADD整体不升级、goal active。

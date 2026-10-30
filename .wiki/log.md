@@ -10609,3 +10609,11 @@ resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不�
 主代理串行16新增基线失败、最终26项去重通过，三反转16/6/4断言失败且bytes恢复，恢复26项、五门/build/freshness通过；118旧advisory保留，保守含constructor的owner计数7→8/host123不增长。两模式原CLI各1保存会话×1消息，真实alt+k/alt+z、外部编辑进程、unbound及/reload原稿恢复，提示实际绘制、零请求、文件不变、exit0/cooked。fixture未flush末grapheme和空草稿双Ctrl+C两类失败保留，未改产品来适配；scratch清理、HANDOFF/指南更新。
 
 ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI41040907065仍in_progress、Watch41040907311 success且head一致，本批Git/未来CI另绑定。CLAUDE.md不改，无full suite/20k/exe/真实provider/独立review，非raw流控与桌面/其他平台未验收，原47与ADD整体不升级、goal active。
+
+## [2026-10-30] test | 多skill真实研究请求未取得生成式验收
+
+[addition21.24](features/phase-20-addition.md#2124-多skill真实研究的有界请求尝试与未知结果)记录两次正常configured-provider/原NodeCLI的有界尝试，显式请求gpt-6.1-terra、两公开矛盾资料/两skill、1保存消息、只读工具、heap768MiB/360秒/2MiB、关闭重试。均在首个请求结束，无native child/read/review/report；最终仅确认query.failed，原因unclassified，未切换模型，不认定provider或产品故障。
+
+账本保留1派发后未知结果符合原合同，零已结算用量不等于零费用。首轮错误用整段终端network正则、又强求清账，失败收据保留且排除诊断；最终改为真实错误event字段的安全enum并保持未知结果，HANDOFF补guardrail。原config/fixture bytes不变、exit0/cooked恢复、凭据fixture删除且收据secret scan通过。无产品源码变化，不重复unit/build或制造修补；syntax/CLI主代理串行，probe exit1如实保留，复用fresh build。
+
+一次延后读回ff084423 CI41040907065/Watch41040907311均completed/success；22e2a1fb Watch41042919272 success、CI41042919220仍in_progress且head一致。当前Git/未来CI另绑定，CLAUDE.md保留；无full suite/20k/exe/本助手subagent/独立review/NormProof judge，原47/ADD不升级，goal active。

@@ -1,0 +1,105 @@
+{
+  "status": "provider-or-model-unverified",
+  "mode": "regular",
+  "provider": "configured openai-compatible live endpoint",
+  "requestedModel": "gpt-6.1-terra",
+  "backendModel": "unconfirmed",
+  "buildId": "e2930dba7c8af5c2ce9a7ae62770da5573bfeaa5485c38b406ce9216dbc1b47f",
+  "inputsDigest": "e2bd5e51ebe097036feaf680dd0ffb219c2f3a5c5eb302c0a9a533badcce0d38",
+  "savedMessages": 1,
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 360,
+    "outputBytes": 2097152,
+    "requestedMaxOutputTokens": 1536,
+    "retryEnabled": false,
+    "nativeDepth": "quick",
+    "allowedTools": [
+      "read",
+      "glob",
+      "grep",
+      "research_run"
+    ]
+  },
+  "checks": {
+    "oneRun": true,
+    "methods": true,
+    "originalInput": true,
+    "referencesBound": true,
+    "noSaveRequested": true,
+    "noUnexpectedTool": true,
+    "noPendingChild": true,
+    "ownerReleased": true,
+    "ledgerOutcomeRetained": true,
+    "fixtureConfigUnchanged": true,
+    "projectUnchanged": true,
+    "operatorConfigUnchanged": true,
+    "secretFixtureRemoved": true
+  },
+  "native": {
+    "status": "ready",
+    "stage": "brief",
+    "runId": "e985a01b-6627-439b-8091-5b6d8ea74824",
+    "depth": "quick",
+    "methods": [
+      "primary",
+      "critical"
+    ],
+    "originalInputPreserved": true,
+    "methodBodiesPreserved": true,
+    "children": [],
+    "childRequestIds": 0,
+    "sources": [],
+    "claims": [],
+    "allReferencesBound": true,
+    "review": {
+      "status": "not-run"
+    },
+    "fragments": 0,
+    "coverage": {
+      "covered": 0,
+      "uncovered": 0
+    },
+    "pendingChild": false,
+    "ownerRetained": false,
+    "save": "not-requested",
+    "ledger": {
+      "present": true,
+      "nextSequence": 2,
+      "pending": 1,
+      "dispatchedUnknown": 1,
+      "unsent": 0,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "historyUnknown": false,
+      "breach": false
+    }
+  },
+  "observation": {
+    "ends": 1,
+    "tools": [],
+    "failures": [
+      {
+        "type": "query.failed",
+        "classification": "unclassified-live-or-runtime"
+      }
+    ],
+    "outcomes": [],
+    "sessionId": "sess_1c988ec78a0b34dc_1793357718855",
+    "scope": "allow-all"
+  },
+  "outcome": "ready",
+  "classification": "unclassified-live-or-runtime",
+  "ledgerSettled": false,
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "outputBytes": 31963,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "elapsedSeconds": 6
+}

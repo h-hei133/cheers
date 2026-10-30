@@ -1,0 +1,90 @@
+{
+  "status": "failed",
+  "mode": "regular",
+  "provider": "configured openai-compatible live endpoint",
+  "requestedModel": "gpt-6.1-terra",
+  "backendModel": "unconfirmed",
+  "buildId": "e2930dba7c8af5c2ce9a7ae62770da5573bfeaa5485c38b406ce9216dbc1b47f",
+  "inputsDigest": "e2bd5e51ebe097036feaf680dd0ffb219c2f3a5c5eb302c0a9a533badcce0d38",
+  "savedMessages": 1,
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 360,
+    "outputBytes": 2097152,
+    "requestedMaxOutputTokens": 1536,
+    "retryEnabled": false,
+    "nativeDepth": "quick",
+    "allowedTools": [
+      "read",
+      "glob",
+      "grep",
+      "research_run"
+    ]
+  },
+  "checks": {
+    "oneRun": true,
+    "methods": true,
+    "originalInput": true,
+    "referencesBound": true,
+    "noSaveRequested": true,
+    "noUnexpectedTool": true,
+    "noPendingChild": true,
+    "ownerReleased": true,
+    "ledgerSettled": false,
+    "fixtureConfigUnchanged": true,
+    "projectUnchanged": true,
+    "operatorConfigUnchanged": true,
+    "secretFixtureRemoved": true
+  },
+  "native": {
+    "status": "ready",
+    "stage": "brief",
+    "runId": "98a5ba70-e818-4285-8ca0-4374a86b99d9",
+    "depth": "quick",
+    "methods": [
+      "primary",
+      "critical"
+    ],
+    "originalInputPreserved": true,
+    "methodBodiesPreserved": true,
+    "children": [],
+    "childRequestIds": 0,
+    "sources": [],
+    "claims": [],
+    "allReferencesBound": true,
+    "review": {
+      "status": "not-run"
+    },
+    "fragments": 0,
+    "coverage": {
+      "covered": 0,
+      "uncovered": 0
+    },
+    "pendingChild": false,
+    "ownerRetained": false,
+    "save": "not-requested",
+    "ledger": {
+      "present": true,
+      "nextSequence": 2,
+      "pending": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "historyUnknown": false,
+      "breach": false
+    }
+  },
+  "outcome": "ready",
+  "classification": "provider-network-suspected",
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "failure": "probe-assertion",
+  "outputBytes": 22554,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "elapsedSeconds": 5
+}
