@@ -10696,3 +10696,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：退出延迟基线与会话不自动重入复核
 
 [addition21.35](features/phase-20-addition.md#2135-退出延迟基线与启动不自动重入的复核)实测两模式各三轮交替`/exit`/Ctrl+D：ready后219/164/215ms与222/158/206ms，全部exit0/cooked、零fetch。剩余唯一阻塞点是状态锁1.2秒同步重试，无竞争writer故未实测，偶发多秒卡顿与锁竞争一致但未证明。第30项复核：CLI bootstrap将recoveryCandidate固定为null、恢复建议首帧后按需，启动不会自动重入旧会话；未复现用户当时界面，不宣称已修复。未改产品代码；合成离线小会话、无并发writer/provider/桌面，原47/ADD整体partial、goal active。
+
+### 2026-10-31：本轮图片修复的CI结论
+
+延后读回：`4fa2cd53`（历史图片恢复）、`4fefcbd0`（工具结果图片）、`7675617f`（退出基线文档）的CI与NormProof均completed/success且head一致。`97b56211`（纯图片空白行）NormProof success、CI当时仍in_progress，另绑定。绿色CI不替代真实provider/桌面/图形协议验收，原47/ADD整体仍partial、goal active。
