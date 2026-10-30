@@ -191,10 +191,6 @@ export class PasteStore {
    * `images` decides whether image placeholders count: a caller expanding text
    * wants only the text pastes, while a stashed draft has to keep alive
    * everything its submission would need, and an image is one of those.
-   *
-   * `protect` keeps those entries from being evicted, or releases them. Pinning
-   * is counted, because two stashed drafts can name the same paste and
-   * restoring one must not release what the other still needs.
    */
   idsIn(draft: string, images = false): number[] {
     const ids: number[] = [];
@@ -309,7 +305,16 @@ export class PasteStore {
     while (variants.size > MAX_ISSUED_VARIANTS) variants.delete(variants.values().next().value!);
     this.issued.delete(id);
     this.issued.set(id, variants);
-    while (this.issued.size > MAX_ISSUED) this.issued.delete(this.issued.keys().next().value!);
+    while (this.issued.size > MAX_ISSUED) {
+      // A retained payload still needs its signed token, including while its
+      // draft is stashed. Expire nonresident history before live identities.
+      // The fallback keeps the signature bound for larger custom stores too.
+      let expired = this.issued.keys().next().value!;
+      for (const key of this.issued.keys()) {
+        if (!this.order.has(key)) { expired = key; break; }
+      }
+      this.issued.delete(expired);
+    }
   }
 }
 

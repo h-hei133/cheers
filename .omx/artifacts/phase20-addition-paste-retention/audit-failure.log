@@ -1,0 +1,12 @@
+{"baseline":21,"count":21,"names":["constructor","shouldHold","hold","arm","evictOldest","expansionAt","update","get","idsIn","unresolved","expand","rewrite","holdIfLong","holdImage","imagesIn","hasImages","clear","rememberPlaceholder","replaceLiteral","normalizePaste","placeholderFor"],"buildFresh":true}
+file://<repo>/.omx/artifacts/phase20-addition-paste-retention/audit.mjs:22
+if (!build.ok || current.length > 20) throw Error('freshness or responsibility ceiling failed');
+                                            ^
+
+Error: freshness or responsibility ceiling failed
+    at file://<repo>/.omx/artifacts/phase20-addition-paste-retention/audit.mjs:22:45
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.15.0

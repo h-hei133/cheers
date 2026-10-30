@@ -10631,3 +10631,12 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 三文件66项、五有效反转/bytes恢复、恢复17项及原reference六项、五门/build/freshness全部主代理串行通过；118旧docs advisory保留，owner callable7→8。相同256会话fixture真实sync调用207302→60422（-70.85%）、scan1658→729ms，仅单次合成/cache未控；最终两CLI各2307会话×1消息扫描6862/6866ms，首帧176/164ms，按键/搜索/删除/重开取消通过，config不变、零请求、exit0/cooked、heap768MiB。早期无效反转与fullscreen观察到chrome清空但未retire的fixture失败均保留，未冒充产品故障。
 
 正式工件/HANDOFF更新、scratch清理、CLAUDE.md保留；真实用户目录/平台/heap与physical I/O未验，原47与ADD不升级、goal active。上一批cccc4466 CI41050906091/Watch41050906089均completed/success且head一致，本批提交/推送与未来CI另绑定，无full local suite/20k/exe/独立review或真实provider。
+
+
+### 2026-10-30：暂存草稿保留已持有载荷的占位符身份
+
+[addition21.27](features/phase-20-addition.md#2127-草稿暂存保留载荷对应的占位符身份)修复原PasteStore在1,024签名历史周转后丢失已保护text/image身份：优先淘汰无载荷签名，保留ID/变体/payload数量与字节上限、精确标签。目标先读后定向只读比较同时保存text/caret/pastedContents的参考决定，未增map/路由或复制代码。
+
+68项去重聚焦、三反转3/1/1失败及源码bytes恢复、五门/build/freshness主代理串行通过；393未选不计、118旧docs advisory保留、owner20→20。原CLI两模式各1保存消息，真实paste/alt+s/Enter，原host注入公开PNG、实际store注入1100微小压力，签名1024/载荷128/4122bytes；draft/caret、text/image/内部展开及实际一次HTTP payload正确，exit0/cooked、config/models/project不变。此为loopback请求/本次恢复证据，非clipboard采集或真实provider。
+
+探针未声明vision、metadata放错owner、saved-image要求均留失败收据。另发现string prompt barrier只保存文字：最终savedUser.imageMatches false明确保留，图片持久化/replay另列后续修复，不能从当前HTTP成功推断。正式工件/HANDOFF更新、scratch清理、CLAUDE.md保留；8061bd92 Watch41056737048 success，CI41056737057延后读回仍in_progress。本批提交/推送/未来CI另绑定，真实目录/桌面/平台与原47/ADD仍partial、goal active。

@@ -347,4 +347,33 @@ describe("the store is bounded", () => {
     expect(store.expand(text)).toBe(text);
     expect(store.imagesIn(attachment)).toEqual([image]);
   });
+
+  it("keeps live signatures while bounding old issued history", () => {
+    const store = new PasteStore(2);
+    const protectedToken = store.hold(LONG);
+    store.protector = id => id === 1;
+    for (let index = 0; index < 1100; index++) store.hold(`${LONG}${index}`);
+    const owner = store as unknown as { issued: Map<number, Set<string>>; order: Map<number, string> };
+    expect(owner.issued.size).toBe(1024);
+    expect(owner.order.size).toBe(2);
+    expect(store.expand(protectedToken)).toBe(LONG);
+    // A retained signature is still exact; arbitrary labels never become payloads.
+    expect(store.expand("[#1 pasted forged]")).toBe("[#1 pasted forged]");
+    expect(store.idsIn("[#1 pasted forged]")).toEqual([]);
+    store.protector = undefined;
+    store.hold(LONG);
+    expect(store.get(1)).toBeUndefined();
+    for (let index = 0; index < 1100; index++) store.hold(`${LONG}${index}`);
+    expect(owner.issued.size).toBe(1024);
+    expect(owner.issued.has(1)).toBe(false);
+    expect(store.expand(protectedToken)).toBe(protectedToken);
+  });
+
+  it("keeps a finite signature bound even when custom capacity exceeds it", () => {
+    const store = new PasteStore(1100);
+    for (let index = 0; index < 1100; index++) store.hold(`${LONG}${index}`);
+    const owner = store as unknown as { issued: Map<number, Set<string>> };
+    expect(owner.issued.size).toBe(1024);
+    expect(store.idsIn(store.hold("latest"))).toEqual([1101]);
+  });
 });

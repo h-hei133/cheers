@@ -1,0 +1,47 @@
+scc-gate root=packages/ts-shell/src files=3016
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=53 read=53 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=25 docs_refs=456 docs_dangling=0 docs_source_dangling=118
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 118 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/presentation/tui/editor/draftStash.test.ts  (10 tests) 28ms
+ ❯ src/presentation/tui/pastes.test.ts  (49 tests | 1 failed) 36ms
+   ❯ src/presentation/tui/pastes.test.ts > the store is bounded > keeps live signatures while bounding old issued history
+     → expected [] to deeply equal [ 1 ]
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/presentation/tui/pastes.test.ts > the store is bounded > keeps live signatures while bounding old issued history
+AssertionError: expected [] to deeply equal [ 1 ]
+
+- Expected
++ Received
+
+- Array [
+-   1,
+- ]
++ Array []
+
+ ❯ src/presentation/tui/pastes.test.ts:365:46
+    363|     store.protector = undefined;
+    364|     store.hold(LONG);
+    365|     expect(store.unresolved(protectedToken)).toEqual([1]);
+       |                                              ^
+    366|     for (let index = 0; index < 1100; index++) store.hold(`${LONG}${in…
+    367|     expect(owner.issued.size).toBe(1024);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 58 passed (59)
+   Start at  20:46:03
+   Duration  509ms (transform 38ms, setup 0ms, collect 66ms, tests 64ms, environment 0ms, prepare 88ms)

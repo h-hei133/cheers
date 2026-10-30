@@ -4529,3 +4529,16 @@ ed4820cb的CI41039139794/Watch41039139814延后读回均completed/success；上�
 最终原Node CLI两模式各2,307会话×1消息、6,303,012 bytes、heap768MiB/90秒/2MiB/offline无凭据。regular/fullscreen首帧176/164ms、全扫6,862/6,866ms、扫描中按键72/51ms、搜索168/168ms、确认删除151/151ms；complete2307/unreadable0/sourceLimited false、原browse保留、重开Escape controller aborted且无迟到页、config不变、零请求、exit0/cooked、scratch清理。与21.25的13秒属不同轮次/近似fixture，不能称受控CLI性能配对。初次fullscreen只等面板清空，前一retire收据迟到混入新计数；改为等待真实retire后重开，失败收据保留，未为此改产品。
 
 HANDOFF补共享guard消费者与retire观察边界。延后读回`cccc44662a66b988cd9d948907de79fe42057b4d` CI41050906091/Watch41050906089均completed/success且head一致；本批Git/未来CI另绑定。无full local suite/20k真实终端/exe/独立代理review/NormProof judge/真实provider/其他平台；CLAUDE.md保留，真实41MiB用户目录与桌面体验、原47及ADD整体仍partial，goal active。
+
+
+### 21.27 草稿暂存保留载荷对应的占位符身份
+
+继续17.4，发现[PasteStore](../../packages/ts-shell/src/presentation/tui/pastes.ts)的protector保留暂存正文/图片载荷，而issued签名按1,024个ID独立FIFO淘汰；再发行1,100个微小paste后，原token虽然可恢复，正文不展开、图片不进入imagesIn，unresolved为空也不代表完整。现原owner优先淘汰order已无载荷的签名；默认128载荷、32MiB总量/8MiB单项、1,024签名ID/8变体、精确标签不变。大于1,024的自定义store仍有限签名fallback，不承诺任意容量下无限保留。删除idsIn关于不存在的计数protect API旧注释，无新store/草稿/路由。
+
+目标先读后定向只读对照参考快照`21a28aef90f19bc64dc6d1bccd5ed8bfb30e7a11`的PromptInput.tsx:1356–1372同时恢复text/caret/pastedContents；本项目复用原protector与载荷map，没有复制参考实现。原实现新增stash三失败/七控制通过，原host两模式均失败；最终49paste+10stash+9filtered host共**68项去重**通过，393未选不计。三反转分别恢复FIFO、删签名上限、弱化精确标签，分别3/1/1 AssertionError；finally源码SHA一致恢复，恢复68项再通过。五静态门/TS build/freshness主代理串行通过，118旧docs advisory保留；owner named-callable20→20，含既有constructor的保守AST为21，仓库分析明确不计constructor，初期audit失败保留并记录两口径。build `00beea7bac87f10ef1e76ff89c1e16ede5439f75965bbeac16a346cb30887526`，inputs `f88bed95e191ccc9a0609cc0a2fb73699627cdf64e4c0b4e47af56d01cf826b9`，见[正式工件](../../.omx/artifacts/phase20-addition-paste-retention/README.md)。
+
+原Node CLI regular/fullscreen各1保存消息、isolated home/profile/project、heap768MiB/45秒/2MiB，真实bracketed paste与alt+s暂存/恢复、Enter提交。公开PNG通过原preferences attachment host注入、1,100微小压力通过实际PasteStore注入，明确非系统clipboard采集或1,100真实键盘事件。两模式精确draft/caret、正文展开/图片/interior expansion/unresolved0成立，压力签名1024/载荷128/4122bytes，暂存期间零POST；提交各一次真实loopback POST，正文精确一次、image_url精确一项、无literal token、短响应实际绘制。config/models/project字节不变，exit0/cooked、scratch清理。
+
+失败收据保留：早期未在models.json声明vision触发原nonvision fallback；错在credentials中写models的夹具派发前失败；已修正metadata owner后实际HTTP通过。随后保存图片断言揭示独立既有缺口：[sessionRuntime](../../packages/ts-shell/src/core/shell/sessionRuntime.ts)调用[string prompt barrier](../../packages/ts-shell/src/session/lifecycle/sessionPromptBarrier.ts)只存文字。最终receipt明确savedUser.textMatches true/imageMatches false，本批不声称图片跨会话replay已修复，该缺口另列后续owner修复。初期释放保护的测试也误要求已淘汰签名仍在unresolved中，现分别验证载荷释放/后续签名过期，原日志保留。
+
+HANDOFF补载荷/签名生命周期及vision/persistence分界，CLAUDE.md保留。延后一次读回8061bd92 Watch41056737048 completed/success，CI41056737057仍in_progress、head匹配，无重复轮询，本批Git/未来CI另绑定。无full local suite/并行heavy/本助手subagent/20k真实终端/exe/真实provider/独立代理review/NormProof judge；真实用户目录、桌面clipboard、其他平台及原47/ADD整体仍partial，goal active。

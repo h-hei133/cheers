@@ -1,0 +1,22 @@
+{
+  "cases": [
+    {
+      "name": "fifo-signatures",
+      "exit": 1,
+      "tests": "3 failed | 7 skipped (10)"
+    },
+    {
+      "name": "unbounded-signatures",
+      "exit": 1,
+      "tests": "1 failed | 48 skipped (49)"
+    },
+    {
+      "name": "forged-label",
+      "exit": 1,
+      "tests": "1 failed | 48 skipped (49)"
+    }
+  ],
+  "sourceSha256": "87dd94b64179febc7eed84602b5611006a0c8a98127f44b57cae69055c93b8b2",
+  "restoredSha256": "87dd94b64179febc7eed84602b5611006a0c8a98127f44b57cae69055c93b8b2",
+  "restored": true
+}

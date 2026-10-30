@@ -1,0 +1,114 @@
+{
+  "mode": "regular",
+  "buildId": "00beea7bac87f10ef1e76ff89c1e16ede5439f75965bbeac16a346cb30887526",
+  "inputsDigest": "f88bed95e191ccc9a0609cc0a2fb73699627cdf64e4c0b4e47af56d01cf826b9",
+  "provider": "loopback HTTP fixture",
+  "savedMessages": 1,
+  "status": "passed",
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 45,
+    "outputBytes": 2097152
+  },
+  "stages": [
+    {
+      "action": "real bracketed paste and alt+s stash",
+      "imageHostInjections": 1,
+      "pressureIssuances": 1100,
+      "pressureSource": "tiny payload injection into actual PasteStore",
+      "pressure": {
+        "signatures": 1024,
+        "payloads": 128,
+        "payloadBytes": 4122
+      },
+      "noPostWhileStashed": true,
+      "noticePainted": true
+    },
+    {
+      "action": "real alt+s restore",
+      "exactDraftAndCaret": true,
+      "textRetained": true,
+      "imageRetained": true,
+      "interiorExpansion": true,
+      "unresolved": 0
+    },
+    {
+      "action": "real Enter submission",
+      "wire": {
+        "textMatches": true,
+        "imageMatches": true,
+        "noLiteralTokens": true
+      },
+      "savedUser": {
+        "textMatches": true,
+        "imageMatches": false
+      },
+      "responsePainted": true
+    }
+  ],
+  "wireShape": [
+    {
+      "role": "system",
+      "array": false,
+      "length": 1366,
+      "kinds": [],
+      "containsPublicText": false,
+      "containsPublicImage": false
+    },
+    {
+      "role": "user",
+      "array": false,
+      "length": 28,
+      "kinds": [],
+      "containsPublicText": false,
+      "containsPublicImage": false
+    },
+    {
+      "role": "user",
+      "array": true,
+      "length": 2,
+      "kinds": [
+        "text",
+        "image_url"
+      ],
+      "containsPublicText": true,
+      "containsPublicImage": true
+    }
+  ],
+  "wire": [
+    {
+      "textMatches": true,
+      "imageMatches": true,
+      "noLiteralTokens": true
+    }
+  ],
+  "savedShape": {
+    "array": false,
+    "kinds": [],
+    "metadataKeys": [],
+    "containsPublicText": true,
+    "containsPublicImage": false
+  },
+  "savedUser": {
+    "textMatches": true,
+    "imageMatches": false
+  },
+  "persistenceGap": "Existing session user prompt barrier stores text only; saved image history is not validated by this repair.",
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "configurationUnchanged": true,
+  "projectUnchanged": true,
+  "requests": 1,
+  "readinessRequests": 1,
+  "rejectedRequests": 0,
+  "configuredProviderLoopback": true,
+  "outputBytes": 6871,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

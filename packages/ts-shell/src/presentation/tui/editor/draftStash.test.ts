@@ -78,4 +78,47 @@ describe("a stashed draft", () => {
     stash.restore();
     expect(pastes.protector).toBeUndefined();
   });
+
+  it.each(["text", "image"] as const)("retains the signed %s token across issuance history turnover", kind => {
+    const pastes = new PasteStore();
+    const image = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+    const token = kind === "text" ? pastes.hold(LONG) : pastes.holdImage(image);
+    const stash = new DraftStash(pastes);
+    expect(stash.stash({ text: `kept ${token}`, cursor: 4 })).toBe(true);
+    for (let index = 0; index < 1100; index++) pastes.hold(`${LONG}${index}`);
+
+    const restored = stash.restore()!;
+    expect(restored).toEqual({ text: `kept ${token}`, cursor: 4 });
+    expect(pastes.idsIn(restored.text, true)).toEqual([1]);
+    expect(pastes.unresolved(restored.text)).toEqual([]);
+    if (kind === "text") {
+      expect(pastes.get(1)).toBe(LONG);
+      expect(pastes.expand(restored.text)).toBe(`kept ${LONG}`);
+      expect(pastes.expansionAt(restored.text, 6)?.text).toBe(LONG);
+    } else {
+      expect(pastes.imagesIn(restored.text)).toEqual([image]);
+      expect(pastes.expand(restored.text)).toBe("kept ");
+    }
+    // The protection is released, so the oldest payload can be evicted again.
+    pastes.hold(LONG);
+    expect(pastes.idsIn(token, true)).toEqual([]);
+  });
+
+  it("keeps both payload types while retaining the existing store bounds", () => {
+    const pastes = new PasteStore(4, 1500);
+    const text = pastes.hold(LONG), image = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+    const attachment = pastes.holdImage(image), stash = new DraftStash(pastes);
+    stash.stash({ text: `${text} ${attachment}`, cursor: 0 });
+    for (let index = 0; index < 1100; index++) pastes.hold(`${LONG}${index}`);
+    const owner = pastes as unknown as { issued: Map<number, Set<string>>; order: Map<number, string>; heldBytes: number };
+    expect(owner.issued.size).toBeLessThanOrEqual(1024);
+    expect(owner.order.size).toBeLessThanOrEqual(4);
+    expect(owner.heldBytes).toBeLessThanOrEqual(1500);
+    const restored = stash.restore()!;
+    expect(pastes.expand(restored.text)).toBe(`${LONG} `);
+    expect(pastes.imagesIn(restored.text)).toEqual([image]);
+    const literal = "[#1 pasted different label]";
+    expect(pastes.expand(literal)).toBe(literal);
+    expect(pastes.idsIn(literal, true)).toEqual([]);
+  });
 });

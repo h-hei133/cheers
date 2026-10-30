@@ -1,0 +1,64 @@
+{
+  "mode": "regular",
+  "buildId": "00beea7bac87f10ef1e76ff89c1e16ede5439f75965bbeac16a346cb30887526",
+  "inputsDigest": "f88bed95e191ccc9a0609cc0a2fb73699627cdf64e4c0b4e47af56d01cf826b9",
+  "provider": "loopback HTTP fixture",
+  "savedMessages": 1,
+  "status": "failed",
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 45,
+    "outputBytes": 2097152
+  },
+  "stages": [
+    {
+      "action": "real bracketed paste and alt+s stash",
+      "imageHostInjections": 1,
+      "pressureIssuances": 1100,
+      "pressureSource": "tiny payload injection into actual PasteStore",
+      "pressure": {
+        "signatures": 1024,
+        "payloads": 128,
+        "payloadBytes": 4122
+      },
+      "noPostWhileStashed": true,
+      "noticePainted": true
+    },
+    {
+      "action": "real alt+s restore",
+      "exactDraftAndCaret": true,
+      "textRetained": true,
+      "imageRetained": true,
+      "interiorExpansion": true,
+      "unresolved": 0
+    }
+  ],
+  "failure": "timeout-submitted",
+  "observation": {
+    "ends": 1,
+    "renders": 7,
+    "imageHostInjections": 1,
+    "pressureIssuances": 1100,
+    "sessionId": "sess_5cc9a474ac874152_1793365235315",
+    "draftLength": 0,
+    "draftHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cursor": 0,
+    "expandedTextMatches": false,
+    "imageMatches": false,
+    "unresolved": 0,
+    "insideExpansionMatches": false,
+    "pressure": {
+      "signatures": 1024,
+      "payloads": 128,
+      "payloadBytes": 4122
+    }
+  },
+  "requests": 0,
+  "readinessRequests": 0,
+  "rejectedRequests": 0,
+  "externalRequests": 0,
+  "outputBytes": 9221,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

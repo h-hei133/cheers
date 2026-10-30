@@ -1,0 +1,32 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/presentation/tui/pastes.test.ts  (49 tests | 1 failed | 48 skipped) 8ms
+   ❯ src/presentation/tui/pastes.test.ts > the store is bounded > keeps a finite signature bound even when custom capacity exceeds it
+     → expected 1100 to be 1024 // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 48 skipped (49)
+   Start at  20:49:50
+   Duration  264ms (transform 47ms, setup 0ms, collect 46ms, tests 8ms, environment 0ms, prepare 50ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/presentation/tui/pastes.test.ts > the store is bounded > keeps a finite signature bound even when custom capacity exceeds it
+AssertionError: expected 1100 to be 1024 // Object.is equality
+
+- Expected
++ Received
+
+- 1024
++ 1100
+
+ ❯ src/presentation/tui/pastes.test.ts:376:31
+    374|     for (let index = 0; index < 1100; index++) store.hold(`${LONG}${in…
+    375|     const owner = store as unknown as { issued: Map<number, Set<string…
+    376|     expect(owner.issued.size).toBe(1024);
+       |                               ^
+    377|     expect(store.idsIn(store.hold("latest"))).toEqual([1101]);
+    378|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

@@ -1,0 +1,10 @@
+
+ RUN  v0.34.6 <repo>/packages/ts-shell
+
+ ✓ src/presentation/tui/pastes.test.ts  (49 tests) 40ms
+ ✓ src/presentation/tui/editor/draftStash.test.ts  (10 tests) 20ms
+
+ Test Files  2 passed (2)
+      Tests  59 passed (59)
+   Start at  20:46:34
+   Duration  460ms (transform 40ms, setup 0ms, collect 66ms, tests 60ms, environment 0ms, prepare 86ms)

@@ -1,0 +1,32 @@
+{
+  "file": "packages/ts-shell/src/presentation/tui/pastes.ts",
+  "baseline": 20,
+  "count": 20,
+  "names": [
+    "shouldHold",
+    "hold",
+    "arm",
+    "evictOldest",
+    "expansionAt",
+    "update",
+    "get",
+    "idsIn",
+    "unresolved",
+    "expand",
+    "rewrite",
+    "holdIfLong",
+    "holdImage",
+    "imagesIn",
+    "hasImages",
+    "clear",
+    "rememberPlaceholder",
+    "replaceLiteral",
+    "normalizePaste",
+    "placeholderFor"
+  ],
+  "constructorCount": 1,
+  "conservativeIncludingConstructor": 21,
+  "buildId": "00beea7bac87f10ef1e76ff89c1e16ede5439f75965bbeac16a346cb30887526",
+  "inputsDigest": "f88bed95e191ccc9a0609cc0a2fb73699627cdf64e4c0b4e47af56d01cf826b9",
+  "freshness": true
+}

@@ -1869,6 +1869,30 @@ it('stashes on the alternate chord too, for a terminal that eats the primary one
   } finally { mode.stop(); }
 });
 
+it.each(['regular', 'fullscreen'] as const)('restores stashed text and image payloads after paste identity turnover in %s mode', kind => {
+  const scheduler = new ManualScheduler(), { mode, terminal } = build({ tuiMode: kind, scheduler });
+  const host = mode as unknown as { view: InteractiveView };
+  const text = 'retained text '.repeat(32), image = { type: 'image' as const, data: 'aGVsbG8=', mimeType: 'image/png' };
+  mode.start();
+  try {
+    terminal.input(`\x1b[200~${text}\x1b[201~`);
+    const token = host.view.editor.getText(), attachment = host.view.pastes.holdImage(image);
+    host.view.editor.insert(` ${attachment}`);
+    const snapshot = host.view.editor.snapshot();
+    terminal.input('\x1bs');
+    expect(host.view.editor.getText()).toBe('');
+    for (let index = 0; index < 1100; index++) host.view.pastes.hold('bounded identity filler ' + index);
+    terminal.input('\x1bs'); scheduler.flush();
+    const restored = host.view.editor.snapshot();
+    expect(restored).toMatchObject({ text: snapshot.text, cursor: snapshot.cursor });
+    expect(host.view.pastes.expand(restored.text)).toBe(text + ' ');
+    expect(host.view.pastes.imagesIn(restored.text)).toEqual([image]);
+    expect(host.view.pastes.unresolved(restored.text)).toEqual([]);
+    expect(host.view.pastes.expansionAt(restored.text, 1)?.text).toBe(text);
+    expect(restored.text).toBe(`${token} ${attachment}`);
+  } finally { mode.stop(); }
+});
+
 it('does not consume the stash slot for an empty prompt', () => {
   const { mode, terminal } = build();
   const host = mode as unknown as { view: InteractiveView };

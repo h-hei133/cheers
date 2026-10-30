@@ -1206,3 +1206,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A close/reopen probe fails its cancellation count even though both original browse controllers eventually abort.
 - **Root Cause**: Overlay chrome clears before its asynchronous close action publishes the retirement receipt; reopening too early captures the preceding retirement in the new run's counter delta.
 - **Rule**: Synchronize reopening on the actual original browse retirement, then compare the new owner's abort receipt and late-publication boundary separately. A blank panel alone is not proof of released acquisition ownership.
+
+### Retained Paste Payloads Still Need Their Issued Token Identity
+- **Symptom**: Restoring a stashed draft after more than 1,024 subsequent pastes shows its original token and caret, but text remains literal and images disappear despite retained payloads.
+- **Root Cause**: Payload protection and the bounded FIFO issued-token history had independent eviction lifetimes; exact token admission requires both. Once the signature is gone, an empty unresolved list cannot prove successful expansion.
+- **Rule**: Expire nonresident signature history before identities of retained payloads, preserve finite bounds and exact-label matching, and test text/image expansion after tiny issuance turnover. Releasing protection may expire payload and signature together; separately assert payload release and eventual identity expiry.
+
+### Image Submission Evidence Requires Declared Capabilities And Separate Persistence Checks
+- **Symptom**: A CLI attachment probe receives nonvision text or sees correct HTTP image blocks but no image in saved user history.
+- **Root Cause**: Undeclared model vision deliberately selects a text fallback; metadata belongs in models.json rather than credential config. The existing user prompt barrier accepts a string and currently saves no attached image.
+- **Rule**: Declare fixture vision through its actual catalogue owner before checking image_url. Verify HTTP submission and saved history independently, preserve missing saved-image evidence, and treat image persistence/replay as a separately owned repair. Do not change adapter defaults or claim cross-session recovery from a successful send.

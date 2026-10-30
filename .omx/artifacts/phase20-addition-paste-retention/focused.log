@@ -1,0 +1,20 @@
+
+ RUN  v0.34.6 <repo>/packages/ts-shell
+
+ ✓ src/presentation/tui/editor/draftStash.test.ts  (10 tests) 37ms
+ ✓ src/presentation/tui/pastes.test.ts  (47 tests) 30ms
+
+ Test Files  2 passed (2)
+      Tests  57 passed (57)
+   Start at  20:44:39
+   Duration  498ms (transform 37ms, setup 0ms, collect 68ms, tests 67ms, environment 0ms, prepare 89ms)
+
+
+ RUN  v0.34.6 <repo>/packages/ts-shell
+
+ ✓ src/cli/interactive/interactiveMode.test.ts  (402 tests | 393 skipped) 1064ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed | 393 skipped (402)
+   Start at  20:44:40
+   Duration  15.28s (transform 10.68s, setup 0ms, collect 13.99s, tests 1.06s, environment 0ms, prepare 52ms)

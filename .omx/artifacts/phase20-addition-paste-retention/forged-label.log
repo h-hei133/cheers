@@ -1,0 +1,32 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/presentation/tui/pastes.test.ts  (49 tests | 1 failed | 48 skipped) 9ms
+   ❯ src/presentation/tui/pastes.test.ts > the store is bounded > keeps live signatures while bounding old issued history
+     → expected 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…' to be '[#1 pasted forged]' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 48 skipped (49)
+   Start at  20:49:50
+   Duration  261ms (transform 46ms, setup 0ms, collect 47ms, tests 9ms, environment 0ms, prepare 51ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/presentation/tui/pastes.test.ts > the store is bounded > keeps live signatures while bounding old issued history
+AssertionError: expected 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…' to be '[#1 pasted forged]' // Object.is equality
+
+- Expected
++ Received
+
+- [#1 pasted forged]
++ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+ ❯ src/presentation/tui/pastes.test.ts:361:48
+    359|     expect(store.expand(protectedToken)).toBe(LONG);
+    360|     // A retained signature is still exact; arbitrary labels never bec…
+    361|     expect(store.expand("[#1 pasted forged]")).toBe("[#1 pasted forged…
+       |                                                ^
+    362|     expect(store.idsIn("[#1 pasted forged]")).toEqual([]);
+    363|     store.protector = undefined;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

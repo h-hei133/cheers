@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 <repo>/packages/ts-shell
+
+ ❯ src/cli/interactive/interactiveMode.test.ts  (402 tests | 2 failed | 400 skipped) 122ms
+   ❯ src/cli/interactive/interactiveMode.test.ts > restores stashed text and image payloads after paste identity turnover in regular mode
+     → expected '[#1 pasted 448 chars] [#2 image image…' to be 'retained text retained text retained …' // Object.is equality
+   ❯ src/cli/interactive/interactiveMode.test.ts > restores stashed text and image payloads after paste identity turnover in fullscreen mode
+     → expected '[#1 pasted 448 chars] [#2 image image…' to be 'retained text retained text retained …' // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > restores stashed text and image payloads after paste identity turnover in regular mode
+ FAIL  src/cli/interactive/interactiveMode.test.ts > restores stashed text and image payloads after paste identity turnover in fullscreen mode
+AssertionError: expected '[#1 pasted 448 chars] [#2 image image…' to be 'retained text retained text retained …' // Object.is equality
+
+- Expected
++ Received
+
+- retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text retained text
++ [#1 pasted 448 chars] [#2 image image/png 0KB]
+
+ ❯ src/cli/interactive/interactiveMode.test.ts:1888:52
+    1886|     const restored = host.view.editor.snapshot();
+    1887|     expect(restored).toMatchObject({ text: snapshot.text, cursor: snap…
+    1888|     expect(host.view.pastes.expand(restored.text)).toBe(text + ' ');
+       |                                                    ^
+    1889|     expect(host.view.pastes.imagesIn(restored.text)).toEqual([image]);
+    1890|     expect(host.view.pastes.unresolved(restored.text)).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 400 skipped (402)
+   Start at  20:44:08
+   Duration  11.21s (transform 8.36s, setup 0ms, collect 10.82s, tests 122ms, environment 0ms, prepare 57ms)
