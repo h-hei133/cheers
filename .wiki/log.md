@@ -10780,3 +10780,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：lsp符号路径与glob/grep同一规则
 
 [addition21.54](features/phase-20-addition.md#2154-lsp符号路径与globgrep同一规则)发现lsp仍输出绝对路径，与glob/grep的相对主根约定并存。现三处渲染共用reportedSymbolPath：主根内重定基、附加根绝对。85项聚焦、三反转命中、五门/TS build通过。build 059b7423。原47/ADD整体partial、goal active。
+
+### 2026-10-31：报告路径的面清单与最后两项确认
+
+[addition21.55](features/phase-20-addition.md#2155-报告路径的面清单与最后两项确认)补齐八处报告路径接口的清单：前五处搜索/列表结果统一「主根内重定基、主根外绝对」，后三处陈述具体文件事实用绝对路径。browser upload与web_fetch确认正确。build 059b7423。原47/ADD整体partial、goal active。

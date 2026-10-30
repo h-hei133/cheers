@@ -4822,3 +4822,10 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现scanner的definitions/references/workspaceSymbol三处渲染共用`reportedSymbolPath`：主根内重定基（`src/a.ts`），主根外（附加根）保持绝对。探针确认主根内为`src/a.ts`、附加根为绝对路径。
 
 验证：`lsp`12（新例断言主根内为`` `public.ts:1` ``、附加根为绝对路径）、`language`44、`arguments`29，共**85项**通过；三反转（扫描只留主根、文档符号只留主根、符号路径恒绝对）全部命中且finally字节恢复；五静态门、TS build/freshness通过。build `059b7423ab15`。原47/ADD整体partial、goal active。
+
+
+### 21.55 报告路径的面清单与最后两项确认
+
+21.53/21.54后补齐清单：**会报告路径的接口**共八处。前五处（glob、grep回退、grep ripgrep、lsp三渲染点、read目录列表）是「人会把结果喂给下一条命令」的搜索/列表结果，统一遵循一条规则：主根内重定基、主根外绝对。后三处（undo状态报告、browser上传预览、`/context`）陈述的是某个具体文件的事实或尺寸，绝对路径即事实本身。
+
+`browser` upload已确认正确：`selectWorkspaceRoot`解析根、`verifyPathContainment`复验、绑定`dev:ino:size:mtimeNs:ctimeNs`身份，预览同时显示源路径与读取根。`web_fetch`只接受URL、不触本地路径。[清单工件](../../.omx/artifacts/phase20-addition-workspace-write/PATH-SURFACES.md)。build `059b7423ab15`。原47/ADD整体partial、goal active。
