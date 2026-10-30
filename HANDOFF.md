@@ -1328,3 +1328,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: After forking a session whose last tool call never returned, the new session reports unfinished work and an active run.
 - **Root Cause**: The recovery read model rebuilds `pendingLifecycle` from the transcript alone, ignoring the state snapshot. Copying the source transcript verbatim therefore recreated a pending call that belonged to the source session.
 - **Rule**: When a derived index is rebuilt from persisted events, copying those events copies the index. Decide explicitly what the copy should owe: a fork starts a new direction and owes nothing, so drop events that would recreate an unsettled call while keeping the message history. Test the fork's own snapshot, not just that the copy succeeded.
+
+### The Subagent Model Is Configured Outside The Tool's Enum
+
+- **Symptom**: A review concludes the requested subagent model is unavailable because `Agent`'s `model` parameter only offers a short enum.
+- **Root Cause**: That parameter is an override. The default comes from `CLAUDE_CODE_SUBAGENT_MODEL` in the environment, which already names the requested model. Omitting `model` uses it.
+- **Rule**: Before declaring a configured subagent model unusable, check the environment and settings for `CLAUDE_CODE_SUBAGENT_MODEL` / `ANTHROPIC_DEFAULT_*_MODEL`. Launch the agent without a `model` override and let the configured default apply.

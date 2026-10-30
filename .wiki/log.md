@@ -10840,3 +10840,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：transcript是会话内容的权威来源
 
 [addition21.68](features/phase-20-addition.md#2168-transcript是会话内容的权威来源)appendSessionTurn先写transcript再写metadata/state；读取侧turns由transcript投影，transcript是权威、metadata是索引，部分成功降级为索引缺一条而记录完整。未改产品代码。build dbe6dc1e。原47/ADD整体partial、goal active。
+
+### 2026-10-31：子代理模型的确认纠正
+
+此前判定「用户指定的子代理模型不可用」是**错误**的：`Agent`工具的`model`参数只是覆盖项，默认来自环境变量`CLAUDE_CODE_SUBAGENT_MODEL`，而该变量已配置为用户指定的模型。省略`model`即使用它。已按此重新派发只读review子代理（三组缺陷形状：派生索引从复制事件重建、一问两主、读取方依赖写入方不变量），并补入HANDOFF。此纠正不影响任何产品代码。
