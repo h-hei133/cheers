@@ -1,0 +1,63 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/settings.test.ts  (47 tests | 2 failed | 45 skipped) 9ms
+   ❯ src/cli/interactive/picker/settings.test.ts > advanced settings picker > shows the user save file and keeps the model catalogue separate
+     → expected 'user file' to be '/profile/config.json' // Object.is equality
+   ❯ src/cli/interactive/picker/settings.test.ts > advanced settings picker > shows the project save file and keeps the model catalogue separate
+     → expected 'project file' to be '/workspace/.cheers/config.json' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 45 skipped (47)
+   Start at  15:00:07
+   Duration  1.08s (transform 553ms, setup 0ms, collect 832ms, tests 9ms, environment 0ms, prepare 59ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/settings.test.ts -t save file and keeps the model catalogue separate
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/settings.test.ts > advanced settings picker > shows the user save file and keeps the model catalogue separate
+AssertionError: expected 'user file' to be '/profile/config.json' // Object.is equality
+
+- Expected
++ Received
+
+- /profile/config.json
++ user file
+
+ ❯ src/cli/interactive/picker/settings.test.ts:34:73
+     32|     expect(root.detail!('maxTurns').join('\n')).toContain('catalogue e…
+     33|     const field = (await root.apply(['maxTurns']))!.next!;
+     34|     expect((await field.load()).find(row => row.id === 'stored')?.note…
+       |                                                                         ^
+     35|     const sources = (await field.apply(['inspect']))!.next!;
+     36|     expect(sources.input?.initial).toContain(`Save file: ${file}`);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/cli/interactive/picker/settings.test.ts > advanced settings picker > shows the project save file and keeps the model catalogue separate
+AssertionError: expected 'project file' to be '/workspace/.cheers/config.json' // Object.is equality
+
+- Expected
++ Received
+
+- /workspace/.cheers/config.json
++ project file
+
+ ❯ src/cli/interactive/picker/settings.test.ts:34:73
+     32|     expect(root.detail!('maxTurns').join('\n')).toContain('catalogue e…
+     33|     const field = (await root.apply(['maxTurns']))!.next!;
+     34|     expect((await field.load()).find(row => row.id === 'stored')?.note…
+       |                                                                         ^
+     35|     const sources = (await field.apply(['inspect']))!.next!;
+     36|     expect(sources.input?.initial).toContain(`Save file: ${file}`);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/picker/settings.test.ts -t 'save file and keeps the model catalogue separate'

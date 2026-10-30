@@ -21,6 +21,7 @@ export interface ConfigBinding {
 export interface ConfigPublication {
   readonly revision: number;
   readonly catalog: readonly CatalogProvider[];
+  readonly catalogDiagnostics: readonly string[];
   readonly config: RuntimeConfig;
   readonly requested: RuntimeConfig;
   readonly binding: ConfigBinding;
@@ -54,8 +55,9 @@ export class ConfigState {
   private generation = 0;
   private publication: ConfigPublication;
 
-  constructor(config: RuntimeConfig, binding: ConfigBinding, catalog: readonly CatalogProvider[] = []) {
+  constructor(config: RuntimeConfig, binding: ConfigBinding, catalog: readonly CatalogProvider[] = [], catalogDiagnostics: readonly string[] = []) {
     this.publication = freezeDeep({ revision: 0, config, requested: config, catalog: structuredClone(catalog), binding: structuredClone(binding),
+      catalogDiagnostics: [...catalogDiagnostics],
       admissionBlocked: config.configValidation.securityBlocked || config.configValidation.constraintsBlocked === true, diagnostics: config.configDiagnostics });
   }
 
@@ -85,7 +87,8 @@ export class ConfigState {
       admissionBlocked: true, diagnostics: ['Configuration must be validated for the new session binding.'] });
   }
 
-  publish(ticket: ConfigTicket, candidate: RuntimeConfig, actual: ConfigBinding, applyPrepared?: () => void, catalog: readonly CatalogProvider[] = this.publication.catalog): ConfigReloadResult {
+  publish(ticket: ConfigTicket, candidate: RuntimeConfig, actual: ConfigBinding, applyPrepared?: () => void,
+    catalog: readonly CatalogProvider[] = this.publication.catalog, catalogDiagnostics: readonly string[] = this.publication.catalogDiagnostics): ConfigReloadResult {
     const before = this.publication.requested;
     if (!this.consume(ticket, actual)) {
       return this.result('superseded', before);
@@ -105,6 +108,7 @@ export class ConfigState {
     const config = projectAccepted(this.publication.config, candidate);
     if (this.publication.config.configScopes?.revision !== config.configScopes?.revision) this.transition(actual);
     this.publication = freezeDeep({ revision: this.publication.revision + 1, config, requested: candidate, catalog: structuredClone(catalog),
+      catalogDiagnostics: [...catalogDiagnostics],
       binding: structuredClone(actual), admissionBlocked: false, diagnostics: candidate.configDiagnostics });
     return this.result('applied', before);
   }

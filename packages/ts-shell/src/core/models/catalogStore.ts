@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { visit } from 'jsonc-parser';
 import { resolveUserDataFile } from "../paths/userHome.js";
 import {
   BUILTIN_PROVIDERS,
@@ -26,6 +27,12 @@ interface StoredCatalog {
   readonly providers?: Record<string, Partial<CatalogProvider>>;
 }
 
+export interface CatalogSnapshot {
+  readonly providers: readonly CatalogProvider[];
+  /** Controlled notices only; never raw parser errors or document values. */
+  readonly diagnostics: readonly string[];
+}
+
 /**
  * Path of the file a user edits to add providers and models.
  *
@@ -44,17 +51,22 @@ export function catalogCachePath(): string {
 
 /** The full catalogue: snapshot, then any refreshed copy, then the user's file. */
 export function loadCatalog(): readonly CatalogProvider[] {
+  return loadCatalogSnapshot().providers;
+}
+
+/** Providers and notices from the same source acquisition. */
+export function loadCatalogSnapshot(): CatalogSnapshot {
   let providers = [...BUILTIN_PROVIDERS];
-  const cached = readOverlay(catalogCachePath());
-  if (cached.length > 0) {
-    providers = mergeProviders(providers, cached, {
+  const cached = readOverlay(catalogCachePath(), CACHE_FILE);
+  if (cached.providers.length > 0) {
+    providers = mergeProviders(providers, cached.providers, {
       preserveExplicitCapabilities: true,
       origin: "refresh",
     });
   }
-  const user = readOverlay(userCatalogPath());
-  if (user.length > 0) providers = mergeProviders(providers, user, { origin: "user" });
-  return providers;
+  const user = readOverlay(userCatalogPath(), USER_FILE);
+  if (user.providers.length > 0) providers = mergeProviders(providers, user.providers, { origin: "user" });
+  return { providers, diagnostics: [...cached.diagnostics, ...user.diagnostics] };
 }
 
 /** Write a fetched catalogue into the cache the next load will read. */
@@ -95,22 +107,40 @@ export function ensureUserCatalog(): string {
   return target;
 }
 
-/** Provider patches from one file, or nothing when it is absent or malformed. */
-function readOverlay(file: string): Partial<CatalogProvider>[] {
+/** Provider patches and safe notices; a bad optional layer never prevents startup. */
+function readOverlay(file: string, label: typeof USER_FILE | typeof CACHE_FILE): {
+  readonly providers: Partial<CatalogProvider>[]; readonly diagnostics: readonly string[];
+} {
   let raw: string;
   try {
     raw = fs.readFileSync(file, "utf8");
-  } catch {
-    return [];
+  } catch (error) {
+    return { providers: [], diagnostics: (error as NodeJS.ErrnoException).code === 'ENOENT' ? []
+      : [`${label} could not be read; its catalogue entries were ignored.`] };
   }
   try {
     const parsed = JSON.parse(raw) as StoredCatalog;
-    const providers = parsed.providers;
-    if (!providers || typeof providers !== "object") return [];
-    return Object.entries(providers).map(([id, patch]) => ({ ...patch, id }));
+    const providers = parsed?.providers;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
+      || providers !== undefined && (!providers || typeof providers !== 'object' || Array.isArray(providers))) {
+      return { providers: [], diagnostics: [`${label} must contain a providers object; its catalogue entries were ignored.`] };
+    }
+    return { providers: Object.entries(providers ?? {}).map(([id, patch]) => ({ ...patch, id })),
+      diagnostics: duplicateProviders(raw) ? [`${label} repeats the top-level providers key; only the last object is used. Merge the provider entries into one providers object.`] : [] };
   } catch {
     // A hand-edited file with a stray comma should degrade to "no overlay", not
     // to a session that cannot start.
-    return [];
+    return { providers: [], diagnostics: [`${label} could not be parsed; its catalogue entries were ignored.`] };
   }
+}
+
+/** Inspect only the top-level owner key, including JSON-escaped spellings. */
+function duplicateProviders(raw: string): boolean {
+  let depth = 0, count = 0;
+  visit(raw, {
+    onObjectBegin() { depth++; }, onArrayBegin() { depth++; },
+    onObjectEnd() { depth--; }, onArrayEnd() { depth--; },
+    onObjectProperty(key) { if (depth === 1 && key === 'providers') count++; },
+  });
+  return count > 1;
 }

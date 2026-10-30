@@ -6,7 +6,7 @@ import { projectTrust } from '../security/projectTrust.js';
 import { identifyProject } from '../security/trust/identity.js';
 import { configTrustMatches } from '../../config/trust.js';
 import { constrainRuntimeConfig, type ConfigModelTarget } from '../../config/constraints.js';
-import { loadCatalog } from '../models/catalogStore.js';
+import { loadCatalogSnapshot } from '../models/catalogStore.js';
 import type { CatalogProvider } from '../models/catalog.js';
 import { resolveProviderCredential } from './providerCredentials.js';
 import type { RuntimeConfig } from '../../config/runtimeConfig.js';
@@ -43,8 +43,8 @@ export function initialConfiguration(context: Omit<ConfigurationContext, 'config
   }
   const binding = { ...configurationBinding(context), workspaceRoot: candidate.configTrust.workspaceRoot,
     trustRevision: candidate.configTrust.revision };
-  const catalog = loadCatalog();
-  return new ConfigState(validateCandidate(candidate, context, catalog), binding, catalog);
+  const catalog = loadCatalogSnapshot();
+  return new ConfigState(validateCandidate(candidate, context, catalog.providers), binding, catalog.providers, catalog.diagnostics);
 }
 
 function validateCandidate(config: RuntimeConfig, context: Pick<ConfigurationContext, 'session' | 'resolveConfigTarget'>, catalog: readonly CatalogProvider[]): RuntimeConfig {
@@ -89,14 +89,15 @@ export function configurationAdmission(context: ConfigurationContext): () => str
 export function refreshConfiguration(context: ConfigurationContext, scope?: 'catalog'): ConfigReloadResult {
   const state = context.configuration;
   const ticket = state.begin(configurationBinding(context));
-  const catalog = loadCatalog();
+  const snapshot = loadCatalogSnapshot();
+  const catalog = snapshot.providers;
   if (scope === 'catalog') {
     const refusal = configurationAdmission(context)();
     if (refusal) return state.rejectCandidate(ticket, configurationBinding(context), [refusal], true);
     const accepted = state.current.requested;
     const target = context.resolveConfigTarget?.(accepted, context.session.id)
       ?? resolveProviderCredential({ runtimeConfig: accepted, pool: { sessionId: context.session.id } });
-    return state.publish(ticket, constrainRuntimeConfig(accepted, target, catalog), configurationBinding(context), undefined, catalog);
+    return state.publish(ticket, constrainRuntimeConfig(accepted, target, catalog), configurationBinding(context), undefined, catalog, snapshot.diagnostics);
   }
   let candidate: RuntimeConfig;
   try { candidate = validateCandidate(getRuntimeConfig(context.projectRoot, context.runtimeConfigOverrides, ticket.binding.inputs), context, catalog); }
@@ -116,5 +117,5 @@ export function refreshConfiguration(context: ConfigurationContext, scope?: 'cat
   if (!configTrustMatches(candidate.configTrust, actual.workspaceRoot, actual.trustRevision)) {
     return state.rejectCandidate(ticket, actual, ['Project trust or workspace changed while preparing configuration; reload again.']);
   }
-  return state.publish(ticket, candidate, actual, apply, catalog);
+  return state.publish(ticket, candidate, actual, apply, catalog, snapshot.diagnostics);
 }

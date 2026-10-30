@@ -18,6 +18,17 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 const load = () => getRuntimeConfig(root, binding.overrides);
 
+it('retains accepted catalogue notices on rejection and replaces them only with an applied catalogue', () => {
+  const state = new ConfigState(load(), binding, [], ['models.json could not be parsed']);
+  const notices = state.current.catalogDiagnostics;
+  fs.writeFileSync(file, '{"maxTurns":"wrong"}');
+  expect(state.publish(state.begin(binding), load(), binding, undefined, [], []).status).toBe('rejected');
+  expect(state.current.catalogDiagnostics).toBe(notices);
+  fs.writeFileSync(file, '{}');
+  expect(state.publish(state.begin(binding), load(), binding, undefined, [], []).status).toBe('applied');
+  expect(state.current.catalogDiagnostics).toEqual([]);
+});
+
 it('separates harmless warnings from invalid candidates without parsing diagnostic strings', () => {
   fs.writeFileSync(file, '{"unknown":true,"maxTurns":12}');
   expect(load().configValidation).toEqual({ valid: true, securityBlocked: false });

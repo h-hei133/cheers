@@ -16,6 +16,7 @@ export interface CatalogView {
   readonly availability: AvailabilitySnapshot;
   /** Where a user adds their own providers. */
   readonly configPath: string;
+  readonly diagnostics?: readonly string[];
 }
 
 const AUTH_NOTE: Record<CatalogProvider["auth"], string> = {
@@ -25,7 +26,7 @@ const AUTH_NOTE: Record<CatalogProvider["auth"], string> = {
 };
 
 export function renderCatalog(view: CatalogView): string {
-  const lines = ["### Providers and models", ""];
+  const lines = ["### Providers and models", ...(view.diagnostics ?? []), ""];
   for (const provider of view.providers) {
     lines.push(...renderProvider(provider, view));
   }
@@ -34,6 +35,7 @@ export function renderCatalog(view: CatalogView): string {
     "- `/model use <provider>/<model>` picks one; `/model use <model>` keeps the current provider.",
     "- `/connect` sets a provider up.",
     `- \`/model config\` opens \`${view.configPath}\`, where your own providers go.`,
+    '- models.json is a user-profile catalogue; config.json stores runtime settings and connections.',
     "- `/model refresh` replaces the shipped catalogue with a current one.",
   );
   return lines.join("\n");

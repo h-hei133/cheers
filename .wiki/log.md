@@ -10541,3 +10541,11 @@ resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不�
 七文件123项+两条实际host聚焦回归、六反转/bytes恢复、五门/build严格串行通过；118旧advisory保留。原NodeCLI两模式各8会话/每条一消息，跨两peer TTL按键重绘均0扫描、关闭刷新，连续两删含搜索复用browse且目标transcript同步读0，文件/config不变、请求0、exit0/cooked。普通首删窗口另有4次当前会话Git轮询读取，不能称全进程零同步读取；归因调用栈/初期失败/最终收据均保留。局部参考同意异步逐行取消与实际overlay几何，不照搬渲染/缓存系统。
 
 工件/HANDOFF更新；第33项建议实现已覆盖，大目录实测和总体性能仍未验证，保持partial；继续31/32/35/36/37，原47与ADD不升级，goal active。db36da44 CI41009873087/Watch41009873069与4c646ae3 CI41012137489/Watch41012137488已completed/success且head匹配；本批Git/未来CI另绑定。
+
+## [2026-10-30] fix | 配置保存路径与模型目录诊断
+
+[addition21.14](features/phase-20-addition.md#2114-第三十一实施区分保存文件并显示目录加载诊断)原catalog owner一次获取providers与安全notice，缺失静默、坏文档降级、顶层重复providers警告但保留last-object语义，不自动修改。诊断随原accepted config/catalog发布，拒绝保留旧快照，notice-only变化也触发model刷新。命令与面板显示固定notice；settings显示实际捕获save file，Model分组/详情说明config.json与user-only models.json，指南补文件/范围/writer表。
+
+十文件219项、四反转/bytes恢复、五门/build严格串行通过；118旧advisory保留。两模式原CLI各1会话×1消息，坏目录notice→probe修正隔离文件→重开清除，实际user/project来源页路径核对，user/project配置未写、零请求、exit0/cooked。全屏probe初次Esc手势冲突收据保留，dismiss间隔超过600ms后通过；未为此改产品键盘行为。catalog owner/helper分别13/2 callable，既有model/settings picker46/23未增长但未解决上限问题；非独立review或全量验收。
+
+工件/HANDOFF/指南更新，真实用户文件不改。31本地实现与小型CLI通过，继续32/35/36/37；33大目录体验和原47/ADD整体仍未升级，goal active。上一批06138788的CI41015773762/Watch41015773723均completed/success且head一致，本批Git/未来CI另绑定。

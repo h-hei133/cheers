@@ -1,0 +1,54 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/models/catalogStore.test.ts  (10 tests | 5 failed | 5 skipped) 16ms
+   ❯ src/core/models/catalogStore.test.ts > degrades malformed catalogue input with a safe notice: { "providers": PRIVATE_CATALOG_VALUE
+     → expected [] to have a length of 1 but got +0
+   ❯ src/core/models/catalogStore.test.ts > degrades malformed catalogue input with a safe notice: null
+     → expected [] to have a length of 1 but got +0
+   ❯ src/core/models/catalogStore.test.ts > degrades malformed catalogue input with a safe notice: []
+     → expected [] to have a length of 1 but got +0
+   ❯ src/core/models/catalogStore.test.ts > degrades malformed catalogue input with a safe notice: {"providers":[]}
+     → expected [] to have a length of 1 but got +0
+   ❯ src/core/models/catalogStore.test.ts > degrades malformed catalogue input with a safe notice: {"providers":null}
+     → expected [] to have a length of 1 but got +0
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 5 skipped (10)
+   Start at  15:00:02
+   Duration  392ms (transform 100ms, setup 0ms, collect 118ms, tests 16ms, environment 0ms, prepare 57ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/models/catalogStore.test.ts -t degrades malformed catalogue input
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/models/catalogStore.test.ts > degrades malformed catalogue input with a safe notice: { "providers": PRIVATE_CATALOG_VALUE
+ FAIL  src/core/models/catalogStore.test.ts > degrades malformed catalogue input with a safe notice: null
+ FAIL  src/core/models/catalogStore.test.ts > degrades malformed catalogue input with a safe notice: []
+ FAIL  src/core/models/catalogStore.test.ts > degrades malformed catalogue input with a safe notice: {"providers":[]}
+ FAIL  src/core/models/catalogStore.test.ts > degrades malformed catalogue input with a safe notice: {"providers":null}
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/core/models/catalogStore.test.ts:29:34
+     27|     const snapshot = loadCatalogSnapshot();
+     28|     expect(snapshot.providers.some(provider => provider.id === 'openai…
+     29|     expect(snapshot.diagnostics).toHaveLength(1);
+       |                                  ^
+     30|     expect(snapshot.diagnostics[0]).toContain('models.json');
+     31|     expect(snapshot.diagnostics[0]).toContain('entries were ignored');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/core/models/catalogStore.test.ts -t 'degrades malformed catalogue input'

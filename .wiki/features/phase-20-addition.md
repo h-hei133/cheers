@@ -4340,3 +4340,21 @@ regular两次删除195/278ms、退出126ms；fullscreen193/275ms、退出125ms�
 较长probe首次把删除窗口内所有同步transcript读都当作删除读取而失败；按synthetic session与bounded调用栈区分后，四个删除目标均0次，普通首个窗口另有4次**当前会话**读取。两模式整个probe的同步读都只属于当前fixture，来源含启动resume/bootstrap及现有`GitCommitIntent.current`轮询；不是所有同步读消失。该残余开销记录为后续调查线索，不扩改Git运行时。初次observer导入非export绑定的启动前失败、host修补前扫描失败、计数归因前失败均保留在[正式工件](../../.omx/artifacts/phase20-addition-catalog-scheduling/README.md)；测试中误把inline help当全屏夹具的断言已改为显式fullScreen，未为此改产品行为。
 
 延后CI一次读回：`db36da4432916d9465f9d085ebef3e9a574ae878` 的CI41009873087/Watch41009873069、`4c646ae3cbf4777718e3a40001530cb51e36c45f` 的CI41012137489/Watch41012137488均completed/success且head一致；不替代本批CI。第33项实现建议已覆盖，**用户大目录实际体验/总体heap与延迟仍未验证，保持partial**；31/32/35/36/37继续。未运行真实provider、其他平台、exe、full suite、20k或独立代理review；原47与ADD整体不升级，goal active。本批Git/推送与未来CI另绑定。
+
+### 21.14 第三十一实施：区分保存文件并显示目录加载诊断
+
+[catalog store](../../packages/ts-shell/src/core/models/catalogStore.ts)在同一次读取中返回providers与固定安全诊断，原`loadCatalog`数组契约委托该owner保留。缺失可选文件不提示；不可读、非法JSON、非法providers容器保留其他目录层并给notice，不拒绝启动。复用已有JSON visitor，仅扫描顶层`providers`（包括转义拼写），重复时警告并保留既有最后对象生效语义；不改写文件、不建立通用lint或项目级模型目录。未引入新依赖、provider/auth流程或配置writer。
+
+定向对照pi `core/model-config.ts:158–217`：同意一次不可变读取保留providers+error、缺失可选文件静默、解析失败返回空自定义层。未采用它拼接原始异常的做法，因为错误可能包含用户文档值；本项目诊断只有受控文件名与固定消息。该局部参考未找到重复键检查，不声称参考已解决本项目此要求；复用本项目已有jsonc-parser visitor并用反转回归约束。
+
+[ConfigState](../../packages/ts-shell/src/config/state.ts)与原[shell configuration](../../packages/ts-shell/src/core/shell/configuration.ts)共同发布`catalogDiagnostics`，拒绝候选时保留此前providers和notice；[model publication](../../packages/ts-shell/src/cli/interactive/picker/model/publication.ts)比较数据和诊断，修正空文件即使providers未变也更新warning。原model choice携带同一快照的诊断，不给缺诊断字段的既有accepted调用者混入live-disk warning。bare `/model`、`/model list`（含unknown provider/account路径）、status与面板显示notice，原配置准入/版本/精确选择契约保留。
+
+[settings draft](../../packages/ts-shell/src/cli/interactive/settings.ts)携带原始捕获保存路径，Stored旁及[只读来源页](../../packages/ts-shell/src/cli/interactive/picker/settings/source.ts)显示实际文件；源路径继续经显示净化、原reopen/save绑定和并发写保护保持不变。Model组/模型详情说明`config.json`负责行为和连接，`models.json`为user-profile-only模型目录；`/model config`指示在已有providers对象内加条目。用户[设置指南](../guides/settings.md)加入关注点→文件→作用域→writer表，并区分generated cache与当前会话选择。没有为项目创建models.json。
+
+主代理串行十个聚焦文件219项、四独立反转/finally bytes恢复、五静态门、TS build通过；118旧docs advisory保留。首轮四个命令测试失败来自Vitest将数组行展开为多个回调参数，改对象夹具后通过，没有为测试改parser行为。新增覆盖不可读/非法JSON与形状、可选缺失、顶层转义重复与嵌套/字符串排除、缓存层优先级、原文不变/不泄露、拒绝保留/notice-only refresh、命令与面板诊断及实际user/project保存路径。
+
+原Node CLI两模式各1会话×1消息：实际`/model`看到安全解析notice和当前模型文件归属，probe仅修正自己的隔离models.json后重开，notice清除；随后实际`/settings`进入maxTurns来源页、切project scope再检查，readonly payload为精确原保存路径、屏幕显示Save file/config.json。全程无Apply，user/project config逐字节不变、请求0、exit0/cooked flags，退出140/132ms。初次普通模式已通过；全屏probe密集Esc留下rewind面板，加入超过既有600ms手势窗口的dismiss间隔后两模式通过，前收据保留。build `d1cc517998304f1864056e6917061d109b7abbd08f9bcf68f4e8427af508921c`，inputs `4f6fe518a669059e1b73f8507dbe919afb8082d684905ea71936e6a8b2eb24cd`。
+
+[正式工件](../../.omx/artifacts/phase20-addition-catalog-ownership/README.md)与HANDOFF保留。named-callable比较：catalog store6→13、publication helper1→2，其余不增长；保守计数下model/settings picker已有46/23仍保留，**本批没有解决这两处既有责任上限问题，不能称所有owner都达标**。实际用户models文件未编辑；其他平台、真实provider、exe/full suite/20k和独立代理review未验证。第31项本地实现与小型CLI通过；32/35/36/37继续，第33项大目录体验仍partial，原47与ADD整体不升级，goal active。
+
+延后一次读回：`0613878865e19f6e9a656d1191a6d8bdb6f7f7d7` 的CI41015773762/Watch41015773723均completed/success且head一致；本批提交/推送与未来CI另绑定，不借用上一批绿色。

@@ -11,7 +11,7 @@ import type { CommandContext, LocalCommandResult } from "./types.js";
 import { parseModelArgs, modelSyntax } from "./model/syntax.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import { projectSessionModel } from "../../session/model/projection.js";
-import { loadCatalog, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
+import { loadCatalogSnapshot, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
 import { catalogProvider } from '../models/catalog.js';
 import { refreshCatalog } from "../models/catalogRefresh.js";
 import { renderCatalog } from "../models/catalogSurface.js";
@@ -58,9 +58,10 @@ export async function runModelCommand(
     return {
       kind: "local",
       output: [
-        `Your provider file is \`${path}\`.`,
+        `Your model catalogue is \`${path}\` (user profile only).`,
         "",
         "An entry with a known provider id patches it — a different base URL, extra models, a different key variable. An unknown id adds a provider outright.",
+        "Add entries inside the existing providers object. Runtime settings and connections are stored in config.json.",
       ].join("\n"),
     };
   }
@@ -94,21 +95,22 @@ export async function runModelCommand(
  */
 function modelConfiguration(context: CommandContext) {
   const publication = context.readConfiguration?.();
+  const local = publication ? undefined : loadCatalogSnapshot();
   const config = publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
-  return { config, catalog: publication?.catalog ?? loadCatalog(),
+  return { config, catalog: publication?.catalog ?? local!.providers, catalogDiagnostics: publication?.catalogDiagnostics ?? local?.diagnostics ?? [],
     active: context.resolveConfigTarget?.(config, context.sessionId)
       ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) }) };
 }
 
 function renderCatalogView(context: CommandContext): string {
-  const { config, catalog, active } = modelConfiguration(context);
+  const { config, catalog, active, catalogDiagnostics } = modelConfiguration(context);
   const projected = availabilitySnapshot({ config, catalog });
-  return renderCatalog({ providers: catalog, configPath: userCatalogPath(),
+  return renderCatalog({ providers: catalog, configPath: userCatalogPath(), diagnostics: catalogDiagnostics,
     availability: { ...projected, activeProvider: active.provider, ...(active.model ? { activeModel: active.model } : {}) } });
 }
 
 function renderModelStatus(context: CommandContext): string {
-  const { config, catalog, active: request } = modelConfiguration(context);
+  const { config, catalog, active: request, catalogDiagnostics } = modelConfiguration(context);
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
@@ -123,6 +125,7 @@ function renderModelStatus(context: CommandContext): string {
 
   return [
     "Model selection status",
+    ...catalogDiagnostics,
     `Provider: ${provider}`,
     `Auth type: ${authType}`,
     `Active connection: ${activeId ?? "none"}`,
@@ -265,22 +268,26 @@ async function listModels(args: string[], refresh: boolean, context: CommandCont
   let snapshot = modelConfiguration(context);
   const hint = args[0]?.trim();
   const requested = hint ? (snapshot.catalog.some(entry => entry.id === hint) ? hint : normalizeProvider(hint) ?? hint) : undefined;
-  if (requested && !snapshot.catalog.some(entry => entry.id === requested) && !RUNTIME_PROVIDERS.some(id => id === requested)) return 'Unknown provider. Use /model to inspect the catalogue.';
+  if (requested && !snapshot.catalog.some(entry => entry.id === requested) && !RUNTIME_PROVIDERS.some(id => id === requested)) {
+    return [...snapshot.catalogDiagnostics, 'Unknown provider. Use /model to inspect the catalogue.'].join('\n');
+  }
   const notice = refresh ? await refreshModels(context) : undefined;
   if (refresh) snapshot = modelConfiguration(context);
-  const { catalog, active } = snapshot;
+  const { catalog, active, catalogDiagnostics } = snapshot;
   const provider = requested ?? active.provider;
   const binding = catalogProvider(catalog, provider, provider === active.provider ? active.baseUrl ?? active.credential?.baseUrl : undefined);
-  if (binding.ambiguous) return 'Model list unavailable: multiple catalogue entries claim the active endpoint.';
+  if (binding.ambiguous) return [...catalogDiagnostics, 'Model list unavailable: multiple catalogue entries claim the active endpoint.'].join('\n');
   const entry = binding.entry;
 
   const activeModel = provider === active.provider ? active.model : undefined;
   if (provider === 'openai' && active.provider === provider && active.credential?.authMode === 'account-auth') {
-    return [notice, renderOpenAIAccountAuthModelList(activeModel)].filter(Boolean).join('\n');
+    return [notice, ...catalogDiagnostics, renderOpenAIAccountAuthModelList(activeModel)].filter(Boolean).join('\n');
   }
   return [
     notice,
+    ...catalogDiagnostics,
     `Models for provider=${provider}`,
+    'Catalogue: models.json (user profile only); connections and request settings: config.json.',
     context.readConfiguration ? 'Source: accepted session catalogue' : 'Source: local catalogue (shipped, refreshed, then user entries)',
     ...(entry?.models ?? []).map(model => model.id === activeModel ? `* ${model.id} (active)` : `- ${model.id}`),
     entry?.models.length ? undefined : 'No models listed for this provider.',

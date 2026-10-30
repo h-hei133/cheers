@@ -11,6 +11,7 @@ import { settingSources } from './settings/source.js';
 import { valueEditor } from './settings/editor.js';
 import type { SettingsHost, StagedValue } from './settings/contract.js';
 import { sameValue } from '../../../config/values.js';
+import { neutraliseForDisplay } from '../../../core/text/safety.js';
 
 export type { SettingsHost } from './settings/contract.js';
 
@@ -42,7 +43,7 @@ function detailOptions(draft: SettingsDraft, setting: SettingDefinition, pending
   const options: Option[] = [
     { id: 'effective', label: `Effective: ${compact(current.effective)}`, note: current.source, disabled: true },
     { id: 'accepted', label: `Accepted: ${compact(current.requested)}`, note: current.restartRequired ? 'restart required' : current.requestedSource, disabled: true },
-    { id: 'stored', label: `Stored: ${compact(current.stored)}`, note: `${draft.scope} file`, disabled: true },
+    { id: 'stored', label: `Stored: ${compact(current.stored)}`, note: neutraliseForDisplay(draft.file), disabled: true },
   ];
   if (current.projectTrustNotice) options.push({ id: 'trust', label: 'Project value inactive', detail: `${current.projectTrustNotice} Use /trust to inspect.`, disabled: true });
   if (pending) options.push({ id: 'pending', label: `Pending: ${compact(pending.value)}`, note: setting.policy.application, disabled: true });
@@ -214,7 +215,8 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
     },
     detail: id => {
       if (id === undefined || !offered.has(id)) return [];
-      if (id === 'settings:model') return ['Browse models, configure connections and assign model roles.', 'Model and role choices apply to the current session and are saved for resume.', 'The settings file scope does not change session choices or the connection owner\'s save scope.'];
+      if (id === 'settings:model') return ['Browse models, configure connections and assign model roles.', 'Model and role choices apply to the current session and are saved for resume.',
+        'Catalogue: models.json (user profile only); connections and request settings: config.json.', 'The settings file scope does not change session choices or the connection owner\'s save scope.'];
       if (id === 'settings:thinking') return ['Choose reasoning effort for the current request model.', 'Changes apply to the current session and are saved for resume; the settings file scope does not change them.', 'Supported levels follow the exact model and connection.'];
       const capability = CAPABILITY_ENTRIES.find(entry => entry.id === id);
       if (capability) return [capability.detail];
@@ -223,7 +225,8 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
       const value = draft.values[setting.key];
       return [setting.description, `${setting.group} / ${setting.section}`, `Field: ${setting.key}`,
         `Effective: ${compact(value.effective)}`, `Stored: ${compact(value.stored)}`, `Source: ${value.source}`,
-        `Save scope: ${scope}`, `Application: ${setting.policy.application}`,
+        `Save file: ${neutraliseForDisplay(draft.file)} (${scope})`, `Application: ${setting.policy.application}`,
+        ...(setting.group === 'Model' ? ['Model behavior: config.json; catalogue entries: models.json (user profile only).'] : []),
         ...(value.projectTrustNotice ? [value.projectTrustNotice] : [])];
     },
     async apply(ids): Promise<PickerOutcome | undefined> {

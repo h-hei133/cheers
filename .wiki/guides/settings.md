@@ -18,6 +18,18 @@ The initial panel saves to user configuration. `/settings set maxTurns 20` expli
 
 Configuration files store explicit overrides. A small or empty file can inherit working defaults, user preferences and startup inputs. Inspect Source and Effective in the panel instead of filling the file with every default. Some values apply only to a compatible provider or to the next request; the description and application timing identify these cases.
 
+Settings shows the actual save file beside Stored and in Values and sources. The model catalogue has its own file:
+
+| Concern | File and scope | Writer |
+|---|---|---|
+| Runtime preferences and saved connections | `config.json` in the selected user profile; project preferences use `.cheers/config.json` | Settings, `/connect` for user connections, `/model use --global` for a lasting default |
+| Custom providers and model metadata | `models.json` in the user profile only | `/model config` creates an example; edit entries inside its existing `providers` object |
+| Refreshed provider catalogue | `models-cache.json` in the user profile | `/model refresh`; generated cache |
+
+Model and role choices made in `/model` normally belong to the current session and are saved for resume. Changing the settings save scope does not move them or create a project model catalogue. A connection's address in `config.json` selects where requests go; a catalogue address identifies provider/model metadata and does not create a connection.
+
+An unreadable or malformed model catalogue produces a notice in `/model` and `/model list`; other catalogue layers remain available. Repeated top-level `providers` keys produce a warning: JSON uses the last object, so merge the entries into one object. The application does not rewrite that file. Reopen the model panel after correcting it to refresh the catalogue and its notice together. Command output using an accepted session snapshot retains that snapshot's notice until it is refreshed.
+
 `/help` opens the command catalogue. Browse Session, Context, Workspace, Workflow or Diagnostics, or type a name, alias or description to search the entire catalogue. Enter inserts one canonical command into the composer; submit it separately to execute. Removed or unavailable extension commands cannot be inserted from a stale selection. Esc returns to category navigation or closes the guide.
 
 | Entry | Purpose and persistence |

@@ -199,6 +199,7 @@ it.each((['user', 'project'] as const).flatMap(scope => [
     for (const columns of [8, 120]) paint(columns, 8);
     await h.key('\x1b'); await h.choose('Values and sources');
     expect(h.render(120)).toContain(`Save scope: ${scope}`);
+    expect(h.render(120)).toContain(`Save file: ${target}`);
     expect(h.render(120)).toContain(field === 'disabledTools' ? 'fixture.b-edited' : '2001');
     expect(h.overlay.fullScreen).toBe(true);
     for (const columns of [8, 120]) for (const rows of [1, 4, 8, 24]) paint(columns, rows);

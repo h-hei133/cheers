@@ -1,0 +1,32 @@
+{
+  "mode": "fullscreen",
+  "buildId": "d1cc517998304f1864056e6917061d109b7abbd08f9bcf68f4e8427af508921c",
+  "inputsDigest": "4f6fe518a669059e1b73f8507dbe919afb8082d684905ea71936e6a8b2eb24cd",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "checks": {
+    "safeMalformedNotice": true,
+    "modelFileOwnership": true,
+    "correctedNoticeCleared": true
+  },
+  "deletionMs": [],
+  "failure": "timeout-settings",
+  "observation": {
+    "requests": 0,
+    "renders": 15,
+    "snapshot": {
+      "title": "Ask again from",
+      "filter": "/settings",
+      "loading": false,
+      "searching": false,
+      "pending": false,
+      "failed": false,
+      "status": "No questions match this search.",
+      "text": "  Ask again from /settings                                                                                           0\n  No questions to show.\n  No questions match this search."
+    }
+  },
+  "outputBytes": 35514,
+  "scratchRemoved": true
+}

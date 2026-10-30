@@ -8,7 +8,7 @@ import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 
 function host() {
   const save = vi.fn(async () => ({ note: 'Saved to your user configuration. Effective for the next operation.', applied: true }));
-  const openSettings = (scope: 'user' | 'project' = 'user'): SettingsDraft => ({ save, scope, reopen: openSettings,
+  const openSettings = (scope: 'user' | 'project' = 'user'): SettingsDraft => ({ save, scope, file: scope === 'user' ? '/profile/config.json' : '/workspace/.cheers/config.json', reopen: openSettings,
     definitions: CONFIG_SETTINGS.filter(item => item.policy.sources.includes(scope)),
     values: Object.fromEntries(CONFIG_SETTINGS.map(item => [item.key, {
       effective: item.key === 'attentionOnIdle', requested: item.key === 'attentionOnIdle', stored: false,
@@ -24,6 +24,18 @@ async function detail(h: SettingsHost = host(), key = 'attentionOnIdle') {
 }
 
 describe('advanced settings picker', () => {
+  it.each(['user', 'project'] as const)('shows the %s save file and keeps the model catalogue separate', async scope => {
+    const h = host(), root = settingsPicker(h, scope, 'Model');
+    await root.load();
+    const file = h.openSettings(scope).file;
+    expect(root.detail!('maxTurns').join('\n')).toContain(`Save file: ${file} (${scope})`);
+    expect(root.detail!('maxTurns').join('\n')).toContain('catalogue entries: models.json (user profile only)');
+    const field = (await root.apply(['maxTurns']))!.next!;
+    expect((await field.load()).find(row => row.id === 'stored')?.note).toBe(file);
+    const sources = (await field.apply(['inspect']))!.next!;
+    expect(sources.input?.initial).toContain(`Save file: ${file}`);
+    expect(h.save).not.toHaveBeenCalled();
+  });
   it('separates file preferences from current-session model and thinking entries without changing their owners', async () => {
     const base = host();
     const child = (back: (notice?: string) => Picker): Picker => ({
@@ -337,7 +349,7 @@ describe('advanced settings picker', () => {
     const overlay = new OverlayHost(() => {}); overlay.open(field); await Promise.resolve(); await Promise.resolve();
     const rows = overlay.render(width, 24).map(stripAnsi).join('\n');
     expect(rows).toContain('save to user'); expect(rows).toContain('Effective: true'); expect(rows).toContain('override');
-    expect(rows).toContain('Stored: false'); expect(rows).toContain('user file');
+    expect(rows).toContain('Stored: false'); expect(rows).toContain('/profile/config.json');
     overlay.open((await field.apply(['choice:1']))!.next!); await Promise.resolve(); await Promise.resolve();
     expect(overlay.render(width, 24).map(stripAnsi).join('\n')).toContain('Pending: false'); overlay.close();
   });

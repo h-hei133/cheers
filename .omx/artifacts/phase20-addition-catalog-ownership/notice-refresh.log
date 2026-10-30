@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/model.test.ts  (46 tests | 1 failed | 45 skipped) 68ms
+   ❯ src/cli/interactive/picker/model.test.ts > refreshes a corrected catalogue notice even when its provider entries did not change
+     → expected 0 to be greater than 0
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 45 skipped (46)
+   Start at  15:00:03
+   Duration  2.82s (transform 1.89s, setup 0ms, collect 2.51s, tests 68ms, environment 0ms, prepare 58ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/model.test.ts -t refreshes a corrected catalogue notice
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/model.test.ts > refreshes a corrected catalogue notice even when its provider entries did not change
+AssertionError: expected 0 to be greater than 0
+ ❯ src/cli/interactive/picker/model.test.ts:69:48
+     67|   expect(shell.configuration.current.catalogDiagnostics).toBe(accepted…
+     68|   const reopened = modelPicker(command); await reopened.load();
+     69|   expect(shell.configuration.current.revision).toBeGreaterThan(accepte…
+       |                                                ^
+     70|   expect(shell.configuration.current.catalog).toEqual(accepted.catalog…
+     71|   expect(shell.configuration.current.catalogDiagnostics).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/picker/model.test.ts -t 'refreshes a corrected catalogue notice'

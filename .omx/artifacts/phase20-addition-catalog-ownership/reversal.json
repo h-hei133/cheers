@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "name": "silent-failure",
+      "exit": 1,
+      "sourceSha256": "eaeab55ce0d5129d76b768241f5c4d9b15fcd4f8ff56dd37467887e11532ab89"
+    },
+    {
+      "name": "duplicate-owner",
+      "exit": 1,
+      "sourceSha256": "eaeab55ce0d5129d76b768241f5c4d9b15fcd4f8ff56dd37467887e11532ab89"
+    },
+    {
+      "name": "notice-refresh",
+      "exit": 1,
+      "sourceSha256": "c9d945c6832f021b0112b14add59017db1ab090b5a35968bb040d28c83814a7f"
+    },
+    {
+      "name": "file-owner",
+      "exit": 1,
+      "sourceSha256": "ceac2d7fbf4377dc4a8e1af3e0b814495ad607bb42948217bfb53e2c0b3e97f0"
+    }
+  ],
+  "restored": true
+}

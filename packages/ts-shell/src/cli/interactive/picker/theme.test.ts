@@ -18,7 +18,7 @@ function host() {
     return { note: 'Saved.', applied: true };
   });
   const themes = themePreferences({ workspaceRoot: process.cwd(), follower: { stop() {}, refresh() {} }, redraw() {} });
-  const reopen = vi.fn((scope: 'user' | 'project' = 'user'): SettingsDraft | undefined => ({ scope, save, reopen,
+  const reopen = vi.fn((scope: 'user' | 'project' = 'user'): SettingsDraft | undefined => ({ scope, file: '/fixture/config.json', save, reopen,
     definitions: CONFIG_SETTINGS.filter(item => item.key === 'theme'),
     values: { theme: { effective: currentTheme(), requested: selectedTheme(), stored: selectedTheme(), source: 'user', requestedSource: 'user', restartRequired: false } },
   }));

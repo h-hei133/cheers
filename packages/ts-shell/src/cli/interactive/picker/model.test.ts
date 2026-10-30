@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { modelPicker } from './model.js';
 import { SessionManager } from '../../../session/SessionManager.js';
 import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../config/runtimeConfig.js';
-import { loadCatalog, writeCatalogCache } from '../../../core/models/catalogStore.js';
+import { loadCatalog, userCatalogPath, writeCatalogCache } from '../../../core/models/catalogStore.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../session/model/state.js';
 import { projectSessionModel } from '../../../session/model/projection.js';
 import { defaultHookDispatcher } from '../../../core/hooks/hookDispatcher.js';
@@ -38,6 +38,39 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { re
 
 const id = (connection = 'b', model = 'shared') => `model:${JSON.stringify([connection, 'openai', model])}`;
 const context = () => ({ cwd: home, projectRoot: home, sessionId });
+
+it.each(['{PRIVATE_CATALOG_VALUE', '{"providers":{},"providers":{}}'])(
+  'shows catalogue diagnostics and file ownership without writing on inspection: %s', async text => {
+    fs.writeFileSync(userCatalogPath(), text);
+    const before = fs.readFileSync(getUserRuntimeConfigPath());
+    const picker = modelPicker(context()); await picker.load();
+    expect(picker.status?.([], '')).toMatch(/models.json (could not be parsed|repeats the top-level providers key)/);
+    expect(picker.status?.([], '')).not.toContain('PRIVATE_CATALOG_VALUE');
+    expect(picker.detail!(id()).join('\n')).toContain('Catalogue: models.json (user profile only)');
+    expect(picker.detail!(id()).join('\n')).toContain('connections and request settings: config.json');
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+    expect(fs.readFileSync(userCatalogPath(), 'utf8')).toBe(text);
+  },
+);
+
+it('refreshes a corrected catalogue notice even when its provider entries did not change', async () => {
+  fs.writeFileSync(userCatalogPath(), '{bad');
+  const shell = createShellRuntimeContext({ cwd: home, originalCwd: home, projectRoot: home, targetPathBase: home,
+    rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+    session: manager.getSession(sessionId)!, runtimeConfig: getRuntimeConfig(home) });
+  const command = { ...context(), readConfiguration: () => shell.configuration.current,
+    refreshRuntimeConfig: (scope?: 'catalog') => refreshShellRuntimeConfig(shell, scope) };
+  const picker = modelPicker(command); await picker.load();
+  expect(picker.status?.([], '')).toContain('models.json could not be parsed');
+  const accepted = shell.configuration.current;
+  fs.writeFileSync(userCatalogPath(), '{}');
+  expect(shell.configuration.current.catalogDiagnostics).toBe(accepted.catalogDiagnostics);
+  const reopened = modelPicker(command); await reopened.load();
+  expect(shell.configuration.current.revision).toBeGreaterThan(accepted.revision);
+  expect(shell.configuration.current.catalog).toEqual(accepted.catalog);
+  expect(shell.configuration.current.catalogDiagnostics).toEqual([]);
+  expect(reopened.status?.([], '')).toBeUndefined();
+});
 
 it.each(['subagent', 'summary', 'advisor'] as const)('edits %s effort and provider default without changing the default model or sibling policies', async name => {
   const roles = { subagent: { connectionId: 'b', provider: 'openai', model: 'other', thinkingEffort: 'high' as const },

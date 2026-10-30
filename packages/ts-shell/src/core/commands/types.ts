@@ -176,7 +176,7 @@ export interface CommandContext {
   /** Resolve the request provider using the host's explicit selection inputs. */
   readonly resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution
   /** Read the configuration and catalogue from one accepted publication. */
-  readonly readConfiguration?: () => { readonly config: RuntimeConfig; readonly catalog: readonly CatalogProvider[]; readonly revision?: number; readonly binding?: import('../../config/state.js').ConfigBinding }
+  readonly readConfiguration?: () => { readonly config: RuntimeConfig; readonly catalog: readonly CatalogProvider[]; readonly catalogDiagnostics?: readonly string[]; readonly revision?: number; readonly binding?: import('../../config/state.js').ConfigBinding }
   readonly admission?: () => string | undefined
   /** Catalogue-only refresh retains ordinary accepted settings and rechecks model constraints. */
   readonly refreshRuntimeConfig?: (scope?: 'catalog') => import('../../config/application.js').ConfigReloadResult

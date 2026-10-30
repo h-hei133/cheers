@@ -31,6 +31,19 @@ function fixture() {
     session: new SessionManager().createNew(root), runtimeConfig: getRuntimeConfig(root, { offline: true }, inputs), runtimeConfigOverrides: { offline: true } });
 }
 
+it('publishes catalogue notices with their providers and refreshes notice-only changes', () => {
+  fs.writeFileSync(userCatalogPath(), '{PRIVATE_CATALOG_VALUE');
+  const shell = fixture(); const before = shell.configuration.current;
+  expect(before.catalogDiagnostics).toEqual(['models.json could not be parsed; its catalogue entries were ignored.']);
+  expect(before.admissionBlocked).toBe(false);
+  expect(Object.isFrozen(before.catalogDiagnostics)).toBe(true);
+  fs.writeFileSync(userCatalogPath(), '{}');
+  expect(shell.configuration.current.catalogDiagnostics).toBe(before.catalogDiagnostics);
+  expect(refreshShellRuntimeConfig(shell, 'catalog').status).toBe('applied');
+  expect(shell.configuration.current.catalog).toEqual(before.catalog);
+  expect(shell.configuration.current.catalogDiagnostics).toEqual([]);
+});
+
 it('retains the complete accepted config, catalogue and theme on bad reload, then publishes one complete good candidate', () => {
   const shell = fixture(); const before = shell.configuration.current;
   let installed = 'dark';

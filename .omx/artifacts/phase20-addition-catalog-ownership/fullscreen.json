@@ -1,0 +1,29 @@
+{
+  "mode": "fullscreen",
+  "buildId": "d1cc517998304f1864056e6917061d109b7abbd08f9bcf68f4e8427af508921c",
+  "inputsDigest": "4f6fe518a669059e1b73f8507dbe919afb8082d684905ea71936e6a8b2eb24cd",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "passed",
+  "checks": {
+    "safeMalformedNotice": true,
+    "modelFileOwnership": true,
+    "correctedNoticeCleared": true,
+    "userSaveFileVisible": true,
+    "projectSaveFileVisible": true,
+    "cookedInputRestored": true,
+    "zeroRequests": true,
+    "configUnchanged": true,
+    "projectConfigUnchanged": true,
+    "modelsCorrectedOnlyByProbe": true
+  },
+  "deletionMs": [],
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 132,
+  "outputBytes": 68093,
+  "scratchRemoved": true
+}

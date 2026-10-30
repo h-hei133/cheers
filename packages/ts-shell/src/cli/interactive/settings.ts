@@ -21,6 +21,7 @@ export interface SettingValue {
 }
 export interface SettingsDraft {
   readonly scope: SettingsScope;
+  readonly file: string;
   readonly definitions: readonly SettingDefinition[];
   readonly values: Readonly<Record<string, SettingValue>>;
   /** Refresh an edit baseline only within this draft's original binding and selected source. */
@@ -107,7 +108,7 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
   }));
   let consumed = false;
   return {
-    scope, definitions, values,
+    scope, file, definitions, values,
     reopen(selected = scope) {
       if (!ownerCurrent() || !sourceCurrent()) return undefined;
       return openSettings(context, onApplied, selected);

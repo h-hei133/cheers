@@ -11,6 +11,7 @@ import { runModelCommand } from "./modelCommandRuntime.js";
 import { credentialIdentityFor } from '../auth/account/pool.js';
 import { ownedConnectionCredential } from '../auth/account/presence.js';
 import { noteCredentialRateLimit, resetCredentialBackoffForTests } from '../auth/account/backoff.js';
+import { loadCatalogSnapshot, userCatalogPath } from '../models/catalogStore.js';
 
 describe("model command runtime", () => {
   const originalHome = process.env.USERPROFILE;
@@ -42,6 +43,31 @@ describe("model command runtime", () => {
     else process.env.HOME = originalUnixHome;
     fs.rmSync(fakeHome, { recursive: true, force: true });
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it.each([[], ['list'], ['list', 'missing-provider'], ['status']].map(args => ({ args })))(
+    'reports safe catalogue failures through model $args', async ({ args }) => {
+    fs.writeFileSync(userCatalogPath(), '{PRIVATE_CATALOG_VALUE');
+    const before = fs.readFileSync(getUserRuntimeConfigPath());
+    const result = await runModelCommand(args, { cwd: workspaceRoot });
+    expect(result.output).toContain('models.json could not be parsed');
+    expect(result.output).not.toContain('PRIVATE_CATALOG_VALUE');
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+    expect(fs.readFileSync(userCatalogPath(), 'utf8')).toBe('{PRIVATE_CATALOG_VALUE');
+  });
+
+  it('keeps model catalogue notices bound to the accepted snapshot', async () => {
+    fs.writeFileSync(userCatalogPath(), '{bad');
+    const snapshot = loadCatalogSnapshot(), config = getRuntimeConfig(workspaceRoot);
+    fs.writeFileSync(userCatalogPath(), '{}');
+    const result = await runModelCommand(['list'], { cwd: workspaceRoot,
+      readConfiguration: () => ({ config, catalog: snapshot.providers, catalogDiagnostics: snapshot.diagnostics }) });
+    expect(result.output).toContain('models.json could not be parsed');
+    expect(result.output).toContain('connections and request settings: config.json');
+    const help = await runModelCommand(['config'], { cwd: workspaceRoot });
+    expect(help.output).toContain('user profile only');
+    expect(help.output).toContain('inside the existing providers object');
+    expect(fs.readFileSync(userCatalogPath(), 'utf8')).toBe('{}');
   });
 
   it("shows model status", async () => {

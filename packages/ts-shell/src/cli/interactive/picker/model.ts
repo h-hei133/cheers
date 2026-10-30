@@ -1,6 +1,6 @@
 import { projectModelSelection, projectSessionModel } from "../../../session/model/projection.js";
 import { getRuntimeConfig } from "../../../config/runtimeConfig.js";
-import { loadCatalog } from "../../../core/models/catalogStore.js";
+import { loadCatalogSnapshot } from "../../../core/models/catalogStore.js";
 import { availabilityLabel, availabilitySnapshot, endpointLabel, type ConnectionAvailability } from "../../../core/models/availability.js";
 import { catalogBaseUrl, catalogProvider, type CatalogProvider } from "../../../core/models/catalog.js";
 import { effortCapability } from "../../../core/models/capability.js";
@@ -53,6 +53,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
   const focusState = new ModelFocus();
   let filtering = false;
   let refreshFailed = false;
+  let catalogDiagnostics: readonly string[] = [];
   const refreshFailure = 'Model catalogue could not be refreshed; cached models are read-only.';
   let observedRevision: number | undefined;
   let activeFocus = focus;
@@ -76,7 +77,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       if (replacement) navigation.focus(replacement);
       return replacement;
     },
-    status: () => [refreshFailed ? refreshFailure : undefined, focusState.notice, notice].filter(Boolean).join(' ') || undefined,
+    status: () => [refreshFailed ? refreshFailure : undefined, ...catalogDiagnostics, focusState.notice, notice].filter(Boolean).join(' ') || undefined,
     filterOptions: query => {
       filtering = Boolean(query);
       const rows = navigation.project(query);
@@ -100,7 +101,9 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       const publication = context.readConfiguration?.();
       observedRevision = publication?.revision;
       const config = choice?.config ?? publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
-      const catalog = choice?.catalog ?? publication?.catalog ?? loadCatalog();
+      const local = choice || publication ? undefined : loadCatalogSnapshot();
+      const catalog = choice?.catalog ?? publication?.catalog ?? local!.providers;
+      catalogDiagnostics = choice?.catalogDiagnostics ?? publication?.catalogDiagnostics ?? local?.diagnostics ?? [];
       const active = context.resolveConfigTarget?.(config, context.sessionId)
         ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
       const activeAddress = catalogBaseUrl(catalog, active.provider, active.baseUrl ?? active.credential?.baseUrl);
@@ -269,6 +272,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         rows.unshift({ id, label: currentModel, detail: [active.credential ? `${active.credential.source} credential` : 'Current request', currentProvider, currentConnection, endpoint].filter(Boolean).join(' · '),
           note, disabled: true, focusable: true });
         const lines = [`Provider: ${currentProvider}`, `Model: ${currentModel}`, `Status: ${note}`, `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
+          'Catalogue: models.json (user profile only); connections and request settings: config.json.',
           ...(currentConnection ? [`Selected connection: ${currentConnection}`] : []),
           ...(active.credential ? [`Credential source: ${active.credential.source}`] : []), ...(endpoint ? [`Endpoint: ${endpoint}`] : []),
           ...(active.blocked ? [`Request blocker: ${active.blocked}`] : []),
@@ -436,6 +440,7 @@ function rowId(connection: string | undefined, provider: string, model: string):
 
 function modelDetails(provider: CatalogProvider, connection?: ConnectionAvailability, source?: string): readonly string[] {
   return [`Provider: ${provider.label} (${provider.runtime})`,
+    'Catalogue: models.json (user profile only); connections and request settings: config.json.',
     ...(connection ? [`Connection: ${connection.connectionId}`, ...(connection.label ? [`Label: ${connection.label}`] : []), ...(connection.endpoint ? [`Endpoint: ${connection.endpoint}`] : []),
       `Availability: ${availabilityLabel(connection.state)}`, connection.reason] : source ? [`Credential source: ${source}`] : ['Availability: configure a connection']),
     'Remote availability: unverified'];
