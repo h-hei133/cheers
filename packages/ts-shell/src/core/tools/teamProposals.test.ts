@@ -1,3 +1,4 @@
+import type { InteractiveAsk } from './ask/contract.js';
 import { expect, it } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -5,11 +6,13 @@ import { createTeamToolDefinition } from './teamTool.js';
 import { createCoreToolRegistry } from './registry.js';
 import { createSubagentRunner } from '../../turn/subagent.js';
 
+const interactiveAsk: InteractiveAsk = async questions => ({ status: 'completed', answers: { [questions[0]!.id]: 'Adopt report' } });
+
 it.each(['valid', 'wrong-id', 'missing-falsifiers', 'unread-ref', 'prose', 'oversized', 'mixed-ref'])(
   'retains only bounded structured proposals for %s', async scenario => {
     let reviews = 0;
     const result = await createTeamToolDefinition().execute({ question: 'Why is it slow?', perspectives: ['profile', 'config'] }, {
-      workspaceRoot: '/repo', taskId: 'proposal-contract', runSubagent: async input => {
+      interactiveAsk, workspaceRoot: '/repo', taskId: 'proposal-contract', runSubagent: async input => {
         const review = input.prompt.includes('CLAIM');
         if (review) { reviews++; return { text: '', failed: false, steps: 1, allowedTools: [] }; }
         const id = input.definition.description.includes('(profile)') ? 'p1' : 'p2';
@@ -59,7 +62,7 @@ it('carries original proposer reads and falsifiers into cross-review without giv
     } }, registry, { workspaceRoot: root, sessionId: 'structured-proposals', agentMode: 'plan', permissionScope: 'allow-all',
       hooks: { dispatch: async () => ({ decision: 'allow' }) }, emit: () => {},
     });
-    const result = await registry.get('team')!.execute({ question: 'Why?', perspectives: ['profile', 'config'] }, { workspaceRoot: root, taskId: 'structured', runSubagent: run });
+    const result = await registry.get('team')!.execute({ question: 'Why?', perspectives: ['profile', 'config'] }, { interactiveAsk, workspaceRoot: root, taskId: 'structured', runSubagent: run });
     expect(reviewed).toHaveLength(2);
     expect(result.output).toContain('Proposed 2 of 2.');
     expect(result.output).toContain('p1: unresolved');

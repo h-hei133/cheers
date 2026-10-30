@@ -1,0 +1,6 @@
+{
+  "headSha": "19ee578ceda0a7be617d1dc162cd7b7bcf12e8cd",
+  "status": "unavailable",
+  "reason": "GitHub Actions API request returned EOF; no run status obtained",
+  "verdict": null
+}

@@ -1,0 +1,53 @@
+{
+  "mode": "fullscreen",
+  "buildId": "79bbfe049002b7483ce57b17da48ddcc95fd8640543885d91fc6276e97403c39",
+  "inputsDigest": "b2b1e2c05d891939c4912f12342ecff11fe09d1ee7d0c228dea54d0526a4d625",
+  "provider": "loopback HTTP fixture",
+  "savedMessages": 1,
+  "status": "passed",
+  "stages": [
+    {
+      "action": "decline after full preview",
+      "reportInSavedSession": false,
+      "reportInNextMainRequest": false,
+      "continuedAfterAnswer": true
+    },
+    {
+      "action": "explicit adoption after full preview",
+      "reportInSavedSession": true,
+      "reportInNextMainRequest": true,
+      "boundReads": 4,
+      "digestPresent": true
+    },
+    {
+      "action": "Ctrl+C pending adoption",
+      "cancelMs": 406,
+      "reportInSavedSession": false,
+      "additionalMainRequests": 0,
+      "questionSettled": true
+    },
+    {
+      "action": "Ctrl+D pending adoption",
+      "reportInSavedSession": false,
+      "additionalMainRequests": 0,
+      "questionSettled": true
+    }
+  ],
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 238,
+  "device": {
+    "cookedFlagsRestored": true
+  },
+  "requests": 43,
+  "readinessRequests": 4,
+  "proposerRequests": 16,
+  "reviewRequests": 16,
+  "receiptRequests": 8,
+  "outputBytes": 85175,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

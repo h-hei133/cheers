@@ -1,9 +1,12 @@
+import type { InteractiveAsk } from './ask/contract.js';
 import { describe, expect, it, vi } from "vitest";
 import { parseRefutations } from "./teamTool.js";
 import { createTeamToolDefinition } from "./teamTool.js";
 import { createHash } from "node:crypto";
 import type { SubagentRunInput } from "../subagents/runner.js";
 import type { ToolExecutionContext } from "../../tools/types.js";
+
+const interactiveAsk: InteractiveAsk = async questions => ({ status: 'completed', answers: { [questions[0]!.id]: 'Adopt report' } });
 
 function hypothesis(input: { prompt?: string }, claim = 'a claim'): string {
   return JSON.stringify({ hypothesisId: /hypothesis ID is (p[12])/.exec(input.prompt ?? '')?.[1], claim,
@@ -68,7 +71,7 @@ describe("reading a reviewer's findings", () => {
 
 describe("starting a team pass", () => {
   const context = (overrides: Partial<ToolExecutionContext> = {}) => ({
-    workspaceRoot: "/repo", taskId: "task", ...overrides,
+    interactiveAsk, workspaceRoot: "/repo", taskId: "task", ...overrides,
   }) as unknown as ToolExecutionContext;
 
   it("refuses without a question", async () => {
@@ -173,7 +176,7 @@ function observedRead(input: SubagentRunInput, overrides: Record<string, unknown
 it.each(["counterevidence", "none-found"])("does not accept an unread %s citation", async kind => {
   const tool = createTeamToolDefinition();
   const result = await tool.execute({ question: "why?", perspectives: ["a", "b"] }, {
-    workspaceRoot: "/repo", taskId: "unread",
+    interactiveAsk, workspaceRoot: "/repo", taskId: "unread",
     runSubagent: async input => ({ text: input.prompt.includes("CLAIM")
       ? `CLAIM p1 ${kind} I checked. evidence: src/profile.ts` : hypothesis(input), failed: false, steps: 1, allowedTools: [] }),
   });
@@ -183,7 +186,7 @@ it.each(["counterevidence", "none-found"])("does not accept an unread %s citatio
 it("binds a finding to its current review receipt and asks for that exact format", async () => {
   let receipt = "";
   const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
-    workspaceRoot: "/repo", taskId: "bound",
+    interactiveAsk, workspaceRoot: "/repo", taskId: "bound",
     runSubagent: async input => {
       if (!input.prompt.includes("CLAIM")) return { text: hypothesis(input), failed: false, steps: 1, allowedTools: [] };
       expect(input.prompt).toContain("evidence:");
@@ -202,7 +205,7 @@ it("binds a finding to its current review receipt and asks for that exact format
 
 it.each(["failed", "directory", "empty", "wrong-hash"])("does not issue a receipt for a %s read", async scenario => {
   const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
-    workspaceRoot: "/repo", taskId: scenario,
+    interactiveAsk, workspaceRoot: "/repo", taskId: scenario,
     runSubagent: async input => {
       if (!input.prompt.includes("CLAIM")) return { text: hypothesis(input), failed: false, steps: 1, allowedTools: [] };
       const observation = await observedRead(input, scenario === "failed" ? { isError: true } : {
@@ -221,7 +224,7 @@ it.each(["failed", "directory", "empty", "wrong-hash"])("does not issue a receip
 it("cannot borrow the other reviewer's receipt or a proposer citation", async () => {
   let stolen = "src/profile.ts";
   const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
-    workspaceRoot: "/repo", taskId: "isolation",
+    interactiveAsk, workspaceRoot: "/repo", taskId: "isolation",
     runSubagent: async input => {
       if (!input.prompt.includes("CLAIM")) {
         return { text: hypothesis(input), failed: false, steps: 1, allowedTools: [] };
@@ -240,7 +243,7 @@ it("cannot borrow the other reviewer's receipt or a proposer citation", async ()
 
 it("uses final answers instead of intermediate proposal and review narration", async () => {
   const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
-    workspaceRoot: "/repo", taskId: "final",
+    interactiveAsk, workspaceRoot: "/repo", taskId: "final",
     runSubagent: async input => {
       if (!input.prompt.includes("CLAIM")) return { text: "intermediate\n\n" + hypothesis(input, "final claim"), finalText: hypothesis(input, "final claim"), failed: false, steps: 2, allowedTools: [] };
       expect(input.prompt).not.toContain("intermediate");
@@ -256,7 +259,7 @@ it("uses final answers instead of intermediate proposal and review narration", a
 
 it("does not fall back to narration when the final answer is explicitly empty", async () => {
   const result = await createTeamToolDefinition().execute({ question: "why?", perspectives: ["a", "b"] }, {
-    workspaceRoot: "/repo", taskId: "empty-final", runSubagent: async () => ({ text: "I am looking", finalText: "", failed: false, steps: 1, allowedTools: [] }),
+    interactiveAsk, workspaceRoot: "/repo", taskId: "empty-final", runSubagent: async () => ({ text: "I am looking", finalText: "", failed: false, steps: 1, allowedTools: [] }),
   });
   expect(result.output).toContain("Proposed 0 of 2");
 });
@@ -267,7 +270,7 @@ it("caps team at two proposers before dispatch and advertises the same schema", 
   const tool = createTeamToolDefinition();
   expect(tool.description).toContain('two');
   expect(tool.argsSchema).toMatchObject({ properties: { perspectives: { maxItems: 2 } } });
-  const result = await tool.execute({ question: 'why?', perspectives: ['a', 'b', 'c'] }, { workspaceRoot: '/repo', taskId: 'capacity', runSubagent });
+  const result = await tool.execute({ question: 'why?', perspectives: ['a', 'b', 'c'] }, { interactiveAsk, workspaceRoot: '/repo', taskId: 'capacity', runSubagent });
   expect(result.error).toContain('at most 2');
   expect(runSubagent).not.toHaveBeenCalled();
 });

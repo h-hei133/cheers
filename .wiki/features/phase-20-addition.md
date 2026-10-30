@@ -2483,9 +2483,9 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 **证据必须显式声明**：评审回复的格式是 `CLAIM <id> <kind> <reason> evidence: <paths>`。理由里出现的路径只是散文——评审者可以写任何路径——所以只有 `evidence:` 之后的才算数，其余按意见处理，收敛规则不会让它证伪。
 
-**未实施**：交互式批准流程。`team` 工具走既有工具审批，没有专门的 UI。
+**后续补齐（21.20）**：完成后的报告复用既有 question bridge 展示，只有用户明确选择 `Adopt report` 才进入主上下文；工具运行许可不代表采用报告。拒绝、空答、取消、无交互宿主及失效会话均不发布报告内容，证据见21.20。
 
-**证据边界**：只实现了编排与判定，未运行真实多代理会话；并发上限、成本与收敛质量均无实测证据。
+**早期证据边界**：当时只实现了编排与判定，未运行真实多代理会话。后续21.20覆盖本地HTTP夹具下的实际runner/read/交互采用链路；真实模型的并发成本与收敛质量仍无实测证据。
 
 
 ### 17.6 第十三项（用户编号第二十三）：对话时界面卡顿
@@ -4002,7 +4002,7 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 
 实际原NodeCLI+PTY+loopback两模式：无ref合法结构提案+invented review unresolved；proposer/read+review/read实际指定行2-2，四收据阶段隔离、falsifiers保留、reviewerID绑定新receipt且进入真实HTTP/原session metadata→refuted；一个p1错误id失败但p2保留、零新增review；第三视角零新增proposer拒绝；两held review Ctrl+C102/103ms结束，exit144/143ms/0/cooked、每模式33POST/5GET，文件/config保持，task scratch清理。原tool和调用fence均有反转证据；不当生产模型质量/成本/平台验证。
 
-[正式工件](../../.omx/artifacts/phase20-addition-team-proposals/)及HANDOFF留存，原CLAUDE.md保留；无本助手subagent/heavy并发/full suite/exe/20k/真实provider或独立review，原47不升级、goal active。专门用户显式批准才采用结论至主上下文尚未实施，仍沿原tool result发布，不称17.5完成。本批Git/未来CI另绑定；20.54已推送`3bc969461f3e8bd757f1e87546f0ab479ad0ab95`，本次两次GitHub API读均EOF，没有新CI结论，不把网络错误判成测试失败或CI成功。
+[正式工件](../../.omx/artifacts/phase20-addition-team-proposals/)及HANDOFF留存，原CLAUDE.md保留；无本助手subagent/heavy并发/full suite/exe/20k/真实provider或独立review，原47不升级、goal active。本批时专门用户显式批准尚未实施，仍沿原tool result发布；后续21.20补齐采用边界，不回改本批历史证据，也不称17.5整体完成。本批Git/未来CI另绑定；20.54已推送`3bc969461f3e8bd757f1e87546f0ab479ad0ab95`，本次两次GitHub API读均EOF，没有新CI结论，不把网络错误判成测试失败或CI成功。
 
 ## 21. 第九轮用户反馈（2026-10-30）：配置文件与模型目录、settings 导航、resume 卡顿、双击 Esc、model 排序、双击粘贴与点击定位
 
@@ -4436,3 +4436,18 @@ publication首轮只换方向仍失败，诊断看到完整内置条目后改为
 原Node CLI regular/fullscreen各1保存会话×1消息，物理40/80/120列resize、真实SGR motion、原字段Enter/取消、鼠标切类与键盘返回、model侧栏悬停和退出逐项验证；配置与models字节不变、请求0、exit0且cooked flags恢复。探针旧收据保留：首轮未取得完整observer；修原子收据和显式颜色后，不能把同色selectedBg/statusBandBg算作多处hover，改为实际行样式hash差与独立hover身份；随后真实暴露的字段丢失已修，未放松返回断言。首次产品修补误将共用chipRows里的侧栏分类也归为chip，既有回归检出后修为列表/侧栏优先；详见[正式工件](../../.omx/artifacts/phase20-addition-tab-hover/README.md)与HANDOFF。
 
 延后一次读回确认`93efa0a0`的CI41028824744/Watch41028824745及`b30801aa`的CI41026961526/Watch41026961630均completed/success且head一致；本批自己的提交、推送与未来CI另绑定。不运行全套/20k真实终端/exe/真实provider/独立review或NormProof judge；用户桌面手感、其他平台和第33项大目录体验仍未验收，原47与ADD整体不升级，goal active。
+
+
+### 21.20 团队报告经用户明确采用后才进入主上下文
+
+继续17.5与20.55的明确缺口：原team工具完成review后立即把提案、收敛、finding与读取证据返回主模型，既有工具运行审批不能代替对完成报告的采用。[team tool](../../packages/ts-shell/src/core/tools/teamTool.ts)现在委托本域[adoption](../../packages/ts-shell/src/core/subagents/team/adoption.ts)，复用原interactiveAsk/question bridge暂停工具结果；预览展示claim/falsifiers/refs、判定理由、finding、实际读取的locator/范围/SHA256、缺失review及相关性限制，明确采用不授予工具许可。控制字符沿原neutraliseForDisplay显示为字面量；序列化或显示超过64KiB则拒绝，不出现“批准截断预览却发布更大报告”。无第二套store、runner、命令或provider机制。
+
+每次报告用随机问题ID，只有completed响应对该ID拥有自身answer且精确等于`Adopt report`才发布；缺省首项为`Keep report out`且无推荐选项，空答/yes/继承属性/其他ID均不采用。通过原[turn tools](../../packages/ts-shell/src/turn/tools.ts)传入已有live admission，提问前后复验session/config/turn准入；取消即使遇到忽略signal的宿主也及时settle、移除listener且不接受迟到回答。无宿主、失败、取消或stale结果只带固定安全状态和report ID，全部结果面不携带claims/verdicts/findings/evidence；采用后metadata保留报告和绑定session/workspace/task/内容的SHA256 digest。没有改变工具许可或写入边界。
+
+目标实现先读，后定向只读对照pi extensions/runner.ts:575–590的prompt生命周期和:333的默认拒绝；oh-my-pi interactive-mode.ts:7435–7492暂停继续、await后复验origin session，以及:7789–7833取消/无回答不批准。本项目复用现成question bridge，未照搬独立UI基础设施、执行模式切换、默认高亮批准或不符合Node floor的AbortSignal.any；沿advisor显式apply的语义但不新增持久note仓库。
+
+主代理严格串行：旧实现14条新增回归全部失败；最终六文件**82项去重测试**、五静态门和TS build通过，118旧docs advisory保留。四独立反转移除发布边界、精确答复、回答后准入和turn准入传递，分别1/5/1/1项失败，finally逐字节恢复；恢复后25项再通过。保守named-callable teamTool7→7、adoption新增7、turn/tools17→17，均≤20。build `79bbfe049002b7483ce57b17da48ddcc95fd8640543885d91fc6276e97403c39`，inputs `b2b1e2c05d891939c4912f12342ecff11fe09d1ee7d0c228dea54d0526a4d625`，详见[正式工件](../../.omx/artifacts/phase20-addition-team-adoption/README.md)。
+
+原Node CLI regular/fullscreen各1保存会话×1消息，isolated home/profile/project、loopback HTTP、heap768MiB、45秒/2MiB限额；实际tool_search/tool_load、两提案/交叉review和native selected read全链路。allow-all下仍等待采用，完整预览期间无新请求且当前报告未持久化；真实输入1拒绝后下一主模型payload与保存会话不含本轮报告，输入2才含对应claim/falsifiers/四条line2收据与digest。每轮独立公开marker排除旧已采用历史的干扰。pending Ctrl+C两模式均观察406ms结束（含300ms静默检查），无后续主模型请求；pending Ctrl+D退出251/238ms，未采用、问题settled、exit0/cooked恢复。配置和fixture文件字节不变，scratch清理；时延只为小夹具观测，非生产性能结论。
+
+原CLAUDE.md保留；无全套/并行heavy/本助手subagent/exe/20k真实终端、真实provider、独立review或NormProof judge。延后读取19ee578c CI时GitHub API EOF，保留失败收据、无CI结论，不混同产品失败或成功；本批提交/推送/未来CI另绑定。17.5的本地报告采用路径已覆盖，模型成本/收敛质量、真实桌面/其他平台与33大目录体验仍未验收，原47与ADD整体不升级，goal active。

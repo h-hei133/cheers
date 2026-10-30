@@ -1,0 +1,54 @@
+[
+  {
+    "file": "core/tools/teamTool.ts",
+    "count": 7,
+    "baseline": 7,
+    "names": [
+      "createTeamToolDefinition",
+      "execute",
+      "definition",
+      "run",
+      "propose",
+      "review",
+      "parseRefutations"
+    ]
+  },
+  {
+    "file": "core/subagents/team/adoption.ts",
+    "count": 7,
+    "baseline": 0,
+    "names": [
+      "publishTeamReport",
+      "withheld",
+      "currentStatus",
+      "requestAdoption",
+      "finish",
+      "cancel",
+      "failed"
+    ]
+  },
+  {
+    "file": "turn/tools.ts",
+    "count": 17,
+    "baseline": 17,
+    "names": [
+      "toolSchemas",
+      "adaptTools",
+      "prepareArguments",
+      "verify",
+      "refused",
+      "execute",
+      "prepareArguments",
+      "executeTool",
+      "assertSourceAccess",
+      "assertFileAccess",
+      "onOutput",
+      "createToolHooks",
+      "toolFor",
+      "beforeToolCall",
+      "afterToolCall",
+      "askPermission",
+      "evaluateWorkspacePermission"
+    ]
+  }
+]

@@ -15,6 +15,8 @@ export interface ToolExecutionContext {
   readonly sessionId?: string
   readonly correlationId?: string
   readonly abortSignal?: AbortSignal
+  /** Revalidate the captured turn before publishing an asynchronously approved report. */
+  readonly admission?: () => string | undefined
   /** Recheck path-specific denial for each actual file, including scan results. */
   readonly assertFileAccess?: (absolutePath: string) => void
   /** Persist native operation correlation before the approved patch can write its intent. */

@@ -1165,3 +1165,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Returning from a field editor, clicking another category and navigating back loses the original field despite keyboard-only category changes retaining it.
 - **Root Cause**: A recreated navigation owner receives the field as initialSelection, but its per-category row memory is not populated until an explicit focus capture. Keyboard category handling captures the outgoing row; the pointer path used select directly.
 - **Rule**: Capture the current row through the existing navigation focus contract before selecting a painted category. Preserve its search guard, and verify both top and side navigation with an explicit initial row that differs from the first option.
+
+
+### Permission To Run A Team Does Not Adopt Its Completed Report
+- **Symptom**: Proposals, verdicts and evidence reach the main model before the user has seen or accepted the completed report; cancellation can hang when a custom question host ignores its signal.
+- **Root Cause**: Tool execution approval was reused as report adoption, and publication trusted the asynchronous host to settle and preserve the original turn.
+- **Rule**: Preview the complete bounded report through the existing question bridge and require an own answer for the exact per-report question ID. Withhold every content/metadata surface on all other outcomes, recheck original turn admission after the answer, and retire publication on cancellation independently of the host. In CLI probes use distinct report markers per round so earlier adopted history cannot mask a later leak; check saved tool metadata and the next main-model HTTP payload separately.

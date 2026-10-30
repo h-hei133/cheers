@@ -5,7 +5,8 @@ import { runTeam } from '../subagents/team/run.js';
 import { readEvidence, type ReadReceipt } from '../subagents/team/evidence.js';
 import type { SubagentRunInput } from '../subagents/runner.js';
 import type { Refutation } from '../subagents/team/convergence.js';
-import { approvedResult, deniedResult } from './toolResultLifecycle.js';
+import { deniedResult } from './toolResultLifecycle.js';
+import { publishTeamReport } from '../subagents/team/adoption.js';
 import type { SubagentDefinition } from '../subagents/types.js';
 
 /**
@@ -31,6 +32,7 @@ export function createTeamToolDefinition(): ToolDefinition {
     name: 'team',
     description:
       'Ask two independent agents the same question, have each try to refute the others, and report what survived. '
+      + 'The user must explicitly adopt the completed report before it is returned to the main conversation. '
       + 'Use it when a question has competing explanations worth testing against each other, not for work that has one answer.',
     argsSchema: {
       type: 'object',
@@ -130,18 +132,7 @@ export function createTeamToolDefinition(): ToolDefinition {
         },
       });
 
-      const lines = [
-        `Proposed ${outcome.proposals.filter(result => result.status === 'proposed').length} of ${outcome.proposals.length}.`,
-        ...outcome.convergence.outcomes.map(entry => `${entry.proposalId}: ${entry.verdict} — ${entry.reason}`),
-        ...(outcome.failedReviews.length ? [`Reviews that did not finish: ${outcome.failedReviews.map(review => review.reviewerId).join(', ')}.`] : []),
-        `Limitation: ${outcome.limitation}`,
-      ];
-      return approvedResult(lines.join('\n'), {
-        proposals: outcome.proposals.map(result => ({ id: result.id, status: result.status, claim: result.claim ?? null, evidenceRefs: result.evidenceRefs ?? [], falsifiers: result.falsifiers ?? [] })),
-        outcomes: outcome.convergence.outcomes.map(entry => ({ proposalId: entry.proposalId, verdict: entry.verdict })),
-        failedReviews: outcome.failedReviews,
-        findings, evidence,
-      });
+      return publishTeamReport(outcome, findings, evidence, context);
     },
   };
 }

@@ -1,0 +1,48 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/teamAdoption.test.ts  (19 tests | 5 failed | 11 skipped) 15ms
+   ❯ src/core/tools/teamAdoption.test.ts > does not adopt a report for decline
+     → expected '{"success":true,"output":"Proposed 2 …' to not include 'WITHHELD_CLAIM_42'
+   ❯ src/core/tools/teamAdoption.test.ts > does not adopt a report for blank
+     → expected '{"success":true,"output":"Proposed 2 …' to not include 'WITHHELD_CLAIM_42'
+   ❯ src/core/tools/teamAdoption.test.ts > does not adopt a report for yes
+     → expected '{"success":true,"output":"Proposed 2 …' to not include 'WITHHELD_CLAIM_42'
+   ❯ src/core/tools/teamAdoption.test.ts > does not adopt a report for inherited
+     → expected '{"success":true,"output":"Proposed 2 …' to not include 'WITHHELD_CLAIM_42'
+   ❯ src/core/tools/teamAdoption.test.ts > does not adopt a report for wrong-id
+     → expected '{"success":true,"output":"Proposed 2 …' to not include 'WITHHELD_CLAIM_42'
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 3 passed | 11 skipped (19)
+   Start at  17:37:54
+   Duration  1.11s (transform 585ms, setup 0ms, collect 865ms, tests 15ms, environment 0ms, prepare 52ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/teamAdoption.test.ts -t does not adopt a report
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/teamAdoption.test.ts > does not adopt a report for decline
+ FAIL  src/core/tools/teamAdoption.test.ts > does not adopt a report for blank
+ FAIL  src/core/tools/teamAdoption.test.ts > does not adopt a report for yes
+ FAIL  src/core/tools/teamAdoption.test.ts > does not adopt a report for inherited
+ FAIL  src/core/tools/teamAdoption.test.ts > does not adopt a report for wrong-id
+AssertionError: expected '{"success":true,"output":"Proposed 2 …' to not include 'WITHHELD_CLAIM_42'
+ ❯ withheld src/core/tools/teamAdoption.test.ts:19:22
+     17|   const text = JSON.stringify(result);
+     18|   for (const privateValue of [marker, 'FALSIFIER_DETAIL_42', 'REVIEW_D…
+     19|     expect(text).not.toContain(privateValue);
+       |                      ^
+     20|   }
+     21| };
+ ❯ src/core/tools/teamAdoption.test.ts:38:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/core/tools/teamAdoption.test.ts -t 'does not adopt a report'

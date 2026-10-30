@@ -198,6 +198,7 @@ async function executeTool(
       artifactRoot: options.workspaceRoot,
       taskId: toolCallId,
       abortSignal: signal,
+      admission: options.admission,
       interactiveAsk: options.interactiveAsk,
       sessionId: options.sessionId,
       correlationId: options.correlationId,

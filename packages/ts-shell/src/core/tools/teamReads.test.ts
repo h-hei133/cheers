@@ -1,3 +1,4 @@
+import type { InteractiveAsk } from './ask/contract.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -5,6 +6,8 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { createCoreToolRegistry } from './registry.js';
 import { createSubagentRunner } from '../../turn/subagent.js';
 import type { AgentMessage } from '../agent/state.js';
+
+const interactiveAsk: InteractiveAsk = async questions => ({ status: 'completed', answers: { [questions[0]!.id]: 'Adopt report' } });
 
 let root: string;
 beforeEach(async () => {
@@ -37,7 +40,7 @@ it.each(['counterevidence', 'none-found', 'invented', 'denied', 'proposer-only',
       hooks: { dispatch: async () => ({ decision: 'allow' }) }, emit: () => {},
     });
     const result = await registry.get('team')!.execute({ question: 'why is it slow?', perspectives: ['profile', 'config'] }, {
-      workspaceRoot: root, taskId: 'team-native', runSubagent: run,
+      interactiveAsk, workspaceRoot: root, taskId: 'team-native', runSubagent: run,
     });
     const successful = ['counterevidence', 'none-found'].includes(scenario);
     expect(result.output).toContain(`p1: ${successful ? scenario === 'none-found' ? 'survived' : 'refuted' : 'unresolved'}`);
@@ -65,6 +68,6 @@ it('keeps a read receipt visible when the original tool output exceeds the model
   } }, registry, { workspaceRoot: root, sessionId: 'team-long-read', agentMode: 'plan', permissionScope: 'allow-all',
     hooks: { dispatch: async () => ({ decision: 'allow' }) }, emit: () => {},
   });
-  const result = await registry.get('team')!.execute({ question: 'why?', perspectives: ['a', 'b'] }, { workspaceRoot: root, taskId: 'long', runSubagent: run });
+  const result = await registry.get('team')!.execute({ question: 'why?', perspectives: ['a', 'b'] }, { interactiveAsk, workspaceRoot: root, taskId: 'long', runSubagent: run });
   expect(result.output).toContain('p1: survived');
 });

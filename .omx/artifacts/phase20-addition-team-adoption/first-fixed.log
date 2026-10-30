@@ -1,0 +1,11 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/teamAdoption.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/core/tools/teamAdoption.test.ts  (14 tests) 33ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  17:32:58
+   Duration  1.32s (transform 656ms, setup 1ms, collect 1.02s, tests 33ms, environment 0ms, prepare 66ms)

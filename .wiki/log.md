@@ -10575,3 +10575,12 @@ resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不�
 新增悬停6失败/既有7通过、鼠标返回2失败；最终四文件118项去重聚焦、四反转3/3/2/2失败与bytes恢复、恢复hover16、五静态门/TS build/freshness通过，118旧advisory保留。原NodeCLI两模式各1保存会话×1消息，40/80/120列实际SGR悬停、Enter/cancel、点击/键盘往返、model侧栏及exit0/cooked通过，文件不变/请求0。探针收据保留缺observer、同色background识别错误及真实丢字段失败；最终用原子收据、样式行hash差与独立hover身份，不放松字段返回断言。overlay30/chips4均不增长，既有overlay责任债append disposition。
 
 正式工件/HANDOFF保留、scratch清理、原CLAUDE.md不改；无full suite/20k真实终端/exe/真实provider/独立review或NormProof judge。延后读回93efa0a0 CI41028824744/Watch41028824745及b30801aa CI41026961526/Watch41026961630均completed/success且head一致；本批Git/未来CI另绑定。用户桌面/其他平台及33大目录体验仍未验收，原47/ADD整体不升级、goal active。
+
+
+## [2026-10-30] fix | 团队报告采用与主上下文隔离
+
+[addition21.20](features/phase-20-addition.md#2120-团队报告经用户明确采用后才进入主上下文)补17.5/20.55显式采用缺口：team完成后沿原question bridge展示完整有界预览，只有对本次随机ID明确选Adopt report才返回报告。默认/空答/拒绝/取消/无宿主/失效不传claims、判定、finding或证据；turn传原live admission，等待前后复验，忽略signal宿主仍能取消且迟到回答无效。沿原文本中和与许可边界，不增store/runner/provider机制。
+
+旧实现14新增失败；最终六文件82项、四反转1/5/1/1失败与bytes恢复、恢复25项、五静态门/build/freshness串行通过，118旧advisory保留，三个owner callable7/7/17均≤20。两模式原NodeCLI各1会话×1消息、loopback HTTP实际discover/load/native read/review；pending无请求，拒绝后会话/下一payload无本轮报告，明确采用保留四条读取证据，Ctrl+C无继续请求，pending Ctrl+D exit0/cooked、文件不变。逐轮marker排除已采用历史干扰，正式工件/HANDOFF更新，scratch清理、CLAUDE.md不改。
+
+上一提交19ee578c延后CI查询遇GitHub API EOF，无新CI结论；本批Git/未来CI另绑定。17.5真实模型成本/质量、33大目录体验及其他平台仍未验收，原47与ADD不升级，goal active。

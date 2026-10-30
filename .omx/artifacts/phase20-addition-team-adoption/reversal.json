@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "name": "publication",
+      "exit": 1,
+      "sourceSha256": "ca1a487edc705d10c4c0d3871af237e796fd61a1af477a0d6a5a3c552241f895"
+    },
+    {
+      "name": "explicit-answer",
+      "exit": 1,
+      "sourceSha256": "7e0a262195d1164b19c0a400504b57c7ce0031a8a41d3b5f20281deb9169bf4f"
+    },
+    {
+      "name": "late-admission",
+      "exit": 1,
+      "sourceSha256": "7e0a262195d1164b19c0a400504b57c7ce0031a8a41d3b5f20281deb9169bf4f"
+    },
+    {
+      "name": "turn-admission",
+      "exit": 1,
+      "sourceSha256": "08b232269140aca10e7b01400db68607245006858127e9599a59d9d80e46b37e"
+    }
+  ],
+  "restored": true
+}

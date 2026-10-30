@@ -1,0 +1,15 @@
+{"reversed":4,"restored":true}
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/teamAdoption.test.ts src/cli/interactive/team.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/core/tools/teamAdoption.test.ts  (19 tests) 37ms
+ ✓ src/cli/interactive/team.test.ts  (6 tests) 11ms
+
+ Test Files  2 passed (2)
+      Tests  25 passed (25)
+   Start at  17:37:59
+   Duration  1.30s (transform 499ms, setup 0ms, collect 879ms, tests 48ms, environment 0ms, prepare 93ms)
+
+{"counts":[{"file":"core/tools/teamTool.ts","count":7,"baseline":7},{"file":"core/subagents/team/adoption.ts","count":7,"baseline":0},{"file":"turn/tools.ts","count":17,"baseline":17}],"build":{"ok":true,"entry":"/home/wang/projects/cheers/packages/ts-shell/dist/builds/79bbfe049002b7483ce57b17da48ddcc95fd8640543885d91fc6276e97403c39/entrypoints/cli.js","buildId":"79bbfe049002b7483ce57b17da48ddcc95fd8640543885d91fc6276e97403c39","inputsDigest":"b2b1e2c05d891939c4912f12342ecff11fe09d1ee7d0c228dea54d0526a4d625","artifactDigest":"e16840422802a57922fc7a9b1cc4f5dd9060693f462caa17d284f6c1c0ad5f0a","version":"0.1.0"}}
