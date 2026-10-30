@@ -4748,3 +4748,5 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现editIdentity的workspaceRoot改回`artifactRoot ?? workspaceRoot`（会话主根），而写入目标仍用解析根：账本随会话、写入随授权。修复后同一探针为`primaryLedgerExists:true`、`attachedLedgerExists:false`，写入仍成功。21.39当时观察到的`Edit operation receipt is invalid.`实为探针缺`taskId`导致`callId`为空，与账本归属无关——此判断错误已在本批纠正。
 
 验证：`arguments`26（新例用真实execution service断言附加根下不产生账本）、`workspace/tools`4、`workspace/approval`25、`fileAccess`3、`workspace`9，共**67项**通过；六反转（write/read/glob/grep退回只查主根、以read解析write授权、账本跟随目标根）全部命中且finally字节恢复；五静态门、TS build/freshness、端到端探针（拒绝→授权→写入→目录替换失效）通过。build `a3fd86238923`。原47/ADD整体partial、goal active。
+
+补充端到端证据：`undo-probe.mjs`在默认profile下经附加根把`before`写成`after`，随后用会话主根的scope读取操作列表——可见**一条**操作，且其文件记录的`workspace`指向附加根。首次探针在未await的`withProfile`回调里调用工具，写入未执行、计数为0，该错误保留记录。

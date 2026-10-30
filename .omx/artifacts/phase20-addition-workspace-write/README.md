@@ -29,6 +29,12 @@ The same batch extended the fix to the rest of the file tools, because they fenc
 - `glob` and `grep` use the resolved root as the search origin and as the base for reported paths, across both the ripgrep path and the in-process fallback walk.
 - `apply_patch` needed no change. It already called `selectWorkspaceRoot` and read `workspaceRoots`. The two-phase probe (`patch-probe.mjs`) confirms it end to end: refused before the grant with "Tool path is outside the registered workspace roots", and after the grant it commits the file at the attached path with the exact content.
 
+## The undo ledger follows the session
+
+A write through an attached root is recorded in the session's own ledger, not the attached root's. `undo-probe.mjs` writes `after` over an existing `before` through an attached root under the default profile, then reads the session's operation list: one operation is visible, and its file entry names the attached root as the target. Without that, the write would succeed and be invisible to `/undo`.
+
+The identity therefore stays on the session's primary root while containment, the execution service, and the write itself use the resolved root. A probe mistake is kept on record: the first version called the tool inside a non-awaited `withProfile` callback, so the write never ran and the operation count read zero.
+
 ## Boundaries
 
 Synthetic session, single write, Linux. `bash` writes remain governed by the sandbox, not this fence. Read-only attached roots still allow reads through the same resolver, unchanged. Not covered: real provider tool calls, desktop platforms, concurrent multi-root writes.
