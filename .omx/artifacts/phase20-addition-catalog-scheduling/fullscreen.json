@@ -1,0 +1,233 @@
+{
+  "mode": "fullscreen",
+  "buildId": "194f2ee5e1e40dbde22761937400ba33dffef19230020aaa5da4b7a7b61e7da9",
+  "inputsDigest": "969a0534db7258c243e2ca18506d95a983b2d19805694417152c5d4f5e085db6",
+  "fixtures": 8,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "passed",
+  "checks": {
+    "noAmbientPeerScansBehindPanel": true,
+    "retainedSourceAcrossTwoDeletions": true,
+    "noRemovedRowsAfterSearchClear": true,
+    "survivorsUnchanged": true,
+    "retiredOnClose": true,
+    "ambientRefreshedAfterClose": true,
+    "cookedInputRestored": true,
+    "zeroRequests": true,
+    "configUnchanged": true
+  },
+  "deletionMs": [
+    195,
+    251
+  ],
+  "peerScansDuringPanel": 0,
+  "syncTranscriptReadsPerDeletion": [
+    0,
+    0
+  ],
+  "targetSyncTranscriptReadsPerDeletion": [
+    0,
+    0
+  ],
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 140,
+  "currentFixtureId": "sess_07d22b4fc7d9e8fb_1793342267588",
+  "transcriptReadSites": [
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at Object.loadSession (file://<build>/session/SessionManager.js:47:57)",
+        "    at tryResumeSession (file://<build>/session/recovery/sessionResume.js:32:35)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.updateSessionWorkspaceBinding (file://<build>/session/SessionManager.js:130:41)",
+        "    at bootstrapShellRuntime (file://<build>/core/shell/bootstrap.js:173:30)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    },
+    {
+      "id": "sess_07d22b4fc7d9e8fb_1793342267588",
+      "site": [
+        "    at readTranscriptSnapshot (file://<build>/session/transcript/read.js:32:79)",
+        "    at readSessionRecordSnapshot (file://<build>/session/store/sessionStore.js:93:28)",
+        "    at loadSessionRecord (file://<build>/session/store/sessionStore.js:82:12)",
+        "    at SessionStoreAccess.load (file://<build>/session/store/sessionStoreAccess.js:31:16)",
+        "    at SessionManager.getSession (file://<build>/session/sessionReadSurface.js:62:36)",
+        "    at GitCommitIntent.current (file://<build>/cli/runtime/git.js:16:114)"
+      ]
+    }
+  ],
+  "transcriptReadsBySession": {
+    "sess_07d22b4fc7d9e8fb_1793342267588": 17
+  },
+  "outputBytes": 39070,
+  "scratchRemoved": true
+}

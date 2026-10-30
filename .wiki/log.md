@@ -10533,3 +10533,11 @@ resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不�
 原实现新delete/pin回归分别2/3次全文读取失败；四独立反转、bytes恢复、四文件136项、五门/build串行通过。四种展示后变化实际经过原picker/native owner，拒绝且零writer/getSession。两模式CLI各8会话/每条一消息连续删两项含搜索，实际同步transcript读取从阶段1次降为最终[0,0]；原browse保留、文件/config不变、零请求、exit0/cooked。194/279及195/278ms为小fixture，不冒充用户大目录性能。原有两pin前置拒绝回归保留，初次扩大优化范围的失败已分类修正。
 
 正式工件/HANDOFF更新，复用上批probe并保留before-selection收据，scratch清理、CLAUDE.md不改。33的扫描解析/ambient/大目录体验仍partial，31/32/35/36/37继续，原47与ADD不升级、goal active。上批已推送db36da4432916d9465f9d085ebef3e9a574ae878，延后一次CI41009873087 in_progress/Watch41009873069 success且head一致；本批Git/未来CI另绑定。
+
+## [2026-10-30] fix | 目录协作解析与隐藏ambient读取
+
+[addition21.13](features/phase-20-addition.md#2113-第三十三实施之三目录解析让出主线程与遮挡提示的按需读取)复用原async transcript parser，catalog await后保留三文件/目录version、预算、取消及页面边界复验。surface先测量overlay，确实能画ambient提示时才读取，新增提示行后再测量；保留pager的inline/fullscreen临界布局。CLI发现composer status另有peer读取，host改为picker/reader期间复用原session-bound缓存、不续TTL、外session不借用；关闭刷新。
+
+七文件123项+两条实际host聚焦回归、六反转/bytes恢复、五门/build严格串行通过；118旧advisory保留。原NodeCLI两模式各8会话/每条一消息，跨两peer TTL按键重绘均0扫描、关闭刷新，连续两删含搜索复用browse且目标transcript同步读0，文件/config不变、请求0、exit0/cooked。普通首删窗口另有4次当前会话Git轮询读取，不能称全进程零同步读取；归因调用栈/初期失败/最终收据均保留。局部参考同意异步逐行取消与实际overlay几何，不照搬渲染/缓存系统。
+
+工件/HANDOFF更新；第33项建议实现已覆盖，大目录实测和总体性能仍未验证，保持partial；继续31/32/35/36/37，原47与ADD不升级，goal active。db36da44 CI41009873087/Watch41009873069与4c646ae3 CI41012137489/Watch41012137488已completed/success且head匹配；本批Git/未来CI另绑定。

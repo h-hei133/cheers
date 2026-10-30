@@ -44,6 +44,12 @@ function runningCommandCount(background?: BackgroundRunner): AmbientContext['run
   }
 }
 
+/** Hidden composer chrome can reuse a count without refreshing its registry walk. */
+export function readPeerSessionCount(sessionId: string, options: { readonly refresh?: boolean } = {}): number | undefined {
+  if (options.refresh === false) return peerCount?.sessionId === sessionId ? peerCount.count : undefined;
+  return countPeerSessions(sessionId, Date.now());
+}
+
 /** Other live sessions reachable for cross-session messaging, at most once a second. */
 function countPeerSessions(sessionId: string, now: number): number {
   if (peerCount?.sessionId === sessionId && now - peerCount.at < PEER_COUNT_TTL_MS) return peerCount.count;

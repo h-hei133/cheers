@@ -1,0 +1,45 @@
+scc-gate root=packages/ts-shell/src files=3007
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=53 read=53 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=25 docs_refs=456 docs_dangling=0 docs_source_dangling=118
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 118 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/session/store/catalog/projection.test.ts src/session/store/catalog/browse.test.ts src/session/store/catalog/index.test.ts src/session/store/catalog/list.test.ts src/presentation/tui/surface/view.test.ts src/presentation/tui/chrome/hints.test.ts src/cli/interactive/ambientFacts.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/session/store/catalog/browse.test.ts  (23 tests) 478ms
+ ✓ src/session/store/catalog/projection.test.ts  (5 tests) 245ms
+ ✓ src/presentation/tui/surface/view.test.ts  (51 tests) 191ms
+ ✓ src/cli/interactive/ambientFacts.test.ts  (4 tests) 5ms
+ ✓ src/session/store/catalog/index.test.ts  (26 tests) 2746ms
+ ✓ src/session/store/catalog/list.test.ts  (8 tests) 513ms
+ ✓ src/presentation/tui/chrome/hints.test.ts  (6 tests) 5ms
+
+ Test Files  7 passed (7)
+      Tests  123 passed (123)
+   Start at  14:34:40
+   Duration  6.99s (transform 656ms, setup 1ms, collect 1.66s, tests 4.18s, environment 1ms, prepare 300ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/interactiveMode.test.ts -t suspends peer scans
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/interactiveMode.test.ts  (378 tests | 376 skipped) 133ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 376 skipped (378)
+   Start at  14:34:47
+   Duration  13.08s (transform 9.83s, setup 0ms, collect 12.70s, tests 133ms, environment 0ms, prepare 52ms)
+
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+Wrote build manifest 194f2ee5e1e4 for @cheers/ts-shell@0.1.0

@@ -1,0 +1,35 @@
+{
+  "cases": [
+    {
+      "name": "sync-parser",
+      "exit": 1,
+      "sourceSha256": "7965d6f067696a25681f5774e85a8ed2aa04f18cfe5381ddcb903326ef1f7e13"
+    },
+    {
+      "name": "parser-cancellation",
+      "exit": 1,
+      "sourceSha256": "7965d6f067696a25681f5774e85a8ed2aa04f18cfe5381ddcb903326ef1f7e13"
+    },
+    {
+      "name": "source-version",
+      "exit": 1,
+      "sourceSha256": "e369755cb475c7901d18c871622328711c376fe64ffff3bb706b2744ab765984"
+    },
+    {
+      "name": "hidden-ambient",
+      "exit": 1,
+      "sourceSha256": "cead26044768231aed1297275c486d3ec901ad4ee527f92ca9130629aa3584fa"
+    },
+    {
+      "name": "status-peer-refresh",
+      "exit": 1,
+      "sourceSha256": "1220b680f25d1c6ff02d14d7ec0d6c114f2cee28ca8d87d3ca50390a100d942a"
+    },
+    {
+      "name": "cache-only-peer",
+      "exit": 1,
+      "sourceSha256": "b0bbaeed02076fe89207921ccd952930bf0b4638ce1765529eee6c0d996085e6"
+    }
+  ],
+  "restored": true
+}

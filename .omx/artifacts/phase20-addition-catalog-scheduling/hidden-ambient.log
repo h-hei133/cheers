@@ -1,0 +1,92 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/presentation/tui/surface/view.test.ts  (51 tests | 2 failed | 49 skipped) 18ms
+   ❯ src/presentation/tui/surface/view.test.ts > reads ambient facts only for a visible hint row in document frames
+     → expected "spy" to not be called at all, but actually been called 3 times
+
+Received:
+
+  1st spy call:
+
+    Array []
+
+  2nd spy call:
+
+    Array []
+
+  3rd spy call:
+
+    Array []
+
+
+Number of calls: 3
+
+   ❯ src/presentation/tui/surface/view.test.ts > reads ambient facts only for a visible hint row in viewport frames
+     → expected "spy" to not be called at all, but actually been called 3 times
+
+Received:
+
+  1st spy call:
+
+    Array []
+
+  2nd spy call:
+
+    Array []
+
+  3rd spy call:
+
+    Array []
+
+
+Number of calls: 3
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 49 skipped (51)
+   Start at  14:33:17
+   Duration  1.17s (transform 684ms, setup 0ms, collect 904ms, tests 18ms, environment 0ms, prepare 58ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/presentation/tui/surface/view.test.ts -t reads ambient facts only for a visible hint row
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/presentation/tui/surface/view.test.ts > reads ambient facts only for a visible hint row in document frames
+ FAIL  src/presentation/tui/surface/view.test.ts > reads ambient facts only for a visible hint row in viewport frames
+AssertionError: expected "spy" to not be called at all, but actually been called 3 times
+
+Received:
+
+  1st spy call:
+
+    Array []
+
+  2nd spy call:
+
+    Array []
+
+  3rd spy call:
+
+    Array []
+
+
+Number of calls: 3
+
+ ❯ src/presentation/tui/surface/view.test.ts:118:23
+    116|     expect(stripAnsi(shown.rows.join('\n'))).not.toContain('open todos…
+    117|   }
+    118|   expect(ambient).not.toHaveBeenCalled();
+       |                       ^
+    119|   ambient.mockReturnValue({ openTodos: 3, peerSessions: 2, runningComm…
+    120|   live.fullScreen = false;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/presentation/tui/surface/view.test.ts -t 'reads ambient facts only for a visible hint row'

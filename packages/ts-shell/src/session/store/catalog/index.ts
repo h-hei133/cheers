@@ -348,7 +348,7 @@ export class SessionCatalog {
       if (metadata === undefined) throw new Error('Session metadata exceeds the listing limit.');
       const state = await readCatalogFile(before.layout.statePath, before.stats[1], CATALOG_LIMITS.stateBytes, signal, readBudget);
       const transcript = await readCatalogFile(before.layout.transcriptPath, before.stats[2], CATALOG_LIMITS.transcriptBytes, signal, readBudget);
-      summary = decodeSessionSummary(id, metadata, state, transcript, before.version);
+      summary = await decodeSessionSummary(id, metadata, state, transcript, before.version, signal);
     }
     const after = await locateCatalogFiles(this.layout, id, signal, onSource);
     if (after?.version !== before.version) { this.cache.delete(id); throw new Error('Session changed while listing.'); }

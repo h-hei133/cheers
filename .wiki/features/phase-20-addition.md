@@ -4322,3 +4322,21 @@ regular两次删除195/278ms、退出126ms；fullscreen193/275ms、退出125ms�
 最终regular删除194/279ms、退出142ms，fullscreen195/278ms、退出135ms。每模式仅8会话/每条一消息，synthetic/offline，heap768MiB、45秒/2MiB；该结果不是用户2307目录的吞吐/延迟基准，也不等于目录解析零I/O。cold catalog精确解析仍可能沿原异步读取正文，本文只证明删除链移除三次同步全文获取。build `c75224511e9184b8c4b496056e3b07e1d3377ef41631dedfa7deba417302288a`、inputs `3c8a8e231dcf1cc3c3742f932309a1dcc5c1833130a2d80a6296b88965bbfc87`，两模式经checkBuild绑定；正式[工件](../../.omx/artifacts/phase20-addition-session-management/)保留反转、测试、阶段与最终收据。scratch清理、原CLAUDE.md保留；无子代理、无并行验证。
 
 第33项仍partial：扫描解析调度、overlay期间ambient读取及用户大目录体验尚未完成；31/32/35/36/37继续。未运行真实provider、其他平台、exe、full suite或20k，未取得本批独立review或CI最终证据；原47与ADD整体状态不升级，goal active。本批Git/推送及未来CI另绑定。
+
+### 21.13 第三十三实施之三：目录解析让出主线程与遮挡提示的按需读取
+
+落实21.3建议3–5。[catalog projection](../../packages/ts-shell/src/session/store/catalog/projection.ts)改为等待已有`parseTranscriptAsync`，传递原signal；未建立第二套decoder或流式读取系统。原[reader](../../packages/ts-shell/src/session/store/catalog/index.ts)在该await之后仍复验目录与metadata/state/transcript三文件version，检查取消/预算后才缓存；visible/current/lookahead、continuation及累积来源预算保持原检查。元数据和state的JSON解析、thread/report/preview投影仍同步；本批保证解析间可调度，不能称总耗时下降或整条路径无阻塞。
+
+先定向对照pi `core/session-manager.ts:799–826`的带signal异步逐行读取：同意协作解析和取消，复用本项目已有parser而不另造stream。其TUI `tui.ts:1381–1427`先测量实际overlay再合成，支持保留布局测量；该段接收已渲染底层内容，没有证明会跳过隐藏ambient读取，本项目按自身可见性作决定。反转测试验证协作解析决定，未复制实现。
+
+[surface chrome](../../packages/ts-shell/src/presentation/tui/surface/chrome.ts)先用transient/search提示测量面板，确认ambient行可显示时才取事实；全屏覆盖、没有空间或已有提示时不取。ambient确实增加一行时再次测量，确保inline report在临界高度仍正确切到全屏，空ambient不白占一行。不能只用render前的fullScreen标志：Pager在render中按composer剩余空间确定形态。临界情况下ambient取值本身可能决定切屏，不能声称任何最终全屏帧都绝无事实读取。
+
+首轮CLI仍观察到面板后peer扫描，定位为原host `facts()`在绘制composer前另调`readAmbientFacts`。[ambient owner](../../packages/ts-shell/src/cli/interactive/ambientFacts.ts)新增原peer缓存的只读入口；[host](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)在picker/reader打开期间复用同session计数，不续TTL、没有缓存或session不符则省略。关闭后原实时读取立即刷新过期计数。没有第二份ambient缓存，未改provider/auth、writer、release脚本或构建行为。
+
+主代理单进程串行完成：七文件123项，加实际普通/全屏host新两项（其余376项跳过）；六独立反转分别使断言失败，finally逐字节恢复；五静态门与TS build通过，118旧docs advisory保留。新测试在首条transcript解析后排入真实event-loop回调，3072条小型单元夹具尚未解析完就观察到调度/取消；另在decode暂停期间分别改变三份来源/取消，拒绝且不缓存。不是20k真实终端。owner named callable计数为catalog index18、projection5、chrome1、hints4、ambient4；host未新增callable。
+
+原Node CLI两模式各8会话×1消息，面板打开后等待两个1200ms周期并通过真实按键重绘，peer扫描均0，关闭后刷新。随后两次Delete/Enter含搜索删项，begin1/forget2/关闭前retire0、关闭后1，幸存三文件/config不变、请求0、exit0/cooked flags。删除耗时普通218/251ms、全屏195/251ms，退出均140ms，仅为小fixture。最终build `194f2ee5e1e40dbde22761937400ba33dffef19230020aaa5da4b7a7b61e7da9`，inputs `969a0534db7258c243e2ca18506d95a983b2d19805694417152c5d4f5e085db6`。
+
+较长probe首次把删除窗口内所有同步transcript读都当作删除读取而失败；按synthetic session与bounded调用栈区分后，四个删除目标均0次，普通首个窗口另有4次**当前会话**读取。两模式整个probe的同步读都只属于当前fixture，来源含启动resume/bootstrap及现有`GitCommitIntent.current`轮询；不是所有同步读消失。该残余开销记录为后续调查线索，不扩改Git运行时。初次observer导入非export绑定的启动前失败、host修补前扫描失败、计数归因前失败均保留在[正式工件](../../.omx/artifacts/phase20-addition-catalog-scheduling/README.md)；测试中误把inline help当全屏夹具的断言已改为显式fullScreen，未为此改产品行为。
+
+延后CI一次读回：`db36da4432916d9465f9d085ebef3e9a574ae878` 的CI41009873087/Watch41009873069、`4c646ae3cbf4777718e3a40001530cb51e36c45f` 的CI41012137489/Watch41012137488均completed/success且head一致；不替代本批CI。第33项实现建议已覆盖，**用户大目录实际体验/总体heap与延迟仍未验证，保持partial**；31/32/35/36/37继续。未运行真实provider、其他平台、exe、full suite、20k或独立代理review；原47与ADD整体不升级，goal active。本批Git/推送与未来CI另绑定。

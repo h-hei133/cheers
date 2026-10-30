@@ -1,0 +1,64 @@
+[
+  {
+    "file": "session/store/catalog/index.ts",
+    "count": 18,
+    "names": [
+      "beginBrowse",
+      "retireBrowse",
+      "forgetBrowse",
+      "resolve",
+      "list",
+      "diagnose",
+      "read",
+      "snapshot",
+      "remember",
+      "listBrowse",
+      "assertCurrent",
+      "read",
+      "validateBrowseSources",
+      "readBatch",
+      "worker",
+      "read",
+      "browseSnapshot",
+      "entriesAfter"
+    ]
+  },
+  {
+    "file": "session/store/catalog/projection.ts",
+    "count": 5,
+    "names": [
+      "summarizeSession",
+      "decodeSessionSummary",
+      "sessionPreview",
+      "boundedText",
+      "append"
+    ]
+  },
+  {
+    "file": "presentation/tui/surface/chrome.ts",
+    "count": 1,
+    "names": [
+      "renderChrome"
+    ]
+  },
+  {
+    "file": "presentation/tui/chrome/hints.ts",
+    "count": 4,
+    "names": [
+      "transientHint",
+      "ambientFacts",
+      "renderHints",
+      "join"
+    ]
+  },
+  {
+    "file": "cli/interactive/ambientFacts.ts",
+    "count": 4,
+    "names": [
+      "readAmbientFacts",
+      "runningCommandCount",
+      "readPeerSessionCount",
+      "countPeerSessions"
+    ]
+  }
+]

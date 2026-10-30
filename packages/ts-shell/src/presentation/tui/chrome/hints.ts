@@ -67,10 +67,10 @@ function ambientFacts(ambient: AmbientContext): string | undefined {
   return facts.length > 0 ? join(facts) : undefined;
 }
 
-/** Zero or one row: the transient hint, else ambient context, else nothing. */
+/** Zero or one row: the transient hint, else available ambient context, else nothing. */
 export function renderHints(
   context: HintContext,
-  ambient: AmbientContext,
+  ambient: AmbientContext | undefined,
   width: number,
 ): string[] {
   if (context.completionStatus && !context.cancelArmed) {
@@ -79,7 +79,7 @@ export function renderHints(
   if (context.toast && !context.cancelArmed && !context.suggesting) {
     return [defaultTheme.fg("accent", truncateToWidth(context.toast, width))];
   }
-  const text = transientHint(context) ?? ambientFacts(ambient);
+  const text = transientHint(context) ?? (ambient && ambientFacts(ambient));
   if (!text) return [];
   return [defaultTheme.dim(truncateToWidth(text, width))];
 }

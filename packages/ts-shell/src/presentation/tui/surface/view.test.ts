@@ -105,6 +105,41 @@ function frame(view: InteractiveSurface, size = SIZE): string[] {
   return view.renderFrame(size).rows.map(stripAnsi);
 }
 
+it.each(['document', 'viewport'] as const)('reads ambient facts only for a visible hint row in %s frames', layout => {
+  const ambient = vi.fn(() => ({ openTodos: 2, peerSessions: 1, runningCommands: 0 }));
+  const { view, live } = surface({ ambient });
+  expect(stripAnsi(view.renderFrame(SIZE, layout).rows.join('\n'))).toContain('2 open todos');
+  ambient.mockClear(); live.fullScreen = true;
+  for (let frame = 0; frame < 3; frame++) {
+    const shown = view.renderFrame(SIZE, layout);
+    expect(shown.fullScreen).toBe(true);
+    expect(stripAnsi(shown.rows.join('\n'))).not.toContain('open todos');
+  }
+  expect(ambient).not.toHaveBeenCalled();
+  ambient.mockReturnValue({ openTodos: 3, peerSessions: 2, runningCommands: 0 });
+  live.fullScreen = false;
+  expect(stripAnsi(view.renderFrame(SIZE, layout).rows.join('\n'))).toContain('3 open todos');
+  expect(ambient).toHaveBeenCalledTimes(1);
+  ambient.mockClear();
+  view.renderFrame({ columns: 60, rows: 1 }, layout);
+  expect(ambient).not.toHaveBeenCalled();
+});
+
+it('does not acquire ambient facts behind transient hints or a search bar', () => {
+  const ambient = vi.fn(() => ({ openTodos: 2, peerSessions: 1, runningCommands: 0 }));
+  const { view, live } = surface({ ambient });
+  live.toast = 'Copied text';
+  expect(frame(view).join('\n')).toContain('Copied text');
+  live.toast = undefined; live.busy = true;
+  expect(frame(view).join('\n')).toContain('esc interrupt');
+  live.busy = false; live.cancelArmed = true;
+  expect(frame(view).join('\n')).toContain('press ctrl+c again');
+  expect(ambient).not.toHaveBeenCalled();
+  const search = surface({ ambient, searchBar: () => ({ query: 'find', matchCount: 1, currentNumber: 1 }) });
+  frame(search.view);
+  expect(ambient).not.toHaveBeenCalled();
+});
+
 describe("the document a main-screen frame reports", () => {
   it("retains written history through one-row and unavailable terminal sizes", () => {
     const { view } = surface();
@@ -700,21 +735,48 @@ it('fits report panels around the real composer and switches screens on resize',
   const report = createReport({ title: 'Measured report', facts: {}, lines: Array.from({ length: 6 }, (_, i) =>
     ({ kind: 'text' as const, spans: [span(`value-${i} with complete provenance`)] })) });
   const pager = new Pager(); pager.open('/context', reportText(report), report);
+  const ambient = vi.fn(() => ({ openTodos: 2, peerSessions: 0, runningCommands: 0 }));
   const { view } = surface({ overlayFullScreen: () => pager.fullScreen,
-    overlayRows: (width, height, available) => pager.render(width, height, available), composerShape: () => 'box' });
+    overlayRows: (width, height, available) => pager.render(width, height, available), composerShape: () => 'box', ambient });
   view.editor.setText('retained draft');
   const inline = view.renderFrame({ columns: 80, rows: 30 });
   expect(inline.fullScreen).not.toBe(true);
   expect(stripAnsi(inline.rows.join('\n'))).toContain('value-5');
   expect(stripAnsi(inline.rows.join('\n'))).toContain('retained draft');
+  expect(stripAnsi(inline.rows.join('\n'))).toContain('2 open todos');
+  expect(ambient).toHaveBeenCalledTimes(1); ambient.mockClear();
   const full = view.renderFrame({ columns: 24, rows: 10 });
   expect(full.fullScreen).toBe(true); expect(full.rows).toHaveLength(10);
   expect(view.composerGeometry()).toBeUndefined();
+  expect(ambient).not.toHaveBeenCalled();
   const restored = view.renderFrame({ columns: 80, rows: 30 });
   expect(restored.fullScreen).not.toBe(true);
   expect(stripAnsi(restored.rows.join('\n'))).toContain('retained draft');
+  expect(stripAnsi(restored.rows.join('\n'))).toContain('2 open todos');
+  expect(ambient).toHaveBeenCalledTimes(1);
   pager.close();
   const closed = view.renderFrame({ columns: 80, rows: 30 });
   expect(stripAnsi(closed.rows.join('\n'))).not.toContain('Measured report');
   expect(view.editor.getText()).toBe('retained draft');
+});
+
+it('remeasures a report at the ambient row boundary without reserving an empty hint', () => {
+  const report = createReport({ title: 'Boundary', facts: {}, lines: Array.from({ length: 4 }, (_, index) =>
+    ({ kind: 'text' as const, spans: [span(`value-${index}`)] })) });
+  let boundarySeen = false;
+  for (let height = 8; height <= 20; height++) {
+    const forms = [0, 1].map(openTodos => {
+      const pager = new Pager(); pager.open('/context', reportText(report), report);
+      const { view } = surface({ overlayFullScreen: () => pager.fullScreen,
+        overlayRows: (width, rows, available) => pager.render(width, rows, available),
+        ambient: () => ({ openTodos, peerSessions: 0, runningCommands: 0 }), composerShape: () => 'box' });
+      view.editor.setText('draft');
+      const output = view.renderFrame({ columns: 80, rows: height });
+      if (!output.fullScreen) expect(stripAnsi(output.rows.join('\n'))).toContain('draft');
+      return output.fullScreen === true;
+    });
+    if (!forms[0] && forms[1]) boundarySeen = true;
+    expect(forms[0] && !forms[1]).toBe(false);
+  }
+  expect(boundarySeen).toBe(true);
 });

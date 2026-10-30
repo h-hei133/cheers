@@ -49,21 +49,27 @@ export function renderChrome(
   // itself the hint, and the composer above it is where the user's text lives, so
   // taking that row instead would lose whatever they had typed.
   const searchBar = context.searchBar?.();
-  const hints = (searchBar ? renderSearchBar(searchBar, width) : renderHints(
-      {
-        busy,
-        suggesting: view.suggestionsOpen,
-        cancelArmed: context.cancelArmed(),
-        queued: context.queuedCount(),
-        steering: context.steeringCount?.() ?? 0,
-        toast: hintStatus?.toast ?? context.toast?.(),
-        completionStatus,
-      },
-      context.ambient(),
-      width,
-    )).slice(0, Math.max(0, remaining - inputRows));
+  const hintContext = {
+    busy,
+    suggesting: view.suggestionsOpen,
+    cancelArmed: context.cancelArmed(),
+    queued: context.queuedCount(),
+    steering: context.steeringCount?.() ?? 0,
+    toast: hintStatus?.toast ?? context.toast?.(),
+    completionStatus,
+  };
+  let hints = (searchBar ? renderSearchBar(searchBar, width) : renderHints(hintContext, undefined, width))
+    .slice(0, Math.max(0, remaining - inputRows));
   remaining -= hints.length;
-  const overlayRows = context.overlayRows(width, height, Math.max(inputRows, remaining - activityRows.length));
+  let overlayRows = context.overlayRows(width, height, Math.max(inputRows, remaining - activityRows.length));
+  // Rendering decides a pager's form from the actual composer capacity. Only
+  // acquire background facts when their row can still be shown. If a fact adds
+  // a row, measure again so an inline report cannot overlap the composer.
+  if (!searchBar && !hints.length && remaining > inputRows && !context.overlayFullScreen()) {
+    hints = renderHints(hintContext, context.ambient(), width);
+    remaining -= hints.length;
+    if (hints.length) overlayRows = context.overlayRows(width, height, Math.max(inputRows, remaining - activityRows.length));
+  }
   const statusRows = [...activityRows, ...overlayRows];
   const visibleStatus = remaining > 0 ? statusRows.slice(-remaining) : [];
   const droppedStatus = statusRows.length - visibleStatus.length;

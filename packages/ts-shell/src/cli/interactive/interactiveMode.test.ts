@@ -79,6 +79,31 @@ import { recordSessionUsage, resetSessionUsage } from '../../observability/usage
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import type { Keybindings } from './keybindings.js';
 import { buildToolEscalationPrompt } from '../../core/query/toolPolicy.js';
+import { AgentRegistryScanner } from '../../core/messaging/agentRegistryScanner.js';
+
+it.each(['regular', 'fullscreen'] as const)('suspends peer scans in the actual %s host while a picker or reader covers chrome', kind => {
+  const scheduler = new ManualScheduler(), { mode } = build({ tuiMode: kind, scheduler });
+  const host = mode as unknown as { overlay: OverlayHost; pager: Pager; view: InteractiveView;
+    options: { runtimeContext: ShellRuntimeContext } };
+  host.options.runtimeContext.session.id = `ambient-host-${kind}`;
+  let now = 1000;
+  const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+  const scan = vi.spyOn(AgentRegistryScanner.prototype, 'scanAllReachableAgents').mockReturnValue([]);
+  const paint = () => host.view.renderFrame({ columns: 100, rows: 24 });
+  mode.start();
+  try {
+    paint(); expect(scan).toHaveBeenCalledTimes(1);
+    now += 2000; host.overlay.open({ ...helpPicker(), fullScreen: true });
+    expect(paint().fullScreen).toBe(true); scheduler.flush();
+    expect(scan).toHaveBeenCalledTimes(1);
+    now += 2000; paint(); expect(scan).toHaveBeenCalledTimes(1);
+    host.overlay.close(); paint(); expect(scan).toHaveBeenCalledTimes(2);
+    now += 2000; host.pager.open('Whole reader', 'report line\n'.repeat(50));
+    expect(paint().fullScreen).toBe(true);
+    expect(scan).toHaveBeenCalledTimes(2);
+    host.pager.close(); paint(); expect(scan).toHaveBeenCalledTimes(3);
+  } finally { mode.stop(); scan.mockRestore(); clock.mockRestore(); }
+});
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind => ['g', '4', 'enter'].map(key => ({ kind, key }))))(
   'selects exact patch groups from a populated runtime approval in the actual $kind host with $key', async ({ kind, key }) => {

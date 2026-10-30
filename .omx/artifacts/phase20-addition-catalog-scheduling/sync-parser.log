@@ -1,0 +1,49 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/store/catalog/projection.test.ts  (5 tests | 2 failed | 3 skipped) 70ms
+   ❯ src/session/store/catalog/projection.test.ts > yields during catalog transcript parsing and respects cancellation=false
+     → expected 0 to be greater than 0
+   ❯ src/session/store/catalog/projection.test.ts > yields during catalog transcript parsing and respects cancellation=true
+     → promise resolved "{ id: 'session', …(10) }" instead of rejecting
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 3 skipped (5)
+   Start at  14:33:13
+   Duration  729ms (transform 344ms, setup 0ms, collect 410ms, tests 70ms, environment 0ms, prepare 57ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/session/store/catalog/projection.test.ts -t yields during catalog
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/store/catalog/projection.test.ts > yields during catalog transcript parsing and respects cancellation=false
+AssertionError: expected 0 to be greater than 0
+ ❯ src/session/store/catalog/projection.test.ts:44:22
+     42|     if (cancel) await expect(decoded).rejects.toBe(reason);
+     43|     else expect(await decoded).toEqual(summarizeSession(session, 'vers…
+     44|     expect(observed).toBeGreaterThan(0);
+       |                      ^
+     45|     expect(observed).toBeLessThan(session.turns.length);
+     46|     if (cancel) expect(parsed).toBeLessThan(session.turns.length);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/session/store/catalog/projection.test.ts > yields during catalog transcript parsing and respects cancellation=true
+AssertionError: promise resolved "{ id: 'session', …(10) }" instead of rejecting
+ ❯ src/session/store/catalog/projection.test.ts:42:37
+     40|   try {
+     41|     const decoded = decodeSessionSummary(session.id, metadata, state, …
+     42|     if (cancel) await expect(decoded).rejects.toBe(reason);
+       |                                     ^
+     43|     else expect(await decoded).toEqual(summarizeSession(session, 'vers…
+     44|     expect(observed).toBeGreaterThan(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/session/store/catalog/projection.test.ts -t 'yields during catalog'

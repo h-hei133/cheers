@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/store/catalog/projection.test.ts  (5 tests | 1 failed | 4 skipped) 34ms
+   ❯ src/session/store/catalog/projection.test.ts > yields during catalog transcript parsing and respects cancellation=true
+     → expected 3072 to be less than 3072
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  14:33:14
+   Duration  657ms (transform 329ms, setup 0ms, collect 392ms, tests 34ms, environment 0ms, prepare 53ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/session/store/catalog/projection.test.ts -t cancellation=true
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/store/catalog/projection.test.ts > yields during catalog transcript parsing and respects cancellation=true
+AssertionError: expected 3072 to be less than 3072
+ ❯ src/session/store/catalog/projection.test.ts:46:32
+     44|     expect(observed).toBeGreaterThan(0);
+     45|     expect(observed).toBeLessThan(session.turns.length);
+     46|     if (cancel) expect(parsed).toBeLessThan(session.turns.length);
+       |                                ^
+     47|     else expect(parsed).toBe(session.turns.length);
+     48|   } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/session/store/catalog/projection.test.ts -t cancellation=true

@@ -4,7 +4,22 @@ import { AgentRegistryScanner } from '../../core/messaging/agentRegistryScanner.
 import type { BackgroundRunner } from '../../workflow/jobs/local/model.js';
 import { renderHints } from '../../presentation/tui/chrome/hints.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
-import { readAmbientFacts } from './ambientFacts.js';
+import { readAmbientFacts, readPeerSessionCount } from './ambientFacts.js';
+
+it('keeps hidden peer reads session-bound without renewing an expired scan', () => {
+  const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+  const scan = vi.mocked(AgentRegistryScanner.prototype.scanAllReachableAgents);
+  expect(readPeerSessionCount('cache-only-origin', { refresh: false })).toBeUndefined();
+  expect(scan).not.toHaveBeenCalled();
+  expect(readPeerSessionCount('cache-only-origin')).toBe(0);
+  expect(scan).toHaveBeenCalledTimes(1);
+  now.mockReturnValue(4000);
+  expect(readPeerSessionCount('cache-only-origin', { refresh: false })).toBe(0);
+  expect(readPeerSessionCount('different-session', { refresh: false })).toBeUndefined();
+  expect(scan).toHaveBeenCalledTimes(1);
+  readAmbientFacts('cache-only-origin');
+  expect(scan).toHaveBeenCalledTimes(2);
+});
 
 beforeEach(() => {
   vi.spyOn(todos, 'getSessionTodos').mockReturnValue([]);

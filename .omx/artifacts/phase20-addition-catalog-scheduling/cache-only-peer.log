@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/ambientFacts.test.ts  (4 tests | 1 failed | 3 skipped) 6ms
+   ❯ src/cli/interactive/ambientFacts.test.ts > keeps hidden peer reads session-bound without renewing an expired scan
+     → expected +0 to be undefined
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  14:33:32
+   Duration  602ms (transform 277ms, setup 0ms, collect 349ms, tests 6ms, environment 0ms, prepare 62ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/ambientFacts.test.ts -t hidden peer reads
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/ambientFacts.test.ts > keeps hidden peer reads session-bound without renewing an expired scan
+AssertionError: expected +0 to be undefined
+ ❯ src/cli/interactive/ambientFacts.test.ts:12:73
+     10|   const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+     11|   const scan = vi.mocked(AgentRegistryScanner.prototype.scanAllReachab…
+     12|   expect(readPeerSessionCount('cache-only-origin', { refresh: false })…
+       |                                                                         ^
+     13|   expect(scan).not.toHaveBeenCalled();
+     14|   expect(readPeerSessionCount('cache-only-origin')).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/ambientFacts.test.ts -t 'hidden peer reads'

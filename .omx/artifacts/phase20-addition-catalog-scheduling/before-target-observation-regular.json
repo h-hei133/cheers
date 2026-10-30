@@ -1,0 +1,66 @@
+{
+  "mode": "regular",
+  "buildId": "194f2ee5e1e40dbde22761937400ba33dffef19230020aaa5da4b7a7b61e7da9",
+  "inputsDigest": "969a0534db7258c243e2ca18506d95a983b2d19805694417152c5d4f5e085db6",
+  "fixtures": 8,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "checks": {
+    "noAmbientPeerScansBehindPanel": true
+  },
+  "deletionMs": [
+    245
+  ],
+  "peerScansDuringPanel": 0,
+  "syncTranscriptReadsPerDeletion": [
+    4
+  ],
+  "failure": "assertion",
+  "assertion": "synchronous conversation read count",
+  "observation": {
+    "begins": 1,
+    "retires": 0,
+    "removals": 1,
+    "requests": 0,
+    "renders": 15,
+    "syncTranscriptReads": 17,
+    "expectedSyncTranscriptReadsPerDeletion": 0,
+    "peerScans": 1,
+    "panelPeerScans": 0,
+    "snapshot": {
+      "title": "Resume session",
+      "filter": "",
+      "current": "sess_d5ab67e07cae19e2_1793342174687",
+      "loading": false,
+      "searching": false,
+      "pending": false,
+      "subMode": "none",
+      "failed": false,
+      "status": "End of this session page range. Reopen to refresh saved sessions.",
+      "ids": [
+        "sess_d5ab67e07cae19e2_1793342174687",
+        "sess_5b535102b60c43b7_1793342175045",
+        "sess_80c23fecdf7db9a0_1793342174997",
+        "sess_bed784cf5bd9367e_1793342174949",
+        "sess_aea23576871a8ae8_1793342174902",
+        "sess_d3e5703cd15d570b_1793342174852",
+        "sess_5431bcfbea6d62d4_1793342174802"
+      ],
+      "painted": [
+        "group:pinned:false",
+        "group:false:Today",
+        "sess_d5ab67e07cae19e2_1793342174687",
+        "sess_5b535102b60c43b7_1793342175045",
+        "sess_80c23fecdf7db9a0_1793342174997",
+        "sess_bed784cf5bd9367e_1793342174949",
+        "sess_aea23576871a8ae8_1793342174902",
+        "sess_d3e5703cd15d570b_1793342174852",
+        "sess_5431bcfbea6d62d4_1793342174802"
+      ],
+      "rows": 13
+    }
+  },
+  "outputBytes": 22933,
+  "scratchRemoved": true
+}

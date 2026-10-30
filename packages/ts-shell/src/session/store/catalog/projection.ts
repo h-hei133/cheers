@@ -6,7 +6,7 @@ import type { SessionMetadata } from '../../schema/sessionMetadataCodec.js';
 import type { Session } from '../../schema/sessionRecord.js';
 import type { SessionStateSnapshot } from '../../schema/sessionStateSnapshot.js';
 import { sessionThreadPath } from '../../schema/sessionThread.js';
-import { parseTranscript, projectBranchMessages } from '../../transcript/sessionTranscript.js';
+import { parseTranscriptAsync, projectBranchMessages } from '../../transcript/sessionTranscript.js';
 import { projectLoadedSession } from '../sessionStore.js';
 import type { SessionSummary } from './model.js';
 
@@ -26,8 +26,9 @@ export function summarizeSession(session: Session, version: string, limited = fa
   };
 }
 
-export function decodeSessionSummary(id: string, metadataText: string, stateText: string | undefined,
-  transcriptText: string | undefined, version: string): SessionSummary {
+export async function decodeSessionSummary(id: string, metadataText: string, stateText: string | undefined,
+  transcriptText: string | undefined, version: string, signal?: AbortSignal): Promise<SessionSummary> {
+  signal?.throwIfAborted();
   const metadata = JSON.parse(metadataText.trim()) as SessionMetadata;
   if (!metadata || metadata.id !== id || typeof metadata.createdAt !== 'string' || !Number.isFinite(Date.parse(metadata.createdAt))
     || typeof metadata.updatedAt !== 'string' || !Number.isFinite(Date.parse(metadata.updatedAt))
@@ -41,11 +42,11 @@ export function decodeSessionSummary(id: string, metadataText: string, stateText
   if (!root) throw new Error('Session project identity is unavailable.');
   if (!state) return { id, projectRoot: root, title: metadata.title, ...(metadata.pinned === true ? { pinned: true } : {}), titleComplete: Boolean(metadata.title?.trim()), createdAt: metadata.createdAt,
     updatedAt: metadata.updatedAt, reentry: 'unknown', quality: 'limited', version };
-  const transcript = transcriptText === undefined ? undefined : parseTranscript(transcriptText);
+  const transcript = transcriptText === undefined ? undefined : await parseTranscriptAsync(transcriptText, undefined, signal);
   const selected = state.thread === undefined ? undefined : sessionThreadPath(state.thread);
   const events = transcript?.events ?? [];
   const turns = projectBranchMessages(events, selected?.resolved ? selected.path.map(entry => entry.id) : undefined,
-    state.thread?.entries.map(entry => entry.id));
+    state.thread?.entries.map(entry => entry.id), signal);
   const session = projectLoadedSession({ metadata, state, turns, cwd: root });
   session.hasReportHistory = events.some(event => event.type === 'command-output');
   const reports = selectSessionReports(events, id, state.thread);

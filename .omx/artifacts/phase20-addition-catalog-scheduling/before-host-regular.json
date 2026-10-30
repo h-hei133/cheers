@@ -1,0 +1,60 @@
+{
+  "mode": "regular",
+  "buildId": "facd66f88e29c2723a809acd8c2f8ff8511e8f9cdce5117580a22c022163db83",
+  "inputsDigest": "c5a216f8dec4f761f2f740c9d7f248c9f46c72bac3cc0f28087c8a171be13878",
+  "fixtures": 8,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "checks": {
+    "noAmbientPeerScansBehindPanel": false,
+    "retainedSourceAcrossTwoDeletions": true,
+    "noRemovedRowsAfterSearchClear": true,
+    "survivorsUnchanged": true,
+    "retiredOnClose": true,
+    "ambientRefreshedAfterClose": true,
+    "cookedInputRestored": true,
+    "zeroRequests": true,
+    "configUnchanged": true
+  },
+  "deletionMs": [
+    195,
+    282
+  ],
+  "peerScansDuringPanel": 2,
+  "syncTranscriptReadsPerDeletion": [
+    0,
+    0
+  ],
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 138,
+  "failure": "assertion",
+  "assertion": "checks",
+  "observation": {
+    "begins": 1,
+    "retires": 1,
+    "removals": 2,
+    "requests": 0,
+    "renders": 22,
+    "syncTranscriptReads": 17,
+    "expectedSyncTranscriptReadsPerDeletion": 0,
+    "peerScans": 4,
+    "panelPeerScans": 3,
+    "snapshot": {
+      "filter": "",
+      "loading": false,
+      "searching": false,
+      "pending": false,
+      "subMode": "none",
+      "failed": false,
+      "ids": [],
+      "painted": [],
+      "rows": 0
+    }
+  },
+  "outputBytes": 37945,
+  "scratchRemoved": true
+}

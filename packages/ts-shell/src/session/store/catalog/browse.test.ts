@@ -11,6 +11,7 @@ import { createSessionStoreLayout, projectSessionFileLayout } from '../sessionFi
 import { SessionCatalog } from './index.js';
 import type { SessionCatalogBrowse, SessionCatalogContinuation, SessionCatalogSnapshot } from './model.js';
 import { CatalogBrowses, type CatalogRead } from './browse.js';
+import * as projection from './projection.js';
 
 vi.mock('node:fs/promises', async () => {
   const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
@@ -53,6 +54,34 @@ async function finish(catalog: SessionCatalog, context: ReturnType<typeof fixtur
   for await (const page of catalog.list(context, signal, limit, undefined, undefined, { browse, needle, after })) pages.push(page);
   return { pages, last: pages.at(-1)! };
 }
+
+it.each(['metadata', 'state', 'transcript', 'abort'] as const)(
+  'rejects %s changes across catalog decode suspension without caching the result', async source => {
+    const { catalog, layout, browse } = fixture();
+    const files = seed(layout, 'one');
+    const controller = new AbortController();
+    let entered!: () => void, release!: () => void;
+    const decoded = new Promise<void>(resolve => { entered = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const original = projection.decodeSessionSummary;
+    const spy = vi.spyOn(projection, 'decodeSessionSummary').mockImplementationOnce(async (...args) => {
+      const summary = await original(...args);
+      entered(); await gate; return summary;
+    });
+    const owner = catalog as unknown as { read: CatalogRead; cache: Map<string, unknown> };
+    const pending = owner.read('one', controller.signal);
+    try {
+      await decoded;
+      if (source === 'abort') controller.abort(new Error('catalog cancelled'));
+      else fs.appendFileSync(files[`${source}Path`], '\n');
+      release();
+      await expect(pending).rejects.toThrow(source === 'abort' ? /cancelled/ : /changed/);
+      expect(owner.cache.has('one')).toBe(false);
+    } finally {
+      release(); spy.mockRestore(); catalog.retireBrowse(browse);
+    }
+  },
+);
 
 it('forgets a confirmed removed row without rediscovery, source reads or a fresh quota', async () => {
   const { catalog, context, browse, layout } = fixture();

@@ -1,0 +1,38 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/interactiveMode.test.ts  (378 tests | 2 failed | 376 skipped) 138ms
+   ❯ src/cli/interactive/interactiveMode.test.ts > suspends peer scans in the actual regular host while a picker or reader covers chrome
+     → expected "scanAllReachableAgents" to be called 1 times, but got 2 times
+   ❯ src/cli/interactive/interactiveMode.test.ts > suspends peer scans in the actual fullscreen host while a picker or reader covers chrome
+     → expected "scanAllReachableAgents" to be called 1 times, but got 2 times
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 376 skipped (378)
+   Start at  14:33:18
+   Duration  13.11s (transform 9.90s, setup 0ms, collect 12.73s, tests 138ms, environment 0ms, prepare 56ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/interactiveMode.test.ts -t suspends peer scans
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/interactiveMode.test.ts > suspends peer scans in the actual regular host while a picker or reader covers chrome
+ FAIL  src/cli/interactive/interactiveMode.test.ts > suspends peer scans in the actual fullscreen host while a picker or reader covers chrome
+AssertionError: expected "scanAllReachableAgents" to be called 1 times, but got 2 times
+ ❯ src/cli/interactive/interactiveMode.test.ts:98:18
+     96|     now += 2000; host.overlay.open({ ...helpPicker(), fullScreen: true…
+     97|     expect(paint().fullScreen).toBe(true); scheduler.flush();
+     98|     expect(scan).toHaveBeenCalledTimes(1);
+       |                  ^
+     99|     now += 2000; paint(); expect(scan).toHaveBeenCalledTimes(1);
+    100|     host.overlay.close(); paint(); expect(scan).toHaveBeenCalledTimes(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/interactiveMode.test.ts -t 'suspends peer scans'

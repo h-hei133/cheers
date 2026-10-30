@@ -1,0 +1,41 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/store/catalog/browse.test.ts  (23 tests | 3 failed | 19 skipped) 41ms
+   ❯ src/session/store/catalog/browse.test.ts > rejects metadata changes across catalog decode suspension without caching the result
+     → promise resolved "{ id: 'one', …(10) }" instead of rejecting
+   ❯ src/session/store/catalog/browse.test.ts > rejects state changes across catalog decode suspension without caching the result
+     → promise resolved "{ id: 'one', …(10) }" instead of rejecting
+   ❯ src/session/store/catalog/browse.test.ts > rejects transcript changes across catalog decode suspension without caching the result
+     → promise resolved "{ id: 'one', …(10) }" instead of rejecting
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 1 passed | 19 skipped (23)
+   Start at  14:33:16
+   Duration  749ms (transform 399ms, setup 0ms, collect 480ms, tests 41ms, environment 0ms, prepare 55ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/session/store/catalog/browse.test.ts -t changes across catalog decode suspension
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/store/catalog/browse.test.ts > rejects metadata changes across catalog decode suspension without caching the result
+ FAIL  src/session/store/catalog/browse.test.ts > rejects state changes across catalog decode suspension without caching the result
+ FAIL  src/session/store/catalog/browse.test.ts > rejects transcript changes across catalog decode suspension without caching the result
+AssertionError: promise resolved "{ id: 'one', …(10) }" instead of rejecting
+ ❯ src/session/store/catalog/browse.test.ts:78:27
+     76|       else fs.appendFileSync(files[`${source}Path`], '\n');
+     77|       release();
+     78|       await expect(pending).rejects.toThrow(source === 'abort' ? /canc…
+       |                           ^
+     79|       expect(owner.cache.has('one')).toBe(false);
+     80|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/session/store/catalog/browse.test.ts -t 'changes across catalog decode suspension'

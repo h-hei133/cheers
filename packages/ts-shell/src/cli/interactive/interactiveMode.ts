@@ -76,7 +76,7 @@ import { promptApproval, type InteractiveApprovalResult } from "./picker/approva
 import { resetVimState, routeKey } from "./keymap.js";
 import { InputPreferences } from "./inputPreferences.js";
 import { QuestionBridge } from "./questionBridge.js";
-import { readAmbientFacts } from "./ambientFacts.js";
+import { readAmbientFacts, readPeerSessionCount } from "./ambientFacts.js";
 import { appendConversation, showConversation, startFreshSession, type HistoryTarget } from "./history.js";
 import { startupObservers, time } from '../../observability/startupTiming.js';
 import { Pager, pageLongOutput } from "../../presentation/tui/chrome/pager.js";
@@ -373,7 +373,7 @@ export class InteractiveMode {
             agentMode: this.options.sessionRuntime.getAgentMode(),
             permissionScope: this.options.sessionRuntime.getPermissionScope(),
             queued: this.queue.length + (this.options.sessionRuntime.input?.()?.pending().followUps.length ?? 0),
-            peers: readAmbientFacts(this.options.runtimeContext.session.id).peerSessions,
+            peers: readPeerSessionCount(this.options.runtimeContext.session.id, { refresh: !this.pager.active && !this.overlay.active }),
             ...(!this.busy ? { promptContext: this.promptContext.read() } : {}),
           }),
         statusItems: () => {
