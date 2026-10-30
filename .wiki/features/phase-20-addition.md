@@ -4623,3 +4623,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 ### 21.34 纯图片提示不再绘制空白气泡行
 
 21.32恢复图片后，`renderUser`对空文字仍先`wrapToWidth("")`出一行，导致纯图片问题在图片上方多一条全宽空白气泡，读起来像错误留白。现只有文字为空且有图片时才省略该行；有文字时行数、源投影与复制语义完全不变。反转（恢复空字符串行）使新增断言失败且finally bytes恢复；blocks/container/source 56项通过，五门与TS build串行通过，118旧docs advisory保留。build `5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473`、inputs `4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806`。两模式原CLI重跑：三user块图片数0/1/1、无协议终端绘制label、零fetch、exit0/cooked，纯图片轮次的空白行不再出现。图形协议内联、桌面平台未验收；原47/ADD整体partial、goal active。
+
+
+### 21.35 退出延迟基线与启动不自动重入的复核
+
+用户第26项「exit有时卡住」的四条已修机制之外，本批实测剩余路径：两模式各三轮、交替`/exit`与Ctrl+D的真实Node CLI（隔离home/profile/Git project、无凭据synthetic且fetch拒绝、heap768MiB、每轮30秒/1MiB）全部exit0/cooked、零fetch。ready后退出耗时普通219/164/215ms、全屏222/158/206ms。唯一仍可能阻塞的是[会话状态锁](../../packages/ts-shell/src/session/store/sessionFileStore.ts)的`STATE_LOCK_TIMEOUT_MS=1200`同步重试：另一进程持锁时close最多阻塞约1.2秒后失败；本夹具无竞争writer，故该路径**未实测**，用户偶发多秒卡顿与锁竞争一致但未被证明。本批未改产品代码。
+
+用户第30项「打开时显示上次会话」的当前机制复核：[CLI bootstrap](../../packages/ts-shell/src/cli/bootstrap/cliBootstrapContext.ts)把`recoveryCandidate`固定为null，并注明恢复建议在首帧后按需发现；交互与print路径保留显式解析。因此新的CLI启动不会自动采用旧会话，原先记录的SIGTERM/SIGHUP重入路径已在20.5改为显式意图。本批未复现用户当时的界面，也不宣称该现象已修复——只能确认当前源码没有自动重入分支。
+
+证据边界：合成/离线、小型会话、无并发writer、无真实provider与桌面终端；不覆盖锁竞争、不可捕获崩溃与旧版本现场。原47/ADD整体partial、goal active。

@@ -1,0 +1,45 @@
+{
+  "mode": "regular",
+  "rounds": [
+    {
+      "index": 0,
+      "exit": "/exit",
+      "readyAt": 2696,
+      "exitAt": 2915,
+      "afterReady": 219,
+      "outputBytes": 4114,
+      "cookedRestored": true,
+      "networkAttempts": 0
+    },
+    {
+      "index": 1,
+      "exit": "ctrl+d",
+      "readyAt": 2651,
+      "exitAt": 2815,
+      "afterReady": 164,
+      "outputBytes": 4114,
+      "cookedRestored": true,
+      "networkAttempts": 0
+    },
+    {
+      "index": 2,
+      "exit": "/exit",
+      "readyAt": 2782,
+      "exitAt": 2997,
+      "afterReady": 215,
+      "outputBytes": 4114,
+      "cookedRestored": true,
+      "networkAttempts": 0
+    }
+  ],
+  "status": "passed",
+  "buildId": "5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473",
+  "inputsDigest": "4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806",
+  "limits": {
+    "heapMiB": 768,
+    "perRoundSeconds": 30,
+    "outputBytes": 1048576
+  },
+  "maxAfterReady": 219,
+  "scratchRemoved": true
+}

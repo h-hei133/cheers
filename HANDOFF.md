@@ -1244,3 +1244,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A prompt that was only a picture shows a full-width empty bubble row above the picture.
 - **Root Cause**: The user-block renderer wraps the source text before drawing; `wrapToWidth("")` returns one empty line, so an empty prompt still produced a padded board.
 - **Rule**: When a prompt has pictures and no text, skip the word rows rather than drawing an empty board; keep the text path untouched so line counts, source projection and copy semantics are unchanged. Assert the picture row is the first row and only the block separator is blank.
+
+### Exit Latency Has One Unmeasured Blocking Path
+
+- **Symptom**: `/exit` occasionally takes seconds even after the close-fencing, MCP budget and busy-exit fixes.
+- **Root Cause**: The only remaining synchronous wait on the close path is `withFileLock`'s retry loop (`STATE_LOCK_TIMEOUT_MS = 1200`), which sleeps while another process holds the session state lock. A clean-machine probe cannot exercise it.
+- **Rule**: Do not claim the occasional hang is fixed from a no-contention exit measurement. Measure with a competing lock holder before changing the timeout or the retry strategy; a 1200 ms bound is also not proof that a user-visible multi-second stall came from this path.

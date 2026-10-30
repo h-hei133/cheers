@@ -10692,3 +10692,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：纯图片提示不再绘制空白气泡行
 
 [addition21.34](features/phase-20-addition.md#2134-纯图片提示不再绘制空白气泡行)续21.32/21.33：`renderUser`对空文字仍wrap出一行全宽气泡，纯图片问题上方出现像错误留白的空行。现仅“无文字且有图片”时省略该行，有文字路径不变。反转使新断言失败并恢复bytes；blocks/container/source 56项、五门、TS build通过，118 advisory保留。两模式原CLI重跑图片数0/1/1、label绘制、零fetch、exit0/cooked。图形协议内联与平台未验收，原47/ADD整体partial、goal active。
+
+### 2026-10-31：退出延迟基线与会话不自动重入复核
+
+[addition21.35](features/phase-20-addition.md#2135-退出延迟基线与启动不自动重入的复核)实测两模式各三轮交替`/exit`/Ctrl+D：ready后219/164/215ms与222/158/206ms，全部exit0/cooked、零fetch。剩余唯一阻塞点是状态锁1.2秒同步重试，无竞争writer故未实测，偶发多秒卡顿与锁竞争一致但未证明。第30项复核：CLI bootstrap将recoveryCandidate固定为null、恢复建议首帧后按需，启动不会自动重入旧会话；未复现用户当时界面，不宣称已修复。未改产品代码；合成离线小会话、无并发writer/provider/桌面，原47/ADD整体partial、goal active。
