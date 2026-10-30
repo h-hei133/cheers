@@ -156,4 +156,13 @@ describe("restoring a turn", () => {
     expect(outcome.steps).toEqual([]);
     expect(outcome.stoppedBecause).toContain("run is in progress");
   });
+
+  it("keeps each verified step and its warning when context publication fails", async () => {
+    seed("older", "prompt-1"); seed("newer", "prompt-1");
+    stubPreview(); stubRestore();
+    const outcome = await restoreTurn({ ...host(), publish: () => { throw new Error('Fixture publication failed'); } }, "prompt-1", true);
+    expect(outcome.complete).toBe(true);
+    expect(outcome.steps).toHaveLength(2);
+    expect(outcome.steps.every(step => step.warning?.includes('model context'))).toBe(true);
+  });
 });

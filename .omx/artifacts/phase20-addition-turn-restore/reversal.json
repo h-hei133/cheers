@@ -1,0 +1,10 @@
+{
+  "baseline": "ef4d078d43f2923a02e6d60efe1166ec339633d2",
+  "restored": true,
+  "exitCode": 1,
+  "sourceDigests": {
+    "packages/ts-shell/src/edit/recovery/undo/command.ts": "8419830743a11a011c68bbc425b2faccd5e7e288231b361424fc2318c014aa9b",
+    "packages/ts-shell/src/edit/recovery/undo/service.ts": "8fa2c1aab73ad173580e30fa8b9f1cebc1c861162a234e42ffb3b6f12145aa29",
+    "packages/ts-shell/src/edit/recovery/undo/turnRestore.ts": "bb4aaec8594fed230228249366587b84729ac36aa2f7dccc6a3c0688d5d17df6"
+  }
+}

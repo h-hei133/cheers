@@ -1,0 +1,32 @@
+{
+  "observedAt": "2026-10-30",
+  "runs": [
+    {
+      "head": "ef4d078d43f2923a02e6d60efe1166ec339633d2",
+      "CI": {
+        "id": 40983398554,
+        "status": "in_progress"
+      },
+      "watch": {
+        "id": 40983398564,
+        "conclusion": "success"
+      }
+    },
+    {
+      "head": "ec8a44aab6884e9f1e496e049f5263fb4e54a7bc",
+      "CI": {
+        "id": 40981106387,
+        "conclusion": "failure",
+        "failedStep": "Run Focused & Unit Tests",
+        "failedFile": "src/cli/interactive/externalEditor.test.ts",
+        "failedTests": 5,
+        "passedTests": 12548,
+        "skippedTests": 3
+      },
+      "watch": {
+        "id": 40981106301,
+        "conclusion": "success"
+      }
+    }
+  ]
+}

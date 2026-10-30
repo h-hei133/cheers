@@ -1,0 +1,15 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/session/store/usage.test.ts  (12 tests) 365ms
+ ✓ src/observability/usage/attribution.test.ts  (23 tests) 37ms
+ ✓ src/edit/recovery/undo/service.test.ts  (16 tests) 1928ms
+ ✓ src/edit/recovery/undo/command.test.ts  (6 tests) 921ms
+ ✓ src/edit/recovery/undo/turnRestore.test.ts  (8 tests) 248ms
+ ✓ src/observability/usage/persistence.test.ts  (11 tests) 7ms
+
+ Test Files  6 passed (6)
+      Tests  76 passed (76)
+   Start at  09:27:34
+   Duration  14.34s (transform 5.50s, setup 0ms, collect 10.53s, tests 3.51s, environment 0ms, prepare 58ms)
+

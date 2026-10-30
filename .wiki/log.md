@@ -10437,3 +10437,12 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 两模式原NodeCLI/PTY真实小child一次dispatch：wait1超时仍running→Ctrl+C109/132ms结束wait、原pid/start identity仍活跃→同job wait至少16秒、release后300/274ms收到完成/持久output/exit0，三wait监听释放。每模式6completion/3readiness，Ctrl+D172/162ms、0/cookedflags恢复，config不变。setup unsupported flag、tool-missing failures、旧short successes单列保留；2MiB/45秒上限、孤立state全部清理，正式工件/HANDOFF/27现状同步。未测production分钟级/60秒提升/真provider/完整平台或capacity/独立review，原47/ADD不升级、goal active。
 
 20.48已推送`ec8a44aab6884e9f1e496e049f5263fb4e54a7bc`，本轮延后exact CI40981106387仍in_progress/Watch40981106301 success；20.47 CI40979466560现success，20.46 CI40979108158、20.45 CI40978485363 success，三Watch均success且head一致。不将Watch成功替代完整验收；本批Git/精确CI另绑定。
+
+
+## [2026-10-30] fix | 整轮恢复部分结果与上下文通知持久化
+
+[addition20.50](features/phase-20-addition.md#2050-整轮文件恢复保留部分结果并送达下一请求)补真实多操作：batch部分/unknown通知不再遗漏，报告失败保留已知文件结果，scope重查失败保留此前步骤，共用单操作上下文失效/发布警告。原CLI暴露usage失效条目缺target attribution，严格snapshot拒绝addTurn；原usage owner补前台身份，累计请求/token与严格校验保持。
+
+最终6文件76通过，undo原三owner反转6失败、usage反转3失败，字节恢复；五门/build/freshness460/3550、build e23a79095b8f、inputs89102ec6a461，118旧advisory。两模式真实edit两操作→未确认零写→partial保留外部a且恢复b→通知落盘/下一HTTP→complete newest-first→完整通知下一HTTP全部通过；每模式7POST/3GET，退出167/166ms、0/cookedflags。正式工件保留pager/observer setup与usage阻塞分类，不削弱断言；scratch清理、原CLAUDE.md，无subagent/heavy并发/exe/full suite/20k，原47不升级、goal active。
+
+20.49已推送ef4d078d43f2923a02e6d60efe1166ec339633d2，延后CI40983398554仍in_progress/Watch40983398564 success；20.48 CI40981106387 failure，五externalEditor fixture试图执行CI不存在的rtk，12548 passed/3 skipped，gates/build成功。此后单独修补fixture，不冒充CI通过；本批Git/精确CI另绑定。

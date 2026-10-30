@@ -1,0 +1,35 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/observability/usage/attribution.test.ts  (23 tests | 2 failed | 21 skipped) 10ms
+   ❯ src/observability/usage/attribution.test.ts > persists context-reset after attributed usage without losing identity or adding requests
+     → Invalid persisted session usage key
+   ❯ src/observability/usage/attribution.test.ts > persists usage-gap after attributed usage without losing identity or adding requests
+     → Invalid persisted session usage key
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/observability/usage/attribution.test.ts > persists context-reset after attributed usage without losing identity or adding requests
+ FAIL  src/observability/usage/attribution.test.ts > persists usage-gap after attributed usage without losing identity or adding requests
+Error: Invalid persisted session usage key
+ ❯ Module.decodeAttribution src/observability/usage/identity.ts:66:48
+     64|   if (value === undefined) {
+     65|     if (key.startsWith(namespace)) {
+     66|       if (!key.startsWith(legacyPrefix)) throw new Error('Invalid pers…
+       |                                                ^
+     67|       const raw: unknown = JSON.parse(key.slice(legacyPrefix.length));
+     68|       if (typeof raw !== 'string' || legacyBucketKey(raw) !== key) thr…
+ ❯ src/observability/usage/snapshot.ts:106:25
+ ❯ decodeUsageHistory src/observability/usage/snapshot.ts:89:16
+ ❯ decodeUsageSnapshot src/observability/usage/snapshot.ts:68:26
+ ❯ Module.mergeUsageDelta src/observability/usage/snapshot.ts:172:10
+ ❯ Module.persistSessionUsage src/observability/usageTelemetry.ts:388:7
+ ❯ src/observability/usage/attribution.test.ts:182:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 21 skipped (23)
+   Start at  09:20:52
+   Duration  548ms (transform 221ms, setup 0ms, collect 303ms, tests 10ms, environment 0ms, prepare 60ms)
+

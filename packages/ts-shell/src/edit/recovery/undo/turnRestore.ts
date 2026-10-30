@@ -24,12 +24,13 @@ import type { OperationReceipt } from '../operation/model.js';
 import { previewOperation, type UndoPreview } from '../operation/preview.js';
 import { restoreOperation, type UndoResult } from '../operation/restore.js';
 import type { OperationAccess } from '../operation/access.js';
-import { operationsForTurn, undoScope } from './service.js';
+import { operationsForTurn, publishUndoResult, undoScope } from './service.js';
 
 export interface TurnRestoreStep {
   readonly operationId: string;
   readonly status: UndoResult['status'];
   readonly files: UndoResult['files'];
+  readonly warning?: string;
 }
 
 export interface TurnRestoreOutcome {
@@ -93,7 +94,9 @@ export async function restoreTurn(
       return { steps, skipped: outstanding.slice(index).map(entry => entry.operationId), complete: false,
         stoppedBecause: `Operation ${receipt.operationId} cannot be restored: ${preview.blockers.join(', ') || 'inspection required'}.` };
     }
-    if (JSON.stringify(undoScope(host.context())) !== JSON.stringify(scope)) {
+    let currentScope: string | undefined;
+    try { currentScope = JSON.stringify(undoScope(host.context())); } catch { /* Retain any earlier file results. */ }
+    if (currentScope !== JSON.stringify(scope)) {
       return { steps, skipped: outstanding.slice(index).map(entry => entry.operationId), complete: false,
         stoppedBecause: 'The undo context changed during the restore.' };
     }
@@ -101,9 +104,9 @@ export async function restoreTurn(
       operationId: receipt.operationId, sessionId: receipt.sessionId,
       workspaceIdentity: receipt.workspace.identity, revision: preview.revision,
     } : undefined, access);
-    steps.push({ operationId: receipt.operationId, status: result.status, files: result.files });
+    const warning = publishUndoResult(host, result, receipt);
+    steps.push({ operationId: receipt.operationId, status: result.status, files: result.files, ...(warning ? { warning } : {}) });
     if (result.status === 'restored-verified') {
-      try { host.publish?.(result, receipt); } catch { /* The step's own result stands; a publish failure must not invent another. */ }
       continue;
     }
     // Anything else leaves this operation's files in a state the next step

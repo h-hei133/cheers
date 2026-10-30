@@ -36,6 +36,24 @@ function activate(session: Session) {
   });
 }
 
+it('persists a local restore notice after invalidating attributed context through the original manager', () => {
+  const manager = new SessionManager();
+  manager.createNewWithId(ID, directory);
+  const attribution = captureUsageAttribution({ provider: 'fixture', model: 'same', baseUrl: 'https://relay.invalid/v1' });
+  recordSessionUsage(ID, { attribution, promptTokens: 100, completionTokens: 20 });
+  manager.addTurn(ID, { role: 'assistant', content: 'Public fixture edited files.' });
+  const metadata = { fileUndo: { operationId: 'turn:fixture', status: 'partial',
+    files: [{ path: 'b.txt', status: 'restored-verified' }] } };
+  markContextUnknown(ID);
+  manager.addTurn(ID, { role: 'user', content: 'Previous file reads may be stale; re-read affected files before editing.', metadata });
+  const saved = new SessionManager().getSession(ID)!;
+  expect(saved.turns.at(-1)?.metadata).toEqual(metadata);
+  expect(saved.usage?.usageHealth).toBeUndefined();
+  expect(saved.usage?.turnsCount).toBe(1);
+  expect(saved.usage?.recentRequests.at(-1)).toMatchObject({ kind: 'context-reset', attribution });
+  expect(totalTokens(getSessionUsage(ID))).toBe(120);
+});
+
 describe("session usage persistence seams", () => {
   it('resumes through the real manager with healthy accounting preserved beside a corrupted bucket', () => {
     const layout = locateExistingSessionLayout(createSessionStoreLayout(), ID);

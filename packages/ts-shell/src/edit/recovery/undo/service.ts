@@ -101,9 +101,15 @@ export async function executeUndo(host: UndoHost, preview: UndoPreview, confirme
     result = { status: confirmed ? 'blocked' : 'denied', operationId: original.operationId,
       files: original.files.map(file => ({ path: file.path, status: file.undo })) };
   }
+  const warning = publishUndoResult(host, result, original);
+  return { result, ...(warning ? { warning } : {}) };
+}
+
+/** File evidence survives context publication failure for single and batch restores. */
+export function publishUndoResult(host: UndoHost, result: UndoResult, receipt: OperationReceipt): string | undefined {
   if (['restored-verified', 'partial', 'unknown'].includes(result.status)) {
-    try { markContextUnknown(original.sessionId); host.publish?.(result, original); }
-    catch { return { result, warning: 'File results remain in the operation receipt; the model context update could not be confirmed.' }; }
+    try { markContextUnknown(receipt.sessionId); host.publish?.(result, receipt); }
+    catch { return 'File results remain in the operation receipt; the model context update could not be confirmed.'; }
   }
-  return { result };
+  return undefined;
 }

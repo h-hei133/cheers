@@ -3,7 +3,7 @@ import { costModel } from '../../core/commands/cost/model.js';
 import { costReport } from '../../core/commands/cost/report.js';
 import { reportText } from '../../core/commands/report/projection.js';
 import { findCacheWaste, summarizeCacheUsage } from '../cacheWaste.js';
-import { getSessionUsage, persistSessionUsage, recordSessionUsage, resetSessionUsage, restoreSessionUsage, totalTokens } from '../usageTelemetry.js';
+import { getSessionUsage, markContextUnknown, persistSessionUsage, recordSessionUsage, resetSessionUsage, restoreSessionUsage, totalTokens } from '../usageTelemetry.js';
 import { attributedBucketKey, cacheIdentity, captureUsageAttribution, legacyBucketKey, splitBucketKey, usageBucketKey } from './identity.js';
 import { decodeUsageSnapshot, mergeUsageDelta } from './snapshot.js';
 import type { SessionUsageSnapshot } from './model.js';
@@ -169,4 +169,27 @@ it('keeps background attribution out of the foreground measurement and cache his
   recordSessionUsage(A, { attribution: capture('https://other.invalid'), promptTokens: 10 }, { affectsContext: false });
   expect(getSessionUsage(A)).toMatchObject({ lastBucketKey: key, lastPromptTokens: 1_000_000, recentRequests: history });
   expect(totalTokens(getSessionUsage(A))).toBe(1_000_010);
+});
+
+it.each(['context-reset', 'usage-gap'] as const)('persists %s after attributed usage without losing identity or adding requests', kind => {
+  const foreground = capture();
+  recordSessionUsage(A, { attribution: foreground, promptTokens: 100, cacheReadTokens: 20 });
+  recordSessionUsage(A, { attribution: capture('https://other.invalid'), promptTokens: 10 }, { affectsContext: false });
+  let disk: SessionUsageSnapshot | undefined;
+  persistSessionUsage(A, undefined, next => { disk = next; });
+  const before = JSON.parse(JSON.stringify(disk));
+  markContextUnknown(A, kind);
+  persistSessionUsage(A, disk, next => { disk = next; });
+  expect(disk?.byModel).toEqual(before.byModel);
+  expect(disk?.turnsCount).toBe(before.turnsCount);
+  expect(disk?.recentRequests.at(-1)).toMatchObject({ kind, bucketKey: attributedBucketKey(foreground),
+    attribution: foreground, promptTokens: 0, completionTokens: 0, reportedCache: true });
+  restoreSessionUsage(B, JSON.parse(JSON.stringify(disk)));
+  expect(getSessionUsage(B).usageHealth).toBeUndefined();
+  expect(getSessionUsage(B).recentRequests).toEqual(disk?.recentRequests);
+  expect(getSessionUsage(A).lastPromptTokens).toBeUndefined();
+  recordSessionUsage(B, { attribution: foreground, promptTokens: 200 });
+  persistSessionUsage(B, disk, next => { disk = next; });
+  expect(totalTokens(getSessionUsage(B))).toBe(330);
+  expect(findCacheWaste(disk!.recentRequests, () => rates).misses).toEqual([]);
 });

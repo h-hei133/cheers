@@ -92,6 +92,7 @@ export function turnRestoreReport(outcome: TurnRestoreOutcome, turnId: string) {
       { kind: 'heading' as const, spans: [span(step.operationId)] },
       text(`Status: ${step.status}`),
       ...step.files.map(file => text(`${JSON.stringify(file.path)}: ${file.status}`)),
+      ...(step.warning ? [text(step.warning)] : []),
     ]),
     ...(outcome.skipped.length ? [text(`Not attempted: ${outcome.skipped.join(', ')}`)] : []),
     ...(outcome.stoppedBecause ? [text(`Stopped: ${outcome.stoppedBecause}`)] : []),

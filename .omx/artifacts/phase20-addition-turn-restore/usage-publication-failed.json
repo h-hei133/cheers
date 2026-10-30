@@ -1,0 +1,83 @@
+{
+  "mode": "regular",
+  "buildId": "3d59bb7bf96677821d8f1035497cdf135be29cec9c918f27891fb8e75fd19879",
+  "inputsDigest": "3949042da26b2e4a32602dad3ecd007bc2a615f089941b0e33d271b73b5b6ec8",
+  "provider": "loopback HTTP fixture",
+  "status": "failed",
+  "stages": [
+    {
+      "action": "unconfirmed batch",
+      "elapsedMs": 153,
+      "writes": 0,
+      "modelRequests": 0
+    }
+  ],
+  "checks": {},
+  "failure": "partial-metadata",
+  "observation": {
+    "ends": 3,
+    "reports": [
+      {
+        "title": "Undo unavailable",
+        "status": "permission-pending"
+      },
+      {
+        "title": "Turn undo: incomplete",
+        "status": "partial",
+        "restored": 1,
+        "steps": [
+          {
+            "operationId": "op-a845dea1-8b5b-4a07-a8c1-107e50b69efb",
+            "status": "restored-verified",
+            "files": [
+              {
+                "path": "b.txt",
+                "status": "restored-verified"
+              }
+            ]
+          }
+        ],
+        "skipped": [
+          "op-0650d3b6-1f13-4396-8349-0d4efcc6640c"
+        ]
+      }
+    ],
+    "sessionId": "sess_20874ae7700e7294_1793323186598",
+    "scope": "accept-edits",
+    "input": {
+      "busy": true,
+      "pager": false,
+      "overlay": false,
+      "key": "enter",
+      "draftLength": 0
+    },
+    "pager": false,
+    "fileUndo": {
+      "operationId": "turn:turn_34dc7773",
+      "status": "partial",
+      "files": [
+        {
+          "path": "b.txt",
+          "status": "restored-verified"
+        }
+      ]
+    },
+    "noticeWrite": {
+      "returned": false,
+      "errorName": "Error",
+      "sourceFrames": [
+        "    at decodeAttribution (file://<build>/observability/usage/identity.js:60:23)",
+        "    at file://<build>/observability/usage/snapshot.js:109:29",
+        "    at Array.map (<anonymous>)",
+        "    at decodeUsageHistory (file://<build>/observability/usage/snapshot.js:92:18)"
+      ],
+      "errorMessage": "Invalid persisted session usage key"
+    }
+  },
+  "requests": 3,
+  "readinessRequests": 1,
+  "outputBytes": 9511,
+  "outputLimitExceeded": false,
+  "deadlineExceeded": false,
+  "scratchRemoved": true
+}

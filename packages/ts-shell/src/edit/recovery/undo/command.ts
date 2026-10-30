@@ -23,6 +23,7 @@ export async function runUndoCommand(args: string[], context: CommandContext): P
     return local(undoNotice('Explicit --execute confirmation is required. Nothing was written.', 'permission-pending'));
   }
   let executionStarted = false;
+  let executionState: LocalCommandResult['state'];
   try {
     if (parsed.action.name === 'restore-turn') {
       const executeTurn = parsed.args[0]!;
@@ -30,11 +31,14 @@ export async function runUndoCommand(args: string[], context: CommandContext): P
       // given, so this reads the same flag rather than asserting a constant:
       // the batch and the single-operation path then share one meaning of
       // "confirmed".
+      executionStarted = true;
       const outcome = await restoreTurn({ context: () => context }, executeTurn, parsed.flags.has('execute'), undoAccess(context));
-      return { ...local(turnRestoreReport(outcome, executeTurn)), state: outcome.complete
-        ? { fileUndo: { operationId: `turn:${executeTurn}`, status: 'restored-verified',
-          files: outcome.steps.flatMap(step => step.files.map(file => ({ ...file }))) } }
-        : undefined };
+      const changed = outcome.steps.some(step => ['restored-verified', 'partial', 'unknown'].includes(step.status));
+      executionState = changed ? { fileUndo: { operationId: `turn:${executeTurn}`,
+        status: outcome.complete ? 'restored-verified' : outcome.steps.some(step => step.status === 'unknown') ? 'unknown' : 'partial',
+        files: outcome.steps.flatMap(step => step.files.map(file => ({ ...file }))) } } : undefined;
+      return { ...local(turnRestoreReport(outcome, executeTurn)), state: executionState,
+        ...(changed ? { stateFailureWarning: 'File results remain in the operation receipt; the model context update could not be confirmed.' } : {}) };
     }
     if (parsed.action.name === 'status') {
       // Selecting by turn is a view over the same ledger: the operations it
@@ -65,7 +69,8 @@ export async function runUndoCommand(args: string[], context: CommandContext): P
       stateFailureWarning: 'File results remain in the operation receipt; the model context update could not be confirmed.' };
   } catch {
     if (executionStarted) return { kind: 'local', output: 'The undo result could not be displayed. Inspect /undo status before retrying; file writes may have occurred.',
-      state: { fileUndo: { operationId: parsed.args[0], status: 'unknown' } } };
+      state: executionState ?? { fileUndo: { operationId: parsed.action.name === 'restore-turn' ? `turn:${parsed.args[0]}` : parsed.args[0], status: 'unknown' } },
+      stateFailureWarning: 'File results remain in the operation receipt; the model context update could not be confirmed.' };
     return local(undoNotice('The operation ledger or current workspace could not be verified. No restoration was started.'));
   }
 }

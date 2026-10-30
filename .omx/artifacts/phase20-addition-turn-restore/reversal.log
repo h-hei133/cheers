@@ -1,0 +1,152 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/edit/recovery/undo/command.test.ts  (6 tests | 5 failed) 935ms
+   ❯ src/edit/recovery/undo/command.test.ts > restores two original snapshot operations newest first and publishes the result
+     → expected "markContextUnknown" to be called with arguments: [ 'undo-command-session' ]
+
+Received: 
+
+
+
+Number of calls: 0
+
+   ❯ src/edit/recovery/undo/command.test.ts > publishes a partial turn after a real restore and preserves the changed older file
+     → expected undefined to match object { …(3) }
+   ❯ src/edit/recovery/undo/command.test.ts > retains known file results when report construction fails after restoration
+     → expected '### Undo unavailable\n\nThe operation…' to not include 'No restoration was started'
+   ❯ src/edit/recovery/undo/command.test.ts > publishes an unknown write when access retires before readback verification
+     → expected undefined to match object { status: 'unknown' }
+   ❯ src/edit/recovery/undo/command.test.ts > retains a verified earlier step when the next context recheck throws
+     → expected undefined to match object { status: 'partial' }
+ ❯ src/edit/recovery/undo/turnRestore.test.ts  (8 tests | 1 failed) 262ms
+   ❯ src/edit/recovery/undo/turnRestore.test.ts > restoring a turn > keeps each verified step and its warning when context publication fails
+     → expected false to be true // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/edit/recovery/undo/command.test.ts > restores two original snapshot operations newest first and publishes the result
+AssertionError: expected "markContextUnknown" to be called with arguments: [ 'undo-command-session' ]
+
+Received: 
+
+
+
+Number of calls: 0
+
+ ❯ src/edit/recovery/undo/command.test.ts:41:22
+     39|   expect(readOperation(older, older.operationId).undo).toBe('restored-…
+     40|   expect(readOperation(newer, newer.operationId).undo).toBe('restored-…
+     41|   expect(invalidate).toHaveBeenCalledWith(context.sessionId);
+       |                      ^
+     42| });
+     43| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/edit/recovery/undo/command.test.ts > publishes a partial turn after a real restore and preserves the changed older file
+AssertionError: expected undefined to match object { …(3) }
+
+- Expected: 
+Object {
+  "files": Array [
+    Object {
+      "path": "b.txt",
+      "status": "restored-verified",
+    },
+  ],
+  "operationId": "turn:prompt-batch",
+  "status": "partial",
+}
+
++ Received: 
+undefined
+
+ ❯ src/edit/recovery/undo/command.test.ts:51:34
+     49|   expect(result.report!.facts.restored).toBe(1);
+     50|   expect(result.report!.facts.skipped).toEqual([older.operationId]);
+     51|   expect(result.state?.fileUndo).toMatchObject({ operationId: 'turn:pr…
+       |                                  ^
+     52|     files: [{ path: 'b.txt', status: 'restored-verified' }] });
+     53|   expect(result.stateFailureWarning).toContain('model context');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/edit/recovery/undo/command.test.ts > retains known file results when report construction fails after restoration
+AssertionError: expected '### Undo unavailable\n\nThe operation…' to not include 'No restoration was started'
+ ❯ src/edit/recovery/undo/command.test.ts:67:29
+     65|   expect(fs.readFileSync(path.join(root, 'a.txt'), 'utf8')).toBe('old-…
+     66|   expect(readOperation(receipt, receipt.operationId).undo).toBe('resto…
+     67|   expect(result.output).not.toContain('No restoration was started');
+       |                             ^
+     68|   expect(result.output).toContain('Inspect /undo status');
+     69|   expect(result.state?.fileUndo).toMatchObject({ status: 'restored-ver…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/edit/recovery/undo/command.test.ts > publishes an unknown write when access retires before readback verification
+AssertionError: expected undefined to match object { status: 'unknown' }
+
+- Expected: 
+Object {
+  "status": "unknown",
+}
+
++ Received: 
+undefined
+
+ ❯ src/edit/recovery/undo/command.test.ts:83:34
+     81|   expect(readOperation(newer, newer.operationId).undo).toBe('unknown');
+     82|   expect(readOperation(older, older.operationId).undo).toBe('none');
+     83|   expect(result.state?.fileUndo).toMatchObject({ status: 'unknown' });
+       |                                  ^
+     84|   expect(result.output).not.toContain('No restoration was started');
+     85| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  src/edit/recovery/undo/command.test.ts > retains a verified earlier step when the next context recheck throws
+AssertionError: expected undefined to match object { status: 'partial' }
+
+- Expected: 
+Object {
+  "status": "partial",
+}
+
++ Received: 
+undefined
+
+ ❯ src/edit/recovery/undo/command.test.ts:109:34
+    107|   expect(fs.readFileSync(path.join(root, 'b.txt'), 'utf8')).toBe('old-…
+    108|   expect(readOperation(older, older.operationId).undo).toBe('none');
+    109|   expect(result.state?.fileUndo).toMatchObject({ status: 'partial' });
+       |                                  ^
+    110|   expect(result.output).not.toContain('No restoration was started');
+    111| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  src/edit/recovery/undo/turnRestore.test.ts > restoring a turn > keeps each verified step and its warning when context publication fails
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/edit/recovery/undo/turnRestore.test.ts:166:82
+    164|     expect(outcome.complete).toBe(true);
+    165|     expect(outcome.steps).toHaveLength(2);
+    166|     expect(outcome.steps.every(step => step.warning?.includes('model c…
+       |                                                                                  ^
+    167|   });
+    168| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+ Test Files  2 failed (2)
+      Tests  6 failed | 8 passed (14)
+   Start at  09:10:17
+   Duration  2.24s (transform 241ms, setup 0ms, collect 805ms, tests 1.20s, environment 0ms, prepare 58ms)
+

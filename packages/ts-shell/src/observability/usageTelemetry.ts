@@ -336,6 +336,7 @@ export function markContextUnknown(sessionId: string, kind: 'context-reset' | 'u
   if (!existing) return;
   if (kind === 'context-reset') delete existing.requestContext;
   clearContextUsage(sessionId);
+  const attribution = existing.byModel[existing.lastBucketKey]?.attribution;
   pushHistory(existing, {
     promptTokens: 0,
     completionTokens: 0,
@@ -343,6 +344,7 @@ export function markContextUnknown(sessionId: string, kind: 'context-reset' | 'u
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
     bucketKey: existing.lastBucketKey,
+    ...(attribution ? { attribution } : {}),
     timestamp: Date.now(),
     // Carried forward rather than set: a rebuild says nothing about whether the
     // provider caches, so it must not erase what was already learned about that.

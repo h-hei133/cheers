@@ -2351,7 +2351,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 `/undo execute` 仍是单操作路径，要求精确 id + revision，未变。
 
-**证据边界**：未新增工作区级快照，`/undo` 的单位仍是单个已提交操作。任何"按 turn 撤销"的实现都必须先有"未批准不写、批准后写入目标与批准目标一致、恢复不重放 unknown、部分失败如实报告"的反转证据。
+**当前补充（20.50）**：批量恢复的部分/未知结果现在也进入下一请求；每一步复用单操作的上下文失效与发布警告。真实CLI两模式已验证未确认零写、较新操作恢复后较旧外部修改被保留、完整两操作恢复及通知落盘/下一HTTP请求。仍未新增工作区级快照，不覆盖bash或二进制副作用；未知写入不作已验证恢复。
 
 **本批已实施（第一百二十一批，20.49补充）**：新增`taskWait`工具，不轮询、不sleep，等`BackgroundRunner.onEnded`，300秒上限与取消信号。20.49修正取消误报完整timeout、同步完成清理与初始discovery可达，超时/取消按当前观察报告，不虚构运行或结束；`bash`描述引导它，`27-background-execution.md`过期结论已更正。未在审批层硬拒前台sleep，避免误伤轮询脚本。
 
@@ -2737,7 +2737,7 @@ account-pool回归在[真实preview/step组合](../../packages/ts-shell/src/cli/
 
 验证：`turnRestore.test.ts` 7 项覆盖顺序、未确认不写、空 turn、跨 turn 隔离、失败即停并列出剩余、预览不可信时不开始、运行中拒绝；`history.test.ts` 2 项覆盖命令面（走对路径、缺确认被拦）。两组反转各触发 1 项预期失败：失败后继续（`['newer','older']` vs `['newer']`）、改为旧到新；源码逐字节恢复并核对 SHA-256 `3d1a97555b98` 后重验，4 文件 49 项通过；静态门、module facade 0 与 TS build `67f982a1ee7c` 通过。
 
-**边界**：夹具用 stub 替换了 `previewOperation`/`restoreOperation`（真实逐文件恢复由 operation 测试覆盖），未在真实多文件 turn 上跑过端到端恢复；报告未接入交互式 picker。
+**当时边界与20.50补充**：初版夹具替换了`previewOperation`/`restoreOperation`，没有真实多文件turn证据。20.50新增实际writer/snapshot回归和原CLI regular/fullscreen两操作批量恢复，验证部分通知与完整通知落盘并进入下一请求。报告仍沿原reader，未新增批量picker或工作区快照。
 
 ### 第一百三十批：提案与交叉评审的编排
 
@@ -3921,3 +3921,22 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 每模式6 completion/3 readiness请求、零real-provider credential、config不变，最终ICANON/ECHO/ISIG恢复；2MiB/45秒上限未触发。fixture child用小文件poll控制结束，product taskWait仍只等completion event；observer同步写小收据影响timings，不作生产性能。保留unsupported CLI flag带来startup prompt的setup失败、原tool-missing两失败和不同build的1.5秒short成功收据，不能代替最终16秒等待。全部任务scratch在归档后清理，原CLAUDE.md保留；未用subagent、不跑exe/full suite/20k、不声称物理terminal像素、未测生产分钟级任务/60秒提升/真实provider选tool/全部清理与容量/独立review。更正27-background-execution无自动提升与17.3实施前结论，HANDOFF追加discovery及同步registration陷阱；原47/ADD整体不升级，goal active。
 
 20.48已提交推送`ec8a44aab6884e9f1e496e049f5263fb4e54a7bc`。本轮延后精确head观察：CI40981106387仍in_progress、Watch40981106301 completed/success；20.47 `433077c52d2a91c79dbb51672dd483b78d93175a` CI40979466560/Watch40979466580均success；20.46 `5b0c9dcbf02194307624c134cec88118c868ad09` CI40979108158/Watch40979108188均success；20.45 `a072ecb199d93e33d3aca70cc5d0c1e84148b713` CI40978485363/Watch40978485261均success。Watch workflow成功不证明完整架构或Phase验收。
+
+
+### 20.50 整轮文件恢复保留部分结果并送达下一请求
+
+补17.2/第一百二十九批真实两操作路径。初版只在complete时返回fileUndo；较新操作已恢复、较旧文件外部变化阻止恢复时，文件已改变却没有下一请求通知。batch也没有标记executionStarted，报告构建失败后误报“No restoration was started”；逐步publish绕过单操作上下文失效且吞掉警告，后续scope读取抛错会丢弃此前结果。
+
+原[command](../../packages/ts-shell/src/edit/recovery/undo/command.ts)在batch执行前记录可能写入，并在报告构建前保留已知fileUndo：全verified才完整、任一步unknown保持unknown，其余已改变为partial；展示失败保留已知状态，未知则提示检查账本，不虚构零写。原[service](../../packages/ts-shell/src/edit/recovery/undo/service.ts)提取单/batch共用publishUndoResult，逐步失效旧测量并保留发布警告；[turnRestore](../../packages/ts-shell/src/edit/recovery/undo/turnRestore.ts)在scope重查失败时返回此前步骤和未尝试项，[report](../../packages/ts-shell/src/edit/recovery/undo/report.ts)显示步骤警告。未建第二账本、未改writer/批准链或跨文件原子性。
+
+真实CLI首次发现更深阻塞：原addTurn收到partial但抛出Invalid persisted session usage key。根因是[usageTelemetry](../../packages/ts-shell/src/observability/usageTelemetry.ts)的markContextUnknown新增context-reset/usage-gap时只带target key、遗漏该key的attribution，严格snapshot校验拒绝持久化。不是branch投影丢消息；原owner现在从前台lastBucketKey取已捕获attribution，保持endpoint/价格身份，不额外增加请求/token或放宽校验。后台另一destination不能替代前台身份。
+
+只读比较opencode HEAD `89f3ac108fc188adef4398e32e299203c2bebffd`的session revert先恢复选定snapshot再发布session事件；本项目保留逐操作账本和partial/unknown。pi HEAD `e65b3b88c08412bb8ffbd21fb5dc5756064a6e5a`的appendUsage保留provider/model、统计累计全部历史并单列contextUsage，支持上下文变化与账单身份分离；它没有本项目endpoint key的相同失效机制，不声称参考已解决本缺陷。两者源码只读，不移植新存储或whole-workspace rewind。
+
+新增6个原writer/snapshot command场景、步骤发布警告、两个attributed失效事件以及原manager落盘回归。最终6文件76项通过；原undo三owner独立反转6失败/8通过，原usage owner反转3失败/32未选，均finally字节恢复。两usage事件有效baseline全失败。最初将rename后撤权误期望verified的夹具已更正为unknown，原writer正确，不改为伪verified。五门/build/freshness通过、118旧docs advisory；build `e23a79095b8f6168778a54bb97ae14f6f80df48af5943d8b9e77a392a892d266`、inputs `89102ec6a461b0d1b446eab2f39e65a3aad6816a02b763af0dbd9aa1630e24e1`，460/3550。owner callable turnRestore1、report8、command4、usage16未增，service9→10，均≤20。
+
+原NodeCLI/PTY/loopback两模式各两个真实edit调用成一轮；无--execute时零restore；外部修改a后batch只恢复b、账本a undo none且报告skipped；下一请求含partial/重读通知。第二轮两个edit后complete newest-first恢复，第三请求含完整通知。每模式7completion/3readiness、local undo零model call、config不变；regular partial711ms/complete940ms/exit167ms，fullscreen633/912/166ms，均exit0与ICANON/ECHO/ISIG恢复。计时含fixture观察和人工等待，不当生产性能。
+
+正式[工件](../../.omx/artifacts/phase20-addition-turn-restore/)保留报告被pager消费、错误observer方法、partial-metadata失败及usage抛错来源；修正的是harness同步与产品usage缺陷，未削弱通知断言。源正文只用public fixture，不保存真实provider响应/凭据。全程heavy serial、无subagent/exe/full suite/20k；scratch归档清理，原CLAUDE.md保留。未验真实provider选择、非Linux/桌面、跨多文件故障矩阵、独立review或工作区整体快照；原47/ADD整体不升级，goal active。
+
+20.49已推送`ef4d078d43f2923a02e6d60efe1166ec339633d2`；本轮延后精确观察CI40983398554 in_progress、Watch40983398564 success。20.48 CI40981106387现failure，Build/gates成功但externalEditor.test.ts五新增fixture失败，12548 passed/3 skipped；错误显示fixture尝试运行CI不存在的rtk，后续单独分类修补，不将其称产品CRLF验证失败或CI通过。20.47及此前成功记录不变；本批Git/CI另绑定。

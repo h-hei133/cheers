@@ -1042,3 +1042,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: The core registry contains taskWait but the actual CLI reports it missing; a synchronous completion returns while leaving its listener and five-minute timer alive. Cancellation also reports the full requested timeout as elapsed.
 - **Root Cause**: Registry tests bypass the initial discovery snapshot. A completion callback can run before registration returns its release function, and timeout/cancellation share an undefined outcome.
 - **Rule**: Verify advertised collaborators through the original discovery snapshot and CLI. After synchronous subscription settlement, release the returned capability before installing timers or abort listeners. Keep cancellation, timeout and observed task state distinct; never infer process termination from stopping a wait. Abort events already provide wakeup, so a periodic abort check is not progress reporting.
+
+
+### Context Invalidation Must Keep Attributed Usage Identity
+- **Symptom**: A real file restore succeeds, but its local model notice does not persist; addTurn throws Invalid persisted session usage key.
+- **Root Cause**: A context-reset or usage-gap history entry carries an attributed target key without that key's required attribution. Strict usage snapshot validation then rejects the encompassing state write.
+- **Rule**: Carry the captured foreground bucket attribution when invalidating context, without adding billed requests or tokens. Test persistence after attributed foreground usage and a different background target. Distinguish an addTurn attempt from a confirmed return and fresh-session readback before blaming branch projection.
+
+### Batch Restores Must Retain Earlier File Evidence
+- **Symptom**: A newer operation restores before an older one is blocked, but the batch omits the next-request notice or a reporting failure claims no restoration began.
+- **Root Cause**: Publication is gated on whole-batch completion, execution is not marked before batch writes, and later context acquisition throws away accumulated results.
+- **Rule**: Publish actual partial/unknown changes through the existing context owner; retain verified prior steps and skipped operations when later scope checks fail. Capture known execution state before report construction. Revocation after rename but before readback remains unknown even when observed bytes match the requested restoration.
