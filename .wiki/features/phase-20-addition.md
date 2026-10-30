@@ -4761,3 +4761,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现两者在搜索根**不是主根**时返回绝对路径；主根下保持原有相对拼写不变。修复后同一探针返回附加根下的绝对路径，`read`可直接打开。
 
 验证：`arguments`27（新例断言附加根结果必须是绝对路径且等于该根下的真实目标）、`glob`19、`grep`3、`grepPaths`12、`grepRipgrep`18，共**78项**通过；七反转（write/read/glob/grep退回只查主根、以read解析write授权、账本跟随目标根、glob返回相对路径）全部命中且finally字节恢复；五静态门、TS build/freshness、往返探针通过。build `f78027dbf35d`。原47/ADD整体partial、goal active。
+
+
+### 21.49 lsp扫描与文档符号覆盖附加根
+
+21.39–21.48修完文件读写搜索后，复查语言工具：[scanner](../../packages/ts-shell/src/language/scanner.ts)完全不读`workspaceRoots`。探针实测：主根`workspaceSymbol`/`documentSymbol`正常，附加根下**符号搜索找不到**、**文档符号返回空**（路径被主根围栏拒绝后又被catch吞掉，呈现为空结果而非错误）。
+
+现三处修复：`workspaceSymbol`的扫描根集合为主根+全部附加根（每根独立列表，绝对路径不重复拼接）；`documentSymbol`的前置校验先由`selectWorkspaceRoot`判定路径归属；`readSource`按归属根读取并把该根传给execution service。首轮实现把列表返回的绝对路径无条件`path.join(scanRoot, file)`，使符号链接逃逸测试失败（伪造出根内路径、跳过围栏），改为只拼接相对路径后既有安全测试恢复通过。
+
+验证：`lsp`12（新例断言附加根与主根各自`1 found`、文档符号含`Function: attachedNeedle`）、`language`44，共**56项**通过；两反转（扫描只留主根、文档符号只留主根）均命中且finally字节恢复；五静态门、TS build/freshness通过。首轮测试用`export const`作夹具，parser不产出符号导致断言假阳性（"no match"文案也含查询词），已改为函数声明并断言匹配格式。build `cf51133aa211`。原47/ADD整体partial、goal active。

@@ -1292,3 +1292,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: `glob` under an attached root returns `found.ts`, and `read` on that exact string fails with ENOENT.
 - **Root Cause**: The listing reports paths relative to the root it walked. Once a search can walk an attached root, that relative path is resolved against the primary root by every later tool, naming a file that does not exist there.
 - **Rule**: When the search root is not the primary root, report absolute paths; keep the primary root's relative spelling unchanged. Compare against the primary root, not against the resolved root — those are equal under an attached grant, so the check silently passes. Test the round trip (search, then read the reported path), not just that the search found something.
+
+### A "Not Found" Message Contains The Query
+
+- **Symptom**: A test asserting `output.toContain(symbol)` passes even when the search found nothing.
+- **Root Cause**: The empty-result message quotes the query (`No workspace symbols matched query \`X\``), so the symbol name appears in the failure text too.
+- **Rule**: Assert the match format (`N found`, the reported path) rather than the symbol name. Also check the fixture actually produces symbols: this parser reports functions and classes, not a bare `export const`, so a const fixture yields an empty parse and makes the assertion vacuous.

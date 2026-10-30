@@ -1,0 +1,26 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/lsp.test.ts  (12 tests | 1 failed | 11 skipped) 43ms
+   ❯ src/core/tools/lsp.test.ts > an attached workspace root is part of the search space > finds symbols in an attached root and keeps the primary root working
+     → expected 'undefined' to include 'Document Symbols'
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 skipped (12)
+   Start at  02:38:16
+   Duration  3.13s (transform 2.21s, setup 0ms, collect 2.87s, tests 43ms, environment 0ms, prepare 54ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/lsp.test.ts > an attached workspace root is part of the search space > finds symbols in an attached root and keeps the primary root working
+AssertionError: expected 'undefined' to include 'Document Symbols'
+ ❯ src/core/tools/lsp.test.ts:199:37
+    197|     const document = await tool.execute({ backend: 'scanner', operatio…
+    198|       filePath: path.join(attached, 'lib.ts') }, context);
+    199|     expect(String(document.output)).toContain('Document Symbols');
+       |                                     ^
+    200|     expect(String(document.output)).toContain('Function: `attachedNeed…
+    201|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

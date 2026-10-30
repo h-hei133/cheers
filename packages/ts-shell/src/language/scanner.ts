@@ -7,6 +7,7 @@ import { parseSourceSymbols, detectLanguageFromPath } from "../context/graph/ast
 import ts from "typescript";
 import { TOOL_APPROVED_READ_AUTHORITY } from "../core/tools/grep.js";
 import { resolveWorkspaceToolTarget } from "../core/tools/permissionContext.js";
+import { selectWorkspaceRoot } from "../core/workspace/roots.js";
 
 /**
  * /lsp tool
@@ -63,7 +64,11 @@ export function createScannerToolDefinition(
       const symbolQuery = typeof args.symbol === "string" ? args.symbol.trim() : "";
       if (filePath) {
         try {
-          const target = resolveWorkspaceToolTarget({ filePath }, 'filePath', context.workspaceRoot);
+          // The file may be under an attached root; resolve which root owns it
+          // before judging the path, exactly as the file tools do.
+          const fileRoot = selectWorkspaceRoot(context.workspaceRoot, context.workspaceRoots ?? [],
+            path.isAbsolute(filePath) ? filePath : path.resolve(context.workspaceRoot, filePath), 'read');
+          const target = resolveWorkspaceToolTarget({ filePath }, 'filePath', fileRoot);
           context.assertFileAccess?.(target);
         } catch {
           return deniedResult('LSP file path is outside the workspace or denied by policy.');
@@ -99,18 +104,32 @@ export function createScannerToolDefinition(
         }
 
         const query = symbolQuery || (filePath ? path.basename(filePath, path.extname(filePath)) : "");
-        const allFiles = await executionService.listFilesRecursive({
-          operationKind: "file.list",
-          assertFileAccess: context.assertFileAccess,
-          abortSignal: context.abortSignal,
-          absoluteRoot: context.workspaceRoot,
-          workspaceRoot: context.workspaceRoot,
-          authority: TOOL_APPROVED_READ_AUTHORITY,
-          caller: "core-tool:lsp",
-          reason: "Scan workspace files for code intelligence symbols.",
-          reportSafeTarget: context.workspaceRoot,
-        });
-        const targetFiles = allFiles.filter((file) => /\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(file));
+        // A workspace symbol search covers the roots the user attached as well:
+        // they are part of this session's workspace, and a symbol that lives in
+        // one is no less real for being outside the primary directory.
+        const scanRoots = [context.workspaceRoot, ...(context.workspaceRoots ?? []).map(root => root.path)];
+        const targetFiles: string[] = [];
+        for (const scanRoot of scanRoots) {
+          const listed = await executionService.listFilesRecursive({
+            operationKind: "file.list",
+            assertFileAccess: context.assertFileAccess,
+            abortSignal: context.abortSignal,
+            absoluteRoot: scanRoot,
+            workspaceRoot: scanRoot,
+            authority: TOOL_APPROVED_READ_AUTHORITY,
+            caller: "core-tool:lsp",
+            reason: "Scan workspace files for code intelligence symbols.",
+            reportSafeTarget: scanRoot,
+          });
+          for (const file of listed) {
+            if (!/\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(file)) continue;
+            // The listing normally yields paths relative to the root it walked,
+            // but a caller-supplied entry can already be absolute. Joining an
+            // absolute path onto the root would fabricate a path inside it and
+            // skip the containment check the reader performs.
+            targetFiles.push(path.isAbsolute(file) ? file : path.join(scanRoot, file));
+          }
+        }
         const matches: Array<{ file: string; line: number; text: string; isDefinition: boolean }> = [];
 
         for (const relative of targetFiles) {
@@ -243,14 +262,19 @@ async function readSource(
   context: ToolExecutionContext,
   relativePath: string,
 ): Promise<string> {
-  const target = resolveWorkspaceToolTarget({ path: relativePath }, 'path', context.workspaceRoot);
+  // The file may live under an attached root. Resolving it against the primary
+  // root would read the wrong path, or nothing, and the caller's catch turns
+  // that into an empty answer rather than an error.
+  const root = selectWorkspaceRoot(context.workspaceRoot, context.workspaceRoots ?? [],
+    path.isAbsolute(relativePath) ? relativePath : path.resolve(context.workspaceRoot, relativePath), 'read');
+  const target = resolveWorkspaceToolTarget({ path: relativePath }, 'path', root);
   context.assertFileAccess?.(target);
   return executionService.readTextFile({
     operationKind: "file.read",
     absolutePath: target,
     assertFileAccess: context.assertFileAccess,
     abortSignal: context.abortSignal,
-    workspaceRoot: context.workspaceRoot,
+    workspaceRoot: root,
     authority: TOOL_APPROVED_READ_AUTHORITY,
     caller: "core-tool:lsp",
     reason: "Read an approved source file for code intelligence.",

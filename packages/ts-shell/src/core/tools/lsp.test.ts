@@ -6,6 +6,7 @@ import { createLspToolDefinition } from "./lsp.js";
 import { createDefaultExecutionService } from '../../runtime/execution/service.js';
 import { adaptTools } from '../../turn/tools.js';
 import { evaluateToolPermissionScope } from '../query/toolPolicy.js';
+import { captureWorkspaceRoot } from '../workspace/roots.js';
 
 const workspaces: string[] = [];
 
@@ -172,3 +173,30 @@ describe("lsp references", () => {
     expect(result.output).not.toContain("mentioned in a string");
   });
 });
+
+describe('an attached workspace root is part of the search space', () => {
+  it('finds symbols in an attached root and keeps the primary root working', async () => {
+    const workspaceRoot = workspaceWith({ 'public.ts': 'export function primaryNeedle() { return 1; }' });
+    const attached = workspaceWith({ 'lib.ts': 'export function attachedNeedle() { return 2; }' });
+    const service = createDefaultExecutionService();
+    const tool = createLspToolDefinition(service);
+    const context = { workspaceRoot, taskId: 'attached-scan',
+      workspaceRoots: [captureWorkspaceRoot(attached, attached, 'read')] };
+
+    // The query text itself appears in the "no match" message, so the assertion
+    // must name the match format rather than the symbol.
+    const attachedResult = await tool.execute({ backend: 'scanner', operation: 'workspaceSymbol', symbol: 'attachedNeedle' }, context);
+    expect(String(attachedResult.output)).toMatch(/Workspace Symbol Matches[^\n]*1 found/);
+    expect(String(attachedResult.output)).toContain(path.join(attached, 'lib.ts'));
+
+    const primaryResult = await tool.execute({ backend: 'scanner', operation: 'workspaceSymbol', symbol: 'primaryNeedle' }, context);
+    expect(String(primaryResult.output)).toMatch(/Workspace Symbol Matches[^\n]*1 found/);
+
+    // documentSymbol must read the file under the root that owns it, rather
+    // than resolving the path against the primary root and failing silently.
+    const document = await tool.execute({ backend: 'scanner', operation: 'documentSymbol',
+      filePath: path.join(attached, 'lib.ts') }, context);
+    expect(String(document.output)).toContain('Document Symbols');
+    expect(String(document.output)).toContain('Function: `attachedNeedle`');
+  });
+})

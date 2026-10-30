@@ -1,0 +1,26 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/lsp.test.ts  (12 tests | 1 failed | 11 skipped) 26ms
+   ❯ src/core/tools/lsp.test.ts > an attached workspace root is part of the search space > finds symbols in an attached root and keeps the primary root working
+     → expected 'No workspace symbols matched query `a…' to match /Workspace Symbol Matches[^\n]*1 found/
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 skipped (12)
+   Start at  02:38:12
+   Duration  3.33s (transform 2.37s, setup 0ms, collect 3.05s, tests 26ms, environment 0ms, prepare 59ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/lsp.test.ts > an attached workspace root is part of the search space > finds symbols in an attached root and keeps the primary root working
+AssertionError: expected 'No workspace symbols matched query `a…' to match /Workspace Symbol Matches[^\n]*1 found/
+ ❯ src/core/tools/lsp.test.ts:189:43
+    187|     // must name the match format rather than the symbol.
+    188|     const attachedResult = await tool.execute({ backend: 'scanner', op…
+    189|     expect(String(attachedResult.output)).toMatch(/Workspace Symbol Ma…
+       |                                           ^
+    190|     expect(String(attachedResult.output)).toContain(path.join(attached…
+    191| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
