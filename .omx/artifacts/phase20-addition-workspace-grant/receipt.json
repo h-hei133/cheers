@@ -1,6 +1,6 @@
 {
-  "buildId": "5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473",
-  "inputsDigest": "4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806",
+  "buildId": "086e671a3335eb59f035bd5a3752c98d2ac4497fc57b2a11a27287b6edbcc390",
+  "inputsDigest": "cc02e2fd94bbd3906d44928ac04ff672004113ebe3912e7022544bd64bad227e",
   "status": "failed",
   "refusedBeforeGrant": {
     "ok": false,
@@ -13,14 +13,14 @@
     "note": "Additional workspace root saved. File access uses its declared mode; executable project resources still come from the primary root.",
     "roots": [
       {
-        "path": "/home/wang/projects/cheers/.tmp/workspace-grant/run-KRpCPT/outside",
+        "path": "/home/wang/projects/cheers/.tmp/workspace-grant/run-IVLxmC/outside",
         "access": "write"
       }
     ]
   },
   "allowedAfterGrant": {
     "ok": false,
-    "output": "Path '/home/wang/projects/cheers/.tmp/workspace-grant/run-KRpCPT/outside/note.txt' symlink resolves outside workspace root. Writes are limited to the workspace (/home/wang/projects/cheers/.tmp/workspace-grant/run-KRpCPT/project) and the roots the user attaches. To allow this path, the user can run /workspace add <path> --write, then retry.",
+    "output": "Edit operation receipt is invalid.",
     "fileCreated": false
   },
   "failure": "write must succeed after the grant",

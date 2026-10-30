@@ -20,6 +20,8 @@ Routing `write`/`edit` through `resolveWorkspaceRoot` made the containment check
 
 That change was reverted. The product is unchanged in this batch.
 
+A second attempt bound the operation identity to the attached root as well, so the receipt's workspace matched the operation scope. Containment and the receipt decode then passed, but the write still ended with the same message. Tracing the ledger showed the store locating itself under `projects/<digest>/edit-snapshots` while the receipt had already been accepted, so the failure sits after allocation, in the persistence/readback path rather than in the fence. A probe-side mistake was also found and fixed on the way: the tool must run with the profile active, because the ledger derives its storage root from the current profile. The remaining failure was not diagnosed further; making the grant work needs a deliberate redesign of how a write whose target root differs from the session's primary root is recorded, not an incremental patch.
+
 ## What this means
 
 The earlier decision in the feature log (that the existing grant mechanism is complete and only its discoverability was missing) is **wrong for the file writers**. The grant is complete as a stored root with identity and access mode; what is missing is that the writers consult it, and that the edit ledger can record a write whose target root is not the primary one.

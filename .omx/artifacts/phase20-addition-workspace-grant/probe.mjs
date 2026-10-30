@@ -40,8 +40,10 @@ try {
     workspaceRoot: project, workspaceRoots: session.workspaceRoots, sessionId: session.id,
     abortSignal: undefined, cwd: project,
   });
-  const runWrite = async (target, content) => {
-    const session = withProfile(profile, () => new SessionManager().getSession(setup.sessionId));
+  // The profile must be active while the tool runs: the edit ledger derives its
+  // storage root from the current profile, exactly as a real turn does.
+  const runWrite = async (target, content) => withProfile(profile, async () => {
+    const session = new SessionManager().getSession(setup.sessionId);
     const tools = createCoreToolRegistry({});
     const write = [...tools.values()].find(tool => tool.name === 'write');
     assert(write, 'write tool missing');
@@ -49,7 +51,7 @@ try {
       const result = await write.execute({ path: target, content }, makeContext(session));
       return { ok: !result.isError, output: result.output ?? '' };
     } catch (error) { return { ok: false, output: error instanceof Error ? error.message : String(error) }; }
-  };
+  });
 
   const targetFile = path.join(outside, 'note.txt');
   const refused = await runWrite(targetFile, 'first');
