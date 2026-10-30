@@ -4265,4 +4265,20 @@ PTY relay将实际输出交给现有pyte有界screen，逐阶段核对原applica
 5. **35**（model 排序）——纯排序与分组标题，风险低。
 6. **36 与 37**（输入手势）——两者都在输入路径上，建议同一批做、同一批验证，避免两次改动同一段 pointer/粘贴代码。
 
-**本轮证据边界**：只做研究与文档；未修改产品代码，未运行测试、构建、PTY、真实 provider 或 20k 压测。21.3 的数字来自本机只读脚本（2307 个会话、41 MiB），不是产品进程内计时。21.4 的回归由源码与提交历史确认，未在终端复现按键。参考项目均为只读对照，未复制其实现。原 Phase 20 的 47 项矩阵与 ADD 整体状态不变。
+**本轮证据边界**：本研究提交只做研究与文档；未修改产品代码，未运行测试、构建、PTY、真实 provider 或 20k 压测。21.3 的数字来自本机只读脚本（2307 个会话、41 MiB），不是产品进程内计时。21.4 的回归由源码与提交历史确认，该研究轮未在终端复现按键；后续修复见21.10。参考项目均为只读对照，未复制其实现。原 Phase 20 的 47 项矩阵与 ADD 整体状态不变。
+
+### 21.10 第三十四实施：恢复双击 Esc 的原宿主接线
+
+原[交互宿主](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)把 `openRewind` 的命令改为 `/back`，并纠正 `openPicker` 的旧“bare command”注释。保留 registry 的 slash 守卫；返回 undefined 时释放原 controller、发布固定可安全展示的 notice 并请求重绘，不回显输入或错误。此分支不代表所有 factory 同步抛错已被处理。
+
+先看目标后局部对照两个参考的 input controller：同意空草稿才触发、busy 优先中断、suggestion 优先关闭、触发后重置双击计时、只做视口重绘；沿用本项目严格空草稿与 `<600 ms` 窗口，不新增配置或复制实现。新增[宿主测试](../../packages/ts-shell/src/cli/interactive/interactiveMode.test.ts)实际经过 terminal input→stdin→keymap→openPicker→registry→rewind picker，仅替换历史读取与导航回调，避免只断言 action 被调用。两模式验证首次 Esc 不打开、600 ms 边界不触发、随后100 ms触发、最新问题在前、关闭不导航、非空草稿保护；同时直接验证原 host signal 与组合 source signal 释放。固定 notice 的精确断言防止以后回显 command。
+
+新三例基线全部失败；owner修改后通过。一次门禁误从 package cwd 调用 root script，报告 Missing script 并短路，未启动测试；改回 root cwd 后五门通过。单 worker、2 GiB heap 上限的单次 Vitest 覆盖宿主/keymap/rewind 三文件484项通过；cleanup失败用例自身输出的提示保留，不当成真实设备恢复证据。接线独立反转两例失败、notice独立反转一例失败，finally精确恢复；评审指出组合信号不能独立证明原controller释放，补host signal直接断言后新三例重跑通过。一个 `gpt-6.1-sol` 代理只读审核，未运行任何验证，最终无需修复的finding；审核没有覆盖全部addition。
+
+原 Node CLI 两模式的隔离 synthetic/offline PTY **仅两条消息**：实际原 `/back` 接线、面板绘制、取消、非空草稿保护与显式选择旧问题后的新 SessionManager 读回均通过；配置字节不变、退出0、cooked flags恢复。最终构建与收据见[本批工件](../../.omx/artifacts/phase20-addition-escape/)；退出时间以最终receipt为准。不运行Bun executable、真实provider、20k终端压测或全套回归。真实桌面键盘/其他平台体验仍未采集；第31/32/33/35/36/37项继续实施，原47项与ADD整体状态不升级，goal active。
+
+最终注释整理后五门/diff与build重新通过，freshness的compiler/source输入为460/3557、digest一致；build `40b7ea7e69f58eb2c8c8ec2c40050b2fb7173a266587eec0bbcfa02741760569`、inputs `22df13f9bbc1257ede3fd1836ad69f8d6ab5789477f3d5d618c3848dbfa1e624`。两模式PTY重新绑定该build通过，退出161/152 ms。原host保守AST callable数123→123，既有超限记录append disposition，不冒充满足20上限。118旧docs advisory保留；scratch为空后清理目录，既有CLAUDE.md不改。
+
+只读评审为33补充具体陷阱：同token更新须废止旧查询/已消费continuation、保护在途扫描不复活删项，tombstone参与条目上限且物理字节预算不可退还；管理快照必须保留metadata/state和全三文件版本，不用 `turns: []` 伪造完整Session。复用索引减少的是物理I/O，内存summaries重投影仍遍历索引；该方案尚未实现或验证。
+
+延后CI观察：研究提交 `b79a301a937f86e1524f23458bad5d1313421033` 的CI41001708699/Watch41001708696均success；20.55 `e74d87f7d083f6117d011e8b2d7f32412b5b2372` CI40991170478/Watch40991170435、20.54 `3bc969461f3e8bd757f1e87546f0ab479ad0ab95` CI40989805757/Watch40989805764、20.53 `8e4e6fd1b3865fc657dee87644912296c75ec009` CI40989150210/Watch40989150206均completed/success且head一致。本批提交、推送和未来CI另绑定，旧CI不替代本批CI。

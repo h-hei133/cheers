@@ -1095,3 +1095,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Deleting one session in the resume picker costs about a second, and the list appears to reload from scratch afterwards.
 - **Root Cause**: The delete action closes the browser on success, which retires the shared catalog browse token. The overlay then reloads the picker, which begins a brand new browse and rescans every session directory; only the small bounded summary cache survives. The same path also reads and parses the target session's full transcript three times synchronously (selection block, preparation, locked apply).
 - **Rule**: A mutation inside one picker lifetime should invalidate the affected entry, not the whole acquisition source: forget the removed id, keep the token, and let the next query re-verify its page boundary. Keep the identity checks; reuse the catalog summary for fields the summary already projects instead of loading the full session. Read the full transcript only where the user is about to see conversation content.
+
+### Combined Abort Signals Do Not Prove Each Owner Released
+- **Symptom**: Closing a picker aborts its source signal, and a test calls that proof that the host lifetime released.
+- **Root Cause**: The source uses a combination of the host signal and the overlay load signal. Either input aborts the combination; the overlay can mask a surviving host controller.
+- **Rule**: Capture the original host signal separately and assert its release directly, alongside the combined source signal. An unavailable factory result must release its original controller too. Keep keyboard-to-panel assertions through the actual registry.

@@ -32,6 +32,7 @@ Last updated: 2026-10-17
 - [Ordinary exit preserves pending session recovery](features/phase-20-addition.md#2019-普通退出保留未完成会话的恢复证据)
 - [Declared public reasoning replay and input accounting](features/phase-20-addition.md#2023-兼容协议公开reasoning的声明回传与输入预算)
 - [Config/model file ownership, panel navigation and input gestures](features/phase-20-addition.md#21-第九轮用户反馈2026-10-30配置文件与模型目录settings-导航resume-卡顿双击-escmodel-排序双击粘贴与点击定位)
+- [Double Escape host repair and focused CLI evidence](features/phase-20-addition.md#2110-第三十四实施恢复双击-esc-的原宿主接线)
 - [Extension registry protocol and capability grants](features/extension-registry.md)
 - [Agent definitions, model routing and lifecycle](features/agent-definitions.md)
 - [SSH sessions, remote jobs and cancellation](features/ssh.md)

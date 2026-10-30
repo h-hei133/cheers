@@ -416,6 +416,59 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
     }
   });
 
+it.each(['regular', 'fullscreen'] as const)('opens back from double Escape through the actual %s host', async kind => {
+  const scheduler = new ManualScheduler(), { mode, terminal } = build({ tuiMode: kind, scheduler });
+  const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView; pickerHost(signal?: AbortSignal): PickerHost };
+  const original = host.pickerHost(), rewind = vi.fn();
+  let sourceSignal: AbortSignal | undefined, hostSignal: AbortSignal | undefined, now = 1_000;
+  const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+  const read = vi.fn(async (signal?: AbortSignal) => {
+    sourceSignal = signal;
+    return { version: 'saved-v1', turns: [{ id: 'older', role: 'user' as const, content: 'Earlier saved question' },
+      { id: 'newer', role: 'user' as const, content: 'Latest saved question' }] };
+  });
+  const wiring = vi.spyOn(host, 'pickerHost').mockImplementation(signal => {
+    hostSignal = signal;
+    return { ...original, commandContext: { ...original.commandContext, signal, admission: () => undefined }, sessionTurns: read, rewind };
+  });
+  mode.start();
+  try {
+    terminal.input('\x1b'); scheduler.flush();
+    expect(host.overlay.active).toBe(false); expect(read).not.toHaveBeenCalled();
+    now += 600; terminal.input('\x1b'); scheduler.flush();
+    expect(host.overlay.active).toBe(false); expect(read).not.toHaveBeenCalled();
+    now += 100; terminal.input('\x1b'); scheduler.flush();
+    await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).toContain('Latest saved question'));
+    expect(host.overlay.active).toBe(true); expect(read).toHaveBeenCalledOnce();
+    const frame = stripAnsi(host.overlay.render(100, 24).join('\n'));
+    expect(frame.indexOf('Latest saved question')).toBeLessThan(frame.indexOf('Earlier saved question'));
+    expect(rewind).not.toHaveBeenCalled(); expect(host.view.editor.getText()).toBe('');
+    expect(sourceSignal?.aborted).toBe(false); expect(hostSignal?.aborted).toBe(false);
+    terminal.input('\x1b'); scheduler.flush();
+    expect(host.overlay.active).toBe(false); expect(sourceSignal?.aborted).toBe(true); expect(hostSignal?.aborted).toBe(true);
+    expect(rewind).not.toHaveBeenCalled();
+    host.view.editor.setText('Keep this draft');
+    now += 100; terminal.input('\x1b'); scheduler.flush();
+    now += 100; terminal.input('\x1b'); scheduler.flush();
+    expect(host.overlay.active).toBe(false); expect(read).toHaveBeenCalledOnce();
+    expect(host.view.editor.getText()).toBe('Keep this draft');
+  } finally { mode.stop(); wiring.mockRestore(); clock.mockRestore(); }
+});
+
+it('reports an unavailable picker and releases its original load lifetime', () => {
+  const { mode } = build();
+  const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView;
+    openPicker(command: string): void; pickerHost(signal?: AbortSignal): PickerHost };
+  const original = host.pickerHost(); let sourceSignal: AbortSignal | undefined;
+  const wiring = vi.spyOn(host, 'pickerHost').mockImplementation(signal => { sourceSignal = signal; return original; });
+  mode.start();
+  try {
+    host.openPicker('back');
+    expect(host.overlay.active).toBe(false); expect(sourceSignal?.aborted).toBe(true);
+    expect(host.view.transcript.all().at(-1)?.text).toBe('Picker unavailable. Use /help to find an available command.');
+  } finally { mode.stop(); wiring.mockRestore(); }
+});
+
 function build(overrides: {
   observeEvents?: () => () => void;
   exit?: (code?: number) => void;

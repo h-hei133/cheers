@@ -21,7 +21,7 @@ confidence: high
 
 | 文档 | 当前内容与边界 |
 |---|---|
-| [Phase 20日常交互补充规划](phase-20-addition.md) | 第19节研究与第20节实施：20.7为resume搜索真实目录比较；20.8修thinking交互；20.9修CRLF草稿/启动坐标夹具；20.10/20.12保留auto并独立准入已知Responses/Google native公开摘要；20.11隔离Session入口与配置字段。第21节为2026-10-30第九轮研究（第三十一至第三十七：config.json/models.json归属、settings顶部导航、resume打开与删除延迟、双击Esc回归、model排序、双击粘贴展开、点击定位光标），只定位未实现。真实provider/终端/平台、启动现场与原坏usage键原因仍缺，ADD active |
+| [Phase 20日常交互补充规划](phase-20-addition.md) | 第19节研究与第20节实施：20.7为resume搜索真实目录比较；20.8修thinking交互；20.9修CRLF草稿/启动坐标夹具；20.10/20.12保留auto并独立准入已知Responses/Google native公开摘要；20.11隔离Session入口与配置字段。第21节研究第三十一至第三十七项；21.10已修双击Esc接线，484项聚焦测试、独立反转及两消息原CLI/PTY两模式通过；配置归属、顶部导航、resume延迟、排序与输入手势仍待实施。真实provider/终端/平台、启动现场与原坏usage键原因仍缺，ADD active |
 | [日常交互问题核查](interaction-audit.md) | 2026-10-25核查及26日更正：保留model按键观察与根因推测区别，记录新几何及补全方向；只交付调查 |
 | [23 输入几何](23-input-surface-geometry.md) | padding1、16正文行的目标；gutter/viewport与应用内复制边界 |
 | [24 Slash与参数](24-slash-completion-defects.md) | canonical/alias、选择状态、共享语法与真实4路径补全 |

@@ -10509,3 +10509,11 @@ regular/fullscreen完整首批1094/1090ms，三次搜索175–179ms含真实输�
 第三十七：输入框点击只做选择、从不移动光标（`pointer.ts:216-233,262`）；映射数据（`composer/contract.ts:11-16`、`row.ts:35-62`）与 `setCursorOffset`（`editor/buffer.ts:77-87`）均已存在。参考 pi 与 Claude Code 已实现（同格 press+release 合成 click → 列偏移 → 设光标），codex/oh-my-pi 未实现。建议复用 `sourceBoundary` 并只在 fullscreen 生效。
 
 同时记录研究新发现：`models.json` 解析失败与重复键静默、`openPicker` 静默失败、删除后索引重建、以及"action 被调用 ≠ 面板真的打开"的测试缺口。建议顺序：34 → 33 → 31 → 32 → 35 → 36+37。参考项目仅只读对照，未复制实现；原 47 项与 ADD 状态不变。
+
+## [2026-10-30] fix | 恢复双击 Esc 到返回面板的原宿主接线
+
+[addition21.10](features/phase-20-addition.md#2110-第三十四实施恢复双击-esc-的原宿主接线)修 `openRewind("back")` 与slash registry守卫冲突，原host改 `/back`；undefined picker释放controller并发固定notice，不回显输入/错误。纠正旧bare-command注释；不扩展factory同步throw处理。先局部对照两个参考的空草稿/busy/suggestion/双击计时与视口重绘，保留本项目600ms和原生命周期。
+
+新三例原基线全失败，三文件484聚焦测试单worker/2GiB通过；接线与notice各独立反转2/1失败并bytes恢复。只读 `gpt-6.1-sol` 评审指出组合signal不能证明原host释放，追加原host signal断言后新三例重跑通过；无剩余本批finding。五门/build与两消息原NodeCLI/PTY两模式均通过：双击→cancel→草稿保护→显式选择旧问题→新manager读回，config不变、exit0/cookedflags。最终build/退出收据见正式工件；源码注释整理后刷新构建绑定。不跑exe/20k/full suite/真实provider，scratch清理、原CLAUDE.md保留；原47与ADD不升级，goal active。
+
+resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不退还与管理快照身份边界，33尚未实现。研究b79a301a CI41001708699/Watch41001708696、20.55 CI40991170478/Watch40991170435、20.54 CI40989805757/Watch40989805764、20.53 CI40989150210/Watch40989150206已completed/success且head一致。本批Git/未来CI另绑定。

@@ -736,7 +736,7 @@ export class InteractiveMode {
           this.tui.requestRender();
         },
         retry: () => this.onSubmit("/retry"),
-        openRewind: () => this.openPicker("back"),
+        openRewind: () => this.openPicker("/back"),
         redrawAfter: (delayMs) => {
           setTimeout(() => this.tui.requestRender(), delayMs).unref?.();
         },
@@ -1181,12 +1181,14 @@ export class InteractiveMode {
     };
   }
 
-  /** Open the chooser a bare command maps to. */
+  /** Opens a slash command line through the shared picker registry. */
   private openPicker(command: string, waitForApply = false): void {
     const controller = this.pickerLifecycles.begin();
     const picker = pickerFor(command, this.pickerHost(controller.signal));
     if (!picker) {
       this.pickerLifecycles.abort(controller);
+      this.state.transcript.append(textBlock("notice", "Picker unavailable. Use /help to find an available command."));
+      this.tui.requestRender();
       return;
     }
     const tracked = this.pickerLifecycles.track(picker, controller, waitForApply);
