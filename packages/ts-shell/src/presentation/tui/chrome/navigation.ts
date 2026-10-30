@@ -40,7 +40,7 @@ export class NavigationViewport {
 }
 
 export interface NavigationChrome {
-  readonly items: readonly { readonly id: string; readonly label: string; readonly note?: string }[];
+  readonly items: readonly { readonly id: string; readonly label: string; readonly note?: string; readonly disabled?: boolean }[];
   readonly active: string;
   readonly focused: boolean;
   readonly viewport?: NavigationViewport;
@@ -63,6 +63,10 @@ export function renderNavigation(model: OptionModel, chrome: PanelChrome, naviga
   for (const item of navigation.items.slice(offset, offset + capacity)) {
     const active = item.id === navigation.active;
     const label = neutraliseForDisplay(item.label);
+    if (item.disabled) {
+      rows.push(defaultTheme.dim(padToWidth(truncateToWidth(`  ${label}`, navWidth), navWidth)));
+      continue;
+    }
     const text = `${active && navigation.focused ? '▸' : active ? '•' : ' '} ${label}${item.note ? ` ${neutraliseForDisplay(item.note)}` : ''}`;
     const line = padToWidth(truncateToWidth(text, navWidth), navWidth);
     navigation.onItem(rows.length, item.id, 0, navWidth);

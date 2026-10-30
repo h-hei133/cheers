@@ -1,0 +1,91 @@
+scc-gate root=packages/ts-shell/src files=3010
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=53 read=53 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=25 docs_refs=456 docs_dangling=0 docs_source_dangling=118
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 118 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/model.test.ts src/cli/interactive/picker/model/category.test.ts src/cli/interactive/picker/model/focus.test.ts src/cli/interactive/picker/navigation.test.ts src/cli/interactive/picker/settings.test.ts src/cli/interactive/picker/help.test.ts src/presentation/tui/chrome/navigation.test.ts src/cli/interactive/overlay.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/picker/help.test.ts  (13 tests) 3011ms
+ ✓ src/cli/interactive/picker/model.test.ts  (46 tests) 2229ms
+ ❯ src/cli/interactive/picker/model/category.test.ts  (26 tests | 3 failed) 915ms
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 40 columns
+     → the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 80 columns
+     → the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 120 columns
+     → the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+ ❯ src/cli/interactive/picker/model/focus.test.ts  (20 tests | 3 failed) 688ms
+   ❯ src/cli/interactive/picker/model/focus.test.ts > moves removed 'epsilon' to its surviving neighbour 'delta' in 'all' without writing
+     → expected '  Browse                │  Model     …' to include '▸ delta'
+   ❯ src/cli/interactive/picker/model/focus.test.ts > moves removed 'epsilon' to its surviving neighbour 'delta' in 'relay' without writing
+     → expected '  Browse                │  Model     …' to include '▸ delta'
+   ❯ src/cli/interactive/picker/model/focus.test.ts > uses the visible cross-provider search result as the deleted detail origin
+     → expected '  Browse                │  Model shar…' to include '▸ shared-b'
+ ✓ src/cli/interactive/picker/navigation.test.ts  (22 tests) 331ms
+ ✓ src/cli/interactive/overlay.test.ts  (77 tests) 285ms
+ ✓ src/cli/interactive/picker/settings.test.ts  (47 tests) 83ms
+ ✓ src/presentation/tui/chrome/navigation.test.ts  (6 tests) 9ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 40 columns
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 80 columns
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 120 columns
+AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+ ❯ src/cli/interactive/picker/model/category.test.ts:297:17
+    295|   const detail = (await picker.inspect!(unavailable.id))!.next!;
+    296|   const draft = (await detail.apply(['configure']))?.draft;
+    297|   expect(draft).toContain('--model sort-aardvark'); expect(draft).toCo…
+       |                 ^
+    298|   expect(apply).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCa…
+    299|   expect(readSessionModelEdit(sessionId)).toEqual(before); expect(fs.r…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/cli/interactive/picker/model/focus.test.ts > moves removed 'epsilon' to its surviving neighbour 'delta' in 'all' without writing
+ FAIL  src/cli/interactive/picker/model/focus.test.ts > moves removed 'epsilon' to its surviving neighbour 'delta' in 'relay' without writing
+AssertionError: expected '  Browse                │  Model     …' to include '▸ delta'
+ ❯ src/cli/interactive/picker/model/focus.test.ts:53:21
+     51|     publication = { ...publication, catalog: catalogue(remaining), rev…
+     52|     writeCatalogCache(publication.catalog); await vi.advanceTimersByTi…
+     53|     expect(frame()).toContain(`▸ ${next}`); expect(frame(40)).toContai…
+       |                     ^
+     54|     expect(frame()).toContain('Focused model left the catalogue');
+     55|     expect(picker.navigation!.preferred).toBe(id(next)); expect(picker…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/cli/interactive/picker/model/focus.test.ts > uses the visible cross-provider search result as the deleted detail origin
+AssertionError: expected '  Browse                │  Model shar…' to include '▸ shared-b'
+ ❯ src/cli/interactive/picker/model/focus.test.ts:194:21
+    192|     expect(frame()).toContain('▸ shared-a');
+    193|     await press('\x1b[B'); await press('\x1b[B');
+    194|     expect(frame()).toContain('▸ shared-b');
+       |                     ^
+    195|     await press('\r');
+    196|     expect(frame()).toContain('Configure connection');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ Test Files  2 failed | 6 passed (8)
+      Tests  6 failed | 251 passed (257)
+   Start at  15:37:06
+   Duration  19.72s (transform 5.20s, setup 1ms, collect 6.43s, tests 7.55s, environment 1ms, prepare 329ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/picker/model.test.ts src/cli/interactive/picker/model/category.test.ts src/cli/interactive/picker/model/focus.test.ts src/cli/interactive/picker/navigation.test.ts src/cli/interactive/picker/settings.test.ts src/cli/interactive/picker/help.test.ts src/presentation/tui/chrome/navigation.test.ts src/cli/interactive/overlay.test.ts

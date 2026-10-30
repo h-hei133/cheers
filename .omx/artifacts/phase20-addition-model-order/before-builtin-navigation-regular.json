@@ -1,0 +1,210 @@
+{
+  "mode": "regular",
+  "buildId": "c8c4b2bde84207e8556a883ecd4f80b71956e4a934e83288a0b51ca98c3f581e",
+  "inputsDigest": "80f803dfa2d548b68a329f6497533d96d4b12def8723fe7f0f7d8c1763eb602b",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "checks": {
+    "providerOrder": true,
+    "currentPinned": true,
+    "heading": true
+  },
+  "widths": [],
+  "failure": "timeout-heading-skipped-40",
+  "observation": {
+    "requests": 0,
+    "renders": 12,
+    "snapshot": {
+      "width": 40,
+      "height": 60,
+      "placement": "side",
+      "categories": [
+        {
+          "id": "roles",
+          "label": "Roles"
+        },
+        {
+          "id": "all",
+          "label": "All models"
+        },
+        {
+          "id": "sort-second",
+          "label": "Alpha ready"
+        },
+        {
+          "id": "openai",
+          "label": "OpenAI"
+        },
+        {
+          "id": "sort-first",
+          "label": "Zulu ready"
+        },
+        {
+          "id": "section:not-ready",
+          "label": "Not ready",
+          "disabled": true
+        },
+        {
+          "id": "dashscope",
+          "label": "Alibaba DashScope",
+          "note": "○"
+        },
+        {
+          "id": "anthropic",
+          "label": "Anthropic",
+          "note": "○"
+        },
+        {
+          "id": "claudecode",
+          "label": "Anthropic-compatible proxy",
+          "note": "○"
+        },
+        {
+          "id": "antigravity",
+          "label": "Antigravity",
+          "note": "○"
+        },
+        {
+          "id": "bedrock",
+          "label": "AWS Bedrock",
+          "note": "○"
+        },
+        {
+          "id": "sort-zlast",
+          "label": "Beta offline",
+          "note": "○"
+        },
+        {
+          "id": "cerebras",
+          "label": "Cerebras",
+          "note": "○"
+        },
+        {
+          "id": "deepseek",
+          "label": "DeepSeek",
+          "note": "○"
+        },
+        {
+          "id": "fireworks",
+          "label": "Fireworks AI",
+          "note": "○"
+        },
+        {
+          "id": "google-ai",
+          "label": "Google AI",
+          "note": "○"
+        },
+        {
+          "id": "google",
+          "label": "Google Gemini",
+          "note": "○"
+        },
+        {
+          "id": "vertex",
+          "label": "Google Vertex",
+          "note": "○"
+        },
+        {
+          "id": "groq",
+          "label": "Groq",
+          "note": "○"
+        },
+        {
+          "id": "lmstudio",
+          "label": "LM Studio (local)",
+          "note": "○"
+        },
+        {
+          "id": "mistral",
+          "label": "Mistral",
+          "note": "○"
+        },
+        {
+          "id": "moonshot",
+          "label": "Moonshot",
+          "note": "○"
+        },
+        {
+          "id": "ollama",
+          "label": "Ollama (local)",
+          "note": "○"
+        },
+        {
+          "id": "sort-aearly",
+          "label": "Omega offline",
+          "note": "○"
+        },
+        {
+          "id": "openrouter",
+          "label": "OpenRouter",
+          "note": "○"
+        },
+        {
+          "id": "siliconflow",
+          "label": "SiliconFlow",
+          "note": "○"
+        },
+        {
+          "id": "together",
+          "label": "Together AI",
+          "note": "○"
+        },
+        {
+          "id": "vllm",
+          "label": "vLLM (local)",
+          "note": "○"
+        },
+        {
+          "id": "xai",
+          "label": "xAI",
+          "note": "○"
+        },
+        {
+          "id": "zhipu",
+          "label": "Zhipu",
+          "note": "○"
+        }
+      ],
+      "visible": [
+        {
+          "id": "model:[null,\"dashscope\",\"qwen3-coder-plus\"]",
+          "label": "qwen3-coder-plus",
+          "disabled": true
+        },
+        {
+          "id": "model:[null,\"dashscope\",\"qwen3-max\"]",
+          "label": "qwen3-max",
+          "disabled": true
+        }
+      ],
+      "category": "dashscope",
+      "categoryFocused": true,
+      "title": "Model",
+      "current": "model:[null,\"dashscope\",\"qwen3-coder-plus\"]",
+      "filter": "",
+      "loading": false,
+      "searching": false,
+      "pending": false,
+      "failed": false,
+      "detail": [
+        "Provider: Alibaba DashScope (openai-compatible)",
+        "Catalogue: models.json (user profile only); connections and request settings: config.json.",
+        "Availability: configure a connection",
+        "Remote availability: unverified",
+        "Endpoint: dashscope.aliyuncs.com/compatible-mode/v1",
+        "Reasoning effort: auto",
+        "Context: 256000 tokens",
+        "Images: unverified",
+        "Tool calls: unverified",
+        "Reasoning settings: unverified",
+        "Effort levels: low unverified · medium unverified · high unverified",
+        "configure a connection"
+      ],
+      "text": "  Browse\n  Roles                                 \n  All models                            \n  Alpha ready                           \n  OpenAI                                \n  Zulu ready                            \n  Not ready                             \n▸ Alibaba DashScope ○                   \n  Anthropic ○                           \n  Anthropic-compatible proxy ○          \n  Antigravity ○                         \n  AWS Bedrock ○                         \n  Beta offline ○                        \n  Cerebras ○                            \n  DeepSeek ○                            \n  Fireworks AI ○                        \n  Google AI ○                           \n  Google Gemini ○                       \n  Google Vertex ○                       \n  Groq ○                                \n  LM Studio (local) ○                   \n  Mistral ○                             \n  Moonshot ○                            \n  Ollama (local) ○                      \n  Omega offline ○                       \n  OpenRouter ○                          \n  SiliconFlow ○                         \n  Together AI ○                         \n  vLLM (local) ○                        \n  xAI ○                                 \n  Zhipu ○                               \nEnter: content · Esc: close"
+    }
+  },
+  "outputBytes": 16950,
+  "scratchRemoved": true
+}

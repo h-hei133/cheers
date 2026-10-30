@@ -1,0 +1,30 @@
+{
+  "cases": [
+    {
+      "name": "provider-alphabet",
+      "exit": 1,
+      "sourceSha256": "538e061ece817ac3e94925eaac995bc07ea1a84de5ec6d17b0087d2165d63ce3"
+    },
+    {
+      "name": "model-alphabet",
+      "exit": 1,
+      "sourceSha256": "538e061ece817ac3e94925eaac995bc07ea1a84de5ec6d17b0087d2165d63ce3"
+    },
+    {
+      "name": "heading-keyboard",
+      "exit": 1,
+      "sourceSha256": "6c3a5dd16ee9b71904638fd807f9d6022c73da8c1b0b7352f756bd49c62ed458"
+    },
+    {
+      "name": "heading-pointer",
+      "exit": 1,
+      "sourceSha256": "d5e5d50aea8cb3482359345ddc7e2f84c7e4433ecc85d5bf09882ca9d31d50ca"
+    },
+    {
+      "name": "heading-admission",
+      "exit": 1,
+      "sourceSha256": "6c3a5dd16ee9b71904638fd807f9d6022c73da8c1b0b7352f756bd49c62ed458"
+    }
+  ],
+  "restored": true
+}

@@ -27,8 +27,8 @@ afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); 
 it.each([
   { category: 'all', focused: 'delta', remaining: ['alpha', 'beta', 'gamma', 'epsilon'], next: 'epsilon' },
   { category: 'relay', focused: 'delta', remaining: ['alpha', 'beta', 'gamma', 'epsilon'], next: 'epsilon' },
-  { category: 'all', focused: 'epsilon', remaining: ['alpha', 'beta', 'gamma', 'delta'], next: 'delta' },
-  { category: 'relay', focused: 'epsilon', remaining: ['alpha', 'beta', 'gamma', 'delta'], next: 'delta' },
+  { category: 'all', focused: 'epsilon', remaining: ['alpha', 'beta', 'gamma', 'delta'], next: 'gamma' },
+  { category: 'relay', focused: 'epsilon', remaining: ['alpha', 'beta', 'gamma', 'delta'], next: 'gamma' },
   { category: 'all', focused: 'gamma', remaining: ['alpha', 'epsilon'], next: 'epsilon' },
   { category: 'relay', focused: 'gamma', remaining: ['alpha', 'epsilon'], next: 'epsilon' },
   { category: 'all', focused: 'delta', remaining: ['new-a', 'new-b'], next: 'new-b' },
@@ -190,7 +190,7 @@ it('uses the visible cross-provider search result as the deleted detail origin',
     host.handleKey(parseKeyEvent('\x1b[C'), vi.fn());
     host.handlePaste('shared');
     expect(frame()).toContain('▸ shared-a');
-    await press('\x1b[B'); await press('\x1b[B');
+    await press('\x1b[B'); // Alphabetical cross-provider results place b immediately after a.
     expect(frame()).toContain('▸ shared-b');
     await press('\r');
     expect(frame()).toContain('Configure connection');
@@ -198,8 +198,8 @@ it('uses the visible cross-provider search result as the deleted detail origin',
     await vi.advanceTimersByTimeAsync(500);
     expect(target).not.toBe(picker.navigation!.preferred);
     await press('\r');
-    expect(frame()).toContain('▸ shared-e');
-    expect(picker.navigation!.active).toBe('second');
+    expect(frame()).toContain('▸ shared-d');
+    expect(picker.navigation!.active).toBe('first');
   } finally { host.close(); }
 });
 

@@ -1,0 +1,15 @@
+{
+  "run": 41018354924,
+  "exit": 0,
+  "head": "94a4737978808146d33d169ee0be48e8065cda51",
+  "selectedFailures": [
+    "\u276f src/cli/interactive/overlay/wheel.test.ts  (12 tests | 1 failed) 319ms",
+    "\u276f src/cli/interactive/overlay/wheel.test.ts > returns settings section focus to rows when wheeling content without staging or saving",
+    "FAIL  src/cli/interactive/overlay/wheel.test.ts > returns settings section focus to rows when wheeling content without staging or saving",
+    "TypeError: value is not iterable",
+    "\u276f src/cli/interactive/overlay/wheel.test.ts:60:17",
+    "Test Files  1 failed | 1042 passed | 1 skipped (1044)",
+    "Tests  1 failed | 12688 passed | 3 skipped (12692)",
+    "##[error]Process completed with exit code 1."
+  ]
+}

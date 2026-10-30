@@ -1,7 +1,11 @@
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import { NavigationViewport } from '../../../presentation/tui/chrome/navigation.js';
 
-export interface NavigationItem { readonly id: string; readonly label: string; readonly note?: string }
+export interface NavigationItem {
+  readonly id: string; readonly label: string; readonly note?: string;
+  /** A display-only heading has no keyboard or pointer selection authority. */
+  readonly disabled?: boolean;
+}
 export interface NavigationGroup { readonly category: string; readonly section?: string }
 export interface NavigationUpdate { readonly options: readonly Option[]; readonly focus?: string; readonly query?: string }
 export interface NavigationOrigin { readonly rows: readonly Option[]; readonly crossCategory: boolean }
@@ -52,7 +56,7 @@ export class CatalogNavigation implements PickerNavigation {
     this.rows = rows; this.groups = groups; this.categories = categories;
     const present = new Set(rows.map(row => row.id));
     for (const [category, id] of this.rowFocus) if (!present.has(id)) this.rowFocus.delete(category);
-    if (!categories.some(item => item.id === this.category)) this.category = categories[0]?.id ?? 'all';
+    if (!categories.some(item => !item.disabled && item.id === this.category)) this.category = categories.find(item => !item.disabled)?.id ?? 'all';
   }
 
   project(query: string): readonly Option[] {
@@ -87,7 +91,7 @@ export class CatalogNavigation implements PickerNavigation {
   }
 
   select(id: string): NavigationUpdate | undefined {
-    if (!this.categories.some(item => item.id === id)) return undefined;
+    if (!this.categories.some(item => !item.disabled && item.id === id)) return undefined;
     this.category = id;
     this.searching = false; this.searchDomain = undefined;
     this.domain = this.placement === 'top' ? 'rows' : 'categories';
@@ -105,7 +109,7 @@ export class CatalogNavigation implements PickerNavigation {
     if (!query) {
       this.searching = false; this.searchDomain = undefined;
       const group = this.groups.get(id);
-      if (this.category !== 'all' && group && this.categories.some(item => item.id === group.category)) this.category = group.category;
+      if (this.category !== 'all' && group && this.categories.some(item => !item.disabled && item.id === group.category)) this.category = group.category;
     }
     this.domain = 'rows';
     this.focus(id);
@@ -140,12 +144,10 @@ export class CatalogNavigation implements PickerNavigation {
       this.domain = domains[(index + (key === 'tab' ? 1 : -1) + domains.length) % domains.length];
     } else if (key === 'left' || key === 'right') {
       if (this.placement === 'top' || this.sectionFocus) {
-        const index = this.categories.findIndex(item => item.id === this.category);
-        this.category = this.categories[(index + (key === 'right' ? 1 : -1) + this.categories.length) % this.categories.length]?.id ?? this.category;
+        this.moveCategory(key === 'right' ? 1 : -1);
       } else this.domain = key === 'left' ? 'categories' : 'rows';
     } else if (this.domain === 'categories' && (key === 'up' || key === 'down')) {
-      const index = this.categories.findIndex(item => item.id === this.category);
-      this.category = this.categories[(index + (key === 'down' ? 1 : -1) + this.categories.length) % this.categories.length]?.id ?? this.category;
+      this.moveCategory(key === 'down' ? 1 : -1);
     } else if (this.domain === 'sections' && (key === 'up' || key === 'down')) {
       const sections = this.project('').filter(row => row.id.startsWith('section:'));
       const index = sections.findIndex(row => row.id === current);
@@ -159,11 +161,16 @@ export class CatalogNavigation implements PickerNavigation {
       this.domain = 'rows';
     } else if (key === 'escape' && this.domain !== (this.placement === 'top' ? 'rows' : 'categories')) {
       this.domain = this.placement === 'top' ? 'rows' : 'categories';
-    }
-    else return undefined;
+    } else return undefined;
     if (this.domain === 'categories') this.viewport.reveal();
     const options = this.project('');
     return { options, query: '', focus: this.domain === 'sections'
       ? options.find(row => row.id === this.section)?.id ?? options.find(row => row.id.startsWith('section:'))?.id : this.rowFocus.get(this.category) };
+  }
+
+  private moveCategory(delta: -1 | 1): void {
+    const categories = this.categories.filter(item => !item.disabled);
+    const index = categories.findIndex(item => item.id === this.category);
+    this.category = categories[(index + delta + categories.length) % categories.length]?.id ?? this.category;
   }
 }

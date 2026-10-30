@@ -1130,3 +1130,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A click between filtering and repaint selects a category from the previous chip window; tests can also accidentally click the right detail column when the same label occurs there.
 - **Root Cause**: Cross-category search changes the active strip to All and can move its visible spans, while filter invalidation previously cleared only content maps. A panel can also repeat field labels in its detail column.
 - **Rule**: Use navigation as the single category source and invalidate chip spans with list/option maps whenever the query changes. Register only painted spans, keep top categories outside the sidebar focus cycle, and derive test clicks from the actual list column. Prove the selected field through Enter identity when narrow labels are truncated; preserve side defaults for other catalogues.
+
+### Sorting Must Preserve Focus By The Previously Painted Order
+- **Symptom**: A refresh test expects the old catalogue insertion neighbour after the visible list becomes alphabetical, or a group title becomes an empty selectable category.
+- **Root Cause**: Fixture insertion order was mistaken for user-visible order, and display-only headings were treated as ordinary category entries.
+- **Rule**: Keep fallback bound to prior visible identities and update expected neighbours to the actual sorted sequence. Skip disabled navigation headings in initial admission, direct selection, keyboard traversal and pointer registration while allowing providers below them to retain exact inspection actions. Assert label sorting with provider IDs in a different order.
+
+### Captured Draft Facts Must Reach Wheel And Other Indirect Fixtures
+- **Symptom**: A settings detail crashes in a wheel test after a required draft fact is added, despite focused picker tests passing.
+- **Root Cause**: An indirect fake omitted SettingsDraft.file; transpiled tests exercised it only when rendering the detail. UI layout changes can also move the tested list column.
+- **Rule**: Type settings hosts, populate the captured draft contract in each fixture, and run the interaction tests that actually render its details. Derive wheel coordinates from the painted list pane; do not make product code synthesize missing ownership facts to accommodate an incomplete test fixture.

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile,
+import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile,
   type RuntimeConfig } from '../../../../config/runtimeConfig.js';
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { defaultHookDispatcher } from '../../../../core/hooks/hookDispatcher.js';
@@ -12,6 +12,7 @@ import { modelPicker } from '../model.js';
 import { OverlayHost, type PickerOutcome } from '../../overlay.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
+import { parseMouseReport } from '../../../../presentation/tui/input/mouse.js';
 
 let root: string, sessionId: string;
 const address = (name: string) => `https://${name}.invalid/v1`;
@@ -35,10 +36,10 @@ it('orders the exact configured relay before unconfigured categories sharing its
   const picker = modelPicker(commands()); const rows = await picker.load();
   const categories = picker.navigation!.items.filter(item => item.id.startsWith('relay-'));
   expect(categories.map(item => [item.id, item.note])).toEqual([
-    ['relay-ready', undefined], ['relay-missing', '○'], ['relay-later', '○'], ['relay-extra', '○'],
+    ['relay-ready', undefined], ['relay-extra', '○'], ['relay-later', '○'], ['relay-missing', '○'],
   ]);
   const models = rows.filter(row => row.id.includes('relay-'));
-  expect(models.map(row => row.id)).toEqual([target('relay-ready', 'ready'), target('relay-missing'), target('relay-later'), target('relay-extra')]);
+  expect(models.map(row => row.id)).toEqual([target('relay-ready', 'ready'), target('relay-extra'), target('relay-later'), target('relay-missing')]);
   expect(models[0]?.disabled).not.toBe(true);
   expect(models.slice(1)).toEqual(expect.arrayContaining([
     expect.objectContaining({ id: target('relay-missing'), disabled: true, focusable: true }),
@@ -243,11 +244,61 @@ it('reorders refreshed exact categories without moving manual focus and refuses 
   expect(readSessionModelEdit(sessionId)).toEqual(before);
   await picker.load();
   expect(picker.navigation!.items.filter(item => item.id.startsWith('relay-')).map(item => [item.id, item.note]))
-    .toEqual([['relay-missing', undefined], ['relay-ready', '○'], ['relay-later', '○'], ['relay-extra', '○']]);
+    .toEqual([['relay-missing', undefined], ['relay-extra', '○'], ['relay-later', '○'], ['relay-ready', '○']]);
   expect(picker.navigation!.active).toBe('relay-ready');
   expect(picker.navigation!.preferred).toBe(target('relay-ready', 'ready'));
   expect(picker.filterOptions!('', []).find(row => row.id === target('relay-ready', 'ready'))).toMatchObject({ disabled: true, focusable: true });
   expect(readSessionModelEdit(sessionId)).toEqual(before);
+});
+
+it.each([40, 80, 120])('sorts exact provider and model groups, skips the not-ready heading and inspects at %i columns', async width => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath()), configured = edit.values.providerConnections![0]!;
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [configured,
+    { ...configured, id: 'second', baseUrl: address('second') }] }, edit);
+  const catalog = [
+    { id: 'sort-aearly', label: 'Omega offline', baseUrl: address('omega'), models: ['sort-zed', 'sort-gamma'] },
+    { id: 'sort-first', label: 'Zulu ready', baseUrl: address('ready'), models: ['sort-zulu', 'sort-alpha'] },
+    { id: 'sort-zlast', label: 'Beta offline', baseUrl: address('beta'), models: ['sort-omega', 'sort-aardvark'] },
+    { id: 'sort-second', label: 'Alpha ready', baseUrl: address('second'), models: ['sort-delta', 'sort-beta'] },
+  ].map(provider => ({ ...provider, runtime: 'openai' as const, auth: 'api-key' as const,
+    models: provider.models.map(id => ({ id })) }));
+  const picker = modelPicker({ ...commands(), readConfiguration: () => ({ config: getRuntimeConfig(root), catalog, revision: 1 }) });
+  const rows = await picker.load(), navigation = picker.navigation!;
+  expect(navigation.items.map(item => item.label)).toEqual([
+    'Roles', 'All models', 'Alpha ready', 'Zulu ready', 'Not ready', 'Beta offline', 'Omega offline',
+  ]);
+  const heading = navigation.items.find(item => item.disabled)!;
+  expect(heading.label).toBe('Not ready'); expect(navigation.select(heading.id)).toBeUndefined();
+  expect(rows[0]?.id).toBe('model:current');
+  const labels = ['sort-alpha', 'sort-beta', 'sort-delta', 'sort-zulu', 'sort-aardvark', 'sort-gamma', 'sort-omega', 'sort-zed'];
+  expect(rows.filter(row => row.label.startsWith('sort-')).map(row => row.label)).toEqual(labels);
+  expect(picker.filterOptions!('sort-', rows).map(row => row.label)).toEqual(labels);
+  expect(rows.filter(row => row.id.startsWith('role:')).map(row => row.id))
+    .toEqual(['role:default', 'role:subagent', 'role:summary', 'role:advisor']);
+  const before = readSessionModelEdit(sessionId), global = fs.readFileSync(getUserRuntimeConfigPath());
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected probe'));
+  const overlay = new OverlayHost(() => {}); overlay.open(picker); await settle(); const apply = vi.fn();
+  overlay.handleKey(parseKeyEvent('\t'), apply);
+  for (let step = 0; step < navigation.items.length && navigation.active !== 'sort-first'; step++) overlay.handleKey(parseKeyEvent('\x1b[B'), apply);
+  expect(navigation.active).toBe('sort-first');
+  overlay.handleKey(parseKeyEvent('\x1b[B'), apply); expect(navigation.active).toBe('sort-zlast');
+  const frame = overlay.render(width, 30).map(stripAnsi);
+  const row = frame.findIndex(text => text.split('│')[0]?.includes('Not ready'));
+  expect(row).toBeGreaterThan(0);
+  const select = vi.spyOn(navigation, 'select');
+  overlay.handlePointer(parseMouseReport(`\x1b[<0;3;${row + 1}M`)!, 0);
+  expect(select).not.toHaveBeenCalled(); expect(navigation.active).toBe('sort-zlast');
+  overlay.handleKey(parseKeyEvent('\x1b[A'), apply); expect(navigation.active).toBe('sort-first');
+  overlay.handleKey(parseKeyEvent('\x1b[B'), apply); overlay.handleKey(parseKeyEvent('\r'), apply);
+  const unavailable = rows.find(row => row.label === 'sort-aardvark')!;
+  expect(unavailable).toMatchObject({ disabled: true, focusable: true });
+  const detail = (await picker.inspect!(unavailable.id))!.next!;
+  expect((await detail.load()).some(row => row.id === 'configure')).toBe(true);
+  const draft = (await detail.apply(['configure']))?.draft;
+  expect(draft).toContain('--model sort-aardvark'); expect(draft).toContain(address('beta'));
+  expect(apply).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
+  expect(readSessionModelEdit(sessionId)).toEqual(before); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+  overlay.close();
 });
 
 it.each([false, true])('navigates exact relay categories, clears empty search and returns from details without writes (all missing: %s)', async allMissing => {

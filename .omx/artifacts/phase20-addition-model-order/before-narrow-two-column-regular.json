@@ -1,0 +1,66 @@
+{
+  "mode": "regular",
+  "buildId": "c8c4b2bde84207e8556a883ecd4f80b71956e4a934e83288a0b51ca98c3f581e",
+  "inputsDigest": "80f803dfa2d548b68a329f6497533d96d4b12def8723fe7f0f7d8c1763eb602b",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "failed",
+  "checks": {
+    "providerOrder": true,
+    "currentPinned": true,
+    "heading": true
+  },
+  "widths": [
+    {
+      "width": 40,
+      "side": true,
+      "headingVisible": true,
+      "headingSkipped": true,
+      "modelAndSearchOrder": true,
+      "inspectAndReturn": true
+    }
+  ],
+  "failure": "timeout-inspect-80",
+  "observation": {
+    "requests": 0,
+    "renders": 55,
+    "snapshot": {
+      "width": 80,
+      "height": 60,
+      "visible": [
+        {
+          "id": "back",
+          "label": "Back to models"
+        },
+        {
+          "id": "configure",
+          "label": "Configure connection"
+        }
+      ],
+      "title": "sort-aardvark",
+      "current": "back",
+      "filter": "",
+      "loading": false,
+      "searching": false,
+      "pending": false,
+      "failed": false,
+      "detail": [
+        "Provider: Beta offline (openai)",
+        "Catalogue: models.json (user profile only); connections and request settings: config.json.",
+        "Availability: configure a connection",
+        "Remote availability: unverified",
+        "Endpoint: beta.invalid/v1",
+        "Reasoning effort: auto",
+        "Images: unverified",
+        "Tool calls: unverified",
+        "Reasoning settings: unverified",
+        "Effort levels: low unverified · medium unverified · high unverified",
+        "configure a connection"
+      ],
+      "text": "  sort-aardvark                                                              2\n  ▸ Back to models                  │Provider: Beta offline (openai)            \n    Configure con…                  │Catalogue: models.json (user profile only)…\n                                    │Availability: configure a connection       \n                                    │Remote availability: unverified            \n                                    │Endpoint: beta.invalid/v1                  \n                                    │Reasoning effort: auto                     \n                                    │Images: unverified                         \n                                    │Tool calls: unverified                     \n                                    │Reasoning settings: unverified             \n                                    │Effort levels: low unverified · medium unv…\n                                    │configure a connection                     \n  Enter reviews the next step · Esc returns"
+    }
+  },
+  "outputBytes": 73368,
+  "scratchRemoved": true
+}

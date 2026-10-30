@@ -1,0 +1,60 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/model/category.test.ts  (26 tests | 3 failed | 23 skipped) 128ms
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 40 columns
+     → expected [ 'sort-delta', 'sort-beta', …(6) ] to deeply equal [ 'sort-alpha', 'sort-beta', …(6) ]
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 80 columns
+     → expected [ 'sort-delta', 'sort-beta', …(6) ] to deeply equal [ 'sort-alpha', 'sort-beta', …(6) ]
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 120 columns
+     → expected [ 'sort-delta', 'sort-beta', …(6) ] to deeply equal [ 'sort-alpha', 'sort-beta', …(6) ]
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 23 skipped (26)
+   Start at  15:42:32
+   Duration  2.82s (transform 1.87s, setup 0ms, collect 2.46s, tests 128ms, environment 0ms, prepare 55ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/model/category.test.ts -t sorts exact provider and model groups
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 40 columns
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 80 columns
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 120 columns
+AssertionError: expected [ 'sort-delta', 'sort-beta', …(6) ] to deeply equal [ 'sort-alpha', 'sort-beta', …(6) ]
+
+- Expected
++ Received
+
+  Array [
+-   "sort-alpha",
++   "sort-delta",
+    "sort-beta",
+-   "sort-delta",
+    "sort-zulu",
+-   "sort-aardvark",
+-   "sort-gamma",
++   "sort-alpha",
+    "sort-omega",
++   "sort-aardvark",
+    "sort-zed",
++   "sort-gamma",
+  ]
+
+ ❯ src/cli/interactive/picker/model/category.test.ts:274:83
+    272|   expect(rows[0]?.id).toBe('model:current');
+    273|   const labels = ['sort-alpha', 'sort-beta', 'sort-delta', 'sort-zulu'…
+    274|   expect(rows.filter(row => row.label.startsWith('sort-')).map(row => …
+       |                                                                                   ^
+    275|   expect(picker.filterOptions!('sort-', rows).map(row => row.label)).t…
+    276|   expect(rows.filter(row => row.id.startsWith('role:')).map(row => row…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/picker/model/category.test.ts -t 'sorts exact provider and model groups'

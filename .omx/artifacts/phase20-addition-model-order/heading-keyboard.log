@@ -1,0 +1,48 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/model/category.test.ts  (26 tests | 3 failed | 23 skipped) 202ms
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 40 columns
+     → expected 'section:not-ready' to be 'sort-zlast' // Object.is equality
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 80 columns
+     → expected 'section:not-ready' to be 'sort-zlast' // Object.is equality
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 120 columns
+     → expected 'section:not-ready' to be 'sort-zlast' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 23 skipped (26)
+   Start at  15:42:36
+   Duration  2.81s (transform 1.82s, setup 0ms, collect 2.39s, tests 202ms, environment 0ms, prepare 54ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/model/category.test.ts -t sorts exact provider and model groups
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 40 columns
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 80 columns
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 120 columns
+AssertionError: expected 'section:not-ready' to be 'sort-zlast' // Object.is equality
+
+- Expected
++ Received
+
+- sort-zlast
++ section:not-ready
+
+ ❯ src/cli/interactive/picker/model/category.test.ts:284:80
+    282|   for (let step = 0; step < navigation.items.length && navigation.acti…
+    283|   expect(navigation.active).toBe('sort-first');
+    284|   overlay.handleKey(parseKeyEvent('\x1b[B'), apply); expect(navigation…
+       |                                                                                ^
+    285|   const frame = overlay.render(width, 30).map(stripAnsi);
+    286|   const row = frame.findIndex(text => text.split('│')[0]?.includes('No…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/picker/model/category.test.ts -t 'sorts exact provider and model groups'

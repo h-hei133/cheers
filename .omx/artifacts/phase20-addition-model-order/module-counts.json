@@ -1,0 +1,96 @@
+[
+  {
+    "file": "cli/interactive/picker/navigation.ts",
+    "count": 13,
+    "baseline": 12,
+    "names": [
+      "items",
+      "active",
+      "focused",
+      "all",
+      "preferred",
+      "origin",
+      "focus",
+      "set",
+      "project",
+      "select",
+      "point",
+      "key",
+      "moveCategory"
+    ]
+  },
+  {
+    "file": "cli/interactive/picker/model.ts",
+    "count": 46,
+    "baseline": 46,
+    "names": [
+      "modelPicker",
+      "empty",
+      "back",
+      "onOpen",
+      "previewEnd",
+      "initialSelection",
+      "replacementSelection",
+      "status",
+      "filterOptions",
+      "load",
+      "admitInspection",
+      "inspection",
+      "back",
+      "childBack",
+      "run",
+      "back",
+      "canReturn",
+      "save",
+      "admission",
+      "done",
+      "run",
+      "run",
+      "run",
+      "admission",
+      "run",
+      "back",
+      "admission",
+      "admission",
+      "detail",
+      "subscribe",
+      "inspect",
+      "apply",
+      "reloadDetailCatalogue",
+      "detailSourceFor",
+      "read",
+      "revision",
+      "reload",
+      "currentRows",
+      "back",
+      "canReturn",
+      "watch",
+      "refreshRoleSelection",
+      "back",
+      "rowId",
+      "modelDetails",
+      "matchesCatalog"
+    ]
+  },
+  {
+    "file": "cli/interactive/picker/model/order.ts",
+    "count": 1,
+    "baseline": 0,
+    "names": [
+      "orderModelCatalog"
+    ]
+  },
+  {
+    "file": "presentation/tui/chrome/navigation.ts",
+    "count": 6,
+    "baseline": 6,
+    "names": [
+      "window",
+      "pan",
+      "reveal",
+      "renderNavigation",
+      "onListRow",
+      "onOptionRow"
+    ]
+  }
+]

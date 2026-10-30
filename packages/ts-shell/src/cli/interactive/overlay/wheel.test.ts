@@ -4,7 +4,7 @@ import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { parseMouseReport } from '../../../presentation/tui/input/mouse.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 import { CONFIG_SETTINGS } from '../../../config/settings.js';
-import { settingsPicker } from '../picker/settings.js';
+import { settingsPicker, type SettingsHost } from '../picker/settings.js';
 import { modelPicker } from '../picker/model.js';
 import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
 import { CatalogNavigation } from '../picker/navigation.js';
@@ -12,8 +12,8 @@ import { CatalogNavigation } from '../picker/navigation.js';
 const settle = async () => { await Promise.resolve(); await Promise.resolve(); };
 const wheel = (overlay: OverlayHost, raw: string, top: number | undefined = 0) => overlay.handlePointer(parseMouseReport(raw)!, top);
 const painted = (overlay: OverlayHost, width = 120, height = 30) => overlay.render(width, height).map(stripAnsi);
-const contentPoint = (frame: readonly string[], label: string) => {
-  const row = frame.findIndex(text => text.split('│')[1]?.includes(label));
+const contentPoint = (frame: readonly string[], label: string, pane: 0 | 1 = 1) => {
+  const row = frame.findIndex(text => text.split('│')[pane]?.includes(label));
   expect(row).toBeGreaterThanOrEqual(0);
   return { row, column: frame[row]!.indexOf(label) };
 };
@@ -49,14 +49,14 @@ it('moves one browsable model per wheel notch, stops at boundaries and requires 
 
 it('returns settings section focus to rows when wheeling content without staging or saving', async () => {
   const save = vi.fn(async () => ({ applied: true, note: 'saved' }));
-  const host = { openSettings: () => ({ scope: 'user' as const, save, reopen: () => undefined, definitions: CONFIG_SETTINGS,
+  const host: SettingsHost = { openSettings: () => ({ scope: 'user', file: '/fixture/config.json', save, reopen: () => undefined, definitions: CONFIG_SETTINGS,
     values: Object.fromEntries(CONFIG_SETTINGS.map(setting => [setting.key, { stored: undefined,
       effective: false, requested: false, source: 'default', requestedSource: 'default', restartRequired: false }])) }) };
   const overlay = new OverlayHost(() => {}); const apply = vi.fn();
   overlay.open(settingsPicker(host, 'user', 'Model')); await settle();
   overlay.handleKey(parseKeyEvent('\t'), apply);
   expect(painted(overlay).join('\n')).toContain('▸ Model / Limits');
-  wheel(overlay, report(contentPoint(painted(overlay), 'Maximum turns'), 1));
+  wheel(overlay, report(contentPoint(painted(overlay), 'Maximum turns', 0), 1));
   const frame = painted(overlay).join('\n');
   expect(frame).toContain('▸ Output token'); expect(frame).not.toContain('Pending:');
   overlay.handleKey(parseKeyEvent('\r'), apply);

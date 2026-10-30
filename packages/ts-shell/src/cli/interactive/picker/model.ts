@@ -24,6 +24,7 @@ import { catalogueDetailSource, modelDetailsPicker, type ModelDetailAction, type
 import { CatalogNavigation, type NavigationGroup } from './navigation.js';
 import { watchModels } from './model/watch.js';
 import { refreshModelCatalog } from './model/publication.js';
+import { orderModelCatalog } from './model/order.js';
 import { modelEffortPicker } from './model/recovery.js';
 import { prepareModelRole, type AutomaticModelRole, type RoleResult } from '../../../core/commands/model/role.js';
 import { modelRoleEditor } from './model/role.js';
@@ -113,8 +114,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       const rows: Option[] = [];
       const groups = new Map<string, NavigationGroup>();
       const seen = new Set<string>();
-      const ordered = [...catalog];
-      for (const provider of ordered) {
+      for (const provider of catalog) {
         const entry = availability.providers.find(item => item.provider === provider.runtime);
         const connections = (entry?.connections ?? []).filter(connection => matchesCatalog(provider, connection, config.providerConnections, catalog));
         const providerSlot = active.provider === provider.runtime && !active.credential?.connectionId
@@ -244,9 +244,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       // A protocol's credential cannot make a different relay category usable.
       // Derive category readiness from its exact, admitted model rows.
       const readyCategories = new Set(rows.filter(row => !row.disabled).map(row => groups.get(row.id)?.category));
-      ordered.sort((left, right) => Number(!readyCategories.has(left.id)) - Number(!readyCategories.has(right.id)));
-      rows.sort((left, right) => Number(!readyCategories.has(groups.get(left.id)?.category))
-        - Number(!readyCategories.has(groups.get(right.id)?.category)));
+      const categories = orderModelCatalog(catalog, rows, groups, readyCategories);
       // Overrides and legacy credentials can supply a current request without a
       // matching named connection. Keep that fact visible without inventing one.
       const savedTarget = choice?.baseline?.selection;
@@ -356,8 +354,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       const crossCategory = focusFallback?.crossCategory === true;
       focusFallback = undefined;
       navigation.set(rows, groups, [...(assigning ? [] : [{ id: 'roles', label: 'Roles' }]), { id: 'all', label: 'All models' },
-        ...ordered.map(provider => ({ id: provider.id, label: provider.label,
-          note: readyCategories.has(provider.id) ? undefined : '○' }))]);
+        ...categories]);
       const fallbackOptions = crossCategory ? navigation.all : navigation.project('');
       if (returnFocus) {
         const requested = returnFocus;

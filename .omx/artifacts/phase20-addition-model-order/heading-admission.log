@@ -1,0 +1,41 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/model/category.test.ts  (26 tests | 3 failed | 23 skipped) 129ms
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 40 columns
+     → expected { options: [], focus: undefined, …(1) } to be undefined
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 80 columns
+     → expected { options: [], focus: undefined, …(1) } to be undefined
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 120 columns
+     → expected { options: [], focus: undefined, …(1) } to be undefined
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 23 skipped (26)
+   Start at  15:42:40
+   Duration  2.90s (transform 1.92s, setup 0ms, collect 2.54s, tests 129ms, environment 0ms, prepare 54ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/model/category.test.ts -t sorts exact provider and model groups
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 40 columns
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 80 columns
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 120 columns
+AssertionError: expected { options: [], focus: undefined, …(1) } to be undefined
+ ❯ src/cli/interactive/picker/model/category.test.ts:271:82
+    269|   ]);
+    270|   const heading = navigation.items.find(item => item.disabled)!;
+    271|   expect(heading.label).toBe('Not ready'); expect(navigation.select(he…
+       |                                                                                  ^
+    272|   expect(rows[0]?.id).toBe('model:current');
+    273|   const labels = ['sort-alpha', 'sort-beta', 'sort-delta', 'sort-zulu'…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/picker/model/category.test.ts -t 'sorts exact provider and model groups'

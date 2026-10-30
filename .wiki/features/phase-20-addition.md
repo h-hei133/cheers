@@ -4371,3 +4371,18 @@ settings 显式采用 `navigation.placement = top`，由原 `chipStrip` 绘制�
 原Node CLI在regular/fullscreen均各1会话×1消息，物理PTY依次resize40/80/120列：顶部活动分类、Tab标题→下一节→Enter字段→实际详情→Esc原字段、左右分类往返保留字段、搜索All与Esc所选归属均通过；再打开model，Tab仍到原侧栏。配置user/project及models文件字节不变、请求0、exit0/cooked flags，退出136/142ms仅为小fixture观测。鼠标实际绘制区域、短frame及旧命中拒绝由单元宿主覆盖；未采集真实桌面鼠标/键盘或其他平台体验。最终build `6a98f52461a8e7443de16bc14fb88b92395048201c67b39d0678a5c0855fb0de`，inputs `40eb551ecc21d86b841a49d4e2567490c43a062e7a5666f0a9c1c336c9fc9967`，收据与[正式工件](../../.omx/artifacts/phase20-addition-settings-navigation/README.md)绑定。scratch已清理，原CLAUDE.md保留。
 
 延后一次读回上批`94a4737978808146d33d169ee0be48e8065cda51`：CI41018354924仍in_progress、Watch41018354865 completed/success，head均一致；不等待或重复轮询。本批未运行独立代理review/真实provider/exe/full suite/20k，自己的Git/推送与未来CI另绑定。第32项本地实现与小型CLI通过；35及36/37继续，第33项用户大目录体验仍partial，原47与ADD整体不升级，goal active。
+
+
+### 21.16 第三十五实施：model 字母排序与不可选择的未就绪分组
+
+provider保持原有“至少一个精确model行可用”的就绪裁决，先就绪后未就绪，各组按label/缺省id字母序；模型行在对应就绪组内按model id字母序，同名模型按provider顺序且保留原connection稳定顺序。排序在navigation.set前完成，侧栏、分类内容与跨分类搜索共用来源。Roles/All models分类固定在前，default/subagent/summary/advisor角色行保留固定顺序，目录外当前请求仍由原路径置顶。新order owner只负责投影，无provider/auth/写入政策变化。
+
+未就绪provider前有不可聚焦的`Not ready`标题：现有未就绪还可能是credential-missing、连接error或effort不兼容，故不把它们全部误写为“未配置”。标题不登记pointer/wheel命中，set/select/键盘跳过，下面的provider及disabled-but-focusable模型仍可检查并打开精确配置入口。40/80/120列回归同时检查标题、跳过、点击无效、字段身份及no-write。定向只读参考model-hub.ts:744–748/772–778与hub-frame.ts:248–250，同意已解锁/锁定分组字母序与无选择分隔；模型按用户字母序而非参考MRU/版本排序。
+
+最终主代理单进程串行：五静态门、九聚焦文件269项、TS build、owner计数与原Node CLI两模式均通过，118旧docs advisory保留。另五独立反转（provider label排序/model排序/标题键盘/pointer/直接select）全部AssertionError，finally逐字节恢复；加强不同id/label顺序夹具后相关三文件52项通过。初次测试分类为旧顺序预期和夹具生命周期：epsilon消失后应取上一帧字母序中的gamma，跨provider已删除搜索结果后取幸存shared-d并回first provider；ModelFocus实现未改，身份/无写入断言保留。新增detail夹具在apply前调用原load，不放宽owner校验。
+
+延后CI读回发现第31项`94a4737978808146d33d169ee0be48e8065cda51` CI41018354924 failure（12688 passed/1 failed/3 skipped，1042文件passed/1 failed/1 skipped）；唯一失败为overlay/wheel.test.ts缺SettingsDraft.file，经真实detail渲染触发TypeError。补typed SettingsHost的完整file及顶部settings的列表列坐标，最终12项wheel全部通过；历史SHA仍失败，不冒充已变绿。该SHA两个Watch41018354865/41020107097均success。`26d3a53c0214410ddd28202a934bd724f294a9dd` CI41020546837本次读回仍in_progress、Watch41020546679 success；不等待/重复轮询，本批远端CI单独绑定。
+
+CLI每模式1会话×1消息，isolated home/profile/project、synthetic offline、heap768MiB/45秒，物理resize40/80/120列：provider组序、当前模型置顶、Not ready标题/键盘跳过、未配置模型真实检查与返回、全目录跨provider模型/搜索字母序均通过。完整built-in目录保留，非只塞四个fixture。前探针误以为自定义provider相邻、并期待窄列未截断的Configure connection，保留失败收据后改用真实next provider/可见prefix/精确action id；未改产品来迁就夹具。user/project config及models字节不变、请求0、exit0/cooked flags，退出130/138ms仅为小夹具观测。
+
+build `02517cf6aedf162c04ac06a13af6cdddbf144202f4b18b3a8f31b3e167b52d65`，inputs `fc9a56afaba143945a564cf526162ac72b4b207cdc9a6197f1f65b5f12cbd27c`，两CLI及[正式工件](../../.omx/artifacts/phase20-addition-model-order/README.md)绑定。named-callable navigation12→13、renderer6不变、order1，model picker既有46未增长，append disposition而不称全owner达标。无独立代理review/NormProof judge/真实provider/其他平台/exe/full suite/20k；scratch清理，原CLAUDE.md保留。第35项本地实现与小型CLI通过；36/37继续，33的大目录真实体验仍partial，原47及ADD整体不升级，goal active。

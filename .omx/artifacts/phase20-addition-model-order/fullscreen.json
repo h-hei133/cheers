@@ -1,0 +1,53 @@
+{
+  "mode": "fullscreen",
+  "buildId": "02517cf6aedf162c04ac06a13af6cdddbf144202f4b18b3a8f31b3e167b52d65",
+  "inputsDigest": "fc9a56afaba143945a564cf526162ac72b4b207cdc9a6197f1f65b5f12cbd27c",
+  "fixtures": 1,
+  "messagesPerFixture": 1,
+  "providerMode": "synthetic",
+  "status": "passed",
+  "checks": {
+    "providerOrder": true,
+    "currentPinned": true,
+    "heading": true,
+    "allWidths": true,
+    "cookedInputRestored": true,
+    "zeroRequests": true,
+    "configUnchanged": true,
+    "projectConfigUnchanged": true,
+    "modelsUnchanged": true
+  },
+  "widths": [
+    {
+      "width": 40,
+      "side": true,
+      "headingVisible": true,
+      "headingSkipped": true,
+      "modelAndSearchOrder": true,
+      "inspectAndReturn": true
+    },
+    {
+      "width": 80,
+      "side": true,
+      "headingVisible": true,
+      "headingSkipped": true,
+      "modelAndSearchOrder": true,
+      "inspectAndReturn": true
+    },
+    {
+      "width": 120,
+      "side": true,
+      "headingVisible": true,
+      "headingSkipped": true,
+      "modelAndSearchOrder": true,
+      "inspectAndReturn": true
+    }
+  ],
+  "shutdown": {
+    "code": 0,
+    "signal": null
+  },
+  "exitMs": 138,
+  "outputBytes": 133811,
+  "scratchRemoved": true
+}

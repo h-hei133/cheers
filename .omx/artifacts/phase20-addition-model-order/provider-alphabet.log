@@ -1,0 +1,57 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/picker/model/category.test.ts  (26 tests | 3 failed | 23 skipped) 130ms
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 40 columns
+     → expected [ 'Roles', 'All models', …(5) ] to deeply equal [ 'Roles', 'All models', …(5) ]
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 80 columns
+     → expected [ 'Roles', 'All models', …(5) ] to deeply equal [ 'Roles', 'All models', …(5) ]
+   ❯ src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 120 columns
+     → expected [ 'Roles', 'All models', …(5) ] to deeply equal [ 'Roles', 'All models', …(5) ]
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 23 skipped (26)
+   Start at  15:42:29
+   Duration  2.90s (transform 1.91s, setup 0ms, collect 2.53s, tests 130ms, environment 0ms, prepare 55ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/picker/model/category.test.ts -t sorts exact provider and model groups
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 40 columns
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 80 columns
+ FAIL  src/cli/interactive/picker/model/category.test.ts > sorts exact provider and model groups, skips the not-ready heading and inspects at 120 columns
+AssertionError: expected [ 'Roles', 'All models', …(5) ] to deeply equal [ 'Roles', 'All models', …(5) ]
+
+- Expected
++ Received
+
+  Array [
+    "Roles",
+    "All models",
+-   "Alpha ready",
+    "Zulu ready",
++   "Alpha ready",
+    "Not ready",
++   "Omega offline",
+    "Beta offline",
+-   "Omega offline",
+  ]
+
+ ❯ src/cli/interactive/picker/model/category.test.ts:267:52
+    265|   const picker = modelPicker({ ...commands(), readConfiguration: () =>…
+    266|   const rows = await picker.load(), navigation = picker.navigation!;
+    267|   expect(navigation.items.map(item => item.label)).toEqual([
+       |                                                    ^
+    268|     'Roles', 'All models', 'Alpha ready', 'Zulu ready', 'Not ready', '…
+    269|   ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/picker/model/category.test.ts -t 'sorts exact provider and model groups'

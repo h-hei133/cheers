@@ -55,3 +55,15 @@ it('registers only painted sidebar spans and maps clicks after panning without c
     expect(onItem).not.toHaveBeenCalled(); expect(onSidebarRow).not.toHaveBeenCalled();
   }
 });
+
+it.each([40, 80, 120])('paints group headings without registering pointer or wheel targets at %i columns', width => {
+  const model = new OptionModel(); model.setOptions([{ id: 'row', label: 'Content' }]);
+  const onItem = vi.fn(), onSidebarRow = vi.fn();
+  const navigation = { items: [{ id: 'first', label: 'Ready' }, { id: 'group', label: 'Not ready', disabled: true },
+    { id: 'last', label: 'Unavailable' }], active: 'last', focused: true, onItem, onSidebarRow };
+  const rows = renderNavigation(model, { title: 'Picker', empty: '', multiple: false }, navigation, width, 10).map(stripAnsi);
+  expect(rows[2]?.split('│')[0]).toContain('Not ready');
+  expect(onItem.mock.calls.map(call => call[1])).toEqual(['first', 'last']);
+  expect(onSidebarRow.mock.calls.map(call => call[0])).toEqual([1, 3]);
+  expect(rows.every(row => visibleWidth(row) <= width)).toBe(true);
+});
