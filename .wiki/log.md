@@ -10816,3 +10816,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：纯图片提示的续跑证据不再依赖运行阶段
 
 [addition21.62](features/phase-20-addition.md#2162-纯图片提示的续跑证据不再依赖运行阶段)发现hasContinuationEvidence仍要求非空文字，纯图片提示只靠runPhase保住证据（巧合而非规则）。现与sessionResumeEligibility读同一条件。63项聚焦、一反转命中、五门/TS build通过。build f9996ca4。原47/ADD整体partial、goal active。
+
+### 2026-10-31：「提示是否有内容」的其余判定点排查
+
+[addition21.63](features/phase-20-addition.md#2163-提示是否有内容的其余判定点排查)四处判定：continuation已修、eligibility与scope 21.30已含图片准入、sessionsPanel仅显示降级（未改，交互式面板本就只显示status）。未改产品代码。build f9996ca4。原47/ADD整体partial、goal active。

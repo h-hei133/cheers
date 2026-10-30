@@ -4888,3 +4888,17 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现两处读同一条件（空文字时要求最新user消息的文本投影等于pendingPrompt且有实际内容），与eligibility owner一致。探针确认纯图片中断会话`continuationEvidence:true`、`unfinishedWork:true`。
 
 验证：`work`13（新例断言纯图片保留、空文字无图片不保留）、`scope`21、`sessionResumeEligibility`5、`recovery`24，共**63项**通过；一反转（退回纯文字判定）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `f9996ca41a80`。原47/ADD整体partial、goal active。
+
+
+### 21.63 「提示是否有内容」的其余判定点排查
+
+按21.62的方法搜索所有判定pending提示的位置，共四处：
+
+- `sessionContinuationProjection.hasContinuationEvidence`：**21.62已修**（原仅文字）。
+- `sessionResumeEligibility`：21.30已含图片准入。
+- `recovery/scope.readPendingPrompt`：21.30已含专门分支（空文字仅经精确保留的图片消息恢复，legacy缺文字修复不得制造不存在的图片）。
+- `entrypoints/sessionsPanel.buildResumeCue`：仅文字判定，纯图片会话退到`lastUserMessage`或空。
+
+最后一处**未修改**：它是非交互式会话列表的显示降级，不丢数据；交互式`/resume`面板本就只显示`session.status`（`interrupted`等）而不显示pending，两条路径状态字段足够。`SessionReentrySummary`没有「是否含图片」字段，添加它需要改投影契约，收益低于风险。
+
+未改产品代码。build `f9996ca41a80`。原47/ADD整体partial、goal active。
