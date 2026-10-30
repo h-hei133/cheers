@@ -4770,3 +4770,5 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现三处修复：`workspaceSymbol`的扫描根集合为主根+全部附加根（每根独立列表，绝对路径不重复拼接）；`documentSymbol`的前置校验先由`selectWorkspaceRoot`判定路径归属；`readSource`按归属根读取并把该根传给execution service。首轮实现把列表返回的绝对路径无条件`path.join(scanRoot, file)`，使符号链接逃逸测试失败（伪造出根内路径、跳过围栏），改为只拼接相对路径后既有安全测试恢复通过。
 
 验证：`lsp`12（新例断言附加根与主根各自`1 found`、文档符号含`Function: attachedNeedle`）、`language`44，共**56项**通过；两反转（扫描只留主根、文档符号只留主根）均命中且finally字节恢复；五静态门、TS build/freshness通过。首轮测试用`export const`作夹具，parser不产出符号导致断言假阳性（"no match"文案也含查询词），已改为函数声明并断言匹配格式。build `cf51133aa211`。原47/ADD整体partial、goal active。
+
+补充撤销与只读证据：`restore-probe.mjs`经附加根把`before`写成`after`，预览`canRestore:true`、恢复`restored-verified`、文件回到`before`。首轮探针传空access对象，`assertOperationFile`找不到授权根而报`snapshot-or-workspace-unavailable`——这是检查在正常工作（撤销不会穿过会话当前未持有的根），非产品缺陷。`patch-readonly-probe.mjs`覆盖另一侧：只读附加根上的补丁在prepare阶段被拒且不创建文件。

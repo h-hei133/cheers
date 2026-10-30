@@ -63,3 +63,11 @@ rtk env NODE_OPTIONS=--max-old-space-size=2048 VITEST_MAX_THREADS=1 VITEST_MIN_T
 | undo ledger | one operation is visible to the session |
 
 Before this batch the first three agreed with each other and the fourth did not, which is what made the grant look broken: policy approved a write the writer then refused. They now share one answer.
+
+## Restore works for an attached-root write
+
+`restore-probe.mjs` writes `after` over `before` through an attached root, previews the operation, and restores it: the preview reports `canRestore: true`, the restore reports `restored-verified`, and the file holds `before` again.
+
+A probe mistake is kept on record: the first version passed an empty access object, so `assertOperationFile` could not find the attached root among the grants and the preview reported `snapshot-or-workspace-unavailable`. That is the check doing its job — undo will not restore through a root the session does not currently hold — not a product defect.
+
+`patch-readonly-probe.mjs` covers the other side: a patch targeting a read-only attached root is refused during preparation ("This additional workspace root is read-only.") and no file is created.
