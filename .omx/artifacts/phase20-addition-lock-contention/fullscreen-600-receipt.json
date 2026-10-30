@@ -1,0 +1,27 @@
+{
+  "mode": "fullscreen",
+  "holdMs": 600,
+  "status": "passed",
+  "buildId": "5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473",
+  "inputsDigest": "4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806",
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 40,
+    "outputBytes": 1048576
+  },
+  "exit": {
+    "code": 0,
+    "signal": null,
+    "elapsedMs": 677
+  },
+  "reportedFailure": false,
+  "reportedCleanClose": true,
+  "outputTail": "[60;1Hopenai ▏ build ▏ ask ▏ <scratch>/project\u001b[0m\u001b]8;;\u0007\u001b[K\u001b[58;3H\u001b[?25h\u001b[?7h\u001b[?2031l\u001b[?25l\u001b[?7l\u001b[58;3H\u001b[?25h\u001b[?7h\u001b[?1006l\u001b[?1002l\u001b[?2031l\u001b[?1049l\u001b[?2026l\u001b[?7h\u001b[?1l\u001b>\u001b[?2004l\u001b[?1006l\u001b[?1003l\u001b[?1002l\u001b[?1000l\u001b[?25h\u001b[0m\u001b[?1049l\u001b[?7l\r\u001b[2K\u001b[1mCheers\u001b[22m  openai\u001b[0m\u001b]8;;\u0007\r\r\n\r\u001b[2K<scratch>/project\u001b[0m\u001b]8;;\u0007\r\r\n\r\u001b[2K\r\r\n\r\u001b[2KA public question                                                                                                       \u001b[0m\u001b[0m\u001b]8;;\u0007\r\r\n\r\u001b[2K\r\r\n\r\u001b[2KWarning: Config user (unknown): unknown-field; value ignored.\u001b[0m\u001b]8;;\u0007\r\r\n\r\u001b[2K\r\r\n\r\u001b[2KResumed session sess_64a78a5bde7bf15f_1793381136215\u001b[0m\u001b]8;;\u0007\r\r\n\r\u001b[2K\u001b[0m\u001b[?7h\r\r\n\u001b[?25h\r\n  --resume sess_64a78a5bde7bf15f_1793381136215\r\n\r\n",
+  "lockStillHeldAfterExit": false,
+  "lockReleasedByHolder": true,
+  "savedStatus": "terminated",
+  "cookedRestored": true,
+  "outputBytes": 2754,
+  "outputLimitExceeded": false,
+  "scratchRemoved": true
+}

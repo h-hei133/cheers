@@ -10704,3 +10704,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：图片修复批次CI全绿
 
 `97b56211`（纯图片空白行）CI与NormProof均completed/success且head一致。至此本轮四个提交`4fa2cd53`/`4fefcbd0`/`97b56211`/`7675617f`全部CI+Watch双绿；`48873abc`为纯文档归档，Watch success、CI当时in_progress另绑定。绿色CI不替代真实provider/桌面/图形协议验收，原47/ADD整体仍partial、goal active。
+
+### 2026-10-31：会话锁竞争下的退出有界性实测
+
+[addition21.36](features/phase-20-addition.md#2136-会话锁竞争下的退出有界性与失败可见)补21.35未实测的阻塞点：另一存活本地进程真实持锁后，两模式×600/2500ms四组原CLI。短持锁673/677ms、exit0、打印--resume、terminated、cooked恢复；长持锁1346/1342ms、exit1、实际绘制"Session state could not be saved; session close was not verified."、无resume、cooked恢复。直接写入测量同界：900ms等待922ms成功，2500ms在1208ms超时且turn未落盘，释放后24ms成功。结论：偶发卡顿与并发写入者一致，退出有界且失败可见；未改产品代码。边界：单本地进程、仅Linux、无跨主机/stale takeover/真实终端。build 5bf1f1e9，原47/ADD整体partial、goal active。

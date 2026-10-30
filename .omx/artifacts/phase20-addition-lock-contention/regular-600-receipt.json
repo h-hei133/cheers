@@ -1,0 +1,27 @@
+{
+  "mode": "regular",
+  "holdMs": 600,
+  "status": "passed",
+  "buildId": "5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473",
+  "inputsDigest": "4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806",
+  "limits": {
+    "heapMiB": 768,
+    "wallSeconds": 40,
+    "outputBytes": 1048576
+  },
+  "exit": {
+    "code": 0,
+    "signal": null,
+    "elapsedMs": 673
+  },
+  "reportedFailure": false,
+  "reportedCleanClose": true,
+  "outputTail": "jects/cheers/.tmp/lock-contention-pty/run-7pWmcH/project\u001b[0m\u001b]8;;\u0007\u001b[2A\r\u001b[2C\u001b[?25h\u001b[?7h\u001b[?2031l\u001b[?25l\u001b[?7l\u001b[1A\r\u001b[2K──────────────────────────────────────────────────────────────────────────────────────────────────────── ?/64k assumed ─\u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K❯ Ask anything, or / for commands                                                                                       \u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2K────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[0m\u001b]8;;\u0007\r\r\n\u001b[2Kopenai ▏ build ▏ ask ▏ <scratch>/project\u001b[0m\u001b]8;;\u0007\u001b[2A\r\u001b[2C\u001b[?25h\u001b[?7h\u001b[?2031l\u001b[?1049l\u001b[?2026l\u001b[?7h\u001b[?1l\u001b>\u001b[?2004l\u001b[?1006l\u001b[?1003l\u001b[?1002l\u001b[?1000l\u001b[?25h\u001b[0m\u001b[3B\r\r\r\n\u001b[?25h\r\n  --resume sess_8b2b2b0f3bf4a9a7_1793381087537\r\n\r\n",
+  "lockStillHeldAfterExit": false,
+  "lockReleasedByHolder": true,
+  "savedStatus": "terminated",
+  "cookedRestored": true,
+  "outputBytes": 2730,
+  "outputLimitExceeded": false,
+  "scratchRemoved": true
+}

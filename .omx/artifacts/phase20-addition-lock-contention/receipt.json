@@ -1,0 +1,22 @@
+{
+  "buildId": "5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473",
+  "inputsDigest": "4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806",
+  "holdMs": 2500,
+  "status": "passed",
+  "lockExisted": true,
+  "write": {
+    "elapsedMs": 1208,
+    "failed": true,
+    "error": "Session state lock timeout at <scratch>/home/.cheers/profiles/probe/sessions/sess_3887b62a65d1ca1d_1793380862927/state.lock"
+  },
+  "lockReleased": true,
+  "retryAfterRelease": {
+    "elapsedMs": 24,
+    "failed": false
+  },
+  "finalMessages": [
+    "q",
+    "after"
+  ],
+  "scratchRemoved": true
+}

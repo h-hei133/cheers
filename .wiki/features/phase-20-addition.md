@@ -4632,3 +4632,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 用户第30项「打开时显示上次会话」的当前机制复核：[CLI bootstrap](../../packages/ts-shell/src/cli/bootstrap/cliBootstrapContext.ts)把`recoveryCandidate`固定为null，并注明恢复建议在首帧后按需发现；交互与print路径保留显式解析。因此新的CLI启动不会自动采用旧会话，原先记录的SIGTERM/SIGHUP重入路径已在20.5改为显式意图。本批未复现用户当时的界面，也不宣称该现象已修复——只能确认当前源码没有自动重入分支。
 
 证据边界：合成/离线、小型会话、无并发writer、无真实provider与桌面终端；不覆盖锁竞争、不可捕获崩溃与旧版本现场。原47/ADD整体partial、goal active。
+
+
+### 21.36 会话锁竞争下的退出有界性与失败可见
+
+21.35记录的唯一未实测阻塞点已补真实证据。[状态锁](../../packages/ts-shell/src/session/store/sessionFileStore.ts)的`STATE_LOCK_TIMEOUT_MS=1200`同步重试由**另一存活本地进程**真实持有（写入真实pid/hostname/createdAt）后测量，非合成mock。两模式×两持锁时长共四组原CLI：持锁600ms时退出673/677ms、exit0、打印`--resume`、状态terminated、cooked恢复；持锁2500ms时退出1346/1342ms、exit1、实际绘制`Session state could not be saved; session close was not verified.`且不打印resume、cooked仍恢复。
+
+直接经产品自身session owner的写入测量给出同一边界：持锁900ms时等待922ms后成功；持锁2500ms时1208ms超时失败且该turn未落盘（`finalMessages`缺该条），释放后重试24ms成功。因此「有时卡住」与**并发写入者**一致，不是无界等待：进程在锁上界停止并如实报告关闭未确认，失败是可见的而非静默。1.35秒是真实用户可感知延迟，但有界且真实；本批未改产品代码，因为改变上界只是换取另一个上界而非消除等待。
+
+证据边界：合成/离线会话、单个本地竞争进程、仅Linux；未覆盖跨主机持有者、持锁中途死亡（stale takeover）、真实用户终端或多进程并发竞争。[正式工件](../../.omx/artifacts/phase20-addition-lock-contention/README.md)。build `5bf1f1e9aa7b6bcbbce651406619195849c98f9a9be8add557fa4467dcb4a473`、inputs `4a1f8e04d9c1e9765729f40c7e6ae6fda84779dd82cef93a457dd7d326ca8806`。原47/ADD整体partial、goal active。
