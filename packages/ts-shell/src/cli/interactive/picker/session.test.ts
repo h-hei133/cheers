@@ -28,7 +28,9 @@ function fixture(
 ) {
   const records = new Map(sessions.map(item => [item.id, item]));
   const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
-  const resume = vi.fn(async () => undefined); const remove = vi.fn(async () => undefined); const rename = vi.fn(async () => undefined);
+  const resume = vi.fn(async () => undefined);
+  const remove = vi.fn(async (): Promise<string | undefined> => undefined);
+  const rename = vi.fn(async (): Promise<string | undefined> => undefined);
   const manager = { catalog: {
       beginBrowse: vi.fn(() => ({ id: 'test-browse' })), retireBrowse: vi.fn(), async *list(listContext: typeof context = context, _signal?: AbortSignal, limit = 40,
     _source?: unknown, _diagnostic?: unknown, query?: SessionCatalogQuery) {
@@ -305,19 +307,31 @@ it.each(['missing', 'foreign', 'empty'] as const)('never bypasses scope or saved
   expect(apply).toHaveBeenCalledWith(setup.picker, ['other']);
 });
 
-it.each(['missing', 'rebound', 'busy', 'session-changed', 'project-changed', 'empty', 'identity-changed'] as const)('revalidates the target and runtime before every action: %s', async change => {
+it.each(['busy', 'session-changed', 'project-changed'] as const)('revalidates the runtime before every action: %s', async change => {
   const setup = fixture(); await setup.picker.load();
-  if (change === 'missing') setup.records.delete('other');
-  if (change === 'rebound') setup.records.get('other')!.projectRoot = '/elsewhere';
   if (change === 'busy') setup.context.busy = true;
   if (change === 'session-changed') setup.context.sessionId = 'new-current';
   if (change === 'project-changed') setup.context.projectRoot = '/elsewhere';
-  if (change === 'empty') { setup.records.get('other')!.turns = []; setup.records.get('other')!.status = 'active'; }
-  if (change === 'identity-changed') setup.records.get('other')!.id = 'injected';
   expect((await setup.picker.apply(['other']))?.note).toBeTruthy();
   expect(await setup.picker.onDelete?.('other')).toBeTruthy();
   expect(await setup.picker.onRename?.('other', 'new title')).toBeTruthy();
   expect(setup.resume).not.toHaveBeenCalled(); expect(setup.remove).not.toHaveBeenCalled(); expect(setup.rename).not.toHaveBeenCalled();
+});
+
+it.each(['missing', 'rebound', 'empty', 'identity-changed'] as const)('revalidates resume content and forwards the original version to mutation owners: %s', async change => {
+  const setup = fixture(); await setup.picker.load();
+  if (change === 'missing') setup.records.delete('other');
+  if (change === 'rebound') setup.records.get('other')!.projectRoot = '/elsewhere';
+  if (change === 'empty') { setup.records.get('other')!.turns = []; setup.records.get('other')!.status = 'active'; }
+  if (change === 'identity-changed') setup.records.get('other')!.id = 'injected';
+  setup.remove.mockResolvedValue('The mutation owner refused the stale source.');
+  setup.rename.mockResolvedValue('The mutation owner refused the stale source.');
+  expect((await setup.picker.apply(['other']))?.note).toBeTruthy();
+  expect(setup.resume).not.toHaveBeenCalled();
+  expect(await setup.picker.onDelete?.('other')).toContain('mutation owner refused');
+  expect(await setup.picker.onRename?.('other', 'new title')).toContain('mutation owner refused');
+  expect(setup.remove).toHaveBeenCalledWith('other', 'version');
+  expect(setup.rename).toHaveBeenCalledWith('other', 'new title', 'version');
 });
 
 it('blocks current deletion while permitting explicit rename and normal completed-session reentry', async () => {

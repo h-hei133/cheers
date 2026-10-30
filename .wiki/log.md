@@ -10525,3 +10525,11 @@ resume只读研究补充删项tombstone/在途worker、消耗cursor、预算不�
 四文件179项、四独立反转/bytes恢复、五门及TS build串行通过；118旧advisory保留，五个主要owner callable≤19。原Node CLI两模式各8会话/每条一消息，真实Delete/Enter连续删两项含搜索后清空，begin1/forget2/close前retire0、close后1，剩余非current三文件与config不变、零请求、exit0/cooked。195/278与193/275ms只为小夹具，非用户大目录性能。初次Ctrl+D在原空草稿策略下正常退出、零删除，失败收据保留；modal提示改Del，未新增session panel页脚。
 
 工件/HANDOFF更新，scratch清理、原CLAUDE.md保留。33的三次整读/扫描解析/ambient优化和大目录实测仍待续，31/32/35/36/37继续；原47与ADD不升级，goal active。上批49e3d16e CI41005821166/Watch41005821171已completed/success且head一致；本批Git/未来CI另绑定。
+
+## [2026-10-30] fix | 会话删除移除三次同步全文读取
+
+[addition21.12](features/phase-20-addition.md#2112-第三十三实施之二管理快照与删除前置检查不再同步读取全文)新增store管理快照与明确target类型，metadata/state前后保留目录+三文件version，校验身份/日期/status/根一致性并保留legacy fallback。原prepare/锁内apply/readback改为管理快照；删除/rename picker用offered summary，真实host/writer继续复验版本和准入，不改原删除writer/unknown证据。resume/pin前置完整检查保留，rename原owner的一次加载保留。
+
+原实现新delete/pin回归分别2/3次全文读取失败；四独立反转、bytes恢复、四文件136项、五门/build串行通过。四种展示后变化实际经过原picker/native owner，拒绝且零writer/getSession。两模式CLI各8会话/每条一消息连续删两项含搜索，实际同步transcript读取从阶段1次降为最终[0,0]；原browse保留、文件/config不变、零请求、exit0/cooked。194/279及195/278ms为小fixture，不冒充用户大目录性能。原有两pin前置拒绝回归保留，初次扩大优化范围的失败已分类修正。
+
+正式工件/HANDOFF更新，复用上批probe并保留before-selection收据，scratch清理、CLAUDE.md不改。33的扫描解析/ambient/大目录体验仍partial，31/32/35/36/37继续，原47与ADD不升级、goal active。上批已推送db36da4432916d9465f9d085ebef3e9a574ae878，延后一次CI41009873087 in_progress/Watch41009873069 success且head一致；本批Git/未来CI另绑定。

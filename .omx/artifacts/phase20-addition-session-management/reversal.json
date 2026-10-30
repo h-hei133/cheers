@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "name": "picker-read",
+      "exit": 1,
+      "sourceSha256": "1612c7c310ae8ad8b9f12505df3571a9890338b63e3e5076a580e9b755907338"
+    },
+    {
+      "name": "full-record",
+      "exit": 1,
+      "sourceSha256": "1b7915d53f551eea905fc1ada1ffbff35fdd5837c6523d7fe7f491912d8fa2bc"
+    },
+    {
+      "name": "source-version",
+      "exit": 1,
+      "sourceSha256": "fcab0b447e83d51adfde9c887a7370774899d24f27f69ba693581b50080abb2c"
+    },
+    {
+      "name": "project-agreement",
+      "exit": 1,
+      "sourceSha256": "fcab0b447e83d51adfde9c887a7370774899d24f27f69ba693581b50080abb2c"
+    }
+  ],
+  "restored": true
+}

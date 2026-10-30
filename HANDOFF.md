@@ -1110,3 +1110,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A direct overlay Ctrl+D test deletes, while the real CLI exits with no deletion.
 - **Root Cause**: Empty-draft app.exit runs before modal ownership; the generic overlay shortcut is not proof of host reachability.
 - **Rule**: Advertise and exercise the existing Delete key for deletion; preserve explicit global exit behavior. Distinguish modal action hints from panel footers and verify real confirmation, directory absence and source retention through CLI input.
+
+### Management Snapshots Need State And Source Identity Without A Conversation
+- **Symptom**: Deletion reparses the transcript during picker checks, preview and locked application; replacing that record with metadata alone can lose busy or source-replacement protection.
+- **Root Cause**: Full Session acquisition was reused for a metadata/state action, and a cached picker gate was confused with the actual writer boundary.
+- **Rule**: Use an explicit management target, read metadata and state at both original confirmation stages, and retain directory plus all three file versions before and after acquisition. Reject conflicting roots and preserve legacy single-source roots. Pass the offered version from cached deletion/rename checks into the native owner, and prove post-display changes invoke no writer. Keep resume and pin admission contracts separate; count actual synchronous transcript reads through the CLI rather than claiming total I/O disappeared.

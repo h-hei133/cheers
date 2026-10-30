@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { checkBuild } from '../../../scripts/start-lib.mjs';
 import { createQaPtyEnvironment } from '../../../scripts/qa-pty-env.mjs';
 
-const root = process.cwd(), archive = path.join(root, '.omx/artifacts/phase20-addition-resume-removal');
+const root = process.cwd(), archive = path.join(root, process.argv[3] ?? '.omx/artifacts/phase20-addition-resume-removal');
 const base = path.join(root, '.tmp/resume-removal');
 fs.mkdirSync(base, { recursive: true, mode: 0o700 });
 const build = checkBuild({ root, dist: path.join(root, 'packages/ts-shell/dist'),
@@ -90,12 +90,18 @@ try {
     const query = index === 1 ? '' : 'removal-fixture-2';
     if (query) { child.stdin.write(query); await wait(() => ready(query) && observe().snapshot.ids.length === 1, 'search'); }
     await focus(fixtureIds[index]);
+    const beforeSync = observe().syncTranscriptReads;
     const started = Date.now(); child.stdin.write('\x1b[3~');
     await wait(() => observe().snapshot.subMode === 'confirm-delete', 'delete-confirmation');
     child.stdin.write('\r');
     await wait(() => !fs.existsSync(directory(fixtureIds[index])) && ready(query)
       && !observe().snapshot.ids.includes(fixtureIds[index]) && observe().removals === index, 'delete');
     receipt.deletionMs.push(Date.now() - started);
+    if (beforeSync !== undefined) {
+      const reads = observe().syncTranscriptReads - beforeSync;
+      (receipt.syncTranscriptReadsPerDeletion ??= []).push(reads);
+      assert.equal(reads, observe().expectedSyncTranscriptReadsPerDeletion ?? 1, 'synchronous conversation read count');
+    }
     assert.equal(observe().begins, 1, 'same browse'); assert.equal(observe().retires, 0, 'not retired');
     assert.equal(current(), fixtureIds[0], 'deletion does not resume');
     if (query) { child.stdin.write('\x7f'.repeat(query.length));

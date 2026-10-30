@@ -1,0 +1,31 @@
+{"reversed":4,"restored":true}
+scc-gate root=packages/ts-shell/src files=3007
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=53 read=53 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=25 docs_refs=456 docs_dangling=0 docs_source_dangling=118
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 118 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/session/store/management.test.ts src/session/lifecycle/management.test.ts src/cli/interactive/picker/session.test.ts src/cli/interactive/picker/session/lifetime.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/session/lifecycle/management.test.ts  (39 tests) 1486ms
+ ✓ src/session/store/management.test.ts  (14 tests) 32ms
+ ✓ src/cli/interactive/picker/session.test.ts  (75 tests) 12875ms
+ ✓ src/cli/interactive/picker/session/lifetime.test.ts  (8 tests) 1076ms
+
+ Test Files  4 passed (4)
+      Tests  136 passed (136)
+   Start at  13:57:51
+   Duration  25.51s (transform 6.41s, setup 0ms, collect 9.27s, tests 15.47s, environment 0ms, prepare 175ms)
+
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+Wrote build manifest c75224511e91 for @cheers/ts-shell@0.1.0

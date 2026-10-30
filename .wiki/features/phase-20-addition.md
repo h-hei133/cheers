@@ -4302,3 +4302,23 @@ regular两次删除195/278ms、退出126ms；fullscreen193/275ms、退出125ms�
 **尚未完成**：21.3建议2的管理快照/三次整读、建议3的扫描解析让出主线程、建议4的ambient读取优化及用户大目录实测；第33项仍partial，31/32/35/36/37继续按顺序实施。没有真实provider/外部平台/独立代理审核/exe/full suite/20k证据；原47项与ADD整体状态不升级，goal active。本批未派发子代理，所有验证严格逐进程串行。
 
 延后精确检查上批 `49e3d16ed1188fbc77b1fa5b80d894936ba3ed10`：CI41005821166和Watch41005821171均completed/success。本批Git/推送及未来CI另绑定，不沿用旧CI作本批证据。
+
+21.11已提交并推送`db36da4432916d9465f9d085ebef3e9a574ae878`。继续下一段后才检查：CI41009873087仍in_progress，Watch41009873069 completed/success，head均一致；不等待或重复轮询该CI。
+
+### 21.12 第三十三实施之二：管理快照与删除前置检查不再同步读取全文
+
+落实21.3建议2。新增原store域的[management快照](../../packages/ts-shell/src/session/store/management.ts)：读取metadata/state，以明确的`SessionManagementTarget`返回管理所需身份和字段；没有构造`turns: []`或冒充完整Session。读取前后仍比较包含目录及metadata/state/transcript三份文件的原version，校验ID、日期、字段类型、status及两处projectRoot一致性；legacy单一根来源沿既有fallback兼容，均缺失或互相矛盾则拒绝。元数据与状态仍分别在预览、锁内应用时读取，不能省掉确认后的复验。
+
+原[lifecycle管理owner](../../packages/ts-shell/src/session/lifecycle/management.ts)的预览、锁内验证和读回改用管理快照。删除继续调用原SessionManager.deleteSession及原物理缺失确认，unknown/unchanged/changed不变；pin沿现有metadata writer更新真实metadata并保留其余字段。rename仍委托原SessionManager.renameSession，因此它本身所需的一次完整加载没有被本批绕过。
+
+原picker的删除/重命名前置检查使用已展示summary的project/reentry及原offered版本；真正fresh身份、busy/current、版本、configuration/surface准入和写锁仍由原sessionPickerHost/prepare/apply检查。resume与pin的picker前置检查保留原完整target读取：初次将summary优化扩到pin使两条missing/foreign回归失败，分类为超出本次优化范围后收回，原拒绝断言保留。旧session测试拆清“前置runtime拒绝”与“将offered version送到真实管理owner”，新增四条原catalog→picker→native host→writer拒绝测试，覆盖展示后的缺失/项目/身份/内容变化；两种mutation均零writer调用、零getSession调用。
+
+写前定向只读比较pi session-selector.ts:644–680：其删除工具不读会话全文，同意管理动作无需正文；不采用其trash退出码即可判成功、直接unlink及stderr回显的策略。本项目保留更严格的三文件/目录版本、锁内状态和实际删除证据。真实writer和metadata publication owner均未替换，不新增执行或索引系统。
+
+新零全文读取回归在原实现上分别捕获delete两次、pin三次同步record读并失败。元数据/状态读取14项测试覆盖不构造conversation、错误ID/日期/title/root/status、legacy根、读取中transcript/目录替换及symlink拒绝。最终单worker/1536MiB四文件136项通过：store14、lifecycle39、session picker75、lifetime8；四个独立反转分别恢复picker全文检查、原lifecycle全文读取、撤回快照version复验及撤回根一致性检查，全部断言失败，finally逐字节恢复后136项再通过。五静态门、2048MiB TS build及diff检查通过，118条旧docs-source advisory保留。
+
+复用21.11有界CLI脚本，增加可选工件目录和共享observer导出；本批observer只计数实际fs.readFileSync的transcript路径，通过syncBuiltinESMExports覆盖内置live bindings，不保存正文。仅管理快照修补时两模式均测到每次删除仍读一次全文，收据保留为before-selection；picker前置检查修补后，最终两模式各两次删除的同步transcript读均为`[0,0]`，确认进入原Delete/Enter、搜索内删除、清搜索、原browse begin1/forget2/关闭前retire0、关闭后1，剩余文件/config不变、零模型请求、exit0及cooked flags恢复。
+
+最终regular删除194/279ms、退出142ms，fullscreen195/278ms、退出135ms。每模式仅8会话/每条一消息，synthetic/offline，heap768MiB、45秒/2MiB；该结果不是用户2307目录的吞吐/延迟基准，也不等于目录解析零I/O。cold catalog精确解析仍可能沿原异步读取正文，本文只证明删除链移除三次同步全文获取。build `c75224511e9184b8c4b496056e3b07e1d3377ef41631dedfa7deba417302288a`、inputs `3c8a8e231dcf1cc3c3742f932309a1dcc5c1833130a2d80a6296b88965bbfc87`，两模式经checkBuild绑定；正式[工件](../../.omx/artifacts/phase20-addition-session-management/)保留反转、测试、阶段与最终收据。scratch清理、原CLAUDE.md保留；无子代理、无并行验证。
+
+第33项仍partial：扫描解析调度、overlay期间ambient读取及用户大目录体验尚未完成；31/32/35/36/37继续。未运行真实provider、其他平台、exe、full suite或20k，未取得本批独立review或CI最终证据；原47与ADD整体状态不升级，goal active。本批Git/推送及未来CI另绑定。

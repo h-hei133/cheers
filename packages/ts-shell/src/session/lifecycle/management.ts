@@ -1,12 +1,10 @@
 import { dirname } from 'node:path';
 import { lstatSync } from 'node:fs';
 import type { SessionManager } from '../SessionManager.js';
-import type { Session } from '../schema/sessionRecord.js';
 import type { SessionSelectionContext } from '../navigation/selection.js';
 import { normalizePathIdentity } from '../continuation/roots.js';
 import { projectSessionFileLayout, type SessionFileLayout } from '../store/sessionFileLayout.js';
-import { readSessionRecordSnapshot } from '../store/sessionStore.js';
-import { projectSessionMetadata } from '../schema/sessionMetadataCodec.js';
+import { readSessionManagementSnapshot, type SessionManagementTarget } from '../store/management.js';
 import { writeJsonFileAtomic } from '../store/sessionFileStore.js';
 import { readSessionFileVersion } from '../store/version.js';
 import { withSessionStateLock } from '../store/sessionStateStore.js';
@@ -15,7 +13,7 @@ type Manager = Pick<SessionManager, 'catalog' | 'getSessionDirPath' | 'renameSes
 export type SessionManagementAction = 'rename' | 'delete' | 'pin';
 export interface SessionManagementPreview {
   readonly action: SessionManagementAction;
-  readonly session: Session;
+  readonly session: SessionManagementTarget;
   readonly expected: SessionSelectionContext;
   readonly layout: SessionFileLayout;
   readonly version: string;
@@ -44,8 +42,8 @@ export async function prepareSessionManagement(manager: Manager, context: () => 
     : 'Session was not found. No session was changed.' };
   try {
     const layout = layoutFor(manager, resolved.sessionId);
-    const version = readSessionFileVersion(layout);
-    const snapshot = readSessionRecordSnapshot({ sessionId: resolved.sessionId, layout, cwd: expected.projectRoot });
+    const snapshot = readSessionManagementSnapshot(layout, resolved.sessionId);
+    const version = snapshot.version;
     const note = block(expected, context(), snapshot.session, resolved.sessionId, action, snapshot.state.status === 'active' ? snapshot.state.runPhase : undefined);
     if (note) return { note };
     if (version !== readSessionFileVersion(layout) || layoutFor(manager, resolved.sessionId).sessionDir !== layout.sessionDir) {
@@ -76,7 +74,7 @@ export function applySessionManagement(manager: Manager, context: () => SessionS
       if (layout.sessionDir !== preview.layout.sessionDir || readSessionFileVersion(layout) !== preview.version) {
         return { status: 'unchanged', note: 'The saved session changed after the preview. Reopen the action.' };
       }
-      const snapshot = readSessionRecordSnapshot({ sessionId: id, layout, cwd: preview.expected.projectRoot });
+      const snapshot = readSessionManagementSnapshot(layout, id);
       const note = block(preview.expected, context(), snapshot.session, id, preview.action, snapshot.state.status === 'active' ? snapshot.state.runPhase : undefined);
       if (note) return { status: 'unchanged', note };
       if (readSessionFileVersion(layout) !== preview.version) return { status: 'unchanged', note: 'The saved session changed after the preview. Reopen the action.' };
@@ -85,8 +83,8 @@ export function applySessionManagement(manager: Manager, context: () => SessionS
       started = true;
       if (preview.action === 'pin') {
         const selected = pinned ?? !snapshot.session.pinned;
-        writeJsonFileAtomic(layout.metadataPath, projectSessionMetadata({ ...snapshot.session, pinned: selected }));
-        const saved = readSessionRecordSnapshot({ sessionId: id, layout, cwd: preview.expected.projectRoot }).session;
+        writeJsonFileAtomic(layout.metadataPath, { ...snapshot.metadata, pinned: selected ? true : undefined });
+        const saved = readSessionManagementSnapshot(layout, id).session;
         return saved.id === id && saved.createdAt === preview.session.createdAt && Boolean(saved.pinned) === selected
           ? { status: 'changed', note: `Session ${id} ${selected ? 'pinned' : 'unpinned'}.` }
           : { status: 'unknown', note: 'Pinning was attempted, but its saved state could not be confirmed. Reopen the session list.' };
@@ -98,7 +96,7 @@ export function applySessionManagement(manager: Manager, context: () => SessionS
           : { status: 'changed', note: `Deleted session ${id}.` };
       }
       manager.renameSession(id, title!.trim());
-      const saved = readSessionRecordSnapshot({ sessionId: id, layout, cwd: preview.expected.projectRoot }).session;
+      const saved = readSessionManagementSnapshot(layout, id).session;
       return saved.id === id && saved.createdAt === preview.session.createdAt && saved.title === title!.trim()
         ? { status: 'changed', note: `Renamed session ${id} to ${saved.title}.` }
         : { status: 'unknown', note: 'Rename was attempted, but the saved title could not be confirmed. Check it before retrying.' };
@@ -137,7 +135,7 @@ function layoutFor(manager: Manager, id: string): SessionFileLayout {
   return projectSessionFileLayout({ sessionsDir: dirname(manager.getSessionDirPath(id)), sessionId: id });
 }
 
-function block(expected: SessionSelectionContext, current: SessionSelectionContext, target: Session, id: string,
+function block(expected: SessionSelectionContext, current: SessionSelectionContext, target: SessionManagementTarget, id: string,
   action: SessionManagementAction, phase?: string): string | undefined {
   const root = normalizePathIdentity(expected.projectRoot);
   if (!root || expected.sessionId !== current.sessionId || root !== normalizePathIdentity(current.projectRoot)) return 'The active session or project changed. Reopen the action.';

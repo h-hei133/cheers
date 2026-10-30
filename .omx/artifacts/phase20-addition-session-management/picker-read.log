@@ -1,0 +1,221 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/lifecycle/management.test.ts  (39 tests | 4 failed | 35 skipped) 201ms
+   ❯ src/session/lifecycle/management.test.ts > refuses a cached picker mutation at the native writer boundary after missing changes
+     → expected "getSession" to not be called at all, but actually been called 2 times
+
+Received:
+
+  1st getSession call:
+
+    Array [
+      "sess_31cd31aca941984b_1793339857622",
+    ]
+
+  2nd getSession call:
+
+    Array [
+      "sess_31cd31aca941984b_1793339857622",
+    ]
+
+
+Number of calls: 2
+
+   ❯ src/session/lifecycle/management.test.ts > refuses a cached picker mutation at the native writer boundary after project changes
+     → expected "getSession" to not be called at all, but actually been called 2 times
+
+Received:
+
+  1st getSession call:
+
+    Array [
+      "sess_deb2443a820e3fa9_1793339857686",
+    ]
+
+  2nd getSession call:
+
+    Array [
+      "sess_deb2443a820e3fa9_1793339857686",
+    ]
+
+
+Number of calls: 2
+
+   ❯ src/session/lifecycle/management.test.ts > refuses a cached picker mutation at the native writer boundary after identity changes
+     → expected "getSession" to not be called at all, but actually been called 2 times
+
+Received:
+
+  1st getSession call:
+
+    Array [
+      "sess_29e075c216aba903_1793339857731",
+    ]
+
+  2nd getSession call:
+
+    Array [
+      "sess_29e075c216aba903_1793339857731",
+    ]
+
+
+Number of calls: 2
+
+   ❯ src/session/lifecycle/management.test.ts > refuses a cached picker mutation at the native writer boundary after empty changes
+     → expected "getSession" to not be called at all, but actually been called 2 times
+
+Received:
+
+  1st getSession call:
+
+    Array [
+      "sess_2315f21c08350534_1793339857775",
+    ]
+
+  2nd getSession call:
+
+    Array [
+      "sess_2315f21c08350534_1793339857775",
+    ]
+
+
+Number of calls: 2
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 35 skipped (39)
+   Start at  13:57:28
+   Duration  9.28s (transform 6.77s, setup 0ms, collect 8.82s, tests 201ms, environment 0ms, prepare 55ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/session/lifecycle/management.test.ts -t cached picker mutation at the native writer boundary
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/lifecycle/management.test.ts > refuses a cached picker mutation at the native writer boundary after missing changes
+AssertionError: expected "getSession" to not be called at all, but actually been called 2 times
+
+Received:
+
+  1st getSession call:
+
+    Array [
+      "sess_31cd31aca941984b_1793339857622",
+    ]
+
+  2nd getSession call:
+
+    Array [
+      "sess_31cd31aca941984b_1793339857622",
+    ]
+
+
+Number of calls: 2
+
+ ❯ src/session/lifecycle/management.test.ts:76:21
+     74|     expect(await picker.onDelete!(h.target.id)).toBeTruthy();
+     75|     expect(await picker.onRename!(h.target.id, 'New title')).toBeTruth…
+     76|     expect(get).not.toHaveBeenCalled(); expect(remove).not.toHaveBeenC…
+       |                     ^
+     77|   } finally { picker.previewEnd?.(); }
+     78| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/session/lifecycle/management.test.ts > refuses a cached picker mutation at the native writer boundary after project changes
+AssertionError: expected "getSession" to not be called at all, but actually been called 2 times
+
+Received:
+
+  1st getSession call:
+
+    Array [
+      "sess_deb2443a820e3fa9_1793339857686",
+    ]
+
+  2nd getSession call:
+
+    Array [
+      "sess_deb2443a820e3fa9_1793339857686",
+    ]
+
+
+Number of calls: 2
+
+ ❯ src/session/lifecycle/management.test.ts:76:21
+     74|     expect(await picker.onDelete!(h.target.id)).toBeTruthy();
+     75|     expect(await picker.onRename!(h.target.id, 'New title')).toBeTruth…
+     76|     expect(get).not.toHaveBeenCalled(); expect(remove).not.toHaveBeenC…
+       |                     ^
+     77|   } finally { picker.previewEnd?.(); }
+     78| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/session/lifecycle/management.test.ts > refuses a cached picker mutation at the native writer boundary after identity changes
+AssertionError: expected "getSession" to not be called at all, but actually been called 2 times
+
+Received:
+
+  1st getSession call:
+
+    Array [
+      "sess_29e075c216aba903_1793339857731",
+    ]
+
+  2nd getSession call:
+
+    Array [
+      "sess_29e075c216aba903_1793339857731",
+    ]
+
+
+Number of calls: 2
+
+ ❯ src/session/lifecycle/management.test.ts:76:21
+     74|     expect(await picker.onDelete!(h.target.id)).toBeTruthy();
+     75|     expect(await picker.onRename!(h.target.id, 'New title')).toBeTruth…
+     76|     expect(get).not.toHaveBeenCalled(); expect(remove).not.toHaveBeenC…
+       |                     ^
+     77|   } finally { picker.previewEnd?.(); }
+     78| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/session/lifecycle/management.test.ts > refuses a cached picker mutation at the native writer boundary after empty changes
+AssertionError: expected "getSession" to not be called at all, but actually been called 2 times
+
+Received:
+
+  1st getSession call:
+
+    Array [
+      "sess_2315f21c08350534_1793339857775",
+    ]
+
+  2nd getSession call:
+
+    Array [
+      "sess_2315f21c08350534_1793339857775",
+    ]
+
+
+Number of calls: 2
+
+ ❯ src/session/lifecycle/management.test.ts:76:21
+     74|     expect(await picker.onDelete!(h.target.id)).toBeTruthy();
+     75|     expect(await picker.onRename!(h.target.id, 'New title')).toBeTruth…
+     76|     expect(get).not.toHaveBeenCalled(); expect(remove).not.toHaveBeenC…
+       |                     ^
+     77|   } finally { picker.previewEnd?.(); }
+     78| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/session/lifecycle/management.test.ts -t 'cached picker mutation at the native writer boundary'

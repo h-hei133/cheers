@@ -11,7 +11,8 @@ export function sessionActions(browser: SessionBrowser,
     try { const issue = options.admission?.(); if (issue) return issue; }
     catch { return 'Session selection is unavailable. Reopen the session picker.'; }
     if (!browser.active()?.offered.has(id)) return 'This session was not offered. Reopen the session picker.';
-    return sessionSelectionBlock({ expected: browser.expected, current: options.context(), target: options.sessionManager.getSession(id), targetId: id, action });
+    const target = action === 'delete' || action === 'rename' ? browser.active()?.summaries.get(id) : options.sessionManager.getSession(id);
+    return sessionSelectionBlock({ expected: browser.expected, current: options.context(), target, targetId: id, action });
   };
   const update = async (id: string, action: 'delete' | 'rename' | 'pin', title?: string): Promise<string | undefined> => {
     const block = blocked(id, action);

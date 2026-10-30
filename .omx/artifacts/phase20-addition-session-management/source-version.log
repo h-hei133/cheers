@@ -1,0 +1,45 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/store/management.test.ts  (14 tests | 2 failed | 12 skipped) 13ms
+   ❯ src/session/store/management.test.ts > refuses transcript replacement during the metadata/state read
+     → expected [Function] to throw an error
+   ❯ src/session/store/management.test.ts > refuses directory replacement during the metadata/state read
+     → expected [Function] to throw an error
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 12 skipped (14)
+   Start at  13:57:48
+   Duration  608ms (transform 304ms, setup 0ms, collect 366ms, tests 13ms, environment 0ms, prepare 56ms)
+
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/session/store/management.test.ts -t replacement during the metadata/state read
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/store/management.test.ts > refuses transcript replacement during the metadata/state read
+ FAIL  src/session/store/management.test.ts > refuses directory replacement during the metadata/state read
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ src/session/store/management.test.ts:67:64
+     65|     return state;
+     66|   });
+     67|   expect(() => readSessionManagementSnapshot(layout, 'saved')).toThrow…
+       |                                                                ^
+     68| });
+     69|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/session/store/management.test.ts -t 'replacement during the metadata/state read'

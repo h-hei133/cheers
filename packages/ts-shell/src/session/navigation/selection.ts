@@ -49,11 +49,11 @@ export function compareSessionChoices(left: Pick<SessionSummary, 'id' | 'pinned'
     || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
 }
 
-/** Validate the runtime identity and freshly read target before a selection action. */
+/** Validate runtime identity and the offered target; mutation owners recheck its source version. */
 export function sessionSelectionBlock(input: {
   readonly expected: SessionSelectionContext;
   readonly current: SessionSelectionContext;
-  readonly target: Session | undefined;
+  readonly target: Session | SessionSummary | undefined;
   readonly targetId: string;
   readonly action: 'resume' | 'rename' | 'delete' | 'pin';
 }): string | undefined {
@@ -65,7 +65,7 @@ export function sessionSelectionBlock(input: {
   if (current.busy) return 'A session operation is running. Wait before changing saved sessions.';
   if (!target) return 'This session is missing or unreadable. Reopen the session picker.';
   if (target.id !== targetId) return 'The saved session identity does not match the selected session.';
-  if (normalizePathIdentity(target.projectRoot) !== root || !sessionHasReentrySurface(target)) {
+  if (normalizePathIdentity(target.projectRoot) !== root || !sessionSelectable(target, current)) {
     return 'This session is no longer available in the current project.';
   }
   if (action === 'delete' && targetId === current.sessionId) return 'The current session cannot be deleted. Switch sessions first.';

@@ -16,11 +16,14 @@ import type { StreamingRenderer } from '../../presentation/terminal/streaming.js
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import { configurationBinding } from '../../core/shell/configuration.js';
 import { ConfigState } from '../../config/state.js';
+import * as sessionStore from '../store/sessionStore.js';
+import { sessionPicker } from '../../cli/interactive/picker/session.js';
 
 const roots: string[] = [];
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
 function fixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-management-')); roots.push(root);
+  const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
+  const root = fs.mkdtempSync(path.join(scratch, 'session-management-')); roots.push(root);
   vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root);
   const manager = new SessionManager();
   const current = manager.createNew(root); const target = manager.createNew(root);
@@ -31,6 +34,48 @@ function fixture() {
   runtimeContext.configuration = new ConfigState(runtimeContext.runtimeConfig, configurationBinding(runtimeContext));
   return { root, manager, current, target, context, host, runtimeContext };
 }
+
+it.each(['delete', 'pin'] as const)('uses metadata and state without synchronously acquiring conversation content for %s', async action => {
+  const h = fixture();
+  const read = vi.spyOn(fs, 'readFileSync');
+  const record = vi.spyOn(sessionStore, 'readSessionRecordSnapshot');
+  const prepared = await prepareSessionManagement(h.manager, h.host.sessionContext, action, h.target.id);
+  expect(prepared.preview).toBeDefined();
+  expect(applySessionManagement(h.manager, h.host.sessionContext, prepared.preview!)).toMatchObject({ status: 'changed' });
+  expect(record).not.toHaveBeenCalled();
+  expect(read.mock.calls.filter(([target]) => String(target).endsWith('transcript.jsonl'))).toHaveLength(0);
+});
+
+it.each(['missing', 'project', 'identity', 'empty'] as const)('refuses a cached picker mutation at the native writer boundary after %s changes', async change => {
+  const h = fixture();
+  h.manager.addTurn(h.target.id, { role: 'user', content: 'Saved target for management' });
+  const actions = sessionPickerHost({ runtimeContext: h.runtimeContext, sessionManager: h.manager,
+    busy: () => false, resume: async () => undefined });
+  const picker = sessionPicker({ sessionManager: h.manager, context: h.host.sessionContext,
+    resume: async () => undefined, delete: actions.deleteSession, rename: actions.renameSession });
+  try {
+    await picker.load();
+    await new Promise<void>(resolve => { picker.subscribe!(rows => {
+      if (rows.some(row => row.id === h.target.id) && picker.status?.(rows)?.includes('End of this session page range')) resolve();
+    }); });
+    const get = vi.spyOn(h.manager, 'getSession'), remove = vi.spyOn(h.manager, 'deleteSession'), rename = vi.spyOn(h.manager, 'renameSession');
+    const directory = h.manager.getSessionDirPath(h.target.id);
+    if (change === 'missing') fs.rmSync(directory, { recursive: true });
+    else if (change === 'project' || change === 'identity') {
+      const target = path.join(directory, 'metadata.json'), metadata = JSON.parse(fs.readFileSync(target, 'utf8'));
+      if (change === 'project') metadata.projectRoot = path.join(h.root, 'other'); else metadata.id = 'other';
+      fs.writeFileSync(target, JSON.stringify(metadata));
+    } else {
+      const transcript = path.join(directory, 'transcript.jsonl'), header = fs.readFileSync(transcript, 'utf8').split('\n')[0]!;
+      fs.writeFileSync(transcript, header + '\n');
+      const target = path.join(directory, 'state.json'), state = JSON.parse(fs.readFileSync(target, 'utf8'));
+      fs.writeFileSync(target, JSON.stringify({ ...state, status: 'active' }));
+    }
+    expect(await picker.onDelete!(h.target.id)).toBeTruthy();
+    expect(await picker.onRename!(h.target.id, 'New title')).toBeTruthy();
+    expect(get).not.toHaveBeenCalled(); expect(remove).not.toHaveBeenCalled(); expect(rename).not.toHaveBeenCalled();
+  } finally { picker.previewEnd?.(); }
+});
 
 it('renames one session through the shared owner without changing the active identity or transcript', async () => {
   const h = fixture(); const before = fs.readFileSync(path.join(h.manager.getSessionDirPath(h.target.id), 'transcript.jsonl'));

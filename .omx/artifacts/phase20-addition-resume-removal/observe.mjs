@@ -8,8 +8,8 @@ setFilePersistenceEnabled(false);
 const { OverlayHost } = await load('cli/interactive/overlay.js');
 const { SessionCatalog } = await load('session/store/catalog/index.js');
 const { TurnSink } = await load('cli/interactive/turnSink.js');
-const receipt = { begins: 0, retires: 0, removals: 0, requests: 0, renders: 0 };
-const save = () => fs.writeFileSync(process.env.CHEERS_PROBE_RECEIPT, JSON.stringify(receipt));
+export const receipt = { begins: 0, retires: 0, removals: 0, requests: 0, renders: 0 };
+export const save = () => fs.writeFileSync(process.env.CHEERS_PROBE_RECEIPT, JSON.stringify(receipt));
 for (const [method, counter] of [['beginBrowse', 'begins'], ['retireBrowse', 'retires'], ['forgetBrowse', 'removals']]) {
   const original = SessionCatalog.prototype[method];
   SessionCatalog.prototype[method] = function(...args) {
