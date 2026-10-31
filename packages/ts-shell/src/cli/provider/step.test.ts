@@ -106,6 +106,24 @@ it('uses the host plan mode for a foreground model that cannot call tools', asyn
   expect(messages[0]?.content).not.toContain('equipped with real tools');
 });
 
+it('keeps an explicit request tier ahead of the resolved connection and provider defaults', async () => {
+  const setup = createAdvisorHarness(false, false);
+  const server = await wire(setup);
+  const connection = { id: 'tier-owner', provider: 'openai' as const, authType: 'api-key' as const,
+    apiKey: 'synthetic-tier-owner', baseUrl: server.request.providerCredentialResolution.baseUrl,
+    serviceTier: 'flex', createdAt: '2026-01-01', updatedAt: '2026-01-01' };
+  const config = { ...server.request.runtimeConfig!, providerConnections: [connection],
+    providerCredentials: { openai: { serviceTier: 'priority' } } };
+  const selected = server.request.providerCredentialResolution;
+  const resolution = { ...selected, credential: { ...selected.credential!, source: 'connection' as const,
+    connectionId: connection.id, apiKey: connection.apiKey } };
+  const step = createProviderStep({ ...server.request, providerCredentialResolution: resolution,
+    runtimeConfig: config, serviceTier: 'default' }, new Map(), {});
+  await step([{ role: 'user', content: 'Check tier override' }], setup.signal, {}, { allowTools: false });
+  expect(server.received).toHaveLength(1);
+  expect(server.received[0]?.service_tier).toBe('default');
+});
+
 it('dispatches a subagent using the effort saved in the role panel while the main request keeps its own setting', async () => {
   const setup = createAdvisorHarness(false, false); const server = await wire(setup);
   const connection = { id: 'role-wire', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'synthetic-role-wire',

@@ -10,7 +10,8 @@ import { projectSessionModel } from './projection.js';
 import { runModelCommand } from '../../core/commands/modelCommandRuntime.js';
 import { runThinkingCommand } from '../../core/commands/thinkingCommandRuntime.js';
 import { runExtendedContextCommand } from '../../core/commands/model/context.js';
-import { setSessionServiceTier } from '../../core/commands/model/serviceTier.js';
+import { runSlowCommand, setSessionServiceTier } from '../../core/commands/model/serviceTier.js';
+import { runFastCommand } from '../../core/commands/fastCommandRuntime.js';
 import { runModelPresetCommand } from '../../core/commands/model/presetCommand.js';
 import { modelPicker } from '../../cli/interactive/picker/model.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
@@ -140,6 +141,8 @@ it.each(['config', 'env', 'cli', 'fallback', 'pool'] as const)('sends the select
     expect(setSessionServiceTier(command, 'flex')).toContain('Service tier set to flex');
     const config = projectSessionModel(getRuntimeConfig(home), sessionId);
     const resolution = resolveConfigTarget(config);
+    expect((await runSlowCommand(['status'], { ...command, runtimeConfig: config })).output).toBe('Slow mode: on (flex).');
+    expect((await runFastCommand(['status'], { ...command, runtimeConfig: config })).output).toContain('effective service tier: flex');
     const step = createProviderStep({ providerMode: 'real', providerCredentialResolution: resolution, runtimeConfig: config,
       ...captureThinkingPreference(home, resolution.thinkingEffort),
       providerCatalog: loadCatalog(), agentMode: 'build', workspaceRoot: home, sessionId }, new Map(), {});

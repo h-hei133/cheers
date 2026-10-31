@@ -43,7 +43,7 @@ import { captureThinkingPreference } from '../../../core/models/preference.js';
 import { toolSchemas } from '../../../turn/tools.js';
 import { projectStatePath } from '../../../core/state/projectState.js';
 import { configuredOutputLimit } from '../../../provider/request/output.js';
-import { serviceTierCapability } from '../../../core/models/serviceTier.js';
+import { configuredServiceTier, serviceTierCapability } from '../../../core/models/serviceTier.js';
 import { tokenizeCommandArgs } from '../../../core/commands/arguments.js';
 import { parseResearchArgs } from '../../../core/commands/research/syntax.js';
 import { researchEntryRequest, researchTurnPrompt } from '../../../research/run/entry.js';
@@ -170,8 +170,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const overhead = { systemPrompt, tools: allowTools ? schemas : [] };
   const assembledIdentity = requestIdentity(overhead);
   const configuredOutput = configuredOutputLimit(config, endpoint);
-  const serviceTier = config.providerConnections?.find(item => item.id === resolution.credential?.connectionId)?.serviceTier
-    ?? config.providerCredentials?.[resolution.provider]?.serviceTier;
+  const serviceTier = configuredServiceTier(config, resolution);
   if (serviceTier && serviceTierCapability(publication.catalog, resolution.provider, resolution.model, serviceTier, base, endpoint) !== 'supported') {
     throw new Error('Configured service tier is unavailable.');
   }

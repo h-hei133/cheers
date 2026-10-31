@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 节、第 24.7 节、第 24.8 节、第 24.9 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断与 fallback/pool 模型绑定已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.12 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份与只读 affinity、tier owner 收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5577,3 +5577,15 @@ picker在捕获实际active之后建立只移除sessionId的inspection context�
 主代理在实际Linux Node20.3.0串行聚焦 **5文件/133项**：category30、activation23、recovery36、auth24、focus20。模型与预设写入、hook拒绝与完成后关闭、provider slot CLI身份、effort恢复、角色与目录刷新原覆盖继续通过。恢复真实session inspection的反转实际AssertionError，源码精确恢复后最终套件全过。五门/diff/build通过，manifest `5ba7e846159b`；正式打包judge exit0，环/导入解析satisfied，仍只有既有interactiveMode21/22-name advisory。两路只读复审APPROVE/CLEAR，子代理未运行验证；本批scratch已清理。
 
 `e2daf775` 的代码CI `41194578660` 延迟读取已success；`da3ca316` 代码CI `41195952241` 最后in_progress，Watch `41195952238` success不替代代码CI。本批另绑提交与自身CI，未真实provider、Windows、PTY、全仓或20k验证，未迁移真实HOME。ADD-70仍partial、整体goal active，旧版本回退与真实环境继续延后。
+
+### 24.12 service tier 读取跟随同一个实际 owner
+
+第24.11节已推送 `7bec50d56b0b27967fb1b6d57b487652d1bc4931`，main与远端精确一致。后续审计发现 `/slow`、`/fast` 状态按 raw activeProviderConnectionId 读取 tier，而实际 dispatch、preview 与 role capture 各按 resolved credential.connectionId。五条新增回归在旧代码全部实际AssertionError：fallback/pool 使用连接flex，却显示独立provider priority；环境/CLI已替代命名连接的凭据源，却显示raw连接flex；多个pool成员的实际affinity与显示不一致。
+
+既有 `core/models/serviceTier.ts` 新增纯 `configuredServiceTier`，按resolved provider+connectionId选择一个owner，缺省连接tier继续继承独立provider slot，显式request.serviceTier继续优先。dispatch、preview、role capture和command共用这一个投影；command使用既有modelRequest，保持实际session affinity及host override。没有新增resolved tier存储或认证面。blocked/无credential请求不宣称effective tier，沿原status文案保持unverified；能力不足继续由原preview/dispatch拒绝，不静默删除配置档位。
+
+只读参考比较：基础模型选择与认证解析分离；已有slow/tier实现按当前model选取wire档位，其他provider保存的档位不代表当前模型。另一实现明确区分configured tier与model capability下的effective tier。本项目同意当前请求身份与单owner投影，保留已有显式不支持档位的拒绝行为与独立连接/pool语义，不复制按family存储。provider身份与raw active选择反转都有实际失败，避免仅沿测试代码重写读取。
+
+主代理实际Linux Node20.3.0单进程串行最终 **6文件/205项**通过：command serviceTier9、model serviceTier5、provider30、step12、role46、preview103。新命令测试包含split文件默认、fallback/pool、env/CLI、affinity前后不变、pending/deleted/empty-pool/missing；观察settings/auth字节或缺失。既有五种HTTP来源用例同时断言slow/fast状态与实际body.service_tier；另真实loopback验证explicit request default优先于connection flex/provider priority。三反转（raw active、去掉provider校验、删除blocked guard）均实际AssertionError，finally源码精确恢复，最终套件全过。五门/diff/build通过，manifest `d6f24e4b74c3`；正式打包judge exit0，环和导入解析satisfied，仅既有interactiveMode21/22-name advisory，未新增ceiling finding。两路只读复审最终APPROVE/CLEAR；scratch已清理，子代理未执行验证。
+
+`da3ca316` 的 `41195952241`、`7bec50d5` 的 `41196273759` 最后代码CI仍in_progress；对应Watch success不替代代码CI。本批提交与CI独立绑定。未真实provider、Windows、PTY、全仓/20k验证或真实HOME迁移，旧版本回退与其余重复事实审计仍缺，ADD-70 partial、整体goal active。

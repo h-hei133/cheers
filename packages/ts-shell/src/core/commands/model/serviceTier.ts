@@ -1,7 +1,7 @@
 import { providerCredentialEndpoint } from '../../auth/account/target.js';
 import type { CommandContext, LocalCommandResult } from '../types.js';
 import { loadCatalog } from '../../models/catalogStore.js';
-import { serviceTierCapability } from '../../models/serviceTier.js';
+import { configuredServiceTier, serviceTierCapability } from '../../models/serviceTier.js';
 import { readSessionModelEdit, writeSessionModel, type SessionModelEdit } from '../../../session/model/state.js';
 import type { SessionModelSelection } from '../../../session/model/contract.js';
 import { configurationApplicationNotice, readFreshConfiguration } from '../configuration.js';
@@ -9,20 +9,17 @@ import { parseSyntax } from '../syntax/parse.js';
 import { syntaxHelp } from '../syntax/projection.js';
 import { slowSyntax } from '../slow/syntax.js';
 import { projectSessionModel } from '../../../session/model/projection.js';
-import { resolveProviderCredential } from '../../shell/providerCredentials.js';
 import { sameValue } from '../../../config/values.js';
 import path from 'node:path';
 import { connectionIdentity } from './identity.js';
 import { catalogProvider } from '../../models/catalog.js';
-import { selectedModelMatches, selectionRequest } from './target.js';
+import { modelRequest, selectedModelMatches, selectionRequest } from './target.js';
 
 export function effectiveServiceTier(context: CommandContext): string | undefined {
   const config = context.readConfiguration?.().config ?? context.runtimeConfig
     ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
-  const target = context.resolveConfigTarget?.(config, context.sessionId)
-    ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
-  return config.providerConnections?.find(item => item.id === config.activeProviderConnectionId && item.provider === target.provider)?.serviceTier
-    ?? config.providerCredentials?.[target.provider]?.serviceTier;
+  const request = modelRequest(context, config);
+  return request.blocked || !request.credential ? undefined : configuredServiceTier(config, request);
 }
 
 /** Apply or remove the session-only tier without leaving a stale value behind. */

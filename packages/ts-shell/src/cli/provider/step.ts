@@ -13,7 +13,7 @@ import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
 import { endpointShape } from '../../provider/endpoints/index.js';
 import { toolSchemas } from '../../turn/tools.js';
 import { delegatedTarget } from './target.js';
-import { serviceTierCapability } from '../../core/models/serviceTier.js';
+import { configuredServiceTier, serviceTierCapability } from '../../core/models/serviceTier.js';
 import { assertScopedModel, scopedRuntimeConfig } from '../../config/scope/projection.js';
 import { credentialBlockMessage } from '../../core/shell/providerCredentials.js';
 import type { ToolDiscovery } from '../../core/tools/discovery/state.js';
@@ -60,9 +60,7 @@ export function createProviderStep(
   const baseUrl = providerCredentialBaseUrl(catalog, resolution);
   if (catalogProvider(catalog, resolution.provider, baseUrl).ambiguous) throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before sending.');
   const endpoint = providerCredentialEndpoint(catalog, resolution, baseUrl);
-  const configuredTier = request.serviceTier ?? request.runtimeConfig?.providerConnections
-    ?.find(item => item.id === resolution.credential?.connectionId)?.serviceTier
-    ?? request.runtimeConfig?.providerCredentials?.[resolution.provider]?.serviceTier;
+  const configuredTier = request.serviceTier ?? configuredServiceTier(request.runtimeConfig, resolution);
   if (configuredTier && serviceTierCapability(catalog, resolution.provider, resolution.model, configuredTier, baseUrl, endpoint) !== 'supported') {
     throw new Error(`Configured service tier '${configuredTier}' is not verified for ${resolution.provider}/${resolution.model}.`);
   }

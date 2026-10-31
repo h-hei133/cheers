@@ -10986,3 +10986,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：交互目录保持 pool 选择直到显式 activation
 
 [addition24.11](features/phase-20-addition.md#2411-交互目录候选检查不改-pool-affinity)da3ca316已推送且main/远端一致；继续复现picker local/host两入口load后ready变later。候选解析、exact与identity改用去掉sessionId的inspection context，实际active与写入保留原context/CLI/admission。四场景验证浏览/刷新/关闭保持选择，显式later保存读回；5文件133项Node20.3、实际反转/精确恢复、五门/build通过，manifest5ba7e846159b。复审APPROVE/CLEAR，正式judge只有既有interactiveMode advisory；e2daf775代码CI已success，da3ca316最后in_progress。未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。
+
+### 2026-10-31：slow/fast、preview、角色与请求共用 tier owner
+
+[addition24.12](features/phase-20-addition.md#2412-service-tier-读取跟随同一个实际-owner)7bec50d5已推送main/远端一致。五回归实际复现raw active tier与fallback/pool/env/CLI请求不同，现既有serviceTier owner按resolved provider/connection选唯一默认，四消费者共用；explicit request override保留，blocked/missing status保持unverified。实际Node20.3上6文件205项含loopback tier/status与explicit override、三反转AssertionError/精确恢复、五门/build通过，manifestd6f24e4b74c3；复审APPROVE/CLEAR，正式judge仅既有interactiveMode advisory。前两代码CI最后in_progress，未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。
