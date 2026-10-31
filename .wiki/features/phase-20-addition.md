@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.26 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier 收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.27 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier 与连接报告收敛已实施；最新代码 CI、签名端点委派准入的静态缺口、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5789,3 +5789,17 @@ build exit0，manifest `ef982b674f90`、inputsDigest `82d6aba4bec6af4140fe8ea483
 最终五静态门/diff实际exit0，binding refs全部解析，118既有docs-source advisory保持；批次 `.tmp/auxiliary-tier/` 已清理，提交/推送与自身CI另读回。
 
 本批代码 `953d677f3f6f41e6470ea33df24dd07f122dbca0` 已提交/推送，远端 main 精确一致，交付后工作区 clean。自身 CI `41213345904` 最后 in_progress；Watch `41213345918` completed/success 不替代代码 CI。延迟复核角色 `27931563`/`41211798735`、文档 `712ea121`/`41210875615` 与旧 `b0a144de`/`41204101311` 仍 in_progress，未终止或重启。本段为后续交付文档，不与代码提交混算。
+
+### 24.27 连接成功与捕获失败报告不带出凭据内容
+
+接续 `9975ac6e` 检查连接报告：API-key 和 browser 成功消息直接输出原始 Base URL，可能带出 userinfo、查询 token 和 fragment；browser failure 直接读取 Error.message 或调用任意 thrown object 的 String。新增八条回归在原实现实际全部失败，失败日志仅记录布尔断言，不输出捕获正文。
+
+沿既有 [endpointLabel](../../packages/ts-shell/src/core/models/availability.ts) 投影成功消息的 host/path，舍弃 userinfo/query/fragment；失败返回固定 local capture 原因，与原生账号登录的非可信错误处理一致。完整原始地址仍由原 writer 保存；ConfigWriteError 继续抛出，pending/error、激活/仅保存、模型偏好分文件与普通默认均沿原合同。不增加 URL 解析器或认证流程；现有 host/path 显示不证明嵌在这些部分的任意秘密已脱敏。
+
+目标检查后定向只读参考：另一终端实现 `mcp/json-rpc.ts:21-34` 去掉 URL userinfo 并处理敏感 query；Codex login `server.rs:748-803` 还移除 fragment、无效 URL 不回显。采用结构化 URL 显示而非原值回显的决定，本项目复用更窄的既有 endpoint projection；任意异常正文采用本项目原生登录的固定原因，不复制参考认证代码。
+
+主代理 Linux Node20.3.0、heap768MiB、单worker串行最终 **3文件/115项** exit0：connect68、model authentication24、availability23。新增 API/browser×activate/save-only 四条验证实际 loopback 浏览器表单/回调、终端安全显示、完整存储地址、0600 auth、模型默认的物理归属及原 provider 默认保留；Error/non-Error×activate/save-only 四条验证零任意 coercion、失败状态和无凭据写入。首次修复后四条 settings bytes 比较失败属 harness 假设：pending 插入会完成原 writer 允许的偏好迁移；改在实际 browser callback 捕获物理基线，仍验证登录前后的逻辑默认相等及失败阶段的 settings bytes 不变，不修改 writer。
+
+原生产源码反转实际 **8失败/60未选/exit1**，finally逐字节恢复，fixed SHA256 `09dc1056a5f3`；恢复后同115项通过。五静态门/diff exit0，118既有 docs-source advisory 保留。build `9743fd74bdbcb0d5dad6a795c48d960b9ca275cbd84b96a81ebf757c05f50ec2`，inputsDigest `668cd39b0edfb58388bf2eb9d73b6f95f80dad7516319d337ff7a7ee27c49872` 与当前输入匹配。正式适配 archive/member/vendor 核对后 judge exit0，环/解析 satisfied，partial仅既有 interactiveMode21/22-name advisory。最初门在 package cwd 缺 root script、judge profile 参数层级错误均按调用 setup 分类，修正后才计通过。独立只读复审 APPROVE/CLEAR；证据 `.omx/artifacts/phase20-addition-connect-report/`。
+
+另一只读审计确认 template/instruction/import/append/skill 的精确 raw-byte freshness 已实现且已有固定元数据回归，本批不重复修补。它还定位签名型 provider 的委派准入静态差异：main readiness允许 signer 无静态 credential，delegatedTarget却强制credential；尚未动态复现，留待单独验证，不称已修复。延迟读取 `f380f6f3` CI `41212017388` 已success；`9975ac6e`/`41213464205`、`953d677f`/`41213345904`、`27931563`/`41211798735`仍in_progress。本批无真实provider/PTY/非Linux/全仓/20k或旧发布binary验收，ADD-70 partial、goal active，提交/推送/自身CI另绑定。

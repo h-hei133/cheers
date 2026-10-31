@@ -26,6 +26,7 @@ import {
   resolveProviderTarget,
 } from "./connect/preset.js";
 import { needsUserEndpoint } from "../providers/facts.js";
+import { endpointLabel } from '../models/availability.js';
 import { withoutConnectionCredentials } from './connect/credentials.js';
 import {
   getConnectHelpText,
@@ -192,7 +193,7 @@ export async function addConnection(args: string[], onPersisted?: () => void, wo
     `Connection ID: ${connection.id}`,
     `Connection type: api-key`,
     `Saved key: ${maskApiKey(apiKey)}`,
-    ...(baseUrl ? [`Base URL: ${baseUrl}`] : []),
+    ...(endpointLabel(baseUrl) ? [`Endpoint: ${endpointLabel(baseUrl)}`] : []),
     ...(model ? [`Model: ${model}`] : []),
     options?.activate === false ? 'Connection saved. Select a model to enable it.' : `Stored provider default: ${target.provider}.`,
     `Stored at: ${configPath}`,
@@ -409,8 +410,8 @@ export async function runBrowserAssistedCaptureConnection(
       "State transition: pending -> connected",
       "Connection type: browser-assisted-capture",
       `Saved key: ${maskApiKey(browserResult.apiKey)}`,
-      ...(activeConnection?.baseUrl
-        ? [`Base URL: ${activeConnection.baseUrl}`]
+      ...(endpointLabel(activeConnection?.baseUrl)
+        ? [`Endpoint: ${endpointLabel(activeConnection?.baseUrl)}`]
         : []),
       ...(activeConnection?.model ? [`Model: ${activeConnection.model}`] : []),
       options?.activate === false ? 'Connection saved. Select a model to enable it.' : `Stored provider default: ${target.provider}.`,
@@ -441,7 +442,7 @@ export async function runBrowserAssistedCaptureConnection(
       `Browser-assisted local credential capture failed for ${target.provider}.`,
       `Connection ID: ${connectionId}`,
       "State transition: pending -> error",
-      `Reason: ${error instanceof Error ? error.message : String(error)}`,
+      "Reason: The local credential capture did not complete. Retry the login.",
       `Stored at: ${configPath}`,
       "Retry with: /connect login <provider> --browser",
     ].join("\n");

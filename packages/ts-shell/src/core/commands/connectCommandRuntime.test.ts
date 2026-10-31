@@ -8,6 +8,7 @@ import * as configStore from '../../config/runtimeConfig.js';
 import { resolveProviderCredential } from '../shell/providerCredentials.js';
 import * as persistence from '../../config/persistence.js';
 import { loginOpenAIAccountViaAuthorizationCodeFlow } from './openaiAccountAuth.js';
+import { captureApiKeyViaBrowser } from './browserAuthOnboarding.js';
 import * as store from '../../session/store/sessionFileStore.js';
 import { refreshLeasesPath } from '../auth/account/lease.js';
 import { renewStoredAccount } from '../auth/account/renewal.js';
@@ -559,6 +560,82 @@ describe("connect command runtime", () => {
       stored.activeProviderConnectionId,
     );
     expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerCredentials).toBeUndefined();
+  });
+
+  it.each([
+    ['api-key', true], ['api-key', false], ['browser', true], ['browser', false],
+  ] as const)('keeps credential-bearing endpoint components out of %s login reports (activate: %s)', async (mode, activate) => {
+    writeUserRuntimeConfigFile({ theme: 'dark', provider: 'anthropic',
+      providerCredentials: { anthropic: { apiKey: 'synthetic-retained', model: 'retained-model' } } },
+    readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    const before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    const baseUrl = 'https://synthetic-user:synthetic-password@relay.invalid/v1?token=synthetic-query#synthetic-fragment';
+    __setConnectBrowserFlowRunnerForTest(options => captureApiKeyViaBrowser({ ...options,
+      openBrowser: async address => {
+        const page = await fetch(address);
+        expect(page.ok).toBe(true);
+        expect(await page.text()).toContain('name="apiKey"');
+        const state = new URL(address).searchParams.get('state')!;
+        const submitted = await fetch(new URL('/submit', address), { method: 'POST',
+          body: new URLSearchParams({ state, apiKey: 'synthetic-captured', baseUrl, model: 'chosen' }) });
+        expect(submitted.ok).toBe(true);
+        expect(await submitted.text()).toContain('Connection completed');
+      },
+    }));
+    const args = mode === 'browser' ? ['login', 'openai', '--browser']
+      : ['login', 'openai', '--api-key', 'synthetic-captured', '--base-url', baseUrl, '--model', 'chosen'];
+    const result = await runConnectCommand(args, { cwd: workspaceRoot }, undefined, { activate });
+    for (const privatePart of ['synthetic-user', 'synthetic-password', 'synthetic-query', 'synthetic-fragment']) {
+      expect(result.output.includes(privatePart)).toBe(false);
+    }
+    expect(result.output).toContain('Endpoint: relay.invalid/v1');
+    const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    const connection = stored.providerConnections?.[0];
+    expect(connection).toMatchObject({ baseUrl, model: 'chosen', apiKey: 'synthetic-captured', status: 'connected' });
+    expect(stored.providerCredentials).toEqual(before.providerCredentials);
+    expect(stored.theme).toBe('dark');
+    expect(stored.activeProviderConnectionId).toBe(activate ? connection!.id : before.activeProviderConnectionId);
+    expect(fs.statSync(getUserAuthPath()).mode & 0o777).toBe(0o600);
+    const settings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+    const auth = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
+    expect(settings.providerConnections).toBeUndefined();
+    expect(settings.modelPreferences.connections.find((item: { id: string }) => item.id === connection!.id)?.model).toBe('chosen');
+    expect(auth.providerConnections[0].model).toBeUndefined();
+    expect(auth.providerConnections[0].baseUrl).toBe(baseUrl);
+  });
+
+  it.each([
+    ['error', true], ['error', false], ['non-error', true], ['non-error', false],
+  ] as const)('excludes untrusted browser failure content (%s, activate: %s)', async (kind, activate) => {
+    writeUserRuntimeConfigFile({ theme: 'dark', provider: 'anthropic',
+      providerCredentials: { anthropic: { apiKey: 'synthetic-retained', model: 'retained-model' } } },
+    readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    const before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    let settingsBefore: Buffer | undefined;
+    const privateContent = 'captured opaque-capture-value https://user:pass@relay.invalid?token=opaque-query-value';
+    const stringify = vi.fn(() => privateContent);
+    __setConnectBrowserFlowRunnerForTest(async () => {
+      settingsBefore = fs.readFileSync(getUserRuntimeConfigPath());
+      throw kind === 'error' ? new Error(privateContent) : { toString: stringify };
+    });
+    const result = await runConnectCommand(['login', 'openai', '--browser'], { cwd: workspaceRoot }, undefined, { activate });
+    expect(result.output.includes('opaque-capture-value')).toBe(false);
+    expect(result.output.includes('opaque-query-value')).toBe(false);
+    expect(stringify).not.toHaveBeenCalled();
+    expect(result.output).toContain('Browser-assisted local credential capture failed');
+    expect(result.output).toContain('pending -> error');
+    expect(result.output).toContain('Reason: The local credential capture did not complete. Retry the login.');
+    expect(result.output).not.toContain('pending -> connected');
+    const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    const { providerConnections: connections, ...defaults } = stored;
+    expect(defaults).toEqual(before);
+    expect(connections).toHaveLength(1);
+    expect(connections?.[0]?.status).toBe('error');
+    expect(connections?.[0]?.apiKey).toBeUndefined();
+    expect(connections?.[0]?.accountAuth).toBeUndefined();
+    expect(settingsBefore).toBeDefined();
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(settingsBefore);
+    expect(fs.statSync(getUserAuthPath()).mode & 0o777).toBe(0o600);
   });
 
   it("records browser-assisted local capture failure as pending -> error", async () => {
