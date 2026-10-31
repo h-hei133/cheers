@@ -11083,3 +11083,6 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：签名会话偏好与新角色保存
 
 [addition24.30](features/phase-20-addition.md#2430-签名-provider-会话偏好进入实际消费与新角色保存)explicit provider signer可保存skill/context，真实prompt技能与窗口预算读回有效；pure namespace匹配与status/writer认证准入分开，named/legacy/pool及tier能力边界保持。fresh role不固化普通预算/tier，六个中间误保存竞态实际复现后补完整request commit/lock复验。Node20.3单worker串行3文件192项，反转21失败/13控制/112未选和精确恢复后通过，五门/build当前digest/judge既有advisory、独立APPROVE/CLEAR。角色fixture目录遗漏已修正；口头196计数以JSON192纠正。b48fd27b精确CI已success，1c874354/1e8e34d2最后in_progress；证据清理与提交/推送另绑，ADD-70 partial、goal active，真实条件仍未验。
+
+
+本批代码/证据说明已提交推送 `f47105684a6a59187a15562f3c3d7492e7766cc9`，远端main精确一致，batch scratch清理、提交后clean。自身CI `41219116283` 与Watch `41219116270`最后均in_progress，未称通过；此交付段后续文档单独提交。
