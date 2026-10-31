@@ -179,7 +179,15 @@ export class TemplateLoader {
       try {
         while (names.size < candidateLimit && entryCount < entryLimit) {
           this.checkCancelled();
-          const entry = directory.readSync();
+          let entry: fs.Dirent | null;
+          try {
+            entry = directory.readSync();
+          } catch (error) {
+            // Some runtimes defer opening the directory until its first read.
+            const code = (error as NodeJS.ErrnoException).code;
+            if (code === 'ENOENT' || code === 'ENOTDIR') break;
+            throw error;
+          }
           if (!entry) break;
           entryCount++;
           if (!entry.isFile() || !/\.md$/i.test(entry.name)) continue;

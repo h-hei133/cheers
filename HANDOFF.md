@@ -1644,3 +1644,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Character-only estimates incur vocabulary parsing latency and retained heap before selecting any tokenizer.
 - **Root Cause**: A lazy encoder factory still imports both large rank arrays at module scope.
 - **Rule**: Load only the selected table at first use through the existing Node/Bun asset pattern. Keep literal require calls visible to the executable bundler, test fallback and selected-table initialization, and run known counts in the compiled artifact. Report first-count initialization and later module retention separately from import savings.
+
+### A Directory Open Can Defer Its Missing-Root Error Until Read
+- **Symptom**: Typing a slash command in the compiled CLI fails when the optional prompt directory does not exist, even though the Node path works.
+- **Root Cause**: Bun 1.3.14 returns a directory handle from opendirSync and throws ENOENT during readSync; catching only open does not cover that runtime's directory lifecycle.
+- **Rule**: Handle ENOENT and ENOTDIR during optional-root reads, close the handle in finally, and preserve cancellation and other read errors. Test a lazy failing handle, continued discovery from valid roots, cancellation and cleanup; verify the production executable with the optional directories absent. Isolated PTY projects need their own Git boundary so ancestor configuration and prompts do not enter the fixture.

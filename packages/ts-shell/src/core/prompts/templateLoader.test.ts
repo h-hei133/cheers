@@ -136,6 +136,48 @@ describe("finding templates", () => {
     ]);
   });
 
+  it.each(['ENOENT', 'ENOTDIR'])("skips optional prefix roots when reading reports %s after open", code => {
+    const root = workspace();
+    fs.mkdirSync(path.join(root, '.git'));
+    write(root, 'home-root', 'Root template.');
+    const nested = path.join(root, 'nested');
+    fs.mkdirSync(nested);
+    const missing = path.join(nested, '.agents', 'prompts');
+    const read = vi.fn(() => { throw Object.assign(new Error('Unavailable directory.'), { code }); });
+    const close = vi.fn();
+    const open = fs.opendirSync.bind(fs);
+    vi.spyOn(fs, 'opendirSync').mockImplementation(target => String(target) === missing
+      ? { readSync: read, closeSync: close } as unknown as fs.Dir : open(target));
+
+    const templates = new TemplateLoader(nested, undefined, { namePrefix: 'home' }).load();
+    expect(templates.get('home-root')?.content).toBe('Root template.');
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves unexpected prefix read errors and closes the directory", () => {
+    const root = workspace();
+    fs.mkdirSync(path.join(root, '.git'));
+    const failure = Object.assign(new Error('Read refused.'), { code: 'EACCES' });
+    const close = vi.fn();
+    vi.spyOn(fs, 'opendirSync').mockReturnValue({ readSync: () => { throw failure; }, closeSync: close } as unknown as fs.Dir);
+    expect(() => new TemplateLoader(root, undefined, { namePrefix: 'home' }).load()).toThrow(failure);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves cancellation after a prefix directory read and closes the directory", () => {
+    const root = workspace();
+    fs.mkdirSync(path.join(root, '.git'));
+    const controller = new AbortController();
+    const reason = new Error('Discovery cancelled.');
+    const close = vi.fn();
+    vi.spyOn(fs, 'opendirSync').mockReturnValue({
+      readSync: () => { controller.abort(reason); return null; }, closeSync: close,
+    } as unknown as fs.Dir);
+    expect(() => new TemplateLoader(root, undefined, { namePrefix: 'home', signal: controller.signal }).load()).toThrow(reason);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
   it("bounds prefix discovery without failing the completion path", () => {
     const root = workspace();
     write(root, "home-a", "A body.");

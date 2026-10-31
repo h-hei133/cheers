@@ -11125,3 +11125,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：词表按首次选用加载
 
 [addition24.37](features/phase-20-addition.md#2437-未选择词表时不初始化其大数据表)修复lazy encoder仍静态加载两套rank的问题，复用既有Node/Bun literal require资源合同。Node20.3串行4文件132项、ESM/CJS两反转各1失败/8控制及精确恢复后132通过；五门/build当前compilerInputs匹配，manifest5869989c1ffc，judge仅既有21/22-name advisory。精确旧/新build的8个有界计数进程输出一致，本轮fallback导入157→22ms、GC堆21.0→3.8MB；首次native初始化与部分RSS增加明确保留，不算CLI性能通过。Bun编译probe含根cwd执行通过，生产exe另构建通过；两路source-only APPROVE/WATCH。2213a671代码CI延迟仍in_progress，本批交付另绑，ADD-08 partial、goal active；未真实provider/PTY/全仓/20k。
+
+### 2026-11-01：生产终端词表计数与可选模板目录修复
+
+[addition24.38](features/phase-20-addition.md#2438-生产终端计数验证与可选模板目录的延迟读取错误)旧生产exe在空项目输入slash时，Bun把缺目录错误延迟到readSync、逃过open catch；最小Node/Bun探针与旧owner两项失败确认。模板owner仅处理read时ENOENT/ENOTDIR、finally关闭，保留其他错误/取消与发现预算；定向参考比较完成。Node20.3串行2文件62项及五门/TS/exe build通过，manifest2d0ffe6ee110、当前compilerInputs摘要匹配。Node/exe×普通/全屏×三计数方式12场小型原生PTY全通过，2168-byte实际body分别611/441/443、preview/report一致，模拟usage123独立；每场一次本地readiness+一次推理、exit0、配置bytes不变、缺省prompt目录未创建、owned进程与夹具清理。中间隔离/预算/舍入/换行/pager及runner设置错误已分类，不算产品失败或通过。未另跑judge/独立委派复审；2213a671精确代码CI已success，69eb6eb4仍in_progress、Watch success。真实provider/历史差额、完整性能/其他平台仍缺，ADD-08 partial、goal active；本批清理、提交/推送/自身CI另绑。

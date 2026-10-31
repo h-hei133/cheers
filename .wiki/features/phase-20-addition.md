@@ -406,7 +406,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批 | 部分完成 | 冷/热 Node 与 exe；桌面全矩阵；性能验收 |
-| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.37 节 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview、目录声明的两套词表及按需加载已实施；不支持的 control/workflow 仍 unknown；其他模型词表、完整媒体/协议计量、真实 1.7k/4.9k 分项差额与性能验收尚缺 |
+| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38 节 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview、目录声明的两套词表及按需加载已实施；Node/exe 普通/全屏的小型本地模拟请求计数已验证；不支持的 control/workflow 仍 unknown；其他模型词表、完整媒体/协议计量、真实 1.7k/4.9k 分项差额与性能验收尚缺 |
 | ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批 | 本地验证 | 不借此宣称 ADD-08 完成 |
 | ADD-35 | P2 | 状态栏 live 估算与 provider 实测的优先级 | 第一百零五批、21.28–21.30 | 本地验证 | 真实 provider 延迟 |
 | ADD-36 | P2 | 目录刷新来源标记与能力上限准入 | 第一百零六至一百零八批 | 本地验证 | 真实外部索引内容与端到端 compaction |
@@ -5972,3 +5972,17 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 五静态门、TS build与manifest.compilerInputs当前摘要通过；新build `5869989c1ffc704f26217026b4cfa42935749363210e8a41ce010cf5e447f841`，inputs `b257e7fb788a95b502222dc2944c5914c0ca1dc0d9665957bf7b635e395427c5`。正式已适配bundle serial judge exit0、解析与无环satisfied，仅既有interactiveMode21/22-name advisory。Bun1.3.14独立30-module编译探针分别跑fallback、两词表及切回，wire/capture数值与opaque边界通过；另从工作目录 `/` 运行同一probe也通过。生产2295-module executable另构建并host version验证，SHA `bd99e7f9496d25dad8924643e4b6c26a3bedb5d8266155eb63eaa209d53c6934`；独立probe不替代生产CLI实际交互，也不证明所有外部模块不可见。
 
 正式证据 `.omx/artifacts/phase20-addition-tokenizer-loading/` 保留exact build对照、实际反转、测试/门/build/judge/编译probe、两路报告和非可执行源码快照；本批scratch清理后交付。上一批 `2213a671` 代码CI `41228113447` 延迟读回仍in_progress，本批提交/推送/自身CI另绑。ADD-08及总体保持partial/active；真实差额、其他词表/媒体协议、完整性能与平台证据尚缺，未真实provider/PTY、全仓或20k真实会话。
+
+### 24.38 生产终端计数验证与可选模板目录的延迟读取错误
+
+接续已推送 `69eb6eb4c3327ea17125eec5ec345b54e0c4a446`，补第24.36–24.37节明确缺少的生产CLI交互证据。旧生产可执行文件在空项目中输入 `/context` 时，对不存在的 `.agents/prompts` 报ENOENT，无法取得报告。主代理最小文件系统探针确认Node20.3.0在opendirSync立即抛错，而Bun1.3.14先返回handle、首次readSync才抛错，closeSync成功；这是[模板前缀发现](../../packages/ts-shell/src/core/prompts/templateLoader.ts)只捕获open阶段的真实缺陷。
+
+先读目标，再定向只读比较参考coding-agent的prompt-templates目录加载：可选目录不存在贡献空集合，枚举期间的IO错误不应被误当作模板结果。本项目沿原bounded streaming discovery保留candidate/entry/bytes预算、最近目录优先与取消围栏，在readSync只处理ENOENT/ENOTDIR并finally关闭handle；其他读取错误继续传播。没有换成全目录readdir，也没有扩大catch到取消、profile身份或source检查。四个新增[回归](../../packages/ts-shell/src/core/prompts/templateLoader.test.ts)覆盖两种延迟错误后继续找到有效父目录模板、EACCES传播及read后取消，并检查close；旧owner实际 **2失败/19控制通过**，修复后含slash suggestions的 **2文件/62项** 全通过。
+
+当前Node20.3.0与Bun1.3.14生产exe × regular/fullscreen × false字符回退/cl100k_base/o200k_base共 **12场原生PTY** 串行通过。每场从空历史启动，使用约1.1k UTF-16的Unicode草稿、零工具；现代settings/auth/catalog/trust均在独立HOME和Git项目夹具中，普通provider传输仅指向127.0.0.1临时端口、使用合成凭据。每场模拟服务实际收到一次readiness GET和一次推理POST，无重试或额外推理；未访问真实外部provider。服务对实际2168-byte body独立计数：字符回退611、cl100k441、o200k443，四种运行/界面组合分别相同；状态栏草稿值与这些数值一致，`/context`实际报告同一count/method/body bytes，模拟provider usage123独立标为provider aggregate，保留estimated及no per-source allocation措辞。报告pager先Escape关闭，再 `/exit` 均code0；settings/auth/catalog/trust逐字节不变，可选prompt目录始终未创建，所观察owned进程均已结束且fixture清理。
+
+启动空草稿285/233/237与计数时间仅是本轮小夹具观察。owned CLI树每50ms采样最高429936KiB，512MiB守卫未触发；不包含父探针进程，不是完整context heap或性能验收。所有原始请求体及终端输出只在内存短暂使用并丢弃，正式证据仅保留尺寸、SHA、计数、固定诊断和布尔断言。中间短提示舍入未变、缺readiness响应、过小8192窗口、缺独立Git边界而读到父项目、报告换行匹配及未退出pager均按探针设置/观察问题分类；只有独立Git项目上的延迟目录错误作为产品修复依据。首次Vitest runner路径与PATH空格设置错误另留日志，均未计通过。
+
+五静态门、Node floor TS/exe构建通过，118既有docs-source advisory保留；build `2d0ffe6ee110a641dc80edb158466225faaef30b64ac138556b61f2422bcacb7`、inputs `bc60b15dbea5ce3be9af430eb0b6dba3d9b84a677e4a830a6a069a1c8b7be063` 与manifest.compilerInputs当前摘要精确匹配，exe SHA `0c3f5ab6488772d0d192c95f793bb097441f6011c15cb0cc430fdc77e2a3121a`。未改导入图，本批未另跑NormProof或独立委派复审，不沿用前批APPROVE。证据及非可执行源码快照归 `.omx/artifacts/phase20-addition-tokenizer-terminal/`，本批交付另绑定。
+
+延迟读回：`2213a671`精确代码CI `41228113447`已completed/success；`69eb6eb4`代码CI `41229200850`仍in_progress，两批Watch均success，不替代代码CI。ADD-08保持partial：此处是本地模拟provider的小型生产终端交互，真实1.7k/4.9k同snapshot差额、其他词表/媒体协议、完整性能及其他平台仍未验；未全仓回归或20k真实会话，原Phase20真实条件继续延后、goal active。
