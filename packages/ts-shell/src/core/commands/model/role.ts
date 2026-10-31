@@ -13,7 +13,6 @@ import { projectModelSelection } from '../../../session/model/projection.js';
 import { catalogModel } from '../../models/catalog.js';
 import { effortCapability } from '../../models/capability.js';
 import { isThinkingPreference, THINKING_LEVELS, type ThinkingPreference } from '../../models/effort.js';
-import { configuredServiceTier } from '../../models/serviceTier.js';
 import { providerCredentialBaseUrl } from '../../auth/account/target.js';
 
 export type AutomaticModelRole = keyof SessionModelPolicy;
@@ -30,12 +29,10 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
   const baseline = choice.baseline;
   const active = context.resolveConfigTarget?.(choice.config, context.sessionId)
     ?? resolveProviderCredential({ runtimeConfig: choice.config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
-  const tier = configuredServiceTier(choice.config, active);
   const selection: SessionModelSelection | undefined = baseline?.selection ?? (active.model && active.credential && !active.blocked
     ? { ...(active.credential.connectionId ? { connectionScope: 'session' as const, connectionId: active.credential.connectionId }
       : { connectionScope: 'provider' as const }), provider: active.provider, model: active.model,
       ...(active.thinkingEffort !== undefined ? { thinkingEffort: active.thinkingEffort } : {}),
-      ...(tier !== undefined ? { serviceTier: tier } : {}),
       roles: choice.config.sessionModelRoles ?? {} }
     : undefined);
   const commit = (target: SessionModelRole | undefined): RoleResult => {

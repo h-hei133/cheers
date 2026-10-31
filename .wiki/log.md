@@ -11042,3 +11042,9 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 [addition24.24](features/phase-20-addition.md#2424-缓存多进程夹具隔离会话状态)原CI单child退出根因未复现；7轮原共享HOME和2轮seed均通过，真实live session lock也未复现。确认--print夹具共用current session，改cliStep独立随机HOME而缓存/project/manifest/group仍共享；实际session ID回归反转1失败/5未选、精确恢复，Node20.3单文件6项再次通过、只读复审APPROVE。不修改产品会话或cache路径；abe32561代码CI已success，3e0a148a/972ed1f6/b0a144de最后in_progress，本批门/build/交付另绑，整体partial、goal active。
 
 夹具代码 `14d3532f9c5b315183a28a0eecb07e57522b07f0` 已推送/远端main一致且clean，五门/build摘要 `300d414e1582` 读回通过；自身CI `41210672771` / Watch `41210672780`最后in_progress。前批director/handoff `3e0a148a`精确CI `41209134634`已于14:31:10Z success；`b0a144de`的test job仍在运行，保留实际live状态。
+
+### 2026-10-31：首次角色保存保留普通 tier 继承
+
+[addition24.25](features/phase-20-addition.md#2425-首次角色保存保留普通-tier-的实时继承)三种真实凭据 namespace 的隔离 HTTP 回归确认首次角色保存会固化普通 priority，后续 flex 更新实际仍发送 priority。仅删除新role selection seed的tier复制，已有显式会话偏好完整保留，历史意图不明的tier不迁移。Node20.3单worker串行4文件151项、反转3失败/87未选及精确恢复重验通过；build与当前输入摘要读回通过，manifest ef982b674f90，正式适配bundle judge既有advisory，两路只读复审APPROVE/CLEAR。972ed1f6代码CI已success，14d3532f/712ea121/b0a144de最后in_progress；本批静态门/清理/交付另绑定，ADD-70 partial、goal active。
+
+最终五静态门/diff已exit0；118既有docs-source advisory不计通过缺口消失。另原生tier setter假设已由协议能力门正确拒绝，与24.20一致，不作无证据修补；本批scratch清理后交付。

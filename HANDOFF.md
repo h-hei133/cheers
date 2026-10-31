@@ -1576,3 +1576,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Three cache writer processes can all adopt one current session, so a cache concurrency test also exercises unrelated session state and locks.
 - **Root Cause**: The fixture passes one HOME to every source CLI; --print intentionally adopts that home's current-session pointer.
 - **Rule**: Give each cache-test CLI a random HOME inside the owning fixture while keeping the explicit project, cache root, runner and manifest shared. Assert actual distinct session IDs after concurrent execution; reverse the HOME change to prove the assertion catches coupling. An unexplained CI child exit remains unexplained when repeated local runs pass.
+
+### Fresh Role Choices Must Preserve Live Tier Defaults
+- **Symptom**: Assigning the first automatic role freezes priority in the main request even after the ordinary provider or connection tier changes to flex or is removed.
+- **Root Cause**: The role seed copies the effective tier reader's inherited default into the explicit session preference; the matching session projection then overrides later defaults.
+- **Rule**: Seed only the role's required model binding and leave ordinary tier inheritance with its existing reader. Preserve explicit tiers in existing selections; historical captured values cannot safely be distinguished from user intent. Verify provider, named and inherited namespaces through actual loopback wire update/removal, alongside explicit-tier preservation and unchanged settings/auth bytes.

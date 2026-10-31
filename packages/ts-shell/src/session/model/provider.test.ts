@@ -26,6 +26,7 @@ import { captureThinkingPreference } from '../../core/models/preference.js';
 import * as files from '../store/sessionFileStore.js';
 import { prepareModelRole } from '../../core/commands/model/role.js';
 import { configuredContextWindow } from '../../core/models/window.js';
+import { configuredServiceTier } from '../../core/models/serviceTier.js';
 
 let home: string;
 let manager: SessionManager;
@@ -79,6 +80,73 @@ it.each(['provider', 'connection'] as const)('keeps the ordinary %s context budg
   expect((await runExtendedContextCommand(['status'], commands)).output).toBe('Extended context: off.');
   expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(updatedBytes);
   expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each(['provider', 'connection', 'inherited'] as const)('keeps ordinary %s tiers live after seeding roles', async source => {
+  const requests: Record<string, unknown>[] = [];
+  const server = http.createServer(async (request, response) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    requests.push(JSON.parse(Buffer.concat(chunks).toString()));
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'Tier received.' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 4, completion_tokens: 1, total_tokens: 5 } }));
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Fixture address unavailable');
+    const baseUrl = `http://127.0.0.1:${address.port}/v1`;
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, maxOutputTokens: 100, reserveTokens: 0, retryEnabled: false,
+      ...(source !== 'provider' ? { activeProviderConnectionId: 'named' } : {}),
+      providerConnections: [{ ...connection(), baseUrl, model: 'base',
+        ...(source === 'connection' ? { serviceTier: 'priority' } : source === 'provider' ? { serviceTier: 'default' } : {}) }],
+      providerCredentials: { openai: { ...edit.values.providerCredentials!.openai, baseUrl,
+        serviceTier: source === 'connection' ? 'default' : 'priority' } } }, edit);
+    writeCatalogCache([{ id: 'openai', models: [{ id: 'base', reasoning: true, serviceTiers: ['default', 'priority', 'flex'] }] }]);
+    const resolveConfigTarget = (config: RuntimeConfig) => resolveProviderCredential({ runtimeConfig: config, env: {},
+      ...(source === 'provider' ? { cliApiKey: 'synthetic-cli', cliBaseUrl: baseUrl } : {}) });
+    const command = { ...context(), resolveConfigTarget };
+    const initial = resolveConfigTarget(getRuntimeConfig(home));
+    expect(initial.credential?.connectionId).toBe(source === 'provider' ? undefined : 'named');
+    expect(configuredServiceTier(getRuntimeConfig(home), initial)).toBe('priority');
+    expect(readSessionModel(sessionId)).toBeUndefined();
+    const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+    const initialBytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+    expect(prepareModelRole(command, 'summary').assign({ connectionId: 'named', provider: 'openai', model: 'base' }).saved).toBe(true);
+    expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(initialBytes);
+    expect(requests).toEqual([]);
+    for (const tier of ['flex', undefined] as const) {
+      const next = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+      writeUserRuntimeConfigFile({ ...next.values,
+        ...(source === 'connection' ? { providerConnections: next.values.providerConnections!.map(item => ({ ...item, serviceTier: tier })) }
+          : { providerCredentials: { ...next.values.providerCredentials, openai: { ...next.values.providerCredentials!.openai, serviceTier: tier } } }),
+      }, next);
+      const updatedBytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+      const config = projectSessionModel(getRuntimeConfig(home), sessionId);
+      const resolution = resolveConfigTarget(config);
+      const effective = tier ?? (source === 'connection' ? 'default' : undefined);
+      const step = createProviderStep({ providerMode: 'real', providerCredentialResolution: resolution, runtimeConfig: config,
+        ...captureThinkingPreference(home, resolution.thinkingEffort), providerCatalog: loadCatalog(), agentMode: 'build', workspaceRoot: home, sessionId }, new Map(), {});
+      expect((await step([{ role: 'user', content: 'Check the ordinary tier.' }], new AbortController().signal, {}, { allowTools: false })).text).toBe('Tier received.');
+      expect(requests.at(-1)?.service_tier).toBe(effective);
+      expect(requests.at(-1)?.model).toBe('base');
+      expect(configuredServiceTier(config, resolution)).toBe(effective);
+      expect(config.sessionServiceTier).toBeUndefined();
+      expect(readSessionModel(sessionId)).not.toHaveProperty('serviceTier');
+      expect((await runSlowCommand(['status'], command)).output).toBe(tier === 'flex' ? 'Slow mode: on (flex).'
+        : `Slow mode: off (${effective ?? 'provider/project default; unverified'}).`);
+      if (tier === undefined) expect(prepareModelRole(command, 'summary').assign(undefined).saved).toBe(true);
+      expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(updatedBytes);
+    }
+    expect(requests).toHaveLength(2);
+    expect(readSessionModel(sessionId)).not.toHaveProperty('serviceTier');
+    expect(readSessionModel(sessionId)?.roles).toEqual({});
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
 });
 
 it.each(['config', 'env', 'cli'] as const)('selects %s models through the picker and command, publishes, and resumes without inventing a connection', async source => {

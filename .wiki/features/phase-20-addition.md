@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.23 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.25 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5753,3 +5753,17 @@ role owner使用现有 `providerCredentialBaseUrl` 读取model/levels；advisor 
 五静态门/diff和build实际通过，manifest `300d414e1582`、inputsDigest `b29ef04176f4e05206817a588f570921649157098dc92a42ac69f00adda3ae19` 与当前输入精确读回相同。证据在 `.omx/artifacts/phase20-addition-cache-failure/`；本批无生产导入/边界变化，未重跑NormProof或全仓。scratch已清理；提交/推送/新CI须独立读取。
 
 本批 `14d3532f9c5b315183a28a0eecb07e57522b07f0` 已提交/推送，远端main精确一致、工作区clean；CI `41210672771` / Watch `41210672780` 最后in_progress。第一次GitHub查询EOF后重试正常，没有推断作业终止。继续延迟读回确认前批 `3e0a148a` CI `41209134634` / job `124560244384` 于 `2026-10-31T14:31:10Z` completed/success，所有步骤通过；此前 `6409450b` failure仍保留。`b0a144de` CI `41204101311` / job `124545558599` 仍有实际运行中的test步骤，未终止或重启。
+
+### 24.25 首次角色保存保留普通 tier 的实时继承
+
+继续审计默认值与会话偏好分离，发现首次 `prepareModelRole` 将 `configuredServiceTier` 的连接/provider 默认写入显式会话 tier。三个隔离回归分别使用实际 provider CLI 凭据、命名连接自身 tier、命名连接继承 provider tier：普通默认从 priority 改为 flex 后，原实现的实际 HTTP body 仍为 priority，全部实际 AssertionError/exit1。
+
+修复只移除既有 role owner 新 selection seed 的 tier import、lookup 与 spread；已有 baseline selection 完整保留，普通默认继续由原 `configuredServiceTier` 读取。未新增 resolver、writer 或字段。历史已存 tier 无法区分用户意图与意外 seed，不自动清除；本次修复适用于新建角色选择。定向只读参考 `model-controls.ts:233-272` 的角色模型变更不保存 tier，`:790-806` 专门保存显式 tier；`agent-session.ts:13198-13223` 在没有显式 tier entry 时恢复配置默认。本项目保留精确 provider/model/credential namespace 绑定，不复制 family map。
+
+主代理 Linux Node20.3.0、heap768MiB、单worker串行 **4文件/151项** exit0：provider90、picker role46、command tier9、model tier6。三个新增真实 loopback 场景检查 flex 更新、默认删除后的省略或 provider default 回退、状态与配置投影一致、session 无 tier、角色增删不修改 settings/auth 字节；原显式 flex 与 extended context 保留用例继续通过。将生产 role owner 撤回 HEAD 实际3失败/87未选/exit1，finally逐字节恢复 `6f55c87b95b0` 后同151项重验exit0，未选项不计反转通过。
+
+build exit0，manifest `ef982b674f90`、inputsDigest `82d6aba4bec6af4140fe8ea483504f799dafd2d0bf24d8487b321a61b02fea94` 与当前输入精确读回一致。正式适配归档 hash/member/vendor 身份核对后，独立串行 judge exit0，环/解析 satisfied；partial 仅既有 interactiveMode21/22-name advisory。一次误将已适配归档作为原始打包输入被 baseline hash 正确拒绝，未改打包脚本/归档；随后直接使用校验后的适配归档。两路独立静态复审 APPROVE/CLEAR，子代理未验证。证据在 `.omx/artifacts/phase20-addition-role-tier/`；五静态门、scratch清理与提交/推送/自身CI另读回。
+
+延迟CI：`972ed1f6`/`41209268816` 已completed/success；`14d3532f`/`41210672771`、文档 `712ea121`/`41210875615`、旧 `b0a144de`/`41204101311` 最后仍in_progress。`6409450b` 原 cache child failure 根因仍未确定。本批未真实provider、旧发布二进制、Windows/macOS/PTY、全仓或20k；ADD-70仍partial，原Phase20真实条件延后、goal active。
+
+最终五静态门/diff实际exit0，binding refs全部解析，118既有docs-source advisory保持。只读复核 tier setter 的原生 issuer 假设被现有协议能力门正确拒绝，与第24.20节既有裁决一致；未新增无缺陷修补。批次scratch清理后提交/推送另记录。
