@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -32,7 +31,8 @@ let home: string;
 let manager: SessionManager;
 let sessionId: string;
 beforeEach(() => {
-  home = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-provider-model-'));
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  home = fs.mkdtempSync(path.join('/tmp/cheers-test', 'provider-model-'));
   vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
   writeUserRuntimeConfigFile({ provider: 'openai', providerConnections: [], providerCredentials: { openai: {
     apiKey: 'synthetic-profile', baseUrl: 'https://profile.invalid/v1', model: 'base', thinkingEffort: 'low',
@@ -48,6 +48,38 @@ function connection() {
   return { id: 'named', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'synthetic-named',
     baseUrl: 'https://named.invalid/v1', model: 'named-model', status: 'connected' as const, createdAt: '2026-01-01', updatedAt: '2026-01-01' };
 }
+
+it.each(['provider', 'connection'] as const)('keeps the ordinary %s context budget separate when seeding roles', async source => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, contextWindow: 12000, reserveTokens: 0,
+    ...(source === 'connection' ? { activeProviderConnectionId: 'named' } : {}),
+    providerConnections: [{ ...connection(), model: 'base' }] }, edit);
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const initialBytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const commands = { ...context(), ...(source === 'provider' ? {
+    resolveConfigTarget: (config: RuntimeConfig) => resolveProviderCredential({ runtimeConfig: config, cliApiKey: 'synthetic-cli', env: {} }),
+  } : {}) };
+  const initial = commands.resolveConfigTarget?.(getRuntimeConfig(home)) ?? resolveProviderCredential({ runtimeConfig: getRuntimeConfig(home), env: {} });
+  expect(initial.credential?.connectionId).toBe(source === 'provider' ? undefined : 'named');
+  expect(readSessionModel(sessionId)).toBeUndefined();
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Role preference changes must not send a request.'));
+  expect(prepareModelRole(commands, 'summary').assign({ connectionId: 'named', provider: 'openai', model: 'base', thinkingEffort: 'low' }).saved).toBe(true);
+  expect(readSessionModel(sessionId)).not.toHaveProperty('contextWindow');
+  expect((await runExtendedContextCommand(['status'], commands)).output).toBe('Extended context: off.');
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(initialBytes);
+  const next = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...next.values, contextWindow: 18000 }, next);
+  const updatedBytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const projected = projectSessionModel(getRuntimeConfig(home), sessionId);
+  expect(projected.contextWindow).toBe(18000);
+  expect(projected.sessionContextWindow).toBeUndefined();
+  expect(configuredContextWindow(projected, commands.resolveConfigTarget?.(projected) ?? resolveProviderCredential({ runtimeConfig: projected, env: {} }))).toBe(18000);
+  expect(prepareModelRole(commands, 'summary').assign(undefined).saved).toBe(true);
+  expect(readSessionModel(sessionId)).not.toHaveProperty('contextWindow');
+  expect((await runExtendedContextCommand(['status'], commands)).output).toBe('Extended context: off.');
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(updatedBytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
 
 it.each(['config', 'env', 'cli'] as const)('selects %s models through the picker and command, publishes, and resumes without inventing a connection', async source => {
   if (source === 'env') vi.stubEnv('OPENAI_API_KEY', 'synthetic-env');

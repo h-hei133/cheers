@@ -1550,3 +1550,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A role editor offers levels from a compatible catalogue to a native account or an unavailable connection; advisor accepts and refuses opposite effort capabilities.
 - **Root Cause**: Role/advisor capability readers use raw URLs independently of their actual issuer, and an absent role credential still falls back to generic metadata.
 - **Rule**: Resolve capability metadata from the issuer owner and gate actionable role efforts on a nonblocked exact provider/model/connection credential. Keep model recovery available and validate again at commit. A test runner with green assertions and a live closing worker is not terminal; confirm the exact process and its exit before starting another validator. Single-file and hanging-process reruns can bound a teardown issue without inventing its cause.
+
+### Role Seeding Must Not Freeze An Ordinary Context Budget
+
+- **Symptom**: The first role assignment turns extended context on without that command and hides later ordinary contextWindow updates.
+- **Root Cause**: A session selection seed copies the ordinary RuntimeConfig window into the catalogue-derived selection field; a test asserts that accidental promotion.
+- **Rule**: Leave ordinary budgets in configuration. Preserve an existing explicit session selection, but never derive its extended window from the ordinary field while seeding roles. Test both actual provider and named namespaces; a fallback can otherwise make two fixtures test the same target. Verify absence of session window and the actual effective budget rather than merely removing an old assertion.

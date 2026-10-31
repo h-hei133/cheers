@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.20 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.21 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5695,3 +5695,15 @@ role owner使用现有 `providerCredentialBaseUrl` 读取model/levels；advisor 
 五静态门/build通过，manifest `3bb4c3141297`，当前inputsDigest `26ee30a366cbce3cb8722ca936d51e18a44aa643daab2f548ae3f7334cc84b8b`读回一致。正式bundle judge独立串行exit0，环/解析satisfied，partial仍仅既有interactiveMode21/22-name advisory；两路最终APPROVE/CLEAR，子代理仅只读未验证，scratch清理。
 
 延迟CI `6c570eb3`/`41203580231`、`b0a144de`/`41204101311`最后仍in_progress，Watch成功不替代代码CI；本批另绑提交/推送/readback与自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移，ADD-70 partial、goal active，旧版本回退、其余重复语义与真实环境尚缺。
+
+### 24.21 初次角色保存不把普通预算变成 extended context
+
+第24.20节已推送 `5ca5d3ed9c167aca699eaf5d0289898760d8d4c7`，main/远端一致且工作区干净。继续审计角色初次保存：没有session selection时，role owner把普通 `RuntimeConfig.contextWindow` 复制到selection同名extended preference。provider CLI与named connection两条隔离回归实际失败；第一次provider夹具自然fallback选named，补上CLI并断言实际namespace后，两真实不同路径仍失败。这个复制会让extended状态误on、使后续普通预算更新被会话偏好遮蔽。
+
+仅删除role seed中的该字段复制；baseline.selection仍优先并完整保留用户已开启的extended窗口和tier，角色增删本身不新建window偏好。定向Pi actual-message/current model窗口owner对照继续支持预算由实际选择/配置持有；本项目保留普通override与显式extended的独立语义，不增加writer或迁移字段。
+
+聚焦套件发现一条旧empty-session picker测试锁定普通90000被复制的缺陷，分类为stale expectation；保留default/summary/advisor与未配置模型浏览断言，改为session无window、projected无sessionContextWindow，实际configured reader仍90000，断言更精确。新增两场景验证初次role保存extended off、无session字段、普通12000→18000实际生效、role删除后仍off、两文档bytes或absence不变/zero fetch。既有enabled32000窗口/tier跨role增删保留测试继续通过，provider夹具临时状态归入/tmp/cheers-test。
+
+主代理实际Linux Node20.3.0、heap768MiB、单worker串行最终 **3文件/179项**exit0：provider87、role picker46、model picker46；旧owner完整反转实际2失败/85跳过、AssertionError，finally精确恢复生产bytes，最终同179项再通过。五静态门/build与当前输入读回通过，manifest `571e6cc80012`，inputsDigest `50bcf926711ebfc2333010f3fbd8aca9905dd068f4ea3a641ececc7f7c386404`。正式bundle judge独立串行exit0，环/解析satisfied，partial仅既有interactiveMode21/22-name advisory；两路最终APPROVE/CLEAR，子代理仅只读未验证、scratch清理。
+
+延迟代码CI `6c570eb3`/`41203580231`、`b0a144de`/`41204101311`最后in_progress，`5ca5d3ed`/`41205332421`新启动；本批另绑提交/推送/远端与自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移；ADD-70 partial、goal active，旧版本回退、其余重复语义和真实环境仍缺。

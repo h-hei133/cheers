@@ -36,7 +36,6 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
       : { connectionScope: 'provider' as const }), provider: active.provider, model: active.model,
       ...(active.thinkingEffort !== undefined ? { thinkingEffort: active.thinkingEffort } : {}),
       ...(tier !== undefined ? { serviceTier: tier } : {}),
-      ...(choice.config.contextWindow !== undefined ? { contextWindow: choice.config.contextWindow } : {}),
       roles: choice.config.sessionModelRoles ?? {} }
     : undefined);
   const commit = (target: SessionModelRole | undefined): RoleResult => {

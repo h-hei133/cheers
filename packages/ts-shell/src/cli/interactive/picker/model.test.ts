@@ -18,6 +18,7 @@ import { tokenizeCommandArgs } from '../../../core/commands/arguments.js';
 import { OverlayHost } from '../overlay.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
+import { configuredContextWindow } from '../../../core/models/window.js';
 
 let home: string;
 let manager: SessionManager;
@@ -226,8 +227,13 @@ it('starts role editing in an empty session and permits browsing an unconfigured
   expect(browse.navigation!.items.map(item => item.id)).not.toContain('roles');
   const saved = await browse.apply([id('b', 'other')]);
   expect(saved?.note).toContain('summary uses');
-  expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'a', model: 'shared', contextWindow: 90000, roles: {
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'a', model: 'shared', roles: {
     summary: { connectionId: 'b', model: 'other' }, advisor: { connectionId: 'a', model: 'other' } } });
+  // The ordinary budget belongs to the accepted configuration, not the session's extended-context selection.
+  expect(readSessionModel(sessionId)).not.toHaveProperty('contextWindow');
+  const projected = projectSessionModel(publication.config, sessionId);
+  expect(projected.sessionContextWindow).toBeUndefined();
+  expect(configuredContextWindow(projected, resolveProviderCredential({ runtimeConfig: projected, env: {} }))).toBe(90000);
 });
 
 it('rejects a role action captured before a competing session selection', async () => {

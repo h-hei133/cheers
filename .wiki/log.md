@@ -11022,3 +11022,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：角色 effort 与 advisor 采用 issuer 能力
 
 [addition24.20](features/phase-20-addition.md#2420-角色-effort-与-advisor-准入使用发行方能力)三角色extra-high与advisor双向能力误判5回归实际失败；沿既有issuer地址读取，复审补修四不可用binding不列effort且保留恢复。Node20.3串行最终4文件184项exit0，三有效反转/精确恢复、五门/build摘要通过，manifest3bb4c3141297，judge仅既有interactiveMode advisory；复审APPROVE/CLEAR、scratch清理。首次同组断言绿但worker关闭超时，终止exit143不计完整通过；单文件与最终同组重跑正常，根因未确认。6c570eb3/b0a144de代码CI最后in_progress，未真实provider/Windows/PTY/全仓/20k；ADD-70 partial、goal active，提交/推送与自身CI另绑。
+
+### 2026-10-31：初次角色保存保留普通窗口预算继承
+
+[addition24.21](features/phase-20-addition.md#2421-初次角色保存不把普通预算变成-extended-context)role seed把普通预算复制为extended偏好，两真实namespace回归实际失败。删除单处复制，已有extended/tier仍保留；旧picker断言分类stale并改为无session window但effective90000。Node20.3串行3文件179项，实际反转2失败/精确恢复、五门/build摘要通过，manifest571e6cc80012；judge仅既有interactiveMode advisory、复审APPROVE/CLEAR、scratch清理。前两代码CI最后in_progress，5ca5d3ed刚启动；未真实provider/Windows/PTY/全仓/20k，ADD-70 partial、goal active，提交/推送与自身CI另绑。
