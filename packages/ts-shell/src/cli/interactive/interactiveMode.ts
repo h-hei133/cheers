@@ -856,7 +856,7 @@ export class InteractiveMode {
       return;
     }
     if (isGoalControl(controlSource) && (this.busy || this.questions.question())) {
-      this.state.transcript.append(textBlock('user', text));
+      this.echoUser(text);
       const context = this.options.runtimeContext;
       void goalCommandFor(context, this.options.sessionManager)(text.trim().split(/\s+/).slice(1), {
         cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
