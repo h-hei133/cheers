@@ -22,7 +22,13 @@ describe('configuration validation boundary', () => {
   });
   afterEach(() => { vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
   function project(value: unknown) { fs.writeFileSync(path.join(root, '.cheers.json'), JSON.stringify(value)); }
-  function user(value: unknown) { fs.writeFileSync(userPath, JSON.stringify(value)); }
+  // Owner-only, the way the product writes a credential file. A fixture left at
+  // the umask default would also trigger the exposure notice, which is a
+  // separate fact from the validation question these cases ask about.
+  function user(value: unknown) {
+    fs.writeFileSync(userPath, JSON.stringify(value), { mode: 0o600 });
+    fs.chmodSync(userPath, 0o600);
+  }
 
   it.each([
     ['maxTurns', 0, 8], ['maxTurns', 1.5, 8], ['maxTurns', 'secret-value', 8],
