@@ -27,6 +27,7 @@ import { resolveRequestShape } from '../../core/models/requestShape.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
 import { configuredOutputLimit } from '../../provider/request/output.js';
 import { providerRequestTarget } from './requestTarget.js';
+import { configuredContextWindow } from '../../core/models/window.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -61,6 +62,7 @@ export function createProviderStep(
   if (catalogProvider(catalog, resolution.provider, baseUrl).ambiguous) throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before sending.');
   const endpoint = providerCredentialEndpoint(catalog, resolution, baseUrl);
   const configuredTier = request.serviceTier ?? configuredServiceTier(request.runtimeConfig, resolution);
+  const contextWindow = configuredContextWindow(request.runtimeConfig, resolution);
   if (configuredTier && serviceTierCapability(catalog, resolution.provider, resolution.model, configuredTier, baseUrl, endpoint) !== 'supported') {
     throw new Error(`Configured service tier '${configuredTier}' is not verified for ${resolution.provider}/${resolution.model}.`);
   }
@@ -123,7 +125,7 @@ export function createProviderStep(
     temperature: request.runtimeConfig?.temperature,
     topP: request.runtimeConfig?.topP,
     maxOutputTokens: configuredOutputLimit(request.runtimeConfig, endpoint),
-    ...(request.runtimeConfig?.contextWindow !== undefined ? { contextWindow: request.runtimeConfig.contextWindow } : {}),
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
     ...(request.runtimeConfig?.reserveTokens !== undefined ? { reserveTokens: request.runtimeConfig.reserveTokens } : {}),
     retry: {
       enabled: request.runtimeConfig?.retryEnabled,

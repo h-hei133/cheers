@@ -125,7 +125,7 @@ export async function captureAgentRuntime(host: JobsComposition, input: AgentRun
               ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
               headers: providerAuthorization({ apiKey: resolved.credential?.apiKey, accountAuth: resolved.credential?.accountAuth, ...(endpoint ? { endpoint } : {}) }).headers,
               ...(endpoint ? { endpoint } : {}) };
-            return { compaction: { ...buildCompactionWiring({ provider, runtimeConfig: config, admission: admit, sessionId: session.id, catalog, requestPolicy: policy,
+            return { compaction: { ...buildCompactionWiring({ provider, resolution: resolved, runtimeConfig: config, admission: admit, sessionId: session.id, catalog, requestPolicy: policy,
               workspaceRoot: session.projectRoot }),
               authority: sessionCompactionAuthority({ sessionId: session.id, workspaceRoot: host.context.cwd,
                 admission: admit,

@@ -103,6 +103,24 @@ it("uses the session-affine pool member for status and context reporting", async
   expect(report.report?.facts.prompt).toMatchObject({ status: 'unknown' });
 });
 
+it.each([['second-model', 'second', 32000], ['first-model', 'first', 12000]] as const)(
+  'uses the same session window for the status band and context report on %s', async (model, connectionId, expected) => {
+    const runtime = pooledContext('session-window-status');
+    const config = { ...runtime.runtimeConfig, contextWindow: 12000, reserveTokens: 0,
+      sessionContextWindow: { provider: 'openai', model: 'second-model', connectionId: 'second',
+        connectionScope: 'session' as const, value: 32000 } };
+    const connection = config.providerConnections.find(item => item.id === connectionId)!;
+    runtime.resolveConfigTarget = () => ({ provider: 'openai', model, baseUrl: connection.baseUrl, expectedEnvVarName: 'FIXTURE',
+      credential: { provider: 'openai', model, connectionId, apiKey: connection.apiKey, baseUrl: connection.baseUrl,
+        authMode: 'api-key', source: 'connection', envVarName: 'FIXTURE' } });
+    Object.assign(runtime, { runtimeConfig: config, configuration: new ConfigState(config, runtime.configuration.current.binding, runtime.configuration.current.catalog) });
+    expect(readStatusFacts(runtime).contextWindow).toBe(expected);
+    const report = await runContextCommand([], { cwd: runtime.projectRoot, sessionId: runtime.session.id,
+      runtimeConfig: config, readConfiguration: () => runtime.configuration.current, resolveConfigTarget: runtime.resolveConfigTarget,
+      getToolPool: async () => new Map() });
+    expect(report.report?.facts.window.tokens).toBe(expected);
+  });
+
 describe("status facts", () => {
   it('marks retained accounting partial and never renders lost usage as a free session', () => {
     const id = 'status-corrupt-usage'; resetSessionUsage(id);

@@ -2,10 +2,40 @@ import { describe, expect, it } from 'vitest'
 import type { CatalogProvider } from './catalog.js'
 import {
   DEFAULT_CONTEXT_WINDOW,
+  configuredContextWindow,
   resolveContextWindow,
   resolveModelCost,
   resolveTokenBudget,
 } from './window.js'
+import type { RuntimeConfig } from '../../config/runtimeConfig.js'
+import { projectModelSelection } from '../../session/model/projection.js'
+
+it('binds the session window without replacing the ordinary budget and retires it on reset', () => {
+  const config = { provider: 'openai', activeProviderConnectionId: 'named', contextWindow: 6000,
+    providerConnections: [{ id: 'named', provider: 'openai', model: 'base' }], providerCredentials: {},
+  } as RuntimeConfig;
+  const selection = { connectionId: 'named', provider: 'openai', model: 'selected', contextWindow: 32000 } as const;
+  const request = (provider = 'openai', model = 'selected', connectionId?: string) => ({ provider, model, credential: { connectionId } });
+  const projected = projectModelSelection(config, selection);
+  expect(projected.contextWindow).toBe(6000);
+  expect(configuredContextWindow(projected, request())).toBe(32000);
+  expect(configuredContextWindow(projected, request('openai', 'selected', 'named'))).toBe(32000);
+  expect(configuredContextWindow(projected, request('openai', 'selected', 'sibling'))).toBe(6000);
+  expect(configuredContextWindow(projected, request('openai', 'other', 'named'))).toBe(6000);
+  expect(configuredContextWindow(projected, request('google'))).toBe(6000);
+  expect(configuredContextWindow(projected, { provider: 'openai', model: 'selected' })).toBe(6000);
+  expect(configuredContextWindow(projected, { ...request(), blocked: 'connection-pending' })).toBe(6000);
+  const explicit = projectModelSelection(config, { ...selection, connectionScope: 'session' });
+  expect(configuredContextWindow(explicit, request())).toBe(6000);
+  const provider = projectModelSelection(config, { connectionScope: 'provider', provider: 'openai', model: 'selected', contextWindow: 32000 });
+  expect(configuredContextWindow(provider, request())).toBe(32000);
+  expect(configuredContextWindow(provider, request('openai', 'selected', 'named'))).toBe(6000);
+  const reset = projectModelSelection(projected, { ...selection, contextWindow: undefined });
+  expect(reset.sessionContextWindow).toBeUndefined();
+  expect(configuredContextWindow(reset, request())).toBe(6000);
+  expect(config).not.toHaveProperty('sessionContextWindow');
+  expect(configuredContextWindow(undefined, request())).toBeUndefined();
+});
 
 it('does not borrow another provider rate when an unpriced model shares its id', () => {
   const rate = { promptPerMTok: 1, completionPerMTok: 2 };

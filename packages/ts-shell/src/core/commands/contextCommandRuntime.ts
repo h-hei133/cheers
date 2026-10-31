@@ -5,7 +5,7 @@ import { contextSyntax } from '../../context/attachment/syntax.js';
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { loadCatalog } from "../models/catalogStore.js";
-import { resolveContextWindow, resolveTokenBudget } from "../models/window.js";
+import { configuredContextWindow, resolveContextWindow, resolveTokenBudget } from "../models/window.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
 import { getSessionUsage, measuredPromptContext, totalTokens } from "../../observability/usageTelemetry.js";
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS } from "../../session/context.js";
@@ -87,7 +87,7 @@ async function inspectContext(context: CommandContext): Promise<LocalCommandResu
     provider: active.provider,
     model: active.model,
     baseUrl: activeBaseUrl,
-    configured: runtimeConfig.contextWindow,
+    configured: configuredContextWindow(runtimeConfig, active),
   });
   const reserve = resolveTokenBudget(runtimeConfig.modelTokenBudgets, active.provider, active.model, "reserveTokens", runtimeConfig.reserveTokens, DEFAULT_RESERVE_TOKENS);
   context.signal?.throwIfAborted();

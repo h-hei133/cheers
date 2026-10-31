@@ -1,4 +1,4 @@
-import { resolveContextWindow, resolveModelCost } from "../../core/models/window.js";
+import { configuredContextWindow, resolveContextWindow, resolveModelCost } from "../../core/models/window.js";
 import { resolveProviderCredential } from "../../core/shell/providerCredentials.js";
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from "../../core/auth/account/target.js";
 import { DEFAULT_ENDPOINT_KIND } from "../../provider/endpoints/index.js";
@@ -80,7 +80,8 @@ export function readStatusFacts(
   const { cost, usesAssumedRates, partial, zeroCostSupported } = estimateSessionCost(usage, (provider, model) =>
     resolveModelCost(catalog, provider, model),
   );
-  const window = resolveContextWindow({ catalog, provider: active.provider, model: active.model, baseUrl: activeBaseUrl, configured: config.contextWindow });
+  const window = resolveContextWindow({ catalog, provider: active.provider, model: active.model, baseUrl: activeBaseUrl,
+    configured: configuredContextWindow(config, active) });
   const preview = live.promptContext;
   // A live reading is useful only when it still carries a number. Missing or
   // expired draft previews must not hide the provider-measured request that

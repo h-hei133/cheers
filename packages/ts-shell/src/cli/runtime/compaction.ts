@@ -3,7 +3,8 @@ import type { Admission } from '../../core/network/admission.js';
 import type { RequestPolicy } from '../../core/agent/request/model.js';
 import type { AgentMessage } from '../../core/agent/state.js';
 import { catalogModel, catalogProvider, type CatalogProvider } from '../../core/models/catalog.js';
-import { resolveContextWindow, resolveTokenBudget } from '../../core/models/window.js';
+import { configuredContextWindow, resolveContextWindow, resolveTokenBudget } from '../../core/models/window.js';
+import type { ModelPreferenceTarget } from '../../core/models/preference.js';
 import { messageToText } from '../../model-adapters/multimodal.js';
 import { createComponentLogger } from '../../observability/structuredLogger.js';
 import { getSessionUsage, measuredPromptContext } from '../../observability/usageTelemetry.js';
@@ -95,6 +96,8 @@ export function buildCompactionWiring(input: {
     readonly credentialGeneration?: string;
   };
   readonly runtimeConfig: RuntimeConfig;
+  /** Captured request identity, including its credential namespace. Never reselect here. */
+  readonly resolution?: ModelPreferenceTarget;
   readonly admission?: Admission;
   readonly sessionId: string;
   /**
@@ -138,7 +141,7 @@ export function buildCompactionWiring(input: {
     provider: provider.providerId,
     model: provider.model,
     baseUrl: provider.baseUrl,
-    configured: runtimeConfig.contextWindow,
+    configured: configuredContextWindow(runtimeConfig, input.resolution ?? { provider: provider.providerId, model: provider.model }),
   });
   const mainModel = catalogModel(input.catalog, provider.providerId, provider.model, provider.baseUrl);
   if (resolvedWindow.warning !== undefined) {

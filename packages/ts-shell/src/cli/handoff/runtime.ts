@@ -15,7 +15,7 @@ import type { Handoff } from '../../workflow/handoff/model.js';
 import { HandoffStore } from '../../workflow/handoff/store.js';
 import { handoffPolicy } from '../../workflow/handoff/policy.js';
 import type { RequestPolicy } from '../../core/agent/request/model.js';
-import { resolveContextWindow, resolveTokenBudget } from '../../core/models/window.js';
+import { configuredContextWindow, resolveContextWindow, resolveTokenBudget } from '../../core/models/window.js';
 import { DEFAULT_RESERVE_TOKENS } from '../../session/context.js';
 import { armedHandoffs, liveHandoffs } from './state.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
@@ -67,7 +67,8 @@ export class HandoffRun {
     const target = this.row.target;
     const current = this.context.resolveConfigTarget?.(config, this.context.session.id)
       ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: this.context.session.id } });
-    const window = resolveContextWindow({ catalog, provider: target.provider, model: target.model, baseUrl: current.baseUrl, configured: config.contextWindow }).window;
+    const window = resolveContextWindow({ catalog, provider: target.provider, model: target.model, baseUrl: current.baseUrl,
+      configured: configuredContextWindow(config, { ...current, provider: target.provider, model: target.model }) }).window;
     const reserve = resolveTokenBudget(config.modelTokenBudgets, target.provider, target.model, 'reserveTokens', config.reserveTokens, DEFAULT_RESERVE_TOKENS);
     return { ...resources, cacheWarming: undefined, ...(resources.compaction ? { compaction: { ...resources.compaction,
       policy: { ...resources.compaction.policy, contextWindow: Math.min(window, resources.compaction.policy.contextWindow),

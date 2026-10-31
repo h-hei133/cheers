@@ -14,6 +14,14 @@ import { readSessionModelEdit } from '../session/model/state.js';
 import { defaultHookDispatcher } from '../core/hooks/hookDispatcher.js';
 import { resolveCliCredential } from '../cli/provider/cliProviderRuntimeBridge.js';
 
+it('checks inactive model budgets against their own capacity instead of the main session window', () => {
+  const config = { ...getRuntimeConfig(root), reserveTokens: 0, maxOutputTokens: 2000,
+    sessionContextWindow: { provider: 'openai', model: 'roomy', connectionId: 'main', connectionScope: 'session' as const, value: 256000 },
+    modelTokenBudgets: { 'openai/small': { reserveTokens: 20000 } } };
+  const target = resolveProviderCredential({ runtimeConfig: config, env: {} });
+  expect(inspectConfigConstraints(config, target, loadCatalog()).errors).toContain('modelTokenBudgets.reserveTokens must leave input space in the resolved context window.');
+});
+
 let root: string;
 let file: string;
 let settings: RuntimeConfigFile;

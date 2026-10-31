@@ -2,6 +2,7 @@ import { catalogBaseUrl, catalogModel, providerEndpoint, type CatalogProvider } 
 import { endpointShape } from '../../provider/endpoints/index.js';
 import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import type { ProviderCredentialResolution } from '../auth/credential.js';
+import { sessionPreferenceMatches } from './preference.js';
 
 export type ServiceTierCapability = 'supported' | 'unsupported' | 'unverified';
 
@@ -10,10 +11,7 @@ export function configuredServiceTier(config: (Pick<RuntimeConfig, 'providerConn
   & Partial<Pick<RuntimeConfig, 'sessionServiceTier' | 'activeProviderConnectionId'>>) | undefined,
   resolution: Pick<ProviderCredentialResolution, 'provider' | 'model' | 'credential'>): string | undefined {
   const session = config?.sessionServiceTier;
-  const connectionId = resolution.credential?.connectionId;
-  if (session && resolution.credential && session.provider === resolution.provider && session.model === resolution.model
-    && (session.connectionId === connectionId || (session.connectionScope === undefined && connectionId === undefined
-      && session.connectionId === config?.activeProviderConnectionId))) return session.value;
+  if (sessionPreferenceMatches(config, session, resolution)) return session!.value;
   return config?.providerConnections.find(connection => connection.id === resolution.credential?.connectionId
     && connection.provider === resolution.provider)?.serviceTier ?? config?.providerCredentials[resolution.provider]?.serviceTier;
 }

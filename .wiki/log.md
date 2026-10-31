@@ -11002,3 +11002,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：会话 tier 独立投影并绑定实际请求模型
 
 [addition24.15](features/phase-20-addition.md#2415-会话-tier-与凭据默认分离并绑定实际模型)15499d9c已推送main/远端一致。实际复现legacy env/CLI保存flex但status仍priority；session projector不再镜像tier到default，runtime-only绑定由现有共同reader匹配provider/model/credential scope，setter同owner读回。Node20.3七文件305项含wire flex/default、preview、resume、role保留、delegated隔离，三有效反转AssertionError/精确恢复、五门/build与摘要校验通过，manifest7205510d4d6f；两路复审APPROVE/CLEAR，judge仅既有interactiveMode advisory。错role路径及无效reset-wire反转已如实分类并补有效验证。a9f537fa/6418a9bf代码CI已success，15499d9c最后in_progress；未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。
+
+### 2026-10-31：会话上下文窗口按实际模型和凭据范围生效
+
+[addition24.16](features/phase-20-addition.md#2416-会话上下文窗口绑定实际请求并保留普通预算)25bec115已推送main/远端一致。实际复现main窗口覆盖小窗口delegated准入及失效选择status仍on；sessionContextWindow独立runtime投影，window/tier共用model preference匹配，普通预算保留。dispatch/constraints/status/context/handoff与三个压缩调用共用捕获identity，saved inactive状态不虚报on。Node20.3八文件220项含真实loopback拒绝与普通override发送、reset/resume/role/隔离/压缩，三反转AssertionError精确恢复；五门/build及inputs摘要读回通过，manifesta387867093ce。两路复审APPROVE/CLEAR，正式judge仅既有interactiveMode advisory。15499d9c代码CI已success，25bec115仍in_progress；未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。

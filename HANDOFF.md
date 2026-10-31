@@ -1520,3 +1520,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A legacy named selection accepts a session flex tier using environment or CLI credentials, yet status and the next request still use the provider's priority default.
 - **Root Cause**: Session tier was overlaid onto a connection record while the shared reader correctly selected defaults using the actual credential namespace, which has no connection ID for ambient credentials.
 - **Rule**: Project the bound session tier separately from stored connection/provider defaults and resolve it in the common tier reader. Match provider, model and scope; preserve legacy ambient credential semantics. Verify actual wire, preview, resume, reset and delegated model/sibling isolation. A reset reversal against fresh disk reload cannot test reuse of an already projected config; target that reuse explicitly.
+
+### Session Catalogue Windows Must Not Replace Ordinary Budgets
+
+- **Symptom**: Extended context on a large main model lets an oversized delegated request reach a smaller model; a saved but ignored or unavailable selection still reports on.
+- **Root Cause**: The session catalogue window overwrites the ordinary configured window, and delegated consumers inherit that unbound number. Status reads saved intent without checking accepted request identity.
+- **Rule**: Project session windows separately, match actual model and credential scope in the existing preference owner, and leave ordinary override semantics intact. Carry captured resolution into compaction instead of reselecting. Check saved and accepted bindings for status; test reset on reused projected config, resume, sibling/model isolation and actual pre-send refusal. A deletion fixture must clear or replace its active ID in the same admitted save.

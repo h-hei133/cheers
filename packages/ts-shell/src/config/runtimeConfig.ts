@@ -20,7 +20,7 @@ import type { ComposerShapeId } from '../presentation/tui/composer/contract.js';
 import type { ConfigInputs } from './inputs/model.js';
 import type { ConfigScopes } from './scope/model.js';
 import type { PathRule } from './scope/contract.js';
-import type { SessionModelPolicy } from '../session/model/contract.js';
+import type { SessionModelPolicy, SessionModelSelection } from '../session/model/contract.js';
 import { captureConfigScopes, scopeSettings } from './scope/capture.js';
 import type { ModelPreferences } from './preferences/contract.js';
 
@@ -155,6 +155,10 @@ export interface RuntimeConfig {
     readonly connectionId?: string;
     readonly connectionScope?: 'session' | 'provider';
     readonly value: string;
+  };
+  /** Bound session catalogue window; never a stored setting or a shared budget. */
+  readonly sessionContextWindow?: Pick<SessionModelSelection, 'provider' | 'model' | 'connectionId' | 'connectionScope'> & {
+    readonly value: number;
   };
   readonly providerConnections: readonly ProviderConnectionConfig[];
   /** Absent means no pool is declared and existing selection applies. */

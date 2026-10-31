@@ -26,6 +26,7 @@ import { createProviderStep } from '../../cli/provider/step.js';
 import { captureThinkingPreference } from '../../core/models/preference.js';
 import * as files from '../store/sessionFileStore.js';
 import { prepareModelRole } from '../../core/commands/model/role.js';
+import { configuredContextWindow } from '../../core/models/window.js';
 
 let home: string;
 let manager: SessionManager;
@@ -75,7 +76,8 @@ it.each(['config', 'env', 'cli'] as const)('selects %s models through the picker
   expect(shell.runtimeConfig.providerCredentials.openai).toMatchObject({ model: 'next', thinkingEffort: 'high' });
   expect(shell.runtimeConfig.providerCredentials.openai).not.toHaveProperty('serviceTier');
   expect(shell.runtimeConfig.sessionServiceTier).toMatchObject({ provider: 'openai', model: 'next', value: 'flex' });
-  expect(shell.runtimeConfig.contextWindow).toBe(32000);
+  expect(shell.runtimeConfig.sessionContextWindow).toMatchObject({ provider: 'openai', model: 'next', value: 32000 });
+  expect(shell.runtimeConfig.contextWindow).toBeUndefined();
   expect(shell.runtimeConfig.configProvenance.providerCredentials.children?.openai.children?.model.sources).toEqual(['session']);
   expect(shell.runtimeConfig.configProvenance.providerConnections.children).toBeUndefined();
   manager.persistUserPromptBarrier(sessionId, 'retain provider model'); manager.saveInterrupted(sessionId);
@@ -86,9 +88,14 @@ it.each(['config', 'env', 'cli'] as const)('selects %s models through the picker
   expect(bridge.resolveCredentialSnapshot().credential).toEqual({ ...before.credential, model: 'next' });
   expect(bridge.resolveCredentialSnapshot().thinkingEffort).toBe('high');
   expect((await runSlowCommand(['status'], command)).output).toBe('Slow mode: on (flex).');
+  expect((await runExtendedContextCommand(['status'], command)).output).toBe('Extended context: on (32000 tokens).');
+  expect((await runExtendedContextCommand(['off'], command)).output).toContain('disabled for this session');
+  expect(shell.runtimeConfig.sessionContextWindow).toBeUndefined();
+  expect((await runExtendedContextCommand(['on'], command)).output).toContain('32000');
   expect((await runModelCommand(['base'], command)).output).toContain('Model switched to base');
   expect(readSessionModel(sessionId)).not.toHaveProperty('serviceTier');
   expect(readSessionModel(sessionId)).not.toHaveProperty('contextWindow');
+  expect(shell.runtimeConfig.sessionContextWindow).toBeUndefined();
   expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
   expect(fetch).not.toHaveBeenCalled();
 });
@@ -207,6 +214,7 @@ it.each(['env', 'cli'] as const)('keeps legacy %s credential resolution when pub
   expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'named', serviceTier: 'flex', contextWindow: 32000 });
   expect(readSessionModel(sessionId)?.connectionScope).toBeUndefined();
   expect(command.resolveConfigTarget(projectSessionModel(getRuntimeConfig(home), sessionId)).credential?.source).toBe(source);
+  expect((await runExtendedContextCommand(['status'], command)).output).toBe('Extended context: on (32000 tokens).');
 });
 
 it('retains the bound session tier while assigning and removing a named role', async () => {
@@ -215,17 +223,65 @@ it('retains the bound session tier while assigning and removing a named role', a
     providerConnections: [{ ...connection(), model: 'next', serviceTier: 'priority' }] }, edit);
   await runModelCommand(['next'], context());
   expect(setSessionServiceTier(context(), 'flex')).toContain('Service tier set to flex');
+  expect((await runExtendedContextCommand(['on'], context())).output).toContain('32000');
   const before = readSessionModelEdit(sessionId);
   const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
   const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
   expect(prepareModelRole(context(), 'advisor').assign({ connectionId: 'named', provider: 'openai', model: 'base' }).saved).toBe(true);
   expect(readSessionModel(sessionId)).toMatchObject({ serviceTier: 'flex', roles: { advisor: { model: 'base' } } });
   expect((await runSlowCommand(['status'], context())).output).toBe('Slow mode: on (flex).');
+  expect((await runExtendedContextCommand(['status'], context())).output).toBe('Extended context: on (32000 tokens).');
   expect(prepareModelRole(context(), 'advisor').assign(undefined).saved).toBe(true);
   expect(readSessionModel(sessionId)).toEqual({ ...before.selection!, roles: {} });
   expect((await runSlowCommand(['status'], context())).output).toBe('Slow mode: on (flex).');
+  expect((await runExtendedContextCommand(['status'], context())).output).toBe('Extended context: on (32000 tokens).');
   expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
 });
+
+it('restores the ordinary context budget when extended context is disabled or its model changes', async () => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, contextWindow: 12000, reserveTokens: 0 }, edit);
+  await runModelCommand(['next'], context());
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  expect((await runExtendedContextCommand(['on'], context())).output).toContain('32000');
+  let projected = projectSessionModel(getRuntimeConfig(home), sessionId);
+  expect(configuredContextWindow(projected, resolveProviderCredential({ runtimeConfig: projected }))).toBe(32000);
+  expect((await runExtendedContextCommand(['off'], context())).output).toContain('disabled');
+  projected = projectSessionModel(getRuntimeConfig(home), sessionId);
+  expect(configuredContextWindow(projected, resolveProviderCredential({ runtimeConfig: projected }))).toBe(12000);
+  expect((await runExtendedContextCommand(['on'], context())).output).toContain('32000');
+  expect((await runModelCommand(['base'], context())).output).toContain('Model switched to base');
+  projected = projectSessionModel(getRuntimeConfig(home), sessionId);
+  expect(configuredContextWindow(projected, resolveProviderCredential({ runtimeConfig: projected }))).toBe(12000);
+  expect((await runExtendedContextCommand(['status'], context())).output).toBe('Extended context: off.');
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+});
+
+it.each(['cli-model', 'ignored', 'deleted', 'pending', 'missing'] as const)(
+  'does not report extended context as active for a %s saved selection', async state => {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'named', providerCredentials: {},
+      providerConnections: [{ ...connection(), model: 'next' }, { ...connection(), id: 'sibling', model: 'base' }] }, edit);
+    writeSessionModel(sessionId, { connectionId: 'named', provider: 'openai', model: 'next', contextWindow: 32000 }, readSessionModelEdit(sessionId));
+    if (state !== 'cli-model') {
+      const changed = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+      writeUserRuntimeConfigFile({ ...changed.values,
+        ...(state === 'ignored' || state === 'deleted' ? { activeProviderConnectionId: 'sibling' } : {}),
+        providerConnections: state === 'deleted' ? changed.values.providerConnections!.filter(item => item.id !== 'named')
+          : changed.values.providerConnections!.map(item => item.id === 'named' ? { ...item,
+            ...(state === 'pending' ? { status: 'pending' as const } : {}), ...(state === 'missing' ? { apiKey: undefined } : {}) } : item),
+      }, changed);
+    }
+    const command = { ...context(), ...(state === 'cli-model' ? { resolveConfigTarget: (config: RuntimeConfig) =>
+      resolveProviderCredential({ runtimeConfig: config, cliModel: 'base', env: {} }) } : {}) };
+    const before = readSessionModelEdit(sessionId);
+    const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+    const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+    expect((await runExtendedContextCommand(['status'], command)).output).not.toContain('on (');
+    expect(readSessionModelEdit(sessionId)).toEqual(before);
+    expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  });
 
 it('refuses a global provider save when a hook introduces a named default owner', async () => {
   vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {

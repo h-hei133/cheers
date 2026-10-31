@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.15 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份与只读 affinity、tier owner/会话偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.16 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份与只读 affinity、tier/会话窗口偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5629,3 +5629,19 @@ picker在捕获实际active之后建立只移除sessionId的inspection context�
 三条有效反转分别移除session reader、model绑定、selection撤回，均实际AssertionError并finally精确恢复。撤回反转首次用于legacy wire用例仍通过，因为正常reload从磁盘重建配置，未复用旧投影；改对已projected配置复用的owner用例后实际失败，未把无效反转当成功。最终五门/build通过，manifest `7205510d4d6f` 当前输入摘要读回通过；正式打包judge独立串行exit0，环/解析satisfied，仍仅既有interactiveMode21/22-name advisory。两路只读复审最终APPROVE/CLEAR，子代理未验证，临时scratch清理。
 
 延迟CI：`7bec50d5`/`41196273759`、`a9f537fa`/`41196921141`、`6418a9bf`/`41197208682` 已success；`15499d9c`/`41198196947` 最后in_progress，Watch success不替代代码CI。本批另绑提交与自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移，ADD-70 partial、goal active，旧版本回退、其余重复语义与真实环境验收继续尚缺。
+
+### 24.16 会话上下文窗口绑定实际请求并保留普通预算
+
+第24.15节已推送 `25bec1157a0709d2a8ac655c42ea93a1c732836b`，main与远端精确一致。继续检查会话窗口：原projector把session `contextWindow`直接覆盖同名普通设置，委派步骤沿用配置。因此主模型开启10000窗口后，目录只有1000窗口的review模型仍实际接收2000-byte prompt；新增loopback回归在旧实现出现AssertionError。CLI覆盖模型、legacy选择被忽略、pending和缺凭据四状态也实际继续显示`Extended context: on`。删除场景初次夹具保留被删active ID，在配置保存阶段冲突；改为同一保存切换至存活sibling后覆盖删除后的只读状态，不将夹具错误算作产品失败。
+
+现session owner单独投影runtime-only `sessionContextWindow`，携带provider/model/connectionId/scope/value，不改普通`contextWindow`。既有core model preference owner提供结构化binding/target匹配，tier与window复用；匹配需要非blocked凭据、相同provider/model与凭据namespace，保留legacy ambient条件、显式session不借ambient、provider scope不传播给命名凭据。window reader先取匹配会话偏好，再取普通预算；有效替换selection无window会清除旧投影。未新增存储字段或认证实现。
+
+dispatch、配置约束、状态栏、`/context`和handoff共用reader。压缩wiring由三个既有调用点传入捕获的resolution，不重新选择账号；缺identity只沿普通预算。inactive模型预算按自己的模型容量检查，summary role继续独立目录容量。`/extended-context status`要求已保存选择与已接受投影都匹配当前请求，否则显示saved且inactive/unverified，查询不写文件。普通显式预算仍允许超过目录值并保留warning，不将第24.3节不同语义的字段合并。
+
+只读参考针对窗口owner核对：Pi `agent-session.ts:3046`按实际message/current model取容量；另一参考session owner `agent-session.ts:6694`在异步刷新后检查当前model仍相同才发布window。采用模型身份绑定、切换撤回与消费者一致的决定，保留本项目普通预算override语义。
+
+主代理实际Linux Node20.3.0、heap768MiB、单worker串行最终 **8文件/220项**通过：window20、serviceTier6、provider85、constraints35、step14、compaction23、sessionFacts26、handoff11。覆盖实际委派超量拒绝且无child wire、普通显式10000预算仍能发送同一prompt；五失效状态查询不改session/settings/auth；env/CLI/provider恢复、off/on/model切换、role增删、旧投影reset、sibling/provider/model隔离、inactive预算约束、status/report同一窗口和捕获身份的压缩策略。参考决定对应的model-binding、dispatch-reader与reset-clearing三反转均实际AssertionError，finally精确恢复生产bytes；最终类型边界调整后重跑同8文件220项通过。
+
+五静态门与build通过，manifest `a387867093ce`，当前inputsDigest `84cec6b450379d5318b4b4c11ff0e94f3bc32ed264cfe8019714c9d74ed42010`读回一致。正式打包NormProof独立串行exit0，环/解析satisfied；partial仍仅既有interactiveMode21/22-name advisory。两路独立只读复审APPROVE/CLEAR，core matcher使用本地structural接口避免新core→session类型依赖；子代理未执行验证。临时反转与validator scratch清理。
+
+延迟CI `15499d9c`/`41198196947` 已success，`25bec115`/`41199285608` 最后仍in_progress，其Watch success不证明代码CI。本批提交/推送与自身CI另行绑定。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移；ADD-70 partial、goal active，其余重复语义、旧版本回退与真实环境验收继续尚缺。

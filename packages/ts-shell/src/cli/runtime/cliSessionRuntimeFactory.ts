@@ -138,7 +138,7 @@ export function createCliSessionRuntime(input: {
         }
         assertAdmission(admission);
         signal.throwIfAborted();
-        const wiring = buildCompactionWiring({ provider, runtimeConfig: config, admission, sessionId, catalog, workspaceRoot,
+        const wiring = buildCompactionWiring({ provider, resolution: resolved, runtimeConfig: config, admission, sessionId, catalog, workspaceRoot,
           onCredentialPersisted: providers.publication,
           requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager) });
         return compactSessionHistory({

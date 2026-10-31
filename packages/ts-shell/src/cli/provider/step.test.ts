@@ -151,6 +151,27 @@ it('does not carry the main session tier into a different delegated model or sib
   expect(server.received.map(body => body.service_tier)).toEqual(['flex', 'default', 'priority']);
 });
 
+it('refuses a delegated prompt at its own window after the main session enables extended context', async () => {
+  const setup = createAdvisorHarness(false, false);
+  const server = await wire(setup);
+  const config = projectSessionModel(server.request.runtimeConfig!, setup.session.id);
+  writeSessionModel(setup.session.id, { connectionScope: 'provider', provider: 'openai', model: 'primary-model',
+    contextWindow: 10000 }, readSessionModelEdit(setup.session.id));
+  const runtimeConfig = projectSessionModel(config, setup.session.id);
+  const providerCatalog = server.request.providerCatalog!.map(provider => ({ ...provider,
+    models: provider.models.map(model => model.id === 'review-model' ? { ...model, contextWindow: 1000 } : model) }));
+  const request = { ...server.request, runtimeConfig, providerCatalog };
+  const messages = [{ role: 'user' as const, content: 'x'.repeat(2000) }];
+  expect(await createProviderStep(request, new Map(), {})(messages, setup.signal, {}, { allowTools: false })).toMatchObject({ stopReason: 'stop' });
+  expect(await delegatedSteps(request, new Map(), {})('review-model')(messages, setup.signal, {}, { allowTools: false }))
+    .toMatchObject({ stopReason: 'error', errorMessage: expect.stringMatching(/^Context overflow:/) });
+  expect(server.received.map(body => body.model)).toEqual(['primary-model']);
+  const ordinary = { ...request, runtimeConfig: { ...runtimeConfig, contextWindow: 10000, sessionContextWindow: undefined } };
+  expect(await delegatedSteps(ordinary, new Map(), {})('review-model')(messages, setup.signal, {}, { allowTools: false }))
+    .toMatchObject({ stopReason: 'stop' });
+  expect(server.received.map(body => body.model)).toEqual(['primary-model', 'review-model']);
+});
+
 it('dispatches a subagent using the effort saved in the role panel while the main request keeps its own setting', async () => {
   const setup = createAdvisorHarness(false, false); const server = await wire(setup);
   const connection = { id: 'role-wire', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'synthetic-role-wire',

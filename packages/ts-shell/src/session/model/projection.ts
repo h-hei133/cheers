@@ -3,7 +3,7 @@ import { readSessionModel } from "./state.js";
 import { sessionModelOrigins } from '../../config/provenance/projection.js';
 import type { SessionModelSelection } from './contract.js';
 
-type ModelConfig = Partial<Pick<RuntimeConfig, "provider" | "activeProviderConnectionId" | "sessionConnection" | "sessionModelRoles" | "sessionServiceTier" | "providerConnections" | "providerCredentials" | "configProvenance" | "contextWindow">>;
+type ModelConfig = Partial<Pick<RuntimeConfig, "provider" | "activeProviderConnectionId" | "sessionConnection" | "sessionModelRoles" | "sessionServiceTier" | "sessionContextWindow" | "providerConnections" | "providerCredentials" | "configProvenance" | "contextWindow">>;
 
 /** Overlay a session preference without mutating shared defaults or credentials. */
 export function projectSessionModel<T extends ModelConfig>(config: T, sessionId?: string): T {
@@ -32,7 +32,11 @@ export function projectModelSelection<T extends ModelConfig>(config: T, selectio
     },
     ...(selection.roles ? { sessionModelRoles: selection.roles } : {}),
     ...(selection.connectionScope ? { provider: selection.provider } : {}),
-    ...(selection.contextWindow !== undefined ? { contextWindow: selection.contextWindow } : {}),
+    sessionContextWindow: selection.contextWindow === undefined ? undefined : {
+      provider: selection.provider, model: selection.model, value: selection.contextWindow,
+      ...(selection.connectionId !== undefined ? { connectionId: selection.connectionId } : {}),
+      ...(selection.connectionScope !== undefined ? { connectionScope: selection.connectionScope } : {}),
+    },
     ...(config.configProvenance ? { configProvenance: sessionModelOrigins(config.configProvenance, connection ? config.providerConnections!.indexOf(connection) : undefined, selection.provider, selection.thinkingEffort !== undefined, Boolean(selection.connectionScope)) } : {}),
     providerConnections: config.providerConnections?.map(item => item === connection ? { ...item, ...preference } : item),
     ...(providerSlot ? { providerCredentials: {

@@ -190,6 +190,18 @@ it("writes the fallback summary's tool history as prose for a model that takes n
   expect(serialized).toContain("file contents");
 });
 
+it.each([['main', 'fixture-model', 32000], ['sibling', 'fixture-model', 6000], ['main', 'other', 6000]] as const)(
+  'binds compaction to the captured %s credential and %s model', (connectionId, model, expected) => {
+    const config = { ...fixture.config, contextWindow: 6000, reserveTokens: 0,
+      sessionContextWindow: { provider: 'fixture', model: 'fixture-model', connectionId: 'main',
+        connectionScope: 'session' as const, value: 32000 },
+      configProvenance: {}, configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [] };
+    const wiring = buildCompactionWiring({ provider: { headers: {}, baseUrl, model, providerId: 'fixture' },
+      resolution: { provider: 'fixture', model, credential: { connectionId } }, runtimeConfig: config as never,
+      sessionId: 'signed-summary', catalog: loadCatalog() });
+    expect(wiring.policy.contextWindow).toBe(expected);
+  });
+
 it("declines a compaction measurement without the complete prompt identity", () => {
   const deps = runtime(true);
   deps.runPrompt('hello', new AbortController().signal);

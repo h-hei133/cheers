@@ -24,7 +24,15 @@
  */
 
 import { catalogBaseUrl, catalogModel, catalogProvider, type CatalogProvider, type ModelCostRates } from './catalog.js'
-import type { ModelTokenBudget } from '../../config/runtimeConfig.js'
+import type { ModelTokenBudget, RuntimeConfig } from '../../config/runtimeConfig.js'
+import { sessionPreferenceMatches, type ModelPreferenceTarget } from './preference.js'
+
+/** A matching session window overrides the ordinary budget only for its selected request. */
+export function configuredContextWindow(config: Partial<Pick<RuntimeConfig, 'contextWindow' | 'sessionContextWindow' | 'activeProviderConnectionId'>> | undefined,
+  resolution: ModelPreferenceTarget): number | undefined {
+  return sessionPreferenceMatches(config, config?.sessionContextWindow, resolution)
+    ? config!.sessionContextWindow!.value : config?.contextWindow;
+}
 
 /**
  * The window assumed when neither the user nor the catalog says otherwise.

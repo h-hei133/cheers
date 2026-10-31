@@ -1,6 +1,6 @@
 import { DEFAULT_CONFIG, type RuntimeConfig } from './runtimeConfig.js';
 import { catalogBaseUrl, catalogModel, catalogProvider, type CatalogProvider } from '../core/models/catalog.js';
-import { resolveContextWindow, resolveTokenBudget } from '../core/models/window.js';
+import { configuredContextWindow, resolveContextWindow, resolveTokenBudget } from '../core/models/window.js';
 import { outputLimitFailure, reserveLimitFailure } from '../core/models/limits.js';
 import { effortCapability } from '../core/models/capability.js';
 import type { ThinkingPreference } from '../core/models/effort.js';
@@ -48,7 +48,7 @@ export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigMo
   }
   if (catalogProvider(catalog, target.provider, target.baseUrl).ambiguous) errors.push('Multiple model catalogue entries claim the selected endpoint. Resolve the duplicate entries before sending.');
   const entry = catalogModel(catalog, target.provider, target.model, target.baseUrl);
-  const window = resolveContextWindow({ catalog, ...target, configured: config.contextWindow });
+  const window = resolveContextWindow({ catalog, ...target, configured: configuredContextWindow(config, resolution) });
   const outputFailure = outputLimitFailure(output, entry?.maxTokens, window.window);
   if (outputFailure) errors.push(outputFailure);
   const reserve = resolveTokenBudget(config.modelTokenBudgets, target.provider, target.model, 'reserveTokens', config.reserveTokens, DEFAULT_CONFIG.reserveTokens!);
@@ -76,7 +76,8 @@ export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigMo
     const provider = key.slice(0, separator);
     const model = key.slice(separator + 1);
     const resolved = resolveContextWindow({ catalog, provider, model,
-      ...(provider === target.provider ? { baseUrl: target.baseUrl } : {}), configured: config.contextWindow });
+      ...(provider === target.provider ? { baseUrl: target.baseUrl } : {}),
+      configured: configuredContextWindow(config, { ...resolution, provider, model }) });
     // Unknown inactive models have no capacity to verify. Their active use is
     // checked above against the actual runtime fallback or explicit window.
     if (resolved.source === 'default' && (provider !== target.provider || model !== target.model)) {
