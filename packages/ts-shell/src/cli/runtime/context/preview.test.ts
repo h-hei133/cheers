@@ -55,7 +55,7 @@ import { resolveCliCredential } from '../../provider/cliProviderRuntimeBridge.js
 import { credentialIdentityFor, selectPooledConnection } from '../../../core/auth/account/pool.js';
 import { noteCredentialRateLimit, resetCredentialBackoffForTests } from '../../../core/auth/account/backoff.js';
 import { captureThinkingPreference } from '../../../core/models/preference.js';
-import { BUILTIN_PROVIDERS } from '../../../core/models/catalog.js';
+import { BUILTIN_PROVIDERS, type CatalogModel } from '../../../core/models/catalog.js';
 import { projectModelSelection } from '../../../session/model/projection.js';
 
 let root: string;
@@ -74,6 +74,7 @@ const fixture = (options: {
   readonly toolCalling?: boolean;
   readonly credential?: boolean;
   readonly endpoint?: 'openai-responses';
+  readonly tokenizer?: CatalogModel['tokenizer'];
   /** Two extra aliases claiming the same endpoint, so the address is ambiguous. */
   readonly ambiguous?: boolean;
 } = {}) => {
@@ -96,6 +97,7 @@ const fixture = (options: {
     { id: 'openai', name: 'Fixture', baseUrl: target.baseUrl,
       ...(options.endpoint ? { endpoint: options.endpoint } : {}),
       models: [{ id: 'fixture', name: 'Fixture', vision: false,
+        ...(options.tokenizer !== undefined ? { tokenizer: options.tokenizer } : {}),
         ...(options.toolCalling !== undefined ? { toolCalling: options.toolCalling } : {}) }] },
     ...(options.ambiguous ? [
       { id: 'alias-a', name: 'Alias A', runtime: 'openai' as const, baseUrl: `${base}/`,
@@ -1395,17 +1397,20 @@ it('rejects tool history for a model that cannot call tools before request const
   expect(wire).not.toHaveBeenCalled();
 });
 
-const previewDispatchCases = [
+const previewDispatchCases: Array<{ capability: string; toolCalling?: boolean; toolDiscovery: 'dynamic' | 'full';
+  maxTurns: number; agentMode: 'build' | 'plan'; tokenizer?: CatalogModel['tokenizer'] }> = [
   ...(['dynamic', 'full'] as const).flatMap(toolDiscovery => [1, 2].flatMap(maxTurns => [
     { capability: 'unknown', toolCalling: undefined, toolDiscovery, maxTurns, agentMode: 'build' as const },
     { capability: 'no-tools', toolCalling: false, toolDiscovery, maxTurns, agentMode: 'build' as const },
   ])),
   { capability: 'no-tools-plan', toolCalling: false, toolDiscovery: 'dynamic' as const, maxTurns: 2, agentMode: 'plan' as const },
+  ...(['cl100k_base', 'o200k_base'] as const).map(tokenizer => ({ capability: `declared tokenizer ${tokenizer}`,
+    tokenizer, toolCalling: false, toolDiscovery: 'dynamic' as const, maxTurns: 2, agentMode: 'build' as const })),
 ];
 it.each(previewDispatchCases)(
   'matches preview and closing policy for $capability capability with $toolDiscovery tools and $maxTurns steps',
-  async ({ toolCalling, toolDiscovery, maxTurns, agentMode }) => {
-    const { cwd, context, session, manager, load, layout, gateway, target } = fixture({ toolCalling });
+  async ({ toolCalling, toolDiscovery, maxTurns, agentMode, tokenizer }) => {
+    const { cwd, context, session, manager, load, layout, gateway, target } = fixture({ toolCalling, tokenizer });
     const config = { ...context.configuration.current.config, maxTurns, toolDiscovery, allowedTools: ['read'] };
     Object.assign(context, { runtimeConfig: config, configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
     const files = [layout.metadataPath, layout.statePath, layout.transcriptPath], before = files.map(file => fs.readFileSync(file));
@@ -1473,6 +1478,8 @@ it.each(previewDispatchCases)(
       expect(preview.estimate.identity.systemDigest).toBe(firstIdentity?.systemDigest);
       expect(preview.estimate.identity.historyDigest).toBe(firstIdentity?.historyDigest);
       expect(preview.estimate.tokens).toBe(firstContext?.localEstimate?.tokens);
+      expect(preview.estimate.method).toBe(tokenizer ?? 'characters/3.5');
+      expect(firstContext?.localEstimate?.method).toBe(preview.estimate.method);
       expect(usage.requestContext?.promptTokens).toBe(123);
       expect(files.map(file => fs.readFileSync(file))).toEqual(before);
       expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();

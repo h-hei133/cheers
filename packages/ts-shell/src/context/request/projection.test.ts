@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { endpointShape, type TurnRequest } from '../../provider/endpoints/index.js';
+import { estimateWirePromptDetails } from './wire.js';
 import { textSize } from './measure.js';
 import { requestContext } from './projection.js';
 import { IMAGE_ESTIMATE_TOKENS } from '../../session/context.js';
@@ -63,4 +64,14 @@ it('withholds an assembled estimate for opaque reasoning', () => {
   const body = JSON.stringify({ messages: [{ role: 'assistant', content: 'answer', reasoning: { signature: 'opaque' } }] });
   expect(requestContext({ body, fields: { conversation: 'messages' }, provider: 'fixture', model: 'm', endpoint: 'fixture' })
     .localEstimate).toBeUndefined();
+});
+
+it('retains the declared tokenizer method without retaining prompt text or treating media as measured tokens', () => {
+  const body = { messages: [{ role: 'user', content: 'PRIVATE_NATIVE_TEXT お誕生日おめでとう' }] };
+  const fields = { conversation: 'messages' };
+  const counted = estimateWirePromptDetails(body, fields, 'o200k_base');
+  const captured = requestContext({ body: JSON.stringify(body), fields, provider: 'fixture', model: 'm',
+    endpoint: 'fixture', tokenizer: 'o200k_base' });
+  expect(captured.localEstimate).toEqual({ tokens: counted.tokens, method: 'o200k_base', scope: 'assembled-request' });
+  expect(JSON.stringify(captured)).not.toContain('PRIVATE_NATIVE_TEXT');
 });

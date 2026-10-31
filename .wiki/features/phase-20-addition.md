@@ -224,7 +224,7 @@ ADD-08提供状态栏启动本地估算。初次定位时，[sessionFacts](../..
 
 约1.7k与4.9k的差额要单独取同模型/协议/规则/历史/实际schema的分项。工具数量、工具菜单是否丰富、源字节大小都不能直接推出token总数；缓存输入与provider归一化也需对齐。参考模型toolSchemasInContext=false时不计常驻工具schema是条件性分支，未验证用户具体模型走它。验收不设“必须也显示1.7k”的目标，而是同snapshot、可解释、estimated/measured/stale/unknown各态真实。
 
-对用户“公式是否不同”的问题，源码支持**计数方式有差异**：本项目[本地估算](../../packages/ts-shell/src/context/request/estimate.ts)标明characters/3.5；oh-my-pi的`packages/agent/src/tokenizer.ts`支持模型对应的native tokenizer，未知模型默认可用bytes/4，模式与环境覆盖会影响选择。对同一ASCII内容仅比较÷3.5和÷4约差14%，远不足以解释4.9k/1.7k约2.9倍；中文、emoji、模型tokenizer、协议与实际输入集合也不能套用这个ASCII比例。参考启动数值来自本地计数，本项目用户反馈中的对话后数值来自provider用量，两种来源须先对齐才可比较。详见[计数口径研究](28-context-display-and-startup-budget.md)。不能把问号原因与数字差额合并为一个已解决的公式问题。
+对用户“公式是否不同”的问题，初次源码核对支持**计数方式有差异**：当时本项目[本地估算](../../packages/ts-shell/src/context/request/estimate.ts)只有characters/3.5；参考A的模型计数支持对应词表，未知模型用字节近似，模式与环境覆盖会影响选择。第24.36节已在实际目录明确声明的模型上接入cl100k_base/o200k_base，未知或显式false保留原字符估算；完整请求仍是estimated。对同一ASCII内容仅比较÷3.5和÷4约差14%，远不足以解释4.9k/1.7k约2.9倍；中文、emoji、模型词表、协议与实际输入集合也不能套用这个ASCII比例。参考启动数值来自本地计数，本项目用户反馈中的对话后数值来自provider用量，两种来源须先对齐才可比较。详见[计数口径研究](28-context-display-and-startup-budget.md)。不能把问号原因与数字差额合并为一个已解决的公式问题。
 
 ADD-09修初次定位时的[报告措辞](../../packages/ts-shell/src/core/commands/context/report.ts)：当时`/context`将完整检查目录估算称作首请求“at least”，没有建立下界。当前报告已明确目录估算不是首请求估算或下界；报告分别展示可发现目录估算、实际组装请求估算、最近provider总输入及分类源尺寸，源尺寸不能冒充精确分类tokens。两项可关联交付，但不能用修报告文字替代启动状态栏能力。
 
@@ -406,7 +406,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批 | 部分完成 | 冷/热 Node 与 exe；桌面全矩阵；性能验收 |
-| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35 节台账复核 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview 已实施；不支持的 control/workflow 仍 unknown；原生 tokenizer、真实 1.7k/4.9k 分项差额与性能尚缺 |
+| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.36 节 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview、目录声明的两套词表计数已实施；不支持的 control/workflow 仍 unknown；其他模型词表、完整媒体/协议计量、真实 1.7k/4.9k 分项差额与性能验收尚缺 |
 | ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批 | 本地验证 | 不借此宣称 ADD-08 完成 |
 | ADD-35 | P2 | 状态栏 live 估算与 provider 实测的优先级 | 第一百零五批、21.28–21.30 | 本地验证 | 真实 provider 延迟 |
 | ADD-36 | P2 | 目录刷新来源标记与能力上限准入 | 第一百零六至一百零八批 | 本地验证 | 真实外部索引内容与端到端 compaction |
@@ -5942,3 +5942,19 @@ build exit0，manifest `ef982b674f90`、inputsDigest `82d6aba4bec6af4140fe8ea483
 同时纠正第12.4节ADD-08当前台账：纯组合准备、独立模板、原生研究新建入口及review snapshot只读preview已有实现。当前源码复核 [preview owner](../../packages/ts-shell/src/cli/runtime/context/preview.ts)、共用 [composition preparation](../../packages/ts-shell/src/core/commands/composition/prepare.ts) 与preview测试237/624/743行，结合第15节第三十三批既有普通/全屏小Node PTY证据，移除过时的“纯组合preview尚缺”。本批未重跑preview测试或PTY，不改写早期第五批历史结论；unsupported/control workflow仍unknown，原生tokenizer、真实1.7k/4.9k分项差额和性能继续尚缺。
 
 延迟读回 `e3273901`/`41224129606`、`0cbbbb32`/`41222600938`代码CI均completed/success，Watch也成功；这些SHA不替代本批提交的CI。本批提交/推送/自身CI另绑。未真实AWS/ADC/provider、PTY、非Linux、旧发布binary、全仓或20k；原Phase20真实条件继续延后，ADD-70 partial、goal active。
+
+### 24.36 目录声明的模型词表用于本地请求估算
+
+ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/core/models/catalog.ts)允许模型声明 `tokenizer: "cl100k_base" | "o200k_base" | false`，四个随包OpenAI型号gpt-5.3/gpt-5.3-codex/gpt-5.1-mini/o4-mini声明o200k_base。既有目录合并、精确relay及歧义围栏保持；registered relay的缺失/false不借用同名兄弟模型。未注册地址仍沿既有provider目录回退，声明不是远端型号证明；该端点不适用时应在models.json覆盖false或声明准确relay行，不声称所有未知URL强制字符回退。
+
+[计数owner](../../packages/ts-shell/src/context/request/tokenizer.ts)采用精确锁定的MIT纯TypeScript依赖gpt-tokenizer 4.1.0，无传递依赖、新语言运行时或网络计数。先检查本项目wire/preview/capture，再定向只读比较参考的目录选词表、未知模型回退与有界缓存决策；本项目沿既有UTF-16字符/3.5回退，单个活动encoder关闭merge cache，不保留请求文本缓存。官方[token counting指南](https://developers.openai.com/api/docs/guides/token-counting)明确本地文本计数与工具/格式、媒体、边界计量的差别；本批未调用server counting或真实provider。
+
+[wire](../../packages/ts-shell/src/context/request/wire.ts)继续投影实际conversation及剩余envelope，对序列化文本计数；图片仍是既有2048固定allowance，opaque reasoning仍拒绝本地估算。preview与接受请求capture读取同一个已解析目录模型声明，报告保留实际method及serialized-text范围；整请求始终estimated，不冒充provider usage，system source仍单独是字符近似。[校准](../../packages/ts-shell/src/context/request/estimate.ts)将count/method成对传递，词表方法须同wire且完整raw message数匹配，避免provider前缀+字符尾巴被标成词表结果。现有admission/compaction/replay预算口径未在本批迁移。
+
+独立代码审查发现profile import的removeAdditional allowlist会静默丢失tokenizer，false因此重新继承随包值。[原导入schema](../../packages/ts-shell/src/config/profiles/import/catalog.ts)补精确枚举，真实plan/apply/目标loadCatalog读回覆盖false及两种relay词表；非法字符串/true/object在写入前拒绝，源bytes保持。两路sol source-only复审最终APPROVE/WATCH，合成COMMENT；WATCH为明确的成本权衡，无未解决正确性阻塞，也不记性能验收通过。
+
+主代理Linux Node20.3.0、heap768MiB、单worker串行8文件196项通过，实际反转计数/导入schema/校准guard分别7/4/1失败；finally逐字节及SHA恢复后同196项再次通过。五静态门、TS build及当前manifest.compilerInputs摘要一致，build `122f0a1411e277e454e3e64fb390617424d390dfc0e30d646e67d4abdc13f822`，inputs `2844bf1472cad09b1955b4c32e67ac599ce9c6f78f82a01f12ee2da1cfe49dd9`。正式已适配bundle哈希核对、serial judge exit0，解析/无环satisfied，仅既有interactiveMode的21/22-name advisory，未提升为整体proven。首次runner缺路径及首次build的report union类型错误保留原日志；性能探针误读非generation dist路径仅保留错误分类记录，原始日志已覆盖。均修正后重验，不算行为通过。
+
+五个独立有界Node计数进程各取1k/8k/64k UTF-16文本和三次warm重复：本轮词表模块导入144–412ms，cl100k/o200k首1k含encoder初始化162/124ms，64k暖样本最慢89/118ms；fallback/两词表/切换进程maxRSS约90/131/142/147MiB，单独旧公式基线约41MiB。两rank源表合计3,590,551字节，静态加载两套表，只有encoder保留一个；同步计数不能被AbortSignal中途打断。这是单轮模块成本证据，不是CLI启动、UI响应、完整context heap或性能验收。Bun1.3.14独立30-module编译probe实际通过两词表Unicode/special、wire/capture与fallback/opaque断言，maxRSS197232KiB；生产2295-module executable另构建成功，106842240字节且host version验证通过。独立probe不替代生产CLI的交互preview执行证据。
+
+证据归 `.omx/artifacts/phase20-addition-tokenizer/`，源码快照用.source.txt避免发现为测试。延迟确认上一批 `f166ac93` 的精确代码CI `41225883811` completed/success；本批提交/推送/自身CI另绑。ADD-08保持partial：其他模型词表、媒体/协议精确计量、真实1.7k/4.9k同snapshot分项及完整性能/平台证据尚缺；未全仓回归、真实PTY/provider或20k真实会话，原Phase20真实条件延后，goal active。

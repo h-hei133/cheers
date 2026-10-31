@@ -11117,3 +11117,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：未知协议目录可浏览，绑定不可用
 
 [addition24.35](features/phase-20-addition.md#2435-未注册协议保留目录浏览并拒绝请求绑定)修复credentialless未知endpoint使picker抛错、static key又错误放行的双向缺陷。既有binding owner先查询实际协议registry，严格dispatch不变；有key的不可用行不再误报缺key，拒绝行可浏览。Node20.3单worker串行2文件87项，binding/提示反转分别4/2失败、精确恢复后87通过；五门/build当前compilerInputs摘要匹配，独立source-only APPROVE/CLEAR。首次提示反转筛选68项全未选已分类重跑，未计通过。ADD-08台账按现有preview源码与第三十三批历史小PTY纠正，未重跑preview/PTY或补造真实差额。前批e3273901与0cbbbb32精确代码CI均success；本批交付另绑，ADD-70 partial、goal active，真实provider/平台/旧binary仍待验。
+
+### 2026-11-01：本地请求估算使用目录声明的词表
+
+[addition24.36](features/phase-20-addition.md#2436-目录声明的模型词表用于本地请求估算)ADD-08接纯TypeScript两词表，未知/false保留字符回退，preview与接受请求capture/report同实际声明，完整请求仍estimated、媒体固定allowance与opaque拒绝保持。独立审查补profile import保留false/两词表，词表校准禁止字符尾巴冒名；预算准入口径保持。Node20.3单worker串行8文件196项，三反转7/4/1失败、精确恢复后196通过；五门/build当前compilerInputs摘要匹配，manifest122f0a1411e2；judge解析/无环satisfied、既有21/22-name advisory。两路source-only APPROVE/WATCH合成COMMENT，有界Node成本及Bun独立编译计数probe通过，生产exe构建通过；同步成本/词表静态加载保留WATCH，不算CLI性能验收。f166ac93精确代码CI已success，本批交付另绑。ADD-08 partial，真实差额/其他模型/平台/完整性能待验，未真实provider/PTY/全仓/20k，goal active。

@@ -526,6 +526,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
               promptIdentity,
               context: requestContext({ body, endpoint, fields: endpointShape(endpoint).contextFields,
                 provider: request.provider.provider ?? '', model: request.provider.model,
+                tokenizer: modelEntry?.tokenizer,
                 ...(!regeneratedPrompt && request.systemPromptSources
                   ? { systemSources: request.systemPromptSources } : {}) }),
               endpoint,

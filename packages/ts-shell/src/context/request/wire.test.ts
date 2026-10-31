@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { endpointShape, endpointTurnBody, type TurnRequest } from '../../provider/endpoints/index.js';
-import { estimateWirePrompt } from './wire.js';
+import { estimateWirePrompt, estimateWirePromptDetails } from './wire.js';
 
 const request: TurnRequest = { model: 'fixture', systemPrompt: 'instructions', messages: [{ role: 'user', content: 'hello' }],
   tools: [{ type: 'function', function: { name: 'read', description: 'Read a file', parameters: { type: 'object' } } }],
@@ -31,4 +31,17 @@ it('preserves schema property names and refuses opaque replay without inventing 
   expect(() => estimateWirePrompt({ messages: [{ content: [{ type: 'thinking', signature: 'opaque', thinking: 'thought' }] }] }, fields))
     .toThrow('Opaque');
   expect(() => estimateWirePrompt({ messages: [] }, undefined)).toThrow('unavailable');
+});
+
+it.each(['cl100k_base', 'o200k_base'] as const)('counts declared tokenizer %s on the actual projection while retaining image and opaque limits', tokenizer => {
+  const fields = endpointShape('openai-responses').contextFields;
+  const body = endpointTurnBody('openai-responses', { ...request, messages: [{ role: 'user', content: 'お誕生日おめでとう 😀' }] });
+  const estimate = estimateWirePromptDetails(body, fields, tokenizer);
+  expect(estimate.method).toBe(tokenizer); expect(estimate.tokens).toBeGreaterThan(0);
+  expect(estimate.tokens).not.toBe(estimateWirePrompt(body, fields));
+  const image = (data: string) => estimateWirePromptDetails(endpointTurnBody('openai-responses', { ...request,
+    messages: [{ role: 'user', content: [{ type: 'image', mimeType: 'image/png', data }] }] }), fields, tokenizer);
+  expect(image('AA==')).toEqual(image('A'.repeat(10_000)));
+  expect(image('AA==').imageAllowanceTokens).toBe(2048);
+  expect(() => estimateWirePromptDetails({ messages: [{ reasoning: { signature: 'opaque' } }] }, { conversation: 'messages' }, tokenizer)).toThrow('Opaque');
 });

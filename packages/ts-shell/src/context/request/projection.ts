@@ -1,6 +1,7 @@
 import { textSize } from './measure.js';
 import type { ContextFields, PromptSource, RequestContext, TextSize } from './model.js';
 import { estimateWirePromptDetails } from './wire.js';
+import type { CatalogModel } from '../../core/models/catalog.js';
 
 /** Only sizes and explicit model identity survive; no request text or credentials are retained. */
 export function requestContext(input: {
@@ -9,6 +10,7 @@ export function requestContext(input: {
   readonly model: string;
   readonly endpoint: string;
   readonly fields?: ContextFields;
+  readonly tokenizer?: CatalogModel['tokenizer'];
   readonly systemSources?: readonly PromptSource[];
 }): RequestContext {
   const body = textSize(input.body);
@@ -17,8 +19,8 @@ export function requestContext(input: {
   let localEstimate: RequestContext['localEstimate'];
   if (parsed && input.fields && partsValue) {
     try {
-      const estimate = estimateWirePromptDetails(parsed, input.fields);
-      localEstimate = Object.freeze({ tokens: estimate.tokens, method: 'characters/3.5' as const,
+      const estimate = estimateWirePromptDetails(parsed, input.fields, input.tokenizer);
+      localEstimate = Object.freeze({ tokens: estimate.tokens, method: estimate.method,
         scope: 'assembled-request' as const,
         ...(estimate.imageCount ? { image: Object.freeze({ count: estimate.imageCount, allowanceTokens: estimate.imageAllowanceTokens }) } : {}) });
     } catch (error) {

@@ -17,6 +17,21 @@ function shapeFor(providerId: string, modelId: string, level: "low" | "medium" |
 }
 
 describe("the shipped catalog", () => {
+  it('binds published tokenizers to exact catalogue entries and permits an explicit fallback', () => {
+    for (const model of ['gpt-5.3', 'gpt-5.3-codex', 'gpt-5.1-mini', 'o4-mini']) {
+      expect(catalogModel(BUILTIN_PROVIDERS, 'openai', model)?.tokenizer).toBe('o200k_base');
+    }
+    const merged = mergeProviders(BUILTIN_PROVIDERS, [
+      { id: 'openai', models: [{ id: 'gpt-5.3', tokenizer: false }] },
+      { id: 'relay', runtime: 'openai', baseUrl: 'https://relay.invalid/v1',
+        models: [{ id: 'gpt-5.3-codex', tokenizer: 'cl100k_base' }] },
+      { id: 'unknown-relay', runtime: 'openai', baseUrl: 'https://unknown.invalid/v1', models: [{ id: 'gpt-5.3-codex' }] },
+    ]);
+    expect(catalogModel(merged, 'openai', 'gpt-5.3')?.tokenizer).toBe(false);
+    expect(catalogModel(merged, 'openai', 'gpt-5.3-codex', 'https://relay.invalid/v1')?.tokenizer).toBe('cl100k_base');
+    expect(catalogModel(merged, 'openai', 'gpt-5.3-codex', 'https://unknown.invalid/v1')?.tokenizer).toBeUndefined();
+  });
+
   it("names the output ceiling the way OpenAI's reasoning models require", () => {
     // These reject `max_tokens`, and the run-wide ceiling is always sent, so
     // without this every request to one of them failed before being answered.

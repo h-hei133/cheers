@@ -13,6 +13,8 @@ import { IMPORT_LIMITS } from './model.js';
 import { TemplateLoader } from '../../../core/prompts/templateLoader.js';
 import { joinPreferences } from '../../preferences/documents.js';
 import type { RuntimeConfigFile } from '../../runtimeConfig.js';
+import { loadCatalog } from '../../../core/models/catalogStore.js';
+import { catalogModel } from '../../../core/models/catalog.js';
 
 let home: string; let workspace: string; let source: ProfileContext; let target: ProfileContext;
 beforeEach(() => {
@@ -93,6 +95,32 @@ it('projects legacy credential slots into pending references without resolving e
   const config = importedConfig();
   expect(config.providerConnections).toEqual([{ id: 'import-openai', provider: 'openai', authType: 'api-key', status: 'pending', model: 'test-model' }]);
   expect(config.providerCredentials).toBeUndefined();
+});
+
+it('preserves explicit tokenizer declarations and the shipped-model opt-out through profile import', () => {
+  write('models.json', JSON.stringify({ providers: {
+    openai: { models: [{ id: 'gpt-5.3', tokenizer: false }] },
+    relay: { runtime: 'openai', baseUrl: 'https://tokenizer.invalid/v1', models: [
+      { id: 'legacy-text', tokenizer: 'cl100k_base' }, { id: 'modern-text', tokenizer: 'o200k_base' },
+    ] },
+  } }));
+  const before = fs.readFileSync(path.join(source.root, 'models.json'));
+  const plan = preview(['catalog']);
+  expect(fs.readdirSync(target.root)).toEqual([]);
+  expect(applyImport(plan, plan.digest).status).toBe('complete');
+  withProfile(target, () => {
+    const catalog = loadCatalog();
+    expect(catalogModel(catalog, 'openai', 'gpt-5.3')?.tokenizer).toBe(false);
+    expect(catalogModel(catalog, 'openai', 'legacy-text', 'https://tokenizer.invalid/v1')?.tokenizer).toBe('cl100k_base');
+    expect(catalogModel(catalog, 'openai', 'modern-text', 'https://tokenizer.invalid/v1')?.tokenizer).toBe('o200k_base');
+  });
+  expect(fs.readFileSync(path.join(source.root, 'models.json'))).toEqual(before);
+});
+
+it.each(['unregistered', true, { encoding: 'o200k_base' }])('rejects an unsupported imported tokenizer declaration: %s', tokenizer => {
+  write('models.json', JSON.stringify({ providers: { openai: { models: [{ id: 'gpt-5.3', tokenizer }] } } }));
+  expect(() => preview(['catalog'])).toThrow('invalid declared data');
+  expect(fs.readdirSync(target.root)).toEqual([]);
 });
 
 it('imports split auth connection metadata without secrets and preserves its selected authority', () => {

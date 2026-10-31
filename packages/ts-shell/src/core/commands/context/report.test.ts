@@ -55,6 +55,19 @@ it('names the fixed image allowance in the assembled estimate', () => {
   expect(reportText(report)).toContain('1 image(s) use a fixed 2,048-token allowance');
 });
 
+it('reports the declared text tokenizer separately from provider usage and source estimates', () => {
+  const request = requestContext({ body: JSON.stringify({ messages: [{ role: 'user', content: 'PRIVATE_NATIVE_TEXT 😀' }] }),
+    fields: { conversation: 'messages' }, provider: 'fixture', model: 'm', endpoint: 'fixture', tokenizer: 'o200k_base' });
+  const report = contextReport({ ...input, used: undefined, request });
+  expect(report.facts.request).toMatchObject({ localEstimate: { status: 'estimated', method: 'o200k_base' },
+    tokenizer: { status: 'available', encoding: 'o200k_base', scope: 'serialized-text' }, usage: { status: 'unknown' },
+    sourceEstimate: { method: 'utf16-code-units', divisor: 3.5 } });
+  expect(reportText(report)).toContain('local o200k_base');
+  expect(reportText(report)).toContain('protocol framing and media remain estimates');
+  expect(reportText(report)).not.toContain('Tokenizer count unavailable');
+  expect(JSON.stringify(report)).not.toContain('PRIVATE_NATIVE_TEXT');
+});
+
 it('retains independent measured, estimated and unknown context facts', () => {
   const report = contextReport({ ...input, used: 64000 });
   expect(report.facts).toMatchObject({ prompt: { status: 'measured', tokens: 64000 }, freeTokens: 119000,

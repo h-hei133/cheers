@@ -4,18 +4,22 @@ import { estimateRequestTokens, estimateTokens } from '../../session/context.js'
 import { historyDigest } from './identity.js';
 import type { PromptMeasurementIdentity } from '../../observability/usage/model.js';
 import type { SessionUsageTelemetry } from '../../observability/usage/model.js';
+import type { PromptCountMethod } from './model.js';
 
 export interface PromptEstimate {
   readonly tokens: number;
   readonly source: 'estimated' | 'calibrated';
   readonly identity: PromptMeasurementIdentity;
   /** Source estimate; fixed image allowance and protocol framing are approximate. */
-  readonly method: 'characters/3.5';
+  readonly method: PromptCountMethod;
 }
 
 /** Calibrate only an unchanged measured prefix, never a same-length replacement. */
 export function estimatePrompt(messages: readonly AgentMessage[], overhead: RequestOverhead,
-  identity: PromptMeasurementIdentity, usage: SessionUsageTelemetry, projectedTokens?: number): PromptEstimate {
+  identity: PromptMeasurementIdentity, usage: SessionUsageTelemetry,
+  projected?: number | { readonly tokens: number; readonly method: PromptCountMethod }): PromptEstimate {
+  const method = typeof projected === 'object' ? projected.method : 'characters/3.5';
+  const projectedTokens = typeof projected === 'number' ? projected : projected?.tokens;
   const previous = usage.lastPromptIdentity;
   const count = usage.lastPromptMessageCount;
   const comparedWireIdentity = previous?.wireHistoryDigest !== undefined || identity.wireHistoryDigest !== undefined;
@@ -24,6 +28,7 @@ export function estimatePrompt(messages: readonly AgentMessage[], overhead: Requ
   const comparedReplayIdentity = previous?.replayBinding !== undefined || identity.replayBinding !== undefined;
   const sameReplayIdentity = previous?.replayBinding === identity.replayBinding;
   const compatible = previous && previous.provider === identity.provider && previous.model === identity.model
+    && (method === 'characters/3.5' || comparedWireIdentity && count === messages.length)
     && previous.endpoint === identity.endpoint && previous.schemaDigest === identity.schemaDigest
     && identity.endpointId !== undefined && previous.endpointId === identity.endpointId
     && previous.systemDigest === identity.systemDigest && previous.historyDigest !== undefined
@@ -37,5 +42,5 @@ export function estimatePrompt(messages: readonly AgentMessage[], overhead: Requ
   const calibrated = compatible && usage.lastPromptTokens !== undefined;
   const tokens = calibrated ? usage.lastPromptTokens! + estimateTokens(messages.slice(count))
     : projectedTokens ?? estimateRequestTokens(messages, overhead);
-  return { tokens, source: calibrated ? 'calibrated' : 'estimated', identity: { ...identity, historyDigest: historyDigest(messages) }, method: 'characters/3.5' };
+  return { tokens, source: calibrated ? 'calibrated' : 'estimated', identity: { ...identity, historyDigest: historyDigest(messages) }, method };
 }

@@ -3,6 +3,8 @@ export interface TextSize {
   readonly codeUnits: number;
 }
 
+export type PromptCountMethod = 'characters/3.5' | 'cl100k_base' | 'o200k_base';
+
 export interface PromptSource extends TextSize {
   readonly kind: 'base' | 'instructions' | 'appended' | 'skills' | 'separators';
 }
@@ -28,7 +30,7 @@ export interface RequestContext {
   /** Local count of the serialized request body, never a provider measurement. */
   readonly localEstimate?: {
     readonly tokens: number;
-    readonly method: 'characters/3.5';
+    readonly method: PromptCountMethod;
     readonly scope: 'assembled-request';
     readonly image?: {
       readonly count: number;

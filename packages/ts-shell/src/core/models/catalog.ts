@@ -22,6 +22,8 @@ export type ProviderAuth = "api-key" | "oauth" | "none";
 
 export interface CatalogModel {
   readonly id: string;
+  /** Published text vocabulary; false disables an inherited declaration. Unknown models keep an estimate. */
+  readonly tokenizer?: 'cl100k_base' | 'o200k_base' | false;
   /** Context window in tokens, when the provider publishes one. */
   readonly contextWindow?: number;
   /** Independent prompt ceiling when the endpoint publishes one. */
@@ -307,12 +309,12 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     models: [
       // Five to ten minutes of inactivity, refreshed by each hit; the extended
       // tier runs to a day.
-      { id: "gpt-5.3", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
-      { id: "gpt-5.3-codex", contextWindow: 400_000, inputLimit: 272_000, maxTokens: 128_000, reasoning: true,
+      { id: "gpt-5.3", tokenizer: 'o200k_base', contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
+      { id: "gpt-5.3-codex", tokenizer: 'o200k_base', contextWindow: 400_000, inputLimit: 272_000, maxTokens: 128_000, reasoning: true,
         compat: { ...REASONING_REQUEST_SHAPE, endpoint: 'openai-responses' },
         promptCache: { short: 600, long: 86_400 }, vision: true },
-      { id: "gpt-5.1-mini", contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
-      { id: "o4-mini", contextWindow: 200_000, reasoning: true,
+      { id: "gpt-5.1-mini", tokenizer: 'o200k_base', contextWindow: 400_000, reasoning: true, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
+      { id: "o4-mini", tokenizer: 'o200k_base', contextWindow: 200_000, reasoning: true,
         compat: { ...REASONING_REQUEST_SHAPE, endpoint: 'openai-responses', reasoningSummary: true },
         vision: true, serviceTiers: ['default', 'priority', 'fast', 'flex'] },
     ],

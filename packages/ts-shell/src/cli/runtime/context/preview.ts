@@ -31,9 +31,9 @@ import {
   TOOL_HISTORY_UNSUPPORTED_MESSAGE,
 } from '../../../turn/messages.js';
 import { resolveRequestShape } from '../../../core/models/requestShape.js';
-import { catalogProvider } from '../../../core/models/catalog.js';
+import { catalogModel, catalogProvider } from '../../../core/models/catalog.js';
 import { captureUsageAttribution } from '../../../observability/usage/identity.js';
-import { estimateWirePrompt } from '../../../context/request/wire.js';
+import { estimateWirePromptDetails } from '../../../context/request/wire.js';
 import { createCommandRegistry } from '../../../core/commands/registry.js';
 import { parseCommandSource, resolveCommandInvocation } from '../../../core/commands/invocation.js';
 import { decodeHandoffs } from '../../../workflow/handoff/codec.js';
@@ -198,9 +198,11 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     maxTokensField: shape.maxTokensField, assistantAfterToolResult: shape.assistantAfterToolResult,
   });
   const endpointId = captureUsageAttribution({ provider: resolution.provider, model: resolution.model, baseUrl: base }).endpointId;
+  const counted = estimateWirePromptDetails(body, protocol.contextFields,
+    catalogModel(publication.catalog, resolution.provider, resolution.model, base)?.tokenizer);
   const estimate = estimatePrompt(messages, overhead, { provider: resolution.provider, model: resolution.model,
     endpoint, endpointId, ...assembledIdentity, wireHistoryDigest, wireMessageCount: wireMessages.length, replayBinding },
-  getSessionUsage(expected.id), estimateWirePrompt(body, protocol.contextFields));
+  getSessionUsage(expected.id), counted);
   let suspended = false;
   const verify = () => {
     try {

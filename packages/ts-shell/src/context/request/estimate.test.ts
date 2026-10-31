@@ -65,3 +65,15 @@ it('calibrates only an identical recorded wire request', () => {
   }, wireUsage(), 800))
     .toMatchObject({ source: 'estimated', tokens: 800 });
 });
+
+it('does not label a character-based prefix extrapolation as a declared tokenizer estimate', () => {
+  const messages: AgentMessage[] = [...prefix, { role: 'user', content: 'next' }];
+  expect(estimatePrompt(messages, overhead, identity, usage(), { tokens: 42, method: 'o200k_base' }))
+    .toMatchObject({ source: 'estimated', tokens: 42, method: 'o200k_base' });
+  const wireIdentity = { ...identity, historyDigest: historyDigest(prefix), wireHistoryDigest: 'c'.repeat(64), wireMessageCount: 2 };
+  const exactUsage = { ...usage(), lastPromptIdentity: wireIdentity };
+  expect(estimatePrompt(prefix, overhead, wireIdentity, exactUsage, { tokens: 42, method: 'o200k_base' }))
+    .toMatchObject({ source: 'calibrated', tokens: 500, method: 'o200k_base' });
+  expect(estimatePrompt(messages, overhead, wireIdentity, exactUsage, { tokens: 42, method: 'o200k_base' }))
+    .toMatchObject({ source: 'estimated', tokens: 42, method: 'o200k_base' });
+});

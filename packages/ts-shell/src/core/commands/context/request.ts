@@ -31,7 +31,7 @@ export function requestDetails(request: RequestContext | undefined, projectRoot 
   if (request.localEstimate) {
     lines.push({ kind: 'columns', cells: [[span('Assembled request estimate')],
       [span(`~${request.localEstimate.tokens.toLocaleString()}`, 'number')],
-      [span(`local characters/3.5${request.localEstimate.image ? `; ${request.localEstimate.image.count} image(s) use a fixed ${request.localEstimate.image.allowanceTokens.toLocaleString()}-token allowance` : ''}; not provider usage`)]] });
+      [span(`local ${request.localEstimate.method}${request.localEstimate.image ? `; ${request.localEstimate.image.count} image(s) use a fixed ${request.localEstimate.image.allowanceTokens.toLocaleString()}-token allowance` : ''}; not provider usage`)]] });
   } else {
     lines.push({ kind: 'text', spans: [span('Assembled request estimate is unavailable for this protocol or opaque reasoning.')] });
   }
@@ -46,9 +46,11 @@ export function requestDetails(request: RequestContext | undefined, projectRoot 
     if (omittedSources > 0) lines.push({ kind: 'text', spans: [span(`${omittedSources} system sources omitted from this bounded report.`, 'muted')] });
     lines.push({ kind: 'text', spans: [span(`Source estimates use UTF-16 code units / ${CHARS_PER_TOKEN}; raw source sizes are not additive to wire sizes.`)] });
   }
+  const tokenizer: Record<string, ReportValue> = request.localEstimate && request.localEstimate.method !== 'characters/3.5'
+    ? { status: 'available', encoding: request.localEstimate.method, scope: 'serialized-text' } : { status: 'unavailable' };
   lines.push({ kind: 'space' }, { kind: 'text', spans: [span(request.promptTokens === undefined
     ? 'Provider prompt usage for this request is unknown.' : `Provider reported ${request.promptTokens.toLocaleString()} input tokens for this request.`)] },
-  { kind: 'text', spans: [span('Tokenizer count unavailable. Provider usage is aggregate; no per-source token allocation is inferred.')] });
+  { kind: 'text', spans: [span(`${tokenizer.status === 'available' ? 'Tokenizer counts serialized text; protocol framing and media remain estimates.' : 'Tokenizer count unavailable.'} Provider usage is aggregate; no per-source token allocation is inferred.`)] });
   return { lines, facts: { status: 'accepted', scope: 'foreground', provider, model, endpoint,
     capturedAt, body: { ...request.body }, byteEncoding: 'utf8', characterUnit: 'utf16-code-units',
     localEstimate: request.localEstimate ? { status: 'estimated', ...request.localEstimate } : { status: 'unavailable' },
@@ -57,7 +59,7 @@ export function requestDetails(request: RequestContext | undefined, projectRoot 
     systemSources: systemSources?.map(source => ({ ...source, estimatedTokens: Math.round(source.codeUnits / CHARS_PER_TOKEN) })) ?? null,
     systemSourcesShown: systemSources?.length ?? 0, systemSourcesOmitted: omittedSources,
     coverage: omittedParts > 0 || omittedSources > 0 ? 'partial' : 'complete',
-    sourceEstimate: { method: 'utf16-code-units', divisor: CHARS_PER_TOKEN }, tokenizer: { status: 'unavailable' },
+    sourceEstimate: { method: 'utf16-code-units', divisor: CHARS_PER_TOKEN }, tokenizer,
     usage: request.promptTokens === undefined ? { status: 'unknown' } : { status: 'reported', promptTokens: request.promptTokens },
   } };
 }

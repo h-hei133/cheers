@@ -1634,3 +1634,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An unknown catalogue protocol crashes a credentialless picker, while the same protocol with an API key becomes selectable.
 - **Root Cause**: Admission calls strict endpoint dispatch for a missing signer but short-circuits that lookup when a static credential exists.
 - **Rule**: Check the existing endpoint registry before either credential path. Keep unsupported rows browsable and read-only, preserve strict dispatch errors, and test both credentialless and static-key entries alongside declared-protocol controls.
+
+### Catalogue Opt-Outs Must Survive Profile Import
+- **Symptom**: An imported model resumes a shipped default despite an explicit false declaration in the source profile.
+- **Root Cause**: The catalogue consumer accepts a new field but the profile import allowlist omits it; removeAdditional silently strips the override before the built-in catalogue merge.
+- **Rule**: Extend the existing import schema alongside new catalogue declarations. Test plan/apply/effective-catalogue readback for false overrides and named relay values, reject unsupported declarations before writes, and preserve source bytes.

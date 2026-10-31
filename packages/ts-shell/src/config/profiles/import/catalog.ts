@@ -7,6 +7,7 @@ const number = { type: 'number', minimum: 0 };
 const model = objectSchema({
   id: nameSchema, contextWindow: positiveSchema, inputLimit: positiveSchema, maxTokens: positiveSchema, reasoning: booleanSchema, vision: booleanSchema,
   serviceTiers: listSchema(nameSchema),
+  tokenizer: { enum: ['cl100k_base', 'o200k_base', false] },
   cost: objectSchema({ promptPerMTok: number, completionPerMTok: number, cacheReadPerMTok: number, cacheWritePerMTok: number }, ['promptPerMTok', 'completionPerMTok']),
   promptCache: objectSchema({ short: positiveSchema, long: positiveSchema }),
   thinkingLevelMap: objectSchema(Object.fromEntries(['low', 'medium', 'high'].map(key => [key, { type: ['string', 'null'] }]))),
