@@ -28,6 +28,9 @@ import { prepareModelRole } from '../../core/commands/model/role.js';
 import { configuredContextWindow } from '../../core/models/window.js';
 import { configuredServiceTier } from '../../core/models/serviceTier.js';
 import { runBtwCommand } from '../../core/commands/btwCommandRuntime.js';
+import { runSkillfulCommand } from '../../core/commands/skillfulCommandRuntime.js';
+import { buildSystemPromptContext } from '../../core/prompts/systemContext.js';
+import { createSessionStoreLayout, locateExistingSessionLayout } from '../store/sessionFileLayout.js';
 
 let home: string;
 let manager: SessionManager;
@@ -50,6 +53,156 @@ function connection() {
   return { id: 'named', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'synthetic-named',
     baseUrl: 'https://named.invalid/v1', model: 'named-model', status: 'connected' as const, createdAt: '2026-01-01', updatedAt: '2026-01-01' };
 }
+
+function signedProvider(provider: 'bedrock' | 'vertex') {
+  const baseUrl = provider === 'bedrock' ? 'https://bedrock-runtime.us-east-1.amazonaws.com'
+    : 'https://us-central1-aiplatform.googleapis.com/v1/projects/synthetic-project/locations/us-central1/publishers/google';
+  writeUserRuntimeConfigFile({ provider, activeProviderConnectionId: undefined, providerConnections: [],
+    contextWindow: 12000, reserveTokens: 0, providerCredentials: { [provider]: { baseUrl, model: 'base', thinkingEffort: null } } },
+  readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  const catalog = [{ id: provider, runtime: provider, baseUrl,
+    endpoint: provider === 'bedrock' ? 'bedrock-converse-stream' : 'google-vertex',
+    models: [{ id: 'base' }, { id: 'next', contextWindow: 32000 }] }];
+  writeCatalogCache(catalog);
+  const resolve = (config: RuntimeConfig, id?: string) => resolveProviderCredential({ runtimeConfig: config, env: {}, pool: { sessionId: id } });
+  const command = { ...context(), resolveConfigTarget: resolve };
+  return { baseUrl, catalog, resolve, command };
+}
+const profileBytes = () => [getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+
+it.each(['nonsigner', 'unknown-endpoint'] as const)('keeps a saved credentialless provider window unverified for a %s endpoint', async endpoint => {
+  const fixture = signedProvider('bedrock');
+  writeSessionModel(sessionId, { connectionScope: 'provider', provider: 'bedrock', model: 'next', contextWindow: 32000 }, readSessionModelEdit(sessionId));
+  writeCatalogCache(fixture.catalog.map(entry => ({ ...entry, endpoint: endpoint === 'nonsigner' ? 'openai-compatible' : 'unrecognized-endpoint' })));
+  const before = readSessionModelEdit(sessionId); const bytes = profileBytes();
+  expect((await runExtendedContextCommand(['status'], fixture.command)).output).toContain('inactive or unverified');
+  expect((await runSkillfulCommand(['off'], fixture.command)).output).not.toContain('Skill listing disabled');
+  expect(readSessionModelEdit(sessionId)).toEqual(before); expect(profileBytes()).toEqual(bytes);
+});
+
+it.each(['named', 'blocked', 'pool', 'no-address'] as const)('refuses signer preferences and fresh role seeding with a %s unavailable binding', async defect => {
+  const fixture = signedProvider(defect === 'no-address' ? 'vertex' : 'bedrock');
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  if (defect === 'named') writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'keyless', providerConnections: [{ ...connection(),
+    id: 'keyless', provider: 'bedrock', baseUrl: fixture.baseUrl, apiKey: undefined, model: 'next' }] }, edit);
+  const command = { ...context(), resolveConfigTarget: (config: RuntimeConfig, id?: string) => {
+    const actual = fixture.resolve(defect === 'pool' ? { ...config, accountPool: { [config.provider]: { connections: ['missing'] } } } : config, id);
+    return { ...actual, ...(defect === 'blocked' ? { blocked: 'connection-unavailable' as const }
+      : defect === 'no-address' ? { baseUrl: undefined } : {}) };
+  } };
+  if (defect === 'no-address') writeCatalogCache(fixture.catalog.map(entry => ({ ...entry, baseUrl: undefined })));
+  const empty = readSessionModelEdit(sessionId); const bytes = profileBytes();
+  expect(prepareModelRole(command, 'summary').assign(undefined).saved).toBe(false);
+  expect(readSessionModelEdit(sessionId)).toEqual(empty);
+  writeSessionModel(sessionId, defect === 'named' ? { connectionScope: 'session', connectionId: 'keyless', provider: 'bedrock', model: 'next' }
+    : { connectionScope: 'provider', provider: defect === 'no-address' ? 'vertex' : 'bedrock', model: 'next' }, readSessionModelEdit(sessionId));
+  const before = readSessionModelEdit(sessionId);
+  expect((await runSkillfulCommand(['off'], command)).output).toContain('unavailable');
+  expect((await runExtendedContextCommand(['on'], command)).output).toContain('unavailable');
+  expect(readSessionModelEdit(sessionId)).toEqual(before); expect(profileBytes()).toEqual(bytes);
+});
+
+it.each(['bedrock', 'vertex'] as const)('uses credentialless %s session skill and context preferences in actual consumers', async provider => {
+  const fixture = signedProvider(provider); const bytes = profileBytes();
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected request'));
+  expect((await runModelCommand(['next'], fixture.command)).output).toContain('Model switched to next');
+  const skills = new Map([['inspect', { name: 'inspect', description: 'inspect changes', body: 'inspect',
+    filePath: '/synthetic/SKILL.md', source: 'user' as const, disableModelInvocation: false, unhonouredFields: [] }]]);
+  const prompt = () => buildSystemPromptContext({ workspaceRoot: home, sessionId,
+    runtimeConfig: projectSessionModel(getRuntimeConfig(home), sessionId), skills, toolNames: [] });
+  for (const [action, enabled] of [['off', false], ['toggle', true], ['on', true]] as const) {
+    expect((await runSkillfulCommand([action], fixture.command)).output).toContain(enabled ? 'enabled' : 'disabled');
+    expect(readSessionModel(sessionId)?.skillful).toBe(enabled);
+    expect(Boolean(prompt().skills)).toBe(enabled);
+  }
+  expect((await runExtendedContextCommand(['on'], fixture.command)).output).toContain('32000');
+  expect((await runExtendedContextCommand(['status'], fixture.command)).output).toBe('Extended context: on (32000 tokens).');
+  let config = projectSessionModel(getRuntimeConfig(home), sessionId);
+  expect(configuredContextWindow(config, fixture.resolve(config, sessionId))).toBe(32000);
+  expect((await runExtendedContextCommand(['off'], fixture.command)).output).toContain('disabled');
+  config = projectSessionModel(getRuntimeConfig(home), sessionId);
+  expect(configuredContextWindow(config, fixture.resolve(config, sessionId))).toBe(12000);
+  expect((await runExtendedContextCommand(['on'], fixture.command)).output).toContain('32000');
+  expect((await runModelCommand(['base'], fixture.command)).output).toContain('Model switched to base');
+  expect((await runExtendedContextCommand(['on'], fixture.command)).output).toContain('no published window');
+  expect((await runSkillfulCommand(['off'], fixture.command)).output).toContain('disabled');
+  expect((await runExtendedContextCommand(['off'], fixture.command)).output).toContain('disabled');
+  expect(profileBytes()).toEqual(bytes); expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each(['bedrock', 'vertex'] as const)('reads an already saved credentialless %s provider window without confusing named or blocked requests', async provider => {
+  const fixture = signedProvider(provider);
+  expect((await runModelCommand(['next'], fixture.command)).output).toContain('Model switched to next');
+  writeSessionModel(sessionId, { ...readSessionModel(sessionId)!, contextWindow: 32000 }, readSessionModelEdit(sessionId));
+  const config = projectSessionModel(getRuntimeConfig(home), sessionId); const actual = fixture.resolve(config, sessionId);
+  expect(actual.credential).toBeUndefined(); expect(actual.blocked).toBeUndefined();
+  expect(configuredContextWindow(config, actual)).toBe(32000);
+  expect((await runExtendedContextCommand(['status'], fixture.command)).output).toBe('Extended context: on (32000 tokens).');
+  expect(configuredContextWindow(config, { ...actual, blocked: 'connection-unavailable' })).toBe(12000);
+  expect(configuredContextWindow(config, { ...actual, model: 'base' })).toBe(12000);
+});
+
+it.each((['skill', 'context'] as const).flatMap(command => (['address', 'provider', 'blocked', 'catalog', 'pool'] as const).map(change => ({ command, change }))))(
+  'refuses a signer $command preference after a $change replacement inside the writer lock', async ({ command, change }) => {
+    const fixture = signedProvider('bedrock');
+    expect((await runModelCommand(['next'], fixture.command)).output).toContain('Model switched to next');
+    const before = readSessionModelEdit(sessionId); const bytes = profileBytes(); let changed = false;
+    const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId); const lock = files.withFileLock;
+    vi.spyOn(files, 'withFileLock').mockImplementation((file, action, options) => lock(file, () => {
+      if (file === layout.stateLockPath) {
+        changed = true;
+        if (change === 'catalog') writeCatalogCache(fixture.catalog.map(entry => ({ ...entry, models: [{ id: 'base' }, { id: 'next', contextWindow: 64000 }] })));
+      }
+      return action();
+    }, options));
+    const commandContext = { ...context(), resolveConfigTarget: (config: RuntimeConfig, id?: string) => {
+      const actual = fixture.resolve(changed && change === 'pool' ? { ...config, accountPool: { bedrock: { connections: ['missing'] } } } : config, id);
+      return !changed ? actual : { ...actual, ...(change === 'address' ? { baseUrl: fixture.baseUrl + '/replaced' }
+        : change === 'provider' ? { provider: 'vertex' as const } : change === 'blocked' ? { blocked: 'connection-unavailable' as const } : {}) };
+    } };
+    const result = command === 'skill' ? await runSkillfulCommand(['off'], commandContext) : await runExtendedContextCommand(['on'], commandContext);
+    expect(changed).toBe(true); expect(result.output).toContain('unverified');
+    expect(readSessionModelEdit(sessionId)).toEqual(before); expect(profileBytes()).toEqual(bytes);
+  });
+
+it.each(['bedrock', 'vertex'] as const)('does not seed a %s signer main role preference with ordinary context or tier defaults', async provider => {
+  const fixture = signedProvider(provider); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [connection()],
+    providerCredentials: { [provider]: { ...edit.values.providerCredentials?.[provider], serviceTier: 'priority' } } }, edit);
+  writeCatalogCache([...fixture.catalog, { id: 'openai', models: [{ id: 'base' }] }]);
+  const bytes = profileBytes();
+  expect(readSessionModel(sessionId)).toBeUndefined();
+  expect(fixture.resolve(getRuntimeConfig(home), sessionId)).toMatchObject({ provider, model: 'base' });
+  expect(prepareModelRole(fixture.command, 'summary').assign({ connectionId: 'named', provider: 'openai', model: 'base' }).output).toContain('summary uses');
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionScope: 'provider', provider, model: 'base', roles: { summary: { connectionId: 'named' } } });
+  expect(readSessionModel(sessionId)).not.toHaveProperty('contextWindow');
+  expect(readSessionModel(sessionId)).not.toHaveProperty('serviceTier');
+  expect(profileBytes()).toEqual(bytes);
+});
+
+it.each((['before commit', 'inside lock'] as const).flatMap(timing => (['address', 'provider', 'blocked'] as const).map(change => ({ timing, change }))))(
+  'refuses a fresh signer role seed after its $change changes $timing', async ({ timing, change }) => {
+    const fixture = signedProvider('bedrock'); let changed = false;
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [connection()] }, edit);
+    writeCatalogCache([...fixture.catalog, { id: 'openai', models: [{ id: 'base' }] }]);
+    const command = { ...context(), resolveConfigTarget: (config: RuntimeConfig, id?: string) => {
+      const actual = fixture.resolve(config, id);
+      return !changed ? actual : { ...actual, ...(change === 'address' ? { baseUrl: fixture.baseUrl + '/changed' }
+        : change === 'provider' ? { provider: 'vertex' as const } : { blocked: 'connection-unavailable' as const }) };
+    } };
+    const prepared = prepareModelRole(command, 'summary');
+    const before = readSessionModelEdit(sessionId); const bytes = profileBytes();
+    if (timing === 'before commit') changed = true;
+    else {
+      const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId); const lock = files.withFileLock;
+      vi.spyOn(files, 'withFileLock').mockImplementation((file, action, options) => lock(file, () => {
+        if (file === layout.stateLockPath) changed = true; return action();
+      }, options));
+    }
+    expect(prepared.assign({ connectionId: 'named', provider: 'openai', model: 'base' }).saved).toBe(false);
+    expect(changed).toBe(true); expect(readSessionModelEdit(sessionId)).toEqual(before); expect(profileBytes()).toEqual(bytes);
+  });
 
 it.each(['provider', 'connection'] as const)('keeps the ordinary %s context budget separate when seeding roles', async source => {
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());

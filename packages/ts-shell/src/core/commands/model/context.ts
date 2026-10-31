@@ -9,6 +9,8 @@ import { projectSessionModel } from '../../../session/model/projection.js';
 import { readFreshConfiguration } from '../configuration.js';
 import { modelRequest } from './target.js';
 import { sessionPreferenceMatches } from '../../models/preference.js';
+import { providerBindingAvailable } from '../../auth/binding.js';
+import { loadCatalog } from '../../models/catalogStore.js';
 
 /** `/extended-context` exposes only the catalog's exact model window. */
 export async function runExtendedContextCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
@@ -18,12 +20,16 @@ export async function runExtendedContextCommand(args: string[], context: Command
   const action = parsed.action.name;
   if (!action || action === 'status') {
     if (!selection?.contextWindow) return { kind: 'local', output: 'Extended context: off.' };
-    const config = context.readConfiguration?.().config ?? context.runtimeConfig
+    const publication = context.readConfiguration?.();
+    const config = publication?.config ?? context.runtimeConfig
       ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
     const request = modelRequest(context, config);
-    const active = sessionPreferenceMatches(config, selection, request)
+    const matches = sessionPreferenceMatches(config, selection, request)
       && sessionPreferenceMatches(config, config.sessionContextWindow, request)
       && config.sessionContextWindow?.value === selection.contextWindow;
+    let active = false;
+    try { active = matches && Boolean(request.credential || providerBindingAvailable(publication?.catalog ?? loadCatalog(), request)); }
+    catch { /* An unavailable endpoint keeps this saved preference unverified. */ }
     return { kind: 'local', output: active ? `Extended context: on (${selection.contextWindow} tokens).`
       : `Extended context: saved (${selection.contextWindow} tokens); inactive or unverified for the current request.` };
   }

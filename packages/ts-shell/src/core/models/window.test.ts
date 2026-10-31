@@ -37,6 +37,39 @@ it('binds the session window without replacing the ordinary budget and retires i
   expect(configuredContextWindow(undefined, request())).toBeUndefined();
 });
 
+it.each(['bedrock', 'vertex'] as const)('keeps the saved %s window on its explicit credentialless provider namespace', provider => {
+  const config = { provider, contextWindow: 12000, providerConnections: [], providerCredentials: {},
+  } as RuntimeConfig;
+  const selection = { connectionScope: 'provider', provider, model: 'selected', contextWindow: 32000 } as const;
+  const request = { provider, model: 'selected' };
+  const projected = projectModelSelection(config, selection);
+  expect(projected.activeProviderConnectionId).toBeUndefined();
+  expect(projected.sessionConnection).toEqual({ scope: 'provider', provider });
+  expect(projected.contextWindow).toBe(12000);
+  // This reads preference identity only; signer authentication remains request-owned.
+  expect(configuredContextWindow(projected, request)).toBe(32000);
+  expect(configuredContextWindow(projected, { ...request, blocked: 'pool-required' })).toBe(12000);
+  expect(configuredContextWindow(projected, { ...request, provider: provider === 'bedrock' ? 'vertex' : 'bedrock' })).toBe(12000);
+  expect(configuredContextWindow(projected, { ...request, model: 'other' })).toBe(12000);
+  expect(configuredContextWindow(projected, { ...request, model: undefined })).toBe(12000);
+  expect(configuredContextWindow(projected, { ...request, credential: { connectionId: 'named' } })).toBe(12000);
+  const reset = projectModelSelection(projected, { ...selection, contextWindow: undefined });
+  expect(reset.sessionContextWindow).toBeUndefined();
+  expect(configuredContextWindow(reset, request)).toBe(12000);
+  expect(config).not.toHaveProperty('sessionContextWindow');
+});
+
+it.each((['bedrock', 'vertex'] as const).flatMap(provider => ([undefined, 'session'] as const).map(scope => ({ provider, scope }))))(
+  'does not apply a credentialless $provider window from a $scope named selection', ({ provider, scope }) => {
+    const config = { provider, activeProviderConnectionId: 'named', contextWindow: 12000,
+      providerConnections: [{ id: 'named', provider, model: 'base' }], providerCredentials: {},
+    } as RuntimeConfig;
+    const projected = projectModelSelection(config, { connectionId: 'named', provider, model: 'selected',
+      contextWindow: 32000, ...(scope ? { connectionScope: scope } : {}) });
+    expect(configuredContextWindow(projected, { provider, model: 'selected' })).toBe(12000);
+    expect(configuredContextWindow(projected, { provider, model: 'selected', credential: { connectionId: 'named' } })).toBe(32000);
+  });
+
 it('does not borrow another provider rate when an unpriced model shares its id', () => {
   const rate = { promptPerMTok: 1, completionPerMTok: 2 };
   const models = [

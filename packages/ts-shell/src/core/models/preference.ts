@@ -16,12 +16,14 @@ export interface ModelPreferenceTarget {
   readonly blocked?: unknown;
 }
 
-/** Session preferences follow the exact model and its admitted credential namespace. */
+/** Match model/connection namespace identity; request admission checks authentication separately. */
 export function sessionPreferenceMatches(config: Partial<Pick<RuntimeConfig, 'activeProviderConnectionId'>> | undefined,
   preference: ModelPreferenceBinding | undefined,
   resolution: ModelPreferenceTarget): boolean {
   const connectionId = resolution.credential?.connectionId;
-  return Boolean(preference && resolution.credential && !resolution.blocked
+  const namespace = resolution.credential || (preference?.connectionScope === 'provider'
+    && preference.connectionId === undefined && config?.activeProviderConnectionId === undefined);
+  return Boolean(preference && namespace && !resolution.blocked
     && preference.provider === resolution.provider && preference.model === resolution.model
     && (preference.connectionId === connectionId || (preference.connectionScope === undefined && connectionId === undefined
       && preference.connectionId === config?.activeProviderConnectionId)));

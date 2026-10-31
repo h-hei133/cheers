@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { CommandContext } from '../types.js';
-import { configurationApplicationNotice } from '../configuration.js';
+import { configurationApplicationNotice, readFreshConfiguration } from '../configuration.js';
 import { captureModelChoice } from './choice.js';
 import { validateModelPreset } from './preset.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
@@ -8,12 +8,14 @@ import { readSessionModel, writeSessionModel } from '../../../session/model/stat
 import type { SessionModelPolicy, SessionModelRole, SessionModelSelection } from '../../../session/model/contract.js';
 import { sameValue } from '../../../config/values.js';
 import { SessionModelWriteError } from '../../../session/model/outcome.js';
-import { selectedModelMatches, selectionRequest } from './target.js';
-import { projectModelSelection } from '../../../session/model/projection.js';
+import { modelRequest, selectedModelMatches, selectionRequest } from './target.js';
+import { projectModelSelection, projectSessionModel } from '../../../session/model/projection.js';
 import { catalogModel } from '../../models/catalog.js';
 import { effortCapability } from '../../models/capability.js';
 import { isThinkingPreference, THINKING_LEVELS, type ThinkingPreference } from '../../models/effort.js';
 import { providerCredentialBaseUrl } from '../../auth/account/target.js';
+import { providerBindingAvailable } from '../../auth/binding.js';
+import { loadCatalog } from '../../models/catalogStore.js';
 
 export type AutomaticModelRole = keyof SessionModelPolicy;
 export interface RoleResult { readonly output: string; readonly saved: boolean }
@@ -29,12 +31,24 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
   const baseline = choice.baseline;
   const active = context.resolveConfigTarget?.(choice.config, context.sessionId)
     ?? resolveProviderCredential({ runtimeConfig: choice.config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
-  const selection: SessionModelSelection | undefined = baseline?.selection ?? (active.model && active.credential && !active.blocked
-    ? { ...(active.credential.connectionId ? { connectionScope: 'session' as const, connectionId: active.credential.connectionId }
+  const ready = !baseline?.selection && !active.blocked && (active.credential
+    || (!choice.config.activeProviderConnectionId && providerBindingAvailable(choice.catalog, active)));
+  const selection: SessionModelSelection | undefined = baseline?.selection ?? (active.model && ready
+    ? { ...(active.credential?.connectionId ? { connectionScope: 'session' as const, connectionId: active.credential.connectionId }
       : { connectionScope: 'provider' as const }), provider: active.provider, model: active.model,
       ...(active.thinkingEffort !== undefined ? { thinkingEffort: active.thinkingEffort } : {}),
       roles: choice.config.sessionModelRoles ?? {} }
     : undefined);
+  const signerSeedCurrent = (): boolean => {
+    if (baseline?.selection || active.credential) return true;
+    try {
+      const current = context.readConfiguration?.().config ?? context.runtimeConfig
+        ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
+      const request = modelRequest(context, current);
+      return !current.activeProviderConnectionId && sameValue(request, active)
+        && providerBindingAvailable(loadCatalog(), request);
+    } catch { return false; }
+  };
   const commit = (target: SessionModelRole | undefined): RoleResult => {
     if (!['subagent', 'summary', 'advisor'].includes(role) || !context.sessionId || !baseline?.projectRoot || !selection
       || path.resolve(baseline.projectRoot) !== path.resolve(context.projectRoot ?? context.cwd)) {
@@ -42,6 +56,7 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
     }
     const refusal = admission();
     if (refusal) return { saved: false, output: refusal };
+    if (!signerSeedCurrent()) return { saved: false, output: 'The current default request changed. Reopen the model picker before editing roles.' };
     if (baseline.selection && (!selectedModelMatches(choice.config, baseline.selection)
       || !sameValue(selectionRequest(context, choice.config, baseline.selection), active))) {
       return { saved: false, output: 'The saved default differs from the current request. Select the current model before editing roles.' };
@@ -53,7 +68,7 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
     else delete roles[role];
     const next = { ...selection, roles };
     try {
-      writeSessionModel(context.sessionId, next, baseline, () => !admission());
+      writeSessionModel(context.sessionId, next, baseline, () => !admission() && signerSeedCurrent());
       if (!sameValue(readSessionModel(context.sessionId), next)) {
         return { saved: false, output: 'Role assignment write outcome is unverified. Reopen the model panel.' };
       }

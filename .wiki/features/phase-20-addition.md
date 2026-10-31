@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.29 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.30 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5841,3 +5841,22 @@ build exit0，manifest `ef982b674f90`、inputsDigest `82d6aba4bec6af4140fe8ea483
 
 
 本批代码/证据说明已提交推送 `1c874354997bc5b51ca3cbfe7e57199970ecc9a9`，远端main精确读回一致，batch scratch已移除、提交后clean。自身CI `41217709469`最后in_progress，Watch `41217709468`completed/success；Watch不替代代码CI。本段后续交付记录是独立文档提交，不与代码SHA混算。
+
+
+### 24.30 签名 provider 会话偏好进入实际消费与新角色保存
+
+接续 `1e8e34d2`：已选Bedrock/Vertex signer请求的 `/skillful` 与 `/extended-context` writer强制static credential；pure preference matcher也忽略同一namespace保存的窗口；首次role seed无法从signer main构造默认绑定。原生产owner下16个新增场景实际失败，含成功消费、已保存窗口、被提前拒绝而尚未进入锁的十个竞态，以及两条角色准备场景。角色测试最初缺对应OpenAI base目录，补齐fixture后才取得有效角色准入证据，不改变preset校验。
+
+[preference writer](../../packages/ts-shell/src/core/commands/model/preferences.ts) 只为显式provider scope复用已有auth binding signer准入，static/named/legacy行为保留，原完整request、issuer地址、catalog、CAS与锁内围栏保持。技能开关在真实system prompt消费中生效；窗口on要求精确published window、off恢复普通预算。pure [preference identity](../../packages/ts-shell/src/core/models/preference.ts) 只扩展explicit provider/no named、provider/model一致且未blocked的无credential匹配，named/legacy无凭据仍回退；不把catalog或auth IO放进纯reader。
+
+身份匹配不是认证证明：手工保存的keyless非signer provider偏好可在纯配置计算中匹配，但 `/extended-context status` 用同一publication/catalog另外检查binding；非signer/unknown endpoint报告saved inactive/unverified，writer不保存，dispatch保持原readiness。未新增Bedrock/Vertex tier能力，协议不支持的tier仍由既有request capability gate拒绝。
+
+[role seed](../../packages/ts-shell/src/core/commands/model/role.ts) 只在缺baseline的fresh provider signer路径开放；不从普通context/tier固化会话默认，不放开角色本身的精确named credential合同。独立架构审查发现旧choice fingerprint只记录API-key env、未捕获Vertex地址或custom resolver：六条prepare后/锁内address/provider/blocked更换实际误保存。为新credentialless seed加完整current request与binding复验，commit和原session lock均检查；已有saved/static路径短路保持。未知endpoint准备异常仍由原role UI owner固定失败notice捕获。
+
+沿第24.29节已重读的只读参考可选static key、implicit auth resolution及请求时签名决定；本批复用同一auth owner，不实现第二套AWS/ADC来源解析，也不复制认证代码。
+
+主代理Linux Node20.3.0、heap768MiB、单worker串行最终 **3文件/192项** exit0：provider120、window26、picker role46。新增34场景涵盖actual signer model selection后skill off/toggle/on及system prompt、window enable/status/actual configured budget/disable/model reset/缺window、已保存window、fresh role seed及普通预算/tier不固化、十个writer lock替换、六个role commit/lock替换、named/blocked/pool/noURL拒绝和非signer/unknown status；settings/auth bytes与session revision保持。未发送外部请求。中间口头196项为计数错误，正式JSON读回和此处均为192。
+
+四个原owner反转实际 **21失败/13控制通过/112未选/exit1**，finally精确恢复，再运行同192项通过；反转中fresh role三条锁竞态因原owner提前拒绝未进入锁，六条中间误保存证据独立保存在seed-race。五静态门/diff exit0，118 docs-source advisory保留；build `325f16d9f1deb9b22f1838e4481df4ea86b897d7ad2cc7f341a78765e963f640`、inputsDigest `b4f75beff13346194c969fffa11f6caff8460cfe7c7b47bd66e3674bfc24f3e3` 与当前compiler inputs精确匹配。正式adapted archive/patch/member/vendor核对后serial judge exit0，环/解析satisfied，partial仅既有interactiveMode21/22-name advisory。两路独立source-only APPROVE/CLEAR，子代理仅window测试编辑/审查、未验证。证据 `.omx/artifacts/phase20-addition-signer-preferences/`。
+
+延迟CI：前文档 `b48fd27b`/`41215914412`已success；模型控制 `1c874354`/`41217709469`、交付文档 `1e8e34d2`/`41217786893`最后in_progress，Watch均success。本批提交/推送/自身CI另绑，真实AWS/ADC/provider、PTY、非Linux平台、旧发布binary、全仓/20k未验，ADD-70 partial，原真实条件延后、goal active。

@@ -1606,3 +1606,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Correcting a runner cwd starts a second validator while the first still runs; broad process argument output exposes unrelated service secrets.
 - **Root Cause**: A yielded session is mistaken for completion, and process arguments are treated as harmless diagnostics.
 - **Rule**: Wait for or terminate the exact owned session and confirm exit before starting another validator. Inspect known PIDs with state or command names only; never print system-wide process arguments. Build digest readback must include the manifest's compilerInputs, matching the build owner.
+
+### Signer Preferences Need Identity Readers And Admission At Their Owners
+- **Symptom**: A signed provider cannot change skill/context preferences, or a saved window is silently ignored. A fresh role seed can also save after its resolved signer address changes.
+- **Root Cause**: Pure preference matching requires a static credential, while the role snapshot records API-key environment but does not capture signer address inputs or custom resolver output.
+- **Rule**: Keep preference matching about explicit provider/model/connection identity and check signer admission separately in writers and active status. Preserve named/legacy credential requirements. For fresh credentialless role seeds, compare the full current request before commit and inside the session lock. Test actual skill/window consumers, unavailable endpoints, named/pool refusals and resolver replacement; identity matching does not prove external authentication.

@@ -11,6 +11,7 @@ import { connectionIdentity } from './identity.js';
 import { configurationApplicationNotice, readFreshConfiguration } from '../configuration.js';
 import { selectedModelMatches, selectionRequest } from './target.js';
 import { providerCredentialBaseUrl } from '../../auth/account/target.js';
+import { providerBindingAvailable } from '../../auth/binding.js';
 
 /** Publish a small session preference through the same active identity and CAS fences. */
 export function publishModelPreference(context: CommandContext, update: (selection: SessionModelSelection, catalog: readonly CatalogProvider[], baseUrl?: string) => SessionModelSelection): string | undefined {
@@ -28,7 +29,7 @@ export function publishModelPreference(context: CommandContext, update: (selecti
     }
     const request = selectionRequest(context, config, selection);
     if (request.provider !== selection.provider || request.model !== selection.model
-      || request.blocked || !request.credential) {
+      || request.blocked || (!request.credential && (selection.connectionScope !== 'provider' || !providerBindingAvailable(catalog, request)))) {
       return 'The selected model differs from the current request or its credential is unavailable. Reload before changing preferences.';
     }
     const baseUrl = providerCredentialBaseUrl(catalog, request);
