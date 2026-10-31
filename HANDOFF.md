@@ -1659,3 +1659,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An invalid project error disappears when the startup alternate screen closes, despite exit code 1 and restored terminal modes.
 - **Root Cause**: The project resolver prints and exits globally, bypassing the CLI callbacks that dispose the loading surface before reporting errors.
 - **Rule**: Thread the existing writeError/exit ports through root bootstrap and project validation. Keep the original message and exit code, and verify the error follows screen restoration in the actual PTY; checking only the final terminal modes misses hidden diagnostics.
+
+### Protocol Markers Do Not Give Tool JSON Protocol Semantics
+- **Symptom**: Ordinary signature fields in tool arguments suppress a context estimate, while image-shaped argument data receives a fixed image allowance instead of being counted as text.
+- **Root Cause**: A recursive JSON replacer interprets field names throughout the conversation, losing the boundary between native content blocks and literal tool payloads.
+- **Rule**: Visit only protocol content containers when masking real images or rejecting opaque reasoning. Count arguments and structured results as literal JSON, preserve actual nested tool-result images, and verify both projected and accepted request counts without changing the transmitted body.

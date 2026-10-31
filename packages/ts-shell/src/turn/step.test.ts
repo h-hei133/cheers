@@ -14,6 +14,7 @@ import { BUILTIN_PROVIDERS } from '../core/models/catalog.js';
 import { buildSystemPrompt } from './prompt.js';
 import { estimateRequestTokens } from '../session/context.js';
 import { FINAL_STEP_MESSAGE, outgoingProjection } from './messages.js';
+import { countRequestText } from '../context/request/tokenizer.js';
 
 /**
  * The step is the only place a provider is spoken to. What matters here is
@@ -41,6 +42,38 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 }
 
 describe("createStepFunction", () => {
+  it.each([false, 'cl100k_base', 'o200k_base'] as const)('retains the accepted native tool JSON estimate with tokenizer %s', async tokenizer => {
+    const sessionId = `native-tool-json-${tokenizer}`; resetSessionUsage(sessionId);
+    let captured: SentRequest | undefined; let serialized = ''; let sends = 0;
+    const literal = 'ORDINARY_DOCUMENT_DATA Ω 😀 '.repeat(120);
+    const arguments_ = JSON.stringify({ document: { signature: literal, inlineData: { data: literal },
+      nested: [{ type: 'redacted_thinking', data: literal }, { type: 'image', source: { data: literal } }] } });
+    const messages = [{ role: 'user' as const, content: 'inspect this document' },
+      { role: 'assistant' as const, content: '', tool_calls: [{ id: 'call_one', type: 'function' as const,
+        function: { name: 'read', arguments: arguments_ } }] },
+      { role: 'tool' as const, tool_call_id: 'call_one', content: 'document inspected' }];
+    const step = createStepFunction({ ...request, sessionId, contextWindow: 65536, maxOutputTokens: 128,
+      provider: { ...request.provider, provider: 'fixture', endpoint: 'anthropic-messages' },
+      catalog: [{ id: 'fixture', models: [{ id: 'm', tokenizer, toolCalling: true, contextWindow: 65536, maxTokens: 128 }] }],
+      tools: [{ type: 'function', function: { name: 'read', parameters: { type: 'object' } } }],
+      fetchImpl: async (_url, init) => {
+        sends++; serialized = String(init?.body);
+        return jsonResponse({ content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn',
+          usage: { input_tokens: 123, output_tokens: 1 } });
+      },
+    });
+    try {
+      const result = await step(messages, undefined, {}, { allowTools: true, onRequestSent: sent => { captured = sent; } });
+      expect(result).toMatchObject({ stopReason: 'stop', text: 'ok' }); expect(sends).toBe(1);
+      const body = JSON.parse(serialized);
+      expect(body.messages[1].content[0].input).toEqual(JSON.parse(arguments_));
+      const counted = countRequestText([JSON.stringify(body.messages), JSON.stringify({ ...body, messages: undefined })], tokenizer);
+      expect(captured?.context?.localEstimate).toEqual({ ...counted, scope: 'assembled-request' });
+      expect(JSON.stringify(captured?.context)).not.toContain('ORDINARY_DOCUMENT_DATA');
+      expect(getSessionUsage(sessionId).lastPromptTokens).toBe(123);
+    } finally { resetSessionUsage(sessionId); }
+  });
+
   it('binds accepted request and provider measurement to the same selected history digest', async () => {
     const id = 'history-step'; resetSessionUsage(id);
     const messages = [{ role: 'user' as const, content: 'selected content' }];

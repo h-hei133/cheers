@@ -406,7 +406,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批、第 24.39 节 | 部分完成 | Node/exe 普通/全屏的生产加载期输入、取消与错误恢复已验证；冷缓存、桌面全矩阵及完整性能验收仍缺 |
-| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38 节 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview、目录声明的两套词表及按需加载已实施；Node/exe 普通/全屏的小型本地模拟请求计数已验证；不支持的 control/workflow 仍 unknown；其他模型词表、完整媒体/协议计量、真实 1.7k/4.9k 分项差额与性能验收尚缺 |
+| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40 节 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview、目录声明的两套词表及按需加载已实施；Node/exe 普通/全屏的小型本地模拟请求计数已验证，工具 JSON 与原生媒体/签名的计量边界已补强；不支持的 control/workflow 仍 unknown；其他模型词表、完整媒体/协议计量、真实 1.7k/4.9k 分项差额与性能验收尚缺 |
 | ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批 | 本地验证 | 不借此宣称 ADD-08 完成 |
 | ADD-35 | P2 | 状态栏 live 估算与 provider 实测的优先级 | 第一百零五批、21.28–21.30 | 本地验证 | 真实 provider 延迟 |
 | ADD-36 | P2 | 目录刷新来源标记与能力上限准入 | 第一百零六至一百零八批 | 本地验证 | 真实外部索引内容与端到端 compaction |
@@ -5998,3 +5998,15 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 最终生产Node/exe × regular/fullscreen × adopt/cancel/invalid-project共 **12场原生PTY** 串行通过。四场adopt在真实Loading首帧后输入两行原文，最终Enter前无传输；之后完整草稿只出现一次，每场一次本地readiness GET与一次推理POST。四场实际body均1062 bytes、o200k估算252，草稿/status及context报告一致，模拟usage123独立标示；唯一有序runtime adoption及正式frame write均取得process marks。取消四场code130、无效project四场code1且错误在屏幕恢复后可见，均零传输、零runtime adoption。每场独立HOME/Git项目，settings/auth/catalog/trust逐字节不变、可选prompt目录未创建、alternate screen和bracketed paste关闭、所观察owned进程结束且夹具移除。CLI树每50ms采样最高332688KiB，512MiB守卫未触发；不含父探针，不作为完整heap验收。
 
 正式证据归 `.omx/artifacts/phase20-addition-startup-terminal/`，含两类产品失败、探针误判分类、反转、最终矩阵、构建身份与非可执行源码快照；原始请求体及PTY输出只在内存使用并丢弃。全部传输仅到127.0.0.1合成服务，不代表真实provider认证或用量验收。父进程观察时刻与process marks分开，未控制冷缓存/负载、未作完整性能或桌面平台结论。延迟读回 `69eb6eb4`精确CI `41229200850`已success，`28b4f3ac`精确CI `41231278750`仍in_progress、Watch `41231278797`success；本批交付另绑定。ADD-07保持partial，原Phase20真实条件延后、goal active。
+
+### 24.40 工具 JSON 的字段名不再冒充协议图片或推理签名
+
+接续已推送 `9c5473288c26907b8cf19ae6819b72104fd6392c`，推进ADD-08的协议计量边界。原[wire估算器](../../packages/ts-shell/src/context/request/wire.ts)用JSON.stringify replacer递归检查整份conversation：原生工具参数中普通的signature/thoughtSignature/reasoningContent或redacted_thinking字段被误判为opaque；image/source、inlineData等普通业务JSON又被替换为固定图片allowance。真实Anthropic、Google、Vertex与Bedrock端点投影的24组参数及两词表回归实际 **26失败/10控制通过**，确认问题属于协议边界，不是词表差异。可能表现为有效草稿估算变unknown，或把参数原文的计数换成与其无关的媒体数值；没有把它解释成用户1.7k/4.9k差额的已证实根因。
+
+先检查目标及实际endpoint转换，再定向只读比较参考的typed content计数：工具调用参数使用JSON.stringify，图片只由明确内容块识别。本项目继续使用端点最终body，不另外组装请求；估算只沿message/content/parts、Responses function_call_output.output、Google functionResponse.parts与Bedrock toolResult.content等内容容器检查真实图片/opaque字段。tool input/args、Google functionResponse.response及其他literal JSON全文进入原计数器，不递归赋予其中字段协议语义，也不修改原body。真实签名仍不给本地estimate，真实用户/工具结果图片仍按固定2048 allowance标示，不冒充实测；方法名与source合同保持。
+
+[wire回归](../../packages/ts-shell/src/context/request/wire.test.ts)覆盖四类原生投影的六组普通JSON、两词表、五协议实际工具图片、四种真实opaque结构及带图片的结构化Google结果；检查输入body不变和capture不留原文。[实际step回归](../../packages/ts-shell/src/turn/step.test.ts)另通过原accepted-request回调，验证Anthropic字符回退/cl100k/o200k三种计数均保留完整参数、一轮一次fetch double，provider usage123独立于本地估算。这里使用合成请求/响应和fetch double，未连接外部provider，不算真实网络、CLI或桌面验收。
+
+主代理Node20.3.0、heap768MiB、单worker串行 **3文件152项** 通过。恢复基线wire owner后，参数/结构化结果/accepted capture共 **30项实际失败**；finally源码逐字节与SHA恢复，152项再次通过。五静态门及Node floor TS/exe构建通过，manifest.compilerInputs当前摘要匹配；build `fb7316f26cd6b3ed7012957df19484a1712806bf15f9b07e4ce2b61d33d8eb96`、inputs `c25180a11bf984784c5dbd7452bb51677f0b9ba00879d71a35179caa2fb4603d`、exe SHA `2770404c1cf0ddacb8760c9b29894e6c809cb988244373f03f7b2e2ecaad7a1a`。118既有docs-source advisory保留，未另跑本批NormProof/独立委派复审、生产PTY、完整性能、全仓回归或20k真实会话。证据与非可执行源码快照归 `.omx/artifacts/phase20-addition-wire-payload/`，清理与提交/推送另绑。
+
+延迟读回 `28b4f3ac`精确CI `41231278750`已completed/success；`9c547328`精确CI `41233253348`仍in_progress，未从本地结果推断其CI成功。ADD-08继续partial：本批修复普通工具JSON的计量，不补造真实用量差额、其他词表、完整媒体/协议、平台或性能证据；原Phase20真实条件仍延后，整体goal active。

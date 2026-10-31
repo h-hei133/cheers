@@ -11133,3 +11133,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：生产启动的排队输入与项目错误恢复
 
 [addition24.39](features/phase-20-addition.md#2439-生产启动保留排队输入并在恢复终端后报告项目错误)旧exe把Loading期两行草稿的首行提前派发，真实排队I/O两回归复现单轮immediate尚未poll便交接。沿同surface等待下一poll，不flush parser；无效project另复现错误先打印后退出alternate screen，复用CLI错误/退出端口先恢复再报告。Node控制的environment前缀误判与runner setup错误已分类。Node20.3单worker串行4文件46项，双反转各2失败、逐字节恢复后46通过；五门/TS/exe构建当前摘要匹配，manifest75e3ebfa85d4。最终Node/exe×普通/全屏×草稿/取消/无效项目12场原生PTY通过：完整草稿一次、最终确认前零传输、取消130、错误恢复后可见且code1；配置bytes及终端模式、owned进程/fixture清理均核对。仅本地模拟provider，原始PTY/body丢弃；未新judge/独立复审/冷缓存/桌面/完整性能。69eb6eb4精确代码CI已success，28b4f3ac仍in_progress、Watch success；ADD-07 partial、goal active，本批交付另绑。
+
+### 2026-11-01：工具 JSON 保留原文计量
+
+[addition24.40](features/phase-20-addition.md#2440-工具-json-的字段名不再冒充协议图片或推理签名)四类原生端点的普通signature/inlineData等工具参数被递归replacer误当opaque或图片，旧owner26失败/10控制确认。估算仅访问协议内容容器，原input/args/result JSON全文计数；真实opaque继续unknown、真实工具图片保留allowance、body不变，定向参考typed-content决定完成。Node20.3单worker串行3文件152项，原owner反转30失败、逐字节恢复后152通过；五门/TS/exe build当前摘要匹配，manifestfb7316f26cd6。accepted step的三计数方式与usage123独立验证使用fetch double；无真实provider/新PTY/完整性能/新judge/独立复审，ADD-08 partial、goal active。28b4f3ac精确代码CI已success，9c547328仍in_progress；证据归档、清理与交付另绑。
