@@ -1764,3 +1764,10 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A restored tool card says failed and its model history says cancelled, even though a command wrote a side effect before the CLI was killed and its child remained alive.
 - **Root Cause**: Protocol repair and lifecycle compensation fill missing records; neither establishes the external operation's outcome or reverses its effects. SIGKILL cannot run the CLI's graceful cancellation path.
 - **Rule**: Pair missing calls with an explicit unknown outcome and possible-side-effect notice; require inspecting state before retrying. Show restored unanswered cards as unknown while preserving actual results. In hard-kill probes, clean only captured PID/start identities and identify harness-owned cleanup separately from product behavior; a scripted final-answer continuation proves no automatic rerun only in that case.
+
+
+### Turn Completion Does Not Prove A Pager Frame Was Painted
+
+- **Symptom**: Report facts, saved ledger and model metadata are correct, but a native PTY assertion sees none of the report's warnings.
+- **Root Cause**: The command has ended while its scheduled pager frame is still pending. A probe that immediately sends Escape dismisses the reader before the terminal draws it.
+- **Rule**: Wait for the actual new report content in the controlled terminal before closing its reader, then synchronize the return before sending another command. Keep failed observations separate from product state; an end callback proves command completion, not rendered delivery.

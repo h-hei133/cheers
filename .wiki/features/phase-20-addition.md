@@ -439,7 +439,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-46 | P1 | 按 turn 审阅与批量恢复文件操作 | 17.2、第一百二十二、一百二十五、一百二十九、20.50、20.52、第 24.42 节 | 本地验证 | 不覆盖 bash/二进制副作用；无工作区级快照 |
-| ADD-47 | P1 | 整轮恢复报告区分未知写入、零写阻止与部分结果 | 20.50、20.52 | 本地验证 | 真实 CLI 未注入 unknown 故障 |
+| ADD-47 | P1 | 整轮恢复报告区分未知写入、零写阻止与部分结果 | 20.50、20.52、24.57 | 本地验证 | Node普通/全屏真实writer的unknown注入、阻止重放与下一请求已验；真实故障设备、exe与其他平台未验 |
 | ADD-48 | P2 | 并发写入同一会话不丢失、transcript 是权威来源 | 21.67–21.68 | 本地验证 | 真实多进程高并发 |
 
 ### 12.8 后台任务、团队与并发（ADD-49 至 ADD-52）
@@ -6308,3 +6308,22 @@ Node20.3单worker串行三个聚焦文件：旧owner6失败/53控制通过，修
 证据在已核对无tracked碰撞的`.omx/artifacts/phase20-addition-tool-kill/`；旧/新执行源码、owner/test文本快照、red/green/反转/build日志和数值/布尔收据分开保留，不存raw PTY、请求/响应正文、真实key/address/header或prompt/session digest。独立verifier已通过当前build/两exe、快照、59项/6项反转、四场实际卡片/wire/副作用/清理核对。最终五静态门、两脚本语法、独立verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留；提交/推送交付另绑。未跑全仓/20k真实PTY/local NormProof或委派复审，无真实外部provider、其他平台/故障设备、普遍防重或孤儿自动清理验收。ADD-30运行所有权租约仍未实施，ADD-65维持本地验证；原47真实条件延后、goal active。
 
 一次延迟读回d1328704精确代码CI41248943399已completed/success；ef937df1代码CI41249700949仍in_progress、Watch41249700933 success，不视为整体CI通过。本批新提交CI尚未观察，不立即轮询。
+
+
+### 24.57 整轮恢复的真实 CLI 未知写入故障注入
+
+ADD-47表中的缺口是20.52尚未在真实CLI注入unknown。本批先检查原[整轮命令](../../packages/ts-shell/src/edit/recovery/undo/command.ts)、[逐操作恢复](../../packages/ts-shell/src/edit/recovery/operation/restore.ts)、[共享文件提交](../../packages/ts-shell/src/edit/authority/commit.ts)及原writer单元场景，确认已有unknown与较新未决操作屏障，沿现有实现验证，无产品改动或第二套恢复机制。保持已交付build e84c96fa8424584f8fcbb8318f18cf9887b9d99670c361e64a35fd35ca66c443、inputs 2ce251530f3575e3d31c9621fd3eed18df3094e3593368ca09d80ea9cfa489a0；独立核对current compilerInputs及stable/不可变exe size/SHA一致，没有因只增证据重建。
+
+生产Node20.3 CLI在普通/全屏PTY各一场。隔离项目原有两个小文件，真实Alt+P到accept-edits，loopback脚本provider实际依次调用两次edit，同一turn生成两个committed操作。先发无--execute的restore-turn，报告permission-pending、零恢复、原edit后字节保持。随后只在显式执行时arm夹具：observer让原renameSync真正完成，将较新b恢复为原字节，再让原目录fsyncSync真正完成，最后在writer readback前抛出一次固定注入异常。目标受隔离项目真实目录、固定b.txt、原.edit临时名及/proc/self/fd目录fd约束；未替换writer、snapshot、批准或命令结果，也没有把物理磁盘故障当成已测试。
+
+两场原报告均unknown/incomplete、restored=0、一个unknown步骤/文件、一个较旧操作skipped；实际b已恢复old-b、a保持new-a。原账本b.undo及file.undo均unknown、a.undo=none；原session持久fileUndo元数据也为unknown。终端实际显示incomplete、Status: unknown及file writes may have occurred，没有因字节已经改变就升级成restored-verified。“0”表示零个已验证操作，不能解释为零文件写入。原通知还要求检查/undo status并重读可能过期的文件。
+
+再真实输入相同restore-turn --execute，原preview遇到undo-unknown而blocked：全部receipt字节结构保持、没有第二次目标rename/异常、较旧a未被恢复。/undo status仍列出unknown；所有local命令不增加推理。最后另发一个普通提示，实际下一POST含unknown、可能写入与重读通知；持久unknown通知精确一条、原session完成、Ctrl+D exit0/cooked flags恢复。每有效场景4 POST/2 GET，共2 CLI、8 POST/4 GET，全部合成凭据/loopback provider，不声称外部模型理解/遵守提醒或真实计费。
+
+两次较早普通模式断言失败均保留unverified，各3 POST/1 GET/1 CLI。首次只有粗粒度标签；第二次已证明报告、账本与元数据正确，但三项render观察全false。根因是探针在TurnSink.end后立即关闭pager，尚未等scheduled frame画出；改为等待原终端实际警告后才Escape，普通/全屏均通过，未改弱断言或改产品。失败场景也已真实注入一次异常并完成清理，故全批合计4 CLI、14 POST/6 GET，不能只报告两有效场景的调用量。
+
+每场45秒、2MiB输出、100ms采样768MiB CLI树RSS、harness heap768MiB及最多4 POST守卫均未触发；最终普通/全屏峰值464464/442120KiB、输出19320/46931 bytes，仅为小夹具观察，不算性能或总heap验收。各场隔离config字节不变、owned PID/start identity均非活跃，home/project/session/observer scratch清理。新根`.omx/artifacts/phase20-addition-restore-unknown/`创建前同时检查不存在与git ls-files无tracked碰撞；保留执行源码文本快照、失败/有效安全收据、语法与静态日志，无raw PTY、请求/响应正文、实际key/address/header或prompt/session digest。
+
+独立verifier已通过当前构建/两exe、精确执行快照、原writer发布后未知、三层状态与实际下一wire、重放屏障、失败保留及scratch缺席核验。本批仅三份markdown，不重复unit/build/反转；全仓、20k真实PTY/local NormProof、委派复审、exe注入、真实provider/故障设备或其他平台均未跑。最终五静态门、三脚本语法、独立verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留；提交推送另绑，ADD-47维持本地验证；原47外部条件继续延后、goal active。
+
+一次延迟读取c66e67eb精确代码CI41250671853及ef937df1 CI41249700949均仍in_progress，各Watch41250671837/41249700933 success；不以Watch代替完整CI，不立即轮询或把在跑任务重启。本批交付CI尚未观察。

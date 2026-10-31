@@ -11217,3 +11217,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：在途工具硬杀后的未知结果
 
 [addition24.56](features/phase-20-addition.md#2456-在途工具硬杀后保留未知结果与副作用边界)旧build真实命令已追加一次副作用、无结果时SIGKILL，子进程仍活，证实缺失结果不能推断取消/失败。定向参考先于修补，原消息owner合成未知/可能副作用/检查后重试，恢复卡片以warning问号显示unknown；真实结果/原call/协议配对/生命周期规则保留。Node20.3串行3文件旧owner及显式反转各6失败/53控制，逐字节恢复后59通过；五门/TS/exe build e84c96fa8424与inputs/size/SHA一致。新Node/exe×普通/全屏四实际PTY均副作用一次后硬杀、未知卡片与真实wire、显式continue同session完成；新8次CLI/8GET/8POST，含旧场景共10/10/10，全loopback脚本provider。原工具子进程由harness清理，provider续接给最终答案，只证旧tool未自动重跑，不算普遍防重/回滚/自动清理或ADD-30租约。exit0/cooked、config不变/owned进程非活跃/scratch清理，采样RSS不算性能；独立证据核验passed，无全仓/20k/judge/委派复审/真实provider及其他平台验收。延迟d1328704代码CI success，ef937df1 CI仍in_progress、Watch success；最终五门/两语法/独立verifier/diff均exit0，118既有advisory保留，提交推送交付另绑，ADD-65本地验证、原47条件延后、goal active。
+
+
+### 2026-11-01：真实 CLI 整轮恢复保留 unknown
+
+[addition24.57](features/phase-20-addition.md#2457-整轮恢复的真实-cli-未知写入故障注入)补ADD-47明确缺口，沿原Node20.3生产CLI普通/全屏各真实两edit同turn，原writer完成较新b的rename/目录fsync后由observer一次异常阻止readback。原报告/账本/fileUndo元数据均unknown、0个verified、较旧a skipped且字节不变；实际b已恢复，不能把0计成零写。相同显式restore-turn重试被unknown屏障blocked、receipt保持/零第二rename，/undo status保留未知；下一实际POST含可能写入/重读通知。两有效场景2CLI/4GET/8POST、exit0/cooked/config不变/owned进程非活跃/scratch清理。两旧普通断言失败均留unverified，原状态已unknown而探针过早Escape关闭未画出的pager；等实际警告再关闭后通过，含失败全批4CLI/6GET/14POST。当前build e84c96fa8424及inputs/两exe核对一致，产品未改；独立verifier passed，不重复unit/build/反转，无真实provider/物理设备/exe注入/其他平台/全仓/20k/judge/委派复审，RSS不算性能。一次延迟c66e67eb与ef937df1代码CI仍in_progress、各Watch success；最终五门/三语法/独立verifier/diff均exit0，118既有advisory保留，提交推送另绑，ADD-47本地验证、goal active。
