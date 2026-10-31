@@ -11040,3 +11040,5 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：缓存并发夹具隔离会话
 
 [addition24.24](features/phase-20-addition.md#2424-缓存多进程夹具隔离会话状态)原CI单child退出根因未复现；7轮原共享HOME和2轮seed均通过，真实live session lock也未复现。确认--print夹具共用current session，改cliStep独立随机HOME而缓存/project/manifest/group仍共享；实际session ID回归反转1失败/5未选、精确恢复，Node20.3单文件6项再次通过、只读复审APPROVE。不修改产品会话或cache路径；abe32561代码CI已success，3e0a148a/972ed1f6/b0a144de最后in_progress，本批门/build/交付另绑，整体partial、goal active。
+
+夹具代码 `14d3532f9c5b315183a28a0eecb07e57522b07f0` 已推送/远端main一致且clean，五门/build摘要 `300d414e1582` 读回通过；自身CI `41210672771` / Watch `41210672780`最后in_progress。前批director/handoff `3e0a148a`精确CI `41209134634`已于14:31:10Z success；`b0a144de`的test job仍在运行，保留实际live状态。
