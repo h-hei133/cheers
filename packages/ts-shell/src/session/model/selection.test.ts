@@ -21,6 +21,19 @@ import { buildCliCommandExecution } from '../../entrypoints/cliCommandExecutionB
 import type { StreamingRenderer } from '../../presentation/terminal/streaming.js';
 import { userCatalogPath } from '../../core/models/catalogStore.js';
 
+function signerDefaults(provider: 'bedrock' | 'vertex') {
+  const baseUrl = provider === 'bedrock' ? 'https://bedrock-runtime.us-east-1.amazonaws.com'
+    : 'https://us-central1-aiplatform.googleapis.com/v1/projects/synthetic-project/locations/us-central1/publishers/google';
+  writeUserRuntimeConfigFile({ provider, activeProviderConnectionId: undefined, providerConnections: [],
+    providerCredentials: { [provider]: { model: 'base-model', baseUrl, thinkingEffort: null } } },
+  readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: { [provider]: { baseUrl,
+    endpoint: provider === 'bedrock' ? 'bedrock-converse-stream' : 'google-vertex', models: [
+      { id: 'base-model', reasoning: true, maxTokens: 16384 }, { id: 'next-model', reasoning: true, maxTokens: 16384 },
+    ] } } }));
+  return baseUrl;
+}
+
 let home: string;
 let manager: SessionManager;
 function configBytes() {
@@ -43,6 +56,125 @@ function addAlternateConnection(active = false) {
     providerConnections: [...edit.values.providerConnections!, { id: 'alternate', provider: 'google', authType: 'api-key',
       apiKey: 'synthetic-alternate-key', model: 'alternate-base', createdAt: '2026-01-01', updatedAt: '2026-01-01' }] }, edit);
 }
+
+it.each(['bedrock', 'vertex'] as const)('persists and resumes credentialless %s model and thinking changes without shared writes', async provider => {
+  const baseUrl = signerDefaults(provider); const session = manager.createNew(home);
+  const resolveConfigTarget = (config: ReturnType<typeof getRuntimeConfig>, sessionId?: string) =>
+    resolveProviderCredential({ runtimeConfig: config, env: {}, pool: { sessionId } });
+  const command = { cwd: home, projectRoot: home, sessionId: session.id, resolveConfigTarget };
+  const original = configBytes(); const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected request'));
+  const captured = resolveConfigTarget(getRuntimeConfig(home), session.id);
+  expect(captured).toMatchObject({ provider, model: 'base-model', baseUrl });
+  expect(captured.credential).toBeUndefined(); expect(captured.blocked).toBeUndefined();
+  const selected = await runModelCommand(['use', 'next-model'], command);
+  expect(selected.output).toContain('Model switched to next-model');
+  expect(selected.output).not.toContain('undefined');
+  expect((await runThinkingCommand(['high'], command)).output).toContain('Reasoning effort: high.');
+  expect(readSessionModel(session.id)).toEqual({ connectionScope: 'provider', provider, model: 'next-model', thinkingEffort: 'high' });
+  expect(configBytes()).toEqual(original); expect(fetch).not.toHaveBeenCalled();
+  manager.persistUserPromptBarrier(session.id, 'resume signed model'); manager.saveInterrupted(session.id);
+  const restarted = new SessionManager(); expect(restarted.tryResume(session.id)).toMatchObject({ ok: true });
+  const resumed = resolveConfigTarget(projectSessionModel(getRuntimeConfig(home), session.id), session.id);
+  expect(resumed).toMatchObject({ provider, model: 'next-model', baseUrl, thinkingEffort: 'high' });
+  expect(resumed.credential).toBeUndefined(); expect(resumed.blocked).toBeUndefined();
+  expect((await runThinkingCommand([], command)).output).toContain('Thinking effort: high.');
+  expect(configBytes()).toEqual(original);
+});
+
+it('keeps static provider-slot model changes across model-specific endpoints available', async () => {
+  writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: undefined, providerConnections: [],
+    providerCredentials: { openai: { apiKey: 'synthetic-provider', model: 'gpt-5.3', thinkingEffort: null } } },
+  readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  const session = manager.createNew(home); const original = configBytes();
+  const command = { cwd: home, projectRoot: home, sessionId: session.id,
+    resolveConfigTarget: (config: ReturnType<typeof getRuntimeConfig>, sessionId?: string) => resolveProviderCredential({ runtimeConfig: config, env: {}, pool: { sessionId } }) };
+  for (const model of ['o4-mini', 'gpt-5.3']) {
+    expect((await runModelCommand(['use', model], command)).output).toContain(`Model switched to ${model}`);
+    expect(readSessionModel(session.id)?.model).toBe(model);
+  }
+  expect(configBytes()).toEqual(original);
+});
+
+it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['model', 'thinking'] as const).map(command => ({ provider, command }))))(
+  'does not borrow the $provider signer for a credentialless active named $command change', async ({ provider, command }) => {
+    const baseUrl = signerDefaults(provider);
+    writeUserRuntimeConfigFile({ activeProviderConnectionId: 'named', providerConnections: [{ id: 'named', provider,
+      model: 'base-model', baseUrl, authType: 'api-key', status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01' }] },
+    readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    const session = manager.createNew(home); const original = configBytes(); const before = readSessionModelEdit(session.id);
+    const hooks = vi.spyOn(defaultHookDispatcher, 'dispatch');
+    const context = { cwd: home, projectRoot: home, sessionId: session.id,
+      resolveConfigTarget: (config: ReturnType<typeof getRuntimeConfig>, sessionId?: string) => resolveProviderCredential({ runtimeConfig: config, env: {}, pool: { sessionId } }) };
+    const captured = context.resolveConfigTarget(getRuntimeConfig(home), session.id);
+    expect(captured.credential).toBeUndefined(); expect(captured.blocked).toBeUndefined();
+    const result = command === 'model' ? await runModelCommand(['use', 'next-model', '--global'], context)
+      : await runThinkingCommand(['high', '--global'], context);
+    expect(result.output).toContain('current request credential is unavailable'); expect(hooks).not.toHaveBeenCalled();
+    expect(configBytes()).toEqual(original); expect(readSessionModelEdit(session.id)).toEqual(before);
+  });
+
+it.each((['bedrock', 'vertex'] as const).flatMap(provider => [false, true].map(session => ({ provider, session }))))(
+  'saves only $provider provider model defaults globally with session=$session and no static credential', async ({ provider, session: withSession }) => {
+    signerDefaults(provider); const auth = fs.readFileSync(getUserAuthPath());
+    const session = withSession ? manager.createNew(home) : undefined;
+    const command = { cwd: home, projectRoot: home, sessionId: session?.id,
+      resolveConfigTarget: (config: ReturnType<typeof getRuntimeConfig>, sessionId?: string) => resolveProviderCredential({ runtimeConfig: config, env: {}, pool: { sessionId } }) };
+    const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected request'));
+    expect((await runModelCommand(['use', 'next-model', '--global'], command)).output).toContain('Global default stored at');
+    expect((await runThinkingCommand(['high', '--global'], command)).output).toContain('Reasoning effort: high.');
+    expect(readUserRuntimeConfigFile().providerCredentials?.[provider]).toMatchObject({ model: 'next-model', thinkingEffort: 'high' });
+    const settings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+    expect(settings.modelPreferences.providers[provider]).toMatchObject({ model: 'next-model', thinkingEffort: 'high' });
+    expect(fs.readFileSync(getUserAuthPath())).toEqual(auth);
+    expect(fetch).not.toHaveBeenCalled();
+    if (session) expect(readSessionModel(session.id)).toEqual({ connectionScope: 'provider', provider, model: 'next-model', thinkingEffort: 'high' });
+  });
+
+it.each((['hook', 'lock'] as const).flatMap(timing => (['address', 'provider', 'blocked', 'pool'] as const).map(change => ({ timing, change }))))(
+  'revalidates a credentialless signer $change change at the $timing before either store writes', async ({ timing, change }) => {
+    const baseUrl = signerDefaults('bedrock'); const session = manager.createNew(home);
+    const before = readSessionModelEdit(session.id); let changed = false;
+    const mutate = () => { changed = true; };
+    if (timing === 'hook') vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+      if (event.eventName === 'PreModelSwitch') mutate(); return undefined;
+    });
+    else {
+      const target = locateExistingSessionLayout(createSessionStoreLayout(), session.id); const lock = files.withFileLock;
+      vi.spyOn(files, 'withFileLock').mockImplementation((file, action, options) => lock(file, () => {
+        if (file === target.stateLockPath) mutate(); return action();
+      }, options));
+    }
+    const original = configBytes();
+    const result = await runModelCommand(['next-model', '--global'], { cwd: home, projectRoot: home, sessionId: session.id,
+      resolveConfigTarget: (config, sessionId) => {
+        const actual = resolveProviderCredential({ runtimeConfig: changed && change === 'pool'
+          ? { ...config, accountPool: { bedrock: { connections: ['missing'] } } } : config, env: {}, pool: { sessionId } });
+        return !changed ? actual : { ...actual, ...(change === 'address' ? { baseUrl: `${baseUrl}/changed` }
+          : change === 'provider' ? { provider: 'vertex' as const } : change === 'blocked' ? { blocked: 'connection-unavailable' as const } : {}) };
+      } });
+    expect(changed).toBe(true);
+    expect(result.output).toContain('conflict: this attempt did not write');
+    expect(configBytes()).toEqual(original); expect(readSessionModelEdit(session.id)).toEqual(before);
+  });
+
+it.each(['openai', 'nonsigner', 'missing-address', 'blocked'] as const)(
+  'refuses a credentialless current request with $0 before model hooks or writes', async defect => {
+    signerDefaults(defect === 'missing-address' ? 'vertex' : 'bedrock'); const session = manager.createNew(home);
+    if (defect === 'nonsigner' || defect === 'missing-address') {
+      const catalog = JSON.parse(fs.readFileSync(userCatalogPath(), 'utf8'));
+      if (defect === 'nonsigner') catalog.providers.bedrock.endpoint = 'openai-compatible';
+      else delete catalog.providers.vertex.baseUrl;
+      fs.writeFileSync(userCatalogPath(), JSON.stringify(catalog));
+    }
+    const original = configBytes(); const before = readSessionModelEdit(session.id);
+    const hooks = vi.spyOn(defaultHookDispatcher, 'dispatch');
+    const result = await runModelCommand(['next-model', '--global'], { cwd: home, projectRoot: home, sessionId: session.id,
+      resolveConfigTarget: config => ({ ...resolveProviderCredential({ runtimeConfig: config, env: {} }), credential: undefined,
+        ...(defect === 'openai' ? { provider: 'openai' as const, baseUrl: 'https://api.openai.com/v1' }
+          : defect === 'missing-address' ? { baseUrl: undefined } : defect === 'blocked' ? { blocked: 'connection-unavailable' as const } : {}) }) });
+    expect(result.output).toContain('current request credential is unavailable'); expect(hooks).not.toHaveBeenCalled();
+    expect(configBytes()).toEqual(original); expect(readSessionModelEdit(session.id)).toEqual(before);
+  });
 
 it.each(['/model new', '/model openai/new --global', '/model google/new', '/thinking high --global'])(
   'rejects a different request provider before hooks or writes through the command bridge: %s', async prompt => {

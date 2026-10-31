@@ -3,8 +3,7 @@ import { resolveProviderCredential, type ProviderCredentialResolution } from '..
 import { providerFacts } from '../../core/providers/facts.js';
 import type { SessionModelRole } from '../../session/model/contract.js';
 import type { CatalogProvider } from '../../core/models/catalog.js';
-import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
-import { endpointShape } from '../../provider/endpoints/index.js';
+import { providerBindingAvailable } from '../../core/auth/binding.js';
 
 /** An exact target names an existing connection or provider; a bare model stays on its captured provider. */
 export function delegatedTarget(target: string | SessionModelRole, main: ProviderCredentialResolution, config?: RuntimeConfig,
@@ -40,9 +39,7 @@ export function delegatedTarget(target: string | SessionModelRole, main: Provide
     resolution = resolveProviderCredential({ runtimeConfig: { ...config, sessionConnection: undefined }, cliProvider: owner, cliModel: model });
   }
   if (resolution.blocked || resolution.model !== model) throw new Error('Delegated model has no usable provider binding.');
-  const baseUrl = providerCredentialBaseUrl(catalog, resolution);
-  // Signed endpoints acquire credentials at dispatch, as the main request does.
-  if (!baseUrl || (!resolution.credential && !endpointShape(providerCredentialEndpoint(catalog, resolution, baseUrl)).signer)) {
+  if (!providerBindingAvailable(catalog, resolution)) {
     throw new Error('Delegated model has no usable provider binding.');
   }
   const allowed = providerFacts(resolution.provider).accountAuthAllowedModels;

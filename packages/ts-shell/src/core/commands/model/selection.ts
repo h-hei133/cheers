@@ -24,6 +24,7 @@ import { connectionIdentity, credentialIdentity } from './identity.js';
 import { invalidatePromptMeasurement } from '../../../observability/usageTelemetry.js';
 import { captureThinkingPreference } from '../../models/preference.js';
 import { exactTargetMatches, modelRequest, targetRequest, targetResolutionIdentity } from './target.js';
+import { providerBindingAvailable } from '../../auth/binding.js';
 
 interface ExactSelection { readonly target: SessionModelTarget; readonly baseline?: SessionModelEdit; readonly roles?: SessionModelPolicy;
   readonly resolution?: string }
@@ -84,9 +85,12 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const projected = projectSessionModel(loaded, context.sessionId);
   const effective = context.readConfiguration?.().config ?? context.runtimeConfig ?? projected;
   const actual = modelRequest(context, effective);
-  if (!exact && (actual.blocked || !actual.credential)) return 'Model switch blocked: the current request credential is unavailable. Select a ready connection before changing its model or effort.';
+  const catalog = loadCatalog();
   const providerSlot = exact ? exact.target.connectionId === undefined
     : !projected.activeProviderConnectionId && !actual.credential?.connectionId;
+  if (!exact && (actual.blocked || (!actual.credential && (!providerSlot || !providerBindingAvailable(catalog, actual))))) {
+    return 'Model switch blocked: the current request credential is unavailable. Select a ready connection before changing its model or effort.';
+  }
   const inferredConnection = !exact && !projected.activeProviderConnectionId && actual.credential?.connectionId !== undefined;
   const activeId = providerSlot ? undefined : exact?.target.connectionId ?? projected.activeProviderConnectionId ?? actual.credential?.connectionId;
   const activeConnection = connections.find((item) => item.id.trim() === activeId);
@@ -101,16 +105,17 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   if (!model) return 'Model switch blocked: no concrete model is selected. Select one with /model use <model> before changing effort.';
   const thinkingEffort = requestedEffort === undefined
     ? captureThinkingPreference(context.projectRoot ?? context.cwd, actual.thinkingEffort).thinkingEffort : requestedEffort;
-  const catalog = loadCatalog();
   const scoped = exact?.target ?? (providerSlot ? { connectionScope: 'provider' as const, provider, model, thinkingEffort }
     : inferredConnection ? { connectionId: activeId!, provider, model, thinkingEffort } : undefined);
   const request = scoped ? targetRequest(context, loaded, scoped) : undefined;
   if (scoped && exact?.resolution !== undefined && targetResolutionIdentity(context, loaded, scoped) !== exact.resolution) {
     return 'Model switch blocked: the selected credential or endpoint changed. Reopen the model picker.';
   }
-  if (scoped && !exactTargetMatches(context, loaded, scoped)) return 'Model switch blocked: the selected credential binding is unavailable or request overrides change its target.';
-  if (providerSlot && (!actual.credential || actual.blocked || actual.credential.connectionId !== undefined
-    || actual.baseUrl !== request?.baseUrl || !sameValue({ ...actual.credential, model: undefined }, { ...request?.credential, model: undefined }))) {
+  if (scoped && !exactTargetMatches(context, loaded, scoped, catalog)) return 'Model switch blocked: the selected credential binding is unavailable or request overrides change its target.';
+  if (providerSlot && (!providerBindingAvailable(catalog, actual) || actual.credential?.connectionId !== undefined
+    || actual.provider !== request?.provider || actual.baseUrl !== request?.baseUrl
+    || providerCredentialEndpoint(catalog, { ...actual, model }) !== (request && providerCredentialEndpoint(catalog, request))
+    || !sameValue({ ...actual.credential, model: undefined }, { ...request?.credential, model: undefined }))) {
     return 'Model switch blocked: the provider credential or endpoint differs from the current request. Reload before selecting a model.';
   }
   const selectedRequest = request ?? actual;
@@ -200,7 +205,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     // Retain the reviewed preference across the session/global stages so this
     // writer's own model publication is not mistaken for a changed credential.
     if (!scoped && !sameValue(modelRequest(context, projectModelSelection(currentConfig, sessionEdit?.selection)), actual)) return false;
-    if (scoped ? (!exactTargetMatches(context, currentConfig, scoped) || !sameValue(targetRequest(context, currentConfig, scoped), request))
+    if (scoped ? (!exactTargetMatches(context, currentConfig, scoped, currentCatalog) || !sameValue(targetRequest(context, currentConfig, scoped), request))
       : !matchesRequestProvider(context, projectSessionModel(currentConfig, context.sessionId), provider)) return false;
     if (currentConfig.activeProviderConnectionId !== loaded.activeProviderConnectionId
       || !sameValue(connectionIdentity(currentConfig.providerConnections.find(item => item.id === activeId)), connectionIdentity(activeConnection))
@@ -288,7 +293,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     `Reasoning effort: ${thinkingEffort ?? "auto (provider decides)"}.`,
     ...(capabilityNotice ? [capabilityNotice] : []),
     `Provider: ${provider}`,
-    providerSlot ? `Credential source: ${request?.credential?.source}` : `Connection: ${activeId}`,
+    ...(providerSlot ? request?.credential ? [`Credential source: ${request.credential.source}`] : [] : [`Connection: ${activeId}`]),
     context.sessionId ? "Scope: current session (saved for resume)." : "Scope: global default.",
     ...(configPath ? [`Global default stored at: ${configPath}`] : []),
   ].join("\n");

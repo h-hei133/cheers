@@ -1596,3 +1596,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Director enablement and handoff arming reject a usable signed provider because its resolver has no static credential object.
 - **Root Cause**: Delegated admission equates static credential presence with the main request's authentication boundary, while the actual endpoint acquires credentials at dispatch.
 - **Rule**: Reject blocked/model mismatch first, then allow the existing issuer endpoint's signer without invoking it. Retain exact named-connection credential identity, pool restrictions and account model constraints. Verify actual resolver, command persistence/cancellation and non-signer/blocked refusal; selection is not proof that external signing credentials work.
+
+### Model Controls Must Separate Ambient Signers From Named Credentials
+- **Symptom**: Model/thinking commands reject an ambient signed request, while broadening their credential gate lets a keyless active named connection borrow a signer or display an actionable provider row. Comparing current and target protocols can also reject a valid model switch.
+- **Root Cause**: A missing credential object does not identify its namespace; endpoint protocol may be model-specific. An active named ID can remain present even when resolution has no credential.
+- **Rule**: Admit credentialless signers only in the true current provider slot; retain own-credential checks for named bindings and their UI rows. Compare binding endpoints with the requested model on both sides, and revalidate catalog/request under hooks and locks. Test active named direct model/thinking refusal as well as picker targets and cross-protocol static model switches.
+
+### Verification Exit And Safe Process Inspection Are Preconditions
+- **Symptom**: Correcting a runner cwd starts a second validator while the first still runs; broad process argument output exposes unrelated service secrets.
+- **Root Cause**: A yielded session is mistaken for completion, and process arguments are treated as harmless diagnostics.
+- **Rule**: Wait for or terminate the exact owned session and confirm exit before starting another validator. Inspect known PIDs with state or command names only; never print system-wide process arguments. Build digest readback must include the manifest's compilerInputs, matching the build owner.

@@ -11070,3 +11070,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 [addition24.28](features/phase-20-addition.md#2428-签名端点的委派模型准入与主请求一致)Bedrock/Vertex无static credential的目标、director on、handover arm六场景实际失败，blocked+credential两防护也失败。既有issuer endpoint的signer准入、先拒绝blocked/model mismatch；精确named ID/pool/account guard保持，不获取签名凭据。Node20.3单worker串行4文件78项，反转8失败/1控制通过/精确恢复、五门/build摘要匹配，manifesta91a9c4872e1，judge既有advisory、独立APPROVE/CLEAR。无外部AWS/ADC认证、PTY/平台/全仓/20k；ADD-70 partial、goal active，清理/提交/推送/自身CI另绑。
 
 代码 `d892c777e3f47cc349e93aab1bb2c39cdc951806` 已推送/远端main一致、scratch清理且交付后clean；自身 CI `41215827302`与连接报告 `41215191300`最后in_progress，Watch均success。辅助tier `953d677f`精确CI `41213345904`及文档 `9975ac6e`/`41213464205`已success；角色 `27931563`与文档 `712ea121`仍in_progress。本交付段文档单独提交，ADD-70 partial。
+
+
+### 2026-11-01：当前签名请求的模型与 effort 控制
+
+[addition24.29](features/phase-20-addition.md#2429-当前签名请求可以保存模型与-effort命名凭据边界保持)修复Bedrock/Vertex ambient signer被model/thinking/picker static credential门拒绝。auth owner单predicate与委派共用；真实provider slot准入、named/pool/hash/catalog/hook/lock保留。审查期间cross-model protocol与keyless active named两回归实际复现后修正，强化named UI边界。Node20.3单worker最终4文件167项、反转30失败/13控制通过/76未选并精确恢复后通过，五门/build当前digest/judge既有advisory与独立APPROVE/CLEAR。中间cwd/过早第二runner短暂并发已终止并确认退出，最终串行；digest漏compilerInputs修正，无关敏感进程参数未复制留档。d892c777/077d7978精确CI均success，b48fd27b/27931563/712ea121最后in_progress。本批证据、清理及交付另绑定；AWS/ADC外部认证、PTY/平台/旧binary未验，ADD-70 partial、goal active。

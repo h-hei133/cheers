@@ -35,6 +35,7 @@ import { modelKeyPicker } from './model/key.js';
 import { listedModelMetadata, modelMetadataDetails } from './model/metadata.js';
 import { ModelFocus } from './model/focus.js';
 import { ModelActionOwner, modelActionAdmission, modelBrowserOwned } from './model/owner.js';
+import { providerBindingAvailable } from '../../../core/auth/binding.js';
 
 interface RoleSelection {
   readonly role: AutomaticModelRole;
@@ -112,6 +113,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       // Keep the host's request overrides, while actual activation retains the original context.
       const inspectionContext = { ...context, sessionId: undefined };
       const activeAddress = providerCredentialBaseUrl(catalog, active);
+      const activeReady = Boolean(!active.blocked && (active.credential
+        || (!config.activeProviderConnectionId && providerBindingAvailable(catalog, active))));
       const availability = availabilitySnapshot({ config, catalog });
       const thinkingEffort = assigning ? assigning.thinkingEffort
         : captureThinkingPreference(context.projectRoot ?? context.cwd, active.thinkingEffort).thinkingEffort;
@@ -122,6 +125,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         const entry = availability.providers.find(item => item.provider === provider.runtime);
         const connections = (entry?.connections ?? []).filter(connection => matchesCatalog(provider, connection, config.providerConnections, catalog));
         const providerSlot = active.provider === provider.runtime && !active.credential?.connectionId
+          && Boolean(active.credential || !config.activeProviderConnectionId)
           && (provider.id === provider.runtime || Boolean(activeAddress && provider.baseUrl
             && activeAddress.replace(/\/+$/, '') === provider.baseUrl.replace(/\/+$/, '')));
         for (const connection of providerSlot ? [...connections, undefined] : connections.length ? connections : [undefined]) {
@@ -151,8 +155,9 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               && ambientResolution.provider === provider.runtime && ambientResolution.credential
               && ambientResolution.credential.connectionId === undefined);
             const effectiveResolution = resolution ?? (namedConnectionRequired ? ambientResolution : undefined);
-            const exact = candidate ? exactTargetMatches(inspectionContext, candidate, target) : false;
-            const modelAddress = effectiveResolution?.credential ? providerCredentialBaseUrl(catalog, effectiveResolution)
+            const exact = candidate ? exactTargetMatches(inspectionContext, candidate, target, catalog) : false;
+            const resolutionReady = Boolean(resolution && providerBindingAvailable(catalog, resolution));
+            const modelAddress = effectiveResolution && providerBindingAvailable(catalog, effectiveResolution) ? providerCredentialBaseUrl(catalog, effectiveResolution)
               : effectiveResolution?.baseUrl ?? config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
             const ambiguous = catalogProvider(catalog, provider.runtime, modelAddress).ambiguous;
             const capability = effortCapability(catalog, provider.runtime, model.id, thinkingEffort, modelAddress);
@@ -161,13 +166,13 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             const alias = provider.id === provider.runtime ? catalog.find(candidate => candidate.runtime === provider.runtime
               && candidate.id !== provider.runtime && candidate.baseUrl !== undefined && modelAddress !== undefined
               && candidate.baseUrl.replace(/\/+$/, '') === modelAddress.replace(/\/+$/, '')) : undefined;
-            const selected = Boolean(exact && !ambiguous && !alias && !active.blocked && active.credential
-              && connection?.connectionId === active.credential.connectionId && provider.runtime === active.provider && model.id === active.model
+            const selected = Boolean(exact && !ambiguous && !alias && activeReady
+              && connection?.connectionId === active.credential?.connectionId && provider.runtime === active.provider && model.id === active.model
               && resolution?.baseUrl === active.baseUrl && sameValue(resolution?.credential, active.credential));
             const reason = namedConnectionRequired ? 'named connection required'
               : assigning && !connection ? 'role assignment requires a configured connection'
               : !connection && !providerSlot ? 'configure a connection' : connection && connection.state !== 'ready' ? availabilityLabel(connection.state)
-              : resolution?.blocked || !resolution?.credential ? 'credential unavailable'
+              : !resolutionReady ? 'credential unavailable'
               : !exact ? 'request target mismatch'
               : ambiguous ? 'model catalogue endpoint is ambiguous'
               : unsupported ? 'reasoning effort unsupported' : !choice?.baseline ? 'active session required' : undefined;
@@ -260,11 +265,11 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       if (currentModel && !rows.some(row => row.note === 'active')) {
         const id = 'model:current';
         groups.set(id, { category: currentProvider });
-        const reportAddress = active.credential && !active.blocked ? activeAddress : active.baseUrl;
+        const reportAddress = activeReady ? activeAddress : active.baseUrl;
         const endpoint = endpointLabel(reportAddress);
-        const note = active.blocked ? 'request blocked' : active.credential ? 'active' : 'credential missing';
+        const note = active.blocked ? 'request blocked' : activeReady ? 'active' : 'credential missing';
         const connection = config.providerConnections.find(item => item.id === currentConnection && item.provider === currentProvider);
-        const metadataAddress = active.credential && !active.blocked ? activeAddress : connection?.baseUrl;
+        const metadataAddress = activeReady ? activeAddress : connection?.baseUrl;
         const exactCatalog = connection ? catalogProvider(catalog, currentProvider, metadataAddress) : undefined;
         const exactFacts = exactCatalog?.entry && !exactCatalog.ambiguous
           ? modelMetadataDetails(catalog, exactCatalog.entry, currentModel, metadataAddress) : undefined;

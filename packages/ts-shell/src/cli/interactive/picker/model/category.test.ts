@@ -1,12 +1,13 @@
 import fs from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile,
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile,
   type RuntimeConfig } from '../../../../config/runtimeConfig.js';
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { defaultHookDispatcher } from '../../../../core/hooks/hookDispatcher.js';
 import { resolveProviderCredential } from '../../../../core/shell/providerCredentials.js';
 import { selectPooledConnection } from '../../../../core/auth/account/pool.js';
 import { setReviewedModelTarget } from '../../../../core/commands/model/selection.js';
+import { targetResolutionIdentity } from '../../../../core/commands/model/target.js';
 import { SessionManager } from '../../../../session/SessionManager.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
 import { projectSessionModel } from '../../../../session/model/projection.js';
@@ -33,6 +34,119 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 const commands = () => ({ cwd: root, projectRoot: root, sessionId });
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+
+function signerFixture(provider: 'bedrock' | 'vertex', model = 'shared') {
+  vi.stubEnv('BEDROCK_API_KEY', ''); vi.stubEnv('VERTEX_API_KEY', '');
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Model selection must not dispatch a provider request.'));
+  const baseUrl = provider === 'bedrock' ? 'https://bedrock-runtime.us-east-1.amazonaws.com'
+    : 'https://us-central1-aiplatform.googleapis.com/v1/projects/synthetic-project/locations/us-central1/publishers/google';
+  writeUserRuntimeConfigFile({ provider, activeProviderConnectionId: undefined, providerConnections: [],
+    providerCredentials: { [provider]: { model, baseUrl, thinkingEffort: null } } }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  const catalog = [{ id: provider, runtime: provider, baseUrl,
+    endpoint: provider === 'bedrock' ? 'bedrock-converse-stream' : 'google-vertex',
+    models: ['shared', 'next'].map(id => ({ id, contextWindow: 32000 })) }];
+  writeCatalogCache(catalog);
+  const row = (id = 'shared', connection: string | null = null) => `model:${JSON.stringify([connection, provider, id])}`;
+  return { baseUrl, catalog, row, fetch };
+}
+
+const sharedConfigBytes = () => [getUserRuntimeConfigPath(), getUserAuthPath()]
+  .map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+
+it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['local', 'host'] as const).map(source => ({ provider, source }))))(
+  'activates and reloads a credentialless $provider signer through the $source reviewed picker without shared writes', async ({ provider, source }) => {
+    const fixture = signerFixture(provider);
+    const resolve = (config: RuntimeConfig, id?: string) => resolveProviderCredential({ runtimeConfig: config, env: {}, pool: { sessionId: id } });
+    const picker = modelPicker({ ...commands(), ...(source === 'host' ? { resolveConfigTarget: resolve } : {}) });
+    const before = sharedConfigBytes();
+    const rows = await picker.load();
+    expect(rows.filter(row => row.note === 'active').map(row => row.id)).toEqual([fixture.row()]);
+    expect(rows.find(row => row.id === fixture.row('next'))).toMatchObject({ note: 'ready' });
+    expect(rows.find(row => row.id === fixture.row('next'))?.disabled).not.toBe(true);
+    expect(rows.some(row => row.id === 'model:current')).toBe(false);
+    expect((await picker.apply([fixture.row('next')]))?.note).toContain('Model switched to next.');
+    expect(readSessionModel(sessionId)).toMatchObject({ connectionScope: 'provider', provider, model: 'next', thinkingEffort: null });
+    const current = resolve(projectSessionModel(getRuntimeConfig(root), sessionId), sessionId);
+    expect(current).toMatchObject({ provider, model: 'next', baseUrl: fixture.baseUrl });
+    expect(current.credential).toBeUndefined(); expect(current.blocked).toBeUndefined();
+    expect((await picker.load()).filter(row => row.note === 'active').map(row => row.id)).toEqual([fixture.row('next')]);
+    expect(fixture.fetch).not.toHaveBeenCalled();
+    expect(sharedConfigBytes()).toEqual(before);
+  });
+
+it.each(['bedrock', 'vertex'] as const)('reports an unknown current %s signer model as active with its actual endpoint', async provider => {
+  const fixture = signerFixture(provider, 'private-model');
+  const before = sharedConfigBytes(); const baseline = readSessionModelEdit(sessionId);
+  const picker = modelPicker(commands()); const rows = await picker.load();
+  expect(rows.find(row => row.id === 'model:current')).toMatchObject({ label: 'private-model', note: 'active', disabled: true, focusable: true });
+  const details = picker.detail!('model:current').join('\n');
+  expect(details).toContain('Remote availability: unverified');
+  expect(details).toContain(new URL(fixture.baseUrl).host);
+  expect(details).not.toMatch(/credential missing|undefined/);
+  expect(readSessionModelEdit(sessionId)).toEqual(baseline); expect(sharedConfigBytes()).toEqual(before);
+});
+
+it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['after load', 'during hook'] as const).map(timing => ({ provider, timing }))))(
+  'refuses a credentialless $provider endpoint replaced $timing without publishing preferences', async ({ provider, timing }) => {
+    const fixture = signerFixture(provider); let baseUrl = fixture.baseUrl;
+    const resolveConfigTarget = (config: RuntimeConfig, id?: string) => ({
+      ...resolveProviderCredential({ runtimeConfig: config, env: {}, pool: { sessionId: id } }), baseUrl,
+    });
+    const picker = modelPicker({ ...commands(), resolveConfigTarget }); const rows = await picker.load();
+    expect(rows.find(row => row.id === fixture.row('next'))?.disabled).not.toBe(true);
+    const before = sharedConfigBytes(); const baseline = readSessionModelEdit(sessionId);
+    if (timing === 'after load') baseUrl = 'https://changed-generation.invalid';
+    else vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+      if (event.eventName === 'PreModelSwitch') baseUrl = 'https://changed-generation.invalid';
+      return undefined;
+    });
+    const result = await picker.apply([fixture.row('next')]);
+    expect(result?.note).toContain(timing === 'after load' ? 'selected credential or endpoint changed' : 'conflict: this attempt did not write');
+    expect(readSessionModelEdit(sessionId)).toEqual(baseline); expect(sharedConfigBytes()).toEqual(before);
+  });
+
+it.each(['bedrock', 'vertex'] as const)('refuses a credentialless %s picker target whose actual endpoint has no signer', async provider => {
+  const fixture = signerFixture(provider);
+  writeCatalogCache(fixture.catalog.map(entry => ({ ...entry, endpoint: 'openai-compatible' })));
+  const before = sharedConfigBytes(); const baseline = readSessionModelEdit(sessionId);
+  const picker = modelPicker(commands()); const rows = await picker.load();
+  expect(rows.find(row => row.id === fixture.row('next'))).toMatchObject({ disabled: true, focusable: true });
+  const requested = { connectionScope: 'provider' as const, provider, model: 'next', thinkingEffort: null };
+  const config = getRuntimeConfig(root);
+  expect(await setReviewedModelTarget(requested, commands(), { baseline,
+    resolution: targetResolutionIdentity(commands(), config, requested) })).toContain('blocked');
+  expect(readSessionModelEdit(sessionId)).toEqual(baseline); expect(sharedConfigBytes()).toEqual(before);
+});
+
+it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['pending', 'error', 'credential-missing'] as const).map(state => ({ provider, state }))))(
+  'does not borrow the $provider signer for a $state named picker connection', async ({ provider, state }) => {
+    const fixture = signerFixture(provider); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'named', providerConnections: [{ id: 'named', provider, baseUrl: fixture.baseUrl,
+      model: 'shared', authType: 'api-key', status: state === 'credential-missing' ? 'connected' : state,
+      createdAt: '2026-01-01', updatedAt: '2026-01-01' }] }, edit);
+    const before = sharedConfigBytes(); const baseline = readSessionModelEdit(sessionId);
+    const picker = modelPicker(commands()); const rows = await picker.load();
+    expect(rows.find(row => row.id === fixture.row('next', 'named'))).toMatchObject({ disabled: true, focusable: true });
+    expect(rows.some(row => row.note === 'active')).toBe(false);
+    expect(rows.find(row => row.id === fixture.row('next'))).toBeUndefined();
+    if (state === 'credential-missing') expect(rows.find(row => row.id === 'model:current')).toMatchObject({ note: 'credential missing' });
+    const requested = { connectionId: 'named', provider, model: 'next', thinkingEffort: null };
+    expect(await setReviewedModelTarget(requested, commands(), { baseline,
+      resolution: targetResolutionIdentity(commands(), getRuntimeConfig(root), requested) })).toContain('blocked');
+    expect(readSessionModelEdit(sessionId)).toEqual(baseline); expect(sharedConfigBytes()).toEqual(before);
+  });
+
+it.each(['bedrock', 'vertex'] as const)('keeps a credentialless %s provider picker blocked by its invalid account pool', async provider => {
+  const fixture = signerFixture(provider); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, accountPool: { [provider]: { connections: ['missing'] } } }, edit);
+  const before = sharedConfigBytes(); const baseline = readSessionModelEdit(sessionId);
+  const picker = modelPicker(commands()); const rows = await picker.load();
+  expect(rows.find(row => row.id === fixture.row('next'))).toMatchObject({ disabled: true, focusable: true });
+  const requested = { connectionScope: 'provider' as const, provider, model: 'next', thinkingEffort: null };
+  expect(await setReviewedModelTarget(requested, commands(), { baseline,
+    resolution: targetResolutionIdentity(commands(), getRuntimeConfig(root), requested) })).toContain('blocked');
+  expect(readSessionModelEdit(sessionId)).toEqual(baseline); expect(sharedConfigBytes()).toEqual(before);
+});
 
 it.each((['local', 'host'] as const).flatMap(source => (['dismiss', 'activate'] as const).map(ending => ({ source, ending }))))(
   'keeps pool affinity through $source discovery and refresh until explicit $ending', async ({ source, ending }) => {

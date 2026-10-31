@@ -5,6 +5,9 @@ import type { SessionModelSelection, SessionModelTarget } from '../../../session
 import { projectModelSelection } from '../../../session/model/projection.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
 import type { CommandContext } from '../types.js';
+import { providerBindingAvailable } from '../../auth/binding.js';
+import { loadCatalog } from '../../models/catalogStore.js';
+import type { CatalogProvider } from '../../models/catalog.js';
 
 export function scopedModelTarget(target: SessionModelTarget): SessionModelSelection {
   return target.connectionId !== undefined ? { ...target, connectionId: target.connectionId, connectionScope: 'session' }
@@ -46,13 +49,15 @@ export function modelRequest(context: CommandContext, config: RuntimeConfig) {
 }
 
 /** Named targets require their own credential. Provider targets use the accepted CLI/env/profile source. */
-export function exactTargetMatches(context: CommandContext, config: RuntimeConfig, target: SessionModelTarget): boolean {
+export function exactTargetMatches(context: CommandContext, config: RuntimeConfig, target: SessionModelTarget,
+  catalog: readonly CatalogProvider[] = loadCatalog()): boolean {
   const providerSlot = 'connectionScope' in target && target.connectionScope === 'provider';
   const connection = config.providerConnections.find(item => item.id === target.connectionId && item.provider === target.provider);
   if (!providerSlot && (!connection || connection.status === 'pending' || connection.status === 'error')) return false;
   const actual = targetRequest(context, config, target);
-  if (actual.blocked || !actual.credential || actual.provider !== target.provider || actual.model !== target.model) return false;
-  if (providerSlot) return actual.credential.connectionId === undefined;
+  if (actual.blocked || actual.provider !== target.provider || actual.model !== target.model) return false;
+  if (providerSlot) return providerBindingAvailable(catalog, actual) && actual.credential?.connectionId === undefined;
+  if (!actual.credential) return false;
   const expected = resolveProviderCredential({ runtimeConfig: projectModelSelection(config, scopedModelTarget(target)),
     ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
   return actual.baseUrl === expected.baseUrl && sameValue(actual.credential, expected.credential);

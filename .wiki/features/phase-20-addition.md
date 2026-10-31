@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.28 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.29 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5819,3 +5819,22 @@ build exit0，manifest `ef982b674f90`、inputsDigest `82d6aba4bec6af4140fe8ea483
 原源码反转 **8失败/1控制通过/40未选/exit1**，finally精确恢复 fixed SHA256 `f9aa5529388a`，恢复后同78项再次通过；没有用 skipped计通过。五静态门/diff exit0，118 docs-source advisory保留。build `a91a9c4872e196989fd7b80c0ea074533fccc7290d0a911b7428f370f7bc065b`，inputsDigest `0d40e55b4e13c38d684fd517f71df7a231957078341d13f8ea11e583bfbd9ea2`与当前输入匹配；正式适配 archive/patch/member/vendor核对后judge exit0，环/解析 satisfied、partial仅既有interactiveMode21/22-name advisory。独立只读复审 APPROVE/CLEAR，子代理未运行验证。证据 `.omx/artifacts/phase20-addition-delegated-signing/`；清理/提交/推送与自身CI另绑，真实provider/平台/PTY/旧发布binary/全仓/20k未验，ADD-70 partial、goal active。
 
 代码 `d892c777e3f47cc349e93aab1bb2c39cdc951806` 已提交/推送，远端 main 精确一致，交付后 clean、批次 scratch 清理。自身 CI `41215827302` 与连接报告 `077d7978`/`41215191300` 最后 in_progress，两者 Watch `41215827400`/`41215191257`已success。延迟检查辅助tier `953d677f`/`41213345904`、文档 `9975ac6e`/`41213464205`已completed/success；角色seed `27931563`/`41211798735`和文档 `712ea121`/`41210875615`仍in_progress。后续本段文档单独交付，不替代两个修复的代码CI。
+
+
+### 24.29 当前签名请求可以保存模型与 effort，命名凭据边界保持
+
+接续 `b48fd27b` 定向审计：`/model use`、`/thinking`、reviewed provider picker 在三个 model owner gate 和 UI ready/active 判断中强制 static credential；Bedrock/Vertex 的既有 resolver 没有这个对象。首次聚焦新增场景实际20失败/14控制通过/80未选；包含成功保存/显示的真实缺陷及被提前拒绝、未进入hook/lock的竞态场景，不把后者算已执行复验。
+
+在 [auth binding owner](../../packages/ts-shell/src/core/auth/binding.ts) 复用 issuer URL/endpoint 与 endpointShape：未blocked、有地址、静态credential或实际signer。委派target改用同一predicate，避免两份准入事实。模型控制只给真正的当前provider slot开放无credential路径；命名连接仍必须有自己的credential，keyless active named也不生成可借用的provider行。picker采用同一catalog判断，正确显示active/ready和未知当前模型；成功报告省略不存在的credential source。未新增source lookup、占位key或签名调用。
+
+保留reviewed SHA256、原provider/address/credential身份及catalog、hook后、锁内完整request复验。独立审查找到两个中间回归并动态复现：把当前模型protocol和目标protocol直接比较会拒绝合法OpenAI跨protocol切换（1失败）；仅按signer放开会让keyless active named直接model/thinking写入（4失败）。最终protocol比较在两侧使用目标model，静态命名路径沿原合同；六条命名picker场景选择真实active named并验证无active/借用provider行。
+
+目标检查后重读只读参考：Pi `providers/amazon-bedrock.ts:64-77`、`providers/google-vertex.ts:78-91` 允许隐式 `auth:{}`；`core/model-runtime.ts:672-700` 传递optional apiKey。采用可选静态key、请求时获取签名凭据的同类决定；本项目仍沿已有readiness把AWS/ADC有效性留给transport，与Pi的来源预检查不同，不重复解析或宣称认证通过。
+
+主代理Linux Node20.3.0、heap768MiB、单worker最终串行 **4文件/167项** exit0：selection69、category50、delegated target19、readiness29。Bedrock/Vertex实际resolver、直接model/effort、session保存/恢复、global有无session的默认保存、local/host picker apply/reload、未知当前报告、加载后和hook/lock地址/provider/blocked/pool更换均覆盖；settings/auth bytes与session revision验证拒绝无写，global偏好仅归settings，零fetch。无signer、missing Vertex address、keyless OpenAI、active named和invalid pool保留拒绝。
+
+最后反转四个原生产owner实际 **30失败/13控制通过/76未选/exit1**：24个先前签名路径场景及六个强化后的active named picker边界；finally逐字节恢复，恢复后167项通过。中间验证cwd错误且提前另起runner造成短暂并发，两条owned runner均终止exit143并确认退出，最终只运行正确package runner；这些中止不计通过。系统级进程参数检查还意外输出无关服务敏感启动参数，未复制进文档/证据/提交，后续仅检查已知PID状态。首次digest调用漏compilerInputs属调用setup，沿manifest输入重算后精确一致；不修改build。
+
+五静态门/diff exit0，118既有docs-source advisory保留；build `d146d52e40a8da0e47790f41bef9c538731ad500271c494797cb64e597df69dc`、inputsDigest `5cadaa2a26f127861c397ec80c91f0916a7696c71a6ffc8615bcee95e5cabac9` 精确匹配。正式适配bundle archive/patch/member/vendor核对后串行judge exit0，环/解析satisfied，partial仅既有interactiveMode21/22-name advisory。独立只读APPROVE/CLEAR，子代理只编辑category测试/审查，未验证。证据 `.omx/artifacts/phase20-addition-model-signing/`。
+
+延迟CI读回：委派 `d892c777`/`41215827302` 与连接报告 `077d7978`/`41215191300` 均completed/success；文档HEAD `b48fd27b`/`41215914412`、角色 `27931563`/`41211798735`、文档 `712ea121`/`41210875615`最后in_progress。本批提交/推送/自身CI另绑；真实AWS/ADC/provider、PTY、非Linux平台、旧发布binary、全仓/20k未验，ADD-70 partial，原真实条件延后、goal active。
