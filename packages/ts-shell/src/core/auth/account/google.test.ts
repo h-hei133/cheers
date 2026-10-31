@@ -207,7 +207,7 @@ describe('stored Google native login and renewal', () => {
       expect(renewed).toMatchObject({ stored: true, writeState: 'persisted' }); expect(renewed.rotation).toBeDefined();
       expect(fetchImpl).toHaveBeenCalledOnce();
       const saved = storedConfig(), account = saved.providerConnections![0]!.accountAuth!.google!;
-      expect(account).toEqual(saved.providerCredentials!.google!.accountAuth!.google); expect(renewed.accountAuth).toEqual(account);
+      expect(saved.providerCredentials).toBeUndefined(); expect(renewed.accountAuth).toEqual(account);
       expect(account).toMatchObject({ clientSecret: 'synthetic-secret', quotaProject: 'synthetic-project', scopes: 'scopes' in before ? before.scopes : undefined });
       const successor = storedResolution(workspace);
       expect(leaseFor(successor).grant).toMatchObject({ ...accountBinding(captureAccountEdit(workspace, successor)), origin: 'rotation' });
@@ -236,7 +236,7 @@ describe('stored Google native login and renewal', () => {
       const fetchImpl = vi.fn(async () => {
         const config = storedConfig(), connection = config.providerConnections![0]!;
         const account = { ...connection.accountAuth!.google!, ...(field === 'scopes' ? { scopes: [scope] } : { [field]: 'synthetic-other' }) };
-        connection.accountAuth = { google: account }; config.providerCredentials!.google!.accountAuth = { google: account };
+        connection.accountAuth = { google: account };
         fs.writeFileSync(getUserAuthPath(), JSON.stringify(config), { mode: 0o600 }); edited = fs.readFileSync(getUserAuthPath());
         return Response.json({ access_token: 'synthetic-next', refresh_token: 'synthetic-rotated', expires_in: 3600 });
       }) as unknown as typeof fetch;

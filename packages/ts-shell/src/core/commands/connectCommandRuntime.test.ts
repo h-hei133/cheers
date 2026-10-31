@@ -128,6 +128,44 @@ describe("connect command runtime", () => {
     expect(stored.providerConnections?.[0]?.model).toBe(
       "deepseek-ai/DeepSeek-V4-Flash",
     );
+    expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerCredentials).toBeUndefined();
+  });
+
+  it.each(['api-key', 'browser', 'account'] as const)('keeps an independent provider slot unchanged when activating a %s connection', async mode => {
+    const provider = mode === 'browser' ? 'openai-compatible' : 'openai';
+    const independent = { apiKey: 'SYNTHETIC_INDEPENDENT_SLOT', baseUrl: 'https://independent.invalid/v1',
+      model: 'independent-model', thinkingEffort: 'low' as const, serviceTier: 'priority' };
+    writeUserRuntimeConfigFile({ theme: 'dark', provider, providerCredentials: { [provider]: independent },
+      providerConnections: [{ id: 'retained-sibling', provider, apiKey: 'SYNTHETIC_SIBLING',
+        baseUrl: 'https://sibling.invalid/v1', model: 'sibling-model', authType: 'api-key', status: 'connected',
+        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }] },
+    readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    const before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    const settings = fs.readFileSync(getUserRuntimeConfigPath());
+    __setConnectBrowserFlowRunnerForTest(async () => ({ apiKey: 'SYNTHETIC_NEW_CONNECTION',
+      baseUrl: 'https://new.invalid/v1', model: 'new-model' }));
+    __setOpenAIAccountAuthRunnerForTest(() => nativeLogin());
+    const args = mode === 'account' ? ['login', 'openai', '--account']
+      : mode === 'browser' ? ['login', 'siliconflow', '--browser']
+      : ['login', 'openai', '--api-key', 'SYNTHETIC_NEW_CONNECTION', '--base-url', 'https://new.invalid/v1', '--model', 'new-model'];
+    const result = await runConnectCommand(args, { cwd: workspaceRoot });
+    const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    expect(stored.providerCredentials).toEqual(before.providerCredentials);
+    expect(stored.providerConnections?.find(connection => connection.id === 'retained-sibling'))
+      .toEqual(before.providerConnections?.[0]);
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(settings);
+    const active = stored.providerConnections?.find(connection => connection.id === stored.activeProviderConnectionId);
+    expect(active?.id).not.toBe('retained-sibling');
+    const resolution = resolveProviderCredential({ runtimeConfig: configStore.getRuntimeConfig(workspaceRoot), env: {} });
+    expect(resolution.credential).toMatchObject({ source: 'connection', connectionId: active!.id });
+    if (mode === 'account') {
+      expect(active?.accountAuth?.openai?.refreshToken).toBe('native-refresh');
+      expect(resolution.credential?.authMode).toBe('account-auth');
+      expect(result.output).not.toContain('Automatic renewal remains unverified');
+    } else {
+      expect(active).toMatchObject({ apiKey: 'SYNTHETIC_NEW_CONNECTION', baseUrl: 'https://new.invalid/v1', model: 'new-model' });
+      expect(resolution.credential).toMatchObject({ apiKey: 'SYNTHETIC_NEW_CONNECTION', baseUrl: 'https://new.invalid/v1', model: 'new-model' });
+    }
   });
 
   it('refreshes only after a confirmed save and reports publication rejection separately', async () => {
@@ -513,6 +551,7 @@ describe("connect command runtime", () => {
     expect(stored.providerConnections?.[0]?.id).toBe(
       stored.activeProviderConnectionId,
     );
+    expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerCredentials).toBeUndefined();
   });
 
   it("records browser-assisted local capture failure as pending -> error", async () => {
@@ -583,9 +622,8 @@ describe("connect command runtime", () => {
     expect(stored.providerConnections?.[0]?.accountAuth?.openai?.type).toBe(
       "openai-chatgpt-account",
     );
-    expect(
-      stored.providerCredentials?.openai?.accountAuth?.openai?.type,
-    ).toBe("openai-chatgpt-account");
+    expect(stored.providerCredentials).toBeUndefined();
+    expect(result.output).not.toContain('Automatic renewal remains unverified');
   });
 
   it.each(['api-key', 'account'])('removes the last %s connection and its credential mirror from fresh resolution', async auth => {
@@ -593,6 +631,14 @@ describe("connect command runtime", () => {
       expiresAt: Date.now() + 3600000, authorizeUrl: 'https://auth.example.invalid/', callbackUrl: 'http://localhost/' }));
     const args = auth === 'account' ? ['login', 'openai', '--account'] : ['login', 'openai', '--api-key', 'SYNTHETIC_LOGOUT_KEY'];
     await runConnectCommand(args, { cwd: workspaceRoot });
+    // Exercise a pre-convergence file: only a matching legacy credential mirror
+    // is removed with its last owning connection.
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const connection = edit.values.providerConnections![0]!;
+    writeUserRuntimeConfigFile({ ...edit.values, providerCredentials: { openai: {
+      ...(connection.apiKey ? { apiKey: connection.apiKey } : {}),
+      ...(connection.accountAuth ? { accountAuth: connection.accountAuth } : {}),
+    } } }, edit);
     const before = configStore.getRuntimeConfig(workspaceRoot);
     expect(resolveProviderCredential({ runtimeConfig: before, env: {} }).credential).toBeDefined();
     const result = await runConnectCommand(['logout', before.activeProviderConnectionId!], { cwd: workspaceRoot });
@@ -624,6 +670,8 @@ describe("connect command runtime", () => {
     await runConnectCommand(['login', 'openai', '--api-key', 'SYNTHETIC_SHARED'], { cwd: workspaceRoot });
     const first = configStore.getRuntimeConfig(workspaceRoot).activeProviderConnectionId!;
     await runConnectCommand(['login', 'openai', '--api-key', 'SYNTHETIC_SHARED'], { cwd: workspaceRoot });
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, providerCredentials: { openai: { apiKey: 'SYNTHETIC_SHARED' } } }, edit);
     await runConnectCommand(['logout', first], { cwd: workspaceRoot });
     let fresh = configStore.getRuntimeConfig(workspaceRoot);
     expect(fresh.providerCredentials.openai?.apiKey).toBe('SYNTHETIC_SHARED');

@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节 | 部分完成 | 凭据拆分与权限已实施；模型目标/目录分离、重复事实收敛与旧版本回退验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节 | 部分完成 | 凭据拆分/权限、导入与新连接镜像停止已实施；模型目标物理分离、其余重复事实收敛与旧版本回退验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5451,3 +5451,15 @@ ADD-70 仍部分完成：本轮只完成凭据与设置的物理拆分；模型�
 继续检查发现 profile 导入只捕获 config.json，迁移后的 auth 连接会被遗漏。现由原 import plan 捕获两份源文档，分别校验后 auth-last 合并，再通过原 sanitizer 一次性生成待认证连接，最后写入目标 settings/auth 各自文档。凭据、账号 token 与未知字段不导入；preview/apply 原有 digest、源重查、目标冲突、stage/journal/recovery 合同继续使用。auth-owned pathRules 若来自旧目录，按其实际源路径绝对化，named profile 不借用 default/legacy。
 
 三个聚焦文件27项通过，包含分文件/仅auth导入、auth覆盖旧连接、preview后auth修改拒绝、未知秘密排除、pool endpoint秘密URL拒绝、目标0600、源文件不变、pathRules实际源目录。移除auth捕获的反转实际AssertionError，源码精确恢复后通过。五门/build通过，manifestb552bb9b1a16；不将此消费者修补当作ADD-70全量完成。此前9278c344远端main精确一致、CI41186572319最后读取in_progress，Watch41186572327成功但仍不等同代码CI通过。
+
+### 24.2 命名连接停止生成凭据与默认值镜像
+
+API-key 登录、浏览器捕获与原生账号激活现在只在命名连接存储新凭据，并继续选择原 provider/活动连接；不再覆盖独立 provider slot 的密钥、端点和默认模型。原生 renewal grant 继续复验 native exchange、完整账号、精确连接及存储来源，不再要求激活时生成的 mirror。已有 exact mirror 的 guarded 续期与最后连接删除保持兼容，测试显式安排旧格式而不依赖新登录继续制造镜像。
+
+命名连接的 global model/effort 只更新该连接，provider-slot 选择继续保存其自身默认。会话投影与 provenance 同时选择一个 owner，保留独立 slot 的值和来源；实际 credential resolution 仍使用命名连接。只读参考将默认模型/思考与目录能力分开；本项目保留采样、请求上限与目录 contextWindow/maxTokens 的不同语义，不把同名字段一律视为重复，不在 models.json 保存采样或创建项目目录。
+
+主代理单进程串行、18 个聚焦文件 **388 项**通过：selection/effort/provider/provenance101，connect/model76，Google/replay28，renewal/picker auth/model auth/model key130，Copilot/current/publication/三个续期消费者53。反转会话双写实际触发默认值与来源断言失败；反转 API-key/browser 连接 writer 恰好两项 provider-slot equality 断言失败，账号控制通过，源码 finally 精确恢复（connect SHA-256 `d68964a7cf8b516056852c81f2c50cf3427b2969ae3dce2bb564bcb749e5a623`），恢复后 connect57 再次通过，重复不累加。Copilot 测试从旧 config.json 改读 auth，并核对登录/续期后无新镜像及实际账号读回。初次反转收据把 Vitest JSON 的错误格式误判为无 AssertionError，修正为实际 equality 失败后收据通过；不将观察器失败记为产品失败。
+
+五静态门、production noEmit、diff 与 TS build 通过，manifest `a7f04674abfa`；118 既有 docs-source advisory 不变。正式打包 NormProof exit0，导入解析与环 satisfied，partial 仅既有 interactiveMode 22-name advisory。只读独立复审无阻塞性生产发现，子代理未执行验证。延迟读回 `9278c344`/`e9e94d43` 的代码 CI `41186572319`/`41187075002` 仍 in_progress，两个 Watch 成功不替代代码 CI。
+
+ADD-70 仍部分完成。模型/effort/serviceTier 默认仍物理嵌在 auth 记录；缺省连接字段仍按既有 provider fallback 解析，显式 effort null 保留。未清除独立 provider slot，未完成模型目标物理分离、全部历史重复清理或旧二进制回退；没有迁移真实 HOME、真实 provider/PTY、全仓或 20k 压测。本批提交/推送及精确 SHA 的 CI 单独绑定，整体 goal active。

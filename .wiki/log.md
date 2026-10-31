@@ -10946,3 +10946,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：补齐 profile 导入的 auth 消费者
 
 [addition24.1](features/phase-20-addition.md#241-导入消费者补齐)发现已拆分凭据文件的profile导入漏读auth，现捕获/校验两文档、合并后沿原脱敏投影生成pending连接、分别写目标settings/auth。未知秘密不复制、pathRules按实际源文件锚定、preview后auth改动拒绝。3文件27项、五门/buildb552bb9b1a16通过；auth捕获反转实际失败/精确恢复。前批9278c344已推送且main与origin/main一致，代码CI41186572319最后in_progress，Watch成功；整体goal active。
+
+### 2026-10-31：命名连接停止生成凭据与默认值镜像
+
+[addition24.2](features/phase-20-addition.md#242-命名连接停止生成凭据与默认值镜像)API-key/browser/native登录只存命名连接，独立provider slot保持；native grant不再依赖生成mirror，legacy exact-mirror续期/移除仍guarded。global model/effort、会话projection与provenance各选同一owner。18文件388项聚焦、两组实际反转/源码精确恢复、五门/noEmit/build通过，manifesta7f04674abfa；正式judge仅既有interactiveMode advisory，导入/环satisfied。Copilot物理读取夹具补齐。ADD-70仍partial：默认值尚嵌auth、缺省字段仍继承provider slot，物理模型目标分离及旧版本/真实环境尚缺。此前两代码CI仍in_progress，整体goal active。

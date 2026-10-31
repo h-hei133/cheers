@@ -12,6 +12,7 @@ import { credentialIdentityFor } from '../auth/account/pool.js';
 import { ownedConnectionCredential } from '../auth/account/presence.js';
 import { noteCredentialRateLimit, resetCredentialBackoffForTests } from '../auth/account/backoff.js';
 import { loadCatalogSnapshot, userCatalogPath } from '../models/catalogStore.js';
+import { resolveProviderCredential } from '../shell/providerCredentials.js';
 
 describe("model command runtime", () => {
   const originalHome = process.env.USERPROFILE;
@@ -254,7 +255,50 @@ describe("model command runtime", () => {
       (connection) => connection.id === stored.activeProviderConnectionId,
     );
     expect(active?.model).toBe("gpt-5.4");
-    expect(stored.providerCredentials?.openai?.model).toBe("gpt-5.4");
+    expect(stored.providerCredentials).toBeUndefined();
+  });
+
+  it('saves named model defaults only on the selected connection and preserves an independent provider slot', async () => {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const selected = edit.values.providerConnections![0]!;
+    const independent = { apiKey: 'SYNTHETIC_INDEPENDENT_SLOT', baseUrl: 'https://independent.invalid/v1',
+      model: 'independent-model', thinkingEffort: 'low' as const, serviceTier: 'priority' };
+    const sibling = { ...selected, id: 'retained-sibling', model: 'sibling-model', thinkingEffort: 'medium' as const };
+    writeUserRuntimeConfigFile({ ...edit.values, theme: 'dark', temperature: 0.2, topP: 0.8,
+      providerCredentials: { openai: independent }, providerConnections: [selected, sibling] }, edit);
+    const before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    const settings = fs.readFileSync(getUserRuntimeConfigPath());
+    const result = await runModelCommand(['use', 'gpt-5.4', '--effort', 'high', '--global'], { cwd: workspaceRoot });
+    expect(result.output).toContain('Model switched to gpt-5.4');
+    const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    expect(stored.providerCredentials).toEqual(before.providerCredentials);
+    expect(stored.providerConnections?.find(connection => connection.id === sibling.id))
+      .toEqual(before.providerConnections?.find(connection => connection.id === sibling.id));
+    const active = stored.providerConnections?.find(connection => connection.id === selected.id);
+    expect(active).toEqual({ ...before.providerConnections![0], model: 'gpt-5.4', thinkingEffort: 'high', updatedAt: expect.any(String) });
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(settings);
+    const resolution = resolveProviderCredential({ runtimeConfig: getRuntimeConfig(workspaceRoot), env: {} });
+    expect(resolution).toMatchObject({ model: 'gpt-5.4', thinkingEffort: 'high',
+      credential: { source: 'connection', connectionId: selected.id, apiKey: selected.apiKey } });
+  });
+
+  it('retains provider-slot model default persistence when no named connection owns the choice', async () => {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const credential = { apiKey: 'SYNTHETIC_PROVIDER_SLOT', model: 'gpt-5.3', thinkingEffort: 'low' as const };
+    writeUserRuntimeConfigFile({ theme: 'dark', provider: 'openai', activeProviderConnectionId: undefined, providerConnections: [],
+      providerCredentials: { openai: credential, google: { apiKey: 'SYNTHETIC_SIBLING_SLOT', model: 'sibling-model' } } }, edit);
+    const before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    const settings = fs.readFileSync(getUserRuntimeConfigPath());
+    const result = await runModelCommand(['use', 'gpt-5.4', '--effort', 'high', '--global'], { cwd: workspaceRoot });
+    expect(result.output).toContain('Model switched to gpt-5.4');
+    const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    expect(stored.providerConnections).toEqual([]);
+    expect(stored.activeProviderConnectionId).toBeUndefined();
+    expect(stored.providerCredentials?.openai).toEqual({ ...credential, model: 'gpt-5.4', thinkingEffort: 'high' });
+    expect(stored.providerCredentials?.google).toEqual(before.providerCredentials?.google);
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(settings);
+    expect(resolveProviderCredential({ runtimeConfig: getRuntimeConfig(workspaceRoot), env: {} }))
+      .toMatchObject({ model: 'gpt-5.4', thinkingEffort: 'high', credential: { source: 'config', apiKey: credential.apiKey } });
   });
 
   it("answers a bare /model with the catalogue, grouped by provider", async () => {

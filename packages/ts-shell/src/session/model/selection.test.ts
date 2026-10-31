@@ -10,7 +10,8 @@ import { createCliProviderRuntimeBridge, resolveCliCredential } from "../../cli/
 import { createShellRuntimeContext, refreshShellRuntimeConfig, switchActiveSession } from "../../core/shell/runtimeContext.js";
 import { createSessionStoreLayout, locateExistingSessionLayout } from "../store/sessionFileLayout.js";
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from "./state.js";
-import { projectSessionModel } from "./projection.js";
+import { projectModelSelection, projectSessionModel } from "./projection.js";
+import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
 import { writeSessionState } from "../store/sessionStateStore.js";
 import * as configStore from "../../config/runtimeConfig.js";
 import * as files from '../store/sessionFileStore.js';
@@ -138,6 +139,18 @@ it("changes defaults only explicitly while other session overrides remain indepe
   expect(readUserRuntimeConfigFile().providerConnections?.[0]?.model).toBe("second");
   expect(projectSessionModel(getRuntimeConfig(home), one.id).providerConnections[0]?.model).toBe("first");
   expect(projectSessionModel(getRuntimeConfig(home), two.id).providerConnections[0]?.model).toBe("second");
+});
+
+it('keeps independent provider preferences and origins intact under a named session selection', () => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ providerCredentials: { openai: { apiKey: 'synthetic-independent', model: 'provider-model', thinkingEffort: 'high' } } }, edit);
+  const config = getRuntimeConfig(home);
+  const projected = projectModelSelection(config, { connectionId: 'fixture', connectionScope: 'session', provider: 'openai', model: 'session-model', thinkingEffort: null });
+  expect(projected.providerCredentials).toBe(config.providerCredentials);
+  expect(projected.configProvenance.providerCredentials).toBe(config.configProvenance.providerCredentials);
+  expect(projected.providerConnections[0]).toMatchObject({ model: 'session-model', thinkingEffort: null });
+  expect(projected.configProvenance.providerConnections.children?.['0'].children?.model.sources).toEqual(['session']);
+  expect(resolveProviderCredential({ runtimeConfig: projected, env: {} })).toMatchObject({ model: 'session-model', thinkingEffort: null, credential: { source: 'connection' } });
 });
 
 it("does not transfer a selection to a different connection or provider", () => {
@@ -338,7 +351,7 @@ it('allows sequential selections and a no-op after a model-only session overlay 
       runtimeConfig: context.runtimeConfig, refreshRuntimeConfig: () => refreshShellRuntimeConfig(context) });
     expect(result.output).toContain(`Model switched to ${model}`);
     expect(context.runtimeConfig.providerConnections[0]?.model).toBe(model);
-    expect(context.runtimeConfig.providerCredentials.openai).toEqual({ model, thinkingEffort: null });
+    expect(context.runtimeConfig.providerCredentials.openai).toBeUndefined();
     expect(readSessionModel(session.id)?.model).toBe(model);
     if (before.selection?.model === model) expect(readSessionModelEdit(session.id).revision).toBe(before.revision);
   }

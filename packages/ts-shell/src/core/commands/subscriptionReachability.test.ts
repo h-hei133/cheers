@@ -7,7 +7,7 @@ import { toSubscriptionAccountAuthConfig } from '../auth/providerAuthContract.js
 import { accountAuthFor } from '../../provider/request/authorization.js';
 import { loginGitHubCopilotViaDeviceFlow } from './subscriptionAccountAuth.js';
 import { resolveProviderCredential } from '../shell/providerCredentials.js';
-import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath } from '../../config/runtimeConfig.js';
 import { renewStoredAccount } from '../auth/account/renewal.js';
 
 const homes: string[] = [];
@@ -82,16 +82,20 @@ describe('Copilot login persistence and renewal', () => {
       workspaceRoot: workspace, onProgress: progress });
     expect(result).toContain('connected via device code');
     expect(progress).toHaveBeenCalledWith(expect.objectContaining({ userCode: 'ABCD-1234' }));
-    const config = JSON.parse(fs.readFileSync(path.join(home, '.cheers', 'config.json'), 'utf8'));
+    const config = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
     expect(config.providerConnections[0]).toMatchObject({ provider: 'github-copilot', status: 'connected',
       accountAuth: { subscription: { type: 'subscription', provider: 'github-copilot',
         refreshToken: 'synthetic-github', baseUrl: 'https://api.individual.githubcopilot.com' } } });
+    expect(config.providerCredentials?.['github-copilot']).toBeUndefined();
     const resolution = resolveProviderCredential({ runtimeConfig: getRuntimeConfig(workspace), env: {} });
     const renewed = await renewStoredAccount({ workspaceRoot: workspace, resolution, fetchImpl });
     expect(renewed).toMatchObject({ stored: true, writeState: 'persisted' });
     expect(renewed.accountAuth).toMatchObject({ type: 'subscription', provider: 'github-copilot',
       refreshToken: 'synthetic-github', accessToken: 'tid=new;proxy-ep=proxy.individual.githubcopilot.com',
       baseUrl: 'https://api.individual.githubcopilot.com' });
+    const stored = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
+    expect(stored.providerConnections[0].accountAuth.subscription).toEqual(renewed.accountAuth);
+    expect(stored.providerCredentials?.['github-copilot']).toBeUndefined();
     expect(calls).toBe(4);
   });
 });

@@ -24,12 +24,14 @@ Settings shows the actual save file beside Stored and in Values and sources. The
 
 | Concern | File and scope | Writer |
 |---|---|---|
-| Runtime preferences | `config.json` in the selected user profile; project preferences use `.cheers/config.json` | Settings, `/model use --global` for a lasting default |
-| Provider identity, connections and credentials | `auth.json` in the selected user profile, written owner-only (`0600` on POSIX) | `/connect` and the existing account/connection commands |
+| Runtime preferences | `config.json` in the selected user profile; project preferences use `.cheers/config.json` | Settings |
+| Provider identity, connections, credentials and their current model defaults | `auth.json` in the selected user profile, written owner-only (`0600` on POSIX) | `/connect`, account/connection commands and `/model use --global` |
 | Custom providers and model metadata | `models.json` in the user profile only | `/model config` creates an example; edit entries inside its existing `providers` object |
 | Refreshed provider catalogue | `models-cache.json` in the user profile | `/model refresh`; generated cache |
 
 Model and role choices made in `/model` normally belong to the current session and are saved for resume. Changing the settings save scope does not move them or create a project model catalogue. A connection's address in `auth.json` selects where requests go; a catalogue address identifies provider/model metadata and does not create a connection.
+
+Activating a named connection stores its credentials once, on that connection. Global model and thinking changes for a named connection update that connection's defaults; provider-level choices update their own slot. Independent provider slots are preserved. An absent connection default still uses the existing provider fallback; an explicit thinking value of `null` selects automatic thinking. Model defaults remain in `auth.json` until their separate storage is implemented.
 
 Existing user settings files containing connections or credentials remain readable. The next user configuration save writes and verifies their `auth.json` copy before removing those fields from settings. An existing auth field takes precedence over a legacy settings copy. If a save is interrupted between the files, it reports an unverified write outcome; the files are not one atomic transaction. Project configuration and explicit input files keep their existing scope rules.
 

@@ -1442,3 +1442,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A profile import loses connections after a credential split, or imports a secret-bearing account-pool URL into its journal.
 - **Root Cause**: The import inventory captures only the old settings filename, while the sanitizer checks connection URLs but treats another endpoint-bearing record as an ordinary field.
 - **Rule**: Inspect every physical document inventory when storage is split. Capture and validate both sources, merge once before projecting inactive references, partition the sanitized result, and bind preview/apply to both source revisions. Apply the existing endpoint validator to every imported endpoint owner; never copy live credential material or resolve source environment references.
+
+### Credential Mirrors Cannot Be A Prerequisite For Native Renewal
+
+- **Symptom**: A native account login stores its connection successfully but cannot obtain a renewal grant after duplicate provider-slot writes are removed.
+- **Root Cause**: Enrollment treated an activation-created provider mirror as proof of storage identity, although the named connection and captured document fences already identify the credential. Session defaults and provenance also projected into both owners.
+- **Rule**: Bind native grants to the verified named connection, source and storage generation. Generate no credential/default mirror for a named choice; preserve independent provider slots and guarded legacy exact-mirror renewal/removal. Change projection and provenance together, and arrange explicit legacy mirror fixtures when testing compatibility.

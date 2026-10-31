@@ -6,8 +6,9 @@ import { readConfigSnapshot, type CapturedConfigSnapshot } from './document.js';
  * The user's configuration, as two documents rather than one.
  *
  * `config.json` holds what the product does: theme, retry policy, tool
- * allowlists, model preferences. `auth.json` holds who is being talked to and as
- * whom: the provider, its connections, their keys and account tokens.
+ * allowlists and request policies. `auth.json` holds who is being talked to and
+ * as whom: the provider, its connections, their keys and account tokens. Model
+ * defaults nested in those records still follow that physical owner.
  *
  * They are separate files because they are different kinds of fact. A settings
  * file is something a user may paste into an issue or share between machines; a

@@ -103,15 +103,15 @@ it.each(['auto', 'off', 'none'])('persists explicit %s without changing another 
   expect(readSessionModel(one.sessionId)?.thinkingEffort).toBeNull();
 });
 
-it('normalizes global defaults including null and honors connection over provider preference', async () => {
+it('saves effort only on its named connection, including null over provider fallback', async () => {
   const ctx = context(); await runModelCommand(['capable', '--effort', 'high', '--global'], ctx);
   const edit = configStore.readRuntimeConfigEditAt(configStore.getUserRuntimeConfigPath());
   expect(edit.values.providerConnections?.[0]?.thinkingEffort).toBe('high');
-  expect(edit.values.providerCredentials?.openai?.thinkingEffort).toBe('high');
+  expect(edit.values.providerCredentials?.openai).toBeUndefined();
   await runThinkingCommand(['auto', '--global'], ctx);
   const config = configStore.getRuntimeConfig(home);
   expect(config.providerConnections[0].thinkingEffort).toBeNull();
-  expect(config.providerCredentials.openai?.thinkingEffort).toBeNull();
+  expect(config.providerCredentials.openai).toBeUndefined();
   expect(resolveProviderCredential({ runtimeConfig: { ...config, providerCredentials: { openai: { thinkingEffort: 'high' } } }, env: {} }).thinkingEffort).toBeNull();
 });
 

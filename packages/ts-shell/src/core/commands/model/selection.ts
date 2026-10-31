@@ -221,13 +221,13 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     provider: activeProvider,
     ...(providerSlot ? {} : { activeProviderConnectionId: activeId }),
     providerConnections: nextConnections,
-    providerCredentials: {
+    ...(providerSlot ? { providerCredentials: {
       ...(config.providerCredentials ?? {}),
       [provider]: {
         ...(config.providerCredentials?.[provider] ?? {}),
         model, thinkingEffort,
       },
-    },
+    } } : {}),
   };
   let receipt: SessionModelReceipt | undefined;
   const roles = exact?.roles ?? sessionEdit?.selection?.roles;

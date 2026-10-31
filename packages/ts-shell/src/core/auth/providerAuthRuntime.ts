@@ -231,21 +231,6 @@ function persistConnectedAccountAuth(input: {
     ...(input.activate !== false ? {
       provider: input.provider,
       activeProviderConnectionId: input.connectionId,
-      providerCredentials: {
-        ...(latest.providerCredentials ?? {}),
-        [input.provider]: {
-          // Account-auth should become the primary credential source after
-          // successful login. Keep endpoint/model metadata, but do not keep
-          // stale api-key fields that can force runtime back to api-key path.
-          ...withoutApiKey(latest.providerCredentials?.[input.provider] ?? {}),
-          model: resolveAccountAuthModel(
-            input.provider,
-            latest.providerCredentials?.[input.provider]?.model,
-          ),
-          accountAuth: toProviderAccountAuthConfig(input.provider, input.accountAuth),
-          ...(accountProtocol(input.accountAuth) ? { baseUrl: accountProtocol(input.accountAuth)!.baseUrl } : {}),
-        },
-      },
     } : {}),
   };
   const oauth = input.provider === 'openai' || input.provider === 'google'
@@ -282,7 +267,7 @@ function persistConnectedAccountAuth(input: {
         activeProviderConnectionId: input.connectionId, sessionConnection: { id: input.connectionId, provider: input.provider } }, env: {} });
       const captured = captureAccountEdit(input.pending.workspaceRoot, resolution);
       if (resolution.credential?.source !== 'connection' || resolution.credential.connectionId !== input.connectionId
-        || !sameValue(resolution.credential.accountAuth, input.accountAuth) || (input.activate !== false && !captured.mirror)
+        || !sameValue(resolution.credential.accountAuth, input.accountAuth)
         || !grantRefreshLogin(enrollment, accountBinding(captured))) throw new Error('grant unavailable');
     } catch {
       refreshWarning = 'Access credentials were stored. Automatic renewal remains unverified; use an independent fresh profile for a new login.';
@@ -395,11 +380,6 @@ function resolveAccountAuthModel(
     return normalized;
   }
   return facts.accountAuthDefaultModel;
-}
-
-function withoutApiKey<T extends { readonly apiKey?: string }>(value: T): Omit<T, "apiKey"> {
-  const { apiKey: _apiKey, ...rest } = value;
-  return rest;
 }
 
 function resolveAccountAuthConfig(

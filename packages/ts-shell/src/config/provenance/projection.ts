@@ -33,7 +33,8 @@ export function sessionModelOrigins(provenance: ConfigProvenance, connectionInde
     result.provider = replaceOrigin(result.provider, origin('session'));
     result.activeProviderConnectionId = replaceOrigin(result.activeProviderConnectionId, origin('session'));
   }
-  for (const [key, childKey] of [...(connectionIndex !== undefined ? [['providerConnections', String(connectionIndex)]] : []), ['providerCredentials', provider]]) {
+  for (const [key, childKey] of connectionIndex !== undefined
+    ? [['providerConnections', String(connectionIndex)]] : [['providerCredentials', provider]]) {
     const parent = result[key] ?? origin('default'); const child = parent.children?.[childKey] ?? origin('default');
     const model = replaceOrigin(child.children?.model, origin('session'));
     const children = { ...child.children, model, ...(hasEffort ? { thinkingEffort: replaceOrigin(child.children?.thinkingEffort, origin('session')) } : {}) };

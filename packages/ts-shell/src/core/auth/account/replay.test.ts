@@ -84,7 +84,7 @@ it.each(['accessToken', 'refreshToken', 'expiresAt', 'loginId', 'accountId', 'sl
       else {
         const account = connection.accountAuth!.openai!;
         const changed = { ...account, [change]: change === 'expiresAt' ? account.expiresAt + 1 : 'replacement' };
-        connection.accountAuth = { openai: changed }; config.providerCredentials!.openai!.accountAuth = { openai: changed };
+        connection.accountAuth = { openai: changed };
       }
       write(config);
     }

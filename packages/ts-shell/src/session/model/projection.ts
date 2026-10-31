@@ -30,9 +30,9 @@ export function projectModelSelection<T extends ModelConfig>(config: T, selectio
     ...(selection.contextWindow !== undefined ? { contextWindow: selection.contextWindow } : {}),
     ...(config.configProvenance ? { configProvenance: sessionModelOrigins(config.configProvenance, connection ? config.providerConnections!.indexOf(connection) : undefined, selection.provider, selection.thinkingEffort !== undefined, Boolean(selection.connectionScope)) } : {}),
     providerConnections: config.providerConnections?.map(item => item === connection ? { ...item, ...preference } : item),
-    providerCredentials: {
+    ...(providerSlot ? { providerCredentials: {
       ...config.providerCredentials,
       [selection.provider]: { ...config.providerCredentials?.[selection.provider], ...preference },
-    },
+    } } : {}),
   };
 }

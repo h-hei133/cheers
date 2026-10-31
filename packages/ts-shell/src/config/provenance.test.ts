@@ -136,7 +136,9 @@ it('marks only matching session model leaves without attributing credentials to 
   expect(trace.providerConnections.rejectedFiles).toEqual(config.configProvenance.providerConnections.rejectedFiles);
   expect(trace.providerConnections.rejectedFiles).toHaveLength(1);
   expect(trace.providerConnections.shadowedFiles).toContainEqual(config.configProvenance.providerConnections.children!['0'].children!.model.files![0]);
-  expect(trace.providerCredentials.children?.openai.children?.model.sources).toEqual(['session']);
+  // The session changes its named connection; it does not invent a provider-slot copy.
+  expect(projected.providerCredentials).toBe(config.providerCredentials);
+  expect(trace.providerCredentials).toBe(config.configProvenance.providerCredentials);
   expect(config.configProvenance.providerConnections.children?.['0'].children?.model.sources).toEqual(['user']);
   expect(JSON.stringify(trace)).not.toContain('private');
   expect(projectSessionModel({ ...config, activeProviderConnectionId: 'missing' }, 'one').configProvenance).toBe(config.configProvenance);

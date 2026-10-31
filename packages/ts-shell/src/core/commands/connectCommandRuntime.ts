@@ -181,15 +181,6 @@ export async function addConnection(args: string[], onPersisted?: () => void, wo
     ...(options?.activate !== false ? {
       provider: target.provider,
       activeProviderConnectionId: connection.id,
-      providerCredentials: {
-        ...(userConfig.providerCredentials ?? {}),
-        [target.provider]: {
-          ...(userConfig.providerCredentials?.[target.provider] ?? {}),
-          apiKey,
-          ...(baseUrl ? { baseUrl } : {}),
-          ...(model ? { model } : {}),
-        },
-      },
     } : {}),
   };
   const configPath = writeUserRuntimeConfigFile(next, edit);
@@ -396,31 +387,18 @@ export async function runBrowserAssistedCaptureConnection(
         : connection,
     );
 
-    const activeConnection = nextConnections.find(
-      (connection) => connection.id === connectionId,
-    );
     const next: RuntimeConfigFile = {
       ...latest,
       providerConnections: nextConnections,
       ...(options?.activate !== false ? {
         provider: target.provider,
         activeProviderConnectionId: connectionId,
-        providerCredentials: {
-          ...(latest.providerCredentials ?? {}),
-          [target.provider]: {
-            ...(latest.providerCredentials?.[target.provider] ?? {}),
-            apiKey: browserResult.apiKey,
-            ...(activeConnection?.baseUrl
-              ? { baseUrl: activeConnection.baseUrl }
-              : {}),
-            ...(activeConnection?.model ? { model: activeConnection.model } : {}),
-          },
-        },
       } : {}),
     };
     const configPath = writeUserRuntimeConfigFile(next, edit);
   onPersisted?.();
 
+    const activeConnection = nextConnections.find(connection => connection.id === connectionId);
     return [
       `Browser-assisted local credential capture completed for ${target.provider}.`,
       `Connection ID: ${connectionId}`,
