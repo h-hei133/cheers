@@ -67,7 +67,8 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
     else delete roles[role];
     const next = { ...selection, roles };
     try {
-      writeSessionModel(context.sessionId, next, baseline, () => !admission() && defaultRequestCurrent());
+      writeSessionModel(context.sessionId, next, baseline, () => !admission() && defaultRequestCurrent()
+        && (!target || !validateModelPreset({ [role]: target }, choice.config, choice.catalog)));
       if (!sameValue(readSessionModel(context.sessionId), next)) {
         return { saved: false, output: 'Role assignment write outcome is unverified. Reopen the model panel.' };
       }

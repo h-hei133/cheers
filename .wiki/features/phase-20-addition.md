@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.35 节、第 24.58 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影、交互目录和首次角色保存的显式 provider 范围收敛、未知协议目录保留与绑定拒绝、角色变更的默认请求池退避重验和带key未知协议首次保存拒绝已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.35 节、第 24.58–24.59 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影、交互目录和首次角色保存的显式 provider 范围收敛、未知协议目录保留与绑定拒绝、角色变更的默认请求池退避重验和带key未知协议首次保存拒绝、角色目标在state lock内的实际pool准入重验已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -6348,3 +6348,26 @@ ADD-47表中的缺口是20.52尚未在真实CLI注入unknown。本批先检查�
 一次延迟读取c66e67eb代码CI41250671853与d25a0c8c文档CI41251337961仍in_progress，各Watch41250671837/41251338001 completed/success；不以Watch替代完整CI，不立即轮询。本批交付CI尚未观察。
 
 最终五静态门、三个脚本语法、独立证据verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留。工作树仅本批两个产品/测试文件与三份markdown，提交/推送/remote-main和clean状态由ignored delivery收据另绑；本批CI未观察，不声明通过。
+
+
+### 24.59 角色目标在原 state lock 内重验
+
+接续ADD-70与24.58，原[角色owner](../../packages/ts-shell/src/core/commands/model/role.ts)已经锁内重验默认请求，但非空角色目标只在进入writer前调用[validateModelPreset](../../packages/ts-shell/src/core/commands/model/preset.ts)。当默认账号named继续可用、目标账号other在实际state lock内进入退避，原guard只看默认，新的角色分配或effort仍被保存。配置/目录/环境与默认请求身份都不变，故原choice fingerprint和默认检查不能替代目标自身准入。
+
+目标检查后、产品修改前定向重读只读参考f09d01b85e0384647fcab6779d35ab9dabe04be3的setModel（agent-session.ts:2562）及available snapshot（model-registry.ts:64）：发布前对具体目标检查认证，发现和可用状态分开。参考没有本项目的多角色session CAS/账号池竞态，不声称它实现了相同锁协议。修复只在原[writeSessionModel](../../packages/ts-shell/src/session/model/state.ts)的beforeCommit guard追加同一个validateModelPreset，使用choice admission刚验证过的原accepted配置/目录；无新validator、resolver、事务、auth/pool核心或存储改动。target为undefined表示清除角色，跳过已移除目标的可用性要求，继续保留默认准入与原CAS。
+
+[provider回归](../../packages/ts-shell/src/session/model/provider.test.ts)新增36项：三角色×新默认assign/已有默认assign/已有effort/已有clear×稳定/提交前退避/锁内退避。两个实际named连接属于同一闭合pool，目标other用原owned credential身份触发原noteCredentialRateLimit，默认named始终可用；原resolver和真实writer检查session selection/revision、settings/auth字节。最初27项旧owner9失败/18控制的原日志保留，加入9项clear控制后，最终旧owner9失败/27通过/164未选中；未选中不计通过。修复后provider200与[角色picker](../../packages/ts-shell/src/cli/interactive/picker/model/role.test.ts)46共246项通过；显式恢复旧owner再次9失败/27通过/164未选中，finally逐字节恢复后同246项再次通过。九个失败均是锁内拒绝预期却实际saved=true，未将其归为环境或provider故障。
+
+五静态门后串行TS/exe构建通过，build387d5c01cdd768abb43c8d8d808481ddd7726ddbd18a8608acf76c4d0dbca947、inputs20d8ae1c2a0876690cd038a790529ed51d950f979ab612866e1a5f70b06ec0cb；stable/不可变exe均106842240 bytes、SHA9651aee9817546f98132dba0fafc021a3a808723b5b544198d4e3d7bb8bb871f，stable为普通文件副本、current compilerInputs一致。上一批ee9ac616449f仅保持历史构建身份。
+
+生产Node20.3 CLI普通/全屏各三场真实键盘：/model搜索advisor、进入角色，再选Thinking effort与high或Use default model。observer等原fs.openSync对该session state lock以wx独占打开成功，确认原model writer调用栈及fd/path设备、inode相同后，才调用原noteCredentialRateLimit。此时原目标预检查已通过，尚未进入原beforeCommit；未替换锁、resolver、writer、角色结果或界面结果。两场effort退避均显示Session model conflict: this attempt did not write，selection/revision精确不变；两场稳定对照保存high；另两场同样锁内退避后清除角色成功、roles={}，默认selection其余字段保持。每场前后原resolver都确认默认named可用，只有目标other按场景变为pool-unavailable。
+
+六场均settings/auth字节不变、真实Ctrl+D exit0/cooked恢复、owned PID/start identities非活跃，隔离home/project/session/observer scratch清理。配置loopback监听器但GET0/POST0/其他HTTP0，无真实/合成推理或实际HTTP429。每场45秒/2MiB/100ms采样768MiB CLI树RSS、harness heap768MiB守卫均未触发；峰值568532KiB、output23602至29277 bytes仅为小夹具观察，不算性能或总heap验收。新默认assign、已有assign及三角色的锁内目标拒绝由集成测试提供；真实CLI覆盖advisor effort与clear，未把它扩大成完整分配/角色/provider矩阵。
+
+证据根`.omx/artifacts/phase20-addition-role-target/`创建前核对路径不存在且git ls-files无tracked碰撞；原/新source/test均为非可执行文本，红绿/反转/build、实际执行probe/observer快照与六场布尔/数值收据分开保存。主代理的独立证据verifier已通过原Git字节、修复源码、实际测试计数/反转、当前compilerInputs/两exe及六场原锁/目标池/真实提示/持久与清理断言；不是委派代码复审。无raw PTY、请求/响应正文、实际凭据/address/header或prompt/session digest。HANDOFF补默认可用不代替角色目标准入的复用规则。
+
+本批未真实provider退避、当前exe角色注入、其他平台/物理故障、计费、全仓/15套件/20k真实PTY、local NormProof或委派复审。ADD-70仍部分完成，原47外部条件延后、ADD-30租约按台账继续暂缓，goal active；最终静态门/语法/diff与提交推送另绑。
+
+一次延迟读回c66e67eb精确代码CI41250671853已completed/success，Watch41250671837 success；上一批f8763ff2代码CI41252261041仍in_progress、Watch41252261035 success。两者均不替代本批交付CI；不立即轮询或重启在跑任务。
+
+最终五静态门、三个脚本语法、独立证据verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留；工作树仅本批两个代码/测试文件与三份markdown。当前提交/推送/remote-main与clean状态由ignored delivery另绑，本批交付CI未观察。

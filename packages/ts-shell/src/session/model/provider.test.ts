@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../SessionManager.js';
 import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile, type RuntimeConfig } from '../../config/runtimeConfig.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel, decodeSessionModel } from './state.js';
-import { projectSessionModel } from './projection.js';
+import { projectModelSelection, projectSessionModel } from './projection.js';
 import { runModelCommand } from '../../core/commands/modelCommandRuntime.js';
 import { runThinkingCommand } from '../../core/commands/thinkingCommandRuntime.js';
 import { runExtendedContextCommand } from '../../core/commands/model/context.js';
@@ -297,6 +297,49 @@ it.each((['subagent', 'summary', 'advisor'] as const).flatMap(role => (['fresh',
     expect(prepared.assign(undefined).saved).toBe(timing === 'stable');
     if (timing === 'stable') expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'named', roles: {} });
     else { expect(actual().blocked).toBeDefined(); expect(readSessionModelEdit(sessionId)).toEqual(before); }
+    expect(profileBytes()).toEqual(bytes);
+  });
+
+it.each((['subagent', 'summary', 'advisor'] as const).flatMap(role => (['fresh', 'saved'] as const).flatMap(selection =>
+  (selection === 'saved' ? ['assign', 'effort', 'clear'] as const : ['assign'] as const).flatMap(action =>
+    (['stable', 'before commit', 'inside lock'] as const).map(timing => ({ role, selection, action, timing }))))))(
+  'guards the $role role write for a $selection default during $action ($timing)', ({ role, selection, action, timing }) => {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const named = { ...connection(), model: 'base', thinkingEffort: 'low' as const };
+    const other = { ...named, id: 'other', apiKey: 'synthetic-other' };
+    writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'named', providerCredentials: {},
+      providerConnections: [named, other], accountPool: { openai: { connections: ['named', 'other'] } } }, edit);
+    const target = { connectionId: 'other', provider: 'openai' as const, model: 'next', thinkingEffort: 'high' as const };
+    if (selection === 'saved') writeSessionModel(sessionId, { connectionScope: 'session', connectionId: 'named',
+      provider: 'openai', model: 'base', thinkingEffort: 'low', roles: { [role]: {
+        ...target, model: action === 'assign' ? 'base' : 'next', thinkingEffort: 'low',
+      } } }, readSessionModelEdit(sessionId));
+    const config = () => projectSessionModel(getRuntimeConfig(home), sessionId);
+    const actual = () => resolveProviderCredential({ runtimeConfig: config(), env: {}, pool: { sessionId } });
+    const roleRequest = () => resolveProviderCredential({ runtimeConfig: projectModelSelection(config(), {
+      ...target, connectionScope: 'session',
+    }), env: {}, pool: { sessionId } });
+    expect(actual().credential?.connectionId).toBe('named'); expect(roleRequest().credential?.connectionId).toBe('other');
+    const prepared = prepareModelRole(context(), role), before = readSessionModelEdit(sessionId), bytes = profileBytes();
+    const retire = () => noteCredentialRateLimit(credentialIdentityFor('openai', ownedConnectionCredential(other))!, 60_000);
+    if (timing === 'before commit') retire();
+    else if (timing === 'inside lock') {
+      const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId), lock = files.withFileLock;
+      vi.spyOn(files, 'withFileLock').mockImplementation((file, action, options) => lock(file, () => {
+        if (file === layout.stateLockPath) retire(); return action();
+      }, options));
+    }
+    const result = action === 'assign' ? prepared.assign(target) : action === 'effort' ? prepared.setEffort('high') : prepared.assign(undefined);
+    expect(result.saved).toBe(action === 'clear' || timing === 'stable');
+    expect(actual().blocked).toBeUndefined(); expect(actual().credential?.connectionId).toBe('named');
+    expect(roleRequest().blocked).toBe(timing === 'stable' ? undefined : 'pool-unavailable');
+    if (action === 'clear' || timing === 'stable') {
+      expect(readSessionModel(sessionId)?.roles?.[role]).toEqual(action === 'clear' ? undefined : target);
+      expect(readSessionModelEdit(sessionId).revision).not.toBe(before.revision);
+    } else {
+      expect(readSessionModelEdit(sessionId)).toEqual(before);
+      if (timing === 'inside lock') expect(result.output).toContain('this attempt did not write');
+    }
     expect(profileBytes()).toEqual(bytes);
   });
 

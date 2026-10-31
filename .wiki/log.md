@@ -11231,3 +11231,12 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 一次延迟读取c66e67eb代码CI41250671853与d25a0c8c文档CI41251337961仍in_progress，各Watch41250671837/41251338001 completed/success；不以Watch替代完整CI，不立即轮询。本批交付CI尚未观察。
 
 最终五静态门、三个脚本语法、独立证据verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留。工作树仅本批两个产品/测试文件与三份markdown，提交/推送/remote-main和clean状态由ignored delivery收据另绑；本批CI未观察，不声明通过。
+
+
+### 2026-11-01：角色目标的锁内账号准入
+
+[addition24.59](features/phase-20-addition.md#2459-角色目标在原-state-lock-内重验)复现默认named始终可用而角色other锁内退避仍保存；定向参考后，仅在原beforeCommit复用validateModelPreset，清除target不要求被移除账号可用，无auth/pool核心或新事务。36新项含三角色assign/effort/clear及新/已有默认，旧owner及反转各9失败/27控制/164未选中，初版27项日志保留；逐字节恢复后两文件246通过。五门/串行TS+exe build387d5c01cdd7与inputs/两exe size/SHA匹配。Node20.3普通/全屏六真实CLI：原state lock的wx打开已返回、fd/path身份一致后原noteCredentialRateLimit使目标blocked，默认仍可用；两effort拒绝selection/revision保持、两稳定high保存、两退避clear成功。HTTP0、settings/auth字节不变、exit0/cooked/owned进程非活跃/scratch清理；独立证据verifier passed，最高采样568532KiB不算性能。无实际429/真实provider/exe角色注入/其他平台/全仓/20k/judge/委派复审，分配矩阵由集成单测覆盖，ADD-70部分完成、ADD-30暂缓、原47外部条件延后、goal active。HANDOFF补默认与角色目标分别准入；最终门/延迟CI/交付另绑。
+
+一次延迟读回c66e67eb精确代码CI41250671853已completed/success，Watch41250671837 success；上一批f8763ff2代码CI41252261041仍in_progress、Watch41252261035 success。两者均不替代本批交付CI；不立即轮询或重启在跑任务。
+
+最终五静态门、三个脚本语法、独立证据verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留；工作树仅本批两个代码/测试文件与三份markdown。当前提交/推送/remote-main与clean状态由ignored delivery另绑，本批交付CI未观察。
