@@ -5402,3 +5402,11 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 第二条不是"改测试迁就实现"：原测试锁定的是"成功查询的保存失败会被记成失败轮次"，而这正是 `e6cad11d` 要消除的矛盾记录。新断言检查的是更强的性质——既没有伪造失败，也没有开始新轮次。
 
 验证：三个受影响文件 71 项通过；`tsc -p tsconfig.build.json --noEmit` 通过；五门通过。
+
+### 23.6 收口：用户块的写入只剩一个入口
+
+`echoUser` 成为"文本交给一轮运行"的唯一写法。此前还有三处各自 append 用户块：`runCommandLine`（程序化提交）、`/queue` 分支、goal 控制分支。三者都是立即执行的命令，语义与提交相同，因此统一走 `echoUser`；`/queue` 与 goal 分支仍保留各自的 `textBlock('command', …)` 作为输出块，那是命令结果，不是用户发言。
+
+统一后可以只用一条不变量检查：**transcript 里出现 user 块 ⇔ 这段文本已经被交给某一轮运行**。等待中的输入只在待发送区出现，被取消时随之消失，不会在记录里留下一个模型从未见过的问题。
+
+验证：`interactiveMode` 402 项、`firstFrame` 24 项通过；TS build 与五门通过。
