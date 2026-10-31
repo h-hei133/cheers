@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.14 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份与只读 affinity、tier owner 与偏好写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.15 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份与只读 affinity、tier owner/会话偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5615,3 +5615,17 @@ picker在捕获实际active之后建立只移除sessionId的inspection context�
 两条保护分别反转后产生实际 AssertionError，finally精确恢复生产源码，再跑最终受影响套件；重复不累加。五道静态门、最终build通过，manifest `6c7801cdab57`；补充恢复测试后旧构建摘要校验正确拒绝，重建后当前输入摘要读回通过。正式打包judge exit0，环/导入解析satisfied，仍只有既有 interactiveMode21/22-name advisory。两路只读复审APPROVE/CLEAR，子代理未运行验证。一次验证调度误在测试尚未完全返回时启动judge，两者短暂重叠，违反串行约束；已如实纠正调度，最终judge独立串行重跑。根runner/包runner混用导致零测试hook错误已分类为设置问题并记录HANDOFF，使用包自己的runner修正，未改产品或断言规避。
 
 延迟代码CI `da3ca316`/`41195952241` 已success；`7bec50d5`/`41196273759`、`a9f537fa`/`41196921141`、`6418a9bf`/`41197208682` 最后仍in_progress。Watch成功不代表代码CI；本批另绑提交与自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移，ADD-70仍partial、整体goal active，旧版本回退与其余重复语义/真实验收仍缺。
+
+### 24.15 会话 tier 与凭据默认分离并绑定实际模型
+
+第24.14节已推送 `15499d9c54aa10f6a4ebe408ad0d02b5d600b88f`，main与远端精确一致。继续检查 legacy 命名选择使用环境/CLI 凭据的路径：`/slow on` 保存flex并报成功，tier reader根据实际credential.connectionId（ambient为undefined）取独立provider priority，因此status和wire仍为priority。两条legacy-env/legacy-cli新增回归在旧实现实际AssertionError，不将前一轮正常保存等同实际请求生效。
+
+既有session projector输出runtime-only `sessionServiceTier`，携带provider/model/connectionId/scope/value；session tier不再投影进connection/provider default。现有 `configuredServiceTier` 先匹配当前provider、model和credential namespace的会话选择，再沿原connection→provider默认；legacy未显式scope仅在原active ID匹配时允许ambient源，命名session scope不借ambient，provider scope不传给命名credential。valid替换selection无tier时清除投影。四既有消费者和setter readback共用此reader，explicit request tier仍优先，无新增存储字段、凭据解析器或认证面。
+
+只读参考核对：service tier由session/model owner持有独立live map，并经effective tier resolver供请求使用，恢复会话不重复持久化。采用偏好与认证默认分离、统一reader的决定；本项目按精确模型/连接scope绑定而非跨family广播，保留已裁决的不同模型切换撤回与显式不支持tier拒绝。
+
+主代理实际Linux Node20.3.0单worker串行最终 **7文件/305项**通过：provider79、model serviceTier6、command serviceTier9、step13、picker role46、selection46、preview106。覆盖legacy env/CLI实际loopback flex→default、状态与body一致、模型切换回原priority、原两文档bytes/absence；session恢复读回flex、角色assignment/removal保留会话tier；preview三scope的actual endpoint body；main/different-model/sibling三实际wire分别flex/default/priority，explicit request default优先。默认记录保持原值，session tier不再虚标为credential default。首次role路径拼错，runner只运行6文件/254项；修正真实路径后运行role46，不将缺失文件计作验证。
+
+三条有效反转分别移除session reader、model绑定、selection撤回，均实际AssertionError并finally精确恢复。撤回反转首次用于legacy wire用例仍通过，因为正常reload从磁盘重建配置，未复用旧投影；改对已projected配置复用的owner用例后实际失败，未把无效反转当成功。最终五门/build通过，manifest `7205510d4d6f` 当前输入摘要读回通过；正式打包judge独立串行exit0，环/解析satisfied，仍仅既有interactiveMode21/22-name advisory。两路只读复审最终APPROVE/CLEAR，子代理未验证，临时scratch清理。
+
+延迟CI：`7bec50d5`/`41196273759`、`a9f537fa`/`41196921141`、`6418a9bf`/`41197208682` 已success；`15499d9c`/`41198196947` 最后in_progress，Watch success不替代代码CI。本批另绑提交与自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移，ADD-70 partial、goal active，旧版本回退、其余重复语义与真实环境验收继续尚缺。

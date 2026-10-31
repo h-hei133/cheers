@@ -25,6 +25,7 @@ import { createCliProviderRuntimeBridge } from '../../cli/provider/cliProviderRu
 import { createProviderStep } from '../../cli/provider/step.js';
 import { captureThinkingPreference } from '../../core/models/preference.js';
 import * as files from '../store/sessionFileStore.js';
+import { prepareModelRole } from '../../core/commands/model/role.js';
 
 let home: string;
 let manager: SessionManager;
@@ -71,7 +72,9 @@ it.each(['config', 'env', 'cli'] as const)('selects %s models through the picker
   expect((await runThinkingCommand(['high'], command)).output).toContain('Reasoning effort: high');
   expect(setSessionServiceTier(command, 'flex')).toContain('Service tier set to flex');
   expect((await runExtendedContextCommand(['on'], command)).output).toContain('32000');
-  expect(shell.runtimeConfig.providerCredentials.openai).toMatchObject({ model: 'next', thinkingEffort: 'high', serviceTier: 'flex' });
+  expect(shell.runtimeConfig.providerCredentials.openai).toMatchObject({ model: 'next', thinkingEffort: 'high' });
+  expect(shell.runtimeConfig.providerCredentials.openai).not.toHaveProperty('serviceTier');
+  expect(shell.runtimeConfig.sessionServiceTier).toMatchObject({ provider: 'openai', model: 'next', value: 'flex' });
   expect(shell.runtimeConfig.contextWindow).toBe(32000);
   expect(shell.runtimeConfig.configProvenance.providerCredentials.children?.openai.children?.model.sources).toEqual(['session']);
   expect(shell.runtimeConfig.configProvenance.providerConnections.children).toBeUndefined();
@@ -82,6 +85,7 @@ it.each(['config', 'env', 'cli'] as const)('selects %s models through the picker
   switchActiveSession(shell, restarted.getSession(sessionId)!);
   expect(bridge.resolveCredentialSnapshot().credential).toEqual({ ...before.credential, model: 'next' });
   expect(bridge.resolveCredentialSnapshot().thinkingEffort).toBe('high');
+  expect((await runSlowCommand(['status'], command)).output).toBe('Slow mode: on (flex).');
   expect((await runModelCommand(['base'], command)).output).toContain('Model switched to base');
   expect(readSessionModel(sessionId)).not.toHaveProperty('serviceTier');
   expect(readSessionModel(sessionId)).not.toHaveProperty('contextWindow');
@@ -115,7 +119,7 @@ it.each(['command', 'picker'] as const)('keeps the actual CLI provider effort th
   expect(command.resolveConfigTarget(projectSessionModel(getRuntimeConfig(home), sessionId))).toMatchObject({ provider: 'google', model: 'next', thinkingEffort: 'low' });
 });
 
-it.each(['config', 'env', 'cli', 'fallback', 'pool'] as const)('sends the selected %s model, effort and tier to its actual HTTP endpoint', async source => {
+it.each(['config', 'env', 'cli', 'fallback', 'pool', 'legacy-env', 'legacy-cli'] as const)('sends the selected %s model, effort and tier to its actual HTTP endpoint', async source => {
   const requests: { url: string; authorization?: string; body: Record<string, unknown> }[] = [];
   const server = http.createServer(async (request, response) => {
     const chunks: Buffer[] = [];
@@ -131,15 +135,20 @@ it.each(['config', 'env', 'cli', 'fallback', 'pool'] as const)('sends the select
     if (!address || typeof address === 'string') throw new Error('Fixture address unavailable');
     const baseUrl = `http://127.0.0.1:${address.port}/v1`;
     const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const legacy = source === 'legacy-env' || source === 'legacy-cli';
     writeUserRuntimeConfigFile({ ...edit.values, maxOutputTokens: 100, reserveTokens: 0, retryEnabled: false,
-      ...(source === 'fallback' || source === 'pool' ? { activeProviderConnectionId: undefined,
-        providerConnections: [{ ...connection(), baseUrl, model: 'base', thinkingEffort: 'low' as const }] } : {}),
+      ...(source === 'fallback' || source === 'pool' || legacy ? { activeProviderConnectionId: legacy ? 'named' : undefined,
+        providerConnections: [{ ...connection(), baseUrl, model: 'base', thinkingEffort: 'low' as const,
+          ...(legacy ? { apiKey: undefined, serviceTier: 'priority' } : {}) }] } : {}),
       ...(source === 'pool' ? { accountPool: { openai: { connections: ['named'] } } } : {}),
-      providerCredentials: { openai: { ...edit.values.providerCredentials!.openai, baseUrl } } }, edit);
-    if (source === 'env') vi.stubEnv('OPENAI_API_KEY', 'synthetic-env');
+      providerCredentials: { openai: { ...edit.values.providerCredentials!.openai, baseUrl,
+        ...(legacy ? { serviceTier: 'priority' } : {}) } } }, edit);
+    if (source === 'env' || source === 'legacy-env') vi.stubEnv('OPENAI_API_KEY', 'synthetic-env');
     const resolveConfigTarget = (config: RuntimeConfig) => resolveProviderCredential({ runtimeConfig: config, pool: { sessionId },
-      ...(source === 'cli' ? { cliApiKey: 'synthetic-cli', cliBaseUrl: baseUrl } : {}) });
+      ...(source === 'cli' || source === 'legacy-cli' ? { cliApiKey: 'synthetic-cli', cliBaseUrl: baseUrl } : {}) });
     const command = { ...context(), resolveConfigTarget };
+    const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+    const original = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
     expect((await runModelCommand(['next', '--effort', 'high'], command)).output).toContain('Model switched to next');
     expect(setSessionServiceTier(command, 'flex')).toContain('Service tier set to flex');
     const config = projectSessionModel(getRuntimeConfig(home), sessionId);
@@ -150,8 +159,21 @@ it.each(['config', 'env', 'cli', 'fallback', 'pool'] as const)('sends the select
       ...captureThinkingPreference(home, resolution.thinkingEffort),
       providerCatalog: loadCatalog(), agentMode: 'build', workspaceRoot: home, sessionId }, new Map(), {});
     expect((await step([{ role: 'user', content: 'Check the selected provider model.' }], new AbortController().signal, {}, { allowTools: false })).text).toContain('Provider selection received.');
-    expect(requests).toEqual([{ url: '/v1/chat/completions', authorization: `Bearer synthetic-${source === 'config' ? 'profile' : source === 'fallback' || source === 'pool' ? 'named' : source}`,
+    expect(requests).toEqual([{ url: '/v1/chat/completions', authorization: `Bearer synthetic-${source === 'config' ? 'profile' : source === 'fallback' || source === 'pool' ? 'named' : source.replace('legacy-', '')}`,
       body: expect.objectContaining({ model: 'next', reasoning_effort: 'high', service_tier: 'flex' }) }]);
+    if (legacy) {
+      expect((await runSlowCommand(['off'], command)).output).toContain('Service tier set to default');
+      const reset = projectSessionModel(getRuntimeConfig(home), sessionId);
+      expect((await runFastCommand(['status'], { ...command, runtimeConfig: reset })).output).toContain('effective service tier: default');
+      const resetResolution = resolveConfigTarget(reset);
+      const resetStep = createProviderStep({ providerMode: 'real', providerCredentialResolution: resetResolution, runtimeConfig: reset,
+        ...captureThinkingPreference(home, resetResolution.thinkingEffort), providerCatalog: loadCatalog(), agentMode: 'build', workspaceRoot: home, sessionId }, new Map(), {});
+      await resetStep([{ role: 'user', content: 'Check the reset tier.' }], new AbortController().signal, {}, { allowTools: false });
+      expect(requests[1]?.body.service_tier).toBe('default');
+      expect((await runModelCommand(['base'], command)).output).toContain('Model switched to base');
+      expect((await runFastCommand(['status'], command)).output).toContain('effective service tier: priority');
+    }
+    expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(original);
   } finally {
     server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));
@@ -185,6 +207,24 @@ it.each(['env', 'cli'] as const)('keeps legacy %s credential resolution when pub
   expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'named', serviceTier: 'flex', contextWindow: 32000 });
   expect(readSessionModel(sessionId)?.connectionScope).toBeUndefined();
   expect(command.resolveConfigTarget(projectSessionModel(getRuntimeConfig(home), sessionId)).credential?.source).toBe(source);
+});
+
+it('retains the bound session tier while assigning and removing a named role', async () => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'named',
+    providerConnections: [{ ...connection(), model: 'next', serviceTier: 'priority' }] }, edit);
+  await runModelCommand(['next'], context());
+  expect(setSessionServiceTier(context(), 'flex')).toContain('Service tier set to flex');
+  const before = readSessionModelEdit(sessionId);
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  expect(prepareModelRole(context(), 'advisor').assign({ connectionId: 'named', provider: 'openai', model: 'base' }).saved).toBe(true);
+  expect(readSessionModel(sessionId)).toMatchObject({ serviceTier: 'flex', roles: { advisor: { model: 'base' } } });
+  expect((await runSlowCommand(['status'], context())).output).toBe('Slow mode: on (flex).');
+  expect(prepareModelRole(context(), 'advisor').assign(undefined).saved).toBe(true);
+  expect(readSessionModel(sessionId)).toEqual({ ...before.selection!, roles: {} });
+  expect((await runSlowCommand(['status'], context())).output).toBe('Slow mode: on (flex).');
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
 });
 
 it('refuses a global provider save when a hook introduces a named default owner', async () => {

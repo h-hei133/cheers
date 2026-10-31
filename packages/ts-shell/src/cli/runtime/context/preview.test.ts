@@ -56,6 +56,7 @@ import { credentialIdentityFor, selectPooledConnection } from '../../../core/aut
 import { noteCredentialRateLimit, resetCredentialBackoffForTests } from '../../../core/auth/account/backoff.js';
 import { captureThinkingPreference } from '../../../core/models/preference.js';
 import { BUILTIN_PROVIDERS } from '../../../core/models/catalog.js';
+import { projectModelSelection } from '../../../session/model/projection.js';
 
 let root: string;
 let repositories: ReturnType<typeof gitFixture>[] = [];
@@ -124,6 +125,32 @@ it('estimates an empty startup through the actual tool projection without provid
   expect(result.estimate.identity.endpointId).toMatch(/^[a-f0-9]{64}$/);
   expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
   expect(files.map(target => fs.readFileSync(target))).toEqual(before); expect(fs.existsSync(layout.stateLockPath)).toBe(false);
+});
+
+it.each(['legacy', 'provider', 'session'] as const)('previews the bound %s session tier ahead of independently stored defaults', async scope => {
+  const { context, load, layout } = fixture({ credential: true });
+  const connection = { id: 'named', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'synthetic-named',
+    baseUrl: 'https://fixture.invalid/v1', model: 'fixture', serviceTier: 'priority', createdAt: '2026-01-01', updatedAt: '2026-01-01' };
+  const shared: RuntimeConfig = { ...context.runtimeConfig, provider: 'openai', activeProviderConnectionId: 'named',
+    providerConnections: [connection], providerCredentials: { openai: { apiKey: 'synthetic-profile', model: 'fixture', serviceTier: 'priority' } } };
+  const selection = { provider: 'openai', model: 'fixture', serviceTier: 'flex',
+    ...(scope === 'provider' ? { connectionScope: 'provider' as const } : { connectionId: 'named',
+      ...(scope === 'session' ? { connectionScope: 'session' as const } : {}) }) };
+  const config = projectModelSelection(shared, selection);
+  const catalog = context.configuration.current.catalog.map(provider => ({ ...provider,
+    models: provider.models.map(model => ({ ...model, serviceTiers: ['default', 'priority', 'flex'] })) }));
+  context.resolveConfigTarget = candidate => resolveCliCredential(candidate, scope === 'legacy' ? { apiKey: 'synthetic-cli' } : {}, {});
+  Object.assign(context, { runtimeConfig: config, configuration: new ConfigState(config, configurationBinding(context), catalog) });
+  const files = [layout.metadataPath, layout.statePath, layout.transcriptPath], before = files.map(file => fs.readFileSync(file));
+  const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+  const preview = await load('question'); preview.verify();
+  try {
+    const body = wire.mock.results.at(-1)!.value;
+    expect(body.service_tier).toBe('flex');
+    expect(config.providerConnections[0].serviceTier).toBe('priority');
+    expect(config.providerCredentials.openai?.serviceTier).toBe('priority');
+    expect(files.map(file => fs.readFileSync(file))).toEqual(before);
+  } finally { preview.dispose?.(); }
 });
 
 it('projects idle foreground tools without loading the Git session history', () => {

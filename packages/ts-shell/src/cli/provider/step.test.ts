@@ -106,14 +106,16 @@ it('uses the host plan mode for a foreground model that cannot call tools', asyn
   expect(messages[0]?.content).not.toContain('equipped with real tools');
 });
 
-it('keeps an explicit request tier ahead of the resolved connection and provider defaults', async () => {
+it('keeps an explicit request tier ahead of the session, resolved connection and provider defaults', async () => {
   const setup = createAdvisorHarness(false, false);
   const server = await wire(setup);
   const connection = { id: 'tier-owner', provider: 'openai' as const, authType: 'api-key' as const,
     apiKey: 'synthetic-tier-owner', baseUrl: server.request.providerCredentialResolution.baseUrl,
     serviceTier: 'flex', createdAt: '2026-01-01', updatedAt: '2026-01-01' };
   const config = { ...server.request.runtimeConfig!, providerConnections: [connection],
-    providerCredentials: { openai: { serviceTier: 'priority' } } };
+    providerCredentials: { openai: { serviceTier: 'priority' } },
+    sessionServiceTier: { provider: 'openai', model: 'primary-model', connectionId: connection.id,
+      connectionScope: 'session' as const, value: 'flex' } };
   const selected = server.request.providerCredentialResolution;
   const resolution = { ...selected, credential: { ...selected.credential!, source: 'connection' as const,
     connectionId: connection.id, apiKey: connection.apiKey } };
@@ -122,6 +124,31 @@ it('keeps an explicit request tier ahead of the resolved connection and provider
   await step([{ role: 'user', content: 'Check tier override' }], setup.signal, {}, { allowTools: false });
   expect(server.received).toHaveLength(1);
   expect(server.received[0]?.service_tier).toBe('default');
+});
+
+it('does not carry the main session tier into a different delegated model or sibling connection', async () => {
+  const setup = createAdvisorHarness(false, false);
+  const server = await wire(setup);
+  const baseUrl = server.request.providerCredentialResolution.baseUrl;
+  const connection = (id: string, serviceTier: string) => ({ id, provider: 'openai' as const, authType: 'api-key' as const,
+    apiKey: `synthetic-${id}`, baseUrl, serviceTier, createdAt: '2026-01-01', updatedAt: '2026-01-01' });
+  const main = connection('main', 'default');
+  const sibling = connection('sibling', 'priority');
+  const config = { ...server.request.runtimeConfig!, providerConnections: [main, sibling],
+    providerCredentials: { openai: { serviceTier: 'priority' } },
+    sessionServiceTier: { provider: 'openai', model: 'primary-model', connectionId: main.id,
+      connectionScope: 'session' as const, value: 'flex' } };
+  const resolution = { ...server.request.providerCredentialResolution, credential: { ...server.request.providerCredentialResolution.credential!,
+    source: 'connection' as const, connectionId: main.id, apiKey: main.apiKey } };
+  const providerCatalog = server.request.providerCatalog!.map(provider => ({ ...provider,
+    models: provider.models.map(model => ({ ...model, serviceTiers: ['default', 'priority', 'flex'] })) }));
+  const request = { ...server.request, runtimeConfig: config, providerCredentialResolution: resolution, providerCatalog };
+  const messages = [{ role: 'user' as const, content: 'Inspect tier binding' }];
+  await createProviderStep(request, new Map(), {})(messages, setup.signal, {}, { allowTools: false });
+  const delegated = delegatedSteps(request, new Map(), {});
+  await delegated('review-model')(messages, setup.signal, {}, { allowTools: false });
+  await delegated({ connectionId: sibling.id, provider: 'openai', model: 'primary-model' })(messages, setup.signal, {}, { allowTools: false });
+  expect(server.received.map(body => body.service_tier)).toEqual(['flex', 'default', 'priority']);
 });
 
 it('dispatches a subagent using the effort saved in the role panel while the main request keeps its own setting', async () => {

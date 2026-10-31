@@ -5,9 +5,15 @@ import type { ProviderCredentialResolution } from '../auth/credential.js';
 
 export type ServiceTierCapability = 'supported' | 'unsupported' | 'unverified';
 
-/** The request's selected credential namespace owns its tier; absent connection defaults inherit its provider slot. */
-export function configuredServiceTier(config: Pick<RuntimeConfig, 'providerConnections' | 'providerCredentials'> | undefined,
-  resolution: Pick<ProviderCredentialResolution, 'provider' | 'credential'>): string | undefined {
+/** A matching session choice overrides the request credential's default, which otherwise inherits its provider slot. */
+export function configuredServiceTier(config: (Pick<RuntimeConfig, 'providerConnections' | 'providerCredentials'>
+  & Partial<Pick<RuntimeConfig, 'sessionServiceTier' | 'activeProviderConnectionId'>>) | undefined,
+  resolution: Pick<ProviderCredentialResolution, 'provider' | 'model' | 'credential'>): string | undefined {
+  const session = config?.sessionServiceTier;
+  const connectionId = resolution.credential?.connectionId;
+  if (session && resolution.credential && session.provider === resolution.provider && session.model === resolution.model
+    && (session.connectionId === connectionId || (session.connectionScope === undefined && connectionId === undefined
+      && session.connectionId === config?.activeProviderConnectionId))) return session.value;
   return config?.providerConnections.find(connection => connection.id === resolution.credential?.connectionId
     && connection.provider === resolution.provider)?.serviceTier ?? config?.providerCredentials[resolution.provider]?.serviceTier;
 }

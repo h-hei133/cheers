@@ -10998,3 +10998,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：直接 model/thinking 准入与锁内凭据变化保护
 
 [addition24.14](features/phase-20-addition.md#2414-直接-modelthinking-保存检查本地凭据与锁内请求身份)6418a9bf已推送main/远端一致；直接显式活动连接路径缺少credential guard与实际请求重查，28新断言实际失败。沿selection owner检查非exact本地准入，beforeCommit投影原selection后重查，保留session/global阶段与显式picker恢复。实际Node20.3五文件194项、两反转AssertionError/精确恢复、五门/最终build通过，manifest6c7801cdab57且当前输入摘要读回通过；复审APPROVE/CLEAR，正式judge仍仅既有interactiveMode advisory。一次judge/测试短暂重叠违反串行规则，已纠正并独立重跑judge；包runner混用零测试错误已修并记HANDOFF。da3ca316代码CI已success，其后三CI最后in_progress；未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。
+
+### 2026-10-31：会话 tier 独立投影并绑定实际请求模型
+
+[addition24.15](features/phase-20-addition.md#2415-会话-tier-与凭据默认分离并绑定实际模型)15499d9c已推送main/远端一致。实际复现legacy env/CLI保存flex但status仍priority；session projector不再镜像tier到default，runtime-only绑定由现有共同reader匹配provider/model/credential scope，setter同owner读回。Node20.3七文件305项含wire flex/default、preview、resume、role保留、delegated隔离，三有效反转AssertionError/精确恢复、五门/build与摘要校验通过，manifest7205510d4d6f；两路复审APPROVE/CLEAR，judge仅既有interactiveMode advisory。错role路径及无效reset-wire反转已如实分类并补有效验证。a9f537fa/6418a9bf代码CI已success，15499d9c最后in_progress；未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。

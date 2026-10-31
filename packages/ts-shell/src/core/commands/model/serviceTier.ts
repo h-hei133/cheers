@@ -66,8 +66,7 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
     const notice = configurationApplicationNotice(context);
     if (notice) return `Service tier preference saved as ${tier}. ${notice}`;
     const saved = projectSessionModel(readFreshConfiguration(context), context.sessionId);
-    const savedTier = selection.connectionScope === 'provider' ? saved.providerCredentials[saved.provider]?.serviceTier
-      : saved.providerConnections.find(item => item.id === selection.connectionId)?.serviceTier;
+    const savedTier = configuredServiceTier(saved, selectionRequest(context, saved, selection));
     if (savedTier !== tier) return 'Service tier publication is unverified; inspect the effective model before sending.';
     return `Service tier set to ${tier} for this session. Account availability and pricing remain unverified.`;
   } catch { return 'Service tier write outcome is unverified; inspect the session before retrying.'; }

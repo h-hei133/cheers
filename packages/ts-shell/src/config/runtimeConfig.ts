@@ -148,6 +148,14 @@ export interface RuntimeConfig {
     | { readonly scope: 'provider'; readonly provider: string; readonly id?: never };
   /** Runtime projection from the session; never a stored configuration field. */
   readonly sessionModelRoles?: SessionModelPolicy;
+  /** Bound session tier projection; never a stored configuration field or credential default. */
+  readonly sessionServiceTier?: {
+    readonly provider: string;
+    readonly model: string;
+    readonly connectionId?: string;
+    readonly connectionScope?: 'session' | 'provider';
+    readonly value: string;
+  };
   readonly providerConnections: readonly ProviderConnectionConfig[];
   /** Absent means no pool is declared and existing selection applies. */
   readonly accountPool?: AccountPool;

@@ -3,7 +3,7 @@ import { readSessionModel } from "./state.js";
 import { sessionModelOrigins } from '../../config/provenance/projection.js';
 import type { SessionModelSelection } from './contract.js';
 
-type ModelConfig = Partial<Pick<RuntimeConfig, "provider" | "activeProviderConnectionId" | "sessionConnection" | "sessionModelRoles" | "providerConnections" | "providerCredentials" | "configProvenance" | "contextWindow">>;
+type ModelConfig = Partial<Pick<RuntimeConfig, "provider" | "activeProviderConnectionId" | "sessionConnection" | "sessionModelRoles" | "sessionServiceTier" | "providerConnections" | "providerCredentials" | "configProvenance" | "contextWindow">>;
 
 /** Overlay a session preference without mutating shared defaults or credentials. */
 export function projectSessionModel<T extends ModelConfig>(config: T, sessionId?: string): T {
@@ -21,10 +21,15 @@ export function projectModelSelection<T extends ModelConfig>(config: T, selectio
     ? { activeProviderConnectionId: selection.connectionId, sessionConnection: { id: selection.connectionId, provider: selection.provider } } : {};
   if (!providerSlot && (!connection || connection.provider !== selection.provider)) return selection.connectionScope === 'session' ? { ...config, ...binding } : config;
   if (!isRuntimeProvider(selection.provider)) return { ...config, ...binding };
-  const preference = { model: selection.model, ...(selection.thinkingEffort !== undefined ? { thinkingEffort: selection.thinkingEffort } : {}), ...(selection.serviceTier !== undefined ? { serviceTier: selection.serviceTier } : {}) };
+  const preference = { model: selection.model, ...(selection.thinkingEffort !== undefined ? { thinkingEffort: selection.thinkingEffort } : {}) };
   return {
     ...config,
     ...binding,
+    sessionServiceTier: selection.serviceTier === undefined ? undefined : {
+      provider: selection.provider, model: selection.model, value: selection.serviceTier,
+      ...(selection.connectionId !== undefined ? { connectionId: selection.connectionId } : {}),
+      ...(selection.connectionScope !== undefined ? { connectionScope: selection.connectionScope } : {}),
+    },
     ...(selection.roles ? { sessionModelRoles: selection.roles } : {}),
     ...(selection.connectionScope ? { provider: selection.provider } : {}),
     ...(selection.contextWindow !== undefined ? { contextWindow: selection.contextWindow } : {}),

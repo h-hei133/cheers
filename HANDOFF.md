@@ -1514,3 +1514,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A package-local run fails before collecting tests with `Cannot read properties of undefined (reading 'on')` at `beforeEach`, on both current Node and Node 20.3.
 - **Root Cause**: The root runner and the package's separately installed Vitest load different runner singletons; package test imports register hooks against the uninitialized one.
 - **Rule**: From `packages/ts-shell`, launch `node_modules/vitest/vitest.mjs`, using the selected Node binary, rather than the root's `../../node_modules/vitest/vitest.mjs`. Classify zero-test hook failures as runner setup before changing product code or fixtures.
+
+### Session Tier Is A Preference, Not A Credential Default
+
+- **Symptom**: A legacy named selection accepts a session flex tier using environment or CLI credentials, yet status and the next request still use the provider's priority default.
+- **Root Cause**: Session tier was overlaid onto a connection record while the shared reader correctly selected defaults using the actual credential namespace, which has no connection ID for ambient credentials.
+- **Rule**: Project the bound session tier separately from stored connection/provider defaults and resolve it in the common tier reader. Match provider, model and scope; preserve legacy ambient credential semantics. Verify actual wire, preview, resume, reset and delegated model/sibling isolation. A reset reversal against fresh disk reload cannot test reuse of an already projected config; target that reuse explicitly.
