@@ -10892,3 +10892,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：把七轮反馈与 review 发现归并为 ADD-01 至 ADD-68 的唯一定义与状态表
 
 [addition12](features/phase-20-addition.md#12-补充任务总表与完成情况唯一任务台账)用户指出此前只登记了ADD-01至13，而后续新增任务散落在第17–21节、没有序号。现第12节重写为唯一台账：用户第十七至第三十七项、第24至30项、子代理review发现全部按职责归入ADD-01至68，重复项合并（粘贴展开合并为ADD-31、resume两个延迟项合并为ADD-25、退出与旧会话界面合并为ADD-26、跨目录写入与附加根分列ADD-41/42、思考不可见拆为ADD-28/22/35等），逐条记录来源、状态与尚缺。状态用语严格区分：0完成、7部分完成、60本地验证、1未开始；部分完成为ADD-01/02/03/07/08/25/41。第1节与frontmatter改为指向第12节，旧章节中「ADD-01…13齐全」的表述标注为当时序号范围。仅改Markdown，未运行产品测试；strict docs drift通过，118条既有advisory不变。
+
+### 2026-10-31：第十轮研究——排队/发送不可区分、配置文件职责、fullscreen 退出残留
+
+[addition22](features/phase-20-addition.md#22-第十轮用户反馈2026-10-31排队与发送不可区分配置文件职责fullscreen-退出残留)第三十八项确认：onSubmit先append用户气泡再判断busy，排队消息与已发送在transcript中完全同形；Enter在busy时传steer，但命令/组合/图片会降级为queue.push，而提示行只写"enter steer"；Ctrl+q空闲时是空操作无反馈。对照Codex的Enter=steer/Tab=queue/Esc=interrupt三分法，本项目底层三条lane已正确，缺的是呈现与键位一致性。第三十九项确认：config.json同时装凭据（含apiKey与OAuth accessToken/refreshToken）、模型目标、普通设置三类；写入未传0600（同仓profile导入日志传了0o600），含refresh token的文件可能对同机其他用户可读；provider/baseUrl/model/contextWindow在4–5处重复。models.json本身无凭据、无项目作用域，是正确的。第四十项确认：fullscreen退出时leaveScreen把整段transcript重写到主屏，且有engine.test锁定该行为——这是早期为补偿"scrollback里没有对话"而做的设计，与用户本次预期直接冲突，属产品决策而非缺陷，需裁决方案。三项编为ADD-69/70/71，台账现71条：0完成、7部分完成、60本地验证、4未开始。本轮只研究未改产品代码；strict docs drift通过，118条既有advisory不变。

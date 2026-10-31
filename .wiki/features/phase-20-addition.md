@@ -5,7 +5,7 @@ sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
 updated: 2026-10-31
 tags: [features, phase-20, additions, interaction, panels, completion]
-summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-68，已把七轮用户反馈与子代理review发现按职责归并，重复项合并，逐条记录完成情况。当前0完成、7部分完成、60本地验证、1未开始；其余章节保留研究过程与逐批证据。"
+summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-68，已把七轮用户反馈与子代理review发现按职责归并，重复项合并，逐条记录完成情况。当前0完成、7部分完成、60本地验证、4未开始；其余章节保留研究过程与逐批证据。"
 confidence: mixed
 ---
 
@@ -15,7 +15,7 @@ confidence: mixed
 
 本文汇总2026-10-25至26日常使用反馈、[逐项核查](interaction-audit.md)及用户后续各轮更正，作为实施的需求与验收依据。
 
-**先看第12节。** 它是全部补充任务的唯一定义与状态来源：用户第十七至第三十七项、第 24 至 30 项、子代理 review 发现等散落在第 17–21 节的问题条目，已按职责归并为 ADD-01 至 ADD-68，同一件事只保留一个条目并附完成情况。第1至11节是初次定位与需求基线，第 13–16 节是验证规则与问题摘要，第 17–21 节是逐轮研究与实施记录——它们保留当时的证据，但**不再各自维护任务状态**，不得据其中某一节的局部绿色提升第12节的条目。
+**先看第12节。** 它是全部补充任务的唯一定义与状态来源：用户第十七至第三十七项、第 24 至 30 项、子代理 review 发现等散落在第 17–21 节的问题条目，已按职责归并为 ADD-01 至 ADD-71，同一件事只保留一个条目并附完成情况。第1至11节是初次定位与需求基线，第 13–16 节是验证规则与问题摘要，第 17–22 节是逐轮研究与实施记录——它们保留当时的证据，但**不再各自维护任务状态**，不得据其中某一节的局部绿色提升第12节的条目。
 
 上一轮文档核对的产品HEAD为`4abe6f11af3bd7966796f29b996f5321b16b0140`，需求收口提交为`91f0d3d343d9ecb107c6792b5e9ee1d12df40157`，只读参考oh-my-pi仍为下述快照。该轮只定位与完善文档；第三十八批随后补37项设置的73条scope操作链并修补搜索焦点，已交付为`05ecc6c8885f61d18e851a6a698597253f1165d7`。第三十九批继续修补失败Apply重试、保存范围确认和user来源换代，证据见第15节。下文的“初次定位”均指修补前机制；不能将旧机制写成当前仍有同样故障。前次文档核对HEAD为`2a5cf9949cff57876adc20ebb8179040d7e00254`，其后第三十七批已修正启动测量和目录测试合同。
 
@@ -345,7 +345,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 
 ## 12. 补充任务总表与完成情况（唯一任务台账）
 
-**本节是全部补充任务的唯一定义与状态来源。** 第 17–21 节是研究过程与逐批实施记录，其中的问题条目（用户编号第十七至第三十七、第 24 至 30 项、子代理 review 发现等）已在此按职责归并到 ADD 序号；同一件事在旧章节里可能被拆成"研究""实施""补强"三段，在这里只有一个条目。
+**本节是全部补充任务的唯一定义与状态来源。** 第 17–22 节是研究过程与逐批实施记录，其中的问题条目（用户编号第十七至第三十七、第 24 至 30 项、子代理 review 发现等）已在此按职责归并到 ADD 序号；同一件事在旧章节里可能被拆成"研究""实施""补强"三段，在这里只有一个条目。
 
 状态用语是严格区分的，不得互换：
 
@@ -482,6 +482,10 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-67 | P2 | 未答复审批被取消后立即结束等待并保留中断恢复 | 20.43 | 本地验证 | — |
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
+| ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节 | 未开始 | 需要先裁决 Enter 的语义，再改呈现 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节 | 未开始 | 需迁移旧格式；先做权限修复 |
+| ADD-71 | P1 | fullscreen 退出后不把会话写回主屏 | 第 40 项、第 22.3 节 | 未开始 | 需裁决方案 A/B；会改动既有测试 |
+
 ### 12.12 归并说明
 
 以下旧编号已合并，不再单独存在：
@@ -494,6 +498,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 - 用户第二十九项（resume 卡顿）与第三十三项（resume 约 1 秒延迟）合并为 **ADD-25**：同一面板、同一扫描链。
 - 用户第三十一项与 19.5 合并为 **ADD-16**；用户第三十二项为 **ADD-14**；第三十四项为 **ADD-27**；第三十五项为 **ADD-15**；第三十七项为 **ADD-33**。
 - 子代理 review 的安全发现（21.74–21.78）原为"范围外缺陷"，因都属审批与授权语义，归入 **ADD-56 至 ADD-60**。
+- 第十轮（第 22 节）的第三十八至第四十项直接编为 **ADD-69 至 ADD-71**，此前没有旧编号，无需归并。
 
 ### 12.13 交付顺序
 
@@ -514,8 +519,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | 部分完成 | 7 | ADD-01、02、03、07、08、25、41 |
 | 本地验证 | 60 | 其余已实施条目 |
 | 本地实现 | 0 | — |
-| 未开始 | 1 | ADD-30 |
-| **合计** | **68** | — |
+| 未开始 | 4 | ADD-30、ADD-69、ADD-70、ADD-71 |
+| **合计** | **71** | — |
 
 **没有一条达到"完成"。** 部分完成的 7 条各有明确缺口；其余条目停在"本地验证"，缺的都是同一类东西：真实终端/输入法/剪贴板、真实 provider 凭据、macOS/Windows 机器。这些条件本仓库无法自行提供，不能把本地绿色测试兑换成完成。
 
@@ -5195,3 +5200,118 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现`switchRuntimeSessionProjectContext`返回项目是否真的变了（在切换前比较，切换后旧根已不可得），交互侧据此把档位重置为`ask`；同项目内切换保持不变，因为授权所针对的对象没有变。决策抽为`permissionScopeAfterSwitch`，`/resume`、`/resume switch`、面板切换与`/fork`四条路径共用；非交互运行没有档位，不传回调。
 
 验证：`cliSessionSwitch`3（同项目保留、跨项目重置、已是ask时不变）；一反转（`return scope;`）命中断言且finally字节恢复；五静态门、TS build通过。原47/ADD整体partial、goal active。
+
+## 22. 第十轮用户反馈（2026-10-31）：排队与发送不可区分、配置文件职责、fullscreen 退出残留
+
+本轮用户提出第三十八至第四十项。**本轮只做定位与机制核实，未修改任何产品代码**；实施另记。证据分三类：**已确认机制**（源码可复现，含行号）、**对照结论**（只读比较参考项目）、**未确认**（现有证据不足）。
+
+编号沿用用户原序号，并已并入第12节台账：第三十八 → **ADD-69**，第三十九 → **ADD-70**，第四十 → **ADD-71**。
+
+### 22.1 第三十八：连续发送两条请求时，无法区分"排队"与"下一个 turn"
+
+**用户观察**：只要发送文本就立刻显示在 TUI 里；第二条到底是在排队，还是已经成为下一轮，看不出来。
+
+**已确认机制（决定性）**
+
+1. **用户气泡在判断"运行还是排队"之前就已写入。** [onSubmit](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts) 先执行 `this.state.transcript.append(textBlock("user", text))`，然后才进入 `if (this.busy)` 分支决定走 `queue.push` 还是 `input.steer/followUp`。因此排队中的消息与已发送的消息在 transcript 里**完全相同**。
+2. **排队数量只出现在提示行，不在 transcript。** [transientHint](../../packages/ts-shell/src/presentation/tui/chrome/hints.ts) 在 `queued > 0` 时显示 `` `${n} queued · runs when the current turn finishes` ``；状态项 `queued`（[items.ts](../../packages/ts-shell/src/presentation/tui/chrome/items.ts)）也只是底栏的一段文字。提示行是 transient 的：一旦有其他提示（suggesting、cancelArmed）或输入框有内容，它就可能被替换。**排队这件事没有一条持久的、与具体消息关联的视觉标记。**
+3. **Enter 在 busy 时是 steer，但会被降级。** [keymap](../../packages/ts-shell/src/cli/interactive/keymap.ts) 的 `tui.input.submit` 在 busy 时传 `"steer"`；但 [onSubmit](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts) 里 `const input = text.startsWith("/") || composed || attachments?.images.length ? undefined : this.options.sessionRuntime.input?.()`，命令、可组合输入、带图片的输入都会拿不到 `input`，于是落入 `this.queue.push(text, attachments)`。**同一个 Enter 键，有时 steer、有时排队，而界面不给任何区分。**
+4. **Ctrl+q 是纯排队，但只在 busy 时生效。** [keymap](../../packages/ts-shell/src/cli/interactive/keymap.ts) 的 `app.message.followUp` 分支要求 `context.busy`，否则返回 `"nothing"`；空闲时按 Ctrl+q 不发任何东西。这符合"没有队列可加入"的语义，但用户若在空闲时按它，会以为按键坏了。
+5. **提示行的文案与实际行为不一致。** 忙碌时提示行写 `enter steer before next step`、`ctrl+q run after turn`，但如上所述 Enter 在命令/组合/图片场景并不是 steer。
+
+**对照结论（Codex / Claude Code）**
+
+- Codex 把三件事拆成三个键：**Enter = steer（在当前 turn 的下一个安全点注入）**、**Tab = 纯排队（FIFO，当前 turn 完成后作为下一轮运行）**、**Esc = 中断**。这是显式的输入契约，不是提示文案。
+- Codex 的队列状态是**独立的 FIFO 状态**，与 steering 分开存放（`queued_user_messages` / `pending_steers` / `rejected_steers_queue`），并且有 `PendingInputPreview` 把三者显示出来。
+- Claude Code 长期被批评为把三者混为一谈；官方在 2026-08 的回复是"Enter 排队、Esc 中断、↑ 取回排队的消息"。即便如此，社区仍在要求"能看见队列、能删除/重排某一条"。
+- **我们的差别**：已有 `steering` / `followUp` / `pending` 三条 lane（[queue.ts](../../packages/ts-shell/src/core/agent/queue.ts) 的 `InputQueueLane`），底层模型是对的；缺的是**呈现**与**键位一致性**，不是队列本身。
+
+**确定的缺口**
+
+1. 排队的用户消息在 transcript 里与已发送的完全相同，无法回溯。
+2. Enter 的行为随输入内容漂移（steer / 排队），但提示行只说 steer。
+3. 空闲时 Ctrl+q 是空操作，没有反馈。
+4. 队列内容不可见、不可编辑、不可单独取消（只有 `clearQueue` 全清）。
+
+**修改方向（未实施）**
+
+- 排队时写入**可区分的块**：例如 `kind: "queued"` 或带 `pending: true` 的用户块，在轮到它时原地转为普通用户块；或在用户块上加一条"排队中 · 按 ctrl+q 提升"的附属行。二者都要在 `restoreConversation` 的持久化投影里保持真实——不能只在内存里好看。
+- 让 Enter 的行为**稳定且可预期**：要么所有 busy 提交都 steer（命令类除外，明确提示"命令不能 steer，已排队"），要么统一排队并把 steer 交给单独的键。**不能继续让同一个键因输入内容而改变语义而不告知。**
+- 空闲时 Ctrl+q 给出一次可见反馈（"当前没有运行中的 turn，消息已直接发送"），而不是静默。
+- 队列可见性：至少提供 `/queue` 或提示行之外的持久列表；编辑/取消单条复用既有 `InputQueueControl.edit/cancel/move`，不新建队列。
+
+**证据边界**：全部为源码链路；未在真实终端复现按键，未测量用户实际节奏下的提示行切换。
+
+### 22.2 第三十九：config.json 与 models.json 没有真正分开
+
+**用户观察**：config 里既有模型配置又有其他设置，连 API key 也写在 config 里。
+
+**已确认机制（决定性）**
+
+1. **一份文档装了三类东西。** [fields.ts](../../packages/ts-shell/src/config/fields.ts) 的 `createConfigFields` 同时声明：凭据（`providerCredentials`、`providerConnections`、`activeProviderConnectionId`、`provider`）、模型行为（`allowedModels`、`contextWindow`、`maxOutputTokens`、`temperature`、`topP`、`modelTokenBudgets`）、以及普通设置（`theme`、`vimMode`、`tuiMode`、`tui`、`maxTurns`、`denyRules`、`allowedTools`、`retry*`、`offline`）。它们写进同一个 `config.json`。
+2. **API key 确实是该文档的一等字段。** [schema.ts](../../packages/ts-shell/src/config/schema.ts) 的 `credentialSchema` 含 `apiKey`、`baseUrl`、`model`、`serviceTier`、`thinkingEffort`、`accountAuth`；`connectionSchema` 展开这些属性，所以 `providerConnections[]` 也带 `apiKey`。`accountAuth` 还含 `accessToken`、`refreshToken`、`clientSecret`。`/connect login` 会把它们写进 `providerConnections[]` 与 `providerCredentials[]`。
+3. **写入没有显式 `0600`。** [persistence.ts](../../packages/ts-shell/src/config/persistence.ts) 调用 `writeTextFileAtomic(baseline.path, text)`，未传 mode；[sessionFileStore.ts](../../packages/ts-shell/src/session/store/sessionFileStore.ts) 的 `writeTextFileAtomic` 在 `mode === undefined` 时用 `fs.openSync(tempPath, "wx", undefined)`，即 `0o666 & ~umask`（常见为 0644）。同仓的 profile 导入日志显式用了 `0o600`（[journal.ts](../../packages/ts-shell/src/config/profiles/import/journal.ts)）。**含 OAuth refresh token 的文件因此可能对同机其他用户可读。**
+4. **`models.json` 无凭据、无项目作用域。** [catalogStore.ts](../../packages/ts-shell/src/core/models/catalogStore.ts) 的 `USER_FILE = "models.json"`，只经 `resolveUserDataFile` 解析；其形状是 `providers: Record<string, Partial<CatalogProvider>>`，唯一与密钥有关的是 `envVar`——**环境变量名**，不是值。这一点是正确的。
+5. **同一事实在多处重复。** provider id 出现在 `provider`、`providerConnections[].provider`、`providerCredentials` 的键、以及 `models.json` 的 `providers.<id>.runtime`；base URL 出现在 `providerConnections[].baseUrl`、`providerCredentials[].baseUrl`、`accountPool[].baseUrl`、`accountAuth.subscription.baseUrl`，以及 `models.json` 的 `CatalogProvider.baseUrl`；model id 出现在 `providerConnections[].model`、`providerCredentials[].model`、`modelTokenBudgets` 的键、`allowedModels` 条目、`models.json` 的 `models[].id`；`contextWindow` 与 `maxOutputTokens` 既在顶层又在目录条目里。
+6. **凭据不会被项目作用域读到。** `provider`、`providerCredentials`、`providerConnections`、`activeProviderConnectionId` 都是 `personal: ['user']`，项目文件设置它们会被 `source-not-allowed` 拒绝。这一条也是正确的。
+
+**对照结论（oh-my-pi）**
+
+- `config.yml` 是设置文件（`/settings`、`omp config set` 写这里）；`models.yml` 是模型目录（provider 的 `baseUrl`、`api`、`headers`、`models[]`、`compat`）；**凭据既不在两者**：文档明确"Provider API keys are resolved separately (stored auth, OAuth, `models.yml`, environment, and `.env` files)"，并建议"Keep secrets out of committed project config"。`models.yml` 里可以写 `apiKey`，但那被当作**环境变量名**或显式覆盖，不是持久凭据库。
+- 我们的问题不是"没有拆分"，而是**拆得不彻底**：`models.json` 确实只有元数据、无密钥、无项目作用域；真正混在一起的是 `config.json` 内部的凭据、模型目标、普通设置三类。
+
+**确定的缺口**
+
+1. 凭据与普通设置同文档，且未强制 `0600`。
+2. "当前模型 / thinking effort / 采样参数"属于模型目标，却存在设置文件里，用户在两处找不到同一件事。
+3. 同一事实（provider、baseUrl、model、contextWindow）在 4–5 处重复，任何一处漂移都会造成"面板显示 A、实际请求 B"。
+
+**修改方向（未实施）**
+
+- **先修权限**：`config.json` 写入传 `0o600`，并加一条"含凭据的文件必须是 0600"的回归。这是最小、最确定、风险最低的一项。
+- **再把凭据拆出去**：新增 `auth.json`（或 `credentials.json`）只放 `providerCredentials` / `providerConnections[].apiKey` / `accountAuth`；`config.json` 保留模型目标与普通设置。迁移必须可逆、可读旧格式、写入前 `0600`。
+- **最后收敛重复**：`baseUrl` 与 `model` 只保留一处权威来源（建议目录负责"能连到哪里"，连接负责"用哪个账号/密钥"），其余改为派生或校验。
+- 不引入 YAML：本项目已有 JSON 解析与 JSONC visitor，换格式是纯成本。
+
+**证据边界**：全部为源码与参考文档；未读取用户真实 `config.json`，未验证 umask 在本机的实际值。
+
+### 22.3 第四十：fullscreen 退出后屏幕上仍有聊天记录
+
+**用户观察**：fullscreen 模式下退出后，屏幕上还留着之前 TUI 里的聊天记录。
+
+**已确认机制（决定性）**
+
+1. **`fullscreen` 就是备用屏。** [interactiveMode.ts](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts) 的 `this.alternateScreen = options.runtimeContext.runtimeConfig.tuiMode !== "regular"`；[engine.ts](../../packages/ts-shell/src/presentation/tui/render/engine.ts) 据此写 `ENTER_ALT_SCREEN`（`\x1b[?1049h`）。
+2. **退出时故意把整段会话重写到主屏。** [leaveScreen](../../packages/ts-shell/src/presentation/tui/render/paint.ts) 先写 `EXIT_ALT_SCREEN`（回到主屏），然后**逐行重写传入的 `document`**。而 `document` 来自 [interactiveMode.stop](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts) 的 `this.state.transcript.render(width).rows`——**整段会话，不是最后几行**。
+3. **这是有意设计，且有测试锁定。** [paint.ts](../../packages/ts-shell/src/presentation/tui/render/paint.ts) 的注释写明"the document written here is what the user gets to scroll back to and copy from once the session is over"；[engine.test.ts](../../packages/ts-shell/src/presentation/tui/render/engine.test.ts) 有一条 `"leaves the document under the restored screen, one row per line"` 直接断言这一行为。
+4. **历史来由**：早期文档（[phase-4-pre-research](../../.wiki/features/phase-4-pre-research.md) 第 3.2 节）记录过"进入备用屏后用户 scrollback 里不留下任何对话"是缺陷，后来加了"退出时重写文档"作为补偿。
+
+**对照结论（codex / oh-my-pi）**
+
+- codex 退出只 `LeaveAlternateScreen`（[tui.rs](../../../codex/codex-rs/tui/src/tui.rs)），不重写会话；用户看到的终端与进入前一致。
+- oh-my-pi 的 `emergencyTerminalRestore` 同样只弹备用屏帧并 `terminal.stop()`，不重写内容。
+- **两者都把"退出后屏幕恢复原样"当作正确行为**；我们为了保住 scrollback 做了相反的选择。
+
+**这不是缺陷，是产品决策冲突**
+
+用户现在的要求（退出后不要有残留）与当初"scrollback 里要有对话"的补偿方向相反。两者不能同时满足于同一个模式，因此需要显式裁决：
+
+- **方案 A（对齐参考）**：`fullscreen` 退出只恢复终端，不留任何会话内容。想保留对话的用户用 `regular`。这是最一致、最可预期的语义，也让两个模式真正有区别。
+- **方案 B（保留补偿，但加开关）**：默认对齐参考，新增一个 `tui.restoreOnExit`（默认 `false`）让需要 scrollback 的人打开。
+- **方案 C（保留现状，改文档）**：明确写"fullscreen 退出会把会话写回主屏"，让用户预期一致。但这与用户本次反馈直接冲突，不可接受。
+
+建议 **A**，理由：`regular` 已经完整承担"对话留在 scrollback"的职责，两个模式应有正交语义；`fullscreen` 再把内容写回主屏，等于把私有屏的内容泄漏到用户的终端历史里，用户无法预期。
+
+**注意**：这不是"修 bug"，改动会**使一条现有测试失败**（`engine.test.ts` 的 `"leaves the document under the restored screen"`）。按项目规则，这类断言变更必须在文档里说明理由，不能悄悄改测试。
+
+**证据边界**：源码与参考实现对照；未在真实终端观察退出后的屏幕（用户已观察）。
+
+### 22.4 本轮结论摘要
+
+| 编号 | 判定 | 主要证据 | 性质 |
+|---|---|---|---|
+| 38 | 确认：排队的消息与已发送的完全同形；Enter 因输入内容在 steer 与排队之间漂移；提示行文案与实现不符 | `interactiveMode.ts` 先 append 后判断；`keymap.ts` busy 传 steer；`hints.ts` 的文案 | 设计缺陷 |
+| 39 | 确认：凭据、模型目标、普通设置同文档；含密钥的文件未强制 0600；同一事实 4–5 处重复 | `fields.ts`、`schema.ts`、`persistence.ts`、`catalogStore.ts` | 结构缺陷 + 安全缺陷 |
+| 40 | 确认：退出时把整段会话重写到主屏，且有测试锁定 | `paint.ts` `leaveScreen`、`interactiveMode.stop`、`engine.test.ts` | 产品决策冲突，非缺陷 |
+
+**本轮未修改任何产品代码。** 三项都已并入第12节台账（ADD-69/70/71），状态为"未开始"。按第12.13节的顺序，ADD-70 的权限修复应当最先做（最小、最确定），其次是 ADD-69 的呈现与键位一致性，ADD-71 需要先裁决方案。
