@@ -10928,3 +10928,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：用户块只在投递时产生（子代理 review 的三处缺陷）
 
 [addition23.7](features/phase-20-addition.md#237-子代理-review-找到的三处缺陷与修正)只读 review 找到三处真实缺陷：`/queue add` 会产出两个用户块；steer/followUp 在投递前就写块，Esc 中断后文本退回草稿、重发产生重复块；`narrowCredentialFile` 在无变化保存里抛错并以 `lock-failed` 逃逸，且跟随符号链接。现由内核在真正注入时报告 `message.delivered`、界面据此写块（该事件不入持久层，真实消息已写成会话 turn；开场消息排除）；`/queue` 不再 echo 自己的命令行；`narrowCredentialFile` 改 lstat、不抛错、失败不把成功保存变成失败。另新增加载期暴露告警：含凭据且组/其他位可读的文件会被报告（只报事实，不含值）。相关 10 个文件 673 项通过、TS build 与五门通过。build 3d89617d78ac。原 47/ADD 整体 partial、goal active。
+
+### 2026-10-31：新增加载告警引出的夹具修正与两处本地陷阱
+
+[addition23.7](features/phase-20-addition.md#237-子代理-review-找到的三处缺陷与修正)新增的「含凭据且组/其他位可读」告警让若干夹具失败：它们以默认 umask 写含 `apiKey` 的 config，告警如实报告，却落在与凭据无关的断言里（`config/validation.test.ts`、`config/runtimeConfig.test.ts`）。修夹具而非修告警——让夹具按产品的方式写 0600，并写明原因。`config` 300 项、`core/commands` 832 项、`cli` 3414 项、`presentation` 1072 项、`turn` 408 项、`session` 1190 项、`planning` 62 项、`collaboration` 24 项全部通过。另两处本地陷阱已写入 HANDOFF：归档测试副本会被根目录 discovery 收集（必须用 `--dir` 或包内相对路径）；`src/cli/print/*` 读的是已发布构建，源码改动后需先 `npm run build`。build efc1186dfee6。原 47/ADD 整体 partial、goal active。
