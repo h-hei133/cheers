@@ -13,6 +13,7 @@ import { endpointShape } from '../../provider/endpoints/index.js';
 import { accountAuthFor, providerAuthorization } from '../../provider/request/authorization.js';
 import { providerFetchFromTimeouts, providerTimeoutsFrom } from '../../provider/request/fetch.js';
 import type { CompactionProvider } from '../runtime/compaction.js';
+import { requestServiceTier } from '../../core/models/serviceTier.js';
 
 export interface ProviderRenewal {
   readonly provider?: CompactionProvider;
@@ -89,6 +90,7 @@ export function createCompactionProviders(input: {
     assertScopedModel(config, resolved);
     const target = compactionTarget(resolved, catalog);
     if (!target) return {};
+    const serviceTier = requestServiceTier(config, resolved, catalog, target.baseUrl, target.endpoint);
     const renewed = await renewStoredAccount({
       workspaceRoot: input.runtimeContext.projectRoot,
       sessionId: input.runtimeContext.session.id,
@@ -114,6 +116,7 @@ export function createCompactionProviders(input: {
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
+      serviceTier,
       shape,
       supportsTemperature: shape.supportsTemperature,
       ...(target.endpoint ? { endpoint: target.endpoint } : {}),

@@ -41,6 +41,7 @@ export interface SimpleProvider {
   readonly credentialId?: string;
   readonly credentialGeneration?: string;
   readonly replayOwner?: string;
+  readonly serviceTier?: string;
   /**
    * Which endpoint kind this request goes to.
    *
@@ -102,6 +103,7 @@ export async function requestSimpleCompletion(
     endpointBody(kind, {
       ...request.shape,
       model: request.provider.model, provider: request.provider.providerId,
+      serviceTier: request.provider.serviceTier,
       replayBinding: requestReplayBinding({ ...request.provider, provider: request.provider.providerId }), systemPrompt, messages,
       ...(request.maxOutputTokens !== undefined ? { maxOutputTokens: request.maxOutputTokens } : {}),
       ...(request.supportsTemperature !== undefined ? { supportsTemperature: request.supportsTemperature } : {}),

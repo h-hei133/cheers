@@ -128,7 +128,7 @@ export interface EndpointShape {
 
 /** A request with no tools, which is what a summarizer or a side question sends. */
 export interface SimpleRequest extends Partial<Pick<TurnRequest,
-  'systemRole' | 'maxTokensField' | 'reasoningEffort' | 'reasoningSummary' | 'reasoningReplayField' | 'thinkingLevelName' | 'thinkingBudgetTokens' | 'allowEmptySignature'>> {
+  'systemRole' | 'maxTokensField' | 'reasoningEffort' | 'reasoningSummary' | 'reasoningReplayField' | 'thinkingLevelName' | 'thinkingBudgetTokens' | 'allowEmptySignature' | 'serviceTier'>> {
   readonly model: string;
   readonly provider?: string;
   readonly replayBinding?: string;

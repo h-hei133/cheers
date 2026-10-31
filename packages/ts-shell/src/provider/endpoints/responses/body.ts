@@ -19,5 +19,5 @@ export function responseBody(input: SimpleRequest | TurnRequest, stream: boolean
     ...(input.temperature !== undefined && input.supportsTemperature !== false && !input.thinkingLevelName ? { temperature: input.temperature } : {}),
     ...(turn?.topP !== undefined ? { top_p: turn.topP } : {}),
     ...(input.maxOutputTokens !== undefined ? { max_output_tokens: input.maxOutputTokens } : {}),
-    ...(turn?.serviceTier !== undefined ? { service_tier: turn.serviceTier } : {}) };
+    ...(input.serviceTier !== undefined ? { service_tier: input.serviceTier } : {}) };
 }

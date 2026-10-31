@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
-import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
 import { ConfigState } from '../../config/state.js';
 import { configurationBinding } from '../../core/shell/configuration.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
@@ -26,6 +26,9 @@ import { compactionOperationsPath } from '../../session/compactionOperation.js';
 import { getSessionUsage, recordSessionUsage, totalTokens } from '../../observability/usageTelemetry.js';
 import { costModel } from '../../core/commands/cost/model.js';
 import { modelPicker } from '../interactive/picker/model.js';
+import { setSessionServiceTier } from '../../core/commands/model/serviceTier.js';
+import { captureSummaryRole } from '../provider/summary.js';
+import * as accountRenewal from '../../core/auth/account/renewal.js';
 
 const observed = vi.hoisted(() => ({ deps: undefined as SessionRuntimeDependencies | undefined, compaction: undefined as CompactionSetup | undefined }));
 // Exercise the production composition and real summary engine without starting UI/scheduling loops.
@@ -93,6 +96,171 @@ function runtime(setup: Awaited<ReturnType<typeof fixture>>) {
   } as never);
   return { deps: observed.deps!, context };
 }
+
+type SummaryKind = 'manual' | 'automatic' | 'branch' | 'prefix';
+const summaryKinds: readonly SummaryKind[] = ['manual', 'automatic', 'branch', 'prefix'];
+
+function unchangedPreferences(setup: Awaited<ReturnType<typeof fixture>>) {
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const edit = readSessionModelEdit(setup.session.id);
+  const selection = Buffer.from(JSON.stringify(JSON.parse(fs.readFileSync(edit.statePath, 'utf8')).modelSelection));
+  return () => {
+    expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+    const current = readSessionModelEdit(setup.session.id);
+    expect(current.revision).toBe(edit.revision);
+    expect(Buffer.from(JSON.stringify(JSON.parse(fs.readFileSync(current.statePath, 'utf8')).modelSelection))).toEqual(selection);
+  };
+}
+
+async function sendSummary(setup: Awaited<ReturnType<typeof fixture>>, kind: SummaryKind) {
+  const { deps } = runtime(setup);
+  const messages = setup.manager.getSession(setup.session.id)!.turns;
+  if (kind === 'manual') expect(await deps.compactHistory!(setup.session.id, setup.signal)).toMatchObject({ status: 'compacted' });
+  else if (kind === 'branch') expect(await deps.summarizeAbandonedTurns!(messages)).toContain('Condensed fixture history.');
+  else {
+    deps.runPrompt('Continue', setup.signal);
+    const compaction = observed.compaction!;
+    if (kind === 'prefix') expect(await compaction.summarizeTurnPrefix!(messages, setup.signal)).toContain('Condensed fixture history.');
+    else expect(await condenseContext({ messages, ...compaction, force: true, signal: setup.signal,
+      operation: { sessionId: setup.session.id } })).toMatchObject({ status: 'condensed' });
+  }
+}
+
+it.each(summaryKinds.flatMap(kind => ['main', 'different-model', 'sibling', 'inherited'].map(target => ({ kind, target }))))(
+  'sends the admitted tier for $kind summaries on $target', async ({ kind, target }) => {
+    const setup = await fixture();
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, contextWindow: 32000,
+      providerCredentials: { openai: { serviceTier: 'priority' } },
+      providerConnections: edit.values.providerConnections!.map(connection => ({ ...connection,
+        serviceTier: connection.id === 'a' ? 'priority' : target === 'inherited' ? undefined : 'default' })) }, edit);
+    writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model =>
+      model.id === 'main' || model.id === 'namespace/summary'
+        ? { ...model, contextWindow: 32000, serviceTiers: ['default', 'priority', 'flex'] } : model) })));
+    const modelEdit = readSessionModelEdit(setup.session.id);
+    writeSessionModel(setup.session.id, { ...modelEdit.selection!, roles: target === 'main' ? undefined : { summary: {
+      connectionId: target === 'different-model' ? 'a' : 'b', provider: 'openai',
+      model: target === 'sibling' ? 'main' : 'namespace/summary', thinkingEffort: 'high',
+    } } }, modelEdit);
+    expect(setSessionServiceTier(setup.context, 'flex')).toContain('Service tier set to flex');
+    const unchanged = unchangedPreferences(setup);
+    recordSessionUsage(setup.session.id, { provider: 'openai', model: 'main', promptTokens: 400, completionTokens: 1 });
+    const recent = structuredClone(getSessionUsage(setup.session.id).recentRequests);
+    await sendSummary(setup, kind);
+    const count = kind === 'manual' || kind === 'automatic' ? 2 : 1;
+    const connectionId = target === 'main' || target === 'different-model' ? 'a' : 'b';
+    const model = target === 'main' || target === 'sibling' ? 'main' : 'namespace/summary';
+    const tier = target === 'main' ? 'flex' : target === 'sibling' ? 'default' : 'priority';
+    expect(setup.requests).toHaveLength(count);
+    for (const request of setup.requests) expect(request).toMatchObject({ path: `/${connectionId}/v1/chat/completions`,
+      credential: `Bearer synthetic-${connectionId}`, model, body: { service_tier: tier } });
+    expect(totalTokens(getSessionUsage(setup.session.id))).toBe(401 + 5 * count);
+    if (kind !== 'manual') {
+      expect(getSessionUsage(setup.session.id).lastPromptTokens).toBe(400);
+      expect(getSessionUsage(setup.session.id).recentRequests).toEqual(recent);
+    }
+    unchanged();
+  });
+
+it.each(['connection', 'provider'] as const)('keeps the ordinary %s tier live for branch summaries without a session override', async source => {
+  const setup = await fixture();
+  const modelEdit = readSessionModelEdit(setup.session.id);
+  writeSessionModel(setup.session.id, { ...modelEdit.selection!, roles: undefined }, modelEdit);
+  writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model =>
+    model.id === 'main' ? { ...model, serviceTiers: ['default', 'priority', 'flex'] } : model) })));
+  for (const tier of ['priority', 'default']) {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, providerCredentials: { openai: { serviceTier: tier } },
+      providerConnections: edit.values.providerConnections!.map(connection => ({ ...connection,
+        serviceTier: source === 'connection' && connection.id === 'a' ? tier : undefined })) }, edit);
+    const unchanged = unchangedPreferences(setup);
+    await sendSummary(setup, 'branch');
+    expect(setup.requests.at(-1)).toMatchObject({ path: '/a/v1/chat/completions', model: 'main', body: { service_tier: tier } });
+    expect(readSessionModel(setup.session.id)).not.toHaveProperty('serviceTier');
+    unchanged();
+  }
+  expect(setup.requests).toHaveLength(2);
+});
+
+it('changes the dedicated summary identity when only its credential tier default changes', async () => {
+  const setup = await fixture();
+  writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model =>
+    model.id === 'namespace/summary' ? { ...model, serviceTiers: ['default', 'priority', 'flex'] } : model) })));
+  const identities: string[] = [];
+  for (const tier of ['priority', 'flex']) {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.map(connection =>
+      connection.id === 'b' ? { ...connection, serviceTier: tier } : connection) }, edit);
+    const unchanged = unchangedPreferences(setup);
+    identities.push(captureSummaryRole({ config: projectSessionModel(getRuntimeConfig(setup.root), setup.session.id),
+      catalog: loadCatalog(), workspaceRoot: setup.root })!.identity);
+    unchanged();
+  }
+  expect(identities[1]).not.toBe(identities[0]);
+  expect(setup.requests).toEqual([]);
+});
+
+it.each(summaryKinds.flatMap(kind => ['model', 'protocol'].map(capability => ({ kind, capability }))))(
+  'refuses an unsupported $capability tier before $kind summary renewal or dispatch', async ({ kind, capability }) => {
+    const setup = await fixture('gpt-5.4');
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const old = { type: 'openai-chatgpt-account' as const, accessToken: 'synthetic-old',
+      refreshToken: 'synthetic-refresh', expiresAt: 1, accountId: 'b' };
+    writeUserRuntimeConfigFile({ ...edit.values, ...(capability === 'protocol' ? { maxOutputTokens: undefined } : {}),
+      providerConnections: edit.values.providerConnections!.map(connection => connection.id === 'b'
+        ? { ...connection, serviceTier: 'priority', ...(capability === 'protocol' ? { baseUrl: 'https://chatgpt.com/backend-api',
+          authType: 'account-auth' as const, apiKey: undefined, accountAuth: { openai: old } } : {}) } : connection) }, edit);
+    writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model =>
+      model.id === 'gpt-5.4' ? { ...model, serviceTiers: capability === 'model' ? ['default'] : ['default', 'priority'] } : model) })));
+    const address = new URL(edit.values.providerConnections!.find(connection => connection.id === 'b')!.baseUrl!);
+    if (capability === 'protocol') accountWire(address.origin, '/b/v1/codex/responses');
+    const renewal = observeOAuthRenewal({ ...old, accessToken: accountToken('synthetic-fresh', 'b'),
+      refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 });
+    const storedRenewal = vi.spyOn(accountRenewal, 'renewStoredAccount');
+    const dispatch = vi.spyOn(attempts, 'prepareRequestAttempt');
+    const unchanged = unchangedPreferences(setup);
+    const history = structuredClone(setup.manager.getSession(setup.session.id)!.turns);
+    const { deps } = runtime(setup);
+    const result = await Promise.resolve().then(async () => {
+      if (kind === 'manual') return deps.compactHistory!(setup.session.id, setup.signal);
+      if (kind === 'branch') return deps.summarizeAbandonedTurns!(history);
+      deps.runPrompt('Continue', setup.signal);
+      if (kind === 'prefix') return observed.compaction!.summarizeTurnPrefix!(history, setup.signal);
+      return condenseContext({ messages: history, ...observed.compaction!, force: true, signal: setup.signal,
+        operation: { sessionId: setup.session.id } });
+    }).catch(error => ({ status: 'failed', reason: error instanceof Error ? error.message : String(error) }));
+    expect(result).toMatchObject({ status: 'failed', reason: expect.stringMatching(/service tier/i) });
+    expect(renewal).not.toHaveBeenCalled();
+    expect(storedRenewal).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(setup.requests).toEqual([]);
+    expect(setup.manager.getSession(setup.session.id)!.turns).toEqual(history);
+    unchanged();
+  });
+
+it.each(summaryKinds)('refuses an unsupported fallback tier before %s summary renewal or dispatch', async kind => {
+  const setup = await fixture();
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.map(connection =>
+    connection.id === 'a' ? { ...connection, serviceTier: 'priority' } : connection) }, edit);
+  const selection = readSessionModelEdit(setup.session.id);
+  writeSessionModel(setup.session.id, { ...selection.selection!, roles: undefined }, selection);
+  writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model =>
+    model.id === 'main' ? { ...model, serviceTiers: ['default'] } : model) })));
+  const renewal = vi.spyOn(accountRenewal, 'renewStoredAccount');
+  const dispatch = vi.spyOn(attempts, 'prepareRequestAttempt');
+  const unchanged = unchangedPreferences(setup);
+  const history = structuredClone(setup.manager.getSession(setup.session.id)!.turns);
+  const result = await Promise.resolve().then(() => sendSummary(setup, kind))
+    .catch(error => error instanceof Error ? error.message : String(error));
+  expect(result).toMatch(/service tier/i);
+  expect(renewal).not.toHaveBeenCalled();
+  expect(dispatch).not.toHaveBeenCalled();
+  expect(setup.requests).toEqual([]);
+  expect(setup.manager.getSession(setup.session.id)!.turns).toEqual(history);
+  unchanged();
+});
 
 it.each([false, true])('uses the exact relay request shape for summaries (independent role: %s)', async role => {
   const setup = await fixture();

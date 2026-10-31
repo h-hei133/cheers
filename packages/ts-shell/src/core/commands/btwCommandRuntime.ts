@@ -21,6 +21,7 @@ import { createReport, span } from './report/projection.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import { recordSessionUsage } from '../../observability/usageTelemetry.js';
 import { hasUsage, usageFromProvider } from '../../provider/response/usage.js';
+import { requestServiceTier } from '../models/serviceTier.js';
 
 /** How long a side question may take before it is abandoned. */
 const SIDE_QUESTION_TIMEOUT_MS = 15_000;
@@ -68,6 +69,9 @@ export async function runBtwCommand(
   catch { return { kind: 'local', output: 'Side question refused: the selected endpoint conflicts with the account credential binding.' }; }
   if (catalogProvider(catalog, resolution.provider, baseUrl).ambiguous) return { kind: 'local', output: 'Side question refused: multiple model catalogue entries claim this endpoint.' };
   const endpoint = providerCredentialEndpoint(catalog, resolution, baseUrl);
+  let serviceTier: string | undefined;
+  try { serviceTier = requestServiceTier(runtimeConfig, resolution, catalog, baseUrl, endpoint); }
+  catch { return { kind: 'local', output: 'Side question refused: the configured service tier is not verified for the selected model.' }; }
 
   let answer = "";
   let attempted = false;
@@ -102,6 +106,7 @@ export async function runBtwCommand(
             baseUrl: baseUrl ?? "",
             model,
             providerId: resolution.provider,
+            serviceTier,
             ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
             ...(endpoint ? { endpoint } : {}),
             fetchImpl: providerFetchForEndpoint(runtimeConfig, endpoint, endpointShape, context.admission),

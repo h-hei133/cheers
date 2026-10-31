@@ -11050,3 +11050,9 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 最终五静态门/diff已exit0；118既有docs-source advisory不计通过缺口消失。另原生tier setter假设已由协议能力门正确拒绝，与24.20一致，不作无证据修补；本批scratch清理后交付。
 
 代码 `279315636c25ae1c6296fb7372d7533bace3ff93` 已提交/推送且远端 main 精确一致，scratch清理、交付后clean；自身 CI `41211798735` 最后in_progress，Watch `41211798701` success，仅此文档另绑提交。
+
+### 2026-10-31：辅助请求沿同一个已准入 tier
+
+[addition24.26](features/phase-20-addition.md#2426-辅助请求传递同一已准入-service-tier)侧问与四summary入口漏传普通/会话tier，simple body也缺字段。复用model tier owner的默认读取与能力拒绝，main和辅助capture共用；renewal/send前检查，精确model/credential隔离，simple provider传值、兼容/Responses序列化，摘要identity包含tier。Node20.3单worker串行8文件223项、原owner21失败与capability12失败反转及精确恢复后通过；build `dd850ed40634` 当前输入摘要匹配，judge既有advisory，两路只读复审APPROVE/CLEAR。第一次反转RTK过滤截断源码导致0-test setup失败，raw proxy修正后才取得有效证据；TS7053采用既有provider guard修正。缓存14d3532f精确CI已success，27931563/712ea121最后in_progress；最终门/清理/交付另绑，ADD-70 partial、goal active。
+
+最终五门/diff实际exit0，118既有docs-source advisory保留，批次scratch已清理；提交/推送/自身CI须独立读回。

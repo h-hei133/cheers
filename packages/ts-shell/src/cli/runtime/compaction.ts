@@ -27,6 +27,7 @@ import { sessionCompactionAuthority } from '../../session/compaction/authority.j
 import type { SessionManager } from '../../session/SessionManager.js';
 import type { ConfigPublication, ConfigState } from '../../config/state.js';
 import { configuredOutputLimit } from '../../provider/request/output.js';
+import { requestServiceTier } from '../../core/models/serviceTier.js';
 
 /** Bind the captured publication and native session owner at each compaction entry point. */
 export function nativeCompactionAuthority(input: {
@@ -116,8 +117,10 @@ export function buildCompactionWiring(input: {
   const runtimeConfig = input.runtimeConfig;
   const summaryRole = captureSummaryRole({ config: runtimeConfig, catalog: input.catalog, workspaceRoot: input.workspaceRoot,
     admission: input.admission, onCredentialPersisted: input.onCredentialPersisted });
+  const serviceTier = summaryRole ? undefined : requestServiceTier(runtimeConfig,
+    input.resolution ?? { provider: provider.providerId, model: provider.model }, input.catalog, provider.baseUrl, provider.endpoint);
   const send = async (request: Omit<Parameters<typeof requestCompactionSummary>[0], 'provider' | 'fetchImpl'>) => {
-    const summaryProvider = summaryRole ? await summaryRole.resolve() : { ...provider, ...effectiveLimits };
+    const summaryProvider = summaryRole ? await summaryRole.resolve() : { ...provider, ...effectiveLimits, serviceTier };
     return requestCompactionSummary({ ...request, provider: summaryProvider,
       onUsage: usageFor({ provider: summaryProvider.providerId ?? '', model: summaryProvider.model,
         baseUrl: summaryProvider.baseUrl, rates: catalogModel(input.catalog, summaryProvider.providerId ?? '', summaryProvider.model, summaryProvider.baseUrl)?.cost }),
@@ -158,7 +161,7 @@ export function buildCompactionWiring(input: {
   const effectiveLimits = fallbackShape ? { ...summaryLimits, shape: fallbackShape } : summaryLimits;
   return {
     policy: {
-      summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([provider, effectiveLimits])).digest('hex'),
+      summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([provider, effectiveLimits, serviceTier])).digest('hex'),
       contextWindow: resolvedWindow.window,
       inputLimit: mainModel?.inputLimit,
       // Per-model budgets where the user set them, the global value otherwise.

@@ -46,6 +46,7 @@ declareEndpoint("openai-compatible", {
       : {}),
     ...(input.reasoningEffort && input.thinkingLevelName ? { reasoning_effort: input.thinkingLevelName } : {}),
     ...(input.maxOutputTokens !== undefined ? { [input.maxTokensField ?? 'max_tokens']: input.maxOutputTokens } : {}),
+    ...(input.serviceTier !== undefined ? { service_tier: input.serviceTier } : {}),
   }),
   /**
    * The full turn: the conversation, the tools, and the model's own vocabulary

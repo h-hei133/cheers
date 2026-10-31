@@ -30,6 +30,7 @@ import { readCompletion } from '../../../provider/response/read.js';
  */
 
 export interface CompactionProvider {
+  readonly serviceTier?: string;
   readonly shape?: ResolvedRequestShape;
   readonly contextWindow?: number;
   readonly inputLimit?: number;
@@ -218,6 +219,7 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
       ...request.provider.shape,
       model: request.provider.model,
       provider: request.provider.providerId,
+      serviceTier: request.provider.serviceTier,
       ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
       ...(request.provider.supportsTemperature !== undefined ? { supportsTemperature: request.provider.supportsTemperature } : {}),
       ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),

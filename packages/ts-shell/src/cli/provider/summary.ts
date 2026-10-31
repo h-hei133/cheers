@@ -18,6 +18,7 @@ import { effortOutputFailure } from '../../provider/endpoints/effort.js';
 import { delegatedTarget } from './target.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
 import { configuredOutputLimit } from '../../provider/request/output.js';
+import { requestServiceTier } from '../../core/models/serviceTier.js';
 
 /** Capture an exact summary role; refresh its account only when a summary is requested. */
 export function captureSummaryRole(input: {
@@ -39,6 +40,7 @@ export function captureSummaryRole(input: {
     throw new Error('The summary role model or reasoning effort is unavailable.');
   }
   const endpoint = providerCredentialEndpoint(input.catalog, selected, resolution.baseUrl);
+  const serviceTier = requestServiceTier(input.config, resolution, input.catalog, resolution.baseUrl, endpoint);
   const shape = resolveRequestShape(input.catalog, role.provider, role.model, role.thinkingEffort ?? undefined, resolution.baseUrl, endpoint);
   const maxOutputTokens = configuredOutputLimit(input.config, endpoint)
     ?? (endpointShape(endpoint).outputControl === 'provider' ? undefined : shape.maxOutputCeiling);
@@ -50,7 +52,7 @@ export function captureSummaryRole(input: {
   const credential = resolution.credential!;
   const accountAuth = accountAuthFor(resolution.provider, credential);
   const identity = createHash('sha256').update(JSON.stringify([role, resolution.baseUrl, endpoint,
-    credentialIdentityFor(resolution.provider, credential), model, shape, maxOutputTokens, reserveTokens])).digest('hex');
+    credentialIdentityFor(resolution.provider, credential), model, shape, maxOutputTokens, reserveTokens, serviceTier])).digest('hex');
   let pending: Promise<CompactionProvider> | undefined;
   const renew = async (): Promise<CompactionProvider> => {
     assertAdmission(input.admission);
@@ -62,7 +64,7 @@ export function captureSummaryRole(input: {
     assertAdmission(input.admission);
     const auth = renewed.accountAuth ?? accountAuth;
     const identity = credentialIdentityFor(resolution.provider, { connectionId: credential.connectionId, apiKey: credential.apiKey, accountAuth: auth });
-    return { providerId: role.provider, model: role.model, baseUrl: resolution.baseUrl!, endpoint,
+    return { providerId: role.provider, model: role.model, baseUrl: resolution.baseUrl!, endpoint, serviceTier,
       headers: providerAuthorization({ apiKey: credential.apiKey, accountAuth: auth, endpoint }).headers,
       ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
       shape, contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens,

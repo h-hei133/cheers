@@ -27,6 +27,7 @@ import * as files from '../store/sessionFileStore.js';
 import { prepareModelRole } from '../../core/commands/model/role.js';
 import { configuredContextWindow } from '../../core/models/window.js';
 import { configuredServiceTier } from '../../core/models/serviceTier.js';
+import { runBtwCommand } from '../../core/commands/btwCommandRuntime.js';
 
 let home: string;
 let manager: SessionManager;
@@ -143,6 +144,63 @@ it.each(['provider', 'connection', 'inherited'] as const)('keeps ordinary %s tie
     expect(requests).toHaveLength(2);
     expect(readSessionModel(sessionId)).not.toHaveProperty('serviceTier');
     expect(readSessionModel(sessionId)?.roles).toEqual({});
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});
+
+it.each(['provider', 'connection'] as const)('sends the %s side-question tier without changing model preferences', async source => {
+  const requests: Record<string, unknown>[] = [];
+  const server = http.createServer(async (request, response) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    requests.push(JSON.parse(Buffer.concat(chunks).toString()));
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ choices: [{ message: { content: 'Side answer.' }, finish_reason: 'stop' }] }));
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Fixture address unavailable');
+    const baseUrl = `http://127.0.0.1:${address.port}/v1`;
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, maxOutputTokens: 100, reserveTokens: 0,
+      ...(source === 'connection' ? { activeProviderConnectionId: 'named' } : {}),
+      providerConnections: [{ ...connection(), baseUrl, model: 'next', serviceTier: 'priority' }],
+      providerCredentials: { openai: { ...edit.values.providerCredentials!.openai, baseUrl, serviceTier: 'priority' } } }, edit);
+    const resolveConfigTarget = (config: RuntimeConfig) => resolveProviderCredential({ runtimeConfig: config, env: {},
+      ...(source === 'provider' ? { cliApiKey: 'synthetic-cli', cliBaseUrl: baseUrl } : {}) });
+    const command = { ...context(), resolveConfigTarget };
+    expect((await runModelCommand(['next'], command)).output).toContain('Model switched');
+    expect(resolveConfigTarget(projectSessionModel(getRuntimeConfig(home), sessionId)).credential?.connectionId)
+      .toBe(source === 'provider' ? undefined : 'named');
+    const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+    const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+    for (const tier of ['flex', 'default', undefined] as const) {
+      if (tier) expect(setSessionServiceTier(command, tier)).toContain(`Service tier set to ${tier}`);
+      else {
+        const selection = readSessionModelEdit(sessionId);
+        const next = { ...selection.selection! }; delete next.serviceTier;
+        writeSessionModel(sessionId, next, selection);
+        writeCatalogCache([{ id: 'openai', models: [{ id: 'next', serviceTiers: ['priority'] }] }]);
+      }
+      const before = readSessionModelEdit(sessionId);
+      const turns = structuredClone(manager.getSession(sessionId)!.turns);
+      expect((await runBtwCommand(['question'], command)).report?.facts?.delivered).toBe(true);
+      expect(requests.at(-1)?.service_tier).toBe(tier ?? 'priority');
+      expect(readSessionModelEdit(sessionId)).toEqual(before);
+      expect(manager.getSession(sessionId)!.turns).toEqual(turns);
+      expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+    }
+    writeCatalogCache([{ id: 'openai', models: [{ id: 'next', serviceTiers: ['flex'] }] }]);
+    const before = readSessionModelEdit(sessionId);
+    const refused = await runBtwCommand(['question'], command);
+    expect(refused.output).toContain('Side question refused');
+    expect(refused.output).toContain('service tier');
+    expect(requests).toHaveLength(3);
+    expect(readSessionModelEdit(sessionId)).toEqual(before);
+    expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
   } finally {
     server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));

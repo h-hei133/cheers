@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.25 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.26 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier 收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5769,3 +5769,21 @@ build exit0，manifest `ef982b674f90`、inputsDigest `82d6aba4bec6af4140fe8ea483
 最终五静态门/diff实际exit0，binding refs全部解析，118既有docs-source advisory保持。只读复核 tier setter 的原生 issuer 假设被现有协议能力门正确拒绝，与第24.20节既有裁决一致；未新增无缺陷修补。批次scratch清理后提交/推送另记录。
 
 本批已提交/推送 `279315636c25ae1c6296fb7372d7533bace3ff93`，远端 main 精确读回相同，交付后工作区 clean，`.tmp/role-tier/` 已清理。自身 CI `41211798735` 最后 in_progress；Watch `41211798701` completed/success 不替代代码 CI。后续本段文档提交与代码 SHA 分开记录。
+
+### 24.26 辅助请求传递同一已准入 service tier
+
+继续检查只读请求消费者，发现 `/btw` 与 automatic/manual/turn-prefix/branch summary 没有携带普通或会话 tier；simple endpoint body 自身也缺少字段。两条 provider/命名连接 HTTP 回归在旧实现实际发送缺失的 `service_tier`，而会话保存为 flex。撤回生产修复后，四种 summary 入口的主模型/不同模型/兄弟连接/继承默认、普通默认更新与摘要身份回归也实际失败，不把纯静态缺口计作通过。
+
+既有 `core/models/serviceTier` 增加 `requestServiceTier`，复用原默认reader和capability检查，main step也委托它并保留explicit request override。侧问、summary role和compaction捕获实际模型/凭据/issuer，再于renewal/send前验证tier。SimpleProvider、CompactionProvider和SimpleRequest仅携带已准入可选值；兼容协议与Responses simple body负责序列化。没有新增credential resolver、存储字段或第二条执行路径。summary role使用自己的模型和连接，同一个精确目标可继承匹配的session tier，其他模型/兄弟连接读取自己的默认；fallback与role summary identity均包含tier。所有生产compaction调用点传入已捕获resolution，含job路径，不在摘要期间重选凭据。
+
+定向只读参考：`agent-session.ts:12741`侧问传effective tier，`session-handoff.ts:167`为handoff传同一模型tier，`packages/agent/src/compaction/compaction.ts:1121-1127`声明mirrored stream controls包含serviceTier。同意请求控制跟随实际模型身份，保留本项目精确model/credential匹配及unsupported/unverified显式拒绝；不复制跨family存储。
+
+主代理Linux Node20.3.0、heap768MiB、单worker串行最终 **8文件/223项** exit0：provider92、summary48、compaction23、step14、btw18、simple completion19、model tier6、endpoint tier3。35条新增用例覆盖侧问flex→default→普通priority、无发送拒绝、四summary入口×主模型/不同模型/兄弟/继承、普通default实时变更、tier-only identity、unsupported model/protocol/fallback在renewal与attempt之前拒绝、Responses/兼容simple body可选字段。实际HTTP body、settings/auth bytes、已存model selection/revision、foreground usage与history合同均检查；compaction合法更新历史不被误要求整文件不变。
+
+两条反转：原生产owner实际21失败/115未选/exit1；撤销capability guard实际12失败/36未选/exit1。finally逐字节恢复所有生产文件，之后上述223项通过；未选不计通过。首次original反转错误使用RTK展示过滤的git show，源码尾部被截断导致0-test transform错误；改为raw proxy后才获得有效行为失败，单独保留setup日志。首build在structural provider字符串索引报TS7053，使用既有isRuntimeProvider收窄后最终build exit0，未放宽类型检查。
+
+最终build manifest `dd850ed40634`，inputsDigest `2885a5209ac8a1de7f2f42787a7847414bc91785a09bdd236f15dd382bf9beaa` 与当前输入精确读回一致。正式适配bundle hash/member/vendor核对后独立串行judge exit0，环/解析satisfied，partial仅既有interactiveMode21/22-name advisory，无新增ceiling finding。两路独立只读复审APPROVE/CLEAR，子代理仅编辑summary测试/读审、未执行验证。证据 `.omx/artifacts/phase20-addition-auxiliary-tier/`；最终五静态门、清理与提交/推送/自身CI另绑定。
+
+延迟CI `14d3532f`/`41210672771` 已completed/success；角色seed `27931563`/`41211798735`、文档 `712ea121`/`41210875615` 最后仍in_progress。前者成功不倒推原 `6409450b` cache child failure根因已确定。本批未真实provider、旧发布二进制、Windows/macOS/PTY、全仓/20k或操作员HOME迁移；ADD-70仍partial，原Phase20真实条件延后，goal active。
+
+最终五静态门/diff实际exit0，binding refs全部解析，118既有docs-source advisory保持；批次 `.tmp/auxiliary-tier/` 已清理，提交/推送与自身CI另读回。
