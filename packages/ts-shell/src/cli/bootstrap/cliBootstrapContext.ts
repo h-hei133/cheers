@@ -57,6 +57,8 @@ export interface CreateCliRootContextInput {
   readonly launchCwd: string;
   readonly options: CliOptions;
   readonly configInputs?: ConfigInputs;
+  readonly writeError: (message: string) => void;
+  readonly exit: (code: number) => never;
 }
 
 export function createCliRootContext(
@@ -65,6 +67,7 @@ export function createCliRootContext(
   const runtimeBaseDir = resolveTargetProjectRoot(
     input.launchCwd,
     input.options.projectPath,
+    input,
   );
   const gitContext = getWorkflowGitContext(runtimeBaseDir);
   const workspaceRoot = gitContext.root ?? runtimeBaseDir;

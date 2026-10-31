@@ -11129,3 +11129,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：生产终端词表计数与可选模板目录修复
 
 [addition24.38](features/phase-20-addition.md#2438-生产终端计数验证与可选模板目录的延迟读取错误)旧生产exe在空项目输入slash时，Bun把缺目录错误延迟到readSync、逃过open catch；最小Node/Bun探针与旧owner两项失败确认。模板owner仅处理read时ENOENT/ENOTDIR、finally关闭，保留其他错误/取消与发现预算；定向参考比较完成。Node20.3串行2文件62项及五门/TS/exe build通过，manifest2d0ffe6ee110、当前compilerInputs摘要匹配。Node/exe×普通/全屏×三计数方式12场小型原生PTY全通过，2168-byte实际body分别611/441/443、preview/report一致，模拟usage123独立；每场一次本地readiness+一次推理、exit0、配置bytes不变、缺省prompt目录未创建、owned进程与夹具清理。中间隔离/预算/舍入/换行/pager及runner设置错误已分类，不算产品失败或通过。未另跑judge/独立委派复审；2213a671精确代码CI已success，69eb6eb4仍in_progress、Watch success。真实provider/历史差额、完整性能/其他平台仍缺，ADD-08 partial、goal active；本批清理、提交/推送/自身CI另绑。
+
+### 2026-11-01：生产启动的排队输入与项目错误恢复
+
+[addition24.39](features/phase-20-addition.md#2439-生产启动保留排队输入并在恢复终端后报告项目错误)旧exe把Loading期两行草稿的首行提前派发，真实排队I/O两回归复现单轮immediate尚未poll便交接。沿同surface等待下一poll，不flush parser；无效project另复现错误先打印后退出alternate screen，复用CLI错误/退出端口先恢复再报告。Node控制的environment前缀误判与runner setup错误已分类。Node20.3单worker串行4文件46项，双反转各2失败、逐字节恢复后46通过；五门/TS/exe构建当前摘要匹配，manifest75e3ebfa85d4。最终Node/exe×普通/全屏×草稿/取消/无效项目12场原生PTY通过：完整草稿一次、最终确认前零传输、取消130、错误恢复后可见且code1；配置bytes及终端模式、owned进程/fixture清理均核对。仅本地模拟provider，原始PTY/body丢弃；未新judge/独立复审/冷缓存/桌面/完整性能。69eb6eb4精确代码CI已success，28b4f3ac仍in_progress、Watch success；ADD-07 partial、goal active，本批交付另绑。

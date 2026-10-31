@@ -1649,3 +1649,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Typing a slash command in the compiled CLI fails when the optional prompt directory does not exist, even though the Node path works.
 - **Root Cause**: Bun 1.3.14 returns a directory handle from opendirSync and throws ENOENT during readSync; catching only open does not cover that runtime's directory lifecycle.
 - **Rule**: Handle ENOENT and ENOTDIR during optional-root reads, close the handle in finally, and preserve cancellation and other read errors. Test a lazy failing handle, continued discovery from valid roots, cancellation and cleanup; verify the production executable with the optional directories absent. Isolated PTY projects need their own Git boundary so ancestor configuration and prompts do not enter the fixture.
+
+### One Immediate Can Transfer Before Queued Terminal Input
+- **Symptom**: The compiled CLI submits the first line typed during Loading, or hands a queued cancellation key to the ready runtime.
+- **Root Cause**: An immediate in the current check phase can resolve before the next poll delivers stdin delayed by module evaluation. A synchronous terminal double does not exercise that queue.
+- **Rule**: Retain loading listeners through the next poll before adopting the same parser/editor/terminal. Test queued input with real loopback I/O and verify the production executable without injected startup delays. Match the user draft after the ordinary opening environment prefix; do not mistake that prefix for lost input.
+
+### Project Validation Must Use The CLI Terminal Owner's Error Ports
+- **Symptom**: An invalid project error disappears when the startup alternate screen closes, despite exit code 1 and restored terminal modes.
+- **Root Cause**: The project resolver prints and exits globally, bypassing the CLI callbacks that dispose the loading surface before reporting errors.
+- **Rule**: Thread the existing writeError/exit ports through root bootstrap and project validation. Keep the original message and exit code, and verify the error follows screen restoration in the actual PTY; checking only the final terminal modes misses hidden diagnostics.

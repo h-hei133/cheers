@@ -405,7 +405,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
-| ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批 | 部分完成 | 冷/热 Node 与 exe；桌面全矩阵；性能验收 |
+| ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批、第 24.39 节 | 部分完成 | Node/exe 普通/全屏的生产加载期输入、取消与错误恢复已验证；冷缓存、桌面全矩阵及完整性能验收仍缺 |
 | ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38 节 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview、目录声明的两套词表及按需加载已实施；Node/exe 普通/全屏的小型本地模拟请求计数已验证；不支持的 control/workflow 仍 unknown；其他模型词表、完整媒体/协议计量、真实 1.7k/4.9k 分项差额与性能验收尚缺 |
 | ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批 | 本地验证 | 不借此宣称 ADD-08 完成 |
 | ADD-35 | P2 | 状态栏 live 估算与 provider 实测的优先级 | 第一百零五批、21.28–21.30 | 本地验证 | 真实 provider 延迟 |
@@ -5986,3 +5986,15 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 五静态门、Node floor TS/exe构建通过，118既有docs-source advisory保留；build `2d0ffe6ee110a641dc80edb158466225faaef30b64ac138556b61f2422bcacb7`、inputs `bc60b15dbea5ce3be9af430eb0b6dba3d9b84a677e4a830a6a069a1c8b7be063` 与manifest.compilerInputs当前摘要精确匹配，exe SHA `0c3f5ab6488772d0d192c95f793bb097441f6011c15cb0cc430fdc77e2a3121a`。未改导入图，本批未另跑NormProof或独立委派复审，不沿用前批APPROVE。证据及非可执行源码快照归 `.omx/artifacts/phase20-addition-tokenizer-terminal/`，本批交付另绑定。
 
 延迟读回：`2213a671`精确代码CI `41228113447`已completed/success；`69eb6eb4`代码CI `41229200850`仍in_progress，两批Watch均success，不替代代码CI。ADD-08保持partial：此处是本地模拟provider的小型生产终端交互，真实1.7k/4.9k同snapshot差额、其他词表/媒体协议、完整性能及其他平台仍未验；未全仓回归或20k真实会话，原Phase20真实条件继续延后、goal active。
+
+### 24.39 生产启动保留排队输入并在恢复终端后报告项目错误
+
+接续已推送 `28b4f3ac2a448c0f6810947d3701821d02ced920`，推进ADD-07的实际启动交接。无注入加载延迟的旧生产exe，在观察到Loading编辑区后输入两行Unicode草稿，尚未发送最终确认Enter便产生请求；安全形状诊断确认实际只提交第一行。Node控制场景完整保留草稿，其首次断言失败源自探针漏算正常opening environment前缀，修正比较后通过，未据此误修Node。原[启动owner](../../packages/ts-shell/src/cli/interactive/startup.ts)仅等待一个setImmediate，可能仍在当前check阶段移交，尚未让poll投递被重模块求值延迟的stdin。现由同一surface等待下一轮poll，再沿原parser/editor/TUI单次移交；无startup时仍不增加等待，不flush部分paste/escape/grapheme，也不加入任意毫秒睡眠。
+
+先读目标后定向对照参考的同composer lease、加载后输入replay及失败释放，保留本项目加载期Enter只换行与取消策略。[新增回归](../../packages/ts-shell/src/cli/interactive/startup.test.ts)用真实loopback socket将输入排到下一次poll，覆盖完整两行与Enter留在加载editor、Ctrl+C在移交前释放终端；原单轮算法实际 **2失败/22控制通过**，不是断言setImmediate调用次数。生产检查还发现无效project路径直接console.error/process.exit，错误先写进alternate screen、随后才恢复；原探针只检查最终模式而漏掉此顺序。现[项目校验](../../packages/ts-shell/src/cli/workspace/binding.ts)使用[bootstrap](../../packages/ts-shell/src/cli/bootstrap/cliBootstrapContext.ts)传下的既有CLI writeError/exit端口，先dispose再输出，原消息和code1保持；缺路径和普通文件两种[回归](../../packages/ts-shell/src/cli/bootstrap/startup.test.ts)覆盖此端口及全局输出拒绝，实际PTY另检查恢复序列在错误之前。
+
+主代理Node20.3.0、heap768MiB、单worker串行 **4文件46项** 通过；单轮交接与原项目校验两次反转各 **2失败**，finally源码逐字节/SHA恢复后46项再次通过。五静态门与Node floor TS/exe构建通过，118既有docs-source advisory保留；build `75e3ebfa85d430f93813f72e1e4a53ea80aa4445c6bf35b7d1feeeee38dabcd2`、inputs `c48df24b3a08a9905a5d63e43db49508505489c58a729c72170a913996858856` 与manifest.compilerInputs当前摘要匹配，exe SHA `f52cb8e87856ce3af4ccd4f4d24879b243e38749ee06c04b7638e6aa7920c867`。首次Vitest runner路径缺失另分类为setup错误，未计测试通过。没有新增产品导入边，本批未另跑NormProof或独立委派复审。
+
+最终生产Node/exe × regular/fullscreen × adopt/cancel/invalid-project共 **12场原生PTY** 串行通过。四场adopt在真实Loading首帧后输入两行原文，最终Enter前无传输；之后完整草稿只出现一次，每场一次本地readiness GET与一次推理POST。四场实际body均1062 bytes、o200k估算252，草稿/status及context报告一致，模拟usage123独立标示；唯一有序runtime adoption及正式frame write均取得process marks。取消四场code130、无效project四场code1且错误在屏幕恢复后可见，均零传输、零runtime adoption。每场独立HOME/Git项目，settings/auth/catalog/trust逐字节不变、可选prompt目录未创建、alternate screen和bracketed paste关闭、所观察owned进程结束且夹具移除。CLI树每50ms采样最高332688KiB，512MiB守卫未触发；不含父探针，不作为完整heap验收。
+
+正式证据归 `.omx/artifacts/phase20-addition-startup-terminal/`，含两类产品失败、探针误判分类、反转、最终矩阵、构建身份与非可执行源码快照；原始请求体及PTY输出只在内存使用并丢弃。全部传输仅到127.0.0.1合成服务，不代表真实provider认证或用量验收。父进程观察时刻与process marks分开，未控制冷缓存/负载、未作完整性能或桌面平台结论。延迟读回 `69eb6eb4`精确CI `41229200850`已success，`28b4f3ac`精确CI `41231278750`仍in_progress、Watch `41231278797`success；本批交付另绑定。ADD-07保持partial，原Phase20真实条件延后、goal active。

@@ -67,6 +67,12 @@ export class StartupSurface {
     this.state.editor.insert(text);
   }
 
+  settleInput(): Promise<void> {
+    // An immediate in the current check phase can run before queued I/O.
+    // Keep the loading listeners through the next poll before transferring.
+    return new Promise(resolve => setImmediate(() => setImmediate(resolve)));
+  }
+
   adopt(alternateScreen: boolean, onFirstWrite?: () => void): void {
     if (this.stopped || this.transferred) throw new Error('Startup surface ownership has already ended.');
     this.releaseInput(); this.releaseKey(); this.releasePaste();
@@ -89,9 +95,7 @@ export function beginStartupSurface(): Promise<void> {
   return pending.firstPaint;
 }
 export function settleStartupInput(): Promise<void> | undefined {
-  // Heavy module evaluation can postpone stdin callbacks. Let the poll phase
-  // deliver input typed during loading to its original owner before adoption.
-  return pending ? new Promise<void>(resolve => setImmediate(resolve)) : undefined;
+  return pending?.settleInput();
 }
 export function takeStartupSurface(): StartupSurface | undefined {
   const surface = pending; pending = undefined; return surface;

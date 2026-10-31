@@ -1,8 +1,29 @@
 import { expect, it, vi } from 'vitest';
+import { once } from 'node:events';
+import { createConnection, createServer, type AddressInfo } from 'node:net';
 import { StartupSurface } from './startup.js';
 import { startupEligible } from './startup/eligibility.js';
 import { RecordingTerminal, ManualScheduler } from '../../test-utils/terminalDouble.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
+
+async function queuedInput(terminal: RecordingTerminal, text: string) {
+  const server = createServer();
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const accepted = once(server, 'connection');
+  const writer = createConnection({ host: '127.0.0.1', port: (server.address() as AddressInfo).port });
+  const connected = once(writer, 'connect');
+  const [reader] = await accepted;
+  await connected;
+  writer.setNoDelay(true);
+  reader.setEncoding('utf8');
+  const received = new Promise<void>(resolve => reader.once('data', (data: string) => { terminal.input(data); resolve(); }));
+  setImmediate(() => writer.write(text));
+  return { received, close: async () => {
+    writer.destroy(); reader.destroy();
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  } };
+}
 
 it.each([[], ['--project', '/fixture', '--no-skills'], ['--profile=test', '--offline']].map(args => [args]))(
   'permits an explicit interactive prepaint: %j', args => { expect(startupEligible(args, true)).toBe(true); });
@@ -24,6 +45,33 @@ it('paints and edits one draft without dispatching Enter before readiness', asyn
     expect(() => surface.adopt(false)).toThrow('ownership');
     surface.dispose(); expect(terminal.stopped).toBe(false);
   } finally { surface.tui.stop(); surface.dispose(); }
+});
+
+it('keeps queued loading text and Enter with the startup editor before adoption', async () => {
+  const terminal = new RecordingTerminal(), surface = new StartupSurface(terminal, new ManualScheduler(), vi.fn());
+  const queued = await queuedInput(terminal, 'early Ω 😀\rsecond\r');
+  try {
+    await surface.settleInput();
+    surface.adopt(false);
+    const runtimeKey = vi.fn(); surface.input.onKey(runtimeKey);
+    surface.tui.onInput(data => surface.input.feed(data));
+    await queued.received;
+    expect(surface.state.editor.getText()).toBe('early Ω 😀\nsecond\n');
+    expect(runtimeKey).not.toHaveBeenCalled();
+  } finally { await queued.close(); surface.input.dispose(); surface.tui.stop(); surface.dispose(); }
+});
+
+it('honors queued loading cancellation before input adoption', async () => {
+  const terminal = new RecordingTerminal(), exit = vi.fn();
+  const surface = new StartupSurface(terminal, new ManualScheduler(), exit);
+  const queued = await queuedInput(terminal, '\x03');
+  try {
+    await surface.settleInput();
+    expect(exit).toHaveBeenCalledOnce(); expect(exit).toHaveBeenCalledWith(130);
+    expect(terminal.stopped).toBe(true);
+    expect(() => surface.adopt(false)).toThrow('ownership');
+    await queued.received;
+  } finally { await queued.close(); surface.input.dispose(); surface.tui.stop(); surface.dispose(); }
 });
 
 it.each([1, 4])('preserves %i loading Enter presses as editable draft lines through regular adoption', async count => {

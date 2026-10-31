@@ -129,6 +129,8 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
     configInputs,
     launchCwd: input.launchCwd,
     options,
+    writeError: input.writeError,
+    exit: input.exit,
   });
   if (child && rootContext.workspaceRoot !== child.plan.workspace.path) throw new Error('Profile handoff workspace changed before bootstrap.');
 

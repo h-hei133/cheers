@@ -117,7 +117,8 @@ export function resolveWorkspaceRootMode(
 
 export function resolveTargetProjectRoot(
   launchCwd: string,
-  requestedProjectPath?: string,
+  requestedProjectPath: string | undefined,
+  failure: { readonly writeError: (message: string) => void; readonly exit: (code: number) => never },
 ): string {
   if (!requestedProjectPath?.trim()) {
     return launchCwd;
@@ -125,14 +126,14 @@ export function resolveTargetProjectRoot(
 
   const resolvedPath = path.resolve(launchCwd, requestedProjectPath.trim());
   if (!fs.existsSync(resolvedPath)) {
-    console.error(`Target project does not exist: ${resolvedPath}`);
-    process.exit(1);
+    failure.writeError(`Target project does not exist: ${resolvedPath}`);
+    failure.exit(1);
   }
 
   const stat = fs.statSync(resolvedPath);
   if (!stat.isDirectory()) {
-    console.error(`Target project must be a directory: ${resolvedPath}`);
-    process.exit(1);
+    failure.writeError(`Target project must be a directory: ${resolvedPath}`);
+    failure.exit(1);
   }
 
   return resolvedPath;

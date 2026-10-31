@@ -10,6 +10,8 @@ import {
   writeUserRuntimeConfigFile,
 } from "../../config/runtimeConfig.js";
 import { selectPooledConnection } from "../../core/auth/account/pool.js";
+import { StartupSurface } from '../interactive/startup.js';
+import { RecordingTerminal, ManualScheduler } from '../../test-utils/terminalDouble.js';
 import {
   createCliBootstrapRuntimeContext,
   createCliRootContext,
@@ -18,6 +20,7 @@ import {
 let scratch = "";
 let home = "";
 let workspace = "";
+const processPorts = { writeError: vi.fn(), exit: (): never => { throw new Error('root context unexpectedly exited'); } };
 
 beforeEach(() => {
   scratch = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-bootstrap-startup-"));
@@ -50,7 +53,7 @@ it.each([0, 100, 1_000, 10_000])(
       throw new Error("startup must not enumerate saved sessions");
     });
     const options = {};
-    const rootContext = createCliRootContext({ launchCwd: workspace, options });
+    const rootContext = createCliRootContext({ launchCwd: workspace, options, ...processPorts });
     const bootstrap = createCliBootstrapRuntimeContext({
       launchCwd: workspace,
       options,
@@ -82,7 +85,7 @@ it("resolves a pooled target with the bootstrapped session identity", () => {
   }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
   const options = {};
-  const rootContext = createCliRootContext({ launchCwd: workspace, options });
+  const rootContext = createCliRootContext({ launchCwd: workspace, options, ...processPorts });
   const bootstrap = createCliBootstrapRuntimeContext({
     launchCwd: workspace,
     options,
@@ -106,7 +109,31 @@ it("resolves a pooled target with the bootstrapped session identity", () => {
 it("rejects a missing explicit config before bootstrap", () => {
   const missing = path.join(workspace, "missing.json");
   expect(() => createCliRootContext({
+    ...processPorts,
     launchCwd: workspace,
     options: { configPaths: [missing] },
   })).toThrow(/Explicit config input/);
+});
+
+it.each(['missing', 'file'] as const)('reports a %s project through the terminal owner before exiting', kind => {
+  const projectPath = path.join(workspace, kind);
+  if (kind === 'file') fs.writeFileSync(projectPath, 'fixture');
+  const terminal = new RecordingTerminal(), surface = new StartupSurface(terminal, new ManualScheduler(), vi.fn());
+  const exited = new Error('fixture exit');
+  const globalError = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const globalExit = vi.spyOn(process, 'exit').mockImplementation(() => { throw exited; });
+  const writeError = vi.fn((message: string) => {
+    surface.dispose();
+    expect(terminal.stopped).toBe(true);
+    terminal.write(message);
+  });
+  const exit = vi.fn((_code: number): never => { throw exited; });
+  try {
+    expect(() => createCliRootContext({ launchCwd: workspace, options: { projectPath }, writeError, exit })).toThrow(exited);
+    expect(writeError).toHaveBeenCalledOnce();
+    expect(writeError).toHaveBeenCalledWith(`Target project ${kind === 'missing' ? 'does not exist' : 'must be a directory'}: ${projectPath}`);
+    expect(terminal.writes.at(-1)).toBe(writeError.mock.calls[0][0]);
+    expect(exit).toHaveBeenCalledOnce(); expect(exit).toHaveBeenCalledWith(1);
+    expect(globalError).not.toHaveBeenCalled(); expect(globalExit).not.toHaveBeenCalled();
+  } finally { surface.dispose(); }
 });
