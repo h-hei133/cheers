@@ -10932,3 +10932,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：新增加载告警引出的夹具修正与两处本地陷阱
 
 [addition23.7](features/phase-20-addition.md#237-子代理-review-找到的三处缺陷与修正)新增的「含凭据且组/其他位可读」告警让若干夹具失败：它们以默认 umask 写含 `apiKey` 的 config，告警如实报告，却落在与凭据无关的断言里（`config/validation.test.ts`、`config/runtimeConfig.test.ts`）。修夹具而非修告警——让夹具按产品的方式写 0600，并写明原因。`config` 300 项、`core/commands` 832 项、`cli` 3414 项、`presentation` 1072 项、`turn` 408 项、`session` 1190 项、`planning` 62 项、`collaboration` 24 项全部通过。另两处本地陷阱已写入 HANDOFF：归档测试副本会被根目录 discovery 收集（必须用 `--dir` 或包内相对路径）；`src/cli/print/*` 读的是已发布构建，源码改动后需先 `npm run build`。build efc1186dfee6。原 47/ADD 整体 partial、goal active。
+
+### 2026-10-31：CI 全量绿色（含本轮全部修复）
+
+`0b511910` 的 CI：Build & Test 完成且成功，**1050 个测试文件、12966 项通过、3 项跳过**；NormProof 同样 success。覆盖本轮 ADD-69/70/71 的全部改动、子代理 review 的三处修正、以及凭据夹具的 0600 修正。此前几轮的失败分别是：`composer.test.ts` 锁定旧计数文案（已在 `ea8e650b` 修正）、`validation.test.ts` 夹具以 0644 写凭据文件（已在 `f848c597` 修正）、以及 `src/cli/print/*` 的构建产物过期（重建后通过，非产品问题）。原 47/ADD 整体 partial、goal active。
