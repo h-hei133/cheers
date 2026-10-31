@@ -107,6 +107,9 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       catalogDiagnostics = choice?.catalogDiagnostics ?? publication?.catalogDiagnostics ?? local?.diagnostics ?? [];
       const active = context.resolveConfigTarget?.(config, context.sessionId)
         ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
+      // Inspecting prospective targets must not remember them as the session's next pool account.
+      // Keep the host's request overrides, while actual activation retains the original context.
+      const inspectionContext = { ...context, sessionId: undefined };
       const activeAddress = catalogBaseUrl(catalog, active.provider, active.baseUrl ?? active.credential?.baseUrl);
       const availability = availabilitySnapshot({ config, catalog });
       const thinkingEffort = assigning ? assigning.thinkingEffort
@@ -136,18 +139,18 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             const target: SessionModelTarget = connection ? { connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort }
               : { connectionScope: 'provider', provider: provider.runtime, model: model.id, thinkingEffort };
             const candidate = connection || providerSlot ? projectModelSelection(config, scopedModelTarget(target)) : undefined;
-            const resolution = candidate ? !connection && context.resolveConfigTarget ? context.resolveConfigTarget(candidate, context.sessionId)
-              : resolveProviderCredential({ runtimeConfig: candidate, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) }) : undefined;
+            const resolution = candidate ? !connection && inspectionContext.resolveConfigTarget ? inspectionContext.resolveConfigTarget(candidate)
+              : resolveProviderCredential({ runtimeConfig: candidate }) : undefined;
             const ambientCandidate = !connection && !providerSlot && provider.id === provider.runtime
               ? projectModelSelection(config, scopedModelTarget(target)) : undefined;
             const ambientResolution = ambientCandidate
-              ? context.resolveConfigTarget?.(ambientCandidate, context.sessionId)
-                ?? resolveProviderCredential({ runtimeConfig: ambientCandidate, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) }) : undefined;
+              ? inspectionContext.resolveConfigTarget?.(ambientCandidate)
+                ?? resolveProviderCredential({ runtimeConfig: ambientCandidate }) : undefined;
             const namedConnectionRequired = Boolean(ambientResolution && !ambientResolution.blocked
               && ambientResolution.provider === provider.runtime && ambientResolution.credential
               && ambientResolution.credential.connectionId === undefined);
             const effectiveResolution = resolution ?? (namedConnectionRequired ? ambientResolution : undefined);
-            const exact = candidate ? exactTargetMatches(context, candidate, target) : false;
+            const exact = candidate ? exactTargetMatches(inspectionContext, candidate, target) : false;
             const ambiguous = catalogProvider(catalog, provider.runtime, effectiveResolution?.baseUrl).ambiguous;
             const capability = effortCapability(catalog, provider.runtime, model.id, thinkingEffort, effectiveResolution?.baseUrl);
             const assignedEffort = assigning && capability !== 'supported' ? null : thinkingEffort;
@@ -205,7 +208,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
                   result === undefined && connectionId === undefined ? returnTo() : back(fresh, result, connectionId, origin);
               const captured = choice;
               if (reason === 'reasoning effort unsupported' && captured) {
-                const resolution = targetResolutionIdentity(context, config, target);
+                const resolution = targetResolutionIdentity(inspectionContext, config, target);
                 detailActions.push({ id: 'effort', label: 'Choose effort', run: (returnTo, inspect) => ({ next: modelEffortPicker({
                   target, current: thinkingEffort, catalog, baseUrl: modelAddress, lines, admission: admitInspection,
                   back: note => note === undefined ? inspect() : returnTo(note), canReturn: () => modelBrowserOwned(context),
@@ -234,7 +237,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               assignments.set(id, () => assigning.assign({ connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort: assignedEffort }));
             } else if (!reason && choice) {
               const captured = choice;
-              const resolution = targetResolutionIdentity(context, config, target);
+              const resolution = targetResolutionIdentity(inspectionContext, config, target);
               actions.set(id, async stillOwned => modelActionAdmission(captured.admission, stillOwned) ?? setReviewedModelTarget(target,
                 { ...context, admission: () => modelActionAdmission(captured.admission, stillOwned) }, { baseline: captured.baseline, resolution }));
             }

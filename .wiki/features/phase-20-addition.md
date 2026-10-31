@@ -5565,3 +5565,15 @@ ADD-70 仍部分完成：默认值已物理移出 auth，但其余重复事实�
 主代理单进程串行在实际 Linux Node20.3.0 上运行 **5 文件 / 104 项**：catalogSurface25、availability23、catalogRefresh11、modelCommand19、picker category26。覆盖 explicit/fallback/pool/provider-slot/CLI、同名模型精确 active、blocked/无凭据、尾斜线、未列端点 canonical、issuer与非 ready 账号、独立 provider 默认、broken pool、歧义隔离、请求 affinity 前后不变；只读断言观察 settings/auth/catalogue 的字节或缺失。六条反转（协议 active、借用 sibling、raw issuer地址、inspection 带真实 session、丢弃 issuer state、丢弃 pool refusal）均实际 AssertionError，finally 精确恢复后最终聚焦套件全过；重复不累加。五门/build通过，manifest `7a2ab949e2a0`。首次 judge 使用包目录的相对 tarball 路径，npm ENOENT 在 judge 执行前退出；从仓库根调用正式打包 judge exit0，环和导入解析 satisfied，仅两个既有 interactiveMode21/22-name advisory，未新增 ceiling finding。
 
 延迟读取 `e9f7a8c9` 代码 CI `41193784458` 已 success；`e2daf775` 的 `41194578660` 最后 in_progress，Watch `41194578673` success 不能替代代码 CI。本批提交/推送与自身 CI 单独绑定。未真实 provider、Windows、PTY、全仓或20k压测，未迁移真实 HOME。ADD-70 partial、整体goal active，旧版本回退与原Phase20真实验收继续延后。
+
+### 24.11 交互目录候选检查不改 pool affinity
+
+第24.10节已推送 `da3ca31603d46b20a58d1623ad3b6f5bb0f4fb18`，读回远端main与本地精确一致、工作区干净。继续沿同一缺陷检查交互model picker：真实session没有shared active ID、pool中ready/later两个可用连接时，初次load显示ready为active，随后的自然请求却改用later。本地resolver与host resolver两条新增回归都实际AssertionError；不把文本目录的修复当成交互路径已修。
+
+picker在捕获实际active之后建立只移除sessionId的inspection context。候选direct/host解析、exactTargetMatches和targetResolutionIdentity捕获都不记忆真实session affinity，host CLI解析函数继续保留。显式named target已有connection绑定，故去掉affinity不改变其identity；provider-slot不能替代declared pool。模型/effort activation、role/preset与admission、generation及保存仍用原context，不新增credential resolver、不修改provider/auth core。
+
+参考沿第24.10节可用快照与显式选择的区别：发现/浏览只读既有可用身份，用户接受后才持久化目标。本项目增加pool副作用边界，四个local/host × dismiss/activate场景分别验证load、reload、details与close不改变自然请求；显式选择later则保存session-scoped连接并在投影后的实际request读回later，避免以禁止所有切换来通过只读断言。
+
+主代理在实际Linux Node20.3.0串行聚焦 **5文件/133项**：category30、activation23、recovery36、auth24、focus20。模型与预设写入、hook拒绝与完成后关闭、provider slot CLI身份、effort恢复、角色与目录刷新原覆盖继续通过。恢复真实session inspection的反转实际AssertionError，源码精确恢复后最终套件全过。五门/diff/build通过，manifest `5ba7e846159b`；正式打包judge exit0，环/导入解析satisfied，仍只有既有interactiveMode21/22-name advisory。两路只读复审APPROVE/CLEAR，子代理未运行验证；本批scratch已清理。
+
+`e2daf775` 的代码CI `41194578660` 延迟读取已success；`da3ca316` 代码CI `41195952241` 最后in_progress，Watch `41195952238` success不替代代码CI。本批另绑提交与自身CI，未真实provider、Windows、PTY、全仓或20k验证，未迁移真实HOME。ADD-70仍partial、整体goal active，旧版本回退与真实环境继续延后。

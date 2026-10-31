@@ -10982,3 +10982,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：文本目录不借用 relay 身份、不改变 pool 选择
 
 [addition24.10](features/phase-20-addition.md#2410-文本模型目录保持精确身份与只读选择)旧文本/model的同协议relay均active/credential present，两回归实际失败。现availability按目录ID投影，活动跟随实际请求与issuer；本地凭据由现有selection adapter无CLI/无session-affinity检查，保留独立slot、issuer setup/pool refusal与歧义隔离，共用picker地址匹配。只读复审发现inspection把pool affinity A改B，新增回归复现并修复，最后APPROVE/CLEAR。Node20.3上5文件104项、六反转AssertionError/精确恢复、五门/build通过，manifest7a2ab949e2a0；正式judge环/解析satisfied，仅既有interactiveMode advisory。e9f7a8c9代码CI已success，e2daf775代码CI最后in_progress；未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。
+
+### 2026-10-31：交互目录保持 pool 选择直到显式 activation
+
+[addition24.11](features/phase-20-addition.md#2411-交互目录候选检查不改-pool-affinity)da3ca316已推送且main/远端一致；继续复现picker local/host两入口load后ready变later。候选解析、exact与identity改用去掉sessionId的inspection context，实际active与写入保留原context/CLI/admission。四场景验证浏览/刷新/关闭保持选择，显式later保存读回；5文件133项Node20.3、实际反转/精确恢复、五门/build通过，manifest5ba7e846159b。复审APPROVE/CLEAR，正式judge只有既有interactiveMode advisory；e2daf775代码CI已success，da3ca316最后in_progress。未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。

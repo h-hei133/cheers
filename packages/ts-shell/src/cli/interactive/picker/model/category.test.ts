@@ -5,9 +5,11 @@ import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, wr
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { defaultHookDispatcher } from '../../../../core/hooks/hookDispatcher.js';
 import { resolveProviderCredential } from '../../../../core/shell/providerCredentials.js';
+import { selectPooledConnection } from '../../../../core/auth/account/pool.js';
 import { setReviewedModelTarget } from '../../../../core/commands/model/selection.js';
 import { SessionManager } from '../../../../session/SessionManager.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
+import { projectSessionModel } from '../../../../session/model/projection.js';
 import { modelPicker } from '../model.js';
 import { OverlayHost, type PickerOutcome } from '../../overlay.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
@@ -31,6 +33,38 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 const commands = () => ({ cwd: root, projectRoot: root, sessionId });
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+
+it.each((['local', 'host'] as const).flatMap(source => (['dismiss', 'activate'] as const).map(ending => ({ source, ending }))))(
+  'keeps pool affinity through $source discovery and refresh until explicit $ending', async ({ source, ending }) => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const ready = edit.values.providerConnections![0]!;
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: undefined,
+    providerConnections: [ready, { ...ready, id: 'later', apiKey: 'synthetic-later', baseUrl: address('later') }],
+    accountPool: { openai: { connections: ['ready', 'later'] } } }, edit);
+  const config = getRuntimeConfig(root);
+  selectPooledConnection({ config, provider: 'openai', connectionId: 'ready', sessionId });
+  const resolve = (candidate: RuntimeConfig, id?: string) => resolveProviderCredential({ runtimeConfig: candidate, env: {}, pool: { sessionId: id } });
+  const current = () => resolve(config, sessionId);
+  const before = current();
+  const picker = modelPicker({ ...commands(), ...(source === 'host' ? { resolveConfigTarget: resolve } : {}) });
+  const rows = await picker.load();
+  expect(rows.find(row => row.note === 'active')?.id).toBe(target('relay-ready', 'ready'));
+  expect(current().credential).toEqual(before.credential);
+  await picker.load();
+  expect(current().credential).toEqual(before.credential);
+  expect(picker.detail!(target('relay-later', 'later')).join('\n')).toContain('later');
+  if (ending === 'activate') {
+    const result = await picker.apply([target('relay-later', 'later')]);
+    expect(result?.note).toContain('Model switched to shared.');
+    expect(readSessionModel(sessionId)).toMatchObject({ connectionScope: 'session', connectionId: 'later', model: 'shared' });
+    const effective = projectSessionModel(getRuntimeConfig(root), sessionId);
+    expect(resolve(effective, sessionId).credential?.connectionId).toBe('later');
+  } else {
+    picker.previewEnd?.();
+    expect(current().credential).toEqual(before.credential);
+    expect(readSessionModel(sessionId)).toBeUndefined();
+  }
+});
 
 it('orders the exact configured relay before unconfigured categories sharing its runtime and keeps their models browsable', async () => {
   const picker = modelPicker(commands()); const rows = await picker.load();
