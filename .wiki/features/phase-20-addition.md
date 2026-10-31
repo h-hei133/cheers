@@ -5232,6 +5232,7 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 2. Enter 的行为随输入内容漂移（steer / 排队），但提示行只说 steer。
 3. 空闲时 Ctrl+q 是空操作，没有反馈。
 4. 队列内容不可见、不可编辑、不可单独取消（只有 `clearQueue` 全清）。
+5. **排队消息不落盘，但它的用户气泡已经落盘。** 队列是内存里的 `PendingQueue`（[queue.ts](../../packages/ts-shell/src/core/agent/queue.ts)），不产生任何持久事件（`isDurableQueryEvent` 的名单里没有排队项，见 [events.ts](../../packages/ts-shell/src/core/query/runtime/events.ts)）。而 `onSubmit` 已经把用户气泡写进 transcript。于是崩溃或退出后：**transcript 里留着一条看起来已发送的消息，队列里的实际内容却没了**。恢复会话时用户会看到一条从未真正送达模型的提问。这比"不可区分"更严重——它是持久层与内存层的事实不一致。
 
 **修改方向（未实施）**
 
@@ -5239,6 +5240,7 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 - 让 Enter 的行为**稳定且可预期**：要么所有 busy 提交都 steer（命令类除外，明确提示"命令不能 steer，已排队"），要么统一排队并把 steer 交给单独的键。**不能继续让同一个键因输入内容而改变语义而不告知。**
 - 空闲时 Ctrl+q 给出一次可见反馈（"当前没有运行中的 turn，消息已直接发送"），而不是静默。
 - 队列可见性：至少提供 `/queue` 或提示行之外的持久列表；编辑/取消单条复用既有 `InputQueueControl.edit/cancel/move`，不新建队列。
+- **排队消息与用户气泡必须同生共死**：要么排队时只写一个明确标记为"未发送"的块、轮到它时才转成正式用户消息，要么把队列持久化。现状是气泡已落盘、队列在内存，崩溃后两边对不上。
 
 **证据边界**：全部为源码链路；未在真实终端复现按键，未测量用户实际节奏下的提示行切换。
 
