@@ -5216,8 +5216,9 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 1. **用户气泡在判断"运行还是排队"之前就已写入。** [onSubmit](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts) 先执行 `this.state.transcript.append(textBlock("user", text))`，然后才进入 `if (this.busy)` 分支决定走 `queue.push` 还是 `input.steer/followUp`。因此排队中的消息与已发送的消息在 transcript 里**完全相同**。
 2. **排队数量只出现在提示行，不在 transcript。** [transientHint](../../packages/ts-shell/src/presentation/tui/chrome/hints.ts) 在 `queued > 0` 时显示 `` `${n} queued · runs when the current turn finishes` ``；状态项 `queued`（[items.ts](../../packages/ts-shell/src/presentation/tui/chrome/items.ts)）也只是底栏的一段文字。提示行是 transient 的：一旦有其他提示（suggesting、cancelArmed）或输入框有内容，它就可能被替换。**排队这件事没有一条持久的、与具体消息关联的视觉标记。**
 3. **Enter 在 busy 时是 steer，但会被降级。** [keymap](../../packages/ts-shell/src/cli/interactive/keymap.ts) 的 `tui.input.submit` 在 busy 时传 `"steer"`；但 [onSubmit](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts) 里 `const input = text.startsWith("/") || composed || attachments?.images.length ? undefined : this.options.sessionRuntime.input?.()`，命令、可组合输入、带图片的输入都会拿不到 `input`，于是落入 `this.queue.push(text, attachments)`。**同一个 Enter 键，有时 steer、有时排队，而界面不给任何区分。**
-4. **Ctrl+q 是纯排队，但只在 busy 时生效。** [keymap](../../packages/ts-shell/src/cli/interactive/keymap.ts) 的 `app.message.followUp` 分支要求 `context.busy`，否则返回 `"nothing"`；空闲时按 Ctrl+q 不发任何东西。这符合"没有队列可加入"的语义，但用户若在空闲时按它，会以为按键坏了。
-5. **提示行的文案与实际行为不一致。** 忙碌时提示行写 `enter steer before next step`、`ctrl+q run after turn`（[hints.ts](../../packages/ts-shell/src/presentation/tui/chrome/hints.ts)），但如上所述 Enter 在命令/组合/图片场景并不是 steer。该文案被 [hints.test.ts](../../packages/ts-shell/src/presentation/tui/chrome/hints.test.ts) 的 `expect(text).toContain("enter steer before next step")` 锁定——**修正它会改动一条既有测试**，实施时必须说明理由，不能悄悄改断言。
+4. **Ctrl+q 是纯排队，但只在 busy 时生效。** [keymap](../../packages/ts-shell/src/cli/interactive/keymap.ts) 的 `app.message.followUp` 分支要求 `context.busy`，否则返回 `"nothing"`；空闲时按 Ctrl+q 不发任何东西。这符合"没有队列可加入"的语义，但用户若在空闲时按它，会以为按键坏了。两条额外限制：**（i）** vim 模式下非 insert 状态时，模态层在动作分派之前就吞掉 ctrl 组合键（`keymap.ts` 先走 `feedVim`，未实现的控制键返回 `none`），Ctrl+q 在那里永远到不了 `app.message.followUp`；**（ii）** 与 Ctrl+s 同类，部分终端或复用器会用 IXON 吞掉 Ctrl+q，而本仓库的 raw mode 是直接 `setRawMode(true)`，没有关闭流控。
+5. **被 steer 投递的消息不会产生任何 transcript 块。** 投递走 `AgentCore` 的 steering/followUp 队列，在 `message_start`/`message_end` 处注入；而 `TurnProjection` 对 `message_start` 不产出事件，对 `message_end` 只处理 `assistant` 与 `tool` 角色。因此 steer 的内容**只**以提交时那一个用户气泡的形式存在，投递动作本身不可见；它会被持久化到会话日志，重开时作为普通用户气泡重现，但**没有任何标记表明它曾被 steer 过**。
+6. **提示行的文案与实际行为不一致。** 忙碌时提示行写 `enter steer before next step`、`ctrl+q run after turn`（[hints.ts](../../packages/ts-shell/src/presentation/tui/chrome/hints.ts)），但如上所述 Enter 在命令/组合/图片场景并不是 steer。该文案被 [hints.test.ts](../../packages/ts-shell/src/presentation/tui/chrome/hints.test.ts) 的 `expect(text).toContain("enter steer before next step")` 锁定——**修正它会改动一条既有测试**，实施时必须说明理由，不能悄悄改断言。
 
 **对照结论（Codex / Claude Code）**
 
@@ -5232,7 +5233,7 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 2. Enter 的行为随输入内容漂移（steer / 排队），但提示行只说 steer。
 3. 空闲时 Ctrl+q 是空操作，没有反馈。
 4. 队列内容不可见、不可编辑、不可单独取消（只有 `clearQueue` 全清）。
-5. **排队消息不落盘，但它的用户气泡已经落盘。** 队列是内存里的 `PendingQueue`（[queue.ts](../../packages/ts-shell/src/core/agent/queue.ts)），不产生任何持久事件（`isDurableQueryEvent` 的名单里没有排队项，见 [events.ts](../../packages/ts-shell/src/core/query/runtime/events.ts)）。而 `onSubmit` 已经把用户气泡写进 transcript。于是崩溃或退出后：**transcript 里留着一条看起来已发送的消息，队列里的实际内容却没了**。恢复会话时用户会看到一条从未真正送达模型的提问。这比"不可区分"更严重——它是持久层与内存层的事实不一致。
+5. **排队消息与已发送消息都只活在内存的显示容器里，但只有前者会随退出消失。** 用户气泡写进的是 `state.transcript`——[createViewState](../../packages/ts-shell/src/presentation/tui/surface/contract.ts) 新建的内存 `Transcript`，不是会话存储；真正落盘要等提交进入 turn 后由持久事件写出。队列同样是内存里的 `PendingQueue`（[queue.ts](../../packages/ts-shell/src/core/agent/queue.ts)），不产生持久事件（`isDurableQueryEvent` 的名单里没有排队项，见 [events.ts](../../packages/ts-shell/src/core/query/runtime/events.ts)）。**因此退出或崩溃后，排队中的消息连同它的气泡一起消失，不会在恢复的会话里留下一条"从未送达"的提问。** 这一条是澄清而非缺陷：先前把它写成"气泡已落盘、队列丢了"是不准确的，已更正。
 
 **修改方向（未实施）**
 
@@ -5240,7 +5241,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 - 让 Enter 的行为**稳定且可预期**：要么所有 busy 提交都 steer（命令类除外，明确提示"命令不能 steer，已排队"），要么统一排队并把 steer 交给单独的键。**不能继续让同一个键因输入内容而改变语义而不告知。**
 - 空闲时 Ctrl+q 给出一次可见反馈（"当前没有运行中的 turn，消息已直接发送"），而不是静默。
 - 队列可见性：至少提供 `/queue` 或提示行之外的持久列表；编辑/取消单条复用既有 `InputQueueControl.edit/cancel/move`，不新建队列。
-- **排队消息与用户气泡必须同生共死**：要么排队时只写一个明确标记为"未发送"的块、轮到它时才转成正式用户消息，要么把队列持久化。现状是气泡已落盘、队列在内存，崩溃后两边对不上。
+- **排队状态必须随消息一起消失或一起留下**：现状是两者都在内存、一起消失，这是自洽的；改动呈现方式时不能顺手把"排队中"的块写进持久层，否则会造出"恢复后看到一条从未送达的提问"这一新缺陷。
+
+**另有两处文档层面的证据**
+
+- 设计文档自己已记录过这类缺口：`.wiki/articles/tui-experience-direction.md` 写着"Enter steer 说明不足……当前提示语只写 `enter steer`，缺少用户可理解的解释"；`turn-lifecycle-alignment.md` 记录的意图是显示 `N steering` / `N queued` 的**计数**，而不是逐条消息的标记。也就是说，"只给计数"是有意的设计，但它不足以回答用户"我这条到底在哪"的问题。
+- 同一动作的两处说明是各自维护的：`KEY_ACTIONS["tui.input.submit"].description` 是平实的 "Send the prompt"（[keybindings.ts](../../packages/ts-shell/src/cli/interactive/keybindings.ts)），而指南行"while a turn runs, steer it before its next step"来自另一张表（[chrome/keys.ts](../../packages/ts-shell/src/presentation/tui/chrome/keys.ts)）。两者独立维护，是文案漂移的温床。
 
 **证据边界**：全部为源码链路；未在真实终端复现按键，未测量用户实际节奏下的提示行切换。
 
