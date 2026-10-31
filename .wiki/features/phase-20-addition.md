@@ -5412,3 +5412,19 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 统一后可以只用一条不变量检查：**transcript 里出现 user 块 ⇔ 这段文本已经被交给某一轮运行**。等待中的输入只在待发送区出现，被取消时随之消失，不会在记录里留下一个模型从未见过的问题。
 
 验证：`interactiveMode` 402 项、`firstFrame` 24 项通过；TS build 与五门通过。
+
+### 23.7 子代理 review 找到的三处缺陷与修正
+
+对第 23.2 节改动的只读 review 找到三处真实缺陷，均已修正：
+
+| 缺陷 | 场景 | 修正 |
+|---|---|---|
+| `/queue add` 产生两个用户块 | 空闲时 `/queue add 解释测试`：命令行一个块，载荷开始运行时又一个块 | `/queue` 不再 echo 自己的命令行。它是队列的控制面，`add` 把载荷交给队列，载荷开始运行时才成为用户块 |
+| steer/followUp 在投递前就写块 | 忙碌时 Enter 发 steer，在模型下一步之前 Esc：块已存在，文本又被退回草稿，重发后出现两个相同块 | 内核在真正注入时报告 `message.delivered`，界面据此写块。提交只是请求 |
+| 无变化的保存里 `narrowCredentialFile` 抛错且跟随符号链接 | 只读挂载或文件消失时以 `lock-failed` 逃逸；符号链接的 config 会 chmod 到目标文件 | 改为返回布尔、`lstat` 判断、不抛错；权限无法修正不把成功保存变成失败，改由加载路径报告 |
+
+`message.delivered` 不进入持久事件：真实消息已由 `persist(onMessage)` 写成会话 turn，再记一次会让同一条消息在 transcript 里出现两遍。开场消息被排除——它带环境前缀，界面画的是用户自己那段文字。
+
+加载路径新增一条暴露告警：含凭据且组/其他位可读的文件会被报告（只报文件与事实，不含任何值）。理由是不写的文件永远不会被收窄，而静默正是这类问题最危险的部分。
+
+验证：`interactiveMode` 403、`composer` 18、`hints` 6、`runtimeConfig` 38、`persistence` 30、`turn/projection` 9、`turn/session` 41、`turnSink` 54、`sessionRuntime` 50、`firstFrame` 24 项通过；TS build 与五门通过。
