@@ -1,7 +1,7 @@
 import type { CatalogProvider } from '../models/catalog.js';
 import type { ProviderCredentialResolution } from './credential.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from './account/target.js';
-import { endpointShape } from '../../provider/endpoints/index.js';
+import { declaredEndpointKinds, DEFAULT_ENDPOINT_KIND, endpointShape } from '../../provider/endpoints/index.js';
 
 /** Explicit request scope can differ from the saved connection default. */
 export function providerScopeSelected(config: { readonly activeProviderConnectionId?: string }, resolution: ProviderCredentialResolution): boolean {
@@ -13,6 +13,8 @@ export function providerScopeSelected(config: { readonly activeProviderConnectio
 export function providerBindingAvailable(catalog: readonly CatalogProvider[], resolution: ProviderCredentialResolution): boolean {
   if (resolution.blocked) return false;
   const baseUrl = providerCredentialBaseUrl(catalog, resolution);
-  return Boolean(baseUrl && (resolution.credential
-    || endpointShape(providerCredentialEndpoint(catalog, resolution, baseUrl)).signer));
+  if (!baseUrl) return false;
+  const endpoint = providerCredentialEndpoint(catalog, resolution, baseUrl);
+  if (!declaredEndpointKinds().includes(endpoint ?? DEFAULT_ENDPOINT_KIND)) return false;
+  return Boolean(resolution.credential || endpointShape(endpoint).signer);
 }

@@ -406,7 +406,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批 | 部分完成 | 冷/热 Node 与 exe；桌面全矩阵；性能验收 |
-| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第一百零四至一百零五批 | 部分完成 | 原生 tokenizer；真实 1.7k/4.9k 分项差额；纯组合 preview；性能 |
+| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35 节台账复核 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview 已实施；不支持的 control/workflow 仍 unknown；原生 tokenizer、真实 1.7k/4.9k 分项差额与性能尚缺 |
 | ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批 | 本地验证 | 不借此宣称 ADD-08 完成 |
 | ADD-35 | P2 | 状态栏 live 估算与 provider 实测的优先级 | 第一百零五批、21.28–21.30 | 本地验证 | 真实 provider 延迟 |
 | ADD-36 | P2 | 目录刷新来源标记与能力上限准入 | 第一百零六至一百零八批 | 本地验证 | 真实外部索引内容与端到端 compaction |
@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.34 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影、交互目录和首次角色保存的显式 provider 范围收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.35 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影、交互目录和首次角色保存的显式 provider 范围收敛、未知协议目录保留与绑定拒绝已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5926,3 +5926,19 @@ build exit0，manifest `ef982b674f90`、inputsDigest `82d6aba4bec6af4140fe8ea483
 三次有效反转串行执行：旧role owner **6失败/10控制通过/118未选**；跳过fresh signer重查 **12失败/6控制通过/116未选**；移除实际命名凭据围栏 **2失败/2控制通过/130未选**，均exit1且失败为行为断言。每次finally逐字节恢复，最终五份受审源文件SHA256精确匹配，再跑同236项exit0。五静态门/最终build通过，118既有docs-source advisory保留；build `8644837fd48189189443615810933c41b0e91e3a2837404f99d99c7c0a87b822`，含manifest.compilerInputs的当前摘要 `41cd73dd869fbc45ac51fbd09ccbdbacc9090a4db4d33ab22acb10e496eea436` 一致。本批未另跑judge；生产import路径边未变。证据 `.omx/artifacts/phase20-addition-role-scope/`，清理/提交/推送/自身CI另绑定。
 
 延迟代码CI `60b88933`/`41222162228`已completed/success，`0cbbbb32`/`41222600938`最后仍in_progress，Watch成功不替代代码CI。当前GitHub release列表读回为空，未取得旧发布二进制，不以旧源码往返代替其验收。未真实AWS/ADC/provider、PTY、非Linux、旧binary、全仓或20k；原Phase20真实条件继续延后，ADD-70 partial、goal active。
+
+### 24.35 未注册协议保留目录浏览并拒绝请求绑定
+
+接续已提交推送的 `e32739011cd8065db8f48bf0857548e3d80f11a8`，沿ADD-70检查实际协议事实。[binding owner](../../packages/ts-shell/src/core/auth/binding.ts) 对无static credential的未知catalogue endpoint调用严格 `endpointShape`，导致整个picker加载抛错；有static credential时又短路该检查，将同一未知协议错误标作可用。Bedrock/Vertex × 无key/有key/已声明协议控制的八个新增或扩展场景，在旧owner实际 **4失败/4控制通过/60未选**；分别是两项加载异常及两项错误启用，属于产品行为缺陷。
+
+现在先通过既有 `providerCredentialEndpoint` 获取实际issuer/protocol，再查询同一个registry的 `declaredEndpointKinds`，无endpoint沿既有default；未知显式协议返回binding unavailable。未增加协议列表、resolver或异常吞没层，派发的 `endpointShape` 仍严格抛错。有credential的不可用行显示 `request unavailable`，避免误报缺key；所有拒绝行保留disabled/focusable浏览。权威writer继续在保存前及原事务guard复验，命名连接沿原credential身份与严格constraints拒绝，不靠UI禁用保证写入边界。
+
+目标检查后定向重读只读参考 `core/model-runtime.ts:305–325`：provider组合失败保留基础发现并记录错误。采用发现可继续、不可执行绑定不放行的决定；本项目沿现有binding与registry实现，没有复制参考的provider重建系统。
+
+两路独立sol source-only审查 **APPROVE/CLEAR**，无子代理验证。主代理Linux Node20.3.0、heap768MiB、单worker串行 **2文件/87项** exit0：category68、delegated target19。包含credentialless未知/已声明无signer拒绝、static key未知拒绝与已声明协议保存读回；拒绝后session revision与shared settings/auth bytes不变、零fetch。委派signer、static/default、named与pool既有控制通过。
+
+两次有效反转分别为binding **4失败/4控制通过/60未选**、提示 **2失败/66未选**，均exit1；finally逐字节恢复，三份受审源码SHA256一致，再跑同87项exit0。提示初次筛选漏掉参数显示的引号，68项全未选，属于调用setup而非行为证据；修正筛选后才取得两项提示断言失败。五静态门/build通过，118既有docs-source advisory保留；build `382a38a76290f75575840d0e6f50de75fcdbd763f75d6786e14205277d57419a`，含manifest.compilerInputs的当前摘要 `eac173e72e9d78b7dc70a19279d35897e706563b7f96bd82d8514380903da3e4` 精确一致。本批未另跑judge，生产import路径边未变。证据 `.omx/artifacts/phase20-addition-protocol-binding/`。
+
+同时纠正第12.4节ADD-08当前台账：纯组合准备、独立模板、原生研究新建入口及review snapshot只读preview已有实现。当前源码复核 [preview owner](../../packages/ts-shell/src/cli/runtime/context/preview.ts)、共用 [composition preparation](../../packages/ts-shell/src/core/commands/composition/prepare.ts) 与preview测试237/624/743行，结合第15节第三十三批既有普通/全屏小Node PTY证据，移除过时的“纯组合preview尚缺”。本批未重跑preview测试或PTY，不改写早期第五批历史结论；unsupported/control workflow仍unknown，原生tokenizer、真实1.7k/4.9k分项差额和性能继续尚缺。
+
+延迟读回 `e3273901`/`41224129606`、`0cbbbb32`/`41222600938`代码CI均completed/success，Watch也成功；这些SHA不替代本批提交的CI。本批提交/推送/自身CI另绑。未真实AWS/ADC/provider、PTY、非Linux、旧发布binary、全仓或20k；原Phase20真实条件继续延后，ADD-70 partial、goal active。

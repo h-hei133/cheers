@@ -209,9 +209,10 @@ it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['after load', 'du
     expect(readSessionModelEdit(sessionId)).toEqual(baseline); expect(sharedConfigBytes()).toEqual(before);
   });
 
-it.each(['bedrock', 'vertex'] as const)('refuses a credentialless %s picker target whose actual endpoint has no signer', async provider => {
+it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['openai-compatible', 'unregistered-endpoint'] as const).map(endpoint => ({ provider, endpoint }))))(
+  'keeps a credentialless $provider picker browsable and refuses its $endpoint binding', async ({ provider, endpoint }) => {
   const fixture = signerFixture(provider);
-  writeCatalogCache(fixture.catalog.map(entry => ({ ...entry, endpoint: 'openai-compatible' })));
+  writeCatalogCache(fixture.catalog.map(entry => ({ ...entry, endpoint })));
   const before = sharedConfigBytes(); const baseline = readSessionModelEdit(sessionId);
   const picker = modelPicker(commands()); const rows = await picker.load();
   expect(rows.find(row => row.id === fixture.row('next'))).toMatchObject({ disabled: true, focusable: true });
@@ -220,7 +221,31 @@ it.each(['bedrock', 'vertex'] as const)('refuses a credentialless %s picker targ
   expect(await setReviewedModelTarget(requested, commands(), { baseline,
     resolution: targetResolutionIdentity(commands(), config, requested) })).toContain('blocked');
   expect(readSessionModelEdit(sessionId)).toEqual(baseline); expect(sharedConfigBytes()).toEqual(before);
+  expect(fixture.fetch).not.toHaveBeenCalled();
 });
+
+it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['declared', 'unregistered'] as const).map(protocol => ({ provider, protocol }))))(
+  'checks the $protocol protocol before admitting a $provider API-key picker target', async ({ provider, protocol }) => {
+    const fixture = signerFixture(provider); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, providerCredentials: { [provider]: {
+      ...edit.values.providerCredentials?.[provider], apiKey: 'synthetic-protocol-key',
+    } } }, edit);
+    if (protocol === 'unregistered') writeCatalogCache(fixture.catalog.map(entry => ({ ...entry, endpoint: 'unregistered-endpoint' })));
+    const before = sharedConfigBytes(); const baseline = readSessionModelEdit(sessionId);
+    const picker = modelPicker(commands()); const rows = await picker.load();
+    const requested = { connectionScope: 'provider' as const, provider, model: 'next', thinkingEffort: null };
+    expect(rows.find(row => row.id === fixture.row('next'))?.disabled).toBe(protocol === 'unregistered' ? true : undefined);
+    const outcome = await setReviewedModelTarget(requested, commands(), { baseline,
+      resolution: targetResolutionIdentity(commands(), getRuntimeConfig(root), requested) });
+    if (protocol === 'unregistered') {
+      expect(picker.detail!(fixture.row('next'))).toContain('request unavailable');
+      expect(outcome).toContain('blocked'); expect(readSessionModelEdit(sessionId)).toEqual(baseline);
+    } else {
+      expect(outcome).toContain('Model switched to next.');
+      expect(readSessionModel(sessionId)).toMatchObject({ connectionScope: 'provider', provider, model: 'next' });
+    }
+    expect(sharedConfigBytes()).toEqual(before); expect(fixture.fetch).not.toHaveBeenCalled();
+  });
 
 it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['pending', 'error', 'credential-missing'] as const).map(state => ({ provider, state }))))(
   'does not borrow the $provider signer for a $state named picker connection', async ({ provider, state }) => {

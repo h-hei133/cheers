@@ -173,7 +173,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             const reason = namedConnectionRequired ? 'named connection required'
               : assigning && !connection ? 'role assignment requires a configured connection'
               : !connection && !providerSlot ? 'configure a connection' : connection && connection.state !== 'ready' ? availabilityLabel(connection.state)
-              : !resolutionReady ? 'credential unavailable'
+              : !resolutionReady ? resolution?.credential ? 'request unavailable' : 'credential unavailable'
               : !exact ? 'request target mismatch'
               : ambiguous ? 'model catalogue endpoint is ambiguous'
               : unsupported ? 'reasoning effort unsupported' : !choice?.baseline ? 'active session required' : undefined;

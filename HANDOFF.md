@@ -1629,3 +1629,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A shared namespace predicate treats an inferred named credential as a provider slot, or fresh role seeding refuses an explicitly scoped signer because a saved named default exists.
 - **Root Cause**: Saved active IDs, explicit selection IDs and the actually resolved credential ID describe different facts; a fallback credential can carry the only named ID.
 - **Rule**: Derive provider scope from the actual credential and selection before consulting saved defaults. Keep scope separate from readiness and revalidate fresh signer identity both before saving and under the session lock. Test actual resolver fallback, explicit provider scope and unchanged ordinary preference inheritance.
+
+### Binding Admission Must Check Protocol Registration Before Credentials
+- **Symptom**: An unknown catalogue protocol crashes a credentialless picker, while the same protocol with an API key becomes selectable.
+- **Root Cause**: Admission calls strict endpoint dispatch for a missing signer but short-circuits that lookup when a static credential exists.
+- **Rule**: Check the existing endpoint registry before either credential path. Keep unsupported rows browsable and read-only, preserve strict dispatch errors, and test both credentialless and static-key entries alongside declared-protocol controls.

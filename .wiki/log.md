@@ -11113,3 +11113,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：首次角色保存尊重实际 provider 范围
 
 [addition24.34](features/phase-20-addition.md#2434-首次角色保存与目录共用实际凭据范围)两个signer × 三角色的首次保存实际被旧active ID门拒绝。既有binding owner统一范围判断，角色初始/保存前/锁内及目录/面板共用；仍单独检查认证与完整request identity，plain CLI --provider、named/pool与普通tier/context边界保持。独立复审补实际credential ID围栏，真实fallback named保存读回通过；两路sol source-only最终APPROVE/CLEAR，无子代理验证。主代理Node20.3单worker串行3文件236项，三反转分别6/12/2失败且精确恢复后236通过；五门/build当前compilerInputs摘要通过，manifest8644837fd481。初次锁内探针未到锁的三失败已分类，不称错误写入。60b88933精确代码CI已success，0cbbbb32仍in_progress；GitHub releases空、未取得旧binary，真实provider/PTY/平台/全仓/20k未验，ADD-70 partial、goal active，本批交付另绑。
+
+### 2026-11-01：未知协议目录可浏览，绑定不可用
+
+[addition24.35](features/phase-20-addition.md#2435-未注册协议保留目录浏览并拒绝请求绑定)修复credentialless未知endpoint使picker抛错、static key又错误放行的双向缺陷。既有binding owner先查询实际协议registry，严格dispatch不变；有key的不可用行不再误报缺key，拒绝行可浏览。Node20.3单worker串行2文件87项，binding/提示反转分别4/2失败、精确恢复后87通过；五门/build当前compilerInputs摘要匹配，独立source-only APPROVE/CLEAR。首次提示反转筛选68项全未选已分类重跑，未计通过。ADD-08台账按现有preview源码与第三十三批历史小PTY纠正，未重跑preview/PTY或补造真实差额。前批e3273901与0cbbbb32精确代码CI均success；本批交付另绑，ADD-70 partial、goal active，真实provider/平台/旧binary仍待验。
