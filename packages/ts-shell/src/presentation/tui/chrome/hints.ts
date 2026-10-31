@@ -39,13 +39,13 @@ export interface AmbientContext {
 function transientHint(context: HintContext): string | undefined {
   if (context.cancelArmed) return "press ctrl+c again to exit";
   if (context.suggesting) return join(["↑↓ select", "tab complete", "esc dismiss"]);
+  // Waiting entries are listed one row each above the prompt, so this row does
+  // not repeat their count: the same fact stated twice is noise, and the band is
+  // the version that says which entry goes where. It also keeps the queue keys
+  // reachable from here — the band is a reminder, and editing happens in /queue.
   const steering = context.steering ?? 0;
-  if (steering > 0 && context.queued > 0) {
-    return `${steering} steering · ${context.queued} queued`;
-  }
-  if (steering > 0) return `${steering} steering · delivered before the next step`;
-  if (context.queued > 0) {
-    return `${context.queued} queued · runs when the current turn finishes`;
+  if (steering > 0 || context.queued > 0) {
+    return join(["esc interrupt", "/queue to edit", "ctrl+q queue"]);
   }
   if (context.busy) {
     // What Enter does for ordinary prose. A command, a composed prompt or one

@@ -86,7 +86,10 @@ describe("renderHints", () => {
     expect(text).toContain("enter steer");
     expect(text).toContain("ctrl+q queue");
   });
-  it("shows queued follow-up counts while busy", () => {
+  it("points at the queue editor instead of repeating the pending band's count", () => {
+    // Waiting entries are listed one row each above the prompt. Repeating their
+    // count here stated the same fact twice and said nothing about where they go;
+    // this row now names the one thing the band cannot: how to change an entry.
     const rows = renderHints(
       {
         busy: true,
@@ -97,6 +100,8 @@ describe("renderHints", () => {
       { openTodos: 0, peerSessions: 0 },
       80,
     );
-    expect(stripAnsi(rows[0]!)).toContain("2 queued");
+    const text = stripAnsi(rows[0]!);
+    expect(text).toContain("/queue to edit");
+    expect(text).not.toContain("2 queued");
   });
 });

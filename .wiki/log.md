@@ -10916,3 +10916,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：终态存储失败不再被记成失败结局（CI 既有失败）
 
 [addition23.5](features/phase-20-addition.md#235-ci-上两个既有失败的根因与修正)读回 CI 发现 `8d9a3ac9` 有两处失败，本地同样复现，都源于 `e6cad11d`。其一：该改动把"终态已决定后的存储失败"标为 `provenanceOutcome = 'failed'`，而查询已完成、未证实的只是它有没有被写下——协作提案因此被记成 failed。现保持 `unknown` 并写明理由。其二：同一改动不再写 `saveError`，使 `uses persisted failure…` 的前提消失；该测试改写为断言轮次保持 pending、`drain: 'unknown'`、`reason: 'recovery-required'`，且恢复被报告而非被当作完成轮次。三个受影响文件 71 项通过、TS build 与五门通过。build b32fb519fe7a。原 47/ADD 整体 partial、goal active。
+
+### 2026-10-31：提示行不再重复待发送区的计数（ADD-69 收口）
+
+[addition23.2](features/phase-20-addition.md#232-add-69等待中的输入可见且不进对话记录已实施)待发送区已逐条列出等待中的输入并标注交付阶段，提示行却仍在报「N queued / N steering」——同一事实说两遍，且没说清它们去哪。提示行现改为指向 `/queue` 的编辑入口，把"逐条是什么、去哪"留给待发送区，"怎么改"留给这一行。`hints.test.ts` 的计数断言改为检查新文案并显式断言不再出现计数。5 个受影响文件 151 项通过、TS build 与五门通过。build d06a2dfe99c7。原 47/ADD 整体 partial、goal active。
