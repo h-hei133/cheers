@@ -10958,3 +10958,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：修正连接存储提示与 auth-only 原生登录
 
 [addition24.4](features/phase-20-addition.md#244-存储提示与无-settings-的原生登录)修正六处旧 config.json 连接提示与 connect/native 的 Stored at 路径。Copilot 无模型默认的 pending 登录曾对缺失 settings 做 realpath；现通过 ConfigEdit 捕获完整两文件 source/canonical tuple、始终保留原 logical source，稳定链接成功，任一同字节换目标拒绝。7文件170项聚焦、两条实际反转/源码精确恢复、五门/noEmit/build通过，manifest8cd0f9836be9；正式judge仍只有既有interactiveMode advisory，复审无剩余阻塞。前批c2819249已推送且main/origin一致，代码CI41190177753最后in_progress、Watch成功。e10964da代码CI失败10项均已在c2819249修复；当前批次仍需自身CI。ADD-70 partial、goal active。
+
+### 2026-10-31：记录历史验证脚本的新格式消费者缺口
+
+[addition24.5](features/phase-20-addition.md#245-后续消费者审计的明确缺口)31616578已推送且main/origin一致、干净。静态审计发现 provider-readiness、doctor-environment、daily/broader 的配置或HOME/活动连接探测仍依赖 config.json，未读 auth 或 join modelPreferences。已加入 ADD-70 尚缺；未执行真实provider/全套脚本，未修改release/default gates。后续必须复用TypeScript owner、验证分文件/auth-only/坏源/脱敏后才可作验收证据。31616578代码CI41190946495与Watch41190946542最后in_progress，c2819249代码CI仍测试中；goal active。

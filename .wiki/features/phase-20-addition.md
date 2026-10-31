@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止及模型默认值移出 auth 已实施；其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.5 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止及模型默认值移出 auth 已实施；历史验证脚本消费者、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5495,3 +5495,17 @@ ADD-70 仍部分完成：默认值已物理移出 auth，但其余重复事实�
 最终五门、production noEmit、diff、build 通过，manifest `8cd0f9836be9`；正式归档 judge exit0，导入解析与环 satisfied，仍只有 interactiveMode 22-name advisory，118 docs-source advisory 保留。复审最后无剩余阻塞发现，子代理仅只读，所有验证由主代理串行执行。未运行全仓、真实 provider/PTY 或 20k 压测。
 
 延迟读取 `e10964da` CI `41188245875` 已 failure：4 文件/10 项失败，12988 项通过，全部为第 24.3 节已修复的 advisor7/preset1/connect syntax1/completion1。`c2819249` 的代码 CI `41190177753` 最后 in_progress，Watch `41190177862` success；不得从 Watch 或本地结果声明代码 CI 已通过。ADD-70 与整体 goal 仍 partial/active，旧二进制回退、其余重复语义与真实环境继续列为尚缺。
+
+### 24.5 后续消费者审计的明确缺口
+
+`316165785e06767554bc0bdc8408b20b77e91375` 已推送，读回 main/origin/main 精确一致、工作区干净。继续静态检查运行时直接读取旧 settings 凭据的路径，未发现新的生产直读；账号 state 已允许 settings 缺失，完整逻辑记录 three-way merge 仍保守拒绝同一连接的并发模型/凭据编辑，不据物理分文件假称可独立合并。
+
+历史验证脚本存在尚未集成的消费者：
+
+- `scripts/verify-provider-readiness.mjs` 的 loadConfig/resolveCredential 只读 `.cheers/config.json` 并自行解析凭据/模型；分文件或 auth-only profile 会报缺凭据/缺配置，modelPreferences 也未 join。
+- `scripts/verify-doctor-environment.mjs` 的路径存在检查仍要求 config.json，auth-only profile 会被误拒绝；该检查明确不读内容，不能算凭据正确性证明。
+- `scripts/daily-regression.mjs`、`scripts/broader-regression.mjs` 的 HOME 候选与活动连接读取仍以 config.json 为唯一来源，可能选错 fixture 或遗漏活动连接。
+
+这些发现加入 ADD-70 尚缺，未执行相关真实 provider/全套脚本，未修改 release/default gates、package scripts 或构建行为。后续修复应通过既有 TypeScript config/credential owner 的受控桥接获取逻辑结果，保持 source/profile/permission 与 report-safe 合同；不在脚本复制第二套 auth/envelope 解析和认证优先级。需要聚焦分文件/auth-only、无读权/坏格式、来源变化与脱敏验证后才可将这些脚本用于新格式验收。此处为静态缺口记录，不是已验证的现场失败。
+
+`31616578` 的代码 CI `41190946495`、Watch `41190946542` 最后读回均 in_progress；`c2819249` 的代码 CI `41190177753` 最后仍在测试阶段。没有宣布 ADD-70 或整体完成，真实环境与旧版本回退验收继续延后。
