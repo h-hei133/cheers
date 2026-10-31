@@ -95,15 +95,18 @@ describe("the row under the prompt", () => {
     expect(row).toContain("ctrl+c again");
   });
 
-  it("says what a queued prompt is waiting for", () => {
+  it("points at the queue editor while entries are waiting", () => {
+    // Each waiting entry is listed above the prompt with its delivery stage, so
+    // this row does not repeat the count; it names how to change one.
     const row = renderHints({ ...quiet, busy: true, queued: 2 }, nothing, 80).join("");
-    expect(row).toContain("2 queued");
+    expect(row).toContain("/queue to edit");
+    expect(row).not.toContain("2 queued");
   });
 
-  it("says a steered prompt is delivered before the next step", () => {
+  it("points at the queue editor while a steered prompt is waiting too", () => {
     const row = renderHints({ ...quiet, busy: true, steering: 1 }, nothing, 80).join("");
-    expect(row).toContain("1 steering");
-    expect(row).toContain("before the next step");
+    expect(row).toContain("/queue to edit");
+    expect(row).not.toContain("1 steering");
   });
 
   it("offers interruption while a turn runs", () => {

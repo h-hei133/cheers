@@ -21,6 +21,15 @@ export class TurnProjection {
   private readonly openCalls = new Map<string, { name: string; isError: boolean }>();
   private steps = 0;
 
+  /**
+   * The opening message, when the caller states it.
+   *
+   * It is a user message too, but it is the prompt the surface already echoed
+   * with the environment prefix folded in. Reporting it as a delivery would draw
+   * that prefix as a second bubble.
+   */
+  constructor(private readonly opening?: AgentMessage) {}
+
   /** Steps the model has taken in this run. */
   get stepCount(): number {
     return this.steps;
@@ -75,6 +84,13 @@ export class TurnProjection {
       case "message_end": {
         const message = event.message;
         if (message.role === "assistant") return [{ type: "message.finished", role: "coder" }];
+        // Input the user handed a running turn. The kernel emits this at the
+        // moment it is injected into the conversation, which is the only
+        // reliable statement that it was delivered: submitting a steer is a
+        // request, and a turn that is interrupted first never takes it.
+        if (message.role === "user") {
+          return message === this.opening ? [] : [{ type: "message.delivered", role: "user", text: messageToText(message.content) }];
+        }
         if (message.role !== "tool" || !message.tool_call_id) return [];
         const open = this.openCalls.get(message.tool_call_id);
         this.openCalls.delete(message.tool_call_id);

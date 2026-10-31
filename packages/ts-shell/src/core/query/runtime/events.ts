@@ -108,6 +108,15 @@ export type QueryEvent =
   | { readonly type: 'message.delta'; readonly role: AgentRole; readonly delta: string }
   /** Transient display boundary before callbacks from one model request. */
   | { readonly type: 'message.started'; readonly role: AgentRole }
+  /**
+   * Input the user handed a running turn, reported when it is injected.
+   *
+   * A steer is a request until the turn reaches a point where it can take it.
+   * An interrupted turn may never take one, so a surface that echoed at submit
+   * time would leave a question in the conversation that the model never saw.
+   * This event is the delivery fact; the text is what was actually delivered.
+   */
+  | { readonly type: 'message.delivered'; readonly role: 'user'; readonly text: string }
   /** The model message stopped producing output, including failed attempts. */
   | { readonly type: 'message.finished'; readonly role: AgentRole }
   /**
@@ -151,5 +160,9 @@ export function isDurableQueryEvent(event: QueryEvent): boolean {
     && event.type !== 'message.replace'
     && event.type !== 'reasoning.replace'
     && event.type !== 'message.started'
+    // The delivered message is already a session turn; this event only tells a
+    // surface when to draw it. Recording both would put one message in the
+    // transcript twice.
+    && event.type !== 'message.delivered'
     && event.type !== 'message.finished'
 }

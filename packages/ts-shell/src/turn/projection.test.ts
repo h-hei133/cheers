@@ -6,7 +6,10 @@ it.each(['stop', 'error', 'aborted'] as const)('closes assistant display on mess
   const message = { role: 'assistant' as const, content: 'partial', stopReason };
   expect(projection.project({ type: 'message_start', message })).toEqual([]);
   expect(projection.project({ type: 'message_end', message })).toEqual([{ type: 'message.finished', role: 'coder' }]);
-  expect(projection.project({ type: 'message_end', message: { role: 'user', content: 'q' } })).toEqual([]);
+  // A user message reaching the kernel is a delivery, not a silent no-op: this
+  // is the fact a surface draws a user block from.
+  expect(projection.project({ type: 'message_end', message: { role: 'user', content: 'q' } }))
+    .toEqual([{ type: 'message.delivered', role: 'user', text: 'q' }]);
 });
 
 it.each(['', ' \n\t'])('does not count an unanswered assistant as successful: %j', content => {

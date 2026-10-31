@@ -829,22 +829,3 @@ function normalizeProviderConnections(
 
   return normalized;
 }
-
-function getRuntimeConfigHomeDir(): string {
-  const explicit = process.env.CHEERS_HOME_OVERRIDE?.trim();
-  if (explicit) {
-    return explicit;
-  }
-
-  const userProfile = process.env.USERPROFILE?.trim();
-  if (userProfile) {
-    return userProfile;
-  }
-
-  const home = process.env.HOME?.trim();
-  if (home) {
-    return home;
-  }
-
-  return os.homedir();
-}

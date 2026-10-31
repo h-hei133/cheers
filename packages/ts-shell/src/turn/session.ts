@@ -209,13 +209,15 @@ function gateOptionsFor(
 
 export function runTurn(options: TurnOptions): TurnRun {
   const channel = new EventChannel<QueryEvent>();
-  const projection = new TurnProjection();
   const parentGate = gateOptionsFor(options, (event) => channel.push(event));
   const runSubagent = options.subagentHost
     ? createSubagentRunner(options.subagentHost, options.tools, parentGate)
     : undefined;
   const gate: ToolGateOptions = { ...parentGate, ...(runSubagent ? { runSubagent } : {}) };
   const opening = openingMessage(options);
+  // The opening prompt carries the environment prefix; the surface already drew
+  // the user's own text, so its delivery is not reported again.
+  const projection = new TurnProjection(opening);
   const toolPool = () => options.toolSnapshot?.() ?? options.tools;
   const hooks = createToolHooks(gate, toolPool);
   const core = new AgentCore({

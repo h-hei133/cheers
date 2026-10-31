@@ -842,7 +842,10 @@ export class InteractiveMode {
     appendPromptHistory(this.options.runtimeContext.projectRoot, text);
     const controlSource = text.startsWith('/') ? text : '';
     if (isQueueControl(controlSource)) {
-      this.echoUser(text, attachments);
+      // `/queue` is the queue's own control surface, not a message: its text is
+      // a command line. `add` hands its payload to the queue, and that payload
+      // becomes a user block when it starts running — echoing the command line
+      // too would show two blocks for one message the user actually wrote.
       const context = this.options.runtimeContext;
       const rawCommandArgs = text.replace(/^\/queue(?:\s|$)/i, '');
       void queueCommandFor(context, this.options.sessionRuntime, attachments)(tokenizeCommandArgs(rawCommandArgs), {
@@ -1032,10 +1035,11 @@ export class InteractiveMode {
         // question the model had already been asked.
         this.queue.push(text, attachments);
       } else if (disposition === "steer") {
-        this.echoUser(text, attachments);
+        // No block yet: a steer is a request, and the turn takes it only when it
+        // reaches its next step. The delivered message produces the block, so an
+        // interrupted turn cannot leave a question the model never saw.
         input.steer(text);
       } else {
-        this.echoUser(text, attachments);
         input.followUp(text);
       }
       this.tui.requestRender();

@@ -669,22 +669,49 @@ it('keeps a waiting message out of the conversation and shows it above the promp
   } finally { mode.stop(); }
 });
 
-it('records a steered message once it is delivered, and not before', () => {
+it('records a steered message only when the running turn actually takes it', () => {
   const { mode } = build();
   const host = mode as unknown as { busy: boolean; onSubmit(text: string, disposition?: 'steer' | 'followUp'): void;
-    options: { sessionRuntime: ShellSessionRuntime }; view: InteractiveView };
+    sink: { handleEvent(event: unknown): void }; options: { sessionRuntime: ShellSessionRuntime }; view: InteractiveView };
   const followUp = vi.fn(), steer = vi.fn();
   host.options.sessionRuntime.input = () => ({ followUp, steer, pending: () => ({ steering: [], followUps: [] }) }) as never;
   host.busy = true;
   try {
     host.onSubmit('tighten the loop', 'steer');
     expect(steer).toHaveBeenCalledWith('tighten the loop');
-    // A steer was accepted by the running turn, so it is part of the conversation.
+    // Submitting a steer is a request. Until the turn reaches a point where it
+    // can take one, the message is waiting — so an interruption cannot leave a
+    // question in the conversation that the model never saw.
+    expect(host.view.transcript.all().filter(block => block.kind === 'user')).toHaveLength(0);
+
+    // The kernel reports the delivery when it injects the message.
+    host.sink.handleEvent({ type: 'message.delivered', role: 'user', text: 'tighten the loop' });
     expect(host.view.transcript.all().filter(block => block.kind === 'user').map(block => block.text)).toEqual(['tighten the loop']);
+
     host.onSubmit('then run the tests', 'followUp');
     expect(followUp).toHaveBeenCalledWith('then run the tests');
+    expect(host.view.transcript.all().filter(block => block.kind === 'user')).toHaveLength(1);
+    host.sink.handleEvent({ type: 'message.delivered', role: 'user', text: 'then run the tests' });
     expect(host.view.transcript.all().filter(block => block.kind === 'user').map(block => block.text))
       .toEqual(['tighten the loop', 'then run the tests']);
+  } finally { mode.stop(); }
+});
+
+it('keeps an interrupted steer in the draft without leaving it in the conversation', async () => {
+  const { mode } = build();
+  const host = mode as unknown as { busy: boolean; onSubmit(text: string, disposition?: 'steer' | 'followUp'): void;
+    interrupt(): Promise<void>; options: { sessionRuntime: ShellSessionRuntime }; view: InteractiveView };
+  const undelivered = ['tighten the loop'];
+  host.options.sessionRuntime.input = () => ({ followUp: vi.fn(), steer: vi.fn(), pending: () => ({ steering: [], followUps: [] }),
+    clearQueue: () => undelivered.splice(0) }) as never;
+  host.options.sessionRuntime.cancelAndWait = async () => {};
+  host.busy = true;
+  try {
+    host.onSubmit('tighten the loop', 'steer');
+    await host.interrupt();
+    expect(host.view.editor.getText()).toBe('tighten the loop');
+    // The message never reached the model, so it is not in the record.
+    expect(host.view.transcript.all().filter(block => block.kind === 'user')).toHaveLength(0);
   } finally { mode.stop(); }
 });
 
@@ -1696,7 +1723,9 @@ it.each((['regular', 'fullscreen'] as const).flatMap(kind => (['add ', ''] as co
       expect(host.busy).toBe(true); host.view.editor.setText(draft); terminal.input('\r');
       await vi.waitFor(() => expect(host.view.transcript.all().some(block => block.text?.includes('Queued '))).toBe(true));
       expect(host.queue.control.entries()).toEqual([{ id: expect.any(String), lane: 'pending', text: `${reroute ? '/queue add ' : ''}${source}` }]);
-      expect(host.view.transcript.all().filter(block => block.kind === 'user').at(-1)).toMatchObject({ images });
+      // A waiting entry is not conversation yet: it is drawn above the prompt and
+      // joins the transcript, pictures included, when it starts running.
+      expect(host.view.transcript.all().filter(block => block.kind === 'user').at(-1)).not.toMatchObject({ images });
       expect(host.view.editor.getText()).toBe(''); expect(dispatch).toHaveBeenCalledOnce();
       if (ending === 'missing') fs.unlinkSync(skillPaths[1]!);
       if (ending === 'oversize') fs.appendFileSync(skillPaths[1]!, 'x'.repeat(65536));
