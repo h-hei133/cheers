@@ -10,6 +10,20 @@ import { planningBody } from '../../core/commands/planning/source.js';
 interface QueueHost { readonly control: InputQueueControl; enqueue(text: string, attachments?: PromptAttachments): string; drain(): void }
 const hosts = new WeakMap<ShellSessionRuntime, QueueHost>();
 
+/**
+ * What the three stages mean, in the same words the pending band uses.
+ *
+ * The list is the only place all three lanes are visible together — the band
+ * above the prompt shows what is waiting, but not why one entry precedes
+ * another. Naming the order here means a user who sees `[steering]` above
+ * `[followUp]` can tell whether that is a bug or the delivery contract.
+ */
+const QUEUE_LEGEND = [
+  'steering  delivered before the running turn\'s next step',
+  'followUp  runs after the running turn finishes',
+  'pending   waits for the turn boundary, then runs in this order',
+].join('\n');
+
 export function attachInputQueue(runtime: ShellSessionRuntime, host: QueueHost): () => void {
   hosts.set(runtime, host); return () => { if (hosts.get(runtime) === host) hosts.delete(runtime); };
 }
@@ -36,7 +50,7 @@ export function queueCommandFor(context: ShellRuntimeContext, runtime: ShellSess
     const controls = [live, host?.control].filter((control): control is InputQueueControl => Boolean(control));
     const entries = controls.flatMap(control => control.entries());
     if (action === 'list') return { kind: 'local', output: entries.length ? `Pending execution (stage order):\n${entries.map((entry, index) =>
-      `${index + 1}. ${entry.id} [${entry.lane}] ${sanitizeExecutionReportText(entry.text, 240)}`).join('\n')}` : 'No pending input.' };
+      `${index + 1}. ${entry.id} [${entry.lane}] ${sanitizeExecutionReportText(entry.text, 240)}`).join('\n')}\n\n${QUEUE_LEGEND}` : 'No pending input.' };
     if (action === 'add') {
       const text = planningBody(commandContext.rawCommandArgs, parsed.action.name ? 1 : 0, parsed.args);
       if (host) { const id = attachments ? host.enqueue(text, attachments) : host.enqueue(text); host.drain(); return { kind: 'local', output: `Queued ${id}.` }; }

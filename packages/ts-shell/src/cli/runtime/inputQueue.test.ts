@@ -55,3 +55,20 @@ it('keeps the existing text-only queue call shape and control commands on the sa
     expect(queue.length).toBe(0); expect(push).toHaveBeenCalledTimes(1);
   } finally { detach(); }
 });
+
+it('names what each stage means so a listed order can be read without guessing', async () => {
+  const { context, runtime, queue, commandContext } = fixture();
+  const detach = attachSubmissionQueue(runtime, queue, vi.fn(), () => false);
+  try {
+    await queueCommandFor(context, runtime)(['add', 'one'], { ...commandContext, rawCommandArgs: 'add one' });
+    const result = await queueCommandFor(context, runtime)(['list'], commandContext);
+    expect(result).toMatchObject({ kind: 'local' });
+    const output = (result as { output: string }).output;
+    expect(output).toContain('1. ');
+    // The band above the prompt shows what is waiting; this is the only place
+    // that says why one entry precedes another.
+    expect(output).toContain('steering  delivered before the running turn');
+    expect(output).toContain('followUp  runs after the running turn finishes');
+    expect(output).toContain('pending   waits for the turn boundary');
+  } finally { detach(); }
+});
