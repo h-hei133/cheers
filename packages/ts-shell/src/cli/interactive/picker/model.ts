@@ -113,8 +113,10 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       // Keep the host's request overrides, while actual activation retains the original context.
       const inspectionContext = { ...context, sessionId: undefined };
       const activeAddress = providerCredentialBaseUrl(catalog, active);
+      const currentProviderSlot = active.selection?.connectionId === undefined
+        && (active.selection?.credentialScope === 'provider' || !config.activeProviderConnectionId);
       const activeReady = Boolean(!active.blocked && (active.credential
-        || (!config.activeProviderConnectionId && providerBindingAvailable(catalog, active))));
+        || (currentProviderSlot && providerBindingAvailable(catalog, active))));
       const availability = availabilitySnapshot({ config, catalog });
       const thinkingEffort = assigning ? assigning.thinkingEffort
         : captureThinkingPreference(context.projectRoot ?? context.cwd, active.thinkingEffort).thinkingEffort;
@@ -125,7 +127,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         const entry = availability.providers.find(item => item.provider === provider.runtime);
         const connections = (entry?.connections ?? []).filter(connection => matchesCatalog(provider, connection, config.providerConnections, catalog));
         const providerSlot = active.provider === provider.runtime && !active.credential?.connectionId
-          && Boolean(active.credential || !config.activeProviderConnectionId)
+          && Boolean(active.credential || currentProviderSlot)
           && (provider.id === provider.runtime || Boolean(activeAddress && provider.baseUrl
             && activeAddress.replace(/\/+$/, '') === provider.baseUrl.replace(/\/+$/, '')));
         for (const connection of providerSlot ? [...connections, undefined] : connections.length ? connections : [undefined]) {

@@ -11094,3 +11094,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 
 
 本批代码/证据说明已提交推送 `638d023ec1fff4c4309dfec23aa823b51a3b791d`，远端main精确一致、batch scratch移除、提交后clean。自身CI `41220480426`最后in_progress，Watch `41220480427`completed/success，不代替代码CI；此段交付记录单独文档提交。
+
+
+### 2026-11-01：交互目录尊重显式 provider 请求范围
+
+[addition24.32](features/phase-20-addition.md#2432-交互模型目录尊重显式-provider-请求范围)接续两处未提交改动，修复保存的无关命名连接压住explicit Bedrock/Vertex signer当前行与切换入口；未明确scope及named/pool边界保持。新增实际OverlayHost上键/Enter，浏览零写、保存后读回、load/hook变更拒绝及零fetch/settings-auth bytes；Node20.3单worker串行1文件58项通过，反转6失败/2控制/50未选并精确恢复后58通过。五门/build当前compilerInputs摘要通过，manifest ee5df6d0d8e5；初次旧版runner参数错误已分类。无独立委派复审/本批judge/真实provider/PTY/平台/旧binary/全仓/20k；776269e2精确CI已success，638d023e/20db8867仍in_progress，交付另读回。ADD-70 partial、goal active。

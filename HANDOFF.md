@@ -1617,3 +1617,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A valid signer is labelled credential missing, or an override attaches request signing to another saved provider's auth label. A saved named ID can also suppress an explicit provider request's status.
 - **Root Cause**: Stored credential presence, actual request admission and configured-provider display are treated as one fact, with independent catalogue/status predicates.
 - **Rule**: Keep static credential and measurement projections unchanged. Use the same exact current-request catalogue owner for signer display and status, preserve named/pool/ambiguity guards, and label request auth/readiness beside request identity. Test CLI overrides and explicit provider scope over unrelated saved named connections without probes or writes; signer capability does not prove external credentials work.
+
+
+### Explicit Provider Scope Must Reach The Interactive Catalogue
+- **Symptom**: Text status accepts a current signer, but the model picker calls it credential missing and disables switching while an unrelated saved named connection exists.
+- **Root Cause**: The interactive projection infers the current namespace only from saved activeProviderConnectionId and overlooks the actual resolution's explicit credentialScope.
+- **Rule**: Check the actual selection connection ID and explicit provider scope when projecting current provider rows. Preserve the named boundary when scope is absent; verify real host navigation, accepted write/readback, stale hook refusal and unchanged shared configuration.

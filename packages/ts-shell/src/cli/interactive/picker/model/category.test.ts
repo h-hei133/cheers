@@ -53,6 +53,87 @@ function signerFixture(provider: 'bedrock' | 'vertex', model = 'shared') {
 const sharedConfigBytes = () => [getUserRuntimeConfigPath(), getUserAuthPath()]
   .map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
 
+it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['direct', 'keyboard'] as const).map(source => ({ provider, source }))))(
+  'keeps an explicit $provider signer picker current over unrelated saved named state through $source activation', async ({ provider, source }) => {
+  const named = getRuntimeConfig(root).providerConnections[0]!;
+  const fixture = signerFixture(provider); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, provider: 'openai', activeProviderConnectionId: named.id,
+    providerConnections: [named] }, edit);
+  const resolveConfigTarget = (config: RuntimeConfig, id?: string) => resolveProviderCredential({ runtimeConfig: {
+    ...config, provider, activeProviderConnectionId: undefined, sessionConnection: { scope: 'provider', provider },
+  }, env: {}, pool: { sessionId: id } });
+  const picker = modelPicker({ ...commands(), resolveConfigTarget });
+  const before = sharedConfigBytes(); const baseline = readSessionModelEdit(sessionId);
+  const rows = await picker.load();
+  expect(rows.filter(row => row.note === 'active').map(row => row.id)).toEqual([fixture.row()]);
+  expect(rows.find(row => row.id === fixture.row('next'))?.disabled).not.toBe(true);
+  expect(rows.some(row => row.id === 'model:current')).toBe(false);
+  expect(readSessionModelEdit(sessionId)).toEqual(baseline); expect(sharedConfigBytes()).toEqual(before);
+  if (source === 'direct') {
+    expect((await picker.apply([fixture.row('next')]))?.note).toContain('Model switched to next.');
+  } else {
+    const host = new OverlayHost(() => {}); host.open(picker); await settle();
+    let work: Promise<PickerOutcome | undefined> | undefined;
+    try {
+      expect(host.render(110, 28).map(stripAnsi).join('\n')).toContain('▸ shared');
+      host.handleKey(parseKeyEvent('\x1b[A'), () => { throw new Error('Browsing must not activate a model.'); });
+      expect(host.render(110, 28).map(stripAnsi).join('\n')).toContain('▸ next');
+      expect(readSessionModelEdit(sessionId)).toEqual(baseline);
+      host.handleKey(parseKeyEvent('\r'), (selected, ids) => {
+        expect(ids).toEqual([fixture.row('next')]); work = selected.apply(ids);
+      });
+      expect(work).toBeDefined();
+      expect((await work)?.note).toContain('Model switched to next.');
+    } finally { host.close(); }
+  }
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionScope: 'provider', provider, model: 'next', thinkingEffort: null });
+  expect(resolveConfigTarget(projectSessionModel(getRuntimeConfig(root), sessionId), sessionId))
+    .toMatchObject({ provider, model: 'next', baseUrl: fixture.baseUrl, selection: { credentialScope: 'provider' } });
+  expect((await picker.load()).filter(row => row.note === 'active').map(row => row.id)).toEqual([fixture.row('next')]);
+  expect(fixture.fetch).not.toHaveBeenCalled(); expect(sharedConfigBytes()).toEqual(before);
+});
+
+it.each(['bedrock', 'vertex'] as const)('keeps an unscoped %s signer separate from unrelated saved named state', async provider => {
+  const named = getRuntimeConfig(root).providerConnections[0]!;
+  const fixture = signerFixture(provider); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, provider: 'openai', activeProviderConnectionId: named.id,
+    providerConnections: [named] }, edit);
+  const resolveConfigTarget = (config: RuntimeConfig) => resolveProviderCredential({ runtimeConfig: {
+    ...config, provider, activeProviderConnectionId: undefined, sessionConnection: undefined,
+  }, env: {} });
+  const picker = modelPicker({ ...commands(), resolveConfigTarget });
+  const before = sharedConfigBytes(); const baseline = readSessionModelEdit(sessionId);
+  const rows = await picker.load();
+  expect(rows.find(row => row.id === fixture.row('next'))).toMatchObject({ disabled: true });
+  expect(rows.filter(row => row.note === 'active')).toEqual([]);
+  expect(readSessionModelEdit(sessionId)).toEqual(baseline); expect(sharedConfigBytes()).toEqual(before);
+  expect(fixture.fetch).not.toHaveBeenCalled();
+});
+
+it.each(['after load', 'during hook'] as const)('refuses an explicit signer scope replaced %s over saved named state', async timing => {
+  const named = getRuntimeConfig(root).providerConnections[0]!;
+  const fixture = signerFixture('bedrock'); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, provider: 'openai', activeProviderConnectionId: named.id,
+    providerConnections: [named] }, edit);
+  let changed = false;
+  const resolveConfigTarget = (config: RuntimeConfig, id?: string) => ({ ...resolveProviderCredential({ runtimeConfig: {
+    ...config, provider: 'bedrock', activeProviderConnectionId: undefined, sessionConnection: { scope: 'provider', provider: 'bedrock' },
+  }, env: {}, pool: { sessionId: id } }), ...(changed ? { baseUrl: 'https://changed.invalid' } : {}) });
+  const picker = modelPicker({ ...commands(), resolveConfigTarget });
+  const rows = await picker.load();
+  expect(rows.find(row => row.id === fixture.row('next'))?.disabled).not.toBe(true);
+  const before = sharedConfigBytes(); const baseline = readSessionModelEdit(sessionId);
+  if (timing === 'after load') changed = true;
+  else vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+    if (event.eventName === 'PreModelSwitch') changed = true;
+    return undefined;
+  });
+  expect((await picker.apply([fixture.row('next')]))?.note)
+    .toContain(timing === 'after load' ? 'selected credential or endpoint changed' : 'conflict: this attempt did not write');
+  expect(readSessionModelEdit(sessionId)).toEqual(baseline); expect(sharedConfigBytes()).toEqual(before);
+  expect(fixture.fetch).not.toHaveBeenCalled();
+});
+
 it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['local', 'host'] as const).map(source => ({ provider, source }))))(
   'activates and reloads a credentialless $provider signer through the $source reviewed picker without shared writes', async ({ provider, source }) => {
     const fixture = signerFixture(provider);

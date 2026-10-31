@@ -3,7 +3,7 @@ title: "Phase 20 日常交互补充要求与任务规划"
 category: article
 sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
-updated: 2026-10-31
+updated: 2026-11-01
 tags: [features, phase-20, additions, interaction, panels, completion]
 summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-71，已把七轮用户反馈与子代理review发现按职责归并，重复项合并，逐条记录完成情况。当前0完成、8部分完成、62本地验证、1未开始；其余章节保留研究过程与逐批证据。"
 confidence: mixed
@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.31 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.32 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影及交互目录显式 provider 范围收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5883,3 +5883,16 @@ build exit0，manifest `ef982b674f90`、inputsDigest `82d6aba4bec6af4140fe8ea483
 
 
 本批代码/证据说明已提交推送 `638d023ec1fff4c4309dfec23aa823b51a3b791d`，远端main精确一致、batch scratch移除、提交后clean。自身CI `41220480426`最后in_progress，Watch `41220480427`completed/success，不代替代码CI；此段交付记录单独文档提交。
+
+
+### 24.32 交互模型目录尊重显式 provider 请求范围
+
+接续 `20db8867` 的两处工作区改动。文本目录与状态已尊重实际请求的 explicit provider scope，但 [model picker](../../packages/ts-shell/src/cli/interactive/picker/model.ts) 仍只看保存的 active connection ID；当 Bedrock/Vertex 请求显式处于 provider 范围，而用户配置保留无关命名连接时，面板把实际 signer 标成缺凭据并拒绝可用模型。既有 auth binding 与模型保存事务无需增加第二套逻辑；面板改为同时检查实际 resolution 的 connection ID 和明确 provider scope，显式范围能显示和选择当前 signer，未明确范围时保留旧命名连接围栏。
+
+先读目标再只读比较参考 coding-agent 的 model-runtime:335–375 与 model-selector:148–184：available snapshot 与 stored credentials 分开，初始焦点按实际 current model 定位；本修复遵循这两个决定。没有改变 signer、issuer、provider dispatch、命名凭据准入或存储结构，也不获取 AWS/ADC 凭据。
+
+主代理 Linux Node20.3.0、heap768MiB、单worker串行验证 [category tests](../../packages/ts-shell/src/cli/interactive/picker/model/category.test.ts)，最终 **1文件/58项** exit0。新增8项覆盖两个provider的直接保存与实际 OverlayHost 上键/Enter、未明确provider范围的命名隔离，以及load后/hook内端点替换拒绝；按键浏览不写，Enter保存后重开读回正确，settings/auth bytes与零fetch保持。首次命令误用新版Vitest的poolOptions参数，在收集测试前exit1，分类为runner设置错误；改用本包0.34.6 runner及single-thread后正常。
+
+旧生产owner反转实际 **6失败/2控制通过/50未选/exit1**，失败为行为AssertionError；finally逐字节恢复修复版本后，同58项exit0。五静态门通过（118既有docs-source advisory），Node floor build `ee5df6d0d8e50149d8abe6cd08ecb08e3ba80062f330b948796370a429d74910`，`inputsDigest=d511b8b1cb4f276d766ca945b0ad0174cf231614564775d9e091485550d936f0` 含manifest.compilerInputs，与当前输入精确一致。未改导入图，本批未另跑NormProof，也没有独立委派复审；不能沿用上批APPROVE。证据保留于 `.omx/artifacts/phase20-addition-picker-signing/`，本批提交/推送/精确CI另读回。
+
+延迟CI `776269e2`/`41219155385`已success；`638d023e`/`41220480426`、`20db8867`/`41220682282`最后仍in_progress，对应Watch成功不替代代码CI。真实AWS/ADC/provider、PTY、非Linux平台、旧发布binary、全仓/20k未验；原Phase20真实条件继续延后，ADD-70与整体仍partial，goal active。
