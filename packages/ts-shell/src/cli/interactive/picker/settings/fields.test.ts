@@ -171,6 +171,26 @@ it.each((['user', 'project'] as const).flatMap(scope => ([
     } finally { view.overlay.close(); }
   });
 
+it.each(['user', 'project'] as const)('retains a failed %s Apply when cancelling the save-scope chooser', async scope => {
+  const view = surface(scope), target = scope === 'user' ? userFile : projectFile;
+  const other = scope === 'user' ? projectFile : userFile, untouched = fs.readFileSync(other);
+  try {
+    await view.open('maxTurns'); await view.press('\r'); await view.press('\x15'); await view.press('42'); await view.press('\r');
+    const external = '// concurrent source\n{"schemaVersion":1,"maxTurns":17,"topP":0.6}';
+    fs.writeFileSync(target, external);
+    expect((await view.press('\r'))?.note).toContain('conflict');
+    await view.choose('Change save scope'); await view.press('\x1b');
+    const retainedFailure = view.frame().includes('Apply not confirmed') && view.frame().includes('conflict');
+    expect(view.frame()).toContain(`save to ${scope}`); expect(view.frame()).toContain('Pending: 42');
+    expect(fs.readFileSync(target, 'utf8')).toBe(external); expect(fs.readFileSync(other)).toEqual(untouched);
+    expect((await view.press('\r'))?.note).toContain(`Saved to your ${scope} configuration.`);
+    expect(retainedFailure).toBe(true);
+    expect(readRuntimeConfigEditAt(target).values).toMatchObject({ maxTurns: 42, topP: 0.6 });
+    expect(fs.readFileSync(target, 'utf8')).toContain('// concurrent source'); expect(fs.readFileSync(other)).toEqual(untouched);
+    await view.press('\r'); expect(view.frame()).toContain('Stored: 42'); expect(view.frame()).not.toContain('Apply not confirmed');
+  } finally { view.overlay.close(); }
+});
+
 it.each(['cancel', 'confirm'] as const)('keeps the scope chooser %s path explicit for a staged value with both source owners', async action => {
   const view = surface('user'); const bytes = [userFile, projectFile].map(file => fs.readFileSync(file));
   try {

@@ -17,10 +17,10 @@ export type { SettingsHost } from './settings/contract.js';
 
 function compact(value: unknown): string { return truncateToWidth(formatSetting(value), 36); }
 
-function scopePicker(host: SettingsHost, draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue): Picker {
+function scopePicker(host: SettingsHost, draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue, failure?: string): Picker {
   return {
     title: 'Choose save scope — pending value will be discarded', form: 'panel', exclusive: true, holdInput: true, empty: '', initialSelection: draft.scope,
-    back: () => settingDetail(host, draft, setting, pending),
+    back: () => settingDetail(host, draft, setting, pending, failure),
     load: async () => (['user', 'project'] as const).filter(scope => setting.policy.sources.includes(scope)).map(scope => ({ id: scope, label: scope === 'user' ? 'User configuration' : 'Project configuration' })),
     async apply(ids) {
       const scope = ids[0];
@@ -101,7 +101,7 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
       if (id === 'inspect') return { next: settingSources(draft, setting, () => settingDetail(host, draft, setting, pending, failure)) };
       if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending, value => settingDetail(host, draft, setting, value, failure)) };
       if (id === 'unset') return { next: settingDetail(host, draft, setting, { value: undefined }, failure) };
-      if (id === 'scope' && setting.policy.sources.includes('project')) return { next: scopePicker(host, draft, setting, pending) };
+      if (id === 'scope' && setting.policy.sources.includes('project')) return { next: scopePicker(host, draft, setting, pending, failure) };
       if (id === 'back' || id === 'discard') return { next: settingsPicker(host, draft.scope, setting.group, setting.key) };
       if (id === 'apply' && pending) {
         consumed = true;

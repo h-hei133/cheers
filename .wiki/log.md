@@ -11247,3 +11247,10 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 [addition24.60](features/phase-20-addition.md#2460-失败-apply-经值编辑器返回后仍可显式重试)修复原 settings 详情经 editor confirm/cancel 丢失 failure、复用 consumed draft 而额外失败；只传递原失败状态，下一明确 Apply 复用原 reopen/binding/source 检查。新增16项 user/project×四种编辑类型×确认/取消，旧 owner16失败/116控制，反转16失败/116未选中，逐字节恢复后 fields132/lifecycle20 共152通过；初次入口路径错误独立留存，不算有效反转。五门/Node20.3 TS+exe build de2e0e38e6dc，current inputs/两份 exe size/SHA核验通过。普通/全屏×两scope×确认/取消八条真实 CLI 全通过：编辑返回零save/reopen，第二 Apply一次reopen并确认写入，冲突及保存实际绘制、Stored读回，注释/兄弟字段/另一scope/auth/session model保持。八场HTTP0、exit0/cooked恢复/owned进程及scratch清理，最高采样578300KiB不算性能；两次早期探针迭代单独保留，固定Escape时序改为观察实际消费和关闭，含迭代10次CLI不算十场有效矩阵。独立证据核验passed，HANDOFF补失败状态与consumed draft关系；无真实provider/exe故障注入/其他平台/全仓/20k/judge/委派复审，ADD-03部分完成、原47外部条件延后、goal active。
 
 一次延迟读取 c66fbc8a 代码CI41252988169仍in_progress、Watch41252988065 success，f8763ff2代码CI41252261041及Watch41252261035均success；本批CI尚未观察，最终门与提交推送另绑。
+
+
+### 2026-11-01：保存范围取消保留失败 Apply
+
+[addition24.61](features/phase-20-addition.md#2461-失败-apply-经保存范围取消返回后仍可重试)补ADD-03/17相邻返回路径：scope取消传回原failure，避免冲突后再次保存consumed draft；确认范围仍按原合同丢弃pending。定向参考先于修补，旧owner2失败/132控制，反转2失败/132未选中，逐字节恢复后154项通过；五门及Node20.3 TS/exe build d0b773499bec、current inputs/两份exe核验通过。普通/全屏×user/project四条真实CLI均在另一scope焦点上Escape取消，原范围/pending/冲突保持且取消零save/reopen，下一明确Apply恰好一次reopen并保存/Stored读回；注释/兄弟字段/另一scope/auth/session保持、HTTP0、exit0/cooked/owned进程与scratch清理。首条观测失败单独unverified保留，修正观察收据原子发布/单帧读取后四场通过，含初条共5次CLI；未断言其唯一异常原因或改产品掩盖探针失败。最高采样575916KiB不算性能，独立核验passed，HANDOFF扩展同一规则。无真实provider/exe故障注入/其他平台/全仓/20k/judge/委派复审，ADD-03部分完成、原47外部条件延后、goal active；本批交付CI尚未观察。
+
+一次延迟读取5acafcb3与c66fbc8a代码CI41254074206/41252988169仍in_progress，各Watch41254074184/41252988065 success。最终门与提交推送另绑。

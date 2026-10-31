@@ -365,11 +365,11 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---|---|---|---|---|
 | ADD-01 | P0 | model 面板未配置模型可聚焦、可浏览、可进入精确配置 | 第 3.2、第 15 节首批、第八十六至九十七批 | 部分完成 | 用户原环境按键现场；真实认证服务的完整往返（自动回返已在 `modelAuthentication` 实现并有测试） |
 | ADD-02 | P0 | model 分类/角色/预设/连接/详情的完整导航与操作路径 | 第 3.3、第六批、第七十六至九十八批 | 部分完成 | 真实 provider 的能力/认证组合矩阵（角色独立 thinking 编辑已由 `modelRoleThinkingPicker` 实现并有测试） |
-| ADD-03 | P0 | settings 分类/section/编辑器/Apply/来源的真实路径 | 第 3.4、第三十八至三十九批、第一百至一百零三批、第24.46、24.60节 | 部分完成 | 工具allowlist与发现入口的实际声明、失败Apply后的编辑返回重试已修补；其余字段×来源×编辑器×窗口组合 |
+| ADD-03 | P0 | settings 分类/section/编辑器/Apply/来源的真实路径 | 第 3.4、第三十八至三十九批、第一百至一百零三批、第24.46、24.60–24.61节 | 部分完成 | 工具allowlist与发现入口的实际声明、失败Apply后的编辑及保存范围取消返回重试已修补；其余字段×来源×编辑器×窗口组合 |
 | ADD-14 | P0 | settings 顶部导航，左右键切分类、Tab 切条目与分节 | 第 32 项、21.2、21.15 | 本地验证 | 真实桌面鼠标/键盘；其他平台 |
 | ADD-15 | P2 | model 面板未就绪项置底、组内字母序、Not ready 分隔标题 | 第 35 项、21.5、21.16 | 本地验证 | 真实面板观感；窄屏分隔标题 |
 | ADD-16 | P1 | 区分 config.json 与 models.json 的归属，并显示目录加载诊断 | 第 31 项、19.5、21.1、21.14 | 本地验证 | 用户真实 models.json 现场 |
-| ADD-17 | P1 | settings 子面板返回、取消与失败后保留原 notice | 第 8、25、26 批 | 本地验证 | 真实文件系统故障 |
+| ADD-17 | P1 | settings 子面板返回、取消与失败后保留原 notice | 第 8、25、26 批、第24.60–24.61节 | 本地验证 | 真实文件系统故障 |
 | ADD-18 | P2 | 面板悬停、滚轮、侧栏独立滚动与非循环焦点 | 第 17–21 批、21.19 | 本地验证 | 真实桌面鼠标手感 |
 | ADD-19 | P2 | 面板鼠标选择后的键盘焦点与切类后的原字段恢复 | 第 17 批、21.19 | 本地验证 | 同上 |
 | ADD-20 | P2 | 角色动作退役、子面板返回与不可用档位的只读焦点 | 第 42–44 批、第八十至九十四批 | 本地验证 | 完整角色/认证矩阵 |
@@ -6388,3 +6388,16 @@ ADD-47表中的缺口是20.52尚未在真实CLI注入unknown。本批先检查�
 证据在 ignored 的 .omx/artifacts/phase20-addition-settings-return/，旧/新 owner/test 与执行脚本的非测试文本快照、red/green/reversal/build日志、失败/中间/最终数值布尔收据分别保留；不存 raw PTY、真实凭据或请求/响应正文。独立 verification.mjs 已通过。结构化字段矩阵由集成测试提供，真实终端只覆盖 number；无当前 exe 故障注入、真实 provider、其他平台/桌面、全仓/15套件/20k真实PTY、local NormProof或委派复审。ADD-03仍部分完成，原47外部条件延后、ADD-30租约继续暂缓，goal active。
 
 一次延迟读取上一批 c66fbc8a 精确代码 CI41252988169 仍 in_progress、Watch41252988065 success；再前批 f8763ff2 的代码 CI41252261041 已 completed/success、Watch41252261035 success。不将 Watch 替代完整 CI，不立即轮询；本批最终静态门和提交推送交付另绑，本批交付 CI 尚未观察。
+
+
+### 24.61 失败 Apply 经保存范围取消返回后仍可重试
+
+沿 ADD-03/17 检查相邻返回路径，[scopePicker](../../packages/ts-shell/src/cli/interactive/picker/settings.ts)的 back 仍丢失原 failure，导致冲突后的 consumed draft 被再次保存。先读目标，再定向比较参考快照 f09d01b85e0384647fcab6779d35ab9dabe04be3 的 settings-list 273–312：undefined 子操作只关闭并恢复原行，不更新父值。本项目采用取消保留原状态的决定；保留自身显式 Apply、原 draft.reopen 及 binding/source 检查，确认范围仍另按原合同丢弃 pending。产品只增加 failure 的入参与取消返回传递，没有改 writer 或增加 owner。
+
+[真实 host 回归](../../packages/ts-shell/src/cli/interactive/picker/settings/fields.test.ts)新增 user/project 两项，旧 owner 两项均在期望下一 Apply 保存时失败，原132控制通过；显式反转2失败/132未选中，finally逐字节恢复后 fields134/lifecycle20 共154项通过。五静态门及串行 Node20.3 TS/exe build通过：build d0b773499bec73e957062a486bec2fa7a960db01861b40b1f4e56b2bde63b921、inputs c53a1bdf9389f3e7751abaca8dfe23dea92f8eb217d7298c81a71bb0cb7a6411，当前 compilerInputs 及两份 exe size/SHA 独立核验一致。
+
+普通/全屏 × user/project 四条实际 Node20.3 /settings 路径全部通过：暂存9、外部改17及topP、首次Apply冲突、打开范围并移动到另一范围、Escape回原范围/原pending/原冲突。取消不save/reopen，随后一次明确Apply恰好reopen一次并确认保存9，实际终端冲突/保存提示及新开Stored读回均核对；注释/兄弟字段、另一scope/auth/session model保持，HTTP0、exit0/cooked恢复、owned PID/start identity非活跃及scratch清理。45秒/2MiB/100ms采样768MiB守卫未触发，最高575916KiB只作小夹具观察。首次探针在 conflict-refused 观测阶段失败，未进入本次取消场景，独立保留unverified；随后将观察收据改为临时文件rename发布、单次读取frame，四场使用同一冻结脚本。初条未记录具体异常名，不能断言文件中间态是其唯一原因；含初条共5次CLI，不计为五条有效矩阵。产品未为该观测失败额外修改。
+
+证据在 ignored 的 .omx/artifacts/phase20-addition-settings-scope-return/，baseline/fixed与探针快照、红绿/反转/build日志、初次失败和四条最终布尔/数值收据分开保留；独立verification已通过。HANDOFF将同一失败状态规则扩展到scope取消。无raw PTY/真实凭据/请求正文，无真实provider、当前exe故障注入、其他平台/真实磁盘故障、全仓/15套件/20k真实PTY、local NormProof或委派复审。本批不升级ADD-03，原47外部条件延后、ADD-30继续暂缓，goal active。
+
+一次延迟读取5acafcb3代码CI41254074206与c66fbc8a代码CI41252988169仍in_progress，各Watch41254074184/41252988065 success；不以Watch替代完整CI，不立即轮询。本批最终门及提交推送另绑，本批交付CI未观察。
