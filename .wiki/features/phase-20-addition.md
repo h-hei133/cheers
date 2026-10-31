@@ -417,7 +417,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---|---|---|---|---|
 | ADD-10 | P1 | 按源位置识别 slash/正文路径并 Tab 补全 | 第 8、第三批、第七十八至八十七批、第一百一十批 | 本地验证 | 真实 Windows 终端 |
 | ADD-11 | P1 | 正文 skill 候选与同提交多 skill 注入 | 第 9、第三批、21.22、21.24、第 24.48 节 | 本地验证 | Node/exe普通多skill真实派发及print原文保持已验证；真实计费金额、研究driver质量与其他环境组合仍缺 |
-| ADD-12 | P1 | 准入 slash 组合与 deep-research + skills | 第 10、第三批、第五十、五十二、五十九批 | 本地验证 | 真实 provider/桌面 |
+| ADD-12 | P1 | 准入 slash 组合与 deep-research + skills | 第 10、第三批、第五十、五十二、五十九批、第 24.49 节 | 本地验证 | Node真实组合逐阶段及账本已有证据；两轮研究均partial，完整报告、真实资料质量、exe及桌面仍缺 |
 | ADD-37 | P2 | 显式队列入口保留附件与正文尾部空白 | 第九十五批 | 本地验证 | 真实 provider/平台 |
 | ADD-38 | P2 | 引用路径、apostrophe、转义目录的补全往返 | 第七十八至八十七批 | 本地验证 | 原生 Windows 文件系统 |
 | ADD-39 | P2 | 代码示例、URL、转义 slash 不误触发命令/skill | 第二十九、七十九批 | 本地验证 | 真实终端 |
@@ -6139,3 +6139,30 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 每场protected HOME/profile/XDG/Git、0600隔离配置仅复制所选真实key/address/model；offline只禁自主检查，显式provider仍真实。65秒、1024输出、2MiB输出/会话文件上限、100ms采样768MiB descendant RSS阈值只是小夹具守卫，不是性能验收。原config/auth/catalog四home来源bytes或缺失、隔离config、skill文件bytes及project条目均不变；owned PID+start-time关闭、含凭据配置/原生会话/expected正文scratch全部删除。raw stdout/stderr/实际请求/响应/思考正文、headers、key/address及prompt/session digest均不进入正式证据；HTTP200后的error仅是未分类诊断。正式baseline/中间失败/反转/构建/可复用probe与安全收据归`.omx/artifacts/phase20-addition-print-source/`。
 
 五项静态门、四脚本语法、diff与安全收据核验均exit0，118既有docs-source advisory保留；当前四owner逐字节匹配恢复后快照、build新鲜度、原始key/address缺席和owned scratch缺失核验通过。无全仓回归、20k真实会话、PTY、新local NormProof或委派复审。延迟读回86f87db0/41241685047及58bf4871/41240901265代码CI经本批一次延迟读回均已success，各Watch已success；35b939c3代码CI仍success，不替代本批CI。ADD-11不升级整体完成，真实金额、研究driver与其他环境组合仍缺，原Phase20真实条件继续延后、goal active，本批提交与推送另绑定。
+
+
+### 24.49 多 skill 研究入口的真实阶段与 partial 边界
+
+在已推送`5b454f035e759923beb4e05bc707d08bafa78518`及当前build d666ac7e304f上，沿ADD-12检查[原生研究入口](../../packages/ts-shell/src/research/run/entry.ts)、[阶段提示词](../../packages/ts-shell/src/research/run/prompts.ts)、[child结算](../../packages/ts-shell/src/research/run/child.ts)与[报告验证](../../packages/ts-shell/src/research/report/validation.ts)。已有本地组合测试使用模拟模型；本批补生产Node20.3 --print真实provider观察，不改产品实现、模型配置或验证门。两份公开fixture skill加一次重复调用从正文中的deep-research进入同一个native run；问题仅涉及公开本地release.md夹具，不是现实资料研究质量验收。
+
+每轮只开放read/research_run，关闭MCP/context files/discovery/warming/retry与报告保存，maxTurns=2、每请求2048输出、最多14次POST、240秒、2MiB输出/会话文件、100ms采样768MiB descendant RSS阈值，Node heap768MiB。透明observer仍转交原Undici fetch参数和未消费Response；额外请求限额属于probe守卫，不改产品重试/预算规则。子阶段顺序运行，无并行模型或重型验证。两次独立项目同夹具不代表同wire body。
+
+| 观察 | 首轮 | 补账本/安全停止分类后的第二轮 |
+|---|---|---|
+| 实际HTTP | 1 GET + 12 POST，均200 | 1 GET + 8 POST，均200 |
+| 子阶段实际请求数 | brief2、investigate2、gaps1、draft1、review2、report2 | brief2、investigate2、gaps1、draft1 |
+| 原生研究终态 | partial，停在report | partial，停在draft |
+| 来源 / claim / 有效报告片段 | 1 / 1 / 1 | 1 / 1 / 0 |
+| 独立复审 | completed，有实际read收据 | not-run |
+| 前景query / CLI | completed/success，exit0 | completed/success，exit0 |
+| RSS采样峰值KiB | 302952 | 276244 |
+
+全部16次实际子阶段请求都包含两份正确body各一次、没有原始invocation token，并与首次实际research_run schema中的native run ID一致；元数据及持久methods保留完整原输入，两份skill按稳定顺序去重。各阶段实际请求数与native child的requestIds数量相符。首轮brief/investigate/review、第二轮brief/investigate均有真实本地读取收据，未执行报告文件保存。首轮共7个child、第二轮4个child；child.status为completed只表示该child调用结束，[finishChild](../../packages/ts-shell/src/research/run/child.ts)随后仍须applyStage验证，不能把它当作stage已接受。首轮第二个report child结束后仅1份片段、第二轮draft child结束后阶段未推进，两次fullNativeChain断言均失败、runner均exit1，原始收据均保留unverified；前景success不替代研究验收。未放宽原生schema、绑定、引用或片段顺序检查。
+
+首轮没有保留具体stopReason，事后安全读取时scratch已删除、仅记录observed:false；第二轮固定错误分类白名单未匹配、stopCategory仍unclassified。因此仅确认原生阶段产出未获接受，不能推断具体schema/引用/绑定问题，也不能凭HTTP200后的diagnostic错误归类provider/network故障。两轮未触发probe请求、时限、输出字节或RSS守卫；没有第三次重试、提高输出限额或用窄绿色掩盖失败。后续若继续诊断，应在原生状态清理前保留完整安全错误分类，再决定是否需要产品修补或输出预算调整。
+
+[前景请求历史](../../packages/ts-shell/src/turn/request.ts)不是研究总请求数：[provider step](../../packages/ts-shell/src/turn/step.ts)把子阶段用量交给[原session辅助计量sink](../../packages/ts-shell/src/session/store/usage.ts)，以affectsContext:false累计，保持前景recentRequests语义。两轮recentRequests各2条不能称各2次推理，前景toolCallsCount=0也不能称没有实际research_run/read。第二轮原生研究账本finalized=8，与8个实际POST相等；22603 input + 11027 output，已含cache read10752，pending/unknown均0、historyUnknown/breach均false。首轮未保存账本合计，不能用第二轮补造；provider归一化tokens与共享账本也不证明真实计费金额。
+
+两轮protected HOME/profile/XDG/Git、0600配置仅复制所选真实provider凭据；四home来源config/auth/catalog bytes或缺失、隔离config、fixture bytes及project条目均不变，owned PID+start-time关闭、含凭据/原生会话/expected body的scratch删除。正式证据不留实际请求/响应/思考正文、headers、key/address或prompt/session digest。首轮精确runner另存非可执行source快照，二轮收据、透明observer、安全核验归`.omx/artifacts/phase20-addition-research-stages/`。提交前发现初选证据目录与历史archive重名，已迁至上述独立目录并从HEAD恢复两份历史文件；原历史目录7个tracked文件逐字节核对不变，未把覆盖混入提交。核验明确scope为部分观察的真实性/安全性，currentProbeStatus=unverified、researchAcceptance=partial-not-verified；其passed不升级研究验收。
+
+本批只有文档/HANDOFF与ignored证据，无新产品build、unit、反转、PTY、全仓、20k、local NormProof或委派复审。五项静态门、三脚本语法、diff及安全证据核验通过，118既有docs-source advisory保留；当前build新鲜、请求/child计数、第二轮账本及原始key/address缺席、scratch清理均核对。一次延迟读回5b454f03代码CI41243494189仍in_progress、Watch41243494336 success，86f87db0代码CI success；不把Watch当代码CI。ADD-12仍本地验证，完整报告、真实资料研究质量、exe/桌面和金额证据继续缺失，ADD-11的研究质量缺口不提升；原47真实条件延后、goal active，提交推送另绑。

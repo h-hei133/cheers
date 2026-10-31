@@ -1708,3 +1708,22 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An explicit scripted prompt loses indentation, trailing spaces and a final newline before skill composition records originalInput and source ranges. Normalizing all slash routes to repair this can also activate a positioned interactive command that should remain prose.
 - **Root Cause**: Argument parsing, prompt collection and non-interactive dispatch trim the data instead of using a normalized view only for empty checks and command recognition. Interactive and scripted hosts have different existing standalone-command placement contracts.
 - **Rule**: Preserve explicit prompt strings through all three boundaries. Compose from the original source; use the scripted host's normalized command view only for standalone dispatch. Keep interactive positioned functional commands literal and retain the existing line-framed pipe contract. Verify exact final prompt, original metadata, source slices and indented standalone-command controls together.
+
+
+### Research Child Completion Precedes Stage Acceptance
+
+- **Symptom**: A research child is marked completed and the foreground query exits successfully, but the native run stops partial with fewer accepted report fragments or an unadvanced draft stage.
+- **Root Cause**: Child completion records the model-call outcome before applyStage parses and validates its output. Research-run status, accepted stage progression, review execution and foreground query completion describe separate outcomes.
+- **Rule**: Verify the native run and accepted fragments or stage-completed events. Keep failed full-chain probes unverified, and capture a fixed safe stop classification before deleting native scratch. Do not weaken schema/citation/binding checks or label an unclassified stage rejection a provider/network failure.
+
+### Foreground Request History Excludes Research Child Calls
+
+- **Symptom**: A real research makes 12 or 8 inference POSTs while recentRequests contains only 2 foreground records; a zero foreground tool counter also coexists with actual research_run and source reads.
+- **Root Cause**: Child requests use the auxiliary session usage sink with affectsContext:false, so foreground context history and counters do not enumerate the whole native workflow.
+- **Rule**: Compare actual transport dispatches, native child request IDs and the shared research ledger. Use the ledger's settled totals, pending and unknown states for combined resource evidence; never infer total calls, tool execution or billed money from foreground history alone.
+
+### Ignored Artifact Roots Can Contain Tracked History
+
+- **Symptom**: New evidence overwrites a historical README or gate log even though its parent artifact directory is ignored.
+- **Root Cause**: Ignore rules do not apply to files already tracked, and reusing an existing directory can collide with archived evidence names.
+- **Rule**: Check both path absence and git ls-files before creating a new evidence directory. Move colliding new evidence to an unused path and restore the previously clean tracked files byte-for-byte; verify the complete historical directory against HEAD before delivery.
