@@ -5589,3 +5589,15 @@ picker在捕获实际active之后建立只移除sessionId的inspection context�
 主代理实际Linux Node20.3.0单进程串行最终 **6文件/205项**通过：command serviceTier9、model serviceTier5、provider30、step12、role46、preview103。新命令测试包含split文件默认、fallback/pool、env/CLI、affinity前后不变、pending/deleted/empty-pool/missing；观察settings/auth字节或缺失。既有五种HTTP来源用例同时断言slow/fast状态与实际body.service_tier；另真实loopback验证explicit request default优先于connection flex/provider priority。三反转（raw active、去掉provider校验、删除blocked guard）均实际AssertionError，finally源码精确恢复，最终套件全过。五门/diff/build通过，manifest `d6f24e4b74c3`；正式打包judge exit0，环和导入解析satisfied，仅既有interactiveMode21/22-name advisory，未新增ceiling finding。两路只读复审最终APPROVE/CLEAR；scratch已清理，子代理未执行验证。
 
 `da3ca316` 的 `41195952241`、`7bec50d5` 的 `41196273759` 最后代码CI仍in_progress；对应Watch success不替代代码CI。本批提交与CI独立绑定。未真实provider、Windows、PTY、全仓/20k验证或真实HOME迁移，旧版本回退与其余重复事实审计仍缺，ADD-70 partial、整体goal active。
+
+### 24.13 命名模型偏好保存拒绝不可用请求
+
+第24.12节 `a9f537faf31dc01b72c23a7b2eb5948d4e087bb8` 已推送且main/远端精确一致。继续复现当前模型偏好保存的guard只对provider scope检查blocked/credential：session-scoped命名连接pending或缺自身key时，`setSessionServiceTier` 和 `publishModelPreference` 仍保存并显示成功。四条新增pending/missing × tier/context回归在旧代码实际AssertionError，error状态因model mismatch已拒绝。
+
+两既有owner移除provider-only限定，所有当前模型选择在进入catalog更新或session writer前都必须有unblocked本地credential。保持legacy未显式绑定选择的env/CLI解析，不增加现场请求；离线可解析但网络未验证仍可保存。锁内sameValue解析重查、connection身份、catalog capability、session/root/CAS原保护不变；无需新helper、数据字段或认证实现。
+
+只读参考再次对照模型变更在保存session目标之前检查认证存在，显式全局persist另行处理。本项目将这一准入边界一致应用到当前模型tier/context偏好，命名连接/closed pool仍以原本地resolver负责授权；没有将真实网络联通作为写入条件，也没有借用provider slot去补被绑定连接的缺凭据。
+
+实际Linux Node20.3.0最终串行 **3文件/77项**通过：provider42、effort26、command serviceTier9。新增pending/error/missing/pool-outside/pool-waiting × tier/context十项证明writer未进入、session保持、settings/auth字节或缺失不变；另两项在session lock内引入pool backoff，原CAS正确拒绝并保留session。已有legacy env/CLI、provider slot、HTTP tier/model/effort、权限与能力回归继续通过。两条scope-only反转分别实际AssertionError，finally源码精确恢复后最终套件全过。五门/diff/build通过，manifest `1198eb3f4160`；正式打包judge exit0，环/导入解析satisfied，仅既有interactiveMode21/22-name advisory。两路只读复审APPROVE/CLEAR，子代理未验证，scratch已清理。
+
+`a9f537fa` 的代码CI `41196921141`、`7bec50d5` 的 `41196273759`、`da3ca316` 的 `41195952241` 最后in_progress，对应Watch success不作代码通过。此次另绑提交与自身CI；未真实provider、Windows、PTY、全仓/20k或真实HOME迁移。ADD-70仍partial、整体goal active，旧版本回退与其余重复事实/真实环境继续延后。

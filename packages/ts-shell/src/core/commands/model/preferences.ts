@@ -27,7 +27,7 @@ export function publishModelPreference(context: CommandContext, update: (selecti
     }
     const request = selectionRequest(context, config, selection);
     if (request.provider !== selection.provider || request.model !== selection.model
-      || (selection.connectionScope === 'provider' && (request.blocked || !request.credential))) {
+      || request.blocked || !request.credential) {
       return 'The selected model differs from the current request or its credential is unavailable. Reload before changing preferences.';
     }
     if (catalogProvider(catalog, selection.provider, request.baseUrl).ambiguous) return 'Model preference refused: multiple catalogue entries claim this endpoint.';

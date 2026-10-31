@@ -46,7 +46,7 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
   }
   const request = selectionRequest(context, config, selection);
   if (request.provider !== selection.provider || request.model !== selection.model
-    || (selection.connectionScope === 'provider' && (request.blocked || !request.credential))) {
+    || request.blocked || !request.credential) {
     return 'Service tier refused: the selected model differs from the current request or its credential is unavailable.';
   }
   if (context.admission?.() || baseline.projectRoot === undefined || path.resolve(baseline.projectRoot) !== path.resolve(root)) return 'Service tier refused: session or workspace admission changed.';

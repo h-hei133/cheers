@@ -10990,3 +10990,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：slow/fast、preview、角色与请求共用 tier owner
 
 [addition24.12](features/phase-20-addition.md#2412-service-tier-读取跟随同一个实际-owner)7bec50d5已推送main/远端一致。五回归实际复现raw active tier与fallback/pool/env/CLI请求不同，现既有serviceTier owner按resolved provider/connection选唯一默认，四消费者共用；explicit request override保留，blocked/missing status保持unverified。实际Node20.3上6文件205项含loopback tier/status与explicit override、三反转AssertionError/精确恢复、五门/build通过，manifestd6f24e4b74c3；复审APPROVE/CLEAR，正式judge仅既有interactiveMode advisory。前两代码CI最后in_progress，未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。
+
+### 2026-10-31：命名连接不可用时偏好保存统一拒绝
+
+[addition24.13](features/phase-20-addition.md#2413-命名模型偏好保存拒绝不可用请求)a9f537fa已推送main/远端一致；复现pending/missing命名选择tier/context仍保存，四断言实际失败。两既有guard移除provider-only条件，所有当前选择都需本地unblocked credential；legacy env/CLI与锁内CAS保留。Node20.3上3文件77项含十项prewriter拒绝/两文档与session不变、两项锁内pool backoff、两反转实际失败/精确恢复、五门/build通过，manifest1198eb3f4160；复审APPROVE/CLEAR，正式judge仅既有interactiveMode advisory。前三代码CI最后in_progress，未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。

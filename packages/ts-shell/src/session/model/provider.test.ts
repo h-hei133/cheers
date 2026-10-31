@@ -4,13 +4,16 @@ import path from 'node:path';
 import http from 'node:http';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../SessionManager.js';
-import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile, type RuntimeConfig } from '../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile, type RuntimeConfig } from '../../config/runtimeConfig.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel, decodeSessionModel } from './state.js';
 import { projectSessionModel } from './projection.js';
 import { runModelCommand } from '../../core/commands/modelCommandRuntime.js';
 import { runThinkingCommand } from '../../core/commands/thinkingCommandRuntime.js';
 import { runExtendedContextCommand } from '../../core/commands/model/context.js';
 import { runSlowCommand, setSessionServiceTier } from '../../core/commands/model/serviceTier.js';
+import { credentialIdentityFor } from '../../core/auth/account/pool.js';
+import { ownedConnectionCredential } from '../../core/auth/account/presence.js';
+import { noteCredentialRateLimit, resetCredentialBackoffForTests } from '../../core/auth/account/backoff.js';
 import { runFastCommand } from '../../core/commands/fastCommandRuntime.js';
 import { runModelPresetCommand } from '../../core/commands/model/presetCommand.js';
 import { modelPicker } from '../../cli/interactive/picker/model.js';
@@ -36,7 +39,7 @@ beforeEach(() => {
     { id: 'next', reasoning: true, contextWindow: 32000, serviceTiers: ['default', 'flex'] }] }]);
   manager = new SessionManager(); sessionId = manager.createNew(home).id;
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { recursive: true, force: true }); });
+afterEach(() => { resetCredentialBackoffForTests(); vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { recursive: true, force: true }); });
 const context = () => ({ cwd: home, projectRoot: home, sessionId });
 const row = (model = 'next') => `model:${JSON.stringify([null, 'openai', model])}`;
 function connection() {
@@ -216,6 +219,50 @@ it.each(['tier', 'context'] as const)('refuses a legacy %s preference if the act
   const lock = files.withFileLock;
   vi.spyOn(files, 'withFileLock').mockImplementation((file, run, options) => lock(file, () => {
     if (file === before.statePath.replace(/state\.json$/, 'state.lock')) vi.stubEnv('OPENAI_API_KEY', 'synthetic-changed');
+    return run();
+  }, options));
+  const output = kind === 'tier' ? setSessionServiceTier(context(), 'flex') : (await runExtendedContextCommand(['on'], context())).output;
+  expect(output).toContain('write outcome is unverified');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+});
+
+it.each((['pending', 'error', 'missing', 'pool-outside', 'pool-waiting'] as const).flatMap(state =>
+  (['tier', 'context'] as const).map(kind => ({ state, kind }))))(
+  'refuses a $kind write for a named $state request before entering the session writer', async ({ state, kind }) => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const named = { ...connection(), ...(state === 'missing' ? { apiKey: undefined } : state === 'pending' || state === 'error' ? { status: state } : {}) };
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'named',
+    providerConnections: [named, { ...connection(), id: 'sibling' }],
+    ...(state === 'pool-outside' || state === 'pool-waiting' ? { accountPool: { openai: { connections: [state === 'pool-outside' ? 'sibling' : 'named'] } } } : {}) }, edit);
+  if (state === 'pool-waiting') noteCredentialRateLimit(credentialIdentityFor('openai', ownedConnectionCredential(named))!, 60_000);
+  writeSessionModel(sessionId, { connectionId: 'named', connectionScope: 'session', provider: 'openai', model: 'next' }, readSessionModelEdit(sessionId));
+  const command = context();
+  const actual = resolveProviderCredential({ runtimeConfig: projectSessionModel(getRuntimeConfig(home), sessionId), env: {} });
+  expect(actual.blocked).toBeDefined();
+  expect(actual.credential).toBeUndefined();
+  const before = readSessionModelEdit(sessionId);
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const lock = vi.spyOn(files, 'withFileLock');
+  const output = kind === 'tier' ? setSessionServiceTier(command, 'flex') : (await runExtendedContextCommand(['on'], command)).output;
+  expect(output).toContain('credential is unavailable');
+  expect(lock).not.toHaveBeenCalled();
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+});
+
+it.each(['tier', 'context'] as const)('preserves the session if its named pool credential becomes unavailable under the %s writer lock', async kind => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const named = connection();
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'named', providerConnections: [named],
+    accountPool: { openai: { connections: ['named'] } } }, edit);
+  writeSessionModel(sessionId, { connectionScope: 'session', connectionId: 'named', provider: 'openai', model: 'next' }, readSessionModelEdit(sessionId));
+  const before = readSessionModelEdit(sessionId);
+  const lock = files.withFileLock;
+  vi.spyOn(files, 'withFileLock').mockImplementation((file, run, options) => lock(file, () => {
+    if (file === before.statePath.replace(/state\.json$/, 'state.lock')) {
+      noteCredentialRateLimit(credentialIdentityFor('openai', ownedConnectionCredential(named))!, 60_000);
+    }
     return run();
   }, options));
   const output = kind === 'tier' ? setSessionServiceTier(context(), 'flex') : (await runExtendedContextCommand(['on'], context())).output;
