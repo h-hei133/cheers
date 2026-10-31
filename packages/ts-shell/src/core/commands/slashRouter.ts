@@ -10,7 +10,9 @@ export async function routeSlashCommand(
   context: CommandContext,
 ): Promise<CommandExecutionResult | null> {
   const registry = createCommandRegistry(context.cwd, context.runtimeConfig);
-  const opening = /^\/([^\s/]+)(?:\s|$)/.exec(input)?.[1];
+  // Scripted hosts allow indented standalone commands; composition keeps the source.
+  const commandSource = context.interactive === false ? input.trimStart() : input;
+  const opening = /^\/([^\s/]+)(?:\s|$)/.exec(commandSource)?.[1];
   const openingCommand = opening ? resolveCommandInvocation([...registry.values()], opening) : undefined;
   const dynamic = catalogContributions(context.cwd, context.sessionId).flatMap(entry => entry.commands);
   const first = openingCommand ?? (opening ? resolveCommandInvocation(dynamic, opening) : undefined);
@@ -18,9 +20,9 @@ export async function routeSlashCommand(
     const composed = await composePrompt(input, context, [...registry.values(), ...dynamic]);
     if (composed) return composed;
   }
-  if (!input.startsWith('/') || /^\/[^\s]*[\/\\]/.test(input)) return null;
+  if (!commandSource.startsWith('/') || /^\/[^\s]*[\/\\]/.test(commandSource)) return null;
 
-  const invocation = parseCommandSource(input);
+  const invocation = parseCommandSource(commandSource);
   const rawName = invocation?.name;
   const rawCommandArgs = invocation?.argsText ?? "";
   if (!rawName) {

@@ -416,7 +416,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-10 | P1 | 按源位置识别 slash/正文路径并 Tab 补全 | 第 8、第三批、第七十八至八十七批、第一百一十批 | 本地验证 | 真实 Windows 终端 |
-| ADD-11 | P1 | 正文 skill 候选与同提交多 skill 注入 | 第 9、第三批、21.22、21.24 | 本地验证 | 真实 provider 派发与成本 |
+| ADD-11 | P1 | 正文 skill 候选与同提交多 skill 注入 | 第 9、第三批、21.22、21.24、第 24.48 节 | 本地验证 | Node/exe普通多skill真实派发及print原文保持已验证；真实计费金额、研究driver质量与其他环境组合仍缺 |
 | ADD-12 | P1 | 准入 slash 组合与 deep-research + skills | 第 10、第三批、第五十、五十二、五十九批 | 本地验证 | 真实 provider/桌面 |
 | ADD-37 | P2 | 显式队列入口保留附件与正文尾部空白 | 第九十五批 | 本地验证 | 真实 provider/平台 |
 | ADD-38 | P2 | 引用路径、apostrophe、转义目录的补全往返 | 第七十八至八十七批 | 本地验证 | 原生 Windows 文件系统 |
@@ -6118,3 +6118,24 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 每次protected HOME/profile仅在0600隔离配置复制所选真实API-key/address/model；65秒、1024输出、2MiB输出/会话文件上限、100ms采样768MiB descendant RSS阈值，最终峰值320800KiB。它是小夹具采样守卫，不是内核硬限额或性能验收。两次原配置/auth/catalog四home来源bytes或缺失及隔离config均不变，最终空项目不变；owned PID+start-time关闭核对、含凭据配置与原生会话scratch删除。stdout/stderr直接丢弃，正式证据不留请求/响应/思考正文、headers、key/address或prompt/session digest。正式脚本、初次与最终收据及核验归`.omx/artifacts/phase20-addition-default-count/`。
 
 本批仅文档/HANDOFF及忽略目录的证据脚本，不重复build/unit/反转，无PTY、全仓回归、20k真实会话、新local NormProof或委派复审。五项静态门、三脚本语法、diff及安全收据核验均exit0，118既有docs-source advisory保留；当前build新鲜度、原始key/address缺席与owned scratch缺失核验通过。延迟读回48f1407e/41239014279及35b939c3/41239648179代码CI现已success，58bf4871/41240901265仍in_progress、其Watch41240901269已success，不替代代码CI。ADD-08仍partial，历史同快照差额、其他环境/provider、完整词表/媒体/协议与性能验收仍缺；原Phase20真实条件继续延后，goal active，本批提交与推送另绑定。
+
+### 24.48 print 原始输入保留与多 skill 真实派发
+
+接续已推送`86f87db072b350e2f1b6b53941af53971a74f159`，继续ADD-11真实派发前检查，发现显式prompt在[argv解析](../../packages/ts-shell/src/entrypoints/cliArgs.ts)、[非交互prompt收集](../../packages/ts-shell/src/core/shell/printPromptInput.ts)和[执行入口](../../packages/ts-shell/src/entrypoints/cliRuntimeModule.ts)三次整体trim，导致普通正文及多skill组合在记录originalInput、解析source ranges前已失去首尾空白。真实参数是一份明确字符串，其缩进、尾空格和最终换行属于内容；不能靠组合owner的局部保持弥补上游丢失。先查目标后定向只读参考A快照f09d01b85e0384647fcab6779d35ab9dabe04be3的cli/initial-message原片段拼接及print-mode:131–136原样交给session.prompt决定，采用原文保持；本项目继续保留自己的line-batch framing和多skill整份准入，不复制参考实现或改成其stdin拼接语义。
+
+原owner现在仅用trim视图判空，原字符串贯穿argv、收集、组合和实际executePrompt；[slash owner](../../packages/ts-shell/src/core/commands/slashRouter.ts)仅为interactive:false保留脚本原有的前导空白独立命令识别，组合仍收到原input。交互模式中带前导空白的settings/model继续是正文，不能因为保留print原文而隐式激活它们；standalone命令参数继续沿原parser。未新增第二份draft或改动provider/auth、执行权限、package/build行为及任何默认配置。
+
+新增argv有/无terminator、transport显式多行/空白过滤、实际非交互路由的普通正文/两skill+重复调用与source slices回归，并保留indented help控制。print transport旧断言把显式参数trim当作预期，与本任务原文合同冲突，已改为精确原文；pipe行framing断言不变。有效旧源码基线三文件6失败/68控制通过；显式四owner原源码反转同6失败/68通过，finally逐字节恢复并核对SHA。主代理Node20.3单worker/768MiB串行最终及恢复后五文件均166通过（argv61、transport8、runtime5、slash49、composition43）。首次Vitest0.34不支持maxWorkers选项未跑测试、首次修补无条件trimStart导致两个既有positioned-command回归，均单独留档；改用原一线程环境限制及非交互条件后通过，未弱化原控制。
+
+最后将runtime测试夹具统一迁入repo内`.tmp/phase20-print-source/`并清理，单文件5项再次通过；测试文件也属于compilerInputs，故此修改使初次build e8ff3217c78d摘要过期。保留`build-freshness-drift.json`的unverified及`*-before-fixture-rebuild.*`旧构建收据后串行重新构建、两runtime各重新实际推理一次；下表与新build绑定，不将旧收据挪绑。两代合计8场CLI、4次真实推理，其余4场未知skill均请求前拒绝。TS/exe串行构建通过，build`d666ac7e304fb20111ac1fab11831823ee4e6f90107c6ccf8df2d3c05a7d87cb`、inputs`db0ebb5af12299da4ca340487865c18a1c6b939dd08be15df7a5ca64db30a768`；linux-x64 exe SHA`cb17e559696dab0b44274e33066695761251db4ca08c3047297000c1c8a8709c`、106842240bytes、Bun1.3.14。每场核对当前compilerInputs摘要，exe另核对size/流式SHA。Node20.3与该生产单文件程序各两场真实--print，显式两份公开fixture skill、三个invocation含重复、原始多行及尾空格，工具/MCP/context files/warming/retry关闭、maxTurns=2，不启动研究driver或实际工具。
+
+| runtime | 未知第二skill | 合法两skill | provider总输入 / 已含cache read / output | RSS采样峰值，拒绝/合法KiB |
+|---|---|---|---:|---:|
+| Node20.3 | blocked、零native HTTP与零记录request | 一POST，completed/success | 958 / 576 / 264 | 259808 / 270532 |
+| exe | blocked、零记录request | 一记录request，completed/success | 955 / 576 / 959 | 199972 / 202444 |
+
+四场均exit0、零tool calls。合法两场原生user消息精确等于两份body各一次及完整prose，metadata保留原始全文、三个原始range切片、两份去重身份/CLI来源；skill正文内的未知/skill字面引用保持文本、不递归触发。未知第二skill两场均没有user或query.completed，不部分提交第一份。Node透明observer复用原Undici观察，实见一次readiness GET和推理POST均HTTP200、2504-byte实际body、1 user/0 tools，两份准确正文各一次、完整prepared suffix含尾空格和最终换行；accepted本地估算712/provider958与原生账本相等，wire system/conversation/tools/envelope为1902/458/0/144bytes。raw source base1198/skills651/separators1另列，不能与wire分项再相加。exe未注入observer或替换打包模块，原生持久记录不冒充独立HTTP计数/body证据。958/955各自已含cache，不能再次相加；两独立临时项目不保证同body，未评回答质量、研究质量或真实计费金额。
+
+每场protected HOME/profile/XDG/Git、0600隔离配置仅复制所选真实key/address/model；offline只禁自主检查，显式provider仍真实。65秒、1024输出、2MiB输出/会话文件上限、100ms采样768MiB descendant RSS阈值只是小夹具守卫，不是性能验收。原config/auth/catalog四home来源bytes或缺失、隔离config、skill文件bytes及project条目均不变；owned PID+start-time关闭、含凭据配置/原生会话/expected正文scratch全部删除。raw stdout/stderr/实际请求/响应/思考正文、headers、key/address及prompt/session digest均不进入正式证据；HTTP200后的error仅是未分类诊断。正式baseline/中间失败/反转/构建/可复用probe与安全收据归`.omx/artifacts/phase20-addition-print-source/`。
+
+五项静态门、四脚本语法、diff与安全收据核验均exit0，118既有docs-source advisory保留；当前四owner逐字节匹配恢复后快照、build新鲜度、原始key/address缺席和owned scratch缺失核验通过。无全仓回归、20k真实会话、PTY、新local NormProof或委派复审。延迟读回86f87db0/41241685047及58bf4871/41240901265代码CI经本批一次延迟读回均已success，各Watch已success；35b939c3代码CI仍success，不替代本批CI。ADD-11不升级整体完成，真实金额、研究driver与其他环境组合仍缺，原Phase20真实条件继续延后、goal active，本批提交与推送另绑定。

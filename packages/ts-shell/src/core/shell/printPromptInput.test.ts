@@ -3,10 +3,18 @@ import { buildNonInteractivePrompts, parseTransportPrompts, resolveStdinTranspor
 
 describe("prompt transport boundaries", () => {
   it("keeps explicit prompt ordering and preserves comment-like user text", () => {
-    expect(buildNonInteractivePrompts(" first ", "\uFEFFsecond\r\n\n # user text \r\nthird")).toEqual(["first", "second", "# user text", "third"]);
+    expect(buildNonInteractivePrompts(" first ", "\uFEFFsecond\r\n\n # user text \r\nthird")).toEqual([" first ", "second", "# user text", "third"]);
     expect(buildNonInteractivePrompts(undefined, null)).toEqual([]);
-    expect(buildNonInteractivePrompts(" first ", " \n")).toEqual(["first"]);
+    expect(buildNonInteractivePrompts(" first ", " \n")).toEqual([" first "]);
     expect(parseTransportPrompts("\uFEFF# note\r\n hello \n# ignored", { allowComments: true })).toEqual(["hello"]);
+  });
+
+  it('preserves the explicit multiline source while filtering blank prompts and framing piped lines', () => {
+    const prompt = '  Compare /skill:one\nthen /skill:two  \n';
+    expect(buildNonInteractivePrompts(prompt, null)).toEqual([prompt]);
+    expect(buildNonInteractivePrompts(prompt, 'next\n')).toEqual([prompt, 'next']);
+    expect(buildNonInteractivePrompts(' \t\n ', null)).toEqual([]);
+    expect(buildNonInteractivePrompts(' \t\n ', ' next \n')).toEqual(['next']);
   });
 
   it.each([

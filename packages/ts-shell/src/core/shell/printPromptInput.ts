@@ -4,19 +4,20 @@ export function buildNonInteractivePrompts(
   promptArg: string | undefined,
   pipedInput: string | null,
 ): string[] {
-  const prompt = promptArg?.trim() ?? "";
+  const prompt = promptArg ?? "";
+  const hasPrompt = prompt.trim().length > 0;
   if (pipedInput === null) {
-    return prompt.length > 0 ? [prompt] : [];
+    return hasPrompt ? [prompt] : [];
   }
 
   const pipedPrompts = parseTransportPrompts(pipedInput, {
     allowComments: false,
   });
   if (pipedPrompts.length === 0) {
-    return prompt.length > 0 ? [prompt] : [];
+    return hasPrompt ? [prompt] : [];
   }
 
-  if (!prompt) {
+  if (!hasPrompt) {
     return pipedPrompts;
   }
 

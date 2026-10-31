@@ -185,7 +185,7 @@ export async function runNonInteractivePrompt(options: {
     planningCommand: planningCommandFor(options.runtimeContext, options.sessionManager, options.sessionRuntime),
     requestPolicy: goalPolicyFor(options.runtimeContext, options.sessionManager),
     recordAuxiliaryUsage: sessionUsageSink(options.runtimeContext.session.id),
-    prompt: trimmedPrompt,
+    prompt: options.prompt,
     cwd: options.runtimeContext.cwd,
     projectRoot: options.runtimeContext.projectRoot,
     renderer: options.renderer,

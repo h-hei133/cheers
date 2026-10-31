@@ -462,8 +462,8 @@ function derivePromptArgument(
     }
   }
 
-  const prompt = positional.join(" ").trim();
-  return prompt.length > 0 ? prompt : undefined;
+  const prompt = positional.join(" ");
+  return prompt.trim().length > 0 ? prompt : undefined;
 }
 
 function normalizePathForCompare(value: string, cwd: string): string {

@@ -35,6 +35,13 @@ function expectParseError(args: readonly string[]) {
 }
 
 describe("cli args parser", () => {
+  it.each([false, true])('preserves the explicit prompt source around composed skills (terminator=%s)', terminator => {
+    const prompt = '  Compare /skill:one\nthen /skill:two /skill:one carefully  \n';
+    const args = ['--project', cwd, '--print', ...(terminator ? ['--'] : []), prompt];
+    expect(expectParsed(args).options.promptArg).toBe(prompt);
+    expect(expectParsed(['--project', cwd, '--print', ' \t\n ']).options.promptArg).toBeUndefined();
+  });
+
   it("preserves version early detection without parsing later modes", () => {
     const parsed = expectParsed(["--version"]);
 

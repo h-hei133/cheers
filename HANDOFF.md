@@ -1702,3 +1702,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A real default-dynamic request sends 18 schemas while a probe expects 13 pinned tools plus 2 discovery entries.
 - **Root Cause**: The foreground runtime explicitly supplies research source tools and an installed security proposal tool. Discovery intentionally adds run-provided tools to its initial set; inspecting only the pinned constant misses this caller composition.
 - **Rule**: Trace the actual foreground feature-tool owner before fixing a request roster expectation. Assert the admitted wire set for the specific fixture, preserve the failed observation separately, and never treat an unexpected count alone as a product defect. A one-step closing request omits schemas and cannot validate an ordinary tool-enabled first request.
+
+### Prompt Source And Command Recognition Need Separate Views
+
+- **Symptom**: An explicit scripted prompt loses indentation, trailing spaces and a final newline before skill composition records originalInput and source ranges. Normalizing all slash routes to repair this can also activate a positioned interactive command that should remain prose.
+- **Root Cause**: Argument parsing, prompt collection and non-interactive dispatch trim the data instead of using a normalized view only for empty checks and command recognition. Interactive and scripted hosts have different existing standalone-command placement contracts.
+- **Rule**: Preserve explicit prompt strings through all three boundaries. Compose from the original source; use the scripted host's normalized command view only for standalone dispatch. Keep interactive positioned functional commands literal and retain the existing line-framed pipe contract. Verify exact final prompt, original metadata, source slices and indented standalone-command controls together.
