@@ -78,6 +78,8 @@ export interface SubagentRunner {
 }
 
 export interface SubagentRunResult {
+  /** Native terminal reason, retained for consumers that require a complete result. */
+  readonly stopReason?: AgentMessage['stopReason'];
   /** Non-secret selection made by the request host, including an automatic session role. */
   readonly selection?: { readonly model?: string; readonly effort?: import('../models/effort.js').ThinkingPreference; readonly source: 'definition' | 'session-role' | 'parent' };
   /** Final answer separately from intermediate narration. */
@@ -246,6 +248,7 @@ export async function runSubagent(
   }
 
   return {
+    ...(lastAssistant?.stopReason ? { stopReason: lastAssistant.stopReason } : {}),
     finalText: typeof lastAssistant?.content === 'string' ? lastAssistant.content : '',
     text,
     failed: failure !== undefined,

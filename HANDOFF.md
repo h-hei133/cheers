@@ -1727,3 +1727,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: New evidence overwrites a historical README or gate log even though its parent artifact directory is ignored.
 - **Root Cause**: Ignore rules do not apply to files already tracked, and reusing an existing directory can collide with archived evidence names.
 - **Rule**: Check both path absence and git ls-files before creating a new evidence directory. Move colliding new evidence to an unused path and restore the previously clean tracked files byte-for-byte; verify the complete historical directory against HEAD before delivery.
+
+### Structured Research Must Preserve Native Terminal Reasons
+
+- **Symptom**: Research reports a generic invalid_response for generated JSON, or accepts syntactically valid stage output even though the model ended at its length limit.
+- **Root Cause**: The generic subagent result dropped the final assistant stopReason, and the local bounded JSON reader reused a network error class. Stage consumers lost the admission fact and the error's local provenance.
+- **Rule**: Preserve the native terminal reason across the subagent boundary; let structured research reject length before stage application without changing generic child failure semantics. Map only the local parser's invalid_response to a fixed research error, retaining byte/depth/schema bounds and no raw output. Test the actual runner-to-research path. For final cleanup assertions, inspect the current store: a returned run snapshot can predate finally releasing its owner.

@@ -21,6 +21,29 @@ import { researchReport } from '../report/renderer.js';
 import * as network from '../../core/network/connection.js';
 
 afterEach(cleanupResearch);
+it.each(['brief', 'report'] as const)('rejects a length-limited %s even when its JSON is valid', async stage => {
+  const setup = researchHarness();
+  const run = stage === 'brief' ? setup.runtime.create({ question: researchBrief.question, depth: 'quick', save: false })
+    : finishResearch(setup, { status: 'ready', stage: 'report' }).finished;
+  const step: StepFunction = async messages => {
+    const prompt = messages.map(message => String(message.content)).find(text => text.startsWith('Research stage:'))!;
+    const input = JSON.parse(prompt.split('Research input: ')[1]!);
+    return { text: JSON.stringify(stage === 'brief' ? researchBrief : { index: input.fragmentIndex,
+      title: input.fragmentSections[input.fragmentIndex], text: 'No additional claim.', claimIds: [], sourceIds: [], inputDigest: input.inputDigest }),
+      toolCalls: [], stopReason: 'length' };
+  };
+  const runner = createSubagentRunner({ step, defaultMaxSteps: 1 }, new Map(), { workspaceRoot: setup.root,
+    sessionId: setup.session.id, agentMode: 'build', permissionScope: 'ask', hooks: new HookDispatcher(), emit: () => {} });
+  const final = await setup.runtime.run(run.id, { taskId: 'truncated', workspaceRoot: setup.root, sessionId: setup.session.id, runSubagent: runner });
+  expect(final.status).toBe('partial'); expect(final.stage).toBe(stage); expect(final.fragments).toEqual([]);
+  expect(final.stopReason).toBe('Research stage output reached the model length limit.');
+  expect(final.children).toHaveLength(1); expect(final.children[0]).toMatchObject({ status: 'failed',
+    failure: 'Research stage output reached the model length limit.' });
+  expect(final.pending).toBeUndefined(); expect(setup.runtime.current()?.owner).toBeUndefined();
+  expect(final.events.some(event => event.kind === 'stage-completed')).toBe(false);
+  if (stage === 'brief') expect(final.brief).toBeUndefined();
+});
+
 it('runs actual read stages, bounded gap reinvestigation and a fresh adversarial context before ordered reports', async () => {
   const setup = researchHarness(); fs.writeFileSync(path.join(setup.root, 'release.md'), 'v2 enabled only on Linux.\n');
   const run = setup.runtime.create({ question: researchBrief.question, mode: 'software', depth: 'quick', save: false });

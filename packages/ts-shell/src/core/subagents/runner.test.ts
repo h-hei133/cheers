@@ -42,6 +42,15 @@ function stepThatCallsOnce(name: string): () => Promise<AssistantStep> {
 const HOST_BASE = { defaultMaxSteps: 10 };
 
 describe("running a subagent", () => {
+  it.each(['stop', 'length', 'error', 'aborted'] as const)('retains the final native stop reason for its consumer: %s', async stopReason => {
+    const result = await runSubagent({
+      definition: { name: 'bounded', description: 'bounded output', systemPrompt: 'Return the result.', maxTurns: 1, source: 'builtin' },
+      prompt: 'Inspect the fixture.', workspace: '/tmp',
+    }, { tools: new Map(), defaultMaxSteps: 1, step: async () => ({ text: 'retained output', toolCalls: [], stopReason }) });
+    expect(result.stopReason).toBe(stopReason);
+    expect(result.finalText).toBe('retained output');
+  });
+
   it("calls the tools the definition allows and reports what it said", async () => {
     let ran = 0;
     const tools = new Map<string, AgentTool>([["read", tool("read", () => { ran += 1; })]]);

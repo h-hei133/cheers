@@ -92,17 +92,18 @@ function finishChild(binding: RunBinding, started: ResearchRun, childId: string,
   return updateRun(binding, current => {
     if (current.pending?.childId !== childId) throw new Error('Research child outcome is no longer current.');
     const stale = current.epoch !== started.epoch || current.status !== 'running';
-    const failed = result.failed || signal.aborted;
+    const failure = result.stopReason === 'length' ? 'Research stage output reached the model length limit.' : result.failure;
+    const failed = result.failed || signal.aborted || result.stopReason === 'length';
     let run: ResearchRun = { ...current, pending: undefined,
       children: current.children.map(child => child.id === childId ? { ...child,
         endedAt: new Date().toISOString(), status: signal.aborted ? 'cancelled' : failed ? 'failed' : 'completed',
-        ...(failed ? { failure: safeText(result.failure ?? 'Child cancelled.') } : {}) } : child) };
+        ...(failed ? { failure: safeText(failure ?? 'Child cancelled.') } : {}) } : child) };
     if (stale) return run;
     if (run.stage !== started.stage) return run;
     if (!failed) {
       try { return runEvent(applyStage(run, result.finalText ?? result.text, childId), 'stage-completed', started.stage); }
       catch (error) { run = { ...run, stopReason: safeText(error instanceof Error ? error.message : 'Stage output validation failed.') }; }
-    } else run = { ...run, stopReason: Date.now() >= Date.parse(run.deadlineAt) ? 'Research deadline reached.' : safeText(result.failure ?? 'Child cancelled.') };
+    } else run = { ...run, stopReason: Date.now() >= Date.parse(run.deadlineAt) ? 'Research deadline reached.' : safeText(failure ?? 'Child cancelled.') };
     if (started.stage === 'review') run = { ...run, review: { role: 'independent', correlation: 'same-model-independent-context',
       inputDigest: researchInputDigest(run), childId, status: signal.aborted ? Date.now() >= Date.parse(run.deadlineAt) ? 'timeout' : 'cancelled' : 'failed',
       findings: [], uncovered: run.draft?.uncovered ?? [], limitation: run.stopReason ?? 'Independent review did not finish.' } };

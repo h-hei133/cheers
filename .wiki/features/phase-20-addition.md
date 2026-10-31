@@ -417,7 +417,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---|---|---|---|---|
 | ADD-10 | P1 | 按源位置识别 slash/正文路径并 Tab 补全 | 第 8、第三批、第七十八至八十七批、第一百一十批 | 本地验证 | 真实 Windows 终端 |
 | ADD-11 | P1 | 正文 skill 候选与同提交多 skill 注入 | 第 9、第三批、21.22、21.24、第 24.48 节 | 本地验证 | Node/exe普通多skill真实派发及print原文保持已验证；真实计费金额、研究driver质量与其他环境组合仍缺 |
-| ADD-12 | P1 | 准入 slash 组合与 deep-research + skills | 第 10、第三批、第五十、五十二、五十九批、第 24.49 节 | 本地验证 | Node真实组合逐阶段及账本已有证据；两轮研究均partial，完整报告、真实资料质量、exe及桌面仍缺 |
+| ADD-12 | P1 | 准入 slash 组合与 deep-research + skills | 第 10、第三批、第五十、五十二、五十九批、第 24.50 节 | 本地验证 | Node真实组合逐阶段及部分账本已有证据；截断拒绝/JSON分类经本地反转验证，新真实研究仍partial且1请求unknown；完整报告、真实资料质量、exe及桌面仍缺 |
 | ADD-37 | P2 | 显式队列入口保留附件与正文尾部空白 | 第九十五批 | 本地验证 | 真实 provider/平台 |
 | ADD-38 | P2 | 引用路径、apostrophe、转义目录的补全往返 | 第七十八至八十七批 | 本地验证 | 原生 Windows 文件系统 |
 | ADD-39 | P2 | 代码示例、URL、转义 slash 不误触发命令/skill | 第二十九、七十九批 | 本地验证 | 真实终端 |
@@ -6166,3 +6166,36 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 两轮protected HOME/profile/XDG/Git、0600配置仅复制所选真实provider凭据；四home来源config/auth/catalog bytes或缺失、隔离config、fixture bytes及project条目均不变，owned PID+start-time关闭、含凭据/原生会话/expected body的scratch删除。正式证据不留实际请求/响应/思考正文、headers、key/address或prompt/session digest。首轮精确runner另存非可执行source快照，二轮收据、透明observer、安全核验归`.omx/artifacts/phase20-addition-research-stages/`。提交前发现初选证据目录与历史archive重名，已迁至上述独立目录并从HEAD恢复两份历史文件；原历史目录7个tracked文件逐字节核对不变，未把覆盖混入提交。核验明确scope为部分观察的真实性/安全性，currentProbeStatus=unverified、researchAcceptance=partial-not-verified；其passed不升级研究验收。
 
 本批只有文档/HANDOFF与ignored证据，无新产品build、unit、反转、PTY、全仓、20k、local NormProof或委派复审。五项静态门、三脚本语法、diff及安全证据核验通过，118既有docs-source advisory保留；当前build新鲜、请求/child计数、第二轮账本及原始key/address缺席、scratch清理均核对。一次延迟读回5b454f03代码CI41243494189仍in_progress、Watch41243494336 success，86f87db0代码CI success；不把Watch当代码CI。ADD-12仍本地验证，完整报告、真实资料研究质量、exe/桌面和金额证据继续缺失，ADD-11的研究质量缺口不提升；原47真实条件延后、goal active，提交推送另绑。
+
+
+### 24.50 研究阶段保留原生终止原因，局部 JSON 失败不再冒充传输失败
+
+沿第24.49节的真实partial继续诊断，先在旧build d666ac7e304f运行一次同预算公开本地夹具。生产Node20.3实际1 GET + 11 POST均HTTP200，brief2/investigate2/gaps1/draft1/review2/report1，研究partial/report、0片段、复审completed，安全停止原因实见`invalid_response`。最后report请求13445 bytes、请求输出上限2048、实际output2048；这只证明本地JSON解析失败并达到请求计数上限，旧收据没有直接观察原生finishReason，不能事后宣称已证实length。透明observer通过相邻串行POST前的原session telemetry差量捕获11份单请求用量，不读取或消费响应正文。34148 input + 13136 output、cache read16896已含在input，11 finalized与11 POST一致，pending/unknown均0、historyUnknown/breach均false；完整研究断言仍失败，收据unverified。
+
+目标实现确认两个独立边界问题：[原生step](../../packages/ts-shell/src/turn/step.ts)保留模型length，但[子代理结果](../../packages/ts-shell/src/core/subagents/runner.ts)丢弃最终assistant的stopReason；研究因此无法在[阶段应用](../../packages/ts-shell/src/research/run/child.ts)前区分截断。另[本地阶段JSON读取](../../packages/ts-shell/src/research/run/parse.ts)复用bounded parser，其malformed/depth错误是NetworkError(invalid_response)，并不能说明传输失败。修补前定向参考A固定SHA `f09d01b85e0384647fcab6779d35ab9dabe04be3`的subagent结果/message_end保留stopReason、通用失败仅error/aborted的决定；本项目沿原结果契约增加可选stopReason，由研究consumer单独拒绝length，不全局改变通用子代理失败语义。参考的JSON修复/原文诊断不采用：研究继续严格拒绝不完整证据，不保留生成原文。
+
+实现只在三个原owner内：runner返回最终原生终止原因；research child遇length时不进入applyStage，child.failed、研究partial，固定原因`Research stage output reached the model length limit.`；parse仅将自身JSON读取的invalid_response转成固定领域错误`Research stage output is not valid bounded JSON.`。保留96000 UTF-8字节、depth16、对象及schema要求，保留取消、deadline、epoch/pending身份与原共享账本规则。没有修改provider/auth、共享网络解析、重试、输出预算或验证门。
+
+[runner测试](../../packages/ts-shell/src/core/subagents/runner.test.ts)覆盖stop/length/error/aborted穿过实际结果边界；[研究runtime测试](../../packages/ts-shell/src/research/run/runtime.test.ts)用实际runner连接brief/report，两种stage即使JSON语法和绑定有效，只要原生length仍不得推进或接收片段，且不发布stage-completed；[parse测试](../../packages/ts-shell/src/research/run/parse.test.ts)覆盖malformed、敏感样例不回显、深度16/17、UTF-8字节上限、对象/schema及正常控制。旧三owner基线9失败/2通过/23未选；首次修补32通过/2失败源自新测试误把try返回快照当作finally后的清理状态，改为检查current store，未改变运行时或削弱阶段拒绝断言。Node20.3单worker串行三文件34项通过；三个owner各自显式反转分别4/2/3失败，全部逐字节恢复后34项再次通过。
+
+五项静态门及TS/exe串行构建通过，118既有docs-source advisory保留、binding dangling 0。最终manifest `7f47912610a7f053bb88a9e5cf5b2d4a5ccf2a0da9b17221cefcb06311a78dec`，inputsDigest `12751b98c4b264d43c4e3f1b8e6ca0717e178eddc23c8543b4fab1962f95c3e8`；Bun1.3.14 linux-x64 exe106842240 bytes、SHA `e48368d37bb0fb42e2496379b48349b11f75f1397b268745483a83efd1c6b132`。当前compilerInputs、产品/测试非可执行快照、exe size/SHA均核对；没有在测试文件修改后继续使用旧build。
+
+新build只再运行一次同预算真实Node --print，不为绿色完整链路继续重试。结果如下：
+
+| 观察 | 修补前诊断 | 新build真实验证 |
+|---|---|---|
+| 实际HTTP | 1 GET + 11 POST，均200 | 1 GET + 12 POST，均200 |
+| 子阶段请求数 | brief2、investigate2、gaps1、draft1、review2、report1 | brief2、investigate2、gaps1、draft1、review2、report2 |
+| 研究 / 接受片段 / 复审 | partial/report，0，completed | partial/report，1，completed |
+| 最后child / 停止分类 | completed，stage-json-decode-or-depth | failed，unclassified |
+| 有单请求用量的POST | 11 / 11 | 11 / 12；第二report未观察到用量 |
+| 账本已知input / output | 34148 / 13136 | 34097 / 12751，仅11个finalized |
+| input内含cache read | 16896 | 16832 |
+| pending / unknown | 0 / 0 | 1 / 1 |
+| RSS采样峰值KiB | 399364 | 280752 |
+
+新运行的后一个report child在接受第二片段前失败，具体原因未匹配安全白名单；没有证实本次真实停止进入length分支，也没有证实新领域JSON消息。12次POST中11份精确单请求用量求和与共享账本一致，剩余report用量为missing-or-overlapping，原生账本也保留1个dispatched unknown，不能称全部结算、0用量或真实金额。前景最后请求output2048不能归给失败report，旧运行report的2048也不能补造本次数据。两次query均completed/success、CLI均exit0，但完整链路runner均exit1/unverified。首版证据校验要求新分类命中且全部结算，实际失败，源码/收据/日志另存initial；后续核验仅检查这些partial观察的真实性、安全性、已知用量及缺口，passed不升级目标诊断、结算或研究验收。HTTP200及无用量不能独自证明provider/network故障，原因继续unknown。
+
+两次均只开放read/research_run，关闭MCP/context files/discovery/warming/retry/save；maxTurns2、每请求输出2048、最多14 POST、240秒、2MiB输出/会话文件、100ms采样768MiB RSS、Node heap768MiB，未触发probe守卫。全部19次真实子阶段请求含两份正确skill各一次并绑定各自native run，原输入/稳定去重、真实本地source/claim/复审read已核对。四home来源config/auth/catalog bytes或缺失、隔离config与夹具/project条目均不变，owned PID+start-time关闭，凭据/会话/expected正文scratch删除，无实际请求/响应/思考正文、key/address/header或prompt/session digest留存；RSS采样不算性能验收。证据、原始失败、独立反转、构建与安全核验归`.omx/artifacts/phase20-addition-research-diagnostics/`，没有覆盖tracked历史。
+
+一次延迟读回5b454f03精确代码CI41243494189已success、Watch41243494336 success；426c09c0文档CI41244810468仍in_progress、Watch41244810449 success，不替代本批代码CI。未运行全仓、20k、真实exe研究、PTY、桌面、local NormProof或委派复审。ADD-12仍本地验证、完整报告/真实资料质量/全部结算/目标真实诊断仍缺，ADD-11不升级、原47真实条件延后、goal active；本批清理、提交/推送及精确SHA的CI另绑。
