@@ -11068,3 +11068,5 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：委派模型保留签名端点准入
 
 [addition24.28](features/phase-20-addition.md#2428-签名端点的委派模型准入与主请求一致)Bedrock/Vertex无static credential的目标、director on、handover arm六场景实际失败，blocked+credential两防护也失败。既有issuer endpoint的signer准入、先拒绝blocked/model mismatch；精确named ID/pool/account guard保持，不获取签名凭据。Node20.3单worker串行4文件78项，反转8失败/1控制通过/精确恢复、五门/build摘要匹配，manifesta91a9c4872e1，judge既有advisory、独立APPROVE/CLEAR。无外部AWS/ADC认证、PTY/平台/全仓/20k；ADD-70 partial、goal active，清理/提交/推送/自身CI另绑。
+
+代码 `d892c777e3f47cc349e93aab1bb2c39cdc951806` 已推送/远端main一致、scratch清理且交付后clean；自身 CI `41215827302`与连接报告 `41215191300`最后in_progress，Watch均success。辅助tier `953d677f`精确CI `41213345904`及文档 `9975ac6e`/`41213464205`已success；角色 `27931563`与文档 `712ea121`仍in_progress。本交付段文档单独提交，ADD-70 partial。
