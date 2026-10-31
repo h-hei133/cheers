@@ -61,6 +61,31 @@ describe("trust command and storage boundaries", () => {
     expect(result.output).toContain("Recorded");
     expect(setter).toHaveBeenCalledWith(root, trustSyntax.actions.find(item => item.name === action)!.level);
   });
+
+  it("withdraws this project's remembered hook approvals and leaves the rest standing", async () => {
+    // The finding this answers: a grant could be recorded and never taken back.
+    const { hookFingerprint, HookTrustStore } = await import("../../hooks/trust.js");
+    const workspace = path.join(root, "workspace");
+    fs.mkdirSync(path.join(workspace, ".agents"), { recursive: true });
+    fs.writeFileSync(path.join(workspace, ".agents", "hooks.json"), JSON.stringify({
+      hooks: { PreToolUse: [{ matcher: "bash", hooks: [{ type: "command", command: "./check.sh" }] }] },
+    }));
+    const here = { event: "PreToolUse", matcher: "bash", command: "./check.sh",
+      sourcePath: path.join(workspace, ".agents", "hooks.json") };
+    const elsewhere = { ...here, sourcePath: path.join(root, "other", ".agents", "hooks.json") };
+    const store = new HookTrustStore();
+    store.recordTrust(hookFingerprint(here));
+    store.recordTrust(hookFingerprint(elsewhere));
+
+    const result = await runTrustCommand(["forget"], { cwd: workspace });
+
+    expect(result.output).toContain("Withdrew 1 remembered approval");
+    expect(store.isTrusted(hookFingerprint(here))).toBe(false);
+    expect(store.isTrusted(hookFingerprint(elsewhere))).toBe(true);
+    // Said plainly when there was nothing to withdraw, rather than claiming a
+    // withdrawal that removed nothing.
+    expect((await runTrustCommand(["forget"], { cwd: workspace })).output).toContain("Nothing was withdrawn");
+  });
 });
 
 describe("state-changing argument validation", () => {

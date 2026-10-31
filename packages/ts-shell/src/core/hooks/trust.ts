@@ -91,10 +91,14 @@ export class HookTrustStore {
   /** Remember an approval, for this session and for later ones. */
   recordTrust(fingerprint: string, description = ""): void {
     assertProfileStorage(this.storePath, this.profile);
-    this.sessionApprovals.add(fingerprint);
     const data = this.read();
     const approved = { ...data.approved, [fingerprint]: description };
-    this.write({ version: 1, approved });
+    // Held in memory only when it could not be written. A durable record is read
+    // back from disk, so every store sees it — and every store sees a withdrawal
+    // too. A session-only copy would survive a withdrawal made elsewhere and keep
+    // granting what the user had just taken back.
+    if (this.write({ version: 1, approved })) this.sessionApprovals.delete(fingerprint);
+    else this.sessionApprovals.add(fingerprint);
   }
 
   /**
@@ -110,13 +114,18 @@ export class HookTrustStore {
    */
   forgetTrust(fingerprint: string): boolean {
     assertProfileStorage(this.storePath, this.profile);
-    this.sessionApprovals.delete(fingerprint);
+    const heldInMemory = this.sessionApprovals.delete(fingerprint);
     const data = this.read();
-    if (data.approved[fingerprint] === undefined) return false;
-    const approved = { ...data.approved };
-    delete approved[fingerprint];
-    this.write({ version: 1, approved });
-    return true;
+    const durable = data.approved[fingerprint] !== undefined;
+    if (durable) {
+      const approved = { ...data.approved };
+      delete approved[fingerprint];
+      // A withdrawal that could not be written has not withdrawn anything: the
+      // record on disk still grants it, so saying otherwise would be a claim the
+      // next read contradicts.
+      if (!this.write({ version: 1, approved })) return false;
+    }
+    return heldInMemory || durable;
   }
 
   /** Every remembered approval, so a caller can show what is standing. */
@@ -138,7 +147,14 @@ export class HookTrustStore {
     return { version: 1, approved: {} };
   }
 
-  private write(data: TrustFile): void {
+  /**
+   * Write the record, reporting whether it reached disk.
+   *
+   * The caller needs the answer: an approval that could not be written still
+   * has to hold for this session, and one that was written must not be shadowed
+   * by a session copy that a later withdrawal cannot reach.
+   */
+  private write(data: TrustFile): boolean {
     try {
       assertProfileStorage(this.storePath, this.profile);
       fs.mkdirSync(path.dirname(this.storePath), { recursive: true });
@@ -147,8 +163,10 @@ export class HookTrustStore {
       fs.writeFileSync(temporary, JSON.stringify(data, null, 2), "utf8");
       assertProfileStorage(this.storePath, this.profile);
       fs.renameSync(temporary, this.storePath);
+      return true;
     } catch {
       // The session approval still holds; only persistence was lost.
+      return false;
     }
   }
 }

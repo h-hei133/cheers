@@ -5025,3 +5025,13 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 顺带修正：git gate的审批把`EscalationDecision`压成布尔，而布尔按契约是一次性，提示里的「Allow Always」在那里永远不会持久化。映射抽为`hookApprovalDecision`，两处调用点共用；`approveDeclaredHook`的提示改为「remembered for this exact command in this file」，与实际范围一致。
 
 验证：`trust`19、`registration`14、`security/trust/command`10、`profile/sources`14，共**57项**通过；四反转（指纹去掉文件、项目拒绝不再拦截、撤回无效、always降为once）全部命中断言且finally字节恢复；五静态门、TS build/freshness、strict docs drift通过。原47/ADD整体partial、goal active。
+
+### 21.77 已记录的钩子授权没有撤回入口；持久授权被内存副本遮蔽
+
+上一批给`HookTrustStore`加了`forgetTrust`/`entries`，但没有任何调用者——一个没人能用的API不等于「可撤回」。现`/trust forget`撤回本项目的钩子授权：按声明文件筛选，所以只撤回属于本项目的，用户自己的`hooks.json`不动；没有可撤回的条目时明说「Nothing was withdrawn」，而不是报告一次什么也没做的撤回。
+
+补上探针暴露的第二个缺陷：`recordTrust`无条件把指纹放进`sessionApprovals`，而`isTrusted`先查内存。于是**另一个实例**撤回后，已经打开的store仍然授权——正是「已持久的授权不该再有一份内存副本」的反面。现只有写盘失败时才留在内存（那种情况下会话内仍应有效），写盘成功则从内存移除；`forgetTrust`在写盘失败时返回`false`，不宣称未生效的撤回。
+
+顺带修正提示语：审批面板的「Allow always for this command/session」把授权描述成会话级，实际写进项目策略文件、跨会话跨进程有效。现为「Allow always for this project」。
+
+验证：`trust`21、`registration`14、`commands.test`41、`pickers`50，共**126项**通过；四反转（持久授权仍进内存、写盘失败仍报成功、未记录也报撤回、标签退回session措辞）全部命中断言且finally字节恢复；五静态门、TS build/freshness、strict docs drift通过。原47/ADD整体partial、goal active。

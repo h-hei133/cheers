@@ -416,6 +416,10 @@ describe("approval chooser", () => {
     expect(options[1]!.note).toBe("2 / a");
     expect(options[2]!.note).toBe("3 / n / d / esc");
     expect(options[0]!.detail).toContain("src/index.ts");
+    // The grant is written to the project's policy file, so the label must not
+    // promise that it ends with this session.
+    expect(options[1]!.label).toContain("project");
+    expect(options[1]!.detail).not.toContain("session");
   });
 
   it("applies selected choice to onSettle callback", async () => {

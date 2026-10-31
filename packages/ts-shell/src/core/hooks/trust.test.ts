@@ -119,6 +119,37 @@ describe("hook trust store", () => {
     expect(store.forgetTrust(fingerprint)).toBe(false);
   });
 
+  it("lets a withdrawal made by another store reach an already-open one", () => {
+    // The defect this guards: a durable grant was also copied into a per-instance
+    // set, so a store opened earlier kept granting what another store had just
+    // withdrawn. Only an approval that could not be written belongs in memory.
+    const source = "/p/.agents/hooks.json";
+    const fingerprint = hookFingerprint({ event: "PreToolUse", command: "x.sh", sourcePath: source });
+    const open = new HookTrustStore(storePath);
+    open.recordTrust(fingerprint);
+    expect(open.isTrusted(fingerprint)).toBe(true);
+
+    new HookTrustStore(storePath).forgetTrust(fingerprint);
+
+    expect(open.isTrusted(fingerprint)).toBe(false);
+  });
+
+  it("does not claim a withdrawal it could not write", () => {
+    // An unwritable store keeps the grant for this session; reporting a
+    // withdrawal would be a claim the next read contradicts.
+    const source = "/p/.agents/hooks.json";
+    const fingerprint = hookFingerprint({ event: "PreToolUse", command: "x.sh", sourcePath: source });
+    const store = new HookTrustStore(storePath);
+    store.recordTrust(fingerprint);
+    // Make the directory read-only so the atomic rename cannot land.
+    fs.chmodSync(tempDir, 0o500);
+    try {
+      expect(store.forgetTrust(fingerprint)).toBe(false);
+    } finally {
+      fs.chmodSync(tempDir, 0o700);
+    }
+  });
+
   it("lists what is standing, so a decision can be reviewed", () => {
     const store = new HookTrustStore(storePath);
     const source = "/p/.agents/hooks.json";

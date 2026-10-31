@@ -1364,3 +1364,21 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: The git gate's hook prompt offers "Allow Always", but the hook is asked about again next time.
 - **Root Cause**: The adapter mapped `EscalationDecision` to `decision !== 'deny'`. By contract a boolean is one-shot, so "always" became "once" — the same class of bug as the earlier approval fix, in a second call site.
 - **Rule**: When the same decision type is mapped in more than one place, extract the mapping into one exported function and test it directly. Look for a second call site whenever a contract gains a distinction; fixing one and not the other leaves the prompt making a promise the code does not keep.
+
+### A Durable Record Must Not Also Live In Memory
+
+- **Symptom**: Withdrawing a remembered hook approval from one store leaves an already-open store still granting it.
+- **Root Cause**: `recordTrust` put the fingerprint into a per-instance set unconditionally, and `isTrusted` consulted that set first. The in-memory copy was meant to cover a store that could not be written, but it was also made for ones that were — so a withdrawal on disk was shadowed.
+- **Rule**: Keep an in-memory fallback only when persistence actually failed, and have the write report whether it landed. Anything else creates two sources of truth that diverge exactly when the user takes a decision back.
+
+### An API With No Caller Is Not A Feature
+
+- **Symptom**: `forgetTrust` and `entries` existed and passed their tests, but a remembered hook approval still could not be withdrawn from the product.
+- **Root Cause**: The store gained the capability; the command surface never gained a verb. The finding was "there is no revocation surface", and the fix stopped one layer short of the surface.
+- **Rule**: When a finding names a missing user-facing capability, the fix is not complete until a command, flag or prompt reaches it. Check `grep` for callers before calling it done, and test through the entry point the user actually uses.
+
+### A Test That Leaves Global State Must Mock Its Owner
+
+- **Symptom**: A hook registration test that changed the project trust decision could leak that decision into other tests or the machine's real records.
+- **Root Cause**: `projectTrust` is a process-wide singleton reading the real user directory. A test that writes to it is not isolated, even when everything else is.
+- **Rule**: For a singleton with durable state, `vi.spyOn` the query the code under test calls and set the return per test; do not write to the real store to arrange a state. Restore in `afterEach`.

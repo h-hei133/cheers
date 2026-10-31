@@ -10880,3 +10880,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：钩子授权的三个范围缺陷（子代理review安全缺陷）
 
 [addition21.76](features/phase-20-addition.md#2176-钩子授权跨项目生效项目拒绝不影响钩子授权无法撤回子代理review安全缺陷)指纹不含声明文件→A项目授权覆盖B项目同样命令；项目untrusted时MCP/workflow被拒而钩子照跑；授权只能记不能撤。现指纹并入sourcePath、注册时按项目信任过滤、增forgetTrust/entries，并把git gate压平决策的映射抽成共用函数。57项聚焦、四反转全命中、五门/TS build通过。原47/ADD整体partial、goal active。
+
+### 2026-10-31：钩子授权的撤回入口与内存遮蔽（子代理review安全缺陷）
+
+[addition21.77](features/phase-20-addition.md#2177-已记录的钩子授权没有撤回入口持久授权被内存副本遮蔽)forgetTrust/entries无调用者，等于没有撤回面；且recordTrust把持久授权也塞进内存集合，另一实例撤回后已打开的store仍在授权。现/trust forget按项目撤回、写盘失败不宣称撤回、只有写盘失败才留内存，并把审批面板的「this session」改为「this project」。126项聚焦、四反转全命中、五门/TS build通过。原47/ADD整体partial、goal active。

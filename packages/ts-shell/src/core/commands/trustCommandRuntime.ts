@@ -6,7 +6,7 @@ import { resolveProjectConfigFile } from '../paths/project.js';
 import { projectTrust, TrustWriteError } from "../security/projectTrust.js";
 import { neutraliseForDisplay } from "../text/safety.js";
 import { loadHookDeclarations } from "../hooks/config.js";
-import { hookFingerprint } from "../hooks/trust.js";
+import { hookFingerprint, HookTrustStore } from "../hooks/trust.js";
 import { configurationApplicationNotice } from "./configuration.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
@@ -30,7 +30,10 @@ export async function runTrustCommand(
   if (!parsed.ok) return { kind: "local", output: `Invalid /trust arguments: ${parsed.reason}\n${syntaxHelp(trustSyntax)}` };
   const root = path.resolve(context.projectRoot ?? context.cwd ?? process.cwd());
   const level = parsed.action.level;
-  if (level === undefined) return { kind: "local", output: describeTrust(root) };
+  if (level === undefined) {
+    if (parsed.action.name === "forget") return forgetHookApprovals(root);
+    return { kind: "local", output: describeTrust(root) };
+  }
 
   try {
     const result = projectTrust.setProjectTrust(root, level);
@@ -45,6 +48,36 @@ export async function runTrustCommand(
   } catch (error) {
     return { kind: 'local', output: error instanceof TrustWriteError ? `${error.message} Inspect the saved decision and reload.` : 'Trust write outcome is unverified. Inspect the saved decision and reload.' };
   }
+}
+
+/**
+ * Withdraw every remembered approval for this project's hooks.
+ *
+ * A grant nobody can take back outlives the judgement behind it. The entry
+ * points here are the fingerprints `/trust status` prints, so a user can see
+ * exactly what is standing before deciding to forget it.
+ *
+ * Only this project's approvals are withdrawn: the store is keyed by declaring
+ * file, so the set to remove is the one whose file lives in this project. The
+ * user's own hooks file is deliberately left alone — it is not this project's
+ * to revoke.
+ */
+function forgetHookApprovals(root: string): LocalCommandResult {
+  const { hooks } = loadHookDeclarations(root, { homeDir: path.join(root, "\u0000none") });
+  const store = new HookTrustStore();
+  const withdrawn = hooks.filter((hook) => hook.sourcePath.startsWith(root))
+    .map((hook) => ({ hook, fingerprint: hookFingerprint(hook) }))
+    .filter(({ fingerprint }) => store.forgetTrust(fingerprint));
+
+  if (withdrawn.length === 0) {
+    return { kind: "local", output: `No remembered approvals for ${neutraliseForDisplay(root)}. Nothing was withdrawn.` };
+  }
+  return { kind: "local", output: [
+    `Withdrew ${withdrawn.length} remembered approval${withdrawn.length === 1 ? "" : "s"} for ${neutraliseForDisplay(root)}.`,
+    ...withdrawn.map(({ hook }) => `  ${hook.event}: ${neutraliseForDisplay(hook.command)}`),
+    "",
+    "Each hook will be put to you again the next time it would run.",
+  ].join("\n") };
 }
 
 /**

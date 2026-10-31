@@ -139,8 +139,11 @@ export function approvalPicker(
       },
       {
         id: "allow-always",
-        label: "Allow always for this command/session",
-        detail: "Remember this grant and do not ask again in this session",
+        label: "Allow always for this project",
+        // It is written to the project's policy file, so it outlives this
+        // session and this process. Saying "this session" here promised
+        // something narrower than what was granted.
+        detail: "Remember this grant for this project and do not ask again",
         note: "2 / a",
       },
       {
