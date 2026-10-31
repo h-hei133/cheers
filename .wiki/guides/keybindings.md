@@ -106,7 +106,8 @@ Arrow keys move within the draft before recalling history; a new draft is not re
 An open completion list consumes its navigation keys first. Enter accepts an actively selected completion;
 otherwise it submits. While a turn runs, Enter steers the draft into it and `ctrl+q` queues it to run after the
 turn. A command, a composed prompt, or one carrying images cannot be steered and waits for the next turn; the rows
-above the prompt name each waiting entry and say which delivery it is. With no turn running, `ctrl+q` sends the
+above the prompt name each waiting entry and say which delivery it is, and `/queue list` prints the same entries
+with the IDs `/queue edit`, `/queue move` and `/queue cancel` take. With no turn running, `ctrl+q` sends the
 draft immediately and says so.
 
 Escape first dismisses a list or interrupts a run. On an idle, empty prompt, two presses within 600ms open the
