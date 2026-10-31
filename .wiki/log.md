@@ -10962,3 +10962,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：记录历史验证脚本的新格式消费者缺口
 
 [addition24.5](features/phase-20-addition.md#245-后续消费者审计的明确缺口)31616578已推送且main/origin一致、干净。静态审计发现 provider-readiness、doctor-environment、daily/broader 的配置或HOME/活动连接探测仍依赖 config.json，未读 auth 或 join modelPreferences。已加入 ADD-70 尚缺；未执行真实provider/全套脚本，未修改release/default gates。后续必须复用TypeScript owner、验证分文件/auth-only/坏源/脱敏后才可作验收证据。31616578代码CI41190946495与Watch41190946542最后in_progress，c2819249代码CI仍测试中；goal active。
+
+### 2026-10-31：历史脚本配置桥接与 Node 下限验证
+
+[addition24.6](features/phase-20-addition.md#246-历史验证脚本复用配置-owner)四个历史消费者改用固定worker复用TS配置/凭据owner，支持settings/auth/modelPreferences与auth-only，不创建用户状态；baseline完整读流、丢弃body、禁止redirect、成功前复核原始来源。16项隔离测试、三条反转/精确恢复、严格桥接noEmit、五门/语法与实际Node20.3同16项通过，复审无阻塞。发现旧时间戳生成值不能作逻辑变化，以及tsx scoped API隐藏20.6下限，均已修复。未跑真实provider/全套daily-broader/PTY/build；c2819249代码CI41190177753失败7文件23项，Copilot由24.4覆盖，旧物理/重绑定夹具下一批修复。其后两CI仍in_progress；ADD-70 partial、goal active。

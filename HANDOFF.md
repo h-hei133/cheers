@@ -1466,3 +1466,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A credential-only Copilot login throws ENOENT after its pending connection saves, or a native login through a stable settings symlink is refused as changed storage.
 - **Root Cause**: Pending capture assumes the logical settings path exists; later acquisition through its canonical alias changes the source positions in the storage tuple even when the link is unchanged.
 - **Rule**: Capture native pending ownership through ConfigEdit's full settings/auth source-and-target tuple, allowing an absent settings document. Keep later reads and writes on that original logical source; the writer owns canonical destinations. Compare the complete tuple before reservation, under the write precondition and after readback. A changed auth or settings target must refuse even when the bytes match. Report credential storage at the captured auth path without changing the internal logical edit path contract.
+
+### Script Bridges Must Check Loader Floors And Generated Read Values
+
+- **Symptom**: A config bridge passes on a recent Node but refuses every source on Node 20.3, or repeated reads of an unchanged legacy connection are reported as changed configuration.
+- **Root Cause**: The scoped TypeScript loader API needs module.register (Node 20.6), despite the dependency's lower package engine floor. Runtime normalization also generates missing connection timestamps afresh on every read.
+- **Rule**: Run fixed workers directly with the loader mode supported by the declared Node floor and verify on that exact version. Avoid an intermediate CLI child that survives its parent's deadline. Fence raw document revisions and complete storage tuples; omit generated timestamps from logical read comparisons while retaining physical revision checks. Drain successful provider streams to EOF without retaining or reporting bodies, then recheck captured sources.

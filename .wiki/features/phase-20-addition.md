@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.5 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止及模型默认值移出 auth 已实施；历史验证脚本消费者、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth 及历史脚本配置桥接已实施；CI 夹具修复、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5509,3 +5509,13 @@ ADD-70 仍部分完成：默认值已物理移出 auth，但其余重复事实�
 这些发现加入 ADD-70 尚缺，未执行相关真实 provider/全套脚本，未修改 release/default gates、package scripts 或构建行为。后续修复应通过既有 TypeScript config/credential owner 的受控桥接获取逻辑结果，保持 source/profile/permission 与 report-safe 合同；不在脚本复制第二套 auth/envelope 解析和认证优先级。需要聚焦分文件/auth-only、无读权/坏格式、来源变化与脱敏验证后才可将这些脚本用于新格式验收。此处为静态缺口记录，不是已验证的现场失败。
 
 `31616578` 的代码 CI `41190946495`、Watch `41190946542` 最后读回均 in_progress；`c2819249` 的代码 CI `41190177753` 最后仍在测试阶段。没有宣布 ADD-70 或整体完成，真实环境与旧版本回退验收继续延后。
+
+### 24.6 历史验证脚本复用配置 owner
+
+第 24.5 节四个消费者已接入 `scripts/support/config.mjs` 的固定隔离 worker；TypeScript 桥接复用 runtime/config、profile、credential、catalogue 和 transport owner，不再复制凭据解析及优先级。settings/auth/modelPreferences、auth-only、旧目录回退均使用既有逻辑投影。命名 profile 只读取 existing，默认 profile 保留旧目录和稳定 link 合同，不创建用户状态。daily/broader 尊重显式 HOME，坏配置拒绝活动连接替代；doctor 解析所选文档但明确 authentication not checked。
+
+凭据仅在 worker 内使用，不进入参数或结果；结果只含存在性、状态及活动 ID 等允许字段。baseline 保留完整响应结束的检查，逐块丢弃内容，HTTP 拒绝不打印 body，redirect 拒绝转发。成功前复核原始 pair revision、完整 source/canonical tuple、旧 edit fence 以及 runtime/catalogue 投影。缺失旧连接时间戳会由 runtime 每次生成，逻辑比较排除这两项，保存字段仍由原始 revision 捕获。worker 直接使用 Node floor 支持的 loader，15/35 秒截止与 64KiB 输出上限直接结束请求 owner 并等 close；不通过 tsx CLI 留第二请求进程。
+
+主代理串行验证：五静态门与 diff check、六个相关 JS 语法检查通过；`node --test scripts/config.test.mjs` 16 项通过，包含四调用方、来源变化、闭合 pool、pending、完整流/断流、重定向与脱敏。daily/broader 只执行函数声明集成夹具，不导入有 Windows 写入副作用的 entrypoint。新增桥接通过临时 tsconfig 的严格 noEmit；实际 Node **20.3.0** 再跑同一 16 项全通过，避免 tsx scoped API 隐含 20.6 下限。auth owner、完整读流、成功前 source fence 三条反转均实际 AssertionError，源码字节精确恢复后再跑通过。只读复审范围内无阻塞；没有重跑产品 build（产品源码未改），没有全仓、真实 provider、真实 PTY 或 20k 压测。
+
+延迟读取 `c2819249` 代码 CI `41190177753` 已 failure：7 文件/23 项失败、13006 项通过。原生 Copilot 1 项由第 24.4 节修复覆盖；其余为缺失 settings 的旧物理读取夹具和禁止同 ID/provider 原地重绑定后的旧设置夹具，下一批逐项分类修复，当前脚本绿色不证明它们已修。`31616578` CI `41190946495`、`73e332f1` CI `41191224812` 最后仍 in_progress。本批提交/推送与自身 CI 另行绑定；ADD-70 partial、整体 goal active，旧版本回退与真实环境验收继续延后。

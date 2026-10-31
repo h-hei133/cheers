@@ -9,6 +9,7 @@ import {
   getSyntheticHome,
 } from './support/testPaths.mjs'
 import { pathsEqual } from './support/scriptRuntime.mjs'
+import { inspectRuntimeConfig } from './support/config.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const expectedRepoRoot = 'D:\\LenovoSoftstore\\pyproject\\source-claudecode\\private-coding-agents'
@@ -131,73 +132,19 @@ function checkHome(name, homePath) {
   return true
 }
 
-function resolveCredential(config) {
-  const provider = typeof config.provider === 'string' ? config.provider : 'openai'
-  const connections = Array.isArray(config.providerConnections) ? config.providerConnections : []
-  const activeConnection = connections.find(
-    (connection) => connection?.id === config.activeProviderConnectionId,
-  ) ?? connections.find((connection) => connection?.provider === provider)
-  const profile = config.providerCredentials?.[provider] ?? {}
-  const credentialSource = activeConnection?.provider === provider && (activeConnection.apiKey || activeConnection.accountAuth)
-    ? 'connection'
-    : profile.apiKey || profile.accountAuth
-      ? 'config'
-      : process.env[getProviderEnvVar(provider)]
-        ? 'env'
-        : 'missing'
-  const authMode = activeConnection?.provider === provider && activeConnection.accountAuth
-    ? 'account-auth'
-    : profile.accountAuth
-      ? 'account-auth'
-      : 'api-key'
-  const baseUrl = activeConnection?.baseUrl ?? profile.baseUrl
-  const model = activeConnection?.model ?? profile.model
-  const hasCredential =
-    credentialSource === 'env' ||
-    Boolean(activeConnection?.apiKey || activeConnection?.accountAuth || profile.apiKey || profile.accountAuth)
-
-  return {
-    provider,
-    activeConnectionId: activeConnection?.id ?? 'none',
-    credentialSource,
-    authMode,
-    baseUrl,
-    model,
-    hasCredential,
-  }
-}
-
-function getProviderEnvVar(provider) {
-  switch (provider) {
-    case 'openai':
-      return 'OPENAI_API_KEY'
-    case 'anthropic':
-      return 'ANTHROPIC_API_KEY'
-    case 'google':
-      return 'GOOGLE_API_KEY'
-    case 'antigravity':
-      return 'ANTIGRAVITY_API_KEY'
-    case 'claudecode':
-      return 'CLAUDECODE_API_KEY'
-    default:
-      return 'OPENAI_COMPATIBLE_API_KEY'
-  }
-}
-
-function checkRealProviderConfig() {
+async function checkRealProviderConfig() {
   if (!realHome) {
     printStep('real-provider-config', 'pass', 'not-configured')
     printStep('real-provider-credential', 'pass', 'not-checked')
     return true
   }
-  const configPath = path.join(realHome, '.cheers', 'config.json')
-  if (!fs.existsSync(configPath)) {
-    printStep('real-provider-config', 'config-failure', `${configPath} missing`)
+  const result = await inspectRuntimeConfig(realHome, repoRoot)
+  if (!result.ok || !result.present) {
+    printStep('real-provider-config', 'config-failure', result.reason ?? 'No user configuration document is present.')
     return false
   }
-
-  printStep('real-provider-config', 'pass', 'config path present; content not read')
-  printStep('real-provider-credential', 'pass', 'not-checked')
+  printStep('real-provider-config', 'pass', 'selected configuration documents parsed; values not reported')
+  printStep('real-provider-credential', 'pass', 'authentication not checked')
   return true
 }
 
@@ -252,7 +199,7 @@ async function main() {
   checks.push(checkHome('synthetic-home', syntheticHome))
   checks.push(checkHome('real-provider-home', realHome))
   checks.push(await checkSyntheticModeEnv())
-  checks.push(checkRealProviderConfig())
+  checks.push(await checkRealProviderConfig())
   checks.push(checkReleaseCommands(packageJson))
 
   const ok = checks.every(Boolean)

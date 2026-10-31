@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { inspectRuntimeConfig } from './support/config.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -78,21 +79,20 @@ function parseTierArg(argv) {
   return requested
 }
 
-function resolveHomeDir() {
+async function resolveHomeDir() {
   const forced = process.env.CHEERS_TEST_HOME
-  if (forced && fs.existsSync(path.join(forced, '.cheers', 'config.json'))) return forced
-
+  if (forced) return forced
   const candidates = ['D:/Test/home-daily', 'D:/Test/home-fulltest2', 'D:/Test/home-fulltest', 'D:/Test/home-sf']
   for (const home of candidates) {
-    if (fs.existsSync(path.join(home, '.cheers', 'config.json'))) return home
+    const result = await inspectRuntimeConfig(home, projectRoot)
+    if (result.ok && result.present) return home
   }
-
   const fallback = 'D:/Test/home-daily'
   fs.mkdirSync(path.join(fallback, '.cheers'), { recursive: true })
   return fallback
 }
 
-const homeDir = resolveHomeDir()
+const homeDir = await resolveHomeDir()
 
 function runProcess(command, args, options = {}) {
   const { cwd, env, input, timeoutMs = 120000 } = options
@@ -195,15 +195,10 @@ function hasProviderDrift(output) {
   return /provider-readiness|missing-key|authentication was rejected/i.test(output)
 }
 
-function readActiveConnectionId() {
-  const configPath = path.join(homeDir, '.cheers', 'config.json')
-  if (!fs.existsSync(configPath)) return null
-  try {
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
-    return config.activeProviderConnectionId ?? null
-  } catch {
-    return null
-  }
+async function readActiveConnectionId() {
+  const result = await inspectRuntimeConfig(homeDir, projectRoot)
+  if (!result.ok) throw new Error('Selected configuration cannot be read; no connection substitute was chosen.')
+  return result.activeConnectionId
 }
 
 function extractSessionId(output) {
@@ -514,7 +509,7 @@ async function runP0Checks(currentRunSessionIds) {
     }),
   )
 
-  const activeConnectionId = readActiveConnectionId()
+  const activeConnectionId = await readActiveConnectionId()
   const cPromptFile = buildReplayPromptFile(`C-${dateStamp}-${runId}-connect-prompts`, [
     '/connect status',
     '/connect list',

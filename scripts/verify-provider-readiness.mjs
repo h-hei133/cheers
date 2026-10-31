@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { Agent, ProxyAgent, fetch as undiciFetch } from 'undici'
+import { inspectRuntimeConfig } from './support/config.mjs'
 import { getRealProviderHome, getTestRoot } from './support/testPaths.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -23,15 +23,6 @@ const expectedBaselineBaseUrl =
 const expectedBaselineModel =
   process.env.CHEERS_EXPECT_MODEL?.trim() ||
   'deepseek-ai/DeepSeek-V4-Flash'
-const providerProxy =
-  process.env.CHEERS_PROVIDER_PROXY?.trim() ||
-  undefined
-const providerNoProxy =
-  process.env.CHEERS_PROVIDER_NO_PROXY?.trim() ||
-  process.env.NO_PROXY?.trim() ||
-  process.env.no_proxy?.trim() ||
-  undefined
-
 const networkFailurePattern =
   /(provider-readiness:network|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network|socket hang up|TLS|timeout|unreachable)/i
 const configFailurePattern =
@@ -117,193 +108,11 @@ function redactProviderOutput(input) {
     .replace(realHomeConfigPattern, '[REAL_PROVIDER_CONFIG_PATH]')
 }
 
-function renderPresence(value) {
-  return value ? 'present' : 'none'
-}
-
-function resolveProviderTransport() {
-  const connectTimeoutMs = parsePositiveInteger(
-    process.env.CHEERS_PROVIDER_CONNECT_TIMEOUT_MS,
-    30000,
-  )
-  const headersTimeoutMs = parsePositiveInteger(
-    process.env.CHEERS_PROVIDER_HEADERS_TIMEOUT_MS,
-    120000,
-  )
-  const bodyTimeoutMs = parsePositiveInteger(
-    process.env.CHEERS_PROVIDER_BODY_TIMEOUT_MS,
-    120000,
-  )
-  const explicitProxy = providerProxy?.toLowerCase() === 'env'
-    ? process.env.HTTPS_PROXY?.trim() ||
-      process.env.https_proxy?.trim() ||
-      process.env.HTTP_PROXY?.trim() ||
-      process.env.http_proxy?.trim() ||
-      undefined
-    : providerProxy && providerProxy.toLowerCase() !== 'off' && providerProxy.toLowerCase() !== 'none'
-      ? providerProxy
-      : undefined
-  const noProxy = (providerNoProxy ?? '')
-    .split(',')
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean)
-  return {
-    connectTimeoutMs,
-    headersTimeoutMs,
-    bodyTimeoutMs,
-    proxyUrl: explicitProxy,
-    noProxy,
-  }
-}
-
-function createProviderFetch() {
-  const transport = resolveProviderTransport()
-  const directDispatcher = new Agent({
-    connect: { timeout: transport.connectTimeoutMs },
-    headersTimeout: transport.headersTimeoutMs,
-    bodyTimeout: transport.bodyTimeoutMs,
-  })
-  const proxyDispatcher = transport.proxyUrl
-    ? new ProxyAgent({
-        uri: transport.proxyUrl,
-        connect: { timeout: transport.connectTimeoutMs },
-        headersTimeout: transport.headersTimeoutMs,
-        bodyTimeout: transport.bodyTimeoutMs,
-      })
-    : undefined
-
-  return async function providerFetch(url, init = {}) {
-    const parsed = new URL(String(url))
-    const dispatcher =
-      proxyDispatcher && !matchesNoProxy(parsed.hostname, transport.noProxy)
-        ? proxyDispatcher
-        : directDispatcher
-    return await undiciFetch(url, { ...init, dispatcher })
-  }
-}
-
-function matchesNoProxy(hostname, entries) {
-  const host = hostname.toLowerCase()
-  for (const entry of entries) {
-    if (entry === '*') return true
-    if (entry.startsWith('*.') && host.endsWith(entry.slice(1))) return true
-    if (entry.startsWith('.') && (host === entry.slice(1) || host.endsWith(entry))) return true
-    if (host === entry) return true
-  }
-  return false
-}
-
-function parsePositiveInteger(value, fallback) {
-  const parsed = Number.parseInt(value ?? '', 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
-}
-
-function loadConfig() {
-  if (!realHome) {
-    return {
-      ok: false,
-      status: 'config-failure',
-      reason: 'real provider home is not configured; set CHEERS_REAL_HOME on Linux/WSL to opt in',
-    }
-  }
-  const configPath = path.join(realHome, '.cheers', 'config.json')
-  if (!fs.existsSync(realHome)) {
-    return { ok: false, status: 'config-failure', reason: `${realHome} missing` }
-  }
-  if (!fs.existsSync(configPath)) {
-    return { ok: false, status: 'config-failure', reason: `${configPath} missing` }
-  }
-  try {
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
-    return { ok: true, configPath, config }
-  } catch (error) {
-    return {
-      ok: false,
-      status: 'config-failure',
-      reason: `Failed to parse ${configPath}: ${error instanceof Error ? error.message : String(error)}`,
-    }
-  }
-}
-
-function resolveCredential(config) {
-  const configuredProvider = typeof config.provider === 'string' ? config.provider : 'openai'
-  const connections = Array.isArray(config.providerConnections) ? config.providerConnections : []
-  const activeConnection = connections.find(
-    (connection) => connection?.id === config.activeProviderConnectionId,
-  ) ?? connections.find((connection) => connection?.provider === configuredProvider)
-  const provider = activeConnection?.provider ?? configuredProvider
-  const profile = config.providerCredentials?.[provider] ?? {}
-  const envApiKey = process.env[getProviderEnvVar(provider)]?.trim()
-  const connectionApiKey =
-    activeConnection?.provider === provider ? activeConnection.apiKey?.trim() : undefined
-  const configApiKey = profile.apiKey?.trim()
-  const accountAuth =
-    provider === 'openai'
-      ? activeConnection?.accountAuth?.openai ?? profile.accountAuth?.openai
-      : provider === 'google'
-        ? activeConnection?.accountAuth?.google ?? profile.accountAuth?.google
-        : undefined
-
-  const source = activeConnection?.provider === provider && (activeConnection.apiKey || activeConnection.accountAuth)
-    ? 'connection'
-    : profile.apiKey || profile.accountAuth
-      ? 'config'
-      : process.env[getProviderEnvVar(provider)]
-        ? 'env'
-        : 'missing'
-  const authMode = activeConnection?.provider === provider && activeConnection.accountAuth
-    ? 'account-auth'
-    : profile.accountAuth
-      ? 'account-auth'
-      : 'api-key'
-  const baseUrl = activeConnection?.baseUrl ?? profile.baseUrl
-  const model = activeConnection?.model ?? profile.model
-  const hasCredential =
-    source === 'env' ||
-    Boolean(activeConnection?.apiKey || activeConnection?.accountAuth || profile.apiKey || profile.accountAuth)
-  const apiKey = connectionApiKey ?? configApiKey ?? envApiKey
-
-  return {
-    provider,
-    activeConnectionId: activeConnection?.id ?? 'none',
-    credentialSource: source,
-    authMode,
-    baseUrl,
-    model,
-    hasCredential,
-    apiKey,
-    accountAuth,
-  }
-}
-
-function getProviderEnvVar(provider) {
-  switch (provider) {
-    case 'openai':
-      return 'OPENAI_API_KEY'
-    case 'anthropic':
-      return 'ANTHROPIC_API_KEY'
-    case 'google':
-      return 'GOOGLE_API_KEY'
-    case 'antigravity':
-      return 'ANTIGRAVITY_API_KEY'
-    case 'claudecode':
-      return 'CLAUDECODE_API_KEY'
-    default:
-      return 'OPENAI_COMPATIBLE_API_KEY'
-  }
-}
-
 function validateCredential(resolved) {
-  if (resolved.credentialSource === 'missing' || !resolved.hasCredential) {
-    return {
-      ok: false,
-      reason: `${getProviderEnvVar(resolved.provider)} or configured credential is missing`,
-    }
-  }
-  if (['openai-compatible', 'google', 'antigravity', 'claudecode'].includes(resolved.provider)) {
-    if (!resolved.baseUrl) return { ok: false, reason: `${resolved.provider} baseUrl is missing` }
-    if (!resolved.model) return { ok: false, reason: `${resolved.provider} model is missing` }
-  }
+  if (resolved.blocked) return { ok: false, reason: 'The selected connection or account pool cannot be used.' }
+  if (!resolved.hasCredential) return { ok: false, reason: 'The resolved provider credential is missing.' }
+  if (!resolved.endpointPresent) return { ok: false, reason: 'The resolved provider endpoint is missing.' }
+  if (resolved.requiresModel && !resolved.modelPresent) return { ok: false, reason: 'The resolved provider model is missing.' }
   return { ok: true }
 }
 
@@ -479,126 +288,16 @@ async function runRealProviderSmoke() {
   return { ok: true, status: 'pass', code: 0 }
 }
 
-function summarizeFetchCause(error) {
-  const cause = error && typeof error === 'object' ? error.cause : undefined
-  if (!cause || typeof cause !== 'object') {
-    return redactProviderOutput(error instanceof Error ? error.message : String(error))
-  }
-
-  const fields = []
-  for (const key of ['name', 'code', 'errno', 'syscall', 'hostname', 'address', 'port']) {
-    const value = cause[key]
-    if (typeof value === 'string' && value.trim()) {
-      fields.push(`${key}=${value.trim().replace(/\s+/g, '_').slice(0, 160)}`)
-    } else if (typeof value === 'number') {
-      fields.push(`${key}=${value}`)
-    }
-  }
-  if (cause instanceof Error && cause.message.trim()) {
-    fields.push(`message=${cause.message.trim().replace(/\s+/g, '_').slice(0, 160)}`)
-  }
-  return redactProviderOutput(fields.length > 0 ? fields.join(' ') : String(error))
-}
-
-async function runProviderBaselineSmoke(resolved) {
-  const baseUrl = String(resolved.baseUrl ?? '').replace(/\/+$/, '')
-  const model = String(resolved.model ?? '').trim()
-  const endpoint = `${baseUrl}/chat/completions`
-  const expectedEndpoint = `${expectedBaselineBaseUrl.replace(/\/+$/, '')}/chat/completions`
-  const accountToken = resolved.accountAuth?.accessToken?.trim()
-  const authToken = accountToken || resolved.apiKey?.trim()
-
+async function runProviderBaselineSmoke() {
+  const result = await inspectRuntimeConfig(realHome, projectRoot, { operation: 'baseline',
+    expectedBaseUrl: expectedBaselineBaseUrl, expectedModel: expectedBaselineModel })
   console.log('baselinePrompt=hello / 你是什么模型')
   console.log('baselineTools=0')
   console.log('baselineWillWrite=false')
-  console.log(`baselineProvider=${resolved.provider}`)
-  console.log(`baselineUrl=${endpoint}`)
-  console.log(`baselineUrlExpected=${expectedEndpoint}`)
-  console.log(`baselineModel=${model || 'missing'}`)
-  console.log(`baselineModelExpected=${expectedBaselineModel}`)
-  console.log(`baselineAuthorization=${authToken ? 'Bearer [REDACTED]' : 'missing'}`)
-  console.log(`baselineProxy=${resolveProviderTransport().proxyUrl ? 'enabled' : 'disabled'}`)
-  console.log(`baselineNoProxy=${providerNoProxy ? 'configured' : 'none'}`)
-
-  if (resolved.provider !== 'openai-compatible') {
-    printStep(
-      'provider-baseline-config',
-      'config-failure',
-      `expected provider openai-compatible, got ${resolved.provider}`,
-    )
-    return { ok: false, status: 'config-failure', code: 3 }
-  }
-  if (endpoint !== expectedEndpoint) {
-    printStep(
-      'provider-baseline-config',
-      'config-failure',
-      `expected chat endpoint ${expectedEndpoint}, got ${endpoint}`,
-    )
-    return { ok: false, status: 'config-failure', code: 3 }
-  }
-  if (model !== expectedBaselineModel) {
-    printStep(
-      'provider-baseline-config',
-      'config-failure',
-      `expected model ${expectedBaselineModel}, got ${model || 'missing'}`,
-    )
-    return { ok: false, status: 'config-failure', code: 3 }
-  }
-  if (!authToken) {
-    printStep('provider-baseline-config', 'config-failure', 'authorization header missing')
-    return { ok: false, status: 'config-failure', code: 3 }
-  }
-
-  const startedAt = Date.now()
-  let response
-  try {
-    response = await createProviderFetch()(endpoint, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${authToken}`,
-      },
-      body: JSON.stringify({
-        model,
-        stream: true,
-        messages: [{ role: 'user', content: 'hello / 你是什么模型' }],
-      }),
-      signal: AbortSignal.timeout(30000),
-    })
-  } catch (error) {
-    const cause = summarizeFetchCause(error)
-    printStep('provider-baseline-chat', 'provider-network-inconclusive', 'fetch failed')
-    console.log(`fetchCause=${cause}`)
-    console.log(`elapsedMs=${Date.now() - startedAt}`)
-    return { ok: false, status: 'provider-network-inconclusive', code: 2 }
-  }
-
-  console.log(`httpStatus=${response.status}`)
-  if (response.status === 401 || response.status === 403) {
-    printStep('provider-baseline-chat', 'config-failure', `HTTP ${response.status}`)
-    return { ok: false, status: 'config-failure', code: 3 }
-  }
-  if (!response.ok) {
-    const errorText = redactProviderOutput((await response.text()).slice(0, 400))
-    printStep('provider-baseline-chat', 'config-failure', `HTTP ${response.status}`)
-    if (errorText) console.log(`httpErrorBody=${errorText}`)
-    return { ok: false, status: 'config-failure', code: 3 }
-  }
-
-  const text = redactProviderOutput((await response.text()).slice(0, 400))
-  const redactionPassed =
-    !/Bearer\s+(?!\[REDACTED\])\S+/i.test(text) &&
-    !/sk-[A-Za-z0-9][A-Za-z0-9._-]{8,}/.test(text)
-  console.log(`responseBodyPresent=${text.length > 0}`)
-  console.log(`redaction=${redactionPassed ? 'pass' : 'fail'}`)
-  printStep(
-    'provider-baseline-chat',
-    redactionPassed ? 'pass' : 'product-regression',
-    `elapsedMs=${Date.now() - startedAt}`,
-  )
-  return redactionPassed
-    ? { ok: true, status: 'pass', code: 0 }
-    : { ok: false, status: 'product-regression', code: 1 }
+  if (result.httpStatus !== undefined) console.log(`httpStatus=${result.httpStatus}`)
+  if (result.responseBodyPresent !== undefined) console.log(`responseBodyPresent=${result.responseBodyPresent}`)
+  printStep('provider-baseline-chat', result.status, result.reason ?? 'HTTP response observed; body not reported')
+  return { ...result, code: result.status === 'pass' ? 0 : result.status === 'provider-network-inconclusive' ? 2 : 3 }
 }
 
 async function main() {
@@ -616,20 +315,20 @@ async function main() {
   console.log(`USERPROFILE used=${realHome ?? 'not-configured'}`)
   console.log('homeCreated=false')
 
-  const loaded = loadConfig()
+  const loaded = await inspectRuntimeConfig(realHome, projectRoot)
   if (!loaded.ok) {
     printStep('real-provider-config', loaded.status, loaded.reason)
     process.exit(3)
   }
   printStep('real-provider-config', 'pass', 'config path redacted')
 
-  const resolved = resolveCredential(loaded.config)
+  const resolved = loaded
   console.log(`provider=${resolved.provider}`)
-  console.log(`activeConnection=${resolved.activeConnectionId === 'none' ? 'none' : 'present'}`)
+  console.log(`activeConnection=${!resolved.activeConnectionId ? 'none' : 'present'}`)
   console.log(`credentialSource=${resolved.credentialSource}`)
   console.log(`authMode=${resolved.authMode}`)
-  console.log(`endpoint=${renderPresence(resolved.baseUrl)}`)
-  console.log(`model=${renderPresence(resolved.model)}`)
+  console.log(`endpoint=${resolved.endpointPresent ? 'present' : 'missing'}`)
+  console.log(`model=${resolved.modelPresent ? 'present' : 'missing'}`)
   const credentialOk = validateCredential(resolved)
   if (!credentialOk.ok) {
     printStep('real-provider-credential', 'config-failure', credentialOk.reason)
@@ -643,7 +342,7 @@ async function main() {
   }
 
   if (baselineSmoke) {
-    const baseline = await runProviderBaselineSmoke(resolved)
+    const baseline = await runProviderBaselineSmoke()
     printStep('provider-baseline-smoke-gate', baseline.status)
     process.exit(baseline.code)
   }
