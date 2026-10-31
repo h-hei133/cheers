@@ -484,7 +484,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节 | 未开始 | 需要先裁决 Enter 的语义，再改呈现 |
 | ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节 | 未开始 | 需迁移旧格式；先做权限修复 |
-| ADD-71 | P1 | fullscreen 退出后不把会话写回主屏 | 第 40 项、第 22.3 节 | 未开始 | 需裁决方案 A/B；会改动既有测试 |
+| ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节 | 未开始 | 实施时须同时更新锁定旧行为的 engine 测试并说明理由 |
 
 ### 12.12 归并说明
 
@@ -5275,7 +5275,21 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 - **最后收敛重复**：`baseUrl` 与 `model` 只保留一处权威来源（建议目录负责"能连到哪里"，连接负责"用哪个账号/密钥"），其余改为派生或校验。
 - 不引入 YAML：本项目已有 JSON 解析与 JSONC visitor，换格式是纯成本。
 
-**证据边界**：全部为源码与参考文档；未读取用户真实 `config.json`，未验证 umask 在本机的实际值。
+**本机实测（2026-10-31，脱敏读取，未打印任何密钥值）**
+
+用户指出上一版结论把范围说窄了：真正的问题不是"models.json 干净"，而是 `config.json` 本身。实测确认：
+
+| 文件 | 权限 | 内容 |
+|---|---|---|
+| `~/.cheers/config.json` | **0644** | 顶层键 `provider`、`providerCredentials`、`tui`、`providerConnections`；前两者含明文 `apiKey`、`baseUrl`、`model` |
+| `~/.omp/agent/config.yml` | **0600** | `grep -ciE "apikey\|baseurl\|token\|secret"` = **0**；只有 `modelRoles`、`retry`、`compaction`、`composer`、`skills` 等设置 |
+| `~/.omp/agent/models.yml` | 0644 | 模型目录，无凭据 |
+
+**并且本机存在一个实际的自相矛盾**：同一份 `config.json` 里同一个模型配了两个不同的 base URL——`providerCredentials["openai-compatible"].baseUrl` 是 `.../openapi/v1`，`providerConnections[0].baseUrl` 是 `.../v1`。`providerCredentialBaseUrl` 取 `resolution.baseUrl ?? credential.baseUrl`（[target.ts](../../packages/ts-shell/src/core/auth/account/target.ts)），即连接值优先，凭据里那个是**死值**。这正是"同一事实多处存储"的直接后果：两处漂移，一处静默失效，而界面不说明哪个在生效。
+
+**正确的划分应当是四份，不是两份**（对照 omp）：设置（`config.json`）、模型目录（`models.json`）、凭据（独立的 auth 文件，0600）、运行时状态（会话/缓存）。当前把前两者和凭据挤在一份 0644 文件里。
+
+**证据边界**：读取为本机真实文件，密钥值已脱敏、未记录；未验证 umask 实际值（但文件实测就是 0644）。
 
 ### 22.3 第四十：fullscreen 退出后屏幕上仍有聊天记录
 
@@ -5304,7 +5318,7 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 
 建议 **A**，理由：`regular` 已经完整承担"对话留在 scrollback"的职责，两个模式应有正交语义；`fullscreen` 再把内容写回主屏，等于把私有屏的内容泄漏到用户的终端历史里，用户无法预期。
 
-**注意**：这不是"修 bug"，改动会**使一条现有测试失败**（`engine.test.ts` 的 `"leaves the document under the restored screen"`）。按项目规则，这类断言变更必须在文档里说明理由，不能悄悄改测试。
+**裁决（2026-10-31，用户明确选择方案 A）**：`fullscreen` 退出只恢复终端，**不再把会话写回主屏**；需要 scrollback 的用户使用 `regular`。理由：两个模式应有正交语义，`fullscreen` 把私有屏内容泄漏进用户终端历史是不可预期的行为。改动会**使一条现有测试失败**（`engine.test.ts` 的 `"leaves the document under the restored screen"`），该断言锁定的是被否决的方案；实施时必须同时改断言并在文档写明理由，不能只改实现留下失败测试，也不能只改测试假装没变。
 
 **证据边界**：源码与参考实现对照；未在真实终端观察退出后的屏幕（用户已观察）。
 
