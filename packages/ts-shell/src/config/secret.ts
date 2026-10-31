@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { isRecord } from '../core/values/record.js';
 
 /**
@@ -38,3 +39,19 @@ function holdsCredentialFields(record: Record<string, unknown>): boolean {
  * narrowed the next time it is saved rather than staying readable forever.
  */
 export const CREDENTIAL_FILE_MODE = 0o600;
+
+/**
+ * Narrow an existing credential file without rewriting it.
+ *
+ * A save whose content does not change still has a permission to correct: the
+ * file on disk may predate this rule, and leaving it wide because "nothing
+ * changed" would mean the only way to fix it is to edit a setting. Content is
+ * untouched, so the revision a caller holds stays valid.
+ */
+export function narrowCredentialFile(filePath: string): void {
+  // Windows has no POSIX mode bits; the file is already governed by its ACL.
+  if (process.platform === 'win32') return;
+  const current = fs.statSync(filePath).mode & 0o777;
+  if (current === CREDENTIAL_FILE_MODE) return;
+  fs.chmodSync(filePath, CREDENTIAL_FILE_MODE);
+}

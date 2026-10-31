@@ -285,3 +285,31 @@ describe('credential file permissions', () => {
     expect(mode()).not.toBe(0o600);
   });
 });
+describe('narrowing a legacy credential file without rewriting it', () => {
+  let root: string;
+  let file: string;
+  beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), 'config-narrow-')); file = path.join(root, 'config.json'); });
+  afterEach(() => { fs.rmSync(root, { recursive: true, force: true }); });
+  const mode = () => fs.statSync(file).mode & 0o777;
+
+  it('narrows permissions when a save changes nothing at all', () => {
+    // The file predates the rule. A save with no content change used to leave it
+    // at 0644 forever, so the only way to protect it was to edit a setting.
+    const content = { theme: 'dark', providerCredentials: { openai: { apiKey: 'synthetic-secret' } } };
+    fs.writeFileSync(file, JSON.stringify(content));
+    fs.chmodSync(file, 0o644);
+    const base = readRuntimeConfigEditAt(file);
+    writeRuntimeConfigFileAt(file, { ...base.values }, base);
+    expect(mode()).toBe(0o600);
+    // The bytes did not change, so a caller's revision is still the file's.
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual(content);
+  });
+
+  it('leaves a credential-free file alone on an unchanged save', () => {
+    fs.writeFileSync(file, JSON.stringify({ theme: 'dark' }));
+    fs.chmodSync(file, 0o644);
+    const base = readRuntimeConfigEditAt(file);
+    writeRuntimeConfigFileAt(file, { ...base.values }, base);
+    expect(mode()).not.toBe(0o600);
+  });
+});

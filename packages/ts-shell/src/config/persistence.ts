@@ -8,7 +8,7 @@ import { validateRawConfig } from './layers.js';
 import { ConfigDocumentError } from './syntax.js';
 import { patchConfigDocument } from './patch.js';
 import { mergeConfigEdit } from './conflict.js';
-import { CREDENTIAL_FILE_MODE, holdsCredentialMaterial } from './secret.js';
+import { CREDENTIAL_FILE_MODE, holdsCredentialMaterial, narrowCredentialFile } from './secret.js';
 import { ConfigWriteError, type ConfigWriteState } from './outcome.js';
 import { assertProfileIdentity, assertProfileStorage, currentProfile, type ProfileContext } from '../core/paths/profile/context.js';
 import { isWithin } from '../core/paths/profile/identity.js';
@@ -93,6 +93,13 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
         code = 'verification-failed';
         if (readConfigSnapshot(baseline.path)?.text !== text) throw new ConfigWriteError('verification-failed', 'unknown');
         state = 'persisted'; savedRevision = revision(text)!;
+      } else if (holdsCredentialMaterial(current?.values)) {
+        // No content to write, but the file that is already there holds
+        // credentials and may predate this rule. Its permissions are a property
+        // of the file, not of this save, so they are narrowed without touching
+        // the bytes — mtime stays put, which is what makes an unchanged save
+        // observably unchanged.
+        narrowCredentialFile(baseline.path);
       }
       code = 'lock-failed';
       return filePath;
