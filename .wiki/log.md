@@ -11091,3 +11091,6 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：签名请求目录与状态投影
 
 [addition24.31](features/phase-20-addition.md#2431-当前签名请求的目录与状态显示) 当前Bedrock/Vertex signer在裸model目录显示authentication at request，static credential/measurement事实保持。status共用actual catalogue owner，并把signer明确列为Request auth/readiness，saved Provider/Auth type/Model/Active connection独立；CLI和explicit provider over saved named、exact alias/反向protocol、named/pool/unknown/ambiguity保留。Node20.3单worker串行3文件92项、旧owner反转10失败/15控制/44未选、finally精确恢复后92通过；五门/build当前compilerInputs digest、独立APPROVE/CLEAR、正式bundle哈希/serial judge环与解析satisfied，仅既有21/22-name advisory；交付另读回。CLI fixture错误已分类修正，无外部请求；1c874354/1e8e34d2精确CI已success，f4710568/776269e2最后in_progress。ADD-70 partial、goal active。
+
+
+本批代码/证据说明已提交推送 `638d023ec1fff4c4309dfec23aa823b51a3b791d`，远端main精确一致、batch scratch移除、提交后clean。自身CI `41220480426`最后in_progress，Watch `41220480427`completed/success，不代替代码CI；此段交付记录单独文档提交。
