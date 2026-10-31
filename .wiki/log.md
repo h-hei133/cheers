@@ -10978,3 +10978,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：fallback/pool 模型保存与 thinking 跟随实际请求
 
 [addition24.9](features/phase-20-addition.md#249-fallbackpool-模型选择绑定实际连接)复现无active ID但已有resolved连接时/model拒绝保存。现捕获connectionId、session显式绑定，global仅改该连接默认；hook/锁内重查自然选择，拒绝sibling timestamp/pool变更，删除后零fallback。thinking inspection复用同resolver、删旧推导。实际Node20.3上4文件121项含loopback wire通过；3反转AssertionError/精确恢复、五门/build通过，manifest1cb0041d151c，judge仅既有interactiveMode advisory。0f758c59代码CI41192812005已success；3918c14f失败24项都是已修夹具、browser healing通过，旧一次失败根因仍未确认。e9f7a8c9代码CI最后in_progress，Watch成功；未真实provider/Windows/PTY/全仓，本批无独立委派复审，ADD-70 partial、goal active。
+
+### 2026-10-31：文本目录不借用 relay 身份、不改变 pool 选择
+
+[addition24.10](features/phase-20-addition.md#2410-文本模型目录保持精确身份与只读选择)旧文本/model的同协议relay均active/credential present，两回归实际失败。现availability按目录ID投影，活动跟随实际请求与issuer；本地凭据由现有selection adapter无CLI/无session-affinity检查，保留独立slot、issuer setup/pool refusal与歧义隔离，共用picker地址匹配。只读复审发现inspection把pool affinity A改B，新增回归复现并修复，最后APPROVE/CLEAR。Node20.3上5文件104项、六反转AssertionError/精确恢复、五门/build通过，manifest7a2ab949e2a0；正式judge环/解析satisfied，仅既有interactiveMode advisory。e9f7a8c9代码CI已success，e2daf775代码CI最后in_progress；未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。

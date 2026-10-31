@@ -15,7 +15,8 @@ import { loadCatalogSnapshot, ensureUserCatalog, userCatalogPath } from "../mode
 import { catalogProvider } from '../models/catalog.js';
 import { refreshCatalog } from "../models/catalogRefresh.js";
 import { renderCatalog } from "../models/catalogSurface.js";
-import { availabilitySnapshot, type AvailabilitySnapshot } from "../models/availability.js";
+import { availabilitySnapshot, catalogAvailabilitySnapshot, type AvailabilitySnapshot } from "../models/availability.js";
+import { selectionRequest } from './model/target.js';
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
 import { configurationApplicationNotice } from "./configuration.js";
 import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
@@ -104,9 +105,12 @@ function modelConfiguration(context: CommandContext) {
 
 function renderCatalogView(context: CommandContext): string {
   const { config, catalog, active, catalogDiagnostics } = modelConfiguration(context);
-  const projected = availabilitySnapshot({ config, catalog });
   return renderCatalog({ providers: catalog, configPath: userCatalogPath(), diagnostics: catalogDiagnostics,
-    availability: { ...projected, activeProvider: active.provider, ...(active.model ? { activeModel: active.model } : {}) } });
+    availability: catalogAvailabilitySnapshot({ config, catalog, active,
+      // Local presence uses neither CLI overrides nor a live session's pool affinity.
+      resolveLocal: (provider, connectionId) => selectionRequest({ cwd: context.cwd }, config, {
+        provider, model: '', ...(connectionId === undefined ? { connectionScope: 'provider' } : { connectionScope: 'session', connectionId }),
+      }) }) });
 }
 
 function renderModelStatus(context: CommandContext): string {

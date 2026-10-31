@@ -280,7 +280,7 @@ describe("refreshing the catalogue", () => {
       const catalog = loadCatalog();
       const rendered = renderCatalog({
         providers: catalog,
-        availability: { activeProvider: "openai", providers: [] },
+        availability: [],
         configPath: userCatalogPath(),
       });
       const lineFor = (id: string) => rendered.split("\n").find(line => line.includes(`\`${id}\``));

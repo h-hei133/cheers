@@ -5553,3 +5553,15 @@ ADD-70 仍部分完成：默认值已物理移出 auth，但其余重复事实�
 主代理串行聚焦 selection46/effort26/provider30/modelCommand19，**121 项**在实际 Linux Node20.3.0 上通过；新增 fallback/pool loopback HTTP 断言验证实际 body.model、reasoning_effort、service_tier 与选中连接凭据。新增 session-only/恢复/删除后零fallback、global有无session、hook/锁内 sibling timestamp与pool选择改变拒绝；两个最初复现断言在旧代码实际失败。三条反转（退回 raw active ID、取消session绑定、移除自然选择重查）均 AssertionError，精确恢复源码后再验证。五门/build通过，manifest `1cb0041d151c`；正式打包 NormProof exit0，环/解析 satisfied，partial仅既有 interactiveMode21/22-name advisory。本批无独立委派复审、真实provider/Windows/PTY/全仓/20k压测。
 
 延迟CI `3918c14f`/`41192490126` failure24项均为第24.7节已修旧夹具，browser healing 此轮通过；此前单场景Node20.3也通过，现有证据仍不足判断它在 `73e332f1` 的失败根因。`0f758c59` 的代码CI `41192812005` 已 success，验证旧夹具修复；`e9f7a8c9` 的 `41193784458` 最后 in_progress，Watch success。旧SHA绿色不证明本批提交；ADD-70 partial、整体goal active，未迁移真实HOME，其余重复语义/旧版本回退/真实环境继续尚缺。
+
+### 24.10 文本模型目录保持精确身份与只读选择
+
+裸 `/model` 的文本目录曾按 runtime 协议合并状态；两个 relay 共用协议和模型 ID 时，两者及 canonical 都显示 active，未配置端点也借用 sibling 的 credential present。两条新增回归在旧代码实际 AssertionError。现由既有 availability owner 输出按 catalogue ID 的本地状态，活动标记采用捕获实际请求的精确 catalogue owner，并通过 credential endpoint owner 保留账号 issuer 路由。重复 endpoint 的类别保持 unverified，不把歧义传播到其他缺凭据的 relay。
+
+本地 presence 与请求覆盖分开：命名目标仍要求自身凭据和 pool 授权；独立 provider slot、环境源及 canonical 经未列出的 relay 使用既有语义。文本目录的 prospect inspection 由命令的现有 selectionRequest adapter 注入，不带 CLI override 或真实 session ID；availability 不依赖 session 存储。`matchesCatalog` 从 picker 原地移入 availability，两消费者共用地址匹配，不复制 credential resolver。pending/error/excluded 的无 URL 账号以既有 issuer policy 定位类别并保留原状态；deleted/missing/empty pool 继续报告明确 refusal。
+
+两路只读复审发现一次真实副作用：逐项检查 pool 连接若带真实 session affinity，原 resolver 会记住最后一个检查目标；新增 before/after 回归实际复现目录显示 A 后，下次请求使用 B。上述 adapter 去掉 inspection 的 session affinity 后修复，并保留实际 active capture 的会话选择。复审同时修正 CLI refusal 被误报为缺本地凭据、issuer 非 ready 状态消失、失效 pool 被降为 missing、ambient 歧义传播到无关类别。最终 code-reviewer APPROVE、architect CLEAR，子代理仅阅读，未执行验证。
+
+主代理单进程串行在实际 Linux Node20.3.0 上运行 **5 文件 / 104 项**：catalogSurface25、availability23、catalogRefresh11、modelCommand19、picker category26。覆盖 explicit/fallback/pool/provider-slot/CLI、同名模型精确 active、blocked/无凭据、尾斜线、未列端点 canonical、issuer与非 ready 账号、独立 provider 默认、broken pool、歧义隔离、请求 affinity 前后不变；只读断言观察 settings/auth/catalogue 的字节或缺失。六条反转（协议 active、借用 sibling、raw issuer地址、inspection 带真实 session、丢弃 issuer state、丢弃 pool refusal）均实际 AssertionError，finally 精确恢复后最终聚焦套件全过；重复不累加。五门/build通过，manifest `7a2ab949e2a0`。首次 judge 使用包目录的相对 tarball 路径，npm ENOENT 在 judge 执行前退出；从仓库根调用正式打包 judge exit0，环和导入解析 satisfied，仅两个既有 interactiveMode21/22-name advisory，未新增 ceiling finding。
+
+延迟读取 `e9f7a8c9` 代码 CI `41193784458` 已 success；`e2daf775` 的 `41194578660` 最后 in_progress，Watch `41194578673` success 不能替代代码 CI。本批提交/推送与自身 CI 单独绑定。未真实 provider、Windows、PTY、全仓或20k压测，未迁移真实 HOME。ADD-70 partial、整体goal active，旧版本回退与原Phase20真实验收继续延后。

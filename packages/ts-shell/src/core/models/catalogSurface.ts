@@ -1,5 +1,5 @@
 import type { CatalogProvider } from "./catalog.js";
-import { availabilityLabel, endpointLabel, type AvailabilitySnapshot } from "./availability.js";
+import { availabilityLabel, endpointLabel, type CatalogAvailability } from "./availability.js";
 
 /**
  * Rendering the catalogue.
@@ -13,7 +13,7 @@ import { availabilityLabel, endpointLabel, type AvailabilitySnapshot } from "./a
 export interface CatalogView {
   readonly providers: readonly CatalogProvider[];
   /** Local configuration facts; nothing here implies a live request was made. */
-  readonly availability: AvailabilitySnapshot;
+  readonly availability: readonly CatalogAvailability[];
   /** Where a user adds their own providers. */
   readonly configPath: string;
   readonly diagnostics?: readonly string[];
@@ -42,11 +42,11 @@ export function renderCatalog(view: CatalogView): string {
 }
 
 function renderProvider(provider: CatalogProvider, view: CatalogView): string[] {
-  const entry = view.availability.providers.find(candidate => candidate.provider === provider.runtime);
+  const entry = view.availability.find(candidate => candidate.id === provider.id);
   const state = entry ? availabilityLabel(entry.state) : AUTH_NOTE[provider.auth];
   const marks = [
     provider.custom ? "yours" : undefined,
-    provider.runtime === view.availability.activeProvider ? "active" : undefined,
+    entry?.active ? "active" : undefined,
     state,
   ].filter(Boolean);
   const head = `**${provider.label}** \`${provider.id}\` — ${marks.join(" · ")}`;
@@ -55,7 +55,7 @@ function renderProvider(provider: CatalogProvider, view: CatalogView): string[] 
   }
   const lines = [head, ""];
   for (const model of provider.models) {
-    const active = provider.runtime === view.availability.activeProvider && model.id === view.availability.activeModel;
+    const active = entry?.active && model.id === entry.activeModel;
     const window = model.contextWindow ? ` · ${Math.round(model.contextWindow / 1000)}k` : "";
     lines.push(`- \`${model.id}\`${window}${active ? " ← active" : ""}`);
   }

@@ -1,7 +1,7 @@
 import { projectModelSelection, projectSessionModel } from "../../../session/model/projection.js";
 import { getRuntimeConfig } from "../../../config/runtimeConfig.js";
 import { loadCatalogSnapshot } from "../../../core/models/catalogStore.js";
-import { availabilityLabel, availabilitySnapshot, endpointLabel, type ConnectionAvailability } from "../../../core/models/availability.js";
+import { availabilityLabel, availabilitySnapshot, endpointLabel, matchesCatalog, type ConnectionAvailability } from "../../../core/models/availability.js";
 import { catalogBaseUrl, catalogProvider, type CatalogProvider } from "../../../core/models/catalog.js";
 import { effortCapability } from "../../../core/models/capability.js";
 import { resolveProviderCredential } from "../../../core/shell/providerCredentials.js";
@@ -441,12 +441,4 @@ function modelDetails(provider: CatalogProvider, connection?: ConnectionAvailabi
     ...(connection ? [`Connection: ${connection.connectionId}`, ...(connection.label ? [`Label: ${connection.label}`] : []), ...(connection.endpoint ? [`Endpoint: ${connection.endpoint}`] : []),
       `Availability: ${availabilityLabel(connection.state)}`, connection.reason] : source ? [`Credential source: ${source}`] : ['Availability: configure a connection']),
     'Remote availability: unverified'];
-}
-
-/** Canonical provider models work through relays; a relay-specific catalogue must match its address. */
-function matchesCatalog(provider: CatalogProvider, connection: ConnectionAvailability,
-  connections: readonly { readonly id: string; readonly baseUrl?: string }[], catalog: readonly CatalogProvider[]): boolean {
-  if (provider.id === provider.runtime) return true;
-  const baseUrl = catalogBaseUrl(catalog, provider.runtime, connections.find(item => item.id === connection.connectionId)?.baseUrl);
-  return Boolean(baseUrl && provider.baseUrl && baseUrl.replace(/\/+$/, '') === provider.baseUrl.replace(/\/+$/, ''));
 }

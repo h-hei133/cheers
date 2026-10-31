@@ -1,7 +1,10 @@
 import type { AccountPool, ProviderConnectionAuthType, ProviderConnectionConfig, ProviderCredentialConfig, RuntimeProvider } from '../../config/runtimeConfig.js';
-import type { CatalogProvider } from './catalog.js';
-import { connectionCredentialState, credentialSources } from '../auth/account/presence.js';
+import { catalogBaseUrl, catalogProvider, type CatalogProvider } from './catalog.js';
+import { connectionCredentialState, credentialSources, ownedConnectionCredential } from '../auth/account/presence.js';
 import { availablePoolConnections } from '../auth/account/pool.js';
+import type { ProviderCredentialResolution } from '../auth/credential.js';
+import { providerCredentialBaseUrl } from '../auth/account/target.js';
+import { accountProtocol } from '../auth/account/policy.js';
 
 /**
  * What the configuration says about a provider, without asking the provider.
@@ -91,7 +94,84 @@ function providerState(connections: readonly ConnectionAvailability[], credentia
   if (connections.some(connection => connection.state === 'pending')) return 'pending';
   if (connections.some(connection => connection.state === 'error')) return 'error';
   if (credential === 'present') return 'ready';
+  if (connections.some(connection => connection.state === 'pool-empty')) return 'pool-empty';
+  if (connections.some(connection => connection.state === 'pool-unavailable')) return 'pool-unavailable';
+  if (connections.some(connection => connection.state === 'unknown')) return 'unknown';
   return catalogued ? 'credential-missing' : 'unsupported';
+}
+
+export interface CatalogAvailability {
+  readonly id: string;
+  readonly state: AvailabilityState;
+  readonly active: boolean;
+  readonly activeModel?: string;
+}
+
+/** Canonical models can use relays; a relay catalogue requires its own address. */
+export function matchesCatalog(provider: CatalogProvider, connection: ConnectionAvailability,
+  connections: readonly { readonly id: string; readonly baseUrl?: string }[], catalog: readonly CatalogProvider[]): boolean {
+  if (provider.id === provider.runtime) return true;
+  const baseUrl = catalogBaseUrl(catalog, provider.runtime, connections.find(item => item.id === connection.connectionId)?.baseUrl);
+  return Boolean(baseUrl && provider.baseUrl && baseUrl.replace(/\/+$/, '') === provider.baseUrl.replace(/\/+$/, ''));
+}
+
+/** Local credential presence is independent of request overrides and cannot change session affinity. */
+export function catalogAvailabilitySnapshot(input: {
+  readonly config: AvailabilityConfig;
+  readonly catalog: readonly CatalogProvider[];
+  readonly active: ProviderCredentialResolution;
+  readonly resolveLocal: (provider: RuntimeProvider, connectionId?: string) => ProviderCredentialResolution;
+}): readonly CatalogAvailability[] {
+  const snapshot = availabilitySnapshot(input);
+  const active = input.active;
+  const owner = !active.blocked && active.credential ? resolvedCatalog(input.catalog, active) : undefined;
+  return input.catalog.map(provider => {
+    const entry = snapshot.providers.find(candidate => candidate.provider === provider.runtime);
+    const connections = (entry?.connections ?? []).flatMap(connection => {
+      const stored = matchesCatalog(provider, connection, input.config.providerConnections ?? [], input.catalog)
+        || issuerMatchesCatalog(provider, connection, input.config, input.catalog);
+      if (connection.state !== 'ready') return stored ? [connection] : [];
+      const state = catalogCredentialState(input.catalog, provider, input.resolveLocal(connection.provider, connection.connectionId), connection.connectionId);
+      // An account's issuer can supply its actual address without a stored URL.
+      return stored || state === 'ready' ? [{ ...connection, state }] : [];
+    });
+    const ambient = input.resolveLocal(provider.runtime);
+    const currentAmbient = !active.credential?.connectionId && owner?.entry?.id === provider.id;
+    const ambientState = catalogCredentialState(input.catalog, provider, ambient);
+    const credential = ambientState === 'ready' || currentAmbient ? 'present' : 'missing';
+    const ambiguous = provider.id !== provider.runtime && catalogProvider(input.catalog, provider.runtime, provider.baseUrl).ambiguous;
+    const localState = providerState(connections, credential, true);
+    return { id: provider.id, state: ambiguous ? 'unknown' : ambient.blocked === 'pool-empty' ? 'pool-empty'
+      : localState === 'credential-missing' && ambientState === 'pool-unavailable' ? ambientState : localState,
+      active: owner?.entry?.id === provider.id,
+      ...(owner?.entry?.id === provider.id && active.model ? { activeModel: active.model } : {}) };
+  });
+}
+
+function issuerMatchesCatalog(provider: CatalogProvider, connection: ConnectionAvailability,
+  config: AvailabilityConfig, catalog: readonly CatalogProvider[]): boolean {
+  const stored = config.providerConnections?.find(item => item.id === connection.connectionId && item.provider === connection.provider);
+  if (!stored) return false;
+  try {
+    const address = accountProtocol(ownedConnectionCredential(stored).accountAuth)?.baseUrl;
+    return Boolean(address && catalogProvider(catalog, connection.provider, address).entry?.id === provider.id);
+  } catch { return false; }
+}
+
+function resolvedCatalog(catalog: readonly CatalogProvider[], resolution: ProviderCredentialResolution) {
+  try { return catalogProvider(catalog, resolution.provider, providerCredentialBaseUrl(catalog, resolution)); }
+  catch { return undefined; }
+}
+
+function catalogCredentialState(catalog: readonly CatalogProvider[], provider: CatalogProvider,
+  resolution: ProviderCredentialResolution, connectionId?: string): AvailabilityState {
+  if (resolution.blocked === 'pool-empty') return 'pool-empty';
+  if (resolution.blocked === 'pool-unavailable' || resolution.blocked === 'pool-required') return 'pool-unavailable';
+  if (resolution.blocked || !resolution.credential || resolution.provider !== provider.runtime
+    || resolution.credential.connectionId !== connectionId) return 'credential-missing';
+  const owner = resolvedCatalog(catalog, resolution);
+  if (!owner || owner.ambiguous) return 'unknown';
+  return provider.id === provider.runtime || owner.entry?.id === provider.id ? 'ready' : 'credential-missing';
 }
 
 export function availabilitySnapshot(input: {
