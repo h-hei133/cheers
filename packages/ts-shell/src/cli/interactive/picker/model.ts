@@ -2,7 +2,8 @@ import { projectModelSelection, projectSessionModel } from "../../../session/mod
 import { getRuntimeConfig } from "../../../config/runtimeConfig.js";
 import { loadCatalogSnapshot } from "../../../core/models/catalogStore.js";
 import { availabilityLabel, availabilitySnapshot, endpointLabel, matchesCatalog, type ConnectionAvailability } from "../../../core/models/availability.js";
-import { catalogBaseUrl, catalogProvider, type CatalogProvider } from "../../../core/models/catalog.js";
+import { catalogProvider, type CatalogProvider } from "../../../core/models/catalog.js";
+import { providerCredentialBaseUrl } from '../../../core/auth/account/target.js';
 import { effortCapability } from "../../../core/models/capability.js";
 import { resolveProviderCredential } from "../../../core/shell/providerCredentials.js";
 import type { CommandContext } from "../../../core/commands/types.js";
@@ -110,7 +111,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       // Inspecting prospective targets must not remember them as the session's next pool account.
       // Keep the host's request overrides, while actual activation retains the original context.
       const inspectionContext = { ...context, sessionId: undefined };
-      const activeAddress = catalogBaseUrl(catalog, active.provider, active.baseUrl ?? active.credential?.baseUrl);
+      const activeAddress = providerCredentialBaseUrl(catalog, active);
       const availability = availabilitySnapshot({ config, catalog });
       const thinkingEffort = assigning ? assigning.thinkingEffort
         : captureThinkingPreference(context.projectRoot ?? context.cwd, active.thinkingEffort).thinkingEffort;
@@ -151,16 +152,16 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               && ambientResolution.credential.connectionId === undefined);
             const effectiveResolution = resolution ?? (namedConnectionRequired ? ambientResolution : undefined);
             const exact = candidate ? exactTargetMatches(inspectionContext, candidate, target) : false;
-            const ambiguous = catalogProvider(catalog, provider.runtime, effectiveResolution?.baseUrl).ambiguous;
-            const capability = effortCapability(catalog, provider.runtime, model.id, thinkingEffort, effectiveResolution?.baseUrl);
+            const modelAddress = effectiveResolution?.credential ? providerCredentialBaseUrl(catalog, effectiveResolution)
+              : effectiveResolution?.baseUrl ?? config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
+            const ambiguous = catalogProvider(catalog, provider.runtime, modelAddress).ambiguous;
+            const capability = effortCapability(catalog, provider.runtime, model.id, thinkingEffort, modelAddress);
             const assignedEffort = assigning && capability !== 'supported' ? null : thinkingEffort;
             const unsupported = !assigning && capability === 'unsupported';
-            const modelAddress = effectiveResolution?.baseUrl
-              ?? config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl ?? provider.baseUrl;
             const alias = provider.id === provider.runtime ? catalog.find(candidate => candidate.runtime === provider.runtime
               && candidate.id !== provider.runtime && candidate.baseUrl !== undefined && modelAddress !== undefined
               && candidate.baseUrl.replace(/\/+$/, '') === modelAddress.replace(/\/+$/, '')) : undefined;
-            const selected = Boolean(exact && !alias && !active.blocked && active.credential
+            const selected = Boolean(exact && !ambiguous && !alias && !active.blocked && active.credential
               && connection?.connectionId === active.credential.connectionId && provider.runtime === active.provider && model.id === active.model
               && resolution?.baseUrl === active.baseUrl && sameValue(resolution?.credential, active.credential));
             const reason = namedConnectionRequired ? 'named connection required'
@@ -179,7 +180,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             const displayed = connection?.state === 'ready' && (resolution?.blocked || !resolution?.credential)
               ? { ...connection, state: 'credential-missing' as const, reason: 'This explicit connection needs its own credential.' } : connection;
             const lines = [...modelDetails(provider, displayed, !connection ? effectiveResolution?.credential?.source : undefined),
-              ...(!connection && (effectiveResolution?.baseUrl ?? provider.baseUrl) ? [`Endpoint: ${endpointLabel(effectiveResolution?.baseUrl ?? provider.baseUrl)}`] : []),
+              ...(!connection && modelAddress ? [`Endpoint: ${endpointLabel(modelAddress)}`] : []),
               `Reasoning effort: ${assignedEffort ?? 'auto'}`, ...modelMetadataDetails(catalog, provider, model.id, modelAddress), ...(reason ? [reason] : [])];
             details.set(id, lines);
             const inspection = () => modelDetailsPicker(detailSourceFor(id, model.id, id));
@@ -259,12 +260,14 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       if (currentModel && !rows.some(row => row.note === 'active')) {
         const id = 'model:current';
         groups.set(id, { category: currentProvider });
-        const endpoint = endpointLabel(active.baseUrl);
+        const reportAddress = active.credential && !active.blocked ? activeAddress : active.baseUrl;
+        const endpoint = endpointLabel(reportAddress);
         const note = active.blocked ? 'request blocked' : active.credential ? 'active' : 'credential missing';
         const connection = config.providerConnections.find(item => item.id === currentConnection && item.provider === currentProvider);
-        const exactCatalog = connection ? catalogProvider(catalog, currentProvider, connection.baseUrl) : undefined;
+        const metadataAddress = active.credential && !active.blocked ? activeAddress : connection?.baseUrl;
+        const exactCatalog = connection ? catalogProvider(catalog, currentProvider, metadataAddress) : undefined;
         const exactFacts = exactCatalog?.entry && !exactCatalog.ambiguous
-          ? modelMetadataDetails(catalog, exactCatalog.entry, currentModel, connection!.baseUrl) : undefined;
+          ? modelMetadataDetails(catalog, exactCatalog.entry, currentModel, metadataAddress) : undefined;
         const targetId = exactCatalog?.entry && !exactCatalog.ambiguous ? rowId(connection!.id, exactCatalog.entry.id, currentModel) : undefined;
         // A report offers the existing exact-record inspection; labels and runtime
         // aliases cannot choose another relay, deleted record or pool member.

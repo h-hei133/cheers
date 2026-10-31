@@ -11010,3 +11010,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：文本目录采用原生账号实际发行方端点
 
 [addition24.17](features/phase-20-addition.md#2417-文本模型目录跟随原生账号发行方端点)368cc3e6已推送且main/远端一致。Copilot假设通过后未改认证；Google native account两个reader实际AssertionError，现model command两处复用providerCredentialBaseUrl，API key与显式其他目录保留。Node20.3三文件39项、两有效反转AssertionError精确恢复、五门/build与inputs校验通过，manifest202e69ad04b0；参数化展开名反转全跳过已排除并纠正。两路复审APPROVE/CLEAR，正式judge仍仅interactiveMode既有advisory。25bec115代码CI已success，368cc3e6仍in_progress；ADD-70 partial、goal active，旧版本/真实环境继续延后。
+
+### 2026-10-31：能力、窗口与交互目录共用原生 issuer 地址
+
+[addition24.18](features/phase-20-addition.md#2418-模型能力窗口偏好与交互目录共用发行方地址)原生account无stored URL时thinking选项、extended窗口、picker命名行与direct反向能力/目录围栏实际失败。沿既有target helper统一初始与锁内读取，合并issuer matcher；复审补修incomplete setup地址回退、duplicate alias activity及current报告unverified，未改auth/provider核心。Node20.3单worker串行6文件207项、七次有效反转/精确恢复、五门/build与输入摘要通过，manifest421717a2aec9；正式judge仅既有interactiveMode advisory，两路最终APPROVE/CLEAR，scratch清理。368cc3e6/cf745bcc代码CI最后in_progress，Watch成功不作代码通过；未真实provider/Windows/PTY/全仓/20k，ADD-70 partial、goal active，提交/推送与自身CI另绑。

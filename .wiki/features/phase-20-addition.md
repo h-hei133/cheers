@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.17 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.18 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5655,3 +5655,17 @@ dispatch、配置约束、状态栏、`/context`和handoff共用reader。压缩w
 主代理实际Linux Node20.3.0、heap768MiB、单worker串行最终 **3文件/39项**通过：session catalog13、model command19、account target7。新增account/API key×data/text四场景验证原生issuer目录、compatible目录、active model、显式other目录无active标记、zero requests与settings/auth bytes/absence不变；原relay真实loopback协议和metadata用例继续通过。data/text两处独立反转各实际1失败/3通过/9跳过，AssertionError且生产bytes精确恢复。第一次使用参数化展开名作`-t`全13项跳过，不计证据；改稳定组名后执行实际四项并获上述失败，最终稳定源码重新39项通过。
 
 五静态门/build通过，manifest `202e69ad04b0` 当前输入摘要读回一致；正式bundle judge独立串行exit0，环/解析satisfied，仍仅既有interactiveMode21/22-name advisory。两路独立只读复审APPROVE/CLEAR，子代理未验证；本轮scratch清理。延迟代码CI `25bec115`/`41199285608` 已success，`368cc3e6`/`41200474418` 最后in_progress，对应Watch success不替代代码CI。本批另绑提交/远端/自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移；ADD-70 partial、goal active，旧版本回退与其余重复语义/真实环境尚缺。
+
+### 24.18 模型能力、窗口偏好与交互目录共用发行方地址
+
+第24.17节已推送 `cf745bcc9a2c27b12384553b5b8fbe87f1d18bee`，接续时工作区干净。有效 Google native account 无 stored URL 的隔离场景复现：thinking picker 把原生目录不支持的 high 显示可选；extended context 保存 compatible 的16000而非native的32000；模型 picker 缺少命名原生目录行；反向能力两条直接 model/thinking 命令被 compatible 元数据误拒绝；hook 后 native 目录变更未拒绝保存。同组 API-key 路径通过。锁注入初次误匹配state.json而非state.lock，未算产品证据；纠正后用完整旧owner bytes反转确认锁内目录变更仍会保存。
+
+沿既有owner改读取：selection与preferences先用 `providerCredentialBaseUrl` 得到目录地址，准入和hook/锁内围栏共用；仍保留原始request/credential equality、自然fallback/pool重查、session/global两阶段与CAS。thinking与model picker按同地址读取effort、metadata和alias。现有availability的matchesCatalog加入issuer优先，删除重复issuer matcher；canonical会员关系保留，命名alias跟随issuer，本地inspection仍无sessionId、不续期或请求。不改auth/provider实现、不新增存储字段、resolver或writer，API key保持配置地址语义。定向只读参考model-controls认证模型元数据与model-registry本地available决定，本项目沿既有issuer地址owner并额外保留精确连接和发布围栏。
+
+两路独立复审进一步发现并修复：不完整account校验失败不能丢失其已声明native URL的pending/error行，保留地址回退、readiness独立判断，两条实际失败后通过；重复issuer alias虽disabled却均标active，新增失败回归后要求无ambiguity才标活动owner；新出现的model:current也必须按实际issuer读元数据，ambiguity显示unverified，不能借compatible容量，补充断言实际失败后通过。重复picker apply夹具曾第二次操作已退休owner，空note断言也误用toContain；按一次真实apply的合同纠正，拒绝写入和状态不变断言保留。
+
+主代理实际Linux Node20.3.0、heap768MiB、单worker串行最终 **6文件/207项**通过：catalog30、effort26、selection46、thinking picker36、model picker46、availability23。17条新增场景覆盖account/API-key能力与容量、canonical alias一致且仅一个active、实际picker apply、反向支持、hook/lock目录替换、incomplete setup与duplicate issuer；session/settings/auth bytes或absence及zero fetch断言保留。五处点反转和两处完整旧owner反转均产生实际AssertionError，finally精确恢复生产bytes；后续最终套件覆盖复审修正，不累计重复通过数。
+
+五静态门/build通过，manifest `421717a2aec9`，当前inputsDigest `15170474481b78df3b7714d2128688f31123bf068397d61ed6e8731f87f5c015`读回一致。正式bundle NormProof独立串行exit0，环/解析satisfied，partial仅既有interactiveMode21/22-name advisory；本轮修改模块无新增ceiling问题。两路最终APPROVE/CLEAR，子代理仅只读、未验证；本轮反转与judge scratch清理。
+
+延迟CI `368cc3e6`/`41200474418`、`cf745bcc`/`41201096537`最后均in_progress；`cf745bcc` Watch `41201096218` success不替代代码CI。本批另绑提交/推送/readback与自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移；ADD-70 partial、goal active，旧版本回退、其余重复语义与真实环境验收仍缺。

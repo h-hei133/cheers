@@ -10,6 +10,7 @@ import { sameValue } from '../../../config/values.js';
 import { connectionIdentity } from './identity.js';
 import { configurationApplicationNotice, readFreshConfiguration } from '../configuration.js';
 import { selectedModelMatches, selectionRequest } from './target.js';
+import { providerCredentialBaseUrl } from '../../auth/account/target.js';
 
 /** Publish a small session preference through the same active identity and CAS fences. */
 export function publishModelPreference(context: CommandContext, update: (selection: SessionModelSelection, catalog: readonly CatalogProvider[], baseUrl?: string) => SessionModelSelection): string | undefined {
@@ -30,16 +31,18 @@ export function publishModelPreference(context: CommandContext, update: (selecti
       || request.blocked || !request.credential) {
       return 'The selected model differs from the current request or its credential is unavailable. Reload before changing preferences.';
     }
-    if (catalogProvider(catalog, selection.provider, request.baseUrl).ambiguous) return 'Model preference refused: multiple catalogue entries claim this endpoint.';
-    const next = update(selection, catalog, request.baseUrl);
+    const baseUrl = providerCredentialBaseUrl(catalog, request);
+    if (catalogProvider(catalog, selection.provider, baseUrl).ambiguous) return 'Model preference refused: multiple catalogue entries claim this endpoint.';
+    const next = update(selection, catalog, baseUrl);
     writeSessionModel(context.sessionId, next, baseline, () => {
       const actual = projectSessionModel(readFreshConfiguration(context), context.sessionId);
       const currentCatalog = loadCatalog();
       return !context.admission?.() && actual.configValidation.valid && selectedModelMatches(actual, selection)
         && sameValue(selectionRequest(context, actual, selection), request)
         && sameValue(connectionIdentity(actual.providerConnections.find(item => item.id === selection.connectionId)), connectionIdentity(config.providerConnections?.find(item => item.id === selection.connectionId)))
-        && sameValue(catalogProvider(currentCatalog, selection.provider, request.baseUrl), catalogProvider(catalog, selection.provider, request.baseUrl))
-        && sameValue(update(selection, currentCatalog, request.baseUrl), next);
+        && providerCredentialBaseUrl(currentCatalog, request) === baseUrl
+        && sameValue(catalogProvider(currentCatalog, selection.provider, baseUrl), catalogProvider(catalog, selection.provider, baseUrl))
+        && sameValue(update(selection, currentCatalog, baseUrl), next);
     });
     if (!sameValue(readSessionModel(context.sessionId), next)) return 'Preference publication is unverified; inspect the session before retrying.';
     return configurationApplicationNotice(context);

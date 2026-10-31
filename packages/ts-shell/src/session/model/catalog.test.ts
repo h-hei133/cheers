@@ -5,7 +5,7 @@ import http from 'node:http';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../SessionManager.js';
 import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
-import { readSessionModel, readSessionModelEdit } from './state.js';
+import { readSessionModel, readSessionModelEdit, writeSessionModel } from './state.js';
 import { projectSessionModel } from './projection.js';
 import { modelPicker } from '../../cli/interactive/picker/model.js';
 import { thinkingPicker } from '../../cli/interactive/picker/thinking.js';
@@ -25,6 +25,8 @@ import { createProviderStep } from '../../cli/provider/step.js';
 import { captureSummaryRole } from '../../cli/provider/summary.js';
 import { defaultHookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
+import { runThinkingCommand } from '../../core/commands/thinkingCommandRuntime.js';
+import * as files from '../store/sessionFileStore.js';
 
 let home: string;
 let sessionId: string;
@@ -84,6 +86,173 @@ async function send() {
     providerMode: 'real', agentMode: 'build', workspaceRoot: home, sessionId, ...captureThinkingPreference(home, resolution.thinkingEffort) }, new Map(), {});
   return step([{ role: 'user', content: 'Check this relay metadata.' }], new AbortController().signal, {}, { allowTools: false });
 }
+
+function nativeSelection(auth: 'account' | 'api-key') {
+  const origin = 'https://generativelanguage.googleapis.com';
+  const compatible = `${origin}/v1beta/openai`;
+  writeUserRuntimeConfigFile({ provider: 'google', activeProviderConnectionId: 'native', reserveTokens: 0, retryEnabled: false,
+    providerConnections: [{ id: 'native', provider: 'google', model: 'shared', thinkingEffort: null, status: 'connected',
+      authType: auth === 'account' ? 'account-auth' : 'api-key',
+      ...(auth === 'account' ? { accountAuth: { google: { type: 'google-gemini-account' as const, accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh',
+        expiresAt: Date.now() + 60000, clientId: 'synthetic-client', scopes: ['https://www.googleapis.com/auth/cloud-platform'], quotaProject: 'synthetic-project' } } }
+        : { apiKey: 'synthetic-api', baseUrl: compatible }), createdAt: '2026-01-01', updatedAt: '2026-01-01' }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  writeCatalogCache([{ id: 'google', baseUrl: compatible, models: [{ id: 'shared', reasoning: true, contextWindow: 16000, thinkingLevelMap: { high: 'strong' } }] },
+    { id: 'native-catalog', runtime: 'google', baseUrl: origin, models: [{ id: 'shared', reasoning: true, contextWindow: 32000, thinkingLevelMap: { high: null } }] }]);
+  writeSessionModel(sessionId, { connectionId: 'native', connectionScope: 'session', provider: 'google', model: 'shared', thinkingEffort: null }, readSessionModelEdit(sessionId));
+  const config = projectSessionModel(getRuntimeConfig(home), sessionId);
+  const resolution = resolveProviderCredential({ runtimeConfig: config, env: {} });
+  expect(resolution.blocked).toBeUndefined();
+  expect(resolution.credential?.connectionId).toBe('native');
+  expect(providerCredentialBaseUrl(loadCatalog(), resolution)).toBe(auth === 'account' ? origin : compatible);
+  return auth === 'account' ? 32000 : 16000;
+}
+
+it.each((['model', 'thinking', 'thinking-picker'] as const).flatMap(route => (['account', 'api-key'] as const).map(auth => ({ route, auth }))))(
+  'checks issuer effort capability for $auth through $route', async ({ route, auth }) => {
+  nativeSelection(auth);
+  const files = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = files.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const before = readSessionModelEdit(sessionId);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No remote request is admitted by this fixture.'));
+  let output: string | undefined;
+  if (route === 'model') output = (await runModelCommand(['shared', '--effort', 'high'], context())).output;
+  else if (route === 'thinking') output = (await runThinkingCommand(['high'], context())).output;
+  else {
+    const picker = thinkingPicker(context());
+    const levels = await picker.load();
+    expect(levels.find(level => level.id === 'high')?.disabled).toBe(auth === 'account');
+    expect(levels.find(level => level.id === 'low')?.disabled).toBe(false);
+    output = (await picker.apply(['high']))?.note;
+  }
+  if (auth === 'account') {
+    expect(output).toContain('does not support');
+    expect(readSessionModelEdit(sessionId)).toEqual(before);
+  } else {
+    expect(output).toContain('Model switched');
+    expect(readSessionModel(sessionId)?.thinkingEffort).toBe('high');
+  }
+  expect(files.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each(['account', 'api-key'] as const)('saves the exact issuer window for %s', async auth => {
+  const window = nativeSelection(auth);
+  const files = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = files.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No remote request is admitted by this fixture.'));
+  expect((await runExtendedContextCommand(['on'], context())).output).toContain(`(${window} tokens)`);
+  expect(readSessionModel(sessionId)?.contextWindow).toBe(window);
+  expect((await runExtendedContextCommand(['status'], context())).output).toContain(`on (${window} tokens)`);
+  expect(files.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each(['model', 'thinking'] as const)('accepts issuer-supported effort through %s despite incompatible relay metadata', async route => {
+  nativeSelection('account');
+  writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model => ({ ...model,
+    thinkingLevelMap: { high: provider.id === 'native-catalog' ? 'strong' : null } })) })));
+  const bytes = [getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No remote request is admitted by this fixture.'));
+  const output = route === 'model' ? (await runModelCommand(['shared', '--effort', 'high'], context())).output
+    : (await runThinkingCommand(['high'], context())).output;
+  expect(output).toContain('Model switched');
+  expect(readSessionModel(sessionId)?.thinkingEffort).toBe('high');
+  expect([getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each(['hook', 'lock'] as const)('refuses an issuer catalogue change during the %s before saving', async stage => {
+  nativeSelection('account');
+  const before = readSessionModelEdit(sessionId);
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No remote request is admitted by this fixture.'));
+  const replace = () => writeCatalogCache(loadCatalog().map(provider => provider.id === 'native-catalog'
+    ? { ...provider, models: provider.models.map(model => ({ ...model, contextWindow: 64000 })) } : provider));
+  let output: string;
+  if (stage === 'hook') {
+    vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+      if (event.eventName === 'PreModelSwitch') replace();
+      return undefined;
+    });
+    output = (await runThinkingCommand(['low'], context())).output;
+    expect(output).toContain('conflict');
+  } else {
+    const lock = files.withFileLock;
+    vi.spyOn(files, 'withFileLock').mockImplementation((file, action, options) => lock(file, () => {
+      if (file.endsWith('state.lock')) replace();
+      return action();
+    }, options));
+    output = (await runExtendedContextCommand(['on'], context())).output;
+    expect(output).toContain('unverified');
+  }
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each(['account', 'api-key'] as const)('browses and selects the exact issuer catalogue for %s', async auth => {
+  const window = nativeSelection(auth);
+  const files = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = files.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const before = readSessionModelEdit(sessionId);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No remote request is admitted by this fixture.'));
+  const picker = modelPicker(context());
+  const rows = await picker.load();
+  const id = row('native', auth === 'account' ? 'native-catalog' : 'google');
+  expect(rows.find(item => item.id === id)).toMatchObject({ note: 'active' });
+  expect(rows.filter(item => item.note === 'active').map(item => item.id)).toEqual([id]);
+  expect(rows.find(item => item.id === id)?.disabled).not.toBe(true);
+  expect(picker.detail?.(id)).toContain(`Context: ${window} tokens`);
+  expect(picker.detail?.(row('native', 'google'))).toContain(`Context: ${window} tokens`);
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+  expect((await picker.apply([id]))?.note).toContain('Connection: native');
+  expect((await runExtendedContextCommand(['on'], context())).output).toContain(`(${window} tokens)`);
+  expect(files.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each(['pending', 'error'] as const)('keeps the explicit issuer setup row for a %s incomplete account', async status => {
+  nativeSelection('account');
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const native = edit.values.providerConnections![0]!;
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [{ ...native, status,
+    baseUrl: 'https://generativelanguage.googleapis.com', accountAuth: { google: { ...native.accountAuth!.google!, quotaProject: '' } } }] }, edit);
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const before = readSessionModelEdit(sessionId);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No remote request is admitted by this fixture.'));
+  const picker = modelPicker(context());
+  const rows = await picker.load();
+  expect(rows.find(item => item.id === row('native', 'native-catalog'))).toMatchObject({ disabled: true,
+    note: status === 'pending' ? 'setup pending' : 'setup error' });
+  expect(picker.detail?.(row('native', 'native-catalog'))).toContain('Context: 32000 tokens');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it('refuses to label duplicate issuer catalogue owners active', async () => {
+  nativeSelection('account');
+  const catalog = loadCatalog();
+  writeCatalogCache([...catalog, { ...catalog.find(provider => provider.id === 'native-catalog')!, id: 'native-duplicate', label: 'Native duplicate' }]);
+  const before = readSessionModelEdit(sessionId);
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No remote request is admitted by this fixture.'));
+  const picker = modelPicker(context());
+  const rows = await picker.load();
+  for (const owner of ['native-catalog', 'native-duplicate']) {
+    expect(rows.find(item => item.id === row('native', owner))).toMatchObject({ disabled: true, note: 'model catalogue endpoint is ambiguous' });
+  }
+  expect((await picker.apply([row('native', 'native-catalog')]))?.note).toContain('unavailable');
+  expect(rows.filter(item => item.note === 'active').map(item => item.id)).toEqual(['model:current']);
+  expect(picker.detail?.('model:current')).toContain('Model capabilities: unverified');
+  expect(picker.detail?.('model:current')).not.toContain('Context: 16000 tokens');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
 
 it.each((['data', 'text'] as const).flatMap(route => (['account', 'api-key'] as const).map(auth => ({ route, auth }))))(
   'lists the exact $auth catalogue through the $route reader', async ({ route, auth }) => {

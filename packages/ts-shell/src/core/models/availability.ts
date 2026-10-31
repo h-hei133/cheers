@@ -109,9 +109,13 @@ export interface CatalogAvailability {
 
 /** Canonical models can use relays; a relay catalogue requires its own address. */
 export function matchesCatalog(provider: CatalogProvider, connection: ConnectionAvailability,
-  connections: readonly { readonly id: string; readonly baseUrl?: string }[], catalog: readonly CatalogProvider[]): boolean {
+  connections: readonly ProviderConnectionConfig[], catalog: readonly CatalogProvider[]): boolean {
   if (provider.id === provider.runtime) return true;
-  const baseUrl = catalogBaseUrl(catalog, provider.runtime, connections.find(item => item.id === connection.connectionId)?.baseUrl);
+  const stored = connections.find(item => item.id === connection.connectionId && item.provider === connection.provider);
+  let baseUrl = catalogBaseUrl(catalog, provider.runtime, stored?.baseUrl);
+  try {
+    baseUrl = (stored && accountProtocol(ownedConnectionCredential(stored).accountAuth)?.baseUrl) ?? baseUrl;
+  } catch { /* Incomplete account setup retains its declared address; readiness is checked separately. */ }
   return Boolean(baseUrl && provider.baseUrl && baseUrl.replace(/\/+$/, '') === provider.baseUrl.replace(/\/+$/, ''));
 }
 
@@ -128,8 +132,7 @@ export function catalogAvailabilitySnapshot(input: {
   return input.catalog.map(provider => {
     const entry = snapshot.providers.find(candidate => candidate.provider === provider.runtime);
     const connections = (entry?.connections ?? []).flatMap(connection => {
-      const stored = matchesCatalog(provider, connection, input.config.providerConnections ?? [], input.catalog)
-        || issuerMatchesCatalog(provider, connection, input.config, input.catalog);
+      const stored = matchesCatalog(provider, connection, input.config.providerConnections ?? [], input.catalog);
       if (connection.state !== 'ready') return stored ? [connection] : [];
       const state = catalogCredentialState(input.catalog, provider, input.resolveLocal(connection.provider, connection.connectionId), connection.connectionId);
       // An account's issuer can supply its actual address without a stored URL.
@@ -146,16 +149,6 @@ export function catalogAvailabilitySnapshot(input: {
       active: owner?.entry?.id === provider.id,
       ...(owner?.entry?.id === provider.id && active.model ? { activeModel: active.model } : {}) };
   });
-}
-
-function issuerMatchesCatalog(provider: CatalogProvider, connection: ConnectionAvailability,
-  config: AvailabilityConfig, catalog: readonly CatalogProvider[]): boolean {
-  const stored = config.providerConnections?.find(item => item.id === connection.connectionId && item.provider === connection.provider);
-  if (!stored) return false;
-  try {
-    const address = accountProtocol(ownedConnectionCredential(stored).accountAuth)?.baseUrl;
-    return Boolean(address && catalogProvider(catalog, connection.provider, address).entry?.id === provider.id);
-  } catch { return false; }
 }
 
 function resolvedCatalog(catalog: readonly CatalogProvider[], resolution: ProviderCredentialResolution) {

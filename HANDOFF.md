@@ -1532,3 +1532,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Text model lists show compatible-protocol models while a native account sends to its fixed issuer endpoint.
 - **Root Cause**: Subscription resolution may project its address, but fixed native issuers may leave the raw resolution address absent; dispatch applies the existing issuer-aware target helper later.
 - **Rule**: Use that same target helper before active catalogue binding. Preserve API-key routing and explicit inactive catalogue queries. First prove the provider-specific path: a subscription hypothesis may already pass. Reversal test filters must match the stable parameterized group name and must execute real cases; a green run with every case skipped proves nothing.
+
+### Issuer Metadata Must Match Both Admission And Publication
+
+- **Symptom**: A native account's picker offers an unsupported effort, saves another catalogue's window, or loses its named catalogue row; a native metadata edit during a hook or lock does not invalidate publication.
+- **Root Cause**: Initial and locked catalogue lookups use an absent raw URL while dispatch resolves the fixed issuer later. Independent catalogue matchers disagree. Adding issuer rows also exposes active-label and current-report reads that still use raw addresses.
+- **Rule**: Use the existing issuer address owner for capabilities, preferences, aliases and admitted current-request facts, while retaining raw credential identity and CAS fences. Consolidate matching; invalid setup retains its declared address with readiness checked separately. Ambiguous aliases cannot claim active ownership; the current request can remain visible with unverified metadata. Inject changes at the actual state.lock path, and apply a picker action once per accepted owner.

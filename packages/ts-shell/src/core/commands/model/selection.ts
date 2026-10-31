@@ -1,4 +1,4 @@
-import { providerCredentialEndpoint } from '../../auth/account/target.js';
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../auth/account/target.js';
 import { configuredOutputLimit } from '../../../provider/request/output.js';
 import { readRuntimeConfigEditAt, getUserRuntimeConfigPath, writeUserRuntimeConfigFile, isRuntimeProvider, type RuntimeConfig, type RuntimeConfigFile } from '../../../config/runtimeConfig.js';
 import path from 'node:path';
@@ -113,11 +113,11 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     || actual.baseUrl !== request?.baseUrl || !sameValue({ ...actual.credential, model: undefined }, { ...request?.credential, model: undefined }))) {
     return 'Model switch blocked: the provider credential or endpoint differs from the current request. Reload before selecting a model.';
   }
-  const baseUrl = request?.baseUrl ?? actual.baseUrl;
+  const selectedRequest = request ?? actual;
+  const baseUrl = providerCredentialBaseUrl(catalog, selectedRequest);
   if (catalogProvider(catalog, provider, baseUrl).ambiguous) return 'Model switch blocked: multiple catalogue entries claim this endpoint.';
   const capability = effortCapability(catalog, provider, model, thinkingEffort, baseUrl);
   const candidate = catalogModel(catalog, provider, model, catalogBaseUrl(catalog, provider, baseUrl));
-  const selectedRequest = request ?? actual;
   const endpoint = providerCredentialEndpoint(catalog, selectedRequest, baseUrl);
   if (capability === 'unsupported') return 'Model switch blocked: this model does not support the selected reasoning effort. Choose another level or --effort auto.';
   // Publication reloads this cap; startup overrides currently declare no output limit.
@@ -205,7 +205,8 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     if (currentConfig.activeProviderConnectionId !== loaded.activeProviderConnectionId
       || !sameValue(connectionIdentity(currentConfig.providerConnections.find(item => item.id === activeId)), connectionIdentity(activeConnection))
       || !sameValue(credentialIdentity(currentConfig.providerCredentials[provider]), credentialIdentity(loaded.providerCredentials[provider]))) return false;
-    if (providerCredentialEndpoint(currentCatalog, selectedRequest, baseUrl) !== endpoint || !currentConfig.configValidation.valid
+    if (providerCredentialBaseUrl(currentCatalog, selectedRequest) !== baseUrl
+      || providerCredentialEndpoint(currentCatalog, selectedRequest, baseUrl) !== endpoint || !currentConfig.configValidation.valid
       || !sameValue([currentConfig.maxOutputTokens, currentConfig.contextWindow, currentConfig.reserveTokens, currentConfig.modelTokenBudgets, currentConfig.retryBaseDelayMs, currentConfig.retryMaxDelayMs],
         [loaded.maxOutputTokens, loaded.contextWindow, loaded.reserveTokens, loaded.modelTokenBudgets, loaded.retryBaseDelayMs, loaded.retryMaxDelayMs])) return false;
     if (inspectConfigConstraints(currentConfig, { provider, model, thinkingEffort, baseUrl, credential: selectedRequest.credential }, currentCatalog).errors.length) return false;

@@ -11,6 +11,7 @@ import type { CommandContext } from '../../../core/commands/types.js';
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import type { Picker, PickerOutcome } from '../overlay.js';
 import { modelBrowserOwned } from './model/owner.js';
+import { providerCredentialBaseUrl } from '../../../core/auth/account/target.js';
 
 const LEVELS = ['auto', 'low', 'medium', 'high'] as const;
 
@@ -46,7 +47,8 @@ export function thinkingPicker(context: CommandContext, back?: (notice?: string)
       const catalog = choice?.catalog ?? publication?.catalog ?? loadCatalog();
       const target = context.resolveConfigTarget?.(config, context.sessionId)
         ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
-      const { provider, model, baseUrl } = target;
+      const { provider, model } = target;
+      const baseUrl = providerCredentialBaseUrl(catalog, target);
       const current = captureThinkingPreference(context.projectRoot ?? context.cwd, target.thinkingEffort);
       initial = current.thinkingEffort ?? 'auto';
       const ambiguous = catalogProvider(catalog, provider, baseUrl).ambiguous;
