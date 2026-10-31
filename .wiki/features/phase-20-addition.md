@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.19 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.20 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5681,3 +5681,17 @@ dispatch、配置约束、状态栏、`/context`和handoff共用reader。压缩w
 五静态门/build通过，manifest `4b1362add6dd`，inputsDigest `c254a7f0e04d4cd876809b85288e6864bdaa192dfaad096931363f89ff079af3`当前读回一致。正式bundle judge独立串行exit0，环/解析satisfied，partial仍仅既有interactiveMode21/22-name advisory；两路最终APPROVE/CLEAR，子代理仅只读未验证，反转/judge scratch清理。
 
 延迟CI `368cc3e6`/`41200474418`与`cf745bcc`/`41201096537`已success，`6c570eb3`/`41203580231`最后in_progress；本批另绑提交/推送/远端与自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移，ADD-70 partial、goal active，旧版本回退与其余重复语义/真实环境尚缺。
+
+### 24.20 角色 effort 与 advisor 准入使用发行方能力
+
+第24.19节已推送 `b0a144dea580c9a6d690115f85499b1aa2854adc`，接续时工作区干净。先查service tier：原生OpenAI/Google account协议不支持tier，未按相邻raw读取推测改setter。另复现角色editor和advisor：三种角色把native不支持的high显示可选；advisor已按issuer取model却按raw URL取effort，因此同组native支持时误拒绝、不支持时误接受。10项account/API-key场景中5项实际失败；API-key正反向和既有catalogue路径通过。
+
+role owner使用现有 `providerCredentialBaseUrl` 读取model/levels；advisor effort沿其已捕获baseUrl，保留independent model、credential、scope与identity哈希。只读参考已定向核对认证模型元数据和本地available不续期的决定，继续复用本项目owner。复审指出不可用role仍借canonical列effort；pending/error/missing/deleted四隔离场景实际AssertionError，现仅非blocked且credential的provider/model/connectionId匹配角色才列effort，choose恢复入口保留。未新增auth/provider实现、resolver、writer或存储字段。
+
+主代理实际Linux Node20.3.0、heap768MiB、单worker串行最终 **4文件/184项**通过并正常exit0：catalog54、role picker46、model picker46、runtime advisor38。新增16场景含三角色实际inspect→editor→thinking→apply、account/key的advisor支持反向、四失效binding恢复和两stale editor拒绝；session/settings/auth bytes或absence与zero fetch断言保留。既有advisor loopback/账号续期和role生命周期套件通过。三点反转实际3/2/4项失败、AssertionError，finally精确恢复bytes；最终组合再次通过。catalog测试临时状态归入/tmp/cheers-test并清理。
+
+首次组合184项断言通过但worker-close超时，准确报告为关闭未完成；核对测试PID的cwd/exe后终止，process exit143、无并发验证。catalog54单独用hanging-process reporter正常exit0，恢复后的同四文件184项也正常exit0；关闭超时未再复现、根因未确认，不据此修改产品或放宽测试，前次不计完整验证通过。
+
+五静态门/build通过，manifest `3bb4c3141297`，当前inputsDigest `26ee30a366cbce3cb8722ca936d51e18a44aa643daab2f548ae3f7334cc84b8b`读回一致。正式bundle judge独立串行exit0，环/解析satisfied，partial仍仅既有interactiveMode21/22-name advisory；两路最终APPROVE/CLEAR，子代理仅只读未验证，scratch清理。
+
+延迟CI `6c570eb3`/`41203580231`、`b0a144de`/`41204101311`最后仍in_progress，Watch成功不替代代码CI；本批另绑提交/推送/readback与自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移，ADD-70 partial、goal active，旧版本回退、其余重复语义与真实环境尚缺。

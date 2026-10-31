@@ -25,7 +25,7 @@ export function resolveAdvisorSelection(input: {
   if (selected.provider === input.main.provider && selected.model === input.main.model) throw new Error('Advisor requires an independent model.');
   const baseUrl = providerCredentialBaseUrl(input.catalog, selected);
   const model = catalogModel(input.catalog, selected.provider, selected.model!, baseUrl);
-  if (role && (!model || effortCapability(input.catalog, role.provider, role.model, role.thinkingEffort ?? null, selected.baseUrl) === 'unsupported')) {
+  if (role && (!model || effortCapability(input.catalog, role.provider, role.model, role.thinkingEffort ?? null, baseUrl) === 'unsupported')) {
     throw new Error('Advisor role model or effort is unavailable.');
   }
   const identity = createHash('sha256').update(JSON.stringify([input.revision, target, selected.provider, selected.model,

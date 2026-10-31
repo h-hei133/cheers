@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -27,6 +26,8 @@ import { defaultHookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
 import { runThinkingCommand } from '../../core/commands/thinkingCommandRuntime.js';
 import * as files from '../store/sessionFileStore.js';
+import { prepareModelRole } from '../../core/commands/model/role.js';
+import { resolveAdvisorSelection } from '../../cli/provider/advisor.js';
 
 let home: string;
 let sessionId: string;
@@ -34,7 +35,8 @@ let server: http.Server;
 let baseUrl: string;
 const requests: { url: string; authorization?: string; apiKey?: string; body: Record<string, unknown> }[] = [];
 beforeEach(async () => {
-  home = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-catalog-target-'));
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  home = fs.mkdtempSync(path.join('/tmp/cheers-test', 'catalog-target-'));
   vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
   requests.length = 0;
   server = http.createServer(async (request, response) => {
@@ -271,6 +273,92 @@ it.each((['account', 'api-key'] as const).flatMap(auth => (['connection', 'catal
     roles: { summary: { connectionId: 'native', provider: 'google', model: 'shared', thinkingEffort: 'high' } } });
   const summary = captureSummaryRole({ config: projectSessionModel(getRuntimeConfig(home), sessionId), catalog: loadCatalog(), workspaceRoot: home });
   expect(summary?.limits.contextWindow).toBe(window);
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each((['summary', 'advisor', 'subagent'] as const).flatMap(role => (['account', 'api-key'] as const).map(auth => ({ role, auth }))))(
+  'edits $role effort from the exact $auth issuer catalogue', async ({ role, auth }) => {
+  nativeSelection(auth);
+  const target = { connectionId: 'native', provider: 'google', model: 'shared', thinkingEffort: null } as const;
+  expect(prepareModelRole(context(), role).assign(target).saved).toBe(true);
+  const before = readSessionModel(sessionId)!;
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No remote request is admitted by this fixture.'));
+  const picker = modelPicker(context()); await picker.load();
+  const editor = (await picker.inspect!(`role:${role}`))!.next!; await editor.load();
+  const thinking = (await editor.apply(['thinking']))!.next!;
+  expect((await thinking.load()).map(item => item.id)).toEqual(auth === 'account' ? ['auto', 'low', 'medium'] : ['auto', 'low', 'medium', 'high']);
+  if (auth === 'account') expect(await thinking.apply(['high'])).toBeUndefined();
+  expect((await thinking.apply([auth === 'account' ? 'low' : 'high']))?.note).toContain(`${role} uses`);
+  expect(readSessionModel(sessionId)).toEqual({ ...before, roles: { ...before.roles,
+    [role]: { ...target, thinkingEffort: auth === 'account' ? 'low' : 'high' } } });
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each((['account', 'api-key'] as const).flatMap(auth => [true, false].map(nativeSupports => ({ auth, nativeSupports }))))(
+  'admits advisor effort using $auth issuer metadata (native support: $nativeSupports)', async ({ auth, nativeSupports }) => {
+  nativeSelection(auth);
+  writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: [...provider.models, { id: 'advisor-model', reasoning: true,
+    contextWindow: provider.id === 'native-catalog' ? 32000 : 16000,
+    thinkingLevelMap: { high: (provider.id === 'native-catalog' ? nativeSupports : !nativeSupports) ? 'strong' : null } }] })));
+  const target = { connectionId: 'native', provider: 'google', model: 'advisor-model', thinkingEffort: 'high' } as const;
+  const baseline = readSessionModelEdit(sessionId);
+  writeSessionModel(sessionId, { ...baseline.selection!, roles: { advisor: target } }, baseline);
+  const before = readSessionModelEdit(sessionId);
+  const config = projectSessionModel(getRuntimeConfig(home), sessionId);
+  const main = resolveProviderCredential({ runtimeConfig: config, env: {} });
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No remote request is admitted by this fixture.'));
+  const select = () => resolveAdvisorSelection({ config, catalog: loadCatalog(), main, revision: 'issuer-fixture' });
+  if (auth === 'account' ? nativeSupports : !nativeSupports) expect(select()).toMatchObject({ label: 'native/advisor-model@high', modelRole: { name: 'advisor' } });
+  else expect(select).toThrow('Advisor role model or effort is unavailable');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each(['pending', 'error', 'missing', 'deleted'] as const)('keeps role recovery but offers no effort for a %s issuer binding', async state => {
+  nativeSelection('account');
+  const baseline = readSessionModelEdit(sessionId);
+  writeSessionModel(sessionId, { ...baseline.selection!, roles: { summary: { connectionId: 'native', provider: 'google', model: 'shared', thinkingEffort: null } } }, baseline);
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const native = edit.values.providerConnections![0]!;
+  writeUserRuntimeConfigFile({ ...edit.values,
+    ...(state === 'deleted' ? { activeProviderConnectionId: 'survivor', providerConnections: [{ ...native, id: 'survivor' }] }
+      : { providerConnections: [{ ...native, ...(state === 'missing' ? { accountAuth: undefined } : { status: state }) }] }) }, edit);
+  const before = readSessionModelEdit(sessionId);
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No remote request is admitted by this fixture.'));
+  expect(prepareModelRole(context(), 'summary').efforts).toEqual([]);
+  const picker = modelPicker(context()); await picker.load();
+  const editor = (await picker.inspect!('role:summary'))!.next!;
+  const options = await editor.load();
+  expect(options.map(item => item.id)).toContain('choose');
+  expect(options.map(item => item.id)).not.toContain('thinking');
+  expect(await editor.apply(['thinking'])).toBeUndefined();
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each(['account', 'api-key'] as const)('rejects a stale %s issuer effort editor without saving', async auth => {
+  nativeSelection(auth);
+  expect(prepareModelRole(context(), 'summary').assign({ connectionId: 'native', provider: 'google', model: 'shared', thinkingEffort: null }).saved).toBe(true);
+  const picker = modelPicker(context()); await picker.load();
+  const editor = (await picker.inspect!('role:summary'))!.next!; await editor.load();
+  const thinking = (await editor.apply(['thinking']))!.next!; await thinking.load();
+  const before = readSessionModelEdit(sessionId);
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No remote request is admitted by this fixture.'));
+  writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model => ({ ...model, thinkingLevelMap: { low: null } })) })));
+  expect((await thinking.apply(['low']))?.note).toContain('expired');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
   expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
   expect(fetch).not.toHaveBeenCalled();
 });

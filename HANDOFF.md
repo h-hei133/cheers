@@ -1544,3 +1544,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Direct native model selection works but a preset rejects its supported effort, or a native catalogue alias finds no saved connection.
 - **Root Cause**: Preset validation reads raw request URLs and role parsing compares stored addresses independently of the existing catalogue matcher.
 - **Rule**: Resolve preset metadata through the request issuer owner and reuse the shared identity matcher for catalogue candidates. Keep category membership separate from credential/status/scope admission. Assert the complete success message: “saved” alone also matches “No saved connection”. Verify save, validate, whole apply and the summary consumer for both account and API-key paths.
+
+### Role Capability Options Need Their Own Available Credential
+
+- **Symptom**: A role editor offers levels from a compatible catalogue to a native account or an unavailable connection; advisor accepts and refuses opposite effort capabilities.
+- **Root Cause**: Role/advisor capability readers use raw URLs independently of their actual issuer, and an absent role credential still falls back to generic metadata.
+- **Rule**: Resolve capability metadata from the issuer owner and gate actionable role efforts on a nonblocked exact provider/model/connection credential. Keep model recovery available and validate again at commit. A test runner with green assertions and a live closing worker is not terminal; confirm the exact process and its exit before starting another validator. Single-file and hanging-process reruns can bound a teardown issue without inventing its cause.

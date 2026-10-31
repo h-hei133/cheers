@@ -14,6 +14,7 @@ import { catalogModel } from '../../models/catalog.js';
 import { effortCapability } from '../../models/capability.js';
 import { isThinkingPreference, THINKING_LEVELS, type ThinkingPreference } from '../../models/effort.js';
 import { configuredServiceTier } from '../../models/serviceTier.js';
+import { providerCredentialBaseUrl } from '../../auth/account/target.js';
 
 export type AutomaticModelRole = keyof SessionModelPolicy;
 export interface RoleResult { readonly output: string; readonly saved: boolean }
@@ -73,9 +74,13 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
   const current = (selection?.roles ?? choice.config.sessionModelRoles)?.[role];
   const resolution = current ? resolveProviderCredential({ runtimeConfig: projectModelSelection(choice.config,
     { ...current, connectionScope: 'session' }), env: {} }) : undefined;
-  const model = current ? catalogModel(choice.catalog, current.provider, current.model, resolution?.baseUrl) : undefined;
-  const levels = current && model?.reasoning !== false ? THINKING_LEVELS.filter(level =>
-    effortCapability(choice.catalog, current.provider, current.model, level, resolution?.baseUrl) === 'supported') : [];
+  const available = current && resolution && !resolution.blocked && resolution.credential
+    && resolution.provider === current.provider && resolution.model === current.model
+    && resolution.credential.connectionId === current.connectionId;
+  const baseUrl = available ? providerCredentialBaseUrl(choice.catalog, resolution) : undefined;
+  const model = available ? catalogModel(choice.catalog, current.provider, current.model, baseUrl) : undefined;
+  const levels = available && model?.reasoning !== false ? THINKING_LEVELS.filter(level =>
+    effortCapability(choice.catalog, current.provider, current.model, level, baseUrl) === 'supported') : [];
   const efforts: readonly ThinkingPreference[] = levels.length ? [null, ...levels] : [];
   return { assign: commit, current, efforts, admission, setEffort: (effort: ThinkingPreference): RoleResult => {
     if (!current || !isThinkingPreference(effort) || !efforts.includes(effort)) {
