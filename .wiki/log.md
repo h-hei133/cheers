@@ -10994,3 +10994,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：命名连接不可用时偏好保存统一拒绝
 
 [addition24.13](features/phase-20-addition.md#2413-命名模型偏好保存拒绝不可用请求)a9f537fa已推送main/远端一致；复现pending/missing命名选择tier/context仍保存，四断言实际失败。两既有guard移除provider-only条件，所有当前选择都需本地unblocked credential；legacy env/CLI与锁内CAS保留。Node20.3上3文件77项含十项prewriter拒绝/两文档与session不变、两项锁内pool backoff、两反转实际失败/精确恢复、五门/build通过，manifest1198eb3f4160；复审APPROVE/CLEAR，正式judge仅既有interactiveMode advisory。前三代码CI最后in_progress，未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。
+
+### 2026-10-31：直接 model/thinking 准入与锁内凭据变化保护
+
+[addition24.14](features/phase-20-addition.md#2414-直接-modelthinking-保存检查本地凭据与锁内请求身份)6418a9bf已推送main/远端一致；直接显式活动连接路径缺少credential guard与实际请求重查，28新断言实际失败。沿selection owner检查非exact本地准入，beforeCommit投影原selection后重查，保留session/global阶段与显式picker恢复。实际Node20.3五文件194项、两反转AssertionError/精确恢复、五门/最终build通过，manifest6c7801cdab57且当前输入摘要读回通过；复审APPROVE/CLEAR，正式judge仍仅既有interactiveMode advisory。一次judge/测试短暂重叠违反串行规则，已纠正并独立重跑judge；包runner混用零测试错误已修并记HANDOFF。da3ca316代码CI已success，其后三CI最后in_progress；未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。

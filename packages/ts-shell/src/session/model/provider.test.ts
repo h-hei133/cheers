@@ -251,6 +251,106 @@ it.each((['pending', 'error', 'missing', 'pool-outside', 'pool-waiting'] as cons
   expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
 });
 
+it.each((['pending', 'error', 'missing', 'pool-outside', 'pool-waiting'] as const).flatMap(state =>
+  (['model', 'thinking'] as const).flatMap(kind => ([undefined, 'session'] as const).map(scope => ({ state, kind, scope })))))(
+  'refuses a direct $kind change for a $scope named $state request before hooks or writes', async ({ state, kind, scope }) => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const named = { ...connection(), ...(state === 'missing' ? { apiKey: undefined } : state === 'pending' || state === 'error' ? { status: state } : {}) };
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'named', providerCredentials: {},
+    providerConnections: [named, { ...connection(), id: 'sibling' }],
+    ...(state === 'pool-outside' || state === 'pool-waiting' ? { accountPool: { openai: { connections: [state === 'pool-outside' ? 'sibling' : 'named'] } } } : {}) }, edit);
+  if (state === 'pool-waiting') noteCredentialRateLimit(credentialIdentityFor('openai', ownedConnectionCredential(named))!, 60_000);
+  writeSessionModel(sessionId, { connectionId: 'named', ...(scope ? { connectionScope: scope } : {}), provider: 'openai', model: 'next' }, readSessionModelEdit(sessionId));
+  const actual = resolveProviderCredential({ runtimeConfig: projectSessionModel(getRuntimeConfig(home), sessionId), env: {} });
+  expect(actual.credential).toBeUndefined();
+  const before = readSessionModelEdit(sessionId);
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const hooks = vi.spyOn(defaultHookDispatcher, 'dispatch');
+  const lock = vi.spyOn(files, 'withFileLock');
+  const output = kind === 'model' ? (await runModelCommand(['base', '--global'], context())).output
+    : (await runThinkingCommand(['high', '--global'], context())).output;
+  expect(output).toContain('credential is unavailable');
+  expect(hooks).not.toHaveBeenCalled();
+  expect(lock).not.toHaveBeenCalled();
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+});
+
+it.each((['model', 'thinking'] as const).flatMap(kind => (['hook', 'lock'] as const).flatMap(stage =>
+  (['env', 'pool'] as const).map(source => ({ kind, stage, source })))))(
+  'preserves a direct $kind selection if its $source credential changes during the $stage', async ({ kind, stage, source }) => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const named = { ...connection(), model: 'next', ...(source === 'env' ? { apiKey: undefined } : {}) };
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'named', providerCredentials: {}, providerConnections: [named],
+    ...(source === 'pool' ? { accountPool: { openai: { connections: ['named'] } } } : {}) }, edit);
+  if (source === 'env') vi.stubEnv('OPENAI_API_KEY', 'synthetic-env');
+  writeSessionModel(sessionId, { connectionId: 'named', provider: 'openai', model: 'next' }, readSessionModelEdit(sessionId));
+  const before = readSessionModelEdit(sessionId);
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const replace = () => {
+    if (source === 'env') vi.stubEnv('OPENAI_API_KEY', 'synthetic-changed');
+    else noteCredentialRateLimit(credentialIdentityFor('openai', ownedConnectionCredential(named))!, 60_000);
+  };
+  if (stage === 'hook') vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+    if (event.eventName === 'PreModelSwitch') replace();
+    return undefined;
+  });
+  else {
+    const lock = files.withFileLock;
+    vi.spyOn(files, 'withFileLock').mockImplementation((file, run, options) => lock(file, () => {
+      if (file === before.statePath.replace(/state\.json$/, 'state.lock')) replace();
+      return run();
+    }, options));
+  }
+  const output = kind === 'model' ? (await runModelCommand(['base', '--global'], context())).output
+    : (await runThinkingCommand(['high', '--global'], context())).output;
+  expect(output).toContain('conflict');
+  expect(output).not.toContain('Model switched');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+});
+
+it.each(['env', 'cli'] as const)('accepts a direct legacy %s model and effort change without borrowing a named credential', async source => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'named', providerCredentials: {},
+    providerConnections: [{ ...connection(), apiKey: undefined, model: 'base' }] }, edit);
+  if (source === 'env') vi.stubEnv('OPENAI_API_KEY', 'synthetic-env');
+  const command = { ...context(), resolveConfigTarget: (config: RuntimeConfig) => resolveProviderCredential({ runtimeConfig: config,
+    ...(source === 'cli' ? { cliApiKey: 'synthetic-cli' } : {}) }) };
+  expect((await runModelCommand(['next', '--global'], command)).output).toContain('Model switched to next');
+  expect((await runThinkingCommand(['high', '--global'], command)).output).toContain('Reasoning effort: high');
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'named', model: 'next', thinkingEffort: 'high' });
+  expect(readSessionModel(sessionId)?.connectionScope).toBeUndefined();
+  expect(command.resolveConfigTarget(projectSessionModel(getRuntimeConfig(home), sessionId))).toMatchObject({ model: 'next', thinkingEffort: 'high', credential: { source } });
+  const saved = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerConnections?.[0];
+  expect(saved).toMatchObject({ id: 'named', model: 'next', thinkingEffort: 'high' });
+  expect(saved?.apiKey).toBeUndefined();
+});
+
+it.each(['pending', 'error', 'missing', 'pool-waiting'] as const)('allows explicit picker recovery from a named %s request to a ready sibling', async state => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const named = { ...connection(), ...(state === 'pending' || state === 'error' ? { status: state } : state === 'missing' ? { apiKey: undefined } : {}) };
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'named', providerCredentials: {},
+    providerConnections: [named, { ...connection(), id: 'sibling', apiKey: 'synthetic-sibling' }],
+    ...(state === 'pool-waiting' ? { accountPool: { openai: { connections: ['named', 'sibling'] } } } : {}) }, edit);
+  if (state === 'pool-waiting') noteCredentialRateLimit(credentialIdentityFor('openai', ownedConnectionCredential(named))!, 60_000);
+  writeSessionModel(sessionId, { connectionScope: 'session', connectionId: 'named', provider: 'openai', model: 'next' }, readSessionModelEdit(sessionId));
+  expect(resolveProviderCredential({ runtimeConfig: projectSessionModel(getRuntimeConfig(home), sessionId), env: {} }).blocked).toBeDefined();
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Picker recovery must not send'));
+  const picker = modelPicker(context());
+  const target = `model:${JSON.stringify(['sibling', 'openai', 'next'])}`;
+  expect((await picker.load()).find(item => item.id === target)).toMatchObject({ label: 'next', note: 'credential present' });
+  expect((await picker.apply([target]))?.note).toContain('Model switched to next');
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionScope: 'session', connectionId: 'sibling', provider: 'openai', model: 'next' });
+  expect(resolveProviderCredential({ runtimeConfig: projectSessionModel(getRuntimeConfig(home), sessionId), env: {} }).credential).toMatchObject({ connectionId: 'sibling', apiKey: 'synthetic-sibling' });
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
 it.each(['tier', 'context'] as const)('preserves the session if its named pool credential becomes unavailable under the %s writer lock', async kind => {
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   const named = connection();

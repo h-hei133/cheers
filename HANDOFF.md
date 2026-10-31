@@ -1502,3 +1502,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Slow/fast status reports an independent provider default while a fallback or pool request sends the selected connection's tier; ambient CLI/environment auth can instead report the raw active connection's tier.
 - **Root Cause**: Status reads raw activeProviderConnectionId, while dispatch, preview and role capture independently read the resolved credential connectionId. A blocked resolution has no effective credential namespace but can still borrow a configured provider tier for display.
 - **Rule**: Use the shared configured service-tier projection keyed by resolved provider and connection ID across all consumers. Preserve absent-connection inheritance and explicit request overrides; suppress effective status when the request is blocked or has no credential. Test split-file defaults, session affinity, ambient sources and actual wire tier separately from configuration presence.
+
+### Direct Model Changes Must Recheck The Request Before Both Saves
+
+- **Symptom**: Direct model/effort commands save an unavailable named connection, or continue after a hook or session lock changes an environment credential or introduces pool backoff.
+- **Root Cause**: Exact picker and inferred targets checked resolved credentials, while the explicit active-connection path only compared stored configuration. Those bytes cannot detect runtime credential availability.
+- **Rule**: Admit direct changes against the actual local resolution, then recheck it under the existing publication fences. Reproject the captured session selection for this comparison so the session-first save does not invalidate its own global-save stage. Keep explicit picker recovery available and test session plus both physical documents.
+
+### Vitest Must Use The Package's Own Runner
+
+- **Symptom**: A package-local run fails before collecting tests with `Cannot read properties of undefined (reading 'on')` at `beforeEach`, on both current Node and Node 20.3.
+- **Root Cause**: The root runner and the package's separately installed Vitest load different runner singletons; package test imports register hooks against the uninitialized one.
+- **Rule**: From `packages/ts-shell`, launch `node_modules/vitest/vitest.mjs`, using the selected Node binary, rather than the root's `../../node_modules/vitest/vitest.mjs`. Classify zero-test hook failures as runner setup before changing product code or fixtures.

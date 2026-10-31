@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.12 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份与只读 affinity、tier owner 收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.14 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份与只读 affinity、tier owner 与偏好写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5601,3 +5601,17 @@ picker在捕获实际active之后建立只移除sessionId的inspection context�
 实际Linux Node20.3.0最终串行 **3文件/77项**通过：provider42、effort26、command serviceTier9。新增pending/error/missing/pool-outside/pool-waiting × tier/context十项证明writer未进入、session保持、settings/auth字节或缺失不变；另两项在session lock内引入pool backoff，原CAS正确拒绝并保留session。已有legacy env/CLI、provider slot、HTTP tier/model/effort、权限与能力回归继续通过。两条scope-only反转分别实际AssertionError，finally源码精确恢复后最终套件全过。五门/diff/build通过，manifest `1198eb3f4160`；正式打包judge exit0，环/导入解析satisfied，仅既有interactiveMode21/22-name advisory。两路只读复审APPROVE/CLEAR，子代理未验证，scratch已清理。
 
 `a9f537fa` 的代码CI `41196921141`、`7bec50d5` 的 `41196273759`、`da3ca316` 的 `41195952241` 最后in_progress，对应Watch success不作代码通过。此次另绑提交与自身CI；未真实provider、Windows、PTY、全仓/20k或真实HOME迁移。ADD-70仍partial、整体goal active，旧版本回退与其余重复事实/真实环境继续延后。
+
+### 24.14 直接 model/thinking 保存检查本地凭据与锁内请求身份
+
+第24.13节已提交并推送为 `6418a9bffd36ea2226028f4231c444f55d801741`，构建 `1198eb3f4160` 完成且工作区干净。继续检查同一边界，发现直接 `/model` 与 `/thinking` 的显式活动连接路径绕过 exact/inferred 分支的凭据检查；存储配置未变时，hook 或 session lock 内环境 key 更换、pool backoff 也不能被原 beforeCommit 检测。新增28项断言在旧代码实际失败，其中23项仍报告切换成功，另5项既有无具体模型拒绝缺少准确的凭据原因。
+
+既有 `model/selection.ts` 对非 exact 的直接变更先检查当前请求的本地 credential/blocked，再进入 hook 或写入。非 scoped 路径在 beforeCommit 中复用既有 `modelRequest`，把捕获的 session selection 投影到新读取的配置，重查完整实际请求；因此凭据、端点、pool/backoff 变化仍可见，而本次 session-first 模型保存不会使随后的 `--global` 自冲突。保留现有配置身份、目录、state/CAS、权限与补偿边界，不新增认证实现或 writer。显式 picker 仍能从不可用当前连接恢复至可用 sibling。
+
+只读参考核对模型变更在写 session 状态之前验证认证存在、仅显式 persist 改全局默认的既有决定。本项目沿当前本地解析而不要求网络验证，并额外保留命名连接与 pool 的身份、hook/锁内检查和两阶段保存保护，不复制另一套解析器。
+
+实际 Linux Node20.3.0 最终单 worker 串行 **5文件/194项**通过：provider76、selection46、effort26、policy10、picker recovery36。新增20项 legacy/session × pending/error/missing/pool-outside/pool-waiting × model/thinking 准入拒绝，8项 hook/lock × env/pool × model/thinking 变化拒绝，均观察 session 与 settings/auth bytes或absence；2项 legacy env/CLI 的 model/effort `--global` 正向保存，4项真实 picker.load/apply 恢复至 sibling、实际请求身份、无配置写入/无fetch。新恢复夹具曾误期望 `ready`，实际合同为 `credential present`，据现有命名连接语义修正期望，保存与请求身份断言保留。
+
+两条保护分别反转后产生实际 AssertionError，finally精确恢复生产源码，再跑最终受影响套件；重复不累加。五道静态门、最终build通过，manifest `6c7801cdab57`；补充恢复测试后旧构建摘要校验正确拒绝，重建后当前输入摘要读回通过。正式打包judge exit0，环/导入解析satisfied，仍只有既有 interactiveMode21/22-name advisory。两路只读复审APPROVE/CLEAR，子代理未运行验证。一次验证调度误在测试尚未完全返回时启动judge，两者短暂重叠，违反串行约束；已如实纠正调度，最终judge独立串行重跑。根runner/包runner混用导致零测试hook错误已分类为设置问题并记录HANDOFF，使用包自己的runner修正，未改产品或断言规避。
+
+延迟代码CI `da3ca316`/`41195952241` 已success；`7bec50d5`/`41196273759`、`a9f537fa`/`41196921141`、`6418a9bf`/`41197208682` 最后仍in_progress。Watch成功不代表代码CI；本批另绑提交与自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移，ADD-70仍partial、整体goal active，旧版本回退与其余重复语义/真实验收仍缺。

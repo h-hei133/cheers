@@ -5,7 +5,7 @@ import path from 'node:path';
 import { ConfigWriteError } from '../../../config/outcome.js';
 import { inspectConfigConstraints } from '../../../config/constraints.js';
 import { sameValue } from '../../../config/values.js';
-import { projectSessionModel } from '../../../session/model/projection.js';
+import { projectModelSelection, projectSessionModel } from '../../../session/model/projection.js';
 import type { SessionModelPolicy, SessionModelTarget } from '../../../session/model/contract.js';
 import { readSessionModelEdit, writeSessionModel, type SessionModelEdit, type SessionModelReceipt } from '../../../session/model/state.js';
 import { SessionModelWriteError } from '../../../session/model/outcome.js';
@@ -84,6 +84,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const projected = projectSessionModel(loaded, context.sessionId);
   const effective = context.readConfiguration?.().config ?? context.runtimeConfig ?? projected;
   const actual = modelRequest(context, effective);
+  if (!exact && (actual.blocked || !actual.credential)) return 'Model switch blocked: the current request credential is unavailable. Select a ready connection before changing its model or effort.';
   const providerSlot = exact ? exact.target.connectionId === undefined
     : !projected.activeProviderConnectionId && !actual.credential?.connectionId;
   const inferredConnection = !exact && !projected.activeProviderConnectionId && actual.credential?.connectionId !== undefined;
@@ -196,6 +197,9 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     if (global && providerSlot && !providerDefaultWritable(currentConfig, provider)) return false;
     // A forced target would hide a changed fallback or pool selection during the hook.
     if (inferredConnection && !sameValue(modelRequest(context, currentConfig), actual)) return false;
+    // Retain the reviewed preference across the session/global stages so this
+    // writer's own model publication is not mistaken for a changed credential.
+    if (!scoped && !sameValue(modelRequest(context, projectModelSelection(currentConfig, sessionEdit?.selection)), actual)) return false;
     if (scoped ? (!exactTargetMatches(context, currentConfig, scoped) || !sameValue(targetRequest(context, currentConfig, scoped), request))
       : !matchesRequestProvider(context, projectSessionModel(currentConfig, context.sessionId), provider)) return false;
     if (currentConfig.activeProviderConnectionId !== loaded.activeProviderConnectionId
