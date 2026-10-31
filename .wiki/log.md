@@ -11121,3 +11121,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：本地请求估算使用目录声明的词表
 
 [addition24.36](features/phase-20-addition.md#2436-目录声明的模型词表用于本地请求估算)ADD-08接纯TypeScript两词表，未知/false保留字符回退，preview与接受请求capture/report同实际声明，完整请求仍estimated、媒体固定allowance与opaque拒绝保持。独立审查补profile import保留false/两词表，词表校准禁止字符尾巴冒名；预算准入口径保持。Node20.3单worker串行8文件196项，三反转7/4/1失败、精确恢复后196通过；五门/build当前compilerInputs摘要匹配，manifest122f0a1411e2；judge解析/无环satisfied、既有21/22-name advisory。两路source-only APPROVE/WATCH合成COMMENT，有界Node成本及Bun独立编译计数probe通过，生产exe构建通过；同步成本/词表静态加载保留WATCH，不算CLI性能验收。f166ac93精确代码CI已success，本批交付另绑。ADD-08 partial，真实差额/其他模型/平台/完整性能待验，未真实provider/PTY/全仓/20k，goal active。
+
+### 2026-11-01：词表按首次选用加载
+
+[addition24.37](features/phase-20-addition.md#2437-未选择词表时不初始化其大数据表)修复lazy encoder仍静态加载两套rank的问题，复用既有Node/Bun literal require资源合同。Node20.3串行4文件132项、ESM/CJS两反转各1失败/8控制及精确恢复后132通过；五门/build当前compilerInputs匹配，manifest5869989c1ffc，judge仅既有21/22-name advisory。精确旧/新build的8个有界计数进程输出一致，本轮fallback导入157→22ms、GC堆21.0→3.8MB；首次native初始化与部分RSS增加明确保留，不算CLI性能通过。Bun编译probe含根cwd执行通过，生产exe另构建通过；两路source-only APPROVE/WATCH。2213a671代码CI延迟仍in_progress，本批交付另绑，ADD-08 partial、goal active；未真实provider/PTY/全仓/20k。

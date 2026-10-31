@@ -1639,3 +1639,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An imported model resumes a shipped default despite an explicit false declaration in the source profile.
 - **Root Cause**: The catalogue consumer accepts a new field but the profile import allowlist omits it; removeAdditional silently strips the override before the built-in catalogue merge.
 - **Rule**: Extend the existing import schema alongside new catalogue declarations. Test plan/apply/effective-catalogue readback for false overrides and named relay values, reject unsupported declarations before writes, and preserve source bytes.
+
+### A Lazy Encoder Can Still Eagerly Load Every Vocabulary
+- **Symptom**: Character-only estimates incur vocabulary parsing latency and retained heap before selecting any tokenizer.
+- **Root Cause**: A lazy encoder factory still imports both large rank arrays at module scope.
+- **Rule**: Load only the selected table at first use through the existing Node/Bun asset pattern. Keep literal require calls visible to the executable bundler, test fallback and selected-table initialization, and run known counts in the compiled artifact. Report first-count initialization and later module retention separately from import savings.

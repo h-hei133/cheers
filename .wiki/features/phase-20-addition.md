@@ -406,7 +406,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批 | 部分完成 | 冷/热 Node 与 exe；桌面全矩阵；性能验收 |
-| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.36 节 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview、目录声明的两套词表计数已实施；不支持的 control/workflow 仍 unknown；其他模型词表、完整媒体/协议计量、真实 1.7k/4.9k 分项差额与性能验收尚缺 |
+| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.37 节 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview、目录声明的两套词表及按需加载已实施；不支持的 control/workflow 仍 unknown；其他模型词表、完整媒体/协议计量、真实 1.7k/4.9k 分项差额与性能验收尚缺 |
 | ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批 | 本地验证 | 不借此宣称 ADD-08 完成 |
 | ADD-35 | P2 | 状态栏 live 估算与 provider 实测的优先级 | 第一百零五批、21.28–21.30 | 本地验证 | 真实 provider 延迟 |
 | ADD-36 | P2 | 目录刷新来源标记与能力上限准入 | 第一百零六至一百零八批 | 本地验证 | 真实外部索引内容与端到端 compaction |
@@ -5958,3 +5958,17 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 五个独立有界Node计数进程各取1k/8k/64k UTF-16文本和三次warm重复：本轮词表模块导入144–412ms，cl100k/o200k首1k含encoder初始化162/124ms，64k暖样本最慢89/118ms；fallback/两词表/切换进程maxRSS约90/131/142/147MiB，单独旧公式基线约41MiB。两rank源表合计3,590,551字节，静态加载两套表，只有encoder保留一个；同步计数不能被AbortSignal中途打断。这是单轮模块成本证据，不是CLI启动、UI响应、完整context heap或性能验收。Bun1.3.14独立30-module编译probe实际通过两词表Unicode/special、wire/capture与fallback/opaque断言，maxRSS197232KiB；生产2295-module executable另构建成功，106842240字节且host version验证通过。独立probe不替代生产CLI的交互preview执行证据。
 
 证据归 `.omx/artifacts/phase20-addition-tokenizer/`，源码快照用.source.txt避免发现为测试。延迟确认上一批 `f166ac93` 的精确代码CI `41225883811` completed/success；本批提交/推送/自身CI另绑。ADD-08保持partial：其他模型词表、媒体/协议精确计量、真实1.7k/4.9k同snapshot分项及完整性能/平台证据尚缺；未全仓回归、真实PTY/provider或20k真实会话，原Phase20真实条件延后，goal active。
+
+### 24.37 未选择词表时不初始化其大数据表
+
+接续已推送 `2213a67101f4d8c30482401f801192df6bea30bc`，沿ADD-08处理上一批实际观察到的固定加载成本。[计数owner](../../packages/ts-shell/src/context/request/tokenizer.ts)虽然延迟创建encoder，却静态导入两套rank数组，因此只用characters/3.5也要加载约3.59MB词表源。先读目标依赖图与仓库现有[主题资源加载方式](../../packages/ts-shell/src/presentation/themes/assets.ts)，再定向比较参考tokenizer的目录选词表/未知回退决定；沿本项目TypeScript边界和已锁定依赖，不引入native addon、第二语言或新异步编排。
+
+现在只有首次使用已声明词表时才通过固定literal require加载它；普通Node ESM沿createRequire，Bun沿可见的literal require把数据嵌入可执行文件。轻量GptEncoding core仍静态导入，字符回退先返回；每次选用仍仅保留一个encoder、merge cache为0，无请求文本缓存。已选过的词表由模块缓存保留；第一次数数要承担初始化，同步大请求计数仍不可中途取消。本批不把成本推迟误报为全部消失，也不改变估算、校准或预算口径。
+
+新增[加载回归](../../packages/ts-shell/src/context/request/loading.test.ts)同时拒绝提前ESM导入并观察实际CommonJS模块缓存：unknown/false无表、cl100k只加载自己、相同选择复用、切换才加载o200k，已知Unicode计数保持。主代理Node20.3.0、heap768MiB、单worker串行4文件132项通过；恢复原ESM导入、提前执行两套CJS加载各产生1失败/8控制通过；finally逐字节/SHA恢复后同132项再次通过。两路sol source-only复审APPROVE/WATCH合成COMMENT，无子代理验证；WATCH保留首次初始化、模块保留与完整CLI性能缺口。
+
+同一有界harness绑定旧build `122f0a1411e2` 与新build `5869989c1ffc`，8个fresh Node20.3进程串行覆盖fallback/cl100k/o200k/switch、1k/8k/64k UTF-16及各3次warm，所有count/method逐项相同。本轮fallback导入156.93→22.29ms，GC后堆21028120→3797728字节，maxRSS91472→47004KiB。cl100k首1k计数43.8→83.9ms、o200k84.6→187.9ms，反映初始化推迟；o200k maxRSS119264→129500KiB并未降低，不能声称所有内存指标改善。单轮进程、未控制OS冷缓存/JIT/调度，只证明本地模块样本，不作CLI首帧/runtime-ready、UI响应或总context性能验收。
+
+五静态门、TS build与manifest.compilerInputs当前摘要通过；新build `5869989c1ffc704f26217026b4cfa42935749363210e8a41ce010cf5e447f841`，inputs `b257e7fb788a95b502222dc2944c5914c0ca1dc0d9665957bf7b635e395427c5`。正式已适配bundle serial judge exit0、解析与无环satisfied，仅既有interactiveMode21/22-name advisory。Bun1.3.14独立30-module编译探针分别跑fallback、两词表及切回，wire/capture数值与opaque边界通过；另从工作目录 `/` 运行同一probe也通过。生产2295-module executable另构建并host version验证，SHA `bd99e7f9496d25dad8924643e4b6c26a3bedb5d8266155eb63eaa209d53c6934`；独立probe不替代生产CLI实际交互，也不证明所有外部模块不可见。
+
+正式证据 `.omx/artifacts/phase20-addition-tokenizer-loading/` 保留exact build对照、实际反转、测试/门/build/judge/编译probe、两路报告和非可执行源码快照；本批scratch清理后交付。上一批 `2213a671` 代码CI `41228113447` 延迟读回仍in_progress，本批提交/推送/自身CI另绑。ADD-08及总体保持partial/active；真实差额、其他词表/媒体协议、完整性能与平台证据尚缺，未真实provider/PTY、全仓或20k真实会话。
