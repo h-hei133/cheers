@@ -11099,3 +11099,10 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：交互目录尊重显式 provider 请求范围
 
 [addition24.32](features/phase-20-addition.md#2432-交互模型目录尊重显式-provider-请求范围)接续两处未提交改动，修复保存的无关命名连接压住explicit Bedrock/Vertex signer当前行与切换入口；未明确scope及named/pool边界保持。新增实际OverlayHost上键/Enter，浏览零写、保存后读回、load/hook变更拒绝及零fetch/settings-auth bytes；Node20.3单worker串行1文件58项通过，反转6失败/2控制/50未选并精确恢复后58通过。五门/build当前compilerInputs摘要通过，manifest ee5df6d0d8e5；初次旧版runner参数错误已分类。无独立委派复审/本批judge/真实provider/PTY/平台/旧binary/全仓/20k；776269e2精确CI已success，638d023e/20db8867仍in_progress，交付另读回。ADD-70 partial、goal active。
+
+
+第24.32节代码 `60b889335591d4811130c2b38fe1b86180952377` 已提交推送且远端main一致、当时clean，scratch清理；自身CI `41222162228`延迟仍in_progress，Watch `41222162287`success。
+
+### 2026-11-01：当前模型报告隔离旧会话连接身份
+
+[addition24.33](features/phase-20-addition.md#2433-当前模型报告不继承其他范围的会话连接)复现explicit provider signer的未列出模型报告带出旧sessionConnection.id，两provider会话场景实际失败、配置场景控制通过。既有投影把session/profile回退一起放入scope围栏，保留实际resolution优先及named边界；报告provider/issuer正确，shared bytes与session偏好不变、零fetch。Node20.3单worker串行1文件62项、反转2失败/2控制/58未选及精确恢复后62通过；五门/build当前compilerInputs摘要通过，manifest f1e3937af13f，无独立复审/新judge/真实provider/PTY/平台/旧binary/全仓/20k。f4710568、20db8867精确代码CI已success，638d023e、60b88933仍in_progress；本批交付另绑，ADD-70 partial、goal active。

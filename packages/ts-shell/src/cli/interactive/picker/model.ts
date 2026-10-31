@@ -262,8 +262,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       const currentModel = active.model ?? (active.blocked && savedTarget?.connectionScope === 'session' ? savedTarget.model : undefined);
       const currentProvider = !active.model && active.blocked && savedTarget?.connectionScope === 'session' ? savedTarget.provider : active.provider;
       const currentConnection = active.credential && !active.blocked ? active.credential.connectionId
-        : active.selection?.connectionId ?? config.sessionConnection?.id
-          ?? (active.selection?.credentialScope !== 'provider' ? config.activeProviderConnectionId : undefined);
+        : active.selection?.connectionId ?? (active.selection?.credentialScope !== 'provider'
+          ? config.sessionConnection?.id ?? config.activeProviderConnectionId : undefined);
       if (currentModel && !rows.some(row => row.note === 'active')) {
         const id = 'model:current';
         groups.set(id, { category: currentProvider });

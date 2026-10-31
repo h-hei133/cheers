@@ -53,6 +53,29 @@ function signerFixture(provider: 'bedrock' | 'vertex', model = 'shared') {
 const sharedConfigBytes = () => [getUserRuntimeConfigPath(), getUserAuthPath()]
   .map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
 
+it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['configuration', 'session'] as const).map(saved => ({ provider, saved }))))(
+  'keeps an unlisted explicit $provider signer report separate from the saved $saved connection', async ({ provider, saved }) => {
+    const named = getRuntimeConfig(root).providerConnections[0]!;
+    const fixture = signerFixture(provider, 'private-model'); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, provider: 'openai', activeProviderConnectionId: named.id,
+      providerConnections: [named] }, edit);
+    if (saved === 'session') writeSessionModel(sessionId, { connectionScope: 'session', connectionId: named.id,
+      provider: named.provider, model: 'shared', thinkingEffort: null }, readSessionModelEdit(sessionId));
+    const resolveConfigTarget = (config: RuntimeConfig, id?: string) => resolveProviderCredential({ runtimeConfig: {
+      ...config, provider, activeProviderConnectionId: undefined, sessionConnection: { scope: 'provider', provider },
+    }, env: {}, pool: { sessionId: id } });
+    const before = sharedConfigBytes(); const baseline = readSessionModelEdit(sessionId);
+    const picker = modelPicker({ ...commands(), resolveConfigTarget }); const rows = await picker.load();
+    expect(rows.find(row => row.id === 'model:current')).toMatchObject({ label: 'private-model', note: 'active' });
+    const details = picker.detail!('model:current').join('\n');
+    expect(details).toContain(`Provider: ${provider}`);
+    expect(details).toContain(new URL(fixture.baseUrl).host);
+    expect(details).not.toContain('Selected connection:');
+    expect(rows.find(row => row.id === 'model:current')?.detail?.split(' · ')).not.toContain(named.id);
+    expect(readSessionModelEdit(sessionId)).toEqual(baseline); expect(sharedConfigBytes()).toEqual(before);
+    expect(fixture.fetch).not.toHaveBeenCalled();
+  });
+
 it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['direct', 'keyboard'] as const).map(source => ({ provider, source }))))(
   'keeps an explicit $provider signer picker current over unrelated saved named state through $source activation', async ({ provider, source }) => {
   const named = getRuntimeConfig(root).providerConnections[0]!;

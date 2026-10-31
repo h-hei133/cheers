@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.32 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影及交互目录显式 provider 范围收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.33 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影及交互目录显式 provider 范围收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5896,3 +5896,16 @@ build exit0，manifest `ef982b674f90`、inputsDigest `82d6aba4bec6af4140fe8ea483
 旧生产owner反转实际 **6失败/2控制通过/50未选/exit1**，失败为行为AssertionError；finally逐字节恢复修复版本后，同58项exit0。五静态门通过（118既有docs-source advisory），Node floor build `ee5df6d0d8e50149d8abe6cd08ecb08e3ba80062f330b948796370a429d74910`，`inputsDigest=d511b8b1cb4f276d766ca945b0ad0174cf231614564775d9e091485550d936f0` 含manifest.compilerInputs，与当前输入精确一致。未改导入图，本批未另跑NormProof，也没有独立委派复审；不能沿用上批APPROVE。证据保留于 `.omx/artifacts/phase20-addition-picker-signing/`，本批提交/推送/精确CI另读回。
 
 延迟CI `776269e2`/`41219155385`已success；`638d023e`/`41220480426`、`20db8867`/`41220682282`最后仍in_progress，对应Watch成功不替代代码CI。真实AWS/ADC/provider、PTY、非Linux平台、旧发布binary、全仓/20k未验；原Phase20真实条件继续延后，ADD-70与整体仍partial，goal active。
+
+
+第24.32节代码与证据说明已提交推送 `60b889335591d4811130c2b38fe1b86180952377`，远端main精确读回一致、交付时clean，scratch已清理。自身代码CI `41222162228`延迟复查仍in_progress，Watch `41222162287`success。
+
+### 24.33 当前模型报告不继承其他范围的会话连接
+
+继续第24.32节的实际身份核查：[model picker](../../packages/ts-shell/src/cli/interactive/picker/model.ts) 的未列出当前模型报告，已对全局active ID设置explicit provider围栏，却把 `sessionConnection.id` 放在围栏外。实际请求明确切到Bedrock/Vertex provider范围、旧会话偏好仍为命名连接时，报告错误声称 Selected connection为旧ID；这不是当前请求的凭据事实。
+
+两个provider × 保存配置/保存会话的四个隔离夹具先在旧owner实跑：会话两项AssertionError，配置两项控制通过、58未选。只调整既有 `currentConnection` 投影，将session/profile回退一起放入实际scope检查；真实 resolution.connectionId与实际credential仍优先。延续第24.32节只读参考的current-model身份与stored/available分离决定，不改auth/provider核心、模型事务或任何存储格式。
+
+主代理Node20.3.0、heap768MiB、单worker串行最终 **1文件/62项** exit0；新增断言同时检查当前报告的provider/issuer、detail及row中无旧ID、原session偏好与settings/auth逐字节不变、零fetch。精确反转到 `60b88933` 生产owner，实际 **2失败/2控制通过/58未选/exit1**；finally按字节恢复后再跑62项exit0。五静态门/build通过（118既有docs-source advisory），build `f1e3937af13fd9af0c8ccf870452e62ff71a558dc81432d98966b79bc51123ff`，含manifest.compilerInputs的当前摘要 `7d7e3f5beb29a8b1495bfdf68548ccad5e56a142ecc52bf2f0c48c36f4f1809f` 一致。无独立委派复审、无新judge；证据 `.omx/artifacts/phase20-addition-picker-report/`，提交/推送/自身CI另读回。
+
+延迟读回 `f4710568`/`41219116283` 与 `20db8867`/`41220682282` 已completed/success；`638d023e`/`41220480426` 与 `60b88933`/`41222162228` 最后in_progress，Watch成功不替代代码CI。真实provider/AWS/ADC、PTY、非Linux、旧发布binary、全仓/20k未验；原Phase20真实条件延后，ADD-70 partial、goal active。
