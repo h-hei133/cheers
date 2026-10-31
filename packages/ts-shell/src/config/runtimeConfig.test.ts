@@ -8,6 +8,7 @@ import {
   getCandidateConfigPaths,
   getRuntimeConfig,
   getUserRuntimeConfigPath,
+  getUserAuthPath,
   readUserRuntimeConfigFile,
   writeUserRuntimeConfigFile,
 } from "./runtimeConfig.js";
@@ -411,9 +412,12 @@ describe("runtime config", () => {
     );
     expect(config.providerCredentials.openai).toBeUndefined();
     expect(config.configDiagnostics).toContain("Config project providerCredentials: source-not-allowed; value ignored.");
+    // Both of the user's documents are sources now: preferences and the
+    // credentials that used to share the file with them.
     expect(config.configSources).toEqual([
       path.join(fakeRoot, ".cheers.json"),
       getUserRuntimeConfigPath(),
+      getUserAuthPath(),
     ]);
   });
 

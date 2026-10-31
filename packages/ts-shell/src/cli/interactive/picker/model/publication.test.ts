@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
 import { loadCatalog, writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../../../../core/shell/runtimeContext.js';
 import { configurationAdmission } from '../../../../core/shell/configuration.js';
@@ -18,6 +18,9 @@ const catalogue = (baseUrl = 'https://original.invalid/v1', maxTokens = 16000) =
   { id: 'relay', runtime: 'openai', baseUrl, models: [{ id: 'shared', contextWindow: 128000 }] },
   { id: 'openai', models: [{ id: 'shared', contextWindow: 128000, maxTokens }] },
 ]);
+function configBytes() {
+  return [getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+}
 beforeEach(() => {
   fs.mkdirSync('/tmp/cheers-test', { recursive: true }); root = fs.mkdtempSync('/tmp/cheers-test/model-publication-');
   vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('OPENAI_API_KEY', '');
@@ -43,7 +46,7 @@ it('reopens from a fresh accepted catalogue after stale rejection while ordinary
   catalogue('https://replacement.invalid/v1');
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   writeUserRuntimeConfigFile({ ...edit.value, maxTurns: 31 }, edit);
-  const before = fs.readFileSync(getUserRuntimeConfigPath()), selection = readSessionModelEdit(runtime.session.id);
+  const before = configBytes(), selection = readSessionModelEdit(runtime.session.id);
   const result = await details.apply(['configure']);
   expect(result?.note).toContain('expired'); expect(result?.next?.initialSelection).toBe(target);
   expect(result?.next?.status?.()).toContain(result!.note);
@@ -61,7 +64,7 @@ it('reopens from a fresh accepted catalogue after stale rejection while ordinary
   expect(returned.detail!(target).join('\n')).toContain('replacement.invalid/v1');
   const published = runtime.configuration.current; await returned.load();
   expect(runtime.configuration.current).toBe(published);
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(readSessionModelEdit(runtime.session.id)).toEqual(selection);
+  expect(configBytes()).toEqual(before); expect(readSessionModelEdit(runtime.session.id)).toEqual(selection);
 });
 
 it.each((['subagent', 'summary', 'advisor'] as const).flatMap(role =>
@@ -85,7 +88,7 @@ it.each((['subagent', 'summary', 'advisor'] as const).flatMap(role =>
       writeSessionModel(runtime.session.id, { ...state.selection!, roles: { ...state.selection!.roles,
         [role]: { ...originalRole, thinkingEffort: 'low' } } }, state);
     }
-    const before = readSessionModelEdit(runtime.session.id), config = fs.readFileSync(getUserRuntimeConfigPath());
+    const before = readSessionModelEdit(runtime.session.id), config = configBytes();
     const refused = (await details.apply(['configure']))!;
     expect(refused.note).toContain('expired'); expect(refused.next?.initialSelection).toBe(target);
     expect(readSessionModelEdit(runtime.session.id)).toEqual(before); expect(runtime.configuration.current).toBe(accepted);
@@ -97,7 +100,7 @@ it.each((['subagent', 'summary', 'advisor'] as const).flatMap(role =>
     expect(readSessionModel(runtime.session.id)).toEqual({ ...before.selection!, roles: { ...before.selection!.roles,
       [role]: { ...before.selection!.roles![role]!, model: 'other' } } });
     expect(runtime.runtimeConfig.maxTurns).toBe(change === 'config' ? 31 : 20);
-    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+    expect(configBytes()).toEqual(config);
     expect(await details.apply(['configure'])).toBeUndefined(); expect(await details.load()).toEqual([]);
   });
 
@@ -117,7 +120,7 @@ it.each((['refusal', 'back'] as const).flatMap(action =>
     if (action === 'refusal') {
       const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath()); writeUserRuntimeConfigFile({ ...edit.value, maxTurns: 31 }, edit);
     }
-    const config = fs.readFileSync(getUserRuntimeConfigPath()), prepare = roleCommands.prepareModelRole;
+    const config = configBytes(), prepare = roleCommands.prepareModelRole;
     const read = vi.spyOn(roleCommands, 'prepareModelRole').mockImplementationOnce((...args) => {
       if (failure === 'throw') throw new Error('private role preparation diagnostic');
       fs.writeFileSync(state.statePath, '{unreadable'); return prepare(...args);
@@ -133,7 +136,7 @@ it.each((['refusal', 'back'] as const).flatMap(action =>
     const fresh = (await returned.inspect!('role:advisor'))!.next!; await fresh.load();
     expect((await fresh.apply(['default']))?.note).toContain('advisor follows the default');
     expect(readSessionModel(runtime.session.id)).toEqual({ ...state.selection!, roles: { summary: originalRole } });
-    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+    expect(configBytes()).toEqual(config);
   });
 
 it('retains the accepted catalogue and refuses child construction when new metadata violates active output constraints', async () => {
@@ -207,7 +210,7 @@ it.each(['revision', 'load'] as const)('makes cached models read-only after a %s
   const frame = () => overlay.render(140, 32).map(stripAnsi).join('\n');
   const ready = `model:${JSON.stringify(['main', 'openai', 'alternate'])}`;
   const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected network request'));
-  const before = fs.readFileSync(getUserRuntimeConfigPath()), selection = readSessionModelEdit(runtime.session.id);
+  const before = configBytes(), selection = readSessionModelEdit(runtime.session.id);
   try {
     await vi.advanceTimersByTimeAsync(0);
     expect(frame()).toContain('▸ shared');
@@ -235,7 +238,7 @@ it.each(['revision', 'load'] as const)('makes cached models read-only after a %s
     overlay.handleKey(parseKeyEvent('\x1b[B'), activate);
     overlay.handleKey(parseKeyEvent('\x1b[A'), activate);
     expect(activate).not.toHaveBeenCalled(); expect(overlay.active).toBe(true);
-    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+    expect(configBytes()).toEqual(before);
     expect(readSessionModelEdit(runtime.session.id)).toEqual(selection);
     readable = true;
     await vi.advanceTimersByTimeAsync(500);
@@ -245,7 +248,7 @@ it.each(['revision', 'load'] as const)('makes cached models read-only after a %s
     expect((await picker.inspect!(target))?.next).toBeDefined();
     overlay.handleKey(parseKeyEvent('\r'), activate);
     expect(activate).toHaveBeenCalledWith(picker, [ready]);
-    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+    expect(configBytes()).toEqual(before);
     expect(readSessionModelEdit(runtime.session.id)).toEqual(selection);
     expect(fetch).not.toHaveBeenCalled();
   } finally { overlay.close(); vi.useRealTimers(); }
@@ -261,7 +264,7 @@ it('routes Enter on a cached model through inspection refusal without executing 
   } });
   const overlay = new OverlayHost(() => {});
   overlay.open(picker);
-  const before = fs.readFileSync(getUserRuntimeConfigPath()), selection = readSessionModelEdit(runtime.session.id);
+  const before = configBytes(), selection = readSessionModelEdit(runtime.session.id);
   try {
     await vi.advanceTimersByTimeAsync(0);
     readable = false;
@@ -272,7 +275,7 @@ it('routes Enter on a cached model through inspection refusal without executing 
     const [inspection, ids] = accepted.mock.calls[0]!;
     expect(inspection).not.toBe(picker);
     expect(await inspection.apply(ids)).toEqual({ note: expect.stringContaining('read-only') });
-    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+    expect(configBytes()).toEqual(before);
     expect(readSessionModelEdit(runtime.session.id)).toEqual(selection);
   } finally { overlay.close(); vi.useRealTimers(); }
 });

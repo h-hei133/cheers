@@ -3,7 +3,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { modelPicker } from '../model.js';
 import { SessionManager } from '../../../../session/SessionManager.js';
-import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
 import { runConnectCommand, __setOpenAIAccountAuthRunnerForTest } from '../../../../core/commands/connectCommandRuntime.js';
@@ -17,6 +17,9 @@ import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
 let home: string;
 let manager: SessionManager;
 let sessionId: string;
+function configBytes() {
+  return [getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+}
 beforeEach(() => {
   fs.mkdirSync('/tmp/cheers-test', { recursive: true });
   home = fs.mkdtempSync(path.join('/tmp/cheers-test', 'model-choice-'));
@@ -170,14 +173,14 @@ it.each(['success', 'failure', 'cancel'] as const)('returns a native account %s 
 
 it('cancels model sign-in through real Escape and the default cancel action without authenticating or writing', async () => {
   const signIn = vi.fn(); const picker = modelSignInPicker(context(), 'openai', signIn, current => modelPicker(current));
-  const original = fs.readFileSync(getUserRuntimeConfigPath());
+  const original = configBytes();
   await picker.load(); expect((await picker.apply(['cancel']))?.next?.title).toBe('Model');
   expect(await picker.apply(['start'])).toBeUndefined();
   const overlay = new OverlayHost(() => {}); overlay.open(modelSignInPicker(context(), 'openai', signIn, current => modelPicker(current)));
   await new Promise(resolve => setTimeout(resolve, 0)); overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
   await new Promise(resolve => setTimeout(resolve, 0));
   expect(stripAnsi(overlay.render(110, 30).join('\n'))).toContain('All models'); overlay.close();
-  expect(signIn).not.toHaveBeenCalled(); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+  expect(signIn).not.toHaveBeenCalled(); expect(configBytes()).toEqual(original);
 });
 
 it('retains configuration publication failure in the visible authentication result and invalidates dismissed confirmations', async () => {

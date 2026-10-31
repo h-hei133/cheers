@@ -1,7 +1,7 @@
 import type { ThinkingPreference } from '../core/models/effort.js';
 import os from "node:os";
 import path from "node:path";
-import { resolveUserDataFile, userDataDir } from "../core/paths/userHome.js"
+import { configDocumentPaths, readConfigDocuments, userAuthPath, userSettingsPath } from './documents.js';
 import { type DenyRule } from "../core/shell/approval/deny.js"
 import { createConfigFields, type ConfigField } from "./fields.js";
 import { readConfigDocument } from "./document.js";
@@ -489,7 +489,11 @@ export function getRuntimeConfig(
   const projectPath = getProjectConfigPath(configTrust.workspaceRoot);
   const layer = loadConfigLayers([
     { path: projectPath, source: "project" },
+    // The user's configuration is two documents: settings and credentials. They
+    // are read in that order, so a credential in its own file wins over a copy a
+    // pre-split `config.json` still holds.
     { path: getUserConfigPath(), source: "user" },
+    { path: userAuthPath(), source: "user" },
   ], overrides, CONFIG_FIELDS, configTrust.decision, inputs, configTrust.workspaceRoot);
   // Every accepted field has passed its registry schema before this projection.
   const merged = layer.values as RuntimeConfigFile & RuntimeConfigOverrides;
@@ -586,8 +590,11 @@ export function getRuntimeConfig(
  * "the project's file" and "the user's file" are different answers to that.
  */
 export function getUserConfigPath(): string {
-  return resolveUserDataFile("config.json");
+  return userSettingsPath();
 }
+
+/** The credential document beside it; owned by `config/documents.ts`. */
+export { userAuthPath as getUserAuthPath } from './documents.js';
 
 export function getProjectConfigPath(rootDir: string = process.cwd()): string {
   return resolveProjectConfigFile(rootDir, 'config.json');
@@ -600,7 +607,7 @@ export function getCandidateConfigPaths(
 }
 
 export function getUserRuntimeConfigPath(): string {
-  return resolveUserDataFile("config.json");
+  return userSettingsPath();
 }
 
 /**
@@ -616,7 +623,15 @@ export function getUserRuntimeConfigPath(): string {
  */
 export function readRuntimeConfigFileAt(configPath: string): RuntimeConfigFile {
   try {
-    const document = readConfigDocument(configPath) ?? {};
+    // The user's configuration is two documents; a caller naming that path
+    // wants the whole of it, not only the half that holds preferences.
+    const { settingsPath, authPath } = configDocumentPaths(configPath);
+    const documents = authPath ? readConfigDocuments(settingsPath, authPath) : undefined;
+    if (documents) {
+      validateRawConfig(documents.settings?.values ?? {}, CONFIG_FIELDS);
+      validateRawConfig(documents.auth?.values ?? {}, CONFIG_FIELDS);
+    }
+    const document = documents?.values ?? readConfigDocument(configPath) ?? {};
     validateRawConfig(document, CONFIG_FIELDS);
     return document as RuntimeConfigFile;
   } catch (error) {

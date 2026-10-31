@@ -132,7 +132,7 @@ export function loadConfigLayers(paths: readonly { path: string; source: 'projec
       continue;
     }
     if (!candidate.snapshot) continue;
-    assertAccountOwner(candidate, paths.find(file => file.source === 'user')!.path);
+    assertAccountOwner(candidate, paths.filter(file => file.source === 'user').map(file => file.path));
     // A credential file another account can read is a leaked key. Writes narrow
     // it, but a file that is never written would stay readable, so the load
     // reports it. Only the fact is stated: the file and its mode, never a value.

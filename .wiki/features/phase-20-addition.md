@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节 | 部分完成 | 权限已强制；凭据拆分与重复事实收敛未做 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节 | 部分完成 | 凭据拆分与权限已实施；模型目标/目录分离、重复事实收敛与旧版本回退验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5428,3 +5428,19 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 加载路径新增一条暴露告警：含凭据且组/其他位可读的文件会被报告（只报文件与事实，不含任何值）。理由是不写的文件永远不会被收窄，而静默正是这类问题最危险的部分。
 
 验证：`interactiveMode` 403、`composer` 18、`hints` 6、`runtimeConfig` 38、`persistence` 30、`turn/projection` 9、`turn/session` 41、`turnSink` 54、`sessionRuntime` 50、`firstFrame` 24 项通过；TS build 与五门通过。
+
+
+## 24. 第十一轮实施（2026-10-31）：ADD-70 凭据文件拆分
+
+接续工作区已有拆分草稿，完成读写调用方集成并修正只读复审发现。`config/documents.ts` 负责物理文档归属，`persistence.ts` 保留既有编辑事务；没有另造连接、认证或配置注册表。
+
+- 用户 `config.json` 保留设置；`auth.json` 承接 provider、providerCredentials、providerConnections、activeProviderConnectionId 和 accountPool，写入无条件 0600。项目与显式输入的原作用域限制保留。模型目录仍是 `models.json`，角色/会话选择仍由原 owner 保存。
+- 旧混合配置仍可读，auth 中同名字段优先；用户配置保存先写并读回验证 auth，再移除 settings 的旧字段。普通设置保存不创建空 auth 文件；已存在的 auth 即使无内容变化也独立收窄权限。未知 auth 字段与注释留在 auth，显式删除移除所有被覆盖副本。
+- 编辑基线绑定两份文件的 revision、存在状态、回退路径及 canonical 目标。锁内及发布前后重查来源，拒绝删除后复活、来源切换和链接换目标；稳定的默认 profile 链接通过其原目标保存。两份文件若指向同一目标，写入前拒绝。账号续期与 peer receipt 复用同一物理存储归属检查。
+- auth 写入/读回或 settings 第二步失败保持 report-safe `unknown`。auth 先成功的中断可通过重新读取后保存完成迁移；没有自动补偿覆盖外部新值。**这不是跨文件原子事务**：不声称 crash atomicity 或并发读者只能观察一代数据。
+
+只读参考对照：凭据独立存储、路径归属固定、锁内读取最新值与 owner-only 写入；迁移采取保留先于删除、删除依赖准确的存储代次。参考中的数据库事务没有移植到本项目；本项目采用既有 JSONC 原子单文件 writer 与真实部分结果合同。反转 auth-first 顺序后，`auth-write` 故障用例实际因旧凭据字节被删除而 AssertionError；finally 逐字节恢复，恢复后的 documents21/persistence30 全通过。
+
+主代理单进程串行聚焦验证：22 个文件、**569 项**通过，分组为 config179、connect/model71、account104、picker153、entrypoint/runtime/provider/session62。重复验证不累加。五道静态门与生产 TS noEmit 通过；最终 `npm run build` 通过，manifest `28363ef38159`。正式打包 NormProof exit0、依赖环与导入解析 satisfied；verdict partial，仅既有 interactiveMode 22-name advisory，runtimeConfig 已回到20，不把 advisory 解释为全局结构完成。没有本地全量回归、真实 provider、PTY 或 20k 压测；子代理仅阅读、分析及编辑。
+
+ADD-70 仍部分完成：本轮只完成凭据与设置的物理拆分；模型目标与目录分离、同一事实多处存储收敛、真实旧版本回退和真实环境验收尚缺。没有迁移操作员真实 HOME、没有验证老二进制会读取新 auth 文件。提交与远端状态以本轮交付读回为准，旧 HEAD 的 CI 成功不证明新提交。

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
-import { getRuntimeConfig, getUserRuntimeConfigPath, type RuntimeConfigFile } from '../../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, type RuntimeConfigFile } from '../../../config/runtimeConfig.js';
 import { accountToken } from '../../../test-utils/oauth.js';
 import { createProfileContext, withProfile, type ProfileContext } from '../../paths/profile/context.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
@@ -26,8 +26,8 @@ beforeEach(() => {
 afterEach(() => { __setOpenAIProviderAuthLoginForTest(); fs.rmSync(fixture, { recursive: true, force: true }); });
 const resolve = () => resolveProviderCredential({ runtimeConfig: getRuntimeConfig(workspace), env: {} });
 const owner = () => accountReplayOwner(workspace, resolve());
-const read = (): RuntimeConfigFile => JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
-const write = (value: RuntimeConfigFile) => fs.writeFileSync(getUserRuntimeConfigPath(), JSON.stringify(value));
+const read = (): RuntimeConfigFile => JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
+const write = (value: RuntimeConfigFile) => fs.writeFileSync(getUserAuthPath(), JSON.stringify(value), { mode: 0o600 });
 const binding = () => {
   const resolution = resolve(), account = resolution.credential!.accountAuth!;
   return requestReplayBinding({ ...resolution, baseUrl: 'https://chatgpt.com/backend-api', endpoint: 'openai-account-responses',
@@ -95,11 +95,11 @@ it.each(['accessToken', 'refreshToken', 'expiresAt', 'loginId', 'accountId', 'sl
 it('fences copied profile config and ledger, and a replaced profile directory', async () => {
   await withProfile(profile, login);
   const other = createProfileContext({ name: 'b', homeDir: fixture, env: {} });
-  for (const name of ['config.json', 'refresh-leases.json']) fs.copyFileSync(path.join(profile.root, name), path.join(other.root, name));
+  for (const name of ['config.json', 'auth.json', 'refresh-leases.json']) fs.copyFileSync(path.join(profile.root, name), path.join(other.root, name));
   await withProfile(other, () => { expect(owner()).toBeUndefined(); });
   await withProfile(profile, () => {
     const captured = resolve(); fs.renameSync(profile.root, `${profile.root}.old`); fs.mkdirSync(profile.root);
-    for (const name of ['config.json', 'refresh-leases.json']) fs.copyFileSync(path.join(`${profile.root}.old`, name), path.join(profile.root, name));
+    for (const name of ['config.json', 'auth.json', 'refresh-leases.json']) fs.copyFileSync(path.join(`${profile.root}.old`, name), path.join(profile.root, name));
     expect(accountReplayOwner(workspace, captured)).toBeUndefined();
   });
 });

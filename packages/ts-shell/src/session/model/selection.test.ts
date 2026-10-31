@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SessionManager } from "../SessionManager.js";
-import { getRuntimeConfig, getUserRuntimeConfigPath, readUserRuntimeConfigFile, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readUserRuntimeConfigFile, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 import { runModelCommand } from "../../core/commands/modelCommandRuntime.js";
 import { createCliProviderRuntimeBridge, resolveCliCredential } from "../../cli/provider/cliProviderRuntimeBridge.js";
 import { createShellRuntimeContext, refreshShellRuntimeConfig, switchActiveSession } from "../../core/shell/runtimeContext.js";
@@ -20,6 +20,9 @@ import type { StreamingRenderer } from '../../presentation/terminal/streaming.js
 
 let home: string;
 let manager: SessionManager;
+function configBytes() {
+  return [getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+}
 beforeEach(() => {
   home = fs.mkdtempSync(path.join(os.tmpdir(), "model-scope-"));
   vi.stubEnv("HOME", home); vi.stubEnv("USERPROFILE", home);
@@ -42,7 +45,7 @@ it.each(['/model new', '/model openai/new --global', '/model google/new', '/thin
   'rejects a different request provider before hooks or writes through the command bridge: %s', async prompt => {
     addAlternateConnection();
     const session = manager.createNew(home);
-    const config = fs.readFileSync(getUserRuntimeConfigPath());
+    const config = configBytes();
     const statePath = locateExistingSessionLayout(createSessionStoreLayout(), session.id).statePath;
     const state = fs.readFileSync(statePath);
     const hooks = vi.spyOn(defaultHookDispatcher, 'dispatch');
@@ -56,7 +59,7 @@ it.each(['/model new', '/model openai/new --global', '/model google/new', '/thin
     expect(lines.join(' ')).toContain('request provider differs');
     expect(lines.join(' ')).not.toMatch(/synthetic-alternate-key|Model switched|preference saved/i);
     expect(hooks).not.toHaveBeenCalled();
-    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+    expect(configBytes()).toEqual(config);
     expect(fs.readFileSync(statePath)).toEqual(state);
   });
 
@@ -77,7 +80,7 @@ it('allows an explicit request provider after selecting its matching saved conne
 it('rejects a request provider change during the model hook before committing either store', async () => {
   addAlternateConnection();
   const session = manager.createNew(home);
-  const config = fs.readFileSync(getUserRuntimeConfigPath());
+  const config = configBytes();
   const statePath = locateExistingSessionLayout(createSessionStoreLayout(), session.id).statePath;
   const state = fs.readFileSync(statePath);
   let provider: 'openai' | 'google' = 'openai';
@@ -88,7 +91,7 @@ it('rejects a request provider change during the model hook before committing ei
   const result = await runModelCommand(['new', '--global'], { cwd: home, projectRoot: home, sessionId: session.id,
     resolveConfigTarget: config => resolveCliCredential(config, { provider }, {}) });
   expect(result.output).toContain('conflict: this attempt did not write');
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+  expect(configBytes()).toEqual(config);
   expect(fs.readFileSync(statePath)).toEqual(state);
 });
 
@@ -150,19 +153,19 @@ it.each([ ["status", "extra"], ["refresh", "extra"], ["config", "extra"], ["use"
   ["use", "m", "--global=false"], ["use", "m", "--global", "--global"], ["use", "m", "--refresh"],
   ["list", "openai", "extra"], ["list", "--unknown"], ["m", "extra"],
 ])("rejects invalid syntax before file or network effects: %j", async (...args) => {
-  const session = manager.createNew(home); const config = fs.readFileSync(getUserRuntimeConfigPath());
+  const session = manager.createNew(home); const config = configBytes();
   const fetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected network"));
   const result = await runModelCommand(args, { cwd: home, sessionId: session.id });
   expect(result.output).toContain("Invalid model arguments");
   expect(fetch).not.toHaveBeenCalled(); expect(readSessionModel(session.id)).toBeUndefined();
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+  expect(configBytes()).toEqual(config);
 });
 
 it("blocks a missing session without changing global defaults", async () => {
-  const original = fs.readFileSync(getUserRuntimeConfigPath());
+  const original = configBytes();
   const result = await runModelCommand(["use", "new", "--global"], { cwd: home, sessionId: "missing" });
   expect(result.output).toContain("session preference");
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+  expect(configBytes()).toEqual(original);
   expect(readSessionModel("missing")).toBeUndefined();
 });
 
@@ -178,14 +181,14 @@ it("retains a model-only session at exit without retaining ordinary empty sessio
 
 it("reports a partial result when the session save succeeds and the global save fails", async () => {
   const session = manager.createNew(home);
-  const original = fs.readFileSync(getUserRuntimeConfigPath());
+  const original = configBytes();
   vi.spyOn(configStore, "writeUserRuntimeConfigFile").mockImplementation(() => { throw new Error("sensitive fixture error"); });
   const refreshRuntimeConfig = vi.fn();
   const result = await runModelCommand(["use", "new", "--global"], { cwd: home, sessionId: session.id, refreshRuntimeConfig });
   expect(result.output).toContain("Session preference saved and verified. Global write outcome is unverified.");
   expect(result.output).not.toContain("sensitive fixture error");
   expect(readSessionModel(session.id)?.model).toBe("new");
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+  expect(configBytes()).toEqual(original);
   expect(refreshRuntimeConfig).not.toHaveBeenCalled();
 });
 
@@ -193,15 +196,15 @@ it("rejects damaged session state without replacing it or writing global default
   const session = manager.createNew(home);
   const layout = locateExistingSessionLayout(createSessionStoreLayout(), session.id);
   fs.writeFileSync(layout.statePath, "{broken");
-  const original = fs.readFileSync(getUserRuntimeConfigPath());
+  const original = configBytes();
   const result = await runModelCommand(["use", "new", "--global"], { cwd: home, sessionId: session.id });
   expect(result.output).toContain("Model switch failed: session preference");
   expect(fs.readFileSync(layout.statePath, "utf8")).toBe("{broken");
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+  expect(configBytes()).toEqual(original);
 });
 
 it('rejects a delayed older selection after another command has saved a newer model', async () => {
-  const session = manager.createNew(home); const original = fs.readFileSync(getUserRuntimeConfigPath());
+  const session = manager.createNew(home); const original = configBytes();
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
   vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
@@ -217,17 +220,17 @@ it('rejects a delayed older selection after another command has saved a newer mo
   expect((await pending).output).toContain('conflict: this attempt did not write');
   expect(readSessionModel(session.id)?.model).toBe('new');
   expect(fs.readFileSync(locateExistingSessionLayout(createSessionStoreLayout(), session.id).statePath)).toEqual(state);
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+  expect(configBytes()).toEqual(original);
   expect(refreshRuntimeConfig).not.toHaveBeenCalled();
 });
 
 it('refuses a connection whose credential was replaced while the selection hook ran', async () => {
-  const session = manager.createNew(home); let external!: Buffer;
+  const session = manager.createNew(home); let external!: ReturnType<typeof configBytes>;
   vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
     if (event.eventName === 'PreModelSwitch') {
       const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
       writeUserRuntimeConfigFile({ providerConnections: edit.values.providerConnections?.map(item => ({ ...item, apiKey: 'SYNTHETIC_ROTATED_SECRET' })) }, edit);
-      external = fs.readFileSync(getUserRuntimeConfigPath());
+      external = configBytes();
     }
     return undefined;
   });
@@ -235,11 +238,11 @@ it('refuses a connection whose credential was replaced while the selection hook 
   expect(result.output).toContain('conflict: this attempt did not write');
   expect(result.output).not.toContain('SYNTHETIC_ROTATED_SECRET');
   expect(readSessionModel(session.id)).toBeUndefined();
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(external);
+  expect(configBytes()).toEqual(external);
 });
 
 it('checks current admission after the asynchronous hook before either write', async () => {
-  const session = manager.createNew(home); const original = fs.readFileSync(getUserRuntimeConfigPath());
+  const session = manager.createNew(home); const original = configBytes();
   let blocked = false;
   vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
     if (event.eventName === 'PreModelSwitch') blocked = true;
@@ -249,11 +252,11 @@ it('checks current admission after the asynchronous hook before either write', a
   expect(result.output).toContain('admission changed');
   expect(result.output).not.toContain('private diagnostic');
   expect(readSessionModel(session.id)).toBeUndefined();
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+  expect(configBytes()).toEqual(original);
 });
 
 it('does not apply or write global defaults when the session writer returns without saving', async () => {
-  const session = manager.createNew(home); const original = fs.readFileSync(getUserRuntimeConfigPath());
+  const session = manager.createNew(home); const original = configBytes();
   const hook = vi.spyOn(defaultHookDispatcher, 'dispatch').mockResolvedValue(undefined);
   vi.spyOn(files, 'writeJsonFileAtomic').mockImplementation(() => {});
   const refreshRuntimeConfig = vi.fn();
@@ -263,7 +266,7 @@ it('does not apply or write global defaults when the session writer returns with
   expect(refreshRuntimeConfig).not.toHaveBeenCalled();
   expect(hook.mock.calls.some(([event]) => event.eventName === 'PostModelSwitch')).toBe(false);
   expect(readSessionModel(session.id)).toBeUndefined();
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+  expect(configBytes()).toEqual(original);
 });
 
 it('does not redirect a selection from the accepted connection to a newly selected disk connection', async () => {
@@ -272,13 +275,13 @@ it('does not redirect a selection from the accepted connection to a newly select
   writeUserRuntimeConfigFile({ activeProviderConnectionId: 'other', providerConnections: [
     ...edit.values.providerConnections!, { ...edit.values.providerConnections![0]!, id: 'other' },
   ] }, edit);
-  const original = fs.readFileSync(getUserRuntimeConfigPath());
+  const original = configBytes();
   const hook = vi.spyOn(defaultHookDispatcher, 'dispatch');
   const result = await runModelCommand(['lost', '--global'], { cwd: home, sessionId: session.id, runtimeConfig });
   expect(result.output).toContain('differs from the accepted session configuration');
   expect(hook).not.toHaveBeenCalled();
   expect(readSessionModel(session.id)).toBeUndefined();
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+  expect(configBytes()).toEqual(original);
 });
 
 it.each(['apiKey', 'baseUrl', 'authType', 'credential'])('rejects same-ID %s replacement before dispatching a model hook', async field => {
@@ -288,11 +291,11 @@ it.each(['apiKey', 'baseUrl', 'authType', 'credential'])('rejects same-ID %s rep
     : field === 'baseUrl' ? { baseUrl: 'https://new-endpoint.invalid/v1' } : { authType: 'browser-assisted-capture' as const };
   writeUserRuntimeConfigFile(field === 'credential' ? { providerCredentials: { openai: { baseUrl: 'https://credential-endpoint.invalid/v1' } } }
     : { providerConnections: edit.values.providerConnections?.map(item => ({ ...item, ...replacement })) }, edit);
-  const original = fs.readFileSync(getUserRuntimeConfigPath()); const hook = vi.spyOn(defaultHookDispatcher, 'dispatch');
+  const original = configBytes(); const hook = vi.spyOn(defaultHookDispatcher, 'dispatch');
   const result = await runModelCommand(['pending', '--global'], { cwd: home, sessionId: session.id, runtimeConfig });
   expect(result.output).toContain('differs from the accepted session configuration');
   expect(hook).not.toHaveBeenCalled(); expect(readSessionModel(session.id)).toBeUndefined();
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+  expect(configBytes()).toEqual(original);
 });
 
 it('rejects a saved workspace that was rebound before the command captured its baseline', async () => {
@@ -307,19 +310,19 @@ it('rejects a saved workspace that was rebound before the command captured its b
 
 it('rechecks credentials after acquiring the session lock', async () => {
   const session = manager.createNew(home); const target = locateExistingSessionLayout(createSessionStoreLayout(), session.id);
-  const lock = files.withFileLock; let external!: Buffer;
+  const lock = files.withFileLock; let external!: ReturnType<typeof configBytes>;
   vi.spyOn(files, 'withFileLock').mockImplementation((file, action, options) => lock(file, () => {
     if (file === target.stateLockPath) {
-      const config = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+      const config = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
       config.providerConnections[0].apiKey = 'SYNTHETIC_LOCK_ROTATION';
-      fs.writeFileSync(getUserRuntimeConfigPath(), JSON.stringify(config));
-      external = fs.readFileSync(getUserRuntimeConfigPath());
+      fs.writeFileSync(getUserAuthPath(), JSON.stringify(config), { mode: 0o600 });
+      external = configBytes();
     }
     return action();
   }, options));
   const result = await runModelCommand(['pending', '--global'], { cwd: home, sessionId: session.id });
   expect(result.output).toContain('conflict: this attempt did not write');
-  expect(readSessionModel(session.id)).toBeUndefined(); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(external);
+  expect(readSessionModel(session.id)).toBeUndefined(); expect(configBytes()).toEqual(external);
 });
 
 it('allows sequential selections and a no-op after a model-only session overlay is published', async () => {
@@ -327,7 +330,7 @@ it('allows sequential selections and a no-op after a model-only session overlay 
   const context = createShellRuntimeContext({ cwd: home, originalCwd: home, projectRoot: home, targetPathBase: home,
     rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
     session, runtimeConfig: getRuntimeConfig(home) });
-  const original = fs.readFileSync(getUserRuntimeConfigPath());
+  const original = configBytes();
   expect(context.runtimeConfig.providerCredentials.openai).toBeUndefined();
   for (const model of ['first-choice', 'second-choice', 'second-choice']) {
     const before = readSessionModelEdit(session.id);
@@ -339,5 +342,5 @@ it('allows sequential selections and a no-op after a model-only session overlay 
     expect(readSessionModel(session.id)?.model).toBe(model);
     if (before.selection?.model === model) expect(readSessionModelEdit(session.id).revision).toBe(before.revision);
   }
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+  expect(configBytes()).toEqual(original);
 });

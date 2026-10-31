@@ -10936,3 +10936,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：CI 全量绿色（含本轮全部修复）
 
 `0b511910` 的 CI：Build & Test 完成且成功，**1050 个测试文件、12966 项通过、3 项跳过**；NormProof 同样 success。覆盖本轮 ADD-69/70/71 的全部改动、子代理 review 的三处修正、以及凭据夹具的 0600 修正。此前几轮的失败分别是：`composer.test.ts` 锁定旧计数文案（已在 `ea8e650b` 修正）、`validation.test.ts` 夹具以 0644 写凭据文件（已在 `f848c597` 修正）、以及 `src/cli/print/*` 的构建产物过期（重建后通过，非产品问题）。原 47/ADD 整体 partial、goal active。
+
+
+### 2026-10-31：ADD-70 凭据独立文档与迁移保护
+
+[addition24](features/phase-20-addition.md#24-第十一轮实施2026-10-31add-70-凭据文件拆分)接续已有草稿，用户凭据/连接移至 auth.json、设置保留 config.json，auth-first 验证后移除旧字段。修复两文件来源与链接身份、删除复活、未知 auth 字段搬移、未变化凭据权限、peer receipt 存储归属等缺陷；实际保存/续期调用方与取消字节断言集成。主代理分组单进程串行22文件569项通过，auth-first 反转实际 AssertionError、源码精确恢复；五门/noEmit/build通过，manifest28363ef38159。打包judge仅既有 interactiveMode advisory，导入解析与环satisfied。未运行全量回归、PTY、20k或真实provider；未迁移真实HOME。ADD-70仍partial：模型目标/目录分离与重复事实收敛、旧版本回退及真实环境尚缺，goal active。

@@ -24,8 +24,10 @@ const connection = (id: string) => ({ id, provider: 'openai' as const, authType:
   createdAt: '2026-01-01', updatedAt: id === 'a' ? '2026-01-03' : '2026-01-02' });
 const initial = (): RuntimeConfigFile => ({ provider: 'openai', activeProviderConnectionId: 'a',
   providerConnections: [connection('a'), connection('b')], providerCredentials: { openai: { accountAuth: { openai: auth() } } } });
-function write(value: RuntimeConfigFile) { fs.writeFileSync(file, JSON.stringify(value)); }
+function write(value: RuntimeConfigFile) { fs.writeFileSync(file, JSON.stringify(value), { mode: 0o600 }); }
 function read(): RuntimeConfigFile { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+function settingsFile(): string { return path.join(home, '.cheers', 'config.json'); }
+function readSettings(): { theme?: string } { try { return JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); } catch { return {}; } }
 function response(accountId = 'a') { return new Response(JSON.stringify({ access_token: accountToken('fresh-a', accountId), refresh_token: 'rotated-a', expires_in: 3600 }),
   { headers: { 'Content-Type': 'application/json' } }); }
 function request(change: () => void = () => {}) {
@@ -36,7 +38,9 @@ function request(change: () => void = () => {}) {
 beforeEach(() => {
   home = fs.mkdtempSync(path.join(os.tmpdir(), 'account-renewal-')); root = path.join(home, 'workspace');
   fs.mkdirSync(path.join(root, '.agents'), { recursive: true }); fs.mkdirSync(path.join(home, '.cheers'));
-  file = path.join(home, '.cheers', 'config.json');
+  // Credentials and connections are the credential document's, so this fixture
+  // writes them where the product now keeps them.
+  file = path.join(home, '.cheers', 'auth.json');
   vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
   write(initial());
 });
@@ -60,16 +64,19 @@ it.each([
 });
 
 it('renews only the captured account and its exact mirror while preserving other settings and ordering', async () => {
-  const before = read(); const input = request(() => write({ ...read(), theme: 'light' }));
+  const before = read();
+  // The concurrent edit touches a setting, which lives in the other document:
+  // renewal must leave it alone rather than rewrite the file it is not editing.
+  const input = request(() => fs.writeFileSync(settingsFile(), JSON.stringify({ ...readSettings(), theme: 'light' })));
   const result = await renewStoredAccount(input); const saved = read();
   expect(result).toMatchObject({ stored: true, writeState: 'persisted', accountAuth: { accessToken: accountToken('fresh-a', 'a'), refreshToken: 'rotated-a', accountId: 'a' } });
   expect(saved.providerConnections?.[0]?.accountAuth?.openai).toEqual(result.accountAuth);
   expect(saved.providerConnections?.[1]).toEqual(before.providerConnections?.[1]);
   expect(saved.providerConnections?.[0]?.updatedAt).toBe(before.providerConnections?.[0]?.updatedAt);
   expect(saved.providerCredentials?.openai?.accountAuth?.openai).toEqual(result.accountAuth);
-  expect(saved.theme).toBe('light'); expect(input.fetchImpl).toHaveBeenCalledOnce();
+  expect(readSettings().theme).toBe('light'); expect(input.fetchImpl).toHaveBeenCalledOnce();
   expect(result.rotation).toMatchObject({ resolution: input.resolution, accountAuth: result.accountAuth,
-    storage: { source: file, path: file } });
+    storage: { source: settingsFile(), path: settingsFile() } });
   expect(result.rotation!.storage.previousRevision).not.toBe(result.rotation!.storage.revision);
 });
 
@@ -218,7 +225,7 @@ it.each([true, false])('accepts a natively proven peer renewal without rewriting
   release(); const completed = await leader; const peerBytes = fs.readFileSync(file); const result = await follower;
   expect(completed.stored).toBe(true);
   expect(result).toMatchObject({ stored: true, writeState: 'unchanged', accountAuth: completed.accountAuth,
-    rotation: { resolution, accountAuth: completed.accountAuth, storage: { source: file, path: file } } });
+    rotation: { resolution, accountAuth: completed.accountAuth, storage: { source: settingsFile(), path: settingsFile() } } });
   expect(result.rotation!.storage.previousRevision).not.toBe(result.rotation!.storage.revision);
   expect(fetchImpl).toHaveBeenCalledOnce(); expect(writer).toHaveBeenCalledOnce(); expect(fs.readFileSync(file)).toEqual(peerBytes);
   expect(read().providerConnections?.[0]).toEqual(before.providerConnections?.[0]);
@@ -327,8 +334,9 @@ it('keeps failed lock cleanup visible with the confirmed write state and no usab
 });
 
 it('rejects a new preferred configuration while renewing a fallback source', async () => {
-  const preferred = file; const legacy = path.join(home, '.cheer', 'config.json');
-  fs.mkdirSync(path.dirname(legacy)); fs.renameSync(preferred, legacy); file = legacy;
+  // This scenario replaces the settings source, not the now-separate auth file.
+  const preferred = settingsFile(); const legacy = path.join(home, '.cheer', 'config.json');
+  fs.mkdirSync(path.dirname(legacy)); fs.renameSync(file, legacy); file = legacy;
   const before = fs.readFileSync(legacy); const input = request(() => fs.writeFileSync(preferred, before));
   const result = await renewStoredAccount(input);
   expect(result).toMatchObject({ stored: false, writeState: 'unchanged' }); expect(result.accountAuth).toBeUndefined();

@@ -52,14 +52,15 @@ export function verifyConfigFiles(captured: readonly ConfigFileCapture[], inputs
 }
 
 /** Refresh/persistence has one owner: the selected profile's primary user document. */
-export function assertAccountOwner(file: ConfigFileCapture, primary: string): void {
+export function assertAccountOwner(file: ConfigFileCapture, primary: readonly string[]): void {
   if (!file.input || file.source !== 'user' || !file.snapshot) return;
   const raw = file.snapshot.values;
   const records = [...(Array.isArray(raw.providerConnections) ? raw.providerConnections : []),
     ...Object.values(raw.providerCredentials && typeof raw.providerCredentials === 'object' ? raw.providerCredentials : {})];
   const rotating = records.some(record => record && typeof record === 'object' && Object.keys((record as { accountAuth?: object }).accountAuth ?? {}).length > 0);
   if (!rotating) return;
-  let owner: string | undefined;
-  try { owner = fs.realpathSync(primary); } catch { /* Missing primary cannot own rotating credentials. */ }
-  if (file.canonical !== owner) throw new ConfigInputError('account-owner', file.path);
+  const owners = primary.flatMap(filePath => {
+    try { return [fs.realpathSync(filePath)]; } catch { return []; }
+  });
+  if (!file.canonical || !owners.includes(file.canonical)) throw new ConfigInputError('account-owner', file.path);
 }

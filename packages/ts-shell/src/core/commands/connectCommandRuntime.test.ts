@@ -1,5 +1,5 @@
 import { accountToken } from '../../test-utils/oauth.js';
-import { readRuntimeConfigEditAt } from "../../config/runtimeConfig.js";
+import { readRuntimeConfigEditAt, getUserAuthPath } from '../../config/runtimeConfig.js';
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -102,7 +102,7 @@ describe("connect command runtime", () => {
     expect(result.kind).toBe("local");
     expect(result.output).toContain("Connected provider openai-compatible");
 
-    const configPath = getUserRuntimeConfigPath();
+    const configPath = getUserAuthPath();
     const stored = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
       provider?: string;
       activeProviderConnectionId?: string;
@@ -414,7 +414,7 @@ describe("connect command runtime", () => {
     expect(result.output).toContain("Connected provider openai-compatible");
     expect(result.output).toContain("legacy compatibility path");
 
-    const configPath = getUserRuntimeConfigPath();
+    const configPath = getUserAuthPath();
     const stored = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
       provider?: string;
       activeProviderConnectionId?: string;
@@ -457,7 +457,7 @@ describe("connect command runtime", () => {
     expect(switched.kind).toBe("local");
     expect(switched.output).toContain("Provider: openai");
 
-    const configPath = getUserRuntimeConfigPath();
+    const configPath = getUserAuthPath();
     const stored = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
       provider?: string;
       activeProviderConnectionId?: string;
@@ -491,7 +491,7 @@ describe("connect command runtime", () => {
     );
     expect(result.output).toContain("pending -> connected");
 
-    const configPath = getUserRuntimeConfigPath();
+    const configPath = getUserAuthPath();
     const stored = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
       provider?: string;
       activeProviderConnectionId?: string;
@@ -533,7 +533,7 @@ describe("connect command runtime", () => {
     );
     expect(result.output).toContain("pending -> error");
 
-    const configPath = getUserRuntimeConfigPath();
+    const configPath = getUserAuthPath();
     const stored = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
       providerConnections?: Array<{ status?: string }>;
     };
@@ -552,7 +552,7 @@ describe("connect command runtime", () => {
     expect(result.output).toContain("OpenAI account-auth connected");
     expect(result.output).toContain("Connection type: account-auth");
 
-    const configPath = getUserRuntimeConfigPath();
+    const configPath = getUserAuthPath();
     const stored = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
       provider?: string;
       activeProviderConnectionId?: string;
@@ -655,7 +655,9 @@ describe("connect command runtime", () => {
   it.each(['delete', 'provider', 'duplicate', 'status', 'mirror'] as const)('rejects a native login when its pending owner changes: %s', async change => {
     __setOpenAIAccountAuthRunnerForTest(async () => {
       const result = await nativeLogin();
-      const file = getUserRuntimeConfigPath(), value = JSON.parse(fs.readFileSync(file, 'utf8')) as configStore.RuntimeConfigFile;
+      // Connections are the credential document's; a concurrent change to them
+      // is a change to that file.
+      const file = getUserAuthPath(), value = JSON.parse(fs.readFileSync(file, 'utf8')) as configStore.RuntimeConfigFile;
       const pending = value.providerConnections![0]!;
       if (change === 'delete') value.providerConnections = [];
       if (change === 'provider') value.providerConnections = [{ ...pending, provider: 'google' }];
@@ -672,10 +674,12 @@ describe("connect command runtime", () => {
   it('rechecks pending identity under the actual config lock before granting native credentials', async () => {
     __setOpenAIAccountAuthRunnerForTest(() => nativeLogin());
     const lock = store.withFileLock; let captures = 0;
+    // The pending connection is in the credential document, so that is the lock
+    // whose interior a concurrent writer can change.
     vi.spyOn(store, 'withFileLock').mockImplementation((name, run, options) => lock(name, () => {
-      if (name === `${getUserRuntimeConfigPath()}.lock` && ++captures === 2) {
-        const value = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
-        value.providerConnections[0].label = 'changed-during-lock'; fs.writeFileSync(getUserRuntimeConfigPath(), JSON.stringify(value));
+      if (name === `${getUserAuthPath()}.lock` && ++captures === 2) {
+        const value = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
+        value.providerConnections[0].label = 'changed-during-lock'; fs.writeFileSync(getUserAuthPath(), JSON.stringify(value));
       }
       return run();
     }, options));
@@ -771,8 +775,9 @@ describe("connect command runtime", () => {
     vi.spyOn(persistence, 'persistConfigEdit').mockImplementation((...args: Parameters<typeof persistence.persistConfigEdit>) => {
       const result = persist(...args);
       if (++writes === 2) {
-        const value = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8')); value.activeProviderConnectionId = 'another';
-        fs.writeFileSync(getUserRuntimeConfigPath(), JSON.stringify(value));
+        // The selection the verification reads is the credential document's.
+        const value = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8')); value.activeProviderConnectionId = 'another';
+        fs.writeFileSync(getUserAuthPath(), JSON.stringify(value));
       }
       return result;
     });

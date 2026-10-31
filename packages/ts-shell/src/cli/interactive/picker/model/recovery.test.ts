@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../../../../core/shell/runtimeContext.js';
 import { configurationAdmission } from '../../../../core/shell/configuration.js';
@@ -24,6 +24,9 @@ const catalogue = (plain = false) => writeCatalogCache([
   { id: 'relay', runtime: 'openai', baseUrl: 'https://relay.invalid/v1', models: [{ id: 'shared', contextWindow: 128000,
     reasoning: !plain, thinkingLevelMap: { high: null } }] },
 ]);
+function configBytes() {
+  return [getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+}
 beforeEach(() => {
   fs.mkdirSync('/tmp/cheers-test', { recursive: true }); root = fs.mkdtempSync('/tmp/cheers-test/model-recovery-');
   vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('OPENAI_API_KEY', '');
@@ -63,7 +66,7 @@ function prospective(commands: CommandContext) {
 
 it('selects the exact relay and compatible effort in one session transaction, retaining siblings and ordinary settings', async () => {
   const { runtime, commands } = host(); const original = readSessionModel(runtime.session.id)!;
-  const before = fs.readFileSync(getUserRuntimeConfigPath()); const { effort } = await recovery(commands);
+  const before = configBytes(); const { effort } = await recovery(commands);
   expect(effort.initialSelection).toBe('high');
   expect((await effort.load()).find(row => row.id === 'high')).toMatchObject({ disabled: true, focusable: true, note: expect.stringContaining('unsupported') });
   expect(readSessionModel(runtime.session.id)).toEqual(original);
@@ -73,7 +76,7 @@ it('selects the exact relay and compatible effort in one session transaction, re
   expect(readSessionModel(runtime.session.id)).toEqual({ ...sessionControls, connectionId: 'relay', thinkingEffort: 'medium' });
   const active = resolveProviderCredential({ runtimeConfig: runtime.runtimeConfig });
   expect(active).toMatchObject({ provider: 'openai', model: 'shared', baseUrl: 'https://relay.invalid/v1', thinkingEffort: 'medium', credential: { connectionId: 'relay' } });
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+  expect(configBytes()).toEqual(before);
 });
 
 it('offers provider-decides recovery for a model with no reasoning parameter and keeps explicit effort disabled', async () => {
@@ -93,11 +96,11 @@ it.each(['catalogue', 'configuration'] as const)('returns an expired prospective
     const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
     writeUserRuntimeConfigFile({ ...edit.value, topP: 0.8 }, edit);
   }
-  const before = fs.readFileSync(getUserRuntimeConfigPath()), result = await effort.apply(['medium']);
+  const before = configBytes(), result = await effort.apply(['medium']);
   expect(result?.note).toContain('expired'); expect(result?.next?.initialSelection).toBe(target);
   expect(result?.next?.status?.()).toContain(result!.note);
   expect(await effort.apply(['medium'])).toBeUndefined(); expect(await effort.load()).toEqual([]);
-  expect(readSessionModel(runtime.session.id)).toEqual(original); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+  expect(readSessionModel(runtime.session.id)).toEqual(original); expect(configBytes()).toEqual(before);
 });
 
 it.each((['close', 'replace'] as const).flatMap(ending => [false, true].map(refuse => ({ ending, refuse }))))(
@@ -163,7 +166,7 @@ it.each((['PreModelSwitch', 'PostModelSwitch'] as const).flatMap(eventName =>
   (['close', 'replace'] as const).map(ending => ({ eventName, ending }))))(
   'fences recovery writes and returns when $eventName causes host $ending', async ({ eventName, ending }) => {
     const { runtime, commands } = host(), { effort } = await recovery(commands), overlay = new OverlayHost(() => {});
-    const original = readSessionModel(runtime.session.id), config = fs.readFileSync(getUserRuntimeConfigPath());
+    const original = readSessionModel(runtime.session.id), config = configBytes();
     vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
       if (event.eventName === eventName) { if (ending === 'close') overlay.close(); else overlay.open(modelPicker(commands)); }
       return undefined;
@@ -180,7 +183,7 @@ it.each((['PreModelSwitch', 'PostModelSwitch'] as const).flatMap(eventName =>
         const { contextWindow: _window, ...controls } = original!;
         expect(readSessionModel(runtime.session.id)).toEqual({ ...controls, connectionId: 'relay', thinkingEffort: 'medium' });
       }
-      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+      expect(configBytes()).toEqual(config);
       expect(await effort.apply(['medium'])).toBeUndefined(); expect(await effort.load()).toEqual([]);
     } finally { overlay.close(); }
   });
@@ -192,7 +195,7 @@ it.each(['workspace', 'abort', 'throw'] as const)(
       if (completed && ending === 'throw') throw new Error('private browser diagnostic');
       return commands.admission();
     } });
-    const before = readSessionModel(runtime.session.id)!, config = fs.readFileSync(getUserRuntimeConfigPath());
+    const before = readSessionModel(runtime.session.id)!, config = configBytes();
     vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
       if (event.eventName === 'PostModelSwitch') {
         completed = true;
@@ -211,7 +214,7 @@ it.each(['workspace', 'abort', 'throw'] as const)(
       expect(result?.next).toBeUndefined();
       const { contextWindow: _window, ...controls } = before;
       expect(readSessionModel(runtime.session.id)).toEqual({ ...controls, connectionId: 'relay', thinkingEffort: 'medium' });
-      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+      expect(configBytes()).toEqual(config);
       expect(await effort.apply(['medium'])).toBeUndefined(); expect(await effort.load()).toEqual([]);
     } finally { overlay.close(); }
   });

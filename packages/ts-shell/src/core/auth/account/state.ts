@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG_FIELDS, getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt,
   type AccountAuthConfig, type RuntimeConfig, type RuntimeConfigFile } from '../../../config/runtimeConfig.js';
-import { persistConfigEdit, type ConfigEdit } from '../../../config/persistence.js';
+import { configEditStorage, persistConfigEdit, type ConfigEdit } from '../../../config/persistence.js';
 import { ConfigWriteError } from '../../../config/outcome.js';
 import { normalizeConnectionId, sameValue } from '../../../config/values.js';
 import { resolveProviderCredential, type ProviderCredentialResolution } from '../../shell/providerCredentials.js';
@@ -29,13 +29,14 @@ export interface AccountEdit {
 }
 
 function authority(source: string, target: string): boolean {
-  try { return path.resolve(getUserRuntimeConfigPath()) === source && fs.realpathSync(source) === target; }
+  try { return path.resolve(getUserRuntimeConfigPath()) === source
+    && (fs.existsSync(source) ? fs.realpathSync(source) : source) === target; }
   catch { return false; }
 }
 
 function snapshot(workspaceRoot: string, selected: ProviderCredentialResolution, sessionId?: string): Snapshot {
   const source = path.resolve(getUserRuntimeConfigPath());
-  const edit = readRuntimeConfigEditAt(fs.realpathSync(source));
+  const edit = readRuntimeConfigEditAt(fs.existsSync(source) ? fs.realpathSync(source) : source);
   const config = getRuntimeConfig(workspaceRoot);
   if (!config.configValidation.valid || !authority(source, edit.path) || readRuntimeConfigEditAt(edit.path).revision !== edit.revision) {
     throw new ConfigWriteError('conflict', 'unchanged');
@@ -121,7 +122,7 @@ export function accountBinding(edit: AccountEdit, accountAuth = edit.resolution.
   const { resolution, snapshot: captured } = edit;
   const { accessToken: _access, refreshToken: _refresh, expiresAt: _expiry, ...metadata } = accountAuth;
   const expected = { ...resolution, credential: { ...resolution.credential!, accountAuth } };
-  return { owner: credentialDigest([captured.source, captured.edit.path, resolution.provider, resolution.credential?.source,
+  return { owner: credentialDigest([captured.source, captured.edit.path, configEditStorage(captured.edit), resolution.provider, resolution.credential?.source,
     resolution.credential?.connectionId, edit.mirror, resolution.baseUrl ?? resolution.credential?.baseUrl, metadata]),
     generation: accountGeneration(accountAuth),
     storage: credentialDigest([selectors(rotated(edit, accountAuth), resolution.provider), identity(expected)]) };
@@ -133,6 +134,7 @@ export function readAccountRotation(edit: AccountEdit): AccountAuthConfig | unde
 }
 
 export function readAccountRotationReceipt(edit: AccountEdit): AccountRotation | undefined {
+  configEditStorage(edit.snapshot.edit);
   const current = snapshot(edit.workspaceRoot, edit.resolution, edit.sessionId);
   const original = edit.resolution.credential?.accountAuth;
   const accountAuth = current.resolution.credential?.accountAuth;

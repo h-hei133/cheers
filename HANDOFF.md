@@ -1424,3 +1424,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: `src/cli/print/*` fails with `Build inputs changed after the build (<hash>). Run npm run build:ts.` while the source compiles.
 - **Root Cause**: Those tests spawn `dist/cli.js`, which verifies its own input digest against the tree.
 - **Rule**: Run `npm run build` after any source change before running them; treat the digest mismatch as a stale artifact rather than a product failure, and do not edit the assertion to accept the stale build.
+
+### Credential Migration Must Preserve Before Removing And Bind Every Source
+
+- **Symptom**: Splitting settings from credentials loses the sole credential on a second-write failure, revives a deleted legacy key, moves unknown auth data into settings, or saves to a fallback ignored by the runtime.
+- **Root Cause**: A logical configuration has two independently selected paths. Saving settings first removes the source before its destination is verified; a merged-value baseline alone does not retain each document's presence or canonical owner. Locks do not fence readers or nonparticipating editors.
+- **Rule**: Capture both selected paths, existence and canonical destinations. Recheck them under locks and around publication; write and verify auth before stripping legacy fields. Preserve unknown auth-owned data in auth, remove all copies on intentional deletion, and protect unchanged credential siblings regardless of settings writes. Receipts must use the same storage fence as writes. Verify both physical files in cancellation fixtures. Report interrupted publication as unknown; never promise cross-file crash atomicity.
+
+### Resource Inspection Must Exclude Process Arguments
+
+- **Symptom**: Inspecting memory usage prints a credential passed in a background service's command line.
+- **Root Cause**: A broad process listing includes full arguments instead of only identity and resource fields.
+- **Rule**: Use process names, PID, state and RSS for resource checks; never include `args` or `command` fields. Do not repeat a credential accidentally exposed by a diagnostic.

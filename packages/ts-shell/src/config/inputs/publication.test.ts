@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getRuntimeConfig, getUserRuntimeConfigPath } from '../runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath } from '../runtimeConfig.js';
 import { createConfigInputs } from './selection.js';
 import { createShellRuntimeContext, refreshShellRuntimeConfig, switchActiveSession } from '../../core/shell/runtimeContext.js';
 import { configurationAdmission } from '../../core/shell/configuration.js';
@@ -17,11 +17,12 @@ import { runConnectCommand } from '../../core/commands/connectCommandRuntime.js'
 let root: string;
 let file: string;
 let user: string;
+let authFile: string;
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'config-input-publication-'));
   vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_MAX_TURNS', '');
   file = path.join(root, 'overlay.json'); fs.writeFileSync(file, '{"maxTurns":31,"theme":"dark"}');
-  user = getUserRuntimeConfigPath(); fs.mkdirSync(path.dirname(user), { recursive: true }); fs.writeFileSync(user, '{/* keep */"maxTurns":11}');
+  user = getUserRuntimeConfigPath(); authFile = getUserAuthPath(); fs.mkdirSync(path.dirname(user), { recursive: true }); fs.writeFileSync(user, '{/* keep */"maxTurns":11}');
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 function fixture() {
@@ -155,7 +156,8 @@ it.each(['use', 'login', 'logout'])('reports primary storage and the overlay sti
   expect(shell.runtimeConfig.activeProviderConnectionId).toBe('overlay');
   expect(shell.runtimeConfig.providerConnections.map(item => item.id)).toEqual(['overlay']);
   expect(fs.readFileSync(file)).toEqual(bytes);
-  const stored = JSON.parse(fs.readFileSync(user, 'utf8'));
+  // Connections and the active selection live in the credential document.
+  const stored = JSON.parse(fs.readFileSync(authFile, 'utf8'));
   if (action === 'use') expect(stored.activeProviderConnectionId).toBe('beta');
   else if (action === 'logout') expect(stored.providerConnections.some((item: { id: string }) => item.id === 'beta')).toBe(false);
   else expect(stored.providerConnections[0].apiKey).toBe('synthetic-new-private');

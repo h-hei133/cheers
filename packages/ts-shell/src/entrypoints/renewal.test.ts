@@ -20,7 +20,7 @@ let root: string;
 let file: string;
 const old = { type: 'openai-chatgpt-account' as const, accessToken: 'old-test', refreshToken: 'refresh-test', expiresAt: 1, accountId: 'a' };
 const fresh = { ...old, accessToken: accountToken('fresh-test'), refreshToken: 'rotated-test', expiresAt: Date.now() + 3600000 };
-function write(value: RuntimeConfigFile) { fs.writeFileSync(file, JSON.stringify(value)); }
+function write(value: RuntimeConfigFile) { fs.writeFileSync(file, JSON.stringify(value), { mode: 0o600 }); }
 function read(): RuntimeConfigFile { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 function nativeExchange(change: () => void = () => {}) {
   const exchange = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
@@ -37,7 +37,7 @@ function nativeExchange(change: () => void = () => {}) {
 beforeEach(() => {
   vi.spyOn(Date, 'now').mockReturnValue(fresh.expiresAt - 3600000);
   home = fs.mkdtempSync(path.join(os.tmpdir(), 'invocation-renewal-')); root = path.join(home, 'workspace');
-  fs.mkdirSync(root); fs.mkdirSync(path.join(home, '.cheers')); file = path.join(home, '.cheers', 'config.json');
+  fs.mkdirSync(root); fs.mkdirSync(path.join(home, '.cheers')); file = path.join(home, '.cheers', 'auth.json');
   vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
   write({ provider: 'openai', activeProviderConnectionId: 'a', providerConnections: [{ id: 'a', provider: 'openai',
     authType: 'account-auth', accountAuth: { openai: old }, model: 'probe', status: 'connected' }] });

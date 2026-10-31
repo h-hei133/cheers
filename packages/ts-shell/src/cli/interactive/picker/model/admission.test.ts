@@ -4,7 +4,7 @@ import { modelPicker } from '../model.js';
 import { catalogueDetailSource, modelDetailsPicker, type ModelDetailAction, type ModelDetailSource,
   type ModelDetailView } from './details.js';
 import { SessionManager } from '../../../../session/SessionManager.js';
-import { getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
+import { getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { readSessionModelEdit } from '../../../../session/model/state.js';
 import { OverlayHost, type Picker } from '../../overlay.js';
@@ -15,6 +15,9 @@ const context = () => ({ cwd: root, projectRoot: root, sessionId });
 const target = `model:${JSON.stringify([null, 'relay', 'shared'])}`;
 const catalogue = (baseUrl = 'https://original.invalid/v1') => writeCatalogCache([{ id: 'relay', runtime: 'openai',
   baseUrl, models: [{ id: 'shared' }] }]);
+function configBytes() {
+  return [getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+}
 beforeEach(() => {
   fs.mkdirSync('/tmp/cheers-test', { recursive: true }); root = fs.mkdtempSync('/tmp/cheers-test/model-admission-');
   vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('OPENAI_API_KEY', '');
@@ -108,10 +111,10 @@ it('rebuilds the actual relay key path from a changed catalogue before configuri
   const signIn = vi.fn(); const picker = modelPicker(context(), undefined, undefined, undefined, undefined, signIn);
   await picker.load(); const details = (await picker.inspect!(target))!.next!; await details.load();
   catalogue('https://replacement.invalid/v1');
-  const before = fs.readFileSync(getUserRuntimeConfigPath()), state = readSessionModelEdit(sessionId);
+  const before = configBytes(), state = readSessionModelEdit(sessionId);
   const result = await details.apply(['configure']);
   expect(result?.note).toBeUndefined(); expect(result?.next?.input?.masked).toBe(true);
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(state);
+  expect(configBytes()).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(state);
   expect(signIn).not.toHaveBeenCalled();
 });
 
@@ -147,11 +150,11 @@ it.each(['refuse', 'abort', 'throw'] as const)('does not return a refused detail
     return 'Workspace changed.';
   } }, undefined, undefined, undefined, undefined, signIn);
   await picker.load(); const details = (await picker.inspect!(target))!.next!; await details.load(); armed = true;
-  const before = fs.readFileSync(getUserRuntimeConfigPath()), state = readSessionModelEdit(sessionId);
+  const before = configBytes(), state = readSessionModelEdit(sessionId);
   const result = await details.apply(['configure']);
   expect(result?.note).toContain('expired'); expect(result?.next).toBeUndefined(); expect(result?.draft).toBeUndefined();
   expect(reads).toBe(2); expect(await details.apply(['configure'])).toBeUndefined(); expect(await details.load()).toEqual([]);
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(state);
+  expect(configBytes()).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(state);
   expect(signIn).not.toHaveBeenCalled();
 });
 
@@ -163,7 +166,7 @@ it.each(['configure', 'account', 'connection'] as const)('returns to fresh model
     actions: [{ id: action, label: action, run: callback }] };
   const details = modelDetailsPicker(detailSource({ back, actions: initial.actions, canReturn: () => true,
     refresh: async () => { if (++refreshes > 1) throw new Error('private diagnostic'); return initial; } }));
-  const host = new OverlayHost(() => {}), before = fs.readFileSync(getUserRuntimeConfigPath()), state = readSessionModelEdit(sessionId);
+  const host = new OverlayHost(() => {}), before = configBytes(), state = readSessionModelEdit(sessionId);
   host.open(details); await new Promise(resolve => setTimeout(resolve, 0));
   let result: Awaited<ReturnType<typeof details.apply>>;
   try {
@@ -177,7 +180,7 @@ it.each(['configure', 'account', 'connection'] as const)('returns to fresh model
     expect(result!.next?.initialSelection).toBe(target); expect(result!.next?.status?.()).toContain(result!.note);
     expect(await details.apply([action])).toBeUndefined(); expect(await details.load()).toEqual([]);
     expect(callback).not.toHaveBeenCalled();
-    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(state);
+    expect(configBytes()).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(state);
   } finally { host.close(); }
 });
 
@@ -209,7 +212,7 @@ it.each(['configure', 'account', 'connection'] as const)(
     const details = modelDetailsPicker(detailSource({ back, canReturn: () => true,
       actions: [{ id: action, label: action, run: callback }],
       admission: () => { throw new Error('private admission diagnostic'); } }));
-    const host = new OverlayHost(() => {}), before = fs.readFileSync(getUserRuntimeConfigPath()), state = readSessionModelEdit(sessionId);
+    const host = new OverlayHost(() => {}), before = configBytes(), state = readSessionModelEdit(sessionId);
     host.open(details); await new Promise(resolve => setTimeout(resolve, 0));
     let accepted!: ReturnType<typeof details.apply>;
     try {
@@ -222,7 +225,7 @@ it.each(['configure', 'account', 'connection'] as const)(
       host.open(result!.next!); await new Promise(resolve => setTimeout(resolve, 0));
       expect(host.active).toBe(true); expect(await details.apply([action])).toBeUndefined();
       expect(await details.load()).toEqual([]); expect(callback).not.toHaveBeenCalled();
-      expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(state);
+      expect(configBytes()).toEqual(before); expect(readSessionModelEdit(sessionId)).toEqual(state);
     } finally { host.close(); }
   });
 

@@ -135,6 +135,9 @@ it('rejects another rotating account-auth owner while allowing the canonical pri
   expect(() => getRuntimeConfig(root, undefined, inputs([other]))).toThrow(/account-owner/);
   fs.writeFileSync(user, JSON.stringify(values));
   expect(getRuntimeConfig(root, undefined, inputs([user])).providerCredentials.openai?.accountAuth?.openai?.refreshToken).toBe('synthetic-refresh');
+  const ownedAuth = path.join(path.dirname(user), 'auth.json');
+  fs.writeFileSync(ownedAuth, JSON.stringify(values), { mode: 0o600 });
+  expect(getRuntimeConfig(root, undefined, inputs([ownedAuth])).providerCredentials.openai?.accountAuth?.openai?.refreshToken).toBe('synthetic-refresh');
 });
 
 it('binds explicit inputs to their captured profile across asynchronous scopes', () => {

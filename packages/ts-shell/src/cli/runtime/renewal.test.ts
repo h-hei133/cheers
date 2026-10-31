@@ -47,10 +47,10 @@ let received: { authorization?: string; stored: boolean }[];
 const old = { type: 'openai-chatgpt-account' as const, accessToken: 'old-test', refreshToken: 'refresh-test', expiresAt: 1, accountId: 'a' };
 const fresh = { ...old, accessToken: accountToken('fresh-test', 'a'), refreshToken: 'rotated-test', expiresAt: Date.now() + 3600000 };
 function read(): RuntimeConfigFile { return JSON.parse(fs.readFileSync(file, 'utf8')); }
-function write(value: RuntimeConfigFile) { fs.writeFileSync(file, JSON.stringify(value)); }
+function write(value: RuntimeConfigFile) { fs.writeFileSync(file, JSON.stringify(value), { mode: 0o600 }); }
 beforeEach(async () => {
   home = fs.mkdtempSync(path.join(os.tmpdir(), 'summary-renewal-')); root = path.join(home, 'workspace');
-  fs.mkdirSync(root); fs.mkdirSync(path.join(home, '.cheers')); file = path.join(home, '.cheers', 'config.json');
+  fs.mkdirSync(root); fs.mkdirSync(path.join(home, '.cheers')); file = path.join(home, '.cheers', 'auth.json');
   vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
   sessionManager = new SessionManager({ storageDir: path.join(home, '.cheers', 'sessions') });
   sessionManager.createNewWithId('summary-renewal', root);
@@ -67,7 +67,8 @@ beforeEach(async () => {
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('Missing local address');
   accountWire(`http://127.0.0.1:${address.port}`);
   baseUrl = 'https://chatgpt.com/backend-api';
-  write({ provider: 'openai', activeProviderConnectionId: 'a', offline: false,
+  fs.writeFileSync(path.join(home, '.cheers', 'config.json'), JSON.stringify({ offline: false }));
+  write({ provider: 'openai', activeProviderConnectionId: 'a',
     providerConnections: [{ id: 'a', provider: 'openai', authType: 'account-auth', accountAuth: { openai: old },
       baseUrl, model: 'probe', status: 'connected' }] });
 });

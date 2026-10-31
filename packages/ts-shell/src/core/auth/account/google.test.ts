@@ -13,7 +13,7 @@ import { loginOpenAIAccountViaAuthorizationCodeFlow } from '../../commands/opena
 import { openAIOAuthConfig } from '../oauth/providers.js';
 import { endpointShape, endpointUrl } from '../../../provider/endpoints/index.js';
 import { createProfileContext, withProfile } from '../../paths/profile/context.js';
-import { getRuntimeConfig, getUserRuntimeConfigPath, type RuntimeConfigFile } from '../../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, type RuntimeConfigFile } from '../../../config/runtimeConfig.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
 import { googleProviderAuthContract } from '../../commands/googleAccountAuth.js';
 import { runProviderAccountAuthLogin } from '../providerAuthRuntime.js';
@@ -179,7 +179,7 @@ async function storedLogin(workspace: string): Promise<void> {
   } finally { login.mockRestore(); }
 }
 
-function storedConfig(): RuntimeConfigFile { return JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8')); }
+function storedConfig(): RuntimeConfigFile { return JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8')); }
 function storedResolution(workspace: string): ProviderCredentialResolution {
   return resolveProviderCredential({ runtimeConfig: getRuntimeConfig(workspace), env: {} });
 }
@@ -217,14 +217,14 @@ describe('stored Google native login and renewal', () => {
 
   it.each(['openid email', scope])('keeps changed grant %s unknown after one HTTP, without storage or replay', async granted => {
     await inProfile(async workspace => {
-      await storedLogin(workspace); const captured = storedResolution(workspace), before = fs.readFileSync(getUserRuntimeConfigPath());
+      await storedLogin(workspace); const captured = storedResolution(workspace), before = fs.readFileSync(getUserAuthPath());
       const fetchImpl = vi.fn(async () => Response.json({ access_token: 'synthetic-untrusted', refresh_token: 'synthetic-untrusted-refresh',
         expires_in: 3600, scope: granted })) as unknown as typeof fetch;
       for (let attempt = 0; attempt < 2; attempt++) {
         const result = await renewStoredAccount({ workspaceRoot: workspace, resolution: captured, fetchImpl });
         expect(result).toMatchObject({ stored: false, writeState: 'unchanged' }); expect(result.accountAuth).toBeUndefined(); expect(result.rotation).toBeUndefined();
       }
-      expect(fetchImpl).toHaveBeenCalledOnce(); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+      expect(fetchImpl).toHaveBeenCalledOnce(); expect(fs.readFileSync(getUserAuthPath())).toEqual(before);
       const attempts = Object.values(leaseFor(captured).attempts);
       expect(attempts).toEqual([expect.objectContaining({ phase: 'unknown' })]); expect(attempts[0]?.production).toBeUndefined();
     });
@@ -237,14 +237,14 @@ describe('stored Google native login and renewal', () => {
         const config = storedConfig(), connection = config.providerConnections![0]!;
         const account = { ...connection.accountAuth!.google!, ...(field === 'scopes' ? { scopes: [scope] } : { [field]: 'synthetic-other' }) };
         connection.accountAuth = { google: account }; config.providerCredentials!.google!.accountAuth = { google: account };
-        fs.writeFileSync(getUserRuntimeConfigPath(), JSON.stringify(config)); edited = fs.readFileSync(getUserRuntimeConfigPath());
+        fs.writeFileSync(getUserAuthPath(), JSON.stringify(config), { mode: 0o600 }); edited = fs.readFileSync(getUserAuthPath());
         return Response.json({ access_token: 'synthetic-next', refresh_token: 'synthetic-rotated', expires_in: 3600 });
       }) as unknown as typeof fetch;
       for (let attempt = 0; attempt < 2; attempt++) {
         const result = await renewStoredAccount({ workspaceRoot: workspace, resolution: captured, fetchImpl });
         expect(result).toMatchObject({ stored: false, writeState: 'unchanged' }); expect(result.accountAuth).toBeUndefined(); expect(result.rotation).toBeUndefined();
       }
-      expect(fetchImpl).toHaveBeenCalledOnce(); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(edited);
+      expect(fetchImpl).toHaveBeenCalledOnce(); expect(fs.readFileSync(getUserAuthPath())).toEqual(edited);
       expect(Object.values(leaseFor(captured).attempts)).toEqual([expect.objectContaining({ phase: 'unknown' })]);
     });
   });

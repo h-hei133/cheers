@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getUserRuntimeConfigPath, readUserRuntimeConfigFile, writeUserRuntimeConfigFile } from './runtimeConfig.js';
+import { userAuthPath } from './documents.js';
 import { patchConfigDocument } from './patch.js';
 
 describe('configuration source syntax', () => {
@@ -51,19 +52,30 @@ describe('configuration source syntax', () => {
   });
 
   it('changes only the requested scalar while preserving comments, BOM, CRLF and placeholders', () => {
-    const before = '\uFEFF{\r\n  // preferences\r\n  "theme" : "dark", /* sibling */ "unknown": { "keep": 1e2 },\r\n  "providerCredentials": { "openai": { "apiKey": "${MISSING_SYNTAX_SECRET}" } },\r\n}\r\n';
+    // The credential field now lives in its own document. Saving a setting must
+    // leave that document alone, and the setting's own file must keep its bytes
+    // apart from the one value that changed.
+    const before = '\uFEFF{\r\n  // preferences\r\n  "theme" : "dark", /* sibling */ "unknown": { "keep": 1e2 },\r\n}\r\n';
+    const authBefore = '{\n  // credentials\n  "providerCredentials": { "openai": { "apiKey": "${MISSING_SYNTAX_SECRET}" } }\n}\n';
     fs.writeFileSync(file, before);
+    fs.writeFileSync(userAuthPath(), authBefore);
     writeUserRuntimeConfigFile({ theme: 'light' }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(fs.readFileSync(file, 'utf8')).toBe(before.replace('"dark"', '"light"'));
+    expect(fs.readFileSync(userAuthPath(), 'utf8')).toBe(authBefore);
     expect(readUserRuntimeConfigFile().providerCredentials?.openai?.apiKey).toBe('${MISSING_SYNTAX_SECRET}');
   });
 
   it('preserves untouched nested and array-entry comments during a connection edit', () => {
-    const before = '{"providerConnections":[/* first */{"id":"a","provider":"openai","label":"old"},/* second */{"id":"b","provider":"openai"}],"tui":{"diagrams":"off",/* status */"statusItems":["model"]}}';
-    fs.writeFileSync(file, before);
+    // Connections live in the credential document, so that is where the edit
+    // lands and where the untouched comments must survive.
+    const settingsBefore = '{"tui":{"diagrams":"off",/* status */"statusItems":["model"]}}';
+    const authBefore = '{"providerConnections":[/* first */{"id":"a","provider":"openai","label":"old"},/* second */{"id":"b","provider":"openai"}]}';
+    fs.writeFileSync(file, settingsBefore);
+    fs.writeFileSync(userAuthPath(), authBefore);
     const config = readUserRuntimeConfigFile();
     writeUserRuntimeConfigFile({ ...config, providerConnections: config.providerConnections!.map(connection => connection.id === 'a' ? { ...connection, label: 'new' } : connection) }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
-    expect(fs.readFileSync(file, 'utf8')).toBe(before.replace('"old"', '"new"'));
+    expect(fs.readFileSync(userAuthPath(), 'utf8')).toBe(authBefore.replace('"old"', '"new"'));
+    expect(fs.readFileSync(file, 'utf8')).toBe(settingsBefore);
   });
 
   it('preserves no-op bytes and mtime', () => {

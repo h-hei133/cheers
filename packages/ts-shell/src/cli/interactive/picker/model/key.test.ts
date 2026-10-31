@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../../../session/SessionManager.js';
-import { getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
+import { getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
 import { runConnectCommand } from '../../../../core/commands/connectCommandRuntime.js';
@@ -16,6 +16,9 @@ import { connectionEndpoint } from '../connections.js';
 
 let home: string, sessionId: string;
 const context = () => ({ cwd: home, projectRoot: home, sessionId });
+function configBytes() {
+  return [getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+}
 beforeEach(() => {
   fs.mkdirSync('/tmp/cheers-test', { recursive: true }); home = fs.mkdtempSync('/tmp/cheers-test/model-key-');
   vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
@@ -64,13 +67,13 @@ it.each([undefined, 'advisor'] as const)('saves the exact relay key and returns 
 });
 
 it('cancels a masked key through Escape without invoking the credential owner or changing files', async () => {
-  const signIn = vi.fn(); const original = fs.readFileSync(getUserRuntimeConfigPath());
+  const signIn = vi.fn(); const original = configBytes();
   const form = modelKeyPicker(context(), 'openai', { model: 'relay-model', label: 'custom' }, signIn, current => modelPicker(current));
   const overlay = new OverlayHost(() => {}); overlay.open(form); await new Promise(resolve => setTimeout(resolve, 0));
   overlay.handlePaste('synthetic-discard-key'); overlay.handleKey(parseKeyEvent('\x1b'), vi.fn());
   await new Promise(resolve => setTimeout(resolve, 0)); expect(overlay.active).toBe(true);
   expect(await form.input!.apply('synthetic-discard-key')).toBeUndefined();
-  expect(signIn).not.toHaveBeenCalled(); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original); overlay.close();
+  expect(signIn).not.toHaveBeenCalled(); expect(configBytes()).toEqual(original); overlay.close();
 });
 
 it('removes endpoint credentials before key submission and expires actions when the catalogue changes', async () => {
@@ -78,10 +81,10 @@ it('removes endpoint credentials before key submission and expires actions when 
     .toBe('https://relay.example.invalid/v1');
   expect(connectionEndpoint('file:///secret')).toBeUndefined();
   const signIn = vi.fn(); const form = modelKeyPicker(context(), 'openai', { model: 'relay-model', label: 'custom' }, signIn, current => modelPicker(current));
-  await form.load(); const original = fs.readFileSync(getUserRuntimeConfigPath());
+  await form.load(); const original = configBytes();
   writeCatalogCache([{ id: 'custom', runtime: 'openai', baseUrl: 'https://changed.example.invalid/v1', models: [{ id: 'relay-model' }] }]);
   expect((await form.input!.apply('synthetic-expired-key'))?.note).toContain('expired');
-  expect(signIn).not.toHaveBeenCalled(); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+  expect(signIn).not.toHaveBeenCalled(); expect(configBytes()).toEqual(original);
 });
 
 it('does not reopen after the original key sign-in signal is cancelled during authentication', async () => {

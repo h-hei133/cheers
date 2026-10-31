@@ -19,7 +19,10 @@ const connection = (id: string, label = id): config.ProviderConnectionConfig => 
 const context = (): CommandContext => ({ cwd: root, sessionId: 's' });
 const read = () => config.readRuntimeConfigEditAt(config.getUserRuntimeConfigPath());
 function save(values: config.RuntimeConfigFile) { config.writeUserRuntimeConfigFile(values, read()); }
-function bytes() { return fs.readFileSync(config.getUserRuntimeConfigPath(), 'utf8'); }
+function bytes() {
+  return JSON.stringify([config.getUserRuntimeConfigPath(), config.getUserAuthPath()]
+    .map(file => fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null));
+}
 async function select(picker: Picker, id: string): Promise<Picker> {
   await picker.load();
   return (await picker.apply([id]))!.next!;
@@ -162,8 +165,8 @@ describe('authentication chooser boundaries', () => {
   });
 
   it('disables ambiguous and unsafe saved connection identities without exposing unsafe labels', async () => {
-    fs.writeFileSync(config.getUserRuntimeConfigPath(), JSON.stringify({ providerConnections:
-      [connection('duplicate'), connection('duplicate'), connection('bad\x1b[31m', 'Bearer synthetic-secret\x1b[31m')] }));
+    fs.writeFileSync(config.getUserAuthPath(), JSON.stringify({ providerConnections:
+      [connection('duplicate'), connection('duplicate'), connection('bad\x1b[31m', 'Bearer synthetic-secret\x1b[31m')] }), { mode: 0o600 });
     const picker = authPicker(context(), 'logout'), rows = await picker.load();
     expect(rows.every(row => row.disabled)).toBe(true);
     expect(JSON.stringify(rows)).not.toMatch(/synthetic-secret|\\u001b/);

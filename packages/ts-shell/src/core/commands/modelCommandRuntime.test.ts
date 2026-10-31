@@ -1,4 +1,4 @@
-import { readRuntimeConfigEditAt } from "../../config/runtimeConfig.js";
+import { readRuntimeConfigEditAt, getUserAuthPath } from "../../config/runtimeConfig.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -117,9 +117,13 @@ describe("model command runtime", () => {
     });
     const result = await runModelCommand(['use', 'new-model', '--global'], { cwd: workspaceRoot });
     expect(result.output).toContain('Global default stored at');
+    // The setting stays in the settings document; the connection it selected is
+    // the credential document's, and both are confirmed separately.
     const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     expect(saved.theme).toBe('light');
-    expect(saved.providerConnections[0].model).toBe('new-model');
+    expect(saved.providerConnections).toBeUndefined();
+    const credential = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
+    expect(credential.providerConnections[0].model).toBe('new-model');
   });
 
   it('reports conflict when an awaited hook changes the active connection', async () => {
@@ -128,18 +132,20 @@ describe("model command runtime", () => {
     const connections = [...base.values.providerConnections!, { id: 'other', provider: 'openai' as const, model: 'other-model' }];
     writeUserRuntimeConfigFile({ providerConnections: connections }, base);
     let external: string;
+    // The active connection is the credential document's, so a concurrent
+    // change to it is a change to that file.
     vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
       if (event.eventName === 'PreModelSwitch') {
-        const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+        const raw = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
         external = JSON.stringify({ ...raw, activeProviderConnectionId: 'other' });
-        fs.writeFileSync(file, external);
+        fs.writeFileSync(getUserAuthPath(), external);
       }
       return undefined;
     });
     const result = await runModelCommand(['use', 'new-model', '--global'], { cwd: workspaceRoot });
     expect(result.output).toContain('conflict: this attempt did not write');
     expect(result.output).not.toContain('Global default stored at');
-    expect(fs.readFileSync(file, 'utf8')).toBe(external!);
+    expect(fs.readFileSync(getUserAuthPath(), 'utf8')).toBe(external!);
   });
 
   it("explains missing active connection", async () => {
@@ -236,8 +242,9 @@ describe("model command runtime", () => {
     expect(result.kind).toBe("local");
     expect(result.output).toContain("Model switched to gpt-5.4");
 
+    // The selection and the connections are the credential document's.
     const stored = JSON.parse(
-      fs.readFileSync(getUserRuntimeConfigPath(), "utf8"),
+      fs.readFileSync(getUserAuthPath(), "utf8"),
     ) as {
       activeProviderConnectionId?: string;
       providerConnections?: Array<{ id: string; model?: string }>;

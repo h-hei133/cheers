@@ -3,13 +3,16 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
-import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
 import * as persistence from '../../config/persistence.js';
 import * as transport from '../../provider/request/fetch.js';
 import { delegatedSteps } from './step.js';
 
 const servers: http.Server[] = [];
+function configBytes() {
+  return [getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+}
 const old = { type: 'openai-chatgpt-account' as const, accountId: 'b', accessToken: 'synthetic-old', refreshToken: 'synthetic-refresh', expiresAt: 1 };
 const fresh = { ...old, accessToken: accountToken('synthetic-fresh', 'b'), refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 };
 afterEach(async () => {
@@ -68,11 +71,11 @@ it('shares one verified rotation across two delegated models and sends only the 
 it('refuses an explicit foreign account endpoint before renewal', async () => {
   const setup = await fixture(true);
   const renew = observeOAuthRenewal(fresh);
-  const bytes = fs.readFileSync(getUserRuntimeConfigPath());
+  const bytes = configBytes();
   expect(() => setup.send()).toThrow(/usable credential/);
   expect(renew).not.toHaveBeenCalled(); expect(setup.published).not.toHaveBeenCalled();
   expect(setup.requests).toEqual([]);
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(bytes);
+  expect(configBytes()).toEqual(bytes);
 });
 
 it.each(['logout', 'relogin', 'topology'] as const)('cached renewal cannot survive %s and never sends a replacement owner', async kind => {
@@ -82,10 +85,10 @@ it.each(['logout', 'relogin', 'topology'] as const)('cached renewal cannot survi
   writeUserRuntimeConfigFile({ ...edit.values, providerConnections: kind === 'logout' ? connections.filter(row => row.id !== 'b')
     : kind === 'topology' ? [...connections, { id: 'c', provider: 'google', authType: 'api-key', apiKey: 'synthetic-c', status: 'connected' }]
       : connections.map(row => row.id === 'b' ? { ...row, accountAuth: { openai: { ...fresh, accountId: 'replacement', accessToken: 'synthetic-new-login' } } } : row) }, edit);
-  const bytes = fs.readFileSync(getUserRuntimeConfigPath());
+  const bytes = configBytes();
   await expect(setup.send()).rejects.toThrow();
   expect(renew).toHaveBeenCalledOnce(); expect(setup.requests).toEqual([]);
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(bytes);
+  expect(configBytes()).toEqual(bytes);
 });
 
 it('unverified persistence prevents delegated publication and HTTP', async () => {
