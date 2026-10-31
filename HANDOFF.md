@@ -1591,3 +1591,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A successful login prints endpoint passwords/query tokens/fragments, or a failed browser capture prints arbitrary exception content and invokes a thrown object's coercion.
 - **Root Cause**: Reporting interpolates stored raw URLs and untrusted errors despite existing endpoint projection and native-login failure boundaries.
 - **Rule**: Reuse the endpoint display owner and fixed untrusted capture failure reason; preserve the complete stored address, write-error propagation and pending/error outcome. Verify actual local callback plus activation/save-only. For error-stage byte invariance, capture after pending insertion because that writer may finish an existing preference migration; independently retain logical pre-login defaults checks.
+
+### Delegated Model Admission Must Recognize Transport Signers
+- **Symptom**: Director enablement and handoff arming reject a usable signed provider because its resolver has no static credential object.
+- **Root Cause**: Delegated admission equates static credential presence with the main request's authentication boundary, while the actual endpoint acquires credentials at dispatch.
+- **Rule**: Reject blocked/model mismatch first, then allow the existing issuer endpoint's signer without invoking it. Retain exact named-connection credential identity, pool restrictions and account model constraints. Verify actual resolver, command persistence/cancellation and non-signer/blocked refusal; selection is not proof that external signing credentials work.

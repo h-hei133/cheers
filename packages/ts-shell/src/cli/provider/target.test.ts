@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { delegatedTarget } from './target.js';
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { BUILTIN_PROVIDERS } from '../../core/models/catalog.js';
+import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
+import { executionChoice, sourceChoice } from './selection.js';
 import type { ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
 import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
 import { captureSummaryRole } from './summary.js';
@@ -38,6 +41,45 @@ it('rejects unsupported account-auth override and an unavailable provider instea
 
 it('supports an explicit bare delegated model only on the captured provider', () => {
   expect(delegatedTarget('review-model', main)).toMatchObject({ provider: 'openai', model: 'review-model', credential: { model: 'review-model', apiKey: main.credential!.apiKey } });
+});
+
+it.each(['bedrock', 'vertex'] as const)('admits captured %s signer targets without a static credential', provider => {
+  const baseUrl = provider === 'bedrock' ? 'https://bedrock-runtime.us-east-1.amazonaws.com'
+    : 'https://us-central1-aiplatform.googleapis.com/v1/projects/synthetic-project/locations/us-central1/publishers/google';
+  const config = { ...getRuntimeConfig(), provider, providerConnections: [], activeProviderConnectionId: undefined,
+    providerCredentials: { [provider]: { model: 'planner', baseUrl, thinkingEffort: null } } };
+  const captured = resolveProviderCredential({ runtimeConfig: config, env: {} });
+  expect(captured).toMatchObject({ provider, model: 'planner', baseUrl });
+  expect(captured.credential).toBeUndefined(); expect(captured.blocked).toBeUndefined();
+  const before = JSON.stringify([captured, config]);
+  for (const text of ['executor', `${provider}/executor`]) {
+    expect(delegatedTarget(text, captured, config, BUILTIN_PROVIDERS, 'current')).toMatchObject({ provider, model: 'executor', baseUrl });
+    expect(executionChoice(text, null, sourceChoice(process.cwd(), captured), captured, config, BUILTIN_PROVIDERS))
+      .toEqual({ provider, model: 'executor', thinkingEffort: null });
+  }
+  expect(JSON.stringify([captured, config])).toBe(before);
+});
+
+it.each(['bedrock', 'vertex'] as const)('does not use %s signer capability to bypass blocked or exact connection admission', provider => {
+  const baseUrl = 'https://generation.invalid';
+  const captured: ProviderCredentialResolution = { provider, model: 'planner', baseUrl, expectedEnvVarName: `${provider.toUpperCase()}_API_KEY` };
+  expect(() => delegatedTarget('executor', { ...captured, blocked: 'connection-unavailable' }, undefined, BUILTIN_PROVIDERS)).toThrow(/usable provider binding/);
+  expect(() => delegatedTarget('executor', { ...captured, blocked: 'connection-unavailable',
+    credential: { provider, apiKey: 'synthetic-blocked', authMode: 'api-key', source: 'config', envVarName: captured.expectedEnvVarName } },
+    undefined, BUILTIN_PROVIDERS)).toThrow(/usable provider binding/);
+  const connection = { id: 'missing-key', provider, baseUrl, model: 'planner', authType: 'api-key' as const,
+    status: 'connected' as const, createdAt: '2026-10-01', updatedAt: '2026-10-01' };
+  const config = { ...getRuntimeConfig(), provider, providerConnections: [connection], activeProviderConnectionId: connection.id, providerCredentials: {} };
+  expect(() => delegatedTarget('missing-key/executor', captured, config, BUILTIN_PROVIDERS)).toThrow(/no usable credential/);
+  expect(() => delegatedTarget('executor', captured, { ...config, accountPool: { [provider]: { connections: ['missing'] } } }, BUILTIN_PROVIDERS))
+    .toThrow(/usable provider binding/);
+});
+
+it('refuses credentialless non-signer targets even when their provider normally has a signer', () => {
+  const captured: ProviderCredentialResolution = { provider: 'bedrock', model: 'planner', baseUrl: 'https://generation.invalid', expectedEnvVarName: 'BEDROCK_API_KEY' };
+  const catalog = [{ id: 'bedrock', runtime: 'bedrock' as const, baseUrl: captured.baseUrl, endpoint: 'openai-compatible', models: [{ id: 'executor' }] }];
+  expect(() => delegatedTarget('executor', captured, undefined, catalog)).toThrow(/usable provider binding/);
+  expect(() => delegatedTarget('executor', { ...main, credential: undefined }, undefined, BUILTIN_PROVIDERS)).toThrow(/usable provider binding/);
 });
 
 it.each(['outside', 'missing', 'duplicate', 'foreign', 'endpoint'] as const)(

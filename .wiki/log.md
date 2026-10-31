@@ -11062,3 +11062,9 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：连接报告收敛凭据边界
 
 [addition24.27](features/phase-20-addition.md#2427-连接成功与捕获失败报告不带出凭据内容)API/browser成功原URL与失败异常正文八回归实际失败；复用endpoint显示与固定capture失败原因，完整存储、0600、偏好归属、默认及pending/error保持。Node20.3单worker串行3文件115项含实际local browser callback，反转8失败/精确恢复、五门/build当前摘要通过，manifest9743fd74bdbc，judge仅既有interactiveMode advisory、独立APPROVE/CLEAR。首次物理基线假设和门/judge调用setup已分类修正；source freshness审计无新缺陷，signer委派静态差异待另复现。f380f6f3代码CI已success，9975ac6e/953d677f/27931563仍in_progress；未真实provider/PTY/平台/全仓/20k，ADD-70 partial、goal active，清理/提交/推送/自身CI另绑。
+
+代码 `077d7978f58017c25a203eac60286cc7741b1a29` 已提交推送、远端main一致且交付后clean；CI `41215191300`最后in_progress，Watch `41215191257`success。
+
+### 2026-10-31：委派模型保留签名端点准入
+
+[addition24.28](features/phase-20-addition.md#2428-签名端点的委派模型准入与主请求一致)Bedrock/Vertex无static credential的目标、director on、handover arm六场景实际失败，blocked+credential两防护也失败。既有issuer endpoint的signer准入、先拒绝blocked/model mismatch；精确named ID/pool/account guard保持，不获取签名凭据。Node20.3单worker串行4文件78项，反转8失败/1控制通过/精确恢复、五门/build摘要匹配，manifesta91a9c4872e1，judge既有advisory、独立APPROVE/CLEAR。无外部AWS/ADC认证、PTY/平台/全仓/20k；ADD-70 partial、goal active，清理/提交/推送/自身CI另绑。

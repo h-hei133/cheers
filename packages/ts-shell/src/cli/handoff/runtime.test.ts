@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../session/SessionManager.js';
 import { ConfigState } from '../../config/state.js';
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { BUILTIN_PROVIDERS } from '../../core/models/catalog.js';
 import { configurationBinding } from '../../core/shell/configuration.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
@@ -68,6 +69,26 @@ async function command(args: string): Promise<string> {
     handoffCommand: handoffCommandFor(context, manager, runtime) });
   if (result?.kind !== 'local') throw new Error('Expected local handoff result.'); return result.output;
 }
+
+it.each(['bedrock', 'vertex'] as const)('arms and cancels a handoff on the captured %s signer without a static credential', async provider => {
+  const current = context.configuration.current;
+  const baseUrl = provider === 'bedrock' ? 'https://bedrock-runtime.us-east-1.amazonaws.com'
+    : 'https://us-central1-aiplatform.googleapis.com/v1/projects/synthetic-project/locations/us-central1/publishers/google';
+  const config = { ...current.config, provider, providerConnections: [], activeProviderConnectionId: undefined,
+    providerCredentials: { [provider]: { model: 'planner', baseUrl, thinkingEffort: null } } };
+  context.configuration = new ConfigState(config, current.binding, BUILTIN_PROVIDERS);
+  const captured = context.resolveConfigTarget!(config);
+  expect(captured).toMatchObject({ provider, model: 'planner', baseUrl }); expect(captured.credential).toBeUndefined();
+  const original = context.runtimeConfig;
+  expect(await command('arm executor')).toContain('armed for the next turn');
+  const row = new HandoffStore(manager, context.session).read().cycles[0]!;
+  expect(row).toMatchObject({ phase: 'armed', source: { provider, model: 'planner' }, target: { provider, model: 'executor' } });
+  expect(armedHandoffs.get(context)).toBe(row.id); expect(context.runtimeConfig).toBe(original);
+  expect(requests).toEqual([]); expect(approvals).toEqual([]);
+  expect(await command('off')).toContain('Pending handoff cancelled');
+  expect(new HandoffStore(manager, context.session).read().cycles[0]!.phase).toBe('cancelled');
+  expect(armedHandoffs.has(context)).toBe(false); expect(context.runtimeConfig).toBe(original); expect(requests).toEqual([]);
+});
 async function drive(signal = new AbortController().signal, extra: { readonly beforeApproval?: () => void; readonly failPersistence?: boolean } = {}) {
   const publication = context.configuration.current; const resolution = context.resolveConfigTarget!(publication.config);
   const handoff = handoffRunFor(context, manager, runtime, resolution, signal, () => undefined, () => {});

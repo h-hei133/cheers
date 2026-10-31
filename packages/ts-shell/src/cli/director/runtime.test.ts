@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../session/SessionManager.js';
 import { ConfigState } from '../../config/state.js';
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { BUILTIN_PROVIDERS } from '../../core/models/catalog.js';
 import { configurationBinding } from '../../core/shell/configuration.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
@@ -133,6 +134,26 @@ it('refuses director mode on a main model the catalogue says takes no tools', as
 
   expect(await command('on --model openai-compatible/vendor/executor')).toContain('requires a main model that accepts tool declarations');
   expect(liveDirectors.get(context)).toBeUndefined();
+});
+
+it.each(['bedrock', 'vertex'] as const)('enables a director on the captured %s signer without storing a placeholder key', async provider => {
+  const current = context.configuration.current;
+  const baseUrl = provider === 'bedrock' ? 'https://bedrock-runtime.us-east-1.amazonaws.com'
+    : 'https://us-central1-aiplatform.googleapis.com/v1/projects/synthetic-project/locations/us-central1/publishers/google';
+  const config = { ...current.config, provider, providerConnections: [], activeProviderConnectionId: undefined,
+    providerCredentials: { [provider]: { model: 'planner', baseUrl, thinkingEffort: null } } };
+  context.configuration = new ConfigState(config, current.binding, BUILTIN_PROVIDERS);
+  const captured = jobsFor(context)!.agentRuntimeInput!.providerRuntimeBridge.resolveCredentialSnapshot();
+  expect(captured).toMatchObject({ provider, model: 'planner', baseUrl }); expect(captured.credential).toBeUndefined();
+  const original = context.runtimeConfig;
+  expect(await command(`on --model ${provider}/executor`)).toContain('Director on');
+  const row = new DirectorStore(manager, context.session).read().cycles[0]!;
+  expect(row).toMatchObject({ phase: 'enabled', source: { provider, model: 'planner' }, worker: { provider, model: 'executor' } });
+  expect(jobsFor(context)!.agents.journal.list()).toEqual([]); expect(requests).toEqual([]); expect(approvals).toEqual([]);
+  expect(context.runtimeConfig).toBe(original);
+  expect(await command('off')).toContain('cleanup settled');
+  expect(new DirectorStore(manager, context.session).read().cycles[0]!.phase).toBe('disabled');
+  expect(context.runtimeConfig).toBe(original); expect(requests).toEqual([]);
 });
 
 it('refuses director mode when two catalogue entries claim the main endpoint', async () => {

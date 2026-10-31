@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.27 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier 与连接报告收敛已实施；最新代码 CI、签名端点委派准入的静态缺口、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.28 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5803,3 +5803,17 @@ build exit0，manifest `ef982b674f90`、inputsDigest `82d6aba4bec6af4140fe8ea483
 原生产源码反转实际 **8失败/60未选/exit1**，finally逐字节恢复，fixed SHA256 `09dc1056a5f3`；恢复后同115项通过。五静态门/diff exit0，118既有 docs-source advisory 保留。build `9743fd74bdbcb0d5dad6a795c48d960b9ca275cbd84b96a81ebf757c05f50ec2`，inputsDigest `668cd39b0edfb58388bf2eb9d73b6f95f80dad7516319d337ff7a7ee27c49872` 与当前输入匹配。正式适配 archive/member/vendor 核对后 judge exit0，环/解析 satisfied，partial仅既有 interactiveMode21/22-name advisory。最初门在 package cwd 缺 root script、judge profile 参数层级错误均按调用 setup 分类，修正后才计通过。独立只读复审 APPROVE/CLEAR；证据 `.omx/artifacts/phase20-addition-connect-report/`。
 
 另一只读审计确认 template/instruction/import/append/skill 的精确 raw-byte freshness 已实现且已有固定元数据回归，本批不重复修补。它还定位签名型 provider 的委派准入静态差异：main readiness允许 signer 无静态 credential，delegatedTarget却强制credential；尚未动态复现，留待单独验证，不称已修复。延迟读取 `f380f6f3` CI `41212017388` 已success；`9975ac6e`/`41213464205`、`953d677f`/`41213345904`、`27931563`/`41211798735`仍in_progress。本批无真实provider/PTY/非Linux/全仓/20k或旧发布binary验收，ADD-70 partial、goal active，提交/推送/自身CI另绑定。
+
+本批 `077d7978f58017c25a203eac60286cc7741b1a29` 已提交/推送，远端 main 精确一致、交付后 clean，scratch 已清理。自身 CI `41215191300` 最后 in_progress，Watch `41215191257` success；后续签名准入证据不替代此提交的 CI。
+
+### 24.28 签名端点的委派模型准入与主请求一致
+
+第24.27节静态差异已动态复现：[delegatedTarget](../../packages/ts-shell/src/cli/provider/target.ts) 强制静态 credential，实际 resolver 对 Bedrock/Vertex 的签名路径没有这个值；主 readiness 与 transport 已支持它。两个 provider 的目标解析/executionChoice、director on、handover arm 六条实际失败。两条人为构造 blocked+credential 防护场景也失败，属于边界防护而非声称真实 resolver 已产生该组合；非signer拒绝控制通过。
+
+修复仍在委派 target owner：先拒绝 blocked 与 model mismatch，再沿既有 issuer URL/endpoint 和 endpointShape 允许静态 credential 或实际 signer。命名连接必须有精确 credential.connectionId、pool拓扑/外部provider限制、account model allowlist保持；不在这里获取或复制 AWS/ADC 凭据、不生成占位 key、不调用 signer。准入表示允许进入既有传输路径，不证明其 principal 或外部认证有效。
+
+目标检查后定向只读 Pi：`providers/amazon-bedrock.ts:64-77` 与 `providers/google-vertex.ts:81-86` 允许隐式 `auth:{}`，`core/model-runtime.ts:672-700` 只拒绝缺失 auth resolution 并把 optional apiKey交给请求。Bedrock SDK 的显式profile优先和另一参考broker禁止绕开pool的决定，支持保留本项目命名身份/pool拒绝。区别是 Pi 在准入时检查隐式来源，本项目原 readiness 已把 signer有效性留给实际 transport；本次不重复实现该来源解析或据此宣称认证通过。
+
+主代理 Linux Node20.3.0、heap768MiB、单worker串行最终 **4文件/78项** exit0：target19、director15、handoff15、readiness29。九条新增场景覆盖两个实际resolver的无credential快照、bare/qualified目标、executionChoice、director on/off持久状态、handover arm/off持久状态，以及blocked有/无credential、missing exact connection、invalid pool、provider名支持signer但实际endpoint非signer的拒绝。启用/arm期间零request/approval、无child，原config对象与捕获结果保持；既有实际loopback worker/handoff路径继续通过。没有外部 AWS/ADC 请求。
+
+原源码反转 **8失败/1控制通过/40未选/exit1**，finally精确恢复 fixed SHA256 `f9aa5529388a`，恢复后同78项再次通过；没有用 skipped计通过。五静态门/diff exit0，118 docs-source advisory保留。build `a91a9c4872e196989fd7b80c0ea074533fccc7290d0a911b7428f370f7bc065b`，inputsDigest `0d40e55b4e13c38d684fd517f71df7a231957078341d13f8ea11e583bfbd9ea2`与当前输入匹配；正式适配 archive/patch/member/vendor核对后judge exit0，环/解析 satisfied、partial仅既有interactiveMode21/22-name advisory。独立只读复审 APPROVE/CLEAR，子代理未运行验证。证据 `.omx/artifacts/phase20-addition-delegated-signing/`；清理/提交/推送与自身CI另绑，真实provider/平台/PTY/旧发布binary/全仓/20k未验，ADD-70 partial、goal active。
