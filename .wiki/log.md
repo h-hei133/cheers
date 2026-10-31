@@ -10868,3 +10868,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：双进程恢复的伪造结果确认为真实竞态但不在本批修复（子代理review缺陷#2）
 
 [addition21.73](features/phase-20-addition.md#2173-双进程恢复的伪造结果确认为真实竞态但不在本批修复子代理review缺陷2)探针确认进程B恢复会为A在途调用写入伪造compensated失败，A的真实结果随后也写入，transcript永久保留两条矛盾记录。根因是无跨进程存活判定，锁文件只在持锁期间存在。可靠修复需运行所有权租约（架构级），仓促实现会误判存活而阻塞合法恢复，故记录不修。21.71已缓解其对目标验收的影响。未改产品代码。build 00460ad6。原47/ADD整体partial、goal active。
+
+### 2026-10-31：钩子的「仅本次」不再变成永久授权（子代理review安全缺陷）
+
+[addition21.74](features/phase-20-addition.md#2174-钩子的仅本次不再变成永久授权子代理review安全缺陷)approveDeclaredHook对once/always返回同一true，dispatcher无条件recordTrust，用户选「仅本次」实得永久跨会话信任；原测试还锁定了该错误。现返回三态决策、只有always持久化、布尔按一次性处理。63项聚焦、一反转到命中、五门/TS build通过。build 46b545b4。原47/ADD整体partial、goal active。

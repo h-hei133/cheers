@@ -109,17 +109,23 @@ export class HookDispatcher {
     }
     if (this.trust.store.isTrusted(hook.fingerprint)) return true;
 
-    const approved = await this.trust.requestApproval?.({
+    const decision = await this.trust.requestApproval?.({
       command: hook.command,
       event: hook.event,
       matcher: hook.matcher,
       sourcePath: hook.sourcePath ?? "(unknown)",
     });
-    if (approved !== true || trust !== this.trust || trust?.admission?.()) {
+    // A boolean is the older answer shape: true meant "run it", which the prompt
+    // offered as two different promises. Treat it as one-shot so an untyped
+    // caller can never turn "Run it for this session" into a permanent grant.
+    const allowed = decision === true || decision === 'allow-once' || decision === 'allow-always';
+    if (!allowed || trust !== this.trust || trust?.admission?.()) {
       logger.info(`Declared hook '${hook.command}' was not approved and will not run.`);
       return false;
     }
-    this.trust.store.recordTrust(hook.fingerprint, `${hook.event}:${hook.command}`);
+    if (decision === 'allow-always') {
+      this.trust.store.recordTrust(hook.fingerprint, `${hook.event}:${hook.command}`);
+    }
     return true;
   }
 

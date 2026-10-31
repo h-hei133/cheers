@@ -1,0 +1,7 @@
+{
+  "name": "persist-once",
+  "exit": 1,
+  "tests": "1 failed | 10 skipped (11)",
+  "originalSha256": "37dcd36667cdf774a9768e4d49bcae22b9de31f2dca9da7a4b13f0831d3ec46e",
+  "restored": true
+}

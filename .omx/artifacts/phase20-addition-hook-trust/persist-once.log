@@ -1,0 +1,33 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/hooks/registration.test.ts  (11 tests | 1 failed | 10 skipped) 21ms
+   ❯ src/core/hooks/registration.test.ts > registering declared hooks > asks again for a command the user allowed only once
+     → expected 1 to be 2 // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 10 skipped (11)
+   Start at  09:59:13
+   Duration  354ms (transform 102ms, setup 0ms, collect 117ms, tests 21ms, environment 0ms, prepare 51ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/hooks/registration.test.ts > registering declared hooks > asks again for a command the user allowed only once
+AssertionError: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ src/core/hooks/registration.test.ts:140:19
+    138|     await fire(second);
+    139| 
+    140|     expect(asked).toBe(2);
+       |                   ^
+    141|     expect(ran()).toEqual(["once", "once"]);
+    142|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

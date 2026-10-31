@@ -12,6 +12,7 @@ import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import { defaultHookDispatcher, type HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { setupBuiltinVerificationHooks } from "../core/hooks/builtin/index.js";
 import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/registration.js";
+import type { HookApprovalDecision } from "../core/hooks/types.js";
 import { type CatalogContent, type ToolCatalogInput } from "../core/tools/catalog.js";
 import type { ToolDiscovery } from "../core/tools/discovery/state.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
@@ -305,8 +306,8 @@ function deferUntilReady(
 async function approveDeclaredHook(
   request: CliRuntimeInvocationRequest,
   hook: { readonly command: string; readonly event: string; readonly matcher?: string; readonly sourcePath: string },
-): Promise<boolean> {
-  if (!request.escalationPromptHandler) return false;
+): Promise<HookApprovalDecision> {
+  if (!request.escalationPromptHandler) return "deny";
 
   const response = await request.escalationPromptHandler({
     id: `hook-approval-${Date.now()}`,
@@ -335,7 +336,10 @@ async function approveDeclaredHook(
     severity: "high",
   });
 
-  return response.decision === "allow" || response.decision === "allow-once" || response.decision === "allow-always";
+  // Only an explicit "remember" is persisted; "allow once" runs this hook once.
+  if (response.decision === "allow-always") return "allow-always";
+  if (response.decision === "allow" || response.decision === "allow-once") return "allow-once";
+  return "deny";
 }
 
 /**

@@ -4995,3 +4995,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 **本批不修复**，理由如下：可靠修复需要引入运行所有权租约（运行期间持续持有可探测的租约、恢复前检查其存活），这是架构级改动；仓促实现（例如仅检查锁文件是否存在）会在进程刚释放锁但仍在收尾时误判存活，反而阻塞合法恢复，或在跨主机/容器场景失效。伪造事件的读取影响已部分缓解——21.71让`compensated`事件不再阻断目标验收；按最新事件判断的读取方看到的是后到的真实结果。
 
 保留为已知竞态。[探针](../../.omx/artifacts/phase20-addition-crash-recovery/double-recovery-probe.mjs)。build `00460ad6ff4d`。未改产品代码。原47/ADD整体partial、goal active。
+
+
+### 21.74 钩子的「仅本次」不再变成永久授权（子代理review安全缺陷）
+
+子代理review发现：`approveDeclaredHook`对`allow-once`与`allow-always`返回**同一个`true`**，而`hookDispatcher`只要`approved === true`就`recordTrust`并写入`hook-trust.json`。用户看到的是「Allow once · Run it for this session」，实际得到的是**跨会话、跨进程的永久信任**——一个安全缺陷，且原先的`registration.test.ts`用例（`asked === 1`）恰好锁定了这个错误行为。
+
+现`HookApprovalRequest`返回`HookApprovalDecision`（`allow-once`/`allow-always`/`deny`），只有`allow-always`才`recordTrust`；布尔返回值按旧形态视为**一次性**，使无类型调用方也无法把「仅本次」升级为永久。测试改为两向对照：`allow-once`第二次**重新询问**（`asked === 2`），`allow-always`才记住（`asked === 1`）。
+
+验证：`hooks`6、`registration`11、`cliRuntimeInvocation`25、其余hook文件，共**63项**通过；一反转（无条件记录信任）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `46b545b404f5`。原47/ADD整体partial、goal active。

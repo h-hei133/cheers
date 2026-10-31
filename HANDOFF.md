@@ -1334,3 +1334,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A review concludes the requested subagent model is unavailable because `Agent`'s `model` parameter only offers a short enum.
 - **Root Cause**: That parameter is an override. The default comes from `CLAUDE_CODE_SUBAGENT_MODEL` in the environment, which already names the requested model. Omitting `model` uses it.
 - **Rule**: Before declaring a configured subagent model unusable, check the environment and settings for `CLAUDE_CODE_SUBAGENT_MODEL` / `ANTHROPIC_DEFAULT_*_MODEL`. Launch the agent without a `model` override and let the configured default apply.
+
+### "Allow Once" And "Allow Always" Must Be Different Answers
+
+- **Symptom**: Answering "Run it for this session" to a declared hook makes it trusted forever, in every later session and process.
+- **Root Cause**: The approval callback returned a boolean, so the dispatcher could not tell the two answers apart and recorded trust for both. A test asserted the wrong behaviour, which is why it survived.
+- **Rule**: Carry the decision itself, not a boolean, through any prompt that offers more than one kind of yes. Treat a legacy boolean as the weakest yes (one-shot), and test both directions: the one-shot answer must ask again, the remembered answer must not. When changing such a contract, read the tests that cover it — a test can encode the defect.

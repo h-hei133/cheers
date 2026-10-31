@@ -111,12 +111,14 @@ describe("registering declared hooks", () => {
     expect(ran()).toEqual(["approved"]);
   });
 
-  it("asks only once for a command it has already been told to allow", async () => {
+  it("asks again for a command the user allowed only once", async () => {
+    // "Run it for this session" is one run, not a standing grant. A boolean
+    // answer is the older shape and is treated as one-shot for that reason.
     const workspace = declareHook(markerCommand("once"));
     let asked = 0;
     const requestApproval = () => {
       asked++;
-      return Promise.resolve(true);
+      return Promise.resolve("allow-once" as const);
     };
 
     const first = new HookDispatcher();
@@ -135,8 +137,28 @@ describe("registering declared hooks", () => {
     });
     await fire(second);
 
-    expect(asked).toBe(1);
+    expect(asked).toBe(2);
     expect(ran()).toEqual(["once", "once"]);
+  });
+
+  it("asks only once for a command the user asked to remember", async () => {
+    const workspace = declareHook(markerCommand("remembered"));
+    let asked = 0;
+    const requestApproval = () => {
+      asked++;
+      return Promise.resolve("allow-always" as const);
+    };
+
+    const first = new HookDispatcher();
+    registerDeclaredHooks(first, workspace, { requestApproval, trustStore: new HookTrustStore(trustPath), homeDir: homeDir() });
+    await fire(first);
+
+    const second = new HookDispatcher();
+    registerDeclaredHooks(second, workspace, { requestApproval, trustStore: new HookTrustStore(trustPath), homeDir: homeDir() });
+    await fire(second);
+
+    expect(asked).toBe(1);
+    expect(ran()).toEqual(["remembered", "remembered"]);
   });
 
   it("asks again when the command changed after it was approved", async () => {

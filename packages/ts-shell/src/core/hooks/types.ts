@@ -215,9 +215,18 @@ export interface HooksConfiguration {
 export const HOOK_TRUST_BYPASS_NOTICE =
   "HOOK TRUST BYPASSED: declared hook commands are running without approval because this run was started with --dangerously-bypass-hook-trust. Only do this in a repository you already trust.";
 
+/**
+ * What the user decided about running a declared hook.
+ *
+ * `allow-once` and `allow-always` are separate answers: the prompt offers both,
+ * and only the second may be remembered. Collapsing them to a boolean is what
+ * made "Run it for this session" permanent.
+ */
+export type HookApprovalDecision = "allow-once" | "allow-always" | "deny";
+
 export type HookApprovalRequest = (request: {
   readonly command: string;
   readonly event: string;
   readonly matcher?: string;
   readonly sourcePath: string;
-}) => Promise<boolean>;
+}) => Promise<HookApprovalDecision | boolean>;
