@@ -11048,3 +11048,5 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 [addition24.25](features/phase-20-addition.md#2425-首次角色保存保留普通-tier-的实时继承)三种真实凭据 namespace 的隔离 HTTP 回归确认首次角色保存会固化普通 priority，后续 flex 更新实际仍发送 priority。仅删除新role selection seed的tier复制，已有显式会话偏好完整保留，历史意图不明的tier不迁移。Node20.3单worker串行4文件151项、反转3失败/87未选及精确恢复重验通过；build与当前输入摘要读回通过，manifest ef982b674f90，正式适配bundle judge既有advisory，两路只读复审APPROVE/CLEAR。972ed1f6代码CI已success，14d3532f/712ea121/b0a144de最后in_progress；本批静态门/清理/交付另绑定，ADD-70 partial、goal active。
 
 最终五静态门/diff已exit0；118既有docs-source advisory不计通过缺口消失。另原生tier setter假设已由协议能力门正确拒绝，与24.20一致，不作无证据修补；本批scratch清理后交付。
+
+代码 `279315636c25ae1c6296fb7372d7533bace3ff93` 已提交/推送且远端 main 精确一致，scratch清理、交付后clean；自身 CI `41211798735` 最后in_progress，Watch `41211798701` success，仅此文档另绑提交。
