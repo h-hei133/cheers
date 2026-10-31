@@ -11075,3 +11075,6 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：当前签名请求的模型与 effort 控制
 
 [addition24.29](features/phase-20-addition.md#2429-当前签名请求可以保存模型与-effort命名凭据边界保持)修复Bedrock/Vertex ambient signer被model/thinking/picker static credential门拒绝。auth owner单predicate与委派共用；真实provider slot准入、named/pool/hash/catalog/hook/lock保留。审查期间cross-model protocol与keyless active named两回归实际复现后修正，强化named UI边界。Node20.3单worker最终4文件167项、反转30失败/13控制通过/76未选并精确恢复后通过，五门/build当前digest/judge既有advisory与独立APPROVE/CLEAR。中间cwd/过早第二runner短暂并发已终止并确认退出，最终串行；digest漏compilerInputs修正，无关敏感进程参数未复制留档。d892c777/077d7978精确CI均success，b48fd27b/27931563/712ea121最后in_progress。本批证据、清理及交付另绑定；AWS/ADC外部认证、PTY/平台/旧binary未验，ADD-70 partial、goal active。
+
+
+本批代码/证据说明已提交推送 `1c874354997bc5b51ca3cbfe7e57199970ecc9a9`，远端main精确读回一致，batch scratch已移除、提交后clean。自身CI `41217709469`最后in_progress，Watch `41217709468`completed/success；Watch不替代代码CI。本段后续交付记录是独立文档提交，不与代码SHA混算。
