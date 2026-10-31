@@ -1771,3 +1771,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Report facts, saved ledger and model metadata are correct, but a native PTY assertion sees none of the report's warnings.
 - **Root Cause**: The command has ended while its scheduled pager frame is still pending. A probe that immediately sends Escape dismisses the reader before the terminal draws it.
 - **Rule**: Wait for the actual new report content in the controlled terminal before closing its reader, then synchronize the return before sending another command. Keep failed observations separate from product state; an end callback proves command completion, not rendered delivery.
+
+
+### Captured Credentials Do Not Freeze Request Admission
+- **Symptom**: A role edit persists an old default after its account enters backoff, or a static key lets an unregistered protocol seed the session default.
+- **Root Cause**: Configuration fingerprints do not observe ephemeral pool admission, and credential-presence shortcuts bypass current resolution and endpoint registration. A pre-writer check also misses changes inside the state lock.
+- **Rule**: Re-resolve and compare the original default request before mutation and under the existing writer guard. Require the existing executable binding check for a newly seeded default even when a key exists; preserve the separate contract for already saved selections. Verify the actual pool and writer with stable controls and keep request identities out of evidence.

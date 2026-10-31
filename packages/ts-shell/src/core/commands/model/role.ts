@@ -39,13 +39,14 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
       ...(active.thinkingEffort !== undefined ? { thinkingEffort: active.thinkingEffort } : {}),
       roles: choice.config.sessionModelRoles ?? {} }
     : undefined);
-  const signerSeedCurrent = (): boolean => {
-    if (baseline?.selection || active.credential) return true;
+  const defaultRequestCurrent = (): boolean => {
     try {
       const current = context.readConfiguration?.().config ?? context.runtimeConfig
         ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
+      if (baseline?.selection) return selectedModelMatches(current, baseline.selection)
+        && sameValue(selectionRequest(context, current, baseline.selection), active);
       const request = modelRequest(context, current);
-      return providerScopeSelected(current, request) && sameValue(request, active)
+      return (Boolean(active.credential) || providerScopeSelected(current, request)) && sameValue(request, active)
         && providerBindingAvailable(loadCatalog(), request);
     } catch { return false; }
   };
@@ -56,11 +57,9 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
     }
     const refusal = admission();
     if (refusal) return { saved: false, output: refusal };
-    if (!signerSeedCurrent()) return { saved: false, output: 'The current default request changed. Reopen the model picker before editing roles.' };
-    if (baseline.selection && (!selectedModelMatches(choice.config, baseline.selection)
-      || !sameValue(selectionRequest(context, choice.config, baseline.selection), active))) {
-      return { saved: false, output: 'The saved default differs from the current request. Select the current model before editing roles.' };
-    }
+    if (!defaultRequestCurrent()) return { saved: false, output: baseline.selection
+      ? 'The saved default differs from the current request. Select the current model before editing roles.'
+      : 'The current default request changed. Reopen the model picker before editing roles.' };
     const failure = target ? validateModelPreset({ [role]: target }, choice.config, choice.catalog) : undefined;
     if (failure) return { saved: false, output: failure };
     const roles = { ...(selection.roles ?? choice.config.sessionModelRoles) };
@@ -68,7 +67,7 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
     else delete roles[role];
     const next = { ...selection, roles };
     try {
-      writeSessionModel(context.sessionId, next, baseline, () => !admission() && signerSeedCurrent());
+      writeSessionModel(context.sessionId, next, baseline, () => !admission() && defaultRequestCurrent());
       if (!sameValue(readSessionModel(context.sessionId), next)) {
         return { saved: false, output: 'Role assignment write outcome is unverified. Reopen the model panel.' };
       }

@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.35 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影、交互目录和首次角色保存的显式 provider 范围收敛、未知协议目录保留与绑定拒绝已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.35 节、第 24.58 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影、交互目录和首次角色保存的显式 provider 范围收敛、未知协议目录保留与绑定拒绝、角色变更的默认请求池退避重验和带key未知协议首次保存拒绝已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -6327,3 +6327,24 @@ ADD-47表中的缺口是20.52尚未在真实CLI注入unknown。本批先检查�
 独立verifier已通过当前构建/两exe、精确执行快照、原writer发布后未知、三层状态与实际下一wire、重放屏障、失败保留及scratch缺席核验。本批仅三份markdown，不重复unit/build/反转；全仓、20k真实PTY/local NormProof、委派复审、exe注入、真实provider/故障设备或其他平台均未跑。最终五静态门、三脚本语法、独立verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留；提交推送另绑，ADD-47维持本地验证；原47外部条件继续延后、goal active。
 
 一次延迟读取c66e67eb精确代码CI41250671853及ef937df1 CI41249700949均仍in_progress，各Watch41250671837/41249700933 success；不以Watch代替完整CI，不立即轮询或把在跑任务重启。本批交付CI尚未观察。
+
+
+### 24.58 角色变更重验当前默认请求与协议准入
+
+接续ADD-70，原[角色owner](../../packages/ts-shell/src/core/commands/model/role.ts)把捕获到的credential视为首次默认保存的持续准入，已有selection则直接跳过writer guard中的默认请求检查。[选择快照](../../packages/ts-shell/src/core/commands/model/choice.ts)已覆盖accepted/fresh配置、目录、会话与环境，但进程内账号池退避不改变这些文件。旧实现因此能在面板打开后、乃至原state lock内请求已被pool阻止时保存旧默认；静态key还绕过了已有[协议绑定准入](../../packages/ts-shell/src/core/auth/binding.ts)，让未注册endpoint通过角色首次保存。已有默认在进入writer前的检查不能替代锁内重验。
+
+修补前定向比较只读参考f09d01b85e0384647fcab6779d35ab9dabe04be3的setModel（agent-session.ts:2562）与可用模型投影（model-registry.ts:64）：在发布模型/会话之前检查当前认证，可发现模型和可执行模型分开，显式保存默认与普通偏好分开。参考没有本项目的account pool与session CAS，未声称直接提供相同竞态修复。保留原resolver、registry、selectionRequest与[session writer](../../packages/ts-shell/src/session/model/state.ts)，只收敛原角色闭包：首次保存重新解析实际请求、比较完整请求并要求原providerBindingAvailable；已有selection重新检查选中命名空间与实际请求身份。进入writer前和原beforeCommit锁内均执行。已有不可用默认的既定清除策略不被升级为新一套通用可用性规则；无auth/pool核心、schema、package script、默认gate或第二套事务改动。
+
+[provider聚焦回归](../../packages/ts-shell/src/session/model/provider.test.ts)新增30项：三角色×新/已有默认×稳定/提交前/锁内的18项，直接调用原noteCredentialRateLimit、原凭据身份及实际writer，检查session edit和settings/auth原字节；另有两签名provider×三角色×注册/未知协议的12项静态合成key对照。旧owner15失败/15通过，另134未选中，不计为通过。初次修复命令中的旧picker路径没有匹配测试，只实际跑provider164通过；确认当前路径后，显式反转原角色owner再次15失败/15通过/134未选中，finally逐字节恢复后，provider164与[当前角色picker](../../packages/ts-shell/src/cli/interactive/picker/model/role.test.ts)46共210项通过。未弱化断言、删除或跳过用例。
+
+五静态门后串行TS/exe构建通过，build ee9ac616449f2b65722e1a0502dd5a41af2ced8fdae7624f3a4fad45c2fdb44e，inputs 75d995c102c736824ad5d8671b58968cfa37cc8430ef3542b869caf76d74e9e5；stable/不可变exe均106842240 bytes、SHA 5c17e18fd4891ff19f9117b4a548834997d0bf260139c610d39c40220752ca4b，stable仍为普通文件副本，current compilerInputs匹配。此前e84c96fa8424构建保持历史证据，不再称为当前源码构建。
+
+生产Node20.3 CLI六场顺序执行：普通/全屏×新/已有默认四场退避拒绝，普通模式新/已有默认另各一场稳定保存。真实/model搜索advisor、Enter进入角色、Down到Use default model；observer只在该真实Enter前调用原noteCredentialRateLimit一次，实际resolver从可用named变成pool-unavailable，没有伪造resolver或writer结果，也没有模拟一次实际HTTP429。原面板返回明确拒绝并真实绘制，四场selection/revision精确不变；两稳定对照正常保存新默认或清除已有advisor。六场settings/auth原字节保持，真实Ctrl+D exit0/cooked flags恢复，owned PID/start identities均非活跃，隔离home/project/session/observer scratch全部清理。配置了loopback监听器但实际GET0/POST0/其他HTTP0，无真实或合成推理调用。
+
+每场45秒/2MiB、100ms采样768MiB CLI树RSS及harness heap768MiB守卫均未触发，最高采样581640KiB、各场output22989至24785 bytes仅为小夹具观察，不是性能结论。原state lock内退避变化由集成单测覆盖，真实CLI只注入Enter前变化；未知协议的静态key覆盖由单测提供。没有真实provider退避、当前exe角色故障注入、其他平台/故障设备、计费、全仓/15套件/20k真实PTY、local NormProof或委派复审验收。ADD-70仍部分完成，其余重复事实收敛、旧发布二进制回退与真实环境缺口保持；原47外部条件继续延后，goal active。
+
+证据归预先核对不存在且无tracked碰撞的`.omx/artifacts/phase20-addition-role-current/`，保留原/新owner与test文本、红绿/反转/build日志、实际执行脚本文本快照和数值/布尔收据，无raw PTY、请求/响应正文、真实凭据/address/header或prompt/session digest。独立证据verifier已通过当前compilerInputs/两exe、原始Git字节/修复快照、测试计数、六场实际键盘/原池状态/绘制/持久及清理核验；该verifier是主代理的独立断言脚本，不冒充委派代码复审。HANDOFF补充credential存在不冻结pool准入的复用规则；最终静态门/语法/diff及提交推送另绑。
+
+一次延迟读取c66e67eb代码CI41250671853与d25a0c8c文档CI41251337961仍in_progress，各Watch41250671837/41251338001 completed/success；不以Watch替代完整CI，不立即轮询。本批交付CI尚未观察。
+
+最终五静态门、三个脚本语法、独立证据verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留。工作树仅本批两个产品/测试文件与三份markdown，提交/推送/remote-main和clean状态由ignored delivery收据另绑；本批CI未观察，不声明通过。

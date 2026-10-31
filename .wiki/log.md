@@ -11222,3 +11222,12 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：真实 CLI 整轮恢复保留 unknown
 
 [addition24.57](features/phase-20-addition.md#2457-整轮恢复的真实-cli-未知写入故障注入)补ADD-47明确缺口，沿原Node20.3生产CLI普通/全屏各真实两edit同turn，原writer完成较新b的rename/目录fsync后由observer一次异常阻止readback。原报告/账本/fileUndo元数据均unknown、0个verified、较旧a skipped且字节不变；实际b已恢复，不能把0计成零写。相同显式restore-turn重试被unknown屏障blocked、receipt保持/零第二rename，/undo status保留未知；下一实际POST含可能写入/重读通知。两有效场景2CLI/4GET/8POST、exit0/cooked/config不变/owned进程非活跃/scratch清理。两旧普通断言失败均留unverified，原状态已unknown而探针过早Escape关闭未画出的pager；等实际警告再关闭后通过，含失败全批4CLI/6GET/14POST。当前build e84c96fa8424及inputs/两exe核对一致，产品未改；独立verifier passed，不重复unit/build/反转，无真实provider/物理设备/exe注入/其他平台/全仓/20k/judge/委派复审，RSS不算性能。一次延迟c66e67eb与ef937df1代码CI仍in_progress、各Watch success；最终五门/三语法/独立verifier/diff均exit0，118既有advisory保留，提交推送另绑，ADD-47本地验证、goal active。
+
+
+### 2026-11-01：角色变更的当前请求与协议准入
+
+[addition24.58](features/phase-20-addition.md#2458-角色变更重验当前默认请求与协议准入)修复原角色owner的credential快捷通过和已有selection锁内免检：新默认重解实际请求并检查原协议registry，已有默认重验命名空间/请求身份，均复用原beforeCommit/CAS。定向参考先于修补，无auth/pool核心或新事务。三角色池稳定/提交前/锁内及两provider注册/未知协议key共30新项，旧owner和显式反转各15失败/15控制/134未选中；旧picker路径未匹配只算provider164通过，正确两文件恢复后210通过。五门/串行TS+exe build ee9ac616449f、inputs/两exe size/SHA匹配。Node20.3普通/全屏×新/已有默认四真实面板退避拒绝，两普通稳定保存对照，六场HTTP0、原noteCredentialRateLimit改变原pool且未伪造resolver/writer；拒绝session edit保持、稳定正常保存、settings/auth字节不变、exit0/cooked/owned进程与scratch清理。独立证据verifier passed，最高采样581640KiB不算性能；锁内与未知协议由集成单测覆盖，无实际HTTP429/真实provider/exe角色注入/其他平台/全仓/20k/judge/委派复审，ADD-70部分完成、原47外部条件延后、goal active。HANDOFF补credential不冻结准入规则；最终门/延迟CI及交付另绑。
+
+一次延迟读取c66e67eb代码CI41250671853与d25a0c8c文档CI41251337961仍in_progress，各Watch41250671837/41251338001 completed/success；不以Watch替代完整CI，不立即轮询。本批交付CI尚未观察。
+
+最终五静态门、三个脚本语法、独立证据verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留。工作树仅本批两个产品/测试文件与三份markdown，提交/推送/remote-main和clean状态由ignored delivery收据另绑；本批CI未观察，不声明通过。

@@ -271,6 +271,51 @@ it.each((['before commit', 'inside lock'] as const).flatMap(timing => (['address
     expect(changed).toBe(true); expect(readSessionModelEdit(sessionId)).toEqual(before); expect(profileBytes()).toEqual(bytes);
   });
 
+it.each((['subagent', 'summary', 'advisor'] as const).flatMap(role => (['fresh', 'saved'] as const).flatMap(selection =>
+  (['stable', 'before commit', 'inside lock'] as const).map(timing => ({ role, selection, timing })))))(
+  'keeps the $selection $role default unchanged when its actual pool request changes $timing', ({ role, selection, timing }) => {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const named = { ...connection(), model: 'base', thinkingEffort: 'low' as const };
+    writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: 'named', providerCredentials: {},
+      providerConnections: [named], accountPool: { openai: { connections: ['named'] } } }, edit);
+    if (selection === 'saved') writeSessionModel(sessionId, { connectionScope: 'session', connectionId: 'named',
+      provider: 'openai', model: 'base', thinkingEffort: 'low', roles: { [role]: {
+        connectionId: 'named', provider: 'openai', model: 'base',
+      } } }, readSessionModelEdit(sessionId));
+    const actual = () => resolveProviderCredential({ runtimeConfig: projectSessionModel(getRuntimeConfig(home), sessionId),
+      env: {}, pool: { sessionId } });
+    expect(actual().credential?.connectionId).toBe('named');
+    const prepared = prepareModelRole(context(), role), before = readSessionModelEdit(sessionId), bytes = profileBytes();
+    const retire = () => noteCredentialRateLimit(credentialIdentityFor('openai', ownedConnectionCredential(named))!, 60_000);
+    if (timing === 'before commit') retire();
+    else if (timing === 'inside lock') {
+      const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId), lock = files.withFileLock;
+      vi.spyOn(files, 'withFileLock').mockImplementation((file, action, options) => lock(file, () => {
+        if (file === layout.stateLockPath) retire(); return action();
+      }, options));
+    }
+    expect(prepared.assign(undefined).saved).toBe(timing === 'stable');
+    if (timing === 'stable') expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'named', roles: {} });
+    else { expect(actual().blocked).toBeDefined(); expect(readSessionModelEdit(sessionId)).toEqual(before); }
+    expect(profileBytes()).toEqual(bytes);
+  });
+
+it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['subagent', 'summary', 'advisor'] as const).flatMap(role =>
+  ([false, true] as const).map(registered => ({ provider, role, registered })))))(
+  'requires a registered protocol when seeding the $provider $role default with a key (registered=$registered)', ({ provider, role, registered }) => {
+    const fixture = signedProvider(provider), edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, providerCredentials: { [provider]: {
+      ...edit.values.providerCredentials![provider], apiKey: 'synthetic-protocol-key',
+    } } }, edit);
+    if (!registered) writeCatalogCache(fixture.catalog.map(entry => ({ ...entry, endpoint: 'unrecognized-endpoint' })));
+    expect(fixture.resolve(getRuntimeConfig(home), sessionId).credential).toBeDefined();
+    const before = readSessionModelEdit(sessionId), bytes = profileBytes();
+    expect(prepareModelRole(fixture.command, role).assign(undefined).saved).toBe(registered);
+    if (!registered) expect(readSessionModelEdit(sessionId)).toEqual(before);
+    else expect(readSessionModel(sessionId)).toMatchObject({ connectionScope: 'provider', provider, model: 'base', roles: {} });
+    expect(profileBytes()).toEqual(bytes);
+  });
+
 it.each(['provider', 'connection'] as const)('keeps the ordinary %s context budget separate when seeding roles', async source => {
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   writeUserRuntimeConfigFile({ ...edit.values, contextWindow: 12000, reserveTokens: 0,
