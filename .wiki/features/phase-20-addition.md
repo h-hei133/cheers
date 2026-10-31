@@ -5444,3 +5444,10 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 主代理单进程串行聚焦验证：22 个文件、**569 项**通过，分组为 config179、connect/model71、account104、picker153、entrypoint/runtime/provider/session62。重复验证不累加。五道静态门与生产 TS noEmit 通过；最终 `npm run build` 通过，manifest `28363ef38159`。正式打包 NormProof exit0、依赖环与导入解析 satisfied；verdict partial，仅既有 interactiveMode 22-name advisory，runtimeConfig 已回到20，不把 advisory 解释为全局结构完成。没有本地全量回归、真实 provider、PTY 或 20k 压测；子代理仅阅读、分析及编辑。
 
 ADD-70 仍部分完成：本轮只完成凭据与设置的物理拆分；模型目标与目录分离、同一事实多处存储收敛、真实旧版本回退和真实环境验收尚缺。没有迁移操作员真实 HOME、没有验证老二进制会读取新 auth 文件。提交与远端状态以本轮交付读回为准，旧 HEAD 的 CI 成功不证明新提交。
+
+
+### 24.1 导入消费者补齐
+
+继续检查发现 profile 导入只捕获 config.json，迁移后的 auth 连接会被遗漏。现由原 import plan 捕获两份源文档，分别校验后 auth-last 合并，再通过原 sanitizer 一次性生成待认证连接，最后写入目标 settings/auth 各自文档。凭据、账号 token 与未知字段不导入；preview/apply 原有 digest、源重查、目标冲突、stage/journal/recovery 合同继续使用。auth-owned pathRules 若来自旧目录，按其实际源路径绝对化，named profile 不借用 default/legacy。
+
+三个聚焦文件27项通过，包含分文件/仅auth导入、auth覆盖旧连接、preview后auth修改拒绝、未知秘密排除、pool endpoint秘密URL拒绝、目标0600、源文件不变、pathRules实际源目录。移除auth捕获的反转实际AssertionError，源码精确恢复后通过。五门/build通过，manifestb552bb9b1a16；不将此消费者修补当作ADD-70全量完成。此前9278c344远端main精确一致、CI41186572319最后读取in_progress，Watch41186572327成功但仍不等同代码CI通过。

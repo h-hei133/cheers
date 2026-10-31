@@ -10941,3 +10941,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：ADD-70 凭据独立文档与迁移保护
 
 [addition24](features/phase-20-addition.md#24-第十一轮实施2026-10-31add-70-凭据文件拆分)接续已有草稿，用户凭据/连接移至 auth.json、设置保留 config.json，auth-first 验证后移除旧字段。修复两文件来源与链接身份、删除复活、未知 auth 字段搬移、未变化凭据权限、peer receipt 存储归属等缺陷；实际保存/续期调用方与取消字节断言集成。主代理分组单进程串行22文件569项通过，auth-first 反转实际 AssertionError、源码精确恢复；五门/noEmit/build通过，manifest28363ef38159。打包judge仅既有 interactiveMode advisory，导入解析与环satisfied。未运行全量回归、PTY、20k或真实provider；未迁移真实HOME。ADD-70仍partial：模型目标/目录分离与重复事实收敛、旧版本回退及真实环境尚缺，goal active。
+
+
+### 2026-10-31：补齐 profile 导入的 auth 消费者
+
+[addition24.1](features/phase-20-addition.md#241-导入消费者补齐)发现已拆分凭据文件的profile导入漏读auth，现捕获/校验两文档、合并后沿原脱敏投影生成pending连接、分别写目标settings/auth。未知秘密不复制、pathRules按实际源文件锚定、preview后auth改动拒绝。3文件27项、五门/buildb552bb9b1a16通过；auth捕获反转实际失败/精确恢复。前批9278c344已推送且main与origin/main一致，代码CI41186572319最后in_progress，Watch成功；整体goal active。

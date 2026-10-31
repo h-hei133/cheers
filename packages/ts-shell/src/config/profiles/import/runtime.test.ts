@@ -60,7 +60,7 @@ it('previews without writes, excludes live credentials and imports inactive nati
   expect(applyImport(plan, 'wrong').status).toBe('rejected');
   expect(fs.readdirSync(target.root)).toEqual([]);
   expect(applyImport(plan, plan.digest).status).toBe('complete');
-  const configText = fs.readFileSync(path.join(target.root, 'config.json'), 'utf8');
+  const configText = fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8');
   const config = JSON.parse(configText);
   expect(config.providerConnections[0]).toMatchObject({ id: 'same-id', status: 'pending', model: 'test-model' });
   for (const secret of ['synthetic-access', 'synthetic-refresh', 'synthetic-key', 'synthetic-legacy', 'do-not-import']) expect(configText).not.toContain(secret);
@@ -83,9 +83,68 @@ it('previews without writes, excludes live credentials and imports inactive nati
 it('projects legacy credential slots into pending references without resolving environment values', () => {
   write('config.json', JSON.stringify({ provider: 'openai', providerCredentials: { openai: { apiKey: '${SOURCE_SECRET}', model: 'test-model' } } }));
   const plan = preview(['config']); expect(applyImport(plan, plan.digest).status).toBe('complete');
-  const config = JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8'));
+  const config = JSON.parse(fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8'));
   expect(config.providerConnections).toEqual([{ id: 'import-openai', provider: 'openai', authType: 'api-key', status: 'pending', model: 'test-model' }]);
   expect(config.providerCredentials).toBeUndefined();
+});
+
+it('imports split auth connection metadata without secrets and preserves its selected authority', () => {
+  write('config.json', JSON.stringify({ maxTurns: 17, provider: 'google',
+    providerConnections: [{ id: 'legacy', provider: 'google', apiKey: 'synthetic-old-secret' }] }));
+  write('auth.json', JSON.stringify({ provider: 'openai', activeProviderConnectionId: 'relay',
+    providerConnections: [{ id: 'relay', provider: 'openai', baseUrl: 'https://relay.invalid/v1', apiKey: 'synthetic-new-secret', model: 'owned-model' }],
+    providerCredentials: { openai: { apiKey: 'synthetic-mirror-secret' } }, unknown: { token: 'synthetic-unknown-secret' } }));
+  const beforeSettings = fs.readFileSync(path.join(source.root, 'config.json'));
+  const beforeAuth = fs.readFileSync(path.join(source.root, 'auth.json'));
+  const plan = preview(['config']);
+  expect(plan.sources.map(file => path.basename(file.path))).toEqual(['auth.json', 'config.json']);
+  expect(fs.readdirSync(target.root)).toEqual([]);
+  expect(applyImport(plan, plan.digest).status).toBe('complete');
+  expect(JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8'))).toEqual({ maxTurns: 17 });
+  const stored = fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8');
+  expect(JSON.parse(stored)).toEqual({ provider: 'openai', activeProviderConnectionId: 'relay', providerConnections: [{
+    id: 'relay', provider: 'openai', baseUrl: 'https://relay.invalid/v1', model: 'owned-model', authType: 'api-key', status: 'pending',
+  }] });
+  expect(stored).not.toContain('synthetic-');
+  expect(fs.readFileSync(path.join(source.root, 'config.json'))).toEqual(beforeSettings);
+  expect(fs.readFileSync(path.join(source.root, 'auth.json'))).toEqual(beforeAuth);
+  if (process.platform !== 'win32') expect(fs.statSync(path.join(target.root, 'auth.json')).mode & 0o777).toBe(0o600);
+});
+
+it('imports an auth-only profile and fences an auth edit after preview', () => {
+  write('auth.json', JSON.stringify({ provider: 'openai', providerConnections: [{ id: 'relay', provider: 'openai', apiKey: 'synthetic-secret' }] }));
+  const plan = preview(['config']);
+  write('auth.json', JSON.stringify({ provider: 'openai', providerConnections: [{ id: 'other', provider: 'openai', apiKey: 'synthetic-secret' }] }));
+  expect(applyImport(plan, plan.digest).status).toBe('rejected');
+  expect(fs.existsSync(path.join(target.root, 'auth.json'))).toBe(false);
+  const fresh = preview(['config']);
+  expect(applyImport(fresh, fresh.digest).status).toBe('complete');
+  expect(fs.existsSync(path.join(target.root, 'config.json'))).toBe(false);
+  expect(JSON.parse(fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8')).providerConnections[0]).toMatchObject({ id: 'other', status: 'pending' });
+});
+
+it('refuses malformed legacy fields even when the auth document shadows them', () => {
+  write('config.json', '{"providerCredentials":"malformed"}');
+  write('auth.json', '{"providerCredentials":{"openai":{"apiKey":"synthetic-secret"}}}');
+  expect(() => preview(['config'])).toThrow('invalid declared field');
+  expect(fs.readdirSync(target.root)).toEqual([]);
+});
+
+it('rejects secret-bearing pool endpoints before they enter an import journal', () => {
+  write('auth.json', JSON.stringify({ accountPool: { openai: { connections: ['relay'], baseUrl: 'https://relay.invalid/v1?token=synthetic-secret' } } }));
+  expect(() => preview(['config'])).toThrow('secret-bearing URL');
+  expect(fs.readdirSync(target.root)).toEqual([]);
+});
+
+it('anchors an auth-owned path rule to its actual source directory', () => {
+  source = createProfileContext({ name: 'default', homeDir: home, env: {} });
+  write('config.json', '{"maxTurns":17}');
+  const legacy = path.join(home, '.cheer'); fs.mkdirSync(legacy);
+  fs.writeFileSync(path.join(legacy, 'auth.json'), JSON.stringify({ pathRules: [{ path: '../workspace', settings: { allowedTools: [] } }] }));
+  const plan = preview(['config']);
+  expect(applyImport(plan, plan.digest).status).toBe('complete');
+  const imported = JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8'));
+  expect(imported.pathRules[0].path).toBe(path.resolve(legacy, '../workspace'));
 });
 
 it('imports prompt definitions into their actual consumer directory', () => {

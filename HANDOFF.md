@@ -1436,3 +1436,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Inspecting memory usage prints a credential passed in a background service's command line.
 - **Root Cause**: A broad process listing includes full arguments instead of only identity and resource fields.
 - **Rule**: Use process names, PID, state and RSS for resource checks; never include `args` or `command` fields. Do not repeat a credential accidentally exposed by a diagnostic.
+
+### Splitting A Document Also Changes Import Consumers
+
+- **Symptom**: A profile import loses connections after a credential split, or imports a secret-bearing account-pool URL into its journal.
+- **Root Cause**: The import inventory captures only the old settings filename, while the sanitizer checks connection URLs but treats another endpoint-bearing record as an ordinary field.
+- **Rule**: Inspect every physical document inventory when storage is split. Capture and validate both sources, merge once before projecting inactive references, partition the sanitized result, and bind preview/apply to both source revisions. Apply the existing endpoint validator to every imported endpoint owner; never copy live credential material or resolve source environment references.

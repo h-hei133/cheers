@@ -8,6 +8,9 @@ import { openProfile } from '../context.js';
 import { IMPORT_CATEGORIES, IMPORT_LIMITS, type ImportCategory, type ImportFile, type ImportPlan, type ImportRequest } from './model.js';
 import { captureSources, type SourceCapture } from './source.js';
 import { importConfig } from './config.js';
+import { documentFor } from '../../documents.js';
+import { parseConfigText } from '../../syntax.js';
+import { serializeConfigDocument } from '../../document.js';
 import { importCatalog } from './catalog.js';
 import { validateSessionId } from '../../../session/store/sessionFileLayout.js';
 
@@ -28,7 +31,16 @@ export function planImport(request: ImportRequest): ImportPlan {
   const files: ImportFile[] = [];
   if (request.categories.includes('config')) {
     const file = capture.first('config.json');
-    if (file !== undefined) files.push({ relative: 'config.json', content: importConfig(file.content, file.path), metadata: false });
+    const auth = capture.first('auth.json');
+    if (file || auth) {
+      const sanitized = parseConfigText(importConfig(file?.content ?? '{}', file?.path ?? auth!.path, auth));
+      const settings: Record<string, unknown> = {}; const credentials: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(sanitized)) {
+        (documentFor(key, undefined) === 'auth' ? credentials : settings)[key] = value;
+      }
+      if (file || Object.keys(settings).length) files.push({ relative: 'config.json', content: serializeConfigDocument(settings) + '\n', metadata: false });
+      if (Object.keys(credentials).length) files.push({ relative: 'auth.json', content: serializeConfigDocument(credentials) + '\n', metadata: false });
+    }
   }
   if (request.categories.includes('catalog')) {
     const file = capture.first('models.json');
