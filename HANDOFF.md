@@ -1678,3 +1678,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Replacing an async directory iterator with explicit reads fixes deferred ENOENT but a simultaneous close failure hides the original admission or inventory rejection.
 - **Root Cause**: A bare finally close replaces the pending exception, unlike the prior iterator's abrupt-completion behavior. Catching the whole iterator to recognize a missing root can also confuse a close ENOENT with a read ENOENT.
 - **Rule**: Catch only the actual read for optional-root classification, and follow the recovery index reader's primary control/limit priority when closing. Preserve standalone close failure, including ENOENT, as failure. Keep a double-fault regression for admission and inventory controls; restore an injected read spy before using the real read method to prove handle closure.
+
+### Real Provider Observers Must Follow The Actual Transport
+
+- **Symptom**: A real CLI request records provider usage but a global-fetch observer sees no dispatches; an Undici error diagnostic also appears after HTTP 200 and is labelled a network failure.
+- **Root Cause**: Production imports the installed Undici fetch instead of global fetch. The request controller is explicitly aborted during cleanup, so an error diagnostic alone does not establish provider/network failure.
+- **Rule**: Observe the actual native transport without consuming or replacing its response, and match its dispatch count and size to the accepted request's live telemetry under the installed profile. Keep diagnostic events separate from failure classifications; retain unknown cause when no safe reason was observed. Build freshness uses buildInputDigest(...).digest, with manifest.compilerInputs supplied.

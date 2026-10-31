@@ -406,7 +406,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批、第 24.39 节 | 部分完成 | Node/exe 普通/全屏的生产加载期输入、取消与错误恢复已验证；冷缓存、桌面全矩阵及完整性能验收仍缺 |
-| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40 节 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview、目录声明的两套词表及按需加载已实施；Node/exe 普通/全屏的小型本地模拟请求计数已验证，工具 JSON 与原生媒体/签名的计量边界已补强；不支持的 control/workflow 仍 unknown；其他模型词表、完整媒体/协议计量、真实 1.7k/4.9k 分项差额与性能验收尚缺 |
+| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40、24.43 节 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview、目录声明的两套词表及按需加载已实施；Node/exe 的小型模拟请求与工具 JSON 计量边界已验证，另有生产 Node CLI 的单次真实请求本地估算/provider 用量匹配证据；不支持的 control/workflow 仍 unknown；其他模型词表、完整媒体/协议计量、真实 TUI 衔接、历史 1.7k/4.9k 分项差额与性能验收尚缺 |
 | ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批 | 本地验证 | 不借此宣称 ADD-08 完成 |
 | ADD-35 | P2 | 状态栏 live 估算与 provider 实测的优先级 | 第一百零五批、21.28–21.30 | 本地验证 | 真实 provider 延迟 |
 | ADD-36 | P2 | 目录刷新来源标记与能力上限准入 | 第一百零六至一百零八批 | 本地验证 | 真实外部索引内容与端到端 compaction |
@@ -6040,3 +6040,17 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 最终build的实际catalog在Node/Bun均返回正确空列表；生产Node/exe × regular/fullscreen四场真实PTY再次串行通过，新项目执行 `/restore` 显示“尚无快照”，无读取失败或Fatal error。四场均账本未创建、配置bytes不变、auth文件仍不存在、exit0/cooked flags恢复、relay退出和夹具删除。每场独立HOME、profile、Git项目与安全环境，offline+synthetic，无provider认证或业务写入；终端输出只留内存并丢弃，保留安全计数与检查收据。中间build的四场PTY单独标为intermediate，不与最终build混算。
 
 正式脚本、旧exe产品失败、夹具错误分类、双故障控制、反转与最终源码快照归 `.omx/artifacts/phase20-addition-restore-cursor/`，owned scratch最终清理。本批没有真实损坏账本、外部provider、其他平台、完整性能、全仓回归、20k真实会话、新NormProof或独立委派复审证据；ADD-46维持本地验证，不提升其他恢复或Phase20验收。前批16c1b794的精确CI `41235289977` 延迟读回仍in_progress；本批提交/推送与自身CI另绑定，整体goal active。
+
+### 24.43 生产 CLI 的单次真实请求估算与 provider 用量对齐
+
+接续已推送 `205ed5672179cb8eebabdbdeffbdb891481a042b`，本批推进ADD-08真实计量证据，不修改产品代码。沿[实际请求投影](../../packages/ts-shell/src/context/request/projection.ts)、[前景请求用量回写](../../packages/ts-shell/src/turn/request.ts)及[provider用量归一化](../../packages/ts-shell/src/provider/response/usage.ts)检查：原始body只有在provider接受后才投影为安全尺寸和本地估算，随后同一个requestContext接入provider总输入。原生[传输owner](../../packages/ts-shell/src/provider/request/fetch.ts)使用安装的Undici，并不依赖global fetch；没有更改provider/auth核心、预算、请求体或任何凭据来源。
+
+实际只读配置检查确认有可用形态的API-key slot，选定请求为openai-compatible / bailu-2.9-preview、外部HTTPS地址；未输出地址、key或原始配置。当前地址没有匹配的精确目录声明，不能按模型名字猜词表，继续characters/3.5。两次真实调用各用独立受保护HOME、named profile和空Git项目，仅复制所选key/address/model到0600配置，关闭工具、MCP、skills、项目指令、cache warming和重试，单轮、输出256及请求/进程超时受限。CLI实际回答文本不保留，也未据此声称短回答质量验收。
+
+未改动的生产build `148356e5847d93e55a994d0ae73d681eb5c853a72c58c1994b8666780f9368ec`，连同manifest.compilerInputs核对当前源码摘要一致。Node20.3经正式scripts/start.mjs的新鲜度校验启动，最终真实调用由透明Undici入口观察与独立diagnostics双重确认：一次readiness GET和一次推理POST，均HTTP200；唯一POST、唯一requestContext和唯一usage entry身份与body尺寸一致。1784 UTF-8 bytes/1784 UTF-16 code units、3条含system消息、0 tools；serialized system/conversation/tools/envelope分别1258/382/0/144 bytes，raw base system source1220 bytes。它们是尺寸分项，不冒充精确分项tokens。
+
+同一最终请求的本地组装估算507，provider归一化总输入764，包含cache read640，输出用量256；CLI exit0、观测采样0 errors。差257、约1.51倍只属于这次隔离请求，cache read不能再加到764上。relay选定的模型名称不足以证明服务端词表、隐藏协议及计费口径，这组数据既不解释历史1.7k/4.9k，也不足以据此修补字符估算。当前仅证明真实Node --print的accepted-request计量链路；真实TUI启动估算→measured、binary、其他平台、完整媒体/协议、词表校准和性能验收仍缺，ADD-08保持partial。
+
+中间结果单独保留：首次harness将buildInputDigest结果对象与字符串比较，未发请求即拒绝，读取.digest后修正；第一次真实调用成功并测得507/764、cache256、output256，但global-fetch wrapper没有捕获实际传输，不算最终完整匹配证据。第二次真实调用才取得上述完整证据；两个独立夹具尺寸相同不证明body字节完全相同。Undici在HTTP200后另发出request:error诊断，早期harness误命名为networkFailure；产品确有finally清理abort，但未保留诊断原始原因，故最终只记requestErrorEvent、原因未分类，不把事件等同provider-network故障。该字段纠正重投影原数值收据，没有第三次请求。
+
+所有原始stdout/stderr仅内存读取后丢弃，不保存URL、headers、请求/响应正文、credential或prompt/session digest。两次真实调用均核对四个已知home根的config/auth/catalog原bytes不变或仍不存在、隔离config不变、含凭据scratch删除；正式安全收据与可复用脚本归 `.omx/artifacts/phase20-addition-live-count/`。本批仅文档与HANDOFF，无新build/tests、全仓回归、20k真实会话、新NormProof或独立委派复审；延迟读回99d99551/41234379850、9c547328/41233253348及16c1b794/41235289977的代码CI现已completed/success；205ed567/41236321295仍in_progress，其Watch已success，不替代代码CI。五项静态门、diff检查与两脚本语法检查均exit0；118既有docs-source advisory保留。安全收据分项求和、归一化输入一致、凭据/地址未进入正式证据及scratch缺失核验通过。本批提交/推送另绑定；原Phase20真实条件继续延后，整体goal active。

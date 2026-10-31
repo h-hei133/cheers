@@ -11147,3 +11147,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：恢复面板保持空账本与读取故障的边界
 
 [addition24.42](features/phase-20-addition.md#2442-恢复面板的空账本与游标关闭错误优先级)旧exe新项目 `/restore` 真实PTY误报读取失败，Node同账本返回空、Bun首次async read抛ENOENT确认。既有scanLedger首次缺失为空、其他或中途失败仍拒绝，显式close保留权限/预算主错误并不掩盖close失败。中间修复双故障2失败、旧实现2控制通过后补优先级；spy关闭断言问题已分类修正。Node20.3串行3文件最终52项，原owner反转5失败/5控制/12未选、精确恢复后52通过；五门/TS/exe最终build摘要148356e5847d读回通过。最终Node/exe×普通/全屏四原生PTY空态正确，配置不变/账本和auth未创建/exit0/cooked/夹具清理；只隔离offline synthetic，无真实损坏账本/其他平台/新judge/独立复审/全仓/20k。ADD-46维持本地验证、goal active；16c1b794 CI仍in_progress，交付另绑。
+
+
+### 2026-11-01：真实 provider 的单次请求计量证据
+
+[addition24.43](features/phase-20-addition.md#2443-生产-cli-的单次真实请求估算与-provider-用量对齐)在当前build148356e5847d经生产Node20.3 --print完成两次隔离真实推理；最终一次由原Undici fetch透明观察与native diagnostics确认1 GET/1 POST均HTTP200，body1784 bytes、3消息/0 tools、本地字符估算507、provider总输入764（含cache640）、output256、exit0。前次真实调用只有live telemetry，global-fetch观察未命中原传输；另digest对象误比与diagnostic错误命名均仅harness问题，保留中间安全收据、纠正未重发第三次。两次均原配置/auth/catalog bytes或缺失不变、隔离config不变、凭据scratch删除；无正文/地址/key留存。仅文档/HANDOFF，无产品改动或新build/tests；延迟读回99d99551、9c547328、16c1b794代码CI已success，205ed567仍in_progress、Watch success；五项静态门/diff/两脚本语法检查exit0，118既有advisory保留，安全收据与清理核验通过；交付另绑。历史1.7k/4.9k、真实TUI/binary、完整词表/协议/性能仍缺，ADD-08 partial、goal active。
