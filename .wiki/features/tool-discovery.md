@@ -2,7 +2,7 @@
 title: "动态工具发现"
 category: article
 created: 2026-10-17
-updated: 2026-10-23
+updated: 2026-11-01
 tags: [tools, context, phase-20]
 summary: "默认只声明常驻工具并提供 search/load 入口；加载只改变下一次请求的 schema，不授予执行权限；full 模式保留诊断与对照。"
 ---
@@ -11,11 +11,13 @@ summary: "默认只声明常驻工具并提供 search/load 入口；加载只改
 
 默认 `toolDiscovery: "dynamic"`。模型首次请求只收到常驻工具、`tool_search` 与 `tool_load` 的 schema；其余工具按名称搜索并加载后，在**下一次**请求中获得完整 schema。
 
+发现入口同样受 `allowedTools`/`disabledTools`/`hiddenToolPrefixes` 约束。若任一入口不准入，则直接声明过滤后的实际工具池，保证显式允许的工具不依赖被禁止的加载入口；空池不追加元工具。显式 allowlist 要保留动态发现时，须包含两个入口及要允许发现的实际工具。该退化只改变声明方式，不授予额外工具或绕过执行权限。
+
 ## 1. 常驻与可发现
 
-常驻：`read`、`glob`、`grep`、`bash`、`edit`、`write`、`apply_patch`、`ask`、`taskOutput`、`taskStop`。当前可见性过滤之后不存在的名字不会凭空出现。
+常驻：`read`、`glob`、`grep`、`bash`、`edit`、`write`、`apply_patch`、`ask`、`task`、`taskOutput`、`taskWait`、`taskStop`、`todo`。当前可见性过滤之后不存在的名字不会凭空出现；运行显式提供的feature工具也进入初始集合。
 
-可发现：其余通过 `allowedTools`/`disabledTools`/`hiddenToolPrefixes`/MCP 开关与模式过滤后的工具，包括 `browser`、`desktop`、`lsp`、`web_fetch`、`web_search`、`todo`、`task`、`skill`、feature 与 MCP 工具。MCP 工具沿用现有 `mcp__<server>__<tool>` 命名空间。
+可发现：其余通过 `allowedTools`/`disabledTools`/`hiddenToolPrefixes`/MCP 开关与模式过滤后的工具，包括 `browser`、`desktop`、`lsp`、`web_fetch`、`web_search`、`skill` 与 MCP 工具。MCP 工具沿用现有 `mcp__<server>__<tool>` 命名空间。
 
 `toolDiscovery: "full"` 保留全部 schema，用于故障诊断和成对评测；命令检查（`/tools` 等）始终使用完整池，不受模型运行模式影响。
 

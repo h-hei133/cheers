@@ -11162,3 +11162,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：单文件程序的真实计量衔接
 
 [addition24.45](features/phase-20-addition.md#2445-生产单文件程序的真实-provider-计量衔接)当前exe43e9cd3ad833经compilerInputs/size/SHA核对，普通/全屏两场真实PTY从估算561切到provider803/802，含cache640，context顶部/最后请求/持久用量一致，query原事件completed/success；每场一user/一记录request/零tool，accepted报告1975-byte分项相等。未注入Node observer或观察native HTTP，不称HTTP计数/状态独立证据，未评回答质量。exit0/cooked/owned进程关闭、四home来源及隔离config不变、凭据与会话scratch删除；RSS采样峰值210688/211048KiB不算性能验收。无产品改动，不重复build/tests/反转；五门/语法/diff通过、118既有advisory保留，原始key/address缺席及scratch清理核验通过；一次延迟读回d9eb5492代码CI已success，48f1407e仍in_progress、Watch success。ADD-08仍partial，其他环境/历史差额/完整计量性能仍缺，原Phase20真实条件延后、goal active，交付另绑。
+
+
+### 2026-11-01：发现入口与实际工具准入一致
+
+[addition24.46](features/phase-20-addition.md#2446-动态发现入口遵守工具限制显式延迟工具可直接使用)旧目录过滤后追加search/load，空allowlist仍声明两schema、显式延迟工具只能经被拒入口访问。既有owner共用visibility，发现对不完整或空池时直接返回已准入池；默认发现保留，合法生成名称不再误报未知。定向参考决定先于修补，执行scope门不放松。旧owner与显式反转均11失败/1控制/109未选，逐字节恢复后Node20.3串行四文件135项再次通过；五门/TS/exe build720d10afc7d9摘要与exe SHA核对。Node/exe×空/read/web_fetch六实际CLI只发精确集合，各一loopback POST/usage123/completed success/exit0，配置与项目不变、夹具清理；模拟provider无真实工具执行，不算外部provider/PTY/性能证据。最终门/语法/diff通过、118既有advisory保留、收据与源码核对及scratch清理完成；48f1407e与35b939c3代码CI仍in_progress、Watch success。ADD-03/08仍partial、默认/历史差额未解释、goal active，交付另绑。

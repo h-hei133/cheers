@@ -1690,3 +1690,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A status gauge has a current provider measurement, but the same session's context report marks it stale despite the caller supplying the live request identity.
 - **Root Cause**: A conditional object spread can pass an undeclared optional field without an excess-property error; the intermediate bridge silently drops it before the command's identity check.
 - **Rule**: Declare and forward the existing owner identity through the bridge. Verify the actual slash route in interactive and print modes, including current, cleared and replaced identities. Preserve strict stale rejection rather than validating saved telemetry against itself; provider acceptance and usage alone do not prove a completed query.
+
+### Generated Discovery Tools Must Share The Catalogue's Restrictions
+
+- **Symptom**: An empty tool allowlist still sends search/load schemas, or an explicitly allowed deferred tool cannot be reached because the execution gate rejects its generated discovery helpers.
+- **Root Cause**: The catalogue filters ordinary tools before appending discovery entry points, while the execution gate correctly applies the original allowlist to every call. Generated names are also falsely reported as unknown before they exist.
+- **Rule**: Apply the existing visibility policy to both discovery entry points before choosing dynamic mode. When either is restricted, expose the admitted ordinary pool directly; an empty pool remains empty. Keep default dynamic loading and the execution gate intact. Verify actual preview and accepted wire sets for empty, pinned and deferred allowlists, plus disabled/hidden entry points and explicit metadata names. Put transport-double assertions after the call returns: the real provider adapter classifies thrown fetch errors, which otherwise hides the original test assertion.

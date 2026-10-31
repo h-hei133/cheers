@@ -11,7 +11,7 @@ import { assertAdmission, type Admission } from '../network/admission.js';
 import { catalogContributions } from '../catalog/contributions.js';
 import { createDefaultExecutionService } from '../../runtime/execution/service.js';
 import { sameValue } from '../../config/values.js';
-import { createToolDiscovery, type ToolDiscovery } from './discovery/state.js';
+import { createToolDiscovery, DISCOVERY_LOAD_TOOL, DISCOVERY_SEARCH_TOOL, type ToolDiscovery } from './discovery/state.js';
 import { discoveryTools } from './discovery/tools.js';
 
 export interface ToolCatalogInput {
@@ -68,8 +68,14 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
     if (combined.has(tool.name)) throw new Error('Feature tool registration collides with an existing tool.');
     combined.set(tool.name, tool);
   }
-  const restricted = input.runtimeConfig ? restrictToolPool(combined, input.runtimeConfig) : combined;
-  if (!input.discover) return { skills, tools: restricted };
+  const discoveryNames = input.discover ? [DISCOVERY_SEARCH_TOOL, DISCOVERY_LOAD_TOOL] : [];
+  const restricted = input.runtimeConfig ? restrictToolPool(combined, input.runtimeConfig, discoveryNames) : combined;
+  // Generated entry points obey the same visibility contract as ordinary tools.
+  // Without the complete discovery pair, offer admitted tools directly so an
+  // explicitly allowed deferred tool remains callable without a forbidden load.
+  const discover = input.discover && restricted.size > 0 && (!input.runtimeConfig
+    || filterVisibleToolNames(discoveryNames, input.runtimeConfig).length === discoveryNames.length);
+  if (!discover) return { skills, tools: restricted };
   // Feature tools are the run's explicit capability, not general catalogue
   // entries: a director's worker controls or a research probe must be present
   // in the first request, so they join the initial set alongside pinned tools.
@@ -176,12 +182,13 @@ async function mcpToolsForRun(
 function restrictToolPool(
   registry: ReadonlyMap<string, ToolDefinition>,
   runtimeConfig: RuntimeConfig,
+  generatedNames: readonly string[],
 ): ReadonlyMap<string, ToolDefinition> {
   // A name in the allowlist that matches no tool is a typo, and a typo here is
   // invisible: the run simply offers fewer tools than intended and the model
   // works around it. Reported rather than rejected, because a shared config may
   // legitimately name a tool this build does not have.
-  const unknown = (runtimeConfig.allowedTools ?? []).filter((name) => !registry.has(name));
+  const unknown = (runtimeConfig.allowedTools ?? []).filter((name) => !registry.has(name) && !generatedNames.includes(name));
   if (unknown.length > 0) {
     createComponentLogger("tools").warn(
       `Ignoring ${unknown.length} name(s) in allowedTools that match no tool: ${unknown.join(", ")}.`,

@@ -57,6 +57,7 @@ import { noteCredentialRateLimit, resetCredentialBackoffForTests } from '../../.
 import { captureThinkingPreference } from '../../../core/models/preference.js';
 import { BUILTIN_PROVIDERS, type CatalogModel } from '../../../core/models/catalog.js';
 import { projectModelSelection } from '../../../session/model/projection.js';
+import type { RequestContext } from '../../../context/request/model.js';
 
 let root: string;
 let repositories: ReturnType<typeof gitFixture>[] = [];
@@ -1395,6 +1396,40 @@ it('rejects tool history for a model that cannot call tools before request const
 
   await expect(load('continue')).rejects.toThrow('does not support tool history');
   expect(wire).not.toHaveBeenCalled();
+});
+
+it.each([[], ['read'], ['web_fetch']].map(allowedTools => ({ allowedTools })))(
+  'previews and sends exactly the explicit tool allowlist $allowedTools', async ({ allowedTools }) => {
+  const { cwd, context, session, load } = fixture();
+  const config = { ...context.runtimeConfig, maxTurns: 2, allowedTools };
+  Object.assign(context, { runtimeConfig: config, configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
+  const prompt = 'Answer from the supplied context.';
+  const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+  const preview = await load(prompt); preview.verify();
+  const previewBody = JSON.parse(JSON.stringify(wire.mock.results.at(-1)!.value));
+  const prepared = await preparePromptRequest({ workspaceRoot: cwd, sessionId: session.id, runtimeConfig: config,
+    skillOptions: context.skillOptions, agentMode: 'build', featureTools: foregroundTools(context) });
+  let accepted: RequestContext | undefined;
+  let transmitted: Record<string, unknown> | undefined;
+  const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+    transmitted = JSON.parse(String(init?.body));
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'done' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 123, completion_tokens: 1 } }), { headers: { 'content-type': 'application/json' } });
+  });
+  const step = createStepFunction({ provider: { provider: 'openai', model: 'fixture', baseUrl: 'https://fixture.invalid/v1', headers: {} },
+    workspaceRoot: cwd, sessionId: session.id, systemPrompt: prepared.system.text, systemPromptSources: prepared.system.sources,
+    tools: toolSchemas(prepared.currentTools()), catalog: context.configuration.current.catalog,
+    temperature: config.temperature, topP: config.topP, maxOutputTokens: configuredOutputLimit(config, endpoints.DEFAULT_ENDPOINT_KIND), fetchImpl });
+  try {
+    await step([openingMessage({ workspaceRoot: cwd, prompt, permissionScope: 'ask' })], new AbortController().signal, {},
+      { allowTools: true, onRequestSent: sent => { accepted = sent.context; } });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(transmitted).toEqual(previewBody);
+    const tools = transmitted?.tools;
+    expect(Array.isArray(tools) ? tools.map(tool => tool.function.name) : []).toEqual(allowedTools);
+    expect(accepted?.localEstimate?.tokens).toBe(preview.estimate.tokens);
+    expect(accepted?.parts?.tools.bytes).toBe(allowedTools.length ? Buffer.byteLength(JSON.stringify(previewBody.tools)) : 0);
+  } finally { resetSessionUsage(session.id); }
 });
 
 const previewDispatchCases: Array<{ capability: string; toolCalling?: boolean; toolDiscovery: 'dynamic' | 'full';

@@ -365,7 +365,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---|---|---|---|---|
 | ADD-01 | P0 | model 面板未配置模型可聚焦、可浏览、可进入精确配置 | 第 3.2、第 15 节首批、第八十六至九十七批 | 部分完成 | 用户原环境按键现场；真实认证服务的完整往返（自动回返已在 `modelAuthentication` 实现并有测试） |
 | ADD-02 | P0 | model 分类/角色/预设/连接/详情的完整导航与操作路径 | 第 3.3、第六批、第七十六至九十八批 | 部分完成 | 真实 provider 的能力/认证组合矩阵（角色独立 thinking 编辑已由 `modelRoleThinkingPicker` 实现并有测试） |
-| ADD-03 | P0 | settings 分类/section/编辑器/Apply/来源的真实路径 | 第 3.4、第三十八至三十九批、第一百至一百零三批 | 部分完成 | 其余字段×来源×编辑器×窗口组合 |
+| ADD-03 | P0 | settings 分类/section/编辑器/Apply/来源的真实路径 | 第 3.4、第三十八至三十九批、第一百至一百零三批、第24.46节 | 部分完成 | 工具allowlist与发现入口的实际声明已修补；其余字段×来源×编辑器×窗口组合 |
 | ADD-14 | P0 | settings 顶部导航，左右键切分类、Tab 切条目与分节 | 第 32 项、21.2、21.15 | 本地验证 | 真实桌面鼠标/键盘；其他平台 |
 | ADD-15 | P2 | model 面板未就绪项置底、组内字母序、Not ready 分隔标题 | 第 35 项、21.5、21.16 | 本地验证 | 真实面板观感；窄屏分隔标题 |
 | ADD-16 | P1 | 区分 config.json 与 models.json 的归属，并显示目录加载诊断 | 第 31 项、19.5、21.1、21.14 | 本地验证 | 用户真实 models.json 现场 |
@@ -406,7 +406,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批、第 24.39 节 | 部分完成 | Node/exe 普通/全屏的生产加载期输入、取消与错误恢复已验证；冷缓存、桌面全矩阵及完整性能验收仍缺 |
-| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40、24.43–24.45 节 | 部分完成 | 纯组合、模板、原生研究/review preview、目录声明的词表及按需加载已实施；生产 Node/exe 普通/全屏真实 TUI 的提交前估算、accepted 请求和 provider 实测已对齐，context 报告身份漏传已修补；不支持的 control/workflow 仍 unknown；其他环境/provider、其他词表、完整媒体/协议、历史 1.7k/4.9k 分项差额与性能验收尚缺 |
+| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40、24.43–24.46 节 | 部分完成 | 纯组合、模板、原生研究/review preview、目录词表及按需加载已实施；Node/exe真实TUI计量衔接、context身份转交及受限工具目录的实际schema/估算已修补验证；不支持的control/workflow仍unknown；默认完整请求的真实差额、其他环境/provider/词表、完整媒体/协议与性能验收尚缺 |
 | ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批、第 24.44–24.45 节 | 本地验证 | 当前报告身份经真实 slash 桥接与 Node/exe TUI 验证；不借此宣称 ADD-08 完成 |
 | ADD-35 | P2 | 状态栏 live 估算与 provider 实测的优先级 | 第一百零五批、21.28–21.30 | 本地验证 | 真实 provider 延迟 |
 | ADD-36 | P2 | 目录刷新来源标记与能力上限准入 | 第一百零六至一百零八批 | 本地验证 | 真实外部索引内容与端到端 compaction |
@@ -6082,3 +6082,15 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 每场protected HOME/profile/空Git项目，仅在0600临时配置复制所选真实key/address/model；tools/MCP/skills/context files/cache warming/retry关闭，offline禁止自主检查但保留显式真实provider。单轮、1024输出、65秒、2MiB输出/会话文件上限；100ms采样relay/CLI RSS，768MiB阈值触发停止，实际峰值210688/211048KiB。这是采样守卫及小夹具观测，不是内核硬限额、Bun堆上限或性能验收。两场exit0/cooked flags恢复、PID+start-time确认owned进程关闭，原配置/auth/catalog四home来源bytes或缺失与隔离config不变；含凭据配置和原生会话正文随scratch全部删除。正式收据只含数值、固定枚举与布尔，raw PTY在内存丢弃，未保留请求/响应/推理正文、headers、key/address或文本digest。
 
 正式可复用runner、安全收据与核验归`.omx/artifacts/phase20-addition-live-binary/`，复用既有环境、build摘要与PTY relay。无新产品代码，故不重复build/unit/反转；五项静态门、runner语法与diff均exit0，118既有docs-source advisory保留；正式证据内原始key/address缺席及owned scratch清理另经核验。无全仓回归、20k真实PTY、新local NormProof或委派复审。一次延迟读回d9eb5492/41237373096代码CI现已completed/success；48f1407e/41239014279仍in_progress，Watch41239014307已success，不替代代码CI。ADD-08保持partial，其他环境/provider、词表/媒体/协议、历史差额和完整性能仍缺；原Phase20真实条件继续延后，goal active，本批提交/推送另绑定。
+
+### 24.46 动态发现入口遵守工具限制，显式延迟工具可直接使用
+
+接续已推送`35b939c384932a40414b98dfbee94394b81debc8`，继续ADD-08实际schema组成检查时，发现ADD-03工具设置的消费缺陷：[目录owner](../../packages/ts-shell/src/core/tools/catalog.ts)先按allowlist/disabled/prefix过滤普通工具，再无条件追加tool_search/tool_load。空allowlist仍发两个schema；仅允许read仍额外声明两个；仅允许web_fetch时本体被延迟、发现入口却不获执行门准入，实际允许能力无法访问。执行门仍正确拒绝，并非已经执行了越权工具；问题是声明与实际准入不一致。此前单步closing会省略schema，因此前两批maxTurns=1真实计量不会发现该问题，不能拿该证据证明一般两步以上请求的空allowlist。
+
+先查本项目目录、request preparation、preview/step、scope gate，后定向只读比较pi快照f09d01b85e0384647fcab6779d35ab9dabe04be3的agent-session:1554–1594：选择、allowlist与hidden控制工具激活；本项目采用同一边界原则，保留自己对全部工具的严格scope门，不引入参考的MCP例外。另查oh-my-pi快照338d2ce6658dfdbfba19efe0f006f0d5a8edd66d的session-tools:1280–1350，参考因transport需求可追加write；本项目不采用此自动加能力决定，因为显式空allowlist与当前执行合同必须成立。原owner复用filterVisibleToolNames判断两个生成入口，任一受限就返回原已过滤完整池；空池不建立discovery。默认两入口均准入时仍动态加载，未改常驻列表、执行门、权限默认、provider/auth或build行为。显式合法生成名称不再误报unknown，发现合同与当前常驻清单同步。
+
+新增[目录回归](../../packages/ts-shell/src/core/tools/catalog.test.ts)覆盖空/延迟工具/只有search的allowlist、禁用search或load、隐藏prefix、空目录、默认发现和显式两入口控制；[preview实际step](../../packages/ts-shell/src/cli/runtime/context/preview.test.ts)覆盖空/read/web_fetch三种allowlist，核对发送集合、preview与accepted计量及schema尺寸。旧owner有效baseline为11失败/1控制/109未选；首次transport double内断言被adapter归类为fetch失败，表现为accepted缺失，该断言位置问题单独留档并改为返回后核验，才取得可解释baseline。显式原源码反转再现同11失败/1控制，逐字节恢复核对SHA；主代理Node20.3单worker/768MiB串行四文件最终及恢复后均135项通过，无全仓或15套并行执行。
+
+五项静态门与TS/exe构建通过，build`720d10afc7d9805b4504367ac9062e56a9298cf5878aec99767ca26549ebc059`当前compilerInputs摘要匹配，exe SHA`eea0b1e720e524ba8174a95f68d9cc3f885fbfd72300dd5477062420a004babf`与manifest size核对。生产Node/exe各三场--print经原生HTTP到本地模拟provider，maxTurns=2保留首步工具能力：空/read/web_fetch分别只发送[]/[read]/[web_fetch]，每场一次GET+一次POST，body1537/2578/2023bytes、schema0/1007/447bytes、2消息；usage123为显式模拟数据，各一query completed/success、一条记录request、零tool calls、exit0。每场独立HOME/profile/空Git项目/synthetic key、offline/无skills/context files/MCP/cache warming/retry，config及project不变、owned夹具清理；25秒/1MiB/100ms采样768MiB阈值，仅小夹具内存保护，不算性能验收。该probe验证实际声明而未让模型执行read/web_fetch，不算真实外部provider、网络工具效果或桌面PTY验收。
+
+正式反转、测试、构建与可复用CLI收据归`.omx/artifacts/phase20-addition-discovery-scope/`；本批不读取真实凭据，无新真实provider请求、PTY、local NormProof或委派复审。最终五门/runner语法/diff通过，118既有docs-source advisory保留；当前build摘要、源码快照、135项恢复后结果与六场CLI收据核对一致，owned scratch已删除。ADD-03/ADD-08仍partial，默认完整请求/历史1.7k与4.9k真实分项调查仍缺，本批不以固定usage解释该差额。一次延迟读回48f1407e/41239014279及35b939c3/41239648179代码CI均仍in_progress、各Watch已success；d9eb5492代码CI仍success，不替代本批自身CI。原Phase20真实条件继续延后，goal active，提交与推送另绑定。
