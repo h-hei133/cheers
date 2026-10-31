@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 节、第 24.7 节、第 24.8 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、已知 CI 夹具修复与实际请求端点诊断已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 节、第 24.7 节、第 24.8 节、第 24.9 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断与 fallback/pool 模型绑定已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5541,3 +5541,15 @@ ADD-70 仍部分完成：默认值已物理移出 auth，但其余重复事实�
 主代理串行运行 constraints34/runtimeConfig35/providerCredentials28，**97 项**通过，涵盖 legacy/split × explicit/fallback/pool/override、legacy/auth-only issuer、相同/缺失/blocked/provider-only、startup/reload 清除与重复重验证。实际 Linux Node20.3.0 上同 97 项通过，重复运行不累加。四条反转（删除提示、比较原始 resolution、打印 URL、保留旧提示）均实际 AssertionError，finally 逐字节恢复源码后再验证。五门与 build 通过，manifest `83ed9a95219d`。正式打包 NormProof exit0，依赖环与导入解析 satisfied；verdict partial，两个既有 interactiveMode 模块分别 21/22-name advisory，本批未新增 ceiling finding。未取得本批独立委派复审。
 
 延迟 CI：`73e332f1` 的 `41191224812` failure，25 项失败包括已由第24.7节修复的旧夹具及一个 browser healing CLI 场景；后者仍待单独分类。`3918c14f` 的 `41192490126` 和 `0f758c59` 的 `41192812005` 最后均 in_progress，两个 Watch success 不替代代码 CI。本批提交与自身 CI 单独绑定；未运行真实 provider、Windows、PTY、全仓或20k压测，未迁移真实 HOME。ADD-70 partial、整体 goal active，其余重复事实语义、旧版本回退与真实环境验收仍缺。
+
+### 24.9 fallback/pool 模型选择绑定实际连接
+
+后续重复事实审计实际复现两项：没有 activeProviderConnectionId 时，凭据 owner 已选中 fallback/pool 连接，但 `/model next` 返回 No active connection。`/thinking` inspection 也另按 raw active ID 推导模型/effort，可显示独立 provider slot 的值，和实际请求不同。
+
+`model/target.ts` 复用既有凭据解析并统一 session affinity；模型保存从已接受请求的 connectionId 捕获目标，新增 session-scoped 绑定以便恢复，global 仅更新该连接默认而不创造 shared active ID。hooks 后及 session 锁内同时检查自然选择和 forced target，防止另一连接的 timestamp/pool 拓扑变化被 target projection 隐藏。自然选择检查读取 shared config，避免把本 writer 已保存的 session model 投影进 global 第二阶段造成自冲突。独立 provider slot 与分文件归属保留；删除绑定连接后不借用 sibling/profile。`/thinking` inspection 同用请求解析；删除旧 currentModelPreference 的重复推导，只有既有 legacy project effort fallback 保留。
+
+只读参考对照：模型变更保存 provider/model 的 session identity，默认值只在显式 persist 时保存；请求采用认证解析后的 baseUrl。沿用身份绑定与显式全局保存原则，本项目另有命名连接/pool，故保留 connectionId 与自然选择重查，不把同协议的不同账号视为同一事实。
+
+主代理串行聚焦 selection46/effort26/provider30/modelCommand19，**121 项**在实际 Linux Node20.3.0 上通过；新增 fallback/pool loopback HTTP 断言验证实际 body.model、reasoning_effort、service_tier 与选中连接凭据。新增 session-only/恢复/删除后零fallback、global有无session、hook/锁内 sibling timestamp与pool选择改变拒绝；两个最初复现断言在旧代码实际失败。三条反转（退回 raw active ID、取消session绑定、移除自然选择重查）均 AssertionError，精确恢复源码后再验证。五门/build通过，manifest `1cb0041d151c`；正式打包 NormProof exit0，环/解析 satisfied，partial仅既有 interactiveMode21/22-name advisory。本批无独立委派复审、真实provider/Windows/PTY/全仓/20k压测。
+
+延迟CI `3918c14f`/`41192490126` failure24项均为第24.7节已修旧夹具，browser healing 此轮通过；此前单场景Node20.3也通过，现有证据仍不足判断它在 `73e332f1` 的失败根因。`0f758c59` 的代码CI `41192812005` 已 success，验证旧夹具修复；`e9f7a8c9` 的 `41193784458` 最后 in_progress，Watch success。旧SHA绿色不证明本批提交；ADD-70 partial、整体goal active，未迁移真实HOME，其余重复语义/旧版本回退/真实环境继续尚缺。

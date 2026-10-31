@@ -111,7 +111,7 @@ it.each(['command', 'picker'] as const)('keeps the actual CLI provider effort th
   expect(command.resolveConfigTarget(projectSessionModel(getRuntimeConfig(home), sessionId))).toMatchObject({ provider: 'google', model: 'next', thinkingEffort: 'low' });
 });
 
-it.each(['config', 'env', 'cli'] as const)('sends the selected %s model, effort and tier to its actual HTTP endpoint', async source => {
+it.each(['config', 'env', 'cli', 'fallback', 'pool'] as const)('sends the selected %s model, effort and tier to its actual HTTP endpoint', async source => {
   const requests: { url: string; authorization?: string; body: Record<string, unknown> }[] = [];
   const server = http.createServer(async (request, response) => {
     const chunks: Buffer[] = [];
@@ -128,9 +128,12 @@ it.each(['config', 'env', 'cli'] as const)('sends the selected %s model, effort 
     const baseUrl = `http://127.0.0.1:${address.port}/v1`;
     const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
     writeUserRuntimeConfigFile({ ...edit.values, maxOutputTokens: 100, reserveTokens: 0, retryEnabled: false,
+      ...(source === 'fallback' || source === 'pool' ? { activeProviderConnectionId: undefined,
+        providerConnections: [{ ...connection(), baseUrl, model: 'base', thinkingEffort: 'low' as const }] } : {}),
+      ...(source === 'pool' ? { accountPool: { openai: { connections: ['named'] } } } : {}),
       providerCredentials: { openai: { ...edit.values.providerCredentials!.openai, baseUrl } } }, edit);
     if (source === 'env') vi.stubEnv('OPENAI_API_KEY', 'synthetic-env');
-    const resolveConfigTarget = (config: RuntimeConfig) => resolveProviderCredential({ runtimeConfig: config,
+    const resolveConfigTarget = (config: RuntimeConfig) => resolveProviderCredential({ runtimeConfig: config, pool: { sessionId },
       ...(source === 'cli' ? { cliApiKey: 'synthetic-cli', cliBaseUrl: baseUrl } : {}) });
     const command = { ...context(), resolveConfigTarget };
     expect((await runModelCommand(['next', '--effort', 'high'], command)).output).toContain('Model switched to next');
@@ -141,7 +144,7 @@ it.each(['config', 'env', 'cli'] as const)('sends the selected %s model, effort 
       ...captureThinkingPreference(home, resolution.thinkingEffort),
       providerCatalog: loadCatalog(), agentMode: 'build', workspaceRoot: home, sessionId }, new Map(), {});
     expect((await step([{ role: 'user', content: 'Check the selected provider model.' }], new AbortController().signal, {}, { allowTools: false })).text).toContain('Provider selection received.');
-    expect(requests).toEqual([{ url: '/v1/chat/completions', authorization: `Bearer synthetic-${source === 'config' ? 'profile' : source}`,
+    expect(requests).toEqual([{ url: '/v1/chat/completions', authorization: `Bearer synthetic-${source === 'config' ? 'profile' : source === 'fallback' || source === 'pool' ? 'named' : source}`,
       body: expect.objectContaining({ model: 'next', reasoning_effort: 'high', service_tier: 'flex' }) }]);
   } finally {
     server.closeAllConnections();

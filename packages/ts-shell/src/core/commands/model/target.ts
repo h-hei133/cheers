@@ -36,9 +36,13 @@ export function targetResolutionIdentity(context: CommandContext, config: Runtim
 
 /** Preference edits preserve legacy cascade semantics as well as explicit bindings. */
 export function selectionRequest(context: CommandContext, config: RuntimeConfig, selection: SessionModelSelection) {
-  const candidate = projectModelSelection(config, selection);
-  return context.resolveConfigTarget?.(candidate, context.sessionId)
-    ?? resolveProviderCredential({ runtimeConfig: candidate, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
+  return modelRequest(context, projectModelSelection(config, selection));
+}
+
+/** Selection and revalidation use the request owner's same session affinity. */
+export function modelRequest(context: CommandContext, config: RuntimeConfig) {
+  return context.resolveConfigTarget?.(config, context.sessionId)
+    ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
 }
 
 /** Named targets require their own credential. Provider targets use the accepted CLI/env/profile source. */

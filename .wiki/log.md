@@ -10974,3 +10974,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：端点诊断跟随实际请求并隐藏地址
 
 [addition24.8](features/phase-20-addition.md#248-实际请求端点诊断与独立-provider-默认)端点关系诊断由原始loader迁入既有constraint owner，覆盖fallback/pool/CLI与账号issuer；独立provider slot保留，blocked不宣称覆盖，URL不入诊断，重验证清除旧提示。legacy/split组合与auth-only、两文件bytes/absence、startup/reload等3文件97项本地及实际Node20.3通过；四反转AssertionError/逐字节恢复、五门/build通过，manifest83ed9a95219d。正式judge仅两个既有interactiveMode21/22-name advisory。73e332f1代码CI失败25项，旧夹具已修、一个browser healing CLI场景待分类；3918c14f/0f758c59代码CI最后in_progress，Watch成功不作代码通过。未真实provider/Windows/PTY/全仓，本批无独立委派复审；ADD-70 partial、goal active，本批提交/CI单独绑定。
+
+### 2026-10-31：fallback/pool 模型保存与 thinking 跟随实际请求
+
+[addition24.9](features/phase-20-addition.md#249-fallbackpool-模型选择绑定实际连接)复现无active ID但已有resolved连接时/model拒绝保存。现捕获connectionId、session显式绑定，global仅改该连接默认；hook/锁内重查自然选择，拒绝sibling timestamp/pool变更，删除后零fallback。thinking inspection复用同resolver、删旧推导。实际Node20.3上4文件121项含loopback wire通过；3反转AssertionError/精确恢复、五门/build通过，manifest1cb0041d151c，judge仅既有interactiveMode advisory。0f758c59代码CI41192812005已success；3918c14f失败24项都是已修夹具、browser healing通过，旧一次失败根因仍未确认。e9f7a8c9代码CI最后in_progress，Watch成功；未真实provider/Windows/PTY/全仓，本批无独立委派复审，ADD-70 partial、goal active。

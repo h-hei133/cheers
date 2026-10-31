@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SessionManager } from "../SessionManager.js";
 import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readUserRuntimeConfigFile, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 import { runModelCommand } from "../../core/commands/modelCommandRuntime.js";
+import { runThinkingCommand } from '../../core/commands/thinkingCommandRuntime.js';
 import { createCliProviderRuntimeBridge, resolveCliCredential } from "../../cli/provider/cliProviderRuntimeBridge.js";
 import { createShellRuntimeContext, refreshShellRuntimeConfig, switchActiveSession } from "../../core/shell/runtimeContext.js";
 import { createSessionStoreLayout, locateExistingSessionLayout } from "../store/sessionFileLayout.js";
@@ -18,6 +19,7 @@ import * as files from '../store/sessionFileStore.js';
 import { defaultHookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import { buildCliCommandExecution } from '../../entrypoints/cliCommandExecutionBridge.js';
 import type { StreamingRenderer } from '../../presentation/terminal/streaming.js';
+import { userCatalogPath } from '../../core/models/catalogStore.js';
 
 let home: string;
 let manager: SessionManager;
@@ -356,4 +358,130 @@ it('allows sequential selections and a no-op after a model-only session overlay 
     if (before.selection?.model === model) expect(readSessionModelEdit(session.id).revision).toBe(before.revision);
   }
   expect(configBytes()).toEqual(original);
+});
+
+it.each(['fallback', 'pool'] as const)('binds a session model change to the resolved %s connection without changing shared defaults', async mode => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: undefined,
+    providerConnections: edit.values.providerConnections!.map(item => ({ ...item, thinkingEffort: 'low' as const })),
+    providerCredentials: { openai: { apiKey: 'synthetic-independent', model: 'independent-model', thinkingEffort: 'high' } },
+    ...(mode === 'pool' ? { accountPool: { openai: { connections: ['fixture'] } } } : {}) }, edit);
+  fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: { openai: { models: [
+    { id: 'base-model', reasoning: true }, { id: 'next-model', reasoning: true },
+  ] } } }));
+  const session = manager.createNew(home);
+  const shell = createShellRuntimeContext({ cwd: home, originalCwd: home, projectRoot: home, targetPathBase: home,
+    rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+    session, runtimeConfig: getRuntimeConfig(home),
+    resolveConfigTarget: (config, sessionId) => resolveProviderCredential({ runtimeConfig: config, env: {}, pool: { sessionId } }) });
+  const command = () => ({ cwd: home, projectRoot: home, sessionId: session.id, runtimeConfig: shell.runtimeConfig,
+    resolveConfigTarget: (config: typeof shell.runtimeConfig, sessionId?: string) => resolveProviderCredential({ runtimeConfig: config, env: {}, pool: { sessionId } }),
+    refreshRuntimeConfig: () => refreshShellRuntimeConfig(shell) });
+  const original = configBytes();
+  expect(command().resolveConfigTarget(shell.runtimeConfig, session.id).credential?.connectionId).toBe('fixture');
+  expect((await runThinkingCommand([], command())).output).toContain('Thinking effort: low.');
+  expect((await runThinkingCommand([], command())).output).toContain('Model: base-model.');
+  expect((await runModelCommand(['next-model', '--effort', 'high'], command())).output).toContain('Model switched to next-model');
+  expect(readSessionModel(session.id)).toEqual({ connectionScope: 'session', connectionId: 'fixture', provider: 'openai', model: 'next-model', thinkingEffort: 'high' });
+  expect(command().resolveConfigTarget(shell.runtimeConfig, session.id)).toMatchObject({ model: 'next-model', thinkingEffort: 'high',
+    credential: { connectionId: 'fixture', source: 'connection' } });
+  expect((await runThinkingCommand([], command())).output).toContain('Thinking effort: high.');
+  expect((await runThinkingCommand([], command())).output).toContain('Model: next-model.');
+  expect(configBytes()).toEqual(original);
+  expect(readUserRuntimeConfigFile().activeProviderConnectionId).toBeUndefined();
+  manager.persistUserPromptBarrier(session.id, 'resume selected model'); manager.saveInterrupted(session.id);
+  const restarted = new SessionManager(); expect(restarted.tryResume(session.id)).toMatchObject({ ok: true });
+  const resumed = projectSessionModel(getRuntimeConfig(home), session.id);
+  expect(command().resolveConfigTarget(resumed, session.id)).toMatchObject({ model: 'next-model', thinkingEffort: 'high', credential: { connectionId: 'fixture' } });
+  expect((await runModelCommand(['base-model'], command())).output).toContain('Model switched to base-model');
+  expect(readSessionModel(session.id)).toMatchObject({ connectionScope: 'session', connectionId: 'fixture', model: 'base-model' });
+  expect(configBytes()).toEqual(original);
+  const latest = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...latest.values,
+    providerCredentials: { openai: { apiKey: 'synthetic-profile-must-not-be-used', model: 'base-model' } },
+    providerConnections: [{ ...latest.values.providerConnections![0], id: 'replacement' }],
+    ...(mode === 'pool' ? { accountPool: { openai: { connections: ['replacement'] } } } : {}) }, latest);
+  const unavailable = command().resolveConfigTarget(projectSessionModel(getRuntimeConfig(home), session.id), session.id);
+  expect(unavailable.blocked).toBe('connection-unavailable');
+  expect(unavailable.credential).toBeUndefined();
+});
+
+it.each((['fallback', 'pool'] as const).flatMap(mode => [false, true].map(session => ({ mode, session }))))(
+  'updates only the resolved $mode model default on an explicit global save with session=$session', async ({ mode, session: withSession }) => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: undefined,
+    providerCredentials: { openai: { apiKey: 'synthetic-independent', model: 'independent-model' } },
+    ...(mode === 'pool' ? { accountPool: { openai: { connections: ['fixture'] } } } : {}) }, edit);
+  const auth = fs.readFileSync(getUserAuthPath());
+  const session = withSession ? manager.createNew(home) : undefined;
+  const result = await runModelCommand(['next-model', '--effort', 'high', '--global'], { cwd: home, projectRoot: home,
+    sessionId: session?.id,
+    resolveConfigTarget: (config, sessionId) => resolveProviderCredential({ runtimeConfig: config, env: {}, pool: { sessionId } }) });
+  expect(result.output).toContain('Global default stored at');
+  const saved = readUserRuntimeConfigFile();
+  expect(saved.activeProviderConnectionId).toBeUndefined();
+  expect(saved.providerConnections?.[0]).toMatchObject({ model: 'next-model', thinkingEffort: 'high' });
+  expect(saved.providerCredentials?.openai).toEqual({ apiKey: 'synthetic-independent', model: 'independent-model' });
+  if (session) expect(readSessionModel(session.id)).toEqual({ connectionScope: 'session', connectionId: 'fixture', provider: 'openai', model: 'next-model', thinkingEffort: 'high' });
+  expect(JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8')).providerConnections[0]).not.toHaveProperty('model');
+  // Updating a model also updates the connection timestamp; credential material remains exact.
+  const beforeAuth = JSON.parse(auth.toString('utf8'));
+  const afterAuth = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
+  delete beforeAuth.providerConnections[0].updatedAt; delete afterAuth.providerConnections[0].updatedAt;
+  expect(afterAuth).toEqual(beforeAuth);
+});
+
+it.each(['fallback', 'pool'] as const)('refuses a changed %s selection after the model hook without saving to either connection', async mode => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const first = edit.values.providerConnections![0];
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: undefined,
+    providerConnections: [first, { ...first, id: 'replacement', apiKey: 'synthetic-replacement', model: 'other-model' }],
+    ...(mode === 'pool' ? { accountPool: { openai: { connections: ['fixture'] } } } : {}) }, edit);
+  const session = manager.createNew(home);
+  const before = readSessionModelEdit(session.id);
+  let external: ReturnType<typeof configBytes> | undefined;
+  const request = (config: ReturnType<typeof getRuntimeConfig>, sessionId?: string) => resolveProviderCredential({ runtimeConfig: config, env: {}, pool: { sessionId } });
+  vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+    if (event.eventName === 'PreModelSwitch') {
+      const current = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+      writeUserRuntimeConfigFile({ ...current.values,
+        ...(mode === 'pool' ? { accountPool: { openai: { connections: ['replacement'] } } }
+          : { providerConnections: current.values.providerConnections!.map(item => item.id === 'replacement' ? { ...item, updatedAt: '2099-01-01' } : item) }) }, current);
+      expect(request(getRuntimeConfig(home), session.id).credential?.connectionId).toBe('replacement');
+      external = configBytes();
+    }
+    return undefined;
+  });
+  const result = await runModelCommand(['next-model', '--global'], { cwd: home, projectRoot: home, sessionId: session.id, resolveConfigTarget: request });
+  expect(result.output).toContain('conflict: this attempt did not write');
+  expect(external).toBeDefined(); expect(configBytes()).toEqual(external);
+  expect(readSessionModelEdit(session.id)).toEqual(before);
+});
+
+it.each(['fallback', 'pool'] as const)('rechecks the resolved %s choice inside the session lock before saving', async mode => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const first = edit.values.providerConnections![0];
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: undefined,
+    providerConnections: [first, { ...first, id: 'replacement', apiKey: 'synthetic-replacement', model: 'other-model' }],
+    ...(mode === 'pool' ? { accountPool: { openai: { connections: ['fixture'] } } } : {}) }, edit);
+  const session = manager.createNew(home);
+  const before = readSessionModelEdit(session.id);
+  const target = locateExistingSessionLayout(createSessionStoreLayout(), session.id);
+  const lock = files.withFileLock;
+  let external: ReturnType<typeof configBytes> | undefined;
+  vi.spyOn(files, 'withFileLock').mockImplementation((file, action, options) => lock(file, () => {
+    if (file === target.stateLockPath) {
+      const current = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+      writeUserRuntimeConfigFile({ ...current.values,
+        ...(mode === 'pool' ? { accountPool: { openai: { connections: ['replacement'] } } }
+          : { providerConnections: current.values.providerConnections!.map(item => item.id === 'replacement' ? { ...item, updatedAt: '2099-01-01' } : item) }) }, current);
+      external = configBytes();
+    }
+    return action();
+  }, options));
+  const result = await runModelCommand(['next-model', '--global'], { cwd: home, projectRoot: home, sessionId: session.id,
+    resolveConfigTarget: (config, sessionId) => resolveProviderCredential({ runtimeConfig: config, env: {}, pool: { sessionId } }) });
+  expect(result.output).toContain('conflict: this attempt did not write');
+  expect(external).toBeDefined(); expect(configBytes()).toEqual(external);
+  expect(readSessionModelEdit(session.id)).toEqual(before);
 });

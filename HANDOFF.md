@@ -1484,3 +1484,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A config-load warning calls an independent provider endpoint unused, misses fallback/pool/CLI choices or account issuer routing, and prints a URL that can contain secrets.
 - **Root Cause**: Raw active-connection fields are compared before credential and catalogue resolution; URLs are treated as safe display strings and a previously appended notice can survive a new target.
 - **Rule**: Compare normalized endpoints in the existing request constraint owner after credential/issuer resolution, suppress override claims for blocked or unresolved targets, and report only the relationship. Recompute this owner's notice on revalidation; preserve provider slots and both physical documents. Test split/auth-only sources and reverse issuer resolution, redaction and notice retirement.
+
+### Fallback Model Changes Must Bind The Selected Connection And Recheck Natural Selection
+
+- **Symptom**: A usable fallback/pool request cannot save a model because activeProviderConnectionId is absent; forcing its target during revalidation can instead save after the natural choice changes to a sibling.
+- **Root Cause**: Model persistence uses the raw active ID instead of the resolved credential's connectionId. Target projection pins that connection and hides selection changes; projecting the newly saved session preference into the later global-write check can also mistake this writer's model change for an external edit.
+- **Rule**: Capture the resolved connection, bind the session preference explicitly, and preserve the absent shared active ID. Recheck natural selection from fresh shared configuration around hooks and inside the session lock before checking the forced target. Use the same resolver and session affinity for thinking inspection. Test sibling timestamp/pool changes, combined session/global saves, resume and zero fallback after deletion.

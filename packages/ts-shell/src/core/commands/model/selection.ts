@@ -13,7 +13,6 @@ import { defaultHookDispatcher } from '../../hooks/hookDispatcher.js';
 import { loadCatalog } from '../../models/catalogStore.js';
 import { providerFacts } from '../../providers/facts.js';
 import { configurationApplicationNotice, readFreshConfiguration } from '../configuration.js';
-import { currentModelPreference } from './preference.js';
 import { globalModelFailure } from './outcome.js';
 import { effortCapability } from '../../models/capability.js';
 import { endpointShape } from '../../../provider/endpoints/index.js';
@@ -23,9 +22,8 @@ import type { ThinkingPreference } from '../../models/effort.js';
 import type { CommandContext } from '../types.js';
 import { connectionIdentity, credentialIdentity } from './identity.js';
 import { invalidatePromptMeasurement } from '../../../observability/usageTelemetry.js';
-import { resolveProviderCredential } from '../../shell/providerCredentials.js';
 import { captureThinkingPreference } from '../../models/preference.js';
-import { exactTargetMatches, targetRequest, targetResolutionIdentity } from './target.js';
+import { exactTargetMatches, modelRequest, targetRequest, targetResolutionIdentity } from './target.js';
 
 interface ExactSelection { readonly target: SessionModelTarget; readonly baseline?: SessionModelEdit; readonly roles?: SessionModelPolicy;
   readonly resolution?: string }
@@ -85,11 +83,11 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const connections = loaded.providerConnections;
   const projected = projectSessionModel(loaded, context.sessionId);
   const effective = context.readConfiguration?.().config ?? context.runtimeConfig ?? projected;
-  const actual = context.resolveConfigTarget?.(effective, context.sessionId)
-    ?? resolveProviderCredential({ runtimeConfig: effective, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
+  const actual = modelRequest(context, effective);
   const providerSlot = exact ? exact.target.connectionId === undefined
     : !projected.activeProviderConnectionId && !actual.credential?.connectionId;
-  const activeId = providerSlot ? undefined : exact?.target.connectionId ?? projected.activeProviderConnectionId;
+  const inferredConnection = !exact && !projected.activeProviderConnectionId && actual.credential?.connectionId !== undefined;
+  const activeId = providerSlot ? undefined : exact?.target.connectionId ?? projected.activeProviderConnectionId ?? actual.credential?.connectionId;
   const activeConnection = connections.find((item) => item.id.trim() === activeId);
   const provider = exact?.target.provider ?? activeConnection?.provider ?? (providerSlot ? actual.provider : loaded.provider);
   if (!isRuntimeProvider(provider)) return 'Model switch blocked: the selected provider is unavailable.';
@@ -97,14 +95,14 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   if (!exact && (!matchesRequestProvider(context, projected, provider) || !matchesRequestProvider(context, effective, provider))) {
     return 'Model switch blocked: the request provider differs from the saved active connection. Select a matching connection with /connect use, or restart without the provider override.';
   }
-  const current = currentModelPreference(effective, context.projectRoot ?? context.cwd);
-  const fromModel = actual.model ?? current.model ?? 'default';
-  model ??= actual.model ?? current.model;
+  const fromModel = actual.model ?? 'default';
+  model ??= actual.model;
   if (!model) return 'Model switch blocked: no concrete model is selected. Select one with /model use <model> before changing effort.';
   const thinkingEffort = requestedEffort === undefined
     ? captureThinkingPreference(context.projectRoot ?? context.cwd, actual.thinkingEffort).thinkingEffort : requestedEffort;
   const catalog = loadCatalog();
-  const scoped = exact?.target ?? (providerSlot ? { connectionScope: 'provider' as const, provider, model, thinkingEffort } : undefined);
+  const scoped = exact?.target ?? (providerSlot ? { connectionScope: 'provider' as const, provider, model, thinkingEffort }
+    : inferredConnection ? { connectionId: activeId!, provider, model, thinkingEffort } : undefined);
   const request = scoped ? targetRequest(context, loaded, scoped) : undefined;
   if (scoped && exact?.resolution !== undefined && targetResolutionIdentity(context, loaded, scoped) !== exact.resolution) {
     return 'Model switch blocked: the selected credential or endpoint changed. Reopen the model picker.';
@@ -134,7 +132,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   if (!providerSlot && !activeConnection) {
     return `Active connection not found: ${activeId}`;
   }
-  if (global && !providerSlot && ((projected.sessionConnection === undefined && config.activeProviderConnectionId?.trim() !== activeId)
+  if (global && !providerSlot && ((!inferredConnection && projected.sessionConnection === undefined && config.activeProviderConnectionId?.trim() !== activeId)
     || !config.providerConnections?.some(item => item.id.trim() === activeId)
     || loaded.configProvenance.providerConnections.files?.some(file => file.position !== undefined))) {
     return 'Global model save refused: the selected connection comes from a read-only config input. Save a session preference or edit its owning file explicitly.';
@@ -196,6 +194,8 @@ async function selectModel(args: string[], context: CommandContext, global: bool
       || !sameValue(catalogModel(currentCatalog, provider, model, catalogBaseUrl(currentCatalog, provider, baseUrl)), candidate)) return false;
     const currentConfig = readFreshConfiguration(context);
     if (global && providerSlot && !providerDefaultWritable(currentConfig, provider)) return false;
+    // A forced target would hide a changed fallback or pool selection during the hook.
+    if (inferredConnection && !sameValue(modelRequest(context, currentConfig), actual)) return false;
     if (scoped ? (!exactTargetMatches(context, currentConfig, scoped) || !sameValue(targetRequest(context, currentConfig, scoped), request))
       : !matchesRequestProvider(context, projectSessionModel(currentConfig, context.sessionId), provider)) return false;
     if (currentConfig.activeProviderConnectionId !== loaded.activeProviderConnectionId
@@ -219,7 +219,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const next: RuntimeConfigFile = {
     ...config,
     provider: activeProvider,
-    ...(providerSlot ? {} : { activeProviderConnectionId: activeId }),
+    ...(providerSlot || inferredConnection ? {} : { activeProviderConnectionId: activeId }),
     providerConnections: nextConnections,
     ...(providerSlot ? { providerCredentials: {
       ...(config.providerCredentials ?? {}),
@@ -235,7 +235,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     try {
       receipt = writeSessionModel(context.sessionId, {
         ...(providerSlot ? { connectionScope: 'provider' as const } : { connectionId: activeId!,
-          ...(exact || sessionEdit?.selection?.connectionScope === 'session' ? { connectionScope: 'session' as const } : {}) }),
+          ...(exact || inferredConnection || sessionEdit?.selection?.connectionScope === 'session' ? { connectionScope: 'session' as const } : {}) }),
         provider,
         model,
         thinkingEffort,
