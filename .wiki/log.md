@@ -11190,3 +11190,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：隔离预算下完成真实原生研究报告
 
 [addition24.51](features/phase-20-addition.md#2451-隔离输出预算下完成真实原生研究报告链)基于旧report实见2048输出上限，核对completion reserve是工作量余量而非输出cap，仅隔离profile改4096，保持产品默认/验证门/其他守卫。已推送1e9c6ad5及当前build7f47912610a7生产Node --print单次实际GET1+POST13均200，全部11个子阶段请求含两份正确skill各一次；8 child、3报告片段及实际复审read均原生接受，research completed、full-chain/CLI exit0。三个report实际output2536/2793/2605超过旧预算，不能反推旧unknown原因或承诺4096总成功。13份单请求用量逐项对齐共享账本42624input+19411output含cache23680，finalized13/pending0/unknown0/historyUnknownfalse/breachfalse。配置/fixture不变、自有进程及凭据/会话scratch清理、无正文/key/address留存；安全与公开夹具workflow核验passed，真实资料质量/金额仍unverified，RSS281092KiB不算性能验收。仅文档/HANDOFF，无新build/unit/PTY/全仓/20k/judge/委派复审；ADD-12补Node完整链路但exe/桌面仍缺、goal active。一次延迟1e9c6ad5代码CI与426c09c0文档CI仍in_progress，各Watch success；最终门与交付另绑。
+
+
+### 2026-11-01：生产单文件程序的真实原生研究
+
+[addition24.52](features/phase-20-addition.md#2452-生产单文件程序的真实原生研究与账本)当前build7f47912610a7稳定exe/不可变产物分别匹配SHA与size，直接生产--print完成隔离真实provider公开夹具研究，8 child/3片段/实际复审read均原生接受、research completed、完整链路及CLI exit0。两份skill/原输入持久值保持，子阶段11唯一requestIds+前景2历史=账本13尝试/13finalized，42094input+18826output含cache23424，pending/unknown0、historyUnknown/breachfalse。无Node observer/代理，故无独立HTTP、逐请求用量或阶段wire skill观察；不套用Node证据、不算质量/金额或性能验收。100ms原生账本14尝试取消阈值/240秒/2MiB/768MiB采样守卫未触发，2069次state采样无错误，RSS217496KiB、输出5418 bytes；配置/fixture不变，自有进程及凭据/会话scratch清理、安全audit与公开夹具native验收passed。仅文档/HANDOFF，无新build/unit/PTY/全仓/20k/judge/委派复审；ADD-12补exe完整链路但真实资料质量/桌面仍缺、goal active。一次延迟1e9c6ad5及54b7cf60 CI仍in_progress、Watch各success；job读取仅证实前者静态/脚本门/TS build已success、unit仍运行、judge pending，不算整体CI通过。最终门与交付另绑。

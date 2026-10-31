@@ -1739,3 +1739,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Research reserves room for later report work, yet a structured report still exhausts a smaller configured per-request output budget.
 - **Root Cause**: Completion reserve is admission workload room, not a maxOutputTokens override. The report schema's character bound is independent of the provider's token cap.
 - **Rule**: Inspect actual request caps and per-request usage separately from reserved workload and JSON size bounds. Test capacity changes in isolated configuration, retain earlier partial/unknown receipts, and preserve production caps and truncation rejection. A later completed workflow cannot establish an earlier unclassified request's cause or missing usage.
+
+### Stable Executable Copies Need Content Verification
+
+- **Symptom**: The stable executable and its manifest's immutable artifact have different realpaths despite matching build content.
+- **Root Cause**: Executable publication intentionally installs a regular stable copy; it does not require a symlink to the immutable artifact.
+- **Rule**: Verify the stable file type, size and SHA against the manifest and immutable artifact, together with current compiler inputs. Do not require their realpaths to match. Keep native ledger sampling distinct from a transport admission guard when verifying the compiled runtime.

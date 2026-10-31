@@ -417,7 +417,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---|---|---|---|---|
 | ADD-10 | P1 | 按源位置识别 slash/正文路径并 Tab 补全 | 第 8、第三批、第七十八至八十七批、第一百一十批 | 本地验证 | 真实 Windows 终端 |
 | ADD-11 | P1 | 正文 skill 候选与同提交多 skill 注入 | 第 9、第三批、21.22、21.24、第 24.48 节 | 本地验证 | Node/exe普通多skill真实派发及print原文保持已验证；真实计费金额、研究driver质量与其他环境组合仍缺 |
-| ADD-12 | P1 | 准入 slash 组合与 deep-research + skills | 第 10、第三批、第五十、五十二、五十九批、第 24.51 节 | 本地验证 | Node真实公开夹具在隔离4096输出预算下完成全部原生阶段/3片段，13请求账本全结；旧2048的partial/unknown保留，真实资料质量、exe研究及桌面仍缺 |
+| ADD-12 | P1 | 准入 slash 组合与 deep-research + skills | 第 10、第三批、第五十、五十二、五十九批、第 24.52 节 | 本地验证 | Node/exe真实公开夹具在隔离4096输出预算下均完成原生阶段/3片段，账本各13 finalized且unknown0；exe无独立HTTP/阶段正文观察，旧partial/unknown保留，真实资料质量与桌面仍缺 |
 | ADD-37 | P2 | 显式队列入口保留附件与正文尾部空白 | 第九十五批 | 本地验证 | 真实 provider/平台 |
 | ADD-38 | P2 | 引用路径、apostrophe、转义目录的补全往返 | 第七十八至八十七批 | 本地验证 | 原生 Windows 文件系统 |
 | ADD-39 | P2 | 代码示例、URL、转义 slash 不误触发命令/skill | 第二十九、七十九批 | 本地验证 | 真实终端 |
@@ -6220,3 +6220,29 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 证据归新建且无tracked碰撞的`.omx/artifacts/phase20-addition-research-capacity/`。执行前保存probe/observer的非可执行精确source快照，安全分类覆盖本地固定错误、原生deadline/cancel/admission/step bound和源码拥有的Network error前缀，未知仍不回显；本次没有触发停止分类，不声称补证旧未分类错误。独立核验同时计算publicFixtureWorkflowAcceptance与真实性/安全性：本次两者passed、nativeResearchStatus=completed，realWorldResearchQuality与billingAmount明确unverified；当前compilerInputs/inputsDigest、exe size/SHA及原fixture文本一致性已检查。此前各2048预算下的partial、未命中诊断、unknown账本及失败验收收据保持原值。
 
 本批只修改文档/HANDOFF并补ignored真实证据，没有新产品实现、build、unit、反转、PTY、全仓、20k、local NormProof或委派复审。一次延迟读回1e9c6ad5精确代码CI41246087467仍in_progress、Watch41246087514 success；426c09c0文档CI41244810468仍in_progress、Watch41244810449 success；均未用Watch代替代码CI，也不立刻轮询本批CI。ADD-12的Node公开夹具完整链路/全结账本缺口已补，真实资料研究质量、生产exe研究及桌面、实际金额仍缺；ADD-11不整体升级，原47真实条件延后、goal active。最终静态/语法/安全核验与提交/推送结果另绑。
+
+
+### 24.52 生产单文件程序的真实原生研究与账本
+
+沿第24.51节补生产exe的独立运行证据。使用已推送产品commit `1e9c6ad57803ae45ee63e18d917c457d4b9b2b35`、当前build `7f47912610a7f053bb88a9e5cf5b2d4a5ccf2a0da9b17221cefcb06311a78dec`；当前compilerInputs/inputsDigest匹配，稳定exe与manifest不可变产物分别核对106842240 bytes及SHA `e48368d37bb0fb42e2496379b48349b11f75f1397b268745483a83efd1c6b132`，Bun1.3.14/linux-x64。稳定发布是普通文件副本，两个realpath不同不表示build过期；本批按文件类型/size/SHA和当前输入校验，没有要求它必须是symlink。没有新产品改动、构建或默认配置变更。
+
+直接启动dist/bin/cheers --print，隔离profile仅复制当前选定的真实provider配置，仍为公开本地release.md、两份method skill加一次重复调用，完整原输入与原顺序去重保持。配置maxTurns2、maxOutputTokens4096，仅允许read/research_run；关闭MCP/context files/discovery/warming/retry/save。原生研究最终status=completed，8个child均completed，实际brief/investigate/review各有本地读取收据，来源1/claim1、独立复审completed、3个报告片段获原schema/顺序/绑定/引用检查接受。无stop reason、pending child或owner，完整链路runner/CLI均exit0，query completed/success亦实见。
+
+| 观察 | exe原生持久状态 |
+|---|---|
+| 子阶段requestIds计数 | brief2、investigate2、gaps1、draft1、review2、report3，共11个唯一ID |
+| 前景recentRequests | 2，不能代替整个研究计量 |
+| 共享账本尝试 / finalized | 13 / 13，与子阶段ID数+前景历史数相符 |
+| 账本input / output tokens | 42094 / 18826 |
+| input内含cache read | 23424，cache write0 |
+| pending / unknown / historyUnknown / breach | 0 / 0 / false / false |
+| 已接受报告片段 / 复审 | 3 / completed，有实际复审read |
+| RSS采样峰值 / 输出bytes | 217496KiB / 5418，仅本轮观察 |
+
+本轮直接使用编译产物，没有Node --import observer、替代fetch或本地转发。持久方法正文及用户metadata原输入逐字节核对，所有child均有原生requestIds；没有独立观察每个exe请求的阶段prompt正文或HTTP，因此不称每次wire skill恰一次、不宣称实际HTTP GET/POST数量/状态，也不称独立逐请求用量求和。原生账本finalized描述结算状态，本身不等同HTTP回执或实际金额；本轮requestIds/历史/账本计数一致与所有阶段接受分别保留。第24.51节Node observer的wire/用量证据不移植为本轮exe观察，两个随机运行也不是相同wire快照或性能A/B。
+
+主代理以100ms采样Bun及owned后代RSS与原生state账本；尝试数达到14时请求取消，另有240秒、2MiB输出/会话文件、768MiB采样RSS阈值和终止升级。该尝试数守卫依据持久账本采样，没有HTTP发送前限额保证；本轮实际最终13尝试，2069次成功state采样、无sample error或守卫触发。Node harness heap768MiB，Bun按实际RSS观察；未装载大型历史、未跑PTY或20k。配置只声明每请求4096输出，本轮未独立观察实际wire cap。运行结束后四home来源config/auth/catalog bytes或缺失、隔离config、fixture bytes/project条目均不变，自有PID+start-time关闭、凭据/原生会话scratch删除，无实际请求/响应/思考正文、key/address/header或prompt/session digest留存。
+
+证据归无tracked碰撞的新目录`.omx/artifacts/phase20-addition-research-executable/`。执行前保存非可执行probe精确source快照；独立核验当前compilerInputs、两份exe内容、与Node相同的原输入/skill/release夹具字面量、原生阶段/账本投影、实际凭据/address缺席及scratch清理。安全audit与publicFixtureNativeResearchAcceptance均passed、nativeResearchStatus=completed；transport/perRequestUsage明确not-instrumented、actualStagePromptMethodPropagation明确not-observed，realWorldResearchQuality与billingAmount仍unverified。原2048预算的partial/unknown和Node全链路收据保持原值。
+
+本批仅文档/HANDOFF及ignored证据，没有新产品build、unit、反转、全仓、PTY、20k、local NormProof或委派复审。一次延迟读回1e9c6ad5精确代码CI41246087467与54b7cf60文档CI41246803802仍in_progress，各Watch41246087514/41246803660 success；额外一次job阶段读取确认1e9c6ad5的静态门、gates脚本测试及TS build已success，Run Focused & Unit Tests仍in_progress、judge尚pending，不能升级整体CI。没有持续轮询。本批最终静态/语法/安全核验与提交/推送另绑。ADD-12补齐Node/exe公开夹具原生完整链路/全结账本，真实资料研究质量、桌面/其他环境及真实金额仍缺；ADD-11不整体升级、原47外部条件延后、goal active。
