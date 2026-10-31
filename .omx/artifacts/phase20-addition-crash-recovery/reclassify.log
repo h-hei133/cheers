@@ -1,0 +1,37 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/shell/sessionRuntime.test.ts  (50 tests | 1 failed | 49 skipped) 17ms
+   ❯ src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > reports a terminal-save failure as storage, not as a contradicting query outcome
+     → expected [ 'event:query.completed', …(3) ] to deeply equal [ Array(2) ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 49 skipped (50)
+   Start at  08:17:43
+   Duration  1.84s (transform 1.30s, setup 0ms, collect 1.58s, tests 17ms, environment 0ms, prepare 53ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/shell/sessionRuntime.test.ts > shell session runtime (W5) > reports a terminal-save failure as storage, not as a contradicting query outcome
+AssertionError: expected [ 'event:query.completed', …(3) ] to deeply equal [ Array(2) ]
+
+- Expected
++ Received
+
+  Array [
+    "event:query.completed",
+    "completed",
++   "event:lifecycle.error",
++   "error",
+  ]
+
+ ❯ src/core/shell/sessionRuntime.test.ts:261:19
+    259|     // The terminal query event and the completed save are the only re…
+    260|     // lifecycle.error and no interruption were appended after the out…
+    261|     expect(calls).toEqual(["event:query.completed", "completed"]);
+       |                   ^
+    262|   });
+    263| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

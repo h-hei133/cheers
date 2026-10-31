@@ -4984,3 +4984,14 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现记录「终态已决定」标志：该标志之后的抛出按存储失败上报并原样抛出，**不**追加任何相反的取消或错误事件。回归用例断言`saveCompleted`抛错时只记录`query.completed`与`completed`，不出现`lifecycle.error`/`interrupted`。
 
 验证：`sessionRuntime`50（新例）、`recovery`24、`bootstrap`28，共**102项**通过；一反转（撤回标志判断）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `00460ad6ff4d`。原47/ADD整体partial、goal active。
+
+
+### 21.73 双进程恢复的伪造结果：确认为真实竞态但不在本批修复（子代理review缺陷#2）
+
+探针确认：进程A的`tool.started`已持久化、结果尚未写入时，进程B调用`reconcilePendingLifecycle`会写入`tool.result { success:false, compensated:true }`；随后A的真实结果`success:true`也写入。该调用在transcript中因此**永久保留两条矛盾记录**，伪造的那条在前。`isDuplicateDurableResolutionEvent`只拒绝完全相同的重复，拦不住它。
+
+根因：`resumeShellSession`只要看到pending就调用reconcile，**不检查该运行是否仍在另一进程存活**；而锁文件只在持锁期间存在，恢复时锁已释放，没有可靠的跨进程存活信号。
+
+**本批不修复**，理由如下：可靠修复需要引入运行所有权租约（运行期间持续持有可探测的租约、恢复前检查其存活），这是架构级改动；仓促实现（例如仅检查锁文件是否存在）会在进程刚释放锁但仍在收尾时误判存活，反而阻塞合法恢复，或在跨主机/容器场景失效。伪造事件的读取影响已部分缓解——21.71让`compensated`事件不再阻断目标验收；按最新事件判断的读取方看到的是后到的真实结果。
+
+保留为已知竞态。[探针](../../.omx/artifacts/phase20-addition-crash-recovery/double-recovery-probe.mjs)。build `00460ad6ff4d`。未改产品代码。原47/ADD整体partial、goal active。

@@ -10864,3 +10864,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：终态保存失败不再被重新归类为查询失败（子代理review缺陷#1）
 
 [addition21.72](features/phase-20-addition.md#2172-终态保存失败不再被重新归类为查询失败子代理review缺陷1)saveCompleted在try内，锁释放失败抛错后catch追加lifecycle.error，造成completed状态与error记录矛盾。现以「终态已决定」标志区分存储失败与查询失败。102项聚焦、一反转到命中、五门/TS build通过。build 00460ad6。原47/ADD整体partial、goal active。
+
+### 2026-10-31：双进程恢复的伪造结果确认为真实竞态但不在本批修复（子代理review缺陷#2）
+
+[addition21.73](features/phase-20-addition.md#2173-双进程恢复的伪造结果确认为真实竞态但不在本批修复子代理review缺陷2)探针确认进程B恢复会为A在途调用写入伪造compensated失败，A的真实结果随后也写入，transcript永久保留两条矛盾记录。根因是无跨进程存活判定，锁文件只在持锁期间存在。可靠修复需运行所有权租约（架构级），仓促实现会误判存活而阻塞合法恢复，故记录不修。21.71已缓解其对目标验收的影响。未改产品代码。build 00460ad6。原47/ADD整体partial、goal active。
