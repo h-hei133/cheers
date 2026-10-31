@@ -575,9 +575,14 @@ describe("an endpoint written twice", () => {
     if (originalUnixHome === undefined) delete process.env.HOME; else process.env.HOME = originalUnixHome;
     fs.rmSync(fakeHome, { recursive: true, force: true }); fs.rmSync(fakeRoot, { recursive: true, force: true });
   });
+  // Owner-only, the way the product writes a credential file. A fixture left at
+  // the umask default would also trigger the exposure notice, which is a
+  // separate fact from the endpoint question these cases ask about.
   const write = (value: unknown) => {
     fs.mkdirSync(path.join(fakeHome, '.cheers'), { recursive: true });
-    fs.writeFileSync(path.join(fakeHome, '.cheers', 'config.json'), JSON.stringify(value));
+    const file = path.join(fakeHome, '.cheers', 'config.json');
+    fs.writeFileSync(file, JSON.stringify(value), { mode: 0o600 });
+    fs.chmodSync(file, 0o600);
   };
 
   it("says which endpoint a request actually uses when the two disagree", () => {
@@ -614,5 +619,46 @@ describe("an endpoint written twice", () => {
       providerCredentials: { openai: { baseUrl: 'https://other.test/v1', apiKey: 'sk-live-secret-value' } } });
     const text = getRuntimeConfig(fakeRoot).configDiagnostics.join('\n');
     expect(text).not.toContain('sk-live-secret-value');
+  });
+});
+
+describe("a credential file other accounts can read", () => {
+  const originalHome = process.env.USERPROFILE;
+  const originalUnixHome = process.env.HOME;
+  let fakeHome: string;
+  let fakeRoot: string;
+  beforeEach(() => {
+    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-home-")); fakeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-root-"));
+    process.env.USERPROFILE = fakeHome; process.env.HOME = fakeHome;
+  });
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = originalHome;
+    if (originalUnixHome === undefined) delete process.env.HOME; else process.env.HOME = originalUnixHome;
+    fs.rmSync(fakeHome, { recursive: true, force: true }); fs.rmSync(fakeRoot, { recursive: true, force: true });
+  });
+  const write = (value: unknown, mode: number) => {
+    fs.mkdirSync(path.join(fakeHome, '.cheers'), { recursive: true });
+    const file = path.join(fakeHome, '.cheers', 'config.json');
+    fs.writeFileSync(file, JSON.stringify(value), { mode });
+    fs.chmodSync(file, mode);
+  };
+
+  it("says so, because a file that is never saved would stay readable", () => {
+    write({ provider: 'openai', providerCredentials: { openai: { apiKey: 'synthetic' } } }, 0o644);
+    const diagnostics = getRuntimeConfig(fakeRoot).configDiagnostics;
+    expect(diagnostics.join('\n')).toContain('readable by other accounts');
+    expect(diagnostics.join('\n')).not.toContain('synthetic');
+    // A warning about exposure, not a refusal to use the configuration.
+    expect(getRuntimeConfig(fakeRoot).configValidation.valid).toBe(true);
+  });
+
+  it("stays quiet when the file is owner-only", () => {
+    write({ provider: 'openai', providerCredentials: { openai: { apiKey: 'synthetic' } } }, 0o600);
+    expect(getRuntimeConfig(fakeRoot).configDiagnostics).toEqual([]);
+  });
+
+  it("stays quiet for a wide file that holds no credential", () => {
+    write({ theme: 'dark' }, 0o644);
+    expect(getRuntimeConfig(fakeRoot).configDiagnostics).toEqual([]);
   });
 });

@@ -98,7 +98,9 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
         // credentials and may predate this rule. Its permissions are a property
         // of the file, not of this save, so they are narrowed without touching
         // the bytes — mtime stays put, which is what makes an unchanged save
-        // observably unchanged.
+        // observably unchanged. A correction that cannot be made does not turn
+        // the save into a failure: the settings were written as asked, and the
+        // load path reports the mode when it is still too wide.
         narrowCredentialFile(baseline.path);
       }
       code = 'lock-failed';

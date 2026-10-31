@@ -8,6 +8,7 @@ import type { TrustDecision } from '../core/security/trust/model.js';
 import { mergeTui, type TuiLayers } from './tui.js';
 import type { ConfigFileOrigin } from './provenance/files.js';
 import { assertAccountOwner, captureConfigFiles, verifyConfigFiles } from './inputs/capture.js';
+import { holdsCredentialMaterial, readableByOthers } from './secret.js';
 import { ConfigInputError, type ConfigInputs } from './inputs/model.js';
 import { mergeConfigValue } from './merge.js';
 import { captureScopeLayer, scopeSettings } from './scope/capture.js';
@@ -132,6 +133,14 @@ export function loadConfigLayers(paths: readonly { path: string; source: 'projec
     }
     if (!candidate.snapshot) continue;
     assertAccountOwner(candidate, paths.find(file => file.source === 'user')!.path);
+    // A credential file another account can read is a leaked key. Writes narrow
+    // it, but a file that is never written would stay readable, so the load
+    // reports it. Only the fact is stated: the file and its mode, never a value.
+    if (candidate.source === 'user' && holdsCredentialMaterial(candidate.snapshot.values)
+      && readableByOthers(candidate.canonical ?? candidate.path)) {
+      const safePath = candidate.path.replace(/[\x00-\x1f\x7f-\x9f]/g, '?').slice(0, 512);
+      layer.diagnostics.push(`Config ${safePath} holds credentials and is readable by other accounts; run a save to narrow it.`);
+    }
     const file: ConfigFileOrigin = { path: candidate.canonical!, revision: candidate.snapshot.revision, source: candidate.source,
       ...(candidate.input ? { position: candidate.input.position } : {}) };
     const documentLayer = { ...layer, valid: true, blocked: false };
