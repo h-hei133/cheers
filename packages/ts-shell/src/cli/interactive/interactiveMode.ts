@@ -236,7 +236,6 @@ export class InteractiveMode {
   private readonly pointer: Pointer;
   private readonly clipboard: Clipboard;
   private readonly composerPreference: ComposerPreference;
-  private statusItems: readonly StatusItemId[];
   /**
    * The band a still-open chooser is proposing. Present only while the chooser is
    * open, so the band shows what a toggle would do without the choice being made
@@ -299,7 +298,6 @@ export class InteractiveMode {
       },
       () => this.options.runtimeContext.configuration.current.revision,
     );
-    this.statusItems = readStatusItems(options.runtimeContext.projectRoot, options.runtimeContext.runtimeConfig);
     this.clipboard = new Clipboard({
       cwd: options.runtimeContext.cwd,
       sessionId: options.runtimeContext.session.id,
@@ -1432,7 +1430,6 @@ export class InteractiveMode {
       configurationRevision: () => this.options.runtimeContext.configuration.current.revision,
       saveStatusItems: async (items) => {
         const written = writeStatusItems(this.options.runtimeContext.projectRoot, items);
-        this.statusItems = items;
         this.options.runtimeContext.configuration.recordDisplay({ tui: { ...this.options.runtimeContext.runtimeConfig.tui, statusItems: items } });
         return written.scope === "project"
           ? `Status band items saved to ${written.path} (this project's file, which wins over your own)`
