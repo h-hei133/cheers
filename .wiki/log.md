@@ -10924,3 +10924,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：CI 全量恢复绿色
 
 读回 `9e56839e`（终态存储失败修正）的 CI：Build & Test 完成且成功，**1050 个测试文件、12957 项通过、3 项跳过**，静态门与构建全过。此前 `8d9a3ac9` 的两处失败已确认消除。后续 5 轮（队列文案、凭据收窄、echo 统一）仍在串行排队；同分支 CI 每轮约 22 分钟，因此不作为阻塞继续推进工作。
+
+### 2026-10-31：用户块只在投递时产生（子代理 review 的三处缺陷）
+
+[addition23.7](features/phase-20-addition.md#237-子代理-review-找到的三处缺陷与修正)只读 review 找到三处真实缺陷：`/queue add` 会产出两个用户块；steer/followUp 在投递前就写块，Esc 中断后文本退回草稿、重发产生重复块；`narrowCredentialFile` 在无变化保存里抛错并以 `lock-failed` 逃逸，且跟随符号链接。现由内核在真正注入时报告 `message.delivered`、界面据此写块（该事件不入持久层，真实消息已写成会话 turn；开场消息排除）；`/queue` 不再 echo 自己的命令行；`narrowCredentialFile` 改 lstat、不抛错、失败不把成功保存变成失败。另新增加载期暴露告警：含凭据且组/其他位可读的文件会被报告（只报事实，不含值）。相关 10 个文件 673 项通过、TS build 与五门通过。build 3d89617d78ac。原 47/ADD 整体 partial、goal active。
