@@ -115,8 +115,8 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
 
   for (const [callId, toolBlock] of toolBlocksById) {
     if (!respondedToolIds.has(callId)) {
-      toolBlock.status = "failed";
-      toolBlock.text = "(Operation interrupted)";
+      toolBlock.status = "unknown";
+      toolBlock.text = "Outcome unknown. Side effects may have occurred; check state before retrying.";
       toolBlock.collapsed = false;
     }
   }

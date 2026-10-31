@@ -141,9 +141,10 @@ export function environmentLine(workspaceRoot: string, permissionScope?: Permiss
  * The stored conversation in the shape a chat completion takes.
  *
  * A provider rejects a request whose assistant tool calls have no results, so a
- * call left open by an interruption gets a synthesized cancellation, and a tool
- * result that answers no call is dropped. System messages never travel: the
- * request carries its own.
+ * call left open gets a synthesized unknown result. Missing output does not
+ * prove that execution stopped or that no side effects occurred. A result that
+ * answers no call is dropped. System messages never travel: the request carries
+ * its own.
  */
 export function toChatMessages(history: readonly SessionMessage[] = []): ChatMessage[] {
   const result: ChatMessage[] = [];
@@ -151,7 +152,8 @@ export function toChatMessages(history: readonly SessionMessage[] = []): ChatMes
 
   const closePending = (): void => {
     for (const call of pendingCalls ?? []) {
-      result.push({ role: "tool", tool_call_id: call.id, content: "(Operation cancelled or interrupted)" });
+      result.push({ role: "tool", tool_call_id: call.id,
+        content: "No tool result was recorded. Outcome unknown; side effects may have occurred. Check the current state before retrying." });
     }
     pendingCalls = undefined;
   };

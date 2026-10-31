@@ -1757,3 +1757,10 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A compiled CLI is streaming with its prompt barrier persisted, but a probe fails a target-selection assertion before delivering SIGKILL.
 - **Root Cause**: An argv path match borrowed from the Node launcher does not establish the compiled target's process identity. Coarse stage labels can also misreport that selection failure as a stream wait.
 - **Rule**: Follow the controlled spawn boundary: select the relay's single direct executable child, or the verified Node entry beneath its launcher, then capture PID/start identity before signalling. Read raw active state after confirmed death and before recovery can reconcile it. Preserve failed setup receipts, and do not claim SIGKILL ran graceful cleanup or restored terminal modes.
+
+
+### Missing Tool Results Do Not Prove Cancellation Or Rollback
+
+- **Symptom**: A restored tool card says failed and its model history says cancelled, even though a command wrote a side effect before the CLI was killed and its child remained alive.
+- **Root Cause**: Protocol repair and lifecycle compensation fill missing records; neither establishes the external operation's outcome or reverses its effects. SIGKILL cannot run the CLI's graceful cancellation path.
+- **Rule**: Pair missing calls with an explicit unknown outcome and possible-side-effect notice; require inspecting state before retrying. Show restored unanswered cards as unknown while preserving actual results. In hard-kill probes, clean only captured PID/start identities and identify harness-owned cleanup separately from product behavior; a scripted final-answer continuation proves no automatic rerun only in that case.

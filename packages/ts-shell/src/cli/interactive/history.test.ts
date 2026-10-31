@@ -278,7 +278,7 @@ describe("restoring a conversation", () => {
     expect(blocks[0]!.collapsed).toBe(false);
   });
 
-  it("marks tool calls without any tool response as interrupted on resume", () => {
+  it("restores unanswered tool calls with an unknown outcome and retry guidance", () => {
     const turns: SessionMessage[] = [
       {
         role: "assistant",
@@ -295,9 +295,12 @@ describe("restoring a conversation", () => {
     ];
     const { blocks } = restoreConversation(turns);
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]!.status).toBe("failed");
-    expect(blocks[0]!.text).toBe("(Operation interrupted)");
+    expect(blocks[0]!.status).toBe("unknown");
+    expect(blocks[0]!.text).toContain("Outcome unknown");
+    expect(blocks[0]!.text).toContain("Side effects may have occurred");
+    expect(blocks[0]!.text).toContain("check state before retrying");
     expect(blocks[0]!.collapsed).toBe(false);
+    expect(blocks[0]!.finalized).toBe(true);
   });
 });
 

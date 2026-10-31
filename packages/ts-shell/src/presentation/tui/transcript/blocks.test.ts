@@ -87,6 +87,15 @@ describe("tool invocation", () => {
     expect(rows).toContain("exit status 1");
   });
 
+  it.each([true, false])("marks an unknown outcome with a warning question mark (collapsed=%s)", collapsed => {
+    const rows = renderBlock({
+      kind: "tool", title: "bash", text: "Outcome unknown", status: "unknown", collapsed, finalized: true,
+    }, WIDTH);
+    expect(rows[0]).toContain(defaultTheme.fg("warning", "?"));
+    expect(stripAnsi(rows[0]!)).not.toMatch(/[✔✗◐]/);
+    if (!collapsed) expect(rows.map(stripAnsi).join("\n")).toContain("Outcome unknown");
+  });
+
   it("renders an attached diff", () => {
     const rows = renderBlock(
       { kind: "tool", title: "edit", text: "", diff: "-old\n+new", status: "ok", finalized: true },

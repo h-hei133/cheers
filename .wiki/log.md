@@ -11212,3 +11212,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 [addition24.55](features/phase-20-addition.md#2455-实际-sigkill-后显式-continue-同一会话)当前build7f47912610a7生产Node/exe×普通/全屏四场顺序完成实际SIGKILL→显式continue。请求delta实际显示后杀owned CLI，exit137/原进程非活跃/连接关闭，在恢复reader前raw state仍active/turn-active并保留原提示。重启不自动推理，/continue才发第二请求，实际body有原提示/原生恢复说明，同session completed、pending清除、最终答复持久、原用户提示仅一次；正常退出0/cooked恢复。有效八次CLI、GET8/POST8，均loopback scripted provider；无真实外部请求、在途工具副作用/故障设备/其他平台验收。每stage30秒/2MiB/768MiB采样守卫未触发，峰值321464KiB不算性能，配置不变/owned进程非活跃/scratch清理。首build policy错误在CLI前失败、另exe目标定位断言在SIGKILL前失败，各源码/日志/收据保留，额外一CLI/POST不计有效场景；仅修harness，产品未改。HANDOFF补真实目标与raw-state边界，最终独立核验/静态/交付另绑；无新build/unit/反转/全仓/20k/judge/委派复审，ADD-65本地验证、ADD-30仍未修、goal active。
 
 最终五门/两脚本语法/四场景独立verifier/diff均exit0，118既有advisory保留。延迟单读d1328704精确CI41248943399仍in_progress、Watch41248943415 success；不轮询、不视为整体CI通过。本批三份markdown的交付另由ignored delivery绑定。
+
+
+### 2026-11-01：在途工具硬杀后的未知结果
+
+[addition24.56](features/phase-20-addition.md#2456-在途工具硬杀后保留未知结果与副作用边界)旧build真实命令已追加一次副作用、无结果时SIGKILL，子进程仍活，证实缺失结果不能推断取消/失败。定向参考先于修补，原消息owner合成未知/可能副作用/检查后重试，恢复卡片以warning问号显示unknown；真实结果/原call/协议配对/生命周期规则保留。Node20.3串行3文件旧owner及显式反转各6失败/53控制，逐字节恢复后59通过；五门/TS/exe build e84c96fa8424与inputs/size/SHA一致。新Node/exe×普通/全屏四实际PTY均副作用一次后硬杀、未知卡片与真实wire、显式continue同session完成；新8次CLI/8GET/8POST，含旧场景共10/10/10，全loopback脚本provider。原工具子进程由harness清理，provider续接给最终答案，只证旧tool未自动重跑，不算普遍防重/回滚/自动清理或ADD-30租约。exit0/cooked、config不变/owned进程非活跃/scratch清理，采样RSS不算性能；独立证据核验passed，无全仓/20k/judge/委派复审/真实provider及其他平台验收。延迟d1328704代码CI success，ef937df1 CI仍in_progress、Watch success；最终五门/两语法/独立verifier/diff均exit0，118既有advisory保留，提交推送交付另绑，ADD-65本地验证、原47条件延后、goal active。

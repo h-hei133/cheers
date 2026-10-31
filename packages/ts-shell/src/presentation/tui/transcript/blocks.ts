@@ -21,7 +21,7 @@ import { renderMarkdown, trimPartialFence } from "./markdown.js";
 
 export type BlockKind = "notice" | "user" | "assistant" | "thinking" | "tool" | "command" | "error";
 
-export type ToolStatus = "running" | "ok" | "failed";
+export type ToolStatus = "running" | "ok" | "failed" | "unknown";
 
 export interface Block {
   readonly kind: BlockKind;
@@ -90,7 +90,7 @@ export interface BlockRenderOptions {
 const GUTTER = "";
 const BODY_INDENT = "";
 
-const STATUS_GLYPH: Record<ToolStatus, string> = { running: "◐", ok: "✔", failed: "✗" };
+const STATUS_GLYPH: Record<ToolStatus, string> = { running: "◐", ok: "✔", failed: "✗", unknown: "?" };
 
 /** Rows for one block at `width`, including its trailing separator row. */
 export function renderBlock(
@@ -213,7 +213,7 @@ function renderTool(block: Block, width: number, options: BlockRenderOptions = {
   const status = block.status ?? "running";
   const glyph = status === "ok" ? defaultTheme.fg("success", STATUS_GLYPH.ok)
     : status === "failed" ? defaultTheme.fg("error", STATUS_GLYPH.failed)
-    : defaultTheme.fg("warning", STATUS_GLYPH.running);
+    : defaultTheme.fg("warning", STATUS_GLYPH[status]);
   const name = defaultTheme.style("toolTitle", block.title ?? "tool", { bold: true });
   const rawDetail = block.detail ? elide(block.detail, headroom(width, block.title)) : "";
   const detail = rawDetail ? ` ${formatToolDetail(block.title, rawDetail)}` : "";

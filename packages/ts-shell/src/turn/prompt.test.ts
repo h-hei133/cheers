@@ -10,7 +10,7 @@ describe("toChatMessages", () => {
     ])).toEqual([{ role: "user", content }]);
   });
 
-  it("synthesizes cancelled tool messages when assistant tool calls were interrupted", () => {
+  it("reports unknown outcomes and possible side effects for missing tool results", () => {
     const converted = toChatMessages([
       { role: "user", content: "run it" },
       {
@@ -21,7 +21,30 @@ describe("toChatMessages", () => {
       { role: "user", content: "never mind" },
     ]);
     expect(converted.map((message) => message.role)).toEqual(["user", "assistant", "tool", "user"]);
-    expect(converted[2]).toMatchObject({ tool_call_id: "call_1", content: "(Operation cancelled or interrupted)" });
+    expect(converted[2]).toMatchObject({ tool_call_id: "call_1" });
+    expect(converted[2].content).toContain("Outcome unknown");
+    expect(converted[2].content).toContain("side effects may have occurred");
+    expect(converted[2].content).toContain("Check the current state before retrying");
+    expect(converted[2].content).not.toMatch(/cancelled|failed/i);
+  });
+
+  it("pairs only unanswered calls while preserving real results across system messages", () => {
+    const calls = ["answered", "missing"].map(id => ({
+      id, type: "function" as const, function: { name: "bash", arguments: ' {"command":"echo done"} ' },
+    }));
+    const content = "  Error: command exited after writing output\n";
+    const converted = toChatMessages([
+      { role: "assistant", content: null, tool_calls: calls },
+      { role: "system", content: "not part of the request history" },
+      { role: "tool", tool_call_id: "answered", content },
+      { role: "user", content: "continue" },
+    ]);
+    expect(converted[0]).toEqual({ role: "assistant", content: null, tool_calls: calls });
+    expect(converted.filter(message => message.role === "tool")).toEqual([
+      { role: "tool", tool_call_id: "answered", content },
+      { role: "tool", tool_call_id: "missing", content: expect.stringContaining("Outcome unknown") },
+    ]);
+    expect(converted.at(-1)).toEqual({ role: "user", content: "continue" });
   });
 
   it("drops orphaned tool messages that have no preceding assistant tool call", () => {
@@ -42,6 +65,7 @@ describe("toChatMessages", () => {
       { role: "assistant", content: "", tool_calls: [{ id: "c", type: "function", function: { name: "read", arguments: "{}" } }] },
     ]);
     expect(converted.at(-1)).toMatchObject({ role: "tool", tool_call_id: "c" });
+    expect(converted.at(-1)?.content).toContain("Outcome unknown");
   });
 });
 

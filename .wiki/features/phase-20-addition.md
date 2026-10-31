@@ -477,7 +477,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---|---|---|---|---|
 | ADD-63 | P1 | 图片在提交、中断、恢复、重开与工具结果中完整保留 | 21.28–21.34、21.45、21.62–21.63 | 本地验证 | 真实图片密集型结果；图形协议终端 |
 | ADD-64 | P1 | 压缩与导航不丢失未完成工作，fork 不继承在途调用 | 21.64–21.66、21.69–21.72 | 本地验证 | — |
-| ADD-65 | P2 | 硬杀会话可再次 continue | 21.70、24.55 | 本地验证 | Linux Node/exe普通/全屏实际SIGKILL后continue已验；在途工具副作用、故障设备与其他平台仍缺 |
+| ADD-65 | P2 | 硬杀会话可再次 continue | 21.70、24.55–24.56 | 本地验证 | Linux Node/exe普通/全屏在途工具实际副作用后SIGKILL、未知结果与continue已验；普遍防重、孤儿自动清理、故障设备与其他平台仍缺 |
 | ADD-66 | P2 | 空草稿的退出动作先于审批与预览按键归属 | 20.44 | 本地验证 | — |
 | ADD-67 | P2 | 未答复审批被取消后立即结束等待并保留中断恢复 | 20.43 | 本地验证 | — |
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
@@ -6291,3 +6291,20 @@ ADD-49矩阵仍列缺少60秒完整路径，但第21.21节已记录regular/fulls
 证据归无tracked碰撞的新目录`.omx/artifacts/phase20-addition-hard-kill/`，只留公开夹具脚本和数值/布尔，无raw PTY、实际请求/响应正文、key/address/header或prompt/session digest。独立核验与最终静态门/语法/diff及交付另绑；无新build/unit/反转/全仓/20k/local NormProof或委派复审。ADD-65仍本地验证，真实在途工具副作用、故障设备及其他平台边界未覆盖；原47真实条件继续延后，goal active。
 
 最终五项静态门、两脚本语法、独立四场景verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留；verifier明确firstRequestUsage未测、nativeInFlightToolSideEffects未练习、realProvider/其他平台未跑。一次延迟读回前提交d1328704精确CI41248943399仍in_progress，Watch41248943415 completed/success，不替代CI。本批仅三份markdown改动，提交/推送/remote-main与clean状态由ignored delivery另绑，当前交付CI未观察。
+
+
+### 24.56 在途工具硬杀后保留未知结果与副作用边界
+
+接续ADD-65，旧build7f47912610a7的生产Node普通PTY先运行一个真实小命令：实际追加一次副作用后仍等待，raw transcript有一条tool.started、零tool.result、一个pending bash。实际SIGKILL CLI、relay exit137后原state仍active/turn-active，pending prompt与工具均保留；子进程仍存活，探针按捕获PID/start identity显式清理后才重启。该旧build有效场景与源码/收据独立保留，不能把夹具清理算作产品自动取消。原[消息投影](../../packages/ts-shell/src/turn/prompt.ts)却合成“Operation cancelled or interrupted”，原[恢复卡片](../../packages/ts-shell/src/cli/interactive/history.ts)也显示failed；缺少结果无法支持这些结论。
+
+修补前已定向比较只读参考f09d01b85e0384647fcab6779d35ab9dabe04be3的消息转换：保留真实结果，为未答调用补协议配对，仅说未提供结果，不推断取消。现仍由原owner补一条原call ID的tool消息，明确Outcome unknown、side effects may have occurred并要求重试前检查当前状态；保留真实结果/调用参数/源文本、system透明及孤立结果过滤。恢复未答卡片使用现有[renderer](../../packages/ts-shell/src/presentation/tui/transcript/blocks.ts)新增unknown状态，warning色问号、展开并提示检查状态；真实成功/拒绝/错误及现有生命周期补偿规则不变，没有新恢复系统或执行路径。
+
+Node20.3单worker串行三个聚焦文件：旧owner6失败/53控制通过，修复59通过；显式反转三个owner再次6失败/53通过，逐字节恢复后59再次通过。回归覆盖缺失结果的未知/副作用/重试提示、真实错误结果跨system消息保持且仅补未答调用、历史末尾配对、恢复卡片与折叠/展开问号颜色。五静态门通过后串行TS/exe构建，最终build e84c96fa8424584f8fcbb8318f18cf9887b9d99670c361e64a35fd35ca66c443、inputs 2ce251530f3575e3d31c9621fd3eed18df3094e3593368ca09d80ea9cfa489a0；stable/不可变exe均106842240 bytes、SHA 8a47ed93d2b77c4f69cb56971f6fc0b57546890abe563ce44d7f2b7d0db26260，current compilerInputs一致。
+
+新build生产Node/exe×普通/全屏四场依次执行同一小夹具；真实Alt+P两次到allow-all后才执行bash。每场副作用精确一次、started1/results0/pending1时实际SIGKILL CLI，原active状态保持，原工具子进程仍存活且由harness清理。重启不自动推理，恢复卡片实际显示问号与未知提示；显式/continue才发第二请求，实际wire含原call配对的唯一tool消息及未知/可能副作用/重试前检查语义，无取消或失败断言。同session最终completed、pending prompt清除、原user仅一次、最终回答持久，原tool未自动重跑、副作用仍一次；补偿事件为success:false/compensated:true、总started1/results1/pending0，不能把它称为实际命令失败。
+
+新四场共八次CLI、GET8/POST8；加旧build有效场景共十次CLI、GET10/POST10，全部loopback scripted provider。每场第一响应正常结束，杀在真实工具执行中；不混称为24.55的打开provider流中断。续接provider按脚本只给最终答案，故本轮只证明没有自动重跑旧调用，不证明模型主动重试时的普遍防重或副作用回滚。每stage30秒/2MiB、100ms采样768MiB RSS、harness heap768MiB及每场2 POST守卫均未触发；新build最大采样453332KiB，不是heap/性能验收。正常退出0/cooked恢复、各隔离config字节不变、owned PID/start均非活跃，home/project/session scratch删除。
+
+证据在已核对无tracked碰撞的`.omx/artifacts/phase20-addition-tool-kill/`；旧/新执行源码、owner/test文本快照、red/green/反转/build日志和数值/布尔收据分开保留，不存raw PTY、请求/响应正文、真实key/address/header或prompt/session digest。独立verifier已通过当前build/两exe、快照、59项/6项反转、四场实际卡片/wire/副作用/清理核对。最终五静态门、两脚本语法、独立verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留；提交/推送交付另绑。未跑全仓/20k真实PTY/local NormProof或委派复审，无真实外部provider、其他平台/故障设备、普遍防重或孤儿自动清理验收。ADD-30运行所有权租约仍未实施，ADD-65维持本地验证；原47真实条件延后、goal active。
+
+一次延迟读回d1328704精确代码CI41248943399已completed/success；ef937df1代码CI41249700949仍in_progress、Watch41249700933 success，不视为整体CI通过。本批新提交CI尚未观察，不立即轮询。
