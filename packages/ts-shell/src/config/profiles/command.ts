@@ -8,6 +8,8 @@ import { IMPORT_CATEGORIES, IMPORT_EXCLUSIONS, type ImportPlan } from './import/
 import { importRequest, planImport } from './import/plan.js';
 import { applyImport, recoverImport, type ImportOutcome } from './import/runtime.js';
 import { readJournal } from './import/journal.js';
+import { planExport } from './export/plan.js';
+import { applyExport } from './export/runtime.js';
 
 function preview(plan: ImportPlan): string {
   const active = plan.request.excludedSessionId ? '\nThe active source conversation is excluded because this preview appends to it. Import it from another profile after it becomes inactive.' : '';
@@ -35,6 +37,14 @@ export async function runProfileCommand(args: string[], context: CommandContext)
       return local(`Profile ${result.profile.id}: ${result.created ? 'created' : 'already exists'}. Active profile: ${owner.id}.`);
     }
     const confirmation = parsed.flags.get('confirm') as string | undefined;
+    if (action === 'export') {
+      const plan = planExport(owner, parsed.args[0]!);
+      if (confirmation === undefined) return local(`Legacy configuration export preview: ${plan.bytes} bytes to profile ${plan.target}.\nThis private copy includes stored credentials and model defaults. Catalogue, sessions and other profile state are excluded.\nConfirm digest: ${plan.digest}`);
+      const result = applyExport(plan, confirmation, admit);
+      return local(result.status === 'complete'
+        ? `Legacy configuration stored and read back in profile ${plan.target}. Start the older program with --profile ${plan.target}. The active profile was not changed.`
+        : `Legacy configuration export ${result.status}; completion is unverified. Request a fresh preview with an empty named profile.`);
+    }
     if (action === 'switch') {
       if (!context.profileSwitch) return local('Profile switch unavailable in this host.');
       const result = await context.profileSwitch.request({ target: parsed.args[0]!, confirmation, sessionId: context.sessionId, signal: context.signal });

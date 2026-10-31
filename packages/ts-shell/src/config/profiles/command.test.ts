@@ -11,7 +11,8 @@ import { SessionManager } from '../../session/SessionManager.js';
 
 let home: string; let source: ProfileContext; let context: CommandContext;
 beforeEach(() => {
-  home = fs.mkdtempSync(path.join(os.tmpdir(), 'profile-command-'));
+  const temporary = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(temporary, { recursive: true });
+  home = fs.mkdtempSync(path.join(temporary, 'profile-command-'));
   const workspace = path.join(home, 'workspace'); fs.mkdirSync(workspace);
   source = createProfileContext({ name: 'source', homeDir: home, env: {} });
   context = { cwd: workspace, projectRoot: workspace, sessionId: 'source-session' };
@@ -100,4 +101,27 @@ it('refuses cancellation and admission changes before management effects', async
     expect((await runProfileCommand(['create', 'stale'], { ...context, admission: () => 'stale' })).output).toContain('not admitted');
   });
   for (const name of ['cancelled', 'stale']) expect(fs.existsSync(path.join(home, '.cheers/profiles', name))).toBe(false);
+});
+
+it('requires explicit private export confirmation and keeps previews and refusals read-only', async () => {
+  fs.writeFileSync(path.join(source.root, 'auth.json'), '{"provider":"openai","providerCredentials":{"openai":{"apiKey":"synthetic-export-key"}}}', { mode: 0o600 });
+  await withProfile(source, async () => {
+    await runProfileCommand(['create', 'rollback'], context);
+    const target = openProfile('rollback', home);
+    const preview = (await runProfileCommand(['export', 'rollback'], context)).output;
+    expect(preview).toContain('includes stored credentials');
+    expect(preview).not.toContain('synthetic-export-key');
+    expect(preview).toContain('Catalogue, sessions');
+    expect(fs.readdirSync(target.root)).toEqual([]);
+    const digest = /Confirm digest: ([a-f0-9]{64})/.exec(preview)![1]!;
+    expect((await runProfileCommand(['export', 'rollback', '--confirm', 'wrong'], context)).output).toContain('rejected');
+    expect(fs.readdirSync(target.root)).toEqual([]);
+    const result = (await runProfileCommand(['export', 'rollback', '--confirm', digest], context)).output;
+    expect(result).toContain('stored and read back'); expect(result).toContain('--profile rollback');
+    expect(result).not.toContain('synthetic-export-key');
+    expect(currentProfile()).toBe(source);
+    expect(fs.readdirSync(target.root)).toEqual(['config.json']);
+    expect((await runProfileCommand(['export', 'rollback'], context)).output).toContain('could not be verified');
+    expect(profileDefinition().getArgumentCompletions?.('export rollback --confirm ')).toBeNull();
+  });
 });

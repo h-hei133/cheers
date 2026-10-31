@@ -31,7 +31,7 @@ CFG-01 已提交、推送并通过精确 SHA CI；CFG-02 的本地实现、反�
 
 | 类别 | named 路由及 owner | 关键边界 |
 |---|---|---|
-| 配置与连接凭据 | `P/config.json`；[runtime config](../../packages/ts-shell/src/config/runtimeConfig.ts)、[persistence](../../packages/ts-shell/src/config/persistence.ts)、[account state](../../packages/ts-shell/src/core/auth/account/state.ts) | 编辑 baseline 捕获 profile，读前、锁内和发布前检查；连接和账户继续使用原事务/CAS |
+| 配置与连接凭据 | `P/config.json`（设置/模型默认）、`P/auth.json`（连接/凭据，0600）；[runtime config](../../packages/ts-shell/src/config/runtimeConfig.ts)、[persistence](../../packages/ts-shell/src/config/persistence.ts)、[account state](../../packages/ts-shell/src/core/auth/account/state.ts) | 编辑 baseline 捕获 profile，读前、锁内和发布前检查；连接和账户继续使用原事务/CAS |
 | 模型目录及刷新 cache | `P/models.json`、`P/models-cache.json`；[catalog store](../../packages/ts-shell/src/core/models/catalogStore.ts) | shipped 目录共享只读；用户覆盖和显式刷新写入各自 profile |
 | MCP OAuth | `P/mcp-auth/*`；[auth store](../../packages/ts-shell/src/cli/mcp/auth/store.ts)、[service](../../packages/ts-shell/src/cli/mcp/auth/service.ts) | service 捕获 owner，发送认证请求、读取、锁内保存和 logout 都检查原 owner |
 | 会话、目录和 reentry | `P/sessions/*`、`P/current-session.json`；[layout](../../packages/ts-shell/src/session/store/sessionFileLayout.ts)、[access](../../packages/ts-shell/src/session/store/sessionStoreAccess.ts)、[catalog](../../packages/ts-shell/src/session/store/catalog/discovery.ts) | 同 ID 会话在 A/B 各有独立 metadata、state、transcript、锁及目录索引 |
@@ -107,6 +107,24 @@ source 和 target 必须已存在且不同；查询缺少的 source 不创建目
 每次导入最多选择 1024 个文件、32 MiB 总量、单文件 2 MiB，定义嵌套最多 12 层；history 沿用 2 MiB/4096 graph entries 的限制。超限拒绝，不截断。摘要绑定版本、选择、源文件内容与 identity、source/target root、canonical workspace 及活动会话排除。锁内重新规划并在发布前复查，旧摘要不能授权新内容。
 
 [import owner](../../packages/ts-shell/src/config/profiles/import/runtime.ts) 先保存持久 journal，再写目标内的私有 staging，逐文件用独占 hard link 发布；目标已有不同内容时拒绝覆盖，即使上次 receipt 是 complete。session metadata 最后发布，缺 state/transcript 的历史不能提前进入正常发现。中断后显式 recover 会核对当前源版本，协调缺失或逐字相同的目标文件，再恢复剩余发布；源变化、换根、链接、锁释放失败及不确定读回均不能报告完成。操作不提供跨文件崩溃原子性，保留 journal/stage 以供核查，不自动删除不确定数据。
+
+## 旧格式配置导出
+
+在当前进程的 profile 中先创建一个空的 named profile，再显式确认导出：
+
+```text
+/profile create rollback
+/profile export rollback
+/profile export rollback --confirm <preview-digest>
+```
+
+[export owner](../../packages/ts-shell/src/config/profiles/export/plan.ts) 捕获实际用户 settings/auth 两份原始文档，将模型默认值恢复为旧版嵌套叶子，输出单份 `config.json`，不输出 `modelPreferences` 或 auth sidecar。环境变量引用保持原文；CLI、项目和会话覆盖不进入副本。独立 provider slot、命名连接、账号 token、活动连接、pool 与未知字段保留，因此这是私有配置副本，不能作为可公开分享的普通导出。
+
+目标必须预先创建、非 default、与源不同且为空。preview 不写目标；确认摘要绑定双方 profile/目录身份、各源文件版本与存在状态、实际路径及输出。源发生变化须重新 preview。[runtime](../../packages/ts-shell/src/config/profiles/export/runtime.ts) 用 `wx`/descriptor 捕获私有 stage，0600 写入/fsync，再独占 hard link 发布；读回检查完整字节、mode 与文件身份，拒绝覆盖目标。阶段替换、发布后变化、残留 scratch 或锁清理失败保持 unknown，并保留不属于本次 writer 的文件。
+
+累积 allow/deny/disable 设置使用既有 merge policy；相对 pathRules 按各自实际 canonical 来源文件锚定。若 settings 规则之后还有 auth 作用域 base/规则，单份旧文档无法表达原逐文件优先级，导出直接拒绝。catalogue、cache、presets、definitions、会话及其他 runtime 状态不随本命令复制，也不切换当前进程。
+
+以支持 named profile 的旧程序执行 `--profile rollback`，避免在原新格式目录直接降级。Linux Node20.3 上对精确历史源码 `a746102aecbb19352a8c45d2e9c9740ad71f65cf`（拆 auth 前）与 `e10964dabc44b1b9ae835e43261285a3efccb7e3`（拆 preferences 前）已验证当前迁移→导出→旧 reader/model/login/logout→当前 reader/再次迁移，原 settings/auth 字节不变。此证据不代表安装版旧二进制、真实 provider/token 有效性或其他平台已通过；完整回滚验收仍 partial。
 
 ## 受控切换
 

@@ -1556,3 +1556,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: The first role assignment turns extended context on without that command and hides later ordinary contextWindow updates.
 - **Root Cause**: A session selection seed copies the ordinary RuntimeConfig window into the catalogue-derived selection field; a test asserts that accidental promotion.
 - **Rule**: Leave ordinary budgets in configuration. Preserve an existing explicit session selection, but never derive its extended window from the ordinary field while seeding roles. Test both actual provider and named namespaces; a fallback can otherwise make two fixtures test the same target. Verify absence of session window and the actual effective budget rather than merely removing an old assertion.
+
+### Legacy Configuration Copies Must Restore Owners And Preserve Scope Order
+- **Symptom**: Running an old version on split storage ignores current model defaults; deleting a connection can leave an orphan preference envelope that the current reader refuses. Flattening two files can also change path-rule precedence.
+- **Root Cause**: The old reader understands embedded controls in one configuration, while the new reader joins separate physical owners. Scope bases and sorted rule groups apply per source file, so their order is not represented by one flattened rule list.
+- **Rule**: Export the captured raw user pair into an empty separate profile, join embedded defaults and omit the envelope, preserve references and cumulative restrictions, anchor rules to their actual source, and refuse scope order that one document cannot express. Verify old read/write and current re-entry against exact source generations; do not infer binary or provider acceptance.
+
+### Exclusive Publication Needs Stage Identity Before The First Write
+- **Symptom**: A replaced stage is removed as if owned, a replaced symlink destination passes byte readback, or failed staging/lock cleanup reports rejection despite retained private files.
+- **Root Cause**: A path inspected after an atomic writer returns is not the identity originally acquired, and lock cleanup errors can be suppressed behind the primary action failure.
+- **Rule**: Acquire private staging with wx, capture fstat before writing, publish exclusively, and check regular/unlinked destination identity around readback and after cleanup. Remove only the acquired inode; retained replacements or observed lock cleanup failure stay unknown. Test the lock owner's onReleaseError contract directly when a filesystem spy does not reach its module namespace.

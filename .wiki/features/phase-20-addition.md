@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.21 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.22 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5707,3 +5707,21 @@ role owner使用现有 `providerCredentialBaseUrl` 读取model/levels；advisor 
 主代理实际Linux Node20.3.0、heap768MiB、单worker串行最终 **3文件/179项**exit0：provider87、role picker46、model picker46；旧owner完整反转实际2失败/85跳过、AssertionError，finally精确恢复生产bytes，最终同179项再通过。五静态门/build与当前输入读回通过，manifest `571e6cc80012`，inputsDigest `50bcf926711ebfc2333010f3fbd8aca9905dd068f4ea3a641ececc7f7c386404`。正式bundle judge独立串行exit0，环/解析satisfied，partial仅既有interactiveMode21/22-name advisory；两路最终APPROVE/CLEAR，子代理仅只读未验证、scratch清理。
 
 延迟代码CI `6c570eb3`/`41203580231`、`b0a144de`/`41204101311`最后in_progress，`5ca5d3ed`/`41205332421`新启动；本批另绑提交/推送/远端与自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移；ADD-70 partial、goal active，旧版本回退、其余重复语义和真实环境仍缺。
+
+### 24.22 显式旧格式配置导出与两代旧源码往返
+
+只读审计确认直接降级不是安全回退：拆 auth 前 `a746102aecbb19352a8c45d2e9c9740ad71f65cf` 只读 config，拆 preferences 前 `e10964dabc44b1b9ae835e43261285a3efccb7e3` 不懂 envelope；旧 global model/login 会被新 owner 覆盖，旧 logout 还可能留下新 reader 拒绝的孤立 preference。凭据不可读不等于 auth 字节已丢失；静态丢弃路径不当作真实账号丢失事件。没有原目录自动降级/补偿或重复 backup registry。
+
+沿既有 profile 管理加入 `/profile export <target> [--confirm <digest>]`：先显式 create 空 named target；preview 无写入，仅报告私有副本含 credentials/defaults 与排除范围，不显示值。读取既有 ConfigEdit 两份 raw source/canonical/revision/absence，与 config capture 围栏、preference join、raw schema及bounded serializer共用；provider slot/named/default/effort null/tier/active/pool/account token/unknown字段保留，引用不展开。单份旧 config 无 envelope/auth sidecar，源 settings/auth 不变；catalogue/cache/presets/definitions/session/runtime不复制，不切换活动profile。
+
+独立架构复审指出逻辑 shallow merge不能代表runtime累积限制及逐文件scope：export采用现有intersect/union/deny/disable与TUI叶子合并，pathRules锚定其真实canonical文件；settings有规则且auth随后有scope base/rules时，单文档无法表达原优先级，明确拒绝。实际 scopedRuntimeConfig回归比较两种单owner源/目标结果，并验证later-base/later-rule原17与拒绝后零写入，不以raw数组相同冒充语义一致。
+
+发布使用目标内随机stage的wx FD，fstat在写入之前捕获，0600/write/fsync后独占hard link；stage/destination regular、unlinked、dev/ino/mode在读回前后与清理后复查。不得用rename覆盖竞态目标或在writer返回后才取得cleanup身份。competing stage、stage replacement、destination symlink、source变化、cleanup残留保持unknown，陌生文件不删；withFileLock的onReleaseError观察primary failure掩盖的锁清理。两次lock故障测试失败分类为harness injection未进入shared fs namespace，改为直接验证既有onReleaseError合同后通过，没有放宽unknown要求。首次Node20.3使用--import的probe因tsx loader未注册报UNKNOWN_FILE_EXTENSION，未运行scenario；正确--loader后执行正常。
+
+主代理Linux Node20.3.0、heap768MiB、单worker串行最终 **5文件/76项**exit0：export19、profile command6、documents32、preferences11、scope8。包含确认/伪造plan/preview secret projection、两文档变化/absence、累积策略、账号与空owner、scope拒绝/等价、竞态发布/stage/cleanup与当前再迁移。三point reversal撤销join、exclusive publication、cleanup observer，各实际1失败/exit1；finally精确恢复plan `9e8a3989d6d5`、runtime `66d41b0142b3`，恢复后同76项正常exit0。
+
+实际历史源码按两个精确SHA archive到批次scratch、删除测试副本，使用已有依赖与Node20.3 loader串行运行小型synthetic probe：当前legacy seed→实际迁移→private export→两代旧reader精确credentials/defaults/effort null/tier/pool/token→旧setModel global→当前readback→旧API-key login/logout→当前reader/再次迁移。两个generation均exit0、来源两文档字节不变；未调用provider或真实HOME，源码执行不称旧发布二进制验收。另用本批fresh compiled CLI、Node20.3、isolated HOME/offline实际create→preview→exact confirmation，核对目标0600/旧格式/defaults、报告无凭据值、原两文档bytes不变；该当前CLI smoke正常exit0，不替代旧binary验收。
+
+五静态门/最终build通过，manifest `c0ed5e9c875f`、inputsDigest `9cee560498ebf199b535ecae383b1d19e29a0598c5cc59b9fe30700cdfc15abd`读回与当前输入一致。正式bundle judge独立串行exit0、环/解析satisfied，partial仅既有interactiveMode21/22-name advisory，118既有docs-source advisory。两路最终APPROVE/CLEAR，子代理只读未验证。批次scratch清理与提交/推送/精确CI另绑定。
+
+延迟CI `5ca5d3ed`/`41205332421`已success；`6409450b`/`41205782214`、`b0a144de`/`41204101311`最后仍in_progress。本批未旧发布二进制、真实provider/token、Windows/macOS/PTY、全仓或20k；ADD-70仍partial，旧发布版本/真实环境及其余语义审计继续，原Phase20真实条件延后、goal active。

@@ -7,6 +7,7 @@ export const profileSyntax: CommandSyntax = {
     { name: 'status', summary: 'show the immutable active profile' },
     { name: 'list', summary: 'list stored profiles' },
     { name: 'create', summary: 'create an empty isolated profile', parameters: [{ name: 'name', kind: 'text', required: true }] },
+    { name: 'export', summary: 'preview or save a private legacy configuration copy', parameters: [{ name: 'target', kind: 'text', required: true }], flags: [confirmation] },
     { name: 'import', summary: 'preview or explicitly apply a source-preserving import', parameters: [{ name: 'source', kind: 'text', required: true }],
       flags: [target, confirmation, ...['config', 'catalog', 'definitions', 'history'].map(name => ({ name, kind: 'boolean' as const, summary: `select ${name}` }))] },
     { name: 'recover', summary: 'inspect or explicitly resume an import; inspect switch outcomes', parameters: [{ name: 'operation', kind: 'text', required: true }], flags: [target, confirmation] },

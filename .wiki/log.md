@@ -11026,3 +11026,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：初次角色保存保留普通窗口预算继承
 
 [addition24.21](features/phase-20-addition.md#2421-初次角色保存不把普通预算变成-extended-context)role seed把普通预算复制为extended偏好，两真实namespace回归实际失败。删除单处复制，已有extended/tier仍保留；旧picker断言分类stale并改为无session window但effective90000。Node20.3串行3文件179项，实际反转2失败/精确恢复、五门/build摘要通过，manifest571e6cc80012；judge仅既有interactiveMode advisory、复审APPROVE/CLEAR、scratch清理。前两代码CI最后in_progress，5ca5d3ed刚启动；未真实provider/Windows/PTY/全仓/20k，ADD-70 partial、goal active，提交/推送与自身CI另绑。
+
+### 2026-10-31：显式旧格式配置导出与两代源码回返
+
+[addition24.22](features/phase-20-addition.md#2422-显式旧格式配置导出与两代旧源码往返)确认直接降级有owner覆盖/孤立偏好风险，新增profile export到空独立named profile；raw pair/default join/累积限制/path anchor共用，无法保留scope顺序则拒绝，wx FD身份先于write、exclusive link、0600/readback与unknown cleanup保持。Node20.3串行5文件76项、三实际反转/精确恢复、两代exact历史源码migration/export/read/model/login/logout/current往返及fresh compiled CLI create/preview/confirm通过，源bytes不变；五门/build当前摘要通过，manifestc0ed5e9c875f，judge仅既有interactiveMode advisory，复审APPROVE/CLEAR。首次--import loader错误与锁spy未命中按harness分类后修正；未旧发布二进制/真实provider/Windows/PTY/全仓/20k，ADD-70 partial、goal active。5ca5d3ed代码CI已success，6409450b/b0a144de最后in_progress；本批提交/推送/自身CI另绑。
