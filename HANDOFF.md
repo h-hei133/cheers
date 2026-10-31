@@ -1382,3 +1382,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A hook registration test that changed the project trust decision could leak that decision into other tests or the machine's real records.
 - **Root Cause**: `projectTrust` is a process-wide singleton reading the real user directory. A test that writes to it is not isolated, even when everything else is.
 - **Rule**: For a singleton with durable state, `vi.spyOn` the query the code under test calls and set the return per test; do not write to the real store to arrange a state. Restore in `afterEach`.
+
+### A Process-Level Setting Outlives The Project It Was Chosen For
+
+- **Symptom**: Choosing `allow-all` in one project and resuming a session in another keeps pre-approving prompts there.
+- **Root Cause**: The permission scope is a field on `ShellSessionRuntime`, created once per interactive process, while `switchRuntimeSessionProjectContext` can replace the project root. Nothing connected the two, so a grant about one repository applied in another.
+- **Rule**: When a setting expresses a decision *about* some scope, find the events that change that scope and reset or re-ask there. Have the switching function report whether the scope actually changed, compute it before the switch (afterwards the old value is gone), and route every switch path through one decision function so a new path cannot skip it.

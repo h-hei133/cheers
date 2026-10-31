@@ -5035,3 +5035,11 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 顺带修正提示语：审批面板的「Allow always for this command/session」把授权描述成会话级，实际写进项目策略文件、跨会话跨进程有效。现为「Allow always for this project」。
 
 验证：`trust`21、`registration`14、`commands.test`41、`pickers`50，共**126项**通过；四反转（持久授权仍进内存、写盘失败仍报成功、未记录也报撤回、标签退回session措辞）全部命中断言且finally字节恢复；五静态门、TS build/freshness、strict docs drift通过。原47/ADD整体partial、goal active。
+
+### 21.78 权限档位跨项目存活
+
+`ShellSessionRuntime`随交互进程创建一次，`permissionScope`是它的字段，而`/resume`切换会话时`switchRuntimeSessionProjectContext`可以换掉`projectRoot`——切换后档位不变。于是用户在A项目选了`allow-all`，切到B项目的会话后，B的普通审批仍被自动放行，用户从未在B做过这个决定。档位文档明确说它「只回答沙箱提出的问题、永不永久授权」，跨项目存活正是这句话的反面。
+
+现`switchRuntimeSessionProjectContext`返回项目是否真的变了（在切换前比较，切换后旧根已不可得），交互侧据此把档位重置为`ask`；同项目内切换保持不变，因为授权所针对的对象没有变。决策抽为`permissionScopeAfterSwitch`，`/resume`、`/resume switch`、面板切换与`/fork`四条路径共用；非交互运行没有档位，不传回调。
+
+验证：`cliSessionSwitch`3（同项目保留、跨项目重置、已是ask时不变）；一反转（`return scope;`）命中断言且finally字节恢复；五静态门、TS build通过。原47/ADD整体partial、goal active。

@@ -9,6 +9,7 @@ import {
   type ShellRuntimeContext,
 } from "../core/shell/runtimeContext.js";
 import { renderRootBindingDiagnostics } from "../core/shell/startupSurfaceRenderer.js";
+import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import { resolveSessionReference } from "../core/shell/recovery.js";
 import {
   renderCurrentSessionSurface,
@@ -43,6 +44,15 @@ export async function runCliSessionCommand(input: {
   readonly lifecycleNotices?: readonly string[];
   readonly readline?: ReadlineInterface;
   readonly onSessionSwitched?: () => void;
+  /**
+   * How to put the permission scope back to its neutral answer.
+   *
+   * Supplied by the interactive run, whose scope is a standing grant made for
+   * the project the user was in. A session that lives in a different project
+   * must not inherit it; a non-interactive run has no scope to reset and passes
+   * nothing.
+   */
+  readonly resetPermissionScope?: () => void;
 }): Promise<void> {
   const sessionAction = input.sessionAction ?? "panel";
   if (sessionAction === "list") {
@@ -115,7 +125,7 @@ export async function runCliSessionCommand(input: {
         return;
       }
       const resumed = input.sessionManager.resume(panelResult.switchedSessionId);
-      switchRuntimeSessionProjectContext(input.runtimeContext, resumed);
+      if (switchRuntimeSessionProjectContext(input.runtimeContext, resumed)) input.resetPermissionScope?.();
       renderProjectedLines(
         input.renderer,
         formatSessionPanelSwitchSuccessLines({
@@ -167,7 +177,7 @@ export function renderSessionSurfaceOverview(
 export function switchRuntimeSessionProjectContext(
   runtimeContext: ShellRuntimeContext,
   resumedSession: Session,
-): void {
+): boolean {
   const nextProjectRoot =
     resumedSession.projectRoot?.trim() || runtimeContext.projectRoot;
   const nextGitContext = getWorkflowGitContext(nextProjectRoot);
@@ -192,6 +202,12 @@ export function switchRuntimeSessionProjectContext(
     gitRoot: nextGitRoot,
     gitContext: nextGitContext,
   });
+  // Whether the session moved to a different project, which the caller needs to
+  // decide about permissions. Computed before the switch, because after it the
+  // old root is gone.
+  const projectChanged =
+    normalizePathForCompare(nextProjectRoot) !==
+    normalizePathForCompare(runtimeContext.projectRoot);
   switchActiveSession(runtimeContext, resumedSession, nextProjectRoot, {
     cwd: nextProjectRoot,
     projectRoot: nextProjectRoot,
@@ -202,6 +218,7 @@ export function switchRuntimeSessionProjectContext(
     rootBindingDiagnostics: nextRootBindingDiagnostics,
     gitContext: nextGitContext,
   });
+  return projectChanged;
 }
 
 export function resolveSessionSwitchDiagnostics(
@@ -283,6 +300,8 @@ async function runCliSessionSwitch(input: {
   readonly sessionId?: string;
   readonly printMode: boolean;
   readonly onSessionSwitched?: () => void;
+  /** Put the permission scope back to neutral when the project changes. */
+  readonly resetPermissionScope?: () => void;
 }): Promise<void> {
   const targetSessionReference = input.sessionId?.trim();
   if (!targetSessionReference) {
@@ -326,7 +345,7 @@ async function runCliSessionSwitch(input: {
     }
     const resumed = input.sessionManager.resume(resolvedSessionId);
     const previousSessionId = input.runtimeContext.session.id;
-    switchRuntimeSessionProjectContext(input.runtimeContext, resumed);
+    if (switchRuntimeSessionProjectContext(input.runtimeContext, resumed)) input.resetPermissionScope?.();
     renderProjectedLines(
       input.renderer,
       formatSessionSwitchSuccessLines({
@@ -357,6 +376,22 @@ async function runCliSessionSwitch(input: {
 
 function normalizePathForCompare(value: string): string {
   return path.resolve(value).toLowerCase();
+}
+
+/**
+ * The scope a session may carry after a switch.
+ *
+ * A scope answers prompts for the project it was chosen in. Carrying `allow-all`
+ * into a different project would pre-approve work the user never saw, in a
+ * repository they did not pick it for — so moving to another project drops it
+ * back to asking. Staying in the same project keeps it, because nothing the
+ * grant was about has changed.
+ */
+export function permissionScopeAfterSwitch(
+  scope: PermissionScope,
+  projectChanged: boolean,
+): PermissionScope {
+  return projectChanged ? "ask" : scope;
 }
 
 function resolveWorkspaceRootMode(

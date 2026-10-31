@@ -52,7 +52,7 @@ import {
   runCliMcpCommand,
 } from "../../entrypoints/cliMcpModule.js";
 import { runCliPermissionCommand } from "../../entrypoints/cliPermissionModule.js";
-import { runCliSessionCommand, switchRuntimeSessionProjectContext } from "../../entrypoints/cliSessionModule.js";
+import { permissionScopeAfterSwitch, runCliSessionCommand, switchRuntimeSessionProjectContext } from "../../entrypoints/cliSessionModule.js";
 import {
   runCliWorkspaceCommand,
 } from "../../entrypoints/cliWorkspaceModule.js";
@@ -293,6 +293,7 @@ export async function routeInteractiveCommand(
       onSessionSwitched: () => {
         sessionSwitched = true;
       },
+      resetPermissionScope: () => input.sessionRuntime.setPermissionScope("ask"),
     });
     return {
       turnNumber: nextTurnNumber,
@@ -321,7 +322,12 @@ export async function routeInteractiveCommand(
         input.runtimeContext.projectRoot,
         { entryId: slashResult.entryId, ...(input.sessionSelection ? { expectedVersion: input.sessionSelection.version } : {}) },
       );
-      switchRuntimeSessionProjectContext(input.runtimeContext, forked);
+      const projectChanged = switchRuntimeSessionProjectContext(input.runtimeContext, forked);
+      // A scope answers prompts for the project it was chosen in. Carrying
+      // `allow-all` into a different project would pre-approve work the user
+      // never saw, in a repository they did not pick it for.
+      input.sessionRuntime.setPermissionScope(
+        permissionScopeAfterSwitch(input.sessionRuntime.getPermissionScope(), projectChanged));
       renderProjectedLines(input.renderer, [
         `Forked ${sourceId} into ${forked.id}: same conversation, new direction. The source is untouched.`,
         "",

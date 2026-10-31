@@ -10884,3 +10884,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：钩子授权的撤回入口与内存遮蔽（子代理review安全缺陷）
 
 [addition21.77](features/phase-20-addition.md#2177-已记录的钩子授权没有撤回入口持久授权被内存副本遮蔽)forgetTrust/entries无调用者，等于没有撤回面；且recordTrust把持久授权也塞进内存集合，另一实例撤回后已打开的store仍在授权。现/trust forget按项目撤回、写盘失败不宣称撤回、只有写盘失败才留内存，并把审批面板的「this session」改为「this project」。126项聚焦、四反转全命中、五门/TS build通过。原47/ADD整体partial、goal active。
+
+### 2026-10-31：权限档位跨项目存活（子代理review安全缺陷）
+
+[addition21.78](features/phase-20-addition.md#2178-权限档位跨项目存活)permissionScope是进程级运行时字段，/resume跨项目切换后不重置，A项目的allow-all会在B项目自动放行。现切换函数返回项目是否改变，交互侧据此重置为ask（同项目保留），四条切换路径共用同一决策函数。3项聚焦、一反转到命中、五门/TS build通过。原47/ADD整体partial、goal active。
