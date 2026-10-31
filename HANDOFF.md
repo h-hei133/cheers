@@ -1611,3 +1611,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A signed provider cannot change skill/context preferences, or a saved window is silently ignored. A fresh role seed can also save after its resolved signer address changes.
 - **Root Cause**: Pure preference matching requires a static credential, while the role snapshot records API-key environment but does not capture signer address inputs or custom resolver output.
 - **Rule**: Keep preference matching about explicit provider/model/connection identity and check signer admission separately in writers and active status. Preserve named/legacy credential requirements. For fresh credentialless role seeds, compare the full current request before commit and inside the session lock. Test actual skill/window consumers, unavailable endpoints, named/pool refusals and resolver replacement; identity matching does not prove external authentication.
+
+
+### Signer Display Must Belong To The Actual Request
+- **Symptom**: A valid signer is labelled credential missing, or an override attaches request signing to another saved provider's auth label. A saved named ID can also suppress an explicit provider request's status.
+- **Root Cause**: Stored credential presence, actual request admission and configured-provider display are treated as one fact, with independent catalogue/status predicates.
+- **Rule**: Keep static credential and measurement projections unchanged. Use the same exact current-request catalogue owner for signer display and status, preserve named/pool/ambiguity guards, and label request auth/readiness beside request identity. Test CLI overrides and explicit provider scope over unrelated saved named connections without probes or writes; signer capability does not prove external credentials work.

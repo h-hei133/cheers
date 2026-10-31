@@ -107,11 +107,15 @@ function modelConfiguration(context: CommandContext) {
 function renderCatalogView(context: CommandContext): string {
   const { config, catalog, active, catalogDiagnostics } = modelConfiguration(context);
   return renderCatalog({ providers: catalog, configPath: userCatalogPath(), diagnostics: catalogDiagnostics,
-    availability: catalogAvailabilitySnapshot({ config, catalog, active,
-      // Local presence uses neither CLI overrides nor a live session's pool affinity.
-      resolveLocal: (provider, connectionId) => selectionRequest({ cwd: context.cwd }, config, {
-        provider, model: '', ...(connectionId === undefined ? { connectionScope: 'provider' } : { connectionScope: 'session', connectionId }),
-      }) }) });
+    availability: modelCatalogAvailability(context, { config, catalog, active }) });
+}
+
+function modelCatalogAvailability(context: CommandContext, input: Pick<ReturnType<typeof modelConfiguration>, 'config' | 'catalog' | 'active'>) {
+  return catalogAvailabilitySnapshot({ ...input,
+    // Local presence uses neither CLI overrides nor a live session's pool affinity.
+    resolveLocal: (provider, connectionId) => selectionRequest({ cwd: context.cwd }, input.config, {
+      provider, model: '', ...(connectionId === undefined ? { connectionScope: 'provider' } : { connectionScope: 'session', connectionId }),
+    }) });
 }
 
 function renderModelStatus(context: CommandContext): string {
@@ -119,6 +123,8 @@ function renderModelStatus(context: CommandContext): string {
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
+  const signed = modelCatalogAvailability(context, { config, catalog, active: request })
+    .some(entry => entry.active && entry.state === 'signed');
   const provider = activeConnection?.provider ?? config.provider ?? "openai";
   const authType = activeConnection?.authType ?? "api-key";
   const model =
@@ -137,11 +143,13 @@ function renderModelStatus(context: CommandContext): string {
     `Model: ${model ?? "unset"}`,
     `Request provider: ${request.provider}`,
     `Request model: ${request.model ?? "unset"}`,
+    ...(signed ? ['Request auth: authentication at request'] : []),
     "",
     ...renderProviderReadinessLines({
       activeConnectionId: activeId,
       activeConnection,
       model,
+      signed,
       availability: availabilitySnapshot({ config, catalog }),
     }),
     "",
@@ -154,10 +162,16 @@ function renderProviderReadinessLines(input: {
   readonly activeConnectionId?: string;
   readonly activeConnection?: ProviderConnectionConfig;
   readonly model?: string;
+  readonly signed?: boolean;
   readonly availability: AvailabilitySnapshot;
 }): string[] {
   const projected = input.availability.providers.flatMap(provider => provider.connections)
     .find(connection => connection.connectionId === input.activeConnectionId?.trim());
+  if (input.signed) return [
+    'Request readiness',
+    '- Request status: authentication at request.',
+    '- Signing credentials and live endpoint are unverified.',
+  ];
   if (!input.activeConnectionId) {
     return [
       "Provider readiness",

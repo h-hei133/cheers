@@ -80,6 +80,94 @@ describe("model command runtime", () => {
     expect(result.output).toContain("npm run verify:provider-readiness");
   });
 
+  it.each(['bedrock', 'vertex'] as const)('reports current %s signing without requiring a named connection or claiming credentials', async provider => {
+    const runtime = getRuntimeConfig(workspaceRoot);
+    const baseUrl = provider === 'bedrock' ? 'https://bedrock-runtime.us-east-1.amazonaws.com'
+      : 'https://us-central1-aiplatform.googleapis.com/v1/projects/synthetic-project/locations/us-central1/publishers/google';
+    const config = { ...runtime, provider, activeProviderConnectionId: undefined, providerConnections: [],
+      providerCredentials: { [provider]: { baseUrl, model: 'shared', thinkingEffort: null } } };
+    const catalog = [{ id: provider, label: provider, runtime: provider, auth: 'none' as const, baseUrl,
+      endpoint: provider === 'bedrock' ? 'bedrock-converse-stream' : 'google-vertex', models: [{ id: 'shared' }] }];
+    const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+    const before = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+    const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected probe'));
+    const command = { cwd: workspaceRoot, readConfiguration: () => ({ config, catalog }),
+      resolveConfigTarget: (candidate: typeof config) => resolveProviderCredential({ runtimeConfig: candidate, env: {} }) };
+    const result = await runModelCommand(['status'], command);
+    expect(result.output).toContain('Active connection: none');
+    expect(result.output).toContain('Request auth: authentication at request');
+    expect(result.output).toContain('Request readiness');
+    expect(result.output).toContain('Signing credentials and live endpoint are unverified');
+    expect(result.output).not.toMatch(/Next: run \/connect|Auth type: request signing|credential present/);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(before);
+  });
+
+  it('keeps saved authentication separate from a current signer provider override', async () => {
+    const runtime = getRuntimeConfig(workspaceRoot);
+    const baseUrl = 'https://bedrock-runtime.us-east-1.amazonaws.com';
+    const config = { ...runtime, provider: 'openai' as const, activeProviderConnectionId: undefined, providerConnections: [],
+      providerCredentials: { openai: { model: 'saved-model' }, bedrock: { baseUrl, model: 'request-model' } } };
+    const catalog = [{ id: 'bedrock', label: 'Bedrock', runtime: 'bedrock' as const, auth: 'none' as const, baseUrl,
+      endpoint: 'bedrock-converse-stream', models: [{ id: 'request-model' }] }];
+    const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+    const before = documents.map(file => fs.readFileSync(file));
+    const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected probe'));
+    const result = await runModelCommand(['status'], { cwd: workspaceRoot, readConfiguration: () => ({ config, catalog }),
+      resolveConfigTarget: candidate => resolveProviderCredential({ runtimeConfig: candidate, env: {},
+        cliProvider: 'bedrock', cliModel: 'request-model' }) });
+    expect(result.output).toContain('Provider: openai\nAuth type: api-key');
+    expect(result.output).toContain('Model: saved-model');
+    expect(result.output).toContain('Request provider: bedrock\nRequest model: request-model\nRequest auth: authentication at request');
+    expect(result.output).toContain('Request readiness\n- Request status: authentication at request.');
+    expect(result.output).not.toMatch(/Config status: authentication at request|Auth type: request signing|Next: run \/connect/);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(documents.map(file => fs.readFileSync(file))).toEqual(before);
+  });
+
+  it('reports an explicit signed provider request over an unrelated saved named connection', async () => {
+    const runtime = getRuntimeConfig(workspaceRoot);
+    const selected = runtime.providerConnections.find(connection => connection.id === runtime.activeProviderConnectionId)!;
+    const baseUrl = 'https://bedrock-runtime.us-east-1.amazonaws.com';
+    const config = { ...runtime, providerCredentials: { ...runtime.providerCredentials,
+      bedrock: { baseUrl, model: 'request-model' } } };
+    const catalog = [{ id: 'bedrock', label: 'Bedrock', runtime: 'bedrock' as const, auth: 'none' as const, baseUrl,
+      endpoint: 'bedrock-converse-stream', models: [{ id: 'request-model' }] }];
+    const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+    const before = documents.map(file => fs.readFileSync(file));
+    const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected probe'));
+    const result = await runModelCommand(['status'], { cwd: workspaceRoot, readConfiguration: () => ({ config, catalog }),
+      resolveConfigTarget: candidate => resolveProviderCredential({ runtimeConfig: { ...candidate, provider: 'bedrock',
+        activeProviderConnectionId: undefined, sessionConnection: { scope: 'provider', provider: 'bedrock' } }, env: {} }) });
+    expect(result.output).toContain(`Provider: ${selected.provider}\nAuth type: ${selected.authType}\nActive connection: ${selected.id}`);
+    expect(result.output).toContain('Request provider: bedrock\nRequest model: request-model\nRequest auth: authentication at request');
+    expect(result.output).toContain('Request readiness');
+    expect(result.output).toContain('Signing credentials and live endpoint are unverified');
+    expect(result.output).not.toMatch(/Auth type: request signing|credential present|Next: run \/connect/);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(documents.map(file => fs.readFileSync(file))).toEqual(before);
+  });
+
+  it.each(['nonsigner', 'unknown', 'blocked', 'named', 'ambiguous', 'pool'] as const)(
+    'does not report signing readiness for a %s current binding', async defect => {
+      const runtime = getRuntimeConfig(workspaceRoot); const baseUrl = 'https://bedrock-runtime.us-east-1.amazonaws.com';
+      const config = { ...runtime, provider: 'bedrock' as const, activeProviderConnectionId: defect === 'named' ? 'named' : undefined,
+        providerConnections: defect === 'named' ? [{ id: 'named', provider: 'bedrock' as const, authType: 'api-key' as const,
+          baseUrl, model: 'shared', status: 'connected' as const, createdAt: '2026-01-01', updatedAt: '2026-01-01' }] : [],
+        providerCredentials: { bedrock: { baseUrl, model: 'shared', thinkingEffort: null } },
+        ...(defect === 'pool' ? { accountPool: { bedrock: { connections: ['missing'] } } } : {}) };
+      const catalog = [{ id: 'bedrock', label: 'Bedrock', runtime: 'bedrock' as const, auth: 'none' as const, baseUrl,
+        endpoint: defect === 'nonsigner' ? 'openai-compatible' : defect === 'unknown' ? 'unknown-endpoint' : 'bedrock-converse-stream',
+        models: [{ id: 'shared' }] }];
+      if (defect === 'ambiguous') catalog.push({ ...catalog[0], id: 'first' }, { ...catalog[0], id: 'second' });
+      const before = fs.readFileSync(getUserAuthPath());
+      const result = await runModelCommand(['status'], { cwd: workspaceRoot, readConfiguration: () => ({ config, catalog }),
+        resolveConfigTarget: candidate => ({ ...resolveProviderCredential({ runtimeConfig: candidate, env: {} }),
+          ...(defect === 'blocked' ? { blocked: 'connection-unavailable' as const } : {}) }) });
+      expect(result.output).not.toMatch(/Request (status|auth): authentication at request|Auth type: request signing/);
+      expect(fs.readFileSync(getUserAuthPath())).toEqual(before);
+    });
+
   it.each(['outside', 'waiting'])('reports the active %s connection as unavailable in its pool', async scenario => {
     const runtime = getRuntimeConfig(workspaceRoot);
     const active = runtime.providerConnections.find(connection => connection.id === runtime.activeProviderConnectionId)!;

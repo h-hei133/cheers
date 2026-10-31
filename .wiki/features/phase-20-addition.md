@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.30 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.31 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5863,3 +5863,20 @@ build exit0，manifest `ef982b674f90`、inputsDigest `82d6aba4bec6af4140fe8ea483
 
 
 本批代码/证据说明已提交推送 `f47105684a6a59187a15562f3c3d7492e7766cc9`，远端main精确一致，batch scratch清理、提交后clean。自身CI `41219116283` 与Watch `41219116270`最后均in_progress，未称通过；此交付段后续文档单独提交。
+
+
+### 24.31 当前签名请求的目录与状态显示
+
+接续 `776269e2`：裸 `/model` 的目录可用性强制 static credential，把实际 Bedrock/Vertex signer 标作 credential missing；`/model status` 也仅按保存的 api-key/named 配置提示登录。新目录场景在原 owner 下实际4失败/8控制通过/25未选，两个 signer status 场景实际失败。`availabilitySnapshot` 的 credential missing 与 measured unknown 本来描述静态配置与测量，不应把签名能力伪造成 credential present。
+
+[catalogue availability](../../packages/ts-shell/src/core/models/availability.ts) 仅为实际请求、无显式 named ID 且 explicit provider 或无保存 active ID 的路径复用 auth binding predicate；按完整请求的 issuer endpoint 解析精确 owner，unknown protocol 安全保持未验证。`signed` 仅属于目录投影，不扩展通用 credential/measurement 类型。当前 signer 的 exact category 标作 authentication at request；非当前来源仍按静态材料呈现，named、pool、blocked、endpoint ambiguity 的原合同保持。
+
+[model status](../../packages/ts-shell/src/core/commands/modelCommandRuntime.ts) 与裸目录共用同一投影。独立架构审查指出 CLI request override 会把 signer auth 标签贴在另一份 saved provider 下；修正为保留 Provider/Auth type/Model/Active connection 的保存事实，并把签名标签明确列在 Request auth/Request readiness 下。explicit provider 请求覆盖无关已保存 named connection 时也沿实际投影显示 signer；真正 keyless named target 仍拒绝，不给 named 凭据借用权。keyless auto-select fallback 若实际 resolver 未返回任何 named selection ID，则本视图按当前 ambient transport 显示，亦不证明 named credential 存在。
+
+只读目标检查之后已对照参考项目 coding-agent 的 model-runtime:335–375 与 model-selector:148–184：available snapshot 和 stored credential 分开，精确 current model 决定显示；此前 provider adapter 的 implicit auth/request signing 决策继续适用。Cheers 显示时不查询 AWS/ADC 来源、不调用签名器或发送 preflight，也不建立第二套认证解析。
+
+主代理 Linux Node20.3.0、heap768MiB、单worker串行最终 **3文件/92项** exit0：command29、catalog40、availability23。新增23项涵盖 Bedrock/Vertex、exact issuer alias、actual alias 与相反 canonical protocol、explicit provider over saved named、CLI provider/model override、unknown/nonsigner/noURL/blocked/named/pool/duplicate，及命令零 fetch、settings/auth bytes/目录 invariance。新 CLI fixture 起初误传不存在的 cli object，唯一失败确认是测试设置；改为真实 cliProvider/cliModel 后通过，未以该设置失败推断产品缺陷。
+
+三个原生产 owner 反转实际 **10失败/15控制通过/44未选/exit1**；finally按字节与SHA256精确恢复审查版本，再跑同92项通过。五静态门/diff exit0，118 docs-source advisory保留；Node floor build `1a3bb4cf93b1e94cf2e181c17d6efa5e4cfea7f117f1a8801a2b226da6034ee9`、inputsDigest `24029052dcbe9418107d0a5cc375629af016ba320e800d21a474151d9d65c654` 与 manifest.compilerInputs 当前摘要一致。两路独立source-only APPROVE/CLEAR，子代理未执行验证。正式adapted archive/patch/member/vendor哈希核对后serial judge exit0，环/解析satisfied，partial仅既有interactiveMode21/22-name advisory。清理/交付另读回；证据 `.omx/artifacts/phase20-addition-catalog-signing/`。
+
+延迟CI读回：模型控制 `1c874354`/`41217709469` 与交付文档 `1e8e34d2`/`41217786893` 已completed/success；签名会话偏好 `f4710568`/`41219116283` 与前文档 `776269e2`/`41219155385` 最后in_progress，Watch均success，不代替代码CI。本批自身提交/推送/CI另绑。真实AWS/ADC凭据/endpoint、provider、PTY、非Linux平台、旧发布binary、全仓/20k未验；ADD-70 partial，原真实条件延后、goal active。

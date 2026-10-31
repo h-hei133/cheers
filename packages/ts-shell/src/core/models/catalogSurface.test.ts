@@ -6,6 +6,7 @@ import { runModelCommand } from '../commands/modelCommandRuntime.js';
 import { selectPooledConnection } from '../auth/account/pool.js';
 import { resolveProviderCredential, type ProviderCredentialResolution } from '../shell/providerCredentials.js';
 import type { CatalogProvider } from './catalog.js';
+import { availabilitySnapshot } from './availability.js';
 
 let root: string;
 const address = (name: string) => `https://${name}.invalid/v1`;
@@ -23,7 +24,7 @@ beforeEach(() => {
   root = fs.mkdtempSync('/tmp/cheers-test/catalog-surface-');
   vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('OPENAI_API_KEY', '');
 });
-afterEach(() => { vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 
 async function render(overrides: Partial<RuntimeConfig> = {}, providers = catalog,
   resolveTarget?: (config: RuntimeConfig) => ProviderCredentialResolution) {
@@ -45,6 +46,79 @@ function group(output: string, id: string): string {
   expect(section).toBeDefined();
   return section!;
 }
+
+function signedCatalog(provider: 'bedrock' | 'vertex') {
+  const baseUrl = provider === 'bedrock' ? 'https://bedrock-runtime.us-east-1.amazonaws.com'
+    : 'https://us-central1-aiplatform.googleapis.com/v1/projects/synthetic-project/locations/us-central1/publishers/google';
+  const providers: readonly CatalogProvider[] = [{ id: provider, label: provider, runtime: provider, auth: 'none', baseUrl,
+    endpoint: provider === 'bedrock' ? 'bedrock-converse-stream' : 'google-vertex', models: [{ id: 'shared' }] }];
+  const config: Partial<RuntimeConfig> = { provider, activeProviderConnectionId: undefined, providerConnections: [],
+    providerCredentials: { [provider]: { baseUrl, model: 'shared', thinkingEffort: null } } };
+  return { providers, config, baseUrl };
+}
+
+it.each(['bedrock', 'vertex'] as const)('shows the current %s signer as active without claiming a stored credential', async provider => {
+  const fixture = signedCatalog(provider);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected probe'));
+  const output = await render(fixture.config, fixture.providers);
+  expect(group(output, provider)).toContain('authentication at request');
+  expect(group(output, provider)).toContain('← active');
+  expect(group(output, provider)).not.toMatch(/credential present|credential missing/);
+  const staticPresence = availabilitySnapshot({ config: fixture.config, catalog: fixture.providers, env: {} });
+  expect(staticPresence.providers[0]).toMatchObject({ credential: 'missing', measured: 'unknown', connections: [] });
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each(['bedrock', 'vertex'] as const)('keeps a current %s signer on its exact issuer catalogue rather than another alias', async provider => {
+  const fixture = signedCatalog(provider);
+  const providers = [...fixture.providers, { ...fixture.providers[0], id: 'issuer', baseUrl: fixture.baseUrl },
+    { ...fixture.providers[0], id: 'other', baseUrl: address('other') }];
+  const output = await render(fixture.config, providers);
+  expect(group(output, 'issuer')).toContain('authentication at request');
+  expect(group(output, 'issuer')).toContain('← active');
+  for (const id of [provider, 'other']) expect(group(output, id)).not.toContain('active');
+  expect(group(output, 'other')).toContain('credential missing');
+});
+
+it('retains an explicit signed provider scope when the stored active named ID belongs to another request', async () => {
+  const fixture = signedCatalog('bedrock');
+  const output = await render({ ...fixture.config, activeProviderConnectionId: 'a', providerConnections: [connection('a')] },
+    [...catalog, ...fixture.providers], candidate => resolveProviderCredential({ runtimeConfig: { ...candidate, provider: 'bedrock',
+      activeProviderConnectionId: undefined, sessionConnection: { scope: 'provider', provider: 'bedrock' } }, env: {} }));
+  expect(group(output, 'bedrock')).toContain('authentication at request');
+  expect(group(output, 'bedrock')).toContain('← active');
+  expect(group(output, 'relay-a')).toContain('credential present');
+  expect(group(output, 'relay-a')).not.toContain('active');
+});
+
+it.each([true, false])('uses the actual alias protocol for signed=%s instead of the canonical default', async signed => {
+  const fixture = signedCatalog('bedrock');
+  const providers = [{ ...fixture.providers[0], endpoint: signed ? 'openai-compatible' : 'bedrock-converse-stream' },
+    { ...fixture.providers[0], id: 'issuer', endpoint: signed ? 'bedrock-converse-stream' : 'openai-compatible' }];
+  const output = await render(fixture.config, providers);
+  expect(group(output, 'issuer').includes('authentication at request')).toBe(signed);
+  expect(group(output, 'issuer').includes('← active')).toBe(signed);
+  expect(group(output, 'bedrock')).not.toContain('active');
+});
+
+it.each(['nonsigner', 'unknown', 'missing-address', 'blocked', 'named', 'pool', 'empty-pool', 'duplicate'] as const)(
+  'does not label a credentialless signer request active when its binding is %s', async defect => {
+    const fixture = signedCatalog(defect === 'missing-address' ? 'vertex' : 'bedrock');
+    const providers = fixture.providers.map(entry => ({ ...entry,
+      ...(defect === 'nonsigner' ? { endpoint: 'openai-compatible' } : defect === 'unknown' ? { endpoint: 'unknown-endpoint' }
+        : defect === 'missing-address' ? { baseUrl: undefined } : {}) }));
+    if (defect === 'duplicate') providers.push({ ...providers[0], id: 'first' }, { ...providers[0], id: 'second' });
+    const config = { ...fixture.config,
+      ...(defect === 'named' ? { activeProviderConnectionId: 'named', providerConnections: [{ ...connection('named'), provider: 'bedrock' as const,
+        apiKey: undefined, baseUrl: fixture.baseUrl }] } : defect === 'pool' || defect === 'empty-pool'
+        ? { accountPool: { bedrock: { connections: defect === 'pool' ? ['missing'] : [] } } } : {}) };
+    const output = await render(config, providers, candidate => ({ ...resolveProviderCredential({ runtimeConfig: candidate, env: {} }),
+      ...(defect === 'blocked' ? { blocked: 'connection-unavailable' as const }
+        : defect === 'missing-address' ? { baseUrl: undefined } : {}) }));
+    expect(output).not.toContain('← active');
+    expect(output).not.toContain('authentication at request');
+    expect(output).not.toContain('credential present');
+  });
 
 it('marks only the exact relay serving the current request active', async () => {
   const output = await render();

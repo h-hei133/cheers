@@ -43,7 +43,7 @@ export function renderCatalog(view: CatalogView): string {
 
 function renderProvider(provider: CatalogProvider, view: CatalogView): string[] {
   const entry = view.availability.find(candidate => candidate.id === provider.id);
-  const state = entry ? availabilityLabel(entry.state) : AUTH_NOTE[provider.auth];
+  const state = entry?.state === 'signed' ? 'authentication at request' : entry ? availabilityLabel(entry.state) : AUTH_NOTE[provider.auth];
   const marks = [
     provider.custom ? "yours" : undefined,
     entry?.active ? "active" : undefined,

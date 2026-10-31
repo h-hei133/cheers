@@ -5,6 +5,7 @@ import { availablePoolConnections } from '../auth/account/pool.js';
 import type { ProviderCredentialResolution } from '../auth/credential.js';
 import { providerCredentialBaseUrl } from '../auth/account/target.js';
 import { accountProtocol } from '../auth/account/policy.js';
+import { providerBindingAvailable } from '../auth/binding.js';
 
 /**
  * What the configuration says about a provider, without asking the provider.
@@ -102,7 +103,7 @@ function providerState(connections: readonly ConnectionAvailability[], credentia
 
 export interface CatalogAvailability {
   readonly id: string;
-  readonly state: AvailabilityState;
+  readonly state: AvailabilityState | 'signed';
   readonly active: boolean;
   readonly activeModel?: string;
 }
@@ -128,7 +129,13 @@ export function catalogAvailabilitySnapshot(input: {
 }): readonly CatalogAvailability[] {
   const snapshot = availabilitySnapshot(input);
   const active = input.active;
-  const owner = !active.blocked && active.credential ? resolvedCatalog(input.catalog, active) : undefined;
+  let owner: ReturnType<typeof resolvedCatalog>;
+  try {
+    const ambient = active.selection?.connectionId === undefined
+      && (active.selection?.credentialScope === 'provider' || !input.config.activeProviderConnectionId);
+    owner = !active.blocked && (active.credential || (ambient && providerBindingAvailable(input.catalog, active)))
+      ? resolvedCatalog(input.catalog, active) : undefined;
+  } catch { /* Unknown request protocols remain unverified without probing them. */ }
   return input.catalog.map(provider => {
     const entry = snapshot.providers.find(candidate => candidate.provider === provider.runtime);
     const connections = (entry?.connections ?? []).flatMap(connection => {
@@ -141,11 +148,12 @@ export function catalogAvailabilitySnapshot(input: {
     const ambient = input.resolveLocal(provider.runtime);
     const currentAmbient = !active.credential?.connectionId && owner?.entry?.id === provider.id;
     const ambientState = catalogCredentialState(input.catalog, provider, ambient);
-    const credential = ambientState === 'ready' || currentAmbient ? 'present' : 'missing';
+    const credential = ambientState === 'ready' || (currentAmbient && active.credential) ? 'present' : 'missing';
     const ambiguous = provider.id !== provider.runtime && catalogProvider(input.catalog, provider.runtime, provider.baseUrl).ambiguous;
     const localState = providerState(connections, credential, true);
     return { id: provider.id, state: ambiguous ? 'unknown' : ambient.blocked === 'pool-empty' ? 'pool-empty'
-      : localState === 'credential-missing' && ambientState === 'pool-unavailable' ? ambientState : localState,
+      : localState === 'credential-missing' && ambientState === 'pool-unavailable' ? ambientState
+      : currentAmbient && !active.credential ? 'signed' : localState,
       active: owner?.entry?.id === provider.id,
       ...(owner?.entry?.id === provider.id && active.model ? { activeModel: active.model } : {}) };
   });
