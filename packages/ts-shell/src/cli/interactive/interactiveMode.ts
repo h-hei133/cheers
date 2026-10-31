@@ -844,8 +844,7 @@ export class InteractiveMode {
     appendPromptHistory(this.options.runtimeContext.projectRoot, text);
     const controlSource = text.startsWith('/') ? text : '';
     if (isQueueControl(controlSource)) {
-      this.state.transcript.append(attachments?.images.length
-        ? { ...textBlock('user', text), images: attachments.images } : textBlock('user', text));
+      this.echoUser(text, attachments);
       const context = this.options.runtimeContext;
       const rawCommandArgs = text.replace(/^\/queue(?:\s|$)/i, '');
       void queueCommandFor(context, this.options.sessionRuntime, attachments)(tokenizeCommandArgs(rawCommandArgs), {
