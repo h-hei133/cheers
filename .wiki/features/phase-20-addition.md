@@ -406,8 +406,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批、第 24.39 节 | 部分完成 | Node/exe 普通/全屏的生产加载期输入、取消与错误恢复已验证；冷缓存、桌面全矩阵及完整性能验收仍缺 |
-| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40、24.43 节 | 部分完成 | 纯组合、独立模板、原生研究新建入口与 review 的只读 preview、目录声明的两套词表及按需加载已实施；Node/exe 的小型模拟请求与工具 JSON 计量边界已验证，另有生产 Node CLI 的单次真实请求本地估算/provider 用量匹配证据；不支持的 control/workflow 仍 unknown；其他模型词表、完整媒体/协议计量、真实 TUI 衔接、历史 1.7k/4.9k 分项差额与性能验收尚缺 |
-| ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批 | 本地验证 | 不借此宣称 ADD-08 完成 |
+| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40、24.43–24.44 节 | 部分完成 | 纯组合、模板、原生研究/review preview、目录声明的词表及按需加载已实施；生产 Node 普通/全屏真实 TUI 的提交前估算、accepted 请求和 provider 实测已对齐，context 报告身份漏传已修补；不支持的 control/workflow 仍 unknown；真实 binary/其他环境、其他词表、完整媒体/协议、历史 1.7k/4.9k 分项差额与性能验收尚缺 |
+| ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批、第 24.44 节 | 本地验证 | 当前报告身份经真实 slash 桥接与 Node TUI 验证；不借此宣称 ADD-08 完成 |
 | ADD-35 | P2 | 状态栏 live 估算与 provider 实测的优先级 | 第一百零五批、21.28–21.30 | 本地验证 | 真实 provider 延迟 |
 | ADD-36 | P2 | 目录刷新来源标记与能力上限准入 | 第一百零六至一百零八批 | 本地验证 | 真实外部索引内容与端到端 compaction |
 
@@ -6054,3 +6054,19 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 中间结果单独保留：首次harness将buildInputDigest结果对象与字符串比较，未发请求即拒绝，读取.digest后修正；第一次真实调用成功并测得507/764、cache256、output256，但global-fetch wrapper没有捕获实际传输，不算最终完整匹配证据。第二次真实调用才取得上述完整证据；两个独立夹具尺寸相同不证明body字节完全相同。Undici在HTTP200后另发出request:error诊断，早期harness误命名为networkFailure；产品确有finally清理abort，但未保留诊断原始原因，故最终只记requestErrorEvent、原因未分类，不把事件等同provider-network故障。该字段纠正重投影原数值收据，没有第三次请求。
 
 所有原始stdout/stderr仅内存读取后丢弃，不保存URL、headers、请求/响应正文、credential或prompt/session digest。两次真实调用均核对四个已知home根的config/auth/catalog原bytes不变或仍不存在、隔离config不变、含凭据scratch删除；正式安全收据与可复用脚本归 `.omx/artifacts/phase20-addition-live-count/`。本批仅文档与HANDOFF，无新build/tests、全仓回归、20k真实会话、新NormProof或独立委派复审；延迟读回99d99551/41234379850、9c547328/41233253348及16c1b794/41235289977的代码CI现已completed/success；205ed567/41236321295仍in_progress，其Watch已success，不替代代码CI。五项静态门、diff检查与两脚本语法检查均exit0；118既有docs-source advisory保留。安全收据分项求和、归一化输入一致、凭据/地址未进入正式证据及scratch缺失核验通过。本批提交/推送另绑定；原Phase20真实条件继续延后，整体goal active。
+
+### 24.44 真实 TUI 计量衔接与 context 报告身份传递
+
+接续已推送 `d9eb54924a88c3aaca66287f159cabedc90ab199`，本批继续ADD-08真实终端链路，并确认ADD-09的实际消费者缺陷。旧build `148356e5847d93e55a994d0ae73d681eb5c853a72c58c1994b8666780f9368ec` 两场Node20.3真实普通/全屏PTY：空态估算503、草稿/accepted估算562，provider总输入分别802/804，状态栏已正确无~显示measured；最后请求详情也持有该用量，报告顶部facts.prompt却没有tokens。查明交互路由已有promptIdentity，但[命令桥接](../../packages/ts-shell/src/entrypoints/cliCommandExecutionBridge.ts)的输入契约和转交列表均漏字段；调用端的条件spread没有触发多余字段错误。既有[报告owner](../../packages/ts-shell/src/core/commands/contextCommandRuntime.ts)因此按缺少当前身份拒绝，不是provider计量故障。
+
+定向只读参考快照f09d01b85e0384647fcab6779d35ab9dabe04be3：coding-agent的interactive-mode:2367将context usage委托同一live session accessor，agent-session:4318在无法证明compaction后usage时保留unknown。本项目同意沿live owner转交、不从inspection schema或存量telemetry重造当前身份；继续保留更严格的endpoint/system/schema/history/wire/replay核验。修补仅在现桥接声明并原样转交promptIdentity两个字段，未改身份owner、provider/auth核心、用量归一化或任何配置默认值。
+
+新增[实际命令路由回归](../../packages/ts-shell/src/core/commands/configuration.test.ts)，interactive/print各覆盖current、missing、replaced三种身份，完整记录wire/replay事实；旧owner实际2失败/4控制通过/14未选，精确验证原TUI与报告分歧。首次runner因StreamingRenderer仍为type import出现六项ReferenceError，修正harness后才取有效baseline。显式原源码反转再次2失败/4控制通过，按raw bytes逐字节恢复并核对SHA；三文件configuration/bridge/sessionFacts最终及恢复后均60项通过，单worker、768MiB、主代理串行，无全仓回归或20k真实会话。
+
+五项静态门、TS/exe构建通过，新build `5d2a876fc754d473fc000f093948e6f62f7c846b644e39ac29d7c382515f3182` 的manifest.compilerInputs摘要、exe size/SHA读回一致。最终Node20.3普通/全屏两场真实PTY均通过：空态~503、草稿~562，提交前零推理；各一次readiness GET和推理POST均HTTP200，1976-byte实际body、3消息/0 tools，本地accepted仍562、provider总输入均803（含cache read640）。两个真实回合均completed/success；状态栏无~显示803，/context顶部Latest context measurement和最后请求详情也实际绘制803，报告不额外推理。两场正常exit0、cooked flags恢复、relay/CLI关闭；exe仅构建验证，本批未冒充真实binary/provider终端证据。
+
+每场独立受保护HOME/profile/空Git项目，仅在0600隔离配置复制所选真实API-key/address/model；tools/MCP/skills/context files/cache warming/retry关闭，offline只关自主检查、显式真实provider仍可调用，单轮、1024输出、65秒进程与请求deadline、2MiB输出上限。真实配置/auth/catalog四个home来源原bytes或缺失不变、隔离config不变、含凭据夹具删除；终端/body/headers/响应正文只在内存观察并丢弃，未留key/address或响应文本digest。最后回答是否服从“只答OK”未评价，不拿传输成功冒充回答质量。
+
+五次真实推理分开记证：首pilot仅256输出，已接受/有usage/显示measured，但query完成与成功谓词为false，原observer未保存精确终态；harness等待成功后超时清理exit143，不算完整通过或产品route失败。其额外native GET404目标未保留，不能归因推理；后续offline夹具没有该请求。两场before收据只通过旧的gauge/last-request契约、current-report仍null，不能替代两场fixed验证。provider输入803与估算562的差额只属于这批隔离请求；不同临时项目的等长body不等于同字节，不解释历史1.7k/4.9k。
+
+正式收据、反转、源码非执行快照、构建身份和可复用脚本归 `.omx/artifacts/phase20-addition-live-context/`，最终清理owned测试scratch。ADD-08保持partial：本批补Linux/Node普通/全屏真实衔接，真实binary/其他平台与provider、词表/媒体/协议、历史差额和完整性能仍缺；无新NormProof或独立委派复审。延迟代码CI读回205ed567/41236321295已completed/success；d9eb5492/41237373096仍in_progress，Watch41237373104已success，不替代代码CI。最终五项静态门、diff与两脚本语法再次exit0，118既有docs-source advisory保留；正式收据核对、恢复后build新鲜度、原始key/address未进入证据及owned scratch清理均通过。本批提交/推送另绑定；原Phase20真实条件继续延后，整体goal active。

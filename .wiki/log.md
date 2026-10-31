@@ -11152,3 +11152,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：真实 provider 的单次请求计量证据
 
 [addition24.43](features/phase-20-addition.md#2443-生产-cli-的单次真实请求估算与-provider-用量对齐)在当前build148356e5847d经生产Node20.3 --print完成两次隔离真实推理；最终一次由原Undici fetch透明观察与native diagnostics确认1 GET/1 POST均HTTP200，body1784 bytes、3消息/0 tools、本地字符估算507、provider总输入764（含cache640）、output256、exit0。前次真实调用只有live telemetry，global-fetch观察未命中原传输；另digest对象误比与diagnostic错误命名均仅harness问题，保留中间安全收据、纠正未重发第三次。两次均原配置/auth/catalog bytes或缺失不变、隔离config不变、凭据scratch删除；无正文/地址/key留存。仅文档/HANDOFF，无产品改动或新build/tests；延迟读回99d99551、9c547328、16c1b794代码CI已success，205ed567仍in_progress、Watch success；五项静态门/diff/两脚本语法检查exit0，118既有advisory保留，安全收据与清理核验通过；交付另绑。历史1.7k/4.9k、真实TUI/binary、完整词表/协议/性能仍缺，ADD-08 partial、goal active。
+
+
+### 2026-11-01：真实 TUI 用量衔接与 context 桥接修复
+
+[addition24.44](features/phase-20-addition.md#2444-真实-tui-计量衔接与-context-报告身份传递)旧生产Node真实PTY发现gauge measured而报告顶部无当前tokens；桥接漏传live promptIdentity，条件spread未报类型错误。仅声明/转交原字段，保留清除/替换身份stale拒绝。参考同session accessor与unknown边界后，实际slash六回归旧owner2失败/4控制/14未选，显式反转相同、逐字节恢复后相关三文件60项再次通过。TS/exe build5d2a876fc754摘要/size/SHA一致；最终Node普通/全屏真实PTY各1推理，preview/accepted562、provider803（含cache640）、gauge与报告顶部/最后请求均实际803、completed/success、正常exit0/cooked/夹具清理。首256-budget pilot未证实成功、两场before报告仍null单独保留，不算最终修复验证。原配置不变、无正文/key/address留存；延迟205ed567代码CI已success，d9eb5492仍in_progress、Watch success；最终五门/diff/两脚本语法通过，118既有advisory保留，原始key/address缺席与scratch清理核验通过；交付另绑。真实binary/其他环境、历史差额和完整性能仍缺，ADD-08 partial、goal active。

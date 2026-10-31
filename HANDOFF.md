@@ -1684,3 +1684,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A real CLI request records provider usage but a global-fetch observer sees no dispatches; an Undici error diagnostic also appears after HTTP 200 and is labelled a network failure.
 - **Root Cause**: Production imports the installed Undici fetch instead of global fetch. The request controller is explicitly aborted during cleanup, so an error diagnostic alone does not establish provider/network failure.
 - **Rule**: Observe the actual native transport without consuming or replacing its response, and match its dispatch count and size to the accepted request's live telemetry under the installed profile. Keep diagnostic events separate from failure classifications; retain unknown cause when no safe reason was observed. Build freshness uses buildInputDigest(...).digest, with manifest.compilerInputs supplied.
+
+### Conditional Caller Fields Still Need A Declared Bridge Contract
+
+- **Symptom**: A status gauge has a current provider measurement, but the same session's context report marks it stale despite the caller supplying the live request identity.
+- **Root Cause**: A conditional object spread can pass an undeclared optional field without an excess-property error; the intermediate bridge silently drops it before the command's identity check.
+- **Rule**: Declare and forward the existing owner identity through the bridge. Verify the actual slash route in interactive and print modes, including current, cleared and replaced identities. Preserve strict stale rejection rather than validating saved telemetry against itself; provider acceptance and usage alone do not prove a completed query.

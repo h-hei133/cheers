@@ -9,6 +9,8 @@ import { configurationAdmission } from '../shell/configuration.js';
 import { resolveCliCredential } from '../../cli/provider/cliProviderRuntimeBridge.js';
 import { SessionManager } from '../../session/SessionManager.js';
 import { recordRequestContext, recordSessionUsage } from '../../observability/usageTelemetry.js';
+import { captureUsageAttribution } from '../../observability/usage/identity.js';
+import type { CommandReport } from './report/contract.js';
 import { requestContext } from '../../context/request/projection.js';
 import * as transport from '../../provider/request/fetch.js';
 import * as refresh from '../models/catalogRefresh.js';
@@ -20,7 +22,7 @@ import { connectionPicker } from '../../cli/interactive/picker/connections.js';
 import { activeModelName, readStatusFacts, readWelcomeState } from '../../cli/interactive/sessionFacts.js';
 import { createCatalogLoader, catalogIdentity } from '../../cli/interactive/completion/catalog.js';
 import { buildCliCommandExecution } from '../../entrypoints/cliCommandExecutionBridge.js';
-import type { StreamingRenderer } from '../../presentation/terminal/streaming.js';
+import { StreamingRenderer } from '../../presentation/terminal/streaming.js';
 import type { CliMcpGateway } from '../../entrypoints/cliMcpModule.js';
 import type { CommandContext } from './types.js';
 import { Pager, pageLongOutput } from '../../presentation/tui/chrome/pager.js';
@@ -64,6 +66,31 @@ function fixture() {
     refreshRuntimeConfig: scope => refreshShellRuntimeConfig(shell, scope), getToolPool: async () => new Map() };
   return { shell, context };
 }
+
+it.each([
+  ['interactive', 'current'], ['print', 'current'],
+  ['interactive', 'missing'], ['print', 'missing'],
+  ['interactive', 'replaced'], ['print', 'replaced'],
+] as const)('keeps live request identity through the %s context command bridge (%s)', async (mode, state) => {
+  const { shell, context } = fixture();
+  const attribution = captureUsageAttribution({ provider: 'google', model: 'chosen', baseUrl: 'https://chosen.invalid' });
+  const identity = {
+    provider: 'google', model: 'chosen', endpoint: 'openai-compatible', endpointId: attribution.endpointId,
+    schemaDigest: 'a'.repeat(64), systemDigest: 'b'.repeat(64), historyDigest: 'c'.repeat(64),
+    wireHistoryDigest: 'd'.repeat(64), wireMessageCount: 3, replayBinding: 'e'.repeat(64),
+  };
+  recordSessionUsage(shell.session.id, { provider: 'google', model: 'chosen', promptTokens: 802,
+    completionTokens: 2, promptMessageCount: 3, promptIdentity: identity, attribution });
+  shell.promptIdentity = state === 'missing' ? undefined
+    : state === 'replaced' ? { ...identity, wireHistoryDigest: 'f'.repeat(64) } : identity;
+  expect(readStatusFacts(shell).contextUsed).toBe(state === 'current' ? 802 : undefined);
+  let report: CommandReport | undefined;
+  const renderer = new StreamingRenderer();
+  renderer.setSink({ line: (_text, value) => { report = value; }, chunk: () => {} });
+  await buildCliCommandExecution({ ...context, promptIdentity: shell.promptIdentity, prompt: '/context', renderer,
+    interactive: mode === 'interactive', printMode: mode === 'print' });
+  expect(report?.facts.prompt).toEqual(state === 'current' ? { status: 'measured', tokens: 802 } : { status: 'stale' });
+});
 
 it.each(['before', 'after'] as const)('rejects obsolete context report admission %s catalog loading', async phase => {
   const { context } = fixture(); let stale = phase === 'before', release!: () => void;
