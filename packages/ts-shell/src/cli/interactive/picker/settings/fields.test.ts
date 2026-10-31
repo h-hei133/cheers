@@ -139,6 +139,38 @@ it.each(['user', 'project'] as const)('allows an explicit second Apply after a s
   } finally { view.overlay.close(); }
 });
 
+it.each((['user', 'project'] as const).flatMap(scope => ([
+  { key: 'maxTurns', value: 42, external: 17, amended: 24 },
+  { key: 'disabledTools', value: ['fixture.a'], external: ['fixture.external'], amended: ['fixture.b'] },
+  { key: 'modelTokenBudgets', value: { 'openai/fixture': { reserveTokens: 1000, keepRecentTokens: 2000 } },
+    external: { 'openai/fixture': { reserveTokens: 600, keepRecentTokens: 1000 } },
+    amended: { 'openai/fixture': { reserveTokens: 1200, keepRecentTokens: 2000 } } },
+  { key: 'denyRules', value: [{ tool: 'bash', pattern: 'first' }], external: [{ tool: 'bash', pattern: 'external' }],
+    amended: [{ tool: 'bash', pattern: 'replacement' }] },
+] as const).flatMap(test => (['confirm', 'cancel'] as const).map(returning => ({ ...test, scope, returning })))))(
+  'preserves a failed $scope $key Apply across editor $returning', async ({ key, value, external, amended, scope, returning }) => {
+    const view = surface(scope), target = scope === 'user' ? userFile : projectFile;
+    const other = scope === 'user' ? projectFile : userFile, untouched = fs.readFileSync(other);
+    try {
+      await view.open(key); await view.press('\r'); await view.press('\x15');
+      view.overlay.handlePaste(JSON.stringify(value)); await view.press('\r');
+      const changed = `// changed externally\n${JSON.stringify({ schemaVersion: 1, [key]: external, topP: 0.6 })}`;
+      fs.writeFileSync(target, changed);
+      expect((await view.press('\r'))?.note).toContain('conflict');
+      expect(fs.readFileSync(target, 'utf8')).toBe(changed); expect(view.frame()).toContain('Apply not confirmed');
+      await view.choose('Edit value'); await view.press('\x15'); view.overlay.handlePaste(JSON.stringify(amended));
+      await view.press(returning === 'confirm' ? '\r' : '\x1b');
+      const retainedFailure = view.frame().includes('Apply not confirmed') && view.frame().includes('conflict');
+      expect(fs.readFileSync(target, 'utf8')).toBe(changed);
+      const result = await view.choose('Apply');
+      expect(result?.note).toContain(`Saved to your ${scope} configuration.`);
+      expect(retainedFailure).toBe(true);
+      expect(readRuntimeConfigEditAt(target).values).toMatchObject({ [key]: returning === 'confirm' ? amended : value, topP: 0.6 });
+      expect(fs.readFileSync(target, 'utf8')).toContain('// changed externally'); expect(fs.readFileSync(other)).toEqual(untouched);
+      await view.open(key); expect(view.frame()).toContain('Stored:'); expect(view.frame()).not.toContain('Apply not confirmed');
+    } finally { view.overlay.close(); }
+  });
+
 it.each(['cancel', 'confirm'] as const)('keeps the scope chooser %s path explicit for a staged value with both source owners', async action => {
   const view = surface('user'); const bytes = [userFile, projectFile].map(file => fs.readFileSync(file));
   try {

@@ -1783,3 +1783,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A role assignment or effort edit saves after its target account enters backoff inside the state lock, while the default account stays usable.
 - **Root Cause**: The target was validated only before the transaction; the writer guard rechecked only the default request. Ephemeral pool changes do not alter configuration fingerprints.
 - **Rule**: Reuse the existing target validator inside the same writer guard and accepted-input fences. Keep clearing a role independent of the removed target's availability. Verify the target and default separately, with stable saves, blocked writes and successful clears under the original lock.
+
+### Returning From A Settings Editor Must Retain Failed Apply State
+- **Symptom**: After a settings conflict, confirming or cancelling a value editor hides the failed Apply and makes the next explicit Apply fail again.
+- **Root Cause**: The editor return reconstructs the detail without its failure state, so the consumed draft is reused instead of reopening through its original binding checks.
+- **Rule**: Preserve the failure notice on both editor return paths. Editing only stages a value; the next explicit Apply refreshes through the original draft and retains source/binding guards. Verify confirmation and cancellation across user/project scopes, preserving external comments, sibling fields and the other scope.

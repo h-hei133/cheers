@@ -11240,3 +11240,10 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 一次延迟读回c66e67eb精确代码CI41250671853已completed/success，Watch41250671837 success；上一批f8763ff2代码CI41252261041仍in_progress、Watch41252261035 success。两者均不替代本批交付CI；不立即轮询或重启在跑任务。
 
 最终五静态门、三个脚本语法、独立证据verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留；工作树仅本批两个代码/测试文件与三份markdown。当前提交/推送/remote-main与clean状态由ignored delivery另绑，本批交付CI未观察。
+
+
+### 2026-11-01：失败设置 Apply 的编辑返回重试
+
+[addition24.60](features/phase-20-addition.md#2460-失败-apply-经值编辑器返回后仍可显式重试)修复原 settings 详情经 editor confirm/cancel 丢失 failure、复用 consumed draft 而额外失败；只传递原失败状态，下一明确 Apply 复用原 reopen/binding/source 检查。新增16项 user/project×四种编辑类型×确认/取消，旧 owner16失败/116控制，反转16失败/116未选中，逐字节恢复后 fields132/lifecycle20 共152通过；初次入口路径错误独立留存，不算有效反转。五门/Node20.3 TS+exe build de2e0e38e6dc，current inputs/两份 exe size/SHA核验通过。普通/全屏×两scope×确认/取消八条真实 CLI 全通过：编辑返回零save/reopen，第二 Apply一次reopen并确认写入，冲突及保存实际绘制、Stored读回，注释/兄弟字段/另一scope/auth/session model保持。八场HTTP0、exit0/cooked恢复/owned进程及scratch清理，最高采样578300KiB不算性能；两次早期探针迭代单独保留，固定Escape时序改为观察实际消费和关闭，含迭代10次CLI不算十场有效矩阵。独立证据核验passed，HANDOFF补失败状态与consumed draft关系；无真实provider/exe故障注入/其他平台/全仓/20k/judge/委派复审，ADD-03部分完成、原47外部条件延后、goal active。
+
+一次延迟读取 c66fbc8a 代码CI41252988169仍in_progress、Watch41252988065 success，f8763ff2代码CI41252261041及Watch41252261035均success；本批CI尚未观察，最终门与提交推送另绑。

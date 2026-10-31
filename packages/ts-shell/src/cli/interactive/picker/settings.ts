@@ -99,7 +99,7 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
       };
       const id = ids[0];
       if (id === 'inspect') return { next: settingSources(draft, setting, () => settingDetail(host, draft, setting, pending, failure)) };
-      if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending, value => settingDetail(host, draft, setting, value)) };
+      if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending, value => settingDetail(host, draft, setting, value, failure)) };
       if (id === 'unset') return { next: settingDetail(host, draft, setting, { value: undefined }, failure) };
       if (id === 'scope' && setting.policy.sources.includes('project')) return { next: scopePicker(host, draft, setting, pending) };
       if (id === 'back' || id === 'discard') return { next: settingsPicker(host, draft.scope, setting.group, setting.key) };
