@@ -1445,8 +1445,9 @@ export class InteractiveMode {
 
   /** Route a command line as if the user had typed it, reusing the same path. */
   private async runCommandLine(line: string, selection?: import('../../session/navigation/selection.js').SavedSessionSelection): Promise<undefined> {
-    this.state.transcript.append(textBlock("user", line));
-    this.view.scrollToEnd();
+    // Programmatic submissions are sent, not queued: they run immediately below,
+    // so they join the conversation the same way a typed one does.
+    this.echoUser(line);
     if (selection) await this.run(line, undefined, undefined, selection);
     else await this.run(line);
     return undefined;
