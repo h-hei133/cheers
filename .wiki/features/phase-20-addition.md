@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 节、第 24.7 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接及已知 CI 夹具修复已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 节、第 24.7 节、第 24.8 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、已知 CI 夹具修复与实际请求端点诊断已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5529,3 +5529,15 @@ ADD-70 仍部分完成：默认值已物理移出 auth，但其余重复事实�
 `31616578` 代码 CI `41190946495` 延迟读回 failure：6 文件/24 项失败、13008 项通过；与前批相比 Copilot 修复已过，增加两项旧模型详情 hint 预期。它们分类为旧合同预期，改为明确断言 `settings: config.json; connections: auth.json.`。六个测试文件改动，不修改产品源码。单进程/单 worker 按测试名聚焦运行前批 23 个场景全部通过，实际 Node **20.3.0** 同一组 23 项通过；两项 catalogue hint 在 Node20.3 单独聚焦通过，合计覆盖已知两批失败的 **25 个不同场景**，没有运行七文件全部 504 项或全仓回归。最初调用用了本地 Vitest0.34 不支持的 `--no-file-parallelism`，在执行测试前参数解析失败，移除后使用 VITEST_MAX_THREADS/MIN_THREADS=1 正常执行，未改产品/测试来规避。
 
 只读复审未发现夹具断言弱化；补充将 loader 地址转换为 file URL，避免 Windows drive colon 被 ESM 当作 URL scheme。Linux Node20.3 的配置与本地baseline再聚焦通过不等于Windows验收。此次另有这一个桥接兼容性修补。本批验证只证明这些已知失败场景，不据此宣布最新代码 CI 已通过。脚本桥接及本批提交分别绑定自身 CI；其余重复事实语义、旧二进制回退与真实 provider/平台/输入验收仍缺，ADD-70 partial、整体 goal active。
+
+### 24.8 实际请求端点诊断与独立 provider 默认
+
+原 `getRuntimeConfig` 只比较 `activeProviderConnectionId` 指向的原始 URL，并将 provider slot 的端点称为 unused。该 slot 仍可由独立 provider 选择使用；fallback、pool、CLI override 和账号 issuer 的实际目标也不能只由 active ID 判断。旧消息还打印连接 URL，其 userinfo、path、query、fragment 都可能含秘密。
+
+诊断迁入既有 `config/constraints.ts`：使用与请求相同的 credential/catalogue/issuer 解析后目标，比较规范化的端点，仅报告覆盖关系，不显示地址、连接 ID 或凭据。blocked/无法解析的目标不宣称端点覆盖；同值与无 provider 端点不提示。provider slot 保留，读取不写 settings/auth；重验证去掉本 owner 的旧消息后重新计算，来源一致时提示清除。原 load-time 测试迁到约束 owner，并补全两个物理文档的 bytes/absence 与独立 slot 可用断言。
+
+只读参考对照：请求在认证解析后将返回的 baseUrl 投影到当次 request model，保留原模型/配置；本批沿用该决策，把比较放在已有请求目标解析之后，不在 loader 重新推导，也不迁移或删除另一选择的独立端点。反转为 raw resolution 后，账号 issuer 场景实际失败。
+
+主代理串行运行 constraints34/runtimeConfig35/providerCredentials28，**97 项**通过，涵盖 legacy/split × explicit/fallback/pool/override、legacy/auth-only issuer、相同/缺失/blocked/provider-only、startup/reload 清除与重复重验证。实际 Linux Node20.3.0 上同 97 项通过，重复运行不累加。四条反转（删除提示、比较原始 resolution、打印 URL、保留旧提示）均实际 AssertionError，finally 逐字节恢复源码后再验证。五门与 build 通过，manifest `83ed9a95219d`。正式打包 NormProof exit0，依赖环与导入解析 satisfied；verdict partial，两个既有 interactiveMode 模块分别 21/22-name advisory，本批未新增 ceiling finding。未取得本批独立委派复审。
+
+延迟 CI：`73e332f1` 的 `41191224812` failure，25 项失败包括已由第24.7节修复的旧夹具及一个 browser healing CLI 场景；后者仍待单独分类。`3918c14f` 的 `41192490126` 和 `0f758c59` 的 `41192812005` 最后均 in_progress，两个 Watch success 不替代代码 CI。本批提交与自身 CI 单独绑定；未运行真实 provider、Windows、PTY、全仓或20k压测，未迁移真实 HOME。ADD-70 partial、整体 goal active，其余重复事实语义、旧版本回退与真实环境验收仍缺。

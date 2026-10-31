@@ -10970,3 +10970,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：修复延迟 CI 的分文件与连接重绑定夹具
 
 [addition24.7](features/phase-20-addition.md#247-延迟代码-ci-的夹具修复)3918c14f已推送且main/origin一致；自身CI41192490126仍in_progress、Watch成功。31616578延迟CI失败24项，其中旧22项同前批、Copilot已过、新增catalogue hint旧预期2项。仅修6测试文件：两文档bytes/absence快照，重绑定夹具delete/fresh-edit/add，存储hint分auth/settings；保留无写入/无父账号回退/会话不变断言。前批23个场景本地与实际Node20.3各过、另2项Node20.3通过，覆盖25个不同场景；未全仓/全文件/build。最新代码CI仍需读回，ADD-70 partial、goal active。
+
+### 2026-10-31：端点诊断跟随实际请求并隐藏地址
+
+[addition24.8](features/phase-20-addition.md#248-实际请求端点诊断与独立-provider-默认)端点关系诊断由原始loader迁入既有constraint owner，覆盖fallback/pool/CLI与账号issuer；独立provider slot保留，blocked不宣称覆盖，URL不入诊断，重验证清除旧提示。legacy/split组合与auth-only、两文件bytes/absence、startup/reload等3文件97项本地及实际Node20.3通过；四反转AssertionError/逐字节恢复、五门/build通过，manifest83ed9a95219d。正式judge仅两个既有interactiveMode21/22-name advisory。73e332f1代码CI失败25项，旧夹具已修、一个browser healing CLI场景待分类；3918c14f/0f758c59代码CI最后in_progress，Watch成功不作代码通过。未真实provider/Windows/PTY/全仓，本批无独立委派复审；ADD-70 partial、goal active，本批提交/CI单独绑定。

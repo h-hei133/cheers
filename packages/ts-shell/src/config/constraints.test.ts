@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getRuntimeConfig, getUserRuntimeConfigPath, type RuntimeConfigFile, type RuntimeProvider } from './runtimeConfig.js';
-import { inspectConfigConstraints } from './constraints.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile, type RuntimeConfigFile, type RuntimeProvider } from './runtimeConfig.js';
+import { constrainRuntimeConfig, inspectConfigConstraints } from './constraints.js';
+import { resolveProviderCredential } from '../core/shell/providerCredentials.js';
 import { loadCatalog, userCatalogPath } from '../core/models/catalogStore.js';
 import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../core/shell/runtimeContext.js';
 import { configurationAdmission } from '../core/shell/configuration.js';
@@ -36,9 +37,96 @@ beforeEach(() => {
   } }));
   manager = new SessionManager();
 });
+
+it.each((['legacy', 'split'] as const).flatMap(storage =>
+  (['explicit', 'fallback', 'pool', 'override'] as const).map(selection => ({ storage, selection }))))(
+  'reports the resolved $selection endpoint in $storage storage without exposing values or deleting independent defaults', ({ storage, selection }) => {
+  const profileEndpoint = 'https://profile.invalid/v1';
+  const connectionEndpoint = 'https://user:synthetic-password@relay.invalid/private-synthetic-path?token=synthetic-query#synthetic-fragment';
+  settings = { ...settings, ...(selection === 'fallback' || selection === 'pool' ? { activeProviderConnectionId: undefined } : {}),
+    providerConnections: settings.providerConnections!.map(item => ({ ...item, baseUrl: connectionEndpoint })),
+    providerCredentials: { openai: { apiKey: 'synthetic-profile-key', baseUrl: profileEndpoint, model: 'roomy' } },
+    ...(selection === 'pool' ? { accountPool: { openai: { connections: ['main'] } } } : {}) };
+  save();
+  if (storage === 'split') {
+    writeUserRuntimeConfigFile(settings, readRuntimeConfigEditAt(file));
+    const preferences = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const auth = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
+    expect(preferences.providerCredentials).toBeUndefined();
+    expect(preferences.providerConnections).toBeUndefined();
+    expect(auth.providerCredentials.openai.baseUrl).toBe(profileEndpoint);
+    expect(auth.providerConnections[0].baseUrl).toBe(connectionEndpoint);
+  } else expect(fs.existsSync(getUserAuthPath())).toBe(false);
+  const files = [file, getUserAuthPath()];
+  const snapshot = () => files.map(source => fs.existsSync(source) ? fs.readFileSync(source) : undefined);
+  const before = snapshot();
+  const config = getRuntimeConfig(root);
+  const target = resolveProviderCredential({ runtimeConfig: config, env: {},
+    ...(selection === 'override' ? { cliBaseUrl: 'https://override.invalid/v1' } : {}) });
+  expect(target.baseUrl).toBe(selection === 'override' ? 'https://override.invalid/v1' : connectionEndpoint);
+  const accepted = constrainRuntimeConfig(config, target, loadCatalog());
+  expect(accepted.configDiagnostics).toContain('The selected request endpoint overrides the stored provider endpoint. Other provider selections retain their own endpoint.');
+  expect(accepted.configDiagnostics.join('\n')).not.toMatch(/synthetic-password|private-synthetic-path|synthetic-query|synthetic-fragment|synthetic-profile-key|relay\.invalid|override\.invalid/);
+  expect(accepted.configDiagnostics.join('\n')).not.toContain('unused');
+  expect(accepted.configValidation.valid).toBe(true);
+  expect(config.providerCredentials.openai?.baseUrl).toBe(profileEndpoint);
+  expect(constrainRuntimeConfig(accepted, target, loadCatalog()).configDiagnostics).toEqual(accepted.configDiagnostics);
+  expect(snapshot()).toEqual(before);
+  const own = resolveProviderCredential({ runtimeConfig: { ...config, activeProviderConnectionId: undefined,
+    providerConnections: [], accountPool: undefined }, env: {} });
+  expect(own.baseUrl).toBe(profileEndpoint);
+});
+
+it.each(['equal', 'absent', 'blocked', 'profile'] as const)('does not claim an endpoint override for a %s target', scenario => {
+  const baseUrl = 'https://relay.invalid/v1';
+  settings = { ...settings, providerCredentials: { openai: { apiKey: 'synthetic-profile', model: 'roomy',
+    ...(scenario === 'absent' ? {} : { baseUrl: scenario === 'blocked' ? 'https://other.invalid/v1' : `${baseUrl}/` }) } },
+    providerConnections: scenario === 'profile' ? [] : settings.providerConnections!.map(item => ({ ...item,
+      baseUrl, ...(scenario === 'blocked' ? { status: 'pending' as const } : {}) })) };
+  save();
+  const config = getRuntimeConfig(root);
+  const target = resolveProviderCredential({ runtimeConfig: config, env: {} });
+  if (scenario === 'blocked') expect(target.blocked).toBe('connection-pending');
+  expect(inspectConfigConstraints(config, target, loadCatalog()).notices).not.toContain(
+    'The selected request endpoint overrides the stored provider endpoint. Other provider selections retain their own endpoint.');
+});
+
+it('refreshes endpoint notices from the accepted request and clears them when the sources agree', () => {
+  save({ providerConnections: settings.providerConnections!.map(item => ({ ...item, baseUrl: 'https://relay.invalid/v1' })),
+    providerCredentials: { openai: { apiKey: 'synthetic-profile-key', baseUrl: 'https://profile.invalid/v1' } } });
+  const context = shell();
+  const notice = 'The selected request endpoint overrides the stored provider endpoint. Other provider selections retain their own endpoint.';
+  expect(context.configuration.current.config.configDiagnostics).toContain(notice);
+  const matching = { ...context.configuration.current.config, providerCredentials: { openai: { baseUrl: 'https://relay.invalid/v1' } } };
+  const renewed = constrainRuntimeConfig(matching, resolveProviderCredential({ runtimeConfig: matching, env: {} }), loadCatalog());
+  expect(renewed.configDiagnostics).not.toContain(notice);
+  save({ providerCredentials: { openai: { apiKey: 'synthetic-profile-key', baseUrl: 'https://relay.invalid/v1/' } } });
+  expect(refreshShellRuntimeConfig(context).status).toBe('applied');
+  expect(context.configuration.current.config.configDiagnostics).not.toContain(notice);
+  expect(configurationAdmission(context)()).toBeUndefined();
+});
+
+it.each(['legacy', 'auth-only'] as const)('uses the account issuer endpoint in %s storage instead of an unrelated stored API endpoint', storage => {
+  save({ providerConnections: [{ ...settings.providerConnections![0], apiKey: undefined, authType: 'account-auth', model: 'gpt-5.4',
+    accountAuth: { openai: { type: 'openai-chatgpt-account', accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 60_000 } } }],
+    providerCredentials: { openai: { apiKey: 'synthetic-profile', baseUrl: 'https://api.openai.com/v1' } } });
+  if (storage === 'auth-only') {
+    fs.renameSync(file, getUserAuthPath());
+    fs.chmodSync(getUserAuthPath(), 0o600);
+  }
+  const snapshot = () => [file, getUserAuthPath()].map(source => fs.existsSync(source) ? fs.readFileSync(source) : undefined);
+  const before = snapshot();
+  const config = getRuntimeConfig(root), target = resolveProviderCredential({ runtimeConfig: config, env: {} });
+  expect(target.baseUrl).toBeUndefined();
+  const accepted = constrainRuntimeConfig(config, target, loadCatalog());
+  expect(accepted.configDiagnostics).toContain('The selected request endpoint overrides the stored provider endpoint. Other provider selections retain their own endpoint.');
+  expect(accepted.configValidation.valid).toBe(true);
+  expect(snapshot()).toEqual(before);
+});
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 function save(patch: Partial<RuntimeConfigFile> = {}) {
-  settings = { ...settings, ...patch }; fs.writeFileSync(file, JSON.stringify(settings));
+  // Legacy credential fixtures use the same owner-only protection as product writes.
+  settings = { ...settings, ...patch }; fs.writeFileSync(file, JSON.stringify(settings), { mode: 0o600 });
 }
 function shell(providerOverride?: RuntimeProvider, apiKey?: string, env: NodeJS.ProcessEnv = {}) {
   return createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,

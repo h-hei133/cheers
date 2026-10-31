@@ -507,9 +507,6 @@ export function getRuntimeConfig(
   const providerConnections = normalizeProviderConnections(merged.providerConnections);
   const accountPool = normalizeAccountPool(merged.accountPool);
   const poolIssue = accountPoolIssue(accountPool, providerConnections);
-  // A warning, not a refusal: the request already goes to the right endpoint.
-  const endpointNotice = duplicateEndpointNotice(merged.providerCredentials, providerConnections,
-    normalizeConnectionId(merged.activeProviderConnectionId));
 
   const config: Omit<RuntimeConfig, 'configProvenance'> = {
     configTrust,
@@ -576,7 +573,7 @@ export function getRuntimeConfig(
     providerConnectTimeoutMs: merged.providerConnectTimeoutMs ?? DEFAULT_CONFIG.providerConnectTimeoutMs,
     providerHeadersTimeoutMs: merged.providerHeadersTimeoutMs ?? DEFAULT_CONFIG.providerHeadersTimeoutMs,
     providerBodyTimeoutMs: merged.providerBodyTimeoutMs ?? DEFAULT_CONFIG.providerBodyTimeoutMs,
-    configDiagnostics: dedupeDiagnostics([...diagnostics, ...(poolIssue ? [poolIssue] : []), ...(endpointNotice ? [endpointNotice] : [])]),
+    configDiagnostics: dedupeDiagnostics([...diagnostics, ...(poolIssue ? [poolIssue] : [])]),
     configSources: sources,
   };
   layer.verify();
@@ -758,30 +755,6 @@ function accountPoolIssue(pool: AccountPool | undefined, connections: readonly P
     }
   }
   return undefined;
-}
-
-/**
- * Report an endpoint that is written twice with different values.
- *
- * `providerCredentials[provider].baseUrl` and the selected connection's
- * `baseUrl` are both read, and the connection wins. When they disagree the
- * profile copy is dead: it stays in the file, looks authoritative in an editor,
- * and is never used for a request. Nothing is broken — the request goes to the
- * connection's endpoint — but a reader comparing the two has no way to tell
- * which one is live.
- *
- * Reported rather than reconciled: rewriting the file from a load would make a
- * read into a write, and deleting a value the user typed is not this layer's
- * decision. Only the two endpoints are named; neither carries a credential.
- */
-function duplicateEndpointNotice(credentials: RuntimeConfigFile['providerCredentials'] | undefined,
-  connections: readonly ProviderConnectionConfig[], activeId: string | undefined): string | undefined {
-  const active = connections.find(connection => connection.id === activeId);
-  if (!active?.baseUrl) return undefined;
-  const profileUrl = credentials?.[active.provider]?.baseUrl?.trim().replace(/\/+$/, '');
-  const connectionUrl = active.baseUrl.trim().replace(/\/+$/, '');
-  if (!profileUrl || profileUrl === connectionUrl) return undefined;
-  return `Config providerCredentials.${active.provider}.baseUrl is unused: connection '${active.id}' sends requests to ${connectionUrl}.`;
 }
 
 function normalizeProviderConnections(

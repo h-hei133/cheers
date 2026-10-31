@@ -9,6 +9,7 @@ import { effortOutputFailure } from '../provider/endpoints/effort.js';
 import type { ProviderCredentialResolution } from '../core/auth/credential.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../core/auth/account/target.js';
 import { configuredOutputLimit } from '../provider/request/output.js';
+import { normalizeBaseUrl } from './values.js';
 
 export interface ConfigModelTarget {
   readonly provider: string;
@@ -16,7 +17,10 @@ export interface ConfigModelTarget {
   readonly baseUrl?: string;
   readonly thinkingEffort?: ThinkingPreference;
   readonly credential?: ProviderCredentialResolution['credential'];
+  readonly blocked?: ProviderCredentialResolution['blocked'];
 }
+
+const ENDPOINT_NOTICE = 'The selected request endpoint overrides the stored provider endpoint. Other provider selections retain their own endpoint.';
 
 /** Final relations use the same target, precedence and window as the consumers. */
 export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigModelTarget, catalog: readonly CatalogProvider[]) {
@@ -32,6 +36,13 @@ export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigMo
     output = configuredOutputLimit(config, endpoint)
       ?? (endpointShape(endpoint).outputControl === 'provider' ? undefined : catalogModel(catalog, target.provider, target.model, target.baseUrl)?.maxTokens);
   } catch { errors.push('The selected model endpoint or output control is unavailable.'); }
+  const storedEndpoint = normalizeBaseUrl(config.providerCredentials?.[target.provider as RuntimeConfig['provider']]?.baseUrl);
+  const requestEndpoint = normalizeBaseUrl(target.baseUrl);
+  if (!errors.length && !target.blocked && storedEndpoint && requestEndpoint && storedEndpoint !== requestEndpoint) {
+    // Compare the resolved request, including fallback, pool and CLI selection.
+    // Endpoints can contain userinfo or secret query/path values; report only the relation.
+    notices.push(ENDPOINT_NOTICE);
+  }
   if ((config.retryBaseDelayMs ?? DEFAULT_CONFIG.retryBaseDelayMs!) > (config.retryMaxDelayMs ?? DEFAULT_CONFIG.retryMaxDelayMs!)) {
     errors.push('retryBaseDelayMs must not exceed retryMaxDelayMs.');
   }
@@ -83,9 +94,10 @@ export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigMo
 
 export function constrainRuntimeConfig(config: RuntimeConfig, target: ConfigModelTarget, catalog: readonly CatalogProvider[]): RuntimeConfig {
   const { errors, notices } = inspectConfigConstraints(config, target, catalog);
-  if (!errors.length && !notices.length) return config;
+  const diagnostics = config.configDiagnostics.filter(message => message !== ENDPOINT_NOTICE);
+  if (!errors.length && !notices.length && diagnostics.length === config.configDiagnostics.length) return config;
   return { ...config,
     configValidation: { ...config.configValidation, ...(errors.length ? { valid: false, constraintsBlocked: true } : {}) },
-    configDiagnostics: [...config.configDiagnostics, ...errors.map(error => `Config constraint: ${error}`), ...notices],
+    configDiagnostics: [...diagnostics, ...errors.map(error => `Config constraint: ${error}`), ...notices],
   };
 }

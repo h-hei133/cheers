@@ -1478,3 +1478,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A no-write test fails while taking its baseline because credential-only setup has no settings file, or a stale session-binding test never reaches its assertion because its setup rebinds a saved connection ID to another provider in place.
 - **Root Cause**: Fixtures assume every logical save creates settings and use a writer operation the current ownership contract rejects.
 - **Rule**: Snapshot each settings/auth file as bytes or absence so unexpected creation still fails. To exercise stale bindings after an ID changes provider, remove the old record, reacquire the current edit, then add the other owner; retain the original no-fallback and unchanged-session assertions. Assert the separate settings/auth storage hints instead of restoring obsolete text.
+
+### Endpoint Diagnostics Must Follow The Resolved Request And Hide Addresses
+
+- **Symptom**: A config-load warning calls an independent provider endpoint unused, misses fallback/pool/CLI choices or account issuer routing, and prints a URL that can contain secrets.
+- **Root Cause**: Raw active-connection fields are compared before credential and catalogue resolution; URLs are treated as safe display strings and a previously appended notice can survive a new target.
+- **Rule**: Compare normalized endpoints in the existing request constraint owner after credential/issuer resolution, suppress override claims for blocked or unresolved targets, and report only the relationship. Recompute this owner's notice on revalidation; preserve provider slots and both physical documents. Test split/auth-only sources and reverse issuer resolution, redaction and notice retirement.
