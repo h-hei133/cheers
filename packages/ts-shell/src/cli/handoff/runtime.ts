@@ -19,6 +19,7 @@ import { configuredContextWindow, resolveContextWindow, resolveTokenBudget } fro
 import { DEFAULT_RESERVE_TOKENS } from '../../session/context.js';
 import { armedHandoffs, liveHandoffs } from './state.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
+import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
 
 export class HandoffRun {
   private row: Handoff;
@@ -67,7 +68,8 @@ export class HandoffRun {
     const target = this.row.target;
     const current = this.context.resolveConfigTarget?.(config, this.context.session.id)
       ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: this.context.session.id } });
-    const window = resolveContextWindow({ catalog, provider: target.provider, model: target.model, baseUrl: current.baseUrl,
+    const baseUrl = providerCredentialBaseUrl(catalog, { ...current, model: target.model });
+    const window = resolveContextWindow({ catalog, provider: target.provider, model: target.model, baseUrl,
       configured: configuredContextWindow(config, { ...current, provider: target.provider, model: target.model }) }).window;
     const reserve = resolveTokenBudget(config.modelTokenBudgets, target.provider, target.model, 'reserveTokens', config.reserveTokens, DEFAULT_RESERVE_TOKENS);
     return { ...resources, cacheWarming: undefined, ...(resources.compaction ? { compaction: { ...resources.compaction,

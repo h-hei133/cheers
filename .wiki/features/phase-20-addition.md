@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.22 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.23 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5725,3 +5725,15 @@ role owner使用现有 `providerCredentialBaseUrl` 读取model/levels；advisor 
 五静态门/最终build通过，manifest `c0ed5e9c875f`、inputsDigest `9cee560498ebf199b535ecae383b1d19e29a0598c5cc59b9fe30700cdfc15abd`读回与当前输入一致。正式bundle judge独立串行exit0、环/解析satisfied，partial仅既有interactiveMode21/22-name advisory，118既有docs-source advisory。两路最终APPROVE/CLEAR，子代理只读未验证。批次scratch清理与提交/推送/精确CI另绑定。
 
 延迟CI `5ca5d3ed`/`41205332421`已success；`6409450b`/`41205782214`、`b0a144de`/`41204101311`最后仍in_progress。本批未旧发布二进制、真实provider/token、Windows/macOS/PTY、全仓或20k；ADD-70仍partial，旧发布版本/真实环境及其余语义审计继续，原Phase20真实条件延后、goal active。
+
+### 24.23 Director 与 handoff 使用实际账号目录
+
+只读消费者复审定位两处遗漏：director 把完整凭据降为 `sourceChoice` 后再查工具支持，固定原生 issuer 的目录地址因而丢失；handoff 压缩则直接读取可能为空的 `current.baseUrl`。冲突目录的真实回归中，原生账号错误启用无工具能力的 planner，反向能力配置又误拒绝；原生 executor 的 8,000 窗口被读成兼容目录的 32,000。API-key 对照保持配置地址语义。
+
+修复沿现有 `providerCredentialBaseUrl` owner：director 使用原始凭据快照，handoff 使用实际凭据和目标模型。普通预算、精确 provider/model/connection 会话偏好、上游较小窗口与较大 reserve 的既有合同保留；不新增 resolver、存储字段或执行路径。定向只读参考 `model-runtime.ts:681` 的认证地址投影，以及 `agent-session.ts:3046,3162` 从实际消息模型读取窗口后交给 `shouldCompact` 的决定；同意实际请求元数据归属，保留本项目显式普通预算优先及精确连接绑定。没有复制参考代码。
+
+主代理 Linux Node20.3.0、heap768MiB、单worker串行最终 **3文件/46项** exit0：director13、handoff13、window20。新增六个 account/API-key 场景覆盖工具能力正反、原生/兼容目标窗口、主模型偏好不外溢、普通预算、精确目标偏好、兄弟连接隔离及上游较小窗口；检查原 compaction 对象不变且无 provider request。两次反转分别实际 director2失败/2通过/9未选、handoff1失败/1通过/11未选，均 exit1；源码逐字节恢复 `04f69ecf671d` / `f0ea0dabb145`，恢复后同46项重验通过。未选用例不计反转通过。
+
+五静态门与最终 build 通过；manifest `56097fecb184`、inputsDigest `2e7c728fd9c59db3bb2d3c436ed627a2eeceaaaded153c05ee95ca13f0e30638` 读回与当前输入一致。正式 bundle judge 独立串行 exit0，环/解析 satisfied，partial 仅既有 interactiveMode21/22-name advisory；docs-source118既有 advisory。触及生产模块函数数 director1/handoff8，最终独立静态复审 APPROVE，未由子代理执行验证。证据在 `.omx/artifacts/phase20-addition-delegation-owner/`，批次 scratch 清理后交付。
+
+延迟CI复查：`6409450b`/`41205782214` 已 failure，唯一失败在既有 browser cache multiprocess concurrent execute 场景，3个子进程中2个exit0、1个exit1，未超时，cache integrity healthy。日志未给出该子进程根因，暂记未分类原因，不以本批聚焦绿色推断已修复或 flaky；本批未修改该路径。`abe32561`/`41207683568` 与 `b0a144de`/`41204101311` 最后仍 in_progress，前者 Watch success。本批提交/推送/自身CI另绑定；未真实provider、旧发布二进制、Windows/macOS/PTY、全仓或20k。ADD-70仍partial，原真实条件延后、goal active。

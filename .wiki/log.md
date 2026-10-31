@@ -11030,3 +11030,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：显式旧格式配置导出与两代源码回返
 
 [addition24.22](features/phase-20-addition.md#2422-显式旧格式配置导出与两代旧源码往返)确认直接降级有owner覆盖/孤立偏好风险，新增profile export到空独立named profile；raw pair/default join/累积限制/path anchor共用，无法保留scope顺序则拒绝，wx FD身份先于write、exclusive link、0600/readback与unknown cleanup保持。Node20.3串行5文件76项、三实际反转/精确恢复、两代exact历史源码migration/export/read/model/login/logout/current往返及fresh compiled CLI create/preview/confirm通过，源bytes不变；五门/build当前摘要通过，manifestc0ed5e9c875f，judge仅既有interactiveMode advisory，复审APPROVE/CLEAR。首次--import loader错误与锁spy未命中按harness分类后修正；未旧发布二进制/真实provider/Windows/PTY/全仓/20k，ADD-70 partial、goal active。5ca5d3ed代码CI已success，6409450b/b0a144de最后in_progress；本批提交/推送/自身CI另绑。
+
+### 2026-10-31：director/handoff 账号目录元数据
+
+[addition24.23](features/phase-20-addition.md#2423-director-与-handoff-使用实际账号目录)原生账号director工具能力正反及handoff8000误读32000实际失败，API-key对照保持通过；改为完整凭据的既有issuer地址owner，普通预算/精确会话偏好/上游窗口合同保留。Node20.3串行3文件46项、两反转实际2/1失败并精确恢复重验通过；五门/build摘要读回通过，manifest56097fecb184，judge既有advisory、静态复审APPROVE。6409450b代码CI已failure于browser cache多进程单子进程exit1，根因未定；abe32561/b0a144de最后in_progress。本批提交/推送/自身CI另绑，未真实provider/旧binary/平台/PTY/全仓/20k，ADD-70 partial、goal active。

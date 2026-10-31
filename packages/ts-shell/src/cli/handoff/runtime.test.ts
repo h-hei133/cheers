@@ -21,6 +21,7 @@ import { sessionRequestStore } from '../../session/store/requests.js';
 import { createRequestPolicy } from '../../core/agent/request/policy.js';
 import { getSessionUsage, resetSessionUsage, totalTokens } from '../../observability/usageTelemetry.js';
 import { approveAllGroups } from '../../test-utils/approval.js';
+import type { CompactionSetup } from '../../turn/session.js';
 
 let scratch: string; let root: string; let manager: SessionManager; let context: ShellRuntimeContext;
 let runtime: ShellSessionRuntime; let server: http.Server; let baseUrl: string;
@@ -106,6 +107,42 @@ function planningScript(_body: Record<string, any>, response: http.ServerRespons
   else if (requests.length === 3) respond(response, [{ id: 'second-write', name: 'write', args: { path: 'second.txt', content: 'target' } }]);
   else respond(response);
 }
+it.each(['account', 'api-key'] as const)('bounds handoff compaction by the actual %s target catalogue', async auth => {
+  const current = context.configuration.current;
+  const origin = 'https://generativelanguage.googleapis.com';
+  const config = { ...current.config, provider: 'google' as const, providerCredentials: {},
+    providerConnections: [{ ...current.config.providerConnections[0]!, provider: 'google' as const, baseUrl: undefined, apiKey: undefined,
+      ...(auth === 'account' ? { authType: 'account-auth' as const, accountAuth: { google: { type: 'google-gemini-account' as const,
+        accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 60000, clientId: 'synthetic-client',
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'], quotaProject: 'synthetic-project' } } }
+        : { authType: 'api-key' as const, apiKey: 'synthetic-api', baseUrl: origin + '/v1beta/openai' }) }] };
+  const catalog = [{ id: 'google', runtime: 'google' as const, label: 'compatible', auth: 'api-key' as const, baseUrl: origin + '/v1beta/openai',
+    models: [{ id: 'planner', contextWindow: 32000 }, { id: 'executor', contextWindow: 32000 }] },
+  { id: 'native', runtime: 'google' as const, label: 'native', auth: 'account-auth' as const, baseUrl: origin,
+    models: [{ id: 'planner', contextWindow: 16000 }, { id: 'executor', contextWindow: 8000 }] }];
+  context.configuration = new ConfigState(config, current.binding, catalog);
+  expect(await command('arm executor')).toContain('armed');
+  const resolution = context.resolveConfigTarget!(config);
+  const signal = new AbortController().signal;
+  const run = handoffRunFor(context, manager, runtime, resolution, signal, () => undefined, () => {})!;
+  const compaction = { policy: { contextWindow: 64000, reserveTokens: 1024 } } as CompactionSetup;
+  const before = context.runtimeConfig;
+  expect(run.resources({ compaction }).compaction!.policy.contextWindow).toBe(auth === 'account' ? 8000 : 32000);
+  expect(compaction.policy.contextWindow).toBe(64000); expect(context.runtimeConfig).toBe(before); expect(requests).toEqual([]);
+  const sourcePreference = { ...config, sessionContextWindow: { provider: 'google', model: 'planner', connectionId: 'fixture', value: 96000 } };
+  context.configuration = new ConfigState(sourcePreference, current.binding, catalog);
+  expect(run.resources({ compaction }).compaction!.policy.contextWindow).toBe(auth === 'account' ? 8000 : 32000);
+  const ordinary = { ...sourcePreference, contextWindow: 24000 };
+  context.configuration = new ConfigState(ordinary, current.binding, catalog);
+  expect(run.resources({ compaction }).compaction!.policy.contextWindow).toBe(24000);
+  expect(run.resources({ compaction: { ...compaction, policy: { ...compaction.policy, contextWindow: 6000 } } }).compaction!.policy.contextWindow).toBe(6000);
+  context.configuration = new ConfigState({ ...ordinary, sessionContextWindow: { ...sourcePreference.sessionContextWindow, model: 'executor', value: 12000 } }, current.binding, catalog);
+  expect(run.resources({ compaction }).compaction!.policy.contextWindow).toBe(12000);
+  context.configuration = new ConfigState({ ...ordinary, sessionContextWindow: { ...sourcePreference.sessionContextWindow, model: 'executor', connectionId: 'sibling', value: 12000 } }, current.binding, catalog);
+  expect(run.resources({ compaction }).compaction!.policy.contextWindow).toBe(24000);
+  expect(compaction.policy).toEqual({ contextWindow: 64000, reserveTokens: 1024 }); expect(requests).toEqual([]);
+  settleHandoffPrompt(context, signal, 'cancelled');
+});
 it('hands off only after persisted checklist and approved mutation, preserving order, usage and session model', async () => {
   reply = planningScript; expect(await command('arm executor --effort low')).toContain('armed');
   const events = await drive();

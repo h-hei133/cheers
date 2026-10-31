@@ -1566,3 +1566,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A replaced stage is removed as if owned, a replaced symlink destination passes byte readback, or failed staging/lock cleanup reports rejection despite retained private files.
 - **Root Cause**: A path inspected after an atomic writer returns is not the identity originally acquired, and lock cleanup errors can be suppressed behind the primary action failure.
 - **Rule**: Acquire private staging with wx, capture fstat before writing, publish exclusively, and check regular/unlinked destination identity around readback and after cleanup. Remove only the acquired inode; retained replacements or observed lock cleanup failure stay unknown. Test the lock owner's onReleaseError contract directly when a filesystem spy does not reach its module namespace.
+
+### Temporary Model Choices Do Not Carry Credential Metadata
+- **Symptom**: Director accepts an account model that rejects tools, or handoff compaction reads a compatible catalogue's 32,000-token window instead of its native target's 8,000.
+- **Root Cause**: sourceChoice retains model preferences and connection ID but drops credential/address; raw resolution.baseUrl can also be absent for a fixed native issuer. Metadata consumers then disagree with dispatch.
+- **Rule**: Resolve capability addresses from the full captured credential through the existing issuer target owner before reducing it to a model choice. For handoff, use the target model with the actual connection; retain ordinary budgets, exact session preference matching and the upstream smaller-window bound. Reverse account and API-key cases with conflicting catalogues.

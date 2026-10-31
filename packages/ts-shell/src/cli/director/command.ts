@@ -62,7 +62,7 @@ export async function runDirectorCommand(host: JobsComposition, args: string[], 
       // An ambiguous endpoint is refused first: with two entries claiming the
       // address the shape would fall back to "capable", and the guard would
       // pass a model the send path cannot address at all.
-      const mainAddress = providerCredentialBaseUrl(catalog, source);
+      const mainAddress = providerCredentialBaseUrl(catalog, original);
       if (catalogProvider(catalog, source.provider, mainAddress).ambiguous) {
         throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before enabling a director.');
       }

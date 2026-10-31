@@ -150,6 +150,34 @@ it('refuses director mode when two catalogue entries claim the main endpoint', a
   expect(liveDirectors.get(context)).toBeUndefined();
 });
 
+it.each((['account', 'api-key'] as const).flatMap(auth => [false, true].map(nativeTools => ({ auth, nativeTools }))))(
+  'checks director tool support at the actual $auth request owner with native tools $nativeTools', async ({ auth, nativeTools }) => {
+  const current = context.configuration.current;
+  const origin = 'https://generativelanguage.googleapis.com';
+  const config = { ...current.config, provider: 'google' as const, providerCredentials: {},
+    providerConnections: [{ ...current.config.providerConnections[0]!, provider: 'google' as const, baseUrl: undefined, apiKey: undefined,
+      ...(auth === 'account' ? { authType: 'account-auth' as const, accountAuth: { google: { type: 'google-gemini-account' as const,
+        accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 60000, clientId: 'synthetic-client',
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'], quotaProject: 'synthetic-project' } } }
+        : { authType: 'api-key' as const, apiKey: 'synthetic-api', baseUrl: origin + '/v1beta/openai' }) }] };
+  const catalog = [{ id: 'google', runtime: 'google' as const, label: 'compatible', auth: 'api-key' as const, baseUrl: origin + '/v1beta/openai',
+    models: [{ id: 'planner', contextWindow: 32000, toolCalling: !nativeTools }, { id: 'executor', contextWindow: 32000 }] },
+  { id: 'native', runtime: 'google' as const, label: 'native', auth: 'account-auth' as const, baseUrl: origin,
+    models: [{ id: 'planner', contextWindow: 32000, toolCalling: nativeTools }, { id: 'executor', contextWindow: 32000 }] }];
+  context.configuration = new ConfigState(config, current.binding, catalog);
+  const original = context.runtimeConfig;
+  const result = await command('on --model google/executor');
+  if (auth === 'account' ? !nativeTools : nativeTools) {
+    expect(result).toContain('requires a main model that accepts tool declarations');
+    expect(liveDirectors.get(context)).toBeUndefined();
+    expect(new DirectorStore(manager, context.session).read().cycles).toEqual([]);
+  } else {
+    expect(result).toContain('Director on'); expect(liveDirectors.get(context)).toBeDefined();
+    await command('off');
+  }
+  expect(context.runtimeConfig).toBe(original); expect(requests).toEqual([]);
+});
+
 it('denies a worker effect separately from delegation and preserves the original tool allowlist', async () => {
   approval = async name => name === 'write' ? 'deny' : 'allow-once'; let turn = 0;
   reply = (_body, response) => ++turn === 1 ? respond(response, [{ id: 'denied-effect', name: 'write', args: { path: 'denied.txt', content: 'denied' } }]) : respond(response);
