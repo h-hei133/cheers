@@ -173,6 +173,9 @@ it.each(['manual', 'automatic', 'branch', 'prefix'])('routes %s summaries to the
 
 it.each(['deleted', 'provider-reused', 'scope', 'effort', 'window', 'output', 'thinking-output'])('refuses a %s summary target without sending to the parent or changing history', async change => {
   const setup = await fixture(); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  if (change === 'provider-reused') {
+    writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.filter(item => item.id !== 'b') }, edit);
+  }
   if (['effort', 'window', 'output', 'thinking-output'].includes(change)) {
     const catalog = loadCatalog().map(provider => ({ ...provider,
       ...(change === 'thinking-output' ? { endpoint: 'anthropic-messages' } : {}),
@@ -183,7 +186,7 @@ it.each(['deleted', 'provider-reused', 'scope', 'effort', 'window', 'output', 't
     ...(change === 'scope' ? { allowedModels: ['openai/main'] } : {}),
     providerConnections: change === 'deleted' ? edit.values.providerConnections!.filter(item => item.id !== 'b')
       : edit.values.providerConnections!.map(item => item.id === 'b' && change === 'provider-reused' ? { ...item, provider: 'google' as const } : item),
-  }, edit);
+  }, change === 'provider-reused' ? readRuntimeConfigEditAt(getUserRuntimeConfigPath()) : edit);
   const { deps } = runtime(setup); const before = structuredClone(setup.manager.getSession(setup.session.id)!.turns);
   const result = await Promise.resolve().then(() => deps.compactHistory!(setup.session.id, setup.signal)).catch(() => ({ status: 'failed' }));
   expect(result).toMatchObject({ status: 'failed' });

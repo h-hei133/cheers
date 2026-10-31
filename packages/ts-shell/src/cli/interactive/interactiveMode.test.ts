@@ -55,7 +55,7 @@ import { Clipboard } from './clipboard.js';
 import * as promptRunner from './interactivePromptRunner.js';
 import { StartupSurface } from './startup.js';
 import { createShellRuntimeContext } from '../../core/shell/runtimeContext.js';
-import { getProjectConfigPath, getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
+import { getProjectConfigPath, getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
 import { writeCatalogCache } from '../../core/models/catalogStore.js';
 import { __setOpenAIProviderAuthLoginForTest } from '../../core/auth/providerAuthRuntime.js';
 import { ConfigWriteError } from '../../config/outcome.js';
@@ -2249,7 +2249,9 @@ describe("session wiring", () => {
     host.options.runtimeContext = context; host.options.sessionManager = manager;
     const run = outcome === 'failure' ? vi.spyOn(host.options.sessionRuntime.commands, 'run')
       .mockRejectedValue(new ConfigWriteError('conflict', 'unchanged')) : undefined;
-    const original = fs.readFileSync(getUserRuntimeConfigPath());
+    const files = [getUserRuntimeConfigPath(), getUserAuthPath()];
+    const snapshot = () => files.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+    const original = snapshot();
     const frame = () => stripAnsi(host.view.renderFrame({ columns: 120, rows: 40 }).rows.join('\n'));
     mode.start();
     try {
@@ -2265,7 +2267,7 @@ describe("session wiring", () => {
       if (outcome === 'save') {
         expect(config.providerConnections![0]).toMatchObject({ model: 'key-model', apiKey: 'synthetic-host-key', status: 'connected' });
         expect(context.runtimeConfig.providerConnections[0]!.model).toBe('key-model');
-      } else expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
+      } else expect(snapshot()).toEqual(original);
       if (outcome === 'failure') expect(frame()).toContain('this attempt did not write');
       const transcript = JSON.stringify(host.view.transcript.all()); expect(transcript).not.toContain('synthetic-host-key');
       expect(transcript).not.toContain('Saved key:'); expect(transcript).not.toContain('--api-key');

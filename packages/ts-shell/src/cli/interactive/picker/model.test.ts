@@ -47,7 +47,7 @@ it.each(['{PRIVATE_CATALOG_VALUE', '{"providers":{},"providers":{}}'])(
     expect(picker.status?.([], '')).toMatch(/models.json (could not be parsed|repeats the top-level providers key)/);
     expect(picker.status?.([], '')).not.toContain('PRIVATE_CATALOG_VALUE');
     expect(picker.detail!(id()).join('\n')).toContain('Catalogue: models.json (user profile only)');
-    expect(picker.detail!(id()).join('\n')).toContain('connections and request settings: config.json');
+    expect(picker.detail!(id()).join('\n')).toContain('settings: config.json; connections: auth.json.');
     expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
     expect(fs.readFileSync(userCatalogPath(), 'utf8')).toBe(text);
   },
@@ -416,7 +416,11 @@ it.each(['deleted', 'provider-changed', 'error'])('blocks an explicit session ta
   const connections = change === 'deleted' ? edit.values.providerConnections!.filter(item => item.id !== 'b')
     : edit.values.providerConnections!.map(item => item.id !== 'b' ? item : change === 'provider-changed'
       ? { ...item, provider: 'google' as const } : { ...item, status: 'error' as const });
-  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: connections }, edit);
+  if (change === 'provider-changed') {
+    writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.filter(item => item.id !== 'b') }, edit);
+  }
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: connections },
+    change === 'provider-changed' ? readRuntimeConfigEditAt(getUserRuntimeConfigPath()) : edit);
   const effective = projectSessionModel(getRuntimeConfig(home), sessionId);
   const resolution = resolveProviderCredential({ runtimeConfig: effective, env: { OPENAI_API_KEY: 'synthetic-env' } });
   expect(effective.activeProviderConnectionId).toBe('b');
@@ -481,10 +485,11 @@ it('marks the resolved fallback connection active when no global connection is s
 it('uses the request provider effort when CLI provider selection differs from the global default', async () => {
   vi.stubEnv('GEMINI_API_KEY', '');
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.filter(item => item.id !== 'b') }, edit);
   writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [
     { ...edit.values.providerConnections![0], thinkingEffort: 'high' },
     { ...edit.values.providerConnections![1], provider: 'google', thinkingEffort: 'low' },
-  ] }, edit);
+  ] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
   writeCatalogCache([{ id: 'google', models: [{ id: 'shared', reasoning: true }] }]);
   const picker = modelPicker({ ...context(), resolveConfigTarget: config => resolveProviderCredential({ runtimeConfig: config, cliProvider: 'google' }) });
   const row = (await picker.load()).find(item => item.note === 'active');

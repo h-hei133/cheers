@@ -91,11 +91,15 @@ it.each([
 
 it.each(['deleted', 'provider-reused', 'scope'])('refuses a %s subagent binding without falling back to the parent account', async change => {
   const setup = await fixture(); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  if (change === 'provider-reused') {
+    // Rebinding a saved ID in place is forbidden; delete it before another owner reuses it.
+    writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.filter(item => item.id !== 'b') }, edit);
+  }
   writeUserRuntimeConfigFile({ ...edit.values,
     ...(change === 'scope' ? { allowedModels: ['openai/main'] } : {}),
     providerConnections: change === 'deleted' ? edit.values.providerConnections!.filter(item => item.id !== 'b')
       : edit.values.providerConnections!.map(item => item.id === 'b' && change === 'provider-reused' ? { ...item, provider: 'google' as const } : item),
-  }, edit);
+  }, change === 'provider-reused' ? readRuntimeConfigEditAt(getUserRuntimeConfigPath()) : edit);
   await invoke(setup);
   expect(setup.requests.map(row => row.path)).toEqual(['/a/v1/chat/completions', '/a/v1/chat/completions']);
 });

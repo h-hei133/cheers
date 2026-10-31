@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
 
 const entry = fileURLToPath(import.meta.url)
@@ -14,7 +14,7 @@ export async function inspectRuntimeConfig(home, workspace, options = {}) {
   const result = await new Promise(resolve => {
     const [major, minor] = process.versions.node.split('.').map(Number)
     const loader = major > 20 || major === 20 && minor >= 6 || major === 18 && minor >= 19 ? '--import' : '--loader'
-    const child = spawn(process.execPath, [loader, require.resolve('tsx'), path.join(path.dirname(entry), 'config-worker.mjs')], {
+    const child = spawn(process.execPath, [loader, pathToFileURL(require.resolve('tsx')).href, path.join(path.dirname(entry), 'config-worker.mjs')], {
       cwd: root, stdio: ['pipe', 'pipe', 'ignore'],
       env: { ...process.env, HOME: path.resolve(home), USERPROFILE: path.resolve(home),
         NODE_OPTIONS: '--max-old-space-size=1024', TSX_DISABLE_CACHE: '1', CHEERS_PROVIDER_TRANSPORT_DIAGNOSTICS: 'off' },

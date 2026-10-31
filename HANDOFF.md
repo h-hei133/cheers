@@ -1472,3 +1472,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A config bridge passes on a recent Node but refuses every source on Node 20.3, or repeated reads of an unchanged legacy connection are reported as changed configuration.
 - **Root Cause**: The scoped TypeScript loader API needs module.register (Node 20.6), despite the dependency's lower package engine floor. Runtime normalization also generates missing connection timestamps afresh on every read.
 - **Rule**: Run fixed workers directly with the loader mode supported by the declared Node floor and verify on that exact version. Avoid an intermediate CLI child that survives its parent's deadline. Fence raw document revisions and complete storage tuples; omit generated timestamps from logical read comparisons while retaining physical revision checks. Drain successful provider streams to EOF without retaining or reporting bodies, then recheck captured sources.
+
+### Read-Only Tests Must Observe Absent Documents And Use Admitted Fixture Writes
+
+- **Symptom**: A no-write test fails while taking its baseline because credential-only setup has no settings file, or a stale session-binding test never reaches its assertion because its setup rebinds a saved connection ID to another provider in place.
+- **Root Cause**: Fixtures assume every logical save creates settings and use a writer operation the current ownership contract rejects.
+- **Rule**: Snapshot each settings/auth file as bytes or absence so unexpected creation still fails. To exercise stale bindings after an ID changes provider, remove the old record, reacquire the current edit, then add the other owner; retain the original no-fallback and unchanged-session assertions. Assert the separate settings/auth storage hints instead of restoring obsolete text.

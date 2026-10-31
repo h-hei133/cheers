@@ -10966,3 +10966,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：历史脚本配置桥接与 Node 下限验证
 
 [addition24.6](features/phase-20-addition.md#246-历史验证脚本复用配置-owner)四个历史消费者改用固定worker复用TS配置/凭据owner，支持settings/auth/modelPreferences与auth-only，不创建用户状态；baseline完整读流、丢弃body、禁止redirect、成功前复核原始来源。16项隔离测试、三条反转/精确恢复、严格桥接noEmit、五门/语法与实际Node20.3同16项通过，复审无阻塞。发现旧时间戳生成值不能作逻辑变化，以及tsx scoped API隐藏20.6下限，均已修复。未跑真实provider/全套daily-broader/PTY/build；c2819249代码CI41190177753失败7文件23项，Copilot由24.4覆盖，旧物理/重绑定夹具下一批修复。其后两CI仍in_progress；ADD-70 partial、goal active。
+
+### 2026-10-31：修复延迟 CI 的分文件与连接重绑定夹具
+
+[addition24.7](features/phase-20-addition.md#247-延迟代码-ci-的夹具修复)3918c14f已推送且main/origin一致；自身CI41192490126仍in_progress、Watch成功。31616578延迟CI失败24项，其中旧22项同前批、Copilot已过、新增catalogue hint旧预期2项。仅修6测试文件：两文档bytes/absence快照，重绑定夹具delete/fresh-edit/add，存储hint分auth/settings；保留无写入/无父账号回退/会话不变断言。前批23个场景本地与实际Node20.3各过、另2项Node20.3通过，覆盖25个不同场景；未全仓/全文件/build。最新代码CI仍需读回，ADD-70 partial、goal active。

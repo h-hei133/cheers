@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth 及历史脚本配置桥接已实施；CI 夹具修复、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 节、第 24.7 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接及已知 CI 夹具修复已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5519,3 +5519,13 @@ ADD-70 仍部分完成：默认值已物理移出 auth，但其余重复事实�
 主代理串行验证：五静态门与 diff check、六个相关 JS 语法检查通过；`node --test scripts/config.test.mjs` 16 项通过，包含四调用方、来源变化、闭合 pool、pending、完整流/断流、重定向与脱敏。daily/broader 只执行函数声明集成夹具，不导入有 Windows 写入副作用的 entrypoint。新增桥接通过临时 tsconfig 的严格 noEmit；实际 Node **20.3.0** 再跑同一 16 项全通过，避免 tsx scoped API 隐含 20.6 下限。auth owner、完整读流、成功前 source fence 三条反转均实际 AssertionError，源码字节精确恢复后再跑通过。只读复审范围内无阻塞；没有重跑产品 build（产品源码未改），没有全仓、真实 provider、真实 PTY 或 20k 压测。
 
 延迟读取 `c2819249` 代码 CI `41190177753` 已 failure：7 文件/23 项失败、13006 项通过。原生 Copilot 1 项由第 24.4 节修复覆盖；其余为缺失 settings 的旧物理读取夹具和禁止同 ID/provider 原地重绑定后的旧设置夹具，下一批逐项分类修复，当前脚本绿色不证明它们已修。`31616578` CI `41190946495`、`73e332f1` CI `41191224812` 最后仍 in_progress。本批提交/推送与自身 CI 另行绑定；ADD-70 partial、整体 goal active，旧版本回退与真实环境验收继续延后。
+
+### 24.7 延迟代码 CI 的夹具修复
+
+脚本桥接批次 `3918c14f3d5f4b8d9cb6b87cf9d81ca12fb3835c` 已推送，读回 main/origin/main 精确一致。自身代码 CI `41192490126` 最后 in_progress，Watch `41192490271` success，不能用 Watch 证明代码 CI。
+
+第 24.6 节延迟失败逐项分类后只修测试夹具：interactive masked key、connect syntax、metadata inspection 用两文档的 bytes/absence 快照，保留意外创建检测，不再假定 credential-only save 创建 config.json。subagent/summary/model 的 provider-reused 场景先删除旧连接、重新获取 edit，再以相同 ID 加入不同 provider，保留不回退到父账号、会话不变和显式替换可成功的原断言。CLI provider effort 夹具也使用合法删除/新增；未放宽生产 writer 的原地重绑定拒绝。
+
+`31616578` 代码 CI `41190946495` 延迟读回 failure：6 文件/24 项失败、13008 项通过；与前批相比 Copilot 修复已过，增加两项旧模型详情 hint 预期。它们分类为旧合同预期，改为明确断言 `settings: config.json; connections: auth.json.`。六个测试文件改动，不修改产品源码。单进程/单 worker 按测试名聚焦运行前批 23 个场景全部通过，实际 Node **20.3.0** 同一组 23 项通过；两项 catalogue hint 在 Node20.3 单独聚焦通过，合计覆盖已知两批失败的 **25 个不同场景**，没有运行七文件全部 504 项或全仓回归。最初调用用了本地 Vitest0.34 不支持的 `--no-file-parallelism`，在执行测试前参数解析失败，移除后使用 VITEST_MAX_THREADS/MIN_THREADS=1 正常执行，未改产品/测试来规避。
+
+只读复审未发现夹具断言弱化；补充将 loader 地址转换为 file URL，避免 Windows drive colon 被 ESM 当作 URL scheme。Linux Node20.3 的配置与本地baseline再聚焦通过不等于Windows验收。此次另有这一个桥接兼容性修补。本批验证只证明这些已知失败场景，不据此宣布最新代码 CI 已通过。脚本桥接及本批提交分别绑定自身 CI；其余重复事实语义、旧二进制回退与真实 provider/平台/输入验收仍缺，ADD-70 partial、整体 goal active。

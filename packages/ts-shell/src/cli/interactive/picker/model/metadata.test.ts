@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { modelPicker } from '../model.js';
 import { SessionManager } from '../../../../session/SessionManager.js';
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
-import { getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
+import { getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
 import { readSessionModelEdit } from '../../../../session/model/state.js';
 import { OverlayHost } from '../../overlay.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
@@ -111,7 +111,10 @@ it.each(['pending', 'error', 'credential-missing'] as const)('keeps exact relay 
 });
 
 it('renders exact facts through keyboard focus and inspection return without activation, writes or network', async () => {
-  const picker = modelPicker(context(), target()), before = readSessionModelEdit(sessionId), config = fs.readFileSync(getUserRuntimeConfigPath());
+  const picker = modelPicker(context(), target()), before = readSessionModelEdit(sessionId);
+  const files = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const snapshot = () => files.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const config = snapshot();
   const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected network'));
   const host = new OverlayHost(() => {}); host.open(picker);
   await new Promise(resolve => setTimeout(resolve, 0));
@@ -127,6 +130,6 @@ it('renders exact facts through keyboard focus and inspection return without act
   expect(host.render(140, 40).map(stripAnsi).join('\n')).toContain('Context: 32000 tokens');
   expect(host.render(40, 18).map(stripAnsi).join('\n')).toContain('▸ shared');
   host.close();
-  expect(readSessionModelEdit(sessionId)).toEqual(before); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+  expect(readSessionModelEdit(sessionId)).toEqual(before); expect(snapshot()).toEqual(config);
   expect(fetch).not.toHaveBeenCalled();
 });

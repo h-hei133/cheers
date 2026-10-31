@@ -29,17 +29,20 @@ it.each([
   ["use", "openai", "extra"], ["rm", "openai", "extra"], ["status", "extra"], ["help", "extra"],
 ])("rejects invalid connection input %j before writes or auth", async (...args) => {
   const files = [getUserRuntimeConfigPath(), getUserAuthPath()];
-  const before = files.map(file => ({ bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs }));
+  const snapshot = () => files.map(file => fs.existsSync(file) ? { bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs } : undefined);
+  const before = snapshot();
   const result = await runConnectCommand(args, { cwd: root });
   expect(result.output).toContain("Invalid /connect arguments"); expect(result.output).not.toContain("fixture-secret");
-  expect(files.map(file => ({ bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs }))).toEqual(before);
+  expect(snapshot()).toEqual(before);
   expect(browser).not.toHaveBeenCalled(); expect(account).not.toHaveBeenCalled();
 });
 
 it("guards directly exported mutators and retains inline key values", async () => {
-  const files = [getUserRuntimeConfigPath(), getUserAuthPath()]; const before = files.map(file => fs.readFileSync(file));
+  const files = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const snapshot = () => files.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const before = snapshot();
   for (const result of [await addConnection(["openai", "--api-key", "fixture-secret", "extra"]), await addConnectionFromLegacyAuthSet(["openai", "fixture-secret", "url", "model", "extra"]), activateConnection(["openai", "extra"]), removeConnection(["openai", "extra"])]) {
-    expect(result).toContain("Invalid /connect arguments"); expect(files.map(file => fs.readFileSync(file))).toEqual(before);
+    expect(result).toContain("Invalid /connect arguments"); expect(snapshot()).toEqual(before);
   }
   expect(await addConnection(["openai", "--key=fixture-secret"])).toContain("Connected provider openai");
   expect(readUserRuntimeConfigFile().providerConnections?.[0].apiKey).toBe("fixture-secret");
