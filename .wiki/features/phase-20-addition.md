@@ -4966,3 +4966,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现为`active`增加证据分支，复用与`interrupted`相同的信号（pending提示、turn/prompt恢复信号、续跑证据）：有证据则`fully-resumable`或`partially-resumable`，无证据仍拒绝并给出独立措辞。未放宽「什么算证据」。
 
 验证：`sessionResumeEligibility`7（两新例：有证据可恢复、无证据仍拒绝）、`recovery`24、`bootstrap`28、`work`13，共**72项**通过；一反转（只按状态拒绝）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `f5ad32ed83e9`。原47/ADD整体partial、goal active。
+
+
+### 21.71 恢复写入的补偿事件不再永久阻断目标验收（子代理review缺陷#3）
+
+`sessionLifecycleReconciliation`在恢复时为未结算的调用写入`tool.result { success:false, compensated:true }`与`approval.resolved { outcome:"denied", compensated:true }`。但`acceptanceEvidence`只看`success !== true`与`outcome !== "approved"`，**不豁免`compensated`**——于是进程崩溃后的一次恢复会让目标永久无法完成。探针确认：真实失败、补偿失败、补偿拒绝三者原本**同等阻断**（均返回undefined）。
+
+现`acceptanceEvidence`按事件类型分别判断并豁免`compensated`：补偿事件记录的是「结果未知」，既不是失败也不是用户拒绝。修复后真实失败与真实拒绝仍阻断，两种补偿事件不再阻断。
+
+验证：`acceptance`14（新例覆盖四种组合）、`recovery`24，共**38项**通过；一反转（撤回补偿豁免）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `76bb4743ebdd`。原47/ADD整体partial、goal active。

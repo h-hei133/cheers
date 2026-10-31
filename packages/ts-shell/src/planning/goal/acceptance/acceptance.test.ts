@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../../session/SessionManager.js';
 import type { Session } from '../../../session/schema/sessionRecord.js';
 import { ShellSessionRuntime } from '../../../core/shell/sessionRuntime.js';
 import { runTurn } from '../../../turn/session.js';
 import { createCoreToolRegistry } from '../../../core/tools/registry.js';
+import { acceptanceEvidence } from './evaluate.js';
 import { HookDispatcher } from '../../../core/hooks/hookDispatcher.js';
 import { readGoalEdit, writeGoal } from '../store.js';
 import { readPlan } from '../../plan/store.js';
@@ -177,3 +178,21 @@ it('does not adopt a fabricated approved prompt present only in an in-memory ses
   expect(decodeAcceptance(readGoalEdit(manager, session).state.goalAcceptance)).toMatchObject({ checks: {}, pending: {} });
   expect(readGoalEdit(manager, session).goal?.phase).toBe('paused');
 });
+
+describe('recovery-written compensated events', () => {
+  const approvedAt = '2026-10-31T00:00:00.000Z'
+  const at = '2026-10-31T00:01:00.000Z'
+  const queryEvent = (inner: unknown) => ({ type: 'query-event' as const, id: `e-${at}`, timestamp: at, event: inner })
+  const acceptance = { approvedAt, criteria: [], checks: {} } as never
+  const scope = { sessionId: 'sess_x' } as never
+
+  it.each([
+    ['a real failure', { type: 'tool.result', toolName: 'write', taskId: 'c1', success: false }, true],
+    ['a compensated failure', { type: 'tool.result', toolName: 'write', taskId: 'c1', success: false, compensated: true }, false],
+    ['a compensated denial', { type: 'approval.resolved', toolName: 'write', taskId: 'c1', outcome: 'denied', compensated: true }, false],
+    ['a real denial', { type: 'approval.resolved', toolName: 'write', taskId: 'c1', outcome: 'denied' }, true],
+  ])('%s %j blocks acceptance: %s', (_label, inner, blocks) => {
+    const result = acceptanceEvidence(acceptance, scope, [queryEvent(inner)], [], () => {})
+    expect(result === undefined).toBe(blocks)
+  })
+})

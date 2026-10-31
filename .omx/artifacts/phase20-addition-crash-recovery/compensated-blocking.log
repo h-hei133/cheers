@@ -1,0 +1,33 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/planning/goal/acceptance/acceptance.test.ts  (14 tests | 1 failed | 10 skipped) 79ms
+   ❯ src/planning/goal/acceptance/acceptance.test.ts > recovery-written compensated events > a compensated failure {"type":"tool.result","toolName":"write","taskId":"c1","success":false,"compensated":true} blocks acceptance: false
+     → expected true to be false // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed | 10 skipped (14)
+   Start at  08:14:49
+   Duration  6.05s (transform 4.41s, setup 0ms, collect 5.69s, tests 79ms, environment 0ms, prepare 60ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/planning/goal/acceptance/acceptance.test.ts > recovery-written compensated events > a compensated failure {"type":"tool.result","toolName":"write","taskId":"c1","success":false,"compensated":true} blocks acceptance: false
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/planning/goal/acceptance/acceptance.test.ts:196:34
+    194|   ])('%s %j blocks acceptance: %s', (_label, inner, blocks) => {
+    195|     const result = acceptanceEvidence(acceptance, scope, [queryEvent(i…
+    196|     expect(result === undefined).toBe(blocks)
+       |                                  ^
+    197|   })
+    198| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

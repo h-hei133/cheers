@@ -10856,3 +10856,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：硬杀会话可再次continue（子代理review缺陷#4）
 
 [addition21.70](features/phase-20-addition.md#2170-硬杀会话可再次continue子代理review缺陷4)非正常死亡不写interrupted而留active，eligibility按状态拒绝导致/continue拒绝最需恢复的会话。现为active增加证据分支，复用相同信号，无证据仍拒绝。72项聚焦、一反转到命中、五门/TS build通过。build f5ad32ed。原47/ADD整体partial、goal active。
+
+### 2026-10-31：恢复写入的补偿事件不再永久阻断目标验收（子代理review缺陷#3）
+
+[addition21.71](features/phase-20-addition.md#2171-恢复写入的补偿事件不再永久阻断目标验收子代理review缺陷3)acceptanceEvidence不豁免compensated，崩溃后一次恢复即永久阻断目标。现按类型判断并豁免补偿事件，真实失败/拒绝仍阻断。38项聚焦、一反转到命中、五门/TS build通过。build 76bb4743。原47/ADD整体partial、goal active。

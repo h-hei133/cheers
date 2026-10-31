@@ -1,7 +1,7 @@
 {
-  "name": "status-only",
+  "name": "compensated-blocking",
   "exit": 1,
-  "tests": "2 failed | 5 skipped (7)",
-  "originalSha256": "6e2081cc62a930efe9d2de18f487b3aa0d40234dce695baea22ded7c2a001c77",
+  "tests": "1 failed | 3 passed | 10 skipped (14)",
+  "originalSha256": "59f5c642006e35f4b3c6d6bb86829aa88e20587ae38039f7b0f33b695befd2e3",
   "restored": true
 }

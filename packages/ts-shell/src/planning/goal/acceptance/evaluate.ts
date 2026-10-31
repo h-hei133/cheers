@@ -10,9 +10,22 @@ import type { AcceptanceState, AcceptanceEvidence } from './model.js';
 export function acceptanceEvidence(acceptance: AcceptanceState, scope: BoundSessionScope, events: readonly TranscriptEvent[],
   operations: readonly OperationReceipt[], access: (absolute: string) => void): readonly AcceptanceEvidence[] | undefined {
   const since = events.filter(event => Date.parse(event.timestamp) >= Date.parse(acceptance.approvedAt));
-  if (since.some(event => event.type === 'query-event' && (event.event.type === 'tool.result' && event.event.success !== true
-    || event.event.type === 'approval.resolved' && event.event.outcome !== 'approved' || event.event.type === 'lifecycle.cancelled'
-    || event.event.type === 'query.failed' || event.event.type === 'lifecycle.error'))) return undefined;
+  // A compensated event is written by recovery for a call the run never
+  // settled; it records that the outcome is unknown, not that the work failed
+  // and not that the user refused it. Counting it as evidence would block a
+  // goal forever after a crash the user recovered from.
+  const blocks = (inner: { readonly type: string }): boolean => {
+    if (inner.type === 'tool.result') {
+      const result = inner as { readonly success?: boolean; readonly compensated?: boolean };
+      return result.success !== true && result.compensated !== true;
+    }
+    if (inner.type === 'approval.resolved') {
+      const resolution = inner as { readonly outcome?: string; readonly compensated?: boolean };
+      return resolution.outcome !== 'approved' && resolution.compensated !== true;
+    }
+    return inner.type === 'lifecycle.cancelled' || inner.type === 'query.failed' || inner.type === 'lifecycle.error';
+  };
+  if (since.some(event => event.type === 'query-event' && blocks(event.event))) return undefined;
   const result: AcceptanceEvidence[] = [];
   for (const criterion of acceptance.criteria) {
     const check = criterion.kind === 'command' ? acceptance.checks[criterion.id] : undefined;
