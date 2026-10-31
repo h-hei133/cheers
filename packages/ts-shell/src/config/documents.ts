@@ -2,13 +2,15 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { resolveUserDataFile } from '../core/paths/userHome.js';
 import { readConfigSnapshot, type CapturedConfigSnapshot } from './document.js';
+import { extractPreferences, joinPreferences, stripPreferences } from './preferences/documents.js';
+import { PREFERENCE_FIELD } from './preferences/contract.js';
 /**
  * The user's configuration, as two documents rather than one.
  *
  * `config.json` holds what the product does: theme, retry policy, tool
  * allowlists and request policies. `auth.json` holds who is being talked to and
  * as whom: the provider, its connections, their keys and account tokens. Model
- * defaults nested in those records still follow that physical owner.
+ * defaults are kept in the settings document and joined at this boundary.
  *
  * They are separate files because they are different kinds of fact. A settings
  * file is something a user may paste into an issue or share between machines; a
@@ -51,6 +53,13 @@ export interface ConfigDocuments {
   readonly values: Record<string, unknown>;
 }
 
+/** Auth wins credential fields; an acquired settings preference owner wins its legacy auth copy. */
+export function mergeConfigDocuments(settings: Record<string, unknown>, auth: Record<string, unknown>): Record<string, unknown> {
+  return joinPreferences({ ...settings, ...auth,
+    ...(Object.hasOwn(settings, PREFERENCE_FIELD) ? { [PREFERENCE_FIELD]: settings[PREFERENCE_FIELD] } : {}),
+  });
+}
+
 /**
  * Read both documents and merge them into the logical one.
  *
@@ -63,7 +72,7 @@ export interface ConfigDocuments {
 export function readConfigDocuments(settingsPath: string, authPath: string): ConfigDocuments {
   const settings = readConfigSnapshot(settingsPath);
   const auth = readConfigSnapshot(authPath);
-  const values = { ...(settings?.values ?? {}), ...(auth?.values ?? {}) };
+  const values = mergeConfigDocuments(settings?.values ?? {}, auth?.values ?? {});
   return { settings, auth, values };
 }
 
@@ -76,6 +85,7 @@ export function readConfigDocuments(settingsPath: string, authPath: string): Con
  * the declared split.
  */
 export function documentFor(key: string, auth: CapturedConfigSnapshot | undefined): 'settings' | 'auth' {
+  if (key === PREFERENCE_FIELD) return 'settings';
   if (auth?.values && Object.hasOwn(auth.values, key)) return 'auth';
   return isAuthField(key) ? 'auth' : 'settings';
 }
@@ -98,12 +108,18 @@ export function partitionConfigDocuments(value: Record<string, unknown>, documen
 } {
   const settings = { ...(documents.settings?.values ?? {}) };
   const auth: Record<string, unknown> = {};
-  for (const key of new Set([...Object.keys(documents.values), ...Object.keys(value)])) {
+  for (const key of new Set([...Object.keys(documents.values), ...Object.keys(value),
+    ...(documents.auth?.values && Object.hasOwn(documents.auth.values, PREFERENCE_FIELD) ? [PREFERENCE_FIELD] : [])])) {
     if (documentFor(key, documents.auth) === 'auth') {
       if (Object.hasOwn(value, key)) auth[key] = value[key];
       if (isAuthField(key) || !Object.hasOwn(value, key)) delete settings[key];
     } else if (Object.hasOwn(value, key)) settings[key] = value[key];
     else delete settings[key];
   }
-  return { settings, auth };
+  const previous = extractPreferences(documents.values, documents.settings?.values[PREFERENCE_FIELD] ?? documents.auth?.values[PREFERENCE_FIELD]);
+  const preferences = extractPreferences(value, previous);
+  delete auth[PREFERENCE_FIELD];
+  if (Object.keys(preferences).length) settings[PREFERENCE_FIELD] = preferences;
+  else delete settings[PREFERENCE_FIELD];
+  return { settings, auth: stripPreferences(auth) };
 }

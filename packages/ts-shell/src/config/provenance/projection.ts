@@ -2,6 +2,7 @@ import type { AnySchemaObject } from 'ajv';
 import type { ConfigFields } from '../fields.js';
 import { sameValue } from '../values.js';
 import { type ConfigOrigin, type ConfigProvenance, composeOrigin, origin, replaceOrigin, schemaChildren, traceValue } from './model.js';
+import { PREFERENCE_FIELD } from '../preferences/contract.js';
 
 function normalizedOrigin(before: unknown, after: unknown, schema: AnySchemaObject, trace: ConfigOrigin): ConfigOrigin {
   if (sameValue(before, after)) return trace;
@@ -15,7 +16,7 @@ function normalizedOrigin(before: unknown, after: unknown, schema: AnySchemaObje
 /** Project origins through domain normalization without retaining either input values or arbitrary keys. */
 export function projectConfigOrigins(raw: Record<string, unknown>, effective: object, traces: ConfigProvenance, fields: ConfigFields): ConfigProvenance {
   const values = effective as Record<string, unknown>;
-  return Object.fromEntries(Object.entries(fields).map(([key, field]) => {
+  return Object.fromEntries(Object.entries(fields).filter(([key]) => key !== PREFERENCE_FIELD).map(([key, field]) => {
     const trace = traces[key];
     if (raw[key] === undefined) {
       const fallback = traceValue(values[key], field.schema, 'default');

@@ -11,6 +11,8 @@ import { loadSessionRecord } from '../../../session/store/sessionStore.js';
 import { projectSessionFileLayout } from '../../../session/store/sessionFileLayout.js';
 import { IMPORT_LIMITS } from './model.js';
 import { TemplateLoader } from '../../../core/prompts/templateLoader.js';
+import { joinPreferences } from '../../preferences/documents.js';
+import type { RuntimeConfigFile } from '../../runtimeConfig.js';
 
 let home: string; let workspace: string; let source: ProfileContext; let target: ProfileContext;
 beforeEach(() => {
@@ -25,6 +27,11 @@ function write(relative: string, content: string, profile = source): void {
 }
 function preview(categories?: Parameters<typeof importRequest>[0]['categories']) {
   return planImport(importRequest({ source: source.id, target: target.id, homeDir: home, workspace, categories }));
+}
+function importedConfig() {
+  const auth = JSON.parse(fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8'));
+  const settingsPath = path.join(target.root, 'config.json');
+  return joinPreferences({ ...(fs.existsSync(settingsPath) ? JSON.parse(fs.readFileSync(settingsPath, 'utf8')) : {}), ...auth }) as RuntimeConfigFile;
 }
 
 it('opens existing profiles without creating missing roots or changing the active owner', () => {
@@ -61,7 +68,7 @@ it('previews without writes, excludes live credentials and imports inactive nati
   expect(fs.readdirSync(target.root)).toEqual([]);
   expect(applyImport(plan, plan.digest).status).toBe('complete');
   const configText = fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8');
-  const config = JSON.parse(configText);
+  const config = importedConfig();
   expect(config.providerConnections[0]).toMatchObject({ id: 'same-id', status: 'pending', model: 'test-model' });
   for (const secret of ['synthetic-access', 'synthetic-refresh', 'synthetic-key', 'synthetic-legacy', 'do-not-import']) expect(configText).not.toContain(secret);
   expect(fs.readFileSync(path.join(target.root, 'models.json'), 'utf8')).not.toContain('do-not-import');
@@ -83,7 +90,7 @@ it('previews without writes, excludes live credentials and imports inactive nati
 it('projects legacy credential slots into pending references without resolving environment values', () => {
   write('config.json', JSON.stringify({ provider: 'openai', providerCredentials: { openai: { apiKey: '${SOURCE_SECRET}', model: 'test-model' } } }));
   const plan = preview(['config']); expect(applyImport(plan, plan.digest).status).toBe('complete');
-  const config = JSON.parse(fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8'));
+  const config = importedConfig();
   expect(config.providerConnections).toEqual([{ id: 'import-openai', provider: 'openai', authType: 'api-key', status: 'pending', model: 'test-model' }]);
   expect(config.providerCredentials).toBeUndefined();
 });
@@ -100,10 +107,12 @@ it('imports split auth connection metadata without secrets and preserves its sel
   expect(plan.sources.map(file => path.basename(file.path))).toEqual(['auth.json', 'config.json']);
   expect(fs.readdirSync(target.root)).toEqual([]);
   expect(applyImport(plan, plan.digest).status).toBe('complete');
-  expect(JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8'))).toEqual({ maxTurns: 17 });
+  expect(JSON.parse(fs.readFileSync(path.join(target.root, 'config.json'), 'utf8'))).toEqual({ maxTurns: 17,
+    modelPreferences: { connections: [{ id: 'relay', provider: 'openai', model: 'owned-model' }] },
+  });
   const stored = fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8');
   expect(JSON.parse(stored)).toEqual({ provider: 'openai', activeProviderConnectionId: 'relay', providerConnections: [{
-    id: 'relay', provider: 'openai', baseUrl: 'https://relay.invalid/v1', model: 'owned-model', authType: 'api-key', status: 'pending',
+    id: 'relay', provider: 'openai', baseUrl: 'https://relay.invalid/v1', authType: 'api-key', status: 'pending',
   }] });
   expect(stored).not.toContain('synthetic-');
   expect(fs.readFileSync(path.join(source.root, 'config.json'))).toEqual(beforeSettings);
@@ -121,6 +130,22 @@ it('imports an auth-only profile and fences an auth edit after preview', () => {
   expect(applyImport(fresh, fresh.digest).status).toBe('complete');
   expect(fs.existsSync(path.join(target.root, 'config.json'))).toBe(false);
   expect(JSON.parse(fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8')).providerConnections[0]).toMatchObject({ id: 'other', status: 'pending' });
+});
+
+it('retains independent provider fallback preferences alongside a pending named connection', () => {
+  write('config.json', JSON.stringify({ modelPreferences: { providers: { openai: { model: 'provider-default', thinkingEffort: 'high', serviceTier: 'flex' } },
+    connections: [{ id: 'relay', provider: 'openai', thinkingEffort: null }] } }));
+  write('auth.json', JSON.stringify({ provider: 'openai', activeProviderConnectionId: 'relay',
+    providerCredentials: { openai: { apiKey: 'synthetic-independent-key', accountAuth: {} } },
+    providerConnections: [{ id: 'relay', provider: 'openai', apiKey: 'synthetic-named-key' }] }));
+  const plan = preview(['config']); expect(applyImport(plan, plan.digest).status).toBe('complete');
+  expect(importedConfig().providerCredentials?.openai).toEqual({ model: 'provider-default', thinkingEffort: 'high', serviceTier: 'flex' });
+  expect(importedConfig().providerConnections?.[0]).toMatchObject({ id: 'relay', status: 'pending', thinkingEffort: null });
+  const settings = fs.readFileSync(path.join(target.root, 'config.json'), 'utf8');
+  const auth = JSON.parse(fs.readFileSync(path.join(target.root, 'auth.json'), 'utf8'));
+  expect(auth.providerCredentials).toEqual({ openai: {} });
+  expect(auth.providerConnections[0]).not.toHaveProperty('thinkingEffort');
+  expect(settings).not.toContain('synthetic-');
 });
 
 it('refuses malformed legacy fields even when the auth document shadows them', () => {

@@ -2,6 +2,7 @@ import { Ajv, type AnySchemaObject, type ValidateFunction } from 'ajv';
 import { booleanSchema, connectionSchema, countSchema, credentialSchema, delaySchema, enumSchema, listSchema, nameSchema, objectSchema, positiveSchema, textSchema, tuiSchemas } from './schema.js';
 import { SCOPE_FIELDS } from './scope/registry.js';
 import type { ScopeFieldPolicy } from './scope/contract.js';
+import { createPreferenceSchema } from './preferences/contract.js';
 
 export type ConfigSource = 'project' | 'user' | 'environment' | 'override';
 export type MergePolicy = 'replace' | 'intersect' | 'union' | 'deny' | 'disable' | 'tui';
@@ -40,6 +41,7 @@ export function createConfigFields(providers: readonly string[]) {
     schemaVersion: field({ const: 1 }, undefined, 'replace', false, { ...safe, application: 'metadata' }),
     provider: field(enumSchema(providers), personal, 'replace', false, { sensitivity: 'personal' }),
     providerCredentials: field(objectSchema(Object.fromEntries(providers.map(provider => [provider, credentialSchema]))), personal, 'replace', false, { sensitivity: 'personal' }),
+    modelPreferences: field(createPreferenceSchema(providers), personal, 'replace', false, { sensitivity: 'personal', application: 'metadata' }),
     accountPool: field({ type: 'object', propertyNames: nameSchema,
       additionalProperties: objectSchema({ connections: listSchema(nameSchema), baseUrl: textSchema }, ['connections']) },
       ['user', 'override'], 'replace', true, { sensitivity: 'personal', application: 'next operation' }),

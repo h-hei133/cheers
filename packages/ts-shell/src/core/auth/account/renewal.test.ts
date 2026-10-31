@@ -2,6 +2,7 @@ import { accountToken } from '../../../test-utils/oauth.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, type OpenAIAccountAuthConfig, type RuntimeConfigFile } from '../../../config/runtimeConfig.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
@@ -45,6 +46,20 @@ beforeEach(() => {
   write(initial());
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { recursive: true, force: true }); });
+
+it('reports per-file revisions for renewal while the logical pair keeps its own revision', async () => {
+  fs.writeFileSync(settingsFile(), '{"theme":"dark"}');
+  const digest = (name: string) => createHash('sha256').update(fs.readFileSync(name)).digest('hex');
+  const previousAuth = digest(file); const previousSettings = digest(settingsFile());
+  const result = await renewStoredAccount(request());
+  expect(result.stored).toBe(true);
+  expect(result.rotation?.storage.documents).toEqual([
+    { source: settingsFile(), path: settingsFile(), previousRevision: previousSettings, revision: previousSettings },
+    { source: file, path: file, previousRevision: previousAuth, revision: digest(file) },
+  ]);
+  expect(result.rotation?.storage.previousRevision).not.toBe(previousAuth);
+  expect(result.rotation?.storage.revision).not.toBe(digest(file));
+});
 
 it.each([
   ['missing', 'synthetic.no-claim.token'], ['malformed', 'synthetic.!.token'],

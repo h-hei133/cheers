@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getRuntimeConfig, getUserRuntimeConfigPath } from '../runtimeConfig.js';
+import { getRuntimeConfig, getUserRuntimeConfigPath, getUserAuthPath } from '../runtimeConfig.js';
 import { createConfigInputs } from './selection.js';
 import { projectTrust } from '../../core/security/trust/store.js';
 import * as document from '../document.js';
@@ -24,6 +24,43 @@ function write(name: string, values: unknown): string {
 function inputs(names: string[], source: 'user' | 'project' = 'user') {
   return createConfigInputs(names.map(file => ({ path: file, source })), root);
 }
+
+it('joins primary model preferences before explicit records replace their defaults and origins', () => {
+  fs.writeFileSync(user, JSON.stringify({ modelPreferences: { providers: { openai: { model: 'primary-provider', thinkingEffort: 'high' } },
+    connections: [{ id: 'relay', provider: 'openai', model: 'primary-model', thinkingEffort: 'low' }] } }));
+  fs.writeFileSync(getUserAuthPath(), JSON.stringify({ provider: 'openai', activeProviderConnectionId: 'relay',
+    providerConnections: [{ id: 'relay', provider: 'openai', apiKey: 'synthetic-primary' }] }), { mode: 0o600 });
+  const file = write('explicit.json', { providerCredentials: { openai: { model: 'explicit-provider' } },
+    providerConnections: [{ id: 'relay', provider: 'openai', apiKey: 'synthetic-explicit', model: 'explicit-model' }] });
+  const config = getRuntimeConfig(root, undefined, inputs([file]));
+  expect(config.providerConnections[0]).toMatchObject({ apiKey: 'synthetic-explicit', model: 'explicit-model' });
+  expect(config.providerConnections[0].thinkingEffort).toBeUndefined();
+  expect(config.providerCredentials.openai).toEqual({ model: 'explicit-provider' });
+  expect(config.configProvenance.providerConnections.children?.['0'].children?.model.files?.[0]).toMatchObject({ path: file, position: 0 });
+  expect(config.configProvenance).not.toHaveProperty('modelPreferences');
+});
+
+it('accepts explicit user preference envelopes with raw references and refuses orphan identities', () => {
+  vi.stubEnv('PREFERENCE_MODEL', 'effective-input');
+  const file = write('preferences.json', { providerConnections: [{ id: 'relay', provider: 'openai', model: 'legacy-input' }],
+    modelPreferences: { providers: { openai: { model: '$PREFERENCE_MODEL' } },
+      connections: [{ id: 'relay', provider: 'openai', model: '${PREFERENCE_MODEL}', thinkingEffort: null }] } });
+  const config = getRuntimeConfig(root, undefined, inputs([file]));
+  expect(config.providerConnections[0]).toMatchObject({ model: 'effective-input', thinkingEffort: null });
+  expect(config.providerCredentials.openai?.model).toBe('effective-input');
+  expect(config.configProvenance.providerConnections.children?.['0'].children?.model).toMatchObject({ environmentReference: true, files: [expect.objectContaining({ path: file, position: 0 })] });
+  expect(fs.readFileSync(file, 'utf8')).toContain('${PREFERENCE_MODEL}');
+  const orphan = write('orphan.json', { modelPreferences: { connections: [{ id: 'missing', provider: 'openai', model: 'unused' }] } });
+  expect(() => getRuntimeConfig(root, undefined, inputs([orphan]))).toThrow('Explicit config input');
+});
+
+it('rejects project preference envelopes before accessing their environment references', () => {
+  const file = write('project-preferences.json', { modelPreferences: { providers: { openai: { model: '$MISSING_PRIVATE_PREFERENCE' } } } });
+  const config = getRuntimeConfig(root, undefined, inputs([file], 'project'));
+  expect(config.providerCredentials).toEqual({});
+  expect(config.configDiagnostics.join(' ')).toContain('source-not-allowed');
+  expect(config.configDiagnostics.join(' ')).not.toContain('MISSING_PRIVATE_PREFERENCE');
+});
 
 it('resolves relative files once, retains repeated positions, and applies env and overrides last', () => {
   write('.cheers.json', { maxTurns: 10, theme: 'project' }); fs.writeFileSync(user, '{"maxTurns":20,"theme":"user"}');

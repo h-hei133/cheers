@@ -125,7 +125,8 @@ describe("connect command runtime", () => {
     expect(stored.providerConnections?.[0]?.baseUrl).toBe(
       "https://api.siliconflow.cn/v1",
     );
-    expect(stored.providerConnections?.[0]?.model).toBe(
+    expect(stored.providerConnections?.[0]?.model).toBeUndefined();
+    expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerConnections?.[0]?.model).toBe(
       "deepseek-ai/DeepSeek-V4-Flash",
     );
     expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerCredentials).toBeUndefined();
@@ -141,7 +142,7 @@ describe("connect command runtime", () => {
         createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }] },
     readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     const before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
-    const settings = fs.readFileSync(getUserRuntimeConfigPath());
+    const settings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
     __setConnectBrowserFlowRunnerForTest(async () => ({ apiKey: 'SYNTHETIC_NEW_CONNECTION',
       baseUrl: 'https://new.invalid/v1', model: 'new-model' }));
     __setOpenAIAccountAuthRunnerForTest(() => nativeLogin());
@@ -153,7 +154,11 @@ describe("connect command runtime", () => {
     expect(stored.providerCredentials).toEqual(before.providerCredentials);
     expect(stored.providerConnections?.find(connection => connection.id === 'retained-sibling'))
       .toEqual(before.providerConnections?.[0]);
-    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(settings);
+    const savedSettings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+    expect(savedSettings.theme).toBe(settings.theme);
+    expect(savedSettings.modelPreferences.providers).toEqual(settings.modelPreferences.providers);
+    expect(savedSettings.modelPreferences.connections.find((item: { id: string }) => item.id === 'retained-sibling'))
+      .toEqual(settings.modelPreferences.connections.find((item: { id: string }) => item.id === 'retained-sibling'));
     const active = stored.providerConnections?.find(connection => connection.id === stored.activeProviderConnectionId);
     expect(active?.id).not.toBe('retained-sibling');
     const resolution = resolveProviderCredential({ runtimeConfig: configStore.getRuntimeConfig(workspaceRoot), env: {} });

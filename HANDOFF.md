@@ -1448,3 +1448,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A native account login stores its connection successfully but cannot obtain a renewal grant after duplicate provider-slot writes are removed.
 - **Root Cause**: Enrollment treated an activation-created provider mirror as proof of storage identity, although the named connection and captured document fences already identify the credential. Session defaults and provenance also projected into both owners.
 - **Rule**: Bind native grants to the verified named connection, source and storage generation. Generate no credential/default mirror for a named choice; preserve independent provider slots and guarded legacy exact-mirror renewal/removal. Change projection and provenance together, and arrange explicit legacy mirror fixtures when testing compatibility.
+
+### Moving Preferences Out Of Auth Requires Preservation In Both Directions
+
+- **Symptom**: Auth-first credential migration deletes the only model default before settings saves, or removing a preference revives a stale auth leaf after cleanup fails.
+- **Root Cause**: Credentials move toward auth while model controls move toward settings; one unconditional two-file publication order cannot preserve both sources. Missing fields also cannot distinguish legacy fallback from a deliberately emptied owner.
+- **Rule**: Stage auth while retaining existing preference sources and removed record identities, verify settings, then clean auth. Present preference records own every model control, including empty tombstones. Match normalized ID and provider, reject in-place provider rebinding, and join before later explicit records. Guard both raw snapshots between stages, updating only snapshots this writer changed; refresh fingerprint after its own chmod. Report interrupted removal as unknown and require reread/retry.
+
+### Logical Pair Revisions Cannot Describe Physical Origin Files
+
+- **Symptom**: A main or advisor account renews successfully but its captured checkpoint is skipped as changed configuration.
+- **Root Cause**: ConfigEdit.revision hashes the settings/auth pair, while provenance stores each file's raw SHA. Receipt matching compares the pair hash against physical origins and therefore updates neither auth nor settings origins.
+- **Rule**: Keep the pair revision for logical edit admission; carry exact per-file source, canonical path and before/after revisions in renewal receipts. Update only matching physical origins and retain full publication equality so unrelated settings/catalog/model changes still refuse adoption.

@@ -14,6 +14,10 @@ import { mergeConfigValue } from './merge.js';
 import { captureScopeLayer, scopeSettings } from './scope/capture.js';
 import type { ScopeLayer } from './scope/model.js';
 import type { PathRule } from './scope/contract.js';
+import { joinPreferences } from './preferences/documents.js';
+import { projectPreferenceOrigins } from './preferences/projection.js';
+import { PREFERENCE_FIELD } from './preferences/contract.js';
+import { preferenceEnvelope } from './preferences/identity.js';
 
 export interface ConfigLayer {
   readonly values: Record<string, unknown>;
@@ -82,6 +86,15 @@ export function applyConfigLayer(layer: ConfigLayer, raw: Record<string, unknown
       layer.diagnostics.push(diagnostic(source, key, 'invalid-value', field.security));
       continue;
     }
+    if (key === PREFERENCE_FIELD) {
+      try { preferenceEnvelope(value); }
+      catch {
+        layer.valid = false;
+        layer.origins[key] = rejectOrigin(layer.origins[key], source, 'invalid-value', file);
+        layer.diagnostics.push(diagnostic(source, key, 'invalid-value'));
+        continue;
+      }
+    }
     const trustRejection = source === 'project' ? configTrustRejection(field, value, trust) : undefined;
     if (trustRejection) {
       layer.origins[key] = rejectOrigin(layer.origins[key], source, trustRejection, file);
@@ -119,11 +132,32 @@ export function applyConfigLayer(layer: ConfigLayer, raw: Record<string, unknown
     }));
 }
 
+/** Resolve the physical preference owner before a later explicit record replaces it. */
+function applyPreferences(layer: ConfigLayer, inputPath?: string): void {
+  const preferences = layer.values[PREFERENCE_FIELD];
+  if (preferences === undefined) return;
+  try {
+    const values = joinPreferences(layer.values);
+    const origins = projectPreferenceOrigins(values, preferences, layer.origins);
+    for (const key of Object.keys(layer.values)) delete layer.values[key];
+    Object.assign(layer.values, values);
+    for (const key of Object.keys(layer.origins)) delete layer.origins[key];
+    Object.assign(layer.origins, origins);
+  } catch {
+    if (inputPath) throw new ConfigInputError('invalid-value', inputPath);
+    layer.valid = false;
+    layer.diagnostics.push(diagnostic('user', PREFERENCE_FIELD, 'invalid-reference'));
+    delete layer.values[PREFERENCE_FIELD];
+    delete layer.origins[PREFERENCE_FIELD];
+  }
+}
+
 export function loadConfigLayers(paths: readonly { path: string; source: 'project' | 'user' }[], overrides: unknown, fields: ConfigFields, trust: TrustDecision, inputs?: ConfigInputs, workspace?: string): ConfigLayer & { sources: string[]; verify: () => void } {
   const captured = captureConfigFiles(paths, inputs);
   const layer: ConfigLayer & { sources: string[]; verify: () => void } = { values: {}, origins: {}, diagnostics: [], blocked: false, valid: true, sources: [], tuiLayers: {}, scopeLayers: [],
     verify: () => verifyConfigFiles(captured, inputs) };
   for (const candidate of captured) {
+    if (candidate.input) applyPreferences(layer);
     if (candidate.error) {
       layer.valid = false;
       layer.blocked = true;
@@ -143,12 +177,20 @@ export function loadConfigLayers(paths: readonly { path: string; source: 'projec
     }
     const file: ConfigFileOrigin = { path: candidate.canonical!, revision: candidate.snapshot.revision, source: candidate.source,
       ...(candidate.input ? { position: candidate.input.position } : {}) };
+    const preferences = candidate.source === 'user' && !candidate.input ? layer.values[PREFERENCE_FIELD] : undefined;
+    const preferenceOrigin = layer.origins[PREFERENCE_FIELD];
     const documentLayer = { ...layer, valid: true, blocked: false };
     applyConfigLayer(documentLayer, candidate.snapshot.values, candidate.source, fields, trust, file, workspace);
+    if (preferences !== undefined) {
+      layer.values[PREFERENCE_FIELD] = preferences;
+      layer.origins[PREFERENCE_FIELD] = preferenceOrigin;
+    }
     if (candidate.input && !documentLayer.valid) throw new ConfigInputError('invalid-value', candidate.path, documentLayer.blocked);
     layer.valid &&= documentLayer.valid; layer.blocked ||= documentLayer.blocked;
+    if (candidate.input) applyPreferences(layer, candidate.path);
     layer.sources.push(candidate.canonical!);
   }
+  applyPreferences(layer);
   for (const [key, field] of Object.entries(fields)) {
     const variable = field.environment;
     if (!variable) continue;
@@ -189,6 +231,7 @@ export function validateRawConfig(value: unknown, fields: ConfigFields): void {
     if (child === undefined) continue;
     const field = Object.hasOwn(fields, key) ? fields[key] : undefined;
     if (field && !field.validate(child)) throw new Error(`Invalid config field ${key}: invalid-value.`);
+    if (key === PREFERENCE_FIELD) preferenceEnvelope(child);
   }
   if (Buffer.byteLength(JSON.stringify(value)) > CONFIG_MAX_BYTES) throw new ConfigDocumentError('resource-limit');
 }

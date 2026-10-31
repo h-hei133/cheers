@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG_FIELDS, getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt,
   type AccountAuthConfig, type RuntimeConfig, type RuntimeConfigFile } from '../../../config/runtimeConfig.js';
-import { configEditStorage, persistConfigEdit, type ConfigEdit } from '../../../config/persistence.js';
+import { configEditDocuments, configEditStorage, persistConfigEdit, type ConfigEdit } from '../../../config/persistence.js';
 import { ConfigWriteError } from '../../../config/outcome.js';
 import { normalizeConnectionId, sameValue } from '../../../config/values.js';
 import { resolveProviderCredential, type ProviderCredentialResolution } from '../../shell/providerCredentials.js';
@@ -144,8 +144,15 @@ export function readAccountRotationReceipt(edit: AccountEdit): AccountRotation |
   if (current.source !== edit.snapshot.source || current.edit.path !== edit.snapshot.edit.path
     || !sameValue(identity(current.resolution), identity(expected))
     || !sameValue(selectors(current.edit.values, edit.resolution.provider), selectors(rotated(edit, accountAuth), edit.resolution.provider))) return undefined;
+  const previousDocuments = configEditDocuments(edit.snapshot.edit);
   return { resolution: edit.resolution, accountAuth, storage: { source: current.source, path: current.edit.path,
-    previousRevision: edit.snapshot.edit.revision, revision: current.edit.revision } };
+    previousRevision: edit.snapshot.edit.revision, revision: current.edit.revision,
+    documents: configEditDocuments(current.edit).map(document => {
+      const previous = previousDocuments.find(item => item.source === document.source && item.path === document.path);
+      if (!previous) throw new ConfigWriteError('conflict', 'unchanged');
+      return { ...document, previousRevision: previous.revision };
+    }),
+  } };
 }
 
 /** Save only the captured owner and an exact-identity mirror, then verify its use. */

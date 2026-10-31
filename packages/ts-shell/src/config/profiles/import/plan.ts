@@ -9,6 +9,7 @@ import { IMPORT_CATEGORIES, IMPORT_LIMITS, type ImportCategory, type ImportFile,
 import { captureSources, type SourceCapture } from './source.js';
 import { importConfig } from './config.js';
 import { documentFor } from '../../documents.js';
+import { extractPreferences, stripPreferences } from '../../preferences/documents.js';
 import { parseConfigText } from '../../syntax.js';
 import { serializeConfigDocument } from '../../document.js';
 import { importCatalog } from './catalog.js';
@@ -38,8 +39,11 @@ export function planImport(request: ImportRequest): ImportPlan {
       for (const [key, value] of Object.entries(sanitized)) {
         (documentFor(key, undefined) === 'auth' ? credentials : settings)[key] = value;
       }
+      const preferences = extractPreferences(sanitized);
+      if (Object.keys(preferences).length) settings.modelPreferences = preferences;
+      const authValues = stripPreferences(credentials);
       if (file || Object.keys(settings).length) files.push({ relative: 'config.json', content: serializeConfigDocument(settings) + '\n', metadata: false });
-      if (Object.keys(credentials).length) files.push({ relative: 'auth.json', content: serializeConfigDocument(credentials) + '\n', metadata: false });
+      if (Object.keys(authValues).length) files.push({ relative: 'auth.json', content: serializeConfigDocument(authValues) + '\n', metadata: false });
     }
   }
   if (request.categories.includes('catalog')) {

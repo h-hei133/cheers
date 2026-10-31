@@ -1,10 +1,9 @@
-import { readRuntimeConfigEditAt } from "../../../config/runtimeConfig.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { runConnectCommand, addConnection, addConnectionFromLegacyAuthSet, activateConnection, removeConnection, __setConnectBrowserFlowRunnerForTest, __setOpenAIAccountAuthRunnerForTest } from "../connectCommandRuntime.js";
-import { getUserRuntimeConfigPath, writeUserRuntimeConfigFile } from "../../../config/runtimeConfig.js";
+import { getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, readUserRuntimeConfigFile, writeUserRuntimeConfigFile } from "../../../config/runtimeConfig.js";
 import { createCommandRegistry } from "../registry.js";
 
 let root: string;
@@ -29,20 +28,21 @@ it.each([
   ["set", "openai", "fixture-secret", "url", "model", "extra"],
   ["use", "openai", "extra"], ["rm", "openai", "extra"], ["status", "extra"], ["help", "extra"],
 ])("rejects invalid connection input %j before writes or auth", async (...args) => {
-  const file = getUserRuntimeConfigPath(); const before = fs.readFileSync(file); const stamp = fs.statSync(file).mtimeMs;
+  const files = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const before = files.map(file => ({ bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs }));
   const result = await runConnectCommand(args, { cwd: root });
   expect(result.output).toContain("Invalid /connect arguments"); expect(result.output).not.toContain("fixture-secret");
-  expect(fs.readFileSync(file)).toEqual(before); expect(fs.statSync(file).mtimeMs).toBe(stamp);
+  expect(files.map(file => ({ bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs }))).toEqual(before);
   expect(browser).not.toHaveBeenCalled(); expect(account).not.toHaveBeenCalled();
 });
 
 it("guards directly exported mutators and retains inline key values", async () => {
-  const file = getUserRuntimeConfigPath(); const before = fs.readFileSync(file);
+  const files = [getUserRuntimeConfigPath(), getUserAuthPath()]; const before = files.map(file => fs.readFileSync(file));
   for (const result of [await addConnection(["openai", "--api-key", "fixture-secret", "extra"]), await addConnectionFromLegacyAuthSet(["openai", "fixture-secret", "url", "model", "extra"]), activateConnection(["openai", "extra"]), removeConnection(["openai", "extra"])]) {
-    expect(result).toContain("Invalid /connect arguments"); expect(fs.readFileSync(file)).toEqual(before);
+    expect(result).toContain("Invalid /connect arguments"); expect(files.map(file => fs.readFileSync(file))).toEqual(before);
   }
   expect(await addConnection(["openai", "--key=fixture-secret"])).toContain("Connected provider openai");
-  expect(JSON.parse(fs.readFileSync(file, "utf8")).providerConnections[0].apiKey).toBe("fixture-secret");
+  expect(readUserRuntimeConfigFile().providerConnections?.[0].apiKey).toBe("fixture-secret");
   expect(activateConnection(["--", "openai"])).toContain("Stored active connection:");
 });
 

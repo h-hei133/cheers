@@ -165,6 +165,8 @@ describe('authentication chooser boundaries', () => {
   });
 
   it('disables ambiguous and unsafe saved connection identities without exposing unsafe labels', async () => {
+    // This deliberately malformed legacy set has no separate preference owner.
+    fs.writeFileSync(config.getUserRuntimeConfigPath(), '{}');
     fs.writeFileSync(config.getUserAuthPath(), JSON.stringify({ providerConnections:
       [connection('duplicate'), connection('duplicate'), connection('bad\x1b[31m', 'Bearer synthetic-secret\x1b[31m')] }), { mode: 0o600 });
     const picker = authPicker(context(), 'logout'), rows = await picker.load();

@@ -22,6 +22,7 @@ import type { ConfigScopes } from './scope/model.js';
 import type { PathRule } from './scope/contract.js';
 import type { SessionModelPolicy } from '../session/model/contract.js';
 import { captureConfigScopes, scopeSettings } from './scope/capture.js';
+import type { ModelPreferences } from './preferences/contract.js';
 
 /**
  * Token budgets for one model.
@@ -359,6 +360,8 @@ export interface TuiPreferences {
 export interface RuntimeConfigFile {
   schemaVersion?: 1;
   provider?: RuntimeProvider;
+  /** Physical user settings envelope; editable APIs expose its joined records. */
+  modelPreferences?: ModelPreferences;
   maxTurns?: number;
   allowedTools?: string[];
   allowedModels?: string[];

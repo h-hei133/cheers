@@ -95,6 +95,14 @@ describe('user configuration documents', () => {
     expect(read(auth).providerCredentials).toEqual({ openai: { apiKey: 'synthetic-new-key' } });
   });
 
+  it('keeps auth-only saves from creating an empty settings source', () => {
+    put(auth, JSON.stringify(credentials));
+    writeUserRuntimeConfigFile({ providerCredentials: { openai: { apiKey: 'synthetic-next-key' } } }, readRuntimeConfigEditAt(settings));
+    expect(fs.existsSync(settings)).toBe(false);
+    expect(read(auth)).toEqual({ provider: 'openai', providerCredentials: { openai: { apiKey: 'synthetic-next-key' } } });
+    expect(getRuntimeConfig(root).configSources).toEqual([auth]);
+  });
+
   it.each(['settings', 'auth'] as const)('refuses a stale edit after its acquired %s document disappears', missing => {
     put(settings, JSON.stringify({ ...credentials, theme: 'dark' }));
     put(auth, JSON.stringify({ providerCredentials: { openai: { apiKey: 'synthetic-new-key' } } }));
@@ -222,5 +230,119 @@ describe('user configuration documents', () => {
     expect(() => writeUserRuntimeConfigFile({ theme: 'light' }, base)).toThrow(expect.objectContaining({ code: 'conflict', state: 'unknown' }));
     expect(fs.readFileSync(settings, 'utf8')).toBe(external);
     expect(read(auth)).toEqual(credentials);
+  });
+
+  it('moves raw model controls to settings while credentials and transport stay in auth', () => {
+    const connection = { id: ' relay ', provider: 'openai', apiKey: 'synthetic-key', baseUrl: 'https://relay.invalid/v1',
+      model: '$MODEL_DEFAULT', thinkingEffort: null, serviceTier: 'priority' };
+    put(auth, JSON.stringify({ provider: 'openai', activeProviderConnectionId: 'relay', providerConnections: [connection],
+      providerCredentials: { openai: { apiKey: 'synthetic-independent', model: 'provider-model', thinkingEffort: 'high' } } }));
+    const baseline = readRuntimeConfigEditAt(settings);
+    writeUserRuntimeConfigFile({ theme: 'dark' }, baseline);
+    expect(read(settings)).toEqual({ theme: 'dark', modelPreferences: {
+      providers: { openai: { model: 'provider-model', thinkingEffort: 'high' } },
+      connections: [{ id: 'relay', provider: 'openai', model: '$MODEL_DEFAULT', thinkingEffort: null, serviceTier: 'priority' }],
+    } });
+    expect(read(auth)).toEqual({ provider: 'openai', activeProviderConnectionId: 'relay', providerConnections: [{
+      id: ' relay ', provider: 'openai', apiKey: 'synthetic-key', baseUrl: 'https://relay.invalid/v1',
+    }], providerCredentials: { openai: { apiKey: 'synthetic-independent' } } });
+    expect(readUserRuntimeConfigFile().providerConnections).toEqual([connection]);
+    vi.stubEnv('MODEL_DEFAULT', 'effective-model');
+    const runtime = getRuntimeConfig(root);
+    expect(runtime.providerConnections[0]).toMatchObject({ model: 'effective-model', thinkingEffort: null });
+    expect(JSON.stringify(read(settings))).not.toContain('synthetic-');
+  });
+
+  it.each(['stage-auth', 'settings', 'cleanup-auth'] as const)('preserves model source or verified destination when %s fails', phase => {
+    put(settings, JSON.stringify({ provider: 'openai', providerConnections: [{ id: 'relay', provider: 'openai',
+      apiKey: 'synthetic-source-key', model: 'source-model', thinkingEffort: 'high' }] }));
+    const baseline = readRuntimeConfigEditAt(settings);
+    const write = store.writeTextFileAtomic; let authWrites = 0;
+    vi.spyOn(store, 'writeTextFileAtomic').mockImplementation((file, text, mode) => {
+      if (file === auth) authWrites++;
+      if (phase === 'stage-auth' && file === auth && authWrites === 1 || phase === 'settings' && file === settings
+        || phase === 'cleanup-auth' && file === auth && authWrites === 2) throw new Error('synthetic interruption');
+      write(file, text, mode);
+    });
+    expect(() => writeUserRuntimeConfigFile({ theme: 'dark' }, baseline)).toThrow(expect.objectContaining({ state: 'unknown' }));
+    expect(readUserRuntimeConfigFile().providerConnections?.[0]).toMatchObject({ apiKey: 'synthetic-source-key', model: 'source-model', thinkingEffort: 'high' });
+    vi.restoreAllMocks();
+    writeUserRuntimeConfigFile({ theme: 'dark' }, readRuntimeConfigEditAt(settings));
+    expect(read(auth).providerConnections).toEqual([{ id: 'relay', provider: 'openai', apiKey: 'synthetic-source-key' }]);
+    expect(readUserRuntimeConfigFile().providerConnections?.[0].model).toBe('source-model');
+  });
+
+  it('keeps an owned empty default from reviving legacy auth leaves after interrupted cleanup', () => {
+    put(auth, JSON.stringify({ provider: 'openai', providerConnections: [{ id: 'relay', provider: 'openai', model: 'old-model', thinkingEffort: 'high' }] }));
+    const baseline = readRuntimeConfigEditAt(settings); const write = store.writeTextFileAtomic;
+    vi.spyOn(store, 'writeTextFileAtomic').mockImplementation((file, text, mode) => {
+      if (file === auth) throw new Error('synthetic cleanup failure'); write(file, text, mode);
+    });
+    expect(() => writeUserRuntimeConfigFile({ providerConnections: [{ ...baseline.values.providerConnections![0], model: undefined, thinkingEffort: undefined }] }, baseline))
+      .toThrow(expect.objectContaining({ state: 'unknown' }));
+    expect(read(settings).modelPreferences).toEqual({ connections: [{ id: 'relay', provider: 'openai' }] });
+    expect(read(auth).providerConnections).toEqual([{ id: 'relay', provider: 'openai', model: 'old-model', thinkingEffort: 'high' }]);
+    expect(readUserRuntimeConfigFile().providerConnections?.[0]).not.toHaveProperty('model');
+    expect(readUserRuntimeConfigFile().providerConnections?.[0]).not.toHaveProperty('thinkingEffort');
+  });
+
+  it.each(['settings', 'auth'] as const)('refuses external %s replacement between preference publication and auth cleanup', changed => {
+    put(settings, '{"theme":"dark"}');
+    put(auth, JSON.stringify({ providerConnections: [{ id: 'relay', provider: 'openai', apiKey: 'synthetic-key', model: 'old-model' }] }));
+    const baseline = readRuntimeConfigEditAt(settings); const write = store.writeTextFileAtomic;
+    let external: Buffer | undefined; let cleanup = false;
+    vi.spyOn(store, 'writeTextFileAtomic').mockImplementation((file, text, mode) => {
+      if (file === auth) cleanup = true;
+      write(file, text, mode);
+      if (file === settings) {
+        const selected = changed === 'settings' ? settings : auth;
+        fs.appendFileSync(selected, '\n/* external revision */'); external = fs.readFileSync(selected);
+      }
+    });
+    expect(() => writeUserRuntimeConfigFile({ theme: 'light' }, baseline)).toThrow(expect.objectContaining({
+      code: changed === 'settings' ? 'verification-failed' : 'conflict', state: 'unknown',
+    }));
+    expect(cleanup).toBe(false);
+    expect(fs.readFileSync(changed === 'settings' ? settings : auth)).toEqual(external);
+    expect(read(auth).providerConnections).toEqual([{ id: 'relay', provider: 'openai', apiKey: 'synthetic-key', model: 'old-model' }]);
+  });
+
+  it('removes a connection preference with its auth record without touching independent defaults', () => {
+    put(auth, JSON.stringify({ provider: 'openai', activeProviderConnectionId: 'relay', providerConnections: [{ id: 'relay', provider: 'openai', apiKey: 'synthetic-key' }],
+      providerCredentials: { openai: { apiKey: 'synthetic-independent' } } }));
+    put(settings, JSON.stringify({ modelPreferences: { providers: { openai: { model: 'provider-model' } },
+      connections: [{ id: 'relay', provider: 'openai', model: 'named-model' }] } }));
+    writeUserRuntimeConfigFile({ providerConnections: [], activeProviderConnectionId: undefined }, readRuntimeConfigEditAt(settings));
+    expect(read(settings)).toEqual({ modelPreferences: { providers: { openai: { model: 'provider-model' } } } });
+    expect(read(auth)).toEqual({ provider: 'openai', providerConnections: [], providerCredentials: { openai: { apiKey: 'synthetic-independent' } } });
+  });
+
+  it('lets verified settings preferences supersede a legacy auth envelope when cleanup is interrupted', () => {
+    put(auth, JSON.stringify({ provider: 'openai', providerConnections: [{ id: 'relay', provider: 'openai', apiKey: 'synthetic-key' }],
+      modelPreferences: { connections: [{ id: 'relay', provider: 'openai', model: 'legacy-envelope' }] } }));
+    const baseline = readRuntimeConfigEditAt(settings); const write = store.writeTextFileAtomic;
+    vi.spyOn(store, 'writeTextFileAtomic').mockImplementation((file, text, mode) => {
+      if (file === auth) throw new Error('synthetic cleanup interruption'); write(file, text, mode);
+    });
+    expect(() => writeUserRuntimeConfigFile({ providerConnections: [{ ...baseline.values.providerConnections![0], model: 'settings-owned' }] }, baseline))
+      .toThrow(expect.objectContaining({ state: 'unknown' }));
+    expect(readUserRuntimeConfigFile().providerConnections?.[0].model).toBe('settings-owned');
+    expect(getRuntimeConfig(root).providerConnections[0].model).toBe('settings-owned');
+    vi.restoreAllMocks();
+    writeUserRuntimeConfigFile({}, readRuntimeConfigEditAt(settings));
+    expect(read(auth)).not.toHaveProperty('modelPreferences');
+    expect(readUserRuntimeConfigFile().providerConnections?.[0].model).toBe('settings-owned');
+  });
+
+  it('verifies settings before removing the sole auth-owned default', () => {
+    put(auth, JSON.stringify({ providerConnections: [{ id: 'relay', provider: 'openai', apiKey: 'synthetic-key', model: 'sole-default' }] }));
+    const before = fs.readFileSync(auth); const baseline = readRuntimeConfigEditAt(settings);
+    const write = store.writeTextFileAtomic;
+    vi.spyOn(store, 'writeTextFileAtomic').mockImplementation((file, text, mode) => {
+      if (file === settings) throw new Error('synthetic settings failure'); write(file, text, mode);
+    });
+    expect(() => writeUserRuntimeConfigFile({}, baseline)).toThrow(expect.objectContaining({ state: 'unknown' }));
+    expect(fs.readFileSync(auth)).toEqual(before);
+    expect(readUserRuntimeConfigFile().providerConnections?.[0].model).toBe('sole-default');
   });
 });

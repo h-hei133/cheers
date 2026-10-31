@@ -124,7 +124,8 @@ describe("model command runtime", () => {
     expect(saved.theme).toBe('light');
     expect(saved.providerConnections).toBeUndefined();
     const credential = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
-    expect(credential.providerConnections[0].model).toBe('new-model');
+    expect(credential.providerConnections[0].model).toBeUndefined();
+    expect(saved.modelPreferences.connections[0].model).toBe('new-model');
   });
 
   it('reports conflict when an awaited hook changes the active connection', async () => {
@@ -243,7 +244,7 @@ describe("model command runtime", () => {
     expect(result.kind).toBe("local");
     expect(result.output).toContain("Model switched to gpt-5.4");
 
-    // The selection and the connections are the credential document's.
+    // Credential identity remains in auth; defaults live in settings.
     const stored = JSON.parse(
       fs.readFileSync(getUserAuthPath(), "utf8"),
     ) as {
@@ -254,7 +255,8 @@ describe("model command runtime", () => {
     const active = stored.providerConnections?.find(
       (connection) => connection.id === stored.activeProviderConnectionId,
     );
-    expect(active?.model).toBe("gpt-5.4");
+    expect(active?.model).toBeUndefined();
+    expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerConnections?.find(connection => connection.id === active?.id)?.model).toBe('gpt-5.4');
     expect(stored.providerCredentials).toBeUndefined();
   });
 
@@ -267,7 +269,7 @@ describe("model command runtime", () => {
     writeUserRuntimeConfigFile({ ...edit.values, theme: 'dark', temperature: 0.2, topP: 0.8,
       providerCredentials: { openai: independent }, providerConnections: [selected, sibling] }, edit);
     const before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
-    const settings = fs.readFileSync(getUserRuntimeConfigPath());
+    const settings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
     const result = await runModelCommand(['use', 'gpt-5.4', '--effort', 'high', '--global'], { cwd: workspaceRoot });
     expect(result.output).toContain('Model switched to gpt-5.4');
     const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
@@ -276,7 +278,11 @@ describe("model command runtime", () => {
       .toEqual(before.providerConnections?.find(connection => connection.id === sibling.id));
     const active = stored.providerConnections?.find(connection => connection.id === selected.id);
     expect(active).toEqual({ ...before.providerConnections![0], model: 'gpt-5.4', thinkingEffort: 'high', updatedAt: expect.any(String) });
-    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(settings);
+    const savedSettings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+    expect(savedSettings).toEqual({ ...settings, modelPreferences: { ...settings.modelPreferences,
+      connections: settings.modelPreferences.connections.map((item: { id: string }) => item.id === selected.id ? { ...item, model: 'gpt-5.4', thinkingEffort: 'high' } : item),
+    } });
+    expect(JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8')).providerConnections.find((item: { id: string }) => item.id === selected.id).model).toBeUndefined();
     const resolution = resolveProviderCredential({ runtimeConfig: getRuntimeConfig(workspaceRoot), env: {} });
     expect(resolution).toMatchObject({ model: 'gpt-5.4', thinkingEffort: 'high',
       credential: { source: 'connection', connectionId: selected.id, apiKey: selected.apiKey } });
@@ -288,7 +294,7 @@ describe("model command runtime", () => {
     writeUserRuntimeConfigFile({ theme: 'dark', provider: 'openai', activeProviderConnectionId: undefined, providerConnections: [],
       providerCredentials: { openai: credential, google: { apiKey: 'SYNTHETIC_SIBLING_SLOT', model: 'sibling-model' } } }, edit);
     const before = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
-    const settings = fs.readFileSync(getUserRuntimeConfigPath());
+    const settings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
     const result = await runModelCommand(['use', 'gpt-5.4', '--effort', 'high', '--global'], { cwd: workspaceRoot });
     expect(result.output).toContain('Model switched to gpt-5.4');
     const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
@@ -296,7 +302,11 @@ describe("model command runtime", () => {
     expect(stored.activeProviderConnectionId).toBeUndefined();
     expect(stored.providerCredentials?.openai).toEqual({ ...credential, model: 'gpt-5.4', thinkingEffort: 'high' });
     expect(stored.providerCredentials?.google).toEqual(before.providerCredentials?.google);
-    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(settings);
+    expect(JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'))).toEqual({ ...settings,
+      modelPreferences: { ...settings.modelPreferences, providers: { ...settings.modelPreferences.providers,
+        openai: { model: 'gpt-5.4', thinkingEffort: 'high' },
+      } },
+    });
     expect(resolveProviderCredential({ runtimeConfig: getRuntimeConfig(workspaceRoot), env: {} }))
       .toMatchObject({ model: 'gpt-5.4', thinkingEffort: 'high', credential: { source: 'config', apiKey: credential.apiKey } });
   });

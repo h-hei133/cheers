@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../../session/SessionManager.js';
-import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../config/runtimeConfig.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../session/model/state.js';
 import { createCommandRegistry } from '../registry.js';
 import { routeSlashCommand } from '../slashRouter.js';
@@ -50,13 +50,13 @@ it('saves and applies a session preset through the command owner', async () => {
 
 it('saves, validates and applies an explicit profile role before a session model has been selected', async () => {
   const context = { cwd: home, projectRoot: home, sessionId };
-  const global = fs.readFileSync(getUserRuntimeConfigPath());
+  const global = [getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.readFileSync(file));
   expect(readSessionModel(sessionId)).toBeUndefined();
   expect((await runModelPresetCommand(['save', 'fresh', '--profile', 'default=fixture/next-model@high'], context)).output).toContain('saved');
   expect((await runModelPresetCommand(['validate', 'fresh'], context)).output).toContain('is valid');
   expect((await runModelPresetCommand(['apply', 'fresh'], context)).output).toContain('applied for this session');
   expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'fixture', model: 'next-model', thinkingEffort: 'high' });
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+  expect([getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.readFileSync(file))).toEqual(global);
 });
 
 it('binds explicit same-provider relay targets and refuses ambiguous provider-only saves without a current choice', async () => {
@@ -77,9 +77,11 @@ it('does not use a stale session connection with a changed provider to resolve a
   await routeSlashCommand('/model base-model', { ...context, interactive: true });
   writeCatalogCache([{ id: 'google', models: [{ id: 'next-model', reasoning: true }] }]);
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  // Reuse a retired ID; an existing preference owner cannot be rebound in place.
+  writeUserRuntimeConfigFile({ providerConnections: [], activeProviderConnectionId: undefined }, edit);
   writeUserRuntimeConfigFile({ ...edit.values, provider: 'google', providerConnections: ['fixture', 'second'].map(id => ({
     ...edit.values.providerConnections![0]!, id, provider: 'google' as const, model: 'next-model',
-  })) }, edit);
+  })) }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
   expect(readSessionModel(sessionId)?.provider).toBe('openai');
   expect((await runModelPresetCommand(['save', 'stale', '--profile', 'review=google/next-model'], context)).output).toContain('ambiguous');
   expect(readProfilePresets().stale).toBeUndefined();
@@ -111,7 +113,7 @@ it('reports the remaining session owner after deleting a shadowed profile preset
 });
 
 it('saves a preset for legacy connections whose optional timestamps are synthesized during reads', async () => {
-  const file = getUserRuntimeConfigPath();
+  const file = getUserAuthPath();
   const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
   delete raw.providerConnections[0].createdAt;
   delete raw.providerConnections[0].updatedAt;
@@ -160,11 +162,11 @@ it('applies a role on a different connection and rejects unavailable companion r
     connectionId: 'second', provider: 'openai', model: 'next-model',
   } } } } }, readSessionModelEdit(sessionId));
   const before = readSessionModel(sessionId);
-  const global = fs.readFileSync(getUserRuntimeConfigPath());
+  const global = [getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.readFileSync(file));
   expect((await runModelPresetCommand(['apply', 'second'], context)).output).toContain('applied for this session');
   expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'second', model: 'next-model', connectionScope: 'session' });
   expect(projectSessionModel(getRuntimeConfig(home), sessionId).activeProviderConnectionId).toBe('second');
-  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+  expect([getUserRuntimeConfigPath(), getUserAuthPath()].map(file => fs.readFileSync(file))).toEqual(global);
   writeSessionModel(sessionId, { ...before!, presets: { mixed: { roles: {
     default: { connectionId: 'fixture', provider: 'openai', model: 'next-model' },
     reviewer: { connectionId: 'fixture', provider: 'openai', model: 'unknown-model' },

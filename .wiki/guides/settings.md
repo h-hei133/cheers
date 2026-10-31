@@ -24,16 +24,18 @@ Settings shows the actual save file beside Stored and in Values and sources. The
 
 | Concern | File and scope | Writer |
 |---|---|---|
-| Runtime preferences | `config.json` in the selected user profile; project preferences use `.cheers/config.json` | Settings |
-| Provider identity, connections, credentials and their current model defaults | `auth.json` in the selected user profile, written owner-only (`0600` on POSIX) | `/connect`, account/connection commands and `/model use --global` |
+| Runtime preferences and model defaults | `config.json` in the selected user profile; project preferences use `.cheers/config.json`, while model defaults are user-only | Settings and `/model use --global` |
+| Provider identity, connections and credentials | `auth.json` in the selected user profile, written owner-only (`0600` on POSIX) | `/connect` and account/connection commands |
 | Custom providers and model metadata | `models.json` in the user profile only | `/model config` creates an example; edit entries inside its existing `providers` object |
 | Refreshed provider catalogue | `models-cache.json` in the user profile | `/model refresh`; generated cache |
 
 Model and role choices made in `/model` normally belong to the current session and are saved for resume. Changing the settings save scope does not move them or create a project model catalogue. A connection's address in `auth.json` selects where requests go; a catalogue address identifies provider/model metadata and does not create a connection.
 
-Activating a named connection stores its credentials once, on that connection. Global model and thinking changes for a named connection update that connection's defaults; provider-level choices update their own slot. Independent provider slots are preserved. An absent connection default still uses the existing provider fallback; an explicit thinking value of `null` selects automatic thinking. Model defaults remain in `auth.json` until their separate storage is implemented.
+Activating a named connection stores its credentials once, on that connection. Global model, thinking and service-tier defaults live under `modelPreferences` in user `config.json`: `providers` holds provider defaults, and `connections` holds records with an exact connection ID and provider. Named choices update their own record and preserve independent provider defaults. An absent connection default still uses the existing provider fallback; an explicit thinking value of `null` selects automatic thinking.
 
 Existing user settings files containing connections or credentials remain readable. The next user configuration save writes and verifies their `auth.json` copy before removing those fields from settings. An existing auth field takes precedence over a legacy settings copy. If a save is interrupted between the files, it reports an unverified write outcome; the files are not one atomic transaction. Project configuration and explicit input files keep their existing scope rules.
+
+Legacy model defaults nested in credential records are moved on the next save. The writer preserves them until the settings copy is verified, then removes the old leaves from auth. A present preference record owns all its model controls, including an empty record after a default is removed, so interrupted cleanup cannot restore that old value. Settings-owned preferences take precedence over a legacy auth preference envelope. If removal is interrupted, auth may still retain the old connection; reread the files and retry the intended edit before treating removal as confirmed.
 
 An unreadable or malformed model catalogue produces a notice in `/model` and `/model list`; other catalogue layers remain available. Repeated top-level `providers` keys produce a warning: JSON uses the last object, so merge the entries into one object. The application does not rewrite that file. Reopen the model panel after correcting it to refresh the catalogue and its notice together. Command output using an accepted session snapshot retains that snapshot's notice until it is refreshed.
 

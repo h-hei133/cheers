@@ -10,6 +10,11 @@ import { projectAccountAuth } from '../../core/auth/account/projection.js';
 
 function fileAfter(file: ConfigFileOrigin, rotation: AccountRotation): ConfigFileOrigin {
   const { storage } = rotation;
+  if (storage.documents) {
+    const document = storage.documents.find(item => file.source === 'user' && (file.path === item.source || file.path === item.path)
+      && file.revision === item.previousRevision);
+    return document?.revision ? { ...file, revision: document.revision } : file;
+  }
   return file.source === 'user' && (file.path === storage.source || file.path === storage.path)
     && file.revision === storage.previousRevision ? { ...file, revision: storage.revision } : file;
 }

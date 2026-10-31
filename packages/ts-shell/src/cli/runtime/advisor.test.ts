@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAdvisorHarness, cleanupAdvisorHarnesses, advisorResult } from '../../test-utils/advisor.js';
-import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
 import { ConfigState } from '../../config/state.js';
 import { configurationAdmission, configurationBinding, refreshConfiguration } from '../../core/shell/configuration.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
@@ -247,6 +247,30 @@ it.each(['main', 'main-environment', 'main-scope'] as const)('keeps the current 
   const scope = readGoalEdit(setup.manager, setup.session).goal!.id;
   expect(decodeRequestLedger(readBoundSessionState(setup.manager, setup.session).state.requestLedger)!.scopes[scope])
     .toMatchObject({ inputTokens: 8, outputTokens: 2, pending: {} });
+});
+
+it('keeps a renewed auth-only profile checkpoint eligible without creating a settings source', async () => {
+  const setup = await fixture('main');
+  const settings = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+  const auth = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
+  auth.providerConnections = auth.providerConnections.map((record: { id: string; provider: string }) => {
+    const owned = settings.modelPreferences.connections.find((item: { id: string; provider: string }) => item.id === record.id && item.provider === record.provider);
+    const { id: _id, provider: _provider, ...defaults } = owned;
+    return { ...record, ...defaults };
+  });
+  // No model defaults: a credential-only save should not add a source file.
+  for (const record of auth.providerConnections) delete record.model;
+  fs.writeFileSync(getUserAuthPath(), JSON.stringify(auth), { mode: 0o600 });
+  fs.unlinkSync(getUserRuntimeConfigPath());
+  const config = projectSessionModel(getRuntimeConfig(setup.root), setup.session.id);
+  setup.context.configuration = new ConfigState(config, configurationBinding(setup.context), loadCatalog());
+  setup.advisor = advisorFor(setup.context, setup.manager, setup.renderer);
+  setup.advisor.setEnabled(true);
+  observeOAuthRenewal(freshAccount);
+  await invoke(setup);
+  expect(setup.requests.map(row => row.model)).toEqual(['gpt-5.4', 'namespace/advisor']);
+  expect(setup.advisor.view().notes).toHaveLength(1);
+  expect(fs.existsSync(getUserRuntimeConfigPath())).toBe(false);
 });
 
 it.each(['settings', 'catalog', 'model', 'main-request'] as const)('does not accept unrelated %s changes with a main-account renewal', async kind => {

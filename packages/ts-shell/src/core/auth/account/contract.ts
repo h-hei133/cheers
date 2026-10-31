@@ -5,7 +5,8 @@ import type { ProviderCredentialResolution } from '../credential.js';
 export interface AccountRotation {
   readonly resolution: ProviderCredentialResolution;
   readonly accountAuth: AccountAuthConfig;
-  readonly storage: { readonly source: string; readonly path: string; readonly previousRevision: string; readonly revision: string };
+  readonly storage: { readonly source: string; readonly path: string; readonly previousRevision: string; readonly revision: string;
+    readonly documents?: readonly { readonly source: string; readonly path: string; readonly previousRevision: string | null; readonly revision: string | null }[] };
 }
 /** A stored credential must be published; only a verified receipt can admit captured requests. */
 export type AccountPublication = (rotation: AccountRotation | undefined, publish: () => boolean | void) => void;

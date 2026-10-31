@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节 | 部分完成 | 凭据拆分/权限、导入与新连接镜像停止已实施；模型目标物理分离、其余重复事实收敛与旧版本回退验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止及模型默认值移出 auth 已实施；其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5463,3 +5463,23 @@ API-key 登录、浏览器捕获与原生账号激活现在只在命名连接存
 五静态门、production noEmit、diff 与 TS build 通过，manifest `a7f04674abfa`；118 既有 docs-source advisory 不变。正式打包 NormProof exit0，导入解析与环 satisfied，partial 仅既有 interactiveMode 22-name advisory。只读独立复审无阻塞性生产发现，子代理未执行验证。延迟读回 `9278c344`/`e9e94d43` 的代码 CI `41186572319`/`41187075002` 仍 in_progress，两个 Watch 成功不替代代码 CI。
 
 ADD-70 仍部分完成。模型/effort/serviceTier 默认仍物理嵌在 auth 记录；缺省连接字段仍按既有 provider fallback 解析，显式 effort null 保留。未清除独立 provider slot，未完成模型目标物理分离、全部历史重复清理或旧二进制回退；没有迁移真实 HOME、真实 provider/PTY、全仓或 20k 压测。本批提交/推送及精确 SHA 的 CI 单独绑定，整体 goal active。
+
+### 24.3 模型默认值移出 auth，并修复续期的物理来源收据
+
+用户 `config.json` 新增 `modelPreferences`：`providers` 保存 provider slot 默认，`connections` 按规范化 ID 与 provider 保存命名连接默认。只移动嵌套的 `model`、`thinkingEffort`、`serviceTier`；`auth.json` 保留 provider/活动连接、连接、端点、凭据与 accountPool，继续 0600。采样和请求策略保留设置作用域，`models.json` 继续负责目录能力，不创建项目目录。此处是对第 22.2 节建议的语义收窄：目录端点描述元数据，连接端点决定真实请求；contextWindow/maxTokens 能力与用户预算上限各有职责，不能按同名字段全部合并。
+
+`config/preferences/` 负责形状、身份、拆合及来源投影；运行时与编辑仍使用既有逻辑 provider/connection 记录，不增加另一份 resolved 默认值。settings 的 envelope 优先于旧 auth envelope；先完成用户层 join，再应用后续显式输入，显式连接替换按原语义生效。每份物理文档独立校验；孤立默认、重复规范化 ID、provider 不匹配均拒绝。已有 ID 不原地换 provider，确需复用则先删除再创建。
+
+存在的默认值 owner 覆盖全部旧模型叶子，空记录也表示已清除；没有默认也没有旧 ownership 的纯凭据记录不生成空 owner。缺省连接值仍继承独立 provider slot，effort `null` 明确选择自动思考。provenance 跟随真实叶子文件，不把物理 envelope 暴露为运行时设置。导入在脱敏前 join、脱敏后 partition，同时保留同 provider 命名连接之外的独立 provider 默认，秘密和未知 auth 数据仍不导入。
+
+保存继续使用原逻辑 three-way merge 与单文件 writer，发布分三步：保留旧默认值和待删除记录的 auth stage → settings 写入并读回验证 → auth 清理。凭据向 auth 移、默认值向 settings 移，先保留再删除才能同时守住两者。各步重查两份 raw snapshot、来源选择与 canonical 目标，仅刷新本 writer 已写的 snapshot；自身 chmod 后也刷新 fingerprint。纯 auth 保存不创建无字段的 settings 文件。清理中断仍为 `unknown`，可能留有旧 auth 记录，需重新读取并重试；不声称两文件 crash atomicity 或无中间可见状态。
+
+延迟读回发现 `9278c344` 的 CI `41186572319`、`e9e94d43` 的 CI `41187075002` 均失败；后者 5 文件/11 项失败、12981 项通过。Copilot 物理读夹具已随 `e10964da` 修正；preset、connect syntax、completion 三个旧 config.json 夹具本批改读逻辑值/实际 auth，并核对两文档无变化，completion 临时目录归入 `/tmp/cheers-test`。advisor 的 7 项失败在本地复现，保留断言并修生产缺陷：逻辑 pair revision 被拿去匹配 provenance 的逐文件 SHA，续期后因此无法采用原 checkpoint。
+
+续期 storage receipt 现在携带每份文档的 source、canonical path、before/after revision；只更新精确匹配的物理来源，兼容无 documents 的旧 receipt。完整 `accountPublicationMatches` equality 保留，外部 settings/catalog/model/main-request 变化仍拒绝采用。新增 auth-only advisor 回归证明续期后 checkpoint 可采用且不新增 settings 来源；这也避免用放宽 equality 掩盖来源错误。
+
+本批主代理分组单进程串行聚焦验证，**32 文件 / 606 项**通过，重复不累加，覆盖拆合/输入/并发/来源/导入、连接与模型命令、会话选择、账号续期、picker、completion、实际运行时与 advisor。最后 persistence30/publication6、advisor38 通过；最新五门、production noEmit、diff check 与 build 通过，manifest `d7ef008e7a1f`。正式归档解包运行 NormProof exit0，导入解析与环 satisfied；partial 仅既有 interactiveMode 22-name advisory，118 条既有 docs-source advisory 保留。只读独立复审最后无阻塞性发现；子代理只阅读/分析/编辑，验证由主代理执行。
+
+三条实际反转均触发预期失败并 finally 精确恢复源码：移除空 owner 对旧叶子的覆盖 → 1 项失败；在 settings 验证前清理 auth → 1 项失败，暴露唯一默认值被删除；禁用物理 receipt 映射 → 3 项 advisor 失败。恢复后对应聚焦测试再次通过。最后 auth-only 保存改动之后重新运行 production noEmit/build；不引用旧 build 作为当前构建证据。
+
+ADD-70 仍部分完成：默认值已物理移出 auth，但其余重复事实的语义审计、真实旧版本回退和真实环境验收尚缺。未迁移操作员真实 HOME，未运行真实 provider/PTY、全仓回归或 20k 压测。`e10964da` 的代码 CI `41188245875` 最后读回仍 in_progress，Watch 成功不替代代码 CI；本批提交与 CI 另行绑定。原 Phase 20 真实验收继续延后，整体 goal active。

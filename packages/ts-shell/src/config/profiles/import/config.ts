@@ -3,6 +3,8 @@ import { CONFIG_FIELDS, type ProviderConnectionConfig, type ProviderCredentialCo
 import { parseConfigText } from '../../syntax.js';
 import { serializeConfigDocument } from '../../document.js';
 import type { PathRule } from '../../scope/contract.js';
+import { mergeConfigDocuments } from '../../documents.js';
+import { preference } from '../../preferences/identity.js';
 
 /** Reject credential-bearing URL forms without reporting the input. */
 export function nonsecretUrl(value: string): string {
@@ -26,7 +28,7 @@ export function importConfig(text: string, sourcePath: string, auth?: { readonly
       if (field?.sources.includes('user') && !field.validate(value)) throw new Error('Imported configuration contains an invalid declared field.');
     }
   }
-  const raw = { ...settings, ...credentials };
+  const raw = mergeConfigDocuments(settings, credentials);
   const result: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(raw)) {
     const field = Object.hasOwn(CONFIG_FIELDS, name) ? CONFIG_FIELDS[name as keyof typeof CONFIG_FIELDS] : undefined;
@@ -39,10 +41,16 @@ export function importConfig(text: string, sourcePath: string, auth?: { readonly
       : value;
   }
   const connections = [...(result.providerConnections as ProviderConnectionConfig[] | undefined ?? [])];
+  const defaults: Record<string, ProviderCredentialConfig> = {};
   for (const [provider, value] of Object.entries(raw.providerCredentials as Record<string, ProviderCredentialConfig> | undefined ?? {})) {
-    if (connections.some(item => item.provider === provider)) continue;
+    if (connections.some(item => item.provider === provider)) {
+      const selected = preference(value as Record<string, unknown>);
+      if (Object.keys(selected).length) defaults[provider] = selected;
+      continue;
+    }
     connections.push({ ...value, id: `import-${provider}`, provider: provider as RuntimeProvider, authType: 'api-key', createdAt: '', updatedAt: '' });
   }
+  if (Object.keys(defaults).length) result.providerCredentials = defaults;
   if (typeof result.provider === 'string' && !connections.some(item => item.provider === result.provider)) {
     connections.push({ id: `import-${result.provider}`, provider: result.provider as RuntimeProvider, authType: 'api-key', createdAt: '', updatedAt: '' });
   }

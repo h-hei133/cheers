@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../../../session/SessionManager.js';
-import { getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
+import { getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../../config/runtimeConfig.js';
 import { writeCatalogCache } from '../../../../core/models/catalogStore.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
 import { modelPicker } from '../model.js';
@@ -97,9 +97,21 @@ it.each(['deleted', 'provider-changed', 'ambiguous', 'overridden', 'pool'] as co
   if (change === 'deleted' || change === 'provider-changed') {
     writeSessionModel(sessionId, { connectionScope: 'session', connectionId: 'broken', provider: 'openai', model: 'shared' }, readSessionModelEdit(sessionId));
     const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
-    writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: undefined, providerConnections: change === 'deleted'
-      ? edit.values.providerConnections!.filter(row => row.id !== 'broken')
-      : edit.values.providerConnections!.map(row => row.id === 'broken' ? { ...row, provider: 'anthropic' } : row) }, edit);
+    if (change === 'deleted') writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: undefined,
+      providerConnections: edit.values.providerConnections!.filter(row => row.id !== 'broken') }, edit);
+    else {
+      // Simulate an external identity replacement. A guarded save refuses to
+      // rebind an acquired ID to another provider during preference migration.
+      const authPath = getUserAuthPath();
+      const auth = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+      delete auth.activeProviderConnectionId;
+      auth.providerConnections = auth.providerConnections.map((row: { id: string }) => row.id === 'broken' ? { ...row, provider: 'anthropic' } : row);
+      fs.writeFileSync(authPath, JSON.stringify(auth), { mode: 0o600 });
+      const settingsPath = getUserRuntimeConfigPath();
+      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      settings.modelPreferences.connections = settings.modelPreferences.connections.map((row: { id: string }) => row.id === 'broken' ? { ...row, provider: 'anthropic' } : row);
+      fs.writeFileSync(settingsPath, JSON.stringify(settings));
+    }
   }
   await picker.load(); const report = (await picker.inspect!('model:current'))!.next!;
   expect((await report.load()).map(row => row.id)).toEqual(['back']);

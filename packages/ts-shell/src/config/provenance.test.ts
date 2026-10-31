@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { CONFIG_FIELDS, getRuntimeConfig, getUserRuntimeConfigPath } from './runtimeConfig.js';
+import { CONFIG_FIELDS, getRuntimeConfig, getUserRuntimeConfigPath, getUserAuthPath } from './runtimeConfig.js';
 import { ConfigState, type ConfigBinding } from './state.js';
 import { projectSessionModel } from '../session/model/projection.js';
 import * as selection from '../session/model/state.js';
@@ -20,6 +20,26 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 function user(value: unknown) { fs.writeFileSync(file, JSON.stringify(value)); }
 function project(value: unknown) { fs.writeFileSync(path.join(root, '.cheers.json'), JSON.stringify(value)); }
+
+it('attributes joined model controls to settings while credential and endpoint origins stay in auth', () => {
+  user({ modelPreferences: { providers: { openai: { model: 'private-provider-model' } },
+    connections: [{ id: 'private-relay', provider: 'openai', model: 'private-model', thinkingEffort: null }] } });
+  const auth = getUserAuthPath();
+  fs.writeFileSync(auth, JSON.stringify({ provider: 'openai', activeProviderConnectionId: 'private-relay',
+    providerConnections: [{ id: 'private-relay', provider: 'openai', apiKey: 'private-key', baseUrl: 'https://relay.invalid/v1' }],
+    providerCredentials: { openai: { apiKey: 'private-independent-key' } } }), { mode: 0o600 });
+  const config = getRuntimeConfig(root); const trace = config.configProvenance;
+  const connection = trace.providerConnections.children?.['0'].children;
+  expect(connection?.model.files?.[0].path).toBe(file);
+  expect(connection?.thinkingEffort.files?.[0].path).toBe(file);
+  expect(connection?.apiKey.files?.[0].path).toBe(auth);
+  expect(connection?.baseUrl.files?.[0].path).toBe(auth);
+  expect(trace.providerCredentials.children?.openai.children?.model.files?.[0].path).toBe(file);
+  expect(trace.providerCredentials.children?.openai.children?.apiKey.files?.[0].path).toBe(auth);
+  expect(trace.providerConnections.files?.map(item => item.path).sort()).toEqual([auth, file].sort());
+  expect(trace).not.toHaveProperty('modelPreferences');
+  expect(JSON.stringify(trace)).not.toMatch(/private-relay|private-model|private-key|private-independent-key/);
+});
 
 it('explains defaults, ordinary precedence, environment and frozen launch overrides', () => {
     projectTrust.setProjectTrust(root, 'session-only');
