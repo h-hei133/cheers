@@ -5739,3 +5739,15 @@ role owner使用现有 `providerCredentialBaseUrl` 读取model/levels；advisor 
 延迟CI复查：`6409450b`/`41205782214` 已 failure，唯一失败在既有 browser cache multiprocess concurrent execute 场景，3个子进程中2个exit0、1个exit1，未超时，cache integrity healthy。日志未给出该子进程根因，暂记未分类原因，不以本批聚焦绿色推断已修复或 flaky；本批未修改该路径。`abe32561`/`41207683568` 与 `b0a144de`/`41204101311` 最后仍 in_progress，前者 Watch success。本批提交/推送/自身CI另绑定；未真实provider、旧发布二进制、Windows/macOS/PTY、全仓或20k。ADD-70仍partial，原真实条件延后、goal active。
 
 本批代码已提交/推送 `3e0a148ac08d3dac60c64ce29665ac19c628e68a`，远端 main 精确读回相同，代码交付后工作区 clean。自身CI `41209134634` 与 Watch `41209134592` 最后读回均 in_progress；未等待或称通过。后续交付记录为文档变更，须与此代码SHA区分。
+
+### 24.24 缓存多进程夹具隔离会话状态
+
+追查 `6409450b` CI 的 browser cache 单个 child exit1：主代理 Node20.3、每进程heap384MiB，原三writer共享HOME场景7轮均exit0；预seed current的2轮也通过。普通current持有真实live session lock时，后CLI仍exit0且保留锁，不能据此证明CI根因；缺legacy gitRoot的补充探针同样未复现。首个探针错误把返回string的redactReportText取`.text`，输出摘要未写入，三轮退出统计仍有效；改正后四轮记录完整脱敏输出。未观察到OOM、超时、provider调用或cache损坏，不将未复现写成修复了原CI。
+
+静态确认夹具存在另一条实际耦合：所有CLI共享同HOME，既有--print按current pointer续接，会采用同一个session。撤销隔离后实际执行3个CLI只产生同一个session ID，新增断言实际 `expected 1 to be 3`，这不是设想的竞争。沿test-utils/browser/cache现有fixture，仅每个cliStep创建随机独立HOME；project/cacheRoot/runner/manifest/groupId均不变，仍由原runner并发真实CLI，同cache读回、replay receipt ID、busy/stale锁与raw内容断言全部保留。定向只读参考 `main.ts:439-451` 显式continueRecent与默认SessionManager.create分开；同意测试显式固定运行状态归属，本项目保留原产品--print续接语义，不修改session/bootstrap或缓存生产路径。
+
+主代理 Linux Node20.3、单worker、heap512MiB，单个scenario文件 **6项**exit0；反转cliStep退回共享HOME实际1失败/5未选/exit1，fixture源码逐字节恢复 `c156beed311c`，恢复后同6项再次exit0。新增检查实际每HOME恰一个session、3个不同session ID、旧共享HOME未创建状态。两个验证均保留所有原缓存断言；既有500ms read lock场景未同步到CLI读阶段，不能证明操作与持锁重叠，此覆盖局限保持记录。静态复审APPROVE，子代理只读未验证；本批只修复夹具会话隔离，CI原失败根因仍未确定。
+
+延迟CI：`abe32561`/`41207683568`已success；`3e0a148a`/`41209134634`、`972ed1f6`/`41209268816`、`b0a144de`/`41204101311`最后仍in_progress。本批静态门/build/交付证据另读回；未全仓测试、真实provider、PTY、旧发布二进制或非Linux平台。ADD-70及整体保持partial，goal active。
+
+五静态门/diff和build实际通过，manifest `300d414e1582`、inputsDigest `b29ef04176f4e05206817a588f570921649157098dc92a42ac69f00adda3ae19` 与当前输入精确读回相同。证据在 `.omx/artifacts/phase20-addition-cache-failure/`；本批无生产导入/边界变化，未重跑NormProof或全仓。scratch已清理；提交/推送/新CI须独立读取。

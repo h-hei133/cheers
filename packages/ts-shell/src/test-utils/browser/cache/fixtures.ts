@@ -90,6 +90,9 @@ export function createBrowserCacheMultiprocessFixture(input: {
     manifestPath,
     env,
     cliStep(step) {
+      // --print adopts the home's current session. Share only the cache under
+      // test; each process needs its own session and configuration state.
+      const processHome = fs.mkdtempSync(path.join(root, "cli-home-"));
       return {
         id: step.id,
         role: step.role,
@@ -98,7 +101,7 @@ export function createBrowserCacheMultiprocessFixture(input: {
         spec: cliSpec({
           prompt: step.prompt,
           projectPath,
-          homeDir,
+          homeDir: processHome,
           env,
           // Cold source CLI startup includes transpilation; three concurrent writers
           // take about 13s on one CPU before completing the cache operation.

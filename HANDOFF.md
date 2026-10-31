@@ -1571,3 +1571,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Director accepts an account model that rejects tools, or handoff compaction reads a compatible catalogue's 32,000-token window instead of its native target's 8,000.
 - **Root Cause**: sourceChoice retains model preferences and connection ID but drops credential/address; raw resolution.baseUrl can also be absent for a fixed native issuer. Metadata consumers then disagree with dispatch.
 - **Rule**: Resolve capability addresses from the full captured credential through the existing issuer target owner before reducing it to a model choice. For handoff, use the target model with the actual connection; retain ordinary budgets, exact session preference matching and the upstream smaller-window bound. Reverse account and API-key cases with conflicting catalogues.
+
+### Shared Cache Fixtures Need Independent CLI Sessions
+- **Symptom**: Three cache writer processes can all adopt one current session, so a cache concurrency test also exercises unrelated session state and locks.
+- **Root Cause**: The fixture passes one HOME to every source CLI; --print intentionally adopts that home's current-session pointer.
+- **Rule**: Give each cache-test CLI a random HOME inside the owning fixture while keeping the explicit project, cache root, runner and manifest shared. Assert actual distinct session IDs after concurrent execution; reverse the HOME change to prove the assertion catches coupling. An unexplained CI child exit remains unexplained when repeated local runs pass.

@@ -11036,3 +11036,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 [addition24.23](features/phase-20-addition.md#2423-director-与-handoff-使用实际账号目录)原生账号director工具能力正反及handoff8000误读32000实际失败，API-key对照保持通过；改为完整凭据的既有issuer地址owner，普通预算/精确会话偏好/上游窗口合同保留。Node20.3串行3文件46项、两反转实际2/1失败并精确恢复重验通过；五门/build摘要读回通过，manifest56097fecb184，judge既有advisory、静态复审APPROVE。6409450b代码CI已failure于browser cache多进程单子进程exit1，根因未定；abe32561/b0a144de最后in_progress。本批提交/推送/自身CI另绑，未真实provider/旧binary/平台/PTY/全仓/20k，ADD-70 partial、goal active。
 
 代码 `3e0a148ac08d3dac60c64ce29665ac19c628e68a` 已提交/推送并读回远端main一致，工作区clean；精确CI `41209134634` / Watch `41209134592` 最后均in_progress，本段文档提交不替代代码CI证据。
+
+### 2026-10-31：缓存并发夹具隔离会话
+
+[addition24.24](features/phase-20-addition.md#2424-缓存多进程夹具隔离会话状态)原CI单child退出根因未复现；7轮原共享HOME和2轮seed均通过，真实live session lock也未复现。确认--print夹具共用current session，改cliStep独立随机HOME而缓存/project/manifest/group仍共享；实际session ID回归反转1失败/5未选、精确恢复，Node20.3单文件6项再次通过、只读复审APPROVE。不修改产品会话或cache路径；abe32561代码CI已success，3e0a148a/972ed1f6/b0a144de最后in_progress，本批门/build/交付另绑，整体partial、goal active。

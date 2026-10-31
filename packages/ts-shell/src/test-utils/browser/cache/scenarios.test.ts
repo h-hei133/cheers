@@ -23,19 +23,18 @@ describe("browser cache multiprocess scenario examples", () => {
 
   it("runs concurrent real CLI execute writes against one explicit cache root", async () => {
     const fixture = track(createBrowserCacheMultiprocessFixture());
+    const steps = [0, 1, 2].map((index) => fixture.cliStep({
+      id: `writer-${index}`,
+      role: "writer",
+      groupId: "writers",
+      prompt: "/browser execute observe local-fixture://route110-demo",
+    }));
     const result = await runBrowserCacheMultiprocessScenario({
       scenario: {
         id: "route110-concurrent-execute-writes",
         name: "concurrent execute writes",
         cacheRoot: fixture.cacheRoot,
-        steps: [0, 1, 2].map((index) =>
-          fixture.cliStep({
-            id: `writer-${index}`,
-            role: "writer",
-            groupId: "writers",
-            prompt: "/browser execute observe local-fixture://route110-demo",
-          }),
-        ),
+        steps,
       },
       now: () => "2026-05-17T02:00:00.000Z",
     });
@@ -48,6 +47,15 @@ describe("browser cache multiprocess scenario examples", () => {
     expect(assertBrowserCacheStressSafe(result)).toEqual([]);
     expect(renderBrowserCacheMultiprocessReport(result)).toContain("Persistence: explicit only");
     expect(cacheText(fixture)).not.toContain("RAW_");
+    const sessions = steps.map(step => {
+      const home = step.spec.env!.HOME!;
+      const directory = path.join(home, ".cheers", "sessions");
+      const ids = fs.readdirSync(directory).filter(id => fs.statSync(path.join(directory, id)).isDirectory());
+      expect(ids).toHaveLength(1);
+      return ids[0]!;
+    });
+    expect(new Set(sessions).size).toBe(3);
+    expect(fs.existsSync(path.join(fixture.homeDir, ".cheers"))).toBe(false);
   }, 45000);
 
   it("runs status and replay while a real lock-holder process simulates an in-flight write", async () => {
