@@ -35,7 +35,7 @@ import { modelKeyPicker } from './model/key.js';
 import { listedModelMetadata, modelMetadataDetails } from './model/metadata.js';
 import { ModelFocus } from './model/focus.js';
 import { ModelActionOwner, modelActionAdmission, modelBrowserOwned } from './model/owner.js';
-import { providerBindingAvailable } from '../../../core/auth/binding.js';
+import { providerBindingAvailable, providerScopeSelected } from '../../../core/auth/binding.js';
 
 interface RoleSelection {
   readonly role: AutomaticModelRole;
@@ -113,8 +113,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       // Keep the host's request overrides, while actual activation retains the original context.
       const inspectionContext = { ...context, sessionId: undefined };
       const activeAddress = providerCredentialBaseUrl(catalog, active);
-      const currentProviderSlot = active.selection?.connectionId === undefined
-        && (active.selection?.credentialScope === 'provider' || !config.activeProviderConnectionId);
+      const currentProviderSlot = providerScopeSelected(config, active);
       const activeReady = Boolean(!active.blocked && (active.credential
         || (currentProviderSlot && providerBindingAvailable(catalog, active))));
       const availability = availabilitySnapshot({ config, catalog });

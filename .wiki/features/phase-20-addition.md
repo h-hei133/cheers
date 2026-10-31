@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.33 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影及交互目录显式 provider 范围收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.34 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影、交互目录和首次角色保存的显式 provider 范围收敛已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5909,3 +5909,20 @@ build exit0，manifest `ef982b674f90`、inputsDigest `82d6aba4bec6af4140fe8ea483
 主代理Node20.3.0、heap768MiB、单worker串行最终 **1文件/62项** exit0；新增断言同时检查当前报告的provider/issuer、detail及row中无旧ID、原session偏好与settings/auth逐字节不变、零fetch。精确反转到 `60b88933` 生产owner，实际 **2失败/2控制通过/58未选/exit1**；finally按字节恢复后再跑62项exit0。五静态门/build通过（118既有docs-source advisory），build `f1e3937af13fd9af0c8ccf870452e62ff71a558dc81432d98966b79bc51123ff`，含manifest.compilerInputs的当前摘要 `7d7e3f5beb29a8b1495bfdf68548ccad5e56a142ecc52bf2f0c48c36f4f1809f` 一致。无独立委派复审、无新judge；证据 `.omx/artifacts/phase20-addition-picker-report/`，提交/推送/自身CI另读回。
 
 延迟读回 `f4710568`/`41219116283` 与 `20db8867`/`41220682282` 已completed/success；`638d023e`/`41220480426` 与 `60b88933`/`41222162228` 最后in_progress，Watch成功不替代代码CI。真实provider/AWS/ADC、PTY、非Linux、旧发布binary、全仓/20k未验；原Phase20真实条件延后，ADD-70 partial、goal active。
+
+
+第24.33节已提交推送 `0cbbbb3260d600428ceab7e068e64bbde8ac8828`，远端main精确一致、交付时clean，scratch清理；自身代码CI `41222600938`最后in_progress，Watch `41222601018`success。
+
+### 24.34 首次角色保存与目录共用实际凭据范围
+
+继续ADD-70语义审计：[role owner](../../packages/ts-shell/src/core/commands/model/role.ts) 首次保存自动角色时，使用raw active connection ID判断主请求是否可通过signer准入，忽略实际resolver明确返回的provider范围。两个provider × 三个角色六个有效保存场景在原owner实际被拒绝；这不等于普通CLI `--provider`参数自动覆盖命名范围，后者仍沿既有拒绝合同。
+
+[既有binding owner](../../packages/ts-shell/src/core/auth/binding.ts) 新增纯范围判断，供角色初始准入/保存前/锁内复验、[目录](../../packages/ts-shell/src/core/models/availability.ts)和[模型面板](../../packages/ts-shell/src/cli/interactive/picker/model.ts)共用。范围与可用认证分开，signer/address/blocked及完整request identity检查保留；角色目标仍须自己的命名凭据，普通context/tier默认不写入会话偏好。只读参考model-runtime:335–375的available/configured/stored分离与model-selector:170–185的实际current model决定继续适用；沿目标原有session writer/CAS，未复制认证解析。
+
+两路独立source-only复审发现提取的范围predicate会把没有显式selection ID的fallback命名凭据称作provider范围。原调用方额外围栏仍安全，但新共享API应准确：补检查实际credential.connectionId，并用两个真实resolver fallback夹具验证named范围与正常角色保存读回。最终code/spec/security **APPROVE**，architecture **CLEAR**；terra未列入可用模型目录，两路均按用户约束使用gpt-6.1-sol，未运行任何验证。
+
+主代理Linux实际Node20.3.0、heap768MiB、单worker串行最终 **3文件/236项**（provider134、category62、catalog40）exit0。新增14项覆盖三个角色×两个provider、显式范围被撤回/地址替换/blocked在保存前和锁内发生、fallback named范围、精确主模型与角色读回、普通默认不被固化；六个成功保存场景断言零fetch，全部新增场景检查settings/auth bytes不变。初次12-case探针中六项有效保存被拒绝，另三项锁内场景因旧代码提前拒绝而未进入锁；这些是到达检查失败，不能称旧代码发生了错误写入。
+
+三次有效反转串行执行：旧role owner **6失败/10控制通过/118未选**；跳过fresh signer重查 **12失败/6控制通过/116未选**；移除实际命名凭据围栏 **2失败/2控制通过/130未选**，均exit1且失败为行为断言。每次finally逐字节恢复，最终五份受审源文件SHA256精确匹配，再跑同236项exit0。五静态门/最终build通过，118既有docs-source advisory保留；build `8644837fd48189189443615810933c41b0e91e3a2837404f99d99c7c0a87b822`，含manifest.compilerInputs的当前摘要 `41cd73dd869fbc45ac51fbd09ccbdbacc9090a4db4d33ab22acb10e496eea436` 一致。本批未另跑judge；生产import路径边未变。证据 `.omx/artifacts/phase20-addition-role-scope/`，清理/提交/推送/自身CI另绑定。
+
+延迟代码CI `60b88933`/`41222162228`已completed/success，`0cbbbb32`/`41222600938`最后仍in_progress，Watch成功不替代代码CI。当前GitHub release列表读回为空，未取得旧发布二进制，不以旧源码往返代替其验收。未真实AWS/ADC/provider、PTY、非Linux、旧binary、全仓或20k；原Phase20真实条件继续延后，ADD-70 partial、goal active。

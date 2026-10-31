@@ -5,7 +5,7 @@ import { availablePoolConnections } from '../auth/account/pool.js';
 import type { ProviderCredentialResolution } from '../auth/credential.js';
 import { providerCredentialBaseUrl } from '../auth/account/target.js';
 import { accountProtocol } from '../auth/account/policy.js';
-import { providerBindingAvailable } from '../auth/binding.js';
+import { providerBindingAvailable, providerScopeSelected } from '../auth/binding.js';
 
 /**
  * What the configuration says about a provider, without asking the provider.
@@ -131,8 +131,7 @@ export function catalogAvailabilitySnapshot(input: {
   const active = input.active;
   let owner: ReturnType<typeof resolvedCatalog>;
   try {
-    const ambient = active.selection?.connectionId === undefined
-      && (active.selection?.credentialScope === 'provider' || !input.config.activeProviderConnectionId);
+    const ambient = providerScopeSelected(input.config, active);
     owner = !active.blocked && (active.credential || (ambient && providerBindingAvailable(input.catalog, active)))
       ? resolvedCatalog(input.catalog, active) : undefined;
   } catch { /* Unknown request protocols remain unverified without probing them. */ }

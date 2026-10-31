@@ -14,7 +14,7 @@ import { catalogModel } from '../../models/catalog.js';
 import { effortCapability } from '../../models/capability.js';
 import { isThinkingPreference, THINKING_LEVELS, type ThinkingPreference } from '../../models/effort.js';
 import { providerCredentialBaseUrl } from '../../auth/account/target.js';
-import { providerBindingAvailable } from '../../auth/binding.js';
+import { providerBindingAvailable, providerScopeSelected } from '../../auth/binding.js';
 import { loadCatalog } from '../../models/catalogStore.js';
 
 export type AutomaticModelRole = keyof SessionModelPolicy;
@@ -32,7 +32,7 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
   const active = context.resolveConfigTarget?.(choice.config, context.sessionId)
     ?? resolveProviderCredential({ runtimeConfig: choice.config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
   const ready = !baseline?.selection && !active.blocked && (active.credential
-    || (!choice.config.activeProviderConnectionId && providerBindingAvailable(choice.catalog, active)));
+    || (providerScopeSelected(choice.config, active) && providerBindingAvailable(choice.catalog, active)));
   const selection: SessionModelSelection | undefined = baseline?.selection ?? (active.model && ready
     ? { ...(active.credential?.connectionId ? { connectionScope: 'session' as const, connectionId: active.credential.connectionId }
       : { connectionScope: 'provider' as const }), provider: active.provider, model: active.model,
@@ -45,7 +45,7 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
       const current = context.readConfiguration?.().config ?? context.runtimeConfig
         ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
       const request = modelRequest(context, current);
-      return !current.activeProviderConnectionId && sameValue(request, active)
+      return providerScopeSelected(current, request) && sameValue(request, active)
         && providerBindingAvailable(loadCatalog(), request);
     } catch { return false; }
   };

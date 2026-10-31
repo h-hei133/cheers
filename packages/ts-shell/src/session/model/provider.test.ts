@@ -11,6 +11,7 @@ import { runThinkingCommand } from '../../core/commands/thinkingCommandRuntime.j
 import { runExtendedContextCommand } from '../../core/commands/model/context.js';
 import { runSlowCommand, setSessionServiceTier } from '../../core/commands/model/serviceTier.js';
 import { credentialIdentityFor } from '../../core/auth/account/pool.js';
+import { providerScopeSelected } from '../../core/auth/binding.js';
 import { ownedConnectionCredential } from '../../core/auth/account/presence.js';
 import { noteCredentialRateLimit, resetCredentialBackoffForTests } from '../../core/auth/account/backoff.js';
 import { runFastCommand } from '../../core/commands/fastCommandRuntime.js';
@@ -179,6 +180,72 @@ it.each(['bedrock', 'vertex'] as const)('does not seed a %s signer main role pre
   expect(readSessionModel(sessionId)).not.toHaveProperty('serviceTier');
   expect(profileBytes()).toEqual(bytes);
 });
+
+it.each((['bedrock', 'vertex'] as const).flatMap(provider => (['subagent', 'summary', 'advisor'] as const).map(role => ({ provider, role }))))(
+  'seeds the $role role from an explicit $provider request over unrelated saved named state', async ({ provider, role }) => {
+    const fixture = signedProvider(provider); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, provider: 'openai', activeProviderConnectionId: 'named',
+      providerConnections: [connection()] }, edit);
+    writeCatalogCache([...fixture.catalog, { id: 'openai', models: [{ id: 'base' }] }]);
+    const resolveConfigTarget = (config: RuntimeConfig, id?: string) => fixture.resolve({ ...config, provider,
+      activeProviderConnectionId: undefined, sessionConnection: { scope: 'provider', provider } }, id);
+    const bytes = profileBytes(); const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Role assignment must not dispatch a provider request.'));
+    expect(readSessionModel(sessionId)).toBeUndefined();
+    expect(resolveConfigTarget(getRuntimeConfig(home), sessionId)).toMatchObject({ provider, selection: { credentialScope: 'provider' } });
+    const assigned = prepareModelRole({ ...context(), resolveConfigTarget }, role)
+      .assign({ connectionId: 'named', provider: 'openai', model: 'base', thinkingEffort: null });
+    expect(assigned.saved).toBe(true);
+    expect(readSessionModel(sessionId)).toMatchObject({ connectionScope: 'provider', provider, model: 'base',
+      roles: { [role]: { connectionId: 'named', provider: 'openai', model: 'base', thinkingEffort: null } } });
+    expect(readSessionModel(sessionId)).not.toHaveProperty('connectionId');
+    expect(readSessionModel(sessionId)).not.toHaveProperty('contextWindow');
+    expect(readSessionModel(sessionId)).not.toHaveProperty('serviceTier');
+    expect(resolveConfigTarget(projectSessionModel(getRuntimeConfig(home), sessionId), sessionId))
+      .toMatchObject({ provider, model: 'base', baseUrl: fixture.baseUrl, selection: { credentialScope: 'provider' } });
+    expect(profileBytes()).toEqual(bytes); expect(fetch).not.toHaveBeenCalled();
+  });
+
+it.each(['bedrock', 'vertex'] as const)('keeps an inferred %s named credential outside the provider namespace when seeding roles', provider => {
+  const fixture = signedProvider(provider); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [{ ...connection(), provider,
+    baseUrl: fixture.baseUrl, model: 'base' }] }, edit);
+  const config = getRuntimeConfig(home); const actual = fixture.resolve(config, sessionId);
+  const bytes = profileBytes();
+  expect(config.activeProviderConnectionId).toBeUndefined();
+  expect(actual.selection?.connectionId).toBeUndefined();
+  expect(actual.credential?.connectionId).toBe('named');
+  expect(providerScopeSelected(config, actual)).toBe(false);
+  expect(prepareModelRole(fixture.command, 'summary').assign({ connectionId: 'named', provider, model: 'base' }).saved).toBe(true);
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionScope: 'session', connectionId: 'named', provider, model: 'base',
+    roles: { summary: { connectionId: 'named', provider, model: 'base' } } });
+  expect(profileBytes()).toEqual(bytes);
+});
+
+it.each((['before commit', 'inside lock'] as const).flatMap(timing => (['address', 'scope', 'blocked'] as const).map(change => ({ timing, change }))))(
+  'refuses an explicit provider role seed over saved named state after its $change changes $timing', async ({ timing, change }) => {
+    const fixture = signedProvider('bedrock'); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, provider: 'openai', activeProviderConnectionId: 'named', providerConnections: [connection()] }, edit);
+    writeCatalogCache([...fixture.catalog, { id: 'openai', models: [{ id: 'base' }] }]);
+    let changed = false;
+    const resolveConfigTarget = (config: RuntimeConfig, id?: string) => {
+      const actual = fixture.resolve({ ...config, provider: 'bedrock', activeProviderConnectionId: undefined,
+        sessionConnection: { scope: 'provider', provider: 'bedrock' } }, id);
+      return !changed ? actual : { ...actual, ...(change === 'address' ? { baseUrl: fixture.baseUrl + '/changed' }
+        : change === 'scope' ? { selection: { ...actual.selection, credentialScope: undefined } }
+          : { blocked: 'connection-unavailable' as const }) };
+    };
+    const prepared = prepareModelRole({ ...context(), resolveConfigTarget }, 'summary');
+    const before = readSessionModelEdit(sessionId); const bytes = profileBytes();
+    if (timing === 'before commit') changed = true;
+    else {
+      const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId); const lock = files.withFileLock;
+      vi.spyOn(files, 'withFileLock').mockImplementation((file, action, options) => lock(file, () => {
+        if (file === layout.stateLockPath) changed = true; return action();
+      }, options));
+    }
+    expect(prepared.assign({ connectionId: 'named', provider: 'openai', model: 'base' }).saved).toBe(false);
+    expect(changed).toBe(true); expect(readSessionModelEdit(sessionId)).toEqual(before); expect(profileBytes()).toEqual(bytes);
+  });
 
 it.each((['before commit', 'inside lock'] as const).flatMap(timing => (['address', 'provider', 'blocked'] as const).map(change => ({ timing, change }))))(
   'refuses a fresh signer role seed after its $change changes $timing', async ({ timing, change }) => {

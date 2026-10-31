@@ -1623,3 +1623,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Text status accepts a current signer, but the model picker calls it credential missing and disables switching while an unrelated saved named connection exists.
 - **Root Cause**: The interactive projection infers the current namespace only from saved activeProviderConnectionId and overlooks the actual resolution's explicit credentialScope.
 - **Rule**: Check the actual selection connection ID and explicit provider scope when projecting current provider rows. Keep both session and profile connection-ID fallbacks inside that scope fence, including unlisted current-model reports. Preserve the named boundary when scope is absent; verify real host navigation, accepted write/readback, stale hook refusal and unchanged shared configuration.
+
+
+### Fallback Credentials Carry Namespace Without Selection IDs
+- **Symptom**: A shared namespace predicate treats an inferred named credential as a provider slot, or fresh role seeding refuses an explicitly scoped signer because a saved named default exists.
+- **Root Cause**: Saved active IDs, explicit selection IDs and the actually resolved credential ID describe different facts; a fallback credential can carry the only named ID.
+- **Rule**: Derive provider scope from the actual credential and selection before consulting saved defaults. Keep scope separate from readiness and revalidate fresh signer identity both before saving and under the session lock. Test actual resolver fallback, explicit provider scope and unchanged ordinary preference inheritance.

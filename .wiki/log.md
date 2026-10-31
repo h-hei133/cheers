@@ -11106,3 +11106,10 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：当前模型报告隔离旧会话连接身份
 
 [addition24.33](features/phase-20-addition.md#2433-当前模型报告不继承其他范围的会话连接)复现explicit provider signer的未列出模型报告带出旧sessionConnection.id，两provider会话场景实际失败、配置场景控制通过。既有投影把session/profile回退一起放入scope围栏，保留实际resolution优先及named边界；报告provider/issuer正确，shared bytes与session偏好不变、零fetch。Node20.3单worker串行1文件62项、反转2失败/2控制/58未选及精确恢复后62通过；五门/build当前compilerInputs摘要通过，manifest f1e3937af13f，无独立复审/新judge/真实provider/PTY/平台/旧binary/全仓/20k。f4710568、20db8867精确代码CI已success，638d023e、60b88933仍in_progress；本批交付另绑，ADD-70 partial、goal active。
+
+
+第24.33节代码 `0cbbbb3260d600428ceab7e068e64bbde8ac8828` 已提交推送、远端main一致、交付时clean且scratch清理；自身代码CI `41222600938`最后in_progress，Watch `41222601018`success。
+
+### 2026-11-01：首次角色保存尊重实际 provider 范围
+
+[addition24.34](features/phase-20-addition.md#2434-首次角色保存与目录共用实际凭据范围)两个signer × 三角色的首次保存实际被旧active ID门拒绝。既有binding owner统一范围判断，角色初始/保存前/锁内及目录/面板共用；仍单独检查认证与完整request identity，plain CLI --provider、named/pool与普通tier/context边界保持。独立复审补实际credential ID围栏，真实fallback named保存读回通过；两路sol source-only最终APPROVE/CLEAR，无子代理验证。主代理Node20.3单worker串行3文件236项，三反转分别6/12/2失败且精确恢复后236通过；五门/build当前compilerInputs摘要通过，manifest8644837fd481。初次锁内探针未到锁的三失败已分类，不称错误写入。60b88933精确代码CI已success，0cbbbb32仍in_progress；GitHub releases空、未取得旧binary，真实provider/PTY/平台/全仓/20k未验，ADD-70 partial、goal active，本批交付另绑。
