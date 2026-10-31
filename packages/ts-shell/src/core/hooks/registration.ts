@@ -13,16 +13,24 @@
  *
  * Two properties make the gate meaningful:
  *
- *   1. The fingerprint covers the event, the matcher and the command, so editing
- *      what will run invalidates any earlier approval and asks again. Approving a
- *      name must not approve a different program.
+ *   1. The fingerprint covers the event, the matcher, the command and the file
+ *      that declared it, so editing what will run — or shipping the same command
+ *      from a different repository — invalidates any earlier approval and asks
+ *      again. Approving a name must not approve a different program.
  *   2. The record of approvals lives in the user's own directory. If it lived in
  *      the workspace, a repository could ship a hook together with its own
  *      approval and the gate would never ask anyone anything.
+ *
+ * The project's own trust decision is a second, independent gate: a project the
+ * user has marked untrusted contributes no hooks at all, whatever any individual
+ * approval says. The same refusal already applies to its MCP servers and
+ * workflows, and a repository that cannot start a server should not be able to
+ * run a command instead.
  */
 
 import path from "node:path";
 import { createComponentLogger } from "../../observability/structuredLogger.js";
+import { projectTrust } from "../security/projectTrust.js";
 import { loadHookDeclarations } from "./config.js";
 import { hookFingerprint, HookTrustStore } from "./trust.js";
 import type { HookDispatcher } from "./hookDispatcher.js";
@@ -30,6 +38,12 @@ import type { CommandHookConfig, HookApprovalRequest } from "./types.js";
 export type { HookApprovalRequest } from "./types.js";
 
 const logger = createComponentLogger("hook-trust");
+
+/** Whether `file` was supplied by `workspaceRoot` rather than by the user. */
+function isWithin(workspaceRoot: string, file: string): boolean {
+  const relative = path.relative(path.resolve(workspaceRoot), path.resolve(file));
+  return relative !== "" && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative);
+}
 
 export interface HookRegistrationOptions {
   readonly admission?: () => string | undefined;
@@ -59,9 +73,16 @@ export function registerDeclaredHooks(
   workspaceRoot: string,
   options?: HookRegistrationOptions,
 ): { readonly registered: number; readonly problems: readonly string[] } {
+  // The project's own decision, read once: a repository the user refused
+  // contributes nothing, even if a command it ships was approved earlier under
+  // a different decision. User-scope hooks are unaffected — they are the user's
+  // own file, not something this workspace supplied.
+  const projectRefused = projectTrust.isProjectUntrusted(workspaceRoot);
   const { hooks, problems } = loadHookDeclarations(workspaceRoot, {
     homeDir: options?.homeDir,
   });
+  const admitted = hooks.filter((hook) =>
+    !projectRefused || !isWithin(workspaceRoot, hook.sourcePath));
 
   for (const problem of problems) {
     logger.warn(problem);
@@ -75,14 +96,14 @@ export function registerDeclaredHooks(
     bypassed: options?.bypassed === true,
   });
 
-  for (const hook of hooks) {
+  for (const hook of admitted) {
     dispatcher.registerCommandHook({
       name: `${path.basename(hook.sourcePath)}:${hook.event}`,
       event: hook.event,
       matcher: hook.matcher,
       command: hook.command,
       // Carried so the dispatcher can name what it is asking about, and so an
-      // approval attaches to this command rather than to the file that held it.
+      // approval attaches to this command in this file rather than to a name.
       fingerprint: hookFingerprint(hook),
       sourcePath: hook.sourcePath,
     } satisfies CommandHookConfig);

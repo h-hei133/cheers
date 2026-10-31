@@ -10876,3 +10876,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：授权目标过粗导致一次授权覆盖实质不同的调用（子代理review安全缺陷）
 
 [addition21.75](features/phase-20-addition.md#2175-授权目标过粗导致一次授权覆盖实质不同的调用子代理review安全缺陷)探针确认task/browser/ssh/MCP目标过粗。现ssh含operation/remote/command、browser含action+anchor、task含指令；MCP参数契约不可解读故禁止allow-always。121项聚焦、一反转到命中、五门/TS build通过。build 9d82295d。原47/ADD整体partial、goal active。
+
+### 2026-10-31：钩子授权的三个范围缺陷（子代理review安全缺陷）
+
+[addition21.76](features/phase-20-addition.md#2176-钩子授权跨项目生效项目拒绝不影响钩子授权无法撤回子代理review安全缺陷)指纹不含声明文件→A项目授权覆盖B项目同样命令；项目untrusted时MCP/workflow被拒而钩子照跑；授权只能记不能撤。现指纹并入sourcePath、注册时按项目信任过滤、增forgetTrust/entries，并把git gate压平决策的映射抽成共用函数。57项聚焦、四反转全命中、五门/TS build通过。原47/ADD整体partial、goal active。

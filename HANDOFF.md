@@ -1340,3 +1340,27 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Answering "Run it for this session" to a declared hook makes it trusted forever, in every later session and process.
 - **Root Cause**: The approval callback returned a boolean, so the dispatcher could not tell the two answers apart and recorded trust for both. A test asserted the wrong behaviour, which is why it survived.
 - **Rule**: Carry the decision itself, not a boolean, through any prompt that offers more than one kind of yes. Treat a legacy boolean as the weakest yes (one-shot), and test both directions: the one-shot answer must ask again, the remembered answer must not. When changing such a contract, read the tests that cover it — a test can encode the defect.
+
+### A Trust Fingerprint That Names Only The Program Is Not A Project Decision
+
+- **Symptom**: Approving `./check.sh` as a hook in one repository makes the same command from a different repository run without asking.
+- **Root Cause**: The fingerprint hashed the event, matcher and command — everything about *what runs*, nothing about *who supplied it*. The whole point of the gate is that a repository's commands are the repository's, so an identity that omits the repository answers a different question than the one being asked.
+- **Rule**: When a permission key is meant to scope a decision, include the thing the user was deciding about — here the declaring file — and test two different sources with identical content. Keep the path `resolve`d so one file named two ways is one hook, and do not follow symlinks: a link whose target moves is a different declaration.
+
+### A Project Refusal Must Reach Every Surface That Runs Project Code
+
+- **Symptom**: `/trust off` stops a repository's MCP servers and workflows, but its hooks still run.
+- **Root Cause**: Each surface consulted `projectTrust.isProjectUntrusted` on its own, and hooks never did. A per-surface check that is written three times gets forgotten once.
+- **Rule**: When a project-level refusal exists, enumerate every consumer and make each one answer to it; a repository that cannot start a server must not be able to run a command instead. Filter at the registration step so the hook is not even offered, and say in the status output that it is being refused rather than silently omitting it.
+
+### A Grant Nobody Can Withdraw Outlives Its Judgement
+
+- **Symptom**: There is no way to revoke a remembered hook approval short of editing `hook-trust.json` by hand.
+- **Root Cause**: The store was written as append-only. Persistence was treated as the whole feature, and revocation was never designed.
+- **Rule**: Any "remember this" surface needs a "forget this" surface in the same owner, and it must report whether something was actually removed so the caller can distinguish "withdrawn" from "there was nothing to withdraw". Test that a store already open sees the withdrawal, not only a freshly constructed one.
+
+### Collapsing A Decision To A Boolean Silently Downgrades It
+
+- **Symptom**: The git gate's hook prompt offers "Allow Always", but the hook is asked about again next time.
+- **Root Cause**: The adapter mapped `EscalationDecision` to `decision !== 'deny'`. By contract a boolean is one-shot, so "always" became "once" — the same class of bug as the earlier approval fix, in a second call site.
+- **Rule**: When the same decision type is mapped in more than one place, extract the mapping into one exported function and test it directly. Look for a second call site whenever a contract gains a distinction; fixing one and not the other leaves the prompt making a promise the code does not keep.

@@ -4,6 +4,7 @@ import type { SessionManager } from '../../session/SessionManager.js';
 import { configurationOperation } from '../../core/shell/scope.js';
 import { toolScopeBinding } from '../../config/scope/tools.js';
 import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
+import { hookApprovalDecision } from '../../core/hooks/types.js';
 import { setupBuiltinVerificationHooks } from '../../core/hooks/builtin/index.js';
 import { registerDeclaredHooks } from '../../core/hooks/registration.js';
 import { buildToolEscalationPrompt } from '../../core/query/toolPolicy.js';
@@ -47,8 +48,14 @@ export function gitGateFor(context: ShellRuntimeContext, manager: SessionManager
   const admission = () => operation.admission() ?? (!filterVisibleToolNames([tool], config).length ? 'The selected native capability is disabled.' : undefined);
   const hooks = new HookDispatcher(); setupBuiltinVerificationHooks(hooks);
   registerDeclaredHooks(hooks, context.cwd, { admission, bypassed: config.allowUntrustedHooks,
-    requestApproval: async hook => (await approval(buildToolEscalationPrompt('bash', 'execute', hook.command,
-      `Declared ${hook.event} hook from ${hook.sourcePath}; approval binds its stored fingerprint.`))).decision !== 'deny' });
+    requestApproval: async hook => {
+      const { decision } = await approval(buildToolEscalationPrompt('bash', 'execute', hook.command,
+        `Declared ${hook.event} hook from ${hook.sourcePath}; approval binds its stored fingerprint.`));
+      // Passed through rather than collapsed to a boolean: the prompt offers
+      // "allow always", and a boolean answer is one-shot by contract, so folding
+      // it here would silently turn a remembered grant into a repeated question.
+      return hookApprovalDecision(decision);
+    } });
   return { sessionId: context.session.id, workspaceRoot: context.cwd, workspaceRoots: context.session.workspaceRoots,
     agentMode: runtime.getAgentMode(), permissionScope: runtime.getPermissionScope(), denyRules: config.denyRules, configScope: toolScopeBinding(config),
     admission, hooks, escalationPromptHandler: approval,

@@ -1,10 +1,23 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { HookDispatcher } from "./hookDispatcher.js";
 import { registerDeclaredHooks } from "./registration.js";
 import { HookTrustStore } from "./trust.js";
+import { hookApprovalDecision } from "./types.js";
+import { projectTrust } from "../security/projectTrust.js";
+
+describe("turning an approval answer into a hook decision", () => {
+  it("keeps 'remember' distinct from 'once', so a grant is not silently downgraded", () => {
+    // The git gate used to collapse the answer to a boolean, which the dispatcher
+    // reads as one-shot: "Allow Always" became a question asked again every time.
+    expect(hookApprovalDecision("allow-always")).toBe("allow-always");
+    expect(hookApprovalDecision("allow-once")).toBe("allow-once");
+    expect(hookApprovalDecision("allow")).toBe("allow-once");
+    expect(hookApprovalDecision("deny")).toBe("deny");
+  });
+});
 
 describe("registering declared hooks", () => {
   let tempDir: string;
@@ -13,9 +26,14 @@ describe("registering declared hooks", () => {
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "hook-register-"));
     trustPath = path.join(tempDir, "hook-trust.json");
+    // The project decision is a process-wide singleton reading the real user
+    // directory; point it at this test's own store so a decision here cannot
+    // leak into another test or into the machine's actual trust records.
+    vi.spyOn(projectTrust, "isProjectUntrusted").mockReturnValue(false);
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -43,8 +61,8 @@ describe("registering declared hooks", () => {
   }
 
   /** A workspace declaring one PreToolUse hook with the given command. */
-  function declareHook(command: string): string {
-    const workspace = path.join(tempDir, "workspace");
+  function declareHook(command: string, name = "workspace"): string {
+    const workspace = path.join(tempDir, name);
     fs.mkdirSync(path.join(workspace, ".agents"), { recursive: true });
     fs.writeFileSync(
       path.join(workspace, ".agents", "hooks.json"),
@@ -245,5 +263,53 @@ describe("registering declared hooks", () => {
     await fire(dispatcher);
 
     expect(ran()).toEqual(["builtin"]);
+  });
+
+  it("does not carry an approval from one project to another", async () => {
+    // The defect this guards: the fingerprint covered only the event, matcher
+    // and command, so a command approved in one repository was already approved
+    // when a different repository shipped the same text.
+    const first = declareHook(markerCommand("shared"), "project-a");
+    registerDeclaredHooks(new HookDispatcher(), first, {
+      requestApproval: () => Promise.resolve("allow-always" as const),
+      trustStore: new HookTrustStore(trustPath),
+      homeDir: homeDir(),
+    });
+    await fire(new HookDispatcher());
+
+    let asked = 0;
+    const second = declareHook(markerCommand("shared"), "project-b");
+    const other = new HookDispatcher();
+    registerDeclaredHooks(other, second, {
+      requestApproval: () => { asked++; return Promise.resolve(false); },
+      trustStore: new HookTrustStore(trustPath),
+      homeDir: homeDir(),
+    });
+    await fire(other);
+
+    expect(asked).toBe(1);
+    expect(ran()).toEqual([]);
+  });
+
+  it("contributes no project hooks once the project is refused", async () => {
+    // The project decision already stops this repository's MCP servers and
+    // workflows; a repository that cannot start a server must not be able to run
+    // a command instead. The user's own hooks file is unaffected.
+    const workspace = declareHook(markerCommand("refused-project"));
+    const trust = new HookTrustStore(trustPath);
+    // Approved first, so the refusal cannot be the fingerprint gate doing the work.
+    registerDeclaredHooks(new HookDispatcher(), workspace, {
+      requestApproval: () => Promise.resolve("allow-always" as const), trustStore: trust, homeDir: homeDir(),
+    });
+    await fire(new HookDispatcher());
+
+    vi.mocked(projectTrust.isProjectUntrusted).mockReturnValue(true);
+    const dispatcher = new HookDispatcher();
+    registerDeclaredHooks(dispatcher, workspace, {
+      requestApproval: asking, trustStore: trust, homeDir: homeDir(),
+    });
+    await fire(dispatcher);
+
+    expect(ran()).toEqual([]);
   });
 });

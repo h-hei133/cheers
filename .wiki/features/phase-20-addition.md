@@ -5013,3 +5013,15 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现按工具补齐目标：`ssh`为`ssh:<operation>:<remote>:<command>`；`browser`为`<action>:<anchor>`（URL/selector/text/key/坐标）；`task`/`team`在标签之外并入指令（`<label>:<instruction>`）。MCP工具的参数契约无法通用解读，因此**禁止`allow-always`**（降为一次性，并在提示中说明），与既有`apply_patch`的同类先例一致。
 
 验证：`toolPolicy`38（三个新例分别断言task/browser/ssh的目标区分）、`cliApprovalModule`、`arguments`29、`turn/tools`54，共**121项**通过；一反转（ssh退回工具名）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `9d82295d16c1`。原47/ADD整体partial、goal active。
+
+### 21.76 钩子授权跨项目生效、项目拒绝不影响钩子、授权无法撤回（子代理review安全缺陷）
+
+三处安全缺陷，同一处所有权：
+
+1. **跨项目生效**：`hookFingerprint`只覆盖event/matcher/command，不含声明文件。在A仓库批准`./check.sh`后，B仓库提交同样文本的钩子会被直接信任。现指纹并入`path.resolve(sourcePath)`；用户级`hooks.json`是同一路径，因此对它的决定仍全局一次生效——那是用户自己的文件。
+2. **项目拒绝不覆盖钩子**：MCP（`gateway.ts`）与workflow（`workflowCommandRuntime.ts`）都查`projectTrust.isProjectUntrusted`，钩子不查。仓库被标为untrusted后仍能借钩子执行命令。现`registerDeclaredHooks`在项目被拒时不再注册该工作区内的钩子；用户级钩子不受影响。`/trust`状态在untrusted时把命令列表改述为「refused while the project is untrusted」。
+3. **授权无法撤回**：`HookTrustStore`只能记录，没有撤回入口。现增`forgetTrust`（返回是否真的删掉了条目，便于区分「已撤回」与「本来就没有」）与`entries`。
+
+顺带修正：git gate的审批把`EscalationDecision`压成布尔，而布尔按契约是一次性，提示里的「Allow Always」在那里永远不会持久化。映射抽为`hookApprovalDecision`，两处调用点共用；`approveDeclaredHook`的提示改为「remembered for this exact command in this file」，与实际范围一致。
+
+验证：`trust`19、`registration`14、`security/trust/command`10、`profile/sources`14，共**57项**通过；四反转（指纹去掉文件、项目拒绝不再拦截、撤回无效、always降为once）全部命中断言且finally字节恢复；五静态门、TS build/freshness、strict docs drift通过。原47/ADD整体partial、goal active。

@@ -224,6 +224,25 @@ export const HOOK_TRUST_BYPASS_NOTICE =
  */
 export type HookApprovalDecision = "allow-once" | "allow-always" | "deny";
 
+/**
+ * How an approval answer becomes a hook decision.
+ *
+ * Lives here because two callers ask the same question — the interactive run and
+ * the git gate — and they must answer it the same way. A caller that collapsed
+ * the answer to a boolean would lose "remember", and the user would be asked
+ * again for a grant they already gave.
+ *
+ * The older boolean shape is one-shot on purpose: it predates the distinction
+ * between the two promises, so the only safe reading of `true` is "this time".
+ */
+export function hookApprovalDecision(
+  decision: "allow" | "deny" | "allow-once" | "allow-always",
+): HookApprovalDecision {
+  if (decision === "allow-always") return "allow-always";
+  if (decision === "allow" || decision === "allow-once") return "allow-once";
+  return "deny";
+}
+
 export type HookApprovalRequest = (request: {
   readonly command: string;
   readonly event: string;

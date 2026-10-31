@@ -76,7 +76,9 @@ function describeTrust(root: string): string {
   const { hooks, problems } = loadHookDeclarations(root, { homeDir: path.join(root, "\u0000none") });
   const projectHooks = hooks.filter((hook) => hook.sourcePath.startsWith(root));
   if (projectHooks.length > 0) {
-    lines.push("", "Commands this project asks to run:");
+    lines.push("", state === 'untrusted'
+      ? "Commands this project asks to run (refused while the project is untrusted):"
+      : "Commands this project asks to run:");
     for (const hook of projectHooks) {
       lines.push(`  ${hook.event}${hook.matcher ? ` (${hook.matcher})` : ""}: ${neutraliseForDisplay(hook.command)}`);
       lines.push(`    fingerprint ${hookFingerprint(hook).slice(0, 12)}`);

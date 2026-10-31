@@ -12,7 +12,7 @@ import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import { defaultHookDispatcher, type HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { setupBuiltinVerificationHooks } from "../core/hooks/builtin/index.js";
 import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/registration.js";
-import type { HookApprovalDecision } from "../core/hooks/types.js";
+import { hookApprovalDecision, type HookApprovalDecision } from "../core/hooks/types.js";
 import { type CatalogContent, type ToolCatalogInput } from "../core/tools/catalog.js";
 import type { ToolDiscovery } from "../core/tools/discovery/state.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
@@ -319,7 +319,7 @@ async function approveDeclaredHook(
       "Command:",
       `  ${neutraliseForDisplay(hook.command)}`,
       "",
-      "Approval is remembered for this exact command; changing it asks again.",
+      "Approval is remembered for this exact command in this file; changing either asks again.",
     ].join("\n"),
     context: {
       toolName: "hook",
@@ -337,9 +337,7 @@ async function approveDeclaredHook(
   });
 
   // Only an explicit "remember" is persisted; "allow once" runs this hook once.
-  if (response.decision === "allow-always") return "allow-always";
-  if (response.decision === "allow" || response.decision === "allow-once") return "allow-once";
-  return "deny";
+  return hookApprovalDecision(response.decision);
 }
 
 /**
