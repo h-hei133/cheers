@@ -560,3 +560,59 @@ describe("runtime config", () => {
     expect(leftovers).toEqual([]);
   });
 });
+
+describe("an endpoint written twice", () => {
+  const originalHome = process.env.USERPROFILE;
+  const originalUnixHome = process.env.HOME;
+  let fakeHome: string;
+  let fakeRoot: string;
+  beforeEach(() => {
+    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-home-")); fakeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-root-"));
+    process.env.USERPROFILE = fakeHome; process.env.HOME = fakeHome;
+  });
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = originalHome;
+    if (originalUnixHome === undefined) delete process.env.HOME; else process.env.HOME = originalUnixHome;
+    fs.rmSync(fakeHome, { recursive: true, force: true }); fs.rmSync(fakeRoot, { recursive: true, force: true });
+  });
+  const write = (value: unknown) => {
+    fs.mkdirSync(path.join(fakeHome, '.cheers'), { recursive: true });
+    fs.writeFileSync(path.join(fakeHome, '.cheers', 'config.json'), JSON.stringify(value));
+  };
+
+  it("says which endpoint a request actually uses when the two disagree", () => {
+    // The connection wins. The profile copy stays in the file, looks
+    // authoritative in an editor, and is never used — a reader comparing the two
+    // has no way to tell which one is live.
+    write({
+      provider: 'openai', activeProviderConnectionId: 'relay',
+      providerConnections: [{ id: 'relay', provider: 'openai', authType: 'api-key', baseUrl: 'https://relay.test/v1', createdAt: '', updatedAt: '' }],
+      providerCredentials: { openai: { baseUrl: 'https://other.test/v1', apiKey: 'synthetic' } },
+    });
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.configDiagnostics).toEqual([
+      "Config providerCredentials.openai.baseUrl is unused: connection 'relay' sends requests to https://relay.test/v1.",
+    ]);
+    // A warning, not a refusal: the configuration is still usable.
+    expect(config.configValidation.valid).toBe(true);
+  });
+
+  it("says nothing when the two agree or only one is set", () => {
+    write({ provider: 'openai', activeProviderConnectionId: 'relay',
+      providerConnections: [{ id: 'relay', provider: 'openai', authType: 'api-key', baseUrl: 'https://relay.test/v1', createdAt: '', updatedAt: '' }],
+      providerCredentials: { openai: { baseUrl: 'https://relay.test/v1', apiKey: 'synthetic' } } });
+    expect(getRuntimeConfig(fakeRoot).configDiagnostics).toEqual([]);
+    write({ provider: 'openai', activeProviderConnectionId: 'relay',
+      providerConnections: [{ id: 'relay', provider: 'openai', authType: 'api-key', baseUrl: 'https://relay.test/v1', createdAt: '', updatedAt: '' }],
+      providerCredentials: { openai: { apiKey: 'synthetic' } } });
+    expect(getRuntimeConfig(fakeRoot).configDiagnostics).toEqual([]);
+  });
+
+  it("never puts the credential in the notice", () => {
+    write({ provider: 'openai', activeProviderConnectionId: 'relay',
+      providerConnections: [{ id: 'relay', provider: 'openai', authType: 'api-key', baseUrl: 'https://relay.test/v1', createdAt: '', updatedAt: '' }],
+      providerCredentials: { openai: { baseUrl: 'https://other.test/v1', apiKey: 'sk-live-secret-value' } } });
+    const text = getRuntimeConfig(fakeRoot).configDiagnostics.join('\n');
+    expect(text).not.toContain('sk-live-secret-value');
+  });
+});

@@ -5377,6 +5377,8 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 - 内容**没有变化**的保存也会收窄一个已含凭据的老文件：权限是文件的属性，不是这次保存的属性。收窄只改 mode、不重写字节，因此调用方持有的 revision 仍然有效，"可观察地未变化"的保存仍然未变化。
 - 六条回归：API key、连接里的 account token 各自收窄；普通设置文件保持原模式；空白占位不被当作凭据；无变化的保存收窄老文件；无凭据文件的空操作保存不动权限。
 
+同一事实重复的**可见性**问题本轮补上了最小的一项：当 `providerCredentials[provider].baseUrl` 与所选连接的 `baseUrl` 不一致时，加载结果会在 `configDiagnostics` 里说明哪一处真正生效（`Config providerCredentials.openai.baseUrl is unused: connection 'relay' sends requests to …`）。这是警告而非拒绝——请求本来就发往连接端点；但此前用户对照两处时无法判断哪个是活的。三条回归覆盖：不一致时报告、一致或只设一处时不报告、报告文本不含密钥。
+
 未做的部分（凭据拆到独立文件、同一事实 4–5 处重复的收敛）仍留在 ADD-70 的"尚缺"里。理由：拆分要同时改 22 个生产写入点、71 个测试文件与迁移路径，属于架构级改动；在没有真实旧格式样本与回滚验证的前提下仓促实施，风险高于本轮收益。
 
 ### 23.4 验证
