@@ -1751,3 +1751,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A CLI probe observes a live adopted child but fails before the promotion window, or reports a PID mismatch when checking promotion.
 - **Root Cause**: The empty journal may omit its optional local collection, and journal-backed get cannot expose a provisional task before promotion. A broad setup label can hide the failing assertion after a successful wait.
 - **Rule**: Read absent local entries as an empty collection, capture the native handle identity at adoption, and compare the durable snapshot only after promotion. Record assertion stages separately from wait stages. Check existing probe history before recreating a scenario; do not treat these observation failures as product or provider failures.
+
+### Hard-Kill Probes Need The Actual Owned CLI Process
+
+- **Symptom**: A compiled CLI is streaming with its prompt barrier persisted, but a probe fails a target-selection assertion before delivering SIGKILL.
+- **Root Cause**: An argv path match borrowed from the Node launcher does not establish the compiled target's process identity. Coarse stage labels can also misreport that selection failure as a stream wait.
+- **Rule**: Follow the controlled spawn boundary: select the relay's single direct executable child, or the verified Node entry beneath its launcher, then capture PID/start identity before signalling. Read raw active state after confirmed death and before recovery can reconcile it. Preserve failed setup receipts, and do not claim SIGKILL ran graceful cleanup or restored terminal modes.

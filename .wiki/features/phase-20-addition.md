@@ -477,7 +477,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---|---|---|---|---|
 | ADD-63 | P1 | 图片在提交、中断、恢复、重开与工具结果中完整保留 | 21.28–21.34、21.45、21.62–21.63 | 本地验证 | 真实图片密集型结果；图形协议终端 |
 | ADD-64 | P1 | 压缩与导航不丢失未完成工作，fork 不继承在途调用 | 21.64–21.66、21.69–21.72 | 本地验证 | — |
-| ADD-65 | P2 | 硬杀会话可再次 continue | 21.70 | 本地验证 | 真实 SIGKILL 现场 |
+| ADD-65 | P2 | 硬杀会话可再次 continue | 21.70、24.55 | 本地验证 | Linux Node/exe普通/全屏实际SIGKILL后continue已验；在途工具副作用、故障设备与其他平台仍缺 |
 | ADD-66 | P2 | 空草稿的退出动作先于审批与预览按键归属 | 20.44 | 本地验证 | — |
 | ADD-67 | P2 | 未答复审批被取消后立即结束等待并保留中断恢复 | 20.43 | 本地验证 | — |
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
@@ -6275,3 +6275,19 @@ ADD-49矩阵仍列缺少60秒完整路径，但第21.21节已记录regular/fulls
 证据归新建且无tracked碰撞的`.omx/artifacts/phase20-addition-promotion/`，只保留数值/布尔及公开夹具脚本，不存raw PTY或实际模型正文。独立核验检查当前compilerInputs、stable/不可变exe size/SHA、最终进程/晋升/等待/退出收据和旧失败保留；与第24.53节真实源码研究的安全audit分开，后者研究质量/unknown用量状态不变。本批仅文档/HANDOFF，未新build/unit/反转/全仓/20k/local NormProof或委派复审；最终门、核验与交付另绑。ADD-49维持本地验证，生产工作负载/平台边界仍缺，原47条件延后、goal active。
 
 最终五项静态门、五个脚本语法检查、两个独立证据verifier及diff check均exit0；binding dangling0、118既有docs-source advisory保留。晋升当前普通Node夹具验收passed；真实源码研究audit passed仍明确bounded case/general quality/billing unverified与1 unknown。再次延迟单读59fb0a97精确CI41247646203仍in_progress，没有重复轮询或以Watch替代；产品1e9c6ad5完整代码CI success证据保持。本批提交/推送另由ignored delivery收据绑定，不将尚未观察的当前交付CI称为通过。
+
+### 24.55 实际 SIGKILL 后显式 continue 同一会话
+
+接续ADD-65与21.70的active恢复分支，目标是验证进程确实被硬杀后仍能恢复，不由夹具预先写入interrupted来代替。先读[资格判定](../../packages/ts-shell/src/session/recovery/sessionResumeEligibility.ts)、[原恢复owner](../../packages/ts-shell/src/core/shell/recovery.ts)及[continue动作](../../packages/ts-shell/src/core/shell/continueShellActionRuntime.ts)，确认已有实现；本批不修改产品代码或另建恢复机制。ADD-30的跨进程运行所有权租约问题仍独立保留。
+
+当前build7f47912610a7与compilerInputs、stable/不可变exe size/SHA保持匹配，生产Node20.3 launcher与直接单文件程序，各覆盖普通/全屏PTY。每场只一条保存消息、一个小会话，loopback scripted provider与合成凭据；请求的首个实际delta已在终端可见，原state.json是active/turn-active、pendingPrompt保持。探针对实际CLI的owned PID发送SIGKILL，观察relay exit137、原PID/start identity非活跃及流连接关闭；在任何恢复reader或新CLI进入前直接重读raw state，仍为active/turn-active与原提示，未借正常关闭写interrupted。
+
+重启后同一history/prompt可见，未自动发送新推理；真实键入/continue才产生第二请求，实际body包含原提示和原生恢复说明。同一session最终completed、pendingPrompt清除、最终回答持久，原用户提示精确一次。Ctrl+D正常退出code0，恢复cooked flags；没有声称SIGKILL本身能运行终端清理。四有效场景共八次CLI启动、GET8/POST8；请求中未调用工具，不把它作为在途工具副作用恢复、不重复执行写入或所有权租约的证据。中断请求用量未测，不补0、真实金额或provider行为。
+
+每stage30秒/2MiB、100ms采样768MiB CLI树RSS及每场2 POST限额均未触发；Node harness heap768MiB。Node普通/全屏两阶段RSS分别302864/313776与321464/308800KiB，exe普通/全屏214028/213096与210508/218300KiB，仅为小夹具观察，不算总heap或性能验收。各场隔离config bytes不变、owned PID/start均非活跃、home/project/session scratch清理，无实际外部provider、故障设备、非Linux或20k终端。
+
+两个中间失败留档：首harness误用build policy require，CLI前拒绝，改用既有required；另一次exe在发出一请求并显示delta后、SIGKILL前的目标选择断言失败，随后正常清理，收据仍unverified。最终沿relay单一直接子进程确定exe目标，Node沿verified entry定位，并在kill前捕获start identity；未改产品或向任意PID发信号。两份Node成功使用的旧精确执行快照、最终exe快照与失败source/log/receipt均分开保留，额外失败exe的一次CLI/POST不计入八场有效验证。
+
+证据归无tracked碰撞的新目录`.omx/artifacts/phase20-addition-hard-kill/`，只留公开夹具脚本和数值/布尔，无raw PTY、实际请求/响应正文、key/address/header或prompt/session digest。独立核验与最终静态门/语法/diff及交付另绑；无新build/unit/反转/全仓/20k/local NormProof或委派复审。ADD-65仍本地验证，真实在途工具副作用、故障设备及其他平台边界未覆盖；原47真实条件继续延后，goal active。
+
+最终五项静态门、两脚本语法、独立四场景verifier及diff check均exit0，binding dangling0、118既有docs-source advisory保留；verifier明确firstRequestUsage未测、nativeInFlightToolSideEffects未练习、realProvider/其他平台未跑。一次延迟读回前提交d1328704精确CI41248943399仍in_progress，Watch41248943415 completed/success，不替代CI。本批仅三份markdown改动，提交/推送/remote-main与clean状态由ignored delivery另绑，当前交付CI未观察。

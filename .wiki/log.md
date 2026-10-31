@@ -11206,3 +11206,9 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 [addition24.54](features/phase-20-addition.md#2454-当前构建的六十秒原地晋升与等待复验)更正ADD-49矩阵遗漏21.21既有60秒完整路径。当前build7f47912610a7生产Node普通PTY、loopback scripted provider、一真实小子进程，原bash无timeout/background参数，接管一次后60136.762761ms原地晋升，同handle/fixture PID与start identity保持、零再launch/一个durable job；随后taskWait实见5s时长，release后11315ms完成/exit0/原输出持久/一次dispatch、wait listener释放。GET1+POST3，配置不变、Ctrl+D exit0/134ms/cooked恢复、owned进程非活跃、scratch清理，140秒/2MiB/768MiB采样守卫未触发；817223bytes/RSS480088KiB不算性能。三次夹具失败保留，计时否定接管超时猜测，修正可选local空账本读取与晋升前get观察，产品未改。HANDOFF补边界；无真实provider/当前exe或fullscreen复跑/生产实际负载/其他平台，新build/unit/反转/全仓/20k/judge/委派复审均未跑。独立核验与最终静态门/交付另绑；真实源码研究仍partial/unverified，ADD-49本地验证、goal active。
 
 最终五门/五脚本语法/diff及两项证据verifier均exit0，118既有advisory保留；晋升夹具验收passed、研究audit passed而质量/完整工作流仍unverified。延迟单读59fb0a97精确CI41247646203仍in_progress，不立刻重读；本批commit/push/remote-main与clean状态由ignored delivery单独绑定，当前交付CI尚未观察。
+
+### 2026-11-01：实际硬杀后恢复同一会话
+
+[addition24.55](features/phase-20-addition.md#2455-实际-sigkill-后显式-continue-同一会话)当前build7f47912610a7生产Node/exe×普通/全屏四场顺序完成实际SIGKILL→显式continue。请求delta实际显示后杀owned CLI，exit137/原进程非活跃/连接关闭，在恢复reader前raw state仍active/turn-active并保留原提示。重启不自动推理，/continue才发第二请求，实际body有原提示/原生恢复说明，同session completed、pending清除、最终答复持久、原用户提示仅一次；正常退出0/cooked恢复。有效八次CLI、GET8/POST8，均loopback scripted provider；无真实外部请求、在途工具副作用/故障设备/其他平台验收。每stage30秒/2MiB/768MiB采样守卫未触发，峰值321464KiB不算性能，配置不变/owned进程非活跃/scratch清理。首build policy错误在CLI前失败、另exe目标定位断言在SIGKILL前失败，各源码/日志/收据保留，额外一CLI/POST不计有效场景；仅修harness，产品未改。HANDOFF补真实目标与raw-state边界，最终独立核验/静态/交付另绑；无新build/unit/反转/全仓/20k/judge/委派复审，ADD-65本地验证、ADD-30仍未修、goal active。
+
+最终五门/两脚本语法/四场景独立verifier/diff均exit0，118既有advisory保留。延迟单读d1328704精确CI41248943399仍in_progress、Watch41248943415 success；不轮询、不视为整体CI通过。本批三份markdown的交付另由ignored delivery绑定。
