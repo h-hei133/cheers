@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.16 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份与只读 affinity、tier/会话窗口偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.17 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5645,3 +5645,13 @@ dispatch、配置约束、状态栏、`/context`和handoff共用reader。压缩w
 五静态门与build通过，manifest `a387867093ce`，当前inputsDigest `84cec6b450379d5318b4b4c11ff0e94f3bc32ed264cfe8019714c9d74ed42010`读回一致。正式打包NormProof独立串行exit0，环/解析satisfied；partial仍仅既有interactiveMode21/22-name advisory。两路独立只读复审APPROVE/CLEAR，core matcher使用本地structural接口避免新core→session类型依赖；子代理未执行验证。临时反转与validator scratch清理。
 
 延迟CI `15499d9c`/`41198196947` 已success，`25bec115`/`41199285608` 最后仍in_progress，其Watch success不证明代码CI。本批提交/推送与自身CI另行绑定。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移；ADD-70 partial、goal active，其余重复语义、旧版本回退与真实环境验收继续尚缺。
+
+### 24.17 文本模型目录跟随原生账号发行方端点
+
+第24.16节已推送 `368cc3e6f1a43d7b3c531e1b1ca90c492fd6c423`，main与远端一致。继续审计目录/连接端点重复语义：Copilot business API key/account假设的两条隔离回归先通过，因为既有credential resolver已投影subscription发行方地址；未为该假设改产品代码。随后valid Google native account没有stored URL、实际请求地址由issuer固定时，`readModelCatalog`与`/model list`仍按原始undefined地址选择compatible目录。两条旧实现回归实际AssertionError，展示native-model缺失且compatible-only混入。
+
+仅改既有model command owner两处目录读取，委托原`providerCredentialBaseUrl`再做精确catalog binding；不新增认证解析器、不修改issuer协议或provider核心。API key继续按其配置端点查目录，显式其他catalog ID查询不借活动地址，原ambiguity拒绝与OpenAI account允许列表保留。只读参考model-controls选择前使用认证对应模型元数据，model-registry的available保持本地auth检查不续期；本修复同样只查询、不发送或续期。
+
+主代理实际Linux Node20.3.0、heap768MiB、单worker串行最终 **3文件/39项**通过：session catalog13、model command19、account target7。新增account/API key×data/text四场景验证原生issuer目录、compatible目录、active model、显式other目录无active标记、zero requests与settings/auth bytes/absence不变；原relay真实loopback协议和metadata用例继续通过。data/text两处独立反转各实际1失败/3通过/9跳过，AssertionError且生产bytes精确恢复。第一次使用参数化展开名作`-t`全13项跳过，不计证据；改稳定组名后执行实际四项并获上述失败，最终稳定源码重新39项通过。
+
+五静态门/build通过，manifest `202e69ad04b0` 当前输入摘要读回一致；正式bundle judge独立串行exit0，环/解析satisfied，仍仅既有interactiveMode21/22-name advisory。两路独立只读复审APPROVE/CLEAR，子代理未验证；本轮scratch清理。延迟代码CI `25bec115`/`41199285608` 已success，`368cc3e6`/`41200474418` 最后in_progress，对应Watch success不替代代码CI。本批另绑提交/远端/自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移；ADD-70 partial、goal active，旧版本回退与其余重复语义/真实环境尚缺。

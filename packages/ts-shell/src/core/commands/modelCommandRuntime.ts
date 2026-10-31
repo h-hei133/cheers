@@ -21,6 +21,7 @@ import { resolveProviderCredential } from "../shell/providerCredentials.js";
 import { configurationApplicationNotice } from "./configuration.js";
 import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
 import { runModelPresetCommand } from './model/presetCommand.js';
+import { providerCredentialBaseUrl } from '../auth/account/target.js';
 
 
 /**
@@ -250,7 +251,7 @@ export async function readModelCatalog(refresh = false, sessionId?: string, runt
   if (refresh) await refreshModels(context);
   const { catalog, active } = modelConfiguration(context);
   const allowed = active.credential?.authMode === 'account-auth' ? providerFacts(active.provider).accountAuthAllowedModels : undefined;
-  const binding = catalogProvider(catalog, active.provider, active.baseUrl ?? active.credential?.baseUrl);
+  const binding = catalogProvider(catalog, active.provider, providerCredentialBaseUrl(catalog, active));
   return { provider: active.provider, models: binding.ambiguous ? [] : allowed ?? binding.entry?.models.map(model => model.id) ?? [],
     active: active.model, offline: true };
 }
@@ -279,7 +280,7 @@ async function listModels(args: string[], refresh: boolean, context: CommandCont
   if (refresh) snapshot = modelConfiguration(context);
   const { catalog, active, catalogDiagnostics } = snapshot;
   const provider = requested ?? active.provider;
-  const binding = catalogProvider(catalog, provider, provider === active.provider ? active.baseUrl ?? active.credential?.baseUrl : undefined);
+  const binding = catalogProvider(catalog, provider, provider === active.provider ? providerCredentialBaseUrl(catalog, active) : undefined);
   if (binding.ambiguous) return [...catalogDiagnostics, 'Model list unavailable: multiple catalogue entries claim the active endpoint.'].join('\n');
   const entry = binding.entry;
 

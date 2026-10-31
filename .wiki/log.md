@@ -11006,3 +11006,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：会话上下文窗口按实际模型和凭据范围生效
 
 [addition24.16](features/phase-20-addition.md#2416-会话上下文窗口绑定实际请求并保留普通预算)25bec115已推送main/远端一致。实际复现main窗口覆盖小窗口delegated准入及失效选择status仍on；sessionContextWindow独立runtime投影，window/tier共用model preference匹配，普通预算保留。dispatch/constraints/status/context/handoff与三个压缩调用共用捕获identity，saved inactive状态不虚报on。Node20.3八文件220项含真实loopback拒绝与普通override发送、reset/resume/role/隔离/压缩，三反转AssertionError精确恢复；五门/build及inputs摘要读回通过，manifesta387867093ce。两路复审APPROVE/CLEAR，正式judge仅既有interactiveMode advisory。15499d9c代码CI已success，25bec115仍in_progress；未真实provider/Windows/PTY/全仓，ADD-70 partial、goal active。
+
+### 2026-10-31：文本目录采用原生账号实际发行方端点
+
+[addition24.17](features/phase-20-addition.md#2417-文本模型目录跟随原生账号发行方端点)368cc3e6已推送且main/远端一致。Copilot假设通过后未改认证；Google native account两个reader实际AssertionError，现model command两处复用providerCredentialBaseUrl，API key与显式其他目录保留。Node20.3三文件39项、两有效反转AssertionError精确恢复、五门/build与inputs校验通过，manifest202e69ad04b0；参数化展开名反转全跳过已排除并纠正。两路复审APPROVE/CLEAR，正式judge仍仅interactiveMode既有advisory。25bec115代码CI已success，368cc3e6仍in_progress；ADD-70 partial、goal active，旧版本/真实环境继续延后。

@@ -1526,3 +1526,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Extended context on a large main model lets an oversized delegated request reach a smaller model; a saved but ignored or unavailable selection still reports on.
 - **Root Cause**: The session catalogue window overwrites the ordinary configured window, and delegated consumers inherit that unbound number. Status reads saved intent without checking accepted request identity.
 - **Rule**: Project session windows separately, match actual model and credential scope in the existing preference owner, and leave ordinary override semantics intact. Carry captured resolution into compaction instead of reselecting. Check saved and accepted bindings for status; test reset on reused projected config, resume, sibling/model isolation and actual pre-send refusal. A deletion fixture must clear or replace its active ID in the same admitted save.
+
+### Fixed Account Issuers Can Differ From Raw Catalogue Addresses
+
+- **Symptom**: Text model lists show compatible-protocol models while a native account sends to its fixed issuer endpoint.
+- **Root Cause**: Subscription resolution may project its address, but fixed native issuers may leave the raw resolution address absent; dispatch applies the existing issuer-aware target helper later.
+- **Rule**: Use that same target helper before active catalogue binding. Preserve API-key routing and explicit inactive catalogue queries. First prove the provider-specific path: a subscription hypothesis may already pass. Reversal test filters must match the stable parameterized group name and must execute real cases; a green run with every case skipped proves nothing.

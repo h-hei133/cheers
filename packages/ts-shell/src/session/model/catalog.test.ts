@@ -4,7 +4,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../SessionManager.js';
-import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
 import { readSessionModel, readSessionModelEdit } from './state.js';
 import { projectSessionModel } from './projection.js';
 import { modelPicker } from '../../cli/interactive/picker/model.js';
@@ -24,6 +24,7 @@ import { captureThinkingPreference } from '../../core/models/preference.js';
 import { createProviderStep } from '../../cli/provider/step.js';
 import { captureSummaryRole } from '../../cli/provider/summary.js';
 import { defaultHookDispatcher } from '../../core/hooks/hookDispatcher.js';
+import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
 
 let home: string;
 let sessionId: string;
@@ -83,6 +84,39 @@ async function send() {
     providerMode: 'real', agentMode: 'build', workspaceRoot: home, sessionId, ...captureThinkingPreference(home, resolution.thinkingEffort) }, new Map(), {});
   return step([{ role: 'user', content: 'Check this relay metadata.' }], new AbortController().signal, {}, { allowTools: false });
 }
+
+it.each((['data', 'text'] as const).flatMap(route => (['account', 'api-key'] as const).map(auth => ({ route, auth }))))(
+  'lists the exact $auth catalogue through the $route reader', async ({ route, auth }) => {
+  const origin = 'https://generativelanguage.googleapis.com';
+  const config = { ...getRuntimeConfig(home), provider: 'google' as const, activeProviderConnectionId: 'native', providerCredentials: {},
+    providerConnections: [{ id: 'native', provider: 'google' as const, model: auth === 'account' ? 'native-model' : 'compatible-only',
+      authType: auth === 'account' ? 'account-auth' as const : 'api-key' as const,
+      ...(auth === 'account' ? { accountAuth: { google: { type: 'google-gemini-account' as const, accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh',
+        expiresAt: Date.now() + 60000, clientId: 'synthetic-client', scopes: ['https://www.googleapis.com/auth/cloud-platform'], quotaProject: 'synthetic-project' } } } : { apiKey: 'synthetic-api', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai' }),
+      createdAt: '2026-01-01', updatedAt: '2026-01-01' }] };
+  writeCatalogCache([{ id: 'google', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', models: [{ id: 'compatible-only' }] },
+    { id: 'native-catalog', runtime: 'google', baseUrl: origin, models: [{ id: 'native-model' }] },
+    { id: 'other-catalog', runtime: 'google', baseUrl: 'https://other.invalid', models: [{ id: 'other-model' }] }]);
+  const resolved = resolveProviderCredential({ runtimeConfig: config, env: {} });
+  expect(resolved.blocked).toBeUndefined();
+  expect(providerCredentialBaseUrl(loadCatalog(), resolved)).toBe(auth === 'account' ? origin : 'https://generativelanguage.googleapis.com/v1beta/openai');
+  const files = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = files.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  if (route === 'data') {
+    const listed = (await readModelCatalog(false, sessionId, config)).models;
+    if (auth === 'account') expect(listed).toEqual(['native-model']);
+    else { expect(listed).toContain('compatible-only'); expect(listed).not.toContain('native-model'); }
+  } else {
+    const output = (await runModelCommand(['list'], { ...context(), runtimeConfig: config })).output;
+    expect(output).toContain(`* ${auth === 'account' ? 'native-model' : 'compatible-only'} (active)`);
+    expect(output).not.toContain(auth === 'account' ? 'compatible-only' : 'native-model');
+  }
+  const explicit = (await runModelCommand(['list', 'other-catalog'], { ...context(), runtimeConfig: config })).output;
+  expect(explicit).toContain('- other-model');
+  expect(explicit).not.toContain('(active)');
+  expect(requests).toHaveLength(0);
+  expect(files.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+});
 
 it('shows and sends exact relay metadata through both generic and relay-specific catalogue rows', async () => {
   const global = fs.readFileSync(getUserRuntimeConfigPath());
