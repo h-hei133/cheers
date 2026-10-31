@@ -1,0 +1,7 @@
+{
+  "name": "status-only",
+  "exit": 1,
+  "tests": "2 failed | 5 skipped (7)",
+  "originalSha256": "6e2081cc62a930efe9d2de18f487b3aa0d40234dce695baea22ded7c2a001c77",
+  "restored": true
+}

@@ -1,0 +1,54 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/recovery/sessionResumeEligibility.test.ts  (7 tests | 2 failed | 5 skipped) 7ms
+   ❯ src/session/recovery/sessionResumeEligibility.test.ts > a session killed without a clean shutdown > is resumable when an unfinished run left evidence
+     → expected false to be true // Object.is equality
+   ❯ src/session/recovery/sessionResumeEligibility.test.ts > a session killed without a clean shutdown > is still refused when the active session left no evidence
+     → expected 'Session is not in interrupted/error s…' to be 'Active session has no unfinished work' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 5 skipped (7)
+   Start at  08:12:12
+   Duration  346ms (transform 68ms, setup 0ms, collect 69ms, tests 7ms, environment 0ms, prepare 67ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/recovery/sessionResumeEligibility.test.ts > a session killed without a clean shutdown > is resumable when an unfinished run left evidence
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/session/recovery/sessionResumeEligibility.test.ts:148:32
+    146|           pendingTools: { call: { taskId: "call", toolName: "write" } …
+    147|     });
+    148|     expect(result.recoverable).toBe(true);
+       |                                ^
+    149|     expect(result.autoResumeReady).toBe(true);
+    150|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/session/recovery/sessionResumeEligibility.test.ts > a session killed without a clean shutdown > is still refused when the active session left no evidence
+AssertionError: expected 'Session is not in interrupted/error s…' to be 'Active session has no unfinished work' // Object.is equality
+
+- Expected
++ Received
+
+- Active session has no unfinished work
++ Session is not in interrupted/error state
+
+ ❯ src/session/recovery/sessionResumeEligibility.test.ts:158:27
+    156|     })
+    157|     expect(result.recoverable).toBe(false)
+    158|     expect(result.detail).toBe("Active session has no unfinished work")
+       |                           ^
+    159|   })
+    160| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

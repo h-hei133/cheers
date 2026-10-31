@@ -4957,3 +4957,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 子代理review另报F2（图片提示在`sessionHasReentrySurface`/`scoreSessionReentrySummary`/`hasPendingPromptHere`仍按`pendingPrompt?.trim()`判定）。逐项探针核实**均已兜底**：`sessionHasReentrySurface`由`sessionHasConversation`先行返回true（图片消息即对话）；`hasPendingPromptHere`由`autoResumeReady`兜底；`bootstrap.hasUnfinishedBusiness`第二条件`hasUnfinishedSessionWork`覆盖。故F2降级为潜在不一致，非当前错误结果。
 
 验证：`create`5（新例断言fork无pending审批、源保留）、`work`13、`recovery`24，共**42项**通过；一反转（只从tool.started播种）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `69a1ba79a49e`。原47/ADD整体partial、goal active。
+
+
+### 21.70 硬杀会话可再次continue（子代理review缺陷#4）
+
+子代理review指出：`evaluateSessionResumeEligibility`在`status`不是`interrupted`/`error`时直接拒绝，但**非正常死亡从不写`interrupted`**——prompt屏障留下的是`active`。于是`/continue`与恢复提示选择器拒绝的正是bootstrap刚认领为未完成工作的会话。探针确认：持久化提示+未答复`tool.started`、从未标记中断的会话为`status:"active"`、`pendingTools:["call-live"]`、`hasUnfinishedSessionWork:true`，但`recoverable:false`、detail为"Session is not in interrupted/error state"。
+
+现为`active`增加证据分支，复用与`interrupted`相同的信号（pending提示、turn/prompt恢复信号、续跑证据）：有证据则`fully-resumable`或`partially-resumable`，无证据仍拒绝并给出独立措辞。未放宽「什么算证据」。
+
+验证：`sessionResumeEligibility`7（两新例：有证据可恢复、无证据仍拒绝）、`recovery`24、`bootstrap`28、`work`13，共**72项**通过；一反转（只按状态拒绝）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `f5ad32ed83e9`。原47/ADD整体partial、goal active。

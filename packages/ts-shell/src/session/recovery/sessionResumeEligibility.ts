@@ -31,7 +31,12 @@ export function evaluateSessionResumeEligibility(input: {
   ) => RecoveryTrustBoundaryBlock;
 }): SessionResumeEligibility {
   const { session } = input;
-  if (session.status !== "interrupted" && session.status !== "error") {
+  // A process killed without a clean shutdown never writes `interrupted`: the
+  // prompt barrier left it `active`. Refusing on the status alone would turn
+  // away exactly the sessions bootstrap adopts as unfinished work, so the
+  // evidence decides — a clean, finished session still has none.
+  const unclean = session.status !== "interrupted" && session.status !== "error";
+  if (unclean && session.status !== "active") {
     return {
       recoverable: false,
       disposition: "not-resumable",
@@ -111,6 +116,39 @@ export function evaluateSessionResumeEligibility(input: {
         session,
         "continuation-evidence-missing",
         "interrupted state has no continuation evidence",
+      ),
+    };
+  }
+
+  // An `active` session with live evidence is a run that never finished writing
+  // its terminal state — the shape a killed process leaves. It is resumable for
+  // exactly the reason bootstrap adopts it, and only for that reason.
+  if (session.status === "active") {
+    if (hasPendingPrompt && (hasTurnRecoverySignal || hasPromptRecoverySignal)) {
+      return {
+        recoverable: true,
+        disposition: "fully-resumable",
+        autoResumeReady: true,
+        detail: "An unfinished run left a pending prompt and interruption evidence",
+      };
+    }
+    if (hasTurnRecoverySignal || hasContinuationEvidence || hasResumeContextEvidence) {
+      return {
+        recoverable: true,
+        disposition: "partially-resumable",
+        autoResumeReady: false,
+        detail: "An unfinished run left context, but no pending prompt to continue",
+      };
+    }
+    return {
+      recoverable: false,
+      disposition: "not-resumable",
+      autoResumeReady: false,
+      detail: "Active session has no unfinished work",
+      block: input.createBlock(
+        session,
+        "continuation-evidence-missing",
+        "active session has no continuation evidence",
       ),
     };
   }

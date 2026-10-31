@@ -132,3 +132,29 @@ function createBlock(
     recoveryHint: "hint",
   };
 }
+
+describe('a session killed without a clean shutdown', () => {
+  it('is resumable when an unfinished run left evidence', () => {
+    // The prompt barrier leaves the session `active`; only a clean interrupt
+    // writes `interrupted`. Refusing on the status alone would turn away the
+    // exact case bootstrap adopts as unfinished work.
+    const result = evaluateSessionResumeEligibility({
+      session: session({ status: "active" }), createBlock,
+      loadRecoverySnapshot: () => snapshot({ pendingPrompt: "Do the work",
+        runPhase: "prompt-persisted",
+        pendingLifecycle: { pendingApprovals: {}, taskStates: {},
+          pendingTools: { call: { taskId: "call", toolName: "write" } } } }),
+    });
+    expect(result.recoverable).toBe(true);
+    expect(result.autoResumeReady).toBe(true);
+  })
+
+  it('is still refused when the active session left no evidence', () => {
+    const result = evaluateSessionResumeEligibility({
+      session: session({ status: "active" }), createBlock,
+      loadRecoverySnapshot: () => snapshot({ runPhase: "idle" }),
+    })
+    expect(result.recoverable).toBe(false)
+    expect(result.detail).toBe("Active session has no unfinished work")
+  })
+})

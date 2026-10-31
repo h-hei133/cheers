@@ -10852,3 +10852,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：近期批次的CI结论
 
 延后读回：`14d2da3b`（并发写入证据）、`5e09ce94`（transcript权威性）、`ef4c120e`（子代理模型纠正）三个提交的CI与NormProof均completed/success且head一致；`9da50c94`（fork审批修复）Watch success、CI当时in_progress另绑定。绿色CI不替代真实provider/桌面/图形协议验收，原47/ADD整体仍partial、goal active。
+
+### 2026-10-31：硬杀会话可再次continue（子代理review缺陷#4）
+
+[addition21.70](features/phase-20-addition.md#2170-硬杀会话可再次continue子代理review缺陷4)非正常死亡不写interrupted而留active，eligibility按状态拒绝导致/continue拒绝最需恢复的会话。现为active增加证据分支，复用相同信号，无证据仍拒绝。72项聚焦、一反转到命中、五门/TS build通过。build f5ad32ed。原47/ADD整体partial、goal active。
