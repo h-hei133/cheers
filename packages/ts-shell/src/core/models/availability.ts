@@ -108,7 +108,7 @@ export interface CatalogAvailability {
 }
 
 /** Canonical models can use relays; a relay catalogue requires its own address. */
-export function matchesCatalog(provider: CatalogProvider, connection: ConnectionAvailability,
+export function matchesCatalog(provider: CatalogProvider, connection: Pick<ConnectionAvailability, 'connectionId' | 'provider'>,
   connections: readonly ProviderConnectionConfig[], catalog: readonly CatalogProvider[]): boolean {
   if (provider.id === provider.runtime) return true;
   const stored = connections.find(item => item.id === connection.connectionId && item.provider === connection.provider);

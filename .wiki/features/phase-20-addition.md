@@ -483,7 +483,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.18 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.19 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛已实施；最新代码 CI、其余重复事实语义收敛、旧版本回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
@@ -5669,3 +5669,15 @@ dispatch、配置约束、状态栏、`/context`和handoff共用reader。压缩w
 五静态门/build通过，manifest `421717a2aec9`，当前inputsDigest `15170474481b78df3b7714d2128688f31123bf068397d61ed6e8731f87f5c015`读回一致。正式bundle NormProof独立串行exit0，环/解析satisfied，partial仅既有interactiveMode21/22-name advisory；本轮修改模块无新增ceiling问题。两路最终APPROVE/CLEAR，子代理仅只读、未验证；本轮反转与judge scratch清理。
 
 延迟CI `368cc3e6`/`41200474418`、`cf745bcc`/`41201096537`最后均in_progress；`cf745bcc` Watch `41201096218` success不替代代码CI。本批另绑提交/推送/readback与自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移；ADD-70 partial、goal active，旧版本回退、其余重复语义与真实环境验收仍缺。
+
+### 24.19 预设模型校验与目录目标跟随发行方
+
+第24.18节已提交推送 `6c570eb309ac36cf45839ac390a122b36cb69619`，本地/远端一致且工作区干净。接续检查summary role已经由既有issuer helper解析地址，无需修补；preset metadata校验却仍按raw URL，role目录alias候选仍按stored URL。新增8条session/profile × account/API-key × connection/catalogue save→validate→apply --all场景，原生account四条实际失败、API-key四条通过。初次saved子串误匹配“No saved connection”，收紧完整成功消息后同四失败重新确认。
+
+既有preset owner用 `providerCredentialBaseUrl` 再读catalogModel/effort；无config时保留canonical fallback。roles owner复用既有matchesCatalog，删除sameEndpoint重复匹配；matcher参数收窄为实际读取的connectionId/provider，不伪造readiness数据。named connection优先、current候选优先、多连接歧义、status/credential/scope/constraint与preset发布围栏均保留。category会员不作认证或写入授权，实际validate/apply继续独立准入；不新增存储、provider/auth实现或writer。延续第24.18节已定向核对的认证模型元数据与本地available参考决定。
+
+主代理实际Linux Node20.3.0、heap768MiB、单worker串行最终 **4文件/82项**通过：catalog38、presetCommand11、policy10、availability23。新增8场景验证完整保存成功、validate、整组apply、精确default/summary角色和native32000/compatible16000 summary容量，settings/auth bytes或absence不变、zero fetch。preset与roles分别反转至完整前版owner，实际4失败/4通过及2失败/6通过，AssertionError且finally精确恢复；最终同82项再通过，不累计重复数。
+
+五静态门/build通过，manifest `4b1362add6dd`，inputsDigest `c254a7f0e04d4cd876809b85288e6864bdaa192dfaad096931363f89ff079af3`当前读回一致。正式bundle judge独立串行exit0，环/解析satisfied，partial仍仅既有interactiveMode21/22-name advisory；两路最终APPROVE/CLEAR，子代理仅只读未验证，反转/judge scratch清理。
+
+延迟CI `368cc3e6`/`41200474418`与`cf745bcc`/`41201096537`已success，`6c570eb3`/`41203580231`最后in_progress；本批另绑提交/推送/远端与自身CI。未真实provider、Windows、PTY、全仓/20k或真实HOME迁移，ADD-70 partial、goal active，旧版本回退与其余重复语义/真实环境尚缺。

@@ -254,6 +254,27 @@ it('refuses to label duplicate issuer catalogue owners active', async () => {
   expect(fetch).not.toHaveBeenCalled();
 });
 
+it.each((['account', 'api-key'] as const).flatMap(auth => (['connection', 'catalogue'] as const).flatMap(target =>
+  (['session', 'profile'] as const).map(scope => ({ auth, target, scope })))))('saves and applies $scope issuer preset using $auth $target targets', async ({ auth, target, scope }) => {
+  const window = nativeSelection(auth);
+  writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model => ({ ...model,
+    thinkingLevelMap: { high: provider.id === 'native-catalog' || auth === 'api-key' ? 'strong' : null } })) })));
+  const documents = [getUserRuntimeConfigPath(), getUserAuthPath()];
+  const bytes = documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No remote request is admitted by this fixture.'));
+  const owner = target === 'connection' ? 'native' : auth === 'account' ? 'native-catalog' : 'google';
+  const saved = await runModelPresetCommand(['save', 'issuer', ...(scope === 'profile' ? ['--profile'] : []), `default=${owner}/shared@high`, `summary=${owner}/shared@high`], context());
+  expect(saved.output).toContain("Model preset 'issuer' saved");
+  expect((await runModelPresetCommand(['validate', 'issuer'], context())).output).toContain('is valid');
+  expect((await runModelPresetCommand(['apply', 'issuer', '--all'], context())).output).toContain('all roles applied');
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'native', thinkingEffort: 'high',
+    roles: { summary: { connectionId: 'native', provider: 'google', model: 'shared', thinkingEffort: 'high' } } });
+  const summary = captureSummaryRole({ config: projectSessionModel(getRuntimeConfig(home), sessionId), catalog: loadCatalog(), workspaceRoot: home });
+  expect(summary?.limits.contextWindow).toBe(window);
+  expect(documents.map(file => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(bytes);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
 it.each((['data', 'text'] as const).flatMap(route => (['account', 'api-key'] as const).map(auth => ({ route, auth }))))(
   'lists the exact $auth catalogue through the $route reader', async ({ route, auth }) => {
   const origin = 'https://generativelanguage.googleapis.com';

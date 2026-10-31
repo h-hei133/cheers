@@ -1538,3 +1538,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A native account's picker offers an unsupported effort, saves another catalogue's window, or loses its named catalogue row; a native metadata edit during a hook or lock does not invalidate publication.
 - **Root Cause**: Initial and locked catalogue lookups use an absent raw URL while dispatch resolves the fixed issuer later. Independent catalogue matchers disagree. Adding issuer rows also exposes active-label and current-report reads that still use raw addresses.
 - **Rule**: Use the existing issuer address owner for capabilities, preferences, aliases and admitted current-request facts, while retaining raw credential identity and CAS fences. Consolidate matching; invalid setup retains its declared address with readiness checked separately. Ambiguous aliases cannot claim active ownership; the current request can remain visible with unverified metadata. Inject changes at the actual state.lock path, and apply a picker action once per accepted owner.
+
+### Preset Categories And Validation Must Share Issuer Decisions
+
+- **Symptom**: Direct native model selection works but a preset rejects its supported effort, or a native catalogue alias finds no saved connection.
+- **Root Cause**: Preset validation reads raw request URLs and role parsing compares stored addresses independently of the existing catalogue matcher.
+- **Rule**: Resolve preset metadata through the request issuer owner and reuse the shared identity matcher for catalogue candidates. Keep category membership separate from credential/status/scope admission. Assert the complete success message: “saved” alone also matches “No saved connection”. Verify save, validate, whole apply and the summary consumer for both account and API-key paths.

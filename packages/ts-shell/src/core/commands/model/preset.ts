@@ -17,6 +17,7 @@ import { inspectConfigConstraints } from '../../../config/constraints.js';
 import { assertScopedModel } from '../../../config/scope/projection.js';
 import { providerFacts } from '../../providers/facts.js';
 import { deleteProfilePreset, ProfilePresetError, readProfilePresets, saveProfilePreset } from './presetStore.js';
+import { providerCredentialBaseUrl } from '../../auth/account/target.js';
 
 export interface ModelPresetTarget extends SessionModelRole {}
 export function validPresetName(name: string): boolean {
@@ -33,8 +34,9 @@ export function validateModelPreset(roles: Readonly<Record<string, ModelPresetTa
     if (!validPresetName(role) || !target || ![target.connectionId, target.provider, target.model].every(value =>
       typeof value === 'string' && value.trim().length > 0 && value.length <= 256)) return 'Model preset contains an invalid role or target.';
     const resolution = config ? resolveProviderCredential({ runtimeConfig: projectModelSelection(config, { ...target, connectionScope: 'session' }) }) : undefined;
-    if (!catalogModel(catalog, target.provider, target.model, catalogBaseUrl(catalog, target.provider, resolution?.baseUrl))) return `Model preset refused: ${target.provider}/${target.model} has no verified catalogue entry.`;
-    const capability = effortCapability(catalog, target.provider, target.model, target.thinkingEffort ?? null, resolution?.baseUrl);
+    const baseUrl = resolution ? providerCredentialBaseUrl(catalog, resolution) : catalogBaseUrl(catalog, target.provider);
+    if (!catalogModel(catalog, target.provider, target.model, baseUrl)) return `Model preset refused: ${target.provider}/${target.model} has no verified catalogue entry.`;
+    const capability = effortCapability(catalog, target.provider, target.model, target.thinkingEffort ?? null, baseUrl);
     if (capability !== 'supported') return `Model preset refused: ${target.provider}/${target.model} reasoning effort ${target.thinkingEffort ?? 'auto'} is ${capability}.`;
     if (config && !config.providerConnections.some(connection => connection.id === target.connectionId
       && connection.provider === target.provider && connection.status === 'connected')) return `Model preset refused: connection '${target.connectionId}' is unavailable or belongs to a different provider.`;

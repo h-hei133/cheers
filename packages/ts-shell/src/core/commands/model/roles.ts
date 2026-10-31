@@ -6,6 +6,7 @@ import type { CatalogProvider } from '../../models/catalog.js';
 import { isThinkingPreference, type ThinkingPreference } from '../../models/effort.js';
 import type { SessionModelRole, SessionModelTarget } from '../../../session/model/contract.js';
 import { validPresetName } from './preset.js';
+import { matchesCatalog } from '../../models/availability.js';
 
 export type RoleParseResult =
   | { readonly ok: true; readonly roles: Readonly<Record<string, SessionModelRole>> }
@@ -50,7 +51,7 @@ function resolveTarget(target: string, selection: SessionModelTarget | undefined
     return current ? roleTarget(current, target) : 'A preset target must name an existing connection or provider.';
   }
   const candidates = config.providerConnections.filter(connection => connection.provider === runtime
-    && (!provider || provider.id === provider.runtime || sameEndpoint(connection.baseUrl, provider.baseUrl)));
+    && (!provider || matchesCatalog(provider, { connectionId: connection.id, provider: connection.provider }, config.providerConnections, catalog)));
   const current = candidates.find(connection => connection.id === selection?.connectionId && connection.provider === selection?.provider);
   const connection = current ?? (candidates.length === 1 ? candidates[0] : undefined);
   if (!connection) return candidates.length ? 'Preset provider target is ambiguous. Use role=connection/model[@effort].'
@@ -60,10 +61,6 @@ function resolveTarget(target: string, selection: SessionModelTarget | undefined
 
 function roleTarget(connection: ProviderConnectionConfig, model: string): SessionModelRole | string {
   return model.trim() ? { connectionId: connection.id, provider: connection.provider, model: model.trim() } : 'Preset model name is empty.';
-}
-
-function sameEndpoint(first?: string, second?: string): boolean {
-  return Boolean(first && second && first.replace(/\/+$/, '') === second.replace(/\/+$/, ''));
 }
 
 function parseEffort(value: string): ThinkingPreference | 'invalid' {

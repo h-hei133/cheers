@@ -11014,3 +11014,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：能力、窗口与交互目录共用原生 issuer 地址
 
 [addition24.18](features/phase-20-addition.md#2418-模型能力窗口偏好与交互目录共用发行方地址)原生account无stored URL时thinking选项、extended窗口、picker命名行与direct反向能力/目录围栏实际失败。沿既有target helper统一初始与锁内读取，合并issuer matcher；复审补修incomplete setup地址回退、duplicate alias activity及current报告unverified，未改auth/provider核心。Node20.3单worker串行6文件207项、七次有效反转/精确恢复、五门/build与输入摘要通过，manifest421717a2aec9；正式judge仅既有interactiveMode advisory，两路最终APPROVE/CLEAR，scratch清理。368cc3e6/cf745bcc代码CI最后in_progress，Watch成功不作代码通过；未真实provider/Windows/PTY/全仓/20k，ADD-70 partial、goal active，提交/推送与自身CI另绑。
+
+### 2026-10-31：预设校验与目录角色目标跟随 issuer
+
+[addition24.19](features/phase-20-addition.md#2419-预设模型校验与目录目标跟随发行方)原生account preset metadata和alias解析仍用raw地址，4回归实际失败、4 API-key场景通过。既有preset读issuer地址，roles复用shared matcher删重复sameEndpoint，status/credential/scope/发布准入保留；summary owner已正确。Node20.3单worker串行4文件82项含save/validate/apply与summary容量，两个有效反转/精确恢复、五门/build摘要通过，manifest4b1362add6dd；正式judge仅既有interactiveMode advisory，复审APPROVE/CLEAR、scratch清理。368cc3e6/cf745bcc代码CI已success，6c570eb3最后in_progress；未真实provider/Windows/PTY/全仓/20k，ADD-70 partial、goal active，提交/推送与自身CI另绑。
