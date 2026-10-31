@@ -1388,3 +1388,27 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Choosing `allow-all` in one project and resuming a session in another keeps pre-approving prompts there.
 - **Root Cause**: The permission scope is a field on `ShellSessionRuntime`, created once per interactive process, while `switchRuntimeSessionProjectContext` can replace the project root. Nothing connected the two, so a grant about one repository applied in another.
 - **Rule**: When a setting expresses a decision *about* some scope, find the events that change that scope and reset or re-ask there. Have the switching function report whether the scope actually changed, compute it before the switch (afterwards the old value is gone), and route every switch path through one decision function so a new path cannot skip it.
+
+### Pending Input Is Not Conversation
+
+- **Symptom**: A message typed while a turn runs appears in the transcript looking exactly like one already delivered; cancelling it leaves a question behind the model never saw.
+- **Root Cause**: The user bubble was appended before the host decided whether the text would steer, queue, or run, so "waiting" and "sent" had no separate representation. The queue itself was memory-only and produced no durable event.
+- **Rule**: Echo a user block only at the moment the text is actually handed to a turn — steer/follow-up accepted, or a queued entry starting. Draw waiting entries in their own band above the prompt (bounded, one row each, labelled by delivery stage) and read them from the existing queue owner rather than a second list. Never persist a pending entry: it disappears with the process, so restoring a session must not show a message that was never sent. Tests that assert a queued entry is a `user` block are asserting the defect.
+
+### A Private Screen Leaves Nothing Behind
+
+- **Symptom**: After leaving fullscreen, the user's terminal history contains the whole conversation; or a test locks "the document is written under the restored screen".
+- **Root Cause**: The alternate screen was treated as a base mode needing an exit-time compensation that rewrote the transcript onto the main screen. That compensation leaked a private screen into the user's terminal history and put a whole re-layout on the exit path.
+- **Rule**: The alternate screen and the terminal's own screen are alternatives, not a base plus a compensation. Leaving the alternate screen restores the terminal exactly; a session that wants a scrollback runs on the main screen, where its rows were never private. Keep `leaveScreen`'s rows parameter only for mid-session handovers (a child process, a borrowed overlay), and pass nothing at session end. When reversing such a behaviour, rewrite the assertions that pinned it and state why in the test, and remove fault-injection cases for cleanup steps that no longer exist.
+
+### Permission Rules Must Follow The Content, Not The Path
+
+- **Symptom**: A config file holding an API key or account token stays readable by every account on the machine because the writer never set a mode.
+- **Root Cause**: The write path had no notion of what the document contained, so the umask default applied to every config file alike. A rule keyed to "the user's config path" would also miss a credential that reached any other file.
+- **Rule**: Decide the mode from the merged result at the writer (`holdsCredentialMaterial`), not from which path is being written: credentials ⇒ 0600, otherwise the umask default. Deciding per write also narrows a legacy file on its next save and drops the rule when the last credential is removed. Count only real material — a non-empty `apiKey` or a non-empty `accountAuth` — so provider names and blank placeholders do not tighten unrelated files.
+
+### Archived Test Copies Are Collected From The Repository Root
+
+- **Symptom**: A two-file focused `vitest run` from the repository root spins up dozens of suites, then dies with `FATAL ERROR: Ineffective mark-compacts near heap limit`.
+- **Root Cause**: `.tmp/integration/**` holds archived copies of `packages/ts-shell/src/**/*.test.ts` from earlier reversal runs. Root-level Vitest discovery walks them, so a focused path still collects every archived copy — dozens of extra suites, each with its own module graph.
+- **Rule**: Run `vitest` from `packages/ts-shell` with package-relative paths, never from the repository root. Treat a discovery set larger than the paths you passed as this trap rather than as product failures, and do not raise the heap limit to work around it — the archive is the input, not the workload.

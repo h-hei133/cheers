@@ -350,49 +350,53 @@ describe("taking the screen", () => {
     tui.stop();
   });
 
-  it('forgets images and leaves the document after physical stop fails', () => {
+  it('forgets images and gives the screen back after physical stop fails', () => {
     const { tui, terminal, scheduler, provider } = boot();
     provider.rows = ['image \x1b_Ga=T,f=100,q=2,c=10,i=29;QUJD\x1b\\'];
     tui.start(); scheduler.flush(); terminal.drain();
     const failure = new Error('private stop fixture');
     const stop = vi.spyOn(terminal, 'stop').mockImplementationOnce(() => { throw failure; });
-    expect(() => tui.stop({ document: ['retained answer'] })).toThrow(failure);
+    expect(() => tui.stop()).toThrow(failure);
     const written = terminal.drain();
     expect(written).toContain('\x1b_Ga=d,d=A');
-    expect(written).toContain('retained answer');
     stop.mockRestore(); tui.start(); terminal.drain(); tui.renderNow();
     expect(terminal.drain()).toContain('QUJD');
     tui.stop();
   });
 
-  it("leaves the document under the restored screen, one row per line", () => {
-    const { tui, terminal, scheduler } = boot();
+  it('leaves no conversation under the restored screen', () => {
+    // The alternate screen is private: leaving it must restore the terminal as
+    // the session found it. This assertion used to require the opposite — the
+    // whole transcript rewritten below `\x1b[?1049l` — which put a private
+    // screen's content into the user's terminal history. That compensation is
+    // gone; a session that wants a scrollback runs on the terminal's own screen.
+    const { tui, terminal, scheduler, provider } = boot();
+    provider.rows = ['first row', `second ${CURSOR_MARKER}row`, 'answer'];
     tui.start();
     scheduler.flush();
     terminal.drain();
-    tui.stop({ document: ["first row", `second ${CURSOR_MARKER}row`, ""] });
+    tui.stop();
     const written = terminal.drain();
 
     const left = written.indexOf("\x1b[?1049l");
     expect(left).toBeGreaterThan(-1);
-    const document = written.slice(left);
-    expect(document).toContain("\x1b[?7l\r\x1b[2Kfirst row");
-    expect(document).toContain("\r\n\r\x1b[2Ksecond row");
-    expect(document).not.toContain(CURSOR_MARKER);
-    // The tail: reset, autowrap back on, a fresh line, and the cursor shown.
-    expect(document).toMatch(/\x1b\[0m\x1b\[\?7h\r\n\x1b\[\?25h\x1b\[\?2026l$/);
+    const after = written.slice(left);
+    expect(after).not.toContain('first row');
+    expect(after).not.toContain('answer');
+    expect(after).not.toContain('\x1b[2K');
+    expect(after).not.toContain(CURSOR_MARKER);
   });
 
-  it("fits document rows to the width the same way a frame is fitted", () => {
-    const { tui, terminal, scheduler } = boot();
-    terminal.columns = 10;
-    tui.start();
+  it('keeps the terminal\'s own screen rows in the scrollback', () => {
+    // The other mode is where a conversation is meant to survive the session:
+    // its rows were written to the terminal's screen, not to a private one.
+    const { tui, terminal, scheduler, provider } = boot();
+    provider.rows = ['kept row'];
+    tui.start({ useAlternateScreen: false });
     scheduler.flush();
-    terminal.drain();
-    tui.stop({ document: ["0123456789abcdef"] });
-    const written = terminal.drain();
-    expect(written).toContain("012345678…");
-    expect(written).not.toContain("9abcdef");
+    expect(terminal.drain()).toContain('kept row');
+    tui.stop();
+    expect(terminal.drain()).not.toContain("\x1b[?1049l");
   });
 
   it("only gives the screen back when there is no document", () => {
@@ -700,17 +704,19 @@ describe("lifecycle stress", () => {
     expect(terminal.stopped).toBe(true);
   });
 
-  it("prepares a long exit document within a bounded budget", () => {
+  it("writes only the exit sequence however long the conversation was", () => {
+    // Leaving used to prepare and write the whole transcript as an exit
+    // document, so a long session paid a re-layout at exit. The private screen
+    // leaves nothing behind now, and the cost is one escape sequence.
     const { tui, terminal, scheduler, provider } = boot();
     provider.rows = Array.from({ length: 2000 }, (_, index) => `history row ${index}`);
     tui.start();
     scheduler.flush();
     terminal.drain();
-    const started = scheduler.now();
-    tui.stop({ document: provider.rows });
-    const elapsed = scheduler.now() - started;
-    expect(terminal.drain()).toContain("\x1b[?1049l");
-    expect(elapsed).toBeLessThan(1000);
+    tui.stop();
+    const written = terminal.drain();
+    expect(written).toContain("\x1b[?1049l");
+    expect(written).not.toContain("history row");
   });
   it("ignores render requests after disconnect", () => {
     const { tui, terminal, scheduler } = boot();

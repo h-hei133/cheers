@@ -10896,3 +10896,19 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：第十轮研究——排队/发送不可区分、配置文件职责、fullscreen 退出残留
 
 [addition22](features/phase-20-addition.md#22-第十轮用户反馈2026-10-31排队与发送不可区分配置文件职责fullscreen-退出残留)第三十八项确认：onSubmit先append用户气泡再判断busy，排队消息与已发送在transcript中完全同形；Enter在busy时传steer，但命令/组合/图片会降级为queue.push，而提示行只写"enter steer"；Ctrl+q空闲时是空操作无反馈。对照Codex的Enter=steer/Tab=queue/Esc=interrupt三分法，本项目底层三条lane已正确，缺的是呈现与键位一致性。第三十九项确认：config.json同时装凭据（含apiKey与OAuth accessToken/refreshToken）、模型目标、普通设置三类；写入未传0600（同仓profile导入日志传了0o600），含refresh token的文件可能对同机其他用户可读；provider/baseUrl/model/contextWindow在4–5处重复。models.json本身无凭据、无项目作用域，是正确的。第四十项确认：fullscreen退出时leaveScreen把整段transcript重写到主屏，且有engine.test锁定该行为——这是早期为补偿"scrollback里没有对话"而做的设计，与用户本次预期直接冲突，属产品决策而非缺陷，需裁决方案。三项编为ADD-69/70/71，台账现71条：0完成、7部分完成、60本地验证、4未开始。本轮只研究未改产品代码；strict docs drift通过，118条既有advisory不变。
+
+### 2026-10-31：fullscreen 退出不再把会话写回主屏（ADD-71）
+
+[addition23.1](features/phase-20-addition.md#231-add-71fullscreen-退出只恢复终端已实施)按已裁决的方案 A：备用屏是私有的，退出只恢复终端。`leaveScreen` 保留 rows 参数供会话中途交还终端使用，会话结束时传空；`TuiStopOptions` 与 `frame.ts` 里的对应接口删除；`interactiveMode.stop` 不再渲染退出文档，因此也去掉了那条可失败的清理步骤与它的 `fault: 'transcript'` 故障注入。三条锁定旧行为的测试改写并在注释里写明理由，另补一条 `regular` 模式的正向覆盖。build 818a1992a095。原 47/ADD 整体 partial、goal active。
+
+### 2026-10-31：等待中的输入可见且不进对话记录（ADD-69）
+
+[addition23.2](features/phase-20-addition.md#232-add-69等待中的输入可见且不进对话记录已实施)气泡写入时机移到"真正发出"之后：忙碌时只有 steer/followUp 分支写用户块，落入 queue 的输入不写；新增 `echoUser`/`runQueued` 把"记录"与"开始运行"分开，五处出队点全部改为 `runQueued`。新增 `chrome/pendingInput.ts`，在输入框正上方按交付顺序显示最多 3 行（标注 steer/queued、多行折成 ↵、超出显示 +N more），`composerOffset` 计入它以保证鼠标几何正确；数据只读既有队列 owner，不新建队列。空闲时 `ctrl+q` 改为立即发送并给出 notice，键位说明与 `.wiki/guides/keybindings.md` 同步（该表格被 keyGuide 测试逐行比对）。提示行从 `enter steer before next step`/`ctrl+q run after turn` 改为 `enter steer`/`ctrl+q queue`，不再承诺 Enter 一定 steer，逐条去向由待发送区说明。对照 Codex/oh-my-pi 均把待发送输入放在输入框上方、从不写进对话记录。659 项聚焦测试、五门、TS build 通过。build 818a1992a095。原 47/ADD 整体 partial、goal active。
+
+### 2026-10-31：含凭据的配置文件强制 0600（ADD-70 部分）
+
+[addition23.3](features/phase-20-addition.md#233-add-70含凭据的配置文件强制-0600部分实施)只做最小确定项：新增 `config/secret.ts`（非空 apiKey / 非空 accountAuth 才算材料，provider 名与空白占位不算），`persistence.ts` 按合并结果决定模式——带凭据 0600，不带沿用 umask，因此老文件下次保存被收窄、移除最后一个凭据后不残留规则。四条回归覆盖 API key、连接内 account token、普通设置、空白占位。凭据拆独立文件与重复事实收敛**未做**：涉及 22 个生产写入点、71 个测试文件与迁移路径，缺真实旧格式样本与回滚验证，风险高于收益，留在"尚缺"。build 818a1992a095。原 47/ADD 整体 partial、goal active。
+
+### 2026-10-31：本轮验证口径
+
+单一串行、无并发：7 个聚焦文件 659 项通过（engine/hints/view/persistence/keymap/firstFrame/interactiveMode）；`tsc -p tsconfig.build.json --noEmit` 通过；五道静态门全绿（118 条既有 advisory 不变）；`npm run build` 通过。**未**运行 20k PTY 压测或任何大内存脚本；**无**真实终端/真实 provider 证据，三项均未升为"完成"。台账现 0 完成、8 部分完成、62 本地验证、1 未开始。

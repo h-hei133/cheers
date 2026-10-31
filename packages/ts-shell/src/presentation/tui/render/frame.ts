@@ -69,14 +69,6 @@ export interface TuiStartOptions {
   readonly useAlternateScreen?: boolean;
 }
 
-export interface TuiStopOptions {
-  /**
-   * Rows to leave in the terminal's own scrollback once the screen is given
-   * back. Nothing on the screen survives leaving it; this is what does.
-   */
-  readonly document?: readonly string[];
-}
-
 export interface RenderRequestOptions {
   readonly force?: boolean;
 }

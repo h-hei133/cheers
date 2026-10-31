@@ -313,7 +313,10 @@ describe("first painted frame", () => {
     } finally { mode.stop(); }
   });
 
-  it("leaves the conversation in the terminal on stop", () => {
+  it("gives a private screen back without leaving the conversation behind", () => {
+    // The default mode is the private screen. Giving it back restores the
+    // terminal exactly as the session found it; a conversation that should
+    // survive the session belongs on the terminal's own screen (`regular`).
     const { mode, terminal, scheduler } = boot();
     mode.start();
     scheduler.flush();
@@ -325,11 +328,23 @@ describe("first painted frame", () => {
     const left = written.indexOf("\x1b[?1049l");
     expect(left).toBeGreaterThan(-1);
     const document = written.slice(left);
-    // The intro is a transcript block, so it is the first thing left behind; the
-    // prompt and band are chrome and stay on the screen that was given back.
-    expect(document).toContain("Cheers");
+    expect(document).not.toContain("Cheers");
     expect(document).not.toContain("hello there");
     expect(document).not.toContain("❯");
+  });
+
+  it("keeps the conversation on the terminal's own screen", () => {
+    const { mode, terminal, scheduler } = boot({}, "regular");
+    mode.start();
+    scheduler.flush();
+    terminal.input("hello there");
+    scheduler.flush();
+    const painted = terminal.drain();
+    expect(painted).toContain("Cheers");
+    mode.stop();
+    // Nothing was taken, so nothing has to be given back, and the rows the
+    // session wrote stay in the terminal's scrollback where they were written.
+    expect(terminal.drain()).not.toContain("\x1b[?1049l");
   });
 
   it("restores the device on stop", () => {

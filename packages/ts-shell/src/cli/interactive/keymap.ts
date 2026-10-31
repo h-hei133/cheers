@@ -240,13 +240,18 @@ function runAction(action: string, event: ParsedKeyEvent, context: KeymapContext
       actions.clearScreen();
       return "redrawn";
     case "app.message.followUp":
-      // Only while a run is active: with nothing running there is no queue to
-      // join, and the key does nothing rather than sending the draft by surprise.
+      // The key means "run this after the current turn". With nothing running
+      // there is no turn to wait for, so the draft is sent now — the same thing
+      // Enter would do — and the press says so. Doing nothing was the worst of
+      // the three: a key that is bound, named in the hints, and silently dead.
       if (context.busy) {
         submitDraft(context, "followUp");
         return "redrawn";
       }
-      return "nothing";
+      if (!view.editor.getText().trim()) return "nothing";
+      submitDraft(context);
+      actions.reportNotice?.("No turn is running; the message was sent now instead of queued.");
+      return "redrawn";
     case "app.thinking.cycle":
       // Tab is completion, so mode cycling takes the shifted form.
       actions.cycleAgentMode();

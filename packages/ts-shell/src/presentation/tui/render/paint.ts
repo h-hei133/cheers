@@ -129,12 +129,20 @@ export function fullPaint(rows: readonly string[], height: number): string {
 /**
  * Give the screen back and leave `rows` under whatever the terminal had.
  *
- * The alternate screen has no scrollback, so everything on it is lost the moment
- * it is left; the document written here is what the user gets to scroll back to
- * and copy from once the session is over. Autowrap is off while the rows go out
- * so a row that fills the width cannot spill into an empty line, and each row
- * erases its line first because the restored screen may still hold the tail of
- * what was there before the session began. The rows must already be prepared.
+ * The alternate screen is private: leaving it restores the terminal exactly as
+ * the session found it, and the conversation goes with it. That is the whole
+ * point of the mode — a full-screen application hands the screen back and leaves
+ * no trace in the user's terminal history. A caller that wants a scrollback
+ * chooses the terminal's own screen instead; it does not get both.
+ *
+ * The rows parameter remains because a caller may still be mid-session, giving
+ * the screen back to a child process or to a borrowed full-screen overlay and
+ * wanting what was on it preserved. At session end it is empty.
+ *
+ * Autowrap is off while the rows go out so a row that fills the width cannot
+ * spill into an empty line, and each row erases its line first because the
+ * restored screen may still hold the tail of what was there before. The rows
+ * must already be prepared.
  */
 export function leaveScreen(rows: readonly string[], synchronized: boolean): string {
   if (rows.length === 0) return EXIT_ALT_SCREEN;

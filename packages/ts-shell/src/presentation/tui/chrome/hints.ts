@@ -48,7 +48,11 @@ function transientHint(context: HintContext): string | undefined {
     return `${context.queued} queued · runs when the current turn finishes`;
   }
   if (context.busy) {
-    return join(["esc interrupt", "enter steer before next step", "ctrl+q run after turn"]);
+    // What Enter does for ordinary prose. A command, a composed prompt or one
+    // carrying images cannot be steered and waits instead — the pending band
+    // above the prompt is where that difference is shown, per entry, rather
+    // than this row promising one thing and the host doing another.
+    return join(["esc interrupt", "enter steer", "ctrl+q queue"]);
   }
 }
 

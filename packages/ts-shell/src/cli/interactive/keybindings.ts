@@ -81,7 +81,7 @@ export const KEY_ACTIONS: Record<string, KeybindingDefinition> = {
   "app.clear": { defaultKeys: ["ctrl+c"], description: "Clear the draft, then exit on a second press" },
   "app.exit": { defaultKeys: ["ctrl+d"], description: "Exit when the draft is empty" },
   "app.clearScreen": { defaultKeys: ["ctrl+l"], description: "Clear the screen" },
-  "app.message.followUp": { defaultKeys: ["ctrl+q"], description: "Queue a follow-up while a run is active" },
+  "app.message.followUp": { defaultKeys: ["ctrl+q"], description: "Queue the draft to run after the turn; sends it now when idle" },
   "app.thinking.cycle": { defaultKeys: ["shift+tab"], description: "Switch between planning and building" },
   "app.thinking.toggle": { defaultKeys: ["ctrl+t"], description: "Collapse or expand thinking blocks" },
   "app.tools.expand": { defaultKeys: ["ctrl+o"], description: "Collapse or expand tool output" },

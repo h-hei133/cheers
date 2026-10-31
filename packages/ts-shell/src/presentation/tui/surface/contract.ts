@@ -55,6 +55,14 @@ export interface ViewContext {
   queuedCount(): number;
   /** Prompts waiting to be steered into the current turn before its next step. */
   steeringCount?(): number;
+  /**
+   * Input that has been submitted but has not started running, in delivery order.
+   *
+   * Shown above the prompt rather than in the transcript: it is not part of the
+   * conversation until it is delivered, and an entry that is cancelled must
+   * leave no question behind in the record.
+   */
+  pendingInput?(): readonly { readonly stage: "steer" | "queued"; readonly text: string }[];
   now(): number;
   /** Background facts for the row under the prompt. */
   ambient(): AmbientContext;

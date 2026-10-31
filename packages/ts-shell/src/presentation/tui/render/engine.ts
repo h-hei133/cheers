@@ -8,7 +8,6 @@ import {
   type RenderScheduler,
   type TerminalFrameProvider,
   type TuiStartOptions,
-  type TuiStopOptions,
   type ViewportSize,
 } from "./frame.js";
 import { MainScreenPainter } from "./mainScreen.js";
@@ -274,16 +273,23 @@ export class TUI {
     }
   }
 
-  stop(options?: TuiStopOptions): void {
+  /**
+   * Give the screen back.
+   *
+   * The alternate screen is private and leaves no trace: the terminal is restored
+   * exactly as the session found it, and the conversation goes with the screen.
+   * A session that wants its transcript left behind runs on the terminal's own
+   * screen, where the rows were never private in the first place — the two modes
+   * are alternatives, not a base plus a compensation.
+   */
+  stop(): void {
     if (!this.started || this.stopped) return;
     this.stopped = true;
     this.started = false;
     // The driver restores every mode it may have set, unbuffered, and that
     // battery includes leaving the screen — which on most terminals also puts the
     // cursor back where it was when the screen was taken. So the driver goes
-    // first, and only then is the screen left (again, harmlessly) and the
-    // document written under it: written before the battery, it would be
-    // overprinted by whatever came next at the restored cursor.
+    // first, and only then is the screen left (again, harmlessly).
     const mainScreen = this.mainScreen;
     this.mainScreen = undefined;
     let failure: { readonly cause: unknown } | undefined;
@@ -305,9 +311,7 @@ export class TUI {
       },
       () => {
         if (mainScreen) { mainScreen.stop(); return; }
-        const width = Math.max(1, this.terminal.getDimensions().columns);
-        const document = prepareRows(options?.document ?? [], width);
-        this.terminal.write(leaveScreen(document, this.terminal.capabilities.supportsDec2026Sync));
+        this.terminal.write(leaveScreen([], this.terminal.capabilities.supportsDec2026Sync));
       },
     ]) {
       try { release(); }

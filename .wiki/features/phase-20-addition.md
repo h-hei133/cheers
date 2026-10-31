@@ -5,7 +5,7 @@ sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
 updated: 2026-10-31
 tags: [features, phase-20, additions, interaction, panels, completion]
-summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-68，已把七轮用户反馈与子代理review发现按职责归并，重复项合并，逐条记录完成情况。当前0完成、7部分完成、60本地验证、4未开始；其余章节保留研究过程与逐批证据。"
+summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-71，已把七轮用户反馈与子代理review发现按职责归并，重复项合并，逐条记录完成情况。当前0完成、8部分完成、62本地验证、1未开始；其余章节保留研究过程与逐批证据。"
 confidence: mixed
 ---
 
@@ -482,9 +482,9 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-67 | P2 | 未答复审批被取消后立即结束等待并保留中断恢复 | 20.43 | 本地验证 | — |
 | ADD-68 | P2 | MCP 关闭时立即拒绝未开始的调用 | 20.17 | 本地验证 | 预算到期不证明清理完成 |
 
-| ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节 | 未开始 | 需要先裁决 Enter 的语义，再改呈现 |
-| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节 | 未开始 | 需迁移旧格式；先做权限修复 |
-| ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节 | 未开始 | 实施时须同时更新锁定旧行为的 engine 测试并说明理由 |
+| ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
+| ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节 | 部分完成 | 权限已强制；凭据拆分与重复事实收敛未做 |
+| ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 
 ### 12.12 归并说明
 
@@ -516,13 +516,13 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | 状态 | 数量 | 条目 |
 |---|---:|---|
 | 完成 | 0 | — |
-| 部分完成 | 7 | ADD-01、02、03、07、08、25、41 |
-| 本地验证 | 60 | 其余已实施条目 |
+| 部分完成 | 8 | ADD-01、02、03、07、08、25、41、70 |
+| 本地验证 | 62 | 其余已实施条目（含本轮 ADD-69、ADD-71） |
 | 本地实现 | 0 | — |
-| 未开始 | 4 | ADD-30、ADD-69、ADD-70、ADD-71 |
+| 未开始 | 1 | ADD-30 |
 | **合计** | **71** | — |
 
-**没有一条达到"完成"。** 部分完成的 7 条各有明确缺口；其余条目停在"本地验证"，缺的都是同一类东西：真实终端/输入法/剪贴板、真实 provider 凭据、macOS/Windows 机器。这些条件本仓库无法自行提供，不能把本地绿色测试兑换成完成。
+**没有一条达到"完成"。** 部分完成的 8 条各有明确缺口；其余条目停在"本地验证"，缺的都是同一类东西：真实终端/输入法/剪贴板、真实 provider 凭据、macOS/Windows 机器。这些条件本仓库无法自行提供，不能把本地绿色测试兑换成完成。
 
 原 Phase 20 的 47 项矩阵保持 **38 complete / 9 partial / 0 open**，与本表分开记录。
 
@@ -5337,3 +5337,54 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 | 40 | 确认：退出时把整段会话重写到主屏，且有测试锁定 | `paint.ts` `leaveScreen`、`interactiveMode.stop`、`engine.test.ts` | 产品决策冲突，非缺陷 |
 
 **本轮未修改任何产品代码。** 三项都已并入第12节台账（ADD-69/70/71），状态为"未开始"。按第12.13节的顺序，ADD-70 的权限修复应当最先做（最小、最确定），其次是 ADD-69 的呈现与键位一致性，ADD-71 需要先裁决方案。
+
+## 23. 第十轮实施（2026-10-31）：ADD-69/70/71 的第一批落地
+
+本轮按第 12.13 节的顺序实施，只做有确定证据、不需要真实环境验收的部分。三项都没有被宣称"完成"——完成条件里仍缺真实终端、真实 provider 与用户环境。
+
+### 23.1 ADD-71：fullscreen 退出只恢复终端（已实施）
+
+裁决是方案 A。改动落在三处，且**先改断言再改实现**，理由写在测试里：
+
+- `paint.ts` 的 `leaveScreen` 现在只负责"把屏还回去"。它保留 `rows` 参数，因为会话中途把终端交给子进程、或借用备用屏显示覆盖层时，仍需要把原内容放回；会话结束时传空数组。注释明确写出两种模式是**互斥选择**，不是"基础模式 + 补偿"。
+- `engine.ts` 的 `stop()` 去掉了 `TuiStopOptions`，不再在离开备用屏后重写任何文档；`frame.ts` 里那个只服务于该行为的接口一并删除。
+- `interactiveMode.stop()` 不再渲染 `transcript.render(...)` 当退出文档，因此也**没有**了那条可以失败的清理步骤。
+
+被否决的行为由三条测试改写并说明：`engine.test.ts` 的 "leaves no conversation under the restored screen"（原断言要求重写整段会话）、"keeps the terminal's own screen rows in the scrollback"（补上另一模式的正向覆盖）、`firstFrame.test.ts` 的 "gives a private screen back without leaving the conversation behind" 与 "keeps the conversation on the terminal's own screen"。另外删除了 `interactiveMode.test.ts` 中 `fault: 'transcript'` 这一故障注入——它注入的步骤已不存在，保留只会是一条永远无法被触发的用例。
+
+`regular` 模式不受影响：它的行本来就写在终端自己的屏上，停止时只释放资源。
+
+### 23.2 ADD-69：等待中的输入可见，且不进对话记录（已实施）
+
+对照 Codex 与 oh-my-pi：两者都把待发送输入放在**输入框上方的独立区域**，从不写进对话记录；Codex 用 Tab 纯排队、Enter steer，oh-my-pi 用 `ctrl+q` 排队。它们都没有"队列条目进入 transcript"的做法。这支持第 22.1 节的方向。
+
+改动：
+
+1. **气泡的写入时机移到了"真正发出"之后。** `onSubmit` 现在先判断 busy：忙碌时只有 steer/followUp 分支才 `echoUser`；落入 `queue.push` 的输入**不写**用户块。新增的 `echoUser` 与 `runQueued` 两个方法把"记录"和"开始运行"分开，五处队列出队点（普通排空、覆盖层关闭、goal 调度、turn 结束、picker 结束）全部改为 `runQueued`——条目开始运行时才成为对话的一部分。
+2. **新增待发送区。** `chrome/pendingInput.ts` 渲染最多 3 行，每行标注 `steer` 或 `queued`，多行输入折成 `↵`，超出部分显示 `+N more · /queue to manage`。它画在输入框正上方，`composerOffset` 把它计入，因此鼠标命中与几何查询仍然落在真实的输入框行上。
+3. **数据来自既有的队列 owner。** `ViewContext.pendingInput()` 只读 `runtime.input().queue.entries()` 与 `SubmissionQueue.control.entries()`，不新建队列、不改三车道模型。
+4. **空闲时 `ctrl+q` 不再是空操作。** 没有运行中的 turn 时，它按 Enter 的语义立即发送，并给出一条 notice 说明"没有 turn 可等，已直接发送"；空草稿仍然什么都不做。键位说明同步改为 "Queue the draft to run after the turn; sends it now when idle"，`.wiki/guides/keybindings.md` 的表格与正文一并更新（该表格被 `keyGuide.test.ts` 逐行比对）。
+5. **提示行文案与实现对齐。** 忙碌提示从 `enter steer before next step` / `ctrl+q run after turn` 改为 `enter steer` / `ctrl+q queue`：不再承诺 Enter 一定 steer（命令、组合、带图输入会排队），逐条的真实去向由待发送区说明。`hints.test.ts` 的断言随之修改并写明理由。
+
+仍然保留的边界：排队条目不落盘（与第 22.1 节第 5 条一致），退出后一起消失；`/queue` 仍是编辑、重排、取消单条的唯一入口。
+
+### 23.3 ADD-70：含凭据的配置文件强制 0600（部分实施）
+
+只做了第 22.2 节判定为"最小、最确定、风险最低"的那一项，**没有**做文件拆分：
+
+- 新增 `config/secret.ts`：`holdsCredentialMaterial()` 只认真正的材料（非空 `apiKey`、非空 `accountAuth` 对象），provider 名、模型 id、空白占位都不算；`CREDENTIAL_FILE_MODE = 0o600`。
+- `persistence.ts` 的写入按**合并后的结果**决定模式：带凭据就 0600，不带则沿用 umask 默认。因此老文件在下一次保存时被收窄，而移除最后一个凭据的保存不会留下一条已无理由的规则。
+- 四条回归：API key、连接里的 account token 各自收窄；普通设置文件保持原模式；空白占位不被当作凭据。
+
+未做的部分（凭据拆到独立文件、同一事实 4–5 处重复的收敛）仍留在 ADD-70 的"尚缺"里。理由：拆分要同时改 22 个生产写入点、71 个测试文件与迁移路径，属于架构级改动；在没有真实旧格式样本与回滚验证的前提下仓促实施，风险高于本轮收益。
+
+### 23.4 验证
+
+单一串行执行，没有并发：
+
+- `vitest run`（7 个聚焦文件）：659 项通过。包含 `engine`、`hints`、`view`、`persistence`、`keymap`、`firstFrame`、`interactiveMode`。
+- `tsc -p packages/ts-shell/tsconfig.build.json --noEmit`：通过（测试文件的既有类型问题不在本次范围，未新增）。
+- 五道静态门：`verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`verify:docs-drift:strict` 全部通过（118 条既有 advisory 不变）。
+- `npm run build`：通过，manifest `818a1992a095`。
+
+**没有**运行 20k PTY 压测，也没有任何在内存中塞入大量消息的脚本。**没有**真实终端/真实 provider 证据，因此三项均不升为"完成"。

@@ -140,6 +140,54 @@ it('does not acquire ambient facts behind transient hints or a search bar', () =
   expect(ambient).not.toHaveBeenCalled();
 });
 
+describe("input that has not been sent yet", () => {
+  const waiting = (entries: readonly { stage: 'steer' | 'queued'; text: string }[]) =>
+    surface({ pendingInput: () => entries });
+
+  it("draws each waiting entry above the prompt and keeps it out of the transcript", () => {
+    const { view } = waiting([
+      { stage: 'steer', text: 'tighten the loop' },
+      { stage: 'queued', text: '/review\nsecond line' },
+    ]);
+    view.transcript.append({ kind: 'user', text: 'first question', finalized: true });
+    const rows = frame(view);
+    const steerRow = rows.findIndex(row => row.includes('tighten the loop'));
+    const queuedRow = rows.findIndex(row => row.includes('/review ↵ second line'));
+    const composerRow = view.composerGeometry()!.top;
+    expect(steerRow).toBeGreaterThanOrEqual(0);
+    expect(queuedRow).toBe(steerRow + 1);
+    // Above the prompt, in delivery order: a waiting entry is not conversation,
+    // so it never appears in the transcript the model was given.
+    expect(queuedRow).toBeLessThan(composerRow);
+    expect(rows.slice(0, composerRow).filter(row => row.includes('first question'))).toHaveLength(1);
+    expect(view.transcript.all().map(block => block.text)).toEqual(['first question']);
+  });
+
+  it("shows the delivery each entry is waiting for", () => {
+    const { view } = waiting([{ stage: 'steer', text: 'a' }, { stage: 'queued', text: 'b' }]);
+    const text = frame(view).join('\n');
+    expect(text).toContain('steer · a');
+    expect(text).toContain('queued · b');
+  });
+
+  it("disappears as soon as nothing is waiting, and never pushes the prompt off screen", () => {
+    const entries = [{ stage: 'queued' as const, text: 'waiting' }];
+    const { view } = waiting(entries);
+    expect(frame(view).join('\n')).toContain('waiting');
+    const cleared = waiting([]);
+    expect(frame(cleared.view).join('\n')).not.toContain('waiting');
+    // A narrow, short frame keeps the prompt and its caret visible; the band is
+    // a reminder, and losing the prompt to it would be worse than losing it.
+    const short = waiting(Array.from({ length: 5 }, (_, index) => ({ stage: 'queued' as const, text: `entry ${index}` })));
+    for (const rows of [3, 4, 6]) {
+      const plan = short.view.renderFrame({ columns: 40, rows });
+      expect(plan.rows.length).toBeLessThanOrEqual(rows);
+      expect(plan.rows.some(row => row.includes(CURSOR_MARKER))).toBe(true);
+    }
+    expect(frame(short.view).join('\n')).toContain('+2 more');
+  });
+});
+
 describe("the document a main-screen frame reports", () => {
   it("retains written history through one-row and unavailable terminal sizes", () => {
     const { view } = surface();

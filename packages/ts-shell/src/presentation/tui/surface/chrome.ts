@@ -4,6 +4,7 @@ import { highlightComposer } from "../composer/projection.js";
 import type { ComposerLayout } from "../composer/contract.js";
 import { truncateToWidth } from "../text/layout.js";
 import { renderHints } from "../chrome/hints.js";
+import { renderPendingInput } from "../chrome/pendingInput.js";
 import { renderSearchBar } from "../chrome/searchBar.js";
 import { renderActivity } from "../transcript/live.js";
 import type { InteractiveView, ViewContext } from "./contract.js";
@@ -12,6 +13,8 @@ import { MIN_TRANSCRIPT_ROWS, composerRowBudget } from "./budget.js";
 /** The bottom rows, composed from the current host facts and draft. */
 export interface ChromeLayout {
   readonly rows: string[];
+  /** Rows of waiting input drawn directly above the composer. */
+  readonly pendingRows: number;
   readonly composerOffset: number;
   readonly composerRows: string[];
   readonly composerLayout: ComposerLayout;
@@ -41,6 +44,11 @@ export function renderChrome(
   );
   const composerRows = highlightComposer(composerLayout, context.composerSelection?.());
   let remaining = chromeCapacity - composerRows.length;
+  // Waiting input sits directly above the prompt, where the eye goes after
+  // typing: it is the answer to "what did that Enter just do?". It is bounded
+  // and yields to everything else, because it is a reminder rather than content.
+  const pendingRows = renderPendingInput(context.pendingInput?.() ?? [], width).slice(0, Math.max(0, remaining));
+  remaining -= pendingRows.length;
   const hintStatus = context.hintStatus?.();
   const completionStatus = hintStatus?.completion;
   const suggestionRows = view.suggestionsOpen ? view.suggestions.render(width, Math.max(0, remaining - inputRows - Number(!!completionStatus))) : [];
@@ -73,9 +81,13 @@ export function renderChrome(
   const statusRows = [...activityRows, ...overlayRows];
   const visibleStatus = remaining > 0 ? statusRows.slice(-remaining) : [];
   const droppedStatus = statusRows.length - visibleStatus.length;
+  // Pending entries sit between the transcript and the prompt, so the composer
+  // offset counts them: geometry answered for the composer must be the rows the
+  // pointer will actually find it on.
   return {
-    rows: [...visibleStatus, ...composerRows, ...suggestionRows, ...hints].map(row => truncateToWidth(row, width)),
-    composerOffset: visibleStatus.length, composerRows, composerLayout,
+    rows: [...visibleStatus, ...pendingRows, ...composerRows, ...suggestionRows, ...hints].map(row => truncateToWidth(row, width)),
+    pendingRows: pendingRows.length,
+    composerOffset: visibleStatus.length + pendingRows.length, composerRows, composerLayout,
     overlayOffset: activityRows.length - droppedStatus, overlayHeight: overlayRows.length, overlayRows, suggestionRows: suggestionRows.length,
   };
 }

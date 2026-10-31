@@ -8,6 +8,7 @@ import { validateRawConfig } from './layers.js';
 import { ConfigDocumentError } from './syntax.js';
 import { patchConfigDocument } from './patch.js';
 import { mergeConfigEdit } from './conflict.js';
+import { CREDENTIAL_FILE_MODE, holdsCredentialMaterial } from './secret.js';
 import { ConfigWriteError, type ConfigWriteState } from './outcome.js';
 import { assertProfileIdentity, assertProfileStorage, currentProfile, type ProfileContext } from '../core/paths/profile/context.js';
 import { isWithin } from '../core/paths/profile/identity.js';
@@ -83,7 +84,11 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
       if (text !== current?.text) {
         assertOwner(baseline.path, profile);
         state = 'unknown'; code = 'write-failed';
-        writeTextFileAtomic(baseline.path, text);
+        // A document carrying keys or account tokens is owner-readable only.
+        // Decided from the merged result, so a write that removes the last
+        // credential leaves the file at its ordinary permissions rather than
+        // keeping a rule that no longer has a reason.
+        writeTextFileAtomic(baseline.path, text, holdsCredentialMaterial(merged) ? CREDENTIAL_FILE_MODE : undefined);
         assertOwner(baseline.path, profile);
         code = 'verification-failed';
         if (readConfigSnapshot(baseline.path)?.text !== text) throw new ConfigWriteError('verification-failed', 'unknown');

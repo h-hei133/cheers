@@ -248,6 +248,25 @@ describe("input while a turn runs", () => {
     press("\r");
     expect(actions.submit).toHaveBeenCalledWith("h");
   });
+
+  it("sends the draft and says so when ctrl+q is pressed with no turn running", () => {
+    // The key is bound and named in the hints. Doing nothing while idle left a
+    // user pressing it and seeing no effect, so it now means what it says: the
+    // message runs now, because there is no turn to wait behind.
+    const { press, actions, surface } = build();
+    press("h");
+    press("\x11");
+    expect(actions.submit).toHaveBeenCalledWith("h");
+    expect(surface.editor.getText()).toBe("");
+    expect(actions.reportNotice).toHaveBeenCalledWith("No turn is running; the message was sent now instead of queued.");
+  });
+
+  it("does nothing on ctrl+q with an empty draft", () => {
+    const { press, actions } = build();
+    press("\x11");
+    expect(actions.submit).not.toHaveBeenCalled();
+    expect(actions.reportNotice).not.toHaveBeenCalled();
+  });
 });
 
 describe("interruption", () => {

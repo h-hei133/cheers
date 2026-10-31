@@ -653,6 +653,41 @@ it('retains composed prose for the submission boundary instead of sending raw ma
   } finally { mode.stop(); }
 });
 
+it('keeps a waiting message out of the conversation and shows it above the prompt', () => {
+  // A message that is only waiting has not been asked yet. Putting it in the
+  // transcript made it indistinguishable from one already delivered — and a
+  // message the user then cancelled left a question behind that never ran.
+  const { mode } = build();
+  const host = mode as unknown as { busy: boolean; onSubmit(text: string): void; queue: SubmissionQueue;
+    options: { sessionRuntime: ShellSessionRuntime }; view: InteractiveView };
+  host.busy = true;
+  try {
+    host.onSubmit('/review --staged');
+    expect(host.queue.control.entries().map(entry => entry.text)).toEqual(['/review --staged']);
+    expect(host.view.transcript.all().filter(block => block.kind === 'user')).toHaveLength(0);
+    expect(stripAnsi(host.view.renderFrame({ columns: 60, rows: 16 }).rows.join('\n'))).toContain('queued · /review --staged');
+  } finally { mode.stop(); }
+});
+
+it('records a steered message once it is delivered, and not before', () => {
+  const { mode } = build();
+  const host = mode as unknown as { busy: boolean; onSubmit(text: string, disposition?: 'steer' | 'followUp'): void;
+    options: { sessionRuntime: ShellSessionRuntime }; view: InteractiveView };
+  const followUp = vi.fn(), steer = vi.fn();
+  host.options.sessionRuntime.input = () => ({ followUp, steer, pending: () => ({ steering: [], followUps: [] }) }) as never;
+  host.busy = true;
+  try {
+    host.onSubmit('tighten the loop', 'steer');
+    expect(steer).toHaveBeenCalledWith('tighten the loop');
+    // A steer was accepted by the running turn, so it is part of the conversation.
+    expect(host.view.transcript.all().filter(block => block.kind === 'user').map(block => block.text)).toEqual(['tighten the loop']);
+    host.onSubmit('then run the tests', 'followUp');
+    expect(followUp).toHaveBeenCalledWith('then run the tests');
+    expect(host.view.transcript.all().filter(block => block.kind === 'user').map(block => block.text))
+      .toEqual(['tighten the loop', 'then run the tests']);
+  } finally { mode.stop(); }
+});
+
 it('passes leading whitespace and second-line functional markers to prose dispatch', () => {
   const { mode } = build(); const host = mode as unknown as { busy: boolean; onSubmit(text: string): void; queue: SubmissionQueue };
   host.busy = true;
@@ -3827,7 +3862,10 @@ describe("session wiring", () => {
   });
 
   it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
-    (['subscription', 'transcript', 'terminal-write', 'terminal-stop', 'error-report', 'stdin'] as const).map(fault => ({ kind, fault }))
+    // 'transcript' used to be a cleanup fault: stopping rendered the whole
+    // conversation into an exit document. The private screen no longer writes
+    // one, so that step does not exist to fail.
+    (['subscription', 'terminal-write', 'terminal-stop', 'error-report', 'stdin'] as const).map(fault => ({ kind, fault }))
   ))('continues failed $fault cleanup and exits the actual $kind host', async ({ kind, fault }) => {
     const exit = vi.fn();
     let armed = false;
@@ -3846,7 +3884,6 @@ describe("session wiring", () => {
     const write = vi.spyOn(terminal, 'write');
     const dispose = vi.spyOn(host.stdin, 'dispose');
     if (fault === 'stdin') dispose.mockImplementation(() => { throw new Error('PRIVATE_CLEANUP_DETAIL'); });
-    if (fault === 'transcript') render.mockImplementationOnce(() => { throw new Error('PRIVATE_CLEANUP_DETAIL'); });
     if (fault === 'terminal-write') write.mockImplementationOnce(() => { throw new Error('PRIVATE_CLEANUP_DETAIL'); });
     const pending: Promise<void>[] = [];
     const original = host.shutdown.bind(mode);

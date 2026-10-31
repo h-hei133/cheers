@@ -234,3 +234,54 @@ describe('revision-bound configuration saves', () => {
     expect(writer).not.toHaveBeenCalled(); expect(read()).toEqual({ theme: 'light', maxTurns: 9 });
   });
 });
+
+describe('credential file permissions', () => {
+  let root: string;
+  let file: string;
+  beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), 'config-mode-')); file = path.join(root, 'config.json'); });
+  afterEach(() => { vi.restoreAllMocks(); fs.rmSync(root, { recursive: true, force: true }); });
+  const write = (value: unknown) => fs.writeFileSync(file, JSON.stringify(value));
+  const mode = () => fs.statSync(file).mode & 0o777;
+
+  it('writes a document holding an API key as owner-readable only', () => {
+    write({ theme: 'dark' });
+    fs.chmodSync(file, 0o644);
+    const base = readRuntimeConfigEditAt(file);
+    writeRuntimeConfigFileAt(file, {
+      ...base.values,
+      providerCredentials: { openai: { apiKey: 'synthetic-secret' } },
+    }, base);
+    expect(mode()).toBe(0o600);
+    // The bytes are what the merge said; narrowing the mode did not drop fields.
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).theme).toBe('dark');
+  });
+
+  it('narrows an account token in a connection record too', () => {
+    write({});
+    fs.chmodSync(file, 0o644);
+    const base = readRuntimeConfigEditAt(file);
+    writeRuntimeConfigFileAt(file, {
+      providerConnections: [{
+        id: 'c1', provider: 'openai', authType: 'account-auth',
+        accountAuth: { openai: { type: 'openai-chatgpt-account', accessToken: 'a', refreshToken: 'r', expiresAt: 1 } },
+      }],
+    }, base);
+    expect(mode()).toBe(0o600);
+  });
+
+  it('leaves an ordinary settings file at the umask default', () => {
+    write({ theme: 'dark' });
+    fs.chmodSync(file, 0o644);
+    const base = readRuntimeConfigEditAt(file);
+    writeRuntimeConfigFileAt(file, { ...base.values, maxTurns: 9 }, base);
+    expect(mode()).not.toBe(0o600);
+  });
+
+  it('does not treat a blank placeholder as a credential', () => {
+    write({});
+    fs.chmodSync(file, 0o644);
+    const base = readRuntimeConfigEditAt(file);
+    writeRuntimeConfigFileAt(file, { providerCredentials: { openai: { apiKey: '   ' } } }, base);
+    expect(mode()).not.toBe(0o600);
+  });
+});

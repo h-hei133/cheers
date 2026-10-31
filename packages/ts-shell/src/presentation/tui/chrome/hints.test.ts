@@ -80,8 +80,11 @@ describe("renderHints", () => {
       80,
     );
     const text = stripAnsi(rows[0]!);
-    expect(text).toContain("enter steer before next step");
-    expect(text).toContain("ctrl+q run after turn");
+    // The hint names the gesture, not a promise about delivery: a command or a
+    // composed prompt waits for the next turn instead of steering, and the
+    // pending band above the prompt is where each entry says which it is.
+    expect(text).toContain("enter steer");
+    expect(text).toContain("ctrl+q queue");
   });
   it("shows queued follow-up counts while busy", () => {
     const rows = renderHints(

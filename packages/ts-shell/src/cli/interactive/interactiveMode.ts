@@ -393,6 +393,16 @@ export class InteractiveMode {
         // command run cannot take, the host's.
         queuedCount: () => this.queue.length + (this.options.sessionRuntime.input?.()?.pending().followUps.length ?? 0),
         steeringCount: () => this.options.sessionRuntime.input?.()?.pending().steering.length ?? 0,
+        // Delivery order: steering reaches the turn before its next step, then
+        // follow-ups and host-queued work run after it. Only the text is read:
+        // the band is a reminder, and the queue itself stays the owner.
+        pendingInput: () => [
+          ...(this.options.sessionRuntime.input?.()?.queue?.entries() ?? []).map(entry => ({
+            stage: entry.lane === "steering" ? "steer" as const : "queued" as const,
+            text: entry.text,
+          })),
+          ...this.queue.control.entries().map(entry => ({ stage: "queued" as const, text: entry.text })),
+        ],
         now: () => Date.now(),
         ambient: () => readAmbientFacts(this.options.runtimeContext.session.id, jobsFor(this.options.runtimeContext)?.registry),
         cancelArmed: () =>
@@ -564,7 +574,7 @@ export class InteractiveMode {
     });
     this.tui.onInput((data) => this.stdin.feed(data));
     this.releaseEvents = this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
-    this.releaseInputQueue = attachSubmissionQueue(this.options.sessionRuntime, this.queue, text => this.run(text, this.queue.takeAttachments()),
+    this.releaseInputQueue = attachSubmissionQueue(this.options.sessionRuntime, this.queue, text => this.runQueued(text, this.queue.takeAttachments()),
       () => !(this.busy || this.pickerPending || this.overlay.active || this.stopped || this.questions.question()));
     this.releaseGoalSubmission = attachGoalSubmission(this.options.sessionRuntime, {
       ready: () => !this.stopped && !this.closing && !this.busy && !this.pickerPending && !this.overlay.active
@@ -574,7 +584,7 @@ export class InteractiveMode {
       settled: () => {
         this.busy = this.pickerPending;
         const next = this.pickerPending || this.overlay.active || this.stopped ? undefined : this.queue.shift();
-        if (next !== undefined) void this.run(next, this.queue.takeAttachments());
+        if (next !== undefined) this.runQueued(next, this.queue.takeAttachments());
         this.tui.requestRender();
       },
     });
@@ -622,10 +632,9 @@ export class InteractiveMode {
     if (this.stopped) return;
     this.stopped = true;
     let failure: { cause: unknown } | undefined;
-    let document: readonly string[] | undefined;
     // Each owner gets its cleanup attempt even when an earlier owner throws.
     // Keep the first failure for the caller; releasing resources is not proof
-    // that every subscription or the final document was restored.
+    // that every subscription or the terminal was restored.
     for (const cleanup of [
       () => this.promptContext.stop(),
       () => this.pickerLifecycles.abortAll(),
@@ -643,10 +652,13 @@ export class InteractiveMode {
       () => this.questions.abandon(),
       () => this.options.renderer.clearSink(),
       () => this.stdin.dispose(),
-      // Preserve the conversation in scrollback when rendering succeeds;
-      // document failure must still give the physical terminal back.
-      () => { document = this.state.transcript.render(Math.max(1, this.terminal.getDimensions().columns)).rows; },
-      () => this.tui.stop({ document }),
+      // `regular` keeps its transcript in the terminal's own scrollback, so
+      // stopping the engine leaves those rows where they were. `fullscreen` is a
+      // private screen: giving it back restores the terminal exactly, which is
+      // what a full-screen application is expected to do. Writing the
+      // conversation onto the restored screen would leak the private screen into
+      // the user's terminal history, so it does not happen.
+      () => this.tui.stop(),
     ]) {
       try { cleanup(); } catch (cause) { failure ??= { cause }; }
     }
@@ -679,7 +691,7 @@ export class InteractiveMode {
     if (this.overlay.handleKey(event, (picker, ids) => this.applyPicker(picker, ids, this.overlay.acceptanceFor(picker)))) {
       if (!this.overlay.active && !this.busy) {
         const next = this.queue.shift();
-        if (next !== undefined) void this.run(next, this.queue.takeAttachments());
+        if (next !== undefined) this.runQueued(next, this.queue.takeAttachments());
       }
       return;
     }
@@ -1007,14 +1019,6 @@ export class InteractiveMode {
       this.openPicker(text);
       return;
     }
-    this.state.transcript.append(
-      attachments && attachments.images.length > 0
-        ? { ...textBlock("user", text), images: attachments.images }
-        : textBlock("user", text),
-    );
-    // Sending is a statement that the user is done reading back: the window
-    // returns to the newest rows so the echo and the answer are in view.
-    this.view.scrollToEnd();
     if (this.busy) {
       // A new message means the user is waiting on the model, not on a
       // foreground command: promote that command in place rather than kill it.
@@ -1024,13 +1028,42 @@ export class InteractiveMode {
       const composed = needsComposition(text, [...createCommandRegistry(this.options.runtimeContext.cwd, this.options.runtimeContext.runtimeConfig).values(),
         ...catalogContributions(this.options.runtimeContext.cwd, this.options.runtimeContext.session.id).flatMap(entry => entry.commands)]);
       const input = text.startsWith("/") || composed || attachments?.images.length ? undefined : this.options.sessionRuntime.input?.();
-      if (!input) this.queue.push(text, attachments);
-      else if (disposition === "steer") input.steer(text);
-      else input.followUp(text);
+      if (!input) {
+        // Waiting work is not conversation: the entry is drawn above the prompt
+        // by the pending band, and it becomes a user block only if it starts
+        // running. Echoing it here would make a cancelled message look like a
+        // question the model had already been asked.
+        this.queue.push(text, attachments);
+      } else if (disposition === "steer") {
+        this.echoUser(text, attachments);
+        input.steer(text);
+      } else {
+        this.echoUser(text, attachments);
+        input.followUp(text);
+      }
       this.tui.requestRender();
       return;
     }
+    this.echoUser(text, attachments);
     void this.run(text, attachments);
+  }
+
+  /** Record a message in the conversation, which is what "sent" means. */
+  private echoUser(text: string, attachments?: { readonly images: readonly ImageContent[] }): void {
+    this.state.transcript.append(
+      attachments && attachments.images.length > 0
+        ? { ...textBlock("user", text), images: attachments.images }
+        : textBlock("user", text),
+    );
+    // Sending is a statement that the user is done reading back: the window
+    // returns to the newest rows so the echo and the answer are in view.
+    this.view.scrollToEnd();
+  }
+
+  /** Start work that was waiting: it joins the conversation as it begins. */
+  private runQueued(text: string, attachments?: { readonly images: readonly ImageContent[] }): Promise<void> {
+    this.echoUser(text, attachments);
+    return this.run(text, attachments);
   }
 
 
@@ -1178,7 +1211,13 @@ export class InteractiveMode {
           );
         }
       }
-      if (next !== undefined) void this.run(next, retrying !== undefined ? this.lastAttachments : this.queue.takeAttachments());
+      // A retry already put its prompt back in the transcript when it was
+      // requested; a queued entry has not been in the conversation yet and joins
+      // it as it starts.
+      if (next !== undefined) {
+        if (retrying !== undefined) void this.run(next, this.lastAttachments);
+        else this.runQueued(next, this.queue.takeAttachments());
+      }
     }
   }
 
@@ -1274,7 +1313,7 @@ export class InteractiveMode {
         }
         this.tui.requestRender();
         const next = picker.exclusive && !this.stopped && !this.overlay.active ? this.queue.shift() : undefined;
-        if (next !== undefined) void this.run(next, this.queue.takeAttachments());
+        if (next !== undefined) this.runQueued(next, this.queue.takeAttachments());
       });
   }
 
