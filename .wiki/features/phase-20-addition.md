@@ -417,7 +417,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---|---|---|---|---|
 | ADD-10 | P1 | 按源位置识别 slash/正文路径并 Tab 补全 | 第 8、第三批、第七十八至八十七批、第一百一十批 | 本地验证 | 真实 Windows 终端 |
 | ADD-11 | P1 | 正文 skill 候选与同提交多 skill 注入 | 第 9、第三批、21.22、21.24、第 24.48 节 | 本地验证 | Node/exe普通多skill真实派发及print原文保持已验证；真实计费金额、研究driver质量与其他环境组合仍缺 |
-| ADD-12 | P1 | 准入 slash 组合与 deep-research + skills | 第 10、第三批、第五十、五十二、五十九批、第 24.50 节 | 本地验证 | Node真实组合逐阶段及部分账本已有证据；截断拒绝/JSON分类经本地反转验证，新真实研究仍partial且1请求unknown；完整报告、真实资料质量、exe及桌面仍缺 |
+| ADD-12 | P1 | 准入 slash 组合与 deep-research + skills | 第 10、第三批、第五十、五十二、五十九批、第 24.51 节 | 本地验证 | Node真实公开夹具在隔离4096输出预算下完成全部原生阶段/3片段，13请求账本全结；旧2048的partial/unknown保留，真实资料质量、exe研究及桌面仍缺 |
 | ADD-37 | P2 | 显式队列入口保留附件与正文尾部空白 | 第九十五批 | 本地验证 | 真实 provider/平台 |
 | ADD-38 | P2 | 引用路径、apostrophe、转义目录的补全往返 | 第七十八至八十七批 | 本地验证 | 原生 Windows 文件系统 |
 | ADD-39 | P2 | 代码示例、URL、转义 slash 不误触发命令/skill | 第二十九、七十九批 | 本地验证 | 真实终端 |
@@ -6199,3 +6199,24 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 两次均只开放read/research_run，关闭MCP/context files/discovery/warming/retry/save；maxTurns2、每请求输出2048、最多14 POST、240秒、2MiB输出/会话文件、100ms采样768MiB RSS、Node heap768MiB，未触发probe守卫。全部19次真实子阶段请求含两份正确skill各一次并绑定各自native run，原输入/稳定去重、真实本地source/claim/复审read已核对。四home来源config/auth/catalog bytes或缺失、隔离config与夹具/project条目均不变，owned PID+start-time关闭，凭据/会话/expected正文scratch删除，无实际请求/响应/思考正文、key/address/header或prompt/session digest留存；RSS采样不算性能验收。证据、原始失败、独立反转、构建与安全核验归`.omx/artifacts/phase20-addition-research-diagnostics/`，没有覆盖tracked历史。
 
 一次延迟读回5b454f03精确代码CI41243494189已success、Watch41243494336 success；426c09c0文档CI41244810468仍in_progress、Watch41244810449 success，不替代本批代码CI。未运行全仓、20k、真实exe研究、PTY、桌面、local NormProof或委派复审。ADD-12仍本地验证、完整报告/真实资料质量/全部结算/目标真实诊断仍缺，ADD-11不升级、原47真实条件延后、goal active；本批清理、提交/推送及精确SHA的CI另绑。
+
+
+### 24.51 隔离输出预算下完成真实原生研究报告链
+
+沿第24.50节已实见的report output2048与请求cap2048，检查[原研究策略](../../packages/ts-shell/src/research/run/policy.ts)与[阶段提示词](../../packages/ts-shell/src/research/run/prompts.ts)后，确认completion reserve只是后续工作量的准入余量，不会提高maxOutputTokens；报告的12000字符上限也不保证适合某个token预算。本批只在隔离profile中把每请求输出从2048调到4096，问题、两份公开skill/重复调用、公开本地release.md、工具准入、maxTurns和其他probe守卫均保持原值。没有提高产品默认值、放宽JSON/引用/绑定检查或修改provider/auth。上一轮未分类且无用量的失败依旧unknown，不能据此补造其原因或成本。
+
+已推送产品commit `1e9c6ad57803ae45ee63e18d917c457d4b9b2b35`及既有build `7f47912610a7f053bb88a9e5cf5b2d4a5ccf2a0da9b17221cefcb06311a78dec`在生产Node20.3 --print完成一次实际原生研究。透明observer转交原Undici参数和未消费Response，实见1 GET + 13 POST均HTTP200；所有13个实际body均请求4096输出，只含read/research_run或空工具集。前景2请求，子阶段11请求：brief2、investigate2、gaps1、draft1、review2、report3；8个child均completed，研究status原值completed、3个报告片段获原schema/顺序/绑定/引用验证，独立复审completed且有实际read。来源1/claim1，stopCategory=none、无pending child或owner；完整链路断言、runner及CLI均exit0，而不只是前景query completed/success。
+
+| 三个已接受报告片段 | 实际body bytes | 请求输出cap | 实际output tokens |
+|---|---|---|---|
+| 0 | 13459 | 4096 | 2536 |
+| 1 | 15951 | 4096 | 2793 |
+| 2 | 18738 | 4096 | 2605 |
+
+本次三个报告请求的实际output均超过旧2048预算，支持把预算充分性作为独立的fixture条件；这是一次随机模型运行，不能宣称4096总能成功、是最小预算，或证明此前HTTP200后的未知失败均由截断造成。每请求精确用量通过相邻串行POST前的原生aggregate telemetry差量观察，13份都requests=1；input/output/cache逐项求和与原共享研究账本完全一致。账本42624 input + 19411 output，cache read23680已含在input，finalized13、pending/unknown均0、historyUnknown/breach均false。前景recentRequests仅2、tool counter0仍不代表总调用/工具数；token计数不是实际计费金额，亦未读取或保留实际响应/思考正文。
+
+全部11个实际子阶段body均包含两份精确method各一次、没有原invocation token，并绑定同一native run；持久methods及用户metadata保持完整原输入和稳定去重。只开放read/research_run，无MCP、context files、discovery、warming、retry或report save；maxTurns2、最多14 POST、240秒、2MiB输出/会话文件、100ms采样768MiB descendant RSS、Node heap768MiB守卫均未触发。采样峰值281092KiB、输出4284 bytes，仅是本轮资源观察，不算冷启动/性能验收。四home来源config/auth/catalog bytes或缺失、隔离配置、fixture bytes/project条目不变；owned PID+start-time关闭，凭据/会话/expected正文scratch删除，无key/address/header、实际请求/响应/思考正文或prompt/session digest留存。
+
+证据归新建且无tracked碰撞的`.omx/artifacts/phase20-addition-research-capacity/`。执行前保存probe/observer的非可执行精确source快照，安全分类覆盖本地固定错误、原生deadline/cancel/admission/step bound和源码拥有的Network error前缀，未知仍不回显；本次没有触发停止分类，不声称补证旧未分类错误。独立核验同时计算publicFixtureWorkflowAcceptance与真实性/安全性：本次两者passed、nativeResearchStatus=completed，realWorldResearchQuality与billingAmount明确unverified；当前compilerInputs/inputsDigest、exe size/SHA及原fixture文本一致性已检查。此前各2048预算下的partial、未命中诊断、unknown账本及失败验收收据保持原值。
+
+本批只修改文档/HANDOFF并补ignored真实证据，没有新产品实现、build、unit、反转、PTY、全仓、20k、local NormProof或委派复审。一次延迟读回1e9c6ad5精确代码CI41246087467仍in_progress、Watch41246087514 success；426c09c0文档CI41244810468仍in_progress、Watch41244810449 success；均未用Watch代替代码CI，也不立刻轮询本批CI。ADD-12的Node公开夹具完整链路/全结账本缺口已补，真实资料研究质量、生产exe研究及桌面、实际金额仍缺；ADD-11不整体升级，原47真实条件延后、goal active。最终静态/语法/安全核验与提交/推送结果另绑。

@@ -1733,3 +1733,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Research reports a generic invalid_response for generated JSON, or accepts syntactically valid stage output even though the model ended at its length limit.
 - **Root Cause**: The generic subagent result dropped the final assistant stopReason, and the local bounded JSON reader reused a network error class. Stage consumers lost the admission fact and the error's local provenance.
 - **Rule**: Preserve the native terminal reason across the subagent boundary; let structured research reject length before stage application without changing generic child failure semantics. Map only the local parser's invalid_response to a fixed research error, retaining byte/depth/schema bounds and no raw output. Test the actual runner-to-research path. For final cleanup assertions, inspect the current store: a returned run snapshot can predate finally releasing its owner.
+
+### Research Completion Reserve Does Not Raise The Request Output Cap
+
+- **Symptom**: Research reserves room for later report work, yet a structured report still exhausts a smaller configured per-request output budget.
+- **Root Cause**: Completion reserve is admission workload room, not a maxOutputTokens override. The report schema's character bound is independent of the provider's token cap.
+- **Rule**: Inspect actual request caps and per-request usage separately from reserved workload and JSON size bounds. Test capacity changes in isolated configuration, retain earlier partial/unknown receipts, and preserve production caps and truncation rejection. A later completed workflow cannot establish an earlier unclassified request's cause or missing usage.
