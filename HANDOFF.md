@@ -1412,3 +1412,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A two-file focused `vitest run` from the repository root spins up dozens of suites, then dies with `FATAL ERROR: Ineffective mark-compacts near heap limit`.
 - **Root Cause**: `.tmp/integration/**` holds archived copies of `packages/ts-shell/src/**/*.test.ts` from earlier reversal runs. Root-level Vitest discovery walks them, so a focused path still collects every archived copy — dozens of extra suites, each with its own module graph.
 - **Rule**: Run `vitest` from `packages/ts-shell` with package-relative paths, never from the repository root. Treat a discovery set larger than the paths you passed as this trap rather than as product failures, and do not raise the heap limit to work around it — the archive is the input, not the workload.
+
+### A New Load-Time Warning Changes Every Fixture That Triggers It
+
+- **Symptom**: After adding a config diagnostic, unrelated suites fail with `expected [ Array(1) ] to deeply equal []` — the assertion is about validation or endpoints, the extra entry is the new warning.
+- **Root Cause**: Test fixtures write config files at the umask default. A warning that describes the file's real state is then correct, and it lands in an assertion that was written when that state was not observable.
+- **Rule**: Fix the fixture, not the warning: make it reproduce what the product writes (a credential file is `0600`), and say in the fixture why. Then search every suite that writes the same kind of file — `grep -l` the credential field and `writeFileSync` together — instead of letting CI report them one per round. Do not special-case the warning away in tests; that would make the gate unable to see the real condition.
+
+### Built-CLI Tests Read The Published Build, Not The Working Tree
+
+- **Symptom**: `src/cli/print/*` fails with `Build inputs changed after the build (<hash>). Run npm run build:ts.` while the source compiles.
+- **Root Cause**: Those tests spawn `dist/cli.js`, which verifies its own input digest against the tree.
+- **Rule**: Run `npm run build` after any source change before running them; treat the digest mismatch as a stale artifact rather than a product failure, and do not edit the assertion to accept the stale build.
