@@ -101,6 +101,7 @@ describe("connect command runtime", () => {
 
     expect(result.kind).toBe("local");
     expect(result.output).toContain("Connected provider openai-compatible");
+    expect(result.output).toContain(`Stored at: ${getUserAuthPath()}`);
 
     const configPath = getUserAuthPath();
     const stored = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
@@ -163,6 +164,7 @@ describe("connect command runtime", () => {
     expect(active?.id).not.toBe('retained-sibling');
     const resolution = resolveProviderCredential({ runtimeConfig: configStore.getRuntimeConfig(workspaceRoot), env: {} });
     expect(resolution.credential).toMatchObject({ source: 'connection', connectionId: active!.id });
+    expect(result.output).toContain(`Stored at: ${getUserAuthPath()}`);
     if (mode === 'account') {
       expect(active?.accountAuth?.openai?.refreshToken).toBe('native-refresh');
       expect(resolution.credential?.authMode).toBe('account-auth');
@@ -182,7 +184,7 @@ describe("connect command runtime", () => {
     expect(refresh).not.toHaveBeenCalled();
     const result = await runConnectCommand(['login', 'openai', '--api-key', 'synthetic-key'], context);
     expect(refresh).toHaveBeenCalledOnce();
-    expect(result.output).toContain('Stored at:');
+    expect(result.output).toContain(`Stored at: ${getUserAuthPath()}`);
     expect(result.output).toContain('Configuration was not applied (rejected)');
   });
 
@@ -703,6 +705,51 @@ describe("connect command runtime", () => {
     const ledger = fs.readFileSync(refreshLeasesPath(), 'utf8'); const rows = JSON.parse(ledger).leases as Record<string, { grant?: { origin?: string } }>;
     expect(Object.values(rows).map(row => row.grant?.origin)).toContain('login');
     expect(ledger).not.toMatch(/native-access|native-refresh|raw-access|raw-refresh/);
+  });
+
+  function linkedDocuments(): { settings: string; auth: string } {
+    const targets = { settings: path.join(fakeHome, 'settings-owner.json'), auth: path.join(fakeHome, 'auth-owner.json') };
+    fs.mkdirSync(path.dirname(getUserRuntimeConfigPath()), { recursive: true });
+    fs.writeFileSync(targets.settings, '{"theme":"dark"}');
+    fs.writeFileSync(targets.auth, '{}', { mode: 0o600 });
+    fs.symlinkSync(targets.settings, getUserRuntimeConfigPath());
+    fs.symlinkSync(targets.auth, getUserAuthPath());
+    return targets;
+  }
+
+  it('keeps stable document links through native grant publication and failed-login cleanup', async () => {
+    const targets = linkedDocuments();
+    __setOpenAIAccountAuthRunnerForTest(() => nativeLogin());
+    const result = await runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot });
+    expect(result.output).toContain(`Stored at: ${getUserAuthPath()}`);
+    expect(result.output).not.toContain('Automatic renewal remains unverified');
+    const rows = JSON.parse(fs.readFileSync(refreshLeasesPath(), 'utf8')).leases;
+    expect(Object.values(rows).map((row: any) => row.grant?.origin)).toContain('login');
+    __setOpenAIAccountAuthRunnerForTest(async () => { throw new Error('synthetic failed login'); });
+    const failed = await runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot });
+    expect(failed.output).toContain('pending -> error');
+    expect(failed.output).toContain(`Stored at: ${getUserAuthPath()}`);
+    expect(fs.realpathSync(getUserRuntimeConfigPath())).toBe(targets.settings);
+    expect(fs.realpathSync(getUserAuthPath())).toBe(targets.auth);
+  });
+
+  it.each(['settings', 'auth'] as const)('refuses a native login after an identical %s source changes target', async kind => {
+    const targets = linkedDocuments();
+    let before: Buffer | undefined;
+    __setOpenAIAccountAuthRunnerForTest(async () => {
+      const result = await nativeLogin();
+      const source = kind === 'settings' ? getUserRuntimeConfigPath() : getUserAuthPath();
+      before = fs.readFileSync(targets.auth);
+      const replacement = path.join(fakeHome, `replacement-${kind}.json`);
+      fs.copyFileSync(targets[kind], replacement);
+      fs.unlinkSync(source); fs.symlinkSync(replacement, source);
+      return result;
+    });
+    await expect(runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot }))
+      .rejects.toMatchObject({ code: 'conflict', state: 'unchanged' });
+    expect(fs.existsSync(refreshLeasesPath())).toBe(false);
+    expect(fs.readFileSync(targets.auth)).toEqual(before);
+    expect(fs.readFileSync(getUserAuthPath())).toEqual(before);
   });
 
   it.each(['delete', 'provider', 'duplicate', 'status', 'mirror'] as const)('rejects a native login when its pending owner changes: %s', async change => {

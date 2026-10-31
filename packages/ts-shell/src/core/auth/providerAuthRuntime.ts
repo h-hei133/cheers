@@ -1,10 +1,9 @@
 import { ConfigWriteError } from '../../config/outcome.js';
-import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { persistConfigEdit } from '../../config/persistence.js';
+import { configEditStorage, persistConfigEdit, type ConfigEdit } from '../../config/persistence.js';
 import { sameValue } from '../../config/values.js';
-import { CONFIG_FIELDS, getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { CONFIG_FIELDS, getRuntimeConfig, getUserAuthPath } from '../../config/runtimeConfig.js';
 import { resolveProviderCredential } from '../shell/providerCredentials.js';
 import { accountBinding, captureAccountEdit } from './account/state.js';
 import { grantRefreshLogin, reserveRefreshLogin, refreshLeasesPath, captureLeaseStore, type RefreshStore } from './account/lease.js';
@@ -44,7 +43,7 @@ let testOpenAILoginOverride:
 
 interface PendingLogin {
   readonly source: string;
-  readonly target: string;
+  readonly storage: readonly string[];
   readonly leaseStore: RefreshStore;
   readonly connection: ProviderConnectionConfig;
   readonly mirror: RuntimeConfigFile['providerCredentials'];
@@ -52,16 +51,16 @@ interface PendingLogin {
 }
 
 function capturePendingLogin(source: string, connection: ProviderConnectionConfig, workspaceRoot: string): PendingLogin {
-  const target = fs.realpathSync(source), current = readRuntimeConfigEditAt(target).values;
+  const edit = readRuntimeConfigEditAt(source), storage = configEditStorage(edit), current = edit.values;
   const matches = current.providerConnections?.filter(item => item.id.trim() === connection.id) ?? [];
   if (matches.length !== 1 || !sameValue(matches[0], connection)) throw new ConfigWriteError('conflict', 'unchanged');
-  return { source: path.resolve(source), target, leaseStore: captureLeaseStore(refreshLeasesPath()), connection: structuredClone(connection),
+  return { source: path.resolve(source), storage, leaseStore: captureLeaseStore(refreshLeasesPath()), connection: structuredClone(connection),
     mirror: structuredClone(current.providerCredentials), workspaceRoot };
 }
 
-function pendingMatches(pending: PendingLogin, current: Readonly<RuntimeConfigFile>): boolean {
+function pendingMatches(pending: PendingLogin, current: Readonly<RuntimeConfigFile>, edit: ConfigEdit<RuntimeConfigFile>): boolean {
   const matches = current.providerConnections?.filter(item => item.id.trim() === pending.connection.id) ?? [];
-  return path.resolve(getUserRuntimeConfigPath()) === pending.source && fs.realpathSync(pending.source) === pending.target
+  return path.resolve(getUserRuntimeConfigPath()) === pending.source && sameValue(configEditStorage(edit), pending.storage)
     && matches.length === 1 && sameValue(matches[0], pending.connection)
     && sameValue(current.providerCredentials?.[pending.connection.provider], pending.mirror?.[pending.connection.provider]);
 }
@@ -148,7 +147,8 @@ export async function runProviderAccountAuthLogin(input: {
     ].filter(Boolean).join("\n");
   } catch (error) {
     if (error instanceof ConfigWriteError) throw error;
-    const configPath = persistConnectionPatch({
+    const configPath = getUserAuthPath();
+    persistConnectionPatch({
       patchKind: "mark-error",
       connectionId,
       pending,
@@ -207,9 +207,9 @@ function persistConnectedAccountAuth(input: {
   readonly nativeResult: ProviderAccountAuthResult;
   readonly activate?: boolean;
 }): ProviderAccountAuthConnectionSummary & { readonly refreshWarning?: string } {
-  const edit = readRuntimeConfigEditAt(input.pending.target);
+  const edit = readRuntimeConfigEditAt(input.pending.source);
   const latest = edit.values;
-  if (!pendingMatches(input.pending, latest)) throw new ConfigWriteError('conflict', 'unchanged');
+  if (!pendingMatches(input.pending, latest, edit)) throw new ConfigWriteError('conflict', 'unchanged');
   const updatedAt = new Date().toISOString();
   const nextConnections = normalizeConnections(latest).map((connection) =>
     connection.id === input.connectionId
@@ -242,17 +242,18 @@ function persistConnectedAccountAuth(input: {
   try {
     enrollment = reserveRefreshLogin({ provider: input.provider, refreshToken: input.accountAuth.refreshToken,
       ...('clientId' in input.accountAuth ? { clientId: input.accountAuth.clientId } : {}), store: input.pending.leaseStore,
-      owner: credentialDigest([input.pending.source, input.pending.target, input.provider, input.connectionId,
+      owner: credentialDigest([input.pending.storage, input.provider, input.connectionId,
         input.pending.connection, input.pending.mirror?.[input.provider]]), generation: accountGeneration(input.accountAuth),
       native });
   } catch {
     // Without durable enrollment, a later compatibility baseline could grant these unverified credentials.
     throw new ConfigWriteError('write-failed', 'unchanged');
   }
-  const configPath = persistConfigEdit(input.pending.target, next, edit, CONFIG_FIELDS, current => pendingMatches(input.pending, current));
-  const confirmed = readRuntimeConfigEditAt(input.pending.target).values;
+  const configPath = getUserAuthPath();
+  persistConfigEdit(input.pending.source, next, edit, CONFIG_FIELDS, current => pendingMatches(input.pending, current, edit));
+  const confirmedEdit = readRuntimeConfigEditAt(input.pending.source), confirmed = confirmedEdit.values;
   const expected: RuntimeConfigFile = JSON.parse(JSON.stringify(next));
-  if (path.resolve(getUserRuntimeConfigPath()) !== input.pending.source || fs.realpathSync(input.pending.source) !== input.pending.target
+  if (path.resolve(getUserRuntimeConfigPath()) !== input.pending.source || !sameValue(configEditStorage(confirmedEdit), input.pending.storage)
     || confirmed.provider !== expected.provider || confirmed.activeProviderConnectionId !== expected.activeProviderConnectionId
     || !sameValue(confirmed.providerConnections?.filter(item => item.id.trim() === input.connectionId), expected.providerConnections?.filter(item => item.id === input.connectionId))
     || !sameValue(confirmed.providerCredentials?.[input.provider], expected.providerCredentials?.[input.provider])) {
@@ -289,7 +290,7 @@ function persistConnectionPatch(input: {
   readonly pendingConnection?: ProviderConnectionConfig;
   readonly pending?: PendingLogin;
 }): string {
-  const edit = readRuntimeConfigEditAt(input.pending?.target ?? getUserRuntimeConfigPath());
+  const edit = readRuntimeConfigEditAt(input.pending?.source ?? getUserRuntimeConfigPath());
   const latest = edit.values;
   if (input.patchKind === "insert-pending" && input.pendingConnection) {
     return writeUserRuntimeConfigFile({
@@ -310,9 +311,9 @@ function persistConnectionPatch(input: {
         }
       : connection,
   );
-  if (input.pending) return persistConfigEdit(input.pending.target, {
+  if (input.pending) return persistConfigEdit(input.pending.source, {
     ...latest, providerConnections: nextConnections,
-  }, edit, CONFIG_FIELDS, current => pendingMatches(input.pending!, current));
+  }, edit, CONFIG_FIELDS, current => pendingMatches(input.pending!, current, edit));
   return writeUserRuntimeConfigFile({
     ...latest,
     providerConnections: nextConnections,

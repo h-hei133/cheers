@@ -5483,3 +5483,15 @@ ADD-70 仍部分完成。模型/effort/serviceTier 默认仍物理嵌在 auth �
 三条实际反转均触发预期失败并 finally 精确恢复源码：移除空 owner 对旧叶子的覆盖 → 1 项失败；在 settings 验证前清理 auth → 1 项失败，暴露唯一默认值被删除；禁用物理 receipt 映射 → 3 项 advisor 失败。恢复后对应聚焦测试再次通过。最后 auth-only 保存改动之后重新运行 production noEmit/build；不引用旧 build 作为当前构建证据。
 
 ADD-70 仍部分完成：默认值已物理移出 auth，但其余重复事实的语义审计、真实旧版本回退和真实环境验收尚缺。未迁移操作员真实 HOME，未运行真实 provider/PTY、全仓回归或 20k 压测。`e10964da` 的代码 CI `41188245875` 最后读回仍 in_progress，Watch 成功不替代代码 CI；本批提交与 CI 另行绑定。原 Phase 20 真实验收继续延后，整体 goal active。
+
+### 24.4 存储提示与无 settings 的原生登录
+
+`c2819249042ea00ea4d4a5e47142029a0dcf6cf1` 已提交推送，读回 main 与 origin/main 精确一致、工作区干净。接着发现六处 catalogue/model/settings 提示仍说连接存入 config.json，已更正为 settings/config.json、connections/auth.json、catalogue/models.json；模型默认值说明与第 24.3 节一致。API-key、browser、native 登录/错误清理及连接 use/remove 的 `Stored at` 改报实际 auth 路径，内部 writer 返回的逻辑编辑路径合同保留。路径在保存前捕获，只有保存确认后才报告。
+
+补跑 Copilot 实际入口暴露生产缺陷：没有默认模型的 pending 连接只创建 auth.json，但 `capturePendingLogin` 对不存在的 settings 调用 realpath，ENOENT 在登录前逃逸。现复用 `configEditStorage` 捕获两份物理 source/canonical tuple；所有后续读取与保存保持原 logical source，由原 writer 选择 canonical 目标。只读复审发现改读 canonical alias 会使稳定 settings symlink 的 tuple 表示不一致，已修复；settings/auth 任一换目标都拒绝，即使字节相同。native proof、账号代次、精确 named credential、原 provider-slot 检查与 grant 合同保留。
+
+本批 7 个聚焦文件 **170 项**通过（model19、catalogue11、settings47、current11、connect60、Google17、Copilot5），重复不累加。Copilot 明确断言没有 config.json；三条新增链接用例覆盖稳定 settings/auth 链接的成功 grant/失败清理，以及两个相同字节新目标的拒绝和 auth 字节保留。两条实际反转分别恢复旧 settings realpath 假设、恢复 canonical-alias 后续读取，均恰好复现 1 项失败，finally 精确恢复源码后原回归再绿；最终 providerAuthRuntime SHA-256 `f834d76b33c835b983c4f434c86eba50e72ed66211244600d0853a8ea760dc21`。
+
+最终五门、production noEmit、diff、build 通过，manifest `8cd0f9836be9`；正式归档 judge exit0，导入解析与环 satisfied，仍只有 interactiveMode 22-name advisory，118 docs-source advisory 保留。复审最后无剩余阻塞发现，子代理仅只读，所有验证由主代理串行执行。未运行全仓、真实 provider/PTY 或 20k 压测。
+
+延迟读取 `e10964da` CI `41188245875` 已 failure：4 文件/10 项失败，12988 项通过，全部为第 24.3 节已修复的 advisor7/preset1/connect syntax1/completion1。`c2819249` 的代码 CI `41190177753` 最后 in_progress，Watch `41190177862` success；不得从 Watch 或本地结果声明代码 CI 已通过。ADD-70 与整体 goal 仍 partial/active，旧二进制回退、其余重复语义与真实环境继续列为尚缺。

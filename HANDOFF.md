@@ -1460,3 +1460,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A main or advisor account renews successfully but its captured checkpoint is skipped as changed configuration.
 - **Root Cause**: ConfigEdit.revision hashes the settings/auth pair, while provenance stores each file's raw SHA. Receipt matching compares the pair hash against physical origins and therefore updates neither auth nor settings origins.
 - **Rule**: Keep the pair revision for logical edit admission; carry exact per-file source, canonical path and before/after revisions in renewal receipts. Update only matching physical origins and retain full publication equality so unrelated settings/catalog/model changes still refuse adoption.
+
+### Native Login Must Admit Missing Settings And Preserve Its Source Representation
+
+- **Symptom**: A credential-only Copilot login throws ENOENT after its pending connection saves, or a native login through a stable settings symlink is refused as changed storage.
+- **Root Cause**: Pending capture assumes the logical settings path exists; later acquisition through its canonical alias changes the source positions in the storage tuple even when the link is unchanged.
+- **Rule**: Capture native pending ownership through ConfigEdit's full settings/auth source-and-target tuple, allowing an absent settings document. Keep later reads and writes on that original logical source; the writer owns canonical destinations. Compare the complete tuple before reservation, under the write precondition and after readback. A changed auth or settings target must refuse even when the bytes match. Report credential storage at the captured auth path without changing the internal logical edit path contract.

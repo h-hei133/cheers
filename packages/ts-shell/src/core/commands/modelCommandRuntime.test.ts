@@ -64,7 +64,7 @@ describe("model command runtime", () => {
     const result = await runModelCommand(['list'], { cwd: workspaceRoot,
       readConfiguration: () => ({ config, catalog: snapshot.providers, catalogDiagnostics: snapshot.diagnostics }) });
     expect(result.output).toContain('models.json could not be parsed');
-    expect(result.output).toContain('connections and request settings: config.json');
+    expect(result.output).toContain('settings: config.json; connections: auth.json');
     const help = await runModelCommand(['config'], { cwd: workspaceRoot });
     expect(help.output).toContain('user profile only');
     expect(help.output).toContain('inside the existing providers object');

@@ -270,7 +270,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         rows.unshift({ id, label: currentModel, detail: [active.credential ? `${active.credential.source} credential` : 'Current request', currentProvider, currentConnection, endpoint].filter(Boolean).join(' · '),
           note, disabled: true, focusable: true });
         const lines = [`Provider: ${currentProvider}`, `Model: ${currentModel}`, `Status: ${note}`, `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
-          'Catalogue: models.json (user profile only); connections and request settings: config.json.',
+          'Catalogue: models.json (user profile only); settings: config.json; connections: auth.json.',
           ...(currentConnection ? [`Selected connection: ${currentConnection}`] : []),
           ...(active.credential ? [`Credential source: ${active.credential.source}`] : []), ...(endpoint ? [`Endpoint: ${endpoint}`] : []),
           ...(active.blocked ? [`Request blocker: ${active.blocked}`] : []),
@@ -437,7 +437,7 @@ function rowId(connection: string | undefined, provider: string, model: string):
 
 function modelDetails(provider: CatalogProvider, connection?: ConnectionAvailability, source?: string): readonly string[] {
   return [`Provider: ${provider.label} (${provider.runtime})`,
-    'Catalogue: models.json (user profile only); connections and request settings: config.json.',
+    'Catalogue: models.json (user profile only); settings: config.json; connections: auth.json.',
     ...(connection ? [`Connection: ${connection.connectionId}`, ...(connection.label ? [`Label: ${connection.label}`] : []), ...(connection.endpoint ? [`Endpoint: ${connection.endpoint}`] : []),
       `Availability: ${availabilityLabel(connection.state)}`, connection.reason] : source ? [`Credential source: ${source}`] : ['Availability: configure a connection']),
     'Remote availability: unverified'];

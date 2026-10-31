@@ -10954,3 +10954,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：模型默认值移出 auth，续期来源收据修复
 
 [addition24.3](features/phase-20-addition.md#243-模型默认值移出-auth并修复续期的物理来源收据)将 model/thinkingEffort/serviceTier 移到用户 settings.modelPreferences，逻辑记录接口保留，按规范化 ID+provider 拆合并投影实际来源。空 owner 防止旧默认复活，纯凭据保存不创建 settings；auth stage 保留旧默认、settings 读回后才清理，两文档中断仍 unknown。导入保留独立 provider 默认，拒绝孤立/重复/错 provider 默认。延迟 CI 发现三处旧物理读取夹具与 advisor 真缺陷：pair hash 无法匹配逐文件 provenance；新增精确物理 before/after receipt，完整 publication equality 保留，auth-only checkpoint 也通过。32文件606项聚焦、三条实际反转/源码精确恢复、最新五门/noEmit/build通过，manifest d7ef008e7a1f；正式 judge 导入/环 satisfied，仅既有 interactiveMode advisory。9278c344/e9e94d43 代码 CI 失败已分类修正，e10964da 最后仍 in_progress；当前批次另绑 CI。旧二进制回退、其余重复语义与真实环境仍缺，ADD-70 partial、goal active。
+
+### 2026-10-31：修正连接存储提示与 auth-only 原生登录
+
+[addition24.4](features/phase-20-addition.md#244-存储提示与无-settings-的原生登录)修正六处旧 config.json 连接提示与 connect/native 的 Stored at 路径。Copilot 无模型默认的 pending 登录曾对缺失 settings 做 realpath；现通过 ConfigEdit 捕获完整两文件 source/canonical tuple、始终保留原 logical source，稳定链接成功，任一同字节换目标拒绝。7文件170项聚焦、两条实际反转/源码精确恢复、五门/noEmit/build通过，manifest8cd0f9836be9；正式judge仍只有既有interactiveMode advisory，复审无剩余阻塞。前批c2819249已推送且main/origin一致，代码CI41190177753最后in_progress、Watch成功。e10964da代码CI失败10项均已在c2819249修复；当前批次仍需自身CI。ADD-70 partial、goal active。

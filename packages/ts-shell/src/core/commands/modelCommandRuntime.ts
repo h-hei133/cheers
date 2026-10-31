@@ -61,7 +61,7 @@ export async function runModelCommand(
         `Your model catalogue is \`${path}\` (user profile only).`,
         "",
         "An entry with a known provider id patches it — a different base URL, extra models, a different key variable. An unknown id adds a provider outright.",
-        "Add entries inside the existing providers object. Runtime settings and connections are stored in config.json.",
+        "Add entries inside the existing providers object. Settings and global model defaults are stored in config.json; connections and credentials in auth.json.",
       ].join("\n"),
     };
   }
@@ -287,7 +287,7 @@ async function listModels(args: string[], refresh: boolean, context: CommandCont
     notice,
     ...catalogDiagnostics,
     `Models for provider=${provider}`,
-    'Catalogue: models.json (user profile only); connections and request settings: config.json.',
+    'Catalogue: models.json (user profile only); settings: config.json; connections: auth.json.',
     context.readConfiguration ? 'Source: accepted session catalogue' : 'Source: local catalogue (shipped, refreshed, then user entries)',
     ...(entry?.models ?? []).map(model => model.id === activeModel ? `* ${model.id} (active)` : `- ${model.id}`),
     entry?.models.length ? undefined : 'No models listed for this provider.',

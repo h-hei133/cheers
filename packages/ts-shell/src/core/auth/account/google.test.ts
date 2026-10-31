@@ -176,6 +176,7 @@ async function storedLogin(workspace: string): Promise<void> {
   try {
     const outcome = await runProviderAccountAuthLogin({ provider: 'google', providerLabel: 'Google', workspaceRoot: workspace });
     expect(outcome).toContain('connected via browser login'); expect(outcome).not.toContain('unverified');
+    expect(outcome).toContain(`Stored at: ${getUserAuthPath()}`);
   } finally { login.mockRestore(); }
 }
 

@@ -7,7 +7,7 @@ import { toSubscriptionAccountAuthConfig } from '../auth/providerAuthContract.js
 import { accountAuthFor } from '../../provider/request/authorization.js';
 import { loginGitHubCopilotViaDeviceFlow } from './subscriptionAccountAuth.js';
 import { resolveProviderCredential } from '../shell/providerCredentials.js';
-import { getRuntimeConfig, getUserAuthPath } from '../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath } from '../../config/runtimeConfig.js';
 import { renewStoredAccount } from '../auth/account/renewal.js';
 
 const homes: string[] = [];
@@ -81,6 +81,9 @@ describe('Copilot login persistence and renewal', () => {
     const result = await runProviderAccountAuthLogin({ provider: 'github-copilot', providerLabel: 'GitHub Copilot',
       workspaceRoot: workspace, onProgress: progress });
     expect(result).toContain('connected via device code');
+    expect(result).toContain(`Stored at: ${getUserAuthPath()}`);
+    // This account has no default model, so its auth owner must stand alone.
+    expect(fs.existsSync(getUserRuntimeConfigPath())).toBe(false);
     expect(progress).toHaveBeenCalledWith(expect.objectContaining({ userCode: 'ABCD-1234' }));
     const config = JSON.parse(fs.readFileSync(getUserAuthPath(), 'utf8'));
     expect(config.providerConnections[0]).toMatchObject({ provider: 'github-copilot', status: 'connected',

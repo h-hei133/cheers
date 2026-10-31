@@ -211,7 +211,7 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
     detail: id => {
       if (id === undefined || !offered.has(id)) return [];
       if (id === 'settings:model') return ['Browse models, configure connections and assign model roles.', 'Model and role choices apply to the current session and are saved for resume.',
-        'Catalogue: models.json (user profile only); connections and request settings: config.json.', 'The settings file scope does not change session choices or the connection owner\'s save scope.'];
+        'Catalogue: models.json (user profile only); settings: config.json; connections: auth.json.', 'The settings file scope does not change session choices or the connection owner\'s save scope.'];
       if (id === 'settings:thinking') return ['Choose reasoning effort for the current request model.', 'Changes apply to the current session and are saved for resume; the settings file scope does not change them.', 'Supported levels follow the exact model and connection.'];
       const capability = CAPABILITY_ENTRIES.find(entry => entry.id === id);
       if (capability) return [capability.detail];

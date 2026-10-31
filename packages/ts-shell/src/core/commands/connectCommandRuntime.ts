@@ -4,7 +4,7 @@ import type { ConfigEdit } from '../../config/persistence.js';
 import { connectSyntax, parseConnectArgs } from "./connect/syntax.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import {
-  readRuntimeConfigEditAt, getUserRuntimeConfigPath,
+  readRuntimeConfigEditAt, getUserRuntimeConfigPath, getUserAuthPath,
   writeUserRuntimeConfigFile,
   type ProviderConnectionConfig,
   type RuntimeConfigFile,
@@ -183,7 +183,8 @@ export async function addConnection(args: string[], onPersisted?: () => void, wo
       activeProviderConnectionId: connection.id,
     } : {}),
   };
-  const configPath = writeUserRuntimeConfigFile(next, edit);
+  const configPath = getUserAuthPath();
+  writeUserRuntimeConfigFile(next, edit);
   onPersisted?.();
 
   return [
@@ -266,7 +267,8 @@ export function activateConnection(args: string[], onPersisted?: () => void): st
     activeProviderConnectionId: selected.id,
     providerConnections: nextConnections,
   };
-  const configPath = writeUserRuntimeConfigFile(next, edit);
+  const configPath = getUserAuthPath();
+  writeUserRuntimeConfigFile(next, edit);
   onPersisted?.();
 
   return [
@@ -313,7 +315,8 @@ export function removeConnection(args: string[], onPersisted?: () => void, basel
         ? (nextActive?.provider ?? userConfig.provider)
         : userConfig.provider,
   };
-  const configPath = writeUserRuntimeConfigFile(next, edit);
+  const configPath = getUserAuthPath();
+  writeUserRuntimeConfigFile(next, edit);
   onPersisted?.();
 
   return [
@@ -395,7 +398,8 @@ export async function runBrowserAssistedCaptureConnection(
         activeProviderConnectionId: connectionId,
       } : {}),
     };
-    const configPath = writeUserRuntimeConfigFile(next, edit);
+    const configPath = getUserAuthPath();
+    writeUserRuntimeConfigFile(next, edit);
   onPersisted?.();
 
     const activeConnection = nextConnections.find(connection => connection.id === connectionId);
@@ -427,7 +431,8 @@ export async function runBrowserAssistedCaptureConnection(
           }
         : connection,
     );
-    const configPath = writeUserRuntimeConfigFile({
+    const configPath = getUserAuthPath();
+    writeUserRuntimeConfigFile({
       ...latest,
       providerConnections: nextConnections,
     }, edit);
