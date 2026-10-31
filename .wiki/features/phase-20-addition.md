@@ -4975,3 +4975,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现`acceptanceEvidence`按事件类型分别判断并豁免`compensated`：补偿事件记录的是「结果未知」，既不是失败也不是用户拒绝。修复后真实失败与真实拒绝仍阻断，两种补偿事件不再阻断。
 
 验证：`acceptance`14（新例覆盖四种组合）、`recovery`24，共**38项**通过；一反转（撤回补偿豁免）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `76bb4743ebdd`。原47/ADD整体partial、goal active。
+
+
+### 21.72 终态保存失败不再被重新归类为查询失败（子代理review缺陷#1）
+
+`executePrompt`把`saveCompleted`/`saveError`放在同一个`try`里，其`catch`把**任何**异常解释为查询结果：非中止时追加`lifecycle.error`并`saveError`，中止时追加`lifecycle.cancelled`并`saveInterrupted`。但`withFileLock`在action成功后若**释放锁时丢失所有权**会抛错（`sessionFileStore.ts:154-161`，有意不把丢所有权的写入当成功）——于是`saveCompleted`已发布`status: completed`却抛错，catch再追加`lifecycle.error`，durable记录与实际结果矛盾。
+
+现记录「终态已决定」标志：该标志之后的抛出按存储失败上报并原样抛出，**不**追加任何相反的取消或错误事件。回归用例断言`saveCompleted`抛错时只记录`query.completed`与`completed`，不出现`lifecycle.error`/`interrupted`。
+
+验证：`sessionRuntime`50（新例）、`recovery`24、`bootstrap`28，共**102项**通过；一反转（撤回标志判断）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `00460ad6ff4d`。原47/ADD整体partial、goal active。

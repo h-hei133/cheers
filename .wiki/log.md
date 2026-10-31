@@ -10860,3 +10860,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：恢复写入的补偿事件不再永久阻断目标验收（子代理review缺陷#3）
 
 [addition21.71](features/phase-20-addition.md#2171-恢复写入的补偿事件不再永久阻断目标验收子代理review缺陷3)acceptanceEvidence不豁免compensated，崩溃后一次恢复即永久阻断目标。现按类型判断并豁免补偿事件，真实失败/拒绝仍阻断。38项聚焦、一反转到命中、五门/TS build通过。build 76bb4743。原47/ADD整体partial、goal active。
+
+### 2026-10-31：终态保存失败不再被重新归类为查询失败（子代理review缺陷#1）
+
+[addition21.72](features/phase-20-addition.md#2172-终态保存失败不再被重新归类为查询失败子代理review缺陷1)saveCompleted在try内，锁释放失败抛错后catch追加lifecycle.error，造成completed状态与error记录矛盾。现以「终态已决定」标志区分存储失败与查询失败。102项聚焦、一反转到命中、五门/TS build通过。build 00460ad6。原47/ADD整体partial、goal active。

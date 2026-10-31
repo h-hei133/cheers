@@ -229,6 +229,38 @@ describe("shell session runtime (W5)", () => {
     ]);
   });
 
+  it("reports a terminal-save failure as storage, not as a contradicting query outcome", async () => {
+    // The run completed. A lock-release failure inside saveCompleted is a storage
+    // failure; appending lifecycle.error or run-interrupted would make the durable
+    // record say the run failed or was cancelled.
+    const calls: string[] = [];
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent(_sessionId: string, event: { readonly type: string }) { calls.push(`event:${event.type}`); },
+        addTurn() {},
+        saveCompleted() { calls.push("completed"); throw new Error("lock release lost ownership"); },
+        saveInterrupted() { calls.push("interrupted"); },
+        saveError() { calls.push("error"); },
+        saveTerminated() {},
+      } as never,
+      renderer: { renderLine() {}, renderChunk() {} } as never,
+      runPrompt: async function* (prompt) {
+        yield { type: "query.completed",
+          result: { status: "completed", terminalReason: "completed", terminalClassification: "success", transcript: [],
+            sharedContext: { sessionId: "sess_1", initialPrompt: prompt, notes: [], handoffs: [] },
+            finalOutput: `done:${prompt}` } };
+      },
+    } as never);
+
+    await expect(runtime.executePrompt("sess_1", "hello")).rejects.toThrow("lock release lost ownership");
+    // The terminal query event and the completed save are the only records; no
+    // lifecycle.error and no interruption were appended after the outcome.
+    expect(calls).toEqual(["event:query.completed", "completed"]);
+  });
+
   it.each(["continue task", "next", "calculate 7 plus 3"])("injects compact context once and selects continuity from the raw request (%s)", async (firstPrompt) => {
     const calls: string[] = [];
     const promptsSeenByModel: string[] = [];

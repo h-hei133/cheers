@@ -1,7 +1,7 @@
 {
-  "name": "compensated-blocking",
+  "name": "reclassify-terminal",
   "exit": 1,
-  "tests": "1 failed | 3 passed | 10 skipped (14)",
-  "originalSha256": "59f5c642006e35f4b3c6d6bb86829aa88e20587ae38039f7b0f33b695befd2e3",
+  "tests": "1 failed | 49 skipped (50)",
+  "originalSha256": "0909aecd52c3f77da4d3f27e5d6f2ccfb7ac1a2fafe26b4f1fce21cd4f38116f",
   "restored": true
 }

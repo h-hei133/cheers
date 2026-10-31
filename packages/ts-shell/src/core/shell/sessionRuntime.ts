@@ -237,6 +237,8 @@ export class ShellSessionRuntime {
     let sourceEntryId: (() => string | undefined) | undefined;
     let settled: Exclude<PromptRun, AsyncIterable<QueryEvent>>['settled'];
     let provenanceOutcome: 'completed' | 'failed' | 'cancelled' | 'unknown' = 'unknown';
+    /** The run's outcome was decided; a later throw is a storage failure. */
+    let terminalOutcomeRecorded = false;
 
     try {
       const continuityState = selectPromptContinuity(this.deps.sessionManager, sessionId, prompt, options);
@@ -353,6 +355,11 @@ export class ShellSessionRuntime {
         });
       }
 
+      // The run's outcome is decided before persistence is attempted. A storage
+      // failure below must not be reported as a different outcome: the query
+      // finished, and appending a cancellation or error would make the durable
+      // record disagree with what actually happened.
+      terminalOutcomeRecorded = true;
       if (terminalState.terminalStatus === "completed") {
         this.deps.sessionManager.saveCompleted(
           sessionId,
@@ -373,6 +380,15 @@ export class ShellSessionRuntime {
       settled?.({ status: terminalState.terminalStatus === 'completed' ? 'completed' : 'error', finalOutput: terminalState.finalOutput });
       return terminalState.finalOutput;
     } catch (error) {
+      // A failure after the terminal state was decided is a storage failure, not
+      // a query failure. Report it as such and leave the durable terminal record
+      // alone, rather than appending a contradicting cancellation or error.
+      if (terminalOutcomeRecorded) {
+        this.currentRunController = null;
+        this.currentInput = undefined;
+        provenanceOutcome = 'failed';
+        throw error;
+      }
       let cancellation: Extract<QueryEvent, { type: "lifecycle.cancelled" }> | undefined;
       if (signal.aborted) {
         cancellation = {
