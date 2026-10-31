@@ -10912,3 +10912,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：本轮验证口径
 
 单一串行、无并发：7 个聚焦文件 659 项通过（engine/hints/view/persistence/keymap/firstFrame/interactiveMode）；`tsc -p tsconfig.build.json --noEmit` 通过；五道静态门全绿（118 条既有 advisory 不变）；`npm run build` 通过。**未**运行 20k PTY 压测或任何大内存脚本；**无**真实终端/真实 provider 证据，三项均未升为"完成"。台账现 0 完成、8 部分完成、62 本地验证、1 未开始。
+
+### 2026-10-31：终态存储失败不再被记成失败结局（CI 既有失败）
+
+[addition23.5](features/phase-20-addition.md#235-ci-上两个既有失败的根因与修正)读回 CI 发现 `8d9a3ac9` 有两处失败，本地同样复现，都源于 `e6cad11d`。其一：该改动把"终态已决定后的存储失败"标为 `provenanceOutcome = 'failed'`，而查询已完成、未证实的只是它有没有被写下——协作提案因此被记成 failed。现保持 `unknown` 并写明理由。其二：同一改动不再写 `saveError`，使 `uses persisted failure…` 的前提消失；该测试改写为断言轮次保持 pending、`drain: 'unknown'`、`reason: 'recovery-required'`，且恢复被报告而非被当作完成轮次。三个受影响文件 71 项通过、TS build 与五门通过。build b32fb519fe7a。原 47/ADD 整体 partial、goal active。

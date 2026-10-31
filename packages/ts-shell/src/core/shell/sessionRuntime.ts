@@ -383,10 +383,16 @@ export class ShellSessionRuntime {
       // A failure after the terminal state was decided is a storage failure, not
       // a query failure. Report it as such and leave the durable terminal record
       // alone, rather than appending a contradicting cancellation or error.
+      //
+      // The outcome stays `unknown`, not `failed`. The query itself reached a
+      // terminal state; what is unverified is whether that state was written
+      // down. Telling a consumer the run failed would replace a question about
+      // durability with a claim about the work, and every downstream record —
+      // a collaboration proposal, a goal round — would then record a failure
+      // that never happened.
       if (terminalOutcomeRecorded) {
         this.currentRunController = null;
         this.currentInput = undefined;
-        provenanceOutcome = 'failed';
         throw error;
       }
       let cancellation: Extract<QueryEvent, { type: "lifecycle.cancelled" }> | undefined;

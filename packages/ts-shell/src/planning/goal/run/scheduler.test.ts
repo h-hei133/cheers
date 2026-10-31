@@ -207,12 +207,22 @@ console.log('running'); process.stdin.resume();
     } finally { child.kill('SIGKILL'); await exited; }
   });
 
-  it('uses persisted failure after a query success whose normal session save failed', async () => {
-    const { scheduler } = setup(async () => ({ text: 'All done.', toolCalls: [], stopReason: 'stop' }), async (run, prompt, metadata) => { await run(prompt, metadata).catch(() => {}); });
+  it('pauses for recovery when the round succeeded but its terminal state was not saved', async () => {
+    // The query reached its terminal state; what failed is writing that state
+    // down. A scheduler that read this as a failed round would record a failure
+    // that never happened and could start another round over work that did
+    // complete. The round therefore stays pending with an unverified drain and
+    // the run pauses for recovery.
+    const { scheduler, lines } = setup(async () => ({ text: 'All done.', toolCalls: [], stopReason: 'stop' }),
+      async (run, prompt, metadata) => { await run(prompt, metadata).catch(() => {}); });
     vi.spyOn(manager, 'saveCompleted').mockImplementation(() => { throw new Error('state publication failed'); });
     scheduler.start();
-    await vi.waitFor(() => expect(goal().scheduling).toMatchObject({ phase: 'paused', pendingRound: false, lastOutcome: 'failure', reason: 'failure' }));
-    expect(goal()).toMatchObject({ phase: 'paused', runOwner: null }); expect(goal().completion).toBeUndefined();
+    await vi.waitFor(() => expect(goal().scheduling).toMatchObject({
+      phase: 'draining', pendingRound: true, reason: 'recovery-required', drain: 'unknown' }));
+    expect(goal().phase).toBe('paused');
+    expect(goal().completion).toBeUndefined();
+    // Recovery is reported rather than claimed as a finished round.
+    expect(lines.join('\n')).toContain('Recovery is required');
   });
 
   it.each([['unsupported', 'unsupported'], [undefined, 'failure']] as const)('uses typed admission %s without trusting provider error prose', async (admissionFailure, reason) => {

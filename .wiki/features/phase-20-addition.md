@@ -5388,3 +5388,16 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 - `npm run build`：通过，manifest `818a1992a095`。
 
 **没有**运行 20k PTY 压测，也没有任何在内存中塞入大量消息的脚本。**没有**真实终端/真实 provider 证据，因此三项均不升为"完成"。
+
+### 23.5 CI 上两个既有失败的根因与修正
+
+推送后读回 CI，`8d9a3ac9`（早于本轮改动）的 Build & Test 有两处失败，本地同样复现：
+
+| 失败 | 根因 | 修正 |
+|---|---|---|
+| `cli/collaboration/command.test.ts` 的 `settles early terminal persistence failure` | `e6cad11d` 把"终态已决定之后的存储失败"标成 `provenanceOutcome = 'failed'`。查询本身已经完成，未证实的是它有没有被写下去；报 `failed` 等于把"持久性未知"换成了"工作失败"的断言 | 保持 `unknown` 并说明理由。协作提案因此记录 `unknown`，与真值规则一致 |
+| `planning/goal/run/scheduler.test.ts` 的 `uses persisted failure…` | 同一条改动的后果：不再写 `saveError`，"持久化的失败"这个前提不再存在 | 测试改写为 `pauses for recovery when the round succeeded but its terminal state was not saved`：断言轮次保持 pending、`drain: 'unknown'`、`reason: 'recovery-required'`，并断言恢复被**报告**而不是被当作完成的轮次 |
+
+第二条不是"改测试迁就实现"：原测试锁定的是"成功查询的保存失败会被记成失败轮次"，而这正是 `e6cad11d` 要消除的矛盾记录。新断言检查的是更强的性质——既没有伪造失败，也没有开始新轮次。
+
+验证：三个受影响文件 71 项通过；`tsc -p tsconfig.build.json --noEmit` 通过；五门通过。
