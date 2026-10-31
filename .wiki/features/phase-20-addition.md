@@ -417,7 +417,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---|---|---|---|---|
 | ADD-10 | P1 | 按源位置识别 slash/正文路径并 Tab 补全 | 第 8、第三批、第七十八至八十七批、第一百一十批 | 本地验证 | 真实 Windows 终端 |
 | ADD-11 | P1 | 正文 skill 候选与同提交多 skill 注入 | 第 9、第三批、21.22、21.24、第 24.48 节 | 本地验证 | Node/exe普通多skill真实派发及print原文保持已验证；真实计费金额、研究driver质量与其他环境组合仍缺 |
-| ADD-12 | P1 | 准入 slash 组合与 deep-research + skills | 第 10、第三批、第五十、五十二、五十九批、第 24.52 节 | 本地验证 | Node/exe真实公开夹具在隔离4096输出预算下均完成原生阶段/3片段，账本各13 finalized且unknown0；exe无独立HTTP/阶段正文观察，旧partial/unknown保留，真实资料质量与桌面仍缺 |
+| ADD-12 | P1 | 准入 slash 组合与 deep-research + skills | 第 10、第三批、第五十、五十二、五十九批、第 24.52–24.53 节 | 本地验证 | Node/exe公开夹具均完成原生阶段/3片段、各13 finalized；真实源码研究停在investigate、1请求unknown，未获质量验收；真实资料质量与桌面仍缺 |
 | ADD-37 | P2 | 显式队列入口保留附件与正文尾部空白 | 第九十五批 | 本地验证 | 真实 provider/平台 |
 | ADD-38 | P2 | 引用路径、apostrophe、转义目录的补全往返 | 第七十八至八十七批 | 本地验证 | 原生 Windows 文件系统 |
 | ADD-39 | P2 | 代码示例、URL、转义 slash 不误触发命令/skill | 第二十九、七十九批 | 本地验证 | 真实终端 |
@@ -446,7 +446,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
-| ADD-49 | P1 | `taskWait` 可等待、可取消、显示等待时长 | 第 20 项、17.3、第一百二十一、一百三十八批、20.49、21.21 | 本地验证 | 生产长时任务；60 秒自动提升的完整路径 |
+| ADD-49 | P1 | `taskWait` 可等待、可取消、显示等待时长 | 第 20 项、17.3、第一百二十一、一百三十八批、20.49、21.21、24.54 | 本地验证 | 21.21已覆盖真实60秒晋升/取消/完成，当前Node普通PTY复验通过；生产实际长时工作负载与其他平台仍缺 |
 | ADD-50 | P1 | 平级团队多提案、交叉证伪与收敛 | 第 22 项、17.5、第一百二十四、一百二十六、一百三十至一百三十九批、20.53–20.55、21.20 | 本地验证 | 真实模型的并发成本与收敛质量 |
 | ADD-51 | P1 | 团队证据绑定实际读取收据、无证据的证伪不算数 | 20.53、20.55、第一百二十六批 | 本地验证 | 同上 |
 | ADD-52 | P2 | 中止能打断已在等待的提案与评审 | 第一百三十一批、20.53 | 本地验证 | 同上 |
@@ -6246,3 +6246,32 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 证据归无tracked碰撞的新目录`.omx/artifacts/phase20-addition-research-executable/`。执行前保存非可执行probe精确source快照；独立核验当前compilerInputs、两份exe内容、与Node相同的原输入/skill/release夹具字面量、原生阶段/账本投影、实际凭据/address缺席及scratch清理。安全audit与publicFixtureNativeResearchAcceptance均passed、nativeResearchStatus=completed；transport/perRequestUsage明确not-instrumented、actualStagePromptMethodPropagation明确not-observed，realWorldResearchQuality与billingAmount仍unverified。原2048预算的partial/unknown和Node全链路收据保持原值。
 
 本批仅文档/HANDOFF及ignored证据，没有新产品build、unit、反转、全仓、PTY、20k、local NormProof或委派复审。一次延迟读回1e9c6ad5精确代码CI41246087467与54b7cf60文档CI41246803802仍in_progress，各Watch41246087514/41246803660 success；额外一次job阶段读取确认1e9c6ad5的静态门、gates脚本测试及TS build已success，Run Focused & Unit Tests仍in_progress、judge尚pending，不能升级整体CI。没有持续轮询。本批最终静态/语法/安全核验与提交/推送另绑。ADD-12补齐Node/exe公开夹具原生完整链路/全结账本，真实资料研究质量、桌面/其他环境及真实金额仍缺；ADD-11不整体升级、原47外部条件延后、goal active。
+
+
+### 24.53 真实源码研究的请求失败与未获质量验收
+
+在第24.51–24.52节公开夹具成功后，改为实际源码问题：条件写在异步snapshot持久化后是否再次校验原文件，以及withFileLock本身是否提供跨进程互斥。固定当前commit `59fb0a9715d2fdb8a29ac2906f8e5e9fde0fdc3b`的[write owner](../../packages/ts-shell/src/runtime/execution/write.ts)与[file lock owner](../../packages/ts-shell/src/runtime/execution/fileLock.ts)，分别4221/5830 bytes；代码快照SHA分别`bb6fb19926a112651f9687ba55a2ed032c74e455e80252ea4754ff16d364dac4`、`38eaf4c28682948d51c02a9d7750201d4a4db23dc7a2fe0889bc34f02706cbd5`。当前文件、Git固定版本与非可执行source快照逐字节一致；只复制到隔离项目，不让模型访问真实home/config或写入原工作区。
+
+执行前的source检查确认：prepareOperation与captureRecoveryAuthorityRecord两个await路径后均调用checkCondition，比较content/identity并在变更时拒绝；withFileLock使用module Map与AsyncLocalStorage，不能把这个应用内锁当作跨进程互斥。模型prompt只提出问题和调查方法，不给出这些预期答案。两份skill要求调查和独立复审实际读取两文件、用真实native引用、区分静态源码和执行证明；一次重复skill仍稳定去重。预先写定七项code/source-content检查，包含实际stage读取、带精确原生code quote的两个窄claim、报告函数名/进程范围/未执行限制。它们只是自动化证据与文字覆盖判据，不构成全面语义质量评审或通用研究评分。
+
+使用现有build7f47912610a7、生产Node20.3 --print及原真实provider，只开放read/research_run，maxTurns2、每请求4096输出、14 POST/240秒/2MiB/768MiB采样守卫与Node heap768MiB，其余隔离条件同前。实际GET1+POST5均HTTP200；brief2次请求并真实读取两个文件，随后investigate第1次请求在native请求/流读取路径失败，原生child.failed、research partial/investigate、0 claim/0片段、review not-run。固定安全类别`native-provider-request-or-stream-failure`只来自原step拥有的Network error前缀；未保留其任意后缀，不能据此精确断言网络断连、协议或provider原因，也不能归为本地stage JSON/schema/引用验证失败。
+
+4份已知单请求用量逐项对齐共享账本13056 input + 4949 output（含cache read4544），finalized4；investigate无可归属用量，pending/unknown各1、historyUnknown/breach均false，不能称0用量或全部结算。全部3次实际child-stage body仍含两份正确skill各一次且绑定原native run。query completed/success与CLI exit0均实见，但完整链路probe exit1/unverified；七项质量检查全false，因为没有可接受claim/report或真实复审，表示未获验收，不是七个错误答案。没有为绿色再发第二次真实请求，也不从前两次公开夹具成功补造当前质量。
+
+RSS采样峰值278260KiB、输出4333 bytes不是性能验收；probe守卫未触发。原源码、四home来源config/auth/catalog、隔离config、fixture及项目条目保持；owned PID+start-time关闭，凭据/会话scratch清理，无实际请求/响应/思考正文、key/address/header或prompt/session digest留存。新证据目录`.omx/artifacts/phase20-addition-research-code/`没有tracked碰撞，源码/运行probe/observer执行前保存精确非可执行快照。独立audit检查snapshot/commit/build、阶段/实际请求、已知用量与unknown、安全与清理并passed，但boundedRealCodeCaseAcceptance/generalResearchQuality/billingAmount仍unverified；不把audit green升级为研究质量或产品通过。
+
+一次延迟检查确认产品commit1e9c6ad5完整代码CI41246087467已success、Watch41246087514 success；59fb0a97文档CI41247646203仍in_progress、Watch41247646180 success。本批没有产品改动、新build/unit/反转/全仓/20k/真实exe研究/local NormProof或委派复审；原公开夹具成功与旧partial/unknown均保留。ADD-12/11整体不升级，真实资料质量继续缺失、原47外部条件延后、goal active。后续能在当前环境推进的任务继续独立执行，不将单次外部失败判为整个目标blocked。
+
+### 24.54 当前构建的六十秒原地晋升与等待复验
+
+ADD-49矩阵仍列缺少60秒完整路径，但第21.21节已记录regular/fullscreen原CLI的真实60秒晋升、超时/取消及同任务完成；先更正这个过期缺口，不把历史证据当作当前build复验。本批沿[原命令owner](../../packages/ts-shell/src/core/tools/registry.ts)、[local job owner](../../packages/ts-shell/src/workflow/jobs/local/registry.ts)与[等待owner](../../packages/ts-shell/src/core/tools/shell/background.ts)复验现有行为，无产品改动、计时缩短或第二套执行系统。
+
+当前build7f47912610a7、生产Node20.3 CLI、普通PTY、一条小保存消息与一个真实Node子进程，provider为loopback脚本夹具。原bash只收到command，没有timeout或runInBackground，真实Alt+P取得隔离allow-all。原owner接管一次，最初durable local为空；CLI内单调计时60136.762761ms后自动晋升，native handle PID与fixture PID/start identity均保持，零重新launch、账本仅一个running条目。紧接原taskWait等待同ID，实际event与终端均观察5s elapsed；11秒后release夹具，原完成事件返回，实测wait11315ms、durable completed/exit0、原输出持久、启动文件精确一次。wait listener释放，host notice listener保留至退出；没有用等待时钟决定任务完成。
+
+实际loopback GET1+POST3；隔离config字节不变，Ctrl+D exit0/134ms、cooked flags恢复，owned PID+start identities均非活跃，home/project/session scratch删除。140秒/2MiB/100ms采样768MiB RSS守卫未触发，fixture自身120秒期限；实际PTY817223 bytes、descendant RSS480088KiB仅为本轮观察，不是性能结论。没有真实provider调用/凭据、当前exe或fullscreen复跑、生产实际长任务、物理像素或其他平台验收；不拿本轮覆盖历史取消测试，也不把合成provider算作外部模型证据。
+
+此前三次晋升前失败及其执行源码快照分别留档。早期只记粗粒度setup/adoption标签，曾误以为等待接管超时；后续计时显示接管/ready均在4秒内，定位为探针直接读取可选journal.local.length。改读local ?? []，并只在晋升后用journal-backed get比较已捕获PID；历史21.21已记录相同空账本陷阱。仅加长等待没有解决问题，不能将这些夹具失败归为产品或provider故障。HANDOFF补入可复用边界，最终执行源码/快照保持一致。
+
+证据归新建且无tracked碰撞的`.omx/artifacts/phase20-addition-promotion/`，只保留数值/布尔及公开夹具脚本，不存raw PTY或实际模型正文。独立核验检查当前compilerInputs、stable/不可变exe size/SHA、最终进程/晋升/等待/退出收据和旧失败保留；与第24.53节真实源码研究的安全audit分开，后者研究质量/unknown用量状态不变。本批仅文档/HANDOFF，未新build/unit/反转/全仓/20k/local NormProof或委派复审；最终门、核验与交付另绑。ADD-49维持本地验证，生产工作负载/平台边界仍缺，原47条件延后、goal active。
+
+最终五项静态门、五个脚本语法检查、两个独立证据verifier及diff check均exit0；binding dangling0、118既有docs-source advisory保留。晋升当前普通Node夹具验收passed；真实源码研究audit passed仍明确bounded case/general quality/billing unverified与1 unknown。再次延迟单读59fb0a97精确CI41247646203仍in_progress，没有重复轮询或以Watch替代；产品1e9c6ad5完整代码CI success证据保持。本批提交/推送另由ignored delivery收据绑定，不将尚未观察的当前交付CI称为通过。

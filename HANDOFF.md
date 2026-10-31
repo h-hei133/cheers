@@ -1745,3 +1745,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: The stable executable and its manifest's immutable artifact have different realpaths despite matching build content.
 - **Root Cause**: Executable publication intentionally installs a regular stable copy; it does not require a symlink to the immutable artifact.
 - **Rule**: Verify the stable file type, size and SHA against the manifest and immutable artifact, together with current compiler inputs. Do not require their realpaths to match. Keep native ledger sampling distinct from a transport admission guard when verifying the compiled runtime.
+
+### Provisional Jobs Have No Durable Local Collection Yet
+
+- **Symptom**: A CLI probe observes a live adopted child but fails before the promotion window, or reports a PID mismatch when checking promotion.
+- **Root Cause**: The empty journal may omit its optional local collection, and journal-backed get cannot expose a provisional task before promotion. A broad setup label can hide the failing assertion after a successful wait.
+- **Rule**: Read absent local entries as an empty collection, capture the native handle identity at adoption, and compare the durable snapshot only after promotion. Record assertion stages separately from wait stages. Check existing probe history before recreating a scenario; do not treat these observation failures as product or provider failures.
