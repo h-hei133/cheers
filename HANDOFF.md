@@ -1664,3 +1664,10 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Ordinary signature fields in tool arguments suppress a context estimate, while image-shaped argument data receives a fixed image allowance instead of being counted as text.
 - **Root Cause**: A recursive JSON replacer interprets field names throughout the conversation, losing the boundary between native content blocks and literal tool payloads.
 - **Rule**: Visit only protocol content containers when masking real images or rejecting opaque reasoning. Count arguments and structured results as literal JSON, preserve actual nested tool-result images, and verify both projected and accepted request counts without changing the transmitted body.
+
+
+### Asynchronous Directory Discovery Must Classify Read Failures Too
+
+- **Symptom**: A missing historical session directory aborts resume discovery under the compiled runtime, although Node continues to later sources; a later read error can discard buffered IDs or lose incomplete provenance.
+- **Root Cause**: Bun can resolve asynchronous opendir and defer ENOENT to the first read. Catching only the open promise misses the actual failure, while a per-batch counter cannot distinguish first read from a directory that disappeared after publishing a batch.
+- **Rule**: Classify only cursor.read failures, prioritize cancellation, skip first-read ENOENT, and retain pending discoveries plus unreadable provenance for other or later failures. Keep the seen-entry fact across batches, continue other directories, and preserve finally closure plus profile/close error propagation. Exercise listing, shared browse and reference consumers against a deferred handle and run the built owner in both runtimes; a synchronous directory fix does not verify its asynchronous consumer.

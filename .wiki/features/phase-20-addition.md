@@ -383,7 +383,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-04 | P0 | resume 自动焦点与手动选择的分界 | 第 4、第 15 节首批、第四十六批 | 本地验证 | 桌面跨平台 |
-| ADD-25 | P0 | resume 打开/搜索/删除不整目录重扫，扫描不阻塞事件循环 | 第 29、33 项、19.6、21.3、21.11–21.13、21.18、21.25–21.26 | 部分完成 | 用户大目录真实体验；cold/warm 磁盘与总 heap |
+| ADD-25 | P0 | resume 打开/搜索/删除不整目录重扫，扫描不阻塞事件循环 | 第 29、33 项、19.6、21.3、21.11–21.13、21.18、21.25–21.26、第 24.41 节 | 部分完成 | 用户大目录真实体验；cold/warm 磁盘与总 heap |
 | ADD-26 | P1 | 会话退出有界、失败可见，信号关闭保留恢复证据 | 第 26、30 项、19.3、20.2、20.5、20.19、20.35、20.37、20.40、21.35–21.36、21.43 | 本地验证 | 用户故障设备；非 Linux；SIGKILL 不可捕获 |
 | ADD-27 | P1 | 双击 Esc 返回面板，失败时不静默 | 第 34 项、21.4、21.10 | 本地验证 | 真实终端按键节奏 |
 | ADD-28 | P1 | 中断会话的思考块保留与恢复 | 第 25 项、20.3、21.57 | 本地验证 | 真实推理模型被中断的现场 |
@@ -6010,3 +6010,18 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 主代理Node20.3.0、heap768MiB、单worker串行 **3文件152项** 通过。恢复基线wire owner后，参数/结构化结果/accepted capture共 **30项实际失败**；finally源码逐字节与SHA恢复，152项再次通过。五静态门及Node floor TS/exe构建通过，manifest.compilerInputs当前摘要匹配；build `fb7316f26cd6b3ed7012957df19484a1712806bf15f9b07e4ce2b61d33d8eb96`、inputs `c25180a11bf984784c5dbd7452bb51677f0b9ba00879d71a35179caa2fb4603d`、exe SHA `2770404c1cf0ddacb8760c9b29894e6c809cb988244373f03f7b2e2ecaad7a1a`。118既有docs-source advisory保留，未另跑本批NormProof/独立委派复审、生产PTY、完整性能、全仓回归或20k真实会话。证据与非可执行源码快照归 `.omx/artifacts/phase20-addition-wire-payload/`，清理与提交/推送另绑。
 
 延迟读回 `28b4f3ac`精确CI `41231278750`已completed/success；`9c547328`精确CI `41233253348`仍in_progress，未从本地结果推断其CI成功。ADD-08继续partial：本批修复普通工具JSON的计量，不补造真实用量差额、其他词表、完整媒体/协议、平台或性能证据；原Phase20真实条件仍延后，整体goal active。
+
+
+### 24.41 会话目录发现处理异步读取阶段的缺失与故障
+
+接续已推送 `99d99551fdd4abddde252762a20b362c88b5b899`，检查ADD-25的实际目录发现链。布局捕获后历史目录被移除，旧build的Node20.3.0探针仍发现后续保存会话，Bun1.3.14却先返回目录句柄、再在首次异步read抛ENOENT；[discovery owner](../../packages/ts-shell/src/session/store/catalog/discovery.ts)只捕获opendir拒绝，因此扫描、共享browse及latest/title引用解析都可能被整个中断。这与第24.38节的同步模板目录是不同的实际消费者，未从该同步修复推断异步列表已安全。第一次探针误用未分代dist路径，报ERR_MODULE_NOT_FOUND，已单独保留为setup失败；改为manifest.entry定位后才取得有效Node/Bun对照。
+
+先检查目标，再定向只读对照pi快照 `f09d01b85e0384647fcab6779d35ab9dabe04be3` 的session-manager.ts:941–976、1965–1986：单目录发现失败不阻止其他来源、取消仍向上传播，本项目采纳；参考把其他目录错误降为空，本项目保留既有unreadable/partial与引用incomplete合同，不将无法确认的latest当成功。原有有界游标、每批16条/64目录项、4并发summary、profile身份检查与finally关闭均保留，不引入第二套扫描或缓存。
+
+修复只捕获cursor.read自身的拒绝。首次读取前ENOENT沿既有可选目录缺失语义跳过；其他错误或已见任何目录条目后的ENOENT发布剩余已发现ID及一个unreadable，继续下一个目录。started跨批保留，不能因发布一批后examined归零而把中途消失当作空目录。取消优先于错误分类，profile边界与cursor.close失败继续向上传播，不纳入普通读错误降级。[回归](../../packages/ts-shell/src/session/store/catalog/index.test.ts)通过实际catalog/browse/reference消费者检查完整/partial/incomplete、后续来源、待发布与完整批次、无错误正文泄漏和句柄关闭。
+
+主代理Node20.3.0、heap768MiB、单worker串行最终 **3文件69项** 通过（index36、browse23、listing10）。首次新增8项在旧owner全部失败；补齐两项后反转原discovery owner，**10项全部实际失败/26未选**；finally逐字节/SHA恢复，69项再次通过。五静态门通过，118既有docs-source advisory保留。Node floor TS与Bun生产exe串行构建通过，build `e7dbb58d8b11881afd199e73c3c70b6360ad652097b4c2e16c1fc6fe42743df2`、inputs `6ddd2cce5c77b3d0200d1c445aaaa8c1bdf9d634afd22ca8a75601b7fe3ec781` 与manifest.compilerInputs当前摘要一致，exe SHA `6d759f993fbdec7956232c8103e2a32ac4c05e55f59505174fbeec7f20a018a5`、106842240 bytes读回一致。
+
+新build的实际目录发现器在Node20.3与Bun1.3.14均发现后续唯一会话、缺目录未重建、夹具清理；额外静态链接同一build owner的独立Bun编译探针也通过。独立探针不是生产CLI/PTY，本批生产exe仅有构建及构建自带版本检查，不冒充resume终端交互、完整性能或真实用户目录证据。正式日志、反转、构建身份、可复用运行时探针及非可执行源码快照归 `.omx/artifacts/phase20-addition-catalog-cursor/`，owned scratch最终清理；没有全仓回归、20k真实会话、新NormProof或独立委派复审。
+
+延迟读回前批 `99d99551` CI `41234379850` 与 `9c547328` CI `41233253348` 仍in_progress，未据此宣称CI成功。本批提交/推送与自身CI另绑定。ADD-25保持partial：真实大目录、cold/warm磁盘、总heap及用户设备体验尚缺；原Phase20真实条件继续延后、goal active。

@@ -24,12 +24,22 @@ export async function* discoverSessions(store: SessionStoreLayout, signal?: Abor
     try {
       let ids: string[] = [];
       let examined = 0;
+      let started = false;
       for (;;) {
         signal?.throwIfAborted();
-        const entry = await cursor.read();
+        let entry;
+        try { entry = await cursor.read(); }
+        catch (error) {
+          signal?.throwIfAborted();
+          // Some runtimes defer a missing-directory error until the first read.
+          // Once entries were seen, a failure leaves this source incomplete.
+          if (started || (error as NodeJS.ErrnoException).code !== 'ENOENT') yield { directory, ids, unreadable: 1 };
+          break;
+        }
         signal?.throwIfAborted();
         assertSessionStoreProfile(store, directory);
         if (!entry) { if (ids.length) yield { directory, ids, unreadable: 0 }; break; }
+        started = true;
         examined++;
         if (entry.isDirectory()) ids.push(entry.name);
         if (ids.length === CATALOG_LIMITS.summaries || examined === CATALOG_LIMITS.directoryEntries) {

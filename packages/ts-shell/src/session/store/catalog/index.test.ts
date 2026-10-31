@@ -129,6 +129,132 @@ it('bounds directory discovery and summary dispatch per update and closes an aba
   await query.return(undefined); expect(closed).toBe(1);
 });
 
+it.each(['listing', 'browse'] as const)('continues %s after a missing directory fails at first read', async mode => {
+  const { root, layout, context } = fixture();
+  seed(layout, 'current'); seed(layout, 'saved');
+  const missing = path.join(root, 'removed-history');
+  const catalog = new SessionCatalog({ ...layout, sessionsSearchDirs: [missing, layout.sessionsDir] });
+  const read = vi.fn().mockRejectedValue(Object.assign(new Error('unreported source contents'), { code: 'ENOENT' }));
+  const close = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(io.opendir).mockImplementation((async (...args: Parameters<typeof io.opendir>) =>
+    args[0] === missing ? { read, close } : fs.promises.opendir(...args)) as typeof io.opendir);
+  const browse = mode === 'browse' ? catalog.beginBrowse(context) : undefined;
+  try {
+    let last: SessionCatalogSnapshot | undefined;
+    for await (const page of catalog.list(context, undefined, 40, undefined, undefined,
+      browse ? { needle: '', browse } : undefined)) last = page;
+    expect(last).toMatchObject({ status: 'complete', unreadable: 0 });
+    expect(last!.sessions.map(session => session.id).sort()).toEqual(['current', 'saved']);
+    expect(read).toHaveBeenCalledOnce(); expect(close).toHaveBeenCalledOnce();
+  } finally { if (browse) catalog.retireBrowse(browse); }
+});
+
+it.each(['EACCES', 'ENOTDIR'] as const)('reports deferred %s and retains readable sessions', async code => {
+  const { root, layout, context } = fixture(); seed(layout, 'current'); seed(layout, 'saved');
+  const denied = path.join(root, 'denied-history');
+  const catalog = new SessionCatalog({ ...layout, sessionsSearchDirs: [denied, layout.sessionsDir] });
+  const close = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(io.opendir).mockImplementation((async (...args: Parameters<typeof io.opendir>) => args[0] === denied
+    ? { read: vi.fn().mockRejectedValue(Object.assign(new Error('unreported source contents'), { code })), close }
+    : fs.promises.opendir(...args)) as typeof io.opendir);
+  const diagnostics = vi.fn();
+  const browse = catalog.beginBrowse(context);
+  try {
+    let last: SessionCatalogSnapshot | undefined;
+    for await (const page of catalog.list(context, undefined, 40, undefined, diagnostics, { needle: '', browse })) last = page;
+    expect(last).toMatchObject({ status: 'partial', unreadable: 1, total: 2 });
+    expect(last!.sessions.map(session => session.id).sort()).toEqual(['current', 'saved']);
+    expect(diagnostics).toHaveBeenCalledWith({ unreadableSessionIds: [], unreadableDirectories: [denied] });
+    expect(JSON.stringify(last)).not.toContain('unreported source contents');
+    expect(close).toHaveBeenCalledOnce();
+  } finally { catalog.retireBrowse(browse); }
+});
+
+it.each(['EIO', 'ENOENT'] as const)('retains pending discoveries and partial provenance after a later %s', async code => {
+  const { root, layout, context } = fixture(); seed(layout, 'saved');
+  const later = path.join(root, 'later-history');
+  seed({ ...layout, sessionsDir: later }, 'later');
+  const catalog = new SessionCatalog({ ...layout, sessionsSearchDirs: [layout.sessionsDir, later] });
+  const closes: ReturnType<typeof vi.fn>[] = [];
+  vi.mocked(io.opendir).mockImplementation((async (...args: Parameters<typeof io.opendir>) => {
+    const cursor = await fs.promises.opendir(...args);
+    const close = vi.fn(cursor.close.bind(cursor)); closes.push(close); cursor.close = close as typeof cursor.close;
+    if (args[0] === layout.sessionsDir) {
+      const read = cursor.read.bind(cursor); let reads = 0;
+      cursor.read = (async () => {
+        if (reads++ === 1) throw Object.assign(new Error('unreported source contents'), { code });
+        return read();
+      }) as typeof cursor.read;
+    }
+    return cursor;
+  }) as typeof io.opendir);
+  const { last } = await finish(catalog, context);
+  expect(last).toMatchObject({ status: 'partial', unreadable: 1 });
+  expect(last.sessions.map(session => session.id).sort()).toEqual(['later', 'saved']);
+  expect(closes).toHaveLength(2); for (const close of closes) expect(close).toHaveBeenCalledOnce();
+});
+
+it('keeps a deferred missing directory partial after a full discovery batch', async () => {
+  const { layout, context, catalog } = fixture();
+  const ids = Array.from({ length: CATALOG_LIMITS.summaries }, (_, index) => `saved-${index}`);
+  for (const id of ids) seed(layout, id);
+  const closes: ReturnType<typeof vi.fn>[] = [];
+  vi.mocked(io.opendir).mockImplementation((async (...args: Parameters<typeof io.opendir>) => {
+    const cursor = await fs.promises.opendir(...args);
+    const close = vi.fn(cursor.close.bind(cursor)); closes.push(close); cursor.close = close as typeof cursor.close;
+    const read = cursor.read.bind(cursor); let reads = 0;
+    cursor.read = (async () => {
+      if (reads++ === ids.length) throw Object.assign(new Error('removed during discovery'), { code: 'ENOENT' });
+      return read();
+    }) as typeof cursor.read;
+    return cursor;
+  }) as typeof io.opendir);
+  const { last } = await finish(catalog, context);
+  expect(last).toMatchObject({ status: 'partial', unreadable: 1 });
+  expect(last.sessions.map(session => session.id).sort()).toEqual(ids.sort());
+  expect(closes).toHaveLength(1); expect(closes[0]).toHaveBeenCalledOnce();
+});
+
+it('keeps title and latest reference resolution available after a deferred missing directory', async () => {
+  const { root, layout } = fixture(); seed(layout, 'saved', { title: 'History conversation' });
+  const missing = path.join(root, 'removed-history');
+  const catalog = new SessionCatalog({ ...layout, sessionsSearchDirs: [missing, layout.sessionsDir] });
+  const close = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(io.opendir).mockImplementation((async (...args: Parameters<typeof io.opendir>) => args[0] === missing
+    ? { read: vi.fn().mockRejectedValue(Object.assign(new Error('missing history'), { code: 'ENOENT' })), close }
+    : fs.promises.opendir(...args)) as typeof io.opendir);
+  await expect(catalog.resolve('latest')).resolves.toMatchObject({ ok: true, sessionId: 'saved' });
+  await expect(catalog.resolve('History conversation')).resolves.toMatchObject({ ok: true, sessionId: 'saved' });
+  expect(close).toHaveBeenCalledTimes(2);
+});
+
+it('preserves cancellation during a deferred directory error and closes its cursor', async () => {
+  const { layout, context, catalog } = fixture(); seed(layout, 'current');
+  const controller = new AbortController(); const reason = new Error('cancelled directory read');
+  const close = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(io.opendir).mockResolvedValue({ read: vi.fn(async () => {
+    controller.abort(reason);
+    throw Object.assign(new Error('deferred missing directory'), { code: 'ENOENT' });
+  }), close } as unknown as fs.Dir);
+  const query = catalog.list(context, controller.signal); await query.next();
+  await expect(query.next()).rejects.toBe(reason);
+  expect(close).toHaveBeenCalledOnce(); expect(io.opendir).toHaveBeenCalledOnce();
+});
+
+it('refuses latest reference success when a directory cannot be completely read', async () => {
+  const { root, layout } = fixture(); seed(layout, 'saved');
+  const denied = path.join(root, 'denied-history');
+  const catalog = new SessionCatalog({ ...layout, sessionsSearchDirs: [layout.sessionsDir, denied] });
+  const close = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(io.opendir).mockImplementation((async (...args: Parameters<typeof io.opendir>) => args[0] === denied
+    ? { read: vi.fn().mockRejectedValue(Object.assign(new Error('unreported source contents'), { code: 'EACCES' })), close }
+    : fs.promises.opendir(...args)) as typeof io.opendir);
+  const result = await catalog.resolve('latest');
+  expect(result).toMatchObject({ ok: false, reason: 'incomplete', candidates: [{ id: 'saved' }] });
+  expect(JSON.stringify(result)).not.toContain('unreported source contents');
+  expect(close).toHaveBeenCalledOnce();
+});
+
 it('reuses one browse attempt index instead of rediscovering every later page', async () => {
   const { layout, context, catalog } = fixture();
   seed(layout, 'current');
