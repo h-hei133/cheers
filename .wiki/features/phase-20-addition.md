@@ -5217,7 +5217,7 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 2. **排队数量只出现在提示行，不在 transcript。** [transientHint](../../packages/ts-shell/src/presentation/tui/chrome/hints.ts) 在 `queued > 0` 时显示 `` `${n} queued · runs when the current turn finishes` ``；状态项 `queued`（[items.ts](../../packages/ts-shell/src/presentation/tui/chrome/items.ts)）也只是底栏的一段文字。提示行是 transient 的：一旦有其他提示（suggesting、cancelArmed）或输入框有内容，它就可能被替换。**排队这件事没有一条持久的、与具体消息关联的视觉标记。**
 3. **Enter 在 busy 时是 steer，但会被降级。** [keymap](../../packages/ts-shell/src/cli/interactive/keymap.ts) 的 `tui.input.submit` 在 busy 时传 `"steer"`；但 [onSubmit](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts) 里 `const input = text.startsWith("/") || composed || attachments?.images.length ? undefined : this.options.sessionRuntime.input?.()`，命令、可组合输入、带图片的输入都会拿不到 `input`，于是落入 `this.queue.push(text, attachments)`。**同一个 Enter 键，有时 steer、有时排队，而界面不给任何区分。**
 4. **Ctrl+q 是纯排队，但只在 busy 时生效。** [keymap](../../packages/ts-shell/src/cli/interactive/keymap.ts) 的 `app.message.followUp` 分支要求 `context.busy`，否则返回 `"nothing"`；空闲时按 Ctrl+q 不发任何东西。这符合"没有队列可加入"的语义，但用户若在空闲时按它，会以为按键坏了。
-5. **提示行的文案与实际行为不一致。** 忙碌时提示行写 `enter steer before next step`、`ctrl+q run after turn`，但如上所述 Enter 在命令/组合/图片场景并不是 steer。
+5. **提示行的文案与实际行为不一致。** 忙碌时提示行写 `enter steer before next step`、`ctrl+q run after turn`（[hints.ts](../../packages/ts-shell/src/presentation/tui/chrome/hints.ts)），但如上所述 Enter 在命令/组合/图片场景并不是 steer。该文案被 [hints.test.ts](../../packages/ts-shell/src/presentation/tui/chrome/hints.test.ts) 的 `expect(text).toContain("enter steer before next step")` 锁定——**修正它会改动一条既有测试**，实施时必须说明理由，不能悄悄改断言。
 
 **对照结论（Codex / Claude Code）**
 
