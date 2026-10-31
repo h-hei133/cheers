@@ -438,7 +438,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
-| ADD-46 | P1 | 按 turn 审阅与批量恢复文件操作 | 17.2、第一百二十二、一百二十五、一百二十九、20.50、20.52 | 本地验证 | 不覆盖 bash/二进制副作用；无工作区级快照 |
+| ADD-46 | P1 | 按 turn 审阅与批量恢复文件操作 | 17.2、第一百二十二、一百二十五、一百二十九、20.50、20.52、第 24.42 节 | 本地验证 | 不覆盖 bash/二进制副作用；无工作区级快照 |
 | ADD-47 | P1 | 整轮恢复报告区分未知写入、零写阻止与部分结果 | 20.50、20.52 | 本地验证 | 真实 CLI 未注入 unknown 故障 |
 | ADD-48 | P2 | 并发写入同一会话不丢失、transcript 是权威来源 | 21.67–21.68 | 本地验证 | 真实多进程高并发 |
 
@@ -6025,3 +6025,18 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 新build的实际目录发现器在Node20.3与Bun1.3.14均发现后续唯一会话、缺目录未重建、夹具清理；额外静态链接同一build owner的独立Bun编译探针也通过。独立探针不是生产CLI/PTY，本批生产exe仅有构建及构建自带版本检查，不冒充resume终端交互、完整性能或真实用户目录证据。正式日志、反转、构建身份、可复用运行时探针及非可执行源码快照归 `.omx/artifacts/phase20-addition-catalog-cursor/`，owned scratch最终清理；没有全仓回归、20k真实会话、新NormProof或独立委派复审。
 
 延迟读回前批 `99d99551` CI `41234379850` 与 `9c547328` CI `41233253348` 仍in_progress，未据此宣称CI成功。本批提交/推送与自身CI另绑定。ADD-25保持partial：真实大目录、cold/warm磁盘、总heap及用户设备体验尚缺；原Phase20真实条件继续延后、goal active。
+
+
+### 24.42 恢复面板的空账本与游标关闭错误优先级
+
+接续已推送 `16c1b7941777d22e9e6a7e43dd3880def9be3342`，继续核对目录读取的实际消费者。[恢复目录](../../packages/ts-shell/src/edit/recovery/catalog.ts)的scanLedger同样只捕获opendir拒绝；布局根本不存在时，旧build的Node20.3.0返回0 records/0 matches/0 unavailable，Bun1.3.14却在异步迭代首次读取时抛ENOENT。实际[restore面板](../../packages/ts-shell/src/cli/interactive/picker/restore.ts)直接调用该owner，旧生产exe的隔离新项目真实PTY确认 `/restore` 显示读取失败，而账本始终不存在。这是空态被误报为文件故障，不是写入、快照损坏或provider失败；其他已有完整错误边界的目录读取路径未改动。
+
+先检查目标，再定向只读比较pi快照 `f09d01b85e0384647fcab6779d35ab9dabe04be3` 的session-manager.ts:941–976：可选来源缺失可为空、取消在读错误处理中继续抛出，本项目采纳；参考将其他目录故障降为空，本项目保留恢复数据的严格失败，避免中途丢失被说成无快照。scanLedger仅捕获cursor.read本身，首次ENOENT可返回空；已经读到任何条目后的ENOENT、EACCES/EIO/ENOTDIR使用既有固定读取失败，不返回截断成功页。预算与调用者准入在读取前后及错误分类前复验，finally显式关闭游标，不捕获下层scanAuthority/record逻辑来伪造空态。
+
+复核发现中间显式finally会让关闭失败覆盖原权限/预算拒绝，两项双故障回归在中间实现均失败、旧实现均通过。现沿同域[index reader](../../packages/ts-shell/src/edit/recovery/index/read.ts)的优先级，保留主要RecoveryReadControlError/RecoveryReadLimitError；缺失目录的close失败仍抛出，即使close自身也报ENOENT，不返回空。原取消夹具从迭代器注入改为实际ledger.read注入；第一次关闭断言仍被spy拦截而失败，恢复spy后才检查真实ERR_DIR_CLOSED，分类为harness问题，未据此修改产品。
+
+主代理Node20.3.0、heap768MiB、单worker串行最终 **3文件52项** 通过（catalog/read22、catalog11、restore picker19）。首批8个新边界在旧owner为 **5失败/3控制通过**；最终原owner反转为 **5失败/5控制通过/12未选**，finally逐字节/SHA恢复后52项再次通过。最初50项绿色未覆盖上述双故障，不作为最终完成证据。五静态门通过、118既有docs-source advisory保留；Node floor TS与Bun生产exe最终串行构建通过，build `148356e5847d93e55a994d0ae73d681eb5c853a72c58c1994b8666780f9368ec`、inputs `9b1d2634088ea981366e810fad693dcc6273d3865ad39c2d526f2325f43c8de4` 与manifest.compilerInputs当前摘要一致，exe SHA `6646d593b82cd80097856338ab454706042c8276206cb6bb39b10fc7de67829f`、106842240 bytes读回一致。没有增加产品导入边或新扫描/缓存系统。
+
+最终build的实际catalog在Node/Bun均返回正确空列表；生产Node/exe × regular/fullscreen四场真实PTY再次串行通过，新项目执行 `/restore` 显示“尚无快照”，无读取失败或Fatal error。四场均账本未创建、配置bytes不变、auth文件仍不存在、exit0/cooked flags恢复、relay退出和夹具删除。每场独立HOME、profile、Git项目与安全环境，offline+synthetic，无provider认证或业务写入；终端输出只留内存并丢弃，保留安全计数与检查收据。中间build的四场PTY单独标为intermediate，不与最终build混算。
+
+正式脚本、旧exe产品失败、夹具错误分类、双故障控制、反转与最终源码快照归 `.omx/artifacts/phase20-addition-restore-cursor/`，owned scratch最终清理。本批没有真实损坏账本、外部provider、其他平台、完整性能、全仓回归、20k真实会话、新NormProof或独立委派复审证据；ADD-46维持本地验证，不提升其他恢复或Phase20验收。前批16c1b794的精确CI `41235289977` 延迟读回仍in_progress；本批提交/推送与自身CI另绑定，整体goal active。

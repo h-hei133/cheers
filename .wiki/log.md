@@ -11142,3 +11142,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：会话目录异步读取故障隔离
 
 [addition24.41](features/phase-20-addition.md#2441-会话目录发现处理异步读取阶段的缺失与故障)旧build在布局捕获后目录消失时，Node可继续发现、Bun首次async read抛ENOENT中断扫描。既有discovery owner处理read阶段错误：未见条目ENOENT跳过、其他或中途失败保留待发布ID与unreadable并继续其他来源，取消/身份/close边界保持。Node20.3单worker串行3文件69项、旧owner10失败反转/逐字节恢复后69通过；五门/TS/exe构建当前compilerInputs摘要匹配，manifest e7dbb58d8b11。新build Node/Bun及独立编译owner探针通过，不等同生产resume PTY/真实大目录。首次dist路径setup失败已分类，旧CI 99d99551/9c547328仍in_progress；无新judge/独立复审/完整性能/全仓/20k，ADD-25 partial、goal active，清理/提交/推送/自身CI另绑。
+
+
+### 2026-11-01：恢复面板保持空账本与读取故障的边界
+
+[addition24.42](features/phase-20-addition.md#2442-恢复面板的空账本与游标关闭错误优先级)旧exe新项目 `/restore` 真实PTY误报读取失败，Node同账本返回空、Bun首次async read抛ENOENT确认。既有scanLedger首次缺失为空、其他或中途失败仍拒绝，显式close保留权限/预算主错误并不掩盖close失败。中间修复双故障2失败、旧实现2控制通过后补优先级；spy关闭断言问题已分类修正。Node20.3串行3文件最终52项，原owner反转5失败/5控制/12未选、精确恢复后52通过；五门/TS/exe最终build摘要148356e5847d读回通过。最终Node/exe×普通/全屏四原生PTY空态正确，配置不变/账本和auth未创建/exit0/cooked/夹具清理；只隔离offline synthetic，无真实损坏账本/其他平台/新judge/独立复审/全仓/20k。ADD-46维持本地验证、goal active；16c1b794 CI仍in_progress，交付另绑。

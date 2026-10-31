@@ -268,10 +268,33 @@ async function* scanLedger(ledgerRoot: string, access: RecoveryReadAccess, inven
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return;
     throw new Error('Edit snapshots could not be read.');
   }
-  for await (const authority of directory) {
-    inventory();
-    if (authority.isDirectory() && !RESERVED_AUTHORITY_NAMES.has(authority.name)) {
-      yield* scanAuthority(ledgerRoot, authority.name, access, inventory);
+  let started = false;
+  let primaryFailure: unknown;
+  try {
+    for (;;) {
+      access.check?.();
+      let authority;
+      try { authority = await directory.read(); }
+      catch (error) {
+        access.check?.();
+        // A missing optional root may fail lazily on its first read.
+        if (!started && error instanceof Error && 'code' in error && error.code === 'ENOENT') return;
+        throw new Error('Edit snapshots could not be read.');
+      }
+      access.check?.();
+      if (!authority) break;
+      started = true;
+      inventory();
+      if (authority.isDirectory() && !RESERVED_AUTHORITY_NAMES.has(authority.name)) {
+        yield* scanAuthority(ledgerRoot, authority.name, access, inventory);
+      }
+    }
+  } catch (error) { primaryFailure = error; throw error; }
+  finally {
+    try { await directory.close(); }
+    catch (error) {
+      access.check?.();
+      if (!(primaryFailure instanceof RecoveryReadControlError || primaryFailure instanceof RecoveryReadLimitError)) throw error;
     }
   }
 }

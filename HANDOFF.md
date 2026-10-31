@@ -1671,3 +1671,10 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A missing historical session directory aborts resume discovery under the compiled runtime, although Node continues to later sources; a later read error can discard buffered IDs or lose incomplete provenance.
 - **Root Cause**: Bun can resolve asynchronous opendir and defer ENOENT to the first read. Catching only the open promise misses the actual failure, while a per-batch counter cannot distinguish first read from a directory that disappeared after publishing a batch.
 - **Rule**: Classify only cursor.read failures, prioritize cancellation, skip first-read ENOENT, and retain pending discoveries plus unreadable provenance for other or later failures. Keep the seen-entry fact across batches, continue other directories, and preserve finally closure plus profile/close error propagation. Exercise listing, shared browse and reference consumers against a deferred handle and run the built owner in both runtimes; a synchronous directory fix does not verify its asynchronous consumer.
+
+
+### Explicit Directory Closure Must Preserve Primary Read Controls
+
+- **Symptom**: Replacing an async directory iterator with explicit reads fixes deferred ENOENT but a simultaneous close failure hides the original admission or inventory rejection.
+- **Root Cause**: A bare finally close replaces the pending exception, unlike the prior iterator's abrupt-completion behavior. Catching the whole iterator to recognize a missing root can also confuse a close ENOENT with a read ENOENT.
+- **Rule**: Catch only the actual read for optional-root classification, and follow the recovery index reader's primary control/limit priority when closing. Preserve standalone close failure, including ENOENT, as failure. Keep a double-fault regression for admission and inventory controls; restore an injected read spy before using the real read method to prove handle closure.

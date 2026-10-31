@@ -12,7 +12,8 @@ vi.mock('./limits.js', () => ({ RECOVERY_CATALOG_LIMITS: { metadataBytes: 32 * 1
 const limits = RECOVERY_CATALOG_LIMITS as { metadataBytes: number; records: number; directoryEntries: number };
 let root: string;
 beforeEach(async () => {
-  root = await fs.mkdtemp(path.join(os.tmpdir(), 'restore-catalog-'));
+  const scratch = path.join(os.tmpdir(), 'cheers-test'); await fs.mkdir(scratch, { recursive: true });
+  root = await fs.mkdtemp(path.join(scratch, 'restore-catalog-'));
   limits.metadataBytes = 32 * 1024; limits.records = 20; limits.directoryEntries = 50;
 });
 afterEach(async () => { vi.restoreAllMocks(); await fs.rm(root, { recursive: true, force: true }); });
@@ -133,14 +134,91 @@ it.each(['EACCES', 'ENOENT'])('preserves actual cancellation when root opendir a
   await expect(readRecoveryCatalogPage({ ledgerRoot: root, signal: controller.signal })).rejects.toBe(reason);
 });
 
+function deferredDirectory(read: () => Promise<import('node:fs').Dirent | null>, close = vi.fn(async () => {})) {
+  const cursor = { read: vi.fn(read), close,
+    async *[Symbol.asyncIterator]() {
+      try { for (;;) { const entry = await cursor.read(); if (!entry) break; yield entry; } }
+      finally { await cursor.close(); }
+    },
+  };
+  vi.spyOn(fs, 'opendir').mockResolvedValue(cursor as unknown as Awaited<ReturnType<typeof fs.opendir>>);
+  return cursor;
+}
+
+it('treats a deferred first-read missing ledger as empty without creating it', async () => {
+  const ledgerRoot = path.join(root, 'absent');
+  const cursor = deferredDirectory(async () => { throw Object.assign(new Error('source details'), { code: 'ENOENT' }); });
+  await expect(readRecoveryCatalogPage({ ledgerRoot })).resolves.toEqual({ records: [], matches: 0, unavailable: 0 });
+  expect(cursor.read).toHaveBeenCalledOnce(); expect(cursor.close).toHaveBeenCalledOnce();
+  await expect(fs.stat(ledgerRoot)).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
+it.each(['EACCES', 'EIO', 'ENOTDIR'])('projects a deferred ledger %s as a fixed read failure', async code => {
+  const cursor = deferredDirectory(async () => { throw Object.assign(new Error('source details'), { code }); });
+  await expect(readRecoveryCatalogPage({ ledgerRoot: root })).rejects.toThrow(/^Edit snapshots could not be read\.$/);
+  expect(cursor.close).toHaveBeenCalledOnce();
+});
+
+it('refuses a missing ledger after discovery started instead of claiming it was empty', async () => {
+  let reads = 0;
+  const cursor = deferredDirectory(async () => {
+    if (reads++ === 0) return { name: 'unrelated', isDirectory: () => false } as import('node:fs').Dirent;
+    throw Object.assign(new Error('source details'), { code: 'ENOENT' });
+  });
+  await expect(readRecoveryCatalogPage({ ledgerRoot: root })).rejects.toThrow(/^Edit snapshots could not be read\.$/);
+  expect(cursor.read).toHaveBeenCalledTimes(2); expect(cursor.close).toHaveBeenCalledOnce();
+});
+
+it('keeps cancellation ahead of a deferred missing ledger', async () => {
+  const controller = new AbortController(); const reason = new Error('cancelled deferred ledger read');
+  const cursor = deferredDirectory(async () => { controller.abort(reason); throw Object.assign(new Error('source details'), { code: 'ENOENT' }); });
+  await expect(readRecoveryCatalogPage({ ledgerRoot: root, signal: controller.signal })).rejects.toBe(reason);
+  expect(cursor.close).toHaveBeenCalledOnce();
+});
+
+it('rechecks caller admission before accepting a deferred missing ledger', async () => {
+  let refused = false;
+  const cursor = deferredDirectory(async () => { refused = true; throw Object.assign(new Error('source details'), { code: 'ENOENT' }); });
+  await expect(readRecoveryCatalogPage({ ledgerRoot: root, readAccess: {
+    check: () => { if (refused) throw new Error('caller revoked'); },
+  } })).rejects.toBeInstanceOf(RecoveryReadControlError);
+  expect(cursor.close).toHaveBeenCalledOnce();
+});
+
+it('preserves close failure after a deferred missing ledger instead of reporting empty', async () => {
+  const reason = Object.assign(new Error('ledger close was not confirmed'), { code: 'ENOENT' });
+  const cursor = deferredDirectory(async () => { throw Object.assign(new Error('source details'), { code: 'ENOENT' }); },
+    vi.fn(async () => { throw reason; }));
+  await expect(readRecoveryCatalogPage({ ledgerRoot: root })).rejects.toBe(reason);
+  expect(cursor.close).toHaveBeenCalledOnce();
+});
+
+it.each(['admission', 'inventory'] as const)('keeps a primary %s refusal when closing also fails', async kind => {
+  let read = false; let refused = false;
+  if (kind === 'inventory') limits.directoryEntries = 0;
+  const cursor = deferredDirectory(async () => {
+    read = true;
+    return { name: 'unrelated', isDirectory: () => false } as import('node:fs').Dirent;
+  }, vi.fn(async () => { throw new Error('secondary close failure'); }));
+  await expect(readRecoveryCatalogPage({ ledgerRoot: root, readAccess: { check: () => {
+    if (kind === 'admission' && read && !refused) { refused = true; throw new Error('primary admission refusal'); }
+  } } })).rejects.toBeInstanceOf(kind === 'admission' ? RecoveryReadControlError : RecoveryReadLimitError);
+  expect(cursor.close).toHaveBeenCalledOnce();
+});
+
 it.each(['ledger', 'records'])('preserves cancellation when the %s iterator fails and closes its handles', async location => {
   await capture();
   const controller = new AbortController(); const reason = new Error('Cancelled snapshot iteration');
   const opened: Awaited<ReturnType<typeof fs.opendir>>[] = [];
+  const reads: ReturnType<typeof vi.spyOn>[] = [];
   const open = fs.opendir.bind(fs);
   vi.spyOn(fs, 'opendir').mockImplementation(async (...args: Parameters<typeof fs.opendir>) => {
     const directory = await Reflect.apply(open, fs, args); opened.push(directory);
-    if (String(args[0]) === (location === 'ledger' ? root : path.join(root, 'edit-a', 'records'))) {
+    if (location === 'ledger' && String(args[0]) === root) {
+      reads.push(vi.spyOn(directory, 'read').mockImplementation(async () => {
+        controller.abort(reason); throw Object.assign(new Error('Directory read failed'), { code: 'EIO' });
+      }));
+    } else if (location === 'records' && String(args[0]) === path.join(root, 'edit-a', 'records')) {
       directory[Symbol.asyncIterator] = async function* () {
         try { controller.abort(reason); throw Object.assign(new Error('Iterator read failed'), { code: 'EIO' }); }
         finally { await directory.close(); }
@@ -150,5 +228,6 @@ it.each(['ledger', 'records'])('preserves cancellation when the %s iterator fail
   });
   await expect(readRecoveryCatalogPage({ ledgerRoot: root, signal: controller.signal })).rejects.toBe(reason);
   expect(opened).toHaveLength(location === 'ledger' ? 1 : 2);
+  for (const read of reads) read.mockRestore();
   for (const directory of opened) await expect(Promise.resolve().then(() => directory.read())).rejects.toMatchObject({ code: 'ERR_DIR_CLOSED' });
 });
