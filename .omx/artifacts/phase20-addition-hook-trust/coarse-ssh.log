@@ -1,0 +1,26 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/query/toolPolicy.test.ts  (38 tests | 1 failed | 37 skipped) 6ms
+   ❯ src/core/query/toolPolicy.test.ts > toolPolicy > derives an ssh target that names the remote command
+     → expected 'ssh' not to be 'ssh' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 skipped (38)
+   Start at  10:03:42
+   Duration  295ms (transform 71ms, setup 0ms, collect 80ms, tests 6ms, environment 0ms, prepare 50ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/query/toolPolicy.test.ts > toolPolicy > derives an ssh target that names the remote command
+AssertionError: expected 'ssh' not to be 'ssh' // Object.is equality
+ ❯ src/core/query/toolPolicy.test.ts:146:29
+    144|     const read = evaluateToolPermissionScope("ssh", { operation: "outp…
+    145|     const run = evaluateToolPermissionScope("ssh", { operation: "run",…
+    146|     expect(read.target).not.toBe(run.target);
+       |                             ^
+    147|     expect(run.target).toContain("rm -rf /");
+    148|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

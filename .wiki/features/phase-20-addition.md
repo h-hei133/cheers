@@ -5004,3 +5004,12 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 现`HookApprovalRequest`返回`HookApprovalDecision`（`allow-once`/`allow-always`/`deny`），只有`allow-always`才`recordTrust`；布尔返回值按旧形态视为**一次性**，使无类型调用方也无法把「仅本次」升级为永久。测试改为两向对照：`allow-once`第二次**重新询问**（`asked === 2`），`allow-always`才记住（`asked === 1`）。
 
 验证：`hooks`6、`registration`11、`cliRuntimeInvocation`25、其余hook文件，共**63项**通过；一反转（无条件记录信任）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `46b545b404f5`。原47/ADD整体partial、goal active。
+
+
+### 21.75 授权目标过粗导致一次授权覆盖实质不同的调用（子代理review安全缺陷）
+
+子代理review指出四类工具的授权目标过粗。探针确认：`task`以`description`为目标（同标签不同prompt共用）、`browser`的`click`/`type`目标只是动词（任意坐标/文本共用）、`ssh`与MCP工具目标只是工具名（任意远程命令/任意参数共用）。用户对一次调用选「allow always」后，实质不同的后续调用会被自动批准。
+
+现按工具补齐目标：`ssh`为`ssh:<operation>:<remote>:<command>`；`browser`为`<action>:<anchor>`（URL/selector/text/key/坐标）；`task`/`team`在标签之外并入指令（`<label>:<instruction>`）。MCP工具的参数契约无法通用解读，因此**禁止`allow-always`**（降为一次性，并在提示中说明），与既有`apply_patch`的同类先例一致。
+
+验证：`toolPolicy`38（三个新例分别断言task/browser/ssh的目标区分）、`cliApprovalModule`、`arguments`29、`turn/tools`54，共**121项**通过；一反转（ssh退回工具名）命中断言且finally字节恢复；五静态门、TS build/freshness通过。build `9d82295d16c1`。原47/ADD整体partial、goal active。

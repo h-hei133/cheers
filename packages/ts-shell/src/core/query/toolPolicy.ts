@@ -128,7 +128,16 @@ export function evaluateToolPermissionScope(
     }
   } else if (toolName === "browser") {
     const action = typeof safeArgs.action === "string" ? safeArgs.action.toLowerCase().trim() : "";
-    target = typeof safeArgs.url === "string" ? safeArgs.url : action || "browser";
+    // A click carries no URL, so the target has to name what it acts on: the
+    // coordinates or the text, not just the verb. Otherwise one approved click
+    // authorizes every later click anywhere on the page.
+    const anchor = typeof safeArgs.url === "string" ? safeArgs.url
+      : typeof safeArgs.selector === "string" ? safeArgs.selector
+        : typeof safeArgs.text === "string" ? safeArgs.text.slice(0, 80)
+          : typeof safeArgs.key === 'string' ? safeArgs.key
+            : typeof safeArgs.x === 'number' && typeof safeArgs.y === 'number' ? `${safeArgs.x},${safeArgs.y}`
+              : "";
+    target = anchor ? `${action || "browser"}:${anchor}` : action || "browser";
     if (Object.hasOwn(READ_ONLY_BROWSER_ACTIONS, action)) {
       operation = "read";
       isReadOnly = true;
@@ -141,17 +150,32 @@ export function evaluateToolPermissionScope(
     // The question is what the user is being asked to allow, so it is the
     // target. Leaving it at the tool name would show a bare "team" and ask for
     // approval of something unnamed.
-    target =
-      typeof safeArgs.description === "string" && safeArgs.description.trim()
-        ? safeArgs.description.trim()
-        : typeof safeArgs.question === "string" && safeArgs.question.trim()
-          ? safeArgs.question.trim().slice(0, 80)
-          : typeof safeArgs.prompt === "string" && safeArgs.prompt.trim()
-            ? safeArgs.prompt.trim().slice(0, 80)
-            : typeof safeArgs.task === "string" && safeArgs.task.trim()
-              ? safeArgs.task.trim()
-              : toolName === "team" ? "competing-hypothesis pass" : "subagent task";
+    // The label is what the user reads, but the prompt is what the subagent is
+    // asked to do. A grant keyed only on the label would cover a later call with
+    // the same label and an entirely different instruction.
+    const label = typeof safeArgs.description === "string" && safeArgs.description.trim()
+      ? safeArgs.description.trim()
+      : typeof safeArgs.question === "string" && safeArgs.question.trim()
+        ? safeArgs.question.trim().slice(0, 80)
+        : typeof safeArgs.task === "string" && safeArgs.task.trim()
+          ? safeArgs.task.trim()
+          : "";
+    const instruction = typeof safeArgs.prompt === "string" && safeArgs.prompt.trim()
+      ? safeArgs.prompt.trim().slice(0, 200) : "";
+    // Neither a label nor an instruction leaves the named fallback, which is
+    // still better than a bare tool name.
+    target = label && instruction ? `${label}:${instruction}` : label || instruction
+      || (toolName === "team" ? "competing-hypothesis pass" : "subagent task");
     isReadOnly = false;
+  } else if (toolName === "ssh") {
+    // A remote command is the thing being approved. Leaving the target at the
+    // tool name let one "allow always" cover every later remote command.
+    const remoteOperation = typeof safeArgs.operation === "string" ? safeArgs.operation.trim() : "";
+    const remote = typeof safeArgs.remote === "string" ? safeArgs.remote.trim() : "";
+    const command = typeof safeArgs.command === "string" ? safeArgs.command.trim() : "";
+    operation = remoteOperation === "output" || remoteOperation === "read" ? "read" : "execute";
+    isReadOnly = operation === "read";
+    target = [toolName, remoteOperation || "ssh", remote, command].filter(Boolean).join(":");
   } else {
     operation = "execute";
     target = toolName;

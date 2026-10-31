@@ -592,6 +592,15 @@ export function createCliEscalationPromptHandler(
       decisionInputKey = "n";
       denialReason = "apply_patch requires an exact one-time group selection; allow-always is not available.";
     }
+    // A tool from an extension has no argument contract this program can read,
+    // so a remembered grant could only be keyed on its name — and would then
+    // cover every later call with any arguments. One-time approval is the most
+    // that can be promised truthfully.
+    if (prompt.context.toolName.startsWith("mcp__") && decision === "allow-always") {
+      decision = "allow-once";
+      decisionInputKey = "y";
+      denialReason = "This tool comes from an extension; the grant covers this call only.";
+    }
     if (prompt.context.explicitApproval && (decision === 'allow-always'
       || !prompt.options.some(option => option.value === decision))) {
       decision = 'deny'; decisionInputKey = 'n';

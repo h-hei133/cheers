@@ -10872,3 +10872,7 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-10-31：钩子的「仅本次」不再变成永久授权（子代理review安全缺陷）
 
 [addition21.74](features/phase-20-addition.md#2174-钩子的仅本次不再变成永久授权子代理review安全缺陷)approveDeclaredHook对once/always返回同一true，dispatcher无条件recordTrust，用户选「仅本次」实得永久跨会话信任；原测试还锁定了该错误。现返回三态决策、只有always持久化、布尔按一次性处理。63项聚焦、一反转到命中、五门/TS build通过。build 46b545b4。原47/ADD整体partial、goal active。
+
+### 2026-10-31：授权目标过粗导致一次授权覆盖实质不同的调用（子代理review安全缺陷）
+
+[addition21.75](features/phase-20-addition.md#2175-授权目标过粗导致一次授权覆盖实质不同的调用子代理review安全缺陷)探针确认task/browser/ssh/MCP目标过粗。现ssh含operation/remote/command、browser含action+anchor、task含指令；MCP参数契约不可解读故禁止allow-always。121项聚焦、一反转到命中、五门/TS build通过。build 9d82295d。原47/ADD整体partial、goal active。

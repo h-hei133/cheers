@@ -1,7 +1,7 @@
 {
-  "name": "persist-once",
+  "name": "coarse-ssh-target",
   "exit": 1,
-  "tests": "1 failed | 10 skipped (11)",
-  "originalSha256": "37dcd36667cdf774a9768e4d49bcae22b9de31f2dca9da7a4b13f0831d3ec46e",
+  "tests": "1 failed | 37 skipped (38)",
+  "originalSha256": "cd4bfce61b53c9af395db342c8b754caf49082a32c01e229cd670b0815c14faf",
   "restored": true
 }

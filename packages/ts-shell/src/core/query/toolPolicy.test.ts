@@ -121,11 +121,30 @@ describe("toolPolicy", () => {
     expect(bare.target).toBe("competing-hypothesis pass");
   });
 
-  it("derives clear target for task tool from description or prompt", () => {
+  it("derives a task target that separates different instructions", () => {
     const withDesc = evaluateToolPermissionScope("task", { description: "Analyze performance" }, "ask");
     expect(withDesc.target).toBe("Analyze performance");
     const withPrompt = evaluateToolPermissionScope("task", { prompt: "Find all unused exports" }, "ask");
     expect(withPrompt.target).toBe("Find all unused exports");
+    // Same label, different instruction: the grant must not carry over.
+    const first = evaluateToolPermissionScope("task", { description: "Analyze performance", prompt: "summarize the README" }, "ask");
+    const second = evaluateToolPermissionScope("task", { description: "Analyze performance", prompt: "delete every log file" }, "ask");
+    expect(first.target).not.toBe(second.target);
+  });
+
+  it("derives a browser target that separates actions and their anchors", () => {
+    const a = evaluateToolPermissionScope("browser", { action: "click", x: 10, y: 10 }, "ask");
+    const b = evaluateToolPermissionScope("browser", { action: "click", x: 900, y: 700 }, "ask");
+    expect(a.target).not.toBe(b.target);
+    const typed = evaluateToolPermissionScope("browser", { action: "type", text: "hello" }, "ask");
+    expect(typed.target).toBe("type:hello");
+  });
+
+  it("derives an ssh target that names the remote command", () => {
+    const read = evaluateToolPermissionScope("ssh", { operation: "output", remote: "prod" }, "ask");
+    const run = evaluateToolPermissionScope("ssh", { operation: "run", remote: "prod", command: "rm -rf /" }, "ask");
+    expect(read.target).not.toBe(run.target);
+    expect(run.target).toContain("rm -rf /");
   });
 
 
