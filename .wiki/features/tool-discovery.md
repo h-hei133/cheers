@@ -4,18 +4,20 @@ category: article
 created: 2026-10-17
 updated: 2026-11-01
 tags: [tools, context, phase-20]
-summary: "默认只声明常驻工具并提供 search/load 入口；加载只改变下一次请求的 schema，不授予执行权限；full 模式保留诊断与对照。"
+summary: "默认声明常驻与运行显式提供的工具及 search/load 入口；加载只改变下一次请求的 schema，不授予执行权限；full 模式保留诊断与对照。"
 ---
 
 # 动态工具发现
 
-默认 `toolDiscovery: "dynamic"`。模型首次请求只收到常驻工具、`tool_search` 与 `tool_load` 的 schema；其余工具按名称搜索并加载后，在**下一次**请求中获得完整 schema。
+默认 `toolDiscovery: "dynamic"`。模型首次请求收到常驻工具、运行显式提供的工具、`tool_search` 与 `tool_load` 的 schema；其余工具按名称搜索并加载后，在**下一次**请求中获得完整 schema。
 
 发现入口同样受 `allowedTools`/`disabledTools`/`hiddenToolPrefixes` 约束。若任一入口不准入，则直接声明过滤后的实际工具池，保证显式允许的工具不依赖被禁止的加载入口；空池不追加元工具。显式 allowlist 要保留动态发现时，须包含两个入口及要允许发现的实际工具。该退化只改变声明方式，不授予额外工具或绕过执行权限。
 
 ## 1. 常驻与可发现
 
 常驻：`read`、`glob`、`grep`、`bash`、`edit`、`write`、`apply_patch`、`ask`、`task`、`taskOutput`、`taskWait`、`taskStop`、`todo`。当前可见性过滤之后不存在的名字不会凭空出现；运行显式提供的feature工具也进入初始集合。
+
+常驻名单不等于普通 CLI 首请求的完整清单。当前前台组装还提供 `paper_search`、`document_read`，已安装的安全运行时提供 `security_propose`；在无其他扩展的隔离空项目中，实际初始集合为13个常驻、3个运行工具、2个发现入口，共18个。其他工作流可按自己的owner再提供工具；数量须从本次实际请求取证，不能硬编码为15或18。真实首请求的尺寸与用量证据见[补充任务24.47](phase-20-addition.md#2447-默认动态清单的真实首请求分项)。
 
 可发现：其余通过 `allowedTools`/`disabledTools`/`hiddenToolPrefixes`/MCP 开关与模式过滤后的工具，包括 `browser`、`desktop`、`lsp`、`web_fetch`、`web_search`、`skill` 与 MCP 工具。MCP 工具沿用现有 `mcp__<server>__<tool>` 命名空间。
 
@@ -38,7 +40,7 @@ summary: "默认只声明常驻工具并提供 search/load 入口；加载只改
 
 ## 4. 请求与预算
 
-step 在每次调用时读取当前快照，所以加载后的 schema 立即计入下一次请求的工具声明与硬预算；工具顺序保持目录顺序，减少 prompt 前缀抖动。初始 system prompt 只列常驻名称。
+step 在每次调用时读取当前快照，所以加载后的 schema 立即计入下一次请求的工具声明与硬预算；工具顺序保持目录顺序，减少 prompt 前缀抖动。初始 system prompt 的名称清单来自初始工具集合，包含运行显式提供的工具。
 
 ## 5. 边界
 

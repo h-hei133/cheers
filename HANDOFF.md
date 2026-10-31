@@ -1696,3 +1696,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An empty tool allowlist still sends search/load schemas, or an explicitly allowed deferred tool cannot be reached because the execution gate rejects its generated discovery helpers.
 - **Root Cause**: The catalogue filters ordinary tools before appending discovery entry points, while the execution gate correctly applies the original allowlist to every call. Generated names are also falsely reported as unknown before they exist.
 - **Rule**: Apply the existing visibility policy to both discovery entry points before choosing dynamic mode. When either is restricted, expose the admitted ordinary pool directly; an empty pool remains empty. Keep default dynamic loading and the execution gate intact. Verify actual preview and accepted wire sets for empty, pinned and deferred allowlists, plus disabled/hidden entry points and explicit metadata names. Put transport-double assertions after the call returns: the real provider adapter classifies thrown fetch errors, which otherwise hides the original test assertion.
+
+### Pinned Tools Do Not Define The Whole Foreground Request
+
+- **Symptom**: A real default-dynamic request sends 18 schemas while a probe expects 13 pinned tools plus 2 discovery entries.
+- **Root Cause**: The foreground runtime explicitly supplies research source tools and an installed security proposal tool. Discovery intentionally adds run-provided tools to its initial set; inspecting only the pinned constant misses this caller composition.
+- **Rule**: Trace the actual foreground feature-tool owner before fixing a request roster expectation. Assert the admitted wire set for the specific fixture, preserve the failed observation separately, and never treat an unexpected count alone as a product defect. A one-step closing request omits schemas and cannot validate an ordinary tool-enabled first request.

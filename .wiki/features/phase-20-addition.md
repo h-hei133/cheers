@@ -406,7 +406,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批、第 24.39 节 | 部分完成 | Node/exe 普通/全屏的生产加载期输入、取消与错误恢复已验证；冷缓存、桌面全矩阵及完整性能验收仍缺 |
-| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40、24.43–24.46 节 | 部分完成 | 纯组合、模板、原生研究/review preview、目录词表及按需加载已实施；Node/exe真实TUI计量衔接、context身份转交及受限工具目录的实际schema/估算已修补验证；不支持的control/workflow仍unknown；默认完整请求的真实差额、其他环境/provider/词表、完整媒体/协议与性能验收尚缺 |
+| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40、24.43–24.47 节 | 部分完成 | 纯组合、模板、原生研究/review preview、目录词表及按需加载已实施；Node/exe真实TUI计量衔接、context身份转交及受限工具目录的实际schema/估算已修补验证；默认动态首请求18个schema与4325/4588估算/实测已取证；不支持的control/workflow仍unknown；历史1.7k/4.9k同快照差额、其他环境/provider/词表、完整媒体/协议与性能验收尚缺 |
 | ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批、第 24.44–24.45 节 | 本地验证 | 当前报告身份经真实 slash 桥接与 Node/exe TUI 验证；不借此宣称 ADD-08 完成 |
 | ADD-35 | P2 | 状态栏 live 估算与 provider 实测的优先级 | 第一百零五批、21.28–21.30 | 本地验证 | 真实 provider 延迟 |
 | ADD-36 | P2 | 目录刷新来源标记与能力上限准入 | 第一百零六至一百零八批 | 本地验证 | 真实外部索引内容与端到端 compaction |
@@ -6094,3 +6094,27 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 五项静态门与TS/exe构建通过，build`720d10afc7d9805b4504367ac9062e56a9298cf5878aec99767ca26549ebc059`当前compilerInputs摘要匹配，exe SHA`eea0b1e720e524ba8174a95f68d9cc3f885fbfd72300dd5477062420a004babf`与manifest size核对。生产Node/exe各三场--print经原生HTTP到本地模拟provider，maxTurns=2保留首步工具能力：空/read/web_fetch分别只发送[]/[read]/[web_fetch]，每场一次GET+一次POST，body1537/2578/2023bytes、schema0/1007/447bytes、2消息；usage123为显式模拟数据，各一query completed/success、一条记录request、零tool calls、exit0。每场独立HOME/profile/空Git项目/synthetic key、offline/无skills/context files/MCP/cache warming/retry，config及project不变、owned夹具清理；25秒/1MiB/100ms采样768MiB阈值，仅小夹具内存保护，不算性能验收。该probe验证实际声明而未让模型执行read/web_fetch，不算真实外部provider、网络工具效果或桌面PTY验收。
 
 正式反转、测试、构建与可复用CLI收据归`.omx/artifacts/phase20-addition-discovery-scope/`；本批不读取真实凭据，无新真实provider请求、PTY、local NormProof或委派复审。最终五门/runner语法/diff通过，118既有docs-source advisory保留；当前build摘要、源码快照、135项恢复后结果与六场CLI收据核对一致，owned scratch已删除。ADD-03/ADD-08仍partial，默认完整请求/历史1.7k与4.9k真实分项调查仍缺，本批不以固定usage解释该差额。一次延迟读回48f1407e/41239014279及35b939c3/41239648179代码CI均仍in_progress、各Watch已success；d9eb5492代码CI仍success，不替代本批自身CI。原Phase20真实条件继续延后，goal active，提交与推送另绑定。
+
+### 24.47 默认动态清单的真实首请求分项
+
+接续已推送`58bf4871bf095a584aca205ed757c94dbf6dec25`，补ADD-08默认工具能力保留时的真实首请求证据。本批无产品代码改动，沿用build`720d10afc7d9805b4504367ac9062e56a9298cf5878aec99767ca26549ebc059`，每次先核对manifest.compilerInputs摘要。此前maxTurns=1会在closing分支省略schema，本次设2、无allowedTools或toolDiscovery覆盖，保留动态默认；独立空Git项目、禁用MCP/skills/context files/cache warming/retry，offline只禁自主检查，denyRules的通配拒绝阻止工具效果但不删声明。该夹具不是完整用户配置，也未让模型实际执行工具。
+
+普通CLI的真实初始集合是18个：13个[常驻工具](../../packages/ts-shell/src/core/tools/discovery/state.ts)、2个发现入口，以及[前台组装](../../packages/ts-shell/src/cli/runtime/prompt.ts)提供的paper_search/document_read和已安装安全运行时的security_propose。[目录owner](../../packages/ts-shell/src/core/tools/catalog.ts)有意把运行显式提供的feature tools放入初始集合。首个probe只按常驻+发现预期15，实际18导致harness断言失败；不能据数量推断目录泄漏。源码核对三个实际owner后修正观测名单，首收据与脚本原快照单独保留、不改写为通过。[发现合同](tool-discovery.md)同步说明该调用端组成，不能把15或18当作全部运行的固定数目。
+
+主代理Node20.3生产--print最终真实调用通过：原生Undici一次readiness GET、一次推理POST均HTTP200，透明observer原样转发参数并返回未消费的原Response；实际body与accepted live telemetry尺寸匹配。两消息、18 schemas，工具名精确匹配本夹具；持久化query.completed为completed/success、一条已记录request、零tool calls、exit0，原生用量与live相等，observer错误0。最终分项如下，都是本次实际请求的数值：
+
+| 量 | 数值 |
+|---|---:|
+| body UTF-8 bytes / UTF-16 code units | 15152 / 15148 |
+| serialized system / conversation / tools / envelope bytes | 1404 / 193 / 13381 / 174 |
+| raw base system source bytes | 1366 |
+| 本地assembled estimate，characters/3.5 | 4325 |
+| provider归一化总输入 / 已含cache read / output | 4588 / 4544 / 27 |
+
+四个wire分项严格求和到body；raw system source为JSON转义/包装前尺寸，不能再次相加。schema对象合计13362bytes、数组括号与逗号19bytes，构成13381；其占body约88.3%是字节比例，不是provider分类tokens。每工具schema、description和parameters的尺寸见安全收据；最大edit1927、bash1234、read1005bytes，未据此删schema或缩减能力。估算与实测相差263、约本地估算的6.1%，cache read已在4588内、不能再加。同一最终内存body的cl100k_base/o200k_base示例为3262/3315，选中relay模型的隔离目录未声明精确词表，这两个只是本地假设，不能替代provider口径或解释历史1.7k/4.9k。服务器隐藏协议、词表与计费规则仍未知，不凭单样本改公式。
+
+首个真实调用另测4325/4590、cache320、output53、CLI exit0，但其预期名单断言在读取native完成记录前退出，故保留unverified，不冒充最终完整验证。两次独立临时项目body等长不代表同字节，示例词表计数也不同；没有保存raw body来证明相同。HTTP200后的request:error仅保留诊断事件、原因未分类，未将其等同provider-network失败；回答质量未评估，完成终态不替代内容验收。
+
+每次protected HOME/profile仅在0600隔离配置复制所选真实API-key/address/model；65秒、1024输出、2MiB输出/会话文件上限、100ms采样768MiB descendant RSS阈值，最终峰值320800KiB。它是小夹具采样守卫，不是内核硬限额或性能验收。两次原配置/auth/catalog四home来源bytes或缺失及隔离config均不变，最终空项目不变；owned PID+start-time关闭核对、含凭据配置与原生会话scratch删除。stdout/stderr直接丢弃，正式证据不留请求/响应/思考正文、headers、key/address或prompt/session digest。正式脚本、初次与最终收据及核验归`.omx/artifacts/phase20-addition-default-count/`。
+
+本批仅文档/HANDOFF及忽略目录的证据脚本，不重复build/unit/反转，无PTY、全仓回归、20k真实会话、新local NormProof或委派复审。五项静态门、三脚本语法、diff及安全收据核验均exit0，118既有docs-source advisory保留；当前build新鲜度、原始key/address缺席与owned scratch缺失核验通过。延迟读回48f1407e/41239014279及35b939c3/41239648179代码CI现已success，58bf4871/41240901265仍in_progress、其Watch41240901269已success，不替代代码CI。ADD-08仍partial，历史同快照差额、其他环境/provider、完整词表/媒体/协议与性能验收仍缺；原Phase20真实条件继续延后，goal active，本批提交与推送另绑定。
