@@ -406,8 +406,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批、第 24.39 节 | 部分完成 | Node/exe 普通/全屏的生产加载期输入、取消与错误恢复已验证；冷缓存、桌面全矩阵及完整性能验收仍缺 |
-| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40、24.43–24.44 节 | 部分完成 | 纯组合、模板、原生研究/review preview、目录声明的词表及按需加载已实施；生产 Node 普通/全屏真实 TUI 的提交前估算、accepted 请求和 provider 实测已对齐，context 报告身份漏传已修补；不支持的 control/workflow 仍 unknown；真实 binary/其他环境、其他词表、完整媒体/协议、历史 1.7k/4.9k 分项差额与性能验收尚缺 |
-| ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批、第 24.44 节 | 本地验证 | 当前报告身份经真实 slash 桥接与 Node TUI 验证；不借此宣称 ADD-08 完成 |
+| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40、24.43–24.45 节 | 部分完成 | 纯组合、模板、原生研究/review preview、目录声明的词表及按需加载已实施；生产 Node/exe 普通/全屏真实 TUI 的提交前估算、accepted 请求和 provider 实测已对齐，context 报告身份漏传已修补；不支持的 control/workflow 仍 unknown；其他环境/provider、其他词表、完整媒体/协议、历史 1.7k/4.9k 分项差额与性能验收尚缺 |
+| ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批、第 24.44–24.45 节 | 本地验证 | 当前报告身份经真实 slash 桥接与 Node/exe TUI 验证；不借此宣称 ADD-08 完成 |
 | ADD-35 | P2 | 状态栏 live 估算与 provider 实测的优先级 | 第一百零五批、21.28–21.30 | 本地验证 | 真实 provider 延迟 |
 | ADD-36 | P2 | 目录刷新来源标记与能力上限准入 | 第一百零六至一百零八批 | 本地验证 | 真实外部索引内容与端到端 compaction |
 
@@ -522,7 +522,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | 未开始 | 1 | ADD-30 |
 | **合计** | **71** | — |
 
-**没有一条达到"完成"。** 部分完成的 8 条各有明确缺口；其余条目停在"本地验证"，缺的都是同一类东西：真实终端/输入法/剪贴板、真实 provider 凭据、macOS/Windows 机器。这些条件本仓库无法自行提供，不能把本地绿色测试兑换成完成。
+**没有一条达到"完成"。** 部分完成的 8 条各有明确缺口，其余条目停在"本地验证"；具体缺口以对应条目为准。第24.43–24.45节已补所选真实provider及Linux/Node/exe普通/全屏的计量链路，但不能替代其他条目的真实工作流、桌面输入法/剪贴板、macOS/Windows与完整性能矩阵，也不能把局部绿色证据兑换成整体验收完成。
 
 原 Phase 20 的 47 项矩阵保持 **38 complete / 9 partial / 0 open**，与本表分开记录。
 
@@ -6070,3 +6070,15 @@ ADD-08补上明确缺失的词表计数。[目录](../../packages/ts-shell/src/c
 五次真实推理分开记证：首pilot仅256输出，已接受/有usage/显示measured，但query完成与成功谓词为false，原observer未保存精确终态；harness等待成功后超时清理exit143，不算完整通过或产品route失败。其额外native GET404目标未保留，不能归因推理；后续offline夹具没有该请求。两场before收据只通过旧的gauge/last-request契约、current-report仍null，不能替代两场fixed验证。provider输入803与估算562的差额只属于这批隔离请求；不同临时项目的等长body不等于同字节，不解释历史1.7k/4.9k。
 
 正式收据、反转、源码非执行快照、构建身份和可复用脚本归 `.omx/artifacts/phase20-addition-live-context/`，最终清理owned测试scratch。ADD-08保持partial：本批补Linux/Node普通/全屏真实衔接，真实binary/其他平台与provider、词表/媒体/协议、历史差额和完整性能仍缺；无新NormProof或独立委派复审。延迟代码CI读回205ed567/41236321295已completed/success；d9eb5492/41237373096仍in_progress，Watch41237373104已success，不替代代码CI。最终五项静态门、diff与两脚本语法再次exit0，118既有docs-source advisory保留；正式收据核对、恢复后build新鲜度、原始key/address未进入证据及owned scratch清理均通过。本批提交/推送另绑定；原Phase20真实条件继续延后，整体goal active。
+
+### 24.45 生产单文件程序的真实 provider 计量衔接
+
+接续已推送`48f1407e1914655bc70cc51aed0e37123f2c8a90`，补ADD-08明确缺失的真实binary证据，不新改产品。沿用build`5d2a876fc754d473fc000f093948e6f62f7c846b644e39ac29d7c382515f3182`；每场先核对当前manifest.compilerInputs摘要与linux-x64可执行文件size/SHA，SHA为`43e9cd3ad833dab06da2c9d086abda971e0f12823788bd1bbcca4ca05abce295`、106842240 bytes、Bun1.3.14编译。直接拉起该单文件程序，不用Node import observer、不替换打包模块、不mock响应或代理传输。
+
+主代理串行两场真实原生PTY均通过。普通/全屏空态估算503，草稿及accepted估算均561；普通provider总输入803、output779，全屏802、output389，均含cache read640。实际状态栏从~561切到无~的803/802，`/context`顶部Latest context measurement、最后请求详情与原生会话持久化用量分别相等；两个query.completed原事件均completed/success。每个隔离会话只有一条user、一条已记录request、零tool calls，报告之后记录数不增加。accepted报告body为1975 UTF-8 bytes/UTF-16 code units，wire分项求和一致，本地方法characters/3.5。仅比较各自实际请求；不同临时项目的等长body、与上一批Node估算562的差异不证明字节相同或产品回归，也不解释历史1.7k/4.9k。
+
+证据来自实际PTY字节输出及原产品command-output/query-event/usage账本，报告数值须在打开命令后的输出中可见。本批未独立观察原生HTTP传输，不据一条用量记录宣称HTTP请求数、HTTP状态、传输层body大小或没有未记账网络操作；上一批Node的透明传输观察单独保留。回答质量与“只答OK”的服从情况未评价，不用完成终态冒充内容质量验收。
+
+每场protected HOME/profile/空Git项目，仅在0600临时配置复制所选真实key/address/model；tools/MCP/skills/context files/cache warming/retry关闭，offline禁止自主检查但保留显式真实provider。单轮、1024输出、65秒、2MiB输出/会话文件上限；100ms采样relay/CLI RSS，768MiB阈值触发停止，实际峰值210688/211048KiB。这是采样守卫及小夹具观测，不是内核硬限额、Bun堆上限或性能验收。两场exit0/cooked flags恢复、PID+start-time确认owned进程关闭，原配置/auth/catalog四home来源bytes或缺失与隔离config不变；含凭据配置和原生会话正文随scratch全部删除。正式收据只含数值、固定枚举与布尔，raw PTY在内存丢弃，未保留请求/响应/推理正文、headers、key/address或文本digest。
+
+正式可复用runner、安全收据与核验归`.omx/artifacts/phase20-addition-live-binary/`，复用既有环境、build摘要与PTY relay。无新产品代码，故不重复build/unit/反转；五项静态门、runner语法与diff均exit0，118既有docs-source advisory保留；正式证据内原始key/address缺席及owned scratch清理另经核验。无全仓回归、20k真实PTY、新local NormProof或委派复审。一次延迟读回d9eb5492/41237373096代码CI现已completed/success；48f1407e/41239014279仍in_progress，Watch41239014307已success，不替代代码CI。ADD-08保持partial，其他环境/provider、词表/媒体/协议、历史差额和完整性能仍缺；原Phase20真实条件继续延后，goal active，本批提交/推送另绑定。

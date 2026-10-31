@@ -11157,3 +11157,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：真实 TUI 用量衔接与 context 桥接修复
 
 [addition24.44](features/phase-20-addition.md#2444-真实-tui-计量衔接与-context-报告身份传递)旧生产Node真实PTY发现gauge measured而报告顶部无当前tokens；桥接漏传live promptIdentity，条件spread未报类型错误。仅声明/转交原字段，保留清除/替换身份stale拒绝。参考同session accessor与unknown边界后，实际slash六回归旧owner2失败/4控制/14未选，显式反转相同、逐字节恢复后相关三文件60项再次通过。TS/exe build5d2a876fc754摘要/size/SHA一致；最终Node普通/全屏真实PTY各1推理，preview/accepted562、provider803（含cache640）、gauge与报告顶部/最后请求均实际803、completed/success、正常exit0/cooked/夹具清理。首256-budget pilot未证实成功、两场before报告仍null单独保留，不算最终修复验证。原配置不变、无正文/key/address留存；延迟205ed567代码CI已success，d9eb5492仍in_progress、Watch success；最终五门/diff/两脚本语法通过，118既有advisory保留，原始key/address缺席与scratch清理核验通过；交付另绑。真实binary/其他环境、历史差额和完整性能仍缺，ADD-08 partial、goal active。
+
+
+### 2026-11-01：单文件程序的真实计量衔接
+
+[addition24.45](features/phase-20-addition.md#2445-生产单文件程序的真实-provider-计量衔接)当前exe43e9cd3ad833经compilerInputs/size/SHA核对，普通/全屏两场真实PTY从估算561切到provider803/802，含cache640，context顶部/最后请求/持久用量一致，query原事件completed/success；每场一user/一记录request/零tool，accepted报告1975-byte分项相等。未注入Node observer或观察native HTTP，不称HTTP计数/状态独立证据，未评回答质量。exit0/cooked/owned进程关闭、四home来源及隔离config不变、凭据与会话scratch删除；RSS采样峰值210688/211048KiB不算性能验收。无产品改动，不重复build/tests/反转；五门/语法/diff通过、118既有advisory保留，原始key/address缺席及scratch清理核验通过；一次延迟读回d9eb5492代码CI已success，48f1407e仍in_progress、Watch success。ADD-08仍partial，其他环境/历史差额/完整计量性能仍缺，原Phase20真实条件延后、goal active，交付另绑。
