@@ -7545,3 +7545,136 @@ return measured.tokens + estimateTokens(messages.slice(measured.messageCount));
 **复核中判定不成立的一条**：复核意见认为 `compactionRefusal` 的 `fits-budget` 分支从生产路径不可达。实测否定——`planCompaction` 返回 undefined 有两条独立路径（切点不足、未达阈值），`isBelowThreshold` 只排除后者，前者两个子因都可达。但意见的另一半成立：原单元测试只直接调 helper，没走真实调用者，已补一条经 `createCompactionStep` 的用例。
 
 **验证。** 单 worker / heap768MiB 串行五文件 102 项通过（persistence 33、compaction 41、loop 20、cliRuntimeModule 5、fatalErrorBoundary 3）。五静态门通过，TS build `a2e03b408548`。真实 CLI：失败 exit=1 无堆栈，成功 exit=0。
+
+### 24.95 auto-compact 成功路径验证：未触发，原因未查明
+
+用小规模配置（`contextWindow: 20000`、`reserveTokens: 2000`、`maxOutputTokens: 1024`、`keepRecentTokens: 2000`）在隔离 home 中续接同一会话，跑到 **41 条消息 / 约 12,581 tokens**。压缩**从未触发**。
+
+**判定逻辑本身是正确的。** 用该会话的真实 transcript 加真实 overhead 跑单元验证：
+
+```
+messages: 41
+planCompactionCut: FOUND          ← 有切点
+estimateRequestTokens: 18143      ← 超过 softLimit 16976
+planCompaction: TRIGGERS          ← 应该触发
+```
+
+**接线也是存在的。** 在 `startTurn` 加持久化诊断后确认：
+
+```
+startTurn compaction=yes tools=18
+after overhead compaction=yes policyOverhead=18
+```
+
+`compaction` 非空、`overhead` 含 18 个工具。
+
+**但 `planCompaction` 在真实运行中从未被调用**，说明 `prepareNextStep` 没有执行。原因未查明。
+
+**排查中的一处失误**：我最初用 `require('node:fs')` 在 ESM 模块里写诊断，异常被 `catch {}` 吞掉，导致连续几轮把「诊断为空」误读为「未调用」。改用 `import` 后才发现接线是好的。这条记入 HANDOFF。
+
+**未完成的排查方向**：
+
+1. 在 `createCompactionStep` 返回的 step 函数入口加持久化计数器，确认它是否被执行；
+2. 在 `driveLoop` 的 pre-step 调用处加同样计数器，区分「没调用 `prepareNextStep`」与「调用了但 `planCompaction` 返回 undefined」；
+3. 对比交互模式是否同样不触发，判断是否 `--print` 特有。
+
+诊断代码已全部回退，工作树干净。本条记为**未解决**，不提升任何 ADD 状态。
+
+### 24.96 本轮问题总结：反复修改、实测遇到、始终未解决
+
+本节只做汇总，不改代码。分三类：**已修复但反复过**、**已发现未修**、**查不到根因**。
+
+#### 一、始终没有解决的问题（最高优先级）
+
+**1. auto-compact 在真实 CLI 中从未成功执行过一次。**
+
+这是本轮最严重的问题。所有压缩相关的修复都只在**拒绝分支**上得到过验证。
+
+已确认的事实：
+
+- 判定逻辑正确：用真实 transcript（41 条消息、约 12,581 tokens）加真实 overhead 跑单测，`planCompactionCut` 找到切点、`estimateRequestTokens` 得 18143（超过 softLimit 16976）、`planCompaction` 返回「应触发」。
+- 接线存在：`startTurn` 的诊断显示 `compaction=yes tools=18`、`policyOverhead=18`。
+- 但 `planCompaction` 在真实运行中**从未被调用**，说明 `prepareNextStep` 没有执行。
+
+原因未查明。可能的方向：`driveLoop` 的 pre-step 调用条件、`--print` 与交互模式的路径差异、`AgentCore.createLoopConfig` 的选项传递。
+
+**2. 上下文显示滞后于压缩判定。**
+
+状态栏取 `measuredPromptContext().tokens`（上次请求实测，不含之后新增），压缩判定取「实测 + 增量」。两者在刚发完请求时一致，此后每发一条消息就拉开距离。按 8000 实测 + 3600 增量、16k 窗口：状态栏 50%，判定 73%。
+
+根因已精确定位，比「两套数值」更具体：**正确算式已经存在，但被丢弃**。
+
+- `estimatePrompt` 已实现锚定算式（实测 + `estimateTokens(messages.slice(count))`），产出 `calibrated` 状态；
+- 但 [interactiveMode.ts](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts:375) 只在**空闲**时提供它：`...(!this.busy ? { promptContext: this.promptContext.read() } : {})`；
+- 忙碌时退回 `sessionFacts.ts` 的 `measured` 分支，不含增量。
+
+还有第二层：`read()` 在预览超过 20 秒（`checkedAt + 20000`）后返回 `{ source: 'stale' }`，**不带 tokens**，即使空闲也会丢掉数字。
+
+参照实现的做法（本轮调研）：三家都用「实测 + 尾部估算」；只有本项目的显示层会丢掉增量。oh-my-pi 另有 `compactionEpoch` 机制拒绝压缩前的陈旧锚点，以及签名的 schema 增量（roster 收缩时数字能下降）。
+
+#### 二、已发现但未修的问题
+
+**3. `fits-budget` 与 `no-legal-cut` 两种拒绝在真实路径上可能只有一种可达。**
+
+复核意见提出这一点，我用实测否定了一半（`fits-budget` 确实可达），但它指出的另一半成立：单元测试只直接调 `compactionRefusal`，没走 `createCompactionStep`。已补用例，但两种拒绝在**完整工具循环**中的实际分布仍未观察。
+
+**4. `compactionRefusal` 重复调用 `measureContextTokens`。**
+
+`planCompaction`、`isBelowThreshold`、`compactionRefusal` 三处各算一次，而实现里含 sha256 与消息切片。只在拒绝路径发生，不构成正确性问题，但是明显的重复工作。
+
+**5. ADD-77 只给了整体预算，没有逐类拆分。**
+
+当前输出「需要约 12,806 tokens 对 16,000 窗口」，没有说明工具 schema / 历史 / 输出各占多少。`/context` 已有分类估算，但没有接到错误路径。
+
+**6. 压缩后的上下文状态没有专门处理。**
+
+pi 在压缩后返回 `tokens: null`（诚实），oh-my-pi 用 epoch 保持一个合理数字，codex 用本地估算替换。本项目压缩后的显示行为未验证。
+
+#### 三、已修复但过程中反复过的问题
+
+**7. print 模式失败退出 0（我引入的回归）。**
+
+上一批加的内层 `catch` 吞掉异常，外层收不到，函数正常返回。当时观察到的 `exit=0` 被误读为修复成功，实际是失败被掩盖。由独立复核发现。已修复并验证（失败 exit=1、成功 exit=0）。
+
+**8. 顶层致命错误打印完整堆栈。**
+
+`writeError("Fatal error:", error)` 把 error 作为第二参数，Node 渲染完整栈。已改为只输出消息。
+
+**9. 拒绝消息去重键含会变的数字。**
+
+去重比较完整文案，而文案嵌了随工具结果增长的 token 数，长循环仍每步打印。已改为按稳定原因去重。
+
+**10. 配置过滤可能触及凭据文档。**
+
+`dropSourcesNotAllowed` 作用于 settings 与 auth 的合并值，规则却按文件声明。当前五个 auth 字段都含 `user` 所以未误删，但规则与范围不一致。已改为跳过凭据文档的键。
+
+**11. 写路径复活被忽略的键（ADD-74）。**
+
+首版对项目文件也生效，导致 `persistence.test.ts` 10 项失败。已收窄为仅用户设置文件。
+
+#### 四、调研过程中的方法论失误（值得记录）
+
+**12. 用 `require()` 在 ESM 模块里写诊断，异常被 `catch {}` 吞掉。**
+
+连续几轮把「诊断日志为空」误读为「代码未被调用」，浪费了大量排查轮次。改用 `import` 后立刻发现接线是好的。这条已写入 HANDOFF 的必要性。
+
+**13. 两次把「部分证据」当成「结论」。**
+
+- 只搜索 `maintainContext*` 就断定「三家没有回合前检查」，实际三家全有；
+- 看到状态栏有五种来源态就断定「显示层比参照更细」，实际数值来源不同。
+
+两次都是**搜索面不足 + 过早下结论**。
+
+**14. 把「无法构造场景」当成「功能正常」。**
+
+60k 窗口跑 10 回合只到 6k，我一度据此认为压缩「不易观察但不是缺陷」。真正原因是单步回合从不触发检查。
+
+#### 建议的下一步（按依赖顺序）
+
+1. **先解决第 1 项**（auto-compact 不执行）。它阻塞了对压缩成功路径的一切验证，也让第 3、4、5、6 项无从判断。
+2. 第 2 项（显示滞后）方案已清晰：忙碌时保留 `calibrated` 读数；`stale` 时保留 tokens 并标注。参照调研已完成。
+3. 第 3–6 项在第 1 项解决后重新评估，可能部分自动消解。
+
+#### 状态
+
+本轮所有代码改动均已提交推送（`a9ab2c96` 及之前），工作树仅有本节所在文档的改动。台账 78 项，未开始仅 ADD-30（已裁决不启动）。第 1、2 项**不提升任何 ADD 状态**。

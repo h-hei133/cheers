@@ -11509,3 +11509,15 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 复核另提「fits-budget 分支不可达」，实测否定：`planCompaction` 的两条 undefined 路径中 `isBelowThreshold` 只排除后者，前者两子因都可达。但其另一半成立——原测试未走真实调用者，已补经 `createCompactionStep` 的用例。
 
 五文件 102 项通过，五静态门通过，TS build `a2e03b408548`。
+
+### 2026-11-01：本轮问题总结（只做研究，不改代码）
+
+按要求把本轮反复修改、实测遇到、始终未解决的问题汇总到 24.96。三类：始终未解决 2 项、已发现未修 4 项、已修复但反复过 5 项、方法论失误 3 项。
+
+最严重的是 **auto-compact 在真实 CLI 中从未成功执行过一次**。判定逻辑经真实 transcript 单测确认正确（41 条消息、18143 tokens 超过 softLimit 16976、有切点），接线也存在（`startTurn` 诊断显示 compaction 与 18 个工具的 overhead 都在），但 `planCompaction` 在真实运行中从未被调用，说明 `prepareNextStep` 没有执行，原因未查明。
+
+其次是**上下文显示滞后**：状态栏取实测值不含增量，压缩判定取实测+增量；正确算式 `estimatePrompt` 已存在，但忙碌时被 `!this.busy` 丢弃，且预览超 20 秒后 `read()` 返回 stale 不带数字。
+
+方法论失误单独记录：用 `require()` 在 ESM 里写诊断导致连续几轮误判；只搜索单一关键词就断定「三家没有回合前检查」（实际全有）；把「无法构造场景」当成「功能正常」。
+
+本轮未改任何代码，未运行 build/vitest，`verify:docs-drift:strict` 与 `git diff --check` 通过。
