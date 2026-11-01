@@ -11415,3 +11415,9 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 验证：红灯先在旧守卫上失败（`Global model save refused`），放宽后通过；有效反转把两条判断加回后同一用例再失败，逐字节恢复并核对 SHA-256 `c635b15c799c6cf96216497c15f5b990d1a636f3ca6251d2ea892049af59ecc7` 后重验。另补一次反转：把 `sessionOwnsModel` 恒置 false，真实投影链与手工 provenance 两条用例同时失败，逐字节恢复并核对 SHA-256 `511f56c0cc1abb9382700d440901262e570b22f51738806c6b573cb1ce6604d9` 后重验。单 worker/heap768MiB 串行四文件 115 项通过（selection 69、modelCommandRuntime 35、providerDefault 4、defaultSource 7），另跑 policy 10、documents 32、preferences/documents 11 确认既有合同未变；五静态门通过、118 条既有 docs-source advisory 保留，TS build manifest `7463f851eba5`。`analyze:module-facades` 仍为既有 `interactiveMode.ts` 一条 advisory，本批未触碰。
 
 台账：ADD-72、ADD-73 由「未开始」改为「本地验证」，未开始由 3 降为 1（仅 ADD-30）；总数 73 不变。证据仅限本地聚焦测试与静态门，未声称真实终端观感、真实 provider 工作流、其他平台或完整性能验收；ADD-70 状态不变，goal active。
+
+### 2026-11-01：删除 `ProviderFacts` 中已无读者的 `fallbackModels`
+
+[addition24.80](features/phase-20-addition.md#2480-providerfacts-中已无读者的-fallbackmodels)继续 ADD-70 的重复事实收敛。`ProviderFacts.fallbackModels` 自 `99c2192d` 起已无生产读者：那次改动把 `/model list` 改为读已接受的目录快照，`fallbackModelsForProvider` 一并删除，但接口成员与十一个 provider 的取值都留在声明表里。它成为同一事实的第三份副本——目录 `BUILTIN_PROVIDERS` 与 `CONNECT_PRESETS` 是仍在用的两份——而这一份永远不会被读到，漂移完全不可见。
+
+删除接口成员、其文档注释与十一条取值行。`check:config-consumers` 只覆盖配置字段、不覆盖 `ProviderFacts`，因此以全仓 `grep` 零命中与 `tsc -p tsconfig.build.json` 通过作为证据（若仍有读者，编译会失败）。`facts.test.ts` 9 项、`modelCommandRuntime.test.ts` 35 项通过，config-consumers/node-floor/docs-drift 通过（118 条既有 advisory 保留），TS build manifest `0ed549f0fc5b`。纯删除，不改行为；未运行真实 provider 请求，ADD-70 仍部分完成、goal active。

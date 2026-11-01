@@ -6775,3 +6775,15 @@ ADD-73 的四态在 [defaultSource.test.ts](../../packages/ts-shell/src/core/com
 **一处未修的显示边界（已核实，未纳入本批）。** 当请求由 fallback 连接或 accountPool 成员服务、而 `activeProviderConnectionId` 未存储时，`/model status` 的 `Active connection: none` 与 `Model: unset` 会和下一行的 `Request model` 不一致。这不是 ADD-73 引入的：它由「已存储选择」与「解析后的请求」两个字段并列展示的既有设计决定，且 [modelCommandRuntime.test.ts](../../packages/ts-shell/src/core/commands/modelCommandRuntime.test.ts) 的 signer 与 missing-connection 用例已锁定该形态。改动它要同时决定 readiness 文案与 `Model:` 的语义，属于独立裁决，本批不动。
 
 本批证据仅限本地聚焦测试与静态门：没有真实终端观感验收、没有真实 provider 工作流、没有其他平台或完整性能矩阵，因此 ADD-72、ADD-73 记为「本地验证」，不提升 ADD-70。
+
+### 24.80 `ProviderFacts` 中已无读者的 `fallbackModels`
+
+继续 ADD-70 的「其余重复事实语义收敛」。只读复核发现 `ProviderFacts` 的 `fallbackModels` 自 `99c2192d`（"keep command model views on accepted publications"）起已无任何生产读者：那次改动把 `/model list` 从「models.dev 拉取失败 → 每 provider 的静态兜底表」改为读已接受的目录快照，`fallbackModelsForProvider` 一并删除，但声明表里的 `fallbackModels` 字段与十一个 provider 的取值都留了下来。
+
+这属于「同一事实多份副本」的残余：目录（`core/models/catalog.ts` 的 `BUILTIN_PROVIDERS`）与 `CONNECT_PRESETS` 已各自持有同一批默认模型名，`fallbackModels` 是第三份，且没有任何消费者会读到它——两份仍在用的副本之间如果漂移，用户看到的是目录里的列表；第三份漂移则完全不可见。保留它只有一种解释：读者相信它在生效。
+
+删除内容：接口成员及其文档注释，以及十一个 provider 各自的取值行。`check:config-consumers` 只统计配置字段，不覆盖 `ProviderFacts`，所以这条不会被既有门禁拦住；验证方式是全仓 `grep -rn "fallbackModels"`（排除 `node_modules` 与 `dist`）零命中，以及 `tsc -p tsconfig.build.json` 通过——若仍有读者，编译会失败。
+
+**验证。** `core/providers/facts.test.ts` 9 项、`core/commands/modelCommandRuntime.test.ts` 35 项通过；`check:config-consumers`、`check:node-floor`、`verify:docs-drift:strict` 通过（118 条既有 docs-source advisory 保留），TS build 通过（manifest `0ed549f0fc5b`）。本批只删声明，不改任何行为：删除前后 `providerFacts()` 的返回值除该字段外完全相同。
+
+证据仅限本地聚焦测试与静态门；没有真实 provider 请求，因此不据此提升 ADD-70。
