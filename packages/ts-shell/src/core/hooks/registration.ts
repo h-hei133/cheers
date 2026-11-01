@@ -89,25 +89,23 @@ export function registerDeclaredHooks(
   }
 
   const store = options?.trustStore ?? new HookTrustStore();
+  const declaredHooks = admitted.map(hook => ({
+    name: `${path.basename(hook.sourcePath)}:${hook.event}`,
+    event: hook.event,
+    matcher: hook.matcher,
+    command: hook.command,
+    // Carried so the dispatcher can name what it is asking about, and so an
+    // approval attaches to this command in this file rather than to a name.
+    fingerprint: hookFingerprint(hook),
+    sourcePath: hook.sourcePath,
+  } satisfies CommandHookConfig));
   dispatcher.setCommandHookTrust({
+    workspaceRoot: path.resolve(workspaceRoot),
     admission: options?.admission,
     store,
     requestApproval: options?.requestApproval,
     bypassed: options?.bypassed === true,
-  });
-
-  for (const hook of admitted) {
-    dispatcher.registerCommandHook({
-      name: `${path.basename(hook.sourcePath)}:${hook.event}`,
-      event: hook.event,
-      matcher: hook.matcher,
-      command: hook.command,
-      // Carried so the dispatcher can name what it is asking about, and so an
-      // approval attaches to this command in this file rather than to a name.
-      fingerprint: hookFingerprint(hook),
-      sourcePath: hook.sourcePath,
-    } satisfies CommandHookConfig);
-  }
+  }, declaredHooks);
 
   return { registered: hooks.length, problems };
 }

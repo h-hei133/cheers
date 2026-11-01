@@ -11324,3 +11324,12 @@ build d4dda071a4dc/current inputs与两exe哈希另由独立verifier核对。普
 针对 `.omx/project-memory.json` 的 Slice 08，复核 F-02/F-03/F-09/F-10：Anthropic thinking 已发送并裁剪 `budget_tokens`，流式 `signature_delta` 已累积并回放；当前四个 JSON 自描述 SSE 协议安全忽略 `event:` 头；models.dev 刷新已保留显式 reasoning、vision、temperature、工具能力、上限和精确 effort 选项，并由 cache merge 保留 reviewed built-in constraints。五个 owning test files 共198项在 Node heap768MiB、单worker下通过，没有产品源码变更。
 
 五静态门与 `git diff --check` 通过，118 条既有 docs-source advisory 保留；仅两份 markdown 变更，不重建，本批交付 CI 未观察。这次复核不把历史审计条目升级为当前缺陷，也不把本地协议测试当作真实 provider 或 Anthropic OAuth client registration/scopes 证据；本批没有新增真实 provider、OAuth、跨平台和发布证据，ADD 状态不变、goal active。
+
+
+### 2026-11-01：钩子声明替换、工作目录绑定与异步失效
+
+[addition24.71](features/phase-20-addition.md#2471-钩子声明快照替换与工作目录绑定)继续ADD-58/59：共享dispatcher每turn追加声明使旧命令重复、删除后仍运行，A旧fingerprint可放行B的相对脚本。目标检查及定向参考后，仅在原registration/dispatcher同步替换声明和策略，保留进程自有钩子；声明绑定workspace，await前捕获身份、执行前复核，clear退役等待审批且不记录grant。初版旧源7失败/1控制（Node24）；最终三个反转分别9/2/1项行为断言失败，逐字节恢复后Node20.3单worker/heap768MiB五文件77项、五静态门及TS build30280aa014aa通过。修正两条空dispatcher空洞基线及process-only cwd夹具；只读委派复审发现的clear数组失效回归已修补，最终无剩余具体发现，未让子代理执行验证。
+
+普通/全屏生产Node CLI各实际四回合，显式hook bypass与loopback，真实shell标记1/2/2/3，删除零新增、替换仅新命令一次；各GET4/POST4、submit4/end4/failed0，config/auth字节保持、exit0、owned进程与scratch清理。最高RSS333556KiB仅小夹具观察，标准relay未单测cooked恢复。本批不取消已经启动的shell、不重建exe，无真实provider/其他平台/全仓/15套件/20k/judge或整体性能验收；HANDOFF补声明快照规则，证据保留ignored目录。ADD-58/59仍本地验证，原47外部条件延后、goal active。一次延迟读3aa72384/6570a436代码CI success；48e2994c代码CI41265797603仍in_progress、Watch41265797606 success，本批最终核验与交付另绑，交付CI未观察。
+
+最终五静态门、Node20.3三份探针/观察/证据脚本语法检查、主代理独立证据verifier与diff check均exit0；核对四份当前TS快照、三份父源原字节、反转恢复哈希、77项测试与两模式原生收据、current build manifest/inputs及清理。委派只读复审与主代理证据断言分别记录。脚本源码以非可执行文本归档，临时执行文件清理；提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，goal active。

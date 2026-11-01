@@ -1858,3 +1858,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A compiled executable launched through a PTY relay can still report the non-interactive default-deny audit and never render the approval picker.
 - **Root Cause**: The runtime's interactive-host admission is independent of the relay's pseudo-terminal; output that contains an approval audit is not proof that keyboard choices were available.
 - **Rule**: Treat default-deny, explicit headless policy, and interactive picker evidence as separate contracts. For compiled PTY probes, assert the actual picker title and a fresh choice frame before sending keys; otherwise classify the run as unverified and do not claim desktop approval coverage.
+
+
+### Shared Hook Dispatchers Need Replacement And Retirement Identity
+- **Symptom**: Re-registering file declarations duplicates commands, removed hooks still execute, or an old project's grant authorizes a relative command under a new cwd. Capturing the command array early can also make clear ineffective after an awaited handler.
+- **Root Cause**: Process-owned registration and replaceable declarations share an append-only list; dispatch and approval outlive the declaration snapshot. Undefined trust cannot distinguish two process-only array generations.
+- **Rule**: Publish a replacement declaration array with its workspace-bound policy, preserving process-owned hooks. Capture both identities before awaiting handlers and recheck before execution; clear must retire pending approvals and arrays without saving grants. Test same-root replacement and process-only clear so workspace guards cannot mask the race. Existing tests must execute the dispatcher they registered and assert the original effect before checking isolation; keep already-started process cancellation as a separate contract.

@@ -75,10 +75,10 @@ describe("registering declared hooks", () => {
   }
 
   /** Run one PreToolUse event against a bash call. */
-  const fire = (dispatcher: HookDispatcher) =>
+  const fire = (dispatcher: HookDispatcher, workspaceRoot = path.join(tempDir, 'workspace')) =>
     dispatcher.dispatch({
       eventName: "PreToolUse",
-      workspaceRoot: tempDir,
+      workspaceRoot,
       toolName: "bash",
       toolArgs: {},
     } as never);
@@ -260,7 +260,7 @@ describe("registering declared hooks", () => {
       command: markerCommand("builtin"),
     });
 
-    await fire(dispatcher);
+    await fire(dispatcher, tempDir);
 
     expect(ran()).toEqual(["builtin"]);
   });
@@ -270,12 +270,14 @@ describe("registering declared hooks", () => {
     // and command, so a command approved in one repository was already approved
     // when a different repository shipped the same text.
     const first = declareHook(markerCommand("shared"), "project-a");
-    registerDeclaredHooks(new HookDispatcher(), first, {
+    const approved = new HookDispatcher();
+    registerDeclaredHooks(approved, first, {
       requestApproval: () => Promise.resolve("allow-always" as const),
       trustStore: new HookTrustStore(trustPath),
       homeDir: homeDir(),
     });
-    await fire(new HookDispatcher());
+    await fire(approved, first);
+    expect(ran()).toEqual(['shared']);
 
     let asked = 0;
     const second = declareHook(markerCommand("shared"), "project-b");
@@ -285,10 +287,10 @@ describe("registering declared hooks", () => {
       trustStore: new HookTrustStore(trustPath),
       homeDir: homeDir(),
     });
-    await fire(other);
+    await fire(other, second);
 
     expect(asked).toBe(1);
-    expect(ran()).toEqual([]);
+    expect(ran()).toEqual(['shared']);
   });
 
   it("contributes no project hooks once the project is refused", async () => {
@@ -298,10 +300,12 @@ describe("registering declared hooks", () => {
     const workspace = declareHook(markerCommand("refused-project"));
     const trust = new HookTrustStore(trustPath);
     // Approved first, so the refusal cannot be the fingerprint gate doing the work.
-    registerDeclaredHooks(new HookDispatcher(), workspace, {
+    const approved = new HookDispatcher();
+    registerDeclaredHooks(approved, workspace, {
       requestApproval: () => Promise.resolve("allow-always" as const), trustStore: trust, homeDir: homeDir(),
     });
-    await fire(new HookDispatcher());
+    await fire(approved, workspace);
+    expect(ran()).toEqual(['refused-project']);
 
     vi.mocked(projectTrust.isProjectUntrusted).mockReturnValue(true);
     const dispatcher = new HookDispatcher();
@@ -310,6 +314,6 @@ describe("registering declared hooks", () => {
     });
     await fire(dispatcher);
 
-    expect(ran()).toEqual([]);
+    expect(ran()).toEqual(['refused-project']);
   });
 });

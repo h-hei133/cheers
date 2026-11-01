@@ -465,8 +465,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---|---|---|---|---|
 | ADD-56 | P0 | 审批的「仅本次」不得变成永久授权 | 21.74、24.68、第一百三十四批 | 本地验证 | 已移除prompt推导授权，普通/全屏实际拒绝及仅本次批准零永久grant；Node/单文件可执行程序的headless print路径已实际验证默认拒绝与显式仅本次，其他平台未验 |
 | ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、24.66、24.68、第一百三十五批 | 本地验证 | 完整调用及全部execution准备结果绑定，验证续接文本不再授权当前调用；原reader完整预览、容量与绘制期限已验；Node/单文件可执行程序headless实际调用已核对目标、工具结果与终态；desktop原生适配器、其他平台仍缺；MCP仍禁止allow-always |
-| ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76 | 本地验证 | — |
-| ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77 | 本地验证 | — |
+| ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76、24.71 | 本地验证 | 已补共享dispatcher跨回合/项目隔离、工作目录绑定与普通/全屏声明替换；其他平台与单文件程序未验 |
+| ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77、24.71 | 本地验证 | 已补删除/编辑声明及待审批快照失效；已启动shell命令不属于本批取消范围 |
 | ADD-60 | P0 | 权限档位不跨项目存活 | 21.78 | 本地验证 | — |
 | ADD-61 | P1 | 权限层与工具体使用同一个围栏判定 | 第一百二十七批 | 本地验证 | — |
 | ADD-62 | P1 | 观察者失败不得吞掉持久事件；`team` 定义名不由模型文本拼成 | 第一百三十七、一百三十九批、24.67 | 本地验证 | 同步/异步及原生取消已验；exe取消、其他平台与真实provider条件未验 |
@@ -6551,3 +6551,24 @@ HANDOFF补提示内容与结构授权分离、保留continuity及验证session�
 - F-10 已收口。[models.dev 刷新](../../packages/ts-shell/src/core/models/catalogRefresh.ts)保留显式 reasoning、tool-call、temperature、image modality、context/input/output limit 及精确 effort 选项；[缓存合并](../../packages/ts-shell/src/core/models/catalogStore.ts)保持 reviewed built-in request constraints，用户 catalog 仍可最终覆盖。刷新回归覆盖缺失字段、非法上限、reasoning options 与内置约束优先级。
 
 本轮受限串行验证为 [Anthropic](../../packages/ts-shell/src/provider/endpoints/anthropicMessages.test.ts)、[SSE](../../packages/ts-shell/src/provider/endpoints/sse.test.ts)、[refresh](../../packages/ts-shell/src/core/models/catalogRefresh.test.ts)、[catalog shape](../../packages/ts-shell/src/core/models/catalogShape.test.ts)、[step](../../packages/ts-shell/src/turn/step.test.ts) 共 5 个文件、198 项通过（Node heap 768 MiB、单 Vitest worker）。五静态门与 `git diff --check` 通过，118 条既有 docs-source advisory 保留；本批仅改两份 markdown，不重建。这只证明本地协议/目录合同；没有新增真实 provider、Anthropic OAuth client registration/scopes、跨平台、桌面或发布证据，ADD 状态与 Phase 20 外部证据缺口保持不变，本批交付 CI 未观察。
+
+
+### 24.71 钩子声明快照替换与工作目录绑定
+
+继续 ADD-58/59。实际 turn 入口每次向共享 `defaultHookDispatcher` 注册声明，旧实现却只追加：第二回合重复执行，编辑/删除后的旧命令仍可运行；切换项目后，A 的旧 fingerprint 还能放行在 B 的 cwd 执行的同名相对脚本。初版八项真实 shell marker 回归在原实现下七失败/一通过（默认 Node 24，只作该次缺陷基线）。
+
+目标检查后、修改前定向只读比较两个参考：f09d01b85e0384647fcab6779d35ab9dabe04be3 的 agent-session.ts:3718–3767 在 reload 时替换 ExtensionRunner 并使旧 runner 失效；4210c08defe92fe8828f789b6f9fda287ad3709e 的 hooks/registry.rs:92–138 重建 hook engine，保留已经运行的命令 runtime。采用替换声明、退役旧动作 admission、保留进程自有钩子的决定，未复制代码或增加第二套 registry。
+
+仅在原 [registration](../../packages/ts-shell/src/core/hooks/registration.ts) 和 [dispatcher](../../packages/ts-shell/src/core/hooks/hookDispatcher.ts) 内修补：同步发布声明数组与信任策略，替换所有带 fingerprint 的声明，保留进程注册的命令和 in-process hooks；策略绑定规范化 workspaceRoot，声明在 bypass、缓存授权或询问之前核对实际 payload cwd。dispatch 在 await in-process handler 前捕获策略与命令数组身份，逐命令及审批返回后复核；clear 同时退役策略，使等待中的 allow-always 不执行、不落 grant。没有取消已经启动的 shell 进程，也没有改变 provider/auth 核心、package scripts、默认门或构建行为。
+
+新增 [11 项生命周期回归](../../packages/ts-shell/src/core/hooks/lifecycle.test.ts)，覆盖重复注册、编辑/删除、两个项目实际相对脚本、普通/显式 bypass 的错 cwd、同根替换期间的异步 handler、项目拒绝与 user grant、clear 及替换期间的待审批失效。修正既有 registration 测试的实际 cwd，并修复两条注册一个 dispatcher 却执行另一个空 dispatcher 的空洞基线：先断言原命令确实运行，再验证跨项目与拒绝。一次中间 74 项复验中 1 失败/73 通过，定位为 process-only 夹具指向不存在目录；保留失败日志，恢复其原 tempDir 后通过。显式只读委派复审还发现提前捕获数组会使 clear 后的 process-only 命令继续执行，已增加数组身份检查和对应回归；最终复审未报告剩余具体问题，不替代独立发布验收。
+
+三个反转串行执行，均为行为断言失败：完整旧生产源 9 失败/2 控制通过，移除 workspace 绑定 2 失败/9 通过，移除数组退役检查 1 失败/10 通过。finally 逐字节恢复两份生产源并核对 SHA；之后 Node 20.3、单 worker、heap 768 MiB、同一 flock 串行五文件 77 项通过（lifecycle 11、registration 14、hooks 6、trust 21、cliRuntimeInvocation 25）。五静态门通过，binding dangling 0，118 条既有 docs-source advisory 保留。Node 20.3 TS 构建通过，build `30280aa014aa4905ee41159a012da85beeaf4b68ed2d4cc70baccaf9b9b2656b`，inputs `1824c53a2b52857460ed3a6d6786d807770891c5d4e7cb584609e0d67859b32a`；本批未重建单文件程序。
+
+生产 Node CLI 普通/全屏各一场实际 PTY，每场四回合，使用隔离项目、scripted loopback 与显式 `--dangerously-bypass-hook-trust`。等待实际启动提示及每次原 TurnSink.end 后，shell marker 累计分别为 1、2、2、3：连续两回合各一次，第三回合删除声明后零新增，第四回合新声明只执行一次。每场 GET4/POST4、UserPromptSubmit4、end4、query.failed0；config/auth 精确字节保持、Ctrl+D exit0、自有 PID/start identity 非活跃、scratch 清理。60 秒/2 MiB/100ms 采样 768 MiB 守卫未触发；RSS 峰值 333556/326204 KiB、输出 13977/19477 bytes 仅为小夹具观察，不算性能验收。使用标准 relay，未单独观测 cooked flags，故不声明终端模式恢复证据。
+
+证据保留于 ignored `.omx/artifacts/phase20-addition-hook-snapshot/`，执行脚本仅放 `.tmp/` 并归档为非可执行文本；无 raw PTY、provider 请求/响应或真实凭据。HANDOFF 补充共享 dispatcher 的声明替换与 clear 失效规则。ADD-58/59 保持本地验证，其他 ADD 状态及原 47 项外部条件不升级；无真实 provider、单文件程序钩子、其他平台、全仓/15 套件/20k PTY 或整体性能验收，goal active。
+
+一次延迟读取：3aa72384 与 6570a436 的精确代码 CI 已 success；父提交 48e2994c 的 CI 41265797603 仍 in_progress，Architecture Watch 41265797606 success，不以 Watch 替代代码 CI、不立即轮询。本批最终核验与提交推送另绑，本批交付 CI 未观察。
+
+最终五静态门、Node20.3三份探针/观察/证据脚本语法检查、主代理独立证据verifier与diff check均exit0；核对四份当前TS快照、三份父源原字节、反转恢复哈希、77项测试与两模式原生收据、current build manifest/inputs及清理。委派只读复审与主代理证据断言分别记录。脚本源码以非可执行文本归档，临时执行文件清理；提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，goal active。

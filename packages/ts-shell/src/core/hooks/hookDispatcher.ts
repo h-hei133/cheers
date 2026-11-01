@@ -2,6 +2,7 @@ import { createComponentLogger } from "../../observability/structuredLogger.js";
 import { HOOK_TRUST_BYPASS_NOTICE } from "./types.js";
 import type { HookTrustStore } from "./trust.js";
 import { execFile } from "node:child_process";
+import path from "node:path";
 import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
 import type {
   HookEventPayload,
@@ -16,6 +17,14 @@ import type {
 } from "./types.js";
 
 const logger = createComponentLogger("HookDispatcher");
+
+interface CommandHookTrust {
+  readonly workspaceRoot?: string;
+  readonly store: HookTrustStore;
+  readonly requestApproval?: HookApprovalRequest;
+  readonly bypassed?: boolean;
+  readonly admission?: () => string | undefined;
+}
 
 /**
  * The shell a hook command is written for.
@@ -61,9 +70,7 @@ function hookTimeoutMs(event: HookEventName): number {
 export class HookDispatcher {
   private commandHooks: CommandHookConfig[] = [];
   private inProcessHooks: InProcessHookConfig[] = [];
-  private trust:
-    | { store: HookTrustStore; requestApproval?: HookApprovalRequest; bypassed?: boolean; admission?: () => string | undefined }
-    | undefined;
+  private trust?: CommandHookTrust;
 
   /**
    * How declared hooks are checked before they run.
@@ -73,12 +80,12 @@ export class HookDispatcher {
    * dispatcher refuses declared hooks and says so, which is the safe reading of
    * "nobody has been asked".
    */
-  setCommandHookTrust(trust: {
-    admission?: () => string | undefined;
-    store: HookTrustStore;
-    requestApproval?: HookApprovalRequest;
-    bypassed?: boolean;
-  }): void {
+  setCommandHookTrust(trust: CommandHookTrust, declaredHooks?: readonly CommandHookConfig[]): void {
+    if (declaredHooks) {
+      // Registration publishes one snapshot. Preserve process-owned hooks while
+      // retiring earlier declarations, including ones removed from disk.
+      this.commandHooks = [...this.commandHooks.filter(hook => hook.fingerprint === undefined), ...declaredHooks];
+    }
     this.trust = trust;
   }
 
@@ -88,10 +95,11 @@ export class HookDispatcher {
    * A hook with no fingerprint did not come from a file — it was registered by
    * this process, which is the process's own code and needs no permission.
    */
-  private async declaredHookIsAllowed(hook: CommandHookConfig): Promise<boolean> {
+  private async declaredHookIsAllowed(hook: CommandHookConfig, workspaceRoot: string): Promise<boolean> {
     const trust = this.trust;
     if (trust?.admission?.()) return false;
     if (hook.fingerprint === undefined) return true;
+    if (trust?.workspaceRoot !== undefined && path.resolve(trust.workspaceRoot) !== path.resolve(workspaceRoot)) return false;
     if (this.trust?.bypassed === true) {
       // Said every time rather than once, because the state that matters is
       // "this command is running unreviewed right now", not "the flag was set
@@ -158,6 +166,7 @@ export class HookDispatcher {
   clear(): void {
     this.commandHooks = [];
     this.inProcessHooks = [];
+    this.trust = undefined;
   }
 
   private matches(matcher: string | undefined, payload: HookEventPayload): boolean {
@@ -183,6 +192,8 @@ export class HookDispatcher {
   }
 
   async dispatch(payload: HookEventPayload): Promise<HookDecision> {
+    const trust = this.trust;
+    const commandHooks = this.commandHooks;
     const eventType = payload.eventName;
     logger.debug(`Dispatching lifecycle hook event: ${eventType}`, {
       event: eventType,
@@ -218,13 +229,15 @@ export class HookDispatcher {
     }
 
     // 2. Execute Command Hooks (Shell scripts with JSON stdin/stdout)
-    for (const hook of this.commandHooks) {
+    for (const hook of commandHooks) {
+      // Awaited process hooks and approvals may publish a replacement. An older
+      // event cannot adopt that snapshot or execute the retired declarations.
+      if (trust !== this.trust || commandHooks !== this.commandHooks) break;
       // What the hook last wrote to stderr, which the block contract reads.
       let lastStderr = "";
       if (hook.event === relevantEvent && this.matches(hook.matcher, payload)) {
-        const trust = this.trust;
-        if (!(await this.declaredHookIsAllowed(hook))) continue;
-        if (trust !== this.trust || trust?.admission?.()) continue;
+        if (!(await this.declaredHookIsAllowed(hook, payload.workspaceRoot))) continue;
+        if (trust !== this.trust || commandHooks !== this.commandHooks || trust?.admission?.()) continue;
         const timeoutMs = hook.timeoutMs ?? hookTimeoutMs(relevantEvent);
         const jsonPayload = JSON.stringify(payload);
 
