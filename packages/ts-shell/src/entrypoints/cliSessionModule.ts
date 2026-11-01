@@ -1,4 +1,4 @@
-import path from "node:path";
+import { normalizePathIdentity } from '../session/continuation/roots.js';
 import type { Interface as ReadlineInterface } from "node:readline";
 import { renderProjectedLines } from "../cli/output/projectedLineRenderer.js";
 import {
@@ -9,7 +9,6 @@ import {
   type ShellRuntimeContext,
 } from "../core/shell/runtimeContext.js";
 import { renderRootBindingDiagnostics } from "../core/shell/startupSurfaceRenderer.js";
-import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import { resolveSessionReference } from "../core/shell/recovery.js";
 import {
   renderCurrentSessionSurface,
@@ -44,15 +43,6 @@ export async function runCliSessionCommand(input: {
   readonly lifecycleNotices?: readonly string[];
   readonly readline?: ReadlineInterface;
   readonly onSessionSwitched?: () => void;
-  /**
-   * How to put the permission scope back to its neutral answer.
-   *
-   * Supplied by the interactive run, whose scope is a standing grant made for
-   * the project the user was in. A session that lives in a different project
-   * must not inherit it; a non-interactive run has no scope to reset and passes
-   * nothing.
-   */
-  readonly resetPermissionScope?: () => void;
 }): Promise<void> {
   const sessionAction = input.sessionAction ?? "panel";
   if (sessionAction === "list") {
@@ -125,7 +115,7 @@ export async function runCliSessionCommand(input: {
         return;
       }
       const resumed = input.sessionManager.resume(panelResult.switchedSessionId);
-      if (switchRuntimeSessionProjectContext(input.runtimeContext, resumed)) input.resetPermissionScope?.();
+      switchRuntimeSessionProjectContext(input.runtimeContext, resumed);
       renderProjectedLines(
         input.renderer,
         formatSessionPanelSwitchSuccessLines({
@@ -202,9 +192,7 @@ export function switchRuntimeSessionProjectContext(
     gitRoot: nextGitRoot,
     gitContext: nextGitContext,
   });
-  // Whether the session moved to a different project, which the caller needs to
-  // decide about permissions. Computed before the switch, because after it the
-  // old root is gone.
+  // Report the binding change before publishing the new project root.
   const projectChanged =
     normalizePathForCompare(nextProjectRoot) !==
     normalizePathForCompare(runtimeContext.projectRoot);
@@ -300,8 +288,6 @@ async function runCliSessionSwitch(input: {
   readonly sessionId?: string;
   readonly printMode: boolean;
   readonly onSessionSwitched?: () => void;
-  /** Put the permission scope back to neutral when the project changes. */
-  readonly resetPermissionScope?: () => void;
 }): Promise<void> {
   const targetSessionReference = input.sessionId?.trim();
   if (!targetSessionReference) {
@@ -345,7 +331,7 @@ async function runCliSessionSwitch(input: {
     }
     const resumed = input.sessionManager.resume(resolvedSessionId);
     const previousSessionId = input.runtimeContext.session.id;
-    if (switchRuntimeSessionProjectContext(input.runtimeContext, resumed)) input.resetPermissionScope?.();
+    switchRuntimeSessionProjectContext(input.runtimeContext, resumed);
     renderProjectedLines(
       input.renderer,
       formatSessionSwitchSuccessLines({
@@ -375,23 +361,7 @@ async function runCliSessionSwitch(input: {
 }
 
 function normalizePathForCompare(value: string): string {
-  return path.resolve(value).toLowerCase();
-}
-
-/**
- * The scope a session may carry after a switch.
- *
- * A scope answers prompts for the project it was chosen in. Carrying `allow-all`
- * into a different project would pre-approve work the user never saw, in a
- * repository they did not pick it for — so moving to another project drops it
- * back to asking. Staying in the same project keeps it, because nothing the
- * grant was about has changed.
- */
-export function permissionScopeAfterSwitch(
-  scope: PermissionScope,
-  projectChanged: boolean,
-): PermissionScope {
-  return projectChanged ? "ask" : scope;
+  return normalizePathIdentity(value) ?? '';
 }
 
 function resolveWorkspaceRootMode(

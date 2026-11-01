@@ -35,6 +35,8 @@ export interface ShellRuntimeContext {
   /** Identity of the request shape most recently prepared by this runtime. */
   promptIdentity?: PromptIdentitySnapshot;
   workspaceRevision?: number;
+  /** Changes only when the primary project changes, including a later return. */
+  projectRevision?: number;
   workspaceIssue?: string;
   /** Durable workspace authority, supplied by the session store owner. */
   workspaceAdmission?: () => string | undefined;
@@ -143,6 +145,7 @@ export function createShellRuntimeContext(input: {
   return {
     profile: currentProfile(),
     workspaceRevision: 0,
+    projectRevision: 0,
     cwd: input.cwd,
     originalCwd: input.originalCwd,
     projectRoot: input.projectRoot,
@@ -245,6 +248,9 @@ export function applyShellSubstrateTransition(
   }
   context.cwd = nextCwd
   context.originalCwd = nextOriginalCwd
+  if (normalizePathForCompare(nextProjectRoot) !== normalizePathForCompare(context.projectRoot)) {
+    context.projectRevision = (context.projectRevision ?? 0) + 1
+  }
   context.projectRoot = nextProjectRoot
   context.rootMode = nextRootMode
   if (nextRequestedWorkspaceRoot) {

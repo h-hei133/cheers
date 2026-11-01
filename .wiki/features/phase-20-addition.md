@@ -467,7 +467,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、24.66、24.68、第一百三十五批 | 本地验证 | 完整调用及全部execution准备结果绑定，验证续接文本不再授权当前调用；原reader完整预览、容量与绘制期限已验；Node/单文件可执行程序headless实际调用已核对目标、工具结果与终态；desktop原生适配器、其他平台仍缺；MCP仍禁止allow-always |
 | ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76、24.71 | 本地验证 | 已补共享dispatcher跨回合/项目隔离、工作目录绑定与普通/全屏声明替换；其他平台与单文件程序未验 |
 | ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77、24.71 | 本地验证 | 已补删除/编辑声明及待审批快照失效；已启动shell命令不属于本批取消范围 |
-| ADD-60 | P0 | 权限档位不跨项目存活 | 21.78 | 本地验证 | — |
+| ADD-60 | P0 | 权限档位不跨项目存活 | 21.78、24.72 | 本地验证 | 已补普通resume/workspace切换、POSIX大小写及不读取权限的项目往返；Node普通/全屏实际重问/拒绝已验，单文件程序及其他平台未验 |
 | ADD-61 | P1 | 权限层与工具体使用同一个围栏判定 | 第一百二十七批 | 本地验证 | — |
 | ADD-62 | P1 | 观察者失败不得吞掉持久事件；`team` 定义名不由模型文本拼成 | 第一百三十七、一百三十九批、24.67 | 本地验证 | 同步/异步及原生取消已验；exe取消、其他平台与真实provider条件未验 |
 
@@ -5197,7 +5197,7 @@ HANDOFF补question admission/display文本分界；无full local suite/并行hea
 
 `ShellSessionRuntime`随交互进程创建一次，`permissionScope`是它的字段，而`/resume`切换会话时`switchRuntimeSessionProjectContext`可以换掉`projectRoot`——切换后档位不变。于是用户在A项目选了`allow-all`，切到B项目的会话后，B的普通审批仍被自动放行，用户从未在B做过这个决定。档位文档明确说它「只回答沙箱提出的问题、永不永久授权」，跨项目存活正是这句话的反面。
 
-现`switchRuntimeSessionProjectContext`返回项目是否真的变了（在切换前比较，切换后旧根已不可得），交互侧据此把档位重置为`ask`；同项目内切换保持不变，因为授权所针对的对象没有变。决策抽为`permissionScopeAfterSwitch`，`/resume`、`/resume switch`、面板切换与`/fork`四条路径共用；非交互运行没有档位，不传回调。
+该批让`switchRuntimeSessionProjectContext`返回项目是否真的变了，交互侧据此把档位重置为`ask`，同项目内保持不变，并抽出`permissionScopeAfterSwitch`。这是当时的实现记录；后续24.72实际路由审计发现普通`/resume`及workspace路径并未接入重置，且比较错误折叠POSIX大小写。现已由权限owner绑定primary项目与变更代次统一取代这些可漏接的回调，旧辅助函数移除，详见24.72。
 
 验证：`cliSessionSwitch`3（同项目保留、跨项目重置、已是ask时不变）；一反转（`return scope;`）命中断言且finally字节恢复；五静态门、TS build通过。原47/ADD整体partial、goal active。
 
@@ -6572,3 +6572,26 @@ HANDOFF补提示内容与结构授权分离、保留continuity及验证session�
 一次延迟读取：3aa72384 与 6570a436 的精确代码 CI 已 success；父提交 48e2994c 的 CI 41265797603 仍 in_progress，Architecture Watch 41265797606 success，不以 Watch 替代代码 CI、不立即轮询。本批最终核验与提交推送另绑，本批交付 CI 未观察。
 
 最终五静态门、Node20.3三份探针/观察/证据脚本语法检查、主代理独立证据verifier与diff check均exit0；核对四份当前TS快照、三份父源原字节、反转恢复哈希、77项测试与两模式原生收据、current build manifest/inputs及清理。委派只读复审与主代理证据断言分别记录。脚本源码以非可执行文本归档，临时执行文件清理；提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，goal active。
+
+
+### 24.72 权限档位绑定主项目与切换代次
+
+继续 ADD-60。只读审计发现 §21.78 的三个布尔函数测试不能证明实际入口覆盖：普通 `/resume <id>` 经 recovery 直接切 substrate，`/workspace attach` 创建新会话、`rebind` 迁移同一会话后也只刷新界面，均未调用权限重置。A 的 `allow-all` 或 `accept-edits` 可被 B 下一次普通审批继续采用；session switch 的路径比较还把 Linux 两个大小写不同的根视为相同。新增回归先使用真实 factory、SessionManager、router 与 escalation handler，在旧代码下 5 失败/3 控制通过，直接实见应拒绝的审批返回 allow-once。
+
+修改前定向只读比较：f09d01b85e0384647fcab6779d35ab9dabe04be3 的 agent-session.ts:452–505 将 cwd 保存在 session owner，:1439–1450 在替换/处置时使旧 extension context 失效；该检索范围未找到相同权限档位机制。4210c08defe92fe8828f789b6f9fda287ad3709e 的 config/mod.rs:4134–4147 把 cwd、workspace roots 与有效 Permissions 一起构造，thread_manager.rs:1038–1055 的恢复接收当前 Config，:1992–2008 把它交给 Session::spawn。采用将授权绑定其拥有的项目上下文、使旧上下文失效的决定；不声称参考有相同自动重置行为，也未复制代码。
+
+原 [权限状态owner](../../packages/ts-shell/src/core/shell/sessionRuntime.ts) 现在在显式设置档位时绑定主项目路径与代次，每次读取同时核对；[唯一生产构造入口](../../packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts) 提供实时 binding。[substrate owner](../../packages/ts-shell/src/core/shell/runtimeContext.ts) 只在 primary project 确实变化时递增 projectRevision，包括之后返回原项目；同项目换会话/新回合、添加附加根或拒绝迁移不增加。所有生产项目根赋值均经该 owner。复用现有纯路径 identity，保留 POSIX 大小写、规范化 Windows 路径，没有每帧文件系统读取。无效主根不能提升权限。移除 session/router 的分散 reset 回调与旧布尔辅助函数；session switch 也复用正确路径比较。未改变 provider/auth 核心、package scripts、构建或默认门。
+
+初版只比较读取时路径，虽有 106 项中间绿灯，但只读复审发现 A→B→A 之间不读取权限仍会保留旧档位。原返回测试在 B 主动读取，掩盖了该序列；删掉中途读取后实际 1 失败/10 通过，随后才加入独立项目代次。最终 [12 项路由/状态回归](../../packages/ts-shell/src/cli/interactive/permissionScope.test.ts)覆盖 resume/attach/rebind × 两种提升档位、首个实际审批 consumer 拒绝、Linux 大小写根、同项目新会话与实际 synthetic turn、无中途读取的往返、附加根、失败迁移、neutral 与无效根；代次边界也有断言。三个旧纯函数测试被这些实际路径覆盖取代，未放宽权限期待。
+
+四组串行反转分别为旧生产源 9 失败/3 控制、移除 factory binding 8 失败/4 控制、移除项目代次更新 7 失败/5 控制、移除 POSIX 大小写区分 1 失败/11 控制，均为断言失败。代次反转的七项含六项代次边界和一项真实往返授权断言，不将全部七项冒充实际执行。finally 恢复五份生产源并核对哈希；恢复后 Node20.3、单 worker/heap768MiB、同一 nonblocking flock 串行六文件 122 项再次通过（新路由12、router39、sessionRuntime50、runtimeContext9、cliCoreSplit6、permissionScope6）。中间一次 filter 包含不存在的 cliSessionModule.test.ts，实际仅运行四文件106项，最终已使用存在的六文件。五静态门通过，118 条既有 docs-source advisory 保留。
+
+Node20.3 TS 构建通过，build `1ccb732ef076b7c50d5645fcee59a20360088cfb9f0c5a528bd2d9f42159aa70`、inputs `8d8c7213d21fbe9587d99beab8c65b648c4e5b64e8fb2f2b3b175cddfc772443`，本批不重建单文件程序。普通/全屏生产 Node CLI 各一场实际 PTY：每次用真实 Alt+P 两次选到 allow-all，再依次 `/resume` 到大小写不同的第二根、`/workspace attach` 到第三根、`rebind` 回第一根。三个切换均为 ask，代次1/2/3，前两次换 session，rebind 保持 session ID。每次下一实际 bash 调用都打开原审批 UI；真实 Escape 拒绝后，模型确实收到 denied 结果，shell marker0、持久 grant0。各 GET3/POST6、run/end6、三次审批 denied/三次工具 false、query.failed0、config/auth 精确字节不变、Ctrl+D exit0、owned PID/start identity 非活跃及 scratch 删除。两场实际各关闭两次 workspace 长输出阅读器后才继续输入；未修改产品以迁就探针。
+
+首条普通模式原生尝试在 resume/拒绝通过后，attach 已完成，但下一输入没有形成 provider POST，等待第二审批超时；仅有 GET1/POST2，一阶段通过，保留为 unverified，不推定是产品或 provider 失败。其 observer 只记录 approval preview，未观测普通命令 pager；增加通用 pager 观察与关闭同步后才取得上述两有效场景，总计三次 CLI。60秒/2MiB/100ms采样768MiB守卫未触发，有效场景 RSS447824/451360KiB，含失败尝试最高589532KiB；这些只作小夹具观察，不是性能验收。标准 relay 未单独观测 cooked flags，故不声明终端模式恢复证据。
+
+最终只读委派复审未发现剩余具体问题，子代理未执行测试/构建/脚本；主代理证据核对与该复审分别记录。证据归 ignored `.omx/artifacts/phase20-addition-permission-project/`，保留源码文本快照、红绿/反转、初次失败及两模式收据；执行脚本放 `.tmp/` 并在归档后清理，无 raw PTY、请求/响应或真实凭据。HANDOFF 补项目代次与普通命令 pager 的输入归属。ADD-60 保持本地验证，其他任务与原47项外部条件不升级；无真实 provider、单文件程序权限档位、其他平台、全仓/15套件/20k PTY、judge 或整体性能验收，goal active。
+
+一次延迟读取：48e2994c 的精确代码 CI41265797603 已 success；父提交 a594884e 的 CI41266906555 仍 in_progress，Watch41266906549 success，不以 Watch 代替代码 CI，不立即轮询。本批最终核验与交付另绑，本批 CI 未观察。
+
+最终五静态门、三份脚本语法、主代理独立证据verifier及diff check均exit0；七份当前TS路径状态（含删除）、六份父源字节、五源反转恢复、122项测试、current build manifest/inputs、两有效原生场景与单独失败收据均已核对。脚本以非可执行文本归档，owned scratch清理，工作树仅本批七个TS路径与三份markdown。提交推送、remote-main和clean状态由ignored delivery收据另绑；本批CI未观察，goal active。

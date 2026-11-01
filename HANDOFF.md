@@ -1864,3 +1864,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Re-registering file declarations duplicates commands, removed hooks still execute, or an old project's grant authorizes a relative command under a new cwd. Capturing the command array early can also make clear ineffective after an awaited handler.
 - **Root Cause**: Process-owned registration and replaceable declarations share an append-only list; dispatch and approval outlive the declaration snapshot. Undefined trust cannot distinguish two process-only array generations.
 - **Rule**: Publish a replacement declaration array with its workspace-bound policy, preserving process-owned hooks. Capture both identities before awaiting handlers and recheck before execution; clear must retire pending approvals and arrays without saving grants. Test same-root replacement and process-only clear so workspace guards cannot mask the race. Existing tests must execute the dispatcher they registered and assert the original effect before checking isolation; keep already-started process cancellation as a separate contract.
+
+
+### Permission Scopes Need A Primary Project Generation
+- **Symptom**: Ordinary resume or workspace migration carries allow-all into another project; checking only the current path also resurrects it after an unread A-to-B-to-A roundtrip.
+- **Root Cause**: Optional reset callbacks miss entrypoints, while current path equality loses intervening project changes. Lowercasing POSIX paths merges distinct projects.
+- **Rule**: Bind scope state in its owner to a normalized primary root and generation maintained by the substrate transition owner. Advance only for a primary project change, including a return; preserve same-project session changes, extra roots and refused migrations. Test the first actual approval consumer and a roundtrip with no intermediate scope reads. Avoid filesystem I/O on display reads.
+
+### Completed Slash Commands Can Still Own Input Through A Pager
+- **Symptom**: A workspace command completes, but the next prompt produces no request or approval.
+- **Root Cause**: Long slash output opens the ordinary reader; approval-preview observation alone misses that input owner.
+- **Rule**: Native probes must observe the generic pager after command settlement, close it through the actual key path, then wait for closure before typing the next prompt. Preserve earlier timeouts as unverified; command completion alone does not establish editor input ownership.

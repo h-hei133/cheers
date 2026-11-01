@@ -37,6 +37,7 @@ import type { PermissionScope } from "../../cli/approval/permissionScope.js";
 import type { CompactionOutcome } from "./compaction.js";
 import type { TurnInput } from "../../turn/session.js";
 import { hasUnfinishedSessionWork } from "../../session/recovery/work.js";
+import { normalizePathIdentity } from '../../session/continuation/roots.js';
 
 /**
  * What travels with a prompt beside its text.
@@ -65,6 +66,8 @@ export interface SessionRuntimeDependencies {
   /** Cancellation reaches the owner of work scheduled across individual prompts. */
   readonly onCancelRequested?: () => void;
   readonly configuredAgentMode?: () => 'plan' | 'build' | undefined;
+  /** Live project binding for a runtime that can switch sessions or workspaces. */
+  readonly projectBinding?: () => { readonly root: string; readonly revision: number };
   readonly sessionManager: SessionManager;
   readonly renderer: StreamingRenderer;
   readonly runPrompt: (
@@ -110,6 +113,7 @@ export class ShellSessionRuntime {
   private lastRun: Promise<string> | null = null;
   private viewMode: "compact" | "verbose" = "compact";
   private permissionScope: PermissionScope = "ask";
+  private permissionScopeProject?: { readonly root: string | undefined; readonly revision: number };
   private agentMode?: "plan" | "build";
 
   constructor(deps: SessionRuntimeDependencies) {
@@ -175,11 +179,18 @@ export class ShellSessionRuntime {
 
   /** How much this session may do before it has to ask. */
   getPermissionScope(): PermissionScope {
+    const project = this.deps.projectBinding?.();
+    if (project && (normalizePathIdentity(project.root) !== this.permissionScopeProject?.root
+      || project.revision !== this.permissionScopeProject?.revision)) {
+      this.permissionScope = 'ask';
+    }
     return this.permissionScope;
   }
 
   setPermissionScope(scope: PermissionScope): void {
-    this.permissionScope = scope;
+    const project = this.deps.projectBinding?.();
+    this.permissionScopeProject = project ? { root: normalizePathIdentity(project.root), revision: project.revision } : undefined;
+    this.permissionScope = project && this.permissionScopeProject?.root === undefined ? 'ask' : scope;
   }
 
   async executePrompt(

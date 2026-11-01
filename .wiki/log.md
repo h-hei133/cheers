@@ -11333,3 +11333,12 @@ build d4dda071a4dc/current inputs与两exe哈希另由独立verifier核对。普
 普通/全屏生产Node CLI各实际四回合，显式hook bypass与loopback，真实shell标记1/2/2/3，删除零新增、替换仅新命令一次；各GET4/POST4、submit4/end4/failed0，config/auth字节保持、exit0、owned进程与scratch清理。最高RSS333556KiB仅小夹具观察，标准relay未单测cooked恢复。本批不取消已经启动的shell、不重建exe，无真实provider/其他平台/全仓/15套件/20k/judge或整体性能验收；HANDOFF补声明快照规则，证据保留ignored目录。ADD-58/59仍本地验证，原47外部条件延后、goal active。一次延迟读3aa72384/6570a436代码CI success；48e2994c代码CI41265797603仍in_progress、Watch41265797606 success，本批最终核验与交付另绑，交付CI未观察。
 
 最终五静态门、Node20.3三份探针/观察/证据脚本语法检查、主代理独立证据verifier与diff check均exit0；核对四份当前TS快照、三份父源原字节、反转恢复哈希、77项测试与两模式原生收据、current build manifest/inputs及清理。委派只读复审与主代理证据断言分别记录。脚本源码以非可执行文本归档，临时执行文件清理；提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，goal active。
+
+
+### 2026-11-01：权限档位绑定主项目与切换代次
+
+[addition24.72](features/phase-20-addition.md#2472-权限档位绑定主项目与切换代次)继续ADD-60：普通resume、workspace attach/rebind漏掉旧重置回调，Linux大小写项目还被合并。目标先查、定向参考后，权限owner绑定root+projectRevision，substrate只在主项目改变时递增，唯一生产factory提供live binding；删除分散回调/布尔helper，以12项真实factory/router/approval回归取代三个pure tests。旧源首版5失败/3控制；复审发现路径-only方案漏掉无读取的A→B→A，实际1失败/10通过后加代次。四反转9/8/7/1项断言失败并逐字节恢复，最终Node20.3单worker/heap768MiB六文件122项再次通过，五静态门与TS build1ccb732ef076通过；中间106项实际仅四文件，未把不存在的filter当测试证据。
+
+普通/全屏真实Node CLI各真实Alt+P选allow-all，依次resume/attach/rebind切三根后ask/代次1/2/3，原bash审批实际Escape拒绝三次，零effect/grant且模型收到denial；各GET3/POST6、run/end6/failed0，config/auth字节保持、exit0、owned进程/scratch清理，workspace两次普通阅读器关闭后继续输入。首场普通探针仅第一阶段通过，attach后下一输入未形成POST，超时留unverified；补通用pager观测后两场通过，共三CLI。最高RSS含失败589532KiB仅夹具观察，未单测cooked。只读复审CLEAR，主代理独立证据另核；HANDOFF补代次及pager输入边界。无真实provider/exe/其他平台/全仓/15套件/20k/judge或性能验收，ADD-60本地验证、原47外部条件延后、goal active。延迟48e2994c代码CI success；a594884e代码CI41266906555仍in_progress、Watch41266906549 success，本批最终核验与交付另绑。
+
+最终五静态门、三份脚本语法、主代理独立证据verifier及diff check均exit0；七份当前TS路径状态（含删除）、六份父源字节、五源反转恢复、122项测试、current build manifest/inputs、两有效原生场景与单独失败收据均已核对。脚本以非可执行文本归档，owned scratch清理，工作树仅本批七个TS路径与三份markdown。提交推送、remote-main和clean状态由ignored delivery收据另绑；本批CI未观察，goal active。

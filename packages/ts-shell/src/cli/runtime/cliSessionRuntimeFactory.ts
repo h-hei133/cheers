@@ -105,6 +105,7 @@ export function createCliSessionRuntime(input: {
     promptSettled: handoffSettlement(input.runtimeContext, settleCollaborationPrompt.bind(undefined, input.runtimeContext)),
     onCancelRequested: () => { goalScheduler?.interrupt(); cancelDirectorFor(input.runtimeContext); cancelEvaluationFor(input.runtimeContext); cancelMediaFor(input.runtimeContext); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); cancelMcpFor(input.runtimeContext); cancelSshFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },
     configuredAgentMode: () => input.runtimeContext.runtimeConfig.agentMode,
+    projectBinding: () => ({ root: input.runtimeContext.projectRoot, revision: input.runtimeContext.projectRevision ?? 0 }),
     sessionManager: input.sessionManager,
     renderer: input.renderer,
     // The store the memory commands write through and the injection planner
