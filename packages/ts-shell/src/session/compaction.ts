@@ -719,6 +719,10 @@ export function createCompactionStep(
   options: CompactionStepOptions,
 ): (snapshot: NextStepSnapshot, signal?: AbortSignal) => Promise<NextStepUpdate | undefined> {
   const reason = options.reason ?? "threshold";
+  // A refusal is reported once per run of identical context, not once per step.
+  // The step runs before every model call in a tool loop, so a context that
+  // cannot be condensed would otherwise repeat the same sentence on each one.
+  let reportedRefusal: string | undefined;
   const step = async (snapshot: NextStepSnapshot, signal?: AbortSignal): Promise<NextStepUpdate | undefined> => {
     if (signal?.aborted) {
       return undefined;
@@ -733,9 +737,13 @@ export function createCompactionStep(
       // and the provider refuses it with no explanation of why nothing was
       // condensed. That case is reported so the user can act before the failure.
       const refusal = compactionRefusal(snapshot.messages, policy);
-      if (refusal) options.onDeclined?.(refusal);
+      if (refusal && refusal !== reportedRefusal) {
+        reportedRefusal = refusal;
+        options.onDeclined?.(refusal);
+      }
       return undefined;
     }
+    reportedRefusal = undefined;
     // The lifecycle travels into `condenseContext` rather than being invoked
     // here: one place dispatches the hooks, so the manual and automatic paths
     // cannot report different payloads for the same event.

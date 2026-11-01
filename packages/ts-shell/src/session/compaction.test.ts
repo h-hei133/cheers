@@ -427,6 +427,27 @@ describe("a decline is reported only when the budget is already spent", () => {
 
 });
 
+describe("a refusal is reported once per identical context", () => {
+  it("does not repeat the same sentence on every step", async () => {
+    // The step runs before every model call in a tool loop. Without a guard the
+    // user would see the same explanation on each one.
+    const policy: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 100_000 };
+    const declined: string[] = [];
+    const step = createCompactionStep(policy, {
+      summarize: async () => "summary",
+      onDeclined: message => { declined.push(message); },
+    });
+    const messages = longHistory(4);
+    const snapshot = { toolResults: [], messages } as const;
+
+    await step(snapshot, undefined);
+    await step(snapshot, undefined);
+    await step(snapshot, undefined);
+
+    expect(declined).toHaveLength(1);
+  });
+});
+
 describe("compaction through the kernel hook", () => {
   it("shrinks the context the next model step sees", async () => {
     const call: AgentToolCall = { id: "call-1", name: "read", args: { path: "a.txt" } };

@@ -7459,3 +7459,9 @@ return measured.tokens + estimateTokens(messages.slice(measured.messageCount));
 真正的边界是**全新会话首回合没有测量记录**，只能估算。这与三家相同，不是缺口。
 
 **16384 的 reserve 默认值：不能采纳。** 我们的 `reserveLimitFailure` 规定 `reserve >= window` 即错误。16k 窗口配 16384 会直接触发 `reserveTokens must leave input space in the resolved context window.`，让所有小窗口配置失效。参照实现没有这条校验，所以能设 16384；我们的校验更严格，保留现状。
+
+#### 24.91 补记：拒绝消息去重
+
+`createCompactionStep` 在工具循环的每一步之前都会运行。首版实现里，「预算已超且无切点」的说明会**每步打印一次**，一次长工具循环就会刷屏。现按「同一段上下文只报一次」去重：记录上次报告的内容，内容相同则不再输出；一旦上下文发生可压缩的变化（`tokensBefore` 有值）就重置记录，使后续再次进入该状态时仍能报告。
+
+真实 CLI 复核：同一会话再次触发时，该消息出现 **1 次**，exit=0，无堆栈。
