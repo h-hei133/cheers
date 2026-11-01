@@ -1853,3 +1853,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A native probe starts before a preceding focused test session has been confirmed terminal, violating the serial validation constraint even if the probe fails its first precheck.
 - **Root Cause**: A tool response with a live session_id is mistaken for command completion; separate command invocations have no automatic mutual exclusion.
 - **Rule**: Confirm terminal exit for every verification session before launching another command. Use one shared nonblocking per-task flock around heavy test/build/probe/verifier invocations in addition to explicit worker and heap limits. Preserve any overlap attempt separately, exclude it from serial evidence and rerun affected validation serially; a precheck failure cannot retroactively establish serialization.
+
+### Compiled PTY Relay Does Not Prove An Interactive Approval Host
+- **Symptom**: A compiled executable launched through a PTY relay can still report the non-interactive default-deny audit and never render the approval picker.
+- **Root Cause**: The runtime's interactive-host admission is independent of the relay's pseudo-terminal; output that contains an approval audit is not proof that keyboard choices were available.
+- **Rule**: Treat default-deny, explicit headless policy, and interactive picker evidence as separate contracts. For compiled PTY probes, assert the actual picker title and a fresh choice frame before sending keys; otherwise classify the run as unverified and do not claim desktop approval coverage.

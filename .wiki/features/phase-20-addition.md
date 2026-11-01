@@ -463,8 +463,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
-| ADD-56 | P0 | 审批的「仅本次」不得变成永久授权 | 21.74、24.68、第一百三十四批 | 本地验证 | 已移除prompt推导授权，普通/全屏实际拒绝及仅本次批准零永久grant；实际headless print/exe审批、其他平台未验 |
-| ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、24.66、24.68、第一百三十五批 | 本地验证 | 完整调用及全部execution准备结果绑定，验证续接文本不再授权当前调用；原reader完整预览、容量与绘制期限已验；desktop仅模拟原生执行，其他原生适配器/平台仍缺；MCP仍禁止allow-always |
+| ADD-56 | P0 | 审批的「仅本次」不得变成永久授权 | 21.74、24.68、第一百三十四批 | 本地验证 | 已移除prompt推导授权，普通/全屏实际拒绝及仅本次批准零永久grant；Node/单文件可执行程序的headless print路径已实际验证默认拒绝与显式仅本次，其他平台未验 |
+| ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、24.66、24.68、第一百三十五批 | 本地验证 | 完整调用及全部execution准备结果绑定，验证续接文本不再授权当前调用；原reader完整预览、容量与绘制期限已验；Node/单文件可执行程序headless实际调用已核对目标、工具结果与终态；desktop原生适配器、其他平台仍缺；MCP仍禁止allow-always |
 | ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76 | 本地验证 | — |
 | ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77 | 本地验证 | — |
 | ADD-60 | P0 | 权限档位不跨项目存活 | 21.78 | 本地验证 | — |
@@ -6527,8 +6527,16 @@ Linux Node20.3、heap768MiB、单worker串行八文件126项通过：binding16�
 
 五静态门、TS/exe构建通过，build caf547ebb515ca82b0cb9d0ffd5d1d6d9cd01fc73fc85a494da303ddd080a1db、inputs 777828f3d2e1dded08de10191c0f84aed456421faec82b4e32b85f2dca23c93e。主代理独立证据脚本已核验current compilerInputs、stable/不可变exe均106838144 bytes及SHA f9e2717dbc8135e40482a47ee7fc34901d4b053e89b1d318ad667bec02d7377d、28份当前TS路径（含两删除）、27份父提交原字节、执行脚本快照、红绿/反转/原生结果与清理及71项状态统计。仓库bundle离线judge exit0、acyclic/unresolved satisfied，整体仍partial，interactiveMode及其test两个既有函数上限advisory保留；本批interactiveMode只删除载体，不能称该文件未改。证据归预先核对不存在且无tracked碰撞的ignored .omx/artifacts/phase20-addition-prompt-authority/，不留raw PTY、provider请求/响应/推理、真实凭据或endpoint；独立断言脚本不冒充委派复审。
 
-HANDOFF补提示内容与结构授权分离、保留continuity及验证session终态/锁互斥规则。ADD-56/57保持本地验证，台账仍1完成/8部分完成/61本地验证/1未开始；无真实provider、实际headless print或exe运行审批、其他平台、全仓/15套件/20k真实历史、完整性能或独立复审验收，原47外部条件延后、ADD-30暂缓、整体goal active。
+HANDOFF补提示内容与结构授权分离、保留continuity及验证session终态/锁互斥规则。ADD-56/57保持本地验证，台账仍1完成/8部分完成/61本地验证/1未开始；无真实provider、交互式exe picker、其他平台、全仓/15套件/20k真实历史、完整性能或独立复审验收，原47外部条件延后、ADD-30暂缓、整体goal active。
 
 一次延迟读取097cbee7精确代码CI41260394184已completed/success；父提交c8e073f9代码CI41261465651仍in_progress，Watch41261465685 success。Watch不代替代码CI，不立即轮询；本批最终核验与提交推送另绑，本批交付CI尚未观察。
 
 最终五静态门、四脚本语法、独立证据verifier及diff check均exit0；binding dangling0、118条既有docs-source advisory保留，current compilerInputs及两个exe size/SHA一致。工作树仅本批28份TS路径（含两删除）与三份markdown，测试/build源码快照保持；提交推送、remote-main与clean状态由ignored delivery收据另绑。本批交付CI未观察，整体goal active。
+
+### 24.69 headless print 与单文件程序的显式审批策略
+
+继续 ADD-56/57，先对照当前 Cheers 的非交互入口与 codex 的 headless 默认策略：两者都把无交互输入的默认值设为拒绝，只有显式命令行策略或已绑定的精确授权才能放行；续接文本仍只提供上下文。没有把“总是允许”写入任何默认路径，也没有为 headless 增加第二套授权存储。
+
+在当前已验证构建 `caf547ebb515ca82b0cb9d0ffd5d1d6d9cd01fc73fc85a494da303ddd080a1db` 上，以 Node 20.3 和 `dist/bin/cheers` 各运行四个隔离 print 场景：续接提示分别要求 always/once，均走实际 loopback provider、bash 工具、transcript 与终态；两场默认拒绝，模型收到 denied 结果、无 marker 写入、终态为 stopped、持久 grant 为 0；显式 `--non-interactive-approval allow-once` 写入一次并完成，下一次默认运行再次拒绝。Node 与 executable 共 8 场，HTTP 各 4 GET/8 POST，配置/auth 字节保持，所有 owned 进程和 scratch 清理，峰值 RSS 199812–417008 KiB，输出均远低于 2 MiB 上限。收据在被忽略的 `.omx/artifacts/phase20-addition-headless-approval/headless.json`，脚本只放在 `.tmp/`。
+
+一次尝试把已编译程序经 relay 送入交互 PTY 时，程序正确落入非交互 default-deny 分支，未出现交互 picker；该观察只证明了拒绝与终态，不能冒充可交互的桌面审批证据，因此不纳入原生键盘验收。旧 Node 普通/全屏 picker 证据仍按 24.68 记录。没有使用真实 provider、跨平台环境、全量套件或 20k 历史 PTY；ADD-56/57 仍为本地验证，整体 goal active。

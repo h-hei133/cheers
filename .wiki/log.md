@@ -11315,3 +11315,6 @@ build d4dda071a4dc/current inputs与两exe哈希另由独立verifier核对。普
 证据归ignored .omx/artifacts/phase20-addition-prompt-authority/，28份TS路径含两删除与27份父源/脚本快照、结果与失败记录由主代理独立verifier通过，不冒充委派复审。judge import两项satisfied/exit0，整体partial及两个既有函数上限advisory保留，interactiveMode本批仅删载体。无真实provider、实际headless print/exe审批、其他平台、全仓/15套件/20k或独立复审验收。台账仍1完成/8部分完成/61本地验证/1未开始，原47外部条件延后，goal active。延迟097cbee7代码CI41260394184 success，c8e073f9代码CI41261465651仍in_progress、Watch41261465685 success，不立即轮询；本批最终核验和交付另绑，本批CI未观察。
 
 最终五静态门、四脚本语法、独立证据verifier及diff check均exit0；binding dangling0、118条既有docs-source advisory保留，current compilerInputs及两个exe size/SHA一致。工作树仅本批28份TS路径（含两删除）与三份markdown，测试/build源码快照保持；提交推送、remote-main与clean状态由ignored delivery收据另绑。本批交付CI未观察，整体goal active。
+### 2026-11-01：headless print 与单文件程序的显式审批策略
+
+补充任务文档 24.69：在当前已验证构建 caf547ebb515ca82b0cb9d0ffd5d1d6d9cd01fc73fc85a494da303ddd080a1db 上，Node 20.3 与 dist/bin/cheers 各四场隔离 print 验证完成。续接提示中的 always/once 不产生授权，默认拒绝实际 bash 调用；显式 `--non-interactive-approval allow-once` 只写入一次，下一次默认仍拒绝，持久 grant 始终为0。共8场、GET8/POST16、配置/auth字节不变、进程和scratch清理，峰值RSS 199812–417008 KiB；收据在 ignored `.omx/artifacts/phase20-addition-headless-approval/headless.json`。一次编译程序经relay尝试交互picker时实际落入非交互default-deny，保留为unverified，不冒充桌面审批证据。没有真实provider、跨平台、全量回归或20k PTY；ADD-56/57仍本地验证，goal active。
