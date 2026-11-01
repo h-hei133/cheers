@@ -6996,3 +6996,32 @@ Warning: Config user allowUntrustedHooks: source-not-allowed; value ignored. Thi
 真实 CLI 复核（Node 24.15，隔离 home）：坏 endpoint 与 `retryBaseDelayMs > retryMaxDelayMs` 两条路径均输出具名原因并 exit 1；`--doctor` 对两者均报 `Config usable for requests: no` 与对应原因；正常配置仍成功往返且 doctor 报 `yes`；交互模式下新警告文案实际可见。
 
 **未做与边界。** 本机 Node 为 24.15（CI floor 20.3），未在 floor 上复验。ADD-74 只改警告文案，没有新增 unset 入口——写入路径虽已支持删除，但把它暴露成命令涉及 `/settings` 的安全字段策略，需要单独裁决。ADD-75 未覆盖交互模式的完整首帧（错误发生在 runtime 组装期，此时尚无界面），也未覆盖 profile 切换中的同类拒绝。
+
+### 24.86 协议与推理探针：responses / messages 的边界
+
+延续 24.84 的隔离方法，本批针对两种 wire 协议做推理与工具链的组合验证。全部在隔离 home 下用真实 provider 往返。
+
+#### 已验证正确
+
+| 场景 | 结果 |
+|---|---|
+| `openai-responses` + `/thinking high` | 正常，`reasoning.effort` 由 `thinkingLevelName` 传入，`reasoning.effort: 'high'` |
+| `openai-responses` 链式工具（read a.txt → read b.txt） | 正确，读到 `alpha` / `bravo` |
+| `openai-responses` 推理捕获 | 正确，`reasoning.text` 40/12 字符且带 `openai-responses` 签名与 `replayBinding` |
+| `anthropic-messages` + 链式工具 + 追问回合 | 正确，两回合都给出 `alpha` / `bravo` |
+| `anthropic-messages` + `/thinking high` | 正确，`reasoning.text` 56 字符且带签名 |
+
+#### 行为差异（非缺陷，但值得说明）
+
+同一模型、同一目录声明（`reasoning: true`）、默认 `auto` effort 下：
+
+- `openai-responses` 捕获到 reasoning（模型自发返回 summary）；
+- `anthropic-messages` 没有 reasoning——因为 `auto` 不设置 `thinkingLevelName`，[anthropicMessages.ts](../../packages/ts-shell/src/provider/endpoints/anthropicMessages.ts) 因而不发送 `thinking` 参数，provider 也就不返回 `thinking` 块。
+
+直接向该端点验证：不带 `thinking` 时 `content` 只有 `text`；带 `thinking: {type:'enabled', budget_tokens}` 时返回 `thinking,text`。也就是说这是**协议默认行为的差异**，不是解析缺陷——显式 `/thinking high` 后 messages 协议立即捕获到 reasoning。
+
+需要留意的是观感：用户切换协议后，「默认是否有思考」会变化，而 `/model status` 不显示这一点。这不构成缺陷（`auto` 的语义就是「由 provider 决定」），但若后续做 ADD-35 的 effort 投影，应把「该协议在 auto 下是否会发送 thinking」纳入说明。
+
+#### 探针缺陷（已修）
+
+- **`--project` 被 harness 覆盖**：`start()` 先拼接共享 fixture 的 `--project WS`，再追加调用方传入的 `--project`，导致后者的工作区被忽略、模型读到旧 fixture 的文件并报 `ENOENT`。已改为「调用方指定了 `--project` 就不再注入默认值」。这条缺陷一度让 T31 的首次结果看起来像产品错误。

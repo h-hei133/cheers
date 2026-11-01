@@ -11453,3 +11453,11 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 实施 ADD-74/75/76。ADD-75 是根因修复：`runCliCycle` 的 `try` 只有 `finally`，`configurationOperation` 抛出的普通 `Error` 一路冒到 `handleCliFatalError`，于是任何约束失败都打成裸栈。新增 `ConfigurationRefusalError` 携带原因，只在 `admissionBlocked` 时抛出（「工作区变了」仍走普通 `Error`，那是可重试状态），并在 `runCliCycle` 补 `catch` 写出消息后 exit 1。`constraints.ts` 不再把 `endpointShape` 的具名错误压成泛化文案，只取协议名、不回显可能含凭据的 endpoint 值，并用共享前缀跳过同一原因的第二次报告。`configurationRefusalCauses` 只收 `Config constraint:` 与 `; tools blocked.` 两类，被忽略的字段不冒充阻塞原因。ADD-76 让 doctor 复用运行时同一份 `constrainRuntimeConfig`，新增 `Config usable for requests: yes|no`。ADD-74 不改写入语义，把警告补成「该字段只由 override 设置，此条目无效，可从文件移除」——写入路径本已支持删除，缺的是表达入口，而暴露 unset 涉及 `/settings` 对安全字段的策略，留待裁决。
 
 验证：单 worker/heap768MiB 串行四文件 79 项通过（constraints 35、runtimeConfig 35、cliDoctor 3、新增 configurationRefusal 6）；反转把类型化抛出改回 `new Error` 后 1 失败/3 通过，逐字节恢复后 6 项再绿；五静态门与 diff check 通过，TS build manifest `a21bb509f851`。真实 CLI（Node 24.15，隔离 home）：坏 endpoint 与 retry 延迟两条路径输出具名原因并 exit 1，doctor 对两者报 `no`、正常配置报 `yes`，交互模式下新警告可见。未在 Node 20.3 floor 复验，未覆盖 profile 切换中的同类拒绝。台账：ADD-74/75/76 转本地验证，未开始由 5 降至 2（ADD-30、ADD-77）。
+
+### 2026-11-01：responses 与 messages 协议的推理/工具组合探针
+
+13 例协议组合在隔离 home 下用真实 provider 完成。通过：responses 与 messages 的链式工具（各自读到 alpha/bravo）、两回合追问、`/thinking high` 的 effort 传递、responses 的 reasoning 捕获（40/12 字符带签名与 replayBinding）、messages 显式 effort 下的 reasoning 捕获（56 字符带签名）。未发现协议层缺陷。
+
+记录一处行为差异（非缺陷）：同模型同 `reasoning: true`、默认 auto 时，responses 捕获到 reasoning 而 messages 没有——auto 不设 `thinkingLevelName`，messages 因而不发 `thinking` 参数。直接验证端点：不带参数只返回 text，带 `thinking:{type:'enabled'}` 返回 thinking,text。显式 `/thinking high` 后 messages 立即捕获。若后续做 effort 投影，应把「auto 下该协议是否发 thinking」纳入说明。
+
+一处探针缺陷已修：`start()` 先注入共享 fixture 的 `--project` 再追加调用方的，导致后者被忽略、模型读到旧 fixture 并报 ENOENT，T31 首轮结果一度看似产品错误。改为调用方指定 `--project` 时不注入默认值。本批仅文档变更，未运行 build/vitest/全量回归，`verify:docs-drift:strict` 通过。
