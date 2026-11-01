@@ -11293,3 +11293,14 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 普通/全屏真实Node CLI各四步原`/collab profile`：y一次选择A、a持久记住A、B实显principal正文并Escape拒绝不换client、相同A命中opaque grant实际选择；各4gate/3审批/3client选择/1grant，匹配false/false/false/true，loopback收到HTTP0。config/auth/private输入字节保持、exit0/cooked/owned进程及0700 scratch清理，最高462616KiB不算性能。judge import两项satisfied/exit0，两个未改interactiveMode函数上限使overall partial。HANDOFF补准备合同覆盖边界；修正12.14遗漏统计，台账仍1完成/8部分完成/61本地验证/1未开始。无真实desktop/远端服务效果、exe审批、其他平台或完整adapter矩阵，不跑全仓/15套件/20k或委派复审；ADD-57本地验证、原47外部条件延后、goal active。延迟33ce9322代码CI41258181082已success，43c09f3b代码CI41259305316仍in_progress、Watch41259305326 success，不轮询；本批最终核验与交付另绑。
 
 最终五静态门、三脚本语法、独立证据verifier与diff check均exit0；binding dangling0、118既有docs-source advisory保留，current compilerInputs及stable/不可变exe size/SHA一致。仅本批五个产品/测试文件与三份markdown变更；提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，整体goal保持active。
+
+
+### 2026-11-01：取消通知与异步显示观察者隔离
+
+[addition24.67](features/phase-20-addition.md#2467-取消事件与异步观察者的失败隔离)继续ADD-62：合成cancelled直接调用观察者，显示抛错会挡住后续UI并替换原取消错误；普通流与取消都漏处理async返回拒绝。先旧runtime两同步断言失败及两未处理拒绝确认，再定向比较参考listener合同，仅增加shell通知owner供两处复用，不await显示任务，保留原持久/状态/controller/throw顺序与live Set合同。两个反转重现两失败/一未处理拒绝，逐字节还原；最终显式单worker/heap768MiB四文件117通过。断言移到隔离回调外。一次中间复验漏带线程限制，默认worker测试段及随后串行TS/exe build记录保留，不算受限证据，已补跑显式受限117项；HANDOFF补每命令重带限制。
+
+build d4dda071a4dc/current inputs与两exe哈希另由独立verifier核对。普通/全屏生产Node CLI各GET1+streaming POST1，真实Escape取消开放loopback流，前置同步抛错/异步拒绝/永不settle观察者不挡健康观察者及原TurnSink；各原界面实际绘制中断，一次durable cancel/一次end，原失败、pending prompt、状态与controller顺序保留，exit0/cooked/config/auth/owned进程及scratch清理。最高340960KiB只作小夹具观察。judge imports两项satisfied/exit0，整体partial与两既有函数上限advisory保留；无真实provider、exe取消、其他平台、全仓/15套件/20k或委派复审验收。ADD-62本地验证、台账1完成/8部分完成/61本地验证/1未开始，原47外部条件延后，goal active。
+
+延迟43c09f3b代码CI41259305316 success；097cbee7代码CI41260394184仍in_progress，Watch41260394153 success，不以Watch替代或反复轮询。本批最终静态/语法/独立证据与交付另绑，本批CI未观察。
+
+最终五静态门、三脚本语法、独立证据verifier及diff check均exit0；binding dangling0、118既有docs-source advisory保留，current compilerInputs及stable/不可变exe均106846336 bytes、SHA9ee2470f2a43032e50b4b3d76c37f486ae5176d7dc8f36352c1ed04e3d18f628一致。一次最终静态门启动因受限PATH漏掉rtk而exit127、尚未运行任何gate，设置日志单独保留，修正PATH后五门全通过。仅本批三份TS与三份markdown变更；提交推送、remote-main及clean状态由ignored delivery收据另绑，本批交付CI未观察，整体goal active。

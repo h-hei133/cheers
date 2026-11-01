@@ -469,7 +469,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77 | 本地验证 | — |
 | ADD-60 | P0 | 权限档位不跨项目存活 | 21.78 | 本地验证 | — |
 | ADD-61 | P1 | 权限层与工具体使用同一个围栏判定 | 第一百二十七批 | 本地验证 | — |
-| ADD-62 | P1 | 观察者失败不得吞掉持久事件；`team` 定义名不由模型文本拼成 | 第一百三十七、一百三十九批 | 本地验证 | — |
+| ADD-62 | P1 | 观察者失败不得吞掉持久事件；`team` 定义名不由模型文本拼成 | 第一百三十七、一百三十九批、24.67 | 本地验证 | 同步/异步及原生取消已验；exe取消、其他平台与真实provider条件未验 |
 
 ### 12.11 其他与缺陷收口（ADD-63 至 ADD-68）
 
@@ -6492,3 +6492,22 @@ Linux Node20.3、heap768MiB、单worker串行八文件126项通过：binding16�
 一次延迟读取33ce9322精确代码CI41258181082已completed/success；43c09f3b代码CI41259305316仍in_progress、Watch41259305326已success。Watch不替代代码CI，不立即轮询；本批最终证据核验及提交推送另绑，本批交付CI尚未观察。
 
 最终五静态门、三脚本语法、独立证据verifier与diff check均exit0；binding dangling0、118既有docs-source advisory保留，current compilerInputs及stable/不可变exe size/SHA一致。仅本批五个产品/测试文件与三份markdown变更；提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，整体goal保持active。
+
+
+### 24.67 取消事件与异步观察者的失败隔离
+
+接续ADD-62，原[会话runtime](../../packages/ts-shell/src/core/shell/sessionRuntime.ts)只在普通流通知逐个捕获同步异常；catch路径合成的lifecycle.cancelled却直接调用观察者。首个观察者抛错会阻断后续原UI通知，并以显示异常替换原取消错误。两条路径也没有处理void回调实际返回的Promise拒绝，造成未处理拒绝。既有“持久化早于合成取消通知”不能保证后续订阅者获得取消，属于产品生命周期缺口。
+
+目标检查后、修改前定向对照只读参考：f09d01b85e0384647fcab6779d35ab9dabe04be3的agent-session.ts公开listener直接调用，agent.ts核心listener则await，两者不提供本项目显示观察者所需的非阻塞隔离；338d2ce6658dfdbfba19efe0f006f0d5a8edd66d的agent-session.ts:3688–3710与event-bus分别隔离同步异常及返回Promise拒绝且不等待。采用这一决策，保留本地不记录任意回调异常及live Set迭代合同。只在shell域新增[通知owner](../../packages/ts-shell/src/core/shell/observers.ts)，两处原通知复用；普通同步delta不分配Promise，返回thenable才接拒绝处理，不await显示任务。原持久化、interrupted状态、controller释放与原始throw顺序均保持；runtime已到20个命名方法，未再往类中增加方法。
+
+[四项集成回归](../../packages/ts-shell/src/core/shell/observers.test.ts)覆盖进入turn前/后的同步失败、正常完成/取消的异步拒绝与永不settle观察者。原runtime同步baseline两断言失败；async baseline虽然两测试通过，却有两未处理拒绝、exit1，是失败证据。两个定向反转分别重现两断言失败和一未处理拒绝，finally均逐字节恢复。最终Node20.3、heap768MiB、显式单worker串行四文件117项通过：observers4、sessionRuntime50、turnSink54、collaboration command9，无未处理错误。断言在被隔离回调外检查其捕获值，避免断言异常自身被guard吞掉。
+
+一次中间合并复验命令漏带Vitest线程环境，四文件117项以默认worker设置结束，随后TS/exe构建串行通过；无观察到OOM，不能称该段为受限单worker证据。build-final.log原样保留，后续已显式补跑受限117项，execution-notes.json分开绑定。HANDOFF补充每条独立命令重带限制的规则。构建为d4dda071a4dca57661b9a9c55c11c821c5efaf35fda9941670752c39f38313aa，inputs08a5df826b455d5d6abe31e2ae42a4a73bbb1dc9e0d91ddc96f5d0196524864b；current compilerInputs与stable/不可变exe size/SHA由独立脚本核验。
+
+生产Node20.3 CLI普通/全屏各一场真实PTY：各GET1、streaming POST1，loopback scripted响应发送公开delta后保持打开，等待原startup提示、active状态及实际正文绘制后按真实Escape。预先在原UI之前注册同步抛错、返回拒绝Promise与永不settle的三个显示观察者，后续健康观察者及原TurnSink均收到一次取消，原界面实际显示Interrupted before completion。interrupted状态及controller释放先于合成通知，保留原取消失败、待处理prompt及恰好一条durable cancellation；流关闭无retry、TurnSink.end一次。Ctrl+D exit0、cooked flags恢复、config/auth原字节不变，owned PID/start identities非活跃且0700 scratch清理。各60秒/2MiB、100ms采样768MiB RSS与harness heap768MiB守卫未触发，峰值314644/340960KiB、输出6293/6439 bytes只是小夹具观察，不是性能或总heap验收。
+
+仓库bundle离线judge exit0、acyclic/unresolved satisfied，整体仍partial，仅两个未改interactiveMode模块的函数上限advisory，保留原disposition。证据归预先核对无tracked碰撞的ignored .omx/artifacts/phase20-addition-cancel-observers/，三份TS及两份执行探针精确非可执行快照、红绿/反转/build/结构日志、安全数值/布尔收据与独立verification分别保留；无raw PTY、请求/响应正文、真实凭据或endpoint。该verifier是主代理的独立断言脚本，不冒充委派复审。ADD-62维持本地验证；台账仍1完成/8部分完成/61本地验证/1未开始，无真实provider、exe运行取消、其他平台、全仓/15套件/20k真实历史或委派复审验收。原47外部条件延后，整体goal active。
+
+一次延迟读取43c09f3b代码CI41259305316已completed/success；097cbee7代码CI41260394184仍in_progress，Watch41260394153已success。Watch不替代代码CI，不立即轮询；本批最终核验及提交推送另绑，本批交付CI尚未观察。
+
+最终五静态门、三脚本语法、独立证据verifier及diff check均exit0；binding dangling0、118既有docs-source advisory保留，current compilerInputs及stable/不可变exe均106846336 bytes、SHA9ee2470f2a43032e50b4b3d76c37f486ae5176d7dc8f36352c1ed04e3d18f628一致。一次最终静态门启动因受限PATH漏掉rtk而exit127、尚未运行任何gate，设置日志单独保留，修正PATH后五门全通过。仅本批三份TS与三份markdown变更；提交推送、remote-main及clean状态由ignored delivery收据另绑，本批交付CI未观察，整体goal active。

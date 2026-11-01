@@ -10,6 +10,7 @@ import type { ProjectMemoryInjectionStateStore } from "../../memory/projectMemor
 import type { ProjectMemoryStore } from "../../memory/projectMemoryStoreContract.js";
 import type { QueryEvent } from "../query/runtime/events.js";
 import { isDurableQueryEvent } from "../query/runtime/events.js";
+import { notifyObservers } from './observers.js';
 import type { QueryRuntimeStateSeed } from "../query/runtime/state.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import {
@@ -94,6 +95,7 @@ export interface SessionRuntimeDependencies {
   ) => Promise<string | undefined>;
 }
 
+/** Display notification only; returned asynchronous work is isolated and not awaited. */
 export type QueryEventObserver = (event: QueryEvent) => void;
 
 export class ShellSessionRuntime {
@@ -309,9 +311,7 @@ export class ShellSessionRuntime {
         // happens mid-turn, and it must not be able to swallow a terminal
         // event — the run would then look like it never ended.
         updateRuntimeEventDigest(eventDigest, event);
-        for (const observer of this.eventObservers) {
-          try { observer(event); } catch { /* A display failure is not a durable one. */ }
-        }
+        notifyObservers(this.eventObservers, event);
         if (isDurableQueryEvent(event)) {
           this.deps.sessionManager.appendQueryEvent(sessionId, event, sourceEntryId ? { entryId: sourceEntryId() } : undefined);
         }
@@ -428,7 +428,7 @@ export class ShellSessionRuntime {
       this.currentRunController = null;
       this.currentInput = undefined;
       if (cancellation) {
-        for (const observer of this.eventObservers) observer(cancellation);
+        notifyObservers(this.eventObservers, cancellation);
       }
       throw error;
     } finally {

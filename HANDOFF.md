@@ -1831,3 +1831,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: An adapter supplies a complete execution preview, but a grant for its short display target authorizes a different principal, scope or captured operation.
 - **Root Cause**: Complete call binding is restricted to a list of tool names, so other adapters using the same preparation contract fall back to summary identity.
 - **Rule**: Bind every execution preparation's original arguments, effective permission arguments and complete preview in the existing approval domain. Keep file-plan authorization under its separate contract. Test an unlisted tool and actual producers, persisted reload, exact reuse, denial before effects, once consumption and manageable legacy grants; a new adapter must not require another name added to the binding policy.
+
+
+### Display Observers Need Both Synchronous And Asynchronous Isolation
+- **Symptom**: Cancellation reaches durable storage but a throwing display callback blocks later listeners, replaces the original error, or an async callback produces an unhandled rejection.
+- **Root Cause**: Synthesized terminal events bypass the ordinary notification guard, and a void callback signature still accepts asynchronous functions. Assertions inside an isolated callback can also be swallowed by the very guard being tested.
+- **Rule**: Reuse the same per-observer isolation for streamed and synthesized events; catch returned thenable rejections without awaiting display work, preserving original state, persistence, error and subscription order. Capture observations inside guarded callbacks and assert outside. Check throwing, rejecting and never-settling listeners through the runtime and original UI.
+
+### Worker Limits Must Be Explicit In Every Validation Invocation
+- **Symptom**: A later test/build chain runs Vitest with default workers despite an earlier constrained run.
+- **Root Cause**: Environment values supplied through a command wrapper do not persist into subsequent tool calls; copying a combined command can omit worker limits while retaining the heap cap.
+- **Rule**: Include VITEST_MAX_THREADS=1, VITEST_MIN_THREADS=1 and NODE_OPTIONS=--max-old-space-size=768 on each independent focused validation command. Keep heavyweight stages serial. Preserve and identify any unconstrained attempt; rerun the affected focused files with explicit limits before claiming constrained evidence.
