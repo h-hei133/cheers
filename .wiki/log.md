@@ -11499,3 +11499,13 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 ### 2026-11-01：第 4、5 项复核为不需要改动
 
 24.90 建议清单里的第 4 项（实测 usage）与第 5 项（恢复带钳制）经核算判定无需改动。第 5 项：我们的 `availableTailTokens = window − reserve − outputTokens` 恒小于阈值 `window − reserve`，保留尾部数学上不可能留在阈值之上；实测 16k/128k/200k 三种窗口与 13000/11500/9000 三种 `keepRecentTokens` 配置均确认。omp 需要恢复带是因为它的尾部预算不扣输出上限，基线不同。第 4 项：`measureContextTokens` 已实现「provider 实测 + 增量估算」，与三家一致；首回合无测量记录只能估算，三家同样如此。16384 的 reserve 默认值不能采纳——我们的 `reserveLimitFailure` 规定 `reserve >= window` 即错误，16k 窗口配 16384 会直接让配置失效。本轮仅文档，未运行 build/vitest。
+
+### 2026-11-01：独立复核发现的四个问题与修复
+
+只读复核 24.91 的三项改动，发现四处问题。最严重的是**我引入的回归**：`cliRuntimeModule` 的内层 catch 吞掉异常，导致 `--print` 失败也 exit 0——当时观察到的 exit=0 不是修复成功而是失败被掩盖。已删除内层 catch，让外层设 error 并抛出；真实 CLI 复核失败 exit=1、成功 exit=0。
+
+其次，顶层致命边界把 error 作为 console.error 第二参数，Node 渲染完整堆栈；改为只输出消息，栈由 crash recorder 保留。第三，拒绝消息去重比较完整文案，而文案含随工具结果增长的 token 数，长循环仍每步打印；改为按稳定原因去重，红灯验证 3 次 vs 1 次。第四，配置过滤作用于 settings 与 auth 合并值而规则按文件声明，当前五个 auth 字段都含 user 所以未误删，但规则与范围不一致；改为跳过凭据文档的键并补回归。
+
+复核另提「fits-budget 分支不可达」，实测否定：`planCompaction` 的两条 undefined 路径中 `isBelowThreshold` 只排除后者，前者两子因都可达。但其另一半成立——原测试未走真实调用者，已补经 `createCompactionStep` 的用例。
+
+五文件 102 项通过，五静态门通过，TS build `a2e03b408548`。

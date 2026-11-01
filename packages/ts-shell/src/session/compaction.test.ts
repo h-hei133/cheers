@@ -411,6 +411,20 @@ describe("a decline is reported only when the budget is already spent", () => {
   // then goes out and the provider refuses it with no explanation.
   const policy: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 100_000 };
 
+  it("reaches the same message through the step the runtime actually calls", async () => {
+    // The unit assertions above call the helper directly. This one goes through
+    // `createCompactionStep`, which is the only production caller, so the two
+    // branches are exercised where they are reached from.
+    const declined: string[] = [];
+    const step = createCompactionStep(policy, {
+      summarize: async () => "summary",
+      onDeclined: message => { declined.push(message); },
+    });
+    await step({ toolResults: [], messages: longHistory(4) }, undefined);
+    expect(declined).toHaveLength(1);
+    expect(declined[0]).toContain("fits the recent tail");
+  });
+
   it("says nothing while the context fits", () => {
     expect(compactionRefusal([userMessage("short")], policy)).toBeUndefined();
   });
@@ -443,6 +457,24 @@ describe("a refusal is reported once per identical context", () => {
     await step(snapshot, undefined);
     await step(snapshot, undefined);
     await step(snapshot, undefined);
+
+    expect(declined).toHaveLength(1);
+  });
+
+  it("stays quiet when only the token count grows", async () => {
+    // The message embeds a token count that grows with every tool result, so a
+    // text-keyed guard would report again on each step of a long loop.
+    const policy: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 100_000 };
+    const declined: string[] = [];
+    const step = createCompactionStep(policy, {
+      summarize: async () => "summary",
+      onDeclined: message => { declined.push(message); },
+    });
+    const base = longHistory(4);
+
+    await step({ toolResults: [], messages: base }, undefined);
+    await step({ toolResults: [], messages: [...base, userMessage("extra ".repeat(200))] }, undefined);
+    await step({ toolResults: [], messages: [...base, userMessage("more ".repeat(400))] }, undefined);
 
     expect(declined).toHaveLength(1);
   });

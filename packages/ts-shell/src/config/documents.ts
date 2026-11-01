@@ -34,8 +34,19 @@ const AUTH_FIELDS: ReadonlySet<string> = new Set([
   'provider', 'providerCredentials', 'providerConnections', 'activeProviderConnectionId', 'accountPool',
 ]);
 
-function isAuthField(key: string): boolean {
+/**
+ * Whether a key belongs to the credential document by declaration.
+ *
+ * Exported for the one caller that has to tell the two documents apart before
+ * either is read: the write path decides what to keep while it still holds only
+ * the merged pair.
+ */
+export function isDeclaredAuthField(key: string): boolean {
   return AUTH_FIELDS.has(key);
+}
+
+function isAuthField(key: string): boolean {
+  return isDeclaredAuthField(key);
 }
 
 export function userSettingsPath(): string {

@@ -358,19 +358,6 @@ export async function runNonInteractivePrompt(options: {
   });
 }
 
-/**
- * Report a run that already recorded its own terminal state.
- *
- * The runtime writes `lifecycle.error` and the session's error record before it
- * throws, and a print run has already rendered the outcome it produced. What is
- * left for the caller is one line naming the failure, not a stack trace that
- * ends somewhere inside the runtime.
- */
-function recordRunFailure(options: { readonly renderer: StreamingRenderer }, error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error);
-  options.renderer.renderLine(message);
-}
-
 export async function executeResolvedPromptTurn(options: {
   promptMetadata?: Record<string, unknown>;
   source: "interactive" | "non-interactive";
@@ -452,13 +439,6 @@ export async function executeResolvedPromptTurn(options: {
           ...(options.promptMetadata ? { promptMetadata: options.promptMetadata } : {}),
         },
       );
-    } catch (error) {
-      // The run already recorded its terminal state and rendered the outcome;
-      // rethrowing here only adds a stack trace under a result the user has
-      // read. Interactive surfaces report the failure through their own sink,
-      // so this stops at the print path, where nothing else would catch it.
-      if (!options.printMode) throw error;
-      recordRunFailure(options, error);
     } finally {
       restoreOutput?.();
       // The prompt counter is recorded before the turn runs, so a run that never

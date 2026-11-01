@@ -35,6 +35,20 @@ describe('saving the user configuration drops keys its own source policy refuses
     expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({ maxTurns: 9 });
   });
 
+  it('does not reach into the credential document', () => {
+    // The rule is about the settings file's own entries. A credential key lives
+    // in auth.json by its own routing, and the filter works on the merged pair,
+    // so it must skip those keys rather than delete them from both documents.
+    fs.writeFileSync(file, JSON.stringify({ maxTurns: 15, allowUntrustedHooks: false }));
+    fs.writeFileSync(path.join(home, '.cheers', 'auth.json'),
+      JSON.stringify({ providerCredentials: { openai: { apiKey: 'synthetic', baseUrl: 'https://x.invalid' } } }));
+    const base = readRuntimeConfigEditAt(file);
+    writeRuntimeConfigFileAt(file, { ...base.values, maxTurns: 9 }, base);
+    const auth = JSON.parse(fs.readFileSync(path.join(home, '.cheers', 'auth.json'), 'utf8'));
+    expect(auth.providerCredentials.openai.apiKey).toBe('synthetic');
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({ maxTurns: 9 });
+  });
+
   it('keeps a key the user file is allowed to set', () => {
     fs.writeFileSync(file, JSON.stringify({ maxTurns: 15, theme: 'dark' }));
     const base = readRuntimeConfigEditAt(file);

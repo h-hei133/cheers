@@ -9,7 +9,7 @@ import { validateRawConfig } from './layers.js';
 import { ConfigDocumentError } from './syntax.js';
 import { patchConfigDocument } from './patch.js';
 import { mergeConfigEdit } from './conflict.js';
-import { configDocumentPaths, mergeConfigDocuments, partitionConfigDocuments, readConfigDocuments, userSettingsPath } from './documents.js';
+import { configDocumentPaths, isDeclaredAuthField, mergeConfigDocuments, partitionConfigDocuments, readConfigDocuments, userSettingsPath } from './documents.js';
 import { CREDENTIAL_FILE_MODE, holdsCredentialMaterial, narrowCredentialFile } from './secret.js';
 import { ConfigWriteError, type ConfigWriteState } from './outcome.js';
 import { assertCurrentProfile, assertProfileStorage, currentProfile, type ProfileContext } from '../core/paths/profile/context.js';
@@ -85,6 +85,10 @@ function dropSourcesNotAllowed(values: Record<string, unknown>, fields: ConfigFi
   // fields the project layer legitimately owns.
   if (!isUserSettingsPath(filePath)) return;
   for (const key of Object.keys(values)) {
+    // The credential document has its own routing, and a key it already holds
+    // stays there regardless of source policy. This rule is about the settings
+    // file's own entries, so it must not reach across into that document.
+    if (isDeclaredAuthField(key)) continue;
     const field = Object.hasOwn(fields, key) ? fields[key] : undefined;
     if (field && !field.sources.includes('user')) delete values[key];
   }

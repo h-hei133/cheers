@@ -7519,3 +7519,29 @@ return measured.tokens + estimateTokens(messages.slice(measured.messageCount));
 所以准确的表述是：**空闲时状态栏正确（`calibrated`，含增量），忙碌时退回滞后值（`measured`）**。而忙碌恰恰是用户最需要看到增长的时刻。
 
 修复方向因此变得明确：忙碌时不应丢弃已有的 `calibrated` 读数。具体做法待参照实现调研结论确定（子代理进行中）。
+
+### 24.94 独立复核发现并修复的四个问题
+
+对 24.91 的三项改动做只读复核，发现四处问题。以下按严重程度排列，全部经红灯验证。
+
+**一、print 模式的失败不再退出非零（真实回归，我引入的）。**
+
+24.91 我在 [cliRuntimeModule.ts](../../packages/ts-shell/src/entrypoints/cliRuntimeModule.ts) 加的内层 `catch` 吞掉了异常：外层 `catch` 收不到，函数正常返回，`--print` 失败也变成 exit 0。这会让脚本化的管道误判成功。当时观察到的 `exit=0` 不是修复成功，而是失败被掩盖。
+
+修复：删除内层 `catch`，让外层按原有逻辑设 `turnEndStatus = "error"` 并抛出。真实 CLI 复核：失败场景 exit=**1**，成功场景 exit=**0**。
+
+**二、顶层致命错误打印完整堆栈。**
+
+[cliFatalErrorBoundary.ts](../../packages/ts-shell/src/cli/errors/cliFatalErrorBoundary.ts) 原本 `writeError("Fatal error:", error)`，把 error 作为第二个参数交给 `console.error`，Node 因此渲染完整栈。改为只输出消息；栈由 crash recorder 保留在 profile 目录，那才是它有用的地方。真实 CLI 复核：输出两行可读消息，无 `at ...` 帧。
+
+**三、拒绝消息的去重键含会变的数字。**
+
+去重原本比较完整文案，而文案里嵌了 `Math.round(tokens)`；该数字随每条工具结果增长，于是一个 `no-legal-cut` 的长工具循环仍会每步打印一次。新增 `compactionRefusalReason` 返回「稳定原因 + 文案」，去重按原因。红灯验证：无此改动时同一上下文报告 3 次，有则 1 次。
+
+**四、配置过滤可能触及凭据文档。**
+
+`dropSourcesNotAllowed` 作用于 settings 与 auth 的**合并值**，而规则按文件声明。当前五个 auth 字段的 `sources` 都含 `user`，所以尚未误删；但规则表述与作用范围不一致，未来出现「只允许 override 的凭据字段」时会静默删除凭据。修复：跳过声明上属于凭据文档的键（导出 `isDeclaredAuthField` 供写路径使用，不复制名单）。补了一条「保存不删除 auth.json 内容」的回归。
+
+**复核中判定不成立的一条**：复核意见认为 `compactionRefusal` 的 `fits-budget` 分支从生产路径不可达。实测否定——`planCompaction` 返回 undefined 有两条独立路径（切点不足、未达阈值），`isBelowThreshold` 只排除后者，前者两个子因都可达。但意见的另一半成立：原单元测试只直接调 helper，没走真实调用者，已补一条经 `createCompactionStep` 的用例。
+
+**验证。** 单 worker / heap768MiB 串行五文件 102 项通过（persistence 33、compaction 41、loop 20、cliRuntimeModule 5、fatalErrorBoundary 3）。五静态门通过，TS build `a2e03b408548`。真实 CLI：失败 exit=1 无堆栈，成功 exit=0。

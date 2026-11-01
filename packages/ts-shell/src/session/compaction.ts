@@ -343,14 +343,29 @@ export function explainNoCut(
  * whose calls are all open needs the turn to finish.
  */
 export function compactionRefusal(messages: readonly AgentMessage[], policy: CompactionPolicy): string | undefined {
+  return compactionRefusalReason(messages, policy)?.message;
+}
+
+/**
+ * The refusal with a stable key for de-duplication.
+ *
+ * The message embeds a token count, and that count grows with every tool result
+ * in a loop, so comparing rendered text would let a long run repeat a
+ * near-identical sentence once per step. The key names the cause instead, which
+ * does not change while the cause does not.
+ */
+export function compactionRefusalReason(
+  messages: readonly AgentMessage[],
+  policy: CompactionPolicy,
+): { readonly key: 'fits-budget' | 'no-legal-cut'; readonly message: string } | undefined {
   if (isBelowThreshold(messages, policy)) return undefined;
   const reason = explainNoCut(messages, policy);
   const measured = policy.measureContextTokens?.(messages, policy.promptIdentity);
   const tokens = measured ?? estimateRequestTokens(messages, policy.overhead);
   const state = `the request needs about ${Math.round(tokens).toLocaleString('en-US')} tokens for a ${policy.contextWindow.toLocaleString('en-US')}-token window`;
   return reason === "no-legal-cut"
-    ? `Context ${state}, but every point it could be split at would separate a tool call from its result. Finish the turn, then compact.`
-    : `Context ${state}, but the conversation still fits the recent tail compaction keeps, so there is nothing to condense. Lower keepRecentTokens to condense it now.`;
+    ? { key: reason, message: `Context ${state}, but every point it could be split at would separate a tool call from its result. Finish the turn, then compact.` }
+    : { key: reason, message: `Context ${state}, but the conversation still fits the recent tail compaction keeps, so there is nothing to condense. Lower keepRecentTokens to condense it now.` };
 }
 
 /**
@@ -736,10 +751,10 @@ export function createCompactionStep(
       // already spent and no cut can be made, because the request then goes out
       // and the provider refuses it with no explanation of why nothing was
       // condensed. That case is reported so the user can act before the failure.
-      const refusal = compactionRefusal(snapshot.messages, policy);
-      if (refusal && refusal !== reportedRefusal) {
-        reportedRefusal = refusal;
-        options.onDeclined?.(refusal);
+      const refusal = compactionRefusalReason(snapshot.messages, policy);
+      if (refusal && refusal.key !== reportedRefusal) {
+        reportedRefusal = refusal.key;
+        options.onDeclined?.(refusal.message);
       }
       return undefined;
     }
