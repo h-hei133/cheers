@@ -22,6 +22,24 @@ export interface ConfigModelTarget {
 
 const ENDPOINT_NOTICE = 'The selected request endpoint overrides the stored provider endpoint. Other provider selections retain their own endpoint.';
 
+/**
+ * The protocol name from an undeclared-endpoint failure, and nothing else.
+ *
+ * The registry's message is `No endpoint declared for '<kind>'. Declared: a, b,
+ * c.` — the kind and the list are both safe to show and both are what the user
+ * needs to correct a catalogue entry. The message is matched rather than passed
+ * through because other failures on this path can carry the endpoint value,
+ * which may include credentials.
+ */
+function undeclaredEndpointFailure(error: unknown): string | undefined {
+  const message = error instanceof Error ? error.message : '';
+  const match = /^No endpoint declared for '([^']*)'\./.exec(message);
+  return match ? `${UNDECLARED_ENDPOINT}: '${match[1]}'.` : undefined;
+}
+
+/** Shared prefix so the second report of the same cause can recognise it. */
+const UNDECLARED_ENDPOINT = 'The model catalogue names an endpoint kind this build does not declare';
+
 /** Final relations use the same target, precedence and window as the consumers. */
 export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigModelTarget, catalog: readonly CatalogProvider[]) {
   const errors: string[] = [];
@@ -35,7 +53,14 @@ export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigMo
     endpoint = providerCredentialEndpoint(catalog, resolution, target.baseUrl);
     output = configuredOutputLimit(config, endpoint)
       ?? (endpointShape(endpoint).outputControl === 'provider' ? undefined : catalogModel(catalog, target.provider, target.model, target.baseUrl)?.maxTokens);
-  } catch { errors.push('The selected model endpoint or output control is unavailable.'); }
+  } catch (error) {
+    // An undeclared protocol is the one failure here a user can act on, and the
+    // registry already names it. Reporting only "endpoint or output control is
+    // unavailable" left them with no way to tell a typo in the catalogue from a
+    // missing key. Only the protocol name is repeated: the message also carries
+    // the endpoint value, which can include credentials, so it is not echoed.
+    errors.push(undeclaredEndpointFailure(error) ?? 'The selected model endpoint or output control is unavailable.');
+  }
   const storedEndpoint = normalizeBaseUrl(config.providerCredentials?.[target.provider as RuntimeConfig['provider']]?.baseUrl);
   const requestEndpoint = normalizeBaseUrl(target.baseUrl);
   if (!errors.length && !target.blocked && storedEndpoint && requestEndpoint && storedEndpoint !== requestEndpoint) {
@@ -61,7 +86,11 @@ export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigMo
     const shape = endpointShape(endpoint);
     const failure = target.thinkingEffort ? effortOutputFailure(shape, output) : undefined;
     if (failure) errors.push(failure);
-  } catch { errors.push('The selected model endpoint is unavailable.'); }
+  } catch {
+    // The same undeclared protocol was already reported above, with its name.
+    // Repeating it under a vaguer wording reads as two separate problems.
+    if (!errors.some(error => error.startsWith(UNDECLARED_ENDPOINT))) errors.push('The selected model endpoint is unavailable.');
+  }
   if (target.model && window.source === 'default') notices.push('Model context capacity is unverified; the runtime fallback window is in use.');
   if (window.source === 'config' && window.warning) notices.push('contextWindow exceeds the model catalogue value; remote support is unverified.');
   if (entry?.compat?.supportsTemperature === false && config.configProvenance.temperature?.sources.some(source => source !== 'default')) {

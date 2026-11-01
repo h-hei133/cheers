@@ -33,6 +33,20 @@ function diagnostic(source: ConfigSource, field: string, code: string, blocked =
   return `Config ${source} ${field}: ${code}${blocked ? '; tools blocked' : '; value ignored'}.`;
 }
 
+/**
+ * A field that only a command line may set, found in a file.
+ *
+ * Saying only "value ignored" leaves the user with a warning on every start and
+ * no way to act on it: the key is not in the settings registry, so it cannot be
+ * cleared there, and nothing rewrites it. Naming the source that *can* set it,
+ * and that the file entry is dead weight, is the whole of what they need.
+ */
+function sourceNotAllowedDiagnostic(source: ConfigSource, field: string, field_?: ConfigField): string {
+  const allowed = field_?.sources ?? [];
+  const owner = allowed.length === 1 ? `only '${allowed[0]}'` : `only ${allowed.map(item => `'${item}'`).join(', ')}`;
+  return `${diagnostic(source, field, 'source-not-allowed')} This field is set ${owner}, so this entry has no effect; remove it from the file.`;
+}
+
 /** Environment text is parsed by the field's declared schema type; anything else stays text. */
 function environmentValue(field: ConfigField, raw: string): unknown {
   const text = raw.trim();
@@ -75,7 +89,7 @@ export function applyConfigLayer(layer: ConfigLayer, raw: Record<string, unknown
     if (!field) { layer.diagnostics.push(diagnostic(source, '(unknown)', 'unknown-field')); continue; }
     if (!field.sources.includes(source)) {
       layer.origins[key] = rejectOrigin(layer.origins[key], source, 'source-not-allowed', file);
-      layer.diagnostics.push(diagnostic(source, key, 'source-not-allowed')); continue;
+      layer.diagnostics.push(sourceNotAllowedDiagnostic(source, key, field)); continue;
     }
     let value: unknown = rawValue;
     if (field.merge === 'tui') value = validateTui(value, source, layer, trust, file);

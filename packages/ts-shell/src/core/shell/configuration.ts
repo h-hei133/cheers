@@ -1,4 +1,4 @@
-import { ConfigState, type ConfigBinding, type ConfigReloadResult } from '../../config/state.js';
+import { ConfigState, type ConfigBinding, type ConfigPublication, type ConfigReloadResult } from '../../config/state.js';
 import { getRuntimeConfig, type RuntimeConfigOverrides } from '../../config/runtimeConfig.js';
 import { projectSessionModel } from '../../session/model/projection.js';
 import { prepareThemeSelection } from '../../presentation/theme/selection.js';
@@ -54,6 +54,62 @@ function validateCandidate(config: RuntimeConfig, context: Pick<ConfigurationCon
   return constrainRuntimeConfig(candidate, target, catalog);
 }
 
+/**
+ * A configuration refusal that a surface can render instead of a stack trace.
+ *
+ * Admission refusals travel as plain strings because most of them answer a
+ * question about a running operation ("start a new operation"). The one raised
+ * while the runtime is still being assembled is different: nobody is running
+ * yet, so a caller cannot recover by retrying, and the user needs the causes.
+ * Carrying the causes in a typed error is what lets the startup boundary print
+ * them without also printing where they were thrown.
+ */
+export class ConfigurationRefusalError extends Error {
+  readonly causes: readonly string[];
+
+  constructor(causes: readonly string[]) {
+    super(configurationRefusalText(causes));
+    this.name = 'ConfigurationRefusalError';
+    this.causes = causes;
+  }
+}
+
+function configurationRefusalText(causes: readonly string[]): string {
+  const head = 'Configuration cannot be used for requests: it fails its own validation.';
+  return causes.length === 0 ? `${head} Inspect /settings for the rejected value, correct it, and restart.`
+    : `${head}\n${causes.map(cause => `  - ${cause}`).join('\n')}\nCorrect the listed values and restart.`;
+}
+
+/**
+ * The causes a publication carries, or none when it was blocked without naming one.
+ *
+ * Two kinds block: a constraint the selected target cannot satisfy, and a
+ * security field that failed validation (the loader marks those `tools
+ * blocked`). A rejected or invalid ordinary field is different — the loader
+ * ignored the value, so what remains is valid without it. Listing that next to
+ * the reasons requests cannot be sent would tell the user to fix something that
+ * is not in the way; those stay in the ordinary startup notices, where the
+ * wording already says "value ignored".
+ */
+export function configurationRefusalCauses(publication: ConfigPublication): readonly string[] {
+  return publication.diagnostics.filter(message => message.startsWith('Config constraint:')
+    || message.endsWith('; tools blocked.'));
+}
+
+/**
+ * Why admission is refused, with the constraint that caused it.
+ *
+ * The bare sentence this replaces told the user to "reload a valid
+ * configuration" without saying what made it invalid, while the same
+ * publication already carried the specific reason in its diagnostics. A user
+ * blocked at startup could not act on either half: not on the instruction,
+ * because reloading changes nothing, and not on the cause, because it was never
+ * shown.
+ */
+export function configurationRefusal(publication: ConfigPublication): string {
+  return configurationRefusalText(configurationRefusalCauses(publication));
+}
+
 /** Ordinary settings stay pinned; safety revocation and substrate changes do not. */
 export function configurationAdmission(context: ConfigurationContext): () => string | undefined {
   try { if (context.profile) assertCurrentProfile(context.profile); }
@@ -73,7 +129,7 @@ export function configurationAdmission(context: ConfigurationContext): () => str
     if (workspaceRevision !== context.workspaceRevision) return 'Workspace roots changed; start a new operation.';
     const workspaceBlocked = context.workspaceAdmission?.();
     if (workspaceBlocked) return workspaceBlocked;
-    if (context.configuration.current.admissionBlocked) return 'Configuration safety validation failed; reload a valid configuration before starting new actions.';
+    if (context.configuration.current.admissionBlocked) return configurationRefusal(context.configuration.current);
     const actual = configurationBinding(context);
     if (context.configuration.current.binding.trustRevision !== actual.trustRevision || context.configuration.current.binding.workspaceRoot !== actual.workspaceRoot) {
       return 'Project trust changed; reload configuration before starting new actions.';

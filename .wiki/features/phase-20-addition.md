@@ -487,9 +487,9 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 | ADD-72 | P0 | 放宽 provider 级默认写入守卫：连接存在不再是拒绝条件，仅只读输入与 accountPool 拒绝 | 第 24.78 节、24.78-A 裁决、第 24.79 节 | 本地验证 | 真实终端中的 provider 槽位写入、`/model status` 来源行观感 |
 | ADD-73 | P1 | `/model status` 显式说明生效模型来自 provider 层还是 connection 层 | 第 24.78 节、24.78-B 裁决、第 24.79 节 | 本地验证 | 真实终端展示；会话内选择与两层来源同时出现时的可读性 |
-| ADD-74 | P1 | 文件里出现来源被拒的字段时，用户能在产品内移除它，而不是每次启动都看到同一条警告 | 第 24.83 节第 1 条 | 未开始 | 实现与裁决：`allowUntrustedHooks` 一类 CLI-only 键如何显式移除（unset 动作、或加载时提示可移除） |
-| ADD-75 | P0 | 配置约束失败不得呈现为裸栈致命错误；交互模式给出可读原因并保留可恢复入口 | 第 24.83 节第 2 条 | 未开始 | 实现与裁决：拒绝启动并说明原因，还是启动但禁止请求；`endpointShape` 的具名错误需到达用户 |
-| ADD-76 | P1 | `--doctor` 覆盖目录解析与配置约束失败，与启动时看到的拒绝一致 | 第 24.83 节第 3 条 | 未开始 | 实现：doctor 读取与运行时发布同一份诊断 |
+| ADD-74 | P1 | 文件里出现来源被拒的字段时，用户能在产品内移除它，而不是每次启动都看到同一条警告 | 第 24.83 节第 1 条、第 24.85 节 | 本地验证 | 警告已说明来源与「可从文件移除」；产品内 unset 入口未做（需裁决 `/settings` 对安全字段的策略） |
+| ADD-75 | P0 | 配置约束失败不得呈现为裸栈致命错误；交互模式给出可读原因并保留可恢复入口 | 第 24.83 节第 2 条、第 24.85 节 | 本地验证 | 已改为具名原因 + exit 1；未覆盖 profile 切换中的同类拒绝与 Node 20.3 floor 复验 |
+| ADD-76 | P1 | `--doctor` 覆盖目录解析与配置约束失败，与启动时看到的拒绝一致 | 第 24.83 节第 3 条、第 24.85 节 | 本地验证 | 已复用运行时约束判定并输出可用性结论；目录解析诊断另列，未做跨平台复验 |
 | ADD-77 | P1 | 上下文溢出的回合错误要说明占用构成并给出可执行动作，而不是只说「无法自动压缩」 | 第 24.84 节「溢出处理」 | 未开始 | 实现与裁决：复用 `/context` 的分类估算到回合错误路径；说明工具 schema/历史/输出上限各占多少 |
 
 ### 12.12 归并说明
@@ -525,9 +525,9 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---:|---|
 | 完成 | 1 | ADD-28 |
 | 部分完成 | 8 | ADD-01、02、03、07、08、25、41、70 |
-| 本地验证 | 63 | 其余已实施条目（含本轮 ADD-72、ADD-73） |
+| 本地验证 | 66 | 其余已实施条目（含本轮 ADD-72、ADD-73、ADD-74、ADD-75、ADD-76） |
 | 本地实现 | 0 | — |
-| 未开始 | 5 | ADD-30、ADD-74、ADD-75、ADD-76、ADD-77 |
+| 未开始 | 2 | ADD-30、ADD-77 |
 | **合计** | **77** | — |
 
 ADD-72/ADD-73 于 2026-11-01 按第 24.78 节裁决实施，证据见第 24.79 节：两项均已落地并只做本地聚焦验证，尚未经真实终端观感与真实 provider 工作流验收。ADD-30 仍按既有记录不启动（需要架构级租约）。
@@ -6951,3 +6951,48 @@ Context overflow error: could not compact context automatically.
 - **补全菜单吞掉 Enter**：`/model use <model>` 输入后第一次 Enter 接受补全，需第二次 Enter 执行。属于 ADD-10 的既有交互。
 - **旧回合终态被误读**：`waitRunEnd` 从 `since - 2000` 扫描，会把上一回合的 `run-interrupted` 当成新回合结果；已改为「从该回合自己的 `run-started` 之后取终态」。
 - **工作区复用导致跨用例读取**：多个用例共用同一 fixture workspace，模型在其中一个会话里读取了 `.ts-shell/prompt-history.txt`（该目录被 `.gitignore` 忽略但物理存在于仓库内），其中含有此前探针的提示词。这是 fixture 复用造成的，不是上下文注入；后续用例改用独立 workspace。它顺带说明：工作区内的历史文件对模型可见，属于既有只读工具权限的既定行为。
+
+### 24.85 ADD-74/75/76 实施：可行动的配置拒绝
+
+三条都来自 24.83 的真实 CLI 探针，本批一并修复。共同点是：配置失败本身判定正确，但用户拿不到原因和动作。
+
+**ADD-75：约束失败不再是裸栈。** 新增 `ConfigurationRefusalError`（[configuration.ts](../../packages/ts-shell/src/core/shell/configuration.ts)），携带具体原因；[scope.ts](../../packages/ts-shell/src/core/shell/scope.ts) 只在 `publication.admissionBlocked` 为真时抛它，其余准入拒绝仍抛普通 `Error`——「工作区变了」是重试即可的状态，不是文件有错。[cliProcessRunner.ts](../../packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts) 的 `runCliCycle` 原本只有 `try`/`finally`，现在补 `catch`，识别该类型后写消息并 `exit(1)`，其他错误照旧上抛。
+
+修复前后同一份坏配置（`endpoint: 'openai-compatble'`）：
+
+```text
+# 之前
+Fatal error: Error: Configuration safety validation failed; reload a valid configuration before starting new actions.
+    at configurationOperation (.../core/shell/scope.js:11:15)
+    at gitGateFor (.../cli/runtime/gitGate.js:20:23)   ← 栈继续向下
+
+# 之后（exit 1）
+Configuration cannot be used for requests: it fails its own validation.
+  - Config constraint: The model catalogue names an endpoint kind this build does not declare: 'openai-compatble'.
+Correct the listed values and restart.
+```
+
+**原因不再被吞。** [constraints.ts](../../packages/ts-shell/src/config/constraints.ts) 原本用 `catch { errors.push('The selected model endpoint or output control is unavailable.'); }` 把 `endpointShape` 的具名错误压成泛化文案。现在只从该错误里取出协议名（`No endpoint declared for '<kind>'.` 的首段），**不回显 endpoint 值**——该值可能含凭据。同一原因在后面的 `endpointShape(endpoint)` 处会再报一次，用共享前缀识别并跳过，避免同一件事读成两个问题。
+
+**被忽略的字段不冒充阻塞原因。** `configurationRefusalCauses` 只收集两类诊断：`Config constraint:` 前缀，以及以 `; tools blocked.` 结尾的安全字段失败。`source-not-allowed` / `invalid-value` 是「值被忽略、其余配置仍有效」，列进「无法发送请求」的原因里会把用户指向错误的文件。它们仍出现在普通启动警告中。
+
+**ADD-76：doctor 与运行时同一份判定。** [cliDoctor.ts](../../packages/ts-shell/src/entrypoints/cliDoctor.ts) 原本读 `getRuntimeConfig`（未约束），现在复用运行时的 `constrainRuntimeConfig` + `resolveProviderCredential` + `loadCatalogSnapshot`，输出与启动拒绝一致的原因，并新增一行 `Config usable for requests: yes|no`。坏配置下 doctor 现在能报出：
+
+```text
+Config problem: Config constraint: retryBaseDelayMs must not exceed retryMaxDelayMs.
+Config usable for requests: no
+```
+
+**ADD-74：被拒字段的警告可行动。** 该字段不在设置注册表内，`/settings set` 返回 `Unknown setting key.`，且任何后续保存都会把它写回（实测 `{maxTurns, allowUntrustedHooks}` 保存 `maxTurns` 后该键仍在）。写入路径本身支持删除（`patchConfigDocument` 有 `deletionEdits`），缺的是表达入口。本批不改写入语义，改为让警告本身完整：
+
+```text
+Warning: Config user allowUntrustedHooks: source-not-allowed; value ignored. This field is set only 'override', so this entry has no effect; remove it from the file.
+```
+
+字段名与来源白名单都是安全信息，可回显。
+
+**验证。** 单 worker / heap768MiB 串行四文件 79 项通过：`constraints` 35、`runtimeConfig` 35、`cliDoctor` 3、新增 `configurationRefusal` 6。红灯：把 `scope.ts` 的类型化抛出改回 `new Error(refused)` 后 `configurationRefusal` 的「raises a typed refusal」失败（1 失败 / 3 通过），逐字节恢复后 6 项再绿。五静态门通过（118 条既有 advisory 保留），`git diff --check` 通过，TS build manifest `a21bb509f851`。
+
+真实 CLI 复核（Node 24.15，隔离 home）：坏 endpoint 与 `retryBaseDelayMs > retryMaxDelayMs` 两条路径均输出具名原因并 exit 1；`--doctor` 对两者均报 `Config usable for requests: no` 与对应原因；正常配置仍成功往返且 doctor 报 `yes`；交互模式下新警告文案实际可见。
+
+**未做与边界。** 本机 Node 为 24.15（CI floor 20.3），未在 floor 上复验。ADD-74 只改警告文案，没有新增 unset 入口——写入路径虽已支持删除，但把它暴露成命令涉及 `/settings` 的安全字段策略，需要单独裁决。ADD-75 未覆盖交互模式的完整首帧（错误发生在 runtime 组装期，此时尚无界面），也未覆盖 profile 切换中的同类拒绝。

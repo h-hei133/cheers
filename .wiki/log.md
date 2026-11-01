@@ -11447,3 +11447,9 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 第二批 13 例覆盖协议与长会话：`openai-compatible`/`openai-responses`/`anthropic-messages` 三种 wire 形态的基础往返、工具循环与两回合追问全部通过；并行三工具的事件序列 `started×3 → settled×3 → result×3` 正确；`/model use` 会话级切换生效（状态栏 1000k→500k，下一回合实际换模型）；8 回合中等会话全部事实召回完整。12k 窗口下第 8 回合触发溢出，判定可核算（工具 schema ≈5.4k + 历史 ≈2.2k + 默认输出 4096 > 12k）且拒绝正确，但错误只说「无法自动压缩」，不说明占用构成也不给动作，登记 ADD-77。台账由 76 增至 77，未开始 5 条。
 
 探针自身缺陷五项单独保留、不计产品问题：审批面板被 `exitCleanly` 的回车代答（默认焦点 Allow once）、连续 Escape 按 ADD-27 打开回溯面板、补全菜单吞首次 Enter、`waitRunEnd` 误读上一回合终态、多例共用 fixture 导致模型读到 `.ts-shell/prompt-history.txt`。harness 已相应修正。全程单进程串行，未运行 build/vitest/全量回归，仅 `verify:docs-drift:strict` 与 `git diff --check` 通过。
+
+### 2026-11-01：配置拒绝改为具名原因与可用性诊断
+
+实施 ADD-74/75/76。ADD-75 是根因修复：`runCliCycle` 的 `try` 只有 `finally`，`configurationOperation` 抛出的普通 `Error` 一路冒到 `handleCliFatalError`，于是任何约束失败都打成裸栈。新增 `ConfigurationRefusalError` 携带原因，只在 `admissionBlocked` 时抛出（「工作区变了」仍走普通 `Error`，那是可重试状态），并在 `runCliCycle` 补 `catch` 写出消息后 exit 1。`constraints.ts` 不再把 `endpointShape` 的具名错误压成泛化文案，只取协议名、不回显可能含凭据的 endpoint 值，并用共享前缀跳过同一原因的第二次报告。`configurationRefusalCauses` 只收 `Config constraint:` 与 `; tools blocked.` 两类，被忽略的字段不冒充阻塞原因。ADD-76 让 doctor 复用运行时同一份 `constrainRuntimeConfig`，新增 `Config usable for requests: yes|no`。ADD-74 不改写入语义，把警告补成「该字段只由 override 设置，此条目无效，可从文件移除」——写入路径本已支持删除，缺的是表达入口，而暴露 unset 涉及 `/settings` 对安全字段的策略，留待裁决。
+
+验证：单 worker/heap768MiB 串行四文件 79 项通过（constraints 35、runtimeConfig 35、cliDoctor 3、新增 configurationRefusal 6）；反转把类型化抛出改回 `new Error` 后 1 失败/3 通过，逐字节恢复后 6 项再绿；五静态门与 diff check 通过，TS build manifest `a21bb509f851`。真实 CLI（Node 24.15，隔离 home）：坏 endpoint 与 retry 延迟两条路径输出具名原因并 exit 1，doctor 对两者报 `no`、正常配置报 `yes`，交互模式下新警告可见。未在 Node 20.3 floor 复验，未覆盖 profile 切换中的同类拒绝。台账：ADD-74/75/76 转本地验证，未开始由 5 降至 2（ADD-30、ADD-77）。

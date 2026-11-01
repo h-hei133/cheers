@@ -411,7 +411,12 @@ describe("runtime config", () => {
       "user-compatible-key",
     );
     expect(config.providerCredentials.openai).toBeUndefined();
-    expect(config.configDiagnostics).toContain("Config project providerCredentials: source-not-allowed; value ignored.");
+    // The entry is dead weight, so the notice says which source does own it and
+    // that the file entry can be removed; "value ignored" alone left the user
+    // with a warning they could not act on.
+    expect(config.configDiagnostics).toContain(
+      "Config project providerCredentials: source-not-allowed; value ignored. This field is set only 'user', so this entry has no effect; remove it from the file.",
+    );
     // Both of the user's documents are sources now: preferences and the
     // credentials that used to share the file with them.
     expect(config.configSources).toEqual([

@@ -1,5 +1,5 @@
 import type { ShellRuntimeContext } from './runtimeContext.js';
-import { configurationAdmission } from './configuration.js';
+import { configurationAdmission, ConfigurationRefusalError, configurationRefusalCauses } from './configuration.js';
 import { scopedRuntimeConfig } from '../../config/scope/projection.js';
 import { constrainRuntimeConfig } from '../../config/constraints.js';
 import { resolveProviderCredential } from './providerCredentials.js';
@@ -10,13 +10,17 @@ export function configurationOperation(context: Pick<ShellRuntimeContext, 'confi
   const publication = context.configuration.current;
   const admission = configurationAdmission(context);
   const refused = admission();
-  if (refused) throw new Error(refused);
+  // A refusal caused by the configuration itself is the one case where nobody
+  // can recover by trying again: the same values will be refused the same way.
+  // It travels as a typed error so the startup boundary can print the causes
+  // rather than a stack trace ending in this line.
+  if (refused) throw publication.admissionBlocked ? new ConfigurationRefusalError(configurationRefusalCauses(publication)) : new Error(refused);
   let config = scopedRuntimeConfig(publication.config, context.cwd);
   if (config !== publication.config) {
     const target = context.resolveConfigTarget?.(config, context.session.id)
       ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
     config = constrainRuntimeConfig(config, target, publication.catalog);
-    if (!config.configValidation.valid) throw new Error('Configuration scope settings do not satisfy the selected model limits. Inspect Settings and reload a valid rule.');
+    if (!config.configValidation.valid) throw new ConfigurationRefusalError(configurationRefusalCauses({ ...publication, diagnostics: config.configDiagnostics }));
   }
   return { publication, config, admission, identity: Object.freeze({
     profile: context.profile?.root ?? config.configScopes?.home,

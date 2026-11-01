@@ -58,7 +58,7 @@ import type { RestartOutcome, RestartPort, RestartRequest } from '../../core/com
 
 import type { CliProcessRunnerInput } from './contract.js';
 import { createProfileContext, currentProfile, withProfile } from '../../core/paths/profile/context.js';
-import { configurationAdmission } from '../../core/shell/configuration.js';
+import { configurationAdmission, ConfigurationRefusalError } from '../../core/shell/configuration.js';
 import { cliHelpText, isHelpRequested } from '../options/early.js';
 import { profileSwitchPort } from './profile/port.js';
 import { freshExecutable } from './profile/invocation.js';
@@ -353,6 +353,17 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       stopSignal: stopSurface.signal,
     });
     return requested;
+  } catch (error) {
+    // A configuration the runtime refuses to run on is an answer about the
+    // user's files, not a crash in this program. Reporting it as a fatal error
+    // printed the stack that led here and hid the cause, which the publication
+    // already knew. The causes are printed instead, with the same exit code the
+    // other argument-level refusals use.
+    if (error instanceof ConfigurationRefusalError) {
+      input.writeError(error.message);
+      input.exit(1);
+    }
+    throw error;
   } finally {
     if (requested && 'kind' in requested) await drainProfileSwitch(requested, () => shutdown.close());
     else await shutdown.close();
