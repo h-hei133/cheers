@@ -487,10 +487,11 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 | ADD-72 | P0 | 放宽 provider 级默认写入守卫：连接存在不再是拒绝条件，仅只读输入与 accountPool 拒绝 | 第 24.78 节、24.78-A 裁决、第 24.79 节 | 本地验证 | 真实终端中的 provider 槽位写入、`/model status` 来源行观感 |
 | ADD-73 | P1 | `/model status` 显式说明生效模型来自 provider 层还是 connection 层 | 第 24.78 节、24.78-B 裁决、第 24.79 节 | 本地验证 | 真实终端展示；会话内选择与两层来源同时出现时的可读性 |
-| ADD-74 | P1 | 文件里出现来源被拒的字段时，用户能在产品内移除它，而不是每次启动都看到同一条警告 | 第 24.83 节第 1 条、第 24.85 节 | 本地验证 | 警告已说明来源与「可从文件移除」；产品内 unset 入口未做（需裁决 `/settings` 对安全字段的策略） |
+| ADD-74 | P1 | 文件里出现来源被拒的字段时，用户能在产品内移除它，而不是每次启动都看到同一条警告 | 第 24.83 节第 1 条、24.85、24.89、24.91 | 本地验证 | 写路径已不再复活该键（下次保存即消失，真实 CLI 已验证）；未做独立 unset 命令，与 Codex 一致 |
 | ADD-75 | P0 | 配置约束失败不得呈现为裸栈致命错误；交互模式给出可读原因并保留可恢复入口 | 第 24.83 节第 2 条、第 24.85 节 | 本地验证 | 已改为具名原因 + exit 1；未覆盖 profile 切换中的同类拒绝与 Node 20.3 floor 复验 |
 | ADD-76 | P1 | `--doctor` 覆盖目录解析与配置约束失败，与启动时看到的拒绝一致 | 第 24.83 节第 3 条、第 24.85 节 | 本地验证 | 已复用运行时约束判定并输出可用性结论；目录解析诊断另列，未做跨平台复验 |
-| ADD-77 | P1 | 上下文溢出的回合错误要说明占用构成并给出可执行动作，而不是只说「无法自动压缩」 | 第 24.84 节「溢出处理」 | 未开始 | 实现与裁决：复用 `/context` 的分类估算到回合错误路径；说明工具 schema/历史/输出上限各占多少 |
+| ADD-77 | P1 | 上下文溢出的回合错误要说明占用构成并给出可执行动作，而不是只说「无法自动压缩」 | 第 24.84 节、24.88、24.91 | 本地验证 | 已按「超预算且无切点」给出具名原因与动作；未做逐类占用拆分（工具 schema/历史/输出） |
+| ADD-78 | P0 | 首次请求前检查预算：到达时已超预算的会话（resumed 或上回合无工具调用）应在发出请求前压缩 | 第 24.88、24.90、24.91 节 | 本地验证 | 已在 loop 入口实现并经反转与单测验证；未在 Node 20.3 floor 与真实 provider 复核 |
 
 ### 12.12 归并说明
 
@@ -525,10 +526,10 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---:|---|
 | 完成 | 1 | ADD-28 |
 | 部分完成 | 8 | ADD-01、02、03、07、08、25、41、70 |
-| 本地验证 | 66 | 其余已实施条目（含本轮 ADD-72、ADD-73、ADD-74、ADD-75、ADD-76） |
+| 本地验证 | 68 | 其余已实施条目（含本轮 ADD-72 至 ADD-78） |
 | 本地实现 | 0 | — |
-| 未开始 | 2 | ADD-30、ADD-77 |
-| **合计** | **77** | — |
+| 未开始 | 1 | ADD-30 |
+| **合计** | **78** | — |
 
 ADD-72/ADD-73 于 2026-11-01 按第 24.78 节裁决实施，证据见第 24.79 节：两项均已落地并只做本地聚焦验证，尚未经真实终端观感与真实 provider 工作流验收。ADD-30 仍按既有记录不启动（需要架构级租约）。
 
@@ -7407,3 +7408,29 @@ Codex 的写入是对 `toml_edit::DocumentMut` 的**定点编辑**，从不重�
 - **上下文显示**：只有 omp 有分类拆分（System prompt / System tools / System context / Skills / Messages，外加 Auto-compact buf 与 Free）；pi 只有百分比与 `?`；codex 显示「N% context left」，pending 时整行留空。我们的四态（measured/stale/unknown + estimated 前缀）比 pi/codex 更细，但状态栏没有 omp 那样的分类拆分。
 
 **对「倾向」的修正**：方案 2（回合前检查）并非「我先前判断错误」——那个判断本身就是错的，`loop.ts` 的暂存改动方向是对的。但仅加回合前检查不足以消除死角，因为首次请求前若仍无切点，同样会静默放行。更完整的修复需要「回合前检查 + 无切点时的明确报告」两项，或采用 omp 的「切点永不拒绝」。
+
+### 24.91 ADD-74 / 77 / 78 实施：写路径、回合前检查与拒绝报告
+
+按 24.90 的建议实施三项，全部经红灯反转与真实 CLI 复核。
+
+**ADD-74：写路径不再复活被忽略的键。** [persistence.ts](../../packages/ts-shell/src/config/persistence.ts) 新增 `dropSourcesNotAllowed`：在构建写入目标时，把用户配置文件里「该字段 `sources` 不含 `user`」的键剔除。`patchConfigDocument` 本就支持删除（`change.value === undefined` → `deletionEdits`），缺的只是让 desired 不含该键。剔除只作用于用户设置文件——项目文件有自己的来源规则与信任门控，且加载时已过滤，一并应用会让普通保存丢掉项目层合法拥有的字段（首版如此实现，`persistence.test.ts` 10 项失败，已收窄）。
+
+真实 CLI：种子 home 写入 `allowUntrustedHooks: false`，启动出现警告，执行 `/settings set maxTurns 11` 保存成功后，文件中该键**已消失**，`maxTurns` 为 11。
+
+**ADD-78：回合前检查。** [loop.ts](../../packages/ts-shell/src/core/agent/loop.ts) 的 `driveLoop` 在进入循环前调用一次 `prepareNextStep`，`NextStepSnapshot.message` 改为可选（首次检查没有「上一步」）。三家参照实现全部有此检查，只有我们没有。
+
+**ADD-77：无切点时明确报告。** [compaction.ts](../../packages/ts-shell/src/session/compaction.ts) 新增 `compactionRefusal`：只在「预算已超、且切不出东西」时返回可读说明，分「对话仍在保留尾部内」与「切点会把工具调用与结果分开」两种，各给对应动作。经 `onDeclined` 回调（新增于 `CompactionStepOptions` 与 `CompactionSetup`）传到 [resources.ts](../../packages/ts-shell/src/cli/provider/resources.ts) 的 `renderer.renderLine`。上下文仍在内时保持静默——那是「无事可做」，不是「无事可说」。
+
+真实 CLI（16k 窗口、历史约 12.8k）：
+
+```text
+Context the request needs about 12,780 tokens for a 16,000-token window, but the
+conversation still fits the recent tail compaction keeps, so there is nothing to
+condense. Lower keepRecentTokens to condense it now.
+```
+
+**顺带修复：print 模式的溢出裸栈。** 验证时发现 `--print` 下溢出仍打印 `Fatal error:` + 完整堆栈。[cliRuntimeModule.ts](../../packages/ts-shell/src/entrypoints/cliRuntimeModule.ts) 的 `executePrompt` 调用只有 `try/finally`，异常直接冒到顶层边界。新增 `catch`：print 模式下由 `recordRunFailure` 渲染一行消息，交互模式照旧上抛（其自有 sink 负责呈现）。修复后 exit=0，无堆栈。
+
+**验证。** 单 worker / heap768MiB 串行四文件 95 项通过：`persistence` 32、`compaction` 38、`loop` 20、`cliRuntimeModule` 5。三次红灯分别成立：移除回合前检查（1 失败）、移除剔除规则（1 失败）、禁用 `compactionRefusal` 的阈值判断（1 失败），逐字节恢复后均再绿。五静态门与 `git diff --check` 通过（118 条既有 advisory 保留），TS build `78bd5c7c7116`。
+
+**未做与边界。** 未采纳 24.90 的第 4–6 项（实测 usage 已存在、恢复带钳制、16384 默认值）。本机 Node 24.15，未在 20.3 floor 复验。`git stash` 中 `compaction.ts` 的 overhead 扣除改动按 24.90 结论未取回，已随 stash 清理。

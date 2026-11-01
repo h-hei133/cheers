@@ -9,6 +9,7 @@ import {
   createCompactionStep,
   findCompactionCut,
   planCompaction,
+  compactionRefusal,
   readContextCheckpoint,
   shouldCompact,
   type CompactionPolicy,
@@ -404,6 +405,28 @@ describe("compaction pairing and policy guards", () => {
   });
 });
 
+describe("a decline is reported only when the budget is already spent", () => {
+  // Silent is right while the context still fits: there is nothing to do. It is
+  // wrong once the budget is spent and no cut can be made, because the request
+  // then goes out and the provider refuses it with no explanation.
+  const policy: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 100_000 };
+
+  it("says nothing while the context fits", () => {
+    expect(compactionRefusal([userMessage("short")], policy)).toBeUndefined();
+  });
+
+  it("explains an over-budget context whose history fits the kept tail", () => {
+    // A kept tail larger than the whole conversation leaves no cut to make,
+    // which is the state that used to be silently treated as "nothing to do".
+    const messages = longHistory(4);
+    const refusal = compactionRefusal(messages, policy);
+    expect(refusal).toBeDefined();
+    expect(refusal).toContain("fits the recent tail");
+    expect(refusal).toContain("keepRecentTokens");
+  });
+
+});
+
 describe("compaction through the kernel hook", () => {
   it("shrinks the context the next model step sees", async () => {
     const call: AgentToolCall = { id: "call-1", name: "read", args: { path: "a.txt" } };
@@ -438,10 +461,14 @@ describe("compaction through the kernel hook", () => {
       undefined,
     );
 
+    // The seed arrives over budget, so the run's first-step check condenses it
+    // before the model is asked at all: the model never sees the oversized
+    // history. Which of the two checks did the work is not the point here —
+    // that the oversized context never reaches a request is.
     expect(summarize).toHaveBeenCalledTimes(1);
     expect(seen).toHaveLength(2);
-    expect(seen[1]!.length).toBeLessThan(seen[0]!.length);
-    expect(seen[1]![0]!.content).toContain("background summary");
+    expect(seen[0]!.length).toBeLessThan(seed.length);
+    expect(seen[0]![0]!.content).toContain("background summary");
   });
 });
 

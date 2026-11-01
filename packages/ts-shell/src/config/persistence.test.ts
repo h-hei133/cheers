@@ -7,6 +7,42 @@ import { persistConfigEdit } from './persistence.js';
 import * as store from '../session/store/sessionFileStore.js';
 import * as document from './document.js';
 
+describe('saving the user configuration drops keys its own source policy refuses', () => {
+  // A field that only a command line may set. The loader reports it and ignores
+  // the value, but the merged document still holds the key, so a save built on
+  // that document returned it to the file every time. The user saw the same
+  // warning on every start and had no surface that could clear it.
+  const originalHome = process.env.HOME;
+  const originalProfile = process.env.USERPROFILE;
+  let home: string;
+  let file: string;
+  beforeEach(() => {
+    home = fs.mkdtempSync(path.join(os.tmpdir(), 'config-user-home-'));
+    process.env.HOME = home; process.env.USERPROFILE = home;
+    file = path.join(home, '.cheers', 'config.json');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+  });
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.HOME; else process.env.HOME = originalHome;
+    if (originalProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = originalProfile;
+    fs.rmSync(home, { recursive: true, force: true });
+  });
+
+  it('removes a command-line-only key on the next save', () => {
+    fs.writeFileSync(file, JSON.stringify({ maxTurns: 15, allowUntrustedHooks: false }));
+    const base = readRuntimeConfigEditAt(file);
+    writeRuntimeConfigFileAt(file, { ...base.values, maxTurns: 9 }, base);
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({ maxTurns: 9 });
+  });
+
+  it('keeps a key the user file is allowed to set', () => {
+    fs.writeFileSync(file, JSON.stringify({ maxTurns: 15, theme: 'dark' }));
+    const base = readRuntimeConfigEditAt(file);
+    writeRuntimeConfigFileAt(file, { ...base.values, maxTurns: 9 }, base);
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({ maxTurns: 9, theme: 'dark' });
+  });
+});
+
 describe('revision-bound configuration saves', () => {
   let root: string;
   let file: string;

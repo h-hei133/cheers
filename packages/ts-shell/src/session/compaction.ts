@@ -333,6 +333,27 @@ export function explainNoCut(
 }
 
 /**
+ * The one decline the user has to hear about, or nothing.
+ *
+ * A context inside its window has nothing to do and nothing to report. A
+ * context past its window that still cannot be cut is different: the request is
+ * about to go out and be refused, and the refusal will say only that compaction
+ * did not happen. Naming which of the two shapes it is tells the user what to
+ * change — a conversation that fits the kept tail needs a smaller tail, one
+ * whose calls are all open needs the turn to finish.
+ */
+export function compactionRefusal(messages: readonly AgentMessage[], policy: CompactionPolicy): string | undefined {
+  if (isBelowThreshold(messages, policy)) return undefined;
+  const reason = explainNoCut(messages, policy);
+  const measured = policy.measureContextTokens?.(messages, policy.promptIdentity);
+  const tokens = measured ?? estimateRequestTokens(messages, policy.overhead);
+  const state = `the request needs about ${Math.round(tokens).toLocaleString('en-US')} tokens for a ${policy.contextWindow.toLocaleString('en-US')}-token window`;
+  return reason === "no-legal-cut"
+    ? `Context ${state}, but every point it could be split at would separate a tool call from its result. Finish the turn, then compact.`
+    : `Context ${state}, but the conversation still fits the recent tail compaction keeps, so there is nothing to condense. Lower keepRecentTokens to condense it now.`;
+}
+
+/**
  * How many tool calls are still unanswered before each position.
  *
  * Only the head is dropped, so only the head must be self-closed: a call before
@@ -672,6 +693,14 @@ export interface CompactionStepOptions {
   readonly model?: string;
   readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
   readonly onError?: (error: unknown) => void;
+  /**
+   * A decline the caller should surface, when there is one worth surfacing.
+   *
+   * Separate from `onError` because nothing failed: the engine looked at the
+   * context and found no useful condensation. Only the over-budget case arrives
+   * here — a context that still fits is silent by design.
+   */
+  readonly onDeclined?: (message: string) => void;
   readonly onCompact?: (input: {
     readonly summary: string;
     readonly keptMessages: number;
@@ -698,6 +727,13 @@ export function createCompactionStep(
     // refused by the caller without paying for a summary that gets thrown away.
     const tokensBefore = planCompaction(snapshot.messages, policy)?.tokensBefore;
     if (tokensBefore === undefined) {
+      // Declining silently is right when the context still fits: there is
+      // nothing to do and nothing to say. It is wrong when the budget is
+      // already spent and no cut can be made, because the request then goes out
+      // and the provider refuses it with no explanation of why nothing was
+      // condensed. That case is reported so the user can act before the failure.
+      const refusal = compactionRefusal(snapshot.messages, policy);
+      if (refusal) options.onDeclined?.(refusal);
       return undefined;
     }
     // The lifecycle travels into `condenseContext` rather than being invoked

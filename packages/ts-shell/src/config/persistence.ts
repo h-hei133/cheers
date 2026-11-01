@@ -9,7 +9,7 @@ import { validateRawConfig } from './layers.js';
 import { ConfigDocumentError } from './syntax.js';
 import { patchConfigDocument } from './patch.js';
 import { mergeConfigEdit } from './conflict.js';
-import { configDocumentPaths, mergeConfigDocuments, partitionConfigDocuments, readConfigDocuments } from './documents.js';
+import { configDocumentPaths, mergeConfigDocuments, partitionConfigDocuments, readConfigDocuments, userSettingsPath } from './documents.js';
 import { CREDENTIAL_FILE_MODE, holdsCredentialMaterial, narrowCredentialFile } from './secret.js';
 import { ConfigWriteError, type ConfigWriteState } from './outcome.js';
 import { assertCurrentProfile, assertProfileStorage, currentProfile, type ProfileContext } from '../core/paths/profile/context.js';
@@ -66,6 +66,36 @@ function assertSelection(filePath: string, owner: EditOwner): void {
       || owner.settingsCanonical && fs.realpathSync(owner.paths.settingsPath) !== owner.settingsCanonical
       || owner.authCanonical && fs.realpathSync(owner.paths.authPath!) !== owner.authCanonical) throw new Error();
   } catch { throw new ConfigWriteError('conflict', 'unchanged'); }
+}
+
+/**
+ * Remove keys this file's layer would refuse.
+ *
+ * A field declares which sources may set it. The loader reports a key that
+ * arrives from another source and ignores the value, so the merged document can
+ * hold a key that never took effect. Writing the merged document back would
+ * return that key to the file on every save, which makes a warning the user can
+ * neither act on nor dismiss. Dropping it here is what lets the next save
+ * remove it, matching what a hand edit would do.
+ */
+function dropSourcesNotAllowed(values: Record<string, unknown>, fields: ConfigFields, filePath: string): void {
+  // Only the user's own settings file. A project file reaches this writer with
+  // its own source rules and its own trust gate, and its keys are already
+  // filtered on load; applying the rule here as well made an ordinary save drop
+  // fields the project layer legitimately owns.
+  if (!isUserSettingsPath(filePath)) return;
+  for (const key of Object.keys(values)) {
+    const field = Object.hasOwn(fields, key) ? fields[key] : undefined;
+    if (field && !field.sources.includes('user')) delete values[key];
+  }
+}
+
+/** The user's own settings file, as opposed to a project's. */
+function isUserSettingsPath(filePath: string): boolean {
+  const target = path.resolve(filePath);
+  const user = path.resolve(userSettingsPath());
+  if (target === user) return true;
+  try { return fs.realpathSync(target) === fs.realpathSync(user); } catch { return false; }
 }
 
 /** Read-only receipt checks use the same physical ownership fence as saves. */
@@ -142,6 +172,17 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
     // Physical envelopes are edited through their joined logical records.
     if (authPath && Object.hasOwn(patch as object, PREFERENCE_FIELD)) throw new ConfigWriteError('invalid-document', 'unchanged');
     const desired = JSON.parse(JSON.stringify({ ...baseline.values, ...patch }));
+    // A key the loader refuses from this file is dropped from the write rather
+    // than carried back by the baseline.
+    //
+    // The baseline is the merged document, which still holds such a key even
+    // though the loader ignored it. Merging a patch onto that baseline put the
+    // key back into every save, so a file-level mistake that only warned on
+    // read became permanent on write and could not be cleared from any surface
+    // the product offers. Omitting it here is what makes the next save the
+    // moment it disappears — the same outcome as editing the file by hand, and
+    // the same behaviour as an editor that only rewrites the keys it knows.
+    dropSourcesNotAllowed(desired, fields, filePath);
     validateRawConfig(desired, fields);
     code = 'lock-failed';
     const locked = (): string => {

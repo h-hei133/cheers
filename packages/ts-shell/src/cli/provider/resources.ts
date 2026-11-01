@@ -106,6 +106,9 @@ export function createProviderResources(input: {
               markContextUnknown(sessionId);
               recordCount('compaction.runs', 1, {});
             },
+            // Said before the request goes out, so the refusal that follows is
+            // not the first thing the user hears about it.
+            onDeclined: message => { input.renderer.renderLine(message); },
           }
         : undefined;
       const resources = { compaction, cacheWarming };

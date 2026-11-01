@@ -11487,3 +11487,11 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 补充记录：omp 的预提示估算包含 system prompt + 工具 schema 并与 provider 锚定值取 max；codex 的 keep-recent 是常数（20k/64k）不从窗口派生；pi 的 keep-recent 完全不钳制；只有 omp 有分类拆分式上下文显示。
 
 由此修正待裁决清单，并注明 `git stash` 中 `loop.ts` 的回合前检查方向正确、`compaction.ts` 的扣除 overhead 与字段论证冲突需重新评估。本轮仅文档，未运行 build/vitest/全量回归。
+
+### 2026-11-01：写路径、回合前检查与拒绝报告落地
+
+按 24.90 的建议实施三项。**ADD-74**：`persistConfigEdit` 构建写入目标时剔除用户配置里「`sources` 不含 `user`」的键，使被忽略的键在下次保存时消失；首版对项目文件也生效，导致 `persistence.test.ts` 10 项失败，已收窄为仅用户设置文件。真实 CLI 验证：种子 home 的 `allowUntrustedHooks` 在 `/settings set maxTurns 11` 保存后消失。**ADD-78**：`driveLoop` 在进入循环前调用一次 `prepareNextStep`，`NextStepSnapshot.message` 改为可选；三家参照实现全部有此检查。**ADD-77**：新增 `compactionRefusal`，只在「预算已超且无切点」时给出具名原因与动作，经新增的 `onDeclined` 回调渲染；上下文仍在内时保持静默。
+
+顺带修复 print 模式的溢出裸栈：`cliRuntimeModule` 的 `executePrompt` 调用只有 `try/finally`，异常直接冒到顶层边界打印堆栈；新增 `catch`，print 模式渲染一行消息、交互模式照旧上抛。修复后 exit=0 无堆栈。
+
+验证：单 worker/heap768MiB 串行四文件 95 项通过（persistence 32、compaction 38、loop 20、cliRuntimeModule 5）；三次红灯各自成立并逐字节恢复；五静态门与 diff check 通过，TS build `78bd5c7c7116`。真实 CLI 在 16k 窗口下实际输出「about 12,780 tokens for a 16,000-token window ... Lower keepRecentTokens to condense it now.」。`git stash` 中另一项（compaction.ts 扣除 overhead）按 24.90 结论未取回，已清理。台账 78 项，未开始仅剩 ADD-30。未在 Node 20.3 floor 复验。

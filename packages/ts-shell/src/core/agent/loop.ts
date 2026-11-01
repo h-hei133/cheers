@@ -77,7 +77,16 @@ export interface AssistantStep {
   };
 }
 export interface NextStepSnapshot {
-  readonly message: AgentMessage;
+  /**
+   * The step that just finished, when there was one.
+   *
+   * Absent for the check made before the run's first step: a conversation can
+   * arrive over budget — a resumed session, or one whose previous turn ended
+   * without a tool call — and the same compaction has to run there too. The
+   * compaction step reads only `messages`, so requiring a preceding step would
+   * have left that case unchecked until the provider refused the request.
+   */
+  readonly message?: AgentMessage;
   readonly toolResults: readonly AgentMessage[];
   readonly messages: readonly AgentMessage[];
 }
@@ -240,6 +249,22 @@ async function driveLoop(
       : undefined;
   let pending: AgentMessage[] = seedSteering ? await pollSteering(config) : [];
   let completedStep: NextStepSnapshot | undefined;
+
+  // Check the budget once before the first step.
+  //
+  // The per-step check below runs only once a step has completed, so a
+  // conversation that is already over budget on arrival — a resumed session, or
+  // one whose last turn made no tool call — never reached it: the request went
+  // out, the provider refused it, and the rescue path then declined for the
+  // same reasons the scheduled one would have. Every other implementation of
+  // this loop checks here for exactly that reason.
+  if (config.prepareNextStep) {
+    const first = await config.prepareNextStep({ toolResults: [], messages: context }, signal);
+    if (first?.messages) {
+      replaceContext(context, first.messages);
+      config.onContextReplaced?.(first.messages);
+    }
+  }
 
   while (true) {
     let hasMoreToolCalls = true;

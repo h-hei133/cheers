@@ -266,6 +266,37 @@ describe("runAgentLoop", () => {
     expect(seen[1].some((message) => message.role === "tool")).toBe(false);
   });
 
+  it("checks the budget before the first step, not only between steps", async () => {
+    // A conversation can arrive over budget — a resumed session, or one whose
+    // last turn made no tool call. The per-step check only runs after a
+    // completed step, so a single-step turn never reached it: the request went
+    // out and the provider refused it. The first call must see no preceding
+    // message and still get the chance to replace the context.
+    const { streamStep } = scriptedStream([textStep("done")]);
+    const { emit } = collect();
+    const seenSnapshots: { hasMessage: boolean; roles: string[] }[] = [];
+
+    await runAgentLoop(
+      [userMessage("go")],
+      [],
+      {
+        streamStep,
+        prepareNextStep: async (step) => {
+          seenSnapshots.push({
+            hasMessage: step.message !== undefined,
+            roles: step.messages.map((message) => message.role),
+          });
+          return undefined;
+        },
+      },
+      emit,
+      undefined,
+    );
+
+    expect(seenSnapshots).toHaveLength(1);
+    expect(seenSnapshots[0]).toEqual({ hasMessage: false, roles: ["user"] });
+  });
+
   it("keeps tool results pairable when the signal is already aborted", async () => {
     const call: AgentToolCall = { id: "call-1", name: "read", args: { path: "a.txt" } };
     const { streamStep } = scriptedStream([toolStep([call]), textStep("done")]);

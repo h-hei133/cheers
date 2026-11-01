@@ -54,6 +54,8 @@ export interface CompactionSetup {
   readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
   /** A checkpoint was written into the context; record it durably. */
   readonly onCompact: (input: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore: number }) => void;
+  /** An automatic compaction that could not help, described for the user. */
+  readonly onDeclined?: (message: string) => void;
   /** Why this compaction is allowed to run. Manual runs say so. */
   readonly reason?: CompactionReason;
 }
@@ -241,6 +243,7 @@ export function runTurn(options: TurnOptions): TurnRun {
           sessionId: options.sessionId,
           summarizeTurnPrefix: options.compaction.summarizeTurnPrefix,
           onCompact: options.compaction.onCompact,
+          ...(options.compaction.onDeclined ? { onDeclined: options.compaction.onDeclined } : {}),
           authority: options.compaction.authority,
           // One builder for both entry points, so a hook sees the same event
           // with the same reason whether the window filled up or the user asked.
