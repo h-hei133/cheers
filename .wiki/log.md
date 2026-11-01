@@ -11439,3 +11439,11 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 ### 2026-11-01：本批改动自审（子代理未产出）
 
 派发的一次只读 review 运行超过一小时未返回结论后停止；改由主代理自行核对四点。**provenance 下标**：`projectConfigOrigins` 以归一化后的 config 重新编号 children，实测 `children[0]=first`、`children[1]=second` 与连接数组一致；加入 `provider: 'not-a-provider'` 后整份 user 配置被判 `invalid-value; value ignored`、连接数组为空，不存在过滤后错位的中间态。**解析链**：`modelDefaultSource` 读取顺序与 `providerCredentials.ts` 的 `cliModel ?? connection.model ?? providerCredentials.model` 一致，仅不读 `cliModel`（命令行覆盖另由 `Request model` 行报告）。**守卫缺口**：见 CI 回归修正 `f255267f`。**copilot 目录条目**：可用性投影与既有 `antigravity` 完全一致（`credential-missing`/`catalogued: true`/`models: 0`）。以上为只读核对与一次性探针（已删除），不构成真实 provider、其他平台或完整性能验收。
+
+### 2026-11-01：真实 provider 探针驱动的缺陷定位
+
+改用隔离真实 provider 副本直接驱动产品（PTY 与 `--print`），不再靠逐条读代码猜测。每例在 `/tmp/cheers-test/live-soak/<case>` 建独立 HOME，配置自真实 `~/.cheers` 复制后按例修改，真实目录不写。首批确认三个产品问题并入台账：来源被拒的 `allowUntrustedHooks` 持久化后无产品内清除路径（ADD-74，实测 `/settings set` 返回 `Unknown setting key.`，且后续保存把它写回）、任一 constraint 失败变成裸栈致命错误且交互模式无法启动（ADD-75，endpoint 拼写错误与 `retryBaseDelayMs > retryMaxDelayMs` 输出相同）、`--doctor` 对这两类完全盲（ADD-76，doctor 读的是未约束的 `getRuntimeConfig`，与运行时发布不是同一份对象）。
+
+第二批 13 例覆盖协议与长会话：`openai-compatible`/`openai-responses`/`anthropic-messages` 三种 wire 形态的基础往返、工具循环与两回合追问全部通过；并行三工具的事件序列 `started×3 → settled×3 → result×3` 正确；`/model use` 会话级切换生效（状态栏 1000k→500k，下一回合实际换模型）；8 回合中等会话全部事实召回完整。12k 窗口下第 8 回合触发溢出，判定可核算（工具 schema ≈5.4k + 历史 ≈2.2k + 默认输出 4096 > 12k）且拒绝正确，但错误只说「无法自动压缩」，不说明占用构成也不给动作，登记 ADD-77。台账由 76 增至 77，未开始 5 条。
+
+探针自身缺陷五项单独保留、不计产品问题：审批面板被 `exitCleanly` 的回车代答（默认焦点 Allow once）、连续 Escape 按 ADD-27 打开回溯面板、补全菜单吞首次 Enter、`waitRunEnd` 误读上一回合终态、多例共用 fixture 导致模型读到 `.ts-shell/prompt-history.txt`。harness 已相应修正。全程单进程串行，未运行 build/vitest/全量回归，仅 `verify:docs-drift:strict` 与 `git diff --check` 通过。

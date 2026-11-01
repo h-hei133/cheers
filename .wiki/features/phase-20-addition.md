@@ -5,7 +5,7 @@ sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
 updated: 2026-11-01
 tags: [features, phase-20, additions, interaction, panels, completion]
-summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-71，已把七轮用户反馈与子代理review发现按职责归并，重复项合并，逐条记录完成情况。当前1完成、8部分完成、61本地验证、1未开始；其余章节保留研究过程与逐批证据。"
+summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-77，已把七轮用户反馈、子代理review发现与真实provider探针结果按职责归并，重复项合并，逐条记录完成情况。当前1完成、8部分完成、63本地验证、5未开始；其余章节保留研究过程与逐批证据。"
 confidence: mixed
 ---
 
@@ -487,6 +487,10 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
 | ADD-72 | P0 | 放宽 provider 级默认写入守卫：连接存在不再是拒绝条件，仅只读输入与 accountPool 拒绝 | 第 24.78 节、24.78-A 裁决、第 24.79 节 | 本地验证 | 真实终端中的 provider 槽位写入、`/model status` 来源行观感 |
 | ADD-73 | P1 | `/model status` 显式说明生效模型来自 provider 层还是 connection 层 | 第 24.78 节、24.78-B 裁决、第 24.79 节 | 本地验证 | 真实终端展示；会话内选择与两层来源同时出现时的可读性 |
+| ADD-74 | P1 | 文件里出现来源被拒的字段时，用户能在产品内移除它，而不是每次启动都看到同一条警告 | 第 24.83 节第 1 条 | 未开始 | 实现与裁决：`allowUntrustedHooks` 一类 CLI-only 键如何显式移除（unset 动作、或加载时提示可移除） |
+| ADD-75 | P0 | 配置约束失败不得呈现为裸栈致命错误；交互模式给出可读原因并保留可恢复入口 | 第 24.83 节第 2 条 | 未开始 | 实现与裁决：拒绝启动并说明原因，还是启动但禁止请求；`endpointShape` 的具名错误需到达用户 |
+| ADD-76 | P1 | `--doctor` 覆盖目录解析与配置约束失败，与启动时看到的拒绝一致 | 第 24.83 节第 3 条 | 未开始 | 实现：doctor 读取与运行时发布同一份诊断 |
+| ADD-77 | P1 | 上下文溢出的回合错误要说明占用构成并给出可执行动作，而不是只说「无法自动压缩」 | 第 24.84 节「溢出处理」 | 未开始 | 实现与裁决：复用 `/context` 的分类估算到回合错误路径；说明工具 schema/历史/输出上限各占多少 |
 
 ### 12.12 归并说明
 
@@ -523,8 +527,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | 部分完成 | 8 | ADD-01、02、03、07、08、25、41、70 |
 | 本地验证 | 63 | 其余已实施条目（含本轮 ADD-72、ADD-73） |
 | 本地实现 | 0 | — |
-| 未开始 | 1 | ADD-30 |
-| **合计** | **73** | — |
+| 未开始 | 5 | ADD-30、ADD-74、ADD-75、ADD-76、ADD-77 |
+| **合计** | **77** | — |
 
 ADD-72/ADD-73 于 2026-11-01 按第 24.78 节裁决实施，证据见第 24.79 节：两项均已落地并只做本地聚焦验证，尚未经真实终端观感与真实 provider 工作流验收。ADD-30 仍按既有记录不启动（需要架构级租约）。
 
@@ -6825,3 +6829,125 @@ ADD-73 的四态在 [defaultSource.test.ts](../../packages/ts-shell/src/core/com
 **4. 新增 `github-copilot` 目录条目的影响。** 与既有 `antigravity` 对比，可用性投影状态完全一致（`credential-missing` / `catalogued: true` / `models: 0`），未引入新的不一致。
 
 以上均为只读核对与一次性探针（探针运行后已删除），不构成对真实 provider、其他平台或完整性能的验收。
+
+### 24.83 真实 provider 交互探针：启动可用性与诊断可见性
+
+本轮改用真实配置的隔离副本直接驱动产品（Node 20.3 之外的当前本机 Node 24.15 仅作运行环境，产品 floor 未改），以 PTY 会话和 `--print` 两种入口执行真实 provider 往返。探针全部在 `/tmp/cheers-test/live-soak/<case>` 下建独立 `HOME`，配置从真实 `~/.cheers` 复制后按用例改动，不写回真实目录。以下四条均已在本机实际复现，属于**产品行为**，不是探针构造错误。
+
+#### 1. 来源被拒的字段持久化后没有产品内清除路径
+
+真实用户配置里存在 `allowUntrustedHooks: false`。该字段在 [fields.ts](../../packages/ts-shell/src/config/fields.ts) 的声明来源只有 `['override']`，文件里出现即被判 `source-not-allowed` 并忽略，因此每次启动都打印：
+
+```text
+Warning: Config user allowUntrustedHooks: source-not-allowed; value ignored.
+```
+
+问题不在「拒绝」本身（拒绝是正确的，该字段只应由命令行授予），而在三条路径叠加后用户无处可去：
+
+- `/settings set allowUntrustedHooks false` 返回 `Unknown setting key.` —— 它不在 `CONFIG_SETTINGS` 注册表内；
+- `/settings` 语法只有 `set <key> <value>`，没有 unset/clear 动作；
+- 后续任何一次正常保存都会把它写回去。实测：配置为 `{maxTurns: 15, allowUntrustedHooks: false}`，执行 `/settings set maxTurns 9` 并确认 `Saved to your user configuration.` 后，文件内容为 `{maxTurns: 9, allowUntrustedHooks: false}`。
+
+原因在 [persistence.ts](../../packages/ts-shell/src/config/persistence.ts) 的写入模型：编辑基线取的是原始文档合并值，`patchConfigDocument` 以该基线为底重写整份文档，被层加载器忽略的键在写入路径上完全不可见。于是这个键既不会自行消失，也不能通过产品界面清除，只能手改文件——而它本身的值恰好等于默认值，不改变任何行为。
+
+字段来源策略本身有明确依据（[phase-19-decisions](../features/phase-19-decisions.md#129) 与 [18-configuration-system](18-configuration-system.md) 都规定 `allowUntrustedHooks` 保持 CLI-only），因此修复方向不是放宽来源，而是让「文件里有、但来源被拒」的键可被显式移除。
+
+#### 2. 任一 constraint 失败都会变成裸栈致命错误，交互模式无法启动
+
+把用户 `models.json` 的 `endpoint` 写成拼错的 `openai-compatble`，`--print` 与交互模式都会直接退出：
+
+```text
+Fatal error: Error: Configuration safety validation failed; reload a valid configuration before starting new actions.
+    at configurationOperation (.../core/shell/scope.js:11:15)
+    at gitGateFor (.../cli/runtime/gitGate.js:20:23)
+    ...
+```
+
+交互模式连首帧都不出现，进程 exit 1。用 `retryBaseDelayMs: 60000` 配 `retryMaxDelayMs: 1000` 可触发完全相同的输出，说明这不是 endpoint 专有路径，而是 [constraints.ts](../../packages/ts-shell/src/config/constraints.ts) 的 `constraintsBlocked` → [state.ts](../../packages/ts-shell/src/config/state.ts) 的 `admissionBlocked` → [scope.ts](../../packages/ts-shell/src/core/shell/scope.ts) 抛错这条链上所有错误共享的表现：**用户的配置错误被呈现为程序崩溃**，且丢失了唯一有用的那句原因。
+
+真实的 endpoint 原因被 [constraints.ts](../../packages/ts-shell/src/config/constraints.ts) 里 `catch { errors.push('The selected model endpoint or output control is unavailable.'); }` 压成了泛化文案；`endpointShape` 抛出的 `No endpoint declared for 'openai-compatble'. Declared: …` 从未到达用户。
+
+对照参考实现：pi 的 `models.json` 校验失败时把 schema 错误逐条格式化输出并保留在 `ModelConfig.getError()` 里（`model-config.ts` 的 `Invalid models.json schema:` 分支），不把可解释的配置错误升级成进程崩溃。
+
+#### 3. `--doctor` 看不到这两类问题
+
+同一份坏配置下运行 `--doctor`，输出里只有：
+
+```text
+Config problem: Config user allowUntrustedHooks: source-not-allowed; value ignored.
+Config problem: Config project maxTurns: trust-not-established; value ignored.
+```
+
+完全没有提到目录解析或 constraint 失败。原因直接：[cliDoctor.ts](../../packages/ts-shell/src/entrypoints/cliDoctor.ts) 只遍历 `runtimeConfig.configDiagnostics`，而 constraint 错误由 `constrainRuntimeConfig` 在**运行时发布**阶段写入 `configDiagnostics`，doctor 读的是 `getRuntimeConfig(targetCwd)` 的未约束结果，两者不是同一份对象。用户被致命错误挡住时，唯一的内省工具给不出原因。
+
+#### 4. 目录解析失败与协议未声明在 `/model list` 上已能区分，但在启动路径上不能
+
+`/model list` 对损坏的 JSON 会显示 `models.json could not be parsed; its catalogue entries were ignored.`，这是正确的。但同一条目在 endpoint 未声明时走的是致命错误路径（见第 2 条），用户得不到「目录里写了什么、哪些协议是已知的」这类信息。
+
+#### 已验证正常的部分（同批探针，不计为问题）
+
+基本回合、`read`→`edit` 工具循环与审批面板（`y` 允许后实际改动 `note.txt` 且模型收到结果）、Escape 与 Ctrl+C 中断、中断后重新启动自动 resume 并继续对话、多轮上下文（`PELICAN-42` 二轮仍能取回）、`/model status` 的 ADD-73 来源行（`Model source: connection, overriding the provider default bailu-2.9-preview.`）、`/context`、`/connect status`、`--version`，以及坏配置下 `--version` 与 `--doctor` 仍能运行。`/settings set` 不会物化默认值：只写 `{maxTurns}` 的文件保存后仍只有 `maxTurns`。
+
+#### 未纳入本轮的边界
+
+- 本机 Node 为 24.15，CI floor 是 20.3；上述结论不依赖 Node 版本差异，但正式验收仍需 floor 环境。
+- 探针使用单一 provider（openai-compatible 协议的第三方 relay），未覆盖 OAuth 订阅类 provider。
+- 第 2、3 条只确认了「失败表现」与「doctor 盲区」，尚未确认修复后 constraint 错误应以何种形式呈现给交互用户（拒绝启动并给出可读原因，还是启动但禁止请求），需要裁决。
+
+### 24.84 真实 provider 探针第二批：协议、长会话与溢出诊断
+
+同一隔离方法（`/tmp/cheers-test/live-soak/<case>`，真实 provider 配置副本，PTY 或 `--print`）。本批新增 13 个场景，覆盖 responses 与 messages 协议、多工具并行、模型切换、中等长度会话与压缩。下列每一条都注明是**产品行为**还是**探针缺陷**。
+
+#### 协议矩阵：两种协议均可用
+
+同一 relay 同时支持三种 wire 形态，逐项实测：
+
+| 场景 | 结果 |
+|---|---|
+| `openai-compatible` 基础往返 | 通过 |
+| `openai-responses` 基础往返 | 通过 |
+| `openai-responses` + 工具循环（read→edit） | 通过，`note.txt` 实际改为 ready，模型收到工具结果 |
+| `openai-responses` 两回合（工具回合后追问） | 通过，第二回合正确复述上一回合读到的值 |
+| `anthropic-messages` 基础往返 | 通过 |
+| `anthropic-messages` + 工具循环 | 通过 |
+| `anthropic-messages` 两回合 | 通过，第二回合正确复述 README 首行 |
+
+两种协议的请求体差异由各自模块承担（`responses/body.ts` 的 `store:false` 与 `include:['reasoning.encrypted_content']`，`anthropic-messages` 的 system 角色与 tools 形态），本次未发现协议层缺陷。
+
+#### 并行工具调用：正确
+
+一次回合内模型发出三个 `read`，事件序列为 `tool.started ×3 → tool.settled ×3 → tool.result ×3`，三个结果全部返回模型，最终回答同时给出三个文件的首行。并行工具没有串行化或丢失。
+
+#### 模型切换：会话级生效
+
+`/model use bailu-2.9-preview` 后状态栏从 `?/1000k` 变为 `?/500k`，`/model status` 的 `Request model` 与之一致，下一回合实际使用新模型。切换前需先按一次 Enter 接受补全菜单（既有补全交互，不是缺陷）。
+
+#### 中等长度会话：8 回合召回完整
+
+8 个回合各约 100 词，随后一次性追问全部 8 个事实，模型按序完整复述（`WORD-1A`…`WORD-8H`），没有遗漏。自动压缩在正常窗口下未触发（未越过阈值），符合预期。
+
+#### 溢出处理：判定正确，但错误信息不可行动（产品问题）
+
+把窗口设为 12k、`reserveTokens` 1500、`keepRecentTokens` 2000，连续 7 个回合后第 8 回合失败：
+
+```text
+Context overflow error: could not compact context automatically.
+```
+
+原因是可核算的：`/context` 显示启动基线约 4.3k（其中检查工具定义 18,865 字节 ≈ 5.4k tokens），7 回合消息约 2.2k，加上默认 `maxOutputTokens` 4096，`P + O + H` 已超过 12k 窗口，[constraints.ts](../../packages/ts-shell/src/config/constraints.ts) 的预算判定正确地拒绝了这次请求；`recoverOverflow` 的救援压缩因 would-not-shrink 或切点不足而拒绝，于是回合以 `run-error` 结束。**判定本身正确**，问题在于呈现：
+
+1. 错误只说「无法自动压缩」，没有说明占用来自哪里（工具 schema、历史、输出上限各占多少）；
+2. 没有给出可执行动作（提高窗口、降低 `maxOutputTokens`、`/compact` 或清理历史）；
+3. 同一回合内 `/context` 能给出完整的分类估算，错误路径却没有复用这份事实。
+
+这与 24.83 第 2、3 条同源：**配置与预算失败缺少可行动的说明**，只是这里的入口是回合而不是启动。
+
+#### 探针缺陷（不计为产品问题）
+
+以下三项是我方探针的观察错误，保留以免后续重复：
+
+- **审批被回车代答**：`exitCleanly` 在审批面板打开时发送 `/exit\r`，回车选中默认聚焦的 `Allow once`，把一次 bash 调用记为 `approved`。已修正 harness：检测到 `Permission:` 时返回 `approval-pending` 而不是回车。产品侧行为正确（默认焦点是 Allow once 符合既有设计）。
+- **连续 Escape 打开回溯面板**：三次快速 Escape 中，第二、三次间隔小于 `DOUBLE_ESCAPE_MS`（600ms），按 ADD-27 的既定裁决打开了 `/back` 选择器，后续输入进入面板而非 composer。这是设计行为，不是缺陷。
+- **补全菜单吞掉 Enter**：`/model use <model>` 输入后第一次 Enter 接受补全，需第二次 Enter 执行。属于 ADD-10 的既有交互。
+- **旧回合终态被误读**：`waitRunEnd` 从 `since - 2000` 扫描，会把上一回合的 `run-interrupted` 当成新回合结果；已改为「从该回合自己的 `run-started` 之后取终态」。
+- **工作区复用导致跨用例读取**：多个用例共用同一 fixture workspace，模型在其中一个会话里读取了 `.ts-shell/prompt-history.txt`（该目录被 `.gitignore` 忽略但物理存在于仓库内），其中含有此前探针的提示词。这是 fixture 复用造成的，不是上下文注入；后续用例改用独立 workspace。它顺带说明：工作区内的历史文件对模型可见，属于既有只读工具权限的既定行为。
