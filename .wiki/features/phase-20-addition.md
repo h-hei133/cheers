@@ -7465,3 +7465,29 @@ return measured.tokens + estimateTokens(messages.slice(measured.messageCount));
 `createCompactionStep` 在工具循环的每一步之前都会运行。首版实现里，「预算已超且无切点」的说明会**每步打印一次**，一次长工具循环就会刷屏。现按「同一段上下文只报一次」去重：记录上次报告的内容，内容相同则不再输出；一旦上下文发生可压缩的变化（`tokensBefore` 有值）就重置记录，使后续再次进入该状态时仍能报告。
 
 真实 CLI 复核：同一会话再次触发时，该消息出现 **1 次**，exit=0，无堆栈。
+
+### 24.93 上下文显示与压缩判定使用不同数值（新发现，未修）
+
+复核状态栏的上下文数字时发现一处不一致，此前被我判为「显示层比参照实现更细」而跳过，实际不是显示样式问题，是**数值来源不同**。
+
+**状态栏**（[sessionFacts.ts](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts)）取 `measuredPromptContext(...).tokens`——上一次请求的 provider 实测值，**不含测量之后新增的消息**。
+
+**压缩判定**（[compaction.ts](../../packages/ts-shell/src/cli/runtime/compaction.ts) 的 `measureContextTokens`）取 `measured.tokens + estimateTokens(messages.slice(measured.messageCount))`——实测值 **加上**之后的增量估算。
+
+两者在「刚发完一次请求」时一致，此后每发一条消息就拉开距离。按 8000 实测 + 3600 增量估算：状态栏显示 50%，压缩判定看到 73%（16k 窗口）。
+
+**这不是设计意图。** [sessionFacts.ts](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts) 的注释只解释了「草稿预览与实测值的优先级」，没有处理「实测之后的增长」。
+
+**参照实现的做法**：oh-my-pi 的 `#anchoredUsedTokens` 明确是「provider 基准 + 锚点之后的非消息增量 + 本地尾部 + pending」，即**包含增量**。它的注释把这条算式称为「shared by every anchored branch」，说明是统一口径。
+
+**为什么没有直接修**：修复需要让状态栏拿到与压缩判定同一份 `messages`（请求视角的数组）。`sessionFacts` 目前只有 `runtimeContext.session.turns`，而 `lastPromptMessageCount` 记录的是**发送给 provider 的消息数**（`turn/step.ts:634` 的 `messages.length`），两者口径未必一致。直接按索引切片可能引入更大的错误。
+
+**可选方案**：
+
+1. 让 `runtimeContext` 暴露一个「当前请求视角的消息快照」，状态栏与压缩判定共用（最正确，改动最大）。
+2. 状态栏维持实测值，但把标签从隐含的「当前」改成明确的「上次请求」，让用户知道会滞后（最小改动，诚实但没解决问题）。
+3. 状态栏改用与压缩判定相同的 `measureContextTokens`，把 `messages` 通过 `StatusFacts` 传入（中等改动，需确认数据可达）。
+
+倾向方案 1 或 3；方案 2 只是把问题说清楚，不解决。
+
+**影响**：用户可能在状态栏看到「还有余量」时突然遇到溢出。这与 24.84 记录的溢出体验是同一类问题，但根因不同——那次是压缩没有切点，这次是**显示滞后**。
