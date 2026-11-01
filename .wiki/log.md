@@ -11318,3 +11318,9 @@ build d4dda071a4dc/current inputs与两exe哈希另由独立verifier核对。普
 ### 2026-11-01：headless print 与单文件程序的显式审批策略
 
 补充任务文档 24.69：在当前已验证构建 caf547ebb515ca82b0cb9d0ffd5d1d6d9cd01fc73fc85a494da303ddd080a1db 上，Node 20.3 与 dist/bin/cheers 各四场隔离 print 验证完成。续接提示中的 always/once 不产生授权，默认拒绝实际 bash 调用；显式 `--non-interactive-approval allow-once` 只写入一次，下一次默认仍拒绝，持久 grant 始终为0。共8场、GET8/POST16、配置/auth字节不变、进程和scratch清理，峰值RSS 199812–417008 KiB；收据在 ignored `.omx/artifacts/phase20-addition-headless-approval/headless.json`。一次编译程序经relay尝试交互picker时实际落入非交互default-deny，保留为unverified，不冒充桌面审批证据。没有真实provider、跨平台、全量回归或20k PTY；ADD-56/57仍本地验证，goal active。
+
+### 2026-11-01：Provider 历史审计清单的当前源码复核
+
+针对 `.omx/project-memory.json` 的 Slice 08，复核 F-02/F-03/F-09/F-10：Anthropic thinking 已发送并裁剪 `budget_tokens`，流式 `signature_delta` 已累积并回放；当前四个 JSON 自描述 SSE 协议安全忽略 `event:` 头；models.dev 刷新已保留显式 reasoning、vision、temperature、工具能力、上限和精确 effort 选项，并由 cache merge 保留 reviewed built-in constraints。五个 owning test files 共198项在 Node heap768MiB、单worker下通过，没有产品源码变更。
+
+五静态门与 `git diff --check` 通过，118 条既有 docs-source advisory 保留；仅两份 markdown 变更，不重建，本批交付 CI 未观察。这次复核不把历史审计条目升级为当前缺陷，也不把本地协议测试当作真实 provider 或 Anthropic OAuth client registration/scopes 证据；本批没有新增真实 provider、OAuth、跨平台和发布证据，ADD 状态不变、goal active。

@@ -6540,3 +6540,14 @@ HANDOFF补提示内容与结构授权分离、保留continuity及验证session�
 在当前已验证构建 `caf547ebb515ca82b0cb9d0ffd5d1d6d9cd01fc73fc85a494da303ddd080a1db` 上，以 Node 20.3 和 `dist/bin/cheers` 各运行四个隔离 print 场景：续接提示分别要求 always/once，均走实际 loopback provider、bash 工具、transcript 与终态；两场默认拒绝，模型收到 denied 结果、无 marker 写入、终态为 stopped、持久 grant 为 0；显式 `--non-interactive-approval allow-once` 写入一次并完成，下一次默认运行再次拒绝。Node 与 executable 共 8 场，HTTP 各 4 GET/8 POST，配置/auth 字节保持，所有 owned 进程和 scratch 清理，峰值 RSS 199812–417008 KiB，输出均远低于 2 MiB 上限。收据在被忽略的 `.omx/artifacts/phase20-addition-headless-approval/headless.json`，脚本只放在 `.tmp/`。
 
 一次尝试把已编译程序经 relay 送入交互 PTY 时，程序正确落入非交互 default-deny 分支，未出现交互 picker；该观察只证明了拒绝与终态，不能冒充可交互的桌面审批证据，因此不纳入原生键盘验收。旧 Node 普通/全屏 picker 证据仍按 24.68 记录。没有使用真实 provider、跨平台环境、全量套件或 20k 历史 PTY；ADD-56/57 仍为本地验证，整体 goal active。
+
+### 24.70 Provider/Model/Auth/Streaming 历史清单的当前源码复核
+
+复核 `.omx/project-memory.json` 中 Slice 08 的 F-02、F-03、F-09、F-10，没有发现仍可复现的生产缺陷，也没有修改 provider 源码。该清单是历史审计输入，不能直接当作当前状态：
+
+- F-02 已收口。[Anthropic 请求构造](../../packages/ts-shell/src/provider/endpoints/anthropicMessages.ts)在开启 thinking 时发送 `thinking.type=enabled` 与 `budget_tokens`，预算限制在 `max_tokens - 1024` 内；不足以同时容纳预算和答案时省略 thinking。对应回归覆盖显式预算、默认预算、上限裁剪和省略路径。
+- F-03 已收口。Anthropic 流读取器按顺序累积分片 `signature_delta`，把完整 `reasoningSignature` 返回给回合层；后续请求保留签名 thinking/redacted block，缺签名时按既有安全合同降为普通文本。拆分签名和回放顺序均有协议测试。
+- F-09 不是当前协议缺陷。共享 SSE 夹具包含 `event:`、`id:`、注释、多行 `data:` 以及 LF/CRLF/CR 边界；当前 OpenAI、Anthropic、Google GenAI、Vertex payload 都以 JSON 自带类型/形状，读取器按 payload 分派，因此不需要用 `event:` 头替代 JSON 类型。若以后接入依赖事件名且 data 非自描述的新协议，需单独增加该协议的事件语义。
+- F-10 已收口。[models.dev 刷新](../../packages/ts-shell/src/core/models/catalogRefresh.ts)保留显式 reasoning、tool-call、temperature、image modality、context/input/output limit 及精确 effort 选项；[缓存合并](../../packages/ts-shell/src/core/models/catalogStore.ts)保持 reviewed built-in request constraints，用户 catalog 仍可最终覆盖。刷新回归覆盖缺失字段、非法上限、reasoning options 与内置约束优先级。
+
+本轮受限串行验证为 [Anthropic](../../packages/ts-shell/src/provider/endpoints/anthropicMessages.test.ts)、[SSE](../../packages/ts-shell/src/provider/endpoints/sse.test.ts)、[refresh](../../packages/ts-shell/src/core/models/catalogRefresh.test.ts)、[catalog shape](../../packages/ts-shell/src/core/models/catalogShape.test.ts)、[step](../../packages/ts-shell/src/turn/step.test.ts) 共 5 个文件、198 项通过（Node heap 768 MiB、单 Vitest worker）。五静态门与 `git diff --check` 通过，118 条既有 docs-source advisory 保留；本批仅改两份 markdown，不重建。这只证明本地协议/目录合同；没有新增真实 provider、Anthropic OAuth client registration/scopes、跨平台、桌面或发布证据，ADD 状态与 Phase 20 外部证据缺口保持不变，本批交付 CI 未观察。
