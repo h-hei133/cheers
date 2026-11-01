@@ -11422,6 +11422,12 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 
 删除接口成员、其文档注释与十一条取值行。`check:config-consumers` 只覆盖配置字段、不覆盖 `ProviderFacts`，因此以全仓 `grep` 零命中与 `tsc -p tsconfig.build.json` 通过作为证据（若仍有读者，编译会失败）。`facts.test.ts` 9 项、`modelCommandRuntime.test.ts` 35 项通过，config-consumers/node-floor/docs-drift 通过（118 条既有 advisory 保留），TS build manifest `0ed549f0fc5b`。纯删除，不改行为；未运行真实 provider 请求，ADD-70 仍部分完成、goal active。
 
+### 2026-11-01：CI 发现的守卫回归与修正
+
+`2964d7b6` 的代码 CI `41283830570` 失败 1 项（13840 通过）：`session/model/provider.test.ts` 的「refuses a global provider save when a hook introduces a named default owner」。根因是 ADD-72 首版把「连接存在」整条从 `providerDefaultWritable` 删除——该检查在 `beforeCommit` 里实际承担竞态检测：hook 在异步等待期间新增一条会被自动选中的连接后，provider 槽位不再是请求归属者，写入却仍成功。
+
+修正：所有权判断保持放宽（仅 accountPool 与只读输入），另在 `beforeCommit` 加 `providerSlot && !providerScopeSelected(currentConfig, modelRequest(context, currentConfig))`；投影目标检查看不到该变化，因为投影本身抑制 fallback。`provider.test.ts` 200 项通过，ADD-72 放宽用例 4 项仍绿，四文件 115 项通过，TS build manifest `87fe5ced39c2`。
+
 ### 2026-11-01：连接预设默认模型与目录漂移
 
 [addition24.81](features/phase-20-addition.md#2481-连接预设的默认模型与目录漂移)继续 ADD-70 的重复事实收敛。`/connect login <provider>` 把预设 `defaultModel` 写进新连接，该值随即成为下一次请求的模型。`openai` 预设写 `gpt-4.1-mini`，而自带目录只列 `gpt-5.3`/`gpt-5.3-codex`/`gpt-5.1-mini`/`o4-mini`；实测登录后 `/model list` 里没有该模型，`/context` 只能报「assuming 64000」。参考侧（pi 的 `defaultModelPerProvider`、omp 的 catalog KDL `defaultModel`）都由目录派生默认值，没有独立副本。

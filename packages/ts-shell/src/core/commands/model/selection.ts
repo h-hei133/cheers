@@ -24,7 +24,7 @@ import { connectionIdentity, credentialIdentity } from './identity.js';
 import { invalidatePromptMeasurement } from '../../../observability/usageTelemetry.js';
 import { captureThinkingPreference } from '../../models/preference.js';
 import { exactTargetMatches, modelRequest, targetRequest, targetResolutionIdentity } from './target.js';
-import { providerBindingAvailable } from '../../auth/binding.js';
+import { providerBindingAvailable, providerScopeSelected } from '../../auth/binding.js';
 
 interface ExactSelection { readonly target: SessionModelTarget; readonly baseline?: SessionModelEdit; readonly roles?: SessionModelPolicy;
   readonly resolution?: string }
@@ -200,6 +200,11 @@ async function selectModel(args: string[], context: CommandContext, global: bool
       || !sameValue(catalogModel(currentCatalog, provider, model, catalogBaseUrl(currentCatalog, provider, baseUrl)), candidate)) return false;
     const currentConfig = readFreshConfiguration(context);
     if (global && providerSlot && !providerDefaultWritable(currentConfig, provider)) return false;
+    // A provider-slot choice is a statement about the request that slot serves.
+    // A hook can add a connection that would serve it instead; the projected
+    // target check below cannot see that, because the projection itself
+    // suppresses the fallback. Ask the unprojected request who owns it.
+    if (providerSlot && !providerScopeSelected(currentConfig, modelRequest(context, currentConfig))) return false;
     // A forced target would hide a changed fallback or pool selection during the hook.
     if (inferredConnection && !sameValue(modelRequest(context, currentConfig), actual)) return false;
     // Retain the reviewed preference across the session/global stages so this

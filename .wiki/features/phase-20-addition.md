@@ -6800,6 +6800,10 @@ ADD-73 的四态在 [defaultSource.test.ts](../../packages/ts-shell/src/core/com
 
 **改动三：新增 [preset.test.ts](../../packages/ts-shell/src/core/commands/connect/preset.test.ts)**，逐个预设断言其 `defaultModel` 出现在对应目录条目里（目录条目模型为空则豁免，无条目则失败）。红灯阶段该测试在 `openai`（`gpt-4.1-mini` 不在列表中）与 `github-copilot`（无目录条目）两处失败；两处修复后 9 项全绿。同一测试另覆盖 `defaultBaseUrl`：预设的地址也会写进连接，若与目录漂移，请求会发往目录已不再描述的 host。当前三处（siliconflow、google、google-ai）一致，用例共 12 项。
 
+**CI 发现的一处回归与修正（`2964d7b6` 的 `41283830570`）。** 首次提交把「连接存在」从 `providerDefaultWritable` 删掉后，`session/model/provider.test.ts` 的「refuses a global provider save when a hook introduces a named default owner」失败：hook 在异步等待期间新增了一条会被自动选中的连接，此后 provider 槽位已不再是请求的归属者，而写入仍报告成功——实际请求会由那条新连接服务。这条保护是真的，只是放错了地方：它不属于「谁能写 provider 默认值」这个所有权判断，而属于「这一笔写入是否仍描述当前请求」这个竞态判断。
+
+修正方式：`providerDefaultWritable` 保持放宽（只保留 accountPool 与只读输入），另在 `beforeCommit` 内加一条 `providerSlot && !providerScopeSelected(currentConfig, modelRequest(context, currentConfig))`。已有的投影目标检查看不到这个变化，因为投影本身会抑制 fallback；这里问的是未投影的请求由谁归属。修正后 `provider.test.ts` 200 项通过，ADD-72 的放宽用例仍绿（4 项），四文件 115 项通过。
+
 **改动四：`resolveProviderTarget` 去掉不可达与重复的分支。** 该函数先查 `CONNECT_PRESETS`，只有别名才会落到后面的 `if` 链。`antigravity` 与 `claudecode` 已是预设 id，其内联分支永远走不到；`google` 同时出现在预设与内联分支里，内联那份复制了 `defaultBaseUrl`/`defaultModel` 两个值。现只保留两个真正可达的别名：`openai-compatible`（不指定模型，端点由用户提供）与 `gemini`（转指 `google` 预设，不再复制取值）。同时删掉 `preset.ts` 里未被使用的 `RuntimeConfigFile` 类型导入。
 
 **验证。** `connect/preset` 9、`connectCommandRuntime` 68、`modelCommandRuntime` 35、`catalogShape` 22、`catalogSurface` 40、`picker/model` 46 共 220 项通过；`verify:import-cycles`、`check:config-consumers`、`check:declarations` 通过，TS build 通过（manifest `18ad34012d19`，去重后 `tsc -p tsconfig.build.json` 仍通过）。
