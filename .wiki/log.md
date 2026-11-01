@@ -11521,3 +11521,17 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 方法论失误单独记录：用 `require()` 在 ESM 里写诊断导致连续几轮误判；只搜索单一关键词就断定「三家没有回合前检查」（实际全有）；把「无法构造场景」当成「功能正常」。
 
 本轮未改任何代码，未运行 build/vitest，`verify:docs-drift:strict` 与 `git diff --check` 通过。
+
+### 2026-11-02：深度研究 auto-compact 与上下文显示
+
+针对 24.96 的两项未解问题做只读深度研究，未改任何代码。用工作流并行跑了三个互斥假设（`--print` 是否有独立执行器 / `compaction` 是否为 undefined / `driveLoop` 的 pre-step 是否被跳过）加三家参照的接线追踪，9 个 agent 全部完成。
+
+三个假设**全部被证伪**，对抗验证 3/3 也全部 refute。逐环核对确认：`--print` 与交互模式共用同一 runtime、`compaction` 非空（诊断实测 `compaction=yes tools=18`）、`prepareNextStep` 已构造、pre-step 位置正确、`planCompaction` 用真实数据会触发。六环全对但真实运行不压缩。
+
+顺带发现一个真实设计问题：压缩能力静默依赖 provider 解析成功——`compactionTarget` 有五个提前返回 undefined 的条件，任何一条命中都会让 `compaction` 变成 undefined，压缩与溢出救援一并失效且无任何提示。
+
+三家对照的关键结论：pi/oh-my-pi/codex 的回合前检查都在 **agent loop 之外**（session 层或 turn 入口），本项目放在 loop 内。codex 把「检查」与「是否压缩」分开（检查无条件、判定在内部），本项目合在一起，使「没触发」与「没调用」在外部无法区分——这正是排查反复卡住的根本原因。
+
+方法论教训单列：用 `require()` 在 ESM 里写诊断导致连续几轮误判；改用 `import` 后只验证了 `startTurn` 却默认 `planCompaction` 被调用过；三个假设全证伪说明假设集漏掉了最直接的那个。下一轮应先建立能区分「未调用」与「调用后拒绝」的观测，再继续推理。
+
+上下文显示的方案已明确：忙碌时保留 `calibrated` 读数、过期时保留 tokens 标 `stale`、可选引入 epoch。本轮仅文档，`verify:docs-drift:strict` 与 `git diff --check` 通过。

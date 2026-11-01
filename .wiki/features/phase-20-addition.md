@@ -7678,3 +7678,156 @@ pi 在压缩后返回 `tokens: null`（诚实），oh-my-pi 用 epoch 保持一�
 #### 状态
 
 本轮所有代码改动均已提交推送（`a9ab2c96` 及之前），工作树仅有本节所在文档的改动。台账 78 项，未开始仅 ADD-30（已裁决不启动）。第 1、2 项**不提升任何 ADD 状态**。
+
+### 24.97 深度研究：auto-compact 不触发的调用链排查（进行中）
+
+针对 24.96 的第 1 项，用互斥假设并行追踪了本项目自身的调用路径。**H1 已证伪**，结论如下。
+
+#### H1 证伪：`--print` 没有独立执行路径
+
+假设「`--print` 走了不同的执行器，所以压缩从未接线」不成立。实际链路：
+
+```
+executeResolvedPromptTurn (cliRuntimeModule.ts:431)
+  → sessionRuntime.executePrompt (sessionRuntime.ts:207)
+  → drivePrompt → deps.runPrompt (sessionRuntime.ts:295)
+  → factory runPrompt (cliSessionRuntimeFactory.ts:197)
+  → streamCliRuntimePrompt (cliSessionRuntimeFactory.ts:263)
+  → runCliRuntimeInvocation → startTurn (cliRuntimeInvocation.ts:321)
+  → runTurn (cliRuntimeInvocation.ts:362)
+  → prepareNextStep (turn/session.ts:240)
+  → driveLoop (core/agent/loop.ts:261)
+```
+
+`printMode` 在这一整段里只被查询一次（`sessionRuntime.ts:246`），且只影响渲染（`:334`、`:362`）。`runPrompt` 的依赖签名（`:73-81`）不带模式判别，工厂侧对 `printMode` 的 grep 为空。两种模式共用同一个 `ShellSessionRuntime` 实例。
+
+#### H1 顺带发现的设计问题（真实，独立于 auto-compact）
+
+**压缩能力静默依赖 provider 解析成功。**
+
+[resources.ts](../../packages/ts-shell/src/cli/provider/resources.ts:99) 的唯一门槛是 `activeProvider`：
+
+```ts
+const compaction: CompactionSetup | undefined = activeProvider ? {...} : undefined;
+```
+
+而 `activeProvider` 来自 `compactionTarget`（[compaction.ts](../../packages/ts-shell/src/cli/provider/compaction.ts:41-57)），它有五个提前返回 `undefined` 的条件：
+
+1. `resolved.blocked` 为真；
+2. `providerCredentialBaseUrl` 抛错；
+3. 目录里存在同地址的多个别名（`ambiguous`）；
+4. 既无 apiKey、无 accountAuth、且 endpoint 无 signer；
+5. 没有 baseUrl 或没有 model。
+
+任何一条命中，`compaction` 就是 `undefined`，`prepareNextStep` 随之消失，**压缩完全失效且没有任何提示**。同时 [turn/session.ts](../../packages/ts-shell/src/turn/session.ts) 的溢出救援也以 `!options.compaction` 为前提，所以救援一并关闭。
+
+这不是 `--print` 特有问题，而是「压缩可用性」与「provider 可解析性」之间的隐式耦合：用户看不到任何关于「本次会话没有压缩能力」的信息。
+
+#### 仍在进行
+
+H2（`compaction` 是否为 undefined）与 H3（`driveLoop` 的 pre-step 是否被跳过）仍在只读追踪中。两者完成前不对第 1 项下结论。
+
+#### 24.97 补记：逐环核实结果
+
+在等待 H2/H3 的同时，主代理逐环核对了整条链路，每一环都成立：
+
+| 环节 | 位置 | 结论 |
+|---|---|---|
+| `--print` 无独立执行器 | `cliModeDispatch.ts:37` → `printModeRouter.ts:76` → `runNonInteractivePrompt` | 与交互模式共用同一 runtime |
+| `compaction` 非空 | `startTurn` 诊断实测 `compaction=yes tools=18` | 成立 |
+| `overhead` 已注入 | `withRequestOverhead`（`cliRuntimeInvocation.ts:343`） | 18 个工具 |
+| `prepareNextStep` 已构造 | `turn/session.ts:240` | 成立 |
+| pre-step 检查已就位 | `core/agent/loop.ts:261`，`driveLoop` 循环之前 | 成立 |
+| `planCompaction` 会触发 | 真实 transcript 单测：18143 > softLimit 16976，且有切点 | 成立 |
+
+**六环全部成立，但真实运行没有压缩。** 这把问题收敛到一个方向：`planCompaction` 在真实运行时收到的 `messages` 或 `policy` 与单测构造的不同。
+
+最可能的差异点（待验证）：
+
+1. `policy.overhead` 的 getter 在 `planCompaction` 调用时刻返回的是**空值**——`withRequestOverhead` 的 `get overhead()` 依赖 `currentOverhead()` 闭包，若工具池在该时刻尚未就绪，`tools` 可能是空数组；
+2. `measureContextTokens` 因 `requireExpectedIdentity: true` 返回 undefined 后，回退估算用的 `messages` 是**已投影/已裁剪**的数组，比持久化 transcript 小；
+3. `maxSteps` 或 `shouldStopAfterStep` 使第一步成为唯一步骤，而 pre-step 检查的 `context` 此时尚未包含 `opening`。
+
+第 1 点最可疑：诊断显示 `tools=18` 是在 `withRequestOverhead` **之前**读的 `currentOverhead()`，而 `planCompaction` 里通过 getter 读时，闭包可能已返回不同的值。
+
+#### 24.97 结论：三个假设全部证伪
+
+工作流的三个互斥假设经独立追踪后**全部 refuted**，对抗验证 3/3 也全部 refute：
+
+| 假设 | 判定 | 依据 |
+|---|---|---|
+| H1：`--print` 有独立执行器 | **refuted** | 两种模式共用同一 `ShellSessionRuntime`；`printMode` 只在 `sessionRuntime.ts:246` 被查询一次且仅影响渲染 |
+| H2：`compaction` 在 `runTurn` 时为 undefined | **refuted** | 唯一门槛是 `activeProvider`；实测诊断显示 `compaction=yes tools=18` |
+| H3：`driveLoop` 的 pre-step 被跳过 | **refuted** | 进入 `driveLoop` 后没有任何提前返回；`pollSteering` 自吞异常；`core.prompt` → `runPromptMessages` → `runAgentLoop` 直达 |
+
+H3 的推理还确认了两点：
+
+- `signal` 即使已中止也不会跳过调用——`createCompactionStep` 返回 undefined，但调用本身仍执行；
+- `runAgentLoopContinue` 走同一个 `driveLoop`，`AgentCore.continue` 的 `createLoopConfig()` 也包含 `prepareNextStep`。
+
+#### 三家的接线对照（工作流实测）
+
+| | 回合前检查的位置 | 前置条件 | 关键差异 |
+|---|---|---|---|
+| pi | `_prepareRun`（`agent-session.ts:1899`），在 `agent.prompt` 之前 | **需要 `lastAssistant` 存在**（`:1950`）；全新会话首回合跳过 | 依赖「上一条 assistant」作为测量锚点 |
+| oh-my-pi | `runPrePromptCompactionIfNeeded`（`agent-session.ts:8958`） | 多个提前返回：slash 命令、`isStreaming` 排队、并发复检、中止竞态、usage 预检、成本上限 | 检查前有大量准入分支 |
+| codex | `run_pre_sampling_compact`（`turn.rs:172`），`run_turn` 的第一件事 | **无条件调用**；内部只在 `token_limit_reached` 时执行压缩体 | 检查无条件，压缩有条件 |
+| 本项目 | `driveLoop` 开头（`loop.ts:261`） | `config.prepareNextStep` 存在 | 位置等价，但**没有任何证据表明它在真实运行中执行过** |
+
+**最重要的对照结论**：codex 把「检查」与「是否压缩」分开——检查无条件，判定在内部。本项目把两者合在一起（`planCompaction` 返回 undefined 就什么都不做），使得「没触发」与「没调用」在外部**无法区分**。这正是本轮排查反复卡住的根本原因。
+
+#### 仍未解决
+
+三个假设全被证伪，但 auto-compact 依然不触发。剩余可能：
+
+1. `planCompaction` 在真实运行时被调用了但返回 undefined——**需要用可靠方式实测，而不是继续推理**；
+2. 我此前用 `require()` 写的诊断在 ESM 中失败（被 `catch {}` 吞掉），导致「诊断为空」被误读为「未调用」。改用 `import` 后只验证了 `startTurn`，**从未可靠验证 `planCompaction` 本身**。
+
+下一步应当是：在 `planCompaction` 入口用 `import` 的 `fs` 写一行诊断，记录 `messages.length`、`measuredTokens`、`policy.overhead?.tools?.length`、`tokensBefore`、`reached`。这一条数据能直接区分「没调用」与「调用了但拒绝」，从而结束这轮反复。
+
+**本轮不执行该诊断**：这一轮的任务是研究，不改代码。诊断改动属于实施范畴，留待下一轮。
+
+#### 本轮研究的方法论教训
+
+排查在此卡住多轮，根因不是代码复杂，而是**观测手段本身不可靠**：
+
+1. 第一次用 `require('node:fs')` 在 ESM 模块里写诊断，异常被 `catch {}` 吞掉，连续几轮把「日志为空」读成「代码未执行」；
+2. 改用 `import` 后只验证了 `startTurn` 一处，**从未验证 `planCompaction` 本身**，却在后续推理中默认它「被调用过」；
+3. 三个互斥假设全部证伪，说明我选的假设集**漏掉了最直接的那一个**——「它被调用了，但返回 undefined」。
+
+**教训**：当多个结构性假设都被证伪时，应当先建立一条**能区分「未调用」与「调用后拒绝」的观测**，再继续推理；否则每次证伪只会缩小假设空间而不产生新信息。
+
+
+#### 24.97 补充：三家的检查位置与本项目的差异
+
+工作流对三家的追踪揭示了一个此前没注意的结构差异：**三家的回合前检查都在 agent loop 之外**。
+
+| | 检查位置 | 是否在 loop 内 |
+|---|---|---|
+| pi | `_prepareRun`（`agent-session.ts:1899`），`agent.prompt` 之前 | **否**，session 层 |
+| oh-my-pi | `#promptWithMessage` 内的 `runPrePromptCompactionIfNeeded`（`agent-session.ts:8958`），在 `promptAgentWithIdleRetry`（`:9037`）之前 | **否**，session 层 |
+| codex | `run_turn` 的第一件事（`turn.rs:172`），在 `capture_step_context`（`:210`）、记录用户输入（`:269`）、采样循环（`:304`）之前 | **否**，turn 入口 |
+| 本项目 | `driveLoop` 开头（`loop.ts:261`） | **是**，loop 内 |
+
+三家都把「回合前检查」放在**构造请求之前**，而本项目的 pre-step 检查放在 loop 内部。位置差异本身不必然导致 bug，但有一个实际后果：**loop 内的检查无法覆盖「loop 尚未开始就被拒绝」的情况**，也无法在日志中与「loop 根本没启动」区分。
+
+oh-my-pi 的补充事实：agent loop 本身（`packages/agent/src/agent-loop.ts`）**不含任何 compaction 调用**，只有 `syncContextBeforeModelCall` 与 `beforeModelCall` 两个前置钩子，而 coding-agent 在其上注册的是渲染、usage 预检与成本上限，都不是阈值检查。mid-run 检查是独立入口，仅经 `onTurnEnd` 到达。
+
+#### 对本项目两个未解问题的方案建议
+
+**问题 1（auto-compact 不触发）**——分两步：
+
+1. **先建立观测**（下一轮实施）：在 `planCompaction` 入口用 `import` 的 `fs` 写诊断，记录 `messages.length`、`measuredTokens`、`policy.overhead?.tools?.length`、`tokensBefore`、`reached`。这一条数据能区分「没调用」与「调用了但拒绝」，结束当前的假设循环。
+2. **再对齐位置**（视第 1 步结果）：若确认是「loop 内检查覆盖不到」，把回合前检查上移到 `runTurn` 入口（session 层），与三家一致；若确认是「调用了但拒绝」，则问题在阈值/切点计算，与位置无关。
+
+**问题 2（显示滞后）**——三家的做法：
+
+- oh-my-pi：`#anchoredUsedTokens` = provider 基准 + 锚点后的非消息增量 + 本地尾部 + pending；schema 增量**带符号**（roster 收缩时数字能下降）；另有 `compactionEpoch` 拒绝压缩前的陈旧锚点。
+- pi：`estimateContextTokens` = 最后 usage + 尾部 `estimateTokens`；压缩后无 post-compaction usage 时**返回 `null`**（诚实）。
+- codex：显示层直接用 `last_token_usage`（**不含尾部**），但内部预算用 `get_total_token_usage`（含尾部）。
+
+本项目的 `estimatePrompt` 已经等价于 oh-my-pi 的锚定算式，问题只在**忙碌时被丢弃**与**20 秒过期后不带数字**。建议：
+
+1. 忙碌时保留最后一次 `calibrated` 读数（不因 `busy` 而丢弃）；
+2. 过期时保留 `tokens` 并标记 `stale`，而不是只返回 `{ source: 'stale' }`；
+3. 可选的长期对齐：引入 oh-my-pi 的 epoch 概念，拒绝压缩前的陈旧锚点。
