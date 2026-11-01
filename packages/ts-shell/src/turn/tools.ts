@@ -7,6 +7,7 @@ import type { DenyRule } from "../core/shell/approval/deny.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { InteractiveAsk } from "../core/tools/ask/contract.js";
 import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
+import { approvalCallBinding } from '../core/shell/approval/binding.js';
 import type { ToolDefinition, ToolExecutionContext, ToolPreparation } from "../tools/types.js";
 import type { SubagentRunner } from "../core/subagents/runner.js";
 import { neutraliseForDisplay } from "../core/text/safety.js";
@@ -410,11 +411,13 @@ async function askPermission(
 ): Promise<{ readonly blocked?: string; readonly approved?: { operation: string; decision: string } }> {
   let evaluation: ReturnType<typeof evaluateToolPermissionScope>;
   let preparation: ToolPreparation | undefined;
+  let callBinding: string | undefined;
   try {
     captureFileAccess(toolName, args, options);
     if (toolName === 'lsp' && args.backend !== 'scanner') bindExecutionTarget(args, args.server, options.workspaceRoot);
     preparation = preparedToolCall(args, options);
     evaluation = preparation ? preparationPermission(toolName, preparation, options, args) : evaluateWorkspacePermission(toolName, args, options, tool);
+    callBinding = approvalCallBinding(preparation?.permissionToolName ?? toolName, args, preparation);
     const external = fileAccessPrompt(args);
     if (external && !evaluation.denied) evaluation = { ...evaluation, requiresEscalation: true,
       target: external, reason: `This call accesses files outside the registered workspace roots. One-time approval is required.\n${evaluation.reason}` };
@@ -462,6 +465,7 @@ async function askPermission(
     ? evaluation.reason
     : "The permission scope allows this operation, but the exact patch groups still require explicit selection.";
   const prompt = buildToolEscalationPrompt(toolName, evaluation.operation, evaluation.target, promptReason);
+  if (callBinding !== undefined) prompt.context.callBinding = callBinding;
   if (fileAccessPrompt(args)) {
     prompt.context.explicitApproval = true;
     prompt.options = prompt.options.filter(option => option.value !== 'allow-always');

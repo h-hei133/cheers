@@ -464,7 +464,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-56 | P0 | 审批的「仅本次」不得变成永久授权 | 21.74、第一百三十四批 | 本地验证 | — |
-| ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、第一百三十五批 | 本地验证 | MCP 参数契约不可解读，已禁止 allow-always |
+| ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63、第一百三十五批 | 本地验证 | task/team/browser/ssh 完整参数及准备预览绑定；旧摘要 grant 不复用；MCP 仍禁止 allow-always |
 | ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76 | 本地验证 | — |
 | ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77 | 本地验证 | — |
 | ADD-60 | P0 | 权限档位不跨项目存活 | 21.78 | 本地验证 | — |
@@ -6414,3 +6414,24 @@ Node20.3 普通/全屏 × user/project 四条真实 CLI 顺序通过：暂存9�
 证据归 ignored 的 .omx/artifacts/phase20-addition-settings-permission/，只保留脚本/快照及布尔数值收据，无raw PTY、真实凭据或请求正文；独立verification已通过。本批只改文档/HANDOFF，没有新unit、build、反转、全仓/15套件/20k真实PTY、local NormProof或委派复审。真实权限拒绝不等于物理磁盘故障；当前exe故障注入、真实provider及其他平台仍未验。ADD-17保持本地验证、ADD-03仍部分完成，原47外部条件延后、ADD-30继续暂缓、goal active。
 
 一次延迟读取b8670318代码CI41254557060与5acafcb3代码CI41254074206仍in_progress，各Watch41254557073/41254074184 success，不代替完整CI、不立即轮询。本批最终门与提交推送另绑，本批交付CI未观察。
+
+
+### 24.63 审批摘要不得充当完整调用的授权身份
+
+继续 ADD-57，先沿 [toolPolicy](../../packages/ts-shell/src/core/query/toolPolicy.ts) → [turn gate](../../packages/ts-shell/src/turn/tools.ts) → [原授权 store](../../packages/ts-shell/src/core/shell/approval/store.ts) 检查：task 指令仅取200字符、team question 与 browser text 仅取80字符；browser 只取一个 anchor，ssh command 又被 trim。原 exact namespace 仍直接比较该摘要，21.75 没有彻底消除碰撞。通过真实 CLI approval bridge 与磁盘重载，最初九类差异各在持久/once路径失败，共18项；包括截断尾部、同 selector 不同文本、URL遮蔽selector、空白、字段冒号拼接和agent选择。有效基线不含后加的team数组顺序控制。
+
+定向只读对照本地 Codex 4210c08defe92fe8828f789b6f9fda287ad3709e：approvals.rs:233–270 使用结构键并纳入环境、完整命令向量、cwd/tty/权限；没有可靠键的MCP等不缓存；command_canonicalization.rs保留复杂脚本原文。采用完整字段和不丢失原文的决定；本项目不推导shell等价性，只忽略JSON对象键顺序，数组顺序/字符串保留；既有MCP持久授权限制保持。没有复制参考代码或增建授权仓库。
+
+新增原审批域 [binding](../../packages/ts-shell/src/core/shell/approval/binding.ts)，仅处理task/team/browser/ssh及准备阶段映射到这些工具的调用。实际gate把完整原参数、准备permissionArgs和完整准备preview共同绑定；后者覆盖通过预览携带命令或文档身份的路径。稳定JSON表示经SHA256形成call-v1键，原target/label及deny前缀语义保持；旧摘要授权可列出/撤销，却不能匹配新调用。非JSON值、过深/循环输入或畸形binding明确拒绝，不回退摘要；其他工具仍沿原scope合同。准备预览按完整文本保守匹配，预览变化也需新授权；这不是跨格式的语义等价推断。
+
+最终 Linux Node20.3.0、heap768MiB、单worker串行七文件 **165项**通过：新binding12、原bridge串联新回归27、toolPolicy38、trustPolicy10、turn/tools54、approvalExecution6、approvalPromptBridge18。新增覆盖持久重载、一次缓存、数组/字符串/类型/property identity、隐藏参数不写入grant、旧记录管理、实际prepared execution与有效别名。四反转分别退回摘要键/断开真实producer/移除对象键排序/移除准备preview，恰好27/27/1/1项失败，finally逐字节恢复后最终套件全绿。五静态门、TS及exe构建通过；build 0c9dd5ccc26342ff5be3c5009c4236a800784c9d6e844b1fbe8c657630a6f012，inputs a36d7467924a174dde9a991d1a7e931fcd530489450009596fdf756950d5e4c2。
+
+普通/全屏两条实际 Node CLI → PTY → loopback HTTP 均各三回合：先实际关闭预览并按a持久批准任务，实际子任务成功；第二条仅200字符后尾部不同，旧grant不命中，关闭新预览后Escape拒绝，零子任务请求且原模型收到denial；第三条与首次完全相同，命中旧grant且实际子任务成功。每模式8次POST、2次子模型调用、2次实际审批面板、1条不含尾部原文的grant；审批approved/denied/approved与工具true/false/true分别核验，auth字节保持。退出0/cooked恢复、owned PID/start非活跃、scratch清理，45秒/2MiB/采样768MiB守卫未触发，最高451820KiB不算性能证据。
+
+三条先前探针观察失败及脚本分别保留unverified：最初误等隐藏的选项面板，随后预览长段落尾部并非可靠可见标记，最后n实际进入可选拒绝理由子模式、未提交。最终改等新回合实际输出、审批open计数和选项revision，Escape作直接拒绝；含迭代共五次CLI启动，不计为五条有效矩阵。未为迁就探针改变产品。
+
+系统PATH无normproof；改用CI同款仓库bundle、隔离npm cache离线执行，exit0，acyclic/unresolved两项satisfied；总体仍partial，interactiveMode.ts及其test两个未改模块的函数上限advisory保留，既有host disposition保留，补充test的defer记录且不改变判定。证据、源码快照及最终独立核验归 ignored 的 .omx/artifacts/phase20-addition-approval-binding/，无raw PTY/真实凭据/HTTP正文。HANDOFF记录摘要与授权身份分离及准备preview边界。没有真实provider评估、真实浏览器/SSH效果、exe运行审批、其他平台、全仓/15套件/20k真实PTY或委派复审；完整任务指令的可视预览并非本批验收范围，ADD-57仍本地验证，原47外部条件延后、ADD-30暂缓、goal active。
+
+一次延迟读取5acafcb3代码CI41254074206及c66fbc8a代码CI41252988169已completed/success；b8670318代码CI41254557060与dc495c3e代码CI41255073974仍in_progress，各Watch已success。Watch不替代完整CI。本批最终门、独立核验与提交推送另绑，本批交付CI尚未观察。
+
+最终五静态门、三脚本语法、独立证据verifier及diff check均exit0；current inputs与stable/不可变exe的size/SHA一致。再次延迟观察dc495c3e精确代码CI41255073974已completed/success，b8670318代码CI41254557060仍in_progress，未重启或轮询追赶；本批交付CI未观察。

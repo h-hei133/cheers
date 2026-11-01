@@ -11259,3 +11259,10 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 ### 2026-11-01：设置真实权限拒绝与显式恢复
 
 [addition24.62](features/phase-20-addition.md#2462-设置真实目录权限拒绝子面板返回与恢复)补ADD-17实际Linux权限场景，产品未改、沿用d0b773499bec及原Git owner/current inputs/两exe核验。Node20.3普通/全屏×user/project四真实CLI：目标父目录0500使原锁两次实际EACCES且文件字节保持，来源阅读/范围取消/编辑返回均保留失败，子操作零save/reopen；恢复原权限后明确Apply才一次锁成功并保存12/Stored读回。每场save3/reopen2、注释/topP/另一scope/auth/session保持，HTTP0、exit0/cooked、权限/owned进程/scratch清理。首条相同旧frame误认未验证保留，改等新overlay revision后四场通过，含初条5次CLI；HANDOFF记录同步规则。最高采样436708KiB不算性能，独立核验passed。本批仅三份markdown，无新产品/unit/build/反转/全仓/20k/judge/委派复审；权限拒绝不替代物理设备/其他平台/exe故障验收，ADD-17本地验证、ADD-03部分完成、原47外部条件延后、goal active。一次延迟读b8670318/5acafcb3代码CI41254557060/41254074206仍in_progress，各Watch41254557073/41254074184 success；本批CI未观察，最终门与提交推送另绑。
+
+
+### 2026-11-01：完整调用身份隔离审批摘要碰撞
+
+[addition24.63](features/phase-20-addition.md#2463-审批摘要不得充当完整调用的授权身份)补ADD-57：task/team/browser截断、单anchor、trim及拼接使不同调用共享持久/once授权。目标先查、定向参考后，仅在原approval域绑定完整参数、准备permissionArgs/preview，原gate传入call-v1摘要；展示/deny语义保持，旧grant可撤销但不复用。有效旧owner基线18失败；四反转27/27/1/1失败并逐字节恢复，最终七文件165项、五静态门、Node20.3 TS/exe build0c9dd5ccc263通过。普通/全屏真实CLI各三回合：a批准第一任务、尾部不同第二任务重新询问且Escape拒绝零child、相同第三任务命中持久grant；各8POST/2child/1grant，审批与实际结果分别保真，auth不变、exit0/cooked/owned进程/scratch清理，最高451820KiB不算性能。三次早期观察失败独立unverified保留，n理由子模式不当直接deny；新输出/open计数/revision同步后两场通过。仓库bundle离线judge exit0、import两项satisfied，两个未改interactiveMode模块函数上限使总体partial；PATH缺命令记录保留。HANDOFF补完整身份与预览边界；无真实provider/browser/SSH效果、exe审批、其他平台/全仓/20k/委派复审，任务完整可视预览不属本批验收，ADD-57本地验证、原47延后、goal active。5acafcb3/c66fbc8a精确代码CI已success，b8670318/dc495c3e仍in_progress，Watch不代替代码CI；本批交付证据另绑。
+
+最终五静态门、三脚本语法、独立证据verifier及diff check均exit0；current inputs与stable/不可变exe的size/SHA一致。再次延迟观察dc495c3e精确代码CI41255073974已completed/success，b8670318代码CI41254557060仍in_progress，未重启或轮询追赶；本批交付CI未观察。

@@ -52,8 +52,11 @@ export function buildScope(prompt: EscalationPrompt): {
   const operation = prompt.context.operation.trim().toLowerCase();
   const target = prompt.context.target;
 
-  // A new namespace prevents lossy legacy keys from authorizing a different target.
-  const scopeKey = `${toolName}:${operation}:exact:${target}`;
+  const binding = prompt.context.callBinding;
+  if (binding !== undefined && !/^[a-f0-9]{64}$/.test(binding)) throw new Error('Invalid approval call binding.');
+  // Bound calls must never fall back to legacy grants keyed on display summaries.
+  const scopeKey = binding !== undefined ? `${toolName}:${operation}:call-v1:${binding}`
+    : `${toolName}:${operation}:exact:${target}`;
   const scopeLabel = `${toolName}/${operation}(${target})`;
   return {
     toolName,

@@ -19,6 +19,8 @@ export interface EscalationPrompt {
     toolName: string;
     operation: string;
     target: string;
+    /** Digest of complete arguments and prepared preview; target is a readable summary. */
+    callBinding?: string;
     /** This call needs a fresh answer; session scopes and cached grants cannot answer it. */
     explicitApproval?: boolean;
     /** A complete read-only approval preview; closing it never approves effects. */

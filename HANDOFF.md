@@ -1793,3 +1793,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A native probe recognizes an unchanged failure frame immediately after sending another Apply, then observes only the previous save count.
 - **Root Cause**: Matching the same title, pending value and ready state cannot distinguish the previous result from the new action; stdin processing is asynchronous.
 - **Rule**: Capture the old overlay revision and require a newer rendered generation before asserting a repeated outcome. Pair the new frame with actual writer calls and filesystem results. Preserve failed observations separately; do not alter product behavior to compensate for probe timing.
+
+
+### Display Summaries Cannot Identify Reusable Approval Grants
+- **Symptom**: Different task tails, browser fields, whitespace or structured values reuse an earlier persistent or one-shot approval because their visible targets coincide.
+- **Root Cause**: Exact comparison of a truncated or joined display string is still lossy. Prepared operations can also carry the actual command or selected document in their preview rather than their permission arguments.
+- **Rule**: Bind the complete original arguments, effective prepared arguments and reviewed preparation preview in the approval domain. Preserve JSON object-key equivalence, array order and literal strings; reject unsupported representations without falling back to summaries. Use a new namespace so old summary grants remain manageable but cannot authorize new bound calls. Cover the actual producer, disk reload, once consumption and prepared execution, and preserve separate approval versus execution outcomes.
+
+### Approval Preview And Denial Drafts Need Separate Native Observations
+- **Symptom**: A PTY probe waits for choices while a preview covers them, or pressing n leaves the tool pending instead of returning a denial.
+- **Root Cause**: The preview and approval choices render at different times; n opens an optional reason draft. Old output can also satisfy a repeated preview marker.
+- **Rule**: Observe new-turn preview output and the new approval opening, close the preview, then wait for the actual choices and generation. Use Escape for a bare denial or explicitly submit the reason draft; wait for both resolved approval and the model's tool result before asserting no effect.
