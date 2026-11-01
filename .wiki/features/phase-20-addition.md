@@ -6804,4 +6804,6 @@ ADD-73 的四态在 [defaultSource.test.ts](../../packages/ts-shell/src/core/com
 
 **验证。** `connect/preset` 9、`connectCommandRuntime` 68、`modelCommandRuntime` 35、`catalogShape` 22、`catalogSurface` 40、`picker/model` 46 共 220 项通过；`verify:import-cycles`、`check:config-consumers`、`check:declarations` 通过，TS build 通过（manifest `18ad34012d19`，去重后 `tsc -p tsconfig.build.json` 仍通过）。
 
+端到端只读复核（临时探针，运行后删除）：全新 HOME 下 `/connect login openai --api-key …` 后连接记录为 `gpt-5.3`，`/model list` 包含该模型并标为 active，`/context` 报 `Window: 400,000 tokens (catalog)` 而非「assuming 64000」，裸 `/model` 目录视图出现 `GitHub Copilot`。修复前同样流程得到 `gpt-4.1-mini`、不在列表中、`/context` 只能假设 64000。
+
 未做：没有真实 OpenAI/Copilot 请求，因此不能据此声称模型可用性；`github-copilot` 的可选模型仍取决于账号，目录里刻意保持为空。
